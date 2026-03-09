@@ -118,17 +118,12 @@
       .kpi-row{grid-template-columns:1fr 1fr}.map-container{height:260px}
       body{cursor:auto}.cursor,.cursor-ring{display:none}
       .sub-btn{font-size:.6rem;padding:.4rem .7rem}.status-bar{padding:.5rem 1.5rem}
-      /* Tabla en móvil: oculta barra de % y muestra lo esencial */
-      .results-table{font-size:.68rem}
+      .results-table{font-size:.68rem;table-layout:fixed;width:100%}
       .results-table th:nth-child(1),.results-table td:nth-child(1){display:none} /* # */
-      .bar-wrap{display:none}
-      .pct-val{width:auto;margin-left:0;font-size:.72rem}
-      .results-table td{padding:.55rem .4rem}
-      .results-table th{padding:.4rem .4rem}
-      .cname{font-size:.78rem}
-      /* Curules: siempre visible y con tamaño adecuado */
-      .results-table th:nth-child(5),.results-table td:nth-child(5){display:table-cell!important}
-      .cbadge{min-width:24px;height:22px;font-size:.78rem}
+      .results-table th:nth-child(2),.results-table td:nth-child(2){width:45%}
+      .results-table th:nth-child(3),.results-table td:nth-child(3){width:28%}
+      .results-table th:nth-child(4),.results-table td:nth-child(4){width:0;display:none}
+      .results-table th:nth-child(5),.results-table td:nth-child(5){width:27%;display:table-cell!important}
       /* KPIs: 2 columnas en móvil */
       .kpi-val{font-size:1.4rem}
       /* Acordeón: asegurar que es tappable en iOS */
@@ -600,16 +595,34 @@ function renderTablaPartidos(tid,datos,curules,votval){
   const mx=Math.max(...datos.map(p=>p.v));
   const c=dhondt(datos,curules,votval);
   tbody.innerHTML='';
+  // Índice único por tabla para funciones globales de toggle
+  const tkey=tid.replace('tbody-','');
+  if(!window._candsToggle) window._candsToggle={};
+
   datos.forEach((p,i)=>{
     const pct=((p.v/base)*100).toFixed(2);
     const bw=((p.v/mx)*100).toFixed(1),cr=c[p.p]||0;
     const bajoUmbral=p.v<umb&&!esBlanco(p.p);
     const cands=(p.candidatos||[]).filter(c=>c.vot>0);
     const tieneCands=cands.length>0;
+    const toggleId=`${tkey}_${i}`;
+
+    // función global de toggle (necesaria para onclick en iOS)
+    if(tieneCands){
+      window._candsToggle[toggleId]=function(){
+        const trC=document.getElementById('cands_'+toggleId);
+        const arrow=document.getElementById('arrow_'+toggleId);
+        if(!trC) return;
+        const open=trC.style.display!=='none';
+        trC.style.display=open?'none':'table-row';
+        if(arrow) arrow.style.transform=open?'':'rotate(90deg)';
+      };
+    }
 
     // — fila del partido —
     const tr=document.createElement('tr');
     tr.style.cursor=tieneCands?'pointer':'default';
+    if(tieneCands) tr.setAttribute('onclick',`window._candsToggle['${toggleId}']()`);
     if(i===0)tr.classList.add('winner');
     if(bajoUmbral)tr.style.opacity='0.45';
     tr.innerHTML=`
@@ -617,16 +630,17 @@ function renderTablaPartidos(tid,datos,curules,votval){
       <td><span class="cname" style="display:flex;align-items:center;gap:.5rem">
         <span class="dot10" style="background:${CP[p.p]||'#bbb'}"></span>
         ${p.p}${bajoUmbral?'<span style="font-size:.6rem;color:#aaa;margin-left:.3rem">↓ umbral</span>':''}
-        ${tieneCands?`<span class="expand-arrow" style="margin-left:auto;font-size:.7rem;color:#999;transition:transform .2s">▶</span>`:''}
+        ${tieneCands?`<span id="arrow_${toggleId}" style="margin-left:auto;font-size:.7rem;color:#999;transition:transform .2s;flex-shrink:0">▶</span>`:''}
       </span></td>
       <td class="r">${p.v.toLocaleString('es-CO')}</td>
       <td class="r"><div class="bar-wrap"><div class="bar-fill" style="width:0%;background:${CP[p.p]||'#bbb'}" data-w="${bw}%"></div></div><span class="pct-val">${pct}%</span></td>
-      <td class="r">${cr>0?`<span class="cbadge">${cr}</span>`:esBlanco(p.p)?'<span style="color:#aaa;font-size:.7rem">No aplica</span>':'<span style="color:#ddd">—</span>'}</td>`;
+      <td class="r" style="white-space:nowrap">${cr>0?`<span class="cbadge">${cr}</span>`:esBlanco(p.p)?'<span style="color:#aaa;font-size:.7rem">N/A</span>':'<span style="color:#ddd">—</span>'}</td>`;
     tbody.appendChild(tr);
 
     // — fila desplegable de candidatos —
     if(tieneCands){
       const trC=document.createElement('tr');
+      trC.id='cands_'+toggleId;
       trC.classList.add('cands-row');
       trC.style.display='none';
       const maxVot=Math.max(...cands.map(c=>c.vot));
@@ -664,17 +678,6 @@ function renderTablaPartidos(tid,datos,curules,votval){
         </div>
       </td>`;
       tbody.appendChild(trC);
-
-      tr.addEventListener('click',()=>{
-        const open=trC.style.display!=='none';
-        trC.style.display=open?'none':'table-row';
-        const arrow=tr.querySelector('.expand-arrow');
-        if(arrow)arrow.style.transform=open?'':'rotate(90deg)';
-      });
-      tr.addEventListener('touchend',(e)=>{
-        e.preventDefault();
-        tr.click();
-      });
     }
   });
   setTimeout(()=>tbody.querySelectorAll('.bar-fill').forEach(b=>{if(b.dataset.w)b.style.width=b.dataset.w;}),80);
