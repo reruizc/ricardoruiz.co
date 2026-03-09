@@ -434,19 +434,25 @@ async function cargarDesdeRegistraduria(){
   }
 
   // — CÁMARA —
+  // Mapeo códigos DANE (2 dígitos) → nombre de departamento usado en CURULES_CAM
+  const DANE_DEP={
+    '05':'Antioquia','08':'Atlántico','11':'Bogotá D.C.','13':'Bolívar',
+    '15':'Boyacá','17':'Caldas','18':'Caquetá','19':'Cauca','20':'Cesar',
+    '23':'Córdoba','25':'Cundinamarca','27':'Chocó','41':'Huila',
+    '44':'La Guajira','47':'Magdalena','50':'Meta','52':'Nariño',
+    '54':'Norte de Santander','63':'Quindío','66':'Risaralda','68':'Santander',
+    '70':'Sucre','73':'Tolima','76':'Valle del Cauca','81':'Arauca',
+    '85':'Casanare','86':'Putumayo','88':'San Andrés','91':'Amazonas',
+    '94':'Guainía','95':'Guaviare','97':'Vaupés','99':'Vichada',
+    '00':'Nacional (todos)',
+  };
+
   const dc=await fetchReg(REG.camara);
-  if(dc && dc.camaras && dc.camaras[0]){
-    const cam0=dc.camaras[0];
-    const partidos=cam0.partotabla||[];
-    if(partidos.length){
-      CAMARA=partidos.map(p=>{
-        const a=p.act;
-        const nombre=NOMBRES_PAR[String(a.codpar)]||a.nompar||`Partido ${a.codpar}`;
-        return {p:nombre, v:parseInt(a.vot)||0, codpar:String(a.codpar)};
-      }).sort((a,b)=>b.v-a.v);
-      ok=true;
-    }
-    const totc=cam0.totales&&cam0.totales.act||dc.totales&&dc.totales.act;
+  if(dc && dc.camaras && dc.camaras.length){
+    // Totales nacionales
+    const totc = dc.totales&&dc.totales.act ||
+                 dc.camaras.find(c=>String(c.codcam)==='00')?.totales?.act ||
+                 dc.camaras[0]?.totales?.act;
     if(totc){
       const votant=parseInt(totc.votant)||0;
       const votval=parseInt(totc.votval)||0;
@@ -454,6 +460,43 @@ async function cargarDesdeRegistraduria(){
       const votblan=parseInt(totc.votblan)||0;
       const votnma=parseInt(totc.votnma)||(votant-votval-votnul)||0;
       TOT_CAMARA={votant,votval,votnul,votnma,votblan};
+    }
+
+    // Parsear TODOS los elementos para armar CAMARA nacional y CAMARA_DEP
+    const newDEP={};
+    let nacPartidos=null;
+
+    dc.camaras.forEach(cam=>{
+      const codRaw=String(cam.codcam||'').padStart(2,'0');
+      const nomDane=DANE_DEP[codRaw];
+      const nomRaw=(cam.nomcam||'').trim();
+      const nomDep=nomDane || Object.keys(CURULES_CAM).find(k=>
+        k.toLowerCase()===nomRaw.toLowerCase()) || nomRaw;
+
+      const partidos=cam.partotabla||[];
+      if(!partidos.length) return;
+      const datos=partidos.map(p=>{
+        const a=p.act;
+        return {p:NOMBRES_PAR[String(a.codpar)]||a.nompar||`Partido ${a.codpar}`,
+                v:parseInt(a.vot)||0, codpar:String(a.codpar)};
+      }).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
+
+      if(codRaw==='00'||nomDep==='Nacional (todos)'){ nacPartidos=datos; }
+      else if(nomDep && CURULES_CAM[nomDep]){ newDEP[nomDep]=datos; }
+    });
+
+    if(nacPartidos&&nacPartidos.length){ CAMARA=nacPartidos; ok=true; }
+    else{ // fallback: primer elemento como nacional
+      const fb=(dc.camaras[0].partotabla||[]).map(p=>{
+        const a=p.act;
+        return {p:NOMBRES_PAR[String(a.codpar)]||a.nompar||`Partido ${a.codpar}`,
+                v:parseInt(a.vot)||0, codpar:String(a.codpar)};
+      }).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
+      if(fb.length){ CAMARA=fb; ok=true; }
+    }
+    if(Object.keys(newDEP).length){
+      CAMARA_DEP=newDEP;
+      console.log(`[CÁMARA DEP] Cargados desde API: ${Object.keys(newDEP).join(', ')}`);
     }
   }
 
