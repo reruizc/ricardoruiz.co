@@ -126,9 +126,16 @@
       .results-table td{padding:.55rem .4rem}
       .results-table th{padding:.4rem .4rem}
       .cname{font-size:.78rem}
+      /* Curules: siempre visible y con tamaño adecuado */
+      .results-table th:nth-child(5),.results-table td:nth-child(5){display:table-cell!important}
       .cbadge{min-width:24px;height:22px;font-size:.78rem}
       /* KPIs: 2 columnas en móvil */
       .kpi-val{font-size:1.4rem}
+      /* Acordeón: asegurar que es tappable en iOS */
+      .results-table tr{cursor:pointer;-webkit-tap-highlight-color:rgba(0,71,255,.08)}
+      /* Tabla candidatos en móvil */
+      .cands-table th:nth-child(1),.cands-table td:nth-child(1){display:none}
+      .cands-inner{padding:.5rem .5rem .75rem 1rem}
     }
   </style>
 </head>
@@ -392,34 +399,11 @@ const NOMBRES_PAR = {
 };
 
 async function fetchReg(url){
-  const tag = url.split('/').pop().toUpperCase(); // "SENADO" o "CAMARA"
   try{
-    const r = await fetch(url+'?t='+Date.now(), {cache:'no-store'});
-    if(!r.ok){
-      // Intentar leer el cuerpo de error que devuelve el Worker
-      let detail = '';
-      try{ const j=await r.json(); detail=j.error||j.message||''; }catch{}
-      console.error(`[REG/${tag}] HTTP ${r.status} ${r.statusText}${detail?' — '+detail:''}`);
-      _setStatusError(`Worker HTTP ${r.status} en /${tag.toLowerCase()}${detail?' — '+detail:''}`);
-      return null;
-    }
+    const r=await fetch(url+'?t='+Date.now(),{cache:'no-store'});
+    if(!r.ok) return null;
     return await r.json();
-  }catch(e){
-    console.error(`[REG/${tag}] Error de red:`, e.message);
-    _setStatusError(`Sin conexión al Worker (${tag}): ${e.message}`);
-    return null;
-  }
-}
-
-/** Muestra un mensaje de error temporal en la barra de estado */
-function _setStatusError(msg){
-  const bar = document.getElementById('statusBar');
-  const lbl = document.getElementById('fuenteLbl');
-  if(!bar||!lbl) return;
-  bar.style.cssText = 'display:flex;background:rgba(200,30,30,.07);border-bottom-color:rgba(200,30,30,.2)';
-  lbl.style.color = '#c01';
-  lbl.textContent = msg;
-  bar.style.display = 'flex';
+  }catch(e){return null;}
 }
 
 async function cargarDesdeRegistraduria(){
@@ -686,6 +670,10 @@ function renderTablaPartidos(tid,datos,curules,votval){
         trC.style.display=open?'none':'table-row';
         const arrow=tr.querySelector('.expand-arrow');
         if(arrow)arrow.style.transform=open?'':'rotate(90deg)';
+      });
+      tr.addEventListener('touchend',(e)=>{
+        e.preventDefault();
+        tr.click();
       });
     }
   });
