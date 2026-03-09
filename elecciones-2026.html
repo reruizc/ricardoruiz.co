@@ -352,45 +352,55 @@ const REG = {
 
 // Mapeo codpar → nombre del partido (del nomenclator oficial)
 const NOMBRES_PAR = {
-  '92':'Pacto Histórico Senado',
-  '10':'Partido Centro Democrático',
+  // — Senado —
+  '92':'Pacto Histórico',
+  // — Compartidos Senado/Cámara —
   '2' :'Partido Liberal Colombiano',
-  '57':'Alianza por Colombia',
   '3' :'Partido Conservador Colombiano',
-  '4' :'Partido de la Unión por la Gente - La U',
-  '44':'Coalición Cambio Radical - ALMA',
-  '43':'Ahora Colombia',
-  '17':'Movimiento Salvación Nacional',
-  '55':'Frente Amplio Unitario',
-  '39':'Creemos',
-  '170':'Coalición Fuerza Ciudadana',
-  '40':'La Lista de Oviedo - Con Toda por Colombia',
-  '18':'Partido Político Oxígeno',
-  '34':'Colombia Segura y Próspera',
-  '33':'Patriotas por Colombia',
-  '9' :'Partido de la Unión por la Gente - Partido de la U',
-  '7' :'Verde Oxígeno',
+  '4' :'Partido de la U',
+  '9' :'Partido de la U',
+  '10':'Centro Democrático',
   '12':'Mira',
   '13':'Dignidad y Compromiso',
   '14':'Comunes',
   '15':'Colombia Humana',
   '16':'AICO',
+  '17':'Movimiento Salvación Nacional',
+  '18':'Partido Político Oxígeno',
   '22':'Movimiento Salvación Nacional',
   '25':'Somos Región',
   '26':'Colombia Justa Libres',
   '27':'Creemos Colombia',
   '30':'Ahora Colombia',
+  '33':'Patriotas por Colombia',
+  '34':'Colombia Segura y Próspera',
   '38':'Unión Patriótica',
+  '39':'Creemos',
+  '40':'La Lista de Oviedo',
+  '43':'Ahora Colombia',
+  '44':'Cambio Radical - ALMA',
   '50':'ASI',
   '53':'Independientes',
+  '55':'Frente Amplio Unitario',
+  '57':'Alianza por Colombia',
+  '58':'Colombia Renaciente',
+  '59':'Fuerza de la Paz',
   '60':'Alianza Social Independiente',
   '65':'Fuerza Ciudadana',
   '70':'Nuevo Liberalismo',
   '75':'Avanza Colombia',
   '80':'Gente en Movimiento',
+  '81':'Coalición Colombia Primero',
+  '84':'Firme con Oviedo',
   '85':'Colombia Primero',
+  '86':'Verde Oxígeno',
   '88':'Fuerza de la Paz',
+  '89':'Independientes',
+  '90':'Colombia Renaciente',
+  '91':'Colombia Segura',
+  '93':'Pacto Histórico Cámara',
   '95':'Esperanza, Paz y Libertad',
+  '170':'Coalición Fuerza Ciudadana',
 };
 
 async function fetchReg(url){
@@ -434,8 +444,11 @@ async function cargarDesdeRegistraduria(){
   }
 
   // — CÁMARA —
-  // Mapeo códigos DANE (2 dígitos) → nombre de departamento usado en CURULES_CAM
-  const DANE_DEP={
+  // AMB = código DANE × 100  (ej: Bogotá=11 → 1100, Antioquia=05 → 0500)
+  // URL: https://resultados.registraduria.gov.co/json/ACT/CA/{AMB}.json
+  // El nacional es 00.json (ya viene del proxy REG.camara → /camara → 00.json)
+  const REG_CAM_BASE = 'https://resultados.registraduria.gov.co/json/ACT/CA';
+  const DANE_DEP = {
     '05':'Antioquia','08':'Atlántico','11':'Bogotá D.C.','13':'Bolívar',
     '15':'Boyacá','17':'Caldas','18':'Caquetá','19':'Cauca','20':'Cesar',
     '23':'Córdoba','25':'Cundinamarca','27':'Chocó','41':'Huila',
@@ -444,64 +457,69 @@ async function cargarDesdeRegistraduria(){
     '70':'Sucre','73':'Tolima','76':'Valle del Cauca','81':'Arauca',
     '85':'Casanare','86':'Putumayo','88':'San Andrés','91':'Amazonas',
     '94':'Guainía','95':'Guaviare','97':'Vaupés','99':'Vichada',
-    '00':'Nacional (todos)',
   };
 
-  const dc=await fetchReg(REG.camara);
-  if(dc && dc.camaras && dc.camaras.length){
-    // Totales nacionales
-    const totc = dc.totales&&dc.totales.act ||
-                 dc.camaras.find(c=>String(c.codcam)==='00')?.totales?.act ||
-                 dc.camaras[0]?.totales?.act;
-    if(totc){
-      const votant=parseInt(totc.votant)||0;
-      const votval=parseInt(totc.votval)||0;
-      const votnul=parseInt(totc.votnul)||0;
-      const votblan=parseInt(totc.votblan)||0;
-      const votnma=parseInt(totc.votnma)||(votant-votval-votnul)||0;
-      TOT_CAMARA={votant,votval,votnul,votnma,votblan};
-    }
-
-    // Parsear TODOS los elementos para armar CAMARA nacional y CAMARA_DEP
-    const newDEP={};
-    let nacPartidos=null;
-
-    dc.camaras.forEach(cam=>{
-      const codRaw=String(cam.codcam||'').padStart(2,'0');
-      const nomDane=DANE_DEP[codRaw];
-      const nomRaw=(cam.nomcam||'').trim();
-      const nomDep=nomDane || Object.keys(CURULES_CAM).find(k=>
-        k.toLowerCase()===nomRaw.toLowerCase()) || nomRaw;
-
-      const partidos=cam.partotabla||[];
-      if(!partidos.length) return;
-      // En cámara, nompar del API es la fuente primaria de nombres
-      // NOMBRES_PAR se usa solo si nompar está vacío
-      const parsePar=a=>{
-        const nombre=NOMBRES_PAR[String(a.codpar)]||
-          (a.nompar||'').trim().replace(/^PARTIDO\s+/i,'Partido ').replace(/^MOVIMIENTO\s+/i,'Movimiento ')||
-          `Partido ${a.codpar}`;
-        return {p:nombre, v:parseInt(a.vot)||0, codpar:String(a.codpar)};
-      };
-      const datos=partidos.map(p=>parsePar(p.act)).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
-
-      if(codRaw==='00'||nomDep==='Nacional (todos)'){ nacPartidos=datos; }
-      else if(nomDep && CURULES_CAM[nomDep]){ newDEP[nomDep]=datos; }
+  // Función que extrae solo partidos de cam="1" (territorial) de un JSON departamental
+  const parsePar = a => {
+    const nombre = NOMBRES_PAR[String(a.codpar)] ||
+      (a.nompar||'').trim().replace(/^PARTIDO\s+/i,'Partido ').replace(/^MOVIMIENTO\s+/i,'Movimiento ') ||
+      `Partido ${a.codpar}`;
+    return {p:nombre, v:parseInt(a.vot)||0, codpar:String(a.codpar)};
+  };
+  const parseCamJSON = (json, soloTerritorial=true) => {
+    if(!json||!json.camaras) return [];
+    const camaras = soloTerritorial ? json.camaras.filter(c=>String(c.cam)==='1') : json.camaras;
+    const acum = {};
+    camaras.forEach(cam=>{
+      (cam.partotabla||[]).forEach(p=>{
+        const d = parsePar(p.act);
+        if(d.v<=0) return;
+        if(!acum[d.codpar]) acum[d.codpar]={p:d.p,v:0,codpar:d.codpar};
+        acum[d.codpar].v += d.v;
+      });
     });
+    return Object.values(acum).sort((a,b)=>b.v-a.v);
+  };
 
-    if(nacPartidos&&nacPartidos.length){ CAMARA=nacPartidos; ok=true; }
-    else{ // fallback: primer elemento como nacional
-      const fb=(dc.camaras[0].partotabla||[]).map(p=>{
-        const a=p.act;
-        const nombre=NOMBRES_PAR[String(a.codpar)]||(a.nompar||'').trim()||`Partido ${a.codpar}`;
-        return {p:nombre, v:parseInt(a.vot)||0, codpar:String(a.codpar)};
-      }).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
-      if(fb.length){ CAMARA=fb; ok=true; }
+  // 1. Cargar el nacional desde el proxy existente (sin tocar Senado)
+  const dc = await fetchReg(REG.camara);
+  if(dc && dc.camaras && dc.camaras.length){
+    const totc = (dc.totales&&dc.totales.act) ||
+                 (dc.camaras[0]&&dc.camaras[0].totales&&dc.camaras[0].totales.act);
+    if(totc){
+      const votant  = parseInt(totc.votant)||0;
+      const votval  = parseInt(totc.votval)||0;
+      const votnul  = parseInt(totc.votnul)||0;
+      const votblan = parseInt(totc.votblan||totc.votbla)||0;
+      const votnma  = parseInt(totc.votnma)||(votant-votval-votnul)||0;
+      TOT_CAMARA = {votant,votval,votnul,votnma,votblan};
     }
-    if(Object.keys(newDEP).length){
-      CAMARA_DEP=newDEP;
-      console.log(`[CÁMARA DEP] Cargados desde API: ${Object.keys(newDEP).join(', ')}`);
-    }
+    const nacPartidos = parseCamJSON(dc);
+    if(nacPartidos.length){ CAMARA=nacPartidos; ok=true;
+      console.log(`[CÁMARA NAC] ${nacPartidos.length} partidos`); }
+  }
+
+  // 2. Cargar departamentos en paralelo directo a la Registraduría
+  //    (CORS está abierto en resultados.registraduria.gov.co)
+  const depEntries = Object.entries(DANE_DEP);
+  const depResults = await Promise.allSettled(
+    depEntries.map(([dane, nomDep]) => {
+      const amb = String(parseInt(dane)*100).padStart(4,'0');
+      return fetch(`${REG_CAM_BASE}/${amb}.json?t=${Date.now()}`,{cache:'no-store'})
+        .then(r=>r.ok?r.json():null)
+        .then(json=>({nomDep, json}));
+    })
+  );
+  const newDEP = {};
+  depResults.forEach(res=>{
+    if(res.status!=='fulfilled'||!res.value||!res.value.json) return;
+    const {nomDep, json} = res.value;
+    const partidos = parseCamJSON(json);
+    if(partidos.length){ newDEP[nomDep]=partidos; }
+  });
+  if(Object.keys(newDEP).length){
+    CAMARA_DEP = newDEP;
+    console.log(`[CÁMARA DEP] ${Object.keys(newDEP).length} departamentos: ${Object.keys(newDEP).join(', ')}`);
   }
 
   return ok;
