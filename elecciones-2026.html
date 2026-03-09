@@ -346,8 +346,10 @@ function votosDepCam(dep){
 // REGISTRADURÍA — conexión directa al API oficial
 // ═══════════════════════════════════════════════════════════
 const REG = {
-  senado: 'https://registraduria-proxy.reruizc.workers.dev/senado',
-  camara: 'https://registraduria-proxy.reruizc.workers.dev/camara',
+  senado:    'https://registraduria-proxy.reruizc.workers.dev/senado',
+  camara:    'https://registraduria-proxy.reruizc.workers.dev/camara',
+  camaraDep: 'https://registraduria-proxy.reruizc.workers.dev/camara',
+  consultas: 'https://registraduria-proxy.reruizc.workers.dev/consultas',
 };
 
 // Mapeo codpar → nombre del partido (del nomenclator oficial)
@@ -499,13 +501,11 @@ async function cargarDesdeRegistraduria(){
       console.log(`[CÁMARA NAC] ${nacPartidos.length} partidos`); }
   }
 
-  // 2. Cargar departamentos en paralelo directo a la Registraduría
-  //    (CORS está abierto en resultados.registraduria.gov.co)
+  // 2. Cargar departamentos en paralelo vía proxy (resuelve CORS)
   const depEntries = Object.entries(DANE_DEP);
   const depResults = await Promise.allSettled(
     depEntries.map(([dane, nomDep]) => {
-      const amb = String(parseInt(dane)*100).padStart(4,'0');
-      return fetch(`${REG_CAM_BASE}/${amb}.json?t=${Date.now()}`,{cache:'no-store'})
+      return fetch(`${REG.camaraDep}/${dane}?t=${Date.now()}`,{cache:'no-store'})
         .then(r=>r.ok?r.json():null)
         .then(json=>({nomDep, json}));
     })
@@ -520,6 +520,45 @@ async function cargarDesdeRegistraduria(){
   if(Object.keys(newDEP).length){
     CAMARA_DEP = newDEP;
     console.log(`[CÁMARA DEP] ${Object.keys(newDEP).length} departamentos: ${Object.keys(newDEP).join(', ')}`);
+  }
+
+  // — CONSULTAS —
+  // codpar 30 → Frente por la Vida · 31 → Gran Consulta · 32 → Consulta de Soluciones
+  const CODPAR_CONSULTA = {'30':'frente','31':'gran','32':'soluciones'};
+  const dc2 = await fetchReg(REG.consultas);
+  if(dc2 && dc2.camaras && dc2.camaras.length){
+    const totCN = (dc2.totales&&dc2.totales.act)||(dc2.camaras[0]&&dc2.camaras[0].totales&&dc2.camaras[0].totales.act);
+    const bloque = dc2.camaras[0];
+    (bloque.partotabla||[]).forEach(p=>{
+      const a=p.act;
+      const clave=CODPAR_CONSULTA[String(a.codpar)];
+      if(!clave) return;
+      const con=CONSULTAS[clave];
+      if(!con) return;
+      const cands=(a.cantotabla||[])
+        .filter(c=>parseInt(c.vot)>0)
+        .map(c=>({
+          n:`${c.nomcan} ${c.apecan}`.trim().split(' ')
+            .map(w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' '),
+          p:con.nombre,
+          v:parseInt(c.vot)||0,
+        }))
+        .sort((a,b)=>b.v-a.v);
+      if(cands.length){
+        con.candidatos=cands;
+        con.vv=parseInt(a.vot)||0;
+        ok=true;
+      }
+    });
+    if(totCN){
+      const votant=parseInt(totCN.votant)||0;
+      const votnul=parseInt(totCN.votnul)||0;
+      Object.values(CONSULTAS).forEach(con=>{
+        if(!con.vv) return;
+        con.vn=Math.round(votnul*con.vv/(votant||1));
+      });
+    }
+    console.log('[CONSULTAS] Cargadas desde API');
   }
 
   return ok;
