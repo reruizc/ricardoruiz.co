@@ -339,7 +339,7 @@ function recalcDeps(){
 }
 function votosDepCam(dep){
   if(CAMARA_DEP[dep]) return CAMARA_DEP[dep];
-  return CAMARA; // usa los datos reales de Sheets para cualquier departamento
+  return null; // sin datos departamentales — renderCamara mostrará aviso
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -475,11 +475,15 @@ async function cargarDesdeRegistraduria(){
 
       const partidos=cam.partotabla||[];
       if(!partidos.length) return;
-      const datos=partidos.map(p=>{
-        const a=p.act;
-        return {p:NOMBRES_PAR[String(a.codpar)]||a.nompar||`Partido ${a.codpar}`,
-                v:parseInt(a.vot)||0, codpar:String(a.codpar)};
-      }).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
+      // En cámara, nompar del API es la fuente primaria de nombres
+      // NOMBRES_PAR se usa solo si nompar está vacío
+      const parsePar=a=>{
+        const nombre=NOMBRES_PAR[String(a.codpar)]||
+          (a.nompar||'').trim().replace(/^PARTIDO\s+/i,'Partido ').replace(/^MOVIMIENTO\s+/i,'Movimiento ')||
+          `Partido ${a.codpar}`;
+        return {p:nombre, v:parseInt(a.vot)||0, codpar:String(a.codpar)};
+      };
+      const datos=partidos.map(p=>parsePar(p.act)).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
 
       if(codRaw==='00'||nomDep==='Nacional (todos)'){ nacPartidos=datos; }
       else if(nomDep && CURULES_CAM[nomDep]){ newDEP[nomDep]=datos; }
@@ -489,8 +493,8 @@ async function cargarDesdeRegistraduria(){
     else{ // fallback: primer elemento como nacional
       const fb=(dc.camaras[0].partotabla||[]).map(p=>{
         const a=p.act;
-        return {p:NOMBRES_PAR[String(a.codpar)]||a.nompar||`Partido ${a.codpar}`,
-                v:parseInt(a.vot)||0, codpar:String(a.codpar)};
+        const nombre=NOMBRES_PAR[String(a.codpar)]||(a.nompar||'').trim()||`Partido ${a.codpar}`;
+        return {p:nombre, v:parseInt(a.vot)||0, codpar:String(a.codpar)};
       }).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
       if(fb.length){ CAMARA=fb; ok=true; }
     }
@@ -797,7 +801,19 @@ function renderSenado(){
   setTimeout(()=>renderMap('map-senado',DEP_SENADO,CP),80);
 }
 function renderCamara(dep){
-  const esNac=dep==='Nacional (todos)',datos=esNac?CAMARA:votosDepCam(dep),curules=esNac?188:(CURULES_CAM[dep]||2);
+  const esNac=dep==='Nacional (todos)';
+  const datosDep=esNac?CAMARA:votosDepCam(dep);
+  // Si no hay datos departamentales aún, mostrar aviso y salir
+  if(!esNac && !datosDep){
+    document.getElementById('tbody-camara').innerHTML=
+      `<tr><td colspan="5" style="padding:2rem;font-family:'DM Mono',monospace;font-size:.72rem;color:#aaa;text-align:center">
+        Datos por departamento no disponibles aún en la API · Selecciona <b>Nacional (todos)</b> o espera la próxima recarga
+      </td></tr>`;
+    document.getElementById('kpi-camara').innerHTML='';
+    return;
+  }
+  const datos=datosDep;
+  const curules=esNac?188:(CURULES_CAM[dep]||2);
   const totales=esNac?TOT_CAMARA:{};
   const cur=dhondt(datos,curules,totales.votval);
   const maxC=Math.max(...Object.values(cur).filter((_,i)=>Object.keys(cur)[i]!=='__cifra__'&&Object.keys(cur)[i]!=='__umb__'));
