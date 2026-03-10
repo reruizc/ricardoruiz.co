@@ -132,6 +132,12 @@
       .cands-table th:nth-child(1),.cands-table td:nth-child(1){display:none}
       .cands-inner{padding:.5rem .5rem .75rem 1rem}
     }
+
+    th.sortable:hover { color: #0047FF; }
+    th.sort-desc .sort-icon::after { content: ' ↓'; }
+    th.sort-asc .sort-icon::after { content: ' ↑'; }
+    th.sort-desc .sort-icon, th.sort-asc .sort-icon { color: #0047FF; font-size:.8em; }
+    th.sort-desc, th.sort-asc { color: #0047FF; }
   </style>
 </head>
 <body>
@@ -221,7 +227,7 @@
     <div class="kpi-row" id="kpi-camara"></div>
     <div class="results-grid">
       <div class="card"><div class="card-label" id="lbl-cam-tabla">Partidos · Cámara · D'Hondt</div>
-        <table class="results-table"><thead><tr><th>#</th><th>Partido / Coalición</th><th class="r">Votos</th><th class="r" style="min-width:130px">%</th><th class="r">Curules</th></tr></thead><tbody id="tbody-camara"></tbody></table>
+        <table class="results-table" id="table-camara"><thead><tr><th>#</th><th>Partido / Coalición</th><th class="r sortable" data-col="v" style="cursor:pointer;user-select:none">VOTOS <span class="sort-icon">↕</span></th><th class="r sortable" data-col="pct" style="cursor:pointer;user-select:none">% <span class="sort-icon">↕</span></th><th class="r sortable" data-col="cur" style="cursor:pointer;user-select:none">CURULES <span class="sort-icon">↕</span></th></tr></thead><tbody id="tbody-camara"></tbody></table>
       </div>
       <div class="card"><div class="card-label">Participación electoral</div>
         <div class="donut-wrap"><div class="donut-cw"><canvas id="donut-camara"></canvas>
@@ -494,6 +500,7 @@ async function cargarDesdeRegistraduria(){
       `Partido ${a.codpar}`;
     return {p:nombre, v:parseInt(a.vot)||0, codpar:String(a.codpar)};
   };
+  // parseCamJSON: acumula por codpar SIN fusionar — fusión solo aplica en Nacional
   const parseCamJSON = (json, soloTerritorial=true) => {
     if(!json||!json.camaras) return [];
     const camaras = soloTerritorial ? json.camaras.filter(c=>String(c.cam)==='1') : json.camaras;
@@ -506,8 +513,7 @@ async function cargarDesdeRegistraduria(){
         acum[d.codpar].v += d.v;
       });
     });
-    // Fusionar partidos con nombre canónico idéntico (ej: múltiples Pacto Histórico)
-    return fusionarPartidos(Object.values(acum));
+    return Object.values(acum).sort((a,b)=>b.v-a.v);
   };
 
   // 1. Cargar el nacional desde el proxy existente (sin tocar Senado)
@@ -523,9 +529,9 @@ async function cargarDesdeRegistraduria(){
       const votnma  = parseInt(totc.votnma)||(votant-votval-votnul)||0;
       TOT_CAMARA = {votant,votval,votnul,votnma,votblan};
     }
-    const nacPartidos = parseCamJSON(dc);
+    const nacPartidos = fusionarPartidos(parseCamJSON(dc));
     if(nacPartidos.length){ CAMARA=nacPartidos; ok=true;
-      console.log(`[CÁMARA NAC] ${nacPartidos.length} partidos`); }
+      console.log(`[CÁMARA NAC] ${nacPartidos.length} partidos (fusionados)`); }
   }
 
   // 2. Cargar departamentos en paralelo vía proxy (resuelve CORS)
@@ -733,22 +739,43 @@ function renderTablaConsulta(d){
   setTimeout(()=>tbody.querySelectorAll('.bar-fill').forEach(b=>b.style.width=b.dataset.w),80);
 }
 
-function renderTablaPartidos(tid,datos,curules,votval,curPrecalc){
+// sortState por tabla
+if(!window._sortState) window._sortState={};
+function renderTablaPartidos(tid,datos,curules,votval,curPrecalc,opciones={}){
+  const {ocultarUmbral=false,sortable=false}=opciones;
   const tbody=document.getElementById(tid);
   const totalArr=datos.reduce((s,p)=>s+p.v,0);
   const base=votval||totalArr;
   const umb=base*0.03;
-  const mx=Math.max(...datos.map(p=>p.v));
   const c=curPrecalc||dhondt(datos,curules,votval);
+  // Aplicar ordenamiento si sortable
+  const ss=window._sortState[tid]||{col:'v',dir:-1};
+  let datosOrdenados=[...datos];
+  if(sortable){
+    datosOrdenados.sort((a,b)=>{
+      if(ss.col==='v'||ss.col==='pct') return ss.dir*(b.v-a.v);
+      if(ss.col==='cur') return ss.dir*((c[b.p]||0)-(c[a.p]||0));
+      return 0;
+    });
+    // actualizar indicadores en thead
+    const thead=tbody.closest('table')?.querySelector('thead tr');
+    if(thead){
+      thead.querySelectorAll('th.sortable').forEach(th=>{
+        th.classList.remove('sort-asc','sort-desc');
+        if(th.dataset.col===ss.col) th.classList.add(ss.dir===-1?'sort-desc':'sort-asc');
+      });
+    }
+  }
+  const mx=Math.max(...datosOrdenados.map(p=>p.v));
   tbody.innerHTML='';
   // Índice único por tabla para funciones globales de toggle
   const tkey=tid.replace('tbody-','');
   if(!window._candsToggle) window._candsToggle={};
 
-  datos.forEach((p,i)=>{
+  datosOrdenados.forEach((p,i)=>{
     const pct=((p.v/base)*100).toFixed(2);
     const bw=((p.v/mx)*100).toFixed(1),cr=c[p.p]||0;
-    const bajoUmbral=p.v<umb&&!esBlanco(p.p);
+    const bajoUmbral=!ocultarUmbral&&p.v<umb&&!esBlanco(p.p);
     const cands=(p.candidatos||[]).filter(c=>c.vot>0);
     const tieneCands=cands.length>0;
     const toggleId=`${tkey}_${i}`;
@@ -949,7 +976,7 @@ function renderCamara(dep){
     {l:'Curules en juego',v:String(curules),c:'dark',d:esNac?'Total Cámara':`Circunscripción ${dep}`},
     {l:'Partido puntero',v:top?top[0].split(' ')[0]:'—',c:'sm',d:top?`${top[1]} curul${top[1]===1?'':'es'} est.`:''},
   ]);
-  renderTablaPartidos('tbody-camara',datos,curules,totales.votval,cur);
+  renderTablaPartidos('tbody-camara',datos,curules,totales.votval,cur,{ocultarUmbral:esNac,sortable:esNac});
   renderDonut('donut-camara','pct-camara','leg-camara',{...totales,potencial:potencialCam,cifra:cur.__cifra__,umb:cur.__umb__});
   renderMapLegend('mlb-camara',DEP_CAM,CP);
   setTimeout(()=>renderMap('map-camara',DEP_CAM,CP),80);
@@ -966,6 +993,16 @@ document.head.appendChild(stt);
 // Dropdown cámara
 const sel=document.getElementById('dep-select');
 Object.keys(CURULES_CAM).forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d+(d!=='Nacional (todos)'&&d!=='Circunscripción exterior'?` (${CURULES_CAM[d]} cur.)`:'');if(d==='Nacional (todos)')o.selected=true;sel.appendChild(o);});
+// Click en headers sortables de cámara
+document.querySelectorAll('#table-camara thead th.sortable').forEach(th=>{
+  th.addEventListener('click',()=>{
+    const tid='tbody-camara';
+    const col=th.dataset.col;
+    const ss=window._sortState[tid]||{col:'v',dir:-1};
+    window._sortState[tid]={col, dir: ss.col===col ? ss.dir*-1 : -1};
+    renderCamara(curDep);
+  });
+});
 
 // Cursor
 const cur2=document.getElementById('cursor'),ri=document.getElementById('cursorRing');
