@@ -353,23 +353,36 @@ const REG = {
   consultas: 'https://registraduria-proxy.reruizc.workers.dev/consultas',
 };
 
-// Mapeo codpar → nombre del partido (del nomenclator oficial)
+// Mapeo codpar → nombre canónico
+// Partidos con mismo nombre canónico se fusionan automáticamente tras el parseo
 const NOMBRES_PAR = {
   // — Senado —
   '92':'Pacto Histórico',
-  // — Compartidos Senado/Cámara —
-  '5' :'Alianza Verde',
+  // — Cámara: Pacto Histórico (múltiples registros departamentales) —
+  '93':'Pacto Histórico',  // Bogotá
+  '84':'Pacto Histórico',  // Antioquia
+  '91':'Pacto Histórico',  // Mov. Político Pacto Histórico
+  '90':'Pacto Histórico',  // Atlántico
+  '89':'Pacto Histórico',  // Córdoba
+  '81':'Pacto Histórico',  // Bolívar
+  '35':'Pacto Histórico',  // Pacto por Risaralda
+  '16':'Pacto Histórico',  // Pacto Verde por el Tolima
+  '149':'Pacto Histórico', // Norte de Santander / Quindío
+  // — Partidos con nombre exacto —
+  '2' :'Partido Liberal Colombiano',
   '3' :'Partido Conservador Colombiano',
-  '4' :'Partido de la U',
+  '4' :'Cambio Radical',
+  '5' :'Alianza Verde',
+  '6' :'ALMA Atlántico',
   '9' :'Partido de la U',
   '10':'Centro Democrático',
-  '12':'Mira',
+  '12':'MIRA',
   '13':'Dignidad y Compromiso',
   '14':'Comunes',
   '15':'Colombia Humana',
-  '16':'AICO',
   '17':'Movimiento Salvación Nacional',
   '18':'Partido Político Oxígeno',
+  '21':'Movimiento Salvación Nacional',
   '22':'Movimiento Salvación Nacional',
   '25':'Somos Región',
   '26':'Colombia Justa Libres',
@@ -383,28 +396,37 @@ const NOMBRES_PAR = {
   '43':'Ahora Colombia',
   '44':'Cambio Radical - ALMA',
   '50':'ASI',
+  '51':'MIRA + Dignidad y Compromiso',  // coalición específica — NO fusionar con MIRA solo
   '53':'Independientes',
   '55':'Frente Amplio Unitario',
   '57':'Alianza por Colombia',
-  '58':'Colombia Renaciente',
-  '59':'Fuerza de la Paz',
+  '58':'Centro Democrático - MIRA',     // coalición específica — NO fusionar con CD solo
+  '59':'Primero Córdoba',
   '60':'Alianza Social Independiente',
   '65':'Fuerza Ciudadana',
   '70':'Nuevo Liberalismo',
   '75':'Avanza Colombia',
+  '76':'Nuestra Fuerza',
   '80':'Gente en Movimiento',
-  '81':'Coalición Colombia Primero',
-  '84':'Firme con Oviedo',
   '85':'Colombia Primero',
   '86':'Verde Oxígeno',
   '88':'Fuerza de la Paz',
-  '89':'Independientes',
-  '90':'Colombia Renaciente',
-  '91':'Colombia Segura',
-  '93':'Pacto Histórico Cámara',
-  '95':'Esperanza, Paz y Libertad',
+  '95':'Ciudadanos Renovemos',
+  '114':'ABC Alianza Bogotá Convergente',
+  '123':'Bogotá Entre Todos',
   '170':'Coalición Fuerza Ciudadana',
 };
+
+// Fusión de partidos con mismo nombre canónico
+// Después del parseo, suma votos de partidos con nombre idéntico
+function fusionarPartidos(datos){
+  const mapa = {};
+  datos.forEach(p=>{
+    if(!mapa[p.p]) mapa[p.p] = {p:p.p, v:0, codpar:p.codpar};
+    mapa[p.p].v += p.v;
+  });
+  return Object.values(mapa).sort((a,b)=>b.v-a.v);
+}
 
 async function fetchReg(url){
   try{
@@ -484,7 +506,8 @@ async function cargarDesdeRegistraduria(){
         acum[d.codpar].v += d.v;
       });
     });
-    return Object.values(acum).sort((a,b)=>b.v-a.v);
+    // Fusionar partidos con nombre canónico idéntico (ej: múltiples Pacto Histórico)
+    return fusionarPartidos(Object.values(acum));
   };
 
   // 1. Cargar el nacional desde el proxy existente (sin tocar Senado)
@@ -521,15 +544,18 @@ async function cargarDesdeRegistraduria(){
     const {nomDep, json} = res.value;
     const partidos = parseCamJSON(json);
     if(partidos.length){ newDEP[nomDep]=partidos; }
+    // centota está en json.totales.act (nivel raíz), no en camTerr
+    const totRaiz = json.totales&&json.totales.act;
     const camTerr = (json.camaras||[]).find(c=>String(c.cam)==='1');
     const t = camTerr&&camTerr.totales&&camTerr.totales.act;
     if(t){
-      const votant  = parseInt(t.votant)||0;
-      const votval  = parseInt(t.votval)||0;
-      const votnul  = parseInt(t.votnul)||0;
-      const votblan = parseInt(t.votblan||t.votbla)||0;
-      const votnma  = parseInt(t.votnma)||(votant-votval-votnul)||0;
-      TOT_DEP_CAM_local[nomDep] = {votant,votval,votnul,votnma,votblan};
+      const votant   = parseInt(t.votant)||0;
+      const votval   = parseInt(t.votval)||0;
+      const votnul   = parseInt(t.votnul)||0;
+      const votblan  = parseInt(t.votblan||t.votbla)||0;
+      const votnma   = parseInt(t.votnma)||(votant-votval-votnul)||0;
+      const potencial= parseInt(totRaiz&&totRaiz.centota)||POTENCIAL;
+      TOT_DEP_CAM_local[nomDep] = {votant,votval,votnul,votnma,votblan,potencial};
     }
   });
   if(Object.keys(newDEP).length){
@@ -917,13 +943,14 @@ function renderCamara(dep){
   document.getElementById('lbl-cam-tabla').textContent=`Partidos · Cámara${esNac?` · Nacional · ${curules} curules`:` · ${dep} · ${curules} curul${curules===1?'':'es'}`} · D'Hondt`;
   document.getElementById('lbl-cam-mapa').textContent=`Partido más votado · Cámara${esNac?'':' · '+dep}`;
   renderKPI('kpi-camara',[
-    {l:'Votantes',v:votant.toLocaleString('es-CO'),d:`${((votant/POTENCIAL)*100).toFixed(2)}% del potencial`},
+    {l:'Votantes',v:votant.toLocaleString('es-CO'),d:`${((votant/potencialCam)*100).toFixed(2)}% del potencial`},
     {l:'Votos válidos',v:(totales.votval||0).toLocaleString('es-CO'),c:'green',d:totales.votval?`${((totales.votval/votant)*100).toFixed(2)}% de votantes`:'—'},
     {l:'Curules en juego',v:String(curules),c:'dark',d:esNac?'Total Cámara':`Circunscripción ${dep}`},
     {l:'Partido puntero',v:top?top[0].split(' ')[0]:'—',c:'sm',d:top?`${top[1]} curul${top[1]===1?'':'es'} est.`:''},
   ]);
   renderTablaPartidos('tbody-camara',datos,curules,totales.votval,cur);
-  renderDonut('donut-camara','pct-camara','leg-camara',{...totales,potencial:POTENCIAL,cifra:cur.__cifra__,umb:cur.__umb__});
+  const potencialCam = esNac ? POTENCIAL : (totales.potencial||POTENCIAL);
+  renderDonut('donut-camara','pct-camara','leg-camara',{...totales,potencial:potencialCam,cifra:cur.__cifra__,umb:cur.__umb__});
   renderMapLegend('mlb-camara',DEP_CAM,CP);
   setTimeout(()=>renderMap('map-camara',DEP_CAM,CP),80);
 }
