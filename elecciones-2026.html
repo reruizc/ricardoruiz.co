@@ -282,8 +282,9 @@ let CAMARA = [
 let CAMARA_DEP = {};  // { 'Antioquia': [{p,v},...], ... }  — opcional
 let MESAS_REP  = 14200;
 // Totales reales desde Registraduría (se actualizan con el API)
-let TOT_SENADO = { votval:0, votnul:0, votnma:0, votblan:0, votant:0 };
-let TOT_CAMARA = { votval:0, votnul:0, votnma:0, votblan:0, votant:0 };
+let TOT_SENADO  = { votval:0, votnul:0, votnma:0, votblan:0, votant:0 };
+let TOT_CAMARA  = { votval:0, votnul:0, votnma:0, votblan:0, votant:0 };
+let TOT_DEP_CAM = {}; // { 'Bogotá D.C.': {votval,votnul,...}, ... }
 
 const CONSULTAS = {
   gran:{nombre:'La Gran Consulta por Colombia',orientacion:'Centroderecha',
@@ -357,7 +358,7 @@ const NOMBRES_PAR = {
   // — Senado —
   '92':'Pacto Histórico',
   // — Compartidos Senado/Cámara —
-  '2' :'Partido Liberal Colombiano',
+  '5' :'Alianza Verde',
   '3' :'Partido Conservador Colombiano',
   '4' :'Partido de la U',
   '9' :'Partido de la U',
@@ -514,14 +515,26 @@ async function cargarDesdeRegistraduria(){
     })
   );
   const newDEP = {};
+  let TOT_DEP_CAM_local = {};
   depResults.forEach(res=>{
     if(res.status!=='fulfilled'||!res.value||!res.value.json) return;
     const {nomDep, json} = res.value;
     const partidos = parseCamJSON(json);
     if(partidos.length){ newDEP[nomDep]=partidos; }
+    const camTerr = (json.camaras||[]).find(c=>String(c.cam)==='1');
+    const t = camTerr&&camTerr.totales&&camTerr.totales.act;
+    if(t){
+      const votant  = parseInt(t.votant)||0;
+      const votval  = parseInt(t.votval)||0;
+      const votnul  = parseInt(t.votnul)||0;
+      const votblan = parseInt(t.votblan||t.votbla)||0;
+      const votnma  = parseInt(t.votnma)||(votant-votval-votnul)||0;
+      TOT_DEP_CAM_local[nomDep] = {votant,votval,votnul,votnma,votblan};
+    }
   });
   if(Object.keys(newDEP).length){
-    CAMARA_DEP = newDEP;
+    CAMARA_DEP  = newDEP;
+    TOT_DEP_CAM = TOT_DEP_CAM_local;
     console.log(`[CÁMARA DEP] ${Object.keys(newDEP).length} departamentos: ${Object.keys(newDEP).join(', ')}`);
   }
 
@@ -874,7 +887,7 @@ function renderCamara(dep){
   }
   const datos=datosDep;
   const curules=esNac?188:(CURULES_CAM[dep]||2);
-  const totales=esNac?TOT_CAMARA:{};
+  const totales=esNac?TOT_CAMARA:(TOT_DEP_CAM[dep]||{});
   const cur=dhondt(datos,curules,totales.votval);
   const maxC=Math.max(...Object.values(cur).filter((_,i)=>Object.keys(cur)[i]!=='__cifra__'&&Object.keys(cur)[i]!=='__umb__'));
   const top=Object.entries(cur).filter(([k])=>k!=='__cifra__'&&k!=='__umb__').find(([,v])=>v===maxC);
@@ -903,7 +916,7 @@ document.head.appendChild(stt);
 
 // Dropdown cámara
 const sel=document.getElementById('dep-select');
-Object.keys(CURULES_CAM).forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d+(d!=='Nacional (todos)'&&d!=='Circunscripción exterior'?` (${CURULES_CAM[d]} cur.)`:'');if(d==='Bogotá D.C.')o.selected=true;sel.appendChild(o);});
+Object.keys(CURULES_CAM).forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d+(d!=='Nacional (todos)'&&d!=='Circunscripción exterior'?` (${CURULES_CAM[d]} cur.)`:'');if(d==='Nacional (todos)')o.selected=true;sel.appendChild(o);});
 
 // Cursor
 const cur2=document.getElementById('cursor'),ri=document.getElementById('cursorRing');
