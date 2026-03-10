@@ -707,13 +707,13 @@ function renderTablaConsulta(d){
   setTimeout(()=>tbody.querySelectorAll('.bar-fill').forEach(b=>b.style.width=b.dataset.w),80);
 }
 
-function renderTablaPartidos(tid,datos,curules,votval){
+function renderTablaPartidos(tid,datos,curules,votval,curPrecalc){
   const tbody=document.getElementById(tid);
   const totalArr=datos.reduce((s,p)=>s+p.v,0);
   const base=votval||totalArr;
   const umb=base*0.03;
   const mx=Math.max(...datos.map(p=>p.v));
-  const c=dhondt(datos,curules,votval);
+  const c=curPrecalc||dhondt(datos,curules,votval);
   tbody.innerHTML='';
   // Índice único por tabla para funciones globales de toggle
   const tkey=tid.replace('tbody-','');
@@ -876,7 +876,6 @@ function renderSenado(){
 function renderCamara(dep){
   const esNac=dep==='Nacional (todos)';
   const datosDep=esNac?CAMARA:votosDepCam(dep);
-  // Si no hay datos departamentales aún, mostrar aviso y salir
   if(!esNac && !datosDep){
     document.getElementById('tbody-camara').innerHTML=
       `<tr><td colspan="5" style="padding:2rem;font-family:'DM Mono',monospace;font-size:.72rem;color:#aaa;text-align:center">
@@ -888,9 +887,32 @@ function renderCamara(dep){
   const datos=datosDep;
   const curules=esNac?188:(CURULES_CAM[dep]||2);
   const totales=esNac?TOT_CAMARA:(TOT_DEP_CAM[dep]||{});
-  const cur=dhondt(datos,curules,totales.votval);
-  const maxC=Math.max(...Object.values(cur).filter((_,i)=>Object.keys(cur)[i]!=='__cifra__'&&Object.keys(cur)[i]!=='__umb__'));
-  const top=Object.entries(cur).filter(([k])=>k!=='__cifra__'&&k!=='__umb__').find(([,v])=>v===maxC);
+
+  // Para Nacional: en lugar de D'Hondt sobre votos nacionales,
+  // sumamos las curules reales que ganó cada partido en cada departamento
+  let cur;
+  if(esNac && Object.keys(CAMARA_DEP).length){
+    cur={};
+    let cifraMax=0, umbMax=0;
+    Object.entries(CAMARA_DEP).forEach(([nomDep, partsDep])=>{
+      const cDep=CURULES_CAM[nomDep]||2;
+      const totDep=TOT_DEP_CAM[nomDep]||{};
+      const resDep=dhondt(partsDep, cDep, totDep.votval);
+      Object.entries(resDep).forEach(([p,n])=>{
+        if(p==='__cifra__'){cifraMax=Math.max(cifraMax,n);return;}
+        if(p==='__umb__'){umbMax=Math.max(umbMax,n);return;}
+        cur[p]=(cur[p]||0)+n;
+      });
+    });
+    cur.__cifra__=cifraMax;
+    cur.__umb__=umbMax;
+  } else {
+    cur=dhondt(datos,curules,totales.votval);
+  }
+
+  const vals=Object.entries(cur).filter(([k])=>k!=='__cifra__'&&k!=='__umb__');
+  const maxC=Math.max(...vals.map(([,v])=>v));
+  const top=vals.find(([,v])=>v===maxC);
   const votant=totales.votant||datos.reduce((s,p)=>s+p.v,0);
   document.getElementById('lbl-cam-tabla').textContent=`Partidos · Cámara${esNac?` · Nacional · ${curules} curules`:` · ${dep} · ${curules} curul${curules===1?'':'es'}`} · D'Hondt`;
   document.getElementById('lbl-cam-mapa').textContent=`Partido más votado · Cámara${esNac?'':' · '+dep}`;
@@ -900,7 +922,7 @@ function renderCamara(dep){
     {l:'Curules en juego',v:String(curules),c:'dark',d:esNac?'Total Cámara':`Circunscripción ${dep}`},
     {l:'Partido puntero',v:top?top[0].split(' ')[0]:'—',c:'sm',d:top?`${top[1]} curul${top[1]===1?'':'es'} est.`:''},
   ]);
-  renderTablaPartidos('tbody-camara',datos,curules,totales.votval);
+  renderTablaPartidos('tbody-camara',datos,curules,totales.votval,cur);
   renderDonut('donut-camara','pct-camara','leg-camara',{...totales,potencial:POTENCIAL,cifra:cur.__cifra__,umb:cur.__umb__});
   renderMapLegend('mlb-camara',DEP_CAM,CP);
   setTimeout(()=>renderMap('map-camara',DEP_CAM,CP),80);
