@@ -488,7 +488,7 @@ const NOMBRES_PAR = {
   '78':'CR-LAU-MSN-OXI',        // Antioquia (coalición regional)
   '79':'CR-CJL-Liga de Gobernantes',
   '80':'Coalición Liberal - Colombia Renaciente',
-  '82':'Alianza Verde',
+  '82':'Ahora Colombia Caldas',
   '83':'Colombia Justa Libres',
   '88':'Fuerza de la Paz',
   '94':'Creemos',
@@ -500,13 +500,13 @@ const NOMBRES_PAR = {
   '101':'Pacto Histórico Chocó',
   '103':'Fuerza Ciudadana',
   '105':'Colombia Justa Libres',
-  '106':'Alianza Verde',
+  '106':'Centro Democrático - Partido de la U',
   '107':'Fuerza Ciudadana',
-  '108':'Colombia Justa Libres',
+  '108':'ALMA - Cambio Radical',
   '109':'Fuerza Ciudadana',
   '110':'Alianza Verde',
   '111':'Esperanza Chocó',
-  '112':'Alianza Verde',
+  '112':'Pacto Histórico Alianza Verde',
   '114':'ABC Alianza Bogotá Convergente',
   '116':'Colombia Justa Libres',
   '117':'Fuerza Ciudadana',
@@ -536,7 +536,7 @@ const NOMBRES_PAR = {
   '142':'Alianza Verde',
   '143':'Colombia Justa Libres',
   '144':'Fuerza Ciudadana',
-  '145':'Colombia Justa Libres',
+  '145':'Frente Amplio Unitario Caldas',
   '146':'Frente Amplio Unitario',
   '147':'Alianza Verde',
   '148':'Colombia Justa Libres',
@@ -746,9 +746,14 @@ async function cargarDesdeRegistraduria(){
     if(totCN){
       const votant=parseInt(totCN.votant)||0;
       const votnul=parseInt(totCN.votnul)||0;
+      const votnma=parseInt(totCN.votnma)||0;
+      const votblan=parseInt(totCN.votblan||totCN.votbla)||0;
       Object.values(CONSULTAS).forEach(con=>{
         if(!con.vv) return;
-        con.vn=Math.round(votnul*con.vv/(votant||1));
+        const ratio=con.vv/(votant||1);
+        con.vn=Math.round(votnul*ratio);
+        con.vma=Math.round(votnma*ratio);
+        con.vblan=Math.round(votblan*ratio);
       });
     }
     console.log('[CONSULTAS] Cargadas desde API');
@@ -1052,7 +1057,7 @@ function renderConsulta(key){
   document.getElementById('lbl-cons-mapa').textContent=`Candidato puntero por departamento · ${d.nombre}`;
   renderKPI('kpi-consultas',[{l:'Votos escrutados',v:(total/1e6).toFixed(2)+'M',d:`de ${(POTENCIAL/1e6).toFixed(1)}M potencial`},{l:'Participación consulta',v:((total/POTENCIAL)*100).toFixed(1)+'%',c:'green',d:'sobre potencial electoral'},{l:'Votos válidos',v:(d.vv/1e6).toFixed(2)+'M',c:'dark',d:`${((d.vv/total)*100).toFixed(1)}% del total`},{l:'Candidato puntero',v:pt.n.split(' ').slice(0,2).join(' '),c:'sm',d:`${((pt.v/total)*100).toFixed(1)}% · ${pt.p}`}]);
   renderTablaConsulta(d);
-  renderDonut('donut-consultas','pct-consultas','leg-consultas',{votval:d.vv||0, votnul:d.vn||0, votnma:0, votblan:0, potencial:POTENCIAL});
+  renderDonut('donut-consultas','pct-consultas','leg-consultas',{votval:d.vv||0, votnul:d.vn||0, votnma:d.vma||0, votblan:d.vblan||0, potencial:POTENCIAL});
   setTimeout(()=>renderMap('map-consultas',d.dep,CC),80);
 }
 function renderSenado(){
