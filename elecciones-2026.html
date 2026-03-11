@@ -195,7 +195,7 @@
       <div class="card"><div class="card-label" id="lbl-cons-tabla">Candidatos</div>
         <table class="results-table"><thead><tr><th>#</th><th>Candidato</th><th>Movimiento / Partido</th><th class="r">Votos</th><th class="r" style="min-width:130px">%</th></tr></thead><tbody id="tbody-consultas"></tbody></table>
       </div>
-      <div class="card"><div class="card-label">Participación · esta consulta</div>
+      <div class="card"><div class="card-label">Participación electoral general</div>
         <div class="donut-wrap"><div class="donut-cw"><canvas id="donut-consultas"></canvas>
           <div class="donut-center"><div class="donut-pct" id="pct-consultas">—</div><div class="donut-sub">votaron</div></div></div>
           <div class="donut-legend" id="leg-consultas"></div></div>
@@ -439,7 +439,7 @@ const NOMBRES_PAR = {
   '113':'Pacto Histórico y Frente Amplio',
   // — Centro Democrático y coaliciones —
   '10':'Centro Democrático',
-  '58':'Centro Democrático y MIRA',   // coalición específica — NO fusionar con CD solo
+  '58':'Centro Democrático y MIRA',
   '41':'Coalición Alianza Verde - ASI - U - PTC',
   // — Partidos nacionales —
   '2' :'Partido Liberal Colombiano',
@@ -462,19 +462,19 @@ const NOMBRES_PAR = {
   '28':'Alianza Social Independiente',
   '7' :'Partido Alianza Social Independiente ASI',
   '8' :'MIRA',
-  '19':'Partido 19',         // 8.9k votos — pendiente nombre exacto
-  '23':'Partido Político Esperanza Democrática',         // 7.8k votos
+  '19':'Partido 19',
+  '23':'Partido Político Esperanza Democrática',
   '29':'Partido Ecologista Colombiano',
   '30':'Ahora Colombia',
   '33':'Patriotas por Colombia',
   '34':'Colombia Segura y Próspera',
-  '35':'La Lista de Oviedo',   // Bogotá
+  '35':'La Lista de Oviedo',
   '36':'Colombia Justa Libres',
   '38':'Creemos',
   '39':'Creemos',
   '42':'Colombia Justa Libres',
   '43':'Ahora Colombia',
-  '44':'CR-LAU-MSN-OXI',        // Antioquia
+  '44':'CR-LAU-MSN-OXI',        // Cámara Antioquia — en Senado se sobreescribe abajo
   '45':'Avanza Colombia',
   '46':'Fuerza Ciudadana',
   '47':'Colombia Justa Libres',
@@ -505,7 +505,7 @@ const NOMBRES_PAR = {
   '75':'Avanza Colombia',
   '76':'Nuestra Fuerza',
   '77':'Coalición Fuerza Ciudadana',
-  '78':'CR-LAU-MSN-OXI',        // Antioquia (coalición regional)
+  '78':'CR-LAU-MSN-OXI',
   '79':'CR-CJL-Liga de Gobernantes',
   '80':'Coalición Liberal - Colombia Renaciente',
   '82':'Ahora Colombia Caldas',
@@ -586,6 +586,15 @@ const NOMBRES_PAR = {
   '6' :'AICO',
 };
 
+// Override de nombres para Senado — codpars que tienen nombre diferente en Senado vs Cámara
+const NOMBRES_PAR_SEN = {
+  ...NOMBRES_PAR,
+  '44':'Coalición Cambio Radical - ALMA',   // en Cámara es CR-LAU-MSN-OXI (Antioquia)
+  '9' :'Partido de la U',                   // mismo nombre, ok
+  '40':'Partido 40',                        // en Cámara es Arauca (DANE_DEP), aquí es codpar real
+  '170':'Coalición Fuerza Ciudadana',       // igual, ok
+};
+
 // Fusión de partidos con mismo nombre canónico
 // Después del parseo, suma votos de partidos con nombre idéntico
 function fusionarPartidos(datos){
@@ -616,7 +625,7 @@ async function cargarDesdeRegistraduria(){
     if(partidos.length){
       SENADO=partidos.map(p=>{
         const a=p.act;
-        const nombre=NOMBRES_PAR[String(a.codpar)]||a.nompar||`Partido ${a.codpar}`;
+        const nombre=NOMBRES_PAR_SEN[String(a.codpar)]||a.nompar||`Partido ${a.codpar}`;
         return {p:nombre, v:parseInt(a.vot)||0, codpar:String(a.codpar),
                 candidatos:(a.cantotabla||[]).filter(c=>c.vot>0)
                             .sort((a,b)=>b.vot-a.vot)};
@@ -1102,7 +1111,7 @@ function renderConsulta(key){
           document.getElementById('lbl-cons-mapa').textContent=`Candidato puntero por departamento · ${CONSULTAS[key].nombre}`;
           renderKPI('kpi-consultas',[
             {l:'Votos escrutados',v:total.toLocaleString('es-CO'),d:`${curConsDep}`},
-            {l:'Participación',v:((potDep>0?(total/potDep)*100:0)).toFixed(1)+'%',c:'green',d:'sobre votantes del dpto.'},
+            {l:'Part. en esta consulta',v:((potDep>0?(total/potDep)*100:0)).toFixed(1)+'%',c:'green',d:'sobre votantes del dpto.'},
             {l:'Votos válidos',v:vv.toLocaleString('es-CO'),c:'dark',d:total?`${((vv/total)*100).toFixed(1)}% del total`:'—'},
             {l:'Candidato puntero',v:pt.n.split(' ').slice(0,2).join(' '),c:'sm',d:`${total?((pt.v/total)*100).toFixed(1)+'%':'—'}`},
           ]);
@@ -1115,7 +1124,7 @@ function renderConsulta(key){
   const d=CONSULTAS[key],total=d.candidatos.reduce((s,c)=>s+c.v,0),pt=d.candidatos[0];
   document.getElementById('lbl-cons-tabla').textContent=`Candidatos · ${d.nombre} · ${d.orientacion}`;
   document.getElementById('lbl-cons-mapa').textContent=`Candidato puntero por departamento · ${d.nombre}`;
-  renderKPI('kpi-consultas',[{l:'Votos escrutados',v:(total/1e6).toFixed(2)+'M',d:`de ${(POTENCIAL/1e6).toFixed(1)}M potencial`},{l:'Participación consulta',v:((total/POTENCIAL)*100).toFixed(1)+'%',c:'green',d:'sobre potencial electoral'},{l:'Votos válidos',v:(d.vv/1e6).toFixed(2)+'M',c:'dark',d:`${((d.vv/total)*100).toFixed(1)}% del total`},{l:'Candidato puntero',v:pt.n.split(' ').slice(0,2).join(' '),c:'sm',d:`${((pt.v/total)*100).toFixed(1)}% · ${pt.p}`}]);
+  renderKPI('kpi-consultas',[{l:'Votos escrutados',v:(total/1e6).toFixed(2)+'M',d:`de ${(POTENCIAL/1e6).toFixed(1)}M potencial`},{l:'Part. en esta consulta',v:((total/POTENCIAL)*100).toFixed(1)+'%',c:'green',d:'sobre potencial electoral'},{l:'Votos válidos',v:(d.vv/1e6).toFixed(2)+'M',c:'dark',d:`${((d.vv/total)*100).toFixed(1)}% del total`},{l:'Candidato puntero',v:pt.n.split(' ').slice(0,2).join(' '),c:'sm',d:`${((pt.v/total)*100).toFixed(1)}% · ${pt.p}`}]);
   renderTablaConsulta(d);
   renderDonut('donut-consultas','pct-consultas','leg-consultas',{votval:d.vv||0, votnul:d.vn||0, votnma:d.vma||0, votblan:d.vblan||0, potencial:POTENCIAL});
   setTimeout(()=>renderMap('map-consultas',d.dep,CC),80);
