@@ -186,6 +186,10 @@
       <button class="sub-btn" onclick="switchConsulta('frente')">Frente por la Vida</button>
       <button class="sub-btn" onclick="switchConsulta('soluciones')">Consulta de Soluciones</button>
     </div>
+    <div class="sub-selector" style="margin-top:.5rem">
+      <span class="sub-label">Circunscripción:</span>
+      <select id="cons-dep-select" onchange="switchConsultaDep(this.value)" style="font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.06em;background:var(--card);border:1px solid var(--card-border);padding:.4rem .8rem;color:var(--black);cursor:pointer;outline:none"></select>
+    </div>
     <div class="kpi-row" id="kpi-consultas"></div>
     <div class="results-grid">
       <div class="card"><div class="card-label" id="lbl-cons-tabla">Candidatos</div>
@@ -392,6 +396,22 @@ const REG = {
   camara:    'https://registraduria-proxy.reruizc.workers.dev/camara',
   camaraDep: 'https://registraduria-proxy.reruizc.workers.dev/camara',
   consultas: 'https://registraduria-proxy.reruizc.workers.dev/consultas',
+};
+
+// Mapa códigos → departamentos para consultas (mismo que DANE_DEP interno)
+const DANE_DEP_CONS = {
+  '60':'Amazonas',    '01':'Antioquia',             '40':'Arauca',
+  '56':'San Andrés',  '88':'Circunscripción exterior','03':'Atlántico',
+  '16':'Bogotá D.C.', '06':'Bolívar',               '07':'Boyacá',
+  '09':'Caldas',      '44':'Caquetá',               '46':'Casanare',
+  '11':'Cauca',       '12':'Cesar',                 '17':'Chocó',
+  '13':'Córdoba',     '15':'Cundinamarca',           '50':'Guainía',
+  '54':'Guaviare',    '19':'Huila',                 '48':'La Guajira',
+  '21':'Magdalena',   '52':'Meta',                  '23':'Nariño',
+  '25':'Norte de Santander','64':'Putumayo',         '24':'Quindío',
+  '27':'Risaralda',   '26':'Santander',             '28':'Sucre',
+  '29':'Tolima',      '31':'Valle del Cauca',       '68':'Vaupés',
+  '72':'Vichada',
 };
 
 // Mapeo codpar → nombre canónico
@@ -1039,7 +1059,8 @@ async function renderMap(divId,depMap,colorMap){
 // ═══════════════════════════════════════════════════════════
 // TABS
 // ═══════════════════════════════════════════════════════════
-let curConsulta='gran',curDep='Nacional (todos)';
+let curConsulta='gran',curDep='Nacional (todos)',curConsDep='Nacional (todos)';
+function switchConsultaDep(dep){curConsDep=dep;renderConsulta(curConsulta);}
 function switchTab(tab){
   document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['consultas','senado','camara'][i]===tab));
   document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
@@ -1052,6 +1073,45 @@ function switchConsulta(key){curConsulta=key;document.querySelectorAll('#tab-con
 function switchDep(dep){curDep=dep;renderCamara(dep);}
 
 function renderConsulta(key){
+  const esNac = curConsDep==='Nacional (todos)';
+  if(!esNac){
+    // Cargar datos departamentales async
+    const cod = Object.entries(DANE_DEP_CONS).find(([,v])=>v===curConsDep)?.[0];
+    if(cod){
+      fetch(`${REG.consultas}/${cod}?t=${Date.now()}`,{cache:'no-store'})
+        .then(r=>r.ok?r.json():null)
+        .then(js=>{
+          if(!js||!js.camaras) return;
+          const CODPAR_C={'30':'frente','31':'gran','32':'soluciones'};
+          const bloque=js.camaras[0];
+          const tot=bloque.totales&&bloque.totales.act;
+          const p=( bloque.partotabla||[]).find(p=>CODPAR_C[String(p.act.codpar)]===key);
+          if(!p) return;
+          const a=p.act;
+          const cands=(a.cantotabla||[]).filter(c=>parseInt(c.vot)>0)
+            .map(c=>({n:`${c.nomcan} ${c.apecan}`.trim().split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' '),p:CONSULTAS[key].nombre,v:parseInt(c.vot)||0}))
+            .sort((a,b)=>b.v-a.v);
+          const vv=parseInt(a.vot)||0;
+          const vn=tot?parseInt(tot.votnul)||0:0;
+          const vma=tot?parseInt(tot.votnma)||0:0;
+          const vblan=tot?parseInt(tot.votblan||tot.votbla)||0:0;
+          const potDep=tot?parseInt(tot.votant)||POTENCIAL:POTENCIAL;
+          const total=cands.reduce((s,c)=>s+c.v,0);
+          const pt=cands[0]||{n:'—',v:0,p:''};
+          document.getElementById('lbl-cons-tabla').textContent=`Candidatos · ${CONSULTAS[key].nombre} · ${curConsDep}`;
+          document.getElementById('lbl-cons-mapa').textContent=`Candidato puntero por departamento · ${CONSULTAS[key].nombre}`;
+          renderKPI('kpi-consultas',[
+            {l:'Votos escrutados',v:total.toLocaleString('es-CO'),d:`${curConsDep}`},
+            {l:'Participación',v:((potDep>0?(total/potDep)*100:0)).toFixed(1)+'%',c:'green',d:'sobre votantes del dpto.'},
+            {l:'Votos válidos',v:vv.toLocaleString('es-CO'),c:'dark',d:total?`${((vv/total)*100).toFixed(1)}% del total`:'—'},
+            {l:'Candidato puntero',v:pt.n.split(' ').slice(0,2).join(' '),c:'sm',d:`${total?((pt.v/total)*100).toFixed(1)+'%':'—'}`},
+          ]);
+          renderTablaConsulta({...CONSULTAS[key],candidatos:cands});
+          renderDonut('donut-consultas','pct-consultas','leg-consultas',{votval:vv,votnul:vn,votnma:vma,votblan:vblan,potencial:potDep});
+        });
+      return;
+    }
+  }
   const d=CONSULTAS[key],total=d.candidatos.reduce((s,c)=>s+c.v,0),pt=d.candidatos[0];
   document.getElementById('lbl-cons-tabla').textContent=`Candidatos · ${d.nombre} · ${d.orientacion}`;
   document.getElementById('lbl-cons-mapa').textContent=`Candidato puntero por departamento · ${d.nombre}`;
@@ -1144,6 +1204,11 @@ document.head.appendChild(stt);
 const sel=document.getElementById('dep-select');
 const depKeys=['Nacional (todos)',...Object.keys(CURULES_CAM).filter(d=>d!=='Nacional (todos)').sort((a,b)=>a.localeCompare(b,'es'))];
 depKeys.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d+(d!=='Nacional (todos)'&&d!=='Circunscripción exterior'?` (${CURULES_CAM[d]} cur.)`:'');if(d==='Nacional (todos)')o.selected=true;sel.appendChild(o);});
+
+// Dropdown de departamento para consultas
+const consSel=document.getElementById('cons-dep-select');
+const consDepKeys=['Nacional (todos)',...Object.values(DANE_DEP_CONS).sort((a,b)=>a.localeCompare(b,'es'))];
+consDepKeys.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;if(d==='Nacional (todos)')o.selected=true;consSel.appendChild(o);});
 // Sort default: curules desc para Nacional
 window._sortState['tbody-camara']={col:'cur',dir:1};
 // Click en headers sortables de cámara
