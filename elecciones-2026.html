@@ -591,7 +591,7 @@ const NOMBRES_PAR_SEN = {
   ...NOMBRES_PAR,
   '44':'Coalición Cambio Radical - ALMA',   // en Cámara es CR-LAU-MSN-OXI (Antioquia)
   '9' :'Partido de la U',                   // mismo nombre, ok
-  '40':'Partido 40',                        // en Cámara es Arauca (DANE_DEP), aquí es codpar real
+  '40':'La Lista de Oviedo - Con Toda por Colombia',  // Senado lista cerrada
   '170':'Coalición Fuerza Ciudadana',       // igual, ok
 };
 
@@ -626,9 +626,19 @@ async function cargarDesdeRegistraduria(){
       SENADO=partidos.map(p=>{
         const a=p.act;
         const nombre=NOMBRES_PAR_SEN[String(a.codpar)]||a.nompar||`Partido ${a.codpar}`;
-        return {p:nombre, v:parseInt(a.vot)||0, codpar:String(a.codpar),
-                candidatos:(a.cantotabla||[]).filter(c=>c.vot>0)
-                            .sort((a,b)=>b.vot-a.vot)};
+        const todosLosCands = a.cantotabla||[];
+        const candsAbiertos = todosLosCands.filter(c=>c.vot>0).sort((a,b)=>b.vot-a.vot);
+        const esCerrada = candsAbiertos.length===0 || (candsAbiertos.length===1 && /solo por la lista/i.test(candsAbiertos[0].nomcan));
+        const candsCerrados = esCerrada
+          ? todosLosCands.filter(c=>!/solo por la lista/i.test(c.nomcan)).sort((a,b)=>parseInt(a.codcan)-parseInt(b.codcan))
+          : [];
+        return {
+          p: nombre,
+          v: parseInt(a.vot)||0,
+          codpar: String(a.codpar),
+          listaCerrada: esCerrada,
+          candidatos: esCerrada ? candsCerrados : candsAbiertos,
+        };
       }).sort((a,b)=>b.v-a.v);
       ok=true;
     }
@@ -955,7 +965,7 @@ function renderTablaPartidos(tid,datos,curules,votval,curPrecalc,opciones={}){
     const pct=((p.v/base)*100).toFixed(2);
     const bw=((p.v/mx)*100).toFixed(1),cr=c[p.p]||0;
     const bajoUmbral=!ocultarUmbral&&p.v<umb&&!esBlanco(p.p);
-    const cands=(p.candidatos||[]).filter(c=>c.vot>0);
+    const cands=(p.candidatos||[]).filter(c=>p.listaCerrada ? true : parseInt(c.vot||0)>0);
     const tieneCands=cands.length>0;
     const toggleId=`${tkey}_${i}`;
 
@@ -1002,34 +1012,50 @@ function renderTablaPartidos(tid,datos,curules,votval,curPrecalc,opciones={}){
       trC.id='cands_'+toggleId;
       trC.classList.add('cands-row');
       trC.style.display='none';
-      const maxVot=Math.max(...cands.map(c=>c.vot));
+      const esCerrada = p.listaCerrada===true;
+      const maxVot=esCerrada ? 1 : Math.max(...cands.map(c=>c.vot));
       trC.innerHTML=`<td colspan="5" style="padding:0">
         <div class="cands-inner">
+          ${esCerrada ? `<div style="font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.08em;color:#aaa;padding:.4rem .8rem .2rem;text-transform:uppercase">Lista cerrada · orden de inscripción · ${cr>0?`primeros ${cr} elegidos`:'sin curules estimadas'}</div>` : ''}
           <table class="cands-table">
             <thead><tr>
               <th style="width:2rem">#</th>
               <th>Candidato/a</th>
-              <th class="r">Votos</th>
-              <th class="r">% partido</th>
+              ${esCerrada ? '' : '<th class="r">Votos</th><th class="r">% partido</th>'}
               <th class="r" style="width:8rem"></th>
             </tr></thead>
             <tbody>
               ${(()=>{
-                let elegidoCount=0;
-                return cands.slice(0,30).map((cd,j)=>{
+                return cands.slice(0,esCerrada?Math.max(cr+5,15):30).map((cd,j)=>{
                   const nom=`${cd.nomcan||''} ${cd.apecan||''}`.trim()||cd.nomcan||'—';
-                  const pctP=((cd.vot/p.v)*100).toFixed(1);
-                  const bwC=((cd.vot/maxVot)*100).toFixed(1);
-                  const esSoloLista=/solo por la lista/i.test(nom);
-                  const elegido=!esSoloLista&&elegidoCount<cr;
-                  if(!esSoloLista) elegidoCount++;
-                  return `<tr>
-                    <td style="color:#bbb;font-size:.6rem">${String(j+1).padStart(2,'0')}</td>
-                    <td style="font-size:.78rem;color:${elegido?'var(--blue)':'inherit'};font-weight:${elegido?'600':'400'}">${nom}${elegido?'<span style="font-size:.55rem;margin-left:.4rem;opacity:.7">✦</span>':''}</td>
-                    <td class="r" style="font-size:.78rem;color:${elegido?'var(--blue)':'inherit'}">${cd.vot.toLocaleString('es-CO')}</td>
-                    <td class="r" style="font-size:.75rem;color:#888">${pctP}%</td>
-                    <td class="r"><div class="bar-wrap"><div class="bar-fill" style="width:${bwC}%;background:${elegido?'var(--blue)':(getColor(p.p)||'#bbb')}"></div></div></td>
-                  </tr>`;
+                  const elegido = esCerrada ? j < cr : (()=>{
+                    // listas abiertas: contar excluyendo "solo por lista"
+                    const esSoloLista=/solo por la lista/i.test(nom);
+                    return !esSoloLista;
+                  })();
+                  if(esCerrada){
+                    const color = j < cr ? 'var(--blue)' : '#888';
+                    const fw = j < cr ? '600' : '400';
+                    return `<tr>
+                      <td style="color:#bbb;font-size:.6rem">${String(j+1).padStart(2,'0')}</td>
+                      <td colspan="2" style="font-size:.78rem;color:${color};font-weight:${fw}">${nom}${j<cr?'<span style="font-size:.55rem;margin-left:.4rem;opacity:.7">✦</span>':''}</td>
+                      <td class="r"><div class="bar-wrap" style="${j<cr?'':'opacity:.3'}"><div class="bar-fill" style="width:${j<cr?(100-(j/Math.max(cr,1))*60).toFixed(0):0}%;background:${j<cr?'var(--blue)':'#ccc'}"></div></div></td>
+                    </tr>`;
+                  } else {
+                    const pctP=((cd.vot/p.v)*100).toFixed(1);
+                    const bwC=((cd.vot/maxVot)*100).toFixed(1);
+                    const esSoloLista=/solo por la lista/i.test(nom);
+                    let elegidoCount=0;
+                    // recalcular elegido para listas abiertas
+                    const esElegido = !esSoloLista && j < cr;
+                    return `<tr>
+                      <td style="color:#bbb;font-size:.6rem">${String(j+1).padStart(2,'0')}</td>
+                      <td style="font-size:.78rem;color:${esElegido?'var(--blue)':'inherit'};font-weight:${esElegido?'600':'400'}">${nom}${esElegido?'<span style="font-size:.55rem;margin-left:.4rem;opacity:.7">✦</span>':''}</td>
+                      <td class="r" style="font-size:.78rem;color:${esElegido?'var(--blue)':'inherit'}">${cd.vot.toLocaleString('es-CO')}</td>
+                      <td class="r" style="font-size:.75rem;color:#888">${pctP}%</td>
+                      <td class="r"><div class="bar-wrap"><div class="bar-fill" style="width:${bwC}%;background:${esElegido?'var(--blue)':(getColor(p.p)||'#bbb')}"></div></div></td>
+                    </tr>`;
+                  }
                 }).join('');
               })()}
             </tbody>
