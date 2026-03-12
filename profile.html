@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Profile · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f4f3ef;
+      --black: #0a0a0a;
+      --blue: #0047FF;
+      --blue-light: #3d6fff;
+      --gray: #888;
+      --gray-light: #e0dfd9;
+      --border: rgba(0,0,0,0.08);
+      --white: #ffffff;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--black);
+      font-family: 'Fraunces', serif;
+      overflow-x: hidden;
+      cursor: none;
+    }
+
+    .cursor {
+      position: fixed; width: 12px; height: 12px;
+      background: var(--blue); border-radius: 50%;
+      pointer-events: none; z-index: 9999;
+      transition: transform .15s ease, background .2s;
+      transform: translate(-50%,-50%);
+    }
+    .cursor-ring {
+      position: fixed; width: 36px; height: 36px;
+      border: 1.5px solid var(--blue); border-radius: 50%;
+      pointer-events: none; z-index: 9998;
+      transition: transform .35s ease, opacity .3s;
+      transform: translate(-50%,-50%); opacity: .4;
+    }
+
+    nav {
+      position: fixed; top: 0; left: 0; right: 0;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 1.2rem 3rem;
+      background: rgba(244,243,239,0.93); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border); z-index: 100;
+    }
+    .nav-logo-wrap { display: flex; align-items: center; gap: .75rem; text-decoration: none; }
+    .nav-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.2rem; letter-spacing: -.02em; color: var(--black); }
+    .nav-logo span { color: var(--blue); }
+    .nav-bars { display: flex; align-items: flex-end; gap: 3px; height: 18px; }
+    .nav-bar { width: 5px; background: var(--blue); border-radius: 1px 1px 0 0; opacity: .85; }
+    .nav-back {
+      font-family: 'DM Mono', monospace; font-size: .72rem;
+      letter-spacing: .1em; text-transform: uppercase;
+      color: var(--gray); text-decoration: none;
+      border-bottom: 1px solid var(--gray-light); padding-bottom: 2px;
+      transition: color .2s, border-color .2s;
+    }
+    .nav-back:hover { color: var(--blue); border-color: var(--blue); }
+
+    .page-header {
+      padding: 9rem 3rem 3rem;
+      border-bottom: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: end;
+      gap: 2rem;
+    }
+    .page-label {
+      font-family: 'DM Mono', monospace; font-size: .7rem;
+      letter-spacing: .2em; text-transform: uppercase; color: var(--blue);
+      margin-bottom: 1rem; display: flex; align-items: center; gap: 1rem;
+    }
+    .page-label::after { content: ''; display: block; width: 40px; height: 1px; background: var(--blue); }
+    .page-title {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: clamp(2.5rem, 6vw, 5.5rem); letter-spacing: -.03em; line-height: .95;
+    }
+    .page-title-sub {
+      font-family: 'Fraunces', serif; font-weight: 300; font-style: italic;
+      font-size: clamp(1rem, 2vw, 1.4rem); color: #555; margin-top: .75rem;
+    }
+    .header-meta {
+      display: flex; flex-direction: column; gap: .5rem; align-items: flex-end;
+      padding-bottom: .25rem;
+    }
+    .meta-tag {
+      font-family: 'DM Mono', monospace; font-size: .62rem;
+      letter-spacing: .12em; text-transform: uppercase;
+      color: var(--blue); background: rgba(0,71,255,.07);
+      padding: .3rem .8rem; white-space: nowrap;
+    }
+
+    .content-wrap { max-width: 1400px; margin: 0 auto; padding: 0 3rem 6rem; }
+
+    .profile-hero {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 5rem;
+      padding: 4rem 0 3rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .photo-col { position: relative; }
+    .photo-frame { position: sticky; top: 6rem; }
+    .photo-img {
+      width: 100%; aspect-ratio: 3/4;
+      object-fit: cover; object-position: top center;
+      display: block; filter: grayscale(8%); transition: filter .4s;
+    }
+    .photo-img:hover { filter: grayscale(0%); }
+    .photo-caption {
+      font-family: 'DM Mono', monospace; font-size: .6rem;
+      letter-spacing: .12em; text-transform: uppercase;
+      color: #bbb; margin-top: .75rem;
+      display: flex; justify-content: space-between;
+    }
+    .photo-line {
+      position: absolute; top: 0; left: -1.5rem;
+      width: 2px; height: 100%; background: var(--blue); opacity: .18;
+    }
+
+    .intro-col { padding-top: .5rem; }
+    .intro-lead {
+      font-family: 'Fraunces', serif; font-weight: 300;
+      font-size: clamp(1.2rem, 2vw, 1.6rem); line-height: 1.55;
+      color: var(--black); margin-bottom: 2rem;
+    }
+    .intro-lead strong { font-weight: 400; color: var(--blue); }
+
+    .bio-sections { padding: 3rem 0; }
+    .bio-block {
+      display: grid; grid-template-columns: 160px 1fr;
+      gap: 3rem; padding: 2.5rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .bio-block:last-child { border-bottom: none; }
+    .bio-block-label {
+      font-family: 'DM Mono', monospace; font-size: .62rem;
+      letter-spacing: .15em; text-transform: uppercase;
+      color: #bbb; padding-top: .3rem;
+      position: sticky; top: 6rem; height: fit-content;
+    }
+    .bio-block-label span {
+      display: block; color: var(--blue);
+      font-size: .85rem; font-family: 'Syne', sans-serif;
+      font-weight: 800; letter-spacing: -.01em;
+      margin-bottom: .4rem; text-transform: none;
+    }
+    .bio-text {
+      font-family: 'Fraunces', serif; font-weight: 300;
+      font-size: 1.05rem; line-height: 1.8; color: #333;
+    }
+    .bio-text + .bio-text { margin-top: 1.25rem; }
+
+    .skills-wrap { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1.5rem; }
+    .skill-chip {
+      font-family: 'DM Mono', monospace; font-size: .62rem;
+      letter-spacing: .1em; text-transform: uppercase;
+      color: var(--blue); background: rgba(0,71,255,.07);
+      border: 1px solid rgba(0,71,255,.15); padding: .35rem .85rem;
+    }
+
+    .countries-row { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-top: 1.5rem; }
+    .country-item {
+      display: flex; align-items: center; gap: .5rem;
+      font-family: 'DM Mono', monospace; font-size: .68rem;
+      letter-spacing: .08em; text-transform: uppercase; color: var(--gray);
+    }
+    .country-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); flex-shrink: 0; }
+
+    .cta-block {
+      background: var(--black); padding: 3rem; margin-top: 1rem;
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 2rem; flex-wrap: wrap;
+    }
+    .cta-text {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: clamp(1.3rem, 3vw, 2rem); letter-spacing: -.02em;
+      color: var(--bg); line-height: 1.1;
+    }
+    .cta-text em { font-family: 'Fraunces', serif; font-weight: 300; font-style: italic; color: var(--blue); }
+    .cta-btn {
+      background: var(--blue); color: #fff;
+      padding: .9rem 2rem; text-decoration: none;
+      font-family: 'DM Mono', monospace; font-size: .78rem;
+      letter-spacing: .08em; text-transform: uppercase;
+      border: 2px solid var(--blue); transition: background .25s, border-color .25s;
+      white-space: nowrap;
+    }
+    .cta-btn:hover { background: transparent; color: var(--blue); }
+
+    footer {
+      background: var(--black); color: #444; padding: 2rem 3rem;
+      display: flex; justify-content: space-between; align-items: center;
+      font-family: 'DM Mono', monospace; font-size: .62rem; letter-spacing: .08em;
+    }
+    footer a { color: #444; text-decoration: none; transition: color .2s; }
+    footer a:hover { color: var(--blue); }
+
+    .reveal { opacity: 0; transform: translateY(32px); transition: opacity .7s ease, transform .7s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 900px) {
+      nav { padding: 1rem 1.5rem; }
+      .page-header { padding: 7rem 1.5rem 2rem; grid-template-columns: 1fr; }
+      .header-meta { align-items: flex-start; flex-direction: row; flex-wrap: wrap; }
+      .content-wrap { padding: 0 1.5rem 4rem; }
+      .profile-hero { grid-template-columns: 1fr; gap: 2rem; }
+      .photo-col { max-width: 280px; }
+      .photo-line { display: none; }
+      .photo-frame { position: static; }
+      .bio-block { grid-template-columns: 1fr; gap: 1rem; }
+      .bio-block-label { position: static; }
+      .cta-block { flex-direction: column; align-items: flex-start; padding: 2rem 1.5rem; }
+      footer { flex-direction: column; gap: 1rem; text-align: center; }
+      body { cursor: auto; }
+      .cursor, .cursor-ring { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <nav>
+    <a href="index-en.html" class="nav-logo-wrap">
+      <div class="nav-bars">
+        <div class="nav-bar" style="height:18px"></div>
+        <div class="nav-bar" style="height:14px"></div>
+        <div class="nav-bar" style="height:9px"></div>
+        <div class="nav-bar" style="height:5px"></div>
+      </div>
+      <span class="nav-logo">Ricardo<span>.</span>Ruiz</span>
+    </a>
+    <a href="index-en.html" class="nav-back">← Back to home</a>
+  </nav>
+
+  <div class="page-header">
+    <div>
+      <div class="page-label">About · Professional profile</div>
+      <h1 class="page-title">Ricardo<br/>Ruiz</h1>
+      <p class="page-title-sub">Political Scientist · Data Analyst · Public Policy Advisor</p>
+    </div>
+    <div class="header-meta">
+      <span class="meta-tag">Universidad Nacional de Colombia</span>
+      <span class="meta-tag">M.Sc. Public Policy · Uniandes</span>
+      <span class="meta-tag">5 years of experience</span>
+    </div>
+  </div>
+
+  <div class="content-wrap">
+
+    <div class="profile-hero reveal">
+      <div class="photo-col">
+        <div class="photo-line"></div>
+        <div class="photo-frame">
+          <img
+            class="photo-img"
+            src="https://drive.google.com/uc?export=view&id=105Wi8fhXfb02v64k-SMch1SApqqH0Kpv"
+            alt="Ricardo Ruiz"
+            onerror="this.style.background='#e8e7e1';this.style.minHeight='480px';this.alt=''"
+          />
+          <div class="photo-caption">
+            <span>Ricardo Ruiz</span>
+            <span>Bogotá · Colombia</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="intro-col">
+        <p class="intro-lead">
+          Ricardo Ruiz is a political scientist from the <strong>National University of Colombia</strong> and holds a Master's degree in Public Policy from <strong>Universidad de los Andes</strong>, with five years of professional experience in data analysis applied to political, institutional, and electoral processes.
+        </p>
+        <p class="intro-lead" style="font-size: clamp(1rem, 1.6vw, 1.2rem); color: #555;">
+          His work focuses on the use of quantitative methodologies to understand complex political phenomena and translate them into strategic inputs for decision-making. Throughout his career he has developed research and analysis on electoral behavior, a topic on which he has also published academic articles.
+        </p>
+        <div class="skills-wrap">
+          <span class="skill-chip">Electoral behavior</span>
+          <span class="skill-chip">Quantitative analysis</span>
+          <span class="skill-chip">Machine Learning</span>
+          <span class="skill-chip">Random Forest</span>
+          <span class="skill-chip">Data Science</span>
+          <span class="skill-chip">Public Policy</span>
+          <span class="skill-chip">Institutional diagnostics</span>
+          <span class="skill-chip">Political strategy</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="bio-sections">
+
+      <div class="bio-block reveal">
+        <div class="bio-block-label">
+          <span>01</span>
+          Career
+        </div>
+        <div>
+          <p class="bio-text">He has worked at nationally recognized polling firms, as well as in public and private sector entities, participating in projects related to electoral analysis, institutional diagnostics, and strategic information assessment. His experience combines applied research, large-scale database processing, and the development of analytical tools that illuminate political, territorial, and social dynamics across different levels of government and organizations.</p>
+        </div>
+      </div>
+
+      <div class="bio-block reveal">
+        <div class="bio-block-label">
+          <span>02</span>
+          Methodology
+        </div>
+        <div>
+          <p class="bio-text">On the methodological side, his work draws on advanced quantitative techniques, including statistical regressions, classification models, and machine learning methods such as Random Forest, among other data science approaches. These tools enable the identification of patterns, segmentation of complex information, and construction of analytical models that provide solid evidence for strategy design and the interpretation of political scenarios.</p>
+        </div>
+      </div>
+
+      <div class="bio-block reveal">
+        <div class="bio-block-label">
+          <span>03</span>
+          Approach
+        </div>
+        <div>
+          <p class="bio-text">Yet his approach extends beyond technical analysis. As a political scientist, his work seeks to connect quantitative results with qualitative interpretations of power, political behavior, and institutions — allowing data to be translated into real strategic decisions. This combination of statistical analysis and political contextual reading is central to his professional approach, especially in projects related to electoral processes, governance, and public decision-making.</p>
+        </div>
+      </div>
+
+      <div class="bio-block reveal">
+        <div class="bio-block-label">
+          <span>04</span>
+          Team
+        </div>
+        <div>
+          <p class="bio-text">In many projects, this work is developed in collaboration with an interdisciplinary team, particularly in the design of positioning and decision-making strategies. The combination of data analysis, political contextual reading, and expertise in strategic communication allows quantitative evidence to be translated into concrete actions. In this process, technical analysis is articulated with the experience of strategists with extensive backgrounds in political campaigns and organizational positioning, strengthening the capacity to design robust strategies for both public and private actors.</p>
+        </div>
+      </div>
+
+      <div class="bio-block reveal">
+        <div class="bio-block-label">
+          <span>05</span>
+          International
+        </div>
+        <div>
+          <p class="bio-text">Beyond his experience in Colombia, he has participated in advisory and electoral analysis processes in countries such as Mexico, Peru, and Paraguay, which has allowed him to work with different political systems, electoral dynamics, and institutional contexts. If you would like to learn more about his work or explore possible collaborations, feel free to get in touch — he would be happy to discuss projects where data analysis, artificial intelligence, and political insight can generate value for decision-making.</p>
+          <div class="countries-row">
+            <div class="country-item"><div class="country-dot"></div>Colombia</div>
+            <div class="country-item"><div class="country-dot"></div>Mexico</div>
+            <div class="country-item"><div class="country-dot"></div>Peru</div>
+            <div class="country-item"><div class="country-dot"></div>Paraguay</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="cta-block reveal">
+      <div class="cta-text">
+        Ready to talk about<br/>your <em>project</em>?
+      </div>
+      <a href="index-en.html#contacto" class="cta-btn">Get in touch →</a>
+    </div>
+
+  </div>
+
+  <footer>
+    <span>© 2026 Ricardo Ruiz · ricardoruiz.co</span>
+    <span>Political Scientist · Data Analyst · Public Policy Advisor</span>
+    <a href="index-en.html">← ricardoruiz.co</a>
+  </footer>
+
+  <script>
+    const cur = document.getElementById('cursor'), ri = document.getElementById('cursorRing');
+    let mx=0,my=0,rx=0,ry=0;
+    document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.left=mx+'px';cur.style.top=my+'px';});
+    (function ar(){rx+=(mx-rx)*.12;ry+=(my-ry)*.12;ri.style.left=rx+'px';ri.style.top=ry+'px';requestAnimationFrame(ar);})();
+    document.querySelectorAll('a,button').forEach(el=>{
+      el.addEventListener('mouseenter',()=>{cur.style.transform='translate(-50%,-50%) scale(2.5)';cur.style.background='transparent';cur.style.border='1.5px solid var(--blue)';ri.style.opacity='0';});
+      el.addEventListener('mouseleave',()=>{cur.style.transform='translate(-50%,-50%) scale(1)';cur.style.background='var(--blue)';cur.style.border='none';ri.style.opacity='.4';});
+    });
+    const obs = new IntersectionObserver(entries=>{
+      entries.forEach(e=>{ if(e.isIntersecting){e.target.classList.add('visible');obs.unobserve(e.target);} });
+    },{threshold:0.08});
+    document.querySelectorAll('.reveal').forEach(r=>obs.observe(r));
+  </script>
+</body>
+</html>
