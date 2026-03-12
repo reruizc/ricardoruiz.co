@@ -207,6 +207,10 @@
   </div>
 
   <div class="tab-content" id="tab-senado">
+    <div class="sub-selector">
+      <span class="sub-label">Circunscripción:</span>
+      <select class="dep-select" id="sen-dep-select" onchange="switchSenDep(this.value)"></select>
+    </div>
     <div class="kpi-row" id="kpi-senado"></div>
     <div class="results-grid">
       <div class="card"><div class="card-label">Partidos · Senado · Circunscripción Nacional · 100 curules · D'Hondt</div>
@@ -971,7 +975,8 @@ function renderTablaPartidos(tid,datos,curules,votval,curPrecalc,opciones={}){
 
     // función global de toggle (necesaria para onclick en iOS)
     if(tieneCands){
-      window._candsToggle[toggleId]=function(){
+      window._candsToggle[toggleId]=function(e){
+        if(e) e.stopPropagation();
         const trC=document.getElementById('cands_'+toggleId);
         const arrow=document.getElementById('arrow_'+toggleId);
         if(!trC) return;
@@ -986,15 +991,20 @@ function renderTablaPartidos(tid,datos,curules,votval,curPrecalc,opciones={}){
     tr.style.cursor=tieneCands?'pointer':'default';
     if(i===0)tr.classList.add('winner');
     if(bajoUmbral)tr.style.opacity='0.45';
+    if(tieneCands){
+      // onclick en el tr para desktop; ontouchend para iOS Safari
+      tr.onclick = window._candsToggle[toggleId];
+      tr.ontouchend = function(e){ e.preventDefault(); window._candsToggle[toggleId](); };
+    }
     tr.innerHTML=`
       <td style="color:#ccc;font-size:.65rem">${String(i+1).padStart(2,'0')}</td>
       <td style="padding:0">
         ${tieneCands
-          ? `<button onclick="window._candsToggle['${toggleId}']()" style="width:100%;background:none;border:none;padding:.55rem .4rem;text-align:left;cursor:pointer;font:inherit;display:flex;align-items:center;gap:.5rem">
+          ? `<div style="width:100%;padding:.55rem .4rem;display:flex;align-items:center;gap:.5rem;pointer-events:none">
               <span class="dot10" style="background:${getColor(p.p)||'#bbb'};flex-shrink:0"></span>
               <span style="flex:1;font-size:.78rem">${p.p}${bajoUmbral?'<span style="font-size:.6rem;color:#aaa;margin-left:.3rem">↓ umbral</span>':''}</span>
               <span id="arrow_${toggleId}" style="font-size:.7rem;color:#999;transition:transform .2s;flex-shrink:0">▶</span>
-            </button>`
+            </div>`
           : `<span class="cname" style="display:flex;align-items:center;gap:.5rem;padding:.55rem .4rem">
               <span class="dot10" style="background:${getColor(p.p)||'#bbb'}"></span>
               ${p.p}${bajoUmbral?'<span style="font-size:.6rem;color:#aaa;margin-left:.3rem">↓ umbral</span>':''}
@@ -1094,8 +1104,9 @@ async function renderMap(divId,depMap,colorMap){
 // ═══════════════════════════════════════════════════════════
 // TABS
 // ═══════════════════════════════════════════════════════════
-let curConsulta='gran',curDep='Nacional (todos)',curConsDep='Nacional (todos)';
+let curConsulta='gran',curDep='Nacional (todos)',curConsDep='Nacional (todos)',curSenDep='Nacional (todos)';
 function switchConsultaDep(dep){curConsDep=dep;renderConsulta(curConsulta);}
+function switchSenDep(dep){curSenDep=dep;renderSenado();}
 function switchTab(tab){
   document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['consultas','senado','camara'][i]===tab));
   document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
@@ -1159,6 +1170,58 @@ function renderSenado(){
   const cur=dhondt(SENADO,100,TOT_SENADO.votval);
   const maxC=Math.max(...Object.values(cur).filter((_,i)=>Object.keys(cur)[i]!=='__cifra__'&&Object.keys(cur)[i]!=='__umb__'));
   const top=Object.entries(cur).filter(([k])=>k!=='__cifra__'&&k!=='__umb__').find(([,v])=>v===maxC);
+
+  const esNac = curSenDep==='Nacional (todos)';
+
+  if(!esNac){
+    const cod = Object.entries(DANE_DEP_CONS).find(([,v])=>v===curSenDep)?.[0];
+    if(cod){
+      fetch(`${REG.senado}/${cod}?t=${Date.now()}`,{cache:'no-store'})
+        .then(r=>r.ok?r.json():null)
+        .then(js=>{
+          if(!js) return;
+          const tot=(js.totales&&js.totales.act)||(js.camaras&&js.camaras[0]&&js.camaras[0].totales&&js.camaras[0].totales.act)||{};
+          const votant=parseInt(tot.votant)||0;
+          const votval=parseInt(tot.votval)||0;
+          const votnul=parseInt(tot.votnul)||0;
+          const votnma=parseInt(tot.votnma)||0;
+          const votblan=parseInt(tot.votblan||tot.votbla)||0;
+          const potDep=parseInt(tot.centota)||votant||POTENCIAL;
+
+          // Votos por partido en el departamento (para reordenar tabla)
+          const votosDep={};
+          if(js.camaras){
+            const bloque=js.camaras.find(c=>String(c.cam)==='0')||js.camaras[0];
+            (bloque&&bloque.partotabla||[]).forEach(p=>{
+              const nombre=NOMBRES_PAR_SEN[String(p.act.codpar)]||`Partido ${p.act.codpar}`;
+              votosDep[nombre]=(votosDep[nombre]||0)+parseInt(p.act.vot||0);
+            });
+          }
+
+          // KPIs con datos del departamento, curules nacionales
+          renderKPI('kpi-senado',[
+            {l:'Votantes',v:votant.toLocaleString('es-CO'),d:`${curSenDep} · ${((votant/(potDep||1))*100).toFixed(2)}% del potencial`},
+            {l:'Votos válidos',v:votval.toLocaleString('es-CO'),c:'green',d:`${votant?((votval/votant)*100).toFixed(2)+'% de votantes':'—'}`},
+            {l:'Curules en juego',v:'100',c:'dark',d:"Circunscripción nacional · D'Hondt · umbral 3%"},
+            {l:'Partido puntero',v:top?top[0].split(' ')[0]:'—',c:'sm',d:top?`${top[1]} curules est. (nacional)`:''},
+          ]);
+          // Tabla con curules nacionales pero votos del departamento si están disponibles
+          const datosConDep = SENADO.map(p=>({
+            ...p,
+            vDep: votosDep[p.p]||0,
+          })).sort((a,b)=>b.vDep-a.vDep);
+          // Mostrar votos del dpto si existen, si no mostrar los nacionales
+          const datosRender = datosConDep.map(p=>({...p, v:p.vDep||p.v}));
+          renderTablaPartidos('tbody-senado', datosRender, 100, TOT_SENADO.votval, cur);
+          renderDonut('donut-senado','pct-senado','leg-senado',{votval,votnul,votnma,votblan,potencial:potDep,cifra:cur.__cifra__,umb:cur.__umb__});
+          // Nota en el label de la tabla
+          document.querySelector('#tab-senado .card-label').textContent=`Partidos · Senado · ${curSenDep} · curules nacionales (D'Hondt)`;
+        });
+      return;
+    }
+  }
+
+  // — Nacional —
   const votant=TOT_SENADO.votant||SENADO.reduce((s,p)=>s+p.v,0);
   renderKPI('kpi-senado',[
     {l:'Votantes',v:votant.toLocaleString('es-CO'),d:`${((votant/POTENCIAL)*100).toFixed(2)}% del potencial`},
@@ -1169,6 +1232,7 @@ function renderSenado(){
   renderTablaPartidos('tbody-senado',SENADO,100,TOT_SENADO.votval);
   renderDonut('donut-senado','pct-senado','leg-senado',{...TOT_SENADO,potencial:POTENCIAL,cifra:cur.__cifra__,umb:cur.__umb__});
   renderMapLegend('mlb-senado',DEP_SENADO,CP);
+  document.querySelector('#tab-senado .card-label').textContent=`Partidos · Senado · Circunscripción Nacional · 100 curules · D'Hondt`;
   setTimeout(()=>renderMap('map-senado',DEP_SENADO,CP),80);
 }
 function renderCamara(dep){
@@ -1244,6 +1308,11 @@ depKeys.forEach(d=>{const o=document.createElement('option');o.value=d;o.textCon
 const consSel=document.getElementById('cons-dep-select');
 const consDepKeys=['Nacional (todos)',...Object.values(DANE_DEP_CONS).sort((a,b)=>a.localeCompare(b,'es'))];
 consDepKeys.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;if(d==='Nacional (todos)')o.selected=true;consSel.appendChild(o);});
+
+// Dropdown de departamento para Senado
+const senSel=document.getElementById('sen-dep-select');
+const senDepKeys=['Nacional (todos)',...Object.values(DANE_DEP_CONS).sort((a,b)=>a.localeCompare(b,'es'))];
+senDepKeys.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;if(d==='Nacional (todos)')o.selected=true;senSel.appendChild(o);});
 // Sort default: curules desc para Nacional
 window._sortState['tbody-camara']={col:'cur',dir:1};
 // Click en headers sortables de cámara
