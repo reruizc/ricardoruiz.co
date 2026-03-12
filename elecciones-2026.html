@@ -67,6 +67,7 @@
     .results-grid{display:grid;grid-template-columns:1fr 300px;gap:1.5rem}
     .card{background:var(--card);border:1px solid var(--card-border);padding:1.5rem;overflow:hidden}
     .card-label{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.18em;text-transform:uppercase;color:#bbb;margin-bottom:1.2rem}
+    .card-label-dark{color:var(--black)!important}
     .results-table{width:100%;border-collapse:collapse}
     .results-table th{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.15em;text-transform:uppercase;color:#ccc;text-align:left;padding:.5rem .6rem;border-bottom:1px solid var(--card-border)}
     .results-table th.r{text-align:right}
@@ -81,6 +82,8 @@
     .cands-table tbody tr:last-child{border-bottom:none}
     .cands-table tbody td{padding:.35rem .5rem;vertical-align:middle}
     .cands-row td{padding:0!important}
+    .cands-row{display:none}
+    .cands-row.open{display:table-row}
     .cifras-bloque{margin-top:.9rem;padding-top:.8rem;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:.4rem}
     .cifra-item{display:flex;justify-content:space-between;align-items:baseline;gap:.5rem}
     .cifra-label{font-size:.65rem;letter-spacing:.06em;text-transform:uppercase;color:#aaa}
@@ -127,7 +130,8 @@
       /* KPIs: 2 columnas en móvil */
       .kpi-val{font-size:1.4rem}
       /* Acordeón: asegurar que es tappable en iOS */
-      .results-table tr{cursor:pointer;-webkit-tap-highlight-color:rgba(0,71,255,.08)}
+    .results-table tbody tr[data-toggle]{touch-action:manipulation;-webkit-tap-highlight-color:rgba(0,71,255,.1)}
+    .results-table tr{cursor:pointer;-webkit-tap-highlight-color:rgba(0,71,255,.08)}
       /* Tabla candidatos en móvil */
       .cands-table th:nth-child(1),.cands-table td:nth-child(1){display:none}
       .cands-inner{padding:.5rem .5rem .75rem 1rem}
@@ -222,7 +226,7 @@
     <div id="sen-search-results" style="display:none"></div>
     <div class="kpi-row" id="kpi-senado"></div>
     <div class="results-grid">
-      <div class="card"><div class="card-label">Partidos · Senado · Circunscripción Nacional · 100 curules · D'Hondt</div>
+      <div class="card"><div class="card-label card-label-dark" id="lbl-sen-tabla" style="color:var(--black)">Partidos · Senado · Circunscripción Nacional · 100 curules · D'Hondt</div>
         <table class="results-table"><thead><tr><th>#</th><th>Partido / Coalición</th><th class="r">Votos</th><th class="r" style="min-width:130px">%</th><th class="r">Curules</th></tr></thead><tbody id="tbody-senado"></tbody></table>
       </div>
       <div class="card"><div class="card-label">Participación electoral</div>
@@ -485,7 +489,7 @@ const NOMBRES_PAR = {
   '36':'Colombia Justa Libres',
   '38':'Creemos',
   '39':'Creemos',
-  '42':'Colombia Justa Libres',
+  '42':'Revive Caquetá 2.0',
   '43':'Ahora Colombia',
   '44':'CR-LAU-MSN-OXI',        // Cámara Antioquia — en Senado se sobreescribe abajo
   '45':'Avanza Colombia',
@@ -528,7 +532,7 @@ const NOMBRES_PAR = {
   '95':'Ciudadanos Renovemos',
   '97':'ALMA',
   '98':'Centro Democrático - Nuevo Liberalismo - MIRA',
-  '99':'Colombia Justa Libres',
+  '99':'Coalición Caquetá',
   '100':'Partido Verde por el Tolima',
   '101':'Pacto Histórico Chocó',
   '103':'Fuerza Ciudadana',
@@ -542,7 +546,7 @@ const NOMBRES_PAR = {
   '112':'Pacto Histórico Alianza Verde',
   '114':'ABC Alianza Bogotá Convergente',
   '116':'Colombia Justa Libres',
-  '117':'Fuerza Ciudadana',
+  '117':'Pacto Histórico Caquetá',
   '118':'Colombia Justa Libres',
   '119':'Coalición Alianza Verde, En Marcha, ASI',
   '120':'Partido de la U - Partido MIRA',
@@ -592,7 +596,7 @@ const NOMBRES_PAR = {
   '166':'Alianza Verde',
   '167':'Coalición Fuerza Ciudadana',
   '168':'Fuerza Ciudadana',
-  '169':'Colombia Justa Libres',
+  '169':'Coalición Fuerza Ciudadana',
   '170':'Coalición Fuerza Ciudadana',
   '171':'Colombia Justa Libres',
   '172':'Fuerza Ciudadana',
@@ -989,8 +993,8 @@ function renderTablaPartidos(tid,datos,curules,votval,curPrecalc,opciones={}){
         const trC=document.getElementById('cands_'+toggleId);
         const arrow=document.getElementById('arrow_'+toggleId);
         if(!trC) return;
-        const open=trC.style.display!=='none';
-        trC.style.display=open?'none':'table-row';
+        const open=trC.classList.contains('open');
+        trC.classList.toggle('open',!open);
         if(arrow) arrow.style.transform=open?'':'rotate(90deg)';
       };
     }
@@ -1001,7 +1005,7 @@ function renderTablaPartidos(tid,datos,curules,votval,curPrecalc,opciones={}){
     if(i===0)tr.classList.add('winner');
     if(bajoUmbral)tr.style.opacity='0.45';
     if(tieneCands){
-      // onclick en el tr para desktop; ontouchend para iOS Safari
+      tr.setAttribute('data-toggle', toggleId);
       tr.onclick = window._candsToggle[toggleId];
       tr.ontouchend = function(e){ e.preventDefault(); window._candsToggle[toggleId](); };
     }
@@ -1030,7 +1034,7 @@ function renderTablaPartidos(tid,datos,curules,votval,curPrecalc,opciones={}){
       const trC=document.createElement('tr');
       trC.id='cands_'+toggleId;
       trC.classList.add('cands-row');
-      trC.style.display='none';
+      // display:none manejado por CSS (.cands-row), .open lo muestra
       const esCerrada = p.listaCerrada===true;
       const maxVot=esCerrada ? 1 : Math.max(...cands.map(c=>c.vot));
       trC.innerHTML=`<td colspan="5" style="padding:0">
@@ -1299,7 +1303,7 @@ function renderSenado(){
           renderTablaPartidos('tbody-senado', datosRender, 100, votval, cur);
           renderDonut('donut-senado','pct-senado','leg-senado',{votval,votnul,votnma,votblan,potencial:potDep,cifra:cur.__cifra__,umb:cur.__umb__});
           // Nota en el label de la tabla
-          document.querySelector('#tab-senado .card-label').textContent=`Partidos · Senado · ${curSenDep} · curules nacionales (D'Hondt)`;
+          document.getElementById('lbl-sen-tabla').textContent=`Partidos · Senado · ${curSenDep} · curules nacionales (D'Hondt)`;
         });
       return;
     }
@@ -1316,7 +1320,7 @@ function renderSenado(){
   renderTablaPartidos('tbody-senado',SENADO,100,TOT_SENADO.votval);
   renderDonut('donut-senado','pct-senado','leg-senado',{...TOT_SENADO,potencial:POTENCIAL,cifra:cur.__cifra__,umb:cur.__umb__});
   renderMapLegend('mlb-senado',DEP_SENADO,CP);
-  document.querySelector('#tab-senado .card-label').textContent=`Partidos · Senado · Circunscripción Nacional · 100 curules · D'Hondt`;
+  document.getElementById('lbl-sen-tabla').textContent=`Partidos · Senado · Circunscripción Nacional · 100 curules · D'Hondt`;
   setTimeout(()=>renderMap('map-senado',DEP_SENADO,CP),80);
 }
 function renderCamara(dep){
@@ -1397,6 +1401,18 @@ consDepKeys.forEach(d=>{const o=document.createElement('option');o.value=d;o.tex
 const senSel=document.getElementById('sen-dep-select');
 const senDepKeys=['Nacional (todos)',...Object.values(DANE_DEP_CONS).sort((a,b)=>a.localeCompare(b,'es'))];
 senDepKeys.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;if(d==='Nacional (todos)')o.selected=true;senSel.appendChild(o);});
+
+// Delegador touch para iOS — captura touchend en cualquier tr[data-toggle] de la página
+// Más fiable que poner ontouchend en cada tr individualmente
+document.addEventListener('touchend', function(e){
+  const tr = e.target.closest('tr[data-toggle]');
+  if(!tr) return;
+  const tid = tr.getAttribute('data-toggle');
+  if(window._candsToggle && window._candsToggle[tid]){
+    e.preventDefault();
+    window._candsToggle[tid]();
+  }
+}, {passive: false});
 // Sort default: curules desc para Nacional
 window._sortState['tbody-camara']={col:'cur',dir:1};
 // Click en headers sortables de cámara
