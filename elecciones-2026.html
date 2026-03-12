@@ -132,6 +132,10 @@
       .cands-table th:nth-child(1),.cands-table td:nth-child(1){display:none}
       .cands-inner{padding:.5rem .5rem .75rem 1rem}
     }
+    .rotate-hint{display:none}
+    @media(max-width:700px) and (orientation:portrait){
+      .rotate-hint{display:flex;align-items:center;gap:.6rem;font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.06em;color:#888;padding:.5rem .8rem;background:#f5f4f0;border:1px solid var(--border);margin-bottom:.8rem}
+    }
 
     th.sortable:hover { color: #0047FF; }
     th.sort-desc .sort-icon::after { content: ' ↓'; }
@@ -223,6 +227,7 @@
     <div class="kpi-row" id="kpi-senado"></div>
     <div class="results-grid">
       <div class="card"><div class="card-label">Partidos · Senado · Circunscripción Nacional · 100 curules · D'Hondt</div>
+        <div class="rotate-hint">↺&nbsp; Gira el teléfono horizontalmente para ver los candidatos</div>
         <table class="results-table"><thead><tr><th>#</th><th>Partido / Coalición</th><th class="r">Votos</th><th class="r" style="min-width:130px">%</th><th class="r">Curules</th></tr></thead><tbody id="tbody-senado"></tbody></table>
       </div>
       <div class="card"><div class="card-label">Participación electoral</div>
@@ -244,6 +249,7 @@
     <div class="kpi-row" id="kpi-camara"></div>
     <div class="results-grid">
       <div class="card"><div class="card-label" id="lbl-cam-tabla">Partidos · Cámara · D'Hondt</div>
+        <div class="rotate-hint">↺&nbsp; Gira el teléfono horizontalmente para ver los candidatos</div>
         <table class="results-table" id="table-camara"><thead><tr><th>#</th><th>Partido / Coalición</th><th class="r sortable" data-col="v" style="cursor:pointer;user-select:none">VOTOS <span class="sort-icon">↕</span></th><th class="r sortable" data-col="pct" style="cursor:pointer;user-select:none">% <span class="sort-icon">↕</span></th><th class="r sortable" data-col="cur" style="cursor:pointer;user-select:none">CURULES <span class="sort-icon">↕</span></th></tr></thead><tbody id="tbody-camara"></tbody></table>
       </div>
       <div class="card"><div class="card-label">Participación electoral</div>
@@ -287,6 +293,7 @@ const MESAS_TOTAL = 126818;
 // DATOS DE PRUEBA (respaldo mientras no hay CSV)
 // ═══════════════════════════════════════════════════════════
 let SENADO = [
+let _SENADO_RENDER = []; // datos del último render (nacional o departamental)
   {p:'Pacto Histórico',v:1720000},{p:'Centro Democrático',v:1350000},
   {p:'Partido Liberal',v:1180000},{p:'La U',v:940000},
   {p:'Cambio Radical',v:870000},{p:'Conservador',v:760000},
@@ -1140,19 +1147,25 @@ function buscarCandidatoSen(q){
 
   const norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
   const qn=norm(q);
+  const esDep = curSenDep!=='Nacional (todos)';
+  // Usar datos del render actual (departamental o nacional)
+  const fuente = (_SENADO_RENDER&&_SENADO_RENDER.length) ? _SENADO_RENDER : SENADO;
+  const cur=dhondt(SENADO,100,TOT_SENADO.votval);
   const resultados=[];
-  SENADO.forEach(partido=>{
+
+  fuente.forEach(partido=>{
     (partido.candidatos||[]).forEach((c,idx)=>{
       const nom=`${c.nomcan||''} ${c.apecan||''}`.trim();
-      if(norm(nom).includes(qn)){
-        const cur=dhondt(SENADO,100,TOT_SENADO.votval);
-        const curPart=cur[partido.p]||0;
-        const elegido=!partido.listaCerrada ? (idx<curPart) : (idx<curPart);
-        resultados.push({nom,partido:partido.p,vot:c.vot||0,pos:idx+1,elegido,listaCerrada:partido.listaCerrada});
-      }
+      if(!norm(nom).includes(qn)) return;
+      const curPart=cur[partido.p]||0;
+      const elegido=idx<curPart;
+      resultados.push({nom,partido:partido.p,vot:c.vot||0,pos:idx+1,elegido,listaCerrada:partido.listaCerrada});
     });
   });
   resultados.sort((a,b)=>b.vot-a.vot);
+
+  const contexto = esDep ? ` · <span style="color:var(--blue)">${curSenDep}</span>` : ' · Nacional';
+  const votLabel = esDep ? `Votos en ${curSenDep}` : 'Votos (nac.)';
 
   if(!resultados.length){
     box.innerHTML=`<div style="padding:2rem;font-family:'DM Mono',monospace;font-size:.72rem;color:#aaa;text-align:center">No se encontraron candidatos con "<b>${q}</b>"</div>`;
@@ -1160,11 +1173,13 @@ function buscarCandidatoSen(q){
   }
 
   box.innerHTML=`
-    <div style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;color:#aaa;text-transform:uppercase;padding:.75rem 0 .5rem">${resultados.length} resultado${resultados.length!==1?'s':''} para "${q}"</div>
+    <div style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;color:#aaa;text-transform:uppercase;padding:.75rem 0 .5rem">
+      ${resultados.length} resultado${resultados.length!==1?'s':''} para "${q}"${contexto}
+    </div>
     <table class="results-table" style="width:100%">
       <thead><tr>
         <th>#</th><th>Candidato/a</th><th>Partido / Coalición</th>
-        <th class="r">Pos. lista</th><th class="r">Votos</th><th class="r">Estado</th>
+        <th class="r">Pos. lista</th><th class="r">${votLabel}</th><th class="r">Estado</th>
       </tr></thead>
       <tbody>
         ${resultados.map((r,i)=>`<tr>
@@ -1173,7 +1188,7 @@ function buscarCandidatoSen(q){
             ${r.nom}${r.elegido?'<span style="font-size:.55rem;margin-left:.4rem;opacity:.7">✦</span>':''}
           </td>
           <td style="font-size:.72rem;color:#888">${r.partido}</td>
-          <td class="r" style="font-size:.72rem;color:#aaa">${r.listaCerrada?`#${r.pos} lista`:`#${r.pos} lista`}</td>
+          <td class="r" style="font-size:.72rem;color:#aaa">#${r.pos} lista</td>
           <td class="r" style="font-size:.78rem">${r.vot>0?r.vot.toLocaleString('es-CO'):'<span style="color:#ccc">—</span>'}</td>
           <td class="r"><span style="font-size:.62rem;font-family:'DM Mono',monospace;padding:.15rem .5rem;border-radius:2px;background:${r.elegido?'rgba(0,71,255,.1)':'#f0efe9'};color:${r.elegido?'var(--blue)':'#aaa'}">${r.elegido?'ELEGIDO':'—'}</span></td>
         </tr>`).join('')}
@@ -1296,6 +1311,7 @@ function renderSenado(){
             listaCerrada: candsDep[p.p] ? false : p.listaCerrada,
           })).filter(p=>p.v>0).sort((a,b)=>b.v-a.v);
           // Pasar votval departamental como base para los %
+          _SENADO_RENDER = datosRender;
           renderTablaPartidos('tbody-senado', datosRender, 100, votval, cur);
           renderDonut('donut-senado','pct-senado','leg-senado',{votval,votnul,votnma,votblan,potencial:potDep,cifra:cur.__cifra__,umb:cur.__umb__});
           // Nota en el label de la tabla
@@ -1313,6 +1329,7 @@ function renderSenado(){
     {l:'Curules en juego',v:'100',c:'dark',d:"Circunscripción nacional · D'Hondt · umbral 3%"},
     {l:'Partido puntero',v:top?top[0].split(' ')[0]:'—',c:'sm',d:top?`${top[1]} curules estimadas`:''},
   ]);
+  _SENADO_RENDER = SENADO;
   renderTablaPartidos('tbody-senado',SENADO,100,TOT_SENADO.votval);
   renderDonut('donut-senado','pct-senado','leg-senado',{...TOT_SENADO,potencial:POTENCIAL,cifra:cur.__cifra__,umb:cur.__umb__});
   renderMapLegend('mlb-senado',DEP_SENADO,CP);
