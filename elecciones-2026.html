@@ -44,6 +44,7 @@
     .status-bar{display:flex;align-items:center;gap:.75rem;padding:.45rem 3rem;background:rgba(0,71,255,.05);border-bottom:1px solid rgba(0,71,255,.12);font-family:'DM Mono',monospace;font-size:.62rem;color:var(--blue)}
     .status-bar span{color:var(--gray)}
     .tabs-wrap{padding:0 3rem;border-bottom:1px solid var(--border);display:flex;overflow-x:auto;background:var(--bg)}
+    .tabs-mobile{display:none}
     .tab-btn{font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gray);background:transparent;border:none;padding:1.2rem 2rem;cursor:none;border-bottom:2px solid transparent;transition:color .2s,border-color .2s;white-space:nowrap}
     .tab-btn:hover{color:var(--black)}
     .tab-btn.active{color:var(--blue);border-bottom-color:var(--blue)}
@@ -115,7 +116,11 @@
     @media(max-width:700px){
       nav{padding:1rem 1.5rem}.page-header{padding:6rem 1.5rem 2rem}
       .tabs-wrap{padding:0 1rem}.tab-content{padding:1rem}
-      .kpi-row{grid-template-columns:1fr 1fr}.map-container{height:260px}
+      .kpi-row{grid-template-columns:1fr;}.map-container{height:260px}
+      /* Tabs: ocultar botones y mostrar select en móvil */
+      .tabs-wrap{display:none}
+      .tabs-mobile{display:block;padding:.75rem 1rem;border-bottom:1px solid var(--border);background:var(--bg)}
+      .tabs-mobile select{font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;width:100%;padding:.6rem .8rem;border:1px solid var(--border);background:var(--bg);color:var(--black);outline:none;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23999' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .8rem center}
       body{cursor:auto}.cursor,.cursor-ring{display:none}
       .sub-btn{font-size:.6rem;padding:.4rem .7rem}.status-bar{padding:.5rem 1.5rem}
       .results-table{font-size:.68rem;table-layout:fixed;width:100%}
@@ -177,6 +182,13 @@
     Datos: <b id="fuenteLbl">—</b> · <span id="csvTimestamp">—</span>
   </div>
 
+  <div class="tabs-mobile">
+    <select onchange="switchTab(this.value)">
+      <option value="consultas">Consultas Presidenciales</option>
+      <option value="senado">Senado de la República</option>
+      <option value="camara">Cámara de Representantes</option>
+    </select>
+  </div>
   <div class="tabs-wrap">
     <button class="tab-btn active" onclick="switchTab('consultas')">Consultas Presidenciales</button>
     <button class="tab-btn" onclick="switchTab('senado')">Senado de la República</button>
@@ -1199,6 +1211,8 @@ function switchTab(tab){
   document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['consultas','senado','camara'][i]===tab));
   document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
   document.getElementById('tab-'+tab).classList.add('active');
+  const sel=document.querySelector('.tabs-mobile select');
+  if(sel) sel.value=tab;
   if(tab==='consultas')renderConsulta(curConsulta);
   if(tab==='senado')renderSenado();
   if(tab==='camara')renderCamara(curDep);
