@@ -112,9 +112,11 @@
     .year-tab.active::after { transform: scaleX(1); }
 
     /* ── PANELS ── */
-    .panels-wrap { flex: 1; min-height: 0; padding: 1rem 2.2rem 0.6rem; }
+    .panels-wrap { flex: 1; min-height: 0; padding: 1rem 2.2rem 1.4rem; overflow: hidden; }
     .panel { display: none; height: 100%; opacity: 0; transform: translateY(10px); transition: opacity .35s ease, transform .35s ease; }
     .panel.active { display: grid; opacity: 1; transform: translateY(0); }
+    /* 2023 y 2025 no deben estirar hasta el fondo — usan height auto */
+    #p2023.active, #p2025.active { height: auto; }
 
     /* ── GRID BASE (2-col layout) ── */
     .grid-main {
@@ -168,8 +170,8 @@
     }
     .card-tape-word {
       font-family:'DM Mono',monospace; font-weight:700;
-      font-size: clamp(0.6rem, 1vw, 0.88rem);
-      letter-spacing:.2em; text-transform:uppercase; padding:0 18px; line-height:1;
+      font-size: clamp(0.72rem, 1.2vw, 1.05rem);
+      letter-spacing:.18em; text-transform:uppercase; padding:0 18px; line-height:1;
     }
     .card-tape-word:nth-child(odd)  { color: rgba(8,8,14,0.95); }
     .card-tape-word:nth-child(even) { color: rgba(238,218,30,0.96); }
@@ -220,7 +222,7 @@
       padding: 0.45rem 2.2rem;
       display: flex; align-items: center; justify-content: flex-end;
     }
-    .footer-brand { font-family:'DM Mono',monospace; font-size:.55rem; letter-spacing:.08em; color:rgba(255,255,255,0.14); }
+    .footer-brand { font-family:'DM Mono',monospace; font-size:.72rem; letter-spacing:.09em; color:rgba(255,255,255,0.22); }
 
     /* Tarjeta disponible (no próximamente) */
     .card-live { border-color: rgba(0,71,255,0.3); }
@@ -388,7 +390,7 @@
         <!-- ══════ 2026 ══════ -->
         <div class="panel active grid-main" id="p2026" style="grid-template-rows:1fr 1fr 1fr 1fr;">
           <!-- Grande izquierda span 2: Consultas Presidenciales (imagen, disponible) -->
-          <div class="card card-img card-live" style="grid-row:span 2; background-image:url('consultas-2026.jpg'); cursor:pointer;">
+          <div class="card card-img card-live" style="grid-row:span 2; background-image:url('consultas-2026.jpg'); background-position: center 20%; cursor:pointer;">
             <div class="card-glow"></div>
             <div class="card-label"><div class="card-name">Consultas Presidenciales 2026</div></div>
           </div>
@@ -405,7 +407,7 @@
           <!-- Fila 3–4: 6 tarjetas en 2 filas de 3 -->
           <div class="bottom-row-6">
             <!-- CITREP (imagen) -->
-            <div class="card card-img" style="background-image:url('CITREP.png'), url('citrep.png');">
+            <div class="card card-img" style="background-image:url('CITREP.png'), url('citrep.png'); background-position: center 20%;">
               <div class="card-glow"></div>
               <div class="card-label"><div class="card-name">CITREP 2026</div></div>
             </div>
@@ -519,6 +521,37 @@
         switchTab(document.querySelector('[data-panel="'+tabs[currentIdx]+'"]'));
       }
     });
+
+    // ── Swipe (touch + mouse drag) para cambiar año ──
+    let touchStartX = 0, touchStartY = 0, mouseStartX = 0, isDragging = false;
+    const swipeTarget = document.querySelector('.panels-wrap');
+
+    swipeTarget.addEventListener('touchstart', e => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    swipeTarget.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      const dy = e.changedTouches[0].clientY - touchStartY;
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 45) {
+        const dir = dx < 0 ? 1 : -1;
+        currentIdx = (currentIdx + dir + tabs.length) % tabs.length;
+        switchTab(document.querySelector('[data-panel="'+tabs[currentIdx]+'"]'));
+      }
+    }, { passive: true });
+
+    swipeTarget.addEventListener('mousedown', e => { mouseStartX = e.clientX; isDragging = true; });
+    swipeTarget.addEventListener('mouseup', e => {
+      if (!isDragging) return; isDragging = false;
+      const dx = e.clientX - mouseStartX;
+      if (Math.abs(dx) > 60) {
+        const dir = dx < 0 ? 1 : -1;
+        currentIdx = (currentIdx + dir + tabs.length) % tabs.length;
+        switchTab(document.querySelector('[data-panel="'+tabs[currentIdx]+'"]'));
+      }
+    });
+    swipeTarget.addEventListener('mouseleave', () => { isDragging = false; });
 
     // Init animate 2026 on load
     animateCards('p2026');
