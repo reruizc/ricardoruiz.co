@@ -127,7 +127,7 @@
     /* Bottom rows of different column counts */
     .bottom-row-3 { grid-column:1/-1; display:grid; grid-template-columns:1fr 1fr 1fr; gap:var(--gap); }
     .bottom-row-4 { grid-column:1/-1; display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:var(--gap); }
-    .bottom-row-6 { grid-column:1/-1; display:grid; grid-template-columns:1fr 1fr 1fr; grid-template-rows:1.875fr 1.875fr; gap:var(--gap); }
+    .bottom-row-6 { grid-column:1/-1; display:grid; grid-template-columns:1fr 1fr 1fr; grid-template-rows:2.44fr 2.44fr; gap:var(--gap); }
 
     /* ── CARD ── */
     .card {
@@ -304,11 +304,96 @@
     .ps-circle {
       width: 15px; height: 15px;
       border-radius: 50%;
-      border: 2.5px solid rgba(90,200,255,0.82);
+      border: 2.5px solid rgba(255,60,60,0.85);
     }
 
 
-    /* ── CURTAIN: 4 CAPAS DIAGONALES ── */
+    /* ── PANEL SABER MÁS (overlay deslizable, no popup) ── */
+    .info-overlay {
+      position: fixed; inset: 0; z-index: 9000;
+      pointer-events: none;
+    }
+    .info-overlay.open { pointer-events: all; }
+
+    /* Fondo semitransparente */
+    .info-backdrop {
+      position: absolute; inset: 0;
+      background: rgba(2,4,16,0.75);
+      backdrop-filter: blur(4px);
+      opacity: 0;
+      transition: opacity .35s ease;
+    }
+    .info-overlay.open .info-backdrop { opacity: 1; }
+
+    /* Panel que sube desde abajo */
+    .info-panel {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      max-height: 80vh;
+      background: #0a0d1e;
+      border-top: 2px solid var(--blue);
+      overflow-y: auto;
+      transform: translateY(100%);
+      transition: transform .42s cubic-bezier(.25,.46,.45,.94);
+      padding: 2.5rem 3rem 2.5rem;
+    }
+    .info-overlay.open .info-panel { transform: translateY(0); }
+
+    .info-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      margin-bottom: 2rem;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding-bottom: 1.2rem;
+    }
+    .info-title {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: clamp(1.3rem, 3vw, 2rem);
+      letter-spacing: -.03em; line-height: 1;
+      color: var(--white);
+    }
+    .info-title span { color: var(--blue); }
+    .info-close {
+      font-family: 'DM Mono', monospace; font-size: .65rem;
+      letter-spacing: .18em; text-transform: uppercase;
+      color: rgba(255,255,255,0.3); cursor: none;
+      background: none; border: none;
+      transition: color .2s; flex-shrink: 0; padding-top:.3rem;
+    }
+    .info-close:hover { color: var(--white); }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .info-block {
+      border-left: 2px solid rgba(0,71,255,0.35);
+      padding: .5rem 0 .5rem 1rem;
+    }
+    .info-block-title {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: .8rem; text-transform: uppercase; letter-spacing: .06em;
+      color: rgba(0,71,255,0.8); margin-bottom: .5rem;
+    }
+    .info-block-text {
+      font-family: 'DM Mono', monospace; font-size: .68rem;
+      line-height: 1.7; letter-spacing: .02em;
+      color: rgba(255,255,255,0.55);
+    }
+    .info-footer-note {
+      font-family: 'DM Mono', monospace; font-size: .6rem;
+      letter-spacing: .12em; text-transform: uppercase;
+      color: rgba(255,255,255,0.2);
+      border-top: 1px solid rgba(255,255,255,0.06);
+      padding-top: 1rem;
+    }
+    @media (max-width: 900px) {
+      .info-panel { padding: 1.5rem 1.2rem 2rem; }
+      .info-grid { grid-template-columns: 1fr; }
+    }
+
+    
     .curtain {
       position: fixed; inset: 0; z-index: 99999;
       pointer-events: none;
@@ -497,7 +582,7 @@
 
         <!-- ══════ 2023 ══════ -->
         <div class="panel grid-main" id="p2023">
-          <div class="card" style="grid-row:span 2;" data-tape>
+          <div class="card card-img" style="grid-row:span 2; background-image:url('alcaldias-2023.png'); background-position:center 20%;" data-tape>
             <div class="card-glow"></div>
             <div class="card-soon"><div class="card-tape"><div class="card-tape-inner" data-words></div></div></div>
             <div class="card-label"><div class="card-name">Alcaldías</div></div>
@@ -656,7 +741,7 @@
 
       <!-- PS BUTTONS — above the full-width line -->
       <div class="ps-buttons-bar">
-        <a href="#" class="ps-btn"><span class="ps-icon"><span class="ps-triangle"></span></span>Saber más</a>
+        <button class="ps-btn" onclick="openSaberMas()"><span class="ps-icon"><span class="ps-triangle"></span></span>Saber más</button>
         <div class="ps-divider"></div>
         <a href="index.html" class="ps-btn"><span class="ps-icon"><span class="ps-cross"></span></span>Volver al inicio</a>
         <div class="ps-divider"></div>
@@ -673,6 +758,44 @@
     </div>
 
   </div><!-- /shell -->
+
+  <!-- PANEL SABER MÁS -->
+  <div class="info-overlay" id="infoOverlay">
+    <div class="info-backdrop" onclick="closeSaberMas()"></div>
+    <div class="info-panel">
+      <div class="info-header">
+        <div class="info-title">Cómo construimos<br/><span>esto</span></div>
+        <button class="info-close" onclick="closeSaberMas()">✕ cerrar</button>
+      </div>
+      <div class="info-grid">
+        <div class="info-block">
+          <div class="info-block-title">📡 Fuente de datos</div>
+          <div class="info-block-text">Los resultados provienen directamente de la Registraduría Nacional del Estado Civil de Colombia. Procesamos los boletines oficiales en tiempo real y los consolidamos en nuestra base de datos.</div>
+        </div>
+        <div class="info-block">
+          <div class="info-block-title">⚡ Actualización</div>
+          <div class="info-block-text">Durante las jornadas electorales actualizamos los datos cada pocos minutos. El indicador "● EN VIVO" aparece en los módulos que están transmitiendo resultados en tiempo real.</div>
+        </div>
+        <div class="info-block">
+          <div class="info-block-title">📊 Análisis</div>
+          <div class="info-block-text">Además del preconteo oficial, construimos modelos de análisis electoral basados en técnicas estadísticas y de machine learning para proyectar tendencias y comparar comportamientos históricos.</div>
+        </div>
+        <div class="info-block">
+          <div class="info-block-title">🛠️ Tecnología</div>
+          <div class="info-block-text">Este portal fue construido con HTML, CSS y JavaScript puro. Las visualizaciones usan Chart.js y librerías de mapas. Toda la infraestructura corre sobre GitHub Pages con dominio propio.</div>
+        </div>
+        <div class="info-block">
+          <div class="info-block-title">🔒 Módulos bloqueados</div>
+          <div class="info-block-text">Los módulos marcados con 🔒 estarán disponibles progresivamente a medida que avancen los procesos electorales. El Escrutinio y el Análisis Electoral se habilitan tras el cierre oficial de urnas.</div>
+        </div>
+        <div class="info-block">
+          <div class="info-block-title">👤 Equipo</div>
+          <div class="info-block-text">Ricardo Ruiz es politólogo de la Universidad Nacional y magíster en ciencia política de los Andes. Este proyecto es una iniciativa independiente de análisis electoral colombiano.</div>
+        </div>
+      </div>
+      <div class="info-footer-note">ricardoruiz.co · Elecciones Colombia · Datos de la Registraduría Nacional del Estado Civil</div>
+    </div>
+  </div>
 
   <!-- CURTAIN TRANSITION -->
   <div class="curtain" id="curtain">
@@ -691,6 +814,20 @@
   </div>
 
   <script>
+    // ── Saber Más panel ──
+    function openSaberMas() {
+      document.getElementById('infoOverlay').classList.add('open');
+    }
+    function closeSaberMas() {
+      document.getElementById('infoOverlay').classList.remove('open');
+    }
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        closeSaberMas();
+        document.querySelectorAll('.card-submenu.open').forEach(m => m.classList.remove('open'));
+      }
+    });
+
     // ── Fill tape words ──
     const TAPE_WORDS = ['PRÓXIMAMENTE','·\u00a0NO PASE\u00a0·'];
     document.querySelectorAll('[data-words]').forEach(inner => {
@@ -774,7 +911,6 @@
 
     // ── Keyboard ──
     document.addEventListener('keydown', e => {
-      if (e.key==='Escape') { document.querySelectorAll('.card-submenu.open').forEach(m=>m.classList.remove('open')); return; }
       if (e.key==='ArrowRight'||e.key==='ArrowLeft') {
         currentIdx = (currentIdx + (e.key==='ArrowRight'?1:-1) + tabs.length) % tabs.length;
         switchTab(document.querySelector('[data-panel="'+tabs[currentIdx]+'"]'));
