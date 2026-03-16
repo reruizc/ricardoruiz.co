@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Senado · Preconteo 2026 · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <style>
+    :root {
+      --black: #0a0a0a;
+      --white: #f4f3ef;
+      --blue: #0047FF;
+      --green: #4ade80;
+      --card: rgba(255,255,255,0.05);
+      --card-border: rgba(255,255,255,0.1);
+      --border: rgba(255,255,255,0.08);
+      --gray: rgba(255,255,255,0.5);
+      --td-color: rgba(255,255,255,0.75);
+      --td-hover: rgba(255,255,255,0.04);
+      --bar-bg: rgba(255,255,255,0.1);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { background: #060810; color: var(--white); font-family: 'Syne', sans-serif; cursor: none; min-height: 100vh; overflow-x: hidden; }
+
+    /* CURSOR */
+    .cursor { position:fixed; width:10px; height:10px; background:var(--blue); border-radius:50%; pointer-events:none; z-index:9999; transform:translate(-50%,-50%); transition:transform .15s,background .2s; }
+    .cursor-ring { position:fixed; width:32px; height:32px; border:1.5px solid var(--blue); border-radius:50%; pointer-events:none; z-index:9998; transform:translate(-50%,-50%); opacity:.4; }
+
+    /* BACKGROUND */
+    .bg-layer { position:fixed; inset:0; z-index:0; background:url('foto-fondo.webp') center right / cover no-repeat; }
+    .bg-overlay {
+      position:fixed; inset:0; z-index:1;
+      background: linear-gradient(to right, rgba(4,6,16,0.97) 0%, rgba(4,6,16,0.94) 55%, rgba(4,6,16,0.72) 72%, rgba(4,6,16,0.35) 88%, rgba(4,6,16,0.10) 100%);
+    }
+
+    /* SHELL */
+    .shell {
+      position: relative; z-index: 2;
+      min-height: 100vh; display: flex; flex-direction: column;
+    }
+
+    /* TOP BAR */
+    .top-bar {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      padding: 1.1rem 2.5rem 0;
+      flex-shrink: 0;
+    }
+    .page-title {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: clamp(1.5rem, 2.8vw, 2.5rem);
+      letter-spacing: -0.04em; line-height: 1.05;
+      color: var(--white); text-shadow: 0 2px 24px rgba(0,71,255,0.4);
+    }
+    .page-title span { color: var(--blue); }
+    .logo-link {
+      display: flex; align-items: center; gap: 0.55rem;
+      text-decoration: none; opacity: .8; transition: opacity .2s;
+    }
+    .logo-link:hover { opacity: 1; }
+    .logo-bars { display: flex; align-items: flex-end; gap: 3px; height: 20px; }
+    .logo-bar { width: 5px; background: var(--blue); border-radius: 1px 1px 0 0; opacity:.85; }
+    .logo-text { font-family: 'Syne', sans-serif; font-weight: 800; font-size: clamp(1.1rem, 2vw, 1.8rem); letter-spacing: -.03em; color: var(--white); }
+    .logo-text span { color: var(--blue); }
+
+    /* BREADCRUMB */
+    .breadcrumb {
+      padding: .6rem 2.5rem 0;
+      font-family: 'DM Mono', monospace; font-size: .62rem;
+      letter-spacing: .15em; text-transform: uppercase;
+      color: rgba(255,255,255,0.3);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: .7rem;
+      flex-shrink: 0;
+    }
+    .breadcrumb a { color: rgba(0,71,255,0.7); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--blue); }
+
+    /* STATUS BAR */
+    .status-bar {
+      display: flex; align-items: center; gap: .75rem;
+      padding: .4rem 2.5rem;
+      background: rgba(0,71,255,.07);
+      border-bottom: 1px solid rgba(0,71,255,.15);
+      font-family: 'DM Mono', monospace; font-size: .62rem; color: var(--blue);
+      flex-shrink: 0;
+    }
+    .status-bar span { color: rgba(255,255,255,0.4); }
+    .live-dot { width:7px; height:7px; background:var(--blue); border-radius:50%; display:inline-block; flex-shrink:0; animation:pulse 1.5s ease infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.3)} }
+
+    /* META BAR */
+    .meta-bar {
+      display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap;
+      padding: .5rem 2.5rem;
+      border-bottom: 1px solid var(--border);
+      font-family: 'DM Mono', monospace; font-size: .62rem;
+      letter-spacing: .08em; color: rgba(255,255,255,0.35);
+      flex-shrink: 0;
+    }
+    .meta-item b { color: rgba(74,222,128,0.85); font-weight: 700; }
+    .reload-badge { margin-left: auto; font-family: 'DM Mono', monospace; font-size: .6rem; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,0.3); background: rgba(255,255,255,.04); border: 1px solid var(--border); padding: .3rem .8rem; }
+    .reload-badge b { color: var(--blue); }
+
+    /* VISTA TABS */
+    .vista-tabs {
+      display: flex; gap: 0;
+      padding: .7rem 2.5rem 0;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .vista-tab {
+      font-family: 'DM Mono', monospace; font-size: .72rem;
+      letter-spacing: .15em; text-transform: uppercase;
+      color: rgba(255,255,255,0.35); padding: .45rem 1.4rem .55rem;
+      border: none; background: none; cursor: none;
+      position: relative; transition: color .2s; user-select: none;
+    }
+    .vista-tab::after { content:''; position:absolute; bottom:-1px; left:0; right:0; height:2px; background:var(--blue); transform:scaleX(0); transition:transform .22s; }
+    .vista-tab.active { color: var(--white); font-weight: 700; }
+    .vista-tab.active::after { transform: scaleX(1); }
+    .vista-tab:hover { color: rgba(255,255,255,.65); }
+
+    /* CONTENT AREA */
+    .content-area {
+      flex: 1;
+      padding: 1.8rem 2.5rem 1.5rem;
+    }
+
+    /* SUB-SELECTOR */
+    .sub-selector {
+      display: flex; gap: .75rem; margin-bottom: 1.5rem;
+      flex-wrap: wrap; align-items: center;
+    }
+    .sub-label {
+      font-family: 'DM Mono', monospace; font-size: .65rem;
+      letter-spacing: .15em; text-transform: uppercase;
+      color: rgba(255,255,255,0.3); margin-right: .25rem;
+    }
+    .dep-select {
+      font-family: 'DM Mono', monospace; font-size: .65rem;
+      letter-spacing: .06em; text-transform: uppercase;
+      background: rgba(255,255,255,.05); border: 1.5px solid var(--card-border);
+      color: var(--white); padding: .45rem 2rem .45rem .8rem;
+      cursor: pointer; outline: none; transition: border-color .2s;
+      appearance: none; -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23aaa' stroke-width='1.5' stroke-linecap='round' fill='none'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right .75rem center;
+    }
+    .dep-select:hover, .dep-select:focus { border-color: var(--blue); }
+    .dep-select option { background: #0e1220; color: var(--white); }
+    .search-input {
+      font-family: 'DM Mono', monospace; font-size: .65rem;
+      letter-spacing: .06em;
+      background: rgba(255,255,255,.05); border: 1.5px solid var(--card-border);
+      color: var(--white); padding: .45rem .8rem;
+      outline: none; width: 200px; transition: border-color .2s;
+    }
+    .search-input:focus { border-color: var(--blue); }
+    .search-input::placeholder { color: rgba(255,255,255,.25); }
+
+    /* KPI */
+    .kpi-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 1.5rem; }
+    .kpi-card {
+      background: rgba(255,255,255,.04); border: 1px solid var(--card-border);
+      padding: 1.1rem 1.3rem;
+      backdrop-filter: blur(4px);
+    }
+    .kpi-label { font-family: 'DM Mono', monospace; font-size: .6rem; letter-spacing: .15em; text-transform: uppercase; color: rgba(255,255,255,.35); margin-bottom: .4rem; }
+    .kpi-val { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.7rem; letter-spacing: -.04em; line-height: 1; color: var(--blue); }
+    .kpi-val.dark { color: var(--white); }
+    .kpi-val.green { color: #4ade80; }
+    .kpi-val.sm { font-size: .95rem; color: var(--white); line-height: 1.3; }
+    .kpi-delta { font-family: 'DM Mono', monospace; font-size: .6rem; color: rgba(255,255,255,.28); margin-top: .3rem; }
+
+    /* RESULTS GRID */
+    .results-grid { display: grid; grid-template-columns: 1fr 300px; gap: 1.2rem; }
+    .card {
+      background: rgba(255,255,255,.04); border: 1px solid var(--card-border);
+      padding: 1.3rem; overflow: hidden;
+      backdrop-filter: blur(4px);
+    }
+    .card-label {
+      font-family: 'DM Mono', monospace; font-size: .6rem;
+      letter-spacing: .18em; text-transform: uppercase;
+      color: rgba(255,255,255,.3); margin-bottom: 1rem;
+    }
+
+    /* TABLE */
+    .results-table { width: 100%; border-collapse: collapse; }
+    .results-table th {
+      font-family: 'DM Mono', monospace; font-size: .58rem;
+      letter-spacing: .15em; text-transform: uppercase;
+      color: rgba(255,255,255,.25); text-align: left;
+      padding: .5rem .6rem; border-bottom: 1px solid var(--border);
+    }
+    .results-table th.r { text-align: right; }
+    .results-table td {
+      padding: .65rem .6rem; border-bottom: 1px solid rgba(255,255,255,.05);
+      font-family: 'DM Mono', monospace; font-size: .74rem;
+      color: var(--td-color); vertical-align: middle;
+    }
+    .results-table td.r { text-align: right; }
+    .results-table tr:hover td { background: var(--td-hover); }
+    .results-table tr.winner td { color: var(--white); }
+
+    .cands-inner {
+      background: rgba(0,0,0,.2); border-top: 1px solid var(--border);
+      border-bottom: 2px solid rgba(0,71,255,.2); padding: .5rem 1rem .75rem 2.5rem;
+    }
+    .cands-table { width:100%; border-collapse:collapse; font-size:.78rem; }
+    .cands-table thead th {
+      font-size:.6rem; letter-spacing:.06em; text-transform:uppercase;
+      color:rgba(255,255,255,.25); padding:.4rem .5rem;
+      border-bottom:1px solid var(--border); font-weight:400;
+    }
+    .cands-table tbody tr { border-bottom: 1px solid rgba(255,255,255,.05); }
+    .cands-table tbody tr:last-child { border-bottom: none; }
+    .cands-table tbody td { padding:.35rem .5rem; vertical-align:middle; }
+    .cands-row td { padding:0!important; }
+
+    .cifras-bloque { margin-top:.9rem; padding-top:.8rem; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:.4rem; }
+    .cifra-item { display:flex; justify-content:space-between; align-items:baseline; gap:.5rem; }
+    .cifra-label { font-size:.65rem; letter-spacing:.06em; text-transform:uppercase; color:rgba(255,255,255,.3); }
+    .cifra-val { font-family:'DM Mono',monospace; font-size:.8rem; color:var(--white); font-weight:500; }
+
+    .cname { font-family:'Syne',sans-serif; font-weight:700; font-size:.86rem; color:var(--white); display:block; }
+    .csub { font-family:'DM Mono',monospace; font-size:.6rem; color:rgba(255,255,255,.3); margin-top:2px; display:block; }
+    .bar-wrap { width:72px; height:4px; background:var(--bar-bg); border-radius:2px; overflow:hidden; display:inline-block; vertical-align:middle; }
+    .bar-fill { height:100%; background:var(--blue); border-radius:2px; transition:width 1s ease; }
+    .pct-val { font-family:'Syne',sans-serif; font-weight:700; font-size:.8rem; color:var(--white); display:inline-block; width:40px; text-align:right; margin-left:6px; }
+    .cbadge {
+      display:inline-flex; align-items:center; justify-content:center;
+      background:rgba(0,71,255,.15); color:var(--blue);
+      font-family:'Syne',sans-serif; font-weight:800; font-size:.85rem;
+      min-width:28px; height:24px; padding:0 6px;
+      border:1px solid rgba(0,71,255,.3);
+    }
+    .dot10 { width:10px; height:10px; border-radius:50%; display:inline-block; flex-shrink:0; }
+
+    /* DONUT */
+    .donut-wrap { display:flex; flex-direction:column; align-items:center; gap:1rem; }
+    .donut-cw { position:relative; width:150px; height:150px; }
+    .donut-center { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; }
+    .donut-pct { font-family:'Syne',sans-serif; font-weight:800; font-size:1.5rem; letter-spacing:-.04em; color:var(--white); line-height:1; }
+    .donut-sub { font-family:'DM Mono',monospace; font-size:.52rem; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.3); margin-top:2px; }
+    .donut-legend { width:100%; display:flex; flex-direction:column; gap:.5rem; }
+    .li { display:flex; align-items:center; gap:.6rem; font-family:'DM Mono',monospace; font-size:.62rem; color:rgba(255,255,255,.5); }
+    .ld { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+    .lv { margin-left:auto; color:var(--white); font-weight:700; }
+
+    /* MAP */
+    .map-card { grid-column: 1 / -1; }
+    .map-container { height:440px; width:100%; background:rgba(0,0,0,.3); position:relative; }
+    .map-container > div:first-child { height:100%; width:100%; }
+    .mlb {
+      position:absolute; bottom:1rem; right:1rem;
+      background:rgba(4,6,16,.92); border:1px solid var(--card-border);
+      padding:.75rem 1rem; z-index:999; max-width:190px;
+      box-shadow:0 2px 16px rgba(0,0,0,.4);
+    }
+    .mlb-title { font-family:'DM Mono',monospace; font-size:.56rem; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.25); margin-bottom:.5rem; }
+    .mlb-item { display:flex; align-items:center; gap:.5rem; font-family:'DM Mono',monospace; font-size:.6rem; color:rgba(255,255,255,.5); margin-bottom:.35rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .mlb-color { width:9px; height:9px; flex-shrink:0; }
+
+    /* SEARCH RESULTS */
+    #sen-search-results { margin-bottom: 1.5rem; }
+
+    /* ROTATE HINT */
+    .rotate-hint { display:none; }
+    @media(max-width:700px) and (orientation:portrait) {
+      .rotate-hint { display:flex; align-items:center; gap:.6rem; font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.06em; color:rgba(255,255,255,.35); padding:.5rem .8rem; background:rgba(255,255,255,.04); border:1px solid var(--border); margin-bottom:.8rem; }
+    }
+
+    /* BACK BAR */
+    .back-bar {
+      flex-shrink:0; padding: .6rem 2.5rem 1rem;
+      display:flex; align-items:center; gap:1rem;
+    }
+    .back-btn {
+      display:flex; align-items:center; gap:.5rem;
+      font-family:'DM Mono',monospace; font-size:.7rem;
+      letter-spacing:.12em; text-transform:uppercase;
+      color:rgba(255,255,255,.38); text-decoration:none;
+      cursor:none; transition:color .2s;
+    }
+    .back-btn:hover { color:var(--white); }
+
+    /* FOOTER */
+    .full-footer {
+      flex-shrink:0; width:100%;
+      border-top:1px solid var(--border);
+      padding:.5rem 2.5rem;
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .footer-brand { font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.09em; color:rgba(255,255,255,.2); }
+    .footer-brand a { color:rgba(255,255,255,.25); text-decoration:none; }
+    .footer-brand a:hover { color:rgba(255,255,255,.5); }
+
+    /* ── CURTAIN ── */
+    .curtain { position:fixed; inset:0; z-index:99999; pointer-events:none; }
+    .curtain-layer {
+      position:absolute; inset:0; background:#04060e;
+    }
+    .curtain-layer:nth-child(1) { clip-path:polygon(0 0,100% 0,100% 22%,0 28%);   transform:translateX(0); transition:transform .58s cubic-bezier(.75,0,.25,1) 0s; }
+    .curtain-layer:nth-child(2) { clip-path:polygon(0 26%,100% 20%,100% 49%,0 55%); transform:translateX(0); transition:transform .58s cubic-bezier(.75,0,.25,1) .07s; }
+    .curtain-layer:nth-child(3) { clip-path:polygon(0 53%,100% 47%,100% 76%,0 82%); transform:translateX(0); transition:transform .58s cubic-bezier(.75,0,.25,1) .14s; }
+    .curtain-layer:nth-child(4) { clip-path:polygon(0 80%,100% 74%,100% 100%,0 100%); transform:translateX(0); transition:transform .58s cubic-bezier(.75,0,.25,1) .21s; }
+    .curtain-stage {
+      position:absolute; inset:0; z-index:1;
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.8rem;
+      pointer-events:none;
+    }
+    .curtain-tag { font-family:'DM Mono',monospace; font-size:1.08rem; letter-spacing:.35em; text-transform:uppercase; color:rgba(0,71,255,0.7); opacity:1; transform:translateY(0); }
+    .curtain-sub { font-family:'DM Mono',monospace; font-size:0.975rem; letter-spacing:.22em; color:rgba(255,255,255,.35); text-transform:uppercase; opacity:1; transform:translateY(0); }
+    .curtain-headline {
+      font-family:'Syne',sans-serif; font-weight:800;
+      font-size:clamp(2.6rem,6.5vw,5.85rem);
+      letter-spacing:-.03em; line-height:1.05; text-shadow:0 0 50px rgba(0,71,255,0.5); text-align:center;
+    }
+    .curtain-line { overflow:hidden; display:block; }
+    .curtain-word { display:inline-block; opacity:1; transform:translateX(0); transition:transform .52s cubic-bezier(.25,.46,.45,.94), opacity .45s ease; }
+    .curtain-word.white { color:#f4f3ef; }
+    .curtain-word.blue  { color:#0047FF; }
+    .curtain.opened .curtain-layer:nth-child(1) { transform:translateX(-110%); }
+    .curtain.opened .curtain-layer:nth-child(2) { transform:translateX( 110%); }
+    .curtain.opened .curtain-layer:nth-child(3) { transform:translateX(-110%); }
+    .curtain.opened .curtain-layer:nth-child(4) { transform:translateX( 110%); }
+    .curtain.opened .curtain-word { opacity:0; }
+    .curtain.opened .curtain-tag, .curtain.opened .curtain-sub { opacity:0; transition:opacity .25s ease; }
+    .curtain.opened { pointer-events:none; }
+
+    /* RESPONSIVE */
+    @media(max-width:1000px) { .results-grid { grid-template-columns:1fr; } .map-card { grid-column:1; } }
+    @media(max-width:900px) {
+      body { cursor:auto; }
+      .cursor, .cursor-ring { display:none; }
+      .top-bar, .breadcrumb, .meta-bar, .vista-tabs, .content-area, .back-bar, .full-footer { padding-left:1.2rem; padding-right:1.2rem; }
+      .bg-overlay { background:rgba(4,6,16,0.93); }
+      .kpi-row { grid-template-columns:1fr 1fr; gap:.75rem; }
+      .map-container { height:260px; }
+      .results-table th:nth-child(1),.results-table td:nth-child(1) { display:none; }
+    }
+    @media(max-width:600px) {
+      .kpi-row { grid-template-columns:1fr; }
+      .sub-selector { flex-direction:column; align-items:flex-start; }
+      .search-input { width:100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <div class="bg-layer"></div>
+  <div class="bg-overlay"></div>
+
+  <!-- CURTAIN -->
+  <div class="curtain" id="curtain">
+    <div class="curtain-layer"></div>
+    <div class="curtain-layer"></div>
+    <div class="curtain-layer"></div>
+    <div class="curtain-layer"></div>
+    <div class="curtain-stage">
+      <span class="curtain-tag">ricardoruiz.co</span>
+      <div class="curtain-headline">
+        <span class="curtain-line"><span class="curtain-word white">Senado</span></span>
+        <span class="curtain-line"><span class="curtain-word blue">Colombia</span></span>
+      </div>
+      <span class="curtain-sub">Preconteo · 2026</span>
+    </div>
+  </div>
+
+  <div class="shell">
+
+    <!-- TOP BAR -->
+    <div class="top-bar">
+      <div class="page-title">Senado de<br/><span>la República</span></div>
+      <a href="electoral.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div>
+          <div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div>
+          <div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+
+    <!-- BREADCRUMB -->
+    <div class="breadcrumb">
+      <a href="electoral.html">Resultados Electorales</a>
+      &nbsp;/&nbsp; Senado de la República · Preconteo 2026
+    </div>
+
+    <!-- STATUS BAR -->
+    <div class="status-bar" id="statusBar" style="display:none">
+      <span class="live-dot"></span>
+      Datos: <b id="fuenteLbl">—</b> · <span id="csvTimestamp">—</span>
+    </div>
+
+    <!-- META BAR -->
+    <div class="meta-bar">
+      <span>Actualización: <b id="lastUpdate">—</b></span>
+      <span>Mesas: <b id="mesasLabel">— / 126.818</b></span>
+      <span>Potencial: <b>41.370.203</b></span>
+      <div class="reload-badge">Recarga auto: <b id="countdown">03:00</b></div>
+    </div>
+
+    <!-- VISTA TABS -->
+    <div class="vista-tabs">
+      <button class="vista-tab active" onclick="switchVista(this,'partidos')">Partidos</button>
+      <button class="vista-tab" onclick="switchVista(this,'candidatos')">Buscar candidato</button>
+      <button class="vista-tab" onclick="switchVista(this,'mapa')">Mapa</button>
+    </div>
+
+    <!-- CONTENT AREA -->
+    <div class="content-area">
+
+      <!-- Vista: Partidos -->
+      <div id="vista-partidos">
+        <div class="sub-selector">
+          <span class="sub-label">Circunscripción:</span>
+          <select class="dep-select" id="sen-dep-select" onchange="switchSenDep(this.value)"></select>
+        </div>
+        <div class="kpi-row" id="kpi-senado"></div>
+        <div class="results-grid">
+          <div class="card">
+            <div class="card-label" id="lbl-sen-tabla">Partidos · Senado · Circunscripción Nacional · 100 curules · D'Hondt</div>
+            <div class="rotate-hint">↺&nbsp; Gira el teléfono horizontalmente para ver los candidatos</div>
+            <table class="results-table">
+              <thead><tr>
+                <th>#</th>
+                <th>Partido / Coalición</th>
+                <th class="r">Votos</th>
+                <th class="r" style="min-width:130px">%</th>
+                <th class="r">Curules</th>
+              </tr></thead>
+              <tbody id="tbody-senado"></tbody>
+            </table>
+          </div>
+          <div class="card">
+            <div class="card-label">Participación electoral</div>
+            <div class="donut-wrap">
+              <div class="donut-cw">
+                <canvas id="donut-senado"></canvas>
+                <div class="donut-center">
+                  <div class="donut-pct" id="pct-senado">—</div>
+                  <div class="donut-sub">votaron</div>
+                </div>
+              </div>
+              <div class="donut-legend" id="leg-senado"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vista: Buscar candidato -->
+      <div id="vista-candidatos" style="display:none">
+        <div class="sub-selector" style="margin-bottom:1.2rem">
+          <span class="sub-label">Buscar:</span>
+          <input id="sen-search" type="search" class="search-input" placeholder="Nombre o apellido…"
+            oninput="buscarCandidatoSen(this.value)"
+            onfocus="this.style.borderColor='var(--blue)'"
+            onblur="this.style.borderColor='var(--card-border)'" />
+        </div>
+        <div id="sen-search-results"></div>
+      </div>
+
+      <!-- Vista: Mapa -->
+      <div id="vista-mapa" style="display:none">
+        <div class="kpi-row" id="kpi-mapa" style="display:none"></div>
+        <div style="background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1.3rem;backdrop-filter:blur(4px)">
+          <div class="card-label">Partido más votado por departamento · Senado</div>
+          <div class="map-container" style="position:relative">
+            <div id="map-senado"></div>
+            <div class="mlb" id="mlb-senado"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- BACK -->
+    <div class="back-bar">
+      <a href="electoral.html" class="back-btn">← Volver a Resultados Electorales</a>
+    </div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <div class="full-footer">
+    <span class="footer-brand">ricardoruiz.co · Elecciones Colombia 2026</span>
+    <span class="footer-brand"><a href="https://registraduria.gov.co" target="_blank">Fuente: Registraduría Nacional</a></span>
+  </div>
+
+  <script>
+    // ═══════════════════════════════════════════════════════════
+    // CONFIGURACIÓN
+    // ═══════════════════════════════════════════════════════════
+    const RECARGA_MIN = 3;
+    const POTENCIAL   = 41370203;
+    const MESAS_TOTAL = 126818;
+    let   MESAS_REP   = 0;
+
+    const REG = {
+      senado: 'https://registraduria-proxy.reruizc.workers.dev/senado',
+    };
+
+    // ═══════════════════════════════════════════════════════════
+    // DATOS DE PRUEBA (respaldo)
+    // ═══════════════════════════════════════════════════════════
+    let _SENADO_RENDER = [];
+    let SENADO = [
+      {p:'Pacto Histórico',v:1720000},{p:'Centro Democrático',v:1350000},
+      {p:'Partido Liberal',v:1180000},{p:'Partido de la U',v:940000},
+      {p:'Cambio Radical',v:870000},{p:'Conservador',v:760000},
+      {p:'Verde Oxígeno',v:430000},{p:'Colombia Renaciente',v:310000},
+      {p:'Mira',v:220000},{p:'Dignidad',v:130000},
+      {p:'Comunes',v:90000},{p:'Voto en blanco',v:80000},
+    ];
+    let TOT_SENADO = { votval:0, votnul:0, votnma:0, votblan:0, votant:0 };
+
+    // ═══════════════════════════════════════════════════════════
+    // PALETA PARTIDOS
+    // ═══════════════════════════════════════════════════════════
+    const CP={
+      'Pacto Histórico':'#6B2D8B','Centro Democrático':'#0088BB',
+      'Centro Democrático y MIRA':'#0088BB','Partido Liberal Colombiano':'#C8102E',
+      'Partido de la U':'#F7941D','Cambio Radical':'#E91E8C',
+      'Partido Conservador Colombiano':'#003580','Alianza Verde':'#4CAF50',
+      'Movimiento Salvación Nacional':'#00AEEF','MIRA':'#1A3FC4',
+      'MIRA + Dignidad y Compromiso':'#1A3FC4','Frente Amplio Unitario':'#F7941D',
+      'Nuevo Liberalismo':'#E53935','Comunes':'#007755','Colombia Humana':'#7a3db5',
+      'Voto en blanco':'#555',
+    };
+    function getColor(nombre){
+      if(CP[nombre]) return CP[nombre];
+      if(/pacto hist/i.test(nombre)) return '#6B2D8B';
+      if(/centro dem/i.test(nombre)) return '#0088BB';
+      if(/liberal/i.test(nombre)) return '#C8102E';
+      if(/conservador/i.test(nombre)) return '#003580';
+      if(/cambio radical/i.test(nombre)) return '#E91E8C';
+      if(/partido de la u|uni[oó]n por la gente/i.test(nombre)) return '#F7941D';
+      if(/alianza verde/i.test(nombre)) return '#4CAF50';
+      if(/salvaci[oó]n/i.test(nombre)) return '#00AEEF';
+      if(/\bMIRA\b/i.test(nombre)) return '#1A3FC4';
+      if(/frente amplio/i.test(nombre)) return '#F7941D';
+      if(/nuevo liberalismo/i.test(nombre)) return '#E53935';
+      if(/comunes/i.test(nombre)) return '#007755';
+      return '#555';
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // NOMBRES PARTIDOS (codpar → nombre)
+    // ═══════════════════════════════════════════════════════════
+    const NOMBRES_PAR = {
+      '92':'Pacto Histórico','93':'Pacto Histórico','84':'Pacto Histórico',
+      '86':'Pacto Histórico','85':'Pacto Histórico','91':'Pacto Histórico',
+      '90':'Pacto Histórico','89':'Pacto Histórico','81':'Pacto Histórico',
+      '26':'Pacto Histórico','87':'Pacto Histórico','104':'Pacto Histórico',
+      '115':'Pacto Histórico','96':'Pacto Histórico','157':'Pacto Histórico',
+      '124':'Pacto Histórico','113':'Pacto Histórico y Frente Amplio',
+      '10':'Centro Democrático','58':'Centro Democrático y MIRA',
+      '2' :'Partido Liberal Colombiano','3' :'Partido Conservador Colombiano',
+      '4' :'Cambio Radical','5' :'Alianza Verde','9' :'Partido de la U',
+      '12':'Colombia Justa Libres','13':'Dignidad y Compromiso','14':'Comunes',
+      '16':'Nuevo Liberalismo','17':'Movimiento Salvación Nacional',
+      '18':'Partido Político Oxígeno','20':'Partido Demócrata Colombiano',
+      '21':'Movimiento Salvación Nacional','8' :'MIRA',
+      '40':'La Lista de Oviedo - Con Toda por Colombia',
+      '44':'Coalición Cambio Radical - ALMA',
+      '6' :'AICO',
+    };
+    const NOMBRES_PAR_SEN = { ...NOMBRES_PAR };
+
+    // Mapa DANE departamentos
+    const DANE_DEP_CONS = {
+      '60':'Amazonas','01':'Antioquia','40':'Arauca','56':'San Andrés',
+      '88':'Circunscripción exterior','03':'Atlántico','16':'Bogotá D.C.',
+      '06':'Bolívar','07':'Boyacá','09':'Caldas','44':'Caquetá','46':'Casanare',
+      '11':'Cauca','12':'Cesar','17':'Chocó','13':'Córdoba','15':'Cundinamarca',
+      '50':'Guainía','54':'Guaviare','19':'Huila','48':'La Guajira','21':'Magdalena',
+      '52':'Meta','23':'Nariño','25':'Norte de Santander','64':'Putumayo',
+      '24':'Quindío','27':'Risaralda','26':'Santander','28':'Sucre','29':'Tolima',
+      '31':'Valle del Cauca','68':'Vaupés','72':'Vichada',
+    };
+
+    let DEP_SENADO = {};
+
+    function topPartido(datos){ return (datos.filter(p=>p.p!=='Voto en blanco').sort((a,b)=>b.v-a.v)[0]||{}).p||'—'; }
+    function recalcDeps(){ const sg=topPartido(SENADO); Object.keys(DANE_DEP_CONS).forEach(cod=>{ DEP_SENADO[DANE_DEP_CONS[cod]]=sg; }); }
+
+    function fusionarPartidos(datos){
+      const mapa={};
+      datos.forEach(p=>{ if(!mapa[p.p]) mapa[p.p]={p:p.p,v:0,codpar:p.codpar}; mapa[p.p].v+=p.v; });
+      return Object.values(mapa).sort((a,b)=>b.v-a.v);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // FETCH REGISTRADURÍA
+    // ═══════════════════════════════════════════════════════════
+    async function fetchReg(url){
+      try{ const r=await fetch(url+'?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return null; return await r.json(); }
+      catch(e){ return null; }
+    }
+
+    async function cargarDesdeRegistraduria(){
+      let ok=false;
+      const ds=await fetchReg(REG.senado);
+      if(ds && ds.camaras && ds.camaras[0]){
+        const cam=ds.camaras[0];
+        const partidos=cam.partotabla||[];
+        if(partidos.length){
+          SENADO=partidos.map(p=>{
+            const a=p.act;
+            const nombre=NOMBRES_PAR_SEN[String(a.codpar)]||a.nompar||`Partido ${a.codpar}`;
+            const todosLosCands=a.cantotabla||[];
+            const candsAbiertos=todosLosCands.filter(c=>c.vot>0).sort((a,b)=>b.vot-a.vot);
+            const esCerrada=candsAbiertos.length===0||(candsAbiertos.length===1&&/solo por la lista/i.test(candsAbiertos[0].nomcan));
+            const candsCerrados=esCerrada
+              ? todosLosCands.filter(c=>!/solo por la lista/i.test(c.nomcan)).sort((a,b)=>parseInt(a.codcan)-parseInt(b.codcan))
+              : [];
+            return {p:nombre,v:parseInt(a.vot)||0,codpar:String(a.codpar),listaCerrada:esCerrada,candidatos:esCerrada?candsCerrados:candsAbiertos};
+          }).sort((a,b)=>b.v-a.v);
+          ok=true;
+        }
+        const tot=ds.totales&&ds.totales.act;
+        if(tot){
+          MESAS_REP=parseInt(tot.mesesc)||MESAS_REP;
+          const votant=parseInt(tot.votant)||0;
+          const votval=parseInt(tot.votval)||0;
+          const votnul=parseInt(tot.votnul)||0;
+          const votblan=parseInt(tot.votblan)||0;
+          const votnma=parseInt(tot.votnma)||(votant-votval-votnul)||0;
+          TOT_SENADO={votant,votval,votnul,votnma,votblan};
+        }
+      }
+      return ok;
+    }
+
+    async function cargarDatos(){
+      let fuente='';
+      const regOk=await cargarDesdeRegistraduria();
+      if(regOk) fuente='Registraduría Nacional';
+      recalcDeps();
+      refreshUI(regOk, fuente);
+    }
+
+    function refreshUI(fromExternal, fuente){
+      const ahora=new Date();
+      const ts=ahora.toLocaleDateString('es-CO')+' · '+ahora.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+      document.getElementById('lastUpdate').textContent=ts;
+      document.getElementById('mesasLabel').textContent=(MESAS_REP||0).toLocaleString('es-CO')+' / '+MESAS_TOTAL.toLocaleString('es-CO');
+      if(fromExternal){
+        document.getElementById('statusBar').style.display='flex';
+        document.getElementById('csvTimestamp').textContent=ts;
+        const lbl=document.getElementById('fuenteLbl');
+        if(lbl) lbl.textContent=fuente||'Fuente externa';
+      }
+      renderSenado();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // D'HONDT
+    // ═══════════════════════════════════════════════════════════
+    function esBlanco(p){ return /blanco/i.test(p); }
+    function dhondt(datos,curules,votval){
+      const base=votval||datos.reduce((s,p)=>s+p.v,0);
+      const umb=base*0.03;
+      const eleg=datos.filter(p=>p.v>=umb&&!esBlanco(p.p));
+      const c={}; eleg.forEach(p=>c[p.p]=0);
+      let cifraRepartidora=0;
+      for(let i=0;i<curules;i++){
+        let mx=-1,win=null;
+        eleg.forEach(p=>{ const v=p.v/(c[p.p]+1); if(v>mx){mx=v;win=p.p;} });
+        if(win){c[win]++;cifraRepartidora=mx;}
+      }
+      c.__cifra__=Math.round(cifraRepartidora);
+      c.__umb__=Math.round(umb);
+      return c;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // RENDERS
+    // ═══════════════════════════════════════════════════════════
+    function renderKPI(id,items){
+      document.getElementById(id).innerHTML=items.map(k=>`<div class="kpi-card"><div class="kpi-label">${k.l}</div><div class="kpi-val ${k.c||''}">${k.v}</div><div class="kpi-delta">${k.d}</div></div>`).join('');
+    }
+
+    const donutI={};
+    function renderDonut(cid,pid,lid,tot){
+      const {votval=0,votnul=0,votnma=0,votblan=0,potencial=POTENCIAL,cifra=0,umb=0}=tot;
+      const novot=Math.max(0,potencial-votval-votnul-votnma-votblan);
+      if(donutI[cid])donutI[cid].destroy();
+      const ctx=document.getElementById(cid).getContext('2d');
+      donutI[cid]=new Chart(ctx,{type:'doughnut',
+        data:{labels:['Votos válidos','Nulos','No marcados','En blanco','No votaron'],
+          datasets:[{data:[votval,votnul,votnma,votblan,novot],
+            backgroundColor:['#0047FF','#cc2233','#f0a500','#666','#1e2030'],
+            borderWidth:0,hoverOffset:6}]},
+        options:{responsive:true,maintainAspectRatio:true,cutout:'72%',
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}}}}
+      });
+      const pct=((votval+votnul+votnma+votblan)/potencial*100).toFixed(1);
+      document.getElementById(pid).textContent=pct+'%';
+      document.getElementById(lid).innerHTML=`
+        <div class="li"><div class="ld" style="background:#0047FF"></div>Votos válidos<span class="lv">${votval.toLocaleString('es-CO')}</span></div>
+        <div class="li"><div class="ld" style="background:#cc2233"></div>Nulos<span class="lv">${votnul.toLocaleString('es-CO')}</span></div>
+        <div class="li"><div class="ld" style="background:#f0a500"></div>No marcados<span class="lv">${votnma.toLocaleString('es-CO')}</span></div>
+        <div class="li"><div class="ld" style="background:#666"></div>En blanco<span class="lv">${votblan.toLocaleString('es-CO')}</span></div>
+        <div class="li"><div class="ld" style="background:#1e2030;border:1px solid #333"></div>No votaron<span class="lv">${novot.toLocaleString('es-CO')}</span></div>
+        ${cifra||umb?`<div class="cifras-bloque">
+          ${umb?`<div class="cifra-item"><span class="cifra-label">Umbral 3%</span><span class="cifra-val">${umb.toLocaleString('es-CO')}</span></div>`:''}
+          ${cifra?`<div class="cifra-item"><span class="cifra-label">Cifra repartidora</span><span class="cifra-val">${cifra.toLocaleString('es-CO')}</span></div>`:''}
+        </div>`:''}`;
+    }
+
+    if(!window._candsToggle) window._candsToggle={};
+    function renderTablaPartidos(tid,datos,curules,votval,curPrecalc){
+      const tbody=document.getElementById(tid);
+      const totalArr=datos.reduce((s,p)=>s+p.v,0);
+      const base=votval||totalArr;
+      const umb=base*0.03;
+      const c=curPrecalc||dhondt(datos,curules,votval);
+      const mx=Math.max(...datos.map(p=>p.v));
+      tbody.innerHTML='';
+      const tkey=tid.replace('tbody-','');
+      datos.forEach((p,i)=>{
+        const pct=((p.v/base)*100).toFixed(2);
+        const bw=((p.v/mx)*100).toFixed(1),cr=c[p.p]||0;
+        const bajoUmbral=p.v<umb&&!esBlanco(p.p);
+        const cands=(p.candidatos||[]).filter(c=>p.listaCerrada?true:parseInt(c.vot||0)>0);
+        const tieneCands=cands.length>0;
+        const toggleId=`${tkey}_${i}`;
+        if(tieneCands){
+          window._candsToggle[toggleId]=function(e){
+            if(e) e.stopPropagation();
+            const trC=document.getElementById('cands_'+toggleId);
+            const arrow=document.getElementById('arrow_'+toggleId);
+            if(!trC) return;
+            const open=trC.style.display!=='none';
+            trC.style.display=open?'none':'table-row';
+            if(arrow) arrow.style.transform=open?'':'rotate(90deg)';
+          };
+        }
+        const tr=document.createElement('tr');
+        tr.style.cursor=tieneCands?'pointer':'default';
+        if(i===0)tr.classList.add('winner');
+        if(bajoUmbral)tr.style.opacity='0.4';
+        if(tieneCands){ tr.onclick=window._candsToggle[toggleId]; tr.ontouchend=function(e){e.preventDefault();window._candsToggle[toggleId]();}; }
+        tr.innerHTML=`
+          <td style="color:rgba(255,255,255,.25);font-size:.65rem">${String(i+1).padStart(2,'0')}</td>
+          <td style="padding:0">
+            ${tieneCands
+              ?`<div style="width:100%;padding:.55rem .4rem;display:flex;align-items:center;gap:.5rem;pointer-events:none">
+                  <span class="dot10" style="background:${getColor(p.p)||'#555'};flex-shrink:0"></span>
+                  <span style="flex:1;font-size:.78rem">${p.p}${bajoUmbral?'<span style="font-size:.6rem;color:rgba(255,255,255,.3);margin-left:.3rem">↓ umbral</span>':''}</span>
+                  <span id="arrow_${toggleId}" style="font-size:.7rem;color:rgba(255,255,255,.3);transition:transform .2s;flex-shrink:0">▶</span>
+                </div>`
+              :`<span style="display:flex;align-items:center;gap:.5rem;padding:.55rem .4rem;font-size:.78rem">
+                  <span class="dot10" style="background:${getColor(p.p)||'#555'}"></span>
+                  ${p.p}${bajoUmbral?'<span style="font-size:.6rem;color:rgba(255,255,255,.3);margin-left:.3rem">↓ umbral</span>':''}
+                </span>`
+            }
+          </td>
+          <td class="r">${p.v.toLocaleString('es-CO')}</td>
+          <td class="r"><div class="bar-wrap"><div class="bar-fill" style="width:0%;background:${getColor(p.p)||'#555'}" data-w="${bw}%"></div></div><span class="pct-val">${pct}%</span></td>
+          <td class="r" style="white-space:nowrap">${cr>0?`<span class="cbadge">${cr}</span>`:esBlanco(p.p)?'<span style="color:rgba(255,255,255,.25);font-size:.7rem">N/A</span>':'<span style="color:rgba(255,255,255,.2)">—</span>'}</td>`;
+        tbody.appendChild(tr);
+
+        if(tieneCands){
+          const trC=document.createElement('tr');
+          trC.id='cands_'+toggleId;
+          trC.className='cands-row';
+          trC.style.display='none';
+          const esCerrada=p.listaCerrada;
+          const maxVot=Math.max(...(cands.map(c=>parseInt(c.vot||0))||[1]));
+          trC.innerHTML=`<td colspan="5" style="padding:0">
+            <div class="cands-inner">
+              <table class="cands-table">
+                <thead><tr>
+                  <th style="width:2rem">#</th><th>Candidato/a</th>
+                  ${esCerrada?'':'<th class="r">Votos</th><th class="r">% partido</th>'}
+                  <th class="r" style="width:8rem"></th>
+                </tr></thead>
+                <tbody>
+                  ${cands.slice(0,esCerrada?Math.max(cr+5,15):30).map((cd,j)=>{
+                    const nom=`${cd.nomcan||''} ${cd.apecan||''}`.trim()||cd.nomcan||'—';
+                    if(esCerrada){
+                      const color=j<cr?'var(--blue)':'rgba(255,255,255,.4)';
+                      const fw=j<cr?'600':'400';
+                      return `<tr>
+                        <td style="color:rgba(255,255,255,.25);font-size:.6rem">${String(j+1).padStart(2,'0')}</td>
+                        <td colspan="2" style="font-size:.78rem;color:${color};font-weight:${fw}">${nom}${j<cr?'<span style="font-size:.55rem;margin-left:.4rem;opacity:.7">✦</span>':''}</td>
+                        <td class="r"><div class="bar-wrap" style="${j<cr?'':'opacity:.3'}"><div class="bar-fill" style="width:${j<cr?(100-(j/Math.max(cr,1))*60).toFixed(0):0}%;background:${j<cr?'var(--blue)':'rgba(255,255,255,.2)'}"></div></div></td>
+                      </tr>`;
+                    } else {
+                      const pctP=((parseInt(cd.vot||0)/p.v)*100).toFixed(1);
+                      const bwC=((parseInt(cd.vot||0)/maxVot)*100).toFixed(1);
+                      const esElegido=j<cr;
+                      return `<tr>
+                        <td style="color:rgba(255,255,255,.25);font-size:.6rem">${String(j+1).padStart(2,'0')}</td>
+                        <td style="font-size:.78rem;color:${esElegido?'var(--blue)':'inherit'};font-weight:${esElegido?'600':'400'}">${nom}${esElegido?'<span style="font-size:.55rem;margin-left:.4rem;opacity:.7">✦</span>':''}</td>
+                        <td class="r" style="font-size:.78rem;color:${esElegido?'var(--blue)':'inherit'}">${parseInt(cd.vot||0).toLocaleString('es-CO')}</td>
+                        <td class="r" style="font-size:.75rem;color:rgba(255,255,255,.35)">${pctP}%</td>
+                        <td class="r"><div class="bar-wrap"><div class="bar-fill" style="width:${bwC}%;background:${esElegido?'var(--blue)':(getColor(p.p)||'#555')}"></div></div></td>
+                      </tr>`;
+                    }
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </td>`;
+          tbody.appendChild(trC);
+        }
+      });
+      setTimeout(()=>tbody.querySelectorAll('.bar-fill').forEach(b=>{if(b.dataset.w)b.style.width=b.dataset.w;}),80);
+    }
+
+    function renderMapLegend(lid,depMap,colorMap){
+      const el=document.getElementById(lid); if(!el) return;
+      const seen={}; Object.values(depMap).forEach(g=>seen[g]=colorMap[g]||'#555');
+      el.innerHTML=`<div class="mlb-title">Puntero</div>`+Object.entries(seen).slice(0,10).map(([n,c])=>`<div class="mlb-item"><div class="mlb-color" style="background:${c}"></div>${n}</div>`).join('');
+    }
+
+    const mapI={},geoC={};
+    async function getGeo(){ if(geoC.d) return geoC.d; const r=await fetch('https://raw.githubusercontent.com/codeforgermany/click_that_hood/main/public/data/colombia-departments.geojson'); geoC.d=await r.json(); return geoC.d; }
+    async function renderMap(divId,depMap,colorMap){
+      if(mapI[divId]?.layer) mapI[divId].map.removeLayer(mapI[divId].layer);
+      let m;
+      if(mapI[divId]){ m=mapI[divId].map; }
+      else {
+        m=L.map(divId,{zoomControl:true,attributionControl:false,scrollWheelZoom:false});
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(m);
+        mapI[divId]={map:m};
+      }
+      try{
+        const geo=await getGeo();
+        const layer=L.geoJSON(geo,{
+          style:f=>{ const dep=f.properties.name||'',g=depMap[dep]||''; return{fillColor:colorMap[g]||'#1e2030',fillOpacity:.75,color:'rgba(255,255,255,.15)',weight:1}; },
+          onEachFeature:(f,l)=>{ const dep=f.properties.name||'',g=depMap[dep]||'—'; l.bindTooltip(`<b style="font-family:Syne,sans-serif">${dep}</b><br/><span style="font-family:'DM Mono',monospace;font-size:11px;color:#aaa">Puntero: ${g}</span>`,{className:'map-tt',sticky:true}); l.on('mouseover',()=>l.setStyle({fillOpacity:1})); l.on('mouseout',()=>l.setStyle({fillOpacity:.75})); }
+        }).addTo(m);
+        mapI[divId].layer=layer; m.fitBounds([[-4.2,-79.0],[12.5,-66.8]]); m.invalidateSize();
+      }catch(e){ console.warn('Mapa no disponible'); }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // RENDER SENADO
+    // ═══════════════════════════════════════════════════════════
+    let curSenDep='Nacional (todos)';
+
+    function switchSenDep(dep){
+      curSenDep=dep;
+      const inp=document.getElementById('sen-search');
+      if(inp) inp.value='';
+      buscarCandidatoSen('');
+      renderSenado();
+    }
+
+    function renderSenado(){
+      const cur=dhondt(SENADO,100,TOT_SENADO.votval);
+      const maxC=Math.max(...Object.entries(cur).filter(([k])=>k!=='__cifra__'&&k!=='__umb__').map(([,v])=>v));
+      const top=Object.entries(cur).filter(([k])=>k!=='__cifra__'&&k!=='__umb__').find(([,v])=>v===maxC);
+      const esNac=curSenDep==='Nacional (todos)';
+
+      if(!esNac){
+        const cod=Object.entries(DANE_DEP_CONS).find(([,v])=>v===curSenDep)?.[0];
+        if(cod){
+          fetch(`${REG.senado}/${cod}?t=${Date.now()}`,{cache:'no-store'})
+            .then(r=>r.ok?r.json():null)
+            .then(js=>{
+              if(!js) return;
+              const tot=(js.totales&&js.totales.act)||(js.camaras&&js.camaras[0]&&js.camaras[0].totales&&js.camaras[0].totales.act)||{};
+              const votant=parseInt(tot.votant)||0;
+              const votval=parseInt(tot.votval)||0;
+              const votnul=parseInt(tot.votnul)||0;
+              const votnma=parseInt(tot.votnma)||0;
+              const votblan=parseInt(tot.votblan||tot.votbla)||0;
+              const potDep=parseInt(tot.centota)||votant||POTENCIAL;
+              const votosDep={},candsDep={};
+              if(js.camaras){
+                const bloque=js.camaras.find(c=>String(c.cam)==='0')||js.camaras[0];
+                (bloque&&bloque.partotabla||[]).forEach(p=>{
+                  const nombre=NOMBRES_PAR_SEN[String(p.act.codpar)]||`Partido ${p.act.codpar}`;
+                  votosDep[nombre]=(votosDep[nombre]||0)+parseInt(p.act.vot||0);
+                  const cands=(p.act.cantotabla||[]).filter(c=>parseInt(c.vot||0)>0&&!/solo por la lista/i.test(c.nomcan)).sort((a,b)=>parseInt(b.vot)-parseInt(a.vot));
+                  if(cands.length){ if(!candsDep[nombre]) candsDep[nombre]=[]; candsDep[nombre].push(...cands); candsDep[nombre].sort((a,b)=>parseInt(b.vot)-parseInt(a.vot)); }
+                });
+              }
+              renderKPI('kpi-senado',[
+                {l:'Votantes',v:votant.toLocaleString('es-CO'),d:`${curSenDep} · ${((votant/(potDep||1))*100).toFixed(2)}% del potencial`},
+                {l:'Votos válidos',v:votval.toLocaleString('es-CO'),c:'green',d:`${votant?((votval/votant)*100).toFixed(2)+'% de votantes':'—'}`},
+                {l:'Curules en juego',v:'100',c:'dark',d:"Circunscripción nacional · D'Hondt · umbral 3%"},
+                {l:'Partido puntero',v:top?top[0].split(' ')[0]:'—',c:'sm',d:top?`${top[1]} curules est. (nacional)`:''},
+              ]);
+              const datosRender=SENADO.map(p=>({...p,v:votosDep[p.p]||0,candidatos:candsDep[p.p]?candsDep[p.p].map(c=>({nomcan:c.nomcan,apecan:c.apecan,vot:parseInt(c.vot)||0})):(p.listaCerrada?p.candidatos:[]),listaCerrada:candsDep[p.p]?false:p.listaCerrada})).filter(p=>p.v>0).sort((a,b)=>b.v-a.v);
+              _SENADO_RENDER=datosRender;
+              renderTablaPartidos('tbody-senado',datosRender,100,votval,cur);
+              renderDonut('donut-senado','pct-senado','leg-senado',{votval,votnul,votnma,votblan,potencial:potDep,cifra:cur.__cifra__,umb:cur.__umb__});
+              document.getElementById('lbl-sen-tabla').textContent=`Partidos · Senado · ${curSenDep} · curules nacionales (D'Hondt)`;
+            });
+          return;
+        }
+      }
+
+      // Nacional
+      const votant=TOT_SENADO.votant||SENADO.reduce((s,p)=>s+p.v,0);
+      renderKPI('kpi-senado',[
+        {l:'Votantes',v:votant.toLocaleString('es-CO'),d:`${((votant/POTENCIAL)*100).toFixed(2)}% del potencial`},
+        {l:'Votos válidos',v:(TOT_SENADO.votval||0).toLocaleString('es-CO'),c:'green',d:`${TOT_SENADO.votval?((TOT_SENADO.votval/votant)*100).toFixed(2)+'% de votantes':'—'}`},
+        {l:'Curules en juego',v:'100',c:'dark',d:"Circunscripción nacional · D'Hondt · umbral 3%"},
+        {l:'Partido puntero',v:top?top[0].split(' ')[0]:'—',c:'sm',d:top?`${top[1]} curules estimadas`:''},
+      ]);
+      _SENADO_RENDER=SENADO;
+      renderTablaPartidos('tbody-senado',SENADO,100,TOT_SENADO.votval);
+      renderDonut('donut-senado','pct-senado','leg-senado',{...TOT_SENADO,potencial:POTENCIAL,cifra:cur.__cifra__,umb:cur.__umb__});
+      renderMapLegend('mlb-senado',DEP_SENADO,CP);
+      document.getElementById('lbl-sen-tabla').textContent=`Partidos · Senado · Circunscripción Nacional · 100 curules · D'Hondt`;
+      setTimeout(()=>renderMap('map-senado',DEP_SENADO,CP),80);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // BUSCAR CANDIDATO
+    // ═══════════════════════════════════════════════════════════
+    function buscarCandidatoSen(q){
+      const box=document.getElementById('sen-search-results');
+      q=q.trim();
+      if(!q){ box.innerHTML=''; return; }
+      const norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+      const qn=norm(q);
+      const fuente=(_SENADO_RENDER&&_SENADO_RENDER.length)?_SENADO_RENDER:SENADO;
+      const cur=dhondt(SENADO,100,TOT_SENADO.votval);
+      const resultados=[];
+      fuente.forEach(partido=>{
+        (partido.candidatos||[]).forEach((c,idx)=>{
+          const nom=`${c.nomcan||''} ${c.apecan||''}`.trim();
+          if(!norm(nom).includes(qn)) return;
+          const curPart=cur[partido.p]||0;
+          const elegido=idx<curPart;
+          resultados.push({nom,partido:partido.p,vot:c.vot||0,pos:idx+1,elegido,listaCerrada:partido.listaCerrada});
+        });
+      });
+      resultados.sort((a,b)=>b.vot-a.vot);
+      if(!resultados.length){
+        box.innerHTML=`<div style="padding:2rem;font-family:'DM Mono',monospace;font-size:.72rem;color:rgba(255,255,255,.3);text-align:center">No se encontraron candidatos con "<b>${q}</b>"</div>`;
+        return;
+      }
+      box.innerHTML=`
+        <div style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;color:rgba(255,255,255,.3);text-transform:uppercase;padding:.75rem 0 .5rem">
+          ${resultados.length} resultado${resultados.length!==1?'s':''} para "${q}"
+        </div>
+        <table class="results-table" style="width:100%">
+          <thead><tr><th>#</th><th>Candidato/a</th><th>Partido / Coalición</th><th class="r">Pos. lista</th><th class="r">Votos</th><th class="r">Estado</th></tr></thead>
+          <tbody>
+            ${resultados.map((r,i)=>`<tr>
+              <td style="color:rgba(255,255,255,.25);font-size:.65rem">${String(i+1).padStart(2,'0')}</td>
+              <td style="font-size:.78rem;color:${r.elegido?'var(--blue)':'inherit'};font-weight:${r.elegido?600:400}">${r.nom}${r.elegido?'<span style="font-size:.55rem;margin-left:.4rem;opacity:.7">✦</span>':''}</td>
+              <td style="font-size:.72rem;color:rgba(255,255,255,.4)">${r.partido}</td>
+              <td class="r" style="font-size:.72rem;color:rgba(255,255,255,.3)">#${r.pos} lista</td>
+              <td class="r" style="font-size:.78rem">${r.vot>0?r.vot.toLocaleString('es-CO'):'<span style="color:rgba(255,255,255,.2)">—</span>'}</td>
+              <td class="r"><span style="font-size:.62rem;font-family:'DM Mono',monospace;padding:.15rem .5rem;background:${r.elegido?'rgba(0,71,255,.15)':'rgba(255,255,255,.04)'};color:${r.elegido?'var(--blue)':'rgba(255,255,255,.25)';border:1px solid ${r.elegido?'rgba(0,71,255,.3)':'rgba(255,255,255,.08)'}">${r.elegido?'ELEGIDO':'—'}</span></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>`;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // VISTA TABS
+    // ═══════════════════════════════════════════════════════════
+    const vistas = { partidos:'vista-partidos', candidatos:'vista-candidatos', mapa:'vista-mapa' };
+    function switchVista(btn, key){
+      document.querySelectorAll('.vista-tab').forEach(t=>t.classList.remove('active'));
+      btn.classList.add('active');
+      Object.values(vistas).forEach(id=>document.getElementById(id).style.display='none');
+      document.getElementById(vistas[key]).style.display='block';
+      if(key==='mapa') setTimeout(()=>{ renderMapLegend('mlb-senado',DEP_SENADO,CP); renderMap('map-senado',DEP_SENADO,CP); },80);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // INIT
+    // ═══════════════════════════════════════════════════════════
+    Chart.defaults.color='rgba(255,255,255,.4)';
+    Chart.defaults.font.family="'DM Mono',monospace";
+
+    // Map tooltip style
+    const stt=document.createElement('style');
+    stt.textContent=`.map-tt{background:#0e1220;border:1px solid rgba(255,255,255,.12);color:#f4f3ef;padding:6px 10px;font-size:12px;border-radius:0;box-shadow:0 2px 16px rgba(0,0,0,.4)}.leaflet-control-zoom{border:1px solid rgba(255,255,255,.12)!important;background:#0e1220!important}.leaflet-control-zoom a{background:#0e1220!important;color:#aaa!important;border-color:rgba(255,255,255,.12)!important}.leaflet-control-zoom a:hover{color:#0047FF!important}`;
+    document.head.appendChild(stt);
+
+    // Poblar dropdown departamentos
+    const senSel=document.getElementById('sen-dep-select');
+    const depKeys=['Nacional (todos)',...Object.values(DANE_DEP_CONS).sort((a,b)=>a.localeCompare(b,'es'))];
+    depKeys.forEach(d=>{ const o=document.createElement('option'); o.value=d; o.textContent=d; if(d==='Nacional (todos)') o.selected=true; senSel.appendChild(o); });
+
+    // Curtain
+    const curtain=document.getElementById('curtain');
+    setTimeout(()=>{ curtain.classList.add('opened'); },900);
+
+    // Cursor
+    const cur2=document.getElementById('cursor'),ri=document.getElementById('cursorRing');
+    let mx2=0,my2=0,rx=0,ry=0;
+    document.addEventListener('mousemove',e=>{ mx2=e.clientX; my2=e.clientY; cur2.style.left=mx2+'px'; cur2.style.top=my2+'px'; });
+    (function ar(){ rx+=(mx2-rx)*.12; ry+=(my2-ry)*.12; ri.style.left=rx+'px'; ri.style.top=ry+'px'; requestAnimationFrame(ar); })();
+    document.querySelectorAll('a,button,select,input').forEach(el=>{
+      el.addEventListener('mouseenter',()=>{ cur2.style.transform='translate(-50%,-50%) scale(2.5)'; cur2.style.background='transparent'; cur2.style.border='1.5px solid var(--blue)'; ri.style.opacity='0'; });
+      el.addEventListener('mouseleave',()=>{ cur2.style.transform='translate(-50%,-50%) scale(1)'; cur2.style.background='var(--blue)'; cur2.style.border='none'; ri.style.opacity='.4'; });
+    });
+
+    // Countdown + auto-recarga
+    let secsLeft=RECARGA_MIN*60;
+    setInterval(()=>{
+      secsLeft--;
+      if(secsLeft<=0){ secsLeft=RECARGA_MIN*60; cargarDatos(); }
+      const m=String(Math.floor(secsLeft/60)).padStart(2,'0'),s=String(secsLeft%60).padStart(2,'0');
+      document.getElementById('countdown').textContent=`${m}:${s}`;
+    },1000);
+
+    // Arranque
+    recalcDeps();
+    cargarDatos();
+  </script>
+</body>
+</html>
