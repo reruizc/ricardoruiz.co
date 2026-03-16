@@ -10,177 +10,140 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <style>
     :root {
-      --black: #0a0a0a;
-      --white: #f4f3ef;
-      --blue: #0047FF;
-      --green: #4ade80;
-      --card: rgba(255,255,255,0.05);
-      --card-border: rgba(255,255,255,0.1);
-      --border: rgba(255,255,255,0.08);
-      --gray: rgba(255,255,255,0.5);
-      --bar-bg: rgba(255,255,255,0.1);
+      --black: #0a0a0a; --white: #f4f3ef; --blue: #0047FF;
+      --green: #4ade80; --purple: #a78bfa;
+      --card-border: rgba(255,255,255,0.1); --border: rgba(255,255,255,0.08); --bar-bg: rgba(255,255,255,0.1);
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
     body { background: #060810; color: var(--white); font-family: 'Syne', sans-serif; cursor: none; min-height: 100vh; overflow-x: hidden; }
-
-    /* CURSOR */
     .cursor { position:fixed; width:10px; height:10px; background:var(--blue); border-radius:50%; pointer-events:none; z-index:9999; transform:translate(-50%,-50%); transition:transform .15s,background .2s; }
     .cursor-ring { position:fixed; width:32px; height:32px; border:1.5px solid var(--blue); border-radius:50%; pointer-events:none; z-index:9998; transform:translate(-50%,-50%); opacity:.4; }
-
-    /* BACKGROUND */
     .bg-layer { position:fixed; inset:0; z-index:0; background:url('foto-fondo.webp') center right / cover no-repeat; }
-    .bg-overlay {
-      position:fixed; inset:0; z-index:1;
-      background: linear-gradient(to right, rgba(4,6,16,0.97) 0%, rgba(4,6,16,0.94) 55%, rgba(4,6,16,0.72) 72%, rgba(4,6,16,0.35) 88%, rgba(4,6,16,0.10) 100%);
-    }
-
-    /* SHELL */
-    .shell { position: relative; z-index: 2; min-height: 100vh; display: flex; flex-direction: column; }
-
-    /* TOP BAR */
-    .top-bar { display: flex; align-items: flex-start; justify-content: space-between; padding: 1.1rem 2.5rem 0; flex-shrink: 0; }
-    .page-title { font-family: 'Syne', sans-serif; font-weight: 800; font-size: clamp(1.5rem, 2.8vw, 2.5rem); letter-spacing: -0.04em; line-height: 1.05; color: var(--white); text-shadow: 0 2px 24px rgba(0,71,255,0.4); }
-    .page-title span { color: var(--blue); }
-    .logo-link { display: flex; align-items: center; gap: 0.55rem; text-decoration: none; opacity: .8; transition: opacity .2s; }
-    .logo-link:hover { opacity: 1; }
-    .logo-bars { display: flex; align-items: flex-end; gap: 3px; height: 20px; }
-    .logo-bar { width: 5px; background: var(--blue); border-radius: 1px 1px 0 0; opacity:.85; }
-    .logo-text { font-family: 'Syne', sans-serif; font-weight: 800; font-size: clamp(1.1rem, 2vw, 1.8rem); letter-spacing: -.03em; color: var(--white); }
-    .logo-text span { color: var(--blue); }
-
-    /* BREADCRUMB */
-    .breadcrumb { padding: .6rem 2.5rem 0; font-family: 'DM Mono', monospace; font-size: .62rem; letter-spacing: .15em; text-transform: uppercase; color: rgba(255,255,255,0.3); border-bottom: 1px solid var(--border); padding-bottom: .7rem; flex-shrink: 0; }
-    .breadcrumb a { color: rgba(0,71,255,0.7); text-decoration: none; }
-    .breadcrumb a:hover { color: var(--blue); }
-
-    /* META BAR */
-    .meta-bar { display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap; padding: .5rem 2.5rem; border-bottom: 1px solid var(--border); font-family: 'DM Mono', monospace; font-size: .62rem; letter-spacing: .08em; color: rgba(255,255,255,0.35); flex-shrink: 0; }
-    .meta-item b { color: rgba(74,222,128,0.85); font-weight: 700; }
-    .source-badge { margin-left: auto; font-family: 'DM Mono', monospace; font-size: .6rem; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,0.3); background: rgba(255,255,255,.04); border: 1px solid var(--border); padding: .3rem .8rem; }
-    .source-badge b { color: var(--blue); }
-
-    /* CONTENT AREA */
-    .content-area { flex: 1; padding: 1.8rem 2.5rem 1.5rem; }
-
-    /* KPI */
-    .kpi-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 1.5rem; }
-    .kpi-card { background: rgba(255,255,255,.04); border: 1px solid var(--card-border); padding: 1.1rem 1.3rem; backdrop-filter: blur(4px); }
-    .kpi-label { font-family: 'DM Mono', monospace; font-size: .6rem; letter-spacing: .15em; text-transform: uppercase; color: rgba(255,255,255,.35); margin-bottom: .4rem; }
-    .kpi-val { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.7rem; letter-spacing: -.04em; line-height: 1; color: var(--blue); }
-    .kpi-val.white { color: var(--white); }
-    .kpi-val.green { color: #4ade80; }
-    .kpi-val.purple { color: #a78bfa; }
-    .kpi-delta { font-family: 'DM Mono', monospace; font-size: .6rem; color: rgba(255,255,255,.28); margin-top: .3rem; }
-
-    /* MAIN GRID */
-    .results-grid { display: grid; grid-template-columns: 1fr 300px; gap: 1.2rem; }
-    .card { background: rgba(255,255,255,.04); border: 1px solid var(--card-border); padding: 1.3rem; overflow: hidden; backdrop-filter: blur(4px); }
-    .card-label { font-family: 'DM Mono', monospace; font-size: .78rem; letter-spacing: .18em; text-transform: uppercase; color: rgba(255,255,255,.3); margin-bottom: 1rem; }
-
-    /* CANDIDATE BARS */
-    .cand-row { padding: 1.1rem 0; border-bottom: 1px solid var(--border); }
-    .cand-row:last-child { border-bottom: none; }
-    .cand-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: .6rem; }
-    .cand-name { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.05rem; letter-spacing: -.02em; }
-    .cand-pct { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.6rem; letter-spacing: -.04em; }
-    .cand-votes { font-family: 'DM Mono', monospace; font-size: .65rem; letter-spacing: .08em; color: rgba(255,255,255,.4); margin-top: .15rem; }
-    .bar-track { height: 6px; background: var(--bar-bg); border-radius: 3px; overflow: hidden; margin-top: .5rem; }
-    .bar-fill { height: 100%; border-radius: 3px; transition: width 1.2s cubic-bezier(.25,.46,.45,.94); }
-    .winner-badge { font-family: 'DM Mono', monospace; font-size: .55rem; letter-spacing: .2em; text-transform: uppercase; color: #4ade80; background: rgba(74,222,128,0.08); border: 1px solid rgba(74,222,128,0.2); padding: .2rem .6rem; margin-left: .75rem; vertical-align: middle; }
-
-    /* DONUT */
+    .bg-overlay { position:fixed; inset:0; z-index:1; background:linear-gradient(to right,rgba(4,6,16,0.97) 0%,rgba(4,6,16,0.94) 55%,rgba(4,6,16,0.72) 72%,rgba(4,6,16,0.35) 88%,rgba(4,6,16,0.10) 100%); }
+    .shell { position:relative; z-index:2; min-height:100vh; display:flex; flex-direction:column; }
+    .top-bar { display:flex; align-items:flex-start; justify-content:space-between; padding:1.1rem 2.5rem 0; flex-shrink:0; }
+    .page-title { font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(1.5rem,2.8vw,2.5rem); letter-spacing:-0.04em; line-height:1.05; color:var(--white); text-shadow:0 2px 24px rgba(0,71,255,0.4); }
+    .page-title span { color:var(--blue); }
+    .logo-link { display:flex; align-items:center; gap:0.55rem; text-decoration:none; opacity:.8; transition:opacity .2s; }
+    .logo-link:hover { opacity:1; }
+    .logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
+    .logo-bar { width:5px; background:var(--blue); border-radius:1px 1px 0 0; opacity:.85; }
+    .logo-text { font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(1.1rem,2vw,1.8rem); letter-spacing:-.03em; color:var(--white); }
+    .logo-text span { color:var(--blue); }
+    .breadcrumb { padding:.6rem 2.5rem 0; font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,0.3); border-bottom:1px solid var(--border); padding-bottom:.7rem; flex-shrink:0; }
+    .breadcrumb a { color:rgba(0,71,255,0.7); text-decoration:none; }
+    .breadcrumb a:hover { color:var(--blue); }
+    .meta-bar { display:flex; gap:1.5rem; align-items:center; flex-wrap:wrap; padding:.5rem 2.5rem; border-bottom:1px solid var(--border); font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.08em; color:rgba(255,255,255,0.35); flex-shrink:0; }
+    .meta-item b { color:rgba(74,222,128,0.85); font-weight:700; }
+    .source-badge { margin-left:auto; font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,0.3); background:rgba(255,255,255,.04); border:1px solid var(--border); padding:.3rem .8rem; }
+    .source-badge b { color:var(--blue); }
+    .content-area { flex:1; padding:1.8rem 2.5rem 1.5rem; }
+    .loader-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1rem; min-height:300px; }
+    .loader-ring { width:40px; height:40px; border:2px solid rgba(0,71,255,.2); border-top-color:var(--blue); border-radius:50%; animation:spin .8s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .loader-label { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.3); }
+    .kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.5rem; }
+    .kpi-card { background:rgba(255,255,255,.04); border:1px solid var(--card-border); padding:1.1rem 1.3rem; backdrop-filter:blur(4px); }
+    .kpi-label { font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.35); margin-bottom:.4rem; }
+    .kpi-val { font-family:'Syne',sans-serif; font-weight:800; font-size:1.7rem; letter-spacing:-.04em; line-height:1; color:var(--blue); }
+    .kpi-val.wh { color:var(--white); } .kpi-val.gr { color:var(--green); } .kpi-val.pu { color:var(--purple); font-size:1.05rem; line-height:1.25; }
+    .kpi-delta { font-family:'DM Mono',monospace; font-size:.6rem; color:rgba(255,255,255,.28); margin-top:.3rem; }
+    .results-grid { display:grid; grid-template-columns:1fr 300px; gap:1.2rem; margin-bottom:1.2rem; }
+    .card { background:rgba(255,255,255,.04); border:1px solid var(--card-border); padding:1.3rem; overflow:hidden; backdrop-filter:blur(4px); }
+    .card-label { font-family:'DM Mono',monospace; font-size:.78rem; letter-spacing:.18em; text-transform:uppercase; color:rgba(255,255,255,.3); margin-bottom:1rem; }
+    .full-card { grid-column:1 / -1; }
+    .cand-row { padding:1.1rem 0; border-bottom:1px solid var(--border); }
+    .cand-row:last-child { border-bottom:none; }
+    .cand-header { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:.4rem; }
+    .cand-name { font-family:'Syne',sans-serif; font-weight:800; font-size:1.05rem; letter-spacing:-.02em; }
+    .cand-pct  { font-family:'Syne',sans-serif; font-weight:800; font-size:1.6rem; letter-spacing:-.04em; }
+    .cand-votes { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.08em; color:rgba(255,255,255,.4); margin-top:.1rem; }
+    .bar-track { height:6px; background:var(--bar-bg); border-radius:3px; overflow:hidden; margin-top:.55rem; }
+    .bar-fill  { height:100%; border-radius:3px; transition:width 1.2s cubic-bezier(.25,.46,.45,.94); }
+    .winner-badge { font-family:'DM Mono',monospace; font-size:.52rem; letter-spacing:.2em; text-transform:uppercase; color:var(--green); background:rgba(74,222,128,0.08); border:1px solid rgba(74,222,128,0.2); padding:.2rem .55rem; margin-left:.65rem; vertical-align:middle; }
     .donut-wrap { display:flex; flex-direction:column; align-items:center; gap:1rem; }
     .donut-cw { position:relative; width:150px; height:150px; }
     .donut-center { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; }
     .donut-pct { font-family:'Syne',sans-serif; font-weight:800; font-size:1.5rem; letter-spacing:-.04em; color:var(--white); line-height:1; }
     .donut-sub { font-family:'DM Mono',monospace; font-size:.52rem; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.3); margin-top:2px; }
-    .donut-legend { width:100%; display:flex; flex-direction:column; gap:.55rem; }
-    .li { display:flex; align-items:center; gap:.6rem; font-family:'DM Mono',monospace; font-size:.78rem; color:rgba(255,255,255,.5); }
-    .ld { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+    .donut-legend { width:100%; display:flex; flex-direction:column; gap:.5rem; }
+    .li { display:flex; align-items:center; gap:.6rem; font-family:'DM Mono',monospace; font-size:.75rem; color:rgba(255,255,255,.5); }
+    .ld { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
     .lv { margin-left:auto; color:var(--white); font-weight:700; }
-
-    /* DEP TABLE */
-    .dep-card { grid-column: 1 / -1; }
-    .results-table { width: 100%; border-collapse: collapse; }
-    .results-table th { font-family: 'DM Mono', monospace; font-size: .58rem; letter-spacing: .15em; text-transform: uppercase; color: rgba(255,255,255,.25); text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--border); }
-    .results-table th.r { text-align: right; }
-    .results-table td { padding: .6rem .6rem; border-bottom: 1px solid rgba(255,255,255,.05); font-family: 'DM Mono', monospace; font-size: .74rem; color: rgba(255,255,255,.75); vertical-align: middle; }
-    .results-table td.r { text-align: right; }
-    .results-table tr:hover td { background: rgba(255,255,255,.03); }
-    .winner-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: middle; flex-shrink:0; }
-    .mini-bar-wrap { width: 60px; height: 3px; background: var(--bar-bg); border-radius: 2px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 6px; }
-    .mini-bar-fill { height: 100%; border-radius: 2px; }
-
-    /* CURTAIN */
+    .drill-nav { display:flex; align-items:center; gap:.6rem; margin-bottom:1rem; flex-wrap:wrap; }
+    .drill-crumb { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.35); cursor:pointer; transition:color .15s; padding:.3rem .7rem; border:1px solid transparent; }
+    .drill-crumb:hover { color:var(--white); }
+    .drill-crumb.active { color:var(--white); border-color:var(--card-border); background:rgba(255,255,255,.04); }
+    .drill-crumb.clickable { color:rgba(0,71,255,.7); }
+    .drill-crumb.clickable:hover { color:var(--blue); }
+    .drill-sep { color:rgba(255,255,255,.2); font-size:.6rem; }
+    .results-table { width:100%; border-collapse:collapse; }
+    .results-table th { font-family:'DM Mono',monospace; font-size:.58rem; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.25); text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--border); white-space:nowrap; }
+    .results-table th.r { text-align:right; }
+    .results-table td { padding:.58rem .6rem; border-bottom:1px solid rgba(255,255,255,.05); font-family:'DM Mono',monospace; font-size:.74rem; color:rgba(255,255,255,.75); vertical-align:middle; }
+    .results-table td.r { text-align:right; }
+    .results-table tr:hover td { background:rgba(255,255,255,.03); }
+    .drill-btn { background:none; border:none; color:var(--blue); font-family:'DM Mono',monospace; font-size:.74rem; cursor:pointer; text-align:left; padding:0; display:inline-flex; align-items:center; gap:.4rem; transition:color .15s; }
+    .drill-btn:hover { color:#7ab3ff; }
+    .winner-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:5px; vertical-align:middle; flex-shrink:0; }
+    .mini-bar-wrap { width:55px; height:3px; background:var(--bar-bg); border-radius:2px; overflow:hidden; display:inline-block; vertical-align:middle; margin-left:5px; }
+    .mini-bar-fill { height:100%; border-radius:2px; }
+    .level-badge { font-family:'DM Mono',monospace; font-size:.55rem; letter-spacing:.15em; text-transform:uppercase; padding:.2rem .55rem; border:1px solid; margin-left:auto; }
+    .level-badge.dep  { color:rgba(167,139,250,.7); border-color:rgba(167,139,250,.25); background:rgba(167,139,250,.06); }
+    .level-badge.mun  { color:rgba(0,71,255,.8); border-color:rgba(0,71,255,.3); background:rgba(0,71,255,.06); }
+    .level-badge.pues { color:rgba(74,222,128,.7); border-color:rgba(74,222,128,.25); background:rgba(74,222,128,.06); }
+    .back-bar { flex-shrink:0; padding:.6rem 2.5rem 1rem; }
+    .back-btn { display:inline-flex; align-items:center; gap:.5rem; font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.12em; text-transform:uppercase; color:var(--white); text-decoration:none; cursor:pointer; transition:background .2s; background:rgba(0,71,255,0.25); border:1px solid rgba(0,71,255,0.5); padding:.3rem .9rem; }
+    .back-btn:hover { background:rgba(0,71,255,0.45); border-color:var(--blue); }
+    .full-footer { flex-shrink:0; width:100%; border-top:1px solid var(--border); padding:.5rem 2.5rem; display:flex; align-items:center; justify-content:space-between; }
+    .footer-brand { font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.09em; color:rgba(255,255,255,.2); }
+    .footer-brand a { color:rgba(255,255,255,.25); text-decoration:none; }
+    .footer-brand a:hover { color:rgba(255,255,255,.5); }
     .curtain { position:fixed; inset:0; z-index:99999; pointer-events:none; }
     .curtain-layer { position:absolute; inset:0; background:#04060e; }
     .curtain-layer:nth-child(1) { clip-path:polygon(0 0,100% 0,100% 22%,0 28%); transform:translateX(-110%); transition:transform .58s cubic-bezier(.75,0,.25,1) 0s; }
-    .curtain-layer:nth-child(2) { clip-path:polygon(0 26%,100% 20%,100% 49%,0 55%); transform:translateX( 110%); transition:transform .58s cubic-bezier(.75,0,.25,1) .07s; }
+    .curtain-layer:nth-child(2) { clip-path:polygon(0 26%,100% 20%,100% 49%,0 55%); transform:translateX(110%); transition:transform .58s cubic-bezier(.75,0,.25,1) .07s; }
     .curtain-layer:nth-child(3) { clip-path:polygon(0 53%,100% 47%,100% 76%,0 82%); transform:translateX(-110%); transition:transform .58s cubic-bezier(.75,0,.25,1) .14s; }
-    .curtain-layer:nth-child(4) { clip-path:polygon(0 80%,100% 74%,100% 100%,0 100%); transform:translateX( 110%); transition:transform .58s cubic-bezier(.75,0,.25,1) .21s; }
+    .curtain-layer:nth-child(4) { clip-path:polygon(0 80%,100% 74%,100% 100%,0 100%); transform:translateX(110%); transition:transform .58s cubic-bezier(.75,0,.25,1) .21s; }
     .curtain-stage { position:absolute; inset:0; z-index:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.8rem; pointer-events:none; }
     .curtain-tag { font-family:'DM Mono',monospace; font-size:1.08rem; letter-spacing:.35em; text-transform:uppercase; color:rgba(0,71,255,0.7); opacity:0; transform:translateY(-12px); transition:opacity .4s ease, transform .4s ease; }
     .curtain-sub { font-family:'DM Mono',monospace; font-size:0.975rem; letter-spacing:.22em; color:rgba(255,255,255,.35); text-transform:uppercase; opacity:0; transform:translateY(12px); transition:opacity .4s ease, transform .4s ease; }
     .curtain-headline { font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(2.6rem,6.5vw,5.85rem); letter-spacing:-.03em; line-height:1.05; text-shadow:0 0 50px rgba(0,71,255,0.5); text-align:center; }
     .curtain-line { overflow:hidden; display:block; }
     .curtain-word { display:inline-block; opacity:0; transition:transform .52s cubic-bezier(.25,.46,.45,.94), opacity .45s ease; }
-    .curtain-word.from-left  { transform:translateX(-80px); }
-    .curtain-word.from-right { transform:translateX( 80px); }
-    .curtain-word.white { color:#f4f3ef; }
-    .curtain-word.blue  { color:#0047FF; }
+    .curtain-word.from-left { transform:translateX(-80px); } .curtain-word.from-right { transform:translateX(80px); }
+    .curtain-word.white { color:#f4f3ef; } .curtain-word.blue { color:#0047FF; }
     .curtain.opening .curtain-layer { transform:translateX(0) !important; transition:none; }
-    .curtain.opening .curtain-word  { transform:translateX(0); opacity:1; transition:none; }
-    .curtain.opening .curtain-tag   { opacity:1; transform:translateY(0); transition:none; }
-    .curtain.opening .curtain-sub   { opacity:1; transform:translateY(0); transition:none; }
+    .curtain.opening .curtain-word { transform:translateX(0); opacity:1; transition:none; }
+    .curtain.opening .curtain-tag { opacity:1; transform:translateY(0); transition:none; }
+    .curtain.opening .curtain-sub { opacity:1; transform:translateY(0); transition:none; }
     .curtain.opened .curtain-layer:nth-child(1) { transform:translateX(-110%); }
-    .curtain.opened .curtain-layer:nth-child(2) { transform:translateX( 110%); }
+    .curtain.opened .curtain-layer:nth-child(2) { transform:translateX(110%); }
     .curtain.opened .curtain-layer:nth-child(3) { transform:translateX(-110%); }
-    .curtain.opened .curtain-layer:nth-child(4) { transform:translateX( 110%); }
+    .curtain.opened .curtain-layer:nth-child(4) { transform:translateX(110%); }
     .curtain.opened .curtain-word { opacity:0; }
     .curtain.opened .curtain-tag, .curtain.opened .curtain-sub { opacity:0; transition:opacity .25s ease; }
     .curtain.opened { pointer-events:none; }
     .curtain.closing { pointer-events:all; }
     .curtain.closing .curtain-layer { transform:translateX(0) !important; }
-    .curtain.closing .curtain-word.from-left,
-    .curtain.closing .curtain-word.from-right { transform:translateX(0); opacity:1; transition-delay:.62s; }
+    .curtain.closing .curtain-word.from-left, .curtain.closing .curtain-word.from-right { transform:translateX(0); opacity:1; transition-delay:.62s; }
     .curtain.closing .curtain-tag { opacity:1; transform:translateY(0); transition-delay:.68s; }
-    .curtain.closing .curtain-sub  { opacity:1; transform:translateY(0); transition-delay:.72s; }
-
-    /* BACK / FOOTER */
-    .back-bar { flex-shrink:0; padding: .6rem 2.5rem 1rem; display:flex; align-items:center; gap:1rem; }
-    .back-btn { display:inline-flex; align-items:center; gap:.5rem; font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.12em; text-transform:uppercase; color:var(--white); text-decoration:none; cursor:none; transition:background .2s, color .2s; background: rgba(0,71,255,0.25); border: 1px solid rgba(0,71,255,0.5); padding: .3rem .9rem; }
-    .back-btn:hover { background: rgba(0,71,255,0.45); border-color: var(--blue); }
-    .full-footer { flex-shrink:0; width:100%; border-top:1px solid var(--border); padding:.5rem 2.5rem; display:flex; align-items:center; justify-content:space-between; }
-    .footer-brand { font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.09em; color:rgba(255,255,255,.2); }
-    .footer-brand a { color:rgba(255,255,255,.25); text-decoration:none; }
-    .footer-brand a:hover { color:rgba(255,255,255,.5); }
-
-    /* RESPONSIVE */
-    @media(max-width:1000px) { .results-grid { grid-template-columns:1fr; } .dep-card { grid-column:1; } }
-    @media(max-width:900px) {
-      body { cursor:auto; }
-      .cursor, .cursor-ring { display:none; }
-      .top-bar, .breadcrumb, .meta-bar, .content-area, .full-footer { padding-left:1.2rem; padding-right:1.2rem; }
-      .bg-overlay { background:rgba(4,6,16,0.93); }
-      .kpi-row { grid-template-columns:1fr 1fr; gap:.75rem; }
-    }
+    .curtain.closing .curtain-sub { opacity:1; transform:translateY(0); transition-delay:.72s; }
+    @media(max-width:1000px) { .results-grid { grid-template-columns:1fr; } .full-card { grid-column:1; } }
+    @media(max-width:900px) { body { cursor:auto; } .cursor,.cursor-ring { display:none; } .top-bar,.breadcrumb,.meta-bar,.content-area,.full-footer,.back-bar { padding-left:1.2rem; padding-right:1.2rem; } .bg-overlay { background:rgba(4,6,16,0.93); } .kpi-row { grid-template-columns:1fr 1fr; gap:.75rem; } }
     @media(max-width:600px) { .kpi-row { grid-template-columns:1fr; } }
   </style>
 </head>
 <body>
-
   <div class="cursor" id="cursor"></div>
   <div class="cursor-ring" id="cursorRing"></div>
   <div class="bg-layer"></div>
   <div class="bg-overlay"></div>
 
-  <!-- CURTAIN -->
   <div class="curtain" id="curtain">
-    <div class="curtain-layer"></div>
-    <div class="curtain-layer"></div>
-    <div class="curtain-layer"></div>
-    <div class="curtain-layer"></div>
+    <div class="curtain-layer"></div><div class="curtain-layer"></div>
+    <div class="curtain-layer"></div><div class="curtain-layer"></div>
     <div class="curtain-stage">
       <span class="curtain-tag">ricardoruiz.co</span>
       <div class="curtain-headline">
@@ -192,326 +155,335 @@
   </div>
 
   <div class="shell">
-
-    <!-- TOP BAR -->
     <div class="top-bar">
       <div class="page-title">Consulta<br/><span>Presidencial</span></div>
-      <a href="electoral.html" class="logo-link" onclick="navigate(event,'electoral.html','Resultados Electorales')">
+      <a href="electoral.html" class="logo-link" onclick="navTo(event,'electoral.html')">
         <div class="logo-bars">
-          <div class="logo-bar" style="height:20px"></div>
-          <div class="logo-bar" style="height:15px"></div>
-          <div class="logo-bar" style="height:9px"></div>
-          <div class="logo-bar" style="height:4px"></div>
+          <div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div>
         </div>
         <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
       </a>
     </div>
-
-    <!-- BREADCRUMB -->
     <div class="breadcrumb">
-      <a href="electoral.html" onclick="navigate(event,'electoral.html','Resultados Electorales')">Resultados Electorales</a>
+      <a href="electoral.html" onclick="navTo(event,'electoral.html')">Resultados Electorales</a>
       &nbsp;/&nbsp; Consulta Presidencial · Pacto Histórico · Octubre 2025
     </div>
-
-    <!-- META BAR -->
     <div class="meta-bar">
       <span class="meta-item">Fecha: <b>26 Oct 2025</b></span>
-      <span class="meta-item">Sufragantes: <b>2.754.622</b></span>
-      <span class="meta-item">Votos válidos: <b>2.365.744</b></span>
+      <span class="meta-item">Sufragantes: <b id="meta-suf">—</b></span>
+      <span class="meta-item">Votos válidos: <b id="meta-val">—</b></span>
       <div class="source-badge">Fuente: <b>Registraduría · Escrutinio</b></div>
     </div>
 
-    <!-- CONTENT AREA -->
-    <div class="content-area">
-
-      <!-- KPIs -->
-      <div class="kpi-row">
-        <div class="kpi-card">
-          <div class="kpi-label">Ganador</div>
-          <div class="kpi-val purple" style="font-size:1.1rem; line-height:1.2">Iván Cepeda<br/>Castro</div>
-          <div class="kpi-delta">Candidato a la presidencia · Pacto Histórico</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Votos ganador</div>
-          <div class="kpi-val" id="kpi-votos">—</div>
-          <div class="kpi-delta">65,1% del total válido</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Total sufragantes</div>
-          <div class="kpi-val white" id="kpi-suf">—</div>
-          <div class="kpi-delta">Incluyendo nulos y no marcados</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Votos válidos</div>
-          <div class="kpi-val green" id="kpi-valid">—</div>
-          <div class="kpi-delta">85,9% de los sufragantes</div>
-        </div>
+    <div class="content-area" id="main-content">
+      <div class="loader-wrap">
+        <div class="loader-ring"></div>
+        <div class="loader-label">Cargando datos desde S3…</div>
       </div>
-
-      <!-- MAIN GRID: candidatos + donut -->
-      <div class="results-grid" style="margin-bottom:1.2rem">
-
-        <!-- CANDIDATE BARS -->
-        <div class="card">
-          <div class="card-label">Resultado · Consulta Pacto Histórico</div>
-          <div id="cand-bars"></div>
-        </div>
-
-        <!-- DONUT CHART -->
-        <div class="card">
-          <div class="card-label">Distribución de votos</div>
-          <div class="donut-wrap">
-            <div class="donut-cw">
-              <canvas id="donut-chart"></canvas>
-              <div class="donut-center">
-                <div class="donut-pct">65,1%</div>
-                <div class="donut-sub">Cepeda</div>
-              </div>
-            </div>
-            <div class="donut-legend" id="donut-legend"></div>
-          </div>
-        </div>
-
-        <!-- DEPARTMENT TABLE -->
-        <div class="card dep-card">
-          <div class="card-label">Resultados por departamento</div>
-          <table class="results-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Departamento</th>
-                <th class="r">Cepeda</th>
-                <th class="r">Corcho</th>
-                <th class="r">Quintero</th>
-                <th class="r">Total</th>
-                <th class="r">%&nbsp;Cepeda</th>
-              </tr>
-            </thead>
-            <tbody id="dep-tbody"></tbody>
-          </table>
-        </div>
-
-      </div>
-
     </div>
 
-    <!-- BACK -->
     <div class="back-bar">
-      <a href="electoral.html" class="back-btn" onclick="navigate(event,'electoral.html','Resultados Electorales')">← Volver a Resultados Electorales</a>
+      <a href="electoral.html" class="back-btn" onclick="navTo(event,'electoral.html')">← Volver a Resultados Electorales</a>
     </div>
-
   </div>
 
-  <!-- FOOTER -->
   <div class="full-footer">
     <span class="footer-brand">ricardoruiz.co · Elecciones Colombia</span>
     <span class="footer-brand"><a href="https://registraduria.gov.co" target="_blank">Fuente: Registraduría Nacional</a></span>
   </div>
 
   <script>
-    // ═══════════════════════════════════════════════════════════
-    // DATOS — procesados del CSV Presidencial-2025.csv
-    // Fuente: Registraduría Nacional · Escrutinio Consulta Oct 2025
-    // ═══════════════════════════════════════════════════════════
-    const CANDIDATOS = [
-      { key:'cepeda',  name:'Iván Cepeda Castro',      votos:1541012, color:'#a78bfa' },
-      { key:'corcho',  name:'Diana Corcho Mejía',       votos:679155,  color:'#0047FF' },
-      { key:'quintero',name:'Daniel Quintero Calle',    votos:145577,  color:'#4ade80' },
-    ];
-    const VOTOS_NULOS     = 139440;
-    const VOTOS_NO_MARC   = 249438;
-    const TOTAL_SUFRAG    = 2754622;
-    const TOTAL_VALIDOS   = 2365744;
+    // ─── CONFIG ───────────────────────────────────────────────
+    const S3 = 'https://elecciones-2026.s3.amazonaws.com/ricardoruiz.co/consulta-2025';
+    const COLORS = { cepeda:'#a78bfa', corcho:'#0047FF', quintero:'#4ade80', nulos:'rgba(255,255,255,0.18)', no_marc:'rgba(255,255,255,0.08)' };
+    const fmt = n => Number(n).toLocaleString('es-CO');
+    const pct = (n, t) => t ? ((n/t)*100).toFixed(1) : '0.0';
 
-    const DEPARTAMENTOS = [
-      { dep:'Bogotá D.C.',        cepeda:257135, corcho:91290,  quintero:14895, total:387339 },
-      { dep:'Valle del Cauca',    cepeda:191780, corcho:79075,  quintero:15207, total:327871 },
-      { dep:'Atlántico',          cepeda:102508, corcho:47656,  quintero:16677, total:214305 },
-      { dep:'Antioquia',          cepeda:84593,  corcho:41072,  quintero:7576,  total:145630 },
-      { dep:'Cauca',              cepeda:88938,  corcho:27426,  quintero:6855,  total:146759 },
-      { dep:'Nariño',             cepeda:98423,  corcho:40591,  quintero:8321,  total:176994 },
-      { dep:'Córdoba',            cepeda:93728,  corcho:34706,  quintero:7946,  total:163636 },
-      { dep:'Bolívar',            cepeda:89003,  corcho:36676,  quintero:9178,  total:166906 },
-      { dep:'Cundinamarca',       cepeda:62583,  corcho:29410,  quintero:4641,  total:104273 },
-      { dep:'Santander',          cepeda:55799,  corcho:29817,  quintero:6800,  total:106216 },
-      { dep:'Magdalena',          cepeda:52730,  corcho:28910,  quintero:9264,  total:120343 },
-      { dep:'Sucre',              cepeda:52405,  corcho:21959,  quintero:5670,  total:98587  },
-      { dep:'Huila',              cepeda:33009,  corcho:17564,  quintero:4465,  total:67834  },
-      { dep:'Tolima',             cepeda:35532,  corcho:16817,  quintero:2451,  total:61196  },
-      { dep:'Meta',               cepeda:31643,  corcho:15016,  quintero:2569,  total:56833  },
-      { dep:'Boyacá',             cepeda:28408,  corcho:16429,  quintero:2361,  total:52122  },
-      { dep:'Cesar',              cepeda:39758,  corcho:15441,  quintero:3564,  total:67270  },
-      { dep:'La Guajira',         cepeda:19017,  corcho:18747,  quintero:3005,  total:48769  },
-      { dep:'Risaralda',          cepeda:19704,  corcho:9391,   quintero:1463,  total:33441  },
-      { dep:'Caldas',             cepeda:16290,  corcho:7530,   quintero:1454,  total:28545  },
-      { dep:'Norte de Santander', cepeda:16352,  corcho:8474,   quintero:2377,  total:34010  },
-      { dep:'Chocó',              cepeda:14384,  corcho:7861,   quintero:2835,  total:28527  },
-      { dep:'Putumayo',           cepeda:17235,  corcho:6991,   quintero:1011,  total:28080  },
-      { dep:'Quindío',            cepeda:12768,  corcho:7107,   quintero:1703,  total:26583  },
-      { dep:'Arauca',             cepeda:3349,   corcho:6233,   quintero:463,   total:11562  },
-      { dep:'Casanare',           cepeda:5914,   corcho:5456,   quintero:454,   total:12886  },
-      { dep:'Caquetá',            cepeda:8386,   corcho:4305,   quintero:845,   total:15732  },
-      { dep:'Amazonas',           cepeda:3018,   corcho:2230,   quintero:610,   total:7486   },
-      { dep:'Guainía',            cepeda:1026,   corcho:907,    quintero:194,   total:2612   },
-      { dep:'Guaviare',           cepeda:1800,   corcho:1295,   quintero:237,   total:4114   },
-      { dep:'San Andrés',         cepeda:1117,   corcho:540,    quintero:113,   total:2022   },
-      { dep:'Vaupés',             cepeda:1405,   corcho:547,    quintero:174,   total:2419   },
-      { dep:'Vichada',            cepeda:1272,   corcho:1686,   quintero:199,   total:3720   },
-    ].sort((a,b) => b.cepeda - a.cepeda);
-
-    // ═══════════════════════════════════════════════════════════
-    // FORMAT HELPERS
-    // ═══════════════════════════════════════════════════════════
-    const fmt  = n => n.toLocaleString('es-CO');
-    const pct  = (n, tot) => ((n / tot) * 100).toFixed(1) + '%';
-
-    // ═══════════════════════════════════════════════════════════
-    // ANIMATE KPIs ON LOAD
-    // ═══════════════════════════════════════════════════════════
-    function animateCount(el, target, duration = 1200) {
-      const start = performance.now();
-      (function tick(now) {
-        const p = Math.min((now - start) / duration, 1);
-        const ease = 1 - Math.pow(1 - p, 3);
-        el.textContent = Math.round(ease * target).toLocaleString('es-CO');
-        if (p < 1) requestAnimationFrame(tick);
-      })(start);
+    // ─── CACHE (no re-fetchea lo que ya cargó) ────────────────
+    const cache = {};
+    async function getJSON(nivel) {
+      if (cache[nivel]) return cache[nivel];
+      const r = await fetch(`${S3}/${nivel}.json`);
+      if (!r.ok) throw new Error(`No se pudo cargar ${nivel}.json (${r.status})`);
+      cache[nivel] = await r.json();
+      return cache[nivel];
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // RENDER
-    // ═══════════════════════════════════════════════════════════
-    function render() {
-      // KPI counters
-      setTimeout(() => {
-        animateCount(document.getElementById('kpi-votos'), 1541012);
-        animateCount(document.getElementById('kpi-suf'),   2754622);
-        animateCount(document.getElementById('kpi-valid'), 2365744);
-      }, 800);
+    // ─── STATE ────────────────────────────────────────────────
+    let donutChart = null;
+    let state = { nivel:'dep', cod_dep:null, nom_dep:null, cod_mun:null, nom_mun:null };
 
-      // Candidate bars
-      const barsEl = document.getElementById('cand-bars');
-      CANDIDATOS.forEach((c, i) => {
-        const p = (c.votos / TOTAL_VALIDOS * 100).toFixed(1);
-        const winner = i === 0 ? '<span class="winner-badge">● Ganador</span>' : '';
-        barsEl.innerHTML += `
+    // ─── INIT ─────────────────────────────────────────────────
+    async function init() {
+      try {
+        const [resumen, deps] = await Promise.all([getJSON('resumen'), getJSON('departamentos')]);
+        const totalVal = resumen.candidatos.reduce((s,c)=>s+c.votos,0);
+        document.getElementById('meta-suf').textContent = fmt(resumen.total_sufragantes);
+        document.getElementById('meta-val').textContent = fmt(totalVal);
+
+        document.getElementById('main-content').innerHTML = `
+          <div class="kpi-row" id="kpi-row"></div>
+          <div class="results-grid">
+            <div class="card" id="card-bars">
+              <div class="card-label">Resultado · Consulta Pacto Histórico</div>
+              <div id="cand-bars"></div>
+            </div>
+            <div class="card">
+              <div class="card-label">Distribución de votos</div>
+              <div class="donut-wrap">
+                <div class="donut-cw">
+                  <canvas id="donut-chart"></canvas>
+                  <div class="donut-center">
+                    <div class="donut-pct" id="donut-pct">—</div>
+                    <div class="donut-sub">Cepeda</div>
+                  </div>
+                </div>
+                <div class="donut-legend" id="donut-legend"></div>
+              </div>
+            </div>
+            <div class="card full-card">
+              <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.8rem;flex-wrap:wrap">
+                <div class="card-label" style="margin-bottom:0" id="drill-title">Por departamento</div>
+                <span class="level-badge dep" id="level-badge">Nacional</span>
+              </div>
+              <div class="drill-nav" id="drill-nav"></div>
+              <table class="results-table">
+                <thead id="drill-thead"></thead>
+                <tbody id="drill-tbody"></tbody>
+              </table>
+            </div>
+          </div>`;
+
+        renderKPIs(resumen, totalVal);
+        renderBars(resumen.candidatos, totalVal);
+        renderDonut(resumen, totalVal);
+        renderDeps(deps);
+
+      } catch(e) {
+        document.getElementById('main-content').innerHTML = `
+          <div class="loader-wrap">
+            <div style="font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,100,100,.8);text-align:center;line-height:1.8">
+              Error al cargar los datos desde S3.<br/>
+              <span style="color:rgba(255,255,255,.3);font-size:.6rem">${e.message}</span>
+            </div>
+          </div>`;
+      }
+    }
+
+    // ─── KPIS ─────────────────────────────────────────────────
+    function animCount(el, target, ms=1100) {
+      const t0 = performance.now();
+      (function tick(now) {
+        const p = Math.min((now-t0)/ms, 1);
+        el.textContent = Math.round((1-Math.pow(1-p,3))*target).toLocaleString('es-CO');
+        if(p<1) requestAnimationFrame(tick);
+      })(t0);
+    }
+
+    function renderKPIs(resumen, totalVal) {
+      const cep = resumen.candidatos.find(c=>c.key==='cepeda');
+      document.getElementById('kpi-row').innerHTML = `
+        <div class="kpi-card">
+          <div class="kpi-label">Ganador consulta</div>
+          <div class="kpi-val pu">Iván Cepeda<br/>Castro</div>
+          <div class="kpi-delta">Candidato Pacto Histórico a presidencia</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Votos Cepeda</div>
+          <div class="kpi-val" id="kv1" style="color:var(--purple)">—</div>
+          <div class="kpi-delta">${pct(cep.votos,totalVal)}% del total válido</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Total sufragantes</div>
+          <div class="kpi-val wh" id="kv2">—</div>
+          <div class="kpi-delta">Incluyendo nulos y no marcados</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Votos válidos</div>
+          <div class="kpi-val gr" id="kv3">—</div>
+          <div class="kpi-delta">${pct(totalVal,resumen.total_sufragantes)}% de los sufragantes</div>
+        </div>`;
+      setTimeout(() => {
+        animCount(document.getElementById('kv1'), cep.votos);
+        animCount(document.getElementById('kv2'), resumen.total_sufragantes);
+        animCount(document.getElementById('kv3'), totalVal);
+      }, 700);
+    }
+
+    // ─── CANDIDATE BARS ───────────────────────────────────────
+    function renderBars(candidatos, totalVal) {
+      const el = document.getElementById('cand-bars');
+      el.innerHTML = '';
+      [...candidatos].sort((a,b)=>b.votos-a.votos).forEach((c,i) => {
+        const p = pct(c.votos, totalVal);
+        const col = COLORS[c.key] || '#aaa';
+        const winner = i===0 ? '<span class="winner-badge">● Ganador</span>' : '';
+        el.innerHTML += `
           <div class="cand-row">
             <div class="cand-header">
-              <span class="cand-name" style="color:${c.color}">${c.name}${winner}</span>
-              <span class="cand-pct" style="color:${c.color}">${p}%</span>
+              <span class="cand-name" style="color:${col}">${c.nombre}${winner}</span>
+              <span class="cand-pct" style="color:${col}">${p}%</span>
             </div>
             <div class="cand-votes">${fmt(c.votos)} votos</div>
-            <div class="bar-track">
-              <div class="bar-fill" style="background:${c.color}; width:0" data-width="${p}"></div>
-            </div>
+            <div class="bar-track"><div class="bar-fill" style="background:${col};width:0" data-w="${p}"></div></div>
           </div>`;
       });
-      // Animate bars
-      setTimeout(() => {
-        document.querySelectorAll('.bar-fill[data-width]').forEach(b => {
-          b.style.width = b.dataset.width + '%';
-        });
-      }, 900);
+      setTimeout(() => document.querySelectorAll('.bar-fill[data-w]').forEach(b => b.style.width = b.dataset.w+'%'), 800);
+    }
 
-      // Donut chart
-      const donutCtx = document.getElementById('donut-chart').getContext('2d');
-      new Chart(donutCtx, {
-        type: 'doughnut',
-        data: {
-          datasets: [{
-            data: [1541012, 679155, 145577, 139440, 249438],
-            backgroundColor: ['#a78bfa','#0047FF','#4ade80','rgba(255,255,255,0.15)','rgba(255,255,255,0.08)'],
-            borderWidth: 0,
-            hoverOffset: 6,
-          }]
-        },
-        options: {
-          cutout: '72%',
-          plugins: { legend: { display: false }, tooltip: { enabled: false } },
-          animation: { duration: 1200, easing: 'easeOutQuart' },
-        }
+    // ─── DONUT ────────────────────────────────────────────────
+    function renderDonut(resumen, totalVal) {
+      const cep = resumen.candidatos.find(c=>c.key==='cepeda');
+      document.getElementById('donut-pct').textContent = pct(cep.votos, totalVal) + '%';
+      if (donutChart) donutChart.destroy();
+      const ctx = document.getElementById('donut-chart').getContext('2d');
+      donutChart = new Chart(ctx, {
+        type:'doughnut',
+        data:{ datasets:[{
+          data: [...resumen.candidatos.map(c=>c.votos), resumen.nulos, resumen.no_marcados],
+          backgroundColor: [...resumen.candidatos.map(c=>COLORS[c.key]||'#aaa'), COLORS.nulos, COLORS.no_marc],
+          borderWidth:0, hoverOffset:6
+        }]},
+        options:{ cutout:'72%', plugins:{ legend:{display:false}, tooltip:{enabled:false} }, animation:{duration:1100,easing:'easeOutQuart'} }
       });
-
-      // Donut legend
-      const legEl = document.getElementById('donut-legend');
-      const items = [
-        { label:'Cepeda', votos:1541012, color:'#a78bfa' },
-        { label:'Corcho',  votos:679155,  color:'#0047FF' },
-        { label:'Quintero',votos:145577,  color:'#4ade80' },
-        { label:'Nulos',   votos:139440,  color:'rgba(255,255,255,0.2)' },
-        { label:'No marc.',votos:249438,  color:'rgba(255,255,255,0.1)' },
-      ];
-      items.forEach(it => {
-        legEl.innerHTML += `
-          <div class="li">
-            <span class="ld" style="background:${it.color}"></span>
-            <span>${it.label}</span>
-            <span class="lv">${fmt(it.votos)}</span>
-          </div>`;
+      const leg = document.getElementById('donut-legend');
+      leg.innerHTML = '';
+      resumen.candidatos.forEach(c => {
+        const short = c.nombre.split(' ').slice(0,2).join(' ');
+        leg.innerHTML += `<div class="li"><span class="ld" style="background:${COLORS[c.key]||'#aaa'}"></span><span>${short}</span><span class="lv">${fmt(c.votos)}</span></div>`;
       });
+      leg.innerHTML += `<div class="li"><span class="ld" style="background:${COLORS.nulos}"></span><span>Nulos</span><span class="lv">${fmt(resumen.nulos)}</span></div>`;
+      leg.innerHTML += `<div class="li"><span class="ld" style="background:${COLORS.no_marc}"></span><span>No marcados</span><span class="lv">${fmt(resumen.no_marcados)}</span></div>`;
+    }
 
-      // Department table
-      const tbody = document.getElementById('dep-tbody');
-      DEPARTAMENTOS.forEach((d, i) => {
-        const pCep = (d.cepeda / (d.cepeda + d.corcho + d.quintero) * 100).toFixed(1);
-        const winner = d.cepeda > d.corcho ? 'cepeda' : 'corcho';
-        const wColor = winner === 'cepeda' ? '#a78bfa' : (d.corcho > d.quintero ? '#0047FF' : '#4ade80');
-        tbody.innerHTML += `
-          <tr>
-            <td style="color:rgba(255,255,255,.3)">${i+1}</td>
-            <td><span class="winner-dot" style="background:${wColor}"></span>${d.dep}</td>
-            <td class="r">${fmt(d.cepeda)}</td>
-            <td class="r" style="color:rgba(255,255,255,.5)">${fmt(d.corcho)}</td>
-            <td class="r" style="color:rgba(255,255,255,.4)">${fmt(d.quintero)}</td>
-            <td class="r" style="color:rgba(255,255,255,.35)">${fmt(d.total)}</td>
-            <td class="r">
-              <span style="color:#a78bfa;font-weight:700">${pCep}%</span>
-              <span class="mini-bar-wrap"><span class="mini-bar-fill" style="background:#a78bfa; width:${pCep}%"></span></span>
-            </td>
-          </tr>`;
+    // ─── DRILL-DOWN TABLE ─────────────────────────────────────
+    function wColor(row) {
+      if (row.cepeda >= row.corcho && row.cepeda >= row.quintero) return COLORS.cepeda;
+      if (row.corcho >= row.quintero) return COLORS.corcho;
+      return COLORS.quintero;
+    }
+
+    function setThead(col1) {
+      document.getElementById('drill-thead').innerHTML = `
+        <tr>
+          <th>#</th><th>${col1}</th>
+          <th class="r">Cepeda</th><th class="r">Corcho</th><th class="r">Quintero</th>
+          <th class="r">Total</th><th class="r">% Cepeda</th>
+        </tr>`;
+    }
+
+    function buildRow(i, label, row, onclickStr) {
+      const total = row.cepeda + row.corcho + row.quintero;
+      const p = pct(row.cepeda, total);
+      const wc = wColor(row);
+      const nameCell = onclickStr
+        ? `<button class="drill-btn" onclick="${onclickStr}"><span class="winner-dot" style="background:${wc}"></span>${label} <span style="font-size:.6rem;opacity:.5">→</span></button>`
+        : `<span><span class="winner-dot" style="background:${wc}"></span>${label}</span>`;
+      return `<tr>
+        <td style="color:rgba(255,255,255,.3)">${i+1}</td>
+        <td>${nameCell}</td>
+        <td class="r" style="color:var(--purple)">${fmt(row.cepeda)}</td>
+        <td class="r" style="color:rgba(255,255,255,.5)">${fmt(row.corcho)}</td>
+        <td class="r" style="color:rgba(74,222,128,.6)">${fmt(row.quintero)}</td>
+        <td class="r" style="color:rgba(255,255,255,.35)">${fmt(total)}</td>
+        <td class="r"><span style="color:var(--purple);font-weight:700">${p}%</span>
+          <span class="mini-bar-wrap"><span class="mini-bar-fill" style="background:var(--purple);width:${p}%"></span></span>
+        </td></tr>`;
+    }
+
+    function updateNav() {
+      const nav = document.getElementById('drill-nav');
+      nav.innerHTML = '';
+      const crumbs = [{ label:'Nacional', clickable:!!state.cod_dep, fn:"renderDeps(cache['departamentos'])" }];
+      if (state.nom_dep) crumbs.push({ label:state.nom_dep, clickable:!!state.cod_mun, fn:`drillDep('${state.cod_dep}','${(state.nom_dep||'').replace(/'/g,"\\'")}')` });
+      if (state.nom_mun) crumbs.push({ label:state.nom_mun, clickable:false, fn:null });
+      crumbs.forEach((c,i) => {
+        if (i>0) nav.innerHTML += '<span class="drill-sep">›</span>';
+        const span = document.createElement('span');
+        span.className = 'drill-crumb' + (i===crumbs.length-1?' active':'') + (c.clickable?' clickable':'');
+        span.textContent = c.label;
+        if (c.clickable) span.setAttribute('onclick', c.fn);
+        nav.appendChild(span);
       });
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // CURTAIN
-    // ═══════════════════════════════════════════════════════════
+    // Nivel 1 — departamentos
+    function renderDeps(deps) {
+      state = { nivel:'dep', cod_dep:null, nom_dep:null, cod_mun:null, nom_mun:null };
+      document.getElementById('drill-title').textContent = 'Por departamento';
+      document.getElementById('level-badge').textContent = 'Nacional';
+      document.getElementById('level-badge').className = 'level-badge dep';
+      updateNav();
+      setThead('Departamento');
+      const tbody = document.getElementById('drill-tbody');
+      tbody.innerHTML = '';
+      [...deps].sort((a,b)=>b.cepeda-a.cepeda).forEach((d,i) => {
+        tbody.innerHTML += buildRow(i, d.nombre, d, `drillDep('${d.cod}','${d.nombre.replace(/'/g,"\\'")}')`);
+      });
+    }
+
+    // Nivel 2 — municipios
+    async function drillDep(cod_dep, nom_dep) {
+      state.nivel='mun'; state.cod_dep=cod_dep; state.nom_dep=nom_dep; state.cod_mun=null; state.nom_mun=null;
+      document.getElementById('drill-title').textContent = `Municipios · ${nom_dep}`;
+      document.getElementById('level-badge').textContent = nom_dep;
+      document.getElementById('level-badge').className = 'level-badge mun';
+      updateNav();
+      setThead('Municipio');
+      const tbody = document.getElementById('drill-tbody');
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:1.5rem;color:rgba(255,255,255,.3);font-family:'DM Mono',monospace;font-size:.65rem">Cargando municipios…</td></tr>`;
+      const muns = await getJSON('municipios');
+      const filtered = muns.filter(m=>m.cod_dep===cod_dep).sort((a,b)=>b.cepeda-a.cepeda);
+      tbody.innerHTML = '';
+      filtered.forEach((m,i) => {
+        tbody.innerHTML += buildRow(i, m.nombre, m, `drillMun('${m.cod_dep}','${m.cod_mun}','${m.nombre.replace(/'/g,"\\'")}')`);
+      });
+    }
+
+    // Nivel 3 — puestos
+    async function drillMun(cod_dep, cod_mun, nom_mun) {
+      state.nivel='puesto'; state.cod_mun=cod_mun; state.nom_mun=nom_mun;
+      document.getElementById('drill-title').textContent = `Puestos · ${nom_mun}`;
+      document.getElementById('level-badge').textContent = nom_mun;
+      document.getElementById('level-badge').className = 'level-badge pues';
+      updateNav();
+      setThead('Puesto de votación');
+      const tbody = document.getElementById('drill-tbody');
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:1.5rem;color:rgba(255,255,255,.3);font-family:'DM Mono',monospace;font-size:.65rem">Cargando puestos…</td></tr>`;
+      const puestos = await getJSON('puestos');
+      const filtered = puestos.filter(p=>p.cod_dep===cod_dep&&p.cod_mun===cod_mun).sort((a,b)=>b.cepeda-a.cepeda);
+      tbody.innerHTML = '';
+      filtered.forEach((p,i) => {
+        tbody.innerHTML += buildRow(i, p.nombre, p, null);
+      });
+    }
+
+    // ─── CURTAIN ──────────────────────────────────────────────
     const curtain = document.getElementById('curtain');
     curtain.classList.add('opening');
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          curtain.classList.remove('opening');
-          curtain.classList.add('opened');
-        }, 900);
-      });
-    });
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      setTimeout(()=>{ curtain.classList.remove('opening'); curtain.classList.add('opened'); }, 900);
+    }));
 
-    // ═══════════════════════════════════════════════════════════
-    // NAVIGATION (curtain close)
-    // ═══════════════════════════════════════════════════════════
-    function navigate(e, href) {
+    function navTo(e, href) {
       e.preventDefault();
       curtain.classList.remove('opened');
       curtain.classList.add('closing');
-      setTimeout(() => { window.location.href = href; }, 1000);
+      setTimeout(()=>{ window.location.href=href; }, 1000);
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // CURSOR
-    // ═══════════════════════════════════════════════════════════
-    const cur = document.getElementById('cursor'), ri = document.getElementById('cursorRing');
+    // ─── CURSOR ───────────────────────────────────────────────
+    const cur=document.getElementById('cursor'), ri=document.getElementById('cursorRing');
     let mx=0,my=0,rx=0,ry=0;
-    document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; cur.style.left=mx+'px'; cur.style.top=my+'px'; });
+    document.addEventListener('mousemove',e=>{ mx=e.clientX; my=e.clientY; cur.style.left=mx+'px'; cur.style.top=my+'px'; });
     (function loop(){ rx+=(mx-rx)*.1; ry+=(my-ry)*.1; ri.style.left=rx+'px'; ri.style.top=ry+'px'; requestAnimationFrame(loop); })();
-    document.querySelectorAll('a, button').forEach(el => {
-      el.addEventListener('mouseenter', () => { cur.style.transform='translate(-50%,-50%) scale(2.2)'; cur.style.background='transparent'; cur.style.border='1.5px solid #0047FF'; ri.style.opacity='0'; });
-      el.addEventListener('mouseleave', () => { cur.style.transform='translate(-50%,-50%) scale(1)'; cur.style.background='#0047FF'; cur.style.border='none'; ri.style.opacity='.4'; });
+    document.addEventListener('mouseover',e=>{
+      if(e.target.closest('a,button')){ cur.style.transform='translate(-50%,-50%) scale(2.2)'; cur.style.background='transparent'; cur.style.border='1.5px solid #0047FF'; ri.style.opacity='0'; }
+      else { cur.style.transform='translate(-50%,-50%) scale(1)'; cur.style.background='#0047FF'; cur.style.border='none'; ri.style.opacity='.4'; }
     });
 
-    // ═══════════════════════════════════════════════════════════
-    // INIT
-    // ═══════════════════════════════════════════════════════════
-    render();
+    init();
   </script>
 </body>
 </html>

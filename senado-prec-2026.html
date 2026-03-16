@@ -518,6 +518,7 @@
       'Centro Democrático y MIRA':'#0088BB','Partido Liberal Colombiano':'#C8102E',
       'Partido de la U':'#F7941D','Cambio Radical':'#E91E8C',
       'Partido Conservador Colombiano':'#003580','Alianza Verde':'#4CAF50',
+      'Partido Alianza por Colombia (Verde)':'#4CAF50',
       'Movimiento Salvación Nacional':'#00AEEF','MIRA':'#1A3FC4',
       'MIRA + Dignidad y Compromiso':'#1A3FC4','Frente Amplio Unitario':'#F7941D',
       'Nuevo Liberalismo':'#E53935','Comunes':'#007755','Colombia Humana':'#7a3db5',
@@ -527,6 +528,7 @@
       if(CP[nombre]) return CP[nombre];
       if(/pacto hist/i.test(nombre)) return '#6B2D8B';
       if(/centro dem/i.test(nombre)) return '#0088BB';
+      if(/alianza por colombia/i.test(nombre)) return '#4CAF50';
       if(/liberal/i.test(nombre)) return '#C8102E';
       if(/conservador/i.test(nombre)) return '#003580';
       if(/cambio radical/i.test(nombre)) return '#E91E8C';
@@ -805,7 +807,8 @@
           trC.className='cands-row';
           trC.style.display='none';
           const esCerrada=p.listaCerrada;
-          const maxVot=Math.max(...(cands.map(c=>parseInt(c.vot||0))||[1]));
+          const esDep2=!!p._usaGanadoresNac;
+          const maxVot=Math.max(1,...(cands.map(c=>parseInt(esDep2?(c.votDep||c.vot||0):(c.vot||0))||[1])));
           trC.innerHTML=`<td colspan="5" style="padding:0">
             <div class="cands-inner">
               <table class="cands-table">
@@ -943,28 +946,30 @@
                 {l:'Curules en juego',v:'100',c:'dark',d:"Circunscripción nacional · D'Hondt · umbral 3%"},
                 {l:'Partido puntero',v:top?top[0].split(' ')[0]:'—',c:'sm',d:top?`${top[1]} curules est. (nacional)`:''},
               ]);
-              // Vista departamental: mostrar candidatos en orden NACIONAL,
-              // anotar con votos del departamento, marcar elegidos según GANADORES_NAC
+              // Vista departamental: candidatos ordenados por votación en el departamento,
+              // pero elegido se determina por GANADORES_NAC (ganadores nacionales fijos)
               const datosRender=SENADO.map(p=>{
                 const vDep=votosDep[p.p]||0;
-                // Tomar lista de candidatos del nacional (orden correcto para elegidos)
-                const candsNac=p.candidatos||[];
-                // Si tenemos votos departamentales para esos candidatos, anotarlos
+                // Construir mapa nombre → votos departamentales
                 const mapVotDep={};
                 (candsDep[p.p]||[]).forEach(c=>{
                   const key=`${c.nomcan||''} ${c.apecan||''}`.trim().toUpperCase();
                   mapVotDep[key]=(mapVotDep[key]||0)+(parseInt(c.vot)||0);
                 });
+                // Anotar candidatos nacionales con sus votos departamentales
+                const candsNac=p.candidatos||[];
                 const candsConVotDep=candsNac.map(c=>{
                   const key=`${c.nomcan||''} ${c.apecan||''}`.trim().toUpperCase();
                   return {...c, votDep: mapVotDep[key]||0};
                 });
+                // Ordenar por votos departamentales desc (los sin voto dep van al final)
+                const candsOrdenados=[...candsConVotDep].sort((a,b)=>(b.votDep||0)-(a.votDep||0));
                 return {
                   ...p,
                   v: vDep,
-                  candidatos: candsConVotDep.length ? candsConVotDep : candsNac,
+                  candidatos: candsOrdenados.length ? candsOrdenados : candsNac,
                   listaCerrada: p.listaCerrada,
-                  _usaGanadoresNac: true,  // flag para que renderTablaPartidos use GANADORES_NAC
+                  _usaGanadoresNac: true,  // elegido viene de GANADORES_NAC, no de la posición
                 };
               }).filter(p=>p.v>0).sort((a,b)=>b.v-a.v);
               _SENADO_RENDER=datosRender;
