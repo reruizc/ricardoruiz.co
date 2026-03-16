@@ -302,31 +302,59 @@
     .footer-brand a { color:rgba(255,255,255,.25); text-decoration:none; }
     .footer-brand a:hover { color:rgba(255,255,255,.5); }
 
-    /* ── CURTAIN ── */
+    /* ── CURTAIN — mismo sistema que electoral.html ── */
     .curtain { position:fixed; inset:0; z-index:99999; pointer-events:none; }
-    .curtain-layer {
-      position:absolute; inset:0; background:#04060e;
-    }
-    .curtain-layer:nth-child(1) { clip-path:polygon(0 0,100% 0,100% 22%,0 28%);   transform:translateX(0); transition:transform .58s cubic-bezier(.75,0,.25,1) 0s; }
-    .curtain-layer:nth-child(2) { clip-path:polygon(0 26%,100% 20%,100% 49%,0 55%); transform:translateX(0); transition:transform .58s cubic-bezier(.75,0,.25,1) .07s; }
-    .curtain-layer:nth-child(3) { clip-path:polygon(0 53%,100% 47%,100% 76%,0 82%); transform:translateX(0); transition:transform .58s cubic-bezier(.75,0,.25,1) .14s; }
-    .curtain-layer:nth-child(4) { clip-path:polygon(0 80%,100% 74%,100% 100%,0 100%); transform:translateX(0); transition:transform .58s cubic-bezier(.75,0,.25,1) .21s; }
+    .curtain-layer { position:absolute; inset:0; background:#04060e; }
+
+    /* Bandas diagonales — posición de reposo: fuera de pantalla (como en electoral) */
+    .curtain-layer:nth-child(1) { clip-path:polygon(0 0,100% 0,100% 22%,0 28%);   transform:translateX(-110%); transition:transform .58s cubic-bezier(.75,0,.25,1) 0s; }
+    .curtain-layer:nth-child(2) { clip-path:polygon(0 26%,100% 20%,100% 49%,0 55%); transform:translateX( 110%); transition:transform .58s cubic-bezier(.75,0,.25,1) .07s; }
+    .curtain-layer:nth-child(3) { clip-path:polygon(0 53%,100% 47%,100% 76%,0 82%); transform:translateX(-110%); transition:transform .58s cubic-bezier(.75,0,.25,1) .14s; }
+    .curtain-layer:nth-child(4) { clip-path:polygon(0 80%,100% 74%,100% 100%,0 100%); transform:translateX( 110%); transition:transform .58s cubic-bezier(.75,0,.25,1) .21s; }
+
     .curtain-stage {
       position:absolute; inset:0; z-index:1;
       display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.8rem;
       pointer-events:none;
     }
-    .curtain-tag { font-family:'DM Mono',monospace; font-size:1.08rem; letter-spacing:.35em; text-transform:uppercase; color:rgba(0,71,255,0.7); opacity:1; transform:translateY(0); }
-    .curtain-sub { font-family:'DM Mono',monospace; font-size:0.975rem; letter-spacing:.22em; color:rgba(255,255,255,.35); text-transform:uppercase; opacity:1; transform:translateY(0); }
+
+    /* Tag y sub: ocultos por defecto, visibles cuando la cortina está cerrada */
+    .curtain-tag {
+      font-family:'DM Mono',monospace; font-size:1.08rem; letter-spacing:.35em; text-transform:uppercase; color:rgba(0,71,255,0.7);
+      opacity:0; transform:translateY(-12px);
+      transition:opacity .4s ease, transform .4s ease;
+    }
+    .curtain-sub {
+      font-family:'DM Mono',monospace; font-size:0.975rem; letter-spacing:.22em; color:rgba(255,255,255,.35); text-transform:uppercase;
+      opacity:0; transform:translateY(12px);
+      transition:opacity .4s ease, transform .4s ease;
+    }
     .curtain-headline {
       font-family:'Syne',sans-serif; font-weight:800;
       font-size:clamp(2.6rem,6.5vw,5.85rem);
       letter-spacing:-.03em; line-height:1.05; text-shadow:0 0 50px rgba(0,71,255,0.5); text-align:center;
     }
     .curtain-line { overflow:hidden; display:block; }
-    .curtain-word { display:inline-block; opacity:1; transform:translateX(0); transition:transform .52s cubic-bezier(.25,.46,.45,.94), opacity .45s ease; }
+    .curtain-word {
+      display:inline-block; opacity:0;
+      transition:transform .52s cubic-bezier(.25,.46,.45,.94), opacity .45s ease;
+    }
+    .curtain-word.from-left  { transform:translateX(-80px); }
+    .curtain-word.from-right { transform:translateX( 80px); }
     .curtain-word.white { color:#f4f3ef; }
     .curtain-word.blue  { color:#0047FF; }
+
+    /* .opening — capas entran instantáneamente (sin transición), texto visible:
+       se añade antes de que el usuario vea nada, simula que la cortina ya estaba cerrada */
+    .curtain.opening .curtain-layer {
+      transform:translateX(0) !important;
+      transition:none;
+    }
+    .curtain.opening .curtain-word { transform:translateX(0); opacity:1; transition:none; }
+    .curtain.opening .curtain-tag  { opacity:1; transform:translateY(0); transition:none; }
+    .curtain.opening .curtain-sub  { opacity:1; transform:translateY(0); transition:none; }
+
+    /* .opened — capas salen hacia sus lados, texto se desvanece */
     .curtain.opened .curtain-layer:nth-child(1) { transform:translateX(-110%); }
     .curtain.opened .curtain-layer:nth-child(2) { transform:translateX( 110%); }
     .curtain.opened .curtain-layer:nth-child(3) { transform:translateX(-110%); }
@@ -334,6 +362,14 @@
     .curtain.opened .curtain-word { opacity:0; }
     .curtain.opened .curtain-tag, .curtain.opened .curtain-sub { opacity:0; transition:opacity .25s ease; }
     .curtain.opened { pointer-events:none; }
+
+    /* .closing — capas entran (para navegar hacia otra página) */
+    .curtain.closing { pointer-events:all; }
+    .curtain.closing .curtain-layer { transform:translateX(0) !important; }
+    .curtain.closing .curtain-word.from-left,
+    .curtain.closing .curtain-word.from-right { transform:translateX(0); opacity:1; transition-delay:.62s; }
+    .curtain.closing .curtain-tag { opacity:1; transform:translateY(0); transition-delay:.68s; }
+    .curtain.closing .curtain-sub { opacity:1; transform:translateY(0); transition-delay:.72s; }
 
     /* RESPONSIVE */
     @media(max-width:1000px) { .results-grid { grid-template-columns:1fr; } .map-card { grid-column:1; } }
@@ -370,8 +406,8 @@
     <div class="curtain-stage">
       <span class="curtain-tag">ricardoruiz.co</span>
       <div class="curtain-headline">
-        <span class="curtain-line"><span class="curtain-word white">Senado</span></span>
-        <span class="curtain-line"><span class="curtain-word blue">Colombia</span></span>
+        <span class="curtain-line"><span class="curtain-word from-left white">Senado</span></span>
+        <span class="curtain-line"><span class="curtain-word from-right blue">Colombia</span></span>
       </div>
       <span class="curtain-sub">Preconteo · 2026</span>
     </div>
@@ -382,7 +418,7 @@
     <!-- TOP BAR -->
     <div class="top-bar">
       <div class="page-title">Senado de<br/><span>la República</span></div>
-      <a href="electoral.html" class="logo-link">
+      <a href="electoral.html" class="logo-link" onclick="navigate(event,'electoral.html','Resultados Electorales')">
         <div class="logo-bars">
           <div class="logo-bar" style="height:20px"></div>
           <div class="logo-bar" style="height:15px"></div>
@@ -395,7 +431,7 @@
 
     <!-- BREADCRUMB -->
     <div class="breadcrumb">
-      <a href="electoral.html">Resultados Electorales</a>
+      <a href="electoral.html" onclick="navigate(event,'electoral.html','Resultados Electorales')">Resultados Electorales</a>
       &nbsp;/&nbsp; Senado de la República · Preconteo 2026
     </div>
 
@@ -489,7 +525,7 @@
 
     <!-- BACK -->
     <div class="back-bar">
-      <a href="electoral.html" class="back-btn">← Volver a Resultados Electorales</a>
+      <a href="electoral.html" class="back-btn" onclick="navigate(event,'electoral.html','Resultados Electorales')">← Volver a Resultados Electorales</a>
     </div>
 
   </div>
@@ -965,7 +1001,7 @@
               <td style="font-size:.72rem;color:rgba(255,255,255,.4)">${r.partido}</td>
               <td class="r" style="font-size:.72rem;color:rgba(255,255,255,.3)">#${r.pos} lista</td>
               <td class="r" style="font-size:.78rem">${r.vot>0?r.vot.toLocaleString('es-CO'):'<span style="color:rgba(255,255,255,.2)">—</span>'}</td>
-              <td class="r"><span style="font-size:.62rem;font-family:'DM Mono',monospace;padding:.15rem .5rem;background:${r.elegido?'rgba(0,71,255,.15)':'rgba(255,255,255,.04)'};color:${r.elegido?'var(--blue)':'rgba(255,255,255,.25)';border:1px solid ${r.elegido?'rgba(0,71,255,.3)':'rgba(255,255,255,.08)'}">${r.elegido?'ELEGIDO':'—'}</span></td>
+              <td class="r"><span style="font-size:.62rem;font-family:'DM Mono',monospace;padding:.15rem .5rem;background:${r.elegido?'rgba(0,71,255,.15)':'rgba(255,255,255,.04)'};color:${r.elegido?'var(--blue)':'rgba(255,255,255,.25)'};border:1px solid ${r.elegido?'rgba(0,71,255,.3)':'rgba(255,255,255,.08)'}">${r.elegido?'ELEGIDO':'—'}</span></td>
             </tr>`).join('')}
           </tbody>
         </table>`;
@@ -999,9 +1035,26 @@
     const depKeys=['Nacional (todos)',...Object.values(DANE_DEP_CONS).sort((a,b)=>a.localeCompare(b,'es'))];
     depKeys.forEach(d=>{ const o=document.createElement('option'); o.value=d; o.textContent=d; if(d==='Nacional (todos)') o.selected=true; senSel.appendChild(o); });
 
-    // Curtain
+    // Curtain — patrón idéntico a electoral.html:
+    // 1) Arranca con .opening (capas in situ sin transición, texto visible)
+    // 2) Un frame después agrega .opened → capas salen animadas, texto se desvanece
     const curtain=document.getElementById('curtain');
-    setTimeout(()=>{ curtain.classList.add('opened'); },900);
+    curtain.classList.add('opening');
+    requestAnimationFrame(()=>{
+      requestAnimationFrame(()=>{
+        curtain.classList.remove('opening');
+        curtain.classList.add('opened');
+      });
+    });
+
+    // navigate() — cierra la cortina antes de ir a otra página
+    function navigate(e, url, label) {
+      e && e.stopPropagation && e.stopPropagation();
+      e && e.preventDefault && e.preventDefault();
+      curtain.classList.remove('opened');
+      curtain.classList.add('closing');
+      setTimeout(()=>{ window.location.href=url; }, 1150);
+    }
 
     // Cursor
     const cur2=document.getElementById('cursor'),ri=document.getElementById('cursorRing');
