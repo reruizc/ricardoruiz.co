@@ -264,13 +264,16 @@
       display:flex; align-items:center; gap:1rem;
     }
     .back-btn {
-      display:flex; align-items:center; gap:.5rem;
+      display:inline-flex; align-items:center; gap:.5rem;
       font-family:'DM Mono',monospace; font-size:.7rem;
       letter-spacing:.12em; text-transform:uppercase;
-      color:rgba(255,255,255,.38); text-decoration:none;
-      cursor:none; transition:color .2s;
+      color:var(--white); text-decoration:none;
+      cursor:none; transition:background .2s, color .2s;
+      background: rgba(0,71,255,0.25);
+      border: 1px solid rgba(0,71,255,0.5);
+      padding: .3rem .9rem;
     }
-    .back-btn:hover { color:var(--white); }
+    .back-btn:hover { background: rgba(0,71,255,0.45); border-color: var(--blue); color: var(--white); }
 
     /* FOOTER */
     .full-footer {
@@ -753,22 +756,22 @@
         if(bajoUmbral)tr.style.opacity='0.4';
         if(tieneCands){ tr.onclick=window._candsToggle[toggleId]; tr.ontouchend=function(e){e.preventDefault();window._candsToggle[toggleId]();}; }
         tr.innerHTML=`
-          <td style="color:rgba(255,255,255,.25);font-size:.65rem">${String(i+1).padStart(2,'0')}</td>
+          <td style="color:rgba(255,255,255,.25);font-size:.72rem">${String(i+1).padStart(2,'0')}</td>
           <td style="padding:0">
             ${tieneCands
               ?`<div style="width:100%;padding:.55rem .4rem;display:flex;align-items:center;gap:.5rem;pointer-events:none">
                   <span class="dot10" style="background:${getColor(p.p)||'#555'};flex-shrink:0"></span>
-                  <span style="flex:1;font-size:.78rem">${p.p}${bajoUmbral?'<span style="font-size:.6rem;color:rgba(255,255,255,.3);margin-left:.3rem">↓ umbral</span>':''}</span>
+                  <span style="flex:1;font-size:.9rem">${p.p}${bajoUmbral?'<span style="font-size:.68rem;color:rgba(255,255,255,.3);margin-left:.3rem">↓ umbral</span>':''}</span>
                   <span id="arrow_${toggleId}" style="font-size:.7rem;color:rgba(255,255,255,.3);transition:transform .2s;flex-shrink:0">▶</span>
                 </div>`
-              :`<span style="display:flex;align-items:center;gap:.5rem;padding:.55rem .4rem;font-size:.78rem">
+              :`<span style="display:flex;align-items:center;gap:.5rem;padding:.55rem .4rem;font-size:.9rem">
                   <span class="dot10" style="background:${getColor(p.p)||'#555'}"></span>
-                  ${p.p}${bajoUmbral?'<span style="font-size:.6rem;color:rgba(255,255,255,.3);margin-left:.3rem">↓ umbral</span>':''}
+                  ${p.p}${bajoUmbral?'<span style="font-size:.68rem;color:rgba(255,255,255,.3);margin-left:.3rem">↓ umbral</span>':''}
                 </span>`
             }
           </td>
-          <td class="r">${p.v.toLocaleString('es-CO')}</td>
-          <td class="r"><div class="bar-wrap"><div class="bar-fill" style="width:0%;background:${getColor(p.p)||'#555'}" data-w="${bw}%"></div></div><span class="pct-val">${pct}%</span></td>
+          <td class="r" style="font-size:.9rem">${p.v.toLocaleString('es-CO')}</td>
+          <td class="r"><div class="bar-wrap"><div class="bar-fill" style="width:0%;background:${getColor(p.p)||'#555'}" data-w="${bw}%"></div></div><span class="pct-val" style="font-size:.88rem">${pct}%</span></td>
           <td class="r" style="white-space:nowrap">${cr>0?`<span class="cbadge">${cr}</span>`:esBlanco(p.p)?'<span style="color:rgba(255,255,255,.25);font-size:.7rem">N/A</span>':'<span style="color:rgba(255,255,255,.2)">—</span>'}</td>`;
         tbody.appendChild(tr);
 
@@ -790,23 +793,27 @@
                 <tbody>
                   ${cands.slice(0,esCerrada?Math.max(cr+5,15):30).map((cd,j)=>{
                     const nom=`${cd.nomcan||''} ${cd.apecan||''}`.trim()||cd.nomcan||'—';
+                    const esSoloLista=/solo por la lista/i.test(nom);
                     if(esCerrada){
-                      const color=j<cr?'var(--blue)':'rgba(255,255,255,.4)';
-                      const fw=j<cr?'600':'400';
+                      // En lista cerrada: elegido si j < cr Y no es "solo por la lista"
+                      const esEleg = j<cr && !esSoloLista;
+                      const color = esEleg ? 'var(--white)' : 'rgba(255,255,255,.4)';
+                      const fw    = esEleg ? '600' : '400';
                       return `<tr>
-                        <td style="color:rgba(255,255,255,.25);font-size:.6rem">${String(j+1).padStart(2,'0')}</td>
-                        <td colspan="2" style="font-size:.78rem;color:${color};font-weight:${fw}">${nom}${j<cr?'<span style="font-size:.55rem;margin-left:.4rem;opacity:.7">✦</span>':''}</td>
-                        <td class="r"><div class="bar-wrap" style="${j<cr?'':'opacity:.3'}"><div class="bar-fill" style="width:${j<cr?(100-(j/Math.max(cr,1))*60).toFixed(0):0}%;background:${j<cr?'var(--blue)':'rgba(255,255,255,.2)'}"></div></div></td>
+                        <td style="color:rgba(255,255,255,.25);font-size:.68rem">${String(j+1).padStart(2,'0')}</td>
+                        <td colspan="2" style="font-size:.88rem;color:${color};font-weight:${fw}">${nom}${esEleg?'<span style="font-size:.6rem;margin-left:.4rem;opacity:.7">✦</span>':''}</td>
+                        <td class="r"><div class="bar-wrap" style="${esEleg?'':'opacity:.3'}"><div class="bar-fill" style="width:${esEleg?(100-(j/Math.max(cr,1))*60).toFixed(0):0}%;background:${esEleg?'var(--blue)':'rgba(255,255,255,.2)'}"></div></div></td>
                       </tr>`;
                     } else {
                       const pctP=((parseInt(cd.vot||0)/p.v)*100).toFixed(1);
                       const bwC=((parseInt(cd.vot||0)/maxVot)*100).toFixed(1);
-                      const esElegido=j<cr;
+                      // En lista abierta: elegido si j < cr Y no es "solo por la lista"
+                      const esElegido = j<cr && !esSoloLista;
                       return `<tr>
-                        <td style="color:rgba(255,255,255,.25);font-size:.6rem">${String(j+1).padStart(2,'0')}</td>
-                        <td style="font-size:.78rem;color:${esElegido?'var(--blue)':'inherit'};font-weight:${esElegido?'600':'400'}">${nom}${esElegido?'<span style="font-size:.55rem;margin-left:.4rem;opacity:.7">✦</span>':''}</td>
-                        <td class="r" style="font-size:.78rem;color:${esElegido?'var(--blue)':'inherit'}">${parseInt(cd.vot||0).toLocaleString('es-CO')}</td>
-                        <td class="r" style="font-size:.75rem;color:rgba(255,255,255,.35)">${pctP}%</td>
+                        <td style="color:rgba(255,255,255,.25);font-size:.68rem">${String(j+1).padStart(2,'0')}</td>
+                        <td style="font-size:.88rem;color:${esElegido?'var(--white)':'inherit'};font-weight:${esElegido?'600':'400'}">${nom}${esElegido?'<span style="font-size:.6rem;margin-left:.4rem;opacity:.7">✦</span>':''}</td>
+                        <td class="r" style="font-size:.88rem;color:${esElegido?'var(--white)':'inherit'}">${parseInt(cd.vot||0).toLocaleString('es-CO')}</td>
+                        <td class="r" style="font-size:.82rem;color:rgba(255,255,255,.35)">${pctP}%</td>
                         <td class="r"><div class="bar-wrap"><div class="bar-fill" style="width:${bwC}%;background:${esElegido?'var(--blue)':(getColor(p.p)||'#555')}"></div></div></td>
                       </tr>`;
                     }
@@ -969,16 +976,16 @@
           <thead><tr><th>#</th><th>Candidato/a</th><th>Partido / Coalición</th><th class="r">Pos. lista</th><th class="r">Votos</th><th class="r">Estado</th></tr></thead>
           <tbody>
             ${resultados.map((r,i)=>{
-              const estadoBg=r.elegido?'rgba(0,71,255,.15)':'rgba(255,255,255,.04)';
-              const estadoColor=r.elegido?'var(--blue)':'rgba(255,255,255,.25)';
-              const estadoBorder=r.elegido?'rgba(0,71,255,.3)':'rgba(255,255,255,.08)';
+              const estadoBg=r.elegido?'rgba(255,255,255,.12)':'rgba(255,255,255,.04)';
+              const estadoColor=r.elegido?'var(--white)':'rgba(255,255,255,.25)';
+              const estadoBorder=r.elegido?'rgba(255,255,255,.3)':'rgba(255,255,255,.08)';
               return `<tr>
-                <td style="color:rgba(255,255,255,.25);font-size:.65rem">${String(i+1).padStart(2,'0')}</td>
-                <td style="font-size:.78rem;color:${r.elegido?'var(--blue)':'inherit'};font-weight:${r.elegido?600:400}">${r.nom}${r.elegido?'<span style="font-size:.55rem;margin-left:.4rem;opacity:.7">✦</span>':''}</td>
-                <td style="font-size:.72rem;color:rgba(255,255,255,.4)">${r.partido}</td>
-                <td class="r" style="font-size:.72rem;color:rgba(255,255,255,.3)">#${r.pos} lista</td>
-                <td class="r" style="font-size:.78rem">${r.vot>0?r.vot.toLocaleString('es-CO'):'<span style="color:rgba(255,255,255,.2)">—</span>'}</td>
-                <td class="r"><span style="font-size:.62rem;font-family:'DM Mono',monospace;padding:.15rem .5rem;background:${estadoBg};color:${estadoColor};border:1px solid ${estadoBorder}">${r.elegido?'ELEGIDO':'—'}</span></td>
+                <td style="color:rgba(255,255,255,.25);font-size:.72rem">${String(i+1).padStart(2,'0')}</td>
+                <td style="font-size:.9rem;color:${r.elegido?'var(--white)':'inherit'};font-weight:${r.elegido?600:400}">${r.nom}${r.elegido?'<span style="font-size:.6rem;margin-left:.4rem;opacity:.7">✦</span>':''}</td>
+                <td style="font-size:.82rem;color:rgba(255,255,255,.45)">${r.partido}</td>
+                <td class="r" style="font-size:.8rem;color:rgba(255,255,255,.3)">#${r.pos} lista</td>
+                <td class="r" style="font-size:.88rem">${r.vot>0?r.vot.toLocaleString('es-CO'):'<span style="color:rgba(255,255,255,.2)">—</span>'}</td>
+                <td class="r"><span style="font-size:.75rem;font-family:'DM Mono',monospace;font-weight:700;padding:.2rem .6rem;background:${estadoBg};color:${estadoColor};border:1px solid ${estadoBorder}">${r.elegido?'ELEGIDO':'—'}</span></td>
               </tr>`;
             }).join('')}
           </tbody>
