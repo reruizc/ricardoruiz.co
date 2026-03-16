@@ -255,7 +255,7 @@
     /* ROTATE HINT */
     .rotate-hint { display:none; }
     @media(max-width:700px) and (orientation:portrait) {
-      .rotate-hint { display:flex; align-items:center; gap:.6rem; font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.06em; color:rgba(255,255,255,.35); padding:.5rem .8rem; background:rgba(255,255,255,.04); border:1px solid var(--border); margin-bottom:.8rem; }
+      .rotate-hint { display:flex; align-items:center; gap:.6rem; font-family:'DM Mono',monospace; font-size:.9rem; letter-spacing:.06em; color:rgba(255,255,255,.55); padding:.6rem 1rem; background:rgba(255,255,255,.06); border:1px solid var(--border); margin-bottom:.8rem; }
     }
 
     /* BACK BAR */
@@ -780,7 +780,17 @@
         tr.style.cursor=tieneCands?'pointer':'default';
         if(i===0)tr.classList.add('winner');
         if(bajoUmbral)tr.style.opacity='0.4';
-        if(tieneCands){ tr.onclick=window._candsToggle[toggleId]; tr.ontouchend=function(e){e.preventDefault();window._candsToggle[toggleId]();}; }
+        if(tieneCands){
+          tr.onclick=window._candsToggle[toggleId];
+          // Móvil: detectar tap vs scroll midiendo desplazamiento entre touchstart y touchend
+          let _touchStartY=0, _touchStartX=0;
+          tr.addEventListener('touchstart', function(e){ _touchStartY=e.touches[0].clientY; _touchStartX=e.touches[0].clientX; }, {passive:true});
+          tr.addEventListener('touchend', function(e){
+            const dy=Math.abs(e.changedTouches[0].clientY-_touchStartY);
+            const dx=Math.abs(e.changedTouches[0].clientX-_touchStartX);
+            if(dy<10 && dx<10){ e.preventDefault(); window._candsToggle[toggleId](); }
+          });
+        }
         tr.innerHTML=`
           <td style="color:rgba(255,255,255,.25);font-size:.72rem">${String(i+1).padStart(2,'0')}</td>
           <td style="padding:0">
@@ -1019,15 +1029,35 @@
       const norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
       const qn=norm(q);
       const fuente=(_SENADO_RENDER&&_SENADO_RENDER.length)?_SENADO_RENDER:SENADO;
+      const esDep = curSenDep !== 'Nacional (todos)';
       const cur=dhondt(SENADO,100,TOT_SENADO.votval);
       const resultados=[];
       fuente.forEach(partido=>{
+        const ganadoresSet = esDep && GANADORES_NAC[partido.p] ? GANADORES_NAC[partido.p] : null;
+        const curPart=cur[partido.p]||0;
+        let curulesRestantes=curPart;
+        // Para el buscador en vista nacional necesitamos saber quién es elegido por posición
+        const elegiados=new Set();
+        if(!ganadoresSet){
+          let rest=curPart;
+          (partido.candidatos||[]).forEach(c=>{
+            const n=`${c.nomcan||''} ${c.apecan||''}`.trim();
+            if(!/solo por la lista/i.test(n) && rest>0){ elegiados.add(n.toUpperCase().trim()); rest--; }
+          });
+        }
         (partido.candidatos||[]).forEach((c,idx)=>{
           const nom=`${c.nomcan||''} ${c.apecan||''}`.trim();
           if(!norm(nom).includes(qn)) return;
-          const curPart=cur[partido.p]||0;
-          const elegido=idx<curPart;
-          resultados.push({nom,partido:partido.p,vot:c.vot||0,pos:idx+1,elegido,listaCerrada:partido.listaCerrada});
+          const esSoloLista=/solo por la lista/i.test(nom);
+          let elegido=false;
+          if(ganadoresSet){
+            elegido = !esSoloLista && ganadoresSet.has(nom.toUpperCase().trim());
+          } else {
+            elegido = elegiados.has(nom.toUpperCase().trim());
+          }
+          // Votos: usar votDep en vista departamental si está disponible
+          const vot = esDep ? (c.votDep || c.vot || 0) : (c.vot || 0);
+          resultados.push({nom, partido:partido.p, vot, pos:idx+1, elegido, listaCerrada:partido.listaCerrada});
         });
       });
       resultados.sort((a,b)=>b.vot-a.vot);
@@ -1037,7 +1067,7 @@
       }
       box.innerHTML=`
         <div style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;color:rgba(255,255,255,.3);text-transform:uppercase;padding:.75rem 0 .5rem">
-          ${resultados.length} resultado${resultados.length!==1?'s':''} para "${q}"
+          ${resultados.length} resultado${resultados.length!==1?'s':''} para "${q}" · ${esDep?curSenDep:'Nacional'}
         </div>
         <table class="results-table" style="width:100%">
           <thead><tr><th>#</th><th>Candidato/a</th><th>Partido / Coalición</th><th class="r">Pos. lista</th><th class="r">Votos</th><th class="r">Estado</th></tr></thead>
