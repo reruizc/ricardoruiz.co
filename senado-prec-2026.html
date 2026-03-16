@@ -506,6 +506,10 @@
     ];
     let TOT_SENADO = { votval:0, votnul:0, votnma:0, votblan:0, votant:0 };
 
+    // Mapa partido → Set de nombres normalizados de candidatos ganadores (nacional)
+    // Se construye una vez al cargar datos nacionales y se reutiliza en vista departamental
+    let GANADORES_NAC = {}; // { 'Movimiento Salvación Nacional': Set(['ENRIQUE GOMEZ MARTINEZ', ...]) }
+
     // ═══════════════════════════════════════════════════════════
     // PALETA PARTIDOS
     // ═══════════════════════════════════════════════════════════
@@ -640,6 +644,26 @@
           const votblan=parseInt(tot.votblan)||0;
           const votnma=parseInt(tot.votnma)||(votant-votval-votnul)||0;
           TOT_SENADO={votant,votval,votnul,votnma,votblan};
+        }
+        // Calcular ganadores nacionales y guardarlos en GANADORES_NAC
+        // Se hace aquí para que esté disponible cuando se filtra por departamento
+        if(SENADO.length){
+          const curNac=dhondt(SENADO,100,TOT_SENADO.votval);
+          GANADORES_NAC={};
+          SENADO.forEach(partido=>{
+            const cr=curNac[partido.p]||0;
+            if(cr===0) return;
+            const ganadores=new Set();
+            let restantes=cr;
+            const cands=partido.candidatos||[];
+            for(let i=0;i<cands.length&&restantes>0;i++){
+              const nom=`${cands[i].nomcan||''} ${cands[i].apecan||''}`.trim();
+              if(/solo por la lista/i.test(nom)) continue;
+              ganadores.add(nom.toUpperCase().trim());
+              restantes--;
+            }
+            GANADORES_NAC[partido.p]=ganadores;
+          });
         }
       }
       return ok;
@@ -792,18 +816,24 @@
                 </tr></thead>
                 <tbody>
                   ${(()=>{
-                    // Pre-calcular cuántos curules quedan por asignar mientras recorremos la lista.
-                    // Los "solo por la lista" NO consumen curul → se saltan en el conteo.
+                    const ganadoresSet = p._usaGanadoresNac && GANADORES_NAC[p.p] ? GANADORES_NAC[p.p] : null;
+                    const esDep = !!p._usaGanadoresNac;
+                    // Pre-calcular curules restantes (solo se usa si NO hay ganadoresSet)
                     let curulesRestantes = cr;
                     return cands.slice(0,esCerrada?Math.max(cr+5,15):30).map((cd,j)=>{
                       const nom=`${cd.nomcan||''} ${cd.apecan||''}`.trim()||cd.nomcan||'—';
                       const esSoloLista=/solo por la lista/i.test(nom);
                       let esEleg = false;
-                      if(!esSoloLista && curulesRestantes > 0){
-                        esEleg = true;
-                        curulesRestantes--;
+                      if(ganadoresSet){
+                        // Vista departamental: elegido si está en los ganadores nacionales
+                        esEleg = !esSoloLista && ganadoresSet.has(nom.toUpperCase().trim());
+                      } else {
+                        // Vista nacional: contar curules restantes saltando "solo por la lista"
+                        if(!esSoloLista && curulesRestantes > 0){ esEleg=true; curulesRestantes--; }
                       }
                       const VERDE = '#39ff7a';
+                      // Votos a mostrar: en vista dep mostrar votDep si existe, si no el vot normal
+                      const votMostrar = esDep ? (cd.votDep||cd.vot||0) : (cd.vot||0);
                       if(esCerrada){
                         const color = esEleg ? VERDE : esSoloLista ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.45)';
                         const fw    = esEleg ? '700' : '400';
@@ -813,14 +843,14 @@
                           <td class="r"><div class="bar-wrap" style="${esEleg?'':'opacity:.25'}"><div class="bar-fill" style="width:${esEleg?(100-(j/Math.max(cr,1))*60).toFixed(0):0}%;background:${esEleg?VERDE:'rgba(255,255,255,.2)'}"></div></div></td>
                         </tr>`;
                       } else {
-                        const pctP=((parseInt(cd.vot||0)/p.v)*100).toFixed(1);
-                        const bwC=((parseInt(cd.vot||0)/maxVot)*100).toFixed(1);
+                        const pctP=p.v>0?((parseInt(votMostrar)/p.v)*100).toFixed(1):'—';
+                        const bwC=maxVot>0?((parseInt(votMostrar)/maxVot)*100).toFixed(1):'0';
                         const color = esEleg ? VERDE : esSoloLista ? 'rgba(255,255,255,.25)' : 'inherit';
                         const fw    = esEleg ? '700' : '400';
                         return `<tr>
                           <td style="color:rgba(255,255,255,.25);font-size:.7rem">${String(j+1).padStart(2,'0')}</td>
                           <td style="font-size:.97rem;color:${color};font-weight:${fw}">${nom}${esEleg?'<span style="font-size:.62rem;margin-left:.4rem;opacity:.85">✦</span>':''}${esSoloLista?'<span style="font-size:.6rem;color:rgba(255,255,255,.2);margin-left:.4rem">(lista)</span>':''}</td>
-                          <td class="r" style="font-size:.97rem;color:${esEleg?VERDE:'inherit'}">${parseInt(cd.vot||0).toLocaleString('es-CO')}</td>
+                          <td class="r" style="font-size:.97rem;color:${esEleg?VERDE:'inherit'}">${parseInt(votMostrar).toLocaleString('es-CO')}${esDep&&parseInt(votMostrar)===0?'<span style="font-size:.65rem;color:rgba(255,255,255,.2);margin-left:.3rem">—dep</span>':''}</td>
                           <td class="r" style="font-size:.85rem;color:rgba(255,255,255,.35)">${pctP}%</td>
                           <td class="r"><div class="bar-wrap"><div class="bar-fill" style="width:${bwC}%;background:${esEleg?VERDE:(getColor(p.p)||'#555')}"></div></div></td>
                         </tr>`;
@@ -913,7 +943,30 @@
                 {l:'Curules en juego',v:'100',c:'dark',d:"Circunscripción nacional · D'Hondt · umbral 3%"},
                 {l:'Partido puntero',v:top?top[0].split(' ')[0]:'—',c:'sm',d:top?`${top[1]} curules est. (nacional)`:''},
               ]);
-              const datosRender=SENADO.map(p=>({...p,v:votosDep[p.p]||0,candidatos:candsDep[p.p]?candsDep[p.p].map(c=>({nomcan:c.nomcan,apecan:c.apecan,vot:parseInt(c.vot)||0})):(p.listaCerrada?p.candidatos:[]),listaCerrada:candsDep[p.p]?false:p.listaCerrada})).filter(p=>p.v>0).sort((a,b)=>b.v-a.v);
+              // Vista departamental: mostrar candidatos en orden NACIONAL,
+              // anotar con votos del departamento, marcar elegidos según GANADORES_NAC
+              const datosRender=SENADO.map(p=>{
+                const vDep=votosDep[p.p]||0;
+                // Tomar lista de candidatos del nacional (orden correcto para elegidos)
+                const candsNac=p.candidatos||[];
+                // Si tenemos votos departamentales para esos candidatos, anotarlos
+                const mapVotDep={};
+                (candsDep[p.p]||[]).forEach(c=>{
+                  const key=`${c.nomcan||''} ${c.apecan||''}`.trim().toUpperCase();
+                  mapVotDep[key]=(mapVotDep[key]||0)+(parseInt(c.vot)||0);
+                });
+                const candsConVotDep=candsNac.map(c=>{
+                  const key=`${c.nomcan||''} ${c.apecan||''}`.trim().toUpperCase();
+                  return {...c, votDep: mapVotDep[key]||0};
+                });
+                return {
+                  ...p,
+                  v: vDep,
+                  candidatos: candsConVotDep.length ? candsConVotDep : candsNac,
+                  listaCerrada: p.listaCerrada,
+                  _usaGanadoresNac: true,  // flag para que renderTablaPartidos use GANADORES_NAC
+                };
+              }).filter(p=>p.v>0).sort((a,b)=>b.v-a.v);
               _SENADO_RENDER=datosRender;
               renderTablaPartidos('tbody-senado',datosRender,100,votval,cur);
               renderDonut('donut-senado','pct-senado','leg-senado',{votval,votnul,votnma,votblan,potencial:potDep,cifra:cur.__cifra__,umb:cur.__umb__});
