@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title id="pageTitle">Planes · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --black: #0a0a0a;
+      --white: #f4f3ef;
+      --blue: #0047FF;
+      --blue-light: #3d6fff;
+      --gray: #888;
+      --gray-light: #e0dfd9;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--white);
+      color: var(--black);
+      font-family: 'Fraunces', serif;
+      overflow-x: hidden;
+      cursor: none;
+    }
+
+    /* CURSOR */
+    .cursor { position:fixed; width:12px; height:12px; background:var(--blue); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s ease,background .2s; transform:translate(-50%,-50%); }
+    .cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--blue); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s ease,opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+
+    /* NAV */
+    nav {
+      position: fixed; top:0; left:0; right:0;
+      display: flex; justify-content:space-between; align-items:center;
+      padding: 1.5rem 3rem; z-index:100;
+      background: rgba(244,243,239,0.88); backdrop-filter:blur(12px);
+      border-bottom: 1px solid rgba(0,0,0,0.07);
+    }
+    .nav-logo-wrap { display:flex; align-items:center; gap:.75rem; text-decoration:none; }
+    .nav-logo { font-family:'Syne',sans-serif; font-weight:800; font-size:1.2rem; letter-spacing:-.02em; color:var(--black); line-height:1; }
+    .nav-logo span { color:var(--blue); }
+    .nav-bars { display:flex; align-items:flex-end; gap:3px; height:18px; }
+    .nav-bar { width:5px; background:var(--blue); border-radius:1px 1px 0 0; opacity:.85; }
+    .nav-back { font-family:'DM Mono',monospace; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--gray); text-decoration:none; transition:color .2s; }
+    .nav-back:hover { color:var(--blue); }
+
+    /* HERO */
+    .pricing-hero {
+      padding: 10rem 3rem 4rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .pricing-hero-bg {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: clamp(120px, 18vw, 240px);
+      color: transparent; -webkit-text-stroke: 1px rgba(0,71,255,0.05);
+      white-space: nowrap; user-select: none; pointer-events: none;
+      letter-spacing: -0.04em;
+    }
+    .pricing-label {
+      font-family: 'DM Mono', monospace; font-size:.7rem;
+      letter-spacing:.2em; text-transform:uppercase; color:var(--blue);
+      margin-bottom: 1rem; display:flex; align-items:center; justify-content:center; gap:1rem;
+    }
+    .pricing-label::before, .pricing-label::after { content:''; display:block; width:30px; height:1px; background:var(--blue); }
+    .pricing-title {
+      font-family: 'Syne', sans-serif; font-weight:800;
+      font-size: clamp(2.5rem, 6vw, 5rem);
+      letter-spacing: -.03em; line-height:.95;
+      margin-bottom: 1.5rem; position:relative; z-index:1;
+    }
+    .pricing-title em { font-style:italic; font-family:'Fraunces',serif; font-weight:300; color:var(--blue); }
+    .pricing-sub {
+      font-family: 'Fraunces', serif; font-weight:300;
+      font-size: 1.1rem; color:#555; line-height:1.7;
+      max-width: 480px; margin: 0 auto 2.5rem;
+      position: relative; z-index:1;
+    }
+
+    /* TOGGLES */
+    .toggles-wrap {
+      display: flex; align-items:center; justify-content:center;
+      gap: 2rem; margin-bottom: 3.5rem; flex-wrap: wrap;
+      position: relative; z-index:1;
+    }
+    .toggle-group {
+      display: flex; align-items:center; gap:.75rem;
+      font-family: 'DM Mono', monospace; font-size:.65rem;
+      letter-spacing:.12em; text-transform:uppercase; color:#aaa;
+    }
+    .toggle-group span.active { color:var(--black); }
+    .toggle-pill {
+      width: 44px; height: 24px;
+      background: var(--black); border-radius: 12px;
+      position: relative; cursor: none;
+      transition: background .25s;
+      border: none; padding: 0;
+      flex-shrink: 0;
+    }
+    .toggle-pill::after {
+      content: ''; position:absolute;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--white); top:3px; left:3px;
+      transition: transform .25s;
+    }
+    .toggle-pill.on { background: var(--blue); }
+    .toggle-pill.on::after { transform: translateX(20px); }
+    .toggle-save {
+      font-family: 'DM Mono', monospace; font-size:.58rem;
+      letter-spacing:.1em; text-transform:uppercase;
+      color: var(--blue); background: rgba(0,71,255,0.08);
+      padding: .2rem .6rem; opacity:0; transition:opacity .2s;
+    }
+    .toggle-save.visible { opacity:1; }
+
+    /* PLANS GRID */
+    .plans-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--gray-light);
+      border: 1px solid var(--gray-light);
+      margin: 0 3rem 6rem;
+    }
+
+    .plan-card {
+      background: var(--white);
+      padding: 2.5rem 2rem;
+      position: relative;
+      transition: background .2s;
+    }
+    .plan-card:hover { background: #fafaf8; }
+    .plan-card.featured {
+      background: var(--black);
+      color: var(--white);
+    }
+    .plan-card.featured:hover { background: #111; }
+
+    /* Featured top bar */
+    .plan-card.featured::before {
+      content: '';
+      position: absolute; top:0; left:0; right:0;
+      height: 3px; background: var(--blue);
+    }
+
+    .plan-badge {
+      font-family: 'DM Mono', monospace; font-size:.58rem;
+      letter-spacing:.18em; text-transform:uppercase;
+      color: var(--blue); margin-bottom: 1.2rem;
+      display: flex; align-items:center; gap:.5rem;
+    }
+    .plan-badge-dot { width:5px; height:5px; border-radius:50%; background:var(--blue); flex-shrink:0; }
+    .plan-featured-tag {
+      font-family: 'DM Mono', monospace; font-size:.55rem;
+      letter-spacing:.15em; text-transform:uppercase;
+      color: var(--white); background: var(--blue);
+      padding: .2rem .65rem; margin-left: auto;
+    }
+
+    .plan-name {
+      font-family: 'Syne', sans-serif; font-weight:800;
+      font-size: 1.6rem; letter-spacing:-.03em; line-height:1;
+      margin-bottom: .75rem;
+    }
+    .plan-desc {
+      font-family: 'Fraunces', serif; font-weight:300;
+      font-size: .9rem; line-height:1.65;
+      color: #777; margin-bottom: 2rem;
+    }
+    .plan-card.featured .plan-desc { color: #666; }
+
+    /* PRICE */
+    .plan-price-wrap { margin-bottom: 2rem; }
+    .plan-price {
+      font-family: 'Syne', sans-serif; font-weight:800;
+      font-size: clamp(2rem, 3.5vw, 3rem);
+      letter-spacing: -.04em; line-height:1;
+      display: flex; align-items:baseline; gap:.3rem;
+    }
+    .plan-price-currency {
+      font-family: 'DM Mono', monospace; font-weight:400;
+      font-size: 1rem; letter-spacing:.04em; color:#aaa;
+    }
+    .plan-card.featured .plan-price-currency { color:#555; }
+    .plan-price-period {
+      font-family: 'DM Mono', monospace; font-size:.6rem;
+      letter-spacing:.1em; text-transform:uppercase;
+      color: #aaa; margin-top:.3rem;
+    }
+    .plan-card.featured .plan-price-period { color:#555; }
+    .plan-price-annual {
+      font-family: 'DM Mono', monospace; font-size:.6rem;
+      letter-spacing:.08em; color:var(--blue);
+      margin-top:.25rem; opacity:0; transition:opacity .2s;
+    }
+    .plan-price-annual.visible { opacity:1; }
+    .plan-free-tag {
+      font-family: 'Syne', sans-serif; font-weight:800;
+      font-size: 2rem; letter-spacing:-.03em;
+    }
+
+    /* FEATURES */
+    .plan-features {
+      list-style: none; display:flex; flex-direction:column; gap:.75rem;
+      margin-bottom: 2.5rem;
+    }
+    .plan-features li {
+      font-family: 'DM Mono', monospace; font-size:.65rem;
+      letter-spacing:.06em; color:#444;
+      display: flex; gap:.65rem; align-items:flex-start;
+      line-height: 1.5;
+    }
+    .plan-card.featured .plan-features li { color:#888; }
+    .plan-features li::before {
+      content: '→'; color:var(--blue); flex-shrink:0;
+      font-size:.6rem; margin-top:.1rem;
+    }
+    .plan-features li.muted::before { content: '—'; color:#ccc; }
+    .plan-features li.muted { color:#ccc; }
+    .plan-card.featured .plan-features li.muted { color:#333; }
+
+    /* CTA BUTTON */
+    .plan-cta {
+      display: block; width:100%;
+      font-family: 'DM Mono', monospace; font-size:.72rem;
+      letter-spacing:.1em; text-transform:uppercase;
+      padding: .9rem 1.5rem; text-align:center;
+      text-decoration: none; cursor: none;
+      transition: background .2s, color .2s, border-color .2s;
+    }
+    .plan-cta-outline {
+      border: 1.5px solid var(--gray-light);
+      color: var(--black); background: transparent;
+    }
+    .plan-cta-outline:hover { border-color:var(--black); }
+    .plan-cta-solid {
+      background: var(--blue); color:#fff;
+      border: 1.5px solid var(--blue);
+    }
+    .plan-cta-solid:hover { background: #0035cc; border-color:#0035cc; }
+    .plan-cta-dark {
+      background: var(--white); color:var(--black);
+      border: 1.5px solid var(--white);
+    }
+    .plan-cta-dark:hover { background: var(--gray-light); border-color:var(--gray-light); }
+    .plan-cta-ghost {
+      border: 1.5px solid #222;
+      color: #666; background: transparent;
+    }
+    .plan-cta-ghost:hover { border-color:#555; color:var(--white); }
+
+    /* COMPARISON NOTE */
+    .compare-note {
+      text-align: center; margin: -3rem 3rem 5rem;
+      font-family: 'DM Mono', monospace; font-size:.62rem;
+      letter-spacing:.1em; text-transform:uppercase; color:#bbb;
+    }
+
+    /* FAQ / CONTEXT SECTION */
+    .context-section {
+      background: var(--black); color:var(--white);
+      padding: 6rem 3rem;
+    }
+    .context-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap:5rem; align-items:start;
+      max-width: 1100px; margin:0 auto;
+    }
+    .context-label {
+      font-family: 'DM Mono', monospace; font-size:.68rem;
+      letter-spacing:.18em; text-transform:uppercase;
+      color:var(--blue); margin-bottom:1rem;
+      display:flex; align-items:center; gap:1rem;
+    }
+    .context-label::after { content:''; display:block; width:30px; height:1px; background:var(--blue); }
+    .context-title {
+      font-family: 'Syne', sans-serif; font-weight:800;
+      font-size: clamp(1.8rem, 3vw, 2.8rem);
+      letter-spacing:-.03em; line-height:.95;
+      margin-bottom: 1.5rem;
+    }
+    .context-title em { font-style:italic; font-family:'Fraunces',serif; font-weight:300; color:var(--blue); }
+    .context-desc {
+      font-family: 'Fraunces', serif; font-weight:300;
+      font-size:1rem; line-height:1.8; color:#666;
+    }
+    .faq-list { display:flex; flex-direction:column; gap:0; }
+    .faq-item {
+      border-bottom: 1px solid #1a1a1a;
+      padding: 1.2rem 0;
+    }
+    .faq-q {
+      font-family: 'DM Mono', monospace; font-size:.68rem;
+      letter-spacing:.08em; text-transform:uppercase;
+      color:var(--white); margin-bottom:.6rem;
+    }
+    .faq-a {
+      font-family: 'Fraunces', serif; font-weight:300;
+      font-size:.9rem; line-height:1.7; color:#555;
+    }
+
+    /* FOOTER */
+    footer {
+      background: var(--black); color:#444;
+      padding: 2.5rem 3rem;
+      display:flex; justify-content:space-between; align-items:center;
+      font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.1em;
+    }
+    footer a { color:#444; text-decoration:none; transition:color .2s; }
+    footer a:hover { color:var(--blue); }
+
+    /* RESPONSIVE */
+    @media (max-width: 1024px) {
+      .plans-grid { grid-template-columns: repeat(2,1fr); margin:0 1.5rem 4rem; }
+    }
+    @media (max-width: 640px) {
+      nav { padding:1.2rem 1.5rem; }
+      .pricing-hero { padding:8rem 1.5rem 3rem; }
+      .plans-grid { grid-template-columns:1fr; margin:0 1.5rem 4rem; }
+      .context-grid { grid-template-columns:1fr; gap:3rem; }
+      .context-section { padding:4rem 1.5rem; }
+      footer { flex-direction:column; gap:1rem; text-align:center; }
+      body { cursor:auto; }
+      .cursor,.cursor-ring { display:none; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <nav>
+    <a href="index.html" class="nav-logo-wrap">
+      <div class="nav-bars">
+        <div class="nav-bar" style="height:18px"></div>
+        <div class="nav-bar" style="height:14px"></div>
+        <div class="nav-bar" style="height:9px"></div>
+        <div class="nav-bar" style="height:5px"></div>
+      </div>
+      <span class="nav-logo">Ricardo<span>.</span>Ruiz</span>
+    </a>
+    <a href="index.html" class="nav-back" id="nav-back">← Inicio</a>
+  </nav>
+
+  <!-- HERO -->
+  <div class="pricing-hero">
+    <div class="pricing-hero-bg" id="hero-bg-text">DATOS</div>
+    <div class="pricing-label" id="pricing-label">Acceso por suscripción</div>
+    <h1 class="pricing-title" id="pricing-title">Elige tu <em>plan</em>.</h1>
+    <p class="pricing-sub" id="pricing-sub">Datos públicos procesados, visualizaciones y análisis actualizados mensualmente. Cancela cuando quieras.</p>
+
+    <!-- TOGGLES -->
+    <div class="toggles-wrap">
+      <div class="toggle-group">
+        <span id="toggle-monthly-label" class="active">Mensual</span>
+        <button class="toggle-pill" id="toggle-billing" onclick="toggleBilling()"></button>
+        <span id="toggle-annual-label">Anual</span>
+        <span class="toggle-save" id="toggle-save">−20%</span>
+      </div>
+      <div class="toggle-group">
+        <span id="toggle-cop-label" class="active">COP</span>
+        <button class="toggle-pill" id="toggle-currency" onclick="toggleCurrency()"></button>
+        <span id="toggle-usd-label">USD</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PLANS -->
+  <div class="plans-grid" id="plans-grid">
+    <!-- populated by JS -->
+  </div>
+
+  <p class="compare-note" id="compare-note">Todos los planes incluyen acceso inmediato · Sin permanencia · Cancela en cualquier momento</p>
+
+  <!-- CONTEXT -->
+  <div class="context-section">
+    <div class="context-grid">
+      <div>
+        <div class="context-label" id="ctx-label">¿Qué incluye?</div>
+        <h2 class="context-title" id="ctx-title">Datos públicos,<br/><em>bien hechos</em>.</h2>
+        <p class="context-desc" id="ctx-desc">Cada mes proceso y publico bases de datos electorales, de seguridad (Comisión de Delitos) y del DANE — especialmente empleo — con cruces propios que no encuentras en ningún otro lado. No son datos crudos: son diagnósticos listos para tomar decisiones.</p>
+      </div>
+      <div class="faq-list" id="faq-list">
+        <!-- populated by JS -->
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span>© 2026 Ricardo Ruiz · ricardoruiz.co</span>
+    <span id="footer-role">Consultor en Análisis de Datos y Política Pública</span>
+    <div style="display:flex;gap:1.5rem;">
+      <a href="https://www.linkedin.com/in/ricardoeruiz/" target="_blank">LinkedIn</a>
+      <a href="https://x.com/RicardoRuiz_" target="_blank">Twitter/X</a>
+    </div>
+  </footer>
+
+  <script>
+    // ─── i18n ─────────────────────────────────────────────────────────────────
+    const i18n = {
+      co: {
+        lang: 'es', title: 'Planes · Ricardo Ruiz',
+        navBack: '← Inicio',
+        heroBg: 'DATOS',
+        pricingLabel: 'Acceso por suscripción',
+        pricingTitle: 'Elige tu <em>plan</em>.',
+        pricingSub: 'Datos públicos procesados, visualizaciones y análisis actualizados mensualmente. Cancela cuando quieras.',
+        toggleMonthly: 'Mensual', toggleAnnual: 'Anual', toggleSave: '−20%',
+        toggleCOP: 'COP', toggleUSD: 'USD',
+        compareNote: 'Todos los planes incluyen acceso inmediato · Sin permanencia · Cancela en cualquier momento',
+        ctxLabel: '¿Qué incluye?',
+        ctxTitle: 'Datos públicos,<br/><em>bien hechos</em>.',
+        ctxDesc: 'Cada mes proceso y publico bases de datos electorales, de seguridad (Comisión de Delitos) y del DANE — especialmente empleo — con cruces propios que no encuentras en ningún otro lado. No son datos crudos: son diagnósticos listos para tomar decisiones.',
+        footerRole: 'Consultor en Análisis de Datos y Política Pública',
+        plans: [
+          {
+            id: 'free', name: 'Básico', featured: false,
+            desc: 'Acceso gratuito a resultados electorales en tiempo real y visualizaciones esenciales.',
+            priceCOP: 0, priceUSD: 0, free: true,
+            cta: 'Crear cuenta gratis', ctaStyle: 'outline', ctaHref: 'register.html',
+            features: [
+              'Datos electorales, de seguridad y economía básicos',
+              'Datos históricos con análisis básico',
+              'Visualizaciones esenciales',
+              { text: 'Descarga de bases de datos', muted: true },
+              { text: 'Visualizaciones avanzadas', muted: true },
+              { text: 'Nuevos tipos de datos mensuales', muted: true },
+              { text: 'Asesoría personalizada', muted: true },
+            ]
+          },
+          {
+            id: 'pro', name: 'Pro', featured: true,
+            desc: 'Para analistas y periodistas que necesitan datos descargables y visualizaciones avanzadas.',
+            priceCOP: 119000, priceUSD: 89, free: false,
+            cta: 'Empezar con Pro', ctaStyle: 'dark', ctaHref: '#',
+            featuredTag: 'Más popular',
+            features: [
+              'Todo lo del plan Básico',
+              '3 descargas de bases de datos al mes',
+              'Visualizaciones avanzadas e interactivas',
+              'Datos históricos con análisis avanzado',
+              'Cruces demográfico, seguridad y socioeconómico con análisis básico',
+              { text: 'Datos de seguridad (Delitos)', muted: true },
+              { text: 'Asesoría personalizada', muted: true },
+            ]
+          },
+          {
+            id: 'premium', name: 'Premium', featured: false,
+            desc: 'Acceso completo a todos los datos, visualizaciones y cruces de información actualizados mensualmente.',
+            priceCOP: 249990, priceUSD: 169, free: false,
+            cta: 'Empezar con Premium', ctaStyle: 'outline', ctaHref: '#',
+            features: [
+              'Todo lo del plan Pro',
+              '10 descargas de bases de datos e infografías al mes',
+              'Todos los tipos de datos disponibles',
+              'Análisis y visualizaciones profundas',
+              'Cruces de información exclusivos',
+              'Notificación de cada actualización mensual',
+              { text: 'Asesoría personalizada', muted: true },
+            ]
+          },
+          {
+            id: 'custom', name: 'Personalizado', featured: false,
+            desc: 'Para empresas, equipos y organizaciones que necesitan análisis a medida y asesoría directa.',
+            priceCOP: null, priceUSD: null, free: false, custom: true,
+            cta: 'Escribir a Ricardo →', ctaStyle: 'outline', ctaHref: 'index.html#contacto',
+            features: [
+              'Descargas ilimitadas',
+              'Todas las visualizaciones y datos',
+              'Asesoría directa para equipos',
+              'Análisis y reportes a medida',
+              'Talleres y formación en datos',
+              'Acceso anticipado a nuevos datasets',
+              'Soporte prioritario',
+            ]
+          },
+        ],
+        faqs: [
+          { q: '¿Cuándo se actualiza el contenido?', a: 'Cada mes subo nuevas bases de datos procesadas y actualizo las visualizaciones. Los datos electorales se actualizan en tiempo real durante períodos de elecciones.' },
+          { q: '¿Puedo cancelar en cualquier momento?', a: 'Sí. No hay permanencia mínima. Puedes cancelar desde tu panel y el acceso se mantiene hasta el final del período pagado.' },
+          { q: '¿Qué son los "cruces de información"?', a: 'Son análisis propios que cruzan datos de distintas fuentes (electoral, DANE, seguridad) para revelar patrones que no son visibles mirando cada base por separado.' },
+          { q: '¿Qué incluye el plan Personalizado?', a: 'Es un acuerdo directo. Hablamos de tus necesidades específicas — análisis recurrentes, formación de equipos, o acceso institucional — y definimos el alcance juntos.' },
+        ]
+      },
+      us: {
+        lang: 'en', title: 'Pricing · Ricardo Ruiz',
+        navBack: '← Home',
+        heroBg: 'DATA',
+        pricingLabel: 'Subscription access',
+        pricingTitle: 'Choose your <em>plan</em>.',
+        pricingSub: 'Processed public data, visualizations and analysis updated monthly. Cancel anytime.',
+        toggleMonthly: 'Monthly', toggleAnnual: 'Annual', toggleSave: '−20%',
+        toggleCOP: 'COP', toggleUSD: 'USD',
+        compareNote: 'All plans include immediate access · No lock-in · Cancel anytime',
+        ctxLabel: "What's included?",
+        ctxTitle: 'Public data,<br/><em>done right</em>.',
+        ctxDesc: 'Every month I process and publish electoral, crime (National Crime Commission), and DANE datasets — especially employment — with proprietary cross-analyses you won\'t find anywhere else. Not raw data: actionable diagnostics ready for decision-making.',
+        footerRole: 'Data Consultant & Public Policy Advisor',
+        plans: [
+          {
+            id: 'free', name: 'Basic', featured: false,
+            desc: 'Free access to real-time electoral results and essential visualizations.',
+            priceCOP: 0, priceUSD: 0, free: true,
+            cta: 'Create free account', ctaStyle: 'outline', ctaHref: 'register.html',
+            features: [
+              'Basic electoral, security and economic data',
+              'Historical data with basic analysis',
+              'Essential visualizations',
+              { text: 'Dataset downloads', muted: true },
+              { text: 'Advanced visualizations', muted: true },
+              { text: 'New monthly data types', muted: true },
+              { text: 'Personal advisory', muted: true },
+            ]
+          },
+          {
+            id: 'pro', name: 'Pro', featured: true,
+            desc: 'For analysts and journalists who need downloadable data and advanced visualizations.',
+            priceCOP: 119000, priceUSD: 89, free: false,
+            cta: 'Start with Pro', ctaStyle: 'dark', ctaHref: '#',
+            featuredTag: 'Most popular',
+            features: [
+              'Everything in Basic',
+              '3 dataset downloads per month',
+              'Advanced interactive visualizations',
+              'Historical data with advanced analysis',
+              'Demographic, security & socioeconomic cross-analysis (basic)',
+              { text: 'Crime data (Delitos)', muted: true },
+              { text: 'Personal advisory', muted: true },
+            ]
+          },
+          {
+            id: 'premium', name: 'Premium', featured: false,
+            desc: 'Full access to all data, visualizations and monthly cross-analysis updates.',
+            priceCOP: 249990, priceUSD: 169, free: false,
+            cta: 'Start with Premium', ctaStyle: 'outline', ctaHref: '#',
+            features: [
+              'Everything in Pro',
+              '10 dataset & infographic downloads per month',
+              'All available data types',
+              'Deep analysis and visualizations',
+              'Exclusive cross-analysis insights',
+              'Monthly update notifications',
+              { text: 'Personal advisory', muted: true },
+            ]
+          },
+          {
+            id: 'custom', name: 'Custom', featured: false,
+            desc: 'For companies, teams and organizations that need tailored analysis and direct advisory.',
+            priceCOP: null, priceUSD: null, free: false, custom: true,
+            cta: 'Get in touch →', ctaStyle: 'outline', ctaHref: 'index.html#contacto',
+            features: [
+              'Unlimited downloads',
+              'All visualizations and datasets',
+              'Direct advisory for teams',
+              'Custom analysis and reports',
+              'Data training & workshops',
+              'Early access to new datasets',
+              'Priority support',
+            ]
+          },
+        ],
+        faqs: [
+          { q: 'When is content updated?', a: 'New processed datasets and updated visualizations are published every month. Electoral data updates in real time during election periods.' },
+          { q: 'Can I cancel anytime?', a: 'Yes. No minimum commitment. Cancel from your dashboard and access remains until the end of the paid period.' },
+          { q: 'What are "cross-analysis insights"?', a: 'Proprietary analyses that combine data from different sources (electoral, DANE, crime) to reveal patterns invisible when looking at each dataset separately.' },
+          { q: 'What does the Custom plan include?', a: 'It\'s a direct agreement. We discuss your specific needs — recurring analysis, team training, or institutional access — and define the scope together.' },
+        ]
+      }
+    };
+
+    // ─── STATE ────────────────────────────────────────────────────────────────
+    let currentLang     = localStorage.getItem('rr-lang') || 'co';
+    let billingAnnual   = false;
+    let currencyUSD     = false;
+
+    // ─── TOGGLES ─────────────────────────────────────────────────────────────
+    function toggleBilling() {
+      billingAnnual = !billingAnnual;
+      document.getElementById('toggle-billing').classList.toggle('on', billingAnnual);
+      const t = i18n[currentLang];
+      document.getElementById('toggle-monthly-label').classList.toggle('active', !billingAnnual);
+      document.getElementById('toggle-annual-label').classList.toggle('active', billingAnnual);
+      document.getElementById('toggle-save').classList.toggle('visible', billingAnnual);
+      renderPlans();
+    }
+
+    function toggleCurrency() {
+      currencyUSD = !currencyUSD;
+      document.getElementById('toggle-currency').classList.toggle('on', currencyUSD);
+      const t = i18n[currentLang];
+      document.getElementById('toggle-cop-label').classList.toggle('active', !currencyUSD);
+      document.getElementById('toggle-usd-label').classList.toggle('active', currencyUSD);
+      renderPlans();
+    }
+
+    // ─── FORMAT PRICE ─────────────────────────────────────────────────────────
+    function formatPrice(plan) {
+      if (plan.free) return null;
+      if (plan.custom) return null;
+      if (currencyUSD) {
+        const p = billingAnnual ? Math.round(plan.priceUSD * 0.8) : plan.priceUSD;
+        return { amount: '$' + p, currency: 'USD', period: billingAnnual ? '/mo · billed annually' : '/month' };
+      } else {
+        const p = billingAnnual ? Math.round(plan.priceCOP * 0.8 / 1000) * 1000 : plan.priceCOP;
+        return { amount: '$' + p.toLocaleString('es-CO'), currency: 'COP', period: billingAnnual ? '/mes · cobro anual' : '/mes' };
+      }
+    }
+
+    // ─── RENDER PLANS ────────────────────────────────────────────────────────
+    function renderPlans() {
+      const t = i18n[currentLang] || i18n.co;
+      const grid = document.getElementById('plans-grid');
+
+      grid.innerHTML = t.plans.map(plan => {
+        const price = formatPrice(plan);
+        const isLoggedIn = !!localStorage.getItem('rr-token');
+        const user = JSON.parse(localStorage.getItem('rr-user') || 'null');
+        const isCurrent = user && user.plan === plan.id;
+
+        const priceHTML = plan.free
+          ? `<div class="plan-price-wrap">
+               <div class="plan-price"><span class="plan-free-tag">${currentLang === 'us' ? 'Free' : 'Gratis'}</span></div>
+               <div class="plan-price-period">${currentLang === 'us' ? 'forever' : 'siempre'}</div>
+             </div>`
+          : plan.custom
+          ? `<div class="plan-price-wrap">
+               <div class="plan-price"><span class="plan-free-tag">${currentLang === 'us' ? 'Custom' : 'A medida'}</span></div>
+               <div class="plan-price-period">${currentLang === 'us' ? 'contact us' : 'contáctanos'}</div>
+             </div>`
+          : `<div class="plan-price-wrap">
+               <div class="plan-price">
+                 <span class="plan-price-currency">${price.currency}</span>
+                 <span>${price.amount}</span>
+               </div>
+               <div class="plan-price-period">${price.period}</div>
+               <div class="plan-price-annual ${billingAnnual ? 'visible' : ''}">
+                 ${currentLang === 'us' ? '20% off vs monthly' : '20% de ahorro vs mensual'}
+               </div>
+             </div>`;
+
+        const ctaText = isCurrent
+          ? (currentLang === 'us' ? 'Current plan' : 'Plan actual')
+          : plan.cta;
+        const ctaDisabled = isCurrent ? 'style="opacity:.4;pointer-events:none;"' : '';
+
+        const featuresHTML = plan.features.map(f => {
+          if (typeof f === 'string') return `<li>${f}</li>`;
+          return `<li class="muted">${f.text}</li>`;
+        }).join('');
+
+        const badgeHTML = plan.featuredTag
+          ? `<span class="plan-featured-tag">${plan.featuredTag}</span>`
+          : '';
+
+        return `
+          <div class="plan-card ${plan.featured ? 'featured' : ''}">
+            <div class="plan-badge">
+              <div class="plan-badge-dot"></div>
+              ${plan.id.toUpperCase()}
+              ${badgeHTML}
+            </div>
+            <div class="plan-name">${plan.name}</div>
+            <div class="plan-desc">${plan.desc}</div>
+            ${priceHTML}
+            <ul class="plan-features">${featuresHTML}</ul>
+            <a href="${plan.ctaHref}" class="plan-cta plan-cta-${plan.featured ? plan.ctaStyle : plan.ctaStyle}" ${ctaDisabled}>${ctaText}</a>
+          </div>`;
+      }).join('');
+
+      // re-attach cursor events
+      document.querySelectorAll('.plan-cta').forEach(el => {
+        el.addEventListener('mouseenter', () => { cursor.style.transform='translate(-50%,-50%) scale(2.5)'; cursor.style.background='transparent'; cursor.style.border='1.5px solid var(--blue)'; ring.style.opacity='0'; });
+        el.addEventListener('mouseleave', () => { cursor.style.transform='translate(-50%,-50%) scale(1)'; cursor.style.background='var(--blue)'; cursor.style.border='none'; ring.style.opacity='.4'; });
+      });
+    }
+
+    // ─── RENDER FAQ ───────────────────────────────────────────────────────────
+    function renderFAQ() {
+      const t = i18n[currentLang] || i18n.co;
+      document.getElementById('faq-list').innerHTML = t.faqs.map(f => `
+        <div class="faq-item">
+          <div class="faq-q">${f.q}</div>
+          <div class="faq-a">${f.a}</div>
+        </div>`).join('');
+    }
+
+    // ─── SET LANGUAGE ─────────────────────────────────────────────────────────
+    function setLanguage(lang) {
+      const t = i18n[lang] || i18n.co;
+      document.getElementById('htmlRoot').lang = t.lang;
+      document.getElementById('pageTitle').textContent = t.title;
+      document.getElementById('nav-back').textContent = t.navBack;
+      document.getElementById('hero-bg-text').textContent = t.heroBg;
+      document.getElementById('pricing-label').childNodes[0] && (document.getElementById('pricing-label').innerHTML = `<span></span>${t.pricingLabel}<span></span>`);
+      document.getElementById('pricing-title').innerHTML = t.pricingTitle;
+      document.getElementById('pricing-sub').textContent = t.pricingSub;
+      document.getElementById('toggle-monthly-label').textContent = t.toggleMonthly;
+      document.getElementById('toggle-annual-label').textContent = t.toggleAnnual;
+      document.getElementById('toggle-save').textContent = t.toggleSave;
+      document.getElementById('toggle-cop-label').textContent = t.toggleCOP;
+      document.getElementById('toggle-usd-label').textContent = t.toggleUSD;
+      document.getElementById('compare-note').textContent = t.compareNote;
+      document.getElementById('ctx-label').childNodes[0] && (document.getElementById('ctx-label').textContent = t.ctxLabel);
+      document.getElementById('ctx-title').innerHTML = t.ctxTitle;
+      document.getElementById('ctx-desc').textContent = t.ctxDesc;
+      document.getElementById('footer-role').textContent = t.footerRole;
+      renderPlans();
+      renderFAQ();
+    }
+
+    // ─── CURSOR ───────────────────────────────────────────────────────────────
+    const cursor = document.getElementById('cursor');
+    const ring   = document.getElementById('cursorRing');
+    let mx=0,my=0,rx=0,ry=0;
+    document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; cursor.style.left=mx+'px'; cursor.style.top=my+'px'; });
+    (function ar(){ rx+=(mx-rx)*.12; ry+=(my-ry)*.12; ring.style.left=rx+'px'; ring.style.top=ry+'px'; requestAnimationFrame(ar); })();
+    document.querySelectorAll('a, button').forEach(el => {
+      el.addEventListener('mouseenter', () => { cursor.style.transform='translate(-50%,-50%) scale(2.5)'; cursor.style.background='transparent'; cursor.style.border='1.5px solid var(--blue)'; ring.style.opacity='0'; });
+      el.addEventListener('mouseleave', () => { cursor.style.transform='translate(-50%,-50%) scale(1)'; cursor.style.background='var(--blue)'; cursor.style.border='none'; ring.style.opacity='.4'; });
+    });
+
+    // ─── INIT ─────────────────────────────────────────────────────────────────
+    setLanguage(currentLang);
+  </script>
+</body>
+</html>
