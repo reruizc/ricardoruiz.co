@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title id="pageTitle">Recuperar contraseña · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --black: #0a0a0a;
+      --white: #f4f3ef;
+      --blue: #0047FF;
+      --blue-light: #3d6fff;
+      --gray: #888;
+      --gray-light: #e0dfd9;
+      --error: #ff4757;
+      --success: #00d68f;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--black);
+      color: var(--white);
+      font-family: 'Fraunces', serif;
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      cursor: none;
+      overflow-x: hidden;
+    }
+
+    /* CURSOR */
+    .cursor {
+      position: fixed; width: 12px; height: 12px;
+      background: var(--blue); border-radius: 50%;
+      pointer-events: none; z-index: 9999;
+      transition: transform 0.15s ease, background 0.2s;
+      transform: translate(-50%, -50%);
+    }
+    .cursor-ring {
+      position: fixed; width: 36px; height: 36px;
+      border: 1.5px solid var(--blue); border-radius: 50%;
+      pointer-events: none; z-index: 9998;
+      transition: transform 0.35s ease, opacity 0.3s;
+      transform: translate(-50%, -50%); opacity: 0.4;
+    }
+
+    /* LEFT PANEL */
+    .panel-left {
+      background: var(--black);
+      padding: 3rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border-right: 1px solid #1a1a1a;
+      position: relative;
+      overflow: hidden;
+    }
+    .panel-left-bg {
+      position: absolute; bottom: -4rem; left: -3rem;
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: clamp(140px, 18vw, 260px);
+      color: transparent;
+      -webkit-text-stroke: 1px rgba(0,71,255,0.07);
+      line-height: 1; user-select: none; pointer-events: none;
+      letter-spacing: -0.04em;
+    }
+    .panel-nav {
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .nav-logo-wrap { display: flex; align-items: center; gap: 0.75rem; text-decoration: none; }
+    .nav-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.2rem; letter-spacing: -0.02em; color: var(--white); line-height: 1; }
+    .nav-logo span { color: var(--blue); }
+    .nav-bars { display: flex; align-items: flex-end; gap: 3px; height: 18px; }
+    .nav-bar { width: 5px; background: var(--blue); border-radius: 1px 1px 0 0; opacity: 0.85; }
+    .nav-back { font-family: 'DM Mono', monospace; font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: #555; text-decoration: none; transition: color 0.2s; }
+    .nav-back:hover { color: var(--blue); }
+
+    .panel-left-body { position: relative; z-index: 1; }
+    .panel-tag {
+      font-family: 'DM Mono', monospace; font-size: 0.68rem;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--blue); margin-bottom: 1.5rem;
+      display: flex; align-items: center; gap: 0.75rem;
+    }
+    .panel-tag::before { content: ''; display: block; width: 24px; height: 1px; background: var(--blue); }
+    .panel-heading {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: clamp(2rem, 3.5vw, 3.2rem);
+      line-height: 0.95; letter-spacing: -0.03em; margin-bottom: 1.5rem;
+    }
+    .panel-heading em { font-style: italic; font-family: 'Fraunces', serif; font-weight: 300; color: var(--blue); }
+    .panel-desc { font-family: 'Fraunces', serif; font-weight: 300; font-size: 1rem; line-height: 1.7; color: #666; max-width: 360px; }
+
+    /* STEP INDICATORS (left panel) */
+    .steps-visual {
+      display: flex; flex-direction: column; gap: 0; margin-top: 2.5rem;
+    }
+    .step-item {
+      display: flex; align-items: flex-start; gap: 1rem;
+      padding: 1rem 0;
+      border-bottom: 1px solid #111;
+      transition: opacity 0.3s;
+    }
+    .step-item:last-child { border-bottom: none; }
+    .step-item.inactive { opacity: 0.25; }
+    .step-num {
+      font-family: 'DM Mono', monospace; font-size: 0.6rem;
+      letter-spacing: 0.15em; text-transform: uppercase;
+      color: #333; padding-top: 0.2rem; min-width: 28px;
+      transition: color 0.3s;
+    }
+    .step-item.active .step-num { color: var(--blue); }
+    .step-item.done .step-num { color: var(--success); }
+    .step-info {}
+    .step-label {
+      font-family: 'DM Mono', monospace; font-size: 0.65rem;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: #444; margin-bottom: 0.2rem;
+      transition: color 0.3s;
+    }
+    .step-item.active .step-label { color: var(--white); }
+    .step-item.done .step-label { color: var(--success); }
+    .step-desc { font-family: 'Fraunces', serif; font-weight: 300; font-size: 0.85rem; color: #333; line-height: 1.5; }
+    .step-item.active .step-desc { color: #666; }
+
+    .panel-footer { font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 0.1em; color: #333; position: relative; z-index: 1; }
+
+    /* RIGHT PANEL */
+    .panel-right {
+      background: #0d0d0d; padding: 3rem;
+      display: flex; flex-direction: column; justify-content: center;
+    }
+    .form-wrap { max-width: 400px; width: 100%; margin: 0 auto; }
+
+    /* STEP PANELS */
+    .step-panel { display: none; }
+    .step-panel.active { display: block; }
+
+    .form-header { margin-bottom: 2.5rem; }
+    .form-step { font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--blue); margin-bottom: 0.75rem; }
+    .form-title { font-family: 'Syne', sans-serif; font-weight: 800; font-size: clamp(1.6rem, 2.5vw, 2.2rem); letter-spacing: -0.03em; line-height: 1; }
+    .form-subtitle { font-family: 'Fraunces', serif; font-weight: 300; font-size: 0.95rem; color: #555; margin-top: 0.6rem; }
+    .form-subtitle a { color: var(--blue); text-decoration: none; border-bottom: 1px solid rgba(0,71,255,0.3); transition: border-color 0.2s; }
+    .form-subtitle a:hover { border-color: var(--blue); }
+
+    /* FIELDS */
+    .form-group { margin-bottom: 1.4rem; position: relative; }
+    .form-group label { display: block; font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase; color: #444; margin-bottom: 0.5rem; transition: color 0.2s; }
+    .form-group:focus-within label { color: var(--blue); }
+    .form-group input { width: 100%; background: transparent; border: none; border-bottom: 1.5px solid #222; padding: 0.7rem 0; font-family: 'Fraunces', serif; font-size: 1rem; color: var(--white); outline: none; transition: border-color 0.25s; }
+    .form-group input:focus { border-color: var(--blue); }
+    .form-group input::placeholder { color: #333; }
+    .form-group input.error { border-color: var(--error); }
+    .field-error { display: none; font-family: 'DM Mono', monospace; font-size: 0.58rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--error); margin-top: 0.4rem; }
+    .form-group input.error + .field-error { display: block; }
+
+    /* CODE INPUT */
+    .code-inputs {
+      display: flex; gap: 0.75rem; margin-top: 0.5rem;
+    }
+    .code-digit {
+      flex: 1; background: transparent;
+      border: none; border-bottom: 2px solid #222;
+      padding: 0.75rem 0; text-align: center;
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: 1.4rem; letter-spacing: -0.02em;
+      color: var(--white); outline: none;
+      transition: border-color 0.2s;
+    }
+    .code-digit:focus { border-color: var(--blue); }
+    .code-digit.filled { border-color: var(--blue-light); color: var(--blue); }
+    .code-digit.error { border-color: var(--error); }
+
+    .code-resend {
+      font-family: 'DM Mono', monospace; font-size: 0.62rem;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: #333; margin-top: 1.2rem; display: flex;
+      align-items: center; gap: 0.5rem;
+    }
+    .code-resend button {
+      background: none; border: none; color: #444; cursor: none;
+      font-family: 'DM Mono', monospace; font-size: 0.62rem;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      text-decoration: underline; text-underline-offset: 3px;
+      transition: color 0.2s; padding: 0;
+    }
+    .code-resend button:hover { color: var(--blue); }
+    .code-resend button:disabled { color: #333; text-decoration: none; cursor: default; }
+
+    /* PASSWORD WRAP */
+    .password-wrap { position: relative; }
+    .password-toggle {
+      position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+      background: none; border: none; color: #444; cursor: none;
+      font-family: 'DM Mono', monospace; font-size: 0.58rem;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      padding: 0.2rem 0; transition: color 0.2s;
+    }
+    .password-toggle:hover { color: var(--blue); }
+
+    /* STRENGTH BAR */
+    .strength-bar { display: flex; gap: 4px; margin-top: 0.6rem; }
+    .strength-segment { flex: 1; height: 2px; background: #1e1e1e; border-radius: 1px; transition: background 0.3s; }
+    .strength-label { font-family: 'DM Mono', monospace; font-size: 0.55rem; letter-spacing: 0.12em; text-transform: uppercase; color: #333; margin-top: 0.4rem; transition: color 0.3s; }
+
+    /* SUBMIT */
+    .btn-submit {
+      width: 100%; background: var(--blue); color: #fff;
+      border: 2px solid var(--blue); padding: 1rem 2rem;
+      font-family: 'DM Mono', monospace; font-size: 0.78rem;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      cursor: none; margin-top: 2rem;
+      transition: background 0.25s, border-color 0.25s, transform 0.15s;
+    }
+    .btn-submit:hover { background: var(--white); border-color: var(--white); color: var(--black); }
+    .btn-submit:active { transform: scale(0.99); }
+    .btn-submit:disabled { background: #1e1e1e; border-color: #1e1e1e; color: #333; }
+
+    /* SUCCESS FINAL */
+    .success-state {
+      text-align: center; padding: 1rem 0;
+    }
+    .success-icon {
+      width: 52px; height: 52px; border: 2px solid var(--success); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 1.5rem; font-size: 1.3rem; color: var(--success);
+    }
+    .success-title { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.8rem; letter-spacing: -0.03em; margin-bottom: 0.75rem; }
+    .success-desc { font-family: 'Fraunces', serif; font-weight: 300; font-size: 0.95rem; color: #555; line-height: 1.7; margin-bottom: 2rem; }
+    .btn-login { display: block; background: transparent; color: var(--blue); border: 1.5px solid var(--blue); padding: 0.85rem 2rem; font-family: 'DM Mono', monospace; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; text-decoration: none; text-align: center; transition: background 0.2s, color 0.2s; }
+    .btn-login:hover { background: var(--blue); color: #fff; }
+
+    /* ERROR BANNER */
+    .form-error-banner { display: none; background: rgba(255,71,87,0.08); border: 1px solid rgba(255,71,87,0.25); padding: 0.75rem 1rem; font-family: 'DM Mono', monospace; font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--error); margin-bottom: 1.5rem; }
+    .form-error-banner.visible { display: block; }
+
+    /* RESPONSIVE */
+    @media (max-width: 768px) {
+      body { grid-template-columns: 1fr; cursor: auto; }
+      .cursor, .cursor-ring { display: none; }
+      .panel-left { display: none; }
+      .panel-right { padding: 2rem 1.5rem; min-height: 100vh; justify-content: flex-start; padding-top: 4rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <!-- LEFT PANEL -->
+  <div class="panel-left">
+    <div class="panel-nav">
+      <a href="index.html" class="nav-logo-wrap">
+        <div class="nav-bars">
+          <div class="nav-bar" style="height:18px"></div>
+          <div class="nav-bar" style="height:14px"></div>
+          <div class="nav-bar" style="height:9px"></div>
+          <div class="nav-bar" style="height:5px"></div>
+        </div>
+        <span class="nav-logo">Ricardo<span>.</span>Ruiz</span>
+      </a>
+      <a href="login.html" class="nav-back" id="nav-back">← Login</a>
+    </div>
+
+    <div class="panel-left-body">
+      <div class="panel-tag" id="panel-tag">Recuperación de acceso</div>
+      <h2 class="panel-heading" id="panel-heading">Sin <em>perder</em><br/>el acceso.</h2>
+      <p class="panel-desc" id="panel-desc">Sigue los pasos para recuperar tu cuenta de forma segura.</p>
+
+      <div class="steps-visual" id="steps-visual">
+        <!-- populated by JS -->
+      </div>
+    </div>
+
+    <div class="panel-left-bg">KEY</div>
+    <div class="panel-footer">© 2026 Ricardo Ruiz · ricardoruiz.co</div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="panel-right">
+    <div class="form-wrap">
+
+      <!-- STEP 1: EMAIL -->
+      <div class="step-panel active" id="step1-panel">
+        <div class="form-header">
+          <div class="form-step" id="s1-step-label">01 — Verificación</div>
+          <h1 class="form-title" id="s1-title">¿Olvidaste tu contraseña?</h1>
+          <p class="form-subtitle" id="s1-subtitle">Te enviaremos un código de verificación a tu correo.</p>
+        </div>
+        <div class="form-error-banner" id="s1-error"></div>
+        <div class="form-group">
+          <label id="s1-label-email" for="s1-email">Correo electrónico</label>
+          <input type="email" id="s1-email" placeholder="maria@ejemplo.com" autocomplete="email" />
+          <span class="field-error" id="s1-err-email">Ingresa un correo válido</span>
+        </div>
+        <button class="btn-submit" id="s1-btn" onclick="submitStep1()">Enviar código →</button>
+        <p style="margin-top:1.2rem; text-align:center;">
+          <a href="login.html" id="s1-back-link" style="font-family:'DM Mono',monospace; font-size:0.62rem; letter-spacing:0.1em; text-transform:uppercase; color:#444; text-decoration:none; transition:color 0.2s;" onmouseover="this.style.color='var(--blue)'" onmouseout="this.style.color='#444'">← Volver al login</a>
+        </p>
+      </div>
+
+      <!-- STEP 2: CODE -->
+      <div class="step-panel" id="step2-panel">
+        <div class="form-header">
+          <div class="form-step" id="s2-step-label">02 — Código</div>
+          <h1 class="form-title" id="s2-title">Revisa tu correo</h1>
+          <p class="form-subtitle" id="s2-subtitle">Ingresa el código de 6 dígitos que te enviamos.</p>
+        </div>
+        <div class="form-error-banner" id="s2-error"></div>
+        <div class="form-group">
+          <label id="s2-label-code">Código de verificación</label>
+          <div class="code-inputs" id="code-inputs">
+            <input class="code-digit" maxlength="1" type="text" inputmode="numeric" pattern="[0-9]" id="d0" />
+            <input class="code-digit" maxlength="1" type="text" inputmode="numeric" pattern="[0-9]" id="d1" />
+            <input class="code-digit" maxlength="1" type="text" inputmode="numeric" pattern="[0-9]" id="d2" />
+            <input class="code-digit" maxlength="1" type="text" inputmode="numeric" pattern="[0-9]" id="d3" />
+            <input class="code-digit" maxlength="1" type="text" inputmode="numeric" pattern="[0-9]" id="d4" />
+            <input class="code-digit" maxlength="1" type="text" inputmode="numeric" pattern="[0-9]" id="d5" />
+          </div>
+          <div class="code-resend">
+            <span id="s2-resend-label">¿No llegó?</span>
+            <button id="resend-btn" onclick="resendCode()" disabled>Reenviar</button>
+            <span id="resend-timer"></span>
+          </div>
+        </div>
+        <button class="btn-submit" id="s2-btn" onclick="submitStep2()">Verificar código →</button>
+      </div>
+
+      <!-- STEP 3: NEW PASSWORD -->
+      <div class="step-panel" id="step3-panel">
+        <div class="form-header">
+          <div class="form-step" id="s3-step-label">03 — Nueva contraseña</div>
+          <h1 class="form-title" id="s3-title">Elige una nueva contraseña</h1>
+          <p class="form-subtitle" id="s3-subtitle">Debe tener mínimo 8 caracteres.</p>
+        </div>
+        <div class="form-error-banner" id="s3-error"></div>
+        <div class="form-group">
+          <label id="s3-label-pw" for="s3-pw">Nueva contraseña</label>
+          <div class="password-wrap">
+            <input type="password" id="s3-pw" placeholder="········" autocomplete="new-password" />
+            <button type="button" class="password-toggle" id="toggle-s3pw" onclick="togglePw('s3-pw','toggle-s3pw')">Ver</button>
+          </div>
+          <div class="strength-bar">
+            <div class="strength-segment" id="ss1"></div>
+            <div class="strength-segment" id="ss2"></div>
+            <div class="strength-segment" id="ss3"></div>
+            <div class="strength-segment" id="ss4"></div>
+          </div>
+          <div class="strength-label" id="s3-strength-label"></div>
+          <span class="field-error" id="s3-err-pw">Mínimo 8 caracteres</span>
+        </div>
+        <div class="form-group">
+          <label id="s3-label-cf" for="s3-cf">Confirmar contraseña</label>
+          <div class="password-wrap">
+            <input type="password" id="s3-cf" placeholder="········" autocomplete="new-password" />
+            <button type="button" class="password-toggle" id="toggle-s3cf" onclick="togglePw('s3-cf','toggle-s3cf')">Ocultar</button>
+          </div>
+          <span class="field-error" id="s3-err-cf">Las contraseñas no coinciden</span>
+        </div>
+        <button class="btn-submit" id="s3-btn" onclick="submitStep3()">Guardar contraseña →</button>
+      </div>
+
+      <!-- STEP 4: SUCCESS -->
+      <div class="step-panel" id="step4-panel">
+        <div class="success-state">
+          <div class="success-icon">✓</div>
+          <h2 class="success-title" id="s4-title">¡Contraseña actualizada!</h2>
+          <p class="success-desc" id="s4-desc">Tu contraseña ha sido cambiada correctamente. Ya puedes iniciar sesión con tus nuevas credenciales.</p>
+          <a href="login.html" class="btn-login" id="s4-btn">Ir al login →</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // ─── i18n ─────────────────────────────────────────────────────────────────
+    const i18n = {
+      co: {
+        lang: 'es', title: 'Recuperar contraseña · Ricardo Ruiz',
+        navBack: '← Login',
+        panelTag: 'Recuperación de acceso',
+        panelHeading: 'Sin <em>perder</em><br/>el acceso.',
+        panelDesc: 'Sigue los pasos para recuperar tu cuenta de forma segura.',
+        steps: [
+          { num: '01', label: 'Verificación', desc: 'Confirma tu correo electrónico' },
+          { num: '02', label: 'Código', desc: 'Ingresa el código que te enviamos' },
+          { num: '03', label: 'Nueva contraseña', desc: 'Elige una contraseña segura' },
+        ],
+        s1StepLabel: '01 — Verificación',
+        s1Title: '¿Olvidaste tu contraseña?',
+        s1Subtitle: 'Te enviaremos un código de verificación a tu correo.',
+        s1LabelEmail: 'Correo electrónico', s1PhEmail: 'maria@ejemplo.com',
+        s1ErrEmail: 'Ingresa un correo válido',
+        s1ErrNotFound: 'No encontramos una cuenta con ese correo',
+        s1Btn: 'Enviar código →', s1BackLink: '← Volver al login',
+        s2StepLabel: '02 — Código',
+        s2Title: 'Revisa tu correo',
+        s2Subtitle: 'Ingresa el código de 6 dígitos que te enviamos.',
+        s2LabelCode: 'Código de verificación',
+        s2ResendLabel: '¿No llegó?', s2ResendBtn: 'Reenviar',
+        s2ErrCode: 'Código incorrecto o expirado',
+        s2Btn: 'Verificar código →',
+        s3StepLabel: '03 — Nueva contraseña',
+        s3Title: 'Elige una nueva contraseña',
+        s3Subtitle: 'Debe tener mínimo 8 caracteres.',
+        s3LabelPw: 'Nueva contraseña',
+        s3LabelCf: 'Confirmar contraseña',
+        s3ErrPw: 'Mínimo 8 caracteres',
+        s3ErrCf: 'Las contraseñas no coinciden',
+        s3Btn: 'Guardar contraseña →',
+        strengthLabels: ['', 'Débil', 'Regular', 'Buena', 'Fuerte'],
+        toggleShow: 'Ver', toggleHide: 'Ocultar',
+        s4Title: '¡Contraseña actualizada!',
+        s4Desc: 'Tu contraseña ha sido cambiada correctamente. Ya puedes iniciar sesión con tus nuevas credenciales.',
+        s4Btn: 'Ir al login →',
+      },
+      us: {
+        lang: 'en', title: 'Reset password · Ricardo Ruiz',
+        navBack: '← Login',
+        panelTag: 'Account recovery',
+        panelHeading: 'Back in <em>control</em>.',
+        panelDesc: 'Follow the steps to recover your account securely.',
+        steps: [
+          { num: '01', label: 'Verification', desc: 'Confirm your email address' },
+          { num: '02', label: 'Code', desc: 'Enter the code we sent you' },
+          { num: '03', label: 'New password', desc: 'Choose a strong password' },
+        ],
+        s1StepLabel: '01 — Verification',
+        s1Title: 'Forgot your password?',
+        s1Subtitle: 'We'll send a verification code to your email.',
+        s1LabelEmail: 'Email address', s1PhEmail: 'jane@example.com',
+        s1ErrEmail: 'Enter a valid email',
+        s1ErrNotFound: 'No account found with that email',
+        s1Btn: 'Send code →', s1BackLink: '← Back to login',
+        s2StepLabel: '02 — Code',
+        s2Title: 'Check your email',
+        s2Subtitle: 'Enter the 6-digit code we sent you.',
+        s2LabelCode: 'Verification code',
+        s2ResendLabel: "Didn't arrive?", s2ResendBtn: 'Resend',
+        s2ErrCode: 'Incorrect or expired code',
+        s2Btn: 'Verify code →',
+        s3StepLabel: '03 — New password',
+        s3Title: 'Choose a new password',
+        s3Subtitle: 'Must be at least 8 characters.',
+        s3LabelPw: 'New password',
+        s3LabelCf: 'Confirm password',
+        s3ErrPw: 'Minimum 8 characters',
+        s3ErrCf: 'Passwords do not match',
+        s3Btn: 'Save password →',
+        strengthLabels: ['', 'Weak', 'Fair', 'Good', 'Strong'],
+        toggleShow: 'Show', toggleHide: 'Hide',
+        s4Title: 'Password updated!',
+        s4Desc: 'Your password has been changed successfully. You can now log in with your new credentials.',
+        s4Btn: 'Go to login →',
+      }
+    };
+
+    const currentLang = localStorage.getItem('rr-lang') || 'co';
+
+    function renderSteps(activeStep) {
+      const t = i18n[currentLang] || i18n.co;
+      const container = document.getElementById('steps-visual');
+      container.innerHTML = t.steps.map((s, i) => {
+        const idx = i + 1;
+        let cls = 'step-item inactive';
+        if (idx < activeStep) cls = 'step-item done';
+        else if (idx === activeStep) cls = 'step-item active';
+        const numDisplay = idx < activeStep ? '✓' : s.num;
+        return `<div class="${cls}">
+          <div class="step-num">${numDisplay}</div>
+          <div class="step-info">
+            <div class="step-label">${s.label}</div>
+            <div class="step-desc">${s.desc}</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function setLanguage(lang) {
+      const t = i18n[lang] || i18n.co;
+      document.getElementById('htmlRoot').lang = t.lang;
+      document.getElementById('pageTitle').textContent = t.title;
+      document.getElementById('nav-back').textContent = t.navBack;
+      document.getElementById('panel-tag').textContent = t.panelTag;
+      document.getElementById('panel-heading').innerHTML = t.panelHeading;
+      document.getElementById('panel-desc').textContent = t.panelDesc;
+      // step 1
+      document.getElementById('s1-step-label').textContent = t.s1StepLabel;
+      document.getElementById('s1-title').textContent = t.s1Title;
+      document.getElementById('s1-subtitle').textContent = t.s1Subtitle;
+      document.getElementById('s1-label-email').textContent = t.s1LabelEmail;
+      document.getElementById('s1-email').placeholder = t.s1PhEmail;
+      document.getElementById('s1-err-email').textContent = t.s1ErrEmail;
+      document.getElementById('s1-btn').textContent = t.s1Btn;
+      document.getElementById('s1-back-link').textContent = t.s1BackLink;
+      // step 2
+      document.getElementById('s2-step-label').textContent = t.s2StepLabel;
+      document.getElementById('s2-title').textContent = t.s2Title;
+      document.getElementById('s2-subtitle').textContent = t.s2Subtitle;
+      document.getElementById('s2-label-code').textContent = t.s2LabelCode;
+      document.getElementById('s2-resend-label').textContent = t.s2ResendLabel;
+      document.getElementById('resend-btn').textContent = t.s2ResendBtn;
+      document.getElementById('s2-btn').textContent = t.s2Btn;
+      // step 3
+      document.getElementById('s3-step-label').textContent = t.s3StepLabel;
+      document.getElementById('s3-title').textContent = t.s3Title;
+      document.getElementById('s3-subtitle').textContent = t.s3Subtitle;
+      document.getElementById('s3-label-pw').textContent = t.s3LabelPw;
+      document.getElementById('s3-label-cf').textContent = t.s3LabelCf;
+      document.getElementById('s3-err-pw').textContent = t.s3ErrPw;
+      document.getElementById('s3-err-cf').textContent = t.s3ErrCf;
+      document.getElementById('s3-btn').textContent = t.s3Btn;
+      document.getElementById('toggle-s3pw').textContent = t.toggleShow;
+      document.getElementById('toggle-s3cf').textContent = t.toggleShow;
+      // step 4
+      document.getElementById('s4-title').textContent = t.s4Title;
+      document.getElementById('s4-desc').textContent = t.s4Desc;
+      document.getElementById('s4-btn').textContent = t.s4Btn;
+      document.getElementById('s4-btn').href = 'login.html';
+    }
+
+    // ─── STEP NAVIGATION ─────────────────────────────────────────────────────
+    let currentStep = 1;
+
+    function goToStep(n) {
+      document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('step' + n + '-panel').classList.add('active');
+      renderSteps(n === 4 ? 4 : n);
+      currentStep = n;
+    }
+
+    // ─── STEP 1 ───────────────────────────────────────────────────────────────
+    function submitStep1() {
+      const t = i18n[currentLang] || i18n.co;
+      const emailEl = document.getElementById('s1-email');
+      emailEl.classList.remove('error');
+      document.getElementById('s1-error').classList.remove('visible');
+      if (!emailEl.value.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+        emailEl.classList.add('error'); return;
+      }
+      // ── aquí irá la llamada al Worker para enviar el código ──
+      startResendTimer();
+      goToStep(2);
+    }
+
+    // ─── STEP 2: CODE INPUT ───────────────────────────────────────────────────
+    const digits = document.querySelectorAll('.code-digit');
+    digits.forEach((input, idx) => {
+      input.addEventListener('input', e => {
+        const val = e.target.value.replace(/\D/g, '');
+        e.target.value = val;
+        if (val) {
+          e.target.classList.add('filled');
+          if (idx < 5) digits[idx + 1].focus();
+        } else {
+          e.target.classList.remove('filled');
+        }
+      });
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Backspace' && !e.target.value && idx > 0) {
+          digits[idx - 1].focus();
+        }
+      });
+      input.addEventListener('paste', e => {
+        e.preventDefault();
+        const paste = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').slice(0, 6);
+        paste.split('').forEach((ch, i) => {
+          if (digits[i]) { digits[i].value = ch; digits[i].classList.add('filled'); }
+        });
+        if (paste.length < 6) digits[paste.length].focus();
+        else digits[5].focus();
+      });
+    });
+
+    function submitStep2() {
+      const t = i18n[currentLang] || i18n.co;
+      const code = Array.from(digits).map(d => d.value).join('');
+      digits.forEach(d => d.classList.remove('error'));
+      document.getElementById('s2-error').classList.remove('visible');
+      if (code.length < 6) {
+        digits.forEach(d => { if (!d.value) d.classList.add('error'); });
+        return;
+      }
+      // ── aquí irá la validación del código contra el Worker ──
+      goToStep(3);
+    }
+
+    // Resend timer
+    let timerInterval;
+    function startResendTimer() {
+      let secs = 60;
+      const btn = document.getElementById('resend-btn');
+      const timer = document.getElementById('resend-timer');
+      btn.disabled = true;
+      timerInterval = setInterval(() => {
+        secs--;
+        timer.textContent = `(${secs}s)`;
+        if (secs <= 0) {
+          clearInterval(timerInterval);
+          btn.disabled = false;
+          timer.textContent = '';
+        }
+      }, 1000);
+    }
+    function resendCode() {
+      // ── aquí irá el reenvío al Worker ──
+      startResendTimer();
+      digits.forEach(d => { d.value = ''; d.classList.remove('filled', 'error'); });
+      digits[0].focus();
+    }
+
+    // ─── STEP 3 ───────────────────────────────────────────────────────────────
+    const strengthColors = ['#1e1e1e', '#ff4757', '#f0c040', '#3d6fff', '#00d68f'];
+    document.getElementById('s3-pw').addEventListener('input', function() {
+      const t = i18n[currentLang] || i18n.co;
+      const val = this.value;
+      let score = 0;
+      if (val.length >= 8) score++;
+      if (/[A-Z]/.test(val)) score++;
+      if (/[0-9]/.test(val)) score++;
+      if (/[^A-Za-z0-9]/.test(val)) score++;
+      for (let i = 1; i <= 4; i++) {
+        document.getElementById('ss'+i).style.background = i <= score ? strengthColors[score] : '#1e1e1e';
+      }
+      const lbl = document.getElementById('s3-strength-label');
+      lbl.textContent = val.length ? t.strengthLabels[score] : '';
+      lbl.style.color = strengthColors[score];
+    });
+
+    function submitStep3() {
+      const t = i18n[currentLang] || i18n.co;
+      const pw = document.getElementById('s3-pw');
+      const cf = document.getElementById('s3-cf');
+      pw.classList.remove('error'); cf.classList.remove('error');
+      document.getElementById('s3-error').classList.remove('visible');
+      let ok = true;
+      if (pw.value.length < 8) { pw.classList.add('error'); ok = false; }
+      if (cf.value !== pw.value || !cf.value) { cf.classList.add('error'); ok = false; }
+      if (!ok) return;
+      // ── aquí irá la actualización de contraseña en el Worker ──
+      goToStep(4);
+    }
+
+    // ─── PASSWORD TOGGLE ─────────────────────────────────────────────────────
+    function togglePw(inputId, btnId) {
+      const t = i18n[currentLang] || i18n.co;
+      const input = document.getElementById(inputId);
+      const btn = document.getElementById(btnId);
+      if (input.type === 'password') { input.type = 'text'; btn.textContent = t.toggleHide; }
+      else { input.type = 'password'; btn.textContent = t.toggleShow; }
+    }
+
+    // ─── CURSOR ──────────────────────────────────────────────────────────────
+    const cursor = document.getElementById('cursor');
+    const ring = document.getElementById('cursorRing');
+    let mx=0, my=0, rx=0, ry=0;
+    document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; cursor.style.left=mx+'px'; cursor.style.top=my+'px'; });
+    (function ar(){ rx+=(mx-rx)*.12; ry+=(my-ry)*.12; ring.style.left=rx+'px'; ring.style.top=ry+'px'; requestAnimationFrame(ar); })();
+    document.querySelectorAll('a, button').forEach(el => {
+      el.addEventListener('mouseenter', () => { cursor.style.transform='translate(-50%,-50%) scale(2.5)'; cursor.style.background='transparent'; cursor.style.border='1.5px solid var(--blue)'; ring.style.opacity='0'; });
+      el.addEventListener('mouseleave', () => { cursor.style.transform='translate(-50%,-50%) scale(1)'; cursor.style.background='var(--blue)'; cursor.style.border='none'; ring.style.opacity='0.4'; });
+    });
+
+    // ─── INIT ─────────────────────────────────────────────────────────────────
+    setLanguage(currentLang);
+    renderSteps(1);
+  </script>
+</body>
+</html>
