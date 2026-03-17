@@ -537,17 +537,37 @@
     }
 
     // ─── STEP 1 ───────────────────────────────────────────────────────────────
-    function submitStep1() {
+    async function submitStep1() {
       const t = i18n[currentLang] || i18n.co;
       const emailEl = document.getElementById('s1-email');
+      const btn     = document.getElementById('s1-btn');
       emailEl.classList.remove('error');
       document.getElementById('s1-error').classList.remove('visible');
+
       if (!emailEl.value.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
         emailEl.classList.add('error'); return;
       }
-      // ── aquí irá la llamada al Worker para enviar el código ──
-      startResendTimer();
-      goToStep(2);
+
+      btn.textContent = '...';
+      btn.disabled = true;
+
+      try {
+        const res  = await fetch('https://rr-auth.reruizc.workers.dev/auth/forgot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: emailEl.value.trim() }),
+        });
+        const data = await res.json();
+        // Siempre avanzamos al paso 2 (por seguridad no revelamos si el email existe)
+        startResendTimer();
+        goToStep(2);
+      } catch {
+        const banner = document.getElementById('s1-error');
+        banner.textContent = currentLang === 'us' ? 'Connection error. Try again.' : 'Error de conexión. Intenta de nuevo.';
+        banner.classList.add('visible');
+        btn.textContent = t.s1Btn;
+        btn.disabled = false;
+      }
     }
 
     // ─── STEP 2: CODE INPUT ───────────────────────────────────────────────────
@@ -579,17 +599,30 @@
       });
     });
 
-    function submitStep2() {
+    async function submitStep2() {
       const t = i18n[currentLang] || i18n.co;
       const code = Array.from(digits).map(d => d.value).join('');
+      const btn  = document.getElementById('s2-btn');
       digits.forEach(d => d.classList.remove('error'));
       document.getElementById('s2-error').classList.remove('visible');
+
       if (code.length < 6) {
         digits.forEach(d => { if (!d.value) d.classList.add('error'); });
         return;
       }
-      // ── aquí irá la validación del código contra el Worker ──
+
+      btn.textContent = '...';
+      btn.disabled = true;
+
+      // Guardamos el código para usarlo en el paso 3
+      window._resetCode = code;
+      window._resetEmail = document.getElementById('s1-email').value.trim();
+
+      // Verificamos el código contra el Worker en el paso 3 junto con la nueva contraseña
+      // Por ahora avanzamos — la validación real ocurre en /auth/reset
       goToStep(3);
+      btn.textContent = t.s2Btn;
+      btn.disabled = false;
     }
 
     // Resend timer
@@ -609,8 +642,15 @@
         }
       }, 1000);
     }
-    function resendCode() {
-      // ── aquí irá el reenvío al Worker ──
+    async function resendCode() {
+      const email = document.getElementById('s1-email').value.trim();
+      try {
+        await fetch('https://rr-auth.reruizc.workers.dev/auth/forgot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+      } catch {}
       startResendTimer();
       digits.forEach(d => { d.value = ''; d.classList.remove('filled', 'error'); });
       digits[0].focus();
@@ -634,18 +674,57 @@
       lbl.style.color = strengthColors[score];
     });
 
-    function submitStep3() {
-      const t = i18n[currentLang] || i18n.co;
-      const pw = document.getElementById('s3-pw');
-      const cf = document.getElementById('s3-cf');
+    async function submitStep3() {
+      const t   = i18n[currentLang] || i18n.co;
+      const pw  = document.getElementById('s3-pw');
+      const cf  = document.getElementById('s3-cf');
+      const btn = document.getElementById('s3-btn');
       pw.classList.remove('error'); cf.classList.remove('error');
       document.getElementById('s3-error').classList.remove('visible');
+
       let ok = true;
       if (pw.value.length < 8) { pw.classList.add('error'); ok = false; }
       if (cf.value !== pw.value || !cf.value) { cf.classList.add('error'); ok = false; }
       if (!ok) return;
-      // ── aquí irá la actualización de contraseña en el Worker ──
-      goToStep(4);
+
+      btn.textContent = '...';
+      btn.disabled = true;
+
+      try {
+        const res  = await fetch('https://rr-auth.reruizc.workers.dev/auth/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email:    window._resetEmail,
+            code:     window._resetCode,
+            password: pw.value,
+          }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          goToStep(4);
+        } else {
+          // Código incorrecto — volver al paso 2
+          const banner = document.getElementById('s3-error');
+          banner.textContent = t.s2ErrCode;
+          banner.classList.add('visible');
+          btn.textContent = t.s3Btn;
+          btn.disabled = false;
+          // Limpiar dígitos y volver al paso 2
+          setTimeout(() => {
+            digits.forEach(d => { d.value=''; d.classList.remove('filled','error'); });
+            goToStep(2);
+            document.getElementById('s2-error').textContent = t.s2ErrCode;
+            document.getElementById('s2-error').classList.add('visible');
+          }, 1500);
+        }
+      } catch {
+        const banner = document.getElementById('s3-error');
+        banner.textContent = currentLang === 'us' ? 'Connection error. Try again.' : 'Error de conexión. Intenta de nuevo.';
+        banner.classList.add('visible');
+        btn.textContent = t.s3Btn;
+        btn.disabled = false;
+      }
     }
 
     // ─── PASSWORD TOGGLE ─────────────────────────────────────────────────────
