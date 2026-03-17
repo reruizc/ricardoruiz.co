@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title id="pageTitle">Dashboard · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet" />
+  <style>
+    /* ── THEME VARIABLES ── */
+    :root {
+      --bg: #f4f3ef;
+      --bg2: #eeedea;
+      --surface: #ffffff;
+      --surface2: #f0efe9;
+      --border: rgba(0,0,0,0.07);
+      --text: #0a0a0a;
+      --text2: #555;
+      --text3: #999;
+      --blue: #0047FF;
+      --blue-light: #3d6fff;
+      --blue-dim: rgba(0,71,255,0.08);
+      --black: #0a0a0a;
+      --white: #f4f3ef;
+      --success: #00d68f;
+      --warning: #f0c040;
+      --lock: #ccc;
+    }
+    [data-theme="dark"] {
+      --bg: #060810;
+      --bg2: #0a0c14;
+      --surface: #0f1018;
+      --surface2: #13151f;
+      --border: rgba(255,255,255,0.06);
+      --text: #f4f3ef;
+      --text2: #888;
+      --text3: #444;
+      --blue-dim: rgba(0,71,255,0.12);
+      --lock: #333;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Fraunces', serif;
+      min-height: 100vh;
+      cursor: none;
+      overflow-x: hidden;
+      transition: background 0.4s, color 0.4s;
+    }
+
+    /* CURSOR */
+    .cursor { position:fixed; width:12px; height:12px; background:var(--blue); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s ease,background .2s; transform:translate(-50%,-50%); }
+    .cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--blue); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s ease,opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed; top:0; left:0; right:0; z-index:100;
+      display: flex; align-items:center; justify-content:space-between;
+      padding: 1rem 2.5rem;
+      background: var(--bg); border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+      transition: background 0.4s, border-color 0.4s;
+    }
+    .nav-left { display:flex; align-items:center; gap:1.5rem; }
+    .nav-logo-wrap { display:flex; align-items:center; gap:.65rem; text-decoration:none; }
+    .nav-logo { font-family:'Syne',sans-serif; font-weight:800; font-size:1.1rem; letter-spacing:-.02em; color:var(--text); line-height:1; }
+    .nav-logo span { color:var(--blue); }
+    .nav-bars { display:flex; align-items:flex-end; gap:3px; height:16px; }
+    .nav-bar { width:4px; background:var(--blue); border-radius:1px 1px 0 0; opacity:.85; }
+    .nav-tag {
+      font-family:'DM Mono',monospace; font-size:.6rem;
+      letter-spacing:.15em; text-transform:uppercase;
+      color:var(--blue); background:var(--blue-dim);
+      padding:.2rem .65rem;
+    }
+    .nav-right { display:flex; align-items:center; gap:1rem; }
+    .nav-greeting {
+      font-family:'DM Mono',monospace; font-size:.68rem;
+      letter-spacing:.06em; text-transform:uppercase; color:var(--text2);
+    }
+    .nav-greeting strong { color:var(--text); }
+    .theme-btn {
+      background:none; border:1px solid var(--border);
+      padding:.3rem .6rem; cursor:none;
+      font-family:'DM Mono',monospace; font-size:.7rem;
+      color:var(--text2); transition:all .2s;
+    }
+    .theme-btn:hover { border-color:var(--blue); color:var(--blue); }
+    .nav-logout-btn {
+      font-family:'DM Mono',monospace; font-size:.65rem;
+      letter-spacing:.08em; text-transform:uppercase;
+      color:var(--text3); background:none; border:none;
+      cursor:none; transition:color .2s; padding:0;
+    }
+    .nav-logout-btn:hover { color:var(--blue); }
+
+    /* ── LAYOUT ── */
+    .dashboard-wrap {
+      max-width: 1400px; margin:0 auto;
+      padding: 6rem 2.5rem 4rem;
+    }
+
+    /* ── HERO GREETING ── */
+    .dash-hero {
+      margin-bottom: 3rem;
+      display: flex; align-items:flex-end; justify-content:space-between;
+      flex-wrap: wrap; gap:1.5rem;
+    }
+    .dash-hero-left {}
+    .dash-time-label {
+      font-family:'DM Mono',monospace; font-size:.65rem;
+      letter-spacing:.18em; text-transform:uppercase;
+      color:var(--blue); margin-bottom:.75rem;
+      display:flex; align-items:center; gap:.75rem;
+    }
+    .dash-time-label::before { content:''; display:block; width:20px; height:1px; background:var(--blue); }
+    .dash-greeting-title {
+      font-family:'Syne',sans-serif; font-weight:800;
+      font-size:clamp(2rem,4vw,3.5rem);
+      letter-spacing:-.03em; line-height:.95;
+    }
+    .dash-greeting-title em { font-style:italic; font-family:'Fraunces',serif; font-weight:300; color:var(--blue); }
+    .dash-hero-right {
+      display:flex; align-items:center; gap:1rem; flex-wrap:wrap;
+    }
+    .plan-badge-hero {
+      display:flex; align-items:center; gap:.5rem;
+      font-family:'DM Mono',monospace; font-size:.65rem;
+      letter-spacing:.12em; text-transform:uppercase;
+    }
+    .plan-dot { width:8px; height:8px; border-radius:50%; background:var(--blue); }
+    .plan-name-hero { color:var(--blue); }
+    .upgrade-btn {
+      font-family:'DM Mono',monospace; font-size:.65rem;
+      letter-spacing:.1em; text-transform:uppercase;
+      color:var(--white); background:var(--blue);
+      border:1.5px solid var(--blue); padding:.4rem 1rem;
+      text-decoration:none; cursor:none;
+      transition:background .2s, border-color .2s;
+    }
+    .upgrade-btn:hover { background:#0035cc; border-color:#0035cc; }
+
+    /* ── GRID ── */
+    .dash-grid {
+      display:grid;
+      grid-template-columns: 1fr 1fr 1fr 320px;
+      grid-template-rows: auto auto auto;
+      gap: 1rem;
+    }
+
+    /* ── CARDS ── */
+    .dash-card {
+      background:var(--surface);
+      border:1px solid var(--border);
+      padding:1.5rem;
+      position:relative; overflow:hidden;
+      transition:background .4s, border-color .4s;
+    }
+    .card-label {
+      font-family:'DM Mono',monospace; font-size:.6rem;
+      letter-spacing:.18em; text-transform:uppercase;
+      color:var(--text3); margin-bottom:1rem;
+    }
+    .card-title {
+      font-family:'Syne',sans-serif; font-weight:800;
+      font-size:1.1rem; letter-spacing:-.02em;
+      margin-bottom:.4rem; color:var(--text);
+    }
+
+    /* ── TOOLS GRID (span 3) ── */
+    .tools-card { grid-column: span 3; }
+    .tools-grid {
+      display:grid; grid-template-columns:repeat(3,1fr);
+      gap:.75rem; margin-top:.5rem;
+    }
+    .tool-item {
+      background:var(--surface2); border:1px solid var(--border);
+      padding:1.2rem; position:relative; overflow:hidden;
+      cursor:none; transition:background .2s, border-color .2s;
+      text-decoration:none; display:block;
+    }
+    .tool-item:hover:not(.locked) { border-color:var(--blue); }
+    .tool-item.locked { cursor:not-allowed; opacity:.6; }
+    .tool-num {
+      font-family:'DM Mono',monospace; font-size:.55rem;
+      letter-spacing:.15em; color:var(--blue); margin-bottom:.75rem;
+    }
+    .tool-name {
+      font-family:'Syne',sans-serif; font-weight:700;
+      font-size:.95rem; letter-spacing:-.01em;
+      color:var(--text); margin-bottom:.3rem;
+    }
+    .tool-desc {
+      font-family:'Fraunces',serif; font-weight:300;
+      font-size:.8rem; line-height:1.5; color:var(--text2);
+    }
+    .tool-lock {
+      position:absolute; top:.9rem; right:.9rem;
+      font-size:.8rem; color:var(--lock);
+    }
+    .tool-arrow {
+      position:absolute; bottom:.9rem; right:.9rem;
+      font-size:.8rem; color:var(--blue); opacity:0;
+      transition:opacity .2s, transform .2s;
+    }
+    .tool-item:hover:not(.locked) .tool-arrow { opacity:1; transform:translate(2px,-2px); }
+    .tool-tag {
+      display:inline-block; margin-top:.6rem;
+      font-family:'DM Mono',monospace; font-size:.55rem;
+      letter-spacing:.1em; text-transform:uppercase;
+      color:var(--blue); background:var(--blue-dim);
+      padding:.15rem .5rem;
+    }
+    .tool-tag.locked-tag { color:var(--lock); background:transparent; border:1px solid var(--lock); }
+
+    /* ── PLAN CARD (right col, row 1) ── */
+    .plan-card { grid-column:4; grid-row:1; }
+    .plan-card-name {
+      font-family:'Syne',sans-serif; font-weight:800;
+      font-size:2rem; letter-spacing:-.04em; color:var(--blue);
+      margin-bottom:.25rem;
+    }
+    .plan-card-desc {
+      font-family:'Fraunces',serif; font-weight:300;
+      font-size:.85rem; color:var(--text2); line-height:1.6;
+      margin-bottom:1.2rem;
+    }
+    .plan-perks { list-style:none; display:flex; flex-direction:column; gap:.5rem; margin-bottom:1.5rem; }
+    .plan-perks li {
+      font-family:'DM Mono',monospace; font-size:.6rem;
+      letter-spacing:.06em; color:var(--text2);
+      display:flex; gap:.5rem; align-items:flex-start;
+    }
+    .plan-perks li::before { content:'→'; color:var(--blue); flex-shrink:0; }
+    .plan-upgrade-link {
+      display:block; text-align:center;
+      font-family:'DM Mono',monospace; font-size:.65rem;
+      letter-spacing:.1em; text-transform:uppercase;
+      color:var(--white); background:var(--blue);
+      border:1.5px solid var(--blue); padding:.75rem;
+      text-decoration:none; transition:background .2s;
+    }
+    .plan-upgrade-link:hover { background:#0035cc; }
+    .plan-current-tag {
+      display:block; text-align:center;
+      font-family:'DM Mono',monospace; font-size:.62rem;
+      letter-spacing:.1em; text-transform:uppercase;
+      color:var(--text3); padding:.75rem;
+      border:1px solid var(--border);
+    }
+
+    /* ── DOWNLOADS CARD ── */
+    .downloads-card { grid-column:span 2; }
+    .downloads-bar-wrap { margin-bottom:1.2rem; }
+    .downloads-numbers {
+      display:flex; justify-content:space-between; align-items:baseline;
+      margin-bottom:.4rem;
+    }
+    .downloads-used {
+      font-family:'Syne',sans-serif; font-weight:800;
+      font-size:2rem; letter-spacing:-.04em; color:var(--blue);
+    }
+    .downloads-total {
+      font-family:'DM Mono',monospace; font-size:.65rem;
+      letter-spacing:.08em; color:var(--text3);
+    }
+    .downloads-track {
+      height:4px; background:var(--surface2); border-radius:2px; overflow:hidden;
+    }
+    .downloads-fill {
+      height:100%; background:var(--blue); border-radius:2px;
+      transition:width 1s ease;
+    }
+    .downloads-list { display:flex; flex-direction:column; gap:.5rem; margin-top:1rem; }
+    .download-item {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:.6rem .75rem; background:var(--surface2); border:1px solid var(--border);
+    }
+    .download-item-name {
+      font-family:'DM Mono',monospace; font-size:.62rem;
+      letter-spacing:.06em; color:var(--text);
+    }
+    .download-item-date {
+      font-family:'DM Mono',monospace; font-size:.58rem;
+      letter-spacing:.06em; color:var(--text3);
+    }
+    .download-btn {
+      font-family:'DM Mono',monospace; font-size:.58rem;
+      letter-spacing:.08em; text-transform:uppercase;
+      color:var(--blue); background:none;
+      border:1px solid rgba(0,71,255,0.3); padding:.25rem .6rem;
+      cursor:none; transition:background .2s, color .2s;
+      text-decoration:none;
+    }
+    .download-btn:hover { background:var(--blue); color:#fff; }
+    .download-btn.locked-btn { color:var(--lock); border-color:var(--lock); pointer-events:none; }
+
+    /* ── NEWS CARD ── */
+    .news-card { grid-column:span 1; }
+    .news-list { display:flex; flex-direction:column; gap:0; margin-top:.5rem; }
+    .news-item {
+      padding:.9rem 0; border-bottom:1px solid var(--border);
+    }
+    .news-item:last-child { border-bottom:none; }
+    .news-date {
+      font-family:'DM Mono',monospace; font-size:.55rem;
+      letter-spacing:.12em; text-transform:uppercase; color:var(--blue);
+      margin-bottom:.3rem;
+    }
+    .news-title {
+      font-family:'Syne',sans-serif; font-weight:700;
+      font-size:.85rem; letter-spacing:-.01em; color:var(--text);
+      margin-bottom:.2rem;
+    }
+    .news-desc {
+      font-family:'Fraunces',serif; font-weight:300;
+      font-size:.78rem; line-height:1.5; color:var(--text2);
+    }
+    .news-plan-tag {
+      display:inline-block; margin-top:.4rem;
+      font-family:'DM Mono',monospace; font-size:.52rem;
+      letter-spacing:.1em; text-transform:uppercase;
+      padding:.15rem .5rem;
+    }
+    .news-plan-tag.pro { color:#f0c040; background:rgba(240,192,64,0.08); }
+    .news-plan-tag.premium { color:var(--blue); background:var(--blue-dim); }
+    .news-plan-tag.free { color:var(--success); background:rgba(0,214,143,0.08); }
+
+    /* ── PROFILE CARD ── */
+    .profile-card { grid-column:4; grid-row:2 / span 2; }
+    .profile-avatar {
+      width:52px; height:52px; border-radius:50%;
+      background:var(--blue-dim); border:2px solid var(--blue);
+      display:flex; align-items:center; justify-content:center;
+      font-family:'Syne',sans-serif; font-weight:800;
+      font-size:1.2rem; color:var(--blue); margin-bottom:1rem;
+    }
+    .profile-name {
+      font-family:'Syne',sans-serif; font-weight:800;
+      font-size:1.1rem; letter-spacing:-.02em; margin-bottom:.2rem;
+    }
+    .profile-email {
+      font-family:'DM Mono',monospace; font-size:.6rem;
+      letter-spacing:.06em; color:var(--text3); margin-bottom:1.2rem;
+    }
+    .profile-field {
+      margin-bottom:.9rem; padding-bottom:.9rem;
+      border-bottom:1px solid var(--border);
+    }
+    .profile-field:last-of-type { border-bottom:none; }
+    .profile-field-label {
+      font-family:'DM Mono',monospace; font-size:.55rem;
+      letter-spacing:.15em; text-transform:uppercase; color:var(--text3);
+      margin-bottom:.3rem;
+    }
+    .profile-field-value {
+      font-family:'Fraunces',serif; font-weight:300;
+      font-size:.9rem; color:var(--text);
+    }
+    .profile-actions { margin-top:1rem; display:flex; flex-direction:column; gap:.5rem; }
+    .profile-action-btn {
+      font-family:'DM Mono',monospace; font-size:.62rem;
+      letter-spacing:.08em; text-transform:uppercase;
+      color:var(--text2); background:none;
+      border:1px solid var(--border); padding:.6rem;
+      cursor:none; text-align:center; text-decoration:none;
+      transition:border-color .2s, color .2s; display:block;
+    }
+    .profile-action-btn:hover { border-color:var(--blue); color:var(--blue); }
+    .profile-action-btn.danger:hover { border-color:#ff4757; color:#ff4757; }
+
+    /* RESPONSIVE */
+    @media (max-width: 1100px) {
+      .dash-grid { grid-template-columns:1fr 1fr 320px; }
+      .tools-card { grid-column:span 2; }
+      .tools-grid { grid-template-columns:repeat(2,1fr); }
+    }
+    @media (max-width: 768px) {
+      nav { padding:.9rem 1.5rem; }
+      .dashboard-wrap { padding:5rem 1.5rem 3rem; }
+      .dash-grid { grid-template-columns:1fr; }
+      .tools-card, .downloads-card, .news-card, .plan-card, .profile-card { grid-column:1; grid-row:auto; }
+      .tools-grid { grid-template-columns:1fr 1fr; }
+      body { cursor:auto; }
+      .cursor,.cursor-ring { display:none; }
+    }
+    @media (max-width: 480px) {
+      .tools-grid { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <!-- NAV -->
+  <nav>
+    <div class="nav-left">
+      <a href="index.html" class="nav-logo-wrap">
+        <div class="nav-bars">
+          <div class="nav-bar" style="height:16px"></div>
+          <div class="nav-bar" style="height:12px"></div>
+          <div class="nav-bar" style="height:8px"></div>
+          <div class="nav-bar" style="height:4px"></div>
+        </div>
+        <span class="nav-logo">Ricardo<span>.</span>Ruiz</span>
+      </a>
+      <span class="nav-tag" id="nav-tag">Dashboard</span>
+    </div>
+    <div class="nav-right">
+      <span class="nav-greeting" id="nav-greeting"></span>
+      <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">🌙</button>
+      <button class="nav-logout-btn" onclick="logOut()" id="nav-logout">Salir</button>
+    </div>
+  </nav>
+
+  <!-- DASHBOARD -->
+  <div class="dashboard-wrap">
+
+    <!-- HERO -->
+    <div class="dash-hero">
+      <div class="dash-hero-left">
+        <div class="dash-time-label" id="time-label">Buenos días</div>
+        <h1 class="dash-greeting-title" id="greeting-title">Hola, <em id="greeting-name">—</em>.</h1>
+      </div>
+      <div class="dash-hero-right" id="hero-right">
+        <!-- plan badge + upgrade btn populated by JS -->
+      </div>
+    </div>
+
+    <!-- GRID -->
+    <div class="dash-grid">
+
+      <!-- TOOLS -->
+      <div class="dash-card tools-card">
+        <div class="card-label" id="tools-label">Herramientas</div>
+        <div class="tools-grid" id="tools-grid">
+          <!-- populated by JS -->
+        </div>
+      </div>
+
+      <!-- PLAN CARD -->
+      <div class="dash-card plan-card" id="plan-card">
+        <!-- populated by JS -->
+      </div>
+
+      <!-- DOWNLOADS -->
+      <div class="dash-card downloads-card">
+        <div class="card-label" id="downloads-label">Descargas este mes</div>
+        <div class="downloads-bar-wrap">
+          <div class="downloads-numbers">
+            <span class="downloads-used" id="downloads-used">0</span>
+            <span class="downloads-total" id="downloads-total">/ 0 disponibles</span>
+          </div>
+          <div class="downloads-track">
+            <div class="downloads-fill" id="downloads-fill" style="width:0%"></div>
+          </div>
+        </div>
+        <div class="downloads-list" id="downloads-list">
+          <!-- populated by JS -->
+        </div>
+      </div>
+
+      <!-- NEWS -->
+      <div class="dash-card news-card">
+        <div class="card-label" id="news-label">Novedades</div>
+        <div class="news-list" id="news-list">
+          <!-- populated by JS -->
+        </div>
+      </div>
+
+      <!-- PROFILE -->
+      <div class="dash-card profile-card" id="profile-card">
+        <!-- populated by JS -->
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // ─── AUTH CHECK ───────────────────────────────────────────────────────────
+    const token = localStorage.getItem('rr-token');
+    const user  = JSON.parse(localStorage.getItem('rr-user') || 'null');
+    if (!token || !user) window.location.href = 'login.html';
+
+    // ─── THEME ────────────────────────────────────────────────────────────────
+    function getAutoTheme() {
+      const h = new Date().getHours();
+      return (h >= 7 && h < 19) ? 'light' : 'dark';
+    }
+    let currentTheme = localStorage.getItem('rr-theme') || getAutoTheme();
+
+    function applyTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : '');
+      document.getElementById('theme-btn').textContent = theme === 'dark' ? '☀️' : '🌙';
+      currentTheme = theme;
+      localStorage.setItem('rr-theme', theme);
+    }
+    function toggleTheme() {
+      applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+    }
+    applyTheme(currentTheme);
+
+    // ─── GREETING ─────────────────────────────────────────────────────────────
+    function getGreeting() {
+      const h = new Date().getHours();
+      const lang = localStorage.getItem('rr-lang') || 'co';
+      if (lang === 'us') {
+        if (h >= 5  && h < 12) return 'Good morning';
+        if (h >= 12 && h < 19) return 'Good afternoon';
+        return 'Good evening';
+      }
+      if (h >= 5  && h < 12) return 'Buenos días';
+      if (h >= 12 && h < 19) return 'Buenas tardes';
+      return 'Buenas noches';
+    }
+
+    // ─── PLAN CONFIG ──────────────────────────────────────────────────────────
+    const PLANS = {
+      free: {
+        label: 'Básico', downloads: 0,
+        desc: 'Acceso a datos esenciales y visualizaciones básicas.',
+        perks: ['Datos electorales básicos', 'Histórico con análisis básico', 'Visualizaciones esenciales'],
+        tools: ['electoral', 'consulta2025'],
+      },
+      pro: {
+        label: 'Pro', downloads: 3,
+        desc: 'Datos avanzados, visualizaciones interactivas y descargas mensuales.',
+        perks: ['3 descargas al mes', 'Análisis histórico avanzado', 'Cruces de información'],
+        tools: ['electoral', 'consulta2025', 'dane', 'security'],
+      },
+      premium: {
+        label: 'Premium', downloads: 10,
+        desc: 'Acceso completo a todos los datos y análisis profundos.',
+        perks: ['10 descargas al mes', 'Todos los tipos de datos', 'Notificaciones de actualización'],
+        tools: ['electoral', 'consulta2025', 'dane', 'security', 'custom'],
+      },
+      full: {
+        label: 'Full', downloads: 999,
+        desc: 'Acceso ilimitado. Todos los datos, herramientas y asesoría.',
+        perks: ['Descargas ilimitadas', 'Todos los datos disponibles', 'Asesoría directa'],
+        tools: ['electoral', 'consulta2025', 'dane', 'security', 'custom'],
+      },
+    };
+
+    const ALL_TOOLS = [
+      { id:'electoral',    name:'Histórico Electoral', desc:'Resultados y análisis de elecciones legislativas y consultas desde 2002.', href:'electoral.html', tag:'Electoral' },
+      { id:'consulta2025', name:'Consulta 2025',       desc:'Análisis completo de la consulta presidencial del Pacto Histórico, octubre 2025.', href:'Consulta-2025.html', tag:'Consulta' },
+      { id:'dane',         name:'Datos DANE',          desc:'Empleo, pobreza e indicadores socioeconómicos procesados mensualmente.', href:'#', tag:'Próximamente' },
+      { id:'security',     name:'Comisión de Delitos', desc:'Bases de datos mensuales de seguridad con análisis territorial.', href:'#', tag:'Próximamente' },
+      { id:'custom',       name:'Análisis a medida',   desc:'Cruces exclusivos y reportes personalizados según tu necesidad.', href:'#', tag:'Premium' },
+    ];
+
+    const DOWNLOADS_DEMO = [
+      { name:'Electoral histórico CO · 2002–2026', date:'Mar 2026', href:'#' },
+      { name:'Consulta Presidencial · Oct 2025',   date:'Mar 2026', href:'#' },
+      { name:'Empleo DANE · Feb 2026',             date:'Feb 2026', href:'#' },
+    ];
+
+    const NEWS = [
+      { date:'Mar 2026', title:'Datos electorales 2026 disponibles', desc:'Resultados del Senado y Cámara actualizados con escrutinio final.', plan:'free' },
+      { date:'Mar 2026', title:'Nueva base: Comisión de Delitos Feb 2026', desc:'Datos de seguridad procesados con cruces municipales disponibles en Pro y Premium.', plan:'pro' },
+      { date:'Feb 2026', title:'DANE Empleo · Enero 2026', desc:'Indicadores de mercado laboral con análisis departamental y comparativo 2024–2026.', plan:'pro' },
+      { date:'Feb 2026', title:'Cruces electorales × seguridad', desc:'Nuevo análisis exclusivo: correlaciones entre votación y tasas de delito por municipio.', plan:'premium' },
+    ];
+
+    // ─── RENDER ───────────────────────────────────────────────────────────────
+    function render() {
+      if (!user) return;
+      const plan = PLANS[user.plan] || PLANS.free;
+      const lang = localStorage.getItem('rr-lang') || 'co';
+      const isEN = lang === 'us';
+
+      // Nav
+      document.getElementById('nav-greeting').innerHTML = `${isEN ? 'Plan' : 'Plan'} <strong>${plan.label}</strong>`;
+      document.getElementById('nav-logout').textContent = isEN ? 'Log out' : 'Salir';
+      document.getElementById('nav-tag').textContent = 'Dashboard';
+
+      // Greeting
+      const greeting = getGreeting();
+      document.getElementById('time-label').textContent = greeting;
+      document.getElementById('greeting-name').textContent = user.name.split(' ')[0];
+
+      // Hero right
+      const isFull = user.plan === 'full' || user.plan === 'premium';
+      document.getElementById('hero-right').innerHTML = `
+        <div class="plan-badge-hero">
+          <div class="plan-dot"></div>
+          <span class="plan-name-hero">${plan.label}</span>
+        </div>
+        ${!isFull ? `<a href="pricing.html" class="upgrade-btn">${isEN ? 'Upgrade plan ↑' : 'Mejorar plan ↑'}</a>` : ''}
+      `;
+
+      // Tools
+      const unlockedIds = plan.tools;
+      document.getElementById('tools-label').textContent = isEN ? 'Tools' : 'Herramientas';
+      document.getElementById('tools-grid').innerHTML = ALL_TOOLS.map((t, i) => {
+        const unlocked = unlockedIds.includes(t.id);
+        return `
+          <a href="${unlocked && t.href !== '#' ? t.href : '#'}"
+             class="tool-item ${unlocked ? '' : 'locked'}"
+             ${!unlocked || t.href === '#' ? 'onclick="return false"' : ''}>
+            <div class="tool-num">0${i+1} —</div>
+            <div class="tool-name">${t.name}</div>
+            <div class="tool-desc">${t.desc}</div>
+            <span class="tool-tag ${unlocked ? '' : 'locked-tag'}">${unlocked ? t.tag : (isEN ? 'Locked' : 'Bloqueado')}</span>
+            ${unlocked && t.href !== '#' ? '<span class="tool-arrow">↗</span>' : '<span class="tool-lock">🔒</span>'}
+          </a>`;
+      }).join('');
+
+      // Plan card
+      const isTopPlan = user.plan === 'full' || user.plan === 'premium';
+      document.getElementById('plan-card').innerHTML = `
+        <div class="card-label">${isEN ? 'Your plan' : 'Tu plan'}</div>
+        <div class="plan-card-name">${plan.label}</div>
+        <div class="plan-card-desc">${plan.desc}</div>
+        <ul class="plan-perks">${plan.perks.map(p => `<li>${p}</li>`).join('')}</ul>
+        ${!isTopPlan
+          ? `<a href="pricing.html" class="plan-upgrade-link">${isEN ? 'Upgrade →' : 'Mejorar plan →'}</a>`
+          : `<span class="plan-current-tag">${isEN ? 'Top plan active' : 'Plan máximo activo'}</span>`}
+      `;
+
+      // Downloads
+      const used = user.plan === 'free' ? 0 : 1;
+      const total = plan.downloads === 999 ? '∞' : plan.downloads;
+      const pct = plan.downloads === 0 ? 0 : plan.downloads === 999 ? 20 : (used / plan.downloads) * 100;
+      document.getElementById('downloads-label').textContent = isEN ? 'Downloads this month' : 'Descargas este mes';
+      document.getElementById('downloads-used').textContent = used;
+      document.getElementById('downloads-total').textContent = `/ ${total} ${isEN ? 'available' : 'disponibles'}`;
+      setTimeout(() => { document.getElementById('downloads-fill').style.width = pct + '%'; }, 300);
+
+      const canDownload = user.plan !== 'free';
+      document.getElementById('downloads-list').innerHTML = DOWNLOADS_DEMO.map(d => `
+        <div class="download-item">
+          <div>
+            <div class="download-item-name">${d.name}</div>
+            <div class="download-item-date">${d.date}</div>
+          </div>
+          <a href="${canDownload ? d.href : '#'}"
+             class="download-btn ${canDownload ? '' : 'locked-btn'}"
+             ${!canDownload ? 'onclick="return false"' : ''}>
+            ${canDownload ? (isEN ? 'Download' : 'Descargar') : '🔒'}
+          </a>
+        </div>`).join('');
+
+      // News
+      document.getElementById('news-label').textContent = isEN ? 'What\'s new' : 'Novedades';
+      document.getElementById('news-list').innerHTML = NEWS.map(n => `
+        <div class="news-item">
+          <div class="news-date">${n.date}</div>
+          <div class="news-title">${n.title}</div>
+          <div class="news-desc">${n.desc}</div>
+          <span class="news-plan-tag ${n.plan}">${n.plan === 'free' ? 'Básico' : n.plan === 'pro' ? 'Pro' : 'Premium'}</span>
+        </div>`).join('');
+
+      // Profile
+      const initials = user.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+      const countryLabels = { co:'Colombia', us:'United States', mx:'México', pe:'Perú', py:'Paraguay', uk:'United Kingdom' };
+      document.getElementById('profile-card').innerHTML = `
+        <div class="card-label">${isEN ? 'Profile' : 'Perfil'}</div>
+        <div class="profile-avatar">${initials}</div>
+        <div class="profile-name">${user.name}</div>
+        <div class="profile-email">${user.email}</div>
+        <div class="profile-field">
+          <div class="profile-field-label">${isEN ? 'Plan' : 'Plan'}</div>
+          <div class="profile-field-value">${plan.label}</div>
+        </div>
+        <div class="profile-field">
+          <div class="profile-field-label">${isEN ? 'Member since' : 'Miembro desde'}</div>
+          <div class="profile-field-value">${isEN ? 'March 2026' : 'Marzo 2026'}</div>
+        </div>
+        <div class="profile-actions">
+          <a href="forgot.html" class="profile-action-btn">${isEN ? 'Change password' : 'Cambiar contraseña'}</a>
+          <button class="profile-action-btn danger" onclick="logOut()">${isEN ? 'Log out' : 'Cerrar sesión'}</button>
+        </div>
+      `;
+    }
+
+    // ─── LOGOUT ───────────────────────────────────────────────────────────────
+    async function logOut() {
+      try {
+        await fetch('https://rr-auth.reruizc.workers.dev/auth/logout', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+      } catch {}
+      localStorage.removeItem('rr-token');
+      localStorage.removeItem('rr-user');
+      window.location.href = 'login.html';
+    }
+
+    // ─── CURSOR ───────────────────────────────────────────────────────────────
+    const cursor = document.getElementById('cursor');
+    const ring   = document.getElementById('cursorRing');
+    let mx=0,my=0,rx=0,ry=0;
+    document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; cursor.style.left=mx+'px'; cursor.style.top=my+'px'; });
+    (function ar(){ rx+=(mx-rx)*.12; ry+=(my-ry)*.12; ring.style.left=rx+'px'; ring.style.top=ry+'px'; requestAnimationFrame(ar); })();
+    document.querySelectorAll('a,button').forEach(el => {
+      el.addEventListener('mouseenter', () => { cursor.style.transform='translate(-50%,-50%) scale(2.5)'; cursor.style.background='transparent'; cursor.style.border='1.5px solid var(--blue)'; ring.style.opacity='0'; });
+      el.addEventListener('mouseleave', () => { cursor.style.transform='translate(-50%,-50%) scale(1)'; cursor.style.background='var(--blue)'; cursor.style.border='none'; ring.style.opacity='.4'; });
+    });
+
+    // ─── INIT ─────────────────────────────────────────────────────────────────
+    render();
+  </script>
+</body>
+</html>
