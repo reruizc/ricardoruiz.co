@@ -840,12 +840,46 @@
       return ok;
     }
 
-    document.getElementById('registerForm').addEventListener('submit', function(e) {
+    document.getElementById('registerForm').addEventListener('submit', async function(e) {
       e.preventDefault();
       if (!validate()) return;
-      // ── aquí irá la llamada al Cloudflare Worker ──
-      document.getElementById('formState').style.display = 'none';
-      document.getElementById('successState').style.display = 'block';
+
+      const t   = i18n[currentLang] || i18n.co;
+      const btn = document.getElementById('btn-submit');
+
+      btn.textContent = '...';
+      btn.disabled = true;
+
+      try {
+        const res  = await fetch('https://rr-auth.reruizc.workers.dev/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name:     document.getElementById('fullname').value.trim(),
+            email:    document.getElementById('email').value.trim(),
+            password: document.getElementById('password').value,
+            country:  document.getElementById('country').value,
+          }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          localStorage.setItem('rr-token', data.token);
+          localStorage.setItem('rr-user',  JSON.stringify(data.user));
+          document.getElementById('formState').style.display    = 'none';
+          document.getElementById('successState').style.display = 'block';
+        } else {
+          // Email ya registrado u otro error del Worker
+          const emailEl = document.getElementById('email');
+          emailEl.classList.add('error');
+          document.getElementById('err-email').textContent = data.error || t.errEmail;
+          document.getElementById('err-email').style.display = 'block';
+          btn.textContent = t.btnSubmit;
+          btn.disabled = false;
+        }
+      } catch {
+        btn.textContent = t.btnSubmit;
+        btn.disabled = false;
+      }
     });
 
     // ─── MODALS ───────────────────────────────────────────────────────────────

@@ -644,33 +644,54 @@
     }
 
     // ─── VALIDATION & SUBMIT ─────────────────────────────────────────────────
-    document.getElementById('loginForm').addEventListener('submit', function(e) {
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
       e.preventDefault();
       const t = i18n[currentLang] || i18n.co;
-      let ok = true;
+      let valid = true;
 
-      const emailEl = document.getElementById('email');
-      const pwEl = document.getElementById('password');
-      const banner = document.getElementById('error-banner');
+      const emailEl  = document.getElementById('email');
+      const pwEl     = document.getElementById('password');
+      const banner   = document.getElementById('error-banner');
+      const btn      = document.getElementById('btn-submit');
 
       emailEl.classList.remove('error');
       pwEl.classList.remove('error');
       banner.classList.remove('visible');
 
       if (!emailEl.value.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-        emailEl.classList.add('error'); ok = false;
+        emailEl.classList.add('error'); valid = false;
       }
       if (!pwEl.value) {
-        pwEl.classList.add('error'); ok = false;
+        pwEl.classList.add('error'); valid = false;
       }
-      if (!ok) return;
+      if (!valid) return;
 
-      // ── aquí irá la llamada al Cloudflare Worker ──
-      // Ejemplo de respuesta de error del Worker:
-      // banner.textContent = t.errorBanner;
-      // banner.classList.add('visible');
-
-      console.log('Login — pendiente de conectar Worker');
+      // Llamada al Worker
+      btn.textContent = '...';
+      btn.disabled = true;
+      try {
+        const res  = await fetch('https://rr-auth.reruizc.workers.dev/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: emailEl.value, password: pwEl.value }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          localStorage.setItem('rr-token', data.token);
+          localStorage.setItem('rr-user',  JSON.stringify(data.user));
+          window.location.href = 'index.html';
+        } else {
+          banner.textContent = t.errorBanner;
+          banner.classList.add('visible');
+          btn.textContent = t.btnSubmit;
+          btn.disabled = false;
+        }
+      } catch {
+        banner.textContent = t.errorBanner;
+        banner.classList.add('visible');
+        btn.textContent = t.btnSubmit;
+        btn.disabled = false;
+      }
     });
 
     // ─── MODALS ───────────────────────────────────────────────────────────────
