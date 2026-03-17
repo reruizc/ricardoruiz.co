@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title id="pageTitle">Iniciar sesión · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --black: #0a0a0a;
+      --white: #f4f3ef;
+      --blue: #0047FF;
+      --blue-light: #3d6fff;
+      --gray: #888;
+      --gray-light: #e0dfd9;
+      --error: #ff4757;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--black);
+      color: var(--white);
+      font-family: 'Fraunces', serif;
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      cursor: none;
+      overflow-x: hidden;
+    }
+
+    /* CURSOR */
+    .cursor {
+      position: fixed; width: 12px; height: 12px;
+      background: var(--blue); border-radius: 50%;
+      pointer-events: none; z-index: 9999;
+      transition: transform 0.15s ease, background 0.2s;
+      transform: translate(-50%, -50%);
+    }
+    .cursor-ring {
+      position: fixed; width: 36px; height: 36px;
+      border: 1.5px solid var(--blue); border-radius: 50%;
+      pointer-events: none; z-index: 9998;
+      transition: transform 0.35s ease, opacity 0.3s;
+      transform: translate(-50%, -50%); opacity: 0.4;
+    }
+
+    /* LEFT PANEL */
+    .panel-left {
+      background: var(--black);
+      padding: 3rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border-right: 1px solid #1a1a1a;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .panel-left-bg {
+      position: absolute;
+      bottom: -4rem;
+      left: -3rem;
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: clamp(140px, 18vw, 260px);
+      color: transparent;
+      -webkit-text-stroke: 1px rgba(0,71,255,0.07);
+      line-height: 1;
+      user-select: none;
+      pointer-events: none;
+      letter-spacing: -0.04em;
+    }
+
+    .panel-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .nav-logo-wrap {
+      display: flex; align-items: center; gap: 0.75rem; text-decoration: none;
+    }
+    .nav-logo {
+      font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.2rem;
+      letter-spacing: -0.02em; color: var(--white); line-height: 1;
+    }
+    .nav-logo span { color: var(--blue); }
+    .nav-bars { display: flex; align-items: flex-end; gap: 3px; height: 18px; }
+    .nav-bar { width: 5px; background: var(--blue); border-radius: 1px 1px 0 0; opacity: 0.85; }
+
+    .nav-back {
+      font-family: 'DM Mono', monospace; font-size: 0.7rem;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: #555; text-decoration: none;
+      transition: color 0.2s;
+    }
+    .nav-back:hover { color: var(--blue); }
+
+    .panel-left-body { position: relative; z-index: 1; }
+
+    .panel-tag {
+      font-family: 'DM Mono', monospace; font-size: 0.68rem;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--blue); margin-bottom: 1.5rem;
+      display: flex; align-items: center; gap: 0.75rem;
+    }
+    .panel-tag::before {
+      content: ''; display: block; width: 24px; height: 1px; background: var(--blue);
+    }
+
+    .panel-heading {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: clamp(2rem, 3.5vw, 3.2rem);
+      line-height: 0.95; letter-spacing: -0.03em;
+      margin-bottom: 1.5rem;
+    }
+    .panel-heading em {
+      font-style: italic;
+      font-family: 'Fraunces', serif;
+      font-weight: 300;
+      color: var(--blue);
+    }
+
+    .panel-desc {
+      font-family: 'Fraunces', serif; font-weight: 300;
+      font-size: 1rem; line-height: 1.7; color: #666;
+      max-width: 360px;
+    }
+
+    /* STAT CHIPS */
+    .stat-row {
+      display: flex; gap: 2rem; margin-top: 2.5rem;
+    }
+    .stat-item { display: flex; flex-direction: column; gap: 0.3rem; }
+    .stat-num {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: 1.8rem; letter-spacing: -0.04em;
+      color: var(--white); line-height: 1;
+    }
+    .stat-num span { color: var(--blue); }
+    .stat-label {
+      font-family: 'DM Mono', monospace; font-size: 0.58rem;
+      letter-spacing: 0.14em; text-transform: uppercase; color: #444;
+    }
+
+    .panel-footer {
+      font-family: 'DM Mono', monospace; font-size: 0.6rem;
+      letter-spacing: 0.1em; color: #333;
+      position: relative; z-index: 1;
+    }
+
+    /* RIGHT PANEL */
+    .panel-right {
+      background: #0d0d0d;
+      padding: 3rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .form-wrap {
+      max-width: 400px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .form-header { margin-bottom: 2.5rem; }
+
+    .form-step {
+      font-family: 'DM Mono', monospace; font-size: 0.65rem;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--blue); margin-bottom: 0.75rem;
+    }
+
+    .form-title {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: clamp(1.6rem, 2.5vw, 2.2rem);
+      letter-spacing: -0.03em; line-height: 1;
+    }
+
+    .form-subtitle {
+      font-family: 'Fraunces', serif; font-weight: 300;
+      font-size: 0.95rem; color: #555; margin-top: 0.6rem;
+    }
+    .form-subtitle a {
+      color: var(--blue); text-decoration: none;
+      border-bottom: 1px solid rgba(0,71,255,0.3);
+      transition: border-color 0.2s;
+    }
+    .form-subtitle a:hover { border-color: var(--blue); }
+
+    /* FORM FIELDS */
+    .form-group {
+      margin-bottom: 1.4rem;
+      position: relative;
+    }
+
+    .form-group label {
+      display: block;
+      font-family: 'DM Mono', monospace; font-size: 0.6rem;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: #444; margin-bottom: 0.5rem;
+      transition: color 0.2s;
+    }
+    .form-group:focus-within label { color: var(--blue); }
+
+    .form-group input {
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-bottom: 1.5px solid #222;
+      padding: 0.7rem 0;
+      font-family: 'Fraunces', serif; font-size: 1rem;
+      color: var(--white); outline: none;
+      transition: border-color 0.25s;
+    }
+    .form-group input:focus { border-color: var(--blue); }
+    .form-group input::placeholder { color: #333; }
+    .form-group input.error { border-color: var(--error); }
+
+    .field-error {
+      display: none;
+      font-family: 'DM Mono', monospace; font-size: 0.58rem;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--error); margin-top: 0.4rem;
+    }
+    .form-group input.error + .field-error,
+    .form-group input.error ~ .field-error { display: block; }
+
+    /* General form error (wrong credentials) */
+    .form-error-banner {
+      display: none;
+      background: rgba(255,71,87,0.08);
+      border: 1px solid rgba(255,71,87,0.25);
+      padding: 0.75rem 1rem;
+      font-family: 'DM Mono', monospace; font-size: 0.62rem;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--error); margin-bottom: 1.5rem;
+    }
+    .form-error-banner.visible { display: block; }
+
+    .password-wrap { position: relative; }
+    .password-toggle {
+      position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+      background: none; border: none; color: #444; cursor: none;
+      font-family: 'DM Mono', monospace; font-size: 0.58rem;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      padding: 0.2rem 0; transition: color 0.2s;
+    }
+    .password-toggle:hover { color: var(--blue); }
+
+    /* FORGOT PASSWORD */
+    .forgot-row {
+      display: flex; justify-content: flex-end;
+      margin-top: 0.4rem;
+    }
+    .forgot-link {
+      font-family: 'DM Mono', monospace; font-size: 0.58rem;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: #444; text-decoration: none;
+      transition: color 0.2s;
+    }
+    .forgot-link:hover { color: var(--blue); }
+
+    /* SUBMIT */
+    .btn-submit {
+      width: 100%;
+      background: var(--blue);
+      color: #fff;
+      border: 2px solid var(--blue);
+      padding: 1rem 2rem;
+      font-family: 'DM Mono', monospace; font-size: 0.78rem;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      cursor: none; margin-top: 2rem;
+      transition: background 0.25s, border-color 0.25s, transform 0.15s;
+    }
+    .btn-submit:hover { background: var(--white); border-color: var(--white); color: var(--black); }
+    .btn-submit:active { transform: scale(0.99); }
+
+    /* SOCIAL BUTTONS */
+    .social-btns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+    .btn-social {
+      display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+      background: transparent;
+      border: 1.5px solid #222;
+      padding: 0.75rem 1rem;
+      font-family: 'DM Mono', monospace; font-size: 0.68rem;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: #666; cursor: none;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+    }
+    .btn-social:hover { border-color: #444; color: var(--white); background: #111; }
+
+    /* DIVIDER */
+    .form-divider {
+      display: flex; align-items: center; gap: 1rem;
+      margin: 1.8rem 0;
+    }
+    .form-divider::before, .form-divider::after {
+      content: ''; flex: 1; height: 1px; background: #1a1a1a;
+    }
+    .form-divider span {
+      font-family: 'DM Mono', monospace; font-size: 0.58rem;
+      letter-spacing: 0.15em; text-transform: uppercase; color: #333;
+    }
+
+    .form-terms {
+      font-family: 'DM Mono', monospace; font-size: 0.58rem;
+      letter-spacing: 0.06em; color: #333;
+      text-align: center; margin-top: 1rem; line-height: 1.6;
+    }
+    .form-terms a { color: #555; text-decoration: underline; text-underline-offset: 3px; }
+    .form-terms a:hover { color: var(--blue); }
+
+    /* RESPONSIVE */
+    @media (max-width: 768px) {
+      body { grid-template-columns: 1fr; cursor: auto; }
+      .cursor, .cursor-ring { display: none; }
+      .panel-left { display: none; }
+      .panel-right { padding: 2rem 1.5rem; min-height: 100vh; justify-content: flex-start; padding-top: 4rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <!-- LEFT PANEL -->
+  <div class="panel-left">
+    <div class="panel-nav">
+      <a href="index.html" class="nav-logo-wrap">
+        <div class="nav-bars">
+          <div class="nav-bar" style="height:18px"></div>
+          <div class="nav-bar" style="height:14px"></div>
+          <div class="nav-bar" style="height:9px"></div>
+          <div class="nav-bar" style="height:5px"></div>
+        </div>
+        <span class="nav-logo">Ricardo<span>.</span>Ruiz</span>
+      </a>
+      <a href="index.html" class="nav-back" id="nav-back">← Inicio</a>
+    </div>
+
+    <div class="panel-left-body">
+      <div class="panel-tag" id="panel-tag">Portal de datos</div>
+      <h2 class="panel-heading" id="panel-heading">Bienvenido<br/>de <em>vuelta</em>.</h2>
+      <p class="panel-desc" id="panel-desc">Accede a tu cuenta para explorar las herramientas de análisis electoral disponibles según tu plan.</p>
+
+      <div class="stat-row">
+        <div class="stat-item">
+          <div class="stat-num">32<span>M+</span></div>
+          <div class="stat-label" id="stat1-label">Registros electorales</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num">1<span>K+</span></div>
+          <div class="stat-label" id="stat2-label">Municipios</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num">20<span>+</span></div>
+          <div class="stat-label" id="stat3-label">Años de historia</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-left-bg">LOG</div>
+
+    <div class="panel-footer">© 2026 Ricardo Ruiz · ricardoruiz.co</div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="panel-right">
+    <div class="form-wrap">
+
+      <div class="form-header">
+        <div class="form-step" id="form-step">02 — Acceso</div>
+        <h1 class="form-title" id="form-title">Iniciar sesión</h1>
+        <p class="form-subtitle" id="form-subtitle">¿No tienes cuenta? <a href="register.html" id="register-link">Regístrate</a></p>
+      </div>
+
+      <div class="form-error-banner" id="error-banner"></div>
+
+      <form id="loginForm" novalidate>
+
+        <div class="form-group">
+          <label id="label-email" for="email">Correo electrónico</label>
+          <input type="email" id="email" name="email" placeholder="maria@ejemplo.com" autocomplete="email" />
+          <span class="field-error" id="err-email">Ingresa un correo válido</span>
+        </div>
+
+        <div class="form-group">
+          <label id="label-password" for="password">Contraseña</label>
+          <div class="password-wrap">
+            <input type="password" id="password" name="password" placeholder="········" autocomplete="current-password" />
+            <button type="button" class="password-toggle" id="toggle-pw" onclick="togglePw()">Ver</button>
+          </div>
+          <span class="field-error" id="err-password">Ingresa tu contraseña</span>
+          <div class="forgot-row">
+            <a href="forgot.html" class="forgot-link" id="forgot-link">¿Olvidaste tu contraseña?</a>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-submit" id="btn-submit">Iniciar sesión →</button>
+
+        <div class="form-divider"><span id="divider-text">o continúa con</span></div>
+
+        <div class="social-btns">
+          <button type="button" class="btn-social" id="btn-google" onclick="handleSocialAuth('google')">
+            <svg width="16" height="16" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M43.611 20.083H42V20H24v8h11.303C33.654 32.657 29.332 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z" fill="#FFC107"/><path d="M6.306 14.691l6.571 4.819C14.655 16.108 19.001 13 24 13c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z" fill="#FF3D00"/><path d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0124 36c-5.311 0-9.818-3.398-11.42-8.099l-6.522 5.025C9.505 39.556 16.227 44 24 44z" fill="#4CAF50"/><path d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 01-4.087 5.571l6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z" fill="#1976D2"/></svg>
+            <span id="btn-google-text">Google</span>
+          </button>
+          <button type="button" class="btn-social" id="btn-microsoft" onclick="handleSocialAuth('microsoft')">
+            <svg width="16" height="16" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+            <span id="btn-microsoft-text">Microsoft</span>
+          </button>
+        </div>
+
+        <p class="form-terms" id="form-terms"></p>
+
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // ─── i18n ─────────────────────────────────────────────────────────────────
+    const i18n = {
+      co: {
+        lang: 'es', title: 'Iniciar sesión · Ricardo Ruiz',
+        navBack: '← Inicio',
+        panelTag: 'Portal de datos',
+        panelHeading: 'Bienvenido<br/>de <em>vuelta</em>.',
+        panelDesc: 'Accede a tu cuenta para explorar las herramientas de análisis electoral disponibles según tu plan.',
+        stat1: 'Registros electorales', stat2: 'Municipios', stat3: 'Años de historia',
+        formStep: '02 — Acceso',
+        formTitle: 'Iniciar sesión',
+        formSubtitle: '¿No tienes cuenta?', registerLink: 'Regístrate',
+        labelEmail: 'Correo electrónico', phEmail: 'maria@ejemplo.com', errEmail: 'Ingresa un correo válido',
+        labelPassword: 'Contraseña', errPassword: 'Ingresa tu contraseña',
+        toggleShow: 'Ver', toggleHide: 'Ocultar',
+        forgotLink: '¿Olvidaste tu contraseña?',
+        btnSubmit: 'Iniciar sesión →',
+        divider: 'o continúa con',
+        errorBanner: 'Correo o contraseña incorrectos',
+        terms: 'Acceso protegido · ', termsLink: 'Términos de uso', and: ' · ', privacyLink: 'Privacidad',
+      },
+      us: {
+        lang: 'en', title: 'Log in · Ricardo Ruiz',
+        navBack: '← Home',
+        panelTag: 'Data portal',
+        panelHeading: 'Welcome<br/><em>back</em>.',
+        panelDesc: 'Log in to your account to explore the electoral analysis tools available on your plan.',
+        stat1: 'Electoral records', stat2: 'Municipalities', stat3: 'Years of history',
+        formStep: '02 — Access',
+        formTitle: 'Log in',
+        formSubtitle: 'No account yet?', registerLink: 'Sign up',
+        labelEmail: 'Email address', phEmail: 'jane@example.com', errEmail: 'Enter a valid email',
+        labelPassword: 'Password', errPassword: 'Enter your password',
+        toggleShow: 'Show', toggleHide: 'Hide',
+        forgotLink: 'Forgot your password?',
+        btnSubmit: 'Log in →',
+        divider: 'or continue with',
+        errorBanner: 'Incorrect email or password',
+        terms: 'Secure access · ', termsLink: 'Terms of use', and: ' · ', privacyLink: 'Privacy',
+      }
+    };
+
+    function setLanguage(lang) {
+      const t = i18n[lang] || i18n.co;
+      document.getElementById('htmlRoot').lang = t.lang;
+      document.getElementById('pageTitle').textContent = t.title;
+      document.getElementById('nav-back').textContent = t.navBack;
+      document.getElementById('panel-tag').textContent = t.panelTag;
+      document.getElementById('panel-heading').innerHTML = t.panelHeading;
+      document.getElementById('panel-desc').textContent = t.panelDesc;
+      document.getElementById('stat1-label').textContent = t.stat1;
+      document.getElementById('stat2-label').textContent = t.stat2;
+      document.getElementById('stat3-label').textContent = t.stat3;
+      document.getElementById('form-step').textContent = t.formStep;
+      document.getElementById('form-title').textContent = t.formTitle;
+      document.getElementById('form-subtitle').childNodes[0].textContent = t.formSubtitle + ' ';
+      document.getElementById('register-link').textContent = t.registerLink;
+      document.getElementById('label-email').textContent = t.labelEmail;
+      document.getElementById('email').placeholder = t.phEmail;
+      document.getElementById('err-email').textContent = t.errEmail;
+      document.getElementById('label-password').textContent = t.labelPassword;
+      document.getElementById('err-password').textContent = t.errPassword;
+      document.getElementById('toggle-pw').textContent = t.toggleShow;
+      document.getElementById('forgot-link').textContent = t.forgotLink;
+      document.getElementById('btn-submit').textContent = t.btnSubmit;
+      document.getElementById('divider-text').textContent = t.divider;
+      document.getElementById('btn-google-text').textContent = 'Google';
+      document.getElementById('btn-microsoft-text').textContent = 'Microsoft';
+      document.getElementById('form-terms').innerHTML =
+        `${t.terms}<a href="#">${t.termsLink}</a>${t.and}<a href="#">${t.privacyLink}</a>`;
+    }
+
+    const currentLang = localStorage.getItem('rr-lang') || 'co';
+    setLanguage(currentLang);
+
+    // ─── PASSWORD VISIBILITY ─────────────────────────────────────────────────
+    function togglePw() {
+      const input = document.getElementById('password');
+      const btn = document.getElementById('toggle-pw');
+      const t = i18n[currentLang] || i18n.co;
+      if (input.type === 'password') {
+        input.type = 'text'; btn.textContent = t.toggleHide;
+      } else {
+        input.type = 'password'; btn.textContent = t.toggleShow;
+      }
+    }
+
+    // ─── VALIDATION & SUBMIT ─────────────────────────────────────────────────
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const t = i18n[currentLang] || i18n.co;
+      let ok = true;
+
+      const emailEl = document.getElementById('email');
+      const pwEl = document.getElementById('password');
+      const banner = document.getElementById('error-banner');
+
+      emailEl.classList.remove('error');
+      pwEl.classList.remove('error');
+      banner.classList.remove('visible');
+
+      if (!emailEl.value.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+        emailEl.classList.add('error'); ok = false;
+      }
+      if (!pwEl.value) {
+        pwEl.classList.add('error'); ok = false;
+      }
+      if (!ok) return;
+
+      // ── aquí irá la llamada al Cloudflare Worker ──
+      // Ejemplo de respuesta de error del Worker:
+      // banner.textContent = t.errorBanner;
+      // banner.classList.add('visible');
+
+      console.log('Login — pendiente de conectar Worker');
+    });
+
+    // ─── SOCIAL AUTH ─────────────────────────────────────────────────────────
+    function handleSocialAuth(provider) {
+      // ── aquí irá la redirección OAuth al Cloudflare Worker ──
+      console.log(`OAuth flow: ${provider} — pendiente de conectar Worker`);
+    }
+
+    // ─── CURSOR ──────────────────────────────────────────────────────────────
+    const cursor = document.getElementById('cursor');
+    const ring = document.getElementById('cursorRing');
+    let mx=0, my=0, rx=0, ry=0;
+    document.addEventListener('mousemove', e => {
+      mx = e.clientX; my = e.clientY;
+      cursor.style.left = mx+'px'; cursor.style.top = my+'px';
+    });
+    (function ar(){ rx+=(mx-rx)*.12; ry+=(my-ry)*.12; ring.style.left=rx+'px'; ring.style.top=ry+'px'; requestAnimationFrame(ar); })();
+    document.querySelectorAll('a, button').forEach(el => {
+      el.addEventListener('mouseenter', () => { cursor.style.transform='translate(-50%,-50%) scale(2.5)'; cursor.style.background='transparent'; cursor.style.border='1.5px solid var(--blue)'; ring.style.opacity='0'; });
+      el.addEventListener('mouseleave', () => { cursor.style.transform='translate(-50%,-50%) scale(1)'; cursor.style.background='var(--blue)'; cursor.style.border='none'; ring.style.opacity='0.4'; });
+    });
+  </script>
+</body>
+</html>

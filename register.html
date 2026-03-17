@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title id="pageTitle">Crear cuenta · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --black: #0a0a0a;
+      --white: #f4f3ef;
+      --blue: #0047FF;
+      --blue-light: #3d6fff;
+      --gray: #888;
+      --gray-light: #e0dfd9;
+      --error: #ff4757;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--black);
+      color: var(--white);
+      font-family: 'Fraunces', serif;
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      cursor: none;
+      overflow-x: hidden;
+    }
+
+    /* CURSOR */
+    .cursor {
+      position: fixed; width: 12px; height: 12px;
+      background: var(--blue); border-radius: 50%;
+      pointer-events: none; z-index: 9999;
+      transition: transform 0.15s ease, background 0.2s;
+      transform: translate(-50%, -50%);
+    }
+    .cursor-ring {
+      position: fixed; width: 36px; height: 36px;
+      border: 1.5px solid var(--blue); border-radius: 50%;
+      pointer-events: none; z-index: 9998;
+      transition: transform 0.35s ease, opacity 0.3s;
+      transform: translate(-50%, -50%); opacity: 0.4;
+    }
+
+    /* LEFT PANEL */
+    .panel-left {
+      background: var(--black);
+      padding: 3rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border-right: 1px solid #1a1a1a;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .panel-left-bg {
+      position: absolute;
+      bottom: -4rem;
+      left: -3rem;
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: clamp(140px, 18vw, 260px);
+      color: transparent;
+      -webkit-text-stroke: 1px rgba(0,71,255,0.07);
+      line-height: 1;
+      user-select: none;
+      pointer-events: none;
+      letter-spacing: -0.04em;
+    }
+
+    .panel-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .nav-logo-wrap {
+      display: flex; align-items: center; gap: 0.75rem; text-decoration: none;
+    }
+    .nav-logo {
+      font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.2rem;
+      letter-spacing: -0.02em; color: var(--white); line-height: 1;
+    }
+    .nav-logo span { color: var(--blue); }
+    .nav-bars { display: flex; align-items: flex-end; gap: 3px; height: 18px; }
+    .nav-bar { width: 5px; background: var(--blue); border-radius: 1px 1px 0 0; opacity: 0.85; }
+
+    .nav-back {
+      font-family: 'DM Mono', monospace; font-size: 0.7rem;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: #555; text-decoration: none;
+      transition: color 0.2s;
+    }
+    .nav-back:hover { color: var(--blue); }
+
+    .panel-left-body {
+      position: relative;
+      z-index: 1;
+    }
+
+    .panel-tag {
+      font-family: 'DM Mono', monospace; font-size: 0.68rem;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--blue); margin-bottom: 1.5rem;
+      display: flex; align-items: center; gap: 0.75rem;
+    }
+    .panel-tag::before {
+      content: '';
+      display: block; width: 24px; height: 1px; background: var(--blue);
+    }
+
+    .panel-heading {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: clamp(2rem, 3.5vw, 3.2rem);
+      line-height: 0.95; letter-spacing: -0.03em;
+      margin-bottom: 1.5rem;
+    }
+    .panel-heading em {
+      font-style: italic;
+      font-family: 'Fraunces', serif;
+      font-weight: 300;
+      color: var(--blue);
+    }
+
+    .panel-desc {
+      font-family: 'Fraunces', serif; font-weight: 300;
+      font-size: 1rem; line-height: 1.7; color: #666;
+      max-width: 360px;
+    }
+
+    .plan-chips {
+      display: flex; flex-direction: column; gap: 0.6rem;
+      margin-top: 2.5rem;
+    }
+    .plan-chip {
+      display: flex; align-items: center; gap: 0.75rem;
+      font-family: 'DM Mono', monospace; font-size: 0.65rem;
+      letter-spacing: 0.1em; text-transform: uppercase; color: #444;
+    }
+    .plan-chip-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #1e1e1e; flex-shrink: 0;
+      transition: background 0.3s;
+    }
+    .plan-chip.active .plan-chip-dot { background: var(--blue); }
+    .plan-chip.active { color: #aaa; }
+
+    .panel-footer {
+      font-family: 'DM Mono', monospace; font-size: 0.6rem;
+      letter-spacing: 0.1em; color: #333;
+    }
+
+    /* RIGHT PANEL — FORM */
+    .panel-right {
+      background: #0d0d0d;
+      padding: 3rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .form-wrap {
+      max-width: 400px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .form-header {
+      margin-bottom: 2.5rem;
+    }
+
+    .form-step {
+      font-family: 'DM Mono', monospace; font-size: 0.65rem;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--blue); margin-bottom: 0.75rem;
+    }
+
+    .form-title {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: clamp(1.6rem, 2.5vw, 2.2rem);
+      letter-spacing: -0.03em; line-height: 1;
+    }
+
+    .form-subtitle {
+      font-family: 'Fraunces', serif; font-weight: 300;
+      font-size: 0.95rem; color: #555; margin-top: 0.6rem;
+    }
+    .form-subtitle a {
+      color: var(--blue); text-decoration: none;
+      border-bottom: 1px solid rgba(0,71,255,0.3);
+      transition: border-color 0.2s;
+    }
+    .form-subtitle a:hover { border-color: var(--blue); }
+
+    /* FORM FIELDS */
+    .form-group {
+      margin-bottom: 1.4rem;
+      position: relative;
+    }
+
+    .form-group label {
+      display: block;
+      font-family: 'DM Mono', monospace; font-size: 0.6rem;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: #444; margin-bottom: 0.5rem;
+      transition: color 0.2s;
+    }
+    .form-group:focus-within label { color: var(--blue); }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-bottom: 1.5px solid #222;
+      padding: 0.7rem 0;
+      font-family: 'Fraunces', serif; font-size: 1rem;
+      color: var(--white); outline: none;
+      transition: border-color 0.25s;
+      appearance: none; -webkit-appearance: none;
+    }
+    .form-group select {
+      cursor: none;
+      background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23444' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0 center;
+      padding-right: 1.2rem;
+    }
+    .form-group select option { background: #111; color: var(--white); }
+    .form-group input:focus,
+    .form-group select:focus { border-color: var(--blue); }
+    .form-group input::placeholder { color: #333; }
+    .form-group input.error { border-color: var(--error); }
+    .form-group input.error + .field-error { display: block; }
+
+    .field-error {
+      display: none;
+      font-family: 'DM Mono', monospace; font-size: 0.58rem;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--error); margin-top: 0.4rem;
+    }
+
+    .password-wrap { position: relative; }
+    .password-toggle {
+      position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+      background: none; border: none; color: #444; cursor: none;
+      font-family: 'DM Mono', monospace; font-size: 0.58rem;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      padding: 0.2rem 0; transition: color 0.2s;
+    }
+    .password-toggle:hover { color: var(--blue); }
+
+    /* PASSWORD STRENGTH */
+    .strength-bar {
+      display: flex; gap: 4px; margin-top: 0.6rem;
+    }
+    .strength-segment {
+      flex: 1; height: 2px; background: #1e1e1e;
+      border-radius: 1px; transition: background 0.3s;
+    }
+    .strength-label {
+      font-family: 'DM Mono', monospace; font-size: 0.55rem;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: #333; margin-top: 0.4rem;
+      transition: color 0.3s;
+    }
+
+    /* SUBMIT */
+    .btn-submit {
+      width: 100%;
+      background: var(--blue);
+      color: #fff;
+      border: 2px solid var(--blue);
+      padding: 1rem 2rem;
+      font-family: 'DM Mono', monospace; font-size: 0.78rem;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      cursor: none; margin-top: 2rem;
+      transition: background 0.25s, border-color 0.25s, transform 0.15s;
+      position: relative; overflow: hidden;
+    }
+    .btn-submit:hover { background: var(--white); border-color: var(--white); color: var(--black); }
+    .btn-submit:active { transform: scale(0.99); }
+    .btn-submit:disabled { background: #1e1e1e; border-color: #1e1e1e; color: #444; }
+
+    .form-terms {
+      font-family: 'DM Mono', monospace; font-size: 0.58rem;
+      letter-spacing: 0.06em; color: #333;
+      text-align: center; margin-top: 1rem; line-height: 1.6;
+    }
+    .form-terms a { color: #555; text-decoration: underline; text-underline-offset: 3px; }
+    .form-terms a:hover { color: var(--blue); }
+
+    /* DIVIDER */
+    .form-divider {
+      display: flex; align-items: center; gap: 1rem;
+      margin: 1.8rem 0;
+    }
+    .form-divider::before, .form-divider::after {
+      content: ''; flex: 1; height: 1px; background: #1a1a1a;
+    }
+    .form-divider span {
+      font-family: 'DM Mono', monospace; font-size: 0.58rem;
+      letter-spacing: 0.15em; text-transform: uppercase; color: #333;
+    }
+
+    /* SOCIAL BUTTONS */
+    .social-btns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+    .btn-social {
+      display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+      background: transparent;
+      border: 1.5px solid #222;
+      padding: 0.75rem 1rem;
+      font-family: 'DM Mono', monospace; font-size: 0.68rem;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: #666; cursor: none;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+    }
+    .btn-social:hover { border-color: #444; color: var(--white); background: #111; }
+
+    /* SUCCESS STATE */
+    .success-state {
+      display: none;
+      text-align: center;
+      padding: 2rem 0;
+    }
+    .success-icon {
+      width: 48px; height: 48px;
+      border: 2px solid var(--blue);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 1.5rem;
+      font-size: 1.2rem;
+    }
+    .success-title {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: 1.6rem; letter-spacing: -0.03em; margin-bottom: 0.75rem;
+    }
+    .success-desc {
+      font-family: 'Fraunces', serif; font-weight: 300;
+      font-size: 0.95rem; color: #555; line-height: 1.7;
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 768px) {
+      body { grid-template-columns: 1fr; cursor: auto; }
+      .cursor, .cursor-ring { display: none; }
+      .panel-left { display: none; }
+      .panel-right { padding: 2rem 1.5rem; min-height: 100vh; }
+      .panel-right::before {
+        content: '';
+        display: block;
+        height: 3rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <!-- LEFT PANEL -->
+  <div class="panel-left">
+    <div class="panel-nav">
+      <a href="index.html" class="nav-logo-wrap">
+        <div class="nav-bars">
+          <div class="nav-bar" style="height:18px"></div>
+          <div class="nav-bar" style="height:14px"></div>
+          <div class="nav-bar" style="height:9px"></div>
+          <div class="nav-bar" style="height:5px"></div>
+        </div>
+        <span class="nav-logo">Ricardo<span>.</span>Ruiz</span>
+      </a>
+      <a href="index.html" class="nav-back" id="nav-back">← Inicio</a>
+    </div>
+
+    <div class="panel-left-body">
+      <div class="panel-tag" id="panel-tag">Acceso por suscripción</div>
+      <h2 class="panel-heading" id="panel-heading">Datos que<br/><em>informan</em><br/>decisiones.</h2>
+      <p class="panel-desc" id="panel-desc">Crea tu cuenta y accede a herramientas de análisis electoral, datos en tiempo real y reportes exclusivos.</p>
+
+      <div class="plan-chips">
+        <div class="plan-chip active" id="chip1">
+          <div class="plan-chip-dot"></div>
+          <span id="chip1-text">Resultados electorales en tiempo real</span>
+        </div>
+        <div class="plan-chip active" id="chip2">
+          <div class="plan-chip-dot"></div>
+          <span id="chip2-text">Histórico · Senado · Cámara · Consultas</span>
+        </div>
+        <div class="plan-chip" id="chip3">
+          <div class="plan-chip-dot"></div>
+          <span id="chip3-text">Mapas y comparativos históricos</span>
+        </div>
+        <div class="plan-chip" id="chip4">
+          <div class="plan-chip-dot"></div>
+          <span id="chip4-text">Exportar datos · Alertas personalizadas</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-left-bg" id="panel-bg-text">DATA</div>
+
+    <div class="panel-footer" id="panel-footer">© 2026 Ricardo Ruiz · ricardoruiz.co</div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="panel-right">
+    <div class="form-wrap">
+
+      <!-- FORM STATE -->
+      <div id="formState">
+        <div class="form-header">
+          <div class="form-step" id="form-step">01 — Registro</div>
+          <h1 class="form-title" id="form-title">Crear cuenta</h1>
+          <p class="form-subtitle" id="form-subtitle">¿Ya tienes una cuenta? <a href="login.html" id="login-link">Inicia sesión</a></p>
+        </div>
+
+        <form id="registerForm" novalidate>
+
+          <div class="form-group">
+            <label id="label-name" for="fullname">Nombre completo</label>
+            <input type="text" id="fullname" name="fullname" placeholder="María García" autocomplete="name" />
+            <span class="field-error" id="err-name">Ingresa tu nombre completo</span>
+          </div>
+
+          <div class="form-group">
+            <label id="label-email" for="email">Correo electrónico</label>
+            <input type="email" id="email" name="email" placeholder="maria@ejemplo.com" autocomplete="email" />
+            <span class="field-error" id="err-email">Ingresa un correo válido</span>
+          </div>
+
+          <div class="form-group">
+            <label id="label-country" for="country">País</label>
+            <select id="country" name="country">
+              <option value="" disabled selected id="country-placeholder">— Selecciona —</option>
+              <option value="co">Colombia</option>
+              <option value="mx">México</option>
+              <option value="pe">Perú</option>
+              <option value="py">Paraguay</option>
+              <option value="us">United States</option>
+              <option value="uk">United Kingdom</option>
+              <option value="other" id="country-other">Otro / Other</option>
+            </select>
+            <span class="field-error" id="err-country">Selecciona tu país</span>
+          </div>
+
+          <div class="form-group">
+            <label id="label-password" for="password">Contraseña</label>
+            <div class="password-wrap">
+              <input type="password" id="password" name="password" placeholder="········" autocomplete="new-password" />
+              <button type="button" class="password-toggle" id="toggle-pw" onclick="togglePw('password', 'toggle-pw')">Ver</button>
+            </div>
+            <div class="strength-bar">
+              <div class="strength-segment" id="s1"></div>
+              <div class="strength-segment" id="s2"></div>
+              <div class="strength-segment" id="s3"></div>
+              <div class="strength-segment" id="s4"></div>
+            </div>
+            <div class="strength-label" id="strength-label"></div>
+            <span class="field-error" id="err-password">Mínimo 8 caracteres</span>
+          </div>
+
+          <div class="form-group">
+            <label id="label-confirm" for="confirm">Confirmar contraseña</label>
+            <div class="password-wrap">
+              <input type="password" id="confirm" name="confirm" placeholder="········" autocomplete="new-password" />
+              <button type="button" class="password-toggle" id="toggle-cf" onclick="togglePw('confirm', 'toggle-cf')">Ver</button>
+            </div>
+            <span class="field-error" id="err-confirm">Las contraseñas no coinciden</span>
+          </div>
+
+          <button type="submit" class="btn-submit" id="btn-submit">Crear cuenta →</button>
+
+          <div class="form-divider"><span id="divider-text">o continúa con</span></div>
+
+          <div class="social-btns">
+            <button type="button" class="btn-social" id="btn-google" onclick="handleSocialAuth('google')">
+              <svg width="16" height="16" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M43.611 20.083H42V20H24v8h11.303C33.654 32.657 29.332 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z" fill="#FFC107"/><path d="M6.306 14.691l6.571 4.819C14.655 16.108 19.001 13 24 13c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z" fill="#FF3D00"/><path d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0124 36c-5.311 0-9.818-3.398-11.42-8.099l-6.522 5.025C9.505 39.556 16.227 44 24 44z" fill="#4CAF50"/><path d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 01-4.087 5.571l6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z" fill="#1976D2"/></svg>
+              <span id="btn-google-text">Google</span>
+            </button>
+            <button type="button" class="btn-social" id="btn-microsoft" onclick="handleSocialAuth('microsoft')">
+              <svg width="16" height="16" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+              <span id="btn-microsoft-text">Microsoft</span>
+            </button>
+          </div>
+
+          <p class="form-terms" id="form-terms">
+            Al registrarte aceptas los <a href="#" id="terms-link">Términos de uso</a> y la <a href="#" id="privacy-link">Política de privacidad</a>.
+          </p>
+
+        </form>
+      </div>
+
+      <!-- SUCCESS STATE -->
+      <div class="success-state" id="successState">
+        <div class="success-icon">✓</div>
+        <h2 class="success-title" id="success-title">¡Cuenta creada!</h2>
+        <p class="success-desc" id="success-desc">Revisa tu correo para confirmar tu cuenta y empezar a explorar las herramientas.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // ─── i18n ─────────────────────────────────────────────────────────────────
+    const i18n = {
+      co: {
+        lang: 'es', title: 'Crear cuenta · Ricardo Ruiz',
+        navBack: '← Inicio',
+        panelTag: 'Acceso por suscripción',
+        panelHeading: 'Datos que<br/><em>informan</em><br/>decisiones.',
+        panelDesc: 'Crea tu cuenta y accede a herramientas de análisis electoral, datos en tiempo real y reportes exclusivos.',
+        chips: ['Resultados electorales en tiempo real','Histórico · Senado · Cámara · Consultas','Mapas y comparativos históricos','Exportar datos · Alertas personalizadas'],
+        formStep: '01 — Registro',
+        formTitle: 'Crear cuenta',
+        formSubtitle: '¿Ya tienes una cuenta?',
+        loginLink: 'Inicia sesión',
+        labelName: 'Nombre completo', phName: 'María García', errName: 'Ingresa tu nombre completo',
+        labelEmail: 'Correo electrónico', phEmail: 'maria@ejemplo.com', errEmail: 'Ingresa un correo válido',
+        labelCountry: 'País', phCountry: '— Selecciona —', errCountry: 'Selecciona tu país',
+        labelPassword: 'Contraseña', errPassword: 'Mínimo 8 caracteres',
+        labelConfirm: 'Confirmar contraseña', errConfirm: 'Las contraseñas no coinciden',
+        toggleShow: 'Ver', toggleHide: 'Ocultar',
+        strengthLabels: ['', 'Débil', 'Regular', 'Buena', 'Fuerte'],
+        btnSubmit: 'Crear cuenta →',
+        terms: 'Al registrarte aceptas los', termsLink: 'Términos de uso', and: 'y la', privacyLink: 'Política de privacidad',
+        successTitle: '¡Cuenta creada!',
+        successDesc: 'Revisa tu correo para confirmar tu cuenta y empezar a explorar las herramientas.',
+        countryOther: 'Otro / Other',
+        divider: 'o continúa con',
+        socialGoogle: 'Google',
+        socialMicrosoft: 'Microsoft',
+      },
+      us: {
+        lang: 'en', title: 'Create account · Ricardo Ruiz',
+        navBack: '← Home',
+        panelTag: 'Subscription access',
+        panelHeading: 'Data that<br/><em>informs</em><br/>decisions.',
+        panelDesc: 'Create your account and access electoral analysis tools, real-time data, and exclusive reports.',
+        chips: ['Electoral results in real time','Historical · Senate · Chamber · Referenda','Maps and historical comparisons','Export data · Custom alerts'],
+        formStep: '01 — Sign up',
+        formTitle: 'Create account',
+        formSubtitle: 'Already have an account?',
+        loginLink: 'Log in',
+        labelName: 'Full name', phName: 'Jane Smith', errName: 'Enter your full name',
+        labelEmail: 'Email address', phEmail: 'jane@example.com', errEmail: 'Enter a valid email',
+        labelCountry: 'Country', phCountry: '— Select —', errCountry: 'Select your country',
+        labelPassword: 'Password', errPassword: 'Minimum 8 characters',
+        labelConfirm: 'Confirm password', errConfirm: 'Passwords do not match',
+        toggleShow: 'Show', toggleHide: 'Hide',
+        strengthLabels: ['', 'Weak', 'Fair', 'Good', 'Strong'],
+        btnSubmit: 'Create account →',
+        terms: 'By signing up you agree to the', termsLink: 'Terms of use', and: 'and', privacyLink: 'Privacy policy',
+        successTitle: 'Account created!',
+        successDesc: 'Check your email to confirm your account and start exploring the tools.',
+        countryOther: 'Other / Otro',
+        divider: 'or continue with',
+        socialGoogle: 'Google',
+        socialMicrosoft: 'Microsoft',
+      }
+    };
+
+    function setLanguage(lang) {
+      const t = i18n[lang] || i18n.co;
+      document.getElementById('htmlRoot').lang = t.lang;
+      document.getElementById('pageTitle').textContent = t.title;
+      document.getElementById('nav-back').textContent = t.navBack;
+      document.getElementById('panel-tag').textContent = t.panelTag;
+      document.getElementById('panel-heading').innerHTML = t.panelHeading;
+      document.getElementById('panel-desc').textContent = t.panelDesc;
+      ['chip1-text','chip2-text','chip3-text','chip4-text'].forEach((id, i) => {
+        document.getElementById(id).textContent = t.chips[i];
+      });
+      document.getElementById('form-step').textContent = t.formStep;
+      document.getElementById('form-title').textContent = t.formTitle;
+      document.getElementById('form-subtitle').childNodes[0].textContent = t.formSubtitle + ' ';
+      document.getElementById('login-link').textContent = t.loginLink;
+      document.getElementById('label-name').textContent = t.labelName;
+      document.getElementById('fullname').placeholder = t.phName;
+      document.getElementById('err-name').textContent = t.errName;
+      document.getElementById('label-email').textContent = t.labelEmail;
+      document.getElementById('email').placeholder = t.phEmail;
+      document.getElementById('err-email').textContent = t.errEmail;
+      document.getElementById('label-country').textContent = t.labelCountry;
+      document.getElementById('country-placeholder').textContent = t.phCountry;
+      document.getElementById('err-country').textContent = t.errCountry;
+      document.getElementById('country-other').textContent = t.countryOther;
+      document.getElementById('label-password').textContent = t.labelPassword;
+      document.getElementById('err-password').textContent = t.errPassword;
+      document.getElementById('label-confirm').textContent = t.labelConfirm;
+      document.getElementById('err-confirm').textContent = t.errConfirm;
+      document.getElementById('toggle-pw').textContent = t.toggleShow;
+      document.getElementById('toggle-cf').textContent = t.toggleShow;
+      document.getElementById('btn-submit').textContent = t.btnSubmit;
+      document.getElementById('form-terms').innerHTML =
+        `${t.terms} <a href="#" id="terms-link">${t.termsLink}</a> ${t.and} <a href="#" id="privacy-link">${t.privacyLink}</a>.`;
+      document.getElementById('success-title').textContent = t.successTitle;
+      document.getElementById('success-desc').textContent = t.successDesc;
+      document.getElementById('divider-text').textContent = t.divider;
+      document.getElementById('btn-google-text').textContent = t.socialGoogle;
+      document.getElementById('btn-microsoft-text').textContent = t.socialMicrosoft;
+      // reset strength label
+      document.getElementById('strength-label').textContent = '';
+    }
+
+    const currentLang = localStorage.getItem('rr-lang') || 'co';
+    setLanguage(currentLang);
+
+    // ─── PASSWORD VISIBILITY ─────────────────────────────────────────────────
+    function togglePw(inputId, btnId) {
+      const input = document.getElementById(inputId);
+      const btn = document.getElementById(btnId);
+      const t = i18n[currentLang] || i18n.co;
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = t.toggleHide;
+      } else {
+        input.type = 'password';
+        btn.textContent = t.toggleShow;
+      }
+    }
+
+    // ─── PASSWORD STRENGTH ───────────────────────────────────────────────────
+    const colors = ['#1e1e1e', '#ff4757', '#f0c040', '#3d6fff', '#00d68f'];
+    document.getElementById('password').addEventListener('input', function() {
+      const val = this.value;
+      let score = 0;
+      if (val.length >= 8) score++;
+      if (/[A-Z]/.test(val)) score++;
+      if (/[0-9]/.test(val)) score++;
+      if (/[^A-Za-z0-9]/.test(val)) score++;
+      const t = i18n[currentLang] || i18n.co;
+      for (let i = 1; i <= 4; i++) {
+        document.getElementById('s'+i).style.background = i <= score ? colors[score] : '#1e1e1e';
+      }
+      document.getElementById('strength-label').textContent = val.length ? t.strengthLabels[score] : '';
+      document.getElementById('strength-label').style.color = colors[score];
+    });
+
+    // ─── VALIDATION ──────────────────────────────────────────────────────────
+    function validate() {
+      const t = i18n[currentLang] || i18n.co;
+      let ok = true;
+      const name = document.getElementById('fullname');
+      const email = document.getElementById('email');
+      const country = document.getElementById('country');
+      const pw = document.getElementById('password');
+      const cf = document.getElementById('confirm');
+
+      [name, email, pw, cf].forEach(el => el.classList.remove('error'));
+
+      if (!name.value.trim() || name.value.trim().length < 2) {
+        name.classList.add('error'); ok = false;
+      }
+      if (!email.value.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+        email.classList.add('error'); ok = false;
+      }
+      if (!country.value) {
+        document.getElementById('err-country').style.display = 'block'; ok = false;
+      } else {
+        document.getElementById('err-country').style.display = 'none';
+      }
+      if (pw.value.length < 8) {
+        pw.classList.add('error'); ok = false;
+      }
+      if (cf.value !== pw.value || !cf.value) {
+        cf.classList.add('error'); ok = false;
+      }
+      return ok;
+    }
+
+    document.getElementById('registerForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      if (!validate()) return;
+      // ── aquí irá la llamada al Cloudflare Worker ──
+      document.getElementById('formState').style.display = 'none';
+      document.getElementById('successState').style.display = 'block';
+    });
+
+    // ─── SOCIAL AUTH ─────────────────────────────────────────────────────────
+    function handleSocialAuth(provider) {
+      // ── aquí irá la redirección OAuth al Cloudflare Worker ──
+      // Ejemplo: window.location.href = `/auth/${provider}`;
+      console.log(`OAuth flow: ${provider} — pendiente de conectar Worker`);
+    }
+
+    // ─── CURSOR ───────────────────────────────────────────────────────────────
+    const cursor = document.getElementById('cursor');
+    const ring = document.getElementById('cursorRing');
+    let mx=0, my=0, rx=0, ry=0;
+    document.addEventListener('mousemove', e => {
+      mx = e.clientX; my = e.clientY;
+      cursor.style.left = mx+'px'; cursor.style.top = my+'px';
+    });
+    (function ar(){ rx+=(mx-rx)*.12; ry+=(my-ry)*.12; ring.style.left=rx+'px'; ring.style.top=ry+'px'; requestAnimationFrame(ar); })();
+    document.querySelectorAll('a, button').forEach(el => {
+      el.addEventListener('mouseenter', () => { cursor.style.transform='translate(-50%,-50%) scale(2.5)'; cursor.style.background='transparent'; cursor.style.border='1.5px solid var(--blue)'; ring.style.opacity='0'; });
+      el.addEventListener('mouseleave', () => { cursor.style.transform='translate(-50%,-50%) scale(1)'; cursor.style.background='var(--blue)'; cursor.style.border='none'; ring.style.opacity='0.4'; });
+    });
+  </script>
+</body>
+</html>
