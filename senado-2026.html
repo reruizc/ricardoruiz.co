@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Escrutinio Senado 2026 · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --black: #0a0a0a; --white: #f4f3ef; --blue: #0047FF;
+      --green: #4ade80; --purple: #a78bfa;
+      --card-border: rgba(255,255,255,0.1); --border: rgba(255,255,255,0.08);
+      --bar-bg: rgba(255,255,255,0.1); --td-hover: rgba(255,255,255,0.04);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { background: #060810; color: var(--white); font-family: 'Syne', sans-serif; cursor: none; min-height: 100vh; overflow-x: hidden; }
+
+    .cursor { position:fixed; width:10px; height:10px; background:var(--blue); border-radius:50%; pointer-events:none; z-index:9999; transform:translate(-50%,-50%); transition:transform .15s,background .2s; }
+    .cursor-ring { position:fixed; width:32px; height:32px; border:1.5px solid var(--blue); border-radius:50%; pointer-events:none; z-index:9998; transform:translate(-50%,-50%); opacity:.4; }
+    .bg-layer { position:fixed; inset:0; z-index:0; background:url('foto-fondo.webp') center right / cover no-repeat; }
+    .bg-overlay { position:fixed; inset:0; z-index:1; background:linear-gradient(to right,rgba(4,6,16,0.97) 0%,rgba(4,6,16,0.94) 55%,rgba(4,6,16,0.72) 72%,rgba(4,6,16,0.35) 88%,rgba(4,6,16,0.10) 100%); }
+    .shell { position:relative; z-index:2; min-height:100vh; display:flex; flex-direction:column; }
+
+    /* NAV */
+    .electoral-nav { position:relative; z-index:10; display:flex; align-items:center; justify-content:space-between; padding:.9rem 2.5rem; border-bottom:1px solid rgba(255,255,255,0.06); background:rgba(4,6,16,0.6); backdrop-filter:blur(8px); flex-shrink:0; }
+    .electoral-nav-auth { display:flex; align-items:center; gap:.75rem; }
+    .e-btn-login { font-family:'DM Mono',monospace; font-size:.68rem; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,0.45); text-decoration:none; border:1.5px solid transparent; padding:.35rem .8rem; transition:color .2s,border-color .2s; }
+    .e-btn-login:hover { color:var(--white); border-color:rgba(255,255,255,0.2); }
+    .e-btn-register { font-family:'DM Mono',monospace; font-size:.68rem; letter-spacing:.08em; text-transform:uppercase; color:var(--white); text-decoration:none; background:var(--blue); border:1.5px solid var(--blue); padding:.35rem .8rem; }
+    .e-user-name { font-family:'DM Mono',monospace; font-size:.68rem; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,0.7); }
+    .e-user-plan { font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.08em; text-transform:uppercase; color:var(--blue); background:rgba(0,71,255,0.12); padding:.2rem .6rem; }
+    .e-btn-logout { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,0.25); background:none; border:none; cursor:none; padding:0; }
+    .logo-link { display:flex; align-items:center; gap:.55rem; text-decoration:none; opacity:.8; transition:opacity .2s; }
+    .logo-link:hover { opacity:1; }
+    .logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
+    .logo-bar { width:5px; background:var(--blue); border-radius:1px 1px 0 0; opacity:.85; }
+    .logo-text { font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(1.1rem,2vw,1.8rem); letter-spacing:-.03em; color:var(--white); }
+    .logo-text span { color:var(--blue); }
+    @media(max-width:900px) { .electoral-nav { display:none; } }
+
+    /* TOP BAR */
+    .top-bar { display:flex; align-items:flex-start; justify-content:space-between; padding:1.1rem 2.5rem 0; flex-shrink:0; }
+    .page-title { font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(1.5rem,2.8vw,2.5rem); letter-spacing:-0.04em; line-height:1.05; color:var(--white); text-shadow:0 2px 24px rgba(0,71,255,0.4); }
+    .page-title span { color:var(--blue); }
+    .breadcrumb { padding:.6rem 2.5rem 0; font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,0.3); border-bottom:1px solid var(--border); padding-bottom:.7rem; flex-shrink:0; }
+    .breadcrumb a { color:rgba(0,71,255,0.7); text-decoration:none; }
+    .breadcrumb a:hover { color:var(--blue); }
+    .meta-bar { display:flex; gap:1.5rem; align-items:center; flex-wrap:wrap; padding:.5rem 2.5rem; border-bottom:1px solid var(--border); font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.08em; color:rgba(255,255,255,.35); flex-shrink:0; }
+    .meta-item b { color:rgba(74,222,128,0.85); font-weight:700; }
+    .source-badge { margin-left:auto; font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,0.3); background:rgba(255,255,255,.04); border:1px solid var(--border); padding:.3rem .8rem; }
+    .source-badge b { color:var(--blue); }
+
+    /* CONTENT */
+    .content-area { flex:1; padding:1.8rem 2.5rem 1.5rem; }
+
+    /* LOADER */
+    .loader-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1rem; min-height:300px; }
+    .loader-ring { width:40px; height:40px; border:2px solid rgba(0,71,255,.2); border-top-color:var(--blue); border-radius:50%; animation:spin .8s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .loader-label { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.3); }
+    .loader-progress { font-family:'DM Mono',monospace; font-size:.6rem; color:rgba(0,71,255,.6); margin-top:.25rem; }
+
+    /* KPI */
+    .kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.5rem; }
+    .kpi-card { background:rgba(255,255,255,.04); border:1px solid var(--card-border); padding:1.1rem 1.3rem; backdrop-filter:blur(4px); }
+    .kpi-label { font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.35); margin-bottom:.4rem; }
+    .kpi-val { font-family:'Syne',sans-serif; font-weight:800; font-size:1.7rem; letter-spacing:-.04em; line-height:1; color:var(--blue); }
+    .kpi-val.wh { color:var(--white); } .kpi-val.gr { color:var(--green); } .kpi-val.sm { font-size:.95rem; line-height:1.3; }
+    .kpi-delta { font-family:'DM Mono',monospace; font-size:.6rem; color:rgba(255,255,255,.28); margin-top:.3rem; }
+
+    /* ENDOSO CTA */
+    .endoso-cta {
+      display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem;
+      background:rgba(0,71,255,0.07); border:1px solid rgba(0,71,255,0.2);
+      padding:1rem 1.5rem; margin-bottom:1.5rem; backdrop-filter:blur(4px);
+    }
+    .endoso-cta-text { font-family:'DM Mono',monospace; font-size:.68rem; letter-spacing:.08em; color:rgba(255,255,255,.5); line-height:1.6; }
+    .endoso-cta-text b { color:var(--white); }
+    .endoso-btn {
+      display:inline-flex; align-items:center; gap:.6rem;
+      font-family:'DM Mono',monospace; font-size:.72rem; letter-spacing:.12em; text-transform:uppercase;
+      color:var(--white); background:var(--blue); border:none; padding:.6rem 1.4rem;
+      cursor:pointer; text-decoration:none; transition:background .2s; white-space:nowrap; flex-shrink:0;
+    }
+    .endoso-btn:hover { background:#0035cc; }
+
+    /* SUB SELECTOR */
+    .sub-selector { display:flex; gap:.75rem; margin-bottom:1.5rem; flex-wrap:wrap; align-items:center; border-bottom:1px solid var(--border); padding-bottom:1rem; }
+    .sub-label { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.3); margin-right:.25rem; }
+    .dep-select { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.06em; text-transform:uppercase; background:rgba(255,255,255,.05); border:1.5px solid var(--card-border); color:var(--white); padding:.45rem 2rem .45rem .8rem; cursor:pointer; outline:none; transition:border-color .2s; appearance:none; -webkit-appearance:none; background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23aaa' stroke-width='1.5' stroke-linecap='round' fill='none'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right .75rem center; }
+    .dep-select:hover, .dep-select:focus { border-color:var(--blue); }
+    .dep-select option { background:#0e1220; color:var(--white); }
+    .search-input { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.06em; background:rgba(255,255,255,.05); border:1.5px solid var(--card-border); color:var(--white); padding:.45rem .8rem; outline:none; width:200px; transition:border-color .2s; }
+    .search-input:focus { border-color:var(--blue); }
+    .search-input::placeholder { color:rgba(255,255,255,.25); }
+
+    /* GRID */
+    .results-grid { display:grid; grid-template-columns:1fr 300px; gap:1.2rem; }
+    .card { background:rgba(255,255,255,.04); border:1px solid var(--card-border); padding:1.3rem; overflow:hidden; backdrop-filter:blur(4px); }
+    .card-label { font-family:'DM Mono',monospace; font-size:.78rem; letter-spacing:.18em; text-transform:uppercase; color:rgba(255,255,255,.3); margin-bottom:1rem; }
+
+    /* TABLE */
+    .results-table { width:100%; border-collapse:collapse; }
+    .results-table th { font-family:'DM Mono',monospace; font-size:.58rem; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.25); text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--border); white-space:nowrap; }
+    .results-table th.r { text-align:right; }
+    .results-table td { padding:.65rem .6rem; border-bottom:1px solid rgba(255,255,255,.05); font-family:'DM Mono',monospace; font-size:.74rem; color:rgba(255,255,255,.75); vertical-align:middle; }
+    .results-table td.r { text-align:right; }
+    .results-table tr:hover td { background:var(--td-hover); }
+
+    .bar-wrap { width:72px; height:4px; background:var(--bar-bg); border-radius:2px; overflow:hidden; display:inline-block; vertical-align:middle; }
+    .bar-fill { height:100%; background:var(--blue); border-radius:2px; transition:width 1s ease; }
+    .pct-val { font-family:'Syne',sans-serif; font-weight:700; font-size:.8rem; color:var(--white); display:inline-block; width:40px; text-align:right; margin-left:6px; }
+
+    /* CURULES BADGE */
+    .cbadge { display:inline-flex; align-items:center; justify-content:center; background:rgba(0,71,255,.15); color:var(--blue); font-family:'Syne',sans-serif; font-weight:800; font-size:.85rem; min-width:28px; height:24px; padding:0 6px; border:1px solid rgba(0,71,255,.3); }
+    .cbadge.umbral { background:rgba(255,255,255,.04); color:rgba(255,255,255,.2); border-color:rgba(255,255,255,.08); }
+
+    /* CANDIDATE EXPAND */
+    .expand-btn { background:none; border:none; cursor:pointer; font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.08em; color:rgba(0,71,255,.7); display:flex; align-items:center; gap:.35rem; padding:0; transition:color .15s; }
+    .expand-btn:hover { color:var(--blue); }
+    .cands-inner { background:rgba(0,0,0,.2); border-top:1px solid var(--border); border-bottom:2px solid rgba(0,71,255,.2); padding:.5rem 1rem .75rem 2.5rem; display:none; }
+    .cands-inner.open { display:block; }
+    .cands-table { width:100%; border-collapse:collapse; font-size:.78rem; }
+    .cands-table thead th { font-size:.6rem; letter-spacing:.06em; text-transform:uppercase; color:rgba(255,255,255,.25); padding:.4rem .5rem; border-bottom:1px solid var(--border); font-weight:400; }
+    .cands-table tbody tr { border-bottom:1px solid rgba(255,255,255,.05); }
+    .cands-table tbody tr:last-child { border-bottom:none; }
+    .cands-table tbody td { padding:.35rem .5rem; vertical-align:middle; }
+
+    /* DONUT */
+    .donut-wrap { display:flex; flex-direction:column; align-items:center; gap:1rem; }
+    .donut-cw { position:relative; width:150px; height:150px; }
+    .donut-center { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; }
+    .donut-pct { font-family:'Syne',sans-serif; font-weight:800; font-size:1.5rem; letter-spacing:-.04em; color:var(--white); line-height:1; }
+    .donut-sub { font-family:'DM Mono',monospace; font-size:.52rem; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.3); margin-top:2px; }
+    .donut-legend { width:100%; display:flex; flex-direction:column; gap:.55rem; }
+    .li { display:flex; align-items:center; gap:.6rem; font-family:'DM Mono',monospace; font-size:.75rem; color:rgba(255,255,255,.5); }
+    .ld { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+    .lv { margin-left:auto; color:var(--white); font-weight:700; }
+
+    /* UMBRAL INFO */
+    .umbral-bar { margin-top:1rem; padding-top:.8rem; border-top:1px solid var(--border); }
+    .umbral-label { font-family:'DM Mono',monospace; font-size:.58rem; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.25); margin-bottom:.4rem; }
+    .umbral-val { font-family:'DM Mono',monospace; font-size:.72rem; color:var(--blue); }
+
+    /* CANDIDATE SEARCH */
+    #sen-search-results { margin-bottom:1.5rem; }
+
+    /* BACK BAR */
+    .back-bar { flex-shrink:0; padding:.6rem 2.5rem 1rem; display:flex; align-items:center; gap:1rem; }
+    .back-btn { display:inline-flex; align-items:center; gap:.5rem; font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.12em; text-transform:uppercase; color:var(--white); text-decoration:none; cursor:pointer; background:rgba(0,71,255,0.25); border:1px solid rgba(0,71,255,0.5); padding:.3rem .9rem; transition:background .2s; }
+    .back-btn:hover { background:rgba(0,71,255,0.45); }
+    .full-footer { flex-shrink:0; width:100%; border-top:1px solid var(--border); padding:.5rem 2.5rem; display:flex; align-items:center; justify-content:space-between; }
+    .footer-brand { font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.09em; color:rgba(255,255,255,.2); }
+    .footer-brand a { color:rgba(255,255,255,.25); text-decoration:none; }
+    .footer-brand a:hover { color:rgba(255,255,255,.5); }
+
+    /* CURTAIN */
+    .curtain { position:fixed; inset:0; z-index:99999; pointer-events:none; }
+    .curtain-layer { position:absolute; inset:0; background:#04060e; }
+    .curtain-layer:nth-child(1) { clip-path:polygon(0 0,100% 0,100% 22%,0 28%); transform:translateX(-110%); transition:transform .58s cubic-bezier(.75,0,.25,1) 0s; }
+    .curtain-layer:nth-child(2) { clip-path:polygon(0 26%,100% 20%,100% 49%,0 55%); transform:translateX(110%); transition:transform .58s cubic-bezier(.75,0,.25,1) .07s; }
+    .curtain-layer:nth-child(3) { clip-path:polygon(0 53%,100% 47%,100% 76%,0 82%); transform:translateX(-110%); transition:transform .58s cubic-bezier(.75,0,.25,1) .14s; }
+    .curtain-layer:nth-child(4) { clip-path:polygon(0 80%,100% 74%,100% 100%,0 100%); transform:translateX(110%); transition:transform .58s cubic-bezier(.75,0,.25,1) .21s; }
+    .curtain-stage { position:absolute; inset:0; z-index:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.8rem; pointer-events:none; }
+    .curtain-tag { font-family:'DM Mono',monospace; font-size:1.08rem; letter-spacing:.35em; text-transform:uppercase; color:rgba(0,71,255,0.7); opacity:0; transform:translateY(-12px); transition:opacity .4s ease, transform .4s ease; }
+    .curtain-sub { font-family:'DM Mono',monospace; font-size:.975rem; letter-spacing:.22em; color:rgba(255,255,255,.35); text-transform:uppercase; opacity:0; transform:translateY(12px); transition:opacity .4s ease, transform .4s ease; }
+    .curtain-headline { font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(2.6rem,6.5vw,5.85rem); letter-spacing:-.03em; line-height:1.05; text-shadow:0 0 50px rgba(0,71,255,0.5); text-align:center; }
+    .curtain-line { overflow:hidden; display:block; }
+    .curtain-word { display:inline-block; opacity:0; transition:transform .52s cubic-bezier(.25,.46,.45,.94), opacity .45s ease; }
+    .curtain-word.from-left { transform:translateX(-80px); } .curtain-word.from-right { transform:translateX(80px); }
+    .curtain-word.white { color:#f4f3ef; } .curtain-word.blue { color:#0047FF; }
+    .curtain.opening .curtain-layer { transform:translateX(0) !important; transition:none; }
+    .curtain.opening .curtain-word { transform:translateX(0); opacity:1; transition:none; }
+    .curtain.opening .curtain-tag { opacity:1; transform:translateY(0); transition:none; }
+    .curtain.opening .curtain-sub { opacity:1; transform:translateY(0); transition:none; }
+    .curtain.opened .curtain-layer:nth-child(1) { transform:translateX(-110%); }
+    .curtain.opened .curtain-layer:nth-child(2) { transform:translateX(110%); }
+    .curtain.opened .curtain-layer:nth-child(3) { transform:translateX(-110%); }
+    .curtain.opened .curtain-layer:nth-child(4) { transform:translateX(110%); }
+    .curtain.opened .curtain-word { opacity:0; }
+    .curtain.opened .curtain-tag, .curtain.opened .curtain-sub { opacity:0; transition:opacity .25s ease; }
+    .curtain.opened { pointer-events:none; }
+    .curtain.closing { pointer-events:all; }
+    .curtain.closing .curtain-layer { transform:translateX(0) !important; }
+    .curtain.closing .curtain-word.from-left, .curtain.closing .curtain-word.from-right { transform:translateX(0); opacity:1; transition-delay:.62s; }
+    .curtain.closing .curtain-tag { opacity:1; transform:translateY(0); transition-delay:.68s; }
+    .curtain.closing .curtain-sub { opacity:1; transform:translateY(0); transition-delay:.72s; }
+
+    @media(max-width:1000px) { .results-grid { grid-template-columns:1fr; } }
+    @media(max-width:900px) { body { cursor:auto; } .cursor,.cursor-ring { display:none; } .top-bar,.breadcrumb,.meta-bar,.content-area,.full-footer,.back-bar { padding-left:1.2rem; padding-right:1.2rem; } .bg-overlay { background:rgba(4,6,16,0.93); } .kpi-row { grid-template-columns:1fr 1fr; gap:.75rem; } }
+    @media(max-width:600px) { .kpi-row { grid-template-columns:1fr; } .sub-selector { flex-direction:column; align-items:flex-start; } .search-input { width:100%; } }
+    .hidden { display:none !important; }
+  </style>
+</head>
+<body>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+  <div class="bg-layer"></div>
+  <div class="bg-overlay"></div>
+
+  <div class="curtain" id="curtain">
+    <div class="curtain-layer"></div><div class="curtain-layer"></div>
+    <div class="curtain-layer"></div><div class="curtain-layer"></div>
+    <div class="curtain-stage">
+      <span class="curtain-tag">ricardoruiz.co</span>
+      <div class="curtain-headline">
+        <span class="curtain-line"><span class="curtain-word from-left white">Senado</span></span>
+        <span class="curtain-line"><span class="curtain-word from-right blue">Colombia</span></span>
+      </div>
+      <span class="curtain-sub">Escrutinio · 2026</span>
+    </div>
+  </div>
+
+  <div class="shell">
+    <nav class="electoral-nav">
+      <div id="e-nav-auth" class="electoral-nav-auth"></div>
+      <a href="electoral.html" class="logo-link" onclick="navTo(event,'electoral.html')">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </nav>
+
+    <div class="top-bar">
+      <div class="page-title">Senado de<br/><span>la República</span></div>
+    </div>
+    <div class="breadcrumb">
+      <a href="electoral.html" onclick="navTo(event,'electoral.html')">Resultados Electorales</a>
+      &nbsp;/&nbsp; Escrutinio Senado 2026
+    </div>
+    <div class="meta-bar">
+      <span class="meta-item">Elección: <b>Congreso · 16 Mar 2026</b></span>
+      <span class="meta-item">Curules: <b>100</b></span>
+      <span class="meta-item">Filas cargadas: <b id="meta-filas">—</b></span>
+      <div class="source-badge">Fuente: <b>Registraduría · Escrutinio</b></div>
+    </div>
+
+    <div class="content-area">
+
+      <!-- LOADER -->
+      <div id="load-state" class="loader-wrap">
+        <div class="loader-ring"></div>
+        <div class="loader-label">Cargando escrutinio desde S3…</div>
+        <div class="loader-progress" id="load-progress"></div>
+      </div>
+
+      <!-- MAIN (oculto hasta cargar) -->
+      <div id="main-content" class="hidden">
+
+        <!-- ENDOSO CTA -->
+        <div class="endoso-cta">
+          <div class="endoso-cta-text">
+            <b>¿Quieres medir el endoso?</b><br/>
+            Compara la votación de un candidato al Senado con uno de Cámara, calcula la votación mínima en común y aplica filtros de arrastre por mesa.
+          </div>
+          <a href="endoso-2026.html" class="endoso-btn" onclick="navTo(event,'endoso-2026.html')">
+            Calcular endoso →
+          </a>
+        </div>
+
+        <!-- SUB SELECTOR -->
+        <div class="sub-selector">
+          <span class="sub-label">Departamento:</span>
+          <select class="dep-select" id="dep-select" onchange="switchDep(this.value)">
+            <option value="TODOS">Nacional (todos)</option>
+          </select>
+          <span class="sub-label" style="margin-left:1.5rem">Buscar candidato:</span>
+          <input id="sen-search" type="search" class="search-input" placeholder="Nombre o apellido…"
+            oninput="buscarCandidato(this.value)"
+            onfocus="this.style.borderColor='var(--blue)'"
+            onblur="this.style.borderColor='var(--card-border)'" />
+        </div>
+
+        <!-- RESULTADOS BÚSQUEDA -->
+        <div id="sen-search-results" style="display:none"></div>
+
+        <!-- KPIs -->
+        <div class="kpi-row" id="kpi-row"></div>
+
+        <!-- TABLA + DONUT -->
+        <div id="sen-main-grid" class="results-grid">
+          <div class="card">
+            <div class="card-label" id="lbl-tabla">Partidos · Senado · Circunscripción Nacional · 100 curules · D'Hondt</div>
+            <table class="results-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Partido / Coalición</th>
+                  <th class="r">Votos</th>
+                  <th class="r" style="min-width:130px">%</th>
+                  <th class="r">Curules</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-senado"></tbody>
+            </table>
+          </div>
+          <div class="card">
+            <div class="card-label">Distribución de votos</div>
+            <div class="donut-wrap">
+              <div class="donut-cw">
+                <canvas id="donut-senado"></canvas>
+                <div class="donut-center">
+                  <div class="donut-pct" id="pct-senado">—</div>
+                  <div class="donut-sub">válidos</div>
+                </div>
+              </div>
+              <div class="donut-legend" id="leg-senado"></div>
+            </div>
+            <div class="umbral-bar">
+              <div class="umbral-label">Cifra repartidora</div>
+              <div class="umbral-val" id="cifra-rep">—</div>
+              <div class="umbral-label" style="margin-top:.5rem">Umbral 3%</div>
+              <div class="umbral-val" id="umbral-val">—</div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /main-content -->
+    </div><!-- /content-area -->
+
+    <div class="back-bar">
+      <a href="electoral.html" class="back-btn" onclick="navTo(event,'electoral.html')">← Volver a Resultados Electorales</a>
+      <a href="endoso-2026.html" class="endoso-btn" onclick="navTo(event,'endoso-2026.html')" style="margin-left:auto">Calcular endoso →</a>
+    </div>
+  </div>
+
+  <div class="full-footer">
+    <span class="footer-brand">ricardoruiz.co · Elecciones Colombia 2026</span>
+    <span class="footer-brand"><a href="https://registraduria.gov.co" target="_blank">Fuente: Registraduría Nacional</a></span>
+  </div>
+
+  <script>
+    // ─── CONFIG ───────────────────────────────────────────────
+    const CSV_URL  = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/Congreso_2026_MMV170326.csv';
+    const CURULES  = 100;
+    const POTENCIAL = 41370203;
+    const fmt  = n => Number(n).toLocaleString('es-CO');
+    const pct  = (n, t) => t ? ((n/t)*100).toFixed(2) : '0.00';
+
+    // ─── PALETA PARTIDOS ──────────────────────────────────────
+    const CP = {
+      'Pacto Histórico':'#6B2D8B','Centro Democrático':'#0088BB',
+      'Centro Democrático y MIRA':'#0088BB','Partido Liberal Colombiano':'#C8102E',
+      'Partido de la U':'#F7941D','Cambio Radical':'#E91E8C',
+      'Partido Conservador Colombiano':'#003580','Alianza Verde':'#4CAF50',
+      'Partido Alianza por Colombia (Verde)':'#4CAF50',
+      'Movimiento Salvación Nacional':'#00AEEF','MIRA':'#1A3FC4',
+      'Frente Amplio Unitario':'#F7941D','Nuevo Liberalismo':'#E53935',
+      'Comunes':'#007755','Voto en blanco':'#555',
+    };
+    function getColor(n){
+      if(CP[n]) return CP[n];
+      if(/pacto hist/i.test(n)) return '#6B2D8B';
+      if(/centro dem/i.test(n)) return '#0088BB';
+      if(/liberal/i.test(n)) return '#C8102E';
+      if(/conservador/i.test(n)) return '#003580';
+      if(/cambio radical/i.test(n)) return '#E91E8C';
+      if(/partido de la u|uni[oó]n/i.test(n)) return '#F7941D';
+      if(/alianza verde|oxígeno/i.test(n)) return '#4CAF50';
+      if(/salvaci[oó]n/i.test(n)) return '#00AEEF';
+      if(/\bMIRA\b/i.test(n)) return '#1A3FC4';
+      if(/comunes/i.test(n)) return '#007755';
+      if(/nuevo liberalismo/i.test(n)) return '#E53935';
+      return '#555';
+    }
+
+    // ─── STATE ────────────────────────────────────────────────
+    let rawRows = [];
+    // Aggregated: { partido, votos, candidatos:[{nombre,votos}] }
+    let partidosNac = [];
+    let totNac = { votval:0, votnul:0, votnma:0, votblan:0, votant:0 };
+    let depList = [];
+    let curDep = 'TODOS';
+    let donutChart = null;
+
+    // ─── D'HONDT ──────────────────────────────────────────────
+    function dhondt(partidos, curules, votval) {
+      const base = votval || partidos.reduce((s,p)=>s+p.votos,0);
+      const umb = base * 0.03;
+      const eleg = partidos.filter(p => p.votos >= umb && !/blanco/i.test(p.partido));
+      const c = {}; eleg.forEach(p=>c[p.partido]=0);
+      let cifra = 0;
+      for(let i=0;i<curules;i++){
+        let mx=-1, win=null;
+        eleg.forEach(p=>{ const v=p.votos/(c[p.partido]+1); if(v>mx){mx=v;win=p.partido;} });
+        if(win){ c[win]++; cifra=mx; }
+      }
+      c.__cifra__ = Math.round(cifra);
+      c.__umb__   = Math.round(umb);
+      return c;
+    }
+
+    // ─── LOAD CSV ─────────────────────────────────────────────
+    async function loadData() {
+      document.getElementById('load-progress').textContent = 'Conectando con S3…';
+      try {
+        await new Promise((resolve, reject) => {
+          Papa.parse(CSV_URL, {
+            download: true, header: true, skipEmptyLines: true,
+            complete(results) { rawRows = results.data; resolve(); },
+            error(err) { reject(err); }
+          });
+        });
+
+        // Filter SENADO only
+        const senadoRows = rawRows.filter(r => (r.corporacionNombre||'').trim().toUpperCase() === 'SENADO');
+        document.getElementById('meta-filas').textContent = fmt(senadoRows.length);
+
+        // Build aggregations
+        buildNacional(senadoRows);
+        buildDepList(senadoRows);
+        populateDepSelect();
+
+        document.getElementById('load-state').classList.add('hidden');
+        document.getElementById('main-content').classList.remove('hidden');
+        renderAll('TODOS', senadoRows);
+
+      } catch(e) {
+        document.getElementById('load-state').innerHTML = `
+          <div style="font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,100,100,.8);text-align:center;line-height:1.8">
+            Error al cargar el CSV desde S3.<br/>
+            <span style="color:rgba(255,255,255,.3);font-size:.6rem">${e.message}</span><br/>
+            <span style="color:rgba(255,255,255,.2);font-size:.58rem">Verifica CORS y acceso público en el bucket S3.</span>
+          </div>`;
+      }
+    }
+
+    // Aggregate nationwide (all SENADO rows)
+    function buildNacional(rows) {
+      const parMap = {};
+      let votval=0, votnul=0, votnma=0, votblan=0;
+
+      rows.forEach(r => {
+        const nomCand = (r.candidatoNombre||'').trim();
+        const nomPart = (r.partidoNombre||'').trim() || 'Sin partido';
+        const votos   = parseInt(r.totalVotos)||0;
+
+        // Totals from special rows
+        if (/votos nulos/i.test(nomCand))     { votnul += votos; return; }
+        if (/no marcados/i.test(nomCand))     { votnma += votos; return; }
+        if (/en blanco/i.test(nomCand))       { votblan += votos; return; }
+        if (/candidatos totales/i.test(nomCand)) { votval += votos; return; }
+
+        if (!nomCand) return;
+
+        if (!parMap[nomPart]) parMap[nomPart] = { partido:nomPart, votos:0, candidatos:{} };
+        parMap[nomPart].votos += votos;
+        if (!parMap[nomPart].candidatos[nomCand]) parMap[nomPart].candidatos[nomCand] = 0;
+        parMap[nomPart].candidatos[nomCand] += votos;
+      });
+
+      partidosNac = Object.values(parMap)
+        .map(p => ({ ...p, candidatos: Object.entries(p.candidatos).map(([n,v])=>({nombre:n,votos:v})).sort((a,b)=>b.votos-a.votos) }))
+        .sort((a,b)=>b.votos-a.votos);
+
+      // If totals not in special rows, derive from candidates
+      if (!votval) votval = partidosNac.reduce((s,p)=>s+p.votos,0);
+      const votant = votval + votnul + votnma + votblan;
+      totNac = { votval, votnul, votnma, votblan, votant };
+    }
+
+    function buildDepList(rows) {
+      const deps = new Set();
+      rows.forEach(r => { if(r.departamentoNombre) deps.add(r.departamentoNombre.trim()); });
+      depList = [...deps].sort((a,b)=>a.localeCompare(b,'es'));
+    }
+
+    function populateDepSelect() {
+      const sel = document.getElementById('dep-select');
+      depList.forEach(d => {
+        const o = document.createElement('option');
+        o.value = d; o.textContent = d;
+        sel.appendChild(o);
+      });
+    }
+
+    // ─── RENDER ALL ───────────────────────────────────────────
+    function renderAll(dep, rows) {
+      const senadoRows = rows || rawRows.filter(r=>(r.corporacionNombre||'').trim().toUpperCase()==='SENADO');
+      const filteredRows = dep === 'TODOS' ? senadoRows : senadoRows.filter(r=>(r.departamentoNombre||'').trim()===dep);
+
+      // Build partidos for this view
+      const parMap = {};
+      filteredRows.forEach(r => {
+        const nomCand = (r.candidatoNombre||'').trim();
+        const nomPart = (r.partidoNombre||'').trim() || 'Sin partido';
+        const votos   = parseInt(r.totalVotos)||0;
+        if (/votos nulos|no marcados|en blanco|candidatos totales/i.test(nomCand)) return;
+        if (!nomCand) return;
+        if (!parMap[nomPart]) parMap[nomPart] = { partido:nomPart, votos:0, candidatos:{} };
+        parMap[nomPart].votos += votos;
+        if (!parMap[nomPart].candidatos[nomCand]) parMap[nomPart].candidatos[nomCand] = 0;
+        parMap[nomPart].candidatos[nomCand] += votos;
+      });
+      const partidos = Object.values(parMap)
+        .map(p => ({ ...p, candidatos: Object.entries(p.candidatos).map(([n,v])=>({nombre:n,votos:v})).sort((a,b)=>b.votos-a.votos) }))
+        .sort((a,b)=>b.votos-a.votos);
+
+      // Totals
+      let votval=0, votnul=0, votnma=0, votblan=0;
+      filteredRows.forEach(r => {
+        const nom = (r.candidatoNombre||'').trim();
+        const v   = parseInt(r.totalVotos)||0;
+        if (/votos nulos/i.test(nom))          votnul  += v;
+        else if (/no marcados/i.test(nom))     votnma  += v;
+        else if (/en blanco/i.test(nom))       votblan += v;
+        else if (/candidatos totales/i.test(nom)) votval += v;
+      });
+      if (!votval) votval = partidos.reduce((s,p)=>s+p.votos,0);
+      const votant = votval + votnul + votnma + votblan;
+      const tot = { votval, votnul, votnma, votblan, votant };
+
+      const cur = dhondt(dep==='TODOS' ? partidosNac : partidos, CURULES, dep==='TODOS' ? totNac.votval : votval);
+      const topP = partidos.filter(p=>!/blanco/i.test(p.partido)).sort((a,b)=>b.votos-a.votos)[0];
+
+      renderKPI(dep, tot, cur, topP);
+      renderTabla(partidos, cur, dep==='TODOS' ? totNac.votval : votval, dep);
+      renderDonut(dep==='TODOS' ? totNac : tot);
+      document.getElementById('cifra-rep').textContent = fmt(cur.__cifra__);
+      document.getElementById('umbral-val').textContent = fmt(cur.__umb__);
+      document.getElementById('lbl-tabla').textContent = dep==='TODOS'
+        ? `Partidos · Senado · Circunscripción Nacional · ${CURULES} curules · D'Hondt`
+        : `Partidos · Senado · ${dep} · curules nacionales (D'Hondt)`;
+    }
+
+    function switchDep(dep) {
+      curDep = dep;
+      document.getElementById('sen-search').value = '';
+      buscarCandidato('');
+      const senadoRows = rawRows.filter(r=>(r.corporacionNombre||'').trim().toUpperCase()==='SENADO');
+      renderAll(dep, senadoRows);
+    }
+
+    // ─── RENDER KPI ───────────────────────────────────────────
+    function renderKPI(dep, tot, cur, topP) {
+      const isNac = dep === 'TODOS';
+      const totalCurules = Object.entries(cur).filter(([k])=>k!=='__cifra__'&&k!=='__umb__').reduce((s,[,v])=>s+v,0);
+      document.getElementById('kpi-row').innerHTML = `
+        <div class="kpi-card">
+          <div class="kpi-label">Votos válidos</div>
+          <div class="kpi-val gr">${fmt(isNac ? totNac.votval : tot.votval)}</div>
+          <div class="kpi-delta">${pct(isNac?totNac.votval:tot.votval, isNac?totNac.votant:tot.votant)}% de los votantes</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Votantes</div>
+          <div class="kpi-val wh">${fmt(isNac ? totNac.votant : tot.votant)}</div>
+          <div class="kpi-delta">${isNac ? pct(totNac.votant, POTENCIAL)+'% del potencial electoral' : dep}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Curules asignadas</div>
+          <div class="kpi-val">${totalCurules} / ${CURULES}</div>
+          <div class="kpi-delta">Método D'Hondt · umbral 3%</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Partido puntero</div>
+          <div class="kpi-val sm">${topP ? topP.partido.split(' ').slice(0,3).join(' ') : '—'}</div>
+          <div class="kpi-delta">${topP ? fmt(topP.votos)+' votos' : ''}</div>
+        </div>`;
+    }
+
+    // ─── RENDER TABLA ─────────────────────────────────────────
+    function renderTabla(partidos, cur, votval, dep) {
+      const tbody = document.getElementById('tbody-senado');
+      tbody.innerHTML = '';
+      const maxV = partidos[0]?.votos || 1;
+
+      partidos.forEach((p, i) => {
+        const curules = cur[p.partido] || 0;
+        const pasaUmbral = p.votos >= cur.__umb__;
+        const pctV = votval ? ((p.votos/votval)*100).toFixed(2) : '0.00';
+        const bw   = ((p.votos/maxV)*100).toFixed(1);
+        const color = getColor(p.partido);
+        const curulesCell = curules > 0
+          ? `<span class="cbadge">${curules}</span>`
+          : pasaUmbral
+            ? `<span class="cbadge">0</span>`
+            : `<span class="cbadge umbral">—</span>`;
+
+        const trId = `tr-${i}`;
+        const tr = document.createElement('tr');
+        tr.id = trId;
+        tr.innerHTML = `
+          <td style="color:rgba(255,255,255,.3)">${i+1}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:.6rem">
+              <span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span>
+              <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span>
+            </div>
+            <div style="margin-top:.35rem">
+              <button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}">
+                <span id="expand-icon-${i}">▸</span> ${p.candidatos.length} candidatos
+              </button>
+            </div>
+          </td>
+          <td class="r" style="font-size:.9rem;font-weight:700">${fmt(p.votos)}</td>
+          <td class="r">
+            <span class="pct-val">${pctV}%</span>
+            <div class="bar-wrap" style="vertical-align:middle">
+              <div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div>
+            </div>
+          </td>
+          <td class="r">${curulesCell}</td>`;
+        tbody.appendChild(tr);
+
+        // Candidates expandable row
+        const trC = document.createElement('tr');
+        trC.id = `cands-row-${i}`;
+        trC.innerHTML = `<td colspan="5" style="padding:0">
+          <div class="cands-inner" id="cands-inner-${i}">
+            <table class="cands-table">
+              <thead><tr><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% del partido</th></tr></thead>
+              <tbody>
+                ${p.candidatos.slice(0,50).map((c,j) => `
+                  <tr>
+                    <td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td>
+                    <td style="font-family:'Syne',sans-serif;font-weight:${j<curules?700:400};color:${j<curules?'#39ff7a':'inherit'}">${c.nombre}${j<curules?'<span style="font-size:.6rem;margin-left:.4rem;opacity:.85">✦</span>':''}</td>
+                    <td class="r">${fmt(c.votos)}</td>
+                    <td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </td>`;
+        tbody.appendChild(trC);
+      });
+
+      // Animate bars
+      setTimeout(() => tbody.querySelectorAll('.bar-fill[data-w]').forEach(b => b.style.width = b.dataset.w+'%'), 100);
+    }
+
+    function toggleCands(i) {
+      const inner = document.getElementById(`cands-inner-${i}`);
+      const icon  = document.getElementById(`expand-icon-${i}`);
+      const open  = inner.classList.toggle('open');
+      icon.textContent = open ? '▾' : '▸';
+    }
+
+    // ─── RENDER DONUT ─────────────────────────────────────────
+    function renderDonut(tot) {
+      const { votval=0, votnul=0, votnma=0, votblan=0, votant=0 } = tot;
+      const pctVal = votant ? ((votval/votant)*100).toFixed(1) : '0.0';
+      document.getElementById('pct-senado').textContent = pctVal + '%';
+      if (donutChart) donutChart.destroy();
+      const ctx = document.getElementById('donut-senado').getContext('2d');
+      donutChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Votos válidos','Nulos','No marcados','En blanco'],
+          datasets: [{
+            data: [votval, votnul, votnma, votblan],
+            backgroundColor: ['#0047FF','#cc2233','#f0a500','#555'],
+            borderWidth: 0, hoverOffset: 6
+          }]
+        },
+        options: { responsive:true, maintainAspectRatio:true, cutout:'72%', plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}} } }
+      });
+      document.getElementById('leg-senado').innerHTML = [
+        ['Votos válidos', votval, '#0047FF'],
+        ['Nulos',         votnul, '#cc2233'],
+        ['No marcados',   votnma, '#f0a500'],
+        ['En blanco',     votblan,'#555'],
+      ].map(([l,v,c])=>`<div class="li"><span class="ld" style="background:${c}"></span><span>${l}</span><span class="lv">${fmt(v)}</span></div>`).join('');
+    }
+
+    // ─── BUSCAR CANDIDATO ─────────────────────────────────────
+    function buscarCandidato(q) {
+      const box = document.getElementById('sen-search-results');
+      const mainGrid = document.getElementById('sen-main-grid');
+      const kpiRow = document.getElementById('kpi-row');
+      q = q.trim();
+      if (!q) {
+        box.style.display='none'; box.innerHTML='';
+        if(mainGrid) mainGrid.style.display='';
+        if(kpiRow) kpiRow.style.display='';
+        return;
+      }
+      if(mainGrid) mainGrid.style.display='none';
+      if(kpiRow) kpiRow.style.display='none';
+      box.style.display='block';
+
+      const norm = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+      const qn = norm(q);
+      const cur = dhondt(partidosNac, CURULES, totNac.votval);
+      const resultados = [];
+      partidosNac.forEach(p => {
+        p.candidatos.forEach((c,idx) => {
+          if (!norm(c.nombre).includes(qn)) return;
+          resultados.push({ nombre:c.nombre, partido:p.partido, votos:c.votos, pos:idx+1, elegido:idx<(cur[p.partido]||0) });
+        });
+      });
+      resultados.sort((a,b)=>b.votos-a.votos);
+
+      if (!resultados.length) {
+        box.innerHTML = `<div style="padding:2rem;font-family:'DM Mono',monospace;font-size:.72rem;color:rgba(255,255,255,.3);text-align:center">No se encontraron candidatos con "<b>${q}</b>"</div>`;
+        return;
+      }
+      const VERDE = '#39ff7a';
+      box.innerHTML = `
+        <div style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;color:rgba(255,255,255,.3);text-transform:uppercase;padding:.75rem 0 .5rem">
+          ${resultados.length} resultado${resultados.length!==1?'s':''} para "${q}"
+        </div>
+        <table class="results-table" style="width:100%">
+          <thead><tr><th>#</th><th>Candidato/a</th><th>Partido</th><th class="r">Pos. lista</th><th class="r">Votos</th><th class="r">Estado</th></tr></thead>
+          <tbody>
+            ${resultados.map((r,i) => `<tr>
+              <td style="color:rgba(255,255,255,.25)">${String(i+1).padStart(2,'0')}</td>
+              <td style="font-family:'Syne',sans-serif;font-weight:${r.elegido?700:400};color:${r.elegido?VERDE:'inherit'}">${r.nombre}${r.elegido?'<span style="font-size:.6rem;margin-left:.4rem">✦</span>':''}</td>
+              <td style="color:rgba(255,255,255,.45)">${r.partido}</td>
+              <td class="r" style="color:rgba(255,255,255,.3)">#${r.pos}</td>
+              <td class="r">${fmt(r.votos)}</td>
+              <td class="r"><span style="font-family:'DM Mono',monospace;font-size:.75rem;font-weight:700;padding:.2rem .6rem;background:${r.elegido?'rgba(57,255,122,.1)':'rgba(255,255,255,.04)'};color:${r.elegido?VERDE:'rgba(255,255,255,.25)'};border:1px solid ${r.elegido?'rgba(57,255,122,.35)':'rgba(255,255,255,.08)'}">${r.elegido?'ELEGIDO':'—'}</span></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>`;
+    }
+
+    // ─── CURTAIN ──────────────────────────────────────────────
+    const curtain = document.getElementById('curtain');
+    curtain.classList.add('opening');
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      setTimeout(()=>{ curtain.classList.remove('opening'); curtain.classList.add('opened'); }, 900);
+    }));
+    function navTo(e, href) {
+      e.preventDefault();
+      curtain.classList.remove('opened');
+      curtain.classList.add('closing');
+      setTimeout(()=>{ window.location.href=href; }, 1150);
+    }
+
+    // ─── CURSOR ───────────────────────────────────────────────
+    const cur2=document.getElementById('cursor'), ri=document.getElementById('cursorRing');
+    let mx=0,my=0,rx=0,ry=0;
+    document.addEventListener('mousemove',e=>{ mx=e.clientX; my=e.clientY; cur2.style.left=mx+'px'; cur2.style.top=my+'px'; });
+    (function loop(){ rx+=(mx-rx)*.12; ry+=(my-ry)*.12; ri.style.left=rx+'px'; ri.style.top=ry+'px'; requestAnimationFrame(loop); })();
+    document.addEventListener('mouseover',e=>{
+      if(e.target.closest('a,button,select,input')){ cur2.style.transform='translate(-50%,-50%) scale(2.5)'; cur2.style.background='transparent'; cur2.style.border='1.5px solid var(--blue)'; ri.style.opacity='0'; }
+      else { cur2.style.transform='translate(-50%,-50%) scale(1)'; cur2.style.background='var(--blue)'; cur2.style.border='none'; ri.style.opacity='.4'; }
+    });
+
+    // ─── NAV AUTH ─────────────────────────────────────────────
+    function updateElectoralNav() {
+      const token = localStorage.getItem('rr-token');
+      const user  = JSON.parse(localStorage.getItem('rr-user') || 'null');
+      const area  = document.getElementById('e-nav-auth');
+      if (!area) return;
+      if (token && user) {
+        const planLabels = { free:'Free', basic:'Básico', analysis:'Análisis', full:'Completo' };
+        area.innerHTML = `
+          <span class="e-user-plan">${planLabels[user.plan]||user.plan}</span>
+          <span class="e-user-name">${user.name.split(' ')[0]}</span>
+          <button class="e-btn-logout" onclick="eLogOut()">Salir</button>`;
+      } else {
+        area.innerHTML = `
+          <a href="pricing.html" style="font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,0.35);text-decoration:none;">Planes</a>
+          <a href="login.html" class="e-btn-login">Iniciar sesión</a>
+          <a href="register.html" class="e-btn-register">Registrarse</a>`;
+      }
+    }
+    async function eLogOut() {
+      const token = localStorage.getItem('rr-token');
+      if (token) { try { await fetch('https://rr-auth.reruizc.workers.dev/auth/logout', { method:'POST', headers:{ 'Authorization':`Bearer ${token}` } }); } catch {} }
+      localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user');
+      updateElectoralNav();
+    }
+    updateElectoralNav();
+
+    // ─── BOOT ─────────────────────────────────────────────────
+    loadData();
+  </script>
+</body>
+</html>
