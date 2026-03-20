@@ -7,196 +7,180 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <style>
-    :root {
-      --black: #0a0a0a; --white: #f4f3ef; --blue: #0047FF;
-      --green: #4ade80; --purple: #a78bfa; --orange: #fb923c;
-      --card-border: rgba(255,255,255,0.1); --border: rgba(255,255,255,0.08); --bar-bg: rgba(255,255,255,0.1);
-    }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
-    body { background: #060810; color: var(--white); font-family: 'Syne', sans-serif; cursor: none; min-height: 100vh; overflow-x: hidden; }
-    .cursor { position:fixed; width:10px; height:10px; background:var(--blue); border-radius:50%; pointer-events:none; z-index:9999; transform:translate(-50%,-50%); transition:transform .15s,background .2s; }
-    .cursor-ring { position:fixed; width:32px; height:32px; border:1.5px solid var(--blue); border-radius:50%; pointer-events:none; z-index:9998; transform:translate(-50%,-50%); opacity:.4; }
-    .bg-layer { position:fixed; inset:0; z-index:0; background:url('foto-fondo.webp') center right / cover no-repeat; }
-    .bg-overlay { position:fixed; inset:0; z-index:1; background:linear-gradient(to right,rgba(4,6,16,0.97) 0%,rgba(4,6,16,0.94) 55%,rgba(4,6,16,0.72) 72%,rgba(4,6,16,0.35) 88%,rgba(4,6,16,0.10) 100%); }
-    .shell { position:relative; z-index:2; min-height:100vh; display:flex; flex-direction:column; }
+    :root{--white:#f4f3ef;--blue:#0047FF;--green:#4ade80;--purple:#a78bfa;--orange:#fb923c;--card-border:rgba(255,255,255,0.1);--border:rgba(255,255,255,0.08);--bar-bg:rgba(255,255,255,0.1)}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{background:#060810;color:var(--white);font-family:'Syne',sans-serif;cursor:none;min-height:100vh;overflow-x:hidden}
+    .cursor{position:fixed;width:10px;height:10px;background:var(--blue);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);transition:transform .15s,background .2s}
+    .cursor-ring{position:fixed;width:32px;height:32px;border:1.5px solid var(--blue);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);opacity:.4}
+    .bg-layer{position:fixed;inset:0;z-index:0;background:url('foto-fondo.webp') center right/cover no-repeat}
+    .bg-overlay{position:fixed;inset:0;z-index:1;background:linear-gradient(to right,rgba(4,6,16,.97) 0%,rgba(4,6,16,.94) 55%,rgba(4,6,16,.72) 72%,rgba(4,6,16,.35) 88%,rgba(4,6,16,.10) 100%)}
+    .shell{position:relative;z-index:2;min-height:100vh;display:flex;flex-direction:column}
 
-    /* NAV */
-    .electoral-nav { position:relative; z-index:10; display:flex; align-items:center; justify-content:space-between; padding:.9rem 2.5rem; border-bottom:1px solid rgba(255,255,255,0.06); background:rgba(4,6,16,0.6); backdrop-filter:blur(8px); flex-shrink:0; }
-    .electoral-nav-auth { display:flex; align-items:center; gap:.75rem; }
-    .e-btn-login { font-family:'DM Mono',monospace; font-size:.68rem; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,0.45); text-decoration:none; border:1.5px solid transparent; padding:.35rem .8rem; transition:color .2s,border-color .2s; }
-    .e-btn-login:hover { color:var(--white); border-color:rgba(255,255,255,0.2); }
-    .e-btn-register { font-family:'DM Mono',monospace; font-size:.68rem; letter-spacing:.08em; text-transform:uppercase; color:var(--white); text-decoration:none; background:var(--blue); border:1.5px solid var(--blue); padding:.35rem .8rem; }
-    .logo-link { display:flex; align-items:center; gap:.55rem; text-decoration:none; opacity:.8; transition:opacity .2s; }
-    .logo-link:hover { opacity:1; }
-    .logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
-    .logo-bar { width:5px; background:var(--blue); border-radius:1px 1px 0 0; }
-    .logo-text { font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(1.1rem,2vw,1.8rem); letter-spacing:-.03em; color:var(--white); }
-    .logo-text span { color:var(--blue); }
-    @media(max-width:900px) { .electoral-nav { display:none; } }
+    .electoral-nav{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(4,6,16,.6);backdrop-filter:blur(8px);flex-shrink:0}
+    .electoral-nav-auth{display:flex;align-items:center;gap:.75rem}
+    .e-btn-login{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.45);text-decoration:none;border:1.5px solid transparent;padding:.35rem .8rem;transition:color .2s,border-color .2s}
+    .e-btn-login:hover{color:var(--white);border-color:rgba(255,255,255,.2)}
+    .e-btn-register{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-decoration:none;background:var(--blue);border:1.5px solid var(--blue);padding:.35rem .8rem}
+    .e-user-name{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.7)}
+    .e-user-plan{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue);background:rgba(0,71,255,.12);padding:.2rem .6rem}
+    .e-btn-logout{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.25);background:none;border:none;cursor:none;padding:0}
+    .logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.8;transition:opacity .2s}
+    .logo-link:hover{opacity:1}
+    .logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px}
+    .logo-bar{width:5px;background:var(--blue);border-radius:1px 1px 0 0}
+    .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.1rem,2vw,1.8rem);letter-spacing:-.03em;color:var(--white)}
+    .logo-text span{color:var(--blue)}
+    @media(max-width:900px){.electoral-nav{display:none}}
 
-    /* HEADER */
-    .top-bar { display:flex; align-items:flex-start; justify-content:space-between; padding:1.1rem 2.5rem 0; flex-shrink:0; }
-    .page-title { font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(1.5rem,2.8vw,2.5rem); letter-spacing:-0.04em; line-height:1.05; color:var(--white); text-shadow:0 2px 24px rgba(0,71,255,0.4); }
-    .page-title span { color:var(--blue); }
-    .breadcrumb { padding:.6rem 2.5rem 0; font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,0.3); border-bottom:1px solid var(--border); padding-bottom:.7rem; flex-shrink:0; }
-    .breadcrumb a { color:rgba(0,71,255,0.7); text-decoration:none; }
-    .meta-bar { display:flex; gap:1.5rem; align-items:center; flex-wrap:wrap; padding:.5rem 2.5rem; border-bottom:1px solid var(--border); font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.08em; color:rgba(255,255,255,.35); flex-shrink:0; }
-    .meta-item b { color:rgba(74,222,128,0.85); font-weight:700; }
-    .source-badge { margin-left:auto; font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,0.3); background:rgba(255,255,255,.04); border:1px solid var(--border); padding:.3rem .8rem; }
-    .source-badge b { color:var(--blue); }
+    .top-bar{display:flex;align-items:flex-start;justify-content:space-between;padding:1.1rem 2.5rem 0;flex-shrink:0}
+    .page-title{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.5rem,2.8vw,2.5rem);letter-spacing:-.04em;line-height:1.05;color:var(--white);text-shadow:0 2px 24px rgba(0,71,255,.4)}
+    .page-title span{color:var(--blue)}
+    .breadcrumb{padding:.6rem 2.5rem 0;font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3);border-bottom:1px solid var(--border);padding-bottom:.7rem;flex-shrink:0}
+    .breadcrumb a{color:rgba(0,71,255,.7);text-decoration:none}
+    .meta-bar{display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap;padding:.5rem 2.5rem;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.08em;color:rgba(255,255,255,.35);flex-shrink:0}
+    .meta-item b{color:rgba(74,222,128,.85);font-weight:700}
+    .source-badge{margin-left:auto;font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:.3rem .8rem}
+    .source-badge b{color:var(--blue)}
 
-    /* CONTENT */
-    .content-area { flex:1; padding:1.8rem 2.5rem 1.5rem; }
-    .loader-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1rem; min-height:300px; }
-    .loader-ring { width:40px; height:40px; border:2px solid rgba(0,71,255,.2); border-top-color:var(--blue); border-radius:50%; animation:spin .8s linear infinite; }
-    @keyframes spin { to { transform:rotate(360deg); } }
-    .loader-label { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.3); }
-    .loader-progress { font-family:'DM Mono',monospace; font-size:.6rem; color:rgba(0,71,255,.6); margin-top:.25rem; }
+    .content-area{flex:1;padding:1.8rem 2.5rem 1.5rem}
+    .loader-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;min-height:300px}
+    .loader-ring{width:40px;height:40px;border:2px solid rgba(0,71,255,.2);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .loader-label{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3)}
+    .loader-progress{font-family:'DM Mono',monospace;font-size:.6rem;color:rgba(0,71,255,.6);margin-top:.25rem}
 
-    /* SELECTOR PANEL */
-    .selector-panel { background:rgba(255,255,255,.04); border:1px solid var(--card-border); padding:1.4rem 1.5rem; margin-bottom:1.5rem; backdrop-filter:blur(4px); }
-    .selector-title { font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.2em; text-transform:uppercase; color:rgba(255,255,255,.35); margin-bottom:1.1rem; }
-    .selector-grid { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:1rem; }
-    .selector-group { display:flex; flex-direction:column; gap:.45rem; }
-    .selector-label { font-family:'DM Mono',monospace; font-size:.58rem; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.3); }
-    .selector-label .cand-badge { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; }
-    .sel-select { background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); color:var(--white); font-family:'DM Mono',monospace; font-size:.72rem; padding:.45rem .7rem; width:100%; appearance:none; -webkit-appearance:none; cursor:pointer; transition:border-color .2s,background .2s; }
-    .sel-select:focus { outline:none; border-color:rgba(0,71,255,.5); background:rgba(0,71,255,.06); }
-    .sel-select option { background:#08090f; color:var(--white); }
-    .sel-select:disabled { opacity:.3; cursor:not-allowed; }
-    .selector-sep { display:flex; align-items:center; justify-content:center; padding-top:1.4rem; font-family:'DM Mono',monospace; font-size:.75rem; color:rgba(255,255,255,.2); }
-    .run-btn { margin-top:1.1rem; display:inline-flex; align-items:center; gap:.6rem; font-family:'DM Mono',monospace; font-size:.72rem; letter-spacing:.12em; text-transform:uppercase; color:var(--white); background:var(--blue); border:none; padding:.55rem 1.4rem; cursor:pointer; transition:background .2s; }
-    .run-btn:hover { background:#0035cc; }
-    .run-btn:disabled { opacity:.35; cursor:not-allowed; }
+    /* SELECTOR */
+    .selector-panel{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1.4rem 1.5rem;margin-bottom:1.5rem;backdrop-filter:blur(4px)}
+    .selector-title{font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:1.1rem}
+    .selector-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:1rem}
+    .selector-group{display:flex;flex-direction:column;gap:.45rem}
+    .selector-label{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3)}
+    .selector-label .cand-badge{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
+    .sel-select{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:var(--white);font-family:'DM Mono',monospace;font-size:.72rem;padding:.45rem .7rem;width:100%;appearance:none;-webkit-appearance:none;cursor:pointer;transition:border-color .2s,background .2s}
+    .sel-select:focus{outline:none;border-color:rgba(0,71,255,.5);background:rgba(0,71,255,.06)}
+    .sel-select option{background:#08090f;color:var(--white)}
+    .sel-select:disabled{opacity:.3;cursor:not-allowed}
+    .selector-sep{display:flex;align-items:center;justify-content:center;padding-top:1.4rem;font-family:'DM Mono',monospace;font-size:.75rem;color:rgba(255,255,255,.2)}
+    .run-btn{margin-top:1.1rem;display:inline-flex;align-items:center;gap:.6rem;font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--white);background:var(--blue);border:none;padding:.55rem 1.4rem;cursor:pointer;transition:background .2s}
+    .run-btn:hover{background:#0035cc}
+    .run-btn:disabled{opacity:.35;cursor:not-allowed}
+    .corp-hint{font-family:'DM Mono',monospace;font-size:.58rem;color:rgba(255,255,255,.2);margin-top:.2rem;min-height:.9rem}
 
-    /* OPTIONAL FILTER C/D */
-    .optional-block { margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border); }
-    .optional-toggle { display:flex; align-items:center; gap:.75rem; cursor:pointer; user-select:none; }
-    .toggle-switch { position:relative; width:34px; height:18px; flex-shrink:0; }
-    .toggle-switch input { opacity:0; width:0; height:0; position:absolute; }
-    .toggle-track { position:absolute; inset:0; background:rgba(255,255,255,.12); border-radius:9px; transition:background .2s; }
-    .toggle-knob { position:absolute; top:2px; left:2px; width:14px; height:14px; background:rgba(255,255,255,.4); border-radius:50%; transition:transform .2s, background .2s; }
-    .toggle-switch input:checked + .toggle-track { background:rgba(0,71,255,.5); }
-    .toggle-switch input:checked ~ .toggle-knob { transform:translateX(16px); background:var(--blue); }
-    .toggle-label { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.4); }
-    .cd-selectors { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:.9rem; display:none; }
-    .cd-selectors.visible { display:grid; }
+    /* TOGGLE C/D */
+    .optional-block{margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)}
+    .optional-toggle{display:flex;align-items:center;gap:.75rem;cursor:pointer;user-select:none}
+    .toggle-switch{position:relative;width:34px;height:18px;flex-shrink:0}
+    .toggle-switch input{opacity:0;width:0;height:0;position:absolute}
+    .toggle-track{position:absolute;inset:0;background:rgba(255,255,255,.12);border-radius:9px;transition:background .2s}
+    .toggle-knob{position:absolute;top:2px;left:2px;width:14px;height:14px;background:rgba(255,255,255,.4);border-radius:50%;transition:transform .2s,background .2s}
+    .toggle-switch input:checked+.toggle-track{background:rgba(0,71,255,.5)}
+    .toggle-switch input:checked~.toggle-knob{transform:translateX(16px);background:var(--blue)}
+    .toggle-label{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.4)}
+    .cd-selectors{display:none;grid-template-columns:1fr 1fr;gap:1rem;margin-top:.9rem}
+    .cd-selectors.visible{display:grid}
 
-    /* KPI ROW */
-    .kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.5rem; }
-    .kpi-card { background:rgba(255,255,255,.04); border:1px solid var(--card-border); padding:1.1rem 1.3rem; backdrop-filter:blur(4px); }
-    .kpi-label { font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.35); margin-bottom:.4rem; }
-    .kpi-val { font-family:'Syne',sans-serif; font-weight:800; font-size:1.7rem; letter-spacing:-.04em; line-height:1; }
-    .kpi-val.bl { color:var(--blue); } .kpi-val.gr { color:var(--green); } .kpi-val.pu { color:var(--purple); } .kpi-val.or { color:var(--orange); }
-    .kpi-delta { font-family:'DM Mono',monospace; font-size:.6rem; color:rgba(255,255,255,.28); margin-top:.3rem; }
+    /* KPI */
+    .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
+    .kpi-card{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1.1rem 1.3rem;backdrop-filter:blur(4px)}
+    .kpi-label{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:.4rem}
+    .kpi-val{font-family:'Syne',sans-serif;font-weight:800;font-size:1.7rem;letter-spacing:-.04em;line-height:1}
+    .kpi-val.bl{color:var(--blue)}.kpi-val.gr{color:var(--green)}.kpi-val.pu{color:var(--purple)}.kpi-val.or{color:var(--orange)}
+    .kpi-delta{font-family:'DM Mono',monospace;font-size:.6rem;color:rgba(255,255,255,.28);margin-top:.3rem}
 
-    /* SECTION HEADERS */
-    .section-header { display:flex; align-items:center; gap:.75rem; margin-bottom:1rem; padding-bottom:.6rem; border-bottom:1px solid var(--border); }
-    .section-num { font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.2em; color:rgba(0,71,255,.6); background:rgba(0,71,255,.1); border:1px solid rgba(0,71,255,.2); padding:.2rem .55rem; }
-    .section-title { font-family:'DM Mono',monospace; font-size:.78rem; letter-spacing:.18em; text-transform:uppercase; color:rgba(255,255,255,.5); }
+    /* SECTIONS */
+    .section-header{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;padding-bottom:.6rem;border-bottom:1px solid var(--border)}
+    .section-num{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.2em;color:rgba(0,71,255,.6);background:rgba(0,71,255,.1);border:1px solid rgba(0,71,255,.2);padding:.2rem .55rem}
+    .section-title{font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.5)}
 
-    /* CARDS */
-    .card { background:rgba(255,255,255,.04); border:1px solid var(--card-border); padding:1.3rem; overflow:hidden; backdrop-filter:blur(4px); margin-bottom:1.2rem; }
-    .card-label { font-family:'DM Mono',monospace; font-size:.78rem; letter-spacing:.18em; text-transform:uppercase; color:rgba(255,255,255,.3); margin-bottom:1rem; }
-    .two-col { display:grid; grid-template-columns:1fr 1fr; gap:1.2rem; margin-bottom:1.2rem; }
+    .card{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1.3rem;overflow:hidden;backdrop-filter:blur(4px);margin-bottom:1.2rem}
+    .card-label{font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:1rem}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.2rem}
 
-    /* CANDIDATE BARS */
-    .cand-row { padding:1.1rem 0; border-bottom:1px solid var(--border); }
-    .cand-row:last-child { border-bottom:none; }
-    .cand-header { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:.4rem; }
-    .cand-name { font-family:'Syne',sans-serif; font-weight:800; font-size:.95rem; letter-spacing:-.02em; }
-    .cand-corp { font-family:'DM Mono',monospace; font-size:.58rem; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.3); margin-left:.5rem; }
-    .cand-pct { font-family:'Syne',sans-serif; font-weight:800; font-size:1.5rem; letter-spacing:-.04em; }
-    .cand-votes { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.08em; color:rgba(255,255,255,.4); margin-top:.1rem; }
-    .bar-track { height:6px; background:var(--bar-bg); border-radius:3px; overflow:hidden; margin-top:.55rem; }
-    .bar-fill { height:100%; border-radius:3px; transition:width 1.2s cubic-bezier(.25,.46,.45,.94); }
+    .cand-row{padding:1.1rem 0;border-bottom:1px solid var(--border)}
+    .cand-row:last-child{border-bottom:none}
+    .cand-header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:.4rem}
+    .cand-name{font-family:'Syne',sans-serif;font-weight:800;font-size:.95rem;letter-spacing:-.02em}
+    .cand-corp{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-left:.5rem}
+    .cand-pct{font-family:'Syne',sans-serif;font-weight:800;font-size:1.5rem;letter-spacing:-.04em}
+    .cand-votes{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;color:rgba(255,255,255,.4);margin-top:.1rem}
+    .bar-track{height:6px;background:var(--bar-bg);border-radius:3px;overflow:hidden;margin-top:.55rem}
+    .bar-fill{height:100%;border-radius:3px;transition:width 1.2s cubic-bezier(.25,.46,.45,.94)}
 
-    /* VOTACION MINIMA BADGE */
-    .min-badge { display:inline-flex; align-items:center; gap:.5rem; font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.1em; text-transform:uppercase; background:rgba(251,146,60,.08); border:1px solid rgba(251,146,60,.2); color:rgba(251,146,60,.8); padding:.4rem .9rem; }
+    .min-badge{display:inline-flex;align-items:center;gap:.5rem;font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;background:rgba(251,146,60,.08);border:1px solid rgba(251,146,60,.2);color:rgba(251,146,60,.8);padding:.4rem .9rem}
 
-    /* DRILL TABLE */
-    .drill-nav { display:flex; align-items:center; gap:.6rem; margin-bottom:1rem; flex-wrap:wrap; }
-    .drill-crumb { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.35); cursor:pointer; padding:.3rem .7rem; border:1px solid transparent; transition:color .15s; }
-    .drill-crumb.active { color:var(--white); border-color:var(--card-border); background:rgba(255,255,255,.04); }
-    .drill-crumb.clickable { color:rgba(0,71,255,.7); }
-    .drill-crumb.clickable:hover { color:var(--blue); }
-    .drill-sep { color:rgba(255,255,255,.2); font-size:.6rem; }
-    .results-table { width:100%; border-collapse:collapse; }
-    .results-table th { font-family:'DM Mono',monospace; font-size:.58rem; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.25); text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--border); white-space:nowrap; }
-    .results-table th.r { text-align:right; }
-    .results-table td { padding:.58rem .6rem; border-bottom:1px solid rgba(255,255,255,.05); font-family:'DM Mono',monospace; font-size:.74rem; color:rgba(255,255,255,.75); vertical-align:middle; }
-    .results-table td.r { text-align:right; }
-    .results-table tr:hover td { background:rgba(255,255,255,.03); }
-    .drill-btn { background:none; border:none; color:var(--blue); font-family:'DM Mono',monospace; font-size:.74rem; cursor:pointer; text-align:left; padding:0; display:inline-flex; align-items:center; gap:.4rem; transition:color .15s; }
-    .drill-btn:hover { color:#7ab3ff; }
-    .winner-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:5px; vertical-align:middle; flex-shrink:0; }
-    .mini-bar-wrap { width:55px; height:3px; background:var(--bar-bg); border-radius:2px; overflow:hidden; display:inline-block; vertical-align:middle; margin-left:5px; }
-    .mini-bar-fill { height:100%; border-radius:2px; }
-    .level-badge { font-family:'DM Mono',monospace; font-size:.55rem; letter-spacing:.15em; text-transform:uppercase; padding:.2rem .55rem; border:1px solid; }
-    .level-badge.dep  { color:rgba(167,139,250,.7); border-color:rgba(167,139,250,.25); background:rgba(167,139,250,.06); }
-    .level-badge.mun  { color:rgba(0,71,255,.8); border-color:rgba(0,71,255,.3); background:rgba(0,71,255,.06); }
-    .level-badge.com  { color:rgba(251,146,60,.7); border-color:rgba(251,146,60,.25); background:rgba(251,146,60,.06); }
-    .level-badge.pues { color:rgba(74,222,128,.7); border-color:rgba(74,222,128,.25); background:rgba(74,222,128,.06); }
+    /* DRILL */
+    .drill-nav{display:flex;align-items:center;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap}
+    .drill-crumb{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.35);cursor:pointer;padding:.3rem .7rem;border:1px solid transparent;transition:color .15s}
+    .drill-crumb.active{color:var(--white);border-color:var(--card-border);background:rgba(255,255,255,.04)}
+    .drill-crumb.clickable{color:rgba(0,71,255,.7)}
+    .drill-crumb.clickable:hover{color:var(--blue)}
+    .drill-sep{color:rgba(255,255,255,.2);font-size:.6rem}
+    .results-table{width:100%;border-collapse:collapse}
+    .results-table th{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.25);text-align:left;padding:.5rem .6rem;border-bottom:1px solid var(--border);white-space:nowrap}
+    .results-table th.r{text-align:right}
+    .results-table td{padding:.58rem .6rem;border-bottom:1px solid rgba(255,255,255,.05);font-family:'DM Mono',monospace;font-size:.74rem;color:rgba(255,255,255,.75);vertical-align:middle}
+    .results-table td.r{text-align:right}
+    .results-table tr:hover td{background:rgba(255,255,255,.03)}
+    .drill-btn{background:none;border:none;color:var(--blue);font-family:'DM Mono',monospace;font-size:.74rem;cursor:pointer;text-align:left;padding:0;display:inline-flex;align-items:center;gap:.4rem;transition:color .15s}
+    .drill-btn:hover{color:#7ab3ff}
+    .mini-bar-wrap{width:55px;height:3px;background:var(--bar-bg);border-radius:2px;overflow:hidden;display:inline-block;vertical-align:middle;margin-left:5px}
+    .mini-bar-fill{height:100%;border-radius:2px}
+    .level-badge{font-family:'DM Mono',monospace;font-size:.55rem;letter-spacing:.15em;text-transform:uppercase;padding:.2rem .55rem;border:1px solid}
+    .level-badge.dep{color:rgba(167,139,250,.7);border-color:rgba(167,139,250,.25);background:rgba(167,139,250,.06)}
+    .level-badge.mun{color:rgba(0,71,255,.8);border-color:rgba(0,71,255,.3);background:rgba(0,71,255,.06)}
+    .level-badge.com{color:rgba(251,146,60,.7);border-color:rgba(251,146,60,.25);background:rgba(251,146,60,.06)}
+    .level-badge.pues{color:rgba(74,222,128,.7);border-color:rgba(74,222,128,.25);background:rgba(74,222,128,.06)}
 
-    /* HIGHLIGHT ROW */
-    .filter-info { display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; margin-bottom:1rem; }
-    .filter-chip { font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.1em; text-transform:uppercase; padding:.25rem .65rem; border:1px solid; }
-    .filter-chip.ab { color:rgba(0,71,255,.8); border-color:rgba(0,71,255,.3); background:rgba(0,71,255,.06); }
-    .filter-chip.cd { color:rgba(251,146,60,.8); border-color:rgba(251,146,60,.3); background:rgba(251,146,60,.06); }
+    .filter-info{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin-bottom:1rem}
+    .filter-chip{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;padding:.25rem .65rem;border:1px solid}
+    .filter-chip.ab{color:rgba(0,71,255,.8);border-color:rgba(0,71,255,.3);background:rgba(0,71,255,.06)}
+    .filter-chip.cd{color:rgba(251,146,60,.8);border-color:rgba(251,146,60,.3);background:rgba(251,146,60,.06)}
 
-    /* FOOTER */
-    .back-bar { flex-shrink:0; padding:.6rem 2.5rem 1rem; }
-    .back-btn { display:inline-flex; align-items:center; gap:.5rem; font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.12em; text-transform:uppercase; color:var(--white); text-decoration:none; cursor:pointer; background:rgba(0,71,255,0.25); border:1px solid rgba(0,71,255,0.5); padding:.3rem .9rem; }
-    .back-btn:hover { background:rgba(0,71,255,0.45); }
-    .full-footer { flex-shrink:0; width:100%; border-top:1px solid var(--border); padding:.5rem 2.5rem; display:flex; align-items:center; justify-content:space-between; }
-    .footer-brand { font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.09em; color:rgba(255,255,255,.2); }
-    .footer-brand a { color:rgba(255,255,255,.25); text-decoration:none; }
+    .back-bar{flex-shrink:0;padding:.6rem 2.5rem 1rem}
+    .back-btn{display:inline-flex;align-items:center;gap:.5rem;font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--white);text-decoration:none;cursor:pointer;background:rgba(0,71,255,.25);border:1px solid rgba(0,71,255,.5);padding:.3rem .9rem}
+    .back-btn:hover{background:rgba(0,71,255,.45)}
+    .full-footer{flex-shrink:0;width:100%;border-top:1px solid var(--border);padding:.5rem 2.5rem;display:flex;align-items:center;justify-content:space-between}
+    .footer-brand{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.09em;color:rgba(255,255,255,.2)}
+    .footer-brand a{color:rgba(255,255,255,.25);text-decoration:none}
 
-    /* CURTAIN */
-    .curtain { position:fixed; inset:0; z-index:99999; pointer-events:none; }
-    .curtain-layer { position:absolute; inset:0; background:#04060e; }
-    .curtain-layer:nth-child(1) { clip-path:polygon(0 0,100% 0,100% 22%,0 28%); transform:translateX(-110%); transition:transform .58s cubic-bezier(.75,0,.25,1) 0s; }
-    .curtain-layer:nth-child(2) { clip-path:polygon(0 26%,100% 20%,100% 49%,0 55%); transform:translateX(110%); transition:transform .58s cubic-bezier(.75,0,.25,1) .07s; }
-    .curtain-layer:nth-child(3) { clip-path:polygon(0 53%,100% 47%,100% 76%,0 82%); transform:translateX(-110%); transition:transform .58s cubic-bezier(.75,0,.25,1) .14s; }
-    .curtain-layer:nth-child(4) { clip-path:polygon(0 80%,100% 74%,100% 100%,0 100%); transform:translateX(110%); transition:transform .58s cubic-bezier(.75,0,.25,1) .21s; }
-    .curtain-stage { position:absolute; inset:0; z-index:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.8rem; pointer-events:none; }
-    .curtain-tag { font-family:'DM Mono',monospace; font-size:1.08rem; letter-spacing:.35em; text-transform:uppercase; color:rgba(0,71,255,0.7); opacity:0; transform:translateY(-12px); transition:opacity .4s ease, transform .4s ease; }
-    .curtain-sub { font-family:'DM Mono',monospace; font-size:.975rem; letter-spacing:.22em; color:rgba(255,255,255,.35); text-transform:uppercase; opacity:0; transform:translateY(12px); transition:opacity .4s ease, transform .4s ease; }
-    .curtain-headline { font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(2.6rem,6.5vw,5.85rem); letter-spacing:-.03em; line-height:1.05; text-shadow:0 0 50px rgba(0,71,255,0.5); text-align:center; }
-    .curtain-line { overflow:hidden; display:block; }
-    .curtain-word { display:inline-block; opacity:0; transition:transform .52s cubic-bezier(.25,.46,.45,.94), opacity .45s ease; }
-    .curtain-word.from-left { transform:translateX(-80px); } .curtain-word.from-right { transform:translateX(80px); }
-    .curtain-word.white { color:#f4f3ef; } .curtain-word.blue { color:#0047FF; }
-    .curtain.opening .curtain-layer { transform:translateX(0) !important; transition:none; }
-    .curtain.opening .curtain-word { transform:translateX(0); opacity:1; transition:none; }
-    .curtain.opening .curtain-tag { opacity:1; transform:translateY(0); transition:none; }
-    .curtain.opening .curtain-sub { opacity:1; transform:translateY(0); transition:none; }
-    .curtain.opened .curtain-layer:nth-child(1) { transform:translateX(-110%); }
-    .curtain.opened .curtain-layer:nth-child(2) { transform:translateX(110%); }
-    .curtain.opened .curtain-layer:nth-child(3) { transform:translateX(-110%); }
-    .curtain.opened .curtain-layer:nth-child(4) { transform:translateX(110%); }
-    .curtain.opened .curtain-word { opacity:0; }
-    .curtain.opened .curtain-tag, .curtain.opened .curtain-sub { opacity:0; transition:opacity .25s ease; }
-    .curtain.opened { pointer-events:none; }
-    .curtain.closing { pointer-events:all; }
-    .curtain.closing .curtain-layer { transform:translateX(0) !important; }
-    .curtain.closing .curtain-word.from-left, .curtain.closing .curtain-word.from-right { transform:translateX(0); opacity:1; transition-delay:.62s; }
-    .curtain.closing .curtain-tag { opacity:1; transform:translateY(0); transition-delay:.68s; }
-    .curtain.closing .curtain-sub { opacity:1; transform:translateY(0); transition-delay:.72s; }
+    .curtain{position:fixed;inset:0;z-index:99999;pointer-events:none}
+    .curtain-layer{position:absolute;inset:0;background:#04060e}
+    .curtain-layer:nth-child(1){clip-path:polygon(0 0,100% 0,100% 22%,0 28%);transform:translateX(-110%);transition:transform .58s cubic-bezier(.75,0,.25,1) 0s}
+    .curtain-layer:nth-child(2){clip-path:polygon(0 26%,100% 20%,100% 49%,0 55%);transform:translateX(110%);transition:transform .58s cubic-bezier(.75,0,.25,1) .07s}
+    .curtain-layer:nth-child(3){clip-path:polygon(0 53%,100% 47%,100% 76%,0 82%);transform:translateX(-110%);transition:transform .58s cubic-bezier(.75,0,.25,1) .14s}
+    .curtain-layer:nth-child(4){clip-path:polygon(0 80%,100% 74%,100% 100%,0 100%);transform:translateX(110%);transition:transform .58s cubic-bezier(.75,0,.25,1) .21s}
+    .curtain-stage{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.8rem;pointer-events:none}
+    .curtain-tag{font-family:'DM Mono',monospace;font-size:1.08rem;letter-spacing:.35em;text-transform:uppercase;color:rgba(0,71,255,.7);opacity:0;transform:translateY(-12px);transition:opacity .4s ease,transform .4s ease}
+    .curtain-sub{font-family:'DM Mono',monospace;font-size:.975rem;letter-spacing:.22em;color:rgba(255,255,255,.35);text-transform:uppercase;opacity:0;transform:translateY(12px);transition:opacity .4s ease,transform .4s ease}
+    .curtain-headline{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(2.6rem,6.5vw,5.85rem);letter-spacing:-.03em;line-height:1.05;text-shadow:0 0 50px rgba(0,71,255,.5);text-align:center}
+    .curtain-line{overflow:hidden;display:block}
+    .curtain-word{display:inline-block;opacity:0;transition:transform .52s cubic-bezier(.25,.46,.45,.94),opacity .45s ease}
+    .curtain-word.from-left{transform:translateX(-80px)}.curtain-word.from-right{transform:translateX(80px)}
+    .curtain-word.white{color:#f4f3ef}.curtain-word.blue{color:#0047FF}
+    .curtain.opening .curtain-layer{transform:translateX(0)!important;transition:none}
+    .curtain.opening .curtain-word{transform:translateX(0);opacity:1;transition:none}
+    .curtain.opening .curtain-tag,.curtain.opening .curtain-sub{opacity:1;transform:translateY(0);transition:none}
+    .curtain.opened .curtain-layer:nth-child(1){transform:translateX(-110%)}
+    .curtain.opened .curtain-layer:nth-child(2){transform:translateX(110%)}
+    .curtain.opened .curtain-layer:nth-child(3){transform:translateX(-110%)}
+    .curtain.opened .curtain-layer:nth-child(4){transform:translateX(110%)}
+    .curtain.opened .curtain-word{opacity:0}
+    .curtain.opened .curtain-tag,.curtain.opened .curtain-sub{opacity:0;transition:opacity .25s ease}
+    .curtain.opened{pointer-events:none}
+    .curtain.closing{pointer-events:all}
+    .curtain.closing .curtain-layer{transform:translateX(0)!important}
+    .curtain.closing .curtain-word.from-left,.curtain.closing .curtain-word.from-right{transform:translateX(0);opacity:1;transition-delay:.62s}
+    .curtain.closing .curtain-tag{opacity:1;transform:translateY(0);transition-delay:.68s}
+    .curtain.closing .curtain-sub{opacity:1;transform:translateY(0);transition-delay:.72s}
 
-    /* PLACEHOLDER */
-    .placeholder-state { text-align:center; padding:3rem 2rem; color:rgba(255,255,255,.2); font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.1em; text-transform:uppercase; line-height:2; }
-
-    @media(max-width:1100px) { .selector-grid { grid-template-columns:1fr 1fr; } }
-    @media(max-width:900px) { body { cursor:auto; } .cursor,.cursor-ring { display:none; } .top-bar,.breadcrumb,.meta-bar,.content-area,.full-footer,.back-bar { padding-left:1.2rem; padding-right:1.2rem; } .bg-overlay { background:rgba(4,6,16,0.93); } .kpi-row { grid-template-columns:1fr 1fr; gap:.75rem; } .two-col { grid-template-columns:1fr; } }
-    @media(max-width:600px) { .kpi-row { grid-template-columns:1fr; } .selector-grid { grid-template-columns:1fr; } }
-
-    /* HIDDEN */
-    .hidden { display:none !important; }
+    .placeholder-state{text-align:center;padding:3rem 2rem;color:rgba(255,255,255,.2);font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;line-height:2}
+    @media(max-width:1100px){.selector-grid{grid-template-columns:1fr 1fr}}
+    @media(max-width:900px){body{cursor:auto}.cursor,.cursor-ring{display:none}.top-bar,.breadcrumb,.meta-bar,.content-area,.full-footer,.back-bar{padding-left:1.2rem;padding-right:1.2rem}.bg-overlay{background:rgba(4,6,16,.93)}.kpi-row{grid-template-columns:1fr 1fr;gap:.75rem}.two-col{grid-template-columns:1fr}}
+    @media(max-width:600px){.kpi-row{grid-template-columns:1fr}.selector-grid{grid-template-columns:1fr}}
+    .hidden{display:none!important}
   </style>
 </head>
 <body>
@@ -239,40 +223,40 @@
     </div>
     <div class="meta-bar">
       <span class="meta-item">Elección: <b>Congreso 2026</b></span>
-      <span class="meta-item" id="meta-mesas">Mesas cargadas: <b id="meta-mesas-val">—</b></span>
+      <span class="meta-item">Candidatos disponibles: <b id="meta-cands">—</b></span>
       <div class="source-badge">Fuente: <b>Registraduría · Escrutinio</b></div>
     </div>
 
     <div class="content-area">
 
-      <!-- LOADING STATE -->
+      <!-- CARGANDO ÍNDICE -->
       <div id="load-state" class="loader-wrap">
         <div class="loader-ring"></div>
-        <div class="loader-label">Cargando datos desde S3…</div>
+        <div class="loader-label">Cargando candidatos…</div>
         <div class="loader-progress" id="load-progress"></div>
       </div>
 
-      <!-- MAIN CONTENT (hidden until data loaded) -->
+      <!-- MAIN -->
       <div id="main-content" class="hidden">
 
-        <!-- ① SELECTOR PANEL -->
+        <!-- SELECTOR -->
         <div class="selector-panel">
           <div class="selector-title">① Selección de candidatos · Fórmula principal A / B</div>
           <div class="selector-grid">
             <div class="selector-group">
               <div class="selector-label"><span class="cand-badge" style="background:var(--blue)"></span>Candidato A</div>
-              <select class="sel-select" id="sel-A">
+              <select class="sel-select" id="sel-A" onchange="onSelChange()">
                 <option value="">— Seleccionar —</option>
               </select>
-              <div style="font-family:'DM Mono',monospace;font-size:.58rem;color:rgba(255,255,255,.2);margin-top:.2rem" id="corp-A"></div>
+              <div class="corp-hint" id="corp-A"></div>
             </div>
             <div class="selector-sep">vs</div>
             <div class="selector-group">
               <div class="selector-label"><span class="cand-badge" style="background:var(--purple)"></span>Candidato B</div>
-              <select class="sel-select" id="sel-B">
+              <select class="sel-select" id="sel-B" onchange="onSelChange()">
                 <option value="">— Seleccionar —</option>
               </select>
-              <div style="font-family:'DM Mono',monospace;font-size:.58rem;color:rgba(255,255,255,.2);margin-top:.2rem" id="corp-B"></div>
+              <div class="corp-hint" id="corp-B"></div>
             </div>
             <div class="selector-group" style="align-self:end">
               <button class="run-btn" id="run-btn" disabled onclick="runAnalysis()">
@@ -281,7 +265,6 @@
             </div>
           </div>
 
-          <!-- OPTIONAL C/D -->
           <div class="optional-block">
             <label class="optional-toggle">
               <div class="toggle-switch">
@@ -294,23 +277,23 @@
             <div class="cd-selectors" id="cd-selectors">
               <div class="selector-group">
                 <div class="selector-label"><span class="cand-badge" style="background:var(--green)"></span>Candidato C</div>
-                <select class="sel-select" id="sel-C">
+                <select class="sel-select" id="sel-C" onchange="onSelChange()">
                   <option value="">— Seleccionar —</option>
                 </select>
-                <div style="font-family:'DM Mono',monospace;font-size:.58rem;color:rgba(255,255,255,.2);margin-top:.2rem" id="corp-C"></div>
+                <div class="corp-hint" id="corp-C"></div>
               </div>
               <div class="selector-group">
                 <div class="selector-label"><span class="cand-badge" style="background:var(--orange)"></span>Candidato D</div>
-                <select class="sel-select" id="sel-D">
+                <select class="sel-select" id="sel-D" onchange="onSelChange()">
                   <option value="">— Seleccionar —</option>
                 </select>
-                <div style="font-family:'DM Mono',monospace;font-size:.58rem;color:rgba(255,255,255,.2);margin-top:.2rem" id="corp-D"></div>
+                <div class="corp-hint" id="corp-D"></div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- RESULTS PLACEHOLDER / ACTUAL RESULTS -->
+        <!-- RESULTADOS -->
         <div id="results-area">
           <div class="placeholder-state">
             Selecciona los candidatos y haz clic en<br/>
@@ -318,8 +301,8 @@
           </div>
         </div>
 
-      </div><!-- /main-content -->
-    </div><!-- /content-area -->
+      </div>
+    </div>
 
     <div class="back-bar">
       <a href="electoral.html" class="back-btn" onclick="navTo(event,'electoral.html')">← Volver a Resultados Electorales</a>
@@ -333,101 +316,70 @@
 
   <script>
     // ─── CONFIG ───────────────────────────────────────────────
-    const CSV_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/Congreso_2026_MMV170326.csv';
+    const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
     const COLORS = { A:'#0047FF', B:'#a78bfa', C:'#4ade80', D:'#fb923c' };
-    const fmt  = n => Number(n).toLocaleString('es-CO');
-    const pct  = (n, t) => t ? ((n/t)*100).toFixed(1) : '0.0';
+    const fmt = n => Number(n).toLocaleString('es-CO');
+    const pct = (n,t) => t ? ((n/t)*100).toFixed(1) : '0.0';
+    const esc = s => (s||'').replace(/'/g,"\\'");
 
     // ─── STATE ────────────────────────────────────────────────
-    let rows = [];           // raw CSV rows
-    let candidates = [];     // {nombre, corporacion} unique list
-    // Per-mesa aggregations keyed by mesaKey → {A:n, B:n, C:n, D:n}
-    let mesaMap = {};
+    let candIndex = [];   // [{nombre, slug, corp, partido, votos}]
     let useCD = false;
-
-    // Drill state for each section
+    let mesasAB = [], mesasABCD = [];
     let drillAB = { nivel:'dep', cod_dep:null, nom_dep:null, cod_mun:null, nom_mun:null, cod_com:null, nom_com:null };
     let drillCD = { nivel:'dep', cod_dep:null, nom_dep:null, cod_mun:null, nom_mun:null, cod_com:null, nom_com:null };
-    // Pre-computed filtered mesas
-    let mesasAB = [];   // mesas where A >= B
-    let mesasABCD = []; // mesas where A >= B AND C >= D
 
-    // ─── MESA KEY ─────────────────────────────────────────────
-    const mesaKey = r => `${r.departamentoCodigo}|${r.municipioCodigo}|${r.zonacodigo}|${r.puestoCodigo}|${r.mesa}`;
-    const mesaKeyRow = r => ({ dep:r.departamentoCodigo, depNom:r.departamentoNombre, mun:r.municipioCodigo, munNom:r.municipioNombre, zon:r.zonacodigo, pue:r.puestoCodigo, pueNom:r.puestoNombre, com:r.comunaCodigo||'', comNom:r.comunaNombre||'' });
-
-    // ─── LOAD CSV ─────────────────────────────────────────────
-    async function loadData() {
+    // ─── LOAD INDEX ───────────────────────────────────────────
+    async function loadIndex() {
       document.getElementById('load-progress').textContent = 'Conectando con S3…';
       try {
-        await new Promise((resolve, reject) => {
-          Papa.parse(CSV_URL, {
-            download: true,
-            header: true,
-            skipEmptyLines: true,
-            worker: false,
-            step: null,
-            complete(results) {
-              rows = results.data;
-              resolve();
-            },
-            error(err) { reject(err); }
-          });
-        });
+        const r = await fetch(`${S3}/endoso/index.json`);
+        if (!r.ok) throw new Error(`index.json devolvió ${r.status}`);
+        candIndex = await r.json();
+        document.getElementById('meta-cands').textContent = candIndex.length.toLocaleString('es-CO');
 
-        document.getElementById('load-progress').textContent = `${fmt(rows.length)} filas procesadas`;
-
-        // Build candidate list
-        const candMap = {};
-        rows.forEach(r => {
-          const nom = (r.candidatoNombre||'').trim();
-          if (!nom || nom === 'CANDIDATOS TOTALES' || nom === 'VOTOS EN BLANCO') return;
-          if (!candMap[nom]) candMap[nom] = r.corporacionNombre || '';
-          else if (!candMap[nom]) candMap[nom] = r.corporacionNombre;
-        });
-        candidates = Object.entries(candMap)
-          .map(([nombre, corporacion]) => ({ nombre, corporacion }))
-          .sort((a,b) => a.nombre.localeCompare(b.nombre, 'es'));
-
-        // Populate selects
+        // Poblar selects — ordenados por votos desc
+        const sorted = [...candIndex].sort((a,b) => b.votos - a.votos);
         ['A','B','C','D'].forEach(k => {
           const sel = document.getElementById(`sel-${k}`);
-          candidates.forEach(c => {
+          sorted.forEach(c => {
             const opt = document.createElement('option');
-            opt.value = c.nombre;
-            opt.textContent = `${c.nombre} (${c.corporacion})`;
+            opt.value = c.slug;
+            opt.dataset.nombre = c.nombre;
+            opt.dataset.corp   = c.corp;
+            opt.dataset.partido = c.partido;
+            opt.textContent = `${c.nombre} (${c.corp})`;
             sel.appendChild(opt);
           });
-          sel.addEventListener('change', onSelChange);
         });
 
-        document.getElementById('meta-mesas-val').textContent = fmt(rows.length);
         document.getElementById('load-state').classList.add('hidden');
         document.getElementById('main-content').classList.remove('hidden');
-
       } catch(e) {
         document.getElementById('load-state').innerHTML = `
           <div style="font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,100,100,.8);text-align:center;line-height:1.8">
-            Error al cargar el CSV desde S3.<br/>
-            <span style="color:rgba(255,255,255,.3);font-size:.6rem">${e.message}</span><br/>
-            <span style="color:rgba(255,255,255,.2);font-size:.58rem">Verifica que el bucket tenga CORS y acceso público habilitado.</span>
+            Error al cargar el índice de candidatos.<br/>
+            <span style="color:rgba(255,255,255,.3);font-size:.6rem">${e.message}</span>
           </div>`;
       }
     }
 
-    function onSelChange() {
-      const a = document.getElementById('sel-A').value;
-      const b = document.getElementById('sel-B').value;
-      const ready = a && b && a !== b;
-      document.getElementById('run-btn').disabled = !ready;
+    function getSelected(k) {
+      const sel = document.getElementById(`sel-${k}`);
+      const opt = sel.options[sel.selectedIndex];
+      if (!opt || !opt.value) return null;
+      return { slug: opt.value, nombre: opt.dataset.nombre, corp: opt.dataset.corp, partido: opt.dataset.partido };
+    }
 
-      // Show corporation
-      if (a) { const c = candidates.find(x=>x.nombre===a); document.getElementById('corp-A').textContent = c?.corporacion||''; }
-      if (b) { const c = candidates.find(x=>x.nombre===b); document.getElementById('corp-B').textContent = c?.corporacion||''; }
-      const c = document.getElementById('sel-C').value;
-      const d = document.getElementById('sel-D').value;
-      if (c) { const cc = candidates.find(x=>x.nombre===c); document.getElementById('corp-C').textContent = cc?.corporacion||''; }
-      if (d) { const cc = candidates.find(x=>x.nombre===d); document.getElementById('corp-D').textContent = cc?.corporacion||''; }
+    function onSelChange() {
+      ['A','B','C','D'].forEach(k => {
+        const s = getSelected(k);
+        const hint = document.getElementById(`corp-${k}`);
+        if (hint && s) hint.textContent = `${s.corp} · ${s.partido}`;
+        else if (hint) hint.textContent = '';
+      });
+      const a = getSelected('A'), b = getSelected('B');
+      document.getElementById('run-btn').disabled = !(a && b && a.slug !== b.slug);
     }
 
     function toggleCD(on) {
@@ -435,131 +387,129 @@
       document.getElementById('cd-selectors').classList.toggle('visible', on);
     }
 
+    // ─── FETCH CANDIDATE JSON ─────────────────────────────────
+    async function fetchCand(slug) {
+      const r = await fetch(`${S3}/endoso/${slug}.json`);
+      if (!r.ok) throw new Error(`No se encontró ${slug}.json (${r.status})`);
+      return await r.json();
+    }
+
     // ─── MAIN ANALYSIS ────────────────────────────────────────
-    function runAnalysis() {
-      const nameA = document.getElementById('sel-A').value;
-      const nameB = document.getElementById('sel-B').value;
-      const nameC = document.getElementById('sel-C').value;
-      const nameD = document.getElementById('sel-D').value;
-      if (!nameA || !nameB) return;
+    async function runAnalysis() {
+      const btn = document.getElementById('run-btn');
+      btn.disabled = true;
+      btn.textContent = 'Calculando…';
 
-      const corpA = candidates.find(x=>x.nombre===nameA)?.corporacion||'';
-      const corpB = candidates.find(x=>x.nombre===nameB)?.corporacion||'';
-      const corpC = nameC ? candidates.find(x=>x.nombre===nameC)?.corporacion||'' : '';
-      const corpD = nameD ? candidates.find(x=>x.nombre===nameD)?.corporacion||'' : '';
+      const selA = getSelected('A'), selB = getSelected('B');
+      const selC = useCD ? getSelected('C') : null;
+      const selD = useCD ? getSelected('D') : null;
 
-      // 1. Build per-mesa vote map for A, B (and optionally C, D)
-      // key → { A, B, C, D, dep, depNom, mun, munNom, pue, pueNom, com, comNom }
-      mesaMap = {};
+      try {
+        // Descargar JSONs necesarios
+        const fetches = [fetchCand(selA.slug), fetchCand(selB.slug)];
+        if (selC) fetches.push(fetchCand(selC.slug));
+        if (selD) fetches.push(fetchCand(selD.slug));
+        const [dataA, dataB, dataC, dataD] = await Promise.all(fetches);
 
-      rows.forEach(r => {
-        const nom = (r.candidatoNombre||'').trim();
-        const votos = parseInt(r.totalVotos)||0;
-        const key = mesaKey(r);
-        if (!mesaMap[key]) {
-          mesaMap[key] = { A:0, B:0, C:0, D:0, ...mesaKeyRow(r) };
-        }
-        if (nom === nameA) mesaMap[key].A += votos;
-        if (nom === nameB) mesaMap[key].B += votos;
-        if (nameC && nom === nameC) mesaMap[key].C += votos;
-        if (nameD && nom === nameD) mesaMap[key].D += votos;
-      });
+        // Construir mapa de mesas para cada candidato
+        // key: dep|mun|zon|pue|mesa → votos
+        const buildMap = data => {
+          const m = {};
+          (data.mesas||[]).forEach(r => {
+            m[`${r.dep}|${r.mun}|${r.zon}|${r.pue}|${r.mesa}`] = { v: r.v, dep:r.dep, depNom:r.depNom, mun:r.mun, munNom:r.munNom, pue:r.pue, pueNom:r.pueNom, com:r.com||'', comNom:r.comNom||'' };
+          });
+          return m;
+        };
+        const mapA = buildMap(dataA), mapB = buildMap(dataB);
+        const mapC = dataC ? buildMap(dataC) : {};
+        const mapD = dataD ? buildMap(dataD) : {};
 
-      const allMesas = Object.values(mesaMap);
+        // Unión de todas las mesas de A y B
+        const allKeys = new Set([...Object.keys(mapA), ...Object.keys(mapB)]);
+        const allMesas = [];
+        allKeys.forEach(k => {
+          const a = mapA[k], b = mapB[k];
+          const meta = a || b;
+          allMesas.push({
+            key: k,
+            A: a?.v||0, B: b?.v||0,
+            C: mapC[k]?.v||0, D: mapD[k]?.v||0,
+            dep: meta.dep, depNom: meta.depNom,
+            mun: meta.mun, munNom: meta.munNom,
+            pue: meta.pue, pueNom: meta.pueNom,
+            com: meta.com, comNom: meta.comNom
+          });
+        });
 
-      // 2. Global totals
-      let totalA=0, totalB=0, totalC=0, totalD=0, totalMin=0;
-      allMesas.forEach(m => {
-        totalA += m.A; totalB += m.B; totalC += m.C; totalD += m.D;
-        totalMin += Math.min(m.A, m.B);
-      });
+        // Totales globales
+        let totalA=0, totalB=0, totalC=0, totalD=0, totalMin=0;
+        allMesas.forEach(m => { totalA+=m.A; totalB+=m.B; totalC+=m.C; totalD+=m.D; totalMin+=Math.min(m.A,m.B); });
 
-      // Dep of B (assuming Cámara has a departamento circunscripcion)
-      // We take the dep where B has most votes
-      const depBMap = {};
-      allMesas.forEach(m => {
-        if (!depBMap[m.dep]) depBMap[m.dep] = { nom:m.depNom, v:0 };
-        depBMap[m.dep].v += m.B;
-      });
-      const depBArr = Object.entries(depBMap).sort((a,b)=>b[1].v-a[1].v);
-      const depBTop = depBArr[0];
-      const depBVotosA = depBTop ? allMesas.filter(m=>m.dep===depBTop[0]).reduce((s,m)=>s+m.A,0) : 0;
-      const depBVotosB = depBTop ? depBTop[1].v : 0;
+        // Depto principal de B (donde más votos sacó)
+        const depBMap = {};
+        allMesas.forEach(m => {
+          if (!depBMap[m.dep]) depBMap[m.dep] = { nom: m.depNom, vB: 0, vA: 0 };
+          depBMap[m.dep].vB += m.B; depBMap[m.dep].vA += m.A;
+        });
+        const depBTop = Object.entries(depBMap).sort((a,b)=>b[1].vB-a[1].vB)[0];
 
-      // 3. Filter A >= B
-      mesasAB = allMesas.filter(m => m.A >= m.B);
+        // Filtro A >= B
+        mesasAB = allMesas.filter(m => m.A >= m.B);
+        let ab_A=0, ab_B=0, ab_C=0, ab_D=0;
+        mesasAB.forEach(m => { ab_A+=m.A; ab_B+=m.B; ab_C+=m.C; ab_D+=m.D; });
 
-      let ab_A=0, ab_B=0, ab_C=0, ab_D=0;
-      mesasAB.forEach(m => { ab_A+=m.A; ab_B+=m.B; ab_C+=m.C; ab_D+=m.D; });
+        // Filtro A >= B AND C >= D
+        mesasABCD = (useCD && selC && selD) ? mesasAB.filter(m => m.C >= m.D) : [];
+        let abcd_A=0, abcd_B=0, abcd_C=0, abcd_D=0;
+        mesasABCD.forEach(m => { abcd_A+=m.A; abcd_B+=m.B; abcd_C+=m.C; abcd_D+=m.D; });
 
-      // 4. Filter A >= B AND C >= D
-      mesasABCD = useCD && nameC && nameD
-        ? mesasAB.filter(m => m.C >= m.D)
-        : [];
+        // Reset drills
+        drillAB = { nivel:'dep', cod_dep:null, nom_dep:null, cod_mun:null, nom_mun:null, cod_com:null, nom_com:null };
+        drillCD = { nivel:'dep', cod_dep:null, nom_dep:null, cod_mun:null, nom_mun:null, cod_com:null, nom_com:null };
 
-      let abcd_A=0, abcd_B=0, abcd_C=0, abcd_D=0;
-      mesasABCD.forEach(m => { abcd_A+=m.A; abcd_B+=m.B; abcd_C+=m.C; abcd_D+=m.D; });
+        renderResults({
+          selA, selB, selC, selD,
+          totalA, totalB, totalC, totalD, totalMin,
+          depBTop, mesasTotal: allMesas.length,
+          ab_A, ab_B, ab_C, ab_D, mesasABCount: mesasAB.length,
+          abcd_A, abcd_B, abcd_C, abcd_D, mesasABCDCount: mesasABCD.length,
+          useCD: useCD && !!selC && !!selD
+        });
 
-      // Reset drill states
-      drillAB = { nivel:'dep', cod_dep:null, nom_dep:null, cod_mun:null, nom_mun:null, cod_com:null, nom_com:null };
-      drillCD = { nivel:'dep', cod_dep:null, nom_dep:null, cod_mun:null, nom_mun:null, cod_com:null, nom_com:null };
-
-      // Render
-      renderResults({
-        nameA, nameB, nameC, nameD, corpA, corpB, corpC, corpD,
-        totalA, totalB, totalC, totalD, totalMin,
-        depBTop, depBVotosA, depBVotosB,
-        ab_A, ab_B, ab_C, ab_D,
-        abcd_A, abcd_B, abcd_C, abcd_D,
-        mesasTotal: allMesas.length,
-        mesasABCount: mesasAB.length,
-        mesasABCDCount: mesasABCD.length,
-        useCD, nameC, nameD
-      });
+      } catch(e) {
+        document.getElementById('results-area').innerHTML = `
+          <div style="padding:2rem;font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,100,100,.8);text-align:center;line-height:1.8">
+            Error al calcular el endoso.<br/><span style="color:rgba(255,255,255,.3);font-size:.6rem">${e.message}</span>
+          </div>`;
+      }
+      btn.disabled = false;
+      btn.textContent = 'Calcular endoso →';
     }
 
     // ─── RENDER RESULTS ───────────────────────────────────────
     function renderResults(d) {
-      const ra = document.getElementById('results-area');
+      const depNomB = d.depBTop ? d.depBTop[1].nom : '—';
+      const depVotosB = d.depBTop ? d.depBTop[1].vB : 0;
+      const depVotosA = d.depBTop ? d.depBTop[1].vA : 0;
+      const maxV = Math.max(d.totalA, d.totalB);
 
-      ra.innerHTML = `
-        <!-- §1 VOTACIÓN BRUTA -->
-        <div class="section-header">
-          <span class="section-num">§ 01</span>
-          <span class="section-title">Votación bruta · Total nacional</span>
-        </div>
+      document.getElementById('results-area').innerHTML = `
+        <!-- § 01 VOTACIÓN BRUTA -->
+        <div class="section-header"><span class="section-num">§ 01</span><span class="section-title">Votación bruta · Total nacional</span></div>
         <div class="kpi-row" style="margin-bottom:1rem">
-          <div class="kpi-card">
-            <div class="kpi-label">Votos <span style="color:var(--blue)">${shortName(d.nameA)}</span> (A)</div>
-            <div class="kpi-val bl" id="kv-A">—</div>
-            <div class="kpi-delta">${d.corpA}</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-label">Votos <span style="color:var(--purple)">${shortName(d.nameB)}</span> (B)</div>
-            <div class="kpi-val pu" id="kv-B">—</div>
-            <div class="kpi-delta">${d.corpB}</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-label">Dpto. principal B · votos A en ese dpto.</div>
-            <div class="kpi-val bl" id="kv-depA">—</div>
-            <div class="kpi-delta" id="kv-depA-sub">—</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-label">Votos B en su dpto. vs total A</div>
-            <div class="kpi-val gr" id="kv-pctDep">—</div>
-            <div class="kpi-delta">% de los votos totales de A</div>
-          </div>
+          <div class="kpi-card"><div class="kpi-label">Votos <span style="color:var(--blue)">${shortName(d.selA.nombre)}</span> (A)</div><div class="kpi-val bl" id="kv-A">—</div><div class="kpi-delta">${d.selA.corp} · ${d.selA.partido}</div></div>
+          <div class="kpi-card"><div class="kpi-label">Votos <span style="color:var(--purple)">${shortName(d.selB.nombre)}</span> (B)</div><div class="kpi-val pu" id="kv-B">—</div><div class="kpi-delta">${d.selB.corp} · ${d.selB.partido}</div></div>
+          <div class="kpi-card"><div class="kpi-label">Votos A en dpto. principal de B</div><div class="kpi-val bl" id="kv-depA">—</div><div class="kpi-delta" id="kv-depA-sub">en ${depNomB}</div></div>
+          <div class="kpi-card"><div class="kpi-label">Votos B en su dpto. vs total A</div><div class="kpi-val gr">${d.totalA ? pct(depVotosB, d.totalA)+'%' : '—'}</div><div class="kpi-delta">% de los votos totales de A</div></div>
         </div>
-        <div class="two-col" style="margin-bottom:1.5rem">
+        <div class="two-col">
           <div class="card">
             <div class="card-label">Votación bruta por candidato</div>
             <div id="bars-bruta"></div>
           </div>
           <div class="card">
             <div class="card-label">Votación mínima en común</div>
-            <div style="margin-bottom:1rem">
-              <div class="min-badge" id="badge-min">—</div>
-            </div>
+            <div style="margin-bottom:1rem"><div class="min-badge" id="badge-min">—</div></div>
             <div style="font-family:'DM Mono',monospace;font-size:.68rem;color:rgba(255,255,255,.4);line-height:1.7">
               Suma de <code style="color:var(--orange)">min(A, B)</code> por mesa.<br/>
               Estimación de votación que comparten ambos candidatos en las mismas mesas.
@@ -570,71 +520,38 @@
           </div>
         </div>
 
-        <!-- §2 FILTRO A ≥ B -->
-        <div class="section-header">
-          <span class="section-num">§ 02</span>
-          <span class="section-title">Filtro arrastre · Mesas donde A ≥ B</span>
-        </div>
+        <!-- § 02 FILTRO A >= B -->
+        <div class="section-header"><span class="section-num">§ 02</span><span class="section-title">Filtro arrastre · Mesas donde A ≥ B</span></div>
         <div class="filter-info">
           <span class="filter-chip ab">${fmt(d.mesasABCount)} mesas · A ≥ B</span>
           <span style="font-family:'DM Mono',monospace;font-size:.6rem;color:rgba(255,255,255,.25)">${pct(d.mesasABCount, d.mesasTotal)}% del total de mesas</span>
         </div>
         <div class="kpi-row" style="grid-template-columns:repeat(2,1fr);margin-bottom:1rem">
-          <div class="kpi-card">
-            <div class="kpi-label">Votos A · mesas A ≥ B</div>
-            <div class="kpi-val bl" id="kv-ab-A">—</div>
-            <div class="kpi-delta">${pct(d.ab_A, d.totalA)}% del total de A</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-label">Votos B · mesas A ≥ B</div>
-            <div class="kpi-val pu" id="kv-ab-B">—</div>
-            <div class="kpi-delta">${pct(d.ab_B, d.totalB)}% del total de B</div>
-          </div>
+          <div class="kpi-card"><div class="kpi-label">Votos A · mesas A ≥ B</div><div class="kpi-val bl" id="kv-ab-A">—</div><div class="kpi-delta">${pct(d.ab_A, d.totalA)}% del total de A</div></div>
+          <div class="kpi-card"><div class="kpi-label">Votos B · mesas A ≥ B</div><div class="kpi-val pu" id="kv-ab-B">—</div><div class="kpi-delta">${pct(d.ab_B, d.totalB)}% del total de B</div></div>
         </div>
-        <div class="card" style="margin-bottom:1.5rem">
+        <div class="card">
           <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.8rem;flex-wrap:wrap">
             <div class="card-label" style="margin-bottom:0" id="drill-ab-title">Por departamento</div>
             <span class="level-badge dep" id="drill-ab-badge">Nacional</span>
           </div>
           <div class="drill-nav" id="drill-ab-nav"></div>
-          <table class="results-table">
-            <thead id="drill-ab-thead"></thead>
-            <tbody id="drill-ab-tbody"></tbody>
-          </table>
+          <table class="results-table"><thead id="drill-ab-thead"></thead><tbody id="drill-ab-tbody"></tbody></table>
         </div>
 
-        <!-- §3 FILTRO CRUZADO C/D (opcional) -->
-        <div id="section-cd" class="${d.useCD && d.nameC && d.nameD ? '' : 'hidden'}">
-          <div class="section-header">
-            <span class="section-num">§ 03</span>
-            <span class="section-title">Filtro cruzado · Mesas donde A ≥ B y C ≥ D</span>
-          </div>
+        <!-- § 03 FILTRO CRUZADO -->
+        <div id="section-cd" class="${d.useCD ? '' : 'hidden'}">
+          <div class="section-header"><span class="section-num">§ 03</span><span class="section-title">Filtro cruzado · Mesas donde A ≥ B y C ≥ D</span></div>
           <div class="filter-info">
             <span class="filter-chip ab">${fmt(d.mesasABCDCount)} mesas</span>
             <span class="filter-chip cd">A ≥ B + C ≥ D</span>
             <span style="font-family:'DM Mono',monospace;font-size:.6rem;color:rgba(255,255,255,.25)">${pct(d.mesasABCDCount, d.mesasTotal)}% del total</span>
           </div>
           <div class="kpi-row" style="margin-bottom:1rem">
-            <div class="kpi-card">
-              <div class="kpi-label">Votos A · filtro cruzado</div>
-              <div class="kpi-val bl" id="kv-abcd-A">—</div>
-              <div class="kpi-delta">${d.corpA}</div>
-            </div>
-            <div class="kpi-card">
-              <div class="kpi-label">Votos B · filtro cruzado</div>
-              <div class="kpi-val pu" id="kv-abcd-B">—</div>
-              <div class="kpi-delta">${d.corpB}</div>
-            </div>
-            <div class="kpi-card">
-              <div class="kpi-label">Votos C · filtro cruzado</div>
-              <div class="kpi-val gr" id="kv-abcd-C">—</div>
-              <div class="kpi-delta">${d.corpC}</div>
-            </div>
-            <div class="kpi-card">
-              <div class="kpi-label">Votos D · filtro cruzado</div>
-              <div class="kpi-val or" id="kv-abcd-D">—</div>
-              <div class="kpi-delta">${d.corpD}</div>
-            </div>
+            <div class="kpi-card"><div class="kpi-label">Votos A · filtro cruzado</div><div class="kpi-val bl" id="kv-abcd-A">—</div><div class="kpi-delta">${d.selA.corp}</div></div>
+            <div class="kpi-card"><div class="kpi-label">Votos B · filtro cruzado</div><div class="kpi-val pu" id="kv-abcd-B">—</div><div class="kpi-delta">${d.selB.corp}</div></div>
+            <div class="kpi-card"><div class="kpi-label">Votos C · filtro cruzado</div><div class="kpi-val gr" id="kv-abcd-C">—</div><div class="kpi-delta">${d.selC?.corp||''}</div></div>
+            <div class="kpi-card"><div class="kpi-label">Votos D · filtro cruzado</div><div class="kpi-val or" id="kv-abcd-D">—</div><div class="kpi-delta">${d.selD?.corp||''}</div></div>
           </div>
           <div class="card">
             <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.8rem;flex-wrap:wrap">
@@ -642,22 +559,18 @@
               <span class="level-badge dep" id="drill-cd-badge">Nacional</span>
             </div>
             <div class="drill-nav" id="drill-cd-nav"></div>
-            <table class="results-table">
-              <thead id="drill-cd-thead"></thead>
-              <tbody id="drill-cd-tbody"></tbody>
-            </table>
+            <table class="results-table"><thead id="drill-cd-thead"></thead><tbody id="drill-cd-tbody"></tbody></table>
           </div>
-        </div>
-      `;
+        </div>`;
 
-      // Animate KPIs
+      // Animar KPIs
       setTimeout(() => {
         animCount(document.getElementById('kv-A'), d.totalA);
         animCount(document.getElementById('kv-B'), d.totalB);
-        animCount(document.getElementById('kv-depA'), d.depBVotosA);
+        animCount(document.getElementById('kv-depA'), depVotosA);
         animCount(document.getElementById('kv-ab-A'), d.ab_A);
         animCount(document.getElementById('kv-ab-B'), d.ab_B);
-        if (d.useCD && d.nameC && d.nameD) {
+        if (d.useCD) {
           animCount(document.getElementById('kv-abcd-A'), d.abcd_A);
           animCount(document.getElementById('kv-abcd-B'), d.abcd_B);
           animCount(document.getElementById('kv-abcd-C'), d.abcd_C);
@@ -665,62 +578,30 @@
         }
       }, 400);
 
-      // dep info
-      const depNomB = d.depBTop ? d.depBTop[1].nom : '—';
-      document.getElementById('kv-depA-sub').textContent = `en ${depNomB}`;
-      document.getElementById('kv-pctDep').textContent = d.totalA ? pct(d.depBVotosB, d.totalA)+'%' : '—';
       document.getElementById('badge-min').textContent = `${fmt(d.totalMin)} votos mínimos en común`;
 
-      // Bars bruta
-      const maxV = Math.max(d.totalA, d.totalB);
+      // Barras brutas
       const barsEl = document.getElementById('bars-bruta');
-      [
-        {nombre: d.nameA, corp: d.corpA, votos: d.totalA, color: COLORS.A},
-        {nombre: d.nameB, corp: d.corpB, votos: d.totalB, color: COLORS.B},
-      ].forEach(c => {
-        const p = pct(c.votos, maxV);
-        barsEl.innerHTML += `
-          <div class="cand-row">
-            <div class="cand-header">
-              <span class="cand-name" style="color:${c.color}">${c.nombre}<span class="cand-corp">${c.corp}</span></span>
-              <span class="cand-pct" style="color:${c.color}">${fmt(c.votos)}</span>
-            </div>
-            <div class="bar-track"><div class="bar-fill" style="background:${c.color};width:0" data-w="${p}"></div></div>
-          </div>`;
+      [{ nombre:d.selA.nombre, corp:d.selA.corp, votos:d.totalA, color:COLORS.A },
+       { nombre:d.selB.nombre, corp:d.selB.corp, votos:d.totalB, color:COLORS.B }].forEach(c => {
+        const p = maxV ? ((c.votos/maxV)*100).toFixed(1) : 0;
+        barsEl.innerHTML += `<div class="cand-row">
+          <div class="cand-header">
+            <span class="cand-name" style="color:${c.color}">${c.nombre}<span class="cand-corp">${c.corp}</span></span>
+            <span class="cand-pct" style="color:${c.color}">${fmt(c.votos)}</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill" style="background:${c.color};width:0" data-w="${p}"></div></div>
+        </div>`;
       });
       setTimeout(() => document.querySelectorAll('.bar-fill[data-w]').forEach(b => b.style.width = b.dataset.w+'%'), 600);
 
-      // Init drill tables
-      renderDrillAB('dep', null, null, null, null, null, null);
-      if (d.useCD && d.nameC && d.nameD) {
-        renderDrillCD('dep', null, null, null, null, null, null);
-      }
+      // Drill tables
+      renderDrill('ab', mesasAB, drillAB);
+      if (d.useCD) renderDrill('cd', mesasABCD, drillCD);
     }
 
-    // ─── HELPERS ──────────────────────────────────────────────
-    function shortName(n) { return n.split(' ').slice(0,2).join(' '); }
-
-    function animCount(el, target, ms=1100) {
-      if (!el) return;
-      const t0 = performance.now();
-      (function tick(now) {
-        const p = Math.min((now-t0)/ms, 1);
-        el.textContent = Math.round((1-Math.pow(1-p,3))*target).toLocaleString('es-CO');
-        if(p<1) requestAnimationFrame(tick);
-      })(t0);
-    }
-
-    // ─── DRILL AB ─────────────────────────────────────────────
-    function renderDrillAB(nivel, cod_dep, nom_dep, cod_mun, nom_mun, cod_com, nom_com) {
-      drillAB = { nivel, cod_dep, nom_dep, cod_mun, nom_mun, cod_com, nom_com };
-      _renderDrill('ab', mesasAB, drillAB);
-    }
-    function renderDrillCD(nivel, cod_dep, nom_dep, cod_mun, nom_mun, cod_com, nom_com) {
-      drillCD = { nivel, cod_dep, nom_dep, cod_mun, nom_mun, cod_com, nom_com };
-      _renderDrill('cd', mesasABCD, drillCD);
-    }
-
-    function _renderDrill(prefix, mesas, state) {
+    // ─── DRILL ────────────────────────────────────────────────
+    function renderDrill(prefix, mesas, state) {
       const hasCD = prefix === 'cd';
       const titleEl = document.getElementById(`drill-${prefix}-title`);
       const badgeEl = document.getElementById(`drill-${prefix}-badge`);
@@ -729,182 +610,120 @@
       const tbodyEl = document.getElementById(`drill-${prefix}-tbody`);
       if (!titleEl) return;
 
-      // Build nav
-      const crumbs = [{ label:'Nacional', clickable: !!state.cod_dep, fn: `_drillTo('${prefix}','dep',null,null,null,null,null,null)` }];
-      if (state.nom_dep) crumbs.push({ label: state.nom_dep, clickable: !!state.cod_mun, fn: `_drillTo('${prefix}','mun','${state.cod_dep}','${esc(state.nom_dep)}',null,null,null,null)` });
-      if (state.nom_mun) crumbs.push({ label: state.nom_mun, clickable: !!state.cod_com, fn: `_drillTo('${prefix}','com','${state.cod_dep}','${esc(state.nom_dep)}','${state.cod_mun}','${esc(state.nom_mun)}',null,null)` });
-      if (state.nom_com) crumbs.push({ label: state.nom_com, clickable: false, fn: null });
+      // Nav
+      const crumbs = [{ label:'Nacional', clickable:!!state.cod_dep, fn:`_drillTo('${prefix}','dep',null,null,null,null,null,null)` }];
+      if (state.nom_dep) crumbs.push({ label:state.nom_dep, clickable:!!state.cod_mun, fn:`_drillTo('${prefix}','mun','${state.cod_dep}','${esc(state.nom_dep)}',null,null,null,null)` });
+      if (state.nom_mun) crumbs.push({ label:state.nom_mun, clickable:!!state.cod_com, fn:`_drillTo('${prefix}','com','${state.cod_dep}','${esc(state.nom_dep)}','${state.cod_mun}','${esc(state.nom_mun)}',null,null)` });
+      if (state.nom_com) crumbs.push({ label:state.nom_com, clickable:false });
       navEl.innerHTML = '';
-      crumbs.forEach((c, i) => {
-        if (i>0) navEl.innerHTML += '<span class="drill-sep">›</span>';
+      crumbs.forEach((c,i) => {
+        if(i>0) navEl.innerHTML += '<span class="drill-sep">›</span>';
         const span = document.createElement('span');
-        span.className = 'drill-crumb' + (i===crumbs.length-1?' active':'') + (c.clickable?' clickable':'');
+        span.className = 'drill-crumb'+(i===crumbs.length-1?' active':'')+(c.clickable?' clickable':'');
         span.textContent = c.label;
-        if (c.clickable) span.setAttribute('onclick', c.fn);
+        if(c.clickable) span.setAttribute('onclick',c.fn);
         navEl.appendChild(span);
       });
 
-      // Filter mesas to current level
+      // Filter
       let filtered = mesas;
       if (state.cod_dep) filtered = filtered.filter(m=>m.dep===state.cod_dep);
       if (state.cod_mun) filtered = filtered.filter(m=>m.mun===state.cod_mun);
       if (state.cod_com) filtered = filtered.filter(m=>m.com===state.cod_com);
 
-      // Aggregate by next level
+      // Group
       let groups = {};
-      let groupKey, groupNom, nextLevel, nextFn;
-
-      if (state.nivel === 'dep') {
-        titleEl.textContent = 'Por departamento';
-        badgeEl.textContent = 'Nacional'; badgeEl.className = 'level-badge dep';
-        filtered.forEach(m => {
-          if (!groups[m.dep]) groups[m.dep] = { nom: m.depNom, A:0, B:0, C:0, D:0, cod: m.dep };
-          groups[m.dep].A += m.A; groups[m.dep].B += m.B; groups[m.dep].C += m.C; groups[m.dep].D += m.D;
-        });
+      if (state.nivel==='dep') {
+        titleEl.textContent='Por departamento'; badgeEl.textContent='Nacional'; badgeEl.className='level-badge dep';
+        filtered.forEach(m=>{ if(!groups[m.dep]) groups[m.dep]={nom:m.depNom,A:0,B:0,C:0,D:0,cod:m.dep}; groups[m.dep].A+=m.A;groups[m.dep].B+=m.B;groups[m.dep].C+=m.C;groups[m.dep].D+=m.D; });
         theadEl.innerHTML = buildThead('Departamento', hasCD);
         tbodyEl.innerHTML = '';
-        Object.values(groups).sort((a,b)=>b.A-a.A).forEach((g,i) => {
-          const fn = `_drillTo('${prefix}','mun','${g.cod}','${esc(g.nom)}',null,null,null,null)`;
-          tbodyEl.innerHTML += buildDrillRow(i, g.nom, g, fn, hasCD);
+        Object.values(groups).sort((a,b)=>b.A-a.A).forEach((g,i)=>{
+          tbodyEl.innerHTML += buildDrillRow(i, g.nom, g, `_drillTo('${prefix}','mun','${g.cod}','${esc(g.nom)}',null,null,null,null)`, hasCD);
         });
-      } else if (state.nivel === 'mun') {
-        titleEl.textContent = `Municipios · ${state.nom_dep}`;
-        badgeEl.textContent = state.nom_dep; badgeEl.className = 'level-badge mun';
-        filtered.forEach(m => {
-          if (!groups[m.mun]) groups[m.mun] = { nom: m.munNom, A:0, B:0, C:0, D:0, cod: m.mun };
-          groups[m.mun].A += m.A; groups[m.mun].B += m.B; groups[m.mun].C += m.C; groups[m.mun].D += m.D;
-        });
+      } else if (state.nivel==='mun') {
+        titleEl.textContent=`Municipios · ${state.nom_dep}`; badgeEl.textContent=state.nom_dep; badgeEl.className='level-badge mun';
+        filtered.forEach(m=>{ if(!groups[m.mun]) groups[m.mun]={nom:m.munNom,A:0,B:0,C:0,D:0,cod:m.mun}; groups[m.mun].A+=m.A;groups[m.mun].B+=m.B;groups[m.mun].C+=m.C;groups[m.mun].D+=m.D; });
         theadEl.innerHTML = buildThead('Municipio', hasCD);
         tbodyEl.innerHTML = '';
-        Object.values(groups).sort((a,b)=>b.A-a.A).forEach((g,i) => {
-          const fn = `_drillTo('${prefix}','com','${state.cod_dep}','${esc(state.nom_dep)}','${g.cod}','${esc(g.nom)}',null,null)`;
-          tbodyEl.innerHTML += buildDrillRow(i, g.nom, g, fn, hasCD);
+        Object.values(groups).sort((a,b)=>b.A-a.A).forEach((g,i)=>{
+          tbodyEl.innerHTML += buildDrillRow(i, g.nom, g, `_drillTo('${prefix}','com','${state.cod_dep}','${esc(state.nom_dep)}','${g.cod}','${esc(g.nom)}',null,null)`, hasCD);
         });
-      } else if (state.nivel === 'com') {
-        titleEl.textContent = `Comunas · ${state.nom_mun}`;
-        badgeEl.textContent = state.nom_mun; badgeEl.className = 'level-badge com';
-        filtered.forEach(m => {
-          const key = m.com || 'SIN COMUNA';
-          const nom = m.comNom || 'Sin comuna';
-          if (!groups[key]) groups[key] = { nom, A:0, B:0, C:0, D:0, cod: key };
-          groups[key].A += m.A; groups[key].B += m.B; groups[key].C += m.C; groups[key].D += m.D;
-        });
+      } else if (state.nivel==='com') {
+        titleEl.textContent=`Comunas · ${state.nom_mun}`; badgeEl.textContent=state.nom_mun; badgeEl.className='level-badge com';
+        filtered.forEach(m=>{ const k=m.com||'SIN'; const n=m.comNom||'Sin comuna'; if(!groups[k]) groups[k]={nom:n,A:0,B:0,C:0,D:0,cod:k}; groups[k].A+=m.A;groups[k].B+=m.B;groups[k].C+=m.C;groups[k].D+=m.D; });
         theadEl.innerHTML = buildThead('Comuna', hasCD);
         tbodyEl.innerHTML = '';
-        Object.values(groups).sort((a,b)=>b.A-a.A).forEach((g,i) => {
-          const fn = `_drillTo('${prefix}','pues','${state.cod_dep}','${esc(state.nom_dep)}','${state.cod_mun}','${esc(state.nom_mun)}','${g.cod}','${esc(g.nom)}')`;
-          tbodyEl.innerHTML += buildDrillRow(i, g.nom, g, fn, hasCD);
+        Object.values(groups).sort((a,b)=>b.A-a.A).forEach((g,i)=>{
+          tbodyEl.innerHTML += buildDrillRow(i, g.nom, g, `_drillTo('${prefix}','pues','${state.cod_dep}','${esc(state.nom_dep)}','${state.cod_mun}','${esc(state.nom_mun)}','${g.cod}','${esc(g.nom)}')`, hasCD);
         });
-      } else if (state.nivel === 'pues') {
-        titleEl.textContent = `Puestos · ${state.nom_com||state.nom_mun}`;
-        badgeEl.textContent = state.nom_com||state.nom_mun; badgeEl.className = 'level-badge pues';
-        filtered.forEach(m => {
-          if (!groups[m.pue]) groups[m.pue] = { nom: m.pueNom, A:0, B:0, C:0, D:0, cod: m.pue };
-          groups[m.pue].A += m.A; groups[m.pue].B += m.B; groups[m.pue].C += m.C; groups[m.pue].D += m.D;
-        });
+      } else {
+        titleEl.textContent=`Puestos · ${state.nom_com||state.nom_mun}`; badgeEl.textContent=state.nom_com||state.nom_mun; badgeEl.className='level-badge pues';
+        filtered.forEach(m=>{ if(!groups[m.pue]) groups[m.pue]={nom:m.pueNom,A:0,B:0,C:0,D:0,cod:m.pue}; groups[m.pue].A+=m.A;groups[m.pue].B+=m.B;groups[m.pue].C+=m.C;groups[m.pue].D+=m.D; });
         theadEl.innerHTML = buildThead('Puesto de votación', hasCD);
         tbodyEl.innerHTML = '';
-        Object.values(groups).sort((a,b)=>b.A-a.A).forEach((g,i) => {
+        Object.values(groups).sort((a,b)=>b.A-a.A).forEach((g,i)=>{
           tbodyEl.innerHTML += buildDrillRow(i, g.nom, g, null, hasCD);
         });
       }
     }
 
-    // Global drill dispatcher
     function _drillTo(prefix, nivel, cod_dep, nom_dep, cod_mun, nom_mun, cod_com, nom_com) {
-      if (prefix==='ab') renderDrillAB(nivel, cod_dep, nom_dep, cod_mun, nom_mun, cod_com, nom_com);
-      else renderDrillCD(nivel, cod_dep, nom_dep, cod_mun, nom_mun, cod_com, nom_com);
+      const state = { nivel, cod_dep, nom_dep, cod_mun, nom_mun, cod_com, nom_com };
+      if (prefix==='ab') { drillAB=state; renderDrill('ab', mesasAB, state); }
+      else { drillCD=state; renderDrill('cd', mesasABCD, state); }
     }
-
-    function esc(s) { return (s||'').replace(/'/g, "\\'"); }
 
     function buildThead(col1, hasCD) {
       const cdCols = hasCD ? '<th class="r" style="color:rgba(74,222,128,.5)">C</th><th class="r" style="color:rgba(251,146,60,.5)">D</th>' : '';
-      return `<tr>
-        <th>#</th><th>${col1}</th>
-        <th class="r" style="color:rgba(0,71,255,.7)">A</th>
-        <th class="r" style="color:rgba(167,139,250,.7)">B</th>
-        ${cdCols}
-        <th class="r">Total</th><th class="r">% A</th>
-      </tr>`;
+      return `<tr><th>#</th><th>${col1}</th><th class="r" style="color:rgba(0,71,255,.7)">A</th><th class="r" style="color:rgba(167,139,250,.7)">B</th>${cdCols}<th class="r">% A vs B</th></tr>`;
     }
 
     function buildDrillRow(i, label, g, onclickStr, hasCD) {
-      const total = g.A + g.B + (hasCD ? g.C + g.D : 0);
       const p = pct(g.A, g.A+g.B);
       const nameCell = onclickStr
-        ? `<button class="drill-btn" onclick="${onclickStr}"><span class="winner-dot" style="background:var(--blue)"></span>${label} <span style="font-size:.6rem;opacity:.5">→</span></button>`
-        : `<span><span class="winner-dot" style="background:var(--blue)"></span>${label}</span>`;
-      const cdCols = hasCD ? `
-        <td class="r" style="color:rgba(74,222,128,.7)">${fmt(g.C)}</td>
-        <td class="r" style="color:rgba(251,146,60,.7)">${fmt(g.D)}</td>` : '';
+        ? `<button class="drill-btn" onclick="${onclickStr}"><span style="width:7px;height:7px;border-radius:50%;background:var(--blue);display:inline-block;margin-right:5px;vertical-align:middle"></span>${label} <span style="font-size:.6rem;opacity:.5">→</span></button>`
+        : `<span><span style="width:7px;height:7px;border-radius:50%;background:var(--blue);display:inline-block;margin-right:5px;vertical-align:middle"></span>${label}</span>`;
+      const cdCols = hasCD ? `<td class="r" style="color:rgba(74,222,128,.7)">${fmt(g.C)}</td><td class="r" style="color:rgba(251,146,60,.7)">${fmt(g.D)}</td>` : '';
       return `<tr>
         <td style="color:rgba(255,255,255,.3)">${i+1}</td>
         <td>${nameCell}</td>
-        <td class="r" style="color:rgba(0,71,255,.9)">${fmt(g.A)}</td>
+        <td class="r" style="color:rgba(0,71,255,.9);font-weight:700">${fmt(g.A)}</td>
         <td class="r" style="color:rgba(167,139,250,.8)">${fmt(g.B)}</td>
         ${cdCols}
-        <td class="r" style="color:rgba(255,255,255,.35)">${fmt(total)}</td>
         <td class="r"><span style="color:var(--blue);font-weight:700">${p}%</span>
           <span class="mini-bar-wrap"><span class="mini-bar-fill" style="background:var(--blue);width:${p}%"></span></span>
         </td></tr>`;
     }
 
-    // ─── CURTAIN ──────────────────────────────────────────────
-    const curtain = document.getElementById('curtain');
-    curtain.classList.add('opening');
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{
-      setTimeout(()=>{ curtain.classList.remove('opening'); curtain.classList.add('opened'); }, 900);
-    }));
-    function navTo(e, href) {
-      e.preventDefault();
-      curtain.classList.remove('opened');
-      curtain.classList.add('closing');
-      setTimeout(()=>{ window.location.href=href; }, 1000);
+    // ─── HELPERS ──────────────────────────────────────────────
+    function shortName(n) { return n.split(' ').slice(0,2).join(' '); }
+    function animCount(el, target, ms=1100) {
+      if(!el) return;
+      const t0=performance.now();
+      (function tick(now){ const p=Math.min((now-t0)/ms,1); el.textContent=Math.round((1-Math.pow(1-p,3))*target).toLocaleString('es-CO'); if(p<1) requestAnimationFrame(tick); })(t0);
     }
+
+    // ─── CURTAIN ──────────────────────────────────────────────
+    const curtain=document.getElementById('curtain');
+    curtain.classList.add('opening');
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{setTimeout(()=>{curtain.classList.remove('opening');curtain.classList.add('opened');},900);}));
+    function navTo(e,href){e.preventDefault();curtain.classList.remove('opened');curtain.classList.add('closing');setTimeout(()=>{window.location.href=href;},1150);}
 
     // ─── CURSOR ───────────────────────────────────────────────
-    const cur=document.getElementById('cursor'), ri=document.getElementById('cursorRing');
+    const cur2=document.getElementById('cursor'),ri=document.getElementById('cursorRing');
     let mx=0,my=0,rx=0,ry=0;
-    document.addEventListener('mousemove',e=>{ mx=e.clientX; my=e.clientY; cur.style.left=mx+'px'; cur.style.top=my+'px'; });
-    (function loop(){ rx+=(mx-rx)*.1; ry+=(my-ry)*.1; ri.style.left=rx+'px'; ri.style.top=ry+'px'; requestAnimationFrame(loop); })();
-    document.addEventListener('mouseover',e=>{
-      if(e.target.closest('a,button,select,label')){ cur.style.transform='translate(-50%,-50%) scale(2.2)'; cur.style.background='transparent'; cur.style.border='1.5px solid #0047FF'; ri.style.opacity='0'; }
-      else { cur.style.transform='translate(-50%,-50%) scale(1)'; cur.style.background='#0047FF'; cur.style.border='none'; ri.style.opacity='.4'; }
-    });
+    document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur2.style.left=mx+'px';cur2.style.top=my+'px';});
+    (function loop(){rx+=(mx-rx)*.12;ry+=(my-ry)*.12;ri.style.left=rx+'px';ri.style.top=ry+'px';requestAnimationFrame(loop);})();
+    document.addEventListener('mouseover',e=>{if(e.target.closest('a,button,select,label')){cur2.style.transform='translate(-50%,-50%) scale(2.2)';cur2.style.background='transparent';cur2.style.border='1.5px solid #0047FF';ri.style.opacity='0';}else{cur2.style.transform='translate(-50%,-50%) scale(1)';cur2.style.background='#0047FF';cur2.style.border='none';ri.style.opacity='.4';}});
 
     // ─── NAV AUTH ─────────────────────────────────────────────
-    function updateElectoralNav() {
-      const token = localStorage.getItem('rr-token');
-      const user  = JSON.parse(localStorage.getItem('rr-user') || 'null');
-      const area  = document.getElementById('e-nav-auth');
-      if (!area) return;
-      if (token && user) {
-        const planLabels = { free:'Free', basic:'Básico', analysis:'Análisis', full:'Completo' };
-        const isFull = user.plan === 'full';
-        area.innerHTML = `
-          <span class="e-user-plan">${planLabels[user.plan] || user.plan}</span>
-          <span class="e-user-name">${user.name.split(' ')[0]}</span>
-          ${!isFull ? `<a href="pricing.html" class="e-btn-upgrade">Mejorar plan ↑</a>` : ''}
-          <button class="e-btn-logout" onclick="eLogOut()">Salir</button>`;
-      } else {
-        area.innerHTML = `
-          <a href="pricing.html" class="e-btn-pricing">Planes</a>
-          <a href="login.html"   class="e-btn-login">Iniciar sesión</a>
-          <a href="register.html" class="e-btn-register">Registrarse</a>`;
-      }
-    }
-    async function eLogOut() {
-      const token = localStorage.getItem('rr-token');
-      if (token) { try { await fetch('https://rr-auth.reruizc.workers.dev/auth/logout', { method:'POST', headers:{ 'Authorization':`Bearer ${token}` } }); } catch {} }
-      localStorage.removeItem('rr-token');
-      localStorage.removeItem('rr-user');
-      updateElectoralNav();
-    }
+    function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;if(token&&user){const pl={free:'Free',basic:'Básico',analysis:'Análisis',full:'Completo'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">Salir</button>`;}else{area.innerHTML=`<a href="pricing.html" style="font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">Planes</a><a href="login.html" class="e-btn-login">Iniciar sesión</a><a href="register.html" class="e-btn-register">Registrarse</a>`;}}
+    async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();}
     updateElectoralNav();
 
     // ─── BOOT ─────────────────────────────────────────────────
-    loadData();
+    loadIndex();
   </script>
 </body>
 </html>
