@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Escrutinio Cámara 2026 · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root{--white:#f4f3ef;--blue:#0047FF;--green:#4ade80;--purple:#a78bfa;--card-border:rgba(255,255,255,0.1);--border:rgba(255,255,255,0.08);--bar-bg:rgba(255,255,255,0.1);--td-hover:rgba(255,255,255,0.04)}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{background:#060810;color:var(--white);font-family:'Syne',sans-serif;cursor:none;min-height:100vh;overflow-x:hidden}
+    .cursor{position:fixed;width:10px;height:10px;background:var(--blue);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);transition:transform .15s,background .2s}
+    .cursor-ring{position:fixed;width:32px;height:32px;border:1.5px solid var(--blue);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);opacity:.4}
+    .bg-layer{position:fixed;inset:0;z-index:0;background:url('foto-fondo.webp') center right/cover no-repeat}
+    .bg-overlay{position:fixed;inset:0;z-index:1;background:linear-gradient(to right,rgba(4,6,16,.97) 0%,rgba(4,6,16,.94) 55%,rgba(4,6,16,.72) 72%,rgba(4,6,16,.35) 88%,rgba(4,6,16,.10) 100%)}
+    .shell{position:relative;z-index:2;min-height:100vh;display:flex;flex-direction:column}
+    .electoral-nav{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(4,6,16,.6);backdrop-filter:blur(8px);flex-shrink:0}
+    .electoral-nav-auth{display:flex;align-items:center;gap:.75rem}
+    .e-btn-login{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.45);text-decoration:none;border:1.5px solid transparent;padding:.35rem .8rem;transition:color .2s,border-color .2s}
+    .e-btn-login:hover{color:var(--white);border-color:rgba(255,255,255,.2)}
+    .e-btn-register{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-decoration:none;background:var(--blue);border:1.5px solid var(--blue);padding:.35rem .8rem}
+    .e-user-name{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.7)}
+    .e-user-plan{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue);background:rgba(0,71,255,.12);padding:.2rem .6rem}
+    .e-btn-logout{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.25);background:none;border:none;cursor:none;padding:0}
+    .logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.8;transition:opacity .2s}
+    .logo-link:hover{opacity:1}
+    .logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px}
+    .logo-bar{width:5px;background:var(--blue);border-radius:1px 1px 0 0;opacity:.85}
+    .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.1rem,2vw,1.8rem);letter-spacing:-.03em;color:var(--white)}
+    .logo-text span{color:var(--blue)}
+    @media(max-width:900px){.electoral-nav{display:none}}
+    .top-bar{display:flex;align-items:flex-start;justify-content:space-between;padding:1.1rem 2.5rem 0;flex-shrink:0}
+    .page-title{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.5rem,2.8vw,2.5rem);letter-spacing:-.04em;line-height:1.05;color:var(--white);text-shadow:0 2px 24px rgba(0,71,255,.4)}
+    .page-title span{color:var(--blue)}
+    .breadcrumb{padding:.6rem 2.5rem 0;font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3);border-bottom:1px solid var(--border);padding-bottom:.7rem;flex-shrink:0}
+    .breadcrumb a{color:rgba(0,71,255,.7);text-decoration:none}
+    .breadcrumb a:hover{color:var(--blue)}
+    .meta-bar{display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap;padding:.5rem 2.5rem;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.08em;color:rgba(255,255,255,.35);flex-shrink:0}
+    .meta-item b{color:rgba(74,222,128,.85);font-weight:700}
+    .source-badge{margin-left:auto;font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:.3rem .8rem}
+    .source-badge b{color:var(--blue)}
+    .content-area{flex:1;padding:1.8rem 2.5rem 1.5rem}
+    .loader-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;min-height:300px}
+    .loader-ring{width:40px;height:40px;border:2px solid rgba(0,71,255,.2);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .loader-label{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3)}
+    .endoso-cta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;background:rgba(0,71,255,.07);border:1px solid rgba(0,71,255,.2);padding:1rem 1.5rem;margin-bottom:1.5rem;backdrop-filter:blur(4px)}
+    .endoso-cta-text{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;color:rgba(255,255,255,.5);line-height:1.6}
+    .endoso-cta-text b{color:var(--white)}
+    .endoso-btn{display:inline-flex;align-items:center;gap:.6rem;font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--white);background:var(--blue);border:none;padding:.6rem 1.4rem;cursor:pointer;text-decoration:none;transition:background .2s;white-space:nowrap;flex-shrink:0}
+    .endoso-btn:hover{background:#0035cc}
+    .sub-selector{display:flex;gap:.75rem;margin-bottom:1.5rem;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--border);padding-bottom:1rem}
+    .sub-label{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-right:.25rem}
+    .dep-select{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.06em;text-transform:uppercase;background:rgba(255,255,255,.05);border:1.5px solid var(--card-border);color:var(--white);padding:.45rem 2rem .45rem .8rem;cursor:pointer;outline:none;transition:border-color .2s;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23aaa' stroke-width='1.5' stroke-linecap='round' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .75rem center}
+    .dep-select:hover,.dep-select:focus{border-color:var(--blue)}
+    .dep-select option{background:#0e1220;color:var(--white)}
+    .search-input{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.06em;background:rgba(255,255,255,.05);border:1.5px solid var(--card-border);color:var(--white);padding:.45rem .8rem;outline:none;width:200px;transition:border-color .2s}
+    .search-input:focus{border-color:var(--blue)}
+    .search-input::placeholder{color:rgba(255,255,255,.25)}
+    .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
+    .kpi-card{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1.1rem 1.3rem;backdrop-filter:blur(4px)}
+    .kpi-label{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:.4rem}
+    .kpi-val{font-family:'Syne',sans-serif;font-weight:800;font-size:1.7rem;letter-spacing:-.04em;line-height:1;color:var(--blue)}
+    .kpi-val.wh{color:var(--white)}.kpi-val.gr{color:var(--green)}.kpi-val.sm{font-size:.95rem;line-height:1.3}
+    .kpi-delta{font-family:'DM Mono',monospace;font-size:.6rem;color:rgba(255,255,255,.28);margin-top:.3rem}
+    .results-grid{display:grid;grid-template-columns:1fr 300px;gap:1.2rem}
+    .card{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1.3rem;overflow:hidden;backdrop-filter:blur(4px)}
+    .card-label{font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:1rem}
+    .drill-nav{display:flex;align-items:center;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap}
+    .drill-crumb{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.35);cursor:pointer;padding:.3rem .7rem;border:1px solid transparent;transition:color .15s}
+    .drill-crumb.active{color:var(--white);border-color:var(--card-border);background:rgba(255,255,255,.04)}
+    .drill-crumb.clickable{color:rgba(0,71,255,.7)}
+    .drill-crumb.clickable:hover{color:var(--blue)}
+    .drill-sep{color:rgba(255,255,255,.2);font-size:.6rem}
+    .level-badge{font-family:'DM Mono',monospace;font-size:.55rem;letter-spacing:.15em;text-transform:uppercase;padding:.2rem .55rem;border:1px solid}
+    .level-badge.dep{color:rgba(167,139,250,.7);border-color:rgba(167,139,250,.25);background:rgba(167,139,250,.06)}
+    .level-badge.mun{color:rgba(0,71,255,.8);border-color:rgba(0,71,255,.3);background:rgba(0,71,255,.06)}
+    .level-badge.pues{color:rgba(74,222,128,.7);border-color:rgba(74,222,128,.25);background:rgba(74,222,128,.06)}
+    .results-table{width:100%;border-collapse:collapse}
+    .results-table th{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.25);text-align:left;padding:.5rem .6rem;border-bottom:1px solid var(--border);white-space:nowrap}
+    .results-table th.r{text-align:right}
+    .results-table td{padding:.65rem .6rem;border-bottom:1px solid rgba(255,255,255,.05);font-family:'DM Mono',monospace;font-size:.74rem;color:rgba(255,255,255,.75);vertical-align:middle}
+    .results-table td.r{text-align:right}
+    .results-table tr:hover td{background:var(--td-hover)}
+    .bar-wrap{width:72px;height:4px;background:var(--bar-bg);border-radius:2px;overflow:hidden;display:inline-block;vertical-align:middle}
+    .bar-fill{height:100%;background:var(--blue);border-radius:2px;transition:width 1s ease}
+    .pct-val{font-family:'Syne',sans-serif;font-weight:700;font-size:.8rem;color:var(--white);display:inline-block;width:46px;text-align:right;margin-left:6px}
+    .cbadge{display:inline-flex;align-items:center;justify-content:center;background:rgba(0,71,255,.15);color:var(--blue);font-family:'Syne',sans-serif;font-weight:800;font-size:.85rem;min-width:28px;height:24px;padding:0 6px;border:1px solid rgba(0,71,255,.3)}
+    .cbadge.sub{background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border-color:rgba(255,255,255,.08)}
+    .drill-btn{background:none;border:none;color:var(--blue);font-family:'DM Mono',monospace;font-size:.74rem;cursor:pointer;text-align:left;padding:0;display:inline-flex;align-items:center;gap:.4rem;transition:color .15s}
+    .drill-btn:hover{color:#7ab3ff}
+    .expand-btn{background:none;border:none;cursor:pointer;font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.06em;color:rgba(0,71,255,.9);display:flex;align-items:center;gap:.4rem;padding:.25rem 0;transition:color .15s;font-weight:500}
+    .expand-btn:hover{color:var(--blue);text-decoration:underline}
+    .cands-inner{background:rgba(0,0,0,.2);border-top:1px solid var(--border);border-bottom:2px solid rgba(0,71,255,.2);padding:.5rem 1rem .75rem 2.5rem;display:none}
+    .cands-inner.open{display:block}
+    .cands-table{width:100%;border-collapse:collapse;font-size:.78rem}
+    .cands-table thead th{font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.25);padding:.4rem .5rem;border-bottom:1px solid var(--border);font-weight:400}
+    .cands-table tbody tr{border-bottom:1px solid rgba(255,255,255,.05)}
+    .cands-table tbody tr:last-child{border-bottom:none}
+    .cands-table tbody td{padding:.35rem .5rem;vertical-align:middle}
+    /* Circunscripcion badge */
+    .circ-badge{display:inline-flex;align-items:center;font-family:'DM Mono',monospace;font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;padding:.15rem .5rem;border:1px solid rgba(0,71,255,.3);color:rgba(0,71,255,.8);background:rgba(0,71,255,.07);margin-left:.5rem}
+    .donut-wrap{display:flex;flex-direction:column;align-items:center;gap:1rem}
+    .donut-cw{position:relative;width:150px;height:150px}
+    .donut-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+    .donut-pct{font-family:'Syne',sans-serif;font-weight:800;font-size:1.5rem;letter-spacing:-.04em;color:var(--white);line-height:1}
+    .donut-sub{font-family:'DM Mono',monospace;font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-top:2px}
+    .donut-legend{width:100%;display:flex;flex-direction:column;gap:.55rem}
+    .li{display:flex;align-items:center;gap:.6rem;font-family:'DM Mono',monospace;font-size:.75rem;color:rgba(255,255,255,.5)}
+    .ld{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+    .lv{margin-left:auto;color:var(--white);font-weight:700}
+    .umbral-bar{margin-top:1rem;padding-top:.8rem;border-top:1px solid var(--border)}
+    .umbral-label{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:.4rem}
+    .umbral-val{font-family:'DM Mono',monospace;font-size:.72rem;color:var(--blue)}
+    .back-bar{flex-shrink:0;padding:.6rem 2.5rem 1rem;display:flex;align-items:center;gap:1rem}
+    .back-btn{display:inline-flex;align-items:center;gap:.5rem;font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--white);text-decoration:none;cursor:pointer;background:rgba(0,71,255,.25);border:1px solid rgba(0,71,255,.5);padding:.3rem .9rem;transition:background .2s}
+    .back-btn:hover{background:rgba(0,71,255,.45)}
+    .full-footer{flex-shrink:0;width:100%;border-top:1px solid var(--border);padding:.5rem 2.5rem;display:flex;align-items:center;justify-content:space-between}
+    .footer-brand{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.09em;color:rgba(255,255,255,.2)}
+    .footer-brand a{color:rgba(255,255,255,.25);text-decoration:none}
+    .curtain{position:fixed;inset:0;z-index:99999;pointer-events:none}
+    .curtain-layer{position:absolute;inset:0;background:#04060e}
+    .curtain-layer:nth-child(1){clip-path:polygon(0 0,100% 0,100% 22%,0 28%);transform:translateX(-110%);transition:transform .58s cubic-bezier(.75,0,.25,1) 0s}
+    .curtain-layer:nth-child(2){clip-path:polygon(0 26%,100% 20%,100% 49%,0 55%);transform:translateX(110%);transition:transform .58s cubic-bezier(.75,0,.25,1) .07s}
+    .curtain-layer:nth-child(3){clip-path:polygon(0 53%,100% 47%,100% 76%,0 82%);transform:translateX(-110%);transition:transform .58s cubic-bezier(.75,0,.25,1) .14s}
+    .curtain-layer:nth-child(4){clip-path:polygon(0 80%,100% 74%,100% 100%,0 100%);transform:translateX(110%);transition:transform .58s cubic-bezier(.75,0,.25,1) .21s}
+    .curtain-stage{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.8rem;pointer-events:none}
+    .curtain-tag{font-family:'DM Mono',monospace;font-size:1.08rem;letter-spacing:.35em;text-transform:uppercase;color:rgba(0,71,255,.7);opacity:0;transform:translateY(-12px);transition:opacity .4s ease,transform .4s ease}
+    .curtain-sub{font-family:'DM Mono',monospace;font-size:.975rem;letter-spacing:.22em;color:rgba(255,255,255,.35);text-transform:uppercase;opacity:0;transform:translateY(12px);transition:opacity .4s ease,transform .4s ease}
+    .curtain-headline{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(2.6rem,6.5vw,5.85rem);letter-spacing:-.03em;line-height:1.05;text-shadow:0 0 50px rgba(0,71,255,.5);text-align:center}
+    .curtain-line{overflow:hidden;display:block}
+    .curtain-word{display:inline-block;opacity:0;transition:transform .52s cubic-bezier(.25,.46,.45,.94),opacity .45s ease}
+    .curtain-word.from-left{transform:translateX(-80px)}.curtain-word.from-right{transform:translateX(80px)}
+    .curtain-word.white{color:#f4f3ef}.curtain-word.blue{color:#0047FF}
+    .curtain.opening .curtain-layer{transform:translateX(0)!important;transition:none}
+    .curtain.opening .curtain-word{transform:translateX(0);opacity:1;transition:none}
+    .curtain.opening .curtain-tag,.curtain.opening .curtain-sub{opacity:1;transform:translateY(0);transition:none}
+    .curtain.opened .curtain-layer:nth-child(1){transform:translateX(-110%)}
+    .curtain.opened .curtain-layer:nth-child(2){transform:translateX(110%)}
+    .curtain.opened .curtain-layer:nth-child(3){transform:translateX(-110%)}
+    .curtain.opened .curtain-layer:nth-child(4){transform:translateX(110%)}
+    .curtain.opened .curtain-word{opacity:0}
+    .curtain.opened .curtain-tag,.curtain.opened .curtain-sub{opacity:0;transition:opacity .25s ease}
+    .curtain.opened{pointer-events:none}
+    .curtain.closing{pointer-events:all}
+    .curtain.closing .curtain-layer{transform:translateX(0)!important}
+    .curtain.closing .curtain-word.from-left,.curtain.closing .curtain-word.from-right{transform:translateX(0);opacity:1;transition-delay:.62s}
+    .curtain.closing .curtain-tag{opacity:1;transform:translateY(0);transition-delay:.68s}
+    .curtain.closing .curtain-sub{opacity:1;transform:translateY(0);transition-delay:.72s}
+    @media(max-width:1000px){.results-grid{grid-template-columns:1fr}}
+    @media(max-width:900px){body{cursor:auto}.cursor,.cursor-ring{display:none}.top-bar,.breadcrumb,.meta-bar,.content-area,.full-footer,.back-bar{padding-left:1.2rem;padding-right:1.2rem}.bg-overlay{background:rgba(4,6,16,.93)}.kpi-row{grid-template-columns:1fr 1fr;gap:.75rem}}
+    @media(max-width:600px){.kpi-row{grid-template-columns:1fr}.sub-selector{flex-direction:column;align-items:flex-start}.search-input{width:100%}}
+    .hidden{display:none!important}
+  </style>
+</head>
+<body>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+  <div class="bg-layer"></div>
+  <div class="bg-overlay"></div>
+  <div class="curtain" id="curtain">
+    <div class="curtain-layer"></div><div class="curtain-layer"></div>
+    <div class="curtain-layer"></div><div class="curtain-layer"></div>
+    <div class="curtain-stage">
+      <span class="curtain-tag">ricardoruiz.co</span>
+      <div class="curtain-headline">
+        <span class="curtain-line"><span class="curtain-word from-left white">Cámara</span></span>
+        <span class="curtain-line"><span class="curtain-word from-right blue">de Representantes</span></span>
+      </div>
+      <span class="curtain-sub">Escrutinio · 2026</span>
+    </div>
+  </div>
+
+  <div class="shell">
+    <nav class="electoral-nav">
+      <div id="e-nav-auth" class="electoral-nav-auth"></div>
+      <a href="electoral.html" class="logo-link" onclick="navTo(event,'electoral.html')">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </nav>
+    <div class="top-bar">
+      <div class="page-title">Cámara de<br/><span>Representantes</span></div>
+    </div>
+    <div class="breadcrumb">
+      <a href="electoral.html" onclick="navTo(event,'electoral.html')">Resultados Electorales</a>
+      &nbsp;/&nbsp; Escrutinio Cámara 2026
+    </div>
+    <div class="meta-bar">
+      <span class="meta-item">Elección: <b>Congreso · 16 Mar 2026</b></span>
+      <span class="meta-item">Curules: <b>166</b></span>
+      <span class="meta-item">Votos válidos: <b id="meta-votval">—</b></span>
+      <div class="source-badge">Fuente: <b>Registraduría · Escrutinio</b></div>
+    </div>
+
+    <div class="content-area">
+      <div id="load-state" class="loader-wrap">
+        <div class="loader-ring"></div>
+        <div class="loader-label">Cargando escrutinio…</div>
+      </div>
+      <div id="main-content" class="hidden">
+
+        <div class="endoso-cta">
+          <div class="endoso-cta-text"><b>¿Quieres medir el endoso?</b><br/>Compara la votación de un candidato a la Cámara con uno al Senado mesa por mesa.</div>
+          <a href="endoso-2026.html" class="endoso-btn" onclick="navTo(event,'endoso-2026.html')">Calcular endoso →</a>
+        </div>
+
+        <div class="sub-selector">
+          <span class="sub-label">Circunscripción:</span>
+          <select class="dep-select" id="dep-select" onchange="switchDep(this.value)">
+            <option value="TODOS">Nacional (todas)</option>
+          </select>
+          <span class="sub-label" style="margin-left:1.5rem">Buscar candidato:</span>
+          <input id="cam-search" type="search" class="search-input" placeholder="Nombre o apellido…"
+            oninput="buscarCandidato(this.value)"
+            onfocus="this.style.borderColor='var(--blue)'"
+            onblur="this.style.borderColor='var(--card-border)'" />
+        </div>
+
+        <div id="cam-search-results" style="display:none;margin-bottom:1.5rem"></div>
+        <div class="kpi-row" id="kpi-row"></div>
+
+        <div class="results-grid" id="cam-main-grid">
+          <div class="card">
+            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.8rem;flex-wrap:wrap">
+              <div class="card-label" style="margin-bottom:0" id="lbl-tabla">Partidos · Cámara · Nacional · 166 curules · D'Hondt por depto.</div>
+              <span class="level-badge dep" id="drill-badge">Nacional</span>
+            </div>
+            <div class="drill-nav" id="drill-nav"></div>
+            <table class="results-table">
+              <thead id="drill-thead"></thead>
+              <tbody id="tbody-camara"></tbody>
+            </table>
+          </div>
+          <div class="card">
+            <div class="card-label">Distribución de votos</div>
+            <div class="donut-wrap">
+              <div class="donut-cw">
+                <canvas id="donut-camara"></canvas>
+                <div class="donut-center">
+                  <div class="donut-pct" id="pct-camara">—</div>
+                  <div class="donut-sub">válidos</div>
+                </div>
+              </div>
+              <div class="donut-legend" id="leg-camara"></div>
+            </div>
+            <div class="umbral-bar">
+              <div class="umbral-label">Curules totales asignadas</div>
+              <div class="umbral-val" id="curules-total">—</div>
+              <div class="umbral-label" style="margin-top:.5rem">Método</div>
+              <div class="umbral-val" style="font-size:.65rem">D'Hondt por circunscripción · umbral 3%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="back-bar">
+      <a href="electoral.html" class="back-btn" onclick="navTo(event,'electoral.html')">← Volver</a>
+      <a href="endoso-2026.html" class="endoso-btn" onclick="navTo(event,'endoso-2026.html')" style="margin-left:auto">Calcular endoso →</a>
+    </div>
+  </div>
+
+  <div class="full-footer">
+    <span class="footer-brand">ricardoruiz.co · Elecciones Colombia 2026</span>
+    <span class="footer-brand"><a href="https://registraduria.gov.co" target="_blank">Fuente: Registraduría Nacional</a></span>
+  </div>
+
+  <script>
+    const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
+    const CURULES_TOTAL = 166;
+    const fmt = n => Number(n).toLocaleString('es-CO');
+    const pct = (n,t) => t ? ((n/t)*100).toFixed(2) : '0.00';
+    const esc = s => (s||'').replace(/'/g,"\\'");
+
+    // ─── CURULES POR DEPARTAMENTO ─────────────────────────────
+    const CURULES_DEP = {
+      'AMAZONAS':2,'ANTIOQUIA':17,'ARAUCA':2,'ATLÁNTICO':7,'BOGOTÁ D.C.':18,
+      'BOLÍVAR':6,'BOYACÁ':6,'CALDAS':5,'CAQUETÁ':2,'CASANARE':2,'CAUCA':5,
+      'CESAR':4,'CHOCÓ':2,'CÓRDOBA':5,'CUNDINAMARCA':7,'GUAINÍA':2,'GUAVIARE':2,
+      'HUILA':4,'LA GUAJIRA':2,'MAGDALENA':5,'META':3,'NARIÑO':6,
+      'NORTE DE SANTANDER':5,'PUTUMAYO':2,'QUINDÍO':3,'RISARALDA':4,
+      'SAN ANDRÉS Y PROVIDENCIA':2,'SANTANDER':7,'SUCRE':3,'TOLIMA':6,
+      'VALLE DEL CAUCA':13,'VAUPÉS':2,'VICHADA':2
+    };
+
+    // Busca curules por nombre de depto (normalizado)
+    function getCurulesDep(nombre) {
+      const n = (nombre||'').toUpperCase().trim()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+        .replace('BOGOTA D.C.','BOGOTÁ D.C.')
+        .replace('BOGOTA','BOGOTÁ D.C.');
+      for (const [k,v] of Object.entries(CURULES_DEP)) {
+        const kn = k.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+        if (kn === n || n.includes(kn) || kn.includes(n)) return v;
+      }
+      return 2; // mínimo por defecto
+    }
+
+    // ─── PALETA ───────────────────────────────────────────────
+    const CP = {'Pacto Histórico':'#6B2D8B','Centro Democrático':'#0088BB','Centro Democrático y MIRA':'#0088BB','Partido Liberal Colombiano':'#C8102E','Partido de la U':'#F7941D','Cambio Radical':'#E91E8C','Partido Conservador Colombiano':'#003580','Alianza Verde':'#4CAF50','Partido Alianza por Colombia (Verde)':'#4CAF50','Movimiento Salvación Nacional':'#00AEEF','MIRA':'#1A3FC4','Frente Amplio Unitario':'#F7941D','Nuevo Liberalismo':'#E53935','Comunes':'#007755'};
+    function getColor(n){if(CP[n])return CP[n];if(/pacto hist/i.test(n))return'#6B2D8B';if(/centro dem/i.test(n))return'#0088BB';if(/liberal/i.test(n))return'#C8102E';if(/conservador/i.test(n))return'#003580';if(/cambio radical/i.test(n))return'#E91E8C';if(/partido de la u/i.test(n))return'#F7941D';if(/alianza (verde|por col)/i.test(n))return'#4CAF50';if(/salvaci[oó]n/i.test(n))return'#00AEEF';if(/\bMIRA\b/i.test(n))return'#1A3FC4';if(/comunes/i.test(n))return'#007755';if(/nuevo liberalismo/i.test(n))return'#E53935';return'#555';}
+
+    // ─── D'HONDT por depto ────────────────────────────────────
+    function dhondtDep(partidos_votos, curules, umbral_pct=0.03) {
+      const total = Object.values(partidos_votos).reduce((s,v)=>s+v,0);
+      const umb = total * umbral_pct;
+      const eleg = Object.entries(partidos_votos).filter(([p,v])=>v>=umb&&!/blanco/i.test(p));
+      const c = Object.fromEntries(eleg.map(([p])=>[p,0]));
+      let cifra = 0;
+      for(let i=0;i<curules;i++){
+        let mx=-1,win=null;
+        eleg.forEach(([p,v])=>{ const q=v/(c[p]+1); if(q>mx){mx=q;win=p;} });
+        if(win){c[win]++;cifra=mx;}
+      }
+      return c;
+    }
+
+    // ─── CACHE ────────────────────────────────────────────────
+    const cache = {};
+    async function getJSON(nivel){
+      if(cache[nivel]) return cache[nivel];
+      const r = await fetch(`${S3}/camara/${nivel}.json`);
+      if(!r.ok) throw new Error(`No se pudo cargar ${nivel}.json (${r.status})`);
+      cache[nivel] = await r.json();
+      return cache[nivel];
+    }
+
+    // ─── STATE ────────────────────────────────────────────────
+    let resumenData = null, donutChart = null;
+    // Curules nacionales calculadas sumando D'Hondt por depto
+    let curulesNac = {}; // {partido: total_curules}
+    let curDep = 'TODOS';
+
+    // ─── INIT ─────────────────────────────────────────────────
+    async function init(){
+      try{
+        resumenData = await getJSON('resumen');
+        // Calcular curules nacionales: D'Hondt por depto, sumar
+        const deps = await getJSON('departamentos');
+        curulesNac = {};
+        deps.forEach(dep => {
+          const nCurules = getCurulesDep(dep.nombre);
+          const cur = dhondtDep(dep.partidos, nCurules);
+          Object.entries(cur).forEach(([p,v])=>{ curulesNac[p]=(curulesNac[p]||0)+v; });
+        });
+        // Anotar curules en resumenData.partidos
+        resumenData.partidos.forEach(p=>{ p.curules_nac = curulesNac[p.partido]||0; });
+
+        document.getElementById('meta-votval').textContent = fmt(resumenData.votval);
+        document.getElementById('load-state').classList.add('hidden');
+        document.getElementById('main-content').classList.remove('hidden');
+
+        // Poblar selector de circunscripciones
+        const sel = document.getElementById('dep-select');
+        deps.sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).forEach(d=>{
+          const o=document.createElement('option'); o.value=d.cod; o.textContent=`${d.nombre} (${getCurulesDep(d.nombre)} curules)`; sel.appendChild(o);
+        });
+
+        renderKPI();
+        renderDonut();
+        renderNacional();
+      }catch(e){
+        document.getElementById('load-state').innerHTML=`<div style="font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,100,100,.8);text-align:center;line-height:1.8">Error al cargar datos.<br/><span style="color:rgba(255,255,255,.3);font-size:.6rem">${e.message}</span></div>`;
+      }
+    }
+
+    // ─── KPI ──────────────────────────────────────────────────
+    function renderKPI(depNom, votval, votant, curulesObj, curulesTotal){
+      const r = resumenData;
+      const vv = votval||r.votval, va = votant||r.votant;
+      const cObj = curulesObj||curulesNac;
+      const cTotal = curulesTotal||Object.values(cObj).reduce((s,v)=>s+v,0);
+      const topP = Object.entries(cObj).filter(([k])=>!/blanco/i.test(k)).sort((a,b)=>b[1]-a[1])[0];
+      document.getElementById('kpi-row').innerHTML=`
+        <div class="kpi-card"><div class="kpi-label">Votos válidos</div><div class="kpi-val gr">${fmt(vv)}</div><div class="kpi-delta">${pct(vv,va)}% de los votantes</div></div>
+        <div class="kpi-card"><div class="kpi-label">Votantes</div><div class="kpi-val wh">${fmt(va)}</div><div class="kpi-delta">${depNom?depNom:'Nacional'}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Curules asignadas</div><div class="kpi-val">${cTotal} / ${depNom?getCurulesDep(depNom):CURULES_TOTAL}</div><div class="kpi-delta">D'Hondt · umbral 3% · ${depNom?'por circunscripción':'suma deptos.'}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Partido puntero</div><div class="kpi-val sm">${topP?topP[0].split(' ').slice(0,3).join(' '):'—'}</div><div class="kpi-delta">${topP?topP[1]+' curules':''}</div></div>`;
+      document.getElementById('curules-total').textContent = `${cTotal} de ${depNom?getCurulesDep(depNom):CURULES_TOTAL}`;
+    }
+
+    // ─── DONUT ────────────────────────────────────────────────
+    function renderDonut(r){
+      r = r||resumenData;
+      document.getElementById('pct-camara').textContent = pct(r.votval,r.votant)+'%';
+      if(donutChart) donutChart.destroy();
+      donutChart = new Chart(document.getElementById('donut-camara').getContext('2d'),{
+        type:'doughnut',
+        data:{labels:['Votos válidos','Nulos','No marcados','En blanco'],datasets:[{data:[r.votval,r.votnul,r.votnma,r.votblan],backgroundColor:['#0047FF','#cc2233','#f0a500','#555'],borderWidth:0,hoverOffset:6}]},
+        options:{responsive:true,maintainAspectRatio:true,cutout:'72%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}}}}
+      });
+      document.getElementById('leg-camara').innerHTML=[['Votos válidos',r.votval,'#0047FF'],['Nulos',r.votnul,'#cc2233'],['No marcados',r.votnma,'#f0a500'],['En blanco',r.votblan,'#555']].map(([l,v,c])=>`<div class="li"><span class="ld" style="background:${c}"></span><span>${l}</span><span class="lv">${fmt(v)}</span></div>`).join('');
+    }
+
+    // ─── SWITCH DEP ───────────────────────────────────────────
+    async function switchDep(depCod){
+      curDep = depCod;
+      document.getElementById('cam-search').value='';
+      buscarCandidato('');
+      if(depCod==='TODOS'){ renderNacional(); return; }
+      // Vista por circunscripción departamental
+      const deps = await getJSON('departamentos');
+      const dep = deps.find(d=>d.cod===depCod);
+      if(!dep) return;
+      const nCurules = getCurulesDep(dep.nombre);
+      const cur = dhondtDep(dep.partidos, nCurules);
+      const totalCurules = Object.values(cur).reduce((s,v)=>s+v,0);
+
+      // Reconstruir partidos para este depto desde resumenData + votos dep
+      const partidosDep = resumenData.partidos.map(p=>({
+        ...p,
+        votos: dep.partidos[p.partido]||0,
+        curules: cur[p.partido]||0
+      })).filter(p=>p.votos>0).sort((a,b)=>b.votos-a.votos);
+
+      // Totales dep (aproximados desde resumenData proporcional)
+      const votvalDep = Object.values(dep.partidos).reduce((s,v)=>s+v,0);
+
+      document.getElementById('lbl-tabla').textContent=`Partidos · Cámara · ${dep.nombre} · ${nCurules} curules · D'Hondt`;
+      document.getElementById('drill-badge').textContent=dep.nombre;
+      document.getElementById('drill-badge').className='level-badge dep';
+      document.getElementById('drill-nav').innerHTML='';
+      renderPartidosTabla(partidosDep, votvalDep, cur, 'camara', true, dep.nombre, dep.cod);
+      renderKPI(dep.nombre, votvalDep, null, cur, totalCurules);
+    }
+
+    // ─── RENDER NACIONAL ──────────────────────────────────────
+    function renderNacional(){
+      document.getElementById('lbl-tabla').textContent=`Partidos · Cámara · Nacional · ${CURULES_TOTAL} curules · D'Hondt por depto.`;
+      document.getElementById('drill-badge').textContent='Nacional';
+      document.getElementById('drill-badge').className='level-badge dep';
+      document.getElementById('drill-nav').innerHTML='';
+      const partidos = [...resumenData.partidos].map(p=>({...p,curules:curulesNac[p.partido]||0})).sort((a,b)=>b.votos-a.votos);
+      renderPartidosTabla(partidos, resumenData.votval, curulesNac, 'camara', false, null, null);
+      renderKPI();
+    }
+
+    // ─── RENDER TABLA PARTIDOS ────────────────────────────────
+    function renderPartidosTabla(partidos, votval, cur, tbodyId, showDrillBtn, depNom, depCod){
+      const thead = document.getElementById('drill-thead');
+      const tbody = document.getElementById(`tbody-${tbodyId}`);
+      thead.innerHTML=`<tr><th>#</th><th>Partido / Coalición</th><th class="r">Votos</th><th class="r" style="min-width:130px">%</th><th class="r">Curules</th></tr>`;
+      tbody.innerHTML='';
+      const maxV = partidos[0]?.votos||1;
+      const norm = s=>s.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+
+      partidos.forEach((p,i)=>{
+        const pctV=pct(p.votos,votval), bw=((p.votos/maxV)*100).toFixed(1), color=getColor(p.partido);
+        const curules=p.curules||0;
+        // Calcular umbral para este contexto
+        const totalVotos = partidos.reduce((s,x)=>s+x.votos,0);
+        const umbral = totalVotos*0.03;
+        const pasaUmbral = p.votos >= umbral;
+        const curulesCell=curules>0?`<span class="cbadge">${curules}</span>`:pasaUmbral?`<span class="cbadge">0</span>`:`<span class="cbadge sub">—</span>`;
+
+        const tr=document.createElement('tr');
+        tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:.6rem">
+              <span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span>
+              <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span>
+              ${showDrillBtn?`<span class="circ-badge">${depNom||''}</span>`:''}
+            </div>
+            <div style="margin-top:.35rem">
+              <button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${p.candidatos.length} candidatos</button>
+            </div>
+          </td>
+          <td class="r" style="font-size:.9rem;font-weight:700">${fmt(p.votos)}</td>
+          <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>
+          <td class="r">${curulesCell}</td>`;
+        tbody.appendChild(tr);
+
+        // Expand candidatos
+        const trC=document.createElement('tr');
+        trC.innerHTML=`<td colspan="5" style="padding:0"><div class="cands-inner" id="cands-inner-${i}">
+          <table class="cands-table"><thead><tr><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% partido</th></tr></thead>
+          <tbody>${(()=>{
+            const nomPart = norm(p.partido);
+            let curulesRestantes = curules;
+            return p.candidatos.map((c,j)=>{
+              const esLista = norm(c.nombre)===nomPart;
+              let elegido=false;
+              if(!esLista&&curulesRestantes>0){elegido=true;curulesRestantes--;}
+              const colorC=elegido?'#39ff7a':esLista?'rgba(255,255,255,.2)':'inherit';
+              const fw=elegido?700:400;
+              const suffix=elegido?'<span style="font-size:.6rem;margin-left:.4rem">✦</span>':esLista?'<span style="font-size:.58rem;color:rgba(255,255,255,.2);margin-left:.4rem">(lista)</span>':'';
+              return `<tr><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif;font-weight:${fw};color:${colorC}">${c.nombre}${suffix}</td><td class="r">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;
+            }).join('');
+          })()}</tbody></table>
+        </div></td>`;
+        tbody.appendChild(trC);
+      });
+      setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
+    }
+
+    function toggleCands(i){const inner=document.getElementById(`cands-inner-${i}`),icon=document.getElementById(`expand-icon-${i}`),open=inner.classList.toggle('open');icon.textContent=open?'▾':'▸';}
+
+    // ─── BUSCAR CANDIDATO ─────────────────────────────────────
+    function buscarCandidato(q){
+      const box=document.getElementById('cam-search-results'),grid=document.getElementById('cam-main-grid'),kpi=document.getElementById('kpi-row');
+      q=q.trim();
+      if(!q){box.style.display='none';box.innerHTML='';grid.style.display='';kpi.style.display='';return;}
+      grid.style.display='none';kpi.style.display='none';box.style.display='block';
+      const norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(), qn=norm(q), res=[];
+      (resumenData?.partidos||[]).forEach(p=>p.candidatos.forEach((c,idx)=>{if(!norm(c.nombre).includes(qn))return;res.push({nombre:c.nombre,partido:p.partido,votos:c.votos,pos:idx+1,elegido:idx<(curulesNac[p.partido]||0)});}));
+      res.sort((a,b)=>b.votos-a.votos);
+      const VERDE='#39ff7a';
+      box.innerHTML=!res.length?`<div style="padding:2rem;font-family:'DM Mono',monospace;font-size:.72rem;color:rgba(255,255,255,.3);text-align:center">No se encontraron candidatos con "<b>${q}</b>"</div>`
+        :`<div style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;color:rgba(255,255,255,.3);text-transform:uppercase;padding:.75rem 0 .5rem">${res.length} resultado${res.length!==1?'s':''} para "${q}"</div>
+        <table class="results-table"><thead><tr><th>#</th><th>Candidato/a</th><th>Partido</th><th class="r">Pos.</th><th class="r">Votos</th><th class="r">Estado</th></tr></thead>
+        <tbody>${res.map((r,i)=>`<tr><td style="color:rgba(255,255,255,.25)">${String(i+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif;font-weight:${r.elegido?700:400};color:${r.elegido?VERDE:'inherit'}">${r.nombre}${r.elegido?'<span style="font-size:.6rem;margin-left:.4rem">✦</span>':''}</td><td style="color:rgba(255,255,255,.45)">${r.partido}</td><td class="r" style="color:rgba(255,255,255,.3)">#${r.pos}</td><td class="r">${fmt(r.votos)}</td><td class="r"><span style="font-family:'DM Mono',monospace;font-size:.75rem;font-weight:700;padding:.2rem .6rem;background:${r.elegido?'rgba(57,255,122,.1)':'rgba(255,255,255,.04)'};color:${r.elegido?VERDE:'rgba(255,255,255,.25)'};border:1px solid ${r.elegido?'rgba(57,255,122,.35)':'rgba(255,255,255,.08)'}">${r.elegido?'ELEGIDO':'—'}</span></td></tr>`).join('')}</tbody></table>`;
+    }
+
+    // ─── CURTAIN ──────────────────────────────────────────────
+    const curtain=document.getElementById('curtain');
+    curtain.classList.add('opening');
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{setTimeout(()=>{curtain.classList.remove('opening');curtain.classList.add('opened');},900);}));
+    function navTo(e,href){e.preventDefault();curtain.classList.remove('opened');curtain.classList.add('closing');setTimeout(()=>{window.location.href=href;},1150);}
+
+    // ─── CURSOR ───────────────────────────────────────────────
+    const cur2=document.getElementById('cursor'),ri=document.getElementById('cursorRing');
+    let mx=0,my=0,rx=0,ry=0;
+    document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur2.style.left=mx+'px';cur2.style.top=my+'px';});
+    (function loop(){rx+=(mx-rx)*.12;ry+=(my-ry)*.12;ri.style.left=rx+'px';ri.style.top=ry+'px';requestAnimationFrame(loop);})();
+    document.addEventListener('mouseover',e=>{if(e.target.closest('a,button,select,input')){cur2.style.transform='translate(-50%,-50%) scale(2.5)';cur2.style.background='transparent';cur2.style.border='1.5px solid var(--blue)';ri.style.opacity='0';}else{cur2.style.transform='translate(-50%,-50%) scale(1)';cur2.style.background='var(--blue)';cur2.style.border='none';ri.style.opacity='.4';}});
+
+    // ─── NAV AUTH ─────────────────────────────────────────────
+    function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;if(token&&user){const pl={free:'Free',basic:'Básico',analysis:'Análisis',full:'Completo'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">Salir</button>`;}else{area.innerHTML=`<a href="pricing.html" style="font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">Planes</a><a href="login.html" class="e-btn-login">Iniciar sesión</a><a href="register.html" class="e-btn-register">Registrarse</a>`;}}
+    async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();}
+    updateElectoralNav();
+    init();
+  </script>
+</body>
+</html>
