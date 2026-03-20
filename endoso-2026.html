@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     :root{--white:#f4f3ef;--blue:#0047FF;--green:#4ade80;--purple:#a78bfa;--orange:#fb923c;--card-border:rgba(255,255,255,0.1);--border:rgba(255,255,255,0.08);--bar-bg:rgba(255,255,255,0.1)}
     /* DAY MODE — fondo blanco limpio, texto oscuro, buen contraste */
@@ -197,6 +198,14 @@
     .results-table tr:hover td{background:rgba(255,255,255,.03)}
     .drill-btn{background:none;border:none;color:var(--blue);font-family:'DM Mono',monospace;font-size:.74rem;cursor:pointer;text-align:left;padding:0;display:inline-flex;align-items:center;gap:.4rem;transition:color .15s}
     .drill-btn:hover{color:#7ab3ff}
+    .sort-btn{background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.45);font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;padding:.25rem .6rem;cursor:pointer;transition:all .15s}
+    .sort-btn:hover{border-color:rgba(0,71,255,.5);color:var(--blue)}
+    .sort-btn.active{border-color:var(--blue);color:var(--blue);background:rgba(0,71,255,.08)}
+    body.day-mode .sort-btn{border-color:rgba(0,0,0,.15);color:rgba(0,0,0,.45)}
+    body.day-mode .sort-btn.active{border-color:var(--blue);color:var(--blue);background:rgba(0,71,255,.07)}
+    .dl-btn{display:inline-flex;align-items:center;gap:.4rem;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);color:rgba(74,222,128,.9);font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;padding:.25rem .65rem;cursor:pointer;transition:all .15s}
+    .dl-btn:hover{background:rgba(74,222,128,.2);border-color:rgba(74,222,128,.5)}
+    body.day-mode .dl-btn{background:rgba(0,120,60,.07);border-color:rgba(0,120,60,.2);color:rgba(0,100,50,.9)}
     .mini-bar-wrap{width:55px;height:3px;background:var(--bar-bg);border-radius:2px;overflow:hidden;display:inline-block;vertical-align:middle;margin-left:5px}
     .mini-bar-fill{height:100%;border-radius:2px}
     .level-badge{font-family:'DM Mono',monospace;font-size:.55rem;letter-spacing:.15em;text-transform:uppercase;padding:.2rem .55rem;border:1px solid}
@@ -646,7 +655,7 @@
           <div class="kpi-card"><div class="kpi-label">Votos <span style="color:var(--blue)">${shortName(d.selA.nombre)}</span> (A)</div><div class="kpi-val bl" id="kv-A">—</div><div class="kpi-delta">${d.selA.corp} · ${d.selA.partido}</div></div>
           <div class="kpi-card"><div class="kpi-label">Votos <span style="color:var(--purple)">${shortName(d.selB.nombre)}</span> (B)</div><div class="kpi-val pu" id="kv-B">—</div><div class="kpi-delta">${d.selB.corp} · ${d.selB.partido}</div></div>
           <div class="kpi-card"><div class="kpi-label">Votos A en dpto. principal de B</div><div class="kpi-val bl" id="kv-depA">—</div><div class="kpi-delta" id="kv-depA-sub">en ${depNomB}</div></div>
-          <div class="kpi-card"><div class="kpi-label">Votos B en su dpto. vs total A</div><div class="kpi-val gr">${d.totalA ? pct(depVotosB, d.totalA)+'%' : '—'}</div><div class="kpi-delta">% de los votos totales de A</div></div>
+          <div class="kpi-card"><div class="kpi-label">Votos A en dpto. de B · % del total A</div><div class="kpi-val gr">${d.totalA ? pct(depVotosA, d.totalA)+'%' : '—'}</div><div class="kpi-delta">${fmt(depVotosA)} de ${fmt(d.totalA)} votos de A están en ${depNomB}</div></div>
         </div>
         <div class="two-col">
           <div class="card">
@@ -681,6 +690,13 @@
           <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.8rem;flex-wrap:wrap">
             <div class="card-label" style="margin-bottom:0" id="drill-ab-title">Por departamento</div>
             <span class="level-badge dep" id="drill-ab-badge">Nacional</span>
+            <div style="margin-left:auto;display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
+              <span style="font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3)">Ordenar:</span>
+              <button class="sort-btn active" id="sort-ab-A" onclick="setSortAB('A')">Votos A</button>
+              <button class="sort-btn" id="sort-ab-zon" onclick="setSortAB('zon')">Zona</button>
+              <button class="sort-btn" id="sort-ab-pct" onclick="setSortAB('pct')">% A vs B</button>
+              <button class="dl-btn" onclick="downloadDrill('ab')">↓ Excel</button>
+            </div>
           </div>
           <div class="drill-nav" id="drill-ab-nav"></div>
           <table class="results-table"><thead id="drill-ab-thead"></thead><tbody id="drill-ab-tbody"></tbody></table>
@@ -762,7 +778,52 @@
       if (d.useCD) renderDrill('cd', mesasABCD, drillCD);
     }
 
-    // ─── DRILL ────────────────────────────────────────────────
+    // ─── SORT STATE ───────────────────────────────────────────
+    let sortAB = 'A'; // 'A' | 'zon' | 'pct'
+
+    function setSortAB(s) {
+      sortAB = s;
+      ['A','zon','pct'].forEach(k => {
+        const btn = document.getElementById(`sort-ab-${k}`);
+        if (btn) btn.classList.toggle('active', k===s);
+      });
+      renderDrill('ab', mesasAB, drillAB);
+    }
+
+    function sortGroups(groups, sort) {
+      const vals = Object.values(groups);
+      if (sort === 'zon') return vals.sort((a,b) => parseInt(a.cod||0) - parseInt(b.cod||0));
+      if (sort === 'pct') return vals.sort((a,b) => ((b.A/(b.A+b.B||1)) - (a.A/(a.A+b.B||1))));
+      return vals.sort((a,b) => b.A - a.A); // default: votos A
+    }
+
+    // ─── DOWNLOAD ─────────────────────────────────────────────
+    function downloadDrill(prefix) {
+      const theadEl = document.getElementById(`drill-${prefix}-thead`);
+      const tbodyEl = document.getElementById(`drill-${prefix}-tbody`);
+      if (!theadEl || !tbodyEl) return;
+
+      // Build data array from table
+      const rows = [];
+      const headers = [...theadEl.querySelectorAll('th')].map(th => th.textContent.trim());
+      rows.push(headers);
+      tbodyEl.querySelectorAll('tr').forEach(tr => {
+        const cells = [...tr.querySelectorAll('td')].map(td => {
+          // Get text, strip mini-bar spans
+          const clone = td.cloneNode(true);
+          clone.querySelectorAll('.mini-bar-wrap').forEach(el => el.remove());
+          return clone.textContent.trim();
+        });
+        if (cells.length) rows.push(cells);
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      const titleEl = document.getElementById(`drill-${prefix}-title`);
+      const sheetName = (titleEl?.textContent||'Tabla').slice(0,31);
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      XLSX.writeFile(wb, `endoso_${prefix}_${sheetName.replace(/[^a-zA-Z0-9]/g,'_')}.xlsx`);
+    }
     function renderDrill(prefix, mesas, state) {
       const hasCD = prefix === 'cd';
       const titleEl = document.getElementById(`drill-${prefix}-title`);
@@ -795,12 +856,14 @@
 
       let groups = {};
 
+      let groups = {};
+
       if (state.nivel==='dep') {
         titleEl.textContent='Por departamento'; badgeEl.textContent='Nacional'; badgeEl.className='level-badge dep';
         filtered.forEach(m=>{ if(!groups[m.dep]) groups[m.dep]={nom:m.depNom,A:0,B:0,C:0,D:0,cod:m.dep}; groups[m.dep].A+=m.A;groups[m.dep].B+=m.B;groups[m.dep].C+=m.C;groups[m.dep].D+=m.D; });
         theadEl.innerHTML = buildThead('Departamento', hasCD);
         tbodyEl.innerHTML = '';
-        Object.values(groups).sort((a,b)=>b.A-a.A).forEach((g,i)=>{
+        sortGroups(groups, prefix==='ab'?sortAB:'A').forEach((g,i)=>{
           tbodyEl.innerHTML += buildDrillRow(i, g.nom, g, `_drillTo('${prefix}','mun','${g.cod}','${esc(g.nom)}',null,null,null,null,null,null)`, hasCD);
         });
       } else if (state.nivel==='mun') {
@@ -808,7 +871,7 @@
         filtered.forEach(m=>{ if(!groups[m.mun]) groups[m.mun]={nom:m.munNom,A:0,B:0,C:0,D:0,cod:m.mun}; groups[m.mun].A+=m.A;groups[m.mun].B+=m.B;groups[m.mun].C+=m.C;groups[m.mun].D+=m.D; });
         theadEl.innerHTML = buildThead('Municipio', hasCD);
         tbodyEl.innerHTML = '';
-        Object.values(groups).sort((a,b)=>b.A-a.A).forEach((g,i)=>{
+        sortGroups(groups, prefix==='ab'?sortAB:'A').forEach((g,i)=>{
           tbodyEl.innerHTML += buildDrillRow(i, g.nom, g, `_drillTo('${prefix}','zon','${state.cod_dep}','${esc(state.nom_dep)}','${g.cod}','${esc(g.nom)}',null,null,null,null)`, hasCD);
         });
       } else if (state.nivel==='zon') {
@@ -816,7 +879,7 @@
         filtered.forEach(m=>{ const k=m.zon||'0'; if(!groups[k]) groups[k]={nom:zonaNom(k,state.nom_mun),A:0,B:0,C:0,D:0,cod:k}; groups[k].A+=m.A;groups[k].B+=m.B;groups[k].C+=m.C;groups[k].D+=m.D; });
         theadEl.innerHTML = buildThead('Zona', hasCD);
         tbodyEl.innerHTML = '';
-        Object.values(groups).sort((a,b)=>b.A-a.A).forEach((g,i)=>{
+        sortGroups(groups, prefix==='ab'?sortAB:'A').forEach((g,i)=>{
           tbodyEl.innerHTML += buildDrillRow(i, g.nom, g, `_drillTo('${prefix}','pues','${state.cod_dep}','${esc(state.nom_dep)}','${state.cod_mun}','${esc(state.nom_mun)}','${g.cod}','${esc(g.nom)}',null,null)`, hasCD);
         });
       } else if (state.nivel==='pues') {
@@ -824,7 +887,7 @@
         filtered.forEach(m=>{ if(!groups[m.pue]) groups[m.pue]={nom:m.pueNom,A:0,B:0,C:0,D:0,cod:m.pue}; groups[m.pue].A+=m.A;groups[m.pue].B+=m.B;groups[m.pue].C+=m.C;groups[m.pue].D+=m.D; });
         theadEl.innerHTML = buildThead('Puesto de votación', hasCD);
         tbodyEl.innerHTML = '';
-        Object.values(groups).sort((a,b)=>b.A-a.A).forEach((g,i)=>{
+        sortGroups(groups, prefix==='ab'?sortAB:'A').forEach((g,i)=>{
           tbodyEl.innerHTML += buildDrillRow(i, g.nom, g, `_drillTo('${prefix}','mesa','${state.cod_dep}','${esc(state.nom_dep)}','${state.cod_mun}','${esc(state.nom_mun)}','${state.cod_zon||''}','${esc(state.nom_zon||'')}','${g.cod}','${esc(g.nom)}')`, hasCD);
         });
       } else {
@@ -861,8 +924,8 @@
     function buildDrillRow(i, label, g, onclickStr, hasCD) {
       const p = pct(g.A, g.A+g.B);
       const nameCell = onclickStr
-        ? `<button class="drill-btn" onclick="${onclickStr}"><span style="width:7px;height:7px;border-radius:50%;background:var(--blue);display:inline-block;margin-right:5px;vertical-align:middle"></span>${label} <span style="font-size:.6rem;opacity:.5">→</span></button>`
-        : `<span><span style="width:7px;height:7px;border-radius:50%;background:var(--blue);display:inline-block;margin-right:5px;vertical-align:middle"></span>${label}</span>`;
+        ? `<button class="drill-btn" onclick="${onclickStr}"><span style="width:7px;height:7px;border-radius:50%;background:var(--blue);display:inline-block;margin-right:5px;vertical-align:middle"></span><span style="font-size:1.2em">${label}</span> <span style="font-size:.6rem;opacity:.5">→</span></button>`
+        : `<span><span style="width:7px;height:7px;border-radius:50%;background:var(--blue);display:inline-block;margin-right:5px;vertical-align:middle"></span><span style="font-size:1.2em">${label}</span></span>`;
       const cdCols = hasCD ? `<td class="r" style="color:rgba(74,222,128,.7)">${fmt(g.C)}</td><td class="r" style="color:rgba(251,146,60,.7)">${fmt(g.D)}</td>` : '';
       return `<tr>
         <td style="color:rgba(255,255,255,.3)">${i+1}</td>
