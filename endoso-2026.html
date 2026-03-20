@@ -620,6 +620,7 @@
         let abcd_A=0, abcd_B=0, abcd_C=0, abcd_D=0;
         mesasABCD.forEach(m => { abcd_A+=m.A; abcd_B+=m.B; abcd_C+=m.C; abcd_D+=m.D; });
 
+        window._allMesasRef = allMesas;
         // Reset drills
         drillAB = { nivel:'dep', cod_dep:null, nom_dep:null, cod_mun:null, nom_mun:null, cod_zon:null, nom_zon:null, cod_pue:null, nom_pue:null };
         drillCD = { nivel:'dep', cod_dep:null, nom_dep:null, cod_mun:null, nom_mun:null, cod_zon:null, nom_zon:null, cod_pue:null, nom_pue:null };
@@ -666,18 +667,19 @@
           </div>
           <div class="card">
             <div class="card-label">Votación mínima en común</div>
-            <div style="margin-bottom:.7rem"><div class="min-badge" id="badge-min">—</div></div>
+            <label class="optional-toggle" style="margin-bottom:1rem;cursor:pointer" onclick="toggleExcluirCeros(event)">
+              <span class="toggle-switch"><input type="checkbox" id="chk-excluir-ceros"><span class="toggle-track"></span><span class="toggle-knob"></span></span>
+              <span class="toggle-label">Excluir mesas donde algún candidato sacó 0 votos</span>
+            </label>
+            <div style="margin-bottom:.7rem;margin-top:.8rem"><div class="min-badge" id="badge-min">—</div></div>
             <div id="min-extra"></div>
-            <div style="font-family:'DM Mono',monospace;font-size:1.05rem;line-height:1.7;margin-top:.7rem" class="min-desc-text">
+            <div style="font-family:'DM Mono',monospace;font-size:1.05rem;line-height:1.7;margin-top:.7rem" class="min-desc-text" id="min-desc-text">
               Suma de <code style="color:var(--orange)">min(A, B)</code> por mesa.<br/>
               Estimación de votación que comparten ambos candidatos en las mismas mesas.
             </div>
-            <div style="margin-bottom:.5rem;margin-top:.9rem"><div class="min-badge" id="badge-min-nozero">—</div></div>
-            <div style="font-family:'DM Mono',monospace;font-size:1.05rem;line-height:1.7;margin-bottom:.8rem" class="min-desc-text">
-              Suma de <code style="color:var(--orange)">min(A, B)</code> por mesa, <strong>excluyendo mesas donde alguno sacó cero</strong>.
-            </div>
-            <div style="margin-top:.6rem;font-family:'DM Mono',monospace;font-size:.8rem;color:rgba(255,255,255,.25)">
-              <span style="color:rgba(0,71,255,.5)">${fmt(d.mesasTotal)}</span> mesas con datos
+            <div style="margin-top:.8rem;font-family:'DM Mono',monospace;font-size:.8rem" id="min-mesas-info">
+              <span style="color:rgba(0,71,255,.5)" id="min-mesas-count">${fmt(d.mesasTotal)}</span>
+              <span style="color:rgba(255,255,255,.25)" id="min-mesas-label"> mesas con datos</span>
             </div>
           </div>
         </div>
@@ -701,6 +703,10 @@
               <button class="sort-btn active" id="sort-ab-A" onclick="setSortAB('A')">Votos A</button>
               <button class="sort-btn" id="sort-ab-zon" onclick="setSortAB('zon')">Zona</button>
               <button class="sort-btn" id="sort-ab-pct" onclick="setSortAB('pct')">% A vs B</button>
+              <label class="optional-toggle" style="margin-left:.5rem;cursor:pointer" onclick="toggleExcluirCeros(event)">
+                <span class="toggle-switch" style="width:28px;height:16px"><input type="checkbox" id="chk-excluir-ceros-02" style="display:none"><span class="toggle-track"></span><span class="toggle-knob" style="width:12px;height:12px"></span></span>
+                <span class="toggle-label" style="font-size:.58rem">Sin ceros</span>
+              </label>
               <button class="dl-btn" onclick="downloadDrill('ab')">↓ Excel</button>
             </div>
           </div>
@@ -747,9 +753,12 @@
         }
       }, 400);
 
-      document.getElementById('badge-min').textContent = `${fmt(d.totalMin)} votos mínimos en común`;
-      const badgeNoZero = document.getElementById('badge-min-nozero');
-      if (badgeNoZero) badgeNoZero.textContent = `${fmt(d.totalMinNoZero)} votos mínimos en común (sin ceros)`;
+      // Guardar totales min para poder recalcular al activar toggle
+      window._totalMin = d.totalMin;
+      window._totalMinNoZero = d.totalMinNoZero;
+      window._mesasTotal = d.mesasTotal;
+      window._mesasSinCeros = (window._allMesasRef||[]).filter(m=>m.A>0&&m.B>0).length;
+      refreshMinBadge();
 
       // Si hay filtro CD activo, mostrar también min en mesas A≥B y min en mesas A≥B y C≥D
       if (d.useCD) {
@@ -782,8 +791,44 @@
       setTimeout(() => document.querySelectorAll('.bar-fill[data-w]').forEach(b => b.style.width = b.dataset.w+'%'), 600);
 
       // Drill tables
-      renderDrill('ab', mesasAB, drillAB);
+      applyExcluirCeros(); // respects current toggle state
       if (d.useCD) renderDrill('cd', mesasABCD, drillCD);
+    }
+
+    // ─── EXCLUIR CEROS TOGGLE ────────────────────────────────
+    let excluirCeros = false;
+
+    function toggleExcluirCeros(e) {
+      if (e) e.stopPropagation();
+      excluirCeros = !excluirCeros;
+      // Sync both checkboxes
+      ['chk-excluir-ceros','chk-excluir-ceros-02'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.checked = excluirCeros;
+      });
+      refreshMinBadge();
+      applyExcluirCeros();
+    }
+
+    function refreshMinBadge() {
+      const badge = document.getElementById('badge-min');
+      const desc = document.getElementById('min-desc-text');
+      const mesasInfo = document.getElementById('min-mesas-info');
+      if (!badge) return;
+      if (excluirCeros) {
+        badge.textContent = `${(window._totalMinNoZero||0).toLocaleString('es-CO')} votos mínimos en común (sin ceros)`;
+        if (desc) desc.innerHTML = 'Suma de <code style="color:var(--orange)">min(A, B)</code> por mesa, <strong>excluyendo mesas donde algún candidato sacó 0 votos</strong>.';
+        if (mesasInfo) mesasInfo.innerHTML = '<span style="color:rgba(0,71,255,.5)">' + (window._mesasSinCeros||0).toLocaleString('es-CO') + '</span> <span style="color:rgba(255,255,255,.25)">mesas donde ambos tienen ≥ 1 voto</span>';
+      } else {
+        badge.textContent = `${(window._totalMin||0).toLocaleString('es-CO')} votos mínimos en común`;
+        if (desc) desc.innerHTML = 'Suma de <code style="color:var(--orange)">min(A, B)</code> por mesa.<br/>Estimación de votación que comparten ambos candidatos en las mismas mesas.';
+        if (mesasInfo) mesasInfo.innerHTML = '<span style="color:rgba(0,71,255,.5)">' + (window._mesasTotal||0).toLocaleString('es-CO') + '</span> <span style="color:rgba(255,255,255,.25)">mesas con datos</span>';
+      }
+    }
+
+    function applyExcluirCeros() {
+      const source = excluirCeros ? mesasAB.filter(m => m.A > 0 && m.B > 0) : mesasAB;
+      renderDrill('ab', source, drillAB);
     }
 
     // ─── SORT STATE ───────────────────────────────────────────
@@ -795,7 +840,7 @@
         const btn = document.getElementById(`sort-ab-${k}`);
         if (btn) btn.classList.toggle('active', k===s);
       });
-      renderDrill('ab', mesasAB, drillAB);
+      applyExcluirCeros();
     }
 
     function sortGroups(groups, sort) {
