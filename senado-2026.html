@@ -276,7 +276,7 @@
     const fmt = n => Number(n).toLocaleString('es-CO');
     const pct = (n,t) => t ? ((n/t)*100).toFixed(2) : '0.00';
     const CP = {'Pacto Histórico':'#6B2D8B','Centro Democrático':'#0088BB','Centro Democrático y MIRA':'#0088BB','Partido Liberal Colombiano':'#C8102E','Partido de la U':'#F7941D','Cambio Radical':'#E91E8C','Partido Conservador Colombiano':'#003580','Alianza Verde':'#4CAF50','Partido Alianza por Colombia (Verde)':'#4CAF50','Movimiento Salvación Nacional':'#00AEEF','MIRA':'#1A3FC4','Frente Amplio Unitario':'#F7941D','Nuevo Liberalismo':'#E53935','Comunes':'#007755'};
-    function getColor(n){if(CP[n])return CP[n];if(/pacto hist/i.test(n))return'#6B2D8B';if(/centro dem/i.test(n))return'#0088BB';if(/liberal/i.test(n))return'#C8102E';if(/conservador/i.test(n))return'#003580';if(/cambio radical/i.test(n))return'#E91E8C';if(/partido de la u/i.test(n))return'#F7941D';if(/alianza verde|oxígeno/i.test(n))return'#4CAF50';if(/salvaci[oó]n/i.test(n))return'#00AEEF';if(/\bMIRA\b/i.test(n))return'#1A3FC4';if(/comunes/i.test(n))return'#007755';if(/nuevo liberalismo/i.test(n))return'#E53935';return'#555';}
+    function getColor(n){if(CP[n])return CP[n];if(/pacto hist/i.test(n))return'#6B2D8B';if(/centro dem/i.test(n))return'#0088BB';if(/liberal/i.test(n))return'#C8102E';if(/conservador/i.test(n))return'#003580';if(/cambio radical/i.test(n))return'#E91E8C';if(/partido de la u/i.test(n))return'#F7941D';if(/alianza (verde|por col)/i.test(n))return'#4CAF50';if(/salvaci[oó]n/i.test(n))return'#00AEEF';if(/\bMIRA\b/i.test(n))return'#1A3FC4';if(/comunes/i.test(n))return'#007755';if(/nuevo liberalismo/i.test(n))return'#E53935';return'#555';}
 
     const cache = {};
     async function getJSON(nivel){
@@ -358,7 +358,21 @@
         const trC=document.createElement('tr');
         trC.innerHTML=`<td colspan="5" style="padding:0"><div class="cands-inner" id="cands-inner-${i}">
           <table class="cands-table"><thead><tr><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% partido</th></tr></thead>
-          <tbody>${p.candidatos.map((c,j)=>`<tr><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif;font-weight:${j<curules?700:400};color:${j<curules?'#39ff7a':'inherit'}">${c.nombre}${j<curules?'<span style="font-size:.6rem;margin-left:.4rem">✦</span>':''}</td><td class="r">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`).join('')}</tbody>
+          <tbody>${(()=>{
+            // Calcular elegidos saltando candidatos cuyo nombre coincida con el partido (voto por lista)
+            const norm = s => s.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+            const nomPart = norm(p.partido);
+            let curulesRestantes = curules;
+            return p.candidatos.map((c,j)=>{
+              const esLista = norm(c.nombre) === nomPart || norm(c.nombre).includes(nomPart.split(' ')[0]+' '+nomPart.split(' ')[1]||'__');
+              let elegido = false;
+              if (!esLista && curulesRestantes > 0) { elegido = true; curulesRestantes--; }
+              const colorCand = elegido ? '#39ff7a' : esLista ? 'rgba(255,255,255,.2)' : 'inherit';
+              const fw = elegido ? 700 : 400;
+              const suffix = elegido ? '<span style="font-size:.6rem;margin-left:.4rem">✦</span>' : esLista ? '<span style="font-size:.58rem;color:rgba(255,255,255,.2);margin-left:.4rem">(lista)</span>' : '';
+              return `<tr><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif;font-weight:${fw};color:${colorCand}">${c.nombre}${suffix}</td><td class="r">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;
+            }).join('');
+          })()}</tbody>
           </table></div></td>`;
         tbody.appendChild(trC);
       });
