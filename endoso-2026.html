@@ -204,6 +204,14 @@
     .ctag.b{color:var(--purple);background:rgba(167,139,250,.15)}
     body.day-mode .ctag.a{color:rgba(0,60,220,.9);background:rgba(0,71,255,.1)}
     body.day-mode .ctag.b{color:rgba(100,60,200,.9);background:rgba(120,80,220,.1)}
+    .ctag.c{color:var(--green);background:rgba(74,222,128,.15)}
+    .ctag.d{color:var(--orange);background:rgba(251,146,60,.15)}
+    body.day-mode .ctag.c{color:rgba(10,120,50,.9);background:rgba(74,222,128,.1)}
+    body.day-mode .ctag.d{color:rgba(180,70,0,.9);background:rgba(251,146,60,.1)}
+    .conditions-sep{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.2);margin:.6rem 0 .4rem;grid-column:1/-1}
+    body.day-mode .conditions-sep{color:rgba(0,0,0,.25)}
+    #cond-cd-block{display:none}
+    #cond-cd-block.visible{display:contents}
     .min-badge{display:inline-flex;align-items:center;gap:.5rem;font-family:'DM Mono',monospace;font-size:.85rem;letter-spacing:.1em;text-transform:uppercase;background:rgba(251,146,60,.08);border:1px solid rgba(251,146,60,.2);color:rgba(251,146,60,.8);padding:.55rem 1.1rem}
     .min-desc-text{color:rgba(255,255,255,.55)}
 
@@ -426,6 +434,28 @@
             <div class="cond-opt" id="cond-5" onclick="setCondicion(5)">
               <span class="cond-dot"></span><span class="ctag b">B</span> mayor que <span class="ctag a">A</span> · sin mesas en cero
             </div>
+            <!-- C/D conditions — visible only when useCD -->
+            <div id="cond-cd-block">
+              <div class="conditions-sep">Condición para C / D</div>
+              <div class="cond-opt active" id="condcd-0" onclick="setCondicionCD(0)">
+                <span class="cond-dot"></span><span class="ctag c">C</span> mayor que <span class="ctag d">D</span> en cada mesa
+              </div>
+              <div class="cond-opt" id="condcd-1" onclick="setCondicionCD(1)">
+                <span class="cond-dot"></span><span class="ctag d">D</span> mayor que <span class="ctag c">C</span> en cada mesa
+              </div>
+              <div class="cond-opt" id="condcd-2" onclick="setCondicionCD(2)">
+                <span class="cond-dot"></span><span class="ctag c">C</span> igual o mayor que <span class="ctag d">D</span> en cada mesa
+              </div>
+              <div class="cond-opt" id="condcd-3" onclick="setCondicionCD(3)">
+                <span class="cond-dot"></span><span class="ctag d">D</span> igual o mayor que <span class="ctag c">C</span> en cada mesa
+              </div>
+              <div class="cond-opt" id="condcd-4" onclick="setCondicionCD(4)">
+                <span class="cond-dot"></span><span class="ctag c">C</span> mayor que <span class="ctag d">D</span> · sin mesas en cero
+              </div>
+              <div class="cond-opt" id="condcd-5" onclick="setCondicionCD(5)">
+                <span class="cond-dot"></span><span class="ctag d">D</span> mayor que <span class="ctag c">C</span> · sin mesas en cero
+              </div>
+            </div>
           </div>
         </div>
 
@@ -590,6 +620,8 @@
     function toggleCD(on) {
       useCD = on;
       document.getElementById('cd-selectors').classList.toggle('visible', on);
+      const cdBlock = document.getElementById('cond-cd-block');
+      if (cdBlock) cdBlock.classList.toggle('visible', on);
     }
 
     // ─── FETCH CANDIDATE JSON ─────────────────────────────────
@@ -664,7 +696,7 @@
         mesasAB.forEach(m => { ab_A+=m.A; ab_B+=m.B; ab_C+=m.C; ab_D+=m.D; });
 
         // Filtro A >= B AND C >= D
-        mesasABCD = (useCD && selC && selD) ? mesasAB.filter(m => m.C >= m.D) : [];
+        mesasABCD = (useCD && selC && selD) ? mesasAB.filter(COND_CD_FNS[condicionCD]) : [];
         let abcd_A=0, abcd_B=0, abcd_C=0, abcd_D=0;
         mesasABCD.forEach(m => { abcd_A+=m.A; abcd_B+=m.B; abcd_C+=m.C; abcd_D+=m.D; });
 
@@ -859,6 +891,35 @@
       return mesas.filter(COND_FNS[condicion]);
     }
 
+    // ─── CONDICION C/D ────────────────────────────────────────
+    let condicionCD = 0;
+
+    const COND_CD_FNS = [
+      m => m.C > m.D,
+      m => m.D > m.C,
+      m => m.C >= m.D,
+      m => m.D >= m.C,
+      m => m.C > m.D && m.C >= 1 && m.D >= 1,
+      m => m.D > m.C && m.C >= 1 && m.D >= 1
+    ];
+    const COND_CD_LABELS = [
+      'C > D', 'D > C', 'C ≥ D', 'D ≥ C',
+      'C > D · sin ceros', 'D > C · sin ceros'
+    ];
+
+    function setCondicionCD(n) {
+      condicionCD = n;
+      for (let i = 0; i < 6; i++) {
+        const el = document.getElementById('condcd-' + i);
+        if (el) el.classList.toggle('active', i === n);
+      }
+      if (!window._allMesasRef || !window._allMesasRef.length || !useCD) return;
+      // Refilter: start from mesasAB (already condicion A/B applied), apply C/D
+      mesasABCD = mesasAB.filter(COND_CD_FNS[condicionCD]);
+      drillCD = { nivel:'dep', cod_dep:null, nom_dep:null, cod_mun:null, nom_mun:null, cod_zon:null, nom_zon:null, cod_pue:null, nom_pue:null };
+      renderDrill('cd', mesasABCD, drillCD);
+    }
+
     function setCondicion(n) {
       condicion = n;
       for (let i = 0; i < 6; i++) {
@@ -867,10 +928,13 @@
       }
       if (!window._allMesasRef || !window._allMesasRef.length) return;
       mesasAB = condicionFilter(window._allMesasRef);
+      if (useCD) mesasABCD = mesasAB.filter(COND_CD_FNS[condicionCD]);
       drillAB = { nivel:'dep', cod_dep:null, nom_dep:null, cod_mun:null, nom_mun:null, cod_zon:null, nom_zon:null, cod_pue:null, nom_pue:null };
+      drillCD = { nivel:'dep', cod_dep:null, nom_dep:null, cod_mun:null, nom_mun:null, cod_zon:null, nom_zon:null, cod_pue:null, nom_pue:null };
       const newMin = mesasAB.reduce((s,m) => s + Math.min(m.A,m.B), 0);
       refreshMinBadge(newMin, mesasAB.length);
       renderDrill('ab', mesasAB, drillAB);
+      if (useCD && mesasABCD.length) renderDrill('cd', mesasABCD, drillCD);
     }
 
     function refreshMinBadge(totalMin, mesasCount) {
