@@ -600,7 +600,7 @@
 
         // Totales globales
         let totalA=0, totalB=0, totalC=0, totalD=0, totalMin=0, totalMinNoZero=0;
-        allMesas.forEach(m => { totalA+=m.A; totalB+=m.B; totalC+=m.C; totalD+=m.D; totalMin+=Math.min(m.A,m.B); if(m.A>0&&m.B>0) totalMinNoZero+=Math.min(m.A,m.B); });
+        allMesas.forEach(m => { totalA+=m.A; totalB+=m.B; totalC+=m.C; totalD+=m.D; totalMin+=Math.min(m.A,m.B); if(m.A>=m.B&&m.A>=1&&m.B>=1) totalMinNoZero+=Math.min(m.A,m.B); });
 
         // Depto principal de B (donde más votos sacó)
         const depBMap = {};
@@ -757,7 +757,7 @@
       window._totalMin = d.totalMin;
       window._totalMinNoZero = d.totalMinNoZero;
       window._mesasTotal = d.mesasTotal;
-      window._mesasSinCeros = (window._allMesasRef||[]).filter(m=>m.A>0&&m.B>0).length;
+      window._mesasSinCeros = (window._allMesasRef||[]).filter(m=>m.A>=m.B&&m.A>=1&&m.B>=1).length;
       refreshMinBadge();
 
       // Si hay filtro CD activo, mostrar también min en mesas A≥B y min en mesas A≥B y C≥D
@@ -815,9 +815,9 @@
       const mesasInfo = document.getElementById('min-mesas-info');
       if (!badge) return;
       if (excluirCeros) {
-        badge.textContent = `${(window._totalMinNoZero||0).toLocaleString('es-CO')} votos mínimos en común (sin ceros)`;
+        badge.textContent = `${(window._totalMinNoZero||0).toLocaleString('es-CO')} votos mínimos en común (A ≥ B, sin ceros)`;
         if (desc) desc.innerHTML = 'Suma de <code style="color:var(--orange)">min(A, B)</code> por mesa, <strong>excluyendo mesas donde algún candidato sacó 0 votos</strong>.';
-        if (mesasInfo) mesasInfo.innerHTML = '<span style="color:rgba(0,71,255,.5)">' + (window._mesasSinCeros||0).toLocaleString('es-CO') + '</span> <span style="color:rgba(255,255,255,.25)">mesas donde ambos tienen ≥ 1 voto</span>';
+        if (mesasInfo) mesasInfo.innerHTML = '<span style="color:rgba(0,71,255,.5)">' + (window._mesasSinCeros||0).toLocaleString('es-CO') + '</span> <span style="color:rgba(255,255,255,.25)">mesas donde A ≥ B y ambos ≥ 1 voto</span>';
       } else {
         badge.textContent = `${(window._totalMin||0).toLocaleString('es-CO')} votos mínimos en común`;
         if (desc) desc.innerHTML = 'Suma de <code style="color:var(--orange)">min(A, B)</code> por mesa.<br/>Estimación de votación que comparten ambos candidatos en las mismas mesas.';

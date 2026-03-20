@@ -89,7 +89,7 @@
     .bar-wrap{width:72px;height:4px;background:var(--bar-bg);border-radius:2px;overflow:hidden;display:inline-block;vertical-align:middle}
     .bar-fill{height:100%;background:var(--blue);border-radius:2px;transition:width 1s ease}
     .pct-val{font-family:'Syne',sans-serif;font-weight:700;font-size:.8rem;color:var(--white);display:inline-block;width:46px;text-align:right;margin-left:6px}
-    .cbadge{display:inline-flex;align-items:center;justify-content:center;background:rgba(0,71,255,.15);color:var(--blue);font-family:'Syne',sans-serif;font-weight:800;font-size:.85rem;min-width:28px;height:24px;padding:0 6px;border:1px solid rgba(0,71,255,.3)}
+    .cbadge{display:inline-flex;align-items:center;justify-content:center;background:rgba(0,71,255,.15);color:var(--white);font-family:'Syne',sans-serif;font-weight:800;font-size:.85rem;min-width:28px;height:24px;padding:0 6px;border:1px solid rgba(0,71,255,.3)}
     .cbadge.sub{background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border-color:rgba(255,255,255,.08)}
     .drill-btn{background:none;border:none;color:var(--blue);font-family:'DM Mono',monospace;font-size:.74rem;cursor:pointer;text-align:left;padding:0;display:inline-flex;align-items:center;gap:.4rem;transition:color .15s}
     .drill-btn:hover{color:#7ab3ff}
@@ -217,6 +217,14 @@
           <select class="dep-select" id="dep-select" onchange="switchDep(this.value)">
             <option value="TODOS">Nacional (todas)</option>
           </select>
+          <span class="sub-label" id="zona-label" style="display:none;margin-left:.75rem">Zona:</span>
+          <select class="dep-select" id="zona-select" onchange="switchZona(this.value)" style="display:none">
+            <option value="TODAS">Todas las zonas</option>
+          </select>
+          <span class="sub-label" id="puesto-label" style="display:none;margin-left:.75rem">Puesto:</span>
+          <select class="dep-select" id="puesto-select" onchange="switchPuesto(this.value)" style="display:none">
+            <option value="TODOS">Todos los puestos</option>
+          </select>
           <span class="sub-label" style="margin-left:1.5rem">Buscar candidato:</span>
           <input id="cam-search" type="search" class="search-input" placeholder="Nombre o apellido…"
             oninput="buscarCandidato(this.value)"
@@ -336,6 +344,9 @@
     // Curules nacionales calculadas sumando D'Hondt por depto
     let curulesNac = {}; // {partido: total_curules}
     let curDep = 'TODOS';
+    let curDepData = null;   // JSON detallado del depto activo {partidos:{partido:[{nombre,codigo,votos}]}, zonas:[...]}
+    let curZona = 'TODAS';
+    let curPuesto = 'TODOS';
 
     // ─── INIT ─────────────────────────────────────────────────
     async function init(){
@@ -401,32 +412,121 @@
     // ─── SWITCH DEP ───────────────────────────────────────────
     async function switchDep(depCod){
       curDep = depCod;
+      curZona = 'TODAS';
+      curPuesto = 'TODOS';
       document.getElementById('cam-search').value='';
       buscarCandidato('');
-      if(depCod==='TODOS'){ renderNacional(); return; }
-      // Vista por circunscripción departamental
+
+      // Ocultar zona/puesto
+      ['zona-label','zona-select','puesto-label','puesto-select'].forEach(id=>{
+        const el=document.getElementById(id);
+        el.style.display='none';
+        if(el.tagName==='SELECT'){ el.innerHTML=''; }
+      });
+      document.getElementById('zona-select').innerHTML='<option value="TODAS">Todas las zonas</option>';
+      document.getElementById('puesto-select').innerHTML='<option value="TODOS">Todos los puestos</option>';
+
+      if(depCod==='TODOS'){ curDepData=null; renderNacional(); return; }
+
+      // Cargar datos del depto (intenta JSON detallado)
       const deps = await getJSON('departamentos');
       const dep = deps.find(d=>d.cod===depCod);
       if(!dep) return;
-      const nCurules = getCurulesDep(dep.nombre);
-      const cur = dhondtDep(dep.partidos, nCurules);
-      const totalCurules = Object.values(cur).reduce((s,v)=>s+v,0);
 
-      // Reconstruir partidos para este depto desde resumenData + votos dep
+      // Intentar cargar JSON detallado del depto
+      curDepData = null;
+      try {
+        curDepData = await getJSON(`dep-${depCod}`);
+      } catch(e) { curDepData = null; }
+
+      // Poblar selector de zonas si hay datos
+      if(curDepData?.zonas?.length){
+        const zSel=document.getElementById('zona-select');
+        curDepData.zonas.forEach(z=>{
+          const o=document.createElement('option'); o.value=z.cod; o.textContent=z.nombre; zSel.appendChild(o);
+        });
+        document.getElementById('zona-label').style.display='';
+        zSel.style.display='';
+      }
+
+      renderDepView(dep, 'TODAS', 'TODOS');
+    }
+
+    // ─── SWITCH ZONA ──────────────────────────────────────────
+    function switchZona(zona){
+      curZona=zona; curPuesto='TODOS';
+      const pSel=document.getElementById('puesto-select');
+      pSel.innerHTML='<option value="TODOS">Todos los puestos</option>';
+      document.getElementById('puesto-label').style.display='none';
+      pSel.style.display='none';
+
+      if(zona!=='TODAS' && curDepData?.zonas){
+        const z=curDepData.zonas.find(z=>z.cod===zona);
+        if(z?.puestos?.length){
+          z.puestos.forEach(p=>{
+            const o=document.createElement('option'); o.value=p.cod; o.textContent=p.nombre; pSel.appendChild(o);
+          });
+          document.getElementById('puesto-label').style.display='';
+          pSel.style.display='';
+        }
+      }
+      _reRenderDep();
+    }
+
+    // ─── SWITCH PUESTO ────────────────────────────────────────
+    function switchPuesto(puesto){ curPuesto=puesto; _reRenderDep(); }
+
+    async function _reRenderDep(){
+      const deps = await getJSON('departamentos');
+      const dep = deps.find(d=>d.cod===curDep);
+      if(dep) renderDepView(dep, curZona, curPuesto);
+    }
+
+    // ─── RENDER VISTA DEPTO ───────────────────────────────────
+    function renderDepView(dep, zona, puesto){
+      const nCurules = getCurulesDep(dep.nombre);
+
+      // Resolver votos de partidos según nivel (zona/puesto/depto)
+      let partidosVotos = dep.partidos; // {partido: votos} por defecto
+      let candMap = null; // {partido: [{nombre, codigo, votos}]} si disponible
+
+      if(curDepData){
+        if(puesto!=='TODOS' && zona!=='TODAS'){
+          const z=curDepData.zonas?.find(z=>z.cod===zona);
+          const p=z?.puestos?.find(p=>p.cod===puesto);
+          if(p){ partidosVotos=p.partidos||partidosVotos; candMap=p.candidatos||null; }
+        } else if(zona!=='TODAS'){
+          const z=curDepData.zonas?.find(z=>z.cod===zona);
+          if(z){ partidosVotos=z.partidos||partidosVotos; candMap=z.candidatos||null; }
+        } else {
+          candMap=curDepData.candidatos||null;
+        }
+      }
+
+      const cur = dhondtDep(partidosVotos, nCurules);
+      const totalCurules = Object.values(cur).reduce((s,v)=>s+v,0);
+      const votvalDep = Object.values(partidosVotos).reduce((s,v)=>s+v,0);
+
+      // Construir array de partidos para render
       const partidosDep = resumenData.partidos.map(p=>({
         ...p,
-        votos: dep.partidos[p.partido]||0,
-        curules: cur[p.partido]||0
+        votos: partidosVotos[p.partido]||0,
+        curules: cur[p.partido]||0,
+        // Si hay candMap, sobrescribir candidatos filtrados
+        candidatos: candMap?.[p.partido]
+          ? candMap[p.partido].filter(c=>c.votos>0)
+          : (candMap ? [] : p.candidatos)
       })).filter(p=>p.votos>0).sort((a,b)=>b.votos-a.votos);
 
-      // Totales dep (aproximados desde resumenData proporcional)
-      const votvalDep = Object.values(dep.partidos).reduce((s,v)=>s+v,0);
+      let labelExtra = dep.nombre;
+      if(zona!=='TODAS'){ const z=curDepData?.zonas?.find(z=>z.cod===zona); labelExtra+=` · ${z?.nombre||zona}`; }
+      if(puesto!=='TODOS'){ const z=curDepData?.zonas?.find(z=>z.cod===zona); const p=z?.puestos?.find(p=>p.cod===puesto); labelExtra+=` · ${p?.nombre||puesto}`; }
 
-      document.getElementById('lbl-tabla').textContent=`Partidos · Cámara · ${dep.nombre} · ${nCurules} curules · D'Hondt`;
+      document.getElementById('lbl-tabla').textContent=`Partidos · Cámara · ${labelExtra} · ${nCurules} curules · D'Hondt`;
       document.getElementById('drill-badge').textContent=dep.nombre;
       document.getElementById('drill-badge').className='level-badge dep';
       document.getElementById('drill-nav').innerHTML='';
-      renderPartidosTabla(partidosDep, votvalDep, cur, 'camara', true, dep.nombre, dep.cod);
+      renderPartidosTabla(partidosDep, votvalDep, cur, 'camara', true, dep.nombre, dep.cod, !!candMap);
       renderKPI(dep.nombre, votvalDep, null, cur, totalCurules);
     }
 
@@ -437,12 +537,12 @@
       document.getElementById('drill-badge').className='level-badge dep';
       document.getElementById('drill-nav').innerHTML='';
       const partidos = [...resumenData.partidos].map(p=>({...p,curules:curulesNac[p.partido]||0})).sort((a,b)=>b.votos-a.votos);
-      renderPartidosTabla(partidos, resumenData.votval, curulesNac, 'camara', false, null, null);
+      renderPartidosTabla(partidos, resumenData.votval, curulesNac, 'camara', false, null, null, false);
       renderKPI();
     }
 
     // ─── RENDER TABLA PARTIDOS ────────────────────────────────
-    function renderPartidosTabla(partidos, votval, cur, tbodyId, showDrillBtn, depNom, depCod){
+    function renderPartidosTabla(partidos, votval, cur, tbodyId, showDrillBtn, depNom, depCod, hasCandMap){
       const thead = document.getElementById('drill-thead');
       const tbody = document.getElementById(`tbody-${tbodyId}`);
       thead.innerHTML=`<tr><th>#</th><th>Partido / Coalición</th><th class="r">Votos</th><th class="r" style="min-width:130px">%</th><th class="r">Curules</th></tr>`;
@@ -459,6 +559,10 @@
         const pasaUmbral = p.votos >= umbral;
         const curulesCell=curules>0?`<span class="cbadge">${curules}</span>`:pasaUmbral?`<span class="cbadge">0</span>`:`<span class="cbadge sub">—</span>`;
 
+        // Filtrar candidatos: si hay candMap, ya vienen filtrados; si no, mostrar todos (vista nacional)
+        const cands = p.candidatos || [];
+        const candCount = cands.filter(c=>{ const n=norm(c.nombre); return n!==norm(p.partido); }).length;
+
         const tr=document.createElement('tr');
         tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td>
           <td>
@@ -468,7 +572,7 @@
               ${showDrillBtn?`<span class="circ-badge">${depNom||''}</span>`:''}
             </div>
             <div style="margin-top:.35rem">
-              <button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${p.candidatos.length} candidatos</button>
+              <button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${candCount} candidatos${hasCandMap?' <span style="font-size:.6rem;color:rgba(74,222,128,.5)">· este depto</span>':''}</button>
             </div>
           </td>
           <td class="r" style="font-size:.9rem;font-weight:700">${fmt(p.votos)}</td>
@@ -479,18 +583,25 @@
         // Expand candidatos
         const trC=document.createElement('tr');
         trC.innerHTML=`<td colspan="5" style="padding:0"><div class="cands-inner" id="cands-inner-${i}">
-          <table class="cands-table"><thead><tr><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% partido</th></tr></thead>
+          <table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% partido</th></tr></thead>
           <tbody>${(()=>{
             const nomPart = norm(p.partido);
             let curulesRestantes = curules;
-            return p.candidatos.map((c,j)=>{
+            return cands.map((c,j)=>{
               const esLista = norm(c.nombre)===nomPart;
               let elegido=false;
               if(!esLista&&curulesRestantes>0){elegido=true;curulesRestantes--;}
               const colorC=elegido?'#39ff7a':esLista?'rgba(255,255,255,.2)':'inherit';
               const fw=elegido?700:400;
               const suffix=elegido?'<span style="font-size:.6rem;margin-left:.4rem">✦</span>':esLista?'<span style="font-size:.58rem;color:rgba(255,255,255,.2);margin-left:.4rem">(lista)</span>':'';
-              return `<tr><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif;font-weight:${fw};color:${colorC}">${c.nombre}${suffix}</td><td class="r">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;
+              const codStr=c.codigo!=null?String(c.codigo).padStart(3,'0'):'—';
+              return `<tr>
+                <td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${codStr}</td>
+                <td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td>
+                <td style="font-family:'Syne',sans-serif;font-weight:${fw};color:${colorC}">${c.nombre}${suffix}</td>
+                <td class="r">${fmt(c.votos)}</td>
+                <td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td>
+              </tr>`;
             }).join('');
           })()}</tbody></table>
         </div></td>`;
