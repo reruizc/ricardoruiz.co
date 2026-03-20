@@ -182,6 +182,28 @@
     .bar-track{height:6px;background:var(--bar-bg);border-radius:3px;overflow:hidden;margin-top:.55rem}
     .bar-fill{height:100%;border-radius:3px;transition:width 1.2s cubic-bezier(.25,.46,.45,.94)}
 
+
+    /* CONDITIONS PANEL */
+    .conditions-panel{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1.2rem 1.5rem;margin-bottom:1.5rem;backdrop-filter:blur(4px)}
+    body.day-mode .conditions-panel{background:rgba(0,0,0,.03);border-color:rgba(0,0,0,.1)}
+    .conditions-title{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:.9rem}
+    body.day-mode .conditions-title{color:rgba(0,0,0,.4)}
+    .conditions-grid{display:grid;grid-template-columns:1fr 1fr;gap:.4rem}
+    @media(max-width:700px){.conditions-grid{grid-template-columns:1fr}}
+    .cond-opt{display:flex;align-items:center;gap:.65rem;font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.04em;color:rgba(255,255,255,.45);cursor:pointer;padding:.5rem .75rem;border:1px solid transparent;transition:all .15s;user-select:none;line-height:1.3}
+    .cond-opt:hover{color:rgba(255,255,255,.8);border-color:rgba(255,255,255,.1);background:rgba(255,255,255,.03)}
+    .cond-opt.active{color:var(--white);border-color:rgba(0,71,255,.5);background:rgba(0,71,255,.1)}
+    body.day-mode .cond-opt{color:rgba(0,0,0,.45)}
+    body.day-mode .cond-opt:hover{color:#0d1120;border-color:rgba(0,0,0,.12);background:rgba(0,0,0,.03)}
+    body.day-mode .cond-opt.active{color:var(--blue);border-color:rgba(0,71,255,.4);background:rgba(0,71,255,.07)}
+    .cond-dot{width:8px;height:8px;border-radius:50%;border:1.5px solid rgba(255,255,255,.3);flex-shrink:0;transition:all .15s}
+    .cond-opt.active .cond-dot{background:var(--blue);border-color:var(--blue)}
+    body.day-mode .cond-dot{border-color:rgba(0,0,0,.25)}
+    .ctag{font-family:'DM Mono',monospace;font-size:.58rem;font-weight:700;letter-spacing:.06em;padding:.1rem .4rem;flex-shrink:0}
+    .ctag.a{color:var(--blue);background:rgba(0,71,255,.15)}
+    .ctag.b{color:var(--purple);background:rgba(167,139,250,.15)}
+    body.day-mode .ctag.a{color:rgba(0,60,220,.9);background:rgba(0,71,255,.1)}
+    body.day-mode .ctag.b{color:rgba(100,60,200,.9);background:rgba(120,80,220,.1)}
     .min-badge{display:inline-flex;align-items:center;gap:.5rem;font-family:'DM Mono',monospace;font-size:.85rem;letter-spacing:.1em;text-transform:uppercase;background:rgba(251,146,60,.08);border:1px solid rgba(251,146,60,.2);color:rgba(251,146,60,.8);padding:.55rem 1.1rem}
     .min-desc-text{color:rgba(255,255,255,.55)}
 
@@ -377,6 +399,32 @@
                 </div>
                 <div class="corp-hint" id="corp-D"></div>
               </div>
+            </div>
+          </div>
+        </div>
+
+
+        <!-- CONDICIONES -->
+        <div class="conditions-panel">
+          <div class="conditions-title">Condiciones · Filtro para votación mínima en común y tabla</div>
+          <div class="conditions-grid">
+            <div class="cond-opt active" id="cond-0" onclick="setCondicion(0)">
+              <span class="cond-dot"></span><span class="ctag a">A</span> mayor que <span class="ctag b">B</span> en cada mesa
+            </div>
+            <div class="cond-opt" id="cond-1" onclick="setCondicion(1)">
+              <span class="cond-dot"></span><span class="ctag b">B</span> mayor que <span class="ctag a">A</span> en cada mesa
+            </div>
+            <div class="cond-opt" id="cond-2" onclick="setCondicion(2)">
+              <span class="cond-dot"></span><span class="ctag a">A</span> igual o mayor que <span class="ctag b">B</span> en cada mesa
+            </div>
+            <div class="cond-opt" id="cond-3" onclick="setCondicion(3)">
+              <span class="cond-dot"></span><span class="ctag b">B</span> igual o mayor que <span class="ctag a">A</span> en cada mesa
+            </div>
+            <div class="cond-opt" id="cond-4" onclick="setCondicion(4)">
+              <span class="cond-dot"></span><span class="ctag a">A</span> mayor que <span class="ctag b">B</span> · sin mesas en cero
+            </div>
+            <div class="cond-opt" id="cond-5" onclick="setCondicion(5)">
+              <span class="cond-dot"></span><span class="ctag b">B</span> mayor que <span class="ctag a">A</span> · sin mesas en cero
             </div>
           </div>
         </div>
@@ -599,8 +647,8 @@
         });
 
         // Totales globales
-        let totalA=0, totalB=0, totalC=0, totalD=0, totalMin=0, totalMinNoZero=0;
-        allMesas.forEach(m => { totalA+=m.A; totalB+=m.B; totalC+=m.C; totalD+=m.D; totalMin+=Math.min(m.A,m.B); if(m.A>=m.B&&m.A>=1&&m.B>=1) totalMinNoZero+=Math.min(m.A,m.B); });
+        let totalA=0, totalB=0, totalC=0, totalD=0;
+        allMesas.forEach(m => { totalA+=m.A; totalB+=m.B; totalC+=m.C; totalD+=m.D; });
 
         // Depto principal de B (donde más votos sacó)
         const depBMap = {};
@@ -610,8 +658,8 @@
         });
         const depBTop = Object.entries(depBMap).sort((a,b)=>b[1].vB-a[1].vB)[0];
 
-        // Filtro A >= B
-        mesasAB = allMesas.filter(m => m.A >= m.B);
+        // Filtro según condición
+        mesasAB = condicionFilter(allMesas);
         let ab_A=0, ab_B=0, ab_C=0, ab_D=0;
         mesasAB.forEach(m => { ab_A+=m.A; ab_B+=m.B; ab_C+=m.C; ab_D+=m.D; });
 
@@ -621,13 +669,14 @@
         mesasABCD.forEach(m => { abcd_A+=m.A; abcd_B+=m.B; abcd_C+=m.C; abcd_D+=m.D; });
 
         window._allMesasRef = allMesas;
+        window._allMesasRef = allMesas;
         // Reset drills
         drillAB = { nivel:'dep', cod_dep:null, nom_dep:null, cod_mun:null, nom_mun:null, cod_zon:null, nom_zon:null, cod_pue:null, nom_pue:null };
         drillCD = { nivel:'dep', cod_dep:null, nom_dep:null, cod_mun:null, nom_mun:null, cod_zon:null, nom_zon:null, cod_pue:null, nom_pue:null };
 
         renderResults({
           selA, selB, selC, selD,
-          totalA, totalB, totalC, totalD, totalMin, totalMinNoZero,
+          totalA, totalB, totalC, totalD, totalMin: mesasAB.reduce((s,m)=>s+Math.min(m.A,m.B),0),
           depBTop, mesasTotal: allMesas.length,
           ab_A, ab_B, ab_C, ab_D, mesasABCount: mesasAB.length,
           abcd_A, abcd_B, abcd_C, abcd_D, mesasABCDCount: mesasABCD.length,
@@ -667,10 +716,7 @@
           </div>
           <div class="card">
             <div class="card-label">Votación mínima en común</div>
-            <label class="optional-toggle" style="margin-bottom:1rem;cursor:pointer">
-              <span class="toggle-switch"><input type="checkbox" id="chk-excluir-ceros" style="opacity:0;width:0;height:0;position:absolute" onchange="toggleExcluirCeros()"><span class="toggle-track"></span><span class="toggle-knob"></span></span>
-              <span class="toggle-label">Excluir mesas donde algún candidato sacó 0 votos</span>
-            </label>
+
             <div style="margin-bottom:.7rem;margin-top:.8rem"><div class="min-badge" id="badge-min">—</div></div>
             <div id="min-extra"></div>
             <div style="font-family:'DM Mono',monospace;font-size:1.05rem;line-height:1.7;margin-top:.7rem" class="min-desc-text" id="min-desc-text">
@@ -703,10 +749,7 @@
               <button class="sort-btn active" id="sort-ab-A" onclick="setSortAB('A')">Votos A</button>
               <button class="sort-btn" id="sort-ab-zon" onclick="setSortAB('zon')">Zona</button>
               <button class="sort-btn" id="sort-ab-pct" onclick="setSortAB('pct')">% A vs B</button>
-              <label class="optional-toggle" style="margin-left:.5rem;cursor:pointer">
-                <span class="toggle-switch" style="width:28px;height:16px"><input type="checkbox" id="chk-excluir-ceros-02" style="opacity:0;width:0;height:0;position:absolute" onchange="toggleExcluirCeros()"><span class="toggle-track"></span><span class="toggle-knob" style="width:12px;height:12px"></span></span>
-                <span class="toggle-label" style="font-size:.58rem">Sin ceros</span>
-              </label>
+
               <button class="dl-btn" onclick="downloadDrill('ab')">↓ Excel</button>
             </div>
           </div>
@@ -791,43 +834,53 @@
       setTimeout(() => document.querySelectorAll('.bar-fill[data-w]').forEach(b => b.style.width = b.dataset.w+'%'), 600);
 
       // Drill tables
-      applyExcluirCeros(); // respects current toggle state
+      renderDrill('ab', mesasAB, drillAB);
       if (d.useCD) renderDrill('cd', mesasABCD, drillCD);
     }
 
-    // ─── EXCLUIR CEROS TOGGLE ────────────────────────────────
-    let excluirCeros = false;
+    // ─── SISTEMA DE CONDICIONES ──────────────────────────────
+    // 0:A>B  1:B>A  2:A>=B  3:B>=A  4:A>B+nozero  5:B>A+nozero
+    let condicion = 0;
 
-    function toggleExcluirCeros() {
-      excluirCeros = !excluirCeros;
-      // Sync both checkboxes
-      ['chk-excluir-ceros','chk-excluir-ceros-02'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.checked = excluirCeros;
-      });
-      refreshMinBadge();
-      applyExcluirCeros();
+    const COND_FNS = [
+      m => m.A > m.B,
+      m => m.B > m.A,
+      m => m.A >= m.B,
+      m => m.B >= m.A,
+      m => m.A > m.B && m.A >= 1 && m.B >= 1,
+      m => m.B > m.A && m.A >= 1 && m.B >= 1
+    ];
+    const COND_LABELS = [
+      'A > B', 'B > A', 'A ≥ B', 'B ≥ A',
+      'A > B · sin ceros', 'B > A · sin ceros'
+    ];
+
+    function condicionFilter(mesas) {
+      return mesas.filter(COND_FNS[condicion]);
     }
 
-    function refreshMinBadge() {
-      const badge = document.getElementById('badge-min');
-      const desc = document.getElementById('min-desc-text');
-      const mesasInfo = document.getElementById('min-mesas-info');
-      if (!badge) return;
-      if (excluirCeros) {
-        badge.textContent = `${(window._totalMinNoZero||0).toLocaleString('es-CO')} votos mínimos en común (A ≥ B, sin ceros)`;
-        if (desc) desc.innerHTML = 'Suma de <code style="color:var(--orange)">min(A, B)</code> por mesa, <strong>excluyendo mesas donde algún candidato sacó 0 votos</strong>.';
-        if (mesasInfo) mesasInfo.innerHTML = '<span style="color:rgba(0,71,255,.5)">' + (window._mesasSinCeros||0).toLocaleString('es-CO') + '</span> <span style="color:rgba(255,255,255,.25)">mesas donde A ≥ B y ambos ≥ 1 voto</span>';
-      } else {
-        badge.textContent = `${(window._totalMin||0).toLocaleString('es-CO')} votos mínimos en común`;
-        if (desc) desc.innerHTML = 'Suma de <code style="color:var(--orange)">min(A, B)</code> por mesa.<br/>Estimación de votación que comparten ambos candidatos en las mismas mesas.';
-        if (mesasInfo) mesasInfo.innerHTML = '<span style="color:rgba(0,71,255,.5)">' + (window._mesasTotal||0).toLocaleString('es-CO') + '</span> <span style="color:rgba(255,255,255,.25)">mesas con datos</span>';
+    function setCondicion(n) {
+      condicion = n;
+      for (let i = 0; i < 6; i++) {
+        const el = document.getElementById('cond-' + i);
+        if (el) el.classList.toggle('active', i === n);
       }
+      if (!window._allMesasRef || !window._allMesasRef.length) return;
+      mesasAB = condicionFilter(window._allMesasRef);
+      drillAB = { nivel:'dep', cod_dep:null, nom_dep:null, cod_mun:null, nom_mun:null, cod_zon:null, nom_zon:null, cod_pue:null, nom_pue:null };
+      const newMin = mesasAB.reduce((s,m) => s + Math.min(m.A,m.B), 0);
+      refreshMinBadge(newMin, mesasAB.length);
+      renderDrill('ab', mesasAB, drillAB);
     }
 
-    function applyExcluirCeros() {
-      const source = excluirCeros ? mesasAB.filter(m => m.A > 0 && m.B > 0) : mesasAB;
-      renderDrill('ab', source, drillAB);
+    function refreshMinBadge(totalMin, mesasCount) {
+      const badge = document.getElementById('badge-min');
+      const desc  = document.getElementById('min-desc-text');
+      const info  = document.getElementById('min-mesas-info');
+      if (!badge) return;
+      badge.textContent = `${(totalMin||0).toLocaleString('es-CO')} votos mínimos en común`;
+      if (desc) desc.innerHTML = `Suma de <code style="color:var(--orange)">min(A, B)</code> por mesa · condición: <strong>${COND_LABELS[condicion]}</strong>`;
+      if (info) info.innerHTML = '<span style="color:rgba(0,71,255,.5)">' + (mesasCount||0).toLocaleString('es-CO') + '</span><span style="color:rgba(255,255,255,.25)"> mesas con esta condición</span>';
     }
 
     // ─── SORT STATE ───────────────────────────────────────────
@@ -839,7 +892,7 @@
         const btn = document.getElementById(`sort-ab-${k}`);
         if (btn) btn.classList.toggle('active', k===s);
       });
-      applyExcluirCeros();
+      renderDrill('ab', mesasAB, drillAB);
     }
 
     function sortGroups(groups, sort) {
@@ -962,7 +1015,7 @@
 
     function _drillTo(prefix, nivel, cod_dep, nom_dep, cod_mun, nom_mun, cod_zon, nom_zon, cod_pue, nom_pue) {
       const state = { nivel, cod_dep, nom_dep, cod_mun, nom_mun, cod_zon, nom_zon, cod_pue, nom_pue };
-      if (prefix==='ab') { drillAB=state; applyExcluirCeros(); }
+      if (prefix==='ab') { drillAB=state; renderDrill('ab', mesasAB, state); }
       else { drillCD=state; renderDrill('cd', mesasABCD, state); }
     }
 
