@@ -212,6 +212,16 @@
           <a href="endoso-2026.html" class="endoso-btn" onclick="navTo(event,'endoso-2026.html')">Calcular endoso →</a>
         </div>
 
+        <div class="sub-selector" style="margin-bottom:.5rem;padding-bottom:.75rem;border-bottom:1px solid var(--border)">
+          <span class="sub-label">Corporación:</span>
+          <select class="dep-select" id="corp-select" onchange="switchCorp(this.value)">
+            <option value="TODAS">Todas</option>
+            <option value="NACIONAL">Ordinaria (Nacional)</option>
+            <option value="INDIGENA">Indígena</option>
+            <option value="AFRO">Comunidades Negras / Afro</option>
+          </select>
+        </div>
+
         <div class="sub-selector">
           <span class="sub-label">Circunscripción:</span>
           <select class="dep-select" id="dep-select" onchange="switchDep(this.value)">
@@ -262,6 +272,13 @@
               <div class="umbral-val" id="curules-total">—</div>
               <div class="umbral-label" style="margin-top:.5rem">Método</div>
               <div class="umbral-val" style="font-size:.65rem">D'Hondt por circunscripción · umbral 3%</div>
+              <div id="dep-cifras" style="display:none">
+                <div style="height:1px;background:var(--border);margin:.75rem 0"></div>
+                <div class="umbral-label">Cifra repartidora</div>
+                <div class="umbral-val" id="cifra-val">—</div>
+                <div class="umbral-label" style="margin-top:.5rem">Umbral (3%)</div>
+                <div class="umbral-val" id="umbral-dep-val">—</div>
+              </div>
             </div>
           </div>
         </div>
@@ -324,7 +341,7 @@
         eleg.forEach(([p,v])=>{ const q=v/(c[p]+1); if(q>mx){mx=q;win=p;} });
         if(win){c[win]++;cifra=mx;}
       }
-      return c;
+      return { cur: c, cifra: Math.round(cifra), umbral: Math.round(umb) };
     }
 
     // ─── CACHE ────────────────────────────────────────────────
@@ -343,6 +360,8 @@
     let curDep = 'TODOS';
     let curDepData = null;   // dep-{cod}.json cargado
     let curMun = 'TODOS', curZon = 'TODOS', curPue = 'TODOS';
+    let curCorp = 'TODAS';
+    let curDepCurules = {}; // D'Hondt congelado al nivel depto
 
     // ─── HELPERS UI ───────────────────────────────────────────
     function showSel(id, show){ document.getElementById(id).style.display = show ? '' : 'none'; }
@@ -376,7 +395,7 @@
         curulesNac = {};
         deps.forEach(dep => {
           const nCurules = getCurulesDep(dep.nombre);
-          const cur = dhondtDep(dep.partidos, nCurules);
+          const { cur } = dhondtDep(dep.partidos, nCurules);
           Object.entries(cur).forEach(([p,v])=>{ curulesNac[p]=(curulesNac[p]||0)+v; });
         });
         // Anotar curules en resumenData.partidos
@@ -416,16 +435,62 @@
     }
 
     // ─── DONUT ────────────────────────────────────────────────
-    function renderDonut(r){
-      r = r||resumenData;
-      document.getElementById('pct-camara').textContent = pct(r.votval,r.votant)+'%';
+    function renderDonut(data){
+      // data puede ser resumenData completo, o {votval, votant, votnul, votnma, votblan}
+      const d = data || resumenData;
+      const votval  = d.votval  || 0;
+      const votant  = d.votant  || votval;
+      const votnul  = d.votnul  || 0;
+      const votnma  = d.votnma  || 0;
+      const votblan = d.votblan || 0;
+      document.getElementById('pct-camara').textContent = votant ? ((votval/votant)*100).toFixed(2)+'%' : '—';
       if(donutChart) donutChart.destroy();
       donutChart = new Chart(document.getElementById('donut-camara').getContext('2d'),{
         type:'doughnut',
-        data:{labels:['Votos válidos','Nulos','No marcados','En blanco'],datasets:[{data:[r.votval,r.votnul,r.votnma,r.votblan],backgroundColor:['#0047FF','#cc2233','#f0a500','#555'],borderWidth:0,hoverOffset:6}]},
-        options:{responsive:true,maintainAspectRatio:true,cutout:'72%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}}}}
+        data:{labels:['Votos válidos','Nulos','No marcados','En blanco'],
+              datasets:[{data:[votval,votnul,votnma,votblan],
+                         backgroundColor:['#0047FF','#cc2233','#f0a500','#555'],
+                         borderWidth:0,hoverOffset:6}]},
+        options:{responsive:true,maintainAspectRatio:true,cutout:'72%',
+                 plugins:{legend:{display:false},
+                          tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}}}}
       });
-      document.getElementById('leg-camara').innerHTML=[['Votos válidos',r.votval,'#0047FF'],['Nulos',r.votnul,'#cc2233'],['No marcados',r.votnma,'#f0a500'],['En blanco',r.votblan,'#555']].map(([l,v,c])=>`<div class="li"><span class="ld" style="background:${c}"></span><span>${l}</span><span class="lv">${fmt(v)}</span></div>`).join('');
+      document.getElementById('leg-camara').innerHTML=[
+        ['Votos válidos',votval,'#0047FF'],
+        ['Nulos',votnul,'#cc2233'],
+        ['No marcados',votnma,'#f0a500'],
+        ['En blanco',votblan,'#555']
+      ].map(([l,v,c])=>`<div class="li"><span class="ld" style="background:${c}"></span><span>${l}</span><span class="lv">${fmt(v)}</span></div>`).join('');
+    }
+
+    // ─── CORPORACIÓN ─────────────────────────────────────────
+    // Detecta si un nombre de depto corresponde a una circunscripción especial
+    const CORP_INDIGENA = /ind[ií]gen/i;
+    const CORP_AFRO     = /negr|afro|comunidades.negr/i;
+    function tipoCirc(nombre){
+      if(CORP_INDIGENA.test(nombre)) return 'INDIGENA';
+      if(CORP_AFRO.test(nombre))     return 'AFRO';
+      return 'NACIONAL';
+    }
+
+    function switchCorp(corp){
+      curCorp = corp;
+      // Re-filtrar el dep-select
+      const sel = document.getElementById('dep-select');
+      Array.from(sel.options).forEach(o=>{
+        if(o.value==='TODOS'){ o.style.display=''; return; }
+        const tipo = tipoCirc(o.textContent);
+        o.style.display = (corp==='TODAS' || tipo===corp) ? '' : 'none';
+      });
+      // Si el depto activo quedó oculto, volver a nacional
+      const selOpt = sel.options[sel.selectedIndex];
+      if(selOpt && selOpt.style.display==='none'){
+        sel.value='TODOS';
+        switchDep('TODOS');
+      } else {
+        // Re-render nacional para filtrar partidos por tipo
+        if(curDep==='TODOS') renderNacional();
+      }
     }
 
     // ─── SWITCH DEP ───────────────────────────────────────────
@@ -496,8 +561,19 @@
     function renderDepView(dep){
       const nCurules = getCurulesDep(dep.nombre);
 
-      // Resolver el slice de datos según nivel activo
-      let slice = curDepData || dep;  // fallback a departamentos.json si no hay dep-cod.json
+      // ── D'HONDT SIEMPRE AL NIVEL DEPTO (congelado) ──────────
+      const depPartidosVotos = (curDepData || dep).partidos || {};
+      const { cur: curFrozen, cifra: cifraVal, umbral: umbralVal } = dhondtDep(depPartidosVotos, nCurules);
+      curDepCurules = curFrozen; // guardar para la tabla
+      const totalCurules = Object.values(curFrozen).reduce((s,v)=>s+v,0);
+
+      // Mostrar cifra repartidora y umbral
+      document.getElementById('dep-cifras').style.display = '';
+      document.getElementById('cifra-val').textContent = fmt(cifraVal);
+      document.getElementById('umbral-dep-val').textContent = fmt(umbralVal);
+
+      // ── SLICE PARA VOTOS Y CANDIDATOS (puede ser mun/zon/pue) ─
+      let slice = curDepData || dep;
       let labelExtra = dep.nombre;
 
       if(curDepData && curMun!=='TODOS'){
@@ -518,18 +594,17 @@
       }
 
       const partidosVotos = slice.partidos || {};
-      const candMap = slice.candidatos || null;  // {partido:[{nombre,codigo,votos}]} ya filtrados
-
-      const cur = dhondtDep(partidosVotos, nCurules);
-      const totalCurules = Object.values(cur).reduce((s,v)=>s+v,0);
+      const candMap = slice.candidatos || null;
       const votvalSlice = Object.values(partidosVotos).reduce((s,v)=>s+v,0);
 
-      // Construir lista de partidos
+      // ── DONUT: actualizar con datos del slice ─────────────────
+      renderDonut({ votval: votvalSlice, votant: votvalSlice });
+
+      // ── TABLA: votos del slice, curules CONGELADAS del depto ──
       const partidosDep = resumenData.partidos.map(p=>({
         ...p,
         votos: partidosVotos[p.partido]||0,
-        curules: cur[p.partido]||0,
-        // Si hay candMap (dep-cod.json), usar candidatos de ese nivel ya filtrados
+        curules: curFrozen[p.partido]||0,
         candidatos: candMap?.[p.partido] ?? p.candidatos
       })).filter(p=>p.votos>0).sort((a,b)=>b.votos-a.votos);
 
@@ -537,8 +612,8 @@
       document.getElementById('drill-badge').textContent=dep.nombre;
       document.getElementById('drill-badge').className='level-badge dep';
       document.getElementById('drill-nav').innerHTML='';
-      renderPartidosTabla(partidosDep, votvalSlice, cur, 'camara', true, dep.nombre, dep.cod, !!candMap);
-      renderKPI(dep.nombre, votvalSlice, null, cur, totalCurules);
+      renderPartidosTabla(partidosDep, votvalSlice, curFrozen, 'camara', true, dep.nombre, dep.cod, !!candMap);
+      renderKPI(dep.nombre, votvalSlice, null, curFrozen, totalCurules);
     }
 
     // ─── RENDER NACIONAL ──────────────────────────────────────
@@ -547,6 +622,8 @@
       document.getElementById('drill-badge').textContent='Nacional';
       document.getElementById('drill-badge').className='level-badge dep';
       document.getElementById('drill-nav').innerHTML='';
+      document.getElementById('dep-cifras').style.display='none';
+      renderDonut(resumenData);
       const partidos = [...resumenData.partidos].map(p=>({...p,curules:curulesNac[p.partido]||0})).sort((a,b)=>b.votos-a.votos);
       renderPartidosTabla(partidos, resumenData.votval, curulesNac, 'camara', false, null, null, false);
       renderKPI();

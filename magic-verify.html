@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title id="pageTitle">Accediendo · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --black: #0a0a0a; --white: #f4f3ef; --blue: #0047FF;
+      --gray: #888; --gray-light: #e0dfd9; --error: #ff4757; --success: #00d68f;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--black); color: var(--white);
+      font-family: 'Fraunces', serif;
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      padding: 2rem; cursor: none;
+    }
+    .cursor { position:fixed; width:12px; height:12px; background:var(--blue); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s ease,background .2s; transform:translate(-50%,-50%); }
+    .cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--blue); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s ease,opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+
+    .wrap { max-width: 420px; width: 100%; }
+
+    .logo-wrap {
+      display: flex; align-items: center; gap: .65rem;
+      text-decoration: none; margin-bottom: 3rem;
+    }
+    .logo { font-family:'Syne',sans-serif; font-weight:800; font-size:1.2rem; letter-spacing:-.02em; color:var(--white); }
+    .logo span { color:var(--blue); }
+    .logo-bars { display:flex; align-items:flex-end; gap:3px; height:18px; }
+    .logo-bar { width:5px; background:var(--blue); border-radius:1px 1px 0 0; opacity:.85; }
+
+    /* LOADING STATE */
+    .state { display: none; }
+    .state.active { display: block; }
+
+    .loader-wrap { text-align: center; padding: 2rem 0; }
+    .loader-ring {
+      width: 44px; height: 44px;
+      border: 2px solid rgba(0,71,255,.2);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      margin: 0 auto 1.5rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loader-label {
+      font-family:'DM Mono',monospace; font-size:.68rem;
+      letter-spacing:.15em; text-transform:uppercase; color:#555;
+    }
+
+    /* SUCCESS STATE */
+    .success-icon {
+      width: 52px; height: 52px; border: 2px solid var(--success);
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      margin: 0 0 1.5rem; font-size: 1.3rem; color: var(--success);
+    }
+    .state-step {
+      font-family:'DM Mono',monospace; font-size:.65rem;
+      letter-spacing:.18em; text-transform:uppercase; color:var(--blue); margin-bottom:.75rem;
+    }
+    .state-title {
+      font-family:'Syne',sans-serif; font-weight:800;
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+      letter-spacing:-.03em; line-height:1; margin-bottom:.6rem;
+    }
+    .state-desc {
+      font-family:'Fraunces',serif; font-weight:300;
+      font-size:.95rem; color:#555; margin-bottom:2rem; line-height:1.7;
+    }
+
+    /* ERROR STATE */
+    .error-icon {
+      width: 52px; height: 52px; border: 2px solid var(--error);
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      margin: 0 0 1.5rem; font-size: 1.3rem; color: var(--error);
+    }
+
+    /* FORM (nuevo usuario) */
+    .form-step {
+      font-family:'DM Mono',monospace; font-size:.65rem;
+      letter-spacing:.18em; text-transform:uppercase; color:var(--blue); margin-bottom:.75rem;
+    }
+    .form-title {
+      font-family:'Syne',sans-serif; font-weight:800;
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+      letter-spacing:-.03em; line-height:1; margin-bottom:.5rem;
+    }
+    .form-subtitle {
+      font-family:'Fraunces',serif; font-weight:300;
+      font-size:.95rem; color:#555; margin-bottom:2rem; line-height:1.7;
+    }
+    .form-group { margin-bottom:1.4rem; }
+    .form-group label {
+      display:block; font-family:'DM Mono',monospace; font-size:.6rem;
+      letter-spacing:.18em; text-transform:uppercase; color:#444; margin-bottom:.5rem; transition:color .2s;
+    }
+    .form-group:focus-within label { color:var(--blue); }
+    .form-group input, .form-group select {
+      width:100%; background:transparent; border:none;
+      border-bottom:1.5px solid #222; padding:.7rem 0;
+      font-family:'Fraunces',serif; font-size:1rem;
+      color:var(--white); outline:none; transition:border-color .25s;
+      appearance:none; -webkit-appearance:none;
+    }
+    .form-group select {
+      background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23444' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat:no-repeat; background-position:right 0 center; padding-right:1.2rem; cursor:none;
+    }
+    .form-group select option { background:#111; color:var(--white); }
+    .form-group input:focus, .form-group select:focus { border-color:var(--blue); }
+    .form-group input::placeholder { color:#333; }
+    .btn-submit {
+      width:100%; background:var(--blue); color:#fff;
+      border:2px solid var(--blue); padding:1rem 2rem;
+      font-family:'DM Mono',monospace; font-size:.78rem;
+      letter-spacing:.1em; text-transform:uppercase;
+      cursor:none; margin-top:2rem;
+      transition:background .25s, border-color .25s;
+    }
+    .btn-submit:hover { background:#0035cc; border-color:#0035cc; }
+    .btn-submit:disabled { background:#1e1e1e; border-color:#1e1e1e; color:#444; }
+    .btn-link {
+      display:block; text-align:center; margin-top:1.5rem;
+      font-family:'DM Mono',monospace; font-size:.62rem;
+      letter-spacing:.1em; text-transform:uppercase;
+      color:#444; text-decoration:none; transition:color .2s;
+    }
+    .btn-link:hover { color:var(--blue); }
+
+    @media (max-width: 480px) {
+      body { cursor:auto; padding:1.5rem; }
+      .cursor,.cursor-ring { display:none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <div class="wrap">
+    <a href="index.html" class="logo-wrap">
+      <div class="logo-bars">
+        <div class="logo-bar" style="height:18px"></div>
+        <div class="logo-bar" style="height:14px"></div>
+        <div class="logo-bar" style="height:9px"></div>
+        <div class="logo-bar" style="height:5px"></div>
+      </div>
+      <span class="logo">Ricardo<span>.</span>Ruiz</span>
+    </a>
+
+    <!-- LOADING -->
+    <div class="state active" id="state-loading">
+      <div class="loader-wrap">
+        <div class="loader-ring"></div>
+        <div class="loader-label" id="loading-label">Verificando enlace...</div>
+      </div>
+    </div>
+
+    <!-- NEW USER — COMPLETE PROFILE -->
+    <div class="state" id="state-setup">
+      <div class="form-step" id="setup-step">01 — Perfil</div>
+      <h1 class="form-title" id="setup-title">Completa tu perfil</h1>
+      <p class="form-subtitle" id="setup-subtitle">Solo necesitamos un par de datos para personalizar tu experiencia.</p>
+      <div class="form-group">
+        <label id="setup-label-name">Nombre completo</label>
+        <input type="text" id="setup-name" placeholder="María García" autocomplete="name" />
+      </div>
+      <div class="form-group">
+        <label id="setup-label-country">País</label>
+        <select id="setup-country">
+          <option value="" disabled selected>— Selecciona —</option>
+          <option value="co">Colombia</option>
+          <option value="mx">México</option>
+          <option value="pe">Perú</option>
+          <option value="py">Paraguay</option>
+          <option value="us">United States</option>
+          <option value="uk">United Kingdom</option>
+          <option value="other">Otro / Other</option>
+        </select>
+      </div>
+      <button class="btn-submit" id="setup-btn" onclick="completeProfile()">Entrar al dashboard →</button>
+    </div>
+
+    <!-- SUCCESS -->
+    <div class="state" id="state-success">
+      <div class="success-icon">✓</div>
+      <div class="state-step" id="success-step">Acceso verificado</div>
+      <h2 class="state-title" id="success-title">¡Bienvenido!</h2>
+      <p class="state-desc" id="success-desc">Redirigiendo al dashboard...</p>
+    </div>
+
+    <!-- ERROR -->
+    <div class="state" id="state-error">
+      <div class="error-icon">✕</div>
+      <div class="state-step">Error</div>
+      <h2 class="state-title" id="error-title">Enlace inválido</h2>
+      <p class="state-desc" id="error-desc">Este enlace expiró o ya fue usado. Solicita uno nuevo.</p>
+      <a href="login.html" class="btn-link" id="error-btn">← Volver al login</a>
+    </div>
+
+  </div>
+
+  <script>
+    const params     = new URLSearchParams(window.location.search);
+    const token      = params.get('token');
+    const setupToken = params.get('setup');
+    const errorCode  = params.get('error');
+    const lang       = localStorage.getItem('rr-lang') || 'co';
+    const isEN       = lang === 'us';
+
+    function showState(id) {
+      document.querySelectorAll('.state').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    // ── Traducción rápida ──
+    if (isEN) {
+      document.getElementById('pageTitle').textContent       = 'Signing in · Ricardo Ruiz';
+      document.getElementById('loading-label').textContent   = 'Verifying link...';
+      document.getElementById('setup-step').textContent      = '01 — Profile';
+      document.getElementById('setup-title').textContent     = 'Complete your profile';
+      document.getElementById('setup-subtitle').textContent  = 'Just a couple of details to personalize your experience.';
+      document.getElementById('setup-label-name').textContent    = 'Full name';
+      document.getElementById('setup-name').placeholder          = 'Jane Smith';
+      document.getElementById('setup-label-country').textContent = 'Country';
+      document.getElementById('setup-btn').textContent           = 'Go to dashboard →';
+      document.getElementById('success-step').textContent    = 'Access verified';
+      document.getElementById('success-title').textContent   = 'Welcome!';
+      document.getElementById('success-desc').textContent    = 'Redirecting to dashboard...';
+      document.getElementById('error-btn').textContent       = '← Back to login';
+    }
+
+    // ── Flujo ──
+    if (errorCode) {
+      // Vino con error desde el Worker
+      const msgs = {
+        expired:  isEN ? 'This link has expired. Please request a new one.' : 'Este enlace expiró. Solicita uno nuevo.',
+        invalid:  isEN ? 'Invalid link.' : 'Enlace inválido.',
+        notfound: isEN ? 'Account not found.' : 'Cuenta no encontrada.',
+      };
+      document.getElementById('error-desc').textContent = msgs[errorCode] || msgs.invalid;
+      showState('state-error');
+
+    } else if (setupToken) {
+      // Usuario nuevo — mostrar formulario de perfil
+      window._setupToken = setupToken;
+      showState('state-setup');
+
+    } else if (token) {
+      // Usuario existente — sesión ya creada, solo guardar y redirigir
+      // El token y datos vienen como query params
+      const name = decodeURIComponent(params.get('name') || '');
+      const plan = params.get('plan') || 'free';
+      if (name) {
+        localStorage.setItem('rr-token', token);
+        localStorage.setItem('rr-user', JSON.stringify({ name, email: '', plan }));
+        // Obtener email completo desde /auth/me
+        fetch('https://rr-auth.reruizc.workers.dev/auth/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) localStorage.setItem('rr-user', JSON.stringify(data.user));
+        })
+        .finally(() => {
+          showState('state-success');
+          setTimeout(() => window.location.href = 'dashboard.html', 1500);
+        });
+      } else {
+        showState('state-error');
+      }
+    } else {
+      showState('state-error');
+    }
+
+    // ── Completar perfil (usuario nuevo) ──
+    async function completeProfile() {
+      const name    = document.getElementById('setup-name').value.trim();
+      const country = document.getElementById('setup-country').value;
+      const btn     = document.getElementById('setup-btn');
+
+      if (!name || name.length < 2) {
+        document.getElementById('setup-name').style.borderColor = '#ff4757'; return;
+      }
+      if (!country) {
+        document.getElementById('setup-country').style.borderColor = '#ff4757'; return;
+      }
+
+      btn.textContent = '...';
+      btn.disabled = true;
+
+      try {
+        const res  = await fetch('https://rr-auth.reruizc.workers.dev/auth/magic/complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ setupToken: window._setupToken, name, country }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          localStorage.setItem('rr-token', data.token);
+          localStorage.setItem('rr-user', JSON.stringify(data.user));
+          document.getElementById('success-title').textContent = isEN ? `Welcome, ${data.user.name.split(' ')[0]}!` : `¡Bienvenido, ${data.user.name.split(' ')[0]}!`;
+          showState('state-success');
+          setTimeout(() => window.location.href = 'dashboard.html', 1500);
+        } else {
+          document.getElementById('error-desc').textContent = data.error || (isEN ? 'An error occurred.' : 'Ocurrió un error.');
+          showState('state-error');
+        }
+      } catch {
+        btn.textContent = isEN ? 'Go to dashboard →' : 'Entrar al dashboard →';
+        btn.disabled = false;
+      }
+    }
+
+    // ── Cursor ──
+    const cursor = document.getElementById('cursor');
+    const ring   = document.getElementById('cursorRing');
+    let mx=0,my=0,rx=0,ry=0;
+    document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; cursor.style.left=mx+'px'; cursor.style.top=my+'px'; });
+    (function ar(){ rx+=(mx-rx)*.12; ry+=(my-ry)*.12; ring.style.left=rx+'px'; ring.style.top=ry+'px'; requestAnimationFrame(ar); })();
+    document.querySelectorAll('a,button').forEach(el => {
+      el.addEventListener('mouseenter', () => { cursor.style.transform='translate(-50%,-50%) scale(2.5)'; cursor.style.background='transparent'; cursor.style.border='1.5px solid var(--blue)'; ring.style.opacity='0'; });
+      el.addEventListener('mouseleave', () => { cursor.style.transform='translate(-50%,-50%) scale(1)'; cursor.style.background='var(--blue)'; cursor.style.border='none'; ring.style.opacity='.4'; });
+    });
+  </script>
+</body>
+</html>

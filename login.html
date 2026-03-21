@@ -284,7 +284,7 @@
     /* SOCIAL BUTTONS */
     .social-btns {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr;
       gap: 0.75rem;
       margin-bottom: 0.5rem;
     }
@@ -466,13 +466,9 @@
         <div class="form-divider"><span id="divider-text">o continúa con</span></div>
 
         <div class="social-btns">
-          <button type="button" class="btn-social" id="btn-google" onclick="handleSocialAuth('google')">
-            <svg width="16" height="16" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M43.611 20.083H42V20H24v8h11.303C33.654 32.657 29.332 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z" fill="#FFC107"/><path d="M6.306 14.691l6.571 4.819C14.655 16.108 19.001 13 24 13c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z" fill="#FF3D00"/><path d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0124 36c-5.311 0-9.818-3.398-11.42-8.099l-6.522 5.025C9.505 39.556 16.227 44 24 44z" fill="#4CAF50"/><path d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 01-4.087 5.571l6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z" fill="#1976D2"/></svg>
-            <span id="btn-google-text">Google</span>
-          </button>
-          <button type="button" class="btn-social" id="btn-microsoft" onclick="handleSocialAuth('microsoft')">
-            <svg width="16" height="16" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
-            <span id="btn-microsoft-text">Microsoft</span>
+          <button type="button" class="btn-social" id="btn-magic" onclick="sendMagicLink()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span id="btn-magic-text">Recibir enlace por email</span>
           </button>
         </div>
 
@@ -621,8 +617,7 @@
       document.getElementById('forgot-link').textContent = t.forgotLink;
       document.getElementById('btn-submit').textContent = t.btnSubmit;
       document.getElementById('divider-text').textContent = t.divider;
-      document.getElementById('btn-google-text').textContent = 'Google';
-      document.getElementById('btn-microsoft-text').textContent = 'Microsoft';
+      document.getElementById('btn-magic-text').textContent = currentLang === 'us' ? 'Receive link by email' : 'Recibir enlace por email';
       document.getElementById('form-terms').innerHTML =
         `${t.terms}<a href="#" id="terms-link">${t.termsLink}</a>${t.and}<a href="#" id="privacy-link">${t.privacyLink}</a>`;
       bindModalLinks();
@@ -716,10 +711,33 @@
       if (pl) pl.addEventListener('click', e => { e.preventDefault(); openModal('modal-privacy'); });
     }
 
-    // ─── SOCIAL AUTH ─────────────────────────────────────────────────────────
-    function handleSocialAuth(provider) {
-      // ── aquí irá la redirección OAuth al Cloudflare Worker ──
-      console.log(`OAuth flow: ${provider} — pendiente de conectar Worker`);
+    // ─── MAGIC LINK ───────────────────────────────────────────────────────────
+    async function sendMagicLink() {
+      const t    = i18n[currentLang] || i18n.co;
+      const btn  = document.getElementById('btn-magic');
+      const email = document.getElementById('email').value.trim();
+
+      // Si hay email en el campo lo usamos, si no pedimos que lo ingrese
+      if (!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+        document.getElementById('email').classList.add('error');
+        document.getElementById('email').focus();
+        return;
+      }
+
+      btn.textContent = '...';
+      btn.disabled = true;
+
+      try {
+        await fetch('https://rr-auth.reruizc.workers.dev/auth/magic', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        btn.textContent = currentLang === 'us' ? '✓ Link sent — check your email' : '✓ Enlace enviado — revisa tu correo';
+      } catch {
+        btn.textContent = currentLang === 'us' ? 'Error. Try again.' : 'Error. Intenta de nuevo.';
+        btn.disabled = false;
+      }
     }
 
     // ─── CURSOR ──────────────────────────────────────────────────────────────
