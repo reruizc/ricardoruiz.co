@@ -217,14 +217,12 @@
           <select class="dep-select" id="dep-select" onchange="switchDep(this.value)">
             <option value="TODOS">Nacional (todas)</option>
           </select>
-          <span class="sub-label" id="zona-label" style="display:none;margin-left:.75rem">Zona:</span>
-          <select class="dep-select" id="zona-select" onchange="switchZona(this.value)" style="display:none">
-            <option value="TODAS">Todas las zonas</option>
-          </select>
-          <span class="sub-label" id="puesto-label" style="display:none;margin-left:.75rem">Puesto:</span>
-          <select class="dep-select" id="puesto-select" onchange="switchPuesto(this.value)" style="display:none">
-            <option value="TODOS">Todos los puestos</option>
-          </select>
+          <span class="sub-label" id="mun-label" style="display:none;margin-left:.75rem">Municipio:</span>
+          <select class="dep-select" id="mun-select" onchange="switchMun(this.value)" style="display:none"></select>
+          <span class="sub-label" id="zon-label" style="display:none;margin-left:.75rem">Zona:</span>
+          <select class="dep-select" id="zon-select" onchange="switchZon(this.value)" style="display:none"></select>
+          <span class="sub-label" id="pue-label" style="display:none;margin-left:.75rem">Puesto:</span>
+          <select class="dep-select" id="pue-select" onchange="switchPue(this.value)" style="display:none"></select>
           <span class="sub-label" style="margin-left:1.5rem">Buscar candidato:</span>
           <input id="cam-search" type="search" class="search-input" placeholder="Nombre o apellido…"
             oninput="buscarCandidato(this.value)"
@@ -341,12 +339,33 @@
 
     // ─── STATE ────────────────────────────────────────────────
     let resumenData = null, donutChart = null;
-    // Curules nacionales calculadas sumando D'Hondt por depto
-    let curulesNac = {}; // {partido: total_curules}
+    let curulesNac = {};
     let curDep = 'TODOS';
-    let curDepData = null;   // JSON detallado del depto activo {partidos:{partido:[{nombre,codigo,votos}]}, zonas:[...]}
-    let curZona = 'TODAS';
-    let curPuesto = 'TODOS';
+    let curDepData = null;   // dep-{cod}.json cargado
+    let curMun = 'TODOS', curZon = 'TODOS', curPue = 'TODOS';
+
+    // ─── HELPERS UI ───────────────────────────────────────────
+    function showSel(id, show){ document.getElementById(id).style.display = show ? '' : 'none'; }
+    function setSel(id, options, allLabel, allVal='TODOS'){
+      const el = document.getElementById(id);
+      el.innerHTML = `<option value="${allVal}">${allLabel}</option>`;
+      options.forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o.value; opt.textContent = o.label; el.appendChild(opt);
+      });
+    }
+    function resetSelFrom(level){
+      // level: 'mun','zon','pue'
+      const levels = ['mun','zon','pue'];
+      const idx = levels.indexOf(level);
+      levels.slice(idx).forEach(l => {
+        showSel(`${l}-label`, false); showSel(`${l}-select`, false);
+        document.getElementById(`${l}-select`).innerHTML='';
+      });
+      if(level==='mun'){ curMun='TODOS'; curZon='TODOS'; curPue='TODOS'; }
+      if(level==='zon'){ curZon='TODOS'; curPue='TODOS'; }
+      if(level==='pue'){ curPue='TODOS'; }
+    }
 
     // ─── INIT ─────────────────────────────────────────────────
     async function init(){
@@ -412,122 +431,114 @@
     // ─── SWITCH DEP ───────────────────────────────────────────
     async function switchDep(depCod){
       curDep = depCod;
-      curZona = 'TODAS';
-      curPuesto = 'TODOS';
+      resetSelFrom('mun');
       document.getElementById('cam-search').value='';
       buscarCandidato('');
-
-      // Ocultar zona/puesto
-      ['zona-label','zona-select','puesto-label','puesto-select'].forEach(id=>{
-        const el=document.getElementById(id);
-        el.style.display='none';
-        if(el.tagName==='SELECT'){ el.innerHTML=''; }
-      });
-      document.getElementById('zona-select').innerHTML='<option value="TODAS">Todas las zonas</option>';
-      document.getElementById('puesto-select').innerHTML='<option value="TODOS">Todos los puestos</option>';
-
       if(depCod==='TODOS'){ curDepData=null; renderNacional(); return; }
 
-      // Cargar datos del depto (intenta JSON detallado)
       const deps = await getJSON('departamentos');
       const dep = deps.find(d=>d.cod===depCod);
       if(!dep) return;
 
-      // Intentar cargar JSON detallado del depto
+      // Intentar cargar dep-{cod}.json
       curDepData = null;
-      try {
-        curDepData = await getJSON(`dep-${depCod}`);
-      } catch(e) { curDepData = null; }
+      try { curDepData = await getJSON(`dep-${depCod}`); } catch(e){}
 
-      // Poblar selector de zonas si hay datos
-      if(curDepData?.zonas?.length){
-        const zSel=document.getElementById('zona-select');
-        curDepData.zonas.forEach(z=>{
-          const o=document.createElement('option'); o.value=z.cod; o.textContent=z.nombre; zSel.appendChild(o);
-        });
-        document.getElementById('zona-label').style.display='';
-        zSel.style.display='';
+      // Poblar selector de municipios si hay datos
+      if(curDepData?.municipios?.length){
+        const muns = curDepData.municipios.map(m=>({value: m.cod, label: m.nombre}));
+        setSel('mun-select', muns, 'Todos los municipios');
+        showSel('mun-label', true); showSel('mun-select', true);
       }
 
-      renderDepView(dep, 'TODAS', 'TODOS');
+      renderDepView(dep);
+    }
+
+    // ─── SWITCH MUNICIPIO ─────────────────────────────────────
+    async function switchMun(munCod){
+      curMun = munCod; resetSelFrom('zon');
+      if(munCod!=='TODOS' && curDepData?.municipios){
+        const mun = curDepData.municipios.find(m=>m.cod===munCod);
+        if(mun?.zonas?.length){
+          const zons = mun.zonas.map(z=>({value: z.cod, label: `Zona ${z.cod}`}));
+          setSel('zon-select', zons, 'Todas las zonas');
+          showSel('zon-label', true); showSel('zon-select', true);
+        }
+      }
+      _reRenderDep();
     }
 
     // ─── SWITCH ZONA ──────────────────────────────────────────
-    function switchZona(zona){
-      curZona=zona; curPuesto='TODOS';
-      const pSel=document.getElementById('puesto-select');
-      pSel.innerHTML='<option value="TODOS">Todos los puestos</option>';
-      document.getElementById('puesto-label').style.display='none';
-      pSel.style.display='none';
-
-      if(zona!=='TODAS' && curDepData?.zonas){
-        const z=curDepData.zonas.find(z=>z.cod===zona);
-        if(z?.puestos?.length){
-          z.puestos.forEach(p=>{
-            const o=document.createElement('option'); o.value=p.cod; o.textContent=p.nombre; pSel.appendChild(o);
-          });
-          document.getElementById('puesto-label').style.display='';
-          pSel.style.display='';
+    function switchZon(zonCod){
+      curZon = zonCod; resetSelFrom('pue');
+      if(zonCod!=='TODOS' && curDepData?.municipios){
+        const mun = curDepData.municipios.find(m=>m.cod===curMun);
+        const zon = mun?.zonas?.find(z=>z.cod===zonCod);
+        if(zon?.puestos?.length){
+          const pues = zon.puestos.map(p=>({value: p.cod, label: p.nombre}));
+          setSel('pue-select', pues, 'Todos los puestos');
+          showSel('pue-label', true); showSel('pue-select', true);
         }
       }
       _reRenderDep();
     }
 
     // ─── SWITCH PUESTO ────────────────────────────────────────
-    function switchPuesto(puesto){ curPuesto=puesto; _reRenderDep(); }
+    function switchPue(pueCod){ curPue = pueCod; _reRenderDep(); }
 
     async function _reRenderDep(){
       const deps = await getJSON('departamentos');
       const dep = deps.find(d=>d.cod===curDep);
-      if(dep) renderDepView(dep, curZona, curPuesto);
+      if(dep) renderDepView(dep);
     }
 
     // ─── RENDER VISTA DEPTO ───────────────────────────────────
-    function renderDepView(dep, zona, puesto){
+    function renderDepView(dep){
       const nCurules = getCurulesDep(dep.nombre);
 
-      // Resolver votos de partidos según nivel (zona/puesto/depto)
-      let partidosVotos = dep.partidos; // {partido: votos} por defecto
-      let candMap = null; // {partido: [{nombre, codigo, votos}]} si disponible
+      // Resolver el slice de datos según nivel activo
+      let slice = curDepData || dep;  // fallback a departamentos.json si no hay dep-cod.json
+      let labelExtra = dep.nombre;
 
-      if(curDepData){
-        if(puesto!=='TODOS' && zona!=='TODAS'){
-          const z=curDepData.zonas?.find(z=>z.cod===zona);
-          const p=z?.puestos?.find(p=>p.cod===puesto);
-          if(p){ partidosVotos=p.partidos||partidosVotos; candMap=p.candidatos||null; }
-        } else if(zona!=='TODAS'){
-          const z=curDepData.zonas?.find(z=>z.cod===zona);
-          if(z){ partidosVotos=z.partidos||partidosVotos; candMap=z.candidatos||null; }
-        } else {
-          candMap=curDepData.candidatos||null;
+      if(curDepData && curMun!=='TODOS'){
+        const mun = curDepData.municipios.find(m=>m.cod===curMun);
+        if(mun){
+          slice = mun; labelExtra = `${dep.nombre} · ${mun.nombre}`;
+          if(curZon!=='TODOS'){
+            const zon = mun.zonas?.find(z=>z.cod===curZon);
+            if(zon){
+              slice = zon; labelExtra += ` · Zona ${zon.cod}`;
+              if(curPue!=='TODOS'){
+                const pue = zon.puestos?.find(p=>p.cod===curPue);
+                if(pue){ slice = pue; labelExtra += ` · ${pue.nombre}`; }
+              }
+            }
+          }
         }
       }
 
+      const partidosVotos = slice.partidos || {};
+      const candMap = slice.candidatos || null;  // {partido:[{nombre,codigo,votos}]} ya filtrados
+
       const cur = dhondtDep(partidosVotos, nCurules);
       const totalCurules = Object.values(cur).reduce((s,v)=>s+v,0);
-      const votvalDep = Object.values(partidosVotos).reduce((s,v)=>s+v,0);
+      const votvalSlice = Object.values(partidosVotos).reduce((s,v)=>s+v,0);
 
-      // Construir array de partidos para render
+      // Construir lista de partidos
       const partidosDep = resumenData.partidos.map(p=>({
         ...p,
         votos: partidosVotos[p.partido]||0,
         curules: cur[p.partido]||0,
-        // Si hay candMap, sobrescribir candidatos filtrados
-        candidatos: candMap?.[p.partido]
-          ? candMap[p.partido].filter(c=>c.votos>0)
-          : (candMap ? [] : p.candidatos)
+        // Si hay candMap (dep-cod.json), usar candidatos de ese nivel ya filtrados
+        candidatos: candMap?.[p.partido] ?? p.candidatos
       })).filter(p=>p.votos>0).sort((a,b)=>b.votos-a.votos);
-
-      let labelExtra = dep.nombre;
-      if(zona!=='TODAS'){ const z=curDepData?.zonas?.find(z=>z.cod===zona); labelExtra+=` · ${z?.nombre||zona}`; }
-      if(puesto!=='TODOS'){ const z=curDepData?.zonas?.find(z=>z.cod===zona); const p=z?.puestos?.find(p=>p.cod===puesto); labelExtra+=` · ${p?.nombre||puesto}`; }
 
       document.getElementById('lbl-tabla').textContent=`Partidos · Cámara · ${labelExtra} · ${nCurules} curules · D'Hondt`;
       document.getElementById('drill-badge').textContent=dep.nombre;
       document.getElementById('drill-badge').className='level-badge dep';
       document.getElementById('drill-nav').innerHTML='';
-      renderPartidosTabla(partidosDep, votvalDep, cur, 'camara', true, dep.nombre, dep.cod, !!candMap);
-      renderKPI(dep.nombre, votvalDep, null, cur, totalCurules);
+      renderPartidosTabla(partidosDep, votvalSlice, cur, 'camara', true, dep.nombre, dep.cod, !!candMap);
+      renderKPI(dep.nombre, votvalSlice, null, cur, totalCurules);
     }
 
     // ─── RENDER NACIONAL ──────────────────────────────────────
