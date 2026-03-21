@@ -564,8 +564,28 @@
       // ── D'HONDT SIEMPRE AL NIVEL DEPTO (congelado) ──────────
       const depPartidosVotos = (curDepData || dep).partidos || {};
       const { cur: curFrozen, cifra: cifraVal, umbral: umbralVal } = dhondtDep(depPartidosVotos, nCurules);
-      curDepCurules = curFrozen; // guardar para la tabla
+      curDepCurules = curFrozen;
       const totalCurules = Object.values(curFrozen).reduce((s,v)=>s+v,0);
+
+      // ── ELEGIDOS CONGELADOS POR NOMBRE (desde candidatos del depto) ──
+      const normStr = s=>s.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      const elegidosMap = {}; // { partido: Set<nombre> }
+      if(curDepData?.candidatos){
+        Object.entries(curDepData.candidatos).forEach(([partido, cands])=>{
+          const nC = curFrozen[partido]||0;
+          if(!nC) return;
+          const nomPart = normStr(partido);
+          let restantes = nC;
+          const set = new Set();
+          for(const c of cands){
+            if(restantes<=0) break;
+            if(normStr(c.nombre)===nomPart) continue;
+            set.add(c.nombre);
+            restantes--;
+          }
+          elegidosMap[partido] = set;
+        });
+      }
 
       // Mostrar cifra repartidora y umbral
       document.getElementById('dep-cifras').style.display = '';
@@ -575,18 +595,19 @@
       // ── SLICE PARA VOTOS Y CANDIDATOS (puede ser mun/zon/pue) ─
       let slice = curDepData || dep;
       let labelExtra = dep.nombre;
+      let isDepLevel = true;
 
       if(curDepData && curMun!=='TODOS'){
         const mun = curDepData.municipios.find(m=>m.cod===curMun);
         if(mun){
-          slice = mun; labelExtra = `${dep.nombre} · ${mun.nombre}`;
+          slice = mun; labelExtra = `${dep.nombre} · ${mun.nombre}`; isDepLevel = false;
           if(curZon!=='TODOS'){
             const zon = mun.zonas?.find(z=>z.cod===curZon);
             if(zon){
-              slice = zon; labelExtra += ` · Zona ${zon.cod}`;
+              slice = zon; labelExtra += ` · Zona ${zon.cod}`; isDepLevel = false;
               if(curPue!=='TODOS'){
                 const pue = zon.puestos?.find(p=>p.cod===curPue);
-                if(pue){ slice = pue; labelExtra += ` · ${pue.nombre}`; }
+                if(pue){ slice = pue; labelExtra += ` · ${pue.nombre}`; isDepLevel = false; }
               }
             }
           }
@@ -597,8 +618,13 @@
       const candMap = slice.candidatos || null;
       const votvalSlice = Object.values(partidosVotos).reduce((s,v)=>s+v,0);
 
-      // ── DONUT: actualizar con datos del slice ─────────────────
-      renderDonut({ votval: votvalSlice, votant: votvalSlice });
+      // ── DONUT: nulos/blancos del depto si estamos en nivel depto ──
+      if(isDepLevel && curDepData?.votant){
+        renderDonut({ votval: votvalSlice, votant: curDepData.votant,
+                      votnul: curDepData.votnul||0, votnma: curDepData.votnma||0, votblan: curDepData.votblan||0 });
+      } else {
+        renderDonut({ votval: votvalSlice, votant: votvalSlice }); // sub-nivel: solo válidos
+      }
 
       // ── TABLA: votos del slice, curules CONGELADAS del depto ──
       const partidosDep = resumenData.partidos.map(p=>({
@@ -612,7 +638,7 @@
       document.getElementById('drill-badge').textContent=dep.nombre;
       document.getElementById('drill-badge').className='level-badge dep';
       document.getElementById('drill-nav').innerHTML='';
-      renderPartidosTabla(partidosDep, votvalSlice, curFrozen, 'camara', true, dep.nombre, dep.cod, !!candMap);
+      renderPartidosTabla(partidosDep, votvalSlice, curFrozen, 'camara', true, dep.nombre, dep.cod, !!candMap, elegidosMap);
       renderKPI(dep.nombre, votvalSlice, null, curFrozen, totalCurules);
     }
 
@@ -624,13 +650,34 @@
       document.getElementById('drill-nav').innerHTML='';
       document.getElementById('dep-cifras').style.display='none';
       renderDonut(resumenData);
-      const partidos = [...resumenData.partidos].map(p=>({...p,curules:curulesNac[p.partido]||0})).sort((a,b)=>b.votos-a.votos);
-      renderPartidosTabla(partidos, resumenData.votval, curulesNac, 'camara', false, null, null, false);
+
+      // Filtrar por corporación si aplica
+      let partidos;
+      if(curCorp === 'TODAS'){
+        partidos = [...resumenData.partidos].map(p=>({...p, curules: curulesNac[p.partido]||0}));
+      } else {
+        // Sumar votos y curules solo de deptos del tipo seleccionado
+        const deps = cache['departamentos'] || [];
+        const votosCorp = {}, curulesCorp = {};
+        deps.filter(d => tipoCirc(d.nombre) === curCorp).forEach(d => {
+          Object.entries(d.partidos||{}).forEach(([p,v]) => { votosCorp[p]=(votosCorp[p]||0)+v; });
+          const { cur } = dhondtDep(d.partidos||{}, getCurulesDep(d.nombre));
+          Object.entries(cur).forEach(([p,v]) => { curulesCorp[p]=(curulesCorp[p]||0)+v; });
+        });
+        partidos = resumenData.partidos
+          .filter(p => (votosCorp[p.partido]||0) > 0)
+          .map(p => ({...p, votos: votosCorp[p.partido]||0, curules: curulesCorp[p.partido]||0}));
+      }
+
+      partidos.sort((a,b)=>b.votos-a.votos);
+      const votval = partidos.reduce((s,p)=>s+p.votos, 0);
+      const curMap = Object.fromEntries(partidos.map(p=>[p.partido, p.curules]));
+      renderPartidosTabla(partidos, votval, curMap, 'camara', false, null, null, false, null);
       renderKPI();
     }
 
     // ─── RENDER TABLA PARTIDOS ────────────────────────────────
-    function renderPartidosTabla(partidos, votval, cur, tbodyId, showDrillBtn, depNom, depCod, hasCandMap){
+    function renderPartidosTabla(partidos, votval, cur, tbodyId, showDrillBtn, depNom, depCod, hasCandMap, elegidosMap){
       const thead = document.getElementById('drill-thead');
       const tbody = document.getElementById(`tbody-${tbodyId}`);
       thead.innerHTML=`<tr><th>#</th><th>Partido / Coalición</th><th class="r">Votos</th><th class="r" style="min-width:130px">%</th><th class="r">Curules</th></tr>`;
@@ -641,13 +688,11 @@
       partidos.forEach((p,i)=>{
         const pctV=pct(p.votos,votval), bw=((p.votos/maxV)*100).toFixed(1), color=getColor(p.partido);
         const curules=p.curules||0;
-        // Calcular umbral para este contexto
         const totalVotos = partidos.reduce((s,x)=>s+x.votos,0);
         const umbral = totalVotos*0.03;
         const pasaUmbral = p.votos >= umbral;
         const curulesCell=curules>0?`<span class="cbadge">${curules}</span>`:pasaUmbral?`<span class="cbadge">0</span>`:`<span class="cbadge sub">—</span>`;
 
-        // Filtrar candidatos: si hay candMap, ya vienen filtrados; si no, mostrar todos (vista nacional)
         const cands = p.candidatos || [];
         const candCount = cands.filter(c=>{ const n=norm(c.nombre); return n!==norm(p.partido); }).length;
 
@@ -674,11 +719,18 @@
           <table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% partido</th></tr></thead>
           <tbody>${(()=>{
             const nomPart = norm(p.partido);
-            let curulesRestantes = curules;
+            const elegSet = elegidosMap?.[p.partido] || null; // Set<nombre> congelado al nivel depto
+            let curulesRestantes = curules; // solo se usa si no hay elegSet (vista nacional)
             return cands.map((c,j)=>{
               const esLista = norm(c.nombre)===nomPart;
-              let elegido=false;
-              if(!esLista&&curulesRestantes>0){elegido=true;curulesRestantes--;}
+              let elegido = false;
+              if(!esLista){
+                if(elegSet){
+                  elegido = elegSet.has(c.nombre); // congelado por nombre
+                } else {
+                  if(curulesRestantes>0){ elegido=true; curulesRestantes--; }
+                }
+              }
               const colorC=elegido?'#39ff7a':esLista?'rgba(255,255,255,.2)':'inherit';
               const fw=elegido?700:400;
               const suffix=elegido?'<span style="font-size:.6rem;margin-left:.4rem">✦</span>':esLista?'<span style="font-size:.58rem;color:rgba(255,255,255,.2);margin-left:.4rem">(lista)</span>':'';
