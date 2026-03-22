@@ -223,8 +223,20 @@
           </select>
           <div id="dep-filter-container" style="display:none;align-items:center;gap:.75rem">
             <span class="sub-label" style="margin-left:1.5rem">Departamento:</span>
-            <select class="dep-select" id="dep-select" onchange="filterByDep(this.value)">
-              <option value="">— Todos los departamentos —</option>
+            <select class="dep-select" id="dep-select" onchange="onDepChange(this.value)">
+              <option value="">— Selecciona —</option>
+            </select>
+          </div>
+          <div id="mun-filter-container" style="display:none;align-items:center;gap:.75rem">
+            <span class="sub-label" style="margin-left:.5rem">Municipio:</span>
+            <select class="dep-select" id="mun-select" onchange="onMunChange(this.value)">
+              <option value="">— Selecciona —</option>
+            </select>
+          </div>
+          <div id="pue-filter-container" style="display:none;align-items:center;gap:.75rem">
+            <span class="sub-label" style="margin-left:.5rem">Puesto:</span>
+            <select class="dep-select" id="pue-select" onchange="onPueChange(this.value)">
+              <option value="">— Selecciona —</option>
             </select>
           </div>
           <span class="sub-label" style="margin-left:1.5rem">Buscar candidato:</span>
@@ -338,65 +350,150 @@
     async function switchVista(v){
       document.getElementById('sen-search').value='';
       buscarCandidato('');
-      const depContainer=document.getElementById('dep-filter-container');
-      if(v==='dep'){
-        depContainer.style.display='flex';
+      const depC=document.getElementById('dep-filter-container');
+      const munC=document.getElementById('mun-filter-container');
+      const pueC=document.getElementById('pue-filter-container');
+      depC.style.display='none'; munC.style.display='none'; pueC.style.display='none';
+      document.getElementById('dep-select').value='';
+      document.getElementById('mun-select').innerHTML='<option value="">— Selecciona —</option>';
+      document.getElementById('pue-select').innerHTML='<option value="">— Selecciona —</option>';
+      if(v==='nacional'){
+        renderNacional(); renderKPI(); renderDonut();
+      } else {
+        depC.style.display='flex';
         const sel=document.getElementById('dep-select');
         if(sel.options.length<=1){
           const deps=await getJSON('departamentos');
           deps.forEach(d=>{const o=document.createElement('option');o.value=d.cod;o.textContent=d.nombre;sel.appendChild(o);});
         }
-        sel.value='';
-        await renderDrill('dep',null,null,null,null);
-        renderKPI(); renderDonut();
-      } else {
-        depContainer.style.display='none';
-        if(v==='nacional'){renderNacional();renderKPI();renderDonut();}
-        else await renderDrill('dep',null,null,null,null);
+        if(v==='mun') munC.style.display='flex';
+        if(v==='pue'){ munC.style.display='flex'; pueC.style.display='flex'; }
+        renderNacional(); renderKPI(); renderDonut();
       }
     }
 
-    async function filterByDep(cod){
-      if(!cod){await renderDrill('dep',null,null,null,null);renderKPI();renderDonut();return;}
-      const deps=await getJSON('departamentos');
-      const dep=deps.find(d=>d.cod===cod);
-      if(!dep) return;
-      const partidos=Object.entries(dep.partidos||{}).map(([nombre,votos])=>({nombre,votos})).sort((a,b)=>b.votos-a.votos);
-      const totalVotos=partidos.reduce((s,p)=>s+p.votos,0), maxV=partidos[0]?.votos||1;
-      document.getElementById('lbl-tabla').textContent=`Partidos · Senado · ${dep.nombre}`;
-      document.getElementById('drill-badge').textContent=dep.nombre;
+    // Shared renderer: same format as renderNacional but with geo-filtered votes
+    async function renderGeoPartidos(nivel, depCod, munCod, pueCod){
+      let geoData, labelText, badgeText;
+      if(nivel==='dep'){
+        const deps=await getJSON('departamentos');
+        const d=deps.find(x=>x.cod===depCod); if(!d) return;
+        geoData=d; labelText=`Partidos · Senado · ${d.nombre}`; badgeText=d.nombre;
+      } else if(nivel==='mun'){
+        const muns=await getJSON('municipios');
+        const d=muns.find(x=>x.dep_cod===depCod&&x.cod===munCod); if(!d) return;
+        geoData=d; labelText=`Partidos · Senado · ${d.nombre}`; badgeText=d.nombre;
+      } else {
+        const pues=await getJSON('puestos');
+        const d=pues.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&x.cod===pueCod); if(!d) return;
+        geoData=d; labelText=`Partidos · Senado · ${d.nombre}`; badgeText=d.nombre;
+      }
+      const geoVotos=geoData.partidos||{};
+      const totalVotos=Object.values(geoVotos).reduce((s,v)=>s+v,0);
+      // Merge geo votes with national partido objects (preserves candidate lists)
+      const geoPartidos=resumenData.partidos
+        .filter(p=>geoVotos[p.partido]>0)
+        .map(p=>({...p, votos:geoVotos[p.partido]||0}))
+        .sort((a,b)=>b.votos-a.votos);
+      // Add parties in geo data not in national
+      Object.entries(geoVotos).forEach(([nombre,votos])=>{
+        if(votos>0&&!geoPartidos.find(p=>p.partido===nombre))
+          geoPartidos.push({partido:nombre,votos,candidatos:[],curules:0});
+      });
+      geoPartidos.sort((a,b)=>b.votos-a.votos);
+
+      document.getElementById('lbl-tabla').textContent=labelText;
+      document.getElementById('drill-badge').textContent=badgeText;
       document.getElementById('drill-badge').className='level-badge dep';
       document.getElementById('drill-nav').innerHTML='';
-      document.getElementById('drill-thead').innerHTML=`<tr><th>#</th><th>Partido / Coalición</th><th class="r">Votos</th><th class="r" style="min-width:130px">%</th></tr>`;
+      document.getElementById('drill-thead').innerHTML=`<tr><th>#</th><th>Partido / Coalición</th><th class="r">Votos</th><th class="r" style="min-width:130px">%</th><th class="r">Candidatos</th></tr>`;
       const tbody=document.getElementById('tbody-senado');
       tbody.innerHTML='';
-      partidos.forEach((p,i)=>{
-        const color=getColor(p.nombre),pctV=pct(p.votos,totalVotos),bw=((p.votos/maxV)*100).toFixed(1);
+      const maxV=geoPartidos[0]?.votos||1;
+      geoPartidos.forEach((p,i)=>{
+        const color=getColor(p.partido), pctV=pct(p.votos,totalVotos), bw=((p.votos/maxV)*100).toFixed(1);
+        const hasCands=p.candidatos&&p.candidatos.length>0;
         const tr=document.createElement('tr');
         tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td>
-          <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">${p.nombre}</span></div></td>
+          <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span></div>
+          ${hasCands?`<div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${p.candidatos.length} candidatos</button></div>`:''}
+          </td>
           <td class="r" style="font-size:.9rem;font-weight:700">${fmt(p.votos)}</td>
-          <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>`;
+          <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>
+          <td class="r"><span class="cbadge sub">${p.candidatos?.length||'—'}</span></td>`;
         tbody.appendChild(tr);
+        if(hasCands){
+          const curules=p.curules||0;
+          const trC=document.createElement('tr');
+          trC.innerHTML=`<td colspan="5" style="padding:0"><div class="cands-inner" id="cands-inner-${i}">
+            <table class="cands-table"><thead><tr><th>#</th><th>Candidato/a</th><th class="r">Votos nac.</th><th class="r">% partido nac.</th></tr></thead>
+            <tbody>${(()=>{
+              const norm=s=>s.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+              const nomPart=norm(p.partido); let cr=curules;
+              return p.candidatos.map((c,j)=>{
+                const esLista=norm(c.nombre)===nomPart||norm(c.nombre).includes(nomPart.split(' ')[0]+' '+(nomPart.split(' ')[1]||'__'));
+                let elegido=false; if(!esLista&&cr>0){elegido=true;cr--;}
+                const colorC=elegido?'#39ff7a':esLista?'rgba(255,255,255,.2)':'inherit', fw=elegido?700:400;
+                const suffix=elegido?'<span style="font-size:.6rem;margin-left:.4rem">✦</span>':esLista?'<span style="font-size:.58rem;color:rgba(255,255,255,.2);margin-left:.4rem">(lista)</span>':'';
+                return `<tr><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif;font-weight:${fw};color:${colorC}">${c.nombre}${suffix}</td><td class="r">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/resumenData.partidos.find(x=>x.partido===p.partido)?.votos||p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;
+              }).join('');
+            })()}</tbody>
+            </table></div></td>`;
+          tbody.appendChild(trC);
+        }
       });
       setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
-      const topP=partidos.filter(p=>!/blanco/i.test(p.nombre))[0];
+      const topP=geoPartidos.filter(p=>!/blanco/i.test(p.partido))[0];
       document.getElementById('kpi-row').innerHTML=`
-        <div class="kpi-card"><div class="kpi-label">Votos válidos</div><div class="kpi-val gr">${fmt(totalVotos)}</div><div class="kpi-delta">${dep.nombre}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Partidos</div><div class="kpi-val wh">${partidos.length}</div><div class="kpi-delta">con votación en el dpto.</div></div>
-        <div class="kpi-card"><div class="kpi-label">Partido puntero</div><div class="kpi-val sm">${topP?topP.nombre.split(' ').slice(0,3).join(' '):'—'}</div><div class="kpi-delta">${topP?fmt(topP.votos)+' votos':''}</div></div>
-        <div class="kpi-card"><div class="kpi-label">% puntero</div><div class="kpi-val">${topP?pct(topP.votos,totalVotos)+'%':'—'}</div><div class="kpi-delta">de votos del dpto.</div></div>`;
+        <div class="kpi-card"><div class="kpi-label">Votos válidos</div><div class="kpi-val gr">${fmt(totalVotos)}</div><div class="kpi-delta">${badgeText}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Partidos</div><div class="kpi-val wh">${geoPartidos.length}</div><div class="kpi-delta">con votación</div></div>
+        <div class="kpi-card"><div class="kpi-label">Partido puntero</div><div class="kpi-val sm">${topP?topP.partido.split(' ').slice(0,3).join(' '):'—'}</div><div class="kpi-delta">${topP?fmt(topP.votos)+' votos':''}</div></div>
+        <div class="kpi-card"><div class="kpi-label">% puntero</div><div class="kpi-val">${topP?pct(topP.votos,totalVotos)+'%':'—'}</div><div class="kpi-delta">de votos</div></div>`;
       document.getElementById('pct-senado').textContent=topP?pct(topP.votos,totalVotos)+'%':'—';
       if(donutChart) donutChart.destroy();
-      const top5=partidos.slice(0,5),otros=partidos.slice(5).reduce((s,p)=>s+p.votos,0);
-      const dLabels=top5.map(p=>p.nombre),dData=top5.map(p=>p.votos),dColors=top5.map(p=>getColor(p.nombre));
-      if(otros>0){dLabels.push('Otros');dData.push(otros);dColors.push('#444');}
+      const top5=geoPartidos.slice(0,5),otros=geoPartidos.slice(5).reduce((s,p)=>s+p.votos,0);
+      const dL=top5.map(p=>p.partido),dD=top5.map(p=>p.votos),dC=top5.map(p=>getColor(p.partido));
+      if(otros>0){dL.push('Otros');dD.push(otros);dC.push('#444');}
       donutChart=new Chart(document.getElementById('donut-senado').getContext('2d'),{
-        type:'doughnut',
-        data:{labels:dLabels,datasets:[{data:dData,backgroundColor:dColors,borderWidth:0,hoverOffset:6}]},
+        type:'doughnut',data:{labels:dL,datasets:[{data:dD,backgroundColor:dC,borderWidth:0,hoverOffset:6}]},
         options:{responsive:true,maintainAspectRatio:true,cutout:'72%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}}}}
       });
-      document.getElementById('leg-senado').innerHTML=top5.map(p=>`<div class="li"><span class="ld" style="background:${getColor(p.nombre)}"></span><span>${p.nombre.split(' ').slice(0,2).join(' ')}</span><span class="lv">${fmt(p.votos)}</span></div>`).join('');
+      document.getElementById('leg-senado').innerHTML=top5.map(p=>`<div class="li"><span class="ld" style="background:${getColor(p.partido)}"></span><span>${p.partido.split(' ').slice(0,2).join(' ')}</span><span class="lv">${fmt(p.votos)}</span></div>`).join('');
+    }
+
+    async function onDepChange(cod){
+      const v=document.getElementById('vista-select').value;
+      document.getElementById('mun-select').innerHTML='<option value="">— Selecciona —</option>';
+      document.getElementById('pue-select').innerHTML='<option value="">— Selecciona —</option>';
+      if(!cod){renderNacional();renderKPI();renderDonut();return;}
+      await renderGeoPartidos('dep',cod,null,null);
+      if(v==='mun'||v==='pue'){
+        const muns=await getJSON('municipios');
+        const sel=document.getElementById('mun-select');
+        sel.innerHTML='<option value="">— Selecciona municipio —</option>';
+        muns.filter(m=>m.dep_cod===cod).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).forEach(m=>{const o=document.createElement('option');o.value=m.cod;o.textContent=m.nombre;sel.appendChild(o);});
+      }
+    }
+
+    async function onMunChange(cod){
+      const v=document.getElementById('vista-select').value;
+      const depCod=document.getElementById('dep-select').value;
+      document.getElementById('pue-select').innerHTML='<option value="">— Selecciona —</option>';
+      if(!cod){if(depCod)await renderGeoPartidos('dep',depCod,null,null);else{renderNacional();renderKPI();renderDonut();}return;}
+      await renderGeoPartidos('mun',depCod,cod,null);
+      if(v==='pue'){
+        const pues=await getJSON('puestos');
+        const sel=document.getElementById('pue-select');
+        sel.innerHTML='<option value="">— Selecciona puesto —</option>';
+        pues.filter(p=>p.dep_cod===depCod&&p.mun_cod===cod).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).forEach(p=>{const o=document.createElement('option');o.value=p.cod;o.textContent=p.nombre;sel.appendChild(o);});
+      }
+    }
+
+    async function onPueChange(cod){
+      const depCod=document.getElementById('dep-select').value;
+      const munCod=document.getElementById('mun-select').value;
+      if(!cod){if(munCod)await renderGeoPartidos('mun',depCod,munCod,null);else if(depCod)await renderGeoPartidos('dep',depCod,null,null);else{renderNacional();renderKPI();renderDonut();}return;}
+      await renderGeoPartidos('pue',depCod,munCod,cod);
     }
 
     function renderNacional(){
