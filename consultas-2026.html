@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Consultas Presidenciales · Preconteo 2026 · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --black: #0a0a0a;
+      --white: #f4f3ef;
+      --blue: #0047FF;
+      --green: #4ade80;
+      --card: rgba(255,255,255,0.05);
+      --card-border: rgba(255,255,255,0.1);
+      --border: rgba(255,255,255,0.08);
+      --gray: rgba(255,255,255,0.5);
+      --td-color: rgba(255,255,255,0.75);
+      --td-hover: rgba(255,255,255,0.04);
+      --bar-bg: rgba(255,255,255,0.1);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { background: #060810; color: var(--white); font-family: 'Syne', sans-serif; cursor: none; min-height: 100vh; overflow-x: hidden; }
+
+    /* CURSOR */
+    .cursor { position:fixed; width:10px; height:10px; background:var(--blue); border-radius:50%; pointer-events:none; z-index:9999; transform:translate(-50%,-50%); transition:transform .15s,background .2s; }
+    .cursor-ring { position:fixed; width:32px; height:32px; border:1.5px solid var(--blue); border-radius:50%; pointer-events:none; z-index:9998; transform:translate(-50%,-50%); opacity:.4; }
+
+    /* BACKGROUND */
+    .bg-layer { position:fixed; inset:0; z-index:0; background:url('foto-fondo.webp') center right / cover no-repeat; }
+    .bg-overlay {
+      position:fixed; inset:0; z-index:1;
+      background: linear-gradient(to right, rgba(4,6,16,0.97) 0%, rgba(4,6,16,0.94) 55%, rgba(4,6,16,0.72) 72%, rgba(4,6,16,0.35) 88%, rgba(4,6,16,0.10) 100%);
+    }
+
+    /* SHELL */
+    .shell {
+      position: relative; z-index: 2;
+      min-height: 100vh; display: flex; flex-direction: column;
+    }
+
+    /* TOP BAR */
+    .top-bar {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      padding: 1.1rem 2.5rem 0;
+      flex-shrink: 0;
+    }
+    .page-title {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: clamp(1.5rem, 2.8vw, 2.5rem);
+      letter-spacing: -0.04em; line-height: 1.05;
+      color: var(--white); text-shadow: 0 2px 24px rgba(0,71,255,0.4);
+    }
+    .page-title span { color: var(--blue); }
+    .logo-link {
+      display: flex; align-items: center; gap: 0.55rem;
+      text-decoration: none; opacity: .8; transition: opacity .2s;
+    }
+    .logo-link:hover { opacity: 1; }
+    .logo-bars { display: flex; align-items: flex-end; gap: 3px; height: 20px; }
+    .logo-bar { width: 5px; background: var(--blue); border-radius: 1px 1px 0 0; opacity:.85; }
+    .logo-text { font-family: 'Syne', sans-serif; font-weight: 800; font-size: clamp(1.1rem, 2vw, 1.8rem); letter-spacing: -.03em; color: var(--white); }
+    .logo-text span { color: var(--blue); }
+
+    /* BREADCRUMB */
+    .breadcrumb {
+      padding: .6rem 2.5rem 0;
+      font-family: 'DM Mono', monospace; font-size: .62rem;
+      letter-spacing: .15em; text-transform: uppercase;
+      color: rgba(255,255,255,0.3);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: .7rem;
+      flex-shrink: 0;
+    }
+    .breadcrumb a { color: rgba(0,71,255,0.7); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--blue); }
+
+    /* STATUS BAR */
+    .status-bar {
+      display: flex; align-items: center; gap: .75rem;
+      padding: .4rem 2.5rem;
+      background: rgba(0,71,255,.07);
+      border-bottom: 1px solid rgba(0,71,255,.15);
+      font-family: 'DM Mono', monospace; font-size: .62rem; color: var(--blue);
+      flex-shrink: 0;
+    }
+    .status-bar span { color: rgba(255,255,255,0.4); }
+    .live-dot { width:7px; height:7px; background:var(--blue); border-radius:50%; display:inline-block; flex-shrink:0; animation:pulse 1.5s ease infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.3)} }
+
+    /* META BAR */
+    .meta-bar {
+      display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap;
+      padding: .5rem 2.5rem;
+      border-bottom: 1px solid var(--border);
+      font-family: 'DM Mono', monospace; font-size: .62rem;
+      letter-spacing: .08em; color: rgba(255,255,255,0.35);
+      flex-shrink: 0;
+    }
+    .meta-item b { color: rgba(74,222,128,0.85); font-weight: 700; }
+    .reload-badge { margin-left: auto; font-family: 'DM Mono', monospace; font-size: .6rem; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,0.3); background: rgba(255,255,255,.04); border: 1px solid var(--border); padding: .3rem .8rem; }
+    .reload-badge b { color: var(--blue); }
+
+    /* CONTENT AREA */
+    .content-area {
+      flex: 1;
+      padding: 1.8rem 2.5rem 1.5rem;
+    }
+
+    /* SUB-SELECTOR */
+    .sub-selector {
+      display: flex; gap: .75rem; margin-bottom: 1.5rem;
+      flex-wrap: wrap; align-items: center;
+    }
+    .sub-label {
+      font-family: 'DM Mono', monospace; font-size: .65rem;
+      letter-spacing: .15em; text-transform: uppercase;
+      color: rgba(255,255,255,0.3); margin-right: .25rem;
+    }
+    .dep-select {
+      font-family: 'DM Mono', monospace; font-size: .65rem;
+      letter-spacing: .06em; text-transform: uppercase;
+      background: rgba(255,255,255,.05); border: 1.5px solid var(--card-border);
+      color: var(--white); padding: .45rem 2rem .45rem .8rem;
+      cursor: pointer; outline: none; transition: border-color .2s;
+      appearance: none; -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23aaa' stroke-width='1.5' stroke-linecap='round' fill='none'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right .75rem center;
+    }
+    .dep-select:hover, .dep-select:focus { border-color: var(--blue); }
+    .dep-select option { background: #0e1220; color: var(--white); }
+    .search-input {
+      font-family: 'DM Mono', monospace; font-size: .65rem;
+      letter-spacing: .06em;
+      background: rgba(255,255,255,.05); border: 1.5px solid var(--card-border);
+      color: var(--white); padding: .45rem .8rem;
+      outline: none; width: 200px; transition: border-color .2s;
+    }
+    .search-input:focus { border-color: var(--blue); }
+    .search-input::placeholder { color: rgba(255,255,255,.25); }
+
+    /* SUB-BTN */
+    .sub-btn{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;background:transparent;border:1.5px solid var(--card-border);color:rgba(255,255,255,.45);padding:.45rem 1rem;cursor:pointer;transition:all .2s}
+    .sub-btn:hover{border-color:rgba(255,255,255,.3);color:var(--white)}
+    .sub-btn.active{border-color:var(--blue);color:var(--blue);background:rgba(0,71,255,.08)}
+
+    /* KPI */
+    .kpi-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 1.5rem; }
+    .kpi-card {
+      background: rgba(255,255,255,.04); border: 1px solid var(--card-border);
+      padding: 1.1rem 1.3rem;
+      backdrop-filter: blur(4px);
+    }
+    .kpi-label { font-family: 'DM Mono', monospace; font-size: .6rem; letter-spacing: .15em; text-transform: uppercase; color: rgba(255,255,255,.35); margin-bottom: .4rem; }
+    .kpi-val { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.7rem; letter-spacing: -.04em; line-height: 1; color: var(--blue); }
+    .kpi-val.dark { color: var(--white); }
+    .kpi-val.green { color: #4ade80; }
+    .kpi-val.sm { font-size: .95rem; color: var(--white); line-height: 1.3; }
+    .kpi-delta { font-family: 'DM Mono', monospace; font-size: .6rem; color: rgba(255,255,255,.28); margin-top: .3rem; }
+
+    /* RESULTS GRID */
+    .results-grid { display: grid; grid-template-columns: 1fr 300px; gap: 1.2rem; }
+    .card {
+      background: rgba(255,255,255,.04); border: 1px solid var(--card-border);
+      padding: 1.3rem; overflow: hidden;
+      backdrop-filter: blur(4px);
+    }
+    .card-label {
+      font-family: 'DM Mono', monospace; font-size: .78rem;
+      letter-spacing: .18em; text-transform: uppercase;
+      color: rgba(255,255,255,.3); margin-bottom: 1rem;
+    }
+
+    /* TABLE */
+    .results-table { width: 100%; border-collapse: collapse; }
+    .results-table th {
+      font-family: 'DM Mono', monospace; font-size: .58rem;
+      letter-spacing: .15em; text-transform: uppercase;
+      color: rgba(255,255,255,.25); text-align: left;
+      padding: .5rem .6rem; border-bottom: 1px solid var(--border);
+    }
+    .results-table th.r { text-align: right; }
+    .results-table td {
+      padding: .65rem .6rem; border-bottom: 1px solid rgba(255,255,255,.05);
+      font-family: 'DM Mono', monospace; font-size: .74rem;
+      color: var(--td-color); vertical-align: middle;
+    }
+    .results-table td.r { text-align: right; }
+    .results-table tr:hover td { background: var(--td-hover); }
+    .results-table tr.winner td { color: var(--white); }
+
+    .bar-wrap { width:72px; height:4px; background:var(--bar-bg); border-radius:2px; overflow:hidden; display:inline-block; vertical-align:middle; }
+    .bar-fill { height:100%; background:var(--blue); border-radius:2px; transition:width 1s ease; }
+    .pct-val { font-family:'Syne',sans-serif; font-weight:700; font-size:.8rem; color:var(--white); display:inline-block; width:40px; text-align:right; margin-left:6px; }
+
+    .cifras-bloque { margin-top:.9rem; padding-top:.8rem; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:.4rem; }
+    .cifra-item { display:flex; justify-content:space-between; align-items:baseline; gap:.5rem; }
+    .cifra-label { font-size:.78rem; letter-spacing:.06em; text-transform:uppercase; color:rgba(255,255,255,.3); }
+    .cifra-val { font-family:'DM Mono',monospace; font-size:.87rem; color:var(--white); font-weight:500; }
+
+    /* DONUT */
+    .donut-wrap { display:flex; flex-direction:column; align-items:center; gap:1rem; }
+    .donut-cw { position:relative; width:150px; height:150px; }
+    .donut-center { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; }
+    .donut-pct { font-family:'Syne',sans-serif; font-weight:800; font-size:1.5rem; letter-spacing:-.04em; color:var(--white); line-height:1; }
+    .donut-sub { font-family:'DM Mono',monospace; font-size:.52rem; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.3); margin-top:2px; }
+    .donut-legend { width:100%; display:flex; flex-direction:column; gap:.55rem; }
+    .li { display:flex; align-items:center; gap:.6rem; font-family:'DM Mono',monospace; font-size:.87rem; color:rgba(255,255,255,.5); }
+    .ld { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+    .lv { margin-left:auto; color:var(--white); font-weight:700; }
+
+    /* SEARCH RESULTS */
+    #cons-search-results { margin-bottom: 1.5rem; }
+
+    /* ELECTORAL NAV */
+    .electoral-nav{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(4,6,16,.6);backdrop-filter:blur(8px);flex-shrink:0}
+    .electoral-nav-auth{display:flex;align-items:center;gap:.75rem}
+    .e-btn-login{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.45);text-decoration:none;border:1.5px solid transparent;padding:.35rem .8rem;transition:color .2s,border-color .2s}
+    .e-btn-login:hover{color:var(--white);border-color:rgba(255,255,255,.2)}
+    .e-btn-register{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-decoration:none;background:var(--blue);border:1.5px solid var(--blue);padding:.35rem .8rem}
+    .e-user-name{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.7)}
+    .e-user-plan{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue);background:rgba(0,71,255,.12);padding:.2rem .6rem}
+    .e-btn-logout{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.25);background:none;border:none;cursor:none;padding:0}
+    .e-btn-back{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--green);text-decoration:none;border:1.5px solid rgba(74,222,128,.4);padding:.3rem .8rem;transition:color .2s,border-color .2s,background .2s;flex-shrink:0}
+    .e-btn-back:hover{color:#060810;background:var(--green);border-color:var(--green)}
+    @media(max-width:900px){.electoral-nav{display:none}}
+
+    /* FOOTER */
+    .full-footer {
+      flex-shrink:0; width:100%;
+      border-top:1px solid var(--border);
+      padding:.5rem 2.5rem;
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .footer-brand { font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.09em; color:rgba(255,255,255,.2); }
+    .footer-brand a { color:rgba(255,255,255,.25); text-decoration:none; }
+    .footer-brand a:hover { color:rgba(255,255,255,.5); }
+
+    /* ── CURTAIN ── */
+    .curtain { position:fixed; inset:0; z-index:99999; pointer-events:none; }
+    .curtain-layer { position:absolute; inset:0; background:#04060e; }
+    .curtain-layer:nth-child(1) { clip-path:polygon(0 0,100% 0,100% 22%,0 28%);    transform:translateX(-110%); transition:transform .58s cubic-bezier(.75,0,.25,1) 0s; }
+    .curtain-layer:nth-child(2) { clip-path:polygon(0 26%,100% 20%,100% 49%,0 55%); transform:translateX( 110%); transition:transform .58s cubic-bezier(.75,0,.25,1) .07s; }
+    .curtain-layer:nth-child(3) { clip-path:polygon(0 53%,100% 47%,100% 76%,0 82%); transform:translateX(-110%); transition:transform .58s cubic-bezier(.75,0,.25,1) .14s; }
+    .curtain-layer:nth-child(4) { clip-path:polygon(0 80%,100% 74%,100% 100%,0 100%); transform:translateX( 110%); transition:transform .58s cubic-bezier(.75,0,.25,1) .21s; }
+    .curtain-stage {
+      position:absolute; inset:0; z-index:1;
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.8rem;
+      pointer-events:none;
+    }
+    .curtain-tag {
+      font-family:'DM Mono',monospace; font-size:1.08rem; letter-spacing:.35em; text-transform:uppercase; color:rgba(0,71,255,0.7);
+      opacity:0; transform:translateY(-12px); transition:opacity .4s ease, transform .4s ease;
+    }
+    .curtain-sub {
+      font-family:'DM Mono',monospace; font-size:0.975rem; letter-spacing:.22em; color:rgba(255,255,255,.35); text-transform:uppercase;
+      opacity:0; transform:translateY(12px); transition:opacity .4s ease, transform .4s ease;
+    }
+    .curtain-headline {
+      font-family:'Syne',sans-serif; font-weight:800;
+      font-size:clamp(2.6rem,6.5vw,5.85rem);
+      letter-spacing:-.03em; line-height:1.05; text-shadow:0 0 50px rgba(0,71,255,0.5); text-align:center;
+    }
+    .curtain-line { overflow:hidden; display:block; }
+    .curtain-word { display:inline-block; opacity:0; transition:transform .52s cubic-bezier(.25,.46,.45,.94), opacity .45s ease; }
+    .curtain-word.from-left  { transform:translateX(-80px); }
+    .curtain-word.from-right { transform:translateX( 80px); }
+    .curtain-word.white { color:#f4f3ef; }
+    .curtain-word.blue  { color:#0047FF; }
+    .curtain.opening .curtain-layer { transform:translateX(0) !important; transition:none; }
+    .curtain.opening .curtain-word  { transform:translateX(0); opacity:1; transition:none; }
+    .curtain.opening .curtain-tag   { opacity:1; transform:translateY(0); transition:none; }
+    .curtain.opening .curtain-sub   { opacity:1; transform:translateY(0); transition:none; }
+    .curtain.opened .curtain-layer:nth-child(1) { transform:translateX(-110%); }
+    .curtain.opened .curtain-layer:nth-child(2) { transform:translateX( 110%); }
+    .curtain.opened .curtain-layer:nth-child(3) { transform:translateX(-110%); }
+    .curtain.opened .curtain-layer:nth-child(4) { transform:translateX( 110%); }
+    .curtain.opened .curtain-word { opacity:0; }
+    .curtain.opened .curtain-tag, .curtain.opened .curtain-sub { opacity:0; transition:opacity .25s ease; }
+    .curtain.opened { pointer-events:none; }
+    .curtain.closing { pointer-events:all; }
+    .curtain.closing .curtain-layer { transform:translateX(0) !important; }
+    .curtain.closing .curtain-word.from-left,
+    .curtain.closing .curtain-word.from-right { transform:translateX(0); opacity:1; transition-delay:.62s; }
+    .curtain.closing .curtain-tag { opacity:1; transform:translateY(0); transition-delay:.68s; }
+    .curtain.closing .curtain-sub  { opacity:1; transform:translateY(0); transition-delay:.72s; }
+
+    /* RESPONSIVE */
+    @media(max-width:1000px) { .results-grid { grid-template-columns:1fr; } }
+    @media(max-width:900px) {
+      body { cursor:auto; }
+      .cursor, .cursor-ring { display:none; }
+      .top-bar, .breadcrumb, .meta-bar, .content-area, .full-footer { padding-left:1.2rem; padding-right:1.2rem; }
+      .bg-overlay { background:rgba(4,6,16,0.93); }
+      .kpi-row { grid-template-columns:1fr 1fr; gap:.75rem; }
+      .results-table th:nth-child(1),.results-table td:nth-child(1) { display:none; }
+    }
+    @media(max-width:600px) {
+      .kpi-row { grid-template-columns:1fr; }
+      .sub-selector { flex-direction:column; align-items:flex-start; }
+      .search-input { width:100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <div class="bg-layer"></div>
+  <div class="bg-overlay"></div>
+
+  <!-- CURTAIN -->
+  <div class="curtain" id="curtain">
+    <div class="curtain-layer"></div>
+    <div class="curtain-layer"></div>
+    <div class="curtain-layer"></div>
+    <div class="curtain-layer"></div>
+    <div class="curtain-stage">
+      <span class="curtain-tag">ricardoruiz.co</span>
+      <div class="curtain-headline">
+        <span class="curtain-line"><span class="curtain-word from-left white">Consultas</span></span>
+        <span class="curtain-line"><span class="curtain-word from-right blue">2026</span></span>
+      </div>
+      <span class="curtain-sub">Preconteo · Colombia 2026</span>
+    </div>
+  </div>
+
+  <div class="shell">
+
+    <nav class="electoral-nav">
+      <div style="display:flex;align-items:center;gap:1rem">
+        <a href="electoral.html" class="e-btn-back" onclick="navigate(event,'electoral.html','Resultados Electorales')">← Volver</a>
+        <div id="e-nav-auth" class="electoral-nav-auth"></div>
+      </div>
+      <a href="electoral.html" class="logo-link" onclick="navigate(event,'electoral.html','Resultados Electorales')">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div>
+          <div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div>
+          <div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </nav>
+
+    <!-- TOP BAR -->
+    <div class="top-bar">
+      <div class="page-title">Consultas<br/><span>Presidenciales</span></div>
+    </div>
+
+    <!-- BREADCRUMB -->
+    <div class="breadcrumb">
+      <a href="electoral.html" onclick="navigate(event,'electoral.html','Resultados Electorales')">Resultados Electorales</a>
+      &nbsp;/&nbsp; Consultas Presidenciales · Preconteo 2026
+    </div>
+
+    <!-- STATUS BAR -->
+    <div class="status-bar" id="statusBar" style="display:none">
+      <span class="live-dot"></span>
+      Datos: <b id="fuenteLbl">—</b> · <span id="csvTimestamp">—</span>
+    </div>
+
+    <!-- META BAR -->
+    <div class="meta-bar">
+      <span>Actualización: <b id="lastUpdate">—</b></span>
+      <span>Consultas: <b>3</b></span>
+      <span>Mesas: <b id="mesasLabel">— / 126.818</b></span>
+      <span>Potencial: <b>41.370.203</b></span>
+      <div class="reload-badge">Recarga auto: <b id="countdown">03:00</b></div>
+    </div>
+
+    <!-- CONTENT AREA -->
+    <div class="content-area">
+
+      <!-- Selector de consulta -->
+      <div class="sub-selector" style="margin-bottom:1rem; border-bottom:1px solid var(--border); padding-bottom:1rem;">
+        <span class="sub-label">Consulta:</span>
+        <button class="sub-btn active" id="tab-gran" onclick="switchConsulta('gran')">La Gran Consulta</button>
+        <button class="sub-btn" id="tab-frente" onclick="switchConsulta('frente')">Frente por la Vida</button>
+        <button class="sub-btn" id="tab-soluciones" onclick="switchConsulta('soluciones')">Soluciones</button>
+      </div>
+
+      <!-- Selector circunscripción + búsqueda -->
+      <div class="sub-selector" style="margin-bottom:1.5rem; border-bottom:1px solid var(--border); padding-bottom:1rem;">
+        <span class="sub-label">Circunscripción:</span>
+        <select class="dep-select" id="cons-dep-select" onchange="switchConsDep(this.value)"></select>
+        <span class="sub-label" style="margin-left:1.5rem">Buscar candidato:</span>
+        <input id="cons-search" type="search" class="search-input" placeholder="Nombre o apellido…"
+          oninput="buscarCandidatoCons(this.value)"
+          onfocus="this.style.borderColor='var(--blue)'"
+          onblur="this.style.borderColor='var(--card-border)'" />
+      </div>
+
+      <!-- Resultados de búsqueda (oculto por defecto) -->
+      <div id="cons-search-results" style="display:none; margin-bottom:1.5rem"></div>
+
+      <!-- KPIs -->
+      <div class="kpi-row" id="kpi-consultas"></div>
+
+      <!-- Tabla + Donut -->
+      <div id="cons-main-grid" class="results-grid">
+        <div class="card">
+          <div class="card-label" id="lbl-cons-tabla">Candidatos · Consulta Presidencial</div>
+          <table class="results-table">
+            <thead><tr>
+              <th>#</th>
+              <th>Candidato/a</th>
+              <th>Partido / Movimiento</th>
+              <th class="r">Votos</th>
+              <th class="r" style="min-width:130px">%</th>
+            </tr></thead>
+            <tbody id="tbody-consultas"></tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-label">Participación electoral</div>
+          <div class="donut-wrap">
+            <div class="donut-cw">
+              <canvas id="donut-consultas"></canvas>
+              <div class="donut-center">
+                <div class="donut-pct" id="pct-consultas">—</div>
+                <div class="donut-sub">votaron</div>
+              </div>
+            </div>
+            <div class="donut-legend" id="leg-consultas"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <div class="full-footer">
+    <span class="footer-brand">ricardoruiz.co · Elecciones Colombia 2026</span>
+    <span class="footer-brand"><a href="https://registraduria.gov.co" target="_blank">Fuente: Registraduría Nacional</a></span>
+  </div>
+
+  <script>
+    // ═══════════════════════════════════════════════════════════
+    // CONFIGURACIÓN
+    // ═══════════════════════════════════════════════════════════
+    const RECARGA_MIN = 3;
+    const POTENCIAL   = 41370203;
+    const MESAS_TOTAL = 126818;
+    let   MESAS_REP   = 0;
+
+    const REG = { consultas: 'https://registraduria-proxy.reruizc.workers.dev/consultas' };
+
+    // ═══════════════════════════════════════════════════════════
+    // DATOS POR CONSULTA
+    // ═══════════════════════════════════════════════════════════
+    let CONSULTAS_DATA = {
+      gran:       { nombre:'La Gran Consulta por Colombia', candidatos:[], tot:{votval:0,votnul:0,votnma:0,votblan:0,votant:0} },
+      frente:     { nombre:'Frente por la Vida',            candidatos:[], tot:{votval:0,votnul:0,votnma:0,votblan:0,votant:0} },
+      soluciones: { nombre:'Consulta de Soluciones',        candidatos:[], tot:{votval:0,votnul:0,votnma:0,votblan:0,votant:0} },
+    };
+
+    let TOT_GENERAL = { votval:0, votnul:0, votnma:0, votblan:0, votant:0 };
+    let curConsulta = 'gran';
+    let curConsDep  = 'Nacional (todos)';
+
+    // Mapa DANE departamentos
+    const DANE_DEP_CONS = {
+      '60':'Amazonas','01':'Antioquia','40':'Arauca','56':'San Andrés',
+      '88':'Circunscripción exterior','03':'Atlántico','16':'Bogotá D.C.',
+      '06':'Bolívar','07':'Boyacá','09':'Caldas','44':'Caquetá','46':'Casanare',
+      '11':'Cauca','12':'Cesar','17':'Chocó','13':'Córdoba','15':'Cundinamarca',
+      '50':'Guainía','54':'Guaviare','19':'Huila','48':'La Guajira','21':'Magdalena',
+      '52':'Meta','23':'Nariño','25':'Norte de Santander','64':'Putumayo',
+      '24':'Quindío','27':'Risaralda','26':'Santander','28':'Sucre','29':'Tolima',
+      '31':'Valle del Cauca','68':'Vaupés','72':'Vichada',
+    };
+
+    // ═══════════════════════════════════════════════════════════
+    // COLORES CANDIDATOS
+    // ═══════════════════════════════════════════════════════════
+    const PALETTE = ['#0047FF','#6B2D8B','#C8102E','#F7941D','#4CAF50','#00AEEF','#E91E8C','#E53935','#007755','#1A3FC4','#f0a500','#003580'];
+    function getCandColor(idx){ return PALETTE[idx % PALETTE.length]; }
+
+    // ═══════════════════════════════════════════════════════════
+    // FETCH REGISTRADURÍA
+    // ═══════════════════════════════════════════════════════════
+    async function fetchReg(url){
+      try{ const r=await fetch(url+'?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return null; return await r.json(); }
+      catch(e){ return null; }
+    }
+
+    async function cargarDesdeRegistraduria(){
+      const ds = await fetchReg(REG.consultas);
+      if(!ds || !ds.camaras) return false;
+
+      const keys = ['gran','frente','soluciones'];
+      ds.camaras.forEach((cam, idx) => {
+        const key = keys[idx] || ('consulta_'+idx);
+        const cons = CONSULTAS_DATA[key];
+        if(!cons) return;
+
+        const cands = cam.cantotabla || cam.partotabla || [];
+        cons.candidatos = cands.map(c => {
+          const a = c.act || c;
+          return {
+            nombre: [(a.nomcan||''),(a.apecan||'')].filter(Boolean).join(' ').trim() || a.nompar || '—',
+            partido: a.nompar || a.partido || '—',
+            votos: parseInt(a.vot||0),
+            codpar: String(a.codpar||''),
+          };
+        }).filter(c=>c.votos>=0).sort((a,b)=>b.votos-a.votos);
+
+        const tot = (cam.totales && cam.totales.act) || {};
+        cons.tot = {
+          votant:  parseInt(tot.votant||0),
+          votval:  parseInt(tot.votval||0),
+          votnul:  parseInt(tot.votnul||0),
+          votnma:  parseInt(tot.votnma||0),
+          votblan: parseInt(tot.votblan||0),
+        };
+        if(idx===0) MESAS_REP = parseInt(tot.mesesc||0)||MESAS_REP;
+      });
+
+      if(ds.totales && ds.totales.act) {
+        const t = ds.totales.act;
+        TOT_GENERAL = { votant:parseInt(t.votant||0), votval:parseInt(t.votval||0), votnul:parseInt(t.votnul||0), votnma:parseInt(t.votnma||0), votblan:parseInt(t.votblan||0) };
+      }
+      return true;
+    }
+
+    async function cargarDep(cod){
+      const url = `${REG.consultas}/${cod}`;
+      const ds = await fetchReg(url);
+      if(!ds || !ds.camaras) return;
+
+      const keys = ['gran','frente','soluciones'];
+      const idx  = keys.indexOf(curConsulta);
+      const cam  = ds.camaras[idx] || ds.camaras[0];
+      if(!cam) return;
+
+      const cands = cam.cantotabla || cam.partotabla || [];
+      const depCands = cands.map(c => {
+        const a = c.act || c;
+        return {
+          nombre: [(a.nomcan||''),(a.apecan||'')].filter(Boolean).join(' ').trim()||a.nompar||'—',
+          partido: a.nompar||'—',
+          votos: parseInt(a.vot||0),
+        };
+      }).filter(c=>c.votos>=0).sort((a,b)=>b.votos-a.votos);
+
+      const tot = (cam.totales && cam.totales.act) || {};
+      renderConsultaConDatos(depCands, {
+        votant:  parseInt(tot.votant||0),
+        votval:  parseInt(tot.votval||0),
+        votnul:  parseInt(tot.votnul||0),
+        votnma:  parseInt(tot.votnma||0),
+        votblan: parseInt(tot.votblan||0),
+      });
+    }
+
+    async function cargarDatos(){
+      const regOk = await cargarDesdeRegistraduria();
+      const fuente = regOk ? 'Registraduría Nacional' : '';
+      refreshUI(regOk, fuente);
+    }
+
+    function refreshUI(fromExternal, fuente){
+      const ahora = new Date();
+      const ts = ahora.toLocaleDateString('es-CO')+' · '+ahora.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+      document.getElementById('lastUpdate').textContent = ts;
+      document.getElementById('mesasLabel').textContent = (MESAS_REP||0).toLocaleString('es-CO')+' / '+MESAS_TOTAL.toLocaleString('es-CO');
+      if(fromExternal){
+        document.getElementById('statusBar').style.display = 'flex';
+        document.getElementById('csvTimestamp').textContent = ts;
+        const lbl = document.getElementById('fuenteLbl');
+        if(lbl) lbl.textContent = fuente||'Fuente externa';
+      }
+      renderConsulta();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // RENDERS
+    // ═══════════════════════════════════════════════════════════
+    function renderKPI(id, items){
+      document.getElementById(id).innerHTML = items.map(k=>`<div class="kpi-card"><div class="kpi-label">${k.l}</div><div class="kpi-val ${k.c||''}">${k.v}</div><div class="kpi-delta">${k.d}</div></div>`).join('');
+    }
+
+    const donutI={};
+    function renderDonut(cid, pid, lid, tot){
+      const {votval=0,votnul=0,votnma=0,votblan=0,potencial=POTENCIAL}=tot;
+      const novot=Math.max(0,potencial-votval-votnul-votnma-votblan);
+      if(donutI[cid]) donutI[cid].destroy();
+      const ctx=document.getElementById(cid).getContext('2d');
+      donutI[cid]=new Chart(ctx,{type:'doughnut',
+        data:{labels:['Votos válidos','Nulos','No marcados','En blanco','No votaron'],
+          datasets:[{data:[votval,votnul,votnma,votblan,novot],
+            backgroundColor:['#0047FF','#cc2233','#f0a500','#666','#1e2030'],
+            borderWidth:0,hoverOffset:6}]},
+        options:{responsive:true,maintainAspectRatio:true,cutout:'72%',
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}}}}
+      });
+      const pct=((votval+votnul+votnma+votblan)/potencial*100).toFixed(1);
+      document.getElementById(pid).textContent=pct+'%';
+      document.getElementById(lid).innerHTML=`
+        <div class="li"><div class="ld" style="background:#0047FF"></div>Votos válidos<span class="lv">${votval.toLocaleString('es-CO')}</span></div>
+        <div class="li"><div class="ld" style="background:#cc2233"></div>Nulos<span class="lv">${votnul.toLocaleString('es-CO')}</span></div>
+        <div class="li"><div class="ld" style="background:#f0a500"></div>No marcados<span class="lv">${votnma.toLocaleString('es-CO')}</span></div>
+        <div class="li"><div class="ld" style="background:#666"></div>En blanco<span class="lv">${votblan.toLocaleString('es-CO')}</span></div>
+        <div class="li"><div class="ld" style="background:#1e2030;border:1px solid #333"></div>No votaron<span class="lv">${novot.toLocaleString('es-CO')}</span></div>`;
+    }
+
+    function renderTablaCandidatos(candidatos, votval){
+      const tbody = document.getElementById('tbody-consultas');
+      tbody.innerHTML = '';
+      if(!candidatos.length){
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:2rem;color:rgba(255,255,255,.25);font-family:'DM Mono',monospace;font-size:.72rem">Sin datos disponibles</td></tr>`;
+        return;
+      }
+      const base = votval || candidatos.reduce((s,c)=>s+c.votos,0);
+      const mx = Math.max(1,...candidatos.map(c=>c.votos));
+      candidatos.forEach((c,i)=>{
+        const pct = base>0 ? ((c.votos/base)*100).toFixed(2) : '0.00';
+        const bw  = ((c.votos/mx)*100).toFixed(1);
+        const color = getCandColor(i);
+        const tr = document.createElement('tr');
+        if(i===0) tr.classList.add('winner');
+        tr.innerHTML=`
+          <td style="color:rgba(255,255,255,.25);font-size:.72rem">${String(i+1).padStart(2,'0')}</td>
+          <td style="font-size:.9rem;font-weight:${i===0?700:400};color:${i===0?'var(--white)':'var(--td-color)'}">${c.nombre}</td>
+          <td style="font-size:.82rem;color:rgba(255,255,255,.45)">${c.partido}</td>
+          <td class="r" style="font-size:.9rem">${c.votos.toLocaleString('es-CO')}</td>
+          <td class="r"><div class="bar-wrap"><div class="bar-fill" style="width:0%;background:${color}" data-w="${bw}%"></div></div><span class="pct-val" style="font-size:.88rem">${pct}%</span></td>`;
+        tbody.appendChild(tr);
+      });
+      setTimeout(()=>tbody.querySelectorAll('.bar-fill').forEach(b=>{ if(b.dataset.w) b.style.width=b.dataset.w; }),80);
+    }
+
+    function renderConsultaConDatos(candidatos, tot){
+      const votant = tot.votant||0;
+      const votval = tot.votval||0;
+      const puntero = candidatos[0]||null;
+      const pctPuntero = (puntero&&votval>0) ? ((puntero.votos/votval)*100).toFixed(1)+'%' : '—';
+      renderKPI('kpi-consultas',[
+        {l:'Votos válidos',    v:(votval).toLocaleString('es-CO'),  c:'green', d:`${votant?((votval/votant)*100).toFixed(2)+'% de votantes':'—'}`},
+        {l:'Candidatos',       v:String(candidatos.length),         c:'dark',  d:`${CONSULTAS_DATA[curConsulta].nombre}`},
+        {l:'Candidato puntero',v:puntero?(puntero.nombre.split(' ')[0]+' '+puntero.nombre.split(' ').slice(-1)[0]):'—', c:'sm', d:puntero?puntero.partido:''},
+        {l:'% puntero',        v:pctPuntero,                        c:'',      d:puntero?puntero.votos.toLocaleString('es-CO')+' votos':''},
+      ]);
+      renderTablaCandidatos(candidatos, votval);
+      renderDonut('donut-consultas','pct-consultas','leg-consultas',{...tot,potencial:POTENCIAL});
+      const cons = CONSULTAS_DATA[curConsulta];
+      document.getElementById('lbl-cons-tabla').textContent=`Candidatos · ${cons.nombre}${curConsDep!=='Nacional (todos)'?' · '+curConsDep:''}`;
+    }
+
+    function renderConsulta(){
+      const inp = document.getElementById('cons-search');
+      if(inp) inp.value='';
+      buscarCandidatoCons('');
+
+      if(curConsDep !== 'Nacional (todos)'){
+        const cod = Object.entries(DANE_DEP_CONS).find(([,v])=>v===curConsDep)?.[0];
+        if(cod){ cargarDep(cod); return; }
+      }
+
+      const cons = CONSULTAS_DATA[curConsulta];
+      renderConsultaConDatos(cons.candidatos, cons.tot);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // SWITCH CONSULTA / DEP
+    // ═══════════════════════════════════════════════════════════
+    function switchConsulta(key){
+      curConsulta = key;
+      ['gran','frente','soluciones'].forEach(k=>{
+        const btn = document.getElementById('tab-'+k);
+        if(btn) btn.classList.toggle('active', k===key);
+      });
+      const inp = document.getElementById('cons-search');
+      if(inp) inp.value='';
+      buscarCandidatoCons('');
+      renderConsulta();
+    }
+
+    function switchConsDep(dep){
+      curConsDep = dep;
+      const inp = document.getElementById('cons-search');
+      if(inp) inp.value='';
+      buscarCandidatoCons('');
+      renderConsulta();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // BUSCAR CANDIDATO
+    // ═══════════════════════════════════════════════════════════
+    function buscarCandidatoCons(q){
+      const box      = document.getElementById('cons-search-results');
+      const mainGrid = document.getElementById('cons-main-grid');
+      const kpi      = document.getElementById('kpi-consultas');
+      q = q.trim();
+      if(!q){
+        box.style.display='none';
+        box.innerHTML='';
+        if(mainGrid) mainGrid.style.display='';
+        if(kpi) kpi.style.display='';
+        return;
+      }
+      if(mainGrid) mainGrid.style.display='none';
+      if(kpi) kpi.style.display='none';
+      box.style.display='block';
+
+      const norm = s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+      const qn = norm(q);
+      const cons = CONSULTAS_DATA[curConsulta];
+      const candidatos = cons.candidatos;
+      const votval = cons.tot.votval||0;
+      const base = votval || candidatos.reduce((s,c)=>s+c.votos,0);
+
+      const resultados = candidatos.filter(c=>norm(c.nombre).includes(qn));
+
+      if(!resultados.length){
+        box.innerHTML=`<div style="padding:2rem;font-family:'DM Mono',monospace;font-size:.72rem;color:rgba(255,255,255,.3);text-align:center">No se encontraron candidatos con "<b>${q}</b>"</div>`;
+        return;
+      }
+      box.innerHTML=`
+        <div style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;color:rgba(255,255,255,.3);text-transform:uppercase;padding:.75rem 0 .5rem">
+          ${resultados.length} resultado${resultados.length!==1?'s':''} para "${q}" · ${cons.nombre}
+        </div>
+        <table class="results-table" style="width:100%">
+          <thead><tr><th>#</th><th>Candidato/a</th><th>Partido / Movimiento</th><th class="r">Votos</th><th class="r">%</th></tr></thead>
+          <tbody>
+            ${resultados.map((r,i)=>{
+              const pct = base>0?((r.votos/base)*100).toFixed(2)+'%':'—';
+              return `<tr>
+                <td style="color:rgba(255,255,255,.25);font-size:.72rem">${String(i+1).padStart(2,'0')}</td>
+                <td style="font-size:.9rem">${r.nombre}</td>
+                <td style="font-size:.82rem;color:rgba(255,255,255,.45)">${r.partido}</td>
+                <td class="r" style="font-size:.88rem">${r.votos.toLocaleString('es-CO')}</td>
+                <td class="r" style="font-size:.85rem;color:rgba(255,255,255,.45)">${pct}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // INIT
+    // ═══════════════════════════════════════════════════════════
+    Chart.defaults.color='rgba(255,255,255,.4)';
+    Chart.defaults.font.family="'DM Mono',monospace";
+
+    // Poblar dropdown departamentos
+    const consSel = document.getElementById('cons-dep-select');
+    const depKeys = ['Nacional (todos)',...Object.values(DANE_DEP_CONS).sort((a,b)=>a.localeCompare(b,'es'))];
+    depKeys.forEach(d=>{ const o=document.createElement('option'); o.value=d; o.textContent=d; if(d==='Nacional (todos)') o.selected=true; consSel.appendChild(o); });
+
+    // Curtain
+    const curtain = document.getElementById('curtain');
+    curtain.classList.add('opening');
+    requestAnimationFrame(()=>{
+      requestAnimationFrame(()=>{
+        curtain.classList.remove('opening');
+        curtain.classList.add('opened');
+      });
+    });
+
+    // navigate()
+    function navigate(e, url, label) {
+      e && e.stopPropagation && e.stopPropagation();
+      e && e.preventDefault && e.preventDefault();
+      curtain.classList.remove('opened');
+      curtain.classList.add('closing');
+      setTimeout(()=>{ window.location.href=url; }, 1150);
+    }
+
+    // Cursor
+    const cur2=document.getElementById('cursor'),ri=document.getElementById('cursorRing');
+    let mx2=0,my2=0,rx=0,ry=0;
+    document.addEventListener('mousemove',e=>{ mx2=e.clientX; my2=e.clientY; cur2.style.left=mx2+'px'; cur2.style.top=my2+'px'; });
+    (function ar(){ rx+=(mx2-rx)*.12; ry+=(my2-ry)*.12; ri.style.left=rx+'px'; ri.style.top=ry+'px'; requestAnimationFrame(ar); })();
+    document.querySelectorAll('a,button,select,input').forEach(el=>{
+      el.addEventListener('mouseenter',()=>{ cur2.style.transform='translate(-50%,-50%) scale(2.5)'; cur2.style.background='transparent'; cur2.style.border='1.5px solid var(--blue)'; ri.style.opacity='0'; });
+      el.addEventListener('mouseleave',()=>{ cur2.style.transform='translate(-50%,-50%) scale(1)'; cur2.style.background='var(--blue)'; cur2.style.border='none'; ri.style.opacity='.4'; });
+    });
+
+    // Countdown + auto-recarga
+    let secsLeft=RECARGA_MIN*60;
+    setInterval(()=>{
+      secsLeft--;
+      if(secsLeft<=0){ secsLeft=RECARGA_MIN*60; cargarDatos(); }
+      const m=String(Math.floor(secsLeft/60)).padStart(2,'0'),s=String(secsLeft%60).padStart(2,'0');
+      document.getElementById('countdown').textContent=`${m}:${s}`;
+    },1000);
+
+    // Arranque
+    cargarDatos();
+
+    // ── AUTH NAV ──
+    function updateElectoralNav() {
+      const token = localStorage.getItem('rr-token');
+      const user  = JSON.parse(localStorage.getItem('rr-user') || 'null');
+      const area  = document.getElementById('e-nav-auth');
+      if (!area) return;
+      if (token && user) {
+        const planLabels = { free:'Free', pro:'Pro', premium:'Premium', basic:'Básico', analysis:'Análisis', full:'Completo' };
+        area.innerHTML = `<span class="e-user-plan">${planLabels[user.plan] || user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">Salir</button>`;
+      } else {
+        area.innerHTML = `<a href="pricing.html" style="font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">Planes</a><a href="login.html" class="e-btn-login">Iniciar sesión</a><a href="register.html" class="e-btn-register">Registrarse</a>`;
+      }
+    }
+    async function eLogOut() {
+      const token = localStorage.getItem('rr-token');
+      if (token) { try { await fetch('https://rr-auth.reruizc.workers.dev/auth/logout', { method:'POST', headers:{ 'Authorization':`Bearer ${token}` } }); } catch {} }
+      localStorage.removeItem('rr-token');
+      localStorage.removeItem('rr-user');
+      window.location.reload();
+    }
+    updateElectoralNav();
+  </script>
+</body>
+</html>
