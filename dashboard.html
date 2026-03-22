@@ -391,9 +391,102 @@
     @media (max-width: 480px) {
       .tools-grid { grid-template-columns:1fr; }
     }
+
+    /* ── PAYMENT SUCCESS BANNER ── */
+    .payment-banner {
+      display: none;
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      z-index: 2000;
+      background: rgba(0,0,0,.7);
+      backdrop-filter: blur(6px);
+      align-items: center; justify-content: center;
+      padding: 1.5rem;
+    }
+    .payment-banner.show { display: flex; }
+    .payment-banner-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 2.5rem 2rem;
+      max-width: 480px; width: 100%;
+      position: relative;
+    }
+    .pbc-check {
+      width: 52px; height: 52px;
+      background: rgba(0,71,255,.1);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 1.25rem;
+    }
+    .pbc-check svg { color: var(--blue); }
+    .pbc-label {
+      font-family: 'DM Mono', monospace; font-size: .6rem;
+      letter-spacing: .18em; text-transform: uppercase;
+      color: var(--blue); margin-bottom: .5rem;
+    }
+    .pbc-title {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: 1.6rem; letter-spacing: -.03em;
+      color: var(--text); margin-bottom: .5rem;
+    }
+    .pbc-sub {
+      font-family: 'Fraunces', serif; font-weight: 300;
+      font-size: .9rem; color: var(--text2);
+      line-height: 1.6; margin-bottom: 1.5rem;
+    }
+    .pbc-benefits {
+      border-top: 1px solid var(--border);
+      padding-top: 1.25rem; margin-bottom: 1.5rem;
+    }
+    .pbc-benefits-title {
+      font-family: 'DM Mono', monospace; font-size: .58rem;
+      letter-spacing: .15em; text-transform: uppercase;
+      color: var(--text3); margin-bottom: .75rem;
+    }
+    .pbc-benefit {
+      font-family: 'DM Mono', monospace; font-size: .7rem;
+      letter-spacing: .04em; color: var(--text2);
+      display: flex; gap: .6rem; align-items: flex-start;
+      margin-bottom: .6rem; line-height: 1.4;
+    }
+    .pbc-benefit::before { content: '→'; color: var(--blue); flex-shrink: 0; }
+    .pbc-close {
+      width: 100%;
+      font-family: 'DM Mono', monospace; font-size: .7rem;
+      letter-spacing: .1em; text-transform: uppercase;
+      color: var(--white); background: var(--blue);
+      border: none; padding: .85rem;
+      cursor: none; transition: background .2s;
+    }
+    .pbc-close:hover { background: #0035cc; }
+    .pbc-polling {
+      font-family: 'DM Mono', monospace; font-size: .55rem;
+      letter-spacing: .08em; text-transform: uppercase;
+      color: var(--text3); text-align: center;
+      margin-top: .75rem; min-height: 1rem;
+    }
   </style>
 </head>
 <body>
+
+  <!-- PAYMENT SUCCESS BANNER (aparece si Wompi redirige aquí con ?status=APPROVED) -->
+  <div class="payment-banner" id="payment-banner">
+    <div class="payment-banner-card">
+      <div class="pbc-check">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+      <div class="pbc-label">Pago confirmado</div>
+      <div class="pbc-title" id="pbc-title">¡Bienvenido al plan Pro!</div>
+      <div class="pbc-sub" id="pbc-sub">Tu plan ha sido activado. Ya tienes acceso a todo lo incluido a continuación.</div>
+      <div class="pbc-benefits">
+        <div class="pbc-benefits-title">Lo que incluye tu plan</div>
+        <div id="pbc-benefits-list"></div>
+      </div>
+      <button class="pbc-close" onclick="closePlanBanner()">Entendido, ir a mi dashboard →</button>
+      <div class="pbc-polling" id="pbc-polling"></div>
+    </div>
+  </div>
 
   <div class="cursor" id="cursor"></div>
   <div class="cursor-ring" id="cursorRing"></div>
@@ -705,8 +798,70 @@
       el.addEventListener('mouseleave', () => { cursor.style.transform='translate(-50%,-50%) scale(1)'; cursor.style.background='var(--blue)'; cursor.style.border='none'; ring.style.opacity='.4'; });
     });
 
+    // ─── PAYMENT SUCCESS DETECTION ────────────────────────────────────────────
+    const PLAN_BENEFITS_DASH = {
+      pro: {
+        name: 'Pro',
+        items: ['Todo lo del plan Básico','3 descargas de bases de datos al mes','Visualizaciones avanzadas e interactivas','Datos históricos con análisis avanzado','Cruces demográfico, seguridad y socioeconómico']
+      },
+      premium: {
+        name: 'Premium',
+        items: ['Todo lo del plan Pro','10 descargas de bases de datos e infografías al mes','Todos los tipos de datos disponibles','Análisis y visualizaciones profundas','Cruces de información exclusivos','Notificación de cada actualización mensual']
+      }
+    };
+
+    async function checkPaymentSuccess() {
+      const params  = new URLSearchParams(window.location.search);
+      const status  = params.get('status');
+      if (status !== 'APPROVED') return;
+
+      // Leer plan pendiente guardado antes del pago
+      const pendingRaw = localStorage.getItem('rr-pending-plan');
+      const pending    = pendingRaw ? JSON.parse(pendingRaw) : null;
+      const planMap    = { pro_mensual:'pro', pro_anual:'pro', premium_mensual:'premium', premium_anual:'premium' };
+      const planId     = planMap[pending?.planId] || 'pro';
+      const planInfo   = PLAN_BENEFITS_DASH[planId] || PLAN_BENEFITS_DASH.pro;
+
+      // Mostrar banner
+      document.getElementById('pbc-title').textContent = `¡Bienvenido al plan ${planInfo.name}!`;
+      document.getElementById('pbc-sub').textContent   = `Tu plan ${planInfo.name} ha sido activado. Ya tienes acceso a todo lo incluido.`;
+      document.getElementById('pbc-benefits-list').innerHTML = planInfo.items.map(b => `<div class="pbc-benefit">${b}</div>`).join('');
+      document.getElementById('payment-banner').classList.add('show');
+
+      localStorage.removeItem('rr-pending-plan');
+      // Limpiar URL sin recargar
+      window.history.replaceState({}, '', 'dashboard.html');
+
+      // Polling para actualizar el plan en localStorage
+      const token = localStorage.getItem('rr-token');
+      if (token) {
+        const pollingEl = document.getElementById('pbc-polling');
+        for (let i = 0; i < 10; i++) {
+          await new Promise(r => setTimeout(r, 5000));
+          try {
+            const res  = await fetch('https://rr-auth.reruizc.workers.dev/auth/me', { headers: { 'Authorization': `Bearer ${token}` } });
+            const data = await res.json();
+            if (data.ok && data.user.plan === planId) {
+              const u = JSON.parse(localStorage.getItem('rr-user') || '{}');
+              u.plan = planId;
+              localStorage.setItem('rr-user', JSON.stringify(u));
+              pollingEl.textContent = '';
+              render(); // Re-render dashboard con nuevo plan
+              break;
+            }
+          } catch {}
+          pollingEl.textContent = 'Activando plan en el sistema...';
+        }
+      }
+    }
+
+    function closePlanBanner() {
+      document.getElementById('payment-banner').classList.remove('show');
+    }
+
     // ─── INIT ─────────────────────────────────────────────────────────────────
     render();
+    checkPaymentSuccess();
   </script>
 </body>
 </html>
