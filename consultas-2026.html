@@ -200,7 +200,7 @@
     .cifras-bloque { margin-top:.9rem; padding-top:.8rem; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:.4rem; }
     .cifra-item { display:flex; justify-content:space-between; align-items:baseline; gap:.5rem; }
     .cifra-label { font-size:.78rem; letter-spacing:.06em; text-transform:uppercase; color:rgba(255,255,255,.3); }
-    .cifra-val { font-family:'DM Mono',monospace; font-size:.87rem; color:var(--white); font-weight:500; }
+    .cifra-val { font-family:'Syne',sans-serif; font-size:.87rem; color:var(--white); font-weight:500; }
 
     /* DONUT */
     .donut-wrap { display:flex; flex-direction:column; align-items:center; gap:1rem; }
@@ -211,7 +211,7 @@
     .donut-legend { width:100%; display:flex; flex-direction:column; gap:.55rem; }
     .li { display:flex; align-items:center; gap:.6rem; font-family:'DM Mono',monospace; font-size:.87rem; color:rgba(255,255,255,.5); }
     .ld { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
-    .lv { margin-left:auto; color:var(--white); font-weight:700; }
+    .lv { margin-left:auto; color:var(--white); font-weight:700; font-family:'Syne',sans-serif; }
 
     /* SEARCH RESULTS */
     #cons-search-results { margin-bottom: 1.5rem; }
@@ -494,39 +494,48 @@
 
     async function cargarDesdeRegistraduria(){
       const ds = await fetchReg(REG.consultas);
-      if(!ds || !ds.camaras) return false;
+      if(!ds || !ds.camaras || !ds.camaras.length) return false;
 
-      const keys = ['gran','frente','soluciones'];
-      ds.camaras.forEach((cam, idx) => {
-        const key = keys[idx] || ('consulta_'+idx);
-        const cons = CONSULTAS_DATA[key];
+      // codpar 30 → Frente por la Vida · 31 → Gran Consulta · 32 → Consulta de Soluciones
+      const CODPAR_CONSULTA = {'30':'frente','31':'gran','32':'soluciones'};
+      const bloque = ds.camaras[0];
+
+      (bloque.partotabla||[]).forEach(p => {
+        const a = p.act;
+        const clave = CODPAR_CONSULTA[String(a.codpar)];
+        if(!clave) return;
+        const cons = CONSULTAS_DATA[clave];
         if(!cons) return;
 
-        const cands = cam.cantotabla || cam.partotabla || [];
-        cons.candidatos = cands.map(c => {
-          const a = c.act || c;
-          return {
-            nombre: [(a.nomcan||''),(a.apecan||'')].filter(Boolean).join(' ').trim() || a.nompar || '—',
-            partido: a.nompar || a.partido || '—',
-            votos: parseInt(a.vot||0),
-            codpar: String(a.codpar||''),
-          };
-        }).filter(c=>c.votos>=0).sort((a,b)=>b.votos-a.votos);
+        cons.candidatos = (a.cantotabla||[])
+          .filter(c => parseInt(c.vot) > 0)
+          .map(c => ({
+            nombre: `${c.nomcan||''} ${c.apecan||''}`.trim()
+              .split(' ').map(w => w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' ') || '—',
+            partido: cons.nombre,
+            votos: parseInt(c.vot)||0,
+          }))
+          .sort((a,b) => b.votos - a.votos);
 
-        const tot = (cam.totales && cam.totales.act) || {};
-        cons.tot = {
-          votant:  parseInt(tot.votant||0),
-          votval:  parseInt(tot.votval||0),
-          votnul:  parseInt(tot.votnul||0),
-          votnma:  parseInt(tot.votnma||0),
-          votblan: parseInt(tot.votblan||0),
-        };
-        if(idx===0) MESAS_REP = parseInt(tot.mesesc||0)||MESAS_REP;
+        cons.tot.votval = parseInt(a.vot)||0;
       });
 
-      if(ds.totales && ds.totales.act) {
-        const t = ds.totales.act;
-        TOT_GENERAL = { votant:parseInt(t.votant||0), votval:parseInt(t.votval||0), votnul:parseInt(t.votnul||0), votnma:parseInt(t.votnma||0), votblan:parseInt(t.votblan||0) };
+      const totAct = (ds.totales&&ds.totales.act) || (bloque.totales&&bloque.totales.act);
+      if(totAct) {
+        const votant  = parseInt(totAct.votant||0);
+        const votnul  = parseInt(totAct.votnul||0);
+        const votnma  = parseInt(totAct.votnma||0);
+        const votblan = parseInt(totAct.votblan||0);
+        TOT_GENERAL = { votant, votval:parseInt(totAct.votval||0), votnul, votnma, votblan };
+        Object.values(CONSULTAS_DATA).forEach(cons => {
+          if(!cons.tot.votval) return;
+          const ratio = cons.tot.votval / (votant||1);
+          cons.tot.votant  = votant;
+          cons.tot.votnul  = Math.round(votnul  * ratio);
+          cons.tot.votnma  = Math.round(votnma  * ratio);
+          cons.tot.votblan = Math.round(votblan * ratio);
+        });
+        MESAS_REP = parseInt(totAct.mesesc||0)||MESAS_REP;
       }
       return true;
     }
@@ -534,27 +543,29 @@
     async function cargarDep(cod){
       const url = `${REG.consultas}/${cod}`;
       const ds = await fetchReg(url);
-      if(!ds || !ds.camaras) return;
+      if(!ds || !ds.camaras || !ds.camaras.length) return;
 
-      const keys = ['gran','frente','soluciones'];
-      const idx  = keys.indexOf(curConsulta);
-      const cam  = ds.camaras[idx] || ds.camaras[0];
-      if(!cam) return;
+      const CODPAR_CONSULTA = {'30':'frente','31':'gran','32':'soluciones'};
+      const bloque = ds.camaras[0];
 
-      const cands = cam.cantotabla || cam.partotabla || [];
-      const depCands = cands.map(c => {
-        const a = c.act || c;
-        return {
-          nombre: [(a.nomcan||''),(a.apecan||'')].filter(Boolean).join(' ').trim()||a.nompar||'—',
-          partido: a.nompar||'—',
-          votos: parseInt(a.vot||0),
-        };
-      }).filter(c=>c.votos>=0).sort((a,b)=>b.votos-a.votos);
+      const partido = (bloque.partotabla||[]).find(p => CODPAR_CONSULTA[String(p.act.codpar)] === curConsulta);
+      if(!partido) return;
 
-      const tot = (cam.totales && cam.totales.act) || {};
+      const a = partido.act;
+      const depCands = (a.cantotabla||[])
+        .filter(c => parseInt(c.vot) > 0)
+        .map(c => ({
+          nombre: `${c.nomcan||''} ${c.apecan||''}`.trim()
+            .split(' ').map(w => w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' ') || '—',
+          partido: CONSULTAS_DATA[curConsulta]?.nombre || '—',
+          votos: parseInt(c.vot)||0,
+        }))
+        .sort((a,b) => b.votos - a.votos);
+
+      const tot = (bloque.totales && bloque.totales.act) || {};
       renderConsultaConDatos(depCands, {
         votant:  parseInt(tot.votant||0),
-        votval:  parseInt(tot.votval||0),
+        votval:  parseInt(a.vot||0),
         votnul:  parseInt(tot.votnul||0),
         votnma:  parseInt(tot.votnma||0),
         votblan: parseInt(tot.votblan||0),
@@ -629,9 +640,9 @@
         if(i===0) tr.classList.add('winner');
         tr.innerHTML=`
           <td style="color:rgba(255,255,255,.25);font-size:.72rem">${String(i+1).padStart(2,'0')}</td>
-          <td style="font-size:.9rem;font-weight:${i===0?700:400};color:${i===0?'var(--white)':'var(--td-color)'}">${c.nombre}</td>
-          <td style="font-size:.82rem;color:rgba(255,255,255,.45)">${c.partido}</td>
-          <td class="r" style="font-size:.9rem">${c.votos.toLocaleString('es-CO')}</td>
+          <td style="font-size:.9rem;font-weight:${i===0?700:400};color:${i===0?'var(--white)':'var(--td-color)'};font-family:'Syne',sans-serif">${c.nombre}</td>
+          <td style="font-size:.82rem;color:rgba(255,255,255,.45);font-family:'Syne',sans-serif">${c.partido}</td>
+          <td class="r" style="font-size:.9rem;font-family:'Syne',sans-serif">${c.votos.toLocaleString('es-CO')}</td>
           <td class="r"><div class="bar-wrap"><div class="bar-fill" style="width:0%;background:${color}" data-w="${bw}%"></div></div><span class="pct-val" style="font-size:.88rem">${pct}%</span></td>`;
         tbody.appendChild(tr);
       });
