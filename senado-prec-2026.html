@@ -395,6 +395,7 @@
         </div>
         <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
       </a>
+      <div id="nav-auth-area"></div>
     </div>
 
     <!-- BREADCRUMB -->
@@ -1147,6 +1148,37 @@
     // Arranque
     recalcDeps();
     cargarDatos();
+
+    // ── AUTH NAV ──
+    function updateNavAuth() {
+      const token = localStorage.getItem('rr-token');
+      const user  = JSON.parse(localStorage.getItem('rr-user') || 'null');
+      const area  = document.getElementById('nav-auth-area');
+      if (!area) return;
+      if (token && user) {
+        const planLabels = { free:'Free', pro:'Pro', premium:'Premium', basic:'Básico', analysis:'Análisis', full:'Completo' };
+        area.innerHTML = `
+          <div class="nav-user">
+            <a href="dashboard.html" class="nav-user-plan">${planLabels[user.plan] || user.plan}</a>
+            <a href="dashboard.html" class="nav-user-name">${user.name.split(' ')[0]}</a>
+            <button class="nav-logout" onclick="logOutPage()">Salir</button>
+          </div>`;
+      } else {
+        area.innerHTML = `
+          <div class="nav-auth">
+            <a href="login.html" class="nav-login">Iniciar sesión</a>
+            <a href="register.html" class="nav-register">Registrarse</a>
+          </div>`;
+      }
+    }
+    async function logOutPage() {
+      const token = localStorage.getItem('rr-token');
+      if (token) { try { await fetch('https://rr-auth.reruizc.workers.dev/auth/logout', { method:'POST', headers:{ 'Authorization':`Bearer ${token}` } }); } catch {} }
+      localStorage.removeItem('rr-token');
+      localStorage.removeItem('rr-user');
+      window.location.reload();
+    }
+    updateNavAuth();
   </script>
 </body>
 </html>
