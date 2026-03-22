@@ -258,6 +258,19 @@
       .rotate-hint { display:flex; align-items:center; gap:.6rem; font-family:'DM Mono',monospace; font-size:.9rem; letter-spacing:.06em; color:rgba(255,255,255,.55); padding:.6rem 1rem; background:rgba(255,255,255,.06); border:1px solid var(--border); margin-bottom:.8rem; }
     }
 
+    /* ELECTORAL NAV */
+    .electoral-nav{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(4,6,16,.6);backdrop-filter:blur(8px);flex-shrink:0}
+    .electoral-nav-auth{display:flex;align-items:center;gap:.75rem}
+    .e-btn-login{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.45);text-decoration:none;border:1.5px solid transparent;padding:.35rem .8rem;transition:color .2s,border-color .2s}
+    .e-btn-login:hover{color:var(--white);border-color:rgba(255,255,255,.2)}
+    .e-btn-register{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-decoration:none;background:var(--blue);border:1.5px solid var(--blue);padding:.35rem .8rem}
+    .e-user-name{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.7)}
+    .e-user-plan{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue);background:rgba(0,71,255,.12);padding:.2rem .6rem}
+    .e-btn-logout{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.25);background:none;border:none;cursor:none;padding:0}
+    .e-btn-back{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none;border:1.5px solid rgba(255,255,255,.12);padding:.3rem .8rem;transition:color .2s,border-color .2s;flex-shrink:0}
+    .e-btn-back:hover{color:var(--white);border-color:rgba(255,255,255,.3)}
+    @media(max-width:900px){.electoral-nav{display:none}}
+
     /* BACK BAR */
     .back-bar {
       flex-shrink:0; padding: .6rem 2.5rem 1rem;
@@ -383,9 +396,11 @@
 
   <div class="shell">
 
-    <!-- TOP BAR -->
-    <div class="top-bar">
-      <div class="page-title">Senado de<br/><span>la República</span></div>
+    <nav class="electoral-nav">
+      <div style="display:flex;align-items:center;gap:1rem">
+        <a href="electoral.html" class="e-btn-back" onclick="navigate(event,'electoral.html','Resultados Electorales')">← Volver</a>
+        <div id="e-nav-auth" class="electoral-nav-auth"></div>
+      </div>
       <a href="electoral.html" class="logo-link" onclick="navigate(event,'electoral.html','Resultados Electorales')">
         <div class="logo-bars">
           <div class="logo-bar" style="height:20px"></div>
@@ -395,7 +410,11 @@
         </div>
         <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
       </a>
-      <div id="nav-auth-area"></div>
+    </nav>
+
+    <!-- TOP BAR -->
+    <div class="top-bar">
+      <div class="page-title">Senado de<br/><span>la República</span></div>
     </div>
 
     <!-- BREADCRUMB -->
@@ -416,7 +435,6 @@
       <span>Mesas: <b id="mesasLabel">— / 126.818</b></span>
       <span>Potencial: <b>41.370.203</b></span>
       <div class="reload-badge">Recarga auto: <b id="countdown">03:00</b></div>
-      <a href="electoral.html" class="back-btn" onclick="navigate(event,'electoral.html','Resultados Electorales')" style="margin-left:auto">← Volver a Resultados Electorales</a>
     </div>
 
     <!-- CONTENT AREA — vista única: partidos + búsqueda inline -->
@@ -1150,35 +1168,26 @@
     cargarDatos();
 
     // ── AUTH NAV ──
-    function updateNavAuth() {
+    function updateElectoralNav() {
       const token = localStorage.getItem('rr-token');
       const user  = JSON.parse(localStorage.getItem('rr-user') || 'null');
-      const area  = document.getElementById('nav-auth-area');
+      const area  = document.getElementById('e-nav-auth');
       if (!area) return;
       if (token && user) {
         const planLabels = { free:'Free', pro:'Pro', premium:'Premium', basic:'Básico', analysis:'Análisis', full:'Completo' };
-        area.innerHTML = `
-          <div class="nav-user">
-            <a href="dashboard.html" class="nav-user-plan">${planLabels[user.plan] || user.plan}</a>
-            <a href="dashboard.html" class="nav-user-name">${user.name.split(' ')[0]}</a>
-            <button class="nav-logout" onclick="logOutPage()">Salir</button>
-          </div>`;
+        area.innerHTML = `<span class="e-user-plan">${planLabels[user.plan] || user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">Salir</button>`;
       } else {
-        area.innerHTML = `
-          <div class="nav-auth">
-            <a href="login.html" class="nav-login">Iniciar sesión</a>
-            <a href="register.html" class="nav-register">Registrarse</a>
-          </div>`;
+        area.innerHTML = `<a href="pricing.html" style="font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">Planes</a><a href="login.html" class="e-btn-login">Iniciar sesión</a><a href="register.html" class="e-btn-register">Registrarse</a>`;
       }
     }
-    async function logOutPage() {
+    async function eLogOut() {
       const token = localStorage.getItem('rr-token');
       if (token) { try { await fetch('https://rr-auth.reruizc.workers.dev/auth/logout', { method:'POST', headers:{ 'Authorization':`Bearer ${token}` } }); } catch {} }
       localStorage.removeItem('rr-token');
       localStorage.removeItem('rr-user');
       window.location.reload();
     }
-    updateNavAuth();
+    updateElectoralNav();
   </script>
 </body>
 </html>

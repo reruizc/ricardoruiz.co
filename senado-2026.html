@@ -26,6 +26,8 @@
     .e-user-name{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.7)}
     .e-user-plan{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue);background:rgba(0,71,255,.12);padding:.2rem .6rem}
     .e-btn-logout{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.25);background:none;border:none;cursor:none;padding:0}
+    .e-btn-back{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none;border:1.5px solid rgba(255,255,255,.12);padding:.3rem .8rem;transition:color .2s,border-color .2s;flex-shrink:0}
+    .e-btn-back:hover{color:var(--white);border-color:rgba(255,255,255,.3)}
     .logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.8;transition:opacity .2s}
     .logo-link:hover{opacity:1}
     .logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px}
@@ -175,7 +177,10 @@
 
   <div class="shell">
     <nav class="electoral-nav">
-      <div id="e-nav-auth" class="electoral-nav-auth"></div>
+      <div style="display:flex;align-items:center;gap:1rem">
+        <a href="electoral.html" class="e-btn-back" onclick="navTo(event,'electoral.html')">← Volver</a>
+        <div id="e-nav-auth" class="electoral-nav-auth"></div>
+      </div>
       <a href="electoral.html" class="logo-link" onclick="navTo(event,'electoral.html')">
         <div class="logo-bars">
           <div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div>
@@ -216,6 +221,12 @@
             <option value="mun">Por municipio</option>
             <option value="pue">Por puesto</option>
           </select>
+          <div id="dep-filter-container" style="display:none;align-items:center;gap:.75rem">
+            <span class="sub-label" style="margin-left:1.5rem">Departamento:</span>
+            <select class="dep-select" id="dep-select" onchange="filterByDep(this.value)">
+              <option value="">— Todos los departamentos —</option>
+            </select>
+          </div>
           <span class="sub-label" style="margin-left:1.5rem">Buscar candidato:</span>
           <input id="sen-search" type="search" class="search-input" placeholder="Nombre o apellido…"
             oninput="buscarCandidato(this.value)"
@@ -259,10 +270,6 @@
       </div>
     </div>
 
-    <div class="back-bar">
-      <a href="electoral.html" class="back-btn" onclick="navTo(event,'electoral.html')">← Volver</a>
-      <a href="endoso-2026.html" class="endoso-btn" onclick="navTo(event,'endoso-2026.html')" style="margin-left:auto">Calcular endoso →</a>
-    </div>
   </div>
 
   <div class="full-footer">
@@ -331,8 +338,65 @@
     async function switchVista(v){
       document.getElementById('sen-search').value='';
       buscarCandidato('');
-      if(v==='nacional') renderNacional();
-      else await renderDrill(v==='dep'?'dep':v==='mun'?'dep':'dep', null,null,null,null);
+      const depContainer=document.getElementById('dep-filter-container');
+      if(v==='dep'){
+        depContainer.style.display='flex';
+        const sel=document.getElementById('dep-select');
+        if(sel.options.length<=1){
+          const deps=await getJSON('departamentos');
+          deps.forEach(d=>{const o=document.createElement('option');o.value=d.cod;o.textContent=d.nombre;sel.appendChild(o);});
+        }
+        sel.value='';
+        await renderDrill('dep',null,null,null,null);
+        renderKPI(); renderDonut();
+      } else {
+        depContainer.style.display='none';
+        if(v==='nacional'){renderNacional();renderKPI();renderDonut();}
+        else await renderDrill('dep',null,null,null,null);
+      }
+    }
+
+    async function filterByDep(cod){
+      if(!cod){await renderDrill('dep',null,null,null,null);renderKPI();renderDonut();return;}
+      const deps=await getJSON('departamentos');
+      const dep=deps.find(d=>d.cod===cod);
+      if(!dep) return;
+      const partidos=Object.entries(dep.partidos||{}).map(([nombre,votos])=>({nombre,votos})).sort((a,b)=>b.votos-a.votos);
+      const totalVotos=partidos.reduce((s,p)=>s+p.votos,0), maxV=partidos[0]?.votos||1;
+      document.getElementById('lbl-tabla').textContent=`Partidos · Senado · ${dep.nombre}`;
+      document.getElementById('drill-badge').textContent=dep.nombre;
+      document.getElementById('drill-badge').className='level-badge dep';
+      document.getElementById('drill-nav').innerHTML='';
+      document.getElementById('drill-thead').innerHTML=`<tr><th>#</th><th>Partido / Coalición</th><th class="r">Votos</th><th class="r" style="min-width:130px">%</th></tr>`;
+      const tbody=document.getElementById('tbody-senado');
+      tbody.innerHTML='';
+      partidos.forEach((p,i)=>{
+        const color=getColor(p.nombre),pctV=pct(p.votos,totalVotos),bw=((p.votos/maxV)*100).toFixed(1);
+        const tr=document.createElement('tr');
+        tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td>
+          <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">${p.nombre}</span></div></td>
+          <td class="r" style="font-size:.9rem;font-weight:700">${fmt(p.votos)}</td>
+          <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>`;
+        tbody.appendChild(tr);
+      });
+      setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
+      const topP=partidos.filter(p=>!/blanco/i.test(p.nombre))[0];
+      document.getElementById('kpi-row').innerHTML=`
+        <div class="kpi-card"><div class="kpi-label">Votos válidos</div><div class="kpi-val gr">${fmt(totalVotos)}</div><div class="kpi-delta">${dep.nombre}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Partidos</div><div class="kpi-val wh">${partidos.length}</div><div class="kpi-delta">con votación en el dpto.</div></div>
+        <div class="kpi-card"><div class="kpi-label">Partido puntero</div><div class="kpi-val sm">${topP?topP.nombre.split(' ').slice(0,3).join(' '):'—'}</div><div class="kpi-delta">${topP?fmt(topP.votos)+' votos':''}</div></div>
+        <div class="kpi-card"><div class="kpi-label">% puntero</div><div class="kpi-val">${topP?pct(topP.votos,totalVotos)+'%':'—'}</div><div class="kpi-delta">de votos del dpto.</div></div>`;
+      document.getElementById('pct-senado').textContent=topP?pct(topP.votos,totalVotos)+'%':'—';
+      if(donutChart) donutChart.destroy();
+      const top5=partidos.slice(0,5),otros=partidos.slice(5).reduce((s,p)=>s+p.votos,0);
+      const dLabels=top5.map(p=>p.nombre),dData=top5.map(p=>p.votos),dColors=top5.map(p=>getColor(p.nombre));
+      if(otros>0){dLabels.push('Otros');dData.push(otros);dColors.push('#444');}
+      donutChart=new Chart(document.getElementById('donut-senado').getContext('2d'),{
+        type:'doughnut',
+        data:{labels:dLabels,datasets:[{data:dData,backgroundColor:dColors,borderWidth:0,hoverOffset:6}]},
+        options:{responsive:true,maintainAspectRatio:true,cutout:'72%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}}}}
+      });
+      document.getElementById('leg-senado').innerHTML=top5.map(p=>`<div class="li"><span class="ld" style="background:${getColor(p.nombre)}"></span><span>${p.nombre.split(' ').slice(0,2).join(' ')}</span><span class="lv">${fmt(p.votos)}</span></div>`).join('');
     }
 
     function renderNacional(){
