@@ -302,6 +302,14 @@
     @media(max-width:900px){body{cursor:auto}.cursor,.cursor-ring{display:none}.top-bar,.breadcrumb,.meta-bar,.content-area,.full-footer,.back-bar{padding-left:1.2rem;padding-right:1.2rem}.bg-overlay{background:rgba(4,6,16,.93)}.kpi-row{grid-template-columns:1fr 1fr;gap:.75rem}.two-col{grid-template-columns:1fr}}
     @media(max-width:600px){.kpi-row{grid-template-columns:1fr}.selector-grid{grid-template-columns:1fr}}
     .hidden{display:none!important}
+
+    .orient-overlay{display:none;position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,.88);align-items:center;justify-content:center;padding:1.5rem}
+    .orient-overlay.show{display:flex}
+    .orient-box{background:#0e1220;border:1px solid rgba(255,255,255,.12);padding:2rem 1.8rem;max-width:320px;text-align:center}
+    .orient-icon{font-size:2.2rem;margin-bottom:1rem;display:block}
+    .orient-msg{font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.06em;line-height:1.9;color:rgba(255,255,255,.75);margin-bottom:1.5rem}
+    .orient-btn{font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;background:#4ade80;color:#060810;border:none;padding:.55rem 2rem;cursor:pointer;transition:background .2s}
+    .orient-btn:hover{background:#22c55e}
   </style>
 </head>
 <body>
@@ -310,6 +318,13 @@
   <div class="bg-layer"></div>
   <div class="bg-overlay"></div>
   <div class="copy-toast" id="copy-toast"><a href="register.html" style="color:inherit;font-weight:700;text-decoration:underline">Regístrate</a> para copiar este contenido</div>
+  <div class="orient-overlay" id="orient-overlay">
+    <div class="orient-box">
+      <span class="orient-icon">📱↔</span>
+      <p class="orient-msg">Para una visualización adecuada,<br/>te pedimos usar el móvil<br/>en formato horizontal.</p>
+      <button class="orient-btn" onclick="dismissOrient()">Ok</button>
+    </div>
+  </div>
 
   <div class="curtain" id="curtain">
     <div class="curtain-layer"></div><div class="curtain-layer"></div>
@@ -1163,6 +1178,9 @@
 
     // ─── COPY PROTECTION ──────────────────────────────────────
     function showCopyToast() {
+      const now = Date.now();
+      if (showCopyToast._last && now - showCopyToast._last < 60000) return;
+      showCopyToast._last = now;
       const t = document.getElementById('copy-toast');
       t.classList.add('show');
       clearTimeout(t._timer);
@@ -1179,6 +1197,9 @@
 
     // ─── BOOT ─────────────────────────────────────────────────
     loadIndex();
+    // MOBILE LANDSCAPE HINT
+    function dismissOrient(){ sessionStorage.setItem("orient-ok","1"); document.getElementById("orient-overlay").classList.remove("show"); }
+    if(/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) && !sessionStorage.getItem("orient-ok")){ document.getElementById("orient-overlay").classList.add("show"); }
   </script>
 </body>
 </html>
