@@ -165,6 +165,7 @@
   <div class="bg-layer"></div>
   <div class="bg-overlay"></div>
   <div class="copy-toast" id="copy-toast">Registrate para copiar este contenido</div>
+  <div class="copy-toast" id="premium-toast" style="border-color:rgba(74,222,128,.4);color:rgba(180,255,200,.9)">Las mesas requieren plan Premium · <a href="pricing.html" style="color:#4ade80">Ver planes →</a></div>
   <div class="curtain" id="curtain">
     <div class="curtain-layer"></div><div class="curtain-layer"></div>
     <div class="curtain-layer"></div><div class="curtain-layer"></div>
@@ -222,7 +223,9 @@
             <option value="nacional">Nacional · Partidos</option>
             <option value="dep">Por departamento</option>
             <option value="mun">Por municipio</option>
+            <option value="zona">Por zona</option>
             <option value="pue">Por puesto</option>
+            <option value="mesa">Por mesa</option>
           </select>
           <div id="dep-filter-container" style="display:none;align-items:center;gap:.75rem">
             <span class="sub-label" style="margin-left:1.5rem">Departamento:</span>
@@ -236,9 +239,21 @@
               <option value="">— Selecciona —</option>
             </select>
           </div>
+          <div id="zona-filter-container" style="display:none;align-items:center;gap:.75rem">
+            <span class="sub-label" style="margin-left:.5rem">Zona:</span>
+            <select class="dep-select" id="zona-select" onchange="onZonaChange(this.value)">
+              <option value="">— Selecciona —</option>
+            </select>
+          </div>
           <div id="pue-filter-container" style="display:none;align-items:center;gap:.75rem">
             <span class="sub-label" style="margin-left:.5rem">Puesto:</span>
             <select class="dep-select" id="pue-select" onchange="onPueChange(this.value)">
+              <option value="">— Selecciona —</option>
+            </select>
+          </div>
+          <div id="mesa-filter-container" style="display:none;align-items:center;gap:.75rem">
+            <span class="sub-label" style="margin-left:.5rem">Mesa:</span>
+            <select class="dep-select" id="mesa-select" onchange="onMesaChange(this.value)">
               <option value="">— Selecciona —</option>
             </select>
           </div>
@@ -355,11 +370,16 @@
       buscarCandidato('');
       const depC=document.getElementById('dep-filter-container');
       const munC=document.getElementById('mun-filter-container');
+      const zonaC=document.getElementById('zona-filter-container');
       const pueC=document.getElementById('pue-filter-container');
-      depC.style.display='none'; munC.style.display='none'; pueC.style.display='none';
+      const mesaC=document.getElementById('mesa-filter-container');
+      depC.style.display='none'; munC.style.display='none'; zonaC.style.display='none';
+      pueC.style.display='none'; mesaC.style.display='none';
       document.getElementById('dep-select').value='';
       document.getElementById('mun-select').innerHTML='<option value="">— Selecciona —</option>';
+      document.getElementById('zona-select').innerHTML='<option value="">— Selecciona —</option>';
       document.getElementById('pue-select').innerHTML='<option value="">— Selecciona —</option>';
+      document.getElementById('mesa-select').innerHTML='<option value="">— Selecciona —</option>';
       if(v==='nacional'){
         renderNacional(); renderKPI(); renderDonut();
       } else {
@@ -370,7 +390,9 @@
           deps.forEach(d=>{const o=document.createElement('option');o.value=d.cod;o.textContent=d.nombre;sel.appendChild(o);});
         }
         if(v==='mun') munC.style.display='flex';
+        if(v==='zona'){ munC.style.display='flex'; zonaC.style.display='flex'; }
         if(v==='pue'){ munC.style.display='flex'; pueC.style.display='flex'; }
+        if(v==='mesa'){ munC.style.display='flex'; pueC.style.display='flex'; mesaC.style.display='flex'; }
         renderNacional(); renderKPI(); renderDonut();
       }
     }
@@ -429,7 +451,7 @@
           const curules=p.curules||0;
           const trC=document.createElement('tr');
           trC.innerHTML=`<td colspan="5" style="padding:0"><div class="cands-inner" id="cands-inner-${i}">
-            <table class="cands-table"><thead><tr><th>#</th><th>Candidato/a</th><th class="r">Votos nac.</th><th class="r">% partido nac.</th></tr></thead>
+            <table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos nac.</th><th class="r">% partido nac.</th></tr></thead>
             <tbody>${(()=>{
               const norm=s=>s.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
               const nomPart=norm(p.partido); let cr=curules;
@@ -438,7 +460,8 @@
                 let elegido=false; if(!esLista&&cr>0){elegido=true;cr--;}
                 const colorC=elegido?'#39ff7a':esLista?'rgba(255,255,255,.2)':'inherit', fw=400;
                 const suffix=elegido?'<span style="font-size:.6rem;margin-left:.4rem">✦</span>':esLista?'<span style="font-size:.58rem;color:rgba(255,255,255,.2);margin-left:.4rem">(lista)</span>':'';
-                return `<tr><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif;font-weight:${fw};color:${colorC}">${c.nombre}${suffix}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/resumenData.partidos.find(x=>x.partido===p.partido)?.votos||p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;
+                const codStr=c.codigo!=null?String(c.codigo).padStart(3,'0'):'—';
+                return `<tr><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${codStr}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif;font-weight:${fw};color:${colorC}">${c.nombre}${suffix}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/resumenData.partidos.find(x=>x.partido===p.partido)?.votos||p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;
               }).join('');
             })()}</tbody>
             </table></div></td>`;
@@ -481,10 +504,18 @@
     async function onMunChange(cod){
       const v=document.getElementById('vista-select').value;
       const depCod=document.getElementById('dep-select').value;
+      document.getElementById('zona-select').innerHTML='<option value="">— Selecciona —</option>';
       document.getElementById('pue-select').innerHTML='<option value="">— Selecciona —</option>';
+      document.getElementById('mesa-select').innerHTML='<option value="">— Selecciona —</option>';
       if(!cod){if(depCod)await renderGeoPartidos('dep',depCod,null,null);else{renderNacional();renderKPI();renderDonut();}return;}
       await renderGeoPartidos('mun',depCod,cod,null);
-      if(v==='pue'){
+      if(v==='zona'){
+        const zonas=await getJSON('zonas');
+        const sel=document.getElementById('zona-select');
+        sel.innerHTML='<option value="">— Selecciona zona —</option>';
+        zonas.filter(z=>z.dep_cod===depCod&&z.mun_cod===cod).sort((a,b)=>a.cod.localeCompare(b.cod)).forEach(z=>{const o=document.createElement('option');o.value=z.cod;o.textContent=z.nombre||`Zona ${z.cod}`;sel.appendChild(o);});
+      }
+      if(v==='pue'||v==='mesa'){
         const pues=await getJSON('puestos');
         const sel=document.getElementById('pue-select');
         sel.innerHTML='<option value="">— Selecciona puesto —</option>';
@@ -492,11 +523,92 @@
       }
     }
 
-    async function onPueChange(cod){
+    async function onZonaChange(cod){
       const depCod=document.getElementById('dep-select').value;
       const munCod=document.getElementById('mun-select').value;
       if(!cod){if(munCod)await renderGeoPartidos('mun',depCod,munCod,null);else if(depCod)await renderGeoPartidos('dep',depCod,null,null);else{renderNacional();renderKPI();renderDonut();}return;}
+      const zonas=await getJSON('zonas');
+      const z=zonas.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&x.cod===cod);
+      if(!z)return;
+      const geoVotos=z.partidos||{};
+      const totalVotos=Object.values(geoVotos).reduce((s,v)=>s+v,0);
+      const geoPartidos=resumenData.partidos.filter(p=>geoVotos[p.partido]>0).map(p=>({...p,votos:geoVotos[p.partido]||0}));
+      Object.entries(geoVotos).forEach(([nombre,votos])=>{if(votos>0&&!geoPartidos.find(p=>p.partido===nombre))geoPartidos.push({partido:nombre,votos,candidatos:[],curules:0});});
+      geoPartidos.sort((a,b)=>b.votos-a.votos);
+      const label=z.nombre||`Zona ${cod}`;
+      document.getElementById('lbl-tabla').textContent=`Partidos · Senado · ${label}`;
+      document.getElementById('drill-badge').textContent=label;
+      document.getElementById('drill-badge').className='level-badge pues';
+      document.getElementById('drill-nav').innerHTML='';
+      document.getElementById('drill-thead').innerHTML=`<tr><th>#</th><th>Partido / Coalición</th><th class="r">Votos</th><th class="r" style="min-width:130px">%</th><th class="r">Candidatos</th></tr>`;
+      const tbody=document.getElementById('tbody-senado');
+      tbody.innerHTML='';
+      const maxV=geoPartidos[0]?.votos||1;
+      geoPartidos.forEach((p,i)=>{
+        const color=getColor(p.partido),pctV=pct(p.votos,totalVotos),bw=((p.votos/maxV)*100).toFixed(1);
+        const tr=document.createElement('tr');
+        tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td><td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span></div></td><td class="r" style="font-size:.9rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td><td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td><td class="r"><span class="cbadge sub">${p.candidatos?.length||'—'}</span></td>`;
+        tbody.appendChild(tr);
+      });
+      setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
+      const topP=geoPartidos.filter(p=>!/blanco/i.test(p.partido))[0];
+      document.getElementById('kpi-row').innerHTML=`<div class="kpi-card"><div class="kpi-label">Votos válidos</div><div class="kpi-val gr">${fmt(totalVotos)}</div><div class="kpi-delta">${label}</div></div><div class="kpi-card"><div class="kpi-label">Partidos</div><div class="kpi-val wh">${geoPartidos.length}</div><div class="kpi-delta">con votación</div></div><div class="kpi-card"><div class="kpi-label">Partido puntero</div><div class="kpi-val sm">${topP?topP.partido.split(' ').slice(0,3).join(' '):'—'}</div><div class="kpi-delta">${topP?fmt(topP.votos)+' votos':''}</div></div><div class="kpi-card"><div class="kpi-label">% puntero</div><div class="kpi-val">${topP?pct(topP.votos,totalVotos)+'%':'—'}</div><div class="kpi-delta">de votos</div></div>`;
+    }
+
+    async function onPueChange(cod){
+      const depCod=document.getElementById('dep-select').value;
+      const munCod=document.getElementById('mun-select').value;
+      const v=document.getElementById('vista-select').value;
+      document.getElementById('mesa-select').innerHTML='<option value="">— Selecciona —</option>';
+      if(!cod){if(munCod)await renderGeoPartidos('mun',depCod,munCod,null);else if(depCod)await renderGeoPartidos('dep',depCod,null,null);else{renderNacional();renderKPI();renderDonut();}return;}
       await renderGeoPartidos('pue',depCod,munCod,cod);
+      if(v==='mesa'){
+        const user=JSON.parse(localStorage.getItem('rr-user')||'null');
+        const isPremium=user&&user.plan==='premium';
+        const sel=document.getElementById('mesa-select');
+        if(!isPremium){
+          sel.innerHTML='<option disabled selected>🔒 Requiere plan Premium</option>';
+          return;
+        }
+        const mesas=await getJSON('mesas');
+        sel.innerHTML='<option value="">— Selecciona mesa —</option>';
+        mesas.filter(m=>m.dep_cod===depCod&&m.mun_cod===munCod&&m.pue_cod===cod).sort((a,b)=>+a.cod-(+b.cod)).forEach(m=>{const o=document.createElement('option');o.value=m.cod;o.textContent=m.nombre||`Mesa ${m.cod}`;sel.appendChild(o);});
+      }
+    }
+
+    async function onMesaChange(cod){
+      const user=JSON.parse(localStorage.getItem('rr-user')||'null');
+      if(!user||user.plan!=='premium'){showPremiumToast();return;}
+      const depCod=document.getElementById('dep-select').value;
+      const munCod=document.getElementById('mun-select').value;
+      const pueCod=document.getElementById('pue-select').value;
+      if(!cod){if(pueCod)await renderGeoPartidos('pue',depCod,munCod,pueCod);return;}
+      const mesas=await getJSON('mesas');
+      const m=mesas.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&x.pue_cod===pueCod&&x.cod===cod);
+      if(!m)return;
+      const geoVotos=m.partidos||{};
+      const totalVotos=Object.values(geoVotos).reduce((s,v)=>s+v,0);
+      const label=m.nombre||`Mesa ${cod}`;
+      const geoPartidos=resumenData.partidos.filter(p=>geoVotos[p.partido]>0).map(p=>({...p,votos:geoVotos[p.partido]||0}));
+      Object.entries(geoVotos).forEach(([nombre,votos])=>{if(votos>0&&!geoPartidos.find(p=>p.partido===nombre))geoPartidos.push({partido:nombre,votos,candidatos:[],curules:0});});
+      geoPartidos.sort((a,b)=>b.votos-a.votos);
+      document.getElementById('lbl-tabla').textContent=`Partidos · Senado · ${label}`;
+      document.getElementById('drill-badge').textContent=label;
+      document.getElementById('drill-badge').className='level-badge pues';
+      document.getElementById('drill-nav').innerHTML='';
+      document.getElementById('drill-thead').innerHTML=`<tr><th>#</th><th>Partido / Coalición</th><th class="r">Votos</th><th class="r" style="min-width:130px">%</th></tr>`;
+      const tbody=document.getElementById('tbody-senado');
+      tbody.innerHTML='';
+      const maxV=geoPartidos[0]?.votos||1;
+      geoPartidos.forEach((p,i)=>{
+        const color=getColor(p.partido),pctV=pct(p.votos,totalVotos),bw=((p.votos/maxV)*100).toFixed(1);
+        const tr=document.createElement('tr');
+        tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td><td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span></div></td><td class="r" style="font-size:.9rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td><td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>`;
+        tbody.appendChild(tr);
+      });
+      setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
+      const topP=geoPartidos.filter(p=>!/blanco/i.test(p.partido))[0];
+      document.getElementById('kpi-row').innerHTML=`<div class="kpi-card"><div class="kpi-label">Votos válidos</div><div class="kpi-val gr">${fmt(totalVotos)}</div><div class="kpi-delta">${label}</div></div><div class="kpi-card"><div class="kpi-label">Partidos</div><div class="kpi-val wh">${geoPartidos.length}</div><div class="kpi-delta">con votación</div></div><div class="kpi-card"><div class="kpi-label">Partido puntero</div><div class="kpi-val sm">${topP?topP.partido.split(' ').slice(0,3).join(' '):'—'}</div><div class="kpi-delta">${topP?fmt(topP.votos)+' votos':''}</div></div><div class="kpi-card"><div class="kpi-label">% puntero</div><div class="kpi-val">${topP?pct(topP.votos,totalVotos)+'%':'—'}</div><div class="kpi-delta">de votos</div></div>`;
     }
 
     function renderNacional(){
@@ -521,7 +633,7 @@
         tbody.appendChild(tr);
         const trC=document.createElement('tr');
         trC.innerHTML=`<td colspan="5" style="padding:0"><div class="cands-inner" id="cands-inner-${i}">
-          <table class="cands-table"><thead><tr><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% partido</th></tr></thead>
+          <table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% partido</th></tr></thead>
           <tbody>${(()=>{
             // Calcular elegidos saltando candidatos cuyo nombre coincida con el partido (voto por lista)
             const norm = s => s.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -534,7 +646,8 @@
               const colorCand = elegido ? '#39ff7a' : esLista ? 'rgba(255,255,255,.2)' : 'inherit';
               const fw = 400;
               const suffix = elegido ? '<span style="font-size:.6rem;margin-left:.4rem">✦</span>' : esLista ? '<span style="font-size:.58rem;color:rgba(255,255,255,.2);margin-left:.4rem">(lista)</span>' : '';
-              return `<tr><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif;font-weight:${fw};color:${colorCand}">${c.nombre}${suffix}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;
+              const codStr = c.codigo!=null ? String(c.codigo).padStart(3,'0') : '—';
+              return `<tr><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${codStr}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif;font-weight:${fw};color:${colorCand}">${c.nombre}${suffix}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;
             }).join('');
           })()}</tbody>
           </table></div></td>`;
@@ -626,6 +739,12 @@
       t.classList.add('show');
       clearTimeout(t._timer);
       t._timer = setTimeout(() => t.classList.remove('show'), 3000);
+    }
+    function showPremiumToast() {
+      const t = document.getElementById('premium-toast');
+      t.classList.add('show');
+      clearTimeout(t._timer);
+      t._timer = setTimeout(() => t.classList.remove('show'), 4000);
     }
     document.addEventListener('copy', e => {
       if (!localStorage.getItem('rr-token')) { e.preventDefault(); showCopyToast(); }
