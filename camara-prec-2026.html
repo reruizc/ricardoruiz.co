@@ -364,12 +364,15 @@
       .sub-selector { flex-direction:column; align-items:flex-start; }
       .search-input { width:100%; }
     }
+    .copy-toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(12px);background:rgba(10,10,20,.95);border:1px solid rgba(255,100,100,.4);color:rgba(255,180,180,.9);font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;padding:.6rem 1.2rem;z-index:99998;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s}
+    .copy-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   </style>
 </head>
 <body>
 
   <div class="cursor" id="cursor"></div>
   <div class="cursor-ring" id="cursorRing"></div>
+  <div class="copy-toast" id="copy-toast">Registrate para copiar este contenido</div>
 
   <div class="bg-layer"></div>
   <div class="bg-overlay"></div>
@@ -1162,6 +1165,22 @@
       window.location.reload();
     }
     updateElectoralNav();
+
+    // ─── COPY PROTECTION ──────────────────────────────────────
+    function showCopyToast() {
+      const t = document.getElementById('copy-toast');
+      t.classList.add('show');
+      clearTimeout(t._timer);
+      t._timer = setTimeout(() => t.classList.remove('show'), 3000);
+    }
+    document.addEventListener('copy', e => {
+      if (!localStorage.getItem('rr-token')) { e.preventDefault(); showCopyToast(); }
+    });
+    document.addEventListener('selectstart', e => {
+      if (!localStorage.getItem('rr-token') && !e.target.closest('select,input')) {
+        e.preventDefault(); showCopyToast();
+      }
+    });
   </script>
 </body>
 </html>

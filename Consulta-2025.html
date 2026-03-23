@@ -188,8 +188,9 @@
 
     <!-- NAV BAR (desktop) -->
     <nav class="electoral-nav">
-      <div id="e-nav-auth" class="electoral-nav-auth">
-        <!-- populated by JS -->
+      <div style="display:flex;align-items:center;gap:1rem">
+        <a href="electoral.html" class="e-btn-back" onclick="navTo(event,'electoral.html')">← Volver</a>
+        <div id="e-nav-auth" class="electoral-nav-auth"></div>
       </div>
       <a href="electoral.html" class="logo-link" onclick="navTo(event,'electoral.html')">
         <div class="logo-bars">
@@ -202,7 +203,6 @@
 
     <div class="top-bar">
       <div class="page-title">Consulta<br/><span>Presidencial</span></div>
-      <a href="electoral.html" class="e-btn-back" onclick="navTo(event,'electoral.html')">← Volver</a>
     </div>
     <div class="breadcrumb">
       <a href="electoral.html" onclick="navTo(event,'electoral.html')">Resultados Electorales</a>
@@ -227,6 +227,12 @@
         <span class="filter-label">Municipio</span>
         <select class="filter-select" id="sel-mun" onchange="onMunChange()" disabled>
           <option value="">— Todos —</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Zona</span>
+        <select class="filter-select" id="sel-zona" onchange="onZonaChange()" disabled>
+          <option value="">— Todas —</option>
         </select>
       </div>
       <div class="filter-group">
@@ -283,7 +289,7 @@
     // ─── STATE ────────────────────────────────────────────────
     let donutChart = null;
     let resumenNac = null;
-    let filterState = { dep:'', mun:'', puesto:'', mesa:'' };
+    let filterState = { dep:'', mun:'', zona:'', puesto:'', mesa:'' };
 
     // ─── INIT ─────────────────────────────────────────────────
     async function init() {
@@ -498,8 +504,8 @@
     }
 
     function renderTable(rows, tipo) {
-      const titulos = { dep:'Departamento', mun:'Municipio', puesto:'Puesto de votación', mesa:'Mesa' };
-      const badges  = { dep:'dep', mun:'mun', puesto:'pues', mesa:'mesa' };
+      const titulos = { dep:'Departamento', mun:'Municipio', zona:'Zona', puesto:'Puesto de votación', mesa:'Mesa' };
+      const badges  = { dep:'dep', mun:'mun', zona:'dep', puesto:'pues', mesa:'mesa' };
       const labels  = { dep:'Nacional', mun: filterState.dep ? (cache.departamentos||[]).find(d=>d.cod===filterState.dep)?.nombre||'' : '', puesto: filterState.mun ? '' : '', mesa: '' };
 
       const title   = document.getElementById('drill-title');
@@ -545,12 +551,13 @@
     function toggleClearBtn() {
       const btn = document.getElementById('btn-clear');
       const scope = document.getElementById('filter-scope');
-      const hasFilter = filterState.dep || filterState.mun || filterState.puesto || filterState.mesa;
+      const hasFilter = filterState.dep || filterState.mun || filterState.zona || filterState.puesto || filterState.mesa;
       if(btn) btn.style.display = hasFilter ? 'inline-block' : 'none';
       if(scope) {
         const parts = [];
         if(filterState.dep) { const d=(cache.departamentos||[]).find(x=>x.cod===filterState.dep); if(d) parts.push(d.nombre); }
         if(filterState.mun) { const m=(cache.municipios||[]).find(x=>x.cod_dep===filterState.dep&&x.cod_mun===filterState.mun); if(m) parts.push(m.nombre); }
+        if(filterState.zona) parts.push('Zona '+filterState.zona);
         if(filterState.puesto) { const p=(cache.puestos||[]).find(x=>x.cod_dep===filterState.dep&&x.cod_mun===filterState.mun&&x.cod_puesto===filterState.puesto); if(p) parts.push(p.nombre); }
         if(filterState.mesa) parts.push('Mesa '+filterState.mesa);
         scope.textContent = parts.join(' › ');
@@ -560,8 +567,9 @@
 
     async function onDepChange() {
       const dep = document.getElementById('sel-dep').value;
-      filterState = { dep, mun:'', puesto:'', mesa:'' };
+      filterState = { dep, mun:'', zona:'', puesto:'', mesa:'' };
       resetSelect('sel-mun', '— Todos —', !dep);
+      resetSelect('sel-zona', '— Todas —', true);
       resetSelect('sel-puesto', '— Todos —', true);
       resetSelect('sel-mesa', '— Todas —', true);
       toggleClearBtn();
@@ -585,7 +593,8 @@
     async function onMunChange() {
       const dep = filterState.dep;
       const mun = document.getElementById('sel-mun').value;
-      filterState = { dep, mun, puesto:'', mesa:'' };
+      filterState = { dep, mun, zona:'', puesto:'', mesa:'' };
+      resetSelect('sel-zona', '— Todas —', !mun);
       resetSelect('sel-puesto', '— Todos —', !mun);
       resetSelect('sel-mesa', '— Todas —', true);
       toggleClearBtn();
@@ -597,21 +606,48 @@
         renderTable(muns.filter(m=>m.cod_dep===dep), 'mun');
         return;
       }
-      const [muns, puestos] = await Promise.all([getJSON('municipios'), getJSON('puestos')]);
+      const [muns, zonas, puestos] = await Promise.all([getJSON('municipios'), getJSON('zonas'), getJSON('puestos')]);
       const munRow = muns.find(m => m.cod_dep===dep && m.cod_mun===mun);
       if (munRow) renderAll(buildFromRow(munRow, munRow.nombre));
+
+      const filtZonas = zonas.filter(z => z.cod_dep===dep && z.cod_mun===mun).sort((a,b)=>a.cod_zona.localeCompare(b.cod_zona));
+      const selZona = document.getElementById('sel-zona');
+      selZona.disabled = false;
+      filtZonas.forEach(z => { const o=document.createElement('option'); o.value=z.cod_zona; o.textContent='Zona '+z.cod_zona; selZona.appendChild(o); });
 
       const filtPuestos = puestos.filter(p => p.cod_dep===dep && p.cod_mun===mun).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
       const selPuesto = document.getElementById('sel-puesto');
       selPuesto.disabled = false;
       filtPuestos.forEach(p => { const o=document.createElement('option'); o.value=p.cod_puesto; o.textContent=p.nombre; selPuesto.appendChild(o); });
-      renderTable(filtPuestos, 'puesto');
+
+      renderTable(filtZonas.map(z=>({...z, nombre:'Zona '+z.cod_zona})), 'zona');
+    }
+
+    async function onZonaChange() {
+      const dep = filterState.dep, mun = filterState.mun;
+      const zona = document.getElementById('sel-zona').value;
+      filterState = { dep, mun, zona, puesto:'', mesa:'' };
+      const selPuesto = document.getElementById('sel-puesto');
+      if(selPuesto) selPuesto.value = '';
+      resetSelect('sel-mesa', '— Todas —', true);
+      toggleClearBtn();
+
+      const [muns, zonas] = await Promise.all([getJSON('municipios'), getJSON('zonas')]);
+      const filtZonas = zonas.filter(z => z.cod_dep===dep && z.cod_mun===mun);
+      if (!zona) {
+        const munRow = muns.find(m => m.cod_dep===dep && m.cod_mun===mun);
+        if (munRow) renderAll(buildFromRow(munRow, munRow.nombre));
+      } else {
+        const zonaRow = filtZonas.find(z => z.cod_zona===zona);
+        if (zonaRow) renderAll(buildFromRow(zonaRow, `Zona ${zona}`));
+      }
+      renderTable(filtZonas.map(z=>({...z, nombre:'Zona '+z.cod_zona})), 'zona');
     }
 
     async function onPuestoChange() {
-      const dep = filterState.dep, mun = filterState.mun;
+      const dep = filterState.dep, mun = filterState.mun, zona = filterState.zona;
       const puesto = document.getElementById('sel-puesto').value;
-      filterState = { dep, mun, puesto, mesa:'' };
+      filterState = { dep, mun, zona, puesto, mesa:'' };
       resetSelect('sel-mesa', '— Todas —', !puesto);
       toggleClearBtn();
 
@@ -674,9 +710,10 @@
     }
 
     async function clearFilters() {
-      filterState = { dep:'', mun:'', puesto:'', mesa:'' };
+      filterState = { dep:'', mun:'', zona:'', puesto:'', mesa:'' };
       document.getElementById('sel-dep').value = '';
       resetSelect('sel-mun', '— Todos —', true);
+      resetSelect('sel-zona', '— Todas —', true);
       resetSelect('sel-puesto', '— Todos —', true);
       resetSelect('sel-mesa', '— Todas —', true);
       toggleClearBtn();
