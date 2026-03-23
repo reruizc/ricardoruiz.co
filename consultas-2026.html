@@ -387,7 +387,7 @@
 
       <!-- Selector circunscripción + búsqueda -->
       <div class="sub-selector" style="margin-bottom:1.5rem; border-bottom:1px solid var(--border); padding-bottom:1rem;">
-        <span class="sub-label">Circunscripción:</span>
+        <span class="sub-label">Departamento:</span>
         <select class="dep-select" id="cons-dep-select" onchange="switchConsDep(this.value)"></select>
         <span class="sub-label" style="margin-left:1.5rem">Buscar candidato:</span>
         <input id="cons-search" type="search" class="search-input" placeholder="Nombre o apellido…"
@@ -465,6 +465,8 @@
     let TOT_GENERAL = { votval:0, votnul:0, votnma:0, votblan:0, votant:0 };
     let curConsulta = 'gran';
     let curConsDep  = 'Nacional (todos)';
+    let curDepCands = null;   // candidatos filtrados por dep (null = nacional)
+    let curDepTot   = null;   // tot filtrado por dep
 
     // Mapa DANE departamentos
     const DANE_DEP_CONS = {
@@ -563,13 +565,21 @@
         .sort((a,b) => b.votos - a.votos);
 
       const tot = (bloque.totales && bloque.totales.act) || {};
-      renderConsultaConDatos(depCands, {
+      const depTot = {
         votant:  parseInt(tot.votant||0),
         votval:  parseInt(a.vot||0),
         votnul:  parseInt(tot.votnul||0),
         votnma:  parseInt(tot.votnma||0),
         votblan: parseInt(tot.votblan||0),
-      });
+      };
+      // Total de votos válidos de las 3 consultas en este dep
+      const CODPAR_CONSULTA2 = {'30':'frente','31':'gran','32':'soluciones'};
+      const totalDepAll3 = (bloque.partotabla||[])
+        .filter(p => CODPAR_CONSULTA2[String(p.act.codpar)])
+        .reduce((s,p) => s + parseInt(p.act.vot||0), 0);
+      curDepCands = depCands;
+      curDepTot   = depTot;
+      renderConsultaConDatos(depCands, depTot, totalDepAll3);
     }
 
     async function cargarDatos(){
@@ -649,16 +659,17 @@
       setTimeout(()=>tbody.querySelectorAll('.bar-fill').forEach(b=>{ if(b.dataset.w) b.style.width=b.dataset.w; }),80);
     }
 
-    function renderConsultaConDatos(candidatos, tot){
+    function renderConsultaConDatos(candidatos, tot, totalConsultas){
       const votant = tot.votant||0;
       const votval = tot.votval||0;
       const puntero = candidatos[0]||null;
-      const pctPuntero = (puntero&&votval>0) ? ((puntero.votos/votval)*100).toFixed(1)+'%' : '—';
+      const pctTotal = (votval>0 && totalConsultas>0) ? ((votval/totalConsultas)*100).toFixed(1)+'%' : '—';
+      const fmtN = n => Number(n).toLocaleString('es-CO');
       renderKPI('kpi-consultas',[
-        {l:'Votos válidos',    v:(votval).toLocaleString('es-CO'),  c:'green', d:`${votant?((votval/votant)*100).toFixed(2)+'% de votantes':'—'}`},
+        {l:'Votos válidos',    v:fmtN(votval),  c:'green', d:`${votant?((votval/votant)*100).toFixed(2)+'% de votantes':'—'}`},
         {l:'Candidatos',       v:String(candidatos.length),         c:'dark',  d:`${CONSULTAS_DATA[curConsulta].nombre}`},
         {l:'Candidato puntero',v:puntero?(puntero.nombre.split(' ')[0]+' '+puntero.nombre.split(' ').slice(-1)[0]):'—', c:'sm', d:puntero?puntero.partido:''},
-        {l:'% puntero',        v:pctPuntero,                        c:'',      d:puntero?puntero.votos.toLocaleString('es-CO')+' votos':''},
+        {l:'% de la consulta', v:pctTotal, c:'', d:totalConsultas>0?`de ${fmtN(totalConsultas)} votos totales`:''},
       ]);
       renderTablaCandidatos(candidatos, votval);
       renderDonut('donut-consultas','pct-consultas','leg-consultas',{...tot,potencial:POTENCIAL});
@@ -677,7 +688,9 @@
       }
 
       const cons = CONSULTAS_DATA[curConsulta];
-      renderConsultaConDatos(cons.candidatos, cons.tot);
+      curDepCands = null; curDepTot = null;
+      const totalAll3 = Object.values(CONSULTAS_DATA).reduce((s,c)=>s+c.tot.votval, 0);
+      renderConsultaConDatos(cons.candidatos, cons.tot, totalAll3);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -685,6 +698,7 @@
     // ═══════════════════════════════════════════════════════════
     function switchConsulta(key){
       curConsulta = key;
+      curDepCands = null; curDepTot = null;
       ['gran','frente','soluciones'].forEach(k=>{
         const btn = document.getElementById('tab-'+k);
         if(btn) btn.classList.toggle('active', k===key);
@@ -725,8 +739,8 @@
       const norm = s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
       const qn = norm(q);
       const cons = CONSULTAS_DATA[curConsulta];
-      const candidatos = cons.candidatos;
-      const votval = cons.tot.votval||0;
+      const candidatos = curDepCands || cons.candidatos;
+      const votval = curDepCands ? (curDepTot?.votval||0) : (cons.tot.votval||0);
       const base = votval || candidatos.reduce((s,c)=>s+c.votos,0);
 
       const resultados = candidatos.filter(c=>norm(c.nombre).includes(qn));
