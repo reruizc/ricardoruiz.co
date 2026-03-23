@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Noticias · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --black: #0a0a0a;
+      --white: #f4f3ef;
+      --blue: #0047FF;
+      --green: #4ade80;
+      --gray: #888;
+      --gray-light: #e0dfd9;
+      --border: rgba(0,0,0,0.08);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { background: var(--white); color: var(--black); font-family: 'Fraunces', serif; overflow-x: hidden; cursor: none; min-height: 100vh; }
+
+    .cursor { position:fixed; width:12px; height:12px; background:var(--blue); border-radius:50%; pointer-events:none; z-index:9999; transform:translate(-50%,-50%); transition:transform .15s,background .2s; }
+    .cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--blue); border-radius:50%; pointer-events:none; z-index:9998; transform:translate(-50%,-50%); opacity:.35; transition:left .08s,top .08s; }
+
+    /* NAV */
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.2rem 3rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--white);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav-logo-link { display:flex; align-items:center; gap:.5rem; text-decoration:none; }
+    .nav-bars { display:flex; align-items:flex-end; gap:3px; height:18px; }
+    .nav-bar { width:4px; background:var(--blue); border-radius:1px 1px 0 0; }
+    .nav-logo { font-family:'Syne',sans-serif; font-weight:800; font-size:1.2rem; letter-spacing:-.03em; color:var(--black); }
+    .nav-logo span { color:var(--blue); }
+    .nav-right { display:flex; align-items:center; gap:1rem; }
+    .nav-back {
+      font-family:'DM Mono',monospace; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase;
+      color:var(--black); text-decoration:none; border:1.5px solid var(--gray-light);
+      padding:.35rem .85rem; transition:border-color .2s,color .2s;
+    }
+    .nav-back:hover { border-color:var(--black); }
+    .nav-noticias-tag {
+      font-family:'DM Mono',monospace; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase;
+      color:var(--black); background:var(--green); border:1.5px solid var(--green);
+      padding:.35rem .85rem;
+    }
+
+    /* HEADER */
+    .page-header {
+      max-width: 760px;
+      margin: 4rem auto 0;
+      padding: 0 2rem;
+    }
+    .page-tag {
+      font-family:'DM Mono',monospace; font-size:.68rem; letter-spacing:.18em; text-transform:uppercase;
+      color:var(--blue); margin-bottom:.8rem;
+    }
+    .page-title {
+      font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(2rem,5vw,3.2rem);
+      letter-spacing:-.04em; line-height:1.05; color:var(--black); margin-bottom:.8rem;
+    }
+    .page-sub {
+      font-family:'DM Mono',monospace; font-size:.75rem; letter-spacing:.06em;
+      color:var(--gray); line-height:1.7;
+    }
+    .page-divider {
+      max-width:760px; margin:2.5rem auto 0; padding:0 2rem;
+      border-top:1px solid var(--border);
+    }
+
+    /* ARTICLES */
+    .articles {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 0 2rem 6rem;
+    }
+    .article {
+      padding: 2.5rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .article:last-child { border-bottom: none; }
+    .article-meta {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .article-date {
+      font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.14em; text-transform:uppercase;
+      color:var(--gray);
+    }
+    .article-tag {
+      font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.1em; text-transform:uppercase;
+      color:var(--black); background:var(--green); padding:.15rem .55rem;
+    }
+    .article-title {
+      font-family:'Syne',sans-serif; font-weight:700; font-size:clamp(1.2rem,2.5vw,1.6rem);
+      letter-spacing:-.02em; color:var(--black); margin-bottom:1.1rem; line-height:1.15;
+    }
+    .article-body {
+      font-family:'Fraunces',serif; font-size:1rem; line-height:1.8; color:#222;
+    }
+    .article-body p + p { margin-top:1rem; }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2rem 3rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .footer-brand { font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; color:var(--gray); }
+
+    @media(max-width:700px) {
+      nav { padding:1rem 1.2rem; }
+      .page-header, .page-divider, .articles { padding-left:1.2rem; padding-right:1.2rem; }
+      .page-header { margin-top:2.5rem; }
+      body { cursor:auto; }
+      .cursor,.cursor-ring { display:none; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <nav>
+    <a href="index.html" class="nav-logo-link">
+      <div class="nav-bars">
+        <div class="nav-bar" style="height:18px"></div>
+        <div class="nav-bar" style="height:13px"></div>
+        <div class="nav-bar" style="height:8px"></div>
+        <div class="nav-bar" style="height:4px"></div>
+      </div>
+      <span class="nav-logo">Ricardo<span>.</span>Ruiz</span>
+    </a>
+    <div class="nav-right">
+      <span class="nav-noticias-tag">Noticias</span>
+      <a href="index.html" class="nav-back">← Inicio</a>
+    </div>
+  </nav>
+
+  <div class="page-header">
+    <div class="page-tag">ricardoruiz.co · Actualizaciones</div>
+    <h1 class="page-title">Noticias</h1>
+    <p class="page-sub">Actualizaciones, novedades y hoja de ruta de la plataforma.<br/>Las entradas más recientes aparecen primero.</p>
+  </div>
+  <div class="page-divider"></div>
+
+  <div class="articles">
+
+    <!-- NOTICIA 3 — más reciente -->
+    <article class="article">
+      <div class="article-meta">
+        <span class="article-date">22 Mar 2026 · Mañana</span>
+        <span class="article-tag">Herramientas</span>
+      </div>
+      <h2 class="article-title">Endoso activo y exploración de mapas electorales en camino</h2>
+      <div class="article-body">
+        <p>La herramienta de medición de endoso ya está disponible para todos los usuarios. Permite cruzar votaciones entre candidatos y partidos del Congreso 2026, identificando transferencias de votos, lealtades electorales y patrones de respaldo entre listas, algo fundamental para entender la geografía política del ciclo legislativo.</p>
+        <p>Paralelamente, estamos en la fase exploratoria de construir mapas electorales a nivel de puesto de votación. Esta capacidad permitiría visualizar el territorio colombiano con una granularidad sin precedentes — municipio, zona y puesto — convirtiendo cada resultado en una capa cartográfica navegable. Mantente atento a las próximas actualizaciones.</p>
+      </div>
+    </article>
+
+    <!-- NOTICIA 2 -->
+    <article class="article">
+      <div class="article-meta">
+        <span class="article-date">22 Mar 2026 · Mañana</span>
+        <span class="article-tag">Electoral</span>
+      </div>
+      <h2 class="article-title">Preconteo y escrutinio 2026 disponibles para análisis total</h2>
+      <div class="article-body">
+        <p>Ya están cargados los resultados completos de preconteo y escrutinio de las elecciones legislativas de 2026. Senado de la República, Cámara de Representantes, Consultas Interpartidistas (Gran Consulta, Frente por la Vida y Consulta de Soluciones) y la Circunscripción Especial Internacional de la Paz (CITREP) están disponibles con visualizaciones interactivas, filtros por departamento, municipio, zona, puesto y mesa de votación. Un panorama completo del mapa político que define el Congreso de los próximos cuatro años.</p>
+      </div>
+    </article>
+
+    <!-- NOTICIA 1 — más antigua -->
+    <article class="article">
+      <div class="article-meta">
+        <span class="article-date">21 Mar 2026 · Mañana</span>
+        <span class="article-tag">Lanzamiento</span>
+      </div>
+      <h2 class="article-title">¡Lanzamos ricardoruiz.co!</h2>
+      <div class="article-body">
+        <p>Estamos emocionados de presentar ricardoruiz.co, una plataforma de análisis político y electoral pensada para transformar la manera en que Colombia accede y comprende sus datos públicos. Empezamos donde más nos apasiona y donde el país más lo necesita en este momento: las elecciones. Con las legislativas de 2026 en pleno desarrollo, ofrecemos visualizaciones interactivas de preconteo y escrutinio para el Senado, la Cámara de Representantes, las Consultas Interpartidistas y el CITREP, junto con herramientas como la medición de endoso entre candidatos y el análisis detallado de la consulta presidencial del Pacto Histórico de octubre de 2025. Un proyecto que nació de la convicción de que los datos bien presentados cambian decisiones.</p>
+        <p>Para quienes se registren, habrá acceso a información más detallada: filtros avanzados por zona y puesto de votación, análisis por mesa y visualizaciones adicionales que profundizan el entendimiento del panorama electoral. Y para quienes se suscriban a nuestros planes, aún más: descargas de datos, cruces de información, análisis históricos comparativos y próximamente herramientas de cartografía electoral. Esto es apenas el comienzo de un proyecto que aspira a convertirse en el referente de análisis de datos públicos en Colombia.</p>
+      </div>
+    </article>
+
+  </div>
+
+  <footer>
+    <span class="footer-brand">ricardoruiz.co · Noticias y actualizaciones</span>
+    <a href="index.html" class="nav-back" style="font-size:.62rem">← Inicio</a>
+  </footer>
+
+  <script>
+    const cur = document.getElementById('cursor'), ri = document.getElementById('cursorRing');
+    let mx=0, my=0, rx=0, ry=0;
+    document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; cur.style.left=mx+'px'; cur.style.top=my+'px'; });
+    (function loop(){ rx+=(mx-rx)*.1; ry+=(my-ry)*.1; ri.style.left=rx+'px'; ri.style.top=ry+'px'; requestAnimationFrame(loop); })();
+    document.addEventListener('mouseover', e => {
+      if(e.target.closest('a,button')) { cur.style.transform='translate(-50%,-50%) scale(2)'; cur.style.background='transparent'; cur.style.border='1.5px solid var(--blue)'; ri.style.opacity='0'; }
+      else { cur.style.transform='translate(-50%,-50%) scale(1)'; cur.style.background='var(--blue)'; cur.style.border='none'; ri.style.opacity='.35'; }
+    });
+  </script>
+</body>
+</html>
