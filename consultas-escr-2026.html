@@ -337,6 +337,25 @@
     function getColor(n){if(CP[n])return CP[n];if(/pacto hist/i.test(n))return'#6B2D8B';if(/centro dem/i.test(n))return'#0088BB';if(/liberal/i.test(n))return'#C8102E';if(/conservador/i.test(n))return'#003580';if(/cambio radical/i.test(n))return'#E91E8C';if(/partido de la u/i.test(n))return'#F7941D';if(/alianza (verde|por col)/i.test(n))return'#4CAF50';if(/\bMIRA\b/i.test(n))return'#1A3FC4';if(/comunes/i.test(n))return'#007755';if(/nuevo liberalismo/i.test(n))return'#E53935';return'#555';}
 
     const cache = {};
+    function buildPartidos(cands){
+      const m={};
+      cands.forEach(c=>{
+        if(!m[c.partido])m[c.partido]={partido:c.partido,votos:0,candidatos:[]};
+        m[c.partido].votos+=c.votos;
+        m[c.partido].candidatos.push({nombre:c.nombre,codigo:c.codigo,votos:c.votos});
+      });
+      return Object.values(m).sort((a,b)=>b.votos-a.votos);
+    }
+    function geoAggr(row){
+      const mp={};
+      Object.entries(row.candidatos||{}).forEach(([nombre,votos])=>{
+        if(!votos)return;
+        const p=resumenData._c2p[nombre];
+        if(!p)return;
+        mp[p]=(mp[p]||0)+votos;
+      });
+      return mp;
+    }
     async function getJSON(nivel){
       if(cache[nivel]) return cache[nivel];
       const r = await fetch(`${S3}/consultas/${nivel}.json`);
@@ -350,6 +369,8 @@
     async function init(){
       try{
         resumenData = await getJSON('resumen');
+        resumenData.partidos = buildPartidos(resumenData.candidatos);
+        resumenData._c2p = Object.fromEntries(resumenData.candidatos.map(c=>[c.nombre,c.partido]));
         document.getElementById('meta-votval').textContent = fmt(resumenData.votval);
         document.getElementById('load-state').classList.add('hidden');
         document.getElementById('main-content').classList.remove('hidden');
@@ -430,17 +451,12 @@
         const d=pues.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&x.cod===pueCod); if(!d) return;
         geoData=d; labelText=`Consultas · ${d.nombre}`; badgeText=d.nombre;
       }
-      const geoVotos=geoData.partidos||{};
+      const geoVotos=geoAggr(geoData);
       const totalVotos=Object.values(geoVotos).reduce((s,v)=>s+v,0);
       const geoPartidos=resumenData.partidos
         .filter(p=>geoVotos[p.partido]>0)
         .map(p=>({...p, votos:geoVotos[p.partido]||0}))
         .sort((a,b)=>b.votos-a.votos);
-      Object.entries(geoVotos).forEach(([nombre,votos])=>{
-        if(votos>0&&!geoPartidos.find(p=>p.partido===nombre))
-          geoPartidos.push({partido:nombre,votos,candidatos:[]});
-      });
-      geoPartidos.sort((a,b)=>b.votos-a.votos);
 
       document.getElementById('lbl-tabla').textContent=labelText;
       document.getElementById('drill-badge').textContent=badgeText;
@@ -525,11 +541,9 @@
       const zonas=await getJSON('zonas');
       const z=zonas.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&x.cod===cod);
       if(!z)return;
-      const geoVotos=z.partidos||{};
+      const geoVotos=geoAggr(z);
       const totalVotos=Object.values(geoVotos).reduce((s,v)=>s+v,0);
-      const geoPartidos=resumenData.partidos.filter(p=>geoVotos[p.partido]>0).map(p=>({...p,votos:geoVotos[p.partido]||0}));
-      Object.entries(geoVotos).forEach(([nombre,votos])=>{if(votos>0&&!geoPartidos.find(p=>p.partido===nombre))geoPartidos.push({partido:nombre,votos,candidatos:[]});});
-      geoPartidos.sort((a,b)=>b.votos-a.votos);
+      const geoPartidos=resumenData.partidos.filter(p=>geoVotos[p.partido]>0).map(p=>({...p,votos:geoVotos[p.partido]||0})).sort((a,b)=>b.votos-a.votos);
       const label=z.nombre||`Zona ${cod}`;
       document.getElementById('lbl-tabla').textContent=`Consultas · ${label}`;
       document.getElementById('drill-badge').textContent=label;
@@ -564,7 +578,7 @@
         if(!isPremium){sel.innerHTML='<option disabled selected>🔒 Requiere plan Premium</option>';return;}
         const mesas=await getJSON('mesas');
         sel.innerHTML='<option value="">— Selecciona mesa —</option>';
-        mesas.filter(m=>m.dep_cod===depCod&&m.mun_cod===munCod&&m.pue_cod===cod).sort((a,b)=>+a.cod-(+b.cod)).forEach(m=>{const o=document.createElement('option');o.value=m.cod;o.textContent=m.nombre||`Mesa ${m.cod}`;sel.appendChild(o);});
+        mesas.filter(m=>m.dep_cod===depCod&&m.mun_cod===munCod&&m.pue_cod===cod).sort((a,b)=>+a.mesa-(+b.mesa)).forEach(m=>{const o=document.createElement('option');o.value=m.mesa;o.textContent=`Mesa ${m.mesa}`;sel.appendChild(o);});
       }
     }
 
@@ -576,14 +590,12 @@
       const pueCod=document.getElementById('pue-select').value;
       if(!cod){if(pueCod)await renderGeoPartidos('pue',depCod,munCod,pueCod);return;}
       const mesas=await getJSON('mesas');
-      const m=mesas.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&x.pue_cod===pueCod&&x.cod===cod);
+      const m=mesas.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&x.pue_cod===pueCod&&x.mesa===cod);
       if(!m)return;
-      const geoVotos=m.partidos||{};
+      const geoVotos=geoAggr(m);
       const totalVotos=Object.values(geoVotos).reduce((s,v)=>s+v,0);
-      const label=m.nombre||`Mesa ${cod}`;
-      const geoPartidos=resumenData.partidos.filter(p=>geoVotos[p.partido]>0).map(p=>({...p,votos:geoVotos[p.partido]||0}));
-      Object.entries(geoVotos).forEach(([nombre,votos])=>{if(votos>0&&!geoPartidos.find(p=>p.partido===nombre))geoPartidos.push({partido:nombre,votos,candidatos:[]});});
-      geoPartidos.sort((a,b)=>b.votos-a.votos);
+      const label=`Mesa ${cod}`;
+      const geoPartidos=resumenData.partidos.filter(p=>geoVotos[p.partido]>0).map(p=>({...p,votos:geoVotos[p.partido]||0})).sort((a,b)=>b.votos-a.votos);
       document.getElementById('lbl-tabla').textContent=`Consultas · ${label}`;
       document.getElementById('drill-badge').textContent=label;
       document.getElementById('drill-badge').className='level-badge pues';
