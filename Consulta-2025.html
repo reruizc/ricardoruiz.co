@@ -777,7 +777,7 @@
       const puestoRow = puestos.find(p => p.cod_dep===dep && p.cod_mun===mun && p.cod_puesto===puesto);
       if (puestoRow) renderAll(buildFromRow(puestoRow, puestoRow.nombre));
 
-      const filtMesas = mesas.filter(m => m.cod_dep===dep && m.cod_mun===mun && m.cod_puesto===puesto).sort((a,b)=>Number(a.mesa)-Number(b.mesa));
+      const filtMesas = mesas.filter(m => m.cod_dep===dep && m.cod_mun===mun && m.cod_zona===zona && m.cod_puesto===puesto).sort((a,b)=>Number(a.mesa)-Number(b.mesa));
       const selMesa = document.getElementById('sel-mesa');
       selMesa.disabled = false;
       filtMesas.forEach(m => { const o=document.createElement('option'); o.value=m.mesa; o.textContent='Mesa '+m.mesa; selMesa.appendChild(o); });
@@ -785,7 +785,7 @@
     }
 
     async function onMesaChange() {
-      const { dep, mun, puesto } = filterState;
+      const { dep, mun, zona, puesto } = filterState;
       const mesa = document.getElementById('sel-mesa').value;
       filterState = { dep, mun, puesto, mesa };
       toggleClearBtn();
@@ -794,11 +794,11 @@
         const [puestos, mesas] = await Promise.all([getJSON('puestos'), getJSON('mesas')]);
         const puestoRow = puestos.find(p => p.cod_dep===dep && p.cod_mun===mun && p.cod_puesto===puesto);
         if (puestoRow) renderAll(buildFromRow(puestoRow, puestoRow.nombre));
-        renderTable(mesas.filter(m=>m.cod_dep===dep&&m.cod_mun===mun&&m.cod_puesto===puesto).map(m=>({...m,nombre:'Mesa '+m.mesa})), 'mesa');
+        renderTable(mesas.filter(m=>m.cod_dep===dep&&m.cod_mun===mun&&m.cod_zona===zona&&m.cod_puesto===puesto).map(m=>({...m,nombre:'Mesa '+m.mesa})), 'mesa');
         return;
       }
       const mesas = await getJSON('mesas');
-      const mesaRow = mesas.find(m => m.cod_dep===dep && m.cod_mun===mun && m.cod_puesto===puesto && m.mesa===mesa);
+      const mesaRow = mesas.find(m => m.cod_dep===dep && m.cod_mun===mun && m.cod_zona===zona && m.cod_puesto===puesto && m.mesa===mesa);
       if (mesaRow) {
         renderAll(buildFromRow(mesaRow, `Mesa ${mesa} · ${mesaRow.puesto}`));
         // At mesa level: show only that row in table (no sub-level)
