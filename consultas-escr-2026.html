@@ -215,6 +215,7 @@
   <div class="bg-layer"></div>
   <div class="bg-overlay"></div>
   <div class="copy-toast" id="copy-toast"><a href="register.html" style="color:inherit;font-weight:700;text-decoration:underline">Regístrate</a> para copiar este contenido</div>
+  <div class="copy-toast" id="register-toast" style="border-color:rgba(0,71,255,.5);color:rgba(180,210,255,.9);max-width:320px;line-height:1.7">¿Quieres ver puestos y mesas?<br/><a href="register.html" style="color:#7ab3ff;font-weight:700;text-decoration:underline">Regístrate gratis</a> para acceder</div>
   <div class="orient-overlay" id="orient-overlay">
     <div class="orient-box">
       <span class="orient-icon">📱↔</span>
@@ -271,46 +272,37 @@
       </div>
       <div id="main-content" class="hidden">
         <div class="sub-selector">
-          <span class="sub-label">Vista:</span>
-          <select class="dep-select" id="vista-select" onchange="switchVista(this.value)">
-            <option value="nacional">Nacional · Consultas</option>
-            <option value="dep">Por departamento</option>
-            <option value="mun">Por municipio</option>
-            <option value="zona">Por zona</option>
-            <option value="pue">Por puesto</option>
-            <option value="mesa">Por mesa</option>
-          </select>
-          <div id="dep-filter-container" style="display:none;align-items:center;gap:.75rem">
-            <span class="sub-label" style="margin-left:1.5rem">Departamento:</span>
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <span class="sub-label">Departamento:</span>
             <select class="dep-select" id="dep-select" onchange="onDepChange(this.value)">
-              <option value="">— Selecciona —</option>
+              <option value="">NACIONAL – TODOS</option>
             </select>
           </div>
-          <div id="mun-filter-container" style="display:none;align-items:center;gap:.75rem">
-            <span class="sub-label" style="margin-left:.5rem">Municipio:</span>
+          <div id="mun-filter-container" style="display:none;align-items:center;gap:.5rem">
+            <span class="sub-label">Municipio:</span>
             <select class="dep-select" id="mun-select" onchange="onMunChange(this.value)">
-              <option value="">— Selecciona —</option>
+              <option value="">TODOS</option>
             </select>
           </div>
-          <div id="zona-filter-container" style="display:none;align-items:center;gap:.75rem">
-            <span class="sub-label" style="margin-left:.5rem">Zona:</span>
+          <div id="zona-filter-container" style="display:none;align-items:center;gap:.5rem">
+            <span class="sub-label">Zona:</span>
             <select class="dep-select" id="zona-select" onchange="onZonaChange(this.value)">
-              <option value="">— Selecciona —</option>
+              <option value="">TODAS</option>
             </select>
           </div>
-          <div id="pue-filter-container" style="display:none;align-items:center;gap:.75rem">
-            <span class="sub-label" style="margin-left:.5rem">Puesto:</span>
+          <div id="pue-filter-container" style="display:none;align-items:center;gap:.5rem">
+            <span class="sub-label">Puesto:</span>
             <select class="dep-select" id="pue-select" onchange="onPueChange(this.value)">
-              <option value="">— Selecciona —</option>
+              <option value="">TODOS</option>
             </select>
           </div>
-          <div id="mesa-filter-container" style="display:none;align-items:center;gap:.75rem">
-            <span class="sub-label" style="margin-left:.5rem">Mesa:</span>
+          <div id="mesa-filter-container" style="display:none;align-items:center;gap:.5rem">
+            <span class="sub-label">Mesa:</span>
             <select class="dep-select" id="mesa-select" onchange="onMesaChange(this.value)">
-              <option value="">— Selecciona —</option>
+              <option value="">TODAS</option>
             </select>
           </div>
-          <span class="sub-label" style="margin-left:1.5rem">Buscar candidato/a:</span>
+          <span class="sub-label" style="margin-left:1rem">Buscar candidato/a:</span>
           <input id="cons-search" type="search" class="search-input" placeholder="Nombre o apellido…"
             oninput="buscarCandidato(this.value)"
             onfocus="this.style.borderColor='var(--blue)'"
@@ -401,6 +393,9 @@
         renderKPI();
         renderDonut();
         renderNacional();
+        const deps=await getJSON('departamentos');
+        const depSel=document.getElementById('dep-select');
+        deps.forEach(d=>{const o=document.createElement('option');o.value=d.cod;o.textContent=d.nombre;depSel.appendChild(o);});
       }catch(e){
         document.getElementById('load-state').innerHTML=`<div style="font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,100,100,.8);text-align:center;line-height:1.8">Error al cargar datos.<br/><span style="color:rgba(255,255,255,.3);font-size:.6rem">${e.message}</span></div>`;
       }
@@ -426,38 +421,6 @@
         options:{responsive:true,maintainAspectRatio:true,cutout:'72%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}}}}
       });
       document.getElementById('leg-cons').innerHTML=[['Votos válidos',r.votval,'#0047FF'],['Nulos',r.votnul||0,'#cc2233'],['No marcados',r.votnma||0,'#f0a500'],['En blanco',r.votblan||0,'#555']].map(([l,v,c])=>`<div class="li"><span class="ld" style="background:${c}"></span><span>${l}</span><span class="lv">${fmt(v)}</span></div>`).join('');
-    }
-
-    async function switchVista(v){
-      document.getElementById('cons-search').value='';
-      buscarCandidato('');
-      const depC=document.getElementById('dep-filter-container');
-      const munC=document.getElementById('mun-filter-container');
-      const zonaC=document.getElementById('zona-filter-container');
-      const pueC=document.getElementById('pue-filter-container');
-      const mesaC=document.getElementById('mesa-filter-container');
-      depC.style.display='none'; munC.style.display='none'; zonaC.style.display='none';
-      pueC.style.display='none'; mesaC.style.display='none';
-      document.getElementById('dep-select').value='';
-      document.getElementById('mun-select').innerHTML='<option value="">— Selecciona —</option>';
-      document.getElementById('zona-select').innerHTML='<option value="">— Selecciona —</option>';
-      document.getElementById('pue-select').innerHTML='<option value="">— Selecciona —</option>';
-      document.getElementById('mesa-select').innerHTML='<option value="">— Selecciona —</option>';
-      if(v==='nacional'){
-        renderNacional(); renderKPI(); renderDonut();
-      } else {
-        depC.style.display='flex';
-        const sel=document.getElementById('dep-select');
-        if(sel.options.length<=1){
-          const deps=await getJSON('departamentos');
-          deps.forEach(d=>{const o=document.createElement('option');o.value=d.cod;o.textContent=d.nombre;sel.appendChild(o);});
-        }
-        if(v==='mun') munC.style.display='flex';
-        if(v==='zona'){ munC.style.display='flex'; zonaC.style.display='flex'; }
-        if(v==='pue'){ munC.style.display='flex'; pueC.style.display='flex'; }
-        if(v==='mesa'){ munC.style.display='flex'; pueC.style.display='flex'; mesaC.style.display='flex'; }
-        renderNacional(); renderKPI(); renderDonut();
-      }
     }
 
     async function renderGeoPartidos(nivel, depCod, munCod, pueCod){
@@ -522,46 +485,51 @@
       document.getElementById('leg-cons').innerHTML=top5.map(p=>`<div class="li"><span class="ld" style="background:${getColor(p.partido)}"></span><span>${p.partido.split(' ').slice(0,2).join(' ')}</span><span class="lv">${fmt(p.votos)}</span></div>`).join('');
     }
 
+    function showRegisterToast(){const t=document.getElementById('register-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),4000);}
+
     async function onDepChange(cod){
-      const v=document.getElementById('vista-select').value;
-      document.getElementById('mun-select').innerHTML='<option value="">— Selecciona —</option>';
-      document.getElementById('pue-select').innerHTML='<option value="">— Selecciona —</option>';
+      document.getElementById('mun-select').innerHTML='<option value="">TODOS</option>';
+      document.getElementById('zona-select').innerHTML='<option value="">TODAS</option>';
+      document.getElementById('pue-select').innerHTML='<option value="">TODOS</option>';
+      document.getElementById('mesa-select').innerHTML='<option value="">TODAS</option>';
+      document.getElementById('mun-filter-container').style.display='none';
+      document.getElementById('zona-filter-container').style.display='none';
+      document.getElementById('pue-filter-container').style.display='none';
+      document.getElementById('mesa-filter-container').style.display='none';
       if(!cod){renderNacional();renderKPI();renderDonut();return;}
       await renderGeoPartidos('dep',cod,null,null);
-      if(v==='mun'||v==='pue'||v==='zona'){
-        const muns=await getJSON('municipios');
-        const sel=document.getElementById('mun-select');
-        sel.innerHTML='<option value="">— Selecciona municipio —</option>';
-        muns.filter(m=>m.dep_cod===cod).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).forEach(m=>{const o=document.createElement('option');o.value=m.cod;o.textContent=m.nombre;sel.appendChild(o);});
-      }
+      const muns=await getJSON('municipios');
+      const sel=document.getElementById('mun-select');
+      sel.innerHTML='<option value="">TODOS</option>';
+      muns.filter(m=>m.dep_cod===cod).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).forEach(m=>{const o=document.createElement('option');o.value=m.cod;o.textContent=m.nombre;sel.appendChild(o);});
+      document.getElementById('mun-filter-container').style.display='flex';
     }
 
     async function onMunChange(cod){
-      const v=document.getElementById('vista-select').value;
       const depCod=document.getElementById('dep-select').value;
-      document.getElementById('zona-select').innerHTML='<option value="">— Selecciona —</option>';
-      document.getElementById('pue-select').innerHTML='<option value="">— Selecciona —</option>';
-      document.getElementById('mesa-select').innerHTML='<option value="">— Selecciona —</option>';
-      if(!cod){if(depCod)await renderGeoPartidos('dep',depCod,null,null);else{renderNacional();renderKPI();renderDonut();}return;}
+      document.getElementById('zona-select').innerHTML='<option value="">TODAS</option>';
+      document.getElementById('pue-select').innerHTML='<option value="">TODOS</option>';
+      document.getElementById('mesa-select').innerHTML='<option value="">TODAS</option>';
+      document.getElementById('zona-filter-container').style.display='none';
+      document.getElementById('pue-filter-container').style.display='none';
+      document.getElementById('mesa-filter-container').style.display='none';
+      if(!cod){await renderGeoPartidos('dep',depCod,null,null);return;}
       await renderGeoPartidos('mun',depCod,cod,null);
-      if(v==='zona'){
-        const zonas=await getJSON('zonas');
-        const sel=document.getElementById('zona-select');
-        sel.innerHTML='<option value="">— Selecciona zona —</option>';
-        zonas.filter(z=>z.dep_cod===depCod&&z.mun_cod===cod).sort((a,b)=>a.cod.localeCompare(b.cod)).forEach(z=>{const o=document.createElement('option');o.value=z.cod;o.textContent=z.nombre||`Zona ${z.cod}`;sel.appendChild(o);});
-      }
-      if(v==='pue'||v==='mesa'){
-        const pues=await getJSON('puestos');
-        const sel=document.getElementById('pue-select');
-        sel.innerHTML='<option value="">— Selecciona puesto —</option>';
-        pues.filter(p=>p.dep_cod===depCod&&p.mun_cod===cod).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).forEach(p=>{const o=document.createElement('option');o.value=p.cod;o.textContent=p.nombre;sel.appendChild(o);});
-      }
+      const zonas=await getJSON('zonas');
+      const sel=document.getElementById('zona-select');
+      sel.innerHTML='<option value="">TODAS</option>';
+      zonas.filter(z=>z.dep_cod===depCod&&z.mun_cod===cod).sort((a,b)=>a.cod.localeCompare(b.cod)).forEach(z=>{const o=document.createElement('option');o.value=z.cod;o.textContent=z.nombre||`Zona ${z.cod}`;sel.appendChild(o);});
+      document.getElementById('zona-filter-container').style.display='flex';
     }
 
     async function onZonaChange(cod){
       const depCod=document.getElementById('dep-select').value;
       const munCod=document.getElementById('mun-select').value;
-      if(!cod){if(munCod)await renderGeoPartidos('mun',depCod,munCod,null);else if(depCod)await renderGeoPartidos('dep',depCod,null,null);else{renderNacional();renderKPI();renderDonut();}return;}
+      document.getElementById('pue-select').innerHTML='<option value="">TODOS</option>';
+      document.getElementById('mesa-select').innerHTML='<option value="">TODAS</option>';
+      document.getElementById('pue-filter-container').style.display='none';
+      document.getElementById('mesa-filter-container').style.display='none';
+      if(!cod){await renderGeoPartidos('mun',depCod,munCod,null);return;}
       const zonas=await getJSON('zonas');
       const z=zonas.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&x.cod===cod);
       if(!z)return;
@@ -586,24 +554,40 @@
       setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
       const topP=geoPartidos.filter(p=>!/blanco/i.test(p.partido))[0];
       document.getElementById('kpi-row').innerHTML=`<div class="kpi-card"><div class="kpi-label">Votos válidos</div><div class="kpi-val gr">${fmt(totalVotos)}</div><div class="kpi-delta">${label}</div></div><div class="kpi-card"><div class="kpi-label">Consultas</div><div class="kpi-val wh">${geoPartidos.length}</div><div class="kpi-delta">con votación</div></div><div class="kpi-card"><div class="kpi-label">Consulta puntero</div><div class="kpi-val sm">${topP?topP.partido.split(' ').slice(0,3).join(' '):'—'}</div><div class="kpi-delta">${topP?fmt(topP.votos)+' votos':''}</div></div><div class="kpi-card"><div class="kpi-label">% puntero</div><div class="kpi-val">${topP?pct(topP.votos,totalVotos)+'%':'—'}</div><div class="kpi-delta">de votos</div></div>`;
+      if(!localStorage.getItem('rr-token')){
+        const pSel=document.getElementById('pue-select');
+        pSel.innerHTML='<option disabled selected>🔒 Regístrate para ver puestos</option>';
+        document.getElementById('pue-filter-container').style.display='flex';
+        return;
+      }
+      const pues=await getJSON('puestos');
+      const pSel=document.getElementById('pue-select');
+      pSel.innerHTML='<option value="">TODOS</option>';
+      pues.filter(p=>p.dep_cod===depCod&&p.mun_cod===munCod&&p.zon_cod===cod).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).forEach(p=>{const o=document.createElement('option');o.value=p.cod;o.textContent=p.nombre;pSel.appendChild(o);});
+      document.getElementById('pue-filter-container').style.display='flex';
     }
 
     async function onPueChange(cod){
       const depCod=document.getElementById('dep-select').value;
       const munCod=document.getElementById('mun-select').value;
-      const v=document.getElementById('vista-select').value;
-      document.getElementById('mesa-select').innerHTML='<option value="">— Selecciona —</option>';
-      if(!cod){if(munCod)await renderGeoPartidos('mun',depCod,munCod,null);else if(depCod)await renderGeoPartidos('dep',depCod,null,null);else{renderNacional();renderKPI();renderDonut();}return;}
-      await renderGeoPartidos('pue',depCod,munCod,cod);
-      if(v==='mesa'){
-        const user=JSON.parse(localStorage.getItem('rr-user')||'null');
-        const isPremium=user&&['premium','full'].includes(user.plan);
-        const sel=document.getElementById('mesa-select');
-        if(!isPremium){sel.innerHTML='<option disabled selected>🔒 Requiere plan Premium</option>';return;}
-        const mesas=await getJSON('mesas');
-        sel.innerHTML='<option value="">— Selecciona mesa —</option>';
-        mesas.filter(m=>m.dep_cod===depCod&&m.mun_cod===munCod&&m.pue_cod===cod).sort((a,b)=>+a.mesa-(+b.mesa)).forEach(m=>{const o=document.createElement('option');o.value=m.mesa;o.textContent=`Mesa ${m.mesa}`;sel.appendChild(o);});
+      document.getElementById('mesa-select').innerHTML='<option value="">TODAS</option>';
+      document.getElementById('mesa-filter-container').style.display='none';
+      if(!cod){
+        const zonaCod=document.getElementById('zona-select').value;
+        if(zonaCod)await onZonaChange(zonaCod);
+        else await renderGeoPartidos('mun',depCod,munCod,null);
+        return;
       }
+      if(!localStorage.getItem('rr-token')){showRegisterToast();return;}
+      await renderGeoPartidos('pue',depCod,munCod,cod);
+      const user=JSON.parse(localStorage.getItem('rr-user')||'null');
+      const isPremium=user&&['premium','full'].includes(user.plan);
+      const sel=document.getElementById('mesa-select');
+      if(!isPremium){sel.innerHTML='<option disabled selected>🔒 Requiere plan Premium</option>';document.getElementById('mesa-filter-container').style.display='flex';return;}
+      const mesas=await getJSON('mesas');
+      sel.innerHTML='<option value="">TODAS</option>';
+      mesas.filter(m=>m.dep_cod===depCod&&m.mun_cod===munCod&&m.pue_cod===cod).sort((a,b)=>+a.mesa-(+b.mesa)).forEach(m=>{const o=document.createElement('option');o.value=m.mesa;o.textContent=`Mesa ${m.mesa}`;sel.appendChild(o);});
+      document.getElementById('mesa-filter-container').style.display='flex';
     }
 
     async function onMesaChange(cod){

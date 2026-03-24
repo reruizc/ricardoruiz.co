@@ -160,6 +160,9 @@
     /* COPY TOAST */
     .copy-toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) translateY(24px);background:rgba(10,10,20,.97);border:1.5px solid rgba(255,100,100,.5);color:rgba(255,180,180,.9);font-family:'DM Mono',monospace;font-size:.88rem;letter-spacing:.08em;padding:1rem 2rem;z-index:99998;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;text-align:center}
     .copy-toast.show{opacity:1;transform:translate(-50%,-50%);pointer-events:auto}
+    .register-toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) translateY(24px);background:rgba(4,6,16,.97);border:1.5px solid rgba(0,71,255,.5);color:rgba(255,255,255,.9);font-family:'DM Mono',monospace;font-size:.82rem;letter-spacing:.06em;padding:1.2rem 2rem;z-index:99999;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;text-align:center;max-width:320px;line-height:1.7}
+    .register-toast.show{opacity:1;transform:translate(-50%,-50%);pointer-events:auto}
+    .register-toast a{color:var(--blue);font-weight:700;text-decoration:underline}
     /* DAY MODE */
     .theme-btn{display:flex;align-items:center;gap:.4rem;font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);padding:.3rem .75rem;cursor:pointer;transition:all .2s;flex-shrink:0}
     .theme-btn:hover{background:rgba(255,255,255,.15);color:var(--white)}
@@ -332,6 +335,7 @@
 
   <!-- Copy protection toast -->
   <div class="copy-toast" id="copy-toast"><a href="register.html" style="color:inherit;font-weight:700;text-decoration:underline">Regístrate</a> para copiar este contenido</div>
+  <div class="register-toast" id="register-toast">¿Quieres ver puestos y mesas?<br/><a href="register.html">Regístrate gratis</a> para acceder</div>
   <div class="orient-overlay" id="orient-overlay">
     <div class="orient-box">
       <span class="orient-icon">📱↔</span>
@@ -707,6 +711,7 @@
       } else {
         const zonaRow = filtZonas.find(z => z.cod_zona===zona);
         if (zonaRow) renderAll(buildFromRow(zonaRow, `Zona ${zona}`));
+        if(!localStorage.getItem('rr-token')){showRegisterToast();return;}
         const filtPuestos = puestos.filter(p => p.cod_dep===dep && p.cod_mun===mun && p.cod_zona===zona).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
         const selPuesto = document.getElementById('sel-puesto');
         selPuesto.disabled = false;
@@ -739,6 +744,7 @@
       const puestoRow = puestos.find(p => p.cod_dep===dep && p.cod_mun===mun && p.cod_puesto===puesto);
       if (puestoRow) renderAll(buildFromRow(puestoRow, puestoRow.nombre));
 
+      if(!localStorage.getItem('rr-token')){showRegisterToast();return;}
       const filtMesas = mesas.filter(m => m.cod_dep===dep && m.cod_mun===mun && m.cod_puesto===puesto).sort((a,b)=>Number(a.mesa)-Number(b.mesa));
       const selMesa = document.getElementById('sel-mesa');
       selMesa.disabled = false;
@@ -821,6 +827,8 @@
       if(e.target.closest('a,button,select')){ cur.style.transform='translate(-50%,-50%) scale(2.2)'; cur.style.background='transparent'; cur.style.border='1.5px solid #0047FF'; ri.style.opacity='0'; }
       else { cur.style.transform='translate(-50%,-50%) scale(1)'; cur.style.background='#0047FF'; cur.style.border='none'; ri.style.opacity='.4'; }
     });
+
+    function showRegisterToast(){const t=document.getElementById('register-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),4000);}
 
     // ─── COPY PROTECTION ──────────────────────────────────────
     function showCopyToast() {
