@@ -368,6 +368,8 @@
     let donutChart = null;
     let resumenNac = null;
     let filterState = { dep:'', mun:'', zona:'', puesto:'', mesa:'' };
+    let sortState = { col:'cepeda', dir:'desc' };
+    let lastRows = [], lastTipo = '';
 
     // ─── INIT ─────────────────────────────────────────────────
     async function init() {
@@ -581,7 +583,15 @@
       return COLORS.quintero;
     }
 
+    function sortBy(col) {
+      if(sortState.col===col) sortState.dir = sortState.dir==='desc'?'asc':'desc';
+      else { sortState.col=col; sortState.dir='desc'; }
+      renderTable(lastRows, lastTipo);
+    }
+
     function renderTable(rows, tipo) {
+      if(tipo !== lastTipo) sortState = {col:'cepeda', dir:'desc'};
+      lastRows = rows; lastTipo = tipo;
       const titulos = { dep:'Departamento', mun:'Municipio', zona:'Zona', puesto:'Puesto de votación', mesa:'Mesa' };
       const badges  = { dep:'dep', mun:'mun', zona:'dep', puesto:'pues', mesa:'mesa' };
       const labels  = { dep:'Nacional', mun: filterState.dep ? (cache.departamentos||[]).find(d=>d.cod===filterState.dep)?.nombre||'' : '', puesto: filterState.mun ? '' : '', mesa: '' };
@@ -596,12 +606,33 @@
       if(title) title.textContent = `Por ${col1.toLowerCase()}`;
       if(badge) { badge.textContent = labels[tipo]||col1; badge.className = `level-badge ${badges[tipo]||'dep'}`; }
 
-      thead.innerHTML = `<tr><th>#</th><th>${col1}</th><th class="r">Cepeda</th><th class="r">Corcho</th><th class="r">Quintero</th><th class="r">Total</th><th class="r">% Cepeda</th></tr>`;
+      const arr = col => {
+        if(sortState.col!==col) return '<span style="opacity:.3;font-size:.65rem">↕</span>';
+        return sortState.dir==='desc' ? '<span style="font-size:.7rem">↓</span>' : '<span style="font-size:.7rem">↑</span>';
+      };
+      const thStyle = 'cursor:pointer;user-select:none';
+      thead.innerHTML = `<tr>
+        <th>#</th>
+        <th onclick="sortBy('nombre')" style="${thStyle}">${col1} ${arr('nombre')}</th>
+        <th class="r" onclick="sortBy('cepeda')" style="${thStyle}">Cepeda ${arr('cepeda')}</th>
+        <th class="r" onclick="sortBy('corcho')" style="${thStyle}">Corcho ${arr('corcho')}</th>
+        <th class="r" onclick="sortBy('quintero')" style="${thStyle}">Quintero ${arr('quintero')}</th>
+        <th class="r" onclick="sortBy('total')" style="${thStyle}">Total ${arr('total')}</th>
+        <th class="r">% Cepeda</th></tr>`;
       tbody.innerHTML = '';
 
-      const sorted = [...rows].sort((a,b)=>b.cepeda-a.cepeda);
+      const withTotal = rows.map(r=>({...r, _total:(r.cepeda||0)+(r.corcho||0)+(r.quintero||0)}));
+      const sorted = [...withTotal].sort((a,b) => {
+        if(sortState.col==='nombre') {
+          const la = a.nombre||a.puesto||a.mesa||'', lb = b.nombre||b.puesto||b.mesa||'';
+          return sortState.dir==='asc' ? la.localeCompare(lb,'es') : lb.localeCompare(la,'es');
+        }
+        const key = sortState.col==='total' ? '_total' : sortState.col;
+        const va = a[key]||0, vb = b[key]||0;
+        return sortState.dir==='asc' ? va-vb : vb-va;
+      });
       sorted.forEach((row, i) => {
-        const total = row.cepeda + row.corcho + row.quintero;
+        const total = row._total;
         const p = pct(row.cepeda, total);
         const wc = wColor(row);
         const label = row.nombre || row.puesto || row.mesa || '—';
@@ -713,12 +744,12 @@
       } else {
         const zonaRow = filtZonas.find(z => z.cod_zona===zona);
         if (zonaRow) renderAll(buildFromRow(zonaRow, `Zona ${zona}`));
-        if(!localStorage.getItem('rr-token')){showRegisterToast();return;}
         const filtPuestos = puestos.filter(p => p.cod_dep===dep && p.cod_mun===mun && p.cod_zona===zona).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+        renderTable(filtPuestos, 'puesto');
+        if(!localStorage.getItem('rr-token')){showRegisterToast();return;}
         const selPuesto = document.getElementById('sel-puesto');
         selPuesto.disabled = false;
         filtPuestos.forEach(p => { const o=document.createElement('option'); o.value=p.cod_puesto; o.textContent=p.nombre; selPuesto.appendChild(o); });
-        renderTable(filtPuestos, 'puesto');
       }
     }
 
