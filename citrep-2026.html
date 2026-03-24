@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Consulta Presidencial Octubre 2025 · Ricardo Ruiz</title>
+  <title>CITREP 2026 · Escrutinio · Ricardo Ruiz</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet" />
@@ -235,10 +235,10 @@
     <div class="curtain-stage">
       <span class="curtain-tag">ricardoruiz.co</span>
       <div class="curtain-headline">
-        <span class="curtain-line"><span class="curtain-word from-left white">Consulta</span></span>
-        <span class="curtain-line"><span class="curtain-word from-right blue">Presidencial</span></span>
+        <span class="curtain-line"><span class="curtain-word from-left white">CITREP</span></span>
+        <span class="curtain-line"><span class="curtain-word from-right blue">2026</span></span>
       </div>
-      <span class="curtain-sub">Pacto Histórico · Octubre 2025</span>
+      <span class="curtain-sub">Escrutinio · Circunscripción Especial</span>
     </div>
   </div>
 
@@ -260,15 +260,15 @@
     </nav>
 
     <div class="top-bar">
-      <div class="page-title">Consulta<br/><span>Presidencial</span></div>
+      <div class="page-title">CITREP<br/><span>2026</span></div>
     </div>
     <div class="breadcrumb">
       <a href="electoral.html" onclick="navTo(event,'electoral.html')">Resultados Electorales</a>
-      &nbsp;/&nbsp; Consulta Presidencial · Pacto Histórico · Octubre 2025
+      &nbsp;/&nbsp; CITREP 2026 · Escrutinio
     </div>
     <div class="meta-bar">
-      <span class="meta-item">Fecha: <b>26 Oct 2025</b></span>
-      <span class="meta-item">Sufragantes: <b id="meta-suf">—</b></span>
+      <span class="meta-item">Elección: <b>CITREP · 16 Mar 2026</b></span>
+      <span class="meta-item">Curules: <b>2</b></span>
       <span class="meta-item">Votos válidos: <b id="meta-val">—</b></span>
       <div class="source-badge">Fuente: <b>Registraduría · Escrutinio</b></div>
       <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
@@ -312,7 +312,7 @@
 
     <!-- ENDOSO CTA -->
     <div class="endoso-cta">
-      <div class="endoso-cta-text"><b>¿Quieres medir el endoso?</b><br/>Compara la votación de un candidato presidencial con uno al Congreso mesa por mesa.</div>
+      <div class="endoso-cta-text"><b>¿Quieres medir el endoso?</b><br/>Compara la votación de un candidato al CITREP con uno al Congreso mesa por mesa.</div>
       <span class="endoso-btn endoso-locked" id="endoso-cta-btn">🔒 Requiere plan Pro</span>
     </div>
 
@@ -342,9 +342,8 @@
 
   <script>
     // ─── CONFIG ───────────────────────────────────────────────
-    const S3 = 'https://elecciones-2026.s3.amazonaws.com/ricardoruiz.co/consulta-2025';
-    const COLORS = { cepeda:'#a78bfa', corcho:'#0047FF', quintero:'#4ade80', nulos:'rgba(255,255,255,0.18)', no_marc:'rgba(255,255,255,0.08)' };
-    const CAND_NAMES = { cepeda:'Iván Cepeda Castro', corcho:'Diana Corcho Mejía', quintero:'Daniel Quintero Calle' };
+    const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/citrep-2026';
+    const CAND_COLORS = ['#0047FF','#a78bfa','#4ade80','#fb923c','#f472b6','#38bdf8'];
     const fmt = n => Number(n).toLocaleString('es-CO');
     const pct = (n, t) => t ? ((n/t)*100).toFixed(1) : '0.0';
 
@@ -361,6 +360,7 @@
     // ─── STATE ────────────────────────────────────────────────
     let donutChart = null;
     let resumenNac = null;
+    let candidatos = []; // [{nombre, votos, key, color}] from resumen.json
     let filterState = { dep:'', mun:'', zona:'', puesto:'', mesa:'' };
 
     // ─── INIT ─────────────────────────────────────────────────
@@ -368,13 +368,20 @@
       try {
         const [resumen, deps] = await Promise.all([getJSON('resumen'), getJSON('departamentos')]);
         resumenNac = resumen;
-        const totalVal = resumen.candidatos.reduce((s,c)=>s+c.votos,0);
-        document.getElementById('meta-suf').textContent = fmt(resumen.total_sufragantes);
+
+        // Build candidate list with colors
+        candidatos = (resumen.candidatos || []).map((c, i) => ({
+          ...c,
+          key: c.key || ('cand_' + i),
+          color: CAND_COLORS[i % CAND_COLORS.length]
+        }));
+
+        const totalVal = candidatos.reduce((s, c) => s + c.votos, 0);
         document.getElementById('meta-val').textContent = fmt(totalVal);
 
         // Populate dep dropdown
         const selDep = document.getElementById('sel-dep');
-        [...deps].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).forEach(d => {
+        [...deps].sort((a,b) => a.nombre.localeCompare(b.nombre,'es')).forEach(d => {
           const o = document.createElement('option');
           o.value = d.cod; o.textContent = d.nombre; selDep.appendChild(o);
         });
@@ -383,7 +390,7 @@
           <div class="kpi-row" id="kpi-row"></div>
           <div class="results-grid">
             <div class="card" id="card-bars">
-              <div class="card-label" id="bars-label">Resultado · Consulta Pacto Histórico</div>
+              <div class="card-label" id="bars-label">Resultado · CITREP 2026</div>
               <div id="cand-bars"></div>
             </div>
             <div class="card">
@@ -393,7 +400,7 @@
                   <canvas id="donut-chart"></canvas>
                   <div class="donut-center">
                     <div class="donut-pct" id="donut-pct">—</div>
-                    <div class="donut-sub" id="donut-sub">Cepeda</div>
+                    <div class="donut-sub" id="donut-sub">CITREP</div>
                   </div>
                 </div>
                 <div class="donut-legend" id="donut-legend"></div>
@@ -427,28 +434,33 @@
 
     // ─── DATA BUILDERS ────────────────────────────────────────
     function buildNacional(resumen) {
-      const val = resumen.candidatos.reduce((s,c)=>s+c.votos,0);
+      const cands = (resumen.candidatos || []).map((c, i) => ({
+        ...c,
+        key: c.key || ('cand_' + i),
+        color: CAND_COLORS[i % CAND_COLORS.length]
+      }));
+      const val = cands.reduce((s, c) => s + c.votos, 0);
       return {
-        candidatos: resumen.candidatos,
-        nulos: resumen.nulos,
-        no_marc: resumen.no_marcados,
-        total_suf: resumen.total_sufragantes,
+        candidatos: cands,
+        nulos: resumen.nulos || 0,
+        no_marc: resumen.no_marcados || 0,
+        total_suf: resumen.total_sufragantes || 0,
         total_val: val,
         label: 'Nacional'
       };
     }
 
     function buildFromRow(row, label) {
-      const val = row.cepeda + row.corcho + row.quintero;
-      const suf = val + (row.nulos||0) + (row.no_marc||0);
+      const cands = candidatos.map(c => ({
+        ...c,
+        votos: row[c.key] || 0
+      })).sort((a,b) => b.votos - a.votos);
+      const val = cands.reduce((s,c) => s + c.votos, 0);
+      const suf = val + (row.nulos || 0) + (row.no_marc || 0);
       return {
-        candidatos: [
-          { key:'cepeda',   nombre: CAND_NAMES.cepeda,   votos: row.cepeda },
-          { key:'corcho',   nombre: CAND_NAMES.corcho,   votos: row.corcho },
-          { key:'quintero', nombre: CAND_NAMES.quintero, votos: row.quintero },
-        ].sort((a,b)=>b.votos-a.votos),
-        nulos:     row.nulos   || 0,
-        no_marc:   row.no_marc || 0,
+        candidatos: cands,
+        nulos: row.nulos || 0,
+        no_marc: row.no_marc || 0,
         total_suf: suf,
         total_val: val,
         label
@@ -473,7 +485,8 @@
     }
 
     function renderKPIs(data) {
-      const winner = [...data.candidatos].sort((a,b)=>b.votos-a.votos)[0];
+      const winner = [...data.candidatos].sort((a,b) => b.votos - a.votos)[0];
+      if (!winner) return;
       const shortName = winner.nombre.split(' ').slice(0,2).join(' ');
       const kpiRow = document.getElementById('kpi-row');
       if (!kpiRow) return;
@@ -485,7 +498,7 @@
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Votos ${shortName.split(' ')[0]}</div>
-          <div class="kpi-val" id="kv1" style="color:${COLORS[winner.key]||'var(--purple)'}">—</div>
+          <div class="kpi-val" id="kv1" style="color:${winner.color}">—</div>
           <div class="kpi-delta">${pct(winner.votos, data.total_suf)}% de sufragantes</div>
         </div>
         <div class="kpi-card">
@@ -513,15 +526,15 @@
       const el = document.getElementById('cand-bars');
       if (!el) return;
       el.innerHTML = '';
-      const sorted = [...data.candidatos].sort((a,b)=>b.votos-a.votos);
-      sorted.forEach((c,i) => {
+      const sorted = [...data.candidatos].sort((a,b) => b.votos - a.votos);
+      sorted.forEach((c, i) => {
         const p = pct(c.votos, data.total_val);
-        const col = COLORS[c.key] || '#aaa';
-        const winner = i===0 ? '<span class="winner-badge">● Puntero</span>' : '';
+        const col = c.color || CAND_COLORS[i % CAND_COLORS.length];
+        const winnerBadge = i === 0 ? '<span class="winner-badge">● Puntero</span>' : '';
         el.innerHTML += `
           <div class="cand-row">
             <div class="cand-header">
-              <span class="cand-name" style="color:${col}">${c.nombre}${winner}</span>
+              <span class="cand-name" style="color:${col}">${c.nombre}${winnerBadge}</span>
               <span class="cand-pct" style="color:${col}">${p}%</span>
             </div>
             <div class="cand-votes">${fmt(c.votos)} votos</div>
@@ -531,13 +544,14 @@
       const lbl = document.getElementById('bars-label');
       if (lbl) lbl.textContent = data.label !== 'Nacional'
         ? `Resultado · ${data.label}`
-        : 'Resultado · Consulta Pacto Histórico';
-      setTimeout(() => document.querySelectorAll('.bar-fill[data-w]').forEach(b => b.style.width = b.dataset.w+'%'), 200);
+        : 'Resultado · CITREP 2026';
+      setTimeout(() => document.querySelectorAll('.bar-fill[data-w]').forEach(b => b.style.width = b.dataset.w + '%'), 200);
     }
 
     // ─── DONUT ────────────────────────────────────────────────
     function renderDonut(data) {
-      const winner = [...data.candidatos].sort((a,b)=>b.votos-a.votos)[0];
+      const winner = [...data.candidatos].sort((a,b) => b.votos - a.votos)[0];
+      if (!winner) return;
       const pctEl = document.getElementById('donut-pct');
       const subEl = document.getElementById('donut-sub');
       if(pctEl) pctEl.textContent = pct(winner.votos, data.total_val) + '%';
@@ -547,14 +561,20 @@
       const canvas = document.getElementById('donut-chart');
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
+
+      const bgColors = [
+        ...data.candidatos.map(c => c.color || '#aaa'),
+        'rgba(255,255,255,0.18)',
+        'rgba(255,255,255,0.08)'
+      ];
       donutChart = new Chart(ctx, {
-        type:'doughnut',
-        data:{ datasets:[{
-          data: [...data.candidatos.map(c=>c.votos), data.nulos, data.no_marc],
-          backgroundColor: [...data.candidatos.map(c=>COLORS[c.key]||'#aaa'), COLORS.nulos, COLORS.no_marc],
-          borderWidth:0, hoverOffset:6
+        type: 'doughnut',
+        data: { datasets: [{
+          data: [...data.candidatos.map(c => c.votos), data.nulos, data.no_marc],
+          backgroundColor: bgColors,
+          borderWidth: 0, hoverOffset: 6
         }]},
-        options:{ cutout:'72%', plugins:{ legend:{display:false}, tooltip:{enabled:false} }, animation:{duration:900,easing:'easeOutQuart'} }
+        options: { cutout:'72%', plugins:{ legend:{display:false}, tooltip:{enabled:false} }, animation:{duration:900,easing:'easeOutQuart'} }
       });
 
       const leg = document.getElementById('donut-legend');
@@ -562,54 +582,102 @@
       leg.innerHTML = '';
       data.candidatos.forEach(c => {
         const short = c.nombre.split(' ').slice(0,2).join(' ');
-        leg.innerHTML += `<div class="li"><span class="ld" style="background:${COLORS[c.key]||'#aaa'}"></span><span>${short}</span><span class="lv">${fmt(c.votos)}</span></div>`;
+        leg.innerHTML += `<div class="li"><span class="ld" style="background:${c.color||'#aaa'}"></span><span>${short}</span><span class="lv">${fmt(c.votos)}</span></div>`;
       });
-      leg.innerHTML += `<div class="li"><span class="ld" style="background:${COLORS.nulos}"></span><span>Nulos</span><span class="lv">${fmt(data.nulos)}</span></div>`;
-      leg.innerHTML += `<div class="li"><span class="ld" style="background:${COLORS.no_marc}"></span><span>No marcados</span><span class="lv">${fmt(data.no_marc)}</span></div>`;
+      leg.innerHTML += `<div class="li"><span class="ld" style="background:rgba(255,255,255,0.18)"></span><span>Nulos</span><span class="lv">${fmt(data.nulos)}</span></div>`;
+      leg.innerHTML += `<div class="li"><span class="ld" style="background:rgba(255,255,255,0.08)"></span><span>No marcados</span><span class="lv">${fmt(data.no_marc)}</span></div>`;
     }
 
     // ─── DRILL-DOWN TABLE ─────────────────────────────────────
-    function wColor(row) {
-      if (row.cepeda >= row.corcho && row.cepeda >= row.quintero) return COLORS.cepeda;
-      if (row.corcho >= row.quintero) return COLORS.corcho;
-      return COLORS.quintero;
+    function winnerColor(row) {
+      let best = null, bestV = -1;
+      candidatos.forEach(c => {
+        const v = row[c.key] || 0;
+        if (v > bestV) { bestV = v; best = c; }
+      });
+      return best ? (best.color || '#aaa') : '#aaa';
     }
 
     function renderTable(rows, tipo) {
       const titulos = { dep:'Departamento', mun:'Municipio', zona:'Zona', puesto:'Puesto de votación', mesa:'Mesa' };
       const badges  = { dep:'dep', mun:'mun', zona:'dep', puesto:'pues', mesa:'mesa' };
-      const labels  = { dep:'Nacional', mun: filterState.dep ? (cache.departamentos||[]).find(d=>d.cod===filterState.dep)?.nombre||'' : '', puesto: filterState.mun ? '' : '', mesa: '' };
 
-      const title   = document.getElementById('drill-title');
-      const badge   = document.getElementById('level-badge');
-      const thead   = document.getElementById('drill-thead');
-      const tbody   = document.getElementById('drill-tbody');
+      const title  = document.getElementById('drill-title');
+      const badge  = document.getElementById('level-badge');
+      const thead  = document.getElementById('drill-thead');
+      const tbody  = document.getElementById('drill-tbody');
       if (!thead || !tbody) return;
 
       const col1 = titulos[tipo] || tipo;
       if(title) title.textContent = `Por ${col1.toLowerCase()}`;
-      if(badge) { badge.textContent = labels[tipo]||col1; badge.className = `level-badge ${badges[tipo]||'dep'}`; }
 
-      thead.innerHTML = `<tr><th>#</th><th>${col1}</th><th class="r">Cepeda</th><th class="r">Corcho</th><th class="r">Quintero</th><th class="r">Total</th><th class="r">% Cepeda</th></tr>`;
+      // Badge label
+      let badgeLabel = col1;
+      if (tipo === 'dep') badgeLabel = 'Nacional';
+      else if (tipo === 'mun' && filterState.dep) {
+        const d = (cache.departamentos||[]).find(x => x.cod === filterState.dep);
+        if (d) badgeLabel = d.nombre;
+      }
+      if(badge) { badge.textContent = badgeLabel; badge.className = `level-badge ${badges[tipo]||'dep'}`; }
+
+      // Build the leading candidate for sorting (first candidate key)
+      const leadKey = candidatos.length > 0 ? candidatos[0].key : null;
+
+      // Table header: geo col + one col per candidate + total + pct leader
+      const leadCand = candidatos[0];
+      const leadName = leadCand ? leadCand.nombre.split(' ')[0] : 'Puntero';
+      const candHeaders = candidatos.map(c =>
+        `<th class="r" style="color:${c.color||'#aaa'}">${c.nombre.split(' ')[0]}</th>`
+      ).join('');
+      thead.innerHTML = `<tr><th>#</th><th>${col1}</th>${candHeaders}<th class="r">Total</th><th class="r">% ${leadName}</th></tr>`;
       tbody.innerHTML = '';
 
-      const sorted = [...rows].sort((a,b)=>b.cepeda-a.cepeda);
+      const sorted = [...rows].sort((a,b) => {
+        const va = leadKey ? (a[leadKey] || 0) : 0;
+        const vb = leadKey ? (b[leadKey] || 0) : 0;
+        return vb - va;
+      });
+
       sorted.forEach((row, i) => {
-        const total = row.cepeda + row.corcho + row.quintero;
-        const p = pct(row.cepeda, total);
-        const wc = wColor(row);
+        const total = candidatos.reduce((s, c) => s + (row[c.key] || 0), 0);
+        const leadVotes = leadKey ? (row[leadKey] || 0) : 0;
+        const p = pct(leadVotes, total);
+        const wc = winnerColor(row);
         const label = row.nombre || row.puesto || row.mesa || '—';
+        const candCells = candidatos.map(c =>
+          `<td class="r" style="color:${c.color||'rgba(255,255,255,.5)'}">${fmt(row[c.key] || 0)}</td>`
+        ).join('');
         tbody.innerHTML += `<tr>
           <td style="color:rgba(255,255,255,.3)">${i+1}</td>
           <td><span class="winner-dot" style="background:${wc}"></span>${label}</td>
-          <td class="r" style="color:var(--purple)">${fmt(row.cepeda)}</td>
-          <td class="r" style="color:rgba(255,255,255,.5)">${fmt(row.corcho)}</td>
-          <td class="r" style="color:rgba(74,222,128,.6)">${fmt(row.quintero)}</td>
+          ${candCells}
           <td class="r" style="color:rgba(255,255,255,.35)">${fmt(total)}</td>
-          <td class="r"><span style="color:var(--purple);font-weight:700">${p}%</span>
-            <span class="mini-bar-wrap"><span class="mini-bar-fill" style="background:var(--purple);width:${p}%"></span></span>
+          <td class="r"><span style="color:${leadCand ? leadCand.color : 'var(--blue)'};font-weight:700">${p}%</span>
+            <span class="mini-bar-wrap"><span class="mini-bar-fill" style="background:${leadCand ? leadCand.color : 'var(--blue)'};width:${p}%"></span></span>
           </td></tr>`;
       });
+    }
+
+    // ─── MESA LEVEL TABLE ─────────────────────────────────────
+    function renderMesaDetail(mesaRow, label) {
+      const title = document.getElementById('drill-title');
+      const badge = document.getElementById('level-badge');
+      const tbody = document.getElementById('drill-tbody');
+      const thead = document.getElementById('drill-thead');
+      if(title) title.textContent = label;
+      if(badge) { badge.textContent = 'Mesa'; badge.className = 'level-badge mesa'; }
+      if(thead) thead.innerHTML = `<tr><th>Candidato</th><th class="r">Votos</th><th class="r">%</th></tr>`;
+      if(tbody) {
+        const total = candidatos.reduce((s, c) => s + (mesaRow[c.key] || 0), 0);
+        const sorted = [...candidatos].map(c => ({
+          nombre: c.nombre, votos: mesaRow[c.key] || 0, color: c.color
+        })).sort((a,b) => b.votos - a.votos);
+        tbody.innerHTML = sorted.map(c => `<tr>
+          <td style="color:${c.color}">${c.nombre}</td>
+          <td class="r" style="color:${c.color}">${fmt(c.votos)}</td>
+          <td class="r">${pct(c.votos, total)}%</td>
+        </tr>`).join('');
+      }
     }
 
     // ─── FILTROS ──────────────────────────────────────────────
@@ -655,7 +723,7 @@
       const depRow = deps.find(d => d.cod === dep);
       if (depRow) renderAll(buildFromRow(depRow, depRow.nombre));
 
-      const filtMuns = muns.filter(m => m.cod_dep === dep).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+      const filtMuns = muns.filter(m => m.cod_dep === dep).sort((a,b) => a.nombre.localeCompare(b.nombre,'es'));
       const selMun = document.getElementById('sel-mun');
       selMun.disabled = false;
       filtMuns.forEach(m => { const o=document.createElement('option'); o.value=m.cod_mun; o.textContent=m.nombre; selMun.appendChild(o); });
@@ -675,19 +743,18 @@
         const [deps, muns] = await Promise.all([getJSON('departamentos'), getJSON('municipios')]);
         const depRow = deps.find(d => d.cod === dep);
         if (depRow) renderAll(buildFromRow(depRow, depRow.nombre));
-        renderTable(muns.filter(m=>m.cod_dep===dep), 'mun');
+        renderTable(muns.filter(m => m.cod_dep===dep), 'mun');
         return;
       }
       const [muns, zonas] = await Promise.all([getJSON('municipios'), getJSON('zonas')]);
       const munRow = muns.find(m => m.cod_dep===dep && m.cod_mun===mun);
       if (munRow) renderAll(buildFromRow(munRow, munRow.nombre));
 
-      const filtZonas = zonas.filter(z => z.cod_dep===dep && z.cod_mun===mun).sort((a,b)=>a.cod_zona.localeCompare(b.cod_zona));
+      const filtZonas = zonas.filter(z => z.cod_dep===dep && z.cod_mun===mun).sort((a,b) => a.cod_zona.localeCompare(b.cod_zona));
       const selZona = document.getElementById('sel-zona');
       selZona.disabled = false;
       filtZonas.forEach(z => { const o=document.createElement('option'); o.value=z.cod_zona; o.textContent='Zona '+z.cod_zona; selZona.appendChild(o); });
-
-      renderTable(filtZonas.map(z=>({...z, nombre:'Zona '+z.cod_zona})), 'zona');
+      renderTable(filtZonas.map(z => ({...z, nombre:'Zona '+z.cod_zona})), 'zona');
     }
 
     async function onZonaChange() {
@@ -703,11 +770,11 @@
       if (!zona) {
         const munRow = muns.find(m => m.cod_dep===dep && m.cod_mun===mun);
         if (munRow) renderAll(buildFromRow(munRow, munRow.nombre));
-        renderTable(filtZonas.map(z=>({...z, nombre:'Zona '+z.cod_zona})), 'zona');
+        renderTable(filtZonas.map(z => ({...z, nombre:'Zona '+z.cod_zona})), 'zona');
       } else {
         const zonaRow = filtZonas.find(z => z.cod_zona===zona);
         if (zonaRow) renderAll(buildFromRow(zonaRow, `Zona ${zona}`));
-        const filtPuestos = puestos.filter(p => p.cod_dep===dep && p.cod_mun===mun && p.cod_zona===zona).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+        const filtPuestos = puestos.filter(p => p.cod_dep===dep && p.cod_mun===mun && p.cod_zona===zona).sort((a,b) => a.nombre.localeCompare(b.nombre,'es'));
         const selPuesto = document.getElementById('sel-puesto');
         selPuesto.disabled = false;
         filtPuestos.forEach(p => { const o=document.createElement('option'); o.value=p.cod_puesto; o.textContent=p.nombre; selPuesto.appendChild(o); });
@@ -725,13 +792,13 @@
       if (!puesto) {
         const [muns, zonas, puestos] = await Promise.all([getJSON('municipios'), getJSON('zonas'), getJSON('puestos')]);
         if (zona) {
-          const zonaRow = zonas.find(z=>z.cod_dep===dep&&z.cod_mun===mun&&z.cod_zona===zona);
+          const zonaRow = zonas.find(z => z.cod_dep===dep && z.cod_mun===mun && z.cod_zona===zona);
           if (zonaRow) renderAll(buildFromRow(zonaRow, `Zona ${zona}`));
-          renderTable(puestos.filter(p=>p.cod_dep===dep&&p.cod_mun===mun&&p.cod_zona===zona), 'puesto');
+          renderTable(puestos.filter(p => p.cod_dep===dep && p.cod_mun===mun && p.cod_zona===zona), 'puesto');
         } else {
-          const munRow = muns.find(m=>m.cod_dep===dep&&m.cod_mun===mun);
+          const munRow = muns.find(m => m.cod_dep===dep && m.cod_mun===mun);
           if (munRow) renderAll(buildFromRow(munRow, munRow.nombre));
-          renderTable(puestos.filter(p=>p.cod_dep===dep&&p.cod_mun===mun), 'puesto');
+          renderTable(puestos.filter(p => p.cod_dep===dep && p.cod_mun===mun), 'puesto');
         }
         return;
       }
@@ -739,50 +806,31 @@
       const puestoRow = puestos.find(p => p.cod_dep===dep && p.cod_mun===mun && p.cod_puesto===puesto);
       if (puestoRow) renderAll(buildFromRow(puestoRow, puestoRow.nombre));
 
-      const filtMesas = mesas.filter(m => m.cod_dep===dep && m.cod_mun===mun && m.cod_puesto===puesto).sort((a,b)=>Number(a.mesa)-Number(b.mesa));
+      const filtMesas = mesas.filter(m => m.cod_dep===dep && m.cod_mun===mun && m.cod_puesto===puesto).sort((a,b) => Number(a.mesa)-Number(b.mesa));
       const selMesa = document.getElementById('sel-mesa');
       selMesa.disabled = false;
       filtMesas.forEach(m => { const o=document.createElement('option'); o.value=m.mesa; o.textContent='Mesa '+m.mesa; selMesa.appendChild(o); });
-      renderTable(filtMesas.map(m=>({...m, nombre:'Mesa '+m.mesa})), 'mesa');
+      renderTable(filtMesas.map(m => ({...m, nombre:'Mesa '+m.mesa})), 'mesa');
     }
 
     async function onMesaChange() {
-      const { dep, mun, puesto } = filterState;
+      const { dep, mun, zona, puesto } = filterState;
       const mesa = document.getElementById('sel-mesa').value;
-      filterState = { dep, mun, puesto, mesa };
+      filterState = { dep, mun, zona, puesto, mesa };
       toggleClearBtn();
 
       if (!mesa) {
         const [puestos, mesas] = await Promise.all([getJSON('puestos'), getJSON('mesas')]);
         const puestoRow = puestos.find(p => p.cod_dep===dep && p.cod_mun===mun && p.cod_puesto===puesto);
         if (puestoRow) renderAll(buildFromRow(puestoRow, puestoRow.nombre));
-        renderTable(mesas.filter(m=>m.cod_dep===dep&&m.cod_mun===mun&&m.cod_puesto===puesto).map(m=>({...m,nombre:'Mesa '+m.mesa})), 'mesa');
+        renderTable(mesas.filter(m => m.cod_dep===dep && m.cod_mun===mun && m.cod_puesto===puesto).map(m => ({...m, nombre:'Mesa '+m.mesa})), 'mesa');
         return;
       }
       const mesas = await getJSON('mesas');
       const mesaRow = mesas.find(m => m.cod_dep===dep && m.cod_mun===mun && m.cod_puesto===puesto && m.mesa===mesa);
       if (mesaRow) {
-        renderAll(buildFromRow(mesaRow, `Mesa ${mesa} · ${mesaRow.puesto}`));
-        // At mesa level: show only that row in table (no sub-level)
-        const title = document.getElementById('drill-title');
-        const badge = document.getElementById('level-badge');
-        const tbody = document.getElementById('drill-tbody');
-        const thead = document.getElementById('drill-thead');
-        if(title) title.textContent = `Mesa ${mesa}`;
-        if(badge) { badge.textContent = 'Mesa'; badge.className = 'level-badge mesa'; }
-        if(thead) thead.innerHTML = `<tr><th>Candidato</th><th class="r">Votos</th><th class="r">%</th></tr>`;
-        if(tbody) {
-          const total = mesaRow.cepeda + mesaRow.corcho + mesaRow.quintero;
-          tbody.innerHTML = [
-            {nombre: CAND_NAMES.cepeda,   votos: mesaRow.cepeda,   col:'var(--purple)'},
-            {nombre: CAND_NAMES.corcho,   votos: mesaRow.corcho,   col:'rgba(0,71,255,.8)'},
-            {nombre: CAND_NAMES.quintero, votos: mesaRow.quintero, col:'rgba(74,222,128,.7)'},
-          ].sort((a,b)=>b.votos-a.votos).map(c=>`<tr>
-            <td style="color:${c.col}">${c.nombre}</td>
-            <td class="r" style="color:${c.col}">${fmt(c.votos)}</td>
-            <td class="r">${pct(c.votos,total)}%</td>
-          </tr>`).join('');
-        }
+        renderAll(buildFromRow(mesaRow, `Mesa ${mesa} · ${mesaRow.puesto || ''}`));
+        renderMesaDetail(mesaRow, `Mesa ${mesa}`);
       }
     }
 
@@ -801,24 +849,24 @@
     // ─── CURTAIN ──────────────────────────────────────────────
     const curtain = document.getElementById('curtain');
     curtain.classList.add('opening');
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{
-      setTimeout(()=>{ curtain.classList.remove('opening'); curtain.classList.add('opened'); }, 900);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      setTimeout(() => { curtain.classList.remove('opening'); curtain.classList.add('opened'); }, 900);
     }));
 
     function navTo(e, href) {
       e.preventDefault();
       curtain.classList.remove('opened');
       curtain.classList.add('closing');
-      setTimeout(()=>{ window.location.href=href; }, 1000);
+      setTimeout(() => { window.location.href = href; }, 1000);
     }
 
     // ─── CURSOR ───────────────────────────────────────────────
-    const cur=document.getElementById('cursor'), ri=document.getElementById('cursorRing');
-    let mx=0,my=0,rx=0,ry=0;
-    document.addEventListener('mousemove',e=>{ mx=e.clientX; my=e.clientY; cur.style.left=mx+'px'; cur.style.top=my+'px'; });
-    (function loop(){ rx+=(mx-rx)*.1; ry+=(my-ry)*.1; ri.style.left=rx+'px'; ri.style.top=ry+'px'; requestAnimationFrame(loop); })();
-    document.addEventListener('mouseover',e=>{
-      if(e.target.closest('a,button,select')){ cur.style.transform='translate(-50%,-50%) scale(2.2)'; cur.style.background='transparent'; cur.style.border='1.5px solid #0047FF'; ri.style.opacity='0'; }
+    const cur = document.getElementById('cursor'), ri = document.getElementById('cursorRing');
+    let mx=0, my=0, rx=0, ry=0;
+    document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; cur.style.left=mx+'px'; cur.style.top=my+'px'; });
+    (function loop() { rx+=(mx-rx)*.1; ry+=(my-ry)*.1; ri.style.left=rx+'px'; ri.style.top=ry+'px'; requestAnimationFrame(loop); })();
+    document.addEventListener('mouseover', e => {
+      if(e.target.closest('a,button,select')) { cur.style.transform='translate(-50%,-50%) scale(2.2)'; cur.style.background='transparent'; cur.style.border='1.5px solid #0047FF'; ri.style.opacity='0'; }
       else { cur.style.transform='translate(-50%,-50%) scale(1)'; cur.style.background='#0047FF'; cur.style.border='none'; ri.style.opacity='.4'; }
     });
 
@@ -873,16 +921,25 @@
       localStorage.removeItem('rr-user');
       updateElectoralNav();
     }
-    function updateEndosoCta(){ const user=JSON.parse(localStorage.getItem('rr-user')||'null'); const btn=document.getElementById('endoso-cta-btn'); if(!btn) return; if(user&&['pro','premium','full'].includes(user.plan)){ btn.outerHTML=`<a href="endoso-2026.html" class="endoso-btn" id="endoso-cta-btn">Calcular endoso →</a>`; } }
+    function updateEndosoCta() {
+      const user = JSON.parse(localStorage.getItem('rr-user') || 'null');
+      const btn = document.getElementById('endoso-cta-btn');
+      if (!btn) return;
+      if (user && ['pro','premium','full'].includes(user.plan)) {
+        btn.outerHTML = `<a href="endoso-2026.html" class="endoso-btn" id="endoso-cta-btn">Calcular endoso →</a>`;
+      }
+    }
     updateElectoralNav(); updateEndosoCta();
-    // MOBILE LANDSCAPE HINT
-    function dismissOrient(){ sessionStorage.setItem("orient-ok","1"); document.getElementById("orient-overlay").classList.remove("show"); }
-    if(/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) && !sessionStorage.getItem("orient-ok")){ document.getElementById("orient-overlay").classList.add("show"); }
-    // THEME
-    function isDayHour(){ const h=new Date().getHours(); return h>=7&&h<19; }
-    function applyTheme(day){ document.body.classList.toggle('day-mode',day); const btn=document.getElementById('theme-btn'); if(btn) btn.textContent=day?'🌙 Modo noche':'☀ Modo día'; localStorage.setItem('rr-theme',day?'day':'night'); }
-    function toggleTheme(){ applyTheme(!document.body.classList.contains('day-mode')); }
-    (function(){ const s=localStorage.getItem('rr-theme'); if(s) applyTheme(s==='day'); else applyTheme(isDayHour()); })();
+
+    // ─── MOBILE LANDSCAPE HINT ────────────────────────────────
+    function dismissOrient() { sessionStorage.setItem("orient-ok","1"); document.getElementById("orient-overlay").classList.remove("show"); }
+    if(/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) && !sessionStorage.getItem("orient-ok")) { document.getElementById("orient-overlay").classList.add("show"); }
+
+    // ─── THEME ────────────────────────────────────────────────
+    function isDayHour() { const h = new Date().getHours(); return h >= 7 && h < 19; }
+    function applyTheme(day) { document.body.classList.toggle('day-mode', day); const btn = document.getElementById('theme-btn'); if(btn) btn.textContent = day ? '🌙 Modo noche' : '☀ Modo día'; localStorage.setItem('rr-theme', day ? 'day' : 'night'); }
+    function toggleTheme() { applyTheme(!document.body.classList.contains('day-mode')); }
+    (function() { const s = localStorage.getItem('rr-theme'); if(s) applyTheme(s === 'day'); else applyTheme(isDayHour()); })();
   </script>
 </body>
 </html>
