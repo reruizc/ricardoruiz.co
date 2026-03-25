@@ -476,11 +476,12 @@
       }
       const geoVotos=geoAggr(geoData);
       const totalVotos=Object.values(geoVotos).reduce((s,v)=>s+v,0);
+      const _gCtx=geoData.candidatos||null;
       const geoPartidos=resumenData.partidos
         .filter(p=>geoVotos[p.partido]>0)
-        .map(p=>({...p, votos:geoVotos[p.partido]||0}))
+        .map(p=>({...p, votos:geoVotos[p.partido]||0, candidatos:p.candidatos.map(c=>({...c,votos:_gCtx?(_gCtx[c.nombre]||0):c.votos})).filter(c=>c.votos>0)}))
         .sort((a,b)=>b.votos-a.votos);
-      lastGeoPartidos=geoPartidos; ctxCandVotos=geoData.candidatos||null;
+      lastGeoPartidos=geoPartidos; ctxCandVotos=_gCtx;
 
       document.getElementById('lbl-tabla').textContent=labelText;
       document.getElementById('drill-badge').textContent=badgeText;
@@ -574,8 +575,9 @@
       if(!z)return;
       const geoVotos=geoAggr(z);
       const totalVotos=Object.values(geoVotos).reduce((s,v)=>s+v,0);
-      const geoPartidos=resumenData.partidos.filter(p=>geoVotos[p.partido]>0).map(p=>({...p,votos:geoVotos[p.partido]||0})).sort((a,b)=>b.votos-a.votos);
-      lastGeoPartidos=geoPartidos; ctxCandVotos=z.candidatos||null;
+      const _zCtx=z.candidatos||null;
+      const geoPartidos=resumenData.partidos.filter(p=>geoVotos[p.partido]>0).map(p=>({...p,votos:geoVotos[p.partido]||0,candidatos:p.candidatos.map(c=>({...c,votos:_zCtx?(_zCtx[c.nombre]||0):c.votos})).filter(c=>c.votos>0)})).sort((a,b)=>b.votos-a.votos);
+      lastGeoPartidos=geoPartidos; ctxCandVotos=_zCtx;
       const label=z.nombre||`Zona ${cod}`;
       document.getElementById('lbl-tabla').textContent=`Consultas · ${label}`;
       document.getElementById('drill-badge').textContent=label;
@@ -645,8 +647,9 @@
       const geoVotos=geoAggr(m);
       const totalVotos=Object.values(geoVotos).reduce((s,v)=>s+v,0);
       const label=`Mesa ${cod}`;
-      const geoPartidos=resumenData.partidos.filter(p=>geoVotos[p.partido]>0).map(p=>({...p,votos:geoVotos[p.partido]||0})).sort((a,b)=>b.votos-a.votos);
-      lastGeoPartidos=geoPartidos; ctxCandVotos=m.candidatos||null;
+      const _mCtx=m.candidatos||null;
+      const geoPartidos=resumenData.partidos.filter(p=>geoVotos[p.partido]>0).map(p=>({...p,votos:geoVotos[p.partido]||0,candidatos:p.candidatos.map(c=>({...c,votos:_mCtx?(_mCtx[c.nombre]||0):c.votos})).filter(c=>c.votos>0)})).sort((a,b)=>b.votos-a.votos);
+      lastGeoPartidos=geoPartidos; ctxCandVotos=_mCtx;
       document.getElementById('lbl-tabla').textContent=`Consultas · ${label}`;
       document.getElementById('drill-badge').textContent=label;
       document.getElementById('drill-badge').className='level-badge pues';
