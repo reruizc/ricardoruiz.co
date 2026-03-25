@@ -344,6 +344,7 @@
   <!-- Copy protection toast -->
   <div class="copy-toast" id="copy-toast"><a href="register.html" style="color:inherit;font-weight:700;text-decoration:underline">Regístrate</a> para copiar este contenido</div>
   <div class="register-toast" id="register-toast">¿Quieres ver puestos y mesas?<br/><a href="register.html">Regístrate gratis</a> para acceder</div>
+  <div class="copy-toast" id="pro-toast" style="border-color:rgba(74,222,128,.4);color:rgba(180,255,200,.9)">Sólo disponible en plan Pro o superior · <a href="pricing.html" style="color:#4ade80">Ver planes →</a></div>
   <div class="orient-overlay" id="orient-overlay">
     <div class="orient-box">
       <span class="orient-icon">📱↔</span>
@@ -417,7 +418,7 @@
               <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.8rem;flex-wrap:wrap">
                 <div class="card-label" style="margin-bottom:0" id="drill-title">Por departamento</div>
                 <span class="level-badge dep" id="level-badge">Nacional</span>
-                <button id="excel-download-btn" class="excel-btn excel-btn-locked" onclick="downloadExcelCurrentView()" disabled>⬇ Descarga Excel</button>
+                <button id="excel-download-btn" class="excel-btn excel-btn-locked" onclick="downloadExcelCurrentView()">⬇ Descarga Excel</button>
               </div>
               <table class="results-table">
                 <thead id="drill-thead"></thead>
@@ -920,8 +921,9 @@
       updateElectoralNav(); updateExcelDownloadBtn();
     }
     function updateEndosoCta(){ const user=JSON.parse(localStorage.getItem('rr-user')||'null'); const btn=document.getElementById('endoso-cta-btn'); if(!btn) return; if(user&&['pro','premium','full'].includes(user.plan)){ btn.outerHTML=`<a href="endoso-2026.html" class="endoso-btn" id="endoso-cta-btn">Calcular endoso →</a>`; } }
-    function updateExcelDownloadBtn(){ const token=localStorage.getItem('rr-token'); const user=JSON.parse(localStorage.getItem('rr-user')||'null'); const btn=document.getElementById('excel-download-btn'); if(!btn) return; const ok=token&&user&&['pro','premium','full'].includes(user.plan); btn.disabled=!ok; btn.className='excel-btn '+(ok?'excel-btn-active':'excel-btn-locked'); }
-    function downloadExcelCurrentView(){ console.log('TODO excel export'); }
+    function updateExcelDownloadBtn(){ const token=localStorage.getItem('rr-token'); const user=JSON.parse(localStorage.getItem('rr-user')||'null'); const btn=document.getElementById('excel-download-btn'); if(!btn) return; const ok=token&&user&&['pro','premium','full'].includes(user.plan); btn.className='excel-btn '+(ok?'excel-btn-active':'excel-btn-locked'); }
+    function downloadExcelCurrentView(){ const token=localStorage.getItem('rr-token'); const user=JSON.parse(localStorage.getItem('rr-user')||'null'); const ok=token&&user&&['pro','premium','full'].includes(user.plan); if(!ok){showProToast();return;} console.log('TODO excel export'); }
+    function showProToast(){const t=document.getElementById('pro-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),4000);}
     updateElectoralNav(); updateEndosoCta(); updateExcelDownloadBtn();
     // MOBILE LANDSCAPE HINT
     function dismissOrient(){ sessionStorage.setItem("orient-ok","1"); document.getElementById("orient-overlay").classList.remove("show"); }
