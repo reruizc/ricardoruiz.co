@@ -382,6 +382,7 @@
     const fmt = n => Number(n).toLocaleString('es-CO');
     const pct = (n,t) => t ? ((n/t)*100).toFixed(2) : '0.00';
     const CP = {'Pacto Histórico':'#6B2D8B','Centro Democrático':'#0088BB','Partido Liberal Colombiano':'#C8102E','Partido de la U':'#F7941D','Cambio Radical':'#E91E8C','Partido Conservador Colombiano':'#003580','Alianza Verde':'#4CAF50','MIRA':'#1A3FC4','Comunes':'#007755','Nuevo Liberalismo':'#E53935'};
+    function shortName(n){n=n.trim().replace(/\s+/g,' ');if(/gran\s+consulta|consulta.*gran/i.test(n))return'La Gran Consulta';if(/soluciones/i.test(n))return'Consulta de Soluciones';if(/frente/i.test(n))return'Frente por la Vida';return n;}
     function getColor(n){if(CP[n])return CP[n];if(/pacto hist/i.test(n))return'#6B2D8B';if(/centro dem/i.test(n))return'#0088BB';if(/liberal/i.test(n))return'#C8102E';if(/conservador/i.test(n))return'#003580';if(/cambio radical/i.test(n))return'#E91E8C';if(/partido de la u/i.test(n))return'#F7941D';if(/alianza (verde|por col)/i.test(n))return'#4CAF50';if(/\bMIRA\b/i.test(n))return'#1A3FC4';if(/comunes/i.test(n))return'#007755';if(/nuevo liberalismo/i.test(n))return'#E53935';return'#555';}
 
     const cache = {};
@@ -514,13 +515,13 @@
       document.getElementById('pct-cons').textContent=topP?pct(topP.votos,totalVotos)+'%':'—';
       if(donutChart) donutChart.destroy();
       const top5=geoPartidos.slice(0,5),otros=geoPartidos.slice(5).reduce((s,p)=>s+p.votos,0);
-      const dL=top5.map(p=>p.partido),dD=top5.map(p=>p.votos),dC=top5.map(p=>getColor(p.partido));
+      const dL=top5.map(p=>shortName(p.partido)),dD=top5.map(p=>p.votos),dC=top5.map(p=>getColor(p.partido));
       if(otros>0){dL.push('Otros');dD.push(otros);dC.push('#444');}
       donutChart=new Chart(document.getElementById('donut-cons').getContext('2d'),{
         type:'doughnut',data:{labels:dL,datasets:[{data:dD,backgroundColor:dC,borderWidth:0,hoverOffset:6}]},
         options:{responsive:true,maintainAspectRatio:true,cutout:'72%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}}}}
       });
-      document.getElementById('leg-cons').innerHTML=top5.map(p=>`<div class="li"><span class="ld" style="background:${getColor(p.partido)}"></span><span>${p.partido.split(' ').slice(0,2).join(' ')}</span><span class="lv">${fmt(p.votos)}</span></div>`).join('');
+      document.getElementById('leg-cons').innerHTML=top5.map(p=>`<div class="li"><span class="ld" style="background:${getColor(p.partido)}"></span><span>${shortName(p.partido)}</span><span class="lv">${fmt(p.votos)}</span></div>`).join('');
     }
 
     function showRegisterToast(){const t=document.getElementById('register-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),4000);}
@@ -596,10 +597,10 @@
       setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
       if(donutChart)donutChart.destroy();
       const _dTop5z=geoPartidos.slice(0,5),_dOtrosZ=geoPartidos.slice(5).reduce((s,p)=>s+p.votos,0);
-      const _dLz=_dTop5z.map(p=>p.partido),_dDz=_dTop5z.map(p=>p.votos),_dCz=_dTop5z.map(p=>getColor(p.partido));
+      const _dLz=_dTop5z.map(p=>shortName(p.partido)),_dDz=_dTop5z.map(p=>p.votos),_dCz=_dTop5z.map(p=>getColor(p.partido));
       if(_dOtrosZ>0){_dLz.push('Otros');_dDz.push(_dOtrosZ);_dCz.push('#444');}
       donutChart=new Chart(document.getElementById('donut-cons').getContext('2d'),{type:'doughnut',data:{labels:_dLz,datasets:[{data:_dDz,backgroundColor:_dCz,borderWidth:0,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:true,cutout:'72%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}}}}});
-      document.getElementById('leg-cons').innerHTML=_dTop5z.map(p=>`<div class="li"><span class="ld" style="background:${getColor(p.partido)}"></span><span>${p.partido.split(' ').slice(0,2).join(' ')}</span><span class="lv">${fmt(p.votos)}</span></div>`).join('');
+      document.getElementById('leg-cons').innerHTML=_dTop5z.map(p=>`<div class="li"><span class="ld" style="background:${getColor(p.partido)}"></span><span>${shortName(p.partido)}</span><span class="lv">${fmt(p.votos)}</span></div>`).join('');
       const topP=geoPartidos.filter(p=>!/blanco/i.test(p.partido))[0];
       document.getElementById('kpi-row').innerHTML=`<div class="kpi-card"><div class="kpi-label">Votos válidos</div><div class="kpi-val gr">${fmt(totalVotos)}</div><div class="kpi-delta">${label}</div></div><div class="kpi-card"><div class="kpi-label">Consultas</div><div class="kpi-val wh">${geoPartidos.length}</div><div class="kpi-delta">con votación</div></div><div class="kpi-card"><div class="kpi-label">Consulta puntero</div><div class="kpi-val sm">${topP?topP.partido.split(' ').slice(0,3).join(' '):'—'}</div><div class="kpi-delta">${topP?fmt(topP.votos)+' votos':''}</div></div><div class="kpi-card"><div class="kpi-label">% puntero</div><div class="kpi-val">${topP?pct(topP.votos,totalVotos)+'%':'—'}</div><div class="kpi-delta">de votos</div></div>`;
       const pues=await getJSON('puestos');
@@ -666,10 +667,10 @@
       setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
       if(donutChart)donutChart.destroy();
       const _dTop5m=geoPartidos.slice(0,5),_dOtrosM=geoPartidos.slice(5).reduce((s,p)=>s+p.votos,0);
-      const _dLm=_dTop5m.map(p=>p.partido),_dDm=_dTop5m.map(p=>p.votos),_dCm=_dTop5m.map(p=>getColor(p.partido));
+      const _dLm=_dTop5m.map(p=>shortName(p.partido)),_dDm=_dTop5m.map(p=>p.votos),_dCm=_dTop5m.map(p=>getColor(p.partido));
       if(_dOtrosM>0){_dLm.push('Otros');_dDm.push(_dOtrosM);_dCm.push('#444');}
       donutChart=new Chart(document.getElementById('donut-cons').getContext('2d'),{type:'doughnut',data:{labels:_dLm,datasets:[{data:_dDm,backgroundColor:_dCm,borderWidth:0,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:true,cutout:'72%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}}}}});
-      document.getElementById('leg-cons').innerHTML=_dTop5m.map(p=>`<div class="li"><span class="ld" style="background:${getColor(p.partido)}"></span><span>${p.partido.split(' ').slice(0,2).join(' ')}</span><span class="lv">${fmt(p.votos)}</span></div>`).join('');
+      document.getElementById('leg-cons').innerHTML=_dTop5m.map(p=>`<div class="li"><span class="ld" style="background:${getColor(p.partido)}"></span><span>${shortName(p.partido)}</span><span class="lv">${fmt(p.votos)}</span></div>`).join('');
     }
 
     function renderNacional(){
