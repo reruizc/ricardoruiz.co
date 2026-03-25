@@ -224,10 +224,14 @@
     body.day-mode .excel-btn-locked{background:rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.18);color:rgba(0,0,0,.35)}
     body.day-mode .endoso-btn.endoso-locked{background:rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.18);color:rgba(0,0,0,.45)}
     .cands-table thead th{font-size:.94rem!important}
-    .cands-table tbody td{font-size:1.2rem!important}
-    .cands-table tbody td:nth-child(3){font-size:1.25rem!important;font-weight:600!important}
-    .cands-table tbody td.r{font-size:1.15rem!important}
+    .cands-table tbody td{font-size:.88rem!important}
+    .cands-table tbody td:nth-child(3){font-size:.95rem!important;font-weight:600!important}
+    .cands-table tbody td.r{font-size:.85rem!important}
+    .winner-row{background:color-mix(in srgb,var(--w-color,#0047FF) 12%,transparent)}
     .winner-row>td:first-child{border-left:3px solid var(--w-color,#fff)}
+    .winner-cand{background:rgba(255,255,255,.07)}
+    .winner-cand>td:first-child{border-left:2px solid var(--wc-color,#fff)}
+    body.day-mode .winner-cand{background:rgba(0,0,0,.04)}
   </style>
 </head>
 <body>
@@ -465,7 +469,8 @@
         geoData=d; labelText=`Consultas · ${d.nombre}`; badgeText=d.nombre;
       } else {
         const pues=await getJSON('puestos');
-        const d=pues.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&x.cod===pueCod); if(!d) return;
+        const zonaCod=document.getElementById('zona-select').value;
+        const d=pues.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&(zonaCod?x.zon_cod===zonaCod:true)&&x.cod===pueCod); if(!d) return;
         geoData=d; labelText=`Consultas · ${d.nombre}`; badgeText=d.nombre;
       }
       const geoVotos=geoAggr(geoData);
@@ -496,7 +501,7 @@
           <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>
           <td class="r"><span class="cbadge sub">${p.candidatos?.length||'—'}</span></td>`;
         tbody.appendChild(tr);
-        if(hasCands){const trC=document.createElement('tr');trC.innerHTML=`<td colspan="5" style="padding:0"><div class="cands-inner" id="cands-inner-${i}"><table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% consulta</th></tr></thead><tbody>${p.candidatos.map((c,j)=>{const codStr=c.codigo!=null?String(c.codigo).padStart(3,'0'):'—';return `<tr><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.86rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${codStr}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif">${c.nombre}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;}).join('')}</tbody></table></div></td>`;tbody.appendChild(trC);}
+        if(hasCands){const trC=document.createElement('tr');trC.innerHTML=`<td colspan="5" style="padding:0"><div class="cands-inner" id="cands-inner-${i}"><table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% consulta</th></tr></thead><tbody>${p.candidatos.map((c,j)=>{const codStr=c.codigo!=null?String(c.codigo).padStart(3,'0'):'—';return `<tr${j===0?' class="winner-cand" style="--wc-color:'+color+'"':''}><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.86rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${codStr}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif">${c.nombre}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;}).join('')}</tbody></table></div></td>`;tbody.appendChild(trC);}
       });
       setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
       const topP=geoPartidos.filter(p=>!/blanco/i.test(p.partido))[0];
@@ -584,7 +589,7 @@
         if(i===0){tr.classList.add('winner-row');tr.style.setProperty('--w-color',color);}
         tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td><td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.15rem">${p.partido}</span></div>${hasCands?`<div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${p.candidatos.length} candidatos</button></div>`:''}</td><td class="r" style="font-size:1.15rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td><td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>`;
         tbody.appendChild(tr);
-        if(hasCands){const trC=document.createElement('tr');trC.innerHTML=`<td colspan="4" style="padding:0"><div class="cands-inner" id="cands-inner-${i}"><table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% consulta</th></tr></thead><tbody>${p.candidatos.map((c,j)=>{const codStr=c.codigo!=null?String(c.codigo).padStart(3,'0'):'—';return `<tr><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.86rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${codStr}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif">${c.nombre}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;}).join('')}</tbody></table></div></td>`;tbody.appendChild(trC);}
+        if(hasCands){const trC=document.createElement('tr');trC.innerHTML=`<td colspan="4" style="padding:0"><div class="cands-inner" id="cands-inner-${i}"><table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% consulta</th></tr></thead><tbody>${p.candidatos.map((c,j)=>{const codStr=c.codigo!=null?String(c.codigo).padStart(3,'0'):'—';return `<tr${j===0?' class="winner-cand" style="--wc-color:'+color+'"':''}><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.86rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${codStr}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif">${c.nombre}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;}).join('')}</tbody></table></div></td>`;tbody.appendChild(trC);}
       });
       setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
       if(donutChart)donutChart.destroy();
@@ -618,7 +623,8 @@
       const mesas=await getJSON('mesas');
       const sel=document.getElementById('mesa-select');
       sel.innerHTML='<option value="">TODAS</option>';
-      mesas.filter(m=>m.dep_cod===depCod&&m.mun_cod===munCod&&m.pue_cod===cod).sort((a,b)=>+a.mesa-(+b.mesa)).forEach(m=>{const o=document.createElement('option');o.value=m.mesa;o.textContent=`Mesa ${m.mesa}`;sel.appendChild(o);});
+      const seen=new Set();
+      mesas.filter(m=>m.dep_cod===depCod&&m.mun_cod===munCod&&m.pue_cod===cod).sort((a,b)=>+a.mesa-(+b.mesa)).forEach(m=>{if(seen.has(m.mesa))return;seen.add(m.mesa);const o=document.createElement('option');o.value=m.mesa;o.textContent=`Mesa ${m.mesa}`;sel.appendChild(o);});
       document.getElementById('mesa-filter-container').style.display='flex';
     }
 
@@ -630,7 +636,8 @@
       const pueCod=document.getElementById('pue-select').value;
       if(!cod){if(pueCod)await renderGeoPartidos('pue',depCod,munCod,pueCod);return;}
       const mesas=await getJSON('mesas');
-      const m=mesas.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&x.pue_cod===pueCod&&x.mesa===cod);
+      const zonaCod=document.getElementById('zona-select').value;
+      const m=mesas.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&(zonaCod?x.zon_cod===zonaCod:true)&&x.pue_cod===pueCod&&x.mesa===cod);
       if(!m)return;
       const geoVotos=geoAggr(m);
       const totalVotos=Object.values(geoVotos).reduce((s,v)=>s+v,0);
@@ -651,7 +658,7 @@
         if(i===0){tr.classList.add('winner-row');tr.style.setProperty('--w-color',color);}
         tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td><td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.15rem">${p.partido}</span></div>${hasCands?`<div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${p.candidatos.length} candidatos</button></div>`:''}</td><td class="r" style="font-size:1.15rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td><td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>`;
         tbody.appendChild(tr);
-        if(hasCands){const trC=document.createElement('tr');trC.innerHTML=`<td colspan="4" style="padding:0"><div class="cands-inner" id="cands-inner-${i}"><table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% consulta</th></tr></thead><tbody>${p.candidatos.map((c,j)=>{const codStr=c.codigo!=null?String(c.codigo).padStart(3,'0'):'—';return `<tr><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.86rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${codStr}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif">${c.nombre}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;}).join('')}</tbody></table></div></td>`;tbody.appendChild(trC);}
+        if(hasCands){const trC=document.createElement('tr');trC.innerHTML=`<td colspan="4" style="padding:0"><div class="cands-inner" id="cands-inner-${i}"><table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% consulta</th></tr></thead><tbody>${p.candidatos.map((c,j)=>{const codStr=c.codigo!=null?String(c.codigo).padStart(3,'0'):'—';return `<tr${j===0?' class="winner-cand" style="--wc-color:'+color+'"':''}><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.86rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${codStr}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif">${c.nombre}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;}).join('')}</tbody></table></div></td>`;tbody.appendChild(trC);}
       });
       setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
       if(donutChart)donutChart.destroy();
@@ -690,7 +697,7 @@
             <table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% consulta</th></tr></thead>
             <tbody>${p.candidatos.map((c,j)=>{
               const codStr=c.codigo!=null?String(c.codigo).padStart(3,'0'):'—';
-              return `<tr><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.86rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${codStr}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif">${c.nombre}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;
+              return `<tr${j===0?' class="winner-cand" style="--wc-color:'+color+'"':''}><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.86rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${codStr}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif">${c.nombre}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;
             }).join('')}</tbody>
             </table></div></td>`;
           tbody.appendChild(trC);
