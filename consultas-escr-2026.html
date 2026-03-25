@@ -207,6 +207,20 @@
     .orient-msg{font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.06em;line-height:1.9;color:rgba(255,255,255,.75);margin-bottom:1.5rem}
     .orient-btn{font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;background:#4ade80;color:#060810;border:none;padding:.55rem 2rem;cursor:pointer;transition:background .2s}
     .orient-btn:hover{background:#22c55e}
+    body.day-mode .li{color:rgba(0,0,0,.6)}
+    body.day-mode .lv{color:#0d1120}
+    body.day-mode .donut-pct{color:#0d1120}
+    .endoso-cta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;background:rgba(0,71,255,.07);border:1px solid rgba(0,71,255,.2);padding:1rem 1.5rem;margin-bottom:1.5rem;backdrop-filter:blur(4px)}
+    .endoso-cta-text{font-family:'DM Mono',monospace;font-size:.82rem;letter-spacing:.08em;color:rgba(255,255,255,.7);line-height:1.6}
+    .endoso-cta-text b{color:var(--white)}
+    .endoso-btn{display:inline-flex;align-items:center;gap:.6rem;font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--white);background:var(--blue);border:none;padding:.6rem 1.4rem;cursor:pointer;text-decoration:none;transition:background .2s;white-space:nowrap;flex-shrink:0}
+    .endoso-btn:hover{background:#0035cc}
+    .endoso-btn.endoso-locked{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.45);cursor:not-allowed}
+    .endoso-btn.endoso-locked:hover{background:rgba(255,255,255,.07)}
+    body.day-mode .endoso-btn.endoso-locked{background:rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.18);color:rgba(0,0,0,.45)}
+    .cands-table thead th{font-size:.78rem!important}
+    .cands-table{font-size:1.2rem!important}
+    .winner-row>td:first-child{border-left:3px solid var(--w-color,#fff)}
   </style>
 </head>
 <body>
@@ -309,6 +323,10 @@
             onblur="this.style.borderColor='var(--card-border)'" />
         </div>
         <div id="cons-search-results" style="display:none;margin-bottom:1.5rem"></div>
+        <div class="endoso-cta">
+          <div class="endoso-cta-text"><b>¿Quieres medir el endoso?</b><br/>Compara la votación de un candidato presidencial con uno al Congreso mesa por mesa.</div>
+          <span class="endoso-btn endoso-locked" id="endoso-cta-btn">🔒 Requiere plan Pro</span>
+        </div>
         <div class="kpi-row" id="kpi-row"></div>
         <div class="results-grid" id="cons-main-grid">
           <div class="card">
@@ -457,14 +475,16 @@
         const color=getColor(p.partido), pctV=pct(p.votos,totalVotos), bw=((p.votos/maxV)*100).toFixed(1);
         const hasCands=p.candidatos&&p.candidatos.length>0;
         const tr=document.createElement('tr');
+        if(i===0){tr.classList.add('winner-row');tr.style.setProperty('--w-color',color);}
         tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td>
-          <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span></div>
+          <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.15rem">${p.partido}</span></div>
           ${hasCands?`<div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${p.candidatos.length} candidatos</button></div>`:''}
           </td>
-          <td class="r" style="font-size:.9rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td>
+          <td class="r" style="font-size:1.15rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td>
           <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>
           <td class="r"><span class="cbadge sub">${p.candidatos?.length||'—'}</span></td>`;
         tbody.appendChild(tr);
+        if(hasCands){const trC=document.createElement('tr');trC.innerHTML=`<td colspan="5" style="padding:0"><div class="cands-inner" id="cands-inner-${i}"><table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% consulta</th></tr></thead><tbody>${p.candidatos.map((c,j)=>{const codStr=c.codigo!=null?String(c.codigo).padStart(3,'0'):'—';return `<tr><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${codStr}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif">${c.nombre}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;}).join('')}</tbody></table></div></td>`;tbody.appendChild(trC);}
       });
       setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
       const topP=geoPartidos.filter(p=>!/blanco/i.test(p.partido))[0];
@@ -547,19 +567,16 @@
       const maxV=geoPartidos[0]?.votos||1;
       geoPartidos.forEach((p,i)=>{
         const color=getColor(p.partido),pctV=pct(p.votos,totalVotos),bw=((p.votos/maxV)*100).toFixed(1);
+        const hasCands=p.candidatos&&p.candidatos.length>0;
         const tr=document.createElement('tr');
-        tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td><td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span></div></td><td class="r" style="font-size:.9rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td><td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>`;
+        if(i===0){tr.classList.add('winner-row');tr.style.setProperty('--w-color',color);}
+        tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td><td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.15rem">${p.partido}</span></div>${hasCands?`<div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${p.candidatos.length} candidatos</button></div>`:''}</td><td class="r" style="font-size:1.15rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td><td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>`;
         tbody.appendChild(tr);
+        if(hasCands){const trC=document.createElement('tr');trC.innerHTML=`<td colspan="4" style="padding:0"><div class="cands-inner" id="cands-inner-${i}"><table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% consulta</th></tr></thead><tbody>${p.candidatos.map((c,j)=>{const codStr=c.codigo!=null?String(c.codigo).padStart(3,'0'):'—';return `<tr><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${codStr}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif">${c.nombre}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;}).join('')}</tbody></table></div></td>`;tbody.appendChild(trC);}
       });
       setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
       const topP=geoPartidos.filter(p=>!/blanco/i.test(p.partido))[0];
       document.getElementById('kpi-row').innerHTML=`<div class="kpi-card"><div class="kpi-label">Votos válidos</div><div class="kpi-val gr">${fmt(totalVotos)}</div><div class="kpi-delta">${label}</div></div><div class="kpi-card"><div class="kpi-label">Consultas</div><div class="kpi-val wh">${geoPartidos.length}</div><div class="kpi-delta">con votación</div></div><div class="kpi-card"><div class="kpi-label">Consulta puntero</div><div class="kpi-val sm">${topP?topP.partido.split(' ').slice(0,3).join(' '):'—'}</div><div class="kpi-delta">${topP?fmt(topP.votos)+' votos':''}</div></div><div class="kpi-card"><div class="kpi-label">% puntero</div><div class="kpi-val">${topP?pct(topP.votos,totalVotos)+'%':'—'}</div><div class="kpi-delta">de votos</div></div>`;
-      if(!localStorage.getItem('rr-token')){
-        const pSel=document.getElementById('pue-select');
-        pSel.innerHTML='<option disabled selected>🔒 Regístrate para ver puestos</option>';
-        document.getElementById('pue-filter-container').style.display='flex';
-        return;
-      }
       const pues=await getJSON('puestos');
       const pSel=document.getElementById('pue-select');
       pSel.innerHTML='<option value="">TODOS</option>';
@@ -614,9 +631,12 @@
       const maxV=geoPartidos[0]?.votos||1;
       geoPartidos.forEach((p,i)=>{
         const color=getColor(p.partido),pctV=pct(p.votos,totalVotos),bw=((p.votos/maxV)*100).toFixed(1);
+        const hasCands=p.candidatos&&p.candidatos.length>0;
         const tr=document.createElement('tr');
-        tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td><td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span></div></td><td class="r" style="font-size:.9rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td><td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>`;
+        if(i===0){tr.classList.add('winner-row');tr.style.setProperty('--w-color',color);}
+        tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td><td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.15rem">${p.partido}</span></div>${hasCands?`<div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${p.candidatos.length} candidatos</button></div>`:''}</td><td class="r" style="font-size:1.15rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td><td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>`;
         tbody.appendChild(tr);
+        if(hasCands){const trC=document.createElement('tr');trC.innerHTML=`<td colspan="4" style="padding:0"><div class="cands-inner" id="cands-inner-${i}"><table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% consulta</th></tr></thead><tbody>${p.candidatos.map((c,j)=>{const codStr=c.codigo!=null?String(c.codigo).padStart(3,'0'):'—';return `<tr><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${codStr}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif">${c.nombre}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;}).join('')}</tbody></table></div></td>`;tbody.appendChild(trC);}
       });
       setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
     }
@@ -634,11 +654,12 @@
         const pctV=pct(p.votos,resumenData.votval), bw=((p.votos/maxV)*100).toFixed(1), color=getColor(p.partido);
         const tr=document.createElement('tr');
         const hasCands=p.candidatos&&p.candidatos.length>0;
+        if(i===0){tr.classList.add('winner-row');tr.style.setProperty('--w-color',color);}
         tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td>
-          <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span></div>
+          <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.15rem">${p.partido}</span></div>
           ${hasCands?`<div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${p.candidatos.length} candidatos</button></div>`:''}
           </td>
-          <td class="r" style="font-size:.9rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td>
+          <td class="r" style="font-size:1.15rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td>
           <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>
           <td class="r"><span class="cbadge sub">${p.candidatos?.length||'—'}</span></td>`;
         tbody.appendChild(tr);
@@ -685,8 +706,9 @@
     document.addEventListener('mouseover',e=>{if(e.target.closest('a,button,select,input')){cur2.style.transform='translate(-50%,-50%) scale(2.5)';cur2.style.background='transparent';cur2.style.border='1.5px solid var(--blue)';ri.style.opacity='0';}else{cur2.style.transform='translate(-50%,-50%) scale(1)';cur2.style.background='var(--blue)';cur2.style.border='none';ri.style.opacity='.4';}});
 
     function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;if(token&&user){const pl={free:'Free',basic:'Básico',analysis:'Análisis',pro:'Pro',premium:'Premium',full:'Completo'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">Salir</button>`;}else{area.innerHTML=`<a href="pricing.html" style="font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">Planes</a><a href="login.html" class="e-btn-login">Iniciar sesión</a><a href="register.html" class="e-btn-register">Registrarse</a>`;}}
-    async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();}
-    updateElectoralNav();
+    async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();updateEndosoCta();}
+    function updateEndosoCta(){const user=JSON.parse(localStorage.getItem('rr-user')||'null');const btn=document.getElementById('endoso-cta-btn');if(!btn)return;if(user&&['pro','premium','full'].includes(user.plan)){btn.outerHTML=`<a href="endoso-2026.html" class="endoso-btn" id="endoso-cta-btn">Calcular endoso →</a>`;}}
+    updateElectoralNav();updateEndosoCta();
 
     function showCopyToast(){const now=Date.now();if(showCopyToast._last&&now-showCopyToast._last<60000)return;showCopyToast._last=now;const t=document.getElementById('copy-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),3000);}
     function showPremiumToast(){const t=document.getElementById('premium-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),4000);}
