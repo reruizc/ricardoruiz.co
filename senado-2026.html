@@ -227,6 +227,14 @@
     body.day-mode .endoso-cta{background:rgba(0,71,255,.06);border-color:rgba(0,71,255,.15)}
     body.day-mode .endoso-cta-text{color:rgba(0,0,0,.7)}
     body.day-mode .sub-label{color:rgba(0,0,0,.45)}
+    .info-bar{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;background:rgba(255,230,100,.08);border:1px solid rgba(255,220,80,.18);padding:.85rem 1.3rem;margin-bottom:1rem;backdrop-filter:blur(4px)}
+    .info-bar-text{font-family:'DM Mono',monospace;font-size:.66rem;letter-spacing:.04em;line-height:1.75;color:rgba(255,235,140,.82)}
+    .info-bar-btn{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;background:rgba(255,220,80,.12);border:1px solid rgba(255,220,80,.3);color:rgba(255,230,120,.75);padding:.28rem .85rem;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background .2s}
+    .info-bar-btn:hover{background:rgba(255,220,80,.22)}
+    body.day-mode .info-bar{background:rgba(255,200,200,.15);border-color:rgba(220,100,100,.18)}
+    body.day-mode .info-bar-text{color:rgba(120,30,30,.8)}
+    body.day-mode .info-bar-btn{background:rgba(220,100,100,.1);border-color:rgba(200,80,80,.3);color:rgba(140,40,40,.8)}
+    body.day-mode .info-bar-btn:hover{background:rgba(220,100,100,.2)}
     body.day-mode .li{color:rgba(0,0,0,.6)}
     body.day-mode .lv{color:rgba(0,0,0,.85)}
     body.day-mode .endoso-btn.endoso-locked{background:rgba(0,0,0,.05);border:1px solid rgba(0,0,0,.18);color:rgba(0,0,0,.45)}
@@ -309,6 +317,10 @@
         <div class="endoso-cta">
           <div class="endoso-cta-text"><b>¿Quieres medir el endoso?</b><br/>Compara la votación de un candidato al Senado con uno de Cámara mesa por mesa.</div>
           <span class="endoso-btn endoso-locked" id="endoso-cta-btn">🔒 Requiere plan Pro</span>
+        </div>
+        <div class="info-bar" id="info-bar" style="display:none">
+          <span class="info-bar-text">Usa los filtros geográficos hasta mesa para ver el detalle más preciso de la votación. Esta herramienta es gratuita y fue construida con muchísimo trabajo. La mejor forma de apoyarnos es difundir nuestro trabajo y <a href="register.html" style="color:inherit;text-decoration:underline">registrarte</a>. Si quieres ver nuevos proyectos y funciones avanzadas, elige un plan Pro o superior.</span>
+          <button class="info-bar-btn" onclick="dismissInfoBar()">Entendido</button>
         </div>
         <div class="sub-selector">
           <div style="display:flex;align-items:center;gap:.5rem">
@@ -484,7 +496,7 @@
         renderNacional();
         const deps=await getJSON('departamentos');
         const depSel=document.getElementById('dep-select');
-        deps.forEach(d=>{const o=document.createElement('option');o.value=d.cod;o.textContent=d.nombre;depSel.appendChild(o);});
+        [...deps].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).forEach(d=>{const o=document.createElement('option');o.value=d.cod;o.textContent=d.nombre;depSel.appendChild(o);});
       }catch(e){
         document.getElementById('load-state').innerHTML=`<div style="font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,100,100,.8);text-align:center;line-height:1.8">Error al cargar datos.<br/><span style="color:rgba(255,255,255,.3);font-size:.6rem">${e.message}</span></div>`;
       }
@@ -1002,6 +1014,8 @@
     function downloadExcelCurrentView(){const token=localStorage.getItem('rr-token');const user=JSON.parse(localStorage.getItem('rr-user')||'null');const ok=token&&user&&['pro','premium','full'].includes(user.plan);if(!ok){showProToast();return;}console.log('TODO excel export');}
     function showInviteToast(){const t=document.getElementById('invite-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),4000);}
     function showProToast(){const t=document.getElementById('pro-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),4000);}
+    function dismissInfoBar(){sessionStorage.setItem('rr-info-bar-ok','1');const b=document.getElementById('info-bar');if(b)b.style.display='none';}
+    (function(){if(!sessionStorage.getItem('rr-info-bar-ok')){const b=document.getElementById('info-bar');if(b)b.style.display='flex';}})();
     updateElectoralNav(); updateEndosoCta(); updateExcelDownloadBtn();
 
     // ─── COPY PROTECTION ──────────────────────────────────────
