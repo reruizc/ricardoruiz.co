@@ -215,6 +215,7 @@
     body.day-mode .endoso-cta{background:rgba(0,71,255,.06);border-color:rgba(0,71,255,.15)}
     body.day-mode .endoso-cta-text{color:rgba(0,0,0,.7)}
     body.day-mode .sub-label{color:rgba(0,0,0,.45)}
+    body.day-mode .li{color:rgba(0,0,0,.6)}
     .orient-overlay{display:none;position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,.88);align-items:center;justify-content:center;padding:1.5rem}
     .orient-overlay.show{display:flex}
     .orient-box{background:#0e1220;border:1px solid rgba(255,255,255,.12);padding:2rem 1.8rem;max-width:320px;text-align:center}
@@ -515,20 +516,23 @@
         document.getElementById('main-content').classList.remove('hidden');
 
         // Poblar selector de departamentos/circunscripciones
+        // Acumular TODAS las circs de un mismo código para que el toggle funcione correctamente
         const sel = document.getElementById('dep-select');
-        const _seenDep=new Set();
+        const _depMap = new Map(); // cod → {dep, circs: Set}
         deps.sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).forEach(d=>{
-          if(_seenDep.has(d.cod)) return;
-          _seenDep.add(d.cod);
-          const o=document.createElement('option'); o.value=d.cod;
-          o.textContent=`${d.nombre} (${getCurulesForDep(d.nombre)} curules)`;
-          o.dataset.circ=getDepCirc(d); // clave para filtrado correcto por circ_nom
+          if(!_depMap.has(d.cod)) _depMap.set(d.cod, {dep: d, circs: new Set()});
+          _depMap.get(d.cod).circs.add(getDepCirc(d));
+        });
+        _depMap.forEach(({dep, circs})=>{
+          const o=document.createElement('option'); o.value=dep.cod;
+          o.textContent=`${dep.nombre} (${getCurulesForDep(dep.nombre)} curules)`;
+          o.dataset.circs=[...circs].join(','); // todas las circs del dep, ej: "TERRITORIAL,INDIGENAS"
           sel.appendChild(o);
         });
         // Filtrar opciones según circunscripción activa por defecto
         Array.from(sel.options).forEach(o=>{
           if(o.value==='TODOS') return;
-          o.style.display = (o.dataset.circ||'TERRITORIAL') === curCorp ? '' : 'none';
+          o.style.display = (o.dataset.circs||'TERRITORIAL').split(',').includes(curCorp) ? '' : 'none';
         });
 
         renderKPI();
@@ -635,22 +639,24 @@
       switchCorp(val);
     }
 
-    function switchCorp(corp){
+    async function switchCorp(corp){
       curCorp = corp;
-      // Re-filtrar el dep-select
+      // Re-filtrar el dep-select usando dataset.circs (todas las circs del dep)
       const sel = document.getElementById('dep-select');
       Array.from(sel.options).forEach(o=>{
         if(o.value==='TODOS'){ o.style.display=''; return; }
-        o.style.display = (o.dataset.circ||'TERRITORIAL')===corp ? '' : 'none';
+        o.style.display = (o.dataset.circs||'TERRITORIAL').split(',').includes(corp) ? '' : 'none';
       });
-      // Si el depto activo quedó oculto, volver a nacional
-      const selOpt = sel.options[sel.selectedIndex];
-      if(selOpt && selOpt.style.display==='none'){
-        sel.value='TODOS';
-        switchDep('TODOS');
+      if(curDep==='TODOS'){ renderNacional(); return; }
+      // Mantener estado geo: buscar el dep en la nueva circ; si no existe, ir a nacional
+      const deps = await getJSON('departamentos');
+      const dep = deps.find(d=>d.cod===curDep && getDepCirc(d)===corp);
+      if(dep){
+        if(!curDepData) try { curDepData = await getJSON('dep-'+curDep); } catch(e){}
+        renderDepView(dep);
       } else {
-        // Re-render nacional para filtrar partidos por tipo
-        if(curDep==='TODOS') renderNacional();
+        sel.value='TODOS'; curDep='TODOS'; curDepData=null;
+        renderNacional();
       }
     }
 
@@ -701,7 +707,7 @@
         const mun = curDepData.municipios.find(m=>m.cod===curMun);
         const zon = mun?.zonas?.find(z=>z.cod===zonCod);
         if(zon?.puestos?.length){
-          const pues = zon.puestos.map(p=>({value: p.cod, label: p.nombre}));
+          const pues = [...zon.puestos].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).map(p=>({value: p.cod, label: p.nombre}));
           setSel('pue-select', pues, 'Todos los puestos');
           showSel('pue-label', true); showSel('pue-select', true);
         }
@@ -718,7 +724,7 @@
         const zon = mun?.zonas?.find(z=>z.cod===curZon);
         const pue = zon?.puestos?.find(p=>p.cod===pueCod);
         if(pue?.mesas?.length){
-          const mesaOpts = pue.mesas.map(m=>({value: m.cod, label: m.nombre||`Mesa ${m.cod}`}));
+          const mesaOpts = pue.mesas.map(m=>({value: String(m.mesa||m.cod), label: m.nombre||`Mesa ${m.mesa||m.cod}`}));
           setSel('mesa-select', mesaOpts, 'Todas las mesas');
           showSel('mesa-label', true); showSel('mesa-select', true);
         } else {
@@ -760,28 +766,35 @@
         const mun = curDepData.municipios.find(m=>m.cod===curMun);
         const zon = mun?.zonas?.find(z=>z.cod===curZon);
         const pue = zon?.puestos?.find(p=>p.cod===curPue);
-        mesaData = pue?.mesas?.find(m=>m.cod===curMesa);
+        mesaData = pue?.mesas?.find(m=>String(m.mesa||m.cod)===String(curMesa));
       }
       if(!mesaData){ getJSON('mesas').then(mesas=>{ const m=mesas.find(x=>x.dep_cod===curDep&&x.mun_cod===curMun&&x.pue_cod===curPue&&x.cod===curMesa); if(m) _renderMesaPartidos(m,`Mesa ${curMesa}`); }).catch(()=>{}); return; }
       _renderMesaPartidos(mesaData, mesaData.nombre||`Mesa ${curMesa}`);
     }
     function _renderMesaPartidos(m, label){
-      const geoVotos = m.partidos||{};
+      const mesaN = m.por_circunscripcion?.[curCorp] ?? m;
+      const geoVotos = mesaN.partidos || m.partidos || {};
       const totalVotos = Object.values(geoVotos).reduce((s,v)=>s+(typeof v==='number'?v:0),0);
-      const geoPartidos = Object.entries(geoVotos).filter(([,v])=>v>0).map(([nombre,votos])=>({partido:nombre,votos})).sort((a,b)=>b.votos-a.votos);
+      const hasCandMap = !!(mesaN.candidatos && Object.keys(mesaN.candidatos).length);
+      const geoPartidos = Object.entries(geoVotos).filter(([,v])=>v>0)
+        .map(([nombre,votos])=>({partido:nombre, votos, curules:curDepCurules?.[nombre]||0,
+          candidatos:(mesaN.candidatos||{})[nombre]||[]}))
+        .sort((a,b)=>b.votos-a.votos);
       document.getElementById('lbl-tabla').textContent=`Partidos · Cámara · ${label}`;
       document.getElementById('drill-badge').textContent=label; document.getElementById('drill-badge').className='level-badge pues';
       document.getElementById('drill-nav').innerHTML='';
-      document.getElementById('drill-thead').innerHTML=`<tr><th>#</th><th>Partido</th><th class="r">Votos</th><th class="r" style="min-width:130px">%</th></tr>`;
-      const tbody=document.getElementById('tbody-camara'); tbody.innerHTML='';
-      const maxV=geoPartidos[0]?.votos||1;
-      geoPartidos.forEach((p,i)=>{
-        const color=getColor?getColor(p.partido):'#0047FF', pctV=pct(p.votos,totalVotos), bw=((p.votos/maxV)*100).toFixed(1);
-        const tr=document.createElement('tr');
-        tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td><td><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;margin-right:.5rem;vertical-align:middle"></span><span style="font-family:'Syne',sans-serif;font-weight:700">${p.partido}</span></td><td class="r" style="font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td><td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>`;
-        tbody.appendChild(tr);
-      });
-      setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
+      renderPartidosTabla(geoPartidos, totalVotos, curDepCurules||{}, 'camara', false, null, null, hasCandMap, null);
+      if(!hasCandMap){
+        const tbody=document.getElementById('tbody-camara');
+        if(tbody){ const note=document.createElement('tr'); note.innerHTML=`<td colspan="5" style="font-family:'DM Mono',monospace;font-size:.62rem;color:rgba(255,255,255,.3);text-align:center;padding:.9rem 0;border:none">Sin detalle de candidatos a nivel mesa</td>`; tbody.appendChild(note); }
+      }
+      // Donut con datos del nodo activo de mesa (por campo, evita circ-node sin totales)
+      const _mVa  = mesaN.votant  ?? m.votant;
+      const _mNul = mesaN.votnul  ?? m.votnul;
+      const _mNma = mesaN.votnma  ?? m.votnma;
+      const _mBla = mesaN.votblan ?? m.votblan;
+      if(_mVa != null){ renderDonut({votant: _mVa, votnul: _mNul, votnma: _mNma, votblan: _mBla}); }
+      else { renderDonut({votval: totalVotos, votant: totalVotos}); }
     }
 
     // ─── RENDER VISTA DEPTO ───────────────────────────────────
@@ -825,23 +838,24 @@
 
       // ── SLICE PARA VOTOS Y CANDIDATOS (puede ser mun/zon/pue) ─
       let slice = depCirc;
+      let sliceFull = depBase; // nodo original sin filtro circ (fallback para donut si circ-node carece de votant)
       let labelExtra = dep.nombre;
 
       if(curDepData && curMun!=='TODOS'){
         const mun = curDepData.municipios.find(m=>m.cod===curMun);
         if(mun){
           const munN = mun.por_circunscripcion?.[curCorp] ?? mun;
-          slice = munN; labelExtra = `${dep.nombre} · ${mun.nombre}`;
+          slice = munN; sliceFull = mun; labelExtra = `${dep.nombre} · ${mun.nombre}`;
           if(curZon!=='TODOS'){
             const zon = mun.zonas?.find(z=>z.cod===curZon);
             if(zon){
               const zonN = zon.por_circunscripcion?.[curCorp] ?? zon;
-              slice = zonN; labelExtra += ` · Zona ${zon.cod}`;
+              slice = zonN; sliceFull = zon; labelExtra += ` · Zona ${zon.cod}`;
               if(curPue!=='TODOS'){
                 const pue = zon.puestos?.find(p=>p.cod===curPue);
                 if(pue){
                   const pueN = pue.por_circunscripcion?.[curCorp] ?? pue;
-                  slice = pueN; labelExtra += ` · ${pue.nombre}`;
+                  slice = pueN; sliceFull = pue; labelExtra += ` · ${pue.nombre}`;
                 }
               }
             }
@@ -852,11 +866,16 @@
       const partidosVotos = slice.partidos || {};
       const votvalSlice = Object.values(partidosVotos).reduce((s,v)=>s+v,0);
 
-      // ── DONUT: usar votant/votnul/votnma/votblan del slice activo ──
-      if(slice.votant != null){
-        renderDonut({ votant: slice.votant, votnul: slice.votnul||0, votnma: slice.votnma||0, votblan: slice.votblan||0 });
+      // ── DONUT: unir campos individualmente; circ-node para partidos, full-node para totales ──
+      // slice puede tener votant pero no votnul/votnma/votblan → tomar cada campo por separado
+      const _va  = slice.votant  ?? sliceFull.votant;
+      const _nul = slice.votnul  ?? sliceFull.votnul;
+      const _nma = slice.votnma  ?? sliceFull.votnma;
+      const _bla = slice.votblan ?? sliceFull.votblan;
+      if(_va != null){
+        renderDonut({votant: _va, votnul: _nul, votnma: _nma, votblan: _bla});
       } else {
-        renderDonut({ votval: votvalSlice, votant: votvalSlice });
+        renderDonut({votval: votvalSlice, votant: votvalSlice});
       }
 
       // ── TABLA: votos del slice, curules CONGELADAS del depto ──
@@ -905,7 +924,41 @@
       renderDonut(circTot.votant>0 ? circTot : getCircData());
 
       const curMap2 = curCorp==='INDIGENAS' ? curulesIndigenas : curCorp==='AFRO-DESCENDIENTES' ? curulesAfro : curulesNac;
+
+      // ── PACTO HISTÓRICO + CD-MIRA: agrupar SOLO en TERRITORIAL NACIONAL ──
+      let _pactoVotos = 0, _pactoCurules = 0, _pactoCands = [];
+      let _cdmVotos = 0, _cdmCurules = 0, _cdmCands = [];
+      if(curCorp === 'TERRITORIAL'){
+        const _PH = new Set(['MOVIMIENTO POLÍTICO PACTO HISTÓRICO','PACTO HISTÓRICO ANTIOQUIA',
+          'PACTO HISTÓRICO ATLÁNTICO','PACTO HISTÓRICO CÓRDOBA','PACTO HISTÓRICO BOLÍVAR',
+          'PACTO HISTÓRICO - SANTANDER','PACTO HISTÓRICO BOYACÁ','PACTO HISTÓRICO CESAR',
+          'PACTO HISTÓRICO MAGDALENA','PACTO HISTÓRICO HUILA',
+          'PACTO HISTÓRICO NORTE DE SANTANDER','PACTO HISTÓRICO QUINDÍO',
+          'PACTO HISTÓRICO GUAJIRA','PACTO HISTÓRICO CAQUETÁ',
+          'PACTO HISTÓRICO - CASANARE','PACTO HISTÓRICO CHOCÓ',
+          'PACTO HISTÓRICO SAN ANDRÉS','PACTO HISTÓRICO AMAZONAS',
+          'PACTO HISTÓRICO GUAINIA','PACTO HISTÓRICO VAUPÉS']);
+        for(const pn of _PH){
+          if(vt[pn]){ _pactoVotos += vt[pn]; delete vt[pn]; }
+          if(curMap2[pn]) _pactoCurules += curMap2[pn];
+          const rp = resumenData.partidos.find(x=>x.partido===pn);
+          if(rp?.candidatos) _pactoCands = _pactoCands.concat(rp.candidatos);
+        }
+        if(_pactoVotos > 0){ vt['PACTO HISTÓRICO NACIONAL'] = _pactoVotos; _pactoCands.sort((a,b)=>(b.votos||0)-(a.votos||0)); }
+        // ── CENTRO DEMOCRÁTICO-MIRA: unir las dos variantes ──
+        const _CDM = ['CENTRO DEMOCRÁTICO - MIRA','CENTRO DEMOCRÁTICO-MIRA'];
+        for(const pn of _CDM){
+          if(vt[pn]){ _cdmVotos += vt[pn]; delete vt[pn]; }
+          if(curMap2[pn]) _cdmCurules += curMap2[pn];
+          const rp = resumenData.partidos.find(x=>x.partido===pn);
+          if(rp?.candidatos) _cdmCands = _cdmCands.concat(rp.candidatos);
+        }
+        if(_cdmVotos > 0){ vt['CENTRO DEMOCRÁTICO - MIRA'] = _cdmVotos; _cdmCands.sort((a,b)=>(b.votos||0)-(a.votos||0)); }
+      }
+
       const partidos = resumenData.partidos.filter(p=>(vt[p.partido]||0)>0).map(p=>({...p,votos:vt[p.partido]||0,curules:curMap2[p.partido]||0}));
+      if(_pactoVotos > 0){ partidos.push({partido:'PACTO HISTÓRICO NACIONAL',votos:_pactoVotos,curules:_pactoCurules,candidatos:_pactoCands}); }
+      if(_cdmVotos > 0){ partidos.push({partido:'CENTRO DEMOCRÁTICO - MIRA',votos:_cdmVotos,curules:_cdmCurules,candidatos:_cdmCands}); }
       partidos.sort((a,b)=>b.votos-a.votos);
       const votval = partidos.reduce((s,p)=>s+p.votos, 0);
       const curMap = Object.fromEntries(partidos.map(p=>[p.partido, p.curules]));
@@ -1001,7 +1054,27 @@
       if(!q){box.style.display='none';box.innerHTML='';grid.style.display='';kpi.style.display='';return;}
       grid.style.display='none';kpi.style.display='none';box.style.display='block';
       const norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(), qn=norm(q), res=[];
-      (resumenData?.partidos||[]).forEach(p=>p.candidatos.forEach((c,idx)=>{if(!norm(c.nombre).includes(qn))return;res.push({nombre:c.nombre,partido:p.partido,votos:c.votos,pos:idx+1,elegido:idx<(curulesNac[p.partido]||0)});}));
+      // Determinar fuente según filtro geo activo
+      let candSource=null, curFrozenLocal=curulesNac;
+      if(curDep!=='TODOS' && curDepData){
+        const depBase=curDepData, depCirc=depBase.por_circunscripcion?.[curCorp]??depBase;
+        let slice=depCirc;
+        if(curMun!=='TODOS'){
+          const mun=depBase.municipios?.find(m=>m.cod===curMun);
+          if(mun){ const munN=mun.por_circunscripcion?.[curCorp]??mun; slice=munN;
+            if(curZon!=='TODOS'){ const zon=mun.zonas?.find(z=>z.cod===curZon);
+              if(zon){ const zonN=zon.por_circunscripcion?.[curCorp]??zon; slice=zonN;
+                if(curPue!=='TODOS'){ const pue=zon.puestos?.find(p=>p.cod===curPue);
+                  if(pue){ slice=pue.por_circunscripcion?.[curCorp]??pue; }}}}}
+        }
+        if(slice.candidatos){ candSource=slice.candidatos; curFrozenLocal=curDepCurules||{}; }
+        else if(depCirc.candidatos){ candSource=depCirc.candidatos; curFrozenLocal=curDepCurules||{}; }
+      }
+      if(candSource){
+        Object.entries(candSource).forEach(([partido,cands])=>cands.forEach((c,idx)=>{if(!norm(c.nombre).includes(qn))return;res.push({nombre:c.nombre,partido,votos:c.votos,pos:idx+1,elegido:idx<(curFrozenLocal[partido]||0)});}));
+      } else {
+        (resumenData?.partidos||[]).forEach(p=>p.candidatos.forEach((c,idx)=>{if(!norm(c.nombre).includes(qn))return;res.push({nombre:c.nombre,partido:p.partido,votos:c.votos,pos:idx+1,elegido:idx<(curulesNac[p.partido]||0)});}));
+      }
       res.sort((a,b)=>b.votos-a.votos);
       const VERDE='#39ff7a';
       box.innerHTML=!res.length?`<div style="padding:2rem;font-family:'DM Mono',monospace;font-size:.72rem;color:rgba(255,255,255,.3);text-align:center">No se encontraron candidatos con "<b>${q}</b>"</div>`
