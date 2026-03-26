@@ -222,6 +222,20 @@
     .orient-msg{font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.06em;line-height:1.9;color:rgba(255,255,255,.75);margin-bottom:1.5rem}
     .orient-btn{font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;background:#4ade80;color:#060810;border:none;padding:.55rem 2rem;cursor:pointer;transition:background .2s}
     .orient-btn:hover{background:#22c55e}
+    .info-bar{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;background:rgba(255,230,100,.08);border:1px solid rgba(255,220,80,.18);padding:.85rem 1.3rem;margin-bottom:1rem;backdrop-filter:blur(4px)}
+    .info-bar-text{font-family:'DM Mono',monospace;font-size:.79rem;letter-spacing:.04em;line-height:1.75;color:rgba(255,235,140,.82)}
+    .info-bar-btn{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;background:rgba(255,220,80,.12);border:1px solid rgba(255,220,80,.3);color:rgba(255,230,120,.75);padding:.28rem .85rem;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background .2s}
+    .info-bar-btn:hover{background:rgba(255,220,80,.22)}
+    body.day-mode .info-bar{background:rgba(255,200,200,.15);border-color:rgba(220,100,100,.18)}
+    body.day-mode .info-bar-text{color:rgba(120,30,30,.8)}
+    body.day-mode .info-bar-btn{background:rgba(220,100,100,.1);border-color:rgba(200,80,80,.3);color:rgba(140,40,40,.8)}
+    body.day-mode .info-bar-btn:hover{background:rgba(220,100,100,.2)}
+    .circ-toggle{display:flex;gap:.5rem;margin-bottom:1rem}
+    .circ-btn{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;padding:.28rem .9rem;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;transition:all .15s}
+    .circ-btn:hover{border-color:rgba(167,139,250,.4);color:rgba(167,139,250,.8)}
+    .circ-btn.circ-btn-active{background:rgba(167,139,250,.12);border-color:rgba(167,139,250,.4);color:rgba(167,139,250,.9)}
+    body.day-mode .circ-btn{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.15);color:rgba(0,0,0,.4)}
+    body.day-mode .circ-btn.circ-btn-active{background:rgba(120,80,200,.1);border-color:rgba(120,80,200,.35);color:rgba(120,80,200,.9)}
   </style>
 </head>
 <body>
@@ -230,7 +244,7 @@
   <div class="bg-layer"></div>
   <div class="bg-overlay"></div>
   <div class="copy-toast" id="copy-toast"><a href="register.html" style="color:inherit;font-weight:700;text-decoration:underline">Regístrate</a> para copiar este contenido</div>
-  <div class="copy-toast" id="premium-toast" style="border-color:rgba(74,222,128,.4);color:rgba(180,255,200,.9)">Las mesas requieren plan Premium · <a href="pricing.html" style="color:#4ade80">Ver planes →</a></div>
+  <div class="copy-toast" id="invite-toast" style="border-color:rgba(0,71,255,.4);color:rgba(180,210,255,.9);max-width:340px;line-height:1.7">¿Te gusta este nivel de detalle? <a href="register.html" style="color:#7ab3ff;font-weight:700;text-decoration:underline">Regístrate gratis</a> para más funciones</div>
   <div class="orient-overlay" id="orient-overlay">
     <div class="orient-box">
       <span class="orient-icon">📱↔</span>
@@ -292,14 +306,9 @@
           <span class="endoso-btn endoso-locked" id="endoso-cta-btn">🔒 Requiere plan Pro</span>
         </div>
 
-        <div class="sub-selector" style="margin-bottom:.5rem;padding-bottom:.75rem;border-bottom:1px solid var(--border)">
-          <span class="sub-label">Corporación:</span>
-          <select class="dep-select" id="corp-select" onchange="switchCorp(this.value)">
-            <option value="TODAS">Todas</option>
-            <option value="NACIONAL">Ordinaria (Nacional)</option>
-            <option value="INDIGENA">Indígena</option>
-            <option value="AFRO">Comunidades Negras / Afro</option>
-          </select>
+        <div class="info-bar" id="info-bar" style="display:none">
+          <span class="info-bar-text">Usa los filtros geográficos hasta mesa para ver el detalle más preciso de la votación. Esta herramienta es gratuita y fue construida con muchísimo trabajo. La mejor forma de apoyarnos es difundir nuestro trabajo y <a href="register.html" style="color:inherit;text-decoration:underline">registrarte</a>. Si quieres ver nuevos proyectos y funciones avanzadas, elige un plan Pro o superior.</span>
+          <button class="info-bar-btn" onclick="dismissInfoBar()">Entendido</button>
         </div>
 
         <div class="sub-selector">
@@ -324,6 +333,12 @@
 
         <div id="cam-search-results" style="display:none;margin-bottom:1.5rem"></div>
         <div class="kpi-row" id="kpi-row"></div>
+
+        <div class="circ-toggle" id="circ-toggle">
+          <button class="circ-btn circ-btn-active" id="circ-btn-territorial" onclick="onCircChange('TERRITORIAL')">Territorial</button>
+          <button class="circ-btn" id="circ-btn-indigenas" onclick="onCircChange('INDIGENAS')">Indígena</button>
+          <button class="circ-btn" id="circ-btn-afro" onclick="onCircChange('AFRO-DESCENDIENTES')">Afro-descendientes</button>
+        </div>
 
         <div class="results-grid" id="cam-main-grid">
           <div class="card">
@@ -377,6 +392,8 @@
   <script>
     const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
     const CURULES_TOTAL = 166;
+    const CURULES_INDIGENAS = 1;
+    const CURULES_AFRO = 2;
     const fmt = n => Number(n).toLocaleString('es-CO');
     const pct = (n,t) => t ? ((n/t)*100).toFixed(2) : '0.00';
     const esc = s => (s||'').replace(/'/g,"\\'");
@@ -384,9 +401,9 @@
     // ─── CURULES POR DEPARTAMENTO ─────────────────────────────
     const CURULES_DEP = {
       'AMAZONAS':2,'ANTIOQUIA':17,'ARAUCA':2,'ATLÁNTICO':7,'BOGOTÁ D.C.':18,
-      'BOLÍVAR':6,'BOYACÁ':6,'CALDAS':5,'CAQUETÁ':2,'CASANARE':2,'CAUCA':5,
-      'CESAR':4,'CHOCÓ':2,'CÓRDOBA':5,'CUNDINAMARCA':7,'GUAINÍA':2,'GUAVIARE':2,
-      'HUILA':4,'LA GUAJIRA':2,'MAGDALENA':5,'META':3,'NARIÑO':6,
+      'BOLÍVAR':6,'BOYACÁ':6,'CALDAS':5,'CAQUETÁ':2,'CASANARE':2,'CAUCA':4,
+      'CESAR':4,'CHOCÓ':2,'CONSULADOS':1,'CÓRDOBA':5,'CUNDINAMARCA':7,'GUAINÍA':2,'GUAVIARE':2,
+      'HUILA':4,'LA GUAJIRA':2,'MAGDALENA':5,'META':3,'NARIÑO':5,
       'NORTE DE SANTANDER':5,'PUTUMAYO':2,'QUINDÍO':3,'RISARALDA':4,
       'SAN ANDRÉS Y PROVIDENCIA':2,'SANTANDER':7,'SUCRE':3,'TOLIMA':6,
       'VALLE DEL CAUCA':13,'VAUPÉS':2,'VICHADA':2
@@ -434,11 +451,11 @@
 
     // ─── STATE ────────────────────────────────────────────────
     let resumenData = null, donutChart = null;
-    let curulesNac = {};
+    let curulesNac = {}, curulesIndigenas = {}, curulesAfro = {};
     let curDep = 'TODOS';
     let curDepData = null;   // dep-{cod}.json cargado
     let curMun = 'TODOS', curZon = 'TODOS', curPue = 'TODOS', curMesa = 'TODOS';
-    let curCorp = 'TODAS';
+    let curCorp = 'TERRITORIAL';
     let curDepCurules = {}; // D'Hondt congelado al nivel depto
 
     // ─── HELPERS UI ───────────────────────────────────────────
@@ -469,25 +486,49 @@
     async function init(){
       try{
         resumenData = await getJSON('resumen');
-        // Calcular curules nacionales: D'Hondt por depto, sumar
+        // Calcular curules por circunscripción: TERRITORIAL (D'Hondt por depto), INDIGENAS (1 curul nacional), AFRO-DESCENDIENTES (2 curules nacional)
         const deps = await getJSON('departamentos');
-        curulesNac = {};
+        curulesNac = {}; curulesIndigenas = {}; curulesAfro = {};
+        const _votosInd = {}, _votosAfro = {};
         deps.forEach(dep => {
-          const nCurules = getCurulesDep(dep.nombre);
-          const { cur } = dhondtDep(dep.partidos, nCurules);
-          Object.entries(cur).forEach(([p,v])=>{ curulesNac[p]=(curulesNac[p]||0)+v; });
+          const tipo = getDepCirc(dep);
+          if(tipo === 'TERRITORIAL'){
+            const nCurules = getCurulesDep(dep.nombre);
+            const { cur } = dhondtDep(dep.partidos||{}, nCurules);
+            Object.entries(cur).forEach(([p,v])=>{ curulesNac[p]=(curulesNac[p]||0)+v; });
+          } else if(tipo === 'INDIGENAS'){
+            Object.entries(dep.partidos||{}).forEach(([p,v])=>{ _votosInd[p]=(_votosInd[p]||0)+v; });
+          } else if(tipo === 'AFRO-DESCENDIENTES'){
+            Object.entries(dep.partidos||{}).forEach(([p,v])=>{ _votosAfro[p]=(_votosAfro[p]||0)+v; });
+          }
         });
+        if(Object.keys(_votosInd).length){ const {cur}=dhondtDep(_votosInd,CURULES_INDIGENAS); curulesIndigenas=cur; }
+        if(Object.keys(_votosAfro).length){ const {cur}=dhondtDep(_votosAfro,CURULES_AFRO); curulesAfro=cur; }
         // Anotar curules en resumenData.partidos
         resumenData.partidos.forEach(p=>{ p.curules_nac = curulesNac[p.partido]||0; });
 
-        document.getElementById('meta-votval').textContent = fmt(resumenData.votval);
+        const _metaVot = resumenData.votant != null
+          ? resumenData.votant - (resumenData.votnul||0) - (resumenData.votnma||0)
+          : resumenData.votval;
+        document.getElementById('meta-votval').textContent = fmt(_metaVot);
         document.getElementById('load-state').classList.add('hidden');
         document.getElementById('main-content').classList.remove('hidden');
 
-        // Poblar selector de circunscripciones
+        // Poblar selector de departamentos/circunscripciones
         const sel = document.getElementById('dep-select');
+        const _seenDep=new Set();
         deps.sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).forEach(d=>{
-          const o=document.createElement('option'); o.value=d.cod; o.textContent=`${d.nombre} (${getCurulesDep(d.nombre)} curules)`; sel.appendChild(o);
+          if(_seenDep.has(d.cod)) return;
+          _seenDep.add(d.cod);
+          const o=document.createElement('option'); o.value=d.cod;
+          o.textContent=`${d.nombre} (${getCurulesForDep(d.nombre)} curules)`;
+          o.dataset.circ=getDepCirc(d); // clave para filtrado correcto por circ_nom
+          sel.appendChild(o);
+        });
+        // Filtrar opciones según circunscripción activa por defecto
+        Array.from(sel.options).forEach(o=>{
+          if(o.value==='TODOS') return;
+          o.style.display = (o.dataset.circ||'TERRITORIAL') === curCorp ? '' : 'none';
         });
 
         renderKPI();
@@ -499,35 +540,39 @@
     }
 
     // ─── KPI ──────────────────────────────────────────────────
-    function renderKPI(depNom, votval, votant, curulesObj, curulesTotal){
-      const r = resumenData;
-      const vv = votval||r.votval, va = votant||r.votant;
-      const cObj = curulesObj||curulesNac;
+    function renderKPI(depNom, _votval, votant, curulesObj, curulesTotal){
+      const r = depNom ? resumenData : getCircData();
+      const va = votant != null ? votant : r.votant;
+      // válidos = votant - nulos - no_marcados (blanco cuenta como válido)
+      const vv = _votval != null ? _votval
+        : (va != null ? va - (r.votnul||0) - (r.votnma||0) : r.votval);
+      const cObj = curulesObj || (curCorp==='INDIGENAS' ? curulesIndigenas : curCorp==='AFRO-DESCENDIENTES' ? curulesAfro : curulesNac);
       const cTotal = curulesTotal||Object.values(cObj).reduce((s,v)=>s+v,0);
       const topP = Object.entries(cObj).filter(([k])=>!/blanco/i.test(k)).sort((a,b)=>b[1]-a[1])[0];
+      const maxC = getMaxCurules(depNom);
       document.getElementById('kpi-row').innerHTML=`
-        <div class="kpi-card"><div class="kpi-label">Votos válidos</div><div class="kpi-val gr">${fmt(vv)}</div><div class="kpi-delta">${pct(vv,va)}% de los votantes</div></div>
         <div class="kpi-card"><div class="kpi-label">Votantes</div><div class="kpi-val wh">${fmt(va)}</div><div class="kpi-delta">${depNom?depNom:'Nacional'}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Curules asignadas</div><div class="kpi-val">${cTotal} / ${depNom?getCurulesDep(depNom):CURULES_TOTAL}</div><div class="kpi-delta">D'Hondt · umbral 3% · ${depNom?'por circunscripción':'suma deptos.'}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Votos válidos</div><div class="kpi-val gr">${fmt(vv)}</div><div class="kpi-delta">${pct(vv,va)}% de los votantes</div></div>
+        <div class="kpi-card"><div class="kpi-label">Curules asignadas</div><div class="kpi-val">${cTotal} / ${maxC}</div><div class="kpi-delta">D'Hondt · umbral 3% · ${depNom?'esta circ.':'suma circ.'}</div></div>
         <div class="kpi-card"><div class="kpi-label">Partido puntero</div><div class="kpi-val sm">${topP?topP[0].split(' ').slice(0,3).join(' '):'—'}</div><div class="kpi-delta">${topP?topP[1]+' curules':''}</div></div>`;
-      document.getElementById('curules-total').textContent = `${cTotal} de ${depNom?getCurulesDep(depNom):CURULES_TOTAL}`;
+      document.getElementById('curules-total').textContent = `${cTotal} de ${maxC}`;
     }
 
     // ─── DONUT ────────────────────────────────────────────────
     function renderDonut(data){
-      // data puede ser resumenData completo, o {votval, votant, votnul, votnma, votblan}
+      // válidos = votant - nulos - no_marcados (blanco SÍ cuenta como válido)
       const d = data || resumenData;
-      const votval  = d.votval  || 0;
-      const votant  = d.votant  || votval;
       const votnul  = d.votnul  || 0;
       const votnma  = d.votnma  || 0;
       const votblan = d.votblan || 0;
+      const votant  = d.votant  != null ? d.votant : (d.votval||0) + votnul + votnma;
+      const votval  = d.votant  != null ? d.votant - votnul - votnma : (d.votval||0) + votblan;
       document.getElementById('pct-camara').textContent = votant ? ((votval/votant)*100).toFixed(2)+'%' : '—';
       if(donutChart) donutChart.destroy();
       donutChart = new Chart(document.getElementById('donut-camara').getContext('2d'),{
         type:'doughnut',
         data:{labels:['Votos válidos','Nulos','No marcados','En blanco'],
-              datasets:[{data:[votval,votnul,votnma,votblan],
+              datasets:[{data:[votval-votblan,votnul,votnma,votblan],
                          backgroundColor:['#0047FF','#cc2233','#f0a500','#555'],
                          borderWidth:0,hoverOffset:6}]},
         options:{responsive:true,maintainAspectRatio:true,cutout:'72%',
@@ -547,9 +592,47 @@
     const CORP_INDIGENA = /ind[ií]gen/i;
     const CORP_AFRO     = /negr|afro|comunidades.negr/i;
     function tipoCirc(nombre){
-      if(CORP_INDIGENA.test(nombre)) return 'INDIGENA';
-      if(CORP_AFRO.test(nombre))     return 'AFRO';
-      return 'NACIONAL';
+      if(CORP_INDIGENA.test(nombre)) return 'INDIGENAS';
+      if(CORP_AFRO.test(nombre))     return 'AFRO-DESCENDIENTES';
+      return 'TERRITORIAL';
+    }
+
+    // Lee circ_nom del objeto dep (como en Senado) — preferido sobre regex en nombre
+    const _normC = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+    function getDepCirc(dep){
+      const cn = _normC(dep.circ_nom || dep.nombre);
+      if(cn.includes('INDIG')) return 'INDIGENAS';
+      if(cn.includes('AFRO') || cn.includes('NEGR')) return 'AFRO-DESCENDIENTES';
+      return 'TERRITORIAL';
+    }
+    // Datos del resumen para la circunscripción activa (igual que getCircData de Senado)
+    function getCircData(){
+      if(!resumenData) return {};
+      if(!resumenData.por_circunscripcion) return resumenData;
+      return resumenData.por_circunscripcion[curCorp] || resumenData;
+    }
+
+    function getCurulesForDep(nombre){
+      const tipo = tipoCirc(nombre);
+      if(tipo === 'INDIGENAS') return CURULES_INDIGENAS;
+      if(tipo === 'AFRO-DESCENDIENTES') return CURULES_AFRO;
+      return getCurulesDep(nombre);
+    }
+
+    function getMaxCurules(depNom){
+      if(curCorp === 'INDIGENAS') return CURULES_INDIGENAS;
+      if(curCorp === 'AFRO-DESCENDIENTES') return CURULES_AFRO;
+      if(depNom) return getCurulesDep(depNom);
+      return CURULES_TOTAL;
+    }
+
+    function onCircChange(val){
+      // Actualizar estado visual del toggle
+      document.querySelectorAll('.circ-btn').forEach(b=>b.classList.remove('circ-btn-active'));
+      const idMap = {'TERRITORIAL':'territorial','INDIGENAS':'indigenas','AFRO-DESCENDIENTES':'afro'};
+      const btn = document.getElementById('circ-btn-' + (idMap[val]||val.toLowerCase()));
+      if(btn) btn.classList.add('circ-btn-active');
+      switchCorp(val);
     }
 
     function switchCorp(corp){
@@ -558,8 +641,7 @@
       const sel = document.getElementById('dep-select');
       Array.from(sel.options).forEach(o=>{
         if(o.value==='TODOS'){ o.style.display=''; return; }
-        const tipo = tipoCirc(o.textContent);
-        o.style.display = (corp==='TODAS' || tipo===corp) ? '' : 'none';
+        o.style.display = (o.dataset.circ||'TERRITORIAL')===corp ? '' : 'none';
       });
       // Si el depto activo quedó oculto, volver a nacional
       const selOpt = sel.options[sel.selectedIndex];
@@ -581,7 +663,7 @@
       if(depCod==='TODOS'){ curDepData=null; renderNacional(); return; }
 
       const deps = await getJSON('departamentos');
-      const dep = deps.find(d=>d.cod===depCod);
+      const dep = deps.find(d=>d.cod===depCod && getDepCirc(d)===curCorp);
       if(!dep) return;
 
       // Intentar cargar dep-{cod}.json
@@ -630,6 +712,7 @@
     // ─── SWITCH PUESTO ────────────────────────────────────────
     async function switchPue(pueCod){
       curPue = pueCod; resetSelFrom('mesa');
+      if(pueCod && pueCod!=='TODOS' && !localStorage.getItem('rr-token')){ showInviteToast(); }
       if(pueCod && pueCod!=='TODOS' && curDepData?.municipios){
         const mun = curDepData.municipios.find(m=>m.cod===curMun);
         const zon = mun?.zonas?.find(z=>z.cod===curZon);
@@ -656,22 +739,18 @@
 
     // ─── SWITCH MESA ──────────────────────────────────────────
     function switchMesa(mesaCod){
-      const user = JSON.parse(localStorage.getItem('rr-user')||'null');
-      if(mesaCod && mesaCod!=='TODOS' && (!user || !['premium','full','pro'].includes(user.plan))){
-        showPremiumToast();
-        document.getElementById('mesa-select').value='TODOS'; curMesa='TODOS'; return;
-      }
+      if(!localStorage.getItem('rr-token')){ showInviteToast(); }
       curMesa = mesaCod; _reRenderDep();
     }
-    function showPremiumToast(){
-      const t=document.getElementById('premium-toast'); if(!t) return;
-      t.classList.add('show'); clearTimeout(t._tmr); t._tmr=setTimeout(()=>t.classList.remove('show'),3500);
+    function showInviteToast(){
+      const t=document.getElementById('invite-toast'); if(!t) return;
+      t.classList.add('show'); clearTimeout(t._tmr); t._tmr=setTimeout(()=>t.classList.remove('show'),4000);
     }
 
     async function _reRenderDep(){
       if(curMesa && curMesa!=='TODOS'){ renderMesaView(); return; }
       const deps = await getJSON('departamentos');
-      const dep = deps.find(d=>d.cod===curDep);
+      const dep = deps.find(d=>d.cod===curDep && getDepCirc(d)===curCorp);
       if(dep) renderDepView(dep);
     }
 
@@ -707,19 +786,23 @@
 
     // ─── RENDER VISTA DEPTO ───────────────────────────────────
     function renderDepView(dep){
-      const nCurules = getCurulesDep(dep.nombre);
+      const nCurules = getCurulesForDep(dep.nombre);
 
-      // ── D'HONDT SIEMPRE AL NIVEL DEPTO (congelado) ──────────
-      const depPartidosVotos = (curDepData || dep).partidos || {};
+      // ── NIVEL DEPTO + CIRCUNSCRIPCIÓN ────────────────────────
+      const depBase = curDepData || dep;
+      const depCirc = depBase.por_circunscripcion?.[curCorp] ?? depBase;
+
+      // ── D'HONDT SIEMPRE AL NIVEL DEPTO-CIRC (congelado) ─────
+      const depPartidosVotos = depCirc.partidos || {};
       const { cur: curFrozen, cifra: cifraVal, umbral: umbralVal } = dhondtDep(depPartidosVotos, nCurules);
       curDepCurules = curFrozen;
       const totalCurules = Object.values(curFrozen).reduce((s,v)=>s+v,0);
 
-      // ── ELEGIDOS CONGELADOS POR NOMBRE (desde candidatos del depto) ──
+      // ── ELEGIDOS CONGELADOS POR NOMBRE (desde candidatos del depto-circ) ──
       const normStr = s=>s.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
       const elegidosMap = {}; // { partido: Set<nombre> }
-      if(curDepData?.candidatos){
-        Object.entries(curDepData.candidatos).forEach(([partido, cands])=>{
+      if(depCirc.candidatos){
+        Object.entries(depCirc.candidatos).forEach(([partido, cands])=>{
           const nC = curFrozen[partido]||0;
           if(!nC) return;
           const nomPart = normStr(partido);
@@ -741,21 +824,25 @@
       document.getElementById('umbral-dep-val').textContent = fmt(umbralVal);
 
       // ── SLICE PARA VOTOS Y CANDIDATOS (puede ser mun/zon/pue) ─
-      let slice = curDepData || dep;
+      let slice = depCirc;
       let labelExtra = dep.nombre;
-      let isDepLevel = true;
 
       if(curDepData && curMun!=='TODOS'){
         const mun = curDepData.municipios.find(m=>m.cod===curMun);
         if(mun){
-          slice = mun; labelExtra = `${dep.nombre} · ${mun.nombre}`; isDepLevel = false;
+          const munN = mun.por_circunscripcion?.[curCorp] ?? mun;
+          slice = munN; labelExtra = `${dep.nombre} · ${mun.nombre}`;
           if(curZon!=='TODOS'){
             const zon = mun.zonas?.find(z=>z.cod===curZon);
             if(zon){
-              slice = zon; labelExtra += ` · Zona ${zon.cod}`; isDepLevel = false;
+              const zonN = zon.por_circunscripcion?.[curCorp] ?? zon;
+              slice = zonN; labelExtra += ` · Zona ${zon.cod}`;
               if(curPue!=='TODOS'){
                 const pue = zon.puestos?.find(p=>p.cod===curPue);
-                if(pue){ slice = pue; labelExtra += ` · ${pue.nombre}`; isDepLevel = false; }
+                if(pue){
+                  const pueN = pue.por_circunscripcion?.[curCorp] ?? pue;
+                  slice = pueN; labelExtra += ` · ${pue.nombre}`;
+                }
               }
             }
           }
@@ -763,65 +850,72 @@
       }
 
       const partidosVotos = slice.partidos || {};
-      const candMap = slice.candidatos || null;
       const votvalSlice = Object.values(partidosVotos).reduce((s,v)=>s+v,0);
 
-      // ── DONUT: nulos/blancos del depto si estamos en nivel depto ──
-      if(isDepLevel && curDepData?.votant){
-        renderDonut({ votval: votvalSlice, votant: curDepData.votant,
-                      votnul: curDepData.votnul||0, votnma: curDepData.votnma||0, votblan: curDepData.votblan||0 });
+      // ── DONUT: usar votant/votnul/votnma/votblan del slice activo ──
+      if(slice.votant != null){
+        renderDonut({ votant: slice.votant, votnul: slice.votnul||0, votnma: slice.votnma||0, votblan: slice.votblan||0 });
       } else {
-        renderDonut({ votval: votvalSlice, votant: votvalSlice }); // sub-nivel: solo válidos
+        renderDonut({ votval: votvalSlice, votant: votvalSlice });
       }
 
       // ── TABLA: votos del slice, curules CONGELADAS del depto ──
+      // Candidatos: fuente de verdad = nodo activo (slice)
+      const hasCandMap = !!depCirc.candidatos;
       const partidosDep = resumenData.partidos.map(p=>({
         ...p,
         votos: partidosVotos[p.partido]||0,
         curules: curFrozen[p.partido]||0,
-        candidatos: candMap?.[p.partido] ?? p.candidatos
+        candidatos: (slice.candidatos||{})[p.partido] || []
       })).filter(p=>p.votos>0).sort((a,b)=>b.votos-a.votos);
 
       document.getElementById('lbl-tabla').textContent=`Partidos · Cámara · ${labelExtra} · ${nCurules} curules · D'Hondt`;
       document.getElementById('drill-badge').textContent=dep.nombre;
       document.getElementById('drill-badge').className='level-badge dep';
       document.getElementById('drill-nav').innerHTML='';
-      renderPartidosTabla(partidosDep, votvalSlice, curFrozen, 'camara', true, dep.nombre, dep.cod, !!candMap, elegidosMap);
-      renderKPI(dep.nombre, votvalSlice, null, curFrozen, totalCurules);
+      renderPartidosTabla(partidosDep, votvalSlice, curFrozen, 'camara', true, dep.nombre, dep.cod, hasCandMap, elegidosMap);
+      // KPI: válidos = votant - nulos - no_marcados del slice activo
+      // Si el nodo no tiene votant, usar votvalSlice para no caer al nacional
+      const sliceVotant = slice.votant != null ? slice.votant : votvalSlice;
+      const sliceValidos = slice.votant != null
+        ? slice.votant - (slice.votnul||0) - (slice.votnma||0)
+        : votvalSlice;
+      renderKPI(dep.nombre, sliceValidos, sliceVotant, curFrozen, totalCurules);
     }
 
     // ─── RENDER NACIONAL ──────────────────────────────────────
     function renderNacional(){
-      document.getElementById('lbl-tabla').textContent=`Partidos · Cámara · Nacional · ${CURULES_TOTAL} curules · D'Hondt por depto.`;
+      const maxC = getMaxCurules();
+      document.getElementById('lbl-tabla').textContent=`Partidos · Cámara · Nacional · ${maxC} curules · D'Hondt${curCorp==='TERRITORIAL'?' por depto.':''}`;
       document.getElementById('drill-badge').textContent='Nacional';
       document.getElementById('drill-badge').className='level-badge dep';
       document.getElementById('drill-nav').innerHTML='';
       document.getElementById('dep-cifras').style.display='none';
-      renderDonut(resumenData);
 
-      // Filtrar por corporación si aplica
-      let partidos;
-      if(curCorp === 'TODAS'){
-        partidos = [...resumenData.partidos].map(p=>({...p, curules: curulesNac[p.partido]||0}));
-      } else {
-        // Sumar votos y curules solo de deptos del tipo seleccionado
-        const deps = cache['departamentos'] || [];
-        const votosCorp = {}, curulesCorp = {};
-        deps.filter(d => tipoCirc(d.nombre) === curCorp).forEach(d => {
-          Object.entries(d.partidos||{}).forEach(([p,v]) => { votosCorp[p]=(votosCorp[p]||0)+v; });
-          const { cur } = dhondtDep(d.partidos||{}, getCurulesDep(d.nombre));
-          Object.entries(cur).forEach(([p,v]) => { curulesCorp[p]=(curulesCorp[p]||0)+v; });
-        });
-        partidos = resumenData.partidos
-          .filter(p => (votosCorp[p.partido]||0) > 0)
-          .map(p => ({...p, votos: votosCorp[p.partido]||0, curules: curulesCorp[p.partido]||0}));
-      }
+      // Agregar votos y totales desde los deps que pertenecen a la circ activa
+      const deps = cache['departamentos'] || [];
+      const vt={}, circTot={votant:0,votnul:0,votnma:0,votblan:0};
+      deps.filter(d=>getDepCirc(d)===curCorp).forEach(d=>{
+        Object.entries(d.partidos||{}).forEach(([p,v])=>{vt[p]=(vt[p]||0)+v;});
+        circTot.votant+=d.votant||0; circTot.votnul+=d.votnul||0;
+        circTot.votnma+=d.votnma||0; circTot.votblan+=d.votblan||0;
+      });
 
+      // Donut: usar agregado de deps si tienen votant, si no el getCircData del resumen
+      renderDonut(circTot.votant>0 ? circTot : getCircData());
+
+      const curMap2 = curCorp==='INDIGENAS' ? curulesIndigenas : curCorp==='AFRO-DESCENDIENTES' ? curulesAfro : curulesNac;
+      const partidos = resumenData.partidos.filter(p=>(vt[p.partido]||0)>0).map(p=>({...p,votos:vt[p.partido]||0,curules:curMap2[p.partido]||0}));
       partidos.sort((a,b)=>b.votos-a.votos);
       const votval = partidos.reduce((s,p)=>s+p.votos, 0);
       const curMap = Object.fromEntries(partidos.map(p=>[p.partido, p.curules]));
       renderPartidosTabla(partidos, votval, curMap, 'camara', false, null, null, false, null);
-      renderKPI();
+
+      // KPI: pasar datos de la circ activa
+      const dVotant = circTot.votant>0 ? circTot.votant : null;
+      const dValidos = dVotant!=null ? dVotant-circTot.votnul-circTot.votnma : null;
+      const curulesTotal = Object.values(curMap2).reduce((s,v)=>s+v,0);
+      renderKPI(null, dValidos, dVotant, curMap2, curulesTotal);
     }
 
     // ─── RENDER TABLA PARTIDOS ────────────────────────────────
@@ -952,6 +1046,8 @@
     function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;if(token&&user){const pl={free:'Free',basic:'Básico',analysis:'Análisis',full:'Completo'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">Salir</button>`;}else{area.innerHTML=`<a href="pricing.html" style="font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">Planes</a><a href="login.html" class="e-btn-login">Iniciar sesión</a><a href="register.html" class="e-btn-register">Registrarse</a>`;}}
     async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();updateEndosoCta();}
     function updateEndosoCta(){ const user=JSON.parse(localStorage.getItem('rr-user')||'null'); const btn=document.getElementById('endoso-cta-btn'); if(!btn) return; if(user&&['pro','premium','full'].includes(user.plan)){ btn.outerHTML=`<a href="endoso-2026.html" class="endoso-btn" id="endoso-cta-btn" onclick="navTo(event,'endoso-2026.html')">Calcular endoso →</a>`; } }
+    function dismissInfoBar(){sessionStorage.setItem('rr-info-bar-ok','1');const b=document.getElementById('info-bar');if(b)b.style.display='none';}
+    (function(){if(!sessionStorage.getItem('rr-info-bar-ok')){const b=document.getElementById('info-bar');if(b)b.style.display='flex';}})();
     updateElectoralNav(); updateEndosoCta();
     init();
     // MOBILE LANDSCAPE HINT
