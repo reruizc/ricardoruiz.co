@@ -303,6 +303,16 @@
     @media(max-width:600px){.kpi-row{grid-template-columns:1fr}.selector-grid{grid-template-columns:1fr}}
     .hidden{display:none!important}
 
+    /* EXTRA CANDIDATES TOGGLE */
+    .extra-cands-selectors{display:none;grid-template-columns:1fr 1fr;gap:1rem;margin-top:.9rem}
+    .extra-cands-selectors.visible{display:grid}
+    body.day-mode .filter-chip.extra{color:rgba(180,0,120,.9);border-color:rgba(180,0,120,.3);background:rgba(180,0,120,.07)}
+    .ctag.e1{color:#f472b6;background:rgba(244,114,182,.15)}
+    .ctag.e2{color:#38bdf8;background:rgba(56,189,248,.15)}
+    body.day-mode .ctag.e1{color:rgba(180,0,100,.9);background:rgba(244,114,182,.1)}
+    body.day-mode .ctag.e2{color:rgba(0,100,180,.9);background:rgba(56,189,248,.1)}
+    .kpi-val.pk{color:#f472b6}.kpi-val.cy{color:#38bdf8}
+
     .orient-overlay{display:none;position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,.88);align-items:center;justify-content:center;padding:1.5rem}
     .orient-overlay.show{display:flex}
     .orient-box{background:#0e1220;border:1px solid rgba(255,255,255,.12);padding:2rem 1.8rem;max-width:320px;text-align:center}
@@ -436,6 +446,36 @@
               </div>
             </div>
           </div>
+
+          <!-- TOGGLE EXTRA CANDIDATES (E1, E2) -->
+          <div class="optional-block">
+            <label class="optional-toggle">
+              <div class="toggle-switch">
+                <input type="checkbox" id="toggle-extra" onchange="toggleExtra(this.checked)" />
+                <div class="toggle-track"></div>
+                <div class="toggle-knob"></div>
+              </div>
+              <span class="toggle-label">Ver la votación de uno o varios candidatos según la primera condición</span>
+            </label>
+            <div class="extra-cands-selectors" id="extra-cands-selectors">
+              <div class="selector-group">
+                <div class="selector-label"><span class="cand-badge" style="background:#f472b6"></span>Candidato extra 1</div>
+                <div class="ac-wrap">
+                  <input type="text" class="ac-input" id="ac-input-E1" placeholder="Escribir nombre…" autocomplete="off" oninput="acSearch('E1')" onfocus="acOpen('E1')" onkeydown="acKey(event,'E1')" />
+                  <div class="ac-dropdown" id="ac-drop-E1"></div>
+                </div>
+                <div class="corp-hint" id="corp-E1"></div>
+              </div>
+              <div class="selector-group">
+                <div class="selector-label"><span class="cand-badge" style="background:#38bdf8"></span>Candidato extra 2 <span style="font-family:'DM Mono',monospace;font-size:.56rem;color:rgba(255,255,255,.25)">(opcional)</span></div>
+                <div class="ac-wrap">
+                  <input type="text" class="ac-input" id="ac-input-E2" placeholder="Escribir nombre…" autocomplete="off" oninput="acSearch('E2')" onfocus="acOpen('E2')" onkeydown="acKey(event,'E2')" />
+                  <div class="ac-dropdown" id="ac-drop-E2"></div>
+                </div>
+                <div class="corp-hint" id="corp-E2"></div>
+              </div>
+            </div>
+          </div>
         </div>
 
 
@@ -550,8 +590,8 @@
 
     // ─── AUTOCOMPLETE ─────────────────────────────────────────
     // Mapa de selección confirmada por key
-    const acSelected = { A: null, B: null, C: null, D: null };
-    let acHighlight = { A: -1, B: -1, C: -1, D: -1 };
+    const acSelected = { A: null, B: null, C: null, D: null, E1: null, E2: null };
+    let acHighlight = { A: -1, B: -1, C: -1, D: -1, E1: -1, E2: -1 };
 
     // Búsqueda que tolera palabras no contiguas y saltos de nombres
     // "JUAN CASTELLANOS" encuentra "JUAN DAVID CASTELLANOS"
@@ -625,7 +665,7 @@
 
     // Cerrar dropdowns al hacer click fuera
     document.addEventListener('click', e => {
-      ['A','B','C','D'].forEach(k => {
+      ['A','B','C','D','E1','E2'].forEach(k => {
         const wrap = document.getElementById(`ac-input-${k}`)?.closest('.ac-wrap');
         if (wrap && !wrap.contains(e.target)) {
           const drop = document.getElementById(`ac-drop-${k}`);
@@ -648,6 +688,21 @@
       if (cdBlock) cdBlock.classList.toggle('visible', on);
     }
 
+    let useExtra = false;
+
+    function toggleExtra(on) {
+      useExtra = on;
+      document.getElementById('extra-cands-selectors').classList.toggle('visible', on);
+      if (!on) {
+        window._selE1 = null;
+        window._selE2 = null;
+      }
+      // Si ya hay resultados calculados, re-renderizar la tabla AB con/sin columnas extra
+      if (window._allMesasRef && window._allMesasRef.length) {
+        renderDrill('ab', mesasAB, drillAB);
+      }
+    }
+
     // ─── FETCH CANDIDATE JSON ─────────────────────────────────
     async function fetchCand(slug) {
       const r = await fetch(`${S3}/endoso/${slug}.json`);
@@ -664,13 +719,24 @@
       const selA = getSelected('A'), selB = getSelected('B');
       const selC = useCD ? getSelected('C') : null;
       const selD = useCD ? getSelected('D') : null;
+      const selE1 = useExtra ? getSelected('E1') : null;
+      const selE2 = useExtra ? getSelected('E2') : null;
 
       try {
         // Descargar JSONs necesarios
         const fetches = [fetchCand(selA.slug), fetchCand(selB.slug)];
         if (selC) fetches.push(fetchCand(selC.slug));
         if (selD) fetches.push(fetchCand(selD.slug));
-        const [dataA, dataB, dataC, dataD] = await Promise.all(fetches);
+        if (selE1) fetches.push(fetchCand(selE1.slug));
+        if (selE2) fetches.push(fetchCand(selE2.slug));
+        const results = await Promise.all(fetches);
+        const dataA = results[0], dataB = results[1];
+        let dataC, dataD, dataE1, dataE2;
+        let idx = 2;
+        if (selC) { dataC = results[idx++]; }
+        if (selD) { dataD = results[idx++]; }
+        if (selE1) { dataE1 = results[idx++]; }
+        if (selE2) { dataE2 = results[idx++]; }
 
         // Construir mapa de mesas para cada candidato
         // key: dep|mun|zon|pue|mesa → votos
@@ -684,6 +750,8 @@
         const mapA = buildMap(dataA), mapB = buildMap(dataB);
         const mapC = dataC ? buildMap(dataC) : {};
         const mapD = dataD ? buildMap(dataD) : {};
+        const mapE1 = dataE1 ? buildMap(dataE1) : {};
+        const mapE2 = dataE2 ? buildMap(dataE2) : {};
 
         // Unión de todas las mesas de A y B
         const allKeys = new Set([...Object.keys(mapA), ...Object.keys(mapB)]);
@@ -695,6 +763,7 @@
             key: k,
             A: a?.v||0, B: b?.v||0,
             C: mapC[k]?.v||0, D: mapD[k]?.v||0,
+            E1: mapE1[k]?.v||0, E2: mapE2[k]?.v||0,
             dep: meta.dep, depNom: meta.depNom,
             mun: meta.mun, munNom: meta.munNom,
             zon: meta.zon,
@@ -726,6 +795,8 @@
 
         window._allMesasRef = allMesas;
         window._allMesasRef = allMesas;
+        window._selE1 = selE1 || null;
+        window._selE2 = selE2 || null;
         // Reset drills
         drillAB = { nivel:'dep', cod_dep:null, nom_dep:null, cod_mun:null, nom_mun:null, cod_zon:null, nom_zon:null, cod_pue:null, nom_pue:null };
         drillCD = { nivel:'dep', cod_dep:null, nom_dep:null, cod_mun:null, nom_mun:null, cod_zon:null, nom_zon:null, cod_pue:null, nom_pue:null };
@@ -1019,6 +1090,7 @@
     }
     function renderDrill(prefix, mesas, state) {
       const hasCD = prefix === 'cd';
+      const hasExtra = prefix === 'ab' && useExtra && (window._selE1 || window._selE2);
       const titleEl = document.getElementById(`drill-${prefix}-title`);
       const badgeEl = document.getElementById(`drill-${prefix}-badge`);
       const navEl   = document.getElementById(`drill-${prefix}-nav`);
@@ -1051,49 +1123,54 @@
 
       if (state.nivel==='dep') {
         titleEl.textContent='Por departamento'; badgeEl.textContent='Nacional'; badgeEl.className='level-badge dep';
-        filtered.forEach(m=>{ if(!groups[m.dep]) groups[m.dep]={nom:m.depNom,A:0,B:0,C:0,D:0,cod:m.dep}; groups[m.dep].A+=m.A;groups[m.dep].B+=m.B;groups[m.dep].C+=m.C;groups[m.dep].D+=m.D; });
-        theadEl.innerHTML = buildThead('Departamento', hasCD);
+        filtered.forEach(m=>{ if(!groups[m.dep]) groups[m.dep]={nom:m.depNom,A:0,B:0,C:0,D:0,E1:0,E2:0,cod:m.dep}; groups[m.dep].A+=m.A;groups[m.dep].B+=m.B;groups[m.dep].C+=m.C;groups[m.dep].D+=m.D;groups[m.dep].E1+=(m.E1||0);groups[m.dep].E2+=(m.E2||0); });
+        theadEl.innerHTML = buildThead('Departamento', hasCD, hasExtra);
         tbodyEl.innerHTML = '';
         sortGroups(groups, prefix==='ab'?sortAB:'A').forEach((g,i)=>{
-          tbodyEl.innerHTML += buildDrillRow(i, g.nom, g, `_drillTo('${prefix}','mun','${g.cod}','${esc(g.nom)}',null,null,null,null,null,null)`, hasCD);
+          tbodyEl.innerHTML += buildDrillRow(i, g.nom, g, `_drillTo('${prefix}','mun','${g.cod}','${esc(g.nom)}',null,null,null,null,null,null)`, hasCD, hasExtra);
         });
       } else if (state.nivel==='mun') {
         titleEl.textContent=`Municipios · ${state.nom_dep}`; badgeEl.textContent=state.nom_dep; badgeEl.className='level-badge mun';
-        filtered.forEach(m=>{ if(!groups[m.mun]) groups[m.mun]={nom:m.munNom,A:0,B:0,C:0,D:0,cod:m.mun}; groups[m.mun].A+=m.A;groups[m.mun].B+=m.B;groups[m.mun].C+=m.C;groups[m.mun].D+=m.D; });
-        theadEl.innerHTML = buildThead('Municipio', hasCD);
+        filtered.forEach(m=>{ if(!groups[m.mun]) groups[m.mun]={nom:m.munNom,A:0,B:0,C:0,D:0,E1:0,E2:0,cod:m.mun}; groups[m.mun].A+=m.A;groups[m.mun].B+=m.B;groups[m.mun].C+=m.C;groups[m.mun].D+=m.D;groups[m.mun].E1+=(m.E1||0);groups[m.mun].E2+=(m.E2||0); });
+        theadEl.innerHTML = buildThead('Municipio', hasCD, hasExtra);
         tbodyEl.innerHTML = '';
         sortGroups(groups, prefix==='ab'?sortAB:'A').forEach((g,i)=>{
-          tbodyEl.innerHTML += buildDrillRow(i, g.nom, g, `_drillTo('${prefix}','zon','${state.cod_dep}','${esc(state.nom_dep)}','${g.cod}','${esc(g.nom)}',null,null,null,null)`, hasCD);
+          tbodyEl.innerHTML += buildDrillRow(i, g.nom, g, `_drillTo('${prefix}','zon','${state.cod_dep}','${esc(state.nom_dep)}','${g.cod}','${esc(g.nom)}',null,null,null,null)`, hasCD, hasExtra);
         });
       } else if (state.nivel==='zon') {
         titleEl.textContent=`Zonas · ${state.nom_mun}`; badgeEl.textContent=state.nom_mun; badgeEl.className='level-badge com';
-        filtered.forEach(m=>{ const k=m.zon||'0'; if(!groups[k]) groups[k]={nom:zonaNom(k,state.nom_mun),A:0,B:0,C:0,D:0,cod:k}; groups[k].A+=m.A;groups[k].B+=m.B;groups[k].C+=m.C;groups[k].D+=m.D; });
-        theadEl.innerHTML = buildThead('Zona', hasCD);
+        filtered.forEach(m=>{ const k=m.zon||'0'; if(!groups[k]) groups[k]={nom:zonaNom(k,state.nom_mun),A:0,B:0,C:0,D:0,E1:0,E2:0,cod:k}; groups[k].A+=m.A;groups[k].B+=m.B;groups[k].C+=m.C;groups[k].D+=m.D;groups[k].E1+=(m.E1||0);groups[k].E2+=(m.E2||0); });
+        theadEl.innerHTML = buildThead('Zona', hasCD, hasExtra);
         tbodyEl.innerHTML = '';
         sortGroups(groups, prefix==='ab'?sortAB:'A').forEach((g,i)=>{
-          tbodyEl.innerHTML += buildDrillRow(i, g.nom, g, `_drillTo('${prefix}','pues','${state.cod_dep}','${esc(state.nom_dep)}','${state.cod_mun}','${esc(state.nom_mun)}','${g.cod}','${esc(g.nom)}',null,null)`, hasCD);
+          tbodyEl.innerHTML += buildDrillRow(i, g.nom, g, `_drillTo('${prefix}','pues','${state.cod_dep}','${esc(state.nom_dep)}','${state.cod_mun}','${esc(state.nom_mun)}','${g.cod}','${esc(g.nom)}',null,null)`, hasCD, hasExtra);
         });
       } else if (state.nivel==='pues') {
         titleEl.textContent=`Puestos · ${state.nom_zon||state.nom_mun}`; badgeEl.textContent=state.nom_zon||state.nom_mun; badgeEl.className='level-badge pues';
-        filtered.forEach(m=>{ if(!groups[m.pue]) groups[m.pue]={nom:m.pueNom,A:0,B:0,C:0,D:0,cod:m.pue}; groups[m.pue].A+=m.A;groups[m.pue].B+=m.B;groups[m.pue].C+=m.C;groups[m.pue].D+=m.D; });
-        theadEl.innerHTML = buildThead('Puesto de votación', hasCD);
+        filtered.forEach(m=>{ if(!groups[m.pue]) groups[m.pue]={nom:m.pueNom,A:0,B:0,C:0,D:0,E1:0,E2:0,cod:m.pue}; groups[m.pue].A+=m.A;groups[m.pue].B+=m.B;groups[m.pue].C+=m.C;groups[m.pue].D+=m.D;groups[m.pue].E1+=(m.E1||0);groups[m.pue].E2+=(m.E2||0); });
+        theadEl.innerHTML = buildThead('Puesto de votación', hasCD, hasExtra);
         tbodyEl.innerHTML = '';
         sortGroups(groups, prefix==='ab'?sortAB:'A').forEach((g,i)=>{
-          tbodyEl.innerHTML += buildDrillRow(i, g.nom, g, `_drillTo('${prefix}','mesa','${state.cod_dep}','${esc(state.nom_dep)}','${state.cod_mun}','${esc(state.nom_mun)}','${state.cod_zon||''}','${esc(state.nom_zon||'')}','${g.cod}','${esc(g.nom)}')`, hasCD);
+          tbodyEl.innerHTML += buildDrillRow(i, g.nom, g, `_drillTo('${prefix}','mesa','${state.cod_dep}','${esc(state.nom_dep)}','${state.cod_mun}','${esc(state.nom_mun)}','${state.cod_zon||''}','${esc(state.nom_zon||'')}','${g.cod}','${esc(g.nom)}')`, hasCD, hasExtra);
         });
       } else {
         titleEl.textContent=`Mesas · ${state.nom_pue}`; badgeEl.textContent=state.nom_pue; badgeEl.className='level-badge mesa';
-        theadEl.innerHTML = buildThead('Mesa', hasCD);
+        theadEl.innerHTML = buildThead('Mesa', hasCD, hasExtra);
         tbodyEl.innerHTML = '';
         filtered.sort((a,b)=>b.A-a.A).forEach((m,i)=>{
           const p = pct(m.A, m.A+m.B);
           const cdCols = hasCD ? `<td class="r" style="color:rgba(74,222,128,.7)">${fmt(m.C)}</td><td class="r" style="color:rgba(251,146,60,.7)">${fmt(m.D)}</td>` : '';
+          let extraCols = '';
+          if (hasExtra) {
+            if (window._selE1) extraCols += `<td class="r" style="color:rgba(244,114,182,.8)">${fmt(m.E1||0)}</td>`;
+            if (window._selE2) extraCols += `<td class="r" style="color:rgba(56,189,248,.8)">${fmt(m.E2||0)}</td>`;
+          }
           tbodyEl.innerHTML += `<tr>
             <td style="color:rgba(255,255,255,.3)">${i+1}</td>
             <td><span style="width:7px;height:7px;border-radius:50%;background:var(--blue);display:inline-block;margin-right:5px;vertical-align:middle"></span>Mesa ${m.key.split('|')[4]||m.key}</td>
             <td class="r" style="color:rgba(0,71,255,.9);font-weight:700">${fmt(m.A)}</td>
             <td class="r" style="color:rgba(167,139,250,.8)">${fmt(m.B)}</td>
-            ${cdCols}
+            ${cdCols}${extraCols}
             <td class="r"><span style="color:var(--blue);font-weight:700">${p}%</span>
               <span class="mini-bar-wrap"><span class="mini-bar-fill" style="background:var(--blue);width:${p}%"></span></span>
             </td></tr>`;
@@ -1107,23 +1184,34 @@
       else { drillCD=state; renderDrill('cd', mesasABCD, state); }
     }
 
-    function buildThead(col1, hasCD) {
+    function buildThead(col1, hasCD, hasExtra) {
       const cdCols = hasCD ? '<th class="r" style="color:rgba(74,222,128,.5)">C</th><th class="r" style="color:rgba(251,146,60,.5)">D</th>' : '';
-      return `<tr><th>#</th><th>${col1}</th><th class="r" style="color:rgba(0,71,255,.7)">A</th><th class="r" style="color:rgba(167,139,250,.7)">B</th>${cdCols}<th class="r">% A vs B</th></tr>`;
+      let extraCols = '';
+      if (hasExtra) {
+        const e1 = window._selE1, e2 = window._selE2;
+        if (e1) extraCols += `<th class="r" style="color:rgba(244,114,182,.7)">${shortName(e1.nombre)}</th>`;
+        if (e2) extraCols += `<th class="r" style="color:rgba(56,189,248,.7)">${shortName(e2.nombre)}</th>`;
+      }
+      return `<tr><th>#</th><th>${col1}</th><th class="r" style="color:rgba(0,71,255,.7)">A</th><th class="r" style="color:rgba(167,139,250,.7)">B</th>${cdCols}${extraCols}<th class="r">% A vs B</th></tr>`;
     }
 
-    function buildDrillRow(i, label, g, onclickStr, hasCD) {
+    function buildDrillRow(i, label, g, onclickStr, hasCD, hasExtra) {
       const p = pct(g.A, g.A+g.B);
       const nameCell = onclickStr
         ? `<button class="drill-btn" onclick="${onclickStr}"><span style="width:7px;height:7px;border-radius:50%;background:var(--blue);display:inline-block;margin-right:5px;vertical-align:middle"></span><span style="font-size:1.2em">${label}</span> <span style="font-size:.6rem;opacity:.5">→</span></button>`
         : `<span><span style="width:7px;height:7px;border-radius:50%;background:var(--blue);display:inline-block;margin-right:5px;vertical-align:middle"></span><span style="font-size:1.2em">${label}</span></span>`;
       const cdCols = hasCD ? `<td class="r" style="color:rgba(74,222,128,.7)">${fmt(g.C)}</td><td class="r" style="color:rgba(251,146,60,.7)">${fmt(g.D)}</td>` : '';
+      let extraCols = '';
+      if (hasExtra) {
+        if (window._selE1) extraCols += `<td class="r" style="color:rgba(244,114,182,.8)">${fmt(g.E1||0)}</td>`;
+        if (window._selE2) extraCols += `<td class="r" style="color:rgba(56,189,248,.8)">${fmt(g.E2||0)}</td>`;
+      }
       return `<tr>
         <td style="color:rgba(255,255,255,.3)">${i+1}</td>
         <td>${nameCell}</td>
         <td class="r" style="color:rgba(0,71,255,.9);font-weight:700">${fmt(g.A)}</td>
         <td class="r" style="color:rgba(167,139,250,.8)">${fmt(g.B)}</td>
-        ${cdCols}
+        ${cdCols}${extraCols}
         <td class="r"><span style="color:var(--blue);font-weight:700">${p}%</span>
           <span class="mini-bar-wrap"><span class="mini-bar-fill" style="background:var(--blue);width:${p}%"></span></span>
         </td></tr>`;
