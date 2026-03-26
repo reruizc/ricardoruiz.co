@@ -113,10 +113,12 @@
     .cands-inner{background:rgba(0,0,0,.2);border-top:1px solid var(--border);border-bottom:2px solid rgba(0,71,255,.2);padding:.5rem 1rem .75rem 2.5rem;display:none}
     .cands-inner.open{display:block}
     .cands-table{width:100%;border-collapse:collapse;font-size:.94rem}
-    .cands-table thead th{font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.25);padding:.4rem .5rem;border-bottom:1px solid var(--border);font-weight:400}
+    .cands-table thead th{font-size:.94rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.25);padding:.4rem .5rem;border-bottom:1px solid var(--border);font-weight:400}
     .cands-table tbody tr{border-bottom:1px solid rgba(255,255,255,.05)}
     .cands-table tbody tr:last-child{border-bottom:none}
-    .cands-table tbody td{padding:.35rem .5rem;vertical-align:middle}
+    .cands-table tbody td{padding:.35rem .5rem;vertical-align:middle;font-size:.88rem}
+    .cands-table tbody td:nth-child(3){font-size:.95rem!important;font-weight:600!important}
+    .cands-table tbody td.r{font-size:.85rem!important}
     .donut-wrap{display:flex;flex-direction:column;align-items:center;gap:1rem}
     .donut-cw{position:relative;width:150px;height:150px}
     .donut-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
@@ -418,6 +420,21 @@
     const CURULES_INDIGENAS = 2;
     function getMaxCurules(){ return activeCirc==='INDIGENAS'?CURULES_INDIGENAS:CURULES; }
 
+    function dhondt(parties, seats){
+      const r=parties.filter(p=>p.votos>0).map(p=>({...p,curules:0}));
+      for(let s=0;s<seats;s++){
+        let bq=-1,bi=-1;
+        r.forEach((p,i)=>{const q=p.votos/(p.curules+1);if(q>bq){bq=q;bi=i;}});
+        if(bi>=0) r[bi].curules++;
+      }
+      return parties.map(p=>{const f=r.find(x=>x.partido===p.partido);return f?f:{...p,curules:0};});
+    }
+    function getCircPartidosCalculated(){
+      const partidos=getCircPartidos();
+      if(activeCirc==='INDIGENAS'&&partidos.length>0) return dhondt(partidos,CURULES_INDIGENAS);
+      return partidos;
+    }
+
     function getCircData(){
       if(!resumenData) return {};
       if(!resumenData.por_circunscripcion) return resumenData;
@@ -475,7 +492,7 @@
 
     function renderKPI(){
       const r = getCircData();
-      const cp = getCircPartidos();
+      const cp = getCircPartidosCalculated();
       const topP = cp.filter(p=>!/blanco/i.test(p.partido))[0];
       const totalCurules = cp.reduce((s,p)=>s+(p.curules||0),0);
       const votVal=r.votant!=null?r.votant-(r.votnul||0)-(r.votnma||0):(r.votval||0)+(r.votblan||0);
@@ -512,8 +529,9 @@
         const d=muns.find(x=>x.dep_cod===depCod&&x.cod===munCod&&(!x.circ_nom||normC(x.circ_nom)===normC(activeCirc))); if(!d) return;
         geoData=d; labelText=`Partidos · Senado · ${d.nombre}`; badgeText=d.nombre;
       } else {
+        const zonaCod=document.getElementById('zona-select').value;
         const pues=await getJSON('puestos');
-        const d=pues.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&x.cod===pueCod&&(!x.circ_nom||normC(x.circ_nom)===normC(activeCirc))); if(!d) return;
+        const d=pues.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&x.cod===pueCod&&(!zonaCod||x.zon_cod===zonaCod)&&(!x.circ_nom||normC(x.circ_nom)===normC(activeCirc))); if(!d) return;
         geoData=d; labelText=`Partidos · Senado · ${d.nombre}`; badgeText=d.nombre;
       }
       const _pcG=geoData.por_circunscripcion;
@@ -531,7 +549,7 @@
       const SPEC=new Set(['996','997','998']);
       const {vv:gVV,vn:gVN,vm:gVM,vb:gVB,votant:gVotant}=calcGeoDonut(geoVotos,geoCirc);
       const totalVotos=gVV; // votos válidos como denominador de %
-      const circPartidos=getCircPartidos();
+      const circPartidos=getCircPartidosCalculated();
       // Intersección: solo partidos de la circunscripción activa con votos en el geo
       const geoPartidos=circPartidos
         .filter(p=>!SPEC.has(p.partido)&&(geoVotos[p.partido]||0)>0)
@@ -553,10 +571,10 @@
         const hasCands=geoCands.length>0||natCurules>0;
         const tr=document.createElement('tr');
         tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td>
-          <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span></div>
+          <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.15rem">${p.partido}</span></div>
           ${hasCands?`<div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${geoCands.length>0?geoCands.length+' candidatos':natCurules+' electos · lista cerrada'}</button></div>`:''}
           </td>
-          <td class="r" style="font-size:.9rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td>
+          <td class="r" style="font-size:1.15rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td>
           <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>
           <td class="r"><span class="cbadge${natCurules>0?'':' sub'}">${natCurules||'—'}</span></td>`;
         tbody.appendChild(tr);
@@ -663,7 +681,7 @@
       const SPEC=new Set(['996','997','998']);
       const {vv:zVV,vn:zVN,vm:zVM,vb:zVB,votant:zVotant}=calcGeoDonut(geoVotos,geoCirc);
       const totalVotos=zVV;
-      const zCP=getCircPartidos();
+      const zCP=getCircPartidosCalculated();
       const geoPartidos=zCP.filter(p=>!SPEC.has(p.partido)&&(geoVotos[p.partido]||0)>0).map(p=>({...p,votos:geoVotos[p.partido]||0})).sort((a,b)=>b.votos-a.votos);
       const label=z.nombre||`Zona ${cod}`;
       document.getElementById('lbl-tabla').textContent=`Partidos · Senado · ${label}`;
@@ -680,10 +698,10 @@
         const hasCands=geoCands.length>0||natCurules>0;
         const tr=document.createElement('tr');
         tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td>
-          <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span></div>
+          <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.15rem">${p.partido}</span></div>
           ${hasCands?`<div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${geoCands.length>0?geoCands.length+' candidatos':natCurules+' electos · lista cerrada'}</button></div>`:''}
           </td>
-          <td class="r" style="font-size:.9rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td>
+          <td class="r" style="font-size:1.15rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td>
           <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>
           <td class="r"><span class="cbadge${natCurules>0?'':' sub'}">${natCurules||'—'}</span></td>`;
         tbody.appendChild(tr);
@@ -776,7 +794,7 @@
       const {vv:mVV,vn:mVN,vm:mVM,vb:mVB,votant:mVotant}=calcGeoDonut(geoVotos,geoCirc);
       const totalVotos=mVV;
       const label=`Mesa ${cod}`;
-      const mCP=getCircPartidos();
+      const mCP=getCircPartidosCalculated();
       const geoPartidos=mCP.filter(p=>!SPEC.has(p.partido)&&(geoVotos[p.partido]||0)>0).map(p=>({...p,votos:geoVotos[p.partido]||0})).sort((a,b)=>b.votos-a.votos);
       document.getElementById('lbl-tabla').textContent=`Partidos · Senado · ${label}`;
       document.getElementById('drill-badge').textContent=label;
@@ -792,10 +810,10 @@
         const hasCands=geoCands.length>0||natCurules>0;
         const tr=document.createElement('tr');
         tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td>
-          <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span></div>
+          <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.15rem">${p.partido}</span></div>
           ${hasCands?`<div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${geoCands.length>0?geoCands.length+' candidatos':natCurules+' electos · lista cerrada'}</button></div>`:''}
           </td>
-          <td class="r" style="font-size:.9rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td>
+          <td class="r" style="font-size:1.15rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td>
           <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>
           <td class="r"><span class="cbadge${natCurules>0?'':' sub'}">${natCurules||'—'}</span></td>`;
         tbody.appendChild(tr);
@@ -865,16 +883,16 @@
       document.getElementById('drill-thead').innerHTML=`<tr><th>#</th><th>Partido / Coalición</th><th class="r">Votos</th><th class="r" style="min-width:130px">%</th><th class="r">Curules</th></tr>`;
       const tbody=document.getElementById('tbody-senado');
       tbody.innerHTML='';
-      const partidos=getCircPartidos(), maxV=partidos[0]?.votos||1;
+      const partidos=getCircPartidosCalculated(), maxV=partidos[0]?.votos||1;
       partidos.forEach((p,i)=>{
         const pctV=pct(p.votos,cd.votval||resumenData.votval), bw=((p.votos/maxV)*100).toFixed(1), color=getColor(p.partido), curules=p.curules||0;
         const umbral=cd.umbral||resumenData.umbral;
         const curulesCell=curules>0?`<span class="cbadge">${curules}</span>`:p.votos>=umbral?`<span class="cbadge">0</span>`:`<span class="cbadge sub">—</span>`;
         const tr=document.createElement('tr');
         tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td>
-          <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span></div>
+          <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.15rem">${p.partido}</span></div>
           <div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${p.candidatos.length>0?p.candidatos.length+' candidatos':curules+' electos · lista cerrada'}</button></div></td>
-          <td class="r" style="font-size:.9rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td>
+          <td class="r" style="font-size:1.15rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td>
           <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>
           <td class="r">${curulesCell}</td>`;
         tbody.appendChild(tr);
