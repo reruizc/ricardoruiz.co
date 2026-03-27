@@ -428,6 +428,8 @@
     let resumenData = null, donutChart = null;
     let activeCirc = 'NACIONAL';
     let circData = null; // circunscripciones.json
+    // Cache de electos nacionales: se recalcula solo cuando cambia la circunscripción
+    let _elegidosNac = null, _elegidosCircKey = '';
 
     const CURULES_INDIGENAS = 2;
     function getMaxCurules(){ return activeCirc==='INDIGENAS'?CURULES_INDIGENAS:CURULES; }
@@ -597,11 +599,12 @@
             <table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% partido</th></tr></thead>
             <tbody>${(()=>{
               const norm=s=>s.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-              const nomPart=norm(p.partido); let cr=curules;
+              const nomPart=norm(p.partido);
+              const natWinners=getElegidosNac().get(p.partido);
               if(geoCands.length===0&&curules>0){return Array.from({length:curules},(_,k)=>`<tr><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${String(k+1).padStart(3,'0')}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(k+1).padStart(2,'0')}</td><td class="cand-elected" style="font-family:'Syne',sans-serif;font-weight:400;color:#39ff7a">Posición ${k+1}<span style="font-size:.6rem;margin-left:.4rem">✦</span></td><td class="r" style="font-family:'Syne',sans-serif;color:rgba(255,255,255,.3)">—</td><td class="r" style="color:rgba(255,255,255,.4)">—</td></tr>`).join('')+`<tr><td colspan="5" style="padding:.5rem .5rem .35rem;font-family:'DM Mono',monospace;font-size:.6rem;color:rgba(255,255,255,.2);text-align:center;letter-spacing:.05em">Lista cerrada · datos individuales no disponibles</td></tr>`;}
               return geoCands.map((c,j)=>{
                 const esLista=norm(c.nombre)===nomPart||norm(c.nombre).includes(nomPart.split(' ')[0]+' '+(nomPart.split(' ')[1]||'__'));
-                let elegido=false; if(!esLista&&cr>0){elegido=true;cr--;}
+                const elegido=!esLista&&(natWinners?.has(c.nombre)??false);
                 const colorC=elegido?'#39ff7a':esLista?'rgba(255,255,255,.2)':'inherit', fw=400;
                 const suffix=elegido?'<span style="font-size:.6rem;margin-left:.4rem">✦</span>':esLista?'<span style="font-size:.58rem;color:rgba(255,255,255,.2);margin-left:.4rem">(lista)</span>':'';
                 const codStr=c.codigo!=null?String(c.codigo).padStart(3,'0'):'—';
@@ -724,11 +727,12 @@
             <table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% partido</th></tr></thead>
             <tbody>${(()=>{
               const norm=s=>s.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-              const nomPart=norm(p.partido); let cr=curules;
+              const nomPart=norm(p.partido);
+              const natWinners=getElegidosNac().get(p.partido);
               if(geoCands.length===0&&curules>0){return Array.from({length:curules},(_,k)=>`<tr><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${String(k+1).padStart(3,'0')}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(k+1).padStart(2,'0')}</td><td class="cand-elected" style="font-family:'Syne',sans-serif;font-weight:400;color:#39ff7a">Posición ${k+1}<span style="font-size:.6rem;margin-left:.4rem">✦</span></td><td class="r" style="font-family:'Syne',sans-serif;color:rgba(255,255,255,.3)">—</td><td class="r" style="color:rgba(255,255,255,.4)">—</td></tr>`).join('')+`<tr><td colspan="5" style="padding:.5rem .5rem .35rem;font-family:'DM Mono',monospace;font-size:.6rem;color:rgba(255,255,255,.2);text-align:center;letter-spacing:.05em">Lista cerrada · datos individuales no disponibles</td></tr>`;}
               return geoCands.map((c,j)=>{
                 const esLista=norm(c.nombre)===nomPart||norm(c.nombre).includes(nomPart.split(' ')[0]+' '+(nomPart.split(' ')[1]||'__'));
-                let elegido=false; if(!esLista&&cr>0){elegido=true;cr--;}
+                const elegido=!esLista&&(natWinners?.has(c.nombre)??false);
                 const colorC=elegido?'#39ff7a':esLista?'rgba(255,255,255,.2)':'inherit', fw=400;
                 const suffix=elegido?'<span style="font-size:.6rem;margin-left:.4rem">✦</span>':esLista?'<span style="font-size:.58rem;color:rgba(255,255,255,.2);margin-left:.4rem">(lista)</span>':'';
                 const codStr=c.codigo!=null?String(c.codigo).padStart(3,'0'):'—';
@@ -836,11 +840,12 @@
             <table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% partido</th></tr></thead>
             <tbody>${(()=>{
               const norm=s=>s.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-              const nomPart=norm(p.partido); let cr=curules;
+              const nomPart=norm(p.partido);
+              const natWinners=getElegidosNac().get(p.partido);
               if(geoCands.length===0&&curules>0){return Array.from({length:curules},(_,k)=>`<tr><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${String(k+1).padStart(3,'0')}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(k+1).padStart(2,'0')}</td><td class="cand-elected" style="font-family:'Syne',sans-serif;font-weight:400;color:#39ff7a">Posición ${k+1}<span style="font-size:.6rem;margin-left:.4rem">✦</span></td><td class="r" style="font-family:'Syne',sans-serif;color:rgba(255,255,255,.3)">—</td><td class="r" style="color:rgba(255,255,255,.4)">—</td></tr>`).join('')+`<tr><td colspan="5" style="padding:.5rem .5rem .35rem;font-family:'DM Mono',monospace;font-size:.6rem;color:rgba(255,255,255,.2);text-align:center;letter-spacing:.05em">Lista cerrada · datos individuales no disponibles</td></tr>`;}
               return geoCands.map((c,j)=>{
                 const esLista=norm(c.nombre)===nomPart||norm(c.nombre).includes(nomPart.split(' ')[0]+' '+(nomPart.split(' ')[1]||'__'));
-                let elegido=false; if(!esLista&&cr>0){elegido=true;cr--;}
+                const elegido=!esLista&&(natWinners?.has(c.nombre)??false);
                 const colorC=elegido?'#39ff7a':esLista?'rgba(255,255,255,.2)':'inherit', fw=400;
                 const suffix=elegido?'<span style="font-size:.6rem;margin-left:.4rem">✦</span>':esLista?'<span style="font-size:.58rem;color:rgba(255,255,255,.2);margin-left:.4rem">(lista)</span>':'';
                 const codStr=c.codigo!=null?String(c.codigo).padStart(3,'0'):'—';
@@ -882,6 +887,25 @@
       else if(munCod) renderGeoPartidos('mun',depCod,munCod,null);
       else if(depCod) renderGeoPartidos('dep',depCod,null,null);
       else renderNacional();
+    }
+
+    // Devuelve Map<partido → Set<nombre>> de candidatos electos según el resultado nacional.
+    // Usa la misma lógica que renderNacional: salta candidatos cuyo nombre == partido (lista),
+    // y toma los primeros p.curules no-lista. Se cachea por circunscripción activa.
+    function getElegidosNac(){
+      if(_elegidosNac && _elegidosCircKey===activeCirc) return _elegidosNac;
+      _elegidosCircKey=activeCirc;
+      _elegidosNac=new Map();
+      const ne=s=>s.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      getCircPartidosCalculated().forEach(p=>{
+        const nom=ne(p.partido); let cr=p.curules||0; const w=new Set();
+        (p.candidatos||[]).forEach(c=>{
+          const esl=ne(c.nombre)===nom||ne(c.nombre).includes(nom.split(' ')[0]+' '+(nom.split(' ')[1]||'__'));
+          if(!esl&&cr>0){w.add(c.nombre);cr--;}
+        });
+        if(w.size>0) _elegidosNac.set(p.partido,w);
+      });
+      return _elegidosNac;
     }
 
     function renderNacional(){
