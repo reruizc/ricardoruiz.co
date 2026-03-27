@@ -589,7 +589,7 @@
       <div class="success-state" id="successState">
         <div class="success-icon">✓</div>
         <h2 class="success-title" id="success-title">¡Cuenta creada!</h2>
-        <p class="success-desc" id="success-desc">Revisa tu correo para confirmar tu cuenta y empezar a explorar las herramientas.</p>
+        <p class="success-desc" id="success-desc">Te enviamos un enlace de confirmación. Revisa tu bandeja de entrada (y spam) para activar tu cuenta.</p>
         <a href="dashboard.html" id="success-btn" style="display:block;margin-top:1.5rem;font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--white);background:var(--blue);border:1.5px solid var(--blue);padding:.9rem 2rem;text-decoration:none;text-align:center;transition:background .2s;" onmouseover="this.style.background='#0035cc'" onmouseout="this.style.background='var(--blue)'">Ir al dashboard →</a>
       </div>
 
@@ -692,7 +692,7 @@
         btnSubmit: 'Crear cuenta →',
         terms: 'Al registrarte aceptas los', termsLink: 'Términos de uso', and: 'y la', privacyLink: 'Política de privacidad',
         successTitle: '¡Cuenta creada!',
-        successDesc: 'Revisa tu correo para confirmar tu cuenta y empezar a explorar las herramientas.',
+        successDesc: 'Te enviamos un enlace de confirmación. Revisa tu bandeja de entrada (y spam) para activar tu cuenta.',
         countryOther: 'Otro / Other',
         divider: 'o continúa con',
         socialGoogle: 'Google',
@@ -719,7 +719,7 @@
         btnSubmit: 'Create account →',
         terms: 'By signing up you agree to the', termsLink: 'Terms of use', and: 'and', privacyLink: 'Privacy policy',
         successTitle: 'Account created!',
-        successDesc: 'Check your email to confirm your account and start exploring the tools.',
+        successDesc: 'We sent you a confirmation link. Check your inbox (and spam) to activate your account.',
         countryOther: 'Other / Otro',
         divider: 'or continue with',
         socialGoogle: 'Google',
@@ -762,7 +762,7 @@
       document.getElementById('form-terms').innerHTML =
         `${t.terms} <a href="#" id="terms-link">${t.termsLink}</a> ${t.and} <a href="#" id="privacy-link">${t.privacyLink}</a>.`;
       document.getElementById('success-title').textContent = t.successTitle;
-      document.getElementById('success-desc').textContent = t.successDesc;
+      document.getElementById('success-desc').innerHTML = t.successDesc;
       document.getElementById('divider-text').textContent = t.divider;
       document.getElementById('btn-magic-text').textContent = currentLang === 'us' ? 'Sign up with email link' : 'Registrarse con enlace por email';
       // reset strength label
@@ -861,6 +861,16 @@
         if (data.ok) {
           localStorage.setItem('rr-token', data.token);
           localStorage.setItem('rr-user',  JSON.stringify(data.user));
+
+          // ¿Venía a comprar un plan? → devolver a pricing
+          const params = new URLSearchParams(window.location.search);
+          if (params.get('next') === 'pricing') {
+            localStorage.setItem('rr-register-done', '1');
+            window.location.href = 'pricing.html';
+            return;
+          }
+
+          // Flujo normal → mostrar estado de éxito
           document.getElementById('formState').style.display    = 'none';
           document.getElementById('successState').style.display = 'block';
         } else {
