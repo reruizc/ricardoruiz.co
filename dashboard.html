@@ -464,6 +464,64 @@
       color: var(--text3); text-align: center;
       margin-top: .75rem; min-height: 1rem;
     }
+
+    /* ── PLAN EXPIRY / CANCEL ── */
+    .plan-expires {
+      font-family: 'DM Mono', monospace; font-size: .62rem;
+      letter-spacing: .06em; color: var(--text3);
+      margin-bottom: .75rem; line-height: 1.5;
+    }
+    .plan-expires.cancelled { color: #ff4757; }
+    .plan-cancel-btn {
+      display: block; width: 100%; text-align: center;
+      font-family: 'DM Mono', monospace; font-size: .6rem;
+      letter-spacing: .08em; text-transform: uppercase;
+      color: var(--text3); background: none;
+      border: 1px solid var(--border); padding: .6rem;
+      cursor: none; margin-top: .5rem;
+      transition: border-color .2s, color .2s;
+    }
+    .plan-cancel-btn:hover { border-color: #ff4757; color: #ff4757; }
+
+    /* ── CANCEL MODAL ── */
+    .cancel-modal {
+      display: none; position: fixed; inset: 0; z-index: 3000;
+      background: rgba(0,0,0,.7); backdrop-filter: blur(6px);
+      align-items: center; justify-content: center; padding: 1.5rem;
+    }
+    .cancel-modal.show { display: flex; }
+    .cancel-modal-card {
+      background: var(--surface); border: 1px solid var(--border);
+      padding: 2rem; max-width: 400px; width: 100%;
+    }
+    .cancel-modal-title {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: 1.3rem; letter-spacing: -.02em;
+      margin-bottom: .5rem; color: var(--text);
+    }
+    .cancel-modal-desc {
+      font-family: 'Fraunces', serif; font-weight: 300;
+      font-size: .9rem; color: var(--text2); line-height: 1.6;
+      margin-bottom: 1.5rem;
+    }
+    .cancel-modal-actions { display: flex; gap: .75rem; }
+    .cancel-modal-confirm {
+      flex: 1; font-family: 'DM Mono', monospace; font-size: .65rem;
+      letter-spacing: .08em; text-transform: uppercase;
+      color: #fff; background: #ff4757;
+      border: none; padding: .75rem; cursor: none;
+      transition: background .2s;
+    }
+    .cancel-modal-confirm:hover { background: #e03347; }
+    .cancel-modal-confirm:disabled { opacity: .5; pointer-events: none; }
+    .cancel-modal-back {
+      flex: 1; font-family: 'DM Mono', monospace; font-size: .65rem;
+      letter-spacing: .08em; text-transform: uppercase;
+      color: var(--text2); background: none;
+      border: 1px solid var(--border); padding: .75rem; cursor: none;
+      transition: border-color .2s, color .2s;
+    }
+    .cancel-modal-back:hover { border-color: var(--blue); color: var(--blue); }
   </style>
 </head>
 <body>
@@ -485,6 +543,20 @@
       </div>
       <button class="pbc-close" onclick="closePlanBanner()">Entendido, ir a mi dashboard →</button>
       <div class="pbc-polling" id="pbc-polling"></div>
+    </div>
+  </div>
+
+  <!-- CANCEL CONFIRMATION MODAL -->
+  <div class="cancel-modal" id="cancel-modal">
+    <div class="cancel-modal-card">
+      <div class="cancel-modal-title">¿Cancelar tu plan?</div>
+      <div class="cancel-modal-desc">
+        Tu acceso continuará activo hasta <strong id="cancel-expires-date">—</strong>. Después de esa fecha pasarás al plan gratuito automáticamente.
+      </div>
+      <div class="cancel-modal-actions">
+        <button class="cancel-modal-back" onclick="closeCancelModal()">Volver</button>
+        <button class="cancel-modal-confirm" id="cancel-confirm-btn" onclick="confirmCancel()">Sí, cancelar</button>
+      </div>
     </div>
   </div>
 
@@ -707,14 +779,25 @@
 
       // Plan card
       const isTopPlan = user.plan === 'full' || user.plan === 'premium';
+      const isCancelled = !!user.cancelledAt;
+      const expiresStr = user.planExpiresAt ? formatExpiry(user.planExpiresAt) : null;
       document.getElementById('plan-card').innerHTML = `
         <div class="card-label">${isEN ? 'Your plan' : 'Tu plan'}</div>
         <div class="plan-card-name">${plan.label}</div>
         <div class="plan-card-desc">${plan.desc}</div>
         <ul class="plan-perks">${plan.perks.map(p => `<li>${p}</li>`).join('')}</ul>
+        ${user.plan !== 'free' && expiresStr ? `
+          <div class="plan-expires ${isCancelled ? 'cancelled' : ''}">
+            ${isCancelled
+              ? `${isEN ? 'Cancelled · access until' : 'Cancelado · acceso hasta'} ${expiresStr}`
+              : `${isEN ? 'Active until' : 'Vigente hasta'} ${expiresStr}`}
+          </div>` : ''}
         ${!isTopPlan
           ? `<a href="pricing.html" class="plan-upgrade-link">${isEN ? 'Upgrade →' : 'Mejorar plan →'}</a>`
           : `<span class="plan-current-tag">${isEN ? 'Top plan active' : 'Plan máximo activo'}</span>`}
+        ${user.plan !== 'free' && !isCancelled
+          ? `<button class="plan-cancel-btn" onclick="openCancelModal()">${isEN ? 'Cancel subscription' : 'Cancelar suscripción'}</button>`
+          : ''}
       `;
 
       // Downloads
@@ -762,6 +845,16 @@
           <div class="profile-field-label">${isEN ? 'Plan' : 'Plan'}</div>
           <div class="profile-field-value">${plan.label}</div>
         </div>
+        ${user.plan !== 'free' && user.billingCycle ? `
+        <div class="profile-field">
+          <div class="profile-field-label">${isEN ? 'Billing cycle' : 'Ciclo de cobro'}</div>
+          <div class="profile-field-value">${user.billingCycle === 'monthly' ? (isEN ? 'Monthly' : 'Mensual') : (isEN ? 'Annual' : 'Anual')}</div>
+        </div>` : ''}
+        ${user.plan !== 'free' && user.planExpiresAt ? `
+        <div class="profile-field">
+          <div class="profile-field-label">${user.cancelledAt ? (isEN ? 'Access until' : 'Acceso hasta') : (isEN ? 'Next renewal' : 'Próxima renovación')}</div>
+          <div class="profile-field-value">${formatExpiry(user.planExpiresAt)}</div>
+        </div>` : ''}
         <div class="profile-field">
           <div class="profile-field-label">${isEN ? 'Member since' : 'Miembro desde'}</div>
           <div class="profile-field-value">${isEN ? 'March 2026' : 'Marzo 2026'}</div>
@@ -771,6 +864,71 @@
           <button class="profile-action-btn danger" onclick="logOut()">${isEN ? 'Log out' : 'Cerrar sesión'}</button>
         </div>
       `;
+    }
+
+    // ─── HELPERS ──────────────────────────────────────────────────────────────
+    function formatExpiry(ts) {
+      if (!ts) return null;
+      const lang = localStorage.getItem('rr-lang') || 'co';
+      return new Date(ts).toLocaleDateString(lang === 'us' ? 'en-US' : 'es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
+    }
+
+    // ─── CANCEL PLAN ──────────────────────────────────────────────────────────
+    function openCancelModal() {
+      const expiresStr = user.planExpiresAt ? formatExpiry(user.planExpiresAt) : '—';
+      document.getElementById('cancel-expires-date').textContent = expiresStr;
+      document.getElementById('cancel-modal').classList.add('show');
+    }
+
+    function closeCancelModal() {
+      document.getElementById('cancel-modal').classList.remove('show');
+    }
+
+    async function confirmCancel() {
+      const btn = document.getElementById('cancel-confirm-btn');
+      btn.textContent = 'Cancelando...';
+      btn.disabled = true;
+      try {
+        const res  = await fetch('https://rr-auth.reruizc.workers.dev/auth/cancel', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (data.ok) {
+          user.cancelledAt = Date.now();
+          localStorage.setItem('rr-user', JSON.stringify(user));
+          closeCancelModal();
+          render();
+        } else {
+          alert(data.error || 'Error al cancelar');
+          btn.textContent = 'Sí, cancelar';
+          btn.disabled = false;
+        }
+      } catch {
+        alert('Error de conexión');
+        btn.textContent = 'Sí, cancelar';
+        btn.disabled = false;
+      }
+    }
+
+    // ─── REFRESH USER FROM API ────────────────────────────────────────────────
+    async function refreshUser() {
+      if (!token) return;
+      try {
+        const res  = await fetch('https://rr-auth.reruizc.workers.dev/auth/me', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (data.ok) {
+          Object.assign(user, data.user);
+          localStorage.setItem('rr-user', JSON.stringify(user));
+          render();
+        } else if (res.status === 401) {
+          localStorage.removeItem('rr-token');
+          localStorage.removeItem('rr-user');
+          window.location.href = 'login.html';
+        }
+      } catch {}
     }
 
     // ─── LOGOUT ───────────────────────────────────────────────────────────────
@@ -860,6 +1018,7 @@
 
     // ─── INIT ─────────────────────────────────────────────────────────────────
     render();
+    refreshUser();
     checkPaymentSuccess();
   </script>
 </body>
