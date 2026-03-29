@@ -626,6 +626,31 @@
     const currentLang = localStorage.getItem('rr-lang') || 'co';
     setLanguage(currentLang);
 
+    // ─── URL PARAMS (verified=1, error=expired, etc.) ─────────────────────────
+    (function() {
+      const params = new URLSearchParams(window.location.search);
+      const banner = document.getElementById('error-banner');
+      if (params.get('verified') === '1') {
+        banner.textContent = currentLang === 'us'
+          ? '✓ Account verified. You can now log in.'
+          : '✓ Cuenta verificada. Ya puedes iniciar sesión.';
+        banner.style.background = 'rgba(0,214,143,0.08)';
+        banner.style.borderColor = 'rgba(0,214,143,0.3)';
+        banner.style.color = '#00d68f';
+        banner.classList.add('visible');
+      } else if (params.get('error') === 'expired') {
+        banner.textContent = currentLang === 'us'
+          ? 'Verification link expired. Register again to get a new one.'
+          : 'El enlace de verificación expiró. Regístrate de nuevo para obtener uno nuevo.';
+        banner.classList.add('visible');
+      } else if (params.get('error') === 'invalid') {
+        banner.textContent = currentLang === 'us'
+          ? 'Invalid verification link.'
+          : 'Enlace de verificación inválido.';
+        banner.classList.add('visible');
+      }
+    })();
+
     // ─── PASSWORD VISIBILITY ─────────────────────────────────────────────────
     function togglePw() {
       const input = document.getElementById('password');
@@ -676,8 +701,33 @@
           localStorage.setItem('rr-user',  JSON.stringify(data.user));
           window.location.href = 'dashboard.html';
         } else {
-          banner.textContent = t.errorBanner;
-          banner.classList.add('visible');
+          // 403 = correo no verificado
+          if (res.status === 403) {
+            const msg = currentLang === 'us'
+              ? 'You must verify your email before logging in. Check your inbox.'
+              : 'Debes verificar tu correo antes de iniciar sesión. Revisa tu bandeja de entrada.';
+            banner.innerHTML = `${msg} <a href="#" id="resend-link" style="color:inherit;text-decoration:underline;text-underline-offset:3px;">${currentLang === 'us' ? 'Resend email' : 'Reenviar correo'}</a>`;
+            banner.classList.add('visible');
+            document.getElementById('resend-link').addEventListener('click', async function(e) {
+              e.preventDefault();
+              this.textContent = '...';
+              this.style.pointerEvents = 'none';
+              try {
+                await fetch('https://rr-auth.reruizc.workers.dev/auth/resend-verify', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ email: emailEl.value }),
+                });
+                this.textContent = currentLang === 'us' ? '✓ Sent' : '✓ Enviado';
+              } catch {
+                this.textContent = currentLang === 'us' ? 'Error. Try again.' : 'Error. Intenta de nuevo.';
+                this.style.pointerEvents = 'auto';
+              }
+            });
+          } else {
+            banner.textContent = t.errorBanner;
+            banner.classList.add('visible');
+          }
           btn.textContent = t.btnSubmit;
           btn.disabled = false;
         }
