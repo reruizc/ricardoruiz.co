@@ -46,6 +46,18 @@
     .nav-bar { width:5px; background:var(--blue); border-radius:1px 1px 0 0; opacity:.85; }
     .nav-back { font-family:'DM Mono',monospace; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--gray); text-decoration:none; transition:color .2s; }
     .nav-back:hover { color:var(--blue); }
+    .nav-right { display:flex; align-items:center; gap:1rem; }
+    .country-selector-wrap { position:relative; }
+    .country-btn { font-family:'DM Mono',monospace; font-size:.72rem; letter-spacing:.08em; text-transform:uppercase; color:var(--black); background:transparent; border:1.5px solid var(--gray-light); padding:.4rem .85rem; cursor:none; display:flex; align-items:center; transition:border-color .2s,color .2s; }
+    .country-btn:hover,.country-btn.open { border-color:var(--blue); color:var(--blue); }
+    .country-dropdown { position:absolute; top:calc(100% + 10px); right:0; background:var(--white); border:1.5px solid var(--gray-light); min-width:190px; display:none; flex-direction:column; z-index:200; box-shadow:0 8px 24px rgba(0,0,0,.08); }
+    .country-dropdown.open { display:flex; }
+    .country-option { font-family:'DM Mono',monospace; font-size:.72rem; letter-spacing:.05em; padding:.7rem 1rem; cursor:none; display:flex; align-items:center; gap:.5rem; color:var(--black); border-bottom:1px solid var(--gray-light); transition:background .15s; user-select:none; }
+    .country-option:last-child { border-bottom:none; }
+    .country-option:hover { background:rgba(0,71,255,.05); }
+    .country-option.selected { color:var(--blue); }
+    .country-check { font-size:.65rem; width:12px; opacity:0; color:var(--blue); font-weight:bold; }
+    .country-option.selected .country-check { opacity:1; }
 
     /* HERO */
     .pricing-hero {
@@ -345,6 +357,19 @@
       </div>
       <span class="nav-logo">Ricardo<span>.</span>Ruiz</span>
     </a>
+    <div class="nav-right">
+      <div class="country-selector-wrap">
+        <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
+          <span id="countryBtnLabel">Colombia</span>
+          <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style="margin-left:6px;transition:transform .2s" id="countryChevron"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <div class="country-dropdown" id="countryDropdown">
+          <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
+          <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
+          <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
+        </div>
+      </div>
+    </div>
   </nav>
 
   <!-- HERO -->
@@ -624,13 +649,16 @@
     function startPayment(planId, planName) {
       const token   = localStorage.getItem('rr-token');
       const billing = billingAnnual ? 'anual' : 'mensual';
-      // Guardar plan pendiente para la página de éxito
+      // Guardar plan pendiente para el dashboard y para retomar después del registro
       localStorage.setItem('rr-pending-plan', JSON.stringify({
         planId: planId + '_' + billing, planName, billing, timestamp: Date.now()
       }));
       if (!token) {
-        // No está logueado: ir a registro primero
-        window.location.href = 'register.html?next=pricing';
+        // No está logueado: guardar también el plan deseado y llevar a registro
+        localStorage.setItem('rr-desired-plan', JSON.stringify({
+          planId, planName, billing, timestamp: Date.now()
+        }));
+        window.location.href = 'register.html?next=pay';
         return;
       }
       const link = WOMPI_LINKS[planId]?.[billing];
@@ -758,6 +786,42 @@
 
     // ─── INIT ─────────────────────────────────────────────────────────────────
     setLanguage(currentLang);
+
+    // ─── COUNTRY SELECTOR ────────────────────────────────────────────────────
+    function toggleCountryDropdown() {
+      document.getElementById('countryBtn').classList.toggle('open');
+      document.getElementById('countryDropdown').classList.toggle('open');
+    }
+    function selectCountry(el) {
+      const val = el.dataset.value;
+      document.getElementById('countryBtn').classList.remove('open');
+      document.getElementById('countryDropdown').classList.remove('open');
+      const langMap = { co:'co', us:'us', mx:'co' };
+      const newLang = langMap[val];
+      if (newLang !== currentLang) {
+        currentLang = newLang;
+        localStorage.setItem('rr-lang', newLang);
+        document.getElementById('countryBtnLabel').textContent = val === 'us' ? 'United States / UK' : val === 'mx' ? 'México' : 'Colombia';
+        document.querySelectorAll('.country-option').forEach(o => o.classList.toggle('selected', o.dataset.value === val));
+        setLanguage(currentLang);
+      }
+    }
+    document.addEventListener('click', e => {
+      const wrap = document.querySelector('.country-selector-wrap');
+      if (wrap && !wrap.contains(e.target)) {
+        document.getElementById('countryBtn').classList.remove('open');
+        document.getElementById('countryDropdown').classList.remove('open');
+      }
+    });
+    // Aplicar idioma guardado al selector
+    (function() {
+      const saved = localStorage.getItem('rr-lang') || 'co';
+      const labelMap = { co:'Colombia', us:'United States / UK', mx:'México' };
+      const valMap   = { co:'co', us:'us' };
+      const val = valMap[saved] || 'co';
+      document.getElementById('countryBtnLabel').textContent = labelMap[val] || 'Colombia';
+      document.querySelectorAll('.country-option').forEach(o => o.classList.toggle('selected', o.dataset.value === val));
+    })();
 
     // ── ¿Viene recién registrado desde register.html?next=pricing? ────────────
     if (localStorage.getItem('rr-register-done')) {

@@ -773,6 +773,20 @@
     setLanguage(currentLang);
     bindModalLinks();
 
+    // ─── CONTEXTO DE PAGO: si viene a comprar un plan, ajustar el panel izquierdo ──
+    (function() {
+      const params  = new URLSearchParams(window.location.search);
+      if (params.get('next') !== 'pay') return;
+      const desired = JSON.parse(localStorage.getItem('rr-desired-plan') || 'null');
+      if (!desired) return;
+      const planName = desired.planName || 'Pro';
+      const billing  = desired.billing === 'anual' ? 'anual' : 'mensual';
+      document.getElementById('panel-tag').textContent = 'Un paso antes de pagar';
+      document.getElementById('panel-heading').innerHTML = `Crea tu cuenta<br/>y accede al<br/><em>plan ${planName}</em>.`;
+      document.getElementById('panel-desc').textContent = `Regístrate gratis, verifica tu correo e inicia sesión. Luego te llevamos directo al checkout del plan ${planName} (${billing}).`;
+      document.getElementById('form-step').textContent = '01 — Registro rápido';
+    })();
+
     // ─── PASSWORD VISIBILITY ─────────────────────────────────────────────────
     function togglePw(inputId, btnId) {
       const input = document.getElementById(inputId);

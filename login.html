@@ -699,6 +699,17 @@
         if (data.ok) {
           localStorage.setItem('rr-token', data.token);
           localStorage.setItem('rr-user',  JSON.stringify(data.user));
+          // Si venía a comprar un plan, llevarlo directo al checkout
+          const desired = JSON.parse(localStorage.getItem('rr-desired-plan') || 'null');
+          const WOMPI_LINKS = {
+            pro:     { mensual: 'https://checkout.wompi.co/l/PLslXs', anual: 'https://checkout.wompi.co/l/2Kdoxx' },
+            premium: { mensual: 'https://checkout.wompi.co/l/YIczAd', anual: 'https://checkout.wompi.co/l/XWAdkz' }
+          };
+          if (desired && Date.now() - desired.timestamp < 30 * 60 * 1000) {
+            localStorage.removeItem('rr-desired-plan');
+            const link = WOMPI_LINKS[desired.planId]?.[desired.billing];
+            if (link) { window.location.href = link; return; }
+          }
           window.location.href = 'dashboard.html';
         } else {
           // 403 = correo no verificado
