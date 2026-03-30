@@ -875,6 +875,18 @@
       '11':'Bogotá D.C.'
     };
 
+    // Mapping DANE dpto_ccdgo → Registraduría electoral code (sin padding)
+    // Used as fallback in depCodeFromFeature when electoral_id is absent.
+    const DANE_TO_REGISTRADURIA = {
+      '05':'1',  '08':'2',  '11':'11', '13':'3',  '15':'4',
+      '17':'5',  '18':'6',  '19':'7',  '20':'8',  '23':'9',
+      '25':'10', '27':'12', '41':'13', '44':'14', '47':'15',
+      '50':'16', '52':'17', '54':'18', '63':'19', '66':'20',
+      '68':'21', '70':'22', '73':'23', '76':'24', '81':'25',
+      '85':'26', '86':'27', '88':'28', '91':'29', '94':'30',
+      '95':'31', '97':'32', '99':'33'
+    };
+
     // Zonas de Bogotá
     const ZONAS_BOGOTA = {'01':'Usaquén','02':'Chapinero','03':'Santa Fe','04':'San Cristóbal','05':'Usme','06':'Tunjuelito','07':'Bosa','08':'Kennedy','09':'Fontibón','10':'Engativá','11':'Suba','12':'Barrios Unidos','13':'Teusaquillo','14':'Los Mártires','15':'Antonio Nariño','16':'Puente Aranda','17':'La Candelaria','18':'Rafael Uribe Uribe','19':'Ciudad Bolívar','20':'Sumapaz'};
 
@@ -936,10 +948,14 @@
       if (props.electoral_id != null && props.electoral_id !== '') {
         return normalizeDepCode(props.electoral_id);   // e.g. "1", "16", "23" — sin padding
       }
-      // FALLBACK: no debe alcanzarse para departamentos actualizados
+      // FALLBACK: convierte código DANE → código electoral Registraduría
       console.warn('[Mapa] feature sin electoral_id — usando fallback por DANE:', props.name || props.id);
-      const raw = props.DPTO_CODI || props.code || null;
-      return raw ? String(raw) : null;
+      const dane = props.dpto_ccdgo || props.DPTO_CODI || props.code || null;
+      if (dane) {
+        const padded = String(dane).padStart(2, '0');
+        return DANE_TO_REGISTRADURIA[padded] ?? String(dane);
+      }
+      return null;
     }
 
     function depNameFromFeature(props) {
@@ -962,8 +978,10 @@
         const bounds = layer.getBounds();
         console.log('[Mapa] showBoundaryLayer → bounds.isValid():', bounds.isValid());
         if (bounds.isValid()) {
-          const zoom = leafletMap.getBoundsZoom(bounds, false, L.point(10, 10)) + 0.7;
-          leafletMap.setView(bounds.getCenter(), zoom);
+          const zoom = leafletMap.getBoundsZoom(bounds, false, L.point(10, 10)) - 0.3;
+          leafletMap.setView(bounds.getCenter(), zoom, { animate: false });
+          const offsetX = Math.round(leafletMap.getSize().x * 0.07);
+          leafletMap.panBy([-offsetX, 0], { animate: false });
         } else {
           console.warn('[Mapa] bounds inválidos — se omite fitBounds');
         }
