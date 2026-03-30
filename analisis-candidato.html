@@ -199,6 +199,24 @@
       height: 0;
       min-height: 420px;
     }
+    .map-loading {
+      position: absolute;
+      inset: 0;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(6,8,16,.85);
+      font-family: 'DM Mono', monospace;
+      font-size: .65rem;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.35);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .35s;
+    }
+    .map-loading.active { opacity: 1; }
     #leaflet-map {
       position: absolute;
       inset: 0;
@@ -746,6 +764,7 @@
 
           <!-- Leaflet Map -->
           <div class="map-container">
+            <div class="map-loading" id="map-loading">Cargando mapa…</div>
             <div id="leaflet-map"></div>
           </div>
         </div>
@@ -956,6 +975,7 @@
     let activeBoundaryLayer = null;
     let depVoteData = {};   // { depCode: { nom, v } }
     let maxDepVotes = 1;
+    let depRank = {};       // { depCode: rank (1=más votos) }
 
     // ─── INIT LEAFLET MAP ────────────────────────────────────
     function initLeafletMap() {
@@ -1144,10 +1164,12 @@
           // Leer depVoteData en el momento del hover, no al crear la capa
           const data = depVoteData[code];
           const votes = data ? data.v : 0;
+          const rank = depRank[code];
+          const rankStr = rank ? `#${rank} ` : '';
           layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
           layer.bindTooltip(
-            `<div style="font-family:'DM Mono',monospace;font-size:.805rem;line-height:1.7;padding:.1rem .2rem">
-              <strong style="color:#0047FF;font-size:.86rem">${name}</strong><br/>
+            `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+              <strong style="color:#0047FF;font-size:.989rem">${rankStr}${name.toUpperCase()}</strong><br/>
               ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
             </div>`,
             { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
@@ -1269,6 +1291,7 @@
     async function loadCandData(meta) {
       document.getElementById('placeholder-state').style.display = 'none';
       document.getElementById('pes-panel').style.display = 'grid';
+      document.getElementById('map-loading')?.classList.add('active');
 
       // Ensure map is initialized now
       setTimeout(() => {
@@ -1388,9 +1411,11 @@
 
       // Update Leaflet map
       depVoteData = {};
-      deps.forEach(([code, d]) => { depVoteData[code] = d; });
+      depRank = {};
+      deps.forEach(([code, d], i) => { depVoteData[code] = d; depRank[code] = i + 1; });
       maxDepVotes = deps[0]?.[1]?.v || 1;
       refreshMapColors();
+      setTimeout(() => document.getElementById('map-loading')?.classList.remove('active'), 400);
 
       buildTerritorialRadar({ meta, deps, muns, zonas, totalVotos });
     }
@@ -1486,8 +1511,10 @@
       document.getElementById('info-zona-votos-row').style.display = 'none';
       document.getElementById('info-puesto-votos-row').style.display = 'none';
       depVoteData = {};
+      depRank = {};
       maxDepVotes = 1;
       refreshMapColors();
+      setTimeout(() => document.getElementById('map-loading')?.classList.remove('active'), 400);
     }
 
     function computeRating(votos, deps) {
