@@ -353,7 +353,7 @@
             <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.8rem;flex-wrap:wrap">
               <div class="card-label" style="margin-bottom:0" id="lbl-tabla">Partidos · Cámara · Nacional · 166 curules · D'Hondt por depto.</div>
               <span class="level-badge dep" id="drill-badge">Nacional</span>
-              <button id="excel-download-btn" class="excel-btn excel-btn-locked" onclick="downloadCsvCurrentView()">⬇ Descarga CSV</button>
+              <button id="excel-download-btn" class="excel-btn excel-btn-locked" onclick="downloadExcelCurrentView()">⬇ Descarga Excel</button>
             </div>
             <div class="drill-nav" id="drill-nav"></div>
             <table class="results-table">
@@ -769,24 +769,27 @@
     function showProToast(){const t=document.getElementById('pro-toast');if(!t)return;t.classList.add('show');clearTimeout(t._tmr);t._tmr=setTimeout(()=>t.classList.remove('show'),4000);}
     function showDepLoadingToast(){const t=document.getElementById('dep-loading-toast');if(!t)return;t.classList.add('show');clearTimeout(t._tmr);t._tmr=setTimeout(()=>t.classList.remove('show'),9000);}
     function updateExcelDownloadBtn(){const token=localStorage.getItem('rr-token');const user=JSON.parse(localStorage.getItem('rr-user')||'null');const btn=document.getElementById('excel-download-btn');if(!btn)return;const ok=token&&user&&['pro','premium','full'].includes(user.plan);btn.className='excel-btn '+(ok?'excel-btn-active':'excel-btn-locked');}
-    function downloadCsvCurrentView(){
+    function downloadExcelCurrentView(){
       const token=localStorage.getItem('rr-token');
       const user=JSON.parse(localStorage.getItem('rr-user')||'null');
       const ok=token&&user&&['pro','premium','full'].includes(user.plan);
       if(!ok){showProToast();return;}
-      if(!_lastTableData) return;
-      const {title, partidos, votval} = _lastTableData;
-      const rows=[['#','Partido / Coalición','Votos','%','Curules']];
-      partidos.forEach((p,i)=>{
-        const pctV = votval>0?(p.votos/votval*100).toFixed(1):'0.0';
-        rows.push([i+1, p.partido, p.votos, pctV+'%', p.curules||0]);
-      });
-      const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
-      const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+      const title=document.getElementById('lbl-tabla')?.textContent.trim()||'camara-2026';
+      const thead=document.getElementById('drill-thead');
+      const tbody=document.getElementById('tbody-camara');
+      if(!thead||!tbody)return;
+      const ths=Array.from(thead.querySelectorAll('th')).map(th=>th.textContent.trim());
+      const trs=Array.from(tbody.querySelectorAll('tr')).map(tr=>
+        Array.from(tr.querySelectorAll('td')).map(td=>td.textContent.trim())
+      ).filter(r=>r.length>0);
+      const thHtml=ths.map(h=>`<th style="background:#1a1d2e;color:#fff;font-weight:bold;padding:6px 10px;border:1px solid #bbb">${h}</th>`).join('');
+      const tdHtml=trs.map(r=>`<tr>${r.map(c=>`<td style="padding:5px 10px;border:1px solid #e0e0e0">${c}</td>`).join('')}</tr>`).join('');
+      const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"></head><body><h3 style="font-family:Arial;margin-bottom:8px">${title}</h3><table border="1" cellpadding="5" style="border-collapse:collapse;font-family:Arial;font-size:12px"><thead><tr>${thHtml}</tr></thead><tbody>${tdHtml}</tbody></table></body></html>`;
+      const blob=new Blob(['\uFEFF'+html],{type:'application/vnd.ms-excel;charset=utf-8;'});
       const url=URL.createObjectURL(blob);
       const a=document.createElement('a');
       a.href=url;
-      a.download='camara-2026-'+title.replace(/[^\w\sáéíóúÁÉÍÓÚñÑ·]/g,'').trim().replace(/\s+/g,'-').toLowerCase()+'.csv';
+      a.download=title.replace(/[·\s]+/g,'-').replace(/[^\w\-áéíóúÁÉÍÓÚñÑ]/g,'').toLowerCase()+'.xls';
       a.click();
       URL.revokeObjectURL(url);
     }
@@ -1155,7 +1158,7 @@
     });
 
     // ─── NAV AUTH ─────────────────────────────────────────────
-    function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;if(token&&user){const pl={free:'Free',basic:'Básico',analysis:'Análisis',full:'Completo'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">Salir</button>`;}else{area.innerHTML=`<a href="pricing.html" style="font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">Planes</a><a href="login.html" class="e-btn-login">Iniciar sesión</a><a href="register.html" class="e-btn-register">Registrarse</a>`;}}
+    function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;if(token&&user){const pl={free:'Free',basic:'Básico',analysis:'Análisis',full:'Completo'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">Salir</button>`;}else{area.innerHTML=`<a href="pricing.html" style="font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">Planes</a><a href="login.html?redirect=camara-2026.html" class="e-btn-login">Iniciar sesión</a><a href="register.html" class="e-btn-register">Registrarse</a>`;}}
     async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();updateEndosoCta();updateExcelDownloadBtn();}
     function updateEndosoCta(){ const user=JSON.parse(localStorage.getItem('rr-user')||'null'); const btn=document.getElementById('endoso-cta-btn'); if(!btn) return; if(user&&['pro','premium','full'].includes(user.plan)){ btn.outerHTML=`<a href="endoso-2026.html" class="endoso-btn" id="endoso-cta-btn" onclick="navTo(event,'endoso-2026.html')">Calcular endoso →</a>`; } }
     function dismissInfoBar(){sessionStorage.setItem('rr-info-bar-ok','1');const b=document.getElementById('info-bar');if(b)b.style.display='none';}
