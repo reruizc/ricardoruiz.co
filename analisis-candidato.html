@@ -504,12 +504,12 @@
 
     /* Radar chart canvas */
     .radar-wrap {
-      padding: .6rem 1rem 0;
+      padding: .8rem 1rem .2rem;
       border-bottom: 1px solid rgba(255,255,255,.05);
     }
     .radar-title {
       font-family: 'DM Mono', monospace;
-      font-size: .52rem;
+      font-size: .624rem;
       letter-spacing: .15em;
       text-transform: uppercase;
       color: rgba(255,255,255,.3);
@@ -518,6 +518,8 @@
     #radar-canvas {
       width: 100% !important;
       max-height: 140px;
+      transform: scale(1.2);
+      transform-origin: center;
     }
 
     /* Candidatos list */
@@ -1534,7 +1536,14 @@
     function isLoggedIn() { return !!localStorage.getItem('rr-token'); }
 
     // ─── MODAL MUNICIPIO ──────────────────────────────────────
-    function showMunModal() { document.getElementById('mun-modal').classList.add('open'); }
+    function showMunModal() {
+      document.getElementById('mun-modal').classList.add('open');
+      const depSelect = document.getElementById('filter-dep');
+      const munSelect = document.getElementById('filter-mun');
+      if (depSelect) depSelect.value = '';
+      if (munSelect) { munSelect.value = ''; munSelect.disabled = true; }
+      if (departamentosLayer) showBoundaryLayer(departamentosLayer);
+    }
     function hideMunModal() { document.getElementById('mun-modal').classList.remove('open'); }
     document.addEventListener('click', e => {
       if (e.target.id === 'mun-modal') hideMunModal();
@@ -1560,7 +1569,7 @@
       munSel.innerHTML = '<option value="">— Todos los municipios —</option>';
       munSel.disabled = true;
 
-      if (depCode && !isLoggedIn()) { showMunModal(); }
+      if (depCode && !isLoggedIn()) { showMunModal(); return; }
 
       if (!depCode) {
         // Volver a vista nacional con capa de departamentos
