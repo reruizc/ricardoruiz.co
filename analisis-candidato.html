@@ -875,17 +875,68 @@
       '11':'Bogotá D.C.'
     };
 
-    // Mapping DANE dpto_ccdgo → Registraduría electoral code (sin padding)
-    // Used as fallback in depCodeFromFeature when electoral_id is absent.
+    // Mapping DANE dpto_ccdgo (2-digit, con padding) → código electoral Registraduría (sin padding).
+    // Orden: estrictamente alfabético por nombre oficial del departamento,
+    // con Bogotá D.C. en posición 16 como circunscripción especial
+    // (insertada entre Guainía=15 y Guaviare=17, según numeración oficial Registraduría).
+    // Evidencia: comentario en código "electoral_id de Bogotá D.C." === '16',
+    // y ejemplos de claves depMap: "1" (Amazonas), "16" (Bogotá), "23" (Norte de Santander).
     const DANE_TO_REGISTRADURIA = {
-      '05':'1',  '08':'2',  '11':'11', '13':'3',  '15':'4',
-      '17':'5',  '18':'6',  '19':'7',  '20':'8',  '23':'9',
-      '25':'10', '27':'12', '41':'13', '44':'14', '47':'15',
-      '50':'16', '52':'17', '54':'18', '63':'19', '66':'20',
-      '68':'21', '70':'22', '73':'23', '76':'24', '81':'25',
-      '85':'26', '86':'27', '88':'28', '91':'29', '94':'30',
-      '95':'31', '97':'32', '99':'33'
+      '91': '1',   // Amazonas
+      '05': '2',   // Antioquia
+      '81': '3',   // Arauca
+      '08': '4',   // Atlántico
+      '13': '5',   // Bolívar
+      '15': '6',   // Boyacá
+      '17': '7',   // Caldas
+      '18': '8',   // Caquetá
+      '85': '9',   // Casanare
+      '19': '10',  // Cauca
+      '20': '11',  // Cesar
+      '27': '12',  // Chocó
+      '23': '13',  // Córdoba
+      '25': '14',  // Cundinamarca
+      '94': '15',  // Guainía
+      '11': '16',  // Bogotá D.C. (circunscripción especial)
+      '95': '17',  // Guaviare
+      '41': '18',  // Huila
+      '44': '19',  // La Guajira
+      '47': '20',  // Magdalena
+      '50': '21',  // Meta
+      '52': '22',  // Nariño
+      '54': '23',  // Norte de Santander
+      '86': '24',  // Putumayo
+      '63': '25',  // Quindío
+      '66': '26',  // Risaralda
+      '88': '27',  // San Andrés
+      '68': '28',  // Santander
+      '70': '29',  // Sucre
+      '73': '30',  // Tolima
+      '76': '31',  // Valle del Cauca
+      '97': '32',  // Vaupés
+      '99': '33'   // Vichada
     };
+
+    // Fallback por nombre: nombre normalizado → código electoral Registraduría.
+    // Usado cuando electoral_id y dpto_ccdgo están ausentes.
+    const NAME_TO_REGISTRADURIA = {
+      'amazonas':'1', 'antioquia':'2', 'arauca':'3', 'atlantico':'4',
+      'bolivar':'5', 'boyaca':'6', 'caldas':'7', 'caqueta':'8',
+      'casanare':'9', 'cauca':'10', 'cesar':'11', 'choco':'12',
+      'cordoba':'13', 'cundinamarca':'14', 'guainia':'15',
+      'bogota':'16', 'bogota d.c.':'16', 'distrito capital':'16',
+      'guaviare':'17', 'huila':'18', 'la guajira':'19', 'guajira':'19',
+      'magdalena':'20', 'meta':'21', 'narino':'22',
+      'norte de santander':'23', 'putumayo':'24', 'quindio':'25',
+      'risaralda':'26', 'san andres':'27', 'san andres y providencia':'27',
+      'santander':'28', 'sucre':'29', 'tolima':'30',
+      'valle del cauca':'31', 'valle':'31', 'vaupes':'32', 'vichada':'33'
+    };
+
+    function normalizeDepName(name) {
+      return (name || '').toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    }
 
     // Zonas de Bogotá
     const ZONAS_BOGOTA = {'01':'Usaquén','02':'Chapinero','03':'Santa Fe','04':'San Cristóbal','05':'Usme','06':'Tunjuelito','07':'Bosa','08':'Kennedy','09':'Fontibón','10':'Engativá','11':'Suba','12':'Barrios Unidos','13':'Teusaquillo','14':'Los Mártires','15':'Antonio Nariño','16':'Puente Aranda','17':'La Candelaria','18':'Rafael Uribe Uribe','19':'Ciudad Bolívar','20':'Sumapaz'};
@@ -946,15 +997,36 @@
     function depCodeFromFeature(props) {
       // PRIMARY: electoral_id asignado al GeoJSON de departamentos
       if (props.electoral_id != null && props.electoral_id !== '') {
-        return normalizeDepCode(props.electoral_id);   // e.g. "1", "16", "23" — sin padding
+        const code = normalizeDepCode(props.electoral_id);
+        console.log(`[Mapa] electoral_id → '${props.electoral_id}' → código '${code}'`);
+        return code;
       }
-      // FALLBACK: convierte código DANE → código electoral Registraduría
-      console.warn('[Mapa] feature sin electoral_id — usando fallback por DANE:', props.name || props.id);
+
+      // FALLBACK 1: código DANE → código electoral Registraduría
       const dane = props.dpto_ccdgo || props.DPTO_CODI || props.code || null;
       if (dane) {
         const padded = String(dane).padStart(2, '0');
-        return DANE_TO_REGISTRADURIA[padded] ?? String(dane);
+        const electoral = DANE_TO_REGISTRADURIA[padded];
+        if (electoral) {
+          console.log(`[Mapa] DANE fallback → '${padded}' → código '${electoral}'`);
+          return electoral;
+        }
+        console.warn(`[Mapa] DANE '${padded}' no encontrado en DANE_TO_REGISTRADURIA`);
       }
+
+      // FALLBACK 2: nombre del departamento → código electoral
+      const rawName = depNameFromFeature(props);
+      if (rawName) {
+        const norm = normalizeDepName(rawName);
+        const electoral = NAME_TO_REGISTRADURIA[norm];
+        if (electoral) {
+          console.log(`[Mapa] Name fallback → '${rawName}' → código '${electoral}'`);
+          return electoral;
+        }
+        console.warn(`[Mapa] Nombre '${rawName}' no encontrado en NAME_TO_REGISTRADURIA`);
+      }
+
+      console.warn('[Mapa] feature sin código resolvible — props:', JSON.stringify(props).substring(0, 120));
       return null;
     }
 
