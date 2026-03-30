@@ -430,6 +430,7 @@
     let circData = null; // circunscripciones.json
     // Cache de electos nacionales: se recalcula solo cuando cambia la circunscripción
     let _elegidosNac = null, _elegidosCircKey = '';
+    let _lastTableData = null; // { title, partidos:[{partido,votos,curules,candidatos}], votval }
 
     const CURULES_INDIGENAS = 2;
     function getMaxCurules(){ return activeCirc==='INDIGENAS'?CURULES_INDIGENAS:CURULES; }
@@ -569,6 +570,7 @@
         .filter(p=>!SPEC.has(p.partido)&&(geoVotos[p.partido]||0)>0)
         .map(p=>({...p, votos:geoVotos[p.partido]||0}))
         .sort((a,b)=>b.votos-a.votos);
+      _lastTableData={title:labelText, partidos:geoPartidos.map(p=>({...p,candidatos:geoCirc.candidatos?.[p.partido]||[]})), votval:totalVotos};
 
       document.getElementById('lbl-tabla').textContent=labelText;
       document.getElementById('drill-badge').textContent=badgeText;
@@ -920,6 +922,7 @@
       const tbody=document.getElementById('tbody-senado');
       tbody.innerHTML='';
       const partidos=getCircPartidosCalculated(), maxV=partidos[0]?.votos||1;
+      _lastTableData={title:document.getElementById('lbl-tabla').textContent, partidos:partidos.map(p=>({...p,candidatos:p.candidatos||[]})), votval:cd.votval||resumenData?.votval||0};
       partidos.forEach((p,i)=>{
         const pctV=pct(p.votos,cd.votval||resumenData.votval), bw=((p.votos/maxV)*100).toFixed(1), color=getColor(p.partido), curules=p.curules||0;
         const umbral=cd.umbral||resumenData.umbral;
@@ -1040,16 +1043,38 @@
       const user=JSON.parse(localStorage.getItem('rr-user')||'null');
       const ok=token&&user&&['pro','premium','full'].includes(user.plan);
       if(!ok){showProToast();return;}
-      const title=document.getElementById('lbl-tabla')?.textContent.trim()||'senado-2026';
-      const thead=document.getElementById('drill-thead');
-      const tbody=document.getElementById('tbody-senado');
-      if(!thead||!tbody)return;
-      const ths=Array.from(thead.querySelectorAll('th')).map(th=>th.textContent.trim());
-      const trs=Array.from(tbody.querySelectorAll('tr')).map(tr=>
-        Array.from(tr.querySelectorAll('td')).map(td=>td.textContent.trim())
-      ).filter(r=>r.length>0);
-      const thHtml=ths.map(h=>`<th style="background:#1a1d2e;color:#fff;font-weight:bold;padding:6px 10px;border:1px solid #bbb">${h}</th>`).join('');
-      const tdHtml=trs.map(r=>`<tr>${r.map(c=>`<td style="padding:5px 10px;border:1px solid #e0e0e0">${c}</td>`).join('')}</tr>`).join('');
+      if(!_lastTableData)return;
+      const {title,partidos,votval}=_lastTableData;
+      const norm=s=>s.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      const headers=['# Partido','Partido / Coalición','Cód.','Candidato/a','Votos','%','Curules'];
+      const rows=[];
+      partidos.forEach((p,i)=>{
+        const curules=p.curules||0;
+        const pctT=votval>0?((p.votos/votval)*100).toFixed(1)+'%':'0.0%';
+        // Fila del partido
+        rows.push({t:'p',c:[i+1, p.partido, '', '', p.votos, pctT, curules||'—']});
+        const cands=p.candidatos||[];
+        const nomPart=norm(p.partido);
+        if(cands.length===0&&curules>0){
+          // Lista cerrada sin candidatos individuales
+          for(let k=0;k<curules;k++)
+            rows.push({t:'c',c:[i+1, p.partido, '', `Lista cerrada · Posición ${k+1}`, '', '', curules]});
+        } else {
+          cands.forEach(c=>{
+            const esLista=norm(c.nombre)===nomPart||norm(c.nombre).startsWith(nomPart.split(' ')[0]+' '+(nomPart.split(' ')[1]||'___'));
+            if(esLista)return;
+            const cod=c.codigo!=null?String(c.codigo).padStart(3,'0'):'';
+            const pctP=p.votos>0?((c.votos/p.votos)*100).toFixed(1)+'%':'0.0%';
+            rows.push({t:'c',c:[i+1, p.partido, cod, c.nombre, c.votos, pctP, curules||'—']});
+          });
+        }
+      });
+      const thHtml=headers.map(h=>`<th style="background:#1a1d2e;color:#fff;font-weight:bold;padding:6px 10px;border:1px solid #999;white-space:nowrap">${h}</th>`).join('');
+      const tdHtml=rows.map(({t,c})=>`<tr>${c.map((v,ci)=>{
+        const bg=t==='p'?'background:#e8edf8;':'';
+        const bold=(t==='p'&&(ci===1||ci===4||ci===5||ci===6))||(t==='c'&&ci===3)?'font-weight:bold;':'';
+        return `<td style="${bg}${bold}padding:5px 10px;border:1px solid #ddd">${v}</td>`;
+      }).join('')}</tr>`).join('');
       const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"></head><body><h3 style="font-family:Arial;margin-bottom:8px">${title}</h3><table border="1" cellpadding="5" style="border-collapse:collapse;font-family:Arial;font-size:12px"><thead><tr>${thHtml}</tr></thead><tbody>${tdHtml}</tbody></table></body></html>`;
       const blob=new Blob(['\uFEFF'+html],{type:'application/vnd.ms-excel;charset=utf-8;'});
       const url=URL.createObjectURL(blob);
