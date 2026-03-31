@@ -430,7 +430,7 @@
     .info-header .cand-full-name {
       font-family: 'Syne', sans-serif;
       font-weight: 400;
-      font-size: 1.09rem;
+      font-size: 1.2rem;
       letter-spacing: -.02em;
       text-transform: uppercase;
       color: var(--white);
@@ -623,6 +623,12 @@
     .mun-modal-close { position: absolute; top: .5rem; right: .7rem; background: none; border: none; color: rgba(255,255,255,.35); font-size: 1.1rem; cursor: pointer; padding: 0; line-height: 1; }
     .mun-modal-close:hover { color: var(--white); }
 
+    /* ─── BOTÓN EXCEL ─── */
+    .btn-excel-dl { font-family:'DM Mono',monospace; font-size:.58rem; letter-spacing:.08em; text-transform:uppercase; color:var(--green); background:none; border:1.5px solid rgba(74,222,128,.4); padding:.2rem .55rem; cursor:pointer; transition:all .2s; flex-shrink:0; white-space:nowrap; }
+    .btn-excel-dl:hover { background:var(--green); color:#060810; border-color:var(--green); }
+    .btn-excel-dl.locked { color:rgba(255,255,255,.3); border-color:rgba(255,255,255,.15); cursor:pointer; }
+    .btn-excel-dl.locked:hover { color:rgba(255,255,255,.55); border-color:rgba(255,255,255,.3); background:none; }
+
     /* ─── TIPOGRAFÍA SYNE EN LAS TRES COLUMNAS ─── */
     .pes-left, .pes-left *,
     .pes-center, .pes-center *,
@@ -736,7 +742,10 @@
         <!-- CENTER: MAPA (ancho) -->
         <div class="pes-center">
           <div class="pes-panel-header">
-            <span class="pes-panel-title">Mapa · Votación por departamento</span>
+            <div style="display:flex;align-items:center;gap:.6rem;">
+              <span class="pes-panel-title">Mapa · Votación por departamento</span>
+              <button class="btn-excel-dl" id="btn-excel-dl" onclick="onExcelDownload()">⬇ Descargar votación excel candidato</button>
+            </div>
             <span class="pes-nav-hint" id="map-total-hint">— votos</span>
           </div>
 
@@ -861,6 +870,14 @@
       <div class="mun-modal-box">
         <button class="mun-modal-close" onclick="hideMunModal()">×</button>
         <p>Para ver municipios, apóyanos <a href="register.html">registrándote aquí</a></p>
+      </div>
+    </div>
+
+    <!-- MODAL EXCEL LOCK -->
+    <div class="mun-modal" id="excel-lock-modal">
+      <div class="mun-modal-box">
+        <button class="mun-modal-close" onclick="hideExcelModal()">×</button>
+        <p>Esta función es exclusiva para usuarios <strong>Premium</strong> o <strong>Full</strong>.<br><a href="register.html">Regístrate</a> o consulta los <a href="pricing.html">planes disponibles</a>.</p>
       </div>
     </div>
 
@@ -1553,7 +1570,65 @@
     function hideMunModal() { document.getElementById('mun-modal').classList.remove('open'); }
     document.addEventListener('click', e => {
       if (e.target.id === 'mun-modal') hideMunModal();
+      if (e.target.id === 'excel-lock-modal') hideExcelModal();
     });
+
+    // ─── EXCEL DOWNLOAD ──────────────────────────────────────
+    function hideExcelModal() { document.getElementById('excel-lock-modal').classList.remove('open'); }
+
+    function isPremiumOrFull() {
+      const user = JSON.parse(localStorage.getItem('rr-user')||'null');
+      return !!(user && (user.plan === 'premium' || user.plan === 'full'));
+    }
+
+    function updateExcelBtn() {
+      const btn = document.getElementById('btn-excel-dl');
+      if (!btn) return;
+      if (isPremiumOrFull()) {
+        btn.classList.remove('locked');
+        btn.title = 'Descargar datos del candidato en Excel';
+      } else {
+        btn.classList.add('locked');
+        btn.title = 'Exclusivo para usuarios Premium o Full';
+        btn.innerHTML = '🔒 Descargar votación excel candidato';
+      }
+    }
+
+    function onExcelDownload() {
+      if (!isPremiumOrFull()) {
+        document.getElementById('excel-lock-modal').classList.add('open');
+        return;
+      }
+      if (!currentData || !currentCand) return;
+      const mesas = currentData.mesas || [];
+      let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<?mso-application progid="Excel.Sheet"?>\n';
+      xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n';
+      xml += '<Worksheet ss:Name="Votación">\n<Table>\n';
+      xml += '<Row>';
+      ['Departamento','Municipio','Zona','Puesto','Votos'].forEach(h => {
+        xml += `<Cell><Data ss:Type="String">${h}</Data></Cell>`;
+      });
+      xml += '</Row>\n';
+      mesas.forEach(m => {
+        const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        xml += '<Row>';
+        xml += `<Cell><Data ss:Type="String">${esc(m.depNom)}</Data></Cell>`;
+        xml += `<Cell><Data ss:Type="String">${esc(m.munNom)}</Data></Cell>`;
+        xml += `<Cell><Data ss:Type="Number">${m.zon||0}</Data></Cell>`;
+        xml += `<Cell><Data ss:Type="String">${esc(m.pueNom||'')}</Data></Cell>`;
+        xml += `<Cell><Data ss:Type="Number">${m.v||0}</Data></Cell>`;
+        xml += '</Row>\n';
+      });
+      xml += '</Table>\n</Worksheet>\n</Workbook>';
+      const blob = new Blob([xml], {type:'application/vnd.ms-excel'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `votacion-${currentCand.slug||'candidato'}.xls`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    }
 
     // ─── FILTROS DEP/MUN ──────────────────────────────────────
     function populateDepFilter(deps) {
@@ -1777,6 +1852,7 @@
       localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); updateElectoralNav();
     }
     updateElectoralNav();
+    updateExcelBtn();
 
     // ─── THEME ───────────────────────────────────────────────
     function isDayHour() { const h = new Date().getHours(); return h >= 7 && h < 19; }
