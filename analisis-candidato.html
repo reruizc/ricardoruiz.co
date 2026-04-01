@@ -153,7 +153,7 @@
     }
     .pes-nav-hint {
       font-family: 'DM Mono', monospace;
-      font-size: .52rem;
+      font-size: .624rem;
       letter-spacing: .1em;
       color: rgba(255,255,255,.35);
     }
@@ -471,7 +471,7 @@
     .info-val.purple { color: var(--purple); }
     .info-val.orange { color: var(--orange); }
     /* Votos totales superior (map-total-hint): ~60% más grande que .pes-nav-hint base (.52rem) */
-    #map-total-hint { font-size: .85rem; color: rgba(255,255,255,.7); letter-spacing: .04em; }
+    #map-total-hint { font-size: 1.02rem; color: rgba(255,255,255,.7); letter-spacing: .04em; }
 
     /* Barra ideológica izq-der */
     .ideology-bar-wrap {
@@ -629,6 +629,26 @@
     .btn-excel-dl.locked { color:rgba(255,255,255,.3); border-color:rgba(255,255,255,.15); cursor:pointer; }
     .btn-excel-dl.locked:hover { color:rgba(255,255,255,.55); border-color:rgba(255,255,255,.3); background:none; }
 
+    /* ─── BOTONES DESCARGA POR NIVEL ─── */
+    .dl-tier-btn { font-family:'DM Mono',monospace; font-size:.58rem; letter-spacing:.07em; text-transform:uppercase; padding:.22rem .55rem; border:1.5px solid; cursor:pointer; transition:all .2s; white-space:nowrap; background:none; }
+    .dl-tier-btn.locked { opacity:.38; cursor:pointer; }
+    .dl-tier-btn.locked:hover { opacity:.6; }
+    .dl-tier-btn.t-free { color:#4ade80; border-color:rgba(74,222,128,.4); }
+    .dl-tier-btn.t-free:not(.locked):hover { background:#4ade80; color:#060810; border-color:#4ade80; }
+    .dl-tier-btn.t-pro { color:#fbbf24; border-color:rgba(251,191,36,.4); }
+    .dl-tier-btn.t-pro:not(.locked):hover { background:#fbbf24; color:#060810; border-color:#fbbf24; }
+    .dl-tier-btn.t-premium { color:#a78bfa; border-color:rgba(167,139,250,.4); }
+    .dl-tier-btn.t-premium:not(.locked):hover { background:#a78bfa; color:#060810; border-color:#a78bfa; }
+    body.day-mode .dl-tier-btn.t-free { color:#16a34a; border-color:rgba(22,163,74,.4); }
+    body.day-mode .dl-tier-btn.t-free:not(.locked):hover { background:#16a34a; color:#fff; border-color:#16a34a; }
+    body.day-mode .dl-tier-btn.t-pro { color:#b45309; border-color:rgba(180,83,9,.4); }
+    body.day-mode .dl-tier-btn.t-pro:not(.locked):hover { background:#b45309; color:#fff; border-color:#b45309; }
+    body.day-mode .dl-tier-btn.t-premium { color:#7c3aed; border-color:rgba(124,58,237,.4); }
+    body.day-mode .dl-tier-btn.t-premium:not(.locked):hover { background:#7c3aed; color:#fff; border-color:#7c3aed; }
+    #dl-btns-wrap { display:none; align-items:center; gap:.45rem; flex-wrap:wrap; }
+    .dl-btns-label { font-family:'DM Mono',monospace; font-size:.58rem; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.28); white-space:nowrap; }
+    body.day-mode .dl-btns-label { color:rgba(0,0,0,.38); }
+
     /* ─── TIPOGRAFÍA SYNE EN LAS TRES COLUMNAS ─── */
     .pes-left, .pes-left *,
     .pes-center, .pes-center *,
@@ -701,6 +721,14 @@
         <div class="ac-dropdown" id="ac-dropdown"></div>
       </div>
       <span class="search-hint" id="search-hint">Cargando índice…</span>
+      <div id="dl-btns-wrap">
+        <span class="dl-btns-label">Descargar por</span>
+        <button class="dl-tier-btn t-free" id="dl-dep" onclick="dlExcel('dep')" title="Departamento · usuarios registrados">⬇ Depto.</button>
+        <button class="dl-tier-btn t-free" id="dl-mun" onclick="dlExcel('mun')" title="Municipio · usuarios registrados">⬇ Municipio</button>
+        <button class="dl-tier-btn t-pro" id="dl-zon" onclick="dlExcel('zon')" title="Zona · plan Pro o superior">⬇ Zona</button>
+        <button class="dl-tier-btn t-premium" id="dl-pue" onclick="dlExcel('pue')" title="Puesto · plan Premium o Full">⬇ Puesto</button>
+        <button class="dl-tier-btn t-premium" id="dl-mesa" onclick="dlExcel('mesa')" title="Mesa · plan Premium o Full">⬇ Mesa</button>
+      </div>
     </div>
 
     <!-- CONTENT -->
@@ -742,10 +770,7 @@
         <!-- CENTER: MAPA (ancho) -->
         <div class="pes-center">
           <div class="pes-panel-header">
-            <div style="display:flex;align-items:center;gap:.6rem;">
-              <span class="pes-panel-title">Mapa · Votación por departamento</span>
-              <button class="btn-excel-dl" id="btn-excel-dl" onclick="onExcelDownload()">⬇ Descargar votación excel candidato</button>
-            </div>
+            <span class="pes-panel-title">Mapa · Votación por departamento</span>
             <span class="pes-nav-hint" id="map-total-hint">— votos</span>
           </div>
 
@@ -877,7 +902,7 @@
     <div class="mun-modal" id="excel-lock-modal">
       <div class="mun-modal-box">
         <button class="mun-modal-close" onclick="hideExcelModal()">×</button>
-        <p>Esta función es exclusiva para usuarios <strong>Premium</strong> o <strong>Full</strong>.<br><a href="register.html">Regístrate</a> o consulta los <a href="pricing.html">planes disponibles</a>.</p>
+        <p id="excel-lock-msg">Esta función es exclusiva para usuarios <strong>Premium</strong> o <strong>Full</strong>.<br><a href="register.html">Regístrate</a> o consulta los <a href="pricing.html">planes disponibles</a>.</p>
       </div>
     </div>
 
@@ -1325,6 +1350,7 @@
         else leafletMap.invalidateSize();
       }, 80);
 
+      updateDlBtns();
       setInfoVal('info-full-name', meta.nombre);
       setInfoVal('cand-surname', splitName(meta.nombre).apellidos);
       setInfoVal('cand-name-first', splitName(meta.nombre).nombres);
@@ -1557,6 +1583,105 @@
 
     // ─── AUTH HELPER ─────────────────────────────────────────
     function isLoggedIn() { return !!localStorage.getItem('rr-token'); }
+    function isProOrHigher() {
+      const user = JSON.parse(localStorage.getItem('rr-user')||'null');
+      return !!(user && ['pro','premium','full'].includes(user.plan));
+    }
+
+    // ─── DESCARGA POR NIVEL ──────────────────────────────────
+    function canDlLevel(level) {
+      if (level === 'dep' || level === 'mun') return isLoggedIn();
+      if (level === 'zon') return isProOrHigher();
+      return isPremiumOrFull(); // pue, mesa
+    }
+
+    function updateDlBtns() {
+      const wrap = document.getElementById('dl-btns-wrap');
+      if (!wrap) return;
+      wrap.style.display = 'flex';
+      ['dep','mun','zon','pue','mesa'].forEach(level => {
+        const btn = document.getElementById(`dl-${level}`);
+        if (btn) btn.classList.toggle('locked', !canDlLevel(level));
+      });
+    }
+
+    function dlExcel(level) {
+      if (!canDlLevel(level)) {
+        const msgs = {
+          dep: 'Descarga por departamento disponible para usuarios <strong>registrados</strong>.',
+          mun: 'Descarga por municipio disponible para usuarios <strong>registrados</strong>.',
+          zon: 'Descarga por zona requiere plan <strong>Pro</strong> o superior.',
+          pue: 'Descarga por puesto requiere plan <strong>Premium</strong> o <strong>Full</strong>.',
+          mesa: 'Descarga por mesa requiere plan <strong>Premium</strong> o <strong>Full</strong>.'
+        };
+        const msg = document.getElementById('excel-lock-msg');
+        if (msg) msg.innerHTML = (msgs[level]||'') + '<br><a href="register.html">Regístrate</a> o consulta los <a href="pricing.html">planes disponibles</a>.';
+        document.getElementById('excel-lock-modal').classList.add('open');
+        return;
+      }
+      if (!currentData || !currentCand) return;
+      const mesas = currentData.mesas || [];
+      const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      let headers, rows;
+
+      if (level === 'dep') {
+        const map = {};
+        mesas.forEach(m => {
+          const k = String(m.dep);
+          if (!map[k]) map[k] = { dep:m.dep, depNom:m.depNom, v:0 };
+          map[k].v += m.v;
+        });
+        headers = ['Cod. Departamento','Nombre Departamento','Votos'];
+        rows = Object.values(map).sort((a,b)=>b.v-a.v).map(r=>[r.dep,r.depNom,r.v]);
+      } else if (level === 'mun') {
+        const map = {};
+        mesas.forEach(m => {
+          const k = `${m.dep}|${m.mun}`;
+          if (!map[k]) map[k] = { dep:m.dep, depNom:m.depNom, mun:m.mun, munNom:m.munNom, v:0 };
+          map[k].v += m.v;
+        });
+        headers = ['Cod. Departamento','Nombre Departamento','Cod. Municipio','Nombre Municipio','Votos'];
+        rows = Object.values(map).sort((a,b)=>b.v-a.v).map(r=>[r.dep,r.depNom,r.mun,r.munNom,r.v]);
+      } else if (level === 'zon') {
+        const map = {};
+        mesas.forEach(m => {
+          const k = `${m.dep}|${m.mun}|${m.zon}`;
+          if (!map[k]) map[k] = { dep:m.dep, depNom:m.depNom, mun:m.mun, munNom:m.munNom, zon:m.zon, v:0 };
+          map[k].v += m.v;
+        });
+        headers = ['Cod. Departamento','Nombre Departamento','Cod. Municipio','Nombre Municipio','Cod. Zona','Votos'];
+        rows = Object.values(map).sort((a,b)=>b.v-a.v).map(r=>[r.dep,r.depNom,r.mun,r.munNom,r.zon,r.v]);
+      } else if (level === 'pue') {
+        const map = {};
+        mesas.forEach(m => {
+          const k = `${m.dep}|${m.mun}|${m.zon}|${m.pue}`;
+          if (!map[k]) map[k] = { dep:m.dep, depNom:m.depNom, mun:m.mun, munNom:m.munNom, zon:m.zon, pue:m.pue, pueNom:m.pueNom, v:0 };
+          map[k].v += m.v;
+        });
+        headers = ['Cod. Departamento','Nombre Departamento','Cod. Municipio','Nombre Municipio','Cod. Zona','Cod. Puesto','Nombre Puesto','Votos'];
+        rows = Object.values(map).sort((a,b)=>b.v-a.v).map(r=>[r.dep,r.depNom,r.mun,r.munNom,r.zon,r.pue,r.pueNom,r.v]);
+      } else {
+        headers = ['Cod. Departamento','Nombre Departamento','Cod. Municipio','Nombre Municipio','Cod. Zona','Cod. Puesto','Nombre Puesto','Mesa','Votos'];
+        rows = [...mesas].sort((a,b)=>b.v-a.v).map(m=>[m.dep,m.depNom,m.mun,m.munNom,m.zon,m.pue,m.pueNom,m.mesa,m.v]);
+      }
+
+      let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<?mso-application progid="Excel.Sheet"?>\n';
+      xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n';
+      xml += '<Worksheet ss:Name="Votación">\n<Table>\n';
+      xml += '<Row>' + headers.map(h=>`<Cell><Data ss:Type="String">${esc(h)}</Data></Cell>`).join('') + '</Row>\n';
+      rows.forEach(row => {
+        xml += '<Row>' + row.map(v => typeof v==='number'
+          ? `<Cell><Data ss:Type="Number">${v}</Data></Cell>`
+          : `<Cell><Data ss:Type="String">${esc(v)}</Data></Cell>`).join('') + '</Row>\n';
+      });
+      xml += '</Table>\n</Worksheet>\n</Workbook>';
+      const blob = new Blob([xml], {type:'application/vnd.ms-excel'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `votacion-${level}-${currentCand.slug||'candidato'}.xls`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    }
 
     // ─── MODAL MUNICIPIO ──────────────────────────────────────
     function showMunModal() {
@@ -1852,7 +1977,7 @@
       localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); updateElectoralNav();
     }
     updateElectoralNav();
-    updateExcelBtn();
+    updateDlBtns();
 
     // ─── THEME ───────────────────────────────────────────────
     function isDayHour() { const h = new Date().getHours(); return h >= 7 && h < 19; }
