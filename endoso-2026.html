@@ -12,7 +12,7 @@
   <style>
     :root{--white:#f4f3ef;--blue:#0047FF;--green:#4ade80;--purple:#a78bfa;--orange:#fb923c;--card-border:rgba(255,255,255,0.1);--border:rgba(255,255,255,0.08);--bar-bg:rgba(255,255,255,0.1)}
     /* DAY MODE — fondo blanco limpio, texto oscuro, buen contraste */
-    body.day-mode{background:#ffffff;color:#0d1120}
+    body.day-mode{background:#e6ded3;color:#0d1120}
     body.day-mode .bg-layer{opacity:.04}
     body.day-mode .bg-overlay{background:linear-gradient(to right,rgba(255,255,255,.99) 0%,rgba(255,255,255,.97) 55%,rgba(255,255,255,.85) 72%,rgba(255,255,255,.6) 88%,rgba(255,255,255,.25) 100%)}
     body.day-mode .shell{color:#0d1120}
@@ -81,7 +81,7 @@
     body.day-mode .theme-btn{background:rgba(0,71,255,.08);border-color:rgba(0,71,255,.25);color:var(--blue)}
     body.day-mode .theme-btn:hover{background:rgba(0,71,255,.15)}
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    html{scroll-behavior:smooth}
+    html{scroll-behavior:smooth;font-size:115%}
     body{background:#060810;color:var(--white);font-family:'Syne',sans-serif;cursor:none;min-height:100vh;overflow-x:hidden}
     .cursor{position:fixed;width:10px;height:10px;background:var(--blue);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);transition:transform .15s,background .2s}
     .cursor-ring{position:fixed;width:32px;height:32px;border:1.5px solid var(--blue);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);opacity:.4}
@@ -106,7 +106,7 @@
     @media(max-width:900px){.electoral-nav{display:none}}
 
     .top-bar{display:flex;align-items:flex-start;justify-content:space-between;padding:1.1rem 2.5rem 0;flex-shrink:0}
-    .page-title{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.5rem,2.8vw,2.5rem);letter-spacing:-.04em;line-height:1.05;color:var(--white);text-shadow:0 2px 24px rgba(0,71,255,.4)}
+    .page-title{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.304rem,2.8vw,2.174rem);letter-spacing:-.04em;line-height:1.05;color:var(--white);text-shadow:0 2px 24px rgba(0,71,255,.4)}
     .page-title span{color:var(--blue)}
     .breadcrumb{padding:.6rem 2.5rem 0;font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3);border-bottom:1px solid var(--border);padding-bottom:.7rem;flex-shrink:0}
     .breadcrumb a{color:rgba(0,71,255,.7);text-decoration:none}
@@ -717,6 +717,8 @@
       btn.textContent = 'Calculando…';
 
       const selA = getSelected('A'), selB = getSelected('B');
+      window._labelA = shortName(selA.nombre);
+      window._labelB = shortName(selB.nombre);
       const selC = useCD ? getSelected('C') : null;
       const selD = useCD ? getSelected('D') : null;
       const selE1 = useExtra ? getSelected('E1') : null;
@@ -784,7 +786,15 @@
         const depBTop = Object.entries(depBMap).sort((a,b)=>b[1].vB-a[1].vB)[0];
 
         // Filtro según condición
-        mesasAB = condicionFilter(allMesas);
+        // Si A=SENADO y B=CAMARA, restringir mesas al departamento donde B tiene votos
+        window._isSenCam = /SENADO/i.test(selA.corp) && /CAMARA/i.test(selB.corp);
+        if (window._isSenCam) {
+          const depsBConVotos = new Set(allMesas.filter(m => m.B > 0).map(m => m.dep));
+          window._mesasScopeRef = allMesas.filter(m => depsBConVotos.has(m.dep));
+        } else {
+          window._mesasScopeRef = allMesas;
+        }
+        mesasAB = condicionFilter(window._mesasScopeRef);
         let ab_A=0, ab_B=0, ab_C=0, ab_D=0;
         mesasAB.forEach(m => { ab_A+=m.A; ab_B+=m.B; ab_C+=m.C; ab_D+=m.D; });
 
@@ -1022,7 +1032,7 @@
         if (el) el.classList.toggle('active', i === n);
       }
       if (!window._allMesasRef || !window._allMesasRef.length) return;
-      mesasAB = condicionFilter(window._allMesasRef);
+      mesasAB = condicionFilter(window._mesasScopeRef || window._allMesasRef);
       if (useCD) mesasABCD = mesasAB.filter(COND_CD_FNS[condicionCD]);
       drillAB = { nivel:'dep', cod_dep:null, nom_dep:null, cod_mun:null, nom_mun:null, cod_zon:null, nom_zon:null, cod_pue:null, nom_pue:null };
       drillCD = { nivel:'dep', cod_dep:null, nom_dep:null, cod_mun:null, nom_mun:null, cod_zon:null, nom_zon:null, cod_pue:null, nom_pue:null };
@@ -1192,7 +1202,7 @@
         if (e1) extraCols += `<th class="r" style="color:rgba(244,114,182,.7)">${shortName(e1.nombre)}</th>`;
         if (e2) extraCols += `<th class="r" style="color:rgba(56,189,248,.7)">${shortName(e2.nombre)}</th>`;
       }
-      return `<tr><th>#</th><th>${col1}</th><th class="r" style="color:rgba(0,71,255,.7)">A</th><th class="r" style="color:rgba(167,139,250,.7)">B</th>${cdCols}${extraCols}<th class="r">% A vs B</th></tr>`;
+      return `<tr><th>#</th><th>${col1}</th><th class="r" style="color:rgba(0,71,255,.7)">${window._labelA||'A'}</th><th class="r" style="color:rgba(167,139,250,.7)">${window._labelB||'B'}</th>${cdCols}${extraCols}<th class="r">% A vs B</th></tr>`;
     }
 
     function buildDrillRow(i, label, g, onclickStr, hasCD, hasExtra) {
