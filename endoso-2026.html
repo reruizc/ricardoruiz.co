@@ -872,19 +872,10 @@
             <div class="card-label">Votación bruta por candidato</div>
             <div id="bars-bruta"></div>
           </div>
-          <div class="card">
-            <div class="card-label">Votación mínima en común</div>
-
-            <div style="margin-bottom:.7rem;margin-top:.8rem"><div class="min-badge" id="badge-min">—</div></div>
-            <div id="min-extra"></div>
-            <div style="font-family:'Syne',sans-serif;font-size:1.05rem;line-height:1.7;margin-top:.7rem" class="min-desc-text" id="min-desc-text">
-              Suma de <code style="color:var(--orange)">min(A, B)</code> por mesa.<br/>
-              Estimación de votación que comparten ambos candidatos en las mismas mesas.
-            </div>
-            <div style="margin-top:.8rem;font-family:'Syne',sans-serif;font-size:.8rem" id="min-mesas-info">
-              <span style="color:rgba(0,71,255,.5)" id="min-mesas-count">${fmt(d.mesasTotal)}</span>
-              <span style="color:rgba(255,255,255,.25)" id="min-mesas-label"> mesas con datos</span>
-            </div>
+          <div class="card" style="overflow:hidden">
+            <div class="card-label">Descargar info de candidatos</div>
+            <!-- fotos de los candidatos seleccionados — se renderizan via renderCandPhotos() -->
+            <div id="cand-photos-grid" style="display:flex;gap:.5rem;margin-top:.6rem"></div>
           </div>
         </div>
 
@@ -898,41 +889,30 @@
           <div class="kpi-card"><div class="kpi-label">Votos A · mesas A ≥ B</div><div class="kpi-val bl" id="kv-ab-A">—</div><div class="kpi-delta">${pct(d.ab_A, d.totalA)}% del total de A</div></div>
           <div class="kpi-card"><div class="kpi-label">Votos B · mesas A ≥ B</div><div class="kpi-val pu" id="kv-ab-B">—</div><div class="kpi-delta">${pct(d.ab_B, d.totalB)}% del total de B</div></div>
         </div>
-        <div class="card">
-          <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.8rem;flex-wrap:wrap">
-            <div class="card-label" style="margin-bottom:0" id="drill-ab-title">Por departamento</div>
-            <span class="level-badge dep" id="drill-ab-badge">Nacional</span>
-            <div style="margin-left:auto;display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
-              <span style="font-family:'Syne',sans-serif;font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3)">Ordenar:</span>
-              <button class="sort-btn active" id="sort-ab-A" onclick="setSortAB('A')">Votos A</button>
-              <button class="sort-btn" id="sort-ab-zon" onclick="setSortAB('zon')">Zona</button>
-              <button class="sort-btn" id="sort-ab-pct" onclick="setSortAB('pct')">% A vs B</button>
-
-              <button class="dl-btn" onclick="downloadDrill('ab')">↓ Excel</button>
+        <!-- § 02 tablas: condición AB a la izquierda, condición CD a la derecha cuando está activa -->
+        <div style="display:flex;gap:1.2rem;align-items:flex-start">
+          <div class="card" style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.8rem;flex-wrap:wrap">
+              <div class="card-label" style="margin-bottom:0" id="drill-ab-title">Por departamento</div>
+              <span class="level-badge dep" id="drill-ab-badge">Nacional</span>
+              <div style="margin-left:auto;display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
+                <span style="font-family:'Syne',sans-serif;font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3)">Ordenar:</span>
+                <button class="sort-btn active" id="sort-ab-A" onclick="setSortAB('A')">Votos A</button>
+                <button class="sort-btn" id="sort-ab-zon" onclick="setSortAB('zon')">Zona</button>
+                <button class="sort-btn" id="sort-ab-pct" onclick="setSortAB('pct')">% A vs B</button>
+                <button class="dl-btn" onclick="downloadDrill('ab')">↓ Excel</button>
+              </div>
             </div>
+            <div class="drill-nav" id="drill-ab-nav"></div>
+            <table class="results-table"><thead id="drill-ab-thead"></thead><tbody id="drill-ab-tbody"></tbody></table>
           </div>
-          <div class="drill-nav" id="drill-ab-nav"></div>
-          <table class="results-table"><thead id="drill-ab-thead"></thead><tbody id="drill-ab-tbody"></tbody></table>
-        </div>
-
-        <!-- § 03 FILTRO CRUZADO -->
-        <div id="section-cd" class="${d.useCD ? '' : 'hidden'}">
-          <div class="section-header"><span class="section-num">§ 03</span><span class="section-title">Filtro cruzado · Mesas donde A ≥ B y C ≥ D</span></div>
-          <div class="filter-info">
-            <span class="filter-chip ab">${fmt(d.mesasABCDCount)} mesas</span>
-            <span class="filter-chip cd">A ≥ B + C ≥ D</span>
-            <span style="font-family:'Syne',sans-serif;font-size:.6rem;color:rgba(255,255,255,.25)">${pct(d.mesasABCDCount, d.mesasTotal)}% del total</span>
-          </div>
-          <div class="kpi-row" style="margin-bottom:1rem">
-            <div class="kpi-card"><div class="kpi-label">Votos A · filtro cruzado</div><div class="kpi-val bl" id="kv-abcd-A">—</div><div class="kpi-delta">${d.selA.corp}</div></div>
-            <div class="kpi-card"><div class="kpi-label">Votos B · filtro cruzado</div><div class="kpi-val pu" id="kv-abcd-B">—</div><div class="kpi-delta">${d.selB.corp}</div></div>
-            <div class="kpi-card"><div class="kpi-label">Votos C · filtro cruzado</div><div class="kpi-val gr" id="kv-abcd-C">—</div><div class="kpi-delta">${d.selC?.corp||''}</div></div>
-            <div class="kpi-card"><div class="kpi-label">Votos D · filtro cruzado</div><div class="kpi-val or" id="kv-abcd-D">—</div><div class="kpi-delta">${d.selD?.corp||''}</div></div>
-          </div>
-          <div class="card">
+          <!-- Segunda condición C/D — aparece a la derecha en cuanto C y D están activos -->
+          <div class="card ${d.useCD ? '' : 'hidden'}" id="section-cd" style="flex:1;min-width:0">
             <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.8rem;flex-wrap:wrap">
               <div class="card-label" style="margin-bottom:0" id="drill-cd-title">Por departamento</div>
               <span class="level-badge dep" id="drill-cd-badge">Nacional</span>
+              <span class="filter-chip cd" style="margin-left:auto;font-size:.55rem">${fmt(d.mesasABCDCount)} mesas · C ≥ D</span>
+              <button class="dl-btn" onclick="downloadDrill('cd')">↓ Excel</button>
             </div>
             <div class="drill-nav" id="drill-cd-nav"></div>
             <table class="results-table"><thead id="drill-cd-thead"></thead><tbody id="drill-cd-tbody"></tbody></table>
@@ -946,12 +926,7 @@
         animCount(document.getElementById('kv-depA'), depVotosA);
         animCount(document.getElementById('kv-ab-A'), d.ab_A);
         animCount(document.getElementById('kv-ab-B'), d.ab_B);
-        if (d.useCD) {
-          animCount(document.getElementById('kv-abcd-A'), d.abcd_A);
-          animCount(document.getElementById('kv-abcd-B'), d.abcd_B);
-          animCount(document.getElementById('kv-abcd-C'), d.abcd_C);
-          animCount(document.getElementById('kv-abcd-D'), d.abcd_D);
-        }
+        // kv-abcd-* eliminados al mover §03 a panel lateral
       }, 400);
 
       // Guardar totales min para poder recalcular al activar toggle
@@ -994,6 +969,7 @@
       // Drill tables
       renderDrill('ab', mesasAB, drillAB);
       if (d.useCD) renderDrill('cd', mesasABCD, drillCD);
+      renderCandPhotos(d.selA, d.selB, d.selC||null, d.selD||null);
     }
 
     // ─── SISTEMA DE CONDICIONES ──────────────────────────────
@@ -1119,6 +1095,160 @@
       XLSX.utils.book_append_sheet(wb, ws, sheetName);
       XLSX.writeFile(wb, `endoso_${prefix}_${sheetName.replace(/[^a-zA-Z0-9]/g,'_')}.xlsx`);
     }
+    // ─── FOTOS DE CANDIDATOS + SELECTORES GEO ────────────────────
+    const S3_PHOTOS = `${S3}/fotos-candidatos`;
+    const _selStyle = `font-family:'DM Mono',monospace;font-size:.55rem;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:var(--white);padding:.28rem .4rem;width:100%;outline:none;cursor:pointer;margin-top:.25rem`;
+    const _selStyleDay = `background:#fff;border-color:rgba(0,0,0,.2);color:#0d1120`;
+
+    function renderCandPhotos(selA, selB, selC, selD) {
+      const grid = document.getElementById('cand-photos-grid');
+      if (!grid) return;
+      const cands = [
+        { k:'A', sel:selA, color:COLORS.A },
+        { k:'B', sel:selB, color:COLORS.B },
+      ];
+      if (selC) cands.push({ k:'C', sel:selC, color:COLORS.C });
+      if (selD) cands.push({ k:'D', sel:selD, color:COLORS.D });
+
+      // Opciones de departamento desde allMesas
+      const deps = {};
+      (window._allMesasRef||[]).forEach(m => { if (m.dep && !deps[m.dep]) deps[m.dep] = m.depNom||m.dep; });
+      const depOpts = '<option value="">— Dpto —</option>' +
+        Object.entries(deps).sort((a,b)=>a[1].localeCompare(b[1],'es'))
+          .map(([c,n])=>`<option value="${c}">${n}</option>`).join('');
+
+      grid.innerHTML = cands.map(({k, sel, color}) => `
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:0">
+          <div style="position:relative;height:110px;overflow:hidden;background:rgba(255,255,255,.04)">
+            <img src="${S3_PHOTOS}/${sel.slug}.jpg" alt="${sel.nombre}"
+              style="width:100%;height:100%;object-fit:cover;object-position:center 15%"
+              onerror="this.style.opacity='.08'" />
+            <div style="position:absolute;top:.3rem;left:.3rem;background:${color};color:#060810;font-family:'DM Mono',monospace;font-size:.5rem;font-weight:700;padding:.1rem .35rem;letter-spacing:.06em">${k}</div>
+            <div style="position:absolute;bottom:0;left:0;right:0;padding:.3rem .45rem;background:linear-gradient(transparent,rgba(0,0,0,.88))">
+              <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:.62rem;color:${color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sel.nombre.split(' ').slice(0,2).join(' ')}</div>
+              <div style="font-family:'DM Mono',monospace;font-size:.48rem;color:rgba(255,255,255,.4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sel.corp}</div>
+            </div>
+          </div>
+          <select id="ph-dep-${k}" style="${_selStyle}" onchange="onPhDepChange('${k}')">
+            ${depOpts}
+          </select>
+          <select id="ph-mun-${k}" style="${_selStyle}" onchange="onPhMunChange('${k}')" disabled>
+            <option value="">— Municipio —</option>
+          </select>
+          <select id="ph-zon-${k}" style="${_selStyle}" onchange="onPhZonChange('${k}')" disabled>
+            <option value="">— Zona —</option>
+          </select>
+          <select id="ph-pue-${k}" style="${_selStyle}" onchange="onPhPueChange('${k}')" disabled>
+            <option value="">— Puesto —</option>
+          </select>
+          <select id="ph-mesa-${k}" style="${_selStyle}" disabled>
+            <option value="">— Mesa —</option>
+          </select>
+          <button onclick="downloadCandInfo('${k}','${sel.slug}')"
+            style="font-family:'DM Mono',monospace;font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;background:${color};color:#060810;border:none;padding:.35rem;cursor:pointer;margin-top:.35rem;width:100%;font-weight:700">
+            ↓ Descargar
+          </button>
+        </div>`).join('');
+    }
+
+    function onPhDepChange(k) {
+      const dep = document.getElementById(`ph-dep-${k}`)?.value;
+      ['mun','zon','pue','mesa'].forEach(f => {
+        const s = document.getElementById(`ph-${f}-${k}`);
+        if (s) { s.innerHTML = `<option value="">—</option>`; s.disabled = true; }
+      });
+      if (!dep) return;
+      const muns = {};
+      (window._allMesasRef||[]).filter(m=>m.dep===dep).forEach(m=>{
+        if (m.mun && !muns[m.mun]) muns[m.mun] = m.munNom||m.mun;
+      });
+      const sel = document.getElementById(`ph-mun-${k}`);
+      if (!sel) return;
+      sel.innerHTML = '<option value="">— Municipio —</option>' +
+        Object.entries(muns).sort((a,b)=>a[1].localeCompare(b[1],'es'))
+          .map(([c,n])=>`<option value="${c}">${n}</option>`).join('');
+      sel.disabled = false;
+    }
+
+    function onPhMunChange(k) {
+      const dep = document.getElementById(`ph-dep-${k}`)?.value;
+      const mun = document.getElementById(`ph-mun-${k}`)?.value;
+      ['zon','pue','mesa'].forEach(f => {
+        const s = document.getElementById(`ph-${f}-${k}`);
+        if (s) { s.innerHTML = `<option value="">—</option>`; s.disabled = true; }
+      });
+      if (!mun) return;
+      const zons = {};
+      (window._allMesasRef||[]).filter(m=>m.dep===dep&&m.mun===mun&&m.zon)
+        .forEach(m=>{ if (!zons[m.zon]) zons[m.zon] = m.zon; });
+      const sel = document.getElementById(`ph-zon-${k}`);
+      if (!sel) return;
+      sel.innerHTML = '<option value="">— Zona —</option>' +
+        Object.keys(zons).sort((a,b)=>+a-+b)
+          .map(c=>`<option value="${c}">${zonaNom(c, '')}</option>`).join('');
+      sel.disabled = Object.keys(zons).length > 0 ? false : true;
+      // Si no hay zonas, cargar puestos directamente
+      if (!Object.keys(zons).length) onPhZonChange(k);
+    }
+
+    function onPhZonChange(k) {
+      const dep = document.getElementById(`ph-dep-${k}`)?.value;
+      const mun = document.getElementById(`ph-mun-${k}`)?.value;
+      const zon = document.getElementById(`ph-zon-${k}`)?.value;
+      ['pue','mesa'].forEach(f => {
+        const s = document.getElementById(`ph-${f}-${k}`);
+        if (s) { s.innerHTML = `<option value="">—</option>`; s.disabled = true; }
+      });
+      const pues = {};
+      (window._allMesasRef||[]).filter(m=>m.dep===dep&&m.mun===mun&&(!zon||m.zon===zon)&&m.pue)
+        .forEach(m=>{ if (!pues[m.pue]) pues[m.pue] = m.pueNom||m.pue; });
+      const sel = document.getElementById(`ph-pue-${k}`);
+      if (!sel) return;
+      sel.innerHTML = '<option value="">— Puesto —</option>' +
+        Object.entries(pues).sort((a,b)=>a[1].localeCompare(b[1],'es'))
+          .map(([c,n])=>`<option value="${c}">${n}</option>`).join('');
+      sel.disabled = Object.keys(pues).length > 0 ? false : true;
+    }
+
+    function onPhPueChange(k) {
+      const dep = document.getElementById(`ph-dep-${k}`)?.value;
+      const mun = document.getElementById(`ph-mun-${k}`)?.value;
+      const zon = document.getElementById(`ph-zon-${k}`)?.value;
+      const pue = document.getElementById(`ph-pue-${k}`)?.value;
+      const sel = document.getElementById(`ph-mesa-${k}`);
+      if (!sel) return;
+      const mesaSet = new Set();
+      (window._allMesasRef||[]).filter(m=>m.dep===dep&&m.mun===mun&&(!zon||m.zon===zon)&&(!pue||m.pue===pue))
+        .forEach(m=>{ const parts=m.key.split('|'); if(parts[4]) mesaSet.add(parts[4]); });
+      sel.innerHTML = '<option value="">— Mesa —</option>' +
+        [...mesaSet].sort((a,b)=>+a-+b).map(m=>`<option value="${m}">Mesa ${m}</option>`).join('');
+      sel.disabled = mesaSet.size > 0 ? false : true;
+    }
+
+    function downloadCandInfo(k, slug) {
+      if (!window._allMesasRef) return;
+      const dep   = document.getElementById(`ph-dep-${k}`)?.value  || null;
+      const mun   = document.getElementById(`ph-mun-${k}`)?.value  || null;
+      const zon   = document.getElementById(`ph-zon-${k}`)?.value  || null;
+      const pue   = document.getElementById(`ph-pue-${k}`)?.value  || null;
+      const mesa  = document.getElementById(`ph-mesa-${k}`)?.value || null;
+      let rows = window._allMesasRef;
+      if (dep)  rows = rows.filter(m => m.dep === dep);
+      if (mun)  rows = rows.filter(m => m.mun === mun);
+      if (zon)  rows = rows.filter(m => m.zon === zon);
+      if (pue)  rows = rows.filter(m => m.pue === pue);
+      if (mesa) rows = rows.filter(m => m.key.split('|')[4] === mesa);
+      const data = [['Departamento','Municipio','Zona','Puesto','Mesa',`Votos ${k}`]];
+      rows.forEach(m => {
+        const parts = m.key.split('|');
+        data.push([m.depNom||m.dep, m.munNom||m.mun, m.zon||'—', m.pueNom||m.pue||'—', parts[4]||'—', m[k]||0]);
+      });
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, `Cand_${k}`);
+      XLSX.writeFile(wb, `cand_${k}_${slug}.xlsx`);
+    }
+
     function renderDrill(prefix, mesas, state) {
       const hasCD = prefix === 'cd';
       const hasExtra = prefix === 'ab' && useExtra && (window._selE1 || window._selE2);
