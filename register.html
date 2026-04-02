@@ -449,6 +449,19 @@
         height: 3rem;
       }
     }
+
+    /* COUNTRY SELECTOR */
+    .country-selector-wrap { position:relative; }
+    .country-btn { font-family:'DM Mono',monospace; font-size:.68rem; letter-spacing:.08em; text-transform:uppercase; color:#555; background:transparent; border:1px solid #222; padding:.35rem .75rem; cursor:none; display:flex; align-items:center; transition:border-color .2s,color .2s; }
+    .country-btn:hover,.country-btn.open { border-color:var(--blue); color:var(--blue); }
+    .country-dropdown { position:absolute; top:calc(100% + 8px); right:0; background:#111; border:1px solid #222; min-width:190px; display:none; flex-direction:column; z-index:200; box-shadow:0 8px 24px rgba(0,0,0,.3); }
+    .country-dropdown.open { display:flex; }
+    .country-option { font-family:'DM Mono',monospace; font-size:.68rem; letter-spacing:.05em; padding:.65rem 1rem; cursor:none; display:flex; align-items:center; gap:.5rem; color:#666; border-bottom:1px solid #1a1a1a; transition:background .15s; user-select:none; }
+    .country-option:last-child { border-bottom:none; }
+    .country-option:hover { background:rgba(0,71,255,.08); color:var(--white); }
+    .country-option.selected { color:var(--blue); }
+    .country-check { font-size:.6rem; width:12px; opacity:0; color:var(--blue); }
+    .country-option.selected .country-check { opacity:1; }
   </style>
 </head>
 <body>
@@ -460,15 +473,28 @@
   <div class="panel-left">
     <div class="panel-nav">
       <a href="javascript:history.back()" class="nav-back" id="nav-back">← Volver</a>
-      <a href="index.html" class="nav-logo-wrap">
-        <div class="nav-bars">
-          <div class="nav-bar" style="height:18px"></div>
-          <div class="nav-bar" style="height:14px"></div>
-          <div class="nav-bar" style="height:9px"></div>
-          <div class="nav-bar" style="height:5px"></div>
+      <div style="display:flex;align-items:center;gap:1rem;">
+        <div class="country-selector-wrap">
+          <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
+            <span id="countryBtnLabel">Colombia</span>
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style="margin-left:6px;transition:transform .2s" id="countryChevron"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+          <div class="country-dropdown" id="countryDropdown">
+            <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
+            <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
+            <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
+          </div>
         </div>
-        <span class="nav-logo">Ricardo<span>.</span>Ruiz</span>
-      </a>
+        <a href="index.html" class="nav-logo-wrap">
+          <div class="nav-bars">
+            <div class="nav-bar" style="height:18px"></div>
+            <div class="nav-bar" style="height:14px"></div>
+            <div class="nav-bar" style="height:9px"></div>
+            <div class="nav-bar" style="height:5px"></div>
+          </div>
+          <span class="nav-logo">Ricardo<span>.</span>Ruiz</span>
+        </a>
+      </div>
     </div>
 
     <div class="panel-left-body">
@@ -773,6 +799,9 @@
     setLanguage(currentLang);
     bindModalLinks();
 
+    // Exponer __applyLang para lang.js
+    window.__applyLang = function(lang) { setLanguage(lang); bindModalLinks(); };
+
     // ─── CONTEXTO DE PAGO: si viene a comprar un plan, ajustar el panel izquierdo ──
     (function() {
       const params  = new URLSearchParams(window.location.search);
@@ -960,5 +989,6 @@
       el.addEventListener('mouseleave', () => { cursor.style.transform='translate(-50%,-50%) scale(1)'; cursor.style.background='var(--blue)'; cursor.style.border='none'; ring.style.opacity='0.4'; });
     });
   </script>
+  <script src="lang.js"></script>
 </body>
 </html>

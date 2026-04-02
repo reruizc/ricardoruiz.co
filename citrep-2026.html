@@ -198,6 +198,10 @@
     body.day-mode .drill-crumb.active{color:#1a1a2e;background:rgba(0,0,0,.06);border-color:rgba(0,0,0,.12)}
     body.day-mode .card-label{color:rgba(0,0,0,.4)}
     body.day-mode .umbral-bar{background:rgba(0,0,0,.07)}
+    body.day-mode .li{color:rgba(0,0,0,.6)}
+    body.day-mode .donut-pct{color:#0d1120}
+    body.day-mode .donut-sub{color:rgba(0,0,0,.45)}
+    body.day-mode .umbral-label{color:rgba(0,0,0,.4)}
     body.day-mode .back-btn{background:rgba(0,71,255,.08);border-color:rgba(0,71,255,.3);color:var(--blue)}
     body.day-mode .expand-btn{color:rgba(0,71,255,.8)}
     body.day-mode .endoso-cta{background:rgba(0,71,255,.06);border-color:rgba(0,71,255,.15)}
@@ -278,14 +282,14 @@
           <span class="sub-label">Vista:</span>
           <select class="dep-select" id="vista-select" onchange="switchVista(this.value)">
             <option value="nacional">Nacional · Partidos</option>
-            <option value="dep">Por departamento</option>
+            <option value="circ">Por circunscripción</option>
             <option value="mun">Por municipio</option>
             <option value="zona">Por zona</option>
             <option value="pue">Por puesto</option>
             <option value="mesa">Por mesa</option>
           </select>
           <div id="dep-filter-container" style="display:none;align-items:center;gap:.75rem">
-            <span class="sub-label" style="margin-left:1.5rem">Departamento:</span>
+            <span class="sub-label" style="margin-left:1.5rem" id="dep-filter-label">Circunscripción:</span>
             <select class="dep-select" id="dep-select" onchange="onDepChange(this.value)">
               <option value="">— Selecciona —</option>
             </select>
@@ -371,6 +375,19 @@
     const CP = {'Pacto Histórico':'#6B2D8B','Centro Democrático':'#0088BB','Partido Liberal Colombiano':'#C8102E','Partido de la U':'#F7941D','Cambio Radical':'#E91E8C','Partido Conservador Colombiano':'#003580','Alianza Verde':'#4CAF50','MIRA':'#1A3FC4','Comunes':'#007755','Nuevo Liberalismo':'#E53935'};
     function getColor(n){if(CP[n])return CP[n];if(/pacto hist/i.test(n))return'#6B2D8B';if(/centro dem/i.test(n))return'#0088BB';if(/liberal/i.test(n))return'#C8102E';if(/conservador/i.test(n))return'#003580';if(/cambio radical/i.test(n))return'#E91E8C';if(/partido de la u/i.test(n))return'#F7941D';if(/alianza (verde|por col)/i.test(n))return'#4CAF50';if(/\bMIRA\b/i.test(n))return'#1A3FC4';if(/comunes/i.test(n))return'#007755';if(/nuevo liberalismo/i.test(n))return'#E53935';return'#555';}
 
+    // CAMBIO: método d'Hondt — se ejecuta por circunscripción, no por departamento
+    function calcDhondt(votosArr, nCurules) {
+      if (!nCurules || !votosArr.length) return {};
+      const res = {}, div = {};
+      votosArr.forEach(p => { res[p.partido] = 0; div[p.partido] = p.votos; });
+      for (let i = 0; i < nCurules; i++) {
+        const w = votosArr.reduce((b, p) => (div[p.partido] > div[b.partido] ? p : b));
+        res[w.partido]++;
+        div[w.partido] = w.votos / (res[w.partido] + 1);
+      }
+      return res;
+    }
+
     const cache = {};
     function buildPartidos(cands){
       const m={};
@@ -406,6 +423,25 @@
         resumenData = await getJSON('resumen');
         resumenData.partidos = buildPartidos(resumenData.candidatos);
         resumenData._c2p = Object.fromEntries(resumenData.candidatos.map(c=>[c.nombre,c.partido]));
+
+        // CAMBIO: calcular curules via d'Hondt por circunscripción (com_cod), no por departamento
+        try {
+          const circs = await getJSON('circunscripciones');
+          const totCurules = {};
+          circs.forEach(circ => {
+            // geoAggr suma votos por partido dentro de la circunscripción
+            const vpMap = geoAggr(circ);
+            const vpArr = Object.entries(vpMap).map(([partido,votos])=>({partido,votos}));
+            // d'Hondt con las curules asignadas a esta circunscripción (com_cod)
+            const asignados = calcDhondt(vpArr, circ.curules || 1);
+            Object.entries(asignados).forEach(([p,c])=>{ totCurules[p]=(totCurules[p]||0)+c; });
+          });
+          // reemplazar curules nacionales con suma de curules por circunscripción
+          resumenData.partidos.forEach(p=>{ p.curules = totCurules[p.partido]||0; });
+        } catch(eCirc) {
+          console.warn('circunscripciones.json no disponible, curules sin calcular:', eCirc.message);
+        }
+
         document.getElementById('meta-votval').textContent = fmt(resumenData.votval);
         document.getElementById('load-state').classList.add('hidden');
         document.getElementById('main-content').classList.remove('hidden');
@@ -462,9 +498,25 @@
       } else {
         depC.style.display='flex';
         const sel=document.getElementById('dep-select');
-        if(sel.options.length<=1){
-          const deps=await getJSON('departamentos');
-          deps.forEach(d=>{const o=document.createElement('option');o.value=d.cod;o.textContent=d.nombre;sel.appendChild(o);});
+        const lbl=document.getElementById('dep-filter-label');
+        // CAMBIO: determinar si el selector tope es circunscripción o departamento
+        const usaCirc = (v === 'circ');
+        const fuenteActual = sel.dataset.fuente;
+        const fuenteNecesaria = usaCirc ? 'circ' : 'dep';
+        if(fuenteActual !== fuenteNecesaria) {
+          // recargar selector cuando cambia la fuente (circ ↔ dep)
+          sel.innerHTML = '<option value="">— Selecciona —</option>';
+          sel.dataset.fuente = fuenteNecesaria;
+          if(usaCirc) {
+            // CAMBIO: cargar circunscripciones (com_cod / com_nom) en lugar de departamentos
+            lbl.textContent = 'Circunscripción:';
+            const circs=await getJSON('circunscripciones');
+            circs.forEach(c=>{const o=document.createElement('option');o.value=c.cod;o.textContent=c.nombre;sel.appendChild(o);});
+          } else {
+            lbl.textContent = 'Departamento:';
+            const deps=await getJSON('departamentos');
+            deps.forEach(d=>{const o=document.createElement('option');o.value=d.cod;o.textContent=d.nombre;sel.appendChild(o);});
+          }
         }
         if(v==='mun') munC.style.display='flex';
         if(v==='zona'){ munC.style.display='flex'; zonaC.style.display='flex'; }
@@ -476,7 +528,12 @@
 
     async function renderGeoPartidos(nivel, depCod, munCod, pueCod){
       let geoData, labelText, badgeText;
-      if(nivel==='dep'){
+      if(nivel==='circ'){
+        // CAMBIO: nivel circunscripción (com_cod) — unidad de cálculo d'Hondt
+        const circs=await getJSON('circunscripciones');
+        const d=circs.find(x=>x.cod===depCod); if(!d) return;
+        geoData=d; labelText=`Partidos · CITREP · ${d.nombre}`; badgeText=d.nombre;
+      } else if(nivel==='dep'){
         const deps=await getJSON('departamentos');
         const d=deps.find(x=>x.cod===depCod); if(!d) return;
         geoData=d; labelText=`Partidos · CITREP · ${d.nombre}`; badgeText=d.nombre;
@@ -540,12 +597,25 @@
       document.getElementById('mun-select').innerHTML='<option value="">— Selecciona —</option>';
       document.getElementById('pue-select').innerHTML='<option value="">— Selecciona —</option>';
       if(!cod){renderNacional();renderKPI();renderDonut();return;}
-      await renderGeoPartidos('dep',cod,null,null);
+      // CAMBIO: si la vista es 'circ', renderizar a nivel circunscripción (com_cod)
+      const nivelGeo = (v==='circ') ? 'circ' : 'dep';
+      await renderGeoPartidos(nivelGeo,cod,null,null);
       if(v==='mun'||v==='pue'||v==='zona'){
         const muns=await getJSON('municipios');
         const sel=document.getElementById('mun-select');
         sel.innerHTML='<option value="">— Selecciona municipio —</option>';
-        muns.filter(m=>m.dep_cod===cod).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).forEach(m=>{const o=document.createElement('option');o.value=m.cod;o.textContent=m.nombre;sel.appendChild(o);});
+        // CAMBIO: para circ, filtrar municipios por los dep_cod de la circunscripción
+        // circunscripciones.json debe exponer el campo deps:[...dep_cods]
+        let filtrados;
+        if(v==='circ'||document.getElementById('dep-select').dataset.fuente==='circ'){
+          const circs=await getJSON('circunscripciones');
+          const circ=circs.find(x=>x.cod===cod);
+          const depCods=circ&&circ.deps?circ.deps:[];
+          filtrados=muns.filter(m=>depCods.includes(m.dep_cod));
+        } else {
+          filtrados=muns.filter(m=>m.dep_cod===cod);
+        }
+        filtrados.sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).forEach(m=>{const o=document.createElement('option');o.value=m.cod;o.textContent=m.nombre;sel.appendChild(o);});
       }
     }
 

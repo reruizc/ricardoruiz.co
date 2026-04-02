@@ -785,43 +785,12 @@
     });
 
     // ─── INIT ─────────────────────────────────────────────────────────────────
+    // Exponer __applyLang para que lang.js lo llame al cambiar idioma
+    window.__applyLang = function(lang) {
+      currentLang = lang;
+      setLanguage(lang);
+    };
     setLanguage(currentLang);
-
-    // ─── COUNTRY SELECTOR ────────────────────────────────────────────────────
-    function toggleCountryDropdown() {
-      document.getElementById('countryBtn').classList.toggle('open');
-      document.getElementById('countryDropdown').classList.toggle('open');
-    }
-    function selectCountry(el) {
-      const val = el.dataset.value;
-      document.getElementById('countryBtn').classList.remove('open');
-      document.getElementById('countryDropdown').classList.remove('open');
-      const langMap = { co:'co', us:'us', mx:'co' };
-      const newLang = langMap[val];
-      if (newLang !== currentLang) {
-        currentLang = newLang;
-        localStorage.setItem('rr-lang', newLang);
-        document.getElementById('countryBtnLabel').textContent = val === 'us' ? 'United States / UK' : val === 'mx' ? 'México' : 'Colombia';
-        document.querySelectorAll('.country-option').forEach(o => o.classList.toggle('selected', o.dataset.value === val));
-        setLanguage(currentLang);
-      }
-    }
-    document.addEventListener('click', e => {
-      const wrap = document.querySelector('.country-selector-wrap');
-      if (wrap && !wrap.contains(e.target)) {
-        document.getElementById('countryBtn').classList.remove('open');
-        document.getElementById('countryDropdown').classList.remove('open');
-      }
-    });
-    // Aplicar idioma guardado al selector
-    (function() {
-      const saved = localStorage.getItem('rr-lang') || 'co';
-      const labelMap = { co:'Colombia', us:'United States / UK', mx:'México' };
-      const valMap   = { co:'co', us:'us' };
-      const val = valMap[saved] || 'co';
-      document.getElementById('countryBtnLabel').textContent = labelMap[val] || 'Colombia';
-      document.querySelectorAll('.country-option').forEach(o => o.classList.toggle('selected', o.dataset.value === val));
-    })();
 
     // ── ¿Viene recién registrado desde register.html?next=pricing? ────────────
     if (localStorage.getItem('rr-register-done')) {
@@ -852,5 +821,6 @@
       setTimeout(() => { banner.remove(); }, 5500);
     }
   </script>
+  <script src="lang.js"></script>
 </body>
 </html>
