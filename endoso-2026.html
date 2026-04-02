@@ -320,6 +320,28 @@
     .orient-msg{font-family:'Syne',sans-serif;font-size:.78rem;letter-spacing:.06em;line-height:1.9;color:rgba(255,255,255,.75);margin-bottom:1.5rem}
     .orient-btn{font-family:'Syne',sans-serif;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;background:#4ade80;color:#060810;border:none;padding:.55rem 2rem;cursor:pointer;transition:background .2s}
     .orient-btn:hover{background:#22c55e}
+
+    /* DAY MODE — selects geo en panel de descarga */
+    body.day-mode .sel-select{background:#fff;border-color:rgba(0,0,0,.2);color:#0d1120}
+    body.day-mode .sel-select option{background:#fff;color:#0d1120}
+
+    /* ACCESS CONTROL */
+    .access-blur{filter:blur(7px);pointer-events:none;user-select:none}
+    .access-overlay{position:fixed;inset:0;z-index:50000;display:flex;align-items:center;justify-content:center;background:rgba(4,6,16,.72);backdrop-filter:blur(3px)}
+    .access-overlay.hidden{display:none!important}
+    .access-modal{background:#0e1220;border:1px solid rgba(255,255,255,.12);padding:2.5rem 2rem;max-width:380px;width:90%;text-align:center}
+    .access-modal-icon{font-size:2rem;margin-bottom:.8rem;display:block}
+    .access-modal-title{font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;letter-spacing:-.02em;color:var(--white);margin-bottom:.6rem}
+    .access-modal-body{font-family:'Syne',sans-serif;font-size:.72rem;letter-spacing:.04em;line-height:1.9;color:rgba(255,255,255,.5);margin-bottom:1.5rem}
+    .access-modal-btns{display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap}
+    .access-btn-primary{font-family:'Syne',sans-serif;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;background:var(--blue);color:var(--white);border:none;padding:.6rem 1.6rem;cursor:pointer;text-decoration:none;display:inline-block}
+    .access-btn-primary:hover{background:#0035cc}
+    .access-btn-secondary{font-family:'Syne',sans-serif;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;background:none;color:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.15);padding:.6rem 1.4rem;cursor:pointer;text-decoration:none;display:inline-block}
+    .access-btn-secondary:hover{border-color:rgba(255,255,255,.35);color:rgba(255,255,255,.7)}
+
+    /* PREMIUM LOCK */
+    .prem-lock-wrap{position:relative}
+    .prem-lock{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:.3rem;background:rgba(6,8,16,.82);font-family:'DM Mono',monospace;font-size:.5rem;letter-spacing:.07em;text-transform:uppercase;color:rgba(251,190,50,.85);pointer-events:none}
   </style>
 </head>
 <body>
@@ -333,6 +355,32 @@
       <span class="orient-icon">📱↔</span>
       <p class="orient-msg">Para una visualización adecuada,<br/>te pedimos usar el móvil<br/>en formato horizontal.</p>
       <button class="orient-btn" onclick="dismissOrient()">Ok</button>
+    </div>
+  </div>
+
+  <!-- MODAL: sin cuenta -->
+  <div id="access-overlay" class="access-overlay hidden">
+    <div class="access-modal">
+      <span class="access-modal-icon">🔒</span>
+      <div class="access-modal-title">Herramienta exclusiva</div>
+      <div class="access-modal-body">La medición de endoso está disponible para usuarios registrados con plan Pro o superior. Crea tu cuenta para continuar.</div>
+      <div class="access-modal-btns">
+        <a href="register.html" class="access-btn-primary" onclick="navTo(event,'register.html')">Registrarse</a>
+        <a href="electoral.html" class="access-btn-secondary" onclick="navTo(event,'electoral.html')">Volver</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: cuenta sin plan Pro -->
+  <div id="upgrade-overlay" class="access-overlay hidden">
+    <div class="access-modal">
+      <span class="access-modal-icon">⚡</span>
+      <div class="access-modal-title">Requiere plan Pro</div>
+      <div class="access-modal-body">El análisis de endoso está disponible para usuarios con plan <strong style="color:var(--blue)">Pro</strong> o superior. Actualiza tu plan para desbloquear todos los resultados.</div>
+      <div class="access-modal-btns">
+        <a href="pricing.html" class="access-btn-primary" onclick="navTo(event,'pricing.html')">Ver planes</a>
+        <button class="access-btn-secondary" onclick="document.getElementById('upgrade-overlay').classList.add('hidden')">Cerrar</button>
+      </div>
     </div>
   </div>
 
@@ -731,8 +779,21 @@
       return await r.json();
     }
 
+    // ─── HELPERS CONDICIÓN CHIPS ──────────────────────────────
+    function condChipLabel(cond, nA, nB) {
+      const tmpl = ['A > B','B > A','A ≥ B','B ≥ A','A > B · sin ceros','B > A · sin ceros'];
+      return (tmpl[cond]||'A > B').replace(/\bA\b/g, nA).replace(/\bB\b/g, nB);
+    }
+
     // ─── MAIN ANALYSIS ────────────────────────────────────────
     async function runAnalysis() {
+      // Verificar acceso antes de hacer cualquier cosa
+      if (!isPro(getUserPlan())) {
+        document.getElementById('results-area').classList.add('access-blur');
+        document.getElementById('upgrade-overlay').classList.remove('hidden');
+        return;
+      }
+
       const btn = document.getElementById('run-btn');
       btn.disabled = true;
       btn.textContent = 'Calculando…';
@@ -825,7 +886,10 @@
         mesasABCD.forEach(m => { abcd_A+=m.A; abcd_B+=m.B; abcd_C+=m.C; abcd_D+=m.D; });
 
         window._allMesasRef = allMesas;
-        window._allMesasRef = allMesas;
+        window._selA  = selA;
+        window._selB  = selB;
+        window._selC  = selC || null;
+        window._selD  = selD || null;
         window._selE1 = selE1 || null;
         window._selE2 = selE2 || null;
         // Reset drills
@@ -882,7 +946,12 @@
         <!-- § 02 FILTRO A >= B -->
         <div class="section-header"><span class="section-num">§ 02</span><span class="section-title">Filtro arrastre · Mesas donde A ≥ B</span></div>
         <div class="filter-info">
-          <span class="filter-chip ab">${fmt(d.mesasABCount)} mesas · A ≥ B</span>
+          <span class="filter-chip ab" id="filter-chip-ab">${fmt(d.mesasABCount)} mesas · ${condChipLabel(condicion, shortName(d.selA.nombre), shortName(d.selB.nombre))}</span>
+          ${d.useCD && d.selC && d.selD
+            ? `<span class="filter-chip cd" id="filter-chip-cd">${fmt(d.mesasABCDCount)} mesas · ${condChipLabel(condicionCD, shortName(d.selC.nombre), shortName(d.selD.nombre))}</span>`
+            : (useExtra && window._selE1)
+              ? `<span class="filter-chip extra" id="filter-chip-cd">${fmt(d.mesasABCount)} mesas · ${shortName(window._selE1.nombre)} en condición principal${window._selE2 ? ' · '+shortName(window._selE2.nombre) : ''}</span>`
+              : ''}
           <span style="font-family:'Syne',sans-serif;font-size:.69rem;color:rgba(255,255,255,.25)">${pct(d.mesasABCount, d.mesasTotal)}% del total de mesas</span>
         </div>
         <div class="kpi-row" style="grid-template-columns:repeat(2,1fr);margin-bottom:1rem">
@@ -1022,6 +1091,13 @@
       // Refilter: start from mesasAB (already condicion A/B applied), apply C/D
       mesasABCD = mesasAB.filter(COND_CD_FNS[condicionCD]);
       drillCD = { nivel:'dep', cod_dep:null, nom_dep:null, cod_mun:null, nom_mun:null, cod_zon:null, nom_zon:null, cod_pue:null, nom_pue:null };
+      // Actualizar chip CD con nombre de candidatos
+      const chipCD = document.getElementById('filter-chip-cd');
+      if (chipCD) {
+        const nC = shortName((window._selC||{}).nombre||'C');
+        const nD = shortName((window._selD||{}).nombre||'D');
+        chipCD.textContent = `${fmt(mesasABCD.length)} mesas · ${condChipLabel(condicionCD, nC, nD)}`;
+      }
       renderDrill('cd', mesasABCD, drillCD);
     }
 
@@ -1038,6 +1114,13 @@
       drillCD = { nivel:'dep', cod_dep:null, nom_dep:null, cod_mun:null, nom_mun:null, cod_zon:null, nom_zon:null, cod_pue:null, nom_pue:null };
       const newMin = mesasAB.reduce((s,m) => s + Math.min(m.A,m.B), 0);
       refreshMinBadge(newMin, mesasAB.length);
+      // Actualizar chip AB con nombre de candidatos
+      const chipAB = document.getElementById('filter-chip-ab');
+      if (chipAB) {
+        const nA = shortName((window._selA||{}).nombre||'A');
+        const nB = shortName((window._selB||{}).nombre||'B');
+        chipAB.textContent = `${fmt(mesasAB.length)} mesas · ${condChipLabel(n, nA, nB)}`;
+      }
       renderDrill('ab', mesasAB, drillAB);
       if (useCD && mesasABCD.length) renderDrill('cd', mesasABCD, drillCD);
     }
@@ -1113,12 +1196,16 @@
       if (selC) cands.push({ k:'C', sel:selC, color:COLORS.C });
       if (selD) cands.push({ k:'D', sel:selD, color:COLORS.D });
 
+      const premium = isPremium(getUserPlan());
+
       // Opciones de departamento desde allMesas
       const deps = {};
       (window._allMesasRef||[]).forEach(m => { if (m.dep && !deps[m.dep]) deps[m.dep] = m.depNom||m.dep; });
       const depOpts = '<option value="">— Dpto —</option>' +
         Object.entries(deps).sort((a,b)=>a[1].localeCompare(b[1],'es'))
           .map(([c,n])=>`<option value="${c}">${n}</option>`).join('');
+
+      const lockHtml = `<div class="prem-lock">🔒 Requiere Premium</div>`;
 
       grid.innerHTML = cands.map(({k, sel, color}) => `
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:0">
@@ -1132,26 +1219,43 @@
               <div style="font-family:'DM Mono',monospace;font-size:.48rem;color:rgba(255,255,255,.4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sel.corp}</div>
             </div>
           </div>
-          <select id="ph-dep-${k}" style="${_selStyle}" onchange="onPhDepChange('${k}')">
+          <select id="ph-dep-${k}" class="sel-select" style="${_selStyle}" onchange="onPhDepChange('${k}')">
             ${depOpts}
           </select>
-          <select id="ph-mun-${k}" style="${_selStyle}" onchange="onPhMunChange('${k}')" disabled>
+          <select id="ph-mun-${k}" class="sel-select" style="${_selStyle}" onchange="onPhMunChange('${k}')" disabled>
             <option value="">— Municipio —</option>
           </select>
-          <select id="ph-zon-${k}" style="${_selStyle}" onchange="onPhZonChange('${k}')" disabled>
+          <select id="ph-zon-${k}" class="sel-select" style="${_selStyle}" onchange="onPhZonChange('${k}')" disabled>
             <option value="">— Zona —</option>
           </select>
-          <select id="ph-pue-${k}" style="${_selStyle}" onchange="onPhPueChange('${k}')" disabled>
-            <option value="">— Puesto —</option>
-          </select>
-          <select id="ph-mesa-${k}" style="${_selStyle}" disabled>
-            <option value="">— Mesa —</option>
-          </select>
-          <button onclick="downloadCandInfo('${k}','${sel.slug}')"
+          <div class="prem-lock-wrap">
+            <select id="ph-pue-${k}" class="sel-select" style="${_selStyle}" ${premium ? `onchange="onPhPueChange('${k}')"` : 'disabled'}>
+              <option value="">— Puesto —</option>
+            </select>
+            ${!premium ? lockHtml : ''}
+          </div>
+          <div class="prem-lock-wrap">
+            <select id="ph-mesa-${k}" class="sel-select" style="${_selStyle}" ${premium ? `onchange="updateDlBtnText('${k}')"` : 'disabled'}>
+              <option value="">— Mesa —</option>
+            </select>
+            ${!premium ? lockHtml : ''}
+          </div>
+          <button id="ph-dl-btn-${k}" onclick="downloadCandInfo('${k}','${sel.slug}')"
             style="font-family:'DM Mono',monospace;font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;background:${color};color:#060810;border:none;padding:.35rem;cursor:pointer;margin-top:.35rem;width:100%;font-weight:700">
-            ↓ Descargar
+            ↓ Descargar todo
           </button>
         </div>`).join('');
+    }
+
+    function updateDlBtnText(k) {
+      const btn = document.getElementById(`ph-dl-btn-${k}`);
+      if (!btn) return;
+      const dep  = document.getElementById(`ph-dep-${k}`)?.value;
+      const mun  = document.getElementById(`ph-mun-${k}`)?.value;
+      const zon  = document.getElementById(`ph-zon-${k}`)?.value;
+      const pue  = document.getElementById(`ph-pue-${k}`)?.value;
+      const mesa = document.getElementById(`ph-mesa-${k}`)?.value;
+      btn.textContent = (dep || mun || zon || pue || mesa) ? '↓ Descargar' : '↓ Descargar todo';
     }
 
     function onPhDepChange(k) {
@@ -1160,6 +1264,7 @@
         const s = document.getElementById(`ph-${f}-${k}`);
         if (s) { s.innerHTML = `<option value="">—</option>`; s.disabled = true; }
       });
+      updateDlBtnText(k);
       if (!dep) return;
       const muns = {};
       (window._allMesasRef||[]).filter(m=>m.dep===dep).forEach(m=>{
@@ -1180,6 +1285,7 @@
         const s = document.getElementById(`ph-${f}-${k}`);
         if (s) { s.innerHTML = `<option value="">—</option>`; s.disabled = true; }
       });
+      updateDlBtnText(k);
       if (!mun) return;
       const zons = {};
       (window._allMesasRef||[]).filter(m=>m.dep===dep&&m.mun===mun&&m.zon)
@@ -1202,6 +1308,7 @@
         const s = document.getElementById(`ph-${f}-${k}`);
         if (s) { s.innerHTML = `<option value="">—</option>`; s.disabled = true; }
       });
+      updateDlBtnText(k);
       const pues = {};
       (window._allMesasRef||[]).filter(m=>m.dep===dep&&m.mun===mun&&(!zon||m.zon===zon)&&m.pue)
         .forEach(m=>{ if (!pues[m.pue]) pues[m.pue] = m.pueNom||m.pue; });
@@ -1226,6 +1333,7 @@
       sel.innerHTML = '<option value="">— Mesa —</option>' +
         [...mesaSet].sort((a,b)=>+a-+b).map(m=>`<option value="${m}">Mesa ${m}</option>`).join('');
       sel.disabled = mesaSet.size > 0 ? false : true;
+      updateDlBtnText(k);
     }
 
     function downloadCandInfo(k, slug) {
@@ -1410,9 +1518,30 @@
     document.addEventListener('mouseover',e=>{if(e.target.closest('a,button,select,label')){cur2.style.transform='translate(-50%,-50%) scale(2.2)';cur2.style.background='transparent';cur2.style.border='1.5px solid #0047FF';ri.style.opacity='0';}else{cur2.style.transform='translate(-50%,-50%) scale(1)';cur2.style.background='#0047FF';cur2.style.border='none';ri.style.opacity='.4';}});
 
     // ─── NAV AUTH ─────────────────────────────────────────────
-    function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;if(token&&user){const pl={free:'Free',basic:'Básico',analysis:'Análisis',full:'Completo'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">Salir</button>`;}else{area.innerHTML=`<a href="pricing.html" class="e-nav-planes" style="font-family:'Syne',sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">Planes</a><a href="login.html" class="e-btn-login">Iniciar sesión</a><a href="register.html" class="e-btn-register">Registrarse</a>`;}}
+    function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;if(token&&user){const pl={free:'Gratis',pro:'Pro',premium:'Premium'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">Salir</button>`;}else{area.innerHTML=`<a href="pricing.html" class="e-nav-planes" style="font-family:'Syne',sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">Planes</a><a href="login.html" class="e-btn-login">Iniciar sesión</a><a href="register.html" class="e-btn-register">Registrarse</a>`;}}
     async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();}
     updateElectoralNav();
+
+    // ─── ACCESS HELPERS ───────────────────────────────────────
+    function getUserPlan() {
+      const token = localStorage.getItem('rr-token');
+      if (!token) return null;
+      const user = JSON.parse(localStorage.getItem('rr-user') || 'null');
+      return user?.plan || 'free';
+    }
+    function isPro(plan)     { return plan === 'pro' || plan === 'premium'; }
+    function isPremium(plan) { return plan === 'premium'; }
+
+    function checkPageAccess() {
+      const plan = getUserPlan();
+      if (!isPro(plan)) {
+        // Sin cuenta o plan free: blur todo el contenido + modal
+        document.getElementById('main-content')?.classList.add('access-blur');
+        document.getElementById('load-state')?.classList.add('access-blur');
+        document.getElementById('access-overlay').classList.remove('hidden');
+      }
+    }
+    checkPageAccess();
 
     // ─── THEME (día/noche) ────────────────────────────────────
     function isDayHour() {
