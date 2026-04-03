@@ -54,6 +54,10 @@
     body.day-mode .e-nav-planes{color:rgba(0,0,0,.55)!important}
     body.day-mode .full-footer{border-top-color:rgba(0,0,0,.1)}
     body.day-mode .footer-brand{color:rgba(0,0,0,.35)}
+    body.day-mode .e-user-name{color:#0d1120;border:1.5px solid rgba(0,0,0,.22);padding:.3rem .8rem}
+    body.day-mode .e-user-plan{color:var(--blue);background:rgba(0,71,255,.1)}
+    body.day-mode .e-btn-logout{color:rgba(0,0,0,.55);border:1.5px solid rgba(0,0,0,.22);padding:.3rem .8rem}
+    body.day-mode .e-btn-logout:hover{color:#0d1120;border-color:rgba(0,0,0,.5)}
     body.day-mode .back-btn{color:#0d1120;background:rgba(0,71,255,.08);border-color:rgba(0,71,255,.25)}
     .copy-toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) translateY(24px);background:rgba(10,10,20,.97);border:1.5px solid rgba(255,100,100,.5);color:rgba(255,180,180,.9);font-family:'Syne',sans-serif;font-size:1.012rem;letter-spacing:.08em;padding:1rem 2rem;z-index:99998;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;text-align:center}
     .copy-toast.show{opacity:1;transform:translate(-50%,-50%);pointer-events:auto}
@@ -121,6 +125,17 @@
     @keyframes spin{to{transform:rotate(360deg)}}
     .loader-label{font-family:'Syne',sans-serif;font-size:.7475rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3)}
     .loader-progress{font-family:'Syne',sans-serif;font-size:.69rem;color:rgba(0,71,255,.6);margin-top:.25rem}
+
+    /* HELP BOX */
+    .help-box{background:rgba(0,71,255,.07);border:1px solid rgba(0,71,255,.22);padding:1.2rem 1.5rem;margin-bottom:1.5rem;display:flex;gap:1.2rem;align-items:flex-start}
+    .help-box.hidden{display:none}
+    .help-box-text{flex:1}
+    .help-box-text p{font-family:'Syne',sans-serif;font-size:.8rem;line-height:1.75;color:rgba(255,255,255,.65);margin-bottom:.5rem}
+    .help-box-text p:last-child{margin-bottom:0}
+    .help-box-ok{font-family:'Syne',sans-serif;font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;background:none;border:1.5px solid rgba(0,71,255,.4);color:var(--blue);padding:.35rem .9rem;cursor:pointer;flex-shrink:0;transition:background .2s,border-color .2s}
+    .help-box-ok:hover{background:rgba(0,71,255,.12);border-color:var(--blue)}
+    body.day-mode .help-box{background:rgba(0,71,255,.05);border-color:rgba(0,71,255,.2)}
+    body.day-mode .help-box-text p{color:rgba(0,0,0,.6)}
 
     /* SELECTOR */
     .selector-panel{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1.4rem 1.5rem;margin-bottom:1.5rem;backdrop-filter:blur(4px)}
@@ -461,6 +476,15 @@
 
       <!-- MAIN -->
       <div id="main-content" class="hidden">
+
+        <!-- HELP BOX -->
+        <div class="help-box" id="help-box">
+          <div class="help-box-text">
+            <p>Esta herramienta mide el endoso cruzado entre dos candidatos al Congreso 2026: compara su votación mesa por mesa para identificar en qué zonas compartieron electorado y con qué intensidad. Es útil para detectar afinidades territoriales entre listas, corporaciones o partidos.</p>
+            <p>Selecciona un Candidato A y un Candidato B en los campos de búsqueda y haz clic en <b>Calcular endoso</b>. Puedes explorar los resultados en el mapa o en la tabla, y aplicar filtros geográficos para ver el detalle por departamento o municipio.</p>
+          </div>
+          <button class="help-box-ok" onclick="dismissHelp()">OK</button>
+        </div>
 
         <!-- SELECTOR -->
         <div class="selector-panel">
@@ -1587,6 +1611,17 @@
     function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;if(token&&user){const pl={free:'Gratis',basic:'Básico',analysis:'Pro',full:'Premium',pro:'Pro',premium:'Premium'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">Salir</button>`;}else{area.innerHTML=`<a href="pricing.html" class="e-nav-planes" style="font-family:'Syne',sans-serif;font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">Planes</a><a href="login.html" class="e-btn-login">Iniciar sesión</a><a href="register.html" class="e-btn-register">Registrarse</a>`;}}
     async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();}
     updateElectoralNav();
+
+    // ─── HELP BOX ─────────────────────────────────────────────
+    function dismissHelp() {
+      sessionStorage.setItem('endoso-help-ok', '1');
+      document.getElementById('help-box').classList.add('hidden');
+    }
+    (function() {
+      if (sessionStorage.getItem('endoso-help-ok')) {
+        document.getElementById('help-box').classList.add('hidden');
+      }
+    })();
 
     // ─── MODAL LOGIN ──────────────────────────────────────────
     function showModalLogin() {
