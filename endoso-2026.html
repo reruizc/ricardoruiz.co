@@ -343,6 +343,8 @@
 
     /* PREMIUM LOCK */
     .prem-lock-wrap{position:relative}
+    .sort-label{font-family:'Syne',sans-serif;font-size:.863rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3)}
+    body.day-mode .sort-label{color:rgba(0,0,0,.55)}
     .prem-lock{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:.3rem;background:rgba(6,8,16,.82);font-family:'DM Mono',monospace;font-size:.575rem;letter-spacing:.07em;text-transform:uppercase;color:rgba(251,190,50,.85);pointer-events:none}
   </style>
 </head>
@@ -957,7 +959,7 @@
           <div class="kpi-card"><div class="kpi-label">Votos <span style="color:var(--blue)">${shortName(d.selA.nombre)}</span> (A)</div><div class="kpi-val bl" id="kv-A">—</div><div class="kpi-delta">${d.selA.corp} · ${d.selA.partido}</div></div>
           <div class="kpi-card"><div class="kpi-label">Votos <span style="color:var(--purple)">${shortName(d.selB.nombre)}</span> (B)</div><div class="kpi-val pu" id="kv-B">—</div><div class="kpi-delta">${d.selB.corp} · ${d.selB.partido}</div></div>
           <div class="kpi-card"><div class="kpi-label">Votos A en dpto. principal de B</div><div class="kpi-val bl" id="kv-depA">—</div><div class="kpi-delta" id="kv-depA-sub">en ${depNomB}</div></div>
-          <div class="kpi-card"><div class="kpi-label">Votos A en dpto. de B · % del total A</div><div class="kpi-val gr">${d.totalA ? pct(depVotosA, d.totalA)+'%' : '—'}</div><div class="kpi-delta">${fmt(depVotosA)} de ${fmt(d.totalA)} votos de A están en ${depNomB}</div></div>
+          <div class="kpi-card"><div class="kpi-label">Votos A en dpto. de B · % del total A</div><div class="kpi-val gr">${d.totalA ? pct(depVotosA, d.totalA)+'%' : '—'}</div><div class="kpi-delta">${fmt(depVotosA)} de ${fmt(d.totalA)} votos de ${shortName(d.selA.nombre)} están en ${depNomB}</div></div>
         </div>
         <div class="two-col">
           <div class="card">
@@ -993,7 +995,7 @@
               <div class="card-label" style="margin-bottom:0" id="drill-ab-title">Por departamento</div>
               <span class="level-badge dep" id="drill-ab-badge">Nacional</span>
               <div style="margin-left:auto;display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
-                <span style="font-family:'Syne',sans-serif;font-size:.863rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3)">ORDENAR POR</span>
+                <span class="sort-label">ORDENAR POR:</span>
                 <button class="sort-btn active" id="sort-ab-A" onclick="setSortAB('A')">Votos A</button>
                 <button class="sort-btn" id="sort-ab-zon" onclick="setSortAB('zon')">COMUNA O LOCALIDAD</button>
                 <button class="sort-btn" id="sort-ab-pct" onclick="setSortAB('pct')">% A vs B</button>
@@ -1236,13 +1238,17 @@
 
       const lockHtml = `<div class="prem-lock">🔒 Requiere Premium</div>`;
 
-      grid.innerHTML = cands.map(({k, sel, color}) => `
+      grid.innerHTML = cands.map(({k, sel, color}) => {
+        const meta = candIndex.find(c => c.slug === sel.slug);
+        const score = computeRating(meta?.votos || 0);
+        return `
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:0">
           <div style="position:relative;height:110px;overflow:hidden;background:rgba(255,255,255,.04)">
             <img src="${S3_PHOTOS}/${sel.slug}.jpg" alt="${sel.nombre}"
               style="width:100%;height:100%;object-fit:cover;object-position:center 15%"
               onerror="this.style.opacity='.08'" />
             <div style="position:absolute;top:.3rem;left:.3rem;background:${color};color:#060810;font-family:'DM Mono',monospace;font-size:.5rem;font-weight:700;padding:.1rem .35rem;letter-spacing:.06em">${k}</div>
+            <div style="position:absolute;top:.3rem;right:.3rem;background:rgba(6,8,16,.78);color:${color};font-family:'Syne',sans-serif;font-size:.58rem;font-weight:800;padding:.1rem .4rem;letter-spacing:.03em">${score}</div>
             <div style="position:absolute;bottom:0;left:0;right:0;padding:.3rem .45rem;background:linear-gradient(transparent,rgba(0,0,0,.88))">
               <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:.713rem;color:${color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sel.nombre.split(' ').slice(0,2).join(' ')}</div>
               <div style="font-family:'DM Mono',monospace;font-size:.552rem;color:rgba(255,255,255,.4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sel.corp}</div>
@@ -1273,7 +1279,7 @@
             style="font-family:'Syne',sans-serif;font-size:.696rem;letter-spacing:.08em;text-transform:uppercase;background:${color};color:#060810;border:none;padding:.35rem;cursor:pointer;margin-top:.35rem;width:100%;font-weight:400">
             ↓ Descargar todo
           </button>
-        </div>`).join('');
+        </div>`; }).join('');
     }
 
     function updateDlBtnText(k) {
@@ -1524,6 +1530,7 @@
 
     // ─── HELPERS ──────────────────────────────────────────────
     function shortName(n) { return n.split(' ').slice(0,2).join(' '); }
+    function computeRating(votos) { if (!votos) return 1; return Math.max(1, Math.min(99, Math.round(Math.log10(votos + 1) * 18))); }
     function animCount(el, target, ms=1100) {
       if(!el) return;
       const t0=performance.now();
