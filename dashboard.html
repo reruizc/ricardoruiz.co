@@ -791,6 +791,11 @@
         if (h >= 12 && h < 19) return 'Good afternoon';
         return 'Good evening';
       }
+      if (lang === 'cn') {
+        if (h >= 5  && h < 12) return '早上好';
+        if (h >= 12 && h < 19) return '下午好';
+        return '晚上好';
+      }
       if (h >= 5  && h < 12) return 'Buenos días';
       if (h >= 12 && h < 19) return 'Buenas tardes';
       return 'Buenas noches';
@@ -849,11 +854,60 @@
       if (!user) return;
       const plan = PLANS[user.plan] || PLANS.free;
       const lang = localStorage.getItem('rr-lang') || 'co';
-      const isEN = lang === 'us';
+
+      // Textos por idioma
+      const T = {
+        co: {
+          logout: 'Salir', tools: 'Herramientas', locked: 'Bloqueado',
+          upgradePlan: 'Mejorar plan ↑', yourPlan: 'Tu plan',
+          upgradeLink: 'Mejorar plan →', topPlan: 'Plan máximo activo',
+          cancelledUntil: 'Cancelado · acceso hasta', activeUntil: 'Vigente hasta',
+          cancelSub: 'Cancelar suscripción',
+          downloadsMonth: 'Descargas este mes', available: 'disponibles',
+          download: 'Descargar', news: 'Noticias',
+          profile: 'Perfil', planLabel: 'Plan',
+          billingCycle: 'Ciclo de cobro', monthly: 'Mensual', annual: 'Anual',
+          accessUntil: 'Acceso hasta', nextRenewal: 'Próxima renovación',
+          memberSince: 'Miembro desde', memberDate: 'Marzo 2026',
+          changePassword: 'Cambiar contraseña', closeSession: 'Cerrar sesión',
+          planBasic: 'Básico', planPro: 'Pro', planPremium: 'Premium',
+        },
+        us: {
+          logout: 'Log out', tools: 'Tools', locked: 'Locked',
+          upgradePlan: 'Upgrade plan ↑', yourPlan: 'Your plan',
+          upgradeLink: 'Upgrade →', topPlan: 'Top plan active',
+          cancelledUntil: 'Cancelled · access until', activeUntil: 'Active until',
+          cancelSub: 'Cancel subscription',
+          downloadsMonth: 'Downloads this month', available: 'available',
+          download: 'Download', news: 'News',
+          profile: 'Profile', planLabel: 'Plan',
+          billingCycle: 'Billing cycle', monthly: 'Monthly', annual: 'Annual',
+          accessUntil: 'Access until', nextRenewal: 'Next renewal',
+          memberSince: 'Member since', memberDate: 'March 2026',
+          changePassword: 'Change password', closeSession: 'Log out',
+          planBasic: 'Basic', planPro: 'Pro', planPremium: 'Premium',
+        },
+        cn: {
+          logout: '退出', tools: '工具', locked: '已锁定',
+          upgradePlan: '升级计划 ↑', yourPlan: '您的计划',
+          upgradeLink: '升级 →', topPlan: '最高计划已激活',
+          cancelledUntil: '已取消 · 访问至', activeUntil: '有效期至',
+          cancelSub: '取消订阅',
+          downloadsMonth: '本月下载', available: '可用',
+          download: '下载', news: '新闻',
+          profile: '个人资料', planLabel: '计划',
+          billingCycle: '计费周期', monthly: '月付', annual: '年付',
+          accessUntil: '访问至', nextRenewal: '下次续费',
+          memberSince: '注册时间', memberDate: '2026年3月',
+          changePassword: '修改密码', closeSession: '退出登录',
+          planBasic: '基础版', planPro: 'Pro', planPremium: 'Premium',
+        },
+      };
+      const t = T[lang] || T.co;
 
       // Nav
-      document.getElementById('nav-greeting').innerHTML = `${isEN ? 'Plan' : 'Plan'} <strong>${plan.label}</strong>`;
-      document.getElementById('nav-logout').textContent = isEN ? 'Log out' : 'Salir';
+      document.getElementById('nav-greeting').innerHTML = `${t.planLabel} <strong>${plan.label}</strong>`;
+      document.getElementById('nav-logout').textContent = t.logout;
       document.getElementById('nav-tag').textContent = 'Dashboard';
 
       // Greeting
@@ -868,23 +922,23 @@
           <div class="plan-dot"></div>
           <span class="plan-name-hero">${plan.label}</span>
         </div>
-        ${!isFull ? `<a href="pricing.html" class="upgrade-btn">${isEN ? 'Upgrade plan ↑' : 'Mejorar plan ↑'}</a>` : ''}
+        ${!isFull ? `<a href="pricing.html" class="upgrade-btn">${t.upgradePlan}</a>` : ''}
       `;
 
       // Tools
       const unlockedIds = plan.tools;
-      document.getElementById('tools-label').textContent = isEN ? 'Tools' : 'Herramientas';
-      document.getElementById('tools-grid').innerHTML = ALL_TOOLS.map((t, i) => {
-        const unlocked = unlockedIds.includes(t.id);
+      document.getElementById('tools-label').textContent = t.tools;
+      document.getElementById('tools-grid').innerHTML = ALL_TOOLS.map((tool, i) => {
+        const unlocked = unlockedIds.includes(tool.id);
         return `
-          <a href="${unlocked && t.href !== '#' ? t.href : '#'}"
+          <a href="${unlocked && tool.href !== '#' ? tool.href : '#'}"
              class="tool-item ${unlocked ? '' : 'locked'}"
-             ${!unlocked || t.href === '#' ? 'onclick="return false"' : ''}>
+             ${!unlocked || tool.href === '#' ? 'onclick="return false"' : ''}>
             <div class="tool-num">0${i+1} —</div>
-            <div class="tool-name">${t.name}</div>
-            <div class="tool-desc">${t.desc}</div>
-            <span class="tool-tag ${unlocked ? '' : 'locked-tag'}">${unlocked ? t.tag : (isEN ? 'Locked' : 'Bloqueado')}</span>
-            ${unlocked && t.href !== '#' ? '<span class="tool-arrow">↗</span>' : '<span class="tool-lock">🔒</span>'}
+            <div class="tool-name">${tool.name}</div>
+            <div class="tool-desc">${tool.desc}</div>
+            <span class="tool-tag ${unlocked ? '' : 'locked-tag'}">${unlocked ? tool.tag : t.locked}</span>
+            ${unlocked && tool.href !== '#' ? '<span class="tool-arrow">↗</span>' : '<span class="tool-lock">🔒</span>'}
           </a>`;
       }).join('');
 
@@ -893,21 +947,19 @@
       const isCancelled = !!user.cancelledAt;
       const expiresStr = user.planExpiresAt ? formatExpiry(user.planExpiresAt) : null;
       document.getElementById('plan-card').innerHTML = `
-        <div class="card-label">${isEN ? 'Your plan' : 'Tu plan'}</div>
+        <div class="card-label">${t.yourPlan}</div>
         <div class="plan-card-name">${plan.label}</div>
         <div class="plan-card-desc">${plan.desc}</div>
         <ul class="plan-perks">${plan.perks.map(p => `<li>${p}</li>`).join('')}</ul>
         ${user.plan !== 'free' && expiresStr ? `
           <div class="plan-expires ${isCancelled ? 'cancelled' : ''}">
-            ${isCancelled
-              ? `${isEN ? 'Cancelled · access until' : 'Cancelado · acceso hasta'} ${expiresStr}`
-              : `${isEN ? 'Active until' : 'Vigente hasta'} ${expiresStr}`}
+            ${isCancelled ? `${t.cancelledUntil} ${expiresStr}` : `${t.activeUntil} ${expiresStr}`}
           </div>` : ''}
         ${!isTopPlan
-          ? `<a href="pricing.html" class="plan-upgrade-link">${isEN ? 'Upgrade →' : 'Mejorar plan →'}</a>`
-          : `<span class="plan-current-tag">${isEN ? 'Top plan active' : 'Plan máximo activo'}</span>`}
+          ? `<a href="pricing.html" class="plan-upgrade-link">${t.upgradeLink}</a>`
+          : `<span class="plan-current-tag">${t.topPlan}</span>`}
         ${user.plan !== 'free' && !isCancelled
-          ? `<button class="plan-cancel-btn" onclick="openCancelModal()">${isEN ? 'Cancel subscription' : 'Cancelar suscripción'}</button>`
+          ? `<button class="plan-cancel-btn" onclick="openCancelModal()">${t.cancelSub}</button>`
           : ''}
       `;
 
@@ -915,9 +967,9 @@
       const used = user.plan === 'free' ? 0 : 1;
       const total = plan.downloads === 999 ? '∞' : plan.downloads;
       const pct = plan.downloads === 0 ? 0 : plan.downloads === 999 ? 20 : (used / plan.downloads) * 100;
-      document.getElementById('downloads-label').textContent = isEN ? 'Downloads this month' : 'Descargas este mes';
+      document.getElementById('downloads-label').textContent = t.downloadsMonth;
       document.getElementById('downloads-used').textContent = used;
-      document.getElementById('downloads-total').textContent = `/ ${total} ${isEN ? 'available' : 'disponibles'}`;
+      document.getElementById('downloads-total').textContent = `/ ${total} ${t.available}`;
       setTimeout(() => { document.getElementById('downloads-fill').style.width = pct + '%'; }, 300);
 
       const canDownload = user.plan !== 'free';
@@ -930,49 +982,49 @@
           <a href="${canDownload ? d.href : '#'}"
              class="download-btn ${canDownload ? '' : 'locked-btn'}"
              ${!canDownload ? 'onclick="return false"' : ''}>
-            ${canDownload ? (isEN ? 'Download' : 'Descargar') : '🔒'}
+            ${canDownload ? t.download : '🔒'}
           </a>
         </div>`).join('');
 
       // News
-      document.getElementById('news-label').textContent = isEN ? 'News' : 'Noticias';
+      document.getElementById('news-label').textContent = t.news;
       document.getElementById('news-list').innerHTML = NEWS.map(n => `
         <div class="news-item">
           <div class="news-date">${n.date}</div>
           <div class="news-title">${n.title}</div>
           <div class="news-desc">${n.desc}</div>
-          <span class="news-plan-tag ${n.plan}">${n.plan === 'free' ? 'Básico' : n.plan === 'pro' ? 'Pro' : 'Premium'}</span>
+          <span class="news-plan-tag ${n.plan}">${n.plan === 'free' ? t.planBasic : n.plan === 'pro' ? t.planPro : t.planPremium}</span>
         </div>`).join('');
 
       // Profile
       const initials = user.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
-      const countryLabels = { co:'Colombia', us:'United States', mx:'México', pe:'Perú', py:'Paraguay', uk:'United Kingdom' };
+      const countryLabels = { co:'Colombia', us:'United States', mx:'México', pe:'Perú', py:'Paraguay', uk:'United Kingdom', cn:'中国' };
       document.getElementById('profile-card').innerHTML = `
-        <div class="card-label">${isEN ? 'Profile' : 'Perfil'}</div>
+        <div class="card-label">${t.profile}</div>
         <div class="profile-avatar">${initials}</div>
         <div class="profile-name">${user.name}</div>
         <div class="profile-email">${user.email}</div>
         <div class="profile-field">
-          <div class="profile-field-label">${isEN ? 'Plan' : 'Plan'}</div>
+          <div class="profile-field-label">${t.planLabel}</div>
           <div class="profile-field-value">${plan.label}</div>
         </div>
         ${user.plan !== 'free' && user.billingCycle ? `
         <div class="profile-field">
-          <div class="profile-field-label">${isEN ? 'Billing cycle' : 'Ciclo de cobro'}</div>
-          <div class="profile-field-value">${user.billingCycle === 'monthly' ? (isEN ? 'Monthly' : 'Mensual') : (isEN ? 'Annual' : 'Anual')}</div>
+          <div class="profile-field-label">${t.billingCycle}</div>
+          <div class="profile-field-value">${user.billingCycle === 'monthly' ? t.monthly : t.annual}</div>
         </div>` : ''}
         ${user.plan !== 'free' && user.planExpiresAt ? `
         <div class="profile-field">
-          <div class="profile-field-label">${user.cancelledAt ? (isEN ? 'Access until' : 'Acceso hasta') : (isEN ? 'Next renewal' : 'Próxima renovación')}</div>
+          <div class="profile-field-label">${user.cancelledAt ? t.accessUntil : t.nextRenewal}</div>
           <div class="profile-field-value">${formatExpiry(user.planExpiresAt)}</div>
         </div>` : ''}
         <div class="profile-field">
-          <div class="profile-field-label">${isEN ? 'Member since' : 'Miembro desde'}</div>
-          <div class="profile-field-value">${isEN ? 'March 2026' : 'Marzo 2026'}</div>
+          <div class="profile-field-label">${t.memberSince}</div>
+          <div class="profile-field-value">${t.memberDate}</div>
         </div>
         <div class="profile-actions">
-          <a href="forgot.html" class="profile-action-btn">${isEN ? 'Change password' : 'Cambiar contraseña'}</a>
-          <button class="profile-action-btn danger" onclick="logOut()">${isEN ? 'Log out' : 'Cerrar sesión'}</button>
+          <a href="forgot.html" class="profile-action-btn">${t.changePassword}</a>
+          <button class="profile-action-btn danger" onclick="logOut()">${t.closeSession}</button>
         </div>
       `;
     }
