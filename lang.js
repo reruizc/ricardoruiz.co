@@ -52,14 +52,8 @@
     if (btn)      btn.classList.remove('open');
     if (dropdown) dropdown.classList.remove('open');
 
-    const prev = getSavedLang();
     localStorage.setItem('rr-lang', lang);
-    applySelector(val);
-
-    // Aplicar idioma en la página actual
-    if (typeof window.__applyLang === 'function') {
-      window.__applyLang(lang);
-    }
+    window.location.reload();
   };
 
   // Cerrar dropdown al hacer clic fuera
