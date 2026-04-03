@@ -340,6 +340,16 @@
     .access-btn-primary:hover{background:#0035cc}
     .access-btn-secondary{font-family:'Syne',sans-serif;font-size:.828rem;letter-spacing:.1em;text-transform:uppercase;background:none;color:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.15);padding:.6rem 1.4rem;cursor:pointer;text-decoration:none;display:inline-block}
     .access-btn-secondary:hover{border-color:rgba(255,255,255,.35);color:rgba(255,255,255,.7)}
+    .access-login-form{display:none;margin-top:1.25rem;text-align:left}
+    .access-login-form.visible{display:block}
+    .access-login-form input{width:100%;box-sizing:border-box;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:var(--white);font-family:'DM Mono',monospace;font-size:.8rem;padding:.55rem .8rem;margin-bottom:.65rem;outline:none}
+    .access-login-form input:focus{border-color:var(--blue)}
+    .access-login-form input::placeholder{color:rgba(255,255,255,.25)}
+    .access-login-err{font-family:'Syne',sans-serif;font-size:.75rem;color:#ff5c5c;margin-bottom:.75rem;min-height:1rem;display:none}
+    .access-login-err.visible{display:block}
+    .access-login-actions{display:flex;gap:.6rem;align-items:center;justify-content:center;flex-wrap:wrap}
+    .access-login-cancel{font-family:'Syne',sans-serif;font-size:.75rem;letter-spacing:.06em;color:rgba(255,255,255,.35);background:none;border:none;cursor:pointer;text-transform:uppercase;padding:.3rem .6rem}
+    .access-login-cancel:hover{color:rgba(255,255,255,.65)}
 
     /* PREMIUM LOCK */
     .prem-lock-wrap{position:relative}
@@ -368,9 +378,19 @@
       <span class="access-modal-icon">🔒</span>
       <div class="access-modal-title">Herramienta exclusiva</div>
       <div class="access-modal-body">La medición de endoso está disponible para usuarios registrados con plan Pro o superior. Crea tu cuenta para continuar.</div>
-      <div class="access-modal-btns">
+      <div class="access-modal-btns" id="access-main-btns">
         <a href="register.html" class="access-btn-primary" onclick="navTo(event,'register.html')">Registrarse</a>
+        <button class="access-btn-secondary" onclick="showModalLogin()">Iniciar sesión</button>
         <a href="electoral.html" class="access-btn-secondary" onclick="navTo(event,'electoral.html')">Volver</a>
+      </div>
+      <div class="access-login-form" id="access-login-form">
+        <input type="email" id="modal-email" placeholder="Correo electrónico" autocomplete="email" />
+        <input type="password" id="modal-password" placeholder="Contraseña" autocomplete="current-password" />
+        <div class="access-login-err" id="modal-login-err"></div>
+        <div class="access-login-actions">
+          <button class="access-btn-primary" id="modal-login-btn" onclick="doModalLogin()">Ingresar</button>
+          <button class="access-login-cancel" onclick="hideModalLogin()">Cancelar</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1567,6 +1587,50 @@
     function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;if(token&&user){const pl={free:'Gratis',basic:'Básico',analysis:'Pro',full:'Premium',pro:'Pro',premium:'Premium'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">Salir</button>`;}else{area.innerHTML=`<a href="pricing.html" class="e-nav-planes" style="font-family:'Syne',sans-serif;font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">Planes</a><a href="login.html" class="e-btn-login">Iniciar sesión</a><a href="register.html" class="e-btn-register">Registrarse</a>`;}}
     async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();}
     updateElectoralNav();
+
+    // ─── MODAL LOGIN ──────────────────────────────────────────
+    function showModalLogin() {
+      document.getElementById('access-main-btns').style.display = 'none';
+      const form = document.getElementById('access-login-form');
+      form.classList.add('visible');
+      document.getElementById('modal-email').focus();
+    }
+    function hideModalLogin() {
+      document.getElementById('access-main-btns').style.display = '';
+      document.getElementById('access-login-form').classList.remove('visible');
+      document.getElementById('modal-login-err').classList.remove('visible');
+      document.getElementById('modal-email').value = '';
+      document.getElementById('modal-password').value = '';
+    }
+    async function doModalLogin() {
+      const email = document.getElementById('modal-email').value.trim();
+      const pw    = document.getElementById('modal-password').value;
+      const err   = document.getElementById('modal-login-err');
+      const btn   = document.getElementById('modal-login-btn');
+      err.classList.remove('visible');
+      if (!email || !pw) { err.textContent = 'Completa todos los campos.'; err.classList.add('visible'); return; }
+      btn.textContent = '...'; btn.disabled = true;
+      try {
+        const res  = await fetch('https://rr-auth.reruizc.workers.dev/auth/login', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password: pw }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          localStorage.setItem('rr-token', data.token);
+          localStorage.setItem('rr-user',  JSON.stringify(data.user));
+          window.location.reload();
+        } else {
+          err.textContent = data.message || 'Correo o contraseña incorrectos.';
+          err.classList.add('visible');
+          btn.textContent = 'Ingresar'; btn.disabled = false;
+        }
+      } catch {
+        err.textContent = 'Error de conexión. Intenta de nuevo.';
+        err.classList.add('visible');
+        btn.textContent = 'Ingresar'; btn.disabled = false;
+      }
+    }
 
     // ─── ACCESS HELPERS ───────────────────────────────────────
     function getUserPlan() {
