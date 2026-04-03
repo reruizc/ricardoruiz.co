@@ -180,7 +180,7 @@
 
     /* Card label */
     .card-label { position:relative; z-index:1; padding:.5rem .7rem .55rem; background:linear-gradient(to top,rgba(0,0,0,0.9) 0%,rgba(0,0,0,0.3) 100%); }
-    .card-name { font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(.52rem,1.1vw,.88rem); letter-spacing:.03em; text-transform:uppercase; color:var(--white); line-height:1.2; transition:color .2s; }
+    .card-name { font-family:'Syne',sans-serif; font-weight:400; font-size:clamp(.572rem,1.21vw,.968rem); letter-spacing:.03em; text-transform:uppercase; color:var(--white); line-height:1.2; transition:color .2s; }
 
     /* Apóyanos */
     .card-apoyo { border-color:rgba(0,71,255,0.4); background:rgba(0,25,90,0.55); }
@@ -667,6 +667,22 @@
     .country-option.selected{color:var(--blue)}
     .country-check{font-size:.6rem;width:12px;opacity:0;color:var(--blue)}
     .country-option.selected .country-check{opacity:1}
+    /* LOGIN MODAL */
+    .login-overlay{position:fixed;inset:0;z-index:50000;display:flex;align-items:center;justify-content:center;background:rgba(4,6,16,.78);backdrop-filter:blur(4px)}
+    .login-overlay.hidden{display:none!important}
+    .login-modal{background:#0e1220;border:1px solid rgba(255,255,255,.12);padding:2.2rem 2rem;max-width:360px;width:90%;text-align:center}
+    .login-modal-title{font-family:'Syne',sans-serif;font-weight:800;font-size:1.15rem;letter-spacing:-.02em;color:var(--white);margin-bottom:.4rem}
+    .login-modal-sub{font-family:'Syne',sans-serif;font-size:.78rem;letter-spacing:.05em;color:rgba(255,255,255,.4);margin-bottom:1.4rem}
+    .login-modal input{width:100%;box-sizing:border-box;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:var(--white);font-family:'DM Mono',monospace;font-size:.8rem;padding:.55rem .8rem;margin-bottom:.65rem;outline:none}
+    .login-modal input:focus{border-color:var(--blue)}
+    .login-modal input::placeholder{color:rgba(255,255,255,.25)}
+    .login-modal-err{font-family:'Syne',sans-serif;font-size:.75rem;color:#ff5c5c;min-height:1rem;margin-bottom:.75rem;display:none}
+    .login-modal-err.visible{display:block}
+    .login-modal-actions{display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap}
+    .login-modal-btn{font-family:'Syne',sans-serif;font-size:.782rem;letter-spacing:.1em;text-transform:uppercase;background:var(--blue);color:var(--white);border:none;padding:.55rem 1.6rem;cursor:pointer}
+    .login-modal-btn:hover{background:#0035cc}
+    .login-modal-cancel{font-family:'Syne',sans-serif;font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.35);background:none;border:none;cursor:pointer;padding:.55rem .6rem}
+    .login-modal-cancel:hover{color:rgba(255,255,255,.65)}
   </style>
 </head>
 <body>
@@ -886,7 +902,7 @@
             <div class="card" data-tape>
               <div class="card-glow"></div>
               <div class="card-soon"><div class="card-tape"><div class="card-tape-inner" data-words></div></div></div>
-              <div class="card-label"><div class="card-name" id="el-2026-mapas">Mapas</div></div>
+              <div class="card-label"><div class="card-name" id="el-2026-mapas">Mapa y descargas</div></div>
             </div>
             <!-- Atípicas Tunja 2026 -->
             <div class="card" data-tape>
@@ -1158,7 +1174,7 @@
         c2026_pv: 'Primera Vuelta 2026',
         c2026_sv: 'Segunda Vuelta 2026',
         c2026_test: 'Test Electoral Presidencial 2026',
-        c2026_mapas: 'Mapas',
+        c2026_mapas: 'Mapa y descargas',
         c2026_tunja: 'Atípicas Tunja 2026',
         // Saber Más
         infoTitle: 'Cómo construimos',
@@ -1226,7 +1242,7 @@
         c2026_pv: 'First Round 2026',
         c2026_sv: 'Second Round 2026',
         c2026_test: 'Presidential Electoral Test 2026',
-        c2026_mapas: 'Maps',
+        c2026_mapas: 'Map and downloads',
         c2026_tunja: 'Tunja By-election 2026',
         // Saber Más
         infoTitle: 'How we build',
@@ -1344,7 +1360,7 @@
       // Nav auth
       const area = s('nav-auth-area');
       if (area && !area.dataset.loggedIn) {
-        area.innerHTML = `<a href="login.html" class="e-btn-login">${t.login}</a><a href="register.html" class="e-btn-register">${t.register}</a>`;
+        area.innerHTML = `<button class="e-btn-login" onclick="showLoginModal()">${t.login}</button><a href="register.html" class="e-btn-register">${t.register}</a>`;
       }
 
       // Tape words
@@ -1373,7 +1389,7 @@
           <button class="e-btn-logout" onclick="eLogOut()">Salir</button>`;
       } else {
         area.innerHTML = `
-          <a href="login.html" class="e-btn-login">Iniciar sesión</a>
+          <button class="e-btn-login" onclick="showLoginModal()">Iniciar sesión</button>
           <a href="register.html" class="e-btn-register">Registrarse</a>`;
       }
     }
@@ -1385,8 +1401,72 @@
       updateNavAuth();
     }
     updateNavAuth();
+
+    // ─── LOGIN MODAL ──────────────────────────────────────────
+    function showLoginModal() {
+      document.getElementById('login-overlay').classList.remove('hidden');
+      document.getElementById('lm-email').focus();
+    }
+    function hideLoginModal() {
+      document.getElementById('login-overlay').classList.add('hidden');
+      document.getElementById('lm-err').classList.remove('visible');
+      document.getElementById('lm-email').value = '';
+      document.getElementById('lm-password').value = '';
+      const btn = document.getElementById('lm-submit');
+      btn.textContent = 'Ingresar'; btn.disabled = false;
+    }
+    async function doElLogin() {
+      const email = document.getElementById('lm-email').value.trim();
+      const pw    = document.getElementById('lm-password').value;
+      const err   = document.getElementById('lm-err');
+      const btn   = document.getElementById('lm-submit');
+      err.classList.remove('visible');
+      if (!email || !pw) { err.textContent = 'Completa todos los campos.'; err.classList.add('visible'); return; }
+      btn.textContent = '...'; btn.disabled = true;
+      try {
+        const res  = await fetch('https://rr-auth.reruizc.workers.dev/auth/login', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password: pw }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          localStorage.setItem('rr-token', data.token);
+          localStorage.setItem('rr-user',  JSON.stringify(data.user));
+          hideLoginModal();
+          updateNavAuth();
+        } else {
+          err.textContent = data.message || 'Correo o contraseña incorrectos.';
+          err.classList.add('visible');
+          btn.textContent = 'Ingresar'; btn.disabled = false;
+        }
+      } catch {
+        err.textContent = 'Error de conexión. Intenta de nuevo.';
+        err.classList.add('visible');
+        btn.textContent = 'Ingresar'; btn.disabled = false;
+      }
+    }
+    // Cerrar modal al hacer clic en el fondo
+    document.getElementById('login-overlay').addEventListener('click', function(e) {
+      if (e.target === this) hideLoginModal();
+    });
+
     window.__applyLang = function() { window.location.reload(); };
   </script>
   <script src="lang.js"></script>
+
+  <!-- MODAL LOGIN -->
+  <div id="login-overlay" class="login-overlay hidden">
+    <div class="login-modal">
+      <div class="login-modal-title">Iniciar sesión</div>
+      <div class="login-modal-sub">Accede a tu cuenta para continuar</div>
+      <input type="email" id="lm-email" placeholder="Correo electrónico" autocomplete="email" />
+      <input type="password" id="lm-password" placeholder="Contraseña" autocomplete="current-password" />
+      <div class="login-modal-err" id="lm-err"></div>
+      <div class="login-modal-actions">
+        <button class="login-modal-btn" id="lm-submit" onclick="doElLogin()">Ingresar</button>
+        <button class="login-modal-cancel" onclick="hideLoginModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
