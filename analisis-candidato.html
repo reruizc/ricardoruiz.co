@@ -291,6 +291,22 @@
       flex-wrap: wrap;
       border-bottom: 1px solid rgba(255,255,255,.05);
     }
+    #btn-volver-pais {
+      display: none;
+      margin-left: auto;
+      font-family: 'DM Mono', monospace;
+      font-size: .62rem;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--blue);
+      background: rgba(0,71,255,.1);
+      border: 1px solid rgba(0,71,255,.35);
+      padding: .25rem .7rem;
+      cursor: pointer;
+      transition: background .15s, color .15s;
+      flex-shrink: 0;
+    }
+    #btn-volver-pais:hover { background: var(--blue); color: #fff; }
     .map-legend-title {
       font-family: 'DM Mono', monospace;
       font-size: .65rem;
@@ -859,6 +875,7 @@
               <div class="map-legend-bar"></div>
               <span class="map-legend-end" id="legend-max">máx</span>
             </div>
+            <button id="btn-volver-pais" onclick="onVolverPais()">← País</button>
           </div>
 
           <!-- Leaflet Map -->
@@ -1414,12 +1431,21 @@
       currentDepCode = null;
       munVoteData = {};
       maxMunVotes = 1;
+      document.getElementById('btn-volver-pais').style.display = 'none';
       if (departamentosLayer) {
         showBoundaryLayer(departamentosLayer);
         departamentosLayer.setStyle(featureStyle);
       } else if (activeBoundaryLayer) {
         activeBoundaryLayer.setStyle(featureStyle);
       }
+    }
+
+    function onVolverPais() {
+      const depSel = document.getElementById('filter-dep');
+      if (depSel) depSel.value = '';
+      const munSel = document.getElementById('filter-mun');
+      if (munSel) { munSel.innerHTML = '<option value="">— Todos los municipios —</option>'; munSel.disabled = true; }
+      showNationalView();
     }
 
     // ─── CAPA MUNICIPIOS POR DEPTO (bajo demanda, con caché) ──
@@ -1441,6 +1467,7 @@
           onEachFeature: onEachFeature
         });
         showBoundaryLayer(newLayer);
+        document.getElementById('btn-volver-pais').style.display = 'block';
       } catch(e) {
         console.error('[Mapa] Error cargando municipios de depto:', e.message);
       } finally {
