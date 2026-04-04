@@ -1500,8 +1500,8 @@
       const props = feature.properties;
       let ratio = 0;
       if (props.mun_electoral !== undefined) {
-        // Feature de municipio (capa por depto)
-        const data = munVoteData[props.mun_electoral];
+        // Feature de municipio (capa por depto) — usar mun_elec (código electoral) para cruzar votos
+        const data = props.mun_elec ? munVoteData[props.mun_elec] : null;
         ratio = data ? data.v / maxMunVotes : 0;
       } else {
         // Feature de departamento (capa nacional)
@@ -1523,11 +1523,11 @@
 
       if (isMunFeature) {
         // ── Capa de municipios de un departamento ──
-        const munCode = props.mun_electoral;
+        const munCode = props.mun_elec;   // código electoral — clave en munVoteData y filter-mun
         const name = (props.mpio_cnmbr || '?');
         layer.on({
           mouseover: function(e) {
-            const data = munVoteData[munCode];
+            const data = munCode ? munVoteData[munCode] : null;
             const votes = data ? data.v : 0;
             layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
             layer.bindTooltip(
@@ -1544,7 +1544,7 @@
           },
           click: function() {
             const sel = document.getElementById('filter-mun');
-            if (sel) sel.value = munCode;
+            if (sel && munCode) sel.value = munCode;
             try {
               const b = layer.getBounds();
               if (b.isValid()) leafletMap.fitBounds(b, { padding: [30, 30] });
@@ -2188,8 +2188,8 @@
       const munCode = document.getElementById('filter-mun').value;
       if (!munCode || !activeBoundaryLayer) return;
       activeBoundaryLayer.eachLayer(layer => {
-        const code = layer.feature?.properties?.mun_electoral;
-        if (code === munCode) {
+        const code = layer.feature?.properties?.mun_elec;
+        if (code && code === munCode) {
           try {
             const b = layer.getBounds();
             if (b.isValid()) leafletMap.fitBounds(b, { padding: [30, 30] });
