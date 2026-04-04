@@ -970,6 +970,153 @@
     const MUNICIPIOS_GEOJSON_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/MUNICIPIOS.json';
     const fmt = n => Number(n).toLocaleString('es-CO');
 
+    // ─── I18N ─────────────────────────────────────────────────
+    const candI18n = {
+      co: {
+        back: '← Volver',
+        congress: 'Congreso 2026', page: 'Mapa Candidato',
+        searchLabel: 'Buscar candidato', searchPlaceholder: 'Nombre del candidato…',
+        loadingIndex: 'Cargando índice…', candidatesLoaded: n => `${n.toLocaleString('es-CO')} candidatos cargados`,
+        dlBy: 'Descargar por', dlDep: '⬇ Depto.', dlMun: '⬇ Municipio', dlZon: '⬇ Zona', dlPue: '⬇ Puesto', dlMesa: '⬇ Mesa',
+        connecting: 'Conectando con S3…', placeholder: 'Busca un candidato para ver su perfil electoral',
+        mapTitle: 'Mapa · Votación por departamento', mapLoading: 'Cargando mapa…',
+        depLabel: 'Departamento', munLabel: 'Municipio',
+        depAll: '— Todos los departamentos —', munAll: '— Todos los municipios —',
+        legendTitle: 'Intensidad · votos', legendMax: 'máx',
+        selectCandidate: 'SELECCIONA UN CANDIDATO',
+        ideoLeft: '← Izquierda', ideoCenter: 'Espectro ideológico', ideoRight: 'Derecha →',
+        radarTitle: 'Presencia territorial',
+        ratingLabel: 'Puntos / 100',
+        photoPlaceholder: 'Foto del<br/>candidato<br/>aquí',
+        keys: { origen:'Origen', partido:'Partido', corp:'Corporación', depTop:'Dpto. más votado', munTop:'Municipio top', zonaTop:'Zona más votada', zonaVotos:'Votos zona top', puestoTop:'Puesto más votado', puestoVotos:'Votos puesto top', votos:'Total de votos', dptos:'Dptos. con votos', mesas:'Mesas con votos' },
+        plans: { free:'Free', basic:'Básico', pro:'Pro', premium:'Premium', analysis:'Análisis', full:'Completo' },
+        logout: 'Salir', login: 'Iniciar sesión', register: 'Registrarse',
+        munModal: 'Para ver municipios, apóyanos <a href="register.html">registrándote aquí</a>',
+        excelLock: 'Esta función es exclusiva para usuarios <strong>Premium</strong> o <strong>Full</strong>.<br><a href="register.html">Regístrate</a> o consulta los <a href="pricing.html">planes disponibles</a>.',
+        footerMain: 'ricardoruiz.co · Elecciones Colombia',
+        footerSource: '<a href="https://registraduria.gov.co" target="_blank">Fuente: Registraduría Nacional</a>',
+        orientText: 'Para mejor experiencia,<br/>gira tu dispositivo en horizontal', orientBtn: 'Continuar',
+        themeDay: '☀ Modo día', themeNight: '🌙 Modo noche',
+        lmTitle: 'Iniciar sesión', lmSub: 'Accede a tu cuenta para continuar',
+        lmEmail: 'Correo electrónico', lmPassword: 'Contraseña',
+        lmSubmit: 'Ingresar', lmCancel: 'Cancelar',
+        lmError: 'Correo o contraseña incorrectos.',
+      },
+      us: {
+        back: '← Back',
+        congress: 'Congress 2026', page: 'Candidate Map',
+        searchLabel: 'Search candidate', searchPlaceholder: 'Candidate name…',
+        loadingIndex: 'Loading index…', candidatesLoaded: n => `${n.toLocaleString('en-US')} candidates loaded`,
+        dlBy: 'Download by', dlDep: '⬇ Dept.', dlMun: '⬇ Municipality', dlZon: '⬇ Zone', dlPue: '⬇ Polling station', dlMesa: '⬇ Table',
+        connecting: 'Connecting to S3…', placeholder: 'Search for a candidate to view their electoral profile',
+        mapTitle: 'Map · Votes by department', mapLoading: 'Loading map…',
+        depLabel: 'Department', munLabel: 'Municipality',
+        depAll: '— All departments —', munAll: '— All municipalities —',
+        legendTitle: 'Intensity · votes', legendMax: 'max',
+        selectCandidate: 'SELECT A CANDIDATE',
+        ideoLeft: '← Left', ideoCenter: 'Ideological spectrum', ideoRight: 'Right →',
+        radarTitle: 'Territorial presence',
+        ratingLabel: 'Points / 100',
+        photoPlaceholder: 'Candidate<br/>photo<br/>here',
+        keys: { origen:'Origin', partido:'Party', corp:'Corporation', depTop:'Top dept.', munTop:'Top municipality', zonaTop:'Top zone', zonaVotos:'Zone top votes', puestoTop:'Top polling station', puestoVotos:'Station top votes', votos:'Total votes', dptos:'Depts. with votes', mesas:'Tables with votes' },
+        plans: { free:'Free', basic:'Basic', pro:'Pro', premium:'Premium', analysis:'Analysis', full:'Full' },
+        logout: 'Log out', login: 'Log in', register: 'Sign up',
+        munModal: 'To view municipalities, support us by <a href="register.html">registering here</a>',
+        excelLock: 'This feature is exclusive to <strong>Premium</strong> or <strong>Full</strong> users.<br><a href="register.html">Sign up</a> or check <a href="pricing.html">available plans</a>.',
+        footerMain: 'ricardoruiz.co · Colombia Elections',
+        footerSource: '<a href="https://registraduria.gov.co" target="_blank">Source: Registraduría Nacional</a>',
+        orientText: 'For a better experience,<br/>rotate your device to landscape', orientBtn: 'Continue',
+        themeDay: '☀ Day mode', themeNight: '🌙 Night mode',
+        lmTitle: 'Log in', lmSub: 'Access your account to continue',
+        lmEmail: 'Email address', lmPassword: 'Password',
+        lmSubmit: 'Log in', lmCancel: 'Cancel',
+        lmError: 'Incorrect email or password.',
+      },
+      cn: {
+        back: '← 返回',
+        congress: '2026年国会', page: '候选人地图',
+        searchLabel: '搜索候选人', searchPlaceholder: '候选人姓名…',
+        loadingIndex: '正在加载索引…', candidatesLoaded: n => `已加载 ${n.toLocaleString('zh-CN')} 名候选人`,
+        dlBy: '下载方式', dlDep: '⬇ 省份', dlMun: '⬇ 市', dlZon: '⬇ 区', dlPue: '⬇ 投票站', dlMesa: '⬇ 投票台',
+        connecting: '正在连接 S3…', placeholder: '搜索候选人以查看其选举档案',
+        mapTitle: '地图 · 各省得票', mapLoading: '地图加载中…',
+        depLabel: '省份', munLabel: '市',
+        depAll: '— 所有省份 —', munAll: '— 所有市 —',
+        legendTitle: '强度 · 得票', legendMax: '最高',
+        selectCandidate: '请选择候选人',
+        ideoLeft: '← 左翼', ideoCenter: '意识形态谱系', ideoRight: '右翼 →',
+        radarTitle: '地域分布',
+        ratingLabel: '得分 / 100',
+        photoPlaceholder: '候选人<br/>照片<br/>在此',
+        keys: { origen:'来源', partido:'政党', corp:'机构', depTop:'最高票省份', munTop:'最高票城市', zonaTop:'最高票区域', zonaVotos:'区域最高票', puestoTop:'最高票站', puestoVotos:'投票站最高票', votos:'总票数', dptos:'得票省份数', mesas:'得票投票台数' },
+        plans: { free:'免费', basic:'基础', pro:'专业', premium:'高级', analysis:'分析', full:'完整' },
+        logout: '退出', login: '登录', register: '注册',
+        munModal: '要查看市级数据，请<a href="register.html">在此注册</a>支持我们',
+        excelLock: '此功能仅限<strong>高级</strong>或<strong>完整</strong>套餐用户。<br><a href="register.html">注册</a>或查看<a href="pricing.html">可用套餐</a>。',
+        footerMain: 'ricardoruiz.co · 哥伦比亚选举',
+        footerSource: '<a href="https://registraduria.gov.co" target="_blank">数据来源：国家选举委员会</a>',
+        orientText: '为获得更佳体验，<br/>请将设备横向旋转', orientBtn: '继续',
+        themeDay: '☀ 日间模式', themeNight: '🌙 夜间模式',
+        lmTitle: '登录', lmSub: '登录您的账户以继续',
+        lmEmail: '电子邮件', lmPassword: '密码',
+        lmSubmit: '登录', lmCancel: '取消',
+        lmError: '邮箱或密码不正确。',
+      }
+    };
+
+    function applyLang(lang) {
+      const t = candI18n[lang] || candI18n.co;
+      const s = id => document.getElementById(id);
+      const st = (id, txt) => { const el = s(id); if (el) el.textContent = txt; };
+      const si = (id, html) => { const el = s(id); if (el) el.innerHTML = html; };
+
+      st('btn-back', t.back);
+      st('breadcrumb-congress', t.congress);
+      st('breadcrumb-page', t.page);
+      st('search-label', t.searchLabel);
+      const inp = s('ac-input'); if (inp) inp.placeholder = t.searchPlaceholder;
+      const hint = s('search-hint');
+      if (hint && hint.dataset.count) st('search-hint', t.candidatesLoaded(parseInt(hint.dataset.count)));
+      else if (hint && !hint.dataset.count) st('search-hint', t.loadingIndex);
+      st('dl-btns-label', t.dlBy);
+      st('dl-dep', t.dlDep); st('dl-mun', t.dlMun); st('dl-zon', t.dlZon); st('dl-pue', t.dlPue); st('dl-mesa', t.dlMesa);
+      st('loader-label', t.connecting);
+      st('placeholder-state', t.placeholder);
+      st('map-panel-title', t.mapTitle);
+      st('map-loading', t.mapLoading);
+      st('filter-dep-label', t.depLabel);
+      st('filter-mun-label', t.munLabel);
+      st('dep-all-opt', t.depAll);
+      st('mun-all-opt', t.munAll);
+      st('map-legend-title', t.legendTitle);
+      st('legend-max', t.legendMax);
+      if (s('pes-panel') && s('pes-panel').style.display === 'none') st('info-full-name', t.selectCandidate);
+      si('ideo-left', t.ideoLeft);
+      si('ideo-center', t.ideoCenter);
+      si('ideo-right', t.ideoRight);
+      st('radar-title', t.radarTitle);
+      st('rating-label', t.ratingLabel);
+      si('photo-placeholder-text', t.photoPlaceholder);
+      const keys = t.keys;
+      st('key-origen', keys.origen); st('key-partido', keys.partido); st('key-corp', keys.corp);
+      st('key-dep-top', keys.depTop); st('key-mun-top', keys.munTop);
+      st('key-zona-top', keys.zonaTop); st('key-zona-votos', keys.zonaVotos);
+      st('key-puesto-top', keys.puestoTop); st('key-puesto-votos', keys.puestoVotos);
+      st('key-votos', keys.votos); st('key-dptos', keys.dptos); st('key-mesas', keys.mesas);
+      si('mun-modal-msg', t.munModal);
+      si('excel-lock-msg', t.excelLock);
+      st('footer-main', t.footerMain);
+      si('footer-source', t.footerSource);
+      si('orient-text', t.orientText);
+      st('orient-btn', t.orientBtn);
+      const themeBtn = s('theme-btn');
+      if (themeBtn) themeBtn.textContent = document.body.classList.contains('day-mode') ? t.themeNight : t.themeDay;
+      st('lm-title', t.lmTitle); st('lm-sub', t.lmSub);
+      const lmEmail = s('lm-email'); if (lmEmail) lmEmail.placeholder = t.lmEmail;
+      const lmPwd = s('lm-password'); if (lmPwd) lmPwd.placeholder = t.lmPassword;
+      st('lm-submit', t.lmSubmit); st('lm-cancel', t.lmCancel);
+    }
+
     // Ideología aproximada por partido (escala 0=izq … 100=der)
     const IDEOLOGY_MAP = {
       'pacto humano': 5, 'colombia humana': 5, 'up': 8, 'polo democratico': 12,
@@ -2081,155 +2228,6 @@
         if (e.target === this) hideLoginModal();
       });
     });
-
-    // ─── I18N ─────────────────────────────────────────────────
-    const candI18n = {
-      co: {
-        back: '← Volver',
-        congress: 'Congreso 2026', page: 'Mapa Candidato',
-        searchLabel: 'Buscar candidato', searchPlaceholder: 'Nombre del candidato…',
-        loadingIndex: 'Cargando índice…', candidatesLoaded: n => `${n.toLocaleString('es-CO')} candidatos cargados`,
-        dlBy: 'Descargar por', dlDep: '⬇ Depto.', dlMun: '⬇ Municipio', dlZon: '⬇ Zona', dlPue: '⬇ Puesto', dlMesa: '⬇ Mesa',
-        connecting: 'Conectando con S3…', placeholder: 'Busca un candidato para ver su perfil electoral',
-        mapTitle: 'Mapa · Votación por departamento', mapLoading: 'Cargando mapa…',
-        depLabel: 'Departamento', munLabel: 'Municipio',
-        depAll: '— Todos los departamentos —', munAll: '— Todos los municipios —',
-        legendTitle: 'Intensidad · votos', legendMax: 'máx',
-        selectCandidate: 'SELECCIONA UN CANDIDATO',
-        ideoLeft: '← Izquierda', ideoCenter: 'Espectro ideológico', ideoRight: 'Derecha →',
-        radarTitle: 'Presencia territorial',
-        ratingLabel: 'Puntos / 100',
-        photoPlaceholder: 'Foto del<br/>candidato<br/>aquí',
-        keys: { origen:'Origen', partido:'Partido', corp:'Corporación', depTop:'Dpto. más votado', munTop:'Municipio top', zonaTop:'Zona más votada', zonaVotos:'Votos zona top', puestoTop:'Puesto más votado', puestoVotos:'Votos puesto top', votos:'Total de votos', dptos:'Dptos. con votos', mesas:'Mesas con votos' },
-        plans: { free:'Free', basic:'Básico', pro:'Pro', premium:'Premium', analysis:'Análisis', full:'Completo' },
-        logout: 'Salir', login: 'Iniciar sesión', register: 'Registrarse',
-        munModal: 'Para ver municipios, apóyanos <a href="register.html">registrándote aquí</a>',
-        excelLock: 'Esta función es exclusiva para usuarios <strong>Premium</strong> o <strong>Full</strong>.<br><a href="register.html">Regístrate</a> o consulta los <a href="pricing.html">planes disponibles</a>.',
-        footerMain: 'ricardoruiz.co · Elecciones Colombia',
-        footerSource: '<a href="https://registraduria.gov.co" target="_blank">Fuente: Registraduría Nacional</a>',
-        orientText: 'Para mejor experiencia,<br/>gira tu dispositivo en horizontal', orientBtn: 'Continuar',
-        themeDay: '☀ Modo día', themeNight: '🌙 Modo noche',
-        lmTitle: 'Iniciar sesión', lmSub: 'Accede a tu cuenta para continuar',
-        lmEmail: 'Correo electrónico', lmPassword: 'Contraseña',
-        lmSubmit: 'Ingresar', lmCancel: 'Cancelar',
-        lmError: 'Correo o contraseña incorrectos.',
-      },
-      us: {
-        back: '← Back',
-        congress: 'Congress 2026', page: 'Candidate Map',
-        searchLabel: 'Search candidate', searchPlaceholder: 'Candidate name…',
-        loadingIndex: 'Loading index…', candidatesLoaded: n => `${n.toLocaleString('en-US')} candidates loaded`,
-        dlBy: 'Download by', dlDep: '⬇ Dept.', dlMun: '⬇ Municipality', dlZon: '⬇ Zone', dlPue: '⬇ Polling station', dlMesa: '⬇ Table',
-        connecting: 'Connecting to S3…', placeholder: 'Search for a candidate to view their electoral profile',
-        mapTitle: 'Map · Votes by department', mapLoading: 'Loading map…',
-        depLabel: 'Department', munLabel: 'Municipality',
-        depAll: '— All departments —', munAll: '— All municipalities —',
-        legendTitle: 'Intensity · votes', legendMax: 'max',
-        selectCandidate: 'SELECT A CANDIDATE',
-        ideoLeft: '← Left', ideoCenter: 'Ideological spectrum', ideoRight: 'Right →',
-        radarTitle: 'Territorial presence',
-        ratingLabel: 'Points / 100',
-        photoPlaceholder: 'Candidate<br/>photo<br/>here',
-        keys: { origen:'Origin', partido:'Party', corp:'Corporation', depTop:'Top dept.', munTop:'Top municipality', zonaTop:'Top zone', zonaVotos:'Zone top votes', puestoTop:'Top polling station', puestoVotos:'Station top votes', votos:'Total votes', dptos:'Depts. with votes', mesas:'Tables with votes' },
-        plans: { free:'Free', basic:'Basic', pro:'Pro', premium:'Premium', analysis:'Analysis', full:'Full' },
-        logout: 'Log out', login: 'Log in', register: 'Sign up',
-        munModal: 'To view municipalities, support us by <a href="register.html">registering here</a>',
-        excelLock: 'This feature is exclusive to <strong>Premium</strong> or <strong>Full</strong> users.<br><a href="register.html">Sign up</a> or check <a href="pricing.html">available plans</a>.',
-        footerMain: 'ricardoruiz.co · Colombia Elections',
-        footerSource: '<a href="https://registraduria.gov.co" target="_blank">Source: Registraduría Nacional</a>',
-        orientText: 'For a better experience,<br/>rotate your device to landscape', orientBtn: 'Continue',
-        themeDay: '☀ Day mode', themeNight: '🌙 Night mode',
-        lmTitle: 'Log in', lmSub: 'Access your account to continue',
-        lmEmail: 'Email address', lmPassword: 'Password',
-        lmSubmit: 'Log in', lmCancel: 'Cancel',
-        lmError: 'Incorrect email or password.',
-      },
-      cn: {
-        back: '← 返回',
-        congress: '2026年国会', page: '候选人地图',
-        searchLabel: '搜索候选人', searchPlaceholder: '候选人姓名…',
-        loadingIndex: '正在加载索引…', candidatesLoaded: n => `已加载 ${n.toLocaleString('zh-CN')} 名候选人`,
-        dlBy: '下载方式', dlDep: '⬇ 省份', dlMun: '⬇ 市', dlZon: '⬇ 区', dlPue: '⬇ 投票站', dlMesa: '⬇ 投票台',
-        connecting: '正在连接 S3…', placeholder: '搜索候选人以查看其选举档案',
-        mapTitle: '地图 · 各省得票', mapLoading: '地图加载中…',
-        depLabel: '省份', munLabel: '市',
-        depAll: '— 所有省份 —', munAll: '— 所有市 —',
-        legendTitle: '强度 · 得票', legendMax: '最高',
-        selectCandidate: '请选择候选人',
-        ideoLeft: '← 左翼', ideoCenter: '意识形态谱系', ideoRight: '右翼 →',
-        radarTitle: '地域分布',
-        ratingLabel: '得分 / 100',
-        photoPlaceholder: '候选人<br/>照片<br/>在此',
-        keys: { origen:'来源', partido:'政党', corp:'机构', depTop:'最高票省份', munTop:'最高票城市', zonaTop:'最高票区域', zonaVotos:'区域最高票', puestoTop:'最高票站', puestoVotos:'投票站最高票', votos:'总票数', dptos:'得票省份数', mesas:'得票投票台数' },
-        plans: { free:'免费', basic:'基础', pro:'专业', premium:'高级', analysis:'分析', full:'完整' },
-        logout: '退出', login: '登录', register: '注册',
-        munModal: '要查看市级数据，请<a href="register.html">在此注册</a>支持我们',
-        excelLock: '此功能仅限<strong>高级</strong>或<strong>完整</strong>套餐用户。<br><a href="register.html">注册</a>或查看<a href="pricing.html">可用套餐</a>。',
-        footerMain: 'ricardoruiz.co · 哥伦比亚选举',
-        footerSource: '<a href="https://registraduria.gov.co" target="_blank">数据来源：国家选举委员会</a>',
-        orientText: '为获得更佳体验，<br/>请将设备横向旋转', orientBtn: '继续',
-        themeDay: '☀ 日间模式', themeNight: '🌙 夜间模式',
-        lmTitle: '登录', lmSub: '登录您的账户以继续',
-        lmEmail: '电子邮件', lmPassword: '密码',
-        lmSubmit: '登录', lmCancel: '取消',
-        lmError: '邮箱或密码不正确。',
-      }
-    };
-
-    function applyLang(lang) {
-      const t = candI18n[lang] || candI18n.co;
-      const s = id => document.getElementById(id);
-      const st = (id, txt) => { const el = s(id); if (el) el.textContent = txt; };
-      const si = (id, html) => { const el = s(id); if (el) el.innerHTML = html; };
-
-      st('btn-back', t.back);
-      st('breadcrumb-congress', t.congress);
-      st('breadcrumb-page', t.page);
-      st('search-label', t.searchLabel);
-      const inp = s('ac-input'); if (inp) inp.placeholder = t.searchPlaceholder;
-      // search-hint: solo actualizar si aún muestra el texto de carga
-      const hint = s('search-hint');
-      if (hint && hint.dataset.count) st('search-hint', t.candidatesLoaded(parseInt(hint.dataset.count)));
-      else if (hint && !hint.dataset.count) st('search-hint', t.loadingIndex);
-      st('dl-btns-label', t.dlBy);
-      st('dl-dep', t.dlDep); st('dl-mun', t.dlMun); st('dl-zon', t.dlZon); st('dl-pue', t.dlPue); st('dl-mesa', t.dlMesa);
-      st('loader-label', t.connecting);
-      st('placeholder-state', t.placeholder);
-      st('map-panel-title', t.mapTitle);
-      st('map-loading', t.mapLoading);
-      st('filter-dep-label', t.depLabel);
-      st('filter-mun-label', t.munLabel);
-      st('dep-all-opt', t.depAll);
-      st('mun-all-opt', t.munAll);
-      st('map-legend-title', t.legendTitle);
-      st('legend-max', t.legendMax);
-      // Solo actualizar si aún no se ha cargado un candidato (el panel está oculto)
-      if (s('pes-panel') && s('pes-panel').style.display === 'none') st('info-full-name', t.selectCandidate);
-      si('ideo-left', t.ideoLeft);
-      si('ideo-center', t.ideoCenter);
-      si('ideo-right', t.ideoRight);
-      st('radar-title', t.radarTitle);
-      st('rating-label', t.ratingLabel);
-      si('photo-placeholder-text', t.photoPlaceholder);
-      const keys = t.keys;
-      st('key-origen', keys.origen); st('key-partido', keys.partido); st('key-corp', keys.corp);
-      st('key-dep-top', keys.depTop); st('key-mun-top', keys.munTop);
-      st('key-zona-top', keys.zonaTop); st('key-zona-votos', keys.zonaVotos);
-      st('key-puesto-top', keys.puestoTop); st('key-puesto-votos', keys.puestoVotos);
-      st('key-votos', keys.votos); st('key-dptos', keys.dptos); st('key-mesas', keys.mesas);
-      si('mun-modal-msg', t.munModal);
-      si('excel-lock-msg', t.excelLock);
-      st('footer-main', t.footerMain);
-      si('footer-source', t.footerSource);
-      si('orient-text', t.orientText);
-      st('orient-btn', t.orientBtn);
-      const themeBtn = s('theme-btn');
-      if (themeBtn) themeBtn.textContent = document.body.classList.contains('day-mode') ? t.themeNight : t.themeDay;
-      st('lm-title', t.lmTitle); st('lm-sub', t.lmSub);
-      const lmEmail = s('lm-email'); if (lmEmail) lmEmail.placeholder = t.lmEmail;
-      const lmPwd = s('lm-password'); if (lmPwd) lmPwd.placeholder = t.lmPassword;
-      st('lm-submit', t.lmSubmit); st('lm-cancel', t.lmCancel);
-    }
 
     window.__applyLang = function() { window.location.reload(); };
 
