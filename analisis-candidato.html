@@ -1154,6 +1154,17 @@
     // (insertada entre Guainía=15 y Guaviare=17, según numeración oficial Registraduría).
     // Evidencia: comentario en código "electoral_id de Bogotá D.C." === '16',
     // y ejemplos de claves depMap: "1" (Amazonas), "16" (Bogotá), "23" (Norte de Santander).
+    // Equivalencias ISO 3166-2:CO (DEPARTAMENTOS2.json props.id) → código electoral Registraduría.
+    const ISO_ID_TO_REGISTRADURIA = {
+      'COAMA':'60', 'COANT':'1',  'COARA':'40', 'COATL':'3',  'COBOL':'5',
+      'COBOY':'7',  'COCAL':'9',  'COCAQ':'44', 'COCAS':'46', 'COCAU':'11',
+      'COCES':'12', 'COCHO':'17', 'COCOR':'13', 'COCUN':'15', 'CODC':'16',
+      'COGUA':'50', 'COGUV':'54', 'COHUI':'19', 'COLAG':'48', 'COMAG':'21',
+      'COMET':'52', 'CONAR':'23', 'CONSA':'25', 'COPUT':'64', 'COQUI':'26',
+      'CORIS':'24', 'COSAN':'27', 'COSAP':'56', 'COSUC':'28', 'COTOL':'29',
+      'COVAC':'31', 'COVAU':'68', 'COVID':'72'
+    };
+
     const DANE_TO_REGISTRADURIA = {
       '05': '1',   // Antioquia
       '08': '3',   // Atlántico
@@ -1194,7 +1205,7 @@
     // Usado cuando electoral_id y dpto_ccdgo están ausentes.
     const NAME_TO_REGISTRADURIA = {
       'antioquia':'1', 'atlantico':'3',
-      'bogota':'16', 'bogota d.c.':'16', 'distrito capital':'16',
+      'bogota':'16', 'bogota d.c.':'16', 'distrito capital':'16', 'distrito capital de bogota':'16',
       'bolivar':'5', 'boyaca':'7', 'caldas':'9', 'caqueta':'44',
       'casanare':'46', 'cauca':'11', 'cesar':'12', 'choco':'17',
       'cordoba':'13', 'cundinamarca':'15', 'guainia':'50',
@@ -1264,7 +1275,8 @@
     // DEPARTAMENTOS: llave principal = feature.properties.electoral_id
     //   Valor asignado en DEPARTAMENTOS.json para todos los departamentos.
     //   Retorna String sin padding, e.g. "1", "16", "23".
-    //   Fallback: campos DANE (DPTO_CODI / code) solo si falta electoral_id.
+    //   Fallbacks en orden: electoral_id → ISO id (DEPARTAMENTOS2.json) →
+    //   código DANE → nombre normalizado.
     //
     // MUNICIPIOS: llave separada — NO usar electoral_id de departamentos aquí.
     //   La homologación de municipios se resolverá por su propio camino
@@ -1273,35 +1285,29 @@
       // PRIMARY: electoral_id asignado al GeoJSON de departamentos
       if (props.electoral_id != null && props.electoral_id !== '') {
         const code = normalizeDepCode(props.electoral_id);
-        console.log(`[Mapa] electoral_id → '${props.electoral_id}' → código '${code}'`);
         return code;
       }
 
-      // FALLBACK 1: código DANE → código electoral Registraduría
+      // FALLBACK 1: ISO 3166-2:CO id (DEPARTAMENTOS2.json: props.id = 'COANT', 'CONAR', …)
+      if (props.id && ISO_ID_TO_REGISTRADURIA[props.id]) {
+        return ISO_ID_TO_REGISTRADURIA[props.id];
+      }
+
+      // FALLBACK 2: código DANE → código electoral Registraduría
       const dane = props.dpto_ccdgo || props.DPTO_CODI || props.code || null;
       if (dane) {
         const padded = String(dane).padStart(2, '0');
         const electoral = DANE_TO_REGISTRADURIA[padded];
-        if (electoral) {
-          console.log(`[Mapa] DANE fallback → '${padded}' → código '${electoral}'`);
-          return electoral;
-        }
-        console.warn(`[Mapa] DANE '${padded}' no encontrado en DANE_TO_REGISTRADURIA`);
+        if (electoral) return electoral;
       }
 
-      // FALLBACK 2: nombre del departamento → código electoral
+      // FALLBACK 3: nombre del departamento → código electoral
       const rawName = depNameFromFeature(props);
       if (rawName) {
-        const norm = normalizeDepName(rawName);
-        const electoral = NAME_TO_REGISTRADURIA[norm];
-        if (electoral) {
-          console.log(`[Mapa] Name fallback → '${rawName}' → código '${electoral}'`);
-          return electoral;
-        }
-        console.warn(`[Mapa] Nombre '${rawName}' no encontrado en NAME_TO_REGISTRADURIA`);
+        const electoral = NAME_TO_REGISTRADURIA[normalizeDepName(rawName)];
+        if (electoral) return electoral;
       }
 
-      console.warn('[Mapa] feature sin código resolvible — props:', JSON.stringify(props).substring(0, 120));
       return null;
     }
 
@@ -1404,9 +1410,9 @@
       const ratio = data ? data.v / maxDepVotes : 0;
       return {
         fillColor: voteColorLeaflet(ratio),
-        fillOpacity: ratio > 0 ? 0.82 : 0.25,
-        color: ratio > 0 ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.18)',
-        weight: ratio > 0 ? 1.5 : 0.8
+        fillOpacity: ratio > 0 ? 0.82 : 0.55,
+        color: ratio > 0 ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)',
+        weight: ratio > 0 ? 1.5 : 1.0
       };
     }
 
@@ -1450,7 +1456,7 @@
     }
 
     function voteColorLeaflet(ratio) {
-      if (ratio <= 0)    return '#0d1117';  // sin votos — casi negro
+      if (ratio <= 0)    return '#0d1b3e';  // sin votos — azul muy oscuro (visible sobre fondo)
       if (ratio < 0.05)  return '#0c1e4a';  // mínimo — azul marino
       if (ratio < 0.15)  return '#1d4ed8';  // bajo — azul
       if (ratio < 0.30)  return '#0891b2';  // medio-bajo — cian
