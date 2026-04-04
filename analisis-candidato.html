@@ -977,6 +977,7 @@
     const S3_PHOTOS = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/fotos-candidatos';
     const DEPARTAMENTOS_GEOJSON_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/DEPARTAMENTOS2.json';
     const MUNICIPIOS_GEOJSON_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/MUNICIPIOS.json';
+    const DEPARTAMENTOS_MPS_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Departamentos-mps/';
     const fmt = n => Number(n).toLocaleString('es-CO');
 
     // ─── I18N ─────────────────────────────────────────────────
@@ -1242,6 +1243,10 @@
     let depVoteData = {};   // { depCode: { nom, v } }
     let maxDepVotes = 1;
     let depRank = {};       // { depCode: rank (1=más votos) }
+    let currentDepCode = null;        // código electoral del depto actualmente en vista (null = vista nacional)
+    let munVoteData = {};             // { munCode: { nom, v } } — solo válido cuando currentDepCode está activo
+    let maxMunVotes = 1;
+    let deptGeoJsonCache = {};        // caché de GeoJSON raw por código electoral de depto
 
     // ─── INIT LEAFLET MAP ────────────────────────────────────
     function initLeafletMap() {
@@ -1404,10 +1409,78 @@
       showBoundaryLayer(municipiosLayer);
     }
 
+    // ─── VISTA NACIONAL ─────────────────────────────────────
+    function showNationalView() {
+      currentDepCode = null;
+      munVoteData = {};
+      maxMunVotes = 1;
+      if (departamentosLayer) {
+        showBoundaryLayer(departamentosLayer);
+        departamentosLayer.setStyle(featureStyle);
+      } else if (activeBoundaryLayer) {
+        activeBoundaryLayer.setStyle(featureStyle);
+      }
+    }
+
+    // ─── CAPA MUNICIPIOS POR DEPTO (bajo demanda, con caché) ──
+    async function loadDepMunicipiosLayer(depCode) {
+      if (!depCode) return;
+      document.getElementById('map-loading')?.classList.add('active');
+      try {
+        let geoData = deptGeoJsonCache[depCode];
+        if (!geoData) {
+          const r = await fetch(`${DEPARTAMENTOS_MPS_URL}${depCode}.json`);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          geoData = await r.json();
+          deptGeoJsonCache[depCode] = geoData;
+        }
+        currentDepCode = depCode;
+        const newLayer = L.geoJSON(geoData, {
+          style: featureStyle,
+          onEachFeature: onEachFeature
+        });
+        showBoundaryLayer(newLayer);
+      } catch(e) {
+        console.error('[Mapa] Error cargando municipios de depto:', e.message);
+      } finally {
+        document.getElementById('map-loading')?.classList.remove('active');
+      }
+    }
+
+    // ─── CONSTRUIR munVoteData PARA UN DEPTO ─────────────────
+    function buildMunVoteData(depCode) {
+      if (!currentData) return;
+      munVoteData = {};
+      (currentData.mesas || [])
+        .filter(m => normalizeDepCode(m.dep) === depCode)
+        .forEach(m => {
+          if (!munVoteData[m.mun]) munVoteData[m.mun] = { nom: m.munNom, v: 0 };
+          munVoteData[m.mun].v += m.v;
+        });
+      const vals = Object.values(munVoteData).map(d => d.v);
+      maxMunVotes = vals.length > 0 ? Math.max(...vals) : 1;
+    }
+
+    // ─── DETECCIÓN CÁMARA TERRITORIAL ───────────────────────
+    function isCamaraTerritorial(corp) {
+      const c = (corp || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return (c.includes('CAMARA') || c.includes('CÁMARA'))
+        && !c.includes('INDIGENA') && !c.includes('AFRO') && !c.includes('PACIFICO');
+    }
+
     function featureStyle(feature) {
-      const code = depCodeFromFeature(feature.properties);
-      const data = depVoteData[code];
-      const ratio = data ? data.v / maxDepVotes : 0;
+      const props = feature.properties;
+      let ratio = 0;
+      if (props.mun_electoral !== undefined) {
+        // Feature de municipio (capa por depto)
+        const data = munVoteData[props.mun_electoral];
+        ratio = data ? data.v / maxMunVotes : 0;
+      } else {
+        // Feature de departamento (capa nacional)
+        const code = depCodeFromFeature(props);
+        const data = depVoteData[code];
+        ratio = data ? data.v / maxDepVotes : 0;
+      }
       return {
         fillColor: voteColorLeaflet(ratio),
         fillOpacity: ratio > 0 ? 0.82 : 0.55,
@@ -1417,42 +1490,71 @@
     }
 
     function onEachFeature(feature, layer) {
-      const code = depCodeFromFeature(feature.properties);
-      const name = depNameFromFeature(feature.properties) || '?';
+      const props = feature.properties;
+      const isMunFeature = props.mun_electoral !== undefined;
 
-      layer.on({
-        mouseover: function(e) {
-          // Leer depVoteData en el momento del hover, no al crear la capa
-          const data = depVoteData[code];
-          const votes = data ? data.v : 0;
-          const rank = depRank[code];
-          const rankStr = rank ? `#${rank} ` : '';
-          layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
-          layer.bindTooltip(
-            `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
-              <strong style="color:#0047FF;font-size:.989rem">${rankStr}${name.toUpperCase()}</strong><br/>
-              ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
-            </div>`,
-            { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
-          ).openTooltip(e.latlng);
-        },
-        mouseout: function() {
-          if (geojsonLayer) geojsonLayer.resetStyle(layer);
-          layer.closeTooltip();
-        },
-        click: function() {
-          if (code) {
-            const sel = document.getElementById('filter-dep');
-            sel.value = code;
-            onDepChange();
-            // fitBounds solo si los bounds son válidos — evita Invalid LatLng NaN
+      if (isMunFeature) {
+        // ── Capa de municipios de un departamento ──
+        const munCode = props.mun_electoral;
+        const name = (props.mpio_cnmbr || '?');
+        layer.on({
+          mouseover: function(e) {
+            const data = munVoteData[munCode];
+            const votes = data ? data.v : 0;
+            layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
+            layer.bindTooltip(
+              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+                <strong style="color:#0047FF;font-size:.989rem">${name.toUpperCase()}</strong><br/>
+                ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
+              </div>`,
+              { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
+            ).openTooltip(e.latlng);
+          },
+          mouseout: function() {
+            if (geojsonLayer) geojsonLayer.resetStyle(layer);
+            layer.closeTooltip();
+          },
+          click: function() {
+            const sel = document.getElementById('filter-mun');
+            if (sel) sel.value = munCode;
             try {
               const b = layer.getBounds();
-              if (b.isValid()) leafletMap.fitBounds(b, { padding: [20, 20] });
+              if (b.isValid()) leafletMap.fitBounds(b, { padding: [30, 30] });
             } catch(e) {}
           }
-        }
-      });
+        });
+      } else {
+        // ── Capa nacional de departamentos ──
+        const code = depCodeFromFeature(props);
+        const name = depNameFromFeature(props) || '?';
+        layer.on({
+          mouseover: function(e) {
+            const data = depVoteData[code];
+            const votes = data ? data.v : 0;
+            const rank = depRank[code];
+            const rankStr = rank ? `#${rank} ` : '';
+            layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
+            layer.bindTooltip(
+              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+                <strong style="color:#0047FF;font-size:.989rem">${rankStr}${name.toUpperCase()}</strong><br/>
+                ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
+              </div>`,
+              { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
+            ).openTooltip(e.latlng);
+          },
+          mouseout: function() {
+            if (geojsonLayer) geojsonLayer.resetStyle(layer);
+            layer.closeTooltip();
+          },
+          click: function() {
+            if (code) {
+              const sel = document.getElementById('filter-dep');
+              sel.value = code;
+              onDepChange();
+            }
+          }
+        });
+      }
     }
 
     function voteColorLeaflet(ratio) {
@@ -1596,6 +1698,14 @@
       // Reset map
       depVoteData = {};
       maxDepVotes = 1;
+      currentDepCode = null;
+      munVoteData = {};
+      maxMunVotes = 1;
+      const _depSel = document.getElementById('filter-dep');
+      if (_depSel) _depSel.value = '';
+      const _munSel = document.getElementById('filter-mun');
+      if (_munSel) { _munSel.innerHTML = '<option value="">— Todos los municipios —</option>'; _munSel.disabled = true; }
+      if (departamentosLayer) showBoundaryLayer(departamentosLayer);
       refreshMapColors();
 
       try {
@@ -1680,8 +1790,36 @@
       depRank = {};
       deps.forEach(([code, d], i) => { depVoteData[code] = d; depRank[code] = i + 1; });
       maxDepVotes = deps[0]?.[1]?.v || 1;
-      refreshMapColors();
-      setTimeout(() => document.getElementById('map-loading')?.classList.remove('active'), 400);
+
+      if (isCamaraTerritorial(meta.corp) && deps.length > 0) {
+        // Cámara territorial: cargar directamente el depto con más votos
+        const topDep = deps[0][0];
+        const sel = document.getElementById('filter-dep');
+        if (sel) sel.value = topDep;
+        // Poblar selector de municipios
+        const munMap = {};
+        (mesas || []).filter(m => normalizeDepCode(m.dep) === topDep).forEach(m => {
+          if (!munMap[m.mun]) munMap[m.mun] = { nom: m.munNom, v: 0 };
+          munMap[m.mun].v += m.v;
+        });
+        const munSel = document.getElementById('filter-mun');
+        if (munSel) {
+          munSel.innerHTML = '<option value="">— Todos los municipios —</option>';
+          Object.entries(munMap).sort((a,b) => b[1].v - a[1].v).forEach(([code, d]) => {
+            const opt = document.createElement('option');
+            opt.value = code;
+            opt.textContent = `${d.nom} (${fmt(d.v)})`;
+            munSel.appendChild(opt);
+          });
+          munSel.disabled = !isLoggedIn();
+        }
+        buildMunVoteData(topDep);
+        loadDepMunicipiosLayer(topDep);
+        // map-loading se quita dentro de loadDepMunicipiosLayer
+      } else {
+        refreshMapColors();
+        setTimeout(() => document.getElementById('map-loading')?.classList.remove('active'), 400);
+      }
 
       buildTerritorialRadar({ meta, deps, muns, zonas, totalVotos });
     }
@@ -1989,60 +2127,47 @@
       munSel.innerHTML = '<option value="">— Todos los municipios —</option>';
       munSel.disabled = true;
 
-      if (depCode && !isLoggedIn()) { showMunModal(); return; }
-
       if (!depCode) {
-        // Volver a vista nacional con capa de departamentos
-        if (departamentosLayer) {
-          showBoundaryLayer(departamentosLayer);
-          departamentosLayer.setStyle(featureStyle);
-        } else if (activeBoundaryLayer) {
-          activeBoundaryLayer.setStyle(featureStyle);
-          try {
-            const b = activeBoundaryLayer.getBounds();
-            if (b.isValid()) leafletMap.fitBounds(b, { padding: [10,10] });
-          } catch(e) {}
-        }
+        showNationalView();
         return;
       }
 
-      // Highlight departamento seleccionado en la capa activa
-      if (activeBoundaryLayer) {
-        activeBoundaryLayer.eachLayer(layer => {
-          const code = depCodeFromFeature(layer.feature.properties);
-          if (code === depCode) {
-            try {
-              const b = layer.getBounds();
-              if (b.isValid()) leafletMap.fitBounds(b, { padding: [20,20] });
-            } catch(e) {}
-            layer.setStyle({ weight: 3, color: '#ffffff', fillOpacity: 0.95 });
-          } else {
-            const data2 = depVoteData[code];
-            const ratio = data2 ? data2.v / maxDepVotes : 0;
-            layer.setStyle({ fillColor: voteColorLeaflet(ratio), fillOpacity: ratio > 0 ? 0.3 : 0.1, color: 'rgba(255,255,255,0.1)', weight: 0.5 });
-          }
+      if (!isLoggedIn()) { showMunModal(); return; }
+
+      // Poblar selector de municipios
+      if (currentData) {
+        const munMap = {};
+        (currentData.mesas || []).filter(m => normalizeDepCode(m.dep) === depCode).forEach(m => {
+          if (!munMap[m.mun]) munMap[m.mun] = { nom: m.munNom, v: 0 };
+          munMap[m.mun].v += m.v;
         });
+        const muns = Object.entries(munMap).sort((a,b) => b[1].v - a[1].v);
+        muns.forEach(([code, d]) => {
+          const opt = document.createElement('option');
+          opt.value = code;
+          opt.textContent = `${d.nom} (${fmt(d.v)})`;
+          munSel.appendChild(opt);
+        });
+        if (muns.length > 0) munSel.disabled = false;
       }
 
-      if (!currentData) return;
-      const munMap = {};
-      // depCode aquí es código electoral normalizado — usar normalizeDepCode para comparar
-      (currentData.mesas || []).filter(m => normalizeDepCode(m.dep) === depCode).forEach(m => {
-        if (!munMap[m.mun]) munMap[m.mun] = { nom: m.munNom, v: 0 };
-        munMap[m.mun].v += m.v;
-      });
-      const muns = Object.entries(munMap).sort((a,b) => b[1].v - a[1].v);
-      muns.forEach(([code, d]) => {
-        const opt = document.createElement('option');
-        opt.value = code;
-        opt.textContent = `${d.nom} (${fmt(d.v)})`;
-        munSel.appendChild(opt);
-      });
-      if (muns.length > 0 && isLoggedIn()) munSel.disabled = false;
+      // Cargar capa de municipios del departamento seleccionado
+      buildMunVoteData(depCode);
+      loadDepMunicipiosLayer(depCode);
     }
 
     function onMunChange() {
-      // Future: highlight municipality
+      const munCode = document.getElementById('filter-mun').value;
+      if (!munCode || !activeBoundaryLayer) return;
+      activeBoundaryLayer.eachLayer(layer => {
+        const code = layer.feature?.properties?.mun_electoral;
+        if (code === munCode) {
+          try {
+            const b = layer.getBounds();
+            if (b.isValid()) leafletMap.fitBounds(b, { padding: [30, 30] });
+          } catch(e) {}
+        }
+      });
     }
 
     // ─── RADAR / PENTÁGONO TERRITORIAL ───────────────────────
