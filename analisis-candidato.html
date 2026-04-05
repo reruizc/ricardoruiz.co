@@ -1972,7 +1972,7 @@
       try {
         const r = await fetch(`${S3}/endoso/index.json`);
         if (!r.ok) throw new Error(`index.json devolvió ${r.status}`);
-        candIndex = await r.json();
+        candIndex = (await r.json()).filter(c => !isPartyEntry(c));
         document.getElementById('load-state').style.display = 'none';
         document.getElementById('placeholder-state').style.display = 'block';
         const _lang = localStorage.getItem('rr-lang') || 'co';
@@ -1985,6 +1985,16 @@
       } catch(e) {
         document.getElementById('load-state').innerHTML = `<div style="font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,100,100,.8);text-align:center;line-height:1.8;padding:2rem">Error al cargar el índice.<br/><span style="font-size:.6rem;color:rgba(255,255,255,.3)">${e.message}</span></div>`;
       }
+    }
+
+    // ─── FILTRO: excluir partidos y movimientos ───────────────
+    // Regla: nombre === partido  →  es entrada de partido (no candidato)
+    // Más: nombres que empiezan con PARTIDO/MOVIMIENTO/COALICIÓN/ALIANZA/PACTO/LISTA
+    // (cubre 6 edge cases donde nombre ≈ partido con tilde diferente)
+    function isPartyEntry(c) {
+      if (c.nombre === c.partido) return true;
+      const n = (c.nombre || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+      return /^(PARTIDO|MOVIMIENTO|COALICION|ALIANZA|LISTA|PACTO)\b/.test(n);
     }
 
     // ─── AUTOCOMPLETE ─────────────────────────────────────────
