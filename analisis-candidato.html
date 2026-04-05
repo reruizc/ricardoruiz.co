@@ -978,11 +978,11 @@
               <span class="info-val green" id="info-mun-top">—</span>
             </div>
             <div class="info-row">
-              <span class="info-key" id="key-zona-top">Zona más votada</span>
+              <span class="info-key" id="key-zona-top">Comuna más votada</span>
               <span class="info-val" id="info-zona-top" style="color:var(--green)">—</span>
             </div>
             <div class="info-row" id="info-zona-votos-row" style="display:none">
-              <span class="info-key" id="key-zona-votos">Votos zona top</span>
+              <span class="info-key" id="key-zona-votos">Votos comuna top</span>
               <span class="info-val blue" id="info-zona-votos">—</span>
             </div>
             <div class="info-row">
@@ -1066,7 +1066,7 @@
         radarTitle: 'Presencia territorial',
         ratingLabel: 'Puntos / 100',
         photoPlaceholder: '<a href="https://drive.google.com/drive/folders/1ULVQC1Cyz_fjnhGdM7ydzg7tEgiDcPRS?usp=share_link" target="_blank">¿Quieres agregar la foto de tu candidato? ¡Haz click aquí y ayúdanos!</a>',
-        keys: { origen:'Origen', partido:'Partido', corp:'Corporación', depTop:'Dpto. más votado', munTop:'Municipio top', zonaTop:'Zona más votada', zonaVotos:'Votos zona top', puestoTop:'Puesto más votado', puestoVotos:'Votos puesto top', votos:'Total de votos', dptos:'Dptos. con votos', mesas:'Mesas con votos' },
+        keys: { origen:'Origen', partido:'Partido', corp:'Corporación', depTop:'Dpto. más votado', munTop:'Municipio top', zonaTop:'Comuna más votada', zonaVotos:'Votos comuna top', puestoTop:'Puesto más votado', puestoVotos:'Votos puesto top', votos:'Total de votos', dptos:'Dptos. con votos', mesas:'Mesas con votos' },
         plans: { free:'Free', basic:'Básico', pro:'Pro', premium:'Premium', analysis:'Análisis', full:'Completo' },
         logout: 'Salir', login: 'Iniciar sesión', register: 'Registrarse',
         munModal: 'Para ver municipios, apóyanos <a href="register.html">registrándote aquí</a>',
@@ -1096,7 +1096,7 @@
         radarTitle: 'Territorial presence',
         ratingLabel: 'Points / 100',
         photoPlaceholder: '<a href="https://drive.google.com/drive/folders/1ULVQC1Cyz_fjnhGdM7ydzg7tEgiDcPRS?usp=share_link" target="_blank">Want to add this candidate\'s photo? Click here and help us!</a>',
-        keys: { origen:'Origin', partido:'Party', corp:'Corporation', depTop:'Top dept.', munTop:'Top municipality', zonaTop:'Top zone', zonaVotos:'Zone top votes', puestoTop:'Top polling station', puestoVotos:'Station top votes', votos:'Total votes', dptos:'Depts. with votes', mesas:'Tables with votes' },
+        keys: { origen:'Origin', partido:'Party', corp:'Corporation', depTop:'Top dept.', munTop:'Top municipality', zonaTop:'Top commune', zonaVotos:'Commune top votes', puestoTop:'Top polling station', puestoVotos:'Station top votes', votos:'Total votes', dptos:'Depts. with votes', mesas:'Tables with votes' },
         plans: { free:'Free', basic:'Basic', pro:'Pro', premium:'Premium', analysis:'Analysis', full:'Full' },
         logout: 'Log out', login: 'Log in', register: 'Sign up',
         munModal: 'To view municipalities, support us by <a href="register.html">registering here</a>',
@@ -1126,7 +1126,7 @@
         radarTitle: '地域分布',
         ratingLabel: '得分 / 100',
         photoPlaceholder: '<a href="https://drive.google.com/drive/folders/1ULVQC1Cyz_fjnhGdM7ydzg7tEgiDcPRS?usp=share_link" target="_blank">想添加候选人照片？点击这里帮助我们！</a>',
-        keys: { origen:'来源', partido:'政党', corp:'机构', depTop:'最高票省份', munTop:'最高票城市', zonaTop:'最高票区域', zonaVotos:'区域最高票', puestoTop:'最高票站', puestoVotos:'投票站最高票', votos:'总票数', dptos:'得票省份数', mesas:'得票投票台数' },
+        keys: { origen:'来源', partido:'政党', corp:'机构', depTop:'最高票省份', munTop:'最高票城市', zonaTop:'最高票社区', zonaVotos:'社区最高票', puestoTop:'最高票站', puestoVotos:'投票站最高票', votos:'总票数', dptos:'得票省份数', mesas:'得票投票台数' },
         plans: { free:'免费', basic:'基础', pro:'专业', premium:'高级', analysis:'分析', full:'完整' },
         logout: '退出', login: '登录', register: '注册',
         munModal: '要查看市级数据，请<a href="register.html">在此注册</a>支持我们',
@@ -2304,8 +2304,8 @@
       const deps = Object.entries(depMap).sort((a,b) => b[1].v - a[1].v);
       const muns = Object.entries(munMap).sort((a,b) => b[1].v - a[1].v);
 
-      // Sub-municipal: zonas y puestos se calculan por separado
-      const zonas = computeTopZona(mesas);
+      // Sub-municipal: localidad/comuna y puesto se calculan por separado
+      const zonas = computeTopComunaLocalidad(mesas);
       const puestos = computeTopPuesto(mesas);
 
       setInfoVal('info-votos', fmt(totalVotos));
@@ -2316,8 +2316,8 @@
       setInfoVal('info-mesas', `${fmt(mesas.length)} mesas`);
       setInfoVal('overall-num', computeRating(totalVotos, deps.length));
 
-      // Zona y puesto: filas separadas, sin fallback cruzado
-      renderTopZona(zonas);
+      // Localidad/comuna y puesto: filas separadas
+      renderTopComunaLocalidad(zonas);
       renderTopPuesto(puestos);
 
       if (data.origen) setInfoVal('info-origen', data.origen);
@@ -2375,66 +2375,116 @@
       buildTerritorialRadar({ meta, deps, muns, zonas, totalVotos });
     }
 
-    // ─── ZONA MÁS VOTADA ─────────────────────────────────────
-    // Fórmula: agrupa mesas EXCLUSIVAMENTE por m.zon (zona administrativa).
-    // No usa m.pue. En Bogotá (munNom contiene "BOGOT") traduce m.zon a
-    // nombre de localidad con ZONAS_BOGOTA. En otros municipios muestra "Zona N".
-    // Retorna array de [key, {nom, munNom, depNom, v}] ordenado por votos desc.
-    function computeTopZona(mesas) {
-      const zonaMap = {};
+    // ─── COMMUNE / LOCALIDAD MÁS VOTADA ─────────────────────
+    // Resuelve cada mesa → nombre de localidad (Bogotá) o nombre/número de comuna
+    // (Medellín, Cali, Pereira). Para otros municipios cae en "Zona N".
+    // Zonas 90/98/99 se ignoran. Agrupa por dep+mun+nombre para que varias
+    // zonas que apunten a la misma comuna sumen correctamente.
+    // Retorna array de [key, {nom, munNom, depNom, v, isBog}] desc por votos.
+    function computeTopComunaLocalidad(mesas) {
+      const map = {};
       mesas.forEach(m => {
-        if (!m.zon) return;   // solo procesa mesas con dato de zona
+        if (!m.zon) return;
         const depKey = normalizeDepCode(m.dep);
-        const key = `${depKey}-${m.mun}-zon${m.zon}`;
-        const nom = (m.munNom||'').toUpperCase().includes('BOGOT')
-          ? (ZONAS_BOGOTA[String(m.zon).padStart(2,'0')] || `Zona ${m.zon}`)
-          : `Zona ${m.zon}`;
-        if (!zonaMap[key]) zonaMap[key] = { nom, munNom: m.munNom, depNom: m.depNom, v: 0 };
-        zonaMap[key].v += m.v;
+        const zon = String(m.zon).padStart(2, '0');
+        if (zon === '90' || zon === '98' || zon === '99') return;
+        const pue = String(m.pue || '').padStart(2, '0');
+        const isBog = depKey === '16' || (m.munNom || '').toUpperCase().includes('BOGOT');
+
+        let comName;
+        if (isBog) {
+          comName = ZONAS_BOGOTA[zon] || null;
+        } else if (depKey === '1' && m.mun === '001') {
+          // Medellín: dos zonas → una comuna
+          const cc = ZON_TO_COM_MED[zon];
+          comName = cc ? `COMUNA ${parseInt(cc)}` : null;
+        } else if (depKey === '31' && m.mun === '001') {
+          // Cali
+          const cc = ZON_TO_COM_CAL[zon];
+          comName = cc ? `COMUNA ${parseInt(cc)}` : null;
+        } else if (depKey === '24' && m.mun === '001') {
+          // Pereira: nivel puesto → comuna
+          const raw = (ZON_PUE_COM_PER[zon] || {})[pue] || null;
+          if (raw) comName = raw.charAt(0) + raw.slice(1).toLowerCase();
+        }
+
+        if (!comName) comName = `Zona ${parseInt(zon)}`;
+
+        const key = `${depKey}-${m.mun}-${comName}`;
+        if (!map[key]) map[key] = { nom: comName, munNom: m.munNom, depNom: m.depNom, v: 0, isBog };
+        map[key].v += m.v;
       });
-      return Object.entries(zonaMap).sort((a,b) => b[1].v - a[1].v);
+      return Object.entries(map).sort((a, b) => b[1].v - a[1].v);
+    }
+
+    // Actualiza las etiquetas "Localidad/Comuna más votada" según contexto.
+    // isBog=true → etiqueta localidad; false → etiqueta comuna.
+    function updateComunaLocalidadLabel(isBog) {
+      const lang = localStorage.getItem('rr-lang') || 'co';
+      const tbl = {
+        co: { zona: isBog ? 'Localidad más votada' : 'Comuna más votada',
+              votos: isBog ? 'Votos localidad top'  : 'Votos comuna top' },
+        en: { zona: isBog ? 'Top locality'          : 'Top commune',
+              votos: isBog ? 'Locality top votes'   : 'Commune top votes' },
+        zh: { zona: isBog ? '最高票地区'             : '最高票社区',
+              votos: isBog ? '地区最高票'            : '社区最高票' },
+      };
+      const l = tbl[lang] || tbl.co;
+      const el1 = document.getElementById('key-zona-top');
+      const el2 = document.getElementById('key-zona-votos');
+      if (el1) el1.textContent = l.zona;
+      if (el2) el2.textContent = l.votos;
     }
 
     // ─── PUESTO MÁS VOTADO ───────────────────────────────────
-    // Fórmula: agrupa mesas EXCLUSIVAMENTE por m.pue + m.pueNom (puesto de votación).
-    // Además rastrea en qué zonas aparece cada puesto para añadir contexto
-    // sin inventar datos: 1 zona → muestra la zona; >1 zona → "Zona múltiple".
-    // Si la mesa no tiene m.pue o m.pueNom se ignora.
-    // Retorna array de [key, {nom, munNom, depNom, v, zonaCtx}] ordenado por votos desc.
+    // Clave única: dep + mun + zon + pue (un mismo código de puesto puede
+    // repetirse en distintas zonas dentro de un mismo municipio).
+    // Retorna array de [key, {nom, munNom, depNom, v, comCtx}] desc por votos.
     function computeTopPuesto(mesas) {
       const puestoMap = {};
       mesas.forEach(m => {
-        if (!m.pue || !m.pueNom) return;   // solo mesas con dato de puesto
+        if (!m.pue || !m.pueNom) return;
         const depKey = normalizeDepCode(m.dep);
-        const key = `${depKey}-${m.mun}-${m.pue}`;
-        if (!puestoMap[key]) puestoMap[key] = { nom: m.pueNom, munNom: m.munNom, depNom: m.depNom, v: 0, _zonas: new Set() };
+        const zon = String(m.zon || '').padStart(2, '0');
+        const pue = String(m.pue).padStart(2, '0');
+        const key = `${depKey}-${m.mun}-${zon}-${pue}`;
+        if (!puestoMap[key]) puestoMap[key] = {
+          nom: m.pueNom, munNom: m.munNom, depNom: m.depNom, v: 0,
+          zon, depKey, mun: m.mun
+        };
         puestoMap[key].v += m.v;
-        if (m.zon) puestoMap[key]._zonas.add(String(m.zon));
       });
       return Object.entries(puestoMap)
         .sort((a, b) => b[1].v - a[1].v)
         .map(([k, d]) => {
-          let zonaCtx = null;
-          if (d._zonas.size === 1) {
-            const z = [...d._zonas][0];
-            const esBogota = (d.munNom || '').toUpperCase().includes('BOGOT');
-            zonaCtx = esBogota
-              ? (ZONAS_BOGOTA[String(z).padStart(2,'0')] || `Zona ${z}`)
-              : `Zona ${z}`;
-          } else if (d._zonas.size > 1) {
-            zonaCtx = 'Zona múltiple';
+          // Contexto de localidad/comuna para mostrar junto al puesto
+          const zon = d.zon;
+          const isBog = d.depKey === '16' || (d.munNom || '').toUpperCase().includes('BOGOT');
+          let comCtx = null;
+          if (isBog) {
+            comCtx = ZONAS_BOGOTA[zon] || `Zona ${parseInt(zon)}`;
+          } else if (d.depKey === '1' && d.mun === '001') {
+            const cc = ZON_TO_COM_MED[zon];
+            comCtx = cc ? `COMUNA ${parseInt(cc)}` : `Zona ${parseInt(zon)}`;
+          } else if (d.depKey === '31' && d.mun === '001') {
+            const cc = ZON_TO_COM_CAL[zon];
+            comCtx = cc ? `COMUNA ${parseInt(cc)}` : `Zona ${parseInt(zon)}`;
+          } else {
+            comCtx = `Zona ${parseInt(zon)}`;
           }
-          return [k, { nom: d.nom, munNom: d.munNom, depNom: d.depNom, v: d.v, zonaCtx }];
+          return [k, { nom: d.nom, munNom: d.munNom, depNom: d.depNom, v: d.v, comCtx }];
         });
     }
 
-    function renderTopZona(zonas) {
-      if (zonas.length > 0) {
-        const top = zonas[0][1];
+    function renderTopComunaLocalidad(comunas) {
+      if (comunas.length > 0) {
+        const top = comunas[0][1];
+        updateComunaLocalidadLabel(top.isBog);
         setInfoVal('info-zona-top', top.nom + (top.munNom ? ` · ${top.munNom}` : ''));
         setInfoVal('info-zona-votos', fmt(top.v) + ' votos');
         document.getElementById('info-zona-votos-row').style.display = 'flex';
       } else {
+        updateComunaLocalidadLabel(false);
         setInfoVal('info-zona-top', 'Sin dato');
         document.getElementById('info-zona-votos-row').style.display = 'none';
       }
@@ -2443,8 +2493,8 @@
     function renderTopPuesto(puestos) {
       if (puestos.length > 0) {
         const top = puestos[0][1];
-        const zonaLabel = top.zonaCtx ? ` · ${top.zonaCtx}` : '';
-        setInfoVal('info-puesto-top', top.nom + (top.munNom ? ` · ${top.munNom}` : '') + zonaLabel);
+        const ctx = top.comCtx ? ` · ${top.comCtx}` : '';
+        setInfoVal('info-puesto-top', top.nom + (top.munNom ? ` · ${top.munNom}` : '') + ctx);
         setInfoVal('info-puesto-votos', fmt(top.v) + ' votos');
         document.getElementById('info-puesto-votos-row').style.display = 'flex';
       } else {
