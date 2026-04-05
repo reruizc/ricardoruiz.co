@@ -1,0 +1,2841 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mapa Candidato · Congreso 2026 · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <style>
+    /* ─── RESET & TOKENS ─── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #060810;
+      --surface: rgba(255,255,255,.04);
+      --border: rgba(255,255,255,.08);
+      --card-border: rgba(255,255,255,.10);
+      --white: #f4f3ef;
+      --blue: #0047FF;
+      --green: #4ade80;
+      --purple: #a78bfa;
+      --orange: #fb923c;
+      --red: #f87171;
+      --izq: #e53e3e;
+      --der: #2563eb;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--white);
+      font-family: 'Syne', sans-serif;
+      cursor: none;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ─── DAY MODE ─── */
+    body.day-mode { background: #e6ded3; color: #0d1120; }
+    body.day-mode .electoral-nav { background: rgba(230,222,211,.93); border-bottom: 1px solid rgba(0,0,0,.1); }
+    body.day-mode .logo-text { color: #0d1120; }
+    body.day-mode .pes-panel { background: #1a1d2e; color: var(--white); }
+    body.day-mode .search-panel { background: rgba(213,205,193,.55); border-color: rgba(0,0,0,.1); }
+    body.day-mode .search-label { color: rgba(0,0,0,.45); }
+    body.day-mode .search-hint { color: rgba(0,0,0,.28); }
+    body.day-mode .loader-label { color: rgba(0,0,0,.4); }
+    body.day-mode .placeholder-state { color: rgba(0,0,0,.18); }
+    body.day-mode .ac-input { background: rgba(255,255,255,.7); border: 1px solid rgba(0,0,0,.2); color: #0d1120; }
+    body.day-mode .ac-input::placeholder { color: rgba(0,0,0,.3); }
+    body.day-mode .ac-dropdown { background: #f5f0ea; border-color: rgba(0,71,255,.3); box-shadow: 0 4px 20px rgba(0,0,0,.12); }
+    body.day-mode .ac-item { color: rgba(0,0,0,.75); border-bottom-color: rgba(0,0,0,.06); }
+    body.day-mode .ac-item:hover, body.day-mode .ac-item.highlighted { background: rgba(0,71,255,.07); }
+    body.day-mode .ac-item .ac-corp { color: rgba(0,0,0,.4); }
+    body.day-mode .theme-btn { background: rgba(0,71,255,.08); border-color: rgba(0,71,255,.25); color: var(--blue); }
+    body.day-mode .full-footer { border-top-color: rgba(0,0,0,.1); }
+    body.day-mode .footer-brand { color: rgba(0,0,0,.35); }
+    body.day-mode .footer-brand a { color: rgba(0,0,0,.3); }
+    body.day-mode .breadcrumb { color: rgba(0,0,0,.4); border-bottom-color: rgba(0,0,0,.1); }
+    body.day-mode .e-btn-login { color: rgba(0,0,0,.6); border-color:transparent; }
+    body.day-mode .e-btn-register { color: var(--white); }
+    body.day-mode .e-user-name { color:#0d1120; border-color:rgba(0,0,0,.22); }
+    body.day-mode .e-user-plan { color:var(--blue); background:rgba(0,71,255,.1); }
+    body.day-mode .e-btn-logout { color:rgba(0,0,0,.55); border-color:rgba(0,0,0,.22); }
+    body.day-mode .e-btn-logout:hover { color:#0d1120; border-color:rgba(0,0,0,.5); }
+    body.day-mode .country-btn { color:rgba(0,0,0,.45); border-color:rgba(0,0,0,.18); }
+    body.day-mode .country-btn:hover, body.day-mode .country-btn.open { color:#0d1120; border-color:rgba(0,0,0,.4); }
+    body.day-mode .country-dropdown { background:#fff; border-color:rgba(0,0,0,.12); }
+    body.day-mode .country-option { color:rgba(0,0,0,.6); border-bottom-color:rgba(0,0,0,.07); }
+    body.day-mode .country-option:hover { background:rgba(0,71,255,.04); }
+
+    /* ─── CURSOR ─── */
+    .cursor { position:fixed; width:10px; height:10px; background:var(--blue); border-radius:50%; pointer-events:none; z-index:9999; transform:translate(-50%,-50%); transition:transform .15s, background .2s; }
+    .cursor-ring { position:fixed; width:32px; height:32px; border:1.5px solid var(--blue); border-radius:50%; pointer-events:none; z-index:9998; transform:translate(-50%,-50%); opacity:.4; }
+
+    /* ─── NAV ─── */
+    .electoral-nav { position:relative; z-index:10; display:flex; align-items:center; justify-content:space-between; padding:.9rem 2.5rem; border-bottom:1px solid rgba(255,255,255,.06); background:rgba(4,6,16,.6); backdrop-filter:blur(8px); flex-shrink:0; }
+    .logo-link { display:flex; align-items:center; gap:.55rem; text-decoration:none; opacity:.8; transition:opacity .2s; }
+    .logo-link:hover { opacity:1; }
+    .logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
+    .logo-bar { width:5px; background:var(--blue); border-radius:1px 1px 0 0; }
+    .logo-text { font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(1.1rem,2vw,1.8rem); letter-spacing:-.03em; color:var(--white); }
+    .logo-text span { color:var(--blue); }
+    .electoral-nav-auth { display:flex; align-items:center; gap:.75rem; }
+    .e-btn-login { font-family:'Syne',sans-serif; font-size:.782rem; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,.45); text-decoration:none; border:1.5px solid transparent; padding:.35rem .8rem; transition:color .2s,border-color .2s; cursor:none; background:none; }
+    .e-btn-login:hover { color:var(--white); border-color:rgba(255,255,255,.2); }
+    .e-btn-register { font-family:'Syne',sans-serif; font-size:.782rem; letter-spacing:.08em; text-transform:uppercase; color:var(--white); text-decoration:none; background:var(--blue); border:1.5px solid var(--blue); padding:.35rem .8rem; }
+    .e-user-name { font-family:'Syne',sans-serif; font-size:.782rem; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,.7); text-decoration:none; border:1.5px solid transparent; padding:.3rem .8rem; }
+    .e-user-plan { font-family:'Syne',sans-serif; font-size:.69rem; letter-spacing:.08em; text-transform:uppercase; color:var(--blue); background:rgba(0,71,255,.12); padding:.2rem .6rem; }
+    .e-btn-logout { font-family:'Syne',sans-serif; font-size:.782rem; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,.25); background:none; border:1.5px solid transparent; padding:.3rem .8rem; cursor:none; transition:color .2s,border-color .2s; }
+    .e-btn-back { font-family:'Syne',sans-serif; font-size:.782rem; letter-spacing:.08em; text-transform:uppercase; color:var(--green); text-decoration:none; border:1.5px solid rgba(74,222,128,.4); padding:.3rem .8rem; transition:color .2s,border-color .2s,background .2s; flex-shrink:0; }
+    .e-btn-back:hover { color:#060810; background:var(--green); border-color:var(--green); }
+    .theme-btn { display:flex; align-items:center; gap:.4rem; font-family:'Syne',sans-serif; font-size:.7475rem; letter-spacing:.08em; text-transform:uppercase; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:rgba(255,255,255,.6); padding:.3rem .75rem; cursor:pointer; transition:all .2s; flex-shrink:0; }
+    .theme-btn:hover { background:rgba(255,255,255,.15); color:var(--white); }
+    .country-selector-wrap { position:relative; }
+    .country-btn { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,.4); background:none; border:1px solid rgba(255,255,255,.15); padding:.3rem .65rem; cursor:none; display:flex; align-items:center; transition:border-color .2s,color .2s; }
+    .country-btn:hover,.country-btn.open { border-color:rgba(255,255,255,.35); color:rgba(255,255,255,.7); }
+    .country-dropdown { position:absolute; top:calc(100% + 8px); right:0; background:#0e1220; border:1px solid rgba(255,255,255,.12); min-width:190px; display:none; flex-direction:column; z-index:200; box-shadow:0 8px 24px rgba(0,0,0,.2); }
+    .country-dropdown.open { display:flex; }
+    .country-option { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.05em; padding:.65rem 1rem; cursor:pointer; display:flex; align-items:center; gap:.5rem; color:rgba(255,255,255,.5); border-bottom:1px solid rgba(255,255,255,.07); transition:background .15s; user-select:none; }
+    .country-option:last-child { border-bottom:none; }
+    .country-option:hover { background:rgba(255,255,255,.05); color:rgba(255,255,255,.8); }
+    .country-option.selected { color:var(--blue); }
+    .country-check { font-size:.6rem; width:12px; opacity:0; color:var(--blue); }
+    .country-option.selected .country-check { opacity:1; }
+    /* LOGIN MODAL */
+    .login-overlay{position:fixed;inset:0;z-index:50000;display:flex;align-items:center;justify-content:center;background:rgba(4,6,16,.78);backdrop-filter:blur(4px)}
+    .login-overlay.hidden{display:none!important}
+    .login-modal{background:#0e1220;border:1px solid rgba(255,255,255,.12);padding:2.2rem 2rem;max-width:360px;width:90%;text-align:center}
+    .login-modal-title{font-family:'Syne',sans-serif;font-weight:800;font-size:1.15rem;letter-spacing:-.02em;color:var(--white);margin-bottom:.4rem}
+    .login-modal-sub{font-family:'Syne',sans-serif;font-size:.78rem;letter-spacing:.05em;color:rgba(255,255,255,.4);margin-bottom:1.4rem}
+    .login-modal input{width:100%;box-sizing:border-box;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:var(--white);font-family:'DM Mono',monospace;font-size:.8rem;padding:.55rem .8rem;margin-bottom:.65rem;outline:none}
+    .login-modal input:focus{border-color:var(--blue)}
+    .login-modal input::placeholder{color:rgba(255,255,255,.25)}
+    .login-modal-err{font-family:'Syne',sans-serif;font-size:.75rem;color:#ff5c5c;min-height:1rem;margin-bottom:.75rem;display:none}
+    .login-modal-err.visible{display:block}
+    .login-modal-actions{display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap}
+    .login-modal-btn{font-family:'Syne',sans-serif;font-size:.782rem;letter-spacing:.1em;text-transform:uppercase;background:var(--blue);color:var(--white);border:none;padding:.55rem 1.6rem;cursor:pointer}
+    .login-modal-btn:hover{background:#0035cc}
+    .login-modal-cancel{font-family:'Syne',sans-serif;font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.35);background:none;border:none;cursor:pointer;padding:.55rem .6rem}
+    .login-modal-cancel:hover{color:rgba(255,255,255,.65)}
+
+    /* ─── BREADCRUMB ─── */
+    .breadcrumb { padding:.6rem 2.5rem; font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.3); border-bottom:1px solid var(--border); }
+    .breadcrumb a { color:rgba(0,71,255,.7); text-decoration:none; }
+
+    /* ─── SEARCH PANEL ─── */
+    .search-panel { padding:1.4rem 2.5rem; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:1.2rem; flex-wrap:wrap; }
+    .search-label { font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.2em; text-transform:uppercase; color:rgba(255,255,255,.3); white-space:nowrap; }
+    .ac-wrap { position:relative; width:340px; max-width:100%; }
+    .ac-input { background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); color:var(--white); font-family:'DM Mono',monospace; font-size:.858rem; padding:.5rem .8rem; width:100%; outline:none; transition:border-color .2s,background .2s; }
+    .ac-input:focus { border-color:rgba(0,71,255,.5); background:rgba(0,71,255,.06); }
+    .ac-input::placeholder { color:rgba(255,255,255,.25); }
+    .ac-input.selected { border-color:rgba(0,71,255,.4); background:rgba(0,71,255,.08); }
+    .ac-dropdown { position:absolute; top:100%; left:0; right:0; background:#0d0f1a; border:1px solid rgba(0,71,255,.3); border-top:none; z-index:1000; max-height:260px; overflow-y:auto; display:none; }
+    .ac-dropdown.open { display:block; }
+    .ac-item { padding:.55rem .8rem; font-family:'DM Mono',monospace; font-size:.7rem; color:rgba(255,255,255,.7); cursor:pointer; border-bottom:1px solid rgba(255,255,255,.05); transition:background .1s; line-height:1.4; }
+    .ac-item:hover, .ac-item.highlighted { background:rgba(0,71,255,.15); color:var(--white); }
+    .ac-item .ac-corp { color:rgba(255,255,255,.3); font-size:.6rem; display:block; margin-top:2px; }
+    .ac-item mark { background:transparent; color:var(--blue); font-weight:700; }
+    .search-hint { font-family:'DM Mono',monospace; font-size:1.2rem; color:rgba(255,255,255,.35); }
+
+    /* ─── MAIN LAYOUT ─── */
+    .shell { position:relative; z-index:2; min-height:100vh; display:flex; flex-direction:column; }
+    .content-area { flex:1; padding:0; }
+
+    /* ─── LOADER ─── */
+    .loader-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1rem; min-height:300px; }
+    .loader-ring { width:40px; height:40px; border:2px solid rgba(0,71,255,.2); border-top-color:var(--blue); border-radius:50%; animation:spin .8s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .loader-label { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.3); }
+
+    /* ─── PLACEHOLDER ─── */
+    .placeholder-state { text-align:center; padding:5rem 2rem; color:rgba(255,255,255,.25); font-family:'DM Mono',monospace; font-size:2rem; letter-spacing:.06em; text-transform:uppercase; line-height:2; }
+    .placeholder-state .pes-hint { font-size:3rem; opacity:.15; margin-bottom:1rem; }
+
+    /* ─── PES LAYOUT ─── */
+    .pes-panel {
+      background: #0d0f1c;
+      border-top: 3px solid var(--blue);
+      display: grid;
+      grid-template-columns: calc(290px + 7%) 1.33fr 1fr;
+      min-height: calc(100vh - 160px);
+      position: relative;
+    }
+
+    /* Panel izquierdo: FOTO */
+    .pes-left {
+      border-right: 1px solid rgba(255,255,255,.08);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .pes-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: .65rem 1rem;
+      background: rgba(0,71,255,.18);
+      border-bottom: 1px solid rgba(0,71,255,.3);
+    }
+    .pes-panel-title {
+      font-family: 'DM Mono', monospace;
+      font-size: .62rem;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--white);
+      font-weight: 700;
+    }
+    .pes-nav-hint {
+      font-family: 'DM Mono', monospace;
+      font-size: .624rem;
+      letter-spacing: .1em;
+      color: rgba(255,255,255,.35);
+    }
+
+    /* Filtros depto/municipio — horizontal en panel central */
+    .map-filters {
+      padding: .65rem 1rem;
+      border-bottom: 1px solid rgba(255,255,255,.07);
+      display: flex;
+      flex-direction: row;
+      gap: 1rem;
+      background: rgba(255,255,255,.02);
+      flex-wrap: wrap;
+    }
+    .map-filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: .3rem;
+      min-width: 160px;
+      flex: 1;
+    }
+    .map-filter-label {
+      font-family: 'DM Mono', monospace;
+      font-size: .572rem;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.3);
+    }
+    .map-select {
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.18);
+      color: var(--white);
+      font-family: 'DM Mono', monospace;
+      font-size: .715rem;
+      padding: .35rem .6rem;
+      width: 100%;
+      appearance: none;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+    }
+    .map-select:focus { outline: none; border-color: rgba(0,71,255,.6); background: rgba(0,71,255,.08); }
+    .map-select option { background: #08090f; color: var(--white); }
+    .map-select:disabled { opacity: .3; cursor: not-allowed; }
+
+    .map-container {
+      flex: 1;
+      position: relative;
+      height: 0;
+      min-height: 420px;
+    }
+    .map-loading {
+      position: absolute;
+      inset: 0;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(6,8,16,.85);
+      font-family: 'DM Mono', monospace;
+      font-size: .65rem;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.35);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .35s;
+    }
+    .map-loading.active { opacity: 1; }
+    #leaflet-map {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      background: #060810 !important;
+    }
+    /* Override Leaflet tiles with dark bg */
+    .leaflet-container { background: #060810 !important; }
+    .leaflet-tile-pane { display: none; } /* hide base tiles, we only use GeoJSON */
+    /* Dark attribution */
+    .leaflet-control-attribution {
+      background: rgba(6,8,16,.85) !important;
+      color: rgba(255,255,255,.25) !important;
+      font-family: 'DM Mono', monospace !important;
+      font-size: .45rem !important;
+    }
+    .leaflet-control-attribution a { color: rgba(0,71,255,.6) !important; }
+    .leaflet-control-zoom a {
+      background: rgba(13,15,28,.9) !important;
+      color: var(--white) !important;
+      border-color: rgba(255,255,255,.15) !important;
+    }
+    .leaflet-control-zoom a:hover { background: rgba(0,71,255,.3) !important; }
+
+    .map-legend {
+      padding: .5rem 1rem .7rem;
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+    }
+    #btn-volver-pais {
+      display: none;
+      margin-left: auto;
+      font-family: 'DM Mono', monospace;
+      font-size: .62rem;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--blue);
+      background: rgba(0,71,255,.1);
+      border: 1px solid rgba(0,71,255,.35);
+      padding: .25rem .7rem;
+      cursor: pointer;
+      transition: background .15s, color .15s;
+      flex-shrink: 0;
+    }
+    #btn-volver-pais:hover { background: var(--blue); color: #fff; }
+    #notice-comunas {
+      display: none;
+      position: absolute;
+      top: 36px;   /* mismo nivel que leaflet-control-zoom-out */
+      left: 44px;  /* justo a la derecha del control de zoom (26px + 10px margen + 8px gap) */
+      z-index: 800;
+      background: rgba(6,8,16,.88);
+      border: 1px solid rgba(0,71,255,.4);
+      color: rgba(255,255,255,.65);
+      font-family: 'DM Mono', monospace;
+      font-size: .9rem;
+      letter-spacing: .06em;
+      padding: .3rem .7rem;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    .map-legend-title {
+      font-family: 'DM Mono', monospace;
+      font-size: .65rem;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.3);
+    }
+    .map-legend-scale {
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+    }
+    .map-legend-bar {
+      width: 240px;
+      height: 8px;
+      background: linear-gradient(to right, #0d1117, #1d4ed8, #0891b2, #15803d, #ca8a04, #fef08a, #ea580c, #dc2626);
+      border-radius: 2px;
+    }
+    .map-legend-ends {
+      display: flex;
+      justify-content: space-between;
+      width: 240px;
+    }
+    .map-legend-end {
+      font-family: 'DM Mono', monospace;
+      font-size: .624rem;
+      color: rgba(255,255,255,.4);
+    }
+
+    /* Panel central: MAPA (ancho) */
+    .pes-center {
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+      background: #060810;
+      border-left: 1px solid rgba(255,255,255,.08);
+      border-right: 1px solid rgba(255,255,255,.08);
+    }
+    .candidate-photo-wrap {
+      width: 100%;
+      position: relative;
+      min-height: 380px;
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .candidate-photo {
+      /* Foto editorial 3:2 — 1248×864 → object-fit:cover recorta al centro */
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center 15%;   /* centra a 15% desde arriba para mostrar el rostro */
+      filter: drop-shadow(0 0 40px rgba(0,71,255,.3));
+      animation: fadeInUp .5s ease forwards;
+      z-index: 1;
+    }
+    @keyframes fadeInUp {
+      from { opacity:0; transform:translateY(20px); }
+      to { opacity:1; transform:translateY(0); }
+    }
+    .candidate-photo-placeholder {
+      width: 180px;
+      height: 280px;
+      border: 2px dashed rgba(255,255,255,.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 2rem;
+    }
+    .candidate-photo-placeholder span {
+      font-family: 'DM Mono', monospace;
+      font-size: .66rem;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.15);
+      text-align: center;
+      padding: 1rem;
+      line-height: 1.8;
+    }
+    .candidate-photo-placeholder span a {
+      color: rgba(255,255,255,.3);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      transition: color .2s;
+    }
+    .candidate-photo-placeholder span a:hover { color: rgba(255,255,255,.6); }
+    .candidate-name-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 3;
+      padding: 1.5rem 1.2rem .8rem;
+      background: linear-gradient(to top, rgba(8,10,24,.98) 0%, transparent 100%);
+    }
+    .candidate-name-overlay .cand-surname {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.1rem;
+      letter-spacing: -.03em;
+      color: var(--white);
+      text-transform: uppercase;
+      line-height: 1;
+    }
+    .candidate-name-overlay .cand-name-first {
+      font-family: 'DM Mono', monospace;
+      font-size: .6rem;
+      letter-spacing: .2em;
+      color: rgba(255,255,255,.4);
+      text-transform: uppercase;
+      margin-top: .25rem;
+    }
+    .overall-badge {
+      position: absolute;
+      top: 1rem;
+      left: 1rem;
+      z-index: 3;
+      width: 77px;
+      height: 77px;
+      background: rgba(0,71,255,.85);
+      border: 2px solid rgba(0,71,255,.6);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+    .overall-badge .rating-num {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 2.2rem;
+      line-height: 1;
+      color: var(--white);
+    }
+    .overall-badge .rating-label {
+      font-family: 'Syne', sans-serif;
+      font-size: .418rem;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.6);
+      margin-top: 2px;
+      text-align: center;
+      line-height: 1.3;
+    }
+    .corp-badge {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      z-index: 3;
+      font-family: 'DM Mono', monospace;
+      font-size: .96rem;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      padding: .396rem .924rem;
+      background: rgba(167,139,250,.15);
+      border: 1px solid rgba(167,139,250,.3);
+      color: var(--purple);
+      max-width: 132px;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    /* Panel derecho: INFO */
+    .pes-right {
+      border-left: 1px solid rgba(255,255,255,.08);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .info-header {
+      padding: .65rem 1rem;
+      background: rgba(0,71,255,.12);
+      border-bottom: 1px solid rgba(0,71,255,.2);
+    }
+    .info-header .cand-full-name {
+      font-family: 'Syne', sans-serif;
+      font-weight: 400;
+      font-size: 1.2rem;
+      letter-spacing: -.02em;
+      text-transform: uppercase;
+      color: var(--white);
+      line-height: 1.2;
+    }
+    .info-rows {
+      flex: 1;
+      padding: 0;
+    }
+    .info-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: .65rem 1rem;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+      gap: .5rem;
+    }
+    .info-row:hover { background: rgba(255,255,255,.02); }
+    .info-key {
+      font-family: 'DM Mono', monospace;
+      font-size: .6rem;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.35);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .info-val {
+      font-family: 'DM Mono', monospace;
+      font-size: .68rem;
+      color: var(--white);
+      text-align: right;
+      line-height: 1.4;
+      font-weight: 400;
+    }
+    .info-val.blue { color: var(--blue); }
+    .info-val.green { color: var(--green); }
+    .info-val.purple { color: var(--purple); }
+    .info-val.orange { color: var(--orange); }
+    /* Votos totales superior (map-total-hint): ~60% más grande que .pes-nav-hint base (.52rem) */
+    #map-total-hint { font-size: 1.02rem; color: rgba(255,255,255,.7); letter-spacing: .04em; }
+
+    /* Barra ideológica izq-der */
+    .ideology-bar-wrap {
+      padding: .75rem 1rem;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+    }
+    .ideology-label {
+      font-family: 'DM Mono', monospace;
+      font-size: .52rem;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.3);
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: .4rem;
+    }
+    .ideology-track {
+      height: 6px;
+      background: linear-gradient(to right, var(--izq), #a78bfa 50%, var(--der));
+      border-radius: 3px;
+      position: relative;
+    }
+    .ideology-thumb {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 12px;
+      height: 12px;
+      background: var(--white);
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,.8);
+      transition: left .6s cubic-bezier(.4,0,.2,1);
+      box-shadow: 0 0 6px rgba(0,0,0,.5);
+    }
+
+    /* Radar chart canvas */
+    .radar-wrap {
+      padding: 1.133rem 1rem 1.5rem;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+    }
+    .radar-title {
+      display: none;
+      font-family: 'DM Mono', monospace;
+      font-size: .624rem;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.3);
+      margin-bottom: .4rem;
+    }
+    #radar-canvas {
+      width: 100% !important;
+      max-height: 208px;
+      transform: scale(1.2);
+      transform-origin: center;
+    }
+
+    /* Candidatos list */
+    .cand-list {
+      overflow-y: auto;
+      flex: 1;
+    }
+    .cand-list-item {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      padding: .5rem 1rem;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .cand-list-item:hover { background: rgba(0,71,255,.08); }
+    .cand-list-item.active { background: rgba(0,71,255,.18); border-left: 2px solid var(--blue); }
+    .cand-rank {
+      font-family: 'DM Mono', monospace;
+      font-size: .6rem;
+      color: rgba(255,255,255,.2);
+      width: 18px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .cand-list-name {
+      flex: 1;
+      font-family: 'DM Mono', monospace;
+      font-size: .68rem;
+      color: rgba(255,255,255,.75);
+      line-height: 1.3;
+    }
+    .cand-list-name .cand-party {
+      display: block;
+      font-size: .55rem;
+      color: rgba(255,255,255,.3);
+    }
+    .cand-list-votes {
+      font-family: 'DM Mono', monospace;
+      font-size: .68rem;
+      color: var(--blue);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    /* ─── FOOTER ─── */
+    .full-footer { flex-shrink:0; width:100%; border-top:1px solid var(--border); padding:.5rem 2.5rem; display:flex; align-items:center; justify-content:space-between; }
+    .footer-brand { font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.09em; color:rgba(255,255,255,.2); }
+    .footer-brand a { color:rgba(255,255,255,.25); text-decoration:none; }
+
+    /* ─── CURTAIN ─── */
+    .curtain { position:fixed; inset:0; z-index:99999; pointer-events:none; }
+    .curtain-layer { position:absolute; inset:0; background:#04060e; }
+    .curtain-layer:nth-child(1) { clip-path:polygon(0 0,100% 0,100% 22%,0 28%); transform:translateX(-110%); transition:transform .58s cubic-bezier(.75,0,.25,1) 0s; }
+    .curtain-layer:nth-child(2) { clip-path:polygon(0 26%,100% 20%,100% 49%,0 55%); transform:translateX(110%); transition:transform .58s cubic-bezier(.75,0,.25,1) .07s; }
+    .curtain-layer:nth-child(3) { clip-path:polygon(0 53%,100% 47%,100% 76%,0 82%); transform:translateX(-110%); transition:transform .58s cubic-bezier(.75,0,.25,1) .14s; }
+    .curtain-layer:nth-child(4) { clip-path:polygon(0 80%,100% 74%,100% 100%,0 100%); transform:translateX(110%); transition:transform .58s cubic-bezier(.75,0,.25,1) .21s; }
+    .curtain.opening .curtain-layer { transform:translateX(0)!important; transition:none; }
+    .curtain.opened .curtain-layer:nth-child(1) { transform:translateX(-110%); }
+    .curtain.opened .curtain-layer:nth-child(2) { transform:translateX(110%); }
+    .curtain.opened .curtain-layer:nth-child(3) { transform:translateX(-110%); }
+    .curtain.opened .curtain-layer:nth-child(4) { transform:translateX(110%); }
+    .curtain.opened { pointer-events:none; }
+    .curtain.closing { pointer-events:all; }
+    .curtain.closing .curtain-layer { transform:translateX(0)!important; }
+
+    /* ORIENT OVERLAY */
+    .orient-overlay { display:none; position:fixed; inset:0; z-index:99990; background:rgba(6,8,16,.98); align-items:center; justify-content:center; flex-direction:column; gap:1rem; text-align:center; padding:2rem; }
+    .orient-overlay.show { display:flex; }
+    .orient-overlay p { font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.5); line-height:2; }
+    .orient-overlay button { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.1em; text-transform:uppercase; padding:.4rem 1rem; background:var(--blue); color:var(--white); border:none; cursor:pointer; }
+
+    @media (max-width:1100px) {
+      .pes-panel { grid-template-columns: calc(240px + 7%) 1.33fr 1fr; }
+    }
+    @media (max-width:900px) {
+      .pes-panel { grid-template-columns: 1fr; }
+      .pes-left, .pes-center, .pes-right { border:none; border-bottom:1px solid rgba(255,255,255,.08); }
+      .electoral-nav { display:none; }
+      #leaflet-map { min-height: 400px; }
+    }
+
+    /* ─── MUNICIPIO LOCK OVERLAY ─── */
+    .mun-wrap { position: relative; }
+    .mun-lock-overlay { position: absolute; inset: 0; display: none; cursor: pointer; z-index: 10; }
+    .mun-lock-overlay.active { display: block; }
+
+    /* ─── MODAL MUNICIPIO ─── */
+    .mun-modal { display: none; position: fixed; inset: 0; z-index: 99998; align-items: center; justify-content: center; background: rgba(6,8,16,.6); backdrop-filter: blur(4px); }
+    .mun-modal.open { display: flex; }
+    .mun-modal-box { background: #0d0f1c; border: 1px solid rgba(0,71,255,.4); padding: 1.89rem 2.43rem; max-width: 486px; text-align: center; position: relative; }
+    .mun-modal-box p { font-family: 'Syne', sans-serif; font-size: 1.107rem; color: rgba(255,255,255,.8); line-height: 1.7; }
+    .mun-modal-box a { color: var(--blue); text-decoration: none; font-weight: 700; }
+    .mun-modal-box a:hover { text-decoration: underline; }
+    .mun-modal-close { position: absolute; top: .5rem; right: .7rem; background: none; border: none; color: rgba(255,255,255,.35); font-size: 1.1rem; cursor: pointer; padding: 0; line-height: 1; }
+    .mun-modal-close:hover { color: var(--white); }
+
+    /* ─── BOTÓN EXCEL ─── */
+    .btn-excel-dl { font-family:'DM Mono',monospace; font-size:.58rem; letter-spacing:.08em; text-transform:uppercase; color:var(--green); background:none; border:1.5px solid rgba(74,222,128,.4); padding:.2rem .55rem; cursor:pointer; transition:all .2s; flex-shrink:0; white-space:nowrap; }
+    .btn-excel-dl:hover { background:var(--green); color:#060810; border-color:var(--green); }
+    .btn-excel-dl.locked { color:rgba(255,255,255,.3); border-color:rgba(255,255,255,.15); cursor:pointer; }
+    .btn-excel-dl.locked:hover { color:rgba(255,255,255,.55); border-color:rgba(255,255,255,.3); background:none; }
+
+    /* ─── BOTONES DESCARGA POR NIVEL ─── */
+    .dl-tier-btn { font-family:'DM Mono',monospace; font-size:.696rem; letter-spacing:.07em; text-transform:uppercase; padding:.264rem .66rem; border:1.5px solid; cursor:pointer; transition:all .2s; white-space:nowrap; background:none; }
+    .dl-tier-btn.locked { opacity:.38; cursor:pointer; }
+    .dl-tier-btn.locked:hover { opacity:.6; }
+    .dl-tier-btn.t-free { color:#4ade80; border-color:rgba(74,222,128,.4); }
+    .dl-tier-btn.t-free:not(.locked):hover { background:#4ade80; color:#060810; border-color:#4ade80; }
+    .dl-tier-btn.t-pro { color:#fbbf24; border-color:rgba(251,191,36,.4); }
+    .dl-tier-btn.t-pro:not(.locked):hover { background:#fbbf24; color:#060810; border-color:#fbbf24; }
+    .dl-tier-btn.t-premium { color:#a78bfa; border-color:rgba(167,139,250,.4); }
+    .dl-tier-btn.t-premium:not(.locked):hover { background:#a78bfa; color:#060810; border-color:#a78bfa; }
+    body.day-mode .dl-tier-btn.t-free { color:#16a34a; border-color:rgba(22,163,74,.4); }
+    body.day-mode .dl-tier-btn.t-free:not(.locked):hover { background:#16a34a; color:#fff; border-color:#16a34a; }
+    body.day-mode .dl-tier-btn.t-pro { color:#b45309; border-color:rgba(180,83,9,.4); }
+    body.day-mode .dl-tier-btn.t-pro:not(.locked):hover { background:#b45309; color:#fff; border-color:#b45309; }
+    body.day-mode .dl-tier-btn.t-premium { color:#7c3aed; border-color:rgba(124,58,237,.4); }
+    body.day-mode .dl-tier-btn.t-premium:not(.locked):hover { background:#7c3aed; color:#fff; border-color:#7c3aed; }
+    #dl-btns-wrap { display:none; align-items:center; gap:.45rem; flex-wrap:wrap; }
+    .dl-btns-label { font-family:'DM Mono',monospace; font-size:.696rem; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.28); white-space:nowrap; }
+    body.day-mode .dl-btns-label { color:rgba(0,0,0,.38); }
+
+    /* ─── TIPOGRAFÍA SYNE EN LAS TRES COLUMNAS ─── */
+    .pes-left, .pes-left *,
+    .pes-center, .pes-center *,
+    .pes-right, .pes-right * {
+      font-family: 'Syne', sans-serif !important;
+    }
+
+    /* ─── TAMAÑOS EN COLUMNA DERECHA ─── */
+    .pes-right .info-key        { font-size: .894rem; }
+    .pes-right .info-val        { font-size: 1.014rem; }
+    .pes-right .ideology-label  { font-size: .775rem; }
+    .pes-right .radar-title     { font-size: .775rem; }
+    .pes-right .cand-full-name  { font-size: 1.54rem; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <!-- CURTAIN -->
+  <div class="curtain opening" id="curtain">
+    <div class="curtain-layer"></div>
+    <div class="curtain-layer"></div>
+    <div class="curtain-layer"></div>
+    <div class="curtain-layer"></div>
+  </div>
+
+  <!-- ORIENT -->
+  <div class="orient-overlay" id="orient-overlay">
+    <p id="orient-text">Para mejor experiencia,<br/>gira tu dispositivo en horizontal</p>
+    <button id="orient-btn" onclick="dismissOrient()">Continuar</button>
+  </div>
+
+  <div class="shell">
+
+    <!-- NAV -->
+    <nav class="electoral-nav">
+      <div style="display:flex;align-items:center;gap:1rem">
+        <a href="javascript:history.back()" class="e-btn-back" id="btn-back">← Volver</a>
+        <div id="e-nav-auth" class="electoral-nav-auth"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:1.2rem">
+        <div class="country-selector-wrap">
+          <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
+            <span id="countryBtnLabel">Colombia</span>
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style="margin-left:6px;transition:transform 0.2s" id="countryChevron"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+          <div class="country-dropdown" id="countryDropdown">
+            <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
+            <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
+            <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
+            <div class="country-option" data-value="cn" onclick="selectCountry(this)"><span class="country-check">✓</span> 中国 / China</div>
+          </div>
+        </div>
+        <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
+        <a href="index.html" class="logo-link" onclick="navTo(event,'index.html')">
+          <div class="logo-bars">
+            <div class="logo-bar" style="height:20px"></div>
+            <div class="logo-bar" style="height:15px"></div>
+            <div class="logo-bar" style="height:9px"></div>
+            <div class="logo-bar" style="height:4px"></div>
+          </div>
+          <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+        </a>
+      </div>
+    </nav>
+
+    <!-- BREADCRUMB -->
+    <div class="breadcrumb">
+      <a href="index.html" onclick="navTo(event,'index.html')">Ricardo Ruiz</a>
+      &nbsp;/&nbsp;
+      <a href="senado-2026.html" id="breadcrumb-congress" onclick="navTo(event,'senado-2026.html')">Congreso 2026</a>
+      &nbsp;/&nbsp; <span id="breadcrumb-page">Mapa Candidato</span>
+    </div>
+
+    <!-- SEARCH BAR -->
+    <div class="search-panel">
+      <span class="search-label" id="search-label">Buscar candidato</span>
+      <div class="ac-wrap">
+        <input class="ac-input" id="ac-input" type="text" placeholder="Nombre del candidato…" autocomplete="off"
+          oninput="acSearch()"
+          onkeydown="acKey(event)"
+          onfocus="acSearch()" />
+        <div class="ac-dropdown" id="ac-dropdown"></div>
+      </div>
+      <span class="search-hint" id="search-hint">Cargando índice…</span>
+      <div id="dl-btns-wrap">
+        <span class="dl-btns-label" id="dl-btns-label">Descargar por</span>
+        <button class="dl-tier-btn t-free" id="dl-dep" onclick="dlExcel('dep')" title="Departamento · usuarios registrados">⬇ Depto.</button>
+        <button class="dl-tier-btn t-free" id="dl-mun" onclick="dlExcel('mun')" title="Municipio · usuarios registrados">⬇ Municipio</button>
+        <button class="dl-tier-btn t-pro" id="dl-zon" onclick="dlExcel('zon')" title="Zona · plan Pro o superior">⬇ Zona</button>
+        <button class="dl-tier-btn t-premium" id="dl-pue" onclick="dlExcel('pue')" title="Puesto · plan Premium o Full">⬇ Puesto</button>
+        <button class="dl-tier-btn t-premium" id="dl-mesa" onclick="dlExcel('mesa')" title="Mesa · plan Premium o Full">⬇ Mesa</button>
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content-area">
+
+      <!-- Loader -->
+      <div class="loader-wrap" id="load-state">
+        <div class="loader-ring"></div>
+        <div class="loader-label" id="loader-label">Conectando con S3…</div>
+      </div>
+
+      <!-- Placeholder -->
+      <div class="placeholder-state" id="placeholder-state" style="display:none">
+        Busca un candidato para ver su perfil electoral
+      </div>
+
+      <!-- PES PANEL -->
+      <div class="pes-panel" id="pes-panel" style="display:none">
+
+        <!-- LEFT: FOTO CANDIDATO -->
+        <div class="pes-left">
+          <div class="candidate-photo-wrap" id="photo-wrap">
+            <div class="overall-badge" id="overall-badge">
+              <span class="rating-num" id="overall-num">—</span>
+              <span class="rating-label" id="rating-label">Puntos / 100</span>
+            </div>
+            <div class="corp-badge" id="corp-badge">—</div>
+            <div class="candidate-photo-placeholder" id="photo-placeholder">
+              <span id="photo-placeholder-text"><a href="https://drive.google.com/drive/folders/1ULVQC1Cyz_fjnhGdM7ydzg7tEgiDcPRS?usp=share_link" target="_blank">¿Quieres agregar la foto de tu candidato? ¡Haz click aquí y ayúdanos!</a></span>
+            </div>
+            <img class="candidate-photo" id="candidate-photo" src="" alt="" style="display:none" onerror="handlePhotoError()"/>
+            <div class="candidate-name-overlay">
+              <div class="cand-surname" id="cand-surname">—</div>
+              <div class="cand-name-first" id="cand-name-first">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CENTER: MAPA (ancho) -->
+        <div class="pes-center">
+          <div class="pes-panel-header">
+            <span class="pes-panel-title" id="map-panel-title">Mapa · Votación por departamento</span>
+            <span class="pes-nav-hint" id="map-total-hint">— votos</span>
+          </div>
+
+          <!-- Filtros horizontales -->
+          <div class="map-filters">
+            <div class="map-filter-group">
+              <div class="map-filter-label" id="filter-dep-label">Departamento</div>
+              <select class="map-select" id="filter-dep" onchange="onDepChange()">
+                <option value="" id="dep-all-opt">— Todos los departamentos —</option>
+              </select>
+            </div>
+            <div class="map-filter-group">
+              <div class="map-filter-label" id="filter-mun-label">Municipio</div>
+              <div class="mun-wrap">
+                <select class="map-select" id="filter-mun" disabled onchange="onMunChange()">
+                  <option value="" id="mun-all-opt">— Todos los municipios —</option>
+                </select>
+                <div class="mun-lock-overlay" id="mun-lock-overlay" onclick="showMunModal()"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Leyenda -->
+          <div class="map-legend">
+            <span class="map-legend-title" id="map-legend-title">Intensidad · votos</span>
+            <div class="map-legend-scale">
+              <span class="map-legend-end">0</span>
+              <div class="map-legend-bar"></div>
+              <span class="map-legend-end" id="legend-max">máx</span>
+            </div>
+            <button id="btn-volver-pais" onclick="onVolverPais()">← País</button>
+          </div>
+
+          <!-- Leaflet Map -->
+          <div class="map-container">
+            <div class="map-loading" id="map-loading">Cargando mapa…</div>
+            <div id="leaflet-map"></div>
+            <div id="notice-comunas">Vista por comunas, excluye corregimientos. Para mayor precisión, descargue zona o puesto.</div>
+          </div>
+        </div>
+
+        <!-- RIGHT: INFO -->
+        <div class="pes-right">
+          <div class="info-header">
+            <div class="cand-full-name" id="info-full-name">SELECCIONA UN CANDIDATO</div>
+          </div>
+
+          <!-- Ideología -->
+          <div class="ideology-bar-wrap">
+            <div class="ideology-label">
+              <span id="ideo-left" style="color:var(--izq)">← Izquierda</span>
+              <span id="ideo-center" style="color:rgba(255,255,255,.3)">Espectro ideológico</span>
+              <span id="ideo-right" style="color:var(--der)">Derecha →</span>
+            </div>
+            <div class="ideology-track">
+              <div class="ideology-thumb" id="ideology-thumb" style="left:50%"></div>
+            </div>
+          </div>
+
+          <!-- Radar de presencia territorial -->
+          <div class="radar-wrap">
+            <div class="radar-title" id="radar-title">Presencia territorial</div>
+            <canvas id="radar-canvas"></canvas>
+          </div>
+
+          <!-- Filas de info -->
+          <div class="info-rows">
+            <div class="info-row">
+              <span class="info-key" id="key-origen">Origen</span>
+              <span class="info-val" id="info-origen">—</span>
+            </div>
+            <div class="info-row">
+              <span class="info-key" id="key-partido">Partido</span>
+              <span class="info-val purple" id="info-partido">—</span>
+            </div>
+            <div class="info-row">
+              <span class="info-key" id="key-corp">Corporación</span>
+              <span class="info-val" id="info-corp">—</span>
+            </div>
+            <div class="info-row">
+              <span class="info-key" id="key-dep-top">Dpto. más votado</span>
+              <span class="info-val green" id="info-dep-top">—</span>
+            </div>
+            <div class="info-row">
+              <span class="info-key" id="key-mun-top">Municipio top</span>
+              <span class="info-val green" id="info-mun-top">—</span>
+            </div>
+            <div class="info-row">
+              <span class="info-key" id="key-zona-top">Zona más votada</span>
+              <span class="info-val" id="info-zona-top" style="color:var(--green)">—</span>
+            </div>
+            <div class="info-row" id="info-zona-votos-row" style="display:none">
+              <span class="info-key" id="key-zona-votos">Votos zona top</span>
+              <span class="info-val blue" id="info-zona-votos">—</span>
+            </div>
+            <div class="info-row">
+              <span class="info-key" id="key-puesto-top">Puesto más votado</span>
+              <span class="info-val" id="info-puesto-top" style="color:var(--green)">—</span>
+            </div>
+            <div class="info-row" id="info-puesto-votos-row" style="display:none">
+              <span class="info-key" id="key-puesto-votos">Votos puesto top</span>
+              <span class="info-val blue" id="info-puesto-votos">—</span>
+            </div>
+            <div class="info-row">
+              <span class="info-key" id="key-votos">Total de votos</span>
+              <span class="info-val blue" id="info-votos">—</span>
+            </div>
+            <div class="info-row">
+              <span class="info-key" id="key-dptos">Dptos. con votos</span>
+              <span class="info-val orange" id="info-dptos">—</span>
+            </div>
+            <div class="info-row">
+              <span class="info-key" id="key-mesas">Mesas con votos</span>
+              <span class="info-val" id="info-mesas">—</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- MODAL MUNICIPIO -->
+    <div class="mun-modal" id="mun-modal">
+      <div class="mun-modal-box">
+        <button class="mun-modal-close" onclick="hideMunModal()">×</button>
+        <p id="mun-modal-msg">Para ver municipios, apóyanos <a href="register.html">registrándote aquí</a></p>
+      </div>
+    </div>
+
+    <!-- MODAL EXCEL LOCK -->
+    <div class="mun-modal" id="excel-lock-modal">
+      <div class="mun-modal-box">
+        <button class="mun-modal-close" onclick="hideExcelModal()">×</button>
+        <p id="excel-lock-msg">Esta función es exclusiva para usuarios <strong>Premium</strong> o <strong>Full</strong>.<br><a href="register.html">Regístrate</a> o consulta los <a href="pricing.html">planes disponibles</a>.</p>
+      </div>
+    </div>
+
+    <div class="full-footer">
+      <span class="footer-brand" id="footer-main">ricardoruiz.co · Elecciones Colombia</span>
+      <span class="footer-brand" id="footer-source"><a href="https://registraduria.gov.co" target="_blank">Fuente: Registraduría Nacional</a></span>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script>
+    // ─── CONFIG ───────────────────────────────────────────────
+    const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
+    const S3_PHOTOS = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/fotos-candidatos';
+    const DEPARTAMENTOS_GEOJSON_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/DEPARTAMENTOS2.json';
+    const MUNICIPIOS_GEOJSON_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/MUNICIPIOS.json';
+    const DEPARTAMENTOS_MPS_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Departamentos-mps/';
+    const BOGOTA_LOCALIDADES_URL  = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json';
+    const BOG_PUESTOS_URL         = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/BOG-PUESTOS.json';
+    const MEDELLIN_COMUNAS_URL    = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json';
+    const CALI_COMUNAS_URL        = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/CALIX.json';
+    const fmt = n => Number(n).toLocaleString('es-CO');
+
+    // ─── I18N ─────────────────────────────────────────────────
+    const candI18n = {
+      co: {
+        back: '← Volver',
+        congress: 'Congreso 2026', page: 'Mapa Candidato',
+        searchLabel: 'Buscar candidato', searchPlaceholder: 'Nombre del candidato…',
+        loadingIndex: 'Cargando índice…', candidatesLoaded: n => `${n.toLocaleString('es-CO')} candidatos cargados`,
+        dlBy: 'Descargar por', dlDep: '⬇ Depto.', dlMun: '⬇ Municipio', dlZon: '⬇ Zona', dlPue: '⬇ Puesto', dlMesa: '⬇ Mesa',
+        connecting: 'Conectando con S3…', placeholder: 'Busca un candidato para ver su perfil electoral',
+        mapTitle: 'Mapa · Votación por departamento', mapLoading: 'Cargando mapa…',
+        depLabel: 'Departamento', munLabel: 'Municipio',
+        depAll: '— Todos los departamentos —', munAll: '— Todos los municipios —',
+        legendTitle: 'Intensidad · votos', legendMax: 'máx',
+        selectCandidate: 'SELECCIONA UN CANDIDATO',
+        ideoLeft: '← Izquierda', ideoCenter: 'Espectro ideológico', ideoRight: 'Derecha →',
+        radarTitle: 'Presencia territorial',
+        ratingLabel: 'Puntos / 100',
+        photoPlaceholder: '<a href="https://drive.google.com/drive/folders/1ULVQC1Cyz_fjnhGdM7ydzg7tEgiDcPRS?usp=share_link" target="_blank">¿Quieres agregar la foto de tu candidato? ¡Haz click aquí y ayúdanos!</a>',
+        keys: { origen:'Origen', partido:'Partido', corp:'Corporación', depTop:'Dpto. más votado', munTop:'Municipio top', zonaTop:'Zona más votada', zonaVotos:'Votos zona top', puestoTop:'Puesto más votado', puestoVotos:'Votos puesto top', votos:'Total de votos', dptos:'Dptos. con votos', mesas:'Mesas con votos' },
+        plans: { free:'Free', basic:'Básico', pro:'Pro', premium:'Premium', analysis:'Análisis', full:'Completo' },
+        logout: 'Salir', login: 'Iniciar sesión', register: 'Registrarse',
+        munModal: 'Para ver municipios, apóyanos <a href="register.html">registrándote aquí</a>',
+        excelLock: 'Esta función es exclusiva para usuarios <strong>Premium</strong> o <strong>Full</strong>.<br><a href="register.html">Regístrate</a> o consulta los <a href="pricing.html">planes disponibles</a>.',
+        footerMain: 'ricardoruiz.co · Elecciones Colombia',
+        footerSource: '<a href="https://registraduria.gov.co" target="_blank">Fuente: Registraduría Nacional</a>',
+        orientText: 'Para mejor experiencia,<br/>gira tu dispositivo en horizontal', orientBtn: 'Continuar',
+        themeDay: '☀ Modo día', themeNight: '🌙 Modo noche',
+        lmTitle: 'Iniciar sesión', lmSub: 'Accede a tu cuenta para continuar',
+        lmEmail: 'Correo electrónico', lmPassword: 'Contraseña',
+        lmSubmit: 'Ingresar', lmCancel: 'Cancelar',
+        lmError: 'Correo o contraseña incorrectos.',
+      },
+      us: {
+        back: '← Back',
+        congress: 'Congress 2026', page: 'Candidate Map',
+        searchLabel: 'Search candidate', searchPlaceholder: 'Candidate name…',
+        loadingIndex: 'Loading index…', candidatesLoaded: n => `${n.toLocaleString('en-US')} candidates loaded`,
+        dlBy: 'Download by', dlDep: '⬇ Dept.', dlMun: '⬇ Municipality', dlZon: '⬇ Zone', dlPue: '⬇ Polling station', dlMesa: '⬇ Table',
+        connecting: 'Connecting to S3…', placeholder: 'Search for a candidate to view their electoral profile',
+        mapTitle: 'Map · Votes by department', mapLoading: 'Loading map…',
+        depLabel: 'Department', munLabel: 'Municipality',
+        depAll: '— All departments —', munAll: '— All municipalities —',
+        legendTitle: 'Intensity · votes', legendMax: 'max',
+        selectCandidate: 'SELECT A CANDIDATE',
+        ideoLeft: '← Left', ideoCenter: 'Ideological spectrum', ideoRight: 'Right →',
+        radarTitle: 'Territorial presence',
+        ratingLabel: 'Points / 100',
+        photoPlaceholder: '<a href="https://drive.google.com/drive/folders/1ULVQC1Cyz_fjnhGdM7ydzg7tEgiDcPRS?usp=share_link" target="_blank">Want to add this candidate\'s photo? Click here and help us!</a>',
+        keys: { origen:'Origin', partido:'Party', corp:'Corporation', depTop:'Top dept.', munTop:'Top municipality', zonaTop:'Top zone', zonaVotos:'Zone top votes', puestoTop:'Top polling station', puestoVotos:'Station top votes', votos:'Total votes', dptos:'Depts. with votes', mesas:'Tables with votes' },
+        plans: { free:'Free', basic:'Basic', pro:'Pro', premium:'Premium', analysis:'Analysis', full:'Full' },
+        logout: 'Log out', login: 'Log in', register: 'Sign up',
+        munModal: 'To view municipalities, support us by <a href="register.html">registering here</a>',
+        excelLock: 'This feature is exclusive to <strong>Premium</strong> or <strong>Full</strong> users.<br><a href="register.html">Sign up</a> or check <a href="pricing.html">available plans</a>.',
+        footerMain: 'ricardoruiz.co · Colombia Elections',
+        footerSource: '<a href="https://registraduria.gov.co" target="_blank">Source: Registraduría Nacional</a>',
+        orientText: 'For a better experience,<br/>rotate your device to landscape', orientBtn: 'Continue',
+        themeDay: '☀ Day mode', themeNight: '🌙 Night mode',
+        lmTitle: 'Log in', lmSub: 'Access your account to continue',
+        lmEmail: 'Email address', lmPassword: 'Password',
+        lmSubmit: 'Log in', lmCancel: 'Cancel',
+        lmError: 'Incorrect email or password.',
+      },
+      cn: {
+        back: '← 返回',
+        congress: '2026年国会', page: '候选人地图',
+        searchLabel: '搜索候选人', searchPlaceholder: '候选人姓名…',
+        loadingIndex: '正在加载索引…', candidatesLoaded: n => `已加载 ${n.toLocaleString('zh-CN')} 名候选人`,
+        dlBy: '下载方式', dlDep: '⬇ 省份', dlMun: '⬇ 市', dlZon: '⬇ 区', dlPue: '⬇ 投票站', dlMesa: '⬇ 投票台',
+        connecting: '正在连接 S3…', placeholder: '搜索候选人以查看其选举档案',
+        mapTitle: '地图 · 各省得票', mapLoading: '地图加载中…',
+        depLabel: '省份', munLabel: '市',
+        depAll: '— 所有省份 —', munAll: '— 所有市 —',
+        legendTitle: '强度 · 得票', legendMax: '最高',
+        selectCandidate: '请选择候选人',
+        ideoLeft: '← 左翼', ideoCenter: '意识形态谱系', ideoRight: '右翼 →',
+        radarTitle: '地域分布',
+        ratingLabel: '得分 / 100',
+        photoPlaceholder: '<a href="https://drive.google.com/drive/folders/1ULVQC1Cyz_fjnhGdM7ydzg7tEgiDcPRS?usp=share_link" target="_blank">想添加候选人照片？点击这里帮助我们！</a>',
+        keys: { origen:'来源', partido:'政党', corp:'机构', depTop:'最高票省份', munTop:'最高票城市', zonaTop:'最高票区域', zonaVotos:'区域最高票', puestoTop:'最高票站', puestoVotos:'投票站最高票', votos:'总票数', dptos:'得票省份数', mesas:'得票投票台数' },
+        plans: { free:'免费', basic:'基础', pro:'专业', premium:'高级', analysis:'分析', full:'完整' },
+        logout: '退出', login: '登录', register: '注册',
+        munModal: '要查看市级数据，请<a href="register.html">在此注册</a>支持我们',
+        excelLock: '此功能仅限<strong>高级</strong>或<strong>完整</strong>套餐用户。<br><a href="register.html">注册</a>或查看<a href="pricing.html">可用套餐</a>。',
+        footerMain: 'ricardoruiz.co · 哥伦比亚选举',
+        footerSource: '<a href="https://registraduria.gov.co" target="_blank">数据来源：国家选举委员会</a>',
+        orientText: '为获得更佳体验，<br/>请将设备横向旋转', orientBtn: '继续',
+        themeDay: '☀ 日间模式', themeNight: '🌙 夜间模式',
+        lmTitle: '登录', lmSub: '登录您的账户以继续',
+        lmEmail: '电子邮件', lmPassword: '密码',
+        lmSubmit: '登录', lmCancel: '取消',
+        lmError: '邮箱或密码不正确。',
+      }
+    };
+
+    function applyLang(lang) {
+      const t = candI18n[lang] || candI18n.co;
+      const s = id => document.getElementById(id);
+      const st = (id, txt) => { const el = s(id); if (el) el.textContent = txt; };
+      const si = (id, html) => { const el = s(id); if (el) el.innerHTML = html; };
+
+      st('btn-back', t.back);
+      st('breadcrumb-congress', t.congress);
+      st('breadcrumb-page', t.page);
+      st('search-label', t.searchLabel);
+      const inp = s('ac-input'); if (inp) inp.placeholder = t.searchPlaceholder;
+      const hint = s('search-hint');
+      if (hint && hint.dataset.count) st('search-hint', t.candidatesLoaded(parseInt(hint.dataset.count)));
+      else if (hint && !hint.dataset.count) st('search-hint', t.loadingIndex);
+      st('dl-btns-label', t.dlBy);
+      st('dl-dep', t.dlDep); st('dl-mun', t.dlMun); st('dl-zon', t.dlZon); st('dl-pue', t.dlPue); st('dl-mesa', t.dlMesa);
+      st('loader-label', t.connecting);
+      st('placeholder-state', t.placeholder);
+      st('map-panel-title', t.mapTitle);
+      st('map-loading', t.mapLoading);
+      st('filter-dep-label', t.depLabel);
+      st('filter-mun-label', t.munLabel);
+      st('dep-all-opt', t.depAll);
+      st('mun-all-opt', t.munAll);
+      st('map-legend-title', t.legendTitle);
+      st('legend-max', t.legendMax);
+      if (s('pes-panel') && s('pes-panel').style.display === 'none') st('info-full-name', t.selectCandidate);
+      si('ideo-left', t.ideoLeft);
+      si('ideo-center', t.ideoCenter);
+      si('ideo-right', t.ideoRight);
+      st('radar-title', t.radarTitle);
+      st('rating-label', t.ratingLabel);
+      si('photo-placeholder-text', t.photoPlaceholder);
+      const keys = t.keys;
+      st('key-origen', keys.origen); st('key-partido', keys.partido); st('key-corp', keys.corp);
+      st('key-dep-top', keys.depTop); st('key-mun-top', keys.munTop);
+      st('key-zona-top', keys.zonaTop); st('key-zona-votos', keys.zonaVotos);
+      st('key-puesto-top', keys.puestoTop); st('key-puesto-votos', keys.puestoVotos);
+      st('key-votos', keys.votos); st('key-dptos', keys.dptos); st('key-mesas', keys.mesas);
+      si('mun-modal-msg', t.munModal);
+      si('excel-lock-msg', t.excelLock);
+      st('footer-main', t.footerMain);
+      si('footer-source', t.footerSource);
+      si('orient-text', t.orientText);
+      st('orient-btn', t.orientBtn);
+      const themeBtn = s('theme-btn');
+      if (themeBtn) themeBtn.textContent = document.body.classList.contains('day-mode') ? t.themeNight : t.themeDay;
+      st('lm-title', t.lmTitle); st('lm-sub', t.lmSub);
+      const lmEmail = s('lm-email'); if (lmEmail) lmEmail.placeholder = t.lmEmail;
+      const lmPwd = s('lm-password'); if (lmPwd) lmPwd.placeholder = t.lmPassword;
+      st('lm-submit', t.lmSubmit); st('lm-cancel', t.lmCancel);
+    }
+
+    // Ideología aproximada por partido (escala 0=izq … 100=der)
+    const IDEOLOGY_MAP = {
+      'pacto humano': 5, 'colombia humana': 5, 'up': 8, 'polo democratico': 12,
+      'verde oxigeno': 18, 'alianza verde': 18, 'colombia verde': 18,
+      'liberal': 38, 'partido liberal': 38,
+      'conservador': 62, 'partido conservador': 62,
+      'cambio radical': 65, 'centro democratico': 72, 'colombia justa libres': 60,
+      'mira': 55, 'u': 50, 'partido de la u': 50,
+      'aico': 25, 'avn': 30, 'comunes': 8
+    };
+
+    const DEP_CODES = {
+      '05':'Antioquia','08':'Atlántico','13':'Bolívar','15':'Boyacá','17':'Caldas',
+      '18':'Caquetá','19':'Cauca','20':'Cesar','23':'Córdoba','25':'Cundinamarca',
+      '27':'Chocó','41':'Huila','44':'La Guajira','47':'Magdalena','50':'Meta',
+      '52':'Nariño','54':'Norte de Santander','63':'Quindío','66':'Risaralda',
+      '68':'Santander','70':'Sucre','73':'Tolima','76':'Valle del Cauca',
+      '81':'Arauca','85':'Casanare','86':'Putumayo','88':'San Andrés',
+      '91':'Amazonas','94':'Guainía','95':'Guaviare','97':'Vaupés','99':'Vichada',
+      '11':'Bogotá D.C.'
+    };
+
+    // Mapping DANE dpto_ccdgo (2-digit, con padding) → código electoral Registraduría (sin padding).
+    // Orden: estrictamente alfabético por nombre oficial del departamento,
+    // con Bogotá D.C. en posición 16 como circunscripción especial
+    // (insertada entre Guainía=15 y Guaviare=17, según numeración oficial Registraduría).
+    // Evidencia: comentario en código "electoral_id de Bogotá D.C." === '16',
+    // y ejemplos de claves depMap: "1" (Amazonas), "16" (Bogotá), "23" (Norte de Santander).
+    // Equivalencias ISO 3166-2:CO (DEPARTAMENTOS2.json props.id) → código electoral Registraduría.
+    const ISO_ID_TO_REGISTRADURIA = {
+      'COAMA':'60', 'COANT':'1',  'COARA':'40', 'COATL':'3',  'COBOL':'5',
+      'COBOY':'7',  'COCAL':'9',  'COCAQ':'44', 'COCAS':'46', 'COCAU':'11',
+      'COCES':'12', 'COCHO':'17', 'COCOR':'13', 'COCUN':'15', 'CODC':'16',
+      'COGUA':'50', 'COGUV':'54', 'COHUI':'19', 'COLAG':'48', 'COMAG':'21',
+      'COMET':'52', 'CONAR':'23', 'CONSA':'25', 'COPUT':'64', 'COQUI':'26',
+      'CORIS':'24', 'COSAN':'27', 'COSAP':'56', 'COSUC':'28', 'COTOL':'29',
+      'COVAC':'31', 'COVAU':'68', 'COVID':'72'
+    };
+
+    const DANE_TO_REGISTRADURIA = {
+      '05': '1',   // Antioquia
+      '08': '3',   // Atlántico
+      '11': '16',  // Bogotá D.C.
+      '13': '5',   // Bolívar
+      '15': '7',   // Boyacá
+      '17': '9',   // Caldas
+      '18': '44',  // Caquetá
+      '19': '11',  // Cauca
+      '20': '12',  // Cesar
+      '23': '13',  // Córdoba
+      '25': '15',  // Cundinamarca
+      '27': '17',  // Chocó
+      '41': '19',  // Huila
+      '44': '48',  // La Guajira
+      '47': '21',  // Magdalena
+      '50': '52',  // Meta
+      '52': '23',  // Nariño
+      '54': '25',  // Norte de Santander
+      '63': '26',  // Quindío
+      '66': '24',  // Risaralda
+      '68': '27',  // Santander
+      '70': '28',  // Sucre
+      '73': '29',  // Tolima
+      '76': '31',  // Valle del Cauca
+      '81': '40',  // Arauca
+      '85': '46',  // Casanare
+      '86': '64',  // Putumayo
+      '88': '56',  // San Andrés y Providencia
+      '91': '60',  // Amazonas
+      '94': '50',  // Guainía
+      '95': '54',  // Guaviare
+      '97': '68',  // Vaupés
+      '99': '72'   // Vichada
+    };
+
+    // Fallback por nombre: nombre normalizado → código electoral Registraduría.
+    // Usado cuando electoral_id y dpto_ccdgo están ausentes.
+    const NAME_TO_REGISTRADURIA = {
+      'antioquia':'1', 'atlantico':'3',
+      'bogota':'16', 'bogota d.c.':'16', 'distrito capital':'16', 'distrito capital de bogota':'16',
+      'bolivar':'5', 'boyaca':'7', 'caldas':'9', 'caqueta':'44',
+      'casanare':'46', 'cauca':'11', 'cesar':'12', 'choco':'17',
+      'cordoba':'13', 'cundinamarca':'15', 'guainia':'50',
+      'guaviare':'54', 'huila':'19', 'la guajira':'48', 'guajira':'48',
+      'magdalena':'21', 'meta':'52', 'narino':'23',
+      'norte de santander':'25', 'putumayo':'64', 'quindio':'26',
+      'risaralda':'24', 'san andres':'56', 'san andres y providencia':'56',
+      'santander':'27', 'sucre':'28', 'tolima':'29',
+      'valle del cauca':'31', 'valle':'31',
+      'arauca':'40', 'amazonas':'60', 'vaupes':'68', 'vichada':'72'
+    };
+
+    function normalizeDepName(name) {
+      return (name || '').toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    }
+
+    // Zonas de Bogotá (zon == localidad, mapping directo)
+    const ZONAS_BOGOTA = {'01':'Usaquén','02':'Chapinero','03':'Santa Fe','04':'San Cristóbal','05':'Usme','06':'Tunjuelito','07':'Bosa','08':'Kennedy','09':'Fontibón','10':'Engativá','11':'Suba','12':'Barrios Unidos','13':'Teusaquillo','14':'Los Mártires','15':'Antonio Nariño','16':'Puente Aranda','17':'La Candelaria','18':'Rafael Uribe Uribe','19':'Ciudad Bolívar','20':'Sumapaz'};
+
+    // Medellín: zona electoral → código de comuna (fuente: DIVIPOLE-MAR2026)
+    const ZON_TO_COM_MED = {
+      '01':'01','02':'01','03':'02','04':'02','05':'03','06':'03',
+      '07':'04','08':'04','09':'05','10':'05','11':'06','12':'06',
+      '13':'07','14':'07','15':'08','16':'08','17':'09','18':'09',
+      '19':'10','20':'10','21':'11','22':'11','23':'12','24':'12',
+      '25':'13','26':'13','27':'14','28':'14','29':'15',
+      '30':'16','31':'16','32':'16'
+    };
+
+    // Cali: zona electoral → código de comuna (fuente: DIVIPOLE-MAR2026)
+    const ZON_TO_COM_CAL = {
+      '01':'01','02':'02','03':'02','04':'03','05':'04','06':'05',
+      '07':'06','08':'06','09':'07','10':'07','11':'08','12':'08',
+      '13':'09','14':'10','15':'10','16':'11','17':'11','18':'12',
+      '19':'13','20':'13','21':'14','22':'14','23':'15','24':'16',
+      '25':'17','26':'17','27':'18','28':'18','29':'19','30':'19',
+      '31':'20','32':'21','33':'22'
+    };
+
+    // ─── STATE ────────────────────────────────────────────────
+    let candIndex = [];
+    let currentCand = null;
+    let currentData = null;
+    let radarChart = null;
+    let acHighlight = -1;
+
+    // ─── LEAFLET MAP STATE ────────────────────────────────────
+    let leafletMap = null;
+    let geojsonLayer = null;          // siempre apunta a activeBoundaryLayer (compatibilidad interna)
+    let departamentosLayer = null;
+    let municipiosLayer = null;
+    let activeBoundaryLayer = null;
+    let depVoteData = {};   // { depCode: { nom, v } }
+    let maxDepVotes = 1;
+    let depRank = {};       // { depCode: rank (1=más votos) }
+    let currentDepCode = null;        // código electoral del depto actualmente en vista (null = vista nacional)
+    let munVoteData = {};             // { munCode: { nom, v } } — solo válido cuando currentDepCode está activo
+    let maxMunVotes = 1;
+    let deptGeoJsonCache = {};        // caché de GeoJSON raw por código electoral de depto
+    let zonVoteData = {};             // { zonCode: { nom, v } } — localidades/comunas
+    let maxZonVotes = 1;
+    let bogotaLocalidadCache = null;  // caché GeoJSON localidades Bogotá
+    let bogPuestosCache = null;       // caché JSON puestos Bogotá (BOG-PUESTOS.json)
+    let puestosLayer = null;          // LayerGroup de marcadores de puestos activos
+    let pueVoteData = {};             // { pueCode: { nom, v } } — votos por puesto activo
+    let medellinComunasCache = null;  // caché GeoJSON comunas Medellín
+    let caliComunasCache = null;      // caché GeoJSON comunas Cali
+    let currentMunCode = null;        // mun electoral activo en vista de ciudad (Medellín/Cali)
+
+    // ─── INIT LEAFLET MAP ────────────────────────────────────
+    function initLeafletMap() {
+      if (leafletMap) return;
+      // Wait for next paint so the container has real pixel dimensions
+      requestAnimationFrame(() => {
+        leafletMap = L.map('leaflet-map', {
+          center: [4.5, -74.0],
+          zoom: 5,
+          zoomSnap: 0.1,
+          zoomControl: true,
+          attributionControl: true,
+          scrollWheelZoom: true
+        });
+        leafletMap.getContainer().style.background = '#060810';
+        setTimeout(() => leafletMap.invalidateSize(), 300);
+        loadDepartamentosLayer();
+      });
+    }
+
+    // ─── NORMALIZACIÓN CÓDIGOS ELECTORALES ───────────────────
+    // Elimina padding de ceros: "01" → "1", "16" → "16", 5 → "5"
+    // Aplicar tanto al campo electoral del dataset (m.dep) como al
+    // electoral_id del GeoJSON para garantizar match exacto.
+    function normalizeDepCode(code) {
+      return String(Number(code));
+    }
+
+    // ─── HELPERS IDENTIFICACIÓN DE FEATURE ───────────────────
+    //
+    // DEPARTAMENTOS: llave principal = feature.properties.electoral_id
+    //   Valor asignado en DEPARTAMENTOS.json para todos los departamentos.
+    //   Retorna String sin padding, e.g. "1", "16", "23".
+    //   Fallbacks en orden: electoral_id → ISO id (DEPARTAMENTOS2.json) →
+    //   código DANE → nombre normalizado.
+    //
+    // MUNICIPIOS: llave separada — NO usar electoral_id de departamentos aquí.
+    //   La homologación de municipios se resolverá por su propio camino
+    //   (MPIO_CDPMP u otra tabla) cuando se active esa capa.
+    function depCodeFromFeature(props) {
+      // PRIMARY: electoral_id asignado al GeoJSON de departamentos
+      if (props.electoral_id != null && props.electoral_id !== '') {
+        const code = normalizeDepCode(props.electoral_id);
+        return code;
+      }
+
+      // FALLBACK 1: ISO 3166-2:CO id (DEPARTAMENTOS2.json: props.id = 'COANT', 'CONAR', …)
+      if (props.id && ISO_ID_TO_REGISTRADURIA[props.id]) {
+        return ISO_ID_TO_REGISTRADURIA[props.id];
+      }
+
+      // FALLBACK 2: código DANE → código electoral Registraduría
+      const dane = props.dpto_ccdgo || props.DPTO_CODI || props.code || null;
+      if (dane) {
+        const padded = String(dane).padStart(2, '0');
+        const electoral = DANE_TO_REGISTRADURIA[padded];
+        if (electoral) return electoral;
+      }
+
+      // FALLBACK 3: nombre del departamento → código electoral
+      const rawName = depNameFromFeature(props);
+      if (rawName) {
+        const electoral = NAME_TO_REGISTRADURIA[normalizeDepName(rawName)];
+        if (electoral) return electoral;
+      }
+
+      return null;
+    }
+
+    function depNameFromFeature(props) {
+      return props.name || props.NOMBRE_DPT || props.dpto_cnmbr || props.DPTO_CNMBR || '';
+    }
+
+    // ─── CAPA HELPER ─────────────────────────────────────────
+    // Cambia la capa activa del mapa sin usar flyTo / panTo / setView.
+    // NUNCA construir [lat, lng] para departamentos o municipios — solo para
+    // marcadores de puestos/zonas (capa premium futura en loadPuestosLayer).
+    function showBoundaryLayer(layer) {
+      if (activeBoundaryLayer && activeBoundaryLayer !== layer) {
+        leafletMap.removeLayer(activeBoundaryLayer);
+      }
+      layer.addTo(leafletMap);
+      activeBoundaryLayer = layer;
+      geojsonLayer = layer;   // alias para compatibilidad con resetStyle / onDepChange
+      leafletMap.invalidateSize();
+      try {
+        const bounds = layer.getBounds();
+        console.log('[Mapa] showBoundaryLayer → bounds.isValid():', bounds.isValid());
+        if (bounds.isValid()) {
+          const zoom = leafletMap.getBoundsZoom(bounds, false, L.point(10, 10)) - 0.3;
+          leafletMap.setView(bounds.getCenter(), zoom, { animate: false });
+          const offsetX = Math.round(leafletMap.getSize().x * 0.07);
+          leafletMap.panBy([-offsetX, 0], { animate: false });
+        } else {
+          console.warn('[Mapa] bounds inválidos — se omite fitBounds');
+        }
+      } catch(e) {
+        console.error('[Mapa] Error en getBounds/fitBounds:', e.message);
+      }
+    }
+
+    // ─── CAPA DEPARTAMENTOS (carga inicial) ──────────────────
+    // NOTA homologación: la falta de match entre códigos electorales y DANE
+    // afecta el COLOREADO (featureStyle), pero NO impide que el contorno
+    // del GeoJSON base se renderice. El contorno siempre debe verse.
+    async function loadDepartamentosLayer() {
+      console.log('[Mapa] Cargando departamentos…', DEPARTAMENTOS_GEOJSON_URL);
+      try {
+        const r = await fetch(DEPARTAMENTOS_GEOJSON_URL);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const geoData = await r.json();
+        const featureCount = geoData?.features?.length ?? 0;
+        console.log(`[Mapa] DEPARTAMENTOS cargados: ${featureCount} features`);
+        if (featureCount === 0) {
+          console.warn('[Mapa] GeoJSON de departamentos vacío — no se renderiza');
+          return;
+        }
+        // Log de la primera feature para identificar los campos de propiedades
+        console.log('[Mapa] Primera feature properties:', JSON.stringify(geoData.features[0].properties));
+        departamentosLayer = L.geoJSON(geoData, {
+          style: featureStyle,
+          onEachFeature: onEachFeature
+        });
+        showBoundaryLayer(departamentosLayer);
+      } catch(e) {
+        console.error('[Mapa] Error cargando departamentos:', e.message);
+      }
+    }
+
+    // ─── CAPA MUNICIPIOS (bajo demanda, una sola carga) ──────
+    // Llamar cuando el usuario seleccione un departamento específico.
+    // NOTA homologación: para colorear municipios, cruzar por
+    //   feature.properties.MPIO_CDPMP (código DANE 5 dígitos) contra tabla externa.
+    //   El contorno base se renderiza aunque no haya datos de votos.
+    // TODO (capa premium): puestos de votación sí usan [lat, lng] desde m.lat/m.lng —
+    //   crear loadPuestosLayer() en ruta separada con L.circleMarker().
+    async function loadMunicipiosLayer() {
+      if (!municipiosLayer) {
+        console.log('[Mapa] Cargando municipios…', MUNICIPIOS_GEOJSON_URL);
+        try {
+          const r = await fetch(MUNICIPIOS_GEOJSON_URL);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const geoData = await r.json();
+          const featureCount = geoData?.features?.length ?? 0;
+          console.log(`[Mapa] MUNICIPIOS cargados: ${featureCount} features`);
+          if (featureCount === 0) {
+            console.warn('[Mapa] GeoJSON de municipios vacío — no se renderiza');
+            return;
+          }
+          console.log('[Mapa] Primera feature properties:', JSON.stringify(geoData.features[0].properties));
+          municipiosLayer = L.geoJSON(geoData, {
+            style: featureStyle,
+            onEachFeature: onEachFeature
+          });
+        } catch(e) {
+          console.error('[Mapa] Error cargando municipios:', e.message);
+          return;
+        }
+      }
+      showBoundaryLayer(municipiosLayer);
+    }
+
+    // ─── VISTA NACIONAL ─────────────────────────────────────
+    function showNationalView() {
+      currentDepCode = null;
+      currentMunCode = null;
+      munVoteData = {};
+      maxMunVotes = 1;
+      zonVoteData = {};
+      maxZonVotes = 1;
+      hidePuestosLayer();
+      showComunasNotice(false);
+      const btn = document.getElementById('btn-volver-pais');
+      btn.textContent = '← País';
+      btn.style.display = 'none';
+      if (departamentosLayer) {
+        showBoundaryLayer(departamentosLayer);
+        departamentosLayer.setStyle(featureStyle);
+      } else if (activeBoundaryLayer) {
+        activeBoundaryLayer.setStyle(featureStyle);
+      }
+    }
+
+    function onVolverPais() {
+      showComunasNotice(false);
+      if (currentMunCode !== null) {
+        // Estamos en vista de ciudad (Medellín/Cali) → volver a municipios del depto
+        const savedDep = currentDepCode;
+        currentMunCode = null;
+        zonVoteData = {};
+        maxZonVotes = 1;
+        const btn = document.getElementById('btn-volver-pais');
+        btn.textContent = '← País';
+        buildMunVoteData(savedDep);
+        loadDepMunicipiosLayer(savedDep);
+      } else {
+        // Estamos en vista de depto → volver al país
+        const depSel = document.getElementById('filter-dep');
+        if (depSel) depSel.value = '';
+        const munSel = document.getElementById('filter-mun');
+        if (munSel) { munSel.innerHTML = '<option value="">— Todos los municipios —</option>'; munSel.disabled = true; }
+        showNationalView();
+      }
+    }
+
+    // ─── CAPA MUNICIPIOS POR DEPTO (bajo demanda, con caché) ──
+    async function loadDepMunicipiosLayer(depCode) {
+      if (!depCode) return;
+      document.getElementById('map-loading')?.classList.add('active');
+      try {
+        let geoData = deptGeoJsonCache[depCode];
+        if (!geoData) {
+          const paddedCode = String(depCode).padStart(2, '0');
+          const r = await fetch(`${DEPARTAMENTOS_MPS_URL}${paddedCode}.json`);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          geoData = await r.json();
+          deptGeoJsonCache[depCode] = geoData;
+        }
+        currentDepCode = depCode;
+        const newLayer = L.geoJSON(geoData, {
+          style: featureStyle,
+          onEachFeature: onEachFeature
+        });
+        showBoundaryLayer(newLayer);
+        document.getElementById('btn-volver-pais').style.display = 'block';
+      } catch(e) {
+        console.error('[Mapa] Error cargando municipios de depto:', e.message);
+      } finally {
+        document.getElementById('map-loading')?.classList.remove('active');
+      }
+    }
+
+    // ─── CONSTRUIR munVoteData PARA UN DEPTO ─────────────────
+    function buildMunVoteData(depCode) {
+      if (!currentData) return;
+      munVoteData = {};
+      (currentData.mesas || [])
+        .filter(m => normalizeDepCode(m.dep) === depCode)
+        .forEach(m => {
+          if (!munVoteData[m.mun]) munVoteData[m.mun] = { nom: m.munNom, v: 0 };
+          munVoteData[m.mun].v += m.v;
+        });
+      const vals = Object.values(munVoteData).map(d => d.v);
+      maxMunVotes = vals.length > 0 ? Math.max(...vals) : 1;
+    }
+
+    // ─── ROTAR GeoJSON -90° (Bogotá se ve mejor apaisado) ───
+    // Rota coordenadas alrededor del centroide de Bogotá.
+    // 1° lon ≈ 1° lat en el ecuador → distorsión < 0.3%.
+    function rotateGeoJSON90Left(geoData) {
+      const cx = -74.08, cy = 4.65;
+      function rc([lon, lat]) { return [cx - (lat - cy), cy + (lon - cx)]; }  // +90° (derecha)
+      function rg(geom) {
+        if (geom.type === 'Polygon')
+          return { ...geom, coordinates: geom.coordinates.map(r => r.map(rc)) };
+        if (geom.type === 'MultiPolygon')
+          return { ...geom, coordinates: geom.coordinates.map(p => p.map(r => r.map(rc))) };
+        return geom;
+      }
+      return { ...geoData, features: geoData.features.map(f => ({ ...f, geometry: rg(f.geometry) })) };
+    }
+
+    // ─── CONSTRUIR zonVoteData (Bogotá / Medellín / Cali) ───
+    // munCode: filtra por municipio (Medellín/Cali). null = todo el depto (Bogotá).
+    // zonToComMap: tabla zon→com (ZON_TO_COM_MED / ZON_TO_COM_CAL). null = Bogotá (zon == com).
+    function buildZonVoteData(depCode, munCode, zonToComMap) {
+      if (!currentData) return;
+      zonVoteData = {};
+      (currentData.mesas || [])
+        .filter(m => {
+          if (normalizeDepCode(m.dep) !== depCode) return false;
+          if (munCode && m.mun !== munCode) return false;
+          return true;
+        })
+        .forEach(m => {
+          const zon = String(m.zon || '').padStart(2, '0');
+          if (!zon || zon === '90' || zon === '98' || zon === '99') return;
+          const comKey = zonToComMap ? (zonToComMap[zon] || null) : zon;
+          if (!comKey) return;
+          if (!zonVoteData[comKey]) zonVoteData[comKey] = { nom: ZONAS_BOGOTA[comKey] || `Comuna ${parseInt(comKey)}`, v: 0 };
+          zonVoteData[comKey].v += m.v;
+        });
+      const vals = Object.values(zonVoteData).map(d => d.v);
+      maxZonVotes = vals.length > 0 ? Math.max(...vals) : 1;
+    }
+
+    // ─── CAPA LOCALIDADES BOGOTÁ (bajo demanda, con caché) ───
+    async function loadBogotaLocalidadLayer() {
+      document.getElementById('map-loading')?.classList.add('active');
+      try {
+        let geoData = bogotaLocalidadCache;
+        if (!geoData) {
+          const r = await fetch(BOGOTA_LOCALIDADES_URL);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          geoData = rotateGeoJSON90Left(await r.json());
+          bogotaLocalidadCache = geoData;
+        }
+        currentDepCode = '16';
+        const newLayer = L.geoJSON(geoData, {
+          style: featureStyle,
+          onEachFeature: onEachFeature
+        });
+        showBoundaryLayer(newLayer);
+        document.getElementById('btn-volver-pais').style.display = 'block';
+        showComunasNotice(true);
+      } catch(e) {
+        console.error('[Mapa] Error cargando localidades Bogotá:', e.message);
+      } finally {
+        document.getElementById('map-loading')?.classList.remove('active');
+      }
+    }
+
+    // ─── HELPER: mostrar/ocultar aviso corregimientos ────────
+    function showComunasNotice(show) {
+      const el = document.getElementById('notice-comunas');
+      if (el) el.style.display = show ? 'block' : 'none';
+    }
+
+    // ─── CAPA COMUNAS MEDELLÍN ───────────────────────────────
+    async function loadMedellinComunasLayer() {
+      document.getElementById('map-loading')?.classList.add('active');
+      try {
+        if (!medellinComunasCache) {
+          const r = await fetch(MEDELLIN_COMUNAS_URL);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          medellinComunasCache = await r.json();
+        }
+        currentMunCode = '001';
+        const newLayer = L.geoJSON(medellinComunasCache, { style: featureStyle, onEachFeature: onEachFeature });
+        showBoundaryLayer(newLayer);
+        const btn = document.getElementById('btn-volver-pais');
+        btn.textContent = '← Antioquia';
+        btn.style.display = 'block';
+        showComunasNotice(true);
+      } catch(e) {
+        console.error('[Mapa] Error cargando comunas Medellín:', e.message);
+      } finally {
+        document.getElementById('map-loading')?.classList.remove('active');
+      }
+    }
+
+    // ─── CAPA COMUNAS CALI ───────────────────────────────────
+    async function loadCaliComunasLayer() {
+      document.getElementById('map-loading')?.classList.add('active');
+      try {
+        if (!caliComunasCache) {
+          const r = await fetch(CALI_COMUNAS_URL);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          caliComunasCache = await r.json();
+        }
+        currentMunCode = '001';
+        const newLayer = L.geoJSON(caliComunasCache, { style: featureStyle, onEachFeature: onEachFeature });
+        showBoundaryLayer(newLayer);
+        const btn = document.getElementById('btn-volver-pais');
+        btn.textContent = '← Valle del Cauca';
+        btn.style.display = 'block';
+        showComunasNotice(true);
+      } catch(e) {
+        console.error('[Mapa] Error cargando comunas Cali:', e.message);
+      } finally {
+        document.getElementById('map-loading')?.classList.remove('active');
+      }
+    }
+
+    // ─── PUESTOS DE VOTACIÓN — BOGOTÁ ────────────────────────
+    // Aplica la misma rotación +90° que usamos para el GeoJSON de localidades,
+    // para que los marcadores caigan sobre los polígonos correctamente.
+    function rotateBogPt(lon, lat) {
+      const cx = -74.08, cy = 4.65;
+      return [cy + (lon - cx), cx - (lat - cy)];  // [rLat, rLon] para Leaflet
+    }
+
+    function hidePuestosLayer() {
+      if (puestosLayer) { leafletMap.removeLayer(puestosLayer); puestosLayer = null; }
+      pueVoteData = {};
+    }
+
+    function buildPueVoteData(depCode, munCode, zonCode) {
+      pueVoteData = {};
+      if (!currentData) return;
+      (currentData.mesas || [])
+        .filter(m => normalizeDepCode(m.dep) === depCode
+                  && m.mun === munCode
+                  && String(m.zon || '').padStart(2, '0') === zonCode)
+        .forEach(m => {
+          const pue = String(m.pue || '').padStart(2, '0');
+          if (!pueVoteData[pue]) pueVoteData[pue] = { nom: m.pueNom || `Puesto ${pue}`, v: 0 };
+          pueVoteData[pue].v += m.v;
+        });
+    }
+
+    async function showPuestosForZon(zonCode) {
+      if (!bogPuestosCache) {
+        try {
+          const r = await fetch(BOG_PUESTOS_URL);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          bogPuestosCache = await r.json();
+        } catch(e) {
+          console.error('[Puestos] Error cargando:', e.message);
+          return;
+        }
+      }
+      hidePuestosLayer();
+      buildPueVoteData('16', '001', zonCode);
+      const filtered = (bogPuestosCache.puestos || []).filter(p => p.zon === zonCode);
+      const markers = filtered.map(p => {
+        const [rLat, rLon] = rotateBogPt(p.lon, p.lat);
+        const vd = pueVoteData[p.pue];
+        const votes = vd ? vd.v : 0;
+        const m = L.circleMarker([rLat, rLon], {
+          radius: 5, fillColor: '#ffffff', color: '#0047FF',
+          weight: 1.5, fillOpacity: 0.9, opacity: 1
+        });
+        m.bindTooltip(
+          `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+            <strong style="color:#0047FF;font-size:.989rem">${p.nom}</strong><br/>
+            ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
+          </div>`,
+          { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
+        );
+        return m;
+      });
+      puestosLayer = L.layerGroup(markers).addTo(leafletMap);
+      console.log(`[Puestos] zon=${zonCode}: ${markers.length} puestos`);
+    }
+
+    // ─── DETECCIÓN CÁMARA TERRITORIAL ───────────────────────
+    function isCamaraTerritorial(corp) {
+      const c = (corp || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return (c.includes('CAMARA') || c.includes('CÁMARA'))
+        && !c.includes('INDIGENA') && !c.includes('AFRO') && !c.includes('PACIFICO');
+    }
+
+    function featureStyle(feature) {
+      const props = feature.properties;
+      let ratio = 0;
+      if (props.LocCodigo !== undefined) {
+        // Feature de localidad Bogotá
+        const zon = String(props.LocCodigo).padStart(2, '0');
+        const data = zonVoteData[zon];
+        ratio = data ? data.v / maxZonVotes : 0;
+      } else if (props.CODIGO !== undefined && props.NOMBRE !== undefined && props.IDENTIFICACION !== undefined) {
+        // Feature de comuna Medellín
+        const zon = String(props.CODIGO).padStart(2, '0');
+        const data = zonVoteData[zon];
+        ratio = data ? data.v / maxZonVotes : 0;
+      } else if (props.comuna !== undefined && props.nombre !== undefined && props.shape_leng !== undefined) {
+        // Feature de comuna Cali
+        const zon = String(props.comuna).padStart(2, '0');
+        const data = zonVoteData[zon];
+        ratio = data ? data.v / maxZonVotes : 0;
+      } else if (props.mun_electoral !== undefined) {
+        // Feature de municipio (capa por depto) — usar mun_elec (código electoral) para cruzar votos
+        const data = props.mun_elec ? munVoteData[props.mun_elec] : null;
+        ratio = data ? data.v / maxMunVotes : 0;
+      } else {
+        // Feature de departamento (capa nacional)
+        const code = depCodeFromFeature(props);
+        const data = depVoteData[code];
+        ratio = data ? data.v / maxDepVotes : 0;
+      }
+      return {
+        fillColor: voteColorLeaflet(ratio),
+        fillOpacity: ratio > 0 ? 0.82 : 0.55,
+        color: ratio > 0 ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)',
+        weight: ratio > 0 ? 1.5 : 1.0
+      };
+    }
+
+    function onEachFeature(feature, layer) {
+      const props = feature.properties;
+      const isLocFeature  = props.LocCodigo !== undefined;
+      const isMedFeature  = !isLocFeature && props.CODIGO !== undefined && props.IDENTIFICACION !== undefined;
+      const isCalFeature  = !isLocFeature && !isMedFeature && props.comuna !== undefined && props.shape_leng !== undefined;
+      const isCityFeature = isLocFeature || isMedFeature || isCalFeature;
+      const isMunFeature  = !isCityFeature && props.mun_electoral !== undefined;
+
+      if (isLocFeature) {
+        // ── Capa de localidades Bogotá ──
+        const zon = String(props.LocCodigo).padStart(2, '0');
+        const name = props.LocNombre || ZONAS_BOGOTA[zon] || `Zona ${zon}`;
+        layer.on({
+          mouseover: function(e) {
+            const data = zonVoteData[zon];
+            const votes = data ? data.v : 0;
+            layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
+            layer.bindTooltip(
+              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+                <strong style="color:#0047FF;font-size:.989rem">${name.toUpperCase()}</strong><br/>
+                ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
+              </div>`,
+              { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
+            ).openTooltip(e.latlng);
+          },
+          mouseout: function() {
+            if (geojsonLayer) geojsonLayer.resetStyle(layer);
+            layer.closeTooltip();
+          },
+          click: function() {
+            try {
+              const b = layer.getBounds();
+              if (b.isValid()) leafletMap.fitBounds(b, { padding: [30, 30] });
+            } catch(e) {}
+            showPuestosForZon(zon);
+          }
+        });
+      } else if (isMedFeature) {
+        // ── Capa de comunas Medellín ──
+        const zon = String(props.CODIGO).padStart(2, '0');
+        const name = props.NOMBRE || props.IDENTIFICACION || `Comuna ${zon}`;
+        layer.on({
+          mouseover: function(e) {
+            const data = zonVoteData[zon];
+            const votes = data ? data.v : 0;
+            layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
+            layer.bindTooltip(
+              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+                <strong style="color:#0047FF;font-size:.989rem">${name.toUpperCase()}</strong><br/>
+                ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
+              </div>`,
+              { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
+            ).openTooltip(e.latlng);
+          },
+          mouseout: function() { if (geojsonLayer) geojsonLayer.resetStyle(layer); layer.closeTooltip(); },
+          click: function() {
+            try { const b = layer.getBounds(); if (b.isValid()) leafletMap.fitBounds(b, { padding: [30,30] }); } catch(e) {}
+          }
+        });
+      } else if (isCalFeature) {
+        // ── Capa de comunas Cali ──
+        const zon = String(props.comuna).padStart(2, '0');
+        const name = props.nombre || `Comuna ${zon}`;
+        layer.on({
+          mouseover: function(e) {
+            const data = zonVoteData[zon];
+            const votes = data ? data.v : 0;
+            layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
+            layer.bindTooltip(
+              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+                <strong style="color:#0047FF;font-size:.989rem">${name.toUpperCase()}</strong><br/>
+                ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
+              </div>`,
+              { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
+            ).openTooltip(e.latlng);
+          },
+          mouseout: function() { if (geojsonLayer) geojsonLayer.resetStyle(layer); layer.closeTooltip(); },
+          click: function() {
+            try { const b = layer.getBounds(); if (b.isValid()) leafletMap.fitBounds(b, { padding: [30,30] }); } catch(e) {}
+          }
+        });
+      } else if (isMunFeature) {
+        // ── Capa de municipios de un departamento ──
+        const munCode = props.mun_elec;   // código electoral — clave en munVoteData y filter-mun
+        const name = (props.mpio_cnmbr || '?');
+        layer.on({
+          mouseover: function(e) {
+            const data = munCode ? munVoteData[munCode] : null;
+            const votes = data ? data.v : 0;
+            layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
+            layer.bindTooltip(
+              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+                <strong style="color:#0047FF;font-size:.989rem">${name.toUpperCase()}</strong><br/>
+                ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
+              </div>`,
+              { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
+            ).openTooltip(e.latlng);
+          },
+          mouseout: function() {
+            if (geojsonLayer) geojsonLayer.resetStyle(layer);
+            layer.closeTooltip();
+          },
+          click: function() {
+            const sel = document.getElementById('filter-mun');
+            if (sel && munCode) sel.value = munCode;
+            // Medellín (dep=1, mun=001) → cargar comunas
+            if (currentDepCode === '1' && munCode === '001') {
+              buildZonVoteData('1', '001', ZON_TO_COM_MED);
+              loadMedellinComunasLayer();
+              return;
+            }
+            // Cali (dep=31, mun=001) → cargar comunas
+            if (currentDepCode === '31' && munCode === '001') {
+              buildZonVoteData('31', '001', ZON_TO_COM_CAL);
+              loadCaliComunasLayer();
+              return;
+            }
+            try {
+              const b = layer.getBounds();
+              if (b.isValid()) leafletMap.fitBounds(b, { padding: [30, 30] });
+            } catch(e) {}
+          }
+        });
+      } else {
+        // ── Capa nacional de departamentos ──
+        const code = depCodeFromFeature(props);
+        const name = depNameFromFeature(props) || '?';
+        layer.on({
+          mouseover: function(e) {
+            const data = depVoteData[code];
+            const votes = data ? data.v : 0;
+            const rank = depRank[code];
+            const rankStr = rank ? `#${rank} ` : '';
+            layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
+            layer.bindTooltip(
+              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+                <strong style="color:#0047FF;font-size:.989rem">${rankStr}${name.toUpperCase()}</strong><br/>
+                ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
+              </div>`,
+              { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
+            ).openTooltip(e.latlng);
+          },
+          mouseout: function() {
+            if (geojsonLayer) geojsonLayer.resetStyle(layer);
+            layer.closeTooltip();
+          },
+          click: function() {
+            if (code) {
+              const sel = document.getElementById('filter-dep');
+              sel.value = code;
+              onDepChange();
+            }
+          }
+        });
+      }
+    }
+
+    function voteColorLeaflet(ratio) {
+      if (ratio <= 0)    return '#0d1b3e';  // sin votos — azul muy oscuro (visible sobre fondo)
+      if (ratio < 0.05)  return '#0c1e4a';  // mínimo — azul marino
+      if (ratio < 0.15)  return '#1d4ed8';  // bajo — azul
+      if (ratio < 0.30)  return '#0891b2';  // medio-bajo — cian
+      if (ratio < 0.50)  return '#15803d';  // medio — verde
+      if (ratio < 0.65)  return '#ca8a04';  // medio-alto — ámbar
+      if (ratio < 0.80)  return '#fef08a';  // alto — amarillo cálido
+      if (ratio < 0.92)  return '#ea580c';  // muy alto — naranja
+      return '#dc2626';                       // máximo — rojo
+    }
+
+    function refreshMapColors() {
+      if (!activeBoundaryLayer) return;
+      activeBoundaryLayer.setStyle(featureStyle);
+      // Log de cobertura: cuántos departamentos del mapa tienen datos electorales
+      if (Object.keys(depVoteData).length > 0) {
+        let colored = 0, noMatch = [];
+        activeBoundaryLayer.eachLayer(l => {
+          const eid = depCodeFromFeature(l.feature.properties);
+          if (eid && depVoteData[eid]) colored++;
+          else if (eid) noMatch.push(eid);
+        });
+        console.log(`[Mapa] Dptos coloreados: ${colored} | sin match electoral: ${noMatch.length > 0 ? noMatch.join(', ') : 'ninguno'}`);
+      }
+    }
+
+    // ─── LOAD INDEX ───────────────────────────────────────────
+    async function loadIndex() {
+      try {
+        const r = await fetch(`${S3}/endoso/index.json`);
+        if (!r.ok) throw new Error(`index.json devolvió ${r.status}`);
+        candIndex = (await r.json()).filter(c => isPartyEntry(c));
+        document.getElementById('load-state').style.display = 'none';
+        document.getElementById('placeholder-state').style.display = 'block';
+        const _lang = localStorage.getItem('rr-lang') || 'co';
+        const _t = candI18n[_lang] || candI18n.co;
+        const _hint = document.getElementById('search-hint');
+        if (_hint) { _hint.dataset.count = candIndex.length; _hint.textContent = _t.candidatesLoaded(candIndex.length); }
+        // No inicializar el mapa aquí: el panel aún está oculto (display:none)
+        // y Leaflet mediría el contenedor como 0×0 → NaN en coordenadas.
+        // El mapa se inicializa en loadCandData() cuando el panel ya es visible.
+      } catch(e) {
+        document.getElementById('load-state').innerHTML = `<div style="font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,100,100,.8);text-align:center;line-height:1.8;padding:2rem">Error al cargar el índice.<br/><span style="font-size:.6rem;color:rgba(255,255,255,.3)">${e.message}</span></div>`;
+      }
+    }
+
+    // ─── FILTRO: excluir partidos y movimientos ───────────────
+    // Regla: nombre === partido  →  es entrada de partido (no candidato)
+    // Más: nombres que empiezan con PARTIDO/MOVIMIENTO/COALICIÓN/ALIANZA/PACTO/LISTA
+    // (cubre 6 edge cases donde nombre ≈ partido con tilde diferente)
+    function isPartyEntry(c) {
+      if (c.nombre === c.partido) return true;
+      const n = (c.nombre || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+      return /^(PARTIDO|MOVIMIENTO|COALICION|ALIANZA|LISTA|PACTO)\b/.test(n);
+    }
+
+    // ─── AUTOCOMPLETE ─────────────────────────────────────────
+    function acMatch(q, nombre) {
+      const norm = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
+      const words = norm(q).split(/\s+/).filter(Boolean);
+      const tw = norm(nombre).split(/\s+/);
+      return words.every(w => tw.some(t => t.startsWith(w)));
+    }
+
+    function acSearch() {
+      const input = document.getElementById('ac-input');
+      const drop = document.getElementById('ac-dropdown');
+      const q = input.value.trim();
+      acHighlight = -1;
+      if (q.length < 2) { drop.classList.remove('open'); return; }
+      const results = candIndex.filter(c => acMatch(q, c.nombre)).slice(0, 20);
+      if (!results.length) { drop.classList.remove('open'); return; }
+      drop.innerHTML = results.map(c => {
+        const hn = c.nombre.replace(new RegExp(`(${q.split(' ').filter(Boolean).join('|')})`, 'gi'), '<mark>$1</mark>');
+        return `<div class="ac-item" data-slug="${c.slug}" onclick="selectCand('${c.slug}')">
+          ${hn}
+          <span class="ac-corp">${c.corp||''} · ${c.partido||''}</span>
+        </div>`;
+      }).join('');
+      drop.classList.add('open');
+    }
+
+    function acKey(e) {
+      const drop = document.getElementById('ac-dropdown');
+      const items = drop.querySelectorAll('.ac-item');
+      if (!items.length) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); acHighlight = Math.min(acHighlight+1, items.length-1); items.forEach((el,i)=>el.classList.toggle('highlighted',i===acHighlight)); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); acHighlight = Math.max(acHighlight-1, 0); items.forEach((el,i)=>el.classList.toggle('highlighted',i===acHighlight)); }
+      else if (e.key === 'Enter' && acHighlight >= 0) { e.preventDefault(); selectCand(items[acHighlight].dataset.slug); }
+      else if (e.key === 'Escape') { drop.classList.remove('open'); }
+    }
+
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.ac-wrap')) document.getElementById('ac-dropdown').classList.remove('open');
+    });
+
+    async function selectCand(slug) {
+      const meta = candIndex.find(c => c.slug === slug);
+      if (!meta) return;
+      const input = document.getElementById('ac-input');
+      input.value = meta.nombre;
+      input.classList.add('selected');
+      document.getElementById('ac-dropdown').classList.remove('open');
+      await loadCandData(meta);
+    }
+
+    // ─── LOAD CANDIDATE DATA ──────────────────────────────────
+    async function loadCandData(meta) {
+      document.getElementById('placeholder-state').style.display = 'none';
+      document.getElementById('pes-panel').style.display = 'grid';
+      document.getElementById('map-loading')?.classList.add('active');
+
+      // Ensure map is initialized now
+      setTimeout(() => {
+        if (!leafletMap) initLeafletMap();
+        else leafletMap.invalidateSize();
+      }, 80);
+
+      updateDlBtns();
+      setInfoVal('info-full-name', meta.nombre);
+      setInfoVal('cand-surname', splitName(meta.nombre).apellidos);
+      setInfoVal('cand-name-first', splitName(meta.nombre).nombres);
+      setInfoVal('info-partido', meta.partido || '—');
+      setInfoVal('info-corp', meta.corp || '—');
+      setInfoVal('corp-badge', (meta.corp || '').toUpperCase());
+      setInfoVal('corp-badge-header', (meta.corp || '—').toUpperCase());
+      setInfoVal('overall-num', '…');
+      setInfoVal('info-origen', '…');
+      // info-edad eliminado del HTML
+      setInfoVal('info-dep-top', '…');
+      setInfoVal('info-mun-top', '…');
+      setInfoVal('info-zona-top', '…');
+      setInfoVal('info-votos', fmt(meta.votos || 0));
+      setInfoVal('map-total-hint', `${fmt(meta.votos||0)} votos`);
+
+      // Photo — el nombre del JPG coincide exactamente con meta.slug (photoKey)
+      // Si en el futuro el identificador cambia, ajustar meta.slug → campo correcto del JSON
+      const photoEl = document.getElementById('candidate-photo');
+      const placeholderEl = document.getElementById('photo-placeholder');
+      const photoKey = meta.slug;   // e.g. "FULANO-DE-TAL-123" → fotos-candidatos/FULANO-DE-TAL-123.jpg
+      photoEl.src = `${S3_PHOTOS}/${photoKey}.jpg`;
+      photoEl.style.display = 'block';
+      placeholderEl.style.display = 'none';
+
+      // Ideology
+      document.getElementById('ideology-thumb').style.left = getIdeology(meta.partido || '') + '%';
+
+      // Reset map
+      depVoteData = {};
+      maxDepVotes = 1;
+      currentDepCode = null;
+      currentMunCode = null;
+      munVoteData = {};
+      maxMunVotes = 1;
+      zonVoteData = {};
+      maxZonVotes = 1;
+      hidePuestosLayer();
+      showComunasNotice(false);
+      const _depSel = document.getElementById('filter-dep');
+      if (_depSel) _depSel.value = '';
+      const _munSel = document.getElementById('filter-mun');
+      if (_munSel) { _munSel.innerHTML = '<option value="">— Todos los municipios —</option>'; _munSel.disabled = true; }
+      if (departamentosLayer) showBoundaryLayer(departamentosLayer);
+      refreshMapColors();
+
+      try {
+        const r = await fetch(`${S3}/endoso/${meta.slug}.json`);
+        if (!r.ok) throw new Error('No data');
+        const data = await r.json();
+        currentData = data;
+        currentCand = meta;
+        processData(data, meta);
+      } catch(e) {
+        processDataBasic(meta);
+      }
+    }
+
+    function splitName(nombre) {
+      const parts = nombre.trim().split(/\s+/);
+      if (parts.length <= 1) return { apellidos: nombre, nombres: '' };
+      const mid = Math.ceil(parts.length / 2);
+      return { apellidos: parts.slice(0, mid).join(' '), nombres: parts.slice(mid).join(' ') };
+    }
+
+    function getIdeology(partido) {
+      const norm = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+      const p = norm(partido);
+      for (const [key, val] of Object.entries(IDEOLOGY_MAP)) {
+        if (p.includes(norm(key))) return val;
+      }
+      return 50;
+    }
+
+    function processData(data, meta) {
+      const mesas = data.mesas || [];
+      let totalVotos = 0;
+      const depMap = {}, munMap = {};
+
+      mesas.forEach(m => {
+        totalVotos += m.v;
+
+        // Departamentos — llave = código electoral normalizado (sin padding), e.g. "1", "16", "23"
+        // normalizeDepCode garantiza match con feature.properties.electoral_id del GeoJSON.
+        // NOTA: municipios usan su propia llave separada (munKey) — no mezclar.
+        const depKey = normalizeDepCode(m.dep);
+        if (!depMap[depKey]) depMap[depKey] = { nom: m.depNom, v: 0 };
+        depMap[depKey].v += m.v;
+
+        // Municipios — llave compuesta depKey + munCode (sistema propio, independiente)
+        const munKey = `${depKey}-${m.mun}`;
+        if (!munMap[munKey]) munMap[munKey] = { nom: m.munNom, depNom: m.depNom, depCode: depKey, v: 0 };
+        munMap[munKey].v += m.v;
+      });
+
+      const deps = Object.entries(depMap).sort((a,b) => b[1].v - a[1].v);
+      const muns = Object.entries(munMap).sort((a,b) => b[1].v - a[1].v);
+
+      // Sub-municipal: zonas y puestos se calculan por separado
+      const zonas = computeTopZona(mesas);
+      const puestos = computeTopPuesto(mesas);
+
+      setInfoVal('info-votos', fmt(totalVotos));
+      setInfoVal('map-total-hint', `${fmt(totalVotos)} votos`);
+      setInfoVal('info-dep-top', deps[0]?.[1]?.nom || '—');
+      setInfoVal('info-mun-top', muns[0]?.[1]?.nom || '—');
+      setInfoVal('info-dptos', `${deps.length} dptos.`);
+      setInfoVal('info-mesas', `${fmt(mesas.length)} mesas`);
+      setInfoVal('overall-num', computeRating(totalVotos, deps.length));
+
+      // Zona y puesto: filas separadas, sin fallback cruzado
+      renderTopZona(zonas);
+      renderTopPuesto(puestos);
+
+      if (data.origen) setInfoVal('info-origen', data.origen);
+      else setInfoVal('info-origen', deps[0]?.[1]?.nom || meta.partido || '—');
+      // info-edad eliminado del panel derecho — campo removido del HTML
+
+      // Log de códigos electorales con votos (para diagnóstico de match con GeoJSON)
+      console.log('[Electoral] Dptos con votos:', deps.map(([k,d]) => `${k}=${d.nom}(${d.v})`).join(', '));
+
+      populateDepFilter(deps);
+
+      // Update Leaflet map
+      depVoteData = {};
+      depRank = {};
+      deps.forEach(([code, d], i) => { depVoteData[code] = d; depRank[code] = i + 1; });
+      maxDepVotes = deps[0]?.[1]?.v || 1;
+
+      if (isCamaraTerritorial(meta.corp) && deps.length > 0) {
+        // Cámara territorial: cargar directamente el depto con más votos
+        const topDep = deps[0][0];
+        const sel = document.getElementById('filter-dep');
+        if (sel) sel.value = topDep;
+        const munSel = document.getElementById('filter-mun');
+        if (munSel) munSel.innerHTML = '<option value="">— Todos los municipios —</option>';
+        if (topDep === '16') {
+          // Bogotá: mapa de localidades, no poblar selector de municipio
+          if (munSel) munSel.disabled = true;
+          buildZonVoteData(topDep);
+          loadBogotaLocalidadLayer();
+        } else {
+          // Otros deptos: poblar selector de municipios
+          const munMap = {};
+          (mesas || []).filter(m => normalizeDepCode(m.dep) === topDep).forEach(m => {
+            if (!munMap[m.mun]) munMap[m.mun] = { nom: m.munNom, v: 0 };
+            munMap[m.mun].v += m.v;
+          });
+          if (munSel) {
+            Object.entries(munMap).sort((a,b) => b[1].v - a[1].v).forEach(([code, d]) => {
+              const opt = document.createElement('option');
+              opt.value = code;
+              opt.textContent = `${d.nom} (${fmt(d.v)})`;
+              munSel.appendChild(opt);
+            });
+            munSel.disabled = !isLoggedIn();
+          }
+          buildMunVoteData(topDep);
+          loadDepMunicipiosLayer(topDep);
+        }
+        // map-loading se quita dentro de loadDepMunicipiosLayer / loadBogotaLocalidadLayer
+      } else {
+        refreshMapColors();
+        setTimeout(() => document.getElementById('map-loading')?.classList.remove('active'), 400);
+      }
+
+      buildTerritorialRadar({ meta, deps, muns, zonas, totalVotos });
+    }
+
+    // ─── ZONA MÁS VOTADA ─────────────────────────────────────
+    // Fórmula: agrupa mesas EXCLUSIVAMENTE por m.zon (zona administrativa).
+    // No usa m.pue. En Bogotá (munNom contiene "BOGOT") traduce m.zon a
+    // nombre de localidad con ZONAS_BOGOTA. En otros municipios muestra "Zona N".
+    // Retorna array de [key, {nom, munNom, depNom, v}] ordenado por votos desc.
+    function computeTopZona(mesas) {
+      const zonaMap = {};
+      mesas.forEach(m => {
+        if (!m.zon) return;   // solo procesa mesas con dato de zona
+        const depKey = normalizeDepCode(m.dep);
+        const key = `${depKey}-${m.mun}-zon${m.zon}`;
+        const nom = (m.munNom||'').toUpperCase().includes('BOGOT')
+          ? (ZONAS_BOGOTA[String(m.zon).padStart(2,'0')] || `Zona ${m.zon}`)
+          : `Zona ${m.zon}`;
+        if (!zonaMap[key]) zonaMap[key] = { nom, munNom: m.munNom, depNom: m.depNom, v: 0 };
+        zonaMap[key].v += m.v;
+      });
+      return Object.entries(zonaMap).sort((a,b) => b[1].v - a[1].v);
+    }
+
+    // ─── PUESTO MÁS VOTADO ───────────────────────────────────
+    // Fórmula: agrupa mesas EXCLUSIVAMENTE por m.pue + m.pueNom (puesto de votación).
+    // Además rastrea en qué zonas aparece cada puesto para añadir contexto
+    // sin inventar datos: 1 zona → muestra la zona; >1 zona → "Zona múltiple".
+    // Si la mesa no tiene m.pue o m.pueNom se ignora.
+    // Retorna array de [key, {nom, munNom, depNom, v, zonaCtx}] ordenado por votos desc.
+    function computeTopPuesto(mesas) {
+      const puestoMap = {};
+      mesas.forEach(m => {
+        if (!m.pue || !m.pueNom) return;   // solo mesas con dato de puesto
+        const depKey = normalizeDepCode(m.dep);
+        const key = `${depKey}-${m.mun}-${m.pue}`;
+        if (!puestoMap[key]) puestoMap[key] = { nom: m.pueNom, munNom: m.munNom, depNom: m.depNom, v: 0, _zonas: new Set() };
+        puestoMap[key].v += m.v;
+        if (m.zon) puestoMap[key]._zonas.add(String(m.zon));
+      });
+      return Object.entries(puestoMap)
+        .sort((a, b) => b[1].v - a[1].v)
+        .map(([k, d]) => {
+          let zonaCtx = null;
+          if (d._zonas.size === 1) {
+            const z = [...d._zonas][0];
+            const esBogota = (d.munNom || '').toUpperCase().includes('BOGOT');
+            zonaCtx = esBogota
+              ? (ZONAS_BOGOTA[String(z).padStart(2,'0')] || `Zona ${z}`)
+              : `Zona ${z}`;
+          } else if (d._zonas.size > 1) {
+            zonaCtx = 'Zona múltiple';
+          }
+          return [k, { nom: d.nom, munNom: d.munNom, depNom: d.depNom, v: d.v, zonaCtx }];
+        });
+    }
+
+    function renderTopZona(zonas) {
+      if (zonas.length > 0) {
+        const top = zonas[0][1];
+        setInfoVal('info-zona-top', top.nom + (top.munNom ? ` · ${top.munNom}` : ''));
+        setInfoVal('info-zona-votos', fmt(top.v) + ' votos');
+        document.getElementById('info-zona-votos-row').style.display = 'flex';
+      } else {
+        setInfoVal('info-zona-top', 'Sin dato');
+        document.getElementById('info-zona-votos-row').style.display = 'none';
+      }
+    }
+
+    function renderTopPuesto(puestos) {
+      if (puestos.length > 0) {
+        const top = puestos[0][1];
+        const zonaLabel = top.zonaCtx ? ` · ${top.zonaCtx}` : '';
+        setInfoVal('info-puesto-top', top.nom + (top.munNom ? ` · ${top.munNom}` : '') + zonaLabel);
+        setInfoVal('info-puesto-votos', fmt(top.v) + ' votos');
+        document.getElementById('info-puesto-votos-row').style.display = 'flex';
+      } else {
+        setInfoVal('info-puesto-top', 'Sin dato');
+        document.getElementById('info-puesto-votos-row').style.display = 'none';
+      }
+    }
+
+    function processDataBasic(meta) {
+      setInfoVal('overall-num', computeRating(meta.votos || 0, 5));
+      setInfoVal('info-origen', meta.partido || '—');
+      // info-edad eliminado del HTML — no se intenta rellenar
+      setInfoVal('info-dep-top', '—');
+      setInfoVal('info-mun-top', '—');
+      setInfoVal('info-zona-top', 'Sin dato');
+      setInfoVal('info-puesto-top', 'Sin dato');
+      setInfoVal('info-dptos', '—');
+      setInfoVal('info-mesas', '—');
+      document.getElementById('info-zona-votos-row').style.display = 'none';
+      document.getElementById('info-puesto-votos-row').style.display = 'none';
+      depVoteData = {};
+      depRank = {};
+      maxDepVotes = 1;
+      refreshMapColors();
+      setTimeout(() => document.getElementById('map-loading')?.classList.remove('active'), 400);
+    }
+
+    function computeRating(votos, deps) {
+      if (!votos) return 1;
+      const log = Math.log10(votos + 1);
+      const raw = Math.min(99, Math.round(log * 18));
+      return Math.max(1, raw);
+    }
+
+    function setInfoVal(id, val) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    }
+
+    // ─── AUTH HELPER ─────────────────────────────────────────
+    function isLoggedIn() { return !!localStorage.getItem('rr-token'); }
+    function isProOrHigher() {
+      const user = JSON.parse(localStorage.getItem('rr-user')||'null');
+      return !!(user && ['pro','premium','full'].includes(user.plan));
+    }
+
+    // ─── DESCARGA POR NIVEL ──────────────────────────────────
+    function canDlLevel(level) {
+      if (level === 'dep' || level === 'mun') return isLoggedIn();
+      if (level === 'zon') return isProOrHigher();
+      return isPremiumOrFull(); // pue, mesa
+    }
+
+    function updateDlBtns() {
+      const wrap = document.getElementById('dl-btns-wrap');
+      if (!wrap) return;
+      wrap.style.display = 'flex';
+      ['dep','mun','zon','pue','mesa'].forEach(level => {
+        const btn = document.getElementById(`dl-${level}`);
+        if (btn) btn.classList.toggle('locked', !canDlLevel(level));
+      });
+    }
+
+    function dlExcel(level) {
+      if (!canDlLevel(level)) {
+        const msgs = {
+          dep: 'Descarga por departamento disponible para usuarios <strong>registrados</strong>.',
+          mun: 'Descarga por municipio disponible para usuarios <strong>registrados</strong>.',
+          zon: 'Descarga por zona requiere plan <strong>Pro</strong> o superior.',
+          pue: 'Descarga por puesto requiere plan <strong>Premium</strong> o <strong>Full</strong>.',
+          mesa: 'Descarga por mesa requiere plan <strong>Premium</strong> o <strong>Full</strong>.'
+        };
+        const msg = document.getElementById('excel-lock-msg');
+        if (msg) msg.innerHTML = (msgs[level]||'') + '<br><a href="register.html">Regístrate</a> o consulta los <a href="pricing.html">planes disponibles</a>.';
+        document.getElementById('excel-lock-modal').classList.add('open');
+        return;
+      }
+      if (!currentData || !currentCand) return;
+      const mesas = currentData.mesas || [];
+      const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      let headers, rows;
+
+      if (level === 'dep') {
+        const map = {};
+        mesas.forEach(m => {
+          const k = String(m.dep);
+          if (!map[k]) map[k] = { dep:m.dep, depNom:m.depNom, v:0 };
+          map[k].v += m.v;
+        });
+        headers = ['Cod. Departamento','Nombre Departamento','Votos'];
+        rows = Object.values(map).sort((a,b)=>b.v-a.v).map(r=>[r.dep,r.depNom,r.v]);
+      } else if (level === 'mun') {
+        const map = {};
+        mesas.forEach(m => {
+          const k = `${m.dep}|${m.mun}`;
+          if (!map[k]) map[k] = { dep:m.dep, depNom:m.depNom, mun:m.mun, munNom:m.munNom, v:0 };
+          map[k].v += m.v;
+        });
+        headers = ['Cod. Departamento','Nombre Departamento','Cod. Municipio','Nombre Municipio','Votos'];
+        rows = Object.values(map).sort((a,b)=>b.v-a.v).map(r=>[r.dep,r.depNom,r.mun,r.munNom,r.v]);
+      } else if (level === 'zon') {
+        const map = {};
+        mesas.forEach(m => {
+          const k = `${m.dep}|${m.mun}|${m.zon}`;
+          if (!map[k]) map[k] = { dep:m.dep, depNom:m.depNom, mun:m.mun, munNom:m.munNom, zon:m.zon, v:0 };
+          map[k].v += m.v;
+        });
+        headers = ['Cod. Departamento','Nombre Departamento','Cod. Municipio','Nombre Municipio','Cod. Zona','Votos'];
+        rows = Object.values(map).sort((a,b)=>b.v-a.v).map(r=>[r.dep,r.depNom,r.mun,r.munNom,r.zon,r.v]);
+      } else if (level === 'pue') {
+        const map = {};
+        mesas.forEach(m => {
+          const k = `${m.dep}|${m.mun}|${m.zon}|${m.pue}`;
+          if (!map[k]) map[k] = { dep:m.dep, depNom:m.depNom, mun:m.mun, munNom:m.munNom, zon:m.zon, pue:m.pue, pueNom:m.pueNom, v:0 };
+          map[k].v += m.v;
+        });
+        headers = ['Cod. Departamento','Nombre Departamento','Cod. Municipio','Nombre Municipio','Cod. Zona','Cod. Puesto','Nombre Puesto','Votos'];
+        rows = Object.values(map).sort((a,b)=>b.v-a.v).map(r=>[r.dep,r.depNom,r.mun,r.munNom,r.zon,r.pue,r.pueNom,r.v]);
+      } else {
+        headers = ['Cod. Departamento','Nombre Departamento','Cod. Municipio','Nombre Municipio','Cod. Zona','Cod. Puesto','Nombre Puesto','Mesa','Votos'];
+        rows = [...mesas].sort((a,b)=>b.v-a.v).map(m=>[m.dep,m.depNom,m.mun,m.munNom,m.zon,m.pue,m.pueNom,m.mesa,m.v]);
+      }
+
+      let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<?mso-application progid="Excel.Sheet"?>\n';
+      xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n';
+      xml += '<Worksheet ss:Name="Votación">\n<Table>\n';
+      xml += '<Row>' + headers.map(h=>`<Cell><Data ss:Type="String">${esc(h)}</Data></Cell>`).join('') + '</Row>\n';
+      rows.forEach(row => {
+        xml += '<Row>' + row.map(v => typeof v==='number'
+          ? `<Cell><Data ss:Type="Number">${v}</Data></Cell>`
+          : `<Cell><Data ss:Type="String">${esc(v)}</Data></Cell>`).join('') + '</Row>\n';
+      });
+      xml += '</Table>\n</Worksheet>\n</Workbook>';
+      const blob = new Blob([xml], {type:'application/vnd.ms-excel'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `votacion-${level}-${currentCand.slug||'candidato'}.xls`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    }
+
+    // ─── MODAL MUNICIPIO ──────────────────────────────────────
+    function showMunModal() {
+      document.getElementById('mun-modal').classList.add('open');
+      const depSelect = document.getElementById('filter-dep');
+      const munSelect = document.getElementById('filter-mun');
+      if (depSelect) depSelect.value = '';
+      if (munSelect) { munSelect.value = ''; munSelect.disabled = true; }
+      if (departamentosLayer) showBoundaryLayer(departamentosLayer);
+    }
+    function hideMunModal() { document.getElementById('mun-modal').classList.remove('open'); }
+    document.addEventListener('click', e => {
+      if (e.target.id === 'mun-modal') hideMunModal();
+      if (e.target.id === 'excel-lock-modal') hideExcelModal();
+    });
+
+    // ─── EXCEL DOWNLOAD ──────────────────────────────────────
+    function hideExcelModal() { document.getElementById('excel-lock-modal').classList.remove('open'); }
+
+    function isPremiumOrFull() {
+      const user = JSON.parse(localStorage.getItem('rr-user')||'null');
+      return !!(user && (user.plan === 'premium' || user.plan === 'full'));
+    }
+
+    function updateExcelBtn() {
+      const btn = document.getElementById('btn-excel-dl');
+      if (!btn) return;
+      if (isPremiumOrFull()) {
+        btn.classList.remove('locked');
+        btn.title = 'Descargar datos del candidato en Excel';
+      } else {
+        btn.classList.add('locked');
+        btn.title = 'Exclusivo para usuarios Premium o Full';
+        btn.innerHTML = '🔒 Descargar votación excel candidato';
+      }
+    }
+
+    function onExcelDownload() {
+      if (!isPremiumOrFull()) {
+        document.getElementById('excel-lock-modal').classList.add('open');
+        return;
+      }
+      if (!currentData || !currentCand) return;
+      const mesas = currentData.mesas || [];
+      let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<?mso-application progid="Excel.Sheet"?>\n';
+      xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n';
+      xml += '<Worksheet ss:Name="Votación">\n<Table>\n';
+      xml += '<Row>';
+      ['Departamento','Municipio','Zona','Puesto','Votos'].forEach(h => {
+        xml += `<Cell><Data ss:Type="String">${h}</Data></Cell>`;
+      });
+      xml += '</Row>\n';
+      mesas.forEach(m => {
+        const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        xml += '<Row>';
+        xml += `<Cell><Data ss:Type="String">${esc(m.depNom)}</Data></Cell>`;
+        xml += `<Cell><Data ss:Type="String">${esc(m.munNom)}</Data></Cell>`;
+        xml += `<Cell><Data ss:Type="Number">${m.zon||0}</Data></Cell>`;
+        xml += `<Cell><Data ss:Type="String">${esc(m.pueNom||'')}</Data></Cell>`;
+        xml += `<Cell><Data ss:Type="Number">${m.v||0}</Data></Cell>`;
+        xml += '</Row>\n';
+      });
+      xml += '</Table>\n</Worksheet>\n</Workbook>';
+      const blob = new Blob([xml], {type:'application/vnd.ms-excel'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `votacion-${currentCand.slug||'candidato'}.xls`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    }
+
+    // ─── FILTROS DEP/MUN ──────────────────────────────────────
+    function populateDepFilter(deps) {
+      const sel = document.getElementById('filter-dep');
+      const current = sel.value;
+      sel.innerHTML = '<option value="">— Todos los departamentos —</option>';
+      deps.forEach(([code, d]) => {
+        const opt = document.createElement('option');
+        opt.value = code;
+        opt.textContent = `${d.nom} (${fmt(d.v)})`;
+        sel.appendChild(opt);
+      });
+      if (current) sel.value = current;
+    }
+
+    function onDepChange() {
+      const depCode = document.getElementById('filter-dep').value;
+      const munSel = document.getElementById('filter-mun');
+      munSel.innerHTML = '<option value="">— Todos los municipios —</option>';
+      munSel.disabled = true;
+
+      if (!depCode) {
+        showNationalView();
+        return;
+      }
+
+      if (!isLoggedIn()) { showMunModal(); return; }
+
+      // Bogotá → localidades en mapa, no poblar selector de municipio
+      if (depCode === '16') {
+        buildZonVoteData(depCode);
+        loadBogotaLocalidadLayer();
+        return;
+      }
+
+      // Poblar selector de municipios (otros departamentos)
+      if (currentData) {
+        const munMap = {};
+        (currentData.mesas || []).filter(m => normalizeDepCode(m.dep) === depCode).forEach(m => {
+          if (!munMap[m.mun]) munMap[m.mun] = { nom: m.munNom, v: 0 };
+          munMap[m.mun].v += m.v;
+        });
+        const muns = Object.entries(munMap).sort((a,b) => b[1].v - a[1].v);
+        muns.forEach(([code, d]) => {
+          const opt = document.createElement('option');
+          opt.value = code;
+          opt.textContent = `${d.nom} (${fmt(d.v)})`;
+          munSel.appendChild(opt);
+        });
+        if (muns.length > 0) munSel.disabled = false;
+      }
+
+      buildMunVoteData(depCode);
+      loadDepMunicipiosLayer(depCode);
+    }
+
+    function onMunChange() {
+      const munCode = document.getElementById('filter-mun').value;
+      if (!munCode || !activeBoundaryLayer) return;
+      activeBoundaryLayer.eachLayer(layer => {
+        const code = layer.feature?.properties?.mun_elec;
+        if (code && code === munCode) {
+          try {
+            const b = layer.getBounds();
+            if (b.isValid()) leafletMap.fitBounds(b, { padding: [30, 30] });
+          } catch(e) {}
+        }
+      });
+    }
+
+    // ─── RADAR / PENTÁGONO TERRITORIAL ───────────────────────
+    // buildTerritorialRadar({ meta, deps, muns, zonas, totalVotos })
+    //
+    // Nivel territorial según corporación:
+    //   SENADO    → 5 departamentos más votados
+    //   CAMARA    → 5 municipios más votados
+    //               ⤷ excepción Bogotá: si electoral_id del depto top === '16',
+    //                 usar las 5 zonas (localidades) más votadas
+    //   resto     → fallback: 5 departamentos
+    //
+    // Escala visual:
+    //   Porcentaje real = round((votos / totalVotos) * 100)
+    //   Clipping explícito: Math.min(60, pct) → ningún valor supera 60 en el eje
+    //   max del radar: 60  → equivale visualmente a "60% del total"
+    //   Un candidato con 30% en su top dpto ocupa el 50% del radio.
+    //   Valores > 60% quedan saturados en el borde.
+    //
+    // Detección "Cámara Bogotá":
+    //   deps[0][0] === '16' → código electoral de Bogotá D.C. (electoral_id en GeoJSON)
+    //   Función aplicada: buildTerritorialRadar (aquí mismo)
+    //   No existe campo "circunscripcion" en meta ni en data — si se agrega, usar ese.
+    const RADAR_MAX = 60;   // techo visual del radar — cambiar aquí si se ajusta
+
+    function buildTerritorialRadar({ meta, deps, muns, zonas, totalVotos }) {
+      if (!totalVotos) return;
+
+      const corp = (meta.corp || '').toUpperCase().trim();
+      // topDepElectoralId: código electoral del depto con más votos (depMap key = String(m.dep))
+      const topDepElectoralId = deps[0]?.[0] || '';
+      const esBogota = topDepElectoralId === '16';   // electoral_id de Bogotá D.C.
+
+      let items = [];
+      let radarTitle = 'Presencia territorial';
+
+      if (corp.includes('CAMARA') || corp.includes('CÁMARA')) {
+        if (esBogota) {
+          // Cámara Bogotá (electoral_id '16'): radar por zonas (localidades)
+          items = zonas.slice(0, 5).map(([,d]) => ({ nom: d.nom, v: d.v }));
+          radarTitle = 'Presencia territorial · zonas Bogotá';
+        } else {
+          // Cámara (otras circunscripciones): radar por municipios
+          items = muns.slice(0, 5).map(([,d]) => ({ nom: d.nom, v: d.v }));
+          radarTitle = 'Presencia territorial · municipios';
+        }
+      } else {
+        // SENADO u otra corporación: radar por departamentos
+        items = deps.slice(0, 5).map(([,d]) => ({ nom: d.nom, v: d.v }));
+        radarTitle = 'Presencia territorial · departamentos';
+      }
+
+      // Relleno mínimo: el radar necesita ≥3 puntos para tener forma
+      while (items.length < 5) items.push({ nom: '—', v: 0 });
+
+      const truncate = s => s.length > 10 ? s.slice(0, 10) + '…' : s;
+      const labels = items.map(d => truncate(d.nom));
+      // Clipping explícito en RADAR_MAX: porcentaje real calculado, luego saturado
+      const values = items.map(d => Math.min(RADAR_MAX, Math.round((d.v / totalVotos) * 100)));
+
+      // Actualizar título del radar
+      const titleEl = document.querySelector('.radar-title');
+      if (titleEl) titleEl.textContent = radarTitle;
+
+      if (radarChart) { radarChart.destroy(); radarChart = null; }
+      const ctx = document.getElementById('radar-canvas').getContext('2d');
+      radarChart = new Chart(ctx, {
+        type: 'radar',
+        data: {
+          labels,
+          datasets: [{
+            data: values,
+            backgroundColor: 'rgba(0,71,255,.2)',
+            borderColor: 'rgba(0,71,255,.8)',
+            borderWidth: 1.5,
+            pointBackgroundColor: 'rgba(0,71,255,.9)',
+            pointRadius: 3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            r: {
+              beginAtZero: true,
+              max: RADAR_MAX,   // techo visual = 60 (≡ 60% del total de votos)
+              ticks: { display: false },
+              grid: { color: 'rgba(255,255,255,.08)' },
+              angleLines: { color: 'rgba(255,255,255,.06)' },
+              pointLabels: { font: { family: "'DM Mono',monospace", size: 9 }, color: 'rgba(255,255,255,.4)' }
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(ctx) {
+                  const pct = ctx.raw;
+                  return ` ${pct}% del total de votos`;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // ─── PHOTO ERROR ─────────────────────────────────────────
+    function handlePhotoError() {
+      document.getElementById('candidate-photo').style.display = 'none';
+      document.getElementById('photo-placeholder').style.display = 'flex';
+    }
+
+    // ─── CURTAIN ─────────────────────────────────────────────
+    const curtain = document.getElementById('curtain');
+    curtain.classList.add('opening');
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{setTimeout(()=>{curtain.classList.remove('opening');curtain.classList.add('opened');},900);}));
+    function navTo(e, href) { e.preventDefault(); curtain.classList.remove('opened'); curtain.classList.add('closing'); setTimeout(()=>{ window.location.href = href; }, 1150); }
+
+    // ─── CURSOR ──────────────────────────────────────────────
+    const cur = document.getElementById('cursor'), ri = document.getElementById('cursorRing');
+    let mx=0, my=0, rx=0, ry=0;
+    document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; cur.style.left=mx+'px'; cur.style.top=my+'px'; });
+    (function loop() { rx+=(mx-rx)*.12; ry+=(my-ry)*.12; ri.style.left=rx+'px'; ri.style.top=ry+'px'; requestAnimationFrame(loop); })();
+    document.addEventListener('mouseover', e => {
+      if (e.target.closest('a,button,select,input')) { cur.style.transform='translate(-50%,-50%) scale(2.2)'; cur.style.background='transparent'; cur.style.border='1.5px solid #0047FF'; ri.style.opacity='0'; }
+      else { cur.style.transform='translate(-50%,-50%) scale(1)'; cur.style.background='#0047FF'; cur.style.border='none'; ri.style.opacity='.4'; }
+    });
+
+    // ─── NAV AUTH ────────────────────────────────────────────
+    function updateElectoralNav() {
+      const token = localStorage.getItem('rr-token');
+      const user = JSON.parse(localStorage.getItem('rr-user')||'null');
+      const area = document.getElementById('e-nav-auth');
+      if (!area) return;
+      const _nt = candI18n[localStorage.getItem('rr-lang')] || candI18n.co;
+      if (token && user) {
+        const pl = _nt.plans;
+        area.innerHTML = `<span class="e-user-plan">${pl[user.plan]||user.plan}</span><a href="dashboard.html" class="e-user-name" onclick="navTo(event,'dashboard.html')">${user.name.split(' ')[0]}</a><button class="e-btn-logout" onclick="eLogOut()">${_nt.logout}</button>`;
+      } else {
+        area.innerHTML = `<button class="e-btn-login" onclick="showLoginModal()">${_nt.login}</button><a href="register.html" class="e-btn-register" onclick="navTo(event,'register.html')">${_nt.register}</a>`;
+      }
+    }
+    async function eLogOut() {
+      const token = localStorage.getItem('rr-token');
+      if (token) { try { await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}}); } catch{} }
+      localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); updateElectoralNav();
+    }
+    updateElectoralNav();
+    updateDlBtns();
+
+    // ─── LOGIN MODAL ──────────────────────────────────────────
+    function showLoginModal() {
+      document.getElementById('login-overlay').classList.remove('hidden');
+      document.getElementById('lm-email').focus();
+    }
+    function hideLoginModal() {
+      document.getElementById('login-overlay').classList.add('hidden');
+      document.getElementById('lm-err').classList.remove('visible');
+      document.getElementById('lm-email').value = '';
+      document.getElementById('lm-password').value = '';
+      const btn = document.getElementById('lm-submit');
+      btn.textContent = 'Ingresar'; btn.disabled = false;
+    }
+    async function doLogin() {
+      const email = document.getElementById('lm-email').value.trim();
+      const pw    = document.getElementById('lm-password').value;
+      const err   = document.getElementById('lm-err');
+      const btn   = document.getElementById('lm-submit');
+      err.classList.remove('visible');
+      if (!email || !pw) { err.textContent = 'Completa todos los campos.'; err.classList.add('visible'); return; }
+      btn.textContent = '...'; btn.disabled = true;
+      try {
+        const res  = await fetch('https://rr-auth.reruizc.workers.dev/auth/login', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ email, password: pw }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          localStorage.setItem('rr-token', data.token);
+          localStorage.setItem('rr-user',  JSON.stringify(data.user));
+          hideLoginModal();
+          updateElectoralNav();
+        } else {
+          err.textContent = data.message || (candI18n[localStorage.getItem('rr-lang')] || candI18n.co).lmError;
+          err.classList.add('visible');
+          btn.textContent = 'Ingresar'; btn.disabled = false;
+        }
+      } catch {
+        err.textContent = 'Error de conexión. Intenta de nuevo.';
+        err.classList.add('visible');
+        btn.textContent = 'Ingresar'; btn.disabled = false;
+      }
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+      const loginOverlay = document.getElementById('login-overlay');
+      if (loginOverlay) loginOverlay.addEventListener('click', function(e) {
+        if (e.target === this) hideLoginModal();
+      });
+    });
+
+    window.__applyLang = function() { window.location.reload(); };
+
+    // ─── THEME ───────────────────────────────────────────────
+    function isDayHour() { const h = new Date().getHours(); return h >= 7 && h < 19; }
+    function applyTheme(day) {
+      document.body.classList.toggle('day-mode', day);
+      const btn = document.getElementById('theme-btn');
+      if (btn) {
+        const _tl = candI18n[localStorage.getItem('rr-lang')] || candI18n.co;
+        btn.textContent = day ? _tl.themeNight : _tl.themeDay;
+      }
+      localStorage.setItem('rr-theme', day ? 'day' : 'night');
+    }
+    function toggleTheme() { applyTheme(!document.body.classList.contains('day-mode')); }
+    (function initTheme() { const saved = localStorage.getItem('rr-theme'); if (saved) applyTheme(saved==='day'); else applyTheme(isDayHour()); })();
+
+    // ─── ORIENT ──────────────────────────────────────────────
+    function dismissOrient() { sessionStorage.setItem('orient-ok','1'); document.getElementById('orient-overlay').classList.remove('show'); }
+    if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) && !sessionStorage.getItem('orient-ok')) { document.getElementById('orient-overlay').classList.add('show'); }
+
+    // ─── LEAFLET TOOLTIP STYLE (injected) ────────────────────
+    const tooltipStyle = document.createElement('style');
+    tooltipStyle.textContent = `
+      .leaflet-dark-tooltip {
+        background: rgba(6,8,16,.97) !important;
+        border: 1px solid rgba(0,71,255,.55) !important;
+        border-radius: 0 !important;
+        color: #f4f3ef !important;
+        box-shadow: 0 4px 20px rgba(0,0,0,.6) !important;
+        padding: .4rem .7rem !important;
+      }
+      .leaflet-dark-tooltip::before { border-top-color: rgba(0,71,255,.55) !important; }
+      .leaflet-tooltip-bottom::before { border-bottom-color: rgba(0,71,255,.55) !important; }
+    `;
+    document.head.appendChild(tooltipStyle);
+
+    // ─── BOOT ────────────────────────────────────────────────
+    if (!isLoggedIn()) document.getElementById('mun-lock-overlay').classList.add('active');
+    applyLang(localStorage.getItem('rr-lang') || 'co');
+    loadIndex();
+  </script>
+  <script src="lang.js"></script>
+
+  <!-- MODAL LOGIN -->
+  <div id="login-overlay" class="login-overlay hidden">
+    <div class="login-modal">
+      <div class="login-modal-title" id="lm-title">Iniciar sesión</div>
+      <div class="login-modal-sub" id="lm-sub">Accede a tu cuenta para continuar</div>
+      <input type="email" id="lm-email" placeholder="Correo electrónico" autocomplete="email" />
+      <input type="password" id="lm-password" placeholder="Contraseña" autocomplete="current-password" />
+      <div class="login-modal-err" id="lm-err"></div>
+      <div class="login-modal-actions">
+        <button class="login-modal-btn" id="lm-submit" onclick="doLogin()">Ingresar</button>
+        <button class="login-modal-cancel" id="lm-cancel" onclick="hideLoginModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
