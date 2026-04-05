@@ -2450,14 +2450,14 @@
         const key = `${depKey}-${m.mun}-${zon}-${pue}`;
         if (!puestoMap[key]) puestoMap[key] = {
           nom: m.pueNom, munNom: m.munNom, depNom: m.depNom, v: 0,
-          zon, depKey, mun: m.mun
+          zon, pue, depKey, mun: m.mun
         };
         puestoMap[key].v += m.v;
       });
       return Object.entries(puestoMap)
         .sort((a, b) => b[1].v - a[1].v)
         .map(([k, d]) => {
-          const zon = d.zon;
+          const { zon, pue } = d;
           const isBog = d.depKey === '16' || (d.munNom || '').toUpperCase().includes('BOGOT');
           let comCtx = null;
           if (isBog) {
@@ -2468,6 +2468,9 @@
           } else if (d.depKey === '31' && d.mun === '001') {
             const cc = ZON_TO_COM_CAL[zon];
             comCtx = cc ? `COMUNA ${parseInt(cc)}` : `Zona ${parseInt(zon)}`;
+          } else if (d.depKey === '24' && d.mun === '001') {
+            const raw = (ZON_PUE_COM_PER[zon] || {})[pue] || null;
+            comCtx = raw ? raw.charAt(0) + raw.slice(1).toLowerCase() : `Zona ${parseInt(zon)}`;
           } else {
             comCtx = `Zona ${parseInt(zon)}`;
           }
