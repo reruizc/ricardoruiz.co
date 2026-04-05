@@ -1016,6 +1016,7 @@
     const BOG_PUESTOS_URL         = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/BOG-PUESTOS.json';
     const MEDELLIN_COMUNAS_URL    = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json';
     const CALI_COMUNAS_URL        = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/CALIX.json';
+    const PEREIRA_COMUNAS_URL     = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/PEREIRAX.json';
     const fmt = n => Number(n).toLocaleString('es-CO');
 
     // ─── I18N ─────────────────────────────────────────────────
@@ -1285,6 +1286,21 @@
       '31':'20','32':'21','33':'22'
     };
 
+    // Pereira: zona electoral → [nombres normalizados de comuna] (fuente: DIVIPOLE-MAR2026)
+    // Nota: varias zonas comparten comuna (05+06→CENTRO) y varias comunas por zona (07→4 comunas)
+    const ZON_TO_COM_PER = {
+      '01':['VILLA SANTANA'],
+      '02':['ORIENTE','VILLAVICENCIO'],
+      '03':['RIO OTUN'],
+      '04':['UNIVERSIDAD'],
+      '05':['CENTRO'],'06':['CENTRO'],
+      '07':['SAN NICOLAS','EL JARDIN','BOSTON','EL ROCIO'],
+      '08':['DEL CAFE','FERROCARRIL'],
+      '09':['EL POBLADO','CONSOTA'],
+      '10':['EL OSO','PERLA DEL OTUN','SAN JOAQUIN'],
+      '11':['OLIMPICA','CUBA'],
+    };
+
     // ─── STATE ────────────────────────────────────────────────
     let candIndex = [];
     let currentCand = null;
@@ -1313,6 +1329,7 @@
     let pueVoteData = {};             // { pueCode: { nom, v } } — votos por puesto activo
     let medellinComunasCache = null;  // caché GeoJSON comunas Medellín
     let caliComunasCache = null;      // caché GeoJSON comunas Cali
+    let pereiraComunasCache = null;   // caché GeoJSON comunas Pereira
     let currentMunCode = null;        // mun electoral activo en vista de ciudad (Medellín/Cali)
     let munZoomed = false;            // true cuando el usuario hizo zoom en un municipio específico
     let deptLayerBounds = null;       // bounds del depto activo (para volver desde municipio)
@@ -1594,9 +1611,9 @@
       return { ...geoData, features: geoData.features.map(f => ({ ...f, geometry: rg(f.geometry) })) };
     }
 
-    // ─── CONSTRUIR zonVoteData (Bogotá / Medellín / Cali) ───
-    // munCode: filtra por municipio (Medellín/Cali). null = todo el depto (Bogotá).
-    // zonToComMap: tabla zon→com (ZON_TO_COM_MED / ZON_TO_COM_CAL). null = Bogotá (zon == com).
+    // ─── CONSTRUIR zonVoteData (Bogotá / Medellín / Cali / Pereira) ───
+    // munCode: filtra por municipio (Medellín/Cali/Pereira). null = todo el depto (Bogotá).
+    // zonToComMap: tabla zon→com. Valores pueden ser string (MED/CAL) o array de nombres (PER). null = Bogotá.
     function buildZonVoteData(depCode, munCode, zonToComMap) {
       if (!currentData) return;
       zonVoteData = {};
@@ -1609,13 +1626,25 @@
         .forEach(m => {
           const zon = String(m.zon || '').padStart(2, '0');
           if (!zon || zon === '90' || zon === '98' || zon === '99') return;
-          const comKey = zonToComMap ? (zonToComMap[zon] || null) : zon;
-          if (!comKey) return;
-          if (!zonVoteData[comKey]) zonVoteData[comKey] = { nom: ZONAS_BOGOTA[comKey] || `Comuna ${parseInt(comKey)}`, v: 0 };
-          zonVoteData[comKey].v += m.v;
+          const rawVal = zonToComMap ? (zonToComMap[zon] || null) : zon;
+          if (!rawVal) return;
+          const comKeys = Array.isArray(rawVal) ? rawVal : [rawVal];
+          comKeys.forEach(comKey => {
+            if (!comKey) return;
+            if (!zonVoteData[comKey]) {
+              const numLabel = parseInt(comKey);
+              zonVoteData[comKey] = { nom: ZONAS_BOGOTA[comKey] || (isNaN(numLabel) ? comKey : `Comuna ${numLabel}`), v: 0 };
+            }
+            zonVoteData[comKey].v += m.v;
+          });
         });
       const vals = Object.values(zonVoteData).map(d => d.v);
       maxZonVotes = vals.length > 0 ? Math.max(...vals) : 1;
+    }
+
+    // Normalizar nombre de comuna Pereira para cruzar GeoJSON con zonVoteData
+    function normComuna(s) {
+      return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
     }
 
     // ─── CAPA LOCALIDADES BOGOTÁ (bajo demanda, con caché) ───
@@ -1691,6 +1720,29 @@
         showComunasNotice(true);
       } catch(e) {
         console.error('[Mapa] Error cargando comunas Cali:', e.message);
+      } finally {
+        document.getElementById('map-loading')?.classList.remove('active');
+      }
+    }
+
+    // ─── CAPA COMUNAS PEREIRA ────────────────────────────────
+    async function loadPereiraComunasLayer() {
+      document.getElementById('map-loading')?.classList.add('active');
+      try {
+        if (!pereiraComunasCache) {
+          const r = await fetch(PEREIRA_COMUNAS_URL);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          pereiraComunasCache = await r.json();
+        }
+        currentMunCode = '001';
+        const newLayer = L.geoJSON(pereiraComunasCache, { style: featureStyle, onEachFeature: onEachFeature });
+        showBoundaryLayer(newLayer);
+        const btn = document.getElementById('btn-volver-pais');
+        btn.textContent = '← Risaralda';
+        btn.style.display = 'block';
+        showComunasNotice(true);
+      } catch(e) {
+        console.error('[Mapa] Error cargando comunas Pereira:', e.message);
       } finally {
         document.getElementById('map-loading')?.classList.remove('active');
       }
@@ -1783,6 +1835,10 @@
         const zon = String(props.comuna).padStart(2, '0');
         const data = zonVoteData[zon];
         ratio = data ? data.v / maxZonVotes : 0;
+      } else if (props.Comuna !== undefined && props.FID !== undefined) {
+        // Feature de comuna Pereira (nombre normalizado como clave)
+        const data = zonVoteData[normComuna(props.Comuna)];
+        ratio = data ? data.v / maxZonVotes : 0;
       } else if (props.mun_electoral !== undefined) {
         // Feature de municipio (capa por depto) — usar mun_elec (código electoral) para cruzar votos
         const data = props.mun_elec ? munVoteData[props.mun_elec] : null;
@@ -1806,7 +1862,8 @@
       const isLocFeature  = props.LocCodigo !== undefined;
       const isMedFeature  = !isLocFeature && props.CODIGO !== undefined && props.IDENTIFICACION !== undefined;
       const isCalFeature  = !isLocFeature && !isMedFeature && props.comuna !== undefined && props.shape_leng !== undefined;
-      const isCityFeature = isLocFeature || isMedFeature || isCalFeature;
+      const isPerFeature  = !isLocFeature && !isMedFeature && !isCalFeature && props.Comuna !== undefined && props.FID !== undefined;
+      const isCityFeature = isLocFeature || isMedFeature || isCalFeature || isPerFeature;
       const isMunFeature  = !isCityFeature && props.mun_electoral !== undefined;
 
       if (isLocFeature) {
@@ -1882,6 +1939,28 @@
             try { const b = layer.getBounds(); if (b.isValid()) leafletMap.fitBounds(b, { padding: [30,30] }); } catch(e) {}
           }
         });
+      } else if (isPerFeature) {
+        // ── Capa de comunas Pereira ──
+        const comNorm = normComuna(props.Comuna);
+        const name = props.Comuna || comNorm;
+        layer.on({
+          mouseover: function(e) {
+            const data = zonVoteData[comNorm];
+            const votes = data ? data.v : 0;
+            layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
+            layer.bindTooltip(
+              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+                <strong style="color:#0047FF;font-size:.989rem">${name.toUpperCase()}</strong><br/>
+                ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
+              </div>`,
+              { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
+            ).openTooltip(e.latlng);
+          },
+          mouseout: function() { if (geojsonLayer) geojsonLayer.resetStyle(layer); layer.closeTooltip(); },
+          click: function() {
+            try { const b = layer.getBounds(); if (b.isValid()) leafletMap.fitBounds(b, { padding: [30,30] }); } catch(e) {}
+          }
+        });
       } else if (isMunFeature) {
         // ── Capa de municipios de un departamento ──
         const munCode = props.mun_elec;   // código electoral — clave en munVoteData y filter-mun
@@ -1916,6 +1995,12 @@
             if (currentDepCode === '31' && munCode === '001') {
               buildZonVoteData('31', '001', ZON_TO_COM_CAL);
               loadCaliComunasLayer();
+              return;
+            }
+            // Pereira (dep=24, mun=001) → cargar comunas
+            if (currentDepCode === '24' && munCode === '001') {
+              buildZonVoteData('24', '001', ZON_TO_COM_PER);
+              loadPereiraComunasLayer();
               return;
             }
             try {
