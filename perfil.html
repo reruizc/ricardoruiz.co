@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #f4f3ef;
+      --bg: #e6ded3;
       --black: #0a0a0a;
       --blue: #0047FF;
       --blue-light: #3d6fff;
@@ -50,7 +50,7 @@
       position: fixed; top: 0; left: 0; right: 0;
       display: flex; justify-content: space-between; align-items: center;
       padding: 1.2rem 3rem;
-      background: rgba(244,243,239,0.93); backdrop-filter: blur(12px);
+      background: rgba(230,222,211,0.85); backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border); z-index: 100;
     }
     .nav-logo-wrap { display: flex; align-items: center; gap: .75rem; text-decoration: none; }
@@ -275,6 +275,19 @@
       body { cursor: auto; }
       .cursor, .cursor-ring { display: none; }
     }
+
+    /* COUNTRY SELECTOR */
+    .country-selector-wrap { position: relative; }
+    .country-btn { font-family:'DM Mono',monospace; font-size:.72rem; letter-spacing:.08em; text-transform:uppercase; color:var(--gray); background:transparent; border:1.5px solid var(--gray-light); padding:.4rem .85rem; cursor:none; display:flex; align-items:center; transition:border-color .2s,color .2s; }
+    .country-btn:hover,.country-btn.open { border-color:var(--blue); color:var(--blue); }
+    .country-dropdown { position:absolute; top:calc(100% + 10px); right:0; background:#fff; border:1.5px solid var(--gray-light); min-width:190px; display:none; flex-direction:column; z-index:200; box-shadow:0 8px 24px rgba(0,0,0,.08); }
+    .country-dropdown.open { display:flex; }
+    .country-option { font-family:'DM Mono',monospace; font-size:.72rem; letter-spacing:.05em; padding:.7rem 1rem; cursor:none; display:flex; align-items:center; gap:.5rem; color:var(--black); border-bottom:1px solid var(--gray-light); transition:background .15s; user-select:none; }
+    .country-option:last-child { border-bottom:none; }
+    .country-option:hover { background:rgba(0,71,255,.05); }
+    .country-option.selected { color:var(--blue); }
+    .country-check { font-size:.65rem; width:12px; opacity:0; color:var(--blue); font-weight:bold; }
+    .country-option.selected .country-check { opacity:1; }
   </style>
 </head>
 <body>
@@ -287,15 +300,29 @@
       <a href="index.html" class="nav-back" id="nav-back">← Volver al inicio</a>
       <div id="nav-auth-area"></div>
     </div>
-    <a href="index.html" class="nav-logo-wrap">
-      <div class="nav-bars">
-        <div class="nav-bar" style="height:18px"></div>
-        <div class="nav-bar" style="height:14px"></div>
-        <div class="nav-bar" style="height:9px"></div>
-        <div class="nav-bar" style="height:5px"></div>
+    <div style="display:flex;align-items:center;gap:1rem;">
+      <div class="country-selector-wrap">
+        <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
+          <span id="countryBtnLabel">Colombia</span>
+          <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style="margin-left:6px;transition:transform .2s" id="countryChevron"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <div class="country-dropdown" id="countryDropdown">
+          <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
+          <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
+          <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
+          <div class="country-option" data-value="cn" onclick="selectCountry(this)"><span class="country-check">✓</span> 中国 / China</div>
+        </div>
       </div>
-      <span class="nav-logo">Ricardo<span>.</span>Ruiz</span>
-    </a>
+      <a href="index.html" class="nav-logo-wrap">
+        <div class="nav-bars">
+          <div class="nav-bar" style="height:18px"></div>
+          <div class="nav-bar" style="height:14px"></div>
+          <div class="nav-bar" style="height:9px"></div>
+          <div class="nav-bar" style="height:5px"></div>
+        </div>
+        <span class="nav-logo">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
   </nav>
 
   <div class="page-header">
@@ -402,7 +429,11 @@
       co: {
         lang: 'es',
         title: 'Perfil · Ricardo Ruiz',
+        country: 'Colombia',
         navBack: '← Volver al inicio',
+        navLogin: 'Iniciar sesión',
+        navRegister: 'Registrarse',
+        navLogout: 'Salir',
         pageLabel: 'Sobre mí · Perfil profesional',
         pageSub: 'Politólogo · Analista de datos · Asesor en política pública',
         metaDegree: 'Mg. Políticas Públicas · Uniandes',
@@ -429,7 +460,11 @@
       us: {
         lang: 'en',
         title: 'Profile · Ricardo Ruiz',
+        country: 'United States / UK',
         navBack: '← Back to home',
+        navLogin: 'Log in',
+        navRegister: 'Sign up',
+        navLogout: 'Log out',
         pageLabel: 'About · Professional profile',
         pageSub: 'Political Scientist · Data Analyst · Public Policy Advisor',
         metaDegree: 'M.Sc. Public Policy · Uniandes',
@@ -452,15 +487,63 @@
         ctaBtn: 'Get in touch →',
         footerRole: 'Political Scientist · Data Analyst · Public Policy Advisor',
         footerBack: '← ricardoruiz.co',
+      },
+      cn: {
+        lang: 'zh',
+        title: '个人资料 · Ricardo Ruiz',
+        country: '中国 / China',
+        navBack: '← 返回首页',
+        navLogin: '登录',
+        navRegister: '注册',
+        navLogout: '退出',
+        pageLabel: '关于我 · 职业简介',
+        pageSub: '政治学家 · 数据分析师 · 公共政策顾问',
+        metaDegree: '公共政策硕士 · Uniandes',
+        metaExp: '5年工作经验',
+        introLead1: 'Ricardo Ruiz是<strong>哥伦比亚国立大学</strong>政治学家，持有<strong>安第斯大学</strong>公共政策硕士学位，拥有五年将数据分析应用于政治、机构和选举过程的专业经验。',
+        introLead2: '他的工作专注于运用定量方法理解复杂政治现象，并将其转化为决策的战略依据。在其职业生涯中，他在选举行为领域开展了研究和分析，并发表了学术文章。',
+        skills: ['选举行为','定量分析','机器学习','随机森林','数据科学','公共政策','机构诊断','政治战略'],
+        bio1Label: '职业经历',
+        bio1: '他曾在全国性民调机构以及公私部门实体工作，参与选举分析、机构诊断和战略信息评估项目。他的经验结合了应用研究、大型数据库处理和分析工具开发，能够理解不同政府层级和组织中的政治、地域和社会动态。',
+        bio2Label: '方法论',
+        bio2: '在方法论层面，他的工作依托先进的定量技术，包括统计回归、分类模型和随机森林等机器学习方法以及其他数据科学方法。这些工具能够识别规律、细分复杂信息，并构建分析模型，为战略设计和政治情景理解提供坚实证据。',
+        bio3Label: '研究方向',
+        bio3: '然而，他的方法不仅限于技术分析。作为政治学家，他的工作致力于将定量结果与权力、政治行为和制度的定性解读相结合，使数据能够转化为真实的战略决策。统计分析与政治背景解读的结合是其专业方法的核心，尤其在选举过程、治理和公共决策相关项目中。',
+        bio4Label: '团队',
+        bio4: '在许多项目中，这项工作与跨学科团队合作开展，特别是在定位和决策战略设计方面。数据分析、政治背景解读和战略传播专业知识的结合，使定量证据能够转化为具体行动。在此过程中，技术分析与在政治竞选和组织定位方面拥有丰富经验的战略家的经验相结合，增强了为公共和私人行为者设计稳健战略的能力。',
+        bio5Label: '国际经验',
+        bio5: '除在哥伦比亚的经验外，他还参与了墨西哥、秘鲁和巴拉圭等国的咨询和选举分析工作，使他能够在不同政治体制、选举动态和制度背景下开展工作。',
+        countries: ['哥伦比亚','墨西哥','秘鲁','巴拉圭'],
+        ctaText: '准备好谈谈<br/>您的<em>项目</em>了吗？',
+        ctaBtn: '联系 Ricardo →',
+        footerRole: '政治学家 · 数据分析师 · 公共政策顾问',
+        footerBack: '← ricardoruiz.co',
       }
     };
 
+    const countryLabels = {
+      co: 'Colombia',
+      us: 'United States / UK',
+      mx: 'México',
+      cn: '中国 / China',
+    };
+
+    let currentLang = localStorage.getItem('rr-lang') || 'co';
+
     function setLanguage(lang) {
       const t = i18n[lang] || i18n.co;
+      const selectedCountry = localStorage.getItem('rr-country') || (lang === 'us' ? 'us' : lang === 'cn' ? 'cn' : 'co');
+      currentLang = lang;
+      localStorage.setItem('rr-lang', lang);
       document.getElementById('htmlRoot').lang = t.lang;
       document.getElementById('pageTitle').textContent = t.title;
+      document.getElementById('countryBtnLabel').textContent = countryLabels[selectedCountry] || t.country;
+      document.querySelectorAll('.country-option').forEach(opt => {
+        const isSelected = opt.dataset.value === selectedCountry;
+        opt.classList.toggle('selected', isSelected);
+      });
       document.getElementById('nav-back').textContent = t.navBack;
-      document.getElementById('page-label').childNodes[0].textContent = t.pageLabel;
+      document.getElementById('page-label').textContent = t.pageLabel;
       document.getElementById('page-sub').textContent = t.pageSub;
       document.getElementById('meta-degree').textContent = t.metaDegree;
       document.getElementById('meta-exp').textContent = t.metaExp;
@@ -490,11 +573,15 @@
       document.getElementById('cta-btn').textContent = t.ctaBtn;
       document.getElementById('footer-role').textContent = t.footerRole;
       document.getElementById('footer-back').textContent = t.footerBack;
+      updateNavAuth();
     }
 
     // Read language from localStorage, default to 'co'
     const lang = localStorage.getItem('rr-lang') || 'co';
     setLanguage(lang);
+
+    // Exponer __applyLang para lang.js
+    window.__applyLang = function(l) { setLanguage(l); };
 
     // Cursor
     const cur = document.getElementById('cursor'), ri = document.getElementById('cursorRing');
@@ -517,20 +604,25 @@
       const token = localStorage.getItem('rr-token');
       const user  = JSON.parse(localStorage.getItem('rr-user') || 'null');
       const area  = document.getElementById('nav-auth-area');
+      const t = i18n[currentLang] || i18n.co;
       if (!area) return;
       if (token && user) {
-        const planLabels = { free:'Free', pro:'Pro', premium:'Premium', basic:'Básico', analysis:'Análisis', full:'Completo' };
+        const planLabels = currentLang === 'us'
+          ? { free:'Free', pro:'Pro', premium:'Premium', basic:'Basic', analysis:'Analysis', full:'Full' }
+          : currentLang === 'cn'
+            ? { free:'Free', pro:'Pro', premium:'Premium', basic:'基础', analysis:'分析', full:'完整' }
+            : { free:'Free', pro:'Pro', premium:'Premium', basic:'Básico', analysis:'Análisis', full:'Completo' };
         area.innerHTML = `
           <div class="nav-user">
             <a href="dashboard.html" class="nav-user-plan">${planLabels[user.plan] || user.plan}</a>
             <a href="dashboard.html" class="nav-user-name">${user.name.split(' ')[0]}</a>
-            <button class="nav-logout" onclick="logOutPage()">Salir</button>
+            <button class="nav-logout" onclick="logOutPage()">${t.navLogout}</button>
           </div>`;
       } else {
         area.innerHTML = `
           <div class="nav-auth">
-            <a href="login.html" class="nav-login">Iniciar sesión</a>
-            <a href="register.html" class="nav-register">Registrarse</a>
+            <a href="login.html" class="nav-login">${t.navLogin}</a>
+            <a href="register.html" class="nav-register">${t.navRegister}</a>
           </div>`;
       }
     }
@@ -543,5 +635,6 @@
     }
     updateNavAuth();
   </script>
+  <script src="lang.js"></script>
 </body>
 </html>
