@@ -12,15 +12,21 @@
  */
 
 (function() {
-  const LANG_MAP   = { co: 'co', us: 'us', mx: 'co', cn: 'cn' };
-  const LABEL_MAP  = { co: 'Colombia', us: 'United States / UK', mx: 'México', cn: '中国 / China' };
-  const VAL_MAP    = { co: 'co', us: 'us', cn: 'cn' }; // inverso: lang → val del dropdown
+  const LANG_MAP  = { co: 'co', us: 'us', mx: 'co', cn: 'cn' };
+  const LABEL_MAP = { co: 'Colombia', us: 'United States / UK', mx: 'México', cn: '中国 / China' };
 
   function getSavedLang() {
     return localStorage.getItem('rr-lang') || 'co';
   }
 
+  function getSavedCountry() {
+    return localStorage.getItem('rr-country');
+  }
+
   function getSavedVal() {
+    const country = getSavedCountry();
+    if (country && LABEL_MAP[country]) return country;
+
     const lang = getSavedLang();
     if (lang === 'us') return 'us';
     if (lang === 'cn') return 'cn';
@@ -52,8 +58,15 @@
     if (btn)      btn.classList.remove('open');
     if (dropdown) dropdown.classList.remove('open');
 
+    localStorage.setItem('rr-country', val);
     localStorage.setItem('rr-lang', lang);
-    window.location.reload();
+    applySelector(val);
+
+    if (typeof window.__applyLang === 'function') {
+      window.__applyLang(lang, val);
+    } else {
+      window.location.reload();
+    }
   };
 
   // Cerrar dropdown al hacer clic fuera

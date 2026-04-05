@@ -995,6 +995,7 @@
     const DEPARTAMENTOS_GEOJSON_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/DEPARTAMENTOS2.json';
     const MUNICIPIOS_GEOJSON_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/MUNICIPIOS.json';
     const DEPARTAMENTOS_MPS_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Departamentos-mps/';
+    const BOGOTA_LOCALIDADES_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json';
     const fmt = n => Number(n).toLocaleString('es-CO');
 
     // ─── I18N ─────────────────────────────────────────────────
@@ -1264,6 +1265,9 @@
     let munVoteData = {};             // { munCode: { nom, v } } — solo válido cuando currentDepCode está activo
     let maxMunVotes = 1;
     let deptGeoJsonCache = {};        // caché de GeoJSON raw por código electoral de depto
+    let zonVoteData = {};             // { zonCode: { nom, v } } — localidades Bogotá (zon 01-20)
+    let maxZonVotes = 1;
+    let bogotaLocalidadCache = null;  // caché del GeoJSON de localidades de Bogotá
 
     // ─── INIT LEAFLET MAP ────────────────────────────────────
     function initLeafletMap() {
@@ -1431,6 +1435,8 @@
       currentDepCode = null;
       munVoteData = {};
       maxMunVotes = 1;
+      zonVoteData = {};
+      maxZonVotes = 1;
       document.getElementById('btn-volver-pais').style.display = 'none';
       if (departamentosLayer) {
         showBoundaryLayer(departamentosLayer);
@@ -1489,6 +1495,47 @@
       maxMunVotes = vals.length > 0 ? Math.max(...vals) : 1;
     }
 
+    // ─── CONSTRUIR zonVoteData PARA BOGOTÁ ──────────────────
+    function buildZonVoteData(depCode) {
+      if (!currentData) return;
+      zonVoteData = {};
+      (currentData.mesas || [])
+        .filter(m => normalizeDepCode(m.dep) === depCode)
+        .forEach(m => {
+          const zon = String(m.zon || '').padStart(2, '0');
+          if (!zon || zon === '90' || zon === '98' || zon === '99') return;
+          if (!zonVoteData[zon]) zonVoteData[zon] = { nom: ZONAS_BOGOTA[zon] || `Zona ${zon}`, v: 0 };
+          zonVoteData[zon].v += m.v;
+        });
+      const vals = Object.values(zonVoteData).map(d => d.v);
+      maxZonVotes = vals.length > 0 ? Math.max(...vals) : 1;
+    }
+
+    // ─── CAPA LOCALIDADES BOGOTÁ (bajo demanda, con caché) ───
+    async function loadBogotaLocalidadLayer() {
+      document.getElementById('map-loading')?.classList.add('active');
+      try {
+        let geoData = bogotaLocalidadCache;
+        if (!geoData) {
+          const r = await fetch(BOGOTA_LOCALIDADES_URL);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          geoData = await r.json();
+          bogotaLocalidadCache = geoData;
+        }
+        currentDepCode = '16';
+        const newLayer = L.geoJSON(geoData, {
+          style: featureStyle,
+          onEachFeature: onEachFeature
+        });
+        showBoundaryLayer(newLayer);
+        document.getElementById('btn-volver-pais').style.display = 'block';
+      } catch(e) {
+        console.error('[Mapa] Error cargando localidades Bogotá:', e.message);
+      } finally {
+        document.getElementById('map-loading')?.classList.remove('active');
+      }
+    }
+
     // ─── DETECCIÓN CÁMARA TERRITORIAL ───────────────────────
     function isCamaraTerritorial(corp) {
       const c = (corp || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -1499,7 +1546,12 @@
     function featureStyle(feature) {
       const props = feature.properties;
       let ratio = 0;
-      if (props.mun_electoral !== undefined) {
+      if (props.LocCodigo !== undefined) {
+        // Feature de localidad Bogotá
+        const zon = String(props.LocCodigo).padStart(2, '0');
+        const data = zonVoteData[zon];
+        ratio = data ? data.v / maxZonVotes : 0;
+      } else if (props.mun_electoral !== undefined) {
         // Feature de municipio (capa por depto) — usar mun_elec (código electoral) para cruzar votos
         const data = props.mun_elec ? munVoteData[props.mun_elec] : null;
         ratio = data ? data.v / maxMunVotes : 0;
@@ -1519,9 +1571,38 @@
 
     function onEachFeature(feature, layer) {
       const props = feature.properties;
-      const isMunFeature = props.mun_electoral !== undefined;
+      const isLocFeature = props.LocCodigo !== undefined;
+      const isMunFeature = !isLocFeature && props.mun_electoral !== undefined;
 
-      if (isMunFeature) {
+      if (isLocFeature) {
+        // ── Capa de localidades Bogotá ──
+        const zon = String(props.LocCodigo).padStart(2, '0');
+        const name = props.LocNombre || ZONAS_BOGOTA[zon] || `Zona ${zon}`;
+        layer.on({
+          mouseover: function(e) {
+            const data = zonVoteData[zon];
+            const votes = data ? data.v : 0;
+            layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
+            layer.bindTooltip(
+              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+                <strong style="color:#0047FF;font-size:.989rem">${name.toUpperCase()}</strong><br/>
+                ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
+              </div>`,
+              { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
+            ).openTooltip(e.latlng);
+          },
+          mouseout: function() {
+            if (geojsonLayer) geojsonLayer.resetStyle(layer);
+            layer.closeTooltip();
+          },
+          click: function() {
+            try {
+              const b = layer.getBounds();
+              if (b.isValid()) leafletMap.fitBounds(b, { padding: [30, 30] });
+            } catch(e) {}
+          }
+        });
+      } else if (isMunFeature) {
         // ── Capa de municipios de un departamento ──
         const munCode = props.mun_elec;   // código electoral — clave en munVoteData y filter-mun
         const name = (props.mpio_cnmbr || '?');
@@ -1729,6 +1810,8 @@
       currentDepCode = null;
       munVoteData = {};
       maxMunVotes = 1;
+      zonVoteData = {};
+      maxZonVotes = 1;
       const _depSel = document.getElementById('filter-dep');
       if (_depSel) _depSel.value = '';
       const _munSel = document.getElementById('filter-mun');
@@ -1824,26 +1907,33 @@
         const topDep = deps[0][0];
         const sel = document.getElementById('filter-dep');
         if (sel) sel.value = topDep;
-        // Poblar selector de municipios
-        const munMap = {};
-        (mesas || []).filter(m => normalizeDepCode(m.dep) === topDep).forEach(m => {
-          if (!munMap[m.mun]) munMap[m.mun] = { nom: m.munNom, v: 0 };
-          munMap[m.mun].v += m.v;
-        });
         const munSel = document.getElementById('filter-mun');
-        if (munSel) {
-          munSel.innerHTML = '<option value="">— Todos los municipios —</option>';
-          Object.entries(munMap).sort((a,b) => b[1].v - a[1].v).forEach(([code, d]) => {
-            const opt = document.createElement('option');
-            opt.value = code;
-            opt.textContent = `${d.nom} (${fmt(d.v)})`;
-            munSel.appendChild(opt);
+        if (munSel) munSel.innerHTML = '<option value="">— Todos los municipios —</option>';
+        if (topDep === '16') {
+          // Bogotá: mapa de localidades, no poblar selector de municipio
+          if (munSel) munSel.disabled = true;
+          buildZonVoteData(topDep);
+          loadBogotaLocalidadLayer();
+        } else {
+          // Otros deptos: poblar selector de municipios
+          const munMap = {};
+          (mesas || []).filter(m => normalizeDepCode(m.dep) === topDep).forEach(m => {
+            if (!munMap[m.mun]) munMap[m.mun] = { nom: m.munNom, v: 0 };
+            munMap[m.mun].v += m.v;
           });
-          munSel.disabled = !isLoggedIn();
+          if (munSel) {
+            Object.entries(munMap).sort((a,b) => b[1].v - a[1].v).forEach(([code, d]) => {
+              const opt = document.createElement('option');
+              opt.value = code;
+              opt.textContent = `${d.nom} (${fmt(d.v)})`;
+              munSel.appendChild(opt);
+            });
+            munSel.disabled = !isLoggedIn();
+          }
+          buildMunVoteData(topDep);
+          loadDepMunicipiosLayer(topDep);
         }
-        buildMunVoteData(topDep);
-        loadDepMunicipiosLayer(topDep);
-        // map-loading se quita dentro de loadDepMunicipiosLayer
+        // map-loading se quita dentro de loadDepMunicipiosLayer / loadBogotaLocalidadLayer
       } else {
         refreshMapColors();
         setTimeout(() => document.getElementById('map-loading')?.classList.remove('active'), 400);
@@ -2162,7 +2252,14 @@
 
       if (!isLoggedIn()) { showMunModal(); return; }
 
-      // Poblar selector de municipios
+      // Bogotá → localidades en mapa, no poblar selector de municipio
+      if (depCode === '16') {
+        buildZonVoteData(depCode);
+        loadBogotaLocalidadLayer();
+        return;
+      }
+
+      // Poblar selector de municipios (otros departamentos)
       if (currentData) {
         const munMap = {};
         (currentData.mesas || []).filter(m => normalizeDepCode(m.dep) === depCode).forEach(m => {
@@ -2179,7 +2276,6 @@
         if (muns.length > 0) munSel.disabled = false;
       }
 
-      // Cargar capa de municipios del departamento seleccionado
       buildMunVoteData(depCode);
       loadDepMunicipiosLayer(depCode);
     }
