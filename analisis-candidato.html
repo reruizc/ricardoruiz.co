@@ -899,7 +899,7 @@
           <div class="map-container">
             <div class="map-loading" id="map-loading">Cargando mapa…</div>
             <div id="leaflet-map"></div>
-            <div id="notice-comunas">Solo comunas urbanas · corregimientos próximamente</div>
+            <div id="notice-comunas">Vista por comunas y territorios urbanos · para mayor precisión descarga por zona o puesto</div>
           </div>
         </div>
 
@@ -1262,8 +1262,28 @@
         .normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
     }
 
-    // Zonas de Bogotá
+    // Zonas de Bogotá (zon == localidad, mapping directo)
     const ZONAS_BOGOTA = {'01':'Usaquén','02':'Chapinero','03':'Santa Fe','04':'San Cristóbal','05':'Usme','06':'Tunjuelito','07':'Bosa','08':'Kennedy','09':'Fontibón','10':'Engativá','11':'Suba','12':'Barrios Unidos','13':'Teusaquillo','14':'Los Mártires','15':'Antonio Nariño','16':'Puente Aranda','17':'La Candelaria','18':'Rafael Uribe Uribe','19':'Ciudad Bolívar','20':'Sumapaz'};
+
+    // Medellín: zona electoral → código de comuna (fuente: DIVIPOLE-MAR2026)
+    const ZON_TO_COM_MED = {
+      '01':'01','02':'01','03':'02','04':'02','05':'03','06':'03',
+      '07':'04','08':'04','09':'05','10':'05','11':'06','12':'06',
+      '13':'07','14':'07','15':'08','16':'08','17':'09','18':'09',
+      '19':'10','20':'10','21':'11','22':'11','23':'12','24':'12',
+      '25':'13','26':'13','27':'14','28':'14','29':'15',
+      '30':'16','31':'16','32':'16'
+    };
+
+    // Cali: zona electoral → código de comuna (fuente: DIVIPOLE-MAR2026)
+    const ZON_TO_COM_CAL = {
+      '01':'01','02':'02','03':'02','04':'03','05':'04','06':'05',
+      '07':'06','08':'06','09':'07','10':'07','11':'08','12':'08',
+      '13':'09','14':'10','15':'10','16':'11','17':'11','18':'12',
+      '19':'13','20':'13','21':'14','22':'14','23':'15','24':'16',
+      '25':'17','26':'17','27':'18','28':'18','29':'19','30':'19',
+      '31':'20','32':'21','33':'22'
+    };
 
     // ─── STATE ────────────────────────────────────────────────
     let candIndex = [];
@@ -1553,8 +1573,9 @@
     }
 
     // ─── CONSTRUIR zonVoteData (Bogotá / Medellín / Cali) ───
-    // munCode opcional: si se pasa, filtra además por municipio (Medellín/Cali)
-    function buildZonVoteData(depCode, munCode) {
+    // munCode: filtra por municipio (Medellín/Cali). null = todo el depto (Bogotá).
+    // zonToComMap: tabla zon→com (ZON_TO_COM_MED / ZON_TO_COM_CAL). null = Bogotá (zon == com).
+    function buildZonVoteData(depCode, munCode, zonToComMap) {
       if (!currentData) return;
       zonVoteData = {};
       (currentData.mesas || [])
@@ -1566,8 +1587,10 @@
         .forEach(m => {
           const zon = String(m.zon || '').padStart(2, '0');
           if (!zon || zon === '90' || zon === '98' || zon === '99') return;
-          if (!zonVoteData[zon]) zonVoteData[zon] = { nom: ZONAS_BOGOTA[zon] || `Zona ${zon}`, v: 0 };
-          zonVoteData[zon].v += m.v;
+          const comKey = zonToComMap ? (zonToComMap[zon] || null) : zon;
+          if (!comKey) return;
+          if (!zonVoteData[comKey]) zonVoteData[comKey] = { nom: ZONAS_BOGOTA[comKey] || `Comuna ${parseInt(comKey)}`, v: 0 };
+          zonVoteData[comKey].v += m.v;
         });
       const vals = Object.values(zonVoteData).map(d => d.v);
       maxZonVotes = vals.length > 0 ? Math.max(...vals) : 1;
@@ -1591,6 +1614,7 @@
         });
         showBoundaryLayer(newLayer);
         document.getElementById('btn-volver-pais').style.display = 'block';
+        showComunasNotice(true);
       } catch(e) {
         console.error('[Mapa] Error cargando localidades Bogotá:', e.message);
       } finally {
@@ -1799,13 +1823,13 @@
             if (sel && munCode) sel.value = munCode;
             // Medellín (dep=1, mun=001) → cargar comunas
             if (currentDepCode === '1' && munCode === '001') {
-              buildZonVoteData('1', '001');
+              buildZonVoteData('1', '001', ZON_TO_COM_MED);
               loadMedellinComunasLayer();
               return;
             }
             // Cali (dep=31, mun=001) → cargar comunas
             if (currentDepCode === '31' && munCode === '001') {
-              buildZonVoteData('31', '001');
+              buildZonVoteData('31', '001', ZON_TO_COM_CAL);
               loadCaliComunasLayer();
               return;
             }
