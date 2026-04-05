@@ -307,6 +307,23 @@
       flex-shrink: 0;
     }
     #btn-volver-pais:hover { background: var(--blue); color: #fff; }
+    #notice-comunas {
+      display: none;
+      position: absolute;
+      bottom: .6rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 800;
+      background: rgba(6,8,16,.88);
+      border: 1px solid rgba(0,71,255,.4);
+      color: rgba(255,255,255,.65);
+      font-family: 'DM Mono', monospace;
+      font-size: .6rem;
+      letter-spacing: .06em;
+      padding: .3rem .7rem;
+      white-space: nowrap;
+      pointer-events: none;
+    }
     .map-legend-title {
       font-family: 'DM Mono', monospace;
       font-size: .65rem;
@@ -882,6 +899,7 @@
           <div class="map-container">
             <div class="map-loading" id="map-loading">Cargando mapa…</div>
             <div id="leaflet-map"></div>
+            <div id="notice-comunas">Solo comunas urbanas · corregimientos próximamente</div>
           </div>
         </div>
 
@@ -995,7 +1013,9 @@
     const DEPARTAMENTOS_GEOJSON_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/DEPARTAMENTOS2.json';
     const MUNICIPIOS_GEOJSON_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/MUNICIPIOS.json';
     const DEPARTAMENTOS_MPS_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Departamentos-mps/';
-    const BOGOTA_LOCALIDADES_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json';
+    const BOGOTA_LOCALIDADES_URL  = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json';
+    const MEDELLIN_COMUNAS_URL    = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json';
+    const CALI_COMUNAS_URL        = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/CALIX.json';
     const fmt = n => Number(n).toLocaleString('es-CO');
 
     // ─── I18N ─────────────────────────────────────────────────
@@ -1265,9 +1285,12 @@
     let munVoteData = {};             // { munCode: { nom, v } } — solo válido cuando currentDepCode está activo
     let maxMunVotes = 1;
     let deptGeoJsonCache = {};        // caché de GeoJSON raw por código electoral de depto
-    let zonVoteData = {};             // { zonCode: { nom, v } } — localidades Bogotá (zon 01-20)
+    let zonVoteData = {};             // { zonCode: { nom, v } } — localidades/comunas
     let maxZonVotes = 1;
-    let bogotaLocalidadCache = null;  // caché del GeoJSON de localidades de Bogotá
+    let bogotaLocalidadCache = null;  // caché GeoJSON localidades Bogotá
+    let medellinComunasCache = null;  // caché GeoJSON comunas Medellín
+    let caliComunasCache = null;      // caché GeoJSON comunas Cali
+    let currentMunCode = null;        // mun electoral activo en vista de ciudad (Medellín/Cali)
 
     // ─── INIT LEAFLET MAP ────────────────────────────────────
     function initLeafletMap() {
@@ -1433,11 +1456,15 @@
     // ─── VISTA NACIONAL ─────────────────────────────────────
     function showNationalView() {
       currentDepCode = null;
+      currentMunCode = null;
       munVoteData = {};
       maxMunVotes = 1;
       zonVoteData = {};
       maxZonVotes = 1;
-      document.getElementById('btn-volver-pais').style.display = 'none';
+      showComunasNotice(false);
+      const btn = document.getElementById('btn-volver-pais');
+      btn.textContent = '← País';
+      btn.style.display = 'none';
       if (departamentosLayer) {
         showBoundaryLayer(departamentosLayer);
         departamentosLayer.setStyle(featureStyle);
@@ -1447,11 +1474,25 @@
     }
 
     function onVolverPais() {
-      const depSel = document.getElementById('filter-dep');
-      if (depSel) depSel.value = '';
-      const munSel = document.getElementById('filter-mun');
-      if (munSel) { munSel.innerHTML = '<option value="">— Todos los municipios —</option>'; munSel.disabled = true; }
-      showNationalView();
+      showComunasNotice(false);
+      if (currentMunCode !== null) {
+        // Estamos en vista de ciudad (Medellín/Cali) → volver a municipios del depto
+        const savedDep = currentDepCode;
+        currentMunCode = null;
+        zonVoteData = {};
+        maxZonVotes = 1;
+        const btn = document.getElementById('btn-volver-pais');
+        btn.textContent = '← País';
+        buildMunVoteData(savedDep);
+        loadDepMunicipiosLayer(savedDep);
+      } else {
+        // Estamos en vista de depto → volver al país
+        const depSel = document.getElementById('filter-dep');
+        if (depSel) depSel.value = '';
+        const munSel = document.getElementById('filter-mun');
+        if (munSel) { munSel.innerHTML = '<option value="">— Todos los municipios —</option>'; munSel.disabled = true; }
+        showNationalView();
+      }
     }
 
     // ─── CAPA MUNICIPIOS POR DEPTO (bajo demanda, con caché) ──
@@ -1500,7 +1541,7 @@
     // 1° lon ≈ 1° lat en el ecuador → distorsión < 0.3%.
     function rotateGeoJSON90Left(geoData) {
       const cx = -74.08, cy = 4.65;
-      function rc([lon, lat]) { return [cx + (lat - cy), cy - (lon - cx)]; }
+      function rc([lon, lat]) { return [cx - (lat - cy), cy + (lon - cx)]; }  // +90° (derecha)
       function rg(geom) {
         if (geom.type === 'Polygon')
           return { ...geom, coordinates: geom.coordinates.map(r => r.map(rc)) };
@@ -1511,12 +1552,17 @@
       return { ...geoData, features: geoData.features.map(f => ({ ...f, geometry: rg(f.geometry) })) };
     }
 
-    // ─── CONSTRUIR zonVoteData PARA BOGOTÁ ──────────────────
-    function buildZonVoteData(depCode) {
+    // ─── CONSTRUIR zonVoteData (Bogotá / Medellín / Cali) ───
+    // munCode opcional: si se pasa, filtra además por municipio (Medellín/Cali)
+    function buildZonVoteData(depCode, munCode) {
       if (!currentData) return;
       zonVoteData = {};
       (currentData.mesas || [])
-        .filter(m => normalizeDepCode(m.dep) === depCode)
+        .filter(m => {
+          if (normalizeDepCode(m.dep) !== depCode) return false;
+          if (munCode && m.mun !== munCode) return false;
+          return true;
+        })
         .forEach(m => {
           const zon = String(m.zon || '').padStart(2, '0');
           if (!zon || zon === '90' || zon === '98' || zon === '99') return;
@@ -1552,6 +1598,58 @@
       }
     }
 
+    // ─── HELPER: mostrar/ocultar aviso corregimientos ────────
+    function showComunasNotice(show) {
+      const el = document.getElementById('notice-comunas');
+      if (el) el.style.display = show ? 'block' : 'none';
+    }
+
+    // ─── CAPA COMUNAS MEDELLÍN ───────────────────────────────
+    async function loadMedellinComunasLayer() {
+      document.getElementById('map-loading')?.classList.add('active');
+      try {
+        if (!medellinComunasCache) {
+          const r = await fetch(MEDELLIN_COMUNAS_URL);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          medellinComunasCache = await r.json();
+        }
+        currentMunCode = '001';
+        const newLayer = L.geoJSON(medellinComunasCache, { style: featureStyle, onEachFeature: onEachFeature });
+        showBoundaryLayer(newLayer);
+        const btn = document.getElementById('btn-volver-pais');
+        btn.textContent = '← Antioquia';
+        btn.style.display = 'block';
+        showComunasNotice(true);
+      } catch(e) {
+        console.error('[Mapa] Error cargando comunas Medellín:', e.message);
+      } finally {
+        document.getElementById('map-loading')?.classList.remove('active');
+      }
+    }
+
+    // ─── CAPA COMUNAS CALI ───────────────────────────────────
+    async function loadCaliComunasLayer() {
+      document.getElementById('map-loading')?.classList.add('active');
+      try {
+        if (!caliComunasCache) {
+          const r = await fetch(CALI_COMUNAS_URL);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          caliComunasCache = await r.json();
+        }
+        currentMunCode = '001';
+        const newLayer = L.geoJSON(caliComunasCache, { style: featureStyle, onEachFeature: onEachFeature });
+        showBoundaryLayer(newLayer);
+        const btn = document.getElementById('btn-volver-pais');
+        btn.textContent = '← Valle del Cauca';
+        btn.style.display = 'block';
+        showComunasNotice(true);
+      } catch(e) {
+        console.error('[Mapa] Error cargando comunas Cali:', e.message);
+      } finally {
+        document.getElementById('map-loading')?.classList.remove('active');
+      }
+    }
+
     // ─── DETECCIÓN CÁMARA TERRITORIAL ───────────────────────
     function isCamaraTerritorial(corp) {
       const c = (corp || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -1565,6 +1663,16 @@
       if (props.LocCodigo !== undefined) {
         // Feature de localidad Bogotá
         const zon = String(props.LocCodigo).padStart(2, '0');
+        const data = zonVoteData[zon];
+        ratio = data ? data.v / maxZonVotes : 0;
+      } else if (props.CODIGO !== undefined && props.NOMBRE !== undefined && props.IDENTIFICACION !== undefined) {
+        // Feature de comuna Medellín
+        const zon = String(props.CODIGO).padStart(2, '0');
+        const data = zonVoteData[zon];
+        ratio = data ? data.v / maxZonVotes : 0;
+      } else if (props.comuna !== undefined && props.nombre !== undefined && props.shape_leng !== undefined) {
+        // Feature de comuna Cali
+        const zon = String(props.comuna).padStart(2, '0');
         const data = zonVoteData[zon];
         ratio = data ? data.v / maxZonVotes : 0;
       } else if (props.mun_electoral !== undefined) {
@@ -1587,8 +1695,11 @@
 
     function onEachFeature(feature, layer) {
       const props = feature.properties;
-      const isLocFeature = props.LocCodigo !== undefined;
-      const isMunFeature = !isLocFeature && props.mun_electoral !== undefined;
+      const isLocFeature  = props.LocCodigo !== undefined;
+      const isMedFeature  = !isLocFeature && props.CODIGO !== undefined && props.IDENTIFICACION !== undefined;
+      const isCalFeature  = !isLocFeature && !isMedFeature && props.comuna !== undefined && props.shape_leng !== undefined;
+      const isCityFeature = isLocFeature || isMedFeature || isCalFeature;
+      const isMunFeature  = !isCityFeature && props.mun_electoral !== undefined;
 
       if (isLocFeature) {
         // ── Capa de localidades Bogotá ──
@@ -1618,6 +1729,50 @@
             } catch(e) {}
           }
         });
+      } else if (isMedFeature) {
+        // ── Capa de comunas Medellín ──
+        const zon = String(props.CODIGO).padStart(2, '0');
+        const name = props.NOMBRE || props.IDENTIFICACION || `Comuna ${zon}`;
+        layer.on({
+          mouseover: function(e) {
+            const data = zonVoteData[zon];
+            const votes = data ? data.v : 0;
+            layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
+            layer.bindTooltip(
+              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+                <strong style="color:#0047FF;font-size:.989rem">${name.toUpperCase()}</strong><br/>
+                ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
+              </div>`,
+              { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
+            ).openTooltip(e.latlng);
+          },
+          mouseout: function() { if (geojsonLayer) geojsonLayer.resetStyle(layer); layer.closeTooltip(); },
+          click: function() {
+            try { const b = layer.getBounds(); if (b.isValid()) leafletMap.fitBounds(b, { padding: [30,30] }); } catch(e) {}
+          }
+        });
+      } else if (isCalFeature) {
+        // ── Capa de comunas Cali ──
+        const zon = String(props.comuna).padStart(2, '0');
+        const name = props.nombre || `Comuna ${zon}`;
+        layer.on({
+          mouseover: function(e) {
+            const data = zonVoteData[zon];
+            const votes = data ? data.v : 0;
+            layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
+            layer.bindTooltip(
+              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+                <strong style="color:#0047FF;font-size:.989rem">${name.toUpperCase()}</strong><br/>
+                ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
+              </div>`,
+              { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
+            ).openTooltip(e.latlng);
+          },
+          mouseout: function() { if (geojsonLayer) geojsonLayer.resetStyle(layer); layer.closeTooltip(); },
+          click: function() {
+            try { const b = layer.getBounds(); if (b.isValid()) leafletMap.fitBounds(b, { padding: [30,30] }); } catch(e) {}
+          }
+        });
       } else if (isMunFeature) {
         // ── Capa de municipios de un departamento ──
         const munCode = props.mun_elec;   // código electoral — clave en munVoteData y filter-mun
@@ -1642,6 +1797,18 @@
           click: function() {
             const sel = document.getElementById('filter-mun');
             if (sel && munCode) sel.value = munCode;
+            // Medellín (dep=1, mun=001) → cargar comunas
+            if (currentDepCode === '1' && munCode === '001') {
+              buildZonVoteData('1', '001');
+              loadMedellinComunasLayer();
+              return;
+            }
+            // Cali (dep=31, mun=001) → cargar comunas
+            if (currentDepCode === '31' && munCode === '001') {
+              buildZonVoteData('31', '001');
+              loadCaliComunasLayer();
+              return;
+            }
             try {
               const b = layer.getBounds();
               if (b.isValid()) leafletMap.fitBounds(b, { padding: [30, 30] });
@@ -1824,10 +1991,12 @@
       depVoteData = {};
       maxDepVotes = 1;
       currentDepCode = null;
+      currentMunCode = null;
       munVoteData = {};
       maxMunVotes = 1;
       zonVoteData = {};
       maxZonVotes = 1;
+      showComunasNotice(false);
       const _depSel = document.getElementById('filter-dep');
       if (_depSel) _depSel.value = '';
       const _munSel = document.getElementById('filter-mun');
