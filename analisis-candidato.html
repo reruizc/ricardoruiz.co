@@ -1314,6 +1314,8 @@
     let medellinComunasCache = null;  // caché GeoJSON comunas Medellín
     let caliComunasCache = null;      // caché GeoJSON comunas Cali
     let currentMunCode = null;        // mun electoral activo en vista de ciudad (Medellín/Cali)
+    let munZoomed = false;            // true cuando el usuario hizo zoom en un municipio específico
+    let deptLayerBounds = null;       // bounds del depto activo (para volver desde municipio)
 
     // ─── INIT LEAFLET MAP ────────────────────────────────────
     function initLeafletMap() {
@@ -1480,6 +1482,8 @@
     function showNationalView() {
       currentDepCode = null;
       currentMunCode = null;
+      munZoomed = false;
+      deptLayerBounds = null;
       munVoteData = {};
       maxMunVotes = 1;
       zonVoteData = {};
@@ -1499,7 +1503,17 @@
 
     function onVolverPais() {
       showComunasNotice(false);
-      if (currentMunCode !== null) {
+      if (munZoomed) {
+        // Estamos con zoom en un municipio → volver a vista completa del depto
+        munZoomed = false;
+        const munSel = document.getElementById('filter-mun');
+        if (munSel) { munSel.value = ''; }
+        const btn = document.getElementById('btn-volver-pais');
+        btn.textContent = '← País';
+        if (deptLayerBounds?.isValid()) {
+          leafletMap.fitBounds(deptLayerBounds, { padding: [10, 10] });
+        }
+      } else if (currentMunCode !== null) {
         // Estamos en vista de ciudad (Medellín/Cali) → volver a municipios del depto
         const savedDep = currentDepCode;
         currentMunCode = null;
@@ -1533,12 +1547,16 @@
           deptGeoJsonCache[depCode] = geoData;
         }
         currentDepCode = depCode;
+        munZoomed = false;
         const newLayer = L.geoJSON(geoData, {
           style: featureStyle,
           onEachFeature: onEachFeature
         });
         showBoundaryLayer(newLayer);
-        document.getElementById('btn-volver-pais').style.display = 'block';
+        deptLayerBounds = newLayer.getBounds();
+        const btn = document.getElementById('btn-volver-pais');
+        btn.textContent = '← País';
+        btn.style.display = 'block';
       } catch(e) {
         console.error('[Mapa] Error cargando municipios de depto:', e.message);
       } finally {
@@ -1902,7 +1920,16 @@
             }
             try {
               const b = layer.getBounds();
-              if (b.isValid()) leafletMap.fitBounds(b, { padding: [30, 30] });
+              if (b.isValid()) {
+                leafletMap.fitBounds(b, { padding: [30, 30] });
+                // Cambiar botón a "← [Departamento]"
+                munZoomed = true;
+                const depName = deptGeoJsonCache[currentDepCode]?.dep_nombre || 'Departamento';
+                const btn = document.getElementById('btn-volver-pais');
+                const depNomCap = depName.charAt(0) + depName.slice(1).toLowerCase();
+                btn.textContent = `← ${depNomCap}`;
+                btn.style.display = 'block';
+              }
             } catch(e) {}
           }
         });
@@ -2093,6 +2120,8 @@
       maxDepVotes = 1;
       currentDepCode = null;
       currentMunCode = null;
+      munZoomed = false;
+      deptLayerBounds = null;
       munVoteData = {};
       maxMunVotes = 1;
       zonVoteData = {};
