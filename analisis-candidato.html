@@ -1495,6 +1495,22 @@
       maxMunVotes = vals.length > 0 ? Math.max(...vals) : 1;
     }
 
+    // ─── ROTAR GeoJSON -90° (Bogotá se ve mejor apaisado) ───
+    // Rota coordenadas alrededor del centroide de Bogotá.
+    // 1° lon ≈ 1° lat en el ecuador → distorsión < 0.3%.
+    function rotateGeoJSON90Left(geoData) {
+      const cx = -74.08, cy = 4.65;
+      function rc([lon, lat]) { return [cx + (lat - cy), cy - (lon - cx)]; }
+      function rg(geom) {
+        if (geom.type === 'Polygon')
+          return { ...geom, coordinates: geom.coordinates.map(r => r.map(rc)) };
+        if (geom.type === 'MultiPolygon')
+          return { ...geom, coordinates: geom.coordinates.map(p => p.map(r => r.map(rc))) };
+        return geom;
+      }
+      return { ...geoData, features: geoData.features.map(f => ({ ...f, geometry: rg(f.geometry) })) };
+    }
+
     // ─── CONSTRUIR zonVoteData PARA BOGOTÁ ──────────────────
     function buildZonVoteData(depCode) {
       if (!currentData) return;
@@ -1519,7 +1535,7 @@
         if (!geoData) {
           const r = await fetch(BOGOTA_LOCALIDADES_URL);
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          geoData = await r.json();
+          geoData = rotateGeoJSON90Left(await r.json());
           bogotaLocalidadCache = geoData;
         }
         currentDepCode = '16';
