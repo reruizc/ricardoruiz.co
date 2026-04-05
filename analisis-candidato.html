@@ -1013,6 +1013,7 @@
     const MUNICIPIOS_GEOJSON_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/MUNICIPIOS.json';
     const DEPARTAMENTOS_MPS_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Departamentos-mps/';
     const BOGOTA_LOCALIDADES_URL  = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json';
+    const BOG_PUESTOS_URL         = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/BOG-PUESTOS.json';
     const MEDELLIN_COMUNAS_URL    = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json';
     const CALI_COMUNAS_URL        = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/CALIX.json';
     const fmt = n => Number(n).toLocaleString('es-CO');
@@ -1307,6 +1308,9 @@
     let zonVoteData = {};             // { zonCode: { nom, v } } — localidades/comunas
     let maxZonVotes = 1;
     let bogotaLocalidadCache = null;  // caché GeoJSON localidades Bogotá
+    let bogPuestosCache = null;       // caché JSON puestos Bogotá (BOG-PUESTOS.json)
+    let puestosLayer = null;          // LayerGroup de marcadores de puestos activos
+    let pueVoteData = {};             // { pueCode: { nom, v } } — votos por puesto activo
     let medellinComunasCache = null;  // caché GeoJSON comunas Medellín
     let caliComunasCache = null;      // caché GeoJSON comunas Cali
     let currentMunCode = null;        // mun electoral activo en vista de ciudad (Medellín/Cali)
@@ -1480,6 +1484,7 @@
       maxMunVotes = 1;
       zonVoteData = {};
       maxZonVotes = 1;
+      hidePuestosLayer();
       showComunasNotice(false);
       const btn = document.getElementById('btn-volver-pais');
       btn.textContent = '← País';
@@ -1673,6 +1678,68 @@
       }
     }
 
+    // ─── PUESTOS DE VOTACIÓN — BOGOTÁ ────────────────────────
+    // Aplica la misma rotación +90° que usamos para el GeoJSON de localidades,
+    // para que los marcadores caigan sobre los polígonos correctamente.
+    function rotateBogPt(lon, lat) {
+      const cx = -74.08, cy = 4.65;
+      return [cy + (lon - cx), cx - (lat - cy)];  // [rLat, rLon] para Leaflet
+    }
+
+    function hidePuestosLayer() {
+      if (puestosLayer) { leafletMap.removeLayer(puestosLayer); puestosLayer = null; }
+      pueVoteData = {};
+    }
+
+    function buildPueVoteData(depCode, munCode, zonCode) {
+      pueVoteData = {};
+      if (!currentData) return;
+      (currentData.mesas || [])
+        .filter(m => normalizeDepCode(m.dep) === depCode
+                  && m.mun === munCode
+                  && String(m.zon || '').padStart(2, '0') === zonCode)
+        .forEach(m => {
+          const pue = String(m.pue || '').padStart(2, '0');
+          if (!pueVoteData[pue]) pueVoteData[pue] = { nom: m.pueNom || `Puesto ${pue}`, v: 0 };
+          pueVoteData[pue].v += m.v;
+        });
+    }
+
+    async function showPuestosForZon(zonCode) {
+      if (!bogPuestosCache) {
+        try {
+          const r = await fetch(BOG_PUESTOS_URL);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          bogPuestosCache = await r.json();
+        } catch(e) {
+          console.error('[Puestos] Error cargando:', e.message);
+          return;
+        }
+      }
+      hidePuestosLayer();
+      buildPueVoteData('16', '001', zonCode);
+      const filtered = (bogPuestosCache.puestos || []).filter(p => p.zon === zonCode);
+      const markers = filtered.map(p => {
+        const [rLat, rLon] = rotateBogPt(p.lon, p.lat);
+        const vd = pueVoteData[p.pue];
+        const votes = vd ? vd.v : 0;
+        const m = L.circleMarker([rLat, rLon], {
+          radius: 5, fillColor: '#ffffff', color: '#0047FF',
+          weight: 1.5, fillOpacity: 0.9, opacity: 1
+        });
+        m.bindTooltip(
+          `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+            <strong style="color:#0047FF;font-size:.989rem">${p.nom}</strong><br/>
+            ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
+          </div>`,
+          { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
+        );
+        return m;
+      });
+      puestosLayer = L.layerGroup(markers).addTo(leafletMap);
+      console.log(`[Puestos] zon=${zonCode}: ${markers.length} puestos`);
+    }
+
     // ─── DETECCIÓN CÁMARA TERRITORIAL ───────────────────────
     function isCamaraTerritorial(corp) {
       const c = (corp || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -1750,6 +1817,7 @@
               const b = layer.getBounds();
               if (b.isValid()) leafletMap.fitBounds(b, { padding: [30, 30] });
             } catch(e) {}
+            showPuestosForZon(zon);
           }
         });
       } else if (isMedFeature) {
@@ -2019,6 +2087,7 @@
       maxMunVotes = 1;
       zonVoteData = {};
       maxZonVotes = 1;
+      hidePuestosLayer();
       showComunasNotice(false);
       const _depSel = document.getElementById('filter-dep');
       if (_depSel) _depSel.value = '';
