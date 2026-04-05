@@ -1276,19 +1276,20 @@
       '30':'16','31':'16','32':'16'
     };
 
-    // Pereira: zona electoral → [nombres normalizados de comuna] (fuente: DIVIPOLE-MAR2026)
-    // Nota: varias zonas comparten comuna (05+06→CENTRO) y varias comunas por zona (07→4 comunas)
-    const ZON_TO_COM_PER = {
-      '01':['VILLA SANTANA'],
-      '02':['ORIENTE','VILLAVICENCIO'],
-      '03':['RIO OTUN'],
-      '04':['UNIVERSIDAD'],
-      '05':['CENTRO'],'06':['CENTRO'],
-      '07':['SAN NICOLAS','EL JARDIN','BOSTON','EL ROCIO'],
-      '08':['DEL CAFE','FERROCARRIL'],
-      '09':['EL POBLADO','CONSOTA'],
-      '10':['EL OSO','PERLA DEL OTUN','SAN JOAQUIN'],
-      '11':['OLIMPICA','CUBA'],
+    // Pereira: zona+puesto → nombre normalizado de comuna (fuente: DIVIPOLE-MAR2026)
+    // Más preciso que zona→lista: cada puesto se asigna a su comuna real.
+    const ZON_PUE_COM_PER = {
+      '01':{'01':'VILLA SANTANA','02':'VILLA SANTANA','03':'VILLA SANTANA','04':'VILLA SANTANA'},
+      '02':{'01':'ORIENTE','02':'ORIENTE','03':'ORIENTE','04':'VILLAVICENCIO','05':'VILLAVICENCIO','06':'ORIENTE'},
+      '03':{'01':'RIO OTUN','02':'RIO OTUN','03':'RIO OTUN','04':'RIO OTUN','05':'RIO OTUN','06':'RIO OTUN','07':'RIO OTUN'},
+      '04':{'01':'UNIVERSIDAD','02':'UNIVERSIDAD','03':'UNIVERSIDAD'},
+      '05':{'01':'CENTRO','02':'CENTRO'},
+      '06':{'01':'CENTRO','02':'CENTRO','03':'CENTRO','05':'CENTRO','06':'CENTRO'},
+      '07':{'01':'SAN NICOLAS','02':'EL JARDIN','03':'BOSTON','04':'BOSTON','05':'EL ROCIO','06':'BOSTON','07':'BOSTON'},
+      '08':{'01':'DEL CAFE','02':'FERROCARRIL','03':'DEL CAFE','04':'DEL CAFE','05':'FERROCARRIL'},
+      '09':{'01':'EL POBLADO','02':'EL POBLADO','03':'CONSOTA','04':'CONSOTA','05':'CONSOTA','06':'CONSOTA'},
+      '10':{'01':'EL OSO','02':'PERLA DEL OTUN','03':'SAN JOAQUIN','04':'SAN JOAQUIN','05':'EL OSO','06':'SAN JOAQUIN','07':'SAN JOAQUIN'},
+      '11':{'01':'OLIMPICA','02':'OLIMPICA','03':'OLIMPICA','04':'CUBA','05':'CUBA','06':'CUBA','07':'OLIMPICA'},
     };
 
     // Cali: zona electoral → código de comuna (fuente: DIVIPOLE-MAR2026)
@@ -1612,9 +1613,9 @@
     }
 
     // ─── CONSTRUIR zonVoteData (Bogotá / Medellín / Cali / Pereira) ───
-    // munCode: filtra por municipio (Medellín/Cali/Pereira). null = todo el depto (Bogotá).
-    // zonToComMap: tabla zon→com. Valores pueden ser string (MED/CAL) o array de nombres (PER). null = Bogotá.
-    function buildZonVoteData(depCode, munCode, zonToComMap) {
+    // zonToComMap:    zon → comCode string  (Medellín/Cali). null = Bogotá (zon==com).
+    // zonPueToComMap: { zon: { pue: comName } }  (Pereira). Asigna cada puesto a su comuna exacta.
+    function buildZonVoteData(depCode, munCode, zonToComMap, zonPueToComMap) {
       if (!currentData) return;
       zonVoteData = {};
       (currentData.mesas || [])
@@ -1626,17 +1627,19 @@
         .forEach(m => {
           const zon = String(m.zon || '').padStart(2, '0');
           if (!zon || zon === '90' || zon === '98' || zon === '99') return;
-          const rawVal = zonToComMap ? (zonToComMap[zon] || null) : zon;
-          if (!rawVal) return;
-          const comKeys = Array.isArray(rawVal) ? rawVal : [rawVal];
-          comKeys.forEach(comKey => {
-            if (!comKey) return;
-            if (!zonVoteData[comKey]) {
-              const numLabel = parseInt(comKey);
-              zonVoteData[comKey] = { nom: ZONAS_BOGOTA[comKey] || (isNaN(numLabel) ? comKey : `Comuna ${numLabel}`), v: 0 };
-            }
-            zonVoteData[comKey].v += m.v;
-          });
+          let comKey;
+          if (zonPueToComMap) {
+            const pue = String(m.pue || '').padStart(2, '0');
+            comKey = (zonPueToComMap[zon] || {})[pue] || null;
+          } else {
+            comKey = zonToComMap ? (zonToComMap[zon] || null) : zon;
+          }
+          if (!comKey) return;
+          if (!zonVoteData[comKey]) {
+            const numLabel = parseInt(comKey);
+            zonVoteData[comKey] = { nom: ZONAS_BOGOTA[comKey] || (isNaN(numLabel) ? comKey : `Comuna ${numLabel}`), v: 0 };
+          }
+          zonVoteData[comKey].v += m.v;
         });
       const vals = Object.values(zonVoteData).map(d => d.v);
       maxZonVotes = vals.length > 0 ? Math.max(...vals) : 1;
@@ -1999,7 +2002,7 @@
             }
             // Pereira (dep=24, mun=001) → cargar comunas
             if (currentDepCode === '24' && munCode === '001') {
-              buildZonVoteData('24', '001', ZON_TO_COM_PER);
+              buildZonVoteData('24', '001', null, ZON_PUE_COM_PER);
               loadPereiraComunasLayer();
               return;
             }
