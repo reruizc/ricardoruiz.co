@@ -1305,6 +1305,19 @@
       '30':'16','31':'16','32':'16'
     };
 
+    // Medellín zona 99 (corregimientos): puesto → código GeoJSON (CODIGO del feature)
+    const ZON99_PUE_COM_MED = {
+      '01':'70','02':'70','03':'70','04':'70',
+      '10':'80','A1':'80','A2':'80','A3':'80','A4':'80','A5':'80','A6':'80',
+      '17':'50',
+      '33':'90','34':'90','35':'90','36':'90',
+      'B1':'60','B2':'60','B3':'60','B4':'60','B5':'60','B6':'60','B7':'60',
+    };
+    const CORR_MED_NAMES = {
+      '50':'Palmitas','60':'San Cristóbal','70':'Altavista',
+      '80':'San Antonio de Prado','90':'Santa Elena',
+    };
+
     // Pereira: zona+puesto → nombre normalizado de comuna (fuente: DIVIPOLE-MAR2026)
     // Más preciso que zona→lista: cada puesto se asigna a su comuna real.
     const ZON_PUE_COM_PER = {
@@ -1644,7 +1657,7 @@
     // ─── CONSTRUIR zonVoteData (Bogotá / Medellín / Cali / Pereira) ───
     // zonToComMap:    zon → comCode string  (Medellín/Cali). null = Bogotá (zon==com).
     // zonPueToComMap: { zon: { pue: comName } }  (Pereira). Asigna cada puesto a su comuna exacta.
-    function buildZonVoteData(depCode, munCode, zonToComMap, zonPueToComMap) {
+    function buildZonVoteData(depCode, munCode, zonToComMap, zonPueToComMap, zon99PueToComMap) {
       if (!currentData) return;
       zonVoteData = {};
       (currentData.mesas || [])
@@ -1655,10 +1668,12 @@
         })
         .forEach(m => {
           const zon = String(m.zon || '').padStart(2, '0');
-          if (!zon || zon === '90' || zon === '98' || zon === '99') return;
+          if (!zon || zon === '90' || zon === '98') return;
+          const pue = String(m.pue || '').padStart(2, '0');
           let comKey;
-          if (zonPueToComMap) {
-            const pue = String(m.pue || '').padStart(2, '0');
+          if (zon === '99') {
+            comKey = zon99PueToComMap ? (zon99PueToComMap[pue] || null) : null;
+          } else if (zonPueToComMap) {
             comKey = (zonPueToComMap[zon] || {})[pue] || null;
           } else {
             comKey = zonToComMap ? (zonToComMap[zon] || null) : zon;
@@ -1666,7 +1681,7 @@
           if (!comKey) return;
           if (!zonVoteData[comKey]) {
             const numLabel = parseInt(comKey);
-            zonVoteData[comKey] = { nom: ZONAS_BOGOTA[comKey] || (isNaN(numLabel) ? comKey : `Comuna ${numLabel}`), v: 0 };
+            zonVoteData[comKey] = { nom: ZONAS_BOGOTA[comKey] || CORR_MED_NAMES[comKey] || (isNaN(numLabel) ? comKey : `Comuna ${numLabel}`), v: 0 };
           }
           zonVoteData[comKey].v += m.v;
         });
@@ -2019,7 +2034,7 @@
             if (sel && munCode) sel.value = munCode;
             // Medellín (dep=1, mun=001) → cargar comunas
             if (currentDepCode === '1' && munCode === '001') {
-              buildZonVoteData('1', '001', ZON_TO_COM_MED);
+              buildZonVoteData('1', '001', ZON_TO_COM_MED, null, ZON99_PUE_COM_MED);
               loadMedellinComunasLayer();
               return;
             }
@@ -2387,7 +2402,7 @@
         if (!m.zon) return;
         const depKey = normalizeDepCode(m.dep);
         const zon = String(m.zon).padStart(2, '0');
-        if (zon === '90' || zon === '98' || zon === '99') return;
+        if (zon === '90' || zon === '98') return;
         const pue = String(m.pue || '').padStart(2, '0');
         const isBog = depKey === '16' || (m.munNom || '').toUpperCase().includes('BOGOT');
 
@@ -2395,9 +2410,13 @@
         if (isBog) {
           comName = ZONAS_BOGOTA[zon] || null;
         } else if (depKey === '1' && m.mun === '001') {
-          // Medellín: dos zonas → una comuna
-          const cc = ZON_TO_COM_MED[zon];
-          comName = cc ? `COMUNA ${parseInt(cc)}` : null;
+          if (zon === '99') {
+            const code = ZON99_PUE_COM_MED[pue] || null;
+            comName = code ? CORR_MED_NAMES[code] : null;
+          } else {
+            const cc = ZON_TO_COM_MED[zon];
+            comName = cc ? `COMUNA ${parseInt(cc)}` : null;
+          }
         } else if (depKey === '31' && m.mun === '001') {
           // Cali
           const cc = ZON_TO_COM_CAL[zon];
@@ -2464,8 +2483,13 @@
           if (isBog) {
             comCtx = ZONAS_BOGOTA[zon] || `Zona ${parseInt(zon)}`;
           } else if (d.depKey === '1' && d.mun === '001') {
-            const cc = ZON_TO_COM_MED[zon];
-            comCtx = cc ? `COMUNA ${parseInt(cc)}` : `Zona ${parseInt(zon)}`;
+            if (zon === '99') {
+              const code = ZON99_PUE_COM_MED[pue] || null;
+              comCtx = code ? CORR_MED_NAMES[code] : `Zona ${parseInt(zon)}`;
+            } else {
+              const cc = ZON_TO_COM_MED[zon];
+              comCtx = cc ? `COMUNA ${parseInt(cc)}` : `Zona ${parseInt(zon)}`;
+            }
           } else if (d.depKey === '31' && d.mun === '001') {
             const cc = ZON_TO_COM_CAL[zon];
             comCtx = cc ? `COMUNA ${parseInt(cc)}` : `Zona ${parseInt(zon)}`;
