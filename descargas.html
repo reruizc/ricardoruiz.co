@@ -578,16 +578,17 @@
     // ─── AUTH + PRO GATE ──────────────────────────────────────────────────────
     (function() {
       const authEl = document.getElementById('e-nav-auth');
-      let sess = null;
-      try { const s = localStorage.getItem('rr-session'); sess = s ? JSON.parse(s) : null; } catch(e) {}
+      const token = localStorage.getItem('rr-token');
+      const user  = JSON.parse(localStorage.getItem('rr-user') || 'null');
 
       // Render nav auth bar
       if (authEl) {
-        if (sess && sess.email) {
+        if (token && user) {
+          const planLabels = { free:'Free', pro:'Pro', premium:'Premium', basic:'Básico', analysis:'Análisis', full:'Completo' };
           authEl.innerHTML = `
-            <span class="e-user-name">${sess.email.split('@')[0]}</span>
-            ${sess.plan ? `<span class="e-user-plan">${sess.plan}</span>` : ''}
-            <button class="e-btn-logout" onclick="localStorage.removeItem('rr-session');location.reload()">Salir</button>`;
+            <span class="e-user-name">${(user.name || user.email || '').split(/[ @]/)[0]}</span>
+            ${user.plan ? `<span class="e-user-plan">${planLabels[user.plan] || user.plan}</span>` : ''}
+            <button class="e-btn-logout" onclick="localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');location.reload()">Salir</button>`;
         } else {
           authEl.innerHTML = `
             <a href="login.html" class="e-btn-login" onclick="navTo(event,'login.html')">Ingresar</a>
@@ -596,7 +597,7 @@
       }
 
       // Pro/Premium gate
-      const isPaid = sess && sess.plan && ['pro','premium'].includes(sess.plan.toLowerCase());
+      const isPaid = token && user && user.plan && ['pro','premium'].includes(user.plan.toLowerCase());
       if (!isPaid) {
         // Disable all download buttons
         document.querySelectorAll('.dl-btn, .dept-dl-btn').forEach(btn => {
@@ -608,10 +609,10 @@
           btn.style.cursor = 'default';
         });
         // Show modal after curtain closes
-        const modalTitle = sess && sess.email
+        const modalTitle = token && user
           ? 'Contenido exclusivo'
           : 'Acceso restringido';
-        const modalSub = sess && sess.email
+        const modalSub = token && user
           ? 'Tu cuenta no tiene un plan activo. Actualiza a <b>Pro</b> o <b>Premium</b> para descargar los archivos.'
           : 'Debes tener una cuenta <b>Pro</b> o <b>Premium</b> para acceder a las descargas.';
         const overlay = document.getElementById('pro-overlay');
