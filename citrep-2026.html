@@ -806,22 +806,6 @@
     (function loop(){rx+=(mx-rx)*.12;ry+=(my-ry)*.12;ri.style.left=rx+'px';ri.style.top=ry+'px';requestAnimationFrame(loop);})();
     document.addEventListener('mouseover',e=>{if(e.target.closest('a,button,select,input')){cur2.style.transform='translate(-50%,-50%) scale(2.5)';cur2.style.background='transparent';cur2.style.border='1.5px solid var(--blue)';ri.style.opacity='0';}else{cur2.style.transform='translate(-50%,-50%) scale(1)';cur2.style.background='var(--blue)';cur2.style.border='none';ri.style.opacity='.4';}});
 
-    function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;const lang=localStorage.getItem('rr-lang')||'co';const t=CIT_LANG[lang]||CIT_LANG.co;if(token&&user){const pl=lang==='us'?{free:'Free',basic:'Basic',analysis:'Analysis',pro:'Pro',premium:'Premium',full:'Full'}:lang==='cn'?{free:'免费',basic:'基础版',analysis:'分析版',pro:'Pro',premium:'Premium',full:'完整版'}:{free:'Free',basic:'Básico',analysis:'Análisis',pro:'Pro',premium:'Premium',full:'Completo'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">${t.logout}</button>`;}else{area.innerHTML=`<a href="pricing.html" style="font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">${t.planes}</a><a href="login.html" class="e-btn-login">${t.login}</a><a href="register.html" class="e-btn-register">${t.register}</a>`;}}
-    async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();}
-    updateElectoralNav();
-
-    function showCopyToast(){const now=Date.now();if(showCopyToast._last&&now-showCopyToast._last<60000)return;showCopyToast._last=now;const t=document.getElementById('copy-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),3000);}
-    function showPremiumToast(){const t=document.getElementById('premium-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),4000);}
-    document.addEventListener('copy',e=>{if(!localStorage.getItem('rr-token')){e.preventDefault();showCopyToast();}});
-    document.addEventListener('selectstart',e=>{if(!localStorage.getItem('rr-token')&&!e.target.closest('select,input')){e.preventDefault();showCopyToast();}});
-    init();
-    function dismissOrient(){sessionStorage.setItem("orient-ok","1");document.getElementById("orient-overlay").classList.remove("show");}
-    if(/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)&&!sessionStorage.getItem("orient-ok")){document.getElementById("orient-overlay").classList.add("show");}
-    function isDayHour(){const h=new Date().getHours();return h>=7&&h<19;}
-    function applyTheme(day){document.body.classList.toggle('day-mode',day);const btn=document.getElementById('theme-btn');if(btn)btn.textContent=day?'🌙 Modo noche':'☀ Modo día';localStorage.setItem('rr-theme',day?'day':'night');}
-    function toggleTheme(){applyTheme(!document.body.classList.contains('day-mode'));}
-    (function(){const s=localStorage.getItem('rr-theme');if(s)applyTheme(s==='day');else applyTheme(isDayHour());})();
-
     // ─── i18n ─────────────────────────────────────────────────
     const CIT_LANG = {
       co: {
@@ -855,6 +839,22 @@
         login:'登录', register:'注册', logout:'退出', planes:'计划',
       },
     };
+
+    function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;const lang=localStorage.getItem('rr-lang')||'co';const t=CIT_LANG[lang]||CIT_LANG.co;if(token&&user){const pl=lang==='us'?{free:'Free',basic:'Basic',analysis:'Analysis',pro:'Pro',premium:'Premium',full:'Full'}:lang==='cn'?{free:'免费',basic:'基础版',analysis:'分析版',pro:'Pro',premium:'Premium',full:'完整版'}:{free:'Free',basic:'Básico',analysis:'Análisis',pro:'Pro',premium:'Premium',full:'Completo'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">${t.logout}</button>`;}else{area.innerHTML=`<a href="pricing.html" style="font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">${t.planes}</a><a href="login.html" class="e-btn-login">${t.login}</a><a href="register.html" class="e-btn-register">${t.register}</a>`;}}
+    async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();}
+    updateElectoralNav();
+
+    function showCopyToast(){const now=Date.now();if(showCopyToast._last&&now-showCopyToast._last<60000)return;showCopyToast._last=now;const t=document.getElementById('copy-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),3000);}
+    function showPremiumToast(){const t=document.getElementById('premium-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),4000);}
+    document.addEventListener('copy',e=>{if(!localStorage.getItem('rr-token')){e.preventDefault();showCopyToast();}});
+    document.addEventListener('selectstart',e=>{if(!localStorage.getItem('rr-token')&&!e.target.closest('select,input')){e.preventDefault();showCopyToast();}});
+    init();
+    function dismissOrient(){sessionStorage.setItem("orient-ok","1");document.getElementById("orient-overlay").classList.remove("show");}
+    if(/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)&&!sessionStorage.getItem("orient-ok")){document.getElementById("orient-overlay").classList.add("show");}
+    function isDayHour(){const h=new Date().getHours();return h>=7&&h<19;}
+    function applyTheme(day){document.body.classList.toggle('day-mode',day);const btn=document.getElementById('theme-btn');if(btn)btn.textContent=day?'🌙 Modo noche':'☀ Modo día';localStorage.setItem('rr-theme',day?'day':'night');}
+    function toggleTheme(){applyTheme(!document.body.classList.contains('day-mode'));}
+    (function(){const s=localStorage.getItem('rr-theme');if(s)applyTheme(s==='day');else applyTheme(isDayHour());})();
 
     function citApplyLang() {
       const lang = localStorage.getItem('rr-lang') || 'co';

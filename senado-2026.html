@@ -1059,6 +1059,55 @@
     (function loop(){rx+=(mx-rx)*.12;ry+=(my-ry)*.12;ri.style.left=rx+'px';ri.style.top=ry+'px';requestAnimationFrame(loop);})();
     document.addEventListener('mouseover',e=>{if(e.target.closest('a,button,select,input')){cur2.style.transform='translate(-50%,-50%) scale(2.5)';cur2.style.background='transparent';cur2.style.border='1.5px solid var(--blue)';ri.style.opacity='0';}else{cur2.style.transform='translate(-50%,-50%) scale(1)';cur2.style.background='var(--blue)';cur2.style.border='none';ri.style.opacity='.4';}});
 
+    // ─── i18n ─────────────────────────────────────────────────
+    const SN_LANG = {
+      co: {
+        htmlLang:'es', pageTitle:'Escrutinio Senado 2026 · Ricardo Ruiz',
+        back:'← Volver', titleLine1:'Senado de', titleSpan:'la República',
+        breadcrumb1:'Resultados Electorales', breadcrumb2:'Escrutinio Senado 2026',
+        metaElec:'Elección: <b>Congreso · 16 Mar 2026</b>',
+        metaCurules:'Curules: <b>100</b>',
+        source:'Fuente: <b>Registraduría · Escrutinio</b>',
+        themeDay:'☀ Modo día', themeNight:'🌙 Modo noche',
+        loading:'Cargando escrutinio…',
+        endosoText:'<b>¿Quieres medir el endoso?</b><br/>Compara la votación de un candidato al Senado con uno de Cámara mesa por mesa.',
+        endosoBtn:'Calcular endoso →',
+        footer1:'ricardoruiz.co · Elecciones Colombia 2026',
+        footer2:'Fuente: Registraduría Nacional',
+        login:'Iniciar sesión', register:'Registrarse', logout:'Salir', planes:'Planes',
+      },
+      us: {
+        htmlLang:'en', pageTitle:'Senate Scrutiny 2026 · Ricardo Ruiz',
+        back:'← Back', titleLine1:'Senate of the', titleSpan:'Republic',
+        breadcrumb1:'Electoral Results', breadcrumb2:'Senate Official Count 2026',
+        metaElec:'Election: <b>Congress · Mar 16, 2026</b>',
+        metaCurules:'Seats: <b>100</b>',
+        source:'Source: <b>Registraduría · Official count</b>',
+        themeDay:'☀ Day mode', themeNight:'🌙 Night mode',
+        loading:'Loading results…',
+        endosoText:'<b>Want to measure endorsement?</b><br/>Compare a Senate candidate\'s votes with a House candidate station by station.',
+        endosoBtn:'Calculate endorsement →',
+        footer1:'ricardoruiz.co · Colombia Elections 2026',
+        footer2:'Source: National Civil Registry',
+        login:'Log in', register:'Sign up', logout:'Log out', planes:'Plans',
+      },
+      cn: {
+        htmlLang:'zh', pageTitle:'参议院计票 2026 · Ricardo Ruiz',
+        back:'← 返回', titleLine1:'共和国', titleSpan:'参议院',
+        breadcrumb1:'选举结果', breadcrumb2:'参议院官方计票 2026',
+        metaElec:'选举: <b>国会 · 2026年3月16日</b>',
+        metaCurules:'席位: <b>100</b>',
+        source:'来源: <b>Registraduría · 官方计票</b>',
+        themeDay:'☀ 日间模式', themeNight:'🌙 夜间模式',
+        loading:'正在加载结果…',
+        endosoText:'<b>想测量背书吗？</b><br/>逐投票站比较参议院候选人与众议院候选人的得票数。',
+        endosoBtn:'计算背书 →',
+        footer1:'ricardoruiz.co · 哥伦比亚选举 2026',
+        footer2:'来源：国家民事登记处',
+        login:'登录', register:'注册', logout:'退出', planes:'计划',
+      },
+    };
+
     function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;const lang=localStorage.getItem('rr-lang')||'co';const t=SN_LANG[lang]||SN_LANG.co;if(token&&user){const pl=lang==='us'?{free:'Free',basic:'Basic',analysis:'Analysis',full:'Full',pro:'Pro',premium:'Premium'}:lang==='cn'?{free:'免费',basic:'基础版',analysis:'分析版',full:'完整版',pro:'Pro',premium:'Premium'}:{free:'Free',basic:'Básico',analysis:'Análisis',full:'Completo',pro:'Pro',premium:'Premium'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">${t.logout}</button>`;}else{area.innerHTML=`<a href="pricing.html" style="font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">${t.planes}</a><a href="login.html?redirect=senado-2026.html" class="e-btn-login">${t.login}</a><a href="register.html" class="e-btn-register">${t.register}</a>`;}}
     async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();updateEndosoCta();updateExcelDownloadBtn();}
     function updateEndosoCta(){}
@@ -1148,55 +1197,6 @@
     function applyTheme(day){ document.body.classList.toggle('day-mode',day); const btn=document.getElementById('theme-btn'); if(btn) btn.textContent=day?'🌙 Modo noche':'☀ Modo día'; localStorage.setItem('rr-theme',day?'day':'night'); }
     function toggleTheme(){ applyTheme(!document.body.classList.contains('day-mode')); }
     (function(){ const s=localStorage.getItem('rr-theme'); if(s) applyTheme(s==='day'); else applyTheme(isDayHour()); })();
-
-    // ─── i18n ─────────────────────────────────────────────────
-    const SN_LANG = {
-      co: {
-        htmlLang:'es', pageTitle:'Escrutinio Senado 2026 · Ricardo Ruiz',
-        back:'← Volver', titleLine1:'Senado de', titleSpan:'la República',
-        breadcrumb1:'Resultados Electorales', breadcrumb2:'Escrutinio Senado 2026',
-        metaElec:'Elección: <b>Congreso · 16 Mar 2026</b>',
-        metaCurules:'Curules: <b>100</b>',
-        source:'Fuente: <b>Registraduría · Escrutinio</b>',
-        themeDay:'☀ Modo día', themeNight:'🌙 Modo noche',
-        loading:'Cargando escrutinio…',
-        endosoText:'<b>¿Quieres medir el endoso?</b><br/>Compara la votación de un candidato al Senado con uno de Cámara mesa por mesa.',
-        endosoBtn:'Calcular endoso →',
-        footer1:'ricardoruiz.co · Elecciones Colombia 2026',
-        footer2:'Fuente: Registraduría Nacional',
-        login:'Iniciar sesión', register:'Registrarse', logout:'Salir', planes:'Planes',
-      },
-      us: {
-        htmlLang:'en', pageTitle:'Senate Scrutiny 2026 · Ricardo Ruiz',
-        back:'← Back', titleLine1:'Senate of the', titleSpan:'Republic',
-        breadcrumb1:'Electoral Results', breadcrumb2:'Senate Official Count 2026',
-        metaElec:'Election: <b>Congress · Mar 16, 2026</b>',
-        metaCurules:'Seats: <b>100</b>',
-        source:'Source: <b>Registraduría · Official count</b>',
-        themeDay:'☀ Day mode', themeNight:'🌙 Night mode',
-        loading:'Loading results…',
-        endosoText:'<b>Want to measure endorsement?</b><br/>Compare a Senate candidate\'s votes with a House candidate station by station.',
-        endosoBtn:'Calculate endorsement →',
-        footer1:'ricardoruiz.co · Colombia Elections 2026',
-        footer2:'Source: National Civil Registry',
-        login:'Log in', register:'Sign up', logout:'Log out', planes:'Plans',
-      },
-      cn: {
-        htmlLang:'zh', pageTitle:'参议院计票 2026 · Ricardo Ruiz',
-        back:'← 返回', titleLine1:'共和国', titleSpan:'参议院',
-        breadcrumb1:'选举结果', breadcrumb2:'参议院官方计票 2026',
-        metaElec:'选举: <b>国会 · 2026年3月16日</b>',
-        metaCurules:'席位: <b>100</b>',
-        source:'来源: <b>Registraduría · 官方计票</b>',
-        themeDay:'☀ 日间模式', themeNight:'🌙 夜间模式',
-        loading:'正在加载结果…',
-        endosoText:'<b>想测量背书吗？</b><br/>逐投票站比较参议院候选人与众议院候选人的得票数。',
-        endosoBtn:'计算背书 →',
-        footer1:'ricardoruiz.co · 哥伦比亚选举 2026',
-        footer2:'来源：国家民事登记处',
-        login:'登录', register:'注册', logout:'退出', planes:'计划',
-      },
-    };
 
     function snApplyLang() {
       const lang = localStorage.getItem('rr-lang') || 'co';
