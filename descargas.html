@@ -156,12 +156,26 @@
     .curtain.closing .curtain-layer:nth-child(2){transition-delay:.07s}
     .curtain.closing .curtain-layer:nth-child(3){transition-delay:.14s}
     .curtain.closing .curtain-layer:nth-child(4){transition-delay:.21s}
-    .curtain-stage{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4rem;pointer-events:none}
+    .curtain-stage{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4rem;pointer-events:none;transition:opacity .35s .25s}
+    .curtain.closing .curtain-stage{opacity:0}
     .curtain-tag{font-family:'DM Mono',monospace;font-size:.69rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.25)}
     .curtain-headline{display:flex;flex-direction:column;align-items:center;gap:.1rem}
     .curtain-word{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(2rem,5vw,3.5rem);letter-spacing:-.04em;color:var(--white)}
     .curtain-word.blue{color:var(--blue)}
     .curtain-sub{font-family:'DM Mono',monospace;font-size:.782rem;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.3)}
+
+    /* ─── PRO MODAL ─────────────────────────────────── */
+    .pro-overlay{position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+    .pro-overlay.hidden{display:none}
+    .pro-modal{background:#0e1220;border:1px solid rgba(255,255,255,.12);padding:2.2rem 2rem;max-width:380px;width:90%;text-align:center}
+    .pro-modal-icon{font-size:2rem;margin-bottom:.6rem}
+    .pro-modal-title{font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;letter-spacing:-.02em;color:var(--white);margin-bottom:.5rem}
+    .pro-modal-sub{font-family:'Syne',sans-serif;font-size:.8rem;letter-spacing:.04em;color:rgba(255,255,255,.4);margin-bottom:1.5rem;line-height:1.6}
+    .pro-modal-actions{display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap}
+    .pro-modal-btn{font-family:'Syne',sans-serif;font-size:.782rem;letter-spacing:.1em;text-transform:uppercase;background:var(--blue);color:var(--white);border:none;padding:.55rem 1.4rem;cursor:pointer;text-decoration:none;display:inline-block}
+    .pro-modal-btn:hover{background:#0035cc}
+    .pro-modal-cancel{font-family:'Syne',sans-serif;font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.35);background:none;border:none;cursor:pointer;padding:.55rem .6rem}
+    .pro-modal-cancel:hover{color:rgba(255,255,255,.65)}
   </style>
 </head>
 <body>
@@ -193,12 +207,12 @@
         <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
         <a href="electoral.html" class="logo-link" onclick="navTo(event,'electoral.html')">
           <div class="logo-bars">
-            <div class="logo-bar" style="height:8px"></div>
-            <div class="logo-bar" style="height:14px"></div>
             <div class="logo-bar" style="height:20px"></div>
-            <div class="logo-bar" style="height:11px"></div>
+            <div class="logo-bar" style="height:15px"></div>
+            <div class="logo-bar" style="height:9px"></div>
+            <div class="logo-bar" style="height:4px"></div>
           </div>
-          <span class="logo-text">ricardo<span>ruiz</span></span>
+          <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
         </a>
       </div>
     </nav>
@@ -219,7 +233,8 @@
     <div class="content-area">
 
       <div class="notice-box">
-        Los archivos contienen resultados <b>por mesa de votación</b>: departamento, municipio, zona, puesto, mesa, candidato, votos, partido y circunscripción.<br/>
+        Los archivos contienen resultados <b>por puesto de votación</b>: departamento, municipio, zona, puesto, candidato, votos, partido y circunscripción.<br/>
+        Si necesitas los datos desagregados <b>por mesa</b>, escríbenos por correo desde el formulario de registro o a través del botón de WhatsApp.<br/>
         Las descargas están disponibles a medida que se publican los resultados oficiales del escrutinio.
       </div>
 
@@ -529,11 +544,15 @@
     function navTo(e, url) {
       e && e.preventDefault();
       const c = document.getElementById('curtain');
+      c.style.display = '';
       c.classList.remove('closing');
       setTimeout(() => { window.location.href = url; }, 0);
     }
     window.addEventListener('load', () => {
-      document.getElementById('curtain')?.classList.add('closing');
+      const c = document.getElementById('curtain');
+      if (!c) return;
+      c.classList.add('closing');
+      setTimeout(() => { c.style.display = 'none'; }, 1300);
     });
 
     // ─── CURSOR ───────────────────────────────────────────────────────────────
@@ -546,13 +565,24 @@
       animRing();
     })();
 
-    // ─── AUTH ─────────────────────────────────────────────────────────────────
+    // ─── PRO MODAL HELPERS ────────────────────────────────────────────────────
+    function closeProModal() {
+      document.getElementById('pro-overlay')?.classList.add('hidden');
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('pro-overlay')?.addEventListener('click', function(e) {
+        if (e.target === this) closeProModal();
+      });
+    });
+
+    // ─── AUTH + PRO GATE ──────────────────────────────────────────────────────
     (function() {
       const authEl = document.getElementById('e-nav-auth');
-      if (!authEl) return;
-      try {
-        const s = localStorage.getItem('rr-session');
-        const sess = s ? JSON.parse(s) : null;
+      let sess = null;
+      try { const s = localStorage.getItem('rr-session'); sess = s ? JSON.parse(s) : null; } catch(e) {}
+
+      // Render nav auth bar
+      if (authEl) {
         if (sess && sess.email) {
           authEl.innerHTML = `
             <span class="e-user-name">${sess.email.split('@')[0]}</span>
@@ -563,10 +593,50 @@
             <a href="login.html" class="e-btn-login" onclick="navTo(event,'login.html')">Ingresar</a>
             <a href="register.html" class="e-btn-register" onclick="navTo(event,'register.html')">Registrarse</a>`;
         }
-      } catch(e) {
-        authEl.innerHTML = `
-          <a href="login.html" class="e-btn-login" onclick="navTo(event,'login.html')">Ingresar</a>
-          <a href="register.html" class="e-btn-register" onclick="navTo(event,'register.html')">Registrarse</a>`;
+      }
+
+      // Pro/Premium gate
+      const isPaid = sess && sess.plan && ['pro','premium'].includes(sess.plan.toLowerCase());
+      if (!isPaid) {
+        // Disable all download buttons
+        document.querySelectorAll('.dl-btn, .dept-dl-btn').forEach(btn => {
+          btn.classList.add('disabled');
+          btn.removeAttribute('href');
+          btn.removeAttribute('download');
+          btn.style.pointerEvents = 'none';
+          btn.style.opacity = '.35';
+          btn.style.cursor = 'default';
+        });
+        // Show modal after curtain closes
+        const modalTitle = sess && sess.email
+          ? 'Contenido exclusivo'
+          : 'Acceso restringido';
+        const modalSub = sess && sess.email
+          ? 'Tu cuenta no tiene un plan activo. Actualiza a <b>Pro</b> o <b>Premium</b> para descargar los archivos.'
+          : 'Debes tener una cuenta <b>Pro</b> o <b>Premium</b> para acceder a las descargas.';
+        const overlay = document.getElementById('pro-overlay');
+        if (overlay) {
+          overlay.querySelector('.pro-modal-title').textContent = modalTitle;
+          overlay.querySelector('.pro-modal-sub').innerHTML = modalSub;
+          setTimeout(() => { overlay.classList.remove('hidden'); }, 1400);
+        }
+        // Also re-disable any dynamically rendered buttons (dept selectors)
+        const origRenderDeptGen = window.renderDeptGen;
+        const origRenderDeptCam = window.renderDeptCam;
+        const origRenderDeptCirc = window.renderDeptCirc;
+        function disableNewBtns() {
+          document.querySelectorAll('.dept-dl-btn:not([style*="pointer-events"])').forEach(btn => {
+            btn.classList.add('disabled');
+            btn.removeAttribute('href');
+            btn.removeAttribute('download');
+            btn.style.pointerEvents = 'none';
+            btn.style.opacity = '.35';
+            btn.style.cursor = 'default';
+          });
+        }
+        window.renderDeptGen  = function() { if(origRenderDeptGen) origRenderDeptGen(); disableNewBtns(); };
+        window.renderDeptCam  = function() { if(origRenderDeptCam) origRenderDeptCam(); disableNewBtns(); };
+        window.renderDeptCirc = function() { if(origRenderDeptCirc) origRenderDeptCirc(); disableNewBtns(); };
       }
     })();
 
@@ -578,5 +648,18 @@
     populateSelect('sel-dept-circ', DEPTOS_CAM);
   </script>
   <script src="lang.js"></script>
+
+  <!-- PRO-ACCESS MODAL -->
+  <div id="pro-overlay" class="pro-overlay hidden">
+    <div class="pro-modal">
+      <div class="pro-modal-icon">🔒</div>
+      <div class="pro-modal-title">Acceso restringido</div>
+      <div class="pro-modal-sub">Debes tener una cuenta <b>Pro</b> o <b>Premium</b> para acceder a las descargas.</div>
+      <div class="pro-modal-actions">
+        <a href="pricing.html" class="pro-modal-btn" onclick="navTo(event,'pricing.html')">Ver planes</a>
+        <button class="pro-modal-cancel" onclick="closeProModal()">Cerrar</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

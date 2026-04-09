@@ -683,6 +683,18 @@
     .login-modal-btn:hover{background:#0035cc}
     .login-modal-cancel{font-family:'Syne',sans-serif;font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.35);background:none;border:none;cursor:pointer;padding:.55rem .6rem}
     .login-modal-cancel:hover{color:rgba(255,255,255,.65)}
+    /* PRO-ACCESS MODAL */
+    .pro-access-overlay{position:fixed;inset:0;z-index:50000;display:flex;align-items:center;justify-content:center;background:rgba(4,6,16,.78);backdrop-filter:blur(4px)}
+    .pro-access-overlay.hidden{display:none!important}
+    .pro-access-modal{background:#0e1220;border:1px solid rgba(255,255,255,.12);padding:2.2rem 2rem;max-width:380px;width:90%;text-align:center}
+    .pro-access-icon{font-size:2rem;margin-bottom:.6rem}
+    .pro-access-title{font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;letter-spacing:-.02em;color:var(--white);margin-bottom:.5rem}
+    .pro-access-sub{font-family:'Syne',sans-serif;font-size:.8rem;letter-spacing:.04em;color:rgba(255,255,255,.4);margin-bottom:1.5rem;line-height:1.6}
+    .pro-access-actions{display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap}
+    .pro-access-btn{font-family:'Syne',sans-serif;font-size:.782rem;letter-spacing:.1em;text-transform:uppercase;background:var(--blue);color:var(--white);border:none;padding:.55rem 1.4rem;cursor:pointer;text-decoration:none;display:inline-block}
+    .pro-access-btn:hover{background:#0035cc}
+    .pro-access-cancel{font-family:'Syne',sans-serif;font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.35);background:none;border:none;cursor:pointer;padding:.55rem .6rem}
+    .pro-access-cancel:hover{color:rgba(255,255,255,.65)}
   </style>
 </head>
 <body>
@@ -899,7 +911,7 @@
               <div class="card-label"><div class="card-name" id="el-2026-test">Test Electoral Presidencial 2026</div></div>
             </div>
             <!-- Mapas -->
-            <div class="card" style="cursor:pointer;" onclick="navigate(event,'descargas.html','Descargas Excel')">
+            <div class="card" style="cursor:pointer;" onclick="navigateDescargas(event)">
               <div class="card-glow"></div>
               <div class="card-label"><div class="card-name" id="el-2026-mapas">Descargas Excel</div></div>
             </div>
@@ -1041,6 +1053,25 @@
       c.classList.add('closing');
       setTimeout(() => { window.location.href = url; }, 1150);
     }
+
+    // ── DESCARGAS GATE ──
+    function navigateDescargas(e) {
+      let sess = null;
+      try { const s = localStorage.getItem('rr-session'); sess = s ? JSON.parse(s) : null; } catch(_) {}
+      if (!sess || !sess.email) {
+        document.getElementById('pro-access-overlay').classList.remove('hidden');
+        return;
+      }
+      navigate(e, 'descargas.html', 'Descargas Excel');
+    }
+    function closeProAccessModal() {
+      document.getElementById('pro-access-overlay').classList.add('hidden');
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('pro-access-overlay')?.addEventListener('click', function(ev) {
+        if (ev.target === this) closeProAccessModal();
+      });
+    });
 
     // ── SUBMENU ──
     function openSubmenu(e, label, url) {
@@ -1510,6 +1541,19 @@
     });
   </script>
   <script src="lang.js"></script>
+
+  <!-- MODAL PRO ACCESS -->
+  <div id="pro-access-overlay" class="pro-access-overlay hidden">
+    <div class="pro-access-modal">
+      <div class="pro-access-icon">🔒</div>
+      <div class="pro-access-title">Contenido exclusivo</div>
+      <div class="pro-access-sub">Las descargas están disponibles para usuarios <b>Pro</b> o <b>Premium</b>. Regístrate o actualiza tu plan para acceder.</div>
+      <div class="pro-access-actions">
+        <a href="pricing.html" class="pro-access-btn" onclick="navigate(event,'pricing.html','Planes')">Ver planes</a>
+        <button class="pro-access-cancel" onclick="closeProAccessModal()">Cerrar</button>
+      </div>
+    </div>
+  </div>
 
   <!-- MODAL LOGIN -->
   <div id="login-overlay" class="login-overlay hidden">
