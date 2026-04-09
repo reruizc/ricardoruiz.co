@@ -579,31 +579,45 @@
         .sort((a,b)=>b.votos-a.votos);
       geoPartidos.sort((a,b)=>b.votos-a.votos);
 
+      // Para nivel circunscripción: calcular D'Hondt (1 curul) dentro de la circ
+      const esCirc = (nivel === 'circ');
+      let circCurules = {};
+      if(esCirc){
+        const vpArr = geoPartidos.map(p=>({partido:p.partido,votos:p.votos}));
+        circCurules = calcDhondt(vpArr, 1);
+      }
+
       document.getElementById('lbl-tabla').textContent=labelText;
       document.getElementById('drill-badge').textContent=badgeText;
       document.getElementById('drill-badge').className='level-badge dep';
       document.getElementById('drill-nav').innerHTML='';
-      document.getElementById('drill-thead').innerHTML=`<tr><th>#</th><th>Partido / Coalición</th><th class="r">Votos</th><th class="r" style="min-width:130px">%</th><th class="r">Candidatos</th></tr>`;
+      document.getElementById('drill-thead').innerHTML=`<tr><th>#</th><th>Partido / Coalición</th><th class="r">Votos</th><th class="r" style="min-width:130px">%</th><th class="r">${esCirc?'Curul':'Candidatos'}</th></tr>`;
       const tbody=document.getElementById('tbody-citrep');
       tbody.innerHTML='';
       const maxV=geoPartidos[0]?.votos||1;
       geoPartidos.forEach((p,i)=>{
         const color=getColor(p.partido), pctV=pct(p.votos,totalVotos), bw=((p.votos/maxV)*100).toFixed(1);
-        const hasCands=p.candidatos&&p.candidatos.length>0;
         const tr=document.createElement('tr');
+        const lastCell = esCirc
+          ? (circCurules[p.partido]>0 ? `<span class="cbadge">1</span>` : `<span class="cbadge sub">—</span>`)
+          : `<span class="cbadge sub">${p.candidatos?.length||'—'}</span>`;
         tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td>
           <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span></div></td>
           <td class="r" style="font-size:.9rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td>
           <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>
-          <td class="r"><span class="cbadge sub">${p.candidatos?.length||'—'}</span></td>`;
+          <td class="r">${lastCell}</td>`;
         tbody.appendChild(tr);
       });
       setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
       const topP=geoPartidos.filter(p=>!/blanco/i.test(p.partido))[0];
+      const ganador = esCirc ? geoPartidos.find(p=>circCurules[p.partido]>0) : null;
       document.getElementById('kpi-row').innerHTML=`
         <div class="kpi-card"><div class="kpi-label">Votos válidos</div><div class="kpi-val gr">${fmt(totalVotos)}</div><div class="kpi-delta">${badgeText}</div></div>
         <div class="kpi-card"><div class="kpi-label">Partidos</div><div class="kpi-val wh">${geoPartidos.length}</div><div class="kpi-delta">con votación</div></div>
-        <div class="kpi-card"><div class="kpi-label">Partido puntero</div><div class="kpi-val sm">${topP?topP.partido.split(' ').slice(0,3).join(' '):'—'}</div><div class="kpi-delta">${topP?fmt(topP.votos)+' votos':''}</div></div>
+        ${esCirc
+          ? `<div class="kpi-card"><div class="kpi-label">Curul asignada</div><div class="kpi-val sm">${ganador?ganador.partido.split(' ').slice(0,3).join(' '):'—'}</div><div class="kpi-delta">${ganador?fmt(ganador.votos)+' votos':''}</div></div>`
+          : `<div class="kpi-card"><div class="kpi-label">Partido puntero</div><div class="kpi-val sm">${topP?topP.partido.split(' ').slice(0,3).join(' '):'—'}</div><div class="kpi-delta">${topP?fmt(topP.votos)+' votos':''}</div></div>`
+        }
         <div class="kpi-card"><div class="kpi-label">% puntero</div><div class="kpi-val">${topP?pct(topP.votos,totalVotos)+'%':'—'}</div><div class="kpi-delta">de votos</div></div>`;
       document.getElementById('pct-citrep').textContent=topP?pct(topP.votos,totalVotos)+'%':'—';
       if(donutChart) donutChart.destroy();
