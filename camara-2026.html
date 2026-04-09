@@ -33,6 +33,17 @@
     .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.1rem,2vw,1.8rem);letter-spacing:-.03em;color:var(--white)}
     .logo-text span{color:var(--blue)}
     @media(max-width:900px){.electoral-nav{display:none}}
+    .country-selector-wrap{position:relative}
+    .country-btn{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.4);background:none;border:1px solid rgba(255,255,255,.15);padding:.3rem .65rem;cursor:none;display:flex;align-items:center;transition:border-color .2s,color .2s}
+    .country-btn:hover,.country-btn.open{border-color:rgba(255,255,255,.35);color:rgba(255,255,255,.7)}
+    .country-dropdown{position:absolute;top:calc(100% + 8px);right:0;background:#0e1220;border:1px solid rgba(255,255,255,.12);min-width:190px;display:none;flex-direction:column;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+    .country-dropdown.open{display:flex}
+    .country-option{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.05em;padding:.65rem 1rem;cursor:pointer;display:flex;align-items:center;gap:.5rem;color:rgba(255,255,255,.5);border-bottom:1px solid rgba(255,255,255,.07);transition:background .15s;user-select:none}
+    .country-option:last-child{border-bottom:none}
+    .country-option:hover{background:rgba(255,255,255,.05);color:rgba(255,255,255,.8)}
+    .country-option.selected{color:var(--blue)}
+    .country-check{font-size:.6rem;width:12px;opacity:0;color:var(--blue)}
+    .country-option.selected .country-check{opacity:1}
     .top-bar{display:flex;align-items:flex-start;justify-content:space-between;padding:1.1rem 2.5rem 0;flex-shrink:0}
     .page-title{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.5rem,2.8vw,2.5rem);letter-spacing:-.04em;line-height:1.05;color:var(--white);text-shadow:0 2px 24px rgba(0,71,255,.4)}
     .page-title span{color:var(--blue)}
@@ -276,29 +287,43 @@
   <div class="shell">
     <nav class="electoral-nav">
       <div style="display:flex;align-items:center;gap:1rem">
-        <a href="electoral.html" class="e-btn-back" onclick="navTo(event,'electoral.html')">← Volver</a>
+        <a href="electoral.html" class="e-btn-back" id="cam-back" onclick="navTo(event,'electoral.html')">← Volver</a>
         <div id="e-nav-auth" class="electoral-nav-auth"></div>
       </div>
-      <a href="electoral.html" class="logo-link" onclick="navTo(event,'electoral.html')">
-        <div class="logo-bars">
-          <div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div>
-          <div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div>
+      <div style="display:flex;align-items:center;gap:1.2rem">
+        <div class="country-selector-wrap">
+          <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
+            <span id="countryBtnLabel">Colombia</span>
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style="margin-left:6px;transition:transform .2s" id="countryChevron"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+          <div class="country-dropdown" id="countryDropdown">
+            <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
+            <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
+            <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
+            <div class="country-option" data-value="cn" onclick="selectCountry(this)"><span class="country-check">✓</span> 中国 / China</div>
+          </div>
         </div>
-        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
-      </a>
+        <a href="electoral.html" class="logo-link" onclick="navTo(event,'electoral.html')">
+          <div class="logo-bars">
+            <div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div>
+            <div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div>
+          </div>
+          <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+        </a>
+      </div>
     </nav>
     <div class="top-bar">
-      <div class="page-title">Cámara de<br/><span>Representantes</span></div>
+      <div class="page-title" id="cam-title">Cámara de<br/><span>Representantes</span></div>
     </div>
-    <div class="breadcrumb">
+    <div class="breadcrumb" id="cam-breadcrumb">
       <a href="electoral.html" onclick="navTo(event,'electoral.html')">Resultados Electorales</a>
       &nbsp;/&nbsp; Escrutinio Cámara 2026
     </div>
     <div class="meta-bar">
-      <span class="meta-item">Elección: <b>Congreso · 16 Mar 2026</b></span>
-      <span class="meta-item">Curules: <b>166</b></span>
+      <span class="meta-item" id="cam-meta-elec">Elección: <b>Congreso · 16 Mar 2026</b></span>
+      <span class="meta-item" id="cam-meta-curules">Curules: <b>166</b></span>
       <span class="meta-item">Votos válidos: <b id="meta-votval">—</b></span>
-      <div class="source-badge">Fuente: <b>Registraduría · Escrutinio</b></div>
+      <div class="source-badge" id="cam-source">Fuente: <b>Registraduría · Escrutinio</b></div>
       <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
     </div>
 
@@ -310,7 +335,7 @@
       <div id="main-content" class="hidden">
 
         <div class="endoso-cta">
-          <div class="endoso-cta-text"><b>¿Quieres medir el endoso?</b><br/>Compara la votación de un candidato a la Cámara con uno al Senado mesa por mesa.</div>
+          <div class="endoso-cta-text" id="cam-endoso-text"><b>¿Quieres medir el endoso?</b><br/>Compara la votación de un candidato a la Cámara con uno al Senado mesa por mesa.</div>
           <a href="endoso-2026.html" class="endoso-btn" id="endoso-cta-btn" onclick="navTo(event,'endoso-2026.html')">Calcular endoso →</a>
         </div>
 
@@ -1180,7 +1205,7 @@
     });
 
     // ─── NAV AUTH ─────────────────────────────────────────────
-    function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;if(token&&user){const pl={free:'Free',basic:'Básico',analysis:'Análisis',full:'Completo'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">Salir</button>`;}else{area.innerHTML=`<a href="pricing.html" style="font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">Planes</a><a href="login.html?redirect=camara-2026.html" class="e-btn-login">Iniciar sesión</a><a href="register.html" class="e-btn-register">Registrarse</a>`;}}
+    function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;const lang=localStorage.getItem('rr-lang')||'co';const t=CAM_LANG[lang]||CAM_LANG.co;if(token&&user){const pl=lang==='us'?{free:'Free',basic:'Basic',analysis:'Analysis',full:'Full',pro:'Pro',premium:'Premium'}:lang==='cn'?{free:'免费',basic:'基础版',analysis:'分析版',full:'完整版',pro:'Pro',premium:'Premium'}:{free:'Free',basic:'Básico',analysis:'Análisis',full:'Completo',pro:'Pro',premium:'Premium'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">${t.logout}</button>`;}else{area.innerHTML=`<a href="pricing.html" style="font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">${t.planes}</a><a href="login.html?redirect=camara-2026.html" class="e-btn-login">${t.login}</a><a href="register.html" class="e-btn-register">${t.register}</a>`;}}
     async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();updateEndosoCta();updateExcelDownloadBtn();}
     function updateEndosoCta(){}
     function dismissInfoBar(){sessionStorage.setItem('rr-info-bar-ok','1');const b=document.getElementById('info-bar');if(b)b.style.display='none';}
@@ -1195,6 +1220,84 @@
     function applyTheme(day){ document.body.classList.toggle('day-mode',day); const btn=document.getElementById('theme-btn'); if(btn) btn.textContent=day?'🌙 Modo noche':'☀ Modo día'; localStorage.setItem('rr-theme',day?'day':'night'); }
     function toggleTheme(){ applyTheme(!document.body.classList.contains('day-mode')); }
     (function(){ const s=localStorage.getItem('rr-theme'); if(s) applyTheme(s==='day'); else applyTheme(isDayHour()); })();
+
+    // ─── i18n ─────────────────────────────────────────────────
+    const CAM_LANG = {
+      co: {
+        htmlLang:'es', pageTitle:'Escrutinio Cámara 2026 · Ricardo Ruiz',
+        back:'← Volver', titleLine1:'Cámara de', titleSpan:'Representantes',
+        breadcrumb1:'Resultados Electorales', breadcrumb2:'Escrutinio Cámara 2026',
+        metaElec:'Elección: <b>Congreso · 16 Mar 2026</b>',
+        metaCurules:'Curules: <b>166</b>',
+        source:'Fuente: <b>Registraduría · Escrutinio</b>',
+        themeDay:'☀ Modo día', themeNight:'🌙 Modo noche',
+        loading:'Cargando escrutinio…',
+        endosoText:'<b>¿Quieres medir el endoso?</b><br/>Compara la votación de un candidato a la Cámara con uno al Senado mesa por mesa.',
+        endosoBtn:'Calcular endoso →',
+        footer1:'ricardoruiz.co · Elecciones Colombia 2026',
+        footer2:'Fuente: Registraduría Nacional',
+        login:'Iniciar sesión', register:'Registrarse', logout:'Salir', planes:'Planes',
+      },
+      us: {
+        htmlLang:'en', pageTitle:'House of Representatives 2026 · Ricardo Ruiz',
+        back:'← Back', titleLine1:'House of', titleSpan:'Representatives',
+        breadcrumb1:'Electoral Results', breadcrumb2:'House Official Count 2026',
+        metaElec:'Election: <b>Congress · Mar 16, 2026</b>',
+        metaCurules:'Seats: <b>166</b>',
+        source:'Source: <b>Registraduría · Official count</b>',
+        themeDay:'☀ Day mode', themeNight:'🌙 Night mode',
+        loading:'Loading results…',
+        endosoText:'<b>Want to measure endorsement?</b><br/>Compare a House candidate\'s votes with a Senate candidate station by station.',
+        endosoBtn:'Calculate endorsement →',
+        footer1:'ricardoruiz.co · Colombia Elections 2026',
+        footer2:'Source: National Civil Registry',
+        login:'Log in', register:'Sign up', logout:'Log out', planes:'Plans',
+      },
+      cn: {
+        htmlLang:'zh', pageTitle:'众议院计票 2026 · Ricardo Ruiz',
+        back:'← 返回', titleLine1:'众议院', titleSpan:'代表',
+        breadcrumb1:'选举结果', breadcrumb2:'众议院官方计票 2026',
+        metaElec:'选举: <b>国会 · 2026年3月16日</b>',
+        metaCurules:'席位: <b>166</b>',
+        source:'来源: <b>Registraduría · 官方计票</b>',
+        themeDay:'☀ 日间模式', themeNight:'🌙 夜间模式',
+        loading:'正在加载结果…',
+        endosoText:'<b>想测量背书吗？</b><br/>逐投票站比较众议院候选人与参议院候选人的得票数。',
+        endosoBtn:'计算背书 →',
+        footer1:'ricardoruiz.co · 哥伦比亚选举 2026',
+        footer2:'来源：国家民事登记处',
+        login:'登录', register:'注册', logout:'退出', planes:'计划',
+      },
+    };
+
+    function camApplyLang() {
+      const lang = localStorage.getItem('rr-lang') || 'co';
+      const t = CAM_LANG[lang] || CAM_LANG.co;
+      document.documentElement.lang = t.htmlLang;
+      document.title = t.pageTitle;
+      const el = id => document.getElementById(id);
+      const si = (id, html) => { const e = el(id); if(e) e.innerHTML = html; };
+      const st = (id, txt) => { const e = el(id); if(e) e.textContent = txt; };
+      st('cam-back', t.back);
+      si('cam-title', t.titleLine1 + '<br/><span>' + t.titleSpan + '</span>');
+      si('cam-breadcrumb', `<a href="electoral.html" onclick="navTo(event,'electoral.html')">${t.breadcrumb1}</a> &nbsp;/&nbsp; ${t.breadcrumb2}`);
+      si('cam-meta-elec', t.metaElec);
+      si('cam-meta-curules', t.metaCurules);
+      si('cam-source', t.source);
+      const themeBtn = el('theme-btn');
+      if(themeBtn) themeBtn.textContent = document.body.classList.contains('day-mode') ? t.themeNight : t.themeDay;
+      si('cam-endoso-text', t.endosoText);
+      const endosoBtn = el('endoso-cta-btn');
+      if(endosoBtn && !endosoBtn.classList.contains('endoso-locked')) endosoBtn.textContent = t.endosoBtn;
+      const footerBrands = document.querySelectorAll('.footer-brand');
+      if(footerBrands[0]) footerBrands[0].textContent = t.footer1;
+      if(footerBrands[1]) footerBrands[1].innerHTML = `<a href="https://registraduria.gov.co" target="_blank">${t.footer2}</a>`;
+      updateElectoralNav();
+    }
+
+    camApplyLang();
+    window.__applyLang = function() { camApplyLang(); };
   </script>
+  <script src="lang.js"></script>
 </body>
 </html>

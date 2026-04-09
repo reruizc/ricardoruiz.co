@@ -756,8 +756,15 @@
           };
           if (desired && Date.now() - desired.timestamp < 30 * 60 * 1000) {
             localStorage.removeItem('rr-desired-plan');
-            const link = WOMPI_LINKS[desired.planId]?.[desired.billing];
-            if (link) { window.location.href = link; return; }
+            const baseLink = WOMPI_LINKS[desired.planId]?.[desired.billing];
+            if (baseLink) {
+              const params = new URLSearchParams({
+                'customer-email': data.user.email,
+                'reference': `rr-${data.user.email}-${desired.planId}-${desired.billing}-${Date.now()}`
+              });
+              window.location.href = `${baseLink}?${params.toString()}`;
+              return;
+            }
           }
           const _redir = new URLSearchParams(window.location.search).get('redirect');
           window.location.href = (_redir && /^[\w-]+\.html$/.test(_redir)) ? _redir : 'dashboard.html';

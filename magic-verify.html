@@ -211,6 +211,7 @@
     const errorCode  = params.get('error');
     const lang       = localStorage.getItem('rr-lang') || 'co';
     const isEN       = lang === 'us';
+    const isCN       = lang === 'cn';
 
     function showState(id) {
       document.querySelectorAll('.state').forEach(s => s.classList.remove('active'));
@@ -232,15 +233,29 @@
       document.getElementById('success-title').textContent   = 'Welcome!';
       document.getElementById('success-desc').textContent    = 'Redirecting to dashboard...';
       document.getElementById('error-btn').textContent       = '← Back to login';
+    } else if (isCN) {
+      document.getElementById('pageTitle').textContent       = '登录中 · Ricardo Ruiz';
+      document.getElementById('loading-label').textContent   = '正在验证链接...';
+      document.getElementById('setup-step').textContent      = '01 — 个人资料';
+      document.getElementById('setup-title').textContent     = '完善您的资料';
+      document.getElementById('setup-subtitle').textContent  = '只需几个细节来个性化您的体验。';
+      document.getElementById('setup-label-name').textContent    = '全名';
+      document.getElementById('setup-name').placeholder          = '张伟';
+      document.getElementById('setup-label-country').textContent = '国家';
+      document.getElementById('setup-btn').textContent           = '前往仪表板 →';
+      document.getElementById('success-step').textContent    = '访问已验证';
+      document.getElementById('success-title').textContent   = '欢迎！';
+      document.getElementById('success-desc').textContent    = '正在跳转到仪表板...';
+      document.getElementById('error-btn').textContent       = '← 返回登录';
     }
 
     // ── Flujo ──
     if (errorCode) {
       // Vino con error desde el Worker
       const msgs = {
-        expired:  isEN ? 'This link has expired. Please request a new one.' : 'Este enlace expiró. Solicita uno nuevo.',
-        invalid:  isEN ? 'Invalid link.' : 'Enlace inválido.',
-        notfound: isEN ? 'Account not found.' : 'Cuenta no encontrada.',
+        expired:  isEN ? 'This link has expired. Please request a new one.' : isCN ? '此链接已过期，请重新申请。' : 'Este enlace expiró. Solicita uno nuevo.',
+        invalid:  isEN ? 'Invalid link.' : isCN ? '链接无效。' : 'Enlace inválido.',
+        notfound: isEN ? 'Account not found.' : isCN ? '未找到账户。' : 'Cuenta no encontrada.',
       };
       document.getElementById('error-desc').textContent = msgs[errorCode] || msgs.invalid;
       showState('state-error');
@@ -303,15 +318,15 @@
         if (data.ok) {
           localStorage.setItem('rr-token', data.token);
           localStorage.setItem('rr-user', JSON.stringify(data.user));
-          document.getElementById('success-title').textContent = isEN ? `Welcome, ${data.user.name.split(' ')[0]}!` : `¡Bienvenido, ${data.user.name.split(' ')[0]}!`;
+          document.getElementById('success-title').textContent = isEN ? `Welcome, ${data.user.name.split(' ')[0]}!` : isCN ? `欢迎，${data.user.name.split(' ')[0]}！` : `¡Bienvenido, ${data.user.name.split(' ')[0]}!`;
           showState('state-success');
           setTimeout(() => window.location.href = 'dashboard.html', 1500);
         } else {
-          document.getElementById('error-desc').textContent = data.error || (isEN ? 'An error occurred.' : 'Ocurrió un error.');
+          document.getElementById('error-desc').textContent = data.error || (isEN ? 'An error occurred.' : isCN ? '发生错误。' : 'Ocurrió un error.');
           showState('state-error');
         }
       } catch {
-        btn.textContent = isEN ? 'Go to dashboard →' : 'Entrar al dashboard →';
+        btn.textContent = isEN ? 'Go to dashboard →' : isCN ? '前往仪表板 →' : 'Entrar al dashboard →';
         btn.disabled = false;
       }
     }
