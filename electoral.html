@@ -1102,27 +1102,76 @@
     const tabs = ['p2023','p2025','p2026'];
     let currentIdx = 2;
 
+    const DISINTEGRATE_MS = 320;
+    const DISINTEGRATE_SPREAD = 180; // px max spread
+    let tabSwitching = false;
+
     function switchTab(btn) {
+      if (tabSwitching) return;
       const panelId = btn.dataset.panel;
+      if (document.getElementById(panelId).classList.contains('active')) return;
       currentIdx = tabs.indexOf(panelId);
+
       document.querySelectorAll('.year-tab').forEach(t => t.classList.remove('active'));
       btn.classList.add('active');
-      document.querySelectorAll('.panel').forEach(p => { p.classList.remove('active'); p.style.display='none'; });
-      // Close any open submenus
       document.querySelectorAll('.card-submenu.open').forEach(m => m.classList.remove('open'));
-      const panel = document.getElementById(panelId);
-      panel.style.display = 'grid';
-      panel.offsetHeight;
-      panel.classList.add('active');
-      animateCards(panelId);
+
+      const outgoing = document.querySelector('.panel.active');
+      const incoming = document.getElementById(panelId);
+
+      tabSwitching = true;
+      disintegratePanel(outgoing, () => {
+        outgoing.classList.remove('active');
+        outgoing.style.display = 'none';
+        // Reset any inline styles left on outgoing cards
+        outgoing.querySelectorAll('.card').forEach(c => {
+          c.style.transition = ''; c.style.transform = ''; c.style.opacity = ''; c.style.filter = '';
+        });
+        // Prepare incoming cards in scattered state before showing panel
+        const inCards = Array.from(incoming.querySelectorAll('.card'));
+        inCards.forEach(card => {
+          const dx = (Math.random() - 0.5) * DISINTEGRATE_SPREAD;
+          const dy = (Math.random() - 0.5) * (DISINTEGRATE_SPREAD * 0.6);
+          card.style.transition = 'none';
+          card.style.transform = `translate(${dx}px,${dy}px) scale(0.72)`;
+          card.style.opacity = '0';
+          card.style.filter = 'blur(5px)';
+        });
+        incoming.style.display = 'grid';
+        incoming.getBoundingClientRect(); // force reflow
+        incoming.classList.add('active');
+        materializePanel(inCards, () => { tabSwitching = false; });
+      });
     }
 
-    function animateCards(panelId) {
-      document.querySelectorAll('#'+panelId+' .card').forEach((card, i) => {
-        card.style.opacity='0'; card.style.transform='translateY(14px)';
-        card.style.transition=`opacity .38s ease ${i*.05}s, transform .38s ease ${i*.05}s, border-color .25s`;
-        setTimeout(() => { card.style.opacity='1'; card.style.transform='translateY(0)'; }, 40+i*50);
+    function disintegratePanel(panel, onDone) {
+      const cards = Array.from(panel.querySelectorAll('.card'));
+      cards.forEach(card => {
+        const dx = (Math.random() - 0.5) * DISINTEGRATE_SPREAD;
+        const dy = (Math.random() - 0.5) * (DISINTEGRATE_SPREAD * 0.6);
+        const delay = Math.random() * 120;
+        card.style.transition = `opacity ${DISINTEGRATE_MS}ms ease-in ${delay}ms, transform ${DISINTEGRATE_MS}ms cubic-bezier(.4,0,1,1) ${delay}ms, filter ${DISINTEGRATE_MS}ms ease-in ${delay}ms`;
+        card.style.transform = `translate(${dx}px,${dy}px) scale(0.72)`;
+        card.style.opacity = '0';
+        card.style.filter = 'blur(5px)';
       });
+      setTimeout(onDone, DISINTEGRATE_MS + 120 + 20);
+    }
+
+    function materializePanel(cards, onDone) {
+      cards.forEach(card => {
+        const delay = Math.random() * 140;
+        card.style.transition = `opacity ${DISINTEGRATE_MS}ms ease-out ${delay}ms, transform ${DISINTEGRATE_MS}ms cubic-bezier(0,.8,.2,1) ${delay}ms, filter ${DISINTEGRATE_MS}ms ease-out ${delay}ms`;
+        card.style.transform = 'translate(0,0) scale(1)';
+        card.style.opacity = '';
+        card.style.filter = 'blur(0)';
+      });
+      setTimeout(() => {
+        cards.forEach(card => {
+          card.style.transition = ''; card.style.transform = ''; card.style.opacity = ''; card.style.filter = '';
+        });
+        if (onDone) onDone();
+      }, DISINTEGRATE_MS + 140 + 20);
     }
 
     // ── Keyboard ──
