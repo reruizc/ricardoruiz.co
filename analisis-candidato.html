@@ -1046,6 +1046,10 @@
     const MEDELLIN_COMUNAS_URL    = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json';
     const CALI_COMUNAS_URL        = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/CALIX.json';
     const PEREIRA_COMUNAS_URL     = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/PEREIRAX.json';
+    const IBAGUE_COMUNAS_URL      = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/IBAGUEX.json';
+    const BARRANQUILLA_LOCAL_URL  = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/BARRANQUILLAX.json';
+    const MONTERIA_COMUNAS_URL    = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/MONTERIAX.json';
+    const MANIZALES_COMUNAS_URL   = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/MANIZALESX.json';
     const fmt = n => Number(n).toLocaleString('es-CO');
 
     // ─── I18N ─────────────────────────────────────────────────
@@ -1344,6 +1348,62 @@
       '31':'20','32':'21','33':'22'
     };
 
+    // Ibagué: zona+puesto → código de comuna (fuente: DIVIPOLE-MAR2026)
+    // Zonas 04 y 11 tienen split por puesto; resto zona limpia.
+    // Zona 10 → comuna 12 (no hay comuna 11 en esa zona). Zona 99=corregimientos, omitida.
+    const ZON_PUE_COM_IBA = {
+      '01':{'01':'01','02':'01','03':'01','04':'01','05':'01','06':'01','07':'01','08':'01','09':'01'},
+      '02':{'01':'02','02':'02','03':'02','04':'02','05':'02'},
+      '03':{'01':'03','02':'03','03':'03','04':'03','05':'03','06':'03','07':'03'},
+      '04':{'01':'04','02':'04','03':'04','04':'05','05':'05','06':'05','07':'05','08':'04'},
+      '05':{'01':'06','02':'06','03':'06','04':'06','05':'06','06':'06'},
+      '06':{'01':'07','02':'07','03':'07','04':'07','05':'07','06':'07','07':'07'},
+      '07':{'01':'08','02':'08','03':'08','04':'08','05':'08','06':'08','07':'08','08':'08','09':'08'},
+      '08':{'01':'09','02':'09','03':'09','04':'09','05':'09','06':'09','07':'09','08':'09','09':'09','10':'09','11':'09'},
+      '09':{'01':'10','02':'10','03':'10','04':'10','05':'10','06':'10','07':'10'},
+      '10':{'01':'12','02':'12','03':'12','04':'12'},
+      '11':{'01':'11','02':'11','03':'11','04':'13','05':'13'},
+    };
+
+    // Barranquilla: zona electoral → código de localidad (fuente: DIVIPOLE-MAR2026)
+    // Zona 98 omitida (sin asignación de localidad). Zona 99 se maneja por puesto vía ZON99_PUE_LOC_BAR.
+    const ZON_TO_LOC_BAR = {
+      '01':'01','02':'01','03':'01','04':'01','05':'01','06':'01','07':'01',
+      '08':'01','09':'01','10':'01','11':'01','12':'01','13':'01','14':'01',
+      '15':'02','16':'02','17':'02','18':'02','19':'02','20':'02',
+      '21':'03','22':'03','23':'03','24':'03','25':'03','26':'03','27':'03','28':'03',
+      '29':'04','30':'04','31':'04','32':'04','33':'04','34':'04','35':'04',
+      '36':'05','37':'05','38':'05'
+    };
+    // Barranquilla zona 99: puesto → código de localidad (fuente: DIVIPOLE-MAR2026)
+    // pue 10 (Pies Descalzos) y 11 (San Vicente de Paul) → Riomar; pue 25 (Juan Mina) → Sur Occidente.
+    const ZON99_PUE_LOC_BAR = { '10':'05', '11':'05', '25':'01' };
+    // Barranquilla: nombre GeoJSON (props.nombre) → código de localidad
+    const BAR_NOM_TO_CODE = {
+      'SUROCCIDENTE':'01','METROPOLITANA':'02','SURORIENTE':'03',
+      'NORTE - CENTRO HISTORICO':'04','RIOMAR':'05'
+    };
+
+    // Montería: zona+puesto → código de comuna (fuente: DIVIPOLE-MAR2026)
+    // Zonas 01, 06 y 07 tienen split por puesto. Comunas 10 y 12 no existen en el GeoJSON (solo 1-9).
+    // Puestos 06 y 07 de zona 06 ausentes en DIVIPOLE y confirmados inexistentes en datos reales.
+    const ZON_PUE_COM_MON = {
+      '01':{'01':'01','02':'01','03':'01','04':'02','05':'02','06':'01','07':'01','08':'02','09':'01'},
+      '02':{'01':'03','02':'03','03':'03','04':'03','05':'03','06':'03','07':'03','08':'03','09':'03'},
+      '03':{'01':'04','02':'04','03':'04','04':'04','05':'04','06':'04','07':'04','08':'04','09':'04','10':'04'},
+      '04':{'01':'05','02':'05','03':'05','04':'05','05':'05','06':'05','07':'05'},
+      '05':{'01':'06','02':'06','03':'06','04':'06','05':'06','06':'06','07':'06','08':'06','09':'06'},
+      '06':{'01':'07','02':'08','03':'08','04':'08','05':'12','08':'08','09':'08','10':'08','11':'08','12':'07','13':'08'},
+      '07':{'01':'09','02':'10','03':'10'},
+    };
+
+    // Manizales: zona electoral → código de comuna (fuente: DIVIPOLE-MAR2026)
+    // Zonas 03 y 04 comparten la misma comuna 03 (Cumanday). Zonas 90/98/99 omitidas.
+    const ZON_TO_COM_MAN = {
+      '01':'01','02':'02','03':'03','04':'03','05':'04','06':'05',
+      '07':'06','08':'07','09':'08','10':'09','11':'10','12':'11','13':'12'
+    };
+
     // ─── STATE ────────────────────────────────────────────────
     let candIndex = [];
     let currentCand = null;
@@ -1373,6 +1433,10 @@
     let medellinComunasCache = null;  // caché GeoJSON comunas Medellín
     let caliComunasCache = null;      // caché GeoJSON comunas Cali
     let pereiraComunasCache = null;   // caché GeoJSON comunas Pereira
+    let ibagueComunasCache = null;    // caché GeoJSON comunas Ibagué
+    let barranquillaLocalCache = null;// caché GeoJSON localidades Barranquilla
+    let monteriaComunasCache = null;  // caché GeoJSON comunas Montería
+    let manizalesComunasCache = null; // caché GeoJSON comunas Manizales
     let currentMunCode = null;        // mun electoral activo en vista de ciudad (Medellín/Cali)
     let munZoomed = false;            // true cuando el usuario hizo zoom en un municipio específico
     let deptLayerBounds = null;       // bounds del depto activo (para volver desde municipio)
@@ -1797,6 +1861,98 @@
       }
     }
 
+    // ─── CAPA COMUNAS IBAGUÉ ─────────────────────────────────
+    async function loadIbagueComunasLayer() {
+      document.getElementById('map-loading')?.classList.add('active');
+      try {
+        if (!ibagueComunasCache) {
+          const r = await fetch(IBAGUE_COMUNAS_URL);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          ibagueComunasCache = await r.json();
+        }
+        currentMunCode = '001';
+        const newLayer = L.geoJSON(ibagueComunasCache, { style: featureStyle, onEachFeature: onEachFeature });
+        showBoundaryLayer(newLayer);
+        const btn = document.getElementById('btn-volver-pais');
+        btn.textContent = '← Tolima';
+        btn.style.display = 'block';
+        showComunasNotice(true, 'Vista por comunas, excluye corregimientos. Para mayor precisión, descargue zona o puesto.');
+      } catch(e) {
+        console.error('[Mapa] Error cargando comunas Ibagué:', e.message);
+      } finally {
+        document.getElementById('map-loading')?.classList.remove('active');
+      }
+    }
+
+    // ─── CAPA LOCALIDADES BARRANQUILLA ───────────────────────
+    async function loadBarranquillaLocalLayer() {
+      document.getElementById('map-loading')?.classList.add('active');
+      try {
+        if (!barranquillaLocalCache) {
+          const r = await fetch(BARRANQUILLA_LOCAL_URL);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          barranquillaLocalCache = await r.json();
+        }
+        currentMunCode = '001';
+        const newLayer = L.geoJSON(barranquillaLocalCache, { style: featureStyle, onEachFeature: onEachFeature });
+        showBoundaryLayer(newLayer);
+        const btn = document.getElementById('btn-volver-pais');
+        btn.textContent = '← Atlántico';
+        btn.style.display = 'block';
+        showComunasNotice(true, 'Vista por localidades, excluye zonas especiales (98/99). Para mayor precisión, descargue zona o puesto.');
+      } catch(e) {
+        console.error('[Mapa] Error cargando localidades Barranquilla:', e.message);
+      } finally {
+        document.getElementById('map-loading')?.classList.remove('active');
+      }
+    }
+
+    // ─── CAPA COMUNAS MONTERÍA ───────────────────────────────
+    async function loadMonteriaComunasLayer() {
+      document.getElementById('map-loading')?.classList.add('active');
+      try {
+        if (!monteriaComunasCache) {
+          const r = await fetch(MONTERIA_COMUNAS_URL);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          monteriaComunasCache = await r.json();
+        }
+        currentMunCode = '001';
+        const newLayer = L.geoJSON(monteriaComunasCache, { style: featureStyle, onEachFeature: onEachFeature });
+        showBoundaryLayer(newLayer);
+        const btn = document.getElementById('btn-volver-pais');
+        btn.textContent = '← Córdoba';
+        btn.style.display = 'block';
+        showComunasNotice(true, 'Vista por comunas, excluye corregimientos (zonas 99, 90). Para mayor precisión, descargue zona o puesto.');
+      } catch(e) {
+        console.error('[Mapa] Error cargando comunas Montería:', e.message);
+      } finally {
+        document.getElementById('map-loading')?.classList.remove('active');
+      }
+    }
+
+    // ─── CAPA COMUNAS MANIZALES ──────────────────────────────
+    async function loadManizalesComunasLayer() {
+      document.getElementById('map-loading')?.classList.add('active');
+      try {
+        if (!manizalesComunasCache) {
+          const r = await fetch(MANIZALES_COMUNAS_URL);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          manizalesComunasCache = await r.json();
+        }
+        currentMunCode = '001';
+        const newLayer = L.geoJSON(manizalesComunasCache, { style: featureStyle, onEachFeature: onEachFeature });
+        showBoundaryLayer(newLayer);
+        const btn = document.getElementById('btn-volver-pais');
+        btn.textContent = '← Caldas';
+        btn.style.display = 'block';
+        showComunasNotice(true, 'Vista por comunas, excluye corregimientos. Para mayor precisión, descargue zona o puesto.');
+      } catch(e) {
+        console.error('[Mapa] Error cargando comunas Manizales:', e.message);
+      } finally {
+        document.getElementById('map-loading')?.classList.remove('active');
+      }
+    }
+
     // ─── PUESTOS DE VOTACIÓN — BOGOTÁ ────────────────────────
     // Aplica la misma rotación +90° que usamos para el GeoJSON de localidades,
     // para que los marcadores caigan sobre los polígonos correctamente.
@@ -1888,6 +2044,25 @@
         // Feature de comuna Pereira (nombre normalizado como clave)
         const data = zonVoteData[normComuna(props.Comuna)];
         ratio = data ? data.v / maxZonVotes : 0;
+      } else if (props.COMUNAS !== undefined) {
+        // Feature de comuna Ibagué — clave: número de COMUNAS padded a 2 dígitos
+        const zon = String(props.COMUNAS).replace('COMUNA ', '').trim().padStart(2, '0');
+        const data = zonVoteData[zon];
+        ratio = data ? data.v / maxZonVotes : 0;
+      } else if (props.nombre !== undefined && props.area_has !== undefined) {
+        // Feature de localidad Barranquilla — clave: código vía BAR_NOM_TO_CODE
+        const code = BAR_NOM_TO_CODE[props.nombre] || null;
+        const data = code ? zonVoteData[code] : null;
+        ratio = data ? data.v / maxZonVotes : 0;
+      } else if (props.CC_COMUNA !== undefined && props.NMG !== undefined) {
+        // Feature de comuna Montería — clave: CC_COMUNA padded a 2 dígitos
+        const zon = String(props.CC_COMUNA).padStart(2, '0');
+        const data = zonVoteData[zon];
+        ratio = data ? data.v / maxZonVotes : 0;
+      } else if (props.ID_COMUNA !== undefined && props.NOMBRES_CO !== undefined) {
+        // Feature de comuna Manizales — clave: ID_COMUNA (ya es '01','02',...)
+        const data = zonVoteData[props.ID_COMUNA];
+        ratio = data ? data.v / maxZonVotes : 0;
       } else if (props.mun_electoral !== undefined) {
         // Feature de municipio (capa por depto) — usar mun_elec (código electoral) para cruzar votos
         const data = props.mun_elec ? munVoteData[props.mun_elec] : null;
@@ -1912,7 +2087,11 @@
       const isMedFeature  = !isLocFeature && props.CODIGO !== undefined && props.IDENTIFICACION !== undefined;
       const isCalFeature  = !isLocFeature && !isMedFeature && props.comuna !== undefined && props.shape_leng !== undefined;
       const isPerFeature  = !isLocFeature && !isMedFeature && !isCalFeature && props.Comuna !== undefined && props.FID !== undefined;
-      const isCityFeature = isLocFeature || isMedFeature || isCalFeature || isPerFeature;
+      const isIbaFeature  = !isLocFeature && !isMedFeature && !isCalFeature && !isPerFeature && props.COMUNAS !== undefined;
+      const isBarFeature  = !isLocFeature && !isMedFeature && !isCalFeature && !isPerFeature && !isIbaFeature && props.nombre !== undefined && props.area_has !== undefined;
+      const isMonFeature  = !isLocFeature && !isMedFeature && !isCalFeature && !isPerFeature && !isIbaFeature && !isBarFeature && props.CC_COMUNA !== undefined && props.NMG !== undefined;
+      const isManFeature  = !isLocFeature && !isMedFeature && !isCalFeature && !isPerFeature && !isIbaFeature && !isBarFeature && !isMonFeature && props.ID_COMUNA !== undefined && props.NOMBRES_CO !== undefined;
+      const isCityFeature = isLocFeature || isMedFeature || isCalFeature || isPerFeature || isIbaFeature || isBarFeature || isMonFeature || isManFeature;
       const isMunFeature  = !isCityFeature && props.mun_electoral !== undefined;
 
       if (isLocFeature) {
@@ -2010,6 +2189,94 @@
             try { const b = layer.getBounds(); if (b.isValid()) leafletMap.fitBounds(b, { padding: [30,30] }); } catch(e) {}
           }
         });
+      } else if (isIbaFeature) {
+        // ── Capa de comunas Ibagué ──
+        const zon = String(props.COMUNAS).replace('COMUNA ', '').trim().padStart(2, '0');
+        const name = props.COMUNAS || `Comuna ${parseInt(zon)}`;
+        layer.on({
+          mouseover: function(e) {
+            const data = zonVoteData[zon];
+            const votes = data ? data.v : 0;
+            layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
+            layer.bindTooltip(
+              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+                <strong style="color:#0047FF;font-size:.989rem">${name.toUpperCase()}</strong><br/>
+                ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
+              </div>`,
+              { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
+            ).openTooltip(e.latlng);
+          },
+          mouseout: function() { if (geojsonLayer) geojsonLayer.resetStyle(layer); layer.closeTooltip(); },
+          click: function() {
+            try { const b = layer.getBounds(); if (b.isValid()) leafletMap.fitBounds(b, { padding: [30,30] }); } catch(e) {}
+          }
+        });
+      } else if (isBarFeature) {
+        // ── Capa de localidades Barranquilla ──
+        const code = BAR_NOM_TO_CODE[props.nombre] || null;
+        const name = props.nombre || `Localidad ${code}`;
+        layer.on({
+          mouseover: function(e) {
+            const data = code ? zonVoteData[code] : null;
+            const votes = data ? data.v : 0;
+            layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
+            layer.bindTooltip(
+              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+                <strong style="color:#0047FF;font-size:.989rem">${name.toUpperCase()}</strong><br/>
+                ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
+              </div>`,
+              { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
+            ).openTooltip(e.latlng);
+          },
+          mouseout: function() { if (geojsonLayer) geojsonLayer.resetStyle(layer); layer.closeTooltip(); },
+          click: function() {
+            try { const b = layer.getBounds(); if (b.isValid()) leafletMap.fitBounds(b, { padding: [30,30] }); } catch(e) {}
+          }
+        });
+      } else if (isMonFeature) {
+        // ── Capa de comunas Montería ──
+        const zon = String(props.CC_COMUNA).padStart(2, '0');
+        const name = props.NMG || `Comuna ${parseInt(zon)}`;
+        layer.on({
+          mouseover: function(e) {
+            const data = zonVoteData[zon];
+            const votes = data ? data.v : 0;
+            layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
+            layer.bindTooltip(
+              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+                <strong style="color:#0047FF;font-size:.989rem">${name.toUpperCase()}</strong><br/>
+                ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
+              </div>`,
+              { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
+            ).openTooltip(e.latlng);
+          },
+          mouseout: function() { if (geojsonLayer) geojsonLayer.resetStyle(layer); layer.closeTooltip(); },
+          click: function() {
+            try { const b = layer.getBounds(); if (b.isValid()) leafletMap.fitBounds(b, { padding: [30,30] }); } catch(e) {}
+          }
+        });
+      } else if (isManFeature) {
+        // ── Capa de comunas Manizales ──
+        const zon = props.ID_COMUNA;
+        const name = props.NOMBRES_CO || `Comuna ${parseInt(zon)}`;
+        layer.on({
+          mouseover: function(e) {
+            const data = zonVoteData[zon];
+            const votes = data ? data.v : 0;
+            layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
+            layer.bindTooltip(
+              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+                <strong style="color:#0047FF;font-size:.989rem">${name.toUpperCase()}</strong><br/>
+                ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
+              </div>`,
+              { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
+            ).openTooltip(e.latlng);
+          },
+          mouseout: function() { if (geojsonLayer) geojsonLayer.resetStyle(layer); layer.closeTooltip(); },
+          click: function() {
+            try { const b = layer.getBounds(); if (b.isValid()) leafletMap.fitBounds(b, { padding: [30,30] }); } catch(e) {}
+          }
+        });
       } else if (isMunFeature) {
         // ── Capa de municipios de un departamento ──
         const munCode = props.mun_elec;   // código electoral — clave en munVoteData y filter-mun
@@ -2050,6 +2317,30 @@
             if (currentDepCode === '24' && munCode === '001') {
               buildZonVoteData('24', '001', null, ZON_PUE_COM_PER);
               loadPereiraComunasLayer();
+              return;
+            }
+            // Ibagué (dep=29, mun=001) → cargar comunas
+            if (currentDepCode === '29' && munCode === '001') {
+              buildZonVoteData('29', '001', null, ZON_PUE_COM_IBA);
+              loadIbagueComunasLayer();
+              return;
+            }
+            // Barranquilla (dep=3, mun=001) → cargar localidades
+            if (currentDepCode === '3' && munCode === '001') {
+              buildZonVoteData('3', '001', ZON_TO_LOC_BAR, null, ZON99_PUE_LOC_BAR);
+              loadBarranquillaLocalLayer();
+              return;
+            }
+            // Montería (dep=13, mun=001) → cargar comunas
+            if (currentDepCode === '13' && munCode === '001') {
+              buildZonVoteData('13', '001', null, ZON_PUE_COM_MON);
+              loadMonteriaComunasLayer();
+              return;
+            }
+            // Manizales (dep=9, mun=001) → cargar comunas
+            if (currentDepCode === '9' && munCode === '001') {
+              buildZonVoteData('9', '001', ZON_TO_COM_MAN);
+              loadManizalesComunasLayer();
               return;
             }
             try {
@@ -2498,6 +2789,18 @@
           } else if (d.depKey === '24' && d.mun === '001') {
             const raw = (ZON_PUE_COM_PER[zon] || {})[pue] || null;
             comCtx = raw ? raw.charAt(0) + raw.slice(1).toLowerCase() : `Zona ${parseInt(zon)}`;
+          } else if (d.depKey === '29' && d.mun === '001') {
+            const cc = (ZON_PUE_COM_IBA[zon] || {})[pue] || null;
+            comCtx = cc ? `COMUNA ${parseInt(cc)}` : `Zona ${parseInt(zon)}`;
+          } else if (d.depKey === '3' && d.mun === '001') {
+            const cc = ZON_TO_LOC_BAR[zon];
+            comCtx = cc ? `LOCALIDAD ${parseInt(cc)}` : `Zona ${parseInt(zon)}`;
+          } else if (d.depKey === '13' && d.mun === '001') {
+            const cc = (ZON_PUE_COM_MON[zon] || {})[pue] || null;
+            comCtx = cc ? `COMUNA ${parseInt(cc)}` : `Zona ${parseInt(zon)}`;
+          } else if (d.depKey === '9' && d.mun === '001') {
+            const cc = ZON_TO_COM_MAN[zon];
+            comCtx = cc ? `COMUNA ${parseInt(cc)}` : `Zona ${parseInt(zon)}`;
           } else {
             comCtx = `Zona ${parseInt(zon)}`;
           }
