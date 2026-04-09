@@ -579,12 +579,23 @@
         .sort((a,b)=>b.votos-a.votos);
       geoPartidos.sort((a,b)=>b.votos-a.votos);
 
-      // Para nivel circunscripción: calcular D'Hondt (1 curul) dentro de la circ
+      // Para nivel circunscripción: calcular D'Hondt (1 curul) y agrupar candidatos por partido
       const esCirc = (nivel === 'circ');
       let circCurules = {};
+      let circCands = {}; // partido → [{nombre, votos}] filtrado a esta circ
       if(esCirc){
         const vpArr = geoPartidos.map(p=>({partido:p.partido,votos:p.votos}));
         circCurules = calcDhondt(vpArr, 1);
+        // Construir candidatos por partido desde geoData.candidatos
+        Object.entries(geoData.candidatos||{}).forEach(([nombre, votos])=>{
+          if(!votos) return;
+          const partido = resumenData._c2p[nombre];
+          if(!partido) return;
+          if(!circCands[partido]) circCands[partido]=[];
+          circCands[partido].push({nombre, votos});
+        });
+        // Ordenar candidatos por votos desc dentro de cada partido
+        Object.values(circCands).forEach(arr=>arr.sort((a,b)=>b.votos-a.votos));
       }
 
       document.getElementById('lbl-tabla').textContent=labelText;
@@ -598,15 +609,30 @@
       geoPartidos.forEach((p,i)=>{
         const color=getColor(p.partido), pctV=pct(p.votos,totalVotos), bw=((p.votos/maxV)*100).toFixed(1);
         const tr=document.createElement('tr');
-        const lastCell = esCirc
+        const cands = esCirc ? (circCands[p.partido]||[]) : [];
+        const curulesCell = esCirc
           ? (circCurules[p.partido]>0 ? `<span class="cbadge">1</span>` : `<span class="cbadge sub">—</span>`)
           : `<span class="cbadge sub">${p.candidatos?.length||'—'}</span>`;
         tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td>
-          <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span></div></td>
+          <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span></div>
+          ${esCirc&&cands.length>0?`<div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${cands.length} candidato${cands.length!==1?'s':''}</button></div>`:''}
+          </td>
           <td class="r" style="font-size:.9rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td>
           <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>
-          <td class="r">${lastCell}</td>`;
+          <td class="r">${curulesCell}</td>`;
         tbody.appendChild(tr);
+        if(esCirc && cands.length>0){
+          const trC=document.createElement('tr');
+          trC.innerHTML=`<td colspan="5" style="padding:0"><div class="cands-inner" id="cands-inner-${i}">
+            <table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% partido</th></tr></thead>
+            <tbody>${cands.map((c,j)=>{
+              const nat=resumenData.candidatos.find(x=>x.nombre===c.nombre);
+              const codStr=nat&&nat.codigo!=null?String(nat.codigo).padStart(3,'0'):'—';
+              return `<tr><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${codStr}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif">${c.nombre}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;
+            }).join('')}</tbody>
+            </table></div></td>`;
+          tbody.appendChild(trC);
+        }
       });
       setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
       const topP=geoPartidos.filter(p=>!/blanco/i.test(p.partido))[0];
