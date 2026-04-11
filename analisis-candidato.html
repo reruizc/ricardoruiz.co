@@ -1404,6 +1404,34 @@
       '07':'06','08':'07','09':'08','10':'09','11':'10','12':'11','13':'12'
     };
 
+    // ─── DIVIPOLE LOOKUP ─────────────────────────────────────
+    // Cargado al inicio desde CSV: "dd-mm-zz-pp" → nombre de comuna/localidad
+    let divipoleMap = {};
+    const DIVIPOLE_CSV_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/Divipole-actualizado/COMUNAS_DATA.csv';
+    async function loadDivipole() {
+      try {
+        const r = await fetch(DIVIPOLE_CSV_URL);
+        if (!r.ok) throw new Error();
+        const text = await r.text();
+        const lines = text.split('\n');
+        for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(';');
+          if (cols.length < 11) continue;
+          const dd = (cols[0]||'').trim();
+          const mm = (cols[1]||'').trim();
+          const zz = (cols[2]||'').trim();
+          const pp = (cols[3]||'').trim();
+          const comunaRaw = (cols[10]||'').trim();
+          if (!dd || !mm || !zz || !pp || !comunaRaw) continue;
+          const nom = comunaRaw.replace(/^\d+/, '').trim();
+          if (!nom) continue;
+          divipoleMap[`${dd}-${mm}-${zz}-${pp}`] = nom;
+        }
+      } catch(e) {
+        console.error('[Divipole] Error cargando:', e.message);
+      }
+    }
+
     // ─── STATE ────────────────────────────────────────────────
     let candIndex = [];
     let currentCand = null;
@@ -2692,36 +2720,15 @@
     function computeTopComunaLocalidad(mesas) {
       const map = {};
       mesas.forEach(m => {
-        if (!m.zon) return;
+        if (!m.zon || !m.pue) return;
         const depKey = normalizeDepCode(m.dep);
-        const zon = String(m.zon).padStart(2, '0');
-        if (zon === '90' || zon === '98') return;
-        const pue = String(m.pue || '').padStart(2, '0');
-        const isBog = depKey === '16' || (m.munNom || '').toUpperCase().includes('BOGOT');
-
-        let comName;
-        if (isBog) {
-          comName = ZONAS_BOGOTA[zon] || null;
-        } else if (depKey === '1' && m.mun === '001') {
-          if (zon === '99') {
-            const code = ZON99_PUE_COM_MED[pue] || null;
-            comName = code ? CORR_MED_NAMES[code] : null;
-          } else {
-            const cc = ZON_TO_COM_MED[zon];
-            comName = cc ? `COMUNA ${parseInt(cc)}` : null;
-          }
-        } else if (depKey === '31' && m.mun === '001') {
-          // Cali
-          const cc = ZON_TO_COM_CAL[zon];
-          comName = cc ? `COMUNA ${parseInt(cc)}` : null;
-        } else if (depKey === '24' && m.mun === '001') {
-          // Pereira: nivel puesto → comuna
-          const raw = (ZON_PUE_COM_PER[zon] || {})[pue] || null;
-          if (raw) comName = raw.charAt(0) + raw.slice(1).toLowerCase();
-        }
-
-        if (!comName) comName = `Zona ${parseInt(zon)}`;
-
+        const dd = depKey.padStart(2, '0');
+        const mm = String(m.mun || '').padStart(3, '0');
+        const zz = String(m.zon).padStart(2, '0');
+        const pp = String(m.pue || '').padStart(2, '0');
+        const comName = divipoleMap[`${dd}-${mm}-${zz}-${pp}`];
+        if (!comName) return;
+        const isBog = depKey === '16';
         const key = `${depKey}-${m.mun}-${comName}`;
         if (!map[key]) map[key] = { nom: comName, munNom: m.munNom, depNom: m.depNom, v: 0, isBog };
         map[key].v += m.v;
@@ -2771,39 +2778,9 @@
         .map(([k, d]) => {
           // Contexto de localidad/comuna para mostrar junto al puesto
           const { zon, pue } = d;
-          const isBog = d.depKey === '16' || (d.munNom || '').toUpperCase().includes('BOGOT');
-          let comCtx = null;
-          if (isBog) {
-            comCtx = ZONAS_BOGOTA[zon] || `Zona ${parseInt(zon)}`;
-          } else if (d.depKey === '1' && d.mun === '001') {
-            if (zon === '99') {
-              const code = ZON99_PUE_COM_MED[pue] || null;
-              comCtx = code ? CORR_MED_NAMES[code] : `Zona ${parseInt(zon)}`;
-            } else {
-              const cc = ZON_TO_COM_MED[zon];
-              comCtx = cc ? `COMUNA ${parseInt(cc)}` : `Zona ${parseInt(zon)}`;
-            }
-          } else if (d.depKey === '31' && d.mun === '001') {
-            const cc = ZON_TO_COM_CAL[zon];
-            comCtx = cc ? `COMUNA ${parseInt(cc)}` : `Zona ${parseInt(zon)}`;
-          } else if (d.depKey === '24' && d.mun === '001') {
-            const raw = (ZON_PUE_COM_PER[zon] || {})[pue] || null;
-            comCtx = raw ? raw.charAt(0) + raw.slice(1).toLowerCase() : `Zona ${parseInt(zon)}`;
-          } else if (d.depKey === '29' && d.mun === '001') {
-            const cc = (ZON_PUE_COM_IBA[zon] || {})[pue] || null;
-            comCtx = cc ? `COMUNA ${parseInt(cc)}` : `Zona ${parseInt(zon)}`;
-          } else if (d.depKey === '3' && d.mun === '001') {
-            const cc = ZON_TO_LOC_BAR[zon];
-            comCtx = cc ? `LOCALIDAD ${parseInt(cc)}` : `Zona ${parseInt(zon)}`;
-          } else if (d.depKey === '13' && d.mun === '001') {
-            const cc = (ZON_PUE_COM_MON[zon] || {})[pue] || null;
-            comCtx = cc ? `COMUNA ${parseInt(cc)}` : `Zona ${parseInt(zon)}`;
-          } else if (d.depKey === '9' && d.mun === '001') {
-            const cc = ZON_TO_COM_MAN[zon];
-            comCtx = cc ? `COMUNA ${parseInt(cc)}` : `Zona ${parseInt(zon)}`;
-          } else {
-            comCtx = `Zona ${parseInt(zon)}`;
-          }
+          const dd = d.depKey.padStart(2, '0');
+          const mm = String(d.mun || '').padStart(3, '0');
+          const comCtx = divipoleMap[`${dd}-${mm}-${zon}-${pue}`] || null;
           return [k, { nom: d.nom, munNom: d.munNom, depNom: d.depNom, v: d.v, comCtx }];
         });
     }
@@ -3357,6 +3334,7 @@
     if (!isLoggedIn()) document.getElementById('mun-lock-overlay').classList.add('active');
     applyLang(localStorage.getItem('rr-lang') || 'co');
     loadIndex();
+    loadDivipole();
   </script>
   <script src="lang.js"></script>
 
