@@ -349,7 +349,7 @@
     }
     .map-legend-end {
       font-family: 'DM Mono', monospace;
-      font-size: .624rem;
+      font-size: .924rem;
       color: rgba(255,255,255,.4);
     }
 
@@ -1488,6 +1488,7 @@
     let maxZonVotes = 1;
     let bogotaLocalidadCache = null;  // caché GeoJSON localidades Bogotá
     let puestosLayer = null;          // LayerGroup de marcadores de puestos activos
+    let selectedPolygon = null;       // Feature layer actualmente seleccionado (muestra puestos)
     let puestosByMun = {};            // 'dd-mm' → [{dd,mm,zz,pp,lat,lng,nom,comNom}]
     let medellinComunasCache = null;  // caché GeoJSON comunas Medellín
     let caliComunasCache = null;      // caché GeoJSON comunas Cali
@@ -2023,8 +2024,22 @@
       return [cy + (lon - cx), cx - (lat - cy)];  // [rLat, rLon] para Leaflet
     }
 
+    function clearSelectedPolygon() {
+      if (selectedPolygon) {
+        if (geojsonLayer) try { geojsonLayer.resetStyle(selectedPolygon); } catch(e) {}
+        selectedPolygon = null;
+      }
+    }
+
+    function selectPolygon(layer) {
+      clearSelectedPolygon();
+      selectedPolygon = layer;
+      layer.setStyle({ fillColor: '#00004d', fillOpacity: 0.92, color: '#ffffff', weight: 1.5 });
+    }
+
     function hidePuestosLayer() {
       if (puestosLayer) { leafletMap.removeLayer(puestosLayer); puestosLayer = null; }
+      clearSelectedPolygon();
     }
 
     function buildVotesPerPuestoMap() {
@@ -2059,7 +2074,7 @@
           fillOpacity: v > 0 ? 0.9 : 0.35,
         }).bindTooltip(
           `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
-            <span style="color:#0047FF;font-size:.831rem">${p.nom}</span><br/>
+            <span style="color:#0047FF;font-size:.914rem">${p.nom}</span><br/>
             ${p.comNom && p.comNom !== 'NULL' ? `<span style="opacity:.55">${p.comNom}</span><br/>` : ''}
             ${v > 0 ? fmt(v)+' votos' : 'Sin datos'}
           </div>`,
@@ -2170,14 +2185,14 @@
             layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
             layer.bindTooltip(
               `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
-                <span style="color:#0047FF;font-size:.831rem">${name.toUpperCase()}</span><br/>
+                <span style="color:#0047FF;font-size:.914rem">${name.toUpperCase()}</span><br/>
                 ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
               </div>`,
               { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
             ).openTooltip(e.latlng);
           },
           mouseout: function() {
-            if (geojsonLayer) geojsonLayer.resetStyle(layer);
+            if (geojsonLayer && layer !== selectedPolygon) geojsonLayer.resetStyle(layer);
             layer.closeTooltip();
           },
           click: function() {
@@ -2185,6 +2200,7 @@
               const b = layer.getBounds();
               if (b.isValid()) leafletMap.fitBounds(b, { padding: [30, 30] });
             } catch(e) {}
+            selectPolygon(layer);
             showPuestosFiltered('16', '001', p => p.zz === zon);
           }
         });
@@ -2199,15 +2215,16 @@
             layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
             layer.bindTooltip(
               `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
-                <span style="color:#0047FF;font-size:.831rem">${name.toUpperCase()}</span><br/>
+                <span style="color:#0047FF;font-size:.914rem">${name.toUpperCase()}</span><br/>
                 ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
               </div>`,
               { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
             ).openTooltip(e.latlng);
           },
-          mouseout: function() { if (geojsonLayer) geojsonLayer.resetStyle(layer); layer.closeTooltip(); },
+          mouseout: function() { if (geojsonLayer && layer !== selectedPolygon) geojsonLayer.resetStyle(layer); layer.closeTooltip(); },
           click: function() {
             try { const b = layer.getBounds(); if (b.isValid()) leafletMap.fitBounds(b, { padding: [30,30] }); } catch(e) {}
+            selectPolygon(layer);
             showPuestosFiltered('01', '001', p => ZON_TO_COM_MED[p.zz] === zon);
           }
         });
@@ -2222,15 +2239,16 @@
             layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
             layer.bindTooltip(
               `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
-                <span style="color:#0047FF;font-size:.831rem">${name.toUpperCase()}</span><br/>
+                <span style="color:#0047FF;font-size:.914rem">${name.toUpperCase()}</span><br/>
                 ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
               </div>`,
               { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
             ).openTooltip(e.latlng);
           },
-          mouseout: function() { if (geojsonLayer) geojsonLayer.resetStyle(layer); layer.closeTooltip(); },
+          mouseout: function() { if (geojsonLayer && layer !== selectedPolygon) geojsonLayer.resetStyle(layer); layer.closeTooltip(); },
           click: function() {
             try { const b = layer.getBounds(); if (b.isValid()) leafletMap.fitBounds(b, { padding: [30,30] }); } catch(e) {}
+            selectPolygon(layer);
             showPuestosFiltered('31', '001', p => ZON_TO_COM_CAL[p.zz] === zon);
           }
         });
@@ -2245,15 +2263,16 @@
             layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
             layer.bindTooltip(
               `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
-                <span style="color:#0047FF;font-size:.831rem">${name.toUpperCase()}</span><br/>
+                <span style="color:#0047FF;font-size:.914rem">${name.toUpperCase()}</span><br/>
                 ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
               </div>`,
               { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
             ).openTooltip(e.latlng);
           },
-          mouseout: function() { if (geojsonLayer) geojsonLayer.resetStyle(layer); layer.closeTooltip(); },
+          mouseout: function() { if (geojsonLayer && layer !== selectedPolygon) geojsonLayer.resetStyle(layer); layer.closeTooltip(); },
           click: function() {
             try { const b = layer.getBounds(); if (b.isValid()) leafletMap.fitBounds(b, { padding: [30,30] }); } catch(e) {}
+            selectPolygon(layer);
             showPuestosFiltered('24', '001', p => normComuna((ZON_PUE_COM_PER[p.zz]||{})[p.pp]||'') === comNorm);
           }
         });
@@ -2268,15 +2287,16 @@
             layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
             layer.bindTooltip(
               `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
-                <span style="color:#0047FF;font-size:.831rem">${name.toUpperCase()}</span><br/>
+                <span style="color:#0047FF;font-size:.914rem">${name.toUpperCase()}</span><br/>
                 ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
               </div>`,
               { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
             ).openTooltip(e.latlng);
           },
-          mouseout: function() { if (geojsonLayer) geojsonLayer.resetStyle(layer); layer.closeTooltip(); },
+          mouseout: function() { if (geojsonLayer && layer !== selectedPolygon) geojsonLayer.resetStyle(layer); layer.closeTooltip(); },
           click: function() {
             try { const b = layer.getBounds(); if (b.isValid()) leafletMap.fitBounds(b, { padding: [30,30] }); } catch(e) {}
+            selectPolygon(layer);
             showPuestosFiltered('29', '001', p => ((ZON_PUE_COM_IBA[p.zz]||{})[p.pp]||'').padStart(2,'0') === zon);
           }
         });
@@ -2291,16 +2311,16 @@
             layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
             layer.bindTooltip(
               `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
-                <span style="color:#0047FF;font-size:.831rem">${name.toUpperCase()}</span><br/>
+                <span style="color:#0047FF;font-size:.914rem">${name.toUpperCase()}</span><br/>
                 ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
               </div>`,
               { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
             ).openTooltip(e.latlng);
           },
-          mouseout: function() { if (geojsonLayer) geojsonLayer.resetStyle(layer); layer.closeTooltip(); },
+          mouseout: function() { if (geojsonLayer && layer !== selectedPolygon) geojsonLayer.resetStyle(layer); layer.closeTooltip(); },
           click: function() {
             try { const b = layer.getBounds(); if (b.isValid()) leafletMap.fitBounds(b, { padding: [30,30] }); } catch(e) {}
-            if (code) showPuestosFiltered('03', '001', p => (ZON_TO_LOC_BAR[p.zz]||ZON99_PUE_LOC_BAR[p.pp]) === code);
+            if (code) { selectPolygon(layer); showPuestosFiltered('03', '001', p => (ZON_TO_LOC_BAR[p.zz]||ZON99_PUE_LOC_BAR[p.pp]) === code); }
           }
         });
       } else if (isMonFeature) {
@@ -2314,15 +2334,16 @@
             layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
             layer.bindTooltip(
               `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
-                <span style="color:#0047FF;font-size:.831rem">${name.toUpperCase()}</span><br/>
+                <span style="color:#0047FF;font-size:.914rem">${name.toUpperCase()}</span><br/>
                 ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
               </div>`,
               { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
             ).openTooltip(e.latlng);
           },
-          mouseout: function() { if (geojsonLayer) geojsonLayer.resetStyle(layer); layer.closeTooltip(); },
+          mouseout: function() { if (geojsonLayer && layer !== selectedPolygon) geojsonLayer.resetStyle(layer); layer.closeTooltip(); },
           click: function() {
             try { const b = layer.getBounds(); if (b.isValid()) leafletMap.fitBounds(b, { padding: [30,30] }); } catch(e) {}
+            selectPolygon(layer);
             showPuestosFiltered('23', '001', p => ((ZON_PUE_COM_MON[p.zz]||{})[p.pp]||'').padStart(2,'0') === zon);
           }
         });
@@ -2337,15 +2358,16 @@
             layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
             layer.bindTooltip(
               `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
-                <span style="color:#0047FF;font-size:.831rem">${name.toUpperCase()}</span><br/>
+                <span style="color:#0047FF;font-size:.914rem">${name.toUpperCase()}</span><br/>
                 ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
               </div>`,
               { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
             ).openTooltip(e.latlng);
           },
-          mouseout: function() { if (geojsonLayer) geojsonLayer.resetStyle(layer); layer.closeTooltip(); },
+          mouseout: function() { if (geojsonLayer && layer !== selectedPolygon) geojsonLayer.resetStyle(layer); layer.closeTooltip(); },
           click: function() {
             try { const b = layer.getBounds(); if (b.isValid()) leafletMap.fitBounds(b, { padding: [30,30] }); } catch(e) {}
+            selectPolygon(layer);
             showPuestosFiltered('09', '001', p => ZON_TO_COM_MAN[p.zz] === String(zon).padStart(2,'0'));
           }
         });
@@ -2360,14 +2382,14 @@
             layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
             layer.bindTooltip(
               `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
-                <span style="color:#0047FF;font-size:.831rem">${name.toUpperCase()}</span><br/>
+                <span style="color:#0047FF;font-size:.914rem">${name.toUpperCase()}</span><br/>
                 ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
               </div>`,
               { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
             ).openTooltip(e.latlng);
           },
           mouseout: function() {
-            if (geojsonLayer) geojsonLayer.resetStyle(layer);
+            if (geojsonLayer && layer !== selectedPolygon) geojsonLayer.resetStyle(layer);
             layer.closeTooltip();
           },
           click: function() {
@@ -2419,6 +2441,7 @@
               const b = layer.getBounds();
               if (b.isValid()) {
                 leafletMap.fitBounds(b, { padding: [30, 30] });
+                selectPolygon(layer);
                 showPuestosForMun(currentDepCode.padStart(2,'0'), munCode);
                 // Cambiar botón a "← [Departamento]"
                 munZoomed = true;
@@ -2444,14 +2467,14 @@
             layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
             layer.bindTooltip(
               `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
-                <span style="color:#0047FF;font-size:.831rem">${rankStr}${name.toUpperCase()}</span><br/>
+                <span style="color:#0047FF;font-size:.914rem">${rankStr}${name.toUpperCase()}</span><br/>
                 ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
               </div>`,
               { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }
             ).openTooltip(e.latlng);
           },
           mouseout: function() {
-            if (geojsonLayer) geojsonLayer.resetStyle(layer);
+            if (geojsonLayer && layer !== selectedPolygon) geojsonLayer.resetStyle(layer);
             layer.closeTooltip();
           },
           click: function() {
