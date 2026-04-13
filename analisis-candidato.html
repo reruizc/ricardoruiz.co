@@ -833,7 +833,7 @@
         <span class="dl-btns-label" id="dl-btns-label">Descargar por</span>
         <button class="dl-tier-btn t-free" id="dl-dep" onclick="dlExcel('dep')" title="Departamento · usuarios registrados">⬇ Depto.</button>
         <button class="dl-tier-btn t-free" id="dl-mun" onclick="dlExcel('mun')" title="Municipio · usuarios registrados">⬇ Municipio</button>
-        <button class="dl-tier-btn t-pro" id="dl-zon" onclick="dlExcel('zon')" title="Zona · plan Pro o superior">⬇ Zona</button>
+        <button class="dl-tier-btn t-pro" id="dl-com" onclick="dlExcel('com')" title="Com./Localidad · plan Pro o superior">⬇ Com./Local.</button>
         <button class="dl-tier-btn t-premium" id="dl-pue" onclick="dlExcel('pue')" title="Puesto · plan Premium o Full">⬇ Puesto</button>
         <button class="dl-tier-btn t-premium" id="dl-mesa" onclick="dlExcel('mesa')" title="Mesa · plan Premium o Full">⬇ Mesa</button>
       </div>
@@ -843,7 +843,7 @@
           <option value="">— Elegir nivel —</option>
           <option value="dep" id="dls-dep">⬇ Depto.</option>
           <option value="mun" id="dls-mun">⬇ Municipio</option>
-          <option value="zon" id="dls-zon">⬇ Zona</option>
+          <option value="com" id="dls-com">⬇ Com./Local.</option>
           <option value="pue" id="dls-pue">⬇ Puesto</option>
           <option value="mesa" id="dls-mesa">⬇ Mesa</option>
         </select>
@@ -1059,7 +1059,7 @@
         congress: 'Congreso 2026', page: 'Mapa Candidato',
         searchLabel: 'Buscar candidato', searchPlaceholder: 'Nombre del candidato…',
         loadingIndex: 'Cargando índice…', candidatesLoaded: n => `${n.toLocaleString('es-CO')} candidatos cargados`,
-        dlBy: 'Descargar por', dlDep: '⬇ Depto.', dlMun: '⬇ Municipio', dlZon: '⬇ Zona', dlPue: '⬇ Puesto', dlMesa: '⬇ Mesa',
+        dlBy: 'Descargar por', dlDep: '⬇ Depto.', dlMun: '⬇ Municipio', dlCom: '⬇ Com./Local.', dlPue: '⬇ Puesto', dlMesa: '⬇ Mesa',
         connecting: 'Conectando con S3…', placeholder: 'Busca un candidato para ver su perfil electoral',
         mapTitle: 'Mapa · Votación por departamento', mapLoading: 'Cargando mapa…',
         depLabel: 'Departamento', munLabel: 'Municipio',
@@ -1089,7 +1089,7 @@
         congress: 'Congress 2026', page: 'Candidate Map',
         searchLabel: 'Search candidate', searchPlaceholder: 'Candidate name…',
         loadingIndex: 'Loading index…', candidatesLoaded: n => `${n.toLocaleString('en-US')} candidates loaded`,
-        dlBy: 'Download by', dlDep: '⬇ Dept.', dlMun: '⬇ Municipality', dlZon: '⬇ Zone', dlPue: '⬇ Polling station', dlMesa: '⬇ Table',
+        dlBy: 'Download by', dlDep: '⬇ Dept.', dlMun: '⬇ Municipality', dlCom: '⬇ Com./Locality', dlPue: '⬇ Polling station', dlMesa: '⬇ Table',
         connecting: 'Connecting to S3…', placeholder: 'Search for a candidate to view their electoral profile',
         mapTitle: 'Map · Votes by department', mapLoading: 'Loading map…',
         depLabel: 'Department', munLabel: 'Municipality',
@@ -1119,7 +1119,7 @@
         congress: '2026年国会', page: '候选人地图',
         searchLabel: '搜索候选人', searchPlaceholder: '候选人姓名…',
         loadingIndex: '正在加载索引…', candidatesLoaded: n => `已加载 ${n.toLocaleString('zh-CN')} 名候选人`,
-        dlBy: '下载方式', dlDep: '⬇ 省份', dlMun: '⬇ 市', dlZon: '⬇ 区', dlPue: '⬇ 投票站', dlMesa: '⬇ 投票台',
+        dlBy: '下载方式', dlDep: '⬇ 省份', dlMun: '⬇ 市', dlCom: '⬇ 社区', dlPue: '⬇ 投票站', dlMesa: '⬇ 投票台',
         connecting: '正在连接 S3…', placeholder: '搜索候选人以查看其选举档案',
         mapTitle: '地图 · 各省得票', mapLoading: '地图加载中…',
         depLabel: '省份', munLabel: '市',
@@ -1161,7 +1161,7 @@
       if (hint && hint.dataset.count) st('search-hint', t.candidatesLoaded(parseInt(hint.dataset.count)));
       else if (hint && !hint.dataset.count) st('search-hint', t.loadingIndex);
       st('dl-btns-label', t.dlBy);
-      st('dl-dep', t.dlDep); st('dl-mun', t.dlMun); st('dl-zon', t.dlZon); st('dl-pue', t.dlPue); st('dl-mesa', t.dlMesa);
+      st('dl-dep', t.dlDep); st('dl-mun', t.dlMun); st('dl-com', t.dlCom); st('dl-pue', t.dlPue); st('dl-mesa', t.dlMesa);
       st('loader-label', t.connecting);
       st('placeholder-state', t.placeholder);
       st('map-panel-title', t.mapTitle);
@@ -2928,7 +2928,7 @@
     // ─── DESCARGA POR NIVEL ──────────────────────────────────
     function canDlLevel(level) {
       if (level === 'dep' || level === 'mun') return isLoggedIn();
-      if (level === 'zon') return isProOrHigher();
+      if (level === 'com') return isProOrHigher();
       return isPremiumOrFull(); // pue, mesa
     }
 
@@ -2943,7 +2943,7 @@
         if (wrap) wrap.style.display = 'flex';
         if (selWrap) selWrap.style.display = 'none';
       }
-      ['dep','mun','zon','pue','mesa'].forEach(level => {
+      ['dep','mun','com','pue','mesa'].forEach(level => {
         const btn = document.getElementById(`dl-${level}`);
         if (btn) btn.classList.toggle('locked', !canDlLevel(level));
         const opt = document.getElementById(`dls-${level}`);
@@ -2956,7 +2956,7 @@
         const msgs = {
           dep: 'Descarga por departamento disponible para usuarios <strong>registrados</strong>.',
           mun: 'Descarga por municipio disponible para usuarios <strong>registrados</strong>.',
-          zon: 'Descarga por zona requiere plan <strong>Pro</strong> o superior.',
+          com: 'Descarga por com./localidad requiere plan <strong>Pro</strong> o superior.',
           pue: 'Descarga por puesto requiere plan <strong>Premium</strong> o <strong>Full</strong>.',
           mesa: 'Descarga por mesa requiere plan <strong>Premium</strong> o <strong>Full</strong>.'
         };
@@ -2967,7 +2967,7 @@
       }
       if (!currentData || !currentCand) return;
       const mesas = currentData.mesas || [];
-      const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const cleanCom = nom => (!nom || nom === 'NACIONAL') ? 'SIN DETERMINAR' : nom;
       let headers, rows;
 
       if (level === 'dep') {
@@ -2988,45 +2988,85 @@
         });
         headers = ['Cod. Departamento','Nombre Departamento','Cod. Municipio','Nombre Municipio','Votos'];
         rows = Object.values(map).sort((a,b)=>b.v-a.v).map(r=>[r.dep,r.depNom,r.mun,r.munNom,r.v]);
-      } else if (level === 'zon') {
+      } else if (level === 'com') {
         const map = {};
         mesas.forEach(m => {
-          const k = `${m.dep}|${m.mun}|${m.zon}`;
-          if (!map[k]) map[k] = { dep:m.dep, depNom:m.depNom, mun:m.mun, munNom:m.munNom, zon:m.zon, v:0 };
+          const depKey = normalizeDepCode(m.dep);
+          const dd = depKey.padStart(2, '0');
+          const mm2 = String(m.mun || '').padStart(3, '0');
+          const zz = String(m.zon || '').padStart(2, '0');
+          const pp = String(m.pue || '').padStart(2, '0');
+          const comNom = cleanCom(divipoleMap[`${dd}-${mm2}-${zz}-${pp}`] || m.comNom || '');
+          const k = `${m.dep}|${m.mun}|${comNom}`;
+          if (!map[k]) map[k] = { dep:m.dep, depNom:m.depNom, mun:m.mun, munNom:m.munNom, com:comNom, v:0 };
           map[k].v += m.v;
         });
-        headers = ['Cod. Departamento','Nombre Departamento','Cod. Municipio','Nombre Municipio','Cod. Zona','Votos'];
-        rows = Object.values(map).sort((a,b)=>b.v-a.v).map(r=>[r.dep,r.depNom,r.mun,r.munNom,r.zon,r.v]);
+        headers = ['Cod. Departamento','Nombre Departamento','Cod. Municipio','Nombre Municipio','Com./Localidad','Votos'];
+        rows = Object.values(map).sort((a,b)=>b.v-a.v).map(r=>[r.dep,r.depNom,r.mun,r.munNom,r.com,r.v]);
       } else if (level === 'pue') {
         const map = {};
         mesas.forEach(m => {
+          const depKey = normalizeDepCode(m.dep);
+          const dd = depKey.padStart(2, '0');
+          const mm2 = String(m.mun || '').padStart(3, '0');
+          const zz = String(m.zon || '').padStart(2, '0');
+          const pp = String(m.pue || '').padStart(2, '0');
+          const comNom = cleanCom(divipoleMap[`${dd}-${mm2}-${zz}-${pp}`] || m.comNom || '');
           const k = `${m.dep}|${m.mun}|${m.zon}|${m.pue}`;
-          if (!map[k]) map[k] = { dep:m.dep, depNom:m.depNom, mun:m.mun, munNom:m.munNom, zon:m.zon, pue:m.pue, pueNom:m.pueNom, v:0 };
+          if (!map[k]) map[k] = { dep:m.dep, depNom:m.depNom, mun:m.mun, munNom:m.munNom, com:comNom, zon:m.zon, pue:m.pue, pueNom:m.pueNom, v:0 };
           map[k].v += m.v;
         });
-        headers = ['Cod. Departamento','Nombre Departamento','Cod. Municipio','Nombre Municipio','Cod. Zona','Cod. Puesto','Nombre Puesto','Votos'];
-        rows = Object.values(map).sort((a,b)=>b.v-a.v).map(r=>[r.dep,r.depNom,r.mun,r.munNom,r.zon,r.pue,r.pueNom,r.v]);
+        headers = ['Cod. Departamento','Nombre Departamento','Cod. Municipio','Nombre Municipio','Com./Localidad','Cod. Zona','Cod. Puesto','Nombre Puesto','Votos'];
+        rows = Object.values(map).sort((a,b)=>b.v-a.v).map(r=>[r.dep,r.depNom,r.mun,r.munNom,r.com,r.zon,r.pue,r.pueNom,r.v]);
       } else {
-        headers = ['Cod. Departamento','Nombre Departamento','Cod. Municipio','Nombre Municipio','Cod. Zona','Cod. Puesto','Nombre Puesto','Mesa','Votos'];
-        rows = [...mesas].sort((a,b)=>b.v-a.v).map(m=>[m.dep,m.depNom,m.mun,m.munNom,m.zon,m.pue,m.pueNom,m.mesa,m.v]);
+        headers = ['Cod. Departamento','Nombre Departamento','Cod. Municipio','Nombre Municipio','Com./Localidad','Cod. Zona','Cod. Puesto','Nombre Puesto','Mesa','Votos'];
+        rows = [...mesas].sort((a,b)=>b.v-a.v).map(m => {
+          const depKey = normalizeDepCode(m.dep);
+          const dd = depKey.padStart(2, '0');
+          const mm2 = String(m.mun || '').padStart(3, '0');
+          const zz = String(m.zon || '').padStart(2, '0');
+          const pp = String(m.pue || '').padStart(2, '0');
+          const comNom = cleanCom(divipoleMap[`${dd}-${mm2}-${zz}-${pp}`] || m.comNom || '');
+          return [m.dep,m.depNom,m.mun,m.munNom,comNom,m.zon,m.pue,m.pueNom,m.mesa,m.v];
+        });
       }
 
-      let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<?mso-application progid="Excel.Sheet"?>\n';
-      xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n';
-      xml += '<Worksheet ss:Name="Votación">\n<Table>\n';
-      xml += '<Row>' + headers.map(h=>`<Cell><Data ss:Type="String">${esc(h)}</Data></Cell>`).join('') + '</Row>\n';
-      rows.forEach(row => {
-        xml += '<Row>' + row.map(v => typeof v==='number'
-          ? `<Cell><Data ss:Type="Number">${v}</Data></Cell>`
-          : `<Cell><Data ss:Type="String">${esc(v)}</Data></Cell>`).join('') + '</Row>\n';
-      });
-      xml += '</Table>\n</Worksheet>\n</Workbook>';
+      const titulo = `${currentCand?.nombre || 'Candidato'} · Votación por ${level}`;
+      const xml = buildExcelXML(titulo, headers, rows);
       const blob = new Blob([xml], {type:'application/vnd.ms-excel'});
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `votacion-${level}-${currentCand.slug||'candidato'}.xls`;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(a.href);
+    }
+
+    // ─── HELPER EXCEL SpreadsheetML CON ESTILOS ───────────────
+    function buildExcelXML(titleText, headers, rows) {
+      const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const nc = headers.length;
+      let x = '<?xml version="1.0" encoding="UTF-8"?>\n<?mso-application progid="Excel.Sheet"?>\n';
+      x += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n';
+      x += '<Styles>\n';
+      x += '<Style ss:ID="ttl"><Alignment ss:Horizontal="Left" ss:Vertical="Center"/><Font ss:Bold="1" ss:Size="13" ss:Color="#FFFFFF"/><Interior ss:Color="#1F4E79" ss:Pattern="Solid"/></Style>\n';
+      x += '<Style ss:ID="hdr"><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="0"/><Font ss:Bold="1" ss:Size="13" ss:Color="#0D1120"/><Interior ss:Color="#D6DCE4" ss:Pattern="Solid"/></Style>\n';
+      x += '<Style ss:ID="e0"><Alignment ss:Vertical="Center"/><Font ss:Size="13"/><Interior ss:Color="#FFFFFF" ss:Pattern="Solid"/></Style>\n';
+      x += '<Style ss:ID="e1"><Alignment ss:Vertical="Center"/><Font ss:Size="13"/><Interior ss:Color="#EEF2F7" ss:Pattern="Solid"/></Style>\n';
+      x += '<Style ss:ID="n0"><Alignment ss:Horizontal="Right" ss:Vertical="Center"/><Font ss:Size="13"/><NumberFormat ss:Format="#,##0"/><Interior ss:Color="#FFFFFF" ss:Pattern="Solid"/></Style>\n';
+      x += '<Style ss:ID="n1"><Alignment ss:Horizontal="Right" ss:Vertical="Center"/><Font ss:Size="13"/><NumberFormat ss:Format="#,##0"/><Interior ss:Color="#EEF2F7" ss:Pattern="Solid"/></Style>\n';
+      x += '</Styles>\n';
+      x += '<Worksheet ss:Name="Votación">\n<Table>\n';
+      x += `<Row ss:Height="22"><Cell ss:StyleID="ttl" ss:MergeAcross="${nc-1}"><Data ss:Type="String">${esc(titleText)}</Data></Cell></Row>\n`;
+      x += '<Row ss:Height="18">' + headers.map(h=>`<Cell ss:StyleID="hdr"><Data ss:Type="String">${esc(h)}</Data></Cell>`).join('') + '</Row>\n';
+      rows.forEach((row, i) => {
+        const s = i % 2 === 0 ? '0' : '1';
+        x += '<Row>' + row.map(v => typeof v === 'number'
+          ? `<Cell ss:StyleID="n${s}"><Data ss:Type="Number">${v}</Data></Cell>`
+          : `<Cell ss:StyleID="e${s}"><Data ss:Type="String">${esc(v)}</Data></Cell>`
+        ).join('') + '</Row>\n';
+      });
+      x += '</Table>\n</Worksheet>\n</Workbook>';
+      return x;
     }
 
     // ─── MODAL MUNICIPIO ──────────────────────────────────────
