@@ -818,9 +818,17 @@
       &nbsp;/&nbsp; <span id="breadcrumb-page">Mapa Candidato</span>
     </div>
 
+    <!-- HELP BOX -->
+    <div class="notice-box" style="margin:0 0 .8rem;padding:.75rem 1.1rem;background:rgba(0,71,255,.06);border:1px solid rgba(0,71,255,.18);font-family:'Syne',sans-serif;font-size:.782rem;letter-spacing:.04em;color:rgba(255,255,255,.5);line-height:1.7">
+      <b style="color:rgba(255,255,255,.8)">¿Cómo usar?</b><br/>
+      Busca un partido o movimiento político para ver su distribución geográfica de votos.<br/>
+      En <b style="color:rgba(255,255,255,.7)">listas abiertas</b> (voto preferente) verás por defecto la votación <b style="color:rgba(255,255,255,.7)">total del partido</b> (logo + candidatos). Activa el interruptor <b style="color:rgba(255,255,255,.7)">Solo logo</b> para ver únicamente los votos marcados directamente al partido.<br/>
+      En <b style="color:rgba(255,255,255,.7)">listas cerradas</b> todos los votos van al logo — el interruptor no aplica.
+    </div>
+
     <!-- SEARCH BAR -->
     <div class="search-panel">
-      <span class="search-label" id="search-label">Buscar candidato</span>
+      <span class="search-label" id="search-label">Buscar partido</span>
       <div class="ac-wrap">
         <input class="ac-input" id="ac-input" type="text" placeholder="Nombre del candidato…" autocomplete="off"
           oninput="acSearch()"
@@ -833,7 +841,7 @@
         <span class="dl-btns-label" id="dl-btns-label">Descargar por</span>
         <button class="dl-tier-btn t-free" id="dl-dep" onclick="dlExcel('dep')" title="Departamento · usuarios registrados">⬇ Depto.</button>
         <button class="dl-tier-btn t-free" id="dl-mun" onclick="dlExcel('mun')" title="Municipio · usuarios registrados">⬇ Municipio</button>
-        <button class="dl-tier-btn t-pro" id="dl-zon" onclick="dlExcel('zon')" title="Zona · plan Pro o superior">⬇ Zona</button>
+        <button class="dl-tier-btn t-pro" id="dl-com" onclick="dlExcel('com')" title="Com./Localidad · plan Pro o superior">⬇ Com./Local.</button>
         <button class="dl-tier-btn t-premium" id="dl-pue" onclick="dlExcel('pue')" title="Puesto · plan Premium o Full">⬇ Puesto</button>
         <button class="dl-tier-btn t-premium" id="dl-mesa" onclick="dlExcel('mesa')" title="Mesa · plan Premium o Full">⬇ Mesa</button>
       </div>
@@ -843,10 +851,20 @@
           <option value="">— Elegir nivel —</option>
           <option value="dep" id="dls-dep">⬇ Depto.</option>
           <option value="mun" id="dls-mun">⬇ Municipio</option>
-          <option value="zon" id="dls-zon">⬇ Zona</option>
+          <option value="com" id="dls-com">⬇ Com./Local.</option>
           <option value="pue" id="dls-pue">⬇ Puesto</option>
           <option value="mesa" id="dls-mesa">⬇ Mesa</option>
         </select>
+      </div>
+      <!-- TOGGLE lista abierta/cerrada -->
+      <div id="toggle-logo-wrap" style="display:none;align-items:center;gap:.5rem;margin-top:.4rem;font-family:'Syne',sans-serif;font-size:.78rem;letter-spacing:.04em;color:rgba(255,255,255,.55)">
+        <label style="display:flex;align-items:center;gap:.45rem;cursor:pointer;user-select:none">
+          <span id="toggle-logo-label">Total (logo + candidatos)</span>
+          <div id="toggle-logo-track" onclick="toggleViewMode()" style="position:relative;width:36px;height:20px;background:rgba(255,255,255,.15);border-radius:10px;cursor:pointer;transition:background .2s">
+            <div id="toggle-logo-thumb" style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:left .2s"></div>
+          </div>
+          <span style="opacity:.7">Solo logo</span>
+        </label>
       </div>
     </div>
 
@@ -927,7 +945,7 @@
           <div class="map-container">
             <div class="map-loading" id="map-loading">Cargando mapa…</div>
             <div id="leaflet-map"></div>
-            <div id="notice-comunas">Vista por comunas, excluye corregimientos. Para mayor precisión, descargue zona o puesto.</div>
+            <div id="notice-comunas">Vista por comunas, excluye corregimientos. Para mayor precisión, descargue com./local. o puesto.</div>
           </div>
         </div>
 
@@ -1059,7 +1077,7 @@
         congress: 'Congreso 2026', page: 'Mapa Candidato',
         searchLabel: 'Buscar partido político', searchPlaceholder: 'Nombre del partido político…',
         loadingIndex: 'Cargando índice…', candidatesLoaded: n => `${n.toLocaleString('es-CO')} partidos cargados`,
-        dlBy: 'Descargar por', dlDep: '⬇ Depto.', dlMun: '⬇ Municipio', dlZon: '⬇ Zona', dlPue: '⬇ Puesto', dlMesa: '⬇ Mesa',
+        dlBy: 'Descargar por', dlDep: '⬇ Depto.', dlMun: '⬇ Municipio', dlCom: '⬇ Com./Local.', dlPue: '⬇ Puesto', dlMesa: '⬇ Mesa',
         connecting: 'Conectando con S3…', placeholder: 'Busca un partido político para ver su perfil electoral',
         mapTitle: 'Mapa · Votación por departamento', mapLoading: 'Cargando mapa…',
         depLabel: 'Departamento', munLabel: 'Municipio',
@@ -1089,7 +1107,7 @@
         congress: 'Congress 2026', page: 'Candidate Map',
         searchLabel: 'Search candidate', searchPlaceholder: 'Candidate name…',
         loadingIndex: 'Loading index…', candidatesLoaded: n => `${n.toLocaleString('en-US')} candidates loaded`,
-        dlBy: 'Download by', dlDep: '⬇ Dept.', dlMun: '⬇ Municipality', dlZon: '⬇ Zone', dlPue: '⬇ Polling station', dlMesa: '⬇ Table',
+        dlBy: 'Download by', dlDep: '⬇ Dept.', dlMun: '⬇ Municipality', dlCom: '⬇ Com./Locality', dlPue: '⬇ Polling station', dlMesa: '⬇ Table',
         connecting: 'Connecting to S3…', placeholder: 'Search for a candidate to view their electoral profile',
         mapTitle: 'Map · Votes by department', mapLoading: 'Loading map…',
         depLabel: 'Department', munLabel: 'Municipality',
@@ -1119,7 +1137,7 @@
         congress: '2026年国会', page: '候选人地图',
         searchLabel: '搜索候选人', searchPlaceholder: '候选人姓名…',
         loadingIndex: '正在加载索引…', candidatesLoaded: n => `已加载 ${n.toLocaleString('zh-CN')} 名候选人`,
-        dlBy: '下载方式', dlDep: '⬇ 省份', dlMun: '⬇ 市', dlZon: '⬇ 区', dlPue: '⬇ 投票站', dlMesa: '⬇ 投票台',
+        dlBy: '下载方式', dlDep: '⬇ 省份', dlMun: '⬇ 市', dlCom: '⬇ 社区', dlPue: '⬇ 投票站', dlMesa: '⬇ 投票台',
         connecting: '正在连接 S3…', placeholder: '搜索候选人以查看其选举档案',
         mapTitle: '地图 · 各省得票', mapLoading: '地图加载中…',
         depLabel: '省份', munLabel: '市',
@@ -1161,7 +1179,7 @@
       if (hint && hint.dataset.count) st('search-hint', t.candidatesLoaded(parseInt(hint.dataset.count)));
       else if (hint && !hint.dataset.count) st('search-hint', t.loadingIndex);
       st('dl-btns-label', t.dlBy);
-      st('dl-dep', t.dlDep); st('dl-mun', t.dlMun); st('dl-zon', t.dlZon); st('dl-pue', t.dlPue); st('dl-mesa', t.dlMesa);
+      st('dl-dep', t.dlDep); st('dl-mun', t.dlMun); st('dl-com', t.dlCom); st('dl-pue', t.dlPue); st('dl-mesa', t.dlMesa);
       st('loader-label', t.connecting);
       st('placeholder-state', t.placeholder);
       st('map-panel-title', t.mapTitle);
@@ -1436,6 +1454,7 @@
     let candIndex = [];
     let currentCand = null;
     let currentData = null;
+    let currentViewMode = 'total'; // 'total' | 'logo'
     let radarChart = null;
     let acHighlight = -1;
 
@@ -1804,7 +1823,7 @@
         });
         showBoundaryLayer(newLayer);
         document.getElementById('btn-volver-pais').style.display = 'block';
-        showComunasNotice(true, 'Vista por localidades, excluye Corferias y Cárceles. Para mayor precisión, descargue zona o puesto.');
+        showComunasNotice(true, 'Vista por localidades, excluye Corferias y Cárceles. Para mayor precisión, descargue com./local. o puesto.');
       } catch(e) {
         console.error('[Mapa] Error cargando localidades Bogotá:', e.message);
       } finally {
@@ -1835,7 +1854,7 @@
         const btn = document.getElementById('btn-volver-pais');
         btn.textContent = '← Antioquia';
         btn.style.display = 'block';
-        showComunasNotice(true, 'Vista por comunas y corregimientos, excluye votos en centro de recolección y cárceles. Para mayor precisión, descargue zona o puesto.');
+        showComunasNotice(true, 'Vista por comunas y corregimientos, excluye votos en centro de recolección y cárceles. Para mayor precisión, descargue com./local. o puesto.');
       } catch(e) {
         console.error('[Mapa] Error cargando comunas Medellín:', e.message);
       } finally {
@@ -1858,7 +1877,7 @@
         const btn = document.getElementById('btn-volver-pais');
         btn.textContent = '← Valle del Cauca';
         btn.style.display = 'block';
-        showComunasNotice(true, 'Vista por comunas, excluye corregimientos. Para mayor precisión, descargue zona o puesto.');
+        showComunasNotice(true, 'Vista por comunas, excluye corregimientos. Para mayor precisión, descargue com./local. o puesto.');
       } catch(e) {
         console.error('[Mapa] Error cargando comunas Cali:', e.message);
       } finally {
@@ -1881,7 +1900,7 @@
         const btn = document.getElementById('btn-volver-pais');
         btn.textContent = '← Risaralda';
         btn.style.display = 'block';
-        showComunasNotice(true, 'Vista por comunas, excluye corregimientos. Para mayor precisión, descargue zona o puesto.');
+        showComunasNotice(true, 'Vista por comunas, excluye corregimientos. Para mayor precisión, descargue com./local. o puesto.');
       } catch(e) {
         console.error('[Mapa] Error cargando comunas Pereira:', e.message);
       } finally {
@@ -1904,7 +1923,7 @@
         const btn = document.getElementById('btn-volver-pais');
         btn.textContent = '← Tolima';
         btn.style.display = 'block';
-        showComunasNotice(true, 'Vista por comunas, excluye corregimientos. Para mayor precisión, descargue zona o puesto.');
+        showComunasNotice(true, 'Vista por comunas, excluye corregimientos. Para mayor precisión, descargue com./local. o puesto.');
       } catch(e) {
         console.error('[Mapa] Error cargando comunas Ibagué:', e.message);
       } finally {
@@ -1927,7 +1946,7 @@
         const btn = document.getElementById('btn-volver-pais');
         btn.textContent = '← Atlántico';
         btn.style.display = 'block';
-        showComunasNotice(true, 'Vista por localidades, excluye zonas especiales (98/99). Para mayor precisión, descargue zona o puesto.');
+        showComunasNotice(true, 'Vista por localidades, excluye zonas especiales (98/99). Para mayor precisión, descargue com./local. o puesto.');
       } catch(e) {
         console.error('[Mapa] Error cargando localidades Barranquilla:', e.message);
       } finally {
@@ -1950,7 +1969,7 @@
         const btn = document.getElementById('btn-volver-pais');
         btn.textContent = '← Córdoba';
         btn.style.display = 'block';
-        showComunasNotice(true, 'Vista por comunas, excluye corregimientos (zonas 99, 90). Para mayor precisión, descargue zona o puesto.');
+        showComunasNotice(true, 'Vista por comunas, excluye corregimientos (zonas 99, 90). Para mayor precisión, descargue com./local. o puesto.');
       } catch(e) {
         console.error('[Mapa] Error cargando comunas Montería:', e.message);
       } finally {
@@ -1973,7 +1992,7 @@
         const btn = document.getElementById('btn-volver-pais');
         btn.textContent = '← Caldas';
         btn.style.display = 'block';
-        showComunasNotice(true, 'Vista por comunas, excluye corregimientos. Para mayor precisión, descargue zona o puesto.');
+        showComunasNotice(true, 'Vista por comunas, excluye corregimientos. Para mayor precisión, descargue com./local. o puesto.');
       } catch(e) {
         console.error('[Mapa] Error cargando comunas Manizales:', e.message);
       } finally {
@@ -2588,12 +2607,17 @@
       if (departamentosLayer) showBoundaryLayer(departamentosLayer);
       refreshMapColors();
 
+      resetToggle();
+      showToggle(false);
+
       try {
         const r = await fetch(`${S3}/endoso/${meta.slug}.json`);
         if (!r.ok) throw new Error('No data');
         const data = await r.json();
         currentData = data;
         currentCand = meta;
+        const esListaAbierta = data.candidatos && data.candidatos.length > 0;
+        showToggle(esListaAbierta);
         processData(data, meta);
       } catch(e) {
         processDataBasic(meta);
@@ -2616,8 +2640,46 @@
       return 50;
     }
 
+    // ─── TOGGLE VISTA LOGO / TOTAL ────────────────────────────
+    function toggleViewMode() {
+      currentViewMode = (currentViewMode === 'total') ? 'logo' : 'total';
+      const track = document.getElementById('toggle-logo-track');
+      const thumb = document.getElementById('toggle-logo-thumb');
+      const label = document.getElementById('toggle-logo-label');
+      if (currentViewMode === 'logo') {
+        if (track) track.style.background = 'rgba(0,71,255,.6)';
+        if (thumb) thumb.style.left = '18px';
+        if (label) label.textContent = 'Solo logo';
+      } else {
+        if (track) track.style.background = 'rgba(255,255,255,.15)';
+        if (thumb) thumb.style.left = '2px';
+        if (label) label.textContent = 'Total (logo + candidatos)';
+      }
+      if (currentData && currentCand) processData(currentData, currentCand);
+    }
+
+    function showToggle(show) {
+      const wrap = document.getElementById('toggle-logo-wrap');
+      if (wrap) wrap.style.display = show ? 'flex' : 'none';
+    }
+
+    function resetToggle() {
+      currentViewMode = 'total';
+      const track = document.getElementById('toggle-logo-track');
+      const thumb = document.getElementById('toggle-logo-thumb');
+      const label = document.getElementById('toggle-logo-label');
+      if (track) track.style.background = 'rgba(255,255,255,.15)';
+      if (thumb) thumb.style.left = '2px';
+      if (label) label.textContent = 'Total (logo + candidatos)';
+    }
+
     function processData(data, meta) {
       const mesas = data.mesas || [];
+      // Decide el total de votos a mostrar según modo
+      const isListaAbierta = data.candidatos && data.candidatos.length > 0;
+      const totalVotosDisplay = isListaAbierta && currentViewMode === 'total'
+        ? (data.votosTotal ?? data.votos ?? 0)
+        : (data.votosLogo ?? data.votos ?? 0);
       let totalVotos = 0;
       const depMap = {}, munMap = {};
 
@@ -2644,13 +2706,13 @@
       const zonas = computeTopComunaLocalidad(mesas);
       const puestos = computeTopPuesto(mesas);
 
-      setInfoVal('info-votos', fmt(totalVotos));
-      setInfoVal('map-total-hint', `${fmt(totalVotos)} votos`);
+      setInfoVal('info-votos', fmt(totalVotosDisplay));
+      setInfoVal('map-total-hint', `${fmt(totalVotosDisplay)} votos`);
       setInfoVal('info-dep-top', deps[0]?.[1]?.nom || '—');
       setInfoVal('info-mun-top', muns[0]?.[1]?.nom || '—');
       setInfoVal('info-dptos', `${deps.length} dptos.`);
       setInfoVal('info-mesas', `${fmt(mesas.length)} mesas`);
-      setInfoVal('overall-num', computeRating(totalVotos, deps.length));
+      setInfoVal('overall-num', computeRating(totalVotosDisplay, deps.length));
 
       // Zona y puesto: filas separadas, sin fallback cruzado
       renderTopComunaLocalidad(zonas);
@@ -2708,7 +2770,7 @@
         setTimeout(() => document.getElementById('map-loading')?.classList.remove('active'), 400);
       }
 
-      buildTerritorialRadar({ meta, deps, muns, zonas, totalVotos });
+      buildTerritorialRadar({ meta, deps, muns, zonas, totalVotos: totalVotosDisplay });
     }
 
     // ─── COMMUNE / LOCALIDAD MÁS VOTADA ─────────────────────
@@ -2852,7 +2914,7 @@
     // ─── DESCARGA POR NIVEL ──────────────────────────────────
     function canDlLevel(level) {
       if (level === 'dep' || level === 'mun') return isLoggedIn();
-      if (level === 'zon') return isProOrHigher();
+      if (level === 'com') return isProOrHigher();
       return isPremiumOrFull(); // pue, mesa
     }
 
@@ -2867,7 +2929,7 @@
         if (wrap) wrap.style.display = 'flex';
         if (selWrap) selWrap.style.display = 'none';
       }
-      ['dep','mun','zon','pue','mesa'].forEach(level => {
+      ['dep','mun','com','pue','mesa'].forEach(level => {
         const btn = document.getElementById(`dl-${level}`);
         if (btn) btn.classList.toggle('locked', !canDlLevel(level));
         const opt = document.getElementById(`dls-${level}`);
@@ -2880,7 +2942,7 @@
         const msgs = {
           dep: 'Descarga por departamento disponible para usuarios <strong>registrados</strong>.',
           mun: 'Descarga por municipio disponible para usuarios <strong>registrados</strong>.',
-          zon: 'Descarga por zona requiere plan <strong>Pro</strong> o superior.',
+          com: 'Descarga por com./localidad requiere plan <strong>Pro</strong> o superior.',
           pue: 'Descarga por puesto requiere plan <strong>Premium</strong> o <strong>Full</strong>.',
           mesa: 'Descarga por mesa requiere plan <strong>Premium</strong> o <strong>Full</strong>.'
         };
@@ -2912,27 +2974,47 @@
         });
         headers = ['Cod. Departamento','Nombre Departamento','Cod. Municipio','Nombre Municipio','Votos'];
         rows = Object.values(map).sort((a,b)=>b.v-a.v).map(r=>[r.dep,r.depNom,r.mun,r.munNom,r.v]);
-      } else if (level === 'zon') {
+      } else if (level === 'com') {
         const map = {};
         mesas.forEach(m => {
-          const k = `${m.dep}|${m.mun}|${m.zon}`;
-          if (!map[k]) map[k] = { dep:m.dep, depNom:m.depNom, mun:m.mun, munNom:m.munNom, zon:m.zon, v:0 };
+          const depKey = normalizeDepCode(m.dep);
+          const dd = depKey.padStart(2, '0');
+          const mm2 = String(m.mun || '').padStart(3, '0');
+          const zz = String(m.zon || '').padStart(2, '0');
+          const pp = String(m.pue || '').padStart(2, '0');
+          const comNom = divipoleMap[`${dd}-${mm2}-${zz}-${pp}`] || m.comNom || `Zona ${zz}`;
+          const k = `${m.dep}|${m.mun}|${comNom}`;
+          if (!map[k]) map[k] = { dep:m.dep, depNom:m.depNom, mun:m.mun, munNom:m.munNom, com:comNom, v:0 };
           map[k].v += m.v;
         });
-        headers = ['Cod. Departamento','Nombre Departamento','Cod. Municipio','Nombre Municipio','Cod. Zona','Votos'];
-        rows = Object.values(map).sort((a,b)=>b.v-a.v).map(r=>[r.dep,r.depNom,r.mun,r.munNom,r.zon,r.v]);
+        headers = ['Cod. Departamento','Nombre Departamento','Cod. Municipio','Nombre Municipio','Com./Localidad','Votos'];
+        rows = Object.values(map).sort((a,b)=>b.v-a.v).map(r=>[r.dep,r.depNom,r.mun,r.munNom,r.com,r.v]);
       } else if (level === 'pue') {
         const map = {};
         mesas.forEach(m => {
+          const depKey = normalizeDepCode(m.dep);
+          const dd = depKey.padStart(2, '0');
+          const mm2 = String(m.mun || '').padStart(3, '0');
+          const zz = String(m.zon || '').padStart(2, '0');
+          const pp = String(m.pue || '').padStart(2, '0');
+          const comNom = divipoleMap[`${dd}-${mm2}-${zz}-${pp}`] || m.comNom || '';
           const k = `${m.dep}|${m.mun}|${m.zon}|${m.pue}`;
-          if (!map[k]) map[k] = { dep:m.dep, depNom:m.depNom, mun:m.mun, munNom:m.munNom, zon:m.zon, pue:m.pue, pueNom:m.pueNom, v:0 };
+          if (!map[k]) map[k] = { dep:m.dep, depNom:m.depNom, mun:m.mun, munNom:m.munNom, com:comNom, zon:m.zon, pue:m.pue, pueNom:m.pueNom, v:0 };
           map[k].v += m.v;
         });
-        headers = ['Cod. Departamento','Nombre Departamento','Cod. Municipio','Nombre Municipio','Cod. Zona','Cod. Puesto','Nombre Puesto','Votos'];
-        rows = Object.values(map).sort((a,b)=>b.v-a.v).map(r=>[r.dep,r.depNom,r.mun,r.munNom,r.zon,r.pue,r.pueNom,r.v]);
+        headers = ['Cod. Departamento','Nombre Departamento','Cod. Municipio','Nombre Municipio','Com./Localidad','Cod. Zona','Cod. Puesto','Nombre Puesto','Votos'];
+        rows = Object.values(map).sort((a,b)=>b.v-a.v).map(r=>[r.dep,r.depNom,r.mun,r.munNom,r.com,r.zon,r.pue,r.pueNom,r.v]);
       } else {
-        headers = ['Cod. Departamento','Nombre Departamento','Cod. Municipio','Nombre Municipio','Cod. Zona','Cod. Puesto','Nombre Puesto','Mesa','Votos'];
-        rows = [...mesas].sort((a,b)=>b.v-a.v).map(m=>[m.dep,m.depNom,m.mun,m.munNom,m.zon,m.pue,m.pueNom,m.mesa,m.v]);
+        headers = ['Cod. Departamento','Nombre Departamento','Cod. Municipio','Nombre Municipio','Com./Localidad','Cod. Zona','Cod. Puesto','Nombre Puesto','Mesa','Votos'];
+        rows = [...mesas].sort((a,b)=>b.v-a.v).map(m => {
+          const depKey = normalizeDepCode(m.dep);
+          const dd = depKey.padStart(2, '0');
+          const mm2 = String(m.mun || '').padStart(3, '0');
+          const zz = String(m.zon || '').padStart(2, '0');
+          const pp = String(m.pue || '').padStart(2, '0');
+          const comNom = divipoleMap[`${dd}-${mm2}-${zz}-${pp}`] || m.comNom || '';
+          return [m.dep,m.depNom,m.mun,m.munNom,comNom,m.zon,m.pue,m.pueNom,m.mesa,m.v];
+        });
       }
 
       let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<?mso-application progid="Excel.Sheet"?>\n';
@@ -2948,7 +3030,7 @@
       const blob = new Blob([xml], {type:'application/vnd.ms-excel'});
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `votacion-${level}-${currentCand.slug||'candidato'}.xls`;
+      a.download = `votacion-${level}-${currentCand.slug||'partido'}.xls`;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(a.href);
     }
