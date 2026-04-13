@@ -233,15 +233,13 @@
     <div class="content-area">
 
       <div class="notice-box">
-        Los archivos contienen resultados <b>por puesto de votación</b>: departamento, municipio, zona, puesto, candidato, votos, partido y circunscripción.<br/>
-        Si necesitas los datos desagregados <b>por mesa</b>, escríbenos por correo desde el formulario de registro o a través del botón de WhatsApp.<br/>
-        Las descargas están disponibles a medida que se publican los resultados oficiales del escrutinio.
+        Los archivos contienen <b>resultados declarados (definitivos)</b> por puesto de votación: departamento, municipio, zona, puesto, candidato, votos, partido y circunscripción.<br/>
+        Si necesitas los datos desagregados <b>por mesa</b>, escríbenos por correo desde el formulario de registro o a través del botón de WhatsApp.
       </div>
 
       <!-- ── TABS ── -->
       <div class="tabs-bar">
-        <button class="tab-btn active" onclick="switchTab('generales')">Resultados Generales</button>
-        <button class="tab-btn" onclick="switchTab('camara')">Cámara · Declarados</button>
+        <button class="tab-btn active" onclick="switchTab('generales')">Resultados Declarados</button>
       </div>
 
       <!-- ══════════════════════════════════════════ -->
@@ -284,42 +282,6 @@
 
       </div><!-- /tab-generales -->
 
-      <!-- ══════════════════════════════════════════ -->
-      <!-- TAB 2: CÁMARA DECLARADOS                   -->
-      <!-- ══════════════════════════════════════════ -->
-      <div class="tab-panel" id="tab-camara">
-
-        <!-- Por departamento consolidado -->
-        <div class="sec-block">
-          <div class="sec-header">
-            <span class="sec-num">01</span>
-            <span class="sec-title">Por departamento · Consolidado Cámara</span>
-          </div>
-          <div class="sel-wrap">
-            <span class="sel-label">Seleccionar departamento</span>
-            <select id="sel-dept-cam" onchange="renderDeptCam()">
-              <option value="">— Elegir departamento —</option>
-            </select>
-          </div>
-          <div class="dept-dl-list" id="list-dept-cam"></div>
-        </div>
-
-        <!-- Por circunscripción + departamento -->
-        <div class="sec-block">
-          <div class="sec-header">
-            <span class="sec-num">02</span>
-            <span class="sec-title">Por circunscripción + departamento</span>
-          </div>
-          <div class="sel-wrap">
-            <span class="sel-label">Seleccionar departamento</span>
-            <select id="sel-dept-circ" onchange="renderDeptCirc()">
-              <option value="">— Elegir departamento —</option>
-            </select>
-          </div>
-          <div class="dept-dl-list" id="list-dept-circ"></div>
-        </div>
-
-      </div><!-- /tab-camara -->
 
     </div><!-- /content-area -->
 
@@ -330,27 +292,26 @@
   </div><!-- /shell -->
 
   <script>
-    // ─── S3 BASE URLS ─────────────────────────────────────────────────────────
-    const S3_GEN   = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/DESCARGAS/descargas/';
-    const S3_CAM   = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/DESCARGAS/descargas_camaras/';
+    // ─── S3 BASE URL ──────────────────────────────────────────────────────────
+    const S3_DEC = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/DESCARGAS/descargas_declaradosfin/';
 
     // ─── CATÁLOGOS ────────────────────────────────────────────────────────────
     const CORP = [
-      { nombre:'SENADO',    desc:'Senado de la República',           filas:'1,459,075', mb:'81.7', archivo:'por_corporacion/SENADO.xlsx' },
-      { nombre:'CÁMARA',    desc:'Cámara de Representantes',         filas:'764,575',   mb:'42.9', archivo:'por_corporacion/CAMARA.xlsx' },
-      { nombre:'CONSULTAS', desc:'Consultas presidenciales',         filas:'189,755',   mb:'10.3', archivo:'por_corporacion/CONSULTAS.xlsx' },
-      { nombre:'CITREP',    desc:'Circunscripciones transitorias',   filas:'28,404',    mb:'1.5',  archivo:'por_corporacion/CITREP.xlsx' },
+      { nombre:'SENADO',    desc:'Senado de la República',           filas:'1,453,892', mb:'81.3', archivo:'por_corporacion/SENADO_DECLARADOS.xlsx' },
+      { nombre:'CÁMARA',    desc:'Cámara de Representantes',         filas:'775,062',   mb:'43.5', archivo:'por_corporacion/CAMARA_DECLARADOS.xlsx' },
+      { nombre:'CONSULTAS', desc:'Consultas presidenciales',         filas:'175,918',   mb:'9.6',  archivo:'por_corporacion/CONSULTAS_DECLARADOS.xlsx' },
+      { nombre:'CITREP',    desc:'Circunscripciones transitorias',   filas:'28,059',    mb:'1.4',  archivo:'por_corporacion/CITREP_DECLARADOS.xlsx' },
     ];
 
     const CIRC = [
-      { nombre:'NACIONAL',           desc:'Circunscripción nacional',         filas:'1,599,897', mb:'89.3', archivo:'por_circunscripcion/NACIONAL.xlsx' },
-      { nombre:'TERRITORIAL',        desc:'Circunscripciones territoriales',  filas:'625,523',   mb:'34.8', archivo:'por_circunscripcion/TERRITORIAL.xlsx' },
-      { nombre:'AFRO-DESCENDIENTES', desc:'Circunscripción afrodescendiente', filas:'100,443',   mb:'5.8',  archivo:'por_circunscripcion/AFRO-DESCENDIENTES.xlsx' },
-      { nombre:'INDÍGENAS',          desc:'Circunscripción indígena',         filas:'87,542',    mb:'4.9',  archivo:'por_circunscripcion/INDIGENAS.xlsx' },
-      { nombre:'CITREP',             desc:'Circunscripciones transitorias',   filas:'28,404',    mb:'1.5',  archivo:'por_circunscripcion/CITREP.xlsx' },
+      { nombre:'NACIONAL',           desc:'Circunscripción nacional',         filas:'1,582,467', mb:'88.2', archivo:'por_circunscripcion/NACIONAL_DECLARADOS.xlsx' },
+      { nombre:'TERRITORIAL',        desc:'Circunscripciones territoriales',  filas:'636,981',   mb:'35.4', archivo:'por_circunscripcion/TERRITORIAL_DECLARADOS.xlsx' },
+      { nombre:'INDÍGENAS',          desc:'Circunscripción indígena',         filas:'146,408',   mb:'8.3',  archivo:'por_circunscripcion/INDIGENAS_DECLARADOS.xlsx' },
+      { nombre:'AFRO-DESCENDIENTES', desc:'Circunscripción afrodescendiente', filas:'39,016',    mb:'2.2',  archivo:'por_circunscripcion/AFRO-DESCENDIENTES_DECLARADOS.xlsx' },
+      { nombre:'CITREP',             desc:'Circunscripciones transitorias',   filas:'28,059',    mb:'1.4',  archivo:'por_circunscripcion/CITREP_DECLARADOS.xlsx' },
     ];
 
-    // Departamentos para descargas generales (incluye CONSULADOS)
+    // Departamentos (incluye CONSULADOS — ahora con datos completos de Senado y Cámara)
     const DEPTOS_GEN = [
       { key:'AMAZONAS',      label:'Amazonas' },
       { key:'ANTIOQUIA',     label:'Antioquia' },
@@ -388,39 +349,6 @@
       { key:'VICHADA',       label:'Vichada' },
     ];
 
-    // Departamentos para descargas de cámara
-    const DEPTOS_CAM = [
-      { key:'AMAZONAS',      label:'Amazonas' },
-      { key:'ANTIOQUIA',     label:'Antioquia' },
-      { key:'ARAUCA',        label:'Arauca' },
-      { key:'ATLANTICO',     label:'Atlántico' },
-      { key:'BOLIVAR',       label:'Bolívar' },
-      { key:'BOYACA',        label:'Boyacá' },
-      { key:'CALDAS',        label:'Caldas' },
-      { key:'CAQUETA',       label:'Caquetá' },
-      { key:'CASANARE',      label:'Casanare' },
-      { key:'CAUCA',         label:'Cauca' },
-      { key:'CESAR',         label:'Cesar' },
-      { key:'CORDOBA',       label:'Córdoba' },
-      { key:'GUAINIA',       label:'Guainía' },
-      { key:'GUAVIARE',      label:'Guaviare' },
-      { key:'HUILA',         label:'Huila' },
-      { key:'LA_GUAJIRA',    label:'La Guajira' },
-      { key:'MAGDALENA',     label:'Magdalena' },
-      { key:'META',          label:'Meta' },
-      { key:'NARINO',        label:'Nariño' },
-      { key:'NORTE_DE_SAN',  label:'Norte de Santander' },
-      { key:'PUTUMAYO',      label:'Putumayo' },
-      { key:'QUINDIO',       label:'Quindío' },
-      { key:'RISARALDA',     label:'Risaralda' },
-      { key:'SAN_ANDRES',    label:'San Andrés y Providencia' },
-      { key:'SANTANDER',     label:'Santander' },
-      { key:'SUCRE',         label:'Sucre' },
-      { key:'TOLIMA',        label:'Tolima' },
-      { key:'VALLE',         label:'Valle del Cauca' },
-      { key:'VAUPES',        label:'Vaupés' },
-      { key:'VICHADA',       label:'Vichada' },
-    ];
 
     // ─── RENDER COMPLETE-FILE GRIDS ───────────────────────────────────────────
     function dlIcon() {
@@ -463,11 +391,11 @@
       if (!key) return;
       const label = DEPTOS_GEN.find(d => d.key === key)?.label || key;
       const rows = [
-        { label:'Todos (consolidado)',  sub:'Todas las corporaciones y circunscripciones', url:`${S3_GEN}por_departamento/${key}.xlsx` },
-        { label:'Senado',               sub:'Solo resultados Senado',                       url:`${S3_GEN}por_corporacion_depto/SENADO/${key}.xlsx` },
-        { label:'Cámara',               sub:'Solo resultados Cámara',                       url:`${S3_GEN}por_corporacion_depto/CAMARA/${key}.xlsx` },
-        { label:'CITREP',               sub:'Circunscripciones transitorias',               url:`${S3_GEN}por_corporacion_depto/CITREP/${key}.xlsx` },
-        { label:'Consultas',            sub:'Consultas presidenciales',                     url:`${S3_GEN}por_corporacion_depto/CONSULTAS/${key}.xlsx` },
+        { label:'Todos (consolidado)',  sub:'Todas las corporaciones y circunscripciones', url:`${S3_DEC}por_departamento/${key}_DECLARADOS.xlsx` },
+        { label:'Senado',               sub:'Solo resultados Senado',                       url:`${S3_DEC}por_corporacion_depto/SENADO/${key}_DECLARADOS.xlsx` },
+        { label:'Cámara',               sub:'Solo resultados Cámara',                       url:`${S3_DEC}por_corporacion_depto/CAMARA/${key}_DECLARADOS.xlsx` },
+        { label:'CITREP',               sub:'Circunscripciones transitorias',               url:`${S3_DEC}por_corporacion_depto/CITREP/${key}_DECLARADOS.xlsx` },
+        { label:'Consultas',            sub:'Consultas presidenciales',                     url:`${S3_DEC}por_corporacion_depto/CONSULTAS/${key}_DECLARADOS.xlsx` },
       ];
       list.innerHTML = rows.map(r => `
         <div class="dept-dl-row">
@@ -476,45 +404,6 @@
             <span class="dept-dl-sub">${r.sub}</span>
           </div>
           <a class="dept-dl-btn" href="${r.url}" target="_blank" download>${dlIcon()} Descargar</a>
-        </div>`).join('');
-    }
-
-    // ─── RENDER DEPT CÁMARA ───────────────────────────────────────────────────
-    function renderDeptCam() {
-      const key = document.getElementById('sel-dept-cam').value;
-      const list = document.getElementById('list-dept-cam');
-      list.innerHTML = '';
-      if (!key) return;
-      const label = DEPTOS_CAM.find(d => d.key === key)?.label || key;
-      list.innerHTML = `
-        <div class="dept-dl-row">
-          <div class="dept-dl-info">
-            <span class="dept-dl-label">${label} · Cámara declarados</span>
-            <span class="dept-dl-sub">Candidatos declarados con partido y número de votos</span>
-          </div>
-          <a class="dept-dl-btn" href="${S3_CAM}por_departamento/${key}_DECLARADOS.xlsx" target="_blank" download>${dlIcon()} Descargar</a>
-        </div>`;
-    }
-
-    // ─── RENDER CIRC + DEPT ───────────────────────────────────────────────────
-    function renderDeptCirc() {
-      const key = document.getElementById('sel-dept-circ').value;
-      const list = document.getElementById('list-dept-circ');
-      list.innerHTML = '';
-      if (!key) return;
-      const label = DEPTOS_CAM.find(d => d.key === key)?.label || key;
-      const circ = [
-        { circ:'TERRITORIAL',        sub:'Circunscripción territorial',      folder:'TERRITORIAL' },
-        { circ:'Afrodescendientes',   sub:'Circunscripción afrodescendiente', folder:'AFRODESCENDIENTES' },
-        { circ:'Indígenas',           sub:'Circunscripción indígena',         folder:'INDIGENAS' },
-      ];
-      list.innerHTML = circ.map(c => `
-        <div class="dept-dl-row">
-          <div class="dept-dl-info">
-            <span class="dept-dl-label">${label} · ${c.circ}</span>
-            <span class="dept-dl-sub">${c.sub}</span>
-          </div>
-          <a class="dept-dl-btn" href="${S3_CAM}por_circunscripcion_depto/${c.folder}/${key}_DECLARADOS.xlsx" target="_blank" download>${dlIcon()} Descargar</a>
         </div>`).join('');
     }
 
@@ -642,11 +531,9 @@
     })();
 
     // ─── INIT ─────────────────────────────────────────────────────────────────
-    renderGrid('grid-corp', CORP, S3_GEN);
-    renderGrid('grid-circ', CIRC, S3_GEN);
+    renderGrid('grid-corp', CORP, S3_DEC);
+    renderGrid('grid-circ', CIRC, S3_DEC);
     populateSelect('sel-dept-gen', DEPTOS_GEN);
-    populateSelect('sel-dept-cam', DEPTOS_CAM);
-    populateSelect('sel-dept-circ', DEPTOS_CAM);
   </script>
   <script src="lang.js"></script>
 
