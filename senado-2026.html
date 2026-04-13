@@ -361,7 +361,7 @@
             </select>
           </div>
           <div id="zona-filter-container" style="display:none;align-items:center;gap:.5rem">
-            <span class="sub-label">Zona:</span>
+            <span class="sub-label">Comuna:</span>
             <select class="dep-select" id="zona-select" onchange="onZonaChange(this.value)">
               <option value="">TODAS</option>
             </select>
@@ -569,9 +569,8 @@
         const d=muns.find(x=>x.dep_cod===depCod&&x.cod===munCod&&(!x.circ_nom||normC(x.circ_nom)===normC(activeCirc))); if(!d) return;
         geoData=d; labelText=`Partidos · Senado · ${d.nombre}`; badgeText=d.nombre;
       } else {
-        const zonaCod=document.getElementById('zona-select').value;
         const pues=await getJSON('puestos');
-        const d=pues.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&x.cod===pueCod&&(!zonaCod||x.zon_cod===zonaCod)&&(!x.circ_nom||normC(x.circ_nom)===normC(activeCirc))); if(!d) return;
+        const d=pues.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&(x.cod===pueCod||x.pue_cod===pueCod)&&(!x.circ_nom||normC(x.circ_nom)===normC(activeCirc))); if(!d) return;
         geoData=d; labelText=`Partidos · Senado · ${d.nombre}`; badgeText=d.nombre;
       }
       const _pcG=geoData.por_circunscripcion;
@@ -688,11 +687,11 @@
       document.getElementById('mesa-filter-container').style.display='none';
       if(!cod){await renderGeoPartidos('dep',depCod,null,null);return;}
       await renderGeoPartidos('mun',depCod,cod,null);
-      const zonas=await getJSON('zonas');
+      const zonas=await getJSON('comunas');
       const sel=document.getElementById('zona-select');
       sel.innerHTML='<option value="">TODAS</option>';
       const seenZon=new Set();const normCZ=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
-      zonas.filter(z=>z.dep_cod===depCod&&z.mun_cod===cod&&(!z.circ_nom||normCZ(z.circ_nom)===normCZ(activeCirc))).sort((a,b)=>a.cod.localeCompare(b.cod)).forEach(z=>{if(seenZon.has(z.cod))return;seenZon.add(z.cod);const o=document.createElement('option');o.value=z.cod;o.textContent=z.nombre||`Zona ${z.cod}`;sel.appendChild(o);});
+      zonas.filter(z=>z.dep_cod===depCod&&z.mun_cod===cod&&(!z.circ_nom||normCZ(z.circ_nom)===normCZ(activeCirc))).sort((a,b)=>(a.nombre||'').localeCompare((b.nombre||''),'es')).forEach(z=>{if(seenZon.has(z.cod))return;seenZon.add(z.cod);const o=document.createElement('option');o.value=z.cod;o.textContent=z.nombre||`Comuna ${z.cod}`;sel.appendChild(o);});
       document.getElementById('zona-filter-container').style.display='flex';
     }
 
@@ -704,14 +703,14 @@
       document.getElementById('pue-filter-container').style.display='none';
       document.getElementById('mesa-filter-container').style.display='none';
       if(!cod){await renderGeoPartidos('mun',depCod,munCod,null);return;}
-      const zonas=await getJSON('zonas');
+      const zonas=await getJSON('comunas');
       const normCZ=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
       const z=zonas.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&x.cod===cod&&(!x.circ_nom||normCZ(x.circ_nom)===normCZ(activeCirc)));
       if(!z)return;
       const _pcZ=z.por_circunscripcion;
       const geoCirc=_pcZ!=null?_pcZ[activeCirc]:z;
       if(!geoCirc){
-        const _lbl=z.nombre||`Zona ${cod}`;
+        const _lbl=z.nombre||`Comuna ${cod}`;
         document.getElementById('lbl-tabla').textContent=`Partidos · Senado · ${_lbl}`;
         document.getElementById('drill-badge').textContent=_lbl;
         document.getElementById('drill-badge').className='level-badge pues';
@@ -725,7 +724,7 @@
       const totalVotos=zVV;
       const zCP=getCircPartidosCalculated();
       const geoPartidos=zCP.filter(p=>!SPEC.has(p.partido)&&(geoVotos[p.partido]||0)>0).map(p=>({...p,votos:geoVotos[p.partido]||0})).sort((a,b)=>b.votos-a.votos);
-      const label=z.nombre||`Zona ${cod}`;
+      const label=z.nombre||`Comuna ${cod}`;
       document.getElementById('lbl-tabla').textContent=`Partidos · Senado · ${label}`;
       document.getElementById('drill-badge').textContent=label;
       document.getElementById('drill-badge').className='level-badge pues';
@@ -786,7 +785,7 @@
       const pSel=document.getElementById('pue-select');
       pSel.innerHTML='<option value="">TODOS</option>';
       const seenPue=new Set();const normCP=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
-      pues.filter(p=>p.dep_cod===depCod&&p.mun_cod===munCod&&p.zon_cod===cod&&(!p.circ_nom||normCP(p.circ_nom)===normCP(activeCirc))).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).forEach(p=>{if(seenPue.has(p.cod))return;seenPue.add(p.cod);const o=document.createElement('option');o.value=p.cod;o.textContent=p.nombre;pSel.appendChild(o);});
+      pues.filter(p=>p.dep_cod===depCod&&p.mun_cod===munCod&&p.com_cod===cod&&(!p.circ_nom||normCP(p.circ_nom)===normCP(activeCirc))).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).forEach(p=>{const pCod=p.cod||p.pue_cod;if(seenPue.has(pCod))return;seenPue.add(pCod);const o=document.createElement('option');o.value=pCod;o.textContent=p.nombre;pSel.appendChild(o);});
       document.getElementById('pue-filter-container').style.display='flex';
     }
 
