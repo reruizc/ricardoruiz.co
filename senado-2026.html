@@ -448,16 +448,20 @@
       'PATRIOTAS':['Nancy Stella Vergara Muñoz'],
     };
     function renderListaCerrada(partido, curules){
-      const _row=(k,name)=>`<tr><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${String(k+1).padStart(3,'0')}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(k+1).padStart(2,'0')}</td><td class="cand-elected" style="font-family:'Syne',sans-serif;font-weight:400;color:#39ff7a">${name}<span style="font-size:.6rem;margin-left:.4rem">✦</span></td><td class="r" style="font-family:'Syne',sans-serif;color:rgba(255,255,255,.3)">—</td><td class="r" style="color:rgba(255,255,255,.4)">—</td></tr>`;
+      const _elected=(k,name)=>`<tr><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${String(k+1).padStart(3,'0')}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(k+1).padStart(2,'0')}</td><td class="cand-elected" style="font-family:'Syne',sans-serif;font-weight:400;color:#39ff7a">${name.toUpperCase()}<span style="font-size:.6rem;margin-left:.4rem">✦</span></td><td class="r" style="font-family:'Syne',sans-serif;color:rgba(255,255,255,.3)">—</td><td class="r" style="color:rgba(255,255,255,.4)">—</td></tr>`;
+      const _plain=(k,name)=>`<tr><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${String(k+1).padStart(3,'0')}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(k+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif;font-weight:400">${name.toUpperCase()}</td><td class="r" style="font-family:'Syne',sans-serif;color:rgba(255,255,255,.3)">—</td><td class="r" style="color:rgba(255,255,255,.4)">—</td></tr>`;
       const _footer=`<tr><td colspan="5" style="padding:.5rem .5rem .35rem;font-family:'DM Mono',monospace;font-size:.6rem;color:rgba(255,255,255,.2);text-align:center;letter-spacing:.05em">Lista cerrada · en orden de asignación</td></tr>`;
-      const names=(CLOSED_LISTS[partido]||[]).slice(0,curules);
-      if(names.length===0) return Array.from({length:curules},(_,k)=>_row(k,`Posición ${k+1}`)).join('')+_footer;
-      return names.map((n,k)=>_row(k,n)).join('')+_footer;
+      const allNames=CLOSED_LISTS[partido]||[];
+      if(allNames.length===0){
+        if(curules===0) return '';
+        return Array.from({length:curules},(_,k)=>_elected(k,`Posición ${k+1}`)).join('')+_footer;
+      }
+      return allNames.map((n,k)=>k<curules?_elected(k,n):_plain(k,n)).join('')+_footer;
     }
     let _toastTimer=null;
     function showLoadingToast(){
       let el=document.getElementById('_loading-toast');
-      if(!el){el=document.createElement('div');el.id='_loading-toast';el.style.cssText='position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:rgba(0,71,255,.92);color:#fff;font-family:\'Syne\',sans-serif;font-size:.82rem;padding:.55rem 1.4rem;border-radius:2px;z-index:9999;pointer-events:none;transition:opacity .3s;white-space:nowrap';el.textContent='Un momento, cargando…';document.body.appendChild(el);}
+      if(!el){el=document.createElement('div');el.id='_loading-toast';el.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,71,255,.92);color:#fff;font-family:\'Syne\',sans-serif;font-size:1.23rem;padding:.85rem 2.1rem;border-radius:3px;z-index:9999;pointer-events:none;transition:opacity .3s;white-space:nowrap;letter-spacing:.02em';el.textContent='Un momento, cargando…';document.body.appendChild(el);}
       el.style.opacity='1';
       clearTimeout(_toastTimer);
       _toastTimer=setTimeout(()=>{el.style.opacity='0';},3000);
@@ -639,11 +643,11 @@
         const color=getColor(p.partido), pctV=pct(p.votos,totalVotos), bw=((p.votos/maxV)*100).toFixed(1);
         const natCurules=p.curules||0;
         const geoCands=geoCirc.candidatos?.[p.partido]||[];
-        const hasCands=geoCands.length>0||natCurules>0;
+        const hasCands=geoCands.length>0||natCurules>0||(CLOSED_LISTS[p.partido]?.length>0);
         const tr=document.createElement('tr');
         tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td>
           <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.15rem">${p.partido}</span></div>
-          ${hasCands?`<div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${geoCands.length>0?geoCands.length+' candidatos':natCurules+' electos · lista cerrada'}</button></div>`:''}
+          ${hasCands?`<div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${geoCands.length>0?geoCands.length+' candidatos':natCurules>0?natCurules+' electos · lista cerrada':(CLOSED_LISTS[p.partido]?.length||0)+' en lista cerrada'}</button></div>`:''}
           </td>
           <td class="r" style="font-size:1.15rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td>
           <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>
@@ -658,7 +662,7 @@
               const norm=s=>s.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
               const nomPart=norm(p.partido);
               const natWinners=getElegidosNac().get(p.partido);
-              if(geoCands.length===0&&curules>0){return renderListaCerrada(p.partido,curules);}
+              if(geoCands.length===0&&(curules>0||CLOSED_LISTS[p.partido]?.length)){return renderListaCerrada(p.partido,curules);}
               return geoCands.map((c,j)=>{
                 const esLista=norm(c.nombre)===nomPart||norm(c.nombre).includes(nomPart.split(' ')[0]+' '+(nomPart.split(' ')[1]||'__'));
                 const elegido=!esLista&&(natWinners?.has(c.nombre)??false);
@@ -726,7 +730,7 @@
       sel.innerHTML='<option value="">TODAS</option>';
       const seenZon=new Set();const normCZ=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
       let locIdx=0;
-      zonas.filter(z=>z.dep_cod===depCod&&z.mun_cod===cod&&(!z.circ_nom||normCZ(z.circ_nom)===normCZ(activeCirc))).sort((a,b)=>a.cod.localeCompare(b.cod)).forEach(z=>{if(seenZon.has(z.cod))return;seenZon.add(z.cod);if(isLocalidad&&z.cod==='000')return;locIdx++;const o=document.createElement('option');o.value=z.cod;o.textContent=isLocalidad?`Localidad ${locIdx}`:(z.nombre||`Comuna ${z.cod}`);sel.appendChild(o);});
+      zonas.filter(z=>z.dep_cod===depCod&&z.mun_cod===cod&&(!z.circ_nom||normCZ(z.circ_nom)===normCZ(activeCirc))).sort((a,b)=>a.cod.localeCompare(b.cod)).forEach(z=>{if(seenZon.has(z.cod))return;seenZon.add(z.cod);const o=document.createElement('option');o.value=z.cod;o.textContent=z.nombre||(isLocalidad?`Localidad ${z.cod}`:`Comuna ${z.cod}`);sel.appendChild(o);});
       document.getElementById('zona-filter-container').style.display='flex';
     }
 
@@ -771,11 +775,11 @@
       geoPartidos.forEach((p,i)=>{
         const color=getColor(p.partido),pctV=pct(p.votos,totalVotos),bw=((p.votos/maxV)*100).toFixed(1),natCurules=p.curules||0;
         const geoCands=geoCirc.candidatos?.[p.partido]||[];
-        const hasCands=geoCands.length>0||natCurules>0;
+        const hasCands=geoCands.length>0||natCurules>0||(CLOSED_LISTS[p.partido]?.length>0);
         const tr=document.createElement('tr');
         tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td>
           <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.15rem">${p.partido}</span></div>
-          ${hasCands?`<div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${geoCands.length>0?geoCands.length+' candidatos':natCurules+' electos · lista cerrada'}</button></div>`:''}
+          ${hasCands?`<div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${geoCands.length>0?geoCands.length+' candidatos':natCurules>0?natCurules+' electos · lista cerrada':(CLOSED_LISTS[p.partido]?.length||0)+' en lista cerrada'}</button></div>`:''}
           </td>
           <td class="r" style="font-size:1.15rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td>
           <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>
@@ -790,7 +794,7 @@
               const norm=s=>s.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
               const nomPart=norm(p.partido);
               const natWinners=getElegidosNac().get(p.partido);
-              if(geoCands.length===0&&curules>0){return renderListaCerrada(p.partido,curules);}
+              if(geoCands.length===0&&(curules>0||CLOSED_LISTS[p.partido]?.length)){return renderListaCerrada(p.partido,curules);}
               return geoCands.map((c,j)=>{
                 const esLista=norm(c.nombre)===nomPart||norm(c.nombre).includes(nomPart.split(' ')[0]+' '+(nomPart.split(' ')[1]||'__'));
                 const elegido=!esLista&&(natWinners?.has(c.nombre)??false);
@@ -886,11 +890,11 @@
       geoPartidos.forEach((p,i)=>{
         const color=getColor(p.partido),pctV=pct(p.votos,totalVotos),bw=((p.votos/maxV)*100).toFixed(1),natCurules=p.curules||0;
         const geoCands=geoCirc.candidatos?.[p.partido]||[];
-        const hasCands=geoCands.length>0||natCurules>0;
+        const hasCands=geoCands.length>0||natCurules>0||(CLOSED_LISTS[p.partido]?.length>0);
         const tr=document.createElement('tr');
         tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td>
           <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.15rem">${p.partido}</span></div>
-          ${hasCands?`<div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${geoCands.length>0?geoCands.length+' candidatos':natCurules+' electos · lista cerrada'}</button></div>`:''}
+          ${hasCands?`<div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${geoCands.length>0?geoCands.length+' candidatos':natCurules>0?natCurules+' electos · lista cerrada':(CLOSED_LISTS[p.partido]?.length||0)+' en lista cerrada'}</button></div>`:''}
           </td>
           <td class="r" style="font-size:1.15rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td>
           <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>
@@ -905,7 +909,7 @@
               const norm=s=>s.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
               const nomPart=norm(p.partido);
               const natWinners=getElegidosNac().get(p.partido);
-              if(geoCands.length===0&&curules>0){return renderListaCerrada(p.partido,curules);}
+              if(geoCands.length===0&&(curules>0||CLOSED_LISTS[p.partido]?.length)){return renderListaCerrada(p.partido,curules);}
               return geoCands.map((c,j)=>{
                 const esLista=norm(c.nombre)===nomPart||norm(c.nombre).includes(nomPart.split(' ')[0]+' '+(nomPart.split(' ')[1]||'__'));
                 const elegido=!esLista&&(natWinners?.has(c.nombre)??false);
@@ -991,7 +995,7 @@
         const tr=document.createElement('tr');
         tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td>
           <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.15rem">${p.partido}</span></div>
-          <div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${p.candidatos.length>0?p.candidatos.length+' candidatos':curules+' electos · lista cerrada'}</button></div></td>
+          <div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${p.candidatos.length>0?p.candidatos.length+' candidatos':curules>0?curules+' electos · lista cerrada':(CLOSED_LISTS[p.partido]?.length||0)+' en lista cerrada'}</button></div></td>
           <td class="r" style="font-size:1.15rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td>
           <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>
           <td class="r">${curulesCell}</td>`;
@@ -1004,7 +1008,7 @@
             const norm = s => s.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
             const nomPart = norm(p.partido);
             let curulesRestantes = curules;
-            if(p.candidatos.length===0&&curules>0){return renderListaCerrada(p.partido,curules);}
+            if(p.candidatos.length===0&&(curules>0||CLOSED_LISTS[p.partido]?.length)){return renderListaCerrada(p.partido,curules);}
             return p.candidatos.map((c,j)=>{
               const esLista = norm(c.nombre) === nomPart || norm(c.nombre).includes(nomPart.split(' ')[0]+' '+nomPart.split(' ')[1]||'__');
               let elegido = false;
@@ -1101,7 +1105,7 @@
         htmlLang:'es', pageTitle:'Escrutinio Senado 2026 · Ricardo Ruiz',
         back:'← Volver', titleLine1:'Senado de', titleSpan:'la República',
         breadcrumb1:'Resultados Electorales', breadcrumb2:'Escrutinio Senado 2026',
-        metaElec:'Elección: <b>Congreso · 16 Mar 2026</b>',
+        metaElec:'Elección: <b>Congreso · Definitivos 14 abr 2026</b>',
         metaCurules:'Curules: <b>100</b>',
         source:'Fuente: <b>Registraduría · Escrutinio</b>',
         themeDay:'☀ Modo día', themeNight:'🌙 Modo noche',
@@ -1116,7 +1120,7 @@
         htmlLang:'en', pageTitle:'Senate Scrutiny 2026 · Ricardo Ruiz',
         back:'← Back', titleLine1:'Senate of the', titleSpan:'Republic',
         breadcrumb1:'Electoral Results', breadcrumb2:'Senate Official Count 2026',
-        metaElec:'Election: <b>Congress · Mar 16, 2026</b>',
+        metaElec:'Election: <b>Congress · Official Apr 14, 2026</b>',
         metaCurules:'Seats: <b>100</b>',
         source:'Source: <b>Registraduría · Official count</b>',
         themeDay:'☀ Day mode', themeNight:'🌙 Night mode',
@@ -1131,7 +1135,7 @@
         htmlLang:'zh', pageTitle:'参议院计票 2026 · Ricardo Ruiz',
         back:'← 返回', titleLine1:'共和国', titleSpan:'参议院',
         breadcrumb1:'选举结果', breadcrumb2:'参议院官方计票 2026',
-        metaElec:'选举: <b>国会 · 2026年3月16日</b>',
+        metaElec:'选举: <b>国会 · 官方结果 2026年4月14日</b>',
         metaCurules:'席位: <b>100</b>',
         source:'来源: <b>Registraduría · 官方计票</b>',
         themeDay:'☀ 日间模式', themeNight:'🌙 夜间模式',
