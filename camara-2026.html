@@ -1115,7 +1115,12 @@
         if(_cdmVotos > 0){ _cdmCands.sort((a,b)=>(b.votos||0)-(a.votos||0)); }
       }
 
-      const partidos = resumenData.partidos.filter(p=>(vt[p.partido]||0)>0).map(p=>({...p,votos:vt[p.partido]||0,curules:curMap2[p.partido]||0}));
+      const _deduped=[]; const _seen={};
+      resumenData.partidos.forEach(p=>{
+        if(_seen[p.partido]){ _seen[p.partido].candidatos=(_seen[p.partido].candidatos||[]).concat(p.candidatos||[]); }
+        else{ _seen[p.partido]={...p}; _deduped.push(_seen[p.partido]); }
+      });
+      const partidos = _deduped.filter(p=>(vt[p.partido]||0)>0).map(p=>({...p,votos:vt[p.partido]||0,curules:curMap2[p.partido]||0}));
       if(_pactoVotos > 0){ partidos.push({partido:'PACTO HISTÓRICO NACIONAL',votos:_pactoVotos,curules:_pactoCurules,candidatos:_pactoCands}); }
       if(_cdmVotos > 0){ partidos.push({partido:'CENTRO DEMOCRÁTICO - MIRA',votos:_cdmVotos,curules:_cdmCurules,candidatos:_cdmCands}); }
       partidos.sort((a,b)=>b.votos-a.votos);
