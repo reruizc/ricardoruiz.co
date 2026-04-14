@@ -504,6 +504,28 @@
       }
       return { cur: c, cifra: Math.round(cifra), umbral: Math.round(umb) };
     }
+    // Art. 263 C.P.: 1 curul → mayoría; 2 curules → cuociente electoral umbral 30%; 3+ → D'Hondt umbral 3%
+    function asignarCurules(partidos_votos, curules) {
+      const eleg0 = Object.entries(partidos_votos).filter(([p,v])=>v>0&&!/blanco/i.test(p));
+      if(!eleg0.length) return {cur:{}, cifra:0, umbral:0, metodo:'—'};
+      if(curules === 1){
+        const win = eleg0.reduce((a,b)=>b[1]>a[1]?b:a);
+        return {cur:{[win[0]]:1}, cifra:win[1], umbral:0, metodo:'Mayoría simple · 1 curul'};
+      }
+      if(curules === 2){
+        const total = eleg0.reduce((s,[,v])=>s+v,0);
+        const cuociente = total / 2;
+        const umb30 = cuociente * 0.30;
+        const eleg = eleg0.filter(([,v])=>v>=umb30);
+        const cur = Object.fromEntries(eleg.map(([p])=>[p,0]));
+        let restantes = 2;
+        eleg.forEach(([p,v])=>{ const n=Math.floor(v/cuociente); cur[p]=n; restantes-=n; });
+        eleg.map(([p,v])=>({p,res:v-cur[p]*cuociente})).sort((a,b)=>b.res-a.res)
+            .slice(0,restantes).forEach(({p})=>cur[p]++);
+        return {cur, cifra:Math.round(cuociente), umbral:Math.round(umb30), metodo:'Cuociente electoral · umbral 30%'};
+      }
+      return {...dhondtDep(partidos_votos, curules), metodo:`D'Hondt · umbral 3%`};
+    }
 
     // ─── CACHE ────────────────────────────────────────────────
     const cache = {};
@@ -586,7 +608,7 @@
           const tipo = getDepCirc(dep);
           if(tipo === 'TERRITORIAL'){
             const nCurules = getCurulesDep(dep.nombre);
-            const { cur } = dhondtDep(dep.partidos||{}, nCurules);
+            const { cur } = asignarCurules(dep.partidos||{}, nCurules);
             Object.entries(cur).forEach(([p,v])=>{ curulesNac[p]=(curulesNac[p]||0)+v; });
           } else if(tipo === 'INDIGENAS'){
             Object.entries(dep.partidos||{}).forEach(([p,v])=>{ _votosInd[p]=(_votosInd[p]||0)+v; });
@@ -941,7 +963,7 @@
 
       // ── D'HONDT SIEMPRE AL NIVEL DEPTO-CIRC (congelado) ─────
       const depPartidosVotos = depCirc.partidos || {};
-      const { cur: curFrozen, cifra: cifraVal, umbral: umbralVal } = dhondtDep(depPartidosVotos, nCurules);
+      const { cur: curFrozen, cifra: cifraVal, umbral: umbralVal, metodo: metodoVal } = asignarCurules(depPartidosVotos, nCurules);
       curDepCurules = curFrozen;
       const totalCurules = Object.values(curFrozen).reduce((s,v)=>s+v,0);
 
@@ -965,10 +987,14 @@
         });
       }
 
-      // Mostrar cifra repartidora y umbral
+      // Mostrar cifra repartidora/cuociente y umbral según método
       document.getElementById('dep-cifras').style.display = '';
+      const _lCifra = document.querySelector('#dep-cifras .umbral-label');
+      const _lUmb   = document.querySelectorAll('#dep-cifras .umbral-label')[1];
+      if(_lCifra) _lCifra.textContent = nCurules===2 ? 'Cuociente electoral' : nCurules===1 ? 'Votos (mayoría)' : 'Cifra repartidora';
+      if(_lUmb)   _lUmb.textContent   = nCurules===2 ? 'Umbral (30% cuociente)' : nCurules===1 ? '—' : 'Umbral (3%)';
       document.getElementById('cifra-val').textContent = fmt(cifraVal);
-      document.getElementById('umbral-dep-val').textContent = fmt(umbralVal);
+      document.getElementById('umbral-dep-val').textContent = nCurules===1 ? '—' : fmt(umbralVal);
 
       // ── SLICE PARA VOTOS Y CANDIDATOS (puede ser mun/zon/pue) ─
       let slice = depCirc;
