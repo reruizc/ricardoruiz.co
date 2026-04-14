@@ -559,6 +559,7 @@
     // ─── STATE ────────────────────────────────────────────────
     let resumenData = null, donutChart = null;
     let curulesNac = {}, curulesIndigenas = {}, curulesAfro = {};
+    let nacElegidosTerritorial = {}, nacElegidosIndigenas = {}, nacElegidosAfro = {};
     let curDep = 'TODOS';
     let curDepData = null;   // dep-{cod}.json slim cargado
     let curComData = null;   // dep-{cod}/com-{mun}-{com}.json cargado
@@ -620,6 +621,21 @@
         if(Object.keys(_votosAfro).length){ const {cur}=dhondtDep(_votosAfro,CURULES_AFRO); curulesAfro=cur; }
         // Anotar curules en resumenData.partidos
         resumenData.partidos.forEach(p=>{ p.curules_nac = curulesNac[p.partido]||0; });
+        // ── Construir nacElegidos desde candidatos de departamentos.json ──
+        const _nNorm = s=>s.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+        deps.filter(d=>getDepCirc(d)==='TERRITORIAL').forEach(dep=>{
+          const {cur:_cf}=asignarCurules(dep.partidos||{},getCurulesDep(dep.nombre));
+          Object.entries(dep.candidatos||{}).forEach(([partido,cands])=>{
+            const nC=_cf[partido]||0; if(!nC) return;
+            const nomPart=_nNorm(partido); let r=nC;
+            if(!nacElegidosTerritorial[partido]) nacElegidosTerritorial[partido]=new Set();
+            for(const c of cands){ if(r<=0) break; if(_nNorm(c.nombre)===nomPart) continue; nacElegidosTerritorial[partido].add(c.nombre); r--; }
+          });
+        });
+        const _poolCands=(circ)=>{ const pool={}; deps.filter(d=>getDepCirc(d)===circ).forEach(dep=>Object.entries(dep.candidatos||{}).forEach(([partido,cands])=>{ if(!pool[partido]) pool[partido]={}; cands.forEach(c=>{pool[partido][c.nombre]=(pool[partido][c.nombre]||0)+(c.votos||0);}); })); return pool; };
+        const _buildEleg=(curFrz,pool)=>{ const map={}; Object.entries(curFrz).forEach(([partido,nC])=>{ if(!nC||!pool[partido]) return; const s=Object.entries(pool[partido]).sort((a,b)=>b[1]-a[1]); map[partido]=new Set(s.slice(0,nC).map(([n])=>n)); }); return map; };
+        nacElegidosIndigenas=_buildEleg(curulesIndigenas,_poolCands('INDIGENAS'));
+        nacElegidosAfro=_buildEleg(curulesAfro,_poolCands('AFRO-DESCENDIENTES'));
 
         const _metaVot = resumenData.votant != null
           ? resumenData.votant - (resumenData.votnul||0) - (resumenData.votnma||0)
@@ -1115,6 +1131,17 @@
         if(_cdmVotos > 0){ _cdmCands.sort((a,b)=>(b.votos||0)-(a.votos||0)); }
       }
 
+      // ── elegidosMap nacional desde datos departamentales ──
+      const _nacBase = curCorp==='INDIGENAS' ? nacElegidosIndigenas : curCorp==='AFRO-DESCENDIENTES' ? nacElegidosAfro : nacElegidosTerritorial;
+      const elegidosMapNac = Object.fromEntries(Object.entries(_nacBase).map(([k,v])=>[k,v]));
+      if(curCorp==='TERRITORIAL'){
+        const _pH=['MOVIMIENTO POLÍTICO PACTO HISTÓRICO','PACTO HISTÓRICO ANTIOQUIA','PACTO HISTÓRICO ATLÁNTICO','PACTO HISTÓRICO CÓRDOBA','PACTO HISTÓRICO BOLÍVAR','PACTO HISTÓRICO - SANTANDER','PACTO HISTÓRICO BOYACÁ','PACTO HISTÓRICO CESAR','PACTO HISTÓRICO MAGDALENA','PACTO HISTÓRICO HUILA','PACTO HISTÓRICO NORTE DE SANTANDER','PACTO HISTÓRICO QUINDÍO','PACTO HISTÓRICO GUAJIRA','PACTO HISTÓRICO CAQUETÁ','PACTO HISTÓRICO - CASANARE','PACTO HISTÓRICO CHOCÓ','PACTO HISTÓRICO SAN ANDRÉS','PACTO HISTÓRICO AMAZONAS','PACTO HISTÓRICO GUAINIA','PACTO HISTÓRICO VAUPÉS'];
+        const _pS=new Set(); _pH.forEach(pn=>{if(nacElegidosTerritorial[pn]) nacElegidosTerritorial[pn].forEach(n=>_pS.add(n));});
+        if(_pS.size) elegidosMapNac['PACTO HISTÓRICO NACIONAL']=_pS;
+        const _cS=new Set(); ['CENTRO DEMOCRÁTICO - MIRA','CENTRO DEMOCRÁTICO-MIRA','CENTRO DEMOCRATICO- MIRA'].forEach(pn=>{if(nacElegidosTerritorial[pn]) nacElegidosTerritorial[pn].forEach(n=>_cS.add(n));});
+        if(_cS.size) elegidosMapNac['CENTRO DEMOCRÁTICO - MIRA']=_cS;
+      }
+
       const _deduped=[]; const _seen={};
       resumenData.partidos.forEach(p=>{
         if(_seen[p.partido]){ _seen[p.partido].candidatos=(_seen[p.partido].candidatos||[]).concat(p.candidatos||[]); }
@@ -1126,7 +1153,7 @@
       partidos.sort((a,b)=>b.votos-a.votos);
       const votval = partidos.reduce((s,p)=>s+p.votos, 0);
       const curMap = Object.fromEntries(partidos.map(p=>[p.partido, p.curules]));
-      renderPartidosTabla(partidos, votval, curMap, 'camara', false, null, null, false, null);
+      renderPartidosTabla(partidos, votval, curMap, 'camara', false, null, null, false, elegidosMapNac);
 
       // KPI: usar curMap (partidos ya unificados: PACTO NAC, CDM-MIRA) para partido puntero correcto
       const dVotant = circTot.votant>0 ? circTot.votant : null;
@@ -1243,7 +1270,8 @@
       if(candSource){
         Object.entries(candSource).forEach(([partido,cands])=>cands.forEach((c,idx)=>{if(!norm(c.nombre).includes(qn))return;res.push({nombre:c.nombre,partido,votos:c.votos,pos:idx+1,elegido:idx<(curFrozenLocal[partido]||0)});}));
       } else {
-        (resumenData?.partidos||[]).forEach(p=>p.candidatos.forEach((c,idx)=>{if(!norm(c.nombre).includes(qn))return;res.push({nombre:c.nombre,partido:p.partido,votos:c.votos,pos:idx+1,elegido:idx<(curulesNac[p.partido]||0)});}));
+        const _sMap=curCorp==='INDIGENAS'?nacElegidosIndigenas:curCorp==='AFRO-DESCENDIENTES'?nacElegidosAfro:nacElegidosTerritorial;
+        (resumenData?.partidos||[]).forEach(p=>p.candidatos.forEach((c,idx)=>{if(!norm(c.nombre).includes(qn))return;const _es=_sMap[p.partido];res.push({nombre:c.nombre,partido:p.partido,votos:c.votos,pos:idx+1,elegido:_es?_es.has(c.nombre):false});}));
       }
       res.sort((a,b)=>b.votos-a.votos);
       const VERDE='#39ff7a';
