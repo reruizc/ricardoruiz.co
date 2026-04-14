@@ -60,7 +60,7 @@
     @keyframes spin{to{transform:rotate(360deg)}}
     .loader-label{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3)}
     .endoso-cta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;background:rgba(0,71,255,.07);border:1px solid rgba(0,71,255,.2);padding:1rem 1.5rem;margin-bottom:1.5rem;backdrop-filter:blur(4px)}
-    .endoso-cta-text{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;color:rgba(255,255,255,.5);line-height:1.6}
+    .endoso-cta-text{font-family:'Syne',sans-serif;font-weight:400;font-size:.68rem;letter-spacing:.04em;color:rgba(255,255,255,.5);line-height:1.6}
     .endoso-cta-text b{color:var(--white)}
     .endoso-btn{display:inline-flex;align-items:center;gap:.6rem;font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--white);background:var(--blue);border:none;padding:.6rem 1.4rem;cursor:pointer;text-decoration:none;transition:background .2s;white-space:nowrap;flex-shrink:0}
     .endoso-btn:hover{background:#0035cc}
@@ -461,6 +461,32 @@
     }
 
     // ─── PALETA ───────────────────────────────────────────────
+    // ─── LISTAS CERRADAS ──────────────────────────────────────
+    const CLOSED_LISTS = {
+      'CON TODA POR BOGOTÁ':['Paula Alejandra Moreno Villalobos','Antonio Perry Sáenz','Carlos Eduardo Forero Palomino'],
+      'MOTOCICLISTAS Y CONDUCTORES UNIDOS POR LA CAUSA':['Diana Jazmín Cristiano Cristiano','Jorge Andrés Morelo Martínez','David Enrique Novoa Bernal','Orlando de Jesús Parra Zuñiga','Alain Rodríguez Martínez','Gustavo Giovanny Barrera Sánchez','Solany Garzón Mendoza','Carlos Eustaquio Cañón Gutiérrez','Juan Carlos Herrera Castillo','Johanna Natali Pérez López','Julieth Natalia Onofre Núñez'],
+      'PACTO HISTÓRICO – BOGOTÁ':['María Fernanda Carrascal Rojas','Daniel Mauricio Monroy Hernández','Laura Daniela Beltrán Palomares','Heráclito Landínez Suárez','María del Mar Pizarro García','Jairo León Vargas','Claudia Teresa Romero Nader','Gabriel Becerra Yañez','Sandra Mireya Nossa Quiroga','Andrés Camilo Rodríguez Castillo','María Angélica Prada Uribe','Jhon Álvaro Forero Herrera','Segundo Celio Nieves Herrera','María Alejandra Rojas Ordoñez','Miguel Ángel Barriga Talero','Guayra Puka Arias Florian','Juan de Jesús Hernández'],
+    };
+    function renderListaCerrada(partido, curules){
+      const allNames = CLOSED_LISTS[partido] || [];
+      const _elected = (k,name) => `<tr>
+        <td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;width:2.5rem">—</td>
+        <td style="color:rgba(255,255,255,.25);width:2rem">${String(k+1).padStart(2,'0')}</td>
+        <td style="font-family:'Syne',sans-serif;font-weight:700;color:#39ff7a">${name.toUpperCase()} <span style="font-size:.6rem;margin-left:.4rem">✦</span></td>
+        <td class="r" style="font-family:'Syne',sans-serif">—</td><td class="r" style="color:rgba(255,255,255,.4)">—</td></tr>`;
+      const _plain = (k,name) => `<tr>
+        <td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;width:2.5rem">—</td>
+        <td style="color:rgba(255,255,255,.25);width:2rem">${String(k+1).padStart(2,'0')}</td>
+        <td style="font-family:'Syne',sans-serif;font-weight:400;color:rgba(255,255,255,.6)">${name.toUpperCase()}</td>
+        <td class="r" style="font-family:'Syne',sans-serif">—</td><td class="r" style="color:rgba(255,255,255,.4)">—</td></tr>`;
+      const _footer = `<tr><td colspan="5" style="font-family:'DM Mono',monospace;font-size:.58rem;color:rgba(255,255,255,.25);padding:.5rem .5rem .3rem;border:none">Lista cerrada · en orden de asignación</td></tr>`;
+      if(allNames.length === 0){
+        if(curules === 0) return '';
+        return Array.from({length:curules},(_,k)=>_elected(k,`Posición ${k+1}`)).join('') + _footer;
+      }
+      return allNames.map((n,k)=>k<curules?_elected(k,n):_plain(k,n)).join('') + _footer;
+    }
+
     const CP = {'Pacto Histórico':'#6B2D8B','Centro Democrático':'#0088BB','Centro Democrático y MIRA':'#0088BB','Partido Liberal Colombiano':'#C8102E','Partido de la U':'#F7941D','Cambio Radical':'#E91E8C','Partido Conservador Colombiano':'#003580','Alianza Verde':'#4CAF50','Partido Alianza por Colombia (Verde)':'#4CAF50','Movimiento Salvación Nacional':'#00AEEF','MIRA':'#1A3FC4','Frente Amplio Unitario':'#F7941D','Nuevo Liberalismo':'#E53935','Comunes':'#007755'};
     function getColor(n){if(CP[n])return CP[n];if(/pacto hist/i.test(n))return'#6B2D8B';if(/centro dem/i.test(n))return'#0088BB';if(/liberal/i.test(n))return'#C8102E';if(/conservador/i.test(n))return'#003580';if(/cambio radical/i.test(n))return'#E91E8C';if(/partido de la u/i.test(n))return'#F7941D';if(/alianza (verde|por col)/i.test(n))return'#4CAF50';if(/salvaci[oó]n/i.test(n))return'#00AEEF';if(/\bMIRA\b/i.test(n))return'#1A3FC4';if(/comunes/i.test(n))return'#007755';if(/nuevo liberalismo/i.test(n))return'#E53935';return'#555';}
 
@@ -1052,8 +1078,8 @@
           if(rp?.candidatos) _pactoCands = _pactoCands.concat(rp.candidatos);
         }
         if(_pactoVotos > 0){ vt['PACTO HISTÓRICO NACIONAL'] = _pactoVotos; _pactoCands.sort((a,b)=>(b.votos||0)-(a.votos||0)); }
-        // ── CENTRO DEMOCRÁTICO-MIRA: unir las dos variantes ──
-        const _CDM = ['CENTRO DEMOCRÁTICO - MIRA','CENTRO DEMOCRÁTICO-MIRA'];
+        // ── CENTRO DEMOCRÁTICO-MIRA: unir las tres variantes ──
+        const _CDM = ['CENTRO DEMOCRÁTICO - MIRA','CENTRO DEMOCRÁTICO-MIRA','CENTRO DEMOCRATICO- MIRA'];
         for(const pn of _CDM){
           if(vt[pn]){ _cdmVotos += vt[pn]; delete vt[pn]; }
           if(curMap2[pn]) _cdmCurules += curMap2[pn];
@@ -1071,11 +1097,11 @@
       const curMap = Object.fromEntries(partidos.map(p=>[p.partido, p.curules]));
       renderPartidosTabla(partidos, votval, curMap, 'camara', false, null, null, false, null);
 
-      // KPI: pasar datos de la circ activa
+      // KPI: usar curMap (partidos ya unificados: PACTO NAC, CDM-MIRA) para partido puntero correcto
       const dVotant = circTot.votant>0 ? circTot.votant : null;
       const dValidos = dVotant!=null ? dVotant-circTot.votnul-circTot.votnma : null;
-      const curulesTotal = Object.values(curMap2).reduce((s,v)=>s+v,0);
-      renderKPI(null, dValidos, dVotant, curMap2, curulesTotal);
+      const curulesTotal = Object.values(curMap).reduce((s,v)=>s+v,0);
+      renderKPI(null, dValidos, dVotant, curMap, curulesTotal);
     }
 
     // ─── RENDER TABLA PARTIDOS ────────────────────────────────
@@ -1097,7 +1123,9 @@
         const curulesCell=curules>0?`<span class="cbadge">${curules}</span>`:pasaUmbral?`<span class="cbadge">0</span>`:`<span class="cbadge sub">—</span>`;
 
         const cands = p.candidatos || [];
-        const candCount = cands.filter(c=>{ const n=norm(c.nombre); return n!==norm(p.partido); }).length;
+        const candCount = cands.length===0 && CLOSED_LISTS[p.partido]!==undefined
+          ? CLOSED_LISTS[p.partido].length
+          : cands.filter(c=>{ const n=norm(c.nombre); return n!==norm(p.partido); }).length;
 
         const tr=document.createElement('tr');
         tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td>
@@ -1121,6 +1149,9 @@
         trC.innerHTML=`<td colspan="5" style="padding:0"><div class="cands-inner" id="cands-inner-${i}">
           <table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% partido</th></tr></thead>
           <tbody>${(()=>{
+            if(cands.length===0 && CLOSED_LISTS[p.partido]!==undefined){
+              return renderListaCerrada(p.partido, curules);
+            }
             const nomPart = norm(p.partido);
             const elegSet = elegidosMap?.[p.partido] || null; // Set<nombre> congelado al nivel depto
             let curulesRestantes = curules; // solo se usa si no hay elegSet (vista nacional)
