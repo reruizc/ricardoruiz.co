@@ -449,6 +449,14 @@
       cache[nivel] = await r.json();
       return cache[nivel];
     }
+    async function getDepJSON(nivel, depCod){
+      const key = `${depCod}/${nivel}`;
+      if(cache[key]) return cache[key];
+      const r = await fetch(`${S3}/senado/departamentos/${depCod}/${nivel}.json`);
+      if(!r.ok) throw new Error(`No se pudo cargar ${depCod}/${nivel}.json (${r.status})`);
+      cache[key] = await r.json();
+      return cache[key];
+    }
 
     let resumenData = null, donutChart = null;
     let activeCirc = 'NACIONAL';
@@ -565,12 +573,11 @@
         const d=deps.find(x=>x.cod===depCod&&(!x.circ_nom||normC(x.circ_nom)===normC(activeCirc))); if(!d) return;
         geoData=d; labelText=`Partidos · Senado · ${d.nombre}`; badgeText=d.nombre;
       } else if(nivel==='mun'){
-        const muns=await getJSON('municipios');
+        const muns=await getDepJSON('municipios',depCod);
         const d=muns.find(x=>x.dep_cod===depCod&&x.cod===munCod&&(!x.circ_nom||normC(x.circ_nom)===normC(activeCirc))); if(!d) return;
         geoData=d; labelText=`Partidos · Senado · ${d.nombre}`; badgeText=d.nombre;
       } else {
-        const pues=await getJSON('puestos');
-        const d=pues.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&(x.cod===pueCod||x.pue_cod===pueCod)&&(!x.circ_nom||normC(x.circ_nom)===normC(activeCirc))); if(!d) return;
+        const pues=await getDepJSON('puestos',depCod);        const d=pues.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&(x.cod===pueCod||x.pue_cod===pueCod)&&(!x.circ_nom||normC(x.circ_nom)===normC(activeCirc))); if(!d) return;
         geoData=d; labelText=`Partidos · Senado · ${d.nombre}`; badgeText=d.nombre;
       }
       const _pcG=geoData.por_circunscripcion;
@@ -669,7 +676,7 @@
       document.getElementById('mesa-filter-container').style.display='none';
       if(!cod){renderNacional();renderKPI();renderDonut();return;}
       await renderGeoPartidos('dep',cod,null,null);
-      const muns=await getJSON('municipios');
+      const muns=await getDepJSON('municipios',cod);
       const sel=document.getElementById('mun-select');
       sel.innerHTML='<option value="">TODOS</option>';
       const seenMun=new Set();const normCM=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -687,8 +694,7 @@
       document.getElementById('mesa-filter-container').style.display='none';
       if(!cod){await renderGeoPartidos('dep',depCod,null,null);return;}
       await renderGeoPartidos('mun',depCod,cod,null);
-      const zonas=await getJSON('comunas');
-      const sel=document.getElementById('zona-select');
+      const zonas=await getDepJSON('comunas',depCod);      const sel=document.getElementById('zona-select');
       sel.innerHTML='<option value="">TODAS</option>';
       const seenZon=new Set();const normCZ=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
       zonas.filter(z=>z.dep_cod===depCod&&z.mun_cod===cod&&(!z.circ_nom||normCZ(z.circ_nom)===normCZ(activeCirc))).sort((a,b)=>(a.nombre||'').localeCompare((b.nombre||''),'es')).forEach(z=>{if(seenZon.has(z.cod))return;seenZon.add(z.cod);const o=document.createElement('option');o.value=z.cod;o.textContent=z.nombre||`Comuna ${z.cod}`;sel.appendChild(o);});
@@ -703,8 +709,7 @@
       document.getElementById('pue-filter-container').style.display='none';
       document.getElementById('mesa-filter-container').style.display='none';
       if(!cod){await renderGeoPartidos('mun',depCod,munCod,null);return;}
-      const zonas=await getJSON('comunas');
-      const normCZ=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+      const zonas=await getDepJSON('comunas',depCod);      const normCZ=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
       const z=zonas.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&x.cod===cod&&(!x.circ_nom||normCZ(x.circ_nom)===normCZ(activeCirc)));
       if(!z)return;
       const _pcZ=z.por_circunscripcion;
@@ -781,7 +786,7 @@
       });
       document.getElementById('leg-senado').innerHTML=[['Votos válidos',zVV,'#0047FF'],['Nulos',zVN,'#cc2233'],['No marcados',zVM,'#f0a500'],['En blanco',zVB,'#555']].map(([l,v,c])=>`<div class="li"><span class="ld" style="background:${c}"></span><span>${l}</span><span class="lv">${fmt(v)}</span></div>`).join('');
       } // end else geoCirc
-      const pues=await getJSON('puestos');
+      const pues=await getDepJSON('puestos',depCod);
       const pSel=document.getElementById('pue-select');
       pSel.innerHTML='<option value="">TODOS</option>';
       const seenPue=new Set();const normCP=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -801,7 +806,7 @@
         return;
       }
       await renderGeoPartidos('pue',depCod,munCod,cod);
-      const mesas=await getJSON('mesas');
+      const mesas=await getDepJSON('mesas',depCod);
       const sel=document.getElementById('mesa-select');
       const seenM=new Set();
       sel.innerHTML='<option value="">TODAS</option>';
@@ -816,7 +821,7 @@
       const munCod=document.getElementById('mun-select').value;
       const pueCod=document.getElementById('pue-select').value;
       if(!cod){if(pueCod)await renderGeoPartidos('pue',depCod,munCod,pueCod);return;}
-      const mesas=await getJSON('mesas');
+      const mesas=await getDepJSON('mesas',depCod);
       const normCM=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
       const m=mesas.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&x.pue_cod===pueCod&&x.mesa===cod&&(!x.circ_nom||normCM(x.circ_nom)===normCM(activeCirc)));
       if(!m)return;
@@ -1012,12 +1017,12 @@
         document.getElementById('lbl-tabla').textContent='Partidos · Senado · Por departamento';
         nextFn=(d)=>`renderDrill('mun','${d.cod}','${esc(d.nombre)}',null,null)`;
       } else if(nivel==='mun'){
-        const all=await getJSON('municipios'); data=all.filter(m=>m.dep_cod===cod_dep); colLabel='Municipio';
+        const all=await getDepJSON('municipios',cod_dep); data=all; colLabel='Municipio';
         badgeEl.textContent=nom_dep; badgeEl.className='level-badge mun';
         document.getElementById('lbl-tabla').textContent=`Partidos · Senado · ${nom_dep}`;
         nextFn=(d)=>`renderDrill('pue','${cod_dep}','${esc(nom_dep)}','${d.cod}','${esc(d.nombre)}')`;
       } else {
-        const all=await getJSON('puestos'); data=all.filter(p=>p.dep_cod===cod_dep&&p.mun_cod===cod_mun); colLabel='Puesto';
+        const all=await getDepJSON('puestos',cod_dep); data=all.filter(p=>p.mun_cod===cod_mun); colLabel='Puesto';
         badgeEl.textContent=nom_mun; badgeEl.className='level-badge pues';
         document.getElementById('lbl-tabla').textContent=`Partidos · Senado · ${nom_mun}`;
         nextFn=null;
