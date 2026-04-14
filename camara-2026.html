@@ -1213,7 +1213,17 @@
             const nomPart = norm(p.partido);
             const elegSet = elegidosMap?.[p.partido] || null; // Set<nombre> congelado al nivel depto
             let curulesRestantes = curules; // solo se usa si no hay elegSet (vista nacional)
-            return cands.map((c,j)=>{
+            const _sumaVCands = cands.filter(c=>norm(c.nombre)!==nomPart).reduce((s,c)=>s+(c.votos||0),0);
+            const _vLista = p.votos - _sumaVCands;
+            const _listaRow = _vLista > 10 ? `<tr>
+              <td style="color:rgba(0,71,255,.45);font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;width:2.5rem;letter-spacing:.04em">—</td>
+              <td style="color:rgba(255,255,255,.18);width:2rem">—</td>
+              <td style="font-family:'Syne',sans-serif;font-weight:500;color:rgba(255,255,255,.38);font-size:.76rem;letter-spacing:.06em;text-transform:uppercase">Votos por el partido</td>
+              <td class="r" style="font-family:'Syne',sans-serif;color:rgba(255,255,255,.38)">${fmt(_vLista)}</td>
+              <td class="r" style="color:rgba(255,255,255,.28)">${p.votos?(_vLista/p.votos*100).toFixed(1):'0.0'}%</td>
+            </tr>` : '';
+            if(cands.length===0) return _listaRow;
+            return _listaRow + cands.map((c,j)=>{
               const esLista = norm(c.nombre)===nomPart;
               let elegido = false;
               if(!esLista){
