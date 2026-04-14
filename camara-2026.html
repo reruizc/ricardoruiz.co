@@ -351,7 +351,7 @@
           </select>
           <span class="sub-label" id="mun-label" style="display:none;margin-left:.75rem">Municipio:</span>
           <select class="dep-select" id="mun-select" onchange="switchMun(this.value)" style="display:none"></select>
-          <span class="sub-label" id="zon-label" style="display:none;margin-left:.75rem">Zona:</span>
+          <span class="sub-label" id="zon-label" style="display:none;margin-left:.75rem">Comuna:</span>
           <select class="dep-select" id="zon-select" onchange="switchZon(this.value)" style="display:none"></select>
           <span class="sub-label" id="pue-label" style="display:none;margin-left:.75rem">Puesto:</span>
           <select class="dep-select" id="pue-select" onchange="switchPue(this.value)" style="display:none"></select>
@@ -502,6 +502,12 @@
         const opt = document.createElement('option');
         opt.value = o.value; opt.textContent = o.label; el.appendChild(opt);
       });
+    }
+    function getMunAreas(mun){
+      return mun?.comunas || mun?.zonas || [];
+    }
+    function getAreaLabel(area){
+      return area?.nombre || area?.com_nom || `Comuna ${area?.cod||''}`;
     }
     function resetSelFrom(level){
       // level: 'mun','zon','pue','mesa'
@@ -730,9 +736,10 @@
       curMun = munCod; resetSelFrom('zon');
       if(munCod!=='TODOS' && curDepData?.municipios){
         const mun = curDepData.municipios.find(m=>m.cod===munCod);
-        if(mun?.zonas?.length){
-          const zons = mun.zonas.map(z=>({value: z.cod, label: `Zona ${z.cod}`}));
-          setSel('zon-select', zons, 'Todas las zonas');
+        const areas = getMunAreas(mun);
+        if(areas.length){
+          const zons = areas.map(z=>({value: z.cod, label: getAreaLabel(z)}));
+          setSel('zon-select', zons, 'Todas las comunas');
           showSel('zon-label', true); showSel('zon-select', true);
         }
       }
@@ -744,7 +751,7 @@
       curZon = zonCod; resetSelFrom('pue');
       if(zonCod!=='TODOS' && curDepData?.municipios){
         const mun = curDepData.municipios.find(m=>m.cod===curMun);
-        const zon = mun?.zonas?.find(z=>z.cod===zonCod);
+        const zon = getMunAreas(mun).find(z=>z.cod===zonCod);
         if(zon?.puestos?.length){
           const pues = [...zon.puestos].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).map(p=>({value: p.cod, label: p.nombre}));
           setSel('pue-select', pues, 'Todos los puestos');
@@ -760,8 +767,8 @@
       if(pueCod && pueCod!=='TODOS' && !localStorage.getItem('rr-token')){ showInviteToast(); }
       if(pueCod && pueCod!=='TODOS' && curDepData?.municipios){
         const mun = curDepData.municipios.find(m=>m.cod===curMun);
-        const zon = mun?.zonas?.find(z=>z.cod===curZon);
-        const pue = zon?.puestos?.find(p=>p.cod===pueCod);
+        const zon = getMunAreas(mun).find(z=>z.cod===curZon);
+        const pue = zon?.puestos?.find(p=>p.cod===pueCod || p.pue_cod===pueCod);
         if(pue?.mesas?.length){
           const mesaOpts = pue.mesas.map(m=>({value: String(m.mesa||m.cod), label: m.nombre||`Mesa ${m.mesa||m.cod}`}));
           setSel('mesa-select', mesaOpts, 'Todas las mesas');
@@ -852,11 +859,11 @@
       let mesaData = null;
       if(curDepData?.municipios){
         const mun = curDepData.municipios.find(m=>m.cod===curMun);
-        const zon = mun?.zonas?.find(z=>z.cod===curZon);
-        const pue = zon?.puestos?.find(p=>p.cod===curPue);
+        const zon = getMunAreas(mun).find(z=>z.cod===curZon);
+        const pue = zon?.puestos?.find(p=>p.cod===curPue || p.pue_cod===curPue);
         mesaData = pue?.mesas?.find(m=>String(m.mesa||m.cod)===String(curMesa));
       }
-      if(!mesaData){ getJSON('mesas').then(mesas=>{ const m=mesas.find(x=>x.dep_cod===curDep&&x.mun_cod===curMun&&x.pue_cod===curPue&&x.cod===curMesa); if(m) _renderMesaPartidos(m,`Mesa ${curMesa}`); }).catch(()=>{}); return; }
+      if(!mesaData){ getJSON('mesas').then(mesas=>{ const m=mesas.find(x=>x.dep_cod===curDep&&x.mun_cod===curMun&&x.pue_cod===curPue&&String(x.cod||x.mesa)===String(curMesa)); if(m) _renderMesaPartidos(m,`Mesa ${curMesa}`); }).catch(()=>{}); return; }
       _renderMesaPartidos(mesaData, mesaData.nombre||`Mesa ${curMesa}`);
     }
     function _renderMesaPartidos(m, label){
@@ -935,12 +942,12 @@
           const munN = mun.por_circunscripcion?.[curCorp] ?? mun;
           slice = munN; sliceFull = mun; labelExtra = `${dep.nombre} · ${mun.nombre}`;
           if(curZon!=='TODOS'){
-            const zon = mun.zonas?.find(z=>z.cod===curZon);
+            const zon = getMunAreas(mun).find(z=>z.cod===curZon);
             if(zon){
               const zonN = zon.por_circunscripcion?.[curCorp] ?? zon;
-              slice = zonN; sliceFull = zon; labelExtra += ` · Zona ${zon.cod}`;
+              slice = zonN; sliceFull = zon; labelExtra += ` · ${getAreaLabel(zon)}`;
               if(curPue!=='TODOS'){
-                const pue = zon.puestos?.find(p=>p.cod===curPue);
+                const pue = zon.puestos?.find(p=>p.cod===curPue || p.pue_cod===curPue);
                 if(pue){
                   const pueN = pue.por_circunscripcion?.[curCorp] ?? pue;
                   slice = pueN; sliceFull = pue; labelExtra += ` · ${pue.nombre}`;
@@ -1151,9 +1158,9 @@
         if(curMun!=='TODOS'){
           const mun=depBase.municipios?.find(m=>m.cod===curMun);
           if(mun){ const munN=mun.por_circunscripcion?.[curCorp]??mun; slice=munN;
-            if(curZon!=='TODOS'){ const zon=mun.zonas?.find(z=>z.cod===curZon);
+            if(curZon!=='TODOS'){ const zon=getMunAreas(mun).find(z=>z.cod===curZon);
               if(zon){ const zonN=zon.por_circunscripcion?.[curCorp]??zon; slice=zonN;
-                if(curPue!=='TODOS'){ const pue=zon.puestos?.find(p=>p.cod===curPue);
+                if(curPue!=='TODOS'){ const pue=zon.puestos?.find(p=>p.cod===curPue || p.pue_cod===curPue);
                   if(pue){ slice=pue.por_circunscripcion?.[curCorp]??pue; }}}}}
         }
         if(slice.candidatos){ candSource=slice.candidatos; curFrozenLocal=curDepCurules||{}; }
