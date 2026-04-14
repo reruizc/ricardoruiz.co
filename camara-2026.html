@@ -134,7 +134,8 @@
     .ld{width:10px;height:10px;border-radius:50%;flex-shrink:0}
     .lv{margin-left:auto;color:var(--white);font-weight:700;font-family:'Syne',sans-serif}
     .umbral-bar{margin-top:1rem;padding-top:.8rem;border-top:1px solid var(--border)}
-    .umbral-label{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:.4rem}
+    .umbral-label{font-family:'Syne',sans-serif;font-weight:400;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:.4rem}
+    body.day-mode .umbral-label{color:rgba(0,0,0,.5)}
     .umbral-val{font-family:'DM Mono',monospace;font-size:.72rem;color:var(--blue)}
     .back-bar{flex-shrink:0;padding:.6rem 2.5rem 1rem;display:flex;align-items:center;gap:1rem}
     .back-btn{display:inline-flex;align-items:center;gap:.5rem;font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--white);text-decoration:none;cursor:pointer;background:rgba(0,71,255,.25);border:1px solid rgba(0,71,255,.5);padding:.3rem .9rem;transition:background .2s}
@@ -443,13 +444,18 @@
       'VALLE DEL CAUCA':13,'VAUPÉS':2,'VICHADA':2
     };
 
-    // Busca curules por nombre de depto (normalizado)
+    const CURULES_TERRITORIAL = Object.values(CURULES_DEP).reduce((s,v)=>s+v,0); // 162
+
+    // Busca curules por nombre de depto (exact first, luego substring)
     function getCurulesDep(nombre) {
       const n = (nombre||'').toUpperCase().trim()
         .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
       for (const [k,v] of Object.entries(CURULES_DEP)) {
+        if(k.normalize('NFD').replace(/[\u0300-\u036f]/g,'') === n) return v;
+      }
+      for (const [k,v] of Object.entries(CURULES_DEP)) {
         const kn = k.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-        if (kn === n || n.includes(kn) || kn.includes(n)) return v;
+        if(n.includes(kn) || kn.includes(n)) return v;
       }
       return 2; // mínimo por defecto
     }
@@ -483,12 +489,31 @@
       cache[nivel] = await r.json();
       return cache[nivel];
     }
+    async function getComJSON(depCod, munCod, comCod){
+      const key = `${depCod}/com/${munCod}-${comCod}`;
+      if(cache[key]) return cache[key];
+      const r = await fetch(`${S3}/camara/dep-${depCod}/com-${munCod}-${comCod}.json`);
+      if(!r.ok) throw new Error(`No se pudo cargar dep-${depCod}/com-${munCod}-${comCod}.json (${r.status})`);
+      cache[key] = await r.json();
+      return cache[key];
+    }
+    let _toastTimer=null;
+    function showLoadingToast(){
+      let el=document.getElementById('_loading-toast');
+      if(!el){el=document.createElement('div');el.id='_loading-toast';
+        el.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,71,255,.92);color:#fff;font-family:\'Syne\',sans-serif;font-size:1.23rem;padding:.85rem 2.1rem;border-radius:3px;z-index:9999;pointer-events:none;transition:opacity .3s;white-space:nowrap;letter-spacing:.02em';
+        el.textContent='Un momento, cargando\u2026';document.body.appendChild(el);}
+      el.style.opacity='1';
+      clearTimeout(_toastTimer);
+      _toastTimer=setTimeout(()=>{el.style.opacity='0';},3000);
+    }
 
     // ─── STATE ────────────────────────────────────────────────
     let resumenData = null, donutChart = null;
     let curulesNac = {}, curulesIndigenas = {}, curulesAfro = {};
     let curDep = 'TODOS';
-    let curDepData = null;   // dep-{cod}.json cargado
+    let curDepData = null;   // dep-{cod}.json slim cargado
+    let curComData = null;   // dep-{cod}/com-{mun}-{com}.json cargado
     let curMun = 'TODOS', curZon = 'TODOS', curPue = 'TODOS', curMesa = 'TODOS';
     let curCorp = 'TERRITORIAL';
     let curDepCurules = {}; // D'Hondt congelado al nivel depto
@@ -667,7 +692,7 @@
       if(curCorp === 'INDIGENAS') return CURULES_INDIGENAS;
       if(curCorp === 'AFRO-DESCENDIENTES') return CURULES_AFRO;
       if(depNom) return getCurulesDep(depNom);
-      return CURULES_TOTAL;
+      return CURULES_TERRITORIAL; // 162 territoriales
     }
 
     function onCircChange(val){
@@ -695,7 +720,7 @@
         if(!curDepData) try { curDepData = await getJSON('dep-'+curDep); } catch(e){}
         renderDepView(dep);
       } else {
-        sel.value='TODOS'; curDep='TODOS'; curDepData=null;
+        sel.value='TODOS'; curDep='TODOS'; curDepData=null; curComData=null;
         renderNacional();
       }
     }
@@ -704,10 +729,12 @@
     async function switchDep(depCod){
       curDep = depCod;
       resetSelFrom('mun');
+      curComData = null;
       document.getElementById('cam-search').value='';
       buscarCandidato('');
       if(depCod==='TODOS'){ curDepData=null; renderNacional(); return; }
 
+      showLoadingToast();
       if(!sessionStorage.getItem('rr-dep-loaded')){
         sessionStorage.setItem('rr-dep-loaded','1');
         showDepLoadingToast();
@@ -733,7 +760,8 @@
 
     // ─── SWITCH MUNICIPIO ─────────────────────────────────────
     async function switchMun(munCod){
-      curMun = munCod; resetSelFrom('zon');
+      curMun = munCod; resetSelFrom('zon'); curComData = null;
+      showLoadingToast();
       if(munCod!=='TODOS' && curDepData?.municipios){
         const mun = curDepData.municipios.find(m=>m.cod===munCod);
         const areas = getMunAreas(mun);
@@ -747,43 +775,30 @@
     }
 
     // ─── SWITCH ZONA ──────────────────────────────────────────
-    function switchZon(zonCod){
-      curZon = zonCod; resetSelFrom('pue');
-      if(zonCod!=='TODOS' && curDepData?.municipios){
-        const mun = curDepData.municipios.find(m=>m.cod===curMun);
-        const zon = getMunAreas(mun).find(z=>z.cod===zonCod);
-        if(zon?.puestos?.length){
-          const pues = [...zon.puestos].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).map(p=>({value: p.cod, label: p.nombre}));
-          setSel('pue-select', pues, 'Todos los puestos');
-          showSel('pue-label', true); showSel('pue-select', true);
-        }
+    async function switchZon(zonCod){
+      curZon = zonCod; resetSelFrom('pue'); curComData = null;
+      if(zonCod!=='TODOS'){
+        showLoadingToast();
+        try {
+          curComData = await getComJSON(curDep, curMun, zonCod);
+          const pues = [...(curComData.puestos||[])].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'))
+                       .map(p=>({value: p.cod||p.pue_cod, label: p.nombre}));
+          if(pues.length){ setSel('pue-select', pues, 'Todos los puestos'); showSel('pue-label',true); showSel('pue-select',true); }
+        } catch(e){ console.warn('No se pudo cargar com JSON:', e); }
       }
       _reRenderDep();
     }
 
     // ─── SWITCH PUESTO ────────────────────────────────────────
-    async function switchPue(pueCod){
+    function switchPue(pueCod){
       curPue = pueCod; resetSelFrom('mesa');
       if(pueCod && pueCod!=='TODOS' && !localStorage.getItem('rr-token')){ showInviteToast(); }
-      if(pueCod && pueCod!=='TODOS' && curDepData?.municipios){
-        const mun = curDepData.municipios.find(m=>m.cod===curMun);
-        const zon = getMunAreas(mun).find(z=>z.cod===curZon);
-        const pue = zon?.puestos?.find(p=>p.cod===pueCod || p.pue_cod===pueCod);
+      if(pueCod && pueCod!=='TODOS' && curComData){
+        const pue = (curComData.puestos||[]).find(p=>p.cod===pueCod || p.pue_cod===pueCod);
         if(pue?.mesas?.length){
           const mesaOpts = pue.mesas.map(m=>({value: String(m.mesa||m.cod), label: m.nombre||`Mesa ${m.mesa||m.cod}`}));
           setSel('mesa-select', mesaOpts, 'Todas las mesas');
           showSel('mesa-label', true); showSel('mesa-select', true);
-        } else {
-          // fallback: try flat mesas.json
-          try {
-            const mesas = await getJSON('mesas');
-            const filtMesas = mesas.filter(m=>m.dep_cod===curDep&&m.mun_cod===curMun&&m.pue_cod===pueCod);
-            if(filtMesas.length){
-              const mesaOpts = filtMesas.sort((a,b)=>+a.cod-(+b.cod)).map(m=>({value: m.cod, label: m.nombre||`Mesa ${m.cod}`}));
-              setSel('mesa-select', mesaOpts, 'Todas las mesas');
-              showSel('mesa-label', true); showSel('mesa-select', true);
-            }
-          } catch(e){}
         }
       }
       _reRenderDep();
@@ -857,13 +872,11 @@
 
     function renderMesaView(){
       let mesaData = null;
-      if(curDepData?.municipios){
-        const mun = curDepData.municipios.find(m=>m.cod===curMun);
-        const zon = getMunAreas(mun).find(z=>z.cod===curZon);
-        const pue = zon?.puestos?.find(p=>p.cod===curPue || p.pue_cod===curPue);
+      if(curComData){
+        const pue = (curComData.puestos||[]).find(p=>p.cod===curPue || p.pue_cod===curPue);
         mesaData = pue?.mesas?.find(m=>String(m.mesa||m.cod)===String(curMesa));
       }
-      if(!mesaData){ getJSON('mesas').then(mesas=>{ const m=mesas.find(x=>x.dep_cod===curDep&&x.mun_cod===curMun&&x.pue_cod===curPue&&String(x.cod||x.mesa)===String(curMesa)); if(m) _renderMesaPartidos(m,`Mesa ${curMesa}`); }).catch(()=>{}); return; }
+      if(!mesaData) return;
       _renderMesaPartidos(mesaData, mesaData.nombre||`Mesa ${curMesa}`);
     }
     function _renderMesaPartidos(m, label){
@@ -941,17 +954,16 @@
         if(mun){
           const munN = mun.por_circunscripcion?.[curCorp] ?? mun;
           slice = munN; sliceFull = mun; labelExtra = `${dep.nombre} · ${mun.nombre}`;
-          if(curZon!=='TODOS'){
-            const zon = getMunAreas(mun).find(z=>z.cod===curZon);
-            if(zon){
-              const zonN = zon.por_circunscripcion?.[curCorp] ?? zon;
-              slice = zonN; sliceFull = zon; labelExtra += ` · ${getAreaLabel(zon)}`;
-              if(curPue!=='TODOS'){
-                const pue = zon.puestos?.find(p=>p.cod===curPue || p.pue_cod===curPue);
-                if(pue){
-                  const pueN = pue.por_circunscripcion?.[curCorp] ?? pue;
-                  slice = pueN; sliceFull = pue; labelExtra += ` · ${pue.nombre}`;
-                }
+          if(curZon!=='TODOS' && curComData){
+            // curComData es el objeto com/zon completo con candidatos+puestos+mesas
+            const zon = curComData;
+            const zonN = zon.por_circunscripcion?.[curCorp] ?? zon;
+            slice = zonN; sliceFull = zon; labelExtra += ` · ${getAreaLabel(zon)}`;
+            if(curPue!=='TODOS'){
+              const pue = (curComData.puestos||[]).find(p=>p.cod===curPue || p.pue_cod===curPue);
+              if(pue){
+                const pueN = pue.por_circunscripcion?.[curCorp] ?? pue;
+                slice = pueN; sliceFull = pue; labelExtra += ` · ${pue.nombre}`;
               }
             }
           }
@@ -1217,7 +1229,7 @@
         htmlLang:'es', pageTitle:'Escrutinio Cámara 2026 · Ricardo Ruiz',
         back:'← Volver', titleLine1:'Cámara de', titleSpan:'Representantes',
         breadcrumb1:'Resultados Electorales', breadcrumb2:'Escrutinio Cámara 2026',
-        metaElec:'Elección: <b>Congreso · 16 Mar 2026</b>',
+        metaElec:'Elección: <b>Congreso · Definitivos 14 abr 2026</b>',
         metaCurules:'Curules: <b>166</b>',
         source:'Fuente: <b>Registraduría · Escrutinio</b>',
         themeDay:'☀ Modo día', themeNight:'🌙 Modo noche',
@@ -1232,7 +1244,7 @@
         htmlLang:'en', pageTitle:'House of Representatives 2026 · Ricardo Ruiz',
         back:'← Back', titleLine1:'House of', titleSpan:'Representatives',
         breadcrumb1:'Electoral Results', breadcrumb2:'House Official Count 2026',
-        metaElec:'Election: <b>Congress · Mar 16, 2026</b>',
+        metaElec:'Election: <b>Congress · Official Apr 14, 2026</b>',
         metaCurules:'Seats: <b>166</b>',
         source:'Source: <b>Registraduría · Official count</b>',
         themeDay:'☀ Day mode', themeNight:'🌙 Night mode',
@@ -1247,7 +1259,7 @@
         htmlLang:'zh', pageTitle:'众议院计票 2026 · Ricardo Ruiz',
         back:'← 返回', titleLine1:'众议院', titleSpan:'代表',
         breadcrumb1:'选举结果', breadcrumb2:'众议院官方计票 2026',
-        metaElec:'选举: <b>国会 · 2026年3月16日</b>',
+        metaElec:'选举: <b>国会 · 官方结果 2026年4月14日</b>',
         metaCurules:'席位: <b>166</b>',
         source:'来源: <b>Registraduría · 官方计票</b>',
         themeDay:'☀ 日间模式', themeNight:'🌙 夜间模式',
