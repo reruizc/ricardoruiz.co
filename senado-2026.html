@@ -503,30 +503,13 @@
     let senaMap = null, senaGeoLayer = null;
     let senaDepWinner = {}; // normCode → {partido, votos, nombre}
     const DEPTO_GEOJSON = `${S3}/mapas-2026/DEPARTAMENTOS2.json`;
-    // ISO 3166-2:CO → código electoral Registraduría (fallback cuando electoral_id falta)
-    const _ISO2REG = {
-      'CO-AMA':'1','CO-ANT':'2','CO-ARA':'3','CO-ATL':'4','CO-BOL':'5',
-      'CO-BOY':'6','CO-CAL':'7','CO-CAQ':'8','CO-CAS':'9','CO-CAU':'10',
-      'CO-CES':'11','CO-CHO':'12','CO-COR':'13','CO-CUN':'14','CO-GUA':'15',
-      'CO-DC':'16','CO-GUV':'17','CO-HUI':'18','CO-LAG':'19','CO-MAG':'20',
-      'CO-MET':'21','CO-NAR':'22','CO-NSA':'23','CO-PUT':'24','CO-QUI':'25',
-      'CO-RIS':'26','CO-SAP':'27','CO-SUC':'28','CO-TOL':'29','CO-VAC':'30',
-      'CO-VAU':'31','CO-VID':'32'
-    };
     function _normC(c){ return String(Number(c)); }
     function _normNom(s){ return s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim(); }
-    let _senaNomMap = {}; // nombre normalizado → code
+    let _senaNomMap = {}; // nombre normalizado → depCode
     function _senaDepCode(props){
       if(props.electoral_id!=null&&props.electoral_id!=='') return _normC(props.electoral_id);
-      if(props.id){
-        if(_ISO2REG[props.id]) return _ISO2REG[props.id];
-        // simplemaps: "CONAR" → "CO-NAR"
-        const iso = props.id.replace(/^CO([A-Z])/,'CO-$1');
-        if(_ISO2REG[iso]) return _ISO2REG[iso];
-      }
       const nom = props.name||props.NOMBRE||props.nombre||'';
-      if(nom && _senaNomMap[_normNom(nom)]) return _senaNomMap[_normNom(nom)];
-      return null;
+      return nom ? (_senaNomMap[_normNom(nom)]||null) : null;
     }
     function buildSenaDepWinner(deps){
       senaDepWinner = {}; _senaNomMap = {};
@@ -590,6 +573,29 @@
           try{ senaMap.fitBounds(senaGeoLayer.getBounds(),{padding:[6,6]}); }catch(_){}
         }catch(e){ console.warn('[SenaMap]',e); }
       });
+    }
+    function updateSenaMap(depCod){
+      if(!senaMap||!senaGeoLayer) return;
+      if(!depCod){
+        senaGeoLayer.resetStyle();
+        try{ senaMap.fitBounds(senaGeoLayer.getBounds(),{padding:[6,6]}); }catch(_){}
+        return;
+      }
+      const code = _normC(depCod);
+      const winner = senaDepWinner[code];
+      if(!winner) return;
+      const targetNom = _normNom(winner.nombre);
+      let found = null;
+      senaGeoLayer.eachLayer(layer=>{
+        const p = layer.feature.properties;
+        const n = p.name||p.NOMBRE||p.nombre||'';
+        if(_normNom(n)===targetNom) found=layer;
+      });
+      if(found){
+        senaGeoLayer.resetStyle();
+        found.setStyle({weight:2.5,color:'#fff',fillOpacity:0.95});
+        try{ senaMap.fitBounds(found.getBounds(),{padding:[18,18]}); }catch(_){}
+      }
     }
     let circData = null; // circunscripciones.json
     // Cache de electos nacionales: se recalcula solo cuando cambia la circunscripción
@@ -807,7 +813,8 @@
       document.getElementById('zona-filter-container').style.display='none';
       document.getElementById('pue-filter-container').style.display='none';
       document.getElementById('mesa-filter-container').style.display='none';
-      if(!cod){renderNacional();renderKPI();renderDonut();return;}
+      if(!cod){renderNacional();renderKPI();renderDonut();updateSenaMap('');return;}
+      updateSenaMap(cod);
       await renderGeoPartidos('dep',cod,null,null);
       const muns=await getDepJSON('municipios',cod);
       const sel=document.getElementById('mun-select');
