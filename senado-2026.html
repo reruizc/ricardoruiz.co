@@ -522,17 +522,20 @@
     function buildSenaDepWinner(deps){
       senaDepWinner = {};
       const SPEC = new Set(['996','997','998']);
+      console.log('[SenaMap] deps[0] keys:', Object.keys(deps[0]||{}));
+      console.log('[SenaMap] deps[0] sample:', JSON.stringify(deps[0]).slice(0,300));
       deps.forEach(dep=>{
-        // Solo circunscripción NACIONAL (ignorar INDIGENAS y otras)
         if(dep.circ_nom && !/nacional/i.test(dep.circ_nom)) return;
         const code = _normC(dep.cod);
-        if(senaDepWinner[code]) return; // ya procesado
+        if(senaDepWinner[code]) return;
         const circ = dep.por_circunscripcion?.['NACIONAL'] ?? dep;
         const pts = Object.entries(circ.partidos||{})
           .filter(([k])=>!SPEC.has(k)&&!/blanco/i.test(k))
           .sort((a,b)=>b[1]-a[1]);
         if(pts.length) senaDepWinner[code]={partido:pts[0][0],votos:pts[0][1],nombre:dep.nombre};
       });
+      console.log('[SenaMap] senaDepWinner keys:', Object.keys(senaDepWinner));
+      console.log('[SenaMap] senaDepWinner sample:', JSON.stringify(Object.entries(senaDepWinner).slice(0,3)));
     }
     function initSenaMap(){
       if(senaMap) return;
@@ -548,9 +551,11 @@
           const r = await fetch(DEPTO_GEOJSON);
           if(!r.ok) return;
           const geo = await r.json();
+          console.log('[SenaMap] GeoJSON feat[0] props:', JSON.stringify(geo.features[0].properties).slice(0,200));
           senaGeoLayer = L.geoJSON(geo,{
             style: feat=>{
               const code = _senaDepCode(feat.properties);
+              if(!senaDepWinner[code]) console.log('[SenaMap] sin match: code='+code, feat.properties.electoral_id, feat.properties.id);
               const w = code ? senaDepWinner[code] : null;
               const col = w ? getColor(w.partido) : '#333';
               return {fillColor:col,fillOpacity:w?0.78:0.35,color:'rgba(255,255,255,0.35)',weight:1};
