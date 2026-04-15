@@ -462,13 +462,18 @@
 
     // ─── PALETA ───────────────────────────────────────────────
     // ─── LISTAS CERRADAS ──────────────────────────────────────
+    // Listas cerradas indexadas por dep cod → partido
+    // Solo aplica para el departamento indicado, nunca de forma global
     const CLOSED_LISTS = {
-      'LA LISTA DE OVIEDO - CON TODA POR BOGOTÁ':['Paula Alejandra Moreno Villalobos','Antonio Perry Sáenz','Carlos Eduardo Forero Palomino'],
-      'MOTOCICLISTAS Y CONDUCTORES UNIDOS POR LA CAUSA':['Diana Jazmín Cristiano Cristiano','Jorge Andrés Morelo Martínez','David Enrique Novoa Bernal','Orlando de Jesús Parra Zuñiga','Alain Rodríguez Martínez','Gustavo Giovanny Barrera Sánchez','Solany Garzón Mendoza','Carlos Eustaquio Cañón Gutiérrez','Juan Carlos Herrera Castillo','Johanna Natali Pérez López','Julieth Natalia Onofre Núñez'],
-      'MOVIMIENTO POLÍTICO PACTO HISTÓRICO':['María Fernanda Carrascal Rojas','Daniel Mauricio Monroy Hernández','Laura Daniela Beltrán Palomares','Heráclito Landínez Suárez','María del Mar Pizarro García','Jairo León Vargas','Claudia Teresa Romero Nader','Gabriel Becerra Yañez','Sandra Mireya Nossa Quiroga','Andrés Camilo Rodríguez Castillo','María Angélica Prada Uribe','Jhon Álvaro Forero Herrera','Segundo Celio Nieves Herrera','María Alejandra Rojas Ordoñez','Miguel Ángel Barriga Talero','Guayra Puka Arias Florian','Juan de Jesús Hernández'],
+      '16': { // Bogotá D.C.
+        'LA LISTA DE OVIEDO - CON TODA POR BOGOTÁ':['Paula Alejandra Moreno Villalobos','Antonio Perry Sáenz','Carlos Eduardo Forero Palomino'],
+        'MOTOCICLISTAS Y CONDUCTORES UNIDOS POR LA CAUSA':['Diana Jazmín Cristiano Cristiano','Jorge Andrés Morelo Martínez','David Enrique Novoa Bernal','Orlando de Jesús Parra Zuñiga','Alain Rodríguez Martínez','Gustavo Giovanny Barrera Sánchez','Solany Garzón Mendoza','Carlos Eustaquio Cañón Gutiérrez','Juan Carlos Herrera Castillo','Johanna Natali Pérez López','Julieth Natalia Onofre Núñez'],
+        'MOVIMIENTO POLÍTICO PACTO HISTÓRICO':['María Fernanda Carrascal Rojas','Daniel Mauricio Monroy Hernández','Laura Daniela Beltrán Palomares','Heráclito Landínez Suárez','María del Mar Pizarro García','Jairo León Vargas','Claudia Teresa Romero Nader','Gabriel Becerra Yañez','Sandra Mireya Nossa Quiroga','Andrés Camilo Rodríguez Castillo','María Angélica Prada Uribe','Jhon Álvaro Forero Herrera','Segundo Celio Nieves Herrera','María Alejandra Rojas Ordoñez','Miguel Ángel Barriga Talero','Guayra Puka Arias Florian','Juan de Jesús Hernández'],
+      },
     };
-    function renderListaCerrada(partido, curules){
-      const allNames = CLOSED_LISTS[partido] || [];
+    function getClosedList(depCod, partido){ return (CLOSED_LISTS[depCod]||{})[partido]; }
+    function renderListaCerrada(names, curules){
+      const allNames = names || [];
       const _elected = (k,name) => `<tr>
         <td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;width:2.5rem">—</td>
         <td style="color:rgba(255,255,255,.25);width:2rem">${String(k+1).padStart(2,'0')}</td>
@@ -1181,8 +1186,9 @@
         const curulesCell=curules>0?`<span class="cbadge">${curules}</span>`:pasaUmbral?`<span class="cbadge">0</span>`:`<span class="cbadge sub">—</span>`;
 
         const cands = p.candidatos || [];
-        const candCount = cands.length===0 && CLOSED_LISTS[p.partido]!==undefined
-          ? CLOSED_LISTS[p.partido].length
+        const _closedNames = cands.length===0 ? getClosedList(depCod, p.partido) : undefined;
+        const candCount = _closedNames
+          ? _closedNames.length
           : cands.filter(c=>{ const n=norm(c.nombre); return n!==norm(p.partido); }).length;
 
         const tr=document.createElement('tr');
@@ -1207,8 +1213,9 @@
         trC.innerHTML=`<td colspan="5" style="padding:0"><div class="cands-inner" id="cands-inner-${i}">
           <table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% partido</th></tr></thead>
           <tbody>${(()=>{
-            if(cands.length===0 && CLOSED_LISTS[p.partido]!==undefined){
-              return renderListaCerrada(p.partido, curules);
+            const _cl = cands.length===0 ? getClosedList(depCod, p.partido) : undefined;
+            if(_cl !== undefined){
+              return renderListaCerrada(_cl, curules);
             }
             const nomPart = norm(p.partido);
             const elegSet = elegidosMap?.[p.partido] || null; // Set<nombre> congelado al nivel depto
