@@ -500,12 +500,16 @@
     let resumenData = null, donutChart = null;
     let activeCirc = 'NACIONAL';
     // ─── MAPA SENADO ──────────────────────────────────────────
-    let senaMap = null, senaGeoLayer = null;
-    let senaDepWinner = {}; // normCode → {partido, votos, nombre}
-    const DEPTO_GEOJSON = `${S3}/mapas-2026/DEPARTAMENTOS2.json`;
+    let senaMap = null, senaGeoLayer = null, senaDepLayer = null;
+    let senaDepWinner = {}; // depCode → {partido, votos, nombre}
+    let _senaMunWinner = {}; // munCode → {partido, votos, nombre}
+    const DEPTO_GEOJSON   = `${S3}/mapas-2026/DEPARTAMENTOS2.json`;
+    const DEPTOS_MPS_URL  = `${S3}/mapas-2026/Departamentos-mps/`;
+    const BOGOTA_LOC_URL  = `${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`;
+    let _senaDepGeoCache  = {};
     function _normC(c){ return String(Number(c)); }
     function _normNom(s){ return s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim(); }
-    let _senaNomMap = {}; // nombre normalizado → depCode
+    let _senaNomMap = {}; // dep nombre normalizado → depCode
     function _senaDepCode(props){
       if(props.electoral_id!=null&&props.electoral_id!=='') return _normC(props.electoral_id);
       const nom = props.name||props.NOMBRE||props.nombre||'';
@@ -525,6 +529,23 @@
           .sort((a,b)=>b[1]-a[1]);
         if(pts.length) senaDepWinner[code]={partido:pts[0][0],votos:pts[0][1],nombre:dep.nombre};
       });
+      // Aliases para nombres truncados o variantes conocidas
+      Object.keys(_senaNomMap).forEach(k=>{
+        const v=_senaNomMap[k];
+        if(k.includes('NORTE')&&k.includes('SAN')){ _senaNomMap['NORTE DE SANTANDER']=_senaNomMap['NORTE DE SANTANDER']||v; }
+        if(k.includes('VALLE')){ _senaNomMap['VALLE DEL CAUCA']=_senaNomMap['VALLE DEL CAUCA']||v; _senaNomMap['VALLE']=_senaNomMap['VALLE']||v; }
+        if(k.includes('SAN ANDRES')||k.includes('ARCHIPIELAGO')){ _senaNomMap['SAN ANDRES Y PROVIDENCIA']=_senaNomMap['SAN ANDRES Y PROVIDENCIA']||v; _senaNomMap['SAN ANDRES']=_senaNomMap['SAN ANDRES']||v; }
+        if(k.includes('BOGOTA')||k.includes('DISTRITO CAPITAL')){ _senaNomMap['BOGOTA D.C.']=_senaNomMap['BOGOTA D.C.']||v; _senaNomMap['BOGOTA']=_senaNomMap['BOGOTA']||v; }
+      });
+    }
+    function _senaMunStyle(feat){
+      const p=feat.properties;
+      let w=null;
+      if(p.mun_elec!=null) w=_senaMunWinner[_normC(p.mun_elec)];
+      if(!w&&p.LocCodigo!=null) w=Object.values(_senaMunWinner)[0]||null;
+      if(!w){ const n=p.mpio_cnmbr||p.NOMBRE||p.nombre||p.name||''; if(n) w=_senaMunWinner[Object.keys(_senaMunWinner).find(k=>_normNom((_senaMunWinner[k]||{}).nombre||'')===_normNom(n))]; }
+      const col=w?getColor(w.partido):'#444';
+      return {fillColor:col,fillOpacity:w?0.76:0.35,color:'rgba(255,255,255,0.4)',weight:0.8,_w:w};
     }
     function initSenaMap(){
       if(senaMap) return;
@@ -542,15 +563,14 @@
           const geo = await r.json();
           senaGeoLayer = L.geoJSON(geo,{
             style: feat=>{
-              const code = _senaDepCode(feat.properties);
-              const w = code ? senaDepWinner[code] : null;
-              const col = w ? getColor(w.partido) : '#333';
-              return {fillColor:col,fillOpacity:w?0.78:0.35,color:'rgba(255,255,255,0.35)',weight:1};
+              const code=_senaDepCode(feat.properties);
+              const w=code?senaDepWinner[code]:null;
+              return {fillColor:w?getColor(w.partido):'#333',fillOpacity:w?0.78:0.35,color:'rgba(255,255,255,0.35)',weight:1};
             },
             onEachFeature:(feat,layer)=>{
-              const code = _senaDepCode(feat.properties);
-              const w = code ? senaDepWinner[code] : null;
-              const depNom = w ? w.nombre : (feat.properties.NOMBRE||feat.properties.nombre||'Depto');
+              const code=_senaDepCode(feat.properties);
+              const w=code?senaDepWinner[code]:null;
+              const depNom=w?w.nombre:(feat.properties.name||feat.properties.NOMBRE||feat.properties.nombre||'Depto');
               layer.on({
                 mouseover(e){
                   layer.setStyle({weight:2,color:'#fff',fillOpacity:0.95});
@@ -558,12 +578,11 @@
                     `<div style="font-family:'DM Mono',monospace;font-size:.78rem;line-height:1.7;padding:.1rem .2rem">
                       <span style="color:#0047FF;font-weight:700">${depNom.toUpperCase()}</span><br/>
                       ${w?`<span style="color:${getColor(w.partido)};font-weight:700">${w.partido}</span><br/>${fmt(w.votos)} votos`:'Sin datos'}
-                    </div>`,
-                    {sticky:true,className:'',opacity:1}
+                    </div>`,{sticky:true,className:'',opacity:1}
                   ).openTooltip(e.latlng);
                 },
                 mouseout(){
-                  const col = w?getColor(w.partido):'#333';
+                  const col=w?getColor(w.partido):'#333';
                   layer.setStyle({weight:1,color:'rgba(255,255,255,0.35)',fillColor:col,fillOpacity:w?0.78:0.35});
                   layer.closeTooltip();
                 }
@@ -574,28 +593,70 @@
         }catch(e){ console.warn('[SenaMap]',e); }
       });
     }
-    function updateSenaMap(depCod){
-      if(!senaMap||!senaGeoLayer) return;
+    async function updateSenaMap(depCod){
+      if(!senaMap) return;
+      // Limpiar capa de depto anterior
+      if(senaDepLayer){ senaMap.removeLayer(senaDepLayer); senaDepLayer=null; }
       if(!depCod){
-        senaGeoLayer.resetStyle();
-        try{ senaMap.fitBounds(senaGeoLayer.getBounds(),{padding:[6,6]}); }catch(_){}
+        // Vista nacional
+        if(senaGeoLayer){ if(!senaMap.hasLayer(senaGeoLayer)) senaGeoLayer.addTo(senaMap); senaGeoLayer.resetStyle(); try{senaMap.fitBounds(senaGeoLayer.getBounds(),{padding:[6,6]});}catch(_){} }
         return;
       }
-      const code = _normC(depCod);
-      const winner = senaDepWinner[code];
-      if(!winner) return;
-      const targetNom = _normNom(winner.nombre);
-      let found = null;
-      senaGeoLayer.eachLayer(layer=>{
-        const p = layer.feature.properties;
-        const n = p.name||p.NOMBRE||p.nombre||'';
-        if(_normNom(n)===targetNom) found=layer;
-      });
-      if(found){
-        senaGeoLayer.resetStyle();
-        found.setStyle({weight:2.5,color:'#fff',fillOpacity:0.95});
-        try{ senaMap.fitBounds(found.getBounds(),{padding:[18,18]}); }catch(_){}
-      }
+      // Ocultar capa nacional mientras se carga depto
+      if(senaGeoLayer&&senaMap.hasLayer(senaGeoLayer)) senaMap.removeLayer(senaGeoLayer);
+      const code=_normC(depCod);
+      const isBogota=(code==='16');
+      // Construir ganadores por municipio
+      try{
+        const muns=await getDepJSON('municipios',depCod);
+        _senaMunWinner={};
+        const SPEC=new Set(['996','997','998']);
+        muns.forEach(m=>{
+          if(m.dep_cod!==depCod) return;
+          if(m.circ_nom&&!/nacional/i.test(m.circ_nom)) return;
+          const mc=_normC(m.cod);
+          if(_senaMunWinner[mc]) return;
+          const circ=m.por_circunscripcion?.['NACIONAL']??m;
+          const pts=Object.entries(circ.partidos||{}).filter(([k])=>!SPEC.has(k)&&!/blanco/i.test(k)).sort((a,b)=>b[1]-a[1]);
+          if(pts.length) _senaMunWinner[mc]={partido:pts[0][0],votos:pts[0][1],nombre:m.nombre};
+        });
+      }catch(e){ console.warn('[SenaMap] muns:',e); }
+      // Cargar GeoJSON del departamento
+      try{
+        let geo=_senaDepGeoCache[depCod];
+        if(!geo){
+          const paddedCode=String(depCod).padStart(2,'0');
+          const url=isBogota?BOGOTA_LOC_URL:`${DEPTOS_MPS_URL}${paddedCode}.json`;
+          const r=await fetch(url); if(!r.ok) throw new Error(`HTTP ${r.status}`);
+          geo=await r.json(); _senaDepGeoCache[depCod]=geo;
+        }
+        senaDepLayer=L.geoJSON(geo,{
+          style:_senaMunStyle,
+          onEachFeature:(feat,layer)=>{
+            const p=feat.properties;
+            let w=null;
+            if(p.mun_elec!=null) w=_senaMunWinner[_normC(p.mun_elec)];
+            if(!w&&p.LocCodigo!=null) w=Object.values(_senaMunWinner)[0]||null;
+            const munNom=p.mpio_cnmbr||p.LocNombre||p.NOMBRE||p.nombre||p.name||'?';
+            layer.on({
+              mouseover(e){
+                layer.setStyle({weight:2,color:'#fff',fillOpacity:0.95});
+                layer.bindTooltip(
+                  `<div style="font-family:'DM Mono',monospace;font-size:.78rem;line-height:1.7;padding:.1rem .2rem">
+                    <span style="color:#0047FF;font-weight:700">${munNom.toUpperCase()}</span><br/>
+                    ${w?`<span style="color:${getColor(w.partido)};font-weight:700">${w.partido}</span><br/>${fmt(w.votos)} votos`:'Sin datos'}
+                  </div>`,{sticky:true,className:'',opacity:1}
+                ).openTooltip(e.latlng);
+              },
+              mouseout(){
+                layer.setStyle(_senaMunStyle(feat));
+                layer.closeTooltip();
+              }
+            });
+          }
+        }).addTo(senaMap);
+        try{senaMap.fitBounds(senaDepLayer.getBounds(),{padding:[10,10]});}catch(_){}
+      }catch(e){ console.warn('[SenaMap] depGeo:',e); if(senaGeoLayer&&!senaMap.hasLayer(senaGeoLayer)) senaGeoLayer.addTo(senaMap); }
     }
     let circData = null; // circunscripciones.json
     // Cache de electos nacionales: se recalcula solo cuando cambia la circunscripción
@@ -814,8 +875,7 @@
       document.getElementById('pue-filter-container').style.display='none';
       document.getElementById('mesa-filter-container').style.display='none';
       if(!cod){renderNacional();renderKPI();renderDonut();updateSenaMap('');return;}
-      updateSenaMap(cod);
-      await renderGeoPartidos('dep',cod,null,null);
+      await Promise.all([updateSenaMap(cod), renderGeoPartidos('dep',cod,null,null)]);
       const muns=await getDepJSON('municipios',cod);
       const sel=document.getElementById('mun-select');
       sel.innerHTML='<option value="">TODOS</option>';
