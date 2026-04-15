@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <style>
     :root{--white:#f4f3ef;--blue:#0047FF;--green:#4ade80;--card-border:rgba(255,255,255,0.1);--border:rgba(255,255,255,0.08);--bar-bg:rgba(255,255,255,0.1);--td-hover:rgba(255,255,255,0.04)}
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -130,6 +132,14 @@
     .cands-table tbody td{padding:.35rem .5rem;vertical-align:middle;font-size:.88rem}
     .cands-table tbody td:nth-child(3){font-size:.95rem!important;font-weight:600!important}
     .cands-table tbody td.r{font-size:.85rem!important}
+    #sena-map-wrap{position:relative;width:100%;height:210px;margin-bottom:1.2rem;overflow:hidden}
+    #sena-map{position:absolute;inset:0;background:#060810}
+    .leaflet-container{background:#060810 !important}
+    .leaflet-tile-pane{display:none}
+    .leaflet-control-attribution{background:rgba(6,8,16,.75) !important;color:rgba(255,255,255,.2) !important;font-size:.4rem !important}
+    .leaflet-control-attribution a{color:rgba(0,71,255,.5) !important}
+    .leaflet-control-zoom a{background:rgba(13,15,28,.9) !important;color:var(--white) !important;border-color:rgba(255,255,255,.15) !important}
+    .leaflet-control-zoom a:hover{background:rgba(0,71,255,.3) !important}
     .donut-wrap{display:flex;flex-direction:column;align-items:center;gap:1rem}
     .donut-cw{position:relative;width:150px;height:150px}
     .donut-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
@@ -406,6 +416,7 @@
           </div>
           <div class="card">
             <div class="card-label">Distribución de votos</div>
+            <div id="sena-map-wrap"><div id="sena-map"></div></div>
             <div class="donut-wrap">
               <div class="donut-cw">
                 <canvas id="donut-senado"></canvas>
@@ -488,6 +499,85 @@
 
     let resumenData = null, donutChart = null;
     let activeCirc = 'NACIONAL';
+    // ─── MAPA SENADO ──────────────────────────────────────────
+    let senaMap = null, senaGeoLayer = null;
+    let senaDepWinner = {}; // normCode → {partido, votos, nombre}
+    const DEPTO_GEOJSON = `${S3}/mapas-2026/DEPARTAMENTOS2.json`;
+    // ISO 3166-2:CO → código electoral Registraduría (fallback cuando electoral_id falta)
+    const _ISO2REG = {
+      'CO-AMA':'1','CO-ANT':'2','CO-ARA':'3','CO-ATL':'4','CO-BOL':'5',
+      'CO-BOY':'6','CO-CAL':'7','CO-CAQ':'8','CO-CAS':'9','CO-CAU':'10',
+      'CO-CES':'11','CO-CHO':'12','CO-COR':'13','CO-CUN':'14','CO-GUA':'15',
+      'CO-DC':'16','CO-GUV':'17','CO-HUI':'18','CO-LAG':'19','CO-MAG':'20',
+      'CO-MET':'21','CO-NAR':'22','CO-NSA':'23','CO-PUT':'24','CO-QUI':'25',
+      'CO-RIS':'26','CO-SAP':'27','CO-SUC':'28','CO-TOL':'29','CO-VAC':'30',
+      'CO-VAU':'31','CO-VID':'32'
+    };
+    function _normC(c){ return String(Number(c)); }
+    function _senaDepCode(props){
+      if(props.electoral_id!=null&&props.electoral_id!=='') return _normC(props.electoral_id);
+      if(props.id&&_ISO2REG[props.id]) return _ISO2REG[props.id];
+      return null;
+    }
+    function buildSenaDepWinner(deps){
+      senaDepWinner = {};
+      const SPEC = new Set(['996','997','998']);
+      deps.forEach(dep=>{
+        const code = _normC(dep.cod);
+        const pts = Object.entries(dep.partidos||{})
+          .filter(([k])=>!SPEC.has(k)&&!/blanco/i.test(k))
+          .sort((a,b)=>b[1]-a[1]);
+        if(pts.length) senaDepWinner[code]={partido:pts[0][0],votos:pts[0][1],nombre:dep.nombre};
+      });
+    }
+    function initSenaMap(){
+      if(senaMap) return;
+      requestAnimationFrame(async ()=>{
+        senaMap = L.map('sena-map',{
+          center:[4.5,-74.0], zoom:5,
+          zoomControl:true, attributionControl:true,
+          scrollWheelZoom:false, doubleClickZoom:false, dragging:false
+        });
+        senaMap.getContainer().style.background='#060810';
+        setTimeout(()=>senaMap.invalidateSize(),200);
+        try{
+          const r = await fetch(DEPTO_GEOJSON);
+          if(!r.ok) return;
+          const geo = await r.json();
+          senaGeoLayer = L.geoJSON(geo,{
+            style: feat=>{
+              const code = _senaDepCode(feat.properties);
+              const w = code ? senaDepWinner[code] : null;
+              const col = w ? getColor(w.partido) : '#333';
+              return {fillColor:col,fillOpacity:w?0.78:0.35,color:'rgba(255,255,255,0.35)',weight:1};
+            },
+            onEachFeature:(feat,layer)=>{
+              const code = _senaDepCode(feat.properties);
+              const w = code ? senaDepWinner[code] : null;
+              const depNom = w ? w.nombre : (feat.properties.NOMBRE||feat.properties.nombre||'Depto');
+              layer.on({
+                mouseover(e){
+                  layer.setStyle({weight:2,color:'#fff',fillOpacity:0.95});
+                  layer.bindTooltip(
+                    `<div style="font-family:'DM Mono',monospace;font-size:.78rem;line-height:1.7;padding:.1rem .2rem">
+                      <span style="color:#0047FF;font-weight:700">${depNom.toUpperCase()}</span><br/>
+                      ${w?`<span style="color:${getColor(w.partido)};font-weight:700">${w.partido}</span><br/>${fmt(w.votos)} votos`:'Sin datos'}
+                    </div>`,
+                    {sticky:true,className:'',opacity:1}
+                  ).openTooltip(e.latlng);
+                },
+                mouseout(){
+                  const col = w?getColor(w.partido):'#333';
+                  layer.setStyle({weight:1,color:'rgba(255,255,255,0.35)',fillColor:col,fillOpacity:w?0.78:0.35});
+                  layer.closeTooltip();
+                }
+              });
+            }
+          }).addTo(senaMap);
+          try{ senaMap.fitBounds(senaGeoLayer.getBounds(),{padding:[6,6]}); }catch(_){}
+        }catch(e){ console.warn('[SenaMap]',e); }
+      });
+    }
     let circData = null; // circunscripciones.json
     // Cache de electos nacionales: se recalcula solo cuando cambia la circunscripción
     let _elegidosNac = null, _elegidosCircKey = '';
@@ -561,6 +651,8 @@
         const deps=await getJSON('departamentos');
         const depSel=document.getElementById('dep-select');
         const _seenDep=new Set();[...deps].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).forEach(d=>{if(_seenDep.has(d.cod))return;_seenDep.add(d.cod);const o=document.createElement('option');o.value=d.cod;o.textContent=d.nombre;depSel.appendChild(o);});
+        buildSenaDepWinner(deps);
+        initSenaMap();
       }catch(e){
         document.getElementById('load-state').innerHTML=`<div style="font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,100,100,.8);text-align:center;line-height:1.8">Error al cargar datos.<br/><span style="color:rgba(255,255,255,.3);font-size:.6rem">${e.message}</span></div>`;
       }
