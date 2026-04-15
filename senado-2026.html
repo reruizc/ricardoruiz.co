@@ -523,8 +523,12 @@
       senaDepWinner = {};
       const SPEC = new Set(['996','997','998']);
       deps.forEach(dep=>{
+        // Solo circunscripción NACIONAL (ignorar INDIGENAS y otras)
+        if(dep.circ_nom && !/nacional/i.test(dep.circ_nom)) return;
         const code = _normC(dep.cod);
-        const pts = Object.entries(dep.partidos||{})
+        if(senaDepWinner[code]) return; // ya procesado
+        const circ = dep.por_circunscripcion?.['NACIONAL'] ?? dep;
+        const pts = Object.entries(circ.partidos||{})
           .filter(([k])=>!SPEC.has(k)&&!/blanco/i.test(k))
           .sort((a,b)=>b[1]-a[1]);
         if(pts.length) senaDepWinner[code]={partido:pts[0][0],votos:pts[0][1],nombre:dep.nombre};
