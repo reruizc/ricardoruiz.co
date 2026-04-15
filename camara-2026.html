@@ -472,6 +472,14 @@
       },
     };
     function getClosedList(depCod, partido){ return (CLOSED_LISTS[depCod]||{})[partido]; }
+    // Listas cerradas para circunscripciones nacionales (AFRO, INDÍGENAS)
+    const AFRO_CLOSED_LISTS = {
+      'PARTIDO DEMÓCRATA COLOMBIANO': [
+        'WINSNER NESSIR SANDOVAL IBAÑEZ',
+        'PEDRO ADAN TORRES PEREZ',
+        'MARIA EUGENIA PEREZ BARRAZA',
+      ],
+    };
     function renderListaCerrada(names, curules){
       const allNames = names || [];
       const _elected = (k,name) => `<tr>
@@ -636,7 +644,7 @@
           }
         });
         if(Object.keys(_votosInd).length){ const {cur}=dhondtDep(_votosInd,CURULES_INDIGENAS); curulesIndigenas=cur; }
-        if(Object.keys(_votosAfro).length){ const {cur}=dhondtPuro(_votosAfro,CURULES_AFRO); curulesAfro=cur; }
+        if(Object.keys(_votosAfro).length){ const {cur}=asignarCurules(_votosAfro,CURULES_AFRO); curulesAfro=cur; }
         // Deduplicar resumenData.partidos por nombre (resumen.json tiene entradas duplicadas)
         { const _seen={}; const _dedup=[];
           resumenData.partidos.forEach(p=>{ if(_seen[p.partido]){ _seen[p.partido].candidatos=(_seen[p.partido].candidatos||[]).concat(p.candidatos||[]); } else{ _seen[p.partido]={...p}; _dedup.push(_seen[p.partido]); } });
@@ -790,7 +798,7 @@
       // Actualizar texto de método
       const _mt = document.getElementById('metodo-txt');
       if(_mt){
-        if(val === 'AFRO-DESCENDIENTES') _mt.textContent = "D'Hondt · sin umbral · circunscripción nacional (2 curules)";
+        if(val === 'AFRO-DESCENDIENTES') _mt.textContent = "Cuociente electoral · umbral 30% · circunscripción nacional (2 curules)";
         else if(val === 'INDIGENAS')      _mt.textContent = "Mayoría simple · circunscripción nacional (1 curul)";
         else                              _mt.textContent = "D'Hondt por circunscripción · umbral 3%";
       }
@@ -1219,7 +1227,8 @@
         const curulesCell=curules>0?`<span class="cbadge">${curules}</span>`:pasaUmbral?`<span class="cbadge">0</span>`:`<span class="cbadge sub">—</span>`;
 
         const cands = p.candidatos || [];
-        const _closedNames = cands.length===0 ? getClosedList(depCod, p.partido) : undefined;
+        const _afroCL = (curCorp === 'AFRO-DESCENDIENTES' && !depCod) ? AFRO_CLOSED_LISTS[p.partido] : undefined;
+        const _closedNames = _afroCL !== undefined ? _afroCL : (cands.length===0 ? getClosedList(depCod, p.partido) : undefined);
         const candCount = _closedNames
           ? _closedNames.length
           : cands.filter(c=>{ const n=norm(c.nombre); return n!==norm(p.partido); }).length;
@@ -1246,7 +1255,8 @@
         trC.innerHTML=`<td colspan="5" style="padding:0"><div class="cands-inner" id="cands-inner-${i}">
           <table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% partido</th></tr></thead>
           <tbody>${(()=>{
-            const _cl = cands.length===0 ? getClosedList(depCod, p.partido) : undefined;
+            const _clAfro = (curCorp === 'AFRO-DESCENDIENTES' && !depCod) ? AFRO_CLOSED_LISTS[p.partido] : undefined;
+            const _cl = _clAfro !== undefined ? _clAfro : (cands.length===0 ? getClosedList(depCod, p.partido) : undefined);
             if(_cl !== undefined){
               return renderListaCerrada(_cl, curules);
             }
