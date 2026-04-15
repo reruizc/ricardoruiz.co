@@ -466,7 +466,7 @@
       </div>
 
       <!-- Selector circunscripción + búsqueda -->
-      <div class="sub-selector" style="margin-bottom:1.5rem; border-bottom:1px solid var(--border); padding-bottom:1rem;">
+      <div class="sub-selector" style="margin-bottom:.6rem; border-bottom:none; padding-bottom:.4rem;">
         <span class="sub-label">Departamento:</span>
         <select class="dep-select" id="cons-dep-select" onchange="switchConsDep(this.value)"></select>
         <span class="sub-label" style="margin-left:1.5rem">Buscar candidato:</span>
@@ -474,6 +474,17 @@
           oninput="buscarCandidatoCons(this.value)"
           onfocus="this.style.borderColor='var(--blue)'"
           onblur="this.style.borderColor='var(--card-border)'" />
+      </div>
+      <!-- Drill-down: Municipio → Zona → Puesto → Mesa -->
+      <div class="sub-selector" id="cons-drilldown" style="margin-bottom:1.5rem; border-bottom:1px solid var(--border); padding-bottom:1rem; display:none; flex-wrap:wrap; gap:.5rem .2rem;">
+        <span class="sub-label" id="mun-label-cons" style="display:none">Municipio:</span>
+        <select class="dep-select" id="cons-mun-select" style="display:none" onchange="switchConsMun(this.value)"></select>
+        <span class="sub-label" id="zon-label-cons" style="display:none; margin-left:.8rem">Zona / Localidad:</span>
+        <select class="dep-select" id="cons-zon-select" style="display:none" onchange="switchConsZon(this.value)"></select>
+        <span class="sub-label" id="pue-label-cons" style="display:none; margin-left:.8rem">Puesto:</span>
+        <select class="dep-select" id="cons-pue-select" style="display:none" onchange="switchConsPue(this.value)"></select>
+        <span class="sub-label" id="mesa-label-cons" style="display:none; margin-left:.8rem">Mesa:</span>
+        <select class="dep-select" id="cons-mesa-select" style="display:none" onchange="switchConsMesa(this.value)"></select>
       </div>
 
       <!-- Resultados de búsqueda (oculto por defecto) -->
@@ -547,8 +558,13 @@
 
     let curConsulta = 'gran';
     let curConsDep  = 'TODOS';
+    let curConsMun  = 'TODOS';
+    let curConsZon  = 'TODOS';
+    let curConsPue  = 'TODOS';
+    let curConsMesa = 'TODOS';
     let curDepCands = null;   // candidatos filtrados por dep (null = nacional)
     let curDepTot   = null;   // tot filtrado por dep
+    let curDepDataCons = null; // dep-{cod}.json completo
 
     // Mapa DANE departamentos
     const DANE_DEP_CONS = {
@@ -594,17 +610,118 @@
       } catch(e){ console.warn('S3 consultas no disponible:', e); return false; }
     }
 
-    function cargarDep(cod){
-      if(!S3_DEPS.length) return;
-      const dep = S3_DEPS.find(d=>d.cod===cod);
-      if(!dep) return;
-      const clave = curConsulta;
-      const depCons = dep[clave];
-      if(!depCons){ curDepCands=[]; curDepTot={votval:0,votant:0,votnul:0,votnma:0,votblan:0}; renderConsultaConDatos([],{votval:0,votant:0,votnul:0,votnma:0,votblan:0},0); return; }
-      curDepCands = depCons.candidatos.map(c=>({...c, partido:CONSULTAS_DATA[clave]?.nombre||''}));
-      curDepTot = {votval:depCons.votos, votant:0, votnul:0, votnma:0, votblan:0};
-      const totalAll3 = ['gran','frente','soluciones'].reduce((s,k)=>s+(dep[k]?.votos||0),0);
-      renderConsultaConDatos(curDepCands, curDepTot, totalAll3);
+    // ── Drill-down helpers ────────────────────────────────────────
+    let _consToastTimer = null;
+    function showConsLoadingToast(){
+      let el = document.getElementById('_cons-loading-toast');
+      if(!el){ el=document.createElement('div'); el.id='_cons-loading-toast';
+        el.style.cssText="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,71,255,.92);color:#fff;font-family:'Syne',sans-serif;font-size:1.23rem;padding:.85rem 2.1rem;border-radius:3px;z-index:9999;pointer-events:none;transition:opacity .3s;white-space:nowrap;letter-spacing:.02em";
+        el.textContent='Un momento, cargando…'; document.body.appendChild(el); }
+      el.style.opacity='1';
+      clearTimeout(_consToastTimer);
+      _consToastTimer = setTimeout(()=>{ el.style.opacity='0'; }, 3000);
+    }
+
+    function _showConsSel(id, visible){
+      const el = document.getElementById(id);
+      if(el) el.style.display = visible ? '' : 'none';
+    }
+    function _setConsSel(id, options, defaultLabel){
+      const sel = document.getElementById(id);
+      if(!sel) return;
+      sel.innerHTML = `<option value="TODOS">${defaultLabel}</option>` + options.map(o=>`<option value="${o.value}">${o.label}</option>`).join('');
+      sel.value = 'TODOS';
+    }
+    function _resetConsSelFrom(level){
+      const levels = ['mun','zon','pue','mesa'];
+      const idx = levels.indexOf(level);
+      levels.slice(idx).forEach(l=>{
+        _showConsSel('cons-'+l+'-select', false);
+        _showConsSel(l+'-label-cons', false);
+      });
+      if(idx <= 0) curConsMun  = 'TODOS';
+      if(idx <= 1) curConsZon  = 'TODOS';
+      if(idx <= 2) curConsPue  = 'TODOS';
+      if(idx <= 3) curConsMesa = 'TODOS';
+    }
+
+    async function cargarDepFull(cod){
+      showConsLoadingToast();
+      try{
+        const r = await fetch(`${S3}/consultas/dep-${cod}.json`);
+        if(!r.ok) throw new Error(r.status);
+        curDepDataCons = await r.json();
+      } catch(e){
+        console.warn('No se pudo cargar dep consultas:', e);
+        curDepDataCons = null;
+      }
+      if(curDepDataCons){
+        const muns = [...(curDepDataCons.municipios||[])].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+        _setConsSel('cons-mun-select', muns.map(m=>({value:m.cod, label:m.nombre})), 'Todos los municipios');
+        _showConsSel('mun-label-cons', true);
+        _showConsSel('cons-mun-select', true);
+        document.getElementById('cons-drilldown').style.display = '';
+      }
+      renderConsulta();
+    }
+
+    function switchConsMun(cod){
+      curConsMun = cod;
+      _resetConsSelFrom('zon');
+      if(cod !== 'TODOS' && curDepDataCons){
+        const mun = (curDepDataCons.municipios||[]).find(m=>m.cod===cod);
+        if(mun){
+          const zons = [...(mun.zonas||[])].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+          _setConsSel('cons-zon-select', zons.map(z=>({value:z.cod, label:z.nombre})), 'Todas las zonas');
+          _showConsSel('zon-label-cons', true);
+          _showConsSel('cons-zon-select', true);
+        }
+      }
+      renderConsulta();
+    }
+
+    function switchConsZon(cod){
+      curConsZon = cod;
+      _resetConsSelFrom('pue');
+      if(cod !== 'TODOS' && curDepDataCons && curConsMun !== 'TODOS'){
+        const mun = (curDepDataCons.municipios||[]).find(m=>m.cod===curConsMun);
+        if(mun){
+          const zon = (mun.zonas||[]).find(z=>z.cod===cod);
+          if(zon){
+            const pues = [...(zon.puestos||[])].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+            _setConsSel('cons-pue-select', pues.map(p=>({value:p.cod, label:p.nombre})), 'Todos los puestos');
+            _showConsSel('pue-label-cons', true);
+            _showConsSel('cons-pue-select', true);
+          }
+        }
+      }
+      renderConsulta();
+    }
+
+    function switchConsPue(cod){
+      curConsPue = cod;
+      _resetConsSelFrom('mesa');
+      if(cod !== 'TODOS' && curDepDataCons && curConsMun !== 'TODOS' && curConsZon !== 'TODOS'){
+        const mun = (curDepDataCons.municipios||[]).find(m=>m.cod===curConsMun);
+        if(mun){
+          const zon = (mun.zonas||[]).find(z=>z.cod===curConsZon);
+          if(zon){
+            const pue = (zon.puestos||[]).find(p=>p.cod===cod);
+            if(pue){
+              const mesas = [...(pue.mesas||[])].sort((a,b)=>Number(a.mesa)-Number(b.mesa));
+              _setConsSel('cons-mesa-select', mesas.map(m=>({value:m.mesa, label:'Mesa '+m.mesa})), 'Todas las mesas');
+              _showConsSel('mesa-label-cons', true);
+              _showConsSel('cons-mesa-select', true);
+            }
+          }
+        }
+      }
+      renderConsulta();
+    }
+
+    function switchConsMesa(cod){
+      curConsMesa = cod;
+      renderConsulta();
     }
 
     async function cargarDatos(){
@@ -681,6 +798,29 @@
       setTimeout(()=>tbody.querySelectorAll('.bar-fill').forEach(b=>{ if(b.dataset.w) b.style.width=b.dataset.w; }),80);
     }
 
+    function _buildConsLevelLabel(){
+      const cons = CONSULTAS_DATA[curConsulta];
+      let parts = [cons.nombre];
+      if(curConsDep !== 'TODOS'){
+        const dep = S3_DEPS.find(d=>d.cod===curConsDep);
+        if(dep) parts.push(dep.nombre);
+        if(curConsMun !== 'TODOS' && curDepDataCons){
+          const mun = (curDepDataCons.municipios||[]).find(m=>m.cod===curConsMun);
+          if(mun) parts.push(mun.nombre);
+          if(curConsZon !== 'TODOS'){
+            const zon = (mun?.zonas||[]).find(z=>z.cod===curConsZon);
+            if(zon) parts.push(zon.nombre);
+            if(curConsPue !== 'TODOS'){
+              const pue = (zon?.puestos||[]).find(p=>p.cod===curConsPue);
+              if(pue) parts.push(pue.nombre);
+              if(curConsMesa !== 'TODOS') parts.push('Mesa '+curConsMesa);
+            }
+          }
+        }
+      }
+      return 'Candidatos · ' + parts.join(' · ');
+    }
+
     function renderConsultaConDatos(candidatos, tot, totalConsultas){
       const votant = tot.votant||0;
       const votval = tot.votval||0;
@@ -695,8 +835,7 @@
       ]);
       renderTablaCandidatos(candidatos, votval);
       renderDonut('donut-consultas','pct-consultas','leg-consultas', curConsDep==='TODOS'?null:curConsDep);
-      const cons = CONSULTAS_DATA[curConsulta];
-      document.getElementById('lbl-cons-tabla').textContent=`Candidatos · ${cons.nombre}${curConsDep!=='Nacional (todos)'?' · '+curConsDep:''}`;
+      document.getElementById('lbl-cons-tabla').textContent = _buildConsLevelLabel();
     }
 
     function renderConsulta(){
@@ -704,14 +843,60 @@
       if(inp) inp.value='';
       buscarCandidatoCons('');
 
-      if(curConsDep !== 'TODOS'){
-        cargarDep(curConsDep); return;
+      // Nacional
+      if(curConsDep === 'TODOS'){
+        curDepCands = null; curDepTot = null;
+        const cons = CONSULTAS_DATA[curConsulta];
+        const totalAll3 = Object.values(CONSULTAS_DATA).reduce((s,c)=>s+c.tot.votval, 0);
+        renderConsultaConDatos(cons.candidatos, cons.tot, totalAll3);
+        return;
       }
 
-      const cons = CONSULTAS_DATA[curConsulta];
-      curDepCands = null; curDepTot = null;
-      const totalAll3 = Object.values(CONSULTAS_DATA).reduce((s,c)=>s+c.tot.votval, 0);
-      renderConsultaConDatos(cons.candidatos, cons.tot, totalAll3);
+      // Dep selected but full data not loaded yet
+      if(!curDepDataCons) return;
+
+      const clave = curConsulta;
+
+      // Navigate hierarchy
+      let node = curDepDataCons;
+
+      if(curConsMun !== 'TODOS'){
+        const mun = (node.municipios||[]).find(m=>m.cod===curConsMun);
+        if(!mun){ renderConsultaConDatos([],{votval:0},0); return; }
+        node = mun;
+
+        if(curConsZon !== 'TODOS'){
+          const zon = (node.zonas||[]).find(z=>z.cod===curConsZon);
+          if(!zon){ renderConsultaConDatos([],{votval:0},0); return; }
+          node = zon;
+
+          if(curConsPue !== 'TODOS'){
+            const pue = (node.puestos||[]).find(p=>p.cod===curConsPue);
+            if(!pue){ renderConsultaConDatos([],{votval:0},0); return; }
+            node = pue;
+
+            if(curConsMesa !== 'TODOS'){
+              const mesa = (node.mesas||[]).find(m=>m.mesa===curConsMesa);
+              if(!mesa){ renderConsultaConDatos([],{votval:0},0); return; }
+              // Mesa level: {clave: {candidateName: votos}}
+              const mesaCands = Object.entries(mesa[clave]||{})
+                .map(([nombre,votos])=>({nombre, votos, partido:CONSULTAS_DATA[clave]?.nombre||''}))
+                .sort((a,b)=>b.votos-a.votos);
+              const votval = mesaCands.reduce((s,c)=>s+c.votos, 0);
+              const totalAll3 = ['gran','frente','soluciones'].reduce((s,k)=>s+Object.values(mesa[k]||{}).reduce((ss,v)=>ss+v,0), 0);
+              renderConsultaConDatos(mesaCands, {votval}, totalAll3);
+              return;
+            }
+          }
+        }
+      }
+
+      // Dep / Mun / Zon / Pue level — node[clave] = {votos, cands:[{nombre,votos}]}
+      const consNode = node[clave]||{};
+      const candidatos = (consNode.cands||[]).map(c=>({...c, partido:CONSULTAS_DATA[clave]?.nombre||''}));
+      const votval = consNode.votos||0;
+      const totalAll3 = ['gran','frente','soluciones'].reduce((s,k)=>s+(node[k]?.votos||0), 0);
+      renderConsultaConDatos(candidatos, {votval}, totalAll3);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -719,7 +904,6 @@
     // ═══════════════════════════════════════════════════════════
     function switchConsulta(key){
       curConsulta = key;
-      curDepCands = null; curDepTot = null;
       ['gran','frente','soluciones'].forEach(k=>{
         const btn = document.getElementById('tab-'+k);
         if(btn) btn.classList.toggle('active', k===key);
@@ -732,10 +916,18 @@
 
     function switchConsDep(cod){
       curConsDep = cod;
+      curDepDataCons = null;
+      _resetConsSelFrom('mun');
+      const dd = document.getElementById('cons-drilldown');
+      if(dd) dd.style.display = cod !== 'TODOS' ? '' : 'none';
       const inp = document.getElementById('cons-search');
       if(inp) inp.value='';
       buscarCandidatoCons('');
-      renderConsulta();
+      if(cod !== 'TODOS'){
+        cargarDepFull(cod);
+      } else {
+        renderConsulta();
+      }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -760,8 +952,20 @@
       const norm = s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
       const qn = norm(q);
       const cons = CONSULTAS_DATA[curConsulta];
-      const candidatos = curDepCands || cons.candidatos;
-      const votval = curDepCands ? (curDepTot?.votval||0) : (cons.tot.votval||0);
+      const clave = curConsulta;
+      // Get candidates from current level
+      let candidatos, votval;
+      if(curConsDep === 'TODOS' || !curDepDataCons){
+        candidatos = cons.candidatos; votval = cons.tot.votval||0;
+      } else {
+        let node = curDepDataCons;
+        if(curConsMun !== 'TODOS'){ const m=(node.municipios||[]).find(m=>m.cod===curConsMun); if(m) node=m; }
+        if(curConsZon !== 'TODOS'){ const z=(node.zonas||[]).find(z=>z.cod===curConsZon); if(z) node=z; }
+        if(curConsPue !== 'TODOS'){ const p=(node.puestos||[]).find(p=>p.cod===curConsPue); if(p) node=p; }
+        const cn = node[clave]||{};
+        candidatos = (cn.cands||[]).map(c=>({...c, partido:cons.nombre}));
+        votval = cn.votos||0;
+      }
       const base = votval || candidatos.reduce((s,c)=>s+c.votos,0);
 
       const resultados = candidatos.filter(c=>norm(c.nombre).includes(qn));
