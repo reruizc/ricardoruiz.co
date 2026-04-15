@@ -403,7 +403,7 @@
               <div class="umbral-label">Curules totales asignadas</div>
               <div class="umbral-val" id="curules-total">—</div>
               <div class="umbral-label" style="margin-top:.5rem">Método</div>
-              <div class="umbral-val" style="font-size:.65rem">D'Hondt por circunscripción · umbral 3%</div>
+              <div class="umbral-val" id="metodo-txt" style="font-size:.65rem">D'Hondt por circunscripción · umbral 3%</div>
               <div id="dep-cifras" style="display:none">
                 <div style="height:1px;background:var(--border);margin:.75rem 0"></div>
                 <div class="umbral-label">Cifra repartidora</div>
@@ -509,6 +509,19 @@
       }
       return { cur: c, cifra: Math.round(cifra), umbral: Math.round(umb) };
     }
+    // D'Hondt puro sin umbral (para circunscripciones nacionales: AFRO)
+    function dhondtPuro(votos, curules){
+      const entries = Object.entries(votos)
+        .filter(([p,v]) => v > 0 && !/blanco/i.test(p));
+      const cur = Object.fromEntries(entries.map(([p]) => [p,0]));
+      for(let i=0;i<curules;i++){
+        let max=-1, win=null;
+        entries.forEach(([p,v])=>{ const q=v/(cur[p]+1); if(q>max){max=q;win=p;} });
+        if(win) cur[win]++;
+      }
+      return {cur};
+    }
+
     // Art. 263 C.P.: 1 curul → mayoría; 2 curules → cuociente electoral umbral 30%; 3+ → D'Hondt umbral 3%
     function asignarCurules(partidos_votos, curules) {
       const eleg0 = Object.entries(partidos_votos).filter(([p,v])=>v>0&&!/blanco/i.test(p));
@@ -623,7 +636,7 @@
           }
         });
         if(Object.keys(_votosInd).length){ const {cur}=dhondtDep(_votosInd,CURULES_INDIGENAS); curulesIndigenas=cur; }
-        if(Object.keys(_votosAfro).length){ const {cur}=dhondtDep(_votosAfro,CURULES_AFRO); curulesAfro=cur; }
+        if(Object.keys(_votosAfro).length){ const {cur}=dhondtPuro(_votosAfro,CURULES_AFRO); curulesAfro=cur; }
         // Deduplicar resumenData.partidos por nombre (resumen.json tiene entradas duplicadas)
         { const _seen={}; const _dedup=[];
           resumenData.partidos.forEach(p=>{ if(_seen[p.partido]){ _seen[p.partido].candidatos=(_seen[p.partido].candidatos||[]).concat(p.candidatos||[]); } else{ _seen[p.partido]={...p}; _dedup.push(_seen[p.partido]); } });
@@ -774,6 +787,13 @@
       const idMap = {'TERRITORIAL':'territorial','INDIGENAS':'indigenas','AFRO-DESCENDIENTES':'afro'};
       const btn = document.getElementById('circ-btn-' + (idMap[val]||val.toLowerCase()));
       if(btn) btn.classList.add('circ-btn-active');
+      // Actualizar texto de método
+      const _mt = document.getElementById('metodo-txt');
+      if(_mt){
+        if(val === 'AFRO-DESCENDIENTES') _mt.textContent = "D'Hondt · sin umbral · circunscripción nacional (2 curules)";
+        else if(val === 'INDIGENAS')      _mt.textContent = "Mayoría simple · circunscripción nacional (1 curul)";
+        else                              _mt.textContent = "D'Hondt por circunscripción · umbral 3%";
+      }
       switchCorp(val);
     }
 
@@ -986,9 +1006,16 @@
       const depBase = curDepData || dep;
       const depCirc = depBase.por_circunscripcion?.[curCorp] ?? depBase;
 
-      // ── D'HONDT SIEMPRE AL NIVEL DEPTO-CIRC (congelado) ─────
+      // ── CURULES: nacionales congeladas para AFRO/INDIGENAS; D'Hondt por dep para TERRITORIAL ─
       const depPartidosVotos = depCirc.partidos || {};
-      const { cur: curFrozen, cifra: cifraVal, umbral: umbralVal, metodo: metodoVal } = asignarCurules(depPartidosVotos, nCurules);
+      let curFrozen, cifraVal, umbralVal;
+      if(curCorp === 'AFRO-DESCENDIENTES'){
+        curFrozen = curulesAfro; cifraVal = 0; umbralVal = 0;
+      } else if(curCorp === 'INDIGENAS'){
+        curFrozen = curulesIndigenas; cifraVal = 0; umbralVal = 0;
+      } else {
+        ({ cur: curFrozen, cifra: cifraVal, umbral: umbralVal } = asignarCurules(depPartidosVotos, nCurules));
+      }
       curDepCurules = curFrozen;
       const totalCurules = Object.values(curFrozen).reduce((s,v)=>s+v,0);
 
@@ -1013,13 +1040,17 @@
       }
 
       // Mostrar cifra repartidora/cuociente y umbral según método
-      document.getElementById('dep-cifras').style.display = '';
-      const _lCifra = document.querySelector('#dep-cifras .umbral-label');
-      const _lUmb   = document.querySelectorAll('#dep-cifras .umbral-label')[1];
-      if(_lCifra) _lCifra.textContent = nCurules===2 ? 'Cuociente electoral' : nCurules===1 ? 'Votos (mayoría)' : 'Cifra repartidora';
-      if(_lUmb)   _lUmb.textContent   = nCurules===2 ? 'Umbral (30% cuociente)' : nCurules===1 ? '—' : 'Umbral (3%)';
-      document.getElementById('cifra-val').textContent = fmt(cifraVal);
-      document.getElementById('umbral-dep-val').textContent = nCurules===1 ? '—' : fmt(umbralVal);
+      if(curCorp === 'AFRO-DESCENDIENTES' || curCorp === 'INDIGENAS'){
+        document.getElementById('dep-cifras').style.display = 'none';
+      } else {
+        document.getElementById('dep-cifras').style.display = '';
+        const _lCifra = document.querySelector('#dep-cifras .umbral-label');
+        const _lUmb   = document.querySelectorAll('#dep-cifras .umbral-label')[1];
+        if(_lCifra) _lCifra.textContent = nCurules===2 ? 'Cuociente electoral' : nCurules===1 ? 'Votos (mayoría)' : 'Cifra repartidora';
+        if(_lUmb)   _lUmb.textContent   = nCurules===2 ? 'Umbral (30% cuociente)' : nCurules===1 ? '—' : 'Umbral (3%)';
+        document.getElementById('cifra-val').textContent = fmt(cifraVal);
+        document.getElementById('umbral-dep-val').textContent = nCurules===1 ? '—' : fmt(umbralVal);
+      }
 
       // ── SLICE PARA VOTOS Y CANDIDATOS (puede ser mun/zon/pue) ─
       let slice = depCirc;
