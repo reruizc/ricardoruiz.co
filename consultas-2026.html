@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Consultas Presidenciales · Preconteo 2026 · Ricardo Ruiz</title>
+  <title>Consultas Presidenciales · Definitivos 2026 · Ricardo Ruiz</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet" />
@@ -436,7 +436,7 @@
     <!-- BREADCRUMB -->
     <div class="breadcrumb" id="con-breadcrumb">
       <a href="electoral.html" onclick="navigate(event,'electoral.html','Resultados Electorales')">Resultados Electorales</a>
-      &nbsp;/&nbsp; Consultas Presidenciales · Preconteo 2026
+      &nbsp;/&nbsp; Consultas Presidenciales · Definitivos 2026
     </div>
 
     <!-- STATUS BAR -->
@@ -451,7 +451,6 @@
       <span id="con-meta-consultas">Consultas: <b>3</b></span>
       <span>Mesas: <b id="mesasLabel">— / 126.818</b></span>
       <span id="con-meta-potencial">Potencial: <b>41.370.203</b></span>
-      <div class="reload-badge" id="con-reload-badge">Recarga auto: <b id="countdown">03:00</b></div>
       <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
     </div>
 
@@ -505,13 +504,13 @@
           </table>
         </div>
         <div class="card">
-          <div class="card-label">Participación electoral</div>
+          <div class="card-label">Votos entre consultas</div>
           <div class="donut-wrap">
             <div class="donut-cw">
               <canvas id="donut-consultas"></canvas>
               <div class="donut-center">
                 <div class="donut-pct" id="pct-consultas">—</div>
-                <div class="donut-sub">votaron</div>
+                <div class="donut-sub">esta consulta</div>
               </div>
             </div>
             <div class="donut-legend" id="leg-consultas"></div>
@@ -533,12 +532,9 @@
     // ═══════════════════════════════════════════════════════════
     // CONFIGURACIÓN
     // ═══════════════════════════════════════════════════════════
-    const RECARGA_MIN = 3;
-    const POTENCIAL   = 41370203;
     const MESAS_TOTAL = 126818;
-    let   MESAS_REP   = 0;
-
-    const REG = { consultas: 'https://registraduria-proxy.reruizc.workers.dev/consultas' };
+    const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
+    let S3_DEPS = [];
 
     // ═══════════════════════════════════════════════════════════
     // DATOS POR CONSULTA
@@ -549,9 +545,8 @@
       soluciones: { nombre:'Consulta de Soluciones',        candidatos:[], tot:{votval:0,votnul:0,votnma:0,votblan:0,votant:0} },
     };
 
-    let TOT_GENERAL = { votval:0, votnul:0, votnma:0, votblan:0, votant:0 };
     let curConsulta = 'gran';
-    let curConsDep  = 'Nacional (todos)';
+    let curConsDep  = 'TODOS';
     let curDepCands = null;   // candidatos filtrados por dep (null = nacional)
     let curDepTot   = null;   // tot filtrado por dep
 
@@ -574,118 +569,52 @@
     function getCandColor(idx){ return PALETTE[idx % PALETTE.length]; }
 
     // ═══════════════════════════════════════════════════════════
-    // FETCH REGISTRADURÍA
+    // CARGA DESDE S3 (Resultados Definitivos)
     // ═══════════════════════════════════════════════════════════
-    async function fetchReg(url){
-      try{ const r=await fetch(url+'?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return null; return await r.json(); }
-      catch(e){ return null; }
-    }
-
-    async function cargarDesdeRegistraduria(){
-      const ds = await fetchReg(REG.consultas);
-      if(!ds || !ds.camaras || !ds.camaras.length) return false;
-
-      // codpar 30 → Frente por la Vida · 31 → Gran Consulta · 32 → Consulta de Soluciones
-      const CODPAR_CONSULTA = {'30':'soluciones','31':'gran','32':'frente'};
-      const bloque = ds.camaras[0];
-
-      (bloque.partotabla||[]).forEach(p => {
-        const a = p.act;
-        const clave = CODPAR_CONSULTA[String(a.codpar)];
-        if(!clave) return;
-        const cons = CONSULTAS_DATA[clave];
-        if(!cons) return;
-
-        cons.candidatos = (a.cantotabla||[])
-          .filter(c => parseInt(c.vot) > 0)
-          .map(c => ({
-            nombre: `${c.nomcan||''} ${c.apecan||''}`.trim()
-              .split(' ').map(w => w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' ') || '—',
-            partido: cons.nombre,
-            votos: parseInt(c.vot)||0,
-          }))
-          .sort((a,b) => b.votos - a.votos);
-
-        cons.tot.votval = parseInt(a.vot)||0;
-      });
-
-      const totAct = (ds.totales&&ds.totales.act) || (bloque.totales&&bloque.totales.act);
-      if(totAct) {
-        const votant  = parseInt(totAct.votant||0);
-        const votnul  = parseInt(totAct.votnul||0);
-        const votnma  = parseInt(totAct.votnma||0);
-        const votblan = parseInt(totAct.votblan||0);
-        TOT_GENERAL = { votant, votval:parseInt(totAct.votval||0), votnul, votnma, votblan };
-        Object.values(CONSULTAS_DATA).forEach(cons => {
-          if(!cons.tot.votval) return;
-          const ratio = cons.tot.votval / (votant||1);
-          cons.tot.votant  = votant;
-          cons.tot.votnul  = Math.round(votnul  * ratio);
-          cons.tot.votnma  = Math.round(votnma  * ratio);
-          cons.tot.votblan = Math.round(votblan * ratio);
+    async function cargarDesdeS3(){
+      try{
+        const [resumen, depsData] = await Promise.all([
+          fetch(`${S3}/consultas/resumen.json`).then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); }),
+          fetch(`${S3}/consultas/deps.json`).then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); }),
+        ]);
+        S3_DEPS = depsData;
+        resumen.consultas.forEach(c=>{
+          if(!CONSULTAS_DATA[c.clave]) return;
+          CONSULTAS_DATA[c.clave].candidatos = c.candidatos;
+          CONSULTAS_DATA[c.clave].nombre = c.nombre;
+          CONSULTAS_DATA[c.clave].tot.votval = c.votos;
         });
-        MESAS_REP = parseInt(totAct.mesesc||0)||MESAS_REP;
-      }
-      return true;
+        // Poblar selector deps desde datos reales
+        const consSel = document.getElementById('cons-dep-select');
+        consSel.innerHTML = '<option value="TODOS" selected>Nacional (todos)</option>';
+        [...depsData].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).forEach(d=>{
+          const o=document.createElement('option'); o.value=d.cod; o.textContent=d.nombre; consSel.appendChild(o);
+        });
+        return true;
+      } catch(e){ console.warn('S3 consultas no disponible:', e); return false; }
     }
 
-    async function cargarDep(cod){
-      const url = `${REG.consultas}/${cod}`;
-      const ds = await fetchReg(url);
-      if(!ds || !ds.camaras || !ds.camaras.length) return;
-
-      const CODPAR_CONSULTA = {'30':'soluciones','31':'gran','32':'frente'};
-      const bloque = ds.camaras[0];
-
-      const partido = (bloque.partotabla||[]).find(p => CODPAR_CONSULTA[String(p.act.codpar)] === curConsulta);
-      if(!partido) return;
-
-      const a = partido.act;
-      const depCands = (a.cantotabla||[])
-        .filter(c => parseInt(c.vot) > 0)
-        .map(c => ({
-          nombre: `${c.nomcan||''} ${c.apecan||''}`.trim()
-            .split(' ').map(w => w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' ') || '—',
-          partido: CONSULTAS_DATA[curConsulta]?.nombre || '—',
-          votos: parseInt(c.vot)||0,
-        }))
-        .sort((a,b) => b.votos - a.votos);
-
-      const tot = (bloque.totales && bloque.totales.act) || {};
-      const depTot = {
-        votant:  parseInt(tot.votant||0),
-        votval:  parseInt(a.vot||0),
-        votnul:  parseInt(tot.votnul||0),
-        votnma:  parseInt(tot.votnma||0),
-        votblan: parseInt(tot.votblan||0),
-      };
-      // Total de votos válidos de las 3 consultas en este dep
-      const CODPAR_CONSULTA2 = {'30':'frente','31':'gran','32':'soluciones'};
-      const totalDepAll3 = (bloque.partotabla||[])
-        .filter(p => CODPAR_CONSULTA2[String(p.act.codpar)])
-        .reduce((s,p) => s + parseInt(p.act.vot||0), 0);
-      curDepCands = depCands;
-      curDepTot   = depTot;
-      renderConsultaConDatos(depCands, depTot, totalDepAll3);
+    function cargarDep(cod){
+      if(!S3_DEPS.length) return;
+      const dep = S3_DEPS.find(d=>d.cod===cod);
+      if(!dep) return;
+      const clave = curConsulta;
+      const depCons = dep[clave];
+      if(!depCons){ curDepCands=[]; curDepTot={votval:0,votant:0,votnul:0,votnma:0,votblan:0}; renderConsultaConDatos([],{votval:0,votant:0,votnul:0,votnma:0,votblan:0},0); return; }
+      curDepCands = depCons.candidatos.map(c=>({...c, partido:CONSULTAS_DATA[clave]?.nombre||''}));
+      curDepTot = {votval:depCons.votos, votant:0, votnul:0, votnma:0, votblan:0};
+      const totalAll3 = ['gran','frente','soluciones'].reduce((s,k)=>s+(dep[k]?.votos||0),0);
+      renderConsultaConDatos(curDepCands, curDepTot, totalAll3);
     }
 
     async function cargarDatos(){
-      const regOk = await cargarDesdeRegistraduria();
-      const fuente = regOk ? 'Registraduría Nacional' : '';
-      refreshUI(regOk, fuente);
-    }
-
-    function refreshUI(fromExternal, fuente){
-      const ahora = new Date();
-      const ts = ahora.toLocaleDateString('es-CO')+' · '+ahora.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
-      document.getElementById('lastUpdate').textContent = ts;
-      document.getElementById('mesasLabel').textContent = (MESAS_REP||0).toLocaleString('es-CO')+' / '+MESAS_TOTAL.toLocaleString('es-CO');
-      if(fromExternal){
-        document.getElementById('statusBar').style.display = 'flex';
-        document.getElementById('csvTimestamp').textContent = ts;
-        const lbl = document.getElementById('fuenteLbl');
-        if(lbl) lbl.textContent = fuente||'Fuente externa';
-      }
+      const ok = await cargarDesdeS3();
+      if(!ok){ console.error('No se pudo cargar datos de consultas desde S3'); return; }
+      document.getElementById('lastUpdate').textContent = 'Definitivos · 13 abr 2026';
+      document.getElementById('mesasLabel').textContent = MESAS_TOTAL.toLocaleString('es-CO')+' / '+MESAS_TOTAL.toLocaleString('es-CO');
+      document.getElementById('statusBar').style.display = 'flex';
+      document.getElementById('fuenteLbl').textContent = 'Resultados Definitivos · Registraduría Nacional';
+      document.getElementById('csvTimestamp').textContent = '13 abr 2026';
       renderConsulta();
     }
 
@@ -696,28 +625,34 @@
       document.getElementById(id).innerHTML = items.map(k=>`<div class="kpi-card"><div class="kpi-label">${k.l}</div><div class="kpi-val ${k.c||''}">${k.v}</div><div class="kpi-delta">${k.d}</div></div>`).join('');
     }
 
+    const CONS_COLORS = { gran:'#0047FF', frente:'#6B2D8B', soluciones:'#C8102E' };
+    const CONS_ORDER  = ['gran','frente','soluciones'];
     const donutI={};
-    function renderDonut(cid, pid, lid, tot){
-      const {votval=0,votnul=0,votnma=0,votblan=0,potencial=POTENCIAL}=tot;
-      const novot=Math.max(0,potencial-votval-votnul-votnma-votblan);
+    function renderDonut(cid, pid, lid, depCod){
+      // Obtener votos por consulta (nacional o dep)
+      const getVotos = clave => {
+        if(depCod && depCod!=='TODOS'){
+          const dep = S3_DEPS.find(d=>d.cod===depCod);
+          return dep?.[clave]?.votos || 0;
+        }
+        return CONSULTAS_DATA[clave]?.tot?.votval || 0;
+      };
+      const vals  = CONS_ORDER.map(k=>getVotos(k));
+      const names = CONS_ORDER.map(k=>CONSULTAS_DATA[k]?.nombre||k);
+      const total = vals.reduce((s,v)=>s+v,0);
       if(donutI[cid]) donutI[cid].destroy();
       const ctx=document.getElementById(cid).getContext('2d');
       donutI[cid]=new Chart(ctx,{type:'doughnut',
-        data:{labels:['Votos válidos','Nulos','No marcados','En blanco','No votaron'],
-          datasets:[{data:[votval,votnul,votnma,votblan,novot],
-            backgroundColor:['#0047FF','#cc2233','#f0a500','#666','#1e2030'],
-            borderWidth:0,hoverOffset:6}]},
+        data:{labels:names,
+          datasets:[{data:vals,backgroundColor:CONS_ORDER.map(k=>CONS_COLORS[k]),borderWidth:0,hoverOffset:6}]},
         options:{responsive:true,maintainAspectRatio:true,cutout:'72%',
           plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}}}}
       });
-      const pct=((votval+votnul+votnma+votblan)/potencial*100).toFixed(1);
-      document.getElementById(pid).textContent=pct+'%';
-      document.getElementById(lid).innerHTML=`
-        <div class="li"><div class="ld" style="background:#0047FF"></div>Votos válidos<span class="lv">${votval.toLocaleString('es-CO')}</span></div>
-        <div class="li"><div class="ld" style="background:#cc2233"></div>Nulos<span class="lv">${votnul.toLocaleString('es-CO')}</span></div>
-        <div class="li"><div class="ld" style="background:#f0a500"></div>No marcados<span class="lv">${votnma.toLocaleString('es-CO')}</span></div>
-        <div class="li"><div class="ld" style="background:#666"></div>En blanco<span class="lv">${votblan.toLocaleString('es-CO')}</span></div>
-        <div class="li"><div class="ld" style="background:#1e2030;border:1px solid #333"></div>No votaron<span class="lv">${novot.toLocaleString('es-CO')}</span></div>`;
+      const curVotos = getVotos(curConsulta);
+      const pct = total>0 ? (curVotos/total*100).toFixed(1)+'%' : '—';
+      document.getElementById(pid).textContent = pct;
+      document.getElementById(lid).innerHTML = CONS_ORDER.map(k=>`
+        <div class="li"><div class="ld" style="background:${CONS_COLORS[k]}"></div>${CONSULTAS_DATA[k]?.nombre||k}<span class="lv">${getVotos(k).toLocaleString('es-CO')}</span></div>`).join('');
     }
 
     function renderTablaCandidatos(candidatos, votval){
@@ -759,7 +694,7 @@
         {l:'% de la consulta', v:pctTotal, c:'', d:totalConsultas>0?`de ${fmtN(totalConsultas)} votos totales`:''},
       ]);
       renderTablaCandidatos(candidatos, votval);
-      renderDonut('donut-consultas','pct-consultas','leg-consultas',{...tot,potencial:POTENCIAL});
+      renderDonut('donut-consultas','pct-consultas','leg-consultas', curConsDep==='TODOS'?null:curConsDep);
       const cons = CONSULTAS_DATA[curConsulta];
       document.getElementById('lbl-cons-tabla').textContent=`Candidatos · ${cons.nombre}${curConsDep!=='Nacional (todos)'?' · '+curConsDep:''}`;
     }
@@ -769,9 +704,8 @@
       if(inp) inp.value='';
       buscarCandidatoCons('');
 
-      if(curConsDep !== 'Nacional (todos)'){
-        const cod = Object.entries(DANE_DEP_CONS).find(([,v])=>v===curConsDep)?.[0];
-        if(cod){ cargarDep(cod); return; }
+      if(curConsDep !== 'TODOS'){
+        cargarDep(curConsDep); return;
       }
 
       const cons = CONSULTAS_DATA[curConsulta];
@@ -796,8 +730,8 @@
       renderConsulta();
     }
 
-    function switchConsDep(dep){
-      curConsDep = dep;
+    function switchConsDep(cod){
+      curConsDep = cod;
       const inp = document.getElementById('cons-search');
       if(inp) inp.value='';
       buscarCandidatoCons('');
@@ -863,10 +797,7 @@
     Chart.defaults.color='rgba(255,255,255,.4)';
     Chart.defaults.font.family="'DM Mono',monospace";
 
-    // Poblar dropdown departamentos
-    const consSel = document.getElementById('cons-dep-select');
-    const depKeys = ['Nacional (todos)',...Object.values(DANE_DEP_CONS).sort((a,b)=>a.localeCompare(b,'es'))];
-    depKeys.forEach(d=>{ const o=document.createElement('option'); o.value=d; o.textContent=d; if(d==='Nacional (todos)') o.selected=true; consSel.appendChild(o); });
+    // Dropdown poblado dinámicamente desde S3_DEPS en cargarDesdeS3()
 
     // Curtain
     const curtain = document.getElementById('curtain');
@@ -896,15 +827,6 @@
       el.addEventListener('mouseenter',()=>{ cur2.style.transform='translate(-50%,-50%) scale(2.5)'; cur2.style.background='transparent'; cur2.style.border='1.5px solid var(--blue)'; ri.style.opacity='0'; });
       el.addEventListener('mouseleave',()=>{ cur2.style.transform='translate(-50%,-50%) scale(1)'; cur2.style.background='var(--blue)'; cur2.style.border='none'; ri.style.opacity='.4'; });
     });
-
-    // Countdown + auto-recarga
-    let secsLeft=RECARGA_MIN*60;
-    setInterval(()=>{
-      secsLeft--;
-      if(secsLeft<=0){ secsLeft=RECARGA_MIN*60; cargarDatos(); }
-      const m=String(Math.floor(secsLeft/60)).padStart(2,'0'),s=String(secsLeft%60).padStart(2,'0');
-      document.getElementById('countdown').textContent=`${m}:${s}`;
-    },1000);
 
     // Arranque
     cargarDatos();
@@ -943,9 +865,9 @@
       co: {
         htmlLang:'es', pageTitle:'Consultas Presidenciales 2026 · Ricardo Ruiz',
         back:'← Volver', titleLine1:'Consultas', titleSpan:'Presidenciales',
-        breadcrumb1:'Resultados Electorales', breadcrumb2:'Consultas Presidenciales · Preconteo 2026',
+        breadcrumb1:'Resultados Electorales', breadcrumb2:'Consultas Presidenciales · Definitivos 2026',
         metaUpdate:'Actualización:', metaConsultas:'Consultas: <b>3</b>',
-        metaPotencial:'Potencial: <b>41.370.203</b>', reloadBadge:'Recarga auto:',
+        metaPotencial:'Potencial: <b>41.370.203</b>',
         themeDay:'☀ Modo día', themeNight:'🌙 Modo noche',
         footer1:'ricardoruiz.co · Elecciones Colombia 2026',
         footer2:'Fuente: Registraduría Nacional',
@@ -954,9 +876,9 @@
       us: {
         htmlLang:'en', pageTitle:'Presidential Primaries 2026 · Ricardo Ruiz',
         back:'← Back', titleLine1:'Presidential', titleSpan:'Primaries',
-        breadcrumb1:'Electoral Results', breadcrumb2:'Presidential Primaries · Pre-count 2026',
+        breadcrumb1:'Electoral Results', breadcrumb2:'Presidential Primaries · Official Results 2026',
         metaUpdate:'Updated:', metaConsultas:'Primaries: <b>3</b>',
-        metaPotencial:'Eligible voters: <b>41,370,203</b>', reloadBadge:'Auto-reload:',
+        metaPotencial:'Eligible voters: <b>41,370,203</b>',
         themeDay:'☀ Day mode', themeNight:'🌙 Night mode',
         footer1:'ricardoruiz.co · Colombia Elections 2026',
         footer2:'Source: National Civil Registry',
@@ -967,7 +889,7 @@
         back:'← 返回', titleLine1:'总统', titleSpan:'初选',
         breadcrumb1:'选举结果', breadcrumb2:'总统初选 · 预计票数 2026',
         metaUpdate:'更新时间:', metaConsultas:'初选: <b>3</b>',
-        metaPotencial:'选民人数: <b>41,370,203</b>', reloadBadge:'自动刷新:',
+        metaPotencial:'选民人数: <b>41,370,203</b>',
         themeDay:'☀ 日间模式', themeNight:'🌙 夜间模式',
         footer1:'ricardoruiz.co · 哥伦比亚选举 2026',
         footer2:'来源：国家民事登记处',
@@ -990,8 +912,6 @@
       if(metaUpdate) metaUpdate.innerHTML = `${t.metaUpdate} <b id="lastUpdate">${el('lastUpdate')?.textContent||'—'}</b>`;
       si('con-meta-consultas', t.metaConsultas);
       si('con-meta-potencial', t.metaPotencial);
-      const reloadBadge = el('con-reload-badge');
-      if(reloadBadge) reloadBadge.innerHTML = `${t.reloadBadge} <b id="countdown">${el('countdown')?.textContent||'03:00'}</b>`;
       const themeBtn = el('theme-btn');
       if(themeBtn) themeBtn.textContent = document.body.classList.contains('day-mode') ? t.themeNight : t.themeDay;
       const footerBrands = document.querySelectorAll('.footer-brand');
