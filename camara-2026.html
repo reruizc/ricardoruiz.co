@@ -624,6 +624,10 @@
         });
         if(Object.keys(_votosInd).length){ const {cur}=dhondtDep(_votosInd,CURULES_INDIGENAS); curulesIndigenas=cur; }
         if(Object.keys(_votosAfro).length){ const {cur}=dhondtDep(_votosAfro,CURULES_AFRO); curulesAfro=cur; }
+        // Deduplicar resumenData.partidos por nombre (resumen.json tiene entradas duplicadas)
+        { const _seen={}; const _dedup=[];
+          resumenData.partidos.forEach(p=>{ if(_seen[p.partido]){ _seen[p.partido].candidatos=(_seen[p.partido].candidatos||[]).concat(p.candidatos||[]); } else{ _seen[p.partido]={...p}; _dedup.push(_seen[p.partido]); } });
+          resumenData.partidos = _dedup; }
         // Anotar curules en resumenData.partidos
         resumenData.partidos.forEach(p=>{ p.curules_nac = curulesNac[p.partido]||0; });
         // ── Construir nacElegidos desde candidatos de departamentos.json ──
@@ -1147,12 +1151,7 @@
         if(_cS.size) elegidosMapNac['CENTRO DEMOCRÁTICO - MIRA']=_cS;
       }
 
-      const _deduped=[]; const _seen={};
-      resumenData.partidos.forEach(p=>{
-        if(_seen[p.partido]){ _seen[p.partido].candidatos=(_seen[p.partido].candidatos||[]).concat(p.candidatos||[]); }
-        else{ _seen[p.partido]={...p}; _deduped.push(_seen[p.partido]); }
-      });
-      const partidos = _deduped.filter(p=>(vt[p.partido]||0)>0).map(p=>({...p,votos:vt[p.partido]||0,curules:curMap2[p.partido]||0}));
+      const partidos = resumenData.partidos.filter(p=>(vt[p.partido]||0)>0).map(p=>({...p,votos:vt[p.partido]||0,curules:curMap2[p.partido]||0}));
       if(_pactoVotos > 0){ partidos.push({partido:'PACTO HISTÓRICO NACIONAL',votos:_pactoVotos,curules:_pactoCurules,candidatos:_pactoCands}); }
       if(_cdmVotos > 0){ partidos.push({partido:'CENTRO DEMOCRÁTICO - MIRA',votos:_cdmVotos,curules:_cdmCurules,candidatos:_cdmCands}); }
       partidos.sort((a,b)=>b.votos-a.votos);
