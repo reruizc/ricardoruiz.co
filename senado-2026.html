@@ -397,23 +397,23 @@
         </div>
         <div id="sen-search-results" style="display:none;margin-bottom:1.5rem"></div>
         <div class="kpi-row" id="kpi-row"></div>
-        <div style="display:none" id="panel-resultados-generales">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.5rem">
-            <div class="card">
-              <div class="card-label" style="margin-bottom:1rem">Hemiciclo · 100 curules · Nacional</div>
-              <svg id="hemiciclo-svg" viewBox="0 0 600 310" style="width:100%;height:auto;display:block"></svg>
-              <div id="hemiciclo-legend" style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem .75rem;margin-top:.75rem;padding-top:.75rem;border-top:1px solid rgba(255,255,255,0.07)"></div>
-            </div>
-            <div class="card" style="padding:1.3rem 1.3rem .75rem">
-              <div class="card-label" style="margin-bottom:.75rem">Mapa Electoral · Partido puntero por departamento</div>
-              <div id="hemiciclo-map" style="width:100%;height:340px;background:#060810"></div>
-            </div>
-          </div>
-        </div>
         <div class="circ-toggle" id="circ-toggle">
           <button class="circ-btn circ-btn-active" id="circ-btn-nacional" onclick="onCircChange('NACIONAL')">Nacional</button>
           <button class="circ-btn" id="circ-btn-indigenas" onclick="onCircChange('INDIGENAS')">Indígena</button>
           <button class="circ-btn" id="circ-btn-resultados-generales" onclick="onCircChange('RESULTADOS_GENERALES')">Resultados Generales</button>
+        </div>
+        <div style="display:none" id="panel-resultados-generales">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.5rem">
+            <div class="card">
+              <div class="card-label" style="margin-bottom:1rem">Hemiciclo · 102 curules · Nacional + Indígena</div>
+              <svg id="hemiciclo-svg" viewBox="0 0 600 330" style="width:100%;height:auto;display:block"></svg>
+              <div id="hemiciclo-legend" style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem .75rem;margin-top:.85rem;padding-top:.85rem;border-top:1px solid rgba(255,255,255,0.07)"></div>
+            </div>
+            <div class="card" style="padding:1.3rem 1.3rem .75rem">
+              <div class="card-label" style="margin-bottom:.75rem">Mapa Electoral · Partido puntero por departamento</div>
+              <div id="hemiciclo-map" style="width:100%;height:400px;background:#060810"></div>
+            </div>
+          </div>
         </div>
         <div class="results-grid" id="sen-main-grid">
           <div class="card">
@@ -513,7 +513,7 @@
 
     let resumenData = null, donutChart = null;
     let activeCirc = 'NACIONAL';
-    let hemicicloMap = null, _deptoGeoRaw = null;
+    let hemicicloMap = null, _deptoGeoRaw = null, _hemicicloNacLayer = null, _hemicicloDepLayer = null;
     // ─── MAPA SENADO ──────────────────────────────────────────
     let senaMap = null, senaGeoLayer = null, senaDepLayer = null;
     let senaDepWinner = {}; // depCode → {partido, votos, nombre}
@@ -755,15 +755,34 @@
     }
 
     function renderKPI(){
-      const r = getCircData();
-      const cp = getCircPartidosCalculated();
-      const topP = cp.filter(p=>!/blanco/i.test(p.partido))[0];
-      const totalCurules = cp.reduce((s,p)=>s+(p.curules||0),0);
-      const votVal=r.votant!=null?r.votant-(r.votnul||0)-(r.votnma||0):(r.votval||0)+(r.votblan||0);
+      let votant, votVal, totalCurules, maxCurules, topP, deltaLabel;
+      if(activeCirc==='RESULTADOS_GENERALES'){
+        const nac=resumenData.por_circunscripcion?.['NACIONAL']||resumenData||{};
+        const ind=resumenData.por_circunscripcion?.['INDIGENAS']||{};
+        const nacVV=nac.votant!=null?nac.votant-(nac.votnul||0)-(nac.votnma||0):(nac.votval||0)+(nac.votblan||0);
+        const indVV=ind.votant!=null?ind.votant-(ind.votnul||0)-(ind.votnma||0):(ind.votval||0)+(ind.votblan||0);
+        votant=(nac.votant||0)+(ind.votant||0);
+        votVal=nacVV+indVV;
+        totalCurules=102; maxCurules=102;
+        const savedCirc=activeCirc; activeCirc='NACIONAL';
+        const nacCp=getCircPartidosCalculated();
+        activeCirc=savedCirc;
+        topP=nacCp.filter(p=>!/blanco/i.test(p.partido))[0];
+        deltaLabel='Nacional + Indígena';
+      } else {
+        const r=getCircData();
+        const cp=getCircPartidosCalculated();
+        topP=cp.filter(p=>!/blanco/i.test(p.partido))[0];
+        totalCurules=cp.reduce((s,p)=>s+(p.curules||0),0);
+        maxCurules=getMaxCurules();
+        votant=r.votant||0;
+        votVal=r.votant!=null?r.votant-(r.votnul||0)-(r.votnma||0):(r.votval||0)+(r.votblan||0);
+        deltaLabel='Votos emitidos';
+      }
       document.getElementById('kpi-row').innerHTML=`
-        <div class="kpi-card"><div class="kpi-label">Votantes</div><div class="kpi-val wh">${fmt(r.votant)}</div><div class="kpi-delta">Votos emitidos</div></div>
-        <div class="kpi-card"><div class="kpi-label">Votos válidos</div><div class="kpi-val gr">${fmt(votVal)}</div><div class="kpi-delta">${pct(votVal,r.votant)}% de los votantes</div></div>
-        <div class="kpi-card"><div class="kpi-label">Curules asignadas</div><div class="kpi-val">${totalCurules} / ${getMaxCurules()}</div><div class="kpi-delta">D'Hondt · umbral 3%</div></div>
+        <div class="kpi-card"><div class="kpi-label">Votantes</div><div class="kpi-val wh">${fmt(votant)}</div><div class="kpi-delta">${deltaLabel}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Votos válidos</div><div class="kpi-val gr">${fmt(votVal)}</div><div class="kpi-delta">${pct(votVal,votant)}% de los votantes</div></div>
+        <div class="kpi-card"><div class="kpi-label">Curules asignadas</div><div class="kpi-val">${totalCurules} / ${maxCurules}</div><div class="kpi-delta">D'Hondt · umbral 3%</div></div>
         <div class="kpi-card"><div class="kpi-label">Partido puntero</div><div class="kpi-val sm">${topP?topP.partido.split(' ').slice(0,3).join(' '):'—'}</div><div class="kpi-delta">${topP?fmt(topP.votos)+' votos · '+topP.curules+' curules':''}</div></div>`;
     }
 
@@ -890,8 +909,17 @@
       document.getElementById('zona-filter-container').style.display='none';
       document.getElementById('pue-filter-container').style.display='none';
       document.getElementById('mesa-filter-container').style.display='none';
-      if(!cod){renderNacional();renderKPI();renderDonut();updateSenaMap('');return;}
-      await Promise.all([updateSenaMap(cod), renderGeoPartidos('dep',cod,null,null)]);
+      if(!cod){
+        renderKPI();renderDonut();
+        if(activeCirc==='RESULTADOS_GENERALES'){renderNacional();updateHemicicloMap('');}
+        else{renderNacional();updateSenaMap('');}
+        return;
+      }
+      if(activeCirc==='RESULTADOS_GENERALES'){
+        await Promise.all([updateHemicicloMap(cod), renderGeoPartidos('dep',cod,null,null)]);
+      } else {
+        await Promise.all([updateSenaMap(cod), renderGeoPartidos('dep',cod,null,null)]);
+      }
       const muns=await getDepJSON('municipios',cod);
       const sel=document.getElementById('mun-select');
       sel.innerHTML='<option value="">TODOS</option>';
@@ -908,8 +936,13 @@
       document.getElementById('zona-filter-container').style.display='none';
       document.getElementById('pue-filter-container').style.display='none';
       document.getElementById('mesa-filter-container').style.display='none';
-      if(!cod){await renderGeoPartidos('dep',depCod,null,null);return;}
+      if(!cod){
+        if(activeCirc==='RESULTADOS_GENERALES') updateHemicicloMap(depCod);
+        await renderGeoPartidos('dep',depCod,null,null);
+        return;
+      }
       showLoadingToast();
+      if(activeCirc==='RESULTADOS_GENERALES') updateHemicicloMap(depCod);
       await renderGeoPartidos('mun',depCod,cod,null);
       const zonas=await getDepJSON('comunas',depCod);
       const isLocalidad=(depCod==='16')||(depCod==='03'&&cod==='001');
@@ -1268,10 +1301,10 @@
       const leg = document.getElementById('hemiciclo-legend');
       if(leg){
         leg.innerHTML = partidos.map(p=>`
-          <div style="display:flex;align-items:center;gap:.5rem;font-family:'DM Mono',monospace;font-size:.65rem;color:rgba(255,255,255,.55)">
+          <div style="display:flex;align-items:center;gap:.5rem;font-family:'Syne',sans-serif;font-weight:400;font-size:.72rem;color:var(--white)">
             <span style="width:9px;height:9px;border-radius:50%;background:${getColor(p.partido)};display:inline-block;flex-shrink:0"></span>
             <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.partido}</span>
-            <span style="color:#f4f3ef;font-weight:700;font-family:'Syne',sans-serif;margin-left:.25rem">${p.curules}</span>
+            <span style="font-weight:700;margin-left:.25rem;flex-shrink:0">${p.curules}</span>
           </div>`).join('');
       }
     }
@@ -1301,7 +1334,7 @@
     }
 
     function _buildHemicicloGeo(){
-      L.geoJSON(_deptoGeoRaw,{
+      _hemicicloNacLayer = L.geoJSON(_deptoGeoRaw,{
         style: feat=>{
           const code = _senaDepCode(feat.properties);
           const w = code ? senaDepWinner[code] : null;
@@ -1328,7 +1361,72 @@
           });
         }
       }).addTo(hemicicloMap);
-      try{ hemicicloMap.fitBounds(L.geoJSON(_deptoGeoRaw).getBounds(),{padding:[6,6]}); }catch(_){}
+      try{ hemicicloMap.fitBounds(_hemicicloNacLayer.getBounds(),{padding:[6,6]}); }catch(_){}
+    }
+
+    async function updateHemicicloMap(depCod){
+      if(!hemicicloMap) return;
+      if(_hemicicloDepLayer){ hemicicloMap.removeLayer(_hemicicloDepLayer); _hemicicloDepLayer=null; }
+      if(!depCod){
+        if(_hemicicloNacLayer){ if(!hemicicloMap.hasLayer(_hemicicloNacLayer)) _hemicicloNacLayer.addTo(hemicicloMap); _hemicicloNacLayer.resetStyle(); try{hemicicloMap.fitBounds(_hemicicloNacLayer.getBounds(),{padding:[6,6]});}catch(_){} }
+        return;
+      }
+      if(_hemicicloNacLayer&&hemicicloMap.hasLayer(_hemicicloNacLayer)) hemicicloMap.removeLayer(_hemicicloNacLayer);
+      const code=_normC(depCod);
+      const isBogota=(code==='16');
+      // Ganadores por municipio (reusar caché de senaMap si ya existe)
+      let munWinner={};
+      try{
+        const muns=await getDepJSON('municipios',depCod);
+        const SPEC=new Set(['996','997','998']);
+        muns.forEach(m=>{
+          if(m.dep_cod!==depCod) return;
+          if(m.circ_nom&&!/nacional/i.test(m.circ_nom)) return;
+          const mc=_normC(m.cod); if(munWinner[mc]) return;
+          const circ=m.por_circunscripcion?.['NACIONAL']??m;
+          const pts=Object.entries(circ.partidos||{}).filter(([k])=>!SPEC.has(k)&&!/blanco/i.test(k)).sort((a,b)=>b[1]-a[1]);
+          if(pts.length) munWinner[mc]={partido:pts[0][0],votos:pts[0][1],nombre:m.nombre};
+        });
+      }catch(e){ console.warn('[HemiMap] muns:',e); }
+      try{
+        let geo=_senaDepGeoCache[depCod];
+        if(!geo){
+          const paddedCode=String(depCod).padStart(2,'0');
+          const url=isBogota?BOGOTA_LOC_URL:`${DEPTOS_MPS_URL}${paddedCode}.json`;
+          const r=await fetch(url); if(!r.ok) throw new Error(`HTTP ${r.status}`);
+          geo=await r.json(); _senaDepGeoCache[depCod]=geo;
+        }
+        const munStyle=feat=>{
+          let w=null;
+          const p=feat.properties;
+          if(p.mun_elec!=null) w=munWinner[_normC(p.mun_elec)];
+          if(!w&&p.LocCodigo!=null) w=Object.values(munWinner)[0]||null;
+          return {fillColor:w?getColor(w.partido):'#333',fillOpacity:w?0.72:0.3,color:'rgba(255,255,255,0.35)',weight:1};
+        };
+        _hemicicloDepLayer=L.geoJSON(geo,{
+          style:munStyle,
+          onEachFeature:(feat,layer)=>{
+            const p=feat.properties;
+            let w=null;
+            if(p.mun_elec!=null) w=munWinner[_normC(p.mun_elec)];
+            if(!w&&p.LocCodigo!=null) w=Object.values(munWinner)[0]||null;
+            const munNom=p.mpio_cnmbr||p.LocNombre||p.NOMBRE||p.nombre||p.name||'?';
+            layer.on({
+              mouseover(e){
+                layer.setStyle({weight:2,color:'#fff',fillOpacity:0.95});
+                layer.bindTooltip(
+                  `<div style="font-family:'DM Mono',monospace;font-size:.78rem;line-height:1.7;padding:.1rem .2rem">
+                    <span style="color:#0047FF;font-weight:700">${munNom.toUpperCase()}</span><br/>
+                    ${w?`<span style="color:${getColor(w.partido)};font-weight:700">${w.partido}</span><br/>${fmt(w.votos)} votos`:'Sin datos'}
+                  </div>`,{sticky:true,opacity:1}
+                ).openTooltip(e.latlng);
+              },
+              mouseout(){ layer.setStyle(munStyle(feat)); layer.closeTooltip(); }
+            });
+          }
+        }).addTo(hemicicloMap);
+        try{hemicicloMap.fitBounds(_hemicicloDepLayer.getBounds(),{padding:[10,10]});}catch(_){}
+      }catch(e){ console.warn('[HemiMap] depGeo:',e); if(_hemicicloNacLayer&&!hemicicloMap.hasLayer(_hemicicloNacLayer)) _hemicicloNacLayer.addTo(hemicicloMap); }
     }
 
     function renderNacional(){
