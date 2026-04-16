@@ -405,7 +405,10 @@
         <div style="display:none" id="panel-resultados-generales">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.5rem">
             <div class="card">
-              <div class="card-label" style="margin-bottom:1rem">Hemiciclo · 102 curules · Nacional + Indígena</div>
+              <div class="card-label" id="hemiciclo-card-label" style="margin-bottom:1rem">Hemiciclo · 102 curules · Nacional + Indígena</div>
+              <div id="hemiciclo-whatif-text" style="display:none;font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:#0047FF;margin-bottom:.9rem;padding:.55rem .75rem;background:rgba(0,71,255,.07);border:1px solid rgba(0,71,255,.25);line-height:1.6">
+                WHAT IF?! — ¿Qué pasaría si solo <span id="hemiciclo-whatif-lugar" style="color:var(--white);font-weight:700"></span> eligiera Senado?
+              </div>
               <svg id="hemiciclo-svg" viewBox="0 0 600 330" style="width:100%;height:auto;display:block"></svg>
               <div id="hemiciclo-legend" style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem .75rem;margin-top:.85rem;padding-top:.85rem;border-top:1px solid rgba(255,255,255,0.07)"></div>
             </div>
@@ -514,6 +517,35 @@
     let resumenData = null, donutChart = null;
     let activeCirc = 'NACIONAL';
     let hemicicloMap = null, _deptoGeoRaw = null, _hemicicloNacLayer = null, _hemicicloDepLayer = null;
+    let _rgFilter = null; // { nombre, nacVotant, nacVV, nacPartidos, indVotant, indVV }
+
+    async function loadRGFilter(depCod, munCod){
+      if(!depCod){ _rgFilter = null; return; }
+      const SPEC = new Set(['996','997','998']);
+      const calcVV = r => r.votant!=null ? r.votant-(r.votnul||0)-(r.votnma||0) : (r.votval||0)+(r.votblan||0);
+      try{
+        let data;
+        if(munCod){
+          const muns = await getDepJSON('municipios', depCod);
+          data = muns.find(m => m.cod===munCod && m.dep_cod===depCod);
+        } else {
+          const deps = await getJSON('departamentos');
+          data = deps.find(d => d.cod===depCod);
+        }
+        if(!data){ _rgFilter = null; return; }
+        const nacRaw = data.por_circunscripcion?.['NACIONAL'] ?? data;
+        const indRaw = data.por_circunscripcion?.['INDIGENAS'] ?? {};
+        const filtParts = obj => Object.fromEntries(
+          Object.entries(obj.partidos||{}).filter(([k])=>!SPEC.has(k)&&!/blanco/i.test(k))
+        );
+        _rgFilter = {
+          nombre: data.nombre || depCod,
+          nacVotant: nacRaw.votant||0, nacVV: calcVV(nacRaw),
+          nacPartidos: filtParts(nacRaw),
+          indVotant: indRaw.votant||0, indVV: calcVV(indRaw),
+        };
+      }catch(e){ console.warn('[RGFilter]',e); _rgFilter = null; }
+    }
     // ─── MAPA SENADO ──────────────────────────────────────────
     let senaMap = null, senaGeoLayer = null, senaDepLayer = null;
     let senaDepWinner = {}; // depCode → {partido, votos, nombre}
@@ -757,18 +789,27 @@
     function renderKPI(){
       let votant, votVal, totalCurules, maxCurules, topP, deltaLabel;
       if(activeCirc==='RESULTADOS_GENERALES'){
-        const nac=resumenData.por_circunscripcion?.['NACIONAL']||resumenData||{};
-        const ind=resumenData.por_circunscripcion?.['INDIGENAS']||{};
-        const nacVV=nac.votant!=null?nac.votant-(nac.votnul||0)-(nac.votnma||0):(nac.votval||0)+(nac.votblan||0);
-        const indVV=ind.votant!=null?ind.votant-(ind.votnul||0)-(ind.votnma||0):(ind.votval||0)+(ind.votblan||0);
-        votant=(nac.votant||0)+(ind.votant||0);
-        votVal=nacVV+indVV;
-        totalCurules=102; maxCurules=102;
-        const savedCirc=activeCirc; activeCirc='NACIONAL';
-        const nacCp=getCircPartidosCalculated();
-        activeCirc=savedCirc;
-        topP=nacCp.filter(p=>!/blanco/i.test(p.partido))[0];
-        deltaLabel='Nacional + Indígena';
+        if(_rgFilter){
+          votant=_rgFilter.nacVotant+_rgFilter.indVotant;
+          votVal=_rgFilter.nacVV+_rgFilter.indVV;
+          totalCurules=102; maxCurules=102;
+          const terrTop=Object.entries(_rgFilter.nacPartidos).sort((a,b)=>b[1]-a[1])[0];
+          topP=terrTop?{partido:terrTop[0],votos:terrTop[1],curules:0}:null;
+          deltaLabel=_rgFilter.nombre;
+        } else {
+          const nac=resumenData.por_circunscripcion?.['NACIONAL']||resumenData||{};
+          const ind=resumenData.por_circunscripcion?.['INDIGENAS']||{};
+          const nacVV=nac.votant!=null?nac.votant-(nac.votnul||0)-(nac.votnma||0):(nac.votval||0)+(nac.votblan||0);
+          const indVV=ind.votant!=null?ind.votant-(ind.votnul||0)-(ind.votnma||0):(ind.votval||0)+(ind.votblan||0);
+          votant=(nac.votant||0)+(ind.votant||0);
+          votVal=nacVV+indVV;
+          totalCurules=102; maxCurules=102;
+          const savedCirc=activeCirc; activeCirc='NACIONAL';
+          const nacCp=getCircPartidosCalculated();
+          activeCirc=savedCirc;
+          topP=nacCp.filter(p=>!/blanco/i.test(p.partido))[0];
+          deltaLabel='Nacional + Indígena';
+        }
       } else {
         const r=getCircData();
         const cp=getCircPartidosCalculated();
@@ -783,7 +824,7 @@
         <div class="kpi-card"><div class="kpi-label">Votantes</div><div class="kpi-val wh">${fmt(votant)}</div><div class="kpi-delta">${deltaLabel}</div></div>
         <div class="kpi-card"><div class="kpi-label">Votos válidos</div><div class="kpi-val gr">${fmt(votVal)}</div><div class="kpi-delta">${pct(votVal,votant)}% de los votantes</div></div>
         <div class="kpi-card"><div class="kpi-label">Curules asignadas</div><div class="kpi-val">${totalCurules} / ${maxCurules}</div><div class="kpi-delta">D'Hondt · umbral 3%</div></div>
-        <div class="kpi-card"><div class="kpi-label">Partido puntero</div><div class="kpi-val sm">${topP?topP.partido.split(' ').slice(0,3).join(' '):'—'}</div><div class="kpi-delta">${topP?fmt(topP.votos)+' votos · '+topP.curules+' curules':''}</div></div>`;
+        <div class="kpi-card"><div class="kpi-label">Partido puntero</div><div class="kpi-val sm">${topP?topP.partido.split(' ').slice(0,3).join(' '):'—'}</div><div class="kpi-delta">${topP?fmt(topP.votos)+' votos':''}</div></div>`;
     }
 
     function renderDonut(){
@@ -911,12 +952,14 @@
       document.getElementById('mesa-filter-container').style.display='none';
       if(!cod){
         renderKPI();renderDonut();
-        if(activeCirc==='RESULTADOS_GENERALES'){renderNacional();updateHemicicloMap('');}
-        else{renderNacional();updateSenaMap('');}
+        if(activeCirc==='RESULTADOS_GENERALES'){
+          _rgFilter=null; renderHemiciclo(); renderKPI(); updateHemicicloMap('');
+        } else { renderNacional(); updateSenaMap(''); }
         return;
       }
       if(activeCirc==='RESULTADOS_GENERALES'){
-        await Promise.all([updateHemicicloMap(cod), renderGeoPartidos('dep',cod,null,null)]);
+        await Promise.all([updateHemicicloMap(cod), loadRGFilter(cod,null)]);
+        renderHemiciclo(); renderKPI();
       } else {
         await Promise.all([updateSenaMap(cod), renderGeoPartidos('dep',cod,null,null)]);
       }
@@ -937,13 +980,17 @@
       document.getElementById('pue-filter-container').style.display='none';
       document.getElementById('mesa-filter-container').style.display='none';
       if(!cod){
-        if(activeCirc==='RESULTADOS_GENERALES') updateHemicicloMap(depCod);
-        await renderGeoPartidos('dep',depCod,null,null);
+        if(activeCirc==='RESULTADOS_GENERALES'){
+          await Promise.all([updateHemicicloMap(depCod), loadRGFilter(depCod,null)]);
+          renderHemiciclo(); renderKPI();
+        } else { await renderGeoPartidos('dep',depCod,null,null); }
         return;
       }
       showLoadingToast();
-      if(activeCirc==='RESULTADOS_GENERALES') updateHemicicloMap(depCod);
-      await renderGeoPartidos('mun',depCod,cod,null);
+      if(activeCirc==='RESULTADOS_GENERALES'){
+        await Promise.all([updateHemicicloMap(depCod), loadRGFilter(depCod,cod)]);
+        renderHemiciclo(); renderKPI();
+      } else { await renderGeoPartidos('mun',depCod,cod,null); }
       const zonas=await getDepJSON('comunas',depCod);
       const isLocalidad=(depCod==='16')||(depCod==='03'&&cod==='001');
       document.querySelector('#zona-filter-container .sub-label').textContent=isLocalidad?'Localidad:':'Comuna:';
@@ -1171,9 +1218,11 @@
       if(activeCirc==='RESULTADOS_GENERALES'){
         panelRG.style.display='';
         panelMain.style.display='none';
+        renderKPI();
         renderHemiciclo();
         initHemicicloMap();
       }else{
+        _rgFilter=null;
         panelRG.style.display='none';
         panelMain.style.display='';
         const depCod=document.getElementById('dep-select').value;
@@ -1211,11 +1260,37 @@
     }
 
     function renderHemiciclo(){
-      // Usar siempre datos NACIONAL para el hemiciclo
+      // Obtener distribución real (NACIONAL)
       const savedCirc = activeCirc;
       activeCirc = 'NACIONAL';
-      const partidos = getCircPartidosCalculated().filter(p=>(p.curules||0)>0);
+      const nacPartidosFull = getCircPartidosCalculated();
       activeCirc = savedCirc;
+
+      // Mostrar/ocultar WHAT IF
+      const wiText = document.getElementById('hemiciclo-whatif-text');
+      const wiLugar = document.getElementById('hemiciclo-whatif-lugar');
+
+      let partidos, whatIfMap = null, actualMap = {};
+      nacPartidosFull.forEach(p=>{ if((p.curules||0)>0) actualMap[p.partido]=p.curules||0; });
+
+      if(_rgFilter){
+        // WHAT IF mode: calcular D'Hondt con votos del territorio, umbral 3%
+        if(wiText) wiText.style.display='block';
+        if(wiLugar) wiLugar.textContent=_rgFilter.nombre;
+        const terrVotes = Object.entries(_rgFilter.nacPartidos)
+          .map(([partido,votos])=>({partido,votos})).filter(p=>p.votos>0);
+        const totalTerrVotes = terrVotes.reduce((s,p)=>s+p.votos,0);
+        const umbral3 = totalTerrVotes*0.03;
+        const aboveUmbral = terrVotes.filter(p=>p.votos>=umbral3);
+        const whatIfResult = dhondt(aboveUmbral, 100);
+        whatIfMap = {};
+        whatIfResult.forEach(p=>{ if((p.curules||0)>0) whatIfMap[p.partido]=p.curules; });
+        // Partidos a dibujar = los que tienen curules en el what-if
+        partidos = whatIfResult.filter(p=>(p.curules||0)>0).sort((a,b)=>b.curules-a.curules);
+      } else {
+        if(wiText) wiText.style.display='none';
+        partidos = nacPartidosFull.filter(p=>(p.curules||0)>0);
+      }
 
       const svg = document.getElementById('hemiciclo-svg');
       svg.innerHTML = '';
@@ -1300,12 +1375,35 @@
       // Leyenda HTML debajo del SVG
       const leg = document.getElementById('hemiciclo-legend');
       if(leg){
-        leg.innerHTML = partidos.map(p=>`
-          <div style="display:flex;align-items:center;gap:.5rem;font-family:'Syne',sans-serif;font-weight:400;font-size:.72rem;color:var(--white)">
-            <span style="width:9px;height:9px;border-radius:50%;background:${getColor(p.partido)};display:inline-block;flex-shrink:0"></span>
-            <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.partido}</span>
-            <span style="font-weight:700;margin-left:.25rem;flex-shrink:0">${p.curules}</span>
-          </div>`).join('');
+        if(whatIfMap){
+          // Modo WHAT IF: mostrar todos los partidos con curules (actual o what-if)
+          const allParties = new Set([...Object.keys(actualMap), ...Object.keys(whatIfMap)]);
+          const rows = [...allParties].map(partido=>{
+            const actual = actualMap[partido]||0;
+            const wi = whatIfMap[partido]||0;
+            const color = getColor(partido);
+            const diff = wi - actual;
+            const arrow = diff>0 ? `<span style="color:#39ff7a">▲${diff}</span>` : diff<0 ? `<span style="color:#ff4444">▼${Math.abs(diff)}</span>` : `<span style="color:rgba(255,255,255,.3)">─</span>`;
+            const sym = actual>wi ? '>' : actual<wi ? '<' : '=';
+            const symColor = actual>wi?'#ff4444':actual<wi?'#39ff7a':'rgba(255,255,255,.3)';
+            return {partido,actual,wi,diff,color,arrow,sym,symColor};
+          }).sort((a,b)=>b.wi-a.wi||b.actual-a.actual);
+          leg.innerHTML = rows.map(r=>`
+            <div style="display:flex;align-items:center;gap:.4rem;font-family:'Syne',sans-serif;font-weight:400;font-size:.7rem;color:var(--white)">
+              <span style="width:8px;height:8px;border-radius:50%;background:${r.color};display:inline-block;flex-shrink:0"></span>
+              <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.65rem">${r.partido}</span>
+              <span style="flex-shrink:0;font-weight:700">${r.actual}</span>
+              <span style="flex-shrink:0;color:${r.symColor};font-size:.65rem;font-family:'DM Mono',monospace">${r.sym}</span>
+              <span style="flex-shrink:0;font-weight:700">${r.wi}</span>
+            </div>`).join('');
+        } else {
+          leg.innerHTML = partidos.map(p=>`
+            <div style="display:flex;align-items:center;gap:.5rem;font-family:'Syne',sans-serif;font-weight:400;font-size:.72rem;color:var(--white)">
+              <span style="width:9px;height:9px;border-radius:50%;background:${getColor(p.partido)};display:inline-block;flex-shrink:0"></span>
+              <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.partido}</span>
+              <span style="font-weight:700;margin-left:.25rem;flex-shrink:0">${p.curules}</span>
+            </div>`).join('');
+        }
       }
     }
 
