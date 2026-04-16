@@ -400,23 +400,20 @@
         <div style="display:none" id="panel-resultados-generales">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.5rem">
             <div class="card">
-              <div class="card-label" style="margin-bottom:1rem">Distribución en Hemiciclo</div>
-              <div id="hemiciclo-container" style="display:flex;justify-content:center;align-items:center;min-height:300px">
-                <svg id="hemiciclo-svg" viewBox="0 0 600 350" style="width:100%;height:auto;max-width:500px"></svg>
-              </div>
+              <div class="card-label" style="margin-bottom:1rem">Hemiciclo · 100 curules · Nacional</div>
+              <svg id="hemiciclo-svg" viewBox="0 0 600 310" style="width:100%;height:auto;display:block"></svg>
+              <div id="hemiciclo-legend" style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem .75rem;margin-top:.75rem;padding-top:.75rem;border-top:1px solid rgba(255,255,255,0.07)"></div>
             </div>
-            <div class="card">
-              <div class="card-label" style="margin-bottom:1rem">Mapa Electoral</div>
-              <div id="hemiciclo-map-wrap" style="position:relative;width:100%;height:320px;overflow:hidden">
-                <div id="hemiciclo-map" style="position:absolute;inset:0;background:#060810"></div>
-              </div>
+            <div class="card" style="padding:1.3rem 1.3rem .75rem">
+              <div class="card-label" style="margin-bottom:.75rem">Mapa Electoral · Partido puntero por departamento</div>
+              <div id="hemiciclo-map" style="width:100%;height:340px;background:#060810"></div>
             </div>
           </div>
         </div>
         <div class="circ-toggle" id="circ-toggle">
-          <button class="circ-btn circ-btn-active" id="circ-btn-resultados-generales" onclick="onCircChange('RESULTADOS_GENERALES')">Resultados Generales</button>
-          <button class="circ-btn" id="circ-btn-nacional" onclick="onCircChange('NACIONAL')">Nacional</button>
+          <button class="circ-btn circ-btn-active" id="circ-btn-nacional" onclick="onCircChange('NACIONAL')">Nacional</button>
           <button class="circ-btn" id="circ-btn-indigenas" onclick="onCircChange('INDIGENAS')">Indígena</button>
+          <button class="circ-btn" id="circ-btn-resultados-generales" onclick="onCircChange('RESULTADOS_GENERALES')">Resultados Generales</button>
         </div>
         <div class="results-grid" id="sen-main-grid">
           <div class="card">
@@ -515,8 +512,8 @@
     }
 
     let resumenData = null, donutChart = null;
-    let activeCirc = 'RESULTADOS_GENERALES';
-    let hemicicloMap = null, hemicicloGeoLayer = null;
+    let activeCirc = 'NACIONAL';
+    let hemicicloMap = null, _deptoGeoRaw = null;
     // ─── MAPA SENADO ──────────────────────────────────────────
     let senaMap = null, senaGeoLayer = null, senaDepLayer = null;
     let senaDepWinner = {}; // depCode → {partido, votos, nombre}
@@ -579,6 +576,7 @@
           const r = await fetch(DEPTO_GEOJSON);
           if(!r.ok) return;
           const geo = await r.json();
+          _deptoGeoRaw = geo;
           senaGeoLayer = L.geoJSON(geo,{
             style: feat=>{
               const code=_senaDepCode(feat.properties);
@@ -745,8 +743,7 @@
         renderDonut();
         document.getElementById('cifra-rep').textContent = fmt(resumenData.cifra);
         document.getElementById('umbral-val').textContent = fmt(resumenData.umbral);
-        renderHemiciclo();
-        initHemicicloMap();
+        renderNacional();
         const deps=await getJSON('departamentos');
         const depSel=document.getElementById('dep-select');
         const _seenDep=new Set();[...deps].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).forEach(d=>{if(_seenDep.has(d.cod))return;_seenDep.add(d.cod);const o=document.createElement('option');o.value=d.cod;o.textContent=d.nombre;depSel.appendChild(o);});
@@ -1181,130 +1178,157 @@
     }
 
     function renderHemiciclo(){
-      const partidos=getCircPartidosCalculated();
-      const svg=document.getElementById('hemiciclo-svg');
-      svg.innerHTML='';
+      // Usar siempre datos NACIONAL para el hemiciclo
+      const savedCirc = activeCirc;
+      activeCirc = 'NACIONAL';
+      const partidos = getCircPartidosCalculated().filter(p=>(p.curules||0)>0);
+      activeCirc = savedCirc;
 
-      const cx=300, cy=280, r=240, startAngle=Math.PI;
-      let currentAngle=startAngle;
+      const svg = document.getElementById('hemiciclo-svg');
+      svg.innerHTML = '';
+      svg.setAttribute('viewBox','0 0 600 310');
 
-      partidos.forEach(p=>{
-        const curules=p.curules||0;
-        if(curules===0) return;
+      // Distribución en 4 anillos concéntricos, total = 100 curules
+      const cx = 300, cy = 295;
+      const rings = [
+        {r: 80,  n: 16},
+        {r: 123, n: 22},
+        {r: 168, n: 28},
+        {r: 213, n: 34},
+      ];
 
-        const anglePerCurul=(Math.PI)/Math.max(100,getMaxCurules());
-        const endAngle=currentAngle+anglePerCurul*curules;
-        const color=getColor(p.partido);
-
-        let curulesDrawn=0;
-        for(let i=0;i<curules;i++){
-          const angle=currentAngle+anglePerCurul*i+anglePerCurul*0.5;
-          const x=cx+r*Math.cos(angle);
-          const y=cy+r*Math.sin(angle);
-          const radius=12;
-
-          const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
-          circle.setAttribute('cx',x);
-          circle.setAttribute('cy',y);
-          circle.setAttribute('r',radius);
-          circle.setAttribute('fill',color);
-          circle.setAttribute('opacity','0.85');
-          circle.setAttribute('stroke','rgba(255,255,255,0.15)');
-          circle.setAttribute('stroke-width','1');
-
-          const title=document.createElementNS('http://www.w3.org/2000/svg','title');
-          title.textContent=p.partido;
-          circle.appendChild(title);
-
-          circle.addEventListener('mouseenter',function(){
-            this.setAttribute('opacity','1');
-            this.setAttribute('r',15);
-            const tooltip=document.createElement('div');
-            tooltip.style.cssText='position:fixed;background:rgba(0,0,0,0.9);color:#fff;padding:0.5rem 0.75rem;border-radius:3px;font-size:0.75rem;pointer-events:none;z-index:10000;font-family:\'DM Mono\',monospace;white-space:nowrap';
-            tooltip.textContent=p.partido;
-            document.body.appendChild(tooltip);
-            circle._tooltip=tooltip;
-            const updatePos=()=>{
-              const rect=circle.getBoundingClientRect();
-              tooltip.style.left=(rect.left+rect.width/2-tooltip.offsetWidth/2)+'px';
-              tooltip.style.top=(rect.top-30)+'px';
-            };
-            updatePos();
-            circle._updatePos=updatePos;
-            window.addEventListener('mousemove',updatePos);
+      // Generar lista de posiciones (x,y) en orden de arco: izquierda→arriba→derecha
+      const positions = [];
+      rings.forEach(ring => {
+        for(let i = 0; i < ring.n; i++){
+          const angle = Math.PI + (Math.PI / ring.n) * i + (Math.PI / (2 * ring.n));
+          positions.push({
+            x: cx + ring.r * Math.cos(angle),
+            y: cy + ring.r * Math.sin(angle),
+            r: ring.r
           });
-
-          circle.addEventListener('mouseleave',function(){
-            this.setAttribute('opacity','0.85');
-            this.setAttribute('r',12);
-            if(this._tooltip){
-              this._tooltip.remove();
-              delete this._tooltip;
-            }
-            if(this._updatePos){
-              window.removeEventListener('mousemove',this._updatePos);
-              delete this._updatePos;
-            }
-          });
-
-          svg.appendChild(circle);
-          curulesDrawn++;
         }
-        currentAngle=endAngle;
       });
 
-      const legendX=20, legendY=20;
-      partidos.filter(p=>p.curules>0).forEach((p,i)=>{
-        const color=getColor(p.partido);
-        const y=legendY+i*18;
+      // Asignar posiciones a partidos en orden de curules (mayor a menor)
+      let pos = 0;
+      partidos.forEach(p => {
+        const curules = p.curules || 0;
+        const color = getColor(p.partido);
+        const elegidos = getElegidosNac().get(p.partido);
+        const nombresElegidos = elegidos ? [...elegidos] : [];
 
-        const rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
-        rect.setAttribute('x',legendX);
-        rect.setAttribute('y',y);
-        rect.setAttribute('width','10');
-        rect.setAttribute('height','10');
-        rect.setAttribute('fill',color);
-        rect.setAttribute('opacity','0.85');
-        svg.appendChild(rect);
+        for(let i = 0; i < curules && pos < positions.length; i++, pos++){
+          const {x, y} = positions[pos];
+          const dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+          dot.setAttribute('cx', x.toFixed(1));
+          dot.setAttribute('cy', y.toFixed(1));
+          dot.setAttribute('r', '8');
+          dot.setAttribute('fill', color);
+          dot.setAttribute('opacity', '0.85');
+          dot.setAttribute('stroke', 'rgba(255,255,255,0.2)');
+          dot.setAttribute('stroke-width', '0.8');
+          dot.style.cursor = 'pointer';
+          dot.style.transition = 'r 0.1s, opacity 0.1s';
 
-        const text=document.createElementNS('http://www.w3.org/2000/svg','text');
-        text.setAttribute('x',legendX+16);
-        text.setAttribute('y',y+9);
-        text.setAttribute('font-size','11');
-        text.setAttribute('fill','rgba(255,255,255,0.75)');
-        text.setAttribute('font-family','DM Mono,monospace');
-        text.textContent=p.partido.substring(0,20)+'...';
-        svg.appendChild(text);
+          // Tooltip hover
+          dot.addEventListener('mouseenter', function(e){
+            this.setAttribute('r','11');
+            this.setAttribute('opacity','1');
+            let tip = document.getElementById('hemi-tooltip');
+            if(!tip){ tip=document.createElement('div'); tip.id='hemi-tooltip'; tip.style.cssText='position:fixed;background:rgba(6,8,16,0.97);border:1px solid rgba(0,71,255,0.4);color:#f4f3ef;padding:.5rem .85rem;font-size:.72rem;pointer-events:none;z-index:10000;font-family:\'DM Mono\',monospace;white-space:nowrap;line-height:1.7'; document.body.appendChild(tip); }
+            const cand = nombresElegidos[i] || '';
+            tip.innerHTML = `<span style="color:#0047FF;font-weight:700">${p.partido}</span><br/>${curules} curul${curules!==1?'es':''}${cand?'<br/><span style="color:rgba(57,255,122,0.9)">'+cand+'</span>':''}`;
+            tip.style.display='block';
+            const move = ev => { tip.style.left=(ev.clientX+14)+'px'; tip.style.top=(ev.clientY-10)+'px'; };
+            move(e);
+            this._mv = move;
+            window.addEventListener('mousemove', move);
+          });
+          dot.addEventListener('mouseleave', function(){
+            this.setAttribute('r','8');
+            this.setAttribute('opacity','0.85');
+            const tip=document.getElementById('hemi-tooltip');
+            if(tip) tip.style.display='none';
+            if(this._mv){ window.removeEventListener('mousemove',this._mv); delete this._mv; }
+          });
+
+          svg.appendChild(dot);
+        }
       });
+
+      // Línea base del hemiciclo
+      const base = document.createElementNS('http://www.w3.org/2000/svg','line');
+      base.setAttribute('x1', cx - 230); base.setAttribute('y1', cy);
+      base.setAttribute('x2', cx + 230); base.setAttribute('y2', cy);
+      base.setAttribute('stroke','rgba(255,255,255,0.12)'); base.setAttribute('stroke-width','1');
+      svg.appendChild(base);
+
+      // Leyenda HTML debajo del SVG
+      const leg = document.getElementById('hemiciclo-legend');
+      if(leg){
+        leg.innerHTML = partidos.map(p=>`
+          <div style="display:flex;align-items:center;gap:.5rem;font-family:'DM Mono',monospace;font-size:.65rem;color:rgba(255,255,255,.55)">
+            <span style="width:9px;height:9px;border-radius:50%;background:${getColor(p.partido)};display:inline-block;flex-shrink:0"></span>
+            <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.partido}</span>
+            <span style="color:#f4f3ef;font-weight:700;font-family:'Syne',sans-serif;margin-left:.25rem">${p.curules}</span>
+          </div>`).join('');
+      }
     }
 
     function initHemicicloMap(){
-      const mapContainer=document.getElementById('hemiciclo-map');
       if(hemicicloMap){
-        hemicicloMap.remove();
-        hemicicloMap=null;
+        setTimeout(()=>hemicicloMap.invalidateSize(),150);
+        return;
       }
-
-      hemicicloMap=L.map(mapContainer,{
-        center:[4.5709,-74.2973],
-        zoom:6,
-        dragging:true,
-        touchZoom:true,
-        scrollWheelZoom:true,
-        attributionControl:true
+      const mapContainer = document.getElementById('hemiciclo-map');
+      hemicicloMap = L.map(mapContainer,{
+        center:[4.5,-74.0], zoom:5,
+        zoomControl:true, attributionControl:true,
+        scrollWheelZoom:false, doubleClickZoom:false, dragging:true
       });
+      mapContainer.style.background = '#060810';
+      setTimeout(()=>hemicicloMap.invalidateSize(), 150);
 
-      const tileLayer=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',{
-        attribution:'© OpenStreetMap contributors, © CARTO',
-        maxZoom:18,
-        subdomains:'abcd'
-      }).addTo(hemicicloMap);
-
-      hemicicloMap.invalidateSize();
-
-      if(senaGeoLayer){
-        hemicicloMap.addLayer(senaGeoLayer);
+      if(_deptoGeoRaw){
+        _buildHemicicloGeo();
+      } else {
+        fetch(DEPTO_GEOJSON).then(r=>r.json()).then(geo=>{
+          _deptoGeoRaw = geo;
+          _buildHemicicloGeo();
+        }).catch(e=>console.warn('[HemiMap]',e));
       }
+    }
+
+    function _buildHemicicloGeo(){
+      L.geoJSON(_deptoGeoRaw,{
+        style: feat=>{
+          const code = _senaDepCode(feat.properties);
+          const w = code ? senaDepWinner[code] : null;
+          return {fillColor:w?getColor(w.partido):'#333',fillOpacity:w?0.78:0.35,color:'rgba(255,255,255,0.35)',weight:1};
+        },
+        onEachFeature:(feat,layer)=>{
+          const code = _senaDepCode(feat.properties);
+          const w = code ? senaDepWinner[code] : null;
+          const nom = w?w.nombre:(feat.properties.name||feat.properties.NOMBRE||feat.properties.nombre||'Depto');
+          layer.on({
+            mouseover(e){
+              layer.setStyle({weight:2,color:'#fff',fillOpacity:0.95});
+              layer.bindTooltip(
+                `<div style="font-family:'DM Mono',monospace;font-size:.78rem;line-height:1.7;padding:.1rem .2rem">
+                  <span style="color:#0047FF;font-weight:700">${nom.toUpperCase()}</span><br/>
+                  ${w?`<span style="color:${getColor(w.partido)};font-weight:700">${w.partido}</span><br/>${fmt(w.votos)} votos`:'Sin datos'}
+                </div>`,{sticky:true,opacity:1}
+              ).openTooltip(e.latlng);
+            },
+            mouseout(){
+              layer.setStyle({weight:1,color:'rgba(255,255,255,0.35)',fillColor:w?getColor(w.partido):'#333',fillOpacity:w?0.78:0.35});
+              layer.closeTooltip();
+            }
+          });
+        }
+      }).addTo(hemicicloMap);
+      try{ hemicicloMap.fitBounds(L.geoJSON(_deptoGeoRaw).getBounds(),{padding:[6,6]}); }catch(_){}
     }
 
     function renderNacional(){
