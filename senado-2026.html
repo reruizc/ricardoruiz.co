@@ -248,14 +248,6 @@
     body.day-mode .endoso-cta{background:rgba(0,71,255,.06);border-color:rgba(0,71,255,.15)}
     body.day-mode .endoso-cta-text{color:rgba(0,0,0,.7)}
     body.day-mode .sub-label{color:rgba(0,0,0,.45)}
-    .info-bar{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;background:rgba(255,230,100,.08);border:1px solid rgba(255,220,80,.18);padding:.85rem 1.3rem;margin-bottom:1rem;backdrop-filter:blur(4px)}
-    .info-bar-text{font-family:'DM Mono',monospace;font-size:.79rem;letter-spacing:.04em;line-height:1.75;color:rgba(255,235,140,.82)}
-    .info-bar-btn{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;background:rgba(255,220,80,.12);border:1px solid rgba(255,220,80,.3);color:rgba(255,230,120,.75);padding:.28rem .85rem;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background .2s}
-    .info-bar-btn:hover{background:rgba(255,220,80,.22)}
-    body.day-mode .info-bar{background:rgba(255,200,200,.15);border-color:rgba(220,100,100,.18)}
-    body.day-mode .info-bar-text{color:rgba(120,30,30,.8)}
-    body.day-mode .info-bar-btn{background:rgba(220,100,100,.1);border-color:rgba(200,80,80,.3);color:rgba(140,40,40,.8)}
-    body.day-mode .info-bar-btn:hover{background:rgba(220,100,100,.2)}
     body.day-mode .li{color:rgba(0,0,0,.6)}
     body.day-mode .lv{color:rgba(0,0,0,.85)}
     body.day-mode .endoso-btn.endoso-locked{background:rgba(0,0,0,.05);border:1px solid rgba(0,0,0,.18);color:rgba(0,0,0,.45)}
@@ -352,10 +344,6 @@
         <div class="endoso-cta">
           <div class="endoso-cta-text" id="sn-endoso-text"><b>¿Quieres medir el endoso?</b><br/>Compara la votación de un candidato al Senado con uno de Cámara mesa por mesa.</div>
           <a href="endoso-2026.html" class="endoso-btn" id="endoso-cta-btn" onclick="navTo(event,'endoso-2026.html')">Calcular endoso →</a>
-        </div>
-        <div class="info-bar" id="info-bar" style="display:none">
-          <span class="info-bar-text">Usa los filtros geográficos hasta mesa para ver el detalle más preciso de la votación. Esta herramienta es gratuita y fue construida con muchísimo trabajo. La mejor forma de apoyarnos es difundir nuestro trabajo y <a href="register.html" style="color:inherit;text-decoration:underline">registrarte</a>. Si quieres ver nuevos proyectos y funciones avanzadas, elige un plan Pro o superior.</span>
-          <button class="info-bar-btn" onclick="dismissInfoBar()">Entendido</button>
         </div>
         <div class="sub-selector">
           <div style="display:flex;align-items:center;gap:.5rem">
@@ -661,7 +649,7 @@
               mouseover(e){
                 layer.setStyle({weight:2,color:'#fff',fillOpacity:0.95});
                 layer.bindTooltip(
-                  `<div style="font-family:'DM Mono',monospace;font-size:.78rem;line-height:1.7;padding:.1rem .2rem">
+                  `<div style="font-family:'Syne',sans-serif;font-weight:400;font-size:.70rem;line-height:1.7;padding:.1rem .2rem">
                     <span style="color:#0047FF;font-weight:700">${munNom.toUpperCase()}</span><br/>
                     ${w?`<span style="color:${getColor(w.partido)};font-weight:700">${w.partido}</span><br/>${fmt(w.votos)} votos`:'Sin datos'}
                   </div>`,{sticky:true,className:'',opacity:1}
@@ -1259,6 +1247,20 @@
       return _elegidosNac;
     }
 
+    function getTopCandidatesNac(partido, n){
+      const savedCirc = activeCirc; activeCirc = 'NACIONAL';
+      const nac = getCircPartidosCalculated(); activeCirc = savedCirc;
+      const pData = nac.find(p=>p.partido===partido); if(!pData||!n) return [];
+      const ne=s=>s.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      const nom=ne(partido); const result=[];
+      for(const c of (pData.candidatos||[])){
+        if(result.length>=n) break;
+        const esl=ne(c.nombre)===nom||ne(c.nombre).includes(nom.split(' ')[0]+' '+(nom.split(' ')[1]||'__'));
+        if(!esl) result.push(c.nombre);
+      }
+      return result;
+    }
+
     function renderHemiciclo(){
       // Obtener distribución real (NACIONAL)
       const savedCirc = activeCirc;
@@ -1323,8 +1325,9 @@
       partidos.forEach(p => {
         const curules = p.curules || 0;
         const color = getColor(p.partido);
-        const elegidos = getElegidosNac().get(p.partido);
-        const nombresElegidos = elegidos ? [...elegidos] : [];
+        const nombresElegidos = whatIfMap
+          ? getTopCandidatesNac(p.partido, whatIfMap[p.partido]||0)
+          : (getElegidosNac().get(p.partido) ? [...getElegidosNac().get(p.partido)] : []);
 
         for(let i = 0; i < curules && pos < positions.length; i++, pos++){
           const {x, y} = positions[pos];
@@ -1344,7 +1347,7 @@
             this.setAttribute('r','11');
             this.setAttribute('opacity','1');
             let tip = document.getElementById('hemi-tooltip');
-            if(!tip){ tip=document.createElement('div'); tip.id='hemi-tooltip'; tip.style.cssText='position:fixed;background:rgba(6,8,16,0.97);border:1px solid rgba(0,71,255,0.4);color:#f4f3ef;padding:.5rem .85rem;font-size:.72rem;pointer-events:none;z-index:10000;font-family:\'DM Mono\',monospace;white-space:nowrap;line-height:1.7'; document.body.appendChild(tip); }
+            if(!tip){ tip=document.createElement('div'); tip.id='hemi-tooltip'; tip.style.cssText='position:fixed;background:rgba(6,8,16,0.97);border:1px solid rgba(0,71,255,0.4);color:#f4f3ef;padding:.5rem .85rem;font-size:.65rem;pointer-events:none;z-index:10000;font-family:\'Syne\',sans-serif;font-weight:400;white-space:nowrap;line-height:1.7'; document.body.appendChild(tip); }
             const cand = nombresElegidos[i] || '';
             tip.innerHTML = `<span style="color:#0047FF;font-weight:700">${p.partido}</span><br/>${curules} curul${curules!==1?'es':''}${cand?'<br/><span style="color:rgba(57,255,122,0.9)">'+cand+'</span>':''}`;
             tip.style.display='block';
@@ -1448,7 +1451,7 @@
             mouseover(e){
               layer.setStyle({weight:2,color:'#fff',fillOpacity:0.95});
               layer.bindTooltip(
-                `<div style="font-family:'DM Mono',monospace;font-size:.78rem;line-height:1.7;padding:.1rem .2rem">
+                `<div style="font-family:'Syne',sans-serif;font-weight:400;font-size:.70rem;line-height:1.7;padding:.1rem .2rem">
                   <span style="color:#0047FF;font-weight:700">${nom.toUpperCase()}</span><br/>
                   ${w?`<span style="color:${getColor(w.partido)};font-weight:700">${w.partido}</span><br/>${fmt(w.votos)} votos`:'Sin datos'}
                 </div>`,{sticky:true,opacity:1}
@@ -1515,7 +1518,7 @@
               mouseover(e){
                 layer.setStyle({weight:2,color:'#fff',fillOpacity:0.95});
                 layer.bindTooltip(
-                  `<div style="font-family:'DM Mono',monospace;font-size:.78rem;line-height:1.7;padding:.1rem .2rem">
+                  `<div style="font-family:'Syne',sans-serif;font-weight:400;font-size:.70rem;line-height:1.7;padding:.1rem .2rem">
                     <span style="color:#0047FF;font-weight:700">${munNom.toUpperCase()}</span><br/>
                     ${w?`<span style="color:${getColor(w.partido)};font-weight:700">${w.partido}</span><br/>${fmt(w.votos)} votos`:'Sin datos'}
                   </div>`,{sticky:true,opacity:1}
@@ -1754,8 +1757,6 @@
     }
     function showInviteToast(){const t=document.getElementById('invite-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),4000);}
     function showProToast(){const t=document.getElementById('pro-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),4000);}
-    function dismissInfoBar(){sessionStorage.setItem('rr-info-bar-ok','1');const b=document.getElementById('info-bar');if(b)b.style.display='none';}
-    (function(){if(!sessionStorage.getItem('rr-info-bar-ok')){const b=document.getElementById('info-bar');if(b)b.style.display='flex';}})();
     updateElectoralNav(); updateEndosoCta(); updateExcelDownloadBtn();
 
     // ─── COPY PROTECTION ──────────────────────────────────────
