@@ -465,10 +465,23 @@
                 <canvas id="donut-senado"></canvas>
                 <div class="donut-center">
                   <div class="donut-pct" id="pct-senado">—</div>
-                  <div class="donut-sub">válidos</div>
+                  <div class="donut-sub" id="sub-senado">válidos</div>
                 </div>
               </div>
               <div class="donut-legend" id="leg-senado"></div>
+              <div id="gender-donut-wrap" style="display:none;width:100%;padding-top:.9rem;margin-top:.2rem;border-top:1px solid var(--border)">
+                <div style="font-family:'DM Mono',monospace;font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:.6rem">Censo electoral</div>
+                <div style="display:flex;align-items:center;gap:1rem">
+                  <div class="donut-cw" style="width:90px;height:90px;flex-shrink:0">
+                    <canvas id="donut-gender"></canvas>
+                    <div class="donut-center">
+                      <div class="donut-pct" id="pct-gender" style="font-size:.95rem">—</div>
+                      <div class="donut-sub">mujeres</div>
+                    </div>
+                  </div>
+                  <div class="donut-legend" id="leg-gender" style="flex:1"></div>
+                </div>
+              </div>
             </div>
             <div class="umbral-bar">
               <div class="umbral-label">Cifra repartidora</div>
@@ -540,7 +553,7 @@
       return cache[key];
     }
 
-    let resumenData = null, donutChart = null;
+    let resumenData = null, donutChart = null, genderDonutChart = null;
     let activeCirc = 'NACIONAL';
     let hemicicloMap = null, _deptoGeoRaw = null, _hemicicloNacLayer = null, _hemicicloDepLayer = null;
     let _rgFilter = null; // { nombre, nacVotant, nacVV, nacPartidos, indVotant, indVV }
@@ -763,39 +776,43 @@
     }
 
     // ─── POTENCIAL ELECTORAL (participación) ──────────────────
-    // Se calcula desde PUESTOS_GEOREF.csv (columnas MUJERES + HOMBRES = censo del puesto)
-    // Agregación: dep / mun / localidad-comuna / zona / puesto. Mesas NO tienen censo propio.
-    let _potencialData = null;        // [{dep,mun,zona,pue,com,censo}, ...]
+    // Fuente: COMUNAS_DATA.csv (Divipole-actualizado)
+    // Columnas: dd(dep 2), mm(mun 3), zz(zona/commune 2), pp(puesto 2),
+    //           mujeres, hombres, total
+    // Agregación: dep / mun / localidad-comuna(zz) / puesto. Mesas NO tienen censo propio.
+    const COMUNAS_CSV_URL = `${S3}/Divipole-actualizado/COMUNAS_DATA.csv`;
+    let _potencialData = null;        // [{dep,mun,zz,pp,m,h}, ...]
     let _potencialLoadingP = null;
     async function loadPotencialCSV(){
       if(_potencialData) return _potencialData;
       if(_potencialLoadingP) return _potencialLoadingP;
       _potencialLoadingP = (async()=>{
         try{
-          const r = await fetch(`${S3}/mapas-2026/PUESTOS_GEOREF.csv`);
+          const r = await fetch(COMUNAS_CSV_URL);
           if(!r.ok){ _potencialData=[]; return _potencialData; }
           const text = await r.text();
           const rows = text.split(/\r?\n/).filter(x=>x.trim());
           if(rows.length<2){ _potencialData=[]; return _potencialData; }
-          const header = rows[0].replace(/^\ufeff/,'').split(';').map(h=>h.trim());
-          const iCod = header.indexOf('CÓDIGO COMPLETO');
-          const iCom = header.indexOf('CÓDIGO COMUNA');
-          const iM   = header.indexOf('MUJERES');
-          const iH   = header.indexOf('HOMBRES');
-          if(iCod<0||iM<0||iH<0){ _potencialData=[]; return _potencialData; }
+          const header = rows[0].replace(/^\ufeff/,'').split(';').map(h=>h.trim().toLowerCase());
+          const iDep = header.indexOf('dd');
+          const iMun = header.indexOf('mm');
+          const iZZ  = header.indexOf('zz');
+          const iPP  = header.indexOf('pp');
+          const iM   = header.indexOf('mujeres');
+          const iH   = header.indexOf('hombres');
+          if(iM<0||iH<0){ _potencialData=[]; return _potencialData; }
           const data=[];
           for(let i=1;i<rows.length;i++){
             const cols = rows[i].split(';');
-            const cod = (cols[iCod]||'').trim();
-            if(cod.length<9) continue;
-            const dep  = cod.slice(0,2);
-            const mun  = cod.slice(2,5);
-            const zona = cod.slice(5,7);
-            const pue  = cod.slice(7,9);
-            const comRaw = (cols[iCom]||'').trim();
-            const com = comRaw ? comRaw.padStart(2,'0') : '';
-            const censo = (parseInt(cols[iM]||'0',10)||0) + (parseInt(cols[iH]||'0',10)||0);
-            data.push({dep,mun,zona,pue,com,censo});
+            if(cols.length<=Math.max(iM,iH)) continue;
+            const dep = iDep>=0 ? (cols[iDep]||'').trim().padStart(2,'0') : '';
+            const mun = iMun>=0 ? (cols[iMun]||'').trim().padStart(3,'0') : '';
+            const zz  = iZZ>=0  ? (cols[iZZ ]||'').trim().padStart(2,'0') : '';
+            const pp  = iPP>=0  ? (cols[iPP ]||'').trim().padStart(2,'0') : '';
+            const m   = parseInt(cols[iM]||'0',10)||0;
+            const h   = parseInt(cols[iH]||'0',10)||0;
+            if(m+h===0) continue;
+            data.push({dep,mun,zz,pp,m,h});
           }
           _potencialData = data;
         }catch(e){
@@ -806,32 +823,32 @@
       })();
       return _potencialLoadingP;
     }
+    // Devuelve {potencial, mujeres, hombres} para el filtro dado.
+    // comCod/zonaCod → columna zz del CSV; pueCod → columna pp.
     function getPotencialFor(filters){
-      if(!_potencialData || !_potencialData.length) return null;
+      if(!_potencialData || !_potencialData.length) return {potencial:null, mujeres:0, hombres:0};
       const f = filters || {};
-      const dep  = f.depCod  ? String(f.depCod).padStart(2,'0')  : null;
-      const mun  = f.munCod  ? String(f.munCod).padStart(3,'0')  : null;
-      const zona = f.zonaCod ? String(f.zonaCod).padStart(2,'0') : null;
-      const pue  = f.pueCod  ? String(f.pueCod).padStart(2,'0')  : null;
-      const com  = f.comCod  ? String(f.comCod).padStart(2,'0')  : null;
-      let total=0;
+      const dep = f.depCod  ? String(f.depCod).padStart(2,'0')  : null;
+      const mun = f.munCod  ? String(f.munCod).padStart(3,'0')  : null;
+      const zz  = (f.comCod||f.zonaCod) ? String(f.comCod||f.zonaCod).padStart(2,'0') : null;
+      const pp  = f.pueCod  ? String(f.pueCod).padStart(2,'0')  : null;
+      let tm=0, th=0;
       for(const r of _potencialData){
-        if(dep  && r.dep !==dep)  continue;
-        if(mun  && r.mun !==mun)  continue;
-        if(com  && r.com !==com)  continue;
-        if(zona && r.zona!==zona) continue;
-        if(pue  && r.pue !==pue)  continue;
-        total += r.censo;
+        if(dep && r.dep!==dep) continue;
+        if(mun && r.mun!==mun) continue;
+        if(zz  && r.zz !==zz ) continue;
+        if(pp  && r.pp !==pp ) continue;
+        tm+=r.m; th+=r.h;
       }
-      return total;
+      return {potencial: tm+th||null, mujeres:tm, hombres:th};
     }
 
-    // Helper central: dibuja el donut. Si hay potencial electoral conocido muestra
-    // % de participación (votantes/potencial) y añade el segmento de Abstención.
-    // Si no, se mantiene el modo legacy de % votos válidos.
-    function drawDonut({vv, vn, vm, vb, votant, potencial}){
+    // Helper central: dibuja el donut de participación / votos válidos.
+    // Si potencial conocido → % participación + segmento Abstención.
+    // mujeres/hombres → se propagan al donut de género.
+    function drawDonut({vv, vn, vm, vb, votant, potencial, mujeres, hombres}){
       const pctEl = document.getElementById('pct-senado');
-      const subEl = document.querySelector('.donut-sub');
+      const subEl = document.getElementById('sub-senado');
       let labels, data, colors;
       if(potencial && potencial > votant){
         const abst = potencial - votant;
@@ -854,6 +871,31 @@
         options:{responsive:true, maintainAspectRatio:true, cutout:'72%', plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}}}}
       });
       document.getElementById('leg-senado').innerHTML = labels.map((l,i)=>`<div class="li"><span class="ld" style="background:${colors[i]}"></span><span>${l}</span><span class="lv">${fmt(data[i])}</span></div>`).join('');
+      drawGenderDonut({mujeres: mujeres||0, hombres: hombres||0});
+    }
+
+    // Donut de género del censo electoral.
+    // Rosa (#ff6eb4) para mujeres, azul (#0047FF) para hombres.
+    function drawGenderDonut({mujeres, hombres}){
+      const total = mujeres + hombres;
+      const pctEl = document.getElementById('pct-gender');
+      const wrap  = document.getElementById('gender-donut-wrap');
+      if(!total){ if(wrap) wrap.style.display='none'; return; }
+      if(wrap) wrap.style.display='';
+      if(pctEl) pctEl.textContent = pct(mujeres, total)+'%';
+      if(genderDonutChart) genderDonutChart.destroy();
+      genderDonutChart = new Chart(document.getElementById('donut-gender').getContext('2d'),{
+        type:'doughnut',
+        data:{
+          labels:['Mujeres','Hombres'],
+          datasets:[{data:[mujeres, hombres], backgroundColor:['#ff6eb4','#0047FF'], borderWidth:0, hoverOffset:4}]
+        },
+        options:{responsive:true, maintainAspectRatio:true, cutout:'72%', plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}}}}
+      });
+      document.getElementById('leg-gender').innerHTML=[
+        ['Mujeres', mujeres, '#ff6eb4'],
+        ['Hombres', hombres, '#0047FF'],
+      ].map(([l,v,c])=>`<div class="li"><span class="ld" style="background:${c}"></span><span>${l}</span><span class="lv">${fmt(v)}</span></div>`).join('');
     }
 
     async function init(){
@@ -925,8 +967,8 @@
       const votVal = r.votant!=null ? r.votant-vn-vm : (r.votval||0)+vb;
       const votant = r.votant || (votVal+vn+vm);
       await loadPotencialCSV();
-      const potencial = getPotencialFor({});
-      drawDonut({vv:votVal, vn, vm, vb, votant, potencial});
+      const {potencial, mujeres, hombres} = getPotencialFor({});
+      drawDonut({vv:votVal, vn, vm, vb, votant, potencial, mujeres, hombres});
     }
 
     // Shared renderer: same format as renderNacional but with geo-filtered votes
@@ -1024,7 +1066,8 @@
       const _gFilters = {depCod};
       if(nivel==='mun' || nivel==='pue') _gFilters.munCod = munCod;
       if(nivel==='pue') _gFilters.pueCod = pueCod;
-      drawDonut({vv:gVV, vn:gVN, vm:gVM, vb:gVB, votant:gVotant, potencial:getPotencialFor(_gFilters)});
+      const {potencial:_gPot, mujeres:_gM, hombres:_gH} = getPotencialFor(_gFilters);
+      drawDonut({vv:gVV, vn:gVN, vm:gVM, vb:gVB, votant:gVotant, potencial:_gPot, mujeres:_gM, hombres:_gH});
     }
 
     async function onDepChange(cod){
@@ -1174,7 +1217,8 @@
       const topP=geoPartidos.filter(p=>!/blanco/i.test(p.partido))[0];
       document.getElementById('kpi-row').innerHTML=`<div class="kpi-card"><div class="kpi-label">Votantes</div><div class="kpi-val wh">${fmt(zVotant)}</div><div class="kpi-delta">${label}</div></div><div class="kpi-card"><div class="kpi-label">Votos válidos</div><div class="kpi-val gr">${fmt(zVV)}</div><div class="kpi-delta">${pct(zVV,zVotant)}% de votantes</div></div><div class="kpi-card"><div class="kpi-label">Partido puntero</div><div class="kpi-val sm">${topP?topP.partido.split(' ').slice(0,3).join(' '):'—'}</div><div class="kpi-delta">${topP?fmt(topP.votos)+' votos':''}</div></div><div class="kpi-card"><div class="kpi-label">Curules nac.</div><div class="kpi-val">${zCP.reduce((s,p)=>s+(p.curules||0),0)} / ${getMaxCurules()}</div><div class="kpi-delta">D'Hondt · resultado nacional</div></div>`;
       await loadPotencialCSV();
-      drawDonut({vv:zVV, vn:zVN, vm:zVM, vb:zVB, votant:zVotant, potencial:getPotencialFor({depCod, munCod, comCod:cod})});
+      const {potencial:_zPot, mujeres:_zM, hombres:_zH} = getPotencialFor({depCod, munCod, comCod:cod});
+      drawDonut({vv:zVV, vn:zVN, vm:zVM, vb:zVB, votant:zVotant, potencial:_zPot, mujeres:_zM, hombres:_zH});
       } // end else geoCirc
       const pues=await getDepJSON('puestos',depCod);
       const pSel=document.getElementById('pue-select');
@@ -1303,8 +1347,12 @@
       setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
       const mTopP=geoPartidos.filter(p=>!/blanco/i.test(p.partido))[0];
       document.getElementById('kpi-row').innerHTML=`<div class="kpi-card"><div class="kpi-label">Votantes</div><div class="kpi-val wh">${fmt(mVotant)}</div><div class="kpi-delta">${label}</div></div><div class="kpi-card"><div class="kpi-label">Votos válidos</div><div class="kpi-val gr">${fmt(mVV)}</div><div class="kpi-delta">${pct(mVV,mVotant)}% de votantes</div></div><div class="kpi-card"><div class="kpi-label">Partido puntero</div><div class="kpi-val sm">${mTopP?mTopP.partido.split(' ').slice(0,3).join(' '):'—'}</div><div class="kpi-delta">${mTopP?fmt(mTopP.votos)+' votos':''}</div></div><div class="kpi-card"><div class="kpi-label">Curules nac.</div><div class="kpi-val">${mCP.reduce((s,p)=>s+(p.curules||0),0)} / ${getMaxCurules()}</div><div class="kpi-delta">D'Hondt · resultado nacional</div></div>`;
-      // Mesa: el censo por mesa no está en PUESTOS_GEOREF, se mantiene % válidos
-      drawDonut({vv:mVV, vn:mVN, vm:mVM, vb:mVB, votant:mVotant, potencial:null});
+      // Mesa: sin censo propio → % válidos; género del puesto padre si está cargado
+      const depCodM=document.getElementById('dep-select').value;
+      const munCodM=document.getElementById('mun-select').value;
+      const pueCodM=document.getElementById('pue-select').value;
+      const {mujeres:_mM, hombres:_mH} = getPotencialFor({depCod:depCodM, munCod:munCodM, pueCod:pueCodM});
+      drawDonut({vv:mVV, vn:mVN, vm:mVM, vb:mVB, votant:mVotant, potencial:null, mujeres:_mM, hombres:_mH});
     }
 
     async function onCircChange(val){

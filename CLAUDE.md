@@ -24,6 +24,9 @@ senado/departamentos/{cod}/mesas.json
 mapas-2026/DEPARTAMENTOS2.json          → GeoJSON departamentos Colombia
 mapas-2026/Departamentos-mps/{cod}.json → GeoJSON municipios por depto (pad 2 dígitos)
 mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json → Bogotá localidades (depCode=16)
+mapas-2026/PUESTOS_GEOREF.csv           → georreferenciación de puestos (NO usar para censo)
+Divipole-actualizado/COMUNAS_DATA.csv   → censo electoral oficial: dd, mm, zz, pp,
+                                          mujeres, hombres, total (41.287.084 total nacional)
 ```
 Todos los JSON tienen `por_circunscripcion: { NACIONAL: {...}, INDIGENAS: {...} }`.
 
@@ -148,11 +151,39 @@ Renombrar variables `sena` → `cam` y duplicar:
 - `getColor(partido)` es compartido
 - Los códigos de depto y municipio son los mismos
 
-## Donut chart
-- Canvas `#donut-senado` con Chart.js 4; tipo `doughnut`, `cutout:'72%'`
-- Centro: `.donut-pct` (% válidos) y `.donut-sub` texto "válidos"
-- Day-mode: `.donut-sub` necesita `color: rgba(0,0,0,.45)` (sino es blanco invisible)
+## Donut chart — participación + género
+### Donut principal `#donut-senado`
+- Chart.js 4, `type:'doughnut'`, `cutout:'72%'`
+- Centro: `#pct-senado` (porcentaje) y `#sub-senado` (label dinámico)
+- Si hay potencial electoral → centro muestra `% participación`, segmento **Abstención** en gris
+- Si no hay potencial → modo legacy `% válidos`
+- Day-mode: `.donut-sub` necesita `color: rgba(0,0,0,.45)`
 - Leyenda: `.li` / `.ld` / `.lv` en Avenir 400
+
+### Potencial electoral
+- Fuente: `COMUNAS_DATA.csv` (Divipole-actualizado), columnas `dd/mm/zz/pp/mujeres/hombres/total`
+- `dd` = dep (2 chars), `mm` = mun (3 chars), `zz` = zona/commune (2 chars), `pp` = puesto (2 chars)
+- `loadPotencialCSV()` → carga y cachea una sola vez
+- `getPotencialFor({depCod, munCod, comCod, zonaCod, pueCod})` → `{potencial, mujeres, hombres}`
+  - `comCod` y `zonaCod` ambos mapean a la columna `zz` del CSV
+  - Mesas no tienen censo propio → pasa `potencial:null` pero sí pasa m/h del puesto padre
+
+### Donut de género `#donut-gender`
+- Canvas 90×90px dentro de `#gender-donut-wrap` (oculto con `display:none` si no hay datos)
+- `drawGenderDonut({mujeres, hombres})` — llamado internamente desde `drawDonut()`
+- Colores: mujeres `#ff6eb4` (rosa), hombres `#0047FF` (azul)
+- Centro: `#pct-gender` muestra % mujeres; sub-label fijo "mujeres"
+- Leyenda: `#leg-gender` con cifras absolutas
+
+### Flujo de render
+```js
+drawDonut({vv, vn, vm, vb, votant, potencial, mujeres, hombres})
+  → actualiza #pct-senado / #sub-senado / #leg-senado / donutChart
+  → llama drawGenderDonut({mujeres, hombres})
+
+// Obtener datos de potencial antes de llamar drawDonut:
+const {potencial, mujeres, hombres} = getPotencialFor({depCod, munCod, comCod});
+```
 
 ## Hemiciclo SVG
 - 100 curules en 4 anillos: r=80(16), r=123(22), r=168(28), r=213(34)
