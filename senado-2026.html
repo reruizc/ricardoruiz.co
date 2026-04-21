@@ -240,6 +240,7 @@
     body.day-mode .level-badge.pues{color:#0a7a3e;border-color:rgba(10,122,62,.35);background:rgba(10,122,62,.08)}
     body.day-mode .results-table td{color:rgba(0,0,0,.75)!important}
     body.day-mode .donut-wrap{background:rgba(0,0,0,.03);border-color:rgba(0,0,0,.08)}
+    body.day-mode .donut-sub{color:rgba(0,0,0,.45)}
     body.day-mode .drill-crumb{color:rgba(0,0,0,.5)}
     body.day-mode .drill-crumb.active{color:#1a1a2e;background:rgba(0,0,0,.06);border-color:rgba(0,0,0,.12)}
     body.day-mode .card-label{color:rgba(0,0,0,.4)}
@@ -256,13 +257,11 @@
     .cand-elected{color:#39ff7a}
     body.day-mode .cand-elected{color:var(--blue)!important}
 
-    .orient-overlay{display:none;position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,.88);align-items:center;justify-content:center;padding:1.5rem}
-    .orient-overlay.show{display:flex}
-    .orient-box{background:#0e1220;border:1px solid rgba(255,255,255,.12);padding:2rem 1.8rem;max-width:320px;text-align:center}
-    .orient-icon{font-size:2.2rem;margin-bottom:1rem;display:block}
-    .orient-msg{font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.06em;line-height:1.9;color:rgba(255,255,255,.75);margin-bottom:1.5rem}
-    .orient-btn{font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;background:#4ade80;color:#060810;border:none;padding:.55rem 2rem;cursor:pointer;transition:background .2s}
-    .orient-btn:hover{background:#22c55e}
+    .orient-overlay{display:none}
+    /* Auto-rotate en móvil portrait */
+    @media screen and (orientation:portrait) and (max-width:900px){
+      html{transform:rotate(-90deg) translateX(-100%);transform-origin:top left;width:100vh;height:100vw;overflow:hidden;position:fixed;top:0;left:0}
+    }
   </style>
 </head>
 <body>
@@ -1194,7 +1193,7 @@
       document.getElementById('leg-senado').innerHTML=[['Votos válidos',mVV,'#0047FF'],['Nulos',mVN,'#cc2233'],['No marcados',mVM,'#f0a500'],['En blanco',mVB,'#555']].map(([l,v,c])=>`<div class="li"><span class="ld" style="background:${c}"></span><span>${l}</span><span class="lv">${fmt(v)}</span></div>`).join('');
     }
 
-    function onCircChange(val){
+    async function onCircChange(val){
       activeCirc=val.toUpperCase();
       document.querySelectorAll('.circ-btn').forEach(b=>b.classList.remove('circ-btn-active'));
       const btnMap={'RESULTADOS_GENERALES':'circ-btn-resultados-generales','NACIONAL':'circ-btn-nacional','INDIGENAS':'circ-btn-indigenas'};
@@ -1208,9 +1207,16 @@
       if(activeCirc==='RESULTADOS_GENERALES'){
         panelRG.style.display='';
         panelMain.style.display='none';
-        renderKPI();
-        renderHemiciclo();
         initHemicicloMap();
+        // Propagar filtro activo (dep/mun) al cambiar a RESULTADOS_GENERALES
+        const depCod=document.getElementById('dep-select').value;
+        const munCod=document.getElementById('mun-select').value;
+        if(depCod){
+          await Promise.all([loadRGFilter(depCod, munCod||null), updateHemicicloMap(depCod)]);
+        } else {
+          _rgFilter=null;
+        }
+        renderHemiciclo(); renderKPI();
       }else{
         _rgFilter=null;
         panelRG.style.display='none';
@@ -1341,7 +1347,7 @@
         const color = getColor(p.partido);
         const nombresElegidos = whatIfMap
           ? getTopCandidatesNac(p.partido, whatIfMap[p.partido]||0)
-          : (getElegidosNac().get(p.partido) ? [...getElegidosNac().get(p.partido)] : []);
+          : getTopCandidatesNac(p.partido, p.curules||0);
 
         for(let i = 0; i < curules && pos < positions.length; i++, pos++){
           const {x, y} = positions[pos];
@@ -1798,9 +1804,8 @@
       }
     });
     init();
-    // MOBILE LANDSCAPE HINT
-    function dismissOrient(){ sessionStorage.setItem("orient-ok","1"); document.getElementById("orient-overlay").classList.remove("show"); }
-    if(/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) && !sessionStorage.getItem("orient-ok")){ document.getElementById("orient-overlay").classList.add("show"); }
+    // MOBILE LANDSCAPE: auto-rotate via CSS (orient-overlay removed)
+    function dismissOrient(){}
     // THEME
     function isDayHour(){ const h=new Date().getHours(); return h>=7&&h<19; }
     function applyTheme(day){ document.body.classList.toggle('day-mode',day); const btn=document.getElementById('theme-btn'); if(btn) btn.textContent=day?'🌙 Modo noche':'☀ Modo día'; localStorage.setItem('rr-theme',day?'day':'night'); }
