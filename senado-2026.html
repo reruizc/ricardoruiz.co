@@ -526,12 +526,21 @@
       return allNames.map((n,k)=>k<curules?_elected(k,n):_plain(k,n)).join('')+_footer;
     }
     let _toastTimer=null;
-    function showLoadingToast(){
+    function showLoadingToast(msg){
       let el=document.getElementById('_loading-toast');
-      if(!el){el=document.createElement('div');el.id='_loading-toast';el.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,71,255,.92);color:#fff;font-family:\'Syne\',sans-serif;font-size:1.23rem;padding:.85rem 2.1rem;border-radius:3px;z-index:9999;pointer-events:none;transition:opacity .3s;white-space:nowrap;letter-spacing:.02em';el.textContent='Un momento, cargando…';document.body.appendChild(el);}
+      if(!el){el=document.createElement('div');el.id='_loading-toast';el.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,71,255,.92);color:#fff;font-family:\'Syne\',sans-serif;font-size:1.23rem;padding:.85rem 2.1rem;border-radius:3px;z-index:9999;pointer-events:none;transition:opacity .3s;white-space:nowrap;letter-spacing:.02em';document.body.appendChild(el);}
+      el.textContent = msg || 'Un momento, cargando…';
       el.style.opacity='1';
       clearTimeout(_toastTimer);
       _toastTimer=setTimeout(()=>{el.style.opacity='0';},3000);
+    }
+    // Ciudades grandes: dep:mun donde las mesas toman más tiempo en cargar.
+    // Bogotá=16:001, Medellín=05:001 ó 01:001, Cali=76:001 ó 31:001 (según electoral_id).
+    const BIG_CITIES = new Set(['16:001','05:001','01:001','76:001','31:001']);
+    function isBigCity(depCod, munCod){
+      if(!depCod||!munCod) return false;
+      const key = `${String(depCod).padStart(2,'0')}:${String(munCod).padStart(3,'0')}`;
+      return BIG_CITIES.has(key);
     }
     const CP = {'Pacto Histórico':'#6B2D8B','Centro Democrático':'#0088BB','Centro Democrático y MIRA':'#0088BB','Partido Liberal Colombiano':'#C8102E','Partido de la U':'#F7941D','Cambio Radical':'#E91E8C','Partido Conservador Colombiano':'#003580','Alianza Verde':'#4CAF50','Partido Alianza por Colombia (Verde)':'#4CAF50','Movimiento Salvación Nacional':'#00AEEF','MIRA':'#1A3FC4','Frente Amplio Unitario':'#F7941D','Nuevo Liberalismo':'#E53935','Comunes':'#007755'};
     function getColor(n){if(CP[n])return CP[n];if(/pacto hist/i.test(n))return'#6B2D8B';if(/centro dem/i.test(n))return'#0088BB';if(/liberal/i.test(n))return'#C8102E';if(/conservador/i.test(n))return'#003580';if(/cambio radical/i.test(n))return'#E91E8C';if(/partido de la u/i.test(n))return'#F7941D';if(/alianza (verde|por col)/i.test(n))return'#4CAF50';if(/salvaci[oó]n/i.test(n))return'#00AEEF';if(/\bMIRA\b/i.test(n))return'#1A3FC4';if(/comunes/i.test(n))return'#007755';if(/nuevo liberalismo/i.test(n))return'#E53935';return'#555';}
@@ -601,7 +610,21 @@
     const DEPTO_GEOJSON   = `${S3}/mapas-2026/DEPARTAMENTOS2.json`;
     const DEPTOS_MPS_URL  = `${S3}/mapas-2026/Departamentos-mps/`;
     const BOGOTA_LOC_URL  = `${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`;
+    const MEDELLIN_COM_URL = `${S3}/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`;
     let _senaDepGeoCache  = {};
+    let _bogotaGeoCache = null, _medellinGeoCache = null;
+    // Rotación 90° a la izquierda alrededor de (cx=-74.08, cy=4.65) — tomado de analisis-candidato.html
+    function rotateGeoJSON90Left(geoData){
+      const cx=-74.08, cy=4.65;
+      const rc=([lon,lat])=>[cx-(lat-cy), cy+(lon-cx)];
+      const rg=geom=>{
+        if(!geom) return geom;
+        if(geom.type==='Polygon') return {...geom, coordinates: geom.coordinates.map(r=>r.map(rc))};
+        if(geom.type==='MultiPolygon') return {...geom, coordinates: geom.coordinates.map(p=>p.map(r=>r.map(rc)))};
+        return geom;
+      };
+      return {...geoData, features: geoData.features.map(f=>({...f, geometry: rg(f.geometry)}))};
+    }
     function _normC(c){ return String(Number(c)); }
     function _normNom(s){ return s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim(); }
     let _senaNomMap = {}; // dep nombre normalizado → depCode
@@ -824,14 +847,25 @@
       return _potencialLoadingP;
     }
     // Devuelve {potencial, mujeres, hombres} para el filtro dado.
-    // comCod/zonaCod → columna zz del CSV; pueCod → columna pp.
+    // comCod/zonaCod → columna zz del CSV (2 chars).
+    // pueCod puede ser '{com}-{zona}-{puesto}' (p.ej. '000-90-01') o '{pp}' simple.
+    // Normaliza '001' → '01' para que coincida con zz/pp del CSV.
     function getPotencialFor(filters){
       if(!_potencialData || !_potencialData.length) return {potencial:null, mujeres:0, hombres:0};
       const f = filters || {};
-      const dep = f.depCod  ? String(f.depCod).padStart(2,'0')  : null;
-      const mun = f.munCod  ? String(f.munCod).padStart(3,'0')  : null;
-      const zz  = (f.comCod||f.zonaCod) ? String(f.comCod||f.zonaCod).padStart(2,'0') : null;
-      const pp  = f.pueCod  ? String(f.pueCod).padStart(2,'0')  : null;
+      const to2 = v => (v!=null && v!=='') ? String(parseInt(v,10)||0).padStart(2,'0') : null;
+      const to3 = v => (v!=null && v!=='') ? String(parseInt(v,10)||0).padStart(3,'0') : null;
+      const dep = to2(f.depCod);
+      const mun = to3(f.munCod);
+      const comZZ = to2(f.comCod || f.zonaCod);
+      let puZZ=null, puPP=null;
+      if(f.pueCod!=null && f.pueCod!==''){
+        const parts = String(f.pueCod).split('-');
+        if(parts.length===3){ puZZ = to2(parts[1]); puPP = to2(parts[2]); }
+        else { puPP = to2(f.pueCod); }
+      }
+      const zz = puZZ || comZZ;
+      const pp = puPP;
       let tm=0, th=0;
       for(const r of _potencialData){
         if(dep && r.dep!==dep) continue;
@@ -1087,7 +1121,7 @@
         return;
       }
       if(activeCirc==='RESULTADOS_GENERALES'){
-        await Promise.all([updateHemicicloMap(cod), loadRGFilter(cod,null)]);
+        await Promise.all([updateHemicicloMap(cod,null), loadRGFilter(cod,null)]);
         renderHemiciclo(); renderKPI();
       } else {
         await Promise.all([updateSenaMap(cod), renderGeoPartidos('dep',cod,null,null)]);
@@ -1110,14 +1144,14 @@
       document.getElementById('mesa-filter-container').style.display='none';
       if(!cod){
         if(activeCirc==='RESULTADOS_GENERALES'){
-          await Promise.all([updateHemicicloMap(depCod), loadRGFilter(depCod,null)]);
+          await Promise.all([updateHemicicloMap(depCod,null), loadRGFilter(depCod,null)]);
           renderHemiciclo(); renderKPI();
         } else { await renderGeoPartidos('dep',depCod,null,null); }
         return;
       }
       showLoadingToast();
       if(activeCirc==='RESULTADOS_GENERALES'){
-        await Promise.all([updateHemicicloMap(depCod), loadRGFilter(depCod,cod)]);
+        await Promise.all([updateHemicicloMap(depCod,cod), loadRGFilter(depCod,cod)]);
         renderHemiciclo(); renderKPI();
       } else { await renderGeoPartidos('mun',depCod,cod,null); }
       const zonas=await getDepJSON('comunas',depCod);
@@ -1243,7 +1277,7 @@
         else await renderGeoPartidos('mun',depCod,munCod,null);
         return;
       }
-      showLoadingToast();
+      showLoadingToast(isBigCity(depCod,munCod) ? 'En unos segundos cargarán las mesas' : undefined);
       if(activeCirc==='RESULTADOS_GENERALES'){
         const pues=await getDepJSON('puestos',depCod);
         const p=pues.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&(x.cod===cod||x.pue_cod===cod));
@@ -1370,11 +1404,36 @@
         panelRG.style.display='';
         panelMain.style.display='none';
         initHemicicloMap();
-        // Propagar filtro activo (dep/mun) al cambiar a RESULTADOS_GENERALES
+        // Propagar filtro activo (dep/mun/zona/pue/mesa) al cambiar a RESULTADOS_GENERALES
         const depCod=document.getElementById('dep-select').value;
         const munCod=document.getElementById('mun-select').value;
+        const zonaCod=document.getElementById('zona-select').value;
+        const pueCod=document.getElementById('pue-select').value;
+        const mesaCod=document.getElementById('mesa-select').value;
         if(depCod){
-          await Promise.all([loadRGFilter(depCod, munCod||null), updateHemicicloMap(depCod)]);
+          // Siempre actualizar mapa al nivel dep/mun
+          await updateHemicicloMap(depCod, munCod||null);
+          // Buscar el dato más profundo para _rgFilter
+          try {
+            if(mesaCod && pueCod){
+              const mesas=await getDepJSON('mesas',depCod);
+              const m=mesas.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&x.pue_cod===pueCod&&x.mesa===mesaCod);
+              if(m) _rgFilter=_buildRGFilterFromData(m,`Mesa ${mesaCod} · ${m.pue_nom||pueCod}`);
+              else await loadRGFilter(depCod,munCod);
+            } else if(pueCod){
+              const pues=await getDepJSON('puestos',depCod);
+              const p=pues.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&(x.cod===pueCod||x.pue_cod===pueCod));
+              if(p) _rgFilter=_buildRGFilterFromData(p,p.nombre||`Puesto ${pueCod}`);
+              else await loadRGFilter(depCod,munCod);
+            } else if(zonaCod){
+              const zonas=await getDepJSON('comunas',depCod);
+              const z=zonas.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&x.cod===zonaCod);
+              if(z) _rgFilter=_buildRGFilterFromData(z,z.nombre||`Comuna ${zonaCod}`);
+              else await loadRGFilter(depCod,munCod);
+            } else {
+              await loadRGFilter(depCod, munCod||null);
+            }
+          } catch(e){ console.warn('[RGFilter propagate]',e); await loadRGFilter(depCod, munCod||null); }
         } else {
           _rgFilter=null;
         }
@@ -1651,7 +1710,27 @@
       try{ hemicicloMap.fitBounds(_hemicicloNacLayer.getBounds(),{padding:[6,6]}); }catch(_){}
     }
 
-    async function updateHemicicloMap(depCod){
+    // Ganadores por localidad/comuna dentro de un mun (dep+mun='001' típicamente).
+    // Devuelve { '01': {partido,votos,nombre}, ... } indexado por zz 2-char.
+    async function _buildLocComWinner(depCod, munCod){
+      const out={};
+      try{
+        const zonas=await getDepJSON('comunas',depCod);
+        const SPEC=new Set(['996','997','998']);
+        const to2=v=>v!=null?String(parseInt(v,10)||0).padStart(2,'0'):'';
+        zonas.forEach(z=>{
+          if(z.dep_cod!==depCod||z.mun_cod!==munCod) return;
+          if(z.circ_nom&&!/nacional/i.test(z.circ_nom)) return;
+          const zc=to2(z.cod); if(!zc||out[zc]) return;
+          const circ=z.por_circunscripcion?.['NACIONAL']??z;
+          const pts=Object.entries(circ.partidos||{}).filter(([k])=>!SPEC.has(k)&&!/blanco/i.test(k)).sort((a,b)=>b[1]-a[1]);
+          if(pts.length) out[zc]={partido:pts[0][0],votos:pts[0][1],nombre:z.nombre};
+        });
+      }catch(e){ console.warn('[LocComWinner]',e); }
+      return out;
+    }
+
+    async function updateHemicicloMap(depCod, munCod){
       if(!hemicicloMap) return;
       if(_hemicicloDepLayer){ hemicicloMap.removeLayer(_hemicicloDepLayer); _hemicicloDepLayer=null; }
       if(!depCod){
@@ -1661,8 +1740,9 @@
       if(_hemicicloNacLayer&&hemicicloMap.hasLayer(_hemicicloNacLayer)) hemicicloMap.removeLayer(_hemicicloNacLayer);
       const code=_normC(depCod);
       const isBogota=(code==='16');
-      // Ganadores por municipio (reusar caché de senaMap si ya existe)
+      // Ganadores por municipio (necesarios siempre para vista de depto)
       let munWinner={};
+      let selectedMunName='';
       try{
         const muns=await getDepJSON('municipios',depCod);
         const SPEC=new Set(['996','997','998']);
@@ -1673,13 +1753,105 @@
           const circ=m.por_circunscripcion?.['NACIONAL']??m;
           const pts=Object.entries(circ.partidos||{}).filter(([k])=>!SPEC.has(k)&&!/blanco/i.test(k)).sort((a,b)=>b[1]-a[1]);
           if(pts.length) munWinner[mc]={partido:pts[0][0],votos:pts[0][1],nombre:m.nombre};
+          if(munCod && m.cod===munCod) selectedMunName = m.nombre||'';
         });
       }catch(e){ console.warn('[HemiMap] muns:',e); }
+
+      const isMedellin = !!(munCod && /medell[ií]n/i.test(selectedMunName));
+
+      // ── CASO BOGOTÁ: localidades rotadas coloreadas por ganador de cada localidad ──
+      if(isBogota){
+        try{
+          const locWinner = await _buildLocComWinner(depCod, munCod || '001');
+          let geo = _bogotaGeoCache;
+          if(!geo){
+            const r=await fetch(BOGOTA_LOC_URL); if(!r.ok) throw new Error(`HTTP ${r.status}`);
+            const raw=await r.json();
+            geo = rotateGeoJSON90Left(raw);
+            _bogotaGeoCache = geo;
+          }
+          const to2=v=>v!=null?String(parseInt(v,10)||0).padStart(2,'0'):'';
+          const locStyle=feat=>{
+            const p=feat.properties;
+            const zc = to2(p.LocCodigo);
+            const w = zc ? locWinner[zc] : null;
+            return {fillColor:w?getColor(w.partido):'#333',fillOpacity:w?0.78:0.3,color:'rgba(255,255,255,0.35)',weight:1};
+          };
+          _hemicicloDepLayer=L.geoJSON(geo,{
+            style:locStyle,
+            onEachFeature:(feat,layer)=>{
+              const p=feat.properties;
+              const zc = to2(p.LocCodigo);
+              const w = zc ? locWinner[zc] : null;
+              const nom = p.LocNombre||p.nombre||'Localidad';
+              layer.on({
+                mouseover(e){
+                  layer.setStyle({weight:2,color:'#fff',fillOpacity:0.95});
+                  layer.bindTooltip(
+                    `<div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.45;padding:.1rem .2rem;white-space:normal;overflow-wrap:break-word">
+                      <span style="color:#0047FF;font-weight:700">${String(nom).toUpperCase()}</span><br/>
+                      ${w?`<span style="color:${getColor(w.partido)};font-weight:700">${w.partido}</span><br/>${fmt(w.votos)} votos`:'Sin datos'}
+                    </div>`,{sticky:true,opacity:1}
+                  ).openTooltip(e.latlng);
+                },
+                mouseout(){ layer.setStyle(locStyle(feat)); layer.closeTooltip(); }
+              });
+            }
+          }).addTo(hemicicloMap);
+          try{hemicicloMap.fitBounds(_hemicicloDepLayer.getBounds(),{padding:[10,10]});}catch(_){}
+          return;
+        }catch(e){ console.warn('[HemiMap] bogota:',e); }
+      }
+
+      // ── CASO MEDELLÍN: comunas sin rotar, coloreadas por ganador de cada comuna ──
+      if(isMedellin){
+        try{
+          const comWinner = await _buildLocComWinner(depCod, munCod);
+          let geo = _medellinGeoCache;
+          if(!geo){
+            const r=await fetch(MEDELLIN_COM_URL); if(!r.ok) throw new Error(`HTTP ${r.status}`);
+            geo = await r.json();
+            _medellinGeoCache = geo;
+          }
+          const to2=v=>v!=null?String(parseInt(v,10)||0).padStart(2,'0'):'';
+          const comStyle=feat=>{
+            const p=feat.properties;
+            const zc = to2(p.CODIGO);
+            const w = zc ? comWinner[zc] : null;
+            return {fillColor:w?getColor(w.partido):'#333',fillOpacity:w?0.78:0.3,color:'rgba(255,255,255,0.35)',weight:1};
+          };
+          _hemicicloDepLayer=L.geoJSON(geo,{
+            style:comStyle,
+            onEachFeature:(feat,layer)=>{
+              const p=feat.properties;
+              const zc = to2(p.CODIGO);
+              const w = zc ? comWinner[zc] : null;
+              const nom = p.NOMBRE||p.IDENTIFICACION||'Comuna';
+              layer.on({
+                mouseover(e){
+                  layer.setStyle({weight:2,color:'#fff',fillOpacity:0.95});
+                  layer.bindTooltip(
+                    `<div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.45;padding:.1rem .2rem;white-space:normal;overflow-wrap:break-word">
+                      <span style="color:#0047FF;font-weight:700">${String(nom).toUpperCase()}</span><br/>
+                      ${w?`<span style="color:${getColor(w.partido)};font-weight:700">${w.partido}</span><br/>${fmt(w.votos)} votos`:'Sin datos'}
+                    </div>`,{sticky:true,opacity:1}
+                  ).openTooltip(e.latlng);
+                },
+                mouseout(){ layer.setStyle(comStyle(feat)); layer.closeTooltip(); }
+              });
+            }
+          }).addTo(hemicicloMap);
+          try{hemicicloMap.fitBounds(_hemicicloDepLayer.getBounds(),{padding:[10,10]});}catch(_){}
+          return;
+        }catch(e){ console.warn('[HemiMap] medellin:',e); }
+      }
+
+      // ── CASO POR DEFECTO: municipios del depto ──
       try{
         let geo=_senaDepGeoCache[depCod];
         if(!geo){
           const paddedCode=String(depCod).padStart(2,'0');
-          const url=isBogota?BOGOTA_LOC_URL:`${DEPTOS_MPS_URL}${paddedCode}.json`;
+          const url=`${DEPTOS_MPS_URL}${paddedCode}.json`;
           const r=await fetch(url); if(!r.ok) throw new Error(`HTTP ${r.status}`);
           geo=await r.json(); _senaDepGeoCache[depCod]=geo;
         }
@@ -1687,7 +1859,6 @@
           let w=null;
           const p=feat.properties;
           if(p.mun_elec!=null) w=munWinner[_normC(p.mun_elec)];
-          if(!w&&p.LocCodigo!=null) w=Object.values(munWinner)[0]||null;
           return {fillColor:w?getColor(w.partido):'#333',fillOpacity:w?0.72:0.3,color:'rgba(255,255,255,0.35)',weight:1};
         };
         _hemicicloDepLayer=L.geoJSON(geo,{
@@ -1696,8 +1867,7 @@
             const p=feat.properties;
             let w=null;
             if(p.mun_elec!=null) w=munWinner[_normC(p.mun_elec)];
-            if(!w&&p.LocCodigo!=null) w=Object.values(munWinner)[0]||null;
-            const munNom=p.mpio_cnmbr||p.LocNombre||p.NOMBRE||p.nombre||p.name||'?';
+            const munNom=p.mpio_cnmbr||p.NOMBRE||p.nombre||p.name||'?';
             layer.on({
               mouseover(e){
                 layer.setStyle({weight:2,color:'#fff',fillOpacity:0.95});

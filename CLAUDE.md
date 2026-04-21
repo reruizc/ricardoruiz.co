@@ -115,12 +115,35 @@ Aliases especiales en `_senaNomMap`: NORTE DE SANTANDER, VALLE DEL CAUCA, SAN AN
 
 ### Actualizar el mapa al filtrar
 ```js
-updateSenaMap(depCod)      // para el panel principal
-updateHemicicloMap(depCod) // para RESULTADOS_GENERALES
-// Si depCod es '' → vuelve a vista nacional (capa _hemicicloNacLayer)
-// Si depCod != '' → carga municipios del depto y dibuja _hemicicloDepLayer
-// Bogotá: usa BOGOTA_LOC_URL y depCode='16'
+updateSenaMap(depCod)                 // panel principal (NACIONAL/INDIGENAS) — actualmente no inicializa L.map
+updateHemicicloMap(depCod, munCod)    // RESULTADOS_GENERALES
+// depCod '' → vista nacional (_hemicicloNacLayer)
+// depCod=16 (Bogotá)        → BOGOTA_LOC_URL + rotateGeoJSON90Left + colorea por LocCodigo
+// depCod+munCod=Medellín    → MEDELLIN_COM_URL sin rotar + colorea por CODIGO
+// default                   → DEPTOS_MPS_URL/{padCode}.json + colorea por mun_elec
 ```
+
+### Ciudades especiales
+```js
+const BOGOTA_LOC_URL   = `${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`;
+const MEDELLIN_COM_URL = `${S3}/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`;
+
+// Rotación Bogotá (alrededor de cx=-74.08, cy=4.65): lon→lat virado 90° izq
+rotateGeoJSON90Left(geoData)
+
+// Ganadores por localidad/comuna (usa comunas.json filtrando por mun)
+_buildLocComWinner(depCod, munCod) // → { zz2char: {partido, votos, nombre} }
+
+// Bogotá GeoJSON props: LocCodigo (2 chars), LocNombre
+// Medellín GeoJSON props: CODIGO (2 chars), NOMBRE, IDENTIFICACION
+
+// Detección Medellín: por nombre del mun (/medell[ií]n/i) en getDepJSON('municipios').
+// Se detecta así para no depender del electoral_id de Antioquia (puede ser '01' o '05').
+```
+
+### Filtro RG propagado desde NACIONAL/INDIGENAS
+`onCircChange('RESULTADOS_GENERALES')` lee dep/mun/zona/pue/mesa y construye `_rgFilter`
+usando el dato más profundo disponible (mesa → pue → zona → mun → dep) vía `_buildRGFilterFromData`.
 
 ### Tooltip del mapa
 ```css
@@ -166,6 +189,10 @@ Renombrar variables `sena` → `cam` y duplicar:
 - `loadPotencialCSV()` → carga y cachea una sola vez
 - `getPotencialFor({depCod, munCod, comCod, zonaCod, pueCod})` → `{potencial, mujeres, hombres}`
   - `comCod` y `zonaCod` ambos mapean a la columna `zz` del CSV
+  - **Normalización de códigos**: UI usa 3-char para comuna (`'001'`) y código compuesto
+    para puesto (`'com-zona-pue'`, ej: `'000-90-01'`). El helper normaliza con
+    `String(parseInt(v,10)||0).padStart(2,'0')` para que coincida con `zz`/`pp` del CSV.
+  - Si `pueCod` viene compuesto, se extrae `parts[1]` → zz, `parts[2]` → pp.
   - Mesas no tienen censo propio → pasa `potencial:null` pero sí pasa m/h del puesto padre
 
 ### Donut de género `#donut-gender`
@@ -183,6 +210,13 @@ drawDonut({vv, vn, vm, vb, votant, potencial, mujeres, hombres})
 
 // Obtener datos de potencial antes de llamar drawDonut:
 const {potencial, mujeres, hombres} = getPotencialFor({depCod, munCod, comCod});
+```
+
+## Toast de carga
+```js
+showLoadingToast(msg?)  // 'Un momento, cargando…' por defecto; override con msg custom
+// En onPueChange, si isBigCity(depCod, munCod) → 'En unos segundos cargarán las mesas'
+const BIG_CITIES = new Set(['16:001','05:001','01:001','76:001','31:001']); // Bogotá, Medellín, Cali (tentativo por electoral_id)
 ```
 
 ## Hemiciclo SVG
