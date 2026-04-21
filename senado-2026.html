@@ -661,6 +661,21 @@
                       code:_=>'', /* Pereira matchea por nombre */
                       name:p=>p.Comuna||'Comuna' },
     };
+    // Pereira: zona (zz) + puesto (pp) → nombre normalizado de comuna
+    // Extraído de analisis-candidato.html para unificar el mapping zona↔comuna
+    const ZON_PUE_COM_PER = {
+      '01':{'01':'VILLA SANTANA','02':'VILLA SANTANA','03':'VILLA SANTANA','04':'VILLA SANTANA'},
+      '02':{'01':'ORIENTE','02':'ORIENTE','03':'ORIENTE','04':'VILLAVICENCIO','05':'VILLAVICENCIO','06':'ORIENTE'},
+      '03':{'01':'RIO OTUN','02':'RIO OTUN','03':'RIO OTUN','04':'RIO OTUN','05':'RIO OTUN','06':'RIO OTUN','07':'RIO OTUN'},
+      '04':{'01':'UNIVERSIDAD','02':'UNIVERSIDAD','03':'UNIVERSIDAD'},
+      '05':{'01':'CENTRO','02':'CENTRO'},
+      '06':{'01':'CENTRO','02':'CENTRO','03':'CENTRO','05':'CENTRO','06':'CENTRO'},
+      '07':{'01':'SAN NICOLAS','02':'EL JARDIN','03':'BOSTON','04':'BOSTON','05':'EL ROCIO','06':'BOSTON','07':'BOSTON'},
+      '08':{'01':'DEL CAFE','02':'FERROCARRIL','03':'DEL CAFE','04':'DEL CAFE','05':'FERROCARRIL'},
+      '09':{'01':'EL POBLADO','02':'EL POBLADO','03':'CONSOTA','04':'CONSOTA','05':'CONSOTA','06':'CONSOTA'},
+      '10':{'01':'EL OSO','02':'PERLA DEL OTUN','03':'SAN JOAQUIN','04':'SAN JOAQUIN','05':'EL OSO','06':'SAN JOAQUIN','07':'SAN JOAQUIN'},
+      '11':{'01':'OLIMPICA','02':'OLIMPICA','03':'OLIMPICA','04':'CUBA','05':'CUBA','06':'CUBA','07':'OLIMPICA'},
+    };
     function detectCity(depCod, munCod, munName){
       // Bogotá se detecta por depCod=16 (su único mun es 001)
       if(_normC(depCod)==='16') return CITY_MAPS.bogota;
@@ -1785,23 +1800,51 @@
     // para matchear por código (zz 2-char) o por nombre (ciudades cuyo GeoJSON no trae cod).
     async function _buildLocComWinner(depCod, munCod){
       const out={}; const byName={};
+      const SPEC=new Set(['996','997','998']);
+      const norm=s=>String(s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
       try{
-        const zonas=await getDepJSON('comunas',depCod);
-        const SPEC=new Set(['996','997','998']);
-        const to2=v=>v!=null?String(parseInt(v,10)||0).padStart(2,'0'):'';
-        const norm=s=>String(s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
-        zonas.forEach(z=>{
-          if(z.dep_cod!==depCod||z.mun_cod!==munCod) return;
-          if(z.circ_nom&&!/nacional/i.test(z.circ_nom)) return;
-          const zc=to2(z.cod); if(!zc||out[zc]) return;
-          const circ=z.por_circunscripcion?.['NACIONAL']??z;
-          const pts=Object.entries(circ.partidos||{}).filter(([k])=>!SPEC.has(k)&&!/blanco/i.test(k)).sort((a,b)=>b[1]-a[1]);
-          if(pts.length){
-            const rec={partido:pts[0][0],votos:pts[0][1],nombre:z.nombre};
-            out[zc]=rec;
-            if(z.nombre) byName[norm(z.nombre)]=rec;
-          }
-        });
+        // Pereira: las zonas electorales no coinciden 1:1 con comunas;
+        // se agrega desde puestos usando ZON_PUE_COM_PER (zona+puesto → nombre de comuna).
+        if(depCod==='24' && munCod==='001'){
+          const pues=await getDepJSON('puestos',depCod);
+          const comVotos={}; // { NORM_NOMBRE: { partidos:{...}, nombre } }
+          pues.forEach(p=>{
+            if(p.dep_cod!==depCod||p.mun_cod!==munCod) return;
+            if(p.circ_nom&&!/nacional/i.test(p.circ_nom)) return;
+            // com_cod es la zona (zz); pp viene de la última parte de pue_cod/cod
+            const zz=String(p.com_cod||'').padStart(2,'0');
+            const parts=String(p.pue_cod||p.cod||'').split('-');
+            const pp=parts.length>=3?parts[parts.length-1].padStart(2,'0'):'';
+            if(!zz||!pp) return;
+            const comName=(ZON_PUE_COM_PER[zz]||{})[pp]; if(!comName) return;
+            const nk=norm(comName);
+            if(!comVotos[nk]) comVotos[nk]={partidos:{},nombre:comName};
+            const circ=p.por_circunscripcion?.['NACIONAL']??p;
+            Object.entries(circ.partidos||{}).forEach(([k,v])=>{
+              if(SPEC.has(k)||/blanco/i.test(k)) return;
+              comVotos[nk].partidos[k]=(comVotos[nk].partidos[k]||0)+v;
+            });
+          });
+          Object.entries(comVotos).forEach(([nk,{partidos,nombre}])=>{
+            const pts=Object.entries(partidos).sort((a,b)=>b[1]-a[1]);
+            if(pts.length){ const rec={partido:pts[0][0],votos:pts[0][1],nombre}; byName[nk]=rec; }
+          });
+        } else {
+          const zonas=await getDepJSON('comunas',depCod);
+          const to2=v=>v!=null?String(parseInt(v,10)||0).padStart(2,'0'):'';
+          zonas.forEach(z=>{
+            if(z.dep_cod!==depCod||z.mun_cod!==munCod) return;
+            if(z.circ_nom&&!/nacional/i.test(z.circ_nom)) return;
+            const zc=to2(z.cod); if(!zc||out[zc]) return;
+            const circ=z.por_circunscripcion?.['NACIONAL']??z;
+            const pts=Object.entries(circ.partidos||{}).filter(([k])=>!SPEC.has(k)&&!/blanco/i.test(k)).sort((a,b)=>b[1]-a[1]);
+            if(pts.length){
+              const rec={partido:pts[0][0],votos:pts[0][1],nombre:z.nombre};
+              out[zc]=rec;
+              if(z.nombre) byName[norm(z.nombre)]=rec;
+            }
+          });
+        }
       }catch(e){ console.warn('[LocComWinner]',e); }
       out.__byName = byName;
       return out;

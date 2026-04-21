@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     :root{--white:#f4f3ef;--blue:#0047FF;--green:#4ade80;--purple:#a78bfa;--card-border:rgba(255,255,255,0.1);--border:rgba(255,255,255,0.08);--bar-bg:rgba(255,255,255,0.1);--td-hover:rgba(255,255,255,0.04)}
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -104,7 +106,7 @@
     .bar-wrap{width:72px;height:4px;background:var(--bar-bg);border-radius:2px;overflow:hidden;display:inline-block;vertical-align:middle}
     .bar-fill{height:100%;background:var(--blue);border-radius:2px;transition:width 1s ease}
     .pct-val{font-family:'Syne',sans-serif;font-weight:700;font-size:.8rem;color:var(--white);display:inline-block;width:46px;text-align:right;margin-left:6px}
-    .cbadge{display:inline-flex;align-items:center;justify-content:center;background:rgba(0,71,255,.15);color:var(--white);font-family:'Syne',sans-serif;font-weight:800;font-size:.85rem;min-width:28px;height:24px;padding:0 6px;border:1px solid rgba(0,71,255,.3)}
+    .cbadge{display:inline-flex;align-items:center;justify-content:center;background:rgba(0,71,255,.15);color:var(--white);font-family:'Avenir Next',Avenir,sans-serif;font-weight:500;font-size:.95rem;min-width:28px;height:24px;padding:0 6px;border:1px solid rgba(0,71,255,.3)}
     .cbadge.sub{background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border-color:rgba(255,255,255,.08)}
     .drill-btn{background:none;border:none;color:var(--blue);font-family:'DM Mono',monospace;font-size:.74rem;cursor:pointer;text-align:left;padding:0;display:inline-flex;align-items:center;gap:.4rem;transition:color .15s}
     .drill-btn:hover{color:#7ab3ff}
@@ -132,7 +134,7 @@
     .donut-legend{width:100%;display:flex;flex-direction:column;gap:.55rem}
     .li{display:flex;align-items:center;gap:.6rem;font-family:'DM Mono',monospace;font-size:.75rem;color:rgba(255,255,255,.5)}
     .ld{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-    .lv{margin-left:auto;color:var(--white);font-weight:700;font-family:'Syne',sans-serif}
+    .lv{margin-left:auto;color:var(--white);font-weight:400;font-family:Avenir,sans-serif}
     .umbral-bar{margin-top:1rem;padding-top:.8rem;border-top:1px solid var(--border)}
     .umbral-label{font-family:'Syne',sans-serif;font-weight:400;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:.4rem}
     body.day-mode .umbral-label{color:rgba(0,0,0,.5)}
@@ -233,6 +235,26 @@
     body.day-mode .endoso-cta-text{color:rgba(0,0,0,.7)}
     body.day-mode .sub-label{color:rgba(0,0,0,.45)}
     body.day-mode .li{color:rgba(0,0,0,.6)}
+    body.day-mode .donut-sub{color:rgba(0,0,0,.45)}
+    /* Gender donut */
+    #gender-donut-wrap{display:none;flex-direction:column;align-items:center;gap:.55rem;margin-top:1rem;padding-top:.85rem;border-top:1px solid var(--border)}
+    #gender-donut-wrap .donut-cw{width:90px;height:90px}
+    /* RESULTADOS GENERALES panel */
+    #rg-panel{display:none}
+    .hemi-map-row{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.2rem}
+    @media(max-width:900px){.hemi-map-row{grid-template-columns:1fr}}
+    #hemiciclo-wrap{position:relative;background:rgba(255,255,255,.03);border:1px solid var(--card-border);padding:1rem}
+    #hemiciclo-svg-wrap svg{width:100%;height:auto;display:block}
+    #hemi-cam-legend{display:flex;flex-wrap:wrap;gap:.4rem .8rem;margin-top:.75rem}
+    #hemiciclo-map-wrap{position:relative;background:rgba(255,255,255,.03);border:1px solid var(--card-border)}
+    #hemiciclo-cam-map{height:320px}
+    #hemiciclo-cam-back{position:absolute;top:.5rem;right:.5rem;z-index:900;font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;background:rgba(6,8,16,.85);border:1px solid rgba(0,71,255,.4);color:rgba(180,210,255,.85);padding:.3rem .75rem;cursor:pointer;display:none}
+    #hemiciclo-cam-back:hover{background:rgba(0,71,255,.25)}
+    #hemi-cam-tooltip{display:none;position:fixed;background:rgba(6,8,16,.97);border:1px solid rgba(0,71,255,.4);color:#f4f3ef;font-family:Avenir,sans-serif;font-size:.85rem;padding:.45rem .65rem;pointer-events:none;z-index:9000;line-height:1.45;max-width:220px}
+    /* Leaflet tooltip override */
+    .leaflet-tooltip{font-family:Avenir,sans-serif!important;font-weight:400!important;font-size:.85rem!important;background:rgba(6,8,16,.97)!important;border:1px solid rgba(0,71,255,.4)!important;color:#f4f3ef!important;width:220px!important;white-space:normal!important;overflow-wrap:break-word!important;word-break:normal!important;border-radius:0!important;padding:.45rem .65rem!important}
+    .leaflet-tooltip:before{display:none!important}
+    #hemiciclo-cam-map .leaflet-interactive{cursor:pointer}
     .orient-overlay{display:none;position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,.88);align-items:center;justify-content:center;padding:1.5rem}
     .orient-overlay.show{display:flex}
     .orient-box{background:#0e1220;border:1px solid rgba(255,255,255,.12);padding:2rem 1.8rem;max-width:320px;text-align:center}
@@ -372,6 +394,7 @@
           <button class="circ-btn circ-btn-active" id="circ-btn-territorial" onclick="onCircChange('TERRITORIAL')">Territorial</button>
           <button class="circ-btn" id="circ-btn-indigenas" onclick="onCircChange('INDIGENAS')">Indígena</button>
           <button class="circ-btn" id="circ-btn-afro" onclick="onCircChange('AFRO-DESCENDIENTES')">Afro-descendientes</button>
+          <button class="circ-btn" id="circ-btn-rg" onclick="onCircChange('RESULTADOS_GENERALES')">Resultados Generales</button>
         </div>
 
         <div class="results-grid" id="cam-main-grid">
@@ -394,10 +417,24 @@
                 <canvas id="donut-camara"></canvas>
                 <div class="donut-center">
                   <div class="donut-pct" id="pct-camara">—</div>
-                  <div class="donut-sub">válidos</div>
+                  <div class="donut-sub" id="donut-sub-camara">válidos</div>
                 </div>
               </div>
               <div class="donut-legend" id="leg-camara"></div>
+            </div>
+            <!-- Donut género -->
+            <div id="gender-donut-wrap" style="display:none;flex-direction:column;align-items:center;gap:.55rem;margin-top:1rem;padding-top:.85rem;border-top:1px solid var(--border)">
+              <div style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3);align-self:flex-start">Censo electoral</div>
+              <div style="display:flex;gap:1.2rem;align-items:center">
+                <div class="donut-cw" style="width:90px;height:90px">
+                  <canvas id="donut-gender"></canvas>
+                  <div class="donut-center">
+                    <div class="donut-pct" id="pct-gender" style="font-size:1rem">—</div>
+                    <div class="donut-sub">mujeres</div>
+                  </div>
+                </div>
+                <div class="donut-legend" id="leg-gender"></div>
+              </div>
             </div>
             <div class="umbral-bar">
               <div class="umbral-label">Curules totales asignadas</div>
@@ -414,6 +451,23 @@
             </div>
           </div>
         </div>
+
+        <!-- RESULTADOS GENERALES panel -->
+        <div id="rg-panel" style="display:none">
+          <div class="hemi-map-row">
+            <div id="hemiciclo-wrap" class="card">
+              <div class="card-label" id="hemi-cam-label">Hemiciclo · Cámara</div>
+              <div id="hemiciclo-svg-wrap"></div>
+              <div id="hemi-cam-legend"></div>
+            </div>
+            <div id="hemiciclo-map-wrap" class="card" style="padding:0;overflow:hidden">
+              <div id="hemiciclo-cam-map"></div>
+              <button id="hemiciclo-cam-back" onclick="camBackBtnClick()"></button>
+            </div>
+          </div>
+        </div>
+        <div id="hemi-cam-tooltip"></div>
+
       </div>
     </div>
 
@@ -485,13 +539,13 @@
       const _elected = (k,name) => `<tr>
         <td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;width:2.5rem">—</td>
         <td style="color:rgba(255,255,255,.25);width:2rem">${String(k+1).padStart(2,'0')}</td>
-        <td style="font-family:'Syne',sans-serif;font-weight:700;color:#39ff7a">${name.toUpperCase()} <span style="font-size:.6rem;margin-left:.4rem">✦</span></td>
-        <td class="r" style="font-family:'Syne',sans-serif">—</td><td class="r" style="color:rgba(255,255,255,.4)">—</td></tr>`;
+        <td style="font-family:'Syne',sans-serif;font-weight:300;font-size:1.05rem;color:#39ff7a">${name.toUpperCase()} <span style="font-size:.6rem;margin-left:.4rem">✦</span></td>
+        <td class="r" style="font-family:Avenir,sans-serif;font-weight:400">—</td><td class="r" style="color:rgba(255,255,255,.4)">—</td></tr>`;
       const _plain = (k,name) => `<tr>
         <td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;width:2.5rem">—</td>
         <td style="color:rgba(255,255,255,.25);width:2rem">${String(k+1).padStart(2,'0')}</td>
-        <td style="font-family:'Syne',sans-serif;font-weight:400;color:rgba(255,255,255,.6)">${name.toUpperCase()}</td>
-        <td class="r" style="font-family:'Syne',sans-serif">—</td><td class="r" style="color:rgba(255,255,255,.4)">—</td></tr>`;
+        <td style="font-family:'Syne',sans-serif;font-weight:300;font-size:1.05rem;color:rgba(255,255,255,.6)">${name.toUpperCase()}</td>
+        <td class="r" style="font-family:Avenir,sans-serif;font-weight:400">—</td><td class="r" style="color:rgba(255,255,255,.4)">—</td></tr>`;
       const _footer = `<tr><td colspan="5" style="font-family:'DM Mono',monospace;font-size:.58rem;color:rgba(255,255,255,.25);padding:.5rem .5rem .3rem;border:none">Lista cerrada · en orden de asignación</td></tr>`;
       if(allNames.length === 0){
         if(curules === 0) return '';
@@ -583,7 +637,9 @@
     }
 
     // ─── STATE ────────────────────────────────────────────────
-    let resumenData = null, donutChart = null;
+    let resumenData = null, donutChart = null, genderDonutChart = null;
+    let camMap = null, _camDeptoGeoRaw = null, _camDepGeoCache = {}, _camDepLayer = null, _camNacLayer = null;
+    let _camDepWinner = {}, _camNomMap = {};
     let curulesNac = {}, curulesIndigenas = {}, curulesAfro = {};
     let nacElegidosTerritorial = {}, nacElegidosIndigenas = {}, nacElegidosAfro = {};
     let curDep = 'TODOS';
@@ -674,6 +730,10 @@
         document.getElementById('load-state').classList.add('hidden');
         document.getElementById('main-content').classList.remove('hidden');
 
+        buildCamDepWinner(deps);
+        initCamMap();
+        loadPotencialCSV();
+
         // Poblar selector de departamentos/circunscripciones
         // Acumular TODAS las circs de un mismo código para que el toggle funcione correctamente
         const sel = document.getElementById('dep-select');
@@ -721,33 +781,113 @@
       document.getElementById('curules-total').textContent = `${cTotal} de ${maxC}`;
     }
 
-    // ─── DONUT ────────────────────────────────────────────────
-    function renderDonut(data){
-      // válidos = votant - nulos - no_marcados (blanco SÍ cuenta como válido)
-      const d = data || resumenData;
-      const votnul  = d.votnul  || 0;
-      const votnma  = d.votnma  || 0;
-      const votblan = d.votblan || 0;
-      const votant  = d.votant  != null ? d.votant : (d.votval||0) + votnul + votnma;
-      const votval  = d.votant  != null ? d.votant - votnul - votnma : (d.votval||0) + votblan;
-      document.getElementById('pct-camara').textContent = votant ? ((votval/votant)*100).toFixed(2)+'%' : '—';
+    // ─── POTENCIAL ELECTORAL (COMUNAS_DATA.csv) ───────────────
+    const COMUNAS_CSV_URL = `${S3}/Divipole-actualizado/COMUNAS_DATA.csv`;
+    let _potencialData = null, _potencialLoadingP = null;
+    async function loadPotencialCSV(){
+      if(_potencialData) return _potencialData;
+      if(_potencialLoadingP) return _potencialLoadingP;
+      _potencialLoadingP = (async()=>{
+        try{
+          const r = await fetch(COMUNAS_CSV_URL);
+          if(!r.ok){ _potencialData=[]; return _potencialData; }
+          const text = await r.text();
+          const rows = text.split(/\r?\n/).filter(x=>x.trim());
+          if(rows.length<2){ _potencialData=[]; return _potencialData; }
+          const header = rows[0].replace(/^\ufeff/,'').split(';').map(h=>h.trim().toLowerCase());
+          const iDep=header.indexOf('dd'), iMun=header.indexOf('mm'), iZZ=header.indexOf('zz'),
+                iPP=header.indexOf('pp'), iM=header.indexOf('mujeres'), iH=header.indexOf('hombres');
+          if(iM<0||iH<0){ _potencialData=[]; return _potencialData; }
+          const data=[];
+          for(let i=1;i<rows.length;i++){
+            const cols=rows[i].split(';'); if(cols.length<=Math.max(iM,iH)) continue;
+            const dep=iDep>=0?(cols[iDep]||'').trim().padStart(2,'0'):'';
+            const mun=iMun>=0?(cols[iMun]||'').trim().padStart(3,'0'):'';
+            const zz=iZZ>=0?(cols[iZZ]||'').trim().padStart(2,'0'):'';
+            const pp=iPP>=0?(cols[iPP]||'').trim().padStart(2,'0'):'';
+            const m=parseInt(cols[iM]||'0',10)||0, h=parseInt(cols[iH]||'0',10)||0;
+            if(m+h===0) continue;
+            data.push({dep,mun,zz,pp,m,h});
+          }
+          _potencialData=data;
+        }catch(e){ console.warn('[PotencialCSV]',e); _potencialData=[]; }
+        return _potencialData;
+      })();
+      return _potencialLoadingP;
+    }
+    function getPotencialFor(filters){
+      if(!_potencialData||!_potencialData.length) return {potencial:null,mujeres:0,hombres:0};
+      const f=filters||{};
+      const to2=v=>(v!=null&&v!=='')?String(parseInt(v,10)||0).padStart(2,'0'):null;
+      const to3=v=>(v!=null&&v!=='')?String(parseInt(v,10)||0).padStart(3,'0'):null;
+      const dep=to2(f.depCod), mun=to3(f.munCod), comZZ=to2(f.comCod||f.zonaCod);
+      let puZZ=null,puPP=null;
+      if(f.pueCod!=null&&f.pueCod!==''){
+        const parts=String(f.pueCod).split('-');
+        if(parts.length===3){puZZ=to2(parts[1]);puPP=to2(parts[2]);}else{puPP=to2(f.pueCod);}
+      }
+      const zz=puZZ||comZZ, pp=puPP;
+      let tm=0,th=0;
+      for(const r of _potencialData){
+        if(dep&&r.dep!==dep) continue; if(mun&&r.mun!==mun) continue;
+        if(zz&&r.zz!==zz) continue; if(pp&&r.pp!==pp) continue;
+        tm+=r.m; th+=r.h;
+      }
+      return {potencial:tm+th||null,mujeres:tm,hombres:th};
+    }
+
+    // ─── DONUT PARTICIPACIÓN ──────────────────────────────────
+    function drawDonut({vv, vn, vm, vb, votant, potencial, mujeres, hombres}){
+      const pctEl=document.getElementById('pct-camara');
+      const subEl=document.getElementById('donut-sub-camara');
+      let labels,data,colors;
+      if(potencial&&potencial>votant){
+        const abst=potencial-votant;
+        if(pctEl) pctEl.textContent=pct(votant,potencial)+'%';
+        if(subEl) subEl.textContent='participación';
+        labels=['Votos válidos','Nulos','No marcados','En blanco','Abstención'];
+        data=[Math.max(0,vv-vb),vn,vm,vb,abst];
+        colors=['#0047FF','#cc2233','#f0a500','#555','rgba(255,255,255,.08)'];
+      } else {
+        if(pctEl) pctEl.textContent=votant?pct(vv,votant)+'%':'—';
+        if(subEl) subEl.textContent='válidos';
+        labels=['Votos válidos','Nulos','No marcados','En blanco'];
+        data=[Math.max(0,vv-vb),vn,vm,vb];
+        colors=['#0047FF','#cc2233','#f0a500','#555'];
+      }
       if(donutChart) donutChart.destroy();
-      donutChart = new Chart(document.getElementById('donut-camara').getContext('2d'),{
+      donutChart=new Chart(document.getElementById('donut-camara').getContext('2d'),{
         type:'doughnut',
-        data:{labels:['Votos válidos','Nulos','No marcados','En blanco'],
-              datasets:[{data:[votval-votblan,votnul,votnma,votblan],
-                         backgroundColor:['#0047FF','#cc2233','#f0a500','#555'],
-                         borderWidth:0,hoverOffset:6}]},
-        options:{responsive:true,maintainAspectRatio:true,cutout:'72%',
-                 plugins:{legend:{display:false},
-                          tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}}}}
+        data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:0,hoverOffset:6}]},
+        options:{responsive:true,maintainAspectRatio:true,cutout:'72%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}}}}
       });
-      document.getElementById('leg-camara').innerHTML=[
-        ['Votos válidos',votval,'#0047FF'],
-        ['Nulos',votnul,'#cc2233'],
-        ['No marcados',votnma,'#f0a500'],
-        ['En blanco',votblan,'#555']
-      ].map(([l,v,c])=>`<div class="li"><span class="ld" style="background:${c}"></span><span>${l}</span><span class="lv">${fmt(v)}</span></div>`).join('');
+      document.getElementById('leg-camara').innerHTML=labels.map((l,i)=>`<div class="li"><span class="ld" style="background:${colors[i]}"></span><span>${l}</span><span class="lv">${fmt(data[i])}</span></div>`).join('');
+      drawGenderDonut({mujeres:mujeres||0,hombres:hombres||0});
+    }
+    // Wrapper que convierte el objeto raw (votant/votnul/…) en los parámetros de drawDonut
+    function renderDonut(data, potencial, mujeres, hombres){
+      const d=data||resumenData;
+      const vn=d.votnul||0, vm=d.votnma||0, vb=d.votblan||0;
+      const votant=d.votant!=null?d.votant:(d.votval||0)+vn+vm;
+      const vv=d.votant!=null?d.votant-vn-vm:(d.votval||0)+vb;
+      drawDonut({vv,vn,vm,vb,votant,potencial:potencial||null,mujeres:mujeres||0,hombres:hombres||0});
+    }
+
+    // ─── DONUT GÉNERO ─────────────────────────────────────────
+    function drawGenderDonut({mujeres,hombres}){
+      const total=mujeres+hombres;
+      const wrap=document.getElementById('gender-donut-wrap');
+      const pctEl=document.getElementById('pct-gender');
+      if(!total){if(wrap)wrap.style.display='none';return;}
+      if(wrap)wrap.style.display='flex';
+      if(pctEl) pctEl.textContent=pct(mujeres,total)+'%';
+      if(genderDonutChart) genderDonutChart.destroy();
+      genderDonutChart=new Chart(document.getElementById('donut-gender').getContext('2d'),{
+        type:'doughnut',
+        data:{labels:['Mujeres','Hombres'],datasets:[{data:[mujeres,hombres],backgroundColor:['#ff6eb4','#0047FF'],borderWidth:0,hoverOffset:4}]},
+        options:{responsive:true,maintainAspectRatio:true,cutout:'72%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}}}}
+      });
+      document.getElementById('leg-gender').innerHTML=[['Mujeres',mujeres,'#ff6eb4'],['Hombres',hombres,'#0047FF']].map(([l,v,c])=>`<div class="li"><span class="ld" style="background:${c}"></span><span>${l}</span><span class="lv">${fmt(v)}</span></div>`).join('');
     }
 
     // ─── CORPORACIÓN ─────────────────────────────────────────
@@ -790,19 +930,30 @@
     }
 
     function onCircChange(val){
-      // Actualizar estado visual del toggle
       document.querySelectorAll('.circ-btn').forEach(b=>b.classList.remove('circ-btn-active'));
-      const idMap = {'TERRITORIAL':'territorial','INDIGENAS':'indigenas','AFRO-DESCENDIENTES':'afro'};
+      const idMap = {'TERRITORIAL':'territorial','INDIGENAS':'indigenas','AFRO-DESCENDIENTES':'afro','RESULTADOS_GENERALES':'rg'};
       const btn = document.getElementById('circ-btn-' + (idMap[val]||val.toLowerCase()));
       if(btn) btn.classList.add('circ-btn-active');
-      // Actualizar texto de método
       const _mt = document.getElementById('metodo-txt');
       if(_mt){
-        if(val === 'AFRO-DESCENDIENTES') _mt.textContent = "Cuociente electoral · umbral 30% · circunscripción nacional (2 curules)";
-        else if(val === 'INDIGENAS')      _mt.textContent = "Mayoría simple · circunscripción nacional (1 curul)";
-        else                              _mt.textContent = "D'Hondt por circunscripción · umbral 3%";
+        if(val === 'AFRO-DESCENDIENTES')      _mt.textContent = "Cuociente electoral · umbral 30% · circunscripción nacional (2 curules)";
+        else if(val === 'INDIGENAS')           _mt.textContent = "Mayoría simple · circunscripción nacional (1 curul)";
+        else if(val === 'RESULTADOS_GENERALES')_mt.textContent = "Mapa y hemiciclo por departamento";
+        else                                   _mt.textContent = "D'Hondt por circunscripción · umbral 3%";
       }
-      switchCorp(val);
+      const isRG = val === 'RESULTADOS_GENERALES';
+      _rgMode = isRG;
+      document.getElementById('cam-main-grid').style.display = isRG ? 'none' : '';
+      document.getElementById('rg-panel').style.display = isRG ? '' : 'none';
+      if(isRG){
+        // Mostrar hemiciclo nacional + mapa
+        const curMap = curulesNac;
+        const total = CURULES_TERRITORIAL;
+        renderCamHemiciclo(curMap, total, 'Hemiciclo · Cámara · Nacional');
+        initCamMap().then(()=>updateCamMap(curDep==='TODOS'?'':curDep));
+      } else {
+        switchCorp(val);
+      }
     }
 
     async function switchCorp(corp){
@@ -833,6 +984,28 @@
       curComData = null;
       document.getElementById('cam-search').value='';
       buscarCandidato('');
+
+      // En modo RG: actualizar hemiciclo y mapa
+      if(_rgMode){
+        showLoadingToast();
+        if(depCod==='TODOS'){
+          renderCamHemiciclo(curulesNac, CURULES_TERRITORIAL, 'Hemiciclo · Cámara · Nacional');
+          updateCamMap('');
+        } else {
+          const deps = await getJSON('departamentos');
+          const dep = deps.find(d=>d.cod===depCod && getDepCirc(d)==='TERRITORIAL');
+          if(dep){
+            const nC=getCurulesDep(dep.nombre);
+            const depData = await (async()=>{try{return await getJSON('dep-'+depCod);}catch(_){return null;}})();
+            const depCirc=(depData||dep).por_circunscripcion?.['TERRITORIAL']??(depData||dep);
+            const {cur}=asignarCurules(depCirc.partidos||{},nC);
+            renderCamHemiciclo(cur, nC, `Hemiciclo · ${dep.nombre} · ${nC} curules`);
+          }
+          updateCamMap(depCod);
+        }
+        return;
+      }
+
       if(depCod==='TODOS'){ curDepData=null; renderNacional(); return; }
 
       showLoadingToast();
@@ -845,11 +1018,9 @@
       const dep = deps.find(d=>d.cod===depCod && getDepCirc(d)===curCorp);
       if(!dep) return;
 
-      // Intentar cargar dep-{cod}.json
       curDepData = null;
       try { curDepData = await getJSON(`dep-${depCod}`); } catch(e){}
 
-      // Poblar selector de municipios si hay datos
       if(curDepData?.municipios?.length){
         const esConsulados = /consulado/i.test(dep.nombre);
         const muns = curDepData.municipios.map(m=>({value: m.cod, label: m.nombre}));
@@ -1097,10 +1268,11 @@
       const _nul = slice.votnul  ?? sliceFull.votnul;
       const _nma = slice.votnma  ?? sliceFull.votnma;
       const _bla = slice.votblan ?? sliceFull.votblan;
+      const _pot = getPotencialFor({depCod: dep.cod, munCod: curMun!=='TODOS'?curMun:null});
       if(_va != null){
-        renderDonut({votant: _va, votnul: _nul, votnma: _nma, votblan: _bla});
+        renderDonut({votant: _va, votnul: _nul, votnma: _nma, votblan: _bla}, _pot.potencial, _pot.mujeres, _pot.hombres);
       } else {
-        renderDonut({votval: votvalSlice, votant: votvalSlice});
+        renderDonut({votval: votvalSlice, votant: votvalSlice}, _pot.potencial, _pot.mujeres, _pot.hombres);
       }
 
       // ── TABLA: votos del slice, curules CONGELADAS del depto ──
@@ -1145,8 +1317,9 @@
         circTot.votnma+=d.votnma||0; circTot.votblan+=d.votblan||0;
       });
 
-      // Donut: usar agregado de deps si tienen votant, si no el getCircData del resumen
-      renderDonut(circTot.votant>0 ? circTot : getCircData());
+      // Donut: usar agregado de deps con potencial nacional
+      const _nacPot = getPotencialFor({});
+      renderDonut(circTot.votant>0 ? circTot : getCircData(), _nacPot.potencial, _nacPot.mujeres, _nacPot.hombres);
 
       const curMap2 = curCorp==='INDIGENAS' ? curulesIndigenas : curCorp==='AFRO-DESCENDIENTES' ? curulesAfro : curulesNac;
 
@@ -1240,14 +1413,14 @@
           <td>
             <div style="display:flex;align-items:center;gap:.6rem">
               <span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span>
-              <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span>
+              <span style="font-family:'Syne',sans-serif;font-weight:500;font-size:.9rem">${p.partido}</span>
               ${showDrillBtn?`<span class="circ-badge">${depNom||''}</span>`:''}
             </div>
             <div style="margin-top:.35rem">
               <button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${candCount} candidatos${hasCandMap?' <span style="font-size:.6rem;color:rgba(74,222,128,.5)">· este depto</span>':''}</button>
             </div>
           </td>
-          <td class="r" style="font-size:.9rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td>
+          <td class="r" style="font-size:.9rem;font-weight:400;font-family:Avenir,sans-serif">${fmt(p.votos)}</td>
           <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>
           <td class="r">${curulesCell}</td>`;
         tbody.appendChild(tr);
@@ -1270,8 +1443,8 @@
             const _listaRow = _vLista > 10 ? `<tr>
               <td style="color:rgba(0,71,255,.45);font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;width:2.5rem;letter-spacing:.04em">—</td>
               <td style="color:rgba(255,255,255,.18);width:2rem">—</td>
-              <td style="font-family:'Syne',sans-serif;font-weight:500;color:rgba(255,255,255,.38);font-size:.76rem;letter-spacing:.06em;text-transform:uppercase">Votos por el partido</td>
-              <td class="r" style="font-family:'Syne',sans-serif;color:rgba(255,255,255,.38)">${fmt(_vLista)}</td>
+              <td style="font-family:'Syne',sans-serif;font-weight:300;font-size:1.05rem;color:rgba(255,255,255,.38)">Votos por el partido</td>
+              <td class="r" style="font-family:Avenir,sans-serif;font-weight:400;color:rgba(255,255,255,.38)">${fmt(_vLista)}</td>
               <td class="r" style="color:rgba(255,255,255,.28)">${p.votos?(_vLista/p.votos*100).toFixed(1):'0.0'}%</td>
             </tr>` : '';
             if(cands.length===0) return _listaRow;
@@ -1292,8 +1465,8 @@
               return `<tr>
                 <td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${codStr}</td>
                 <td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td>
-                <td style="font-family:'Syne',sans-serif;font-weight:${fw};color:${colorC}">${c.nombre}${suffix}</td>
-                <td class="r" style="font-family:'Syne',sans-serif">${fmt(c.votos)}</td>
+                <td style="font-family:'Syne',sans-serif;font-weight:300;font-size:1.05rem;color:${colorC}">${c.nombre}${suffix}</td>
+                <td class="r" style="font-family:Avenir,sans-serif;font-weight:400">${fmt(c.votos)}</td>
                 <td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td>
               </tr>`;
             }).join('');
@@ -1342,6 +1515,146 @@
         <table class="results-table"><thead><tr><th>#</th><th>Candidato/a</th><th>Partido</th><th class="r">Pos.</th><th class="r">Votos</th><th class="r">Estado</th></tr></thead>
         <tbody>${res.map((r,i)=>`<tr><td style="color:rgba(255,255,255,.25)">${String(i+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif;font-weight:${r.elegido?700:400};color:${r.elegido?VERDE:'inherit'}">${r.nombre}${r.elegido?'<span style="font-size:.6rem;margin-left:.4rem">✦</span>':''}</td><td style="color:rgba(255,255,255,.45);font-family:'Syne',sans-serif">${r.partido}</td><td class="r" style="color:rgba(255,255,255,.3)">#${r.pos}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(r.votos)}</td><td class="r"><span style="font-family:'DM Mono',monospace;font-size:.75rem;font-weight:700;padding:.2rem .6rem;background:${r.elegido?'rgba(57,255,122,.1)':'rgba(255,255,255,.04)'};color:${r.elegido?VERDE:'rgba(255,255,255,.25)'};border:1px solid ${r.elegido?'rgba(57,255,122,.35)':'rgba(255,255,255,.08)'}">${r.elegido?'ELEGIDO':'—'}</span></td></tr>`).join('')}</tbody></table>`;
     }
+
+    // ─── GEO URLS ─────────────────────────────────────────────
+    const DEPTO_GEOJSON_URL = `${S3}/mapas-2026/DEPARTAMENTOS2.json`;
+    const DEPTOS_MPS_URL    = `${S3}/mapas-2026/Departamentos-mps`;
+    let _rgMode = false; // true cuando el toggle RG está activo
+
+    // ─── BUILD DEP WINNER ─────────────────────────────────────
+    const _normCN = s=>(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
+    function buildCamDepWinner(deps){
+      const SPEC=new Set(['996','997','998']);
+      _camDepWinner={}; _camNomMap={};
+      deps.filter(d=>getDepCirc(d)==='TERRITORIAL').forEach(dep=>{
+        const circ=dep.por_circunscripcion?.['TERRITORIAL']??dep;
+        const pts=Object.entries(circ.partidos||{}).filter(([k])=>!SPEC.has(k)&&!/blanco/i.test(k)).sort((a,b)=>b[1]-a[1]);
+        if(pts.length){ _camDepWinner[dep.cod]={partido:pts[0][0],votos:pts[0][1],nombre:dep.nombre}; _camNomMap[_normCN(dep.nombre)]=dep.cod; }
+      });
+      const AL={'NORTE DE SANTANDER':'norte de santander','VALLE DEL CAUCA':'valle del cauca','SAN ANDRES':'san andres y providencia','BOGOTA D.C.':'bogota d.c.'};
+      Object.entries(AL).forEach(([k,v])=>{ const cod=_camNomMap[k.toUpperCase()]||_camNomMap[_normCN(v)]; if(cod) _camNomMap[k]=cod; });
+    }
+
+    // ─── HEMICICLO DINÁMICO ────────────────────────────────────
+    function _camHemiPos(total){
+      const cx=300,cy=295;
+      let rings;
+      if(total<=8)       rings=[{r:130,n:total}];
+      else if(total<=20){const n1=Math.ceil(total/2);rings=[{r:100,n:n1},{r:155,n:total-n1}];}
+      else if(total<=40){const n1=Math.round(total*.30),n2=Math.round(total*.35);rings=[{r:88,n:n1},{r:130,n:n2},{r:172,n:total-n1-n2}];}
+      else if(total<=80){const n1=Math.round(total*.22),n2=Math.round(total*.26),n3=Math.round(total*.26);rings=[{r:80,n:n1},{r:115,n:n2},{r:152,n:n3},{r:190,n:total-n1-n2-n3}];}
+      else{const n1=Math.round(total*.16),n2=Math.round(total*.18),n3=Math.round(total*.21),n4=Math.round(total*.22);rings=[{r:68,n:n1},{r:100,n:n2},{r:133,n:n3},{r:167,n:n4},{r:202,n:total-n1-n2-n3-n4}];}
+      const pos=[];
+      rings.forEach(({r,n})=>{for(let i=0;i<n;i++){const a=Math.PI-(n===1?Math.PI/2:(i/(n-1))*Math.PI);pos.push({x:cx+r*Math.cos(a),y:cy-r*Math.sin(a)});}});
+      return pos;
+    }
+
+    function renderCamHemiciclo(curMap, totalSeats, label){
+      const wrap=document.getElementById('hemiciclo-svg-wrap');
+      const legEl=document.getElementById('hemi-cam-legend');
+      const lblEl=document.getElementById('hemi-cam-label');
+      if(!wrap) return;
+      if(lblEl) lblEl.textContent=label||'Hemiciclo · Cámara';
+      const SPEC=new Set(['996','997','998']);
+      const parties=Object.entries(curMap).filter(([k,v])=>v>0&&!SPEC.has(k)&&!/blanco/i.test(k)).sort((a,b)=>b[1]-a[1]);
+      const total=totalSeats||parties.reduce((s,[,v])=>s+v,0);
+      if(!total){wrap.innerHTML='';if(legEl)legEl.innerHTML='';return;}
+      const positions=_camHemiPos(total);
+      const dots=[];
+      let pi=0;
+      for(const [partido,curules] of parties){const color=getColor(partido);for(let c=0;c<curules&&pi<positions.length;c++,pi++)dots.push({...positions[pi],color,partido});}
+      while(pi<positions.length){dots.push({...positions[pi],color:'#2a2a3a',partido:''});pi++;}
+      const dotR=total<=10?11:total<=20?9:total<=50?7:total<=100?6:5;
+      const tooltip=document.getElementById('hemi-cam-tooltip');
+      wrap.innerHTML=`<svg viewBox="0 0 600 310" xmlns="http://www.w3.org/2000/svg">${dots.map((d,i)=>`<circle cx="${d.x.toFixed(1)}" cy="${d.y.toFixed(1)}" r="${dotR}" fill="${d.color}" opacity="0.92" data-i="${i}"/>`).join('')}</svg>`;
+      wrap.querySelectorAll('circle[data-i]').forEach(c=>{
+        const d=dots[+c.dataset.i]; if(!d.partido) return;
+        c.style.cursor='pointer';
+        c.addEventListener('mouseenter',e=>{if(tooltip){tooltip.style.display='block';tooltip.innerHTML=`<span style="color:${d.color};font-weight:700;font-family:'Syne',sans-serif">${d.partido}</span><br/>${curMap[d.partido]||0} curul${(curMap[d.partido]||0)!==1?'es':''}`;} });
+        c.addEventListener('mousemove',e=>{if(tooltip){tooltip.style.left=(e.clientX+14)+'px';tooltip.style.top=(e.clientY-10)+'px';}});
+        c.addEventListener('mouseleave',()=>{if(tooltip)tooltip.style.display='none';});
+      });
+      if(legEl) legEl.innerHTML=parties.map(([partido,curules])=>`<div style="display:flex;align-items:center;gap:.35rem;font-family:'DM Mono',monospace;font-size:.6rem;color:rgba(255,255,255,.6)"><span style="width:8px;height:8px;border-radius:50%;background:${getColor(partido)};flex-shrink:0;display:inline-block"></span><span>${partido.split(' ').slice(0,3).join(' ')}</span><span style="font-family:Avenir,sans-serif;font-weight:400;color:var(--white);margin-left:.2rem">${curules}</span></div>`).join('');
+    }
+
+    // ─── MAPA CÁMARA ──────────────────────────────────────────
+    function _camDepCode(props){
+      if(props.electoral_id) return String(props.electoral_id).padStart(2,'0');
+      const n=_normCN(props.NOMBRE_DPT||props.nombre||props.NOMBRE||'');
+      return _camNomMap[n]||null;
+    }
+
+    async function initCamMap(){
+      if(camMap) return;
+      if(!_camDeptoGeoRaw){
+        try{const r=await fetch(DEPTO_GEOJSON_URL);if(r.ok)_camDeptoGeoRaw=await r.json();}catch(e){console.warn('[CamMap]',e);}
+      }
+    }
+
+    async function updateCamMap(depCod){
+      const el=document.getElementById('hemiciclo-cam-map'); if(!el) return;
+      if(!camMap){
+        camMap=L.map('hemiciclo-cam-map',{zoomControl:false,attributionControl:false,dragging:true,scrollWheelZoom:false});
+      }
+      if(_camDepLayer){try{camMap.removeLayer(_camDepLayer);}catch(_){}_camDepLayer=null;}
+
+      if(!depCod){
+        // Vista nacional
+        if(_camNacLayer){if(!camMap.hasLayer(_camNacLayer))_camNacLayer.addTo(camMap);_camNacLayer.resetStyle();try{camMap.fitBounds(_camNacLayer.getBounds(),{padding:[6,6]});}catch(_){}updateCamMapBackBtn('');return;}
+        if(!_camDeptoGeoRaw){updateCamMapBackBtn('');return;}
+        const SPEC=new Set(['996','997','998']);
+        _camNacLayer=L.geoJSON(_camDeptoGeoRaw,{
+          style:feat=>{const cod=_camDepCode(feat.properties);const w=cod?_camDepWinner[cod]:null;return{fillColor:w?getColor(w.partido):'#333',fillOpacity:w?0.72:0.25,color:'rgba(255,255,255,0.25)',weight:1};},
+          onEachFeature:(feat,layer)=>{
+            const cod=_camDepCode(feat.properties);const w=cod?_camDepWinner[cod]:null;
+            const nom=feat.properties.NOMBRE_DPT||feat.properties.nombre||feat.properties.NOMBRE||'';
+            layer.on({
+              mouseover(e){layer.setStyle({weight:2,color:'#fff',fillOpacity:.95});layer.bindTooltip(`<div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.45"><span style="color:#0047FF;font-weight:700">${String(nom).toUpperCase()}</span><br/>${w?`<span style="color:${getColor(w.partido)};font-weight:700">${w.partido}</span><br/>${fmt(w.votos)} votos`:'Sin datos'}</div>`,{sticky:true,opacity:1}).openTooltip(e.latlng);},
+              mouseout(){const w2=cod?_camDepWinner[cod]:null;layer.setStyle({fillColor:w2?getColor(w2.partido):'#333',fillOpacity:w2?0.72:0.25,color:'rgba(255,255,255,0.25)',weight:1});layer.closeTooltip();},
+              click(){if(!cod)return;const sel=document.getElementById('dep-select');if(sel)sel.value=cod;switchDep(cod);}
+            });
+          }
+        }).addTo(camMap);
+        try{camMap.fitBounds(_camNacLayer.getBounds(),{padding:[6,6]});}catch(_){}
+        updateCamMapBackBtn('');
+        return;
+      }
+
+      // Vista departamento
+      if(_camNacLayer&&camMap.hasLayer(_camNacLayer))camMap.removeLayer(_camNacLayer);
+      const paddedCode=String(depCod).padStart(2,'0');
+      try{
+        let geo=_camDepGeoCache[depCod];
+        if(!geo){const r=await fetch(`${DEPTOS_MPS_URL}/${paddedCode}.json`);if(r.ok){geo=await r.json();_camDepGeoCache[depCod]=geo;}}
+        if(geo){
+          // Construir ganadores por mun
+          const SPEC=new Set(['996','997','998']);const munWin={};
+          let depData=null;try{depData=await getJSON('dep-'+depCod);}catch(e){}
+          if(depData?.municipios){depData.municipios.forEach(m=>{const circ=m.por_circunscripcion?.['TERRITORIAL']??m;const pts=Object.entries(circ.partidos||{}).filter(([k])=>!SPEC.has(k)&&!/blanco/i.test(k)).sort((a,b)=>b[1]-a[1]);if(pts.length)munWin[String(parseInt(m.cod,10))]={partido:pts[0][0],votos:pts[0][1]};});}
+          _camDepLayer=L.geoJSON(geo,{
+            style:feat=>{const mc=String(Number(feat.properties.mun_elec||feat.properties.cod_mun||feat.properties.CODIGO||0));const w=munWin[mc];return{fillColor:w?getColor(w.partido):'#333',fillOpacity:w?0.72:0.25,color:'rgba(255,255,255,0.25)',weight:1};},
+            onEachFeature:(feat,layer)=>{
+              const mc=String(Number(feat.properties.mun_elec||feat.properties.cod_mun||feat.properties.CODIGO||0));const w=munWin[mc];
+              const nom=feat.properties.nombre||feat.properties.NOMBRE||mc;
+              layer.on({
+                mouseover(e){layer.setStyle({weight:2,color:'#fff',fillOpacity:.95});layer.bindTooltip(`<div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.45"><span style="color:#0047FF;font-weight:700">${String(nom).toUpperCase()}</span><br/>${w?`<span style="color:${getColor(w.partido)};font-weight:700">${w.partido}</span><br/>${fmt(w.votos)} votos`:'Sin datos'}</div>`,{sticky:true,opacity:1}).openTooltip(e.latlng);},
+                mouseout(){const w2=munWin[mc];layer.setStyle({fillColor:w2?getColor(w2.partido):'#333',fillOpacity:w2?0.72:0.25,color:'rgba(255,255,255,0.25)',weight:1});layer.closeTooltip();}
+              });
+            }
+          }).addTo(camMap);
+          try{camMap.fitBounds(_camDepLayer.getBounds(),{padding:[10,10]});}catch(_){}
+        }
+      }catch(e){console.warn('[CamMap dep]',e);}
+      updateCamMapBackBtn(depCod);
+    }
+
+    function updateCamMapBackBtn(depCod){
+      const btn=document.getElementById('hemiciclo-cam-back');if(!btn)return;
+      if(!depCod){btn.style.display='none';btn.onclick=null;return;}
+      btn.style.display='';btn.textContent='← Nacional';
+      btn.onclick=()=>{const sel=document.getElementById('dep-select');if(sel)sel.value='TODOS';switchDep('TODOS');};
+    }
+    function camBackBtnClick(){const btn=document.getElementById('hemiciclo-cam-back');if(btn&&btn.onclick)btn.onclick();}
 
     // ─── CURTAIN ──────────────────────────────────────────────
     const curtain=document.getElementById('curtain');
