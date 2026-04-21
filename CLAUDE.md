@@ -127,6 +127,7 @@ updateHemicicloMap(depCod, munCod)    // RESULTADOS_GENERALES
 ```js
 const BOGOTA_LOC_URL   = `${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`;
 const MEDELLIN_COM_URL = `${S3}/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`;
+const CALI_COM_URL     = `${S3}/mapas-2026/Ciudades-COM-LOC/CALIX.json`;
 
 // Rotación Bogotá (alrededor de cx=-74.08, cy=4.65): lon→lat virado 90° izq
 rotateGeoJSON90Left(geoData)
@@ -136,10 +137,18 @@ _buildLocComWinner(depCod, munCod) // → { zz2char: {partido, votos, nombre} }
 
 // Bogotá GeoJSON props: LocCodigo (2 chars), LocNombre
 // Medellín GeoJSON props: CODIGO (2 chars), NOMBRE, IDENTIFICACION
+// Cali GeoJSON props:    comuna (int 1-22), nombre
 
-// Detección Medellín: por nombre del mun (/medell[ií]n/i) en getDepJSON('municipios').
-// Se detecta así para no depender del electoral_id de Antioquia (puede ser '01' o '05').
+// Detección Medellín/Cali: por nombre del mun (/medell[ií]n/i y /^cali$|santiago de cali/i)
+// desde getDepJSON('municipios'). Se detecta así para no depender del electoral_id.
 ```
+
+### Click-to-filter en el mapa RG
+- `_buildHemicicloGeo()` (capa nacional): click en depto → `dep-select.value=cod; onDepChange(cod)`
+- `updateHemicicloMap` default (capa muns): click en mun → `mun-select.value=cod; onMunChange(cod)`
+- Ambos buscan la opción del select con `String(Number(o.value))===String(Number(code))`
+  para reconciliar códigos padded ('01') vs normalizados ('1').
+- CSS: `#hemiciclo-map .leaflet-interactive{cursor:pointer}` da señal visual.
 
 ### Filtro RG propagado desde NACIONAL/INDIGENAS
 `onCircChange('RESULTADOS_GENERALES')` lee dep/mun/zona/pue/mesa y construye `_rgFilter`

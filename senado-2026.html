@@ -144,6 +144,10 @@
     .donut-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
     .donut-pct{font-family:Avenir,sans-serif;font-weight:800;font-size:1.5rem;letter-spacing:-.04em;color:var(--white);line-height:1}
     .donut-sub{font-family:Avenir,sans-serif;font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-top:2px}
+    .gender-censo-label{font-family:'DM Mono',monospace;font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:.6rem}
+    body.day-mode .gender-censo-label{color:rgba(0,0,0,.5)}
+    /* Hacer que deptos/muns del mapa se vean clickeables */
+    #hemiciclo-map .leaflet-interactive{cursor:pointer !important}
     .donut-legend{width:100%;display:flex;flex-direction:column;gap:.55rem}
     .li{display:flex;align-items:center;gap:.6rem;font-family:Avenir,sans-serif;font-weight:400;font-size:.75rem;color:rgba(255,255,255,.5)}
     .ld{width:10px;height:10px;border-radius:50%;flex-shrink:0}
@@ -470,7 +474,7 @@
               </div>
               <div class="donut-legend" id="leg-senado"></div>
               <div id="gender-donut-wrap" style="display:none;width:100%;padding-top:.9rem;margin-top:.2rem;border-top:1px solid var(--border)">
-                <div style="font-family:'DM Mono',monospace;font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:.6rem">Censo electoral</div>
+                <div class="gender-censo-label">Censo electoral</div>
                 <div style="display:flex;align-items:center;gap:1rem">
                   <div class="donut-cw" style="width:90px;height:90px;flex-shrink:0">
                     <canvas id="donut-gender"></canvas>
@@ -611,8 +615,9 @@
     const DEPTOS_MPS_URL  = `${S3}/mapas-2026/Departamentos-mps/`;
     const BOGOTA_LOC_URL  = `${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`;
     const MEDELLIN_COM_URL = `${S3}/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`;
+    const CALI_COM_URL     = `${S3}/mapas-2026/Ciudades-COM-LOC/CALIX.json`;
     let _senaDepGeoCache  = {};
-    let _bogotaGeoCache = null, _medellinGeoCache = null;
+    let _bogotaGeoCache = null, _medellinGeoCache = null, _caliGeoCache = null;
     // Rotación 90° a la izquierda alrededor de (cx=-74.08, cy=4.65) — tomado de analisis-candidato.html
     function rotateGeoJSON90Left(geoData){
       const cx=-74.08, cy=4.65;
@@ -1703,6 +1708,15 @@
             mouseout(){
               layer.setStyle({weight:1,color:'rgba(255,255,255,0.35)',fillColor:w?getColor(w.partido):'#333',fillOpacity:w?0.78:0.35});
               layer.closeTooltip();
+            },
+            click(){
+              // Click en depto → setea el dep-select y dispara la cascada de filtros
+              if(!code) return;
+              const depSel=document.getElementById('dep-select');
+              const opt=[...depSel.options].find(o=>String(Number(o.value))===String(Number(code)));
+              if(!opt) return;
+              depSel.value=opt.value;
+              onDepChange(opt.value);
             }
           });
         }
@@ -1758,6 +1772,7 @@
       }catch(e){ console.warn('[HemiMap] muns:',e); }
 
       const isMedellin = !!(munCod && /medell[ií]n/i.test(selectedMunName));
+      const isCali     = !!(munCod && /^cali$|santiago de cali/i.test(selectedMunName));
 
       // ── CASO BOGOTÁ: localidades rotadas coloreadas por ganador de cada localidad ──
       if(isBogota){
@@ -1846,6 +1861,49 @@
         }catch(e){ console.warn('[HemiMap] medellin:',e); }
       }
 
+      // ── CASO CALI: 22 comunas sin rotar, feat.properties.comuna (int 1-22) ──
+      if(isCali){
+        try{
+          const comWinner = await _buildLocComWinner(depCod, munCod);
+          let geo = _caliGeoCache;
+          if(!geo){
+            const r=await fetch(CALI_COM_URL); if(!r.ok) throw new Error(`HTTP ${r.status}`);
+            geo = await r.json();
+            _caliGeoCache = geo;
+          }
+          const to2=v=>v!=null?String(parseInt(v,10)||0).padStart(2,'0'):'';
+          const comStyle=feat=>{
+            const p=feat.properties;
+            const zc = to2(p.comuna);
+            const w = zc ? comWinner[zc] : null;
+            return {fillColor:w?getColor(w.partido):'#333',fillOpacity:w?0.78:0.3,color:'rgba(255,255,255,0.35)',weight:1};
+          };
+          _hemicicloDepLayer=L.geoJSON(geo,{
+            style:comStyle,
+            onEachFeature:(feat,layer)=>{
+              const p=feat.properties;
+              const zc = to2(p.comuna);
+              const w = zc ? comWinner[zc] : null;
+              const nom = p.nombre||`Comuna ${p.comuna}`;
+              layer.on({
+                mouseover(e){
+                  layer.setStyle({weight:2,color:'#fff',fillOpacity:0.95});
+                  layer.bindTooltip(
+                    `<div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.45;padding:.1rem .2rem;white-space:normal;overflow-wrap:break-word">
+                      <span style="color:#0047FF;font-weight:700">${String(nom).toUpperCase()}</span><br/>
+                      ${w?`<span style="color:${getColor(w.partido)};font-weight:700">${w.partido}</span><br/>${fmt(w.votos)} votos`:'Sin datos'}
+                    </div>`,{sticky:true,opacity:1}
+                  ).openTooltip(e.latlng);
+                },
+                mouseout(){ layer.setStyle(comStyle(feat)); layer.closeTooltip(); }
+              });
+            }
+          }).addTo(hemicicloMap);
+          try{hemicicloMap.fitBounds(_hemicicloDepLayer.getBounds(),{padding:[10,10]});}catch(_){}
+          return;
+        }catch(e){ console.warn('[HemiMap] cali:',e); }
+      }
+
       // ── CASO POR DEFECTO: municipios del depto ──
       try{
         let geo=_senaDepGeoCache[depCod];
@@ -1878,7 +1936,17 @@
                   </div>`,{sticky:true,opacity:1}
                 ).openTooltip(e.latlng);
               },
-              mouseout(){ layer.setStyle(munStyle(feat)); layer.closeTooltip(); }
+              mouseout(){ layer.setStyle(munStyle(feat)); layer.closeTooltip(); },
+              click(){
+                // Click en municipio → setea mun-select y dispara la cascada
+                if(p.mun_elec==null) return;
+                const munSel=document.getElementById('mun-select');
+                const target=String(Number(p.mun_elec));
+                const opt=[...munSel.options].find(o=>String(Number(o.value))===target);
+                if(!opt) return;
+                munSel.value=opt.value;
+                onMunChange(opt.value);
+              }
             });
           }
         }).addTo(hemicicloMap);
