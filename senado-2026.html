@@ -258,9 +258,30 @@
     body.day-mode .cand-elected{color:var(--blue)!important}
 
     .orient-overlay{display:none}
-    /* Auto-rotate en móvil portrait */
+    /* Modal confirmación descarga */
+    .dl-modal{display:none;position:fixed;inset:0;z-index:99997;background:rgba(4,6,16,.78);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:1.5rem}
+    .dl-modal.show{display:flex}
+    .dl-box{background:#0e1220;border:1px solid rgba(0,71,255,.3);padding:2.2rem 2rem 1.8rem;max-width:520px;width:100%;text-align:center;box-shadow:0 12px 48px rgba(0,0,0,.5)}
+    .dl-title{font-family:'Syne',sans-serif;font-weight:400;font-size:1.15rem;color:var(--white);margin-bottom:1rem;letter-spacing:-.01em}
+    .dl-text{font-family:Avenir,sans-serif;font-weight:400;font-size:1rem;line-height:1.6;color:rgba(255,255,255,.8);margin-bottom:1.6rem}
+    .dl-text a{color:var(--blue);text-decoration:underline;font-weight:500}
+    .dl-text a:hover{color:#7ab3ff}
+    .dl-btns{display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap}
+    .dl-btn{font-family:'Syne',sans-serif;font-weight:400;font-size:.95rem;letter-spacing:.02em;padding:.65rem 1.6rem;cursor:pointer;border:none;transition:background .2s}
+    .dl-btn-ok{background:var(--blue);color:#fff}
+    .dl-btn-ok:hover{background:#0035cc}
+    .dl-btn-cancel{background:rgba(255,255,255,.06);color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.15)}
+    .dl-btn-cancel:hover{background:rgba(255,255,255,.12);color:var(--white)}
+    body.day-mode .dl-modal{background:rgba(240,235,228,.85)}
+    body.day-mode .dl-box{background:#fff;border-color:rgba(0,71,255,.25)}
+    body.day-mode .dl-title{color:#1a1a2e}
+    body.day-mode .dl-text{color:rgba(0,0,0,.75)}
+    body.day-mode .dl-btn-cancel{background:rgba(0,0,0,.04);color:rgba(0,0,0,.6);border-color:rgba(0,0,0,.15)}
+    body.day-mode .dl-btn-cancel:hover{background:rgba(0,0,0,.08);color:#1a1a2e}
+    /* Auto-rotate en móvil portrait: rota html y permite scroll dentro del body */
     @media screen and (orientation:portrait) and (max-width:900px){
-      html{transform:rotate(-90deg) translateX(-100%);transform-origin:top left;width:100vh;height:100vw;overflow:hidden;position:fixed;top:0;left:0}
+      html{transform:rotate(-90deg) translateX(-100%);transform-origin:top left;width:100vh;height:100vw;position:fixed;top:0;left:0;overflow:hidden}
+      body{width:100%;height:100%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
     }
   </style>
 </head>
@@ -280,6 +301,18 @@
   <div class="copy-toast" id="premium-toast" style="border-color:rgba(74,222,128,.4);color:rgba(180,255,200,.9)">Las mesas requieren plan Premium · <a href="pricing.html" style="color:#4ade80">Ver planes →</a></div>
   <div class="copy-toast" id="invite-toast" style="border-color:rgba(0,71,255,.4);color:rgba(180,210,255,.9);max-width:340px;line-height:1.7">¿Te gusta este nivel de detalle? <a href="register.html" style="color:#7ab3ff;font-weight:700;text-decoration:underline">Regístrate gratis</a> para más funciones</div>
   <div class="copy-toast" id="pro-toast" style="border-color:rgba(74,222,128,.4);color:rgba(180,255,200,.9)">Sólo disponible en plan Pro o superior · <a href="pricing.html" style="color:#4ade80">Ver planes →</a></div>
+  <div class="dl-modal" id="dl-modal">
+    <div class="dl-box">
+      <div class="dl-title">Descarga Excel</div>
+      <div class="dl-text">
+        Ten claro que aquí se descarga la lista únicamente en el territorio que has seleccionado. Para ver los territorios desagregados, recomendamos descargar desde el <a href="descargas.html" onclick="navTo(event,'descargas.html')">centro de descargas</a> (si es por territorio) o el <a href="analisis-candidato.html" onclick="navTo(event,'analisis-candidato.html')">análisis de candidato</a>.
+      </div>
+      <div class="dl-btns">
+        <button class="dl-btn dl-btn-cancel" onclick="closeDlModal()">Cancelar</button>
+        <button class="dl-btn dl-btn-ok" onclick="confirmDownloadExcel()">OK, Descargar</button>
+      </div>
+    </div>
+  </div>
   <div class="curtain" id="curtain">
     <div class="curtain-layer"></div><div class="curtain-layer"></div>
     <div class="curtain-layer"></div><div class="curtain-layer"></div>
@@ -1735,6 +1768,15 @@
       const ok=token&&user&&['pro','premium','full'].includes(user.plan);
       if(!ok){showProToast();return;}
       if(!_lastTableData)return;
+      document.getElementById('dl-modal').classList.add('show');
+    }
+    function closeDlModal(){ document.getElementById('dl-modal').classList.remove('show'); }
+    function confirmDownloadExcel(){
+      closeDlModal();
+      _doDownloadExcel();
+    }
+    function _doDownloadExcel(){
+      if(!_lastTableData)return;
       const {title,partidos,votval}=_lastTableData;
       const norm=s=>s.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
       const headers=['# Partido','Partido / Coalición','Cód.','Candidato/a','Votos','%','Curules'];
@@ -1747,9 +1789,12 @@
         const cands=p.candidatos||[];
         const nomPart=norm(p.partido);
         if(cands.length===0&&curules>0){
-          // Lista cerrada sin candidatos individuales
-          for(let k=0;k<curules;k++)
-            rows.push({t:'c',c:[i+1, p.partido, '', `Lista cerrada · Posición ${k+1}`, '', '', curules]});
+          // Lista cerrada: usa nombres de CLOSED_LISTS si existen
+          const closedNames=CLOSED_LISTS[p.partido]||[];
+          for(let k=0;k<curules;k++){
+            const nombre=closedNames[k]||`Lista cerrada · Posición ${k+1}`;
+            rows.push({t:'c',c:[i+1, p.partido, String(k+1).padStart(3,'0'), nombre, '', '', curules]});
+          }
         } else {
           cands.forEach(c=>{
             const esLista=norm(c.nombre)===nomPart||norm(c.nombre).startsWith(nomPart.split(' ')[0]+' '+(nomPart.split(' ')[1]||'___'));
