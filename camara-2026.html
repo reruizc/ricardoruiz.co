@@ -276,6 +276,25 @@
     .circ-btn.circ-btn-active{background:rgba(167,139,250,.12);border-color:rgba(167,139,250,.4);color:rgba(167,139,250,.9)}
     body.day-mode .circ-btn{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.15);color:rgba(0,0,0,.4)}
     body.day-mode .circ-btn.circ-btn-active{background:rgba(120,80,200,.1);border-color:rgba(120,80,200,.35);color:rgba(120,80,200,.9)}
+    .dl-modal{display:none;position:fixed;inset:0;z-index:99997;background:rgba(4,6,16,.78);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:1.5rem}
+    .dl-modal.show{display:flex}
+    .dl-box{background:#0e1220;border:1px solid rgba(0,71,255,.3);padding:2.2rem 2rem 1.8rem;max-width:520px;width:100%;text-align:center;box-shadow:0 12px 48px rgba(0,0,0,.5)}
+    .dl-title{font-family:'Syne',sans-serif;font-weight:400;font-size:1.15rem;color:var(--white);margin-bottom:1rem;letter-spacing:-.01em}
+    .dl-text{font-family:Avenir,sans-serif;font-weight:400;font-size:1rem;line-height:1.6;color:rgba(255,255,255,.8);margin-bottom:1.6rem}
+    .dl-text a{color:var(--blue);text-decoration:underline;font-weight:500}
+    .dl-text a:hover{color:#7ab3ff}
+    .dl-btns{display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap}
+    .dl-btn{font-family:'Syne',sans-serif;font-weight:400;font-size:.95rem;letter-spacing:.02em;padding:.65rem 1.6rem;cursor:pointer;border:none;transition:background .2s}
+    .dl-btn-ok{background:var(--blue);color:#fff}
+    .dl-btn-ok:hover{background:#0035cc}
+    .dl-btn-cancel{background:rgba(255,255,255,.06);color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.15)}
+    .dl-btn-cancel:hover{background:rgba(255,255,255,.12);color:var(--white)}
+    body.day-mode .dl-modal{background:rgba(240,235,228,.85)}
+    body.day-mode .dl-box{background:#fff;border-color:rgba(0,71,255,.25)}
+    body.day-mode .dl-title{color:#1a1a2e}
+    body.day-mode .dl-text{color:rgba(0,0,0,.75)}
+    body.day-mode .dl-btn-cancel{background:rgba(0,0,0,.04);color:rgba(0,0,0,.6);border-color:rgba(0,0,0,.15)}
+    body.day-mode .dl-btn-cancel:hover{background:rgba(0,0,0,.08);color:#1a1a2e}
   </style>
 </head>
 <body>
@@ -287,6 +306,18 @@
   <div class="copy-toast" id="invite-toast" style="border-color:rgba(0,71,255,.4);color:rgba(180,210,255,.9);max-width:340px;line-height:1.7">¿Te gusta este nivel de detalle? <a href="register.html" style="color:#7ab3ff;font-weight:700;text-decoration:underline">Regístrate gratis</a> para más funciones</div>
   <div class="copy-toast" id="pro-toast" style="border-color:rgba(74,222,128,.4);color:rgba(180,255,200,.9)">Sólo disponible en plan Pro o superior · <a href="pricing.html" style="color:#4ade80">Ver planes →</a></div>
   <div class="copy-toast" id="dep-loading-toast" style="border-color:rgba(0,71,255,.4);color:rgba(180,210,255,.9);max-width:380px;line-height:1.8">Cargando datos del departamento…<br/><span style="color:rgba(255,255,255,.6)">Espera unos <strong style="color:#f4f3ef">7 segundos</strong> mientras se carga la información.</span></div>
+  <div class="dl-modal" id="dl-modal">
+    <div class="dl-box">
+      <div class="dl-title">Descarga Excel</div>
+      <div class="dl-text">
+        Ten claro que aquí se descarga la lista únicamente en el territorio que has seleccionado. Para ver los territorios desagregados, recomendamos descargar desde el <a href="descargas.html" onclick="navTo(event,'descargas.html')">centro de descargas</a> (si es por territorio) o el <a href="analisis-candidato.html" onclick="navTo(event,'analisis-candidato.html')">análisis de candidato</a>.
+      </div>
+      <div class="dl-btns">
+        <button class="dl-btn dl-btn-cancel" onclick="closeDlModal()">Cancelar</button>
+        <button class="dl-btn dl-btn-ok" onclick="confirmDownloadExcel()">OK, Descargar</button>
+      </div>
+    </div>
+  </div>
   <div class="orient-overlay" id="orient-overlay">
     <div class="orient-box">
       <span class="orient-icon">📱↔</span>
@@ -424,7 +455,7 @@
             </div>
             <!-- Donut género -->
             <div id="gender-donut-wrap" style="display:none;flex-direction:column;align-items:center;gap:.55rem;margin-top:1rem;padding-top:.85rem;border-top:1px solid var(--border)">
-              <div style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3);align-self:flex-start">Censo electoral</div>
+              <div class="card-label" style="margin-bottom:0;align-self:flex-start">Censo electoral</div>
               <div style="display:flex;gap:1.2rem;align-items:center">
                 <div class="donut-cw" style="width:90px;height:90px">
                   <canvas id="donut-gender"></canvas>
@@ -946,11 +977,13 @@
       document.getElementById('cam-main-grid').style.display = isRG ? 'none' : '';
       document.getElementById('rg-panel').style.display = isRG ? '' : 'none';
       if(isRG){
-        // Mostrar hemiciclo nacional + mapa
         const curMap = curulesNac;
         const total = CURULES_TERRITORIAL;
         renderCamHemiciclo(curMap, total, 'Hemiciclo · Cámara · Nacional');
-        initCamMap().then(()=>updateCamMap(curDep==='TODOS'?'':curDep));
+        // Destruir mapa anterior (si estaba en contenedor oculto con dimensiones 0)
+        if(camMap){ try{camMap.remove();}catch(_){} camMap=null; }
+        // Diferir hasta que el browser pinte el panel con sus dimensiones reales
+        setTimeout(()=>initCamMap().then(()=>updateCamMap(curDep==='TODOS'?'':curDep)), 80);
       } else {
         switchCorp(val);
       }
@@ -1095,6 +1128,12 @@
       const user=JSON.parse(localStorage.getItem('rr-user')||'null');
       const ok=token&&user&&['pro','premium','full'].includes(user.plan);
       if(!ok){showProToast();return;}
+      if(!_lastTableData)return;
+      document.getElementById('dl-modal').classList.add('show');
+    }
+    function closeDlModal(){ document.getElementById('dl-modal').classList.remove('show'); }
+    function confirmDownloadExcel(){ closeDlModal(); _doDownloadExcel(); }
+    function _doDownloadExcel(){
       if(!_lastTableData)return;
       const {title,partidos,votval}=_lastTableData;
       const norm=s=>s.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -1413,7 +1452,7 @@
           <td>
             <div style="display:flex;align-items:center;gap:.6rem">
               <span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span>
-              <span style="font-family:'Syne',sans-serif;font-weight:500;font-size:.9rem">${p.partido}</span>
+              <span style="font-family:'Syne',sans-serif;font-weight:500;font-size:1.08rem">${p.partido}</span>
               ${showDrillBtn?`<span class="circ-badge">${depNom||''}</span>`:''}
             </div>
             <div style="margin-top:.35rem">
