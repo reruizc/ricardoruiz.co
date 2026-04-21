@@ -287,11 +287,25 @@
       html{transform:rotate(-90deg) translateX(-100%);transform-origin:top left;width:100vh;height:100vw;position:fixed;top:0;left:0;overflow:hidden}
       body{width:100vh;height:100vw;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
       .shell{min-height:0;height:auto}
-      .content-area{flex:none}
+      .content-area{flex:none;padding-bottom:6rem !important}
+      .full-footer{padding-bottom:2rem}
       /* RG panel: colapsar grid de 2 columnas para que todo quepa y scrollee */
       #panel-resultados-generales > div{grid-template-columns:1fr !important}
-      #hemiciclo-map{height:280px !important}
+      #hemiciclo-map{height:340px !important}
     }
+    /* Custom select overlay (sólo se monta cuando se está en modo rotado) */
+    ._sel-overlay{position:fixed;inset:0;background:rgba(4,6,16,.92);z-index:99999;display:flex;align-items:center;justify-content:center;padding:1rem}
+    ._sel-panel{background:#0e1220;border:1px solid rgba(0,71,255,.35);max-width:420px;width:100%;max-height:80vh;display:flex;flex-direction:column;font-family:'Syne',sans-serif}
+    ._sel-title{padding:.9rem 1rem;font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:#0047FF;border-bottom:1px solid rgba(255,255,255,.08);font-family:'DM Mono',monospace}
+    ._sel-list{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1}
+    ._sel-opt{display:block;width:100%;text-align:left;background:transparent;color:#f4f3ef;border:none;border-bottom:1px solid rgba(255,255,255,.05);padding:.85rem 1rem;font-family:'Syne',sans-serif;font-size:.95rem;cursor:pointer}
+    ._sel-opt:hover,._sel-opt:active{background:rgba(0,71,255,.12)}
+    ._sel-opt.sel{color:#0047FF;font-weight:700}
+    ._sel-close{padding:.8rem;background:rgba(255,255,255,.06);color:rgba(255,255,255,.7);border:none;font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;border-top:1px solid rgba(255,255,255,.08)}
+    body.day-mode ._sel-overlay{background:rgba(230,222,211,.94)}
+    body.day-mode ._sel-panel{background:#fff;border-color:rgba(0,71,255,.3)}
+    body.day-mode ._sel-opt{color:#1a1a2e;border-bottom-color:rgba(0,0,0,.06)}
+    body.day-mode ._sel-close{background:rgba(0,0,0,.05);color:rgba(0,0,0,.6);border-top-color:rgba(0,0,0,.08)}
   </style>
 </head>
 <body>
@@ -444,7 +458,10 @@
             </div>
             <div class="card" style="padding:1.3rem 1.3rem .75rem">
               <div class="card-label" style="margin-bottom:.75rem">Mapa Electoral · Partido puntero por departamento</div>
-              <div id="hemiciclo-map" style="width:100%;height:400px;background:#060810"></div>
+              <div style="position:relative">
+                <div id="hemiciclo-map" style="width:100%;height:400px;background:#060810"></div>
+                <button id="hemiciclo-back" type="button" style="display:none;position:absolute;top:.55rem;right:.55rem;z-index:500;background:rgba(0,71,255,.92);color:#fff;border:none;padding:.4rem .7rem;font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;border-radius:2px">← Volver</button>
+              </div>
             </div>
           </div>
         </div>
@@ -616,8 +633,47 @@
     const BOGOTA_LOC_URL  = `${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`;
     const MEDELLIN_COM_URL = `${S3}/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`;
     const CALI_COM_URL     = `${S3}/mapas-2026/Ciudades-COM-LOC/CALIX.json`;
+    const BARRANQUILLA_COM_URL = `${S3}/mapas-2026/Ciudades-COM-LOC/BARRANQUILLAX.json`;
+    const IBAGUE_COM_URL       = `${S3}/mapas-2026/Ciudades-COM-LOC/IBAGUEX.json`;
+    const MANIZALES_COM_URL    = `${S3}/mapas-2026/Ciudades-COM-LOC/MANIZALESX.json`;
+    const PEREIRA_COM_URL      = `${S3}/mapas-2026/Ciudades-COM-LOC/PEREIRAX.json`;
     let _senaDepGeoCache  = {};
-    let _bogotaGeoCache = null, _medellinGeoCache = null, _caliGeoCache = null;
+    // Cachés de GeoJSON por ciudad (una fetch por sesión)
+    let _cityGeoCache = {};
+    // Config de cada ciudad grande: cómo extraer código/nombre de cada feature.
+    // code() debe devolver el zz 2-char que coincida con comunas.json (o '' si no aplica).
+    const _to2 = v => (v!=null && v!=='') ? String(parseInt(v,10)||0).padStart(2,'0') : '';
+    const CITY_MAPS = {
+      bogota:       { key:'bogota',       url:BOGOTA_LOC_URL,      rotate:true,
+                      code:p=>_to2(p.LocCodigo),                  name:p=>p.LocNombre||p.nombre||'Localidad' },
+      medellin:     { key:'medellin',     url:MEDELLIN_COM_URL,    rotate:false,
+                      code:p=>_to2(p.CODIGO),                     name:p=>p.NOMBRE||p.IDENTIFICACION||'Comuna' },
+      cali:         { key:'cali',         url:CALI_COM_URL,        rotate:false,
+                      code:p=>_to2(p.comuna),                     name:p=>p.nombre||`Comuna ${p.comuna}` },
+      barranquilla: { key:'barranquilla', url:BARRANQUILLA_COM_URL,rotate:false,
+                      code:p=>_to2(p.id),                         name:p=>p.nombre||'Localidad' },
+      ibague:       { key:'ibague',       url:IBAGUE_COM_URL,      rotate:false,
+                      code:p=>{const m=String(p.COMUNAS||'').match(/(\d+)/); return m?_to2(m[1]):'';},
+                      name:p=>p.COMUNAS||'Comuna' },
+      manizales:    { key:'manizales',    url:MANIZALES_COM_URL,   rotate:false,
+                      code:p=>_to2(p.ID_COMUNA),                  name:p=>p.NOMBRES_CO||'Comuna' },
+      pereira:      { key:'pereira',      url:PEREIRA_COM_URL,     rotate:false,
+                      code:_=>'', /* Pereira matchea por nombre */
+                      name:p=>p.Comuna||'Comuna' },
+    };
+    function detectCity(depCod, munCod, munName){
+      // Bogotá se detecta por depCod=16 (su único mun es 001)
+      if(_normC(depCod)==='16') return CITY_MAPS.bogota;
+      if(!munName) return null;
+      const n = munName.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      if(/MEDELL/.test(n)) return CITY_MAPS.medellin;
+      if(/^CALI$|SANTIAGO DE CALI/.test(n)) return CITY_MAPS.cali;
+      if(/BARRANQUILLA/.test(n)) return CITY_MAPS.barranquilla;
+      if(/IBAGU/.test(n)) return CITY_MAPS.ibague;
+      if(/MANIZALES/.test(n)) return CITY_MAPS.manizales;
+      if(/PEREIRA/.test(n)) return CITY_MAPS.pereira;
+      return null;
+    }
     // Rotación 90° a la izquierda alrededor de (cx=-74.08, cy=4.65) — tomado de analisis-candidato.html
     function rotateGeoJSON90Left(geoData){
       const cx=-74.08, cy=4.65;
@@ -1725,23 +1781,97 @@
     }
 
     // Ganadores por localidad/comuna dentro de un mun (dep+mun='001' típicamente).
-    // Devuelve { '01': {partido,votos,nombre}, ... } indexado por zz 2-char.
+    // Devuelve { '01': {...}, ..., __byName: { 'CENTRO': {...}, ... } }
+    // para matchear por código (zz 2-char) o por nombre (ciudades cuyo GeoJSON no trae cod).
     async function _buildLocComWinner(depCod, munCod){
-      const out={};
+      const out={}; const byName={};
       try{
         const zonas=await getDepJSON('comunas',depCod);
         const SPEC=new Set(['996','997','998']);
         const to2=v=>v!=null?String(parseInt(v,10)||0).padStart(2,'0'):'';
+        const norm=s=>String(s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
         zonas.forEach(z=>{
           if(z.dep_cod!==depCod||z.mun_cod!==munCod) return;
           if(z.circ_nom&&!/nacional/i.test(z.circ_nom)) return;
           const zc=to2(z.cod); if(!zc||out[zc]) return;
           const circ=z.por_circunscripcion?.['NACIONAL']??z;
           const pts=Object.entries(circ.partidos||{}).filter(([k])=>!SPEC.has(k)&&!/blanco/i.test(k)).sort((a,b)=>b[1]-a[1]);
-          if(pts.length) out[zc]={partido:pts[0][0],votos:pts[0][1],nombre:z.nombre};
+          if(pts.length){
+            const rec={partido:pts[0][0],votos:pts[0][1],nombre:z.nombre};
+            out[zc]=rec;
+            if(z.nombre) byName[norm(z.nombre)]=rec;
+          }
         });
       }catch(e){ console.warn('[LocComWinner]',e); }
+      out.__byName = byName;
       return out;
+    }
+
+    // Render genérico de la capa de una ciudad (todas las CITY_MAPS comparten este
+    // skeleton: fetch+cache, style, tooltip, fitBounds). Evita duplicación.
+    async function _renderCityLayer(cfg, winner){
+      let geo = _cityGeoCache[cfg.key];
+      if(!geo){
+        const r = await fetch(cfg.url); if(!r.ok) throw new Error(`HTTP ${r.status}`);
+        const raw = await r.json();
+        geo = cfg.rotate ? rotateGeoJSON90Left(raw) : raw;
+        _cityGeoCache[cfg.key] = geo;
+      }
+      const normN=s=>String(s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+      const resolve=p=>{
+        const c=cfg.code(p);
+        if(c && winner[c]) return winner[c];
+        const nm=cfg.name(p);
+        return (winner.__byName||{})[normN(nm)]||null;
+      };
+      const style=feat=>{
+        const w=resolve(feat.properties);
+        return {fillColor:w?getColor(w.partido):'#333',fillOpacity:w?0.78:0.3,color:'rgba(255,255,255,0.35)',weight:1};
+      };
+      _hemicicloDepLayer=L.geoJSON(geo,{
+        style,
+        onEachFeature:(feat,layer)=>{
+          const p=feat.properties;
+          const w=resolve(p);
+          const nom=cfg.name(p);
+          layer.on({
+            mouseover(e){
+              layer.setStyle({weight:2,color:'#fff',fillOpacity:0.95});
+              layer.bindTooltip(
+                `<div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.45;padding:.1rem .2rem;white-space:normal;overflow-wrap:break-word">
+                  <span style="color:#0047FF;font-weight:700">${String(nom).toUpperCase()}</span><br/>
+                  ${w?`<span style="color:${getColor(w.partido)};font-weight:700">${w.partido}</span><br/>${fmt(w.votos)} votos`:'Sin datos'}
+                </div>`,{sticky:true,opacity:1}
+              ).openTooltip(e.latlng);
+            },
+            mouseout(){ layer.setStyle(style(feat)); layer.closeTooltip(); }
+          });
+        }
+      }).addTo(hemicicloMap);
+      try{ hemicicloMap.fitBounds(_hemicicloDepLayer.getBounds(),{padding:[10,10]}); }catch(_){}
+    }
+
+    // Botón flotante "volver" sobre el mapa: mun→dep / dep→nacional.
+    function updateHemicicloBackBtn(depCod, munCod){
+      const btn=document.getElementById('hemiciclo-back');
+      if(!btn) return;
+      if(!depCod){ btn.style.display='none'; btn.onclick=null; return; }
+      btn.style.display='';
+      if(munCod){
+        btn.textContent='← Departamento';
+        btn.onclick=()=>{
+          const munSel=document.getElementById('mun-select');
+          munSel.value='';
+          onMunChange('');
+        };
+      } else {
+        btn.textContent='← Nacional';
+        btn.onclick=()=>{
+          document.getElementById('dep-select').value='';
+          document.getElementById('mun-select').value='';
+          onDepChange('');
+        };
+      }
     }
 
     async function updateHemicicloMap(depCod, munCod){
@@ -1749,11 +1879,10 @@
       if(_hemicicloDepLayer){ hemicicloMap.removeLayer(_hemicicloDepLayer); _hemicicloDepLayer=null; }
       if(!depCod){
         if(_hemicicloNacLayer){ if(!hemicicloMap.hasLayer(_hemicicloNacLayer)) _hemicicloNacLayer.addTo(hemicicloMap); _hemicicloNacLayer.resetStyle(); try{hemicicloMap.fitBounds(_hemicicloNacLayer.getBounds(),{padding:[6,6]});}catch(_){} }
+        updateHemicicloBackBtn('', '');
         return;
       }
       if(_hemicicloNacLayer&&hemicicloMap.hasLayer(_hemicicloNacLayer)) hemicicloMap.removeLayer(_hemicicloNacLayer);
-      const code=_normC(depCod);
-      const isBogota=(code==='16');
       // Ganadores por municipio (necesarios siempre para vista de depto)
       let munWinner={};
       let selectedMunName='';
@@ -1771,137 +1900,16 @@
         });
       }catch(e){ console.warn('[HemiMap] muns:',e); }
 
-      const isMedellin = !!(munCod && /medell[ií]n/i.test(selectedMunName));
-      const isCali     = !!(munCod && /^cali$|santiago de cali/i.test(selectedMunName));
-
-      // ── CASO BOGOTÁ: localidades rotadas coloreadas por ganador de cada localidad ──
-      if(isBogota){
+      // ── CASO CIUDAD ESPECIAL (Bogotá, Medellín, Cali, Barranquilla, Ibagué, Manizales, Pereira)
+      const cityCfg = detectCity(depCod, munCod, selectedMunName);
+      if(cityCfg){
         try{
-          const locWinner = await _buildLocComWinner(depCod, munCod || '001');
-          let geo = _bogotaGeoCache;
-          if(!geo){
-            const r=await fetch(BOGOTA_LOC_URL); if(!r.ok) throw new Error(`HTTP ${r.status}`);
-            const raw=await r.json();
-            geo = rotateGeoJSON90Left(raw);
-            _bogotaGeoCache = geo;
-          }
-          const to2=v=>v!=null?String(parseInt(v,10)||0).padStart(2,'0'):'';
-          const locStyle=feat=>{
-            const p=feat.properties;
-            const zc = to2(p.LocCodigo);
-            const w = zc ? locWinner[zc] : null;
-            return {fillColor:w?getColor(w.partido):'#333',fillOpacity:w?0.78:0.3,color:'rgba(255,255,255,0.35)',weight:1};
-          };
-          _hemicicloDepLayer=L.geoJSON(geo,{
-            style:locStyle,
-            onEachFeature:(feat,layer)=>{
-              const p=feat.properties;
-              const zc = to2(p.LocCodigo);
-              const w = zc ? locWinner[zc] : null;
-              const nom = p.LocNombre||p.nombre||'Localidad';
-              layer.on({
-                mouseover(e){
-                  layer.setStyle({weight:2,color:'#fff',fillOpacity:0.95});
-                  layer.bindTooltip(
-                    `<div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.45;padding:.1rem .2rem;white-space:normal;overflow-wrap:break-word">
-                      <span style="color:#0047FF;font-weight:700">${String(nom).toUpperCase()}</span><br/>
-                      ${w?`<span style="color:${getColor(w.partido)};font-weight:700">${w.partido}</span><br/>${fmt(w.votos)} votos`:'Sin datos'}
-                    </div>`,{sticky:true,opacity:1}
-                  ).openTooltip(e.latlng);
-                },
-                mouseout(){ layer.setStyle(locStyle(feat)); layer.closeTooltip(); }
-              });
-            }
-          }).addTo(hemicicloMap);
-          try{hemicicloMap.fitBounds(_hemicicloDepLayer.getBounds(),{padding:[10,10]});}catch(_){}
+          const effMun = munCod || (cityCfg===CITY_MAPS.bogota ? '001' : null);
+          const winner = effMun ? await _buildLocComWinner(depCod, effMun) : {__byName:{}};
+          await _renderCityLayer(cityCfg, winner);
+          updateHemicicloBackBtn(depCod, munCod);
           return;
-        }catch(e){ console.warn('[HemiMap] bogota:',e); }
-      }
-
-      // ── CASO MEDELLÍN: comunas sin rotar, coloreadas por ganador de cada comuna ──
-      if(isMedellin){
-        try{
-          const comWinner = await _buildLocComWinner(depCod, munCod);
-          let geo = _medellinGeoCache;
-          if(!geo){
-            const r=await fetch(MEDELLIN_COM_URL); if(!r.ok) throw new Error(`HTTP ${r.status}`);
-            geo = await r.json();
-            _medellinGeoCache = geo;
-          }
-          const to2=v=>v!=null?String(parseInt(v,10)||0).padStart(2,'0'):'';
-          const comStyle=feat=>{
-            const p=feat.properties;
-            const zc = to2(p.CODIGO);
-            const w = zc ? comWinner[zc] : null;
-            return {fillColor:w?getColor(w.partido):'#333',fillOpacity:w?0.78:0.3,color:'rgba(255,255,255,0.35)',weight:1};
-          };
-          _hemicicloDepLayer=L.geoJSON(geo,{
-            style:comStyle,
-            onEachFeature:(feat,layer)=>{
-              const p=feat.properties;
-              const zc = to2(p.CODIGO);
-              const w = zc ? comWinner[zc] : null;
-              const nom = p.NOMBRE||p.IDENTIFICACION||'Comuna';
-              layer.on({
-                mouseover(e){
-                  layer.setStyle({weight:2,color:'#fff',fillOpacity:0.95});
-                  layer.bindTooltip(
-                    `<div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.45;padding:.1rem .2rem;white-space:normal;overflow-wrap:break-word">
-                      <span style="color:#0047FF;font-weight:700">${String(nom).toUpperCase()}</span><br/>
-                      ${w?`<span style="color:${getColor(w.partido)};font-weight:700">${w.partido}</span><br/>${fmt(w.votos)} votos`:'Sin datos'}
-                    </div>`,{sticky:true,opacity:1}
-                  ).openTooltip(e.latlng);
-                },
-                mouseout(){ layer.setStyle(comStyle(feat)); layer.closeTooltip(); }
-              });
-            }
-          }).addTo(hemicicloMap);
-          try{hemicicloMap.fitBounds(_hemicicloDepLayer.getBounds(),{padding:[10,10]});}catch(_){}
-          return;
-        }catch(e){ console.warn('[HemiMap] medellin:',e); }
-      }
-
-      // ── CASO CALI: 22 comunas sin rotar, feat.properties.comuna (int 1-22) ──
-      if(isCali){
-        try{
-          const comWinner = await _buildLocComWinner(depCod, munCod);
-          let geo = _caliGeoCache;
-          if(!geo){
-            const r=await fetch(CALI_COM_URL); if(!r.ok) throw new Error(`HTTP ${r.status}`);
-            geo = await r.json();
-            _caliGeoCache = geo;
-          }
-          const to2=v=>v!=null?String(parseInt(v,10)||0).padStart(2,'0'):'';
-          const comStyle=feat=>{
-            const p=feat.properties;
-            const zc = to2(p.comuna);
-            const w = zc ? comWinner[zc] : null;
-            return {fillColor:w?getColor(w.partido):'#333',fillOpacity:w?0.78:0.3,color:'rgba(255,255,255,0.35)',weight:1};
-          };
-          _hemicicloDepLayer=L.geoJSON(geo,{
-            style:comStyle,
-            onEachFeature:(feat,layer)=>{
-              const p=feat.properties;
-              const zc = to2(p.comuna);
-              const w = zc ? comWinner[zc] : null;
-              const nom = p.nombre||`Comuna ${p.comuna}`;
-              layer.on({
-                mouseover(e){
-                  layer.setStyle({weight:2,color:'#fff',fillOpacity:0.95});
-                  layer.bindTooltip(
-                    `<div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.45;padding:.1rem .2rem;white-space:normal;overflow-wrap:break-word">
-                      <span style="color:#0047FF;font-weight:700">${String(nom).toUpperCase()}</span><br/>
-                      ${w?`<span style="color:${getColor(w.partido)};font-weight:700">${w.partido}</span><br/>${fmt(w.votos)} votos`:'Sin datos'}
-                    </div>`,{sticky:true,opacity:1}
-                  ).openTooltip(e.latlng);
-                },
-                mouseout(){ layer.setStyle(comStyle(feat)); layer.closeTooltip(); }
-              });
-            }
-          }).addTo(hemicicloMap);
-          try{hemicicloMap.fitBounds(_hemicicloDepLayer.getBounds(),{padding:[10,10]});}catch(_){}
-          return;
-        }catch(e){ console.warn('[HemiMap] cali:',e); }
+        }catch(e){ console.warn('[HemiMap] city '+cityCfg.key+':',e); }
       }
 
       // ── CASO POR DEFECTO: municipios del depto ──
@@ -1952,6 +1960,7 @@
         }).addTo(hemicicloMap);
         try{hemicicloMap.fitBounds(_hemicicloDepLayer.getBounds(),{padding:[10,10]});}catch(_){}
       }catch(e){ console.warn('[HemiMap] depGeo:',e); if(_hemicicloNacLayer&&!hemicicloMap.hasLayer(_hemicicloNacLayer)) _hemicicloNacLayer.addTo(hemicicloMap); }
+      updateHemicicloBackBtn(depCod, munCod);
     }
 
     function renderNacional(){
@@ -2271,6 +2280,59 @@
     init();
     // MOBILE LANDSCAPE: auto-rotate via CSS (orient-overlay removed)
     function dismissOrient(){}
+
+    // ─── Custom select overlay para móvil rotado ─────────────────────────
+    // El <select> nativo abre su picker en orientación del dispositivo
+    // (vertical, ya que no gira con el transform). Para que se vea
+    // horizontal, mostramos un modal propio en el DOM rotado.
+    function _isMobileRotated(){
+      return window.matchMedia('(orientation:portrait) and (max-width:900px)').matches;
+    }
+    function _openSelectOverlay(selEl, labelText){
+      const overlay=document.createElement('div'); overlay.className='_sel-overlay';
+      const panel=document.createElement('div'); panel.className='_sel-panel';
+      const title=document.createElement('div'); title.className='_sel-title';
+      title.textContent = labelText || selEl.getAttribute('aria-label') || 'Seleccionar';
+      panel.appendChild(title);
+      const list=document.createElement('div'); list.className='_sel-list';
+      [...selEl.options].forEach(o=>{
+        const b=document.createElement('button');
+        b.type='button';
+        b.className='_sel-opt'+(o.value===selEl.value?' sel':'');
+        b.textContent=o.textContent;
+        b.addEventListener('click',()=>{
+          selEl.value=o.value;
+          selEl.dispatchEvent(new Event('change',{bubbles:true}));
+          document.body.removeChild(overlay);
+        });
+        list.appendChild(b);
+      });
+      panel.appendChild(list);
+      const close=document.createElement('button'); close.type='button'; close.className='_sel-close'; close.textContent='Cerrar';
+      close.addEventListener('click',()=>{ if(overlay.parentNode) document.body.removeChild(overlay); });
+      panel.appendChild(close);
+      overlay.appendChild(panel);
+      overlay.addEventListener('click', e=>{ if(e.target===overlay) document.body.removeChild(overlay); });
+      document.body.appendChild(overlay);
+    }
+    // Engancha todos los <select> de filtros: dep/mun/zona/pue/mesa
+    (function bindMobileSelects(){
+      const ids=['dep-select','mun-select','zona-select','pue-select','mesa-select'];
+      ids.forEach(id=>{
+        const el=document.getElementById(id); if(!el) return;
+        const labelFor = {
+          'dep-select':'Departamento','mun-select':'Municipio',
+          'zona-select':'Localidad / Comuna','pue-select':'Puesto','mesa-select':'Mesa',
+        }[id];
+        el.addEventListener('mousedown', e=>{
+          if(_isMobileRotated()){ e.preventDefault(); el.blur(); _openSelectOverlay(el, labelFor); }
+        });
+        // touchstart complementa en iOS donde mousedown a veces no prefija al picker
+        el.addEventListener('touchstart', e=>{
+          if(_isMobileRotated()){ e.preventDefault(); el.blur(); _openSelectOverlay(el, labelFor); }
+        }, {passive:false});
+      });
+    })();
     // THEME
     function isDayHour(){ const h=new Date().getHours(); return h>=7&&h<19; }
     function applyTheme(day){ document.body.classList.toggle('day-mode',day); const btn=document.getElementById('theme-btn'); if(btn) btn.textContent=day?'🌙 Modo noche':'☀ Modo día'; localStorage.setItem('rr-theme',day?'day':'night'); }

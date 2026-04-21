@@ -123,25 +123,48 @@ updateHemicicloMap(depCod, munCod)    // RESULTADOS_GENERALES
 // default                   → DEPTOS_MPS_URL/{padCode}.json + colorea por mun_elec
 ```
 
-### Ciudades especiales
+### Ciudades especiales (CITY_MAPS)
 ```js
-const BOGOTA_LOC_URL   = `${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`;
-const MEDELLIN_COM_URL = `${S3}/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`;
-const CALI_COM_URL     = `${S3}/mapas-2026/Ciudades-COM-LOC/CALIX.json`;
+// Todos los GeoJSON viven en mapas-2026/Ciudades-COM-LOC/:
+// BOG-LOCALIDADX.json   → Bogotá (localidades, rota 90° izq)
+// MEDELLINX.json        → Medellín   CODIGO (2c), NOMBRE
+// CALIX.json            → Cali       comuna (int), nombre
+// BARRANQUILLAX.json    → Barranquilla  id (int), nombre
+// IBAGUEX.json          → Ibagué     COMUNAS='COMUNA N'
+// MANIZALESX.json       → Manizales  ID_COMUNA ('01'..'12'), NOMBRES_CO
+// PEREIRAX.json         → Pereira    Comuna (nombre; match por __byName)
 
-// Rotación Bogotá (alrededor de cx=-74.08, cy=4.65): lon→lat virado 90° izq
-rotateGeoJSON90Left(geoData)
+rotateGeoJSON90Left(geoData)            // sólo Bogotá, cx=-74.08, cy=4.65
 
-// Ganadores por localidad/comuna (usa comunas.json filtrando por mun)
-_buildLocComWinner(depCod, munCod) // → { zz2char: {partido, votos, nombre} }
+_buildLocComWinner(depCod, munCod)
+// → { '01':{...}, ..., __byName:{ 'NORM NOMBRE':{...} } }
+//   Index por código zz y por nombre normalizado. Requerido para Pereira.
 
-// Bogotá GeoJSON props: LocCodigo (2 chars), LocNombre
-// Medellín GeoJSON props: CODIGO (2 chars), NOMBRE, IDENTIFICACION
-// Cali GeoJSON props:    comuna (int 1-22), nombre
+CITY_MAPS = { bogota, medellin, cali, barranquilla, ibague, manizales, pereira }
+// Cada entry: { key, url, rotate, code(p), name(p) }
+detectCity(depCod, munCod, munName)     // → cfg o null
+_renderCityLayer(cfg, winner)           // genérico: fetch+cache+style+tooltip+fit
+_cityGeoCache = {}                      // una fetch por ciudad/sesión
 
-// Detección Medellín/Cali: por nombre del mun (/medell[ií]n/i y /^cali$|santiago de cali/i)
-// desde getDepJSON('municipios'). Se detecta así para no depender del electoral_id.
+// Bogotá se detecta por depCod=16 (su único mun es 001).
+// Las demás se detectan por nombre del mun en getDepJSON('municipios').
 ```
+
+### Botón volver del mapa RG
+- `#hemiciclo-back` está absolutamente posicionado top-right dentro del contenedor relativo del mapa.
+- `updateHemicicloBackBtn(depCod, munCod)` se llama al final de `updateHemicicloMap`:
+  - Sin `depCod` → oculto
+  - Con `munCod` → label "← Departamento", onclick limpia `mun-select` y llama `onMunChange('')`
+  - Sin `munCod` → label "← Nacional", onclick limpia `dep-select`+`mun-select` y llama `onDepChange('')`
+
+### Custom select overlay (móvil rotado)
+Problema: `<select>` abre el picker del SO en orientación del dispositivo, ignorando
+nuestro `transform:rotate(-90deg)`. Solución: al detectar
+`window.matchMedia('(orientation:portrait) and (max-width:900px)')`, interceptar
+`mousedown`/`touchstart` de los selects y mostrar un modal propio
+(`._sel-overlay`/`._sel-panel`) dentro del DOM rotado. Tras elegir una opción,
+`selectEl.dispatchEvent(new Event('change',{bubbles:true}))` dispara el inline
+`onchange="onDepChange(this.value)"` como si fuera nativo.
 
 ### Click-to-filter en el mapa RG
 - `_buildHemicicloGeo()` (capa nacional): click en depto → `dep-select.value=cod; onDepChange(cod)`
