@@ -254,7 +254,7 @@
     #hemiciclo-cam-map{height:320px}
     #hemiciclo-cam-back{position:absolute;top:.55rem;right:.55rem;z-index:900;font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;background:rgba(0,71,255,.92);color:#fff;border:none;padding:.4rem .7rem;cursor:pointer;border-radius:2px;display:none}
     #hemiciclo-cam-back:hover{background:rgba(0,71,255,1)}
-    #hemi-cam-tooltip{display:none;position:fixed;background:rgba(6,8,16,.97);border:1px solid rgba(0,71,255,.4);color:#f4f3ef;font-family:Avenir,sans-serif;font-size:.85rem;padding:.45rem .65rem;pointer-events:none;z-index:9000;line-height:1.45;max-width:220px}
+    #hemi-cam-tooltip{display:none;position:fixed;background:rgba(6,8,16,.97);border:1px solid rgba(0,71,255,.4);color:#f4f3ef;font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;padding:.5rem .85rem;pointer-events:none;z-index:10000;line-height:1.7;white-space:nowrap}
     /* Leaflet tooltip override */
     .leaflet-tooltip{font-family:Avenir,sans-serif!important;font-weight:400!important;font-size:.85rem!important;background:rgba(6,8,16,.97)!important;border:1px solid rgba(0,71,255,.4)!important;color:#f4f3ef!important;width:220px!important;white-space:normal!important;overflow-wrap:break-word!important;word-break:normal!important;border-radius:0!important;padding:.45rem .65rem!important}
     .leaflet-tooltip:before{display:none!important}
@@ -994,6 +994,8 @@
         }
         // Destruir mapa anterior (si estaba en contenedor oculto con dimensiones 0)
         if(camMap){ try{camMap.remove();}catch(_){} camMap=null; _camNacLayer=null; _camDepLayer=null; }
+        // Resetear WHAT IF al reentrar a RG
+        _rgCamFilter = null;
         // Renderizar hemiciclo (nacional vs dep) y diferir el mapa hasta que el panel pinte
         _rgRenderHemicicloForDep(curDep==='TODOS'?'':curDep);
         requestAnimationFrame(()=>requestAnimationFrame(()=>{
@@ -1034,12 +1036,15 @@
       resetSelFrom('mun');
       curComData = null;
       document.getElementById('cam-search').value='';
-      buscarCandidato('');
+      // En RG no llamamos buscarCandidato('') porque revela cam-main-grid
+      // (que muestra la tabla del curCorp previo — p.ej. AFRO — y pisa el panel RG)
+      if(!_rgMode){ buscarCandidato(''); }
 
       // En modo RG: actualizar hemiciclo y mapa; además poblar mun-select
       if(_rgMode){
         showLoadingToast();
         _ensureRGActive();
+        _rgCamFilter = null; // resetear WHAT IF al cambiar de depto
         const effDep = depCod==='TODOS' ? '' : depCod;
         await _rgRenderHemicicloForDep(effDep);
         if(effDep){
@@ -1090,7 +1095,7 @@
     async function switchMun(munCod){
       curMun = munCod; resetSelFrom('zon'); curComData = null;
       showLoadingToast();
-      // En RG: actualizar sólo mapa (el hemiciclo se mantiene al nivel de depto)
+      // En RG: actualizar mapa + hemiciclo (WHAT IF si hay mun filtrado)
       if(_rgMode){
         _ensureRGActive();
         const effDep = curDep==='TODOS'?'':curDep;
@@ -1102,6 +1107,18 @@
             const zons = mun.comunas.filter(c=>c.com_cod!=='000'&&c.com_nom!=='SIN COMUNA').map(c=>({value:c.com_cod||c.cod, label:c.com_nom||c.nombre}));
             if(zons.length){ setSel('zon-select', zons, 'Todas las comunas'); showSel('zon-label', true); showSel('zon-select', true); }
           }
+        }
+        // WHAT IF: si hay mun filtrado, construir filtro y re-render hemi
+        if(effDep && effMun && curDepData?.municipios){
+          const mun = curDepData.municipios.find(m=>m.cod===effMun);
+          if(mun){
+            _rgCamFilter = _buildRGCamFilter(mun, mun.nombre||`Municipio ${effMun}`, effDep);
+            await _rgRenderHemicicloWhatIf();
+          }
+        } else {
+          // Mun='TODOS' → volver al hemi del depto
+          _rgCamFilter = null;
+          await _rgRenderHemicicloForDep(effDep);
         }
         await updateCamMap(effDep, effMun);
         return;
@@ -1121,17 +1138,35 @@
     // ─── SWITCH ZONA ──────────────────────────────────────────
     async function switchZon(zonCod){
       curZon = zonCod; resetSelFrom('pue'); curComData = null;
-      // En RG: no disparamos re-render del flujo TERRITORIAL; mantenemos el
-      // mapa del municipio (si es ciudad con comunas ya muestra el detalle)
-      // y dejamos los selects poblados para que el usuario pueda navegar.
+      // En RG: WHAT IF con votos de la comuna/localidad
       if(_rgMode){
         _ensureRGActive();
+        const effDep = curDep==='TODOS'?'':curDep;
+        const effMun = curMun==='TODOS'?'':curMun;
         if(zonCod && zonCod!=='TODOS'){
-          try{ curComData = await getComJSON(curDep, curMun, zonCod);
-               const pues = [...(curComData.puestos||[])].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'))
-                            .map(p=>({value: p.cod||p.pue_cod, label: p.nombre}));
-               if(pues.length){ setSel('pue-select', pues, 'Todos los puestos'); showSel('pue-label',true); showSel('pue-select',true); }
+          try{
+            curComData = await getComJSON(effDep, effMun, zonCod);
+            const pues = [...(curComData.puestos||[])].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'))
+                         .map(p=>({value: p.cod||p.pue_cod, label: p.nombre}));
+            if(pues.length){ setSel('pue-select', pues, 'Todos los puestos'); showSel('pue-label',true); showSel('pue-select',true); }
+            // WHAT IF para la comuna
+            if(curComData){
+              _rgCamFilter = _buildRGCamFilter(curComData, curComData.nombre||`Comuna ${zonCod}`, effDep);
+              await _rgRenderHemicicloWhatIf();
+            }
           }catch(e){ console.warn('[RG zon com]',e); }
+        } else {
+          // Zon='TODOS' → volver al WHAT IF del mun si lo hay, sino al depto
+          if(effMun && curDepData?.municipios){
+            const mun = curDepData.municipios.find(m=>m.cod===effMun);
+            if(mun){
+              _rgCamFilter = _buildRGCamFilter(mun, mun.nombre||`Municipio ${effMun}`, effDep);
+              await _rgRenderHemicicloWhatIf();
+            }
+          } else {
+            _rgCamFilter = null;
+            await _rgRenderHemicicloForDep(effDep);
+          }
         }
         return;
       }
@@ -1148,7 +1183,7 @@
     }
 
     // ─── SWITCH PUESTO ────────────────────────────────────────
-    function switchPue(pueCod){
+    async function switchPue(pueCod){
       curPue = pueCod; resetSelFrom('mesa');
       if(pueCod && pueCod!=='TODOS' && !localStorage.getItem('rr-token')){ showInviteToast(); }
       if(pueCod && pueCod!=='TODOS' && curComData){
@@ -1158,14 +1193,39 @@
           setSel('mesa-select', mesaOpts, 'Todas las mesas');
           showSel('mesa-label', true); showSel('mesa-select', true);
         }
+        // RG WHAT IF a nivel puesto
+        if(_rgMode){
+          _ensureRGActive();
+          const effDep = curDep==='TODOS'?'':curDep;
+          if(effDep && pue){
+            _rgCamFilter = _buildRGCamFilter(pue, pue.nombre||`Puesto ${pueCod}`, effDep);
+            await _rgRenderHemicicloWhatIf();
+          }
+          return;
+        }
       }
+      if(_rgMode) return; // no _reRenderDep en RG
       _reRenderDep();
     }
 
     // ─── SWITCH MESA ──────────────────────────────────────────
-    function switchMesa(mesaCod){
+    async function switchMesa(mesaCod){
       if(!localStorage.getItem('rr-token')){ showInviteToast(); }
-      curMesa = mesaCod; _reRenderDep();
+      curMesa = mesaCod;
+      if(_rgMode){
+        _ensureRGActive();
+        const effDep = curDep==='TODOS'?'':curDep;
+        if(mesaCod && mesaCod!=='TODOS' && curComData && effDep){
+          const pue = (curComData.puestos||[]).find(p=>p.cod===curPue || p.pue_cod===curPue);
+          const m = pue?.mesas?.find(x=>String(x.mesa||x.cod)===String(mesaCod));
+          if(m){
+            _rgCamFilter = _buildRGCamFilter(m, `Mesa ${mesaCod} · ${pue.nombre||curPue}`, effDep);
+            await _rgRenderHemicicloWhatIf();
+          }
+        }
+        return;
+      }
+      _reRenderDep();
     }
     function showInviteToast(){
       const t=document.getElementById('invite-toast'); if(!t) return;
@@ -1637,15 +1697,53 @@
     }
 
     // Asegura que el toggle visual esté en 'Resultados Generales' cuando _rgMode=true
+    // SIEMPRE enforza visibilidad de panel, aunque el botón ya esté active
+    // (buscarCandidato('') y otros flows pueden haber revelado cam-main-grid)
     function _ensureRGActive(){
-      const btn=document.getElementById('circ-btn-rg');
-      if(!btn || btn.classList.contains('circ-btn-active')) return;
-      document.querySelectorAll('.circ-btn').forEach(b=>b.classList.remove('circ-btn-active'));
-      btn.classList.add('circ-btn-active');
-      const _mt=document.getElementById('metodo-txt'); if(_mt) _mt.textContent='Mapa y hemiciclo por departamento';
-      // Asegurar que el panel RG esté visible
+      const btn=document.getElementById('circ-btn-rg'); if(!btn) return;
+      if(!btn.classList.contains('circ-btn-active')){
+        document.querySelectorAll('.circ-btn').forEach(b=>b.classList.remove('circ-btn-active'));
+        btn.classList.add('circ-btn-active');
+        const _mt=document.getElementById('metodo-txt'); if(_mt) _mt.textContent='Mapa y hemiciclo por departamento';
+      }
+      // Enforza visibilidad SIEMPRE
       const rg=document.getElementById('rg-panel'); if(rg) rg.style.display='block';
       const mg=document.getElementById('cam-main-grid'); if(mg) mg.style.display='none';
+      const kpi=document.getElementById('kpi-row'); if(kpi) kpi.style.display='none';
+      const searchBox=document.getElementById('cam-search-results'); if(searchBox) searchBox.style.display='none';
+    }
+
+    // ─── WHAT IF (RG mode con filtro mun/comuna/puesto/mesa) ─────
+    // _rgCamFilter = { nombre, partidos: {partido: votos}, depCod } | null
+    let _rgCamFilter = null;
+    function _buildRGCamFilter(data, nombre, depCod){
+      const SPEC=new Set(['996','997','998']);
+      const terrRaw = data.por_circunscripcion?.['TERRITORIAL'] ?? data;
+      const partidos = Object.fromEntries(
+        Object.entries(terrRaw.partidos||{}).filter(([k])=>!SPEC.has(k)&&!/blanco/i.test(k))
+      );
+      return { nombre, partidos, depCod };
+    }
+
+    // Renderiza hemiciclo en modo WHAT IF: D'Hondt 3% sobre los curules del depto
+    async function _rgRenderHemicicloWhatIf(){
+      if(!_rgCamFilter){ return _rgRenderHemicicloForDep(curDep==='TODOS'?'':curDep); }
+      try{
+        const deps=await getJSON('departamentos');
+        const dep=deps.find(d=>d.cod===_rgCamFilter.depCod && getDepCirc(d)==='TERRITORIAL');
+        if(!dep){ return _rgRenderHemicicloForDep(_rgCamFilter.depCod); }
+        const nC=getCurulesDep(dep.nombre);
+        // Reparto según reglas del art. 263 C.P. (usando asignarCurules, idéntico a TERRITORIAL)
+        const {cur}=asignarCurules(_rgCamFilter.partidos||{}, nC);
+        const curMap = {};
+        Object.entries(cur||{}).forEach(([p,n])=>{ if(n>0) curMap[p]=n; });
+        // Para WHAT IF no tenemos candidatos elegidos reales del territorio pequeño;
+        // mostrar "POS.N LISTA CERRADA / candidato" como fallback usando los candidatos del depto
+        const depForNames={cod:dep.cod, nombre:dep.nombre, candidatos:dep.candidatos||{}};
+        const winners=_buildWinnerNamesDep(depForNames, curMap);
+        const label=`WHAT IF?! · ${_rgCamFilter.nombre} · ${nC} curules`;
+        renderCamHemiciclo(curMap, nC, label, winners);
+      }catch(e){ console.warn('[rgHemiWhatIf]',e); }
     }
 
     // Renderiza el hemiciclo para el dep activo en modo RG.
@@ -1792,8 +1890,9 @@
           const nm=(winnerNames&&winnerNames[d.partido])?winnerNames[d.partido][d.idx]:null;
           const winTxt=nm || `POS. ${(d.idx||0)+1} LISTA CERRADA`;
           const totalCur=curMap[d.partido]||0;
+          // Mismo formato que senado-2026: partido azul UPPERCASE, nombre verde UPPERCASE, curules
           tooltip.style.display='block';
-          tooltip.innerHTML=`<span style="color:${d.color};font-weight:700;font-family:'Syne',sans-serif">${d.partido}</span><br/><span style="font-family:'Syne',sans-serif;font-weight:400">${winTxt}</span><br/><span style="font-family:Avenir,sans-serif;font-weight:400;opacity:.75">${totalCur} curul${totalCur!==1?'es':''}</span>`;
+          tooltip.innerHTML=`<span style="color:#0047FF;font-weight:700">${String(d.partido).toUpperCase()}</span><br/><span style="color:rgba(57,255,122,0.9)">${String(winTxt).toUpperCase()}</span><br/>${totalCur} curul${totalCur!==1?'es':''}`;
         });
         c.addEventListener('mousemove',e=>{if(tooltip){tooltip.style.left=(e.clientX+14)+'px';tooltip.style.top=(e.clientY-10)+'px';}});
         c.addEventListener('mouseleave',()=>{if(tooltip)tooltip.style.display='none';});
@@ -2128,7 +2227,8 @@
       const btn=document.getElementById('hemiciclo-cam-back');
       if(!btn) return;
       if(!depCod){ btn.style.display='none'; btn.onclick=null; return; }
-      btn.style.display='';
+      // IMPORTANT: CSS default es display:none → usar valor explícito
+      btn.style.display='block';
       if(munCod){
         btn.textContent='← Departamento';
         btn.onclick=()=>{
