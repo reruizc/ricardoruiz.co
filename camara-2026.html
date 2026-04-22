@@ -240,10 +240,10 @@
     #gender-donut-wrap{display:none;flex-direction:column;align-items:center;gap:.55rem;margin-top:1rem;padding-top:.85rem;border-top:1px solid var(--border)}
     #gender-donut-wrap .donut-cw{width:90px;height:90px}
     /* RESULTADOS GENERALES panel */
-    #rg-panel{display:none}
     .hemi-map-row{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.2rem}
     @media(max-width:900px){.hemi-map-row{grid-template-columns:1fr}}
     #hemiciclo-wrap{position:relative;background:rgba(255,255,255,.03);border:1px solid var(--card-border);padding:1rem}
+    #hemiciclo-svg-wrap{min-height:240px}
     #hemiciclo-svg-wrap svg{width:100%;height:auto;display:block}
     #hemi-cam-legend{display:flex;flex-wrap:wrap;gap:.4rem .8rem;margin-top:.75rem}
     #hemiciclo-map-wrap{position:relative;background:rgba(255,255,255,.03);border:1px solid var(--card-border)}
@@ -975,7 +975,7 @@
       const isRG = val === 'RESULTADOS_GENERALES';
       _rgMode = isRG;
       document.getElementById('cam-main-grid').style.display = isRG ? 'none' : '';
-      document.getElementById('rg-panel').style.display = isRG ? '' : 'none';
+      document.getElementById('rg-panel').style.display = isRG ? 'block' : 'none';
       if(isRG){
         const curMap = curulesNac;
         const total = CURULES_TERRITORIAL;
@@ -983,7 +983,12 @@
         // Destruir mapa anterior (si estaba en contenedor oculto con dimensiones 0)
         if(camMap){ try{camMap.remove();}catch(_){} camMap=null; }
         // Diferir hasta que el browser pinte el panel con sus dimensiones reales
-        setTimeout(()=>initCamMap().then(()=>updateCamMap(curDep==='TODOS'?'':curDep)), 80);
+        requestAnimationFrame(()=>requestAnimationFrame(()=>{
+          initCamMap().then(()=>{
+            updateCamMap(curDep==='TODOS'?'':curDep);
+            setTimeout(()=>{ try{ camMap && camMap.invalidateSize(); }catch(_){}; }, 150);
+          });
+        }));
       } else {
         switchCorp(val);
       }
