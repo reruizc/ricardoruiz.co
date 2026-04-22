@@ -250,8 +250,8 @@
     .hemi-leg-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;display:inline-block}
     .hemi-leg-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .hemi-leg-count{font-family:Avenir,sans-serif;font-weight:400;font-size:.98rem;color:var(--white);margin-left:auto;flex-shrink:0}
-    #hemiciclo-map-wrap{position:relative;background:rgba(255,255,255,.03);border:1px solid var(--card-border)}
-    #hemiciclo-cam-map{height:320px}
+    #hemiciclo-map-wrap{position:relative;background:rgba(255,255,255,.03);border:1px solid var(--card-border);display:flex;flex-direction:column;align-self:stretch}
+    #hemiciclo-cam-map{flex:1 1 auto;width:100%;min-height:480px}
     #hemiciclo-cam-back{position:absolute;top:.55rem;right:.55rem;z-index:900;font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;background:rgba(0,71,255,.92);color:#fff;border:none;padding:.4rem .7rem;cursor:pointer;border-radius:2px;display:none}
     #hemiciclo-cam-back:hover{background:rgba(0,71,255,1)}
     #hemi-cam-tooltip{display:none;position:fixed;background:rgba(6,8,16,.97);border:1px solid rgba(0,71,255,.4);color:#f4f3ef;font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;padding:.5rem .85rem;pointer-events:none;z-index:10000;line-height:1.7;white-space:nowrap}
@@ -492,6 +492,9 @@
           <div class="hemi-map-row">
             <div id="hemiciclo-wrap" class="card">
               <div class="card-label" id="hemi-cam-label">Hemiciclo · Cámara</div>
+              <div id="hemiciclo-cam-whatif-text" style="display:none;font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:#0047FF;margin-bottom:.9rem;padding:.55rem .75rem;background:rgba(0,71,255,.07);border:1px solid rgba(0,71,255,.25);line-height:1.6">
+                WHAT IF?! — ¿Qué pasaría si solo <span id="hemiciclo-cam-whatif-lugar" style="color:var(--white);font-weight:700"></span> eligiera Cámara?
+              </div>
               <div id="hemiciclo-svg-wrap"></div>
               <div id="hemi-cam-legend"></div>
             </div>
@@ -1725,6 +1728,15 @@
       return { nombre, partidos, depCod };
     }
 
+    // Muestra u oculta la aclaración "WHAT IF?!" sobre el hemiciclo
+    function _setWhatIfText(lugar){
+      const box=document.getElementById('hemiciclo-cam-whatif-text');
+      const lug=document.getElementById('hemiciclo-cam-whatif-lugar');
+      if(!box) return;
+      if(lugar){ if(lug) lug.textContent=lugar; box.style.display='block'; }
+      else { box.style.display='none'; }
+    }
+
     // Renderiza hemiciclo en modo WHAT IF: D'Hondt 3% sobre los curules del depto
     async function _rgRenderHemicicloWhatIf(){
       if(!_rgCamFilter){ return _rgRenderHemicicloForDep(curDep==='TODOS'?'':curDep); }
@@ -1741,7 +1753,8 @@
         // mostrar "POS.N LISTA CERRADA / candidato" como fallback usando los candidatos del depto
         const depForNames={cod:dep.cod, nombre:dep.nombre, candidatos:dep.candidatos||{}};
         const winners=_buildWinnerNamesDep(depForNames, curMap);
-        const label=`WHAT IF?! · ${_rgCamFilter.nombre} · ${nC} curules`;
+        const label=`Hemiciclo · ${dep.nombre} · ${nC} curules`;
+        _setWhatIfText(_rgCamFilter.nombre);
         renderCamHemiciclo(curMap, nC, label, winners);
       }catch(e){ console.warn('[rgHemiWhatIf]',e); }
     }
@@ -1750,6 +1763,7 @@
     // depCod='' → nacional con las 3 circunscripciones combinadas (165 curules)
     // depCod='05' → sólo los curules territoriales de Antioquia (17) con el reparto D'Hondt del depto
     async function _rgRenderHemicicloForDep(depCod){
+      _setWhatIfText(null); // ocultar aclaración WHAT IF al salir de un mun/comuna
       if(!depCod){
         const winners=await _buildWinnerNamesNacional();
         renderCamHemiciclo(_mergeCurulesAll(), CURULES_TERRITORIAL+CURULES_INDIGENAS+CURULES_AFRO, 'Hemiciclo · Cámara · Nacional', winners);
@@ -2030,7 +2044,7 @@
           });
         }
       }).addTo(camMap);
-      try{ camMap.fitBounds(_camNacLayer.getBounds(),{padding:[6,6]}); }catch(_){}
+      try{ camMap.fitBounds(_camNacLayer.getBounds(),{padding:[14,14]}); }catch(_){}
     }
 
     // Ganadores por localidad/comuna dentro de un mun de un dep.
@@ -2125,7 +2139,7 @@
           });
         }
       }).addTo(camMap);
-      try{ camMap.fitBounds(_camDepLayer.getBounds(),{padding:[10,10]}); }catch(_){}
+      try{ camMap.fitBounds(_camDepLayer.getBounds(),{paddingTopLeft:[12,55],paddingBottomRight:[55,12]}); }catch(_){}
     }
 
     async function updateCamMap(depCod, munCod){
@@ -2137,7 +2151,7 @@
         if(_camNacLayer){
           if(!camMap.hasLayer(_camNacLayer)) _camNacLayer.addTo(camMap);
           _camNacLayer.resetStyle();
-          try{camMap.fitBounds(_camNacLayer.getBounds(),{padding:[6,6]});}catch(_){}
+          try{camMap.fitBounds(_camNacLayer.getBounds(),{padding:[14,14]});}catch(_){}
         } else if(_camDeptoGeoRaw){ _buildCamNacLayer(); }
         updateCamMapBackBtn('', '');
         return;
@@ -2217,7 +2231,7 @@
               });
             }
           }).addTo(camMap);
-          try{camMap.fitBounds(_camDepLayer.getBounds(),{padding:[10,10]});}catch(_){}
+          try{camMap.fitBounds(_camDepLayer.getBounds(),{paddingTopLeft:[12,55],paddingBottomRight:[55,12]});}catch(_){}
         }
       }catch(e){ console.warn('[CamMap dep]:',e); if(_camNacLayer&&!camMap.hasLayer(_camNacLayer)) _camNacLayer.addTo(camMap); }
       updateCamMapBackBtn(depCod, munCod);
