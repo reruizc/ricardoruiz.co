@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Previa · Primera Vuelta 2026 · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#060810; --surface:rgba(255,255,255,.04); --border:rgba(255,255,255,.08);
+      --white:#f4f3ef; --blue:#0047FF; --green:#4ade80; --purple:#a78bfa;
+      --orange:#fb923c; --red:#f87171; --amber:#f59e0b;
+    }
+    html{scroll-behavior:smooth}
+    body{background:var(--bg);color:var(--white);font-family:'Syne',sans-serif;min-height:100vh;overflow-x:hidden}
+    body.day-mode{background:#e6ded3;color:#0d1120}
+
+    /* NAV */
+    .electoral-nav{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(4,6,16,.6);backdrop-filter:blur(8px)}
+    .logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.85}
+    .logo-link:hover{opacity:1}
+    .logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px}
+    .logo-bar{width:5px;background:var(--blue);border-radius:1px 1px 0 0}
+    .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.1rem,2vw,1.65rem);letter-spacing:-.03em;color:var(--white)}
+    .logo-text span{color:var(--blue)}
+    .nav-actions{display:flex;align-items:center;gap:.6rem}
+    .e-btn-back{font-family:'Syne',sans-serif;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--green);text-decoration:none;border:1.5px solid rgba(74,222,128,.4);padding:.3rem .8rem;transition:color .2s,border-color .2s,background .2s}
+    .e-btn-back:hover{color:#060810;background:var(--green);border-color:var(--green)}
+
+    /* BREADCRUMB */
+    .breadcrumb{padding:.6rem 2.5rem;font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3);border-bottom:1px solid var(--border)}
+    .breadcrumb a{color:rgba(0,71,255,.7);text-decoration:none}
+    .breadcrumb a:hover{color:var(--blue)}
+
+    /* HEADER */
+    .page-header{padding:1.3rem 2.5rem 1rem;border-bottom:1px solid var(--border)}
+    .page-title{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.4rem,2.6vw,2.2rem);letter-spacing:-.025em;color:var(--white)}
+    .page-title span{color:var(--blue)}
+    .page-sub{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-top:.35rem}
+
+    /* PONDERADOR: stacked bar */
+    .ponderador{padding:1rem 2.5rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.015)}
+    .ponderador-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:.55rem}
+    .ponderador-title{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.5)}
+    .ponderador-total{font-family:Avenir,sans-serif;font-size:.75rem;color:rgba(255,255,255,.5)}
+    .ponderador-total b{color:var(--white);font-weight:500}
+    #stack{display:flex;height:28px;width:100%;border:1px solid rgba(255,255,255,.1);overflow:hidden}
+    .seg{display:flex;align-items:center;justify-content:center;font-family:Avenir,sans-serif;font-size:.72rem;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;transition:width .25s cubic-bezier(.25,.8,.25,1),background .2s;cursor:pointer;border-right:1px solid rgba(0,0,0,.25)}
+    .seg:last-child{border-right:none}
+    .seg.active{box-shadow:inset 0 0 0 2px #fff}
+    .pond-legend{display:flex;gap:.9rem;margin-top:.55rem;flex-wrap:wrap;font-family:'DM Mono',monospace;font-size:.6rem;color:rgba(255,255,255,.55)}
+    .pond-chip{display:inline-flex;align-items:center;gap:.35rem}
+    .pond-chip .dot{width:9px;height:9px;display:inline-block}
+
+    /* MAIN LAYOUT */
+    .shell{display:grid;grid-template-columns:1fr 380px;gap:0;min-height:calc(100vh - 260px)}
+    @media (max-width:1100px){.shell{grid-template-columns:1fr}}
+
+    /* MAPA */
+    .map-wrap{position:relative;border-right:1px solid var(--border);display:flex;flex-direction:column}
+    .map-head{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.65rem 1.2rem;background:rgba(0,71,255,.1);border-bottom:1px solid rgba(0,71,255,.25)}
+    .map-head-title{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;color:var(--white)}
+    .map-head-cand{font-family:'Syne',sans-serif;font-weight:700;font-size:.95rem;letter-spacing:-.01em}
+    .map-head-pct{font-family:Avenir,sans-serif;font-size:.85rem;color:rgba(255,255,255,.7)}
+    #leaflet-map{flex:1;min-height:520px;background:#060810}
+    .leaflet-container{background:#060810!important}
+    .leaflet-tile-pane{display:none}
+    .leaflet-control-attribution{background:rgba(6,8,16,.85)!important;color:rgba(255,255,255,.25)!important;font-family:'DM Mono',monospace!important;font-size:.45rem!important}
+    .leaflet-control-attribution a{color:rgba(0,71,255,.6)!important}
+    .leaflet-control-zoom a{background:rgba(13,15,28,.9)!important;color:var(--white)!important;border-color:rgba(255,255,255,.15)!important}
+    .leaflet-control-zoom a:hover{background:rgba(0,71,255,.3)!important}
+    .leaflet-dark-tooltip{background:rgba(6,8,16,.97)!important;border:1px solid rgba(0,71,255,.4)!important;color:#f4f3ef!important;font-family:Avenir,sans-serif!important;font-size:.8rem!important;padding:.45rem .65rem!important;border-radius:0!important}
+    .leaflet-dark-tooltip:before{display:none!important}
+
+    .map-legend{padding:.6rem 1.2rem .8rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;border-top:1px solid var(--border)}
+    .map-legend-title{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.35)}
+    .map-legend-bar{width:260px;height:8px;background:linear-gradient(to right,#0d1b3e,#1d4ed8,#0891b2,#15803d,#ca8a04,#fef08a,#ea580c,#dc2626)}
+    .map-legend-ends{display:flex;justify-content:space-between;width:260px;font-family:'DM Mono',monospace;font-size:.6rem;color:rgba(255,255,255,.45)}
+
+    /* PANEL CANDIDATOS */
+    .panel{padding:1rem 1.2rem;max-height:calc(100vh - 260px);overflow-y:auto}
+    .panel-title{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-bottom:.65rem}
+    .cand-card{display:grid;grid-template-columns:62px 1fr;gap:.7rem;padding:.75rem;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02);margin-bottom:.65rem;transition:border-color .15s,background .15s;cursor:pointer}
+    .cand-card:hover{border-color:rgba(0,71,255,.4);background:rgba(0,71,255,.04)}
+    .cand-card.active{border-color:var(--blue);background:rgba(0,71,255,.08)}
+    .cand-photo{width:62px;height:62px;border:1px dashed rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;background:rgba(0,0,0,.3)}
+    .cand-photo img{width:100%;height:100%;object-fit:cover;object-position:center 20%}
+    .cand-photo .ph-plus{font-family:'DM Mono',monospace;font-size:.55rem;letter-spacing:.1em;color:rgba(255,255,255,.35);text-align:center;padding:.3rem;line-height:1.3}
+    .cand-photo input{position:absolute;inset:0;opacity:0;cursor:pointer}
+    .cand-body{display:flex;flex-direction:column;gap:.35rem;min-width:0}
+    .cand-top{display:flex;align-items:baseline;justify-content:space-between;gap:.5rem}
+    .cand-name{font-family:'Syne',sans-serif;font-weight:700;font-size:.92rem;letter-spacing:-.01em;color:var(--white);line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .cand-party{font-family:'DM Mono',monospace;font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-top:1px}
+    .cand-pct{font-family:Avenir,sans-serif;font-weight:500;font-size:1rem;color:var(--white);white-space:nowrap}
+    .cand-pct .delta{font-size:.65rem;margin-left:.25rem;opacity:.7}
+    .cand-slider{-webkit-appearance:none;appearance:none;width:100%;height:4px;background:rgba(255,255,255,.1);outline:none;margin:.25rem 0 .15rem}
+    .cand-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:14px;height:14px;background:var(--white);border:2px solid var(--blue);border-radius:50%;cursor:pointer}
+    .cand-slider::-moz-range-thumb{width:14px;height:14px;background:var(--white);border:2px solid var(--blue);border-radius:50%;cursor:pointer}
+    .cand-meta{display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:.54rem;color:rgba(255,255,255,.3);letter-spacing:.08em}
+
+    .actions{display:flex;gap:.5rem;margin-top:.8rem;flex-wrap:wrap}
+    .btn{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.65);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);padding:.45rem .7rem;cursor:pointer;transition:all .15s}
+    .btn:hover{background:rgba(0,71,255,.12);border-color:rgba(0,71,255,.5);color:var(--white)}
+    .btn-primary{color:var(--blue);border-color:rgba(0,71,255,.5)}
+    .btn-primary:hover{background:var(--blue);color:#fff}
+
+    .note{margin-top:.9rem;padding:.7rem;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:rgba(245,158,11,.85);font-family:'DM Mono',monospace;font-size:.58rem;line-height:1.55;letter-spacing:.05em}
+
+    /* FOOTER */
+    .foot{padding:1.1rem 2.5rem;border-top:1px solid var(--border);font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.3);text-align:center}
+    .foot a{color:rgba(0,71,255,.7);text-decoration:none}
+  </style>
+</head>
+<body>
+
+  <nav class="electoral-nav">
+    <a href="index.html" class="logo-link">
+      <div class="logo-bars">
+        <div class="logo-bar" style="height:40%"></div>
+        <div class="logo-bar" style="height:70%"></div>
+        <div class="logo-bar" style="height:100%"></div>
+      </div>
+      <div class="logo-text">ricardo<span>ruiz</span></div>
+    </a>
+    <div class="nav-actions">
+      <a class="e-btn-back" href="electoral.html">← Electoral</a>
+    </div>
+  </nav>
+
+  <div class="breadcrumb">
+    <a href="electoral.html">Electoral</a> · Primera Vuelta 2026 · <span style="color:var(--white)">Previa</span>
+  </div>
+
+  <header class="page-header">
+    <div class="page-title">Previa <span>Primera Vuelta 2026</span></div>
+    <div class="page-sub">Simulador de intención de voto · Ponderador regional por fórmula presidencial</div>
+  </header>
+
+  <!-- Ponderador (stacked bar al estilo La Silla Vacía) -->
+  <section class="ponderador">
+    <div class="ponderador-head">
+      <div class="ponderador-title">Ponderador electoral (100%)</div>
+      <div class="ponderador-total">Suma actual: <b id="stack-sum">100%</b></div>
+    </div>
+    <div id="stack" role="img" aria-label="Ponderador"></div>
+    <div class="pond-legend" id="pond-legend"></div>
+  </section>
+
+  <div class="shell">
+    <!-- MAPA -->
+    <div class="map-wrap">
+      <div class="map-head">
+        <div>
+          <div class="map-head-title">Fuerza regional proyectada</div>
+          <div class="map-head-cand" id="map-cand-name">—</div>
+        </div>
+        <div class="map-head-pct" id="map-cand-pct">0% nacional</div>
+      </div>
+      <div id="leaflet-map"></div>
+      <div class="map-legend">
+        <div class="map-legend-title">Intensidad por depto</div>
+        <div>
+          <div class="map-legend-bar"></div>
+          <div class="map-legend-ends"><span>menor</span><span>mayor</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL CANDIDATOS -->
+    <aside class="panel">
+      <div class="panel-title">Fórmulas presidenciales · mover el deslizador</div>
+      <div id="cand-list"></div>
+
+      <div class="actions">
+        <button class="btn btn-primary" onclick="resetSim()">Restablecer encuesta base</button>
+        <button class="btn" onclick="normalize()">Normalizar a 100%</button>
+      </div>
+
+      <div class="note">
+        Borrador · los valores iniciales y el sesgo regional son estimaciones
+        ilustrativas. El siguiente paso es conectar el histórico 2014 / 2018 / 2022
+        por municipio para precisar el ponderador territorial.
+      </div>
+    </aside>
+  </div>
+
+  <footer class="foot">
+    © Ricardo Ruiz · Elecciones 2026 · <a href="index.html">ricardoruiz.co</a>
+  </footer>
+
+<script>
+  // ─── DATA: FÓRMULAS (placeholder) ─────────────────────────────
+  // bias: multiplicador regional por departamento (clave normalizada, mayúsculas sin tildes)
+  // 1.0 = promedio nacional. Las claves faltantes caen al default 1.0.
+  // Reemplazable luego por el histórico 2014/2018/2022 por municipio.
+  const CANDIDATOS = [
+    { id:'vd', nombre:'Vicky Dávila',           partido:'Independiente',     color:'#f59e0b', pct:14.0,
+      bias:{ 'ANTIOQUIA':1.7,'SANTANDER':1.5,'NORTE DE SANTANDER':1.4,'BOLIVAR':1.2,'CESAR':1.3,'ATLANTICO':1.2,'VALLE DEL CAUCA':1.1,'CALDAS':1.3,'RISARALDA':1.3,'QUINDIO':1.3,'BOGOTA D.C.':1.1,'NARIÑO':.6,'CAUCA':.5,'PUTUMAYO':.6 } },
+    { id:'mu', nombre:'Miguel Uribe Turbay',    partido:'Centro Democrático', color:'#6366f1', pct:12.0,
+      bias:{ 'BOGOTA D.C.':1.6,'ANTIOQUIA':1.5,'CUNDINAMARCA':1.3,'VALLE DEL CAUCA':1.2,'ATLANTICO':1.1,'BOYACA':1.2,'META':1.2,'CASANARE':1.3,'CAUCA':.5,'NARIÑO':.5,'CHOCO':.4 } },
+    { id:'pe', nombre:'Iván Cepeda',            partido:'Pacto Histórico',   color:'#e53e3e', pct:13.0,
+      bias:{ 'NARIÑO':1.8,'CAUCA':1.9,'CHOCO':1.7,'BOLIVAR':1.4,'ATLANTICO':1.2,'MAGDALENA':1.3,'SUCRE':1.3,'CORDOBA':1.2,'PUTUMAYO':1.6,'AMAZONAS':1.5,'BOGOTA D.C.':1.1,'VALLE DEL CAUCA':1.2,'ANTIOQUIA':.7,'SANTANDER':.6 } },
+    { id:'cl', nombre:'Claudia López',          partido:'Alianza Verde',     color:'#22d3ee', pct:9.0,
+      bias:{ 'BOGOTA D.C.':1.8,'CUNDINAMARCA':1.4,'BOYACA':1.3,'ANTIOQUIA':.9,'VALLE DEL CAUCA':1.1,'RISARALDA':1.1,'QUINDIO':1.1,'ATLANTICO':.9,'CAUCA':.7 } },
+    { id:'sf', nombre:'Sergio Fajardo',         partido:'Dignidad',          color:'#16a34a', pct:7.0,
+      bias:{ 'ANTIOQUIA':2.0,'CALDAS':1.4,'RISARALDA':1.4,'QUINDIO':1.4,'BOGOTA D.C.':1.2,'CUNDINAMARCA':1.1,'VALLE DEL CAUCA':1.0,'CHOCO':.6,'LA GUAJIRA':.6 } },
+    { id:'gq', nombre:'Gustavo Bolívar / Quintero', partido:'Pacto Histórico', color:'#a855f7', pct:8.0,
+      bias:{ 'ANTIOQUIA':1.4,'BOGOTA D.C.':1.3,'NARIÑO':1.3,'CAUCA':1.2,'VALLE DEL CAUCA':1.2,'TOLIMA':1.1,'HUILA':1.0,'SANTANDER':.8,'BOYACA':.8 } },
+    { id:'ot', nombre:'Otros candidatos',       partido:'Varios',            color:'#64748b', pct:11.0,
+      bias:{} },
+    { id:'nd', nombre:'Indecisos / Blanco',     partido:'—',                 color:'#475569', pct:26.0,
+      bias:{} },
+  ];
+
+  // ─── STATE ────────────────────────────────────────────────────
+  let selectedId = CANDIDATOS[0].id;
+  const BASE = CANDIDATOS.map(c => ({ ...c }));  // copia para reset
+
+  const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
+  const DEPARTAMENTOS_URL = `${S3}/mapas-2026/DEPARTAMENTOS2.json`;
+
+  // ─── HELPERS ──────────────────────────────────────────────────
+  const norm = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase();
+  const fmtPct = n => (Math.round(n*10)/10).toFixed(1) + '%';
+  const depName = props =>
+    props.name || props.NOMBRE_DPT || props.dpto_cnmbr || props.DPTO_CNMBR || props.NOMBRE || '';
+
+  function biasFor(cand, depNom){
+    const key = norm(depNom);
+    return (cand.bias && cand.bias[key] != null) ? cand.bias[key] : 1.0;
+  }
+  function projected(cand, depNom){
+    return cand.pct * biasFor(cand, depNom);
+  }
+
+  // ─── COLOR SCALE (ratio 0..1) ─────────────────────────────────
+  function voteColor(r){
+    if (r <= 0)    return '#0d1b3e';
+    if (r < 0.08)  return '#0c1e4a';
+    if (r < 0.20)  return '#1d4ed8';
+    if (r < 0.35)  return '#0891b2';
+    if (r < 0.50)  return '#15803d';
+    if (r < 0.65)  return '#ca8a04';
+    if (r < 0.80)  return '#fef08a';
+    if (r < 0.92)  return '#ea580c';
+    return '#dc2626';
+  }
+
+  // ─── LEAFLET MAP ──────────────────────────────────────────────
+  let map = null;
+  let deptLayer = null;
+  let geoData = null;
+
+  function initMap(){
+    map = L.map('leaflet-map', {
+      center: [4.5, -74.0], zoom: 5, zoomSnap: .1,
+      zoomControl: true, attributionControl: true, scrollWheelZoom: true
+    });
+    map.getContainer().style.background = '#060810';
+    setTimeout(() => map.invalidateSize(), 300);
+    loadDeptos();
+  }
+
+  async function loadDeptos(){
+    try{
+      const r = await fetch(DEPARTAMENTOS_URL);
+      geoData = await r.json();
+      deptLayer = L.geoJSON(geoData, {
+        style: featureStyle,
+        onEachFeature: onEachFeature
+      }).addTo(map);
+      try{
+        const b = deptLayer.getBounds();
+        if (b.isValid()) map.fitBounds(b, { padding:[12,12] });
+      }catch(e){}
+    }catch(e){
+      console.error('[Previa] error cargando deptos:', e);
+    }
+  }
+
+  function featureStyle(feature){
+    const nm = depName(feature.properties);
+    const cand = CANDIDATOS.find(c => c.id === selectedId);
+    if (!cand) return { fillColor:'#0d1b3e', fillOpacity:.5, color:'rgba(255,255,255,.3)', weight:1 };
+    // ratio: proyección del depto vs máx proyección entre deptos para ese candidato
+    const all = geoData ? geoData.features.map(f => projected(cand, depName(f.properties))) : [];
+    const maxV = Math.max(1, ...all);
+    const v = projected(cand, nm);
+    const ratio = v / maxV;
+    return {
+      fillColor: voteColor(ratio),
+      fillOpacity: ratio > 0 ? 0.85 : 0.5,
+      color: 'rgba(255,255,255,0.4)',
+      weight: 1.0
+    };
+  }
+
+  function onEachFeature(feature, layer){
+    const nm = depName(feature.properties);
+    layer.on({
+      mouseover: function(){
+        const cand = CANDIDATOS.find(c => c.id === selectedId);
+        const v = cand ? projected(cand, nm) : 0;
+        const nac = cand ? cand.pct : 0;
+        const mult = cand ? biasFor(cand, nm) : 1;
+        layer.setStyle({ weight:2.5, color:'#fff', fillOpacity:.95 });
+        const html = `
+          <div style="font-family:Avenir,sans-serif;line-height:1.5">
+            <div style="font-family:'Syne',sans-serif;font-weight:700;color:#fff;font-size:.95rem;margin-bottom:.25rem">${nm}</div>
+            <div style="color:rgba(255,255,255,.7);font-size:.75rem">${cand ? cand.nombre : ''}</div>
+            <div style="color:#fff;font-size:.85rem;margin-top:.2rem">
+              Proyección: <b>${fmtPct(v)}</b>
+            </div>
+            <div style="color:rgba(255,255,255,.55);font-size:.7rem">
+              Nacional: ${fmtPct(nac)} · Ponderador: ×${mult.toFixed(2)}
+            </div>
+          </div>`;
+        layer.bindTooltip(html, { sticky:true, className:'leaflet-dark-tooltip', opacity:1 }).openTooltip();
+      },
+      mouseout: function(){
+        if (deptLayer) deptLayer.resetStyle(layer);
+        layer.closeTooltip();
+      }
+    });
+  }
+
+  function repaintMap(){
+    if (deptLayer) deptLayer.setStyle(featureStyle);
+    const cand = CANDIDATOS.find(c => c.id === selectedId);
+    document.getElementById('map-cand-name').textContent = cand ? cand.nombre : '—';
+    document.getElementById('map-cand-name').style.color = cand ? cand.color : 'var(--white)';
+    document.getElementById('map-cand-pct').textContent = cand ? (fmtPct(cand.pct) + ' nacional') : '';
+  }
+
+  // ─── PONDERADOR (stacked bar + legend) ────────────────────────
+  function renderPonderador(){
+    const stack = document.getElementById('stack');
+    const leg = document.getElementById('pond-legend');
+    const total = CANDIDATOS.reduce((s,c) => s + c.pct, 0);
+    document.getElementById('stack-sum').textContent = fmtPct(total);
+    stack.innerHTML = '';
+    leg.innerHTML = '';
+    CANDIDATOS.forEach(c => {
+      const seg = document.createElement('div');
+      seg.className = 'seg' + (c.id === selectedId ? ' active' : '');
+      seg.style.width = (c.pct / Math.max(total,1) * 100).toFixed(2) + '%';
+      seg.style.background = c.color;
+      seg.title = `${c.nombre} — ${fmtPct(c.pct)}`;
+      seg.textContent = c.pct >= 6 ? fmtPct(c.pct) : '';
+      seg.onclick = () => selectCand(c.id);
+      stack.appendChild(seg);
+
+      const chip = document.createElement('span');
+      chip.className = 'pond-chip';
+      chip.innerHTML = `<span class="dot" style="background:${c.color}"></span>${c.nombre} · <b style="color:#fff;font-weight:500">${fmtPct(c.pct)}</b>`;
+      leg.appendChild(chip);
+    });
+  }
+
+  // ─── PANEL CANDIDATOS ─────────────────────────────────────────
+  function renderPanel(){
+    const host = document.getElementById('cand-list');
+    host.innerHTML = '';
+    CANDIDATOS.forEach((c, idx) => {
+      const base = BASE[idx].pct;
+      const delta = c.pct - base;
+      const card = document.createElement('div');
+      card.className = 'cand-card' + (c.id === selectedId ? ' active' : '');
+      card.onclick = () => selectCand(c.id);
+      card.innerHTML = `
+        <label class="cand-photo" title="Subir imagen">
+          ${c.imgURL ? `<img src="${c.imgURL}" alt="">` : `<span class="ph-plus">+ FOTO</span>`}
+          <input type="file" accept="image/*" data-id="${c.id}" onchange="onUpload(event)">
+        </label>
+        <div class="cand-body">
+          <div class="cand-top">
+            <div style="min-width:0">
+              <div class="cand-name" style="color:${c.color}">${c.nombre}</div>
+              <div class="cand-party">${c.partido}</div>
+            </div>
+            <div class="cand-pct">
+              ${fmtPct(c.pct)}
+              ${delta !== 0 ? `<span class="delta" style="color:${delta>0?'var(--green)':'var(--red)'}">${delta>0?'+':''}${delta.toFixed(1)}</span>` : ''}
+            </div>
+          </div>
+          <input type="range" class="cand-slider" min="0" max="50" step="0.5"
+                 value="${c.pct}" data-id="${c.id}"
+                 oninput="onSlider(event)" onclick="event.stopPropagation()">
+          <div class="cand-meta">
+            <span>Base: ${fmtPct(base)}</span>
+            <span>Ponderador regional activo</span>
+          </div>
+        </div>`;
+      host.appendChild(card);
+    });
+  }
+
+  // ─── INTERACTION ──────────────────────────────────────────────
+  function selectCand(id){
+    selectedId = id;
+    renderPonderador();
+    renderPanel();
+    repaintMap();
+  }
+
+  function onSlider(ev){
+    const id = ev.target.dataset.id;
+    const val = parseFloat(ev.target.value);
+    const cand = CANDIDATOS.find(c => c.id === id);
+    if (!cand) return;
+    cand.pct = val;
+    selectedId = id;
+    renderPonderador();
+    renderPanel();
+    repaintMap();
+  }
+
+  function onUpload(ev){
+    const id = ev.target.dataset.id;
+    const file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    const cand = CANDIDATOS.find(c => c.id === id);
+    if (!cand) return;
+    cand.imgURL = URL.createObjectURL(file);
+    renderPanel();
+  }
+
+  function resetSim(){
+    CANDIDATOS.forEach((c,i) => { c.pct = BASE[i].pct; });
+    renderPonderador(); renderPanel(); repaintMap();
+  }
+
+  function normalize(){
+    const total = CANDIDATOS.reduce((s,c) => s + c.pct, 0);
+    if (total <= 0) return;
+    CANDIDATOS.forEach(c => { c.pct = +(c.pct * 100 / total).toFixed(2); });
+    renderPonderador(); renderPanel(); repaintMap();
+  }
+
+  // ─── BOOT ─────────────────────────────────────────────────────
+  renderPonderador();
+  renderPanel();
+  repaintMap();
+  initMap();
+</script>
+</body>
+</html>
