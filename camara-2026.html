@@ -997,16 +997,58 @@
         }
         // Destruir mapa anterior (si estaba en contenedor oculto con dimensiones 0)
         if(camMap){ try{camMap.remove();}catch(_){} camMap=null; _camNacLayer=null; _camDepLayer=null; }
-        // Resetear WHAT IF al reentrar a RG
+        // Resetear WHAT IF; se reconstruye más abajo si hay filtros activos
         _rgCamFilter = null;
-        // Renderizar hemiciclo (nacional vs dep) y diferir el mapa hasta que el panel pinte
-        _rgRenderHemicicloForDep(curDep==='TODOS'?'':curDep);
-        requestAnimationFrame(()=>requestAnimationFrame(()=>{
-          initCamMap().then(()=>{
-            updateCamMap(curDep==='TODOS'?'':curDep, '');
-            setTimeout(()=>{ try{ camMap && camMap.invalidateSize(); }catch(_){}; }, 150);
-          });
-        }));
+        // Reconstruir _rgCamFilter desde los filtros actuales (TERRITORIAL → RG
+        // debe preservar mun/comuna/puesto/mesa y activar WHAT IF).
+        const _rgEffDep = curDep==='TODOS'?'':curDep;
+        const _rgEffMun = curMun==='TODOS'?'':curMun;
+        const _rgEffZon = curZon==='TODOS'?'':curZon;
+        const _rgEffPue = curPue==='TODOS'?'':curPue;
+        const _rgEffMesa= curMesa==='TODOS'?'':curMesa;
+        (async ()=>{
+          try{
+            if(_rgEffDep){
+              if(!curDepData){ try{ curDepData=await getJSON('dep-'+_rgEffDep); }catch(_){} }
+              const mun = _rgEffMun ? (curDepData?.municipios||[]).find(m=>m.cod===_rgEffMun) : null;
+              // Si hay zon/pue/mesa pero aún no tenemos curComData, intenta cargarlo
+              if((_rgEffPue || _rgEffZon) && !curComData && _rgEffMun && _rgEffZon){
+                try{ curComData=await getComJSON(_rgEffDep, _rgEffMun, _rgEffZon); }catch(_){}
+              }
+              // Más profundo: mesa → puesto → comuna → mun
+              if(_rgEffMesa && curComData && _rgEffPue){
+                const pue=(curComData.puestos||[]).find(p=>p.cod===_rgEffPue || p.pue_cod===_rgEffPue);
+                const m=pue?.mesas?.find(x=>String(x.mesa||x.cod)===String(_rgEffMesa));
+                if(m) _rgCamFilter=_buildRGCamFilter(m, `Mesa ${_rgEffMesa} · ${pue.nombre||_rgEffPue}`, _rgEffDep);
+              } else if(_rgEffPue && curComData){
+                const pue=(curComData.puestos||[]).find(p=>p.cod===_rgEffPue || p.pue_cod===_rgEffPue);
+                if(pue) _rgCamFilter=_buildRGCamFilter(pue, pue.nombre||`Puesto ${_rgEffPue}`, _rgEffDep);
+              } else if(_rgEffZon && curComData){
+                _rgCamFilter=_buildRGCamFilter(curComData, curComData.nombre||`Comuna ${_rgEffZon}`, _rgEffDep);
+              } else if(_rgEffZon && mun){
+                // Tenemos zon pero no curComData cargado — fetch
+                try{
+                  const cd=await getComJSON(_rgEffDep, _rgEffMun, _rgEffZon);
+                  curComData=cd;
+                  _rgCamFilter=_buildRGCamFilter(cd, cd.nombre||`Comuna ${_rgEffZon}`, _rgEffDep);
+                }catch(_){ /* fallback al mun */
+                  if(mun) _rgCamFilter=_buildRGCamFilter(mun, mun.nombre||`Municipio ${_rgEffMun}`, _rgEffDep);
+                }
+              } else if(_rgEffMun && mun){
+                _rgCamFilter=_buildRGCamFilter(mun, mun.nombre||`Municipio ${_rgEffMun}`, _rgEffDep);
+              }
+            }
+          }catch(e){ console.warn('[RG reconstruir filter]',e); }
+          // Render hemi (WHAT IF si hay filter, sino el hemi del dep/nacional)
+          if(_rgCamFilter) await _rgRenderHemicicloWhatIf();
+          else await _rgRenderHemicicloForDep(_rgEffDep);
+          requestAnimationFrame(()=>requestAnimationFrame(()=>{
+            initCamMap().then(()=>{
+              updateCamMap(_rgEffDep, _rgEffMun);
+              setTimeout(()=>{ try{ camMap && camMap.invalidateSize(); }catch(_){}; }, 150);
+            });
+          }));
+        })();
       } else {
         switchCorp(val);
       }
@@ -1064,6 +1106,12 @@
             }
           }catch(e){ console.warn('[RG dep mun-select]',e); }
         }
+        // Bogotá: auto-seleccionar mun 001 para abrir vista de localidades
+        if(effDep==='16'){
+          const munSel=document.getElementById('mun-select');
+          if(munSel) munSel.value='001';
+          return switchMun('001');
+        }
         await updateCamMap(effDep, '');
         return;
       }
@@ -1091,6 +1139,13 @@
         showSel('mun-label', true); showSel('mun-select', true);
       }
 
+      // Bogotá: auto-seleccionar mun 001 para abrir vista de localidades
+      if(depCod==='16'){
+        const munSel=document.getElementById('mun-select');
+        if(munSel) munSel.value='001';
+        return switchMun('001');
+      }
+
       renderDepView(dep);
     }
 
@@ -1103,12 +1158,17 @@
         _ensureRGActive();
         const effDep = curDep==='TODOS'?'':curDep;
         const effMun = munCod==='TODOS'?'':munCod;
-        // Poblar zon/comuna select si hay comunas
+        // Poblar zon/comuna/localidad select si hay comunas
         if(effMun && curDepData?.municipios){
           const mun = curDepData.municipios.find(m=>m.cod===effMun);
           if(mun?.comunas?.length){
             const zons = mun.comunas.filter(c=>c.com_cod!=='000'&&c.com_nom!=='SIN COMUNA').map(c=>({value:c.com_cod||c.cod, label:c.com_nom||c.nombre}));
-            if(zons.length){ setSel('zon-select', zons, 'Todas las comunas'); showSel('zon-label', true); showSel('zon-select', true); }
+            if(zons.length){
+              const isLoc=_zonLabelFor(effDep, mun.nombre)==='Localidad:';
+              setSel('zon-select', zons, isLoc?'Todas las localidades':'Todas las comunas');
+              _applyZonLabel(effDep, mun.nombre);
+              showSel('zon-label', true); showSel('zon-select', true);
+            }
           }
         }
         // WHAT IF: si hay mun filtrado, construir filtro y re-render hemi
@@ -1131,7 +1191,9 @@
         const areas = getMunAreas(mun);
         if(areas.length){
           const zons = areas.map(z=>({value: z.cod, label: getAreaLabel(z)}));
-          setSel('zon-select', zons, 'Todas las comunas');
+          const isLoc=_zonLabelFor(curDep, mun?.nombre)==='Localidad:';
+          setSel('zon-select', zons, isLoc?'Todas las localidades':'Todas las comunas');
+          _applyZonLabel(curDep, mun?.nombre);
           showSel('zon-label', true); showSel('zon-select', true);
         }
       }
@@ -1697,6 +1759,19 @@
         const cod = _camNomMap[_normCN(jsonName)];
         if(cod) _camNomMap[_normCN(geoName)] = cod;
       });
+    }
+
+    // Determina etiqueta de zon-label: 'Localidad:' para Bogotá/Barranquilla, 'Comuna:' resto.
+    // Bogotá: depCod=16 (su único mun es 001). Barranquilla: mun.nombre contiene 'BARRANQUILLA'.
+    function _zonLabelFor(depCod, munName){
+      if(String(Number(depCod||0))===String(16)) return 'Localidad:';
+      const n=String(munName||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      if(/BARRANQUILLA/.test(n)) return 'Localidad:';
+      return 'Comuna:';
+    }
+    function _applyZonLabel(depCod, munName){
+      const lbl=document.getElementById('zon-label');
+      if(lbl) lbl.textContent=_zonLabelFor(depCod, munName);
     }
 
     // Asegura que el toggle visual esté en 'Resultados Generales' cuando _rgMode=true
