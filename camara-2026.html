@@ -245,10 +245,11 @@
     #hemiciclo-wrap{position:relative;background:rgba(255,255,255,.03);border:1px solid var(--card-border);padding:1rem}
     #hemiciclo-svg-wrap{min-height:240px}
     #hemiciclo-svg-wrap svg{width:100%;height:auto;display:block}
-    #hemi-cam-legend{display:flex;flex-wrap:wrap;gap:.4rem .8rem;margin-top:.75rem}
-    .hemi-leg-item{display:flex;align-items:center;gap:.35rem;font-family:'Syne',sans-serif;font-weight:400;font-size:.78rem;color:var(--white);opacity:.85}
-    .hemi-leg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;display:inline-block}
-    .hemi-leg-count{font-family:Avenir,sans-serif;font-weight:400;font-size:.78rem;color:var(--white);margin-left:.2rem}
+    #hemi-cam-legend{display:flex;flex-direction:column;gap:.35rem;margin-top:.9rem}
+    .hemi-leg-item{display:flex;align-items:center;gap:.55rem;font-family:'Syne',sans-serif;font-weight:400;font-size:.98rem;color:var(--white);width:100%}
+    .hemi-leg-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;display:inline-block}
+    .hemi-leg-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .hemi-leg-count{font-family:Avenir,sans-serif;font-weight:400;font-size:.98rem;color:var(--white);margin-left:auto;flex-shrink:0}
     #hemiciclo-map-wrap{position:relative;background:rgba(255,255,255,.03);border:1px solid var(--card-border)}
     #hemiciclo-cam-map{height:320px}
     #hemiciclo-cam-back{position:absolute;top:.5rem;right:.5rem;z-index:900;font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;background:rgba(6,8,16,.85);border:1px solid rgba(0,71,255,.4);color:rgba(180,210,255,.85);padding:.3rem .75rem;cursor:pointer;display:none}
@@ -402,7 +403,7 @@
         </div>
 
         <div class="sub-selector">
-          <span class="sub-label">Circunscripción:</span>
+          <span class="sub-label">Departamento:</span>
           <select class="dep-select" id="dep-select" onchange="switchDep(this.value)">
             <option value="TODOS">Nacional (todas)</option>
           </select>
@@ -980,15 +981,24 @@
       document.getElementById('cam-main-grid').style.display = isRG ? 'none' : '';
       document.getElementById('rg-panel').style.display = isRG ? 'block' : 'none';
       if(isRG){
-        const curMap = _mergeCurulesAll();
-        const total = CURULES_TERRITORIAL + CURULES_INDIGENAS + CURULES_AFRO;
-        renderCamHemiciclo(curMap, total, 'Hemiciclo · Cámara · Nacional');
+        // Restaurar visibilidad de TODAS las opciones territoriales en dep-select
+        const sel = document.getElementById('dep-select');
+        Array.from(sel.options).forEach(o=>{
+          if(o.value==='TODOS'){ o.style.display=''; return; }
+          o.style.display = (o.dataset.circs||'TERRITORIAL').split(',').includes('TERRITORIAL') ? '' : 'none';
+        });
+        // Si el dep activo no es territorial, resetear a TODOS
+        if(curDep!=='TODOS'){
+          const activeOpt=[...sel.options].find(o=>o.value===curDep);
+          if(!activeOpt || activeOpt.style.display==='none'){ curDep='TODOS'; sel.value='TODOS'; curDepData=null; }
+        }
         // Destruir mapa anterior (si estaba en contenedor oculto con dimensiones 0)
-        if(camMap){ try{camMap.remove();}catch(_){} camMap=null; }
-        // Diferir hasta que el browser pinte el panel con sus dimensiones reales
+        if(camMap){ try{camMap.remove();}catch(_){} camMap=null; _camNacLayer=null; _camDepLayer=null; }
+        // Renderizar hemiciclo (nacional vs dep) y diferir el mapa hasta que el panel pinte
+        _rgRenderHemicicloForDep(curDep==='TODOS'?'':curDep);
         requestAnimationFrame(()=>requestAnimationFrame(()=>{
           initCamMap().then(()=>{
-            updateCamMap(curDep==='TODOS'?'':curDep);
+            updateCamMap(curDep==='TODOS'?'':curDep, '');
             setTimeout(()=>{ try{ camMap && camMap.invalidateSize(); }catch(_){}; }, 150);
           });
         }));
@@ -1026,24 +1036,26 @@
       document.getElementById('cam-search').value='';
       buscarCandidato('');
 
-      // En modo RG: actualizar hemiciclo y mapa
+      // En modo RG: actualizar hemiciclo y mapa; además poblar mun-select
       if(_rgMode){
         showLoadingToast();
-        if(depCod==='TODOS'){
-          renderCamHemiciclo(_mergeCurulesAll(), CURULES_TERRITORIAL+CURULES_INDIGENAS+CURULES_AFRO, 'Hemiciclo · Cámara · Nacional');
-          updateCamMap('');
-        } else {
-          const deps = await getJSON('departamentos');
-          const dep = deps.find(d=>d.cod===depCod && getDepCirc(d)==='TERRITORIAL');
-          if(dep){
-            const nC=getCurulesDep(dep.nombre);
-            const depData = await (async()=>{try{return await getJSON('dep-'+depCod);}catch(_){return null;}})();
-            const depCirc=(depData||dep).por_circunscripcion?.['TERRITORIAL']??(depData||dep);
-            const {cur}=asignarCurules(depCirc.partidos||{},nC);
-            renderCamHemiciclo(cur, nC, `Hemiciclo · ${dep.nombre} · ${nC} curules`);
-          }
-          updateCamMap(depCod);
+        const effDep = depCod==='TODOS' ? '' : depCod;
+        await _rgRenderHemicicloForDep(effDep);
+        if(effDep){
+          // Poblar mun-select para que el usuario pueda filtrar aún más en el mapa
+          try{
+            curDepData = await getJSON('dep-'+effDep);
+            if(curDepData?.municipios?.length){
+              const esConsulados = /consulado/i.test(curDepData.nombre||'');
+              const muns = curDepData.municipios.map(m=>({value:m.cod, label:m.nombre}));
+              setSel('mun-select', muns, esConsulados?'Todos los países':'Todos los municipios');
+              const munLbl=document.getElementById('mun-label');
+              if(munLbl) munLbl.textContent = esConsulados?'País:':'Municipio:';
+              showSel('mun-label', true); showSel('mun-select', true);
+            }
+          }catch(e){ console.warn('[RG dep mun-select]',e); }
         }
+        await updateCamMap(effDep, '');
         return;
       }
 
@@ -1077,6 +1089,12 @@
     async function switchMun(munCod){
       curMun = munCod; resetSelFrom('zon'); curComData = null;
       showLoadingToast();
+      // En RG: actualizar sólo mapa (el hemiciclo se mantiene al nivel de depto)
+      if(_rgMode){
+        const effDep = curDep==='TODOS'?'':curDep;
+        await updateCamMap(effDep, munCod==='TODOS'?'':munCod);
+        return;
+      }
       if(munCod!=='TODOS' && curDepData?.municipios){
         const mun = curDepData.municipios.find(m=>m.cod===munCod);
         const areas = getMunAreas(mun);
@@ -1593,6 +1611,26 @@
       });
     }
 
+    // Renderiza el hemiciclo para el dep activo en modo RG.
+    // depCod='' → nacional con las 3 circunscripciones combinadas (165 curules)
+    // depCod='05' → sólo los curules territoriales de Antioquia (17) con el reparto D'Hondt del depto
+    async function _rgRenderHemicicloForDep(depCod){
+      if(!depCod){
+        renderCamHemiciclo(_mergeCurulesAll(), CURULES_TERRITORIAL+CURULES_INDIGENAS+CURULES_AFRO, 'Hemiciclo · Cámara · Nacional');
+        return;
+      }
+      try{
+        const deps=await getJSON('departamentos');
+        const dep=deps.find(d=>d.cod===depCod && getDepCirc(d)==='TERRITORIAL');
+        if(!dep){ renderCamHemiciclo(_mergeCurulesAll(), CURULES_TERRITORIAL+CURULES_INDIGENAS+CURULES_AFRO, 'Hemiciclo · Cámara · Nacional'); return; }
+        const nC=getCurulesDep(dep.nombre);
+        let depData=null; try{ depData=await getJSON('dep-'+depCod); }catch(_){}
+        const depCirc=(depData||dep).por_circunscripcion?.['TERRITORIAL']??(depData||dep);
+        const {cur}=asignarCurules(depCirc.partidos||{}, nC);
+        renderCamHemiciclo(cur, nC, `Hemiciclo · ${dep.nombre} · ${nC} curules`);
+      }catch(e){ console.warn('[rgHemi]',e); }
+    }
+
     // Combina curules territoriales + indígenas + afro (solo ganadores)
     function _mergeCurulesAll(){
       const m={...curulesNac};
@@ -1640,10 +1678,78 @@
         c.addEventListener('mousemove',e=>{if(tooltip){tooltip.style.left=(e.clientX+14)+'px';tooltip.style.top=(e.clientY-10)+'px';}});
         c.addEventListener('mouseleave',()=>{if(tooltip)tooltip.style.display='none';});
       });
-      if(legEl) legEl.innerHTML=parties.map(([partido,curules])=>`<div class="hemi-leg-item"><span class="hemi-leg-dot" style="background:${getColor(partido)}"></span><span>${partido.split(' ').slice(0,3).join(' ')}</span><span class="hemi-leg-count">${curules}</span></div>`).join('');
+      // parties ya viene ordenado por curules desc (ver línea anterior)
+      if(legEl) legEl.innerHTML=parties.map(([partido,curules])=>`<div class="hemi-leg-item"><span class="hemi-leg-dot" style="background:${getColor(partido)}"></span><span class="hemi-leg-name">${partido}</span><span class="hemi-leg-count">${curules} ${curules===1?'curul':'curules'}</span></div>`).join('');
     }
 
-    // ─── MAPA CÁMARA ──────────────────────────────────────────
+    // ─── MAPA CÁMARA (puerto de senado-2026.html) ────────────────
+    // URLs de ciudades con GeoJSON de localidades/comunas
+    const BOGOTA_LOC_URL   = `${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`;
+    const MEDELLIN_COM_URL = `${S3}/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`;
+    const CALI_COM_URL     = `${S3}/mapas-2026/Ciudades-COM-LOC/CALIX.json`;
+    const BARRANQUILLA_COM_URL = `${S3}/mapas-2026/Ciudades-COM-LOC/BARRANQUILLAX.json`;
+    const IBAGUE_COM_URL       = `${S3}/mapas-2026/Ciudades-COM-LOC/IBAGUEX.json`;
+    const MANIZALES_COM_URL    = `${S3}/mapas-2026/Ciudades-COM-LOC/MANIZALESX.json`;
+    const PEREIRA_COM_URL      = `${S3}/mapas-2026/Ciudades-COM-LOC/PEREIRAX.json`;
+    let _cityGeoCache = {};
+
+    const _camTo2 = v => (v!=null && v!=='') ? String(parseInt(v,10)||0).padStart(2,'0') : '';
+    const CITY_MAPS_CAM = {
+      bogota:       { key:'bogota',       url:BOGOTA_LOC_URL,      rotate:true,
+                      code:p=>_camTo2(p.LocCodigo),              name:p=>p.LocNombre||p.nombre||'Localidad' },
+      medellin:     { key:'medellin',     url:MEDELLIN_COM_URL,    rotate:false,
+                      code:p=>_camTo2(p.CODIGO),                 name:p=>p.NOMBRE||p.IDENTIFICACION||'Comuna' },
+      cali:         { key:'cali',         url:CALI_COM_URL,        rotate:false,
+                      code:p=>_camTo2(p.comuna),                 name:p=>p.nombre||`Comuna ${p.comuna}` },
+      barranquilla: { key:'barranquilla', url:BARRANQUILLA_COM_URL,rotate:false,
+                      code:p=>_camTo2(p.id),                     name:p=>p.nombre||'Localidad' },
+      ibague:       { key:'ibague',       url:IBAGUE_COM_URL,      rotate:false,
+                      code:p=>{const m=String(p.COMUNAS||'').match(/(\d+)/); return m?_camTo2(m[1]):'';},
+                      name:p=>p.COMUNAS||'Comuna' },
+      manizales:    { key:'manizales',    url:MANIZALES_COM_URL,   rotate:false,
+                      code:p=>_camTo2(p.ID_COMUNA),              name:p=>p.NOMBRES_CO||'Comuna' },
+      pereira:      { key:'pereira',      url:PEREIRA_COM_URL,     rotate:false,
+                      code:_=>'',
+                      name:p=>p.Comuna||'Comuna' },
+    };
+    // Pereira: zona(zz) + puesto(pp) → nombre de comuna (mismo mapping que senado)
+    const ZON_PUE_COM_PER_CAM = {
+      '01':{'01':'VILLA SANTANA','02':'VILLA SANTANA','03':'VILLA SANTANA','04':'VILLA SANTANA'},
+      '02':{'01':'ORIENTE','02':'ORIENTE','03':'ORIENTE','04':'VILLAVICENCIO','05':'VILLAVICENCIO','06':'ORIENTE'},
+      '03':{'01':'RIO OTUN','02':'RIO OTUN','03':'RIO OTUN','04':'RIO OTUN','05':'RIO OTUN','06':'RIO OTUN','07':'RIO OTUN'},
+      '04':{'01':'UNIVERSIDAD','02':'UNIVERSIDAD','03':'UNIVERSIDAD'},
+      '05':{'01':'CENTRO','02':'CENTRO'},
+      '06':{'01':'CENTRO','02':'CENTRO','03':'CENTRO','05':'CENTRO','06':'CENTRO'},
+      '07':{'01':'SAN NICOLAS','02':'EL JARDIN','03':'BOSTON','04':'BOSTON','05':'EL ROCIO','06':'BOSTON','07':'BOSTON'},
+      '08':{'01':'DEL CAFE','02':'FERROCARRIL','03':'DEL CAFE','04':'DEL CAFE','05':'FERROCARRIL'},
+      '09':{'01':'EL POBLADO','02':'EL POBLADO','03':'CONSOTA','04':'CONSOTA','05':'CONSOTA','06':'CONSOTA'},
+      '10':{'01':'EL OSO','02':'PERLA DEL OTUN','03':'SAN JOAQUIN','04':'SAN JOAQUIN','05':'EL OSO','06':'SAN JOAQUIN','07':'SAN JOAQUIN'},
+      '11':{'01':'OLIMPICA','02':'OLIMPICA','03':'OLIMPICA','04':'CUBA','05':'CUBA','06':'CUBA','07':'OLIMPICA'},
+    };
+    function detectCityCam(depCod, munCod, munName){
+      if(String(Number(depCod))==='16') return CITY_MAPS_CAM.bogota;
+      if(!munName) return null;
+      const n=String(munName).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      if(/MEDELL/.test(n)) return CITY_MAPS_CAM.medellin;
+      if(/^CALI$|SANTIAGO DE CALI/.test(n)) return CITY_MAPS_CAM.cali;
+      if(/BARRANQUILLA/.test(n)) return CITY_MAPS_CAM.barranquilla;
+      if(/IBAGU/.test(n)) return CITY_MAPS_CAM.ibague;
+      if(/MANIZALES/.test(n)) return CITY_MAPS_CAM.manizales;
+      if(/PEREIRA/.test(n)) return CITY_MAPS_CAM.pereira;
+      return null;
+    }
+    function rotateGeoJSON90LeftCam(geoData){
+      const cx=-74.08, cy=4.65;
+      const rc=([lon,lat])=>[cx-(lat-cy), cy+(lon-cx)];
+      const rg=geom=>{
+        if(!geom) return geom;
+        if(geom.type==='Polygon') return {...geom, coordinates: geom.coordinates.map(r=>r.map(rc))};
+        if(geom.type==='MultiPolygon') return {...geom, coordinates: geom.coordinates.map(p=>p.map(r=>r.map(rc)))};
+        return geom;
+      };
+      return {...geoData, features: geoData.features.map(f=>({...f, geometry: rg(f.geometry)}))};
+    }
+
     function _camDepCode(props){
       if(props.electoral_id!=null&&props.electoral_id!=='') return String(props.electoral_id).padStart(2,'0');
       const n=_normCN(props.NOMBRE_DPT||props.name||props.nombre||props.NOMBRE||'');
@@ -1651,74 +1757,275 @@
     }
 
     async function initCamMap(){
-      if(camMap) return;
-      if(!_camDeptoGeoRaw){
-        try{const r=await fetch(DEPTO_GEOJSON_URL);if(r.ok)_camDeptoGeoRaw=await r.json();}catch(e){console.warn('[CamMap]',e);}
+      if(camMap){
+        setTimeout(()=>{try{camMap.invalidateSize();}catch(_){}},150);
+      } else {
+        const el=document.getElementById('hemiciclo-cam-map'); if(!el) return;
+        camMap=L.map(el,{
+          center:[4.5,-74.0], zoom:5,
+          zoomControl:false, attributionControl:false,
+          scrollWheelZoom:false, doubleClickZoom:false,
+          touchZoom:false, boxZoom:false, keyboard:false,
+          dragging:false, tap:false
+        });
+        el.style.background='#060810';
+        setTimeout(()=>{try{camMap.invalidateSize();}catch(_){}},150);
       }
+      if(!_camDeptoGeoRaw){
+        try{const r=await fetch(DEPTO_GEOJSON_URL);if(r.ok) _camDeptoGeoRaw=await r.json();}catch(e){console.warn('[CamMap]',e);}
+      }
+      if(_camDeptoGeoRaw && !_camNacLayer) _buildCamNacLayer();
     }
 
-    async function updateCamMap(depCod){
-      const el=document.getElementById('hemiciclo-cam-map'); if(!el) return;
-      if(!camMap){
-        camMap=L.map('hemiciclo-cam-map',{zoomControl:false,attributionControl:false,dragging:true,scrollWheelZoom:false});
+    function _buildCamNacLayer(){
+      _camNacLayer=L.geoJSON(_camDeptoGeoRaw,{
+        style:feat=>{
+          const cod=_camDepCode(feat.properties);
+          const w=cod?_camDepWinner[cod]:null;
+          return {fillColor:w?getColor(w.partido):'#333',fillOpacity:w?0.78:0.35,color:'rgba(255,255,255,0.35)',weight:1};
+        },
+        onEachFeature:(feat,layer)=>{
+          const cod=_camDepCode(feat.properties);
+          const w=cod?_camDepWinner[cod]:null;
+          const nom=w?w.nombre:(feat.properties.name||feat.properties.NOMBRE||feat.properties.nombre||'Depto');
+          layer.on({
+            mouseover(e){
+              layer.setStyle({weight:2,color:'#fff',fillOpacity:0.95});
+              layer.bindTooltip(
+                `<div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.45;padding:.1rem .2rem;white-space:normal;overflow-wrap:break-word"><span style="color:#0047FF;font-weight:700">${String(nom).toUpperCase()}</span><br/>${w?`<span style="color:${getColor(w.partido)};font-weight:700">${w.partido}</span><br/>${fmt(w.votos)} votos`:'Sin datos'}</div>`,
+                {sticky:true,opacity:1}
+              ).openTooltip(e.latlng);
+            },
+            mouseout(){
+              layer.setStyle({weight:1,color:'rgba(255,255,255,0.35)',fillColor:w?getColor(w.partido):'#333',fillOpacity:w?0.78:0.35});
+              layer.closeTooltip();
+            },
+            click(){
+              if(!cod) return;
+              const depSel=document.getElementById('dep-select');
+              const opt=[...depSel.options].find(o=>String(Number(o.value))===String(Number(cod)));
+              if(!opt) return;
+              depSel.value=opt.value;
+              switchDep(opt.value);
+            }
+          });
+        }
+      }).addTo(camMap);
+      try{ camMap.fitBounds(_camNacLayer.getBounds(),{padding:[6,6]}); }catch(_){}
+    }
+
+    // Ganadores por localidad/comuna dentro de un mun de un dep.
+    // Para Pereira (24:001) agrega desde puestos usando ZON_PUE_COM_PER_CAM.
+    // Retorna {'01':{...}, ..., __byName:{ 'CENTRO':{...}, ... }}
+    async function _buildCamLocComWinner(depCod, munCod){
+      const out={}; const byName={};
+      const SPEC=new Set(['996','997','998']);
+      const norm=s=>String(s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+      try{
+        const depData = await getJSON('dep-'+depCod);
+        const mun = (depData?.municipios||[]).find(m=>m.cod===munCod || String(Number(m.cod))===String(Number(munCod)));
+        if(!mun) return {__byName:byName};
+
+        if(String(Number(depCod))===String(24) && String(Number(munCod))===String(1)){
+          // Pereira: recorrer todos los puestos y agrupar por nombre de comuna vía ZON_PUE_COM_PER_CAM
+          const comVotos={};
+          (mun.comunas||[]).forEach(c=>{
+            (c.puestos||[]).forEach(p=>{
+              const zz=String(p.zon_cod||p.com_cod||'').padStart(2,'0');
+              const parts=String(p.pue_cod||p.cod||'').split('-');
+              const pp=parts.length>=3?parts[parts.length-1].padStart(2,'0'):'';
+              if(!zz||!pp) return;
+              const comName=(ZON_PUE_COM_PER_CAM[zz]||{})[pp]; if(!comName) return;
+              const nk=norm(comName);
+              if(!comVotos[nk]) comVotos[nk]={partidos:{},nombre:comName};
+              const circ=p.por_circunscripcion?.['TERRITORIAL']??p;
+              Object.entries(circ.partidos||{}).forEach(([k,v])=>{
+                if(SPEC.has(k)||/blanco/i.test(k)) return;
+                comVotos[nk].partidos[k]=(comVotos[nk].partidos[k]||0)+v;
+              });
+            });
+          });
+          Object.entries(comVotos).forEach(([nk,{partidos,nombre}])=>{
+            const pts=Object.entries(partidos).sort((a,b)=>b[1]-a[1]);
+            if(pts.length){ byName[nk]={partido:pts[0][0],votos:pts[0][1],nombre}; }
+          });
+        } else {
+          // Resto de ciudades: usar ganadores por comuna (zz = comuna.cod / com_cod)
+          const to2=v=>v!=null?String(parseInt(v,10)||0).padStart(2,'0'):'';
+          (mun.comunas||[]).forEach(c=>{
+            const zc=to2(c.com_cod||c.cod); if(!zc||out[zc]) return;
+            const circ=c.por_circunscripcion?.['TERRITORIAL']??c;
+            const pts=Object.entries(circ.partidos||{}).filter(([k])=>!SPEC.has(k)&&!/blanco/i.test(k)).sort((a,b)=>b[1]-a[1]);
+            if(pts.length){
+              const rec={partido:pts[0][0],votos:pts[0][1],nombre:c.com_nom||c.nombre};
+              out[zc]=rec;
+              if(c.com_nom||c.nombre) byName[norm(c.com_nom||c.nombre)]=rec;
+            }
+          });
+        }
+      }catch(e){ console.warn('[CamLocComWinner]',e); }
+      out.__byName=byName;
+      return out;
+    }
+
+    // Render genérico para ciudades (Bogotá, Medellín, Cali, etc.)
+    async function _renderCamCityLayer(cfg, winner){
+      let geo=_cityGeoCache[cfg.key];
+      if(!geo){
+        const r=await fetch(cfg.url); if(!r.ok) throw new Error(`HTTP ${r.status}`);
+        const raw=await r.json();
+        geo = cfg.rotate ? rotateGeoJSON90LeftCam(raw) : raw;
+        _cityGeoCache[cfg.key]=geo;
       }
-      if(_camDepLayer){try{camMap.removeLayer(_camDepLayer);}catch(_){}_camDepLayer=null;}
+      const normN=s=>String(s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+      const resolve=p=>{
+        const c=cfg.code(p);
+        if(c && winner[c]) return winner[c];
+        const nm=cfg.name(p);
+        return (winner.__byName||{})[normN(nm)]||null;
+      };
+      const style=feat=>{
+        const w=resolve(feat.properties);
+        return {fillColor:w?getColor(w.partido):'#333',fillOpacity:w?0.78:0.3,color:'rgba(255,255,255,0.35)',weight:1};
+      };
+      _camDepLayer=L.geoJSON(geo,{
+        style,
+        onEachFeature:(feat,layer)=>{
+          const p=feat.properties;
+          const w=resolve(p);
+          const nom=cfg.name(p);
+          layer.on({
+            mouseover(e){
+              layer.setStyle({weight:2,color:'#fff',fillOpacity:0.95});
+              layer.bindTooltip(
+                `<div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.45;padding:.1rem .2rem;white-space:normal;overflow-wrap:break-word"><span style="color:#0047FF;font-weight:700">${String(nom).toUpperCase()}</span><br/>${w?`<span style="color:${getColor(w.partido)};font-weight:700">${w.partido}</span><br/>${fmt(w.votos)} votos`:'Sin datos'}</div>`,
+                {sticky:true,opacity:1}
+              ).openTooltip(e.latlng);
+            },
+            mouseout(){ layer.setStyle(style(feat)); layer.closeTooltip(); }
+          });
+        }
+      }).addTo(camMap);
+      try{ camMap.fitBounds(_camDepLayer.getBounds(),{padding:[10,10]}); }catch(_){}
+    }
+
+    async function updateCamMap(depCod, munCod){
+      if(!camMap) await initCamMap();
+      if(!camMap) return;
+      if(_camDepLayer){ try{camMap.removeLayer(_camDepLayer);}catch(_){} _camDepLayer=null; }
 
       if(!depCod){
-        // Vista nacional
-        if(_camNacLayer){if(!camMap.hasLayer(_camNacLayer))_camNacLayer.addTo(camMap);_camNacLayer.resetStyle();try{camMap.fitBounds(_camNacLayer.getBounds(),{padding:[6,6]});}catch(_){}updateCamMapBackBtn('');return;}
-        if(!_camDeptoGeoRaw){updateCamMapBackBtn('');return;}
-        const SPEC=new Set(['996','997','998']);
-        _camNacLayer=L.geoJSON(_camDeptoGeoRaw,{
-          style:feat=>{const cod=_camDepCode(feat.properties);const w=cod?_camDepWinner[cod]:null;return{fillColor:w?getColor(w.partido):'#333',fillOpacity:w?0.72:0.25,color:'rgba(255,255,255,0.25)',weight:1};},
-          onEachFeature:(feat,layer)=>{
-            const cod=_camDepCode(feat.properties);const w=cod?_camDepWinner[cod]:null;
-            const nom=feat.properties.NOMBRE_DPT||feat.properties.name||feat.properties.nombre||feat.properties.NOMBRE||'';
-            layer.on({
-              mouseover(e){layer.setStyle({weight:2,color:'#fff',fillOpacity:.95});layer.bindTooltip(`<div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.45"><span style="color:#0047FF;font-weight:700">${String(nom).toUpperCase()}</span><br/>${w?`<span style="color:${getColor(w.partido)};font-weight:700">${w.partido}</span><br/>${fmt(w.votos)} votos`:'Sin datos'}</div>`,{sticky:true,opacity:1}).openTooltip(e.latlng);},
-              mouseout(){const w2=cod?_camDepWinner[cod]:null;layer.setStyle({fillColor:w2?getColor(w2.partido):'#333',fillOpacity:w2?0.72:0.25,color:'rgba(255,255,255,0.25)',weight:1});layer.closeTooltip();},
-              click(){if(!cod)return;const sel=document.getElementById('dep-select');if(sel)sel.value=cod;switchDep(cod);}
-            });
-          }
-        }).addTo(camMap);
-        try{camMap.fitBounds(_camNacLayer.getBounds(),{padding:[6,6]});}catch(_){}
-        updateCamMapBackBtn('');
+        if(_camNacLayer){
+          if(!camMap.hasLayer(_camNacLayer)) _camNacLayer.addTo(camMap);
+          _camNacLayer.resetStyle();
+          try{camMap.fitBounds(_camNacLayer.getBounds(),{padding:[6,6]});}catch(_){}
+        } else if(_camDeptoGeoRaw){ _buildCamNacLayer(); }
+        updateCamMapBackBtn('', '');
         return;
       }
 
-      // Vista departamento
-      if(_camNacLayer&&camMap.hasLayer(_camNacLayer))camMap.removeLayer(_camNacLayer);
-      const paddedCode=String(depCod).padStart(2,'0');
+      if(_camNacLayer && camMap.hasLayer(_camNacLayer)) camMap.removeLayer(_camNacLayer);
+
+      // Ganadores por municipio
+      let munWinner={}, selectedMunName='';
+      try{
+        const depData = await getJSON('dep-'+depCod);
+        const SPEC=new Set(['996','997','998']);
+        (depData?.municipios||[]).forEach(m=>{
+          const mc=String(Number(m.cod));
+          if(munWinner[mc]) return;
+          const circ=m.por_circunscripcion?.['TERRITORIAL']??m;
+          const pts=Object.entries(circ.partidos||{}).filter(([k])=>!SPEC.has(k)&&!/blanco/i.test(k)).sort((a,b)=>b[1]-a[1]);
+          if(pts.length) munWinner[mc]={partido:pts[0][0],votos:pts[0][1],nombre:m.nombre};
+          if(munCod && (m.cod===munCod || String(Number(m.cod))===String(Number(munCod)))) selectedMunName=m.nombre||'';
+        });
+      }catch(e){ console.warn('[CamMap] muns:',e); }
+
+      // Ciudad especial (Bogotá, Medellín, Cali, Barranquilla, Ibagué, Manizales, Pereira)
+      const cityCfg = detectCityCam(depCod, munCod, selectedMunName);
+      if(cityCfg){
+        try{
+          const effMun = munCod || (cityCfg===CITY_MAPS_CAM.bogota ? '001' : null);
+          const winner = effMun ? await _buildCamLocComWinner(depCod, effMun) : {__byName:{}};
+          await _renderCamCityLayer(cityCfg, winner);
+          updateCamMapBackBtn(depCod, munCod);
+          return;
+        }catch(e){ console.warn('[CamMap] city '+cityCfg.key+':',e); }
+      }
+
+      // Caso por defecto: municipios del depto
       try{
         let geo=_camDepGeoCache[depCod];
-        if(!geo){const r=await fetch(`${DEPTOS_MPS_URL}/${paddedCode}.json`);if(r.ok){geo=await r.json();_camDepGeoCache[depCod]=geo;}}
+        if(!geo){
+          const paddedCode=String(depCod).padStart(2,'0');
+          const r=await fetch(`${DEPTOS_MPS_URL}/${paddedCode}.json`);
+          if(r.ok){ geo=await r.json(); _camDepGeoCache[depCod]=geo; }
+        }
         if(geo){
-          // Construir ganadores por mun
-          const SPEC=new Set(['996','997','998']);const munWin={};
-          let depData=null;try{depData=await getJSON('dep-'+depCod);}catch(e){}
-          if(depData?.municipios){depData.municipios.forEach(m=>{const circ=m.por_circunscripcion?.['TERRITORIAL']??m;const pts=Object.entries(circ.partidos||{}).filter(([k])=>!SPEC.has(k)&&!/blanco/i.test(k)).sort((a,b)=>b[1]-a[1]);if(pts.length)munWin[String(parseInt(m.cod,10))]={partido:pts[0][0],votos:pts[0][1]};});}
+          const munStyle=feat=>{
+            const p=feat.properties;
+            const mc=String(Number(p.mun_elec||p.cod_mun||p.CODIGO||0));
+            const w=munWinner[mc];
+            return {fillColor:w?getColor(w.partido):'#333',fillOpacity:w?0.72:0.3,color:'rgba(255,255,255,0.35)',weight:1};
+          };
           _camDepLayer=L.geoJSON(geo,{
-            style:feat=>{const mc=String(Number(feat.properties.mun_elec||feat.properties.cod_mun||feat.properties.CODIGO||0));const w=munWin[mc];return{fillColor:w?getColor(w.partido):'#333',fillOpacity:w?0.72:0.25,color:'rgba(255,255,255,0.25)',weight:1};},
+            style:munStyle,
             onEachFeature:(feat,layer)=>{
-              const mc=String(Number(feat.properties.mun_elec||feat.properties.cod_mun||feat.properties.CODIGO||0));const w=munWin[mc];
-              const nom=feat.properties.nombre||feat.properties.NOMBRE||mc;
+              const p=feat.properties;
+              const mc=String(Number(p.mun_elec||p.cod_mun||p.CODIGO||0));
+              const w=munWinner[mc];
+              const munNom=p.mpio_cnmbr||p.NOMBRE||p.nombre||p.name||mc;
               layer.on({
-                mouseover(e){layer.setStyle({weight:2,color:'#fff',fillOpacity:.95});layer.bindTooltip(`<div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.45"><span style="color:#0047FF;font-weight:700">${String(nom).toUpperCase()}</span><br/>${w?`<span style="color:${getColor(w.partido)};font-weight:700">${w.partido}</span><br/>${fmt(w.votos)} votos`:'Sin datos'}</div>`,{sticky:true,opacity:1}).openTooltip(e.latlng);},
-                mouseout(){const w2=munWin[mc];layer.setStyle({fillColor:w2?getColor(w2.partido):'#333',fillOpacity:w2?0.72:0.25,color:'rgba(255,255,255,0.25)',weight:1});layer.closeTooltip();}
+                mouseover(e){
+                  layer.setStyle({weight:2,color:'#fff',fillOpacity:0.95});
+                  layer.bindTooltip(
+                    `<div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.45;padding:.1rem .2rem;white-space:normal;overflow-wrap:break-word"><span style="color:#0047FF;font-weight:700">${String(munNom).toUpperCase()}</span><br/>${w?`<span style="color:${getColor(w.partido)};font-weight:700">${w.partido}</span><br/>${fmt(w.votos)} votos`:'Sin datos'}</div>`,
+                    {sticky:true,opacity:1}
+                  ).openTooltip(e.latlng);
+                },
+                mouseout(){ layer.setStyle(munStyle(feat)); layer.closeTooltip(); },
+                click(){
+                  // Click en municipio → setea mun-select y dispara la cascada
+                  if(p.mun_elec==null) return;
+                  const munSel=document.getElementById('mun-select');
+                  if(!munSel) return;
+                  const target=String(Number(p.mun_elec));
+                  const opt=[...munSel.options].find(o=>String(Number(o.value))===target);
+                  if(!opt) return;
+                  munSel.value=opt.value;
+                  switchMun(opt.value);
+                }
               });
             }
           }).addTo(camMap);
           try{camMap.fitBounds(_camDepLayer.getBounds(),{padding:[10,10]});}catch(_){}
         }
-      }catch(e){console.warn('[CamMap dep]',e);}
-      updateCamMapBackBtn(depCod);
+      }catch(e){ console.warn('[CamMap dep]:',e); if(_camNacLayer&&!camMap.hasLayer(_camNacLayer)) _camNacLayer.addTo(camMap); }
+      updateCamMapBackBtn(depCod, munCod);
     }
 
-    function updateCamMapBackBtn(depCod){
-      const btn=document.getElementById('hemiciclo-cam-back');if(!btn)return;
-      if(!depCod){btn.style.display='none';btn.onclick=null;return;}
-      btn.style.display='';btn.textContent='← Nacional';
-      btn.onclick=()=>{const sel=document.getElementById('dep-select');if(sel)sel.value='TODOS';switchDep('TODOS');};
+    function updateCamMapBackBtn(depCod, munCod){
+      const btn=document.getElementById('hemiciclo-cam-back');
+      if(!btn) return;
+      if(!depCod){ btn.style.display='none'; btn.onclick=null; return; }
+      btn.style.display='';
+      if(munCod){
+        btn.textContent='← Departamento';
+        btn.onclick=()=>{
+          const munSel=document.getElementById('mun-select');
+          if(munSel) munSel.value='TODOS';
+          switchMun('TODOS');
+        };
+      } else {
+        btn.textContent='← Nacional';
+        btn.onclick=()=>{
+          const depSel=document.getElementById('dep-select');
+          const munSel=document.getElementById('mun-select');
+          if(depSel) depSel.value='TODOS';
+          if(munSel) munSel.value='TODOS';
+          switchDep('TODOS');
+        };
+      }
     }
     function camBackBtnClick(){const btn=document.getElementById('hemiciclo-cam-back');if(btn&&btn.onclick)btn.onclick();}
 
