@@ -243,7 +243,7 @@
     .hemi-map-row{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.2rem}
     @media(max-width:900px){.hemi-map-row{grid-template-columns:1fr}}
     #hemiciclo-wrap{position:relative;background:rgba(255,255,255,.03);border:1px solid var(--card-border);padding:1rem}
-    #hemiciclo-svg-wrap{min-height:240px}
+    #hemiciclo-svg-wrap{display:flex;align-items:center;justify-content:center;padding:.3rem 0}
     #hemiciclo-svg-wrap svg{width:100%;height:auto;display:block}
     #hemi-cam-legend{display:flex;flex-direction:column;gap:.35rem;margin-top:.9rem}
     .hemi-leg-item{display:flex;align-items:center;gap:.55rem;font-family:'Syne',sans-serif;font-weight:400;font-size:.98rem;color:var(--white);width:100%}
@@ -252,8 +252,8 @@
     .hemi-leg-count{font-family:Avenir,sans-serif;font-weight:400;font-size:.98rem;color:var(--white);margin-left:auto;flex-shrink:0}
     #hemiciclo-map-wrap{position:relative;background:rgba(255,255,255,.03);border:1px solid var(--card-border)}
     #hemiciclo-cam-map{height:320px}
-    #hemiciclo-cam-back{position:absolute;top:.5rem;right:.5rem;z-index:900;font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;background:rgba(6,8,16,.85);border:1px solid rgba(0,71,255,.4);color:rgba(180,210,255,.85);padding:.3rem .75rem;cursor:pointer;display:none}
-    #hemiciclo-cam-back:hover{background:rgba(0,71,255,.25)}
+    #hemiciclo-cam-back{position:absolute;top:.55rem;right:.55rem;z-index:900;font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;background:rgba(0,71,255,.92);color:#fff;border:none;padding:.4rem .7rem;cursor:pointer;border-radius:2px;display:none}
+    #hemiciclo-cam-back:hover{background:rgba(0,71,255,1)}
     #hemi-cam-tooltip{display:none;position:fixed;background:rgba(6,8,16,.97);border:1px solid rgba(0,71,255,.4);color:#f4f3ef;font-family:Avenir,sans-serif;font-size:.85rem;padding:.45rem .65rem;pointer-events:none;z-index:9000;line-height:1.45;max-width:220px}
     /* Leaflet tooltip override */
     .leaflet-tooltip{font-family:Avenir,sans-serif!important;font-weight:400!important;font-size:.85rem!important;background:rgba(6,8,16,.97)!important;border:1px solid rgba(0,71,255,.4)!important;color:#f4f3ef!important;width:220px!important;white-space:normal!important;overflow-wrap:break-word!important;word-break:normal!important;border-radius:0!important;padding:.45rem .65rem!important}
@@ -1039,6 +1039,7 @@
       // En modo RG: actualizar hemiciclo y mapa; además poblar mun-select
       if(_rgMode){
         showLoadingToast();
+        _ensureRGActive();
         const effDep = depCod==='TODOS' ? '' : depCod;
         await _rgRenderHemicicloForDep(effDep);
         if(effDep){
@@ -1091,8 +1092,18 @@
       showLoadingToast();
       // En RG: actualizar sólo mapa (el hemiciclo se mantiene al nivel de depto)
       if(_rgMode){
+        _ensureRGActive();
         const effDep = curDep==='TODOS'?'':curDep;
-        await updateCamMap(effDep, munCod==='TODOS'?'':munCod);
+        const effMun = munCod==='TODOS'?'':munCod;
+        // Poblar zon/comuna select si hay comunas
+        if(effMun && curDepData?.municipios){
+          const mun = curDepData.municipios.find(m=>m.cod===effMun);
+          if(mun?.comunas?.length){
+            const zons = mun.comunas.filter(c=>c.com_cod!=='000'&&c.com_nom!=='SIN COMUNA').map(c=>({value:c.com_cod||c.cod, label:c.com_nom||c.nombre}));
+            if(zons.length){ setSel('zon-select', zons, 'Todas las comunas'); showSel('zon-label', true); showSel('zon-select', true); }
+          }
+        }
+        await updateCamMap(effDep, effMun);
         return;
       }
       if(munCod!=='TODOS' && curDepData?.municipios){
@@ -1110,6 +1121,20 @@
     // ─── SWITCH ZONA ──────────────────────────────────────────
     async function switchZon(zonCod){
       curZon = zonCod; resetSelFrom('pue'); curComData = null;
+      // En RG: no disparamos re-render del flujo TERRITORIAL; mantenemos el
+      // mapa del municipio (si es ciudad con comunas ya muestra el detalle)
+      // y dejamos los selects poblados para que el usuario pueda navegar.
+      if(_rgMode){
+        _ensureRGActive();
+        if(zonCod && zonCod!=='TODOS'){
+          try{ curComData = await getComJSON(curDep, curMun, zonCod);
+               const pues = [...(curComData.puestos||[])].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'))
+                            .map(p=>({value: p.cod||p.pue_cod, label: p.nombre}));
+               if(pues.length){ setSel('pue-select', pues, 'Todos los puestos'); showSel('pue-label',true); showSel('pue-select',true); }
+          }catch(e){ console.warn('[RG zon com]',e); }
+        }
+        return;
+      }
       if(zonCod!=='TODOS'){
         showLoadingToast();
         try {
@@ -1611,23 +1636,43 @@
       });
     }
 
+    // Asegura que el toggle visual esté en 'Resultados Generales' cuando _rgMode=true
+    function _ensureRGActive(){
+      const btn=document.getElementById('circ-btn-rg');
+      if(!btn || btn.classList.contains('circ-btn-active')) return;
+      document.querySelectorAll('.circ-btn').forEach(b=>b.classList.remove('circ-btn-active'));
+      btn.classList.add('circ-btn-active');
+      const _mt=document.getElementById('metodo-txt'); if(_mt) _mt.textContent='Mapa y hemiciclo por departamento';
+      // Asegurar que el panel RG esté visible
+      const rg=document.getElementById('rg-panel'); if(rg) rg.style.display='block';
+      const mg=document.getElementById('cam-main-grid'); if(mg) mg.style.display='none';
+    }
+
     // Renderiza el hemiciclo para el dep activo en modo RG.
     // depCod='' → nacional con las 3 circunscripciones combinadas (165 curules)
     // depCod='05' → sólo los curules territoriales de Antioquia (17) con el reparto D'Hondt del depto
     async function _rgRenderHemicicloForDep(depCod){
       if(!depCod){
-        renderCamHemiciclo(_mergeCurulesAll(), CURULES_TERRITORIAL+CURULES_INDIGENAS+CURULES_AFRO, 'Hemiciclo · Cámara · Nacional');
+        const winners=await _buildWinnerNamesNacional();
+        renderCamHemiciclo(_mergeCurulesAll(), CURULES_TERRITORIAL+CURULES_INDIGENAS+CURULES_AFRO, 'Hemiciclo · Cámara · Nacional', winners);
         return;
       }
       try{
         const deps=await getJSON('departamentos');
         const dep=deps.find(d=>d.cod===depCod && getDepCirc(d)==='TERRITORIAL');
-        if(!dep){ renderCamHemiciclo(_mergeCurulesAll(), CURULES_TERRITORIAL+CURULES_INDIGENAS+CURULES_AFRO, 'Hemiciclo · Cámara · Nacional'); return; }
+        if(!dep){
+          const winners=await _buildWinnerNamesNacional();
+          renderCamHemiciclo(_mergeCurulesAll(), CURULES_TERRITORIAL+CURULES_INDIGENAS+CURULES_AFRO, 'Hemiciclo · Cámara · Nacional', winners);
+          return;
+        }
         const nC=getCurulesDep(dep.nombre);
         let depData=null; try{ depData=await getJSON('dep-'+depCod); }catch(_){}
         const depCirc=(depData||dep).por_circunscripcion?.['TERRITORIAL']??(depData||dep);
         const {cur}=asignarCurules(depCirc.partidos||{}, nC);
-        renderCamHemiciclo(cur, nC, `Hemiciclo · ${dep.nombre} · ${nC} curules`);
+        // Para el dep-level usamos datos del dep (más ricos que los del listing)
+        const depForNames={cod:dep.cod, nombre:dep.nombre, candidatos:depCirc.candidatos||dep.candidatos||{}};
+        const winners=_buildWinnerNamesDep(depForNames, cur);
+        renderCamHemiciclo(cur, nC, `Hemiciclo · ${dep.nombre} · ${nC} curules`, winners);
       }catch(e){ console.warn('[rgHemi]',e); }
     }
 
@@ -1653,7 +1698,73 @@
       return pos;
     }
 
-    function renderCamHemiciclo(curMap, totalSeats, label){
+    // Construye {partido: [nombre1, nombre2, ...]} para la vista nacional combinada
+    // (territorial + indígena + afro). Mantiene orden estable.
+    async function _buildWinnerNamesNacional(){
+      const out={};
+      const _nNorm=s=>(s||'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      try{
+        const deps=await getJSON('departamentos');
+        // Territorial: un dep a la vez
+        deps.filter(d=>getDepCirc(d)==='TERRITORIAL').forEach(dep=>{
+          const nC=getCurulesDep(dep.nombre);
+          const {cur}=asignarCurules(dep.partidos||{}, nC);
+          Object.entries(cur).forEach(([partido,n])=>{
+            if(!n) return;
+            if(!out[partido]) out[partido]=[];
+            const cl=(CLOSED_LISTS[dep.cod]||{})[partido];
+            if(cl && cl.length){
+              for(let i=0;i<n;i++) out[partido].push(cl[i] ? `${cl[i]} · ${dep.nombre}` : `POS. ${i+1} LISTA CERRADA · ${dep.nombre}`);
+            } else {
+              const cands=(dep.candidatos||{})[partido]||[];
+              const nomPart=_nNorm(partido);
+              const sorted=cands.filter(c=>_nNorm(c.nombre)!==nomPart).sort((a,b)=>(b.votos||0)-(a.votos||0));
+              for(let i=0;i<n;i++) out[partido].push(sorted[i]?.nombre ? `${sorted[i].nombre} · ${dep.nombre}` : `POS. ${i+1} · ${dep.nombre}`);
+            }
+          });
+        });
+        // Indígenas (1 curul)
+        Object.entries(curulesIndigenas||{}).forEach(([partido,n])=>{
+          if(!n) return;
+          if(!out[partido]) out[partido]=[];
+          const set=nacElegidosIndigenas[partido];
+          const arr=set?[...set]:[];
+          for(let i=0;i<n;i++) out[partido].push(arr[i] ? `${arr[i]} · Circ. Indígena` : `POS. ${i+1} LISTA CERRADA · Indígena`);
+        });
+        // Afro (2 curules)
+        Object.entries(curulesAfro||{}).forEach(([partido,n])=>{
+          if(!n) return;
+          if(!out[partido]) out[partido]=[];
+          const cl=AFRO_CLOSED_LISTS[partido]||[];
+          const set=nacElegidosAfro[partido];
+          const arr=cl.length?cl:(set?[...set]:[]);
+          for(let i=0;i<n;i++) out[partido].push(arr[i] ? `${arr[i]} · Circ. Afro` : `POS. ${i+1} LISTA CERRADA · Afro`);
+        });
+      }catch(e){ console.warn('[winnerNamesNac]',e); }
+      return out;
+    }
+
+    // Construye {partido: [nombre1, ...]} para un dep territorial específico
+    function _buildWinnerNamesDep(dep, cur){
+      const out={};
+      const _nNorm=s=>(s||'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      Object.entries(cur||{}).forEach(([partido,n])=>{
+        if(!n) return;
+        out[partido]=[];
+        const cl=(CLOSED_LISTS[dep.cod]||{})[partido];
+        if(cl && cl.length){
+          for(let i=0;i<n;i++) out[partido].push(cl[i] || `POS. ${i+1} LISTA CERRADA`);
+        } else {
+          const cands=(dep.candidatos||{})[partido]||[];
+          const nomPart=_nNorm(partido);
+          const sorted=cands.filter(c=>_nNorm(c.nombre)!==nomPart).sort((a,b)=>(b.votos||0)-(a.votos||0));
+          for(let i=0;i<n;i++) out[partido].push(sorted[i]?.nombre || `POS. ${i+1} LISTA CERRADA`);
+        }
+      });
+      return out;
+    }
+
+    function renderCamHemiciclo(curMap, totalSeats, label, winnerNames){
       const wrap=document.getElementById('hemiciclo-svg-wrap');
       const legEl=document.getElementById('hemi-cam-legend');
       const lblEl=document.getElementById('hemi-cam-label');
@@ -1666,15 +1777,24 @@
       const positions=_camHemiPos(total);
       const dots=[];
       let pi=0;
-      for(const [partido,curules] of parties){const color=getColor(partido);for(let c=0;c<curules&&pi<positions.length;c++,pi++)dots.push({...positions[pi],color,partido});}
-      while(pi<positions.length){dots.push({...positions[pi],color:'#2a2a3a',partido:''});pi++;}
+      for(const [partido,curules] of parties){const color=getColor(partido);for(let c=0;c<curules&&pi<positions.length;c++,pi++)dots.push({...positions[pi],color,partido,idx:c});}
+      while(pi<positions.length){dots.push({...positions[pi],color:'#2a2a3a',partido:'',idx:-1});pi++;}
       const dotR=total<=10?11:total<=20?9:total<=50?7:total<=100?6:5;
       const tooltip=document.getElementById('hemi-cam-tooltip');
-      wrap.innerHTML=`<svg viewBox="0 0 600 310" xmlns="http://www.w3.org/2000/svg">${dots.map((d,i)=>`<circle cx="${d.x.toFixed(1)}" cy="${d.y.toFixed(1)}" r="${dotR}" fill="${d.color}" opacity="0.92" data-i="${i}"/>`).join('')}</svg>`;
+      // viewBox ajustado: el hemi ocupa y=71-306 del plano (cx=300,cy=295,rMax≈213,dotR≤11).
+      // Recortamos whitespace superior para que el SVG se vea verticalmente centrado.
+      wrap.innerHTML=`<svg viewBox="60 65 480 250" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">${dots.map((d,i)=>`<circle cx="${d.x.toFixed(1)}" cy="${d.y.toFixed(1)}" r="${dotR}" fill="${d.color}" opacity="0.92" data-i="${i}"/>`).join('')}</svg>`;
       wrap.querySelectorAll('circle[data-i]').forEach(c=>{
         const d=dots[+c.dataset.i]; if(!d.partido) return;
         c.style.cursor='pointer';
-        c.addEventListener('mouseenter',e=>{if(tooltip){tooltip.style.display='block';tooltip.innerHTML=`<span style="color:${d.color};font-weight:700;font-family:'Syne',sans-serif">${d.partido}</span><br/>${curMap[d.partido]||0} curul${(curMap[d.partido]||0)!==1?'es':''}`;} });
+        c.addEventListener('mouseenter',e=>{
+          if(!tooltip) return;
+          const nm=(winnerNames&&winnerNames[d.partido])?winnerNames[d.partido][d.idx]:null;
+          const winTxt=nm || `POS. ${(d.idx||0)+1} LISTA CERRADA`;
+          const totalCur=curMap[d.partido]||0;
+          tooltip.style.display='block';
+          tooltip.innerHTML=`<span style="color:${d.color};font-weight:700;font-family:'Syne',sans-serif">${d.partido}</span><br/><span style="font-family:'Syne',sans-serif;font-weight:400">${winTxt}</span><br/><span style="font-family:Avenir,sans-serif;font-weight:400;opacity:.75">${totalCur} curul${totalCur!==1?'es':''}</span>`;
+        });
         c.addEventListener('mousemove',e=>{if(tooltip){tooltip.style.left=(e.clientX+14)+'px';tooltip.style.top=(e.clientY-10)+'px';}});
         c.addEventListener('mouseleave',()=>{if(tooltip)tooltip.style.display='none';});
       });
