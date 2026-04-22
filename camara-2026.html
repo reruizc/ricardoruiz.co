@@ -246,6 +246,9 @@
     #hemiciclo-svg-wrap{min-height:240px}
     #hemiciclo-svg-wrap svg{width:100%;height:auto;display:block}
     #hemi-cam-legend{display:flex;flex-wrap:wrap;gap:.4rem .8rem;margin-top:.75rem}
+    .hemi-leg-item{display:flex;align-items:center;gap:.35rem;font-family:'Syne',sans-serif;font-weight:400;font-size:.78rem;color:var(--white);opacity:.85}
+    .hemi-leg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;display:inline-block}
+    .hemi-leg-count{font-family:Avenir,sans-serif;font-weight:400;font-size:.78rem;color:var(--white);margin-left:.2rem}
     #hemiciclo-map-wrap{position:relative;background:rgba(255,255,255,.03);border:1px solid var(--card-border)}
     #hemiciclo-cam-map{height:320px}
     #hemiciclo-cam-back{position:absolute;top:.5rem;right:.5rem;z-index:900;font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;background:rgba(6,8,16,.85);border:1px solid rgba(0,71,255,.4);color:rgba(180,210,255,.85);padding:.3rem .75rem;cursor:pointer;display:none}
@@ -977,8 +980,8 @@
       document.getElementById('cam-main-grid').style.display = isRG ? 'none' : '';
       document.getElementById('rg-panel').style.display = isRG ? 'block' : 'none';
       if(isRG){
-        const curMap = curulesNac;
-        const total = CURULES_TERRITORIAL;
+        const curMap = _mergeCurulesAll();
+        const total = CURULES_TERRITORIAL + CURULES_INDIGENAS + CURULES_AFRO;
         renderCamHemiciclo(curMap, total, 'Hemiciclo · Cámara · Nacional');
         // Destruir mapa anterior (si estaba en contenedor oculto con dimensiones 0)
         if(camMap){ try{camMap.remove();}catch(_){} camMap=null; }
@@ -1027,7 +1030,7 @@
       if(_rgMode){
         showLoadingToast();
         if(depCod==='TODOS'){
-          renderCamHemiciclo(curulesNac, CURULES_TERRITORIAL, 'Hemiciclo · Cámara · Nacional');
+          renderCamHemiciclo(_mergeCurulesAll(), CURULES_TERRITORIAL+CURULES_INDIGENAS+CURULES_AFRO, 'Hemiciclo · Cámara · Nacional');
           updateCamMap('');
         } else {
           const deps = await getJSON('departamentos');
@@ -1575,8 +1578,27 @@
         const pts=Object.entries(circ.partidos||{}).filter(([k])=>!SPEC.has(k)&&!/blanco/i.test(k)).sort((a,b)=>b[1]-a[1]);
         if(pts.length){ _camDepWinner[dep.cod]={partido:pts[0][0],votos:pts[0][1],nombre:dep.nombre}; _camNomMap[_normCN(dep.nombre)]=dep.cod; }
       });
-      const AL={'NORTE DE SANTANDER':'norte de santander','VALLE DEL CAUCA':'valle del cauca','SAN ANDRES':'san andres y providencia','BOGOTA D.C.':'bogota d.c.'};
-      Object.entries(AL).forEach(([k,v])=>{ const cod=_camNomMap[k.toUpperCase()]||_camNomMap[_normCN(v)]; if(cod) _camNomMap[k]=cod; });
+      // Aliases GeoJSON → dep.cod (el JSON trae nombres truncados/variantes; el GeoJSON trae nombre completo)
+      // JSON → GeoJSON:  "NORTE DE SAN"→"Norte de Santander"; "VALLE"→"Valle del Cauca";
+      // "SAN ANDRES"→"San Andrés y Providencia"; "BOGOTA D.C."→"Distrito Capital de Bogotá"
+      const ALIAS=[
+        ['NORTE DE SANTANDER','NORTE DE SAN'],
+        ['VALLE DEL CAUCA','VALLE'],
+        ['SAN ANDRES Y PROVIDENCIA','SAN ANDRES'],
+        ['DISTRITO CAPITAL DE BOGOTA','BOGOTA D.C.'],
+      ];
+      ALIAS.forEach(([geoName, jsonName])=>{
+        const cod = _camNomMap[_normCN(jsonName)];
+        if(cod) _camNomMap[_normCN(geoName)] = cod;
+      });
+    }
+
+    // Combina curules territoriales + indígenas + afro (solo ganadores)
+    function _mergeCurulesAll(){
+      const m={...curulesNac};
+      Object.entries(curulesIndigenas||{}).forEach(([p,v])=>{ if(v>0) m[p]=(m[p]||0)+v; });
+      Object.entries(curulesAfro||{}).forEach(([p,v])=>{ if(v>0) m[p]=(m[p]||0)+v; });
+      return m;
     }
 
     // ─── HEMICICLO DINÁMICO ────────────────────────────────────
@@ -1618,14 +1640,14 @@
         c.addEventListener('mousemove',e=>{if(tooltip){tooltip.style.left=(e.clientX+14)+'px';tooltip.style.top=(e.clientY-10)+'px';}});
         c.addEventListener('mouseleave',()=>{if(tooltip)tooltip.style.display='none';});
       });
-      if(legEl) legEl.innerHTML=parties.map(([partido,curules])=>`<div style="display:flex;align-items:center;gap:.35rem;font-family:'DM Mono',monospace;font-size:.6rem;color:rgba(255,255,255,.6)"><span style="width:8px;height:8px;border-radius:50%;background:${getColor(partido)};flex-shrink:0;display:inline-block"></span><span>${partido.split(' ').slice(0,3).join(' ')}</span><span style="font-family:Avenir,sans-serif;font-weight:400;color:var(--white);margin-left:.2rem">${curules}</span></div>`).join('');
+      if(legEl) legEl.innerHTML=parties.map(([partido,curules])=>`<div class="hemi-leg-item"><span class="hemi-leg-dot" style="background:${getColor(partido)}"></span><span>${partido.split(' ').slice(0,3).join(' ')}</span><span class="hemi-leg-count">${curules}</span></div>`).join('');
     }
 
     // ─── MAPA CÁMARA ──────────────────────────────────────────
     function _camDepCode(props){
-      if(props.electoral_id) return String(props.electoral_id).padStart(2,'0');
-      const n=_normCN(props.NOMBRE_DPT||props.nombre||props.NOMBRE||'');
-      return _camNomMap[n]||null;
+      if(props.electoral_id!=null&&props.electoral_id!=='') return String(props.electoral_id).padStart(2,'0');
+      const n=_normCN(props.NOMBRE_DPT||props.name||props.nombre||props.NOMBRE||'');
+      return n ? (_camNomMap[n]||null) : null;
     }
 
     async function initCamMap(){
@@ -1651,7 +1673,7 @@
           style:feat=>{const cod=_camDepCode(feat.properties);const w=cod?_camDepWinner[cod]:null;return{fillColor:w?getColor(w.partido):'#333',fillOpacity:w?0.72:0.25,color:'rgba(255,255,255,0.25)',weight:1};},
           onEachFeature:(feat,layer)=>{
             const cod=_camDepCode(feat.properties);const w=cod?_camDepWinner[cod]:null;
-            const nom=feat.properties.NOMBRE_DPT||feat.properties.nombre||feat.properties.NOMBRE||'';
+            const nom=feat.properties.NOMBRE_DPT||feat.properties.name||feat.properties.nombre||feat.properties.NOMBRE||'';
             layer.on({
               mouseover(e){layer.setStyle({weight:2,color:'#fff',fillOpacity:.95});layer.bindTooltip(`<div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.45"><span style="color:#0047FF;font-weight:700">${String(nom).toUpperCase()}</span><br/>${w?`<span style="color:${getColor(w.partido)};font-weight:700">${w.partido}</span><br/>${fmt(w.votos)} votos`:'Sin datos'}</div>`,{sticky:true,opacity:1}).openTooltip(e.latlng);},
               mouseout(){const w2=cod?_camDepWinner[cod]:null;layer.setStyle({fillColor:w2?getColor(w2.partido):'#333',fillOpacity:w2?0.72:0.25,color:'rgba(255,255,255,0.25)',weight:1});layer.closeTooltip();},
