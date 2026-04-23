@@ -9,7 +9,7 @@
 
 ## Worktree y deploy
 ```
-worktree activo: /Users/ricardoruiz/ricardoruiz.co/.claude/worktrees/peaceful-khayyam/
+worktree activo: /Users/ricardoruiz/ricardoruiz.co/.claude/worktrees/agitated-rosalind/
 deploy:          git push origin HEAD:main   (desde dentro del worktree)
 ```
 
@@ -200,11 +200,77 @@ El HTML del tooltip va en un `<div>` inline con los mismos estilos de fuente (Le
 
 ### Portar el mapa a camara-2026.html
 Renombrar variables `sena` → `cam` y duplicar:
-- `senaMap` → `camaraMap`, `senaDepWinner` → `camaraDepWinner`, etc.
+- `senaMap` → `camMap`, `senaDepWinner` → `_camDepWinner`, etc.
 - Las URLs S3 cambian: `senado/` → `camara/` (confirmar estructura)
 - `DEPTO_GEOJSON` y `DEPTOS_MPS_URL` son compartidos (mismos GeoJSON)
 - `getColor(partido)` es compartido
-- Los códigos de depto y municipio son los mismos
+- **Atención códigos**: la Cámara usa `electoral_id` que NO coincide con DANE.
+  En cámara: `01`=Antioquia, `03`=Atlántico, `05`=Bolívar, `16`=Bogotá, `60`=Amazonas.
+  Los archivos `Departamentos-mps/{cod}.json` están keyados por electoral_id (no DANE).
+  El GeoJSON nacional `DEPARTAMENTOS2.json` NO trae `electoral_id` — sólo `name` —
+  así que `_camDepCode(props)` cae al lookup por nombre normalizado en `_camNomMap`.
+
+## Cámara 2026 — sistema RG (WHAT IF) y flujo
+
+### Variables globales clave
+```js
+_rgMode           // true cuando el toggle "Resultados Generales" está activo
+_rgCamFilter      // { nombre, partidos, depCod } | null — WHAT IF state
+_rgIIFEToken      // contador para abortar IIFE stale (ver race fix abajo)
+camMap            // L.map del panel RG
+_camDeptoGeoRaw   // GeoJSON nacional cacheado
+_camDepGeoCache   // { depCod: geoJSON } por dep
+_camNacLayer      // capa nacional (se REMUEVE al entrar a dep)
+_camDepLayer      // capa dep (se REMUEVE al volver a nacional)
+_camDepWinner     // { depCod: {partido, votos, nombre} }
+_camNomMap        // { NOMBRE_NORM: depCod } para lookup desde GeoJSON
+curDep/curMun/curZon/curPue/curMesa  // 'TODOS' o código
+curDepData/curComData                // JSON cargado del dep / de la comuna
+```
+
+### Race condition del toggle RG (fix commit `eab3225`)
+`onCircChange('RESULTADOS_GENERALES')` destruye el mapa y lanza un IIFE async
+que termina con `rAF x2 → initCamMap().then(updateCamMap(...))`. El closure
+captura `_rgEffDep/_rgEffMun` del momento del toggle. Si el usuario hacía
+click en un depto antes de que el rAF disparara, el IIFE resumía con valores
+stale y llamaba `updateCamMap('', '')` pisando el `_camDepLayer` recién
+renderizado por `switchDep`.
+
+**Solución**: `_rgIIFEToken` global. `onCircChange` captura su token; cada
+async checkpoint y el rAF final chequean `_rgMyToken !== _rgIIFEToken → return`.
+`_ensureRGActive()` (llamado por switchDep/switchMun/switchZon/switchPue/
+switchMesa en rama RG) bumpea el token, invalidando cualquier IIFE stale.
+Adentro del rAF final también se leen `curDep/curMun` frescos en vez de
+los capturados en closure, como segunda línea de defensa.
+
+### WHAT IF — reconstrucción al entrar a RG
+`onCircChange('RG')` lee mun/zon/pue/mesa actuales y construye `_rgCamFilter`
+con el dato más profundo disponible (mesa → pue → zon → mun). Si `curComData`
+no está cargado pero hay `zon`, intenta `getComJSON(dep,mun,zon)`. Luego
+`_rgRenderHemicicloWhatIf()` corre `asignarCurules()` (NO `dhondt()` — la
+cámara sólo tiene `asignarCurules`, `dhondtDep`, `dhondtPuro`) sobre
+`_rgCamFilter.partidos` con las curules del depto. Muestra aclaración
+WHAT IF?! arriba del hemi vía `_setWhatIfText(lugar)`.
+
+### Helpers recientes
+```js
+_zonLabelFor(depCod, munName)  // 'Localidad:' para Bogotá (dep=16) y
+                               // Barranquilla (match por nombre); resto 'Comuna:'
+_applyZonLabel(depCod, munName) // aplica al DOM #zon-label
+```
+Placeholder del zon-select también cambia: `'Todas las localidades'` vs `'Todas las comunas'`.
+
+### Auto-mun para Bogotá
+Al hacer `switchDep('16')` (tanto en TERRITORIAL como en RG), se setea
+automáticamente `mun-select.value='001'` y se llama `switchMun('001')` para
+abrir directo la vista de localidades. Bogotá tiene un solo mun (001 =
+Bogotá D.C.) y no tiene sentido quedarse en la vista de "muns del depto".
+
+### Listas cerradas cámara (por dep)
+`CLOSED_LISTS_CAM[depCod]` y `AFRO_CLOSED_LISTS` (circunscripción afro).
+`_buildWinnerNamesDep(dep, curMap)` → nombres de ganadores para tooltips
+del hemiciclo. `_buildWinnerNamesNacional()` combina territorial + indígenas
++ afro para la vista nacional (165 curules = 161+2+2).
 
 ## Donut chart — participación + género
 ### Donut principal `#donut-senado`
