@@ -955,7 +955,6 @@
         const entry = data.candidatos[c.id];
         if (entry && typeof entry.pct === 'number') c.pct = entry.pct;
       });
-      BASE = CANDIDATOS.map(c => ({ ...c }));
       PONDERADOR_META = {
         fuente: data.fuente,
         fecha_corte: data.fecha_corte,
@@ -965,6 +964,11 @@
     }catch(e){
       console.warn('[Previa] usando valores hardcoded (no se pudo cargar el ponderador):', e.message);
     }
+    // Ordena de mayor a menor % (una sola vez, al boot). Luego los sliders
+    // NO re-ordenan durante la interacción para evitar que las tarjetas
+    // salten mientras el usuario arrastra.
+    CANDIDATOS.sort((a, b) => b.pct - a.pct);
+    BASE = CANDIDATOS.map(c => ({ ...c }));
   }
 
   // Renderiza un chip pequeño en el header del ponderador con la fuente.
