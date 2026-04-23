@@ -770,7 +770,9 @@
 
         buildCamDepWinner(deps);
         initCamMap();
-        loadPotencialCSV();
+        // Esperar el CSV antes de renderNacional/renderDonut para que el donut
+        // salga con potencial + abstención + donut de género desde el primer render.
+        await loadPotencialCSV();
 
         // Poblar selector de departamentos/circunscripciones
         // Acumular TODAS las circs de un mismo código para que el toggle funcione correctamente
@@ -2136,7 +2138,7 @@
           });
         }
       }).addTo(camMap);
-      try{ camMap.fitBounds(_camNacLayer.getBounds(),{padding:[14,14]}); }catch(_){}
+      try{ camMap.invalidateSize(false); camMap.fitBounds(_camNacLayer.getBounds(),{padding:[14,14]}); }catch(_){}
     }
 
     // Ganadores por localidad/comuna dentro de un mun de un dep.
@@ -2231,7 +2233,7 @@
           });
         }
       }).addTo(camMap);
-      try{ camMap.fitBounds(_camDepLayer.getBounds(),{paddingTopLeft:[12,55],paddingBottomRight:[55,12]}); }catch(_){}
+      try{ camMap.invalidateSize(false); camMap.fitBounds(_camDepLayer.getBounds(),{paddingTopLeft:[12,55],paddingBottomRight:[55,12]}); }catch(_){}
     }
 
     async function updateCamMap(depCod, munCod){
@@ -2243,7 +2245,7 @@
         if(_camNacLayer){
           if(!camMap.hasLayer(_camNacLayer)) _camNacLayer.addTo(camMap);
           _camNacLayer.resetStyle();
-          try{camMap.fitBounds(_camNacLayer.getBounds(),{padding:[14,14]});}catch(_){}
+          try{camMap.invalidateSize(false); camMap.fitBounds(_camNacLayer.getBounds(),{padding:[14,14]});}catch(_){}
         } else if(_camDeptoGeoRaw){ _buildCamNacLayer(); }
         updateCamMapBackBtn('', '');
         return;
@@ -2323,7 +2325,7 @@
               });
             }
           }).addTo(camMap);
-          try{camMap.fitBounds(_camDepLayer.getBounds(),{paddingTopLeft:[12,55],paddingBottomRight:[55,12]});}catch(_){}
+          try{camMap.invalidateSize(false); camMap.fitBounds(_camDepLayer.getBounds(),{paddingTopLeft:[12,55],paddingBottomRight:[55,12]});}catch(_){}
         }
       }catch(e){ console.warn('[CamMap dep]:',e); if(_camNacLayer&&!camMap.hasLayer(_camNacLayer)) _camNacLayer.addTo(camMap); }
       updateCamMapBackBtn(depCod, munCod);
