@@ -324,6 +324,29 @@ const BIG_CITIES = new Set(['16:001','05:001','01:001','76:001','31:001']); // B
 - Tooltip: `div#hemi-tooltip` creado dinámicamente, `position:fixed`, Avenir 400 .85rem
 - Modo WHAT IF activo cuando `_rgFilter != null`
 
+## Cursor custom + modales (regla importante)
+`body{cursor:none}` + `<div class="cursor">` + `<div class="cursor-ring">` con
+handlers JS en `mousemove`/`mouseover`. Dos reglas que hay que respetar al
+añadir modales/overlays:
+
+1. **z-index del cursor > z-index de cualquier modal/overlay.**
+   `.cursor` usa `z-index:100000`, `.cursor-ring` usa `99999`.
+   `.dl-modal` (descarga excel) usa `z-index:99997`. Si se añade un overlay
+   nuevo con z-index ≥ 100000, el cursor queda oculto detrás → "se desaparece
+   el mouse" mientras el modal está abierto.
+2. **Al cerrar un modal hay que resetear el estilo del cursor.** El botón
+   "Cancelar" sobre el que se hizo click desaparece sin disparar `mouseout`,
+   y el cursor queda con los estilos de hover (`background:transparent`,
+   `ring opacity:0`) = cursor fantasma hasta que el mouse se mueve sobre
+   otro elemento. Ver `closeDlModal()` en `camara-2026.html`:
+   ```js
+   const c=document.getElementById('cursor'), r=document.getElementById('cursorRing');
+   if(c){ c.style.transform='translate(-50%,-50%) scale(1)'; c.style.background='var(--blue)'; c.style.border='none'; }
+   if(r){ r.style.opacity='.4'; }
+   ```
+   Aplicar este reset en cualquier función que cierre un modal u overlay
+   donde el elemento bajo el puntero desaparece del DOM.
+
 ## Convenciones de commit
 ```
 git commit -m "scope: descripción concisa\n\nDetalle si es necesario\n\nCo-Authored-By: Claude Sonnet 4-6 <noreply@anthropic.com>"

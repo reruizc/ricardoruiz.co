@@ -15,8 +15,8 @@
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     html{scroll-behavior:smooth}
     body{background:#060810;color:var(--white);font-family:'Syne',sans-serif;cursor:none;min-height:100vh;overflow-x:hidden}
-    .cursor{position:fixed;width:10px;height:10px;background:var(--blue);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);transition:transform .15s,background .2s}
-    .cursor-ring{position:fixed;width:32px;height:32px;border:1.5px solid var(--blue);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);opacity:.4}
+    .cursor{position:fixed;width:10px;height:10px;background:var(--blue);border-radius:50%;pointer-events:none;z-index:100000;transform:translate(-50%,-50%);transition:transform .15s,background .2s}
+    .cursor-ring{position:fixed;width:32px;height:32px;border:1.5px solid var(--blue);border-radius:50%;pointer-events:none;z-index:99999;transform:translate(-50%,-50%);opacity:.4}
     .bg-layer{position:fixed;inset:0;z-index:0;background:url('foto-fondo.webp') center right/cover no-repeat}
     .bg-overlay{position:fixed;inset:0;z-index:1;background:linear-gradient(to right,rgba(4,6,16,.97) 0%,rgba(4,6,16,.94) 55%,rgba(4,6,16,.72) 72%,rgba(4,6,16,.35) 88%,rgba(4,6,16,.10) 100%)}
     .shell{position:relative;z-index:2;min-height:100vh;display:flex;flex-direction:column}
@@ -1323,7 +1323,16 @@
       if(!_lastTableData)return;
       document.getElementById('dl-modal').classList.add('show');
     }
-    function closeDlModal(){ document.getElementById('dl-modal').classList.remove('show'); }
+    function closeDlModal(){
+      document.getElementById('dl-modal').classList.remove('show');
+      // Reset custom cursor: tras cerrar, el botón bajo el puntero desaparece sin disparar mouseout,
+      // lo que dejaba el cursor en estado "hover" (transparente + ring invisible) = cursor fantasma.
+      try{
+        const c=document.getElementById('cursor'), r=document.getElementById('cursorRing');
+        if(c){ c.style.transform='translate(-50%,-50%) scale(1)'; c.style.background='var(--blue)'; c.style.border='none'; }
+        if(r){ r.style.opacity='.4'; }
+      }catch(_){}
+    }
     function confirmDownloadExcel(){ closeDlModal(); _doDownloadExcel(); }
     function _doDownloadExcel(){
       if(!_lastTableData)return;
