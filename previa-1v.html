@@ -284,19 +284,13 @@
     <div class="map-wrap">
       <div class="map-head">
         <div>
-          <div class="map-head-title">Fuerza regional proyectada</div>
-          <div class="map-head-cand" id="map-cand-name">—</div>
+          <div class="map-head-title" id="map-head-label">Ganador por departamento</div>
+          <div class="map-head-cand" id="map-cand-name">Clic en una fórmula para filtrar</div>
         </div>
-        <div class="map-head-pct" id="map-cand-pct">0% nacional</div>
+        <div class="map-head-pct" id="map-cand-pct"></div>
       </div>
       <div id="leaflet-map"></div>
-      <div class="map-legend">
-        <div class="map-legend-title">Intensidad por depto</div>
-        <div>
-          <div class="map-legend-bar"></div>
-          <div class="map-legend-ends"><span>menor</span><span>mayor</span></div>
-        </div>
-      </div>
+      <div class="map-legend" id="map-legend"></div>
     </div>
 
     <!-- PANEL -->
@@ -387,25 +381,25 @@
   // bias: multiplicador regional por depto (clave normalizada MAYÚS sin tildes).
   // 1.0 = promedio nacional; claves ausentes caen al default 1.0.
   const CANDIDATOS = [
-    { id:'ic', nombre:'Iván Cepeda',          partido:'Pacto Histórico',              color:'#e53e3e', pct:38.0,
+    { id:'ic', nombre:'Iván Cepeda',          partido:'Pacto Histórico',              color:'#7c3aed', pct:38.0,
       bias:{ 'NARIÑO':1.7,'CAUCA':1.8,'CHOCO':1.7,'PUTUMAYO':1.6,'AMAZONAS':1.5,'GUAVIARE':1.4,'VAUPES':1.3,
              'BOLIVAR':1.3,'ATLANTICO':1.2,'MAGDALENA':1.3,'SUCRE':1.3,'CORDOBA':1.1,'LA GUAJIRA':1.3,
              'BOGOTA D.C.':1.2,'VALLE DEL CAUCA':1.2,'HUILA':1.0,'TOLIMA':1.0,
              'ANTIOQUIA':.7,'SANTANDER':.65,'NORTE DE SANTANDER':.7,'BOYACA':.8,'CASANARE':.7 } },
-    { id:'ae', nombre:'Abelardo de la Espriella', partido:'Mov. Salvación Nacional',  color:'#f59e0b', pct:29.0,
+    { id:'ae', nombre:'Abelardo de la Espriella', partido:'Mov. Salvación Nacional',  color:'#1e3a8a', pct:29.0,
       bias:{ 'CORDOBA':2.0,'SUCRE':1.6,'BOLIVAR':1.5,'MAGDALENA':1.5,'ATLANTICO':1.4,'CESAR':1.5,'LA GUAJIRA':1.3,
              'ANTIOQUIA':1.4,'SANTANDER':1.3,'NORTE DE SANTANDER':1.3,'CASANARE':1.3,'META':1.2,'BOYACA':1.1,
              'BOGOTA D.C.':.9,'VALLE DEL CAUCA':1.0,
              'NARIÑO':.5,'CAUCA':.5,'CHOCO':.5,'PUTUMAYO':.5,'AMAZONAS':.6 } },
-    { id:'sf', nombre:'Sergio Fajardo',       partido:'Dignidad y Compromiso',        color:'#16a34a', pct:11.0,
+    { id:'sf', nombre:'Sergio Fajardo',       partido:'Dignidad y Compromiso',        color:'#eab308', pct:11.0,
       bias:{ 'ANTIOQUIA':2.0,'CALDAS':1.5,'RISARALDA':1.4,'QUINDIO':1.4,
              'BOGOTA D.C.':1.2,'CUNDINAMARCA':1.1,'VALLE DEL CAUCA':1.0,'BOYACA':1.0,'SANTANDER':1.0,
              'CHOCO':.6,'LA GUAJIRA':.6,'PUTUMAYO':.6,'AMAZONAS':.6 } },
-    { id:'pv', nombre:'Paloma Valencia',      partido:'Centro Democrático',           color:'#6366f1', pct:6.5,
+    { id:'pv', nombre:'Paloma Valencia',      partido:'Centro Democrático',           color:'#3b82f6', pct:6.5,
       bias:{ 'CAUCA':1.8,'HUILA':1.4,'TOLIMA':1.3,'ANTIOQUIA':1.4,'VALLE DEL CAUCA':1.2,'RISARALDA':1.2,
              'BOGOTA D.C.':1.1,'CUNDINAMARCA':1.1,'CASANARE':1.2,'META':1.2,
              'NARIÑO':.6,'CHOCO':.5,'ATLANTICO':.8 } },
-    { id:'rb', nombre:'Roy Barreras',         partido:'La Fuerza',                    color:'#0ea5e9', pct:1.5,
+    { id:'rb', nombre:'Roy Barreras',         partido:'La Fuerza',                    color:'#f97316', pct:1.5,
       bias:{ 'VALLE DEL CAUCA':2.0,'CAUCA':1.4,'BOGOTA D.C.':1.2,'ANTIOQUIA':1.0,'ATLANTICO':1.1,
              'QUINDIO':1.1,'RISARALDA':1.1,
              'NORTE DE SANTANDER':.7,'SANTANDER':.7 } },
@@ -413,7 +407,7 @@
       bias:{ 'BOGOTA D.C.':2.2,'CUNDINAMARCA':1.4,'BOYACA':1.2,'ANTIOQUIA':.9,
              'VALLE DEL CAUCA':1.0,'RISARALDA':1.0,'QUINDIO':1.0,
              'CHOCO':.6,'LA GUAJIRA':.6,'CAUCA':.7 } },
-    { id:'lm', nombre:'Luis Gilberto Murillo', partido:'Independiente',               color:'#a855f7', pct:0.8,
+    { id:'lm', nombre:'Luis Gilberto Murillo', partido:'Independiente',               color:'#16a34a', pct:0.8,
       bias:{ 'CHOCO':2.4,'ANTIOQUIA':1.3,'BOGOTA D.C.':1.2,'VALLE DEL CAUCA':1.1,'CAUCA':1.2,'NARIÑO':1.1,
              'SANTANDER':.7,'BOYACA':.7 } },
     { id:'nd', nombre:'Blanco / NS–NR',       partido:'Indecisos',                    color:'#64748b', pct:11.7,
@@ -421,7 +415,11 @@
   ];
 
   // ─── STATE ────────────────────────────────────────────────────
-  let selectedId = CANDIDATOS[0].id;
+  // selectedId === null → MODO GANADORES (por defecto). Cada depto se pinta
+  //   con el color del candidato #1 y la intensidad refleja el margen vs el #2.
+  // selectedId === '<id>' → MODO FILTRO. El mapa pinta sólo la fuerza de ese
+  //   candidato (gradiente claro→oscuro de su propio color).
+  let selectedId = null;
   const BASE = CANDIDATOS.map(c => ({ ...c }));
 
   const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
@@ -439,16 +437,54 @@
   }
   function projected(cand, depNom){ return cand.pct * biasFor(cand, depNom); }
 
-  function voteColor(r){
-    if (r <= 0)    return '#0d1b3e';
-    if (r < 0.08)  return '#0c1e4a';
-    if (r < 0.20)  return '#1d4ed8';
-    if (r < 0.35)  return '#0891b2';
-    if (r < 0.50)  return '#15803d';
-    if (r < 0.65)  return '#ca8a04';
-    if (r < 0.80)  return '#fef08a';
-    if (r < 0.92)  return '#ea580c';
-    return '#dc2626';
+  // ─── COLOR HELPERS ────────────────────────────────────────────
+  // Convierte hex → HSL para poder modular lightness/saturation según
+  // la intensidad (margen en modo ganadores, % propio en modo filtro).
+  function hexToHsl(hex){
+    const m = hex.replace('#','').match(/.{2}/g);
+    const [r,g,b] = m.map(x => parseInt(x,16) / 255);
+    const mx = Math.max(r,g,b), mn = Math.min(r,g,b);
+    const l = (mx + mn) / 2;
+    let h, s;
+    if (mx === mn){ h = 0; s = 0; }
+    else {
+      const d = mx - mn;
+      s = l > .5 ? d / (2 - mx - mn) : d / (mx + mn);
+      switch(mx){
+        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / d + 2; break;
+        default: h = (r - g) / d + 4;
+      }
+      h *= 60;
+    }
+    return { h, s: s*100, l: l*100 };
+  }
+  // intensity ∈ [0,1]: 1 = color base saturado, 0 = casi blanco/desaturado.
+  // Usamos una "cama" pastel siempre para que el color siga siendo reconocible
+  // incluso en intensidades bajas.
+  function colorWithIntensity(hex, intensity){
+    const it = Math.max(0, Math.min(1, intensity));
+    const { h, s, l } = hexToHsl(hex);
+    const targetL = 93;  // blanco casi puro cuando intensity=0
+    const targetS = 18;
+    const newL = targetL - (targetL - l) * it;
+    const newS = targetS + (s - targetS) * it;
+    return `hsl(${h.toFixed(1)}, ${newS.toFixed(1)}%, ${newL.toFixed(1)}%)`;
+  }
+
+  // Para cada feature/depto calcula ganador, segundo, y margen.
+  function computeDeptoRanking(depNom){
+    const ranked = CANDIDATOS
+      .map(c => ({ c, v: projected(c, depNom) }))
+      .filter(x => x.v > 0)
+      .sort((a,b) => b.v - a.v);
+    if (!ranked.length) return null;
+    const winner = ranked[0];
+    const second = ranked[1] || { c: null, v: 0 };
+    const total = ranked.reduce((s,x) => s + x.v, 0);
+    const winShare = total > 0 ? winner.v / total : 0;
+    const margin = winner.v - second.v;
+    return { winner: winner.c, winnerV: winner.v, second: second.c, secondV: second.v, margin, winShare, ranked };
   }
 
   // ─── LEAFLET MAP ──────────────────────────────────────────────
@@ -468,23 +504,64 @@
     try{
       const r = await fetch(DEPARTAMENTOS_URL);
       geoData = await r.json();
+      recomputeScales();
       deptLayer = L.geoJSON(geoData, { style: featureStyle, onEachFeature }).addTo(map);
       try{ const b = deptLayer.getBounds(); if (b.isValid()) map.fitBounds(b, { padding:[12,12] }); }catch(e){}
+      // Segunda pasada para pintar con escalas correctas y poblar la leyenda.
+      repaintMap();
     }catch(e){ console.error('[Previa] error cargando deptos:', e); }
+  }
+
+  // Máximos globales para normalizar intensidad (se recalculan en cada repaint).
+  let _maxMargin = 1, _maxSingleShare = 1;
+  function recomputeScales(){
+    if (!geoData) return;
+    let mMargin = 0, mShare = 0;
+    for (const f of geoData.features){
+      const nm = depName(f.properties);
+      const r = computeDeptoRanking(nm);
+      if (r && r.margin > mMargin) mMargin = r.margin;
+      if (selectedId){
+        const cand = CANDIDATOS.find(c => c.id === selectedId);
+        if (cand){
+          const total = CANDIDATOS.reduce((s,c) => s + projected(c, nm), 0);
+          const share = total > 0 ? projected(cand, nm) / total : 0;
+          if (share > mShare) mShare = share;
+        }
+      }
+    }
+    _maxMargin = Math.max(mMargin, 1);
+    _maxSingleShare = Math.max(mShare, 0.01);
   }
 
   function featureStyle(feature){
     const nm = depName(feature.properties);
-    const cand = CANDIDATOS.find(c => c.id === selectedId);
-    if (!cand) return { fillColor:'#0d1b3e', fillOpacity:.5, color:'rgba(255,255,255,.3)', weight:1 };
-    const all = geoData ? geoData.features.map(f => projected(cand, depName(f.properties))) : [];
-    const maxV = Math.max(1, ...all);
-    const v = projected(cand, nm);
-    const ratio = v / maxV;
+
+    // ── MODO FILTRO (candidato seleccionado) ──
+    if (selectedId){
+      const cand = CANDIDATOS.find(c => c.id === selectedId);
+      if (!cand) return { fillColor:'#1a1d2e', fillOpacity:.35, color:'rgba(255,255,255,.3)', weight:1 };
+      const total = CANDIDATOS.reduce((s,c) => s + projected(c, nm), 0);
+      const share = total > 0 ? projected(cand, nm) / total : 0;
+      const intensity = Math.min(1, share / _maxSingleShare);
+      return {
+        fillColor: colorWithIntensity(cand.color, intensity),
+        fillOpacity: 0.9,
+        color: 'rgba(255,255,255,0.35)',
+        weight: 1.0
+      };
+    }
+
+    // ── MODO GANADORES (default) ──
+    const r = computeDeptoRanking(nm);
+    if (!r || !r.winner){
+      return { fillColor:'#1a1d2e', fillOpacity:.35, color:'rgba(255,255,255,.3)', weight:1 };
+    }
+    const intensity = Math.min(1, r.margin / _maxMargin);
     return {
-      fillColor: voteColor(ratio),
-      fillOpacity: ratio > 0 ? 0.85 : 0.5,
-      color: 'rgba(255,255,255,0.4)',
+      fillColor: colorWithIntensity(r.winner.color, intensity),
+      fillOpacity: 0.9,
+      color: 'rgba(255,255,255,0.35)',
       weight: 1.0
     };
   }
@@ -493,31 +570,112 @@
     const nm = depName(feature.properties);
     layer.on({
       mouseover(){
-        const cand = CANDIDATOS.find(c => c.id === selectedId);
-        const v = cand ? projected(cand, nm) : 0;
-        const nac = cand ? cand.pct : 0;
-        const mult = cand ? biasFor(cand, nm) : 1;
-        layer.setStyle({ weight:2.5, color:'#fff', fillOpacity:.95 });
-        const html = `
-          <div style="font-family:Avenir,sans-serif;line-height:1.5">
-            <div style="font-family:'Syne',sans-serif;font-weight:700;color:#fff;font-size:.95rem;margin-bottom:.25rem">${nm}</div>
-            <div style="color:rgba(255,255,255,.7);font-size:.75rem">${cand ? cand.nombre : ''}</div>
-            <div style="color:#fff;font-size:.88rem;margin-top:.25rem">Proyección: <b>${fmtPct(v)}</b></div>
-            <div style="color:rgba(255,255,255,.55);font-size:.72rem">Nacional: ${fmtPct(nac)} · Ponderador: ×${mult.toFixed(2)}</div>
-          </div>`;
+        layer.setStyle({ weight:2.5, color:'#fff', fillOpacity:.98 });
+        let html = '';
+        if (selectedId){
+          // Modo filtro: mostrar la fuerza del candidato en el depto
+          const cand = CANDIDATOS.find(c => c.id === selectedId);
+          const total = CANDIDATOS.reduce((s,c) => s + projected(c, nm), 0);
+          const v = cand ? projected(cand, nm) : 0;
+          const share = total > 0 ? v / total : 0;
+          const mult = cand ? biasFor(cand, nm) : 1;
+          html = `
+            <div style="font-family:Avenir,sans-serif;line-height:1.5">
+              <div style="font-family:'Syne',sans-serif;font-weight:700;color:#fff;font-size:.95rem;margin-bottom:.25rem">${nm}</div>
+              <div style="color:${cand?cand.color:'#fff'};font-size:.78rem;font-weight:500">${cand ? cand.nombre : ''}</div>
+              <div style="color:#fff;font-size:.88rem;margin-top:.25rem">Fuerza local: <b>${(share*100).toFixed(1)}%</b></div>
+              <div style="color:rgba(255,255,255,.55);font-size:.72rem">Nacional: ${fmtPct(cand?cand.pct:0)} · Ponderador: ×${mult.toFixed(2)}</div>
+            </div>`;
+        } else {
+          // Modo ganadores: ganador, segundo y margen
+          const r = computeDeptoRanking(nm);
+          if (r && r.winner){
+            const winPct = (r.winnerV / r.ranked.reduce((s,x)=>s+x.v,0) * 100);
+            const secPct = r.second ? (r.secondV / r.ranked.reduce((s,x)=>s+x.v,0) * 100) : 0;
+            html = `
+              <div style="font-family:Avenir,sans-serif;line-height:1.55">
+                <div style="font-family:'Syne',sans-serif;font-weight:700;color:#fff;font-size:.95rem;margin-bottom:.3rem">${nm}</div>
+                <div style="color:${r.winner.color};font-size:.82rem;font-weight:500">1º ${r.winner.nombre}</div>
+                <div style="color:rgba(255,255,255,.8);font-size:.78rem;margin-bottom:.2rem"> ${winPct.toFixed(1)}% local</div>
+                ${r.second ? `
+                  <div style="color:${r.second.color};font-size:.78rem;font-weight:500">2º ${r.second.nombre}</div>
+                  <div style="color:rgba(255,255,255,.65);font-size:.74rem"> ${secPct.toFixed(1)}% local</div>
+                  <div style="color:#fff;font-size:.82rem;margin-top:.35rem;padding-top:.35rem;border-top:1px solid rgba(255,255,255,.15)">Margen: <b>+${(winPct-secPct).toFixed(1)} pp</b></div>
+                ` : ''}
+              </div>`;
+          } else {
+            html = `<div style="font-family:Avenir,sans-serif;color:rgba(255,255,255,.7)">${nm} · sin datos</div>`;
+          }
+        }
         layer.bindTooltip(html, { sticky:true, className:'leaflet-dark-tooltip', opacity:1 }).openTooltip();
       },
       mouseout(){ if (deptLayer) deptLayer.resetStyle(layer); layer.closeTooltip(); }
     });
   }
 
+  // Cuenta cuántos deptos gana cada candidato (modo ganadores).
+  function countWinners(){
+    const counts = new Map();
+    if (!geoData) return counts;
+    for (const f of geoData.features){
+      const r = computeDeptoRanking(depName(f.properties));
+      if (r && r.winner) counts.set(r.winner.id, (counts.get(r.winner.id)||0) + 1);
+    }
+    return counts;
+  }
+
   function repaintMap(){
+    recomputeScales();
     if (deptLayer) deptLayer.setStyle(featureStyle);
-    const cand = CANDIDATOS.find(c => c.id === selectedId);
+    const label = document.getElementById('map-head-label');
     const nameEl = document.getElementById('map-cand-name');
-    nameEl.textContent = cand ? cand.nombre : '—';
-    nameEl.style.color = cand ? cand.color : 'var(--white)';
-    document.getElementById('map-cand-pct').textContent = cand ? (fmtPct(cand.pct) + ' nacional') : '';
+    const pctEl  = document.getElementById('map-cand-pct');
+
+    if (selectedId){
+      const cand = CANDIDATOS.find(c => c.id === selectedId);
+      label.textContent = 'Filtro · fuerza regional';
+      nameEl.textContent = cand ? cand.nombre : '—';
+      nameEl.style.color = cand ? cand.color : 'var(--white)';
+      pctEl.textContent = cand ? (fmtPct(cand.pct) + ' nacional') : '';
+    } else {
+      label.textContent = 'Ganador por departamento';
+      nameEl.textContent = 'Clic en una fórmula para filtrar';
+      nameEl.style.color = '';
+      const counts = countWinners();
+      const totalDeptos = counts.size ? [...counts.values()].reduce((a,b)=>a+b,0) : 0;
+      pctEl.textContent = totalDeptos ? `${totalDeptos} deptos` : '';
+    }
+    renderMapLegend();
+  }
+
+  // Leyenda inferior: en modo ganadores muestra un chip por candidato
+  // (color + conteo de deptos ganados). En modo filtro muestra un gradient
+  // del color propio del candidato (poco → mucho apoyo).
+  function renderMapLegend(){
+    const el = document.getElementById('map-legend');
+    if (!el) return;
+    if (selectedId){
+      const cand = CANDIDATOS.find(c => c.id === selectedId);
+      if (!cand){ el.innerHTML = ''; return; }
+      const c0 = colorWithIntensity(cand.color, 0.05);
+      const c1 = colorWithIntensity(cand.color, 1.0);
+      el.innerHTML = `
+        <div class="map-legend-title">Apoyo relativo · ${cand.nombre}</div>
+        <div>
+          <div class="map-legend-bar" style="background:linear-gradient(to right, ${c0}, ${c1})"></div>
+          <div class="map-legend-ends"><span>menor</span><span>mayor</span></div>
+        </div>`;
+    } else {
+      const counts = countWinners();
+      const chips = CANDIDATOS
+        .filter(c => counts.get(c.id))
+        .sort((a,b) => (counts.get(b.id)||0) - (counts.get(a.id)||0))
+        .map(c => `<span class="pond-chip"><span class="dot" style="background:${c.color}"></span>${c.nombre} · <b class="pond-chip-num">${counts.get(c.id)}</b></span>`)
+        .join('');
+      el.innerHTML = `
+        <div class="map-legend-title">Ganadores · deptos</div>
+        <div class="pond-legend" style="margin-top:0">${chips || '<span style="color:rgba(255,255,255,.4)">sin datos</span>'}</div>`;
+    }
   }
 
   // ─── PONDERADOR ──────────────────────────────────────────────
@@ -585,7 +743,14 @@
   }
 
   // ─── INTERACTION ──────────────────────────────────────────────
-  function selectCand(id){ selectedId = id; renderPonderador(); renderPanel(); repaintMap(); }
+  // Click sobre una tarjeta: activa modo filtro. Si ya está activa la misma
+  // tarjeta, deselecciona y vuelve al modo ganadores.
+  function selectCand(id){
+    selectedId = (selectedId === id) ? null : id;
+    renderPonderador();
+    renderPanel();
+    repaintMap();
+  }
 
   // Actualiza %/delta/slider en el DOM existente (sin rebuild) para no romper
   // el arrastre del slider activo. Marca la tarjeta activa con CSS toggle.
@@ -656,7 +821,9 @@
     ev.target.value = cand.pct;
     ev.target.dataset.prev = cand.pct;
 
-    selectedId = id;
+    // NOTE: mover el slider NO activa el modo filtro — el modo se activa sólo
+    // al hacer click explícitamente en una tarjeta. Así el usuario puede
+    // mover porcentajes y seguir viendo el mapa de ganadores recolorearse.
     renderPonderador();
     updatePcts(id);
     repaintMap();
