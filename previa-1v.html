@@ -41,7 +41,7 @@
     body.day-mode .map-head-cand{color:#0d1120}
     body.day-mode .map-head-pct{color:rgba(0,0,0,.55)}
     body.day-mode .map-wrap{border-right-color:rgba(0,0,0,.1)}
-    body.day-mode .map-legend{border-top-color:rgba(0,0,0,.1)}
+    body.day-mode .map-legend{border-bottom-color:rgba(0,0,0,.1)}
     body.day-mode .map-legend-title{color:rgba(0,0,0,.4)}
     body.day-mode .map-legend-ends{color:rgba(0,0,0,.5)}
     body.day-mode #leaflet-map{background:#dbd2c4!important}
@@ -194,7 +194,10 @@
     .leaflet-dark-tooltip{background:rgba(6,8,16,.97)!important;border:1px solid rgba(0,71,255,.4)!important;color:#f4f3ef!important;font-family:Avenir,sans-serif!important;font-size:.8rem!important;padding:.5rem .7rem!important;border-radius:0!important}
     .leaflet-dark-tooltip:before{display:none!important}
 
-    .map-legend{padding:.7rem 1.3rem .9rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;border-top:1px solid var(--border)}
+    .map-legend{padding:.7rem 1.3rem .9rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;border-bottom:1px solid var(--border)}
+    #leaflet-map,#leaflet-map .leaflet-container{cursor:default!important}
+    #leaflet-map .leaflet-grab,#leaflet-map .leaflet-dragging .leaflet-grab,#leaflet-map.leaflet-grab{cursor:default!important}
+    #leaflet-map .leaflet-interactive{cursor:pointer!important}
     .map-legend-title{font-family:Avenir,sans-serif;font-weight:500;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.4)}
     .map-legend-bar{width:260px;height:8px;background:linear-gradient(to right,#0d1b3e,#1d4ed8,#0891b2,#15803d,#ca8a04,#fef08a,#ea580c,#dc2626)}
     .map-legend-ends{display:flex;justify-content:space-between;width:260px;font-family:Avenir,sans-serif;font-weight:400;font-size:.68rem;color:rgba(255,255,255,.5)}
@@ -279,12 +282,14 @@
   <!-- Nota de uso -->
   <section class="use-note">
     <strong>¿Cómo usar esta herramienta?</strong>
-    Esta simulación parte del <em>ponderador de encuestas de La Silla Vacía</em> y lo proyecta al territorio.
+    Esta simulación parte del <em>ponderador de encuestas de La Silla Vacía</em> —medida provisional mientras terminamos nuestro propio agregador— y lo proyecta al territorio.
     Mueve los deslizadores del panel derecho para modificar la intención de voto nacional de cada fórmula:
-    el mapa repinta al ganador por departamento, y la votación estimada (basada en la participación real de Senado 2026)
+    el mapa repinta al ganador por departamento, y la votación estimada (basada en la participación real de Senado 2026 escalada al escenario presidencial 2022)
     se recalcula en vivo. Si subes a un candidato, el resto cede proporcionalmente — la suma total se mantiene fija en 100%.
     Haz <strong>clic sobre una tarjeta</strong> para filtrar el mapa a la fuerza regional de ese candidato; vuelve a hacer clic para regresar a la vista de ganadores.
     El botón <strong>Restablecer</strong> vuelve a los valores del ponderador actual.
+    <br/><br/>
+    <strong>Sólo se incluyen candidatos por encima del 1%</strong> del ponderador. Emular las fórmulas residuales (&lt;1%) volvería el modelo y la interacción innecesariamente complejos sin ganancia analítica clara.
   </section>
 
   <!-- Ponderador (stacked bar) -->
@@ -320,8 +325,8 @@
         </div>
         <div class="map-head-pct" id="map-cand-pct"></div>
       </div>
-      <div id="leaflet-map"></div>
       <div class="map-legend" id="map-legend"></div>
+      <div id="leaflet-map"></div>
     </div>
 
     <!-- PANEL -->
@@ -362,14 +367,21 @@
           mantiene rígidamente en 100%.
         </p>
 
-        <h4>1. Ponderador nacional (insumo)</h4>
+        <h4>1. Ponderador nacional (insumo, provisional)</h4>
         <p>
-          El % de intención inicial de cada candidato se toma del
+          Mientras terminamos nuestro propio agregador, el % de intención
+          inicial de cada candidato se toma —de manera provisional— del
           <a href="https://www.lasillavacia.com/silla-nacional/ponderador-de-encuestas-presidenciales-2026/" target="_blank" rel="noopener" style="color:var(--blue)">Ponderador de Encuestas Presidenciales 2026 de La Silla Vacía</a>,
           que agrega todas las encuestas públicas ponderando por recencia, tamaño muestral y
           desempeño histórico de la firma —ver su
           <a href="https://www.lasillavacia.com/wp-content/uploads/2026/03/Nota-tecnica-ponderacion-encuestas-Presidenciales-2026-V-Mar29.docx.pdf" target="_blank" rel="noopener" style="color:var(--blue)">nota técnica de marzo de 2026</a>—.
-          Cargamos los valores del corte más reciente desde <b>ponderador-actual.json</b>, publicado en el mismo sitio.
+          Cargamos los valores del corte más reciente desde
+          <b>ponderador-actual.json</b>. La próxima versión reemplazará esta
+          fuente por un agregador propio construido sobre la tabla de sondeos
+          de Wikipedia, con pesos de reputación por encuestadora configurables
+          localmente. <b>Sólo incluimos candidatos con intención superior al
+          1%</b>: las fórmulas residuales complicarían el modelo sin ganancia
+          analítica.
         </p>
         <div class="modal-formula">%nacional(c) = Σ ( w<sub>i</sub> · %<sub>i</sub>(c) ) / Σ w<sub>i</sub></div>
 
@@ -405,12 +417,13 @@
 
         <h4>4. Votación estimada por depto</h4>
         <p>
-          Los votantes esperados por departamento se derivan del escrutinio
-          real de Senado 2026, escalado al 54% de participación típico de
-          primera vuelta presidencial (factor 1,087 sobre el 49,8% que votó en
-          Senado). Esto refleja el comportamiento electoral local real —alta
-          participación en Córdoba, más baja en ciertos municipios de
-          Antioquia— y no una tasa plana nacional.
+          Los votantes esperados por departamento toman como base el 54% del
+          potencial electoral —participación típica de primera vuelta
+          presidencial en el escenario 2022—, distribuido según el
+          comportamiento real por depto del escrutinio Senado 2026. Esto
+          preserva las asimetrías locales (alta participación en Córdoba, más
+          baja en ciertos municipios de Antioquia) en vez de asumir una tasa
+          plana nacional.
         </p>
         <div class="modal-formula">votos(c, d) = votantes_est(d) × share_local(c, d)</div>
         <p>
@@ -566,9 +579,19 @@
   let map = null, deptLayer = null, geoData = null;
 
   function initMap(){
+    // Mapa estático: sin zoom ni pan. Los controles de Leaflet quedan
+    // desactivados y el usuario no puede desplazar ni ampliar el mapa.
     map = L.map('leaflet-map', {
       center: [4.5, -74.0], zoom: 5, zoomSnap: .1,
-      zoomControl: true, attributionControl: true, scrollWheelZoom: true
+      zoomControl: false,
+      attributionControl: true,
+      scrollWheelZoom: false,
+      doubleClickZoom: false,
+      boxZoom: false,
+      touchZoom: false,
+      dragging: false,
+      keyboard: false,
+      tap: false,
     });
     map.getContainer().style.background = '#060810';
     setTimeout(() => map.invalidateSize(), 300);
@@ -753,10 +776,10 @@
         return `<span class="pond-chip" title="${fmtFull(x.v)} votos"><span class="dot" style="background:${x.c.color}"></span>${x.c.nombre} · <b class="pond-chip-num">${fmtCompact(x.v)}</b> <span style="opacity:.55">(${pct.toFixed(1)}%)</span></span>`;
       }).join('');
       const titleHint = Object.keys(SENADO_BY_DEPTO).length
-        ? `Votación estimada · base Senado 2026 × ${TURNOUT_SCALE.toFixed(3)}`
-        : 'Votación estimada · cargando base de Senado…';
+        ? 'Votación estimada · 54% del potencial como votantes (escenario 2022)'
+        : 'Votación estimada · cargando base territorial…';
       el.innerHTML = `
-        <div class="map-legend-title" title="Participación por depto calibrada con Senado 2026; escalada al 54% típico de presidencial">${titleHint}</div>
+        <div class="map-legend-title" title="Participación por depto calibrada con el comportamiento real de Senado 2026 y escalada al 54% típico de primera vuelta presidencial (referencia 2022)">${titleHint}</div>
         <div class="pond-legend" style="margin-top:0">${chips || '<span style="color:rgba(255,255,255,.4)">sin datos</span>'}</div>`;
     }
   }
@@ -1122,7 +1145,7 @@
     el.innerHTML =
       '<a href="' + url + '" target="_blank" rel="noopener" ' +
       'style="color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">' +
-      'Base: La Silla Vacía · ' + fecha + '</a>';
+      'Base provisional: La Silla Vacía · ' + fecha + '</a>';
   }
 
   // ─── BOOT ─────────────────────────────────────────────────────
