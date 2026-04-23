@@ -28,6 +28,43 @@ mapas-2026/PUESTOS_GEOREF.csv           → georreferenciación de puestos (NO u
 Divipole-actualizado/COMUNAS_DATA.csv   → censo electoral oficial: dd, mm, zz, pp,
                                           mujeres, hombres, total (41.287.084 total nacional)
 ```
+
+## Data local — históricos pre-2026 (GCS)
+Histórico electoral desde 2010 (Registraduría, formato GCS unificado). **Pesados, no se
+despliegan al navegador**: se procesan y se suben a S3 como JSON agregados.
+
+```
+/Users/ricardoruiz/ricardoruiz.co/Bases de datos/FINAL SUBIDA GCS/
+  GCS_2010PRES1V.csv   GCS_2014PRES1V.csv   GCS_2018PRES1V.csv   GCS_2022PRES1V.csv
+  GCS_2010PRES2V.csv   GCS_2014PRES2V.csv   GCS_2018PRES2V.csv   GCS_2022PRES2V.csv
+  GCS_2014CON.csv      GCS_2018CON.csv      GCS_2022CON.csv       (Congreso)
+  GCS_2022CONSU.csv    GCS_2025CONSU.csv    GCS_2025CONSU_CAM/SEN.csv
+  GCS_201XTER.csv / GCS_20XXCLMJ.csv / GCS_20XXJAL.csv / GCS_2016PLEB.csv
+```
+
+Columnas (mismas en todos los años, orden puede variar ligeramente en 2010/2025):
+`FUENTE; FEC_ELEC; COD_COR; DES_COR; COD_CIR; DES_CIR; COD_DDE; COD_MME; COD_ZZ;
+ COD_PP; DES_MS; COD_PAR; DES_PAR; COD_CAN; DES_CAN; NUM_VOT`
+- `COD_DDE`/`COD_MME`/`COD_ZZ`/`COD_PP` = códigos Registraduría (depto/mun/zona/puesto)
+- `DES_MS` = mesa; `COD_CAN`/`DES_CAN` = candidato; `NUM_VOT` = votos
+- `COD_CAN` especiales: 996=Blanco, 997=Nulos, 998/999=No marcados
+
+## Data local — 2026 agregada (antes de subir a S3)
+```
+/Users/ricardoruiz/ricardoruiz.co/Bases de datos/
+  DEPTOS_DECLARADOS/                    → raw 2026 declarados por depto
+  output_agregados/consultas/
+    resumen.json                        → nacional: 3 consultas y sus candidatos
+    deps.json                           → array compacto de deptos
+    dep-{cod}.json                      → tree depto → consulta → cands → municipios[]
+  output_declarados/CONSULTAS/NACIONAL/candidatos/   → por candidato
+```
+Las 3 consultas presidenciales 2026 (claves):
+- `gran`       → La Gran Consulta por Colombia (derecha, ganó **Paloma Valencia**, 3.2M)
+- `frente`     → Frente por la Vida (centro-izq, ganó **Roy Barreras**, 259K)
+- `soluciones` → Consulta de Soluciones (centro, ganó **Claudia López**, 573K)
+
+Consulta Pacto Histórico 2025: ganó **Iván Cepeda** (consulta única, `GCS_2025CONSU.csv`).
 Todos los JSON tienen `por_circunscripcion: { NACIONAL: {...}, INDIGENAS: {...} }`.
 
 ## Tipografía
