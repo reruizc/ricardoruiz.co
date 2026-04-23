@@ -129,9 +129,18 @@
     .seg{display:flex;align-items:center;justify-content:center;font-family:Avenir,sans-serif;font-weight:500;font-size:.75rem;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;transition:width .25s cubic-bezier(.25,.8,.25,1),background .2s;cursor:pointer;border-right:1px solid rgba(0,0,0,.25)}
     .seg:last-child{border-right:none}
     .seg.active{box-shadow:inset 0 0 0 2px #fff}
-    .pond-legend{display:flex;gap:.9rem;margin-top:.6rem;flex-wrap:wrap;font-family:Avenir,sans-serif;font-weight:400;font-size:.72rem;color:rgba(255,255,255,.6)}
-    .pond-chip{display:inline-flex;align-items:center;gap:.35rem}
-    .pond-chip .dot{width:9px;height:9px;display:inline-block;border-radius:2px}
+    .pond-legend{display:flex;gap:1rem;margin-top:.7rem;flex-wrap:wrap;font-family:Avenir,sans-serif;font-weight:400;font-size:1.01rem;color:rgba(255,255,255,.72);line-height:1.4}
+    body.day-mode .pond-legend{color:rgba(0,0,0,.75)}
+    .pond-chip{display:inline-flex;align-items:center;gap:.45rem}
+    .pond-chip .dot{width:11px;height:11px;display:inline-block;border-radius:2px}
+    .pond-chip-num{font-weight:500}
+
+    .use-note{padding:.95rem 2.5rem 1rem;font-family:Avenir,sans-serif;font-weight:400;font-size:.95rem;line-height:1.55;color:rgba(255,255,255,.78);border-bottom:1px solid var(--border);background:rgba(0,71,255,.04);max-width:none}
+    .use-note strong{color:var(--white);font-weight:600}
+    .use-note em{font-style:italic;color:rgba(0,71,255,.95)}
+    body.day-mode .use-note{color:rgba(0,0,0,.75);background:rgba(0,71,255,.05);border-bottom-color:rgba(0,0,0,.1)}
+    body.day-mode .use-note strong{color:#0d1120}
+    body.day-mode .use-note em{color:var(--blue)}
     .pond-chip-num{color:var(--white);font-weight:500}
 
     /* Info button junto al título del ponderador */
@@ -267,6 +276,17 @@
     <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
   </header>
 
+  <!-- Nota de uso -->
+  <section class="use-note">
+    <strong>¿Cómo usar esta herramienta?</strong>
+    Esta simulación parte del <em>ponderador de encuestas de La Silla Vacía</em> y lo proyecta al territorio.
+    Mueve los deslizadores del panel derecho para modificar la intención de voto nacional de cada fórmula:
+    el mapa repinta al ganador por departamento, y la votación estimada (basada en la participación real de Senado 2026)
+    se recalcula en vivo. Si subes a un candidato, el resto cede proporcionalmente — la suma total se mantiene fija en 100%.
+    Haz <strong>clic sobre una tarjeta</strong> para filtrar el mapa a la fuerza regional de ese candidato; vuelve a hacer clic para regresar a la vista de ganadores.
+    El botón <strong>Restablecer</strong> vuelve a los valores del ponderador actual.
+  </section>
+
   <!-- Ponderador (stacked bar) -->
   <section class="ponderador">
     <div class="ponderador-head">
@@ -335,50 +355,79 @@
       </div>
       <div class="modal-body">
         <p>
-          El <b>ponderador electoral</b> es una estimación agregada de intención
-          de voto, construida como un promedio <b>ponderado</b> —no simple— de
-          las encuestas publicadas. La idea es que no todas las encuestas pesan
-          igual: algunas han sido más precisas históricamente, otras son más
-          recientes, y algunas tienen muestras más robustas.
+          Esta herramienta combina dos bloques: un <b>ponderador nacional de
+          encuestas</b> (quién va primero, quién crece, quién cae) y una
+          <b>proyección territorial</b> (dónde se concentra su fuerza). Al mover
+          un deslizador, ambos bloques se recalculan en vivo y la suma total se
+          mantiene rígidamente en 100%.
         </p>
 
-        <h4>Insumos</h4>
-        <ul>
-          <li><b>Encuestas públicas</b> de firmas autorizadas por el CNE (Invamer, CNC, YanHaas, Guarumo, Atlas, etc.) publicadas desde mediados de 2025.</li>
-          <li><b>Histórico real</b> de las presidenciales <b>2018</b> y <b>2022</b>, primera vuelta, a nivel nacional y por departamento.</li>
-          <li><b>Resultados de Congreso 2026</b> (Senado y Cámara) ya disponibles — referencia fresca de la fuerza territorial de cada coalición.</li>
-        </ul>
-
-        <h4>Pesos por encuesta</h4>
-        <p>A cada encuesta se le asigna un peso <b>w</b> en el promedio, combinando tres factores:</p>
-        <div class="modal-formula">w = recencia × precisión histórica × tamaño de muestra</div>
-        <ul>
-          <li><b>Recencia</b>: las encuestas más recientes pesan más (decaimiento exponencial, vida media ~30 días).</li>
-          <li><b>Precisión histórica</b>: qué tan cerca quedó la firma de los resultados reales de 2018 y 2022 (error promedio absoluto). Menor error → mayor peso.</li>
-          <li><b>Muestra</b>: encuestas con n &gt; 1.500 entrevistas reciben peso pleno; muestras más pequeñas se descuentan.</li>
-        </ul>
-
-        <h4>Agregación</h4>
-        <p>Para cada candidato <b>c</b>, el promedio ponderado nacional es:</p>
+        <h4>1. Ponderador nacional (insumo)</h4>
+        <p>
+          El % de intención inicial de cada candidato se toma del
+          <a href="https://www.lasillavacia.com/silla-nacional/ponderador-de-encuestas-presidenciales-2026/" target="_blank" rel="noopener" style="color:var(--blue)">Ponderador de Encuestas Presidenciales 2026 de La Silla Vacía</a>,
+          que agrega todas las encuestas públicas ponderando por recencia, tamaño muestral y
+          desempeño histórico de la firma —ver su
+          <a href="https://www.lasillavacia.com/wp-content/uploads/2026/03/Nota-tecnica-ponderacion-encuestas-Presidenciales-2026-V-Mar29.docx.pdf" target="_blank" rel="noopener" style="color:var(--blue)">nota técnica de marzo de 2026</a>—.
+          Cargamos los valores del corte más reciente desde <b>ponderador-actual.json</b>, publicado en el mismo sitio.
+        </p>
         <div class="modal-formula">%nacional(c) = Σ ( w<sub>i</sub> · %<sub>i</sub>(c) ) / Σ w<sub>i</sub></div>
 
-        <h4>Proyección territorial</h4>
+        <h4>2. Suma total forzada a 100%</h4>
         <p>
-          Para el mapa, ese % nacional se <b>modula por departamento</b> usando
-          un ponderador regional. Este multiplicador se construye con la
-          votación histórica del candidato o su coalición más cercana en 2018 y
-          2022 (y, cuando aplica, las listas al Congreso 2026). Un valor
-          de <b>×1.5</b> en Antioquia significa que el candidato
-          tiene 50% más fuerza en ese departamento que el promedio nacional.
+          Si el ponderador externo reporta una suma distinta de 100 —por
+          redondeos o porque publican menos candidatos— el residual lo absorbe
+          automáticamente la categoría <b>Blanco / Indecisos</b>. Al mover un
+          deslizador hacia arriba, los demás candidatos ceden proporcionalmente
+          a su % actual (el que más tiene, más cede); al moverlo hacia abajo,
+          ocurre lo inverso. La suma del ponderador siempre marca 100.0%.
         </p>
 
-        <h4>Nota metodológica</h4>
-        <p style="color:rgba(245,158,11,.85);font-size:.8rem">
-          Este borrador utiliza pesos ilustrativos. La siguiente iteración
-          cargará los resultados reales 2014/2018/2022 por municipio (y el
-          Congreso 2026) para calibrar automáticamente los pesos regionales.
-          La metodología base está inspirada en el
-          <a href="https://www.lasillavacia.com/silla-nacional/ponderador-electoral-2026-la-foto-de-las-presidenciales-arrancando-el-ano/" target="_blank" rel="noopener" style="color:var(--blue)">Ponderador Electoral 2026 de La Silla Vacía</a>.
+        <h4>3. Proyección territorial (bias)</h4>
+        <p>
+          Para proyectar el % nacional al nivel departamental usamos un modelo
+          <b>proporcional multiplicativo</b>:
+        </p>
+        <div class="modal-formula">p(c, d) = %nacional(c) × bias(c, d)</div>
+        <p>
+          El <b>bias(c, d)</b> es un multiplicador regional: 1,0 significa que
+          el candidato vota en el depto al mismo nivel que el promedio
+          nacional; 1,8 que tiene 80% más fuerza; 0,5 que tiene la mitad.
+          Este coeficiente se calibra con señales empíricas: resultados
+          presidenciales históricos de candidatos equivalentes (2010–2022),
+          consultas interpartidistas 2025 y 2026, y votación al Congreso 2026
+          por partido o movimiento. La votación directa al candidato siempre
+          pesa más que la señal partidista (Oraculus, México 2024; Silver,
+          2024). Detalle completo de los seis perfiles de pesos y las
+          equivalencias históricas en el
+          <a href="metodologia-simulador-presidencial-2026.pdf" target="_blank" rel="noopener" style="color:var(--blue)">documento metodológico</a>.
+        </p>
+
+        <h4>4. Votación estimada por depto</h4>
+        <p>
+          Los votantes esperados por departamento se derivan del escrutinio
+          real de Senado 2026, escalado al 54% de participación típico de
+          primera vuelta presidencial (factor 1,087 sobre el 49,8% que votó en
+          Senado). Esto refleja el comportamiento electoral local real —alta
+          participación en Córdoba, más baja en ciertos municipios de
+          Antioquia— y no una tasa plana nacional.
+        </p>
+        <div class="modal-formula">votos(c, d) = votantes_est(d) × share_local(c, d)</div>
+        <p>
+          Donde <b>share_local</b> es la proyección del candidato normalizada
+          al total proyectado en el depto, garantizando que los votos por
+          candidato sumen exactamente los votantes esperados. El total
+          nacional es la suma sobre todos los deptos.
+        </p>
+
+        <h4>5. Bandas de incertidumbre</h4>
+        <p style="color:rgba(245,158,11,.88);font-size:.82rem">
+          Este borrador reporta proyecciones puntuales. En la siguiente
+          iteración incorporaremos una banda de incertidumbre de ±σ, donde σ
+          combina error muestral y house effect (Shirani-Mehr, Rothschild, Goel
+          &amp; Gelman, JASA 2018). Además, migraremos del agregador externo a
+          uno propio construido directamente desde la tabla de sondeos de
+          Wikipedia, con pesos de reputación por encuestadora configurables.
         </p>
       </div>
     </div>
@@ -980,11 +1029,28 @@
     }catch(e){
       console.warn('[Previa] usando valores hardcoded (no se pudo cargar el ponderador):', e.message);
     }
+    // Forzamos suma exacta a 100%: si el ponderador externo reporta una
+    // suma distinta (p.ej. 99 o 101 por redondeo), el residual lo absorbe
+    // el candidato 'nd' (Blanco / Indecisos). Los otros candidatos no se
+    // tocan — el ponderador total del header siempre marca 100.0%.
+    forzar100ResidualBlanco();
     // Ordena de mayor a menor % (una sola vez, al boot). Luego los sliders
     // NO re-ordenan durante la interacción para evitar que las tarjetas
     // salten mientras el usuario arrastra.
     CANDIDATOS.sort((a, b) => b.pct - a.pct);
     BASE = CANDIDATOS.map(c => ({ ...c }));
+  }
+
+  // Ajusta el candidato 'nd' (Blanco / Indecisos) para que la suma sea 100.
+  // Si 'nd' no existe, usa el de menor pct como absorbedor. Clamp ≥ 0.
+  function forzar100ResidualBlanco(){
+    const total = CANDIDATOS.reduce((s,c) => s + c.pct, 0);
+    const diff = 100 - total;
+    if (Math.abs(diff) < 0.001) return;
+    const absorbedor = CANDIDATOS.find(c => c.id === 'nd')
+                    || [...CANDIDATOS].sort((a,b) => a.pct - b.pct)[0];
+    if (!absorbedor) return;
+    absorbedor.pct = Math.max(0, +(absorbedor.pct + diff).toFixed(2));
   }
 
   // Carga los totales de votantes por depto del escrutinio Senado 2026. Estos
