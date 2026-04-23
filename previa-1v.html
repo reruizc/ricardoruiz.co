@@ -439,9 +439,17 @@
 
   const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
   const DEPARTAMENTOS_URL = `${S3}/mapas-2026/DEPARTAMENTOS2.json`;
+  const SENADO_DEPTOS_URL = `${S3}/senado/departamentos.json`;
   // Archivo local en la raíz del sitio. Cuando escalamos al ponderador propio
   // (Opción C) cambiamos esta URL al JSON generado por el scraper en S3.
   const PONDERADOR_URL = 'ponderador-actual.json';
+  // Los votantes de presidencial suelen superar a los de congreso por ~8-10%.
+  // Senado 2026: 20,56M (~49,8%). Target presidencial ~54% → factor 1,087.
+  // Ref histórica: 2022 pres/con = 1,157 · 2018 pres/con = 1,092.
+  const TURNOUT_SCALE = 1.087;
+  // SENADO_BY_DEPTO[ norm(nombre) ] = { votant, cod, nombre }
+  // Se llena una vez al boot desde senado/departamentos.json
+  let SENADO_BY_DEPTO = {};
 
   // ─── HELPERS ──────────────────────────────────────────────────
   const norm = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase();
@@ -659,9 +667,10 @@
       label.textContent = 'Ganador por departamento';
       nameEl.textContent = 'Clic en una fórmula para filtrar';
       nameEl.style.color = '';
-      const counts = countWinners();
-      const totalDeptos = counts.size ? [...counts.values()].reduce((a,b)=>a+b,0) : 0;
-      pctEl.textContent = totalDeptos ? `${totalDeptos} deptos` : '';
+      // Total nacional de votación estimada (suma sobre todos los candidatos)
+      let totalVotes = 0;
+      for (const c of CANDIDATOS) totalVotes += estimatedVotes(c);
+      pctEl.textContent = totalVotes > 0 ? `${fmtCompact(totalVotes)} votos estimados` : '';
     }
     renderMapLegend();
   }
@@ -684,14 +693,21 @@
           <div class="map-legend-ends"><span>menor</span><span>mayor</span></div>
         </div>`;
     } else {
-      const counts = countWinners();
-      const chips = CANDIDATOS
-        .filter(c => counts.get(c.id))
-        .sort((a,b) => (counts.get(b.id)||0) - (counts.get(a.id)||0))
-        .map(c => `<span class="pond-chip"><span class="dot" style="background:${c.color}"></span>${c.nombre} · <b class="pond-chip-num">${counts.get(c.id)}</b></span>`)
-        .join('');
+      // Votación estimada por candidato, ordenada desc. La fila de totales
+      // nacional + por candidato se recalcula cada repaint (responde a slider).
+      const votes = CANDIDATOS.map(c => ({ c, v: estimatedVotes(c) }))
+                              .filter(x => x.v > 0)
+                              .sort((a,b) => b.v - a.v);
+      const totalVotes = votes.reduce((s,x) => s + x.v, 0);
+      const chips = votes.map(x => {
+        const pct = totalVotes > 0 ? (x.v / totalVotes * 100) : 0;
+        return `<span class="pond-chip" title="${fmtFull(x.v)} votos"><span class="dot" style="background:${x.c.color}"></span>${x.c.nombre} · <b class="pond-chip-num">${fmtCompact(x.v)}</b> <span style="opacity:.55">(${pct.toFixed(1)}%)</span></span>`;
+      }).join('');
+      const titleHint = Object.keys(SENADO_BY_DEPTO).length
+        ? `Votación estimada · base Senado 2026 × ${TURNOUT_SCALE.toFixed(3)}`
+        : 'Votación estimada · cargando base de Senado…';
       el.innerHTML = `
-        <div class="map-legend-title">Ganadores · deptos</div>
+        <div class="map-legend-title" title="Participación por depto calibrada con Senado 2026; escalada al 54% típico de presidencial">${titleHint}</div>
         <div class="pond-legend" style="margin-top:0">${chips || '<span style="color:rgba(255,255,255,.4)">sin datos</span>'}</div>`;
     }
   }
@@ -971,6 +987,66 @@
     BASE = CANDIDATOS.map(c => ({ ...c }));
   }
 
+  // Carga los totales de votantes por depto del escrutinio Senado 2026. Estos
+  // son la base para estimar la votación presidencial por depto, reflejando
+  // el comportamiento electoral local real (p.ej. alta participación en
+  // Córdoba, baja en algunos municipios de Antioquia) y no una tasa
+  // transversal plana del 54%.
+  async function loadSenadoParticipacion(){
+    try{
+      const r = await fetch(SENADO_DEPTOS_URL, { cache: 'force-cache' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const arr = await r.json();
+      for (const d of arr){
+        const k = norm(d.nombre);
+        SENADO_BY_DEPTO[k] = {
+          votant: d.votant || 0,
+          cod: d.cod,
+          nombre: d.nombre,
+        };
+      }
+    }catch(e){
+      console.warn('[Previa] no se pudo cargar Senado 2026 para estimar votantes:', e.message);
+    }
+  }
+
+  // Votantes presidenciales esperados para el depto, escalados sobre la
+  // participación real de Senado 2026.
+  function expectedVoters(depNom){
+    const k = norm(depNom);
+    const entry = SENADO_BY_DEPTO[k];
+    if (!entry) return 0;
+    return entry.votant * TURNOUT_SCALE;
+  }
+
+  // Votos estimados para el candidato a nivel nacional: suma sobre deptos
+  // de (votantes esperados × share local). El share local es la proyección
+  // del candidato NORMALIZADA por el total proyectado en ese depto, para
+  // garantizar que la suma sobre candidatos en cada depto = votantes(d) y
+  // por tanto la suma nacional = total de votantes esperados.
+  function estimatedVotes(cand){
+    if (!geoData) return 0;
+    let total = 0;
+    for (const f of geoData.features){
+      const nm = depName(f.properties);
+      const voters = expectedVoters(nm);
+      if (voters <= 0) continue;
+      const localTotal = CANDIDATOS.reduce((s,c) => s + projected(c, nm), 0);
+      if (localTotal <= 0) continue;
+      const shareLocal = projected(cand, nm) / localTotal;
+      total += voters * shareLocal;
+    }
+    return total;
+  }
+
+  // Formato corto de votos en español: 8,47 M · 345 K · 1.234
+  const fmtCompact = n => new Intl.NumberFormat('es-CO', {
+    notation: 'compact', compactDisplay: 'short', maximumFractionDigits: 2,
+  }).format(Math.round(n));
+  const fmtFull = n => new Intl.NumberFormat('es-CO', {
+    maximumFractionDigits: 0,
+  }).format(Math.round(n));
+
   // Renderiza un chip pequeño en el header del ponderador con la fuente.
   function renderPonderadorFuente(){
     const el = document.getElementById('pond-fuente');
@@ -985,7 +1061,9 @@
 
   // ─── BOOT ─────────────────────────────────────────────────────
   (async () => {
-    await loadPonderador();     // primero amarramos pct al ponderador externo
+    // En paralelo: ponderador (para pct iniciales) y Senado (para votantes
+    // esperados por depto). Ninguno es bloqueante para el render inicial.
+    await Promise.all([loadPonderador(), loadSenadoParticipacion()]);
     renderPonderador();
     renderPanel();
     repaintMap();
