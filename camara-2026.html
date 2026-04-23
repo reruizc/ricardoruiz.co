@@ -1415,8 +1415,17 @@
       const _mNul = mesaN.votnul  ?? m.votnul;
       const _mNma = mesaN.votnma  ?? m.votnma;
       const _mBla = mesaN.votblan ?? m.votblan;
-      if(_mVa != null){ renderDonut({votant: _mVa, votnul: _mNul, votnma: _mNma, votblan: _mBla}); }
-      else { renderDonut({votval: totalVotos, votant: totalVotos}); }
+      // A nivel mesa no hay censo propio. No pasamos potencial (% participación
+      // no tiene sentido con denominador del puesto), pero sí m/h del puesto padre
+      // para que el donut de género no desaparezca al bajar a mesa.
+      const _mPot = getPotencialFor({
+        depCod: curDep!=='TODOS'?curDep:null,
+        munCod: curMun!=='TODOS'?curMun:null,
+        zonaCod: curZon!=='TODOS'?curZon:null,
+        pueCod: curPue!=='TODOS'?curPue:null
+      });
+      if(_mVa != null){ renderDonut({votant: _mVa, votnul: _mNul, votnma: _mNma, votblan: _mBla}, null, _mPot.mujeres, _mPot.hombres); }
+      else { renderDonut({votval: totalVotos, votant: totalVotos}, null, _mPot.mujeres, _mPot.hombres); }
     }
 
     // ─── RENDER VISTA DEPTO ───────────────────────────────────
@@ -1508,7 +1517,14 @@
       const _nul = slice.votnul  ?? sliceFull.votnul;
       const _nma = slice.votnma  ?? sliceFull.votnma;
       const _bla = slice.votblan ?? sliceFull.votblan;
-      const _pot = getPotencialFor({depCod: dep.cod, munCod: curMun!=='TODOS'?curMun:null});
+      // Propagar todos los niveles del drill: sin esto el denominador se queda
+      // en el municipio y la participación a nivel comuna/localidad/puesto sale ~3-5%.
+      const _pot = getPotencialFor({
+        depCod: dep.cod,
+        munCod: curMun!=='TODOS'?curMun:null,
+        zonaCod: curZon!=='TODOS'?curZon:null,
+        pueCod: curPue!=='TODOS'?curPue:null
+      });
       if(_va != null){
         renderDonut({votant: _va, votnul: _nul, votnma: _nma, votblan: _bla}, _pot.potencial, _pot.mujeres, _pot.hombres);
       } else {
