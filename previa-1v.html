@@ -119,8 +119,10 @@
 
     /* PONDERADOR */
     .ponderador{padding:1rem 2.5rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.015)}
-    .ponderador-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:.55rem}
+    .ponderador-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:.55rem;gap:.9rem;flex-wrap:wrap}
     .ponderador-title{font-family:Avenir,sans-serif;font-weight:500;font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.55)}
+    .pond-fuente{font-family:Avenir,sans-serif;font-weight:400;font-size:.68rem;letter-spacing:.05em;color:rgba(255,255,255,.45);margin-left:.6rem}
+    body.day-mode .pond-fuente{color:rgba(0,0,0,.55)}
     .ponderador-total{font-family:Avenir,sans-serif;font-weight:400;font-size:.78rem;color:rgba(255,255,255,.5)}
     .ponderador-total b{color:var(--white);font-weight:500}
     #stack{display:flex;height:30px;width:100%;border:1px solid rgba(255,255,255,.1);overflow:hidden}
@@ -271,6 +273,7 @@
       <div class="pond-title-wrap">
         <div class="ponderador-title">Ponderador electoral (100%)</div>
         <button class="info-btn" onclick="openMethodology()" title="Cómo se calcula" aria-label="Metodología">?</button>
+        <span class="pond-fuente" id="pond-fuente"></span>
       </div>
       <div class="ponderador-total">Suma actual: <b id="stack-sum">100.0%</b></div>
     </div>
@@ -428,10 +431,17 @@
   // selectedId === '<id>' → MODO FILTRO. El mapa pinta sólo la fuerza de ese
   //   candidato (gradiente claro→oscuro de su propio color).
   let selectedId = null;
-  const BASE = CANDIDATOS.map(c => ({ ...c }));
+  // BASE se rehidrata desde ponderador-actual.json si está disponible; si no,
+  // cae al pct hardcoded del array CANDIDATOS (valores de la última encuesta
+  // vigente al momento del deploy).
+  let BASE = CANDIDATOS.map(c => ({ ...c }));
+  let PONDERADOR_META = null;  // { fuente, fecha_corte, url_fuente } cuando se carga el JSON
 
   const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
   const DEPARTAMENTOS_URL = `${S3}/mapas-2026/DEPARTAMENTOS2.json`;
+  // Archivo local en la raíz del sitio. Cuando escalamos al ponderador propio
+  // (Opción C) cambiamos esta URL al JSON generado por el scraper en S3.
+  const PONDERADOR_URL = 'ponderador-actual.json';
 
   // ─── HELPERS ──────────────────────────────────────────────────
   const norm = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase();
@@ -930,11 +940,53 @@
     }
   });
 
+  // ─── CARGA DEL PONDERADOR (Opción A: JSON amarrado a LSV) ─────
+  // Amarra los valores iniciales de pct a una fuente canónica externa
+  // (ponderador LSV al corte fecha_corte). Si falla la red, mantiene
+  // los valores hardcoded del array CANDIDATOS como fallback.
+  async function loadPonderador(){
+    try{
+      const r = await fetch(PONDERADOR_URL, { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const data = await r.json();
+      if (!data || !data.candidatos) throw new Error('JSON inválido');
+      // Sobrescribimos pct en CANDIDATOS y en BASE para los ids que existan
+      CANDIDATOS.forEach(c => {
+        const entry = data.candidatos[c.id];
+        if (entry && typeof entry.pct === 'number') c.pct = entry.pct;
+      });
+      BASE = CANDIDATOS.map(c => ({ ...c }));
+      PONDERADOR_META = {
+        fuente: data.fuente,
+        fecha_corte: data.fecha_corte,
+        url_fuente: data.url_fuente,
+      };
+      renderPonderadorFuente();
+    }catch(e){
+      console.warn('[Previa] usando valores hardcoded (no se pudo cargar el ponderador):', e.message);
+    }
+  }
+
+  // Renderiza un chip pequeño en el header del ponderador con la fuente.
+  function renderPonderadorFuente(){
+    const el = document.getElementById('pond-fuente');
+    if (!el || !PONDERADOR_META) return;
+    const fecha = PONDERADOR_META.fecha_corte || '—';
+    const url = PONDERADOR_META.url_fuente || '#';
+    el.innerHTML =
+      '<a href="' + url + '" target="_blank" rel="noopener" ' +
+      'style="color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">' +
+      'Base: La Silla Vacía · ' + fecha + '</a>';
+  }
+
   // ─── BOOT ─────────────────────────────────────────────────────
-  renderPonderador();
-  renderPanel();
-  repaintMap();
-  initMap();
+  (async () => {
+    await loadPonderador();     // primero amarramos pct al ponderador externo
+    renderPonderador();
+    renderPanel();
+    repaintMap();
+    initMap();
+  })();
 </script>
 </body>
 </html>
