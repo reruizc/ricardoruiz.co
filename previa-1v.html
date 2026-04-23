@@ -220,6 +220,14 @@
     #leaflet-map,#leaflet-map .leaflet-container{cursor:default!important}
     #leaflet-map .leaflet-grab,#leaflet-map .leaflet-dragging .leaflet-grab,#leaflet-map.leaflet-grab{cursor:default!important}
     #leaflet-map .leaflet-interactive{cursor:pointer!important}
+    .map-back-btn{display:none;font-family:Avenir,sans-serif;font-weight:500;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue);background:rgba(0,71,255,.1);border:1px solid rgba(0,71,255,.5);padding:.35rem .75rem;cursor:pointer;transition:all .15s}
+    .map-back-btn:hover{background:var(--blue);color:#fff}
+    .map-back-btn.show{display:inline-flex}
+    body.day-mode .map-back-btn{background:rgba(0,71,255,.08);color:var(--blue);border-color:rgba(0,71,255,.5)}
+    body.day-mode .map-back-btn:hover{background:var(--blue);color:#fff}
+    .map-loading{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(6,8,16,.85);z-index:800;font-family:Avenir,sans-serif;font-weight:500;font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.75);pointer-events:none}
+    .map-loading.show{display:flex}
+    body.day-mode .map-loading{background:rgba(230,222,211,.85);color:rgba(0,0,0,.7)}
     .map-legend-title{font-family:Avenir,sans-serif;font-weight:500;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.4)}
     .map-legend-bar{width:260px;height:8px;background:linear-gradient(to right,#0d1b3e,#1d4ed8,#0891b2,#15803d,#ca8a04,#fef08a,#ea580c,#dc2626)}
     .map-legend-ends{display:flex;justify-content:space-between;width:260px;font-family:Avenir,sans-serif;font-weight:400;font-size:.68rem;color:rgba(255,255,255,.5)}
@@ -344,12 +352,18 @@
       <div class="map-head">
         <div>
           <div class="map-head-title" id="map-head-label">Ganador por departamento</div>
-          <div class="map-head-cand" id="map-cand-name">Clic en una fórmula para filtrar</div>
+          <div class="map-head-cand" id="map-cand-name">Clic en un departamento para ver sus municipios</div>
         </div>
-        <div class="map-head-pct" id="map-cand-pct"></div>
+        <div style="display:flex;align-items:center;gap:.75rem">
+          <button class="map-back-btn" id="map-back-btn" onclick="exitToNacional()">← Nacional</button>
+          <div class="map-head-pct" id="map-cand-pct"></div>
+        </div>
       </div>
       <div class="map-legend" id="map-legend"></div>
-      <div id="leaflet-map"></div>
+      <div style="position:relative;flex:1;display:flex;flex-direction:column">
+        <div id="leaflet-map"></div>
+        <div class="map-loading" id="map-loading">Cargando municipios…</div>
+      </div>
     </div>
 
     <!-- PANEL -->
@@ -615,6 +629,14 @@
   // ─── LEAFLET MAP ──────────────────────────────────────────────
   let map = null, deptLayer = null, geoData = null;
 
+  // Drill-down: null = vista nacional (departamentos).
+  // '05', '16', etc = depto actual en zoom (municipios visibles).
+  let currentDepCod = null;
+  let munLayer = null;               // capa activa de municipios (drill)
+  const _munGeoCache = {};           // { depCod: GeoJSON }  (lazy, por sesión)
+  let nacionalMunLayer = null;       // capa con TODOS los municipios del país
+  let _nacionalMunFeatures = null;   // todos los features agregados (cacheado)
+
   function initMap(){
     // Mapa estático: sin zoom ni pan. Los controles de Leaflet quedan
     // desactivados y el usuario no puede desplazar ni ampliar el mapa.
@@ -744,8 +766,198 @@
         }
         layer.bindTooltip(html, { sticky:true, className:'leaflet-dark-tooltip', opacity:1 }).openTooltip();
       },
-      mouseout(){ if (deptLayer) deptLayer.resetStyle(layer); layer.closeTooltip(); }
+      mouseout(){ if (deptLayer) deptLayer.resetStyle(layer); layer.closeTooltip(); },
+      click(){
+        // Click en un depto → drill-down a sus municipios.
+        // Usa electoral_id si existe, si no el nombre → código via SENADO_BY_DEPTO.
+        const props = feature.properties;
+        let depCod = props.electoral_id || props.dep_electoral;
+        if (!depCod){
+          const entry = SENADO_BY_DEPTO[norm(nm)];
+          depCod = entry?.cod;
+        }
+        if (depCod) drillToDepto(String(depCod).padStart(2,'0'), nm);
+      }
     });
+  }
+
+  // ─── DRILL-DOWN: depto → municipios ──────────────────────────
+  async function getMunGeo(depCod){
+    const key = String(depCod).padStart(2, '0');
+    if (_munGeoCache[key]) return _munGeoCache[key];
+    const url = `${S3}/mapas-2026/Departamentos-mps/${key}.json`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    _munGeoCache[key] = data;
+    return data;
+  }
+
+  // Nombre del depto padre para un feature de municipio (para heredar bias)
+  function munParentDep(props){
+    return props.dpto_cnmbr || props.DPTO_CNMBR || props.dpto_ccnbr || '';
+  }
+
+  // Estilo para una feature de municipio. El bias se hereda del depto padre
+  // (mismo color/intensidad para todos los municipios del mismo depto) hasta
+  // que el script build-historicos provea bias a nivel municipal.
+  function munFeatureStyle(feature){
+    const depNom = munParentDep(feature.properties);
+    return _styleByDepName(depNom);
+  }
+
+  function _styleByDepName(depNom){
+    if (selectedId){
+      const cand = CANDIDATOS.find(c => c.id === selectedId);
+      if (!cand) return { fillColor:'#1a1d2e', fillOpacity:.35, color:'rgba(255,255,255,.3)', weight:.7 };
+      const total = CANDIDATOS.reduce((s,c) => s + projected(c, depNom), 0);
+      const share = total > 0 ? projected(cand, depNom) / total : 0;
+      const intensity = Math.min(1, share / Math.max(_maxSingleShare, .01));
+      return { fillColor: colorWithIntensity(cand.color, intensity), fillOpacity:.9, color:'rgba(255,255,255,0.3)', weight:.7 };
+    }
+    const r = computeDeptoRanking(depNom);
+    if (!r || !r.winner) return { fillColor:'#1a1d2e', fillOpacity:.35, color:'rgba(255,255,255,.3)', weight:.7 };
+    const intensity = Math.min(1, r.margin / Math.max(_maxMargin, 1));
+    return { fillColor: colorWithIntensity(r.winner.color, intensity), fillOpacity:.9, color:'rgba(255,255,255,0.3)', weight:.7 };
+  }
+
+  function onEachMunFeature(feature, layer){
+    const props = feature.properties;
+    const munName = props.mpio_cnmbr || props.NOMBRE_MPI || 'Municipio';
+    const depNom = munParentDep(props);
+    layer.on({
+      mouseover(){
+        layer.setStyle({ weight: 2, color:'#fff', fillOpacity: .98 });
+        let html = '';
+        if (selectedId){
+          const cand = CANDIDATOS.find(c => c.id === selectedId);
+          const total = CANDIDATOS.reduce((s,c) => s + projected(c, depNom), 0);
+          const share = total > 0 ? projected(cand, depNom) / total : 0;
+          html = `
+            <div style="font-family:Avenir,sans-serif;line-height:1.5">
+              <div style="font-family:'Syne',sans-serif;font-weight:700;color:#fff;font-size:.95rem;margin-bottom:.25rem">${munName}</div>
+              <div style="color:rgba(255,255,255,.55);font-size:.7rem;margin-bottom:.3rem">${depNom}</div>
+              <div style="color:${cand?cand.color:'#fff'};font-size:.78rem;font-weight:500">${cand ? cand.nombre : ''}</div>
+              <div style="color:#fff;font-size:.88rem;margin-top:.2rem">Fuerza local: <b>${(share*100).toFixed(1)}%</b></div>
+              <div style="color:rgba(255,255,255,.55);font-size:.7rem;margin-top:.3rem;font-style:italic">Bias municipal hereda del depto (en calibración)</div>
+            </div>`;
+        } else {
+          const r = computeDeptoRanking(depNom);
+          if (r && r.winner){
+            const total = r.ranked.reduce((s,x)=>s+x.v,0);
+            const winPct = total > 0 ? r.winnerV/total*100 : 0;
+            const secPct = r.second && total > 0 ? r.secondV/total*100 : 0;
+            html = `
+              <div style="font-family:Avenir,sans-serif;line-height:1.55">
+                <div style="font-family:'Syne',sans-serif;font-weight:700;color:#fff;font-size:.95rem;margin-bottom:.15rem">${munName}</div>
+                <div style="color:rgba(255,255,255,.55);font-size:.7rem;margin-bottom:.3rem">${depNom}</div>
+                <div style="color:${r.winner.color};font-size:.82rem;font-weight:500">1º ${r.winner.nombre}</div>
+                <div style="color:rgba(255,255,255,.8);font-size:.78rem"> ${winPct.toFixed(1)}% local</div>
+                ${r.second ? `<div style="color:${r.second.color};font-size:.76rem;margin-top:.15rem">2º ${r.second.nombre} · ${secPct.toFixed(1)}%</div>` : ''}
+                <div style="color:rgba(255,255,255,.45);font-size:.68rem;margin-top:.3rem;font-style:italic">Hereda bias del depto</div>
+              </div>`;
+          } else {
+            html = `<div style="font-family:Avenir,sans-serif;color:rgba(255,255,255,.7)">${munName}</div>`;
+          }
+        }
+        layer.bindTooltip(html, { sticky:true, className:'leaflet-dark-tooltip', opacity:1 }).openTooltip();
+      },
+      mouseout(){
+        const activeLayer = munLayer || nacionalMunLayer;
+        if (activeLayer) activeLayer.resetStyle(layer);
+        layer.closeTooltip();
+      }
+    });
+  }
+
+  function showMapLoading(msg){
+    const el = document.getElementById('map-loading');
+    if (!el) return;
+    el.textContent = msg || 'Cargando municipios…';
+    el.classList.add('show');
+  }
+  function hideMapLoading(){
+    document.getElementById('map-loading')?.classList.remove('show');
+  }
+
+  // Entra al drill-down de un depto: quita deptLayer, añade munLayer de ese depto
+  async function drillToDepto(depCod, depNom){
+    if (currentLevel !== 'dep') return;  // sólo desde vista departamental
+    if (currentDepCod === depCod) return;
+    showMapLoading(`Cargando ${depNom}…`);
+    try {
+      const geo = await getMunGeo(depCod);
+      if (nacionalMunLayer){ map.removeLayer(nacionalMunLayer); nacionalMunLayer = null; }
+      if (munLayer){ map.removeLayer(munLayer); munLayer = null; }
+      if (deptLayer) map.removeLayer(deptLayer);
+      munLayer = L.geoJSON(geo, { style: munFeatureStyle, onEachFeature: onEachMunFeature }).addTo(map);
+      currentDepCod = depCod;
+      try { const b = munLayer.getBounds(); if (b.isValid()) map.fitBounds(b, { padding:[10,10] }); } catch(e){}
+      document.getElementById('map-back-btn')?.classList.add('show');
+      updateMapHeadForDrill(depNom, (geo.features||[]).length);
+    } catch(e){
+      console.error('[Previa] error cargando muns de', depCod, e);
+    } finally {
+      hideMapLoading();
+    }
+  }
+
+  function exitToNacional(){
+    if (munLayer){ map.removeLayer(munLayer); munLayer = null; }
+    if (nacionalMunLayer){ map.removeLayer(nacionalMunLayer); nacionalMunLayer = null; }
+    if (deptLayer) deptLayer.addTo(map);
+    currentDepCod = null;
+    document.getElementById('map-back-btn')?.classList.remove('show');
+    try { if (deptLayer){ const b = deptLayer.getBounds(); if (b.isValid()) map.fitBounds(b, { padding:[12,12] }); } } catch(e){}
+    repaintMap();
+  }
+
+  function updateMapHeadForDrill(depNom, nMuns){
+    const label = document.getElementById('map-head-label');
+    const nameEl = document.getElementById('map-cand-name');
+    if (label) label.textContent = `${depNom} · ${nMuns} municipios`;
+    if (nameEl){
+      if (selectedId){
+        const cand = CANDIDATOS.find(c => c.id === selectedId);
+        nameEl.textContent = cand ? cand.nombre : '—';
+        nameEl.style.color = cand ? cand.color : '';
+      } else {
+        nameEl.textContent = 'Color hereda del depto (bias municipal en calibración)';
+        nameEl.style.color = '';
+      }
+    }
+  }
+
+  // Carga municipal NACIONAL: fetches paralelos por todos los deptos conocidos
+  async function loadMunicipalNacional(){
+    if (nacionalMunLayer){ nacionalMunLayer.addTo(map); return; }
+    // Si ya tenemos los features cacheados, sólo reconstruimos la capa
+    if (_nacionalMunFeatures){
+      nacionalMunLayer = L.geoJSON({ type:'FeatureCollection', features: _nacionalMunFeatures },
+        { style: munFeatureStyle, onEachFeature: onEachMunFeature }).addTo(map);
+      return;
+    }
+    showMapLoading('Cargando municipios de todo el país…');
+    try {
+      // Lista de codes de deptos — los tomamos de senado si está cargado,
+      // sino de una lista fallback completa de Registraduría.
+      let codes = Object.values(SENADO_BY_DEPTO).map(x => x.cod).filter(Boolean);
+      if (!codes.length){
+        codes = ['01','02','03','05','07','08','09','11','12','13','15','16','17','19','21','23','24','25','26','27','28','29','31','40','44','46','48','50','52','54','56','60','64','68','72','88'];
+      }
+      const all = await Promise.all(codes.map(c => getMunGeo(c).catch(() => null)));
+      const features = [];
+      for (const geo of all){
+        if (geo && geo.features) features.push(...geo.features);
+      }
+      _nacionalMunFeatures = features;
+      nacionalMunLayer = L.geoJSON({ type:'FeatureCollection', features },
+        { style: munFeatureStyle, onEachFeature: onEachMunFeature }).addTo(map);
+    } catch(e){
+      console.error('[Previa] error cargando muns nacionales:', e);
+    } finally {
+      hideMapLoading();
+    }
   }
 
   // Cuenta cuántos deptos gana cada candidato (modo ganadores).
@@ -762,6 +974,8 @@
   function repaintMap(){
     recomputeScales();
     if (deptLayer) deptLayer.setStyle(featureStyle);
+    if (munLayer) munLayer.setStyle(munFeatureStyle);
+    if (nacionalMunLayer) nacionalMunLayer.setStyle(munFeatureStyle);
     const label = document.getElementById('map-head-label');
     const nameEl = document.getElementById('map-cand-name');
     const pctEl  = document.getElementById('map-cand-pct');
@@ -773,9 +987,17 @@
       nameEl.style.color = cand ? cand.color : 'var(--white)';
       pctEl.textContent = cand ? (fmtPct(cand.pct) + ' nacional') : '';
     } else {
-      label.textContent = 'Ganador por departamento';
-      nameEl.textContent = 'Clic en una fórmula para filtrar';
-      nameEl.style.color = '';
+      // Si estamos en drill-down, updateMapHeadForDrill ya escribió el título.
+      // Sólo sobreescribimos cuando NO hay depto activo.
+      if (!currentDepCod && currentLevel !== 'mun'){
+        label.textContent = 'Ganador por departamento';
+        nameEl.textContent = 'Clic en un depto para ver sus municipios';
+        nameEl.style.color = '';
+      } else if (currentLevel === 'mun'){
+        label.textContent = 'Ganador por municipio (nacional)';
+        nameEl.textContent = 'Los colores heredan del depto (bias en calibración)';
+        nameEl.style.color = '';
+      }
       // Total nacional de votación estimada (suma sobre todos los candidatos)
       let totalVotes = 0;
       for (const c of CANDIDATOS) totalVotes += estimatedVotes(c);
@@ -1150,7 +1372,7 @@
   }
 
   let currentLevel = 'dep';
-  function switchView(level){
+  async function switchView(level){
     const { isLogged, isPremium } = authInfo();
     const hint = document.getElementById('toggle-hint');
     if (level === 'mun' && !isLogged){
@@ -1166,10 +1388,26 @@
     document.querySelectorAll('#view-toggles .toggle-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.level === level);
     });
-    // Los mapas municipal / puestos se conectarán cuando tengamos las URLs.
-    // Por ahora mantenemos el mapa departamental visible y mostramos un aviso.
-    if (level !== 'dep'){
-      hint.innerHTML = 'Mapa ' + (level === 'mun' ? 'municipal' : 'por puestos') + ' en preparación · llega en breve';
+
+    if (level === 'dep'){
+      // Vuelve a vista nacional por deptos. Remueve cualquier capa mun.
+      if (munLayer){ map.removeLayer(munLayer); munLayer = null; }
+      if (nacionalMunLayer){ map.removeLayer(nacionalMunLayer); nacionalMunLayer = null; }
+      if (deptLayer && !map.hasLayer(deptLayer)) deptLayer.addTo(map);
+      currentDepCod = null;
+      document.getElementById('map-back-btn')?.classList.remove('show');
+      try { if (deptLayer){ const b = deptLayer.getBounds(); if (b.isValid()) map.fitBounds(b, { padding:[12,12] }); } } catch(e){}
+      repaintMap();
+    } else if (level === 'mun'){
+      // Vista municipal nacional (todos los muns del país).
+      if (munLayer){ map.removeLayer(munLayer); munLayer = null; }
+      if (deptLayer) map.removeLayer(deptLayer);
+      currentDepCod = null;
+      document.getElementById('map-back-btn')?.classList.remove('show');
+      await loadMunicipalNacional();
+      repaintMap();
+    } else if (level === 'pue'){
+      hint.innerHTML = 'Mapa por puestos en preparación · llega en breve';
     }
   }
 
