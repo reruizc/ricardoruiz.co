@@ -21,6 +21,31 @@ S3: dejarlos en disco local y entregar al usuario el comando exacto que
 debe correr él (incluyendo ruta origen → prefijo destino), junto con una
 lista clara de los archivos generados.
 
+## Pipeline de históricos — `tools/build-historicos.js`
+Script Node (streaming, sin dependencias) que procesa un archivo GCS de
+la Registraduría y genera tres JSONs agregados por elección:
+```
+tools/build-historicos.js <archivo.csv> <out-dir> [--meta k=v,k=v]
+  → {out-dir}/resumen.json     (~2 KB,  nacional por candidato)
+  → {out-dir}/por-depto.json   (~30 KB, depto × candidato)
+  → {out-dir}/por-mun.json     (~1 MB,  mun × candidato)
+```
+Normaliza nombres (MAYÚS sin tildes). `COD_CAN` 996/997/998/999 se
+agrupan en `especiales` aparte; el porcentaje de cada candidato se
+calcula sobre `votos_validos` (excluyendo especiales). Procesa 100 MB
+en ~1,5 s en una laptop.
+
+**Outputs locales** (gitignored, no subir al repo):
+```
+/Users/ricardoruiz/ricardoruiz.co/Bases de datos/output_historicos/
+  pres-2010-v1/{resumen,por-depto,por-mun}.json
+  pres-2014-v1/{resumen,por-depto,por-mun}.json
+  pres-2018-v1/{resumen,por-depto,por-mun}.json
+  pres-2022-v1/{resumen,por-depto,por-mun}.json
+  consulta-2025-pacto/{resumen,por-depto,por-mun}.json
+```
+Subir a S3 bajo `ricardoruiz.co/congreso-2026/output/historicos/`.
+
 ## Data — S3
 ```
 const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
