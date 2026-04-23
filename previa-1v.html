@@ -610,9 +610,86 @@
   // Senado 2026: 20,56M (~49,8%). Target presidencial ~54% → factor 1,087.
   // Ref histórica: 2022 pres/con = 1,157 · 2018 pres/con = 1,092.
   const TURNOUT_SCALE = 1.087;
-  // SENADO_BY_DEPTO[ norm(nombre) ] = { votant, cod, nombre }
+  // SENADO_BY_DEPTO[ norm(nombre) ] = { votant, votval, cod, nombre, partidos }
   // Se llena una vez al boot desde senado/departamentos.json
   let SENADO_BY_DEPTO = {};
+
+  // URL base de históricos procesados (5 JSONs subidos por el usuario)
+  const HISTORICOS_URL = `${S3}/historicos`;
+  // Señales históricas disponibles en S3. Se podrán sumar más cuando se
+  // procesen los GCS de Congreso 2014/2018/2022 o consultas 2022/2026.
+  const HISTORICO_KEYS = [
+    'pres-2010-v1',
+    'pres-2014-v1',
+    'pres-2018-v1',
+    'pres-2022-v1',
+    'consulta-2025-pacto',
+  ];
+  // HISTORICOS[sig] = { nacional: { nombreNorm: pctFraccion }, deptos: { depCod: { nombreNorm: pctFraccion } } }
+  let HISTORICOS = {};
+  // Cache calibrado de bias por candidato y depto (nombre normalizado).
+  // Se llena tras cargar históricos + senado. Si está vacío, biasFor() cae
+  // al bias hardcoded de CANDIDATOS (valor ilustrativo inicial).
+  let _biasCache = {};
+
+  // ─── EQUIVALENCIAS: candidato 2026 → señales históricas ────────
+  // Cada entrada es el perfil de ponderación descrito en el documento
+  // metodológico (Capítulo 5 · Esquema Final de Ponderación de Señales).
+  // Las claves dentro de cada candidato son IDs de señal que deben existir
+  // como dataset cargado (HISTORICOS[sig] o 'senado-2026' si applies).
+  //   cands/partidos   = nombres NORMALIZADOS (MAYÚS sin tildes) buscados
+  //                      en el índice del histórico correspondiente.
+  //   peso             = w_señal del modelo (se normaliza por Σw al calcular).
+  // Los nombres de partidos en 'senado-2026' deben coincidir con los tal
+  // cual aparecen en el JSON (luego se normalizan al compararlos).
+  const EQUIVALENCIAS = {
+    'ic': {  // Iván Cepeda — trayectoria directa en consulta Pacto + Petro como equivalente
+      'consulta-2025-pacto': { cands: ['IVAN CEPEDA CASTRO'], peso: 0.38 },
+      'senado-2026':         { partidos: ['PACTO HISTÓRICO SENADO'], peso: 0.18 },
+      'pres-2022-v1':        { cands: ['GUSTAVO PETRO'], peso: 0.17 },
+      'pres-2018-v1':        { cands: ['GUSTAVO PETRO'], peso: 0.10 },
+      'pres-2014-v1':        { cands: ['CLARA LOPEZ'], peso: 0.05 },   // sólo Clara López, no Peñalosa
+      'pres-2010-v1':        { cands: ['GUSTAVO FRANCISCO PETRO URREGO', 'AURELIJUS RUTENIS ANTANAS MOCKUS SIVICKAS'], peso: 0.02 },
+    },
+    'ae': {  // Abelardo de la Espriella — outsider, sin trayectoria previa
+      'senado-2026':  { partidos: ['MOVIMIENTO SALVACIÓN NACIONAL'], peso: 0.30 },
+      'pres-2022-v1': { cands: ['FEDERICO GUTIERREZ', 'RODOLFO HERNANDEZ'], peso: 0.25 },
+      'pres-2018-v1': { cands: ['IVAN DUQUE'], peso: 0.15 },
+      'pres-2014-v1': { cands: ['OSCAR IVAN ZULUAGA'], peso: 0.10 },
+      'pres-2010-v1': { cands: ['JUAN MANUEL SANTOS CALDERON'], peso: 0.05 },
+    },
+    'pv': {  // Paloma Valencia — Centro Democrático con dos candidaturas previas
+      'senado-2026':  { partidos: ['PARTIDO CENTRO DEMOCRÁTICO'], peso: 0.28 },
+      'pres-2022-v1': { cands: ['FEDERICO GUTIERREZ'], peso: 0.18 },
+      'pres-2018-v1': { cands: ['IVAN DUQUE'], peso: 0.10 },
+      'pres-2014-v1': { cands: ['OSCAR IVAN ZULUAGA'], peso: 0.04 },
+    },
+    'sf': {  // Sergio Fajardo — dos observaciones directas
+      'pres-2022-v1': { cands: ['SERGIO FAJARDO'], peso: 0.30 },
+      'pres-2018-v1': { cands: ['SERGIO FAJARDO'], peso: 0.25 },
+      'senado-2026':  { partidos: ['ALIANZA POR COLOMBIA', 'AHORA COLOMBIA'], peso: 0.15 },  // dignidad fragmentado, verde dividido
+      'pres-2014-v1': { cands: ['ENRIQUE PENALOSA', 'MARTHA LUCIA RAMIREZ'], peso: 0.07 },
+      'pres-2010-v1': { cands: ['AURELIJUS RUTENIS ANTANAS MOCKUS SIVICKAS'], peso: 0.05 },
+    },
+    'cl': {  // Claudia López — ex Alianza Verde, Bogotá como base
+      'senado-2026':  { partidos: ['AHORA COLOMBIA'], peso: 0.15 },  // fragmento verde independiente
+      'pres-2022-v1': { cands: ['SERGIO FAJARDO'], peso: 0.18 },
+      'pres-2018-v1': { cands: ['SERGIO FAJARDO'], peso: 0.08 },
+      'pres-2014-v1': { cands: ['ENRIQUE PENALOSA'], peso: 0.04 },
+    },
+    'rb': {  // Roy Barreras — Frente Amplio Unitario en Senado
+      'senado-2026':  { partidos: ['FRENTE AMPLIO UNITARIO'], peso: 0.28 },
+      'pres-2022-v1': { cands: ['GUSTAVO PETRO'], peso: 0.15 },
+      'pres-2018-v1': { cands: ['HUMBERTO DE LA CALLE'], peso: 0.08 },
+    },
+    'lm': {  // Luis Gilberto Murillo — Chocó, Pacto moderado
+      'senado-2026':  { partidos: ['PACTO HISTÓRICO SENADO'], peso: 0.15 },
+      'pres-2022-v1': { cands: ['SERGIO FAJARDO', 'GUSTAVO PETRO'], peso: 0.20 },
+      'pres-2018-v1': { cands: ['HUMBERTO DE LA CALLE'], peso: 0.10 },
+    },
+    'nd': {  // Blanco / Indecisos — sin bias regional (uniforme)
+    },
+  };
 
   // ─── HELPERS ──────────────────────────────────────────────────
   const norm = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase();
@@ -622,7 +699,13 @@
 
   function biasFor(cand, depNom){
     const k = norm(depNom);
-    return (cand.bias && cand.bias[k] != null) ? cand.bias[k] : 1.0;
+    // 1) Bias calibrado desde históricos + senado (si HISTORICOS cargó OK)
+    const cached = _biasCache[cand.id]?.[k];
+    if (cached != null && cached > 0) return cached;
+    // 2) Fallback al bias hardcoded en CANDIDATOS (valor ilustrativo)
+    if (cand.bias && cand.bias[k] != null) return cand.bias[k];
+    // 3) Default: promedio nacional (1.0 = mismo que nacional)
+    return 1.0;
   }
   function projected(cand, depNom){ return cand.pct * biasFor(cand, depNom); }
 
@@ -1634,12 +1717,126 @@
         const k = norm(d.nombre);
         SENADO_BY_DEPTO[k] = {
           votant: d.votant || 0,
+          votval: d.votval || 0,
           cod: d.cod,
           nombre: d.nombre,
+          partidos: d.partidos || {},
         };
       }
     }catch(e){
       console.warn('[Previa] no se pudo cargar Senado 2026 para estimar votantes:', e.message);
+    }
+  }
+
+  // Carga las 5 señales históricas en paralelo y construye el índice
+  // HISTORICOS[sig] = { nacional, deptos } con pcts como fracción 0–1.
+  async function loadHistoricos(){
+    const urls = HISTORICO_KEYS.map(k => `${HISTORICOS_URL}/${k}/por-depto.json`);
+    const results = await Promise.all(urls.map(u =>
+      fetch(u, { cache: 'force-cache' })
+        .then(r => r.ok ? r.json() : null)
+        .catch(() => null)
+    ));
+    results.forEach((data, i) => {
+      if (!data) return;
+      const sig = HISTORICO_KEYS[i];
+      const deptos = {};
+      const nacCounts = {};
+      let nacValidos = 0;
+      for (const [depCod, dep] of Object.entries(data)){
+        const byName = {};
+        const depValidos = dep.votos_validos || 0;
+        for (const c of Object.values(dep.candidatos || {})){
+          const key = norm(c.nombre);
+          byName[key] = depValidos > 0 ? (c.votos / depValidos) : 0;
+          nacCounts[key] = (nacCounts[key] || 0) + c.votos;
+        }
+        nacValidos += depValidos;
+        deptos[depCod] = byName;
+      }
+      const nacional = {};
+      for (const [n, v] of Object.entries(nacCounts)){
+        nacional[n] = nacValidos > 0 ? v / nacValidos : 0;
+      }
+      HISTORICOS[sig] = { nacional, deptos };
+    });
+  }
+
+  // Construye HISTORICOS['senado-2026'] a partir de SENADO_BY_DEPTO.
+  // Debe llamarse DESPUÉS de loadSenadoParticipacion().
+  function buildSenadoHistorico(){
+    if (!Object.keys(SENADO_BY_DEPTO).length) return;
+    const nacCounts = {};
+    let nacValidos = 0;
+    const deptos = {};
+    for (const s of Object.values(SENADO_BY_DEPTO)){
+      const depValidos = s.votval || 0;
+      nacValidos += depValidos;
+      const byPart = {};
+      for (const [partido, votos] of Object.entries(s.partidos || {})){
+        const key = norm(partido);
+        byPart[key] = depValidos > 0 ? votos / depValidos : 0;
+        nacCounts[key] = (nacCounts[key] || 0) + votos;
+      }
+      deptos[s.cod] = byPart;
+    }
+    const nacional = {};
+    for (const [p, v] of Object.entries(nacCounts)){
+      nacional[p] = nacValidos > 0 ? v / nacValidos : 0;
+    }
+    HISTORICOS['senado-2026'] = { nacional, deptos };
+  }
+
+  // Computa bias(c, d) según EQUIVALENCIAS y las señales cargadas.
+  // Guarda resultado en _biasCache[candId][deptoNombreNormalizado].
+  function precomputeBias(){
+    _biasCache = {};
+    const depCodByName = {};  // cod → nombreNormalizado (para rellenar cache con keys por nombre)
+    for (const s of Object.values(SENADO_BY_DEPTO)){
+      depCodByName[s.cod] = norm(s.nombre);
+    }
+    const depCodes = Object.keys(depCodByName);
+    if (!depCodes.length) return;
+
+    for (const cand of CANDIDATOS){
+      const equiv = EQUIVALENCIAS[cand.id];
+      if (!equiv || !Object.keys(equiv).length) continue;
+
+      _biasCache[cand.id] = {};
+
+      for (const depCod of depCodes){
+        const depKey = depCodByName[depCod];
+        let num = 0;     // Σ w_sig × (pct_dep / pct_nac)
+        let wTot = 0;    // Σ w_sig aplicados
+
+        for (const [sig, spec] of Object.entries(equiv)){
+          const dataset = HISTORICOS[sig];
+          if (!dataset) continue;
+          const names = spec.cands || spec.partidos || [];
+          if (!names.length) continue;
+
+          // Agregamos pct (fracciones) nacionales y departamentales de
+          // los equivalentes. Si ninguno aparece, se omite la señal
+          // (evita dividir 0/0 y no penalizar al candidato).
+          let nacSum = 0, depSum = 0, foundAny = false;
+          for (const n of names){
+            const key = norm(n);
+            const nac = dataset.nacional[key];
+            if (nac == null) continue;
+            foundAny = true;
+            nacSum += nac;
+            depSum += dataset.deptos[depCod]?.[key] || 0;
+          }
+          if (!foundAny || nacSum <= 0) continue;
+
+          const rel = depSum / nacSum;   // fuerza relativa ≥ 0
+          num  += spec.peso * rel;
+          wTot += spec.peso;
+        }
+        if (wTot > 0){
+          _biasCache[cand.id][depKey] = num / wTot;
+        }
+      }
     }
   }
 
@@ -1694,9 +1891,24 @@
 
   // ─── BOOT ─────────────────────────────────────────────────────
   (async () => {
-    // En paralelo: ponderador (para pct iniciales) y Senado (para votantes
-    // esperados por depto). Ninguno es bloqueante para el render inicial.
-    await Promise.all([loadPonderador(), loadSenadoParticipacion()]);
+    // Paralelizamos todo lo que no tiene dependencia entre sí:
+    //   - ponderador externo (pct iniciales por candidato)
+    //   - Senado 2026 (votantes esperados + señal partidista)
+    //   - históricos 2010/2014/2018/2022 + consulta 2025 (calibración bias)
+    await Promise.all([
+      loadPonderador(),
+      loadSenadoParticipacion(),
+      loadHistoricos(),
+    ]);
+    // Ahora que senado y los históricos cargaron, construimos la señal
+    // 'senado-2026' y precomputamos bias(c, d) para todos los candidatos.
+    buildSenadoHistorico();
+    precomputeBias();
+    // Log de cobertura para verificar que la calibración funcionó
+    const sigOk = HISTORICO_KEYS.filter(k => HISTORICOS[k]).length;
+    const biasCount = Object.values(_biasCache).reduce((s, m) => s + Object.keys(m).length, 0);
+    console.log(`[Previa] calibración: ${sigOk}/${HISTORICO_KEYS.length} históricos + senado 2026 → ${biasCount} celdas bias computadas`);
+
     renderPonderador();
     renderPanel();
     repaintMap();
