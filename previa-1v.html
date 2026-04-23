@@ -135,6 +135,28 @@
     .pond-chip .dot{width:11px;height:11px;display:inline-block;border-radius:2px}
     .pond-chip-num{font-weight:500}
 
+    /* Excel download button + modal (estilo copiado de camara-2026) */
+    .excel-btn{font-family:Avenir,sans-serif;font-weight:500;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:#15803d;border:1px solid #15803d;padding:.45rem .9rem;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:.4rem;margin-left:auto}
+    .excel-btn:hover{background:#166534;border-color:#166534}
+    body.day-mode .excel-btn{background:#15803d;color:#fff;border-color:#15803d}
+    .dl-modal{display:none;position:fixed;inset:0;z-index:99997;background:rgba(4,6,16,.78);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:1.5rem}
+    .dl-modal.show{display:flex}
+    .dl-box{background:#0e1220;border:1px solid rgba(0,71,255,.3);padding:2.2rem 2rem 1.8rem;max-width:520px;width:100%;text-align:center;box-shadow:0 12px 48px rgba(0,0,0,.5)}
+    .dl-title{font-family:'Syne',sans-serif;font-weight:400;font-size:1.15rem;color:var(--white);margin-bottom:1rem;letter-spacing:-.01em}
+    .dl-text{font-family:Avenir,sans-serif;font-weight:400;font-size:1rem;line-height:1.6;color:rgba(255,255,255,.8);margin-bottom:1.6rem}
+    .dl-btns{display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap}
+    .dl-btn{font-family:'Syne',sans-serif;font-weight:400;font-size:.95rem;letter-spacing:.02em;padding:.65rem 1.6rem;cursor:pointer;border:none;transition:background .2s}
+    .dl-btn-ok{background:var(--blue);color:#fff}
+    .dl-btn-ok:hover{background:#0035cc}
+    .dl-btn-cancel{background:rgba(255,255,255,.06);color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.15)}
+    .dl-btn-cancel:hover{background:rgba(255,255,255,.12);color:var(--white)}
+    body.day-mode .dl-modal{background:rgba(240,235,228,.85)}
+    body.day-mode .dl-box{background:#fff;border-color:rgba(0,71,255,.25)}
+    body.day-mode .dl-title{color:#1a1a2e}
+    body.day-mode .dl-text{color:rgba(0,0,0,.75)}
+    body.day-mode .dl-btn-cancel{background:rgba(0,0,0,.04);color:rgba(0,0,0,.6);border-color:rgba(0,0,0,.15)}
+    body.day-mode .dl-btn-cancel:hover{background:rgba(0,0,0,.08);color:#1a1a2e}
+
     .use-note{padding:.95rem 2.5rem 1rem;font-family:Avenir,sans-serif;font-weight:400;font-size:.95rem;line-height:1.55;color:rgba(255,255,255,.78);border-bottom:1px solid var(--border);background:rgba(0,71,255,.04);max-width:none}
     .use-note strong{color:var(--white);font-weight:600}
     .use-note em{font-style:italic;color:rgba(0,71,255,.95)}
@@ -312,6 +334,7 @@
     <button class="toggle-btn active" data-level="dep" onclick="switchView('dep')">Departamental</button>
     <button class="toggle-btn" data-level="mun" onclick="switchView('mun')">Municipal <span class="lock">🔒</span></button>
     <button class="toggle-btn" data-level="pue" onclick="switchView('pue')">Puestos <span class="lock">🔒</span></button>
+    <button class="excel-btn" id="excel-btn" onclick="downloadExcelCurrentView()" title="Descargar la tabla actual en Excel">⬇ Excel</button>
     <span class="toggle-hint" id="toggle-hint"></span>
   </section>
 
@@ -350,6 +373,20 @@
   <footer class="foot">
     © Ricardo Ruiz · Elecciones 2026 · <a href="index.html">ricardoruiz.co</a>
   </footer>
+
+  <!-- Modal: confirmación descarga Excel -->
+  <div class="dl-modal" id="dl-modal" onclick="if(event.target===this)closeDlModal()">
+    <div class="dl-box">
+      <div class="dl-title">Descargar Excel</div>
+      <div class="dl-text">
+        Se exportará la proyección actual del simulador a nivel departamental: votos estimados por candidato, porcentaje, ganador y potencial electoral por departamento. La descarga refleja los valores que has ajustado en los deslizadores.
+      </div>
+      <div class="dl-btns">
+        <button class="dl-btn dl-btn-cancel" onclick="closeDlModal()">Cancelar</button>
+        <button class="dl-btn dl-btn-ok" onclick="confirmDownloadExcel()">OK, Descargar</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Modal: metodología del ponderador -->
   <div class="modal-overlay" id="methodology-modal" onclick="closeMethodology(event)">
@@ -955,6 +992,136 @@
     if (total <= 0) return;
     CANDIDATOS.forEach(c => { c.pct = +(c.pct * 100 / total).toFixed(2); });
     renderPonderador(); renderPanel(); repaintMap();
+  }
+
+  // ─── DESCARGA EXCEL ───────────────────────────────────────────
+  // Exporta la vista actual (proyección por depto) a un archivo .xls
+  // estilo camara-2026: HTML con content-type Excel, abre en Numbers /
+  // Excel / LibreOffice sin dependencias externas.
+  function downloadExcelCurrentView(){
+    if (!geoData || !geoData.features.length){
+      alert('El mapa aún no ha terminado de cargar. Espera un momento y vuelve a intentar.');
+      return;
+    }
+    document.getElementById('dl-modal').classList.add('show');
+  }
+  function closeDlModal(){
+    document.getElementById('dl-modal').classList.remove('show');
+  }
+  function confirmDownloadExcel(){
+    closeDlModal();
+    _doDownloadExcel();
+  }
+  function _doDownloadExcel(){
+    if (!geoData) return;
+    const fecha = new Date().toISOString().slice(0,10);
+    const title = `Previa Primera Vuelta 2026 · Proyección Departamental · ${fecha}`;
+
+    // Cabeceras: Depto, Potencial (votantes_est), Votantes est,
+    // luego por cada candidato → Votos / % / Ganador flag
+    const cands = [...CANDIDATOS].sort((a,b) => b.pct - a.pct);
+    const headers = ['#', 'Departamento', 'Cód. Electoral', 'Votantes Senado 2026', 'Votantes est. pres.'];
+    cands.forEach(c => {
+      headers.push(`${c.nombre} · Votos est.`);
+      headers.push(`${c.nombre} · %`);
+    });
+    headers.push('Ganador', 'Margen (pp)');
+
+    // Una fila por depto
+    const rows = [];
+    geoData.features.forEach((f, i) => {
+      const nm = depName(f.properties);
+      const k = norm(nm);
+      const senadoEntry = SENADO_BY_DEPTO[k];
+      const senCod = senadoEntry?.cod || '';
+      const senVotant = senadoEntry?.votant || 0;
+      const esperados = senVotant * TURNOUT_SCALE;
+
+      // Proyecciones locales y normalización
+      const projections = cands.map(c => ({ c, p: projected(c, nm) }));
+      const localTotal = projections.reduce((s,x) => s + x.p, 0);
+      const localShares = projections.map(x => localTotal > 0 ? x.p / localTotal : 0);
+
+      // Ranking
+      const ranked = projections.map((x, idx) => ({ ...x, share: localShares[idx] }))
+                                .sort((a,b) => b.share - a.share);
+      const ganador = ranked[0]?.c.nombre || '';
+      const margenPp = ranked.length > 1
+        ? ((ranked[0].share - ranked[1].share) * 100).toFixed(1)
+        : '';
+
+      const cells = [
+        i + 1,
+        nm,
+        senCod,
+        senVotant,
+        Math.round(esperados),
+      ];
+      cands.forEach((c, idx) => {
+        const share = localShares[idx];
+        const votos = Math.round(esperados * share);
+        const pct = (share * 100).toFixed(2) + '%';
+        cells.push(votos, pct);
+      });
+      cells.push(ganador, margenPp);
+      rows.push(cells);
+    });
+
+    // Fila totales
+    const totalRow = ['', 'TOTAL NACIONAL', '', 0, 0];
+    const candTotals = cands.map(() => ({ votos: 0 }));
+    rows.forEach(r => {
+      totalRow[3] += Number(r[3]) || 0;
+      totalRow[4] += Number(r[4]) || 0;
+      cands.forEach((c, idx) => {
+        const votos = Number(r[5 + idx*2]) || 0;
+        candTotals[idx].votos += votos;
+      });
+    });
+    const totalEsperados = totalRow[4];
+    cands.forEach((c, idx) => {
+      const v = candTotals[idx].votos;
+      const pct = totalEsperados > 0 ? (v/totalEsperados * 100).toFixed(2) + '%' : '0%';
+      totalRow.push(v, pct);
+    });
+    totalRow.push('—', '');
+    rows.push(totalRow);
+
+    // Construir HTML tabla
+    const thHtml = headers.map(h =>
+      `<th style="background:#1a1d2e;color:#fff;font-weight:bold;padding:8px 10px;border:1px solid #666;white-space:nowrap;font-family:Arial;font-size:11px">${h}</th>`
+    ).join('');
+    const tdHtml = rows.map((r, ri) => {
+      const isTotal = ri === rows.length - 1;
+      const bg = isTotal ? 'background:#e8edf8;font-weight:bold;' : (ri % 2 ? 'background:#f7f7f4;' : '');
+      return `<tr>${r.map(v => `<td style="${bg}padding:6px 10px;border:1px solid #ccc;font-family:Arial;font-size:11px">${v}</td>`).join('')}</tr>`;
+    }).join('');
+
+    const metaHtml = `
+      <h3 style="font-family:Arial;margin:0 0 4px">${title}</h3>
+      <p style="font-family:Arial;font-size:11px;color:#555;margin:0 0 12px">
+        Base ponderador: La Silla Vacía · ${PONDERADOR_META?.fecha_corte || 'sin fecha'} ·
+        Votantes estimados = potencial × 54% (escenario 2022), distribuido según Senado 2026.
+      </p>`;
+
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head><meta charset="UTF-8"></head>
+      <body>${metaHtml}
+        <table border="1" cellpadding="5" style="border-collapse:collapse;font-family:Arial;font-size:11px">
+          <thead><tr>${thHtml}</tr></thead>
+          <tbody>${tdHtml}</tbody>
+        </table>
+      </body></html>`;
+
+    const blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `previa-1v-2026-depto-${fecha}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   // ─── MODAL METODOLOGÍA ────────────────────────────────────────
