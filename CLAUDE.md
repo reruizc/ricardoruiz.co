@@ -13,6 +13,14 @@ worktree activo: /Users/ricardoruiz/ricardoruiz.co/.claude/worktrees/agitated-ro
 deploy:          git push origin HEAD:main   (desde dentro del worktree)
 ```
 
+## AWS / S3
+El usuario **NO tiene AWS CLI instalado localmente** y prefiere subir él
+mismo los artefactos a S3. No invocar `aws s3 cp` ni `aws s3 sync` ni
+confirmar credenciales AWS. Cuando un script produzca JSONs/CSVs para
+S3: dejarlos en disco local y entregar al usuario el comando exacto que
+debe correr él (incluyendo ruta origen → prefijo destino), junto con una
+lista clara de los archivos generados.
+
 ## Data — S3
 ```
 const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
