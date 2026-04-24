@@ -213,6 +213,8 @@
     .toggle-btn .lock{font-size:.65rem;opacity:.7}
     .toggle-hint{font-family:Avenir,sans-serif;font-weight:400;font-size:.7rem;color:rgba(245,158,11,.85);margin-left:auto}
     .toggle-hint a{color:var(--amber);text-decoration:underline;text-underline-offset:2px}
+    /* Para aviso de Puestos: +30% tamaño (0.7 → 0.91 rem) */
+    .toggle-hint.lg{font-size:.91rem;font-weight:500}
 
     /* Modal metodología */
     .modal-overlay{position:fixed;inset:0;z-index:50000;background:rgba(4,6,16,.78);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:1.5rem}
@@ -254,8 +256,8 @@
     #leaflet-map,#leaflet-map .leaflet-container{cursor:default!important}
     #leaflet-map .leaflet-grab,#leaflet-map .leaflet-dragging .leaflet-grab,#leaflet-map.leaflet-grab{cursor:default!important}
     #leaflet-map .leaflet-interactive{cursor:pointer!important}
-    .map-back-btn{display:none;font-family:Avenir,sans-serif;font-weight:500;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue);background:rgba(0,71,255,.1);border:1px solid rgba(0,71,255,.5);padding:.35rem .75rem;cursor:pointer;transition:all .15s}
-    .map-back-btn:hover{background:var(--blue);color:#fff}
+    .map-back-btn{display:none;position:absolute;top:.85rem;right:.85rem;z-index:800;font-family:Avenir,sans-serif;font-weight:500;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);background:rgba(6,8,16,.9);backdrop-filter:blur(6px);border:1px solid rgba(0,71,255,.6);padding:.45rem .85rem;cursor:pointer;transition:all .15s;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+    .map-back-btn:hover{background:var(--blue);color:#fff;border-color:var(--blue)}
     .map-back-btn.show{display:inline-flex}
     body.day-mode .map-back-btn{background:rgba(0,71,255,.08);color:var(--blue);border-color:rgba(0,71,255,.5)}
     body.day-mode .map-back-btn:hover{background:var(--blue);color:#fff}
@@ -391,14 +393,12 @@
           <div class="map-head-title" id="map-head-label">Ganador por departamento</div>
           <div class="map-head-cand" id="map-cand-name">Clic en un departamento para ver sus municipios</div>
         </div>
-        <div style="display:flex;align-items:center;gap:.75rem">
-          <button class="map-back-btn" id="map-back-btn" onclick="exitToNacional()">← Nacional</button>
-          <div class="map-head-pct" id="map-cand-pct"></div>
-        </div>
+        <div class="map-head-pct" id="map-cand-pct"></div>
       </div>
       <div class="map-legend" id="map-legend"></div>
       <div style="position:relative;flex:1;display:flex;flex-direction:column">
         <div id="leaflet-map"></div>
+        <button class="map-back-btn" id="map-back-btn" onclick="exitToNacional()">← Nacional</button>
         <div class="map-loading" id="map-loading">Cargando municipios…</div>
       </div>
     </div>
@@ -587,6 +587,14 @@
     { id:'lm', nombre:'Luis Gilberto Murillo', partido:'Independiente',               color:'#16a34a', pct:0.8,
       bias:{ 'CHOCO':2.4,'ANTIOQUIA':1.3,'BOGOTA D.C.':1.2,'VALLE DEL CAUCA':1.1,'CAUCA':1.2,'NARIÑO':1.1,
              'SANTANDER':.7,'BOYACA':.7 } },
+    // Candidato agregador residual: Lizcano + M. Uribe Londoño + Caicedo +
+    // Santiago Botero + Clara López + S. Macollins. Se carga su pct desde
+    // ponderador-actual.json sumando los ids residuales (ver loadPonderador).
+    // Sin equivalencias → bias uniforme 1.0. NO compite en el ranking del
+    // mapa (igual tratamiento que 'nd'), pero sí cuenta en el ponderador
+    // nacional y en la leyenda de votos estimados.
+    { id:'otros', nombre:'Otros', partido:'Candidatos residuales (<2%)',  color:'#94a3b8', pct:5.3,
+      bias:{} },
     { id:'nd', nombre:'Blanco / NS–NR',       partido:'Indecisos',                    color:'#64748b', pct:11.7,
       bias:{} },
   ];
@@ -776,15 +784,14 @@
   }
 
   // Para cada feature/depto calcula ganador, segundo, y margen.
-  // IMPORTANTE: excluimos 'nd' (Blanco / Indecisos) del ranking competitivo.
-  // El voto en blanco es una categoría residual, no un rival de candidatos —
-  // incluirlo distorsionaba la lectura del mapa (p. ej. 2º en Putumayo/Nariño
-  // donde Cepeda domina, sólo porque nd tiene bias=1 uniforme y los demás
-  // candidatos tienen bias bajo). nd se sigue contabilizando en votos
-  // estimados y en el stack del ponderador nacional.
+  // IMPORTANTE: excluimos 'nd' (Blanco / Indecisos) y 'otros' (agregador de
+  // candidatos residuales) del ranking competitivo. Son categorías de
+  // agregación, no rivales de candidatos individuales. Ambos siguen
+  // contabilizándose en el stack del ponderador nacional y en la suma de
+  // votos estimados (leyenda del mapa).
   function computeDeptoRanking(depNom){
     const ranked = CANDIDATOS
-      .filter(c => c.id !== 'nd')
+      .filter(c => c.id !== 'nd' && c.id !== 'otros')
       .map(c => ({ c, v: projected(c, depNom) }))
       .filter(x => x.v > 0)
       .sort((a,b) => b.v - a.v);
@@ -1063,7 +1070,6 @@
               <div style="color:rgba(255,255,255,.6);font-size:.81rem;margin-bottom:.35rem">${depNom}</div>
               <div style="color:${cand?displayColorOnDark(cand.color):'#fff'};font-size:.90rem;font-weight:500">${cand ? cand.nombre : ''}</div>
               <div style="color:#fff;font-size:1.01rem;margin-top:.25rem">Fuerza local: <b>${(share*100).toFixed(1)}%</b></div>
-              <div style="color:rgba(255,255,255,.55);font-size:.81rem;margin-top:.35rem;font-style:italic">${fuente}</div>
             </div>`;
         } else {
           const r = hasMunBias ? computeMunRanking(munKey, depNom) : computeDeptoRanking(depNom);
@@ -1082,7 +1088,6 @@
                   <div style="color:rgba(255,255,255,.7);font-size:.83rem"> ${secPct.toFixed(1)}% local</div>
                   <div style="color:#fff;font-size:.94rem;margin-top:.4rem;padding-top:.4rem;border-top:1px solid rgba(255,255,255,.15)">Margen: <b>+${(winPct-secPct).toFixed(1)} pp</b></div>
                 ` : ''}
-                <div style="color:rgba(255,255,255,.5);font-size:.78rem;margin-top:.35rem;font-style:italic">${fuente}</div>
               </div>`;
           } else {
             html = `<div style="font-family:Avenir,sans-serif;color:rgba(255,255,255,.7)">${munName}</div>`;
@@ -1226,9 +1231,10 @@
         nameEl.textContent = 'Los colores heredan del depto (bias en calibración)';
         nameEl.style.color = '';
       }
-      // Total nacional de votación estimada (suma sobre todos los candidatos)
+      // Total de votación estimada: nacional en vista general, o del depto
+      // cuando el usuario ha hecho drill-down a uno específico.
       let totalVotes = 0;
-      for (const c of CANDIDATOS) totalVotes += estimatedVotes(c);
+      for (const c of CANDIDATOS) totalVotes += estimatedVotesInScope(c);
       pctEl.textContent = totalVotes > 0 ? `${fmtCompact(totalVotes)} votos estimados` : '';
     }
     renderMapLegend();
@@ -1253,8 +1259,9 @@
         </div>`;
     } else {
       // Votación estimada por candidato, ordenada desc. La fila de totales
-      // nacional + por candidato se recalcula cada repaint (responde a slider).
-      const votes = CANDIDATOS.map(c => ({ c, v: estimatedVotes(c) }))
+      // se recalcula cada repaint (responde a slider). Si hay drill-down,
+      // muestra SÓLO el depto activo (estimatedVotesInScope).
+      const votes = CANDIDATOS.map(c => ({ c, v: estimatedVotesInScope(c) }))
                               .filter(x => x.v > 0)
                               .sort((a,b) => b.v - a.v);
       const totalVotes = votes.reduce((s,x) => s + x.v, 0);
@@ -1262,8 +1269,13 @@
         const pct = totalVotes > 0 ? (x.v / totalVotes * 100) : 0;
         return `<span class="pond-chip" title="${fmtFull(x.v)} votos"><span class="dot" style="background:${x.c.color}"></span>${x.c.nombre} · <b class="pond-chip-num">${fmtCompact(x.v)}</b> <span style="opacity:.55">(${pct.toFixed(1)}%)</span></span>`;
       }).join('');
+      const scopeLabel = currentDepCod
+        ? (Object.values(SENADO_BY_DEPTO).find(s => s.cod === currentDepCod)?.nombre || 'depto')
+        : null;
       const titleHint = Object.keys(SENADO_BY_DEPTO).length
-        ? 'Votación estimada · 54% del potencial como votantes (escenario 2022)'
+        ? (scopeLabel
+            ? `Votación estimada · ${scopeLabel}`
+            : 'Votación estimada · 54% del potencial como votantes (escenario 2022)')
         : 'Votación estimada · cargando base territorial…';
       el.innerHTML = `
         <div class="map-legend-title" title="Participación por depto calibrada con el comportamiento real de Senado 2026 y escalada al 54% típico de primera vuelta presidencial (referencia 2022)">${titleHint}</div>
@@ -1724,8 +1736,11 @@
       await loadMunicipalNacional();
       repaintMap();
     } else if (level === 'pue'){
+      hint.classList.add('lg');
       hint.innerHTML = 'Mapa por puestos en preparación · llega en breve';
     }
+    // Limpiar clase lg si cambiamos a otro nivel
+    if (level !== 'pue') hint.classList.remove('lg');
   }
 
   // ─── THEME ────────────────────────────────────────────────────
@@ -1760,11 +1775,26 @@
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const data = await r.json();
       if (!data || !data.candidatos) throw new Error('JSON inválido');
-      // Sobrescribimos pct en CANDIDATOS y en BASE para los ids que existan
+      // IDs de candidatos principales (excluyendo agregadores locales 'otros' y 'nd')
+      const principalIds = new Set(CANDIDATOS.filter(c => c.id !== 'otros' && c.id !== 'nd').map(c => c.id));
+      // Sobrescribimos pct en CANDIDATOS para los ids que existan en el JSON
       CANDIDATOS.forEach(c => {
+        if (c.id === 'otros') return;  // se calcula abajo como suma residual
         const entry = data.candidatos[c.id];
         if (entry && typeof entry.pct === 'number') c.pct = entry.pct;
       });
+      // 'otros' = suma de pct de candidatos del JSON que NO son principales
+      //           ni 'nd' (Blanco). P.ej.: Lizcano, M. Uribe Londoño, Caicedo,
+      //           Santiago Botero, Clara López, Sondra Macollins.
+      const otrosCand = CANDIDATOS.find(c => c.id === 'otros');
+      if (otrosCand){
+        let sumOtros = 0;
+        for (const [id, entry] of Object.entries(data.candidatos)){
+          if (id === 'nd' || principalIds.has(id)) continue;
+          if (entry && typeof entry.pct === 'number') sumOtros += entry.pct;
+        }
+        if (sumOtros > 0) otrosCand.pct = +sumOtros.toFixed(2);
+      }
       PONDERADOR_META = {
         fuente: data.fuente,
         fecha_corte: data.fecha_corte,
@@ -2076,9 +2106,9 @@
     return cand.pct * biasForMun(cand, munKey, parentDepName);
   }
   function computeMunRanking(munKey, parentDepName){
-    // Misma razón que computeDeptoRanking: excluimos nd del ranking.
+    // Misma razón que computeDeptoRanking: excluimos agregadores.
     const ranked = CANDIDATOS
-      .filter(c => c.id !== 'nd')
+      .filter(c => c.id !== 'nd' && c.id !== 'otros')
       .map(c => ({ c, v: projectedMun(c, munKey, parentDepName) }))
       .filter(x => x.v > 0)
       .sort((a,b) => b.v - a.v);
@@ -2120,6 +2150,28 @@
       total += voters * shareLocal;
     }
     return total;
+  }
+
+  // Votos estimados restringidos a UN SOLO depto (scope drill-down). Para
+  // el encabezado y la leyenda cuando el usuario entró a un depto específico
+  // vía click: los chips muestran los números DE ese depto, no nacionales.
+  function estimatedVotesForDep(cand, depCod){
+    const entry = Object.values(SENADO_BY_DEPTO).find(s => s.cod === depCod);
+    if (!entry) return 0;
+    const depNom = entry.nombre;
+    const voters = expectedVoters(depNom);
+    if (voters <= 0) return 0;
+    const localTotal = CANDIDATOS.reduce((s,c) => s + projected(c, depNom), 0);
+    if (localTotal <= 0) return 0;
+    const shareLocal = projected(cand, depNom) / localTotal;
+    return voters * shareLocal;
+  }
+
+  // Dispatcher: si hay drill-down activo, usa scope depto; si no, nacional.
+  function estimatedVotesInScope(cand){
+    return currentDepCod
+      ? estimatedVotesForDep(cand, currentDepCod)
+      : estimatedVotes(cand);
   }
 
   // Formato corto de votos en español: 8,47 M · 345 K · 1.234
