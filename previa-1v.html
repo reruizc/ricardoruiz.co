@@ -234,8 +234,8 @@
     .modal-body .modal-formula{font-family:'Syne',sans-serif;font-weight:500;background:rgba(0,71,255,.1);border-left:3px solid var(--blue);padding:.55rem .8rem;margin:.6rem 0;font-size:.82rem}
 
     /* MAIN */
-    .shell{display:grid;grid-template-columns:1fr 300px 380px;gap:0;min-height:calc(100vh - 320px)}
-    @media (max-width:1280px){.shell{grid-template-columns:1fr 260px 340px}}
+    .shell{display:grid;grid-template-columns:1fr 380px 380px;gap:0;min-height:calc(100vh - 320px)}
+    @media (max-width:1280px){.shell{grid-template-columns:1fr 320px 340px}}
     @media (max-width:1100px){.shell{grid-template-columns:1fr}}
 
     /* Columna central: leyenda/detalle candidato */
@@ -285,6 +285,15 @@
     .leaflet-dark-tooltip:before{display:none!important}
 
     .map-legend{padding:.2rem 0 .6rem;display:flex;align-items:flex-start;gap:.75rem;flex-wrap:wrap;flex-direction:column}
+    /* Chips de candidato en columna central: uno por renglón, alineados.
+       Estructura: [dot] [nombre flex-grow] [valores tabular-nums]
+       (La pond-legend de arriba del stack bar usa el mismo .pond-legend
+       pero como hijo directo de .ponderador y conserva su flex-row.) */
+    #map-legend .pond-legend{flex-direction:column;gap:.55rem;margin-top:.4rem;width:100%}
+    #map-legend .pond-chip{width:100%;display:flex;align-items:center;gap:.55rem;line-height:1.25}
+    #map-legend .pond-chip .dot{flex-shrink:0}
+    #map-legend .pond-chip-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    #map-legend .pond-chip-vals{flex-shrink:0;font-variant-numeric:tabular-nums;white-space:nowrap}
     #leaflet-map,#leaflet-map .leaflet-container{cursor:default!important}
     #leaflet-map .leaflet-grab,#leaflet-map .leaflet-dragging .leaflet-grab,#leaflet-map.leaflet-grab{cursor:default!important}
     #leaflet-map .leaflet-interactive{cursor:pointer!important}
@@ -1585,7 +1594,11 @@
       const totalVotes = votes.reduce((s,x) => s + x.v, 0);
       const chips = votes.map(x => {
         const pct = totalVotes > 0 ? (x.v / totalVotes * 100) : 0;
-        return `<span class="pond-chip" title="${fmtFull(x.v)} votos"><span class="dot" style="background:${x.c.color}"></span>${x.c.nombre} · <b class="pond-chip-num">${fmtCompact(x.v)}</b> <span style="opacity:.55">(${pct.toFixed(1)}%)</span></span>`;
+        return `<span class="pond-chip" title="${fmtFull(x.v)} votos">
+          <span class="dot" style="background:${x.c.color}"></span>
+          <span class="pond-chip-name">${x.c.nombre}</span>
+          <span class="pond-chip-vals"><b class="pond-chip-num">${fmtCompact(x.v)}</b> <span style="opacity:.55">(${pct.toFixed(1)}%)</span></span>
+        </span>`;
       }).join('');
       const scopeLabel = currentDepCod
         ? (Object.values(SENADO_BY_DEPTO).find(s => s.cod === currentDepCod)?.nombre || 'depto')
