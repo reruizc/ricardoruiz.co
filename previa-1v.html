@@ -267,8 +267,11 @@
     .map-legend-ends{display:flex;justify-content:space-between;width:260px;font-family:Avenir,sans-serif;font-weight:400;font-size:.68rem;color:rgba(255,255,255,.5)}
 
     /* PANEL */
-    .panel{padding:1rem 1.2rem;max-height:calc(100vh - 320px);overflow-y:auto}
-    .panel-head{display:flex;align-items:center;justify-content:space-between;gap:.7rem;margin-bottom:.85rem;flex-wrap:wrap}
+    .panel{padding:0;max-height:calc(100vh - 320px);overflow-y:auto;position:relative}
+    .panel-head{display:flex;align-items:center;justify-content:space-between;gap:.7rem;flex-wrap:wrap;position:sticky;top:0;z-index:5;background:var(--bg);padding:1rem 1.2rem .75rem;border-bottom:1px solid var(--border);margin-bottom:.6rem}
+    body.day-mode .panel-head{background:#e6ded3;border-bottom-color:rgba(0,0,0,.1)}
+    .panel #cand-list{padding:0 1.2rem}
+    .panel .note{margin:1rem 1.2rem 1.2rem}
     .panel-title{font-family:Avenir,sans-serif;font-weight:500;font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.5);flex:1;min-width:0}
     .btn{font-family:Avenir,sans-serif;font-weight:500;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.7);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);padding:.42rem .7rem;cursor:pointer;transition:all .15s;white-space:nowrap}
     .btn:hover{background:rgba(0,71,255,.15);border-color:rgba(0,71,255,.5);color:var(--white)}
@@ -555,29 +558,29 @@
   // bias: multiplicador regional por depto (clave normalizada MAYÚS sin tildes).
   // 1.0 = promedio nacional; claves ausentes caen al default 1.0.
   const CANDIDATOS = [
-    { id:'ic', nombre:'Iván Cepeda',          partido:'Pacto Histórico',              color:'#7c3aed', pct:38.0,
+    { id:'ic', nombre:'Iván Cepeda',          partido:'Pacto Histórico',              color:'#51458F', pct:38.0,
       bias:{ 'NARIÑO':1.7,'CAUCA':1.8,'CHOCO':1.7,'PUTUMAYO':1.6,'AMAZONAS':1.5,'GUAVIARE':1.4,'VAUPES':1.3,
              'BOLIVAR':1.3,'ATLANTICO':1.2,'MAGDALENA':1.3,'SUCRE':1.3,'CORDOBA':1.1,'LA GUAJIRA':1.3,
              'BOGOTA D.C.':1.2,'VALLE DEL CAUCA':1.2,'HUILA':1.0,'TOLIMA':1.0,
              'ANTIOQUIA':.7,'SANTANDER':.65,'NORTE DE SANTANDER':.7,'BOYACA':.8,'CASANARE':.7 } },
-    { id:'ae', nombre:'Abelardo de la Espriella', partido:'Mov. Salvación Nacional',  color:'#1e3a8a', pct:29.0,
+    { id:'ae', nombre:'Abelardo de la Espriella', partido:'Mov. Salvación Nacional',  color:'#000062', pct:29.0,
       bias:{ 'CORDOBA':2.0,'SUCRE':1.6,'BOLIVAR':1.5,'MAGDALENA':1.5,'ATLANTICO':1.4,'CESAR':1.5,'LA GUAJIRA':1.3,
              'ANTIOQUIA':1.4,'SANTANDER':1.3,'NORTE DE SANTANDER':1.3,'CASANARE':1.3,'META':1.2,'BOYACA':1.1,
              'BOGOTA D.C.':.9,'VALLE DEL CAUCA':1.0,
              'NARIÑO':.5,'CAUCA':.5,'CHOCO':.5,'PUTUMAYO':.5,'AMAZONAS':.6 } },
-    { id:'sf', nombre:'Sergio Fajardo',       partido:'Dignidad y Compromiso',        color:'#eab308', pct:11.0,
+    { id:'sf', nombre:'Sergio Fajardo',       partido:'Dignidad y Compromiso',        color:'#EEAA22', pct:11.0,
       bias:{ 'ANTIOQUIA':2.0,'CALDAS':1.5,'RISARALDA':1.4,'QUINDIO':1.4,
              'BOGOTA D.C.':1.2,'CUNDINAMARCA':1.1,'VALLE DEL CAUCA':1.0,'BOYACA':1.0,'SANTANDER':1.0,
              'CHOCO':.6,'LA GUAJIRA':.6,'PUTUMAYO':.6,'AMAZONAS':.6 } },
-    { id:'pv', nombre:'Paloma Valencia',      partido:'Centro Democrático',           color:'#3b82f6', pct:6.5,
+    { id:'pv', nombre:'Paloma Valencia',      partido:'Centro Democrático',           color:'#1866DF', pct:6.5,
       bias:{ 'CAUCA':1.8,'HUILA':1.4,'TOLIMA':1.3,'ANTIOQUIA':1.4,'VALLE DEL CAUCA':1.2,'RISARALDA':1.2,
              'BOGOTA D.C.':1.1,'CUNDINAMARCA':1.1,'CASANARE':1.2,'META':1.2,
              'NARIÑO':.6,'CHOCO':.5,'ATLANTICO':.8 } },
-    { id:'rb', nombre:'Roy Barreras',         partido:'La Fuerza',                    color:'#f97316', pct:1.5,
+    { id:'rb', nombre:'Roy Barreras',         partido:'La Fuerza',                    color:'#F01E14', pct:1.5,
       bias:{ 'VALLE DEL CAUCA':2.0,'CAUCA':1.4,'BOGOTA D.C.':1.2,'ANTIOQUIA':1.0,'ATLANTICO':1.1,
              'QUINDIO':1.1,'RISARALDA':1.1,
              'NORTE DE SANTANDER':.7,'SANTANDER':.7 } },
-    { id:'cl', nombre:'Claudia López',        partido:'Independiente',                color:'#22d3ee', pct:1.5,
+    { id:'cl', nombre:'Claudia López',        partido:'Independiente',                color:'#d9db24', pct:1.5,
       bias:{ 'BOGOTA D.C.':2.2,'CUNDINAMARCA':1.4,'BOYACA':1.2,'ANTIOQUIA':.9,
              'VALLE DEL CAUCA':1.0,'RISARALDA':1.0,'QUINDIO':1.0,
              'CHOCO':.6,'LA GUAJIRA':.6,'CAUCA':.7 } },
@@ -750,6 +753,18 @@
     return `hsl(${h.toFixed(1)}, ${newS.toFixed(1)}%, ${newL.toFixed(1)}%)`;
   }
 
+  // Para texto sobre fondo oscuro (tooltips): los colores demasiado oscuros
+  // (Abelardo #000062, por ejemplo) se aclaran preservando el tinte de modo
+  // que el nombre del candidato siga siendo legible sobre el tooltip negro.
+  // Mantiene intacto el color del mapa (que va con fillColor saturado).
+  function displayColorOnDark(hex){
+    const { h, s, l } = hexToHsl(hex);
+    if (l < 30){
+      return `hsl(${h.toFixed(1)}, ${Math.min(s, 85).toFixed(1)}%, 62%)`;
+    }
+    return hex;
+  }
+
   // Para cada feature/depto calcula ganador, segundo, y margen.
   function computeDeptoRanking(depNom){
     const ranked = CANDIDATOS
@@ -877,10 +892,10 @@
           const mult = cand ? biasFor(cand, nm) : 1;
           html = `
             <div style="font-family:Avenir,sans-serif;line-height:1.5">
-              <div style="font-family:'Syne',sans-serif;font-weight:700;color:#fff;font-size:.95rem;margin-bottom:.25rem">${nm}</div>
-              <div style="color:${cand?cand.color:'#fff'};font-size:.78rem;font-weight:500">${cand ? cand.nombre : ''}</div>
-              <div style="color:#fff;font-size:.88rem;margin-top:.25rem">Fuerza local: <b>${(share*100).toFixed(1)}%</b></div>
-              <div style="color:rgba(255,255,255,.55);font-size:.72rem">Nacional: ${fmtPct(cand?cand.pct:0)} · Ponderador: ×${mult.toFixed(2)}</div>
+              <div style="font-family:'Syne',sans-serif;font-weight:700;color:#fff;font-size:1.09rem;margin-bottom:.3rem">${nm}</div>
+              <div style="color:${cand?displayColorOnDark(cand.color):'#fff'};font-size:.90rem;font-weight:500">${cand ? cand.nombre : ''}</div>
+              <div style="color:#fff;font-size:1.01rem;margin-top:.3rem">Fuerza local: <b>${(share*100).toFixed(1)}%</b></div>
+              <div style="color:rgba(255,255,255,.55);font-size:.83rem">Nacional: ${fmtPct(cand?cand.pct:0)} · Ponderador: ×${mult.toFixed(2)}</div>
             </div>`;
         } else {
           // Modo ganadores: ganador, segundo y margen
@@ -890,13 +905,13 @@
             const secPct = r.second ? (r.secondV / r.ranked.reduce((s,x)=>s+x.v,0) * 100) : 0;
             html = `
               <div style="font-family:Avenir,sans-serif;line-height:1.55">
-                <div style="font-family:'Syne',sans-serif;font-weight:700;color:#fff;font-size:.95rem;margin-bottom:.3rem">${nm}</div>
-                <div style="color:${r.winner.color};font-size:.82rem;font-weight:500">1º ${r.winner.nombre}</div>
-                <div style="color:rgba(255,255,255,.8);font-size:.78rem;margin-bottom:.2rem"> ${winPct.toFixed(1)}% local</div>
+                <div style="font-family:'Syne',sans-serif;font-weight:700;color:#fff;font-size:1.09rem;margin-bottom:.35rem">${nm}</div>
+                <div style="color:${displayColorOnDark(r.winner.color)};font-size:.94rem;font-weight:500">1º ${r.winner.nombre}</div>
+                <div style="color:rgba(255,255,255,.85);font-size:.90rem;margin-bottom:.25rem"> ${winPct.toFixed(1)}% local</div>
                 ${r.second ? `
-                  <div style="color:${r.second.color};font-size:.78rem;font-weight:500">2º ${r.second.nombre}</div>
-                  <div style="color:rgba(255,255,255,.65);font-size:.74rem"> ${secPct.toFixed(1)}% local</div>
-                  <div style="color:#fff;font-size:.82rem;margin-top:.35rem;padding-top:.35rem;border-top:1px solid rgba(255,255,255,.15)">Margen: <b>+${(winPct-secPct).toFixed(1)} pp</b></div>
+                  <div style="color:${displayColorOnDark(r.second.color)};font-size:.90rem;font-weight:500">2º ${r.second.nombre}</div>
+                  <div style="color:rgba(255,255,255,.7);font-size:.85rem"> ${secPct.toFixed(1)}% local</div>
+                  <div style="color:#fff;font-size:.94rem;margin-top:.4rem;padding-top:.4rem;border-top:1px solid rgba(255,255,255,.15)">Margen: <b>+${(winPct-secPct).toFixed(1)} pp</b></div>
                 ` : ''}
               </div>`;
           } else {
@@ -1026,11 +1041,11 @@
           }
           html = `
             <div style="font-family:Avenir,sans-serif;line-height:1.5">
-              <div style="font-family:'Syne',sans-serif;font-weight:700;color:#fff;font-size:.95rem;margin-bottom:.25rem">${munName}</div>
-              <div style="color:rgba(255,255,255,.55);font-size:.7rem;margin-bottom:.3rem">${depNom}</div>
-              <div style="color:${cand?cand.color:'#fff'};font-size:.78rem;font-weight:500">${cand ? cand.nombre : ''}</div>
-              <div style="color:#fff;font-size:.88rem;margin-top:.2rem">Fuerza local: <b>${(share*100).toFixed(1)}%</b></div>
-              <div style="color:rgba(255,255,255,.55);font-size:.7rem;margin-top:.3rem;font-style:italic">${fuente}</div>
+              <div style="font-family:'Syne',sans-serif;font-weight:700;color:#fff;font-size:1.09rem;margin-bottom:.3rem">${munName}</div>
+              <div style="color:rgba(255,255,255,.6);font-size:.81rem;margin-bottom:.35rem">${depNom}</div>
+              <div style="color:${cand?displayColorOnDark(cand.color):'#fff'};font-size:.90rem;font-weight:500">${cand ? cand.nombre : ''}</div>
+              <div style="color:#fff;font-size:1.01rem;margin-top:.25rem">Fuerza local: <b>${(share*100).toFixed(1)}%</b></div>
+              <div style="color:rgba(255,255,255,.55);font-size:.81rem;margin-top:.35rem;font-style:italic">${fuente}</div>
             </div>`;
         } else {
           const r = hasMunBias ? computeMunRanking(munKey, depNom) : computeDeptoRanking(depNom);
@@ -1040,12 +1055,16 @@
             const secPct = r.second && total > 0 ? r.secondV/total*100 : 0;
             html = `
               <div style="font-family:Avenir,sans-serif;line-height:1.55">
-                <div style="font-family:'Syne',sans-serif;font-weight:700;color:#fff;font-size:.95rem;margin-bottom:.15rem">${munName}</div>
-                <div style="color:rgba(255,255,255,.55);font-size:.7rem;margin-bottom:.3rem">${depNom}</div>
-                <div style="color:${r.winner.color};font-size:.82rem;font-weight:500">1º ${r.winner.nombre}</div>
-                <div style="color:rgba(255,255,255,.8);font-size:.78rem"> ${winPct.toFixed(1)}% local</div>
-                ${r.second ? `<div style="color:${r.second.color};font-size:.76rem;margin-top:.15rem">2º ${r.second.nombre} · ${secPct.toFixed(1)}%</div>` : ''}
-                <div style="color:rgba(255,255,255,.45);font-size:.68rem;margin-top:.3rem;font-style:italic">${fuente}</div>
+                <div style="font-family:'Syne',sans-serif;font-weight:700;color:#fff;font-size:1.09rem;margin-bottom:.2rem">${munName}</div>
+                <div style="color:rgba(255,255,255,.6);font-size:.81rem;margin-bottom:.35rem">${depNom}</div>
+                <div style="color:${displayColorOnDark(r.winner.color)};font-size:.94rem;font-weight:500">1º ${r.winner.nombre}</div>
+                <div style="color:rgba(255,255,255,.85);font-size:.90rem"> ${winPct.toFixed(1)}% local</div>
+                ${r.second ? `
+                  <div style="color:${displayColorOnDark(r.second.color)};font-size:.87rem;font-weight:500;margin-top:.2rem">2º ${r.second.nombre}</div>
+                  <div style="color:rgba(255,255,255,.7);font-size:.83rem"> ${secPct.toFixed(1)}% local</div>
+                  <div style="color:#fff;font-size:.94rem;margin-top:.4rem;padding-top:.4rem;border-top:1px solid rgba(255,255,255,.15)">Margen: <b>+${(winPct-secPct).toFixed(1)} pp</b></div>
+                ` : ''}
+                <div style="color:rgba(255,255,255,.5);font-size:.78rem;margin-top:.35rem;font-style:italic">${fuente}</div>
               </div>`;
           } else {
             html = `<div style="font-family:Avenir,sans-serif;color:rgba(255,255,255,.7)">${munName}</div>`;
