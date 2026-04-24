@@ -627,6 +627,13 @@
     'pres-2018-v1',
     'pres-2022-v1',
     'consulta-2025-pacto',
+    // Consultas interpartidistas marzo 2026 (nombres oficiales de la clave):
+    //  - gran:       La Gran Consulta por Colombia (ganó Paloma Valencia)
+    //  - frente:     Frente por la Vida             (ganó Roy Barreras)
+    //  - soluciones: Consulta de Soluciones         (ganó Claudia López)
+    'consulta-2026-gran',
+    'consulta-2026-frente',
+    'consulta-2026-soluciones',
   ];
   // HISTORICOS[sig] = {
   //   nacional: { nombreNorm: pctFraccion },
@@ -667,8 +674,9 @@
       'pres-2014-v1': { cands: ['OSCAR IVAN ZULUAGA'], peso: 0.10 },
       'pres-2010-v1': { cands: ['JUAN MANUEL SANTOS CALDERON'], peso: 0.05 },
     },
-    'pv': {  // Paloma Valencia — Centro Democrático con dos candidaturas previas
-      'senado-2026':  { partidos: ['PARTIDO CENTRO DEMOCRÁTICO'], peso: 0.28 },
+    'pv': {  // Paloma Valencia — Centro Democrático + ganadora consulta gran 2026
+      'consulta-2026-gran': { cands: ['PALOMA SUSANA VALENCIA LASERNA'], peso: 0.40 },
+      'senado-2026':  { partidos: ['PARTIDO CENTRO DEMOCRÁTICO'], peso: 0.20 },
       'pres-2022-v1': { cands: ['FEDERICO GUTIERREZ'], peso: 0.18 },
       'pres-2018-v1': { cands: ['IVAN DUQUE'], peso: 0.10 },
       'pres-2014-v1': { cands: ['OSCAR IVAN ZULUAGA'], peso: 0.04 },
@@ -680,14 +688,16 @@
       'pres-2014-v1': { cands: ['ENRIQUE PENALOSA', 'MARTHA LUCIA RAMIREZ'], peso: 0.07 },
       'pres-2010-v1': { cands: ['AURELIJUS RUTENIS ANTANAS MOCKUS SIVICKAS'], peso: 0.05 },
     },
-    'cl': {  // Claudia López — ex Alianza Verde, Bogotá como base
+    'cl': {  // Claudia López — ex Alianza Verde + ganadora consulta soluciones 2026
+      'consulta-2026-soluciones': { cands: ['CLAUDIA NAYIBE LOPEZ HERNANDEZ'], peso: 0.35 },
       'senado-2026':  { partidos: ['AHORA COLOMBIA'], peso: 0.15 },  // fragmento verde independiente
       'pres-2022-v1': { cands: ['SERGIO FAJARDO'], peso: 0.18 },
       'pres-2018-v1': { cands: ['SERGIO FAJARDO'], peso: 0.08 },
       'pres-2014-v1': { cands: ['ENRIQUE PENALOSA'], peso: 0.04 },
     },
-    'rb': {  // Roy Barreras — Frente Amplio Unitario en Senado
-      'senado-2026':  { partidos: ['FRENTE AMPLIO UNITARIO'], peso: 0.28 },
+    'rb': {  // Roy Barreras — Frente Amplio Unitario + ganador consulta frente 2026
+      'consulta-2026-frente': { cands: ['ROY LEONARDO BARRERAS MONTEALEGRE'], peso: 0.40 },
+      'senado-2026':  { partidos: ['FRENTE AMPLIO UNITARIO'], peso: 0.20 },
       'pres-2022-v1': { cands: ['GUSTAVO PETRO'], peso: 0.15 },
       'pres-2018-v1': { cands: ['HUMBERTO DE LA CALLE'], peso: 0.08 },
     },
@@ -766,8 +776,15 @@
   }
 
   // Para cada feature/depto calcula ganador, segundo, y margen.
+  // IMPORTANTE: excluimos 'nd' (Blanco / Indecisos) del ranking competitivo.
+  // El voto en blanco es una categoría residual, no un rival de candidatos —
+  // incluirlo distorsionaba la lectura del mapa (p. ej. 2º en Putumayo/Nariño
+  // donde Cepeda domina, sólo porque nd tiene bias=1 uniforme y los demás
+  // candidatos tienen bias bajo). nd se sigue contabilizando en votos
+  // estimados y en el stack del ponderador nacional.
   function computeDeptoRanking(depNom){
     const ranked = CANDIDATOS
+      .filter(c => c.id !== 'nd')
       .map(c => ({ c, v: projected(c, depNom) }))
       .filter(x => x.v > 0)
       .sort((a,b) => b.v - a.v);
@@ -1026,8 +1043,9 @@
       mouseover(){
         layer.setStyle({ weight: 2, color:'#fff', fillOpacity: .98 });
         let html = '';
+        // Fuente dinámica: lista años/consultas realmente cargadas
         const fuente = hasMunBias
-          ? 'Bias municipal calibrado (histórico 2010–2022 + consulta 2025)'
+          ? `Bias municipal calibrado · ${_fuentesDisponibles()}`
           : 'Bias hereda del depto (mun sin cobertura en históricos)';
         if (selectedId){
           const cand = CANDIDATOS.find(c => c.id === selectedId);
@@ -2026,6 +2044,28 @@
     }
   }
 
+  // Etiqueta humana de las señales cargadas en HISTORICOS (para tooltips).
+  // Agrupa años presidenciales y marca las consultas explícitamente.
+  function _fuentesDisponibles(){
+    const has = k => !!HISTORICOS[k];
+    const years = [];
+    if (has('pres-2010-v1')) years.push('2010');
+    if (has('pres-2014-v1')) years.push('2014');
+    if (has('pres-2018-v1')) years.push('2018');
+    if (has('pres-2022-v1')) years.push('2022');
+    const parts = [];
+    if (years.length){
+      parts.push(`presidenciales ${years.length > 1 ? years[0]+'–'+years[years.length-1] : years[0]}`);
+    }
+    const consultas = [];
+    if (has('consulta-2025-pacto'))       consultas.push('Pacto 2025');
+    if (has('consulta-2026-gran'))        consultas.push('Gran 2026');
+    if (has('consulta-2026-frente'))      consultas.push('Frente 2026');
+    if (has('consulta-2026-soluciones'))  consultas.push('Soluciones 2026');
+    if (consultas.length) parts.push('consultas ' + consultas.join(', '));
+    return parts.join(' + ') || 'sin señales';
+  }
+
   // Bias municipal con fallback al depto padre
   function biasForMun(cand, munKey, parentDepName){
     const cached = _biasCacheMun[cand.id]?.[munKey];
@@ -2036,7 +2076,9 @@
     return cand.pct * biasForMun(cand, munKey, parentDepName);
   }
   function computeMunRanking(munKey, parentDepName){
+    // Misma razón que computeDeptoRanking: excluimos nd del ranking.
     const ranked = CANDIDATOS
+      .filter(c => c.id !== 'nd')
       .map(c => ({ c, v: projectedMun(c, munKey, parentDepName) }))
       .filter(x => x.v > 0)
       .sort((a,b) => b.v - a.v);
