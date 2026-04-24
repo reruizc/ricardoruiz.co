@@ -937,10 +937,23 @@
     return props.dpto_cnmbr || props.DPTO_CNMBR || props.dpto_ccnbr || '';
   }
 
-  // Extrae "depCod-munCod" (padding 2-3 dígitos) del feature
+  // Extrae "depCod-munCod" (padding 2-3 dígitos) del feature.
+  //
+  // IMPORTANTE: el GeoJSON tiene DOS campos con nombres parecidos y valores
+  // distintos:
+  //   - mun_electoral : código DANE disfrazado (p.ej. Abejorral = '002',
+  //                     Amalfi = '031', Santa Bárbara = '679'). NO matchea
+  //                     con los CSV de la Registraduría.
+  //   - mun_elec      : código electoral REAL de la Registraduría (Abejorral
+  //                     = '004', Amalfi = '016', Santa Bárbara = '247'),
+  //                     secuencial por depto. ESTE es el que usan los CSVs
+  //                     y los por-mun.json.
+  // Resultado empírico sobre Antioquia (125 muns):
+  //   - mun_electoral:  20/125 match (20%)
+  //   - mun_elec:      125/125 match (100%)
   function munKeyFromProps(props){
     const d = String(props.dep_electoral || props.DEP_ELECTORAL || '').trim();
-    const m = String(props.mun_electoral || props.MUN_ELECTORAL || props.mun_elec || '').trim();
+    const m = String(props.mun_elec || props.MUN_ELEC || props.mun_electoral || '').trim();
     if (!d || !m) return null;
     return `${d.padStart(2,'0')}-${m.padStart(3,'0')}`;
   }
