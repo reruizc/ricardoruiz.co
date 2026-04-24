@@ -398,7 +398,7 @@
       <div class="map-legend" id="map-legend"></div>
       <div style="position:relative;flex:1;display:flex;flex-direction:column">
         <div id="leaflet-map"></div>
-        <button class="map-back-btn" id="map-back-btn" onclick="exitToNacional()">← Nacional</button>
+        <button class="map-back-btn" id="map-back-btn" onclick="exitOneLevel()">← Nacional</button>
         <div class="map-loading" id="map-loading">Cargando municipios…</div>
       </div>
     </div>
@@ -815,6 +815,43 @@
   let nacionalMunLayer = null;       // capa con TODOS los municipios del país
   let _nacionalMunFeatures = null;   // todos los features agregados (cacheado)
 
+  // Ciudades con capa de comunas/localidades propia. Al clickear un
+  // municipio que sea capital de una de estas ciudades, se abre un
+  // drill adicional con el GeoJSON de sus comunas o localidades.
+  let cityLayer = null;
+  let currentCityKey = null;         // 'bogota', 'medellin', ... | null
+  const _cityGeoCache = {};          // { cityKey: GeoJSON }
+  const CITY_MAPS = {
+    bogota:       { depCod:'16', munCod:'001', url:`${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`, rotate:true,  nameField:'LocNombre',  codeField:'LocCodigo', kind:'Localidades' },
+    medellin:     { depCod:'01', munCod:'001', url:`${S3}/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`,       rotate:false, nameField:'NOMBRE',     codeField:'CODIGO',    kind:'Comunas' },
+    cali:         { depCod:'31', munCod:'001', url:`${S3}/mapas-2026/Ciudades-COM-LOC/CALIX.json`,           rotate:false, nameField:'nombre',     codeField:'comuna',    kind:'Comunas' },
+    barranquilla: { depCod:'03', munCod:'001', url:`${S3}/mapas-2026/Ciudades-COM-LOC/BARRANQUILLAX.json`,   rotate:false, nameField:'nombre',     codeField:'id',        kind:'Localidades' },
+    ibague:       { depCod:'29', munCod:'001', url:`${S3}/mapas-2026/Ciudades-COM-LOC/IBAGUEX.json`,         rotate:false, nameField:'COMUNAS',    codeField:'COMUNAS',   kind:'Comunas' },
+    manizales:    { depCod:'09', munCod:'001', url:`${S3}/mapas-2026/Ciudades-COM-LOC/MANIZALESX.json`,      rotate:false, nameField:'NOMBRES_CO', codeField:'ID_COMUNA', kind:'Comunas' },
+    pereira:      { depCod:'24', munCod:'001', url:`${S3}/mapas-2026/Ciudades-COM-LOC/PEREIRAX.json`,        rotate:false, nameField:'Comuna',     codeField:'Comuna',    kind:'Comunas' },
+    monteria:     { depCod:'13', munCod:'001', url:`${S3}/mapas-2026/Ciudades-COM-LOC/MONTERIAX.json`,       rotate:false, nameField:'NMG',        codeField:'CC_COMUNA', kind:'Comunas' },
+  };
+  function detectCity(depCod, munCod){
+    const key = Object.keys(CITY_MAPS).find(k =>
+      CITY_MAPS[k].depCod === String(depCod).padStart(2,'0') &&
+      CITY_MAPS[k].munCod === String(munCod).padStart(3,'0')
+    );
+    return key ? { key, ...CITY_MAPS[key] } : null;
+  }
+
+  // Bogotá viene en coordenadas proyectadas que requieren rotación 90° a la
+  // izquierda alrededor de (-74.08, 4.65) para quedar orientadas geográficamente.
+  function rotateGeoJSON90Left(geoData){
+    const cx = -74.08, cy = 4.65;
+    const rc = ([lon, lat]) => [cx - (lat - cy), cy + (lon - cx)];
+    const rg = geom => {
+      if (geom.type === 'Polygon')      return { ...geom, coordinates: geom.coordinates.map(ring => ring.map(rc)) };
+      if (geom.type === 'MultiPolygon') return { ...geom, coordinates: geom.coordinates.map(p => p.map(ring => ring.map(rc))) };
+      return geom;
+    };
+    return { ...geoData, features: geoData.features.map(f => ({ ...f, geometry: rg(f.geometry) })) };
+  }
+
   function initMap(){
     // Mapa estático: sin zoom ni pan. Los controles de Leaflet quedan
     // desactivados y el usuario no puede desplazar ni ampliar el mapa.
@@ -1099,6 +1136,16 @@
         const activeLayer = munLayer || nacionalMunLayer;
         if (activeLayer) activeLayer.resetStyle(layer);
         layer.closeTooltip();
+      },
+      click(){
+        // Si el municipio clicheado es una ciudad especial (Bogotá, Medellín,
+        // Cali, Barranquilla, Ibagué, Manizales, Pereira, Montería) abrimos
+        // otra capa con sus comunas/localidades. Solo aplica cuando estamos
+        // en drill-down departamental, no desde vista municipal nacional.
+        if (!munKey || nacionalMunLayer) return;
+        const [dep, mun] = munKey.split('-');
+        const cfg = detectCity(dep, mun);
+        if (cfg) loadCityLayer(cfg, depNom, munName);
       }
     });
   }
@@ -1126,7 +1173,8 @@
       munLayer = L.geoJSON(geo, { style: munFeatureStyle, onEachFeature: onEachMunFeature }).addTo(map);
       currentDepCod = depCod;
       try { const b = munLayer.getBounds(); if (b.isValid()) map.fitBounds(b, { padding:[10,10] }); } catch(e){}
-      document.getElementById('map-back-btn')?.classList.add('show');
+      const backBtn = document.getElementById('map-back-btn');
+      if (backBtn){ backBtn.textContent = '← Nacional'; backBtn.classList.add('show'); }
       updateMapHeadForDrill(depNom, (geo.features||[]).length);
     } catch(e){
       console.error('[Previa] error cargando muns de', depCod, e);
@@ -1158,6 +1206,120 @@
         nameEl.textContent = 'Color hereda del depto (bias municipal en calibración)';
         nameEl.style.color = '';
       }
+    }
+  }
+
+  // ─── DRILL-DOWN: municipio capital → comunas/localidades ─────
+  // Para las 8 ciudades listadas en CITY_MAPS (Bogotá, Medellín, Cali,
+  // Barranquilla, Ibagué, Manizales, Pereira, Montería). El coloreado
+  // por ahora hereda del municipio padre (todos misma intensidad) — la
+  // calibración a nivel zona/comuna requiere reprocesar los CSVs GCS
+  // con agregación COD_DDE × COD_MME × COD_ZZ (pendiente).
+  async function loadCityLayer(cfg, depNom, munNom){
+    showMapLoading(`Cargando ${munNom}…`);
+    try {
+      let geo = _cityGeoCache[cfg.key];
+      if (!geo){
+        const r = await fetch(cfg.url);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        geo = await r.json();
+        if (cfg.rotate) geo = rotateGeoJSON90Left(geo);
+        _cityGeoCache[cfg.key] = geo;
+      }
+      if (munLayer){ map.removeLayer(munLayer); munLayer = null; }
+      if (cityLayer){ map.removeLayer(cityLayer); cityLayer = null; }
+      cityLayer = L.geoJSON(geo, {
+        style: () => _styleByDepName(depNom),
+        onEachFeature: (f, layer) => onEachCityFeature(f, layer, cfg, depNom, munNom),
+      }).addTo(map);
+      currentCityKey = cfg.key;
+      try { const b = cityLayer.getBounds(); if (b.isValid()) map.fitBounds(b, { padding:[10,10] }); } catch(e){}
+      // Header: "Bogotá D.C. · Localidades" o "Medellín · Comunas"
+      const label = document.getElementById('map-head-label');
+      const nameEl = document.getElementById('map-cand-name');
+      if (label) label.textContent = `${munNom} · ${cfg.kind}`;
+      if (nameEl){
+        nameEl.textContent = `Color hereda del municipio (bias por comuna pendiente)`;
+        nameEl.style.color = '';
+      }
+      // Botón: cambia a "← Depto" (un solo paso arriba)
+      const backBtn = document.getElementById('map-back-btn');
+      if (backBtn){
+        backBtn.textContent = '← Depto';
+        backBtn.classList.add('show');
+      }
+    } catch(e){
+      console.error('[Previa] error cargando ciudad', cfg.key, e);
+    } finally {
+      hideMapLoading();
+    }
+  }
+
+  function onEachCityFeature(feature, layer, cfg, depNom, munNom){
+    const p = feature.properties;
+    let name = p[cfg.nameField] || p[cfg.codeField] || 'Comuna';
+    // Ibagué guarda nombre = "COMUNA 3" en la misma columna; normaliza
+    if (typeof name !== 'string') name = String(name);
+    layer.on({
+      mouseover(){
+        layer.setStyle({ weight:2, color:'#fff', fillOpacity:.98 });
+        let html = '';
+        if (selectedId){
+          const cand = CANDIDATOS.find(c => c.id === selectedId);
+          const total = CANDIDATOS.reduce((s,c) => s + projected(c, depNom), 0);
+          const share = total > 0 ? projected(cand, depNom) / total : 0;
+          html = `
+            <div style="font-family:Avenir,sans-serif;line-height:1.5">
+              <div style="font-family:'Syne',sans-serif;font-weight:700;color:#fff;font-size:1.09rem;margin-bottom:.3rem">${name}</div>
+              <div style="color:rgba(255,255,255,.6);font-size:.81rem;margin-bottom:.35rem">${munNom} · ${depNom}</div>
+              <div style="color:${cand?displayColorOnDark(cand.color):'#fff'};font-size:.90rem;font-weight:500">${cand ? cand.nombre : ''}</div>
+              <div style="color:#fff;font-size:1.01rem;margin-top:.25rem">Fuerza local: <b>${(share*100).toFixed(1)}%</b></div>
+            </div>`;
+        } else {
+          const r = computeDeptoRanking(depNom);
+          if (r && r.winner){
+            const total = r.ranked.reduce((s,x)=>s+x.v,0);
+            const winPct = total > 0 ? r.winnerV/total*100 : 0;
+            const secPct = r.second && total > 0 ? r.secondV/total*100 : 0;
+            html = `
+              <div style="font-family:Avenir,sans-serif;line-height:1.55">
+                <div style="font-family:'Syne',sans-serif;font-weight:700;color:#fff;font-size:1.09rem;margin-bottom:.2rem">${name}</div>
+                <div style="color:rgba(255,255,255,.6);font-size:.81rem;margin-bottom:.35rem">${munNom} · ${depNom}</div>
+                <div style="color:${displayColorOnDark(r.winner.color)};font-size:.94rem;font-weight:500">1º ${r.winner.nombre}</div>
+                <div style="color:rgba(255,255,255,.85);font-size:.90rem"> ${winPct.toFixed(1)}% local</div>
+                ${r.second ? `
+                  <div style="color:${displayColorOnDark(r.second.color)};font-size:.87rem;font-weight:500;margin-top:.2rem">2º ${r.second.nombre}</div>
+                  <div style="color:rgba(255,255,255,.7);font-size:.83rem"> ${secPct.toFixed(1)}% local</div>
+                  <div style="color:#fff;font-size:.94rem;margin-top:.4rem;padding-top:.4rem;border-top:1px solid rgba(255,255,255,.15)">Margen: <b>+${(winPct-secPct).toFixed(1)} pp</b></div>
+                ` : ''}
+              </div>`;
+          } else {
+            html = `<div style="font-family:Avenir,sans-serif;color:rgba(255,255,255,.7)">${name}</div>`;
+          }
+        }
+        layer.bindTooltip(html, { sticky:true, className:'leaflet-dark-tooltip', opacity:1 }).openTooltip();
+      },
+      mouseout(){
+        if (cityLayer) cityLayer.resetStyle(layer);
+        layer.closeTooltip();
+      }
+    });
+  }
+
+  // Vuelve un paso: si estamos en ciudad → muns del depto; si estamos en
+  // muns de un depto → nacional. El botón "← Nacional" se rebautiza según
+  // el contexto.
+  async function exitOneLevel(){
+    if (currentCityKey){
+      // De ciudad → muns del depto padre
+      const cfg = CITY_MAPS[currentCityKey];
+      if (cityLayer){ map.removeLayer(cityLayer); cityLayer = null; }
+      currentCityKey = null;
+      const sen = Object.values(SENADO_BY_DEPTO).find(s => s.cod === cfg.depCod);
+      if (sen) await drillToDepto(cfg.depCod, sen.nombre);
+      else exitToNacional();
+    } else {
+      exitToNacional();
     }
   }
 
@@ -1719,7 +1881,8 @@
     });
 
     if (level === 'dep'){
-      // Vuelve a vista nacional por deptos. Remueve cualquier capa mun.
+      // Vuelve a vista nacional por deptos. Remueve cualquier capa mun/city.
+      if (cityLayer){ map.removeLayer(cityLayer); cityLayer = null; currentCityKey = null; }
       if (munLayer){ map.removeLayer(munLayer); munLayer = null; }
       if (nacionalMunLayer){ map.removeLayer(nacionalMunLayer); nacionalMunLayer = null; }
       if (deptLayer && !map.hasLayer(deptLayer)) deptLayer.addTo(map);
@@ -1729,6 +1892,7 @@
       repaintMap();
     } else if (level === 'mun'){
       // Vista municipal nacional (todos los muns del país).
+      if (cityLayer){ map.removeLayer(cityLayer); cityLayer = null; currentCityKey = null; }
       if (munLayer){ map.removeLayer(munLayer); munLayer = null; }
       if (deptLayer) map.removeLayer(deptLayer);
       currentDepCod = null;
