@@ -610,12 +610,39 @@
           baja en ciertos municipios de Antioquia) en vez de asumir una tasa
           plana nacional.
         </p>
-        <div class="modal-formula">votos(c, d) = votantes_est(d) × share_local(c, d)</div>
         <p>
-          Donde <b>share_local</b> es la proyección del candidato normalizada
-          al total proyectado en el depto, garantizando que los votos por
-          candidato sumen exactamente los votantes esperados. El total
-          nacional es la suma sobre todos los deptos.
+          Los modelos proporcionales multiplicativos como el nuestro presentan
+          una tensión clásica entre dos consistencias mutuamente excluyentes
+          (Hanretty, 2024). Aplicamos la versión más adecuada a cada vista:
+        </p>
+        <p style="margin-left:.8rem">
+          <b>Vista nacional (suma sobre todos los deptos)</b> — usamos el
+          bias normalizado por candidato, definido como
+          bias<sub>norm</sub>(c, d) = bias<sub>raw</sub>(c, d) ÷ promedio
+          ponderado de bias<sub>raw</sub>(c) por votantes esperados:
+        </p>
+        <div class="modal-formula">votos(c) = pct(c) × Σ<sub>d</sub> votantes(d) × bias<sub>norm</sub>(c, d) / 100</div>
+        <p style="margin-left:.8rem">
+          Esta normalización garantiza la <b>consistencia global</b>: el
+          ranking de votos preserva el ranking de pct nacional. Si Abelardo
+          tiene mayor pct que Paloma, sus votos también serán mayores.
+        </p>
+        <p style="margin-left:.8rem">
+          <b>Vista de un depto (drill-down)</b> — usamos normalización local:
+        </p>
+        <div class="modal-formula">votos(c, d) = votantes(d) × share<sub>local</sub>(c, d)</div>
+        <p style="margin-left:.8rem">
+          Donde share<sub>local</sub>(c, d) = pct(c) × bias<sub>raw</sub>(c, d)
+          / Σ<sub>c'</sub> pct(c') × bias<sub>raw</sub>(c', d). Esto da
+          <b>consistencia local</b>: los votos de los candidatos en un depto
+          suman exactamente los votantes esperados de ese depto. Aquí sí son
+          legítimas las inversiones locales (un candidato con menor pct
+          nacional puede sacar más votos en un depto donde es más fuerte).
+        </p>
+        <p style="margin-left:.8rem">
+          El coloreado del mapa siempre usa bias<sub>raw</sub> y share<sub>local</sub>:
+          el ranking competitivo entre candidatos por depto refleja la fuerza
+          relativa real, sin la corrección de la normalización por candidato.
         </p>
 
         <h4>5. Bandas de incertidumbre</h4>
@@ -748,12 +775,17 @@
   //   muns:     { "depCod-munCod": { nombreNorm: pctFraccion } }    (lazy/optional)
   // }
   let HISTORICOS = {};
-  // Cache calibrado de bias por candidato. Dos niveles:
-  //   _biasCache    [ candId ][ depNombreNorm ]  → depto
-  //   _biasCacheMun [ candId ][ "depCod-munCod" ] → municipio
-  // Si el mun no tiene cobertura, biasForMun cae al del depto padre.
-  let _biasCache    = {};
-  let _biasCacheMun = {};
+  // Cache calibrado de bias por candidato. Tres niveles:
+  //   _biasCache     [ candId ][ depNombreNorm ]  → bias raw a nivel depto
+  //   _biasCacheMun  [ candId ][ "depCod-munCod" ] → bias raw a nivel mun
+  //   _biasNormCache [ candId ][ depNombreNorm ]  → bias normalizado por
+  //     candidato (raw / promedio_ponderado_por_voters). Garantiza la
+  //     consistencia global: Σ_d voters(d)×bias_norm(c,d) = Σ_d voters(d).
+  //     Se usa SOLO para sumar votos nacionales en estimatedVotes(); el
+  //     coloreado del mapa y el drill local siguen usando el bias raw.
+  let _biasCache     = {};
+  let _biasCacheMun  = {};
+  let _biasNormCache = {};
 
   // ─── EQUIVALENCIAS: candidato 2026 → señales históricas ────────
   // Cada entrada es el perfil de ponderación descrito en el documento
@@ -2470,6 +2502,59 @@
     }
   }
 
+  // Genera _biasNormCache. El bias_norm de un candidato es el bias raw
+  // dividido por su promedio ponderado por votantes esperados. Esto
+  // garantiza Σ_d voters(d) × bias_norm(c, d) = Σ_d voters(d), y por tanto
+  //   Σ_d votos_estimados(c, d) = pct(c) × total_voters / 100
+  // (consistencia global: el ranking de votos preserva el ranking de pct).
+  // Se aplica SÓLO a la suma nacional en estimatedVotes(); coloreado y
+  // drill por depto siguen usando bias raw + share_local (consistencia local).
+  function precomputeBiasNorm(){
+    _biasNormCache = {};
+    // Cods únicos: evita doble-conteo cuando un depto tiene aliases en
+    // SENADO_BY_DEPTO (NORTE DE SAN / NORTE DE SANTANDER apuntan al mismo).
+    const uniqueByCod = {};
+    for (const s of Object.values(SENADO_BY_DEPTO)){
+      if (s.cod && !uniqueByCod[s.cod]) uniqueByCod[s.cod] = s;
+    }
+    const cods = Object.values(uniqueByCod);
+    if (!cods.length) return;
+
+    for (const cand of CANDIDATOS){
+      _biasNormCache[cand.id] = {};
+
+      // Promedio de bias raw, ponderado por voters esperados de cada depto.
+      // Usa biasFor() para que el cálculo herede el fallback (cache→hardcoded
+      // →1.0) y sea idéntico al bias que ve estimatedVotes después.
+      let sumBW = 0, sumW = 0;
+      for (const sen of cods){
+        const w = (sen.votant || 0) * TURNOUT_SCALE;
+        if (w <= 0) continue;
+        const bias = biasFor(cand, sen.nombre);
+        sumBW += bias * w;
+        sumW += w;
+      }
+      const avgBias = sumW > 0 ? sumBW / sumW : 1;
+      if (avgBias <= 0) continue;
+
+      // Llena el cache para cada key de SENADO_BY_DEPTO (incl. aliases) con
+      // bias_norm = bias_raw / avgBias. Aliases comparten valor por ser el
+      // mismo entry → mismo cod → mismo bias.
+      for (const [key, sen] of Object.entries(SENADO_BY_DEPTO)){
+        const bias = biasFor(cand, sen.nombre);
+        _biasNormCache[cand.id][key] = bias / avgBias;
+      }
+    }
+  }
+
+  // Devuelve el bias normalizado para conteo de votos nacionales. Si no hay
+  // cache (boot inicial sin históricos), cae a 1.0 (uniforme).
+  function biasForNorm(cand, depNom){
+    const k = norm(depNom);
+    const v = _biasNormCache[cand.id]?.[k];
+    return (v != null && v > 0) ? v : 1.0;
+  }
+
   // Computa bias(c, munKey) a nivel municipal a partir de las señales
   // históricas que tengan cobertura municipal (HISTORICOS[sig].muns).
   // Para la señal 'senado-2026' (solo a nivel depto) se hereda el valor
@@ -2590,15 +2675,18 @@
   // por tanto la suma nacional = total de votantes esperados.
   function estimatedVotes(cand){
     if (!geoData) return 0;
+    // Versión consistente a nivel nacional: usa bias_norm (que está
+    // calibrado para que el promedio ponderado por votantes valga 1).
+    // Esto garantiza que ranking(votos) == ranking(pct nacional): si
+    // Abelardo tiene mayor pct que Paloma, sus votos también serán mayores.
+    // La normalización local se aplica solo en el drill por depto
+    // (estimatedVotesForDep) donde la suma local sí debe igualar voters(d).
     let total = 0;
     for (const f of geoData.features){
       const nm = depName(f.properties);
       const voters = expectedVoters(nm);
       if (voters <= 0) continue;
-      const localTotal = CANDIDATOS.reduce((s,c) => s + projected(c, nm), 0);
-      if (localTotal <= 0) continue;
-      const shareLocal = projected(cand, nm) / localTotal;
-      total += voters * shareLocal;
+      total += voters * cand.pct * biasForNorm(cand, nm) / 100;
     }
     return total;
   }
@@ -2661,6 +2749,7 @@
     buildSenadoHistorico();
     precomputeBias();
     precomputeBiasMun();
+    precomputeBiasNorm();
     // Log de cobertura para verificar que la calibración funcionó
     const sigOk = HISTORICO_KEYS.filter(k => HISTORICOS[k]).length;
     const sigMunOk = HISTORICO_KEYS.filter(k => HISTORICOS[k]?.muns).length;
