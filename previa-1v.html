@@ -172,6 +172,16 @@
     /* Excel download button + modal (estilo copiado de camara-2026) */
     .excel-btn{font-family:Avenir,sans-serif;font-weight:500;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:#15803d;border:1px solid #15803d;padding:.45rem .9rem;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:.4rem}
     .excel-btn:hover{background:#166534;border-color:#166534}
+    .excel-btn.locked{background:rgba(120,120,120,.25);border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.6)}
+    .excel-btn.locked:hover{background:rgba(120,120,120,.35);border-color:rgba(255,255,255,.3)}
+    body.day-mode .excel-btn.locked{background:rgba(0,0,0,.06);border-color:rgba(0,0,0,.18);color:rgba(0,0,0,.5)}
+
+    /* Toast acceso (no Premium / no registrado) */
+    .access-toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%) translateY(20px);background:rgba(245,158,11,.95);color:#1a1a2e;padding:.75rem 1.3rem;font-family:Avenir,sans-serif;font-size:.88rem;font-weight:500;z-index:60000;max-width:520px;line-height:1.5;box-shadow:0 8px 24px rgba(0,0,0,.35);opacity:0;visibility:hidden;transition:opacity .25s,transform .25s,visibility 0s linear .25s}
+    .access-toast.show{opacity:1;visibility:visible;transform:translateX(-50%) translateY(0);transition:opacity .25s,transform .25s,visibility 0s}
+    .access-toast b{font-weight:700}
+    .access-toast a{color:#1a1a2e;font-weight:700;text-decoration:underline;text-underline-offset:2px}
+    .access-toast a:hover{color:#000}
     body.day-mode .excel-btn{background:#15803d;color:#fff;border-color:#15803d}
     .dl-modal{display:none;position:fixed;inset:0;z-index:99997;background:rgba(4,6,16,.78);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:1.5rem}
     .dl-modal.show{display:flex}
@@ -294,6 +304,19 @@
     #map-legend .pond-chip .dot{flex-shrink:0}
     #map-legend .pond-chip-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     #map-legend .pond-chip-vals{flex-shrink:0;font-variant-numeric:tabular-nums;white-space:nowrap}
+    /* El chip es clickeable: abre el detalle del candidato. Hover sutil. */
+    #map-legend .pond-chip.pond-chip-link{cursor:pointer;padding:.4rem .55rem;margin:0 -.55rem;border-radius:3px;transition:background .15s}
+    #map-legend .pond-chip.pond-chip-link:hover{background:rgba(0,71,255,.08)}
+    body.day-mode #map-legend .pond-chip.pond-chip-link:hover{background:rgba(0,71,255,.06)}
+    #map-legend .pond-chip.pond-chip-link .pond-chip-name{text-decoration:underline;text-underline-offset:3px;text-decoration-color:rgba(255,255,255,.18);text-decoration-thickness:1px}
+    #map-legend .pond-chip.pond-chip-link:hover .pond-chip-name{text-decoration-color:rgba(0,71,255,.6)}
+    body.day-mode #map-legend .pond-chip.pond-chip-link .pond-chip-name{text-decoration-color:rgba(0,0,0,.2)}
+
+    /* Botón "← Volver" dentro de la vista detalle */
+    .det-back-btn{font-family:Avenir,sans-serif;font-weight:500;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue);background:rgba(0,71,255,.08);border:1px solid rgba(0,71,255,.4);padding:.32rem .7rem;cursor:pointer;transition:all .15s}
+    .det-back-btn:hover{background:var(--blue);color:#fff}
+    body.day-mode .det-back-btn{background:rgba(0,71,255,.06);color:var(--blue);border-color:rgba(0,71,255,.4)}
+    body.day-mode .det-back-btn:hover{background:var(--blue);color:#fff}
     #leaflet-map,#leaflet-map .leaflet-container{cursor:default!important}
     #leaflet-map .leaflet-grab,#leaflet-map .leaflet-dragging .leaflet-grab,#leaflet-map.leaflet-grab{cursor:default!important}
     #leaflet-map .leaflet-interactive{cursor:pointer!important}
@@ -322,10 +345,9 @@
     .btn-primary:hover{background:var(--blue);color:#fff}
     .btn-sm{font-size:.62rem;padding:.32rem .55rem}
 
-    .cand-card{display:grid;grid-template-columns:6px 1fr;gap:.75rem;padding:.75rem .9rem;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02);margin-bottom:.6rem;transition:border-color .15s,background .15s;cursor:pointer}
+    .cand-card{display:grid;grid-template-columns:6px 1fr;gap:.75rem;padding:.75rem .9rem;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02);margin-bottom:.6rem;transition:border-color .15s,background .15s}
     .cand-stripe{width:6px;border-radius:1px;align-self:stretch}
-    .cand-card:hover{border-color:rgba(0,71,255,.4);background:rgba(0,71,255,.04)}
-    .cand-card.active{border-color:var(--blue);background:rgba(0,71,255,.08)}
+    .cand-card.active{border-color:var(--blue);background:rgba(0,71,255,.04)}
     .cand-photo{width:62px;height:62px;border:1px dashed rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;background:rgba(0,0,0,.3)}
     .cand-photo img{width:100%;height:100%;object-fit:cover;object-position:center 20%}
     .cand-photo .ph-plus{font-family:Avenir,sans-serif;font-weight:500;font-size:.6rem;letter-spacing:.08em;color:rgba(255,255,255,.4);text-align:center;padding:.3rem;line-height:1.3}
@@ -1235,6 +1257,8 @@
       const backBtn = document.getElementById('map-back-btn');
       if (backBtn){ backBtn.textContent = '← Nacional'; backBtn.classList.add('show'); }
       updateMapHeadForDrill(depNom, (geo.features||[]).length);
+      // Recalcula leyenda y total de votos con scope = este depto
+      repaintMap();
     } catch(e){
       console.error('[Previa] error cargando muns de', depCod, e);
     } finally {
@@ -1307,6 +1331,8 @@
         backBtn.textContent = '← Depto';
         backBtn.classList.add('show');
       }
+      // Recalcula leyenda y total con scope = ciudad (hereda del depto padre)
+      repaintMap();
     } catch(e){
       console.error('[Previa] error cargando ciudad', cfg.key, e);
     } finally {
@@ -1439,30 +1465,34 @@
     const nameEl = document.getElementById('map-cand-name');
     const pctEl  = document.getElementById('map-cand-pct');
 
-    if (selectedId){
-      const cand = CANDIDATOS.find(c => c.id === selectedId);
-      label.textContent = 'Filtro · fuerza regional';
-      nameEl.textContent = cand ? cand.nombre : '—';
-      nameEl.style.color = cand ? cand.color : 'var(--white)';
-      pctEl.textContent = cand ? (fmtPct(cand.pct) + ' nacional') : '';
-    } else {
-      // Si estamos en drill-down, updateMapHeadForDrill ya escribió el título.
-      // Sólo sobreescribimos cuando NO hay depto activo.
-      if (!currentDepCod && currentLevel !== 'mun'){
-        label.textContent = 'Ganador por departamento';
-        nameEl.textContent = 'Clic en un depto para ver sus municipios';
-        nameEl.style.color = '';
+    // ─ LABEL ─ sólo lo escribimos cuando NO hay drill activo (drillToDepto
+    // y loadCityLayer ya pusieron su propio título tipo "ANTIOQUIA · 125 muns"
+    // o "Bogotá D.C. · Localidades").
+    if (!currentDepCod && !currentCityKey){
+      if (selectedId){
+        label.textContent = 'Filtro · fuerza regional';
       } else if (currentLevel === 'mun'){
         label.textContent = 'Ganador por municipio (nacional)';
-        nameEl.textContent = 'Los colores heredan del depto (bias en calibración)';
-        nameEl.style.color = '';
+      } else {
+        label.textContent = 'Ganador por departamento';
       }
-      // Total de votación estimada: nacional en vista general, o del depto
-      // cuando el usuario ha hecho drill-down a uno específico.
-      let totalVotes = 0;
-      for (const c of CANDIDATOS) totalVotes += estimatedVotesInScope(c);
-      pctEl.textContent = totalVotes > 0 ? `${fmtCompact(totalVotes)} votos estimados` : '';
     }
+
+    // ─ NAME ─ candidato si hay filtro; placeholder si no. NO depende de drill.
+    if (selectedId){
+      const cand = CANDIDATOS.find(c => c.id === selectedId);
+      nameEl.textContent = cand ? cand.nombre : '—';
+      nameEl.style.color = cand ? displayColorOnDark(cand.color) : '';
+    } else {
+      nameEl.textContent = 'Clic en un candidato del listado para ver su detalle';
+      nameEl.style.color = '';
+    }
+
+    // ─ PCT ─ siempre votos estimados en el scope vigente (nacional / depto).
+    let totalVotes = 0;
+    for (const c of CANDIDATOS) totalVotes += estimatedVotesInScope(c);
+    pctEl.textContent = totalVotes > 0 ? `${fmtCompact(totalVotes)} votos estimados` : '';
+
     renderMapLegend();
   }
 
@@ -1480,7 +1510,10 @@
       ? `<img src="${cand.foto}" alt="${cand.nombre}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/><div class="det-fallback" style="display:none">Foto no disponible</div>${stripe}`
       : `<div class="det-fallback">Foto no disponible</div>${stripe}`;
     return `
-      <h4 class="mid-title">Detalle · ${cand.nombre}</h4>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+        <h4 class="mid-title" style="margin:0">Detalle · ${cand.nombre}</h4>
+        <button class="det-back-btn" onclick="closeCandDetail()">← Volver</button>
+      </div>
       <div class="det-card">
         <div class="det-photo">${foto}</div>
         <div>
@@ -1594,7 +1627,7 @@
       const totalVotes = votes.reduce((s,x) => s + x.v, 0);
       const chips = votes.map(x => {
         const pct = totalVotes > 0 ? (x.v / totalVotes * 100) : 0;
-        return `<span class="pond-chip" title="${fmtFull(x.v)} votos">
+        return `<span class="pond-chip pond-chip-link" title="Ver detalle de ${x.c.nombre}" onclick="openCandDetail('${x.c.id}')">
           <span class="dot" style="background:${x.c.color}"></span>
           <span class="pond-chip-name">${x.c.nombre}</span>
           <span class="pond-chip-vals"><b class="pond-chip-num">${fmtCompact(x.v)}</b> <span style="opacity:.55">(${pct.toFixed(1)}%)</span></span>
@@ -1649,7 +1682,9 @@
       const card = document.createElement('div');
       card.className = 'cand-card' + (c.id === selectedId ? ' active' : '');
       card.dataset.id = c.id;
-      card.onclick = () => selectCand(c.id);
+      // Las tarjetas del panel ya NO abren el detalle. Sólo controlan el
+      // slider y muestran la franja de color. El detalle se abre desde los
+      // chips del map-legend (columna central) — ver onclick en pond-chip.
       card.innerHTML = `
         <div class="cand-stripe" style="background:${c.color}"></div>
         <div class="cand-body">
@@ -1676,13 +1711,26 @@
   }
 
   // ─── INTERACTION ──────────────────────────────────────────────
-  // Click sobre una tarjeta: activa modo filtro. Si ya está activa la misma
-  // tarjeta, deselecciona y vuelve al modo ganadores.
-  function selectCand(id){
-    selectedId = (selectedId === id) ? null : id;
+  // Click sobre un chip del pond-legend (columna central) → abre el panel
+  // de detalle (foto + hexágono + propuesta) y activa modo filtro en el mapa.
+  // Click sobre el botón "← Volver" del detalle → cierra y vuelve al listado.
+  function openCandDetail(id){
+    selectedId = id;
     renderPonderador();
     renderPanel();
     repaintMap();
+  }
+  function closeCandDetail(){
+    selectedId = null;
+    renderPonderador();
+    renderPanel();
+    repaintMap();
+  }
+  // Compat: selectCand sigue existiendo (lo usan otros sitios) pero ahora
+  // delega en openCandDetail / closeCandDetail.
+  function selectCand(id){
+    if (selectedId === id) closeCandDetail();
+    else openCandDetail(id);
   }
 
   // Actualiza %/delta/slider en el DOM existente (sin rebuild) para no romper
@@ -1793,7 +1841,29 @@
       alert('El mapa aún no ha terminado de cargar. Espera un momento y vuelve a intentar.');
       return;
     }
+    // Acceso restringido a planes Pro / Premium / Full (mismo modelo de
+    // negocio que camara-2026 y senado-2026). Toast al pie para no-premium.
+    const { isPremium } = authInfo();
+    if (!isPremium){
+      showAccessToast('Descarga Excel sólo en plan <b>Premium</b> · <a href="pricing.html">Ver planes →</a>');
+      return;
+    }
     document.getElementById('dl-modal').classList.add('show');
+  }
+
+  // Toast no intrusivo (3.5 s). HTML-aware (acepta <b> y <a> en el mensaje).
+  function showAccessToast(html){
+    let t = document.getElementById('access-toast');
+    if (!t){
+      t = document.createElement('div');
+      t.id = 'access-toast';
+      t.className = 'access-toast';
+      document.body.appendChild(t);
+    }
+    t.innerHTML = html;
+    t.classList.add('show');
+    clearTimeout(showAccessToast._tid);
+    showAccessToast._tid = setTimeout(() => t.classList.remove('show'), 3500);
   }
   function closeDlModal(){
     document.getElementById('dl-modal').classList.remove('show');
@@ -1958,6 +2028,23 @@
       area.innerHTML = `
         <button class="e-btn-login" onclick="showLoginModal()">Iniciar sesión</button>
         <a href="register.html" class="e-btn-register">Registrarse</a>`;
+    }
+    // Botón Excel: candado visible cuando no es Premium
+    refreshExcelBtnLockState();
+  }
+
+  function refreshExcelBtnLockState(){
+    const btn = document.getElementById('excel-btn');
+    if (!btn) return;
+    const { isPremium } = authInfo();
+    if (isPremium){
+      btn.classList.remove('locked');
+      btn.innerHTML = '⬇ Excel';
+      btn.title = 'Descargar la tabla actual en Excel';
+    } else {
+      btn.classList.add('locked');
+      btn.innerHTML = '⬇ Excel 🔒';
+      btn.title = 'Descarga Excel sólo en plan Premium';
     }
   }
 
