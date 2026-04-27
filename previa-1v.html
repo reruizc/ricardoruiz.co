@@ -248,8 +248,8 @@
     @media (max-width:1280px){.shell{grid-template-columns:1fr 320px 340px}}
     @media (max-width:1100px){.shell{grid-template-columns:1fr}}
 
-    /* Columna central: leyenda/detalle candidato */
-    .mid-col{border-right:1px solid var(--border);display:flex;flex-direction:column;padding:1rem 1rem 1.2rem;overflow-y:auto;max-height:calc(100vh - 320px)}
+    /* Columna central: leyenda/detalle candidato — scroll del navegador */
+    .mid-col{border-right:1px solid var(--border);display:flex;flex-direction:column;padding:1rem 1rem 1.2rem}
     body.day-mode .mid-col{border-right-color:rgba(0,0,0,.1)}
     .mid-col h4.mid-title{font-family:Avenir,sans-serif;font-weight:500;font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:.7rem}
     body.day-mode .mid-col h4.mid-title{color:rgba(0,0,0,.4)}
@@ -333,7 +333,8 @@
     .map-legend-ends{display:flex;justify-content:space-between;width:260px;font-family:Avenir,sans-serif;font-weight:400;font-size:.68rem;color:rgba(255,255,255,.5)}
 
     /* PANEL */
-    .panel{padding:0;max-height:calc(100vh - 320px);overflow-y:auto;position:relative}
+    /* Panel de fórmulas — sin scroll interno; usa el del navegador */
+    .panel{padding:0;position:relative}
     .panel-head{display:flex;align-items:center;justify-content:space-between;gap:.7rem;flex-wrap:wrap;position:sticky;top:0;z-index:5;background:var(--bg);padding:1rem 1.2rem .75rem;border-bottom:1px solid var(--border);margin-bottom:.6rem}
     body.day-mode .panel-head{background:#e6ded3;border-bottom-color:rgba(0,0,0,.1)}
     .panel #cand-list{padding:0 1.2rem}
@@ -356,8 +357,12 @@
     .cand-top{display:flex;align-items:baseline;justify-content:space-between;gap:.5rem}
     .cand-name{font-family:'Syne',sans-serif;font-weight:700;font-size:.95rem;letter-spacing:-.01em;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .cand-party{font-family:Avenir,sans-serif;font-weight:400;font-size:.68rem;letter-spacing:.05em;color:rgba(255,255,255,.45);margin-top:2px}
-    .cand-pct{font-family:Avenir,sans-serif;font-weight:500;font-size:1.05rem;color:var(--white);white-space:nowrap}
-    .cand-pct .delta{font-size:.7rem;margin-left:.25rem;opacity:.75}
+    .cand-pct{font-family:Avenir,sans-serif;font-weight:500;font-size:1.05rem;color:var(--white);white-space:nowrap;display:flex;align-items:center;gap:.3rem}
+    .cand-pct .delta{font-size:.7rem;opacity:.75}
+    .cand-lock{background:rgba(245,158,11,.2);border:1px solid rgba(245,158,11,.5);color:rgba(245,158,11,.95);font-size:.7rem;padding:.05rem .35rem;cursor:pointer;line-height:1;transition:all .15s}
+    .cand-lock:hover{background:rgba(245,158,11,.4);color:#fff}
+    body.day-mode .cand-lock{background:rgba(245,158,11,.15);color:#8a6300;border-color:rgba(245,158,11,.5)}
+    body.day-mode .cand-lock:hover{background:rgba(245,158,11,.4);color:#5a4400}
     .cand-slider{-webkit-appearance:none;appearance:none;width:100%;height:4px;background:rgba(255,255,255,.1);outline:none;margin:.3rem 0 .15rem}
     .cand-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:14px;height:14px;background:var(--white);border:2px solid var(--blue);border-radius:50%;cursor:pointer}
     .cand-slider::-moz-range-thumb{width:14px;height:14px;background:var(--white);border:2px solid var(--blue);border-radius:50%;cursor:pointer}
@@ -560,10 +565,19 @@
         <p>
           Si el ponderador externo reporta una suma distinta de 100 —por
           redondeos o porque publican menos candidatos— el residual lo absorbe
-          automáticamente la categoría <b>Blanco / Indecisos</b>. Al mover un
-          deslizador hacia arriba, los demás candidatos ceden proporcionalmente
-          a su % actual (el que más tiene, más cede); al moverlo hacia abajo,
-          ocurre lo inverso. La suma del ponderador siempre marca 100.0%.
+          automáticamente la categoría <b>Blanco / Indecisos</b>. La suma del
+          ponderador siempre marca 100.0%.
+        </p>
+        <p>
+          Al mover un deslizador hacia arriba, los demás candidatos ceden
+          proporcionalmente a su % actual (el que más tiene, más cede); al
+          moverlo hacia abajo, ocurre lo inverso. <b>Importante:</b> cualquier
+          candidato cuyo deslizador hayas tocado queda <b>fijo</b> (con un
+          candado 🔒 al lado de su porcentaje). Si después mueves otros
+          deslizadores, esos candidatos fijados no se ajustan; sólo se mueven
+          los que aún no has tocado. Para soltar un candidato basta con
+          presionar su candado, o usar <b>Restablecer</b> para volver a la
+          base del ponderador y limpiar todos los candados.
         </p>
 
         <h4>3. Proyección territorial (bias)</h4>
@@ -690,6 +704,10 @@
   // cae al pct hardcoded del array CANDIDATOS (valores de la última encuesta
   // vigente al momento del deploy).
   let BASE = CANDIDATOS.map(c => ({ ...c }));
+  // Candidatos cuyo slider fue tocado por el usuario: quedan FIJOS.
+  // Cuando se mueve un slider, la redistribución del delta sólo afecta a los
+  // candidatos que NO están en este set. Restablecer limpia el set.
+  let _lockedIds = new Set();
   let PONDERADOR_META = null;  // { fuente, fecha_corte, url_fuente } cuando se carga el JSON
 
   const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
@@ -1696,6 +1714,7 @@
             <div class="cand-pct">
               ${fmtPct(c.pct)}
               ${delta !== 0 ? `<span class="delta" style="color:${delta>0?'var(--green)':'var(--red)'}">${delta>0?'+':''}${delta}</span>` : ''}
+              ${_lockedIds.has(c.id) ? `<button class="cand-lock" onclick="unlockCand('${c.id}',event)" title="Desbloquear · vuelve a moverse cuando ajustes otros candidatos">🔒</button>` : ''}
             </div>
           </div>
           <input type="range" class="cand-slider" min="0" max="100" step="0.5"
@@ -1744,7 +1763,9 @@
       const delta = +(c.pct - base).toFixed(1);
       const pctEl = card.querySelector('.cand-pct');
       if (pctEl){
-        pctEl.innerHTML = `${fmtPct(c.pct)}${delta !== 0 ? `<span class="delta" style="color:${delta>0?'var(--green)':'var(--red)'}">${delta>0?'+':''}${delta}</span>` : ''}`;
+        const deltaSpan = delta !== 0 ? `<span class="delta" style="color:${delta>0?'var(--green)':'var(--red)'}">${delta>0?'+':''}${delta}</span>` : '';
+        const lockBtn = _lockedIds.has(c.id) ? `<button class="cand-lock" onclick="unlockCand('${c.id}',event)" title="Desbloquear · vuelve a moverse cuando ajustes otros candidatos">🔒</button>` : '';
+        pctEl.innerHTML = `${fmtPct(c.pct)}${deltaSpan}${lockBtn}`;
       }
       const slider = card.querySelector('.cand-slider');
       if (slider && c.id !== draggingId){
@@ -1765,10 +1786,13 @@
     const prev = parseFloat(ev.target.dataset.prev ?? cand.pct);
     let val = parseFloat(ev.target.value);
 
-    const others = CANDIDATOS.filter(c => c.id !== id);
+    // Candidatos disponibles para absorber el delta: ni el actual, ni los
+    // que el usuario ya ajustó manualmente (lockeados → su % queda intacto).
+    const others = CANDIDATOS.filter(c => c.id !== id && !_lockedIds.has(c.id));
     const othersTotal = others.reduce((s,c) => s + c.pct, 0);
 
-    // No puedo subir más allá de lo que los demás pueden entregar
+    // No puedo subir más allá de lo que los NO-lockeados pueden entregar.
+    // Si todos los otros están lockeados, el slider sólo puede bajar.
     const maxPossible = prev + othersTotal;
     if (val > maxPossible) val = maxPossible;
     if (val < 0) val = 0;
@@ -1802,9 +1826,11 @@
     ev.target.value = cand.pct;
     ev.target.dataset.prev = cand.pct;
 
-    // NOTE: mover el slider NO activa el modo filtro — el modo se activa sólo
-    // al hacer click explícitamente en una tarjeta. Así el usuario puede
-    // mover porcentajes y seguir viendo el mapa de ganadores recolorearse.
+    // El candidato tocado queda LOCKED: futuros movimientos en otros
+    // sliders ya no le quitan ni le suman porcentaje. Se desbloquea con
+    // click en el candado de su tarjeta o con el botón Restablecer.
+    if (delta !== 0) _lockedIds.add(id);
+
     renderPonderador();
     updatePcts(id);
     repaintMap();
@@ -1822,7 +1848,15 @@
 
   function resetSim(){
     CANDIDATOS.forEach((c,i) => { c.pct = BASE[i].pct; });
+    _lockedIds.clear();   // restablecer también suelta los candados manuales
     renderPonderador(); renderPanel(); repaintMap();
+  }
+  // Desbloquea un candidato individual sin tocar los demás. Su % queda
+  // donde estaba y volverá a redistribuir cuando muevas otros sliders.
+  function unlockCand(id, ev){
+    if (ev) ev.stopPropagation();
+    _lockedIds.delete(id);
+    renderPanel();
   }
 
   function normalize(){
