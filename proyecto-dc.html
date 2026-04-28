@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Proyecto DC · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet" />
+  <style>
+    /* ── THEME ── */
+    :root {
+      --bg: #f4f3ef;
+      --bg2: #eeedea;
+      --surface: #ffffff;
+      --surface2: #f0efe9;
+      --border: rgba(0,0,0,0.07);
+      --border2: rgba(0,0,0,0.12);
+      --text: #0a0a0a;
+      --text2: #555;
+      --text3: #999;
+      --blue: #0047FF;
+      --blue-dim: rgba(0,71,255,0.08);
+      --purple: #7c3aed;
+      --purple-dim: rgba(124,58,237,0.10);
+      --amber: #b8860b;
+      --amber-dim: rgba(184,134,11,0.10);
+      --white: #f4f3ef;
+      --pending: #c9c4ba;
+      --active: #f0c040;
+      --done: #00d68f;
+    }
+    [data-theme="dark"] {
+      --bg: #060810;
+      --bg2: #0a0c14;
+      --surface: #0f1018;
+      --surface2: #13151f;
+      --border: rgba(255,255,255,0.06);
+      --border2: rgba(255,255,255,0.12);
+      --text: #f4f3ef;
+      --text2: #888;
+      --text3: #444;
+      --blue-dim: rgba(0,71,255,0.12);
+      --purple: #a78bfa;
+      --purple-dim: rgba(167,139,250,0.14);
+      --amber: #d4a373;
+      --amber-dim: rgba(212,163,115,0.14);
+      --pending: #2a2c38;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Fraunces', serif;
+      min-height: 100vh;
+      cursor: none;
+      overflow-x: hidden;
+      transition: background 0.4s, color 0.4s;
+    }
+
+    /* ── GATE LOADING ── */
+    .gate {
+      position: fixed; inset: 0; z-index: 5000;
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 1rem;
+    }
+    .gate-text {
+      font-family: 'DM Mono', monospace;
+      font-size: .82rem; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--text2);
+    }
+    .gate-bar {
+      width: 120px; height: 1px; background: var(--border);
+      position: relative; overflow: hidden;
+    }
+    .gate-bar::after {
+      content: ''; position: absolute; inset: 0;
+      background: var(--blue);
+      animation: gate-slide 1.4s ease-in-out infinite;
+    }
+    @keyframes gate-slide {
+      0%   { transform: translateX(-100%); }
+      50%  { transform: translateX(0); }
+      100% { transform: translateX(100%); }
+    }
+
+    /* ── CURSOR ── */
+    .cursor { position:fixed; width:12px; height:12px; background:var(--purple); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s ease,background .2s; transform:translate(-50%,-50%); }
+    .cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--purple); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s ease,opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+
+    /* ── NAV ── */
+    nav.top {
+      position: fixed; top:0; left:0; right:0; z-index:100;
+      display: flex; align-items:center; justify-content:space-between;
+      padding: .9rem 2.5rem;
+      background: var(--bg); border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+    }
+    .nav-left { display:flex; align-items:center; gap:1rem; }
+    .nav-right { display:flex; align-items:center; gap:1.2rem; }
+    .e-btn-back { font-family:'Syne',sans-serif; font-size:.78rem; letter-spacing:.08em; text-transform:uppercase; color:var(--text2); text-decoration:none; border:1.5px solid var(--border); padding:.3rem .8rem; transition:color .2s,border-color .2s; }
+    .e-btn-back:hover { color:var(--text); border-color:var(--text2); }
+    .private-badge {
+      font-family:'DM Mono',monospace; font-size:.65rem;
+      letter-spacing:.18em; text-transform:uppercase;
+      color: var(--purple); background: var(--purple-dim);
+      padding:.32rem .7rem; border:1px solid var(--purple-dim);
+    }
+    .logo-link { display:flex; align-items:center; gap:.55rem; text-decoration:none; opacity:.85; }
+    .logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
+    .logo-bar { width:5px; background:var(--purple); border-radius:1px 1px 0 0; }
+    .logo-text { font-family:'Syne',sans-serif; font-weight:800; font-size:1.3rem; letter-spacing:-.03em; color:var(--text); }
+    .logo-text span { color:var(--purple); }
+
+    /* ── LAYOUT ── */
+    main.wrap {
+      max-width: 1320px; margin:0 auto;
+      padding: 6rem 2.5rem 4rem;
+    }
+
+    /* ── HERO ── */
+    .hero {
+      padding: 2rem 0 4rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .hero-label {
+      font-family:'DM Mono',monospace; font-size:.72rem;
+      letter-spacing:.18em; text-transform:uppercase;
+      color:var(--purple); margin-bottom:1rem;
+      display:flex; align-items:center; gap:.75rem;
+    }
+    .hero-label::before { content:''; display:block; width:24px; height:1px; background:var(--purple); }
+    .hero-title {
+      font-family:'Syne',sans-serif; font-weight:800;
+      font-size:clamp(2.2rem, 5.5vw, 4.4rem);
+      letter-spacing:-.03em; line-height:.96;
+      max-width: 920px;
+    }
+    .hero-title em {
+      font-style:italic; font-family:'Fraunces',serif;
+      font-weight:300; color:var(--purple);
+    }
+    .hero-quote {
+      margin-top: 2rem; max-width: 720px;
+      font-family:'Fraunces',serif; font-weight:300;
+      font-size: 1.15rem; line-height: 1.55;
+      color: var(--text2);
+      padding-left: 1.2rem;
+      border-left: 2px solid var(--purple);
+    }
+    .hero-meta {
+      margin-top: 2.5rem;
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+    }
+    .hero-meta-item {
+      padding: 1rem 0;
+      border-top: 1px solid var(--border);
+    }
+    .hero-meta-label {
+      font-family:'DM Mono',monospace; font-size:.62rem;
+      letter-spacing:.18em; text-transform:uppercase;
+      color: var(--text3); margin-bottom: .5rem;
+    }
+    .hero-meta-val {
+      font-family:'Syne',sans-serif; font-weight:500;
+      font-size: 1rem; color: var(--text);
+    }
+
+    /* ── SECTION ── */
+    section.s {
+      padding: 4.5rem 0;
+      border-top: 1px solid var(--border);
+    }
+    section.s:first-of-type { border-top: none; }
+    .s-label {
+      font-family:'DM Mono',monospace; font-size:.7rem;
+      letter-spacing:.2em; text-transform:uppercase;
+      color: var(--purple); margin-bottom: .75rem;
+      display:flex; align-items:center; gap:.5rem;
+    }
+    .s-num {
+      font-family:'DM Mono',monospace;
+      color: var(--text3);
+    }
+    .s-title {
+      font-family:'Syne',sans-serif; font-weight:800;
+      font-size: clamp(1.6rem, 3.4vw, 2.6rem);
+      letter-spacing: -.02em; line-height: 1.05;
+      margin-bottom: 1rem;
+      max-width: 880px;
+    }
+    .s-title em {
+      font-style:italic; font-family:'Fraunces',serif;
+      font-weight:300; color: var(--purple);
+    }
+    .s-intro {
+      font-family:'Fraunces',serif; font-weight:300;
+      font-size: 1.05rem; line-height: 1.6;
+      color: var(--text2); max-width: 720px;
+      margin-bottom: 2.5rem;
+    }
+    .s-intro strong {
+      font-weight: 400; color: var(--text);
+      border-bottom: 1px solid var(--purple);
+    }
+
+    /* ── OBJETIVOS ── */
+    .obj-general {
+      padding: 1.5rem; background: var(--surface);
+      border: 1px solid var(--border);
+      font-family:'Fraunces',serif; font-weight:300;
+      font-size: 1.08rem; line-height: 1.6;
+      color: var(--text); margin-bottom: 2rem;
+      max-width: 880px;
+    }
+    .obj-list {
+      list-style: none; display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+    }
+    .obj-list li {
+      padding: 1.2rem;
+      background: var(--surface2);
+      border-left: 2px solid var(--purple);
+      font-family:'Fraunces',serif; font-weight: 300;
+      font-size: .98rem; line-height: 1.5;
+      color: var(--text);
+    }
+    .obj-list li strong {
+      display:block; font-family:'DM Mono',monospace;
+      font-size: .68rem; letter-spacing: .15em;
+      color: var(--purple); font-weight: 400;
+      margin-bottom: .4rem;
+    }
+
+    /* ── PARADIGMA TABLE ── */
+    .paradigma {
+      width: 100%; border-collapse: collapse;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+    .paradigma th, .paradigma td {
+      padding: 1.1rem 1.25rem;
+      text-align: left; vertical-align: top;
+      border-bottom: 1px solid var(--border);
+      font-family:'Fraunces',serif; font-weight: 300;
+      font-size: .98rem; line-height: 1.45;
+    }
+    .paradigma thead th {
+      font-family:'DM Mono',monospace; font-weight: 400;
+      font-size: .68rem; letter-spacing: .15em;
+      text-transform: uppercase; color: var(--text3);
+      background: var(--surface2);
+    }
+    .paradigma tbody tr:last-child td { border-bottom: none; }
+    .paradigma .dim {
+      font-family:'Syne',sans-serif; font-weight: 700;
+      font-size: 1rem; color: var(--text);
+      width: 22%;
+    }
+    .paradigma .trad { color: var(--text2); width: 39%; }
+    .paradigma .cond { color: var(--text); width: 39%; background: var(--purple-dim); }
+    .paradigma .cond::before {
+      content: '✓'; color: var(--purple);
+      margin-right: .5rem; font-weight: 600;
+    }
+
+    /* ── HUELLAS ── */
+    .huellas-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 1rem; margin-bottom: 1.5rem;
+    }
+    .huella {
+      padding: 1.75rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-top: 2px solid var(--purple);
+      position: relative;
+    }
+    .huella-num {
+      font-family:'DM Mono',monospace;
+      font-size: .72rem; letter-spacing: .15em;
+      color: var(--purple); margin-bottom: 1rem;
+    }
+    .huella h3 {
+      font-family:'Syne',sans-serif; font-weight: 800;
+      font-size: 1.25rem; letter-spacing: -.01em;
+      margin-bottom: .75rem;
+    }
+    .huella p {
+      font-family:'Fraunces',serif; font-weight: 300;
+      font-size: 1rem; line-height: 1.55;
+      color: var(--text2);
+    }
+    .huellas-foot {
+      padding: 1rem 1.25rem;
+      border: 1px dashed var(--border2);
+      font-family:'DM Mono',monospace;
+      font-size: .72rem; letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--text2); text-align: center;
+    }
+
+    /* ── ÍNDICES ── */
+    .indices-grid {
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      gap: .75rem;
+    }
+    .indice {
+      padding: 1.4rem 1.1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+    .indice-num {
+      font-family:'Syne',sans-serif; font-weight: 800;
+      font-size: 2.4rem; line-height: 1;
+      color: var(--purple); margin-bottom: .5rem;
+    }
+    .indice h3 {
+      font-family:'Syne',sans-serif; font-weight: 700;
+      font-size: 1.05rem; letter-spacing: -.01em;
+      margin-bottom: .5rem;
+    }
+    .indice p {
+      font-family:'Fraunces',serif; font-weight: 300;
+      font-size: .9rem; line-height: 1.5;
+      color: var(--text2);
+    }
+
+    /* ── ROADMAP ── */
+    .roadmap-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+    .mes {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 1.75rem;
+    }
+    .mes-num {
+      font-family:'DM Mono',monospace;
+      font-size: .72rem; letter-spacing: .18em;
+      text-transform: uppercase; color: var(--purple);
+      margin-bottom: .75rem;
+    }
+    .mes h3 {
+      font-family:'Syne',sans-serif; font-weight: 800;
+      font-size: 1.4rem; letter-spacing: -.01em;
+      margin-bottom: 1.2rem;
+    }
+    .modulos {
+      list-style: none; display: flex; flex-direction: column;
+      gap: .65rem; margin-bottom: 1.2rem;
+    }
+    .modulos li {
+      font-family:'Fraunces',serif; font-weight: 300;
+      font-size: .98rem; line-height: 1.4;
+      color: var(--text); display: flex; gap: .6rem;
+      align-items: flex-start;
+    }
+    .badge {
+      display: inline-block; flex-shrink: 0;
+      width: 8px; height: 8px; border-radius: 50%;
+      margin-top: .55rem; background: var(--pending);
+    }
+    .badge.active { background: var(--active); }
+    .badge.done   { background: var(--done); }
+    .mes-foot {
+      padding: .8rem 0 0;
+      border-top: 1px solid var(--border);
+      font-family:'DM Mono',monospace;
+      font-size: .68rem; letter-spacing: .1em;
+      color: var(--text3); text-transform: uppercase;
+    }
+
+    /* ── ARQUETIPOS TERRITORIALES ── */
+    .arq-terr-grid {
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      gap: .75rem;
+    }
+    .arq-terr {
+      padding: 1.4rem 1.2rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      position: relative;
+    }
+    .arq-terr h3 {
+      font-family:'Syne',sans-serif; font-weight: 800;
+      font-size: 1.1rem; letter-spacing: -.01em;
+      margin-bottom: .35rem;
+    }
+    .arq-terr-axes {
+      font-family:'DM Mono',monospace;
+      font-size: .62rem; letter-spacing: .12em;
+      color: var(--text3); text-transform: uppercase;
+      margin-bottom: 1rem; line-height: 1.5;
+    }
+    .arq-terr-row {
+      margin-top: .8rem;
+      font-family:'Fraunces',serif; font-weight: 300;
+      font-size: .92rem; line-height: 1.45;
+      color: var(--text2);
+    }
+    .arq-terr-row b {
+      display: block; font-family:'DM Mono',monospace;
+      font-size: .6rem; letter-spacing: .15em;
+      color: var(--purple); font-weight: 400;
+      text-transform: uppercase; margin-bottom: .25rem;
+    }
+
+    /* ── ARQUETIPOS DE MOVILIZACIÓN ── */
+    .arq-mov-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr);
+      gap: 1rem; margin-bottom: 3rem;
+    }
+    .arq-mov {
+      padding: 1.75rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--purple);
+    }
+    .arq-mov h3 {
+      font-family:'Syne',sans-serif; font-weight: 800;
+      font-size: 1.3rem; letter-spacing: -.01em;
+      margin-bottom: .25rem;
+    }
+    .arq-mov-tagline {
+      font-family:'DM Mono',monospace;
+      font-size: .65rem; letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--purple); margin-bottom: 1.2rem;
+    }
+    .arq-mov-meta {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: .6rem; margin-bottom: 1.2rem;
+      padding: .9rem 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .arq-mov-meta-item {
+      font-family:'DM Mono',monospace;
+      font-size: .65rem; letter-spacing: .08em;
+    }
+    .arq-mov-meta-item span {
+      display: block; color: var(--text3);
+      margin-bottom: .2rem; text-transform: uppercase; letter-spacing: .15em;
+      font-size: .58rem;
+    }
+    .arq-mov-meta-item strong {
+      color: var(--text); font-weight: 400; font-size: .82rem;
+    }
+    .arq-mov-msg {
+      font-family:'Fraunces',serif; font-weight: 300;
+      font-size: 1rem; line-height: 1.55;
+      color: var(--text); margin-bottom: 1.2rem;
+      font-style: italic;
+    }
+    .arq-mov-actions-label {
+      font-family:'DM Mono',monospace;
+      font-size: .64rem; letter-spacing: .15em;
+      text-transform: uppercase; color: var(--text3);
+      margin-bottom: .65rem;
+    }
+    .arq-mov-actions {
+      list-style: none; display: flex; flex-direction: column;
+      gap: .55rem;
+    }
+    .arq-mov-actions li {
+      font-family:'Fraunces',serif; font-weight: 300;
+      font-size: .92rem; line-height: 1.45;
+      color: var(--text2); padding-left: 1.2rem;
+      position: relative;
+    }
+    .arq-mov-actions li::before {
+      content: '→'; position: absolute; left: 0;
+      color: var(--purple); font-weight: 600;
+    }
+
+    /* ── SITUACIONES ── */
+    .situaciones-block {
+      margin-top: 2rem;
+    }
+    .situaciones-block h3 {
+      font-family:'Syne',sans-serif; font-weight: 800;
+      font-size: 1.5rem; letter-spacing: -.01em;
+      margin-bottom: 1.5rem;
+    }
+    .situacion {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      margin-bottom: 1rem;
+    }
+    .situacion-head {
+      padding: 1.25rem 1.5rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 1rem;
+      transition: background .15s;
+    }
+    .situacion-head:hover { background: var(--surface2); }
+    .situacion-num {
+      font-family:'DM Mono',monospace;
+      font-size: .68rem; letter-spacing: .18em;
+      text-transform: uppercase; color: var(--purple);
+      flex-shrink: 0; min-width: 100px;
+    }
+    .situacion-q {
+      font-family:'Fraunces',serif; font-weight: 300;
+      font-size: 1rem; line-height: 1.45;
+      color: var(--text); flex: 1;
+    }
+    .situacion-toggle {
+      font-family:'DM Mono',monospace;
+      font-size: 1rem; color: var(--purple);
+      flex-shrink: 0;
+    }
+    .situacion.open .situacion-toggle { transform: rotate(45deg); }
+    .situacion-body {
+      display: none;
+      padding: 0 1.5rem 1.5rem;
+    }
+    .situacion.open .situacion-body { display: block; }
+    .opcion {
+      padding: 1rem 1.2rem;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      margin-bottom: .6rem;
+      display: grid;
+      grid-template-columns: 30px 1fr 200px;
+      gap: 1rem; align-items: start;
+    }
+    .opcion-letra {
+      font-family:'Syne',sans-serif; font-weight: 800;
+      font-size: 1.1rem; color: var(--purple);
+    }
+    .opcion-text {
+      font-family:'Fraunces',serif; font-weight: 300;
+      font-size: .92rem; line-height: 1.45;
+      color: var(--text);
+    }
+    .opcion-arq {
+      font-family:'DM Mono',monospace;
+      font-size: .65rem; letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--purple);
+      text-align: right;
+      padding-top: .15rem;
+    }
+
+    /* ── STACK ── */
+    .stack-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+    .stack-col {
+      padding: 1.5rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+    .stack-col h3 {
+      font-family:'Syne',sans-serif; font-weight: 800;
+      font-size: 1.1rem; letter-spacing: -.01em;
+      margin-bottom: 1rem;
+      padding-bottom: .75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .stack-col ul {
+      list-style: none; display: flex; flex-direction: column;
+      gap: .75rem;
+    }
+    .stack-col li {
+      font-family:'Syne',sans-serif; font-weight: 500;
+      font-size: .95rem; color: var(--text);
+    }
+    .stack-col li span {
+      display: block; margin-top: .15rem;
+      font-family:'Fraunces',serif; font-weight: 300;
+      font-size: .82rem; color: var(--text3);
+      line-height: 1.4;
+    }
+
+    /* ── ENTREGABLES ── */
+    .ent-list {
+      list-style: none; display: flex; flex-direction: column;
+      gap: .5rem;
+    }
+    .ent-list li {
+      display: grid; grid-template-columns: 110px 1fr;
+      gap: 1rem; align-items: center;
+      padding: 1rem 1.25rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      font-family:'Fraunces',serif; font-weight: 300;
+      font-size: 1rem; color: var(--text);
+    }
+    .status {
+      font-family:'DM Mono',monospace;
+      font-size: .62rem; letter-spacing: .15em;
+      text-transform: uppercase;
+      padding: .25rem .6rem;
+      text-align: center;
+      border: 1px solid var(--border2);
+    }
+    .status.pending { color: var(--text3); border-color: var(--border2); }
+    .status.active  { color: var(--active);  border-color: var(--active); }
+    .status.done    { color: var(--done);    border-color: var(--done); }
+
+    /* ── BITÁCORA ── */
+    .bitacora-empty {
+      padding: 3rem 2rem;
+      background: var(--surface);
+      border: 1px dashed var(--border2);
+      text-align: center;
+      font-family:'Fraunces',serif; font-weight: 300;
+      font-size: 1rem; color: var(--text3);
+      font-style: italic;
+    }
+
+    /* ── FOOTER ── */
+    footer.foot {
+      padding: 3rem 0 1rem;
+      border-top: 1px solid var(--border);
+      display: flex; justify-content: space-between;
+      flex-wrap: wrap; gap: 1rem;
+      font-family:'DM Mono',monospace;
+      font-size: .65rem; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--text3);
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 1100px) {
+      .indices-grid { grid-template-columns: repeat(3, 1fr); }
+      .arq-terr-grid { grid-template-columns: repeat(3, 1fr); }
+      .roadmap-grid, .huellas-grid, .stack-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    @media (max-width: 768px) {
+      nav.top { padding: .9rem 1.5rem; }
+      main.wrap { padding: 5rem 1.5rem 3rem; }
+      .hero-meta { grid-template-columns: 1fr; }
+      .indices-grid, .arq-terr-grid { grid-template-columns: 1fr 1fr; }
+      .arq-mov-grid { grid-template-columns: 1fr; }
+      .arq-mov-meta { grid-template-columns: 1fr; }
+      .opcion { grid-template-columns: 1fr; }
+      .opcion-arq { text-align: left; }
+      .ent-list li { grid-template-columns: 1fr; gap: .5rem; }
+      .status { justify-self: start; }
+      .paradigma .dim, .paradigma .trad, .paradigma .cond { width: auto; display: block; }
+      .paradigma td:not(.dim) { padding-top: 0; }
+      .paradigma thead { display: none; }
+      body { cursor: auto; }
+      .cursor, .cursor-ring { display: none; }
+    }
+    @media (max-width: 480px) {
+      .indices-grid, .arq-terr-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Gate -->
+  <div id="gate" class="gate">
+    <div class="gate-text">Verificando acceso</div>
+    <div class="gate-bar"></div>
+  </div>
+
+  <!-- Cursor -->
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <!-- NAV -->
+  <nav class="top" hidden id="topNav">
+    <div class="nav-left">
+      <a href="dashboard.html" class="e-btn-back">← Dashboard</a>
+      <span class="private-badge">Privado</span>
+    </div>
+    <div class="nav-right">
+      <a href="index.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div>
+          <div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div>
+          <div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <main class="wrap" hidden id="main">
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-label">Proyecto DC · Investigación Medellín 2027</div>
+      <h1 class="hero-title">Lectura no declarativa<br><em>del clima electoral local.</em></h1>
+      <p class="hero-quote">"Lo que la gente hace, busca, reclama y evita es mucho más elocuente que lo que declara en un cuestionario."</p>
+      <div class="hero-meta">
+        <div class="hero-meta-item">
+          <div class="hero-meta-label">Duración</div>
+          <div class="hero-meta-val">3 meses · abr–jul 2026</div>
+        </div>
+        <div class="hero-meta-item">
+          <div class="hero-meta-label">Ámbito</div>
+          <div class="hero-meta-val">Medellín · 12 comunas + 2 corregimientos</div>
+        </div>
+        <div class="hero-meta-item">
+          <div class="hero-meta-label">Equipo</div>
+          <div class="hero-meta-val">Derecho · ciencia política · datos · conducta</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 01 OBJETIVOS -->
+    <section class="s">
+      <div class="s-label"><span class="s-num">01</span> · Objetivos</div>
+      <h2 class="s-title">Reconocer · caracterizar · predecir · <em>simular</em>.</h2>
+      <p class="s-intro">Cinco objetivos específicos articulan la lectura no declarativa del clima electoral local a partir de indicadores conductuales, territoriales y digitales.</p>
+      <div class="obj-general">
+        Reconocer patrones, caracterizar clivajes, predecir y simular escenarios electorales para Medellín 2027 a partir de indicadores conductuales, territoriales y de trazas digitales — combinando observación en campo, datos administrativos y monitoreo automatizado de información pública.
+      </div>
+      <ul class="obj-list">
+        <li><strong>01 — Reconocer</strong>la agenda pública real, actores, territorios críticos y dispositivos de "gobierno criminal" en Medellín.</li>
+        <li><strong>02 — Caracterizar</strong>cambios implícitos de opinión a través de indicadores de saliencia, fricción, atribución, territorialización y volatilidad.</li>
+        <li><strong>03 — Arquetipar</strong>votantes y construir perfiles comunicacionales observables, asociados a canales, contenidos y tendencias a las que reaccionan.</li>
+        <li><strong>04 — Predecir</strong>tendencias de opinión y riesgo mediante modelos de series de tiempo y métricas compuestas.</li>
+        <li><strong>05 — Simular</strong>escenarios "what if" ante distintos shocks (seguridad, corrupción, decisiones de gobierno, desinformación).</li>
+      </ul>
+    </section>
+
+    <!-- 02 PARADIGMA -->
+    <section class="s">
+      <div class="s-label"><span class="s-num">02</span> · Cambio de paradigma</div>
+      <h2 class="s-title">Encuestas tradicionales <em>vs.</em> enfoque conductual.</h2>
+      <p class="s-intro">Las encuestas asumen una <strong>ciudad plana</strong> y respuestas sinceras. La realidad es otra: clivajes territoriales severos, presencia de gobierno criminal, alta sensibilidad a temas de seguridad y conversación pública mediada por algoritmos. El enfoque conductual abandona lo declarativo para leer huellas reales.</p>
+      <table class="paradigma">
+        <thead>
+          <tr><th>Dimensión</th><th>Metodología tradicional</th><th>Enfoque conductual · nuestro plan</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="dim">Origen del dato</td>
+            <td class="trad">Declaraciones inducidas (focus groups, encuestas)</td>
+            <td class="cond">Observación empírica y huellas públicas reales</td>
+          </tr>
+          <tr>
+            <td class="dim">Temporalidad</td>
+            <td class="trad">Fotografías estáticas y reactivas</td>
+            <td class="cond">Monitoreo continuo y automatizado en tiempo real</td>
+          </tr>
+          <tr>
+            <td class="dim">Foco de medición</td>
+            <td class="trad">Intención de voto teórica</td>
+            <td class="cond">Comportamiento orgánico, fricción ciudadana y atribución política</td>
+          </tr>
+          <tr>
+            <td class="dim">Tecnología y costo</td>
+            <td class="trad">Despliegues costosos de legacy data</td>
+            <td class="cond">Ecosistema ágil de bajo costo (open source, scraping, NLP)</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 03 HUELLAS -->
+    <section class="s">
+      <div class="s-label"><span class="s-num">03</span> · Arquitectura</div>
+      <h2 class="s-title">Tres huellas alimentan <em>un motor analítico</em>.</h2>
+      <p class="s-intro">La huella ciudadana se reconstruye desde tres dimensiones complementarias. Ninguna basta por sí sola: la potencia explicativa surge del cruce.</p>
+      <div class="huellas-grid">
+        <div class="huella">
+          <div class="huella-num">01 / Huella Digital</div>
+          <h3>Comportamiento en plataformas</h3>
+          <p>Scraping automatizado, tendencias de búsqueda, engagement en X, TikTok, Facebook e interacciones en noticias.</p>
+        </div>
+        <div class="huella">
+          <div class="huella-num">02 / Huella Institucional</div>
+          <h3>Comportamiento administrativo</h3>
+          <p>Análisis de PQRSD, uso de servicios oficiales, denuncias y datos de MEData, SISC, SIMM, Observatorio de Familia.</p>
+        </div>
+        <div class="huella">
+          <div class="huella-num">03 / Huella Territorial</div>
+          <h3>Comportamiento en el barrio</h3>
+          <p>Observación no declarativa en comunas priorizadas. Símbolos, propaganda, reuniones, mediación de combos urbanos y dinámica barrial.</p>
+        </div>
+      </div>
+      <div class="huellas-foot">
+        Respeto estricto a legalidad y ética · 100% datos públicos y anonimizados · cero interceptación privada
+      </div>
+    </section>
+
+    <!-- 04 ÍNDICES -->
+    <section class="s">
+      <div class="s-label"><span class="s-num">04</span> · Motor de inteligencia</div>
+      <h2 class="s-title">Cinco índices conductuales <em>compuestos</em>.</h2>
+      <p class="s-intro">Métricas que pasan de "qué se habla" a "cómo se mueve la posición pública". Cada índice combina varias fuentes para distinguir ruido de señal real.</p>
+      <div class="indices-grid">
+        <div class="indice">
+          <div class="indice-num">1</div>
+          <h3>Saliencia real</h3>
+          <p>Combina volumen de noticias, búsquedas, visualizaciones y comentarios. Distingue ruido mediático de temas internalizados por la ciudadanía.</p>
+        </div>
+        <div class="indice">
+          <div class="indice-num">2</div>
+          <h3>Fricción ciudadana</h3>
+          <p>Cruza PQRSD, noticias y comentarios con verbos de molestia, queja, trámite y urgencia. Anclaje en sistemas oficiales de Medellín.</p>
+        </div>
+        <div class="indice">
+          <div class="indice-num">3</div>
+          <h3>Atribución política</h3>
+          <p>Mide el paso de problema técnico a problema "de modelo": cuándo se responsabiliza a actores, partidos o gestiones específicas.</p>
+        </div>
+        <div class="indice">
+          <div class="indice-num">4</div>
+          <h3>Territorialización</h3>
+          <p>Ubica comunas y corregimientos donde la conversación digital y los problemas urbanos físicos coinciden o divergen.</p>
+        </div>
+        <div class="indice">
+          <div class="indice-num">5</div>
+          <h3>Volatilidad</h3>
+          <p>Detecta cambios bruscos en ventanas de 6h, 24h, 72h y 7 días tras un evento. Predice qué shocks dejan huella sostenida.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 05 ROADMAP -->
+    <section class="s">
+      <div class="s-label"><span class="s-num">05</span> · Ejecución</div>
+      <h2 class="s-title">Tres meses hacia <em>la simulación</em>.</h2>
+      <p class="s-intro">Línea base → detección de cambios → predicción y simulación. Cada mes cierra con entregables verificables.</p>
+      <div class="roadmap-grid">
+        <div class="mes">
+          <div class="mes-num">Mes 1 · Abril–Mayo</div>
+          <h3>Línea base y reconocimiento</h3>
+          <ul class="modulos">
+            <li><span class="badge"></span>1.1 Línea base electoral-territorial 2015–2023</li>
+            <li><span class="badge"></span>1.2 Mapa de agenda pública y actores narrativos</li>
+            <li><span class="badge"></span>1.3 Observación de campo no declarativa</li>
+            <li><span class="badge"></span>1.4 Configuración del sistema tecnológico</li>
+          </ul>
+          <div class="mes-foot">Entregable: Dashboard 1.0 con 5 capas de datos</div>
+        </div>
+        <div class="mes">
+          <div class="mes-num">Mes 2 · Mayo–Junio</div>
+          <h3>Detección y métricas</h3>
+          <ul class="modulos">
+            <li><span class="badge"></span>2.1 Implementación de los 5 índices compuestos</li>
+            <li><span class="badge"></span>2.2 Detección de change points · BSTS</li>
+            <li><span class="badge"></span>2.3 Modelos de tópicos y análisis de stance</li>
+            <li><span class="badge"></span>2.4 Reporte de "frentes calientes"</li>
+          </ul>
+          <div class="mes-foot">Entregable: Atlas de temas + ranking de movimiento</div>
+        </div>
+        <div class="mes">
+          <div class="mes-num">Mes 3 · Junio–Julio</div>
+          <h3>Predicción y simulación</h3>
+          <ul class="modulos">
+            <li><span class="badge"></span>3.1 Series de tiempo · ARIMA · Prophet · BSTS</li>
+            <li><span class="badge"></span>3.2 Random Forest sobre clivajes territoriales</li>
+            <li><span class="badge"></span>3.3 Simulador de escenarios + agentes (Mesa)</li>
+            <li><span class="badge"></span>3.4 Matriz de riesgo y semáforo de eventos</li>
+          </ul>
+          <div class="mes-foot">Entregable: Simulador parametrizable Medellín 2027</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 06 ARQUETIPOS TERRITORIALES -->
+    <section class="s">
+      <div class="s-label"><span class="s-num">06</span> · Arquetipos territoriales</div>
+      <h2 class="s-title">Cinco perfiles según <em>comportamiento observable</em>.</h2>
+      <p class="s-intro">Ejes: <strong>volatilidad emocional</strong> × <strong>exposición / conectividad</strong>. Cada perfil tiene canales dominantes y detonantes específicos.</p>
+      <div class="arq-terr-grid">
+        <div class="arq-terr">
+          <h3>Voto Duro</h3>
+          <div class="arq-terr-axes">Volatilidad baja<br>Conectividad baja</div>
+          <div class="arq-terr-row"><b>Canales</b>WhatsApp comunitario, reuniones presenciales.</div>
+          <div class="arq-terr-row"><b>Detonante</b>Señales de legitimación política y amenaza a sus beneficios.</div>
+        </div>
+        <div class="arq-terr">
+          <h3>Cautivo</h3>
+          <div class="arq-terr-axes">Volatilidad alta<br>Conectividad baja</div>
+          <div class="arq-terr-row"><b>Canales</b>Control territorial local, Facebook barrial.</div>
+          <div class="arq-terr-row"><b>Detonante</b>Operativos de seguridad, caos o estabilidad en el barrio.</div>
+        </div>
+        <div class="arq-terr">
+          <h3>Voto Blando</h3>
+          <div class="arq-terr-axes">Volatilidad media<br>Conectividad media</div>
+          <div class="arq-terr-row"><b>Canales</b>Redes generales, radio.</div>
+          <div class="arq-terr-row"><b>Detonante</b>Evidencia de gestión o fracaso · narrativa antes vs ahora.</div>
+        </div>
+        <div class="arq-terr">
+          <h3>Abstencionista</h3>
+          <div class="arq-terr-axes">Volatilidad alta<br>Conectividad media</div>
+          <div class="arq-terr-row"><b>Canales</b>Ecosistema mixto.</div>
+          <div class="arq-terr-row"><b>Detonante</b>Confirmaciones de corrupción, fraude o captura criminal.</div>
+        </div>
+        <div class="arq-terr">
+          <h3>Joven Hiperconectado</h3>
+          <div class="arq-terr-axes">Volatilidad alta<br>Conectividad alta</div>
+          <div class="arq-terr-row"><b>Canales</b>TikTok, Instagram.</div>
+          <div class="arq-terr-row"><b>Detonante</b>Tendencias virales, polémicas, narrativas identitarias, autenticidad.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 07 ARQUETIPOS DE MOVILIZACIÓN -->
+    <section class="s">
+      <div class="s-label"><span class="s-num">07</span> · Arquetipos de movilización</div>
+      <h2 class="s-title">Matriz integrada · <em>cuatro perfiles operativos</em>.</h2>
+      <p class="s-intro">Derivados del comportamiento ante <strong>cinco situaciones electorales clave</strong>. Cada arquetipo implica un perfil propio de impacto, riesgo y mensaje de movilización.</p>
+      <div class="arq-mov-grid" id="arq-mov-grid"></div>
+      <div class="situaciones-block">
+        <h3>Cinco situaciones · veinte respuestas</h3>
+        <div id="situaciones-list"></div>
+      </div>
+    </section>
+
+    <!-- 08 STACK -->
+    <section class="s">
+      <div class="s-label"><span class="s-num">08</span> · Stack</div>
+      <h2 class="s-title">Infraestructura · <em>alto impacto, bajo costo</em>.</h2>
+      <p class="s-intro">Open source y planes free/starter siempre que sea posible. Ningún componente del stack requiere licenciamiento premium.</p>
+      <div class="stack-grid">
+        <div class="stack-col">
+          <h3>Ingesta de datos</h3>
+          <ul>
+            <li>Apify<span>Plan free/starter · scraping de X, Instagram, TikTok, Facebook, foros y noticias</span></li>
+            <li>Google Trends<span>Series de búsqueda por ciudad y tema</span></li>
+            <li>YouTube Data API<span>Videos, descripciones, comentarios y picos de interés</span></li>
+            <li>Wikimedia Pageviews<span>Atención informacional a páginas de instituciones y temas clave</span></li>
+            <li>RSS medios locales<span>El Colombiano y otros + scraping básico con Python requests</span></li>
+            <li>MEData · SISC · SIMM · PQRSD<span>Fuentes administrativas oficiales</span></li>
+            <li>Observatorio de Familia · Medellín Cómo Vamos<span>Indicadores ciudadanos consolidados</span></li>
+          </ul>
+        </div>
+        <div class="stack-col">
+          <h3>Procesamiento analítico</h3>
+          <ul>
+            <li>Python<span>Pandas · scikit-learn · statsmodels para modelado y series de tiempo</span></li>
+            <li>NetworkX<span>Análisis de redes de actores y amplificadores</span></li>
+            <li>Mesa<span>Modelos de agentes (1.000–10.000 por territorio) para simulación</span></li>
+            <li>BERTopic · LDA<span>Modelos de tópicos sobre conversación pública</span></li>
+            <li>BETO · HuggingFace<span>NLP en español para análisis de sentimiento profundo</span></li>
+          </ul>
+        </div>
+        <div class="stack-col">
+          <h3>Visualización</h3>
+          <ul>
+            <li>Looker Studio<span>Dashboards públicos sin licenciamiento premium</span></li>
+            <li>Power BI Desktop<span>Análisis interno gratuito</span></li>
+            <li>ricardoruiz.co<span>Esta plataforma · capa privada de seguimiento</span></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 09 ENTREGABLES -->
+    <section class="s">
+      <div class="s-label"><span class="s-num">09</span> · Entregables</div>
+      <h2 class="s-title">Doce entregables verificables <em>en tres meses</em>.</h2>
+      <p class="s-intro">Sistema en producción que responde semanalmente: qué mueve la conversación, qué cambia la posición ciudadana, qué eventos importan, qué escenarios son más probables.</p>
+      <ul class="ent-list">
+        <li><span class="status pending">Mes 1</span><span>Mapa de agenda pública de Medellín — 12–15 macrotemas, 60–100 términos asociados</span></li>
+        <li><span class="status pending">Mes 1</span><span>Mapa de actores narrativos y redes de influencia</span></li>
+        <li><span class="status pending">Mes 1</span><span>Línea base electoral-territorial 2015–2023 cruzada con pobreza, informalidad y seguridad</span></li>
+        <li><span class="status pending">Mes 1</span><span>Dashboard 1.0 con 5 capas: búsqueda · noticia · interacción social · presión institucional · datos urbanos</span></li>
+        <li><span class="status pending">Mes 2</span><span>Atlas de temas con saliencia, emoción, atribución y territorio</span></li>
+        <li><span class="status pending">Mes 2</span><span>Ranking de temas por capacidad de mover el clima de opinión</span></li>
+        <li><span class="status pending">Mes 2</span><span>Reporte de frentes calientes (conversación sin problema, problema sin conversación, ambas)</span></li>
+        <li><span class="status pending">Mes 3</span><span>Simulador parametrizable de escenarios Medellín 2027</span></li>
+        <li><span class="status pending">Mes 3</span><span>Matriz de riesgo electoral temprano por tema y territorio</span></li>
+        <li><span class="status pending">Mes 3</span><span>Semáforo de eventos · bajo · medio · alto · crítico</span></li>
+        <li><span class="status pending">Mes 3</span><span>Cuaderno de hipótesis predictivas para pruebas semanales</span></li>
+        <li><span class="status pending">Continuo</span><span>Marco de arquetipos, métricas y simulaciones reutilizable durante toda la campaña</span></li>
+      </ul>
+    </section>
+
+    <!-- 10 BITÁCORA -->
+    <section class="s">
+      <div class="s-label"><span class="s-num">10</span> · Bitácora</div>
+      <h2 class="s-title">Registro semanal <em>de avances</em>.</h2>
+      <p class="s-intro">Espacio reservado para registrar hitos, hallazgos, hipótesis verificadas y descartadas. Se irá poblando con el avance del equipo.</p>
+      <div class="bitacora-empty">
+        Aún no hay entradas registradas. Esta sección se irá poblando con los avances semanales del equipo.
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="foot">
+      <div>Proyecto DC · capa privada · ricardoruiz.co</div>
+      <div>Solo datos públicos · anonimizados · sin scraping de mensajería privada</div>
+    </footer>
+
+  </main>
+
+  <script>
+    // ─── EMAIL GATE ───────────────────────────────────────────────────
+    const ALLOWED = ['reruizc@gmail.com', 'nuevagemela@gmail.com'];
+
+    const token = localStorage.getItem('rr-token');
+    const userRaw = localStorage.getItem('rr-user');
+    const user = userRaw ? JSON.parse(userRaw) : null;
+
+    function denyToLogin() {
+      localStorage.removeItem('rr-token');
+      localStorage.removeItem('rr-user');
+      window.location.replace('login.html');
+    }
+    function denyToDashboard() {
+      window.location.replace('dashboard.html');
+    }
+    function emailAllowed(em) {
+      return em && ALLOWED.includes(String(em).toLowerCase().trim());
+    }
+
+    if (!token || !user) {
+      denyToLogin();
+    } else if (!emailAllowed(user.email)) {
+      denyToDashboard();
+    } else {
+      // Pasa el filtro local — verificar contra el worker antes de revelar
+      (async () => {
+        try {
+          const res = await fetch('https://rr-auth.reruizc.workers.dev/auth/me', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (res.status === 401) return denyToLogin();
+          const data = await res.json();
+          if (!data.ok || !emailAllowed(data.user && data.user.email)) {
+            return denyToDashboard();
+          }
+          // Aprobado server-side
+          localStorage.setItem('rr-user', JSON.stringify(Object.assign({}, user, data.user)));
+          revealPage();
+        } catch (e) {
+          // En caso de offline, aceptar el localStorage que ya pasó
+          revealPage();
+        }
+      })();
+    }
+
+    function revealPage() {
+      const gate = document.getElementById('gate');
+      if (gate) gate.remove();
+      document.getElementById('topNav').hidden = false;
+      document.getElementById('main').hidden = false;
+      renderAll();
+    }
+
+    // ─── THEME ────────────────────────────────────────────────────────
+    function getAutoTheme() {
+      const h = new Date().getHours();
+      return (h >= 7 && h < 19) ? 'light' : 'dark';
+    }
+    const theme = localStorage.getItem('rr-theme') || getAutoTheme();
+    document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : '');
+
+    // ─── DATA · ARQUETIPOS DE MOVILIZACIÓN ────────────────────────────
+    const ARQ_MOV = [
+      {
+        nombre: 'Confirmador Silencioso',
+        tagline: 'Convicción sin ruido',
+        intensidad: 'Baja',
+        impacto: 'Moderado-Bajo',
+        radio: '1–3 personas',
+        sesgo: 'Confirmación + endogrupo',
+        riesgo: 'Bajo',
+        mensaje: 'Tu voto ya está decidido: esa convicción vale más de lo que crees. No necesitas ser el más ruidoso para marcar la diferencia. Tu credibilidad ante quienes te conocen es tu mayor poder. Una conversación sincera tuya vale más que cien publicaciones en redes.',
+        acciones: [
+          'Lleva a votar a 3 personas de tu círculo cercano el día de las elecciones: coordina transporte o punto de encuentro.',
+          'Comparte en tu estado de WhatsApp una sola razón personal y auténtica por la que votarás por tu candidato.',
+          'Habla con alguien indeciso de tu familia o trabajo, no para convencerlo, sino para contarle tu experiencia.'
+        ]
+      },
+      {
+        nombre: 'Activista Causal',
+        tagline: 'Comunidad real, acción colectiva',
+        intensidad: 'Alta',
+        impacto: 'Alto',
+        radio: '50–200 personas',
+        sesgo: 'Aversión a pérdida + contagio',
+        riesgo: 'Medio-alto',
+        mensaje: 'Eres de los que no se quedan en la pantalla. Construyes comunidad real, arrastras personas y conviertes el entusiasmo en acción colectiva. Las elecciones las gana quien tiene más gente comprometida en el territorio.',
+        acciones: [
+          'Organiza o lidera una jornada de puerta a puerta en tu barrio o lugar de trabajo durante los 15 días previos a la elección.',
+          'Conforma un grupo de 10 personas comprometidas a votar y a llevar cada una a 2 personas más el día de las elecciones.',
+          'Sé testigo electoral o apoya la logística del tarjetón en tu mesa de votación; la victoria también se cuida en las urnas.'
+        ]
+      },
+      {
+        nombre: 'Traductor Digital',
+        tagline: 'Puente entre la propuesta y la red',
+        intensidad: 'Media',
+        impacto: 'Moderado-Alto',
+        radio: '10–50 personas',
+        sesgo: 'Disponibilidad + halo',
+        riesgo: 'Medio',
+        mensaje: 'Tienes un don que pocos tienen: conviertes información compleja en mensajes que la gente entiende y comparte. Eres el puente entre el candidato y quienes aún no le prestan atención. Tu red te lee, te escucha y confía en tu criterio.',
+        acciones: [
+          'Crea o adapta una pieza semanal: video corto, carrusel o hilo, explicando una propuesta concreta en lenguaje cotidiano.',
+          'Identifica y etiqueta a 5 contactos indecisos en una publicación con información clave, sin presión y con tono cercano.',
+          'Desmiente activamente una fake news con fuente verificada antes de que se instale en la conversación de tus grupos.'
+        ]
+      },
+      {
+        nombre: 'Contestatario Estructural',
+        tagline: 'Energía movilizadora · alto riesgo',
+        intensidad: 'Muy alta',
+        impacto: 'Muy alto · riesgo alto',
+        radio: '+200 / viral',
+        sesgo: 'Realismo ingenuo + libertad moral',
+        riesgo: 'Muy alto',
+        mensaje: 'Tu convicción es total y tu energía movilizadora no tiene igual: eres capaz de mover multitudes y cambiar narrativas. Ese poder exige responsabilidad. Canaliza tu fuerza hacia la verdad: la mejor contranarrativa es la que no necesita ser desmentida.',
+        acciones: [
+          'Verifica antes de distribuir: aplica la regla de las 3 fuentes; si no lo confirman fuentes independientes, no lo publiques.',
+          'Construye y difunde el relato positivo del candidato, no solo el ataque al adversario; la movilización sostenida se basa en esperanza.',
+          'Convierte tu red en una red de votantes activos: cierra cada conversación con un llamado concreto a votar el día de las elecciones.'
+        ]
+      }
+    ];
+
+    // ─── DATA · 5 SITUACIONES × 4 OPCIONES ────────────────────────────
+    const SITUACIONES = [
+      {
+        num: 'Situación 1',
+        escenario: 'Estás en una reunión familiar y alguien menciona que está pensando en votar por el candidato opuesto al tuyo.',
+        opciones: [
+          { letra: 'A', respuesta: 'Le pregunto sus razones con genuina curiosidad, aunque internamente no cambie mi posición.', arq: 'Confirmador Silencioso' },
+          { letra: 'B', respuesta: 'Le advierto de inmediato que ese candidato representa un riesgo real para el país y le presento argumentos contundentes para disuadirlo.', arq: 'Contestatario Estructural' },
+          { letra: 'C', respuesta: 'Le cuento por qué me identifico con mi candidato desde mi experiencia personal y le propongo que veamos juntos sus propuestas.', arq: 'Activista Causal' },
+          { letra: 'D', respuesta: 'Prefiero no generar conflicto. Si me pregunta, doy mi opinión; si no, no intervengo.', arq: 'Confirmador Silencioso' }
+        ]
+      },
+      {
+        num: 'Situación 2',
+        escenario: 'Una semana antes de las elecciones, tu candidato favorito aparece en una encuesta bajando 4 puntos.',
+        opciones: [
+          { letra: 'A', respuesta: 'Organizo o me sumo a alguna actividad presencial de campaña para sumar votos en zonas donde se pueda recuperar terreno.', arq: 'Activista Causal' },
+          { letra: 'B', respuesta: 'Lo proceso internamente. Confío en que las encuestas no siempre reflejan la realidad y espero el día de las elecciones.', arq: 'Confirmador Silencioso' },
+          { letra: 'C', respuesta: 'Busco la ficha técnica de la encuesta, identifico sus posibles sesgos y construyo un argumento para compartirlo con mis contactos digitales.', arq: 'Traductor Digital' },
+          { letra: 'D', respuesta: 'Lanzo en mis redes un mensaje fuerte cuestionando la credibilidad de la encuesta y del medio que la publicó. El relato hay que contrarrestarlo ya.', arq: 'Contestatario Estructural' }
+        ]
+      },
+      {
+        num: 'Situación 3',
+        escenario: 'Un amigo cercano te dice que no piensa votar porque "todos los candidatos son lo mismo".',
+        opciones: [
+          { letra: 'A', respuesta: 'Le digo que entiendo su frustración, que es válida, pero le explico con calma por qué en esta elección el voto sí importa.', arq: 'Activista Causal' },
+          { letra: 'B', respuesta: 'Le envío varios videos, hilos de Twitter e infografías para que "se informe mejor" antes de tomar esa decisión.', arq: 'Traductor Digital' },
+          { letra: 'C', respuesta: 'Respeto su postura. Cada quien decide sobre su propio voto. No es mi responsabilidad convencerlo.', arq: 'Confirmador Silencioso' },
+          { letra: 'D', respuesta: 'Le digo que abstenerse equivale a votar por el adversario y le describo en detalle lo que pasará si gana el otro candidato.', arq: 'Contestatario Estructural' }
+        ]
+      },
+      {
+        num: 'Situación 4',
+        escenario: 'Circula en redes un video comprometedor sobre tu candidato. Aún no está verificado.',
+        opciones: [
+          { letra: 'A', respuesta: 'Espero a que haya versiones oficiales antes de opinar. Me genera duda pero no cambio mi posición de fondo.', arq: 'Confirmador Silencioso' },
+          { letra: 'B', respuesta: 'Lo distribuyo con un mensaje que lo contextualiza como un ataque político coordinado. Hay que salir rápido a contrarrestarlo antes de que se instale.', arq: 'Contestatario Estructural' },
+          { letra: 'C', respuesta: 'Lo comento con mi círculo más cercano para entender qué piensan. Si hay algo real, hay que reconocerlo con madurez.', arq: 'Traductor Digital' },
+          { letra: 'D', respuesta: 'Busco inmediatamente contrainformación, la compilo y la distribuyo en todos mis grupos como respuesta directa al video.', arq: 'Contestatario Estructural' }
+        ]
+      },
+      {
+        num: 'Situación 5',
+        escenario: 'Es el día de las elecciones. Ya votaste. ¿Qué más haces durante el resto del día?',
+        opciones: [
+          { letra: 'A', respuesta: 'Estoy pendiente de los resultados en tiempo real. Si veo algo sospechoso en los conteos, lo denuncio y lo distribuyo de inmediato.', arq: 'Contestatario Estructural' },
+          { letra: 'B', respuesta: 'Hago seguimiento a los testigos electorales de mi movimiento, ayudo en transporte de votantes y cierro el día en un punto de encuentro del equipo.', arq: 'Activista Causal' },
+          { letra: 'C', respuesta: 'Sigo mi día con normalidad. Reviso los resultados en la noche cuando ya haya datos consolidados.', arq: 'Confirmador Silencioso' },
+          { letra: 'D', respuesta: 'Comparto en mis redes una historia o post motivando a mis contactos que aún no han votado a que no dejen pasar el momento.', arq: 'Traductor Digital' }
+        ]
+      }
+    ];
+
+    // ─── RENDER ───────────────────────────────────────────────────────
+    function renderArqMov() {
+      const grid = document.getElementById('arq-mov-grid');
+      grid.innerHTML = ARQ_MOV.map(a => `
+        <div class="arq-mov">
+          <h3>${a.nombre}</h3>
+          <div class="arq-mov-tagline">${a.tagline}</div>
+          <div class="arq-mov-meta">
+            <div class="arq-mov-meta-item"><span>Intensidad</span><strong>${a.intensidad}</strong></div>
+            <div class="arq-mov-meta-item"><span>Impacto</span><strong>${a.impacto}</strong></div>
+            <div class="arq-mov-meta-item"><span>Radio</span><strong>${a.radio}</strong></div>
+            <div class="arq-mov-meta-item"><span>Sesgo dominante</span><strong>${a.sesgo}</strong></div>
+            <div class="arq-mov-meta-item"><span>Riesgo</span><strong>${a.riesgo}</strong></div>
+          </div>
+          <div class="arq-mov-msg">"${a.mensaje}"</div>
+          <div class="arq-mov-actions-label">Acciones de movilización</div>
+          <ul class="arq-mov-actions">
+            ${a.acciones.map(x => `<li>${x}</li>`).join('')}
+          </ul>
+        </div>
+      `).join('');
+    }
+
+    function renderSituaciones() {
+      const list = document.getElementById('situaciones-list');
+      list.innerHTML = SITUACIONES.map((s, i) => `
+        <div class="situacion" data-i="${i}">
+          <div class="situacion-head" onclick="toggleSit(${i})">
+            <div class="situacion-num">${s.num}</div>
+            <div class="situacion-q">${s.escenario}</div>
+            <div class="situacion-toggle">+</div>
+          </div>
+          <div class="situacion-body">
+            ${s.opciones.map(o => `
+              <div class="opcion">
+                <div class="opcion-letra">${o.letra}</div>
+                <div class="opcion-text">${o.respuesta}</div>
+                <div class="opcion-arq">→ ${o.arq}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function toggleSit(i) {
+      const el = document.querySelector(`.situacion[data-i="${i}"]`);
+      if (el) el.classList.toggle('open');
+    }
+
+    function renderAll() {
+      renderArqMov();
+      renderSituaciones();
+      attachCursorHovers();
+    }
+
+    // ─── CURSOR ───────────────────────────────────────────────────────
+    const cursor = document.getElementById('cursor');
+    const ring   = document.getElementById('cursorRing');
+    let mx=0, my=0, rx=0, ry=0;
+    document.addEventListener('mousemove', e => {
+      mx = e.clientX; my = e.clientY;
+      cursor.style.left = mx + 'px'; cursor.style.top = my + 'px';
+    });
+    (function ar(){ rx += (mx-rx)*.12; ry += (my-ry)*.12; ring.style.left = rx+'px'; ring.style.top = ry+'px'; requestAnimationFrame(ar); })();
+    function attachCursorHovers() {
+      document.querySelectorAll('a, button, .situacion-head').forEach(el => {
+        el.addEventListener('mouseenter', () => {
+          cursor.style.transform = 'translate(-50%,-50%) scale(2.5)';
+          cursor.style.background = 'transparent';
+          cursor.style.border = '1.5px solid var(--purple)';
+          ring.style.opacity = '0';
+        });
+        el.addEventListener('mouseleave', () => {
+          cursor.style.transform = 'translate(-50%,-50%) scale(1)';
+          cursor.style.background = 'var(--purple)';
+          cursor.style.border = 'none';
+          ring.style.opacity = '.4';
+        });
+      });
+    }
+  </script>
+</body>
+</html>

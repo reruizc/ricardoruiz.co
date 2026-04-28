@@ -207,6 +207,14 @@
       padding:.15rem .5rem;
     }
     .tool-tag.locked-tag { color:var(--lock); background:transparent; border:1px solid var(--lock); }
+    .tool-tag.private-tag { color:#7c3aed; background:rgba(124,58,237,0.10); }
+    [data-theme="dark"] .tool-tag.private-tag { color:#a78bfa; background:rgba(167,139,250,0.14); }
+    .tool-item.private { border-left:2px solid #7c3aed; }
+    [data-theme="dark"] .tool-item.private { border-left-color:#a78bfa; }
+    .tool-item.private .tool-num { color:#7c3aed; }
+    [data-theme="dark"] .tool-item.private .tool-num { color:#a78bfa; }
+    .tool-item.private .tool-arrow { color:#7c3aed; }
+    [data-theme="dark"] .tool-item.private .tool-arrow { color:#a78bfa; }
 
     /* ── PLAN CARD (right col, row 1) ── */
     .plan-card { grid-column:4; grid-row:1; }
@@ -824,6 +832,18 @@
       { id:'descargas',    name:'Centro de Descargas', desc:'Archivos Excel por departamento, circunscripción y corporación hasta nivel de puesto de votación.', href:'descargas.html', tag:'Descargas' },
     ];
 
+    // Herramientas privadas: visibles solo si el email del usuario está en allowedEmails.
+    const PRIVATE_TOOLS = [
+      {
+        id: 'proyecto-dc',
+        name: 'Proyecto DC',
+        desc: 'Investigación no declarativa Medellín 2027. Lectura de huellas digitales, institucionales y territoriales.',
+        href: 'proyecto-dc.html',
+        tag: 'Privado',
+        allowedEmails: ['reruizc@gmail.com', 'nuevagemela@gmail.com'],
+      },
+    ];
+
     const DOWNLOADS_DEMO = [
       { name:'Escrutinio Congreso y Consultas 2026', date:'Mar 2026', href:'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/Congreso_2026_MMV170326.csv' },
       { name:'Consulta Presidencial · Oct 2025',    date:'Mar 2026', href:'#' },
@@ -913,17 +933,24 @@
 
       // Tools
       const unlockedIds = plan.tools;
+      const userEmail = (user.email || '').toLowerCase().trim();
+      const visiblePrivate = PRIVATE_TOOLS.filter(p => (p.allowedEmails || []).includes(userEmail));
+      const allRendered = ALL_TOOLS.concat(visiblePrivate);
       document.getElementById('tools-label').textContent = t.tools;
-      document.getElementById('tools-grid').innerHTML = ALL_TOOLS.map((tool, i) => {
-        const unlocked = unlockedIds.includes(tool.id);
+      document.getElementById('tools-grid').innerHTML = allRendered.map((tool, i) => {
+        const isPrivate = !!tool.allowedEmails;
+        const unlocked = isPrivate ? true : unlockedIds.includes(tool.id);
+        const tagClass = isPrivate ? 'private-tag' : (unlocked ? '' : 'locked-tag');
+        const itemClass = (unlocked ? '' : 'locked') + (isPrivate ? ' private' : '');
+        const num = String(i+1).padStart(2, '0');
         return `
           <a href="${unlocked && tool.href !== '#' ? tool.href : '#'}"
-             class="tool-item ${unlocked ? '' : 'locked'}"
+             class="tool-item ${itemClass}"
              ${!unlocked || tool.href === '#' ? 'onclick="return false"' : ''}>
-            <div class="tool-num">0${i+1} —</div>
+            <div class="tool-num">${num} —</div>
             <div class="tool-name">${tool.name}</div>
             <div class="tool-desc">${tool.desc}</div>
-            <span class="tool-tag ${unlocked ? '' : 'locked-tag'}">${unlocked ? tool.tag : t.locked}</span>
+            <span class="tool-tag ${tagClass}">${unlocked ? tool.tag : t.locked}</span>
             ${unlocked && tool.href !== '#' ? '<span class="tool-arrow">↗</span>' : '<span class="tool-lock">🔒</span>'}
           </a>`;
       }).join('');
