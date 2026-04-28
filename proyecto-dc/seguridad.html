@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Seguridad Medellín · Proyecto DC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=DM+Mono:wght@300;400&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    :root {
+      --bg: #f4f3ef; --bg2: #eeedea;
+      --surface: #ffffff; --surface2: #f0efe9;
+      --border: rgba(0,0,0,0.07); --border2: rgba(0,0,0,0.12);
+      --text: #0a0a0a; --text2: #555; --text3: #999;
+      --blue: #0047FF; --purple: #7c3aed;
+      --purple-dim: rgba(124,58,237,0.10);
+      --warn: #f0c040; --danger: #e63946;
+      --danger-dim: rgba(230,57,70,0.10);
+    }
+    [data-theme="dark"] {
+      --bg: #060810; --bg2: #0a0c14;
+      --surface: #0f1018; --surface2: #13151f;
+      --border: rgba(255,255,255,0.06); --border2: rgba(255,255,255,0.12);
+      --text: #f4f3ef; --text2: #888; --text3: #444;
+      --purple: #a78bfa;
+      --purple-dim: rgba(167,139,250,0.14);
+      --danger: #ff6b7a;
+      --danger-dim: rgba(255,107,122,0.14);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'Fraunces', serif;
+      min-height: 100vh; cursor: none; overflow-x: hidden;
+      transition: background 0.4s, color 0.4s;
+    }
+
+    .gate { position: fixed; inset: 0; z-index: 5000; background: var(--bg); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 1rem; }
+    .gate-text { font-family:'DM Mono',monospace; font-size:.82rem; letter-spacing:.12em; text-transform:uppercase; color:var(--text2); }
+    .gate-bar { width:120px; height:1px; background:var(--border); position:relative; overflow:hidden; }
+    .gate-bar::after { content:''; position:absolute; inset:0; background:var(--purple); animation:gate-slide 1.4s ease-in-out infinite; }
+    @keyframes gate-slide { 0%{transform:translateX(-100%);} 50%{transform:translateX(0);} 100%{transform:translateX(100%);} }
+
+    .cursor { position:fixed; width:12px; height:12px; background:var(--purple); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s ease,background .2s; transform:translate(-50%,-50%); }
+    .cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--purple); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s ease,opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+
+    nav.top {
+      position: fixed; top:0; left:0; right:0; z-index:100;
+      display: flex; align-items:center; justify-content:space-between;
+      padding: .9rem 2.5rem;
+      background: var(--bg); border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+    }
+    .nav-left { display:flex; align-items:center; gap:1rem; }
+    .nav-right { display:flex; align-items:center; gap:1.2rem; }
+    .e-btn-back { font-family:'Syne',sans-serif; font-size:.78rem; letter-spacing:.08em; text-transform:uppercase; color:var(--text2); text-decoration:none; border:1.5px solid var(--border); padding:.3rem .8rem; transition:color .2s,border-color .2s; }
+    .e-btn-back:hover { color:var(--text); border-color:var(--text2); }
+    .private-badge { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.18em; text-transform:uppercase; color: var(--purple); background: var(--purple-dim); padding:.32rem .7rem; border:1px solid var(--purple-dim); }
+    .logo-link { display:flex; align-items:center; gap:.55rem; text-decoration:none; opacity:.85; }
+    .logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
+    .logo-bar { width:5px; background:var(--purple); border-radius:1px 1px 0 0; }
+    .logo-text { font-family:'Syne',sans-serif; font-weight:800; font-size:1.3rem; letter-spacing:-.03em; color:var(--text); }
+    .logo-text span { color:var(--purple); }
+
+    main.wrap {
+      max-width: 1400px; margin: 0 auto;
+      padding: 6rem 2.5rem 4rem;
+    }
+
+    .hero { padding: 1rem 0 1.5rem; }
+    .hero-label {
+      font-family:'DM Mono',monospace; font-size:.7rem;
+      letter-spacing:.2em; text-transform:uppercase;
+      color:var(--purple); margin-bottom: .9rem;
+      display:flex; align-items:center; gap:.6rem;
+    }
+    .hero-label::before { content:''; display:block; width:24px; height:1px; background:var(--purple); }
+    .hero-title {
+      font-family:'Syne',sans-serif; font-weight:800;
+      font-size: clamp(1.8rem, 4vw, 3rem);
+      letter-spacing:-.025em; line-height:1;
+    }
+    .hero-title em { font-style:italic; font-family:'Fraunces',serif; font-weight:300; color:var(--purple); }
+    .hero-sub {
+      margin-top: .85rem; max-width: 760px;
+      font-family:'Fraunces',serif; font-weight: 300;
+      font-size: 1rem; line-height: 1.55; color: var(--text2);
+    }
+
+    .controls { margin-top: 1.5rem; display: flex; gap: 1.2rem; align-items: flex-start; flex-wrap: wrap; }
+    .ctrl-group { display: flex; flex-direction: column; gap: .35rem; }
+    .ctrl-label { font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.18em; text-transform:uppercase; color: var(--text3); }
+    .pill-group { display: flex; gap: 0; flex-wrap: wrap; }
+    .pill {
+      font-family:'Syne',sans-serif; font-weight:500;
+      font-size: .78rem; letter-spacing: .04em;
+      padding: .45rem .9rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      cursor: none; color: var(--text2);
+      transition: all .15s;
+    }
+    .pill + .pill { margin-left: -1px; }
+    .pill:hover { color: var(--text); }
+    .pill.active {
+      background: var(--purple); color: #fff;
+      border-color: var(--purple);
+      position: relative; z-index: 1;
+    }
+    .tip-select {
+      font-family:'Syne',sans-serif; font-weight:500;
+      font-size: .85rem;
+      padding: .55rem 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      cursor: none;
+      min-width: 240px;
+    }
+
+    .summary {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 1rem; margin-bottom: 1.5rem;
+    }
+    .sum-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 1.4rem;
+    }
+    .sum-card.danger { border-left: 3px solid var(--danger); }
+    .sum-card.purple { border-left: 3px solid var(--purple); }
+    .sum-label {
+      font-family:'DM Mono',monospace; font-size:.6rem;
+      letter-spacing: .18em; text-transform: uppercase;
+      color: var(--text3); margin-bottom: .55rem;
+    }
+    .sum-value-big {
+      font-family:'Syne',sans-serif; font-weight: 800;
+      font-size: clamp(1.5rem, 3vw, 2.4rem);
+      line-height: 1.05; letter-spacing: -.02em;
+      margin-bottom: .35rem;
+    }
+    .sum-value-big.danger { color: var(--danger); }
+    .sum-value-big.purple { color: var(--purple); }
+    .sum-meta {
+      font-family:'DM Mono',monospace; font-size: .68rem;
+      color: var(--text2); letter-spacing: .04em;
+    }
+    .sum-meta strong { font-weight: 600; color: var(--text); }
+
+    .layout {
+      display: grid; grid-template-columns: 1.4fr 1fr;
+      gap: 1rem;
+    }
+    .map-card, .table-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+    .card-header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 1rem;
+    }
+    .card-title {
+      font-family:'Syne',sans-serif; font-weight: 800;
+      font-size: 1.05rem; letter-spacing: -.01em;
+    }
+    .card-sub {
+      font-family:'DM Mono',monospace; font-size: .62rem;
+      letter-spacing: .1em; color: var(--text3); text-transform: uppercase;
+    }
+    #map { width: 100%; height: 540px; background: var(--bg2); }
+
+    .map-legend {
+      padding: .75rem 1.25rem;
+      border-top: 1px solid var(--border);
+      font-family:'DM Mono',monospace; font-size: .68rem;
+      color: var(--text2);
+    }
+    .legend-bar { display: flex; height: 12px; margin: .4rem 0; border: 1px solid var(--border2); }
+    .legend-bar div { flex: 1; }
+    .legend-ticks { display: flex; justify-content: space-between; font-size: .58rem; color: var(--text3); }
+
+    .rank-table { width: 100%; border-collapse: collapse; }
+    .rank-table th, .rank-table td {
+      padding: .65rem 1.1rem;
+      text-align: left; border-bottom: 1px solid var(--border);
+      font-family:'Fraunces',serif; font-weight: 300;
+      font-size: .9rem;
+    }
+    .rank-table th {
+      font-family:'DM Mono',monospace; font-weight: 400;
+      font-size: .58rem; letter-spacing: .15em;
+      color: var(--text3); text-transform: uppercase;
+      background: var(--surface2);
+    }
+    .rank-table tbody tr:hover { background: var(--purple-dim); }
+    .rank-table .pos { font-family:'DM Mono',monospace; width: 30px; color: var(--text3); }
+    .rank-table .v { font-family:'Avenir',sans-serif; text-align: right; white-space: nowrap; }
+    .rank-table .bar-cell { width: 90px; padding-right: 1rem; }
+    .bar-bg { width: 100%; height: 6px; background: var(--bg2); position: relative; }
+    .bar-fg { position: absolute; top:0; left:0; bottom:0; background: var(--danger); }
+
+    .leaflet-tooltip {
+      font-family: Avenir, sans-serif !important;
+      font-weight: 400 !important; font-size: .85rem !important;
+      background: rgba(6,8,16,0.97) !important;
+      border: 1px solid var(--purple) !important;
+      color: #f4f3ef !important;
+      width: 260px !important;
+      white-space: normal !important;
+      overflow-wrap: break-word !important;
+      border-radius: 0 !important;
+      padding: .6rem .75rem !important;
+    }
+    .leaflet-tooltip:before { display: none !important; }
+    #map .leaflet-interactive { cursor: pointer; }
+
+    /* Charts */
+    .chart-grid {
+      display: grid; grid-template-columns: 2fr 1fr;
+      gap: 1rem; margin-top: 1rem;
+    }
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+    .chart-card .body { padding: 1.5rem 1.25rem; }
+    canvas, .svg-chart { width: 100%; display: block; }
+
+    /* Tipologías small bars */
+    .tip-bars { padding: 1rem 1.25rem; }
+    .tip-row {
+      display: grid; grid-template-columns: 200px 1fr 70px 60px;
+      gap: .8rem; align-items: center;
+      padding: .35rem 0;
+      font-family:'Fraunces',serif; font-weight: 300;
+      font-size: .85rem;
+    }
+    .tip-row .name { color: var(--text); }
+    .tip-row .bar { height: 10px; background: var(--bg2); position: relative; }
+    .tip-row .bar > div { position: absolute; top:0; left:0; bottom:0; background: var(--danger); }
+    .tip-row .v { font-family:'Avenir',sans-serif; text-align: right; white-space: nowrap; }
+    .tip-row .pct { font-family:'Avenir',sans-serif; text-align: right; color: var(--purple); font-weight: 500; }
+
+    .err-banner {
+      padding: 1rem 1.25rem;
+      background: rgba(255,71,87,0.08);
+      border: 1px solid rgba(255,71,87,0.3);
+      color: #ff4757;
+      font-family:'DM Mono',monospace;
+      font-size: .8rem; margin-bottom: 1rem;
+    }
+
+    @media (max-width: 980px) {
+      main.wrap { padding: 5rem 1.5rem 3rem; }
+      nav.top { padding: .9rem 1.5rem; }
+      .summary { grid-template-columns: 1fr 1fr; }
+      .layout, .chart-grid { grid-template-columns: 1fr; }
+      #map { height: 380px; }
+      .tip-row { grid-template-columns: 130px 1fr 60px 50px; font-size: .78rem; }
+      body { cursor: auto; }
+      .cursor, .cursor-ring { display: none; }
+    }
+    @media (max-width: 540px) {
+      .summary { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="gate" class="gate">
+    <div class="gate-text">Verificando acceso</div>
+    <div class="gate-bar"></div>
+  </div>
+
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <nav class="top" hidden id="topNav">
+    <div class="nav-left">
+      <a href="../proyecto-dc.html" class="e-btn-back">← Proyecto DC</a>
+      <span class="private-badge">Privado</span>
+    </div>
+    <div class="nav-right">
+      <a href="../index.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div>
+          <div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div>
+          <div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+  </nav>
+
+  <main class="wrap" hidden id="main">
+
+    <section class="hero">
+      <div class="hero-label">Módulo 02 · Mapa de seguridad</div>
+      <h1 class="hero-title">Comisión de delitos · <em>Medellín</em>.</h1>
+      <p class="hero-sub">19 tipologías de delito reportadas por la Policía Nacional. Filtrá por tipología, mirá la distribución territorial por comuna, la tasa por 100k habitantes y la comparación con cifras nacionales.</p>
+      <div class="controls">
+        <div class="ctrl-group">
+          <div class="ctrl-label">Período</div>
+          <div class="pill-group">
+            <button class="pill active">Enero 2026</button>
+          </div>
+        </div>
+        <div class="ctrl-group">
+          <div class="ctrl-label">Tipología</div>
+          <select class="tip-select" id="tip-select">
+            <option value="__all__">Todas las tipologías</option>
+          </select>
+        </div>
+        <div class="ctrl-group">
+          <div class="ctrl-label">Métrica del mapa</div>
+          <div class="pill-group" id="metric-pills">
+            <button class="pill active" data-metric="absoluto">Absoluto</button>
+            <button class="pill" data-metric="tasa">Tasa por 100k</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div id="err-area"></div>
+
+    <section class="summary" id="summary"></section>
+
+    <section class="layout">
+      <div class="map-card">
+        <div class="card-header">
+          <div>
+            <div class="card-title" id="map-title">Distribución territorial</div>
+            <div class="card-sub" id="map-sub">Color por intensidad · 16 comunas + corregimientos</div>
+          </div>
+        </div>
+        <div id="map"></div>
+        <div class="map-legend">
+          <div id="legend-label">Total de incidentes por comuna</div>
+          <div class="legend-bar" id="legend-bar"></div>
+          <div class="legend-ticks" id="legend-ticks"></div>
+        </div>
+      </div>
+      <div class="table-card">
+        <div class="card-header">
+          <div>
+            <div class="card-title" id="rank-title">Comunas · ranking</div>
+            <div class="card-sub" id="rank-sub">Mayor a menor</div>
+          </div>
+        </div>
+        <table class="rank-table">
+          <thead>
+            <tr>
+              <th class="pos">#</th>
+              <th>Comuna</th>
+              <th class="bar-cell" style="text-align:right">Volumen</th>
+              <th style="text-align:right" id="rank-val-col">Total</th>
+            </tr>
+          </thead>
+          <tbody id="rank-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="chart-grid">
+      <div class="chart-card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Top tipologías · Medellín vs Nacional</div>
+            <div class="card-sub">% del total nacional capturado por Medellín</div>
+          </div>
+        </div>
+        <div class="tip-bars" id="tip-bars"></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Distribución horaria</div>
+            <div class="card-sub">Hora del hecho · 0–23</div>
+          </div>
+        </div>
+        <div class="body">
+          <svg id="hour-chart" viewBox="0 0 320 200" preserveAspectRatio="none"></svg>
+        </div>
+      </div>
+    </section>
+
+    <section class="chart-card" style="margin-top:1rem">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Serie diaria del mes</div>
+          <div class="card-sub">Total de incidentes por día</div>
+        </div>
+      </div>
+      <div class="body">
+        <svg id="day-chart" viewBox="0 0 800 220" preserveAspectRatio="none"></svg>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // ─── EMAIL GATE ───────────────────────────────────────────────────
+    const ALLOWED = ['reruizc@gmail.com', 'nuevagemela@gmail.com'];
+    const token = localStorage.getItem('rr-token');
+    const userRaw = localStorage.getItem('rr-user');
+    const user = userRaw ? JSON.parse(userRaw) : null;
+    function emailAllowed(em){ return em && ALLOWED.includes(String(em).toLowerCase().trim()); }
+    function denyToLogin(){ localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); window.location.replace('../login.html'); }
+    function denyToDashboard(){ window.location.replace('../dashboard.html'); }
+    if (!token || !user) denyToLogin();
+    else if (!emailAllowed(user.email)) denyToDashboard();
+    else {
+      (async () => {
+        try {
+          const res = await fetch('https://rr-auth.reruizc.workers.dev/auth/me', { headers: { 'Authorization': `Bearer ${token}` } });
+          if (res.status === 401) return denyToLogin();
+          const data = await res.json();
+          if (!data.ok || !emailAllowed(data.user && data.user.email)) return denyToDashboard();
+          localStorage.setItem('rr-user', JSON.stringify(Object.assign({}, user, data.user)));
+          revealPage();
+        } catch (e) { revealPage(); }
+      })();
+    }
+    function revealPage(){
+      document.getElementById('gate').remove();
+      document.getElementById('topNav').hidden = false;
+      document.getElementById('main').hidden = false;
+      init();
+    }
+
+    function getAutoTheme(){ const h = new Date().getHours(); return (h >= 7 && h < 19) ? 'light' : 'dark'; }
+    const theme = localStorage.getItem('rr-theme') || getAutoTheme();
+    document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : '');
+
+    // ─── DATA ─────────────────────────────────────────────────────────
+    const S3_BASE = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co';
+    const SEG_BASE = `${S3_BASE}/bases+de+datos/output_seguridad/2026-01`;
+    const MEDELLIN_GEO_URL = `${S3_BASE}/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`;
+
+    const TIP_LABEL = {
+      'amenazas': 'Amenazas',
+      'delitos-informaticos': 'Delitos informáticos',
+      'delitos-sexuales': 'Delitos sexuales',
+      'extorsion': 'Extorsión',
+      'homicidios': 'Homicidios',
+      'homicidios-en-at': 'Homicidios en accidente de tránsito',
+      'hurto-a-comercio': 'Hurto a comercio',
+      'hurto-a-motos': 'Hurto a motos',
+      'hurto-a-personas': 'Hurto a personas',
+      'hurto-a-residencias': 'Hurto a residencias',
+      'hurto-automotores': 'Hurto a automotores',
+      'hurto-bicicletas': 'Hurto a bicicletas',
+      'hurto-celular': 'Hurto de celular',
+      'lesiones-en-at': 'Lesiones en accidente de tránsito',
+      'lesiones-personales': 'Lesiones personales',
+      'pirateria-terrestre': 'Piratería terrestre',
+      'secuestro': 'Secuestro',
+      'terrorismo': 'Terrorismo',
+      'violencia-intrafamiliar': 'Violencia intrafamiliar',
+    };
+
+    let dataResumen = null, dataComuna = null, dataDia = null, dataHora = null;
+    let geoCache = null;
+    let map = null, mapLayer = null;
+
+    async function fetchAll(){
+      const [r, c, d, h] = await Promise.all([
+        fetch(`${SEG_BASE}/resumen.json`).then(r => r.json()),
+        fetch(`${SEG_BASE}/por-comuna.json`).then(r => r.json()),
+        fetch(`${SEG_BASE}/por-dia.json`).then(r => r.json()),
+        fetch(`${SEG_BASE}/por-hora.json`).then(r => r.json()),
+      ]);
+      dataResumen = r; dataComuna = c; dataDia = d; dataHora = h;
+    }
+
+    async function loadGeo(){
+      if (geoCache) return geoCache;
+      const r = await fetch(MEDELLIN_GEO_URL);
+      geoCache = await r.json();
+      return geoCache;
+    }
+
+    function fmt(n){ return new Intl.NumberFormat('es-CO').format(n || 0); }
+
+    // ─── COLOR SCALE (verde→amarillo→rojo) ────────────────────────────
+    function colorScale(t){
+      t = Math.max(0, Math.min(1, t));
+      if (t < 0.5){
+        const k = t / 0.5;
+        return `rgb(${Math.round(74+(240-74)*k)},${Math.round(175+(192-175)*k)},${Math.round(80+(64-80)*k)})`;
+      } else {
+        const k = (t - 0.5) / 0.5;
+        return `rgb(${Math.round(240+(220-240)*k)},${Math.round(192+(50-192)*k)},${Math.round(64+(50-64)*k)})`;
+      }
+    }
+
+    // ─── STATE ────────────────────────────────────────────────────────
+    const state = { tip: '__all__', metric: 'absoluto' };
+
+    async function init(){
+      attachCursorHovers();
+      try {
+        await fetchAll();
+      } catch (e) {
+        showError(`Error cargando datos. Verificá que estén públicos en S3 bajo bases+de+datos/output_seguridad/2026-01/. ${e.message}`);
+        return;
+      }
+
+      // populate tipology select
+      const sel = document.getElementById('tip-select');
+      const tipos = (dataResumen.meta && dataResumen.meta.tipologias) || [];
+      tipos.forEach(t => {
+        const o = document.createElement('option');
+        o.value = t; o.textContent = TIP_LABEL[t] || t;
+        sel.appendChild(o);
+      });
+      sel.addEventListener('change', () => { state.tip = sel.value; render(); });
+
+      document.querySelectorAll('#metric-pills .pill').forEach(p => {
+        p.addEventListener('click', () => {
+          state.metric = p.dataset.metric;
+          document.querySelectorAll('#metric-pills .pill').forEach(x => x.classList.remove('active'));
+          p.classList.add('active');
+          render();
+        });
+      });
+
+      initMap();
+      render();
+    }
+
+    function initMap(){
+      map = L.map('map', { zoomControl: true, attributionControl: false, scrollWheelZoom: false })
+        .setView([6.245, -75.58], 11);
+    }
+
+    // ─── RENDER ───────────────────────────────────────────────────────
+    function getValue(scope, tip){
+      if (!scope) return 0;
+      if (tip === '__all__') return scope.total || 0;
+      return (scope.por_tipologia || {})[tip] || 0;
+    }
+
+    function getNacionalValue(tip){
+      if (tip === '__all__') return dataResumen.nacional.total || 0;
+      return dataResumen.nacional.por_tipologia[tip] || 0;
+    }
+
+    function getMedellinValue(tip){
+      if (tip === '__all__') return dataResumen.medellin.total || 0;
+      return dataResumen.medellin.por_tipologia[tip] || 0;
+    }
+
+    async function render(){
+      clearError();
+      const tip = state.tip;
+      const tipLabel = tip === '__all__' ? 'todas las tipologías' : TIP_LABEL[tip];
+      const medN = getMedellinValue(tip);
+      const nacN = getNacionalValue(tip);
+      const sharePct = nacN > 0 ? (medN / nacN * 100).toFixed(2) : '0.00';
+
+      // worst comuna
+      const comEntries = Object.entries(dataComuna)
+        .filter(([k]) => k !== 'OTROS')
+        .map(([k, d]) => ({
+          cod: k, nombre: d.nombre, poblacion: d.poblacion_estimada,
+          total: getValue(d, tip),
+          tasa: d.poblacion_estimada > 0 ? getValue(d, tip) / d.poblacion_estimada * 100000 : 0,
+        }));
+      const sortedAbs = [...comEntries].sort((a,b) => b.total - a.total);
+      const sortedRate = [...comEntries].sort((a,b) => b.tasa - a.tasa);
+      const worst = sortedRate[0] || { nombre: '—', total: 0, tasa: 0 };
+
+      const pob = (dataResumen.medellin.poblacion_estimada) || 0;
+      const tasaMed = pob > 0 ? (medN / pob * 100000).toFixed(1) : '—';
+
+      // SUMMARY
+      document.getElementById('summary').innerHTML = `
+        <div class="sum-card danger">
+          <div class="sum-label">Incidentes en Medellín</div>
+          <div class="sum-value-big danger">${fmt(medN)}</div>
+          <div class="sum-meta">${tipLabel} · enero 2026</div>
+        </div>
+        <div class="sum-card purple">
+          <div class="sum-label">% del total nacional</div>
+          <div class="sum-value-big purple">${sharePct}%</div>
+          <div class="sum-meta">Nacional: <strong>${fmt(nacN)}</strong> incidentes</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-label">Tasa por 100k hab</div>
+          <div class="sum-value-big">${tasaMed}</div>
+          <div class="sum-meta">Medellín · ${fmt(pob)} habitantes (estimado)</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-label">Comuna con mayor tasa</div>
+          <div class="sum-value-big">${worst.nombre.length > 14 ? worst.nombre.slice(0,12)+'…' : worst.nombre}</div>
+          <div class="sum-meta">${fmt(worst.total)} incidentes · <strong>${worst.tasa.toFixed(1)}/100k</strong></div>
+        </div>
+      `;
+
+      // MAP
+      const geo = await loadGeo();
+      if (mapLayer){ map.removeLayer(mapLayer); mapLayer = null; }
+
+      const useRate = state.metric === 'tasa';
+      const dataset = comEntries;
+      const values = dataset.map(d => useRate ? d.tasa : d.total).filter(v => Number.isFinite(v) && v > 0);
+      const minV = Math.min(...values, 0);
+      const maxV = Math.max(...values, 1);
+
+      const dataByCode = Object.fromEntries(dataset.map(d => [d.cod, d]));
+
+      const styleOf = (feat) => {
+        const code = String(feat.properties.CODIGO || '').padStart(2, '0');
+        const d = dataByCode[code];
+        if (!d){
+          return { fillColor: '#444', fillOpacity: .25, color: 'rgba(255,255,255,0.25)', weight: 1 };
+        }
+        const v = useRate ? d.tasa : d.total;
+        const t = (v - minV) / (maxV - minV || 1);
+        return {
+          fillColor: colorScale(t),
+          fillOpacity: 0.82,
+          color: 'rgba(255,255,255,0.4)',
+          weight: 1,
+        };
+      };
+
+      mapLayer = L.geoJSON(geo, {
+        style: styleOf,
+        onEachFeature: (feat, layer) => {
+          const code = String(feat.properties.CODIGO || '').padStart(2, '0');
+          const d = dataByCode[code];
+          layer.on({
+            mouseover: (e) => {
+              layer.setStyle({ weight: 2, color: '#fff', fillOpacity: 0.96 });
+              if (d) {
+                const tt = `
+                  <div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.5">
+                    <span style="color:#a78bfa;font-weight:700">${d.nombre.toUpperCase()}</span><br/>
+                    <span style="color:#e63946;font-weight:700">${fmt(d.total)} incidentes</span><br/>
+                    <span style="color:#fff">Tasa: ${d.tasa.toFixed(1)}/100k</span><br/>
+                    <span style="color:#999;font-size:.7rem">Población: ${fmt(d.poblacion)} (est.)</span><br/>
+                    <span style="color:#999;font-size:.7rem">${tipLabel}</span>
+                  </div>`;
+                layer.bindTooltip(tt, { sticky: true, opacity: 1 }).openTooltip(e.latlng);
+              }
+            },
+            mouseout: () => { layer.setStyle(styleOf(feat)); layer.closeTooltip(); },
+          });
+        },
+      }).addTo(map);
+
+      try { map.fitBounds(mapLayer.getBounds(), { padding: [10, 10] }); } catch(_) {}
+
+      // legend
+      const legendBar = document.getElementById('legend-bar');
+      const stops = 12;
+      let bar = '';
+      for (let i = 0; i < stops; i++){
+        const t = i / (stops-1);
+        bar += `<div style="background:${colorScale(t)}"></div>`;
+      }
+      legendBar.innerHTML = bar;
+      const fmtV = v => useRate ? v.toFixed(0) + '/100k' : fmt(Math.round(v));
+      document.getElementById('legend-ticks').innerHTML = `<span>${fmtV(minV)}</span><span>${fmtV(maxV)}</span>`;
+      document.getElementById('legend-label').textContent = useRate
+        ? `Tasa por 100k habitantes (${tipLabel})`
+        : `Total de incidentes (${tipLabel})`;
+      document.getElementById('map-title').textContent = useRate
+        ? `Tasa por 100k · ${tipLabel}`
+        : `Volumen absoluto · ${tipLabel}`;
+
+      // RANK
+      const sorted = useRate ? sortedRate : sortedAbs;
+      const tbody = document.getElementById('rank-tbody');
+      const maxBar = useRate ? sorted[0].tasa : sorted[0].total;
+      tbody.innerHTML = sorted.map((c, i) => {
+        const v = useRate ? c.tasa : c.total;
+        const w = maxBar > 0 ? (v / maxBar * 100) : 0;
+        const t = maxV > 0 ? v / maxV : 0;
+        return `
+          <tr>
+            <td class="pos">${String(i+1).padStart(2,'0')}</td>
+            <td>${c.nombre}</td>
+            <td class="bar-cell">
+              <div class="bar-bg"><div class="bar-fg" style="width:${w}%;background:${colorScale(t)}"></div></div>
+            </td>
+            <td class="v">${useRate ? c.tasa.toFixed(1) : fmt(c.total)}</td>
+          </tr>
+        `;
+      }).join('');
+      document.getElementById('rank-val-col').textContent = useRate ? 'Tasa /100k' : 'Total';
+      document.getElementById('rank-title').textContent = `Comunas · ${useRate ? 'tasa' : 'absoluto'}`;
+      document.getElementById('rank-sub').textContent = `Mayor a menor · ${tipLabel}`;
+
+      // TOP TIPOLOGIAS
+      const tipos = dataResumen.meta.tipologias;
+      const tipoData = tipos.map(t => {
+        const med = dataResumen.medellin.por_tipologia[t] || 0;
+        const nac = dataResumen.nacional.por_tipologia[t] || 0;
+        const share = nac > 0 ? med / nac * 100 : 0;
+        return { id: t, label: TIP_LABEL[t] || t, med, nac, share };
+      }).sort((a,b) => b.med - a.med);
+      const maxMed = Math.max(...tipoData.map(d => d.med));
+      const tipBars = document.getElementById('tip-bars');
+      tipBars.innerHTML = tipoData.slice(0, 12).map(d => `
+        <div class="tip-row">
+          <div class="name">${d.label}</div>
+          <div class="bar"><div style="width:${maxMed > 0 ? d.med/maxMed*100 : 0}%"></div></div>
+          <div class="v">${fmt(d.med)}</div>
+          <div class="pct">${d.share.toFixed(1)}%</div>
+        </div>
+      `).join('');
+
+      // HOUR CHART (radial bars)
+      drawHourChart(tip);
+      // DAY CHART (time series)
+      drawDayChart(tip);
+    }
+
+    function drawHourChart(tip){
+      const svg = document.getElementById('hour-chart');
+      const W = 320, H = 200;
+      svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+      const padL = 28, padR = 8, padT = 8, padB = 32;
+      const innerW = W - padL - padR, innerH = H - padT - padB;
+      const hours = Array.from({length:24}, (_,i) => String(i).padStart(2,'0'));
+      const vals = hours.map(h => {
+        const sc = dataHora[h];
+        return sc ? (tip === '__all__' ? sc.total : (sc.por_tipologia[tip] || 0)) : 0;
+      });
+      const maxV = Math.max(...vals, 1);
+      const bw = innerW / 24;
+      let bars = '';
+      hours.forEach((h, i) => {
+        const v = vals[i];
+        const bh = (v / maxV) * innerH;
+        const x = padL + i * bw + 1;
+        const y = padT + (innerH - bh);
+        bars += `<rect x="${x}" y="${y}" width="${bw - 2}" height="${bh}" fill="${colorScale(v/maxV)}" opacity="0.9"/>`;
+        if (i % 3 === 0){
+          bars += `<text x="${x + bw/2}" y="${H - padB + 14}" font-family="DM Mono" font-size="8" fill="currentColor" text-anchor="middle" opacity=".55">${h}</text>`;
+        }
+      });
+      // Y axis label
+      bars += `<text x="${padL - 4}" y="${padT + 8}" font-family="DM Mono" font-size="8" fill="currentColor" text-anchor="end" opacity=".55">${maxV}</text>`;
+      bars += `<text x="${padL - 4}" y="${padT + innerH}" font-family="DM Mono" font-size="8" fill="currentColor" text-anchor="end" opacity=".55">0</text>`;
+      bars += `<text x="${W/2}" y="${H - 4}" font-family="DM Mono" font-size="8" fill="currentColor" text-anchor="middle" opacity=".55">hora del día</text>`;
+      svg.innerHTML = bars;
+    }
+
+    function drawDayChart(tip){
+      const svg = document.getElementById('day-chart');
+      const W = 800, H = 220;
+      svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+      const padL = 36, padR = 12, padT = 14, padB = 32;
+      const innerW = W - padL - padR, innerH = H - padT - padB;
+
+      const days = Object.keys(dataDia).sort();
+      if (!days.length){ svg.innerHTML = ''; return; }
+      const vals = days.map(d => {
+        const sc = dataDia[d];
+        return tip === '__all__' ? sc.total : (sc.por_tipologia[tip] || 0);
+      });
+      const maxV = Math.max(...vals, 1);
+      const stepX = innerW / Math.max(days.length - 1, 1);
+
+      // line + area
+      let path = '';
+      let areaPath = '';
+      days.forEach((d, i) => {
+        const x = padL + i * stepX;
+        const y = padT + innerH - (vals[i] / maxV) * innerH;
+        path += (i === 0 ? 'M' : 'L') + x + ',' + y + ' ';
+        areaPath += (i === 0 ? 'M' : 'L') + x + ',' + y + ' ';
+      });
+      areaPath += `L ${padL + (days.length-1)*stepX},${padT+innerH} L ${padL},${padT+innerH} Z`;
+
+      let dots = '';
+      days.forEach((d, i) => {
+        const x = padL + i * stepX;
+        const y = padT + innerH - (vals[i] / maxV) * innerH;
+        dots += `<circle cx="${x}" cy="${y}" r="2.5" fill="#e63946"/>`;
+      });
+
+      // x ticks (every 3 days)
+      let ticks = '';
+      days.forEach((d, i) => {
+        if (i % 3 === 0 || i === days.length-1){
+          const x = padL + i * stepX;
+          const lbl = d.slice(8); // day part
+          ticks += `<text x="${x}" y="${H - 12}" font-family="DM Mono" font-size="8" fill="currentColor" text-anchor="middle" opacity=".55">${lbl}</text>`;
+        }
+      });
+      // y axis
+      const yTicks = `
+        <text x="${padL - 4}" y="${padT + 6}" font-family="DM Mono" font-size="8" fill="currentColor" text-anchor="end" opacity=".55">${maxV}</text>
+        <text x="${padL - 4}" y="${padT + innerH}" font-family="DM Mono" font-size="8" fill="currentColor" text-anchor="end" opacity=".55">0</text>
+      `;
+      svg.innerHTML = `
+        <path d="${areaPath}" fill="rgba(230,57,70,0.12)" stroke="none"/>
+        <path d="${path}" stroke="#e63946" stroke-width="1.6" fill="none"/>
+        ${dots}
+        ${ticks}
+        ${yTicks}
+        <text x="${W/2}" y="${H - 2}" font-family="DM Mono" font-size="8" fill="currentColor" text-anchor="middle" opacity=".55">día del mes</text>
+      `;
+    }
+
+    function showError(msg){
+      document.getElementById('err-area').innerHTML = `<div class="err-banner">${msg}</div>`;
+    }
+    function clearError(){ document.getElementById('err-area').innerHTML = ''; }
+
+    // ─── CURSOR ───────────────────────────────────────────────────────
+    const cursor = document.getElementById('cursor');
+    const ring   = document.getElementById('cursorRing');
+    let mx=0, my=0, rx=0, ry=0;
+    document.addEventListener('mousemove', e => {
+      mx = e.clientX; my = e.clientY;
+      cursor.style.left = mx + 'px'; cursor.style.top = my + 'px';
+    });
+    (function ar(){ rx += (mx-rx)*.12; ry += (my-ry)*.12; ring.style.left = rx+'px'; ring.style.top = ry+'px'; requestAnimationFrame(ar); })();
+    function attachCursorHovers(){
+      document.querySelectorAll('a, button, .pill, select').forEach(el => {
+        el.addEventListener('mouseenter', () => {
+          cursor.style.transform = 'translate(-50%,-50%) scale(2.5)';
+          cursor.style.background = 'transparent';
+          cursor.style.border = '1.5px solid var(--purple)';
+          ring.style.opacity = '0';
+        });
+        el.addEventListener('mouseleave', () => {
+          cursor.style.transform = 'translate(-50%,-50%) scale(1)';
+          cursor.style.background = 'var(--purple)';
+          cursor.style.border = 'none';
+          ring.style.opacity = '.4';
+        });
+      });
+    }
+  </script>
+</body>
+</html>
