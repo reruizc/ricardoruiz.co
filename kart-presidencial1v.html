@@ -343,7 +343,11 @@
     color: white;
     text-shadow: 0 1px 2px rgba(0,0,0,0.5);
     flex-shrink: 0;
+    object-fit: cover;
+    background-position: center;
+    background-size: cover;
   }
+  .stand-card img.ph { display:block; }
   .stand-card .nm {
     font-family: 'Arima', sans-serif;
     font-size: 11.5px;
@@ -895,22 +899,33 @@ function toggleMenu() {
 // ============================================================
 const SKIN = { fair:'#e9c9a7', medium:'#c8956d', dark:'#7a5132' };
 // Colores del partido tomados de previa-1v.html (Botero/Caicedo locales).
+// `photo` es la URL del retrato (S3 o Wikipedia). null = caer al placeholder de iniciales.
+// Sugerencia: subir Botero y Caicedo a S3 en /Fotos-presidenciales/ con el mismo formato 300×300.
+const FOTOS_S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/Fotos-presidenciales';
 const CANDIDATES = [
   { id:'cepeda',   name:'Iván Cepeda',              short:'Cepeda',   color:'#51458F', region:'Atlántico',    skill:0.97,
+    photo: FOTOS_S3 + '/IVAN+CEPEDA.jpg',
     features: { hairStyle:'curly', hair:'#9a9a9a',  skin:SKIN.medium, glasses:true,  beard:'short' } },
   { id:'abelardo', name:'Abelardo De La Espriella', short:'Abelardo', color:'#000062', region:'Bolívar',      skill:0.95,
+    photo: FOTOS_S3 + '/abelardo.jpg',
     features: { hairStyle:'short', hair:'#1a1a1a',  skin:SKIN.medium, glasses:false, beard:'goatee' } },
   { id:'paloma',   name:'Paloma Valencia',          short:'Paloma',   color:'#1866DF', region:'Cauca',        skill:0.93,
+    photo: FOTOS_S3 + '/PALOMA+VALENCIA.jpg',
     features: { hairStyle:'long',  hair:'#d4a040',  skin:SKIN.fair,   glasses:false, beard:'none' } },
   { id:'claudia',  name:'Claudia López',            short:'Claudia',  color:'#d9db24', region:'Bogotá',       skill:1.00,
+    photo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cf/Claudia_Lopez_H_26.jpg/480px-Claudia_Lopez_H_26.jpg',
     features: { hairStyle:'shortF',hair:'#3a3a3a',  skin:SKIN.fair,   glasses:false, beard:'none' } },
   { id:'fajardo',  name:'Sergio Fajardo',           short:'Fajardo',  color:'#EEAA22', region:'Antioquia',    skill:0.92,
+    photo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/SergioFajardo.jpg/480px-SergioFajardo.jpg',
     features: { hairStyle:'short', hair:'#b8b8b8',  skin:SKIN.fair,   glasses:false, beard:'none' } },
   { id:'botero',   name:'Santiago Botero',          short:'Botero',   color:'#d4af37', region:'Cundinamarca', skill:0.96,
+    photo: null,
     features: { hairStyle:'short', hair:'#5a3a1f',  skin:SKIN.medium, glasses:false, beard:'none' } },
   { id:'caicedo',  name:'Carlos Caicedo',           short:'Caicedo',  color:'#ff6eb4', region:'Magdalena',    skill:0.91,
+    photo: null,
     features: { hairStyle:'short', hair:'#1a1a1a',  skin:SKIN.medium, glasses:false, beard:'short' } },
   { id:'murillo',  name:'Luis Gilberto Murillo',    short:'Murillo',  color:'#16a34a', region:'Chocó',        skill:0.90,
+    photo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/20240521_posesi%C3%B3n_canciller_Murillo-Joel_Gonz%C3%A1lez1536_%28Cropped%29.jpg/480px-20240521_posesi%C3%B3n_canciller_Murillo-Joel_Gonz%C3%A1lez1536_%28Cropped%29.jpg',
     features: { hairStyle:'short', hair:'#0a0a0a',  skin:SKIN.dark,   glasses:true,  beard:'none' } },
 ];
 let selectedCandidate = CANDIDATES[0];
@@ -947,51 +962,62 @@ const TOTAL_LAPS = 3;
 // ============================================================
 // CENTERLINE — silueta de Bogotá D.C. (cerrada, sentido horario)
 // ============================================================
-// Silueta de Bogotá D.C. — ARRANCA en el sur (Ciudad Bolívar/Sumapaz tail)
-// y va en sentido HORARIO (este → norte → oeste → sur). Asimétrica con
-// concavidades reales del mapa (Suba bulbo NW, Bosa bulbo SW, knee SE).
+// Silueta de Bogotá D.C. — refinada con 41 vértices.
+// Características reales: Suba (NW bulge), Bosa (SW bulge), San Cristóbal
+// (SE knee), Usaquén (N narrow tip), Cerros (E recta), notch oeste.
+// Arranca en el sur (Ciudad Bolívar tip), va HORARIO.
 const CL_OFFSET_X = 1024;
 const CL_OFFSET_Y = 924;
 const RAW_CENTERLINE = [
-  [1080, 1850],     // 0 — start (sur, Ciudad Bolívar tip)
-  [1240, 1810],
-  [1380, 1760],
-  // Knee bend SE (San Cristóbal)
-  [1490, 1690],
-  [1550, 1560],
-  [1500, 1470],     // pequeña concavidad
-  [1530, 1380],
-  [1570, 1240],
-  // Cerros este (recta larga)
-  [1580, 1100],
-  [1560, 970],
-  [1530, 850],
-  [1490, 730],
-  // Curva norte (Usaquén)
-  [1430, 620],
-  [1340, 530],
-  [1230, 470],
-  [1100, 440],
-  // Suba bulge NW
-  [970, 430],
-  [840, 450],
-  [720, 510],
-  [620, 590],
+  // Sur (Ciudad Bolívar tip) — start
+  [1080, 1880],     // 0
+  [1230, 1860],
+  [1360, 1820],
+  [1470, 1760],
+  // Knee SE (San Cristóbal/Usme) — protrusión
+  [1560, 1680],
+  [1610, 1570],
+  [1635, 1450],
+  [1610, 1340],     // ligera concavidad
+  [1645, 1230],
+  // Cerros este (línea casi recta)
+  [1660, 1120],
+  [1660, 1010],
+  [1645, 900],
+  [1620, 800],
+  [1580, 710],
+  // Norte curva (Usaquén tip — narrow)
+  [1520, 620],
+  [1440, 540],
+  [1340, 480],
+  [1230, 440],
+  [1110, 420],
+  [990, 410],
+  [880, 420],
+  // Suba bulge NW (prominente)
+  [770, 450],
+  [660, 500],
+  [560, 580],
+  [490, 680],
   // Engativá oeste
-  [540, 700],
-  [490, 830],
-  [460, 970],
-  // Concavidad / muesca oeste
-  [500, 1090],
-  [460, 1180],
+  [445, 790],
+  [415, 900],
+  [395, 1010],
+  // Notch oeste (sutil)
+  [420, 1100],
+  [400, 1190],
   // Bosa SW bulge
-  [430, 1310],
-  [470, 1450],
-  [560, 1560],
-  [690, 1660],
-  [840, 1740],
-  [980, 1810],
-  [1080, 1850],     // close
+  [375, 1290],
+  [360, 1380],
+  [380, 1470],
+  [430, 1560],
+  // Curva sur (volviendo)
+  [510, 1650],
+  [610, 1730],
+  [740, 1800],
+  [880, 1850],
+  [1010, 1875],
+  [1080, 1880],     // close
 ];
 const CENTERLINE = RAW_CENTERLINE.map(([x,y]) => [x + CL_OFFSET_X, y + CL_OFFSET_Y]);
 const CL_LENS = [0];
@@ -1028,32 +1054,46 @@ TRACK_CY /= CENTERLINE.length;
 // LANDMARKS / TRIBUNAS — posiciones en world coords
 // (dentro del lazo o cerca a la pista)
 // ============================================================
-// Landmarks DENTRO del loop (centroide ~1000,1100 raw).
-// `size` multiplica el tamaño del sprite (1 = base, 2 = doble, etc.)
+// Helper: posición sobre el borde de la pista a un t (en world coords ya con offset)
+// y un offset lateral (positivo = derecha al sentido de marcha = exterior CW).
+// asfalto halfwidth = 110, berma ~145, así que >150 queda en pasto.
+function placeOnEdge(tFrac, lateralOff, type, size, name) {
+  const t = (tFrac * CL_TOTAL) % CL_TOTAL;
+  const p = posAtParam(t);
+  const nx = -Math.sin(p.angle), ny = Math.cos(p.angle);
+  return {
+    name, type, size,
+    x: p.x + nx * lateralOff,
+    y: p.y + ny * lateralOff,
+  };
+}
+
+// Landmarks AL BORDE de la pista (afuera = lateral positivo, adentro = negativo).
+// `size` controla el tamaño relativo del sprite.
 const LANDMARKS = [
-  // Centro: Plaza de Bolívar + Capitolio + Candelaria + Periodistas
-  { name:'Plaza de Bolívar', x: CL_OFFSET_X + 990,  y: CL_OFFSET_Y + 1130, type:'plaza',      size:2.2 },
-  { name:'Capitolio',         x: CL_OFFSET_X + 1080, y: CL_OFFSET_Y + 1080, type:'capitolio',  size:2.4 },
-  { name:'La Candelaria',     x: CL_OFFSET_X + 1180, y: CL_OFFSET_Y + 1170, type:'candelaria', size:1.8 },
-  { name:'Periodistas',       x: CL_OFFSET_X + 900,  y: CL_OFFSET_Y + 1220, type:'parque',     size:1.6 },
-  // Norte: Campín + Movistar
-  { name:'El Campín',         x: CL_OFFSET_X + 1010, y: CL_OFFSET_Y + 750,  type:'campin',     size:3.0 },
-  { name:'Movistar Arena',    x: CL_OFFSET_X + 1130, y: CL_OFFSET_Y + 820,  type:'arena',      size:2.4 },
-  // TransMilenios parqueados al borde de la pista (cerca pero fuera del asfalto)
-  { name:'TM 1',              x: CL_OFFSET_X + 1380, y: CL_OFFSET_Y + 950,  type:'tm',         size:1.4 },
-  { name:'TM 2',              x: CL_OFFSET_X + 700,  y: CL_OFFSET_Y + 1320, type:'tm',         size:1.4 },
-  { name:'TM 3',              x: CL_OFFSET_X + 850,  y: CL_OFFSET_Y + 1570, type:'tm',         size:1.4 },
-  { name:'TM 4',              x: CL_OFFSET_X + 1300, y: CL_OFFSET_Y + 1450, type:'tm',         size:1.4 },
+  // Centro histórico (cluster en sur-este, aprox t=0.18-0.30)
+  placeOnEdge(0.20, 175, 'plaza',      3.5, 'Plaza de Bolívar'),
+  placeOnEdge(0.23, 180, 'capitolio',  3.8, 'Capitolio'),
+  placeOnEdge(0.27, 175, 'candelaria', 3.0, 'La Candelaria'),
+  placeOnEdge(0.16, 175, 'parque',     2.5, 'Periodistas'),
+  // Norte (estadios)
+  placeOnEdge(0.49, 200, 'campin',     4.5, 'El Campín'),
+  placeOnEdge(0.53, 175, 'arena',      3.5, 'Movistar Arena'),
+  // TransMilenios parqueados a lo largo del trazado (afuera)
+  placeOnEdge(0.08, 165, 'tm',         2.2, 'TM 1'),
+  placeOnEdge(0.40, 165, 'tm',         2.2, 'TM 2'),
+  placeOnEdge(0.65, 165, 'tm',         2.2, 'TM 3'),
+  placeOnEdge(0.82, 165, 'tm',         2.2, 'TM 4'),
 ];
-// Tribunas alrededor de la pista
+// Tribunas a lo largo del trazado (al borde de la pista)
 const TRIBUNES = [
-  { x: CL_OFFSET_X + 1180, y: CL_OFFSET_Y + 580,  type:'tribune', size:2.0 },   // NE
-  { x: CL_OFFSET_X + 1430, y: CL_OFFSET_Y + 1100, type:'tribune', size:2.0 },   // E
-  { x: CL_OFFSET_X + 1280, y: CL_OFFSET_Y + 1620, type:'tribune', size:2.0 },   // SE
-  { x: CL_OFFSET_X + 1080, y: CL_OFFSET_Y + 1750, type:'tribune', size:2.0 },   // S (cerca de la salida)
-  { x: CL_OFFSET_X + 770,  y: CL_OFFSET_Y + 1700, type:'tribune', size:2.0 },   // SW
-  { x: CL_OFFSET_X + 590,  y: CL_OFFSET_Y + 1280, type:'tribune', size:2.0 },   // W
-  { x: CL_OFFSET_X + 660,  y: CL_OFFSET_Y + 700,  type:'tribune', size:2.0 },   // NW
+  placeOnEdge(0.05, 180, 'tribune', 3.0, 'Tribuna salida'),
+  placeOnEdge(0.18, 200, 'tribune', 3.0, 'Tribuna SE'),
+  placeOnEdge(0.36, 195, 'tribune', 3.0, 'Tribuna E'),
+  placeOnEdge(0.51, 220, 'tribune', 3.0, 'Tribuna N'),
+  placeOnEdge(0.66, 195, 'tribune', 3.0, 'Tribuna NW'),
+  placeOnEdge(0.78, 195, 'tribune', 3.0, 'Tribuna W'),
+  placeOnEdge(0.92, 180, 'tribune', 3.0, 'Tribuna pre-meta'),
 ];
 const WORLD_OBJECTS = [...LANDMARKS, ...TRIBUNES];
 
@@ -1520,10 +1560,16 @@ function handlePauseToggle() {
       ? parts[0].slice(0,2).toUpperCase()
       : (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
     const fontColor = isLightHex(c.color) ? '#0a0a14' : '#fff';
+    let phHtml;
+    if (c.photo) {
+      phHtml = `<img class="ph" src="${c.photo}" alt="${c.short}" style="width:48px;height:48px;border-radius:50%;border:2px solid ${c.color};object-fit:cover;display:block;margin:0 auto 8px;" onerror="this.outerHTML='<div class=&quot;ph&quot; style=&quot;background:${c.color};color:${fontColor}&quot;>${inits}</div>'">`;
+    } else {
+      phHtml = `<div class="ph" style="background:${c.color};color:${fontColor}">${inits}</div>`;
+    }
     const card = document.createElement('div');
     card.className = 'cand';
     card.innerHTML = `
-      <div class="ph" style="background:${c.color};color:${fontColor}">${inits}</div>
+      ${phHtml}
       <div class="nm">${c.short}</div>
       <div class="pt">${c.region}</div>
     `;
@@ -2447,155 +2493,431 @@ function drawLandmark(c, screenX, screenY, scale, type, dayness, sizeMult) {
   c.scale(finalScale, finalScale);
   switch (type) {
     case 'plaza': {
-      // Plaza de Bolívar — losas rectangulares + estatua central
-      c.fillStyle = '#a07a4a';
-      c.fillRect(-30, -8, 60, 12);
-      c.fillStyle = '#8a6536';
-      c.fillRect(-28, -6, 56, 1);
-      // Estatua
-      c.fillStyle = '#3a3a40';
-      c.fillRect(-2, -22, 4, 14);
-      c.fillStyle = '#5a5a60';
-      c.beginPath(); c.arc(0, -23, 3, 0, Math.PI*2); c.fill();
-      // Pedestal
+      // Plaza de Bolívar — explanada de losas + estatua + palomas + farolas
+      // Sombra base
+      c.fillStyle = 'rgba(0,0,0,0.35)';
+      c.beginPath(); c.ellipse(0, 4, 50, 8, 0, 0, Math.PI*2); c.fill();
+      // Explanada (perspectiva trapezoidal)
+      c.fillStyle = '#9a7546';
+      c.beginPath();
+      c.moveTo(-44, 4); c.lineTo(44, 4); c.lineTo(36, -10); c.lineTo(-36, -10);
+      c.closePath(); c.fill();
+      // Patrón de losas
+      c.strokeStyle = 'rgba(0,0,0,0.18)';
+      c.lineWidth = 0.4;
+      for (let i=0; i<6; i++) {
+        const y = -10 + i*2.4;
+        const w = 36 + i*1.4;
+        c.beginPath(); c.moveTo(-w, y); c.lineTo(w, y); c.stroke();
+        const cols = 6 + i;
+        for (let j=0; j<=cols; j++) {
+          const x = -w + (2*w/cols)*j;
+          c.beginPath(); c.moveTo(x, y); c.lineTo(x*1.05, y+2.4); c.stroke();
+        }
+      }
+      // Bordes (highlight superior)
+      c.fillStyle = '#b58a55';
+      c.fillRect(-36, -10, 72, 1);
+      // Pedestal de la estatua
+      c.fillStyle = '#3a2a1a';
+      c.fillRect(-7, -14, 14, 6);
       c.fillStyle = '#5a4030';
-      c.fillRect(-5, -10, 10, 4);
-      // Etiqueta
-      drawSpriteLabel(c, 'Plaza Bolívar', -28);
+      c.fillRect(-6, -14, 12, 1);
+      // Estatua de Bolívar (silueta)
+      c.fillStyle = '#2a2a30';
+      c.fillRect(-2, -28, 4, 14);
+      // Cabeza
+      c.fillStyle = '#3a3a40';
+      c.beginPath(); c.arc(0, -30, 2.6, 0, Math.PI*2); c.fill();
+      // Brazos extendidos
+      c.fillStyle = '#2a2a30';
+      c.fillRect(-5, -25, 3, 1.5);
+      c.fillRect(2, -25, 3, 1.5);
+      // Espada apuntando arriba
+      c.fillStyle = '#aaaaaa';
+      c.fillRect(4, -30, 0.8, 4);
+      // Farolas a los lados
+      for (const fx of [-30, 30]) {
+        c.fillStyle = '#1a1a1a';
+        c.fillRect(fx-0.5, -16, 1, 12);
+        c.fillStyle = '#fcd116';
+        c.beginPath(); c.arc(fx, -17, 1.6, 0, Math.PI*2); c.fill();
+      }
+      // Palomas
+      c.fillStyle = '#fafafa';
+      c.fillRect(-18, -8, 1.2, 1);
+      c.fillRect(-12, -7, 1.2, 1);
+      c.fillRect(8, -8, 1.2, 1);
+      c.fillRect(16, -7, 1.2, 1);
+      drawSpriteLabel(c, 'Plaza de Bolívar', -36);
       break;
     }
     case 'capitolio': {
-      // Capitolio — fachada blanca con columnas
-      c.fillStyle = '#5a5a64';
-      c.fillRect(-26, -2, 52, 4);  // base oscura
-      c.fillStyle = '#e8e4dc';
-      c.fillRect(-24, -22, 48, 22);
-      // Frontón
-      c.fillStyle = '#d8d3c8';
+      // Capitolio Nacional — escalinata, columnas, frontón y bandera
+      // Sombra
+      c.fillStyle = 'rgba(0,0,0,0.4)';
+      c.beginPath(); c.ellipse(0, 5, 38, 5, 0, 0, Math.PI*2); c.fill();
+      // Escalinata (3 escalones)
+      c.fillStyle = '#a8a098';
+      c.fillRect(-32, 0, 64, 5);
+      c.fillStyle = '#c8c0b6';
+      c.fillRect(-30, -2, 60, 2);
+      c.fillStyle = '#d8d2c8';
+      c.fillRect(-28, -4, 56, 2);
+      // Base oscura
+      c.fillStyle = '#807660';
+      c.fillRect(-28, -4, 56, 2);
+      // Cuerpo (fachada blanca)
+      c.fillStyle = '#efe9d8';
+      c.fillRect(-28, -28, 56, 24);
+      // Sombra lateral derecha
+      c.fillStyle = 'rgba(0,0,0,0.10)';
+      c.fillRect(20, -28, 8, 24);
+      // Frontón triangular
+      c.fillStyle = '#e0d9c4';
       c.beginPath();
-      c.moveTo(-26, -22);
-      c.lineTo(0, -32);
-      c.lineTo(26, -22);
-      c.closePath();
-      c.fill();
-      // Columnas
-      c.fillStyle = '#c5beac';
-      for (let i=-22; i<=22; i+=8) c.fillRect(i, -22, 4, 22);
-      drawSpriteLabel(c, 'Capitolio', -36);
+      c.moveTo(-30, -28); c.lineTo(0, -40); c.lineTo(30, -28);
+      c.closePath(); c.fill();
+      c.strokeStyle = '#a89c80';
+      c.lineWidth = 0.7;
+      c.stroke();
+      // Detalle del frontón (escudo)
+      c.fillStyle = '#c8b878';
+      c.beginPath(); c.arc(0, -32, 2.2, 0, Math.PI*2); c.fill();
+      c.fillStyle = '#fcd116';
+      c.beginPath(); c.arc(0, -32, 1.4, 0, Math.PI*2); c.fill();
+      // 6 columnas
+      c.fillStyle = '#c5b89c';
+      for (let i=-22; i<=22; i+=9) {
+        c.fillRect(i, -28, 4, 24);
+        c.fillStyle = '#dcd0b8';
+        c.fillRect(i, -28, 1, 24);  // highlight izq
+        c.fillStyle = '#a89c80';
+        c.fillRect(i+3, -28, 1, 24);  // sombra der
+        c.fillStyle = '#c5b89c';
+        // capiteles
+        c.fillRect(i-0.5, -28, 5, 1.5);
+        c.fillRect(i-0.5, -5.5, 5, 1.5);
+      }
+      // Puerta central
+      c.fillStyle = '#3a2a14';
+      c.fillRect(-5, -16, 10, 12);
+      c.fillStyle = '#5a4020';
+      c.fillRect(-5, -16, 10, 1);
+      // Bandera de Colombia ondeando arriba
+      c.fillStyle = '#1a1a1a';
+      c.fillRect(0, -50, 0.8, 10);
+      c.fillStyle = '#fcd116';
+      c.fillRect(0.8, -50, 8, 3.5);
+      c.fillStyle = '#0033a0';
+      c.fillRect(0.8, -46.5, 8, 1.5);
+      c.fillStyle = '#ce1126';
+      c.fillRect(0.8, -45, 8, 1.5);
+      drawSpriteLabel(c, 'Capitolio Nacional', -55);
       break;
     }
     case 'candelaria': {
-      // La Candelaria — barrio colorido (varias casas pequeñas)
-      const colors = ['#cc4444','#fcd116','#3478bb','#fafafa','#cc4444','#5a8a3c','#fcd116'];
+      // La Candelaria — fila de casas coloniales coloridas con tejas
+      c.fillStyle = 'rgba(0,0,0,0.3)';
+      c.beginPath(); c.ellipse(0, 4, 38, 4, 0, 0, Math.PI*2); c.fill();
+      const colors = [
+        {body:'#cc4444', name:'rojo'},
+        {body:'#fcd116', name:'amar'},
+        {body:'#3478bb', name:'azul'},
+        {body:'#fafafa', name:'blnc'},
+        {body:'#5a8a3c', name:'verd'},
+        {body:'#cc4444', name:'rojo'},
+        {body:'#fcd116', name:'amar'},
+      ];
+      const houseW = 9;
       for (let i=0; i<colors.length; i++) {
-        const x = -28 + i*8;
-        c.fillStyle = colors[i];
-        c.fillRect(x, -14, 7, 14);
-        // Tejas rojas
+        const x = -32 + i*houseW;
+        const isShortBuilding = (i === 2 || i === 5);
+        const baseY = isShortBuilding ? -16 : -22;
+        // Cuerpo
+        c.fillStyle = colors[i].body;
+        c.fillRect(x, baseY, houseW - 0.5, -baseY);
+        // Sombra lateral
+        c.fillStyle = 'rgba(0,0,0,0.18)';
+        c.fillRect(x + houseW - 2, baseY, 1.5, -baseY);
+        // Ventanas
+        c.fillStyle = '#1a3a5a';
+        c.fillRect(x + 1.5, baseY + 3, 2, 2.5);
+        c.fillRect(x + 5, baseY + 3, 2, 2.5);
+        if (!isShortBuilding) {
+          c.fillRect(x + 1.5, baseY + 9, 2, 2.5);
+          c.fillRect(x + 5, baseY + 9, 2, 2.5);
+        }
+        // Cruceta de la ventana
+        c.strokeStyle = colors[i].body;
+        c.lineWidth = 0.4;
+        c.beginPath(); c.moveTo(x + 2.5, baseY + 3); c.lineTo(x + 2.5, baseY + 5.5); c.stroke();
+        // Puerta (sólo casa central)
+        if (i === 3) {
+          c.fillStyle = '#5a3010';
+          c.fillRect(x + 3, -8, 3, 8);
+        }
+        // Tejas (techo)
         c.fillStyle = '#8a3a2a';
-        c.fillRect(x - 1, -17, 9, 4);
+        c.beginPath();
+        c.moveTo(x - 0.5, baseY);
+        c.lineTo(x + houseW/2, baseY - 4);
+        c.lineTo(x + houseW + 0.5, baseY);
+        c.closePath();
+        c.fill();
+        c.fillStyle = '#6a2a1a';
+        c.fillRect(x - 0.5, baseY, houseW + 1, 1);
       }
-      drawSpriteLabel(c, 'La Candelaria', -22);
+      drawSpriteLabel(c, 'La Candelaria', -28);
       break;
     }
     case 'parque': {
-      // Parque de los Periodistas — cipreses + banca
-      c.fillStyle = '#5a4030';
-      c.fillRect(-12, -2, 24, 3);
-      c.fillStyle = '#2a5e3a';
-      c.beginPath(); c.arc(-8, -10, 5, 0, Math.PI*2); c.fill();
-      c.beginPath(); c.arc(0, -12, 6, 0, Math.PI*2); c.fill();
-      c.beginPath(); c.arc(8, -10, 5, 0, Math.PI*2); c.fill();
-      c.fillStyle = '#3a6a48';
-      c.fillRect(-9, -10, 2, 8);
-      c.fillRect(-1, -12, 2, 10);
-      c.fillRect(7, -10, 2, 8);
-      drawSpriteLabel(c, 'Periodistas', -22);
+      // Parque de los Periodistas — cipreses, banca, iglesia al fondo
+      // Sombra
+      c.fillStyle = 'rgba(0,0,0,0.3)';
+      c.beginPath(); c.ellipse(0, 3, 30, 4, 0, 0, Math.PI*2); c.fill();
+      // Suelo
+      c.fillStyle = '#7a8a5a';
+      c.fillRect(-22, -2, 44, 5);
+      // Banca
+      c.fillStyle = '#5a3a20';
+      c.fillRect(-12, -3, 24, 1.5);
+      c.fillRect(-12, -1, 1.5, 4);
+      c.fillRect(10.5, -1, 1.5, 4);
+      // Cipreses
+      const trees = [-18, -8, 6, 14];
+      for (const tx of trees) {
+        c.fillStyle = '#3a2a1a';
+        c.fillRect(tx - 0.7, -10, 1.4, 8);
+        c.fillStyle = '#1f4a2a';
+        c.beginPath(); c.arc(tx, -14, 4, 0, Math.PI*2); c.fill();
+        c.fillStyle = '#2a6038';
+        c.beginPath(); c.arc(tx-1, -15, 3, 0, Math.PI*2); c.fill();
+      }
+      // Iglesia al fondo
+      c.fillStyle = '#a89880';
+      c.fillRect(-8, -24, 16, 14);
+      c.fillStyle = '#c8b8a0';
+      c.fillRect(-8, -24, 1, 14);
+      c.fillStyle = '#8a3a2a';
+      c.beginPath();
+      c.moveTo(-9, -24); c.lineTo(0, -32); c.lineTo(9, -24);
+      c.closePath(); c.fill();
+      // Cruz
+      c.fillStyle = '#3a2a1a';
+      c.fillRect(-0.4, -36, 0.8, 4);
+      c.fillRect(-1.5, -34, 3, 0.8);
+      // Puerta
+      c.fillStyle = '#3a2010';
+      c.fillRect(-2, -16, 4, 6);
+      drawSpriteLabel(c, 'Periodistas', -40);
       break;
     }
     case 'campin': {
-      // El Campín — estadio oval con tribunas
-      c.fillStyle = '#3a4d6a';
+      // El Campín — estadio con cuatro tribunas y techos
+      // Sombra
+      c.fillStyle = 'rgba(0,0,0,0.4)';
+      c.beginPath(); c.ellipse(0, 6, 44, 7, 0, 0, Math.PI*2); c.fill();
+      // Tribuna exterior (oval grande, oscuro)
+      c.fillStyle = '#2c3a52';
       c.beginPath();
-      c.ellipse(0, -10, 32, 14, 0, 0, Math.PI*2);
+      c.ellipse(0, -10, 38, 18, 0, 0, Math.PI*2);
+      c.fill();
+      // Tribuna intermedia
+      c.fillStyle = '#3e5070';
+      c.beginPath();
+      c.ellipse(0, -10, 34, 15, 0, 0, Math.PI*2);
       c.fill();
       // Cancha
-      c.fillStyle = '#3a8848';
+      c.fillStyle = '#2a7a38';
       c.beginPath();
-      c.ellipse(0, -10, 26, 9, 0, 0, Math.PI*2);
+      c.ellipse(0, -10, 28, 11, 0, 0, Math.PI*2);
       c.fill();
-      // Línea central
+      c.fillStyle = '#368a44';
+      c.beginPath();
+      c.ellipse(0, -10, 26, 10, 0, 0, Math.PI*2);
+      c.fill();
+      // Líneas de cancha
       c.strokeStyle = '#fafafa';
-      c.lineWidth = 0.5;
-      c.beginPath(); c.moveTo(0, -19); c.lineTo(0, -1); c.stroke();
+      c.lineWidth = 0.6;
+      c.beginPath(); c.moveTo(0, -20); c.lineTo(0, 0); c.stroke();
       c.beginPath(); c.arc(0, -10, 3, 0, Math.PI*2); c.stroke();
-      drawSpriteLabel(c, 'El Campín', -32);
+      // Áreas
+      c.beginPath(); c.rect(-22, -14, 6, 8); c.stroke();
+      c.beginPath(); c.rect(16, -14, 6, 8); c.stroke();
+      // Sombras del techo (en partes superiores)
+      c.fillStyle = 'rgba(0,0,0,0.3)';
+      c.beginPath();
+      c.ellipse(0, -22, 36, 6, 0, Math.PI, 2*Math.PI);
+      c.fill();
+      // Torres de luz (4 esquinas)
+      for (const tx of [-32, -18, 18, 32]) {
+        c.fillStyle = '#1a1a24';
+        c.fillRect(tx-0.5, -28, 1, 6);
+        c.fillStyle = '#fcd116';
+        c.fillRect(tx-2, -29, 4, 1.5);
+      }
+      // Público (dots)
+      c.fillStyle = '#ff3b3b';
+      for (let i=0; i<8; i++) c.fillRect(-30 + i*8, -18, 1, 1);
+      drawSpriteLabel(c, 'El Campín', -34);
       break;
     }
     case 'arena': {
-      // Movistar Arena — domo
-      c.fillStyle = '#1a4d8a';
+      // Movistar Arena — domo con paneles + entrada iluminada
+      // Sombra
+      c.fillStyle = 'rgba(0,0,0,0.4)';
+      c.beginPath(); c.ellipse(0, 5, 32, 5, 0, 0, Math.PI*2); c.fill();
+      // Domo principal
+      c.fillStyle = '#173b6e';
       c.beginPath();
-      c.ellipse(0, -10, 22, 10, 0, Math.PI, 2*Math.PI);
+      c.ellipse(0, -8, 28, 16, 0, Math.PI, 2*Math.PI);
       c.fill();
-      c.fillStyle = '#2d6db8';
-      c.fillRect(-22, -10, 44, 4);
-      c.fillStyle = '#3478bb';
-      c.fillRect(-22, -8, 44, 2);
+      // Highlight superior del domo
+      c.fillStyle = '#2862a8';
+      c.beginPath();
+      c.ellipse(-4, -16, 16, 8, -0.2, Math.PI, 2*Math.PI);
+      c.fill();
+      // Paneles (líneas radiales)
+      c.strokeStyle = 'rgba(255,255,255,0.18)';
+      c.lineWidth = 0.5;
+      for (let i=-3; i<=3; i++) {
+        const a = Math.PI + (i+3) * Math.PI/6;
+        c.beginPath();
+        c.moveTo(0, -8);
+        c.lineTo(Math.cos(a)*28, -8 + Math.sin(a)*16);
+        c.stroke();
+      }
+      // Plinth / base
+      c.fillStyle = '#1a1a24';
+      c.fillRect(-26, -8, 52, 6);
+      c.fillStyle = '#2c2c34';
+      c.fillRect(-26, -8, 52, 1);
+      // Entrada brillante
+      c.fillStyle = '#fcd116';
+      c.fillRect(-7, -8, 14, 4);
+      c.fillStyle = '#fff';
+      c.fillRect(-6, -7.5, 12, 1);
+      // Logo M (estilizado)
+      c.fillStyle = '#fafafa';
+      c.font = 'bold 7px sans-serif';
+      c.textAlign = 'center';
+      c.fillText('M', 0, -16);
       // Vidriera
-      c.fillStyle = 'rgba(255,255,255,0.25)';
+      c.fillStyle = 'rgba(255,255,255,0.20)';
       c.beginPath();
-      c.ellipse(-6, -16, 6, 4, -0.3, 0, Math.PI*2);
+      c.ellipse(-10, -18, 6, 4, -0.3, 0, Math.PI*2);
       c.fill();
-      drawSpriteLabel(c, 'Movistar', -26);
+      drawSpriteLabel(c, 'Movistar Arena', -28);
       break;
     }
     case 'tm': {
-      // TransMilenio bus parqueado
-      c.fillStyle = '#a01818';
-      c.fillRect(-14, -10, 28, 10);
-      c.fillStyle = '#c92020';
-      c.fillRect(-14, -10, 28, 3);
-      // Ventanas
-      c.fillStyle = '#1a3a6a';
-      c.fillRect(-12, -8, 4, 3);
-      c.fillRect(-7, -8, 4, 3);
-      c.fillRect(-2, -8, 4, 3);
-      c.fillRect(3, -8, 4, 3);
-      c.fillRect(8, -8, 4, 3);
-      // Llantas
-      c.fillStyle = '#0c0c14';
-      c.fillRect(-11, 0, 4, 2);
-      c.fillRect(7, 0, 4, 2);
-      // Logo
+      // TransMilenio — bus articulado largo con perspectiva
+      // Sombra
+      c.fillStyle = 'rgba(0,0,0,0.45)';
+      c.beginPath(); c.ellipse(0, 4, 28, 3, 0, 0, Math.PI*2); c.fill();
+      // Carrocería principal (rojo)
+      c.fillStyle = '#b51818';
+      c.fillRect(-24, -10, 48, 11);
+      // Articulación (más oscuro)
+      c.fillStyle = '#7a1010';
+      c.fillRect(-2, -10, 4, 11);
+      // Highlight superior
+      c.fillStyle = '#dc2c2c';
+      c.fillRect(-24, -10, 48, 1.5);
+      // Línea blanca del medio (faja blanca de TM)
       c.fillStyle = '#fafafa';
-      c.font = 'bold 4px sans-serif';
+      c.fillRect(-24, -7.5, 48, 1.5);
+      // Ventanas (4 + 4)
+      c.fillStyle = '#1a3a6a';
+      for (let i=0; i<4; i++) {
+        c.fillRect(-22 + i*5, -5, 4, 3);
+        c.fillRect(2 + i*5, -5, 4, 3);
+      }
+      // Reflejos en ventanas
+      c.fillStyle = 'rgba(255,255,255,0.25)';
+      for (let i=0; i<4; i++) {
+        c.fillRect(-22 + i*5, -5, 1.5, 1);
+        c.fillRect(2 + i*5, -5, 1.5, 1);
+      }
+      // Puertas (oscuras)
+      c.fillStyle = '#3a3a44';
+      c.fillRect(-15, -1.5, 3, 4);
+      c.fillRect(12, -1.5, 3, 4);
+      // Llantas grandes
+      c.fillStyle = '#0c0c14';
+      c.fillRect(-21, 0, 6, 3.5);
+      c.fillRect(-5, 0, 6, 3.5);
+      c.fillRect(15, 0, 6, 3.5);
+      // Logo TransMilenio
+      c.fillStyle = '#fcd116';
+      c.fillRect(-7, -9, 14, 1.5);
+      c.fillStyle = '#1a1a1a';
+      c.font = 'bold 3.5px sans-serif';
       c.textAlign = 'center';
-      c.fillText('TM', 0, -4);
+      c.fillText('TRANSMILENIO', 0, -7.7);
+      // Faros
+      c.fillStyle = '#fffacd';
+      c.fillRect(-25, -4, 1, 1);
+      c.fillRect(24, -4, 1, 1);
       break;
     }
     case 'tribune': {
-      // Tribuna — tres niveles de gradas con público
-      c.fillStyle = '#3a3a44';
-      c.fillRect(-32, -4, 64, 4);
-      c.fillStyle = '#46464e';
-      c.fillRect(-32, -10, 64, 6);
-      c.fillStyle = '#52525a';
-      c.fillRect(-32, -16, 64, 6);
-      // Public como dots de colores
-      const palette = ['#ff3b3b','#39ff7a','#ffaa00','#0047FF','#ff6eb4','#d4af37'];
-      for (let row=0; row<3; row++) {
-        const ry = -16 + row*6 + 2;
-        for (let col=0; col<14; col++) {
-          c.fillStyle = palette[(row*14 + col) % palette.length];
-          c.fillRect(-30 + col*5, ry, 2, 2);
+      // Tribuna — 4 niveles de gradas con estructura de techo + sponsor
+      // Sombra
+      c.fillStyle = 'rgba(0,0,0,0.45)';
+      c.beginPath(); c.ellipse(0, 4, 42, 5, 0, 0, Math.PI*2); c.fill();
+      // Estructura inferior
+      c.fillStyle = '#1a1a22';
+      c.fillRect(-38, -2, 76, 5);
+      // 4 niveles de gradas (perspectiva)
+      const tiers = [
+        {y: -7,  w: 38, color: '#52525a'},
+        {y: -13, w: 36, color: '#46464e'},
+        {y: -19, w: 34, color: '#3a3a44'},
+        {y: -25, w: 32, color: '#2e2e36'},
+      ];
+      for (const t of tiers) {
+        c.fillStyle = t.color;
+        c.fillRect(-t.w, t.y, t.w*2, 6);
+        // Highlight superior
+        c.fillStyle = 'rgba(255,255,255,0.08)';
+        c.fillRect(-t.w, t.y, t.w*2, 1);
+      }
+      // Público
+      const palette = ['#ff3b3b','#39ff7a','#fcd116','#0047FF','#ff6eb4','#d4af37','#fafafa','#000062'];
+      for (let row=0; row<4; row++) {
+        const ry = tiers[row].y + 2;
+        const rw = tiers[row].w - 1;
+        const cols = 18 - row;
+        for (let col=0; col<cols; col++) {
+          const cx = -rw + (2*rw/(cols-1)) * col;
+          c.fillStyle = palette[(row*7 + col*3) % palette.length];
+          c.fillRect(cx - 0.5, ry, 1.5, 2);
         }
       }
-      // Estructura del techo
-      c.fillStyle = '#2a2a32';
-      c.fillRect(-34, -22, 68, 3);
-      c.fillRect(-34, -22, 3, 7);
-      c.fillRect(31, -22, 3, 7);
+      // Estructura del techo (perfil)
+      c.fillStyle = '#1a1a22';
+      c.fillRect(-40, -32, 80, 3);
+      c.fillRect(-40, -32, 3, 9);
+      c.fillRect(37, -32, 3, 9);
+      // Soportes diagonales
+      c.strokeStyle = '#1a1a22';
+      c.lineWidth = 1;
+      c.beginPath(); c.moveTo(-37, -25); c.lineTo(-30, -32); c.stroke();
+      c.beginPath(); c.moveTo(37, -25); c.lineTo(30, -32); c.stroke();
+      // Banner sponsor (TM amarillo)
+      c.fillStyle = '#fcd116';
+      c.fillRect(-26, -31, 52, 4);
+      c.fillStyle = '#1a1a1a';
+      c.font = 'bold 4px sans-serif';
+      c.textAlign = 'center';
+      c.fillText('KART ELECTORAL · BOGOTÁ', 0, -28);
+      // Banderas
+      c.fillStyle = '#ce1126';
+      c.fillRect(-39, -36, 5, 2.5);
+      c.fillStyle = '#fcd116';
+      c.fillRect(34, -36, 5, 2.5);
       break;
     }
   }
@@ -2625,10 +2947,13 @@ function renderWorldObjects(c, dayness) {
     if (p && p.x > -200 && p.x < IW + 200) projected.push({ kind:'obj', obj, p });
   }
   projected.sort((a, b) => b.p.dist - a.p.dist);
+  // Multiplica el tamaño de los rivales — intermedio entre "iguales al jugador" (1.0)
+  // y la versión gigante anterior (~6). 1.7 da una sensación cercana sin abrumar.
+  const RIVAL_BOOST = 1.7;
   for (const item of projected) {
     if (item.kind === 'ai') {
-      const sc = item.p.kartScale;
-      if (sc < 0.05) continue;
+      const sc = item.p.kartScale * RIVAL_BOOST;
+      if (sc < 0.08) continue;
       c.save();
       c.translate(item.p.x, item.p.y);
       c.scale(sc, sc);
@@ -2637,7 +2962,7 @@ function renderWorldObjects(c, dayness) {
         time: performance.now(),
         speed: 3,
         dayness,
-        label: sc > 0.55 ? item.ai.candidate.short : null,
+        label: sc > 0.7 ? item.ai.candidate.short : null,
       });
       c.restore();
     } else {
@@ -2825,12 +3150,17 @@ function updateStandings() {
     if (!k) { card.style.display = 'none'; continue; }
     card.style.display = 'flex';
     card.classList.toggle('you', k.isYou);
-    const inits = initials(k.candidate.name);
-    const fontColor = isLightHex(k.color) ? '#0a0a14' : '#fff';
-    const lap = k.isYou ? Math.min(currentLap, TOTAL_LAPS) : Math.min(Math.max(k.candidate.lap || 0, 1), TOTAL_LAPS);
+    const photo = k.candidate.photo;
+    let phHtml;
+    if (photo) {
+      phHtml = `<img class="ph" src="${photo}" alt="${k.name}" style="border-color:${k.color};" onerror="this.outerHTML='<span class=&quot;ph&quot; style=&quot;background:${k.color}&quot;>${initials(k.candidate.name)}</span>'">`;
+    } else {
+      const fontColor = isLightHex(k.color) ? '#0a0a14' : '#fff';
+      phHtml = `<span class="ph" style="background:${k.color};color:${fontColor}">${initials(k.candidate.name)}</span>`;
+    }
     card.innerHTML = `
       <span class="pos">${i+1}</span>
-      <span class="ph" style="background:${k.color};color:${fontColor}">${inits}</span>
+      ${phHtml}
       <span class="nm">${k.name}${k.isYou ? ' (tú)' : ''}</span>
     `;
   }
