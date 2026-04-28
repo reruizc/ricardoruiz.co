@@ -1,376 +1,606 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" id="htmlRoot">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="theme-color" content="#0a1124">
-<title>Kart Electoral · Colombia 2026</title>
+<meta name="theme-color" content="#e6ded3">
+<title id="pageTitle">Kart Electoral · Bogotá D.C.</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=DM+Mono&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=DM+Mono&family=Fraunces:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root { --blue:#0047FF; --green:#39ff7a; --bg:#0a1124; --fg:#f4f3ef; --red:#ff3b3b; --amber:#ffaa00; }
-  * { margin:0; padding:0; box-sizing:border-box; }
+  :root {
+    --black: #0a0a0a;
+    --white: #e6ded3;
+    --blue: #0047FF;
+    --blue-light: #3d6fff;
+    --gray: #888;
+    --gray-light: #e0dfd9;
+    --green: #39ff7a;
+    --bg: #0a1124;
+    --fg: #f4f3ef;
+    --red: #ff3b3b;
+    --amber: #ffaa00;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
-    width:100%; height:100%; overflow:hidden;
-    background:var(--bg); color:var(--fg);
-    font-family:'DM Mono',monospace;
-    user-select:none; -webkit-user-select:none;
-    touch-action:none; -webkit-touch-callout:none;
-    overscroll-behavior:none;
+    height: 100vh; width: 100%;
+    overflow: hidden;
+    background: var(--white);
+    color: var(--black);
+    font-family: 'Fraunces', serif;
+    cursor: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+    overscroll-behavior: none;
+  }
+  body { display: flex; flex-direction: column; }
+
+  /* === CUSTOM CURSOR === */
+  .cursor {
+    position: fixed;
+    width: 12px; height: 12px;
+    background: var(--blue);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9999;
+    transition: transform .15s ease, width .2s, height .2s, background .2s;
+    transform: translate(-50%, -50%);
+  }
+  .cursor-ring {
+    position: fixed;
+    width: 36px; height: 36px;
+    border: 1.5px solid var(--blue);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9998;
+    transition: transform .35s ease, width .3s, height .3s, opacity .3s;
+    transform: translate(-50%, -50%);
+    opacity: 0.5;
+  }
+
+  /* === NAV (copia de index.html) === */
+  nav {
+    position: relative;
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: .9rem 2.5rem;
+    z-index: 100;
+    background: rgba(230,222,211,0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(0,0,0,0.07);
+  }
+  .nav-logo-wrap { display: flex; align-items: center; gap: .75rem; text-decoration: none; }
+  .nav-logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: clamp(1.1rem,2vw,1.8rem);
+    letter-spacing: -0.03em;
+    color: var(--black);
+    text-decoration: none;
+    line-height: 1;
+  }
+  .nav-logo span { color: var(--blue); }
+  .nav-bars { display: flex; align-items: flex-end; gap: 3px; height: 18px; }
+  .nav-bar { width: 5px; background: var(--blue); border-radius: 1px 1px 0 0; opacity: 0.85; }
+  nav ul { list-style: none; display: flex; gap: 2.5rem; align-items: center; }
+  nav ul li { display: flex; align-items: center; }
+  nav ul a {
+    font-family: 'Syne', sans-serif;
+    font-size: .75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--black);
+    text-decoration: none;
+    transition: color .2s;
+  }
+  nav ul a:hover { color: var(--blue); }
+  .nav-noticias { background: #4ade80; border: 1.5px solid #4ade80; padding: .4rem .85rem; transition: background .2s, border-color .2s; }
+  .nav-noticias:hover { background: #22c55e; border-color: #22c55e; }
+  .nav-planes { border: 1.5px solid transparent; padding: .4rem .85rem; transition: color .2s, border-color .2s; }
+  .nav-planes:hover { color: var(--blue); border-color: var(--blue); }
+  .nav-auth { display: flex; align-items: center; gap: .6rem; }
+  .nav-login { border: 1.5px solid transparent; padding: .4rem .85rem; transition: color .2s, border-color .2s; }
+  .nav-login:hover { color: var(--blue); border-color: var(--blue); }
+  .nav-register {
+    color: var(--white);
+    background: var(--blue);
+    border: 1.5px solid var(--blue);
+    padding: .4rem .85rem;
+    transition: background .2s, border-color .2s;
+  }
+  .nav-register:hover { background: var(--black); border-color: var(--black); }
+
+  .country-selector-wrap { position: relative; }
+  .country-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: .75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--black);
+    background: transparent;
+    border: 1.5px solid var(--gray-light);
+    padding: .4rem .85rem;
+    cursor: none;
+    display: flex;
+    align-items: center;
+    min-width: 190px;
+    justify-content: space-between;
+    transition: border-color .2s, color .2s;
+  }
+  .country-btn:hover { border-color: var(--blue); color: var(--blue); }
+  .country-btn.open { border-color: var(--blue); color: var(--blue); }
+  .country-dropdown {
+    position: absolute;
+    top: calc(100% + 10px); right: 0;
+    background: var(--white);
+    border: 1.5px solid var(--gray-light);
+    min-width: 190px;
+    display: none;
+    flex-direction: column;
+    z-index: 200;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  }
+  .country-dropdown.open { display: flex; }
+  .country-option {
+    font-family: 'DM Mono', monospace;
+    font-size: .72rem;
+    letter-spacing: 0.05em;
+    padding: .7rem 1rem;
+    cursor: none;
+    display: flex; align-items: center; gap: .5rem;
+    color: var(--black);
+    border-bottom: 1px solid var(--gray-light);
+    transition: background .15s;
+  }
+  .country-option:last-child { border-bottom: none; }
+  .country-option:hover { background: rgba(0,71,255,0.05); }
+  .country-option.selected { color: var(--blue); }
+  .country-check { font-size: .65rem; width: 12px; opacity: 0; color: var(--blue); font-weight: bold; }
+  .country-option.selected .country-check { opacity: 1; }
+
+  .nav-hamburger { display: none; }
+
+  @media (max-width: 768px) {
+    nav { padding: 1rem 1.5rem; }
+    body { cursor: auto; }
+    .cursor, .cursor-ring { display: none; }
+    .nav-links { display: none; }
+    .nav-links.open {
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 60px; left: 0; right: 0;
+      background: rgba(244,243,239,0.98);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 1.2rem 1.5rem;
+      gap: 1rem;
+      border-bottom: 1px solid rgba(0,0,0,0.07);
+      z-index: 99;
+    }
+    .nav-links.open li { display: flex; flex-direction: column; }
+    .nav-links.open a { font-size: .9rem; padding: .3rem 0; }
+    .nav-hamburger {
+      display: flex; flex-direction: column; gap: 5px;
+      cursor: pointer; padding: 4px;
+      background: none; border: none;
+    }
+    .nav-hamburger span {
+      display: block; width: 22px; height: 2px;
+      background: var(--black);
+      transition: all .3s; border-radius: 2px;
+    }
+    .nav-hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .nav-hamburger.open span:nth-child(2) { opacity: 0; }
+    .nav-hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+    .nav-auth { flex-direction: row; gap: .5rem; margin-top: .2rem; }
+    .nav-login, .nav-register { font-size: .8rem; padding: .45rem .85rem; }
+  }
+
+  /* === GAME WRAP === */
+  #game-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
   }
   #game {
-    display:block; width:100vw; height:100vh;
-    image-rendering:pixelated;
-    image-rendering:crisp-edges;
-    background:var(--bg);
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    background: var(--bg);
+    touch-action: none;
   }
+
+  /* === HUD === */
   .panel {
-    position:fixed;
-    background:rgba(0,0,0,0.5);
-    border:1px solid rgba(255,255,255,0.18);
-    padding:8px 12px;
-    backdrop-filter:blur(8px);
-    -webkit-backdrop-filter:blur(8px);
-    pointer-events:none;
-    line-height:1.4;
+    position: absolute;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.18);
+    padding: 8px 12px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    pointer-events: none;
+    line-height: 1.4;
+    color: var(--fg);
+    font-family: 'DM Mono', monospace;
   }
-  #title-top {
-    top:env(safe-area-inset-top, 12px);
-    left:50%; transform:translateX(-50%);
-    padding:9px 18px;
-    text-align:center;
-    min-width:230px;
+  #hud { top: 12px; left: 12px; font-size: 11px; }
+  #hud .v { color: var(--green); font-weight: 500; }
+  #hud .who { color: rgba(255,255,255,0.8); font-size: 10px; margin-top: 2px; }
+  #hud .who b { color: #fff; font-weight: 500; }
+  #hud .phase { font-size: 10px; opacity: 0.7; margin-top: 2px; }
+  #hud-track {
+    top: 12px; right: 12px;
+    text-align: right;
+    padding: 9px 14px;
   }
-  #title-top .main {
-    font-family:'Syne',sans-serif; font-weight:800;
-    font-size:14px; letter-spacing:0.06em; text-transform:uppercase;
-    line-height:1.05;
+  #hud-track .name {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
   }
-  #title-top .sub {
-    font-family:'DM Mono',monospace; font-weight:400;
-    font-size:10px; opacity:0.6; letter-spacing:0.04em;
-    margin-top:3px;
+  #hud-track .reg {
+    font-size: 9px;
+    opacity: 0.6;
+    margin-top: 2px;
+    letter-spacing: 0.04em;
   }
-  #hud {
-    top:env(safe-area-inset-top, 12px); left:12px;
-    font-size:11px;
-  }
-  #hud .v { color:var(--green); font-weight:500; }
-  #hud .who { color:rgba(255,255,255,0.8); font-size:10px; margin-top:2px; }
-  #hud .who b { color:#fff; font-weight:500; }
-  #hud .phase { font-size:10px; opacity:0.7; margin-top:2px; }
 
   /* === Modal common === */
   .modal {
-    position:fixed; inset:0;
-    display:flex; align-items:center; justify-content:center;
-    z-index:30;
-    background:rgba(10,17,36,0.78);
-    backdrop-filter:blur(10px);
-    -webkit-backdrop-filter:blur(10px);
-    padding:24px;
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 30;
+    background: rgba(10,17,36,0.78);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 24px;
   }
   .modal .card {
-    width:100%;
-    background:rgba(12,18,40,0.96);
-    border:1px solid rgba(0,71,255,0.5);
-    box-shadow:0 0 60px rgba(0,71,255,0.18);
-    max-height:calc(100vh - 48px);
-    overflow-y:auto;
+    width: 100%;
+    background: rgba(12,18,40,0.96);
+    border: 1px solid rgba(0,71,255,0.5);
+    box-shadow: 0 0 60px rgba(0,71,255,0.18);
+    max-height: calc(100% - 16px);
+    overflow-y: auto;
+    color: var(--fg);
   }
-
-  /* === Menu === */
-  #menu .card {
-    max-width:460px;
-    padding:28px 28px 24px;
-  }
+  #menu .card { max-width: 460px; padding: 28px 28px 24px; }
   #menu h1 {
-    font-family:'Syne',sans-serif; font-weight:800;
-    font-size:30px; line-height:1.0;
-    letter-spacing:0.04em; text-transform:uppercase;
-    margin-bottom:4px;
+    font-family: 'Syne', sans-serif; font-weight: 800;
+    font-size: 30px; line-height: 1.0;
+    letter-spacing: 0.04em; text-transform: uppercase;
+    margin-bottom: 4px;
   }
   #menu .menu-sub {
-    font-family:'DM Mono',monospace;
-    font-size:11px; color:var(--green);
-    letter-spacing:0.12em; text-transform:uppercase;
-    margin-bottom:18px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; color: var(--green);
+    letter-spacing: 0.12em; text-transform: uppercase;
+    margin-bottom: 18px;
   }
   #menu p {
-    font-family:'DM Mono',monospace;
-    font-size:13px; line-height:1.6;
-    color:rgba(255,255,255,0.85);
-    margin-bottom:14px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px; line-height: 1.6;
+    color: rgba(255,255,255,0.85);
+    margin-bottom: 14px;
   }
-  #menu p.dim { opacity:0.65; font-size:11.5px; }
-  #menu .controls {
-    border-top:1px solid rgba(255,255,255,0.12);
-    padding-top:14px;
-    margin-bottom:18px;
-  }
+  #menu p.dim { opacity: 0.65; font-size: 11.5px; }
+  #menu .controls { border-top: 1px solid rgba(255,255,255,0.12); padding-top: 14px; margin-bottom: 18px; }
   #menu .ctrl-title {
-    font-family:'DM Mono',monospace; font-size:10px;
-    color:rgba(255,255,255,0.5);
-    text-transform:uppercase; letter-spacing:0.12em;
-    margin-bottom:6px;
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    color: rgba(255,255,255,0.5);
+    text-transform: uppercase; letter-spacing: 0.12em;
+    margin-bottom: 6px;
   }
   #menu .ctrl-row {
-    display:flex; justify-content:space-between;
-    font-family:'DM Mono',monospace; font-size:12px;
-    padding:3px 0;
-    color:rgba(255,255,255,0.85);
+    display: flex; justify-content: space-between;
+    font-family: 'DM Mono', monospace; font-size: 12px;
+    padding: 3px 0;
+    color: rgba(255,255,255,0.85);
   }
-  #menu .ctrl-row span:last-child {
-    color:rgba(255,255,255,0.55); font-size:11px;
-  }
-  .big-btn {
-    width:100%;
-    padding:14px 20px;
-    background:var(--blue);
-    color:#fff;
-    border:none;
-    font-family:'Syne',sans-serif; font-weight:800;
-    font-size:14px; letter-spacing:0.1em;
-    text-transform:uppercase;
-    cursor:pointer;
-    transition:background 100ms, transform 100ms, color 100ms;
-  }
-  .big-btn:hover { background:#0058ff; }
-  .big-btn:active { transform:scale(0.98); background:var(--green); color:#0a1124; }
+  #menu .ctrl-row span:last-child { color: rgba(255,255,255,0.55); font-size: 11px; }
 
-  /* === Select candidate === */
-  #select .card {
-    max-width:560px;
-    padding:24px;
-    position:relative;
+  .big-btn {
+    width: 100%;
+    padding: 14px 20px;
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 14px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: none;
+    transition: background .1s, transform .1s, color .1s;
   }
+  .big-btn:hover { background: #0058ff; }
+  .big-btn:active { transform: scale(0.98); background: var(--green); color: #0a1124; }
+
+  #select .card { max-width: 560px; padding: 24px; position: relative; }
   #select .back-btn {
-    position:absolute; top:18px; right:18px;
-    background:transparent;
-    border:1px solid rgba(255,255,255,0.2);
-    color:rgba(255,255,255,0.7);
-    font-family:'DM Mono',monospace;
-    font-size:10px; letter-spacing:0.06em;
-    padding:6px 10px;
-    cursor:pointer;
-    transition:all 100ms;
+    position: absolute; top: 18px; right: 18px;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.2);
+    color: rgba(255,255,255,0.7);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 0.06em;
+    padding: 6px 10px;
+    cursor: none;
+    transition: all .1s;
   }
-  #select .back-btn:hover { background:rgba(255,255,255,0.08); color:#fff; }
+  #select .back-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
   #select h2 {
-    font-family:'Syne',sans-serif; font-weight:800;
-    font-size:22px; letter-spacing:0.04em;
-    text-transform:uppercase;
-    margin-bottom:4px;
-    padding-right:80px;
+    font-family: 'Syne', sans-serif; font-weight: 800;
+    font-size: 22px; letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    padding-right: 80px;
+    color: var(--fg);
   }
   #select .sel-sub {
-    font-family:'DM Mono',monospace;
-    font-size:11px; color:var(--green);
-    letter-spacing:0.1em; text-transform:uppercase;
-    margin-bottom:6px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; color: var(--green);
+    letter-spacing: 0.1em; text-transform: uppercase;
+    margin-bottom: 6px;
   }
   #select p {
-    font-family:'DM Mono',monospace;
-    font-size:11.5px; line-height:1.55;
-    opacity:0.7;
-    margin-bottom:18px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11.5px; line-height: 1.55;
+    opacity: 0.7;
+    margin-bottom: 18px;
+    color: var(--fg);
   }
-  #cand-grid {
-    display:grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap:10px;
-  }
-  @media (max-width:540px) {
-    #cand-grid { grid-template-columns: repeat(2, 1fr); }
-  }
+  #cand-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  @media (max-width: 540px) { #cand-grid { grid-template-columns: repeat(2, 1fr); } }
   .cand {
-    background:rgba(255,255,255,0.04);
-    border:1px solid rgba(255,255,255,0.08);
-    padding:12px 8px 10px;
-    cursor:pointer;
-    text-align:center;
-    transition:all 120ms;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    padding: 12px 8px 10px;
+    cursor: none;
+    text-align: center;
+    transition: all .12s;
   }
   .cand:hover {
-    background:rgba(0,71,255,0.18);
-    border-color:rgba(0,71,255,0.6);
-    transform:translateY(-2px);
+    background: rgba(0,71,255,0.18);
+    border-color: rgba(0,71,255,0.6);
+    transform: translateY(-2px);
   }
   .cand:active {
-    transform:translateY(0);
-    background:rgba(57,255,122,0.18);
-    border-color:var(--green);
+    transform: translateY(0);
+    background: rgba(57,255,122,0.18);
+    border-color: var(--green);
   }
   .cand .ph {
-    width:48px; height:48px;
-    border-radius:50%;
-    margin:0 auto 8px;
-    display:flex; align-items:center; justify-content:center;
-    font-family:'Syne',sans-serif; font-weight:800; font-size:16px;
-    text-shadow:0 1px 2px rgba(0,0,0,0.4);
-    border:2px solid rgba(255,255,255,0.18);
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    margin: 0 auto 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Syne', sans-serif; font-weight: 800; font-size: 16px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+    border: 2px solid rgba(255,255,255,0.18);
   }
   .cand .nm {
-    font-family:'DM Mono',monospace; font-size:11px; font-weight:500;
-    color:rgba(255,255,255,0.95);
-    margin-bottom:2px;
-    line-height:1.2;
+    font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500;
+    color: rgba(255,255,255,0.95);
+    margin-bottom: 2px;
+    line-height: 1.2;
   }
   .cand .pt {
-    font-family:'DM Mono',monospace; font-size:9px;
-    color:rgba(255,255,255,0.45);
-    text-transform:uppercase; letter-spacing:0.05em;
+    font-family: 'DM Mono', monospace; font-size: 9px;
+    color: rgba(255,255,255,0.45);
+    text-transform: uppercase; letter-spacing: 0.05em;
   }
 
-  /* === Countdown === */
   #countdown {
-    position:fixed; inset:0;
-    display:none;
-    flex-direction:column; align-items:center; justify-content:center;
-    gap:18px;
-    z-index:25;
-    pointer-events:none;
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    z-index: 25;
+    pointer-events: none;
   }
   #cd-num {
-    font-family:'Syne',sans-serif; font-weight:800;
-    font-size:128px;
-    color:var(--fg);
-    text-shadow:0 0 40px rgba(0,71,255,0.7), 0 6px 20px rgba(0,0,0,0.6);
-    line-height:1;
+    font-family: 'Syne', sans-serif; font-weight: 800;
+    font-size: 128px;
+    color: var(--fg);
+    text-shadow: 0 0 40px rgba(0,71,255,0.7), 0 6px 20px rgba(0,0,0,0.6);
+    line-height: 1;
   }
-  #cd-num.go { color:var(--green); font-size:84px; text-shadow:0 0 50px rgba(57,255,122,0.6); }
+  #cd-num.go { color: var(--green); font-size: 84px; text-shadow: 0 0 50px rgba(57,255,122,0.6); }
   #cd-lights {
-    display:flex; gap:18px;
-    background:rgba(0,0,0,0.65);
-    padding:14px 22px;
-    border:1px solid rgba(255,255,255,0.18);
-    backdrop-filter:blur(10px);
-    -webkit-backdrop-filter:blur(10px);
+    display: flex; gap: 18px;
+    background: rgba(0,0,0,0.65);
+    padding: 14px 22px;
+    border: 1px solid rgba(255,255,255,0.18);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
   }
   #cd-lights .light {
-    width:38px; height:38px;
-    border-radius:50%;
-    background:rgba(255,59,59,0.15);
-    border:2px solid rgba(255,255,255,0.18);
-    transition:all 120ms;
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: rgba(255,59,59,0.15);
+    border: 2px solid rgba(255,255,255,0.18);
+    transition: all .12s;
   }
   #cd-lights .light.red {
-    background:var(--red);
-    border-color:#fff;
-    box-shadow:0 0 22px var(--red), inset 0 0 8px rgba(255,255,255,0.4);
+    background: var(--red);
+    border-color: #fff;
+    box-shadow: 0 0 22px var(--red), inset 0 0 8px rgba(255,255,255,0.4);
   }
   #cd-lights .light.green {
-    background:var(--green);
-    border-color:#fff;
-    box-shadow:0 0 22px var(--green), inset 0 0 8px rgba(255,255,255,0.4);
+    background: var(--green);
+    border-color: #fff;
+    box-shadow: 0 0 22px var(--green), inset 0 0 8px rgba(255,255,255,0.4);
   }
 
-  /* === Touch buttons === */
   .btn {
-    position:fixed;
-    width:68px; height:68px;
-    border:2px solid rgba(255,255,255,0.35);
-    background:rgba(0,71,255,0.22);
-    border-radius:50%;
-    display:flex; align-items:center; justify-content:center;
-    font-family:'Syne',sans-serif; font-weight:800; font-size:24px;
-    color:var(--fg);
-    backdrop-filter:blur(6px);
-    -webkit-backdrop-filter:blur(6px);
-    user-select:none; -webkit-user-select:none;
-    touch-action:none;
-    transition:transform 80ms, background 80ms, border-color 80ms;
-    z-index:10;
+    position: absolute;
+    width: 68px; height: 68px;
+    border: 2px solid rgba(255,255,255,0.35);
+    background: rgba(0,71,255,0.22);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Syne', sans-serif; font-weight: 800; font-size: 24px;
+    color: var(--fg);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    user-select: none; -webkit-user-select: none;
+    touch-action: none;
+    transition: transform .08s, background .08s, border-color .08s;
+    z-index: 10;
+    cursor: none;
   }
-  .btn.active { transform:scale(0.94); background:rgba(57,255,122,0.32); border-color:var(--green); }
-  #btn-l   { left:calc(env(safe-area-inset-left,0) + 18px);  bottom:calc(env(safe-area-inset-bottom,0) + 110px); }
-  #btn-r   { left:calc(env(safe-area-inset-left,0) + 100px); bottom:calc(env(safe-area-inset-bottom,0) + 110px); }
-  #btn-gas { right:calc(env(safe-area-inset-right,0) + 18px);  bottom:calc(env(safe-area-inset-bottom,0) + 110px); background:rgba(57,255,122,0.22); }
-  #btn-brk { right:calc(env(safe-area-inset-right,0) + 100px); bottom:calc(env(safe-area-inset-bottom,0) + 110px); background:rgba(255,71,71,0.22); }
-  @media (hover:hover) and (pointer:fine) { .btn { display:none; } }
+  .btn.active { transform: scale(.94); background: rgba(57,255,122,0.32); border-color: var(--green); }
+  #btn-l   { left: calc(env(safe-area-inset-left,0) + 18px);  bottom: calc(env(safe-area-inset-bottom,0) + 110px); }
+  #btn-r   { left: calc(env(safe-area-inset-left,0) + 100px); bottom: calc(env(safe-area-inset-bottom,0) + 110px); }
+  #btn-gas { right: calc(env(safe-area-inset-right,0) + 18px);  bottom: calc(env(safe-area-inset-bottom,0) + 110px); background: rgba(57,255,122,0.22); }
+  #btn-brk { right: calc(env(safe-area-inset-right,0) + 100px); bottom: calc(env(safe-area-inset-bottom,0) + 110px); background: rgba(255,71,71,0.22); }
+  @media (hover: hover) and (pointer: fine) { .btn { display: none; } }
 
   #help {
-    position:fixed;
-    bottom:calc(env(safe-area-inset-bottom,0) + 14px);
-    left:50%; transform:translateX(-50%);
-    font-family:'DM Mono',monospace;
-    font-size:10px; color:rgba(255,255,255,0.45);
-    text-align:center; pointer-events:none; white-space:nowrap;
+    position: absolute;
+    bottom: calc(env(safe-area-inset-bottom,0) + 14px);
+    left: 50%; transform: translateX(-50%);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; color: rgba(255,255,255,0.45);
+    text-align: center; pointer-events: none; white-space: nowrap;
   }
-  @media (hover:none) and (pointer:coarse) { #help { display:none; } }
+  @media (hover: none) and (pointer: coarse) { #help { display: none; } }
 </style>
 </head>
 <body>
-<canvas id="game"></canvas>
 
-<div id="title-top" class="panel">
-  <div class="main">Kart Electoral</div>
-  <div class="sub">Colombia 2026</div>
-</div>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
 
-<div id="hud" class="panel">
-  <div>VEL <span class="v" id="speed">0</span> km/h</div>
-  <div>FPS <span class="v" id="fps">--</span></div>
-  <div class="who" id="who"></div>
-  <div class="phase" id="phase"></div>
-</div>
-
-<div id="btn-l"   class="btn">◀</div>
-<div id="btn-r"   class="btn">▶</div>
-<div id="btn-gas" class="btn">⏶</div>
-<div id="btn-brk" class="btn">⏷</div>
-
-<div id="help">↑↓ acelerar/frenar  ·  ←→ girar</div>
-
-<!-- ===== MENU ===== -->
-<div id="menu" class="modal">
-  <div class="card">
-    <h1>Kart Electoral</h1>
-    <div class="menu-sub">— Colombia 2026 —</div>
-    <p>
-      Carrera entre los <b>8 candidatos presidenciales</b> de 2026 sobre pistas
-      inspiradas en los departamentos clave del país. Cada candidato tiene su
-      sesgo regional: si la pista es su tierra, corre más fuerte.
-    </p>
-    <p class="dim">
-      Esta es una pista de práctica para sentir el manejo. Cada 2 minutos en
-      carrera, anochece o amanece. Próximamente: mapas por departamento e
-      ítems con vibe local.
-    </p>
-    <div class="controls">
-      <div class="ctrl-title">Controles</div>
-      <div class="ctrl-row"><span>Acelerar / Frenar</span><span>↑ ↓ &nbsp;·&nbsp; W S</span></div>
-      <div class="ctrl-row"><span>Girar</span><span>← → &nbsp;·&nbsp; A D</span></div>
-      <div class="ctrl-row"><span>Móvil</span><span>4 botones en pantalla</span></div>
+<!-- ============ NAV (mismo que index.html) ============ -->
+<nav>
+  <ul class="nav-links" id="navLinks">
+    <li class="country-selector-wrap">
+      <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
+        <span id="countryBtnLabel">Colombia</span>
+        <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style="margin-left:6px;transition:transform 0.2s" id="countryChevron"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+      <div class="country-dropdown" id="countryDropdown">
+        <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
+        <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
+        <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
+        <div class="country-option" data-value="cn" onclick="selectCountry(this)"><span class="country-check">✓</span> 中国 / China</div>
+      </div>
+    </li>
+    <li><a href="index.html#proyectos">Proyectos</a></li>
+    <li><a href="noticias.html" class="nav-noticias">Noticias</a></li>
+    <li><a href="pricing.html" class="nav-planes">Planes</a></li>
+    <li>
+      <div class="nav-auth">
+        <a href="login.html" class="nav-login">Iniciar sesión</a>
+        <a href="register.html" class="nav-register">Registrarse</a>
+      </div>
+    </li>
+  </ul>
+  <button class="nav-hamburger" id="hamburger" onclick="toggleMenu()" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+  <a href="index.html" class="nav-logo-wrap">
+    <div class="nav-bars">
+      <div class="nav-bar" style="height:18px"></div>
+      <div class="nav-bar" style="height:14px"></div>
+      <div class="nav-bar" style="height:9px"></div>
+      <div class="nav-bar" style="height:5px"></div>
     </div>
-    <button id="start-race" class="big-btn">Elegir candidato</button>
-  </div>
-</div>
+    <span class="nav-logo">Ricardo<span>.</span>Ruiz</span>
+  </a>
+</nav>
 
-<!-- ===== SELECT CANDIDATE ===== -->
-<div id="select" class="modal" style="display:none;">
-  <div class="card">
-    <button class="back-btn" id="back-from-select">← volver</button>
-    <div class="sel-sub">Paso 2 de 2</div>
-    <h2>Elegí tu candidato</h2>
-    <p>Tocá un candidato para subirte a su kart. El color del casco es el del partido; el sesgo regional afectará la velocidad cuando corras en su tierra.</p>
-    <div id="cand-grid"></div>
-  </div>
-</div>
+<!-- ============ GAME ============ -->
+<main id="game-wrap">
+  <canvas id="game"></canvas>
 
-<!-- ===== COUNTDOWN ===== -->
-<div id="countdown">
-  <div id="cd-num">3</div>
-  <div id="cd-lights">
-    <div class="light"></div>
-    <div class="light"></div>
-    <div class="light"></div>
+  <div id="hud" class="panel">
+    <div>VEL <span class="v" id="speed">0</span> km/h</div>
+    <div>FPS <span class="v" id="fps">--</span></div>
+    <div class="who" id="who"></div>
+    <div class="phase" id="phase"></div>
   </div>
-</div>
+  <div id="hud-track" class="panel">
+    <div class="name">Bogotá D.C.</div>
+    <div class="reg">Cundinamarca · pista 1 / 8</div>
+  </div>
 
+  <div id="btn-l"   class="btn">◀</div>
+  <div id="btn-r"   class="btn">▶</div>
+  <div id="btn-gas" class="btn">⏶</div>
+  <div id="btn-brk" class="btn">⏷</div>
+
+  <div id="help">↑↓ acelerar/frenar  ·  ←→ girar</div>
+
+  <div id="menu" class="modal">
+    <div class="card">
+      <h1>Kart Electoral</h1>
+      <div class="menu-sub">— Bogotá D.C. · primera pista —</div>
+      <p>
+        Carrera entre los <b>8 candidatos presidenciales</b> de 2026 sobre pistas
+        inspiradas en los departamentos clave del país. Cada candidato tiene su
+        sesgo regional: si la pista es su tierra, corre más fuerte.
+      </p>
+      <p class="dim">
+        Pista actual: Bogotá D.C., con los Cerros Orientales al fondo
+        (Monserrate y Guadalupe). Cada 2 minutos en carrera, anochece o amanece.
+      </p>
+      <div class="controls">
+        <div class="ctrl-title">Controles</div>
+        <div class="ctrl-row"><span>Acelerar / Frenar</span><span>↑ ↓ &nbsp;·&nbsp; W S</span></div>
+        <div class="ctrl-row"><span>Girar</span><span>← → &nbsp;·&nbsp; A D</span></div>
+        <div class="ctrl-row"><span>Móvil</span><span>4 botones en pantalla</span></div>
+      </div>
+      <button id="start-race" class="big-btn">Elegir candidato</button>
+    </div>
+  </div>
+
+  <div id="select" class="modal" style="display:none;">
+    <div class="card">
+      <button class="back-btn" id="back-from-select">← volver</button>
+      <div class="sel-sub">Paso 2 de 2</div>
+      <h2>Elegí tu candidato</h2>
+      <p>Tocá un candidato para subirte a su kart. El color del casco es el del partido; el sesgo regional afectará la velocidad cuando corras en su tierra.</p>
+      <div id="cand-grid"></div>
+    </div>
+  </div>
+
+  <div id="countdown">
+    <div id="cd-num">3</div>
+    <div id="cd-lights">
+      <div class="light"></div>
+      <div class="light"></div>
+      <div class="light"></div>
+    </div>
+  </div>
+</main>
+
+<script src="lang.js"></script>
 <script>
 'use strict';
+
+function toggleMenu() {
+  document.getElementById('navLinks').classList.toggle('open');
+  document.getElementById('hamburger').classList.toggle('open');
+}
 
 // ============================================================
 // CANDIDATOS
@@ -410,12 +640,12 @@ const TRACK_SIZE = 1024;
 const TRACK_MASK = TRACK_SIZE - 1;
 const TR_CX = TRACK_SIZE/2;
 const TR_CY = TRACK_SIZE/2;
-const TR_RX = TRACK_SIZE * 0.30;
-const TR_RY = TRACK_SIZE * 0.20;
+const TR_RX = TRACK_SIZE * 0.32;
+const TR_RY = TRACK_SIZE * 0.19;
 const TR_HALF_WIDTH = 130;
 
-// Day/night cycle (cada 2 min anochece o amanece)
-const CYCLE_MS = 240000;          // ciclo total = 4 min (2 día + 2 noche)
+const CYCLE_MS = 240000;
+const KART_SCALE = 1.10;
 
 // ============================================================
 // CANVAS
@@ -435,7 +665,7 @@ const gd        = groundImg.data;
 for (let i=3; i<gd.length; i+=4) gd[i] = 255;
 
 // ============================================================
-// TRACK (procedural)
+// TRACK — Bogotá D.C.
 // ============================================================
 const tc = document.createElement('canvas');
 tc.width = TRACK_SIZE; tc.height = TRACK_SIZE;
@@ -445,60 +675,86 @@ const trackData = tctx.getImageData(0, 0, TRACK_SIZE, TRACK_SIZE).data;
 
 function buildTrack(c, S) {
   const cx = S/2, cy = S/2;
-  const rx = S * 0.30, ry = S * 0.20;
+  const rx = TR_RX, ry = TR_RY;
   const halfW = TR_HALF_WIDTH;
 
+  // Sabana de Bogotá
   for (let y=0; y<S; y+=64) {
     for (let x=0; x<S; x+=64) {
       const dark = ((x/64 + y/64) | 0) % 2 === 0;
-      c.fillStyle = dark ? '#2a5e3a' : '#326b42';
+      c.fillStyle = dark ? '#3d6b48' : '#436f4d';
       c.fillRect(x, y, 64, 64);
     }
   }
-  for (let i=0; i<3000; i++) {
+  for (let i=0; i<3500; i++) {
     const x = Math.random()*S | 0;
     const y = Math.random()*S | 0;
     const a = 0.25 + Math.random()*0.35;
     const isLight = Math.random() < 0.4;
     c.fillStyle = isLight
-      ? `rgba(${130+Math.random()*40|0},${180+Math.random()*40|0},${100+Math.random()*30|0},${a})`
-      : `rgba(${20+Math.random()*30|0},${80+Math.random()*30|0},${30+Math.random()*30|0},${a})`;
+      ? `rgba(${130+Math.random()*40|0},${180+Math.random()*40|0},${110+Math.random()*30|0},${a})`
+      : `rgba(${22+Math.random()*30|0},${75+Math.random()*30|0},${35+Math.random()*30|0},${a})`;
     c.fillRect(x, y, 2, 2);
   }
-  for (let i=0; i<60; i++) {
+  for (let i=0; i<70; i++) {
     const x = Math.random()*S, y = Math.random()*S;
-    const r = 18 + Math.random()*40;
-    c.fillStyle = `rgba(${50+Math.random()*30|0},${130+Math.random()*30|0},${60+Math.random()*20|0},0.25)`;
+    const r = 20 + Math.random()*40;
+    c.fillStyle = `rgba(${50+Math.random()*30|0},${130+Math.random()*30|0},${70+Math.random()*20|0},0.25)`;
     c.beginPath();
     c.ellipse(x, y, r, r*0.7, Math.random()*Math.PI, 0, Math.PI*2);
     c.fill();
   }
+  // Cuadrícula urbana tenue dentro del óvalo
+  c.strokeStyle = 'rgba(180,150,120,0.10)';
+  c.lineWidth = 1;
+  const innerR = ry - halfW - 30;
+  if (innerR > 60) {
+    for (let i=-3; i<=3; i++) {
+      c.beginPath();
+      c.moveTo(cx - rx + halfW + 30, cy + i * 22);
+      c.lineTo(cx + rx - halfW - 30, cy + i * 22);
+      c.stroke();
+    }
+    for (let i=-5; i<=5; i++) {
+      c.beginPath();
+      c.moveTo(cx + i * 22, cy - innerR);
+      c.lineTo(cx + i * 22, cy + innerR);
+      c.stroke();
+    }
+  }
 
+  // Berma exterior (ladrillo bogotano)
   c.lineCap = 'butt'; c.lineJoin = 'round';
-  c.strokeStyle = '#5e4225';
+  c.strokeStyle = '#5a3424';
   c.lineWidth = 2*halfW + 70;
   c.beginPath(); c.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2); c.stroke();
-  c.strokeStyle = '#7a5b3a';
+  c.strokeStyle = '#7a4a30';
   c.lineWidth = 2*halfW + 36;
   c.beginPath(); c.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2); c.stroke();
 
-  c.strokeStyle = '#2a2a32';
+  // Asfalto en 3 capas
+  c.strokeStyle = '#28282e';
   c.lineWidth = 2*halfW;
   c.beginPath(); c.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2); c.stroke();
-  c.strokeStyle = '#363640';
+  c.strokeStyle = '#34343e';
   c.lineWidth = 2*halfW - 24;
   c.beginPath(); c.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2); c.stroke();
-  c.strokeStyle = '#3d3d48';
+  c.strokeStyle = '#3c3c46';
   c.lineWidth = 2*halfW - 80;
   c.beginPath(); c.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2); c.stroke();
+  // Carril TransMilenio (rojo tenue al centro)
+  c.strokeStyle = 'rgba(178,34,34,0.18)';
+  c.lineWidth = 22;
+  c.beginPath(); c.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2); c.stroke();
 
-  for (let i=0; i<700; i++) {
+  for (let i=0; i<800; i++) {
     const t  = Math.random() * Math.PI * 2;
     const xPos = cx + Math.cos(t) * rx + (Math.random()-0.5) * (halfW*1.7);
     const yPos = cy + Math.sin(t) * ry + (Math.random()-0.5) * (halfW*1.7);
     c.fillStyle = `rgba(255,255,255,${0.02 + Math.random()*0.04})`;
     c.fillRect(xPos|0, yPos|0, 1+Math.random()*2|0, 1);
   }
+
   c.strokeStyle = 'rgba(0,0,0,0.18)';
   c.lineWidth = 4;
   c.setLineDash([60, 30, 20, 80]);
@@ -521,6 +777,7 @@ function buildTrack(c, S) {
   c.beginPath(); c.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2); c.stroke();
   c.setLineDash([]);
 
+  // Línea de meta
   const mx = cx, my = cy + ry;
   const cellW = 22, cellH = halfW - 10;
   c.save();
@@ -531,13 +788,36 @@ function buildTrack(c, S) {
       c.fillRect(-88 + i*cellW, -cellH + j*cellH, cellW, cellH);
     }
   }
-  c.fillStyle = 'rgba(0,71,255,0.85)';
-  c.fillRect(-46, cellH + 4, 92, 18);
+  // Banner BOGOTÁ con bandera amarillo/azul/rojo
+  c.fillStyle = '#fcd116';
+  c.fillRect(-58, cellH + 4, 26, 20);
+  c.fillStyle = '#ce1126';
+  c.fillRect(32, cellH + 4, 26, 20);
+  c.fillStyle = 'rgba(0,71,255,0.92)';
+  c.fillRect(-32, cellH + 4, 64, 20);
   c.fillStyle = '#fafafa';
-  c.font = 'bold 12px sans-serif';
+  c.font = 'bold 13px sans-serif';
   c.textAlign = 'center';
-  c.fillText('META', 0, cellH + 17);
+  c.fillText('BOGOTÁ', 0, cellH + 18);
   c.restore();
+
+  // Chevrons amarillos pre-meta
+  c.fillStyle = 'rgba(252,209,22,0.6)';
+  for (let k=0; k<3; k++) {
+    const offY = -k * 18 - 30;
+    c.save();
+    c.translate(mx, my + offY);
+    c.beginPath();
+    c.moveTo(-30, 6);
+    c.lineTo(0, -6);
+    c.lineTo(30, 6);
+    c.lineTo(30, 0);
+    c.lineTo(0, -12);
+    c.lineTo(-30, 0);
+    c.closePath();
+    c.fill();
+    c.restore();
+  }
 }
 
 function drawKerb(c, cx, cy, rx, ry, width, dashLen) {
@@ -564,11 +844,11 @@ const player = {
 const cam = { x:0, y:0, angle:0 };
 const input = { up:false, down:false, left:false, right:false };
 
-let state = 'menu';     // 'menu' | 'select' | 'countdown' | 'racing'
+let state = 'menu';
 let cdStart = 0;
 let cdLastSec = -1;
-let raceTimeMs = 0;     // ms desde que se largó la carrera
-let steerSmooth = 0;    // -1..1 dirección del giro suavizada (visual)
+let raceTimeMs = 0;
+let steerSmooth = 0;
 
 // ============================================================
 // INPUT
@@ -608,7 +888,7 @@ bindBtn('btn-gas', 'up');
 bindBtn('btn-brk', 'down');
 
 // ============================================================
-// FLOW: menu → select → countdown → racing
+// FLOW
 // ============================================================
 const $menu      = document.getElementById('menu');
 const $select    = document.getElementById('select');
@@ -631,7 +911,7 @@ function showSelect() {
   $select.style.display = 'flex';
 }
 
-function selectCandidate(id) {
+function chooseCandidate(id) {
   selectedCandidate = CANDIDATES.find(c => c.id === id) || CANDIDATES[0];
   $who.innerHTML = `🪪 <b>${selectedCandidate.name}</b> · ${selectedCandidate.region}`;
   state = 'countdown';
@@ -645,7 +925,6 @@ function selectCandidate(id) {
   initAudio();
 }
 
-// Build candidate grid
 (function buildCandGrid() {
   const grid = document.getElementById('cand-grid');
   for (const c of CANDIDATES) {
@@ -661,7 +940,7 @@ function selectCandidate(id) {
       <div class="nm">${c.short}</div>
       <div class="pt">${c.region}</div>
     `;
-    card.addEventListener('click', () => selectCandidate(c.id));
+    card.addEventListener('click', () => chooseCandidate(c.id));
     grid.appendChild(card);
   }
 })();
@@ -722,21 +1001,14 @@ function playBeep(freq, duration, type='sine', vol=0.18) {
 function tickCountdown(t) {
   const elapsed = (t - cdStart) / 1000;
   const sec = Math.floor(elapsed);
-
   if (sec !== cdLastSec) {
     cdLastSec = sec;
     if (sec === 0) {
-      $cdNum.textContent = '3';
-      cdLights[0].classList.add('red');
-      playBeep(440, 0.18);
+      $cdNum.textContent = '3'; cdLights[0].classList.add('red'); playBeep(440, 0.18);
     } else if (sec === 1) {
-      $cdNum.textContent = '2';
-      cdLights[1].classList.add('red');
-      playBeep(440, 0.18);
+      $cdNum.textContent = '2'; cdLights[1].classList.add('red'); playBeep(440, 0.18);
     } else if (sec === 2) {
-      $cdNum.textContent = '1';
-      cdLights[2].classList.add('red');
-      playBeep(440, 0.18);
+      $cdNum.textContent = '1'; cdLights[2].classList.add('red'); playBeep(440, 0.18);
     } else if (sec === 3) {
       $cdNum.textContent = '¡VAMOS!';
       $cdNum.classList.add('go');
@@ -754,26 +1026,19 @@ function tickCountdown(t) {
 // ============================================================
 // DAY / NIGHT
 // ============================================================
-// 0..1 = day, transición rápida en los bordes
 function getDayness(timeMs) {
-  const t = (timeMs % CYCLE_MS) / CYCLE_MS;     // 0..1
-  // 0..0.42 día (1) | 0.42..0.50 anochece | 0.50..0.92 noche (0) | 0.92..1 amanece
+  const t = (timeMs % CYCLE_MS) / CYCLE_MS;
   if (t < 0.42) return 1;
   if (t < 0.50) return 1 - (t - 0.42) / 0.08;
   if (t < 0.92) return 0;
   return (t - 0.92) / 0.08;
 }
-
-function lerp(a, b, k) { return a + (b - a) * k; }
-function lerpRGB(a, b, k) {
-  return [ a[0]+(b[0]-a[0])*k, a[1]+(b[1]-a[1])*k, a[2]+(b[2]-a[2])*k ];
-}
-function rgb(c, alpha) {
+function lerpRGB(a, b, k) { return [a[0]+(b[0]-a[0])*k, a[1]+(b[1]-a[1])*k, a[2]+(b[2]-a[2])*k]; }
+function rgbStr(c, alpha) {
   if (alpha === undefined) return `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`;
   return `rgba(${c[0]|0},${c[1]|0},${c[2]|0},${alpha})`;
 }
 
-// Paletas
 const SKY_DAY_TOP = [60, 130, 220];
 const SKY_DAY_MID = [150, 200, 240];
 const SKY_DAY_BOT = [210, 230, 250];
@@ -782,13 +1047,14 @@ const SKY_NIT_MID = [12, 24, 60];
 const SKY_NIT_BOT = [28, 38, 88];
 const FOG_DAY = [180, 200, 220];
 const FOG_NIT = [40, 50, 90];
+const MTN_DAY = [85, 105, 145];
+const MTN_NIT = [10, 14, 30];
 
 // ============================================================
 // UPDATE
 // ============================================================
 function update(dt) {
   raceTimeMs += dt;
-
   if (input.up) {
     player.speed += ACCEL;
   } else if (input.down) {
@@ -812,13 +1078,12 @@ function update(dt) {
   cam.y = player.y - Math.sin(player.angle) * CAM_DIST;
   cam.angle = player.angle;
 
-  // Smoothed steering for visual feedback
   const targetSteer = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   steerSmooth += (targetSteer - steerSmooth) * 0.18;
 }
 
 // ============================================================
-// RENDER
+// RENDER — SKY (con cordillera Cerros Orientales)
 // ============================================================
 function renderSky(c, dayness) {
   const top = lerpRGB(SKY_NIT_TOP, SKY_DAY_TOP, dayness);
@@ -826,13 +1091,12 @@ function renderSky(c, dayness) {
   const bot = lerpRGB(SKY_NIT_BOT, SKY_DAY_BOT, dayness);
 
   const g = c.createLinearGradient(0, 0, 0, HORIZON);
-  g.addColorStop(0,   rgb(top));
-  g.addColorStop(0.5, rgb(mid));
-  g.addColorStop(1,   rgb(bot));
+  g.addColorStop(0,   rgbStr(top));
+  g.addColorStop(0.5, rgbStr(mid));
+  g.addColorStop(1,   rgbStr(bot));
   c.fillStyle = g;
   c.fillRect(0, 0, IW, HORIZON);
 
-  // Glow naranja en horizonte durante atardecer/amanecer
   const glow = Math.max(0, 1 - Math.abs(dayness - 0.5) * 2);
   if (glow > 0.05) {
     const og = c.createLinearGradient(0, HORIZON*0.55, 0, HORIZON);
@@ -842,41 +1106,29 @@ function renderSky(c, dayness) {
     c.fillRect(0, HORIZON*0.55, IW, HORIZON*0.45);
   }
 
-  // Línea brillante del horizonte
-  c.fillStyle = `rgba(255,170,100,${0.35 + 0.25*glow})`;
-  c.fillRect(0, HORIZON - 1, IW, 1);
-  c.fillStyle = `rgba(0,71,255,${0.10 + 0.10*dayness})`;
-  c.fillRect(0, HORIZON - 2, IW, 1);
-
-  // SOL (visible de día)
   if (dayness > 0.35) {
     const sa = Math.min(1, (dayness - 0.35) / 0.5);
-    const sx = IW * 0.28, sy = HORIZON * 0.40;
+    const sx = IW * 0.28, sy = HORIZON * 0.38;
     c.fillStyle = `rgba(255,225,140,${sa * 0.35})`;
-    c.beginPath(); c.arc(sx, sy, 26, 0, Math.PI*2); c.fill();
+    c.beginPath(); c.arc(sx, sy, 28, 0, Math.PI*2); c.fill();
     c.fillStyle = `rgba(255,240,180,${sa})`;
-    c.beginPath(); c.arc(sx, sy, 12, 0, Math.PI*2); c.fill();
+    c.beginPath(); c.arc(sx, sy, 13, 0, Math.PI*2); c.fill();
     c.fillStyle = `rgba(255,250,220,${sa})`;
     c.beginPath(); c.arc(sx-2, sy-2, 6, 0, Math.PI*2); c.fill();
   }
-
-  // LUNA (visible de noche)
   if (dayness < 0.65) {
     const ma = Math.min(1, (0.65 - dayness) / 0.5);
-    const mx = IW * 0.74, my = HORIZON * 0.32;
+    const mxx = IW * 0.74, myy = HORIZON * 0.32;
     c.fillStyle = `rgba(220,225,235,${ma})`;
-    c.beginPath(); c.arc(mx, my, 9, 0, Math.PI*2); c.fill();
-    // sombra creciente
+    c.beginPath(); c.arc(mxx, myy, 9, 0, Math.PI*2); c.fill();
     const niSky = lerpRGB(SKY_NIT_TOP, SKY_DAY_TOP, dayness);
-    c.fillStyle = rgb(niSky, ma);
-    c.beginPath(); c.arc(mx + 3, my - 1, 8, 0, Math.PI*2); c.fill();
-    // craters
+    c.fillStyle = rgbStr(niSky, ma);
+    c.beginPath(); c.arc(mxx + 3, myy - 1, 8, 0, Math.PI*2); c.fill();
     c.fillStyle = `rgba(180,190,210,${ma * 0.6})`;
-    c.fillRect(mx - 4, my, 1, 1);
-    c.fillRect(mx - 2, my + 3, 1, 1);
+    c.fillRect(mxx - 4, myy, 1, 1);
+    c.fillRect(mxx - 2, myy + 3, 1, 1);
   }
 
-  // ESTRELLAS (de noche)
   const starA = (1 - dayness) * 0.9;
   if (starA > 0.05) {
     c.fillStyle = `rgba(255,255,255,${starA})`;
@@ -885,43 +1137,164 @@ function renderSky(c, dayness) {
       [0.48,0.18],[0.55,0.10],[0.62,0.22],[0.69,0.07],[0.78,0.18],[0.85,0.09],
       [0.91,0.19],[0.96,0.06],[0.10,0.30],[0.30,0.32],[0.50,0.30],[0.80,0.35],
     ];
-    for (const [u,v] of stars) {
-      c.fillRect((u*IW)|0, (v*HORIZON)|0, 1, 1);
-    }
-    // estrellas brillantes
+    for (const [u,v] of stars) c.fillRect((u*IW)|0, (v*HORIZON)|0, 1, 1);
     c.fillStyle = `rgba(255,255,255,${starA * 0.7})`;
     c.fillRect((0.21*IW)|0, (0.12*HORIZON)|0, 2, 1);
     c.fillRect((0.66*IW)|0, (0.16*HORIZON)|0, 2, 1);
     c.fillRect((0.88*IW)|0, (0.24*HORIZON)|0, 1, 2);
   }
 
-  // NUBES con parallax (más tenues de noche)
-  const cloudA = 0.35 + 0.5 * dayness;
-  const sf = (cam.angle * 80);
-  const clouds = [
-    [40, 30, 56, 9], [150, 22, 70, 10], [260, 36, 42, 7],
-    [340, 18, 64, 9], [450, 28, 50, 8], [560, 24, 70, 10],
-    [660, 32, 48, 7], [750, 18, 58, 9],
+  // Nubes — dos capas con parallax distinto
+  drawCloudLayer(c, dayness, 0.65, 70, 600, 0);
+  drawCloudLayer(c, dayness, 1.00, 85, 800, 1);
+
+  // Cerros Orientales
+  drawMountains(c, dayness);
+}
+
+function drawCloudLayer(c, dayness, scale, parallaxDiv, period, layerSeed) {
+  const sf = (cam.angle * parallaxDiv) % period;
+  const baseAlpha = 0.40 + 0.55 * dayness;
+  const clouds = layerSeed === 0 ? [
+    [40,  18, 1.0], [180, 12, 1.2], [340, 22, 0.9], [520, 14, 1.1], [680, 20, 1.0],
+  ] : [
+    [70,  40, 1.3], [220, 46, 1.0], [380, 38, 1.4], [540, 44, 1.1], [700, 40, 1.2],
   ];
-  for (const [x, y, w, h] of clouds) {
-    let xx = (((x - sf) % 800) + 800) % 800;
-    if (xx > IW + 60) xx -= 800;
-    if (xx > -80 && xx < IW + 60) {
-      c.fillStyle = `rgba(0,0,0,${0.10 * cloudA})`;
-      c.beginPath();
-      c.ellipse(xx + 1, y + 2, w/2, h/2, 0, 0, Math.PI*2);
-      c.fill();
-      c.fillStyle = `rgba(255,255,255,${cloudA})`;
-      c.beginPath();
-      c.ellipse(xx, y, w/2, h/2, 0, 0, Math.PI*2);
-      c.fill();
-      c.beginPath();
-      c.ellipse(xx + w*0.15, y - h*0.4, w*0.3, h*0.45, 0, 0, Math.PI*2);
-      c.fill();
+  for (const [x, y, sc] of clouds) {
+    let xx = (((x - sf) % period) + period) % period;
+    if (xx > IW + 80) xx -= period;
+    if (xx > -100 && xx < IW + 80) {
+      drawCloud(c, xx, y, sc * scale, baseAlpha);
     }
   }
 }
 
+function drawCloud(c, x, y, sc, alpha) {
+  // Sombra inferior (gradiente suave)
+  c.fillStyle = `rgba(20,30,60,${0.18 * alpha})`;
+  c.beginPath();
+  c.ellipse(x, y + 5*sc, 32*sc, 5*sc, 0, 0, Math.PI*2);
+  c.fill();
+  const blobs = [
+    [-22,  1, 14, 8],
+    [-10, -3, 18, 12],
+    [  4, -8, 18, 14],
+    [ 16, -3, 16, 11],
+    [ 26,  2, 10, 7],
+  ];
+  c.fillStyle = `rgba(215,220,240,${alpha})`;
+  for (const [bx,by,bw,bh] of blobs) {
+    c.beginPath();
+    c.ellipse(x + bx*sc, y + by*sc, bw*sc, bh*sc, 0, 0, Math.PI*2);
+    c.fill();
+  }
+  c.fillStyle = `rgba(245,245,252,${alpha})`;
+  for (const [bx,by,bw,bh] of blobs) {
+    c.beginPath();
+    c.ellipse(x + bx*sc, y + (by - bh*0.25)*sc, bw*sc*0.85, bh*sc*0.7, 0, 0, Math.PI*2);
+    c.fill();
+  }
+  c.fillStyle = `rgba(255,255,255,${alpha})`;
+  for (const [bx,by,bw,bh] of blobs) {
+    c.beginPath();
+    c.ellipse(x + bx*sc, y + (by - bh*0.55)*sc, bw*sc*0.55, bh*sc*0.45, 0, 0, Math.PI*2);
+    c.fill();
+  }
+}
+
+function drawMountains(c, dayness) {
+  const baseY = HORIZON;
+  const mtn = lerpRGB(MTN_NIT, MTN_DAY, dayness);
+  const mtnDark = [mtn[0]*0.7, mtn[1]*0.7, mtn[2]*0.75];
+  const glow = Math.max(0, 1 - Math.abs(dayness - 0.5) * 2);
+
+  // Cordillera lejana
+  c.fillStyle = rgbStr(mtn);
+  c.beginPath();
+  c.moveTo(-10, baseY);
+  const farPeaks = [
+    [0,0],[40,-8],[90,-14],[140,-10],[200,-18],[260,-12],
+    [320,-20],[380,-14],[440,-8],[480,-6],
+  ];
+  for (const [px, dy] of farPeaks) c.lineTo(px, baseY + dy);
+  c.lineTo(IW + 10, baseY);
+  c.closePath();
+  c.fill();
+
+  // Cerros Orientales — picos prominentes
+  c.fillStyle = rgbStr(mtnDark);
+  c.beginPath();
+  c.moveTo(-10, baseY + 4);
+  const peaks = [
+    [0,    0],
+    [30,  -6],
+    [60,  -12],
+    [85,  -10],
+    [115, -22],
+    [140, -16],
+    [170, -28],
+    [195, -18],
+    [220, -36],   // Monserrate
+    [240, -32],
+    [270, -42],   // Guadalupe
+    [295, -34],
+    [320, -28],
+    [345, -22],
+    [370, -30],
+    [395, -20],
+    [425, -14],
+    [455, -10],
+    [480, -6],
+  ];
+  for (const [px, dy] of peaks) c.lineTo(px, baseY + dy);
+  c.lineTo(IW + 10, baseY + 4);
+  c.closePath();
+  c.fill();
+
+  // Capilla de Monserrate
+  const monX = 220, monY = baseY - 36;
+  c.fillStyle = `rgba(245,240,225,${0.5 + 0.5*dayness})`;
+  c.fillRect(monX-1, monY-3, 3, 3);
+  c.fillStyle = `rgba(245,240,225,${0.6 + 0.4*dayness})`;
+  c.fillRect(monX, monY-5, 1, 2);
+  // Cerro de Guadalupe
+  const guX = 270, guY = baseY - 42;
+  c.fillStyle = `rgba(220,215,200,${0.5 + 0.5*dayness})`;
+  c.fillRect(guX, guY-4, 1, 4);
+  c.fillRect(guX-1, guY-2, 3, 1);
+
+  // Glow naranja en cresta durante atardecer
+  if (glow > 0.1) {
+    c.strokeStyle = `rgba(255,170,90,${0.5 * glow})`;
+    c.lineWidth = 1;
+    c.beginPath();
+    c.moveTo(-10, baseY + 4);
+    for (const [px, dy] of peaks) c.lineTo(px, baseY + dy);
+    c.stroke();
+  }
+
+  // Lucecitas de la ciudad de noche
+  if (dayness < 0.55) {
+    const cityA = (0.55 - dayness) * 1.5;
+    c.fillStyle = `rgba(255,220,140,${cityA * 0.9})`;
+    const lights = [
+      [50, -2],[90, -2],[125, -3],[160, -2],[195, -3],[235, -4],
+      [275, -5],[310, -4],[345, -3],[380, -3],[420, -2],[460, -2],
+    ];
+    for (const [lx, ly] of lights) c.fillRect(lx, baseY + ly, 1, 1);
+    c.fillStyle = `rgba(255,235,180,${cityA})`;
+    c.fillRect(150, baseY - 3, 2, 1);
+    c.fillRect(290, baseY - 5, 2, 1);
+    c.fillRect(370, baseY - 3, 2, 1);
+  }
+
+  c.fillStyle = `rgba(255,170,100,${0.30 + 0.30*glow})`;
+  c.fillRect(0, HORIZON - 1, IW, 1);
+}
+
+// ============================================================
+// RENDER — MODE 7
+// ============================================================
 function renderMode7(dayness) {
   const cosA = Math.cos(cam.angle);
   const sinA = Math.sin(cam.angle);
@@ -929,20 +1302,15 @@ function renderMode7(dayness) {
 
   const fog = lerpRGB(FOG_NIT, FOG_DAY, dayness);
   const fogR = fog[0], fogG = fog[1], fogB = fog[2];
-
-  // Brillo global del piso (más oscuro de noche)
   const bright = 0.42 + 0.58 * dayness;
 
   for (let y=0; y<GROUND_H; y++) {
-    const yy   = y + 1;
+    const yy = y + 1;
     const dist = (CAM_HEIGHT * FOV) / yy;
-
     const wcx = cx + cosA * dist;
     const wcy = cy + sinA * dist;
-
     const stepX = -sinA * dist / FOV;
     const stepY =  cosA * dist / FOV;
-
     let sx = wcx - stepX * (IW/2);
     let sy = wcy - stepY * (IW/2);
 
@@ -969,145 +1337,230 @@ function renderMode7(dayness) {
   ictx.putImageData(groundImg, 0, HORIZON);
 }
 
-function hexToRgbStr(hex) {
-  const r = parseInt(hex.slice(1,3), 16);
-  const g = parseInt(hex.slice(3,5), 16);
-  const b = parseInt(hex.slice(5,7), 16);
-  return `${r},${g},${b}`;
-}
 function darkenHex(hex, amt) {
   const r = parseInt(hex.slice(1,3), 16) * amt | 0;
   const g = parseInt(hex.slice(3,5), 16) * amt | 0;
   const b = parseInt(hex.slice(5,7), 16) * amt | 0;
   return `rgb(${r},${g},${b})`;
 }
+function lightenHex(hex, amt) {
+  const r = parseInt(hex.slice(1,3), 16);
+  const g = parseInt(hex.slice(3,5), 16);
+  const b = parseInt(hex.slice(5,7), 16);
+  return `rgb(${(r+(255-r)*amt)|0},${(g+(255-g)*amt)|0},${(b+(255-b)*amt)|0})`;
+}
 
+// ============================================================
+// RENDER — KART (10% más grande, llantas redondas, mucho detalle)
+// ============================================================
 function renderKart(c, dayness) {
   const sp   = Math.abs(player.speed);
   const bob  = Math.sin(performance.now()*0.014) * Math.min(2.4, sp);
   const tilt = steerSmooth * Math.min(1, sp/1.0);
   const cx   = IW/2;
-  const cy   = IH - 48 + bob;
+  const cy   = IH - 50 + bob;
   const tx   = tilt * 8;
 
-  // Tinte de iluminación según día/noche
-  const litTint = `rgba(${rgb255Str(SKY_NIT_TOP)},${(1-dayness)*0.35})`;
-
-  // Sombra más fuerte de día
-  c.fillStyle = `rgba(0,0,0,${0.35 + 0.15*dayness})`;
+  c.fillStyle = `rgba(0,0,0,${0.38 + 0.15*dayness})`;
   c.beginPath();
-  c.ellipse(cx, cy + 20, 32, 7, 0, 0, Math.PI*2);
+  c.ellipse(cx, cy + 22, 36, 8, 0, 0, Math.PI*2);
   c.fill();
 
   c.save();
   c.translate(cx + tx, cy);
   c.rotate(tilt * 0.06);
+  c.scale(KART_SCALE, KART_SCALE);
 
-  // Difusor inferior
+  // Difusor / spoiler bajo
   c.fillStyle = '#000';
-  c.fillRect(-26, 12, 52, 4);
+  c.fillRect(-28, 14, 56, 4);
+  c.fillStyle = '#1a1a24';
+  for (let i=-2; i<=2; i++) c.fillRect(i*8 - 1, 14, 2, 4);
 
-  // Llantas traseras (estáticas, no giran con dirección)
-  drawWheel(c, -25.5, 9, 9, 14, 0);
-  drawWheel(c,  25.5, 9, 9, 14, 0);
+  // Llantas traseras redondas
+  drawRoundWheel(c, -27, 9, 9, 14, 0);
+  drawRoundWheel(c,  27, 9, 9, 14, 0);
 
-  // Bumper trasero
+  // Aleta trasera
+  c.fillStyle = '#1a1a28';
+  c.fillRect(-2, 0, 4, 4);
+  c.fillStyle = '#0a0a14';
+  c.fillRect(-18, -2, 36, 3);
+  c.fillStyle = '#1a1a28';
+  c.fillRect(-19, -3, 2, 5);
+  c.fillRect( 17, -3, 2, 5);
+  c.fillStyle = selectedCandidate.color;
+  c.fillRect(-16, 0, 32, 1);
+
+  // Bumper / faldón trasero con luces
   c.fillStyle = '#001ea8';
-  c.fillRect(-24, 4, 48, 10);
+  c.fillRect(-25, 4, 50, 11);
   c.fillStyle = '#0a2dc4';
-  c.fillRect(-22, 5, 44, 2);
+  c.fillRect(-23, 5, 46, 2);
+  c.fillStyle = '#ff3b3b';
+  c.fillRect(-22, 9, 6, 3);
+  c.fillRect( 16, 9, 6, 3);
+  c.fillStyle = 'rgba(255,200,200,0.9)';
+  c.fillRect(-21, 9, 4, 1);
+  c.fillRect( 17, 9, 4, 1);
 
-  // Cuerpo
+  // Cuerpo principal
   c.fillStyle = '#0047FF';
   c.beginPath();
-  c.moveTo(-22, -2);
-  c.lineTo(-22, 5);
-  c.lineTo( 22, 5);
-  c.lineTo( 22, -2);
-  c.lineTo( 16, -11);
-  c.lineTo(-16, -11);
+  c.moveTo(-23, -4);
+  c.lineTo(-23,  6);
+  c.lineTo( 23,  6);
+  c.lineTo( 23, -4);
+  c.lineTo( 17, -12);
+  c.lineTo(-17, -12);
   c.closePath();
   c.fill();
   c.fillStyle = '#3370ff';
-  c.fillRect(-18, -5, 36, 2);
+  c.fillRect(-19, -7, 38, 2);
   c.fillStyle = '#5b8bff';
-  c.fillRect(-14, -7, 28, 1);
+  c.fillRect(-15, -9, 30, 1);
   c.fillStyle = '#1f5cff';
-  c.fillRect(-21, 3, 42, 1);
+  c.fillRect(-22, 4, 44, 1);
+  c.strokeStyle = 'rgba(0,0,0,0.25)';
+  c.lineWidth = 0.5;
+  c.beginPath(); c.moveTo(-22, 0); c.lineTo(22, 0); c.stroke();
 
-  // Asiento / cabina
+  // Side pods con vents
+  c.fillStyle = '#001ea8';
+  c.fillRect(-24, -2, 4, 7);
+  c.fillRect( 20, -2, 4, 7);
+  c.fillStyle = '#000';
+  c.fillRect(-23, 0, 2, 1);
+  c.fillRect(-23, 2, 2, 1);
+  c.fillRect( 21, 0, 2, 1);
+  c.fillRect( 21, 2, 2, 1);
+
+  // Cabina
   c.fillStyle = '#0a1838';
   c.beginPath();
-  c.moveTo(-10, -11);
-  c.lineTo(-10, -4);
-  c.lineTo( 10, -4);
-  c.lineTo( 10, -11);
-  c.lineTo(  7, -16);
-  c.lineTo( -7, -16);
+  c.moveTo(-11, -12);
+  c.lineTo(-11, -4);
+  c.lineTo( 11, -4);
+  c.lineTo( 11, -12);
+  c.lineTo(  8, -17);
+  c.lineTo( -8, -17);
   c.closePath();
   c.fill();
   c.strokeStyle = '#1a2858';
   c.lineWidth = 1;
   c.stroke();
+  // Halo de seguridad
+  c.strokeStyle = '#0a0a14';
+  c.lineWidth = 1;
+  c.beginPath();
+  c.moveTo(-9, -16);
+  c.bezierCurveTo(-9, -22, 9, -22, 9, -16);
+  c.stroke();
 
-  // Llantas DELANTERAS — giran con la dirección
-  const wheelAngle = steerSmooth * 0.50;     // hasta ~28°
-  drawWheel(c, -22.5, -6.5, 7, 7, wheelAngle);
-  drawWheel(c,  22.5, -6.5, 7, 7, wheelAngle);
+  // Volante con manos (rota con dirección)
+  const swAngle = steerSmooth * 0.6;
+  c.save();
+  c.translate(0, -10);
+  c.rotate(swAngle);
+  c.fillStyle = '#0a0a14';
+  c.beginPath(); c.arc(0, 0, 4.2, 0, Math.PI*2); c.fill();
+  c.strokeStyle = '#3a3a44';
+  c.lineWidth = 1.2;
+  c.stroke();
+  c.strokeStyle = '#5a5a68';
+  c.lineWidth = 1;
+  c.beginPath();
+  c.moveTo(-3.4, 0); c.lineTo(3.4, 0);
+  c.moveTo(0, 0); c.lineTo(0, 3.4);
+  c.stroke();
+  c.fillStyle = '#1a1a24';
+  c.beginPath(); c.arc(-3.2, 0, 1.8, 0, Math.PI*2); c.fill();
+  c.beginPath(); c.arc( 3.2, 0, 1.8, 0, Math.PI*2); c.fill();
+  c.fillStyle = '#3a3a44';
+  c.fillRect(-3.6, -0.5, 0.8, 1);
+  c.fillRect( 2.8, -0.5, 0.8, 1);
+  c.restore();
 
-  // CABEZA (casco) — gira con la dirección
+  // Llantas DELANTERAS redondas — giran con dirección
+  const wheelAngle = steerSmooth * 0.50;
+  drawRoundWheel(c, -23, -7, 7, 8, wheelAngle);
+  drawRoundWheel(c,  23, -7, 7, 8, wheelAngle);
+
+  // Nariz / morro frontal con luces
+  c.fillStyle = '#001ea8';
+  c.fillRect(-7, -16, 14, 4);
+  c.fillStyle = '#0a2dc4';
+  c.fillRect(-6, -16, 12, 1);
+  c.fillStyle = 'rgba(255,250,200,0.95)';
+  c.fillRect(-5, -14, 3, 1);
+  c.fillRect( 2, -14, 3, 1);
+  c.fillStyle = `rgba(255,250,200,${0.6 + 0.4*(1-dayness)})`;
+  c.fillRect(-5, -13, 3, 1);
+  c.fillRect( 2, -13, 3, 1);
+
+  // Cabeza / casco — gira con dirección
   const headDx  = steerSmooth * 2.2;
   const headRot = steerSmooth * 0.18;
   c.save();
   c.translate(headDx, 0);
   c.rotate(headRot);
-  // Casco con color del candidato
+  c.fillStyle = '#1a1a28';
+  c.fillRect(-7, -13, 14, 4);
   const helmetColor = selectedCandidate.color;
   const helmetDark  = darkenHex(helmetColor, 0.55);
+  const helmetLight = lightenHex(helmetColor, 0.30);
   c.fillStyle = helmetColor;
+  c.beginPath(); c.arc(0, -19, 8.2, 0, Math.PI*2); c.fill();
+  c.fillStyle = helmetLight;
   c.beginPath();
-  c.arc(0, -18, 8, 0, Math.PI*2);
+  c.arc(-1.5, -22, 4, Math.PI*1.05, Math.PI*1.95);
+  c.closePath();
   c.fill();
-  // Sombra del lado opuesto al giro
-  c.fillStyle = `rgba(0,0,0,${0.25 + 0.15*Math.abs(steerSmooth)})`;
-  c.beginPath();
-  c.arc(steerSmooth * 1.2, -17, 7, 0, Math.PI*2);
-  c.fill();
-  // Banda del casco
+  c.fillStyle = `rgba(0,0,0,${0.28 + 0.18*Math.abs(steerSmooth)})`;
+  c.beginPath(); c.arc(steerSmooth * 1.5, -18, 7.2, 0, Math.PI*2); c.fill();
   c.fillStyle = helmetDark;
-  c.fillRect(-7, -18, 14, 2);
-  // Visor
+  c.fillRect(-7.5, -19, 15, 2);
+  c.fillStyle = '#fafafa';
+  c.fillRect(-7.5, -18, 15, 0.6);
   c.fillStyle = '#0a1124';
-  c.fillRect(-5, -20, 10, 3);
-  // Brillo
-  c.fillStyle = 'rgba(255,255,255,0.45)';
-  c.fillRect(-5, -23, 4, 1);
-  // Antena/decal
+  c.beginPath();
+  c.moveTo(-5.5, -22);
+  c.lineTo( 5.5, -22);
+  c.lineTo( 5,   -19.5);
+  c.lineTo(-5,   -19.5);
+  c.closePath();
+  c.fill();
+  c.fillStyle = 'rgba(255,255,255,0.4)';
+  c.fillRect(-5, -22, 5, 0.6);
+  c.fillRect(-5, -21, 1.5, 0.4);
   c.fillStyle = '#fff';
-  c.fillRect(-1, -26, 2, 4);
+  c.fillRect(-1, -28, 2, 4);
+  c.fillStyle = '#ff3b3b';
+  c.fillRect(-1, -28, 2, 1);
   c.restore();
 
-  // Sombra de la cabeza sobre el cuerpo
-  c.fillStyle = 'rgba(0,0,0,0.28)';
+  c.fillStyle = 'rgba(0,0,0,0.3)';
   c.beginPath();
-  c.ellipse(0, -11, 6, 1.8, 0, 0, Math.PI*2);
+  c.ellipse(0, -12, 7, 2, 0, 0, Math.PI*2);
   c.fill();
 
-  // Número 01
+  // Sticker / número
   c.fillStyle = '#fafafa';
-  c.font = 'bold 7px sans-serif';
+  c.font = 'bold 6px sans-serif';
   c.textAlign = 'center';
   c.fillText('01', 0, 12);
+  c.fillStyle = 'rgba(255,255,255,0.6)';
+  c.font = 'bold 4px sans-serif';
+  c.fillText('R.RUIZ', 0, 7);
 
-  // Tinte nocturno encima del kart
   if (dayness < 0.85) {
-    c.fillStyle = litTint;
-    c.fillRect(-26, -28, 52, 50);
+    const a = (0.85 - dayness) * 0.42;
+    c.fillStyle = `rgba(${SKY_NIT_TOP[0]},${SKY_NIT_TOP[1]},${SKY_NIT_TOP[2]},${a})`;
+    c.fillRect(-30, -32, 60, 56);
   }
 
   c.restore();
 
-  // Líneas de velocidad
   if (sp > MAX_FWD * 0.55) {
     const intensity = (sp - MAX_FWD*0.55) / (MAX_FWD*0.45);
     c.strokeStyle = `rgba(255,255,255,${0.24 * intensity})`;
@@ -1126,19 +1579,47 @@ function renderKart(c, dayness) {
   }
 }
 
-function drawWheel(c, x, y, w, h, angle) {
+// Llanta redonda con rim, hub, spokes
+function drawRoundWheel(c, x, y, w, h, angle) {
   c.save();
   c.translate(x, y);
   c.rotate(angle);
   c.fillStyle = '#0a0a14';
-  c.fillRect(-w/2, -h/2, w, h);
-  c.fillStyle = '#5a5a68';
-  c.fillRect(-w/2 + 1, -h/2 + 2, w - 2, h - 4);
+  c.beginPath();
+  c.ellipse(0, 0, w/2 + 0.8, h/2 + 0.6, 0, 0, Math.PI*2);
+  c.fill();
+  c.fillStyle = '#1a1a24';
+  c.beginPath();
+  c.ellipse(0, 0, w/2 - 0.2, h/2 - 0.3, 0, 0, Math.PI*2);
+  c.fill();
+  c.fillStyle = '#888896';
+  c.beginPath();
+  c.ellipse(0, 0, w/2 - 1.8, h/2 - 1.7, 0, 0, Math.PI*2);
+  c.fill();
   c.fillStyle = '#3a3a44';
-  c.fillRect(-w/2 + 2, -h/2 + 3, w - 4, h - 6);
+  c.beginPath();
+  c.ellipse(0, 0, w/2 - 2.6, h/2 - 2.4, 0, 0, Math.PI*2);
+  c.fill();
+  c.strokeStyle = '#9a9aaa';
+  c.lineWidth = 0.7;
+  for (let i=0; i<4; i++) {
+    const a = i * Math.PI / 4;
+    const cosA = Math.cos(a), sinA = Math.sin(a);
+    c.beginPath();
+    c.moveTo(0, 0);
+    c.lineTo(cosA * (w/2 - 2.2), sinA * (h/2 - 2));
+    c.stroke();
+  }
+  c.fillStyle = '#bbbbcc';
+  c.beginPath(); c.ellipse(0, 0, 1.2, 1.1, 0, 0, Math.PI*2); c.fill();
+  c.fillStyle = '#5a5a68';
+  c.beginPath(); c.ellipse(0, 0, 0.5, 0.45, 0, 0, Math.PI*2); c.fill();
+  c.fillStyle = 'rgba(255,255,255,0.18)';
+  c.beginPath();
+  c.ellipse(-w*0.18, -h*0.22, w*0.18, h*0.10, -0.4, 0, Math.PI*2);
+  c.fill();
   c.restore();
 }
-function rgb255Str(arr) { return `${arr[0]|0},${arr[1]|0},${arr[2]|0}`; }
 
 // ============================================================
 // LOOP
@@ -1147,17 +1628,14 @@ let lastT = performance.now();
 let fpsAcc = 0, fpsCount = 0, fpsLastT = lastT;
 const fpsEl   = document.getElementById('fps');
 const speedEl = document.getElementById('speed');
+const wrap    = document.getElementById('game-wrap');
 
 function frame(t) {
   const dt = Math.min(33, t - lastT);
   lastT = t;
 
-  if (state === 'racing') {
-    update(dt);
-    updateAudio();
-  } else if (state === 'countdown') {
-    tickCountdown(t);
-  }
+  if (state === 'racing') { update(dt); updateAudio(); }
+  else if (state === 'countdown') { tickCountdown(t); }
 
   const dayness = state === 'racing' ? getDayness(raceTimeMs) : 1;
 
@@ -1174,7 +1652,6 @@ function frame(t) {
   }
   ctx.drawImage(ic, shX, shY, cv.width, cv.height);
 
-  // HUD
   fpsAcc += 1000 / Math.max(1, dt);
   fpsCount++;
   if (t - fpsLastT > 500) {
@@ -1195,15 +1672,55 @@ function frame(t) {
 
 function resize() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  cv.width  = Math.round(window.innerWidth  * dpr);
-  cv.height = Math.round(window.innerHeight * dpr);
-  cv.style.width  = window.innerWidth  + 'px';
-  cv.style.height = window.innerHeight + 'px';
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  cv.width  = Math.round(w * dpr);
+  cv.height = Math.round(h * dpr);
+  cv.style.width  = w + 'px';
+  cv.style.height = h + 'px';
   ctx.imageSmoothingEnabled = false;
 }
 addEventListener('resize', resize);
 resize();
 requestAnimationFrame(frame);
+
+// ============================================================
+// CURSOR (idéntico a index.html)
+// ============================================================
+(function setupCursor() {
+  const cursor = document.getElementById('cursor');
+  const ring   = document.getElementById('cursorRing');
+  if (!cursor || !ring) return;
+  let mx = 0, my = 0, rx = 0, ry = 0;
+  document.addEventListener('mousemove', e => {
+    mx = e.clientX; my = e.clientY;
+    cursor.style.left = mx + 'px'; cursor.style.top = my + 'px';
+  });
+  function animRing() {
+    rx += (mx - rx) * 0.12; ry += (my - ry) * 0.12;
+    ring.style.left = rx + 'px'; ring.style.top = ry + 'px';
+    requestAnimationFrame(animRing);
+  }
+  animRing();
+  document.addEventListener('mouseover', e => {
+    if (e.target.closest && e.target.closest('a, button, .cand, .country-option')) {
+      cursor.style.transform='translate(-50%,-50%) scale(2.5)';
+      cursor.style.background='transparent';
+      cursor.style.border='1.5px solid var(--blue)';
+      ring.style.opacity='0';
+    }
+  });
+  document.addEventListener('mouseout', e => {
+    if (e.target.closest && e.target.closest('a, button, .cand, .country-option')) {
+      const rel = e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('a, button, .cand, .country-option');
+      if (!rel) {
+        cursor.style.transform='translate(-50%,-50%) scale(1)';
+        cursor.style.background='var(--blue)';
+        cursor.style.border='none';
+        ring.style.opacity='0.5';
+      }
+    }
+  });
+})();
 </script>
 </body>
 </html>
