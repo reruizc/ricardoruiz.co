@@ -297,6 +297,75 @@
   #hud-pos .num { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 22px; line-height: 1; margin-top: 2px; }
   #hud-pos .num b { color: var(--amber); }
 
+  /* Top-4 standings panel — abajo izquierda */
+  #standings {
+    position: absolute;
+    bottom: 14px;
+    left: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 8;
+    pointer-events: none;
+  }
+  .stand-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0,0,0,0.55);
+    border: 1px solid rgba(255,255,255,0.2);
+    padding: 5px 9px 5px 5px;
+    width: 158px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: background .2s, border-color .2s;
+  }
+  .stand-card .pos {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 16px;
+    color: var(--amber);
+    width: 16px;
+    text-align: center;
+    line-height: 1;
+  }
+  .stand-card .ph {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255,255,255,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 10px;
+    color: white;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    flex-shrink: 0;
+  }
+  .stand-card .nm {
+    font-family: 'Arima', sans-serif;
+    font-size: 11.5px;
+    color: var(--fg);
+    font-weight: 500;
+    flex: 1;
+    line-height: 1.1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .stand-card .gap {
+    font-family: 'Syne', sans-serif;
+    font-size: 9px;
+    color: rgba(255,255,255,0.5);
+  }
+  .stand-card.you {
+    border-color: var(--green);
+    background: rgba(57,255,122,0.18);
+  }
+  .stand-card.you .pos { color: var(--green); }
+
   /* === Modal common === */
   .modal {
     position: absolute;
@@ -446,7 +515,6 @@
     text-transform: uppercase; letter-spacing: 0.05em;
   }
 
-  /* Countdown */
   #countdown {
     position: absolute;
     inset: 0;
@@ -492,7 +560,6 @@
     box-shadow: 0 0 22px var(--green), inset 0 0 8px rgba(255,255,255,0.4);
   }
 
-  /* Pause overlay */
   #pause-overlay {
     position: absolute;
     inset: 0;
@@ -539,7 +606,6 @@
   #pause-overlay button:hover { background: #0058ff; }
   #pause-overlay button:active { transform: scale(0.97); background: var(--green); color: #0a1124; }
 
-  /* Finish overlay */
   #finish-overlay {
     position: absolute;
     inset: 0;
@@ -615,7 +681,6 @@
   #finish-overlay button.alt { background: transparent; border: 1.5px solid rgba(255,255,255,0.3); }
   #finish-overlay button.alt:hover { background: rgba(255,255,255,0.06); }
 
-  /* Touch buttons */
   .btn {
     position: absolute;
     width: 68px; height: 68px;
@@ -662,6 +727,13 @@
     text-align: center; pointer-events: none; white-space: nowrap;
   }
   @media (hover: none) and (pointer: coarse) { #help { display: none; } }
+
+  /* Indicador de lluvia en HUD */
+  #weather-indicator {
+    display: inline-block;
+    margin-left: 6px;
+    color: rgba(170,200,240,0.85);
+  }
 </style>
 </head>
 <body>
@@ -709,7 +781,7 @@
   <canvas id="game"></canvas>
 
   <div id="hud" class="panel">
-    <div>VEL <span class="v" id="speed">0</span> km/h</div>
+    <div>VEL <span class="v" id="speed">0</span> km/h<span id="weather-indicator"></span></div>
     <div>FPS <span class="v" id="fps">--</span></div>
     <div class="who" id="who"></div>
     <div class="phase" id="phase"></div>
@@ -725,6 +797,13 @@
   <div id="hud-pos" class="panel">
     <div class="lab">Posición</div>
     <div class="num"><b id="pos-num">8</b><span style="opacity:.5"> / 8</span></div>
+  </div>
+
+  <div id="standings">
+    <div class="stand-card" id="stand-1"></div>
+    <div class="stand-card" id="stand-2"></div>
+    <div class="stand-card" id="stand-3"></div>
+    <div class="stand-card" id="stand-4"></div>
   </div>
 
   <button id="btn-pause" title="Pausa (ESC)">II</button>
@@ -745,11 +824,13 @@
       <div class="menu-sub">— Bogotá D.C. · primera pista —</div>
       <p>
         Carrera contra los <b>otros 7 candidatos presidenciales</b> de 2026 en
-        un circuito inspirado en Bogotá: 3 vueltas, recorrido completo.
+        un circuito con la silueta de Bogotá: 3 vueltas pasando por la Plaza
+        de Bolívar, el Capitolio, la Candelaria, el Campín y el Movistar Arena.
       </p>
       <p class="dim">
-        Cada candidato tiene su sesgo regional. Cada 2 minutos, anochece o
-        amanece. Pausá con <b>ESC</b> en cualquier momento.
+        Cada candidato corre con sus propios rasgos. Cada 2 minutos, anochece
+        o amanece, y de vez en cuando llueve sobre la sabana. Pausá con
+        <b>ESC</b> en cualquier momento.
       </p>
       <div class="controls">
         <div class="ctrl-title">Controles</div>
@@ -767,7 +848,7 @@
       <button class="back-btn" id="back-from-select">← volver</button>
       <div class="sel-sub">Paso 2 de 2</div>
       <h2>Elegí tu candidato</h2>
-      <p>Tocá un candidato para subirte a su kart. El color del casco es el del partido. Los otros 7 candidatos serán tus rivales.</p>
+      <p>Tocá un candidato para subirte a su kart. Cada uno tiene rasgos propios y un sesgo regional. Los otros 7 son tus rivales.</p>
       <div id="cand-grid"></div>
     </div>
   </div>
@@ -810,17 +891,26 @@ function toggleMenu() {
 }
 
 // ============================================================
-// CANDIDATOS
+// CANDIDATOS — con rasgos físicos
 // ============================================================
+const SKIN = { fair:'#e9c9a7', medium:'#c8956d', dark:'#7a5132' };
 const CANDIDATES = [
-  { id:'cepeda',   name:'Iván Cepeda',              short:'Cepeda',   color:'#e63946', region:'Atlántico',    skill:0.97 },
-  { id:'abelardo', name:'Abelardo De La Espriella', short:'Abelardo', color:'#3b3b5e', region:'Bolívar',      skill:0.95 },
-  { id:'paloma',   name:'Paloma Valencia',          short:'Paloma',   color:'#0047FF', region:'Cauca',        skill:0.93 },
-  { id:'claudia',  name:'Claudia López',            short:'Claudia',  color:'#39ff7a', region:'Bogotá',       skill:1.00 },  // home en Bogotá → más rápida
-  { id:'fajardo',  name:'Sergio Fajardo',           short:'Fajardo',  color:'#ffaa00', region:'Antioquia',    skill:0.92 },
-  { id:'botero',   name:'Santiago Botero',          short:'Botero',   color:'#d4af37', region:'Cundinamarca', skill:0.96 },  // semi-home
-  { id:'caicedo',  name:'Carlos Caicedo',           short:'Caicedo',  color:'#ff6eb4', region:'Magdalena',    skill:0.91 },
-  { id:'murillo',  name:'Luis Gilberto Murillo',    short:'Murillo',  color:'#8b4513', region:'Chocó',        skill:0.90 },
+  { id:'cepeda',   name:'Iván Cepeda',              short:'Cepeda',   color:'#e63946', region:'Atlántico',    skill:0.97,
+    features: { hairStyle:'curly', hair:'#9a9a9a',  skin:SKIN.medium, glasses:true,  beard:'short' } },
+  { id:'abelardo', name:'Abelardo De La Espriella', short:'Abelardo', color:'#3b3b5e', region:'Bolívar',      skill:0.95,
+    features: { hairStyle:'short', hair:'#1a1a1a',  skin:SKIN.medium, glasses:false, beard:'goatee' } },
+  { id:'paloma',   name:'Paloma Valencia',          short:'Paloma',   color:'#0047FF', region:'Cauca',        skill:0.93,
+    features: { hairStyle:'long',  hair:'#d4a040',  skin:SKIN.fair,   glasses:false, beard:'none' } },
+  { id:'claudia',  name:'Claudia López',            short:'Claudia',  color:'#39ff7a', region:'Bogotá',       skill:1.00,
+    features: { hairStyle:'shortF',hair:'#3a3a3a',  skin:SKIN.fair,   glasses:false, beard:'none' } },
+  { id:'fajardo',  name:'Sergio Fajardo',           short:'Fajardo',  color:'#ffaa00', region:'Antioquia',    skill:0.92,
+    features: { hairStyle:'short', hair:'#b8b8b8',  skin:SKIN.fair,   glasses:false, beard:'none' } },
+  { id:'botero',   name:'Santiago Botero',          short:'Botero',   color:'#d4af37', region:'Cundinamarca', skill:0.96,
+    features: { hairStyle:'short', hair:'#5a3a1f',  skin:SKIN.medium, glasses:false, beard:'none' } },
+  { id:'caicedo',  name:'Carlos Caicedo',           short:'Caicedo',  color:'#ff6eb4', region:'Magdalena',    skill:0.91,
+    features: { hairStyle:'short', hair:'#1a1a1a',  skin:SKIN.medium, glasses:false, beard:'short' } },
+  { id:'murillo',  name:'Luis Gilberto Murillo',    short:'Murillo',  color:'#8b4513', region:'Chocó',        skill:0.90,
+    features: { hairStyle:'short', hair:'#0a0a0a',  skin:SKIN.dark,   glasses:true,  beard:'none' } },
 ];
 let selectedCandidate = CANDIDATES[0];
 
@@ -843,42 +933,51 @@ const HORIZON    = 102;
 
 const IW = 480, IH = 270;
 
-const TRACK_SIZE = 2048;
-const TRACK_MASK = TRACK_SIZE - 1;
-const TRACK_SHIFT = 11;          // log2(TRACK_SIZE)
-const TR_HALF_WIDTH = 110;       // medio-asfalto en world units
+// Texture grande para que las repeticiones queden lejos en la fog
+const TRACK_SIZE  = 4096;
+const TRACK_MASK  = TRACK_SIZE - 1;
+const TRACK_SHIFT = 12;          // log2(TRACK_SIZE)
+const TR_HALF_WIDTH = 110;
 
 const CYCLE_MS = 240000;
 const KART_SCALE = 1.10;
 const TOTAL_LAPS = 3;
 
 // ============================================================
-// CENTERLINE — circuito Bogotá D.C. (cerrado, en sentido horario)
+// CENTERLINE — silueta de Bogotá D.C. (cerrada, sentido horario)
 // ============================================================
-const CENTERLINE = [
-  [1024, 1700],  // 0 — start/finish (sur)
-  [1240, 1720],
-  [1450, 1700],
-  [1620, 1620],
-  [1750, 1450],
-  [1820, 1230],
-  [1790, 1000],
-  [1700, 800],
-  [1540, 660],
-  [1300, 580],
-  [1050, 560],   // 10 — punto más al norte
-  [800,  580],
-  [560,  660],
-  [380,  800],
-  [280,  1000],
-  [260,  1230],  // 15 — flanco oeste
-  [320,  1430],
-  [460,  1580],
-  [680,  1660],
-  [880,  1690],
-  [1024, 1700],  // 20 — cierra el lazo
+const CL_OFFSET_X = 1024;       // shift para centrar en 4096
+const CL_OFFSET_Y = 924;
+const RAW_CENTERLINE = [
+  [1024, 350],   // 0 — start (norte de la ciudad)
+  [1180, 380],
+  [1320, 450],
+  [1450, 580],
+  [1540, 740],
+  [1600, 920],
+  [1620, 1110],
+  [1610, 1300],
+  [1570, 1470],
+  [1490, 1620],
+  [1380, 1750],
+  [1230, 1830],
+  [1060, 1850],
+  [900,  1820],
+  [770,  1740],
+  [680,  1610],
+  [620,  1460],
+  [580,  1290],
+  [540,  1130],
+  [500,  980],
+  [490,  820],
+  [530,  670],
+  [610,  540],
+  [710,  450],
+  [840,  390],
+  [970,  360],
+  [1024, 350],   // close
 ];
-// Longitudes acumuladas para param t
+const CENTERLINE = RAW_CENTERLINE.map(([x,y]) => [x + CL_OFFSET_X, y + CL_OFFSET_Y]);
 const CL_LENS = [0];
 let CL_TOTAL = 0;
 for (let i = 1; i < CENTERLINE.length; i++) {
@@ -888,7 +987,6 @@ for (let i = 1; i < CENTERLINE.length; i++) {
   CL_LENS.push(CL_TOTAL);
 }
 function posAtParam(t) {
-  // wrap
   while (t < 0) t += CL_TOTAL;
   while (t >= CL_TOTAL) t -= CL_TOTAL;
   for (let i = 0; i < CL_LENS.length - 1; i++) {
@@ -905,12 +1003,36 @@ function posAtParam(t) {
   }
   return { x: CENTERLINE[0][0], y: CENTERLINE[0][1], angle: 0 };
 }
-
-// Centro geométrico para detectar vueltas por ángulo
 let TRACK_CX = 0, TRACK_CY = 0;
 for (const [x, y] of CENTERLINE) { TRACK_CX += x; TRACK_CY += y; }
 TRACK_CX /= CENTERLINE.length;
 TRACK_CY /= CENTERLINE.length;
+
+// ============================================================
+// LANDMARKS / TRIBUNAS — posiciones en world coords
+// (dentro del lazo o cerca a la pista)
+// ============================================================
+const LANDMARKS = [
+  // Centro-sur: Plaza de Bolívar + Capitolio + Candelaria juntos
+  { name:'Plaza de Bolívar', x: CL_OFFSET_X + 1100, y: CL_OFFSET_Y + 1280, type:'plaza' },
+  { name:'Capitolio',         x: CL_OFFSET_X + 1050, y: CL_OFFSET_Y + 1240, type:'capitolio' },
+  { name:'La Candelaria',     x: CL_OFFSET_X + 1180, y: CL_OFFSET_Y + 1320, type:'candelaria' },
+  { name:'Periodistas',       x: CL_OFFSET_X + 1130, y: CL_OFFSET_Y + 1370, type:'parque' },
+  // Norte: Campín + Movistar Arena
+  { name:'El Campín',         x: CL_OFFSET_X + 1100, y: CL_OFFSET_Y + 720,  type:'campin' },
+  { name:'Movistar Arena',    x: CL_OFFSET_X + 1180, y: CL_OFFSET_Y + 770,  type:'arena' },
+  // TransMilenios parqueados
+  { name:'TM 1',              x: CL_OFFSET_X + 800,  y: CL_OFFSET_Y + 900,  type:'tm' },
+  { name:'TM 2',              x: CL_OFFSET_X + 1300, y: CL_OFFSET_Y + 1500, type:'tm' },
+  { name:'TM 3',              x: CL_OFFSET_X + 950,  y: CL_OFFSET_Y + 1600, type:'tm' },
+];
+const TRIBUNES = [
+  { x: CL_OFFSET_X + 1140, y: CL_OFFSET_Y + 480, type:'tribune' },   // norte (cerca de salida)
+  { x: CL_OFFSET_X + 1380, y: CL_OFFSET_Y + 700, type:'tribune' },   // este
+  { x: CL_OFFSET_X + 1100, y: CL_OFFSET_Y + 1700, type:'tribune' },  // sur
+  { x: CL_OFFSET_X + 720,  y: CL_OFFSET_Y + 1100, type:'tribune' },  // oeste
+];
+const WORLD_OBJECTS = [...LANDMARKS, ...TRIBUNES];
 
 // ============================================================
 // CANVAS principal
@@ -929,7 +1051,6 @@ const groundImg = ictx.createImageData(IW, GROUND_H);
 const gd        = groundImg.data;
 for (let i=3; i<gd.length; i+=4) gd[i] = 255;
 
-// Mini-mapa
 const mini  = document.getElementById('minimap');
 const mctx  = mini.getContext('2d');
 const MINI_W = 130, MINI_H = 150;
@@ -943,7 +1064,7 @@ function setupMinimap() {
 setupMinimap();
 
 // ============================================================
-// TRACK — Bogotá (texture 2048×2048)
+// TRACK TEXTURE
 // ============================================================
 const tc = document.createElement('canvas');
 tc.width = TRACK_SIZE; tc.height = TRACK_SIZE;
@@ -952,7 +1073,8 @@ buildTrack(tctx, TRACK_SIZE);
 const trackData = tctx.getImageData(0, 0, TRACK_SIZE, TRACK_SIZE).data;
 
 function buildTrack(c, S) {
-  // === Sabana base ===
+  const halfW = TR_HALF_WIDTH;
+  // Sabana base
   for (let y=0; y<S; y+=80) {
     for (let x=0; x<S; x+=80) {
       const dark = ((x/80 + y/80) | 0) % 2 === 0;
@@ -960,7 +1082,7 @@ function buildTrack(c, S) {
       c.fillRect(x, y, 80, 80);
     }
   }
-  for (let i=0; i<7000; i++) {
+  for (let i=0; i<14000; i++) {
     const x = Math.random()*S | 0;
     const y = Math.random()*S | 0;
     const a = 0.25 + Math.random()*0.35;
@@ -970,7 +1092,7 @@ function buildTrack(c, S) {
       : `rgba(${22+Math.random()*30|0},${75+Math.random()*30|0},${35+Math.random()*30|0},${a})`;
     c.fillRect(x, y, 2, 2);
   }
-  for (let i=0; i<140; i++) {
+  for (let i=0; i<280; i++) {
     const x = Math.random()*S, y = Math.random()*S;
     const r = 24 + Math.random()*55;
     c.fillStyle = `rgba(${50+Math.random()*30|0},${130+Math.random()*30|0},${70+Math.random()*20|0},0.25)`;
@@ -978,21 +1100,19 @@ function buildTrack(c, S) {
     c.ellipse(x, y, r, r*0.7, Math.random()*Math.PI, 0, Math.PI*2);
     c.fill();
   }
-
-  // === Edificios fantasma como decoración (manchas urbanas grises) ===
-  for (let i=0; i<50; i++) {
+  // Edificios fantasma fuera de la pista (urbano disperso)
+  for (let i=0; i<140; i++) {
     const x = Math.random()*S, y = Math.random()*S;
-    // Sólo lejos del centerline
     let close = false;
     for (const [px, py] of CENTERLINE) {
-      if (Math.hypot(x-px, y-py) < 220) { close = true; break; }
+      if (Math.hypot(x-px, y-py) < 240) { close = true; break; }
     }
     if (close) continue;
     const w = 30 + Math.random()*60;
     const h = 30 + Math.random()*60;
-    c.fillStyle = `rgba(120,110,100,0.18)`;
+    c.fillStyle = 'rgba(120,110,100,0.18)';
     c.fillRect(x, y, w, h);
-    c.fillStyle = `rgba(80,70,60,0.25)`;
+    c.fillStyle = 'rgba(80,70,60,0.25)';
     c.fillRect(x+w-3, y, 3, h);
     c.fillRect(x, y+h-3, w, 3);
   }
@@ -1000,66 +1120,61 @@ function buildTrack(c, S) {
   c.lineCap = 'round';
   c.lineJoin = 'round';
 
-  // === Berma exterior (ladrillo bogotano) ===
+  // Berma exterior (ladrillo)
   c.strokeStyle = '#5a3424';
-  c.lineWidth = TR_HALF_WIDTH*2 + 70;
+  c.lineWidth = halfW*2 + 70;
   drawCenterPath(c);
   c.strokeStyle = '#7a4a30';
-  c.lineWidth = TR_HALF_WIDTH*2 + 36;
+  c.lineWidth = halfW*2 + 36;
   drawCenterPath(c);
 
-  // === Asfalto (3 capas para textura) ===
+  // Asfalto en capas
   c.strokeStyle = '#28282e';
-  c.lineWidth = TR_HALF_WIDTH*2;
+  c.lineWidth = halfW*2;
   drawCenterPath(c);
   c.strokeStyle = '#34343e';
-  c.lineWidth = TR_HALF_WIDTH*2 - 24;
+  c.lineWidth = halfW*2 - 24;
   drawCenterPath(c);
   c.strokeStyle = '#3c3c46';
-  c.lineWidth = TR_HALF_WIDTH*2 - 80;
+  c.lineWidth = halfW*2 - 80;
   drawCenterPath(c);
-
-  // Carril central rojo tenue (TransMilenio)
+  // Carril TransMilenio rojo tenue
   c.strokeStyle = 'rgba(178,34,34,0.18)';
   c.lineWidth = 22;
   drawCenterPath(c);
 
   // Granulado del asfalto
-  for (let i=0; i<2500; i++) {
+  for (let i=0; i<3500; i++) {
     const t = Math.random() * CL_TOTAL;
     const p = posAtParam(t);
-    // perpendicular
-    const nx = -Math.sin(p.angle);
-    const ny =  Math.cos(p.angle);
-    const off = (Math.random() - 0.5) * (TR_HALF_WIDTH * 1.7);
+    const nx = -Math.sin(p.angle), ny = Math.cos(p.angle);
+    const off = (Math.random() - 0.5) * (halfW * 1.7);
     const xPos = p.x + nx * off;
     const yPos = p.y + ny * off;
     c.fillStyle = `rgba(255,255,255,${0.02 + Math.random()*0.04})`;
     c.fillRect(xPos|0, yPos|0, 1+Math.random()*2|0, 1);
   }
 
-  // Marcas de neumático
   c.strokeStyle = 'rgba(0,0,0,0.16)';
   c.lineWidth = 4;
   c.setLineDash([60, 30, 20, 80]);
   drawCenterPath(c);
   c.setLineDash([]);
 
-  // === Líneas blancas de borde del asfalto ===
+  // Líneas blancas borde
   c.strokeStyle = 'rgba(255,255,255,0.55)';
   c.lineWidth = 4;
-  drawCenterPath(c, TR_HALF_WIDTH - 8);   // borde interno
-  drawCenterPath(c, -(TR_HALF_WIDTH - 8)); // borde externo
+  drawCenterPath(c, halfW - 8);
+  drawCenterPath(c, -(halfW - 8));
 
-  // === Línea central segmentada ===
+  // Línea central segmentada
   c.strokeStyle = 'rgba(255,255,255,0.32)';
   c.lineWidth = 3;
   c.setLineDash([24, 24]);
   drawCenterPath(c);
   c.setLineDash([]);
 
-  // === Kerbs (rumble strips) en cada vértice de cambio fuerte ===
-  // Detectar curvas: vértices donde cambia el ángulo significativamente
+  // Kerbs en curvas (vértices con cambio de ángulo)
   for (let i = 1; i < CENTERLINE.length - 1; i++) {
     const a = CENTERLINE[i-1], b = CENTERLINE[i], d = CENTERLINE[i+1];
     const ang1 = Math.atan2(b[1]-a[1], b[0]-a[0]);
@@ -1067,25 +1182,19 @@ function buildTrack(c, S) {
     let diff = ang2 - ang1;
     while (diff >  Math.PI) diff -= 2*Math.PI;
     while (diff < -Math.PI) diff += 2*Math.PI;
-    if (Math.abs(diff) > 0.3) {
-      // Curva significativa: dibujar kerbs cortos en el lado interno
-      drawCornerKerb(c, b, ang1, ang2, diff, TR_HALF_WIDTH);
-    }
+    if (Math.abs(diff) > 0.25) drawCornerKerb(c, b, ang1, ang2, diff, halfW);
   }
 
-  // === Línea de meta perpendicular a la dirección de salida ===
+  // Línea de meta + chevrons + banner
   const start = CENTERLINE[0];
   const next  = CENTERLINE[1];
   const startAng = Math.atan2(next[1]-start[1], next[0]-start[0]);
-  drawFinishLine(c, start[0], start[1], startAng, TR_HALF_WIDTH);
+  drawFinishLine(c, start[0], start[1], startAng, halfW);
 
-  // === Chevrons amarillos antes de meta ===
   c.fillStyle = 'rgba(252,209,22,0.6)';
   for (let k=0; k<3; k++) {
-    // posición ANTES de start, retroceder por la centerline
     const t = (CL_TOTAL - 80 - k * 30) % CL_TOTAL;
     const p = posAtParam(t);
-    const nx = -Math.sin(p.angle), ny = Math.cos(p.angle);
     c.save();
     c.translate(p.x, p.y);
     c.rotate(p.angle);
@@ -1101,33 +1210,31 @@ function buildTrack(c, S) {
     c.restore();
   }
 
-  // === Sponsor banner gigante "BOGOTÁ" pasando la meta ===
+  // Banner BOGOTÁ
   c.save();
   const ban = posAtParam(40);
   c.translate(ban.x, ban.y);
   c.rotate(ban.angle);
   c.fillStyle = '#fcd116';
-  c.fillRect(-58, -TR_HALF_WIDTH-30, 26, 22);
+  c.fillRect(-58, -halfW-30, 26, 22);
   c.fillStyle = '#ce1126';
-  c.fillRect(32, -TR_HALF_WIDTH-30, 26, 22);
+  c.fillRect(32, -halfW-30, 26, 22);
   c.fillStyle = 'rgba(0,71,255,0.92)';
-  c.fillRect(-32, -TR_HALF_WIDTH-30, 64, 22);
+  c.fillRect(-32, -halfW-30, 64, 22);
   c.fillStyle = '#fafafa';
   c.font = 'bold 14px sans-serif';
   c.textAlign = 'center';
   c.textBaseline = 'middle';
-  c.fillText('BOGOTÁ', 0, -TR_HALF_WIDTH-19);
+  c.fillText('BOGOTÁ', 0, -halfW-19);
   c.restore();
 }
 
-// Dibuja el path central (con offset perpendicular opcional)
 function drawCenterPath(c, offset) {
   c.beginPath();
   if (!offset) {
     c.moveTo(CENTERLINE[0][0], CENTERLINE[0][1]);
     for (let i=1; i<CENTERLINE.length; i++) c.lineTo(CENTERLINE[i][0], CENTERLINE[i][1]);
   } else {
-    // Camino paralelo desplazado perpendicular
     for (let i=0; i<CENTERLINE.length; i++) {
       const p0 = CENTERLINE[Math.max(0, i-1)];
       const p1 = CENTERLINE[i];
@@ -1141,16 +1248,13 @@ function drawCenterPath(c, offset) {
   }
   c.stroke();
 }
-
 function drawCornerKerb(c, point, ang1, ang2, diff, halfW) {
-  // Kerb pequeño en el lado interno de la curva
   const innerSide = diff > 0 ? -1 : 1;
   const angAvg = (ang1 + ang2) / 2;
   const nx = -Math.sin(angAvg) * innerSide;
   const ny =  Math.cos(angAvg) * innerSide;
   const cx = point[0] - nx * (halfW + 2);
   const cy = point[1] - ny * (halfW + 2);
-  // banda roja
   c.save();
   c.translate(cx, cy);
   c.rotate(angAvg);
@@ -1160,12 +1264,10 @@ function drawCornerKerb(c, point, ang1, ang2, diff, halfW) {
   }
   c.restore();
 }
-
 function drawFinishLine(c, x, y, angle, halfW) {
   c.save();
   c.translate(x, y);
   c.rotate(angle);
-  // Cuadrícula de meta perpendicular a la pista
   const cellW = 14;
   const cells = Math.ceil((halfW * 2) / cellW);
   for (let i=0; i<cells; i++) {
@@ -1195,8 +1297,7 @@ let cdLastSec = -1;
 let raceTimeMs = 0;
 let steerSmooth = 0;
 
-// Lap detection
-let totalAngle = 0;          // acumulado angular alrededor del centro de pista
+let totalAngle = 0;
 let lastAngleFromCenter = 0;
 let currentLap = 1;
 let lapTimes = [];
@@ -1204,11 +1305,34 @@ let currentLapStart = 0;
 let raceStartTime = 0;
 let finishedRanking = null;
 
-// AI
 let aiKarts = [];
-
-// Smoke particles
 const smokeParticles = [];
+
+// Lluvia (ciclo independiente de día/noche)
+let rainState = 'dry';     // 'dry' | 'wet'
+let rainStartedAt = 0;
+let rainDuration = 0;
+let nextRainAt = 60_000 + Math.random() * 60_000;  // primer aguacero entre 60-120 s
+const RAIN_DROPS = [];
+
+function initRainDrops() {
+  RAIN_DROPS.length = 0;
+  for (let i = 0; i < 110; i++) {
+    RAIN_DROPS.push({
+      x: Math.random() * (IW + 60),
+      y: Math.random() * IH,
+      speed: 4 + Math.random() * 3,
+    });
+  }
+}
+function getRainIntensity() {
+  if (rainState !== 'wet') return 0;
+  const t = raceTimeMs - rainStartedAt;
+  const fade = 5000;
+  if (t < fade) return Math.min(1, t / fade);
+  if (t > rainDuration - fade) return Math.max(0, (rainDuration - t) / fade);
+  return 1;
+}
 
 // ============================================================
 // INPUT
@@ -1226,7 +1350,6 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => {
   if (keyMap[e.code]) { input[keyMap[e.code]] = false; e.preventDefault(); }
 });
-
 function bindBtn(id, key) {
   const b = document.getElementById(id);
   const on = e => {
@@ -1247,7 +1370,6 @@ bindBtn('btn-l',   'left');
 bindBtn('btn-r',   'right');
 bindBtn('btn-gas', 'up');
 bindBtn('btn-brk', 'down');
-
 document.getElementById('btn-pause').addEventListener('click', handlePauseToggle);
 
 // ============================================================
@@ -1264,6 +1386,7 @@ const $pause     = document.getElementById('pause-overlay');
 const $finish    = document.getElementById('finish-overlay');
 const $lapNum    = document.getElementById('lap-num');
 const $posNum    = document.getElementById('pos-num');
+const $weather   = document.getElementById('weather-indicator');
 
 document.getElementById('start-race').addEventListener('click', showSelect);
 document.getElementById('back-from-select').addEventListener('click', () => {
@@ -1291,7 +1414,6 @@ function showSelect() {
   $menu.style.display = 'none';
   $select.style.display = 'flex';
 }
-
 function chooseCandidate(id) {
   selectedCandidate = CANDIDATES.find(c => c.id === id) || CANDIDATES[0];
   $who.innerHTML = `<b>${selectedCandidate.name}</b> · ${selectedCandidate.region}`;
@@ -1302,12 +1424,10 @@ function chooseCandidate(id) {
 }
 
 function resetRace() {
-  // Reset player
   player.x = CENTERLINE[0][0];
   player.y = CENTERLINE[0][1];
   player.angle = Math.atan2(CENTERLINE[1][1]-CENTERLINE[0][1], CENTERLINE[1][0]-CENTERLINE[0][0]);
   player.speed = 0;
-  // Lap
   totalAngle = 0;
   lastAngleFromCenter = Math.atan2(player.y - TRACK_CY, player.x - TRACK_CX);
   currentLap = 1;
@@ -1317,15 +1437,16 @@ function resetRace() {
   raceStartTime = 0;
   finishedRanking = null;
   smokeParticles.length = 0;
-  // AI: 7 rivales, alineados detrás del jugador
+  rainState = 'dry';
+  nextRainAt = 60_000 + Math.random() * 60_000;
+  // AI 7 rivales
   aiKarts = [];
   const rivals = CANDIDATES.filter(c => c.id !== selectedCandidate.id);
   const homeBoost = (cand) => cand.region === 'Bogotá' ? 1.05 : (cand.region === 'Cundinamarca' ? 1.02 : 1.0);
   rivals.forEach((c, i) => {
-    // Grilla compacta: 2 columnas × 4 filas detrás del jugador
     const col = i % 2;
     const row = Math.floor(i / 2);
-    const offset = -(20 + row * 40);     // -20, -60, -100, -140
+    const offset = -(20 + row * 40);
     const lateral = (col === 0 ? -1 : 1) * 32;
     const tStart = CL_TOTAL + offset;
     const baseSpeed = 3.55 + Math.random() * 0.25;
@@ -1333,23 +1454,20 @@ function resetRace() {
       candidate: c,
       t: ((tStart % CL_TOTAL) + CL_TOTAL) % CL_TOTAL,
       lateral,
-      lap: 0,                             // todavía no cruzó la meta por primera vez
-      lastAngle: 0,
+      lap: 0,
       speed: baseSpeed * c.skill * homeBoost(c),
       x: 0, y: 0, angle: 0,
       finishTime: null,
     });
-    // posición inicial
     updateAIPos(aiKarts[aiKarts.length-1]);
-    aiKarts[aiKarts.length-1].lastAngle = Math.atan2(aiKarts[aiKarts.length-1].y - TRACK_CY, aiKarts[aiKarts.length-1].x - TRACK_CX);
   });
   $lapNum.textContent = '1';
   $posNum.textContent = '8';
+  updateStandings();
 }
 
 function updateAIPos(ai) {
   const p = posAtParam(ai.t);
-  // Aplicar offset lateral
   const nx = -Math.sin(p.angle);
   const ny =  Math.cos(p.angle);
   ai.x = p.x + nx * ai.lateral;
@@ -1366,15 +1484,9 @@ function startCountdown() {
   $cdNum.textContent = '';
   cdLights.forEach(l => { l.classList.remove('red'); l.classList.remove('green'); });
 }
-
 function handlePauseToggle() {
-  if (state === 'racing') {
-    state = 'paused';
-    $pause.style.display = 'flex';
-  } else if (state === 'paused') {
-    state = 'racing';
-    $pause.style.display = 'none';
-  }
+  if (state === 'racing') { state = 'paused'; $pause.style.display = 'flex'; }
+  else if (state === 'paused') { state = 'racing'; $pause.style.display = 'none'; }
 }
 
 (function buildCandGrid() {
@@ -1396,12 +1508,15 @@ function handlePauseToggle() {
     grid.appendChild(card);
   }
 })();
-
 function isLightHex(hex) {
   const r = parseInt(hex.slice(1,3), 16);
   const g = parseInt(hex.slice(3,5), 16);
   const b = parseInt(hex.slice(5,7), 16);
   return (r*0.299 + g*0.587 + b*0.114) > 150;
+}
+function initials(name) {
+  const parts = name.split(' ');
+  return parts.length === 1 ? parts[0].slice(0,2).toUpperCase() : (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
 }
 
 // ============================================================
@@ -1506,7 +1621,6 @@ const MTN_NIT = [10, 14, 30];
 function update(dt) {
   raceTimeMs += dt;
 
-  // Player physics
   if (input.up) player.speed += ACCEL;
   else if (input.down) {
     if (player.speed > 0.05) player.speed -= BRAKE;
@@ -1532,15 +1646,13 @@ function update(dt) {
   const targetSteer = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   steerSmooth += (targetSteer - steerSmooth) * 0.18;
 
-  // ==== Lap detection (player) por ángulo desde centro ====
+  // Lap detection
   const ang = Math.atan2(player.y - TRACK_CY, player.x - TRACK_CX);
   let delta = ang - lastAngleFromCenter;
   if (delta >  Math.PI) delta -= 2*Math.PI;
   if (delta < -Math.PI) delta += 2*Math.PI;
   totalAngle += delta;
   lastAngleFromCenter = ang;
-
-  // Player conduce HORARIO → totalAngle DECRECE; vuelta cuando llega a -2π
   if (totalAngle <= -Math.PI * 2) {
     totalAngle += Math.PI * 2;
     const lapMs = raceTimeMs - currentLapStart;
@@ -1548,59 +1660,68 @@ function update(dt) {
     currentLapStart = raceTimeMs;
     currentLap++;
     $lapNum.textContent = String(Math.min(currentLap, TOTAL_LAPS));
-    if (currentLap > TOTAL_LAPS) {
-      finishRace();
-    }
+    if (currentLap > TOTAL_LAPS) finishRace();
   }
 
-  // ==== AI update ====
+  // AI
   for (const ai of aiKarts) {
     if (ai.finishTime != null) continue;
     ai.t += ai.speed;
     if (ai.t >= CL_TOTAL) {
       ai.t -= CL_TOTAL;
       ai.lap++;
-      if (ai.lap > TOTAL_LAPS && ai.finishTime == null) {
-        ai.finishTime = raceTimeMs;
-      }
+      if (ai.lap > TOTAL_LAPS && ai.finishTime == null) ai.finishTime = raceTimeMs;
     }
     updateAIPos(ai);
   }
 
-  // ==== Update HUD pos ====
-  updateRacePosition();
+  // Lluvia
+  updateRain();
 
-  // ==== Smoke spawn ====
+  // HUD
+  updateRacePosition();
   spawnSmokeIfNeeded();
   updateSmoke(dt);
 }
 
+function updateRain() {
+  if (rainState === 'dry' && raceTimeMs >= nextRainAt) {
+    rainState = 'wet';
+    rainStartedAt = raceTimeMs;
+    rainDuration = 35000 + Math.random() * 20000;  // 35-55 s
+    initRainDrops();
+  }
+  if (rainState === 'wet' && raceTimeMs >= rainStartedAt + rainDuration) {
+    rainState = 'dry';
+    nextRainAt = raceTimeMs + 90_000 + Math.random() * 50_000;  // próxima en 90-140 s
+  }
+}
+
 function updateRacePosition() {
-  // Posición = cantidad de rivales delante en términos de progreso total
-  const playerProgress = (currentLap - 1) - (totalAngle / (2*Math.PI)); // mayor = más avanzado
+  const playerProgress = (currentLap - 1) - (totalAngle / (2*Math.PI));
   let aheadOf = 0;
   for (const ai of aiKarts) {
     const aiProg = (ai.lap - 1) + (ai.t / CL_TOTAL);
     if (aiProg < playerProgress) aheadOf++;
   }
-  // posición del jugador = total karts - aheadOf
   const pos = aiKarts.length + 1 - aheadOf;
   $posNum.textContent = String(pos);
 }
 
 function finishRace() {
   state = 'finished';
-  // Construir ranking con jugador
   const all = aiKarts.map(ai => ({
+    candidate: ai.candidate,
     name: ai.candidate.name,
     short: ai.candidate.short,
     color: ai.candidate.color,
     isYou: false,
-    finishTime: ai.finishTime != null ? ai.finishTime : null,
+    finishTime: ai.finishTime,
     lap: ai.lap,
     t: ai.t,
   }));
   all.push({
+    candidate: selectedCandidate,
     name: selectedCandidate.name,
     short: selectedCandidate.short,
     color: selectedCandidate.color,
@@ -1609,7 +1730,6 @@ function finishRace() {
     lap: currentLap,
     t: 0,
   });
-  // Los que terminaron primero, ordenados por finishTime; los que no, por progreso
   all.sort((a, b) => {
     if (a.finishTime != null && b.finishTime != null) return a.finishTime - b.finishTime;
     if (a.finishTime != null) return -1;
@@ -1621,7 +1741,6 @@ function finishRace() {
   finishedRanking = all;
   showFinishOverlay();
 }
-
 function showFinishOverlay() {
   const yourPos = finishedRanking.findIndex(r => r.isYou) + 1;
   const ttl = document.getElementById('finish-ttl');
@@ -1633,9 +1752,7 @@ function showFinishOverlay() {
   posL.textContent = `${ordinals[yourPos-1]} lugar · Bogotá D.C.`;
   stand.innerHTML = finishedRanking.map((r, i) => {
     const pos = ordinals[i];
-    const time = r.finishTime != null
-      ? formatTime(r.finishTime)
-      : `vuelta ${r.lap}`;
+    const time = r.finishTime != null ? formatTime(r.finishTime) : `vuelta ${r.lap}`;
     return `<div class="row${r.isYou ? ' you' : ''}">
       <span class="pos">${pos}</span>
       <span class="name">${r.short}${r.isYou ? ' (tú)' : ''}</span>
@@ -1644,7 +1761,6 @@ function showFinishOverlay() {
   }).join('');
   $finish.style.display = 'flex';
 }
-
 function formatTime(ms) {
   const s = ms / 1000;
   const m = Math.floor(s / 60);
@@ -1653,7 +1769,7 @@ function formatTime(ms) {
 }
 
 // ============================================================
-// SMOKE PARTICLES (humo de escape)
+// SMOKE
 // ============================================================
 function spawnSmokeIfNeeded() {
   if (state !== 'racing') return;
@@ -1662,14 +1778,11 @@ function spawnSmokeIfNeeded() {
   const prob = Math.min(0.8, sp / MAX_FWD);
   if (Math.random() > prob * 0.6) return;
   if (smokeParticles.length > 70) return;
-  // Spawn pos en pantalla: detrás del kart (parte inferior central)
-  const cx = IW/2 + (Math.random() - 0.5) * 14;
-  const cy = IH - 32 + Math.random() * 4;
   smokeParticles.push({
-    x: cx,
-    y: cy,
+    x: IW/2 + (Math.random() - 0.5) * 14,
+    y: IH - 32 + Math.random() * 4,
     vx: (Math.random() - 0.5) * 0.25,
-    vy: 0.4 + Math.random() * 0.45,  // hacia abajo (cámara) en pantalla
+    vy: 0.4 + Math.random() * 0.45,
     age: 0,
     life: 0.55 + Math.random() * 0.4,
     size: 2.5 + Math.random() * 2,
@@ -1683,7 +1796,7 @@ function updateSmoke(dt) {
     p.x += p.vx;
     p.y += p.vy;
     p.size += 0.05;
-    p.vy += 0.04;  // acelera ligeramente
+    p.vy += 0.04;
     if (p.age >= p.life) smokeParticles.splice(i, 1);
   }
 }
@@ -1703,19 +1816,24 @@ function renderSmoke(c) {
 }
 
 // ============================================================
-// RENDER — SKY + MONTAÑAS (sin cambios)
+// RENDER — SKY + MONTAÑAS
 // ============================================================
-function renderSky(c, dayness) {
+function renderSky(c, dayness, rainK) {
   const top = lerpRGB(SKY_NIT_TOP, SKY_DAY_TOP, dayness);
   const mid = lerpRGB(SKY_NIT_MID, SKY_DAY_MID, dayness);
   const bot = lerpRGB(SKY_NIT_BOT, SKY_DAY_BOT, dayness);
+  // Cielo se oscurece cuando llueve
+  const stormify = (col) => {
+    return [col[0] * (1 - 0.5*rainK) + 50*rainK, col[1] * (1 - 0.45*rainK) + 55*rainK, col[2] * (1 - 0.35*rainK) + 75*rainK];
+  };
+  const top2 = stormify(top), mid2 = stormify(mid), bot2 = stormify(bot);
   const g = c.createLinearGradient(0, 0, 0, HORIZON);
-  g.addColorStop(0,   rgbStr(top));
-  g.addColorStop(0.5, rgbStr(mid));
-  g.addColorStop(1,   rgbStr(bot));
+  g.addColorStop(0,   rgbStr(top2));
+  g.addColorStop(0.5, rgbStr(mid2));
+  g.addColorStop(1,   rgbStr(bot2));
   c.fillStyle = g;
   c.fillRect(0, 0, IW, HORIZON);
-  const glow = Math.max(0, 1 - Math.abs(dayness - 0.5) * 2);
+  const glow = Math.max(0, 1 - Math.abs(dayness - 0.5) * 2) * (1 - rainK);
   if (glow > 0.05) {
     const og = c.createLinearGradient(0, HORIZON*0.55, 0, HORIZON);
     og.addColorStop(0, 'rgba(255,160,80,0)');
@@ -1723,8 +1841,8 @@ function renderSky(c, dayness) {
     c.fillStyle = og;
     c.fillRect(0, HORIZON*0.55, IW, HORIZON*0.45);
   }
-  if (dayness > 0.35) {
-    const sa = Math.min(1, (dayness - 0.35) / 0.5);
+  if (dayness > 0.35 && rainK < 0.7) {
+    const sa = Math.min(1, (dayness - 0.35) / 0.5) * (1 - rainK);
     const sx = IW * 0.28, sy = HORIZON * 0.38;
     c.fillStyle = `rgba(255,225,140,${sa * 0.35})`;
     c.beginPath(); c.arc(sx, sy, 28, 0, Math.PI*2); c.fill();
@@ -1733,8 +1851,8 @@ function renderSky(c, dayness) {
     c.fillStyle = `rgba(255,250,220,${sa})`;
     c.beginPath(); c.arc(sx-2, sy-2, 6, 0, Math.PI*2); c.fill();
   }
-  if (dayness < 0.65) {
-    const ma = Math.min(1, (0.65 - dayness) / 0.5);
+  if (dayness < 0.65 && rainK < 0.7) {
+    const ma = Math.min(1, (0.65 - dayness) / 0.5) * (1 - rainK);
     const mxx = IW * 0.74, myy = HORIZON * 0.32;
     c.fillStyle = `rgba(220,225,235,${ma})`;
     c.beginPath(); c.arc(mxx, myy, 9, 0, Math.PI*2); c.fill();
@@ -1745,7 +1863,7 @@ function renderSky(c, dayness) {
     c.fillRect(mxx - 4, myy, 1, 1);
     c.fillRect(mxx - 2, myy + 3, 1, 1);
   }
-  const starA = (1 - dayness) * 0.9;
+  const starA = (1 - dayness) * 0.9 * (1 - rainK);
   if (starA > 0.05) {
     c.fillStyle = `rgba(255,255,255,${starA})`;
     const stars = [
@@ -1754,60 +1872,59 @@ function renderSky(c, dayness) {
       [0.91,0.19],[0.96,0.06],[0.10,0.30],[0.30,0.32],[0.50,0.30],[0.80,0.35],
     ];
     for (const [u,v] of stars) c.fillRect((u*IW)|0, (v*HORIZON)|0, 1, 1);
-    c.fillStyle = `rgba(255,255,255,${starA * 0.7})`;
-    c.fillRect((0.21*IW)|0, (0.12*HORIZON)|0, 2, 1);
-    c.fillRect((0.66*IW)|0, (0.16*HORIZON)|0, 2, 1);
-    c.fillRect((0.88*IW)|0, (0.24*HORIZON)|0, 1, 2);
   }
-  drawCloudLayer(c, dayness, 0.65, 70, 600, 0);
-  drawCloudLayer(c, dayness, 1.00, 85, 800, 1);
-  drawMountains(c, dayness);
+  drawCloudLayer(c, dayness, 0.65, 70, 600, 0, rainK);
+  drawCloudLayer(c, dayness, 1.00, 85, 800, 1, rainK);
+  drawMountains(c, dayness, rainK);
 }
-
-function drawCloudLayer(c, dayness, scale, parallaxDiv, period, layerSeed) {
+function drawCloudLayer(c, dayness, scale, parallaxDiv, period, layerSeed, rainK) {
   const sf = (cam.angle * parallaxDiv) % period;
-  const baseAlpha = 0.40 + 0.55 * dayness;
+  const baseAlpha = (0.40 + 0.55 * dayness) * (1 - rainK*0.3);
   const clouds = layerSeed === 0 ? [
     [40,  18, 1.0], [180, 12, 1.2], [340, 22, 0.9], [520, 14, 1.1], [680, 20, 1.0],
   ] : [
     [70,  40, 1.3], [220, 46, 1.0], [380, 38, 1.4], [540, 44, 1.1], [700, 40, 1.2],
   ];
+  // Más nubes y más oscuras durante lluvia
+  const stormTint = rainK > 0.1 ? 0.5 + rainK * 0.4 : 1.0;
   for (const [x, y, sc] of clouds) {
     let xx = (((x - sf) % period) + period) % period;
     if (xx > IW + 80) xx -= period;
-    if (xx > -100 && xx < IW + 80) drawCloud(c, xx, y, sc * scale, baseAlpha);
+    if (xx > -100 && xx < IW + 80) drawCloud(c, xx, y, sc * scale, baseAlpha, stormTint);
   }
 }
-function drawCloud(c, x, y, sc, alpha) {
+function drawCloud(c, x, y, sc, alpha, stormTint=1) {
   c.fillStyle = `rgba(20,30,60,${0.18 * alpha})`;
   c.beginPath();
   c.ellipse(x, y + 5*sc, 32*sc, 5*sc, 0, 0, Math.PI*2);
   c.fill();
   const blobs = [[-22,1,14,8],[-10,-3,18,12],[4,-8,18,14],[16,-3,16,11],[26,2,10,7]];
-  c.fillStyle = `rgba(215,220,240,${alpha})`;
+  const baseR = 215 * stormTint, baseG = 220 * stormTint, baseB = 240 * stormTint;
+  c.fillStyle = `rgba(${baseR|0},${baseG|0},${baseB|0},${alpha})`;
   for (const [bx,by,bw,bh] of blobs) {
     c.beginPath();
     c.ellipse(x + bx*sc, y + by*sc, bw*sc, bh*sc, 0, 0, Math.PI*2);
     c.fill();
   }
-  c.fillStyle = `rgba(245,245,252,${alpha})`;
+  const midR = 245 * stormTint, midG = 245 * stormTint, midB = 252 * stormTint;
+  c.fillStyle = `rgba(${midR|0},${midG|0},${midB|0},${alpha})`;
   for (const [bx,by,bw,bh] of blobs) {
     c.beginPath();
     c.ellipse(x + bx*sc, y + (by - bh*0.25)*sc, bw*sc*0.85, bh*sc*0.7, 0, 0, Math.PI*2);
     c.fill();
   }
-  c.fillStyle = `rgba(255,255,255,${alpha})`;
+  c.fillStyle = `rgba(255,255,255,${alpha * stormTint})`;
   for (const [bx,by,bw,bh] of blobs) {
     c.beginPath();
     c.ellipse(x + bx*sc, y + (by - bh*0.55)*sc, bw*sc*0.55, bh*sc*0.45, 0, 0, Math.PI*2);
     c.fill();
   }
 }
-function drawMountains(c, dayness) {
+function drawMountains(c, dayness, rainK) {
   const baseY = HORIZON;
   const mtn = lerpRGB(MTN_NIT, MTN_DAY, dayness);
   const mtnDark = [mtn[0]*0.7, mtn[1]*0.7, mtn[2]*0.75];
-  const glow = Math.max(0, 1 - Math.abs(dayness - 0.5) * 2);
+  const glow = Math.max(0, 1 - Math.abs(dayness - 0.5) * 2) * (1 - rainK);
   c.fillStyle = rgbStr(mtn);
   c.beginPath();
   c.moveTo(-10, baseY);
@@ -1824,13 +1941,11 @@ function drawMountains(c, dayness) {
   c.lineTo(IW + 10, baseY + 4);
   c.closePath();
   c.fill();
-  // Capilla Monserrate
-  c.fillStyle = `rgba(245,240,225,${0.5 + 0.5*dayness})`;
+  c.fillStyle = `rgba(245,240,225,${(0.5 + 0.5*dayness)*(1-rainK*0.5)})`;
   c.fillRect(220-1, baseY-36-3, 3, 3);
-  c.fillStyle = `rgba(245,240,225,${0.6 + 0.4*dayness})`;
+  c.fillStyle = `rgba(245,240,225,${(0.6 + 0.4*dayness)*(1-rainK*0.5)})`;
   c.fillRect(220, baseY-36-5, 1, 2);
-  // Guadalupe
-  c.fillStyle = `rgba(220,215,200,${0.5 + 0.5*dayness})`;
+  c.fillStyle = `rgba(220,215,200,${(0.5 + 0.5*dayness)*(1-rainK*0.5)})`;
   c.fillRect(270, baseY-42-4, 1, 4);
   c.fillRect(270-1, baseY-42-2, 3, 1);
   if (glow > 0.1) {
@@ -1841,8 +1956,8 @@ function drawMountains(c, dayness) {
     for (const [px, dy] of peaks) c.lineTo(px, baseY + dy);
     c.stroke();
   }
-  if (dayness < 0.55) {
-    const cityA = (0.55 - dayness) * 1.5;
+  if (dayness < 0.55 && rainK < 0.6) {
+    const cityA = (0.55 - dayness) * 1.5 * (1 - rainK);
     c.fillStyle = `rgba(255,220,140,${cityA * 0.9})`;
     const lights = [[50,-2],[90,-2],[125,-3],[160,-2],[195,-3],[235,-4],[275,-5],[310,-4],[345,-3],[380,-3],[420,-2],[460,-2]];
     for (const [lx, ly] of lights) c.fillRect(lx, baseY + ly, 1, 1);
@@ -1856,15 +1971,21 @@ function drawMountains(c, dayness) {
 }
 
 // ============================================================
-// RENDER — MODE 7
+// MODE 7
 // ============================================================
-function renderMode7(dayness) {
+function renderMode7(dayness, rainK) {
   const cosA = Math.cos(cam.angle);
   const sinA = Math.sin(cam.angle);
   const cx = cam.x, cy = cam.y;
-  const fog = lerpRGB(FOG_NIT, FOG_DAY, dayness);
+  // Fog se vuelve gris-azul cuando llueve
+  const fogBase = lerpRGB(FOG_NIT, FOG_DAY, dayness);
+  const fog = [
+    fogBase[0]*(1-rainK*0.5) + 70*rainK*0.5,
+    fogBase[1]*(1-rainK*0.5) + 80*rainK*0.5,
+    fogBase[2]*(1-rainK*0.4) + 95*rainK*0.4,
+  ];
   const fogR = fog[0], fogG = fog[1], fogB = fog[2];
-  const bright = 0.42 + 0.58 * dayness;
+  const bright = (0.42 + 0.58 * dayness) * (1 - rainK * 0.25);
   for (let y=0; y<GROUND_H; y++) {
     const yy = y + 1;
     const dist = (CAM_HEIGHT * FOV) / yy;
@@ -1897,113 +2018,37 @@ function renderMode7(dayness) {
 }
 
 // ============================================================
-// PROYECCIÓN MODE 7 INVERSA (para AI sprites)
+// PROYECCIÓN MODE 7 INVERSA
 // ============================================================
 function projectWorld(wx, wy) {
   const dx = wx - cam.x;
   const dy = wy - cam.y;
   const cosA = Math.cos(cam.angle);
   const sinA = Math.sin(cam.angle);
-  const rx = dx * cosA + dy * sinA;     // forward
-  const ry = -dx * sinA + dy * cosA;    // lateral (right)
+  const rx = dx * cosA + dy * sinA;
+  const ry = -dx * sinA + dy * cosA;
   if (rx < 4) return null;
   const sx = IW/2 + ry * FOV / rx;
   const sy = HORIZON + (CAM_HEIGHT * FOV) / rx;
-  const scale = (CAM_HEIGHT * FOV) / rx / CAM_HEIGHT;  // simplificado
+  const scale = (FOV / rx);
   return { x: sx, y: sy, scale: scale * 0.6, dist: rx };
 }
 
-function renderAIKarts(c, dayness) {
-  const projected = [];
-  for (const ai of aiKarts) {
-    const p = projectWorld(ai.x, ai.y);
-    if (p && p.x > -40 && p.x < IW + 40) projected.push({ ai, p });
-  }
-  // Lejos a cerca
-  projected.sort((a, b) => b.p.dist - a.p.dist);
-  for (const { ai, p } of projected) drawAISprite(c, p.x, p.y, p.scale, ai, dayness);
-}
-
-function drawAISprite(c, x, y, scale, ai, dayness) {
-  if (scale < 0.05) return;
-  const w = 16 * scale;
-  const h = 22 * scale;
-  // Sombra
-  c.fillStyle = `rgba(0,0,0,${0.45 * Math.min(1, scale)})`;
-  c.beginPath();
-  c.ellipse(x, y + h*0.4, w*1.1, h*0.18, 0, 0, Math.PI*2);
-  c.fill();
-  // Cuerpo (rectángulo + chasis)
-  c.fillStyle = '#001ea8';
-  c.fillRect(x - w/2, y - h/2 + h*0.2, w, h*0.5);
-  c.fillStyle = '#0047FF';
-  c.fillRect(x - w/2 + w*0.08, y - h/2 + h*0.12, w*0.84, h*0.4);
-  // Llantas (4 puntos negros)
-  c.fillStyle = '#0a0a14';
-  c.fillRect(x - w/2 - 1, y - h/2 + h*0.7, 3*scale, 4*scale);
-  c.fillRect(x + w/2 - 2*scale + 1, y - h/2 + h*0.7, 3*scale, 4*scale);
-  c.fillRect(x - w/2 - 1, y - h/2 + h*0.18, 3*scale, 4*scale);
-  c.fillRect(x + w/2 - 2*scale + 1, y - h/2 + h*0.18, 3*scale, 4*scale);
-  // Casco con color del candidato
-  c.fillStyle = ai.candidate.color;
-  c.beginPath();
-  c.arc(x, y - h*0.05, w*0.32, 0, Math.PI*2);
-  c.fill();
-  c.fillStyle = '#0a1124';
-  c.fillRect(x - w*0.18, y - h*0.10, w*0.36, h*0.06);
-  // Tinte nocturno
-  if (dayness < 0.85) {
-    const a = (0.85 - dayness) * 0.42;
-    c.fillStyle = `rgba(${SKY_NIT_TOP[0]},${SKY_NIT_TOP[1]},${SKY_NIT_TOP[2]},${a})`;
-    c.fillRect(x - w/2, y - h/2, w, h);
-  }
-  // Etiqueta de nombre si está cerca
-  if (scale > 0.6) {
-    c.fillStyle = 'rgba(0,0,0,0.6)';
-    const txt = ai.candidate.short;
-    c.font = `bold ${Math.max(6, 7*Math.min(scale, 1))}px sans-serif`;
-    c.textAlign = 'center';
-    const tw = c.measureText(txt).width;
-    c.fillRect(x - tw/2 - 2, y - h*0.7, tw + 4, 9);
-    c.fillStyle = '#fff';
-    c.fillText(txt, x, y - h*0.7 + 7);
-  }
-}
-
-function darkenHex(hex, amt) {
-  const r = parseInt(hex.slice(1,3), 16) * amt | 0;
-  const g = parseInt(hex.slice(3,5), 16) * amt | 0;
-  const b = parseInt(hex.slice(5,7), 16) * amt | 0;
-  return `rgb(${r},${g},${b})`;
-}
-function lightenHex(hex, amt) {
-  const r = parseInt(hex.slice(1,3), 16);
-  const g = parseInt(hex.slice(3,5), 16);
-  const b = parseInt(hex.slice(5,7), 16);
-  return `rgb(${(r+(255-r)*amt)|0},${(g+(255-g)*amt)|0},${(b+(255-b)*amt)|0})`;
-}
-
 // ============================================================
-// RENDER — KART (con llantas sólidas y rotación visible)
+// SPRITE UNIFICADO — kart (player + IA)
 // ============================================================
-function renderKart(c, dayness) {
-  const sp   = Math.abs(player.speed);
-  const bob  = Math.sin(performance.now()*0.014) * Math.min(2.4, sp);
-  const tilt = steerSmooth * Math.min(1, sp/1.0);
-  const cx   = IW/2;
-  const cy   = IH - 50 + bob;
-  const tx   = tilt * 8;
+function drawKartSprite(c, candidate, opts) {
+  const steerSm = opts.steer || 0;
+  const time = opts.time || 0;
+  const speedRef = opts.speed || 0;
+  const dayness = opts.dayness != null ? opts.dayness : 1;
+  const showLabel = opts.label || null;
 
   // Sombra
   c.fillStyle = `rgba(0,0,0,${0.40 + 0.15*dayness})`;
   c.beginPath();
-  c.ellipse(cx, cy + 22, 36, 8, 0, 0, Math.PI*2);
+  c.ellipse(0, 22, 36, 8, 0, 0, Math.PI*2);
   c.fill();
-
-  c.save();
-  c.translate(cx + tx, cy);
-  c.rotate(tilt * 0.06);
-  c.scale(KART_SCALE, KART_SCALE);
 
   // Difusor
   c.fillStyle = '#000';
@@ -2011,12 +2056,12 @@ function renderKart(c, dayness) {
   c.fillStyle = '#1a1a24';
   for (let i=-2; i<=2; i++) c.fillRect(i*8 - 1, 14, 2, 4);
 
-  // Llantas traseras (sólidas, rotan con el "tiempo" al moverse)
-  const rearSpin = (performance.now() / 1000) * sp * 1.2;
-  drawSolidWheel(c, -27, 9, 10, 15, rearSpin);
-  drawSolidWheel(c,  27, 9, 10, 15, rearSpin);
+  // Llantas traseras (rotan con velocidad)
+  const rearSpin = (time / 1000) * speedRef * 1.3;
+  drawSolidWheel(c, -27, 9, 10, 16, rearSpin, true);
+  drawSolidWheel(c,  27, 9, 10, 16, rearSpin, true);
 
-  // Aleta trasera
+  // Rear wing
   c.fillStyle = '#1a1a28';
   c.fillRect(-2, 0, 4, 4);
   c.fillStyle = '#0a0a14';
@@ -2024,10 +2069,10 @@ function renderKart(c, dayness) {
   c.fillStyle = '#1a1a28';
   c.fillRect(-19, -3, 2, 5);
   c.fillRect( 17, -3, 2, 5);
-  c.fillStyle = selectedCandidate.color;
+  c.fillStyle = candidate.color;
   c.fillRect(-16, 0, 32, 1);
 
-  // Bumper trasero con luces
+  // Bumper trasero
   c.fillStyle = '#001ea8';
   c.fillRect(-25, 4, 50, 11);
   c.fillStyle = '#0a2dc4';
@@ -2091,8 +2136,8 @@ function renderKart(c, dayness) {
   c.bezierCurveTo(-9, -22, 9, -22, 9, -16);
   c.stroke();
 
-  // Volante con manos
-  const swAngle = steerSmooth * 0.6;
+  // Volante
+  const swAngle = steerSm * 0.6;
   c.save();
   c.translate(0, -10);
   c.rotate(swAngle);
@@ -2110,15 +2155,12 @@ function renderKart(c, dayness) {
   c.fillStyle = '#1a1a24';
   c.beginPath(); c.arc(-3.2, 0, 1.8, 0, Math.PI*2); c.fill();
   c.beginPath(); c.arc( 3.2, 0, 1.8, 0, Math.PI*2); c.fill();
-  c.fillStyle = '#3a3a44';
-  c.fillRect(-3.6, -0.5, 0.8, 1);
-  c.fillRect( 2.8, -0.5, 0.8, 1);
   c.restore();
 
-  // Llantas DELANTERAS — giran VISIBLEMENTE con dirección
-  const wheelAngle = steerSmooth * 0.50;
-  drawSolidWheel(c, -23, -7, 8, 9, wheelAngle);
-  drawSolidWheel(c,  23, -7, 8, 9, wheelAngle);
+  // === Llantas DELANTERAS (giran con la dirección, son más alargadas para que el giro sea evidente) ===
+  const wheelAngle = steerSm * 0.75;     // hasta ~43°
+  drawSolidWheel(c, -23, -7, 6, 11, wheelAngle, false);
+  drawSolidWheel(c,  23, -7, 6, 11, wheelAngle, false);
 
   // Nariz con luces
   c.fillStyle = '#001ea8';
@@ -2132,49 +2174,24 @@ function renderKart(c, dayness) {
   c.fillRect(-5, -13, 3, 1);
   c.fillRect( 2, -13, 3, 1);
 
-  // Casco
-  const headDx  = steerSmooth * 2.2;
-  const headRot = steerSmooth * 0.18;
+  // === Cabeza con rasgos del candidato (gira con la dirección) ===
+  const headDx  = steerSm * 2.2;
+  const headRot = steerSm * 0.18;
   c.save();
   c.translate(headDx, 0);
   c.rotate(headRot);
   c.fillStyle = '#1a1a28';
-  c.fillRect(-7, -13, 14, 4);
-  const helmetColor = selectedCandidate.color;
-  const helmetDark  = darkenHex(helmetColor, 0.55);
-  const helmetLight = lightenHex(helmetColor, 0.30);
-  c.fillStyle = helmetColor;
-  c.beginPath(); c.arc(0, -19, 8.2, 0, Math.PI*2); c.fill();
-  c.fillStyle = helmetLight;
-  c.beginPath(); c.arc(-1.5, -22, 4, Math.PI*1.05, Math.PI*1.95); c.closePath(); c.fill();
-  c.fillStyle = `rgba(0,0,0,${0.28 + 0.18*Math.abs(steerSmooth)})`;
-  c.beginPath(); c.arc(steerSmooth * 1.5, -18, 7.2, 0, Math.PI*2); c.fill();
-  c.fillStyle = helmetDark;
-  c.fillRect(-7.5, -19, 15, 2);
-  c.fillStyle = '#fafafa';
-  c.fillRect(-7.5, -18, 15, 0.6);
-  c.fillStyle = '#0a1124';
-  c.beginPath();
-  c.moveTo(-5.5, -22);
-  c.lineTo( 5.5, -22);
-  c.lineTo( 5,   -19.5);
-  c.lineTo(-5,   -19.5);
-  c.closePath();
-  c.fill();
-  c.fillStyle = 'rgba(255,255,255,0.4)';
-  c.fillRect(-5, -22, 5, 0.6);
-  c.fillRect(-5, -21, 1.5, 0.4);
-  c.fillStyle = '#fff';
-  c.fillRect(-1, -28, 2, 4);
-  c.fillStyle = '#ff3b3b';
-  c.fillRect(-1, -28, 2, 1);
+  c.fillRect(-7, -13, 14, 4);  // hombros
+  drawDriverHead(c, candidate);
   c.restore();
 
+  // Sombra de la cabeza sobre el chasis
   c.fillStyle = 'rgba(0,0,0,0.3)';
   c.beginPath();
   c.ellipse(0, -12, 7, 2, 0, 0, Math.PI*2);
   c.fill();
 
+  // Número 01 / sponsor
   c.fillStyle = '#fafafa';
   c.font = 'bold 6px sans-serif';
   c.textAlign = 'center';
@@ -2183,12 +2200,431 @@ function renderKart(c, dayness) {
   c.font = 'bold 4px sans-serif';
   c.fillText('R.RUIZ', 0, 7);
 
+  // Tinte nocturno
   if (dayness < 0.85) {
     const a = (0.85 - dayness) * 0.42;
     c.fillStyle = `rgba(${SKY_NIT_TOP[0]},${SKY_NIT_TOP[1]},${SKY_NIT_TOP[2]},${a})`;
     c.fillRect(-30, -32, 60, 56);
   }
 
+  // Etiqueta nombre (sólo cuando se pide)
+  if (showLabel) {
+    c.fillStyle = 'rgba(0,0,0,0.7)';
+    c.font = 'bold 6px sans-serif';
+    c.textAlign = 'center';
+    const tw = c.measureText(showLabel).width;
+    c.fillRect(-tw/2 - 3, -36, tw + 6, 9);
+    c.fillStyle = '#fff';
+    c.fillText(showLabel, 0, -29);
+  }
+}
+
+// ============================================================
+// CABEZA con rasgos físicos
+// ============================================================
+// Dibuja la cabeza del piloto vista DESDE ATRÁS (cámara detrás del kart)
+// → la mayoría de la cabeza es cabello, sólo se ven slivers de piel en orejas y nuca.
+function drawDriverHead(c, candidate) {
+  const f = candidate.features;
+
+  // === FASE 1: cabello que cae POR DETRÁS (long hair / shortF medium) ===
+  // Se dibuja antes del cuello para quedar al fondo
+  if (f.hairStyle === 'long') {
+    c.fillStyle = f.hair;
+    // Mechones cayendo a los hombros
+    c.fillRect(-9, -16, 18, 13);
+    c.beginPath();
+    c.arc(0, -3, 9, 0, Math.PI);   // base curva
+    c.fill();
+  } else if (f.hairStyle === 'shortF') {
+    c.fillStyle = f.hair;
+    c.fillRect(-8, -16, 16, 5);    // baja un poquito por detrás
+  }
+
+  // === Cuello (piel visible bajo la nuca) ===
+  c.fillStyle = f.skin;
+  c.fillRect(-3, -14, 6, 4);
+
+  // === Cabeza (silueta — mayoritariamente cabello visto desde atrás) ===
+  // Bald: la corona es piel
+  if (f.hairStyle === 'bald') {
+    c.fillStyle = f.skin;
+    c.beginPath();
+    c.ellipse(0, -19, 7, 7.5, 0, 0, Math.PI*2);
+    c.fill();
+    // Sombra
+    c.fillStyle = 'rgba(0,0,0,0.18)';
+    c.beginPath();
+    c.ellipse(2, -18, 5, 6.5, 0, 0, Math.PI*2);
+    c.fill();
+    // Mechones laterales (corona)
+    c.fillStyle = f.hair;
+    c.fillRect(-8, -19, 2, 5);
+    c.fillRect(6, -19, 2, 5);
+    c.fillRect(-7, -14, 14, 1);   // base nuca
+  } else {
+    // Cabeza con pelo: silueta de cabello
+    c.fillStyle = f.hair;
+    switch (f.hairStyle) {
+      case 'curly':
+        // Bumps rizados (silueta irregular)
+        c.beginPath();
+        c.ellipse(0, -19, 7.5, 8, 0, 0, Math.PI*2);
+        c.fill();
+        c.beginPath();
+        c.arc(-6, -23, 2.8, 0, Math.PI*2);
+        c.arc(-2, -25, 3, 0, Math.PI*2);
+        c.arc(2, -25, 3, 0, Math.PI*2);
+        c.arc(6, -23, 2.8, 0, Math.PI*2);
+        c.arc(-8, -19, 2.5, 0, Math.PI*2);
+        c.arc(8, -19, 2.5, 0, Math.PI*2);
+        c.arc(-7, -15, 2.2, 0, Math.PI*2);
+        c.arc(7, -15, 2.2, 0, Math.PI*2);
+        c.fill();
+        break;
+      case 'long':
+        // Cabeza ancha (con cabello)
+        c.beginPath();
+        c.ellipse(0, -19, 8.5, 9, 0, 0, Math.PI*2);
+        c.fill();
+        // Flequillo / línea superior
+        c.fillRect(-7, -27, 14, 3);
+        break;
+      case 'shortF':
+        // Cabeza con corte mediano cubriendo orejas
+        c.beginPath();
+        c.ellipse(0, -19, 7.5, 8.5, 0, 0, Math.PI*2);
+        c.fill();
+        c.fillRect(-8, -22, 16, 4);
+        break;
+      case 'short':
+      default:
+        // Corto masculino: silueta compacta
+        c.beginPath();
+        c.ellipse(0, -19, 7, 7.5, 0, 0, Math.PI*2);
+        c.fill();
+        c.fillRect(-7, -22, 14, 3);
+        break;
+    }
+    // Sliver de piel en los costados (orejas / nuca lateral)
+    c.fillStyle = f.skin;
+    c.fillRect(-7.5, -19, 1.2, 2);
+    c.fillRect(6.3, -19, 1.2, 2);
+    // Sombra ligera
+    c.fillStyle = 'rgba(0,0,0,0.18)';
+    c.beginPath();
+    c.ellipse(2, -18, 4.5, 6, 0, 0, Math.PI*2);
+    c.fill();
+  }
+
+  // === Detalles: gafas ===
+  if (f.glasses) {
+    c.strokeStyle = '#0a0a14';
+    c.lineWidth = 0.7;
+    c.fillStyle = '#0a0a14';
+    // Patillas visibles desde atrás
+    c.fillRect(-7, -19, 2, 0.8);
+    c.fillRect(5, -19, 2, 0.8);
+  }
+
+  // === Cuello de camisa (color del candidato) ===
+  c.fillStyle = candidate.color;
+  c.fillRect(-5, -12, 10, 2);
+  c.fillStyle = '#fff';
+  c.fillRect(-2, -12, 4, 2);
+  c.fillStyle = candidate.color;
+  c.fillRect(-1, -11, 2, 1);
+}
+
+// ============================================================
+// LLANTA SÓLIDA (más opaca, con disco de freno y radios)
+// ============================================================
+function drawSolidWheel(c, x, y, w, h, angle, isRear) {
+  c.save();
+  c.translate(x, y);
+  c.rotate(angle);
+  // Tire (negro sólido sin agujero)
+  c.fillStyle = '#0c0c14';
+  c.beginPath();
+  c.ellipse(0, 0, w/2, h/2, 0, 0, Math.PI*2);
+  c.fill();
+  // Sidewall sutil
+  c.fillStyle = '#15151c';
+  c.beginPath();
+  c.ellipse(0, 0, w*0.42, h*0.45, 0, 0, Math.PI*2);
+  c.fill();
+  // Disco/freno
+  c.fillStyle = '#7a7a88';
+  c.beginPath();
+  c.ellipse(0, 0, w*0.30, h*0.32, 0, 0, Math.PI*2);
+  c.fill();
+  // Cara interna oscura
+  c.fillStyle = '#2c2c34';
+  c.beginPath();
+  c.ellipse(0, 0, w*0.22, h*0.24, 0, 0, Math.PI*2);
+  c.fill();
+  // Radios — más gruesos en delanteras para mostrar giro
+  c.strokeStyle = '#bbbbcc';
+  c.lineWidth = isRear ? 0.7 : 1.0;
+  const spokes = isRear ? 5 : 4;
+  for (let i=0; i<spokes; i++) {
+    const a = (i * Math.PI * 2 / spokes);
+    const cosA = Math.cos(a), sinA = Math.sin(a);
+    c.beginPath();
+    c.moveTo(0, 0);
+    c.lineTo(cosA * w*0.30, sinA * h*0.32);
+    c.stroke();
+  }
+  // Hub
+  c.fillStyle = '#dddde6';
+  c.beginPath(); c.ellipse(0, 0, w*0.08, h*0.08, 0, 0, Math.PI*2); c.fill();
+  c.fillStyle = '#3a3a44';
+  c.beginPath(); c.ellipse(0, 0, w*0.04, h*0.04, 0, 0, Math.PI*2); c.fill();
+  // Highlight
+  c.fillStyle = 'rgba(255,255,255,0.25)';
+  c.beginPath();
+  c.ellipse(-w*0.15, -h*0.20, w*0.18, h*0.10, -0.4, 0, Math.PI*2);
+  c.fill();
+  c.restore();
+}
+
+// ============================================================
+// LANDMARKS — sprites estáticos en el mundo
+// ============================================================
+function drawLandmark(c, screenX, screenY, scale, type, dayness) {
+  if (scale < 0.04) return;
+  c.save();
+  c.translate(screenX, screenY);
+  c.scale(scale, scale);
+  switch (type) {
+    case 'plaza': {
+      // Plaza de Bolívar — losas rectangulares + estatua central
+      c.fillStyle = '#a07a4a';
+      c.fillRect(-30, -8, 60, 12);
+      c.fillStyle = '#8a6536';
+      c.fillRect(-28, -6, 56, 1);
+      // Estatua
+      c.fillStyle = '#3a3a40';
+      c.fillRect(-2, -22, 4, 14);
+      c.fillStyle = '#5a5a60';
+      c.beginPath(); c.arc(0, -23, 3, 0, Math.PI*2); c.fill();
+      // Pedestal
+      c.fillStyle = '#5a4030';
+      c.fillRect(-5, -10, 10, 4);
+      // Etiqueta
+      drawSpriteLabel(c, 'Plaza Bolívar', -28);
+      break;
+    }
+    case 'capitolio': {
+      // Capitolio — fachada blanca con columnas
+      c.fillStyle = '#5a5a64';
+      c.fillRect(-26, -2, 52, 4);  // base oscura
+      c.fillStyle = '#e8e4dc';
+      c.fillRect(-24, -22, 48, 22);
+      // Frontón
+      c.fillStyle = '#d8d3c8';
+      c.beginPath();
+      c.moveTo(-26, -22);
+      c.lineTo(0, -32);
+      c.lineTo(26, -22);
+      c.closePath();
+      c.fill();
+      // Columnas
+      c.fillStyle = '#c5beac';
+      for (let i=-22; i<=22; i+=8) c.fillRect(i, -22, 4, 22);
+      drawSpriteLabel(c, 'Capitolio', -36);
+      break;
+    }
+    case 'candelaria': {
+      // La Candelaria — barrio colorido (varias casas pequeñas)
+      const colors = ['#cc4444','#fcd116','#3478bb','#fafafa','#cc4444','#5a8a3c','#fcd116'];
+      for (let i=0; i<colors.length; i++) {
+        const x = -28 + i*8;
+        c.fillStyle = colors[i];
+        c.fillRect(x, -14, 7, 14);
+        // Tejas rojas
+        c.fillStyle = '#8a3a2a';
+        c.fillRect(x - 1, -17, 9, 4);
+      }
+      drawSpriteLabel(c, 'La Candelaria', -22);
+      break;
+    }
+    case 'parque': {
+      // Parque de los Periodistas — cipreses + banca
+      c.fillStyle = '#5a4030';
+      c.fillRect(-12, -2, 24, 3);
+      c.fillStyle = '#2a5e3a';
+      c.beginPath(); c.arc(-8, -10, 5, 0, Math.PI*2); c.fill();
+      c.beginPath(); c.arc(0, -12, 6, 0, Math.PI*2); c.fill();
+      c.beginPath(); c.arc(8, -10, 5, 0, Math.PI*2); c.fill();
+      c.fillStyle = '#3a6a48';
+      c.fillRect(-9, -10, 2, 8);
+      c.fillRect(-1, -12, 2, 10);
+      c.fillRect(7, -10, 2, 8);
+      drawSpriteLabel(c, 'Periodistas', -22);
+      break;
+    }
+    case 'campin': {
+      // El Campín — estadio oval con tribunas
+      c.fillStyle = '#3a4d6a';
+      c.beginPath();
+      c.ellipse(0, -10, 32, 14, 0, 0, Math.PI*2);
+      c.fill();
+      // Cancha
+      c.fillStyle = '#3a8848';
+      c.beginPath();
+      c.ellipse(0, -10, 26, 9, 0, 0, Math.PI*2);
+      c.fill();
+      // Línea central
+      c.strokeStyle = '#fafafa';
+      c.lineWidth = 0.5;
+      c.beginPath(); c.moveTo(0, -19); c.lineTo(0, -1); c.stroke();
+      c.beginPath(); c.arc(0, -10, 3, 0, Math.PI*2); c.stroke();
+      drawSpriteLabel(c, 'El Campín', -32);
+      break;
+    }
+    case 'arena': {
+      // Movistar Arena — domo
+      c.fillStyle = '#1a4d8a';
+      c.beginPath();
+      c.ellipse(0, -10, 22, 10, 0, Math.PI, 2*Math.PI);
+      c.fill();
+      c.fillStyle = '#2d6db8';
+      c.fillRect(-22, -10, 44, 4);
+      c.fillStyle = '#3478bb';
+      c.fillRect(-22, -8, 44, 2);
+      // Vidriera
+      c.fillStyle = 'rgba(255,255,255,0.25)';
+      c.beginPath();
+      c.ellipse(-6, -16, 6, 4, -0.3, 0, Math.PI*2);
+      c.fill();
+      drawSpriteLabel(c, 'Movistar', -26);
+      break;
+    }
+    case 'tm': {
+      // TransMilenio bus parqueado
+      c.fillStyle = '#a01818';
+      c.fillRect(-14, -10, 28, 10);
+      c.fillStyle = '#c92020';
+      c.fillRect(-14, -10, 28, 3);
+      // Ventanas
+      c.fillStyle = '#1a3a6a';
+      c.fillRect(-12, -8, 4, 3);
+      c.fillRect(-7, -8, 4, 3);
+      c.fillRect(-2, -8, 4, 3);
+      c.fillRect(3, -8, 4, 3);
+      c.fillRect(8, -8, 4, 3);
+      // Llantas
+      c.fillStyle = '#0c0c14';
+      c.fillRect(-11, 0, 4, 2);
+      c.fillRect(7, 0, 4, 2);
+      // Logo
+      c.fillStyle = '#fafafa';
+      c.font = 'bold 4px sans-serif';
+      c.textAlign = 'center';
+      c.fillText('TM', 0, -4);
+      break;
+    }
+    case 'tribune': {
+      // Tribuna — tres niveles de gradas con público
+      c.fillStyle = '#3a3a44';
+      c.fillRect(-32, -4, 64, 4);
+      c.fillStyle = '#46464e';
+      c.fillRect(-32, -10, 64, 6);
+      c.fillStyle = '#52525a';
+      c.fillRect(-32, -16, 64, 6);
+      // Public como dots de colores
+      const palette = ['#ff3b3b','#39ff7a','#ffaa00','#0047FF','#ff6eb4','#d4af37'];
+      for (let row=0; row<3; row++) {
+        const ry = -16 + row*6 + 2;
+        for (let col=0; col<14; col++) {
+          c.fillStyle = palette[(row*14 + col) % palette.length];
+          c.fillRect(-30 + col*5, ry, 2, 2);
+        }
+      }
+      // Estructura del techo
+      c.fillStyle = '#2a2a32';
+      c.fillRect(-34, -22, 68, 3);
+      c.fillRect(-34, -22, 3, 7);
+      c.fillRect(31, -22, 3, 7);
+      break;
+    }
+  }
+  c.restore();
+}
+function drawSpriteLabel(c, text, y) {
+  c.fillStyle = 'rgba(0,0,0,0.65)';
+  c.font = 'bold 5px sans-serif';
+  c.textAlign = 'center';
+  const tw = c.measureText(text).width;
+  c.fillRect(-tw/2 - 2, y - 5, tw + 4, 7);
+  c.fillStyle = '#fff';
+  c.fillText(text, 0, y);
+}
+
+// ============================================================
+// RENDER OBJETOS DEL MUNDO (IA + landmarks/tribunas) ordenado por z
+// ============================================================
+function renderWorldObjects(c, dayness) {
+  const projected = [];
+  // AI
+  for (const ai of aiKarts) {
+    const p = projectWorld(ai.x, ai.y);
+    if (p && p.x > -60 && p.x < IW + 60) {
+      projected.push({ kind:'ai', ai, p });
+    }
+  }
+  // Landmarks/tribunes
+  for (const obj of WORLD_OBJECTS) {
+    const p = projectWorld(obj.x, obj.y);
+    if (p && p.x > -100 && p.x < IW + 100) {
+      projected.push({ kind:'obj', obj, p });
+    }
+  }
+  // Lejos a cerca
+  projected.sort((a, b) => b.p.dist - a.p.dist);
+  for (const item of projected) {
+    if (item.kind === 'ai') {
+      const sc = item.p.scale;
+      if (sc < 0.05) continue;
+      c.save();
+      c.translate(item.p.x, item.p.y);
+      c.scale(sc, sc);
+      drawKartSprite(c, item.ai.candidate, {
+        steer: 0,
+        time: performance.now(),
+        speed: 3,
+        dayness,
+        label: sc > 0.45 ? item.ai.candidate.short : null,
+      });
+      c.restore();
+    } else {
+      drawLandmark(c, item.p.x, item.p.y, item.p.scale, item.obj.type, dayness);
+    }
+  }
+}
+
+// ============================================================
+// PLAYER KART
+// ============================================================
+function renderPlayerKart(c, dayness) {
+  const sp   = Math.abs(player.speed);
+  const bob  = Math.sin(performance.now()*0.014) * Math.min(2.4, sp);
+  const tilt = steerSmooth * Math.min(1, sp/1.0);
+  const cx   = IW/2;
+  const cy   = IH - 50 + bob;
+  const tx   = tilt * 8;
+
+  c.save();
+  c.translate(cx + tx, cy);
+  c.rotate(tilt * 0.06);
+  c.scale(KART_SCALE, KART_SCALE);
+  drawKartSprite(c, selectedCandidate, {
+    steer: steerSmooth,
+    time: performance.now(),
+    speed: sp,
+    dayness,
+  });
   c.restore();
 
   // Líneas de velocidad
@@ -2210,53 +2646,27 @@ function renderKart(c, dayness) {
   }
 }
 
-// Llanta sólida con disco de freno y radios visibles que ROTAN
-function drawSolidWheel(c, x, y, w, h, angle) {
-  c.save();
-  c.translate(x, y);
-  c.rotate(angle);
-  // Tire (sólido, oscuro)
-  c.fillStyle = '#0c0c14';
-  c.beginPath();
-  c.ellipse(0, 0, w/2, h/2, 0, 0, Math.PI*2);
-  c.fill();
-  // Sidewall (un poco más clara)
-  c.fillStyle = '#15151c';
-  c.beginPath();
-  c.ellipse(0, 0, w*0.42, h*0.42, 0, 0, Math.PI*2);
-  c.fill();
-  // Disco de freno (rim grande gris)
-  c.fillStyle = '#9090a0';
-  c.beginPath();
-  c.ellipse(0, 0, w*0.32, h*0.32, 0, 0, Math.PI*2);
-  c.fill();
-  // Cara interna del rim (oscura)
-  c.fillStyle = '#2c2c34';
-  c.beginPath();
-  c.ellipse(0, 0, w*0.27, h*0.27, 0, 0, Math.PI*2);
-  c.fill();
-  // Radios (visiblemente rotan con angle)
-  c.strokeStyle = '#bbbbcc';
-  c.lineWidth = 0.7;
-  for (let i=0; i<5; i++) {
-    const a = (i * Math.PI * 2 / 5);
-    const cosA = Math.cos(a), sinA = Math.sin(a);
+// ============================================================
+// LLUVIA — render
+// ============================================================
+function renderRain(c, k) {
+  if (k <= 0) return;
+  // Tinte gris-azul
+  c.fillStyle = `rgba(60,80,120,${0.18 * k})`;
+  c.fillRect(0, 0, IW, IH);
+  // Streaks
+  c.strokeStyle = `rgba(220,235,255,${0.55 * k})`;
+  c.lineWidth = 0.8;
+  for (const d of RAIN_DROPS) {
     c.beginPath();
-    c.moveTo(0, 0);
-    c.lineTo(cosA * w*0.30, sinA * h*0.30);
+    c.moveTo(d.x, d.y);
+    c.lineTo(d.x + 2, d.y + 8);
     c.stroke();
+    d.y += d.speed;
+    d.x -= d.speed * 0.25;
+    if (d.y > IH) { d.y = -10; d.x = Math.random() * (IW + 60); }
+    if (d.x < -10) d.x += IW + 60;
   }
-  // Hub central
-  c.fillStyle = '#dddde6';
-  c.beginPath(); c.ellipse(0, 0, w*0.10, h*0.10, 0, 0, Math.PI*2); c.fill();
-  c.fillStyle = '#3a3a44';
-  c.beginPath(); c.ellipse(0, 0, w*0.05, h*0.05, 0, 0, Math.PI*2); c.fill();
-  // Highlight superior izquierdo
-  c.fillStyle = 'rgba(255,255,255,0.22)';
-  c.beginPath();
-  c.ellipse(-w*0.15, -h*0.18, w*0.18, h*0.10, -0.4, 0, Math.PI*2);
-  c.fill();
-  c.restore();
 }
 
 // ============================================================
@@ -2267,11 +2677,9 @@ function renderMinimap() {
   m.clearRect(0, 0, MINI_W, MINI_H);
   m.fillStyle = 'rgba(8,12,28,0.85)';
   m.fillRect(0, 0, MINI_W, MINI_H);
-  // Borde
   m.strokeStyle = 'rgba(255,255,255,0.18)';
   m.lineWidth = 1;
   m.strokeRect(0.5, 0.5, MINI_W-1, MINI_H-1);
-  // Bbox del centerline
   let mnx=Infinity, mny=Infinity, mxx=-Infinity, mxy=-Infinity;
   for (const [x,y] of CENTERLINE) {
     if (x < mnx) mnx = x;
@@ -2288,7 +2696,7 @@ function renderMinimap() {
   const offY = (MINI_H - bh*sc) / 2 - mny*sc;
   const W2M = (wx, wy) => [wx*sc + offX, wy*sc + offY];
 
-  // Pista (línea ancha gris)
+  // Pista
   m.strokeStyle = 'rgba(255,255,255,0.30)';
   m.lineWidth = TR_HALF_WIDTH * 2 * sc * 0.7;
   m.lineCap = 'round';
@@ -2299,18 +2707,23 @@ function renderMinimap() {
     if (i===0) m.moveTo(px, py); else m.lineTo(px, py);
   }
   m.stroke();
-  // Línea central blanca
   m.strokeStyle = 'rgba(255,255,255,0.7)';
   m.lineWidth = 1.5;
   m.stroke();
-  // Línea de meta
-  const [s0x, s0y] = W2M(CENTERLINE[0][0], CENTERLINE[0][1]);
-  m.fillStyle = '#fcd116';
-  m.beginPath();
-  m.arc(s0x, s0y, 4, 0, Math.PI*2);
-  m.fill();
 
-  // AI markers
+  // Landmarks (puntos pequeños amarillos)
+  m.fillStyle = '#fcd116';
+  for (const lm of LANDMARKS) {
+    const [px, py] = W2M(lm.x, lm.y);
+    m.beginPath(); m.arc(px, py, 1.5, 0, Math.PI*2); m.fill();
+  }
+
+  // Meta
+  const [s0x, s0y] = W2M(CENTERLINE[0][0], CENTERLINE[0][1]);
+  m.fillStyle = '#ce1126';
+  m.beginPath(); m.arc(s0x, s0y, 4, 0, Math.PI*2); m.fill();
+
+  // AI
   for (const ai of aiKarts) {
     const [px, py] = W2M(ai.x, ai.y);
     m.fillStyle = ai.candidate.color;
@@ -2321,7 +2734,7 @@ function renderMinimap() {
     m.lineWidth = 0.5;
     m.stroke();
   }
-  // Player marker (más grande)
+  // Player
   const [pmx, pmy] = W2M(player.x, player.y);
   m.fillStyle = selectedCandidate.color;
   m.beginPath();
@@ -2330,13 +2743,55 @@ function renderMinimap() {
   m.strokeStyle = '#fff';
   m.lineWidth = 1.5;
   m.stroke();
-  // Flecha de dirección
   m.strokeStyle = '#fff';
-  m.lineWidth = 1.5;
   m.beginPath();
   m.moveTo(pmx, pmy);
   m.lineTo(pmx + Math.cos(player.angle)*8, pmy + Math.sin(player.angle)*8);
   m.stroke();
+}
+
+// ============================================================
+// TOP-4 STANDINGS
+// ============================================================
+const standCards = [
+  document.getElementById('stand-1'),
+  document.getElementById('stand-2'),
+  document.getElementById('stand-3'),
+  document.getElementById('stand-4'),
+];
+function updateStandings() {
+  const all = [
+    {
+      candidate: selectedCandidate,
+      name: selectedCandidate.short,
+      color: selectedCandidate.color,
+      isYou: true,
+      progress: (currentLap - 1) - (totalAngle / (2*Math.PI)),
+    },
+    ...aiKarts.map(ai => ({
+      candidate: ai.candidate,
+      name: ai.candidate.short,
+      color: ai.candidate.color,
+      isYou: false,
+      progress: (ai.lap - 1) + (ai.t / CL_TOTAL),
+    })),
+  ];
+  all.sort((a, b) => b.progress - a.progress);
+  for (let i = 0; i < 4; i++) {
+    const card = standCards[i];
+    const k = all[i];
+    if (!k) { card.style.display = 'none'; continue; }
+    card.style.display = 'flex';
+    card.classList.toggle('you', k.isYou);
+    const inits = initials(k.candidate.name);
+    const fontColor = isLightHex(k.color) ? '#0a0a14' : '#fff';
+    const lap = k.isYou ? Math.min(currentLap, TOTAL_LAPS) : Math.min(Math.max(k.candidate.lap || 0, 1), TOTAL_LAPS);
+    card.innerHTML = `
+      <span class="pos">${i+1}</span>
+      <span class="ph" style="background:${k.color};color:${fontColor}">${inits}</span>
+      <span class="nm">${k.name}${k.isYou ? ' (tú)' : ''}</span>
+    `;
+  }
 }
 
 // ============================================================
@@ -2355,13 +2810,15 @@ function frame(t) {
   if (state === 'racing') { update(dt); updateAudio(); }
   else if (state === 'countdown') { tickCountdown(t); }
 
-  const dayness = state === 'racing' || state === 'paused' ? getDayness(raceTimeMs) : 1;
+  const dayness = (state === 'racing' || state === 'paused') ? getDayness(raceTimeMs) : 1;
+  const rainK   = (state === 'racing' || state === 'paused') ? getRainIntensity() : 0;
 
-  renderSky(ictx, dayness);
-  renderMode7(dayness);
-  renderAIKarts(ictx, dayness);
+  renderSky(ictx, dayness, rainK);
+  renderMode7(dayness, rainK);
+  renderWorldObjects(ictx, dayness);
   renderSmoke(ictx);
-  renderKart(ictx, dayness);
+  renderPlayerKart(ictx, dayness);
+  renderRain(ictx, rainK);
 
   const sp = Math.abs(player.speed);
   let shX = 0, shY = 0;
@@ -2383,8 +2840,11 @@ function frame(t) {
       const sec = Math.floor(raceTimeMs / 1000);
       const phaseChar = dayness > 0.6 ? '☼ día' : dayness < 0.4 ? '☾ noche' : '··· transición';
       $phase.textContent = `${phaseChar} · ${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;
+      $weather.textContent = rainK > 0.05 ? '· ☔ lluvia' : '';
+      updateStandings();
     } else {
       $phase.textContent = '';
+      $weather.textContent = '';
     }
   }
   speedEl.textContent = (Math.abs(player.speed) * 60).toFixed(0);
