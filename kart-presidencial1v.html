@@ -936,12 +936,12 @@ let selectedCandidate = CANDIDATES[0];
 // ============================================================
 // TUNABLES
 // ============================================================
-const ACCEL      = 0.064;   // +10% sobre 0.058
+const ACCEL      = 0.067;   // +10% inicial + 5% adicional
 const BRAKE      = 0.085;
-const REV_ACCEL  = 0.033;   // +10% sobre 0.030
+const REV_ACCEL  = 0.035;   // +10% inicial + 5% adicional
 const FRICTION   = 0.985;
-const MAX_FWD    = 4.84;    // +10% sobre 4.40
-const MAX_REV    = -1.76;   // +10% sobre -1.60
+const MAX_FWD    = 5.08;    // +10% inicial + 5% adicional sobre 4.40
+const MAX_REV    = -1.85;   // +10% inicial + 5% adicional sobre -1.60
 const TURN_RATE  = 0.050;
 const TURN_RAMP  = 1.30;
 
@@ -1242,21 +1242,30 @@ function buildTrack(c, S) {
   c.lineWidth = halfW*2 + 36;
   drawCenterPath(c);
 
-  // Asfalto en capas. La franja blanca del borde se pinta como capa
-  // concéntrica MÁS ANCHA que el asfalto principal — luego las capas de
-  // asfalto la cubren por dentro y queda solo un anillo de 4 px al borde
-  // exterior. Esto garantiza que la franja siempre coincida con el borde
-  // real del asfalto en cualquier curva, por cerrada que sea (los offset
-  // paths laterales fallaban en concavidades cortas, generando trazos que
-  // no compaginaban con el asfalto).
-  c.strokeStyle = 'rgba(255,255,255,0.55)';
+  // Borde de la pista estilo kerb F1: anillo blanco/rojo alternando segmentos
+  // de 42 px alrededor de TODO el perímetro. Se pinta como dos strokes con
+  // line-dash desfasados, cubriendo todo el ancho del asfalto; luego las
+  // capas de asfalto interiores cubren el centro, dejando un anillo de
+  // 6 px de kerb visible exactamente en el borde. Como es stroke al mismo
+  // path del asfalto, siempre coincide con la geometría real (los offset
+  // paths laterales del intento previo fallaban en curvas cerradas).
+  c.lineCap = 'butt';
+  c.strokeStyle = '#fafafa';
   c.lineWidth = halfW*2;
+  c.setLineDash([42, 42]);
+  c.lineDashOffset = 0;
   drawCenterPath(c);
+  c.strokeStyle = '#cc2434';
+  c.lineDashOffset = 42;
+  drawCenterPath(c);
+  c.setLineDash([]);
+  c.lineCap = 'round';
+  // Asfalto outer (cubre el centro del kerb, deja 6 px de kerb al borde)
   c.strokeStyle = '#28282e';
-  c.lineWidth = halfW*2 - 8;       // deja 4 px de blanco a cada lado
+  c.lineWidth = halfW*2 - 12;
   drawCenterPath(c);
   c.strokeStyle = '#34343e';
-  c.lineWidth = halfW*2 - 24;
+  c.lineWidth = halfW*2 - 28;
   drawCenterPath(c);
   c.strokeStyle = '#3c3c46';
   c.lineWidth = halfW*2 - 80;
@@ -1294,16 +1303,10 @@ function buildTrack(c, S) {
   drawCenterPath(c);
   c.setLineDash([]);
 
-  // Kerbs en curvas (vértices con cambio de ángulo)
-  for (let i = 1; i < CENTERLINE.length - 1; i++) {
-    const a = CENTERLINE[i-1], b = CENTERLINE[i], d = CENTERLINE[i+1];
-    const ang1 = Math.atan2(b[1]-a[1], b[0]-a[0]);
-    const ang2 = Math.atan2(d[1]-b[1], d[0]-b[0]);
-    let diff = ang2 - ang1;
-    while (diff >  Math.PI) diff -= 2*Math.PI;
-    while (diff < -Math.PI) diff += 2*Math.PI;
-    if (Math.abs(diff) > 0.25) drawCornerKerb(c, b, ang1, ang2, diff, halfW);
-  }
+  // (Antes se dibujaban kerbs transversales en cada curva con drawCornerKerb,
+  // pero generaban franjas rojo/blanco a través del asfalto que no
+  // compaginaban con el borde; ahora el kerb va alrededor de toda la pista
+  // como capa concéntrica — ver bloque "Borde de la pista estilo kerb F1".)
 
   // Línea de meta + chevrons + banner
   const start = CENTERLINE[0];
@@ -1599,7 +1602,7 @@ function resetRace() {
       initialLap = 0; // antes de la meta
     }
     const tStart = ((playerT + tOffset) % CL_TOTAL + CL_TOTAL) % CL_TOTAL;
-    const baseSpeed = 3.55 + Math.random() * 0.25;
+    const baseSpeed = 3.83 + Math.random() * 0.27;  // +8% sobre 3.55-3.80
     const aiBaseSpeed = baseSpeed * c.skill * homeBoost(c);
     aiKarts.push({
       candidate: c,
