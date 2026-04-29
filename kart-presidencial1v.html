@@ -335,8 +335,8 @@
     z-index: 2;
   }
   .stand-card .ph {
-    width: 70px;
-    height: 150px;
+    width: 47px;
+    height: 100px;
     border-radius: 3px;
     border: 2px solid rgba(255,255,255,0.3);
     display: flex;
@@ -344,7 +344,7 @@
     justify-content: center;
     font-family: 'Syne', sans-serif;
     font-weight: 800;
-    font-size: 26px;
+    font-size: 18px;
     color: white;
     text-shadow: 0 1px 2px rgba(0,0,0,0.5);
     flex-shrink: 0;
@@ -355,12 +355,12 @@
   .stand-card img.ph { display:block; }
   .stand-card .nm {
     font-family: 'Arima', sans-serif;
-    font-size: 12px;
+    font-size: 11px;
     color: var(--fg);
     font-weight: 500;
     line-height: 1.1;
     text-align: center;
-    width: 70px;
+    width: 60px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1187,36 +1187,104 @@ setupMinimap();
 const tc = document.createElement('canvas');
 tc.width = TRACK_SIZE; tc.height = TRACK_SIZE;
 const tctx = tc.getContext('2d');
-buildTrack(tctx, TRACK_SIZE);
-const trackData = tctx.getImageData(0, 0, TRACK_SIZE, TRACK_SIZE).data;
 
-function buildTrack(c, S) {
+// Texturas externas (PNG/JPG en S3) — async. Mientras cargan, el track usa
+// fallback procedural (gris para asfalto, checkerboard verde para pasto,
+// silueta SVG para los cerros). Cuando todas terminan de cargar, se
+// reconstruyen los dos trackDatas (día y noche) con texturas reales.
+let gramillaDiaImg   = null;   // textura asfalto día
+let gramillaNocheImg = null;   // textura asfalto noche
+let pastoDiaImg      = null;   // textura pasto día
+let pastoNocheImg    = null;   // textura pasto noche
+let fondoBogotaImg   = null;   // panorámica de cerros
+const TEX_BASE = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/game/textures';
+function loadTexture(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload  = () => resolve(img);
+    img.onerror = (e) => reject(e);
+    img.src = url;
+  });
+}
+
+buildTrack(tctx, TRACK_SIZE);
+let trackData      = tctx.getImageData(0, 0, TRACK_SIZE, TRACK_SIZE).data;
+let trackDataNight = null;   // se llena cuando carga la textura nocturna
+
+// Cargar las texturas y rebuild en cuanto estén listas. Construimos DOS
+// trackDatas (día y noche) — el inner loop de renderMode7 las mezcla por
+// dayness. Costo de RAM: ~256 MB extra (TRACK_SIZE² × 4). En desktop está
+// bien; en mobile puede ser pesado — fallback automático si alguna
+// textura no carga.
+Promise.all([
+  loadTexture(`${TEX_BASE}/gramilla_dia.png`),
+  loadTexture(`${TEX_BASE}/gramilla_noche.png`),
+  loadTexture(`${TEX_BASE}/pasto_dia.png`),
+  loadTexture(`${TEX_BASE}/pasto_noche.png`),
+]).then(([asfaltoDia, asfaltoNoche, pastoDia, pastoNoche]) => {
+  gramillaDiaImg   = asfaltoDia;
+  gramillaNocheImg = asfaltoNoche;
+  pastoDiaImg      = pastoDia;
+  pastoNocheImg    = pastoNoche;
+  // Rebuild trackData con texturas de día (asfalto + pasto).
+  tctx.clearRect(0, 0, TRACK_SIZE, TRACK_SIZE);
+  buildTrack(tctx, TRACK_SIZE, asfaltoDia, pastoDia);
+  trackData = tctx.getImageData(0, 0, TRACK_SIZE, TRACK_SIZE).data;
+  // Build trackDataNight con texturas de noche.
+  tctx.clearRect(0, 0, TRACK_SIZE, TRACK_SIZE);
+  buildTrack(tctx, TRACK_SIZE, asfaltoNoche, pastoNoche);
+  trackDataNight = tctx.getImageData(0, 0, TRACK_SIZE, TRACK_SIZE).data;
+}).catch(err => {
+  console.warn('[kart] No se pudieron cargar texturas de pista, usando procedural:', err);
+});
+
+// Cerros / fondo de Bogotá (JPG panorámico) — se carga aparte porque no
+// requiere rebuild del track. drawMountains usa la imagen si está lista;
+// sino fallback al SVG procedural.
+loadTexture(`${TEX_BASE}/fondo_bogota.jpg`).then(img => {
+  fondoBogotaImg = img;
+}).catch(err => {
+  console.warn('[kart] No se pudo cargar fondo_bogota.jpg, usando procedural:', err);
+});
+
+function buildTrack(c, S, asphaltImg, grassImg) {
   const halfW = TR_HALF_WIDTH;
-  // Sabana base
-  for (let y=0; y<S; y+=80) {
-    for (let x=0; x<S; x+=80) {
-      const dark = ((x/80 + y/80) | 0) % 2 === 0;
-      c.fillStyle = dark ? '#3d6b48' : '#436f4d';
-      c.fillRect(x, y, 80, 80);
+  // Si no se pasan imágenes explícitas, usar las globales de día (compat
+  // con primera build sincrónica antes de cargar texturas).
+  if (asphaltImg === undefined) asphaltImg = gramillaDiaImg;
+  if (grassImg === undefined)   grassImg   = pastoDiaImg;
+  // Sabana base — textura de pasto si cargó, fallback checkerboard procedural.
+  if (grassImg) {
+    const pat = c.createPattern(grassImg, 'repeat');
+    c.fillStyle = pat;
+    c.fillRect(0, 0, S, S);
+  } else {
+    for (let y=0; y<S; y+=80) {
+      for (let x=0; x<S; x+=80) {
+        const dark = ((x/80 + y/80) | 0) % 2 === 0;
+        c.fillStyle = dark ? '#3d6b48' : '#436f4d';
+        c.fillRect(x, y, 80, 80);
+      }
     }
-  }
-  for (let i=0; i<14000; i++) {
-    const x = Math.random()*S | 0;
-    const y = Math.random()*S | 0;
-    const a = 0.25 + Math.random()*0.35;
-    const isLight = Math.random() < 0.4;
-    c.fillStyle = isLight
-      ? `rgba(${130+Math.random()*40|0},${180+Math.random()*40|0},${110+Math.random()*30|0},${a})`
-      : `rgba(${22+Math.random()*30|0},${75+Math.random()*30|0},${35+Math.random()*30|0},${a})`;
-    c.fillRect(x, y, 2, 2);
-  }
-  for (let i=0; i<280; i++) {
-    const x = Math.random()*S, y = Math.random()*S;
-    const r = 24 + Math.random()*55;
-    c.fillStyle = `rgba(${50+Math.random()*30|0},${130+Math.random()*30|0},${70+Math.random()*20|0},0.25)`;
-    c.beginPath();
-    c.ellipse(x, y, r, r*0.7, Math.random()*Math.PI, 0, Math.PI*2);
-    c.fill();
+    for (let i=0; i<14000; i++) {
+      const x = Math.random()*S | 0;
+      const y = Math.random()*S | 0;
+      const a = 0.25 + Math.random()*0.35;
+      const isLight = Math.random() < 0.4;
+      c.fillStyle = isLight
+        ? `rgba(${130+Math.random()*40|0},${180+Math.random()*40|0},${110+Math.random()*30|0},${a})`
+        : `rgba(${22+Math.random()*30|0},${75+Math.random()*30|0},${35+Math.random()*30|0},${a})`;
+      c.fillRect(x, y, 2, 2);
+    }
+    for (let i=0; i<280; i++) {
+      const x = Math.random()*S, y = Math.random()*S;
+      const r = 24 + Math.random()*55;
+      c.fillStyle = `rgba(${50+Math.random()*30|0},${130+Math.random()*30|0},${70+Math.random()*20|0},0.25)`;
+      c.beginPath();
+      c.ellipse(x, y, r, r*0.7, Math.random()*Math.PI, 0, Math.PI*2);
+      c.fill();
+    }
   }
   // Edificios fantasma fuera de la pista (urbano disperso)
   for (let i=0; i<140; i++) {
@@ -1265,16 +1333,24 @@ function buildTrack(c, S) {
   drawCenterPath(c);
   c.setLineDash([]);
   c.lineCap = 'round';
-  // Asfalto outer (cubre el centro del kerb, deja 6 px de kerb al borde)
-  c.strokeStyle = '#28282e';
-  c.lineWidth = halfW*2 - 12;
-  drawCenterPath(c);
-  c.strokeStyle = '#34343e';
-  c.lineWidth = halfW*2 - 28;
-  drawCenterPath(c);
-  c.strokeStyle = '#3c3c46';
-  c.lineWidth = halfW*2 - 80;
-  drawCenterPath(c);
+  // Asfalto: si la textura PNG ya cargó, usarla como pattern; sino, fallback
+  // procedural con las 3 capas de gris originales.
+  if (asphaltImg) {
+    const pat = c.createPattern(asphaltImg, 'repeat');
+    c.strokeStyle = pat;
+    c.lineWidth = halfW*2 - 12;
+    drawCenterPath(c);
+  } else {
+    c.strokeStyle = '#28282e';
+    c.lineWidth = halfW*2 - 12;
+    drawCenterPath(c);
+    c.strokeStyle = '#34343e';
+    c.lineWidth = halfW*2 - 28;
+    drawCenterPath(c);
+    c.strokeStyle = '#3c3c46';
+    c.lineWidth = halfW*2 - 80;
+    drawCenterPath(c);
+  }
   // Carril TransMilenio rojo tenue
   c.strokeStyle = 'rgba(178,34,34,0.18)';
   c.lineWidth = 22;
@@ -1713,7 +1789,14 @@ $raceMusic.volume = 0.42;
 $menuMusic.preload = $raceMusic.preload = 'auto';
 let _curMusic = null;
 function setMusicForState(s) {
-  const target = (s === 'racing' || s === 'countdown' || s === 'paused') ? $raceMusic : $menuMusic;
+  // En pausa, mantener track actual pero detenerla (sin reset de currentTime).
+  if (s === 'paused') {
+    if (_curMusic && !_curMusic.paused) {
+      try { _curMusic.pause(); } catch(_) {}
+    }
+    return;
+  }
+  const target = (s === 'racing' || s === 'countdown') ? $raceMusic : $menuMusic;
   if (_curMusic === target) {
     if (target.paused) target.play().catch(()=>{});
     return;
@@ -2173,8 +2256,7 @@ function renderSky(c, dayness, rainK) {
     ];
     for (const [u,v] of stars) c.fillRect((u*IW)|0, (v*HORIZON)|0, 1, 1);
   }
-  drawCloudLayer(c, dayness, 0.65, 70, 600, 0, rainK);
-  drawCloudLayer(c, dayness, 1.00, 85, 800, 1, rainK);
+  // Nubes procedurales removidas — vienen integradas en fondo_bogota.jpg.
   drawMountains(c, dayness, rainK);
 }
 function drawCloudLayer(c, dayness, scale, parallaxDiv, period, layerSeed, rainK) {
@@ -2221,6 +2303,46 @@ function drawCloud(c, x, y, sc, alpha, stormTint=1) {
   }
 }
 function drawMountains(c, dayness, rainK) {
+  // Si la JPG panorámica de Bogotá ya cargó, usarla con parallax horizontal
+  // por cam.angle. Tinte nocturno + lluvia encima.
+  if (fondoBogotaImg) {
+    const baseY = HORIZON;
+    const naturalW = fondoBogotaImg.naturalWidth || fondoBogotaImg.width;
+    const naturalH = fondoBogotaImg.naturalHeight || fondoBogotaImg.height;
+    // Banda de cerros = ~32% del alto interno (más imponente, también
+    // hace que cada tile de la imagen ocupe más ancho de pantalla y
+    // disimule la repetición cuando la imagen no es panorámica).
+    const bgH = Math.round(IH * 0.32);
+    const bgY = baseY - bgH;
+    const scale = bgH / naturalH;
+    const drawnW = Math.max(1, naturalW * scale);
+    // Parallax horizontal: el panorama recorre todo el 360° (2π) en una
+    // pasada por la imagen, así girando el kart se ven distintas zonas.
+    const offset = (((cam.angle / (Math.PI*2)) * drawnW) % drawnW + drawnW) % drawnW;
+    const startX = -offset;
+    // Tilear hasta cubrir el ancho de IW.
+    let x = startX;
+    while (x < IW + drawnW) {
+      c.drawImage(fondoBogotaImg, x, bgY, drawnW, bgH);
+      x += drawnW;
+    }
+    // Tinte nocturno (oscurece la JPG cuando dayness baja).
+    if (dayness < 1) {
+      const nightAlpha = (1 - dayness) * 0.65;
+      c.fillStyle = `rgba(20,28,55,${nightAlpha})`;
+      c.fillRect(0, bgY, IW, bgH);
+    }
+    // Tinte lluvia.
+    if (rainK > 0.05) {
+      c.fillStyle = `rgba(40,50,70,${0.4 * rainK})`;
+      c.fillRect(0, bgY, IW, bgH);
+    }
+    // Línea naranja del horizonte/sunset.
+    const glow = Math.max(0, 1 - Math.abs(dayness - 0.5) * 2) * (1 - rainK);
+    c.fillStyle = `rgba(255,170,100,${0.30 + 0.30*glow})`;
+    c.fillRect(0, HORIZON - 1, IW, 1);
+    return;
+  }
   const baseY = HORIZON;
   const mtn = lerpRGB(MTN_NIT, MTN_DAY, dayness);
   const mtnDark = [mtn[0]*0.7, mtn[1]*0.7, mtn[2]*0.75];
@@ -2286,6 +2408,11 @@ function renderMode7(dayness, rainK) {
   ];
   const fogR = fog[0], fogG = fog[1], fogB = fog[2];
   const bright = (0.42 + 0.58 * dayness) * (1 - rainK * 0.25);
+  // Si la textura de noche cargó, mezclamos día/noche por dayness en cada
+  // pixel. Si no, ramo único con solo trackData (perf óptima).
+  const tdN = trackDataNight;
+  const dn  = dayness;
+  const nn  = 1 - dayness;
   for (let y=0; y<GROUND_H; y++) {
     const yy = y + 1;
     const dist = (CAM_HEIGHT * FOV) / yy;
@@ -2302,16 +2429,33 @@ function renderMode7(dayness, rainK) {
     const fG  = fogG * f * bright;
     const fB  = fogB * f * bright;
     let di = (y * IW) << 2;
-    for (let x=0; x<IW; x++) {
-      const tx = (sx | 0) & TRACK_MASK;
-      const ty = (sy | 0) & TRACK_MASK;
-      const ti = ((ty << TRACK_SHIFT) + tx) << 2;
-      gd[di]     = trackData[ti]   * inv + fR;
-      gd[di + 1] = trackData[ti+1] * inv + fG;
-      gd[di + 2] = trackData[ti+2] * inv + fB;
-      di += 4;
-      sx += stepX;
-      sy += stepY;
+    if (tdN) {
+      for (let x=0; x<IW; x++) {
+        const tx = (sx | 0) & TRACK_MASK;
+        const ty = (sy | 0) & TRACK_MASK;
+        const ti = ((ty << TRACK_SHIFT) + tx) << 2;
+        const r = trackData[ti]   * dn + tdN[ti]   * nn;
+        const g = trackData[ti+1] * dn + tdN[ti+1] * nn;
+        const b = trackData[ti+2] * dn + tdN[ti+2] * nn;
+        gd[di]     = r * inv + fR;
+        gd[di + 1] = g * inv + fG;
+        gd[di + 2] = b * inv + fB;
+        di += 4;
+        sx += stepX;
+        sy += stepY;
+      }
+    } else {
+      for (let x=0; x<IW; x++) {
+        const tx = (sx | 0) & TRACK_MASK;
+        const ty = (sy | 0) & TRACK_MASK;
+        const ti = ((ty << TRACK_SHIFT) + tx) << 2;
+        gd[di]     = trackData[ti]   * inv + fR;
+        gd[di + 1] = trackData[ti+1] * inv + fG;
+        gd[di + 2] = trackData[ti+2] * inv + fB;
+        di += 4;
+        sx += stepX;
+        sy += stepY;
+      }
     }
   }
   ictx.putImageData(groundImg, 0, HORIZON);
