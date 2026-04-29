@@ -417,6 +417,163 @@ añadir modales/overlays:
    Aplicar este reset en cualquier función que cierre un modal u overlay
    donde el elemento bajo el puntero desaparece del DOM.
 
+## Kart Electoral — `kart-presidencial1v.html`
+
+Juego de karts estilo Mario Kart / CTR con los 8 candidatos presidenciales
+2026. Single-file HTML autocontenido (~3000 líneas), sin build step. Linkeado
+desde `index.html` (proyectos, en es/en/zh).
+
+### Tech base
+- **Mode 7 fake-3D** sobre Canvas 2D. Resolución interna `IW=480, IH=270`,
+  escalada al viewport con `imageSmoothingEnabled=false` (look pixelart).
+- **Texture procedural 4096×4096** (`TRACK_SIZE`, ~64 MB ImageData) que se
+  samplea por inverse-mode-7 cada frame. Bitwise `& TRACK_MASK` (potencia de 2)
+  para wrap rápido. La pista misma ocupa una zona pequeña del centro; la
+  textura grande mantiene las repeticiones lejos en la fog.
+- **Inner loop mode 7** (renderMode7): por cada scanline `y`, distancia
+  `dist = CAM_HEIGHT * FOV / yy`, sample paso `dist/FOV`. Píxeles en
+  `groundImg` (ImageData reusada — alpha pre-rellenada).
+- **Cámara**: chase camera 28 unidades detrás del jugador
+  (`CAM_DIST=28`), altura `CAM_HEIGHT=32`, `FOV=300`, `HORIZON=102`.
+
+### Pista — silueta de Bogotá
+- `RAW_CENTERLINE`: 41 vértices que aproximan la silueta D.C. (Suba bulge NW,
+  Bosa SW, San Cristóbal SE knee, Usaquén tip N, Cerros recta E, notch oeste).
+  Ajustada con `CL_OFFSET_X=1024, CL_OFFSET_Y=924` para centrar en 4096².
+- **Importante**: arranca en el sur ([1080,1880] raw → world [2104,2804])
+  y va sentido **horario**. Si rotás el start a otra parte del lazo, validá
+  que el `totalAngle` de detección de vueltas siga decreciendo (ver más abajo).
+- `posAtParam(t)`: devuelve `{x, y, angle}` interpolando la polilínea por
+  longitud acumulada (`CL_LENS`/`CL_TOTAL`).
+- `buildTrack(c, S)` dibuja: pasto granulado, edificios fantasma fuera del
+  loop, berma ladrillo, asfalto en 3 capas, carril TM rojo tenue, kerbs en
+  curvas, líneas blancas borde, línea de meta a cuadros, banner BOGOTÁ con
+  bandera amarilla/azul/roja, chevrons amarillos pre-meta.
+
+### Detección de vueltas
+- `totalAngle` = ángulo acumulado del jugador alrededor de
+  `(TRACK_CX, TRACK_CY)` = promedio de vértices del centerline.
+- En sentido horario (canvas y-down), `totalAngle` **decrece**. Lap cuando
+  `totalAngle <= -2π`. **Si la pista arranca al norte** (jugador encima del
+  centroide), la dirección se invierte y el lap nunca se cuenta — bug
+  histórico que rompió la versión anterior con start [1024, 350].
+- IA usa `t` lineal (`ai.t += ai.speed`); cada wrap a `>= CL_TOTAL` incrementa
+  `ai.lap`. Inicializan en `lap: 0` y `t = CL_TOTAL - offset` (grilla detrás
+  del jugador) para que la primera cruzada de meta los pase a lap 1 sin
+  regalarles distancia.
+
+### Candidatos
+- Array `CANDIDATES` (8), cada uno con:
+  - `color` (del partido, según `previa-1v.html`): Cepeda `#51458F`,
+    Abelardo `#000062`, Paloma `#1866DF`, Claudia `#d9db24`,
+    Fajardo `#EEAA22`, Murillo `#16a34a`. Botero `#d4af37` y
+    Caicedo `#ff6eb4` son locales (no están en previa).
+  - `features`: `hairStyle` (`curly`/`short`/`shortF`/`long`/`bald`),
+    `hair` (color), `skin` (`SKIN.fair/medium/dark`), `glasses`, `beard`.
+  - `photo`: URL S3 (Cepeda, Abelardo, Paloma) o Wikipedia (Claudia,
+    Fajardo, Murillo) o `null` (Botero, Caicedo — pendientes de subir).
+- `skill` 0.90–1.00 multiplica la velocidad base de la IA (~3.55).
+  Bogotá da home boost ×1.05 (Claudia), Cundinamarca ×1.02 (Botero).
+- **Foto pendiente**: subir a `/Fotos-presidenciales/` en S3 con formato
+  300×300: `CLAUDIA+LOPEZ.jpg`, `SERGIO+FAJARDO.jpg`, `LUIS+GILBERTO+MURILLO.jpg`,
+  `SANTIAGO+BOTERO.jpg`, `CARLOS+CAICEDO.jpg`. Las de Wikipedia pueden
+  fallar por hotlinking; el fallback dibuja iniciales en círculo del color.
+
+### Sprite unificado del kart
+- `drawKartSprite(c, candidate, opts)` dibuja al origen; el caller hace
+  `translate/rotate/scale`. Mismo sprite para jugador (escala `KART_SCALE=1.10`)
+  y para IA (escala calculada por proyección).
+- Colores derivados de `candidate.color` con `darkenHex/lightenHex`:
+  `carBase, carDark, carDarker, carLight, carLighter, carShine, carCabin`.
+- Cabeza vista **desde atrás** (cámara detrás del kart): mayoritariamente
+  silueta de cabello con color del partido en el cuello de camisa. Estilos:
+  `long` (cae a hombros, flequillo), `shortF` (corte corto femenino),
+  `short`, `curly` (bumps irregulares), `bald` (corona + skin top).
+- Llantas delanteras: elipses 6×11 (alargadas) que rotan hasta `0.75 rad`
+  (~43°) con el steering — **importante** para que el giro sea visible.
+  Traseras 10×16 con spin acumulado por velocidad.
+
+### Proyección y rivales
+- `projectWorld(wx, wy)` retorna `{x, y, kartScale, lmScale, dist}`:
+  - `kartScale = (CAM_DIST / rx) * KART_SCALE` — a la distancia del jugador
+    da exactamente el mismo tamaño que el sprite del jugador.
+  - `lmScale = FOV / rx` — escala "intrínseca" para landmarks; multiplicada
+    por `obj.size` (controla qué tan grande es cada landmark).
+- En `renderWorldObjects`: `RIVAL_BOOST = 1.7` multiplica el `kartScale` de
+  los rivales (intermedio entre tamaño igual al jugador y la versión gigante).
+
+### Landmarks — al BORDE de la pista
+- `placeOnEdge(tFrac, lateralOff, type, size, name)` resuelve un landmark
+  a coordenadas world a partir de un t (fracción del lazo) y un offset
+  lateral. `lateralOff > 0` = derecha del sentido de marcha = exterior CW.
+- Asfalto halfwidth = 110, berma ~145, así que offsets ≥165 quedan en pasto.
+- Tipos definidos (cada uno con sprite procedural detallado tipo PS1):
+  `plaza` (Plaza Bolívar con estatua, palomas, farolas),
+  `capitolio` (6 columnas, frontón, bandera ondeando),
+  `candelaria` (7 casas coloniales con tejas),
+  `parque` (cipreses, banca, iglesia con cruz),
+  `campin` (estadio oval con cancha + 4 torres luz),
+  `arena` (Movistar, domo con paneles + entrada),
+  `tm` (TransMilenio articulado, 8 ventanas, faja blanca, logo),
+  `tribune` (4 niveles graduados con público + banner sponsor).
+
+### Render pipeline (por frame)
+1. `renderSky(ictx, dayness, rainK)` — gradiente, sol/luna, estrellas,
+   nubes con parallax (2 capas), Cerros Orientales (Monserrate + Guadalupe).
+2. `renderMode7(dayness, rainK)` — piso vía sample del trackData.
+3. `renderWorldObjects(ictx, dayness)` — proyecta IA + landmarks + tribunas,
+   ordena far-to-near, dibuja.
+4. `renderSmoke(ictx)` — partículas de escape (sólo en movimiento).
+5. `renderPlayerKart(ictx, dayness)` — sprite del jugador encima.
+6. `renderRain(ictx, rainK)` — streaks + tinte azul-gris.
+7. `ctx.drawImage(ic, ...)` — escala el canvas interno al viewport, con
+   shake aleatorio si `speed > 0.7 * MAX_FWD`.
+8. `renderMinimap()` — canvas 130×150 abajo derecha con trazado, posición
+   del jugador (flecha), markers IA y landmarks.
+
+### Día/noche y lluvia (independientes)
+- Día/noche: `getDayness(timeMs)` cicla cada 4 min (`CYCLE_MS=240000`):
+  42% día → 8% sunset → 42% noche → 8% sunrise. `dayness ∈ [0,1]`.
+- Lluvia: estado `rainState` `dry`/`wet`. Próximo aguacero en
+  `nextRainAt = raceTimeMs + 90 a 140 s`. Duración `35–55 s`. Fade in/out
+  de 5 s. `getRainIntensity()` retorna 0..1. Decoupled del día/noche.
+
+### Estados y flujo
+- `state`: `'menu'` → `'select'` → `'countdown'` → `'racing'` → `'finished'`.
+  `'paused'` se intercambia con `'racing'` vía `ESC` o botón `#btn-pause`.
+- `resetRace()` reinicia jugador, IA, lapTimes, smoke, rain.
+- `chooseCandidate(id)` setea `selectedCandidate`, llama `resetRace`,
+  arranca countdown, `initAudio()` (engine sintetizado + beeps).
+
+### Layout HTML
+- `<nav>` con logo Ricardo.Ruiz, selector de país (lang.js compartido),
+  Proyectos / Noticias / Planes / Iniciar sesión / Registrarse — copiado
+  literal de `index.html` para mantener identidad visual.
+- `<main id="game-wrap">` flex-1 contiene el `<canvas#game>`, todos los
+  HUDs (`#hud`, `#hud-track`, `#hud-laps`, `#hud-pos`), el panel
+  `#standings` (top-4 con foto), el `<canvas#minimap>`, y los modales
+  (menu, select, countdown, pause-overlay, finish-overlay).
+- Cursor custom z-index 9999/9998 (no 100000 como en otras páginas — match
+  con index.html).
+
+### Tunables principales (top del script)
+```
+ACCEL=0.058 BRAKE=0.085 REV_ACCEL=0.030 FRICTION=0.985
+MAX_FWD=4.40 MAX_REV=-1.60 TURN_RATE=0.050 TURN_RAMP=1.30
+CAM_HEIGHT=32 CAM_DIST=28 FOV=300 HORIZON=102
+KART_SCALE=1.10 TOTAL_LAPS=3 CYCLE_MS=240000
+TRACK_SIZE=4096 TR_HALF_WIDTH=110
+RIVAL_BOOST=1.7 (en renderWorldObjects)
+```
+
+### Pendientes / próximas iteraciones
+- Subir 5 fotos faltantes a S3 (Claudia, Fajardo, Murillo, Botero, Caicedo).
+- Reemplazar URLs en `CANDIDATES[].photo` cuando estén arriba.
+- Refinar más la silueta de Bogotá si queda corta.
+- Sprites de landmarks como PNG en S3 si la versión procedural no alcanza.
+- Pistas adicionales: una por departamento clave (Cauca, Antioquia,
+  Magdalena, Bolívar, Atlántico, Chocó, Cundinamarca).
+
 ## Convenciones de commit
 ```
 git commit -m "scope: descripción concisa\n\nDetalle si es necesario\n\nCo-Authored-By: Claude Sonnet 4-6 <noreply@anthropic.com>"
