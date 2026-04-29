@@ -796,11 +796,11 @@
   </div>
   <div id="hud-laps" class="panel">
     <div class="lab">Vuelta</div>
-    <div class="num"><b id="lap-num">1</b><span style="opacity:.5"> / 3</span></div>
+    <div class="num"><b id="lap-num">1</b><span style="opacity:.5"> / 2</span></div>
   </div>
   <div id="hud-pos" class="panel">
     <div class="lab">Posición</div>
-    <div class="num"><b id="pos-num">8</b><span style="opacity:.5"> / 8</span></div>
+    <div class="num"><b id="pos-num">5</b><span style="opacity:.5"> / 8</span></div>
   </div>
 
   <div id="standings">
@@ -812,7 +812,7 @@
 
   <button id="btn-pause" title="Pausa (ESC)">II</button>
 
-  <div id="minimap-label">Bogotá · 3 vueltas</div>
+  <div id="minimap-label">Bogotá · 2 vueltas</div>
   <canvas id="minimap"></canvas>
 
   <div id="btn-l"   class="btn">◀</div>
@@ -828,7 +828,7 @@
       <div class="menu-sub">— Bogotá D.C. · primera pista —</div>
       <p>
         Carrera contra los <b>otros 7 candidatos presidenciales</b> de 2026 en
-        un circuito con la silueta de Bogotá: 3 vueltas pasando por la Plaza
+        un circuito con la silueta de Bogotá: 2 vueltas pasando por la Plaza
         de Bolívar, el Capitolio, la Candelaria, el Campín y el Movistar Arena.
       </p>
       <p class="dim">
@@ -936,12 +936,12 @@ let selectedCandidate = CANDIDATES[0];
 // ============================================================
 // TUNABLES
 // ============================================================
-const ACCEL      = 0.058;
+const ACCEL      = 0.064;   // +10% sobre 0.058
 const BRAKE      = 0.085;
-const REV_ACCEL  = 0.030;
+const REV_ACCEL  = 0.033;   // +10% sobre 0.030
 const FRICTION   = 0.985;
-const MAX_FWD    = 4.40;
-const MAX_REV    = -1.60;
+const MAX_FWD    = 4.84;    // +10% sobre 4.40
+const MAX_REV    = -1.76;   // +10% sobre -1.60
 const TURN_RATE  = 0.050;
 const TURN_RAMP  = 1.30;
 
@@ -1242,9 +1242,18 @@ function buildTrack(c, S) {
   c.lineWidth = halfW*2 + 36;
   drawCenterPath(c);
 
-  // Asfalto en capas
-  c.strokeStyle = '#28282e';
+  // Asfalto en capas. La franja blanca del borde se pinta como capa
+  // concéntrica MÁS ANCHA que el asfalto principal — luego las capas de
+  // asfalto la cubren por dentro y queda solo un anillo de 4 px al borde
+  // exterior. Esto garantiza que la franja siempre coincida con el borde
+  // real del asfalto en cualquier curva, por cerrada que sea (los offset
+  // paths laterales fallaban en concavidades cortas, generando trazos que
+  // no compaginaban con el asfalto).
+  c.strokeStyle = 'rgba(255,255,255,0.55)';
   c.lineWidth = halfW*2;
+  drawCenterPath(c);
+  c.strokeStyle = '#28282e';
+  c.lineWidth = halfW*2 - 8;       // deja 4 px de blanco a cada lado
   drawCenterPath(c);
   c.strokeStyle = '#34343e';
   c.lineWidth = halfW*2 - 24;
@@ -1275,11 +1284,8 @@ function buildTrack(c, S) {
   drawCenterPath(c);
   c.setLineDash([]);
 
-  // Líneas blancas borde
-  c.strokeStyle = 'rgba(255,255,255,0.55)';
-  c.lineWidth = 4;
-  drawCenterPath(c, halfW - 8);
-  drawCenterPath(c, -(halfW - 8));
+  // (Las franjas blancas del borde ahora se pintan como capa concéntrica
+  // arriba, antes del asfalto outer — ver bloque "Asfalto en capas".)
 
   // Línea central segmentada
   c.strokeStyle = 'rgba(255,255,255,0.32)';
