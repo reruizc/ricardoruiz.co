@@ -1240,6 +1240,25 @@ Promise.all([
   console.warn('[kart] No se pudieron cargar texturas de pista, usando procedural:', err);
 });
 
+// Sprites de karts por candidato (PNG, fondo transparente). Se cargan los
+// que existan en S3; los que falten (404) caen al fallback procedural sin
+// romper. Estructura: KART_SPRITES[candidate.id] = { back, left, right }
+const KART_SPRITES = {};
+const KARTS_S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/game/karts';
+function loadCandidateKartSprites(id) {
+  KART_SPRITES[id] = KART_SPRITES[id] || {};
+  for (const view of ['back', 'left', 'right']) {
+    loadTexture(`${KARTS_S3}/${id}_${view}.png`)
+      .then(img => { KART_SPRITES[id][view] = img; })
+      .catch(() => {}); // 404 esperado mientras se suben sprites
+  }
+}
+// Disparar la carga lo más temprano posible. CANDIDATES se define más
+// abajo, así que envolvemos en setTimeout 0 para correr post-script-eval.
+setTimeout(() => {
+  for (const c of CANDIDATES) loadCandidateKartSprites(c.id);
+}, 0);
+
 // Cerros / fondo de Bogotá (JPG panorámico día + noche) — se cargan
 // aparte porque no requieren rebuild del track. drawMountains mezcla
 // día/noche por dayness; si solo hay día, usa solo día; si no carga
@@ -3400,6 +3419,34 @@ function drawSpriteLabel(c, text, y) {
   c.fillStyle = '#fff';
   c.fillText(text, 0, y);
 }
+// Etiqueta usada cuando dibujamos sprites PNG (fuera del scale del kart).
+function drawKartLabelDirect(c, text, y, fontPx) {
+  fontPx = fontPx || 10;
+  c.fillStyle = 'rgba(0,0,0,0.65)';
+  c.font = `bold ${fontPx}px sans-serif`;
+  c.textAlign = 'center';
+  const tw = c.measureText(text).width;
+  c.fillRect(-tw/2 - 3, y - fontPx + 1, tw + 6, fontPx + 2);
+  c.fillStyle = '#fff';
+  c.fillText(text, 0, y);
+}
+// Selecciona el sprite del jugador según el ángulo de giro.
+function pickPlayerKartSprite(sprites, steerSm) {
+  if (steerSm < -0.25 && sprites.left)  return sprites.left;
+  if (steerSm >  0.25 && sprites.right) return sprites.right;
+  return sprites.back || sprites.left || sprites.right || null;
+}
+// Selecciona el sprite del rival según su heading vs cámara.
+function pickAIKartSprite(sprites, ai) {
+  let delta = ai.angle - cam.angle;
+  while (delta >  Math.PI) delta -= Math.PI * 2;
+  while (delta < -Math.PI) delta += Math.PI * 2;
+  // Aligned con cámara → vemos su trasera.
+  if (Math.abs(delta) < Math.PI * 0.30) return sprites.back || null;
+  // delta>0: rival va a la derecha de la cámara → vemos su flanco izquierdo.
+  if (delta > 0) return sprites.left || sprites.back || null;
+  return sprites.right || sprites.back || null;
+}
 
 // ============================================================
 // RENDER OBJETOS DEL MUNDO (IA + landmarks/tribunas) ordenado por z
@@ -3422,16 +3469,29 @@ function renderWorldObjects(c, dayness) {
     if (item.kind === 'ai') {
       const sc = item.p.kartScale * RIVAL_BOOST;
       if (sc < 0.08) continue;
+      const aiSprites = KART_SPRITES[item.ai.candidate.id];
+      const aiPng = aiSprites && pickAIKartSprite(aiSprites, item.ai);
       c.save();
       c.translate(item.p.x, item.p.y);
-      c.scale(sc, sc);
-      drawKartSprite(c, item.ai.candidate, {
-        steer: 0,
-        time: performance.now(),
-        speed: 3,
-        dayness,
-        label: sc > 0.7 ? item.ai.candidate.short : null,
-      });
+      if (aiPng) {
+        // Tamaño de PNG en pantalla equivalente al procedural a la misma
+        // distancia. Factor 75 calibrado para que un rival a CAM_DIST se
+        // vea como ~140 px de ancho (similar al jugador).
+        const targetSize = sc * 75;
+        c.drawImage(aiPng, -targetSize/2, -targetSize * 0.92, targetSize, targetSize);
+        if (sc > 0.7) {
+          drawKartLabelDirect(c, item.ai.candidate.short, -targetSize * 1.0, Math.max(8, sc*7));
+        }
+      } else {
+        c.scale(sc, sc);
+        drawKartSprite(c, item.ai.candidate, {
+          steer: 0,
+          time: performance.now(),
+          speed: 3,
+          dayness,
+          label: sc > 0.7 ? item.ai.candidate.short : null,
+        });
+      }
       c.restore();
     } else {
       drawLandmark(c, item.p.x, item.p.y, item.p.lmScale, item.obj.type, dayness, item.obj.size || 1, item.obj.name);
@@ -3450,17 +3510,31 @@ function renderPlayerKart(c, dayness) {
   const cy   = IH - 75 + bob;
   const tx   = tilt * 12;
 
-  c.save();
-  c.translate(cx + tx, cy);
-  c.rotate(tilt * 0.06);
-  c.scale(KART_SCALE, KART_SCALE);
-  drawKartSprite(c, selectedCandidate, {
-    steer: steerSmooth,
-    time: performance.now(),
-    speed: sp,
-    dayness,
-  });
-  c.restore();
+  const playerSprites = KART_SPRITES[selectedCandidate.id];
+  const playerPng = playerSprites && pickPlayerKartSprite(playerSprites, steerSmooth);
+  if (playerPng) {
+    // PNG sprite: 200×200 dibujado a 128×128 en pantalla, anclado al
+    // borde inferior (los neumáticos quedan al nivel del piso visual).
+    const targetW = 128;
+    const targetH = 128;
+    c.save();
+    c.translate(cx + tx, cy);
+    c.rotate(tilt * 0.06);
+    c.drawImage(playerPng, -targetW/2, -targetH * 0.92, targetW, targetH);
+    c.restore();
+  } else {
+    c.save();
+    c.translate(cx + tx, cy);
+    c.rotate(tilt * 0.06);
+    c.scale(KART_SCALE, KART_SCALE);
+    drawKartSprite(c, selectedCandidate, {
+      steer: steerSmooth,
+      time: performance.now(),
+      speed: sp,
+      dayness,
+    });
+    c.restore();
+  }
 
   // Líneas de velocidad
   if (sp > MAX_FWD * 0.55) {
