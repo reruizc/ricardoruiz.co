@@ -870,6 +870,7 @@
     <div class="ttl">PAUSA</div>
     <div class="sub">presioná ESC para continuar</div>
     <button id="resume-btn">Reanudar carrera</button>
+    <button id="pause-restart" style="margin-top:.6rem;background:rgba(255,255,255,0.08);color:var(--fg);border:1px solid rgba(255,255,255,0.25);">Reiniciar carrera</button>
   </div>
 
   <div id="finish-overlay">
@@ -924,9 +925,9 @@ const CANDIDATES = [
   { id:'botero',   name:'Santiago Botero',          short:'Botero',   color:'#d4af37', region:'Cundinamarca', skill:0.96,
     photo: FOTOS_S3 + '/botero.jpg',
     features: { hairStyle:'short', hair:'#5a3a1f',  skin:SKIN.medium, glasses:false, beard:'none' } },
-  { id:'caicedo',  name:'Carlos Caicedo',           short:'Caicedo',  color:'#ff6eb4', region:'Magdalena',    skill:0.91,
-    photo: FOTOS_S3 + '/caicedo.jpg',
-    features: { hairStyle:'short', hair:'#1a1a1a',  skin:SKIN.medium, glasses:false, beard:'short' } },
+  { id:'roy',      name:'Roy Barreras',             short:'Roy',      color:'#a83246', region:'Valle',        skill:0.93,
+    photo: FOTOS_S3 + '/caicedo.jpg',  // archivo se mantuvo con el nombre viejo
+    features: { hairStyle:'short', hair:'#b8b8b8',  skin:SKIN.fair,   glasses:false, beard:'none' } },
   { id:'murillo',  name:'Luis Gilberto Murillo',    short:'Murillo',  color:'#16a34a', region:'Chocó',        skill:0.90,
     photo: FOTOS_S3 + '/murillo.jpg',
     features: { hairStyle:'short', hair:'#0a0a0a',  skin:SKIN.dark,   glasses:true,  beard:'none' } },
@@ -1527,6 +1528,12 @@ document.getElementById('back-from-select').addEventListener('click', () => {
 document.getElementById('resume-btn').addEventListener('click', () => {
   if (state === 'paused') { state = 'racing'; $pause.style.display = 'none'; setMusicForState(state); }
 });
+document.getElementById('pause-restart').addEventListener('click', () => {
+  $pause.style.display = 'none';
+  resetRace();
+  startCountdown();
+  setMusicForState('countdown');
+});
 document.getElementById('finish-restart').addEventListener('click', () => {
   resetRace();
   $finish.style.display = 'none';
@@ -1617,6 +1624,10 @@ function resetRace() {
     });
     updateAIPos(aiKarts[aiKarts.length-1]);
   });
+  // Reset del estado de hysteresis para updateRacePosition.
+  // Inicializo según lap inicial: AI con lap=1 (los 4 delanteros) están adelante
+  // del player; AI con lap=0 (los 3 traseros) están atrás.
+  _aiAheadState = aiKarts.map(ai => ai.lap >= 1);
   $lapNum.textContent = '1';
   $posNum.textContent = '5';
   updateStandings();
@@ -1959,15 +1970,34 @@ function updateRain() {
   }
 }
 
+// Estado adelante/atrás por AI con hysteresis. Antes la comparación directa
+// aiProg vs playerProgress oscilaba frame a frame cuando el progreso de un
+// rival y el del player estaban casi pares, haciendo que el contador de
+// posición saltara aunque no hubiera un sobrepaso real.
+let _aiAheadState = [];
 function updateRacePosition() {
-  // |totalAngle|/2π funciona en cualquier sentido (CW o CCW visual canvas).
-  // El código previo restaba totalAngle (asumía CCW), pero la pista actual
-  // es CW y el player progress quedaba negativo → posición siempre última.
   const playerProgress = (currentLap - 1) + (Math.abs(totalAngle) / (2*Math.PI));
+  // Threshold 0.5% de una vuelta (~150 unidades de centerline). Un sobrepaso
+  // real implica al menos esta separación; oscilaciones por colisiones o
+  // micro-variaciones de velocidad no superan este margen.
+  const THR = 0.005;
   let aheadOf = 0;
-  for (const ai of aiKarts) {
+  for (let i = 0; i < aiKarts.length; i++) {
+    const ai = aiKarts[i];
     const aiProg = (ai.lap - 1) + (ai.t / CL_TOTAL);
-    if (aiProg < playerProgress) aheadOf++;
+    const wasAhead = _aiAheadState[i];
+    let isAhead;
+    if (wasAhead === undefined) {
+      isAhead = aiProg > playerProgress;
+    } else if (wasAhead) {
+      // Estaba adelante: solo cae a "atrás" si pierde por más de THR
+      isAhead = aiProg > playerProgress - THR;
+    } else {
+      // Estaba atrás: solo sube a "adelante" si gana por más de THR
+      isAhead = aiProg > playerProgress + THR;
+    }
+    _aiAheadState[i] = isAhead;
+    if (!isAhead) aheadOf++;
   }
   const pos = aiKarts.length + 1 - aheadOf;
   $posNum.textContent = String(pos);
@@ -2441,17 +2471,41 @@ function drawKartSprite(c, candidate, opts) {
   drawSolidWheel(c, -23, -7, 6, 11, wheelAngle, false);
   drawSolidWheel(c,  23, -7, 6, 11, wheelAngle, false);
 
-  // Nariz con luces
+  // Nariz con luces (faros delanteros — amarillos, halo nocturno)
   c.fillStyle = carDark;
   c.fillRect(-7, -16, 14, 4);
   c.fillStyle = carBase;
   c.fillRect(-6, -16, 12, 1);
+  // Halo amarillento de los faros cuando hay poca luz
+  if (dayness < 0.85) {
+    const ha = (0.85 - dayness) * 0.6;
+    c.fillStyle = `rgba(255,235,140,${ha})`;
+    c.beginPath();
+    c.ellipse(-3.5, -14, 5, 3.5, 0, 0, Math.PI*2);
+    c.ellipse( 3.5, -14, 5, 3.5, 0, 0, Math.PI*2);
+    c.fill();
+  }
   c.fillStyle = 'rgba(255,250,200,0.95)';
   c.fillRect(-5, -14, 3, 1);
   c.fillRect( 2, -14, 3, 1);
   c.fillStyle = `rgba(255,250,200,${0.6 + 0.4*(1-dayness)})`;
   c.fillRect(-5, -13, 3, 1);
   c.fillRect( 2, -13, 3, 1);
+
+  // Luces traseras (rojo tenue) — visibles desde la cámara que está detrás del
+  // kart, más brillantes de noche. Quedan integradas al difusor (y≈14-17).
+  const tailBase = 0.45 + (1 - dayness) * 0.50;
+  c.fillStyle = `rgba(220,40,40,${tailBase})`;
+  c.fillRect(-22, 14, 5, 3);
+  c.fillRect( 17, 14, 5, 3);
+  if (dayness < 0.7) {
+    const ga = (0.7 - dayness) * 0.55;
+    c.fillStyle = `rgba(255,80,80,${ga})`;
+    c.beginPath();
+    c.ellipse(-19.5, 15.5, 5, 3, 0, 0, Math.PI*2);
+    c.ellipse( 19.5, 15.5, 5, 3, 0, 0, Math.PI*2);
+    c.fill();
+  }
 
   // === Cabeza con rasgos del candidato (gira con la dirección) ===
   const headDx  = steerSm * 2.2;
