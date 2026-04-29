@@ -901,31 +901,34 @@ const SKIN = { fair:'#e9c9a7', medium:'#c8956d', dark:'#7a5132' };
 // Colores del partido tomados de previa-1v.html (Botero/Caicedo locales).
 // `photo` es la URL del retrato (S3 o Wikipedia). null = caer al placeholder de iniciales.
 // Sugerencia: subir Botero y Caicedo a S3 en /Fotos-presidenciales/ con el mismo formato 300×300.
-const FOTOS_S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/Fotos-presidenciales';
+// Fotos S3 — bucket actualizado por el usuario con 8 fotos consistentes.
+// Naming: id en minúsculas + .jpg (cepeda.jpg, abelardo.jpg, ...). Si una
+// foto falla la carga, el sprite cae al placeholder de iniciales coloreado.
+const FOTOS_S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/fotos-candidatos-ctr';
 const CANDIDATES = [
   { id:'cepeda',   name:'Iván Cepeda',              short:'Cepeda',   color:'#51458F', region:'Atlántico',    skill:0.97,
-    photo: FOTOS_S3 + '/IVAN+CEPEDA.jpg',
+    photo: FOTOS_S3 + '/cepeda.jpg',
     features: { hairStyle:'curly', hair:'#9a9a9a',  skin:SKIN.medium, glasses:true,  beard:'short' } },
   { id:'abelardo', name:'Abelardo De La Espriella', short:'Abelardo', color:'#000062', region:'Bolívar',      skill:0.95,
     photo: FOTOS_S3 + '/abelardo.jpg',
     features: { hairStyle:'short', hair:'#1a1a1a',  skin:SKIN.medium, glasses:false, beard:'goatee' } },
   { id:'paloma',   name:'Paloma Valencia',          short:'Paloma',   color:'#1866DF', region:'Cauca',        skill:0.93,
-    photo: FOTOS_S3 + '/PALOMA+VALENCIA.jpg',
+    photo: FOTOS_S3 + '/paloma.jpg',
     features: { hairStyle:'long',  hair:'#d4a040',  skin:SKIN.fair,   glasses:false, beard:'none' } },
   { id:'claudia',  name:'Claudia López',            short:'Claudia',  color:'#d9db24', region:'Bogotá',       skill:1.00,
-    photo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cf/Claudia_Lopez_H_26.jpg/480px-Claudia_Lopez_H_26.jpg',
+    photo: FOTOS_S3 + '/claudia.jpg',
     features: { hairStyle:'shortF',hair:'#3a3a3a',  skin:SKIN.fair,   glasses:false, beard:'none' } },
   { id:'fajardo',  name:'Sergio Fajardo',           short:'Fajardo',  color:'#EEAA22', region:'Antioquia',    skill:0.92,
-    photo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/SergioFajardo.jpg/480px-SergioFajardo.jpg',
+    photo: FOTOS_S3 + '/fajardo.jpg',
     features: { hairStyle:'short', hair:'#b8b8b8',  skin:SKIN.fair,   glasses:false, beard:'none' } },
   { id:'botero',   name:'Santiago Botero',          short:'Botero',   color:'#d4af37', region:'Cundinamarca', skill:0.96,
-    photo: null,
+    photo: FOTOS_S3 + '/botero.jpg',
     features: { hairStyle:'short', hair:'#5a3a1f',  skin:SKIN.medium, glasses:false, beard:'none' } },
   { id:'caicedo',  name:'Carlos Caicedo',           short:'Caicedo',  color:'#ff6eb4', region:'Magdalena',    skill:0.91,
-    photo: null,
+    photo: FOTOS_S3 + '/caicedo.jpg',
     features: { hairStyle:'short', hair:'#1a1a1a',  skin:SKIN.medium, glasses:false, beard:'short' } },
   { id:'murillo',  name:'Luis Gilberto Murillo',    short:'Murillo',  color:'#16a34a', region:'Chocó',        skill:0.90,
-    photo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/20240521_posesi%C3%B3n_canciller_Murillo-Joel_Gonz%C3%A1lez1536_%28Cropped%29.jpg/480px-20240521_posesi%C3%B3n_canciller_Murillo-Joel_Gonz%C3%A1lez1536_%28Cropped%29.jpg',
+    photo: FOTOS_S3 + '/murillo.jpg',
     features: { hairStyle:'short', hair:'#0a0a0a',  skin:SKIN.dark,   glasses:true,  beard:'none' } },
 ];
 let selectedCandidate = CANDIDATES[0];
@@ -949,75 +952,65 @@ const HORIZON    = 102;
 
 const IW = 480, IH = 270;
 
-// Texture grande para que las repeticiones queden lejos en la fog
-const TRACK_SIZE  = 4096;
+// Texture grande para que las repeticiones queden lejos en la fog. Subida a
+// 8192 (256 MB de ImageData) para que el centerline pueda escalarse al
+// doble de amplio sin que las curvas estén tan apretadas.
+const TRACK_SIZE  = 8192;
 const TRACK_MASK  = TRACK_SIZE - 1;
-const TRACK_SHIFT = 12;          // log2(TRACK_SIZE)
-const TR_HALF_WIDTH = 110;
+const TRACK_SHIFT = 13;          // log2(TRACK_SIZE)
+const TR_HALF_WIDTH = 110;       // ancho de asfalto IGUAL al anterior — pista
+                                 // más espaciosa pero el kart sigue teniendo
+                                 // el mismo ancho relativo de carril.
 
 const CYCLE_MS = 240000;
 const KART_SCALE = 1.10;
-const TOTAL_LAPS = 3;
+const TOTAL_LAPS = 2;
 
 // ============================================================
 // CENTERLINE — silueta de Bogotá D.C. (cerrada, sentido horario)
 // ============================================================
-// Silueta de Bogotá D.C. — refinada con 41 vértices.
-// Características reales: Suba (NW bulge), Bosa (SW bulge), San Cristóbal
-// (SE knee), Usaquén (N narrow tip), Cerros (E recta), notch oeste.
-// Arranca en el sur (Ciudad Bolívar tip), va HORARIO.
-const CL_OFFSET_X = 1024;
-const CL_OFFSET_Y = 924;
+// Silueta real de Bogotá D.C. — derivada del GeoJSON oficial de localidades.
+// Pipeline: raster 1200-px → closing → boundary trace → DP → escalado x1.10
+// extra (sobre la versión x2 anterior, TRACK_SIZE 8192). 90 puntos. Línea
+// de meta en MEDIO de la mayor recta (1215 unidades en la zona sur / Bosa-
+// Ciudad Bolívar tras el rescalado), así la grilla de 8 karts queda toda
+// sobre asfalto recto. Sentido CW visual canvas — lap detection agnóstico
+// al sentido (checa |totalAngle|>=2π). CL_TOTAL ≈ 31 650 → vuelta ~120 s.
+const CL_OFFSET_X = 0;
+const CL_OFFSET_Y = 0;
 const RAW_CENTERLINE = [
-  // Sur (Ciudad Bolívar tip) — start
-  [1080, 1880],     // 0
-  [1230, 1860],
-  [1360, 1820],
-  [1470, 1760],
-  // Knee SE (San Cristóbal/Usme) — protrusión
-  [1560, 1680],
-  [1610, 1570],
-  [1635, 1450],
-  [1610, 1340],     // ligera concavidad
-  [1645, 1230],
-  // Cerros este (línea casi recta)
-  [1660, 1120],
-  [1660, 1010],
-  [1645, 900],
-  [1620, 800],
-  [1580, 710],
-  // Norte curva (Usaquén tip — narrow)
-  [1520, 620],
-  [1440, 540],
-  [1340, 480],
-  [1230, 440],
-  [1110, 420],
-  [990, 410],
-  [880, 420],
-  // Suba bulge NW (prominente)
-  [770, 450],
-  [660, 500],
-  [560, 580],
-  [490, 680],
-  // Engativá oeste
-  [445, 790],
-  [415, 900],
-  [395, 1010],
-  // Notch oeste (sutil)
-  [420, 1100],
-  [400, 1190],
-  // Bosa SW bulge
-  [375, 1290],
-  [360, 1380],
-  [380, 1470],
-  [430, 1560],
-  // Curva sur (volviendo)
-  [510, 1650],
-  [610, 1730],
-  [740, 1800],
-  [880, 1850],
-  [1010, 1875],
-  [1080, 1880],     // close
+  [3272, 7600], [3844, 7396], [4353, 6660], [4249, 6503], [3868, 6388], [3972, 5617],
+  [4135, 5479], [4794, 5351], [4834, 5035], [5091, 5011], [5313, 4709], [5655, 4679],
+  [5972, 4031], [6556, 4004], [6606, 3653], [6877, 3439], [6848, 3255], [7041, 3026],
+  [6487, 3086], [6487, 2911], [5932, 2830], [6095, 2579], [6511, 2560], [6669, 2419],
+  [6358, 2125], [6546, 1839], [6541, 1485], [6497, 1311], [6259, 1142], [6363, 750],
+  [6689, 655], [6580, 390], [6143, 359], [5467, 205], [5190, 295], [5066, 203],
+  [5036, 295], [4903, 203], [4546, 251], [4739, 404], [4541, 478], [4719, 573],
+  [4363, 810], [4194, 704], [3853, 870], [3798, 1215], [3412, 1512], [3556, 1667],
+  [2764, 1717], [2700, 1779], [2834, 1946], [2284, 2032], [2482, 2057], [2403, 2147],
+  [2511, 2226], [2339, 2392], [2640, 2398], [2448, 2476], [2745, 2582], [2115, 2791],
+  [1873, 2686], [1541, 2887], [1175, 2846], [1343, 2939], [1151, 3046], [1165, 3186],
+  [1606, 3450], [2121, 3497], [2329, 3786], [2250, 3856], [2383, 4240], [2012, 4371],
+  [2155, 4646], [2368, 4720], [2175, 4768], [2260, 5019], [2052, 5490], [1858, 5831],
+  [1626, 5934], [1388, 6255], [1388, 6568], [1180, 6699], [1353, 7507], [1309, 7766],
+  [1180, 7826], [1309, 7948], [1547, 7989], [1818, 7723], [2076, 7828], [2700, 7804],
+];
+
+// Localidades fronterizas — referencia para los puentes-cartel. Centroides
+// del GeoJSON, escalados igual que el centerline (x1.10 sobre la versión
+// previa) y centrados en TRACK_SIZE 8192.
+const LOCALITIES = [
+  { name: "USAQUÉN",        x: 6390, y: 1486 },
+  { name: "CHAPINERO",      x: 6159, y: 2931 },
+  { name: "SANTA FE",       x: 5653, y: 3541 },
+  { name: "SAN CRISTÓBAL",  x: 5019, y: 4220 },
+  { name: "USME",           x: 3510, y: 5767 },
+  { name: "CIUDAD BOLÍVAR", x: 2767, y: 4806 },
+  { name: "BOSA",           x: 1902, y: 3131 },
+  { name: "KENNEDY",        x: 2683, y: 3057 },
+  { name: "FONTIBÓN",       x: 2835, y: 2383 },
+  { name: "ENGATIVÁ",       x: 3787, y: 1838 },
+  { name: "SUBA",           x: 4406, y:  997 },
 ];
 const CENTERLINE = RAW_CENTERLINE.map(([x,y]) => [x + CL_OFFSET_X, y + CL_OFFSET_Y]);
 const CL_LENS = [0];
@@ -1057,15 +1050,34 @@ TRACK_CY /= CENTERLINE.length;
 // Helper: posición sobre el borde de la pista a un t (en world coords ya con offset)
 // y un offset lateral (positivo = derecha al sentido de marcha = exterior CW).
 // asfalto halfwidth = 110, berma ~145, así que >150 queda en pasto.
+// Validamos que el landmark no quede a menos de (halfW + sizeRadius + buffer)
+// del centerline en CUALQUIER punto del loop — necesario porque la silueta de
+// Bogotá tiene concavidades donde un offset lateral grande puede aterrizar
+// sobre la pista del lado opuesto. Si está demasiado cerca, lo empujamos
+// más afuera y si no se puede, descartamos (devuelve null).
 function placeOnEdge(tFrac, lateralOff, type, size, name) {
   const t = (tFrac * CL_TOTAL) % CL_TOTAL;
   const p = posAtParam(t);
   const nx = -Math.sin(p.angle), ny = Math.cos(p.angle);
-  return {
-    name, type, size,
-    x: p.x + nx * lateralOff,
-    y: p.y + ny * lateralOff,
-  };
+  const sizeRadius = size * 18; // sprites: ~18 px por unidad de "size"
+  const minClearance = TR_HALF_WIDTH + sizeRadius + 20;
+  let off = Math.max(lateralOff, TR_HALF_WIDTH + 40);
+  let lx, ly;
+  for (let attempt = 0; attempt < 10; attempt++) {
+    lx = p.x + nx * off;
+    ly = p.y + ny * off;
+    let minD = Infinity;
+    for (let i = 0; i < CENTERLINE.length; i++) {
+      const dx = lx - CENTERLINE[i][0], dy = ly - CENTERLINE[i][1];
+      const d2 = dx*dx + dy*dy;
+      if (d2 < minD) minD = d2;
+    }
+    minD = Math.sqrt(minD);
+    if (minD >= minClearance) return { name, type, size, x: lx, y: ly };
+    off *= 1.25;
+    if (off > 600) break; // demasiado lejos, no vale la pena
+  }
+  return null;
 }
 
 // Landmarks AL BORDE de la pista (afuera = lateral positivo, adentro = negativo).
@@ -1084,7 +1096,7 @@ const LANDMARKS = [
   placeOnEdge(0.40, 165, 'tm',         2.2, 'TM 2'),
   placeOnEdge(0.65, 165, 'tm',         2.2, 'TM 3'),
   placeOnEdge(0.82, 165, 'tm',         2.2, 'TM 4'),
-];
+].filter(Boolean);
 // Tribunas a lo largo del trazado (al borde de la pista)
 const TRIBUNES = [
   placeOnEdge(0.05, 180, 'tribune', 3.0, 'Tribuna salida'),
@@ -1094,8 +1106,46 @@ const TRIBUNES = [
   placeOnEdge(0.66, 195, 'tribune', 3.0, 'Tribuna NW'),
   placeOnEdge(0.78, 195, 'tribune', 3.0, 'Tribuna W'),
   placeOnEdge(0.92, 180, 'tribune', 3.0, 'Tribuna pre-meta'),
-];
-const WORLD_OBJECTS = [...LANDMARKS, ...TRIBUNES];
+].filter(Boolean);
+
+// Puentes-cartel sobre la pista con el nombre de la localidad (estilo Rolex
+// en F1). Para cada localidad fronteriza buscamos el t del centerline más
+// cercano a su centroide. Si dos quedan a < 8 % del CL_TOTAL entre sí, solo
+// dejamos uno (el más cercano al centroide). Posicionados EN el centerline,
+// el sprite billboard se ve sobre la pista.
+const BRIDGES = (() => {
+  const candidates = LOCALITIES.map(loc => {
+    let minD = Infinity, bestT = 0;
+    const N = 400;
+    for (let i = 0; i < N; i++) {
+      const t = (i / N) * CL_TOTAL;
+      const p = posAtParam(t);
+      const d = Math.hypot(loc.x - p.x, loc.y - p.y);
+      if (d < minD) { minD = d; bestT = t; }
+    }
+    return { name: loc.name, t: bestT, dist: minD };
+  });
+  candidates.sort((a, b) => a.dist - b.dist); // priorizar más cercanos al centerline
+  const placed = [];
+  const MIN_GAP = 0.08 * CL_TOTAL;
+  for (const c of candidates) {
+    let close = false;
+    for (const p of placed) {
+      let gap = Math.abs(c.t - p.t);
+      gap = Math.min(gap, CL_TOTAL - gap);
+      if (gap < MIN_GAP) { close = true; break; }
+    }
+    if (!close) placed.push(c);
+  }
+  // Reordenar por t (orden de aparición en la pista)
+  placed.sort((a, b) => a.t - b.t);
+  return placed.map(b => {
+    const p = posAtParam(b.t);
+    return { name: b.name, type: 'bridge', size: 1.0, x: p.x, y: p.y, ang: p.angle };
+  });
+})();
+
+const WORLD_OBJECTS = [...LANDMARKS, ...TRIBUNES, ...BRIDGES];
 
 // ============================================================
 // CANVAS principal
@@ -1179,6 +1229,7 @@ function buildTrack(c, S) {
     c.fillRect(x+w-3, y, 3, h);
     c.fillRect(x, y+h-3, w, 3);
   }
+
 
   c.lineCap = 'round';
   c.lineJoin = 'round';
@@ -1293,15 +1344,21 @@ function buildTrack(c, S) {
 }
 
 function drawCenterPath(c, offset) {
+  // Loop cerrado: el último vértice se conecta con el primero. Sin esto el
+  // asfalto queda con un gap en la línea de meta, lo que hace que el kart
+  // aparezca sobre el pasto en el countdown inicial.
   c.beginPath();
+  const n = CENTERLINE.length;
   if (!offset) {
     c.moveTo(CENTERLINE[0][0], CENTERLINE[0][1]);
-    for (let i=1; i<CENTERLINE.length; i++) c.lineTo(CENTERLINE[i][0], CENTERLINE[i][1]);
+    for (let i=1; i<n; i++) c.lineTo(CENTERLINE[i][0], CENTERLINE[i][1]);
+    c.lineTo(CENTERLINE[0][0], CENTERLINE[0][1]);
   } else {
-    for (let i=0; i<CENTERLINE.length; i++) {
-      const p0 = CENTERLINE[Math.max(0, i-1)];
-      const p1 = CENTERLINE[i];
-      const p2 = CENTERLINE[Math.min(CENTERLINE.length-1, i+1)];
+    for (let i=0; i<=n; i++) {
+      const ii = i % n;
+      const p0 = CENTERLINE[(ii - 1 + n) % n];
+      const p1 = CENTERLINE[ii];
+      const p2 = CENTERLINE[(ii + 1) % n];
       const ang = Math.atan2(p2[1]-p0[1], p2[0]-p0[0]);
       const nx = -Math.sin(ang), ny = Math.cos(ang);
       const x = p1[0] + nx * offset;
@@ -1456,9 +1513,10 @@ document.getElementById('back-from-select').addEventListener('click', () => {
   state = 'menu';
   $select.style.display = 'none';
   $menu.style.display = 'flex';
+  setMusicForState(state);
 });
 document.getElementById('resume-btn').addEventListener('click', () => {
-  if (state === 'paused') { state = 'racing'; $pause.style.display = 'none'; }
+  if (state === 'paused') { state = 'racing'; $pause.style.display = 'none'; setMusicForState(state); }
 });
 document.getElementById('finish-restart').addEventListener('click', () => {
   resetRace();
@@ -1470,12 +1528,14 @@ document.getElementById('finish-menu').addEventListener('click', () => {
   resetRace();
   state = 'menu';
   $menu.style.display = 'flex';
+  setMusicForState(state);
 });
 
 function showSelect() {
   state = 'select';
   $menu.style.display = 'none';
   $select.style.display = 'flex';
+  setMusicForState(state);
 }
 function chooseCandidate(id) {
   selectedCandidate = CANDIDATES.find(c => c.id === id) || CANDIDATES[0];
@@ -1484,12 +1544,19 @@ function chooseCandidate(id) {
   $select.style.display = 'none';
   startCountdown();
   initAudio();
+  setMusicForState('countdown');
 }
 
 function resetRace() {
-  player.x = CENTERLINE[0][0];
-  player.y = CENTERLINE[0][1];
-  player.angle = Math.atan2(CENTERLINE[1][1]-CENTERLINE[0][1], CENTERLINE[1][0]-CENTERLINE[0][0]);
+  // El player arranca a CAM_DIST adelante de la meta para que la cámara
+  // (que está CAM_DIST atrás del player en línea recta) quede SOBRE la
+  // línea de meta durante el countdown — antes el kart aparecía sobre el
+  // pasto porque la cámara estaba en el "afuera" del primer punto.
+  const startP = posAtParam(CAM_DIST);
+  player.x = startP.x;
+  player.y = startP.y;
+  player.angle = startP.angle;
+  player.offTrack = false;
   player.speed = 0;
   totalAngle = 0;
   lastAngleFromCenter = Math.atan2(player.y - TRACK_CY, player.x - TRACK_CX);
@@ -1506,26 +1573,43 @@ function resetRace() {
   aiKarts = [];
   const rivals = CANDIDATES.filter(c => c.id !== selectedCandidate.id);
   const homeBoost = (cand) => cand.region === 'Bogotá' ? 1.05 : (cand.region === 'Cundinamarca' ? 1.02 : 1.0);
+  // El player arranca SIEMPRE en posición 5/8: 4 rivales adelante, 3 detrás.
+  // Player en posAtParam(CAM_DIST=28). Rivales adelante a +40, +80, +120, +160
+  // (lap=1, ya pasaron la línea de meta). Rivales detrás a -40, -80, -120
+  // (lap=0, todavía en el segmento de cierre antes de la meta).
+  const playerT = CAM_DIST;
   rivals.forEach((c, i) => {
-    const col = i % 2;
-    const row = Math.floor(i / 2);
-    const offset = -(20 + row * 40);
-    const lateral = (col === 0 ? -1 : 1) * 32;
-    const tStart = CL_TOTAL + offset;
+    let tOffset, lateral, initialLap;
+    if (i < 4) {
+      // 4 rivales adelante (posiciones 1-4): el más lejano primero
+      tOffset = 40 + 40 * (3 - i);  // i=0→160 (frente), i=3→40 (justo adelante)
+      lateral = (i % 2 === 0 ? -1 : 1) * 32;
+      initialLap = 1; // ya pasaron la meta
+    } else {
+      // 3 rivales detrás (posiciones 6-8)
+      const j = i - 4;
+      tOffset = -(40 + 40 * j); // -40, -80, -120
+      lateral = (j % 2 === 0 ? 1 : -1) * 32;
+      initialLap = 0; // antes de la meta
+    }
+    const tStart = ((playerT + tOffset) % CL_TOTAL + CL_TOTAL) % CL_TOTAL;
     const baseSpeed = 3.55 + Math.random() * 0.25;
+    const aiBaseSpeed = baseSpeed * c.skill * homeBoost(c);
     aiKarts.push({
       candidate: c,
-      t: ((tStart % CL_TOTAL) + CL_TOTAL) % CL_TOTAL,
+      t: tStart,
       lateral,
-      lap: 0,
-      speed: baseSpeed * c.skill * homeBoost(c),
+      baseLateral: lateral,
+      lap: initialLap,
+      baseSpeed: aiBaseSpeed,
+      speed: aiBaseSpeed,
       x: 0, y: 0, angle: 0,
       finishTime: null,
     });
     updateAIPos(aiKarts[aiKarts.length-1]);
   });
   $lapNum.textContent = '1';
-  $posNum.textContent = '8';
+  $posNum.textContent = '5';
   updateStandings();
 }
 
@@ -1548,8 +1632,8 @@ function startCountdown() {
   cdLights.forEach(l => { l.classList.remove('red'); l.classList.remove('green'); });
 }
 function handlePauseToggle() {
-  if (state === 'racing') { state = 'paused'; $pause.style.display = 'flex'; }
-  else if (state === 'paused') { state = 'racing'; $pause.style.display = 'none'; }
+  if (state === 'racing') { state = 'paused'; $pause.style.display = 'flex'; setMusicForState(state); }
+  else if (state === 'paused') { state = 'racing'; $pause.style.display = 'none'; setMusicForState(state); }
 }
 
 (function buildCandGrid() {
@@ -1592,6 +1676,31 @@ function initials(name) {
 // AUDIO
 // ============================================================
 let ac, oscEngine, gainEngine, lpEngine;
+// Música de fondo: dos pistas (menús vs carrera) cargadas desde S3. El switch
+// es por estado del juego. play() puede fallar si el navegador bloquea autoplay
+// hasta que haya interacción — por eso `setMusicForState` se llama también en
+// chooseCandidate y en cada handler de click.
+const MUSIC_S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/musica';
+const $menuMusic  = new Audio(MUSIC_S3 + '/menu.mp3');
+const $raceMusic  = new Audio(MUSIC_S3 + '/race.mp3');
+$menuMusic.loop = $raceMusic.loop = true;
+$menuMusic.volume = 0.40;
+$raceMusic.volume = 0.42;
+$menuMusic.preload = $raceMusic.preload = 'auto';
+let _curMusic = null;
+function setMusicForState(s) {
+  const target = (s === 'racing' || s === 'countdown' || s === 'paused') ? $raceMusic : $menuMusic;
+  if (_curMusic === target) {
+    if (target.paused) target.play().catch(()=>{});
+    return;
+  }
+  if (_curMusic) {
+    try { _curMusic.pause(); _curMusic.currentTime = 0; } catch(_) {}
+  }
+  _curMusic = target;
+  target.play().catch(()=>{});
+}
+
 function initAudio() {
   if (ac) return;
   try {
@@ -1655,6 +1764,7 @@ function tickCountdown(t) {
     raceStartTime = performance.now();
     currentLapStart = 0;
     $countdown.style.display = 'none';
+    setMusicForState('racing');
   }
 }
 
@@ -1711,9 +1821,30 @@ function update(dt) {
   if (player.speed > MAX_FWD) player.speed = MAX_FWD;
   if (player.speed < MAX_REV) player.speed = MAX_REV;
 
+  // Detectar superficie sampleando el trackData en la posición del jugador.
+  // Asfalto: R≈G≈B (gris). Pasto: G > R y G > B. Berma de ladrillo: R > G > B.
+  const tx = ((Math.round(player.x) % TRACK_SIZE) + TRACK_SIZE) % TRACK_SIZE;
+  const ty = ((Math.round(player.y) % TRACK_SIZE) + TRACK_SIZE) % TRACK_SIZE;
+  const ti = (ty * TRACK_SIZE + tx) * 4;
+  const sR = trackData[ti], sG = trackData[ti+1], sB = trackData[ti+2];
+  const isGrass = sG > sR + 10 && sG > sB + 8;
+  const isBerm  = sR > sG + 6 && sR > sB + 14;
+  let surfMaxFwd = MAX_FWD, surfFric = 1.0;
+  if (isGrass)      { surfMaxFwd = MAX_FWD * 0.42; surfFric = 0.93; }
+  else if (isBerm)  { surfMaxFwd = MAX_FWD * 0.78; surfFric = 0.985; }
+  player.speed *= surfFric;
+  if (player.speed > surfMaxFwd) player.speed = surfMaxFwd;
+  const surfMinRev = MAX_REV * (surfMaxFwd / MAX_FWD);
+  if (player.speed < surfMinRev) player.speed = surfMinRev;
+  player.offTrack = isGrass || isBerm;
+
+  // Lluvia reduce el grip en curvas (cuesta más girar a velocidad alta).
+  const rainK = (typeof getRainIntensity === 'function') ? getRainIntensity() : 0;
+  const rainGrip = 1 - rainK * 0.45;
+
   const tf  = Math.min(1, Math.abs(player.speed) / TURN_RAMP);
   const dir = player.speed >= 0 ? 1 : -1;
-  const tr  = TURN_RATE * tf * dir;
+  const tr  = TURN_RATE * tf * dir * rainGrip;
   if (input.left)  player.angle -= tr;
   if (input.right) player.angle += tr;
 
@@ -1727,15 +1858,18 @@ function update(dt) {
   const targetSteer = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   steerSmooth += (targetSteer - steerSmooth) * 0.18;
 
-  // Lap detection
+  // Lap detection — agnóstico al sentido. Antes el código asumía centerline
+  // CCW visual canvas (totalAngle decrece a -2π); ahora la pista de Bogotá
+  // es CW visual canvas (totalAngle crece a +2π) y el contador no avanzaba.
+  // Comprobamos |totalAngle| >= 2π en cualquier dirección.
   const ang = Math.atan2(player.y - TRACK_CY, player.x - TRACK_CX);
   let delta = ang - lastAngleFromCenter;
   if (delta >  Math.PI) delta -= 2*Math.PI;
   if (delta < -Math.PI) delta += 2*Math.PI;
   totalAngle += delta;
   lastAngleFromCenter = ang;
-  if (totalAngle <= -Math.PI * 2) {
-    totalAngle += Math.PI * 2;
+  if (totalAngle <= -Math.PI * 2 || totalAngle >= Math.PI * 2) {
+    totalAngle += (totalAngle > 0 ? -1 : 1) * Math.PI * 2;
     const lapMs = raceTimeMs - currentLapStart;
     lapTimes.push(lapMs);
     currentLapStart = raceTimeMs;
@@ -1747,6 +1881,12 @@ function update(dt) {
   // AI
   for (const ai of aiKarts) {
     if (ai.finishTime != null) continue;
+    // Recuperación hacia baseSpeed (sin esto las colisiones dejan al rival
+    // estancado: ai.speed *= 0.85 sin recuperación drena a 0).
+    ai.speed += (ai.baseSpeed - ai.speed) * 0.06;
+    // El lateral también vuelve gradualmente a su carril nominal tras un
+    // empujón por colisión.
+    ai.lateral += (ai.baseLateral - ai.lateral) * 0.03;
     ai.t += ai.speed;
     if (ai.t >= CL_TOTAL) {
       ai.t -= CL_TOTAL;
@@ -1754,6 +1894,38 @@ function update(dt) {
       if (ai.lap > TOTAL_LAPS && ai.finishTime == null) ai.finishTime = raceTimeMs;
     }
     updateAIPos(ai);
+  }
+
+  // Colisiones player ↔ IA: si se tocan, se separan, ambos pierden velocidad y
+  // el player rebota un poco. Aplicamos solo al player (los rivales siguen su
+  // ruta predeterminada por t — los empujamos lateralmente vía .lateral).
+  const KART_R = 22;
+  for (const ai of aiKarts) {
+    if (ai.finishTime != null) continue;
+    const dx = player.x - ai.x;
+    const dy = player.y - ai.y;
+    const d2 = dx*dx + dy*dy;
+    const min = KART_R * 2;
+    if (d2 < min*min && d2 > 0.5) {
+      const d = Math.sqrt(d2);
+      const nx = dx / d, ny = dy / d;
+      const overlap = min - d;
+      // Empuja al player fuera del IA
+      player.x += nx * overlap * 0.7;
+      player.y += ny * overlap * 0.7;
+      // Empuja al IA hacia el otro lado de la pista (modificando .lateral)
+      const aiNx = -Math.sin(ai.angle), aiNy = Math.cos(ai.angle);
+      const sideDot = nx * aiNx + ny * aiNy;
+      ai.lateral -= Math.sign(sideDot) * overlap * 0.4;
+      ai.lateral = Math.max(-90, Math.min(90, ai.lateral));
+      // Desaceleran ambos
+      player.speed *= 0.55;
+      ai.speed *= 0.85;
+      // Pequeño rebote angular al player (se desvía un poquito)
+      const tangent = Math.atan2(ny, nx);
+      const angDiff = ((tangent - player.angle + Math.PI*3) % (Math.PI*2)) - Math.PI;
+      player.angle += angDiff * 0.08;
+    }
   }
 
   // Lluvia
@@ -1779,7 +1951,10 @@ function updateRain() {
 }
 
 function updateRacePosition() {
-  const playerProgress = (currentLap - 1) - (totalAngle / (2*Math.PI));
+  // |totalAngle|/2π funciona en cualquier sentido (CW o CCW visual canvas).
+  // El código previo restaba totalAngle (asumía CCW), pero la pista actual
+  // es CW y el player progress quedaba negativo → posición siempre última.
+  const playerProgress = (currentLap - 1) + (Math.abs(totalAngle) / (2*Math.PI));
   let aheadOf = 0;
   for (const ai of aiKarts) {
     const aiProg = (ai.lap - 1) + (ai.t / CL_TOTAL);
@@ -1791,6 +1966,7 @@ function updateRacePosition() {
 
 function finishRace() {
   state = 'finished';
+  setMusicForState('finished');
   const all = aiKarts.map(ai => ({
     candidate: ai.candidate,
     name: ai.candidate.name,
@@ -2485,7 +2661,7 @@ function drawSolidWheel(c, x, y, w, h, angle, isRear) {
 // ============================================================
 // LANDMARKS — sprites estáticos en el mundo
 // ============================================================
-function drawLandmark(c, screenX, screenY, scale, type, dayness, sizeMult) {
+function drawLandmark(c, screenX, screenY, scale, type, dayness, sizeMult, name) {
   const finalScale = scale * (sizeMult || 1);
   if (finalScale < 0.04) return;
   c.save();
@@ -2920,6 +3096,59 @@ function drawLandmark(c, screenX, screenY, scale, type, dayness, sizeMult) {
       c.fillRect(34, -36, 5, 2.5);
       break;
     }
+    case 'bridge': {
+      // Puente-cartel sobre la pista (estilo F1 con sponsor en lo alto).
+      // El sprite es billboard (siempre cara a la cámara), así que se ve
+      // como un pórtico al cruzarlo. Postes en los lados del asfalto
+      // (halfW=110 → ±90 en escala lmScale), barra arriba con el nombre
+      // de la localidad. Ancho del cartel ≈ ancho de pista.
+      const w = 70, top = -88, postT = 14, signH = 20;
+      // Sombra de los postes
+      c.fillStyle = 'rgba(0,0,0,0.45)';
+      c.fillRect(-w-3, 4, 6, 5);
+      c.fillRect(w-3, 4, 6, 5);
+      // Postes (cilindros oscuros con highlight)
+      c.fillStyle = '#262626';
+      c.fillRect(-w-4, top+postT, 8, -top-postT+4);
+      c.fillRect(w-4, top+postT, 8, -top-postT+4);
+      c.fillStyle = '#3a3a3a';
+      c.fillRect(-w-2, top+postT, 2, -top-postT+4);
+      c.fillRect(w-2, top+postT, 2, -top-postT+4);
+      c.fillStyle = '#0a0a0a';
+      c.fillRect(w+2, top+postT, 2, -top-postT+4);
+      c.fillRect(-w+2, top+postT, 2, -top-postT+4);
+      // Cabezales (donde la barra se ancla a los postes)
+      c.fillStyle = '#1a1a1a';
+      c.fillRect(-w-7, top+postT-2, 14, 4);
+      c.fillRect(w-7, top+postT-2, 14, 4);
+      // Barra superior (estructura)
+      c.fillStyle = '#1a1a1a';
+      c.fillRect(-w-2, top, 2*w+4, postT);
+      // Cartel verde estilo F1 (Rolex)
+      c.fillStyle = '#0d3a22';
+      c.fillRect(-w+2, top+1, 2*w-4, signH-2);
+      // Borde dorado tenue
+      c.fillStyle = '#7a5a1a';
+      c.fillRect(-w+2, top+1, 2*w-4, 1);
+      c.fillRect(-w+2, top+signH-2, 2*w-4, 1);
+      // Nombre de la localidad
+      c.fillStyle = '#fafafa';
+      const nm = name || '';
+      // Tamaño tipográfico adaptado al ancho disponible
+      const tFsize = Math.max(7, Math.min(12, (2*w - 14) / Math.max(6, nm.length) * 1.4));
+      c.font = 'bold ' + tFsize.toFixed(1) + 'px "Syne", sans-serif';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText(nm, 0, top + signH/2);
+      // Bandera de Bogotá pequeña a un lado del cartel
+      c.fillStyle = '#fcd116'; c.fillRect(-w-4, top+1, 4, 6);
+      c.fillStyle = '#0047FF'; c.fillRect(-w-4, top+7, 4, 6);
+      c.fillStyle = '#ce1126'; c.fillRect(-w-4, top+13, 4, 6);
+      c.fillStyle = '#fcd116'; c.fillRect(w, top+1, 4, 6);
+      c.fillStyle = '#0047FF'; c.fillRect(w, top+7, 4, 6);
+      c.fillStyle = '#ce1126'; c.fillRect(w, top+13, 4, 6);
+      break;
+    }
   }
   c.restore();
 }
@@ -2949,7 +3178,7 @@ function renderWorldObjects(c, dayness) {
   projected.sort((a, b) => b.p.dist - a.p.dist);
   // Multiplica el tamaño de los rivales — intermedio entre "iguales al jugador" (1.0)
   // y la versión gigante anterior (~6). 1.7 da una sensación cercana sin abrumar.
-  const RIVAL_BOOST = 1.7;
+  const RIVAL_BOOST = 1.87; // +10% sobre el 1.7 anterior
   for (const item of projected) {
     if (item.kind === 'ai') {
       const sc = item.p.kartScale * RIVAL_BOOST;
@@ -2966,7 +3195,7 @@ function renderWorldObjects(c, dayness) {
       });
       c.restore();
     } else {
-      drawLandmark(c, item.p.x, item.p.y, item.p.lmScale, item.obj.type, dayness, item.obj.size || 1);
+      drawLandmark(c, item.p.x, item.p.y, item.p.lmScale, item.obj.type, dayness, item.obj.size || 1, item.obj.name);
     }
   }
 }
@@ -3133,7 +3362,7 @@ function updateStandings() {
       name: selectedCandidate.short,
       color: selectedCandidate.color,
       isYou: true,
-      progress: (currentLap - 1) - (totalAngle / (2*Math.PI)),
+      progress: (currentLap - 1) + (Math.abs(totalAngle) / (2*Math.PI)),
     },
     ...aiKarts.map(ai => ({
       candidate: ai.candidate,
