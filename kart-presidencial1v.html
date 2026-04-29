@@ -1196,7 +1196,8 @@ let gramillaDiaImg   = null;   // textura asfalto día
 let gramillaNocheImg = null;   // textura asfalto noche
 let pastoDiaImg      = null;   // textura pasto día
 let pastoNocheImg    = null;   // textura pasto noche
-let fondoBogotaImg   = null;   // panorámica de cerros
+let fondoBogotaImg      = null;   // panorámica de cerros (día)
+let fondoBogotaNocheImg = null;   // panorámica de cerros (noche)
 const TEX_BASE = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/game/textures';
 function loadTexture(url) {
   return new Promise((resolve, reject) => {
@@ -1239,13 +1240,19 @@ Promise.all([
   console.warn('[kart] No se pudieron cargar texturas de pista, usando procedural:', err);
 });
 
-// Cerros / fondo de Bogotá (JPG panorámico) — se carga aparte porque no
-// requiere rebuild del track. drawMountains usa la imagen si está lista;
-// sino fallback al SVG procedural.
+// Cerros / fondo de Bogotá (JPG panorámico día + noche) — se cargan
+// aparte porque no requieren rebuild del track. drawMountains mezcla
+// día/noche por dayness; si solo hay día, usa solo día; si no carga
+// ninguna, fallback al SVG procedural.
 loadTexture(`${TEX_BASE}/fondo_bogota.jpg`).then(img => {
   fondoBogotaImg = img;
 }).catch(err => {
   console.warn('[kart] No se pudo cargar fondo_bogota.jpg, usando procedural:', err);
+});
+loadTexture(`${TEX_BASE}/fondo_bogota_noche.jpg`).then(img => {
+  fondoBogotaNocheImg = img;
+}).catch(err => {
+  console.warn('[kart] No se pudo cargar fondo_bogota_noche.jpg, usando solo día:', err);
 });
 
 function buildTrack(c, S, asphaltImg, grassImg) {
@@ -2303,12 +2310,14 @@ function drawCloud(c, x, y, sc, alpha, stormTint=1) {
   }
 }
 function drawMountains(c, dayness, rainK) {
-  // Si la JPG panorámica de Bogotá ya cargó, usarla con parallax horizontal
-  // por cam.angle. Tinte nocturno + lluvia encima.
-  if (fondoBogotaImg) {
+  // Si al menos una JPG panorámica cargó, usarla con parallax horizontal
+  // por cam.angle. Si están las dos (día + noche), se cross-fadean por
+  // dayness usando globalAlpha. Lluvia añade tinte gris-azul.
+  if (fondoBogotaImg || fondoBogotaNocheImg) {
+    const refImg = fondoBogotaImg || fondoBogotaNocheImg;
     const baseY = HORIZON;
-    const naturalW = fondoBogotaImg.naturalWidth || fondoBogotaImg.width;
-    const naturalH = fondoBogotaImg.naturalHeight || fondoBogotaImg.height;
+    const naturalW = refImg.naturalWidth || refImg.width;
+    const naturalH = refImg.naturalHeight || refImg.height;
     // Banda de cerros = ~32% del alto interno (más imponente, también
     // hace que cada tile de la imagen ocupe más ancho de pantalla y
     // disimule la repetición cuando la imagen no es panorámica).
@@ -2320,17 +2329,36 @@ function drawMountains(c, dayness, rainK) {
     // pasada por la imagen, así girando el kart se ven distintas zonas.
     const offset = (((cam.angle / (Math.PI*2)) * drawnW) % drawnW + drawnW) % drawnW;
     const startX = -offset;
-    // Tilear hasta cubrir el ancho de IW.
-    let x = startX;
-    while (x < IW + drawnW) {
-      c.drawImage(fondoBogotaImg, x, bgY, drawnW, bgH);
-      x += drawnW;
-    }
-    // Tinte nocturno (oscurece la JPG cuando dayness baja).
-    if (dayness < 1) {
-      const nightAlpha = (1 - dayness) * 0.65;
-      c.fillStyle = `rgba(20,28,55,${nightAlpha})`;
-      c.fillRect(0, bgY, IW, bgH);
+    // Helper para tilear una imagen hasta cubrir IW.
+    const tileImage = (img) => {
+      let x = startX;
+      while (x < IW + drawnW) {
+        c.drawImage(img, x, bgY, drawnW, bgH);
+        x += drawnW;
+      }
+    };
+    // Capa día (alpha = dayness) + capa noche (alpha = 1-dayness).
+    const prevAlpha = c.globalAlpha;
+    if (fondoBogotaImg && fondoBogotaNocheImg) {
+      c.globalAlpha = prevAlpha * dayness;
+      tileImage(fondoBogotaImg);
+      c.globalAlpha = prevAlpha * (1 - dayness);
+      tileImage(fondoBogotaNocheImg);
+      c.globalAlpha = prevAlpha;
+    } else if (fondoBogotaImg) {
+      tileImage(fondoBogotaImg);
+      // Sin imagen de noche: oscurecer con overlay azul como antes.
+      if (dayness < 1) {
+        c.fillStyle = `rgba(20,28,55,${(1 - dayness) * 0.65})`;
+        c.fillRect(0, bgY, IW, bgH);
+      }
+    } else {
+      tileImage(fondoBogotaNocheImg);
+      // Solo noche cargada: aclarar con overlay si es de día.
+      if (dayness > 0) {
+        c.fillStyle = `rgba(180,170,140,${dayness * 0.4})`;
+        c.fillRect(0, bgY, IW, bgH);
+      }
     }
     // Tinte lluvia.
     if (rainK > 0.05) {
