@@ -310,36 +310,41 @@
   }
   .stand-card {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 4px;
     background: rgba(0,0,0,0.55);
     border: 1px solid rgba(255,255,255,0.2);
-    padding: 5px 9px 5px 5px;
-    width: 158px;
+    padding: 6px 6px 6px 6px;
+    width: auto;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     transition: background .2s, border-color .2s;
+    position: relative;
   }
   .stand-card .pos {
     font-family: 'Syne', sans-serif;
     font-weight: 800;
-    font-size: 16px;
+    font-size: 22px;
     color: var(--amber);
-    width: 16px;
-    text-align: center;
     line-height: 1;
+    position: absolute;
+    top: 4px;
+    left: 7px;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.85);
+    z-index: 2;
   }
   .stand-card .ph {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    border: 1.5px solid rgba(255,255,255,0.3);
+    width: 70px;
+    height: 150px;
+    border-radius: 3px;
+    border: 2px solid rgba(255,255,255,0.3);
     display: flex;
     align-items: center;
     justify-content: center;
     font-family: 'Syne', sans-serif;
     font-weight: 800;
-    font-size: 10px;
+    font-size: 26px;
     color: white;
     text-shadow: 0 1px 2px rgba(0,0,0,0.5);
     flex-shrink: 0;
@@ -350,25 +355,24 @@
   .stand-card img.ph { display:block; }
   .stand-card .nm {
     font-family: 'Arima', sans-serif;
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--fg);
     font-weight: 500;
-    flex: 1;
     line-height: 1.1;
+    text-align: center;
+    width: 70px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  .stand-card .gap {
-    font-family: 'Syne', sans-serif;
-    font-size: 9px;
-    color: rgba(255,255,255,0.5);
+    margin-top: 2px;
   }
   .stand-card.you {
     border-color: var(--green);
     background: rgba(57,255,122,0.18);
   }
   .stand-card.you .pos { color: var(--green); }
+  .stand-card.you .ph { border-color: var(--green); }
+  .stand-card.you .nm { color: var(--green); font-weight: 700; }
 
   /* === Modal common === */
   .modal {
@@ -948,10 +952,10 @@ const TURN_RAMP  = 1.30;
 
 const CAM_HEIGHT = 32;
 const CAM_DIST   = 28;
-const FOV        = 300;
-const HORIZON    = 102;
+const FOV        = 450;       // bump 1.5× con resolución
+const HORIZON    = 153;       // bump 1.5× con resolución
 
-const IW = 480, IH = 270;
+const IW = 720, IH = 405;     // bump 1.5× sobre 480×270 — más nitidez sin rediseñar look
 
 // Texture grande para que las repeticiones queden lejos en la fog. Subida a
 // 8192 (256 MB de ImageData) para que el centerline pueda escalarse al
@@ -964,7 +968,7 @@ const TR_HALF_WIDTH = 110;       // ancho de asfalto IGUAL al anterior — pista
                                  // el mismo ancho relativo de carril.
 
 const CYCLE_MS = 240000;
-const KART_SCALE = 1.10;
+const KART_SCALE = 1.65;       // 1.10 × 1.5 — escala del sprite del jugador acorde a la nueva resolución
 const TOTAL_LAPS = 2;
 
 // ============================================================
@@ -2075,8 +2079,8 @@ function spawnSmokeIfNeeded() {
   if (Math.random() > prob * 0.6) return;
   if (smokeParticles.length > 70) return;
   smokeParticles.push({
-    x: IW/2 + (Math.random() - 0.5) * 14,
-    y: IH - 32 + Math.random() * 4,
+    x: IW/2 + (Math.random() - 0.5) * 21,
+    y: IH - 48 + Math.random() * 6,
     vx: (Math.random() - 0.5) * 0.25,
     vy: 0.4 + Math.random() * 0.45,
     age: 0,
@@ -3271,8 +3275,8 @@ function renderPlayerKart(c, dayness) {
   const bob  = Math.sin(performance.now()*0.014) * Math.min(2.4, sp);
   const tilt = steerSmooth * Math.min(1, sp/1.0);
   const cx   = IW/2;
-  const cy   = IH - 50 + bob;
-  const tx   = tilt * 8;
+  const cy   = IH - 75 + bob;
+  const tx   = tilt * 12;
 
   c.save();
   c.translate(cx + tx, cy);
@@ -3443,12 +3447,13 @@ function updateStandings() {
     card.style.display = 'flex';
     card.classList.toggle('you', k.isYou);
     const photo = k.candidate.photo;
+    const fontColor = isLightHex(k.color) ? '#0a0a14' : '#fff';
+    const fallback = `<span class=&quot;ph&quot; style=&quot;background:${k.color};color:${fontColor};border-color:${k.color}&quot; title=&quot;${k.name}${k.isYou ? ' (tú)' : ''}&quot;>${initials(k.candidate.name)}</span>`;
     let phHtml;
     if (photo) {
-      phHtml = `<img class="ph" src="${photo}" alt="${k.name}" style="border-color:${k.color};" onerror="this.outerHTML='<span class=&quot;ph&quot; style=&quot;background:${k.color}&quot;>${initials(k.candidate.name)}</span>'">`;
+      phHtml = `<img class="ph" src="${photo}" alt="${k.name}" title="${k.name}${k.isYou ? ' (tú)' : ''}" style="border-color:${k.color};" onerror="this.outerHTML='${fallback}'">`;
     } else {
-      const fontColor = isLightHex(k.color) ? '#0a0a14' : '#fff';
-      phHtml = `<span class="ph" style="background:${k.color};color:${fontColor}">${initials(k.candidate.name)}</span>`;
+      phHtml = `<span class="ph" style="background:${k.color};color:${fontColor};border-color:${k.color}" title="${k.name}${k.isYou ? ' (tú)' : ''}">${initials(k.candidate.name)}</span>`;
     }
     card.innerHTML = `
       <span class="pos">${i+1}</span>
