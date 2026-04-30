@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Comportamiento electoral · Proyecto DC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=DM+Mono:wght@300;400&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    :root {
+      --bg: #f4f3ef; --bg2: #eeedea;
+      --surface: #ffffff; --surface2: #f0efe9;
+      --border: rgba(0,0,0,0.07); --border2: rgba(0,0,0,0.12);
+      --text: #0a0a0a; --text2: #555; --text3: #999;
+      --blue: #0047FF; --purple: #7c3aed;
+      --purple-dim: rgba(124,58,237,0.10);
+      --warn: #f0c040; --danger: #e63946;
+    }
+    [data-theme="dark"] {
+      --bg: #060810; --bg2: #0a0c14;
+      --surface: #0f1018; --surface2: #13151f;
+      --border: rgba(255,255,255,0.06); --border2: rgba(255,255,255,0.12);
+      --text: #f4f3ef; --text2: #888; --text3: #444;
+      --purple: #a78bfa;
+      --purple-dim: rgba(167,139,250,0.14);
+      --danger: #ff6b7a;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'Fraunces', serif;
+      min-height: 100vh; cursor: none; overflow-x: hidden;
+      transition: background 0.4s, color 0.4s;
+    }
+
+    .gate { position: fixed; inset: 0; z-index: 5000; background: var(--bg); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 1rem; }
+    .gate-text { font-family:'DM Mono',monospace; font-size:.82rem; letter-spacing:.12em; text-transform:uppercase; color:var(--text2); }
+    .gate-bar { width:120px; height:1px; background:var(--border); position:relative; overflow:hidden; }
+    .gate-bar::after { content:''; position:absolute; inset:0; background:var(--purple); animation:gate-slide 1.4s ease-in-out infinite; }
+    @keyframes gate-slide { 0%{transform:translateX(-100%);} 50%{transform:translateX(0);} 100%{transform:translateX(100%);} }
+
+    .cursor { position:fixed; width:12px; height:12px; background:var(--purple); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s ease,background .2s; transform:translate(-50%,-50%); }
+    .cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--purple); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s ease,opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+
+    nav.top { position: fixed; top:0; left:0; right:0; z-index:100; display: flex; align-items:center; justify-content:space-between; padding: .9rem 2.5rem; background: var(--bg); border-bottom: 1px solid var(--border); backdrop-filter: blur(12px); }
+    .nav-left { display:flex; align-items:center; gap:1rem; }
+    .nav-right { display:flex; align-items:center; gap:1.2rem; }
+    .e-btn-back { font-family:'Syne',sans-serif; font-size:.78rem; letter-spacing:.08em; text-transform:uppercase; color:var(--text2); text-decoration:none; border:1.5px solid var(--border); padding:.3rem .8rem; transition:color .2s,border-color .2s; }
+    .e-btn-back:hover { color:var(--text); border-color:var(--text2); }
+    .private-badge { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.18em; text-transform:uppercase; color: var(--purple); background: var(--purple-dim); padding:.32rem .7rem; border:1px solid var(--purple-dim); }
+    .logo-link { display:flex; align-items:center; gap:.55rem; text-decoration:none; opacity:.85; }
+    .logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
+    .logo-bar { width:5px; background:var(--purple); border-radius:1px 1px 0 0; }
+    .logo-text { font-family:'Syne',sans-serif; font-weight:800; font-size:1.3rem; letter-spacing:-.03em; color:var(--text); }
+    .logo-text span { color:var(--purple); }
+
+    main.wrap { max-width: 1400px; margin: 0 auto; padding: 6rem 2.5rem 4rem; }
+
+    .hero { padding: 1rem 0 1.5rem; }
+    .hero-label { font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.2em; text-transform:uppercase; color:var(--purple); margin-bottom: .9rem; display:flex; align-items:center; gap:.6rem; }
+    .hero-label::before { content:''; display:block; width:24px; height:1px; background:var(--purple); }
+    .hero-title { font-family:'Syne',sans-serif; font-weight:800; font-size: clamp(1.8rem, 4vw, 3rem); letter-spacing:-.025em; line-height:1; }
+    .hero-title em { font-style:italic; font-family:'Fraunces',serif; font-weight:300; color:var(--purple); }
+    .hero-sub { margin-top: .85rem; max-width: 760px; font-family:'Fraunces',serif; font-weight: 300; font-size: 1rem; line-height: 1.55; color: var(--text2); }
+    .hero-actions { margin-top: 1.2rem; display: flex; gap: .8rem; flex-wrap: wrap; }
+    .pdf-btn { font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.12em; text-transform:uppercase; padding:.55rem 1rem; background:var(--surface); border:1px solid var(--purple); color:var(--purple); text-decoration:none; transition:background .15s; }
+    .pdf-btn:hover { background:var(--purple); color:#fff; }
+
+    .controls { margin-top: 1.5rem; display: flex; gap: 1.2rem; align-items: flex-start; flex-wrap: wrap; }
+    .ctrl-group { display: flex; flex-direction: column; gap: .35rem; }
+    .ctrl-label { font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.18em; text-transform:uppercase; color: var(--text3); }
+    .pill-group { display: flex; gap: 0; flex-wrap: wrap; }
+    .pill { font-family:'Syne',sans-serif; font-weight:500; font-size: .8rem; letter-spacing: .04em; padding: .5rem 1rem; background: var(--surface); border: 1px solid var(--border); cursor: none; color: var(--text2); transition: all .15s; }
+    .pill + .pill { margin-left: -1px; }
+    .pill:hover { color: var(--text); }
+    .pill.active { background: var(--purple); color: #fff; border-color: var(--purple); position: relative; z-index: 1; }
+
+    .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin: 1.5rem 0; }
+    .sum-card { background: var(--surface); border: 1px solid var(--border); padding: 1.4rem; }
+    .sum-card.danger { border-left: 3px solid var(--danger); }
+    .sum-card.purple { border-left: 3px solid var(--purple); }
+    .sum-label { font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing: .18em; text-transform: uppercase; color: var(--text3); margin-bottom: .55rem; }
+    .sum-value-big { font-family:'Syne',sans-serif; font-weight: 800; font-size: clamp(1.3rem, 2.6vw, 2rem); line-height: 1.05; letter-spacing: -.02em; margin-bottom: .35rem; }
+    .sum-value-big.danger { color: var(--danger); }
+    .sum-value-big.purple { color: var(--purple); }
+    .sum-meta { font-family:'DM Mono',monospace; font-size: .68rem; color: var(--text2); letter-spacing: .04em; }
+
+    .layout { display: grid; grid-template-columns: 1.5fr 1fr; gap: 1rem; }
+    .map-card, .detail-card { background: var(--surface); border: 1px solid var(--border); }
+    .card-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .card-title { font-family:'Syne',sans-serif; font-weight: 800; font-size: 1.05rem; letter-spacing: -.01em; }
+    .card-sub { font-family:'DM Mono',monospace; font-size: .62rem; letter-spacing: .1em; color: var(--text3); text-transform: uppercase; }
+    #map { width: 100%; height: 540px; background: var(--bg2); }
+
+    .map-legend { padding: .9rem 1.25rem; border-top: 1px solid var(--border); font-family:'DM Mono',monospace; font-size: .68rem; color: var(--text2); }
+    .legend-item { display: flex; align-items: center; gap: .5rem; padding: .25rem 0; }
+    .legend-swatch { width: 14px; height: 14px; flex-shrink: 0; border: 1px solid var(--border2); }
+
+    .detail-body { padding: 1.5rem; min-height: 540px; }
+    .detail-empty { color: var(--text3); font-family:'Fraunces',serif; font-style: italic; padding: 4rem 1rem; text-align: center; }
+    .detail-com-name { font-family:'Syne',sans-serif; font-weight: 800; font-size: 1.6rem; letter-spacing: -.02em; margin-bottom: .35rem; }
+    .detail-zone { font-family:'DM Mono',monospace; font-size: .65rem; letter-spacing: .1em; text-transform: uppercase; color: var(--purple); margin-bottom: 1rem; }
+    .detail-row { padding: .8rem 0; border-bottom: 1px solid var(--border); }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-row-label { font-family:'DM Mono',monospace; font-size: .58rem; letter-spacing: .15em; text-transform: uppercase; color: var(--text3); margin-bottom: .35rem; }
+    .detail-row-val { font-family:'Fraunces',serif; font-weight: 300; font-size: .95rem; line-height: 1.55; color: var(--text); }
+    .detail-row-val .pill-inline { display: inline-block; padding: .12rem .5rem; font-family:'DM Mono',monospace; font-size: .7rem; background: var(--purple-dim); color: var(--purple); margin-right: .3rem; }
+    .detail-row-val .risk-pill { font-family:'DM Mono',monospace; font-size: .68rem; padding: .15rem .55rem; letter-spacing: .08em; }
+    .risk-pill.r-low { background: rgba(74,175,80,0.15); color: #2e7d32; }
+    .risk-pill.r-med { background: rgba(240,192,64,0.18); color: #b8860b; }
+    .risk-pill.r-high { background: rgba(255,140,0,0.18); color: #d35400; }
+    .risk-pill.r-extreme { background: rgba(230,57,70,0.18); color: var(--danger); }
+
+    .arquetipos { margin-top: 2rem; }
+    .arq-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+    .arq-card { background: var(--surface); border: 1px solid var(--border); padding: 1.4rem; border-left: 3px solid var(--purple); }
+    .arq-name { font-family:'Syne',sans-serif; font-weight: 800; font-size: 1.1rem; margin-bottom: .35rem; letter-spacing: -.01em; }
+    .arq-territory { font-family:'DM Mono',monospace; font-size: .65rem; letter-spacing: .08em; color: var(--text2); margin-bottom: .9rem; line-height: 1.45; }
+    .arq-section { margin-bottom: .65rem; font-family:'Fraunces',serif; font-weight: 300; font-size: .9rem; line-height: 1.5; color: var(--text2); }
+    .arq-section b { font-family:'DM Mono',monospace; font-size: .58rem; letter-spacing: .15em; text-transform: uppercase; color: var(--purple); display: block; margin-bottom: .2rem; font-weight: 400; }
+
+    .timeline { margin-top: 2rem; }
+    .timeline-list { position: relative; padding-left: 2rem; }
+    .timeline-list::before { content: ''; position: absolute; left: .6rem; top: 0; bottom: 0; width: 2px; background: var(--purple); opacity: .25; }
+    .timeline-item { position: relative; padding: .9rem 0 .9rem 1.2rem; }
+    .timeline-item::before { content: ''; position: absolute; left: -1.55rem; top: 1.4rem; width: 12px; height: 12px; background: var(--purple); border-radius: 50%; box-shadow: 0 0 0 3px var(--bg); }
+    .timeline-period { font-family:'DM Mono',monospace; font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--purple); margin-bottom: .25rem; }
+    .timeline-event { font-family:'Syne',sans-serif; font-weight: 700; font-size: 1.05rem; margin-bottom: .35rem; }
+    .timeline-data { font-family:'Fraunces',serif; font-weight: 400; font-size: .95rem; color: var(--text); margin-bottom: .35rem; font-style: italic; }
+    .timeline-interp { font-family:'Fraunces',serif; font-weight: 300; font-size: .92rem; line-height: 1.5; color: var(--text2); }
+
+    .results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 2rem; }
+    .results-card { background: var(--surface); border: 1px solid var(--border); padding: 1.5rem; }
+    .res-row { display: grid; grid-template-columns: 1fr 60px; gap: 1rem; align-items: center; padding: .55rem 0; border-bottom: 1px solid var(--border); font-family:'Fraunces',serif; font-weight: 300; font-size: .92rem; }
+    .res-row:last-child { border-bottom: none; }
+    .res-row .pct { font-family:'Avenir',sans-serif; text-align: right; color: var(--purple); font-weight: 500; }
+    .res-bar { height: 6px; background: var(--bg2); margin-top: .15rem; position: relative; }
+    .res-bar-fg { position: absolute; top:0; left:0; bottom:0; background: var(--purple); }
+
+    .vars-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 1rem; }
+    .var-card { background: var(--surface); border: 1px solid var(--border); padding: 1.2rem; }
+    .var-name { font-family:'Syne',sans-serif; font-weight: 700; font-size: 1rem; margin-bottom: .5rem; }
+    .var-eff { font-family:'Fraunces',serif; font-weight: 300; font-size: .9rem; line-height: 1.5; color: var(--text2); margin-bottom: .55rem; }
+    .var-zone { font-family:'DM Mono',monospace; font-size: .6rem; letter-spacing: .1em; color: var(--purple); }
+
+    .section-block { margin-top: 3rem; }
+    .section-label { font-family:'DM Mono',monospace; font-size: .7rem; letter-spacing: .2em; text-transform: uppercase; color: var(--purple); margin-bottom: .6rem; display:flex; align-items:center; gap:.5rem; }
+    .section-num { color: var(--text3); }
+    .section-title { font-family:'Syne',sans-serif; font-weight: 800; font-size: clamp(1.3rem, 2.4vw, 1.8rem); letter-spacing: -.015em; margin-bottom: .9rem; }
+    .section-intro { font-family:'Fraunces',serif; font-weight: 300; font-size: 1rem; line-height: 1.55; color: var(--text2); max-width: 760px; margin-bottom: 1.5rem; }
+
+    .sources-block {
+      margin-top: 3rem; padding: 1.5rem;
+      background: var(--surface2); border: 1px solid var(--border);
+      font-family:'DM Mono',monospace; font-size:.7rem; line-height: 1.6; color: var(--text2);
+    }
+    .sources-block strong { color: var(--text); font-weight: 500; }
+
+    .leaflet-tooltip { font-family: Avenir, sans-serif !important; font-weight: 400 !important; font-size: .85rem !important; background: rgba(6,8,16,0.97) !important; border: 1px solid var(--purple) !important; color: #f4f3ef !important; width: 240px !important; white-space: normal !important; overflow-wrap: break-word !important; border-radius: 0 !important; padding: .55rem .7rem !important; }
+    .leaflet-tooltip:before { display: none !important; }
+    #map .leaflet-interactive { cursor: pointer; }
+
+    @media (max-width: 980px) {
+      main.wrap { padding: 5rem 1.5rem 3rem; }
+      nav.top { padding: .9rem 1.5rem; }
+      .summary { grid-template-columns: 1fr 1fr; }
+      .layout { grid-template-columns: 1fr; }
+      .results-grid { grid-template-columns: 1fr; }
+      #map { height: 380px; }
+      body { cursor: auto; }
+      .cursor, .cursor-ring { display: none; }
+    }
+    @media (max-width: 540px) {
+      .summary { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="gate" class="gate">
+    <div class="gate-text">Verificando acceso</div>
+    <div class="gate-bar"></div>
+  </div>
+
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <nav class="top" hidden id="topNav">
+    <div class="nav-left">
+      <a href="../proyecto-dc.html" class="e-btn-back">← Proyecto DC</a>
+      <span class="private-badge">Privado</span>
+    </div>
+    <div class="nav-right">
+      <a href="../index.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div>
+          <div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div>
+          <div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+  </nav>
+
+  <main class="wrap" hidden id="main">
+
+    <section class="hero">
+      <div class="hero-label">Módulo 03 · Comportamiento electoral 2021–2026</div>
+      <h1 class="hero-title">Riesgo MOE, públicos y <em>arquetipos</em>.</h1>
+      <p class="hero-sub">Lectura por comuna del riesgo electoral según la MOE, el público electoral dominante, el patrón de voto y los activadores narrativos. Cubre el ciclo 2021–2026: de la elección de Quintero a las legislativas 2026.</p>
+      <div class="hero-actions">
+        <a href="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/Proyecto+DC/pdfs/informe_unificado_comportamiento_electoral_medellin_2021_2026.pdf" target="_blank" class="pdf-btn">↓ Descargar informe (PDF)</a>
+      </div>
+      <div class="controls">
+        <div class="ctrl-group">
+          <div class="ctrl-label">Capa del mapa</div>
+          <div class="pill-group" id="layer-pills">
+            <button class="pill active" data-layer="riesgo">Riesgo MOE</button>
+            <button class="pill" data-layer="publico">Público dominante</button>
+            <button class="pill" data-layer="perfil">Perfil socioeconómico</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="summary" id="summary"></section>
+
+    <section class="layout">
+      <div class="map-card">
+        <div class="card-header">
+          <div>
+            <div class="card-title" id="map-title">Riesgo electoral MOE por comuna</div>
+            <div class="card-sub" id="map-sub">% puestos en riesgo · 16 comunas + corregimientos en gris</div>
+          </div>
+        </div>
+        <div id="map"></div>
+        <div class="map-legend" id="map-legend"></div>
+      </div>
+      <div class="detail-card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Detalle por comuna</div>
+            <div class="card-sub">Click en una comuna del mapa</div>
+          </div>
+        </div>
+        <div class="detail-body" id="detail">
+          <div class="detail-empty">Hacé click en una comuna del mapa para ver su lectura analítica completa.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-label"><span class="section-num">1</span> · Arquetipos electorales</div>
+      <h2 class="section-title">Cinco públicos electorales con territorio asignado.</h2>
+      <p class="section-intro">Cada arquetipo combina un territorio característico, activadores narrativos y vulnerabilidades específicas. No son etiquetas duras: pueden coexistir en una misma comuna con pesos distintos.</p>
+      <div class="arq-grid" id="arq-grid"></div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-label"><span class="section-num">2</span> · Cronología</div>
+      <h2 class="section-title">2019 → 2026 · ciclo de expansión y refracción del voto alternativo.</h2>
+      <div class="timeline">
+        <div class="timeline-list" id="timeline-list"></div>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-label"><span class="section-num">3</span> · Resultados 2026</div>
+      <h2 class="section-title">Senado y consultas presidenciales · Medellín.</h2>
+      <div class="results-grid">
+        <div class="results-card">
+          <div class="card-sub" style="margin-bottom:1rem">Senado 2026 · partidos</div>
+          <div id="senado-list"></div>
+        </div>
+        <div class="results-card">
+          <div class="card-sub" style="margin-bottom:1rem">Consultas presidenciales 2026 · bloques</div>
+          <div id="consultas-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-label"><span class="section-num">4</span> · Variables explicativas</div>
+      <h2 class="section-title">Seis dimensiones de decisión.</h2>
+      <p class="section-intro">Variables transversales que explican comportamiento electoral más allá del partido. Útiles para segmentar mensajes y diagnósticos.</p>
+      <div class="vars-grid" id="vars-grid"></div>
+    </section>
+
+    <div class="sources-block">
+      <strong>Fuentes:</strong> MOE — Mapas de riesgo electoral 2022/2023 · Casa de las Estrategias — Elecciones presidenciales y participación ciudadana en Medellín 2022 · Corporación Con Ciudadanía — Análisis de comportamiento electoral 2019–2023 · Resultados oficiales Senado 2026 y Consultas presidenciales 2026.<br/><br/>
+      <strong>Nota:</strong> los porcentajes de riesgo MOE por zona corresponden a puestos identificados en las matrices oficiales. La clasificación por comuna es interpretación analítica del paquete unificado y no sustituye los reportes formales de cada elección.
+    </div>
+
+  </main>
+
+  <script>
+    // ─── EMAIL GATE ───────────────────────────────────────────────────
+    const ALLOWED = ['reruizc@gmail.com', 'nuevagemela@gmail.com'];
+    const token = localStorage.getItem('rr-token');
+    const userRaw = localStorage.getItem('rr-user');
+    const user = userRaw ? JSON.parse(userRaw) : null;
+    function emailAllowed(em){ return em && ALLOWED.includes(String(em).toLowerCase().trim()); }
+    function denyToLogin(){ localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); window.location.replace('../login.html'); }
+    function denyToDashboard(){ window.location.replace('../dashboard.html'); }
+    if (!token || !user) denyToLogin();
+    else if (!emailAllowed(user.email)) denyToDashboard();
+    else {
+      (async () => {
+        try {
+          const res = await fetch('https://rr-auth.reruizc.workers.dev/auth/me', { headers: { 'Authorization': `Bearer ${token}` } });
+          if (res.status === 401) return denyToLogin();
+          const data = await res.json();
+          if (!data.ok || !emailAllowed(data.user && data.user.email)) return denyToDashboard();
+          localStorage.setItem('rr-user', JSON.stringify(Object.assign({}, user, data.user)));
+          revealPage();
+        } catch (e) { revealPage(); }
+      })();
+    }
+    function revealPage(){
+      document.getElementById('gate').remove();
+      document.getElementById('topNav').hidden = false;
+      document.getElementById('main').hidden = false;
+      init();
+    }
+
+    function getAutoTheme(){ const h = new Date().getHours(); return (h >= 7 && h < 19) ? 'light' : 'dark'; }
+    const theme = localStorage.getItem('rr-theme') || getAutoTheme();
+    document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : '');
+
+    // ─── DATOS EMBEBIDOS (paquete comportamiento electoral 2021-2026) ─
+    // Fuente: paquete_comportamiento_electoral_medellin_2021_2026 / bases_csv
+    const COMUNAS = [
+      {num:1,  comuna:'Popular',          zona:'Nororiental',    perfil:'Estratos 1–2', publico:'Voto de cambio/alternativo + abstencionismo estructural', patron:'Alta vulnerabilidad, demanda de inclusión, riesgo por baja participación', riesgo:'Medio-Alto',  riesgo_pct:29, activadores:'Inequidad, presencia estatal, seguridad cotidiana, reconocimiento barrial', observacion:'Hace parte del bloque norte con mayor asociación entre IPM/desempleo y voto alternativo.'},
+      {num:2,  comuna:'Santa Cruz',       zona:'Nororiental',    perfil:'Estratos 1–2', publico:'Voto de cambio/alternativo + abstencionismo estructural', patron:'Alta densidad social, voto alternativo visible y riesgo de desmovilización', riesgo:'Medio-Alto', riesgo_pct:29, activadores:'Promesas de cambio, cercanía territorial, confianza comunitaria', observacion:'Comuna señalada entre territorios con alta votación alternativa en 2022.'},
+      {num:3,  comuna:'Manrique',         zona:'Nororiental',    perfil:'Estratos 1–2', publico:'Voto de cambio/alternativo', patron:'Sensibilidad a desigualdad, desempleo y memoria territorial', riesgo:'Medio-Alto', riesgo_pct:29, activadores:'Inclusión, empleo juvenil, seguridad barrial, liderazgo cercano', observacion:'Aparece en cruces de IPM, desempleo, desplazamiento y voto por Petro >=39%.'},
+      {num:4,  comuna:'Aranjuez',         zona:'Nororiental',    perfil:'Estratos 1–2', publico:'Voto alternativo con potencial de opinión volátil', patron:'Crecimiento de voto alternativo entre vueltas 2022; sensibilidad al ciclo político', riesgo:'Medio-Alto', riesgo_pct:29, activadores:'Memoria social, infraestructura, seguridad y reputación del candidato', observacion:'Uno de los territorios con crecimiento absoluto relevante para Petro en 2022.'},
+      {num:5,  comuna:'Castilla',         zona:'Noroccidental',  perfil:'Estratos 2–3', publico:'Voto de opinión volátil + cambio', patron:'Competencia abierta, voto sensible a candidaturas alternativas', riesgo:'Medio-Alto', riesgo_pct:14, activadores:'Reputación, propuestas sociales, seguridad, trayectoria del candidato', observacion:'Zona bisagra entre voto popular y voto de opinión.'},
+      {num:6,  comuna:'Doce de Octubre',  zona:'Noroccidental',  perfil:'Estratos 2–3', publico:'Voto de opinión volátil + cambio', patron:'Participación media y alta sensibilidad a coyuntura política', riesgo:'Medio-Alto', riesgo_pct:14, activadores:'Candidato, confianza, promesas verificables, identidad barrial', observacion:'Presentó crecimiento absoluto relevante del voto Petro en segunda vuelta 2022.'},
+      {num:7,  comuna:'Robledo',          zona:'Noroccidental',  perfil:'Estratos 2–3', publico:'Voto de cambio + opinión volátil', patron:'Confluye vulnerabilidad, voto alternativo y movilidad electoral', riesgo:'Medio-Alto', riesgo_pct:14, activadores:'Desempleo, educación, seguridad, movilidad, candidato confiable', observacion:'Aparece en varios cruces de vulnerabilidad y votación Petro >=39%.'},
+      {num:8,  comuna:'Villa Hermosa',    zona:'Centroriental',  perfil:'Estratos 2–3', publico:'Voto de cambio/alternativo + mediación barrial', patron:'Alta votación alternativa y posible intermediación local', riesgo:'Medio-Alto', riesgo_pct:25, activadores:'Inequidad, servicios públicos, seguridad, presencia institucional', observacion:'Se repite en cruces de IPM, desempleo, homicidios juveniles y desplazamiento.'},
+      {num:9,  comuna:'Buenos Aires',     zona:'Centroriental',  perfil:'Estratos 2–3', publico:'Voto fragmentado + clientelar/opinión', patron:'Comportamiento heterogéneo con competencia entre redes y opinión', riesgo:'Medio-Alto', riesgo_pct:25, activadores:'Liderazgo local, seguridad, movilidad, oferta institucional', observacion:'Tiene lectura de zona fragmentada y sensible a maquinarias barriales.'},
+      {num:10, comuna:'La Candelaria',    zona:'Centroriental',  perfil:'Estratos 2–3 / centro económico', publico:'Voto fragmentado + establecimiento urbano', patron:'Centro urbano con contraste entre opinión, comercio, redes y dominio territorial puntual', riesgo:'Medio-Alto', riesgo_pct:25, activadores:'Gestión del centro, seguridad, comercio, orden urbano', observacion:'Aparece entre comunas con mayor número de empresas y mayoría Hernández >=63%.'},
+      {num:11, comuna:'Laureles-Estadio', zona:'Centroccidental',perfil:'Estratos 3–5', publico:'Voto de establecimiento + opinión urbana', patron:'Participación media-alta y preferencia por orden, gestión y estabilidad', riesgo:'Alto-Extremo', riesgo_pct:34, activadores:'Seguridad, movilidad, valorización, gestión pública, anticorrupción', observacion:'Pertenece a zonas de menor IPM y alta votación Hernández en 2022.'},
+      {num:12, comuna:'La América',       zona:'Centroccidental',perfil:'Estratos 3–5', publico:'Voto de establecimiento', patron:'Preferencia por continuidad, gestión y baja tolerancia al riesgo político', riesgo:'Alto-Extremo', riesgo_pct:34, activadores:'Seguridad, economía, infraestructura, candidato con reputación', observacion:'Asociada a menor desempleo y mayoría Hernández >=63% en 2022.'},
+      {num:13, comuna:'San Javier',       zona:'Centroccidental',perfil:'Estratos 3–5 con contrastes internos', publico:'Voto de opinión volátil + memoria de conflicto', patron:'Variaciones atípicas de participación en puestos; sensibilidad a seguridad y memoria territorial', riesgo:'Alto-Extremo', riesgo_pct:34, activadores:'Seguridad, reconocimiento territorial, reparación simbólica, confianza', observacion:'La MOE destaca variaciones atípicas de participación en seis puestos.'},
+      {num:14, comuna:'El Poblado',       zona:'Suroriental',    perfil:'Estratos 5–6', publico:'Voto de establecimiento', patron:'Alta participación y dominio electoral consolidado', riesgo:'Extremo', riesgo_pct:60, activadores:'Seguridad, inversión, continuidad, orden, estabilidad económica', observacion:'Más del 60% de puestos con riesgo extremo por dominio electoral.'},
+      {num:15, comuna:'Guayabal',         zona:'Suroccidental',  perfil:'Estratos 3–4', publico:'Voto de opinión moderado + establecimiento', patron:'Comportamiento moderado; menor volatilidad que norte; peso de economía y empleo', riesgo:'Bajo-Medio', riesgo_pct:19, activadores:'Empleo, movilidad, seguridad, reputación del candidato', observacion:'Comuna con mayoría Hernández >=63% y menor desempleo según el informe.'},
+      {num:16, comuna:'Belén',            zona:'Suroccidental',  perfil:'Estratos 3–4', publico:'Voto de establecimiento + opinión volátil', patron:'Estabilidad relativa, pero con crecimiento absoluto del voto alternativo en 2022', riesgo:'Bajo-Medio', riesgo_pct:19, activadores:'Seguridad, movilidad, economía familiar, reputación, servicios urbanos', observacion:'Aunque favorece bloques de establecimiento, fue uno de los mayores crecimientos absolutos Petro entre vueltas 2022.'},
+    ];
+
+    const ARQUETIPOS = [
+      { nombre:'Voto de establecimiento',   territorio:'El Poblado, Laureles-Estadio, La América, Belén, Guayabal', activadores:'Gestión, seguridad, continuidad, estabilidad económica, anticorrupción', vulnerabilidad:'Narrativas de orden y prosperidad; rechazo a propuestas percibidas como radicales', lectura:'Alta capacidad de participación y afinidad con candidaturas de orden o liderazgo tradicional renovado.' },
+      { nombre:'Voto de cambio/alternativo', territorio:'Popular, Santa Cruz, Manrique, Aranjuez, Robledo, Villa Hermosa', activadores:'Inequidad, exclusión, presencia estatal, redistribución, empleo juvenil', vulnerabilidad:'Promesas de cambio sistémico, inclusión social y representación territorial', lectura:'Alta volatilidad; puede expandirse con esperanza de cambio y retraerse ante frustración o desgaste.' },
+      { nombre:'Voto clientelar o mediado', territorio:'Sectores con JAC, operadores barriales, liderazgos locales y redes de intermediación', activadores:'Relación con líderes, favores, gestión de problemas cotidianos, acceso a recursos', vulnerabilidad:'Movilización territorial y redes comunitarias; riesgo de frontera difusa con coacción', lectura:'Se superpone a otros públicos; menos programático y más relacional.' },
+      { nombre:'Voto en blanco de protesta', territorio:'Transversal a comunas y estratos', activadores:'Desencanto, crisis de credibilidad, rechazo a la oferta, escándalos', vulnerabilidad:'No responde a persuasión partidaria tradicional; es protesta activa', lectura:'En 2023 alcanzó 19,06% y funcionó como segunda fuerza electoral de hecho.' },
+      { nombre:'Abstencionismo estructural', territorio:'Norte y periferias con baja participación recurrente', activadores:'Falta de oferta significativa, control territorial, desconfianza institucional', vulnerabilidad:'Sensibilidad a operativos de presión y desmovilización barrial', lectura:'Se confunde con desmovilización forzada; debe separarse abstención voluntaria de coerción.' },
+    ];
+
+    const CRONOLOGIA = [
+      { periodo:'2019',                evento:'Elección de Daniel Quintero',           dato:'Punto de inflexión del voto alternativo',                                       interp:'Ruptura con hegemonía tradicional y apertura del ciclo alternativo.' },
+      { periodo:'2021',                evento:'Paro Nacional y movilización social',   dato:'Nueva capa de electores activos, especialmente jóvenes',                        interp:'Aumenta sensibilidad a narrativas de cambio, inequidad y representación.' },
+      { periodo:'2022 · primera vuelta', evento:'Presidencial',                        dato:'Petro obtiene 24% en primera vuelta en Medellín',                              interp:'Consolidación territorial del voto alternativo en norte y centro.' },
+      { periodo:'2022 · segunda vuelta', evento:'Presidencial',                        dato:'Petro alcanza 34,04% y 371.257 votos; crece 34,6% entre vueltas',              interp:'Expansión del voto de cambio; crecimiento absoluto en Belén, Doce de Octubre, Robledo y Aranjuez.' },
+      { periodo:'2023',                evento:'Elección local Alcaldía',               dato:'Federico Gutiérrez gana con 28,55%; voto en blanco 19,06%',                    interp:'Refracción del ciclo alternativo y consolidación del voto de protesta.' },
+      { periodo:'2026',                evento:'Legislativas Senado',                   dato:'Centro Democrático 36,72%; Pacto Histórico 18,92%; Creemos 12,08%',            interp:'Reorganización del mapa con bloques de derecha/centroderecha, voto localista y oposición ideológica.' },
+    ];
+
+    const SENADO_2026 = [
+      { partido:'Centro Democrático',     votos:322924, pct:36.72 },
+      { partido:'Pacto Histórico',        votos:166391, pct:18.92 },
+      { partido:'Creemos',                votos:106308, pct:12.08 },
+      { partido:'Alianza por Colombia',   votos: 49634, pct: 5.64 },
+    ];
+
+    const CONSULTAS_2026 = [
+      { consulta:'La Gran Consulta por Colombia', bloque:'Derecha-centroderecha',          votos:478722, pct:90.74 },
+      { consulta:'Frente por la Vida',            bloque:'Centroizquierda/alternativo',    votos: 31600, pct: 5.99 },
+    ];
+
+    const VARIABLES = [
+      { nombre:'Identidad territorial',       efecto:'La pertenencia comunal y barrial pesa más que la filiación partidaria formal.', zonas:'Todas, con mayor fuerza en norte y centro' },
+      { nombre:'Candidatura personalista',    efecto:'El candidato supera al partido como factor de movilización en ciclos 2019 y 2023.', zonas:'Medellín urbana' },
+      { nombre:'Seguridad local',             efecto:'La presencia o ausencia de control territorial incide en participación y libertad electoral.', zonas:'Norte, periferias, San Javier' },
+      { nombre:'Vulnerabilidad socioeconómica', efecto:'Alta IPM/desempleo/desplazamiento se asocia con mayor votación alternativa, sin ser determinista.', zonas:'Popular, Santa Cruz, Manrique, Robledo, Villa Hermosa' },
+      { nombre:'Dominio electoral',           efecto:'En zonas de alta participación, el riesgo proviene de concentración política más que de abstención.', zonas:'El Poblado, parte del centro-occidente' },
+      { nombre:'Voto en blanco',              efecto:'Funciona como protesta activa transversal y señal de crisis de representación.', zonas:'Transversal' },
+    ];
+
+    // ─── DATA SOURCES ─────────────────────────────────────────────────
+    const S3_BASE = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co';
+    const MEDELLIN_GEO_URL = `${S3_BASE}/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`;
+
+    // ─── COLOR SCALES ─────────────────────────────────────────────────
+    function colorRiesgoPct(pct){
+      // 0-15 verde, 15-25 amarillo, 25-40 naranja, 40+ rojo
+      if (pct < 15) return '#4caf50';
+      if (pct < 22) return '#a4c63d';
+      if (pct < 30) return '#f0c040';
+      if (pct < 40) return '#f08c30';
+      return '#e63946';
+    }
+
+    const PUBLICO_COLORS = {
+      'Voto de establecimiento':                        '#0088BB',
+      'Voto de establecimiento + opinión urbana':       '#0088BB',
+      'Voto de establecimiento + opinión volátil':      '#5cb8e0',
+      'Voto de cambio/alternativo':                     '#6B2D8B',
+      'Voto de cambio/alternativo + abstencionismo estructural': '#9333ea',
+      'Voto de cambio/alternativo + mediación barrial': '#7c3aed',
+      'Voto alternativo con potencial de opinión volátil': '#c084fc',
+      'Voto de cambio + opinión volátil':               '#a855f7',
+      'Voto de opinión volátil + cambio':               '#5cb8e0',
+      'Voto de opinión volátil + memoria de conflicto': '#d97706',
+      'Voto fragmentado + clientelar/opinión':          '#84B59F',
+      'Voto fragmentado + establecimiento urbano':      '#5e9b8a',
+      'Voto de opinión moderado + establecimiento':     '#4CAF50',
+    };
+
+    const PERFIL_COLORS = {
+      'Estratos 1–2': '#9333ea',
+      'Estratos 2–3': '#a855f7',
+      'Estratos 2–3 / centro económico': '#c084fc',
+      'Estratos 3–4': '#5cb8e0',
+      'Estratos 3–5': '#0088BB',
+      'Estratos 3–5 con contrastes internos': '#5cb8e0',
+      'Estratos 5–6': '#003580',
+    };
+
+    // ─── STATE ────────────────────────────────────────────────────────
+    const state = { layer: 'riesgo', selected: null };
+    let map = null, mapLayer = null, geoCache = null;
+
+    function fmt(n){ return new Intl.NumberFormat('es-CO').format(n || 0); }
+    function pct(n){ return (Math.round(n*100)/100).toLocaleString('es-CO') + '%'; }
+
+    function init(){
+      attachCursorHovers();
+      document.querySelectorAll('#layer-pills .pill').forEach(p => {
+        p.addEventListener('click', () => {
+          state.layer = p.dataset.layer;
+          document.querySelectorAll('#layer-pills .pill').forEach(x => x.classList.remove('active'));
+          p.classList.add('active');
+          render();
+        });
+      });
+      initMap();
+      renderSummary();
+      renderArquetipos();
+      renderTimeline();
+      renderResults();
+      renderVariables();
+      render();
+    }
+
+    function initMap(){
+      map = L.map('map', { zoomControl: true, attributionControl: false, scrollWheelZoom: false }).setView([6.245, -75.58], 11);
+    }
+    async function loadGeo(){
+      if (geoCache) return geoCache;
+      const r = await fetch(MEDELLIN_GEO_URL);
+      geoCache = await r.json();
+      return geoCache;
+    }
+
+    function getColor(d){
+      if (!d) return '#444';
+      if (state.layer === 'riesgo')  return colorRiesgoPct(d.riesgo_pct);
+      if (state.layer === 'publico') return PUBLICO_COLORS[d.publico] || '#888';
+      if (state.layer === 'perfil')  return PERFIL_COLORS[d.perfil]  || '#888';
+      return '#888';
+    }
+
+    function riskClass(r){
+      const k = String(r || '').toLowerCase();
+      if (k.includes('extremo')) return 'r-extreme';
+      if (k.includes('alto'))    return 'r-high';
+      if (k.includes('medio'))   return 'r-med';
+      return 'r-low';
+    }
+
+    function renderSummary(){
+      const promPct = (COMUNAS.reduce((s,c) => s + c.riesgo_pct, 0) / COMUNAS.length).toFixed(1);
+      const extreme = COMUNAS.find(c => c.riesgo === 'Extremo') || COMUNAS[0];
+      const altoExt = COMUNAS.filter(c => c.riesgo === 'Alto-Extremo').length;
+      document.getElementById('summary').innerHTML = `
+        <div class="sum-card purple">
+          <div class="sum-label">Comunas analizadas</div>
+          <div class="sum-value-big purple">${COMUNAS.length}</div>
+          <div class="sum-meta">Cubre ciclo 2021–2026</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-label">Riesgo MOE promedio</div>
+          <div class="sum-value-big">${promPct}%</div>
+          <div class="sum-meta">% puestos en riesgo (promedio simple)</div>
+        </div>
+        <div class="sum-card danger">
+          <div class="sum-label">Riesgo extremo</div>
+          <div class="sum-value-big danger">${extreme.comuna}</div>
+          <div class="sum-meta">${extreme.riesgo_pct}% puestos · concentración política</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-label">Voto blanco 2023</div>
+          <div class="sum-value-big">19,06%</div>
+          <div class="sum-meta">Segunda fuerza de hecho · ciclo local</div>
+        </div>
+      `;
+    }
+
+    async function render(){
+      const geo = await loadGeo();
+      if (mapLayer){ map.removeLayer(mapLayer); mapLayer = null; }
+      const dataByCode = Object.fromEntries(COMUNAS.map(c => [String(c.num).padStart(2,'0'), c]));
+
+      const styleOf = (feat) => {
+        const code = String(feat.properties.CODIGO || '').padStart(2, '0');
+        const d = dataByCode[code];
+        if (!d){
+          return { fillColor: '#444', fillOpacity: .2, color: 'rgba(255,255,255,0.2)', weight: 1, dashArray: '3,3' };
+        }
+        return { fillColor: getColor(d), fillOpacity: 0.82, color: 'rgba(255,255,255,0.4)', weight: 1 };
+      };
+
+      mapLayer = L.geoJSON(geo, {
+        style: styleOf,
+        onEachFeature: (feat, layer) => {
+          const code = String(feat.properties.CODIGO || '').padStart(2, '0');
+          const d = dataByCode[code];
+          const nombre = feat.properties.NOMBRE || code;
+          layer.on({
+            mouseover: (e) => {
+              layer.setStyle({ weight: 2, color: '#fff', fillOpacity: 0.96 });
+              if (d) {
+                let valLine = '';
+                if (state.layer === 'riesgo')  valLine = `<span style="color:#fff">${d.riesgo} · ${d.riesgo_pct}% puestos en riesgo</span>`;
+                if (state.layer === 'publico') valLine = `<span style="color:#fff">${d.publico}</span>`;
+                if (state.layer === 'perfil')  valLine = `<span style="color:#fff">${d.perfil}</span>`;
+                const tt = `
+                  <div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.5">
+                    <span style="color:#a78bfa;font-weight:700">${d.comuna.toUpperCase()}</span><br/>
+                    <span style="color:#999;font-size:.7rem">${d.zona} · ${d.perfil}</span><br/>
+                    ${valLine}
+                  </div>`;
+                layer.bindTooltip(tt, { sticky: true, opacity: 1 }).openTooltip(e.latlng);
+              } else {
+                layer.bindTooltip(`<div style="font-family:Avenir,sans-serif;font-size:.82rem"><span style="color:#a78bfa;font-weight:700">${String(nombre).toUpperCase()}</span><br/><span style="color:#999;font-size:.7rem">No incluido en este análisis</span></div>`, { sticky: true, opacity: 1 }).openTooltip(e.latlng);
+              }
+            },
+            mouseout: () => { layer.setStyle(styleOf(feat)); layer.closeTooltip(); },
+            click: () => { if (d) { state.selected = d.num; renderDetail(); } },
+          });
+        },
+      }).addTo(map);
+
+      try { map.fitBounds(mapLayer.getBounds(), { padding: [10, 10] }); } catch(_) {}
+
+      renderLegend();
+      const titles = {
+        riesgo:  'Riesgo electoral MOE por comuna',
+        publico: 'Público electoral dominante',
+        perfil:  'Perfil socioeconómico',
+      };
+      const subs = {
+        riesgo:  '% puestos en riesgo · escala verde→amarillo→rojo',
+        publico: 'Categoría dominante por comuna · 5 arquetipos',
+        perfil:  'Estrato modal de la comuna',
+      };
+      document.getElementById('map-title').textContent = titles[state.layer];
+      document.getElementById('map-sub').textContent = subs[state.layer];
+
+      if (!state.selected) renderDetailEmpty();
+      else renderDetail();
+    }
+
+    function renderLegend(){
+      const el = document.getElementById('map-legend');
+      if (state.layer === 'riesgo'){
+        const stops = [
+          { lbl: '< 15% · bajo',    c:'#4caf50' },
+          { lbl: '15–22% · medio-bajo', c:'#a4c63d' },
+          { lbl: '22–30% · medio',  c:'#f0c040' },
+          { lbl: '30–40% · alto',   c:'#f08c30' },
+          { lbl: '≥ 40% · extremo', c:'#e63946' },
+        ];
+        el.innerHTML = stops.map(s => `<div class="legend-item"><div class="legend-swatch" style="background:${s.c}"></div>${s.lbl}</div>`).join('');
+      } else if (state.layer === 'publico'){
+        const present = new Set(COMUNAS.map(c => c.publico));
+        const items = Array.from(present).map(p => `<div class="legend-item"><div class="legend-swatch" style="background:${PUBLICO_COLORS[p] || '#888'}"></div>${p}</div>`).join('');
+        el.innerHTML = items;
+      } else {
+        const present = new Set(COMUNAS.map(c => c.perfil));
+        const items = Array.from(present).map(p => `<div class="legend-item"><div class="legend-swatch" style="background:${PERFIL_COLORS[p] || '#888'}"></div>${p}</div>`).join('');
+        el.innerHTML = items;
+      }
+    }
+
+    function renderDetailEmpty(){
+      document.getElementById('detail').innerHTML = `<div class="detail-empty">Hacé click en una comuna del mapa para ver su lectura analítica completa.</div>`;
+    }
+
+    function renderDetail(){
+      const d = COMUNAS.find(c => c.num === state.selected);
+      if (!d) return renderDetailEmpty();
+      document.getElementById('detail').innerHTML = `
+        <div class="detail-com-name">${d.comuna}</div>
+        <div class="detail-zone">${d.zona} · ${d.perfil}</div>
+
+        <div class="detail-row">
+          <div class="detail-row-label">Riesgo MOE</div>
+          <div class="detail-row-val">
+            <span class="risk-pill ${riskClass(d.riesgo)}">${d.riesgo}</span>
+            · ${d.riesgo_pct}% puestos en riesgo
+          </div>
+        </div>
+
+        <div class="detail-row">
+          <div class="detail-row-label">Público dominante</div>
+          <div class="detail-row-val">${d.publico}</div>
+        </div>
+
+        <div class="detail-row">
+          <div class="detail-row-label">Patrón observado</div>
+          <div class="detail-row-val">${d.patron}</div>
+        </div>
+
+        <div class="detail-row">
+          <div class="detail-row-label">Activadores narrativos</div>
+          <div class="detail-row-val">${d.activadores}</div>
+        </div>
+
+        <div class="detail-row">
+          <div class="detail-row-label">Lectura analítica</div>
+          <div class="detail-row-val" style="font-style:italic;color:var(--text2)">${d.observacion}</div>
+        </div>
+      `;
+    }
+
+    function renderArquetipos(){
+      document.getElementById('arq-grid').innerHTML = ARQUETIPOS.map(a => `
+        <div class="arq-card">
+          <div class="arq-name">${a.nombre}</div>
+          <div class="arq-territory">${a.territorio}</div>
+          <div class="arq-section"><b>Activadores</b>${a.activadores}</div>
+          <div class="arq-section"><b>Vulnerabilidad / framing</b>${a.vulnerabilidad}</div>
+          <div class="arq-section"><b>Lectura</b>${a.lectura}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderTimeline(){
+      document.getElementById('timeline-list').innerHTML = CRONOLOGIA.map(t => `
+        <div class="timeline-item">
+          <div class="timeline-period">${t.periodo}</div>
+          <div class="timeline-event">${t.evento}</div>
+          <div class="timeline-data">${t.dato}</div>
+          <div class="timeline-interp">${t.interp}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderResults(){
+      const maxS = Math.max(...SENADO_2026.map(s => s.pct));
+      document.getElementById('senado-list').innerHTML = SENADO_2026.map(s => `
+        <div class="res-row">
+          <div>
+            <div>${s.partido}</div>
+            <div class="res-bar"><div class="res-bar-fg" style="width:${s.pct/maxS*100}%"></div></div>
+          </div>
+          <div class="pct">${s.pct.toLocaleString('es-CO')}%</div>
+        </div>
+      `).join('');
+      const maxC = Math.max(...CONSULTAS_2026.map(s => s.pct));
+      document.getElementById('consultas-list').innerHTML = CONSULTAS_2026.map(s => `
+        <div class="res-row">
+          <div>
+            <div>${s.consulta}</div>
+            <div class="res-bar"><div class="res-bar-fg" style="width:${s.pct/maxC*100}%"></div></div>
+            <div style="font-family:'DM Mono',monospace;font-size:.6rem;color:var(--text3);margin-top:.3rem">${s.bloque} · ${fmt(s.votos)} votos</div>
+          </div>
+          <div class="pct">${s.pct.toLocaleString('es-CO')}%</div>
+        </div>
+      `).join('');
+    }
+
+    function renderVariables(){
+      document.getElementById('vars-grid').innerHTML = VARIABLES.map(v => `
+        <div class="var-card">
+          <div class="var-name">${v.nombre}</div>
+          <div class="var-eff">${v.efecto}</div>
+          <div class="var-zone">${v.zonas}</div>
+        </div>
+      `).join('');
+    }
+
+    // ─── CURSOR ───────────────────────────────────────────────────────
+    const cursor = document.getElementById('cursor');
+    const ring   = document.getElementById('cursorRing');
+    let mx=0, my=0, rx=0, ry=0;
+    document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; cursor.style.left = mx + 'px'; cursor.style.top = my + 'px'; });
+    (function ar(){ rx += (mx-rx)*.12; ry += (my-ry)*.12; ring.style.left = rx+'px'; ring.style.top = ry+'px'; requestAnimationFrame(ar); })();
+    function attachCursorHovers(){
+      document.querySelectorAll('a, button, .pill').forEach(el => {
+        el.addEventListener('mouseenter', () => { cursor.style.transform = 'translate(-50%,-50%) scale(2.5)'; cursor.style.background = 'transparent'; cursor.style.border = '1.5px solid var(--purple)'; ring.style.opacity = '0'; });
+        el.addEventListener('mouseleave', () => { cursor.style.transform = 'translate(-50%,-50%) scale(1)'; cursor.style.background = 'var(--purple)'; cursor.style.border = 'none'; ring.style.opacity = '.4'; });
+      });
+    }
+  </script>
+</body>
+</html>

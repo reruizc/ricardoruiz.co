@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Gobierno criminal y elecciones · Proyecto DC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=DM+Mono:wght@300;400&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    :root {
+      --bg: #f4f3ef; --bg2: #eeedea;
+      --surface: #ffffff; --surface2: #f0efe9;
+      --border: rgba(0,0,0,0.07); --border2: rgba(0,0,0,0.12);
+      --text: #0a0a0a; --text2: #555; --text3: #999;
+      --blue: #0047FF; --purple: #7c3aed;
+      --purple-dim: rgba(124,58,237,0.10);
+      --warn: #f0c040; --warn-dim: rgba(240,192,64,0.12);
+      --danger: #e63946;
+    }
+    [data-theme="dark"] {
+      --bg: #060810; --bg2: #0a0c14;
+      --surface: #0f1018; --surface2: #13151f;
+      --border: rgba(255,255,255,0.06); --border2: rgba(255,255,255,0.12);
+      --text: #f4f3ef; --text2: #888; --text3: #444;
+      --purple: #a78bfa;
+      --purple-dim: rgba(167,139,250,0.14);
+      --danger: #ff6b7a;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'Fraunces', serif;
+      min-height: 100vh; cursor: none; overflow-x: hidden;
+      transition: background 0.4s, color 0.4s;
+    }
+
+    .gate { position: fixed; inset: 0; z-index: 5000; background: var(--bg); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 1rem; }
+    .gate-text { font-family:'DM Mono',monospace; font-size:.82rem; letter-spacing:.12em; text-transform:uppercase; color:var(--text2); }
+    .gate-bar { width:120px; height:1px; background:var(--border); position:relative; overflow:hidden; }
+    .gate-bar::after { content:''; position:absolute; inset:0; background:var(--purple); animation:gate-slide 1.4s ease-in-out infinite; }
+    @keyframes gate-slide { 0%{transform:translateX(-100%);} 50%{transform:translateX(0);} 100%{transform:translateX(100%);} }
+
+    .cursor { position:fixed; width:12px; height:12px; background:var(--purple); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s ease,background .2s; transform:translate(-50%,-50%); }
+    .cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--purple); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s ease,opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+
+    nav.top { position: fixed; top:0; left:0; right:0; z-index:100; display: flex; align-items:center; justify-content:space-between; padding: .9rem 2.5rem; background: var(--bg); border-bottom: 1px solid var(--border); backdrop-filter: blur(12px); }
+    .nav-left { display:flex; align-items:center; gap:1rem; }
+    .nav-right { display:flex; align-items:center; gap:1.2rem; }
+    .e-btn-back { font-family:'Syne',sans-serif; font-size:.78rem; letter-spacing:.08em; text-transform:uppercase; color:var(--text2); text-decoration:none; border:1.5px solid var(--border); padding:.3rem .8rem; transition:color .2s,border-color .2s; }
+    .e-btn-back:hover { color:var(--text); border-color:var(--text2); }
+    .private-badge { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.18em; text-transform:uppercase; color: var(--purple); background: var(--purple-dim); padding:.32rem .7rem; border:1px solid var(--purple-dim); }
+    .logo-link { display:flex; align-items:center; gap:.55rem; text-decoration:none; opacity:.85; }
+    .logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
+    .logo-bar { width:5px; background:var(--purple); border-radius:1px 1px 0 0; }
+    .logo-text { font-family:'Syne',sans-serif; font-weight:800; font-size:1.3rem; letter-spacing:-.03em; color:var(--text); }
+    .logo-text span { color:var(--purple); }
+
+    main.wrap { max-width: 1400px; margin: 0 auto; padding: 6rem 2.5rem 4rem; }
+
+    .disclaimer-banner {
+      padding: 1rem 1.25rem; background: var(--warn-dim);
+      border: 1px solid var(--warn); margin-bottom: 1.5rem;
+      display: flex; align-items: flex-start; gap: 1rem; flex-wrap: wrap;
+    }
+    .disclaimer-icon { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.15em; text-transform:uppercase; padding:.3rem .65rem; background:var(--warn); color:#1a1a2e; flex-shrink:0; }
+    .disclaimer-text { font-family:'Fraunces',serif; font-weight:300; font-size:.92rem; line-height:1.5; color: var(--text); flex: 1; min-width: 280px; }
+    .disclaimer-text strong { font-weight:400; color:var(--warn); }
+
+    .hero { padding: 1rem 0 1.5rem; }
+    .hero-label { font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.2em; text-transform:uppercase; color:var(--purple); margin-bottom: .9rem; display:flex; align-items:center; gap:.6rem; }
+    .hero-label::before { content:''; display:block; width:24px; height:1px; background:var(--purple); }
+    .hero-title { font-family:'Syne',sans-serif; font-weight:800; font-size: clamp(1.8rem, 4vw, 3rem); letter-spacing:-.025em; line-height:1; }
+    .hero-title em { font-style:italic; font-family:'Fraunces',serif; font-weight:300; color:var(--purple); }
+    .hero-sub { margin-top: .85rem; max-width: 760px; font-family:'Fraunces',serif; font-weight: 300; font-size: 1rem; line-height: 1.55; color: var(--text2); }
+    .hero-actions { margin-top: 1.2rem; display: flex; gap: .8rem; flex-wrap: wrap; }
+    .pdf-btn { font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.12em; text-transform:uppercase; padding:.55rem 1rem; background:var(--surface); border:1px solid var(--purple); color:var(--purple); text-decoration:none; transition:background .15s; }
+    .pdf-btn:hover { background:var(--purple); color:#fff; }
+
+    .controls { margin-top: 1.5rem; display: flex; gap: 1.2rem; align-items: flex-start; flex-wrap: wrap; }
+    .ctrl-group { display: flex; flex-direction: column; gap: .35rem; }
+    .ctrl-label { font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.18em; text-transform:uppercase; color: var(--text3); }
+    .pill-group { display: flex; gap: 0; flex-wrap: wrap; }
+    .pill { font-family:'Syne',sans-serif; font-weight:500; font-size: .78rem; letter-spacing: .04em; padding: .5rem .9rem; background: var(--surface); border: 1px solid var(--border); cursor: none; color: var(--text2); transition: all .15s; }
+    .pill + .pill { margin-left: -1px; }
+    .pill:hover { color: var(--text); }
+    .pill.active { background: var(--purple); color: #fff; border-color: var(--purple); position: relative; z-index: 1; }
+
+    .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin: 1.5rem 0; }
+    .sum-card { background: var(--surface); border: 1px solid var(--border); padding: 1.4rem; }
+    .sum-card.danger { border-left: 3px solid var(--danger); }
+    .sum-card.purple { border-left: 3px solid var(--purple); }
+    .sum-label { font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing: .18em; text-transform: uppercase; color: var(--text3); margin-bottom: .55rem; }
+    .sum-value-big { font-family:'Syne',sans-serif; font-weight: 800; font-size: clamp(1.3rem, 2.6vw, 2rem); line-height: 1.05; letter-spacing: -.02em; margin-bottom: .35rem; }
+    .sum-value-big.danger { color: var(--danger); }
+    .sum-value-big.purple { color: var(--purple); }
+    .sum-meta { font-family:'DM Mono',monospace; font-size: .68rem; color: var(--text2); letter-spacing: .04em; }
+
+    .layout { display: grid; grid-template-columns: 1.5fr 1fr; gap: 1rem; }
+    .map-card, .detail-card { background: var(--surface); border: 1px solid var(--border); }
+    .card-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .card-title { font-family:'Syne',sans-serif; font-weight: 800; font-size: 1.05rem; letter-spacing: -.01em; }
+    .card-sub { font-family:'DM Mono',monospace; font-size: .62rem; letter-spacing: .1em; color: var(--text3); text-transform: uppercase; }
+    #map { width: 100%; height: 580px; background: var(--bg2); }
+
+    .map-legend { padding: .9rem 1.25rem; border-top: 1px solid var(--border); font-family:'DM Mono',monospace; font-size: .68rem; color: var(--text2); }
+    .legend-item { display: flex; align-items: center; gap: .5rem; padding: .25rem 0; }
+    .legend-swatch { width: 14px; height: 14px; flex-shrink: 0; border: 1px solid var(--border2); }
+
+    .detail-body { padding: 1.5rem; min-height: 580px; max-height: 700px; overflow-y: auto; }
+    .detail-empty { color: var(--text3); font-family:'Fraunces',serif; font-style: italic; padding: 4rem 1rem; text-align: center; }
+    .detail-com-name { font-family:'Syne',sans-serif; font-weight: 800; font-size: 1.5rem; letter-spacing: -.02em; margin-bottom: .25rem; }
+    .detail-zone { font-family:'DM Mono',monospace; font-size: .65rem; letter-spacing: .1em; text-transform: uppercase; color: var(--purple); margin-bottom: 1rem; }
+
+    .level-bars { display: grid; grid-template-columns: 1fr; gap: .5rem; margin-bottom: 1.2rem; padding-bottom: 1.2rem; border-bottom: 1px solid var(--border); }
+    .level-bar { display: grid; grid-template-columns: 130px 1fr 18px; gap: .6rem; align-items: center; font-family:'DM Mono',monospace; font-size: .68rem; }
+    .level-bar .lb-label { color: var(--text2); }
+    .level-bar .lb-track { display: flex; gap: 2px; height: 14px; }
+    .level-bar .lb-cell { flex: 1; background: var(--bg2); }
+    .level-bar .lb-cell.on { background: var(--purple); }
+    .level-bar .lb-cell.on.l1 { background: #4caf50; }
+    .level-bar .lb-cell.on.l2 { background: #f0c040; }
+    .level-bar .lb-cell.on.l3 { background: var(--danger); }
+    .level-bar .lb-val { text-align: right; color: var(--text); font-weight: 600; }
+
+    .detail-row { padding: .7rem 0; border-bottom: 1px solid var(--border); }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-row-label { font-family:'DM Mono',monospace; font-size: .58rem; letter-spacing: .15em; text-transform: uppercase; color: var(--text3); margin-bottom: .35rem; }
+    .detail-row-val { font-family:'Fraunces',serif; font-weight: 300; font-size: .92rem; line-height: 1.5; color: var(--text); }
+
+    .code-pill { display: inline-block; padding: .15rem .5rem; margin: .15rem .2rem .15rem 0; font-family:'DM Mono',monospace; font-size: .65rem; background: var(--purple-dim); color: var(--purple); border: 1px solid var(--purple-dim); }
+    .risk-pill { font-family:'DM Mono',monospace; font-size: .68rem; padding: .15rem .55rem; letter-spacing: .08em; }
+    .risk-pill.r-low { background: rgba(74,175,80,0.15); color: #2e7d32; }
+    .risk-pill.r-med { background: rgba(240,192,64,0.18); color: #b8860b; }
+    .risk-pill.r-high { background: rgba(255,140,0,0.18); color: #d35400; }
+    .risk-pill.r-extreme { background: rgba(230,57,70,0.18); color: var(--danger); }
+
+    .section-block { margin-top: 3rem; }
+    .section-label { font-family:'DM Mono',monospace; font-size: .7rem; letter-spacing: .2em; text-transform: uppercase; color: var(--purple); margin-bottom: .6rem; display:flex; align-items:center; gap:.5rem; }
+    .section-num { color: var(--text3); }
+    .section-title { font-family:'Syne',sans-serif; font-weight: 800; font-size: clamp(1.3rem, 2.4vw, 1.8rem); letter-spacing: -.015em; margin-bottom: .9rem; }
+    .section-intro { font-family:'Fraunces',serif; font-weight: 300; font-size: 1rem; line-height: 1.55; color: var(--text2); max-width: 760px; margin-bottom: 1.5rem; }
+
+    .dict-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .dict-card { background: var(--surface); border: 1px solid var(--border); padding: 1.4rem; }
+    .dict-title { font-family:'Syne',sans-serif; font-weight: 800; font-size: 1.05rem; margin-bottom: .25rem; }
+    .dict-sub { font-family:'DM Mono',monospace; font-size: .6rem; letter-spacing: .1em; text-transform: uppercase; color: var(--text3); margin-bottom: 1rem; }
+    .dict-row { padding: .5rem 0; border-bottom: 1px dashed var(--border); display: grid; grid-template-columns: 50px 1fr; gap: .6rem; font-family:'Fraunces',serif; font-weight: 300; font-size: .85rem; line-height: 1.45; }
+    .dict-row:last-child { border-bottom: none; }
+    .dict-row .code { font-family:'DM Mono',monospace; font-size: .7rem; color: var(--purple); font-weight: 400; }
+
+    .timeline { margin-top: 1rem; }
+    .timeline-list { position: relative; padding-left: 2rem; }
+    .timeline-list::before { content: ''; position: absolute; left: .6rem; top: 0; bottom: 0; width: 2px; background: var(--purple); opacity: .25; }
+    .timeline-item { position: relative; padding: .9rem 0 .9rem 1.2rem; }
+    .timeline-item::before { content: ''; position: absolute; left: -1.55rem; top: 1.4rem; width: 12px; height: 12px; background: var(--purple); border-radius: 50%; box-shadow: 0 0 0 3px var(--bg); }
+    .timeline-period { font-family:'DM Mono',monospace; font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--purple); margin-bottom: .25rem; }
+    .timeline-event { font-family:'Syne',sans-serif; font-weight: 700; font-size: 1.05rem; margin-bottom: .35rem; }
+    .timeline-interp { font-family:'Fraunces',serif; font-weight: 300; font-size: .92rem; line-height: 1.5; color: var(--text2); }
+    .timeline-attention { font-family:'DM Mono',monospace; font-size: .6rem; letter-spacing: .1em; text-transform: uppercase; padding: .15rem .5rem; margin-top: .5rem; display: inline-block; }
+    .timeline-attention.a-alta { background: rgba(255,140,0,0.18); color: #d35400; }
+    .timeline-attention.a-critica { background: rgba(230,57,70,0.18); color: var(--danger); }
+
+    .recom-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+    .recom-card { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--purple); padding: 1.3rem; }
+    .recom-name { font-family:'DM Mono',monospace; font-size: .65rem; letter-spacing: .12em; text-transform: uppercase; color: var(--purple); margin-bottom: .5rem; }
+    .recom-rec { font-family:'Syne',sans-serif; font-weight: 500; font-size: 1rem; line-height: 1.4; margin-bottom: .55rem; }
+    .recom-util { font-family:'Fraunces',serif; font-weight: 300; font-size: .88rem; line-height: 1.5; color: var(--text2); }
+
+    .sources-block { margin-top: 3rem; padding: 1.5rem; background: var(--surface2); border: 1px solid var(--border); font-family:'DM Mono',monospace; font-size:.7rem; line-height: 1.6; color: var(--text2); }
+    .sources-block strong { color: var(--text); font-weight: 500; }
+
+    .leaflet-tooltip { font-family: Avenir, sans-serif !important; font-weight: 400 !important; font-size: .85rem !important; background: rgba(6,8,16,0.97) !important; border: 1px solid var(--purple) !important; color: #f4f3ef !important; width: 260px !important; white-space: normal !important; overflow-wrap: break-word !important; border-radius: 0 !important; padding: .55rem .7rem !important; }
+    .leaflet-tooltip:before { display: none !important; }
+    #map .leaflet-interactive { cursor: pointer; }
+
+    @media (max-width: 980px) {
+      main.wrap { padding: 5rem 1.5rem 3rem; }
+      nav.top { padding: .9rem 1.5rem; }
+      .summary { grid-template-columns: 1fr 1fr; }
+      .layout { grid-template-columns: 1fr; }
+      .dict-grid { grid-template-columns: 1fr; }
+      #map { height: 380px; }
+      body { cursor: auto; }
+      .cursor, .cursor-ring { display: none; }
+    }
+    @media (max-width: 540px) {
+      .summary { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="gate" class="gate">
+    <div class="gate-text">Verificando acceso</div>
+    <div class="gate-bar"></div>
+  </div>
+
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <nav class="top" hidden id="topNav">
+    <div class="nav-left">
+      <a href="../proyecto-dc.html" class="e-btn-back">← Proyecto DC</a>
+      <span class="private-badge">Privado</span>
+    </div>
+    <div class="nav-right">
+      <a href="../index.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div>
+          <div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div>
+          <div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+  </nav>
+
+  <main class="wrap" hidden id="main">
+
+    <section class="hero">
+      <div class="hero-label">Módulo 06 · Gobierno criminal y elecciones 2023–2026</div>
+      <h1 class="hero-title">Riesgo de injerencia electoral por <em>comuna</em>.</h1>
+      <p class="hero-sub">Lectura no judicial sobre la incidencia que el gobierno criminal barrial puede tener en procesos electorales: control territorial, capacidad de movilización, mecanismos dominantes y prioridad de observación. Combina nivel cuantitativo (0–3) y cualitativo (mecanismos, actividades).</p>
+      <div class="hero-actions">
+        <a href="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/Proyecto+DC/pdfs/informe_grupos_criminales_medellin_elecciones_2023_2026.pdf" target="_blank" class="pdf-btn">↓ Descargar informe (PDF)</a>
+      </div>
+    </section>
+
+    <div class="disclaimer-banner">
+      <span class="disclaimer-icon">Aviso</span>
+      <div class="disclaimer-text">
+        Los mapas son <strong>esquemáticos</strong>, no georreferenciados ni a escala. La matriz clasifica riesgos y prioridades analíticas por comuna; <strong>no constituye señalamiento judicial, prueba penal ni cartografía oficial de control criminal</strong>. Reemplazar con cartografía oficial cuando esté disponible. Las referencias a estructuras (La Oficina, combos locales) reproducen el lenguaje de las fuentes citadas en el informe.
+      </div>
+    </div>
+
+    <section class="controls">
+      <div class="ctrl-group">
+        <div class="ctrl-label">Capa del mapa</div>
+        <div class="pill-group" id="layer-pills">
+          <button class="pill active" data-layer="gob">Gobierno criminal</button>
+          <button class="pill" data-layer="riesgo">Riesgo injerencia</button>
+          <button class="pill" data-layer="prio">Prioridad obs.</button>
+          <button class="pill" data-layer="terr">Control territorial</button>
+          <button class="pill" data-layer="dano">Capacidad de daño</button>
+          <button class="pill" data-layer="movil">Cap. movilización</button>
+          <button class="pill" data-layer="mec">Mecanismo dominante</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="summary" id="summary"></section>
+
+    <section class="layout">
+      <div class="map-card">
+        <div class="card-header">
+          <div>
+            <div class="card-title" id="map-title">Gobierno criminal por comuna</div>
+            <div class="card-sub" id="map-sub">Nivel 0–3 · 16 comunas analizadas</div>
+          </div>
+        </div>
+        <div id="map"></div>
+        <div class="map-legend" id="map-legend"></div>
+      </div>
+      <div class="detail-card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Detalle por comuna</div>
+            <div class="card-sub">Click en una comuna del mapa</div>
+          </div>
+        </div>
+        <div class="detail-body" id="detail">
+          <div class="detail-empty">Hacé click en una comuna del mapa para ver su matriz analítica completa.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-label"><span class="section-num">1</span> · Diccionarios</div>
+      <h2 class="section-title">Códigos CS · AC · IE.</h2>
+      <p class="section-intro">El detalle de cada comuna usa estos códigos para mecanismos de control social, actividades criminales e influencia electoral.</p>
+      <div class="dict-grid">
+        <div class="dict-card">
+          <div class="dict-title">Control social · CS</div>
+          <div class="dict-sub">Mecanismos de gobernanza barrial</div>
+          <div id="cs-list"></div>
+        </div>
+        <div class="dict-card">
+          <div class="dict-title">Actividades criminales · AC</div>
+          <div class="dict-sub">Rentas y economías ilegales</div>
+          <div id="ac-list"></div>
+        </div>
+        <div class="dict-card">
+          <div class="dict-title">Influencia electoral · IE</div>
+          <div class="dict-sub">Mecanismos de incidencia política</div>
+          <div id="ie-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-label"><span class="section-num">2</span> · Cronología</div>
+      <h2 class="section-title">2023 → 2026 · ciclo electoral con incidencia criminal.</h2>
+      <div class="timeline">
+        <div class="timeline-list" id="timeline-list"></div>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-label"><span class="section-num">3</span> · Recomendaciones metodológicas</div>
+      <h2 class="section-title">Cinco principios para usar este análisis.</h2>
+      <div class="recom-grid" id="recom-grid"></div>
+    </section>
+
+    <div class="sources-block">
+      <strong>Fuentes:</strong> Documento base cargado por la usuaria · Estudios académicos (EAFIT/IPA/Universidad de Chicago/otros) sobre estructura de crimen organizado y gobierno criminal · Reportes institucionales (Personería, Defensoría, Misión de Observación Electoral) sobre liderazgo comunitario, JAC, riesgo electoral y control territorial.<br/><br/>
+      <strong>Confianza por comuna:</strong> el campo "Confianza" indica el grado de respaldo de las fuentes para cada clasificación (Alta, Media-alta, Media, Media-baja). Las clasificaciones con confianza media-baja son prudenciales por convergencia territorial y requieren validación con cartografía oficial de barrios.
+    </div>
+
+  </main>
+
+  <script>
+    // ─── EMAIL GATE ───────────────────────────────────────────────────
+    const ALLOWED = ['reruizc@gmail.com', 'nuevagemela@gmail.com'];
+    const token = localStorage.getItem('rr-token');
+    const userRaw = localStorage.getItem('rr-user');
+    const user = userRaw ? JSON.parse(userRaw) : null;
+    function emailAllowed(em){ return em && ALLOWED.includes(String(em).toLowerCase().trim()); }
+    function denyToLogin(){ localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); window.location.replace('../login.html'); }
+    function denyToDashboard(){ window.location.replace('../dashboard.html'); }
+    if (!token || !user) denyToLogin();
+    else if (!emailAllowed(user.email)) denyToDashboard();
+    else {
+      (async () => {
+        try {
+          const res = await fetch('https://rr-auth.reruizc.workers.dev/auth/me', { headers: { 'Authorization': `Bearer ${token}` } });
+          if (res.status === 401) return denyToLogin();
+          const data = await res.json();
+          if (!data.ok || !emailAllowed(data.user && data.user.email)) return denyToDashboard();
+          localStorage.setItem('rr-user', JSON.stringify(Object.assign({}, user, data.user)));
+          revealPage();
+        } catch (e) { revealPage(); }
+      })();
+    }
+    function revealPage(){
+      document.getElementById('gate').remove();
+      document.getElementById('topNav').hidden = false;
+      document.getElementById('main').hidden = false;
+      init();
+    }
+    function getAutoTheme(){ const h = new Date().getHours(); return (h >= 7 && h < 19) ? 'light' : 'dark'; }
+    const theme = localStorage.getItem('rr-theme') || getAutoTheme();
+    document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : '');
+
+    // ─── DATOS EMBEBIDOS (paquete grupos criminales 2023-2026) ────────
+    const COMUNAS = [
+      {num:1,  comuna:'Popular',          zona:'Nororiental',     gob:3, gob_desc:'Alto: presencia de combos, regulación barrial y presión comunitaria reportada en zonas populares.', terr:3, dano:2, movil:3, riesgo:'Alto',    score:3, prio:'Alta',   prio_idx:3.0,  mec:'Fronteras/control territorial', estructura:'Combos locales articulados a redes metropolitanas', bandas:'La Oficina / redes metropolitanas; combos barriales',                                            cs:['CS01','CS03','CS04','CS06'], ac:['AC01','AC02','AC05'],                ie:['IE03','IE05','IE06'], org:'JAC; liderazgos barriales; colectivos comunitarios',          conf:'Media',      obs:'Zona prioritaria para observar acceso de campañas, presión silenciosa sobre liderazgos y abstención por control social.'},
+      {num:2,  comuna:'Santa Cruz',       zona:'Nororiental',     gob:2, gob_desc:'Medio-alto: lectura por zona nororiental con control social y vulnerabilidad acumulada.',          terr:2, dano:2, movil:2, riesgo:'Alto',    score:3, prio:'Media',  prio_idx:2.2,  mec:'Acceso político/comunitario',    estructura:'Combos barriales y redes de intermediación',         bandas:'No consolidado por fuente; referencia a combos locales',                                          cs:['CS01','CS03','CS04'],        ac:['AC01','AC02'],                       ie:['IE03','IE05'],          org:'JAC; líderes de base',                                       conf:'Media-baja', obs:'Clasificación prudente por convergencia territorial; requiere validación con cartografía oficial de barrios.'},
+      {num:3,  comuna:'Manrique',         zona:'Nororiental',     gob:2, gob_desc:'Medio-alto: presión social, control de circulación y mediación barrial en sectores de ladera.',     terr:2, dano:2, movil:2, riesgo:'Alto',    score:3, prio:'Media',  prio_idx:2.2,  mec:'Acceso político/comunitario',    estructura:'Combos locales y operadores comunitarios subordinados', bandas:'La Oficina / redes metropolitanas; combos barriales',                                          cs:['CS01','CS03','CS04','CS06'], ac:['AC01','AC02','AC05'],                ie:['IE03','IE05','IE06'], org:'JAC; liderazgos juveniles; organizaciones barriales',         conf:'Media',      obs:'Riesgo asociado a control de ingreso de campañas y presión sobre liderazgos alternativos.'},
+      {num:4,  comuna:'Aranjuez',         zona:'Nororiental',     gob:3, gob_desc:'Alto: comuna crítica en reportes por presencia de combos y bandas articuladas.',                     terr:3, dano:3, movil:3, riesgo:'Alto',    score:3, prio:'Alta',   prio_idx:3.0,  mec:'Fronteras/control territorial', estructura:'Combos articulados a estructuras de norte urbano',   bandas:'La Oficina / redes metropolitanas; referencias a Los Triana en el norte',                          cs:['CS01','CS03','CS04','CS06'], ac:['AC01','AC02','AC05'],                ie:['IE03','IE05','IE06'], org:'JAC; liderazgos barriales; redes comunitarias',               conf:'Media-alta', obs:'Territorio prioritario por densidad poblacional, intermediación comunitaria y control barrial.'},
+      {num:5,  comuna:'Castilla',         zona:'Noroccidental',   gob:3, gob_desc:'Alto: comuna priorizada por presencia de combos, rentas urbanas y corredores de movilidad.',          terr:3, dano:3, movil:3, riesgo:'Alto',    score:3, prio:'Alta',   prio_idx:3.0,  mec:'Fronteras/control territorial', estructura:'Redes y combos con alcance interbarrial',            bandas:'La Oficina / Los Triana / Pachelly en entorno norte según reportes citados',                       cs:['CS01','CS03','CS04','CS05'], ac:['AC01','AC02','AC05','AC06'],         ie:['IE03','IE04','IE05'], org:'JAC; comerciantes; organizaciones comunales',                 conf:'Media-alta', obs:'Relevancia por rentas urbanas, control de movilidad y peso electoral de sectores densamente poblados.'},
+      {num:6,  comuna:'Doce de Octubre',  zona:'Noroccidental',   gob:3, gob_desc:'Alto: comuna crítica por presencia de combos y conexión con estructuras de la zona norte.',           terr:3, dano:2, movil:3, riesgo:'Alto',    score:3, prio:'Alta',   prio_idx:3.0,  mec:'Fronteras/control territorial', estructura:'Combos locales articulados a bandas mayores',        bandas:'La Oficina / referencias a redes del norte urbano',                                                cs:['CS01','CS03','CS04','CS06'], ac:['AC01','AC02','AC05'],                ie:['IE03','IE05','IE06'], org:'JAC; liderazgos comunales; redes juveniles',                  conf:'Media-alta', obs:'Zona de observación por posible control de acceso a campaña y movilización comunitaria condicionada.'},
+      {num:7,  comuna:'Robledo',          zona:'Noroccidental',   gob:3, gob_desc:'Alto: comuna crítica por densidad de población, laderas, corredores y presencia de combos.',         terr:3, dano:3, movil:3, riesgo:'Alto',    score:3, prio:'Alta',   prio_idx:3.0,  mec:'Fronteras/control territorial', estructura:'Combos locales y redes de control barrial',          bandas:'La Oficina / redes metropolitanas; combos barriales',                                              cs:['CS01','CS03','CS04','CS05','CS06'], ac:['AC01','AC02','AC03','AC05'],   ie:['IE03','IE05','IE06'], org:'JAC; asociaciones barriales; liderazgos comunitarios',        conf:'Media-alta', obs:'Prioridad alta por capacidad de control territorial y traducción potencial a movilización selectiva.'},
+      {num:8,  comuna:'Villa Hermosa',    zona:'Centroriental',   gob:3, gob_desc:'Alto: comuna priorizada por presencia de múltiples combos y presión sobre liderazgo comunitario.',   terr:3, dano:3, movil:3, riesgo:'Alto',    score:3, prio:'Alta',   prio_idx:3.0,  mec:'Fronteras/control territorial', estructura:'Combos locales y redes de mediación barrial',        bandas:'La Oficina / combos barriales; estructuras locales no consolidadas por fuente',                    cs:['CS01','CS03','CS04','CS06'], ac:['AC01','AC02','AC05'],                ie:['IE03','IE05','IE06'], org:'JAC; líderes sociales; colectivos culturales',                conf:'Media-alta', obs:'Riesgo por silenciamiento de liderazgos y canalización de apoyos mediante estructuras comunitarias.'},
+      {num:9,  comuna:'Buenos Aires',     zona:'Centroriental',   gob:2, gob_desc:'Medio: influencia posible por continuidad territorial con centro-oriente y presencia de rentas locales.', terr:2, dano:2, movil:2, riesgo:'Medio',   score:2, prio:'Media',  prio_idx:2.0,  mec:'Acceso político/comunitario',    estructura:'Combos locales y economías informales',              bandas:'No consolidado por fuente; referencia general a combos locales',                                   cs:['CS03','CS04','CS05'],        ac:['AC01','AC02','AC05'],                ie:['IE03','IE05'],          org:'JAC; redes comunitarias',                                    conf:'Media-baja', obs:'Riesgo intermedio; se recomienda validación barrial antes de inferencias electorales.'},
+      {num:10, comuna:'La Candelaria',    zona:'Centroriental',   gob:3, gob_desc:'Alto: concentración de rentas urbanas, comercio, transporte y extorsión en el centro tradicional.',   terr:3, dano:3, movil:2, riesgo:'Extremo', score:4, prio:'Alta',   prio_idx:2.95, mec:'Acceso político/comunitario',    estructura:'Estructuras de control de rentas urbanas y redes del centro', bandas:'La Oficina / redes del centro; estructuras con control de rentas',                                cs:['CS03','CS04','CS05'],        ac:['AC01','AC02','AC04','AC05','AC06','AC07'], ie:['IE03','IE04','IE05'], org:'Comerciantes; transportadores; liderazgos comunitarios',  conf:'Media-alta', obs:'Extrema atención por control económico, alta circulación poblacional y posibles pactos de tranquilidad territorial.'},
+      {num:11, comuna:'Laureles-Estadio', zona:'Centroccidental', gob:0, gob_desc:'Nulo/bajo: fuente citada no identifica dominio territorial estable; sí pueden existir actividades puntuales.', terr:0, dano:1, movil:0, riesgo:'Bajo',    score:1, prio:'Baja',   prio_idx:0.2,  mec:'Actividad puntual/sin dominio',  estructura:'Sin dominio territorial estable identificado',       bandas:'No dominio territorial; actividades puntuales posibles',                                            cs:[],                            ac:['AC02','AC07'],                       ie:[],                       org:'No priorizado',                                              conf:'Alta',       obs:'No debe leerse como ausencia de delito, sino como ausencia de control territorial estable reportado.'},
+      {num:12, comuna:'La América',       zona:'Centroccidental', gob:1, gob_desc:'Bajo-medio: zona con alerta por cercanía a dinámicas de fronteras y presión intercomunal.',             terr:1, dano:2, movil:1, riesgo:'Medio',   score:2, prio:'Baja',   prio_idx:1.2,  mec:'Acceso político/comunitario',    estructura:'Presencia focalizada y presión por contigüidad con San Javier', bandas:'No consolidado; referencias a alertas en comunas 12 y 13',                                       cs:['CS01','CS04'],               ac:['AC01','AC02','AC05'],                ie:['IE03'],                 org:'JAC en sectores específicos',                                conf:'Media',      obs:'Riesgo localizado; requiere lectura por barrio y no por comuna completa.'},
+      {num:13, comuna:'San Javier',       zona:'Centroccidental', gob:3, gob_desc:'Alto: comuna clave por fronteras invisibles, control de ladera y disputas entre estructuras.',         terr:3, dano:3, movil:3, riesgo:'Extremo', score:4, prio:'Crítica',prio_idx:3.2,  mec:'Fronteras/control territorial', estructura:'Estructuras en disputa y control de fronteras invisibles', bandas:'Referencias a La Agonía y Los Pesebreros en comunas 13 y 16',                                  cs:['CS01','CS03','CS04','CS06'], ac:['AC01','AC02','AC03','AC05'],         ie:['IE03','IE05','IE06'], org:'JAC; liderazgos juveniles; colectivos culturales; organizaciones de base', conf:'Alta',       obs:'Prioridad extrema para observación electoral por fronteras invisibles y control de acceso a territorio.'},
+      {num:14, comuna:'El Poblado',       zona:'Suroriental',     gob:0, gob_desc:'Nulo/bajo: fuente citada no identifica dominio territorial estable; sí actividades criminales específicas.', terr:0, dano:1, movil:0, riesgo:'Bajo',    score:1, prio:'Baja',   prio_idx:0.2,  mec:'Actividad puntual/sin dominio',  estructura:'Sin dominio territorial estable identificado',       bandas:'No dominio territorial; actividades puntuales de drogas/lavado según fuente',                      cs:[],                            ac:['AC02','AC07'],                       ie:[],                       org:'No priorizado',                                              conf:'Alta',       obs:'Riesgo electoral por crimen organizado bajo; riesgo de delitos económicos o lavado debe analizarse por otra matriz.'},
+      {num:15, comuna:'Guayabal',         zona:'Suroccidental',   gob:1, gob_desc:'Bajo-medio: control territorial no central en la fuente; existen actividades urbanas puntuales.',     terr:1, dano:1, movil:1, riesgo:'Medio',   score:2, prio:'Baja',   prio_idx:1.2,  mec:'Control económico',              estructura:'Presencia focalizada y rentas urbanas',              bandas:'No consolidado por fuente; actividades puntuales posibles',                                        cs:['CS05'],                      ac:['AC01','AC02','AC07'],                ie:['IE03'],                 org:'Comerciantes; redes barriales específicas',                  conf:'Media-baja', obs:'Riesgo medio por actividad urbana y movilidad; no se asume gobierno criminal extendido.'},
+      {num:16, comuna:'Belén',            zona:'Suroccidental',   gob:3, gob_desc:'Alto: reportes persistentes de fronteras invisibles, disputa por laderas y rentas como loteo ilegal.', terr:3, dano:3, movil:3, riesgo:'Alto',    score:3, prio:'Alta',   prio_idx:3.0,  mec:'Fronteras/control territorial', estructura:'Estructuras en disputa por laderas y rentas urbanas', bandas:'Referencias a La Agonía y Los Pesebreros en comunas 13 y 16',                                     cs:['CS01','CS03','CS04','CS05','CS06'], ac:['AC01','AC02','AC03','AC05'], ie:['IE03','IE04','IE05','IE06'], org:'JAC; asentamientos de ladera; organizaciones barriales', conf:'Alta',       obs:'Prioridad alta por mezcla de frontera invisible, loteo ilegal y capacidad de mediación comunitaria.'},
+    ];
+
+    const CODIGOS_CS = [
+      ['CS01','Fronteras invisibles entre barrios o sectores'],
+      ['CS02','Toques de queda informales o restricciones horarias'],
+      ['CS03','Regulación de conflictos y justicia informal'],
+      ['CS04','Control de ingreso de campañas, ONGs o actores externos'],
+      ['CS05','Regulación del comercio local y de mercados informales'],
+      ['CS06','Prohibición o presión sobre participación comunitaria'],
+    ];
+    const CODIGOS_AC = [
+      ['AC01','Extorsión al comercio formal e informal'],
+      ['AC02','Microtráfico de drogas'],
+      ['AC03','Loteo ilegal y urbanización informal'],
+      ['AC04','Explotación sexual comercial'],
+      ['AC05','Hurto, robo o control de seguridad barrial'],
+      ['AC06','Control de transporte informal o rutas'],
+      ['AC07','Lavado de activos o uso de fachadas comerciales'],
+    ];
+    const CODIGOS_IE = [
+      ['IE01','Constreñimiento directo al elector'],
+      ['IE02','Compra de votos'],
+      ['IE03','Control de acceso de campañas al territorio'],
+      ['IE04','Negociación de tranquilidad con campañas'],
+      ['IE05','Cooptación de JAC, JAL o liderazgos de base'],
+      ['IE06','Sabotaje o presión sobre procesos comunitarios/electorales'],
+    ];
+
+    const CRONOLOGIA = [
+      { anio:'2023', evento:'Elecciones locales',                                          interp:'Mayor exposición de influencia directa por cercanía entre barrios, liderazgos, contratos y JAL/JAC.', atencion:'alta' },
+      { anio:'2023', evento:'Elecciones JAC/JAL y procesos comunitarios',                  interp:'Reportes de presión, veto y captura de organizaciones comunitarias como infraestructura social de movilización.', atencion:'critica' },
+      { anio:'2024', evento:'Reacomodo de rentas urbanas',                                 interp:'Persistencia de gobierno criminal barrial, control de economías ilegales y mediación territorial.', atencion:'alta' },
+      { anio:'2025', evento:'Ambiente preelectoral',                                       interp:'Riesgo de reorganización de redes y presión sobre liderazgos políticos y sociales en ciclo nacional.', atencion:'alta' },
+      { anio:'2026', evento:'Elecciones presidenciales y legislativas',                    interp:'Incidencia más indirecta: control de acceso, movilización diferencial, cooptación comunitaria y negociación de tranquilidad.', atencion:'alta' },
+    ];
+
+    const RECOMENDACIONES = [
+      { dim:'Cartografía',      rec:'Georreferenciar con shapefile oficial de comunas y barrios.',                                       util:'Evita que el mapa esquemático sea interpretado como cartografía judicial o censal.' },
+      { dim:'Validación',       rec:'Contrastar cada comuna con fuentes oficiales y entrevistas territoriales.',                          util:'Reduce riesgo de estigmatización y mejora precisión por barrio.' },
+      { dim:'Seguridad electoral', rec:'Priorizar observación en comunas con fronteras, JAC en riesgo y alta capacidad de movilización.', util:'Permite focalizar protección de liderazgos y acceso de campañas.' },
+      { dim:'Gobernanza',       rec:'Separar delitos económicos de control territorial.',                                                  util:'Evita tratar de la misma forma a comunas sin gobierno criminal pero con actividades ilegales puntuales.' },
+      { dim:'Análisis político',rec:'No inferir resultado electoral directo por presencia criminal.',                                     util:'La incidencia puede ser indirecta, parcial, oportunista o limitada a elecciones locales.' },
+    ];
+
+    // ─── DATA SOURCES ─────────────────────────────────────────────────
+    const S3_BASE = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co';
+    const MEDELLIN_GEO_URL = `${S3_BASE}/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`;
+
+    // ─── COLOR SCALES ─────────────────────────────────────────────────
+    function colorLevel(n){
+      // 0-3 escala discreta verde→amarillo→naranja→rojo
+      if (n === 0) return '#4caf50';
+      if (n === 1) return '#a4c63d';
+      if (n === 2) return '#f08c30';
+      if (n === 3) return '#e63946';
+      return '#888';
+    }
+    const RIESGO_COLORS = { 'Bajo':'#4caf50', 'Medio':'#f0c040', 'Alto':'#e63946', 'Extremo':'#7c1414' };
+    const PRIO_COLORS   = { 'Baja':'#4caf50', 'Media':'#f0c040', 'Alta':'#e63946', 'Crítica':'#7c1414' };
+    const MEC_COLORS = {
+      'Fronteras/control territorial':  '#7c1414',
+      'Acceso político/comunitario':    '#7c3aed',
+      'Control económico':              '#0088BB',
+      'Actividad puntual/sin dominio':  '#888',
+    };
+
+    // ─── STATE ────────────────────────────────────────────────────────
+    const state = { layer: 'gob', selected: null };
+    let map = null, mapLayer = null, geoCache = null;
+
+    function init(){
+      attachCursorHovers();
+      document.querySelectorAll('#layer-pills .pill').forEach(p => {
+        p.addEventListener('click', () => {
+          state.layer = p.dataset.layer;
+          document.querySelectorAll('#layer-pills .pill').forEach(x => x.classList.remove('active'));
+          p.classList.add('active');
+          render();
+        });
+      });
+      initMap();
+      renderSummary();
+      renderDicts();
+      renderTimeline();
+      renderRecom();
+      render();
+    }
+
+    function initMap(){
+      map = L.map('map', { zoomControl: true, attributionControl: false, scrollWheelZoom: false }).setView([6.245, -75.58], 11);
+    }
+    async function loadGeo(){
+      if (geoCache) return geoCache;
+      const r = await fetch(MEDELLIN_GEO_URL);
+      geoCache = await r.json();
+      return geoCache;
+    }
+
+    function getColor(d){
+      if (!d) return '#444';
+      if (state.layer === 'gob')    return colorLevel(d.gob);
+      if (state.layer === 'terr')   return colorLevel(d.terr);
+      if (state.layer === 'dano')   return colorLevel(d.dano);
+      if (state.layer === 'movil')  return colorLevel(d.movil);
+      if (state.layer === 'riesgo') return RIESGO_COLORS[d.riesgo] || '#888';
+      if (state.layer === 'prio')   return PRIO_COLORS[d.prio] || '#888';
+      if (state.layer === 'mec')    return MEC_COLORS[d.mec] || '#888';
+      return '#888';
+    }
+
+    function getValueText(d){
+      if (state.layer === 'gob')    return `Nivel ${d.gob} · ${['Nulo/bajo','Bajo','Medio-alto','Alto'][d.gob]}`;
+      if (state.layer === 'terr')   return `Nivel ${d.terr} · ${['Sin control','Puntual','Parcial/disputado','Estable'][d.terr]}`;
+      if (state.layer === 'dano')   return `Nivel ${d.dano}`;
+      if (state.layer === 'movil')  return `Nivel ${d.movil}`;
+      if (state.layer === 'riesgo') return `Riesgo ${d.riesgo}`;
+      if (state.layer === 'prio')   return `Prioridad ${d.prio}`;
+      if (state.layer === 'mec')    return d.mec;
+      return '';
+    }
+
+    function renderSummary(){
+      const altos = COMUNAS.filter(c => c.gob === 3).length;
+      const ext   = COMUNAS.filter(c => c.riesgo === 'Extremo').length;
+      const crit  = COMUNAS.find(c => c.prio === 'Crítica');
+      const mecs  = new Set(COMUNAS.map(c => c.mec));
+      document.getElementById('summary').innerHTML = `
+        <div class="sum-card danger">
+          <div class="sum-label">Comunas · gob criminal alto</div>
+          <div class="sum-value-big danger">${altos} <span style="font-size:.6em;color:var(--text3);font-weight:400">de ${COMUNAS.length}</span></div>
+          <div class="sum-meta">Nivel 3 · sustituye parcialmente Estado</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-label">Riesgo injerencia · Extremo</div>
+          <div class="sum-value-big">${ext}</div>
+          <div class="sum-meta">La Candelaria · San Javier</div>
+        </div>
+        <div class="sum-card purple">
+          <div class="sum-label">Prioridad crítica</div>
+          <div class="sum-value-big purple">${crit ? crit.comuna : '—'}</div>
+          <div class="sum-meta">Índice ${crit ? crit.prio_idx : '—'} · fronteras invisibles</div>
+        </div>
+        <div class="sum-card">
+          <div class="sum-label">Mecanismos dominantes</div>
+          <div class="sum-value-big">${mecs.size}</div>
+          <div class="sum-meta">${Array.from(mecs).slice(0,2).join(' · ')}</div>
+        </div>
+      `;
+    }
+
+    async function render(){
+      const geo = await loadGeo();
+      if (mapLayer){ map.removeLayer(mapLayer); mapLayer = null; }
+      const dataByCode = Object.fromEntries(COMUNAS.map(c => [String(c.num).padStart(2,'0'), c]));
+
+      const styleOf = (feat) => {
+        const code = String(feat.properties.CODIGO || '').padStart(2, '0');
+        const d = dataByCode[code];
+        if (!d){
+          return { fillColor: '#444', fillOpacity: .2, color: 'rgba(255,255,255,0.2)', weight: 1, dashArray: '3,3' };
+        }
+        return { fillColor: getColor(d), fillOpacity: 0.82, color: 'rgba(255,255,255,0.4)', weight: 1 };
+      };
+
+      mapLayer = L.geoJSON(geo, {
+        style: styleOf,
+        onEachFeature: (feat, layer) => {
+          const code = String(feat.properties.CODIGO || '').padStart(2, '0');
+          const d = dataByCode[code];
+          const nombre = feat.properties.NOMBRE || code;
+          layer.on({
+            mouseover: (e) => {
+              layer.setStyle({ weight: 2, color: '#fff', fillOpacity: 0.96 });
+              if (d) {
+                const tt = `
+                  <div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.5">
+                    <span style="color:#a78bfa;font-weight:700">${d.comuna.toUpperCase()}</span><br/>
+                    <span style="color:#999;font-size:.7rem">${d.zona}</span><br/>
+                    <span style="color:#fff">${getValueText(d)}</span><br/>
+                    <span style="color:#999;font-size:.7rem">Riesgo ${d.riesgo} · Prioridad ${d.prio}</span>
+                  </div>`;
+                layer.bindTooltip(tt, { sticky: true, opacity: 1 }).openTooltip(e.latlng);
+              } else {
+                layer.bindTooltip(`<div style="font-family:Avenir,sans-serif;font-size:.82rem"><span style="color:#a78bfa;font-weight:700">${String(nombre).toUpperCase()}</span><br/><span style="color:#999;font-size:.7rem">No incluido en este análisis</span></div>`, { sticky: true, opacity: 1 }).openTooltip(e.latlng);
+              }
+            },
+            mouseout: () => { layer.setStyle(styleOf(feat)); layer.closeTooltip(); },
+            click: () => { if (d) { state.selected = d.num; renderDetail(); } },
+          });
+        },
+      }).addTo(map);
+
+      try { map.fitBounds(mapLayer.getBounds(), { padding: [10, 10] }); } catch(_) {}
+
+      renderLegend();
+      const titles = {
+        gob:    'Gobierno criminal por comuna',
+        terr:   'Control territorial por comuna',
+        dano:   'Capacidad de daño por comuna',
+        movil:  'Capacidad de movilización electoral por comuna',
+        riesgo: 'Riesgo de injerencia electoral',
+        prio:   'Prioridad de observación electoral',
+        mec:    'Mecanismo dominante de incidencia',
+      };
+      const subs = {
+        gob:    'Nivel 0 (sin) · 1 (bajo) · 2 (medio-alto) · 3 (alto)',
+        terr:   'Nivel 0–3 · sin control → estable',
+        dano:   'Nivel 0–3 · capacidad de daño físico/material',
+        movil:  'Nivel 0–3 · capacidad de incidir en resultados comunitarios',
+        riesgo: 'Bajo · Medio · Alto · Extremo',
+        prio:   'Baja · Media · Alta · Crítica',
+        mec:    '4 mecanismos dominantes según matriz',
+      };
+      document.getElementById('map-title').textContent = titles[state.layer];
+      document.getElementById('map-sub').textContent = subs[state.layer];
+
+      if (!state.selected) renderDetailEmpty();
+      else renderDetail();
+    }
+
+    function renderLegend(){
+      const el = document.getElementById('map-legend');
+      const layer = state.layer;
+      let stops = [];
+      if (['gob','terr','dano','movil'].includes(layer)){
+        stops = [
+          { lbl: '0 · sin/nulo',     c: colorLevel(0) },
+          { lbl: '1 · bajo',         c: colorLevel(1) },
+          { lbl: '2 · medio-alto',   c: colorLevel(2) },
+          { lbl: '3 · alto',         c: colorLevel(3) },
+        ];
+      } else if (layer === 'riesgo'){
+        stops = Object.entries(RIESGO_COLORS).map(([k,v]) => ({ lbl: k, c: v }));
+      } else if (layer === 'prio'){
+        stops = Object.entries(PRIO_COLORS).map(([k,v]) => ({ lbl: k, c: v }));
+      } else if (layer === 'mec'){
+        stops = Object.entries(MEC_COLORS).map(([k,v]) => ({ lbl: k, c: v }));
+      }
+      el.innerHTML = stops.map(s => `<div class="legend-item"><div class="legend-swatch" style="background:${s.c}"></div>${s.lbl}</div>`).join('');
+    }
+
+    function renderDetailEmpty(){
+      document.getElementById('detail').innerHTML = `<div class="detail-empty">Hacé click en una comuna del mapa para ver su matriz analítica completa.</div>`;
+    }
+
+    function levelBar(label, val){
+      const cells = [0,1,2,3].map(i => `<div class="lb-cell ${i <= val ? `on l${val}` : ''}"></div>`).join('');
+      return `<div class="level-bar"><div class="lb-label">${label}</div><div class="lb-track">${cells}</div><div class="lb-val">${val}</div></div>`;
+    }
+
+    function pillForCS(c){ const def = CODIGOS_CS.find(x => x[0] === c); return `<span class="code-pill" title="${def ? def[1] : ''}">${c} · ${def ? def[1] : '—'}</span>`; }
+    function pillForAC(c){ const def = CODIGOS_AC.find(x => x[0] === c); return `<span class="code-pill" title="${def ? def[1] : ''}">${c} · ${def ? def[1] : '—'}</span>`; }
+    function pillForIE(c){ const def = CODIGOS_IE.find(x => x[0] === c); return `<span class="code-pill" title="${def ? def[1] : ''}">${c} · ${def ? def[1] : '—'}</span>`; }
+
+    function riskClass(r){
+      if (r === 'Extremo' || r === 'Crítica') return 'r-extreme';
+      if (r === 'Alto' || r === 'Alta') return 'r-high';
+      if (r === 'Medio' || r === 'Media') return 'r-med';
+      return 'r-low';
+    }
+
+    function renderDetail(){
+      const d = COMUNAS.find(c => c.num === state.selected);
+      if (!d) return renderDetailEmpty();
+      document.getElementById('detail').innerHTML = `
+        <div class="detail-com-name">${d.comuna}</div>
+        <div class="detail-zone">${d.zona}</div>
+
+        <div class="level-bars">
+          ${levelBar('Gob criminal',    d.gob)}
+          ${levelBar('Control terr.',   d.terr)}
+          ${levelBar('Cap. daño',       d.dano)}
+          ${levelBar('Cap. movil.',     d.movil)}
+        </div>
+
+        <div class="detail-row">
+          <div class="detail-row-label">Riesgo injerencia electoral</div>
+          <div class="detail-row-val">
+            <span class="risk-pill ${riskClass(d.riesgo)}">${d.riesgo}</span>
+            · Prioridad
+            <span class="risk-pill ${riskClass(d.prio)}">${d.prio}</span>
+            · Índice ${d.prio_idx}
+          </div>
+        </div>
+
+        <div class="detail-row">
+          <div class="detail-row-label">Descripción gobierno criminal</div>
+          <div class="detail-row-val">${d.gob_desc}</div>
+        </div>
+
+        <div class="detail-row">
+          <div class="detail-row-label">Mecanismo dominante</div>
+          <div class="detail-row-val">${d.mec}</div>
+        </div>
+
+        <div class="detail-row">
+          <div class="detail-row-label">Estructura de referencia</div>
+          <div class="detail-row-val">${d.estructura}</div>
+        </div>
+
+        <div class="detail-row">
+          <div class="detail-row-label">Bandas referidas (citadas en fuentes)</div>
+          <div class="detail-row-val" style="font-size:.85rem">${d.bandas}</div>
+        </div>
+
+        ${d.cs.length ? `
+        <div class="detail-row">
+          <div class="detail-row-label">Mecanismos de control social</div>
+          <div class="detail-row-val">${d.cs.map(pillForCS).join('')}</div>
+        </div>` : ''}
+
+        ${d.ac.length ? `
+        <div class="detail-row">
+          <div class="detail-row-label">Actividades criminales</div>
+          <div class="detail-row-val">${d.ac.map(pillForAC).join('')}</div>
+        </div>` : ''}
+
+        ${d.ie.length ? `
+        <div class="detail-row">
+          <div class="detail-row-label">Influencia electoral</div>
+          <div class="detail-row-val">${d.ie.map(pillForIE).join('')}</div>
+        </div>` : ''}
+
+        <div class="detail-row">
+          <div class="detail-row-label">Organizaciones / actores en riesgo</div>
+          <div class="detail-row-val">${d.org}</div>
+        </div>
+
+        <div class="detail-row">
+          <div class="detail-row-label">Confianza de la fuente</div>
+          <div class="detail-row-val">${d.conf}</div>
+        </div>
+
+        <div class="detail-row">
+          <div class="detail-row-label">Observación</div>
+          <div class="detail-row-val" style="font-style:italic;color:var(--text2)">${d.obs}</div>
+        </div>
+      `;
+    }
+
+    function renderDicts(){
+      document.getElementById('cs-list').innerHTML = CODIGOS_CS.map(([k,v]) => `<div class="dict-row"><div class="code">${k}</div><div>${v}</div></div>`).join('');
+      document.getElementById('ac-list').innerHTML = CODIGOS_AC.map(([k,v]) => `<div class="dict-row"><div class="code">${k}</div><div>${v}</div></div>`).join('');
+      document.getElementById('ie-list').innerHTML = CODIGOS_IE.map(([k,v]) => `<div class="dict-row"><div class="code">${k}</div><div>${v}</div></div>`).join('');
+    }
+
+    function renderTimeline(){
+      document.getElementById('timeline-list').innerHTML = CRONOLOGIA.map(t => `
+        <div class="timeline-item">
+          <div class="timeline-period">${t.anio}</div>
+          <div class="timeline-event">${t.evento}</div>
+          <div class="timeline-interp">${t.interp}</div>
+          <span class="timeline-attention a-${t.atencion}">${t.atencion === 'critica' ? 'Atención crítica' : 'Atención alta'}</span>
+        </div>
+      `).join('');
+    }
+
+    function renderRecom(){
+      document.getElementById('recom-grid').innerHTML = RECOMENDACIONES.map(r => `
+        <div class="recom-card">
+          <div class="recom-name">${r.dim}</div>
+          <div class="recom-rec">${r.rec}</div>
+          <div class="recom-util">${r.util}</div>
+        </div>
+      `).join('');
+    }
+
+    // ─── CURSOR ───────────────────────────────────────────────────────
+    const cursor = document.getElementById('cursor');
+    const ring   = document.getElementById('cursorRing');
+    let mx=0, my=0, rx=0, ry=0;
+    document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; cursor.style.left = mx + 'px'; cursor.style.top = my + 'px'; });
+    (function ar(){ rx += (mx-rx)*.12; ry += (my-ry)*.12; ring.style.left = rx+'px'; ring.style.top = ry+'px'; requestAnimationFrame(ar); })();
+    function attachCursorHovers(){
+      document.querySelectorAll('a, button, .pill').forEach(el => {
+        el.addEventListener('mouseenter', () => { cursor.style.transform = 'translate(-50%,-50%) scale(2.5)'; cursor.style.background = 'transparent'; cursor.style.border = '1.5px solid var(--purple)'; ring.style.opacity = '0'; });
+        el.addEventListener('mouseleave', () => { cursor.style.transform = 'translate(-50%,-50%) scale(1)'; cursor.style.background = 'var(--purple)'; cursor.style.border = 'none'; ring.style.opacity = '.4'; });
+      });
+    }
+  </script>
+</body>
+</html>
