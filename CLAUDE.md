@@ -21,6 +21,19 @@ S3: dejarlos en disco local y entregar al usuario el comando exacto que
 debe correr él (incluyendo ruta origen → prefijo destino), junto con una
 lista clara de los archivos generados.
 
+## Entrega de archivos al usuario
+**NUNCA** dejar artefactos en `~/Desktop`, `~/Downloads` o paths fuera del
+proyecto. **SIEMPRE** entregar dentro de `/Users/ricardoruiz/ricardoruiz.co/`
+y elegir la subcarpeta acorde al proyecto:
+- Proyecto DC (Medellín 2027) → `Bases de datos/proyecto-dc/<modulo>/`
+- Datos electorales 2026 → `Bases de datos/output_*/...` o `Bases de datos/<categoria>/`
+- Scripts / build tools → `tools/<modulo>/` (worktree, gitignored si genera artefactos)
+
+Si la subcarpeta no existe, crearla con `mkdir -p` en una ruta semánticamente
+clara. El worktree (`/.claude/worktrees/.../`) está oculto en Finder, así que
+los artefactos finales que el usuario va a manipular (zips de deploy, CSVs
+para subir a S3, exports) deben vivir en el repo principal, no en el worktree.
+
 ## Pipeline de históricos — `tools/build-historicos.js`
 Script Node (streaming, sin dependencias) que procesa un archivo GCS de
 la Registraduría y genera tres JSONs agregados por elección:
