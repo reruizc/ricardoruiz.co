@@ -680,6 +680,13 @@ hay que cruzar `(ZZ=99, COD_PP)` con PUESTOS_GEOREF. Pendiente para v1.
 - `consulta-2025/*` · `Congreso_2026_MMV170326.csv` · `congreso-2026/output/*`
 - `DESCARGAS/*` · `Fotos-presidenciales/*` · `bases de datos/*` (incluye
   espacio literal en ARN — URL las codifica como `+` o `%20`)
+- `ricardoruiz.co/proyecto-dc/agenda/agregados/*` (nube/medios/titulares
+  del módulo 07 — añadida 2026-04-30)
+
+> **Importante**: cada vez que se cree un nuevo prefijo bajo el bucket
+> que el frontend deba leer públicamente, hay que añadir un statement
+> a la bucket policy. El prefijo `raw/` y `state/` del módulo 07 NO
+> son públicos (solo los lee la Lambda con su IAM role).
 
 Datos del proyecto DC viven bajo `bases de datos/`:
 ```
@@ -713,7 +720,7 @@ y similares por módulo.
 | 04 | Pobreza e IPM | simulado v0 (embebido) | ✓ datos simulados |
 | 05 | Arquetipos territoriales | — | pendiente |
 | 06 | Gobierno criminal | paquete socia 2023-2026 (embebido) | ✓ |
-| 07 | Saliencia/agenda pública | — | pendiente pipeline |
+| 07 | Saliencia/agenda pública | 10 medios RSS + agregador (S3) | ✓ v1 (medios) |
 | 08 | Fricción ciudadana / PQRSD | — | pendiente datos |
 | 09 | Simulador what-if | — | pendiente |
 
@@ -723,11 +730,128 @@ y similares por módulo.
 - MEData / SISC / SIMM
 - Pobreza/IPM oficial (DANE / Medellín Cómo Vamos) — reemplazar simulado
 - Padrón electoral 2027 cuando salga
-- Pipeline scraping (Apify token, YouTube Data API, Google Trends)
+- Bloque B medios (4): El Colombiano, Blu Radio, Pulzo, Q'Hubo Medellín
+  — Lambda con paso extra de parsear sitemap.xml + comparar lastmod.
+- Bloque C medios (6): Caracol Medellín, RCN Radio, La FM, Semana, ADN,
+  Teleantioquia — scraping HTML con selectores propios (Teleantioquia
+  es SPA, requiere headless light o reemplazo).
+- Redes sociales (Track 2): X, Instagram, Facebook (vía Apify si DIY no
+  alcanza). Pendiente decisión costo/beneficio (~$200–400/mes con Apify
+  vs scraper propio que requiere mantenimiento).
+- Atribución a actores políticos (NER + lista curada con alias).
+- YouTube Data API + Google Trends para señal de búsqueda.
 - Mapa de actores políticos (concejales, periodistas, influencers)
 - Senado/Cámara 2026 a nivel comuna Medellín (S3 actual solo tiene a
   nivel municipio — reprocesar `Congreso_2026_MMV170326.csv` similar al
   script de TER si se necesita drilldown)
+
+### Módulo 07 — agenda pública (saliencia mediática)
+
+Pipeline de scraping de medios + agregador + frontend interactivo. Todo
+en infraestructura propia (Lambda + S3 + EventBridge), sin servicios
+pagos. Costo real <$1/mes (cabe en free tier salvo S3 storage marginal).
+
+**Arquitectura**:
+```
+EventBridge (rate 30min) ─▶ Lambda agenda-medios-rss
+   ├─ fetch paralelo 10 RSS (ThreadPoolExecutor, ~5s)
+   ├─ User-Agent tipo Chrome (evita fingerprinting)
+   ├─ HTTP_TIMEOUT=15s, dedup por hash24 de url canónica
+   └─ S3: raw/medios/yyyy=Y/mm=M/dd=D/{medio}__{run_id}.jsonl
+                                                  │
+EventBridge (rate 1h) ──▶ Lambda agenda-medios-aggregator
+   ├─ lista 6 días de raw/medios/, lee y dedupea por id
+   ├─ filtra por ventana (6h / 24h / 5d) según fecha_pub
+   ├─ tokeniza título (peso 2x) + resumen (1x)
+   ├─ strip URLs (regex http/https/www) antes de tokenizar
+   ├─ filtra stopwords ES + reporting verbs + ruido geo + ruido URL
+   └─ S3: agregados/{nube,medios,titulares}-{6h,24h,5d}.json
+                                                  │
+proyecto-dc/agenda.html ◀──── fetch directo a S3 (cache 5min)
+   ├─ toggle ventana 6h | 24h | 5d
+   ├─ nube top-50 con tooltip ::after (data-count)
+   ├─ click-filtro: titulares con regex word-boundary ES
+   ├─ chip "Filtrando por X ×"
+   └─ tipografía: Fraunces serif + Arima sans (no DM Mono)
+```
+
+**Layout S3** (bajo `ricardoruiz.co/proyecto-dc/agenda/`):
+- `state/medios.json` — privado, dedup state del RSS reader (lista de IDs vistos por medio, cap MAX_SEEN_PER_FEED=600)
+- `raw/medios/yyyy=YYYY/mm=MM/dd=DD/{medio}__{run_id}.jsonl` — privado
+- `agregados/{nube,medios,titulares}-{6h,24h,5d}.json` — **público** vía bucket policy
+
+**Esquema del evento** (jsonl raw):
+```json
+{
+  "id": "hash24 url canónica", "medio": "minuto30", "fuente": "rss",
+  "url": "...", "url_canonica": "...",
+  "titulo": "...", "resumen": "texto plano sin tags",
+  "fecha_pub": "ISO 8601 con tz",
+  "fecha_capturada": "ISO 8601 UTC",
+  "autor": "...|null", "categorias": ["..."],
+  "raw_id": "guid del feed", "run_id": "YYYYMMDDTHHMMSSZ"
+}
+```
+
+**IAM** — un solo role `lambda-agenda-medios-rss` reusado por ambas Lambdas:
+- `s3:GetObject`, `s3:PutObject` sobre `proyecto-dc/agenda/*`
+- `s3:ListBucket` sobre el bucket con condition `s3:prefix` que matchea el mismo prefijo (necesario para que GetObject de archivo inexistente devuelva NoSuchKey en vez de AccessDenied)
+- `AWSLambdaBasicExecutionRole` para CloudWatch logs
+
+**Medios — bloque A (RSS, los 10 desplegados)**:
+| medio | feed |
+|---|---|
+| minuto30 | https://www.minuto30.com/feed/ |
+| telemedellin | https://telemedellin.tv/feed/ |
+| eltiempo-medellin | https://www.eltiempo.com/rss/colombia_medellin.xml |
+| vivirenelpoblado | https://vivirenelpoblado.com/feed/ |
+| mioriente | https://www.mioriente.com/feed |
+| hacemosmemoria | https://hacemosmemoria.org/feed/ |
+| periferia | https://periferiaprensa.com/feed/ |
+| las2orillas | https://www.las2orillas.co/feed/ |
+| delaurbe | https://delaurbe.udea.edu.co/feed/ |
+| centropolis | https://www.centropolismedellin.com/feed/ |
+
+> **Centrópolis** es intermitente desde us-east-1 (TLS handshake timeout
+> ocasional, hosting compartido lento). Como el RSS no es incremental,
+> entra cuando alcanza a responder. Si después de varios días sigue sin
+> dar señales, considerar moverlo a fallback HTML scraping.
+
+**Medios pendientes — bloque B (sitemap, ~1 Lambda)**:
+- El Colombiano — sitemap.xml (557+ URLs con lastmod)
+- Blu Radio — sitemap-latest.xml
+- Pulzo — sitemap.xml index → sub-sitemap mensual
+- Q'Hubo Medellín — sitemap.xml (limitado, ~40 URLs de secciones)
+
+**Medios pendientes — bloque C (HTML scraping, 1 Lambda por medio)**:
+- Caracol Radio Medellín (bloqueado vía WebFetch, requiere UA rotation)
+- RCN Radio Medellín
+- La FM
+- Semana (filtrar por keyword Medellín/Antioquia)
+- ADN Colombia
+- Teleantioquia (SPA — requiere puppeteer-core en Lambda layer)
+
+**Stopwords y filtros** (`tools/agenda-medios-aggregator/stopwords-es.txt`):
+- Artículos, preposiciones, pronombres, demostrativos, cuantificadores
+- Auxiliares (ser, estar, haber, tener, poder, deber, hacer, ir, decir, ver, saber)
+- Verbos de noticia (afirma/afirmó/afirman, asegura, indica, declara,
+  sostiene, expresa, manifiesta, señala, revela, confirma, explica,
+  agrega, añade, anuncia, denuncia, advierte, alerta, informa, publica…)
+- Tiempo / fechas (días de la semana, meses, año/mes/día)
+- Numerales escritos
+- Ruido geográfico (medellín, antioquia, colombia y variantes)
+- Ruido de URLs (https, http, webp, jpeg, jpg, www, com, html, content,
+  wp-content, uploads, staticprd) — y `URL_RE` strip antes de tokenizar
+- `MIN_WORD_LEN=4` filtra palabras de ≤3 chars
+
+**Reglas de despliegue del módulo 07**:
+- Ambas Lambdas: Python 3.14, x86_64, runtime stdlib + boto3 (sin deps externos).
+- Memoria: RSS reader 256 MB, aggregator 512 MB.
+- Timeout: RSS 1 min, aggregator 2 min.
+- Handler: `lambda_handler.handler`.
+- ZIP de deploy: bundle plano (`zip -j`) con `lambda_handler.py` + config (`feeds.json` o `stopwords-es.txt`). No requiere `pip install`.
+- Para añadir medios al bloque A: editar `tools/agenda-medios-rss/feeds.json`, rebuild, re-upload. La dedup state.json maneja IDs nuevos sin tocar nada más.
+- Para refinar stopwords: editar `tools/agenda-medios-aggregator/stopwords-es.txt`, rebuild, re-upload. La próxima corrida del agregador (cada hora) reescribe los JSONs.
 
 ### Cosas a no perder
 - Los nombres de bandas (La Oficina, Los Triana, Pachelly, La Agonía, Los
@@ -743,6 +867,8 @@ y similares por módulo.
 
 ## Convenciones de commit
 ```
-git commit -m "scope: descripción concisa\n\nDetalle si es necesario\n\nCo-Authored-By: Claude Sonnet 4-6 <noreply@anthropic.com>"
+git commit -m "scope: descripción concisa\n\nDetalle si es necesario\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 git push origin HEAD:main
 ```
+> Usar el nombre del modelo activo (Opus 4.7 / Sonnet 4.6 / Haiku 4.5),
+> no un valor fijo. Si Claude está en otro modelo, ajustar.
