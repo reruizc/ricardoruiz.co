@@ -47,6 +47,11 @@ with open(os.path.join(_HERE, "stopwords-es.txt"), encoding="utf-8") as _f:
 # Letras ES (con tildes y ñ). Tokens = secuencias de letras.
 TOKEN_RE = re.compile(r"[A-Za-zÁÉÍÓÚáéíóúÑñÜü]+")
 
+# URLs e imágenes que muchos RSS embeben en el resumen
+URL_RE = re.compile(r"https?://\S+|www\.\S+", re.IGNORECASE)
+
+RESUMEN_MAX = 240  # chars del resumen guardado en titulares (para filtrar en el frontend)
+
 _s3 = None
 def _s3_client():
     global _s3
@@ -70,7 +75,9 @@ def is_stopword(w: str) -> bool:
 def tokenize(text: str):
     if not text:
         return []
-    return [m.group().lower() for m in TOKEN_RE.finditer(text)]
+    # Limpiar URLs e imágenes embebidas antes de tokenizar
+    clean = URL_RE.sub(" ", text)
+    return [m.group().lower() for m in TOKEN_RE.finditer(clean)]
 
 def good_token(t: str) -> bool:
     if len(t) < MIN_WORD_LEN:
@@ -165,6 +172,7 @@ def compute_titulares(events):
             "medio":  e.get("medio"),
             "url":    e.get("url"),
             "fecha_pub": e.get("fecha_pub"),
+            "resumen": (URL_RE.sub("", e.get("resumen") or "")[:RESUMEN_MAX]).strip(),
         }
         for e in sorted_evs
     ]
