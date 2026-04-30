@@ -574,6 +574,160 @@ RIVAL_BOOST=1.7 (en renderWorldObjects)
 - Pistas adicionales: una por departamento clave (Cauca, Antioquia,
   Magdalena, Bolívar, Atlántico, Chocó, Cundinamarca).
 
+## Proyecto DC — capa privada (Daniel Carvalho · Alcaldía Medellín 2027)
+
+### Contexto y reglas de visibilidad
+Plataforma de investigación no declarativa para posicionar a Daniel Carvalho
+rumbo a la Alcaldía de Medellín en 2027. **El nombre del candidato y el
+objetivo electoral NO deben aparecer en HTML/contenido visible** — solo en
+este CLAUDE.md y en commits internos. Las páginas se nombran "Proyecto DC ·
+Investigación Medellín". Todas llevan `<meta name="robots" content="noindex,nofollow">`.
+
+### Acceso (gate por email)
+- Whitelist hardcodeada en cada HTML privado: `['reruizc@gmail.com', 'nuevagemela@gmail.com']`
+- **Doble gate**: localStorage (instantáneo, sin flash) + verificación contra
+  `https://rr-auth.reruizc.workers.dev/auth/me` antes de revelar el contenido
+- Si email no matchea → `window.location.replace('../dashboard.html')`
+- Si token inválido → redirect a `login.html`
+- Mientras verifica: overlay `.gate` con barra animada y texto "Verificando acceso"
+- En `dashboard.html`: array `PRIVATE_TOOLS` con `allowedEmails` filtra qué
+  tarjetas se renderizan en la grilla (tag morado `private-tag` `#7c3aed`)
+
+### Archivos
+```
+proyecto-dc.html                          hub: 9 tarjetas de módulos + secciones descriptivas
+proyecto-dc/voto-historico.html           módulo 01
+proyecto-dc/seguridad.html                módulo 02
+proyecto-dc/comportamiento-electoral.html módulo 03
+proyecto-dc/pobreza-ipm.html              módulo 04
+proyecto-dc/gobierno-criminal.html        módulo 06
+```
+
+### Convención visual de páginas privadas (chasis a copiar)
+- Cursor `--purple` `#7c3aed` (no blue como las públicas) · `--purple-dim` rgba 0.10
+- Banner amarillo `--warn` `#f0c040` para datos simulados o disclaimers
+- Banner rojo `--danger` `#e63946` para alertas
+- Tipografía heredada del resto del sitio: Syne 800/500/400, DM Mono, Fraunces 300/400
+- Mapa Leaflet con tooltip dark `rgba(6,8,16,0.97)`, border `var(--purple)`
+- `.gate` overlay z-index 5000 que se remueve cuando `revealPage()`
+- `.private-badge` en nav: "Privado" en morado
+
+### Códigos Registraduría (archivos GCS_*TER.csv)
+- **Antioquia=1, Medellín=1** (Registraduría — NO confundir con DANE 5/001)
+- Bogotá=16/1 (Galán 2023 lo confirmó: 1.5M votos en (16,1))
+- `COD_COR` numérico cambia entre años; usar `DES_COR` (texto) que también varía:
+  - 2015: `ALCALDIA` / `GOBERNACION`
+  - 2019/2023: `ALCALDE` / `GOBERNADOR`
+- Aceptar ambas formas: `COR_DES_TO_NAME = {'ALCALDE':'alcaldia','ALCALDIA':'alcaldia','CONCEJO':'concejo'}`
+
+### Mapeo zona electoral → comuna política Medellín
+`COD_ZZ` del CSV TER es zona electoral (1-32, 90, 98, 99), NO comuna política.
+Mapeo derivado de `PUESTOS_GEOREF.csv` (col ZONA → CÓDIGO COMUNA), estable
+entre 2015-2026. Hardcodeado en `tools/build-medellin-historicos.js`:
+```
+01-02 → 01 Popular            17-18 → 09 Buenos Aires
+03-04 → 02 Santa Cruz         19-20 → 10 La Candelaria
+05-06 → 03 Manrique           21-22 → 11 Laureles Estadio
+07-08 → 04 Aranjuez           23-24 → 12 La América
+09-10 → 05 Castilla           25-26 → 13 San Javier
+11-12 → 06 Doce de Octubre    27-28 → 14 El Poblado
+13-14 → 07 Robledo            29    → 15 Guayabal
+15-16 → 08 Villa Hermosa      30-32 → 16 Belén
+99 → CORR (5 corregimientos agregados)   90,98 → OTROS / consular
+```
+Para desagregar corregimientos individuales (50/60/70/80/90 del GeoJSON)
+hay que cruzar `(ZZ=99, COD_PP)` con PUESTOS_GEOREF. Pendiente para v1.
+
+### Scripts de procesamiento
+- `tools/build-medellin-historicos.js` — Node streaming. Procesa
+  `GCS_2015TER.csv`, `GCS_2019TER.csv`, `GCS_2023TER.csv` (~1.9 GB c/u) en ~15s
+  cada uno. Filtra (depto=1, mun=1) y produce 5 niveles de agregación por
+  corporación (alcaldía, concejo): `resumen.json` (ciudad), `por-comuna.json`
+  (16+CORR+OTROS), `por-zona.json` (zonas electorales), `por-puesto.json`,
+  `por-mesa.json`. Para concejo agrega D'Hondt sobre 21 curules.
+- `tools/build-seguridad-medellin.py` — Python. Procesa los 19 CSVs de la
+  Policía Nacional (un archivo por tipología) filtrando `MUNICIPIO_HECHO ==
+  "Medellín (CT)"`. Extrae comuna desde `COMUNAS_ZONAS_DESCRIPCION` con regex
+  (codes 01-16 + 50/60/70/80/90 alineados con GeoJSON). Genera 7 JSONs por
+  período: `resumen` (nacional + Medellín + share + tasa por 100k),
+  `por-comuna`, `por-dia`, `por-hora`, `por-genero`, `por-clase-sitio`,
+  `por-dia-semana`. ~22% de incidentes caen en "OTROS / sin clasificar"
+  porque `COMUNAS_ZONAS_DESCRIPCION` trae valores no parseables ("COMUNA
+  NORORIENTAL", vacíos). Mejorar con cruce por barrio si sube prioridad.
+
+### Validación de resultados (sanity check)
+- 2015 alcaldía: Federico Gutiérrez 38.3% vs Vélez 36.8% (margen estrecho)
+- 2019 alcaldía: Daniel Quintero 43.3% vs Alfredo Ramos 33.5%
+- 2023 alcaldía: Federico Gutiérrez 79.1% (697.910 votos)
+- Si los números no se acercan a estos valores conocidos, hay bug en el
+  script (probablemente filtro de depto/mun o asignación de COR).
+
+### S3 — paths del proyecto DC
+**Política del bucket actual** (`elecciones-2026`) cubre:
+- `consulta-2025/*` · `Congreso_2026_MMV170326.csv` · `congreso-2026/output/*`
+- `DESCARGAS/*` · `Fotos-presidenciales/*` · `bases de datos/*` (incluye
+  espacio literal en ARN — URL las codifica como `+` o `%20`)
+
+Datos del proyecto DC viven bajo `bases de datos/`:
+```
+bases+de+datos/output_medellin/{2015,2019,2023}/{alcaldia,concejo}/
+  {resumen,por-comuna,por-zona,por-puesto,por-mesa}.json
+bases+de+datos/output_seguridad/2026-01/
+  {resumen,por-comuna,por-dia,por-hora,por-genero,por-clase-sitio,por-dia-semana}.json
+bases+de+datos/Proyecto+DC/pdfs/
+  informe_unificado_comportamiento_electoral_medellin_2021_2026.pdf
+  informe_grupos_criminales_medellin_elecciones_2023_2026.pdf
+```
+Constante en módulos: `const HIST_BASE = '${S3_BASE}/bases+de+datos/output_medellin'`
+y similares por módulo.
+
+### Datos embebidos vs. S3 fetch (criterio)
+- **Embebidos en HTML** (objetos JS al inicio del script): cuando son
+  análisis cerrados, pequeños (<200 KB) y NO periódicos.
+  - Módulo 03 (comportamiento electoral): paquete socia 2021-2026 cerrado
+  - Módulo 04 (pobreza/IPM): cifras simuladas v0
+  - Módulo 06 (gobierno criminal): paquete socia 2023-2026 cerrado
+- **S3 + fetch**: datasets pesados o periódicos
+  - Módulo 01 (voto histórico): 30 JSONs / ~43 MB total
+  - Módulo 02 (seguridad): 7 JSONs por mes / ~60 KB total
+
+### Módulos disponibles (estado actual)
+| # | Módulo | Datos | Estado |
+|---|---|---|---|
+| 01 | Voto histórico | 2015/2019/2023 alcaldía+concejo (S3) | ✓ |
+| 02 | Seguridad y delitos | enero 2026 PNP (S3) | ✓ |
+| 03 | Comportamiento electoral & MOE | paquete socia 2021-2026 (embebido) | ✓ |
+| 04 | Pobreza e IPM | simulado v0 (embebido) | ✓ datos simulados |
+| 05 | Arquetipos territoriales | — | pendiente |
+| 06 | Gobierno criminal | paquete socia 2023-2026 (embebido) | ✓ |
+| 07 | Saliencia/agenda pública | — | pendiente pipeline |
+| 08 | Fricción ciudadana / PQRSD | — | pendiente datos |
+| 09 | Simulador what-if | — | pendiente |
+
+### Datos pendientes / faltantes
+- Censos electorales históricos por año (potencial 2015/2019/2023) → calcular abstención real
+- PQRSD Medellín (datos abiertos)
+- MEData / SISC / SIMM
+- Pobreza/IPM oficial (DANE / Medellín Cómo Vamos) — reemplazar simulado
+- Padrón electoral 2027 cuando salga
+- Pipeline scraping (Apify token, YouTube Data API, Google Trends)
+- Mapa de actores políticos (concejales, periodistas, influencers)
+- Senado/Cámara 2026 a nivel comuna Medellín (S3 actual solo tiene a
+  nivel municipio — reprocesar `Congreso_2026_MMV170326.csv` similar al
+  script de TER si se necesita drilldown)
+
+### Cosas a no perder
+- Los nombres de bandas (La Oficina, Los Triana, Pachelly, La Agonía, Los
+  Pesebreros) sí se muestran tal cual en módulo 06, con disclaimer en el
+  banner amarillo: "no es señalamiento judicial, prueba penal ni
+  cartografía oficial". Reproducen lenguaje de fuentes citadas en el
+  informe original de la socia.
+- Los GeoJSON de Medellín (`MEDELLINX.json`) tienen 23 features: 16
+  comunas (CODIGO 01-16) + 5 corregimientos (50/60/70/80/90) + 2 SN.
+  Los corregimientos NO están en el análisis de comportamiento electoral
+  ni de gobierno criminal — se pintan en gris con tooltip "No incluido en
+  este análisis".
+
 ## Convenciones de commit
 ```
 git commit -m "scope: descripción concisa\n\nDetalle si es necesario\n\nCo-Authored-By: Claude Sonnet 4-6 <noreply@anthropic.com>"
