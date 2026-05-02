@@ -63,6 +63,19 @@
     .theme-btn { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.1em; text-transform:uppercase; color:var(--text2); background:transparent; border:1px solid var(--border); padding:.3rem .65rem; cursor:none; transition:all .2s; }
     .theme-btn:hover { color:var(--text); border-color:var(--text2); }
 
+    /* Country selector (lang.js) */
+    .country-selector-wrap { position:relative; }
+    .country-btn { font-family:'DM Mono',monospace; font-weight:400; font-size:.65rem; letter-spacing:.1em; text-transform:uppercase; color:var(--text2); background:transparent; border:1px solid var(--border); padding:.3rem .65rem; cursor:none; display:flex; align-items:center; transition:all .2s; }
+    .country-btn:hover, .country-btn.open { color:var(--text); border-color:var(--text2); }
+    .country-dropdown { position:absolute; top:calc(100% + 8px); right:0; background:var(--surface); border:1px solid var(--border2); min-width:200px; display:none; flex-direction:column; z-index:200; box-shadow:0 8px 24px rgba(0,0,0,.18); }
+    .country-dropdown.open { display:flex; }
+    .country-option { font-family:Avenir,sans-serif; font-weight:400; font-size:.78rem; letter-spacing:.02em; padding:.7rem 1rem; cursor:none; display:flex; align-items:center; gap:.5rem; color:var(--text2); border-bottom:1px solid var(--border); transition:background .15s; user-select:none; }
+    .country-option:last-child { border-bottom:none; }
+    .country-option:hover { background:var(--purple-dim); color:var(--text); }
+    .country-option.selected { color:var(--purple); }
+    .country-check { font-size:.7rem; width:14px; opacity:0; color:var(--purple); }
+    .country-option.selected .country-check { opacity:1; }
+
     /* WRAP */
     main.wrap { max-width: 1400px; margin: 0 auto; padding: 6rem 2.5rem 2.5rem; }
 
@@ -224,6 +237,18 @@
     <span class="private-badge">Privado</span>
   </div>
   <div class="nav-right">
+    <div class="country-selector-wrap">
+      <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
+        <span id="countryBtnLabel">Colombia</span>
+        <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style="margin-left:6px;transition:transform .2s" id="countryChevron"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+      <div class="country-dropdown" id="countryDropdown">
+        <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
+        <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
+        <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
+        <div class="country-option" data-value="cn" onclick="selectCountry(this)"><span class="country-check">✓</span> 中国 / China</div>
+      </div>
+    </div>
     <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">Tema</button>
     <a href="../index.html" class="logo-link">
       <div class="logo-bars"><div class="logo-bar" style="height:11px"></div><div class="logo-bar" style="height:15px"></div><div class="logo-bar" style="height:8px"></div></div>
@@ -988,8 +1013,21 @@
     await initMap();
     await loadHistoricosMedComuna();
     repaintMap();
+    // Cierra el dropdown del selector de país al click fuera
+    document.addEventListener('click', e => {
+      const wrap = document.querySelector('.country-selector-wrap');
+      if (wrap && !wrap.contains(e.target)){
+        document.getElementById('countryBtn')?.classList.remove('open');
+        document.getElementById('countryDropdown')?.classList.remove('open');
+        const ch = document.getElementById('countryChevron'); if (ch) ch.style.transform = '';
+      }
+    });
   }
 </script>
+
+<!-- lang.js compartido — selector de país/idioma. Path relativo desde
+     /proyecto-dc/ a la raíz del repo. -->
+<script src="../lang.js"></script>
 
 </body>
 </html>
