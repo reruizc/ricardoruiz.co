@@ -135,7 +135,7 @@
       .mid-col::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
     }
     @media (max-width:1100px){ .mid-col{border-left:none; padding-left:0} }
-    .map-legend { padding:.2rem 0 .6rem; display:flex; align-items:flex-start; gap:.75rem; flex-wrap:wrap; flex-direction:column; }
+    .map-legend { padding:1rem 0 .6rem; margin-top:.4rem; border-top:1px solid var(--border); display:flex; align-items:flex-start; gap:.75rem; flex-wrap:wrap; flex-direction:column; }
     .map-legend-title { font-family:Avenir,sans-serif; font-weight:500; font-size:.7rem; letter-spacing:.12em; text-transform:uppercase; color:var(--text2); }
     .pond-legend { display:flex; flex-direction:column; gap:.55rem; margin-top:.4rem; width:100%; }
     .pond-chip { width:100%; display:flex; align-items:center; gap:.55rem; line-height:1.25; font-family:Avenir,sans-serif; font-weight:400; font-size:.95rem; color:var(--text); }
@@ -149,9 +149,9 @@
     .pond-chip-vals b { color:var(--text); font-weight:500; }
 
     /* TERRITORY CARD */
-    .territory-card { display:none; margin-top:1.1rem; padding:.95rem 0 .2rem; border-top:1px solid var(--border); font-family:Avenir,sans-serif; }
+    .territory-card { display:none; padding:.2rem 0 .2rem; font-family:Avenir,sans-serif; }
     .territory-card.show { display:block; }
-    .territory-card.compact { margin-top:.7rem; padding-top:.7rem; }
+    .territory-card.compact { padding-top:.4rem; }
     .tc-head { display:flex; justify-content:space-between; align-items:flex-start; gap:.5rem; margin-bottom:.65rem; }
     .tc-head-text { min-width:0; flex:1; }
     .tc-name { font-family:'Syne',sans-serif; font-weight:700; font-size:1.05rem; line-height:1.18; color:var(--text); }
@@ -341,8 +341,11 @@
     </div>
 
     <div class="mid-col" id="mid-col">
-      <div class="map-legend" id="map-legend"></div>
+      <!-- ARRIBA: tarjeta con proyección % por candidato (ciudad por
+           defecto, comuna específica al hover/click) -->
       <div class="territory-card" id="territory-card" aria-live="polite"></div>
+      <!-- ABAJO: leyenda con cantidad de votos estimados (en K) -->
+      <div class="map-legend" id="map-legend"></div>
     </div>
 
     <aside class="panel" id="panel">
@@ -763,6 +766,23 @@
     return 1.0;
   }
 
+  // Ranking agregado a nivel Medellín ciudad (default cuando no hay scope).
+  // Usa la proyección municipal pura: pct_nacional × bias_mun_medellin.
+  function computeMedellinCiudadRanking(){
+    const ranked = CANDIDATOS
+      .filter(c => c.id !== 'nd' && c.id !== 'otros')
+      .map(c => ({ c, v: c.pct * (BIAS_MUN_MEDELLIN[c.id] ?? 1) }))
+      .filter(x => x.v > 0)
+      .sort((a,b) => b.v - a.v);
+    if (!ranked.length) return null;
+    return {
+      winner: ranked[0].c, winnerV: ranked[0].v,
+      second: ranked[1]?.c, secondV: ranked[1]?.v || 0,
+      margin: ranked[0].v - (ranked[1]?.v || 0),
+      ranked,
+    };
+  }
+
   // Bias municipal de Medellín, precalculado offline contra los históricos
   // nacionales (mismas EQUIVALENCIAS y fórmula que biasForMun() de
   // previa-1v.html). Mide cuánta más fuerza tiene cada candidato en Medellín
@@ -1025,6 +1045,7 @@
     currentComCod = null;
     repaintMap();
     renderLegend();
+    if (!_territoryPinned) _renderTerritoryCard(_scopePayload());
   }
   window.openCandDetail = openCandDetail;
   window.closeCandDetail = closeCandDetail;
@@ -1240,6 +1261,36 @@
   // TARJETA DE TERRITORIO + HOVER CHIP + BOTTOM-SHEET
   // ════════════════════════════════════════════════════════════════
   let _territoryHovered = null, _territoryPinned = null, _lastPayload = null;
+  // Payload por defecto: Medellín ciudad (ranking agregado).
+  const _defaultPayload = {
+    scopeKey: 'med:ciudad',
+    level: 'Medellín ciudad',
+    name: 'Medellín',
+    parents: ['Antioquia · agregado de las 16 comunas + corregimientos'],
+    comCod: null,
+    fuente: 'Proyección municipal: pct_nacional × bias_mun_medellin (sin diferenciación intra-comuna).',
+  };
+  const COMUNA_NAMES = {
+    '01':'Popular','02':'Santa Cruz','03':'Manrique','04':'Aranjuez',
+    '05':'Castilla','06':'Doce de Octubre','07':'Robledo','08':'Villa Hermosa',
+    '09':'Buenos Aires','10':'La Candelaria','11':'Laureles Estadio','12':'La América',
+    '13':'San Javier','14':'El Poblado','15':'Guayabal','16':'Belén',
+    'CORR':'Corregimientos',
+  };
+  function _payloadForComuna(comCod){
+    return {
+      scopeKey: 'com:' + comCod,
+      level: comCod === 'CORR' ? 'Corregimiento' : 'Comuna',
+      name: COMUNA_NAMES[comCod] || comCod,
+      parents: ['Medellín · Antioquia'],
+      comCod,
+      fuente: 'Bias intra-comuna · pres 10-22 + alc/concejo + Congreso 2026 + consultas 25-26',
+    };
+  }
+  // Payload del estado actual del scope: comuna clickeada o ciudad default.
+  function _scopePayload(){
+    return currentComCod ? _payloadForComuna(currentComCod) : _defaultPayload;
+  }
 
   function _setHoverChip(e, name, color){
     const chip = document.getElementById('hover-chip'); if (!chip) return;
@@ -1271,10 +1322,16 @@
     card.classList.toggle('compact', compact);
     card.classList.add('show');
     if (sheet){ sheet.classList.toggle('compact', compact); sheet.classList.add('show'); }
-    const ranking = computeComunaMedRanking(payload.comCod)?.ranked || [];
+    // Si comCod === null, ranking agregado a ciudad. Si no, comuna específica.
+    const rankResult = payload.comCod
+      ? computeComunaMedRanking(payload.comCod)
+      : computeMedellinCiudadRanking();
+    const ranking = rankResult?.ranked || [];
     const total = ranking.reduce((s,x)=>s+x.v, 0);
+    const isCiudad = !payload.comCod;
     const isPinned = _territoryPinned === payload.scopeKey;
     const pinLabel = isPinned ? '📌 Fijado' : '📌 Fijar';
+    const pinHtml = isCiudad ? '' : `<button class="tc-pin ${isPinned?'pinned':''}" onclick="_toggleTerritoryPin()">${pinLabel}</button>`;
     const parentsLine = payload.parents.join(' · ');
     let body;
     if (selectedId){
@@ -1313,7 +1370,7 @@
           <div class="tc-name">${payload.name}</div>
           <div class="tc-parents">${payload.level}${parentsLine ? ' · ' + parentsLine : ''}</div>
         </div>
-        <button class="tc-pin ${isPinned?'pinned':''}" onclick="_toggleTerritoryPin()">${pinLabel}</button>
+        ${pinHtml}
       </div>
       ${body}
       ${payload.fuente && !compact ? `<div class="tc-fuente">${payload.fuente}</div>` : ''}`;
@@ -1372,13 +1429,23 @@
         layer.bindTooltip(tooltipFn(), { sticky:true, className:'leaflet-dark-tooltip', opacity:1 }).openTooltip();
       },
       mousemove(e){ _moveHoverChip(e); },
-      mouseout(){ if (comunaLayer) comunaLayer.resetStyle(layer); layer.closeTooltip(); _clearHoverChip(); },
+      mouseout(){
+        if (comunaLayer) comunaLayer.resetStyle(layer);
+        layer.closeTooltip();
+        _clearHoverChip();
+        // Tarjeta vuelve al scope activo (comuna clickeada o ciudad), salvo pin
+        if (!_territoryPinned){
+          _territoryHovered = null;
+          _renderTerritoryCard(_scopePayload());
+        }
+      },
       click(){
-        // Drill scope: la leyenda (votos estimados) ahora se restringe a esta
-        // comuna. Click de nuevo en la misma comuna → vuelve a Medellín ciudad.
+        // Toggle scope: click selecciona/deselecciona la comuna como scope
+        // activo. Tarjeta y leyenda reflejan el scope.
         currentComCod = (currentComCod === comCod) ? null : comCod;
         repaintMap();
         renderLegend();
+        if (!_territoryPinned) _renderTerritoryCard(_scopePayload());
       },
     });
   }
@@ -1409,7 +1476,9 @@
     await initMap();             // mapa visible inmediatamente
     await loadHistoricosMedComuna();  // carga 16 fuentes y precomputa bias
     repaintMap();                // recolorea con bias real
-    renderLegend();              // ← ahora SÍ con votos estimados (chips clicables)
+    renderLegend();              // ahora SÍ con votos estimados (chips clicables)
+    // Render por defecto: tarjeta con ranking de Medellín ciudad
+    _renderTerritoryCard(_scopePayload());
     // Cierra el dropdown del selector de país al click fuera
     document.addEventListener('click', e => {
       const wrap = document.querySelector('.country-selector-wrap');
