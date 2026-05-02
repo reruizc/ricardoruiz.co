@@ -47,6 +47,7 @@ MAX_SEEN_PER_FEED = 600
 ARTICLE_FETCH_WORKERS = 8
 
 SM_NS = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
+NEWS_NS = "{http://www.google.com/schemas/sitemap-news/0.9}"
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 with open(os.path.join(_HERE, "sitemaps.json"), encoding="utf-8") as _f:
@@ -113,7 +114,9 @@ def parse_iso_date(s):
 
 # ---- Sitemap parsing ----
 def parse_sitemap_xml(xml_bytes):
-    """Devuelve (is_index, items) donde items = [{loc, lastmod}, ...]."""
+    """Devuelve (is_index, items) donde items = [{loc, lastmod}, ...].
+    Para sitemaps de noticias (Google News namespace), usa
+    <news:publication_date> como lastmod si no hay <lastmod> estándar."""
     root = ET.fromstring(xml_bytes)
     is_index = "sitemapindex" in root.tag.lower()
     selector = "sitemap" if is_index else "url"
@@ -121,6 +124,10 @@ def parse_sitemap_xml(xml_bytes):
     for entry in root.findall(SM_NS + selector):
         loc = entry.findtext(SM_NS + "loc")
         lastmod = entry.findtext(SM_NS + "lastmod")
+        if not lastmod:
+            news_el = entry.find(NEWS_NS + "news")
+            if news_el is not None:
+                lastmod = news_el.findtext(NEWS_NS + "publication_date")
         if loc:
             items.append({"loc": loc.strip(), "lastmod": (lastmod or "").strip()})
     return is_index, items
