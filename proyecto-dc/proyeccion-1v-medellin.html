@@ -173,9 +173,11 @@
     .cand-meta { display:flex; justify-content:space-between; align-items:baseline; }
     .cand-name { font-family:'Syne',sans-serif; font-weight:500; font-size:.88rem; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .cand-pct { font-family:Avenir,sans-serif; font-variant-numeric:tabular-nums; font-weight:500; font-size:.92rem; color:var(--text); }
-    .cand-slider { width:100%; -webkit-appearance:none; height:3px; background:var(--border2); outline:none; margin-top:.35rem; cursor:none; }
-    .cand-slider::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; cursor:none; }
-    .cand-slider::-moz-range-thumb { width:14px; height:14px; border-radius:50%; cursor:none; border:none; }
+    .cand-slider { -webkit-appearance:none; appearance:none; width:100%; height:4px; background:var(--border2); outline:none; margin:.4rem 0 .15rem; cursor:none; }
+    .cand-slider::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:16px; height:16px; background:var(--surface); border:2px solid var(--purple); border-radius:50%; cursor:none; box-shadow:0 1px 4px rgba(0,0,0,.18); transition:transform .12s; }
+    .cand-slider::-webkit-slider-thumb:hover { transform:scale(1.2); }
+    .cand-slider::-moz-range-thumb { width:16px; height:16px; background:var(--surface); border:2px solid var(--purple); border-radius:50%; cursor:none; box-shadow:0 1px 4px rgba(0,0,0,.18); }
+    .cand-slider::-moz-range-track { background:var(--border2); height:4px; border:none; }
     .note { margin-top:1rem; padding:.8rem; background:rgba(240,192,64,0.08); border:1px solid rgba(240,192,64,0.22); color:var(--text2); font-family:'Arima',sans-serif; font-weight:400; font-size:.82rem; line-height:1.55; }
 
     /* FOOT */
@@ -682,11 +684,35 @@
     if (cached != null && cached > 0) return cached;
     return 1.0;
   }
-  // Nota: en este módulo NO componemos bias municipal porque ya estamos
-  // dentro de Medellín como scope único — el promedio ponderado por
-  // potencial dentro de Medellín da 1.0, así que pct_nacional × bias_intra
-  // reproduce la distribución intra-municipal correcta.
-  function projectedComunaMed(cand, comCod){ return cand.pct * biasForComunaMed(cand, comCod); }
+
+  // Bias municipal de Medellín, precalculado offline contra los históricos
+  // nacionales (mismas EQUIVALENCIAS y fórmula que biasForMun() de
+  // previa-1v.html). Mide cuánta más fuerza tiene cada candidato en Medellín
+  // que en el promedio nacional.
+  //
+  // Sin esto, p(c, com) = pct_nacional × bias_intra mantiene la distribución
+  // nacional como baseline — y Medellín NO es un microcosmos del país (es
+  // estructuralmente más uribista/CD). Composición correcta:
+  //   p(c, com) = pct_nacional × bias_mun_medellin × bias_intra_comuna
+  //
+  // Calibrado con tools/calc-bias-mun-medellin (ver script). Si EQUIVALENCIAS
+  // cambian o se actualiza Senado/Cámara, recomputar.
+  const BIAS_MUN_MEDELLIN = {
+    'ic': 0.83,   // Cepeda — Pacto débil en MDE
+    'ae': 1.19,   // Abelardo — Salvación + uribismo paisa
+    'pv': 1.76,   // Paloma — CD muy fuerte en MDE (gran consulta 68% vs 50% nac)
+    'sf': 1.23,   // Fajardo — su ciudad
+    'cl': 1.09,   // Claudia — ex-verde con rastros Fajardo
+    'rb': 0.58,   // Roy — sin huella; Quintero le ganó la consulta
+    'lm': 0.87,   // Murillo — Liberal débil en MDE
+    'otros': 1.0,
+    'nd': 1.0,
+  };
+  function biasMunMed(cand){ return BIAS_MUN_MEDELLIN[cand.id] ?? 1.0; }
+
+  function projectedComunaMed(cand, comCod){
+    return cand.pct * biasMunMed(cand) * biasForComunaMed(cand, comCod);
+  }
   function computeComunaMedRanking(comCod){
     const ranked = CANDIDATOS
       .filter(c => c.id !== 'nd' && c.id !== 'otros')
@@ -748,10 +774,10 @@
   function renderLegend(){
     const el = document.getElementById('map-legend');
     if (!el) return;
-    // Agregar votos estimados a nivel ciudad (ponderados por peso de cada comuna)
+    // Proyección Medellín ciudad: pct_nacional × bias_mun_medellin, renormalizado
     const ranked = CANDIDATOS
       .filter(c => c.id !== 'nd')
-      .map(c => ({ c, v: c.pct }))
+      .map(c => ({ c, v: c.pct * biasMunMed(c) }))
       .sort((a,b) => b.v - a.v);
     const total = ranked.reduce((s,x) => s+x.v, 0);
     const chips = ranked.map(x => {
@@ -759,10 +785,10 @@
       return `<span class="pond-chip" onclick="_openCand('${x.c.id}')" title="Ver detalle">
         <span class="dot" style="background:${x.c.color}"></span>
         <span class="pond-chip-name">${x.c.nombre}</span>
-        <span class="pond-chip-vals"><b>${fmtPct(x.v)}</b></span>
+        <span class="pond-chip-vals"><b>${pct.toFixed(1)}%</b> <span style="opacity:.55">(${fmtPct(x.c.pct)} nac)</span></span>
       </span>`;
     }).join('');
-    el.innerHTML = `<div class="map-legend-title">Intención de voto · Medellín</div>${chips}`;
+    el.innerHTML = `<div class="map-legend-title">Proyección Medellín ciudad</div>${chips}`;
   }
   function _openCand(id){ selectedId = (selectedId === id) ? null : id; repaintMap(); _refreshTerritoryCard(); renderLegend(); }
   window._openCand = _openCand;
