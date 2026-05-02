@@ -849,6 +849,123 @@
     },
   };
 
+  // ─── EQUIVALENCIAS COMUNA MEDELLÍN ──────────────────────────────
+  // Misma fórmula bias = (1/W)·Σ wₛ·[pctₛ(t)/pctₛ(nacional)] del documento,
+  // pero con señales locales adicionales (alc/concejo MDE, congreso 2026
+  // a comuna) que sí diferencian intra-municipio. Sólo se activa al hacer
+  // drill a Medellín (depCod='01' & munCod='001'); la lógica nacional,
+  // departamental y de Medellín-como-municipio queda intacta.
+  //
+  // 'cands'    → DES_CAN normalizado (presidenciales, alcaldía, consultas)
+  // 'partidos' → DES_PAR normalizado (concejo, senado/cámara 2026)
+  // 'consulta' → slug interno ('gran' | 'frente' | 'soluciones') del archivo
+  //              consolidado consultas/por-comuna.json
+  const MED_S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_medellin';
+  const MED_SIGNALS = {
+    'pres-2010-mde':              { url: `${MED_S3}/historicos-comuna/pres-2010/por-comuna.json`,           type: 'cands',    wrapper: 'por_comuna' },
+    'pres-2014-mde':              { url: `${MED_S3}/historicos-comuna/pres-2014/por-comuna.json`,           type: 'cands',    wrapper: 'por_comuna' },
+    'pres-2018-mde':              { url: `${MED_S3}/historicos-comuna/pres-2018/por-comuna.json`,           type: 'cands',    wrapper: 'por_comuna' },
+    'pres-2022-mde':              { url: `${MED_S3}/historicos-comuna/pres-2022/por-comuna.json`,           type: 'cands',    wrapper: 'por_comuna' },
+    'consulta-2025-pacto-mde':    { url: `${MED_S3}/historicos-comuna/consulta-2025-pacto/por-comuna.json`, type: 'cands',    wrapper: 'por_comuna' },
+    'alc-2015-mde':               { url: `${MED_S3}/2015/alcaldia/por-comuna.json`,                          type: 'cands',    wrapper: null },
+    'concejo-2015-mde':           { url: `${MED_S3}/2015/concejo/por-comuna.json`,                           type: 'partidos', wrapper: null },
+    'alc-2019-mde':               { url: `${MED_S3}/2019/alcaldia/por-comuna.json`,                          type: 'cands',    wrapper: null },
+    'concejo-2019-mde':           { url: `${MED_S3}/2019/concejo/por-comuna.json`,                           type: 'partidos', wrapper: null },
+    'alc-2023-mde':               { url: `${MED_S3}/2023/alcaldia/por-comuna.json`,                          type: 'cands',    wrapper: null },
+    'concejo-2023-mde':           { url: `${MED_S3}/2023/concejo/por-comuna.json`,                           type: 'partidos', wrapper: null },
+    'senado-2026-mde':            { url: `${MED_S3}/2026/senado/por-comuna.json`,                            type: 'partidos', wrapper: 'por_comuna' },
+    'camara-2026-mde':            { url: `${MED_S3}/2026/camara/por-comuna.json`,                            type: 'partidos', wrapper: 'por_comuna' },
+    'consulta-2026-gran-mde':     { url: `${MED_S3}/2026/consultas/por-comuna.json`, type: 'consulta', wrapper: 'por_comuna', slug: 'gran' },
+    'consulta-2026-frente-mde':   { url: `${MED_S3}/2026/consultas/por-comuna.json`, type: 'consulta', wrapper: 'por_comuna', slug: 'frente' },
+    'consulta-2026-soluciones-mde':{ url: `${MED_S3}/2026/consultas/por-comuna.json`, type: 'consulta', wrapper: 'por_comuna', slug: 'soluciones' },
+  };
+  const EQUIVALENCIAS_MED_COMUNA = {
+    'ic': {  // Iván Cepeda — Pacto en Medellín
+      'consulta-2025-pacto-mde':    { cands: ['IVAN CEPEDA CASTRO'], peso: 0.22 },
+      'consulta-2026-frente-mde':   { cands: ['DANIEL QUINTERO CALLE'], peso: 0.08 },
+      'senado-2026-mde':            { partidos: ['PACTO HISTÓRICO SENADO'], peso: 0.12 },
+      'camara-2026-mde':            { partidos: ['PACTO HISTÓRICO ANTIOQUIA'], peso: 0.14 },
+      'pres-2022-mde':              { cands: ['GUSTAVO PETRO'], peso: 0.14 },
+      'pres-2018-mde':              { cands: ['GUSTAVO PETRO'], peso: 0.08 },
+      'alc-2019-mde':               { cands: ['DANIEL QUINTERO CALLE'], peso: 0.16 },
+      'concejo-2023-mde':           { partidos: ['JUNTOS'], peso: 0.03 },
+      'concejo-2019-mde':           { partidos: ['PARTIDO ALIANZA VERDE'], peso: 0.02 },
+      'pres-2014-mde':              { cands: ['CLARA LOPEZ'], peso: 0.01 },
+    },
+    'pv': {  // Paloma Valencia — CD / uribismo paisa
+      'consulta-2026-gran-mde':     { cands: ['PALOMA SUSANA VALENCIA LASERNA'], peso: 0.30 },
+      'senado-2026-mde':            { partidos: ['PARTIDO CENTRO DEMOCRÁTICO'], peso: 0.15 },
+      'camara-2026-mde':            { partidos: ['PARTIDO CENTRO DEMOCRÁTICO'], peso: 0.10 },
+      'alc-2023-mde':               { cands: ['FEDERICO ANDRES GUTIERREZ ZULUAGA'], peso: 0.12 },
+      'alc-2015-mde':               { cands: ['FEDERICO ANDRES GUTIERREZ ZULUAGA'], peso: 0.08 },
+      'concejo-2023-mde':           { partidos: ['INDEPENDIENTES'], peso: 0.06 },
+      'pres-2018-mde':              { cands: ['IVAN DUQUE'], peso: 0.08 },
+      'pres-2022-mde':              { cands: ['FEDERICO GUTIERREZ', 'RODOLFO HERNANDEZ'], peso: 0.06 },
+      'pres-2014-mde':              { cands: ['OSCAR IVAN ZULUAGA'], peso: 0.03 },
+      'pres-2010-mde':              { cands: ['JUAN MANUEL SANTOS CALDERON'], peso: 0.02 },
+    },
+    'rb': {  // Roy Barreras — Frente Amplio Unitario
+      'consulta-2026-frente-mde':   { cands: ['ROY LEONARDO BARRERAS MONTEALEGRE'], peso: 0.30 },
+      'senado-2026-mde':            { partidos: ['FRENTE AMPLIO UNITARIO'], peso: 0.15 },
+      'camara-2026-mde':            { partidos: ['FRENTE AMPLIO UNITARIO'], peso: 0.10 },
+      'pres-2022-mde':              { cands: ['GUSTAVO PETRO'], peso: 0.15 },
+      'pres-2018-mde':              { cands: ['GUSTAVO PETRO'], peso: 0.10 },
+      'alc-2019-mde':               { cands: ['DANIEL QUINTERO CALLE'], peso: 0.10 },
+      'concejo-2023-mde':           { partidos: ['JUNTOS'], peso: 0.05 },
+      'pres-2014-mde':              { cands: ['CLARA LOPEZ'], peso: 0.03 },
+      'pres-2010-mde':              { cands: ['GUSTAVO FRANCISCO PETRO URREGO', 'AURELIJUS RUTENIS ANTANAS MOCKUS SIVICKAS'], peso: 0.02 },
+    },
+    'sf': {  // Sergio Fajardo — su ciudad
+      'pres-2022-mde':              { cands: ['SERGIO FAJARDO'], peso: 0.25 },
+      'pres-2018-mde':              { cands: ['SERGIO FAJARDO'], peso: 0.20 },
+      'senado-2026-mde':            { partidos: ['ALIANZA POR COLOMBIA', 'AHORA COLOMBIA'], peso: 0.13 },
+      'camara-2026-mde':            { partidos: ['AHORA COLOMBIA', 'COALICIÓN ALIANZA VERDE, EN MARCHA, ASI'], peso: 0.10 },
+      'concejo-2023-mde':           { partidos: ['JUNTOS'], peso: 0.08 },
+      'concejo-2019-mde':           { partidos: ['PARTIDO ALIANZA VERDE'], peso: 0.13 },
+      'pres-2014-mde':              { cands: ['ENRIQUE PENALOSA', 'MARTHA LUCIA RAMIREZ', 'AURELIJUS RUTENIS ANTANAS MOCKUS SIVICKAS'], peso: 0.06 },
+      'pres-2010-mde':              { cands: ['AURELIJUS RUTENIS ANTANAS MOCKUS SIVICKAS'], peso: 0.05 },
+    },
+    'cl': {  // Claudia López — bogotana, ex Verde
+      'consulta-2026-soluciones-mde':{ cands: ['CLAUDIA NAYIBE LOPEZ HERNANDEZ'], peso: 0.20 },
+      'senado-2026-mde':            { partidos: ['AHORA COLOMBIA'], peso: 0.12 },
+      'camara-2026-mde':            { partidos: ['COALICIÓN ALIANZA VERDE, EN MARCHA, ASI', 'AHORA COLOMBIA'], peso: 0.10 },
+      'pres-2022-mde':              { cands: ['SERGIO FAJARDO'], peso: 0.18 },
+      'pres-2018-mde':              { cands: ['SERGIO FAJARDO'], peso: 0.10 },
+      'pres-2010-mde':              { cands: ['AURELIJUS RUTENIS ANTANAS MOCKUS SIVICKAS'], peso: 0.07 },
+      'concejo-2023-mde':           { partidos: ['JUNTOS'], peso: 0.05 },
+      'concejo-2019-mde':           { partidos: ['PARTIDO ALIANZA VERDE'], peso: 0.14 },
+      'pres-2014-mde':              { cands: ['ENRIQUE PENALOSA', 'MARTHA LUCIA RAMIREZ'], peso: 0.04 },
+    },
+    'ae': {  // Abelardo de la Espriella — outsider derecha
+      'senado-2026-mde':            { partidos: ['MOVIMIENTO SALVACIÓN NACIONAL'], peso: 0.25 },
+      'camara-2026-mde':            { partidos: ['CR-LAU-MSN-OXI'], peso: 0.15 },
+      'pres-2018-mde':              { cands: ['IVAN DUQUE'], peso: 0.18 },
+      'concejo-2023-mde':           { partidos: ['INDEPENDIENTES'], peso: 0.12 },
+      'pres-2022-mde':              { cands: ['FEDERICO GUTIERREZ', 'RODOLFO HERNANDEZ'], peso: 0.10 },
+      'pres-2014-mde':              { cands: ['OSCAR IVAN ZULUAGA'], peso: 0.10 },
+      'concejo-2019-mde':           { partidos: ['PARTIDO CENTRO DEMOCRATICO'], peso: 0.05 },
+      'pres-2010-mde':              { cands: ['JUAN MANUEL SANTOS CALDERON'], peso: 0.05 },
+    },
+    'lm': {  // Luis Gilberto Murillo — Liberal/Pacto moderado
+      'senado-2026-mde':            { partidos: ['PARTIDO LIBERAL COLOMBIANO'], peso: 0.35 },
+      'camara-2026-mde':            { partidos: ['PARTIDO LIBERAL COLOMBIANO'], peso: 0.20 },
+      'concejo-2023-mde':           { partidos: ['INDEPENDIENTES'], peso: 0.10 },
+      'pres-2022-mde':              { cands: ['SERGIO FAJARDO', 'GUSTAVO PETRO'], peso: 0.18 },
+      'pres-2018-mde':              { cands: ['HUMBERTO DE LA CALLE', 'SERGIO FAJARDO'], peso: 0.10 },
+      'pres-2014-mde':              { cands: ['CLARA LOPEZ', 'ENRIQUE PENALOSA'], peso: 0.04 },
+      'pres-2010-mde':              { cands: ['JUAN MANUEL SANTOS CALDERON'], peso: 0.03 },
+    },
+    'otros': {},  // sin bias específico → uniforme 1.0
+    'nd': {},
+  };
+  // Mapas en memoria que se llenan al primer drill a Medellín (lazy).
+  //   HISTORICOS_MED[sig] = { ciudad: { keyNorm: pctFraccion },
+  //                            comunas: { '01': { keyNorm: pctFraccion }, ... } }
+  //   _biasCacheMedComuna[candId][comCod] = bias raw
+  let HISTORICOS_MED = {};
+  let _biasCacheMedComuna = {};
+  let _medComunaLoadingPromise = null;
+
   // ─── HELPERS ──────────────────────────────────────────────────
   const norm = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase();
   const fmtPct = n => (Math.round(n*10)/10).toFixed(1) + '%';
@@ -1208,6 +1325,28 @@
     return { fillColor: colorWithIntensity(r.winner.color, intensity), fillOpacity:.9, color:'rgba(255,255,255,0.3)', weight:.7 };
   }
 
+  // Estilo análogo a _styleByDepName pero usando el bias calibrado por
+  // comuna de Medellín. Si el bias aún no está cargado (lazy), retorna un
+  // estilo neutro y la función se vuelve a llamar tras precomputeBiasMedComuna().
+  function _styleByComunaMed(comCod){
+    const hasBias = _biasCacheMedComuna && Object.values(_biasCacheMedComuna).some(m => m[comCod] != null);
+    if (!hasBias){
+      return { fillColor:'#1a1d2e', fillOpacity:.5, color:'rgba(255,255,255,.3)', weight:.7 };
+    }
+    if (selectedId){
+      const cand = CANDIDATOS.find(c => c.id === selectedId);
+      if (!cand) return { fillColor:'#1a1d2e', fillOpacity:.35, color:'rgba(255,255,255,.3)', weight:.7 };
+      const total = CANDIDATOS.reduce((s,c) => s + projectedComunaMed(c, comCod), 0);
+      const share = total > 0 ? projectedComunaMed(cand, comCod) / total : 0;
+      const intensity = Math.min(1, share / Math.max(_maxSingleShare, .01));
+      return { fillColor: colorWithIntensity(cand.color, intensity), fillOpacity:.9, color:'rgba(255,255,255,0.3)', weight:.7 };
+    }
+    const r = computeComunaMedRanking(comCod);
+    if (!r || !r.winner) return { fillColor:'#1a1d2e', fillOpacity:.35, color:'rgba(255,255,255,.3)', weight:.7 };
+    const intensity = Math.min(1, r.margin / Math.max(_maxMargin, 1));
+    return { fillColor: colorWithIntensity(r.winner.color, intensity), fillOpacity:.9, color:'rgba(255,255,255,0.3)', weight:.7 };
+  }
+
   function onEachMunFeature(feature, layer){
     const props = feature.properties;
     const munName = props.mpio_cnmbr || props.NOMBRE_MPI || 'Municipio';
@@ -1361,8 +1500,11 @@
       }
       if (munLayer){ map.removeLayer(munLayer); munLayer = null; }
       if (cityLayer){ map.removeLayer(cityLayer); cityLayer = null; }
+      const isMed = cfg.key === 'medellin';
       cityLayer = L.geoJSON(geo, {
-        style: () => _styleByDepName(depNom),
+        style: (f) => isMed
+          ? _styleByComunaMed(_medComunaCode(f.properties[cfg.codeField]))
+          : _styleByDepName(depNom),
         onEachFeature: (f, layer) => onEachCityFeature(f, layer, cfg, depNom, munNom),
       }).addTo(map);
       currentCityKey = cfg.key;
@@ -1372,8 +1514,21 @@
       const nameEl = document.getElementById('map-cand-name');
       if (label) label.textContent = `${munNom} · ${cfg.kind}`;
       if (nameEl){
-        nameEl.textContent = `Color hereda del municipio (bias por comuna pendiente)`;
+        nameEl.textContent = isMed
+          ? 'Bias por comuna calibrado · pres 2010-2022 + alcaldía/concejo + Congreso 2026 + consultas 2025-26'
+          : 'Color hereda del municipio (bias por comuna pendiente)';
         nameEl.style.color = '';
+      }
+      // Para Medellín: dispara carga lazy del bias y repinta cuando termine
+      if (isMed){
+        const layerRef = cityLayer;
+        loadHistoricosMedComuna().then(() => {
+          // Sólo repintamos si el usuario sigue dentro de la capa Medellín
+          if (cityLayer === layerRef && currentCityKey === 'medellin'){
+            cityLayer.setStyle(f =>
+              _styleByComunaMed(_medComunaCode(f.properties[cfg.codeField])));
+          }
+        });
       }
       // Botón: cambia a "← Depto" (un solo paso arriba)
       const backBtn = document.getElementById('map-back-btn');
@@ -1395,27 +1550,45 @@
     let name = p[cfg.nameField] || p[cfg.codeField] || 'Comuna';
     // Ibagué guarda nombre = "COMUNA 3" en la misma columna; normaliza
     if (typeof name !== 'string') name = String(name);
+    const isMed = cfg.key === 'medellin';
+    const comCod = isMed ? _medComunaCode(p[cfg.codeField]) : null;
     layer.on({
       mouseover(){
         layer.setStyle({ weight:2, color:'#fff', fillOpacity:.98 });
         let html = '';
+        // En Medellín usamos el bias calibrado por comuna; en las demás
+        // ciudades por ahora hereda del depto (pendiente calibración propia).
+        const hasMedBias = isMed && _biasCacheMedComuna && Object.values(_biasCacheMedComuna).some(m => m[comCod] != null);
         if (selectedId){
           const cand = CANDIDATOS.find(c => c.id === selectedId);
-          const total = CANDIDATOS.reduce((s,c) => s + projected(c, depNom), 0);
-          const share = total > 0 ? projected(cand, depNom) / total : 0;
+          let total, share;
+          if (hasMedBias){
+            total = CANDIDATOS.reduce((s,c) => s + projectedComunaMed(c, comCod), 0);
+            share = total > 0 ? projectedComunaMed(cand, comCod) / total : 0;
+          } else {
+            total = CANDIDATOS.reduce((s,c) => s + projected(c, depNom), 0);
+            share = total > 0 ? projected(cand, depNom) / total : 0;
+          }
+          const fuente = hasMedBias
+            ? `Bias comuna · pres 10-22 + alc/concejo + Congreso 2026 + consultas`
+            : (isMed ? 'Cargando bias por comuna…' : 'Bias hereda del municipio');
           html = `
             <div style="font-family:Avenir,sans-serif;line-height:1.5">
               <div style="font-family:'Syne',sans-serif;font-weight:700;color:#fff;font-size:1.09rem;margin-bottom:.3rem">${name}</div>
               <div style="color:rgba(255,255,255,.6);font-size:.81rem;margin-bottom:.35rem">${munNom} · ${depNom}</div>
               <div style="color:${cand?displayColorOnDark(cand.color):'#fff'};font-size:.90rem;font-weight:500">${cand ? cand.nombre : ''}</div>
               <div style="color:#fff;font-size:1.01rem;margin-top:.25rem">Fuerza local: <b>${(share*100).toFixed(1)}%</b></div>
+              <div style="color:rgba(255,255,255,.55);font-size:.74rem;margin-top:.3rem;padding-top:.3rem;border-top:1px solid rgba(255,255,255,.12)">${fuente}</div>
             </div>`;
         } else {
-          const r = computeDeptoRanking(depNom);
+          const r = hasMedBias ? computeComunaMedRanking(comCod) : computeDeptoRanking(depNom);
           if (r && r.winner){
             const total = r.ranked.reduce((s,x)=>s+x.v,0);
             const winPct = total > 0 ? r.winnerV/total*100 : 0;
             const secPct = r.second && total > 0 ? r.secondV/total*100 : 0;
+            const fuente = hasMedBias
+              ? `Bias comuna · pres 10-22 + alc/concejo + Congreso 2026 + consultas`
+              : (isMed ? 'Cargando bias por comuna…' : '');
             html = `
               <div style="font-family:Avenir,sans-serif;line-height:1.55">
                 <div style="font-family:'Syne',sans-serif;font-weight:700;color:#fff;font-size:1.09rem;margin-bottom:.2rem">${name}</div>
@@ -1427,6 +1600,7 @@
                   <div style="color:rgba(255,255,255,.7);font-size:.83rem"> ${secPct.toFixed(1)}% local</div>
                   <div style="color:#fff;font-size:.94rem;margin-top:.4rem;padding-top:.4rem;border-top:1px solid rgba(255,255,255,.15)">Margen: <b>+${(winPct-secPct).toFixed(1)} pp</b></div>
                 ` : ''}
+                ${fuente ? `<div style="color:rgba(255,255,255,.55);font-size:.74rem;margin-top:.3rem;padding-top:.3rem;border-top:1px solid rgba(255,255,255,.12)">${fuente}</div>` : ''}
               </div>`;
           } else {
             html = `<div style="font-family:Avenir,sans-serif;color:rgba(255,255,255,.7)">${name}</div>`;
@@ -2646,6 +2820,178 @@
     const ranked = CANDIDATOS
       .filter(c => c.id !== 'nd' && c.id !== 'otros')
       .map(c => ({ c, v: projectedMun(c, munKey, parentDepName) }))
+      .filter(x => x.v > 0)
+      .sort((a,b) => b.v - a.v);
+    if (!ranked.length) return null;
+    const winner = ranked[0];
+    const second = ranked[1] || { c: null, v: 0 };
+    return {
+      winner: winner.c, winnerV: winner.v,
+      second: second.c, secondV: second.v,
+      margin: winner.v - second.v,
+      ranked,
+    };
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // BIAS POR COMUNA — sólo Medellín (depCod='01' & munCod='001')
+  //
+  // Carga lazy de los 16 JSONs definidos en MED_SIGNALS al primer drill.
+  // Construye HISTORICOS_MED[sig] = { ciudad, comunas } y precomputa
+  // _biasCacheMedComuna[candId][comCod] aplicando la fórmula del cap.4
+  // del documento metodológico v2.0:
+  //
+  //   bias(c,t) = (1/W) · Σ_s w_s · [ pct_s(t) / pct_s(nacional) ]
+  //
+  // donde "nacional" se interpreta como Medellín ciudad (no Colombia)
+  // — porque al hacer drill ya estamos dentro del scope MDE y queremos
+  // diferenciación intra-municipal, no inter-departamental.
+  // ════════════════════════════════════════════════════════════════
+  // MEDELLINX.json codifica corregimientos con CODIGO ∈ {50,60,70,80,90}.
+  // Nuestros JSONs los agregan en 'CORR'. Mapeo + zero-pad.
+  function _medComunaCode(raw){
+    const k = String(raw || '').padStart(2, '0');
+    if (k === '50' || k === '60' || k === '70' || k === '80' || k === '90') return 'CORR';
+    return k;
+  }
+
+  function _medExtractEntries(j, sig){
+    const cfg = MED_SIGNALS[sig];
+    const root = cfg.wrapper ? (j[cfg.wrapper] || {}) : j;
+    const out = { ciudad: {}, comunas: {} };
+    // Acumular para "ciudad" sumando todas las comunas (más confiable que
+    // depender del archivo resumen.json: usamos el mismo agregado que el
+    // detalle).
+    const ciudadCounts = {};
+    let ciudadTotal = 0;
+    for (const [comCod, com] of Object.entries(root)){
+      if (!com || typeof com !== 'object') continue;
+      let arr = [];
+      let totalLocal = 0;
+      if (cfg.type === 'consulta'){
+        const consultas = com.consultas || {};
+        // Buscar el slug ('gran' | 'frente' | 'soluciones') por su atributo
+        // — los archivos lo traen como '0100'/'0200'/'0300' al nivel raíz
+        // y el slug está dentro del objeto.
+        let target = null;
+        for (const v of Object.values(consultas)){
+          if (v && v.slug === cfg.slug){ target = v; break; }
+        }
+        if (!target) continue;
+        arr = (target.candidatos || []).map(r => ({ key: r.nombre, votos: r.votos || 0 }));
+        totalLocal = target.votos_validos || arr.reduce((s,r)=>s+(r.votos||0),0);
+      } else if (cfg.type === 'partidos'){
+        // Si el archivo tiene .partidos directo, úsalo. Si no, agrega por
+        // .partido desde .candidatos (caso concejo).
+        if (Array.isArray(com.partidos)){
+          arr = com.partidos.map(r => ({ key: r.nombre || r.partido || r.cod, votos: r.votos || 0 }));
+        } else if (Array.isArray(com.candidatos)){
+          const sums = {};
+          for (const r of com.candidatos){
+            const k = r.partido || r.nombre;
+            if (!k) continue;
+            sums[k] = (sums[k] || 0) + (r.votos || 0);
+          }
+          arr = Object.entries(sums).map(([k,v]) => ({ key: k, votos: v }));
+        }
+        totalLocal = com.votos_validos || arr.reduce((s,r)=>s+(r.votos||0),0);
+      } else { // 'cands'
+        arr = (com.candidatos || []).map(r => ({ key: r.nombre, votos: r.votos || 0 }));
+        totalLocal = com.votos_validos || arr.reduce((s,r)=>s+(r.votos||0),0);
+      }
+      const byKey = {};
+      for (const r of arr){
+        const kn = norm(r.key);
+        const v = r.votos || 0;
+        byKey[kn] = totalLocal > 0 ? v / totalLocal : 0;
+        ciudadCounts[kn] = (ciudadCounts[kn] || 0) + v;
+      }
+      ciudadTotal += totalLocal;
+      out.comunas[comCod] = byKey;
+    }
+    out.ciudad = {};
+    for (const [k,v] of Object.entries(ciudadCounts)){
+      out.ciudad[k] = ciudadTotal > 0 ? v / ciudadTotal : 0;
+    }
+    return out;
+  }
+
+  async function loadHistoricosMedComuna(){
+    if (_medComunaLoadingPromise) return _medComunaLoadingPromise;
+    _medComunaLoadingPromise = (async () => {
+      const sigs = Object.keys(MED_SIGNALS);
+      // Dedupe URLs (consultas marzo 2026 comparten archivo) → un solo fetch
+      const urlCache = {};
+      const fetcher = url => {
+        if (!urlCache[url]){
+          urlCache[url] = fetch(url, { cache: 'force-cache' })
+            .then(r => r.ok ? r.json() : null)
+            .catch(() => null);
+        }
+        return urlCache[url];
+      };
+      const results = await Promise.all(sigs.map(s => fetcher(MED_SIGNALS[s].url)));
+      sigs.forEach((sig, i) => {
+        const j = results[i];
+        if (!j) { console.warn('[Previa MDE] no carga', sig); return; }
+        try { HISTORICOS_MED[sig] = _medExtractEntries(j, sig); }
+        catch(e){ console.warn('[Previa MDE] parse', sig, e.message); }
+      });
+      precomputeBiasMedComuna();
+      const sigOk = sigs.filter(s => HISTORICOS_MED[s]).length;
+      const cellsCount = Object.values(_biasCacheMedComuna).reduce((s,m) => s + Object.keys(m).length, 0);
+      console.log(`[Previa MDE] comunas: ${sigOk}/${sigs.length} señales → ${cellsCount} celdas bias`);
+    })();
+    return _medComunaLoadingPromise;
+  }
+
+  function precomputeBiasMedComuna(){
+    _biasCacheMedComuna = {};
+    // Universo de comunas: unión de todos los códigos vistos en los datasets
+    const comSet = new Set();
+    for (const sig of Object.keys(HISTORICOS_MED)){
+      Object.keys(HISTORICOS_MED[sig].comunas || {}).forEach(c => comSet.add(c));
+    }
+    const comunas = Array.from(comSet);
+    for (const cand of CANDIDATOS){
+      const equiv = EQUIVALENCIAS_MED_COMUNA[cand.id];
+      if (!equiv || !Object.keys(equiv).length) continue;
+      _biasCacheMedComuna[cand.id] = {};
+      for (const com of comunas){
+        let num = 0, den = 0;
+        for (const [sig, spec] of Object.entries(equiv)){
+          const data = HISTORICOS_MED[sig];
+          if (!data) continue;
+          const keys = (spec.cands || spec.partidos || []).map(k => norm(k));
+          if (!keys.length) continue;
+          const pctLocal = keys.reduce((s,k) => s + (data.comunas[com]?.[k] || 0), 0);
+          const pctCiudad = keys.reduce((s,k) => s + (data.ciudad[k] || 0), 0);
+          if (pctCiudad <= 0) continue; // sin denominador útil → omitimos esa señal
+          num += spec.peso * (pctLocal / pctCiudad);
+          den += spec.peso;
+        }
+        if (den > 0){
+          // Clamp al rango [0.15, 3.50] como define el documento (cap.4 ·
+          // validación automática).
+          const raw = num / den;
+          _biasCacheMedComuna[cand.id][com] = Math.max(0.15, Math.min(3.50, raw));
+        }
+      }
+    }
+  }
+
+  function biasForComunaMed(cand, comCod){
+    const cached = _biasCacheMedComuna[cand.id]?.[comCod];
+    if (cached != null && cached > 0) return cached;
+    return 1.0;
+  }
+  function projectedComunaMed(cand, comCod){
+    return cand.pct * biasForComunaMed(cand, comCod);
+  }
+  function computeComunaMedRanking(comCod){
+    const ranked = CANDIDATOS
+      .filter(c => c.id !== 'nd' && c.id !== 'otros')
+      .map(c => ({ c, v: projectedComunaMed(c, comCod) }))
       .filter(x => x.v > 0)
       .sort((a,b) => b.v - a.v);
     if (!ranked.length) return null;
