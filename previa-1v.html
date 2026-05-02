@@ -2985,8 +2985,21 @@
     if (cached != null && cached > 0) return cached;
     return 1.0;
   }
+  // El bias intra-comuna está normalizado para que el promedio ponderado
+  // por potencial dentro de Medellín valga 1.0 — describe sólo la
+  // diferenciación entre comunas, no el "efecto Medellín" sobre el voto
+  // nacional. Para que la proyección a comuna reproduzca el nivel
+  // municipal correcto (p.ej. Paloma en Medellín ≈ 34% por el voto CD
+  // estructural-paisa) hay que componer el bias municipal con el bias
+  // intra-comuna:
+  //
+  //   p(c, com) = pct_nacional(c) × bias_mun(c, '01-001') × bias_intra(c, com)
+  //
+  // Σ_com potencial(com) × bias_intra(c, com) / Σ_com potencial(com) ≈ 1
+  // garantiza que el promedio ponderado en comunas reproduce el nivel
+  // municipal — la consistencia matemática del cap.4 del documento.
   function projectedComunaMed(cand, comCod){
-    return cand.pct * biasForComunaMed(cand, comCod);
+    return cand.pct * biasForMun(cand, '01-001', 'ANTIOQUIA') * biasForComunaMed(cand, comCod);
   }
   function computeComunaMedRanking(comCod){
     const ranked = CANDIDATOS
