@@ -6,7 +6,7 @@
   <title>Previa · Primera Vuelta 2026 · Ricardo Ruiz</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=Arima:wght@400;500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <style>
@@ -316,20 +316,25 @@
     .tc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;margin-bottom:.65rem}
     .tc-head-text{min-width:0;flex:1}
     .tc-name{font-family:'Syne',sans-serif;font-weight:700;font-size:1.05rem;line-height:1.18;color:rgba(255,255,255,.96)}
-    .tc-parents{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-top:.2rem}
+    .tc-parents{font-family:'Arima',sans-serif;font-weight:400;font-size:.74rem;letter-spacing:.04em;color:rgba(255,255,255,.55);margin-top:.2rem}
     .tc-pin{flex-shrink:0;cursor:pointer;background:transparent;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.7);padding:.22rem .48rem;font-family:Avenir,sans-serif;font-size:.7rem;letter-spacing:.04em;border-radius:3px;line-height:1.2;transition:all .15s}
     .tc-pin:hover{background:rgba(0,71,255,.18);border-color:rgba(0,71,255,.55);color:#fff}
     .tc-pin.pinned{background:rgba(0,71,255,.28);border-color:rgba(0,71,255,.7);color:#fff}
     .tc-row{display:flex;align-items:center;gap:.55rem;font-size:.86rem;margin-bottom:.18rem}
-    .tc-row .rank{font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,255,255,.42);width:1.1rem;flex-shrink:0;text-align:center}
+    .tc-row .rank{font-family:'Arima',sans-serif;font-weight:500;font-size:.82rem;color:rgba(255,255,255,.5);width:1.2rem;flex-shrink:0;text-align:center}
     .tc-row .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
     .tc-row .pct{font-variant-numeric:tabular-nums;font-weight:500;color:rgba(255,255,255,.96);flex-shrink:0}
     .tc-bar{height:5px;background:rgba(255,255,255,.06);margin-bottom:.55rem;overflow:hidden}
     .tc-bar-fill{height:100%}
-    .tc-margin{display:flex;justify-content:space-between;margin-top:.45rem;padding-top:.55rem;border-top:1px solid rgba(255,255,255,.08);font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.6)}
+    .tc-margin{display:flex;justify-content:space-between;margin-top:.45rem;padding-top:.55rem;border-top:1px solid rgba(255,255,255,.08);font-family:'Arima',sans-serif;font-weight:500;font-size:.82rem;letter-spacing:.02em;color:rgba(255,255,255,.7)}
     .tc-margin b{color:rgba(255,255,255,.95)}
-    .tc-fuente{margin-top:.55rem;padding-top:.5rem;border-top:1px solid rgba(255,255,255,.06);font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.04em;color:rgba(255,255,255,.42);line-height:1.5}
-    .tc-empty{font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.05em;color:rgba(255,255,255,.4);text-transform:uppercase;padding:.3rem 0}
+    .tc-fuente{margin-top:.55rem;padding-top:.5rem;border-top:1px solid rgba(255,255,255,.06);font-family:'Arima',sans-serif;font-weight:400;font-size:.78rem;letter-spacing:.01em;color:rgba(255,255,255,.5);line-height:1.45}
+    .tc-empty{font-family:'Arima',sans-serif;font-weight:400;font-size:.85rem;color:rgba(255,255,255,.5);padding:.3rem 0}
+    .tc-drill{display:block;width:100%;margin-top:.65rem;padding:.55rem .75rem;background:rgba(0,71,255,.18);border:1px solid rgba(0,71,255,.45);color:#f4f3ef;font-family:Avenir,sans-serif;font-weight:500;font-size:.82rem;letter-spacing:.02em;cursor:pointer;text-align:center;transition:all .15s}
+    .tc-drill:hover{background:rgba(0,71,255,.32);border-color:rgba(0,71,255,.7)}
+    body.day-mode .tc-drill{background:rgba(0,71,255,.1);border-color:rgba(0,71,255,.4);color:rgba(0,0,0,.85)}
+    body.day-mode .tc-drill:hover{background:rgba(0,71,255,.18)}
+    .territory-card.compact .tc-drill{display:none}
     /* Modo compacto (selectedId activo): cintillo de 1-2 filas */
     .territory-card.compact .tc-row{font-size:.78rem;margin-bottom:.12rem}
     .territory-card.compact .tc-bar{height:3px;margin-bottom:.32rem}
@@ -348,6 +353,65 @@
     body.day-mode .tc-pin{border-color:rgba(0,0,0,.2);color:rgba(0,0,0,.7)}
     body.day-mode .tc-pin:hover{background:rgba(0,71,255,.12)}
     body.day-mode .tc-pin.pinned{background:rgba(0,71,255,.18)}
+
+    /* ── MOBILE TWEAKS (<1100px) ─────────────────────────────────
+       En mobile, la mid-col se colapsa al final del flujo y no es
+       inmediatamente visible al tocar el mapa. Por eso convertimos
+       la #territory-card en un bottom-sheet flotante (position:fixed)
+       que aparece sobre el mapa al tocar un territorio, da el detalle
+       completo sin obstruir, y se cierra con drag o tap fuera. */
+    @media (max-width:1099px){
+      /* Mapa: alto razonable para iPhone (≈360px deja espacio al panel) */
+      #leaflet-map{min-height:360px;height:360px}
+      /* Mid-col: la copia "estática" de la tarjeta queda oculta — solo
+         vive como bottom-sheet abajo */
+      #mid-col .territory-card{display:none!important}
+      /* La instancia bottom-sheet se monta al final del body en mobile */
+      .territory-sheet{
+        position:fixed;left:0;right:0;bottom:0;z-index:8000;
+        background:rgba(6,8,16,.98);
+        border-top:1px solid rgba(0,71,255,.45);
+        box-shadow:0 -6px 24px rgba(0,0,0,.45);
+        padding:.85rem 1rem 1rem;
+        max-height:55vh;overflow-y:auto;
+        transform:translateY(100%);transition:transform .22s cubic-bezier(.4,0,.2,1);
+        font-family:Avenir,sans-serif;
+      }
+      .territory-sheet.show{transform:translateY(0)}
+      .territory-sheet .ts-grip{width:36px;height:4px;background:rgba(255,255,255,.25);border-radius:2px;margin:0 auto .65rem}
+      .territory-sheet .tc-head{margin-bottom:.55rem}
+      .territory-sheet .tc-name{font-size:1.1rem}
+      .territory-sheet .tc-parents{font-size:.78rem}
+      .territory-sheet .tc-pin{padding:.4rem .7rem;font-size:.74rem;min-height:36px}
+      .territory-sheet .tc-row{font-size:.92rem;margin-bottom:.22rem;min-height:24px}
+      .territory-sheet .tc-row .rank{font-size:.86rem;width:1.4rem}
+      .territory-sheet .tc-bar{height:6px;margin-bottom:.65rem}
+      .territory-sheet .tc-margin{font-size:.86rem}
+      .territory-sheet .tc-fuente{font-size:.78rem}
+      .territory-sheet .tc-drill{padding:.78rem 1rem;font-size:.92rem;min-height:48px;margin-top:.85rem}
+      .territory-sheet-close{
+        position:absolute;top:.55rem;right:.65rem;
+        width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+        background:transparent;border:none;color:rgba(255,255,255,.55);
+        font-family:Avenir,sans-serif;font-size:1.25rem;line-height:1;cursor:pointer;
+        padding:0;
+      }
+      body.day-mode .territory-sheet{background:rgba(255,255,255,.99);border-top-color:rgba(0,71,255,.4);box-shadow:0 -6px 24px rgba(0,0,0,.18)}
+      body.day-mode .territory-sheet .ts-grip{background:rgba(0,0,0,.25)}
+      body.day-mode .territory-sheet-close{color:rgba(0,0,0,.55)}
+
+      /* Tooltip Leaflet ya no aparece (la sheet lo reemplaza) */
+      .leaflet-dark-tooltip{display:none!important}
+
+      /* Botón "← Depto/Nacional" sobre el mapa: touch-friendly */
+      .map-back-btn{padding:.6rem 1rem;font-size:.78rem;min-height:42px}
+
+      /* Layout: panel de sliders accesible vía botón flotante. La nota
+         al pie del panel se reduce un poco para no inflar el scroll. */
+      .panel{padding-bottom:1.5rem}
+
+      html{scroll-behavior:smooth}
+    }
 
     .map-legend{padding:.2rem 0 .6rem;display:flex;align-items:flex-start;gap:.75rem;flex-wrap:wrap;flex-direction:column}
     /* Chips de candidato en columna central: uno por renglón, alineados.
@@ -1244,6 +1308,12 @@
 
   function onEachFeature(feature, layer){
     const nm = depName(feature.properties);
+    // Code para drill (electoral_id si existe, si no via SENADO_BY_DEPTO)
+    let _drillDepCod = feature.properties.electoral_id || feature.properties.dep_electoral;
+    if (!_drillDepCod){
+      const entry = SENADO_BY_DEPTO[norm(nm)];
+      _drillDepCod = entry?.cod;
+    }
     const payload = {
       scopeKey: 'dep:' + nm,
       level:    'Departamento',
@@ -1252,6 +1322,7 @@
       kind:     'depto',
       args:     { depNom: nm },
       fuente:   `Bias depto · ${_fuentesDisponibles ? _fuentesDisponibles() : 'señales históricas'}`,
+      drillTo:  _drillDepCod ? { label: 'Ver municipios →', kind: 'depto', args: [String(_drillDepCod).padStart(2,'0'), nm] } : null,
     };
     // Tooltip Leaflet sigue presente como fallback en mobile (CSS lo oculta
     // en desktop ≥1100px). En desktop el detalle vive en #territory-card.
@@ -1406,6 +1477,16 @@
     const fuenteMun = hasMunBias
       ? `Bias municipal calibrado · ${_fuentesDisponibles()}`
       : 'Bias hereda del depto (mun sin cobertura en históricos)';
+    // Drill solo si estamos en vista de drill departamental Y el mun es
+    // una ciudad especial con capa de comunas/localidades cargada.
+    let _munDrill = null;
+    if (munKey && !nacionalMunLayer){
+      const [dep, mun] = munKey.split('-');
+      const cfg = detectCity(dep, mun);
+      if (cfg){
+        _munDrill = { label: `Ver ${cfg.kind.toLowerCase()} →`, kind: 'city', args: [dep, mun, depNom, munName] };
+      }
+    }
     const payload = {
       scopeKey: 'mun:' + (munKey || munName),
       level:    'Municipio',
@@ -1414,6 +1495,7 @@
       kind:     'mun',
       args:     { munKey, depNom, hasMunBias },
       fuente:   fuenteMun,
+      drillTo:  _munDrill,
     };
     const tooltipHtmlFn = () => {
       const r = hasMunBias ? computeMunRanking(munKey, depNom) : computeDeptoRanking(depNom);
@@ -1962,9 +2044,14 @@
   }
 
   function _renderTerritoryCard(payload){
-    const card = document.getElementById('territory-card'); if (!card) return;
+    const card = document.getElementById('territory-card');
+    const sheetBody = document.getElementById('territory-sheet-body');
+    const sheet = document.getElementById('territory-sheet');
+    if (!card) return;
     if (!payload){
       card.classList.remove('show'); card.innerHTML = '';
+      if (sheetBody) sheetBody.innerHTML = '';
+      if (sheet) sheet.classList.remove('show');
       _lastTerritoryPayload = null;
       return;
     }
@@ -1972,6 +2059,7 @@
     const compact = !!selectedId;
     card.classList.toggle('compact', compact);
     card.classList.add('show');
+    if (sheet){ sheet.classList.toggle('compact', compact); sheet.classList.add('show'); }
     const ranking = _computeRankingForPayload(payload);
     const total = ranking.reduce((s,x) => s + x.v, 0);
     const isPinned = _territoryPinned === payload.scopeKey;
@@ -2014,7 +2102,10 @@
         }
       }
     }
-    card.innerHTML = `
+    const drillBtn = payload.drillTo
+      ? `<button class="tc-drill" onclick="_drillFromSheet('${payload.drillTo.kind}',${(payload.drillTo.args || []).map(a => `'${String(a).replace(/'/g,'&#39;').replace(/&/g,'&amp;')}'`).join(',')})">${payload.drillTo.label}</button>`
+      : '';
+    const cardHTML = `
       <div class="tc-head">
         <div class="tc-head-text">
           <div class="tc-name">${payload.name}</div>
@@ -2023,8 +2114,41 @@
         <button class="tc-pin ${isPinned ? 'pinned' : ''}" onclick="_toggleTerritoryPin()" title="${isPinned ? 'Soltar (volver a hover)' : 'Fijar este territorio'}">${pinLabel}</button>
       </div>
       ${body}
+      ${drillBtn}
       ${payload.fuente && !compact ? `<div class="tc-fuente">${payload.fuente}</div>` : ''}`;
+    card.innerHTML = cardHTML;
+    if (sheetBody) sheetBody.innerHTML = cardHTML;
   }
+
+  // Drill desde el botón de la tarjeta/sheet. Encapsula las dos vías ya
+  // existentes (drillToDepto + loadCityLayer) para que el usuario en mobile
+  // tenga un CTA claro sin necesidad del double-tap iOS.
+  function _drillFromSheet(kind, ...args){
+    try{
+      if (kind === 'depto'){
+        drillToDepto(args[0], args[1]);
+      } else if (kind === 'city'){
+        const cfg = detectCity(args[0], args[1]);
+        if (cfg) loadCityLayer(cfg, args[2], args[3]);
+      }
+    } finally {
+      _closeTerritorySheet();
+    }
+  }
+  window._drillFromSheet = _drillFromSheet;
+
+  // Cierre manual del bottom-sheet en mobile (también limpia hover/pin para
+  // que no reaparezca al primer mousemove sobre el mapa).
+  function _closeTerritorySheet(){
+    const sheet = document.getElementById('territory-sheet');
+    const card  = document.getElementById('territory-card');
+    if (sheet) sheet.classList.remove('show');
+    if (card)  card.classList.remove('show');
+    _territoryHovered = null;
+    _territoryPinned  = null;
+    _lastTerritoryPayload = null;
+  }
+  window._closeTerritorySheet = _closeTerritorySheet;
 
   // Wrapper que respeta el estado de pin: si está pinned, NO actualiza la
   // tarjeta (solo mueve el chip). Llamado desde los 3 mouseover handlers.
@@ -3314,5 +3438,12 @@
   })();
 </script>
 <div id="hover-chip" class="hover-chip" aria-hidden="true"></div>
+<!-- Bottom-sheet: solo visible en mobile (<1100px). Duplica el contenido de
+     #territory-card pero como overlay flotante sobre el mapa. -->
+<div id="territory-sheet" class="territory-sheet" aria-hidden="true">
+  <div class="ts-grip"></div>
+  <button class="territory-sheet-close" onclick="_closeTerritorySheet()" aria-label="Cerrar">×</button>
+  <div id="territory-sheet-body"></div>
+</div>
 </body>
 </html>
