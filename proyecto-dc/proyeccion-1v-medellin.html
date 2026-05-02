@@ -1159,13 +1159,20 @@
   // un layout flex que cambia de altura mientras carga (bug clásico Leaflet).
   const MED_CENTER = [6.247, -75.575];
   const MED_ZOOM = 11.6;
+  const MED_OFFSET_DESKTOP_X = 0.09;  // 9% del ancho del mapa, sólo desktop
 
   async function initMap(){
     map = L.map('leaflet-map', {
-      zoomControl: true, attributionControl: false,
-      touchZoom: true, dragging: true, tap: true,
-      doubleClickZoom: true, scrollWheelZoom: false, keyboard: false,
-      zoomSnap: 0.1, zoomDelta: 0.5,   // permite zoom fraccional (default 1)
+      zoomControl: false,           // sin botones +/- (usuario no necesita zoom)
+      attributionControl: false,
+      dragging: false,              // sin pan: el mapa es solo visual
+      touchZoom: false,
+      doubleClickZoom: false,
+      boxZoom: false,
+      scrollWheelZoom: false,       // ya estaba: evita capturar el scroll de la página
+      keyboard: false,
+      tap: true,                    // mantenemos tap para que el click en comunas funcione en móvil
+      zoomSnap: 0.1,                // zoom fraccional (necesario para 11.6)
     }).setView(MED_CENTER, MED_ZOOM);
     showMapLoading('Cargando mapa de Medellín…');
     try{
@@ -1178,10 +1185,17 @@
       // Reposicionamos al centro/zoom hardcoded en varios momentos del ciclo
       // de layout. Esto sortea el bug Leaflet donde fitBounds queda mal
       // alineado si el contenedor flex aún no llegó a su altura final.
+      // En desktop, después del setView corremos la vista ~9% a la izquierda
+      // (panBy con dx negativo) para que el polígono aparezca desplazado a
+      // la derecha del map-col. En mobile no aplica (mapa ocupa ancho full).
       const settle = () => {
         if (!map) return;
         map.invalidateSize({ animate:false });
         map.setView(MED_CENTER, MED_ZOOM, { animate:false });
+        if (window.innerWidth >= 1100){
+          const dx = -Math.round(map.getSize().x * MED_OFFSET_DESKTOP_X);
+          map.panBy([dx, 0], { animate:false });
+        }
       };
       requestAnimationFrame(() => requestAnimationFrame(settle));
       setTimeout(settle, 250);
