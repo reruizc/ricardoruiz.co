@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Proyección 1ª vuelta · Comunas de Medellín · Proyecto DC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=Arima:wght@400;500;700&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    :root {
+      --bg: #f4f3ef; --bg2: #eeedea;
+      --surface: #ffffff; --surface2: #f0efe9;
+      --border: rgba(0,0,0,0.07); --border2: rgba(0,0,0,0.12);
+      --text: #0a0a0a; --text2: #555; --text3: #999;
+      --purple: #7c3aed; --purple-dim: rgba(124,58,237,0.10);
+      --warn: #f0c040;
+    }
+    [data-theme="dark"] {
+      --bg: #060810; --bg2: #0a0c14;
+      --surface: #0f1018; --surface2: #13151f;
+      --border: rgba(255,255,255,0.06); --border2: rgba(255,255,255,0.12);
+      --text: #f4f3ef; --text2: #888; --text3: #444;
+      --purple: #a78bfa; --purple-dim: rgba(167,139,250,0.14);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: Avenir, sans-serif;
+      min-height: 100vh; cursor: none;
+      overflow-x: hidden;
+      transition: background 0.4s, color 0.4s;
+    }
+
+    /* GATE */
+    .gate { position: fixed; inset: 0; z-index: 5000; background: var(--bg); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 1rem; }
+    .gate-text { font-family: 'DM Mono', monospace; font-size: .82rem; letter-spacing: .12em; text-transform: uppercase; color: var(--text2); }
+    .gate-bar { width: 120px; height: 1px; background: var(--border); position: relative; overflow: hidden; }
+    .gate-bar::after { content: ''; position: absolute; inset: 0; background: var(--purple); animation: gate-slide 1.4s ease-in-out infinite; }
+    @keyframes gate-slide { 0%{transform:translateX(-100%)} 50%{transform:translateX(0)} 100%{transform:translateX(100%)} }
+
+    /* CURSOR */
+    .cursor { position:fixed; width:12px; height:12px; background:var(--purple); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s ease,background .2s; transform:translate(-50%,-50%); }
+    .cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--purple); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s ease,opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+
+    /* NAV */
+    nav.top { position: fixed; top:0; left:0; right:0; z-index:100; display: flex; align-items:center; justify-content:space-between; padding: .9rem 2.5rem; background: var(--bg); border-bottom: 1px solid var(--border); backdrop-filter: blur(12px); }
+    .nav-left { display:flex; align-items:center; gap:1rem; }
+    .nav-right { display:flex; align-items:center; gap:1.2rem; }
+    .e-btn-back { font-family:'Syne',sans-serif; font-size:.78rem; letter-spacing:.08em; text-transform:uppercase; color:var(--text2); text-decoration:none; border:1.5px solid var(--border); padding:.3rem .8rem; transition:color .2s,border-color .2s; }
+    .e-btn-back:hover { color:var(--text); border-color:var(--text2); }
+    .private-badge { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.18em; text-transform:uppercase; color: var(--purple); background: var(--purple-dim); padding:.32rem .7rem; border:1px solid var(--purple-dim); }
+    .logo-link { display:flex; align-items:center; gap:.55rem; text-decoration:none; opacity:.85; }
+    .logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
+    .logo-bar { width:5px; background:var(--purple); border-radius:1px 1px 0 0; }
+    .logo-text { font-family:'Syne',sans-serif; font-weight:800; font-size:1.3rem; letter-spacing:-.03em; color:var(--text); }
+    .logo-text span { color:var(--purple); }
+    .theme-btn { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.1em; text-transform:uppercase; color:var(--text2); background:transparent; border:1px solid var(--border); padding:.3rem .65rem; cursor:none; transition:all .2s; }
+    .theme-btn:hover { color:var(--text); border-color:var(--text2); }
+
+    /* WRAP */
+    main.wrap { max-width: 1400px; margin: 0 auto; padding: 6rem 2.5rem 2.5rem; }
+
+    /* HERO */
+    .hero { margin-bottom: 1.6rem; padding-bottom: 1.4rem; border-bottom: 1px solid var(--border); }
+    .hero-eyebrow { font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.18em; text-transform:uppercase; color:var(--purple); margin-bottom:.6rem; }
+    .hero-title { font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(1.7rem,3.2vw,2.8rem); line-height:1.05; letter-spacing:-.02em; }
+    .hero-sub { font-family:'Arima',sans-serif; font-weight:400; font-size:1.02rem; color:var(--text2); margin-top:.7rem; max-width:800px; line-height:1.55; }
+
+    /* NOTICE BANNER */
+    .notice { font-family:'Arima',sans-serif; font-weight:400; font-size:.92rem; color:var(--text2); background:rgba(240,192,64,0.08); border:1px solid rgba(240,192,64,0.32); padding:.7rem 1rem; margin-top:1rem; line-height:1.5; }
+    .notice b { color:var(--text); font-weight:700; }
+
+    /* SHELL: 3 columnas en desktop, mapa | mid-col | panel */
+    .shell { display: grid; grid-template-columns: 1fr 360px 360px; gap: 1rem; min-height: 560px; margin-top: 1.6rem; }
+    @media (max-width:1280px){ .shell{grid-template-columns: 1fr 320px 320px} }
+    @media (max-width:1100px){ .shell{grid-template-columns: 1fr; gap: .8rem} }
+
+    /* MAP */
+    .map-col { display:flex; flex-direction:column; min-height: 0; position: relative; }
+    .map-head { display:flex; justify-content:space-between; align-items:flex-start; gap:.7rem; padding:.4rem 0 .65rem; border-bottom:1px solid var(--border); margin-bottom:.6rem; flex-wrap:wrap; }
+    .map-head-label { font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.12em; text-transform:uppercase; color:var(--text2); }
+    .map-head-cand { font-family:'Syne',sans-serif; font-weight:700; font-size:1.05rem; letter-spacing:-.01em; margin-top:.15rem; color:var(--text); }
+    .map-head-pct { font-family:Avenir,sans-serif; font-weight:500; font-size:.9rem; color:var(--text2); }
+    #leaflet-map { flex:1; min-height: 520px; background: var(--bg2); border:1px solid var(--border); }
+    .leaflet-container { background: var(--bg2)!important; }
+    .leaflet-tile-pane { display:none; }
+    .leaflet-control-attribution { display:none!important; }
+    .leaflet-control-zoom a { background: var(--surface)!important; color: var(--text)!important; border-color: var(--border)!important; }
+    .leaflet-control-zoom a:hover { background: var(--purple-dim)!important; }
+    .leaflet-dark-tooltip { background: var(--surface)!important; border:1px solid var(--purple)!important; color: var(--text)!important; font-family:Avenir,sans-serif!important; font-size:.8rem!important; padding:.5rem .7rem!important; border-radius:0!important; box-shadow: 0 2px 12px rgba(0,0,0,.18); }
+    .leaflet-dark-tooltip:before { display:none!important; }
+    @media (min-width:1100px){ .leaflet-dark-tooltip{display:none!important} }
+
+    .map-loading { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.12em; text-transform:uppercase; color:var(--text2); display:none; }
+    .map-loading.show { display:block; }
+
+    /* HOVER CHIP */
+    .hover-chip { position:fixed; z-index:9000; pointer-events:none; display:none; background:var(--surface); color:var(--text); font-family:Avenir,sans-serif; font-weight:500; font-size:.74rem; padding:.3rem .55rem; border:1px solid var(--purple); letter-spacing:.02em; box-shadow:0 2px 10px rgba(0,0,0,.18); transform:translate(14px,18px); }
+    .hover-chip.show { display:flex; align-items:center; gap:.42rem; }
+    .hover-chip .hc-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; display:inline-block; }
+    .hover-chip .hc-name { white-space:nowrap; }
+    @media (max-width:1099px){ .hover-chip{display:none!important} }
+
+    /* MID-COL: leyenda + tarjeta */
+    .mid-col { display:flex; flex-direction:column; gap:.4rem; padding-left:.4rem; border-left:1px solid var(--border); padding-top:.4rem; }
+    @media (max-width:1100px){ .mid-col{border-left:none; padding-left:0} }
+    .map-legend { padding:.2rem 0 .6rem; display:flex; align-items:flex-start; gap:.75rem; flex-wrap:wrap; flex-direction:column; }
+    .map-legend-title { font-family:Avenir,sans-serif; font-weight:500; font-size:.7rem; letter-spacing:.12em; text-transform:uppercase; color:var(--text2); }
+    .pond-legend { display:flex; flex-direction:column; gap:.55rem; margin-top:.4rem; width:100%; }
+    .pond-chip { width:100%; display:flex; align-items:center; gap:.55rem; line-height:1.25; font-family:Avenir,sans-serif; font-weight:400; font-size:.95rem; color:var(--text); }
+    .pond-chip .dot { flex-shrink:0; width:9px; height:9px; border-radius:50%; }
+    .pond-chip-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .pond-chip-vals { flex-shrink:0; font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--text2); }
+    .pond-chip-vals b { color:var(--text); font-weight:500; }
+
+    /* TERRITORY CARD */
+    .territory-card { display:none; margin-top:1.1rem; padding:.95rem 0 .2rem; border-top:1px solid var(--border); font-family:Avenir,sans-serif; }
+    .territory-card.show { display:block; }
+    .territory-card.compact { margin-top:.7rem; padding-top:.7rem; }
+    .tc-head { display:flex; justify-content:space-between; align-items:flex-start; gap:.5rem; margin-bottom:.65rem; }
+    .tc-head-text { min-width:0; flex:1; }
+    .tc-name { font-family:'Syne',sans-serif; font-weight:700; font-size:1.05rem; line-height:1.18; color:var(--text); }
+    .tc-parents { font-family:'Arima',sans-serif; font-weight:400; font-size:.74rem; letter-spacing:.04em; color:var(--text2); margin-top:.2rem; }
+    .tc-pin { flex-shrink:0; cursor:none; background:transparent; border:1px solid var(--border2); color:var(--text2); padding:.22rem .48rem; font-family:Avenir,sans-serif; font-size:.7rem; letter-spacing:.04em; border-radius:3px; line-height:1.2; transition:all .15s; }
+    .tc-pin:hover { background:var(--purple-dim); border-color:var(--purple); color:var(--text); }
+    .tc-pin.pinned { background:var(--purple-dim); border-color:var(--purple); color:var(--text); }
+    .tc-row { display:flex; align-items:center; gap:.55rem; font-size:.86rem; margin-bottom:.18rem; color:var(--text); }
+    .tc-row .rank { font-family:'Arima',sans-serif; font-weight:500; font-size:.82rem; color:var(--text3); width:1.2rem; flex-shrink:0; text-align:center; }
+    .tc-row .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500; }
+    .tc-row .pct { font-variant-numeric:tabular-nums; font-weight:500; color:var(--text); flex-shrink:0; }
+    .tc-bar { height:5px; background:var(--bg2); margin-bottom:.55rem; overflow:hidden; }
+    .tc-bar-fill { height:100%; }
+    .tc-margin { display:flex; justify-content:space-between; margin-top:.45rem; padding-top:.55rem; border-top:1px solid var(--border); font-family:'Arima',sans-serif; font-weight:500; font-size:.82rem; letter-spacing:.02em; color:var(--text2); }
+    .tc-margin b { color:var(--text); font-weight:700; }
+    .tc-fuente { margin-top:.55rem; padding-top:.5rem; border-top:1px solid var(--border); font-family:'Arima',sans-serif; font-weight:400; font-size:.78rem; letter-spacing:.01em; color:var(--text2); line-height:1.45; }
+    .tc-empty { font-family:'Arima',sans-serif; font-weight:400; font-size:.85rem; color:var(--text2); padding:.3rem 0; }
+    .territory-card.compact .tc-row { font-size:.78rem; margin-bottom:.12rem; }
+    .territory-card.compact .tc-bar { height:3px; margin-bottom:.32rem; }
+    .territory-card.compact .tc-fuente { display:none; }
+    .territory-card.compact .tc-name { font-size:.94rem; }
+
+    /* PANEL DE SLIDERS */
+    .panel { padding:0; position:relative; padding-top:.4rem; border-left:1px solid var(--border); padding-left:1rem; }
+    @media (max-width:1100px){ .panel{border-left:none; padding-left:0} }
+    .panel-head { display:flex; align-items:center; justify-content:space-between; gap:.7rem; flex-wrap:wrap; padding:.4rem 0 .75rem; border-bottom:1px solid var(--border); margin-bottom:.6rem; }
+    .panel-title { font-family:Avenir,sans-serif; font-weight:500; font-size:.7rem; letter-spacing:.15em; text-transform:uppercase; color:var(--text2); flex:1; min-width:0; }
+    .btn { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.1em; text-transform:uppercase; padding:.3rem .65rem; border:1px solid var(--border2); background:transparent; color:var(--text2); cursor:none; transition:all .15s; }
+    .btn:hover { color:var(--text); border-color:var(--text2); }
+    #cand-list { display:flex; flex-direction:column; gap:.55rem; }
+    .cand-row { display:flex; align-items:center; gap:.65rem; padding:.45rem 0; border-bottom:1px solid var(--border); }
+    .cand-photo { width:38px; height:38px; border-radius:50%; flex-shrink:0; overflow:hidden; background:var(--bg2); border:1.5px solid; }
+    .cand-photo img { width:100%; height:100%; object-fit:cover; }
+    .cand-body { flex:1; min-width:0; }
+    .cand-meta { display:flex; justify-content:space-between; align-items:baseline; }
+    .cand-name { font-family:'Syne',sans-serif; font-weight:500; font-size:.88rem; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .cand-pct { font-family:Avenir,sans-serif; font-variant-numeric:tabular-nums; font-weight:500; font-size:.92rem; color:var(--text); }
+    .cand-slider { width:100%; -webkit-appearance:none; height:3px; background:var(--border2); outline:none; margin-top:.35rem; cursor:none; }
+    .cand-slider::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; cursor:none; }
+    .cand-slider::-moz-range-thumb { width:14px; height:14px; border-radius:50%; cursor:none; border:none; }
+    .note { margin-top:1rem; padding:.8rem; background:rgba(240,192,64,0.08); border:1px solid rgba(240,192,64,0.22); color:var(--text2); font-family:'Arima',sans-serif; font-weight:400; font-size:.82rem; line-height:1.55; }
+
+    /* FOOT */
+    .foot { padding:1.6rem 2.5rem; border-top: 1px solid var(--border); margin-top: 2rem; font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.1em; text-transform:uppercase; color:var(--text2); text-align:center; }
+
+    /* ── MOBILE TWEAKS (<1100px) ────────────────────────────────── */
+    @media (max-width:1099px){
+      main.wrap { padding: 5.2rem 1rem 2rem; }
+      nav.top { padding: .75rem 1rem; }
+      #leaflet-map { min-height:360px; height:360px; }
+      #mid-col .territory-card { display:none!important; }
+      .territory-sheet { position:fixed; left:0; right:0; bottom:0; z-index:8000; background:var(--surface); border-top:1px solid var(--purple); box-shadow:0 -6px 24px rgba(0,0,0,.18); padding:.85rem 1rem 1rem; max-height:55vh; overflow-y:auto; transform:translateY(100%); transition:transform .22s cubic-bezier(.4,0,.2,1); font-family:Avenir,sans-serif; }
+      .territory-sheet.show { transform:translateY(0); }
+      .territory-sheet .ts-grip { width:36px; height:4px; background:var(--border2); border-radius:2px; margin:0 auto .65rem; }
+      .territory-sheet .tc-head { margin-bottom:.55rem; }
+      .territory-sheet .tc-name { font-size:1.1rem; }
+      .territory-sheet .tc-parents { font-size:.78rem; }
+      .territory-sheet .tc-pin { padding:.4rem .7rem; font-size:.74rem; min-height:36px; }
+      .territory-sheet .tc-row { font-size:.92rem; margin-bottom:.22rem; min-height:24px; }
+      .territory-sheet .tc-row .rank { font-size:.86rem; width:1.4rem; }
+      .territory-sheet .tc-bar { height:6px; margin-bottom:.65rem; }
+      .territory-sheet .tc-margin { font-size:.86rem; }
+      .territory-sheet .tc-fuente { font-size:.78rem; }
+      .territory-sheet-close { position:absolute; top:.55rem; right:.65rem; width:32px; height:32px; display:flex; align-items:center; justify-content:center; background:transparent; border:none; color:var(--text2); font-family:Avenir,sans-serif; font-size:1.25rem; line-height:1; cursor:none; padding:0; }
+
+      /* Panel drawer */
+      .panel { position:fixed; left:0; right:0; bottom:0; top:auto; max-height:78vh; overflow-y:auto; z-index:7500; background:var(--surface); border-top:1px solid var(--purple); box-shadow:0 -8px 28px rgba(0,0,0,.18); transform:translateY(100%); transition:transform .25s cubic-bezier(.4,0,.2,1); padding:1rem 1rem 1.6rem; }
+      .panel.open { transform:translateY(0); }
+      .panel-close-mobile { display:flex; align-items:center; justify-content:center; position:absolute; top:.6rem; right:.7rem; width:36px; height:36px; background:transparent; border:none; color:var(--text2); font-size:1.4rem; line-height:1; cursor:none; padding:0; }
+      .panel-grip { width:36px; height:4px; background:var(--border2); border-radius:2px; margin:0 auto .6rem; }
+      .panel-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:7400; display:none; }
+      .panel-backdrop.show { display:block; }
+      .ponderador-fab { position:fixed; right:1rem; bottom:1rem; z-index:7000; display:flex; align-items:center; gap:.45rem; background:var(--purple); color:#fff; border:none; font-family:Avenir,sans-serif; font-weight:600; font-size:.85rem; letter-spacing:.02em; padding:.85rem 1.15rem; border-radius:999px; box-shadow:0 6px 18px rgba(124,58,237,.45); cursor:none; min-height:48px; transition:transform .15s; }
+      .ponderador-fab:active { transform:scale(.96); }
+      .ponderador-fab.hidden { display:none; }
+      [data-theme="dark"] .ponderador-fab { box-shadow: 0 6px 18px rgba(167,139,250,.4); }
+    }
+    @media (min-width:1100px){
+      .panel-close-mobile, .panel-grip, .panel-backdrop, .ponderador-fab, .territory-sheet { display:none!important; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- GATE -->
+<div class="gate" id="gate">
+  <div class="gate-text">Verificando acceso</div>
+  <div class="gate-bar"></div>
+</div>
+
+<!-- CURSOR -->
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- NAV -->
+<nav class="top" id="topNav" hidden>
+  <div class="nav-left">
+    <a href="../proyecto-dc.html" class="e-btn-back">← Proyecto DC</a>
+    <span class="private-badge">Privado</span>
+  </div>
+  <div class="nav-right">
+    <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">Tema</button>
+    <a href="../index.html" class="logo-link">
+      <div class="logo-bars"><div class="logo-bar" style="height:11px"></div><div class="logo-bar" style="height:15px"></div><div class="logo-bar" style="height:8px"></div></div>
+      <div class="logo-text">RICARDO<span>.RUIZ</span></div>
+    </a>
+  </div>
+</nav>
+
+<main class="wrap" id="main" hidden>
+  <header class="hero">
+    <div class="hero-eyebrow">Módulo 10 · Proyección electoral</div>
+    <h1 class="hero-title">Proyección 1ª vuelta · Comunas de Medellín.</h1>
+    <p class="hero-sub">Modelo proporcional multiplicativo (cap. 4 del documento metodológico v2.0) calibrado a nivel comuna con presidenciales 2010–2022, alcaldía y concejo 2015/2019/2023, Senado y Cámara 2026, consulta Pacto 2025 y consultas marzo 2026. Mueve los deslizadores de intención de voto nacional para reproyectar las 16 comunas en tiempo real.</p>
+    <div class="notice">
+      <b>Heredado.</b> El ponderador de intención de voto nacional se sincroniza con el de la página pública <code>previa-1v.html</code> vía <code>ponderador-actual.json</code>. Cuando se actualice, este módulo se actualizará automáticamente.
+    </div>
+  </header>
+
+  <div class="shell">
+    <div class="map-col">
+      <div class="map-head">
+        <div>
+          <div class="map-head-label" id="map-head-label">Medellín · 16 comunas + 5 corregimientos</div>
+          <div class="map-head-cand" id="map-head-cand">Ganador por comuna</div>
+          <div class="map-head-pct" id="map-head-pct">Bias intra-comuna calibrado</div>
+        </div>
+      </div>
+      <div id="leaflet-map">
+        <div class="map-loading" id="map-loading">Cargando mapa…</div>
+      </div>
+    </div>
+
+    <div class="mid-col" id="mid-col">
+      <div class="map-legend" id="map-legend"></div>
+      <div class="territory-card" id="territory-card" aria-live="polite"></div>
+    </div>
+
+    <aside class="panel" id="panel">
+      <button class="panel-close-mobile" onclick="_closePanelDrawer()" aria-label="Cerrar panel">×</button>
+      <div class="panel-grip" aria-hidden="true"></div>
+      <div class="panel-head">
+        <div class="panel-title">Intención de voto · mover el deslizador</div>
+        <button class="btn" onclick="resetSim()">Restablecer</button>
+      </div>
+      <div id="cand-list"></div>
+      <div class="note">
+        Bias por comuna calibrado con: presidenciales 1V 2010/2014/2018/2022, alcaldía Medellín 2015/2019/2023, concejo 2015/2019/2023, Senado y Cámara 2026, consulta Pacto Histórico 2025, consultas marzo 2026 (gran/frente/soluciones). Equivalencias por candidato editables en el código fuente.
+      </div>
+    </aside>
+  </div>
+</main>
+
+<div id="hover-chip" class="hover-chip" aria-hidden="true"></div>
+<div id="territory-sheet" class="territory-sheet" aria-hidden="true">
+  <div class="ts-grip"></div>
+  <button class="territory-sheet-close" onclick="_closeTerritorySheet()" aria-label="Cerrar">×</button>
+  <div id="territory-sheet-body"></div>
+</div>
+<div id="panel-backdrop" class="panel-backdrop" onclick="_closePanelDrawer()" aria-hidden="true"></div>
+<button id="ponderador-fab" class="ponderador-fab" onclick="_openPanelDrawer()" aria-label="Ajustar ponderadores">
+  <span>🎚</span><span>Ajustar ponderadores</span>
+</button>
+
+<script>
+  // ════════════════════════════════════════════════════════════════
+  // GATE: verificación de email contra worker auth + whitelist
+  // ════════════════════════════════════════════════════════════════
+  const ALLOWED = ['reruizc@gmail.com', 'nuevagemela@gmail.com'];
+  function emailAllowed(em){ return ALLOWED.map(e=>e.toLowerCase()).includes(String(em||'').toLowerCase().trim()); }
+  function denyToLogin(){ try{ localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); }catch(e){} window.location.replace('../login.html'); }
+  function denyToDashboard(){ window.location.replace('../dashboard.html'); }
+
+  (async function gate(){
+    try{
+      const userRaw = localStorage.getItem('rr-user');
+      const token = localStorage.getItem('rr-token');
+      if (!userRaw || !token){ denyToLogin(); return; }
+      const user = JSON.parse(userRaw);
+      if (!emailAllowed(user?.email)){ denyToDashboard(); return; }
+      // verificación remota
+      const res = await fetch('https://rr-auth.reruizc.workers.dev/auth/me', { headers: { Authorization: 'Bearer ' + token } });
+      if (!res.ok){ denyToLogin(); return; }
+      const me = await res.json();
+      if (!emailAllowed(me?.email || user.email)){ denyToDashboard(); return; }
+      revealPage();
+    } catch(e){ denyToLogin(); }
+  })();
+
+  function revealPage(){
+    document.getElementById('gate')?.remove();
+    document.getElementById('topNav').hidden = false;
+    document.getElementById('main').hidden = false;
+    initTheme();
+    initCursor();
+    boot();
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // THEME
+  // ════════════════════════════════════════════════════════════════
+  function initTheme(){
+    let t = localStorage.getItem('rr-theme');
+    if (!t){ const h = new Date().getHours(); t = (h>=7 && h<19) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }
+  function toggleTheme(){
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('rr-theme', next); } catch(e){}
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // CURSOR custom (purple)
+  // ════════════════════════════════════════════════════════════════
+  function initCursor(){
+    const c = document.getElementById('cursor');
+    const r = document.getElementById('cursorRing');
+    if (!c || !r) return;
+    document.addEventListener('mousemove', e => {
+      c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px';
+      r.style.left = e.clientX + 'px'; r.style.top = e.clientY + 'px';
+    });
+    document.addEventListener('mouseover', e => {
+      const t = e.target;
+      if (t.closest('a,button,input,.cand-slider,.tc-pin,.pond-chip,.ponderador-fab,.leaflet-interactive')){
+        c.style.transform = 'translate(-50%,-50%) scale(.5)';
+        r.style.transform = 'translate(-50%,-50%) scale(1.4)';
+        r.style.opacity = '.7';
+      } else {
+        c.style.transform = 'translate(-50%,-50%) scale(1)';
+        r.style.transform = 'translate(-50%,-50%) scale(1)';
+        r.style.opacity = '.4';
+      }
+    });
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // CONFIG, CANDIDATOS, EQUIVALENCIAS — copiados/adaptados de previa-1v
+  // ════════════════════════════════════════════════════════════════
+  const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
+  const PONDERADOR_URL = '../ponderador-actual.json';
+  const MEDELLINX_URL = `${S3}/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`;
+  const MED_S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_medellin';
+
+  // Defaults (sobrescritos por ponderador-actual.json)
+  let CANDIDATOS = [
+    { id:'ic', nombre:'Iván Cepeda',          partido:'Pacto Histórico',         color:'#51458F', pct:37.0, foto:`${S3}/Fotos-presidenciales/IVAN+CEPEDA.jpg` },
+    { id:'ae', nombre:'Abelardo de la Espriella', partido:'Mov. Salvación Nacional', color:'#000062', pct:23.0, foto:`${S3}/Fotos-presidenciales/abelardo.jpg` },
+    { id:'pv', nombre:'Paloma Valencia',      partido:'Centro Democrático',      color:'#1866DF', pct:20.0, foto:`${S3}/Fotos-presidenciales/PALOMA+VALENCIA.jpg` },
+    { id:'sf', nombre:'Sergio Fajardo',       partido:'Dignidad y Compromiso',   color:'#EEAA22', pct:4.5,  foto:'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/SergioFajardo.jpg/240px-SergioFajardo.jpg' },
+    { id:'cl', nombre:'Claudia López',        partido:'Independiente',           color:'#d9db24', pct:2.0,  foto:'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cf/Claudia_Lopez_H_26.jpg/240px-Claudia_Lopez_H_26.jpg' },
+    { id:'rb', nombre:'Roy Barreras',         partido:'Frente Amplio Unitario',  color:'#F01E14', pct:1.0,  foto:'' },
+    { id:'lm', nombre:'Luis Gilberto Murillo', partido:'Independiente',          color:'#16a34a', pct:1.2,  foto:'' },
+    { id:'otros', nombre:'Otros (<2%)',       partido:'Candidatos residuales',   color:'#94a3b8', pct:5.6,  foto:'' },
+    { id:'nd', nombre:'Blanco / NS-NR',       partido:'Indecisos',               color:'#64748b', pct:5.0,  foto:'' },
+  ];
+  const RESIDUAL_IDS = ['sb','mul','cc','ml','clp','sm']; // se suman a 'otros' del ponderador
+
+  // Equivalencias por comuna Medellín (idénticas a previa-1v.html)
+  const MED_SIGNALS = {
+    'pres-2010-mde':              { url: `${MED_S3}/historicos-comuna/pres-2010/por-comuna.json`,           type: 'cands',    wrapper: 'por_comuna' },
+    'pres-2014-mde':              { url: `${MED_S3}/historicos-comuna/pres-2014/por-comuna.json`,           type: 'cands',    wrapper: 'por_comuna' },
+    'pres-2018-mde':              { url: `${MED_S3}/historicos-comuna/pres-2018/por-comuna.json`,           type: 'cands',    wrapper: 'por_comuna' },
+    'pres-2022-mde':              { url: `${MED_S3}/historicos-comuna/pres-2022/por-comuna.json`,           type: 'cands',    wrapper: 'por_comuna' },
+    'consulta-2025-pacto-mde':    { url: `${MED_S3}/historicos-comuna/consulta-2025-pacto/por-comuna.json`, type: 'cands',    wrapper: 'por_comuna' },
+    'alc-2015-mde':               { url: `${MED_S3}/2015/alcaldia/por-comuna.json`,                          type: 'cands',    wrapper: null },
+    'concejo-2015-mde':           { url: `${MED_S3}/2015/concejo/por-comuna.json`,                           type: 'partidos', wrapper: null },
+    'alc-2019-mde':               { url: `${MED_S3}/2019/alcaldia/por-comuna.json`,                          type: 'cands',    wrapper: null },
+    'concejo-2019-mde':           { url: `${MED_S3}/2019/concejo/por-comuna.json`,                           type: 'partidos', wrapper: null },
+    'alc-2023-mde':               { url: `${MED_S3}/2023/alcaldia/por-comuna.json`,                          type: 'cands',    wrapper: null },
+    'concejo-2023-mde':           { url: `${MED_S3}/2023/concejo/por-comuna.json`,                           type: 'partidos', wrapper: null },
+    'senado-2026-mde':            { url: `${MED_S3}/2026/senado/por-comuna.json`,                            type: 'partidos', wrapper: 'por_comuna' },
+    'camara-2026-mde':            { url: `${MED_S3}/2026/camara/por-comuna.json`,                            type: 'partidos', wrapper: 'por_comuna' },
+    'consulta-2026-gran-mde':     { url: `${MED_S3}/2026/consultas/por-comuna.json`, type: 'consulta', wrapper: 'por_comuna', slug: 'gran' },
+    'consulta-2026-frente-mde':   { url: `${MED_S3}/2026/consultas/por-comuna.json`, type: 'consulta', wrapper: 'por_comuna', slug: 'frente' },
+    'consulta-2026-soluciones-mde':{ url: `${MED_S3}/2026/consultas/por-comuna.json`, type: 'consulta', wrapper: 'por_comuna', slug: 'soluciones' },
+  };
+  const EQUIVALENCIAS_MED_COMUNA = {
+    'ic': {
+      'consulta-2025-pacto-mde':    { cands: ['IVAN CEPEDA CASTRO'], peso: 0.22 },
+      'consulta-2026-frente-mde':   { cands: ['DANIEL QUINTERO CALLE'], peso: 0.08 },
+      'senado-2026-mde':            { partidos: ['PACTO HISTÓRICO SENADO'], peso: 0.12 },
+      'camara-2026-mde':            { partidos: ['PACTO HISTÓRICO ANTIOQUIA'], peso: 0.14 },
+      'pres-2022-mde':              { cands: ['GUSTAVO PETRO'], peso: 0.14 },
+      'pres-2018-mde':              { cands: ['GUSTAVO PETRO'], peso: 0.08 },
+      'alc-2019-mde':               { cands: ['DANIEL QUINTERO CALLE'], peso: 0.16 },
+      'concejo-2023-mde':           { partidos: ['JUNTOS'], peso: 0.03 },
+      'concejo-2019-mde':           { partidos: ['PARTIDO ALIANZA VERDE'], peso: 0.02 },
+      'pres-2014-mde':              { cands: ['CLARA LOPEZ'], peso: 0.01 },
+    },
+    'pv': {
+      'consulta-2026-gran-mde':     { cands: ['PALOMA SUSANA VALENCIA LASERNA'], peso: 0.30 },
+      'senado-2026-mde':            { partidos: ['PARTIDO CENTRO DEMOCRÁTICO'], peso: 0.15 },
+      'camara-2026-mde':            { partidos: ['PARTIDO CENTRO DEMOCRÁTICO'], peso: 0.10 },
+      'alc-2023-mde':               { cands: ['FEDERICO ANDRES GUTIERREZ ZULUAGA'], peso: 0.12 },
+      'alc-2015-mde':               { cands: ['FEDERICO ANDRES GUTIERREZ ZULUAGA'], peso: 0.08 },
+      'concejo-2023-mde':           { partidos: ['INDEPENDIENTES'], peso: 0.06 },
+      'pres-2018-mde':              { cands: ['IVAN DUQUE'], peso: 0.08 },
+      'pres-2022-mde':              { cands: ['FEDERICO GUTIERREZ', 'RODOLFO HERNANDEZ'], peso: 0.06 },
+      'pres-2014-mde':              { cands: ['OSCAR IVAN ZULUAGA'], peso: 0.03 },
+      'pres-2010-mde':              { cands: ['JUAN MANUEL SANTOS CALDERON'], peso: 0.02 },
+    },
+    'rb': {
+      'consulta-2026-frente-mde':   { cands: ['ROY LEONARDO BARRERAS MONTEALEGRE'], peso: 0.30 },
+      'senado-2026-mde':            { partidos: ['FRENTE AMPLIO UNITARIO'], peso: 0.15 },
+      'camara-2026-mde':            { partidos: ['FRENTE AMPLIO UNITARIO'], peso: 0.10 },
+      'pres-2022-mde':              { cands: ['GUSTAVO PETRO'], peso: 0.15 },
+      'pres-2018-mde':              { cands: ['GUSTAVO PETRO'], peso: 0.10 },
+      'alc-2019-mde':               { cands: ['DANIEL QUINTERO CALLE'], peso: 0.10 },
+      'concejo-2023-mde':           { partidos: ['JUNTOS'], peso: 0.05 },
+      'pres-2014-mde':              { cands: ['CLARA LOPEZ'], peso: 0.03 },
+      'pres-2010-mde':              { cands: ['GUSTAVO FRANCISCO PETRO URREGO', 'AURELIJUS RUTENIS ANTANAS MOCKUS SIVICKAS'], peso: 0.02 },
+    },
+    'sf': {
+      'pres-2022-mde':              { cands: ['SERGIO FAJARDO'], peso: 0.25 },
+      'pres-2018-mde':              { cands: ['SERGIO FAJARDO'], peso: 0.20 },
+      'senado-2026-mde':            { partidos: ['ALIANZA POR COLOMBIA', 'AHORA COLOMBIA'], peso: 0.13 },
+      'camara-2026-mde':            { partidos: ['AHORA COLOMBIA', 'COALICIÓN ALIANZA VERDE, EN MARCHA, ASI'], peso: 0.10 },
+      'concejo-2023-mde':           { partidos: ['JUNTOS'], peso: 0.08 },
+      'concejo-2019-mde':           { partidos: ['PARTIDO ALIANZA VERDE'], peso: 0.13 },
+      'pres-2014-mde':              { cands: ['ENRIQUE PENALOSA', 'MARTHA LUCIA RAMIREZ', 'AURELIJUS RUTENIS ANTANAS MOCKUS SIVICKAS'], peso: 0.06 },
+      'pres-2010-mde':              { cands: ['AURELIJUS RUTENIS ANTANAS MOCKUS SIVICKAS'], peso: 0.05 },
+    },
+    'cl': {
+      'consulta-2026-soluciones-mde':{ cands: ['CLAUDIA NAYIBE LOPEZ HERNANDEZ'], peso: 0.20 },
+      'senado-2026-mde':            { partidos: ['AHORA COLOMBIA'], peso: 0.12 },
+      'camara-2026-mde':            { partidos: ['COALICIÓN ALIANZA VERDE, EN MARCHA, ASI', 'AHORA COLOMBIA'], peso: 0.10 },
+      'pres-2022-mde':              { cands: ['SERGIO FAJARDO'], peso: 0.18 },
+      'pres-2018-mde':              { cands: ['SERGIO FAJARDO'], peso: 0.10 },
+      'pres-2010-mde':              { cands: ['AURELIJUS RUTENIS ANTANAS MOCKUS SIVICKAS'], peso: 0.07 },
+      'concejo-2023-mde':           { partidos: ['JUNTOS'], peso: 0.05 },
+      'concejo-2019-mde':           { partidos: ['PARTIDO ALIANZA VERDE'], peso: 0.14 },
+      'pres-2014-mde':              { cands: ['ENRIQUE PENALOSA', 'MARTHA LUCIA RAMIREZ'], peso: 0.04 },
+    },
+    'ae': {
+      'senado-2026-mde':            { partidos: ['MOVIMIENTO SALVACIÓN NACIONAL'], peso: 0.25 },
+      'camara-2026-mde':            { partidos: ['CR-LAU-MSN-OXI'], peso: 0.15 },
+      'pres-2018-mde':              { cands: ['IVAN DUQUE'], peso: 0.18 },
+      'concejo-2023-mde':           { partidos: ['INDEPENDIENTES'], peso: 0.12 },
+      'pres-2022-mde':              { cands: ['FEDERICO GUTIERREZ', 'RODOLFO HERNANDEZ'], peso: 0.10 },
+      'pres-2014-mde':              { cands: ['OSCAR IVAN ZULUAGA'], peso: 0.10 },
+      'concejo-2019-mde':           { partidos: ['PARTIDO CENTRO DEMOCRATICO'], peso: 0.05 },
+      'pres-2010-mde':              { cands: ['JUAN MANUEL SANTOS CALDERON'], peso: 0.05 },
+    },
+    'lm': {
+      'senado-2026-mde':            { partidos: ['PARTIDO LIBERAL COLOMBIANO'], peso: 0.35 },
+      'camara-2026-mde':            { partidos: ['PARTIDO LIBERAL COLOMBIANO'], peso: 0.20 },
+      'concejo-2023-mde':           { partidos: ['INDEPENDIENTES'], peso: 0.10 },
+      'pres-2022-mde':              { cands: ['SERGIO FAJARDO', 'GUSTAVO PETRO'], peso: 0.18 },
+      'pres-2018-mde':              { cands: ['HUMBERTO DE LA CALLE', 'SERGIO FAJARDO'], peso: 0.10 },
+      'pres-2014-mde':              { cands: ['CLARA LOPEZ', 'ENRIQUE PENALOSA'], peso: 0.04 },
+      'pres-2010-mde':              { cands: ['JUAN MANUEL SANTOS CALDERON'], peso: 0.03 },
+    },
+    'otros': {}, 'nd': {},
+  };
+
+  let HISTORICOS_MED = {};
+  let _biasCacheMedComuna = {};
+  let _BASE_PCTS = null;
+
+  // ════════════════════════════════════════════════════════════════
+  // HELPERS
+  // ════════════════════════════════════════════════════════════════
+  const norm = s => String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').trim().toUpperCase();
+  const fmtPct = n => (Math.round(n*10)/10).toFixed(1) + '%';
+
+  function _medComunaCode(raw){
+    const k = String(raw || '').padStart(2, '0');
+    if (k === '50' || k === '60' || k === '70' || k === '80' || k === '90') return 'CORR';
+    return k;
+  }
+
+  function hexToHsl(hex){
+    const m = hex.replace('#','').match(/.{2}/g);
+    const [r,g,b] = m.map(x => parseInt(x,16)/255);
+    const mx = Math.max(r,g,b), mn = Math.min(r,g,b);
+    const l = (mx+mn)/2;
+    let h, s;
+    if (mx===mn){ h=0; s=0; }
+    else {
+      const d = mx-mn;
+      s = l > .5 ? d/(2-mx-mn) : d/(mx+mn);
+      switch(mx){
+        case r: h = (g-b)/d + (g<b ? 6 : 0); break;
+        case g: h = (b-r)/d + 2; break;
+        default: h = (r-g)/d + 4;
+      }
+      h *= 60;
+    }
+    return { h, s:s*100, l:l*100 };
+  }
+  function colorWithIntensity(hex, intensity){
+    const it = Math.max(0, Math.min(1, intensity));
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const { h, s, l } = hexToHsl(hex);
+    const targetL = isDark ? 18 : 93;
+    const targetS = 18;
+    const newL = targetL + (l - targetL) * it;
+    const newS = targetS + (s - targetS) * it;
+    return `hsl(${h.toFixed(1)}, ${newS.toFixed(1)}%, ${newL.toFixed(1)}%)`;
+  }
+  function displayColorOnDark(hex){
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    if (!isDark) return hex;
+    const { h, s, l } = hexToHsl(hex);
+    if (l < 30) return `hsl(${h.toFixed(1)}, ${Math.min(s,85).toFixed(1)}%, 62%)`;
+    return hex;
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // PONDERADOR · cargado de ../ponderador-actual.json (single source of truth)
+  // ════════════════════════════════════════════════════════════════
+  async function loadPonderador(){
+    try{
+      const r = await fetch(PONDERADOR_URL, { cache: 'no-cache' });
+      if (!r.ok) throw new Error('HTTP '+r.status);
+      const j = await r.json();
+      const cands = j.candidatos || {};
+      // Aplicar pcts a CANDIDATOS visibles
+      let othersSum = 0;
+      for (const cand of CANDIDATOS){
+        if (cand.id === 'otros'){ continue; }
+        if (cands[cand.id]?.pct != null) cand.pct = cands[cand.id].pct;
+      }
+      // Sumar residuales en 'otros'
+      for (const rid of RESIDUAL_IDS){
+        if (cands[rid]?.pct != null) othersSum += cands[rid].pct;
+      }
+      const otros = CANDIDATOS.find(c => c.id === 'otros');
+      if (otros && othersSum > 0) otros.pct = othersSum;
+    } catch(e){
+      console.warn('[Med-1V] No se pudo cargar', PONDERADOR_URL, '→ usando defaults', e.message);
+    }
+    _BASE_PCTS = CANDIDATOS.map(c => ({ id: c.id, pct: c.pct }));
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // BIAS POR COMUNA · réplica del bloque de previa-1v.html
+  // ════════════════════════════════════════════════════════════════
+  function _medExtractEntries(j, sig){
+    const cfg = MED_SIGNALS[sig];
+    const root = cfg.wrapper ? (j[cfg.wrapper] || {}) : j;
+    const out = { ciudad: {}, comunas: {} };
+    const ciudadCounts = {}; let ciudadTotal = 0;
+    for (const [comCod, com] of Object.entries(root)){
+      if (!com || typeof com !== 'object') continue;
+      let arr = []; let totalLocal = 0;
+      if (cfg.type === 'consulta'){
+        const consultas = com.consultas || {};
+        let target = null;
+        for (const v of Object.values(consultas)){ if (v && v.slug === cfg.slug){ target = v; break; } }
+        if (!target) continue;
+        arr = (target.candidatos || []).map(r => ({ key: r.nombre, votos: r.votos || 0 }));
+        totalLocal = target.votos_validos || arr.reduce((s,r)=>s+(r.votos||0),0);
+      } else if (cfg.type === 'partidos'){
+        if (Array.isArray(com.partidos)){
+          arr = com.partidos.map(r => ({ key: r.nombre || r.partido || r.cod, votos: r.votos || 0 }));
+        } else if (Array.isArray(com.candidatos)){
+          const sums = {};
+          for (const r of com.candidatos){ const k = r.partido || r.nombre; if (!k) continue; sums[k] = (sums[k]||0) + (r.votos||0); }
+          arr = Object.entries(sums).map(([k,v]) => ({ key: k, votos: v }));
+        }
+        totalLocal = com.votos_validos || arr.reduce((s,r)=>s+(r.votos||0),0);
+      } else {
+        arr = (com.candidatos || []).map(r => ({ key: r.nombre, votos: r.votos || 0 }));
+        totalLocal = com.votos_validos || arr.reduce((s,r)=>s+(r.votos||0),0);
+      }
+      const byKey = {};
+      for (const r of arr){
+        const kn = norm(r.key);
+        const v = r.votos || 0;
+        byKey[kn] = totalLocal > 0 ? v / totalLocal : 0;
+        ciudadCounts[kn] = (ciudadCounts[kn] || 0) + v;
+      }
+      ciudadTotal += totalLocal;
+      out.comunas[comCod] = byKey;
+    }
+    out.ciudad = {};
+    for (const [k,v] of Object.entries(ciudadCounts)) out.ciudad[k] = ciudadTotal > 0 ? v/ciudadTotal : 0;
+    return out;
+  }
+
+  async function loadHistoricosMedComuna(){
+    const sigs = Object.keys(MED_SIGNALS);
+    const urlCache = {};
+    const fetcher = url => {
+      if (!urlCache[url]) urlCache[url] = fetch(url, { cache: 'force-cache' }).then(r => r.ok ? r.json() : null).catch(()=>null);
+      return urlCache[url];
+    };
+    const results = await Promise.all(sigs.map(s => fetcher(MED_SIGNALS[s].url)));
+    sigs.forEach((sig, i) => {
+      const j = results[i];
+      if (!j){ console.warn('[Med-1V] no carga', sig); return; }
+      try { HISTORICOS_MED[sig] = _medExtractEntries(j, sig); }
+      catch(e){ console.warn('[Med-1V] parse', sig, e.message); }
+    });
+    precomputeBiasMedComuna();
+    const sigOk = sigs.filter(s => HISTORICOS_MED[s]).length;
+    console.log(`[Med-1V] ${sigOk}/${sigs.length} señales cargadas`);
+  }
+
+  function precomputeBiasMedComuna(){
+    _biasCacheMedComuna = {};
+    const comSet = new Set();
+    for (const sig of Object.keys(HISTORICOS_MED)) Object.keys(HISTORICOS_MED[sig].comunas || {}).forEach(c => comSet.add(c));
+    const comunas = Array.from(comSet);
+    for (const cand of CANDIDATOS){
+      const equiv = EQUIVALENCIAS_MED_COMUNA[cand.id];
+      if (!equiv || !Object.keys(equiv).length) continue;
+      _biasCacheMedComuna[cand.id] = {};
+      for (const com of comunas){
+        let num = 0, den = 0;
+        for (const [sig, spec] of Object.entries(equiv)){
+          const data = HISTORICOS_MED[sig]; if (!data) continue;
+          const keys = (spec.cands || spec.partidos || []).map(k => norm(k));
+          if (!keys.length) continue;
+          const pctLocal = keys.reduce((s,k) => s + (data.comunas[com]?.[k] || 0), 0);
+          const pctCiudad = keys.reduce((s,k) => s + (data.ciudad[k] || 0), 0);
+          if (pctCiudad <= 0) continue;
+          num += spec.peso * (pctLocal / pctCiudad);
+          den += spec.peso;
+        }
+        if (den > 0) _biasCacheMedComuna[cand.id][com] = Math.max(0.15, Math.min(3.50, num/den));
+      }
+    }
+  }
+
+  function biasForComunaMed(cand, comCod){
+    const cached = _biasCacheMedComuna[cand.id]?.[comCod];
+    if (cached != null && cached > 0) return cached;
+    return 1.0;
+  }
+  // Nota: en este módulo NO componemos bias municipal porque ya estamos
+  // dentro de Medellín como scope único — el promedio ponderado por
+  // potencial dentro de Medellín da 1.0, así que pct_nacional × bias_intra
+  // reproduce la distribución intra-municipal correcta.
+  function projectedComunaMed(cand, comCod){ return cand.pct * biasForComunaMed(cand, comCod); }
+  function computeComunaMedRanking(comCod){
+    const ranked = CANDIDATOS
+      .filter(c => c.id !== 'nd' && c.id !== 'otros')
+      .map(c => ({ c, v: projectedComunaMed(c, comCod) }))
+      .filter(x => x.v > 0)
+      .sort((a,b) => b.v - a.v);
+    if (!ranked.length) return null;
+    return {
+      winner: ranked[0].c, winnerV: ranked[0].v,
+      second: ranked[1]?.c, secondV: ranked[1]?.v || 0,
+      margin: ranked[0].v - (ranked[1]?.v || 0),
+      ranked,
+    };
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // STATE + RENDER PANEL DE SLIDERS
+  // ════════════════════════════════════════════════════════════════
+  let selectedId = null;
+
+  function renderPanel(){
+    const list = document.getElementById('cand-list');
+    list.innerHTML = '';
+    for (const cand of CANDIDATOS){
+      const row = document.createElement('div');
+      row.className = 'cand-row';
+      const photoHtml = cand.foto
+        ? `<div class="cand-photo" style="border-color:${cand.color}"><img src="${cand.foto}" alt="${cand.nombre}" onerror="this.style.display='none'"></div>`
+        : `<div class="cand-photo" style="border-color:${cand.color};background:${cand.color}33"></div>`;
+      row.innerHTML = `
+        ${photoHtml}
+        <div class="cand-body">
+          <div class="cand-meta">
+            <span class="cand-name">${cand.nombre}</span>
+            <span class="cand-pct" id="pct-${cand.id}">${fmtPct(cand.pct)}</span>
+          </div>
+          <input type="range" class="cand-slider" id="sld-${cand.id}" min="0" max="60" step="0.5" value="${cand.pct}" style="accent-color:${cand.color}">
+        </div>`;
+      list.appendChild(row);
+    }
+    // Listeners
+    for (const cand of CANDIDATOS){
+      const sld = document.getElementById('sld-'+cand.id);
+      sld.addEventListener('input', e => {
+        const v = parseFloat(e.target.value);
+        cand.pct = v;
+        document.getElementById('pct-'+cand.id).textContent = fmtPct(v);
+        repaintMap(); renderLegend();
+      });
+    }
+  }
+  function resetSim(){
+    if (!_BASE_PCTS) return;
+    for (const b of _BASE_PCTS){ const c = CANDIDATOS.find(x => x.id === b.id); if (c) c.pct = b.pct; }
+    renderPanel(); repaintMap(); renderLegend();
+  }
+  window.resetSim = resetSim;
+
+  function renderLegend(){
+    const el = document.getElementById('map-legend');
+    if (!el) return;
+    // Agregar votos estimados a nivel ciudad (ponderados por peso de cada comuna)
+    const ranked = CANDIDATOS
+      .filter(c => c.id !== 'nd')
+      .map(c => ({ c, v: c.pct }))
+      .sort((a,b) => b.v - a.v);
+    const total = ranked.reduce((s,x) => s+x.v, 0);
+    const chips = ranked.map(x => {
+      const pct = total > 0 ? x.v/total*100 : 0;
+      return `<span class="pond-chip" onclick="_openCand('${x.c.id}')" title="Ver detalle">
+        <span class="dot" style="background:${x.c.color}"></span>
+        <span class="pond-chip-name">${x.c.nombre}</span>
+        <span class="pond-chip-vals"><b>${fmtPct(x.v)}</b></span>
+      </span>`;
+    }).join('');
+    el.innerHTML = `<div class="map-legend-title">Intención de voto · Medellín</div>${chips}`;
+  }
+  function _openCand(id){ selectedId = (selectedId === id) ? null : id; repaintMap(); _refreshTerritoryCard(); renderLegend(); }
+  window._openCand = _openCand;
+
+  // ════════════════════════════════════════════════════════════════
+  // MAPA · solo Medellín, una sola capa con las 16 comunas + corregimientos
+  // ════════════════════════════════════════════════════════════════
+  let map, comunaLayer, _maxMargin = 0.001, _maxSingleShare = 0.001;
+  function showMapLoading(msg){ const el = document.getElementById('map-loading'); if (el){ el.textContent = msg||'Cargando…'; el.classList.add('show'); }}
+  function hideMapLoading(){ document.getElementById('map-loading')?.classList.remove('show'); }
+
+  async function initMap(){
+    map = L.map('leaflet-map', {
+      zoomControl: true, attributionControl: false,
+      touchZoom: true, dragging: true, tap: true,
+      doubleClickZoom: true, scrollWheelZoom: false, keyboard: false,
+    });
+    showMapLoading('Cargando mapa de Medellín…');
+    try{
+      const r = await fetch(MEDELLINX_URL);
+      const geo = await r.json();
+      comunaLayer = L.geoJSON(geo, {
+        style: f => _styleByComuna(_medComunaCode(f.properties.CODIGO)),
+        onEachFeature: onEachComuna,
+      }).addTo(map);
+      const b = comunaLayer.getBounds(); if (b.isValid()) map.fitBounds(b, { padding:[10,10] });
+    } catch(e){
+      console.error('[Med-1V] error mapa', e);
+      showMapLoading('Error al cargar mapa');
+      return;
+    } finally { hideMapLoading(); }
+  }
+
+  function recomputeScales(){
+    let maxMargin = 0.001, maxSingle = 0.001;
+    const codes = new Set();
+    for (const id of Object.keys(_biasCacheMedComuna)) for (const c of Object.keys(_biasCacheMedComuna[id])) codes.add(c);
+    for (const com of codes){
+      const r = computeComunaMedRanking(com);
+      if (r){
+        const tot = r.ranked.reduce((s,x)=>s+x.v,0);
+        if (tot > 0) maxMargin = Math.max(maxMargin, r.margin/tot);
+      }
+      if (selectedId){
+        const cand = CANDIDATOS.find(c => c.id === selectedId);
+        const tot = CANDIDATOS.reduce((s,c) => s + projectedComunaMed(c, com), 0);
+        if (tot > 0) maxSingle = Math.max(maxSingle, projectedComunaMed(cand, com)/tot);
+      }
+    }
+    _maxMargin = maxMargin; _maxSingleShare = maxSingle;
+  }
+
+  function _styleByComuna(comCod){
+    const hasBias = _biasCacheMedComuna && Object.values(_biasCacheMedComuna).some(m => m[comCod] != null);
+    if (!hasBias) return { fillColor: 'rgba(124,58,237,.08)', fillOpacity: .5, color: 'rgba(124,58,237,.3)', weight: .8 };
+    if (selectedId){
+      const cand = CANDIDATOS.find(c => c.id === selectedId);
+      if (!cand) return { fillColor:'#1a1d2e', fillOpacity:.35, color:'rgba(124,58,237,.3)', weight:.8 };
+      const total = CANDIDATOS.reduce((s,c) => s + projectedComunaMed(c, comCod), 0);
+      const share = total > 0 ? projectedComunaMed(cand, comCod) / total : 0;
+      const intensity = Math.min(1, share / Math.max(_maxSingleShare, .01));
+      return { fillColor: colorWithIntensity(cand.color, intensity), fillOpacity:.9, color:'rgba(124,58,237,.3)', weight:.8 };
+    }
+    const r = computeComunaMedRanking(comCod);
+    if (!r || !r.winner) return { fillColor: 'rgba(124,58,237,.08)', fillOpacity: .5, color: 'rgba(124,58,237,.3)', weight: .8 };
+    const tot = r.ranked.reduce((s,x)=>s+x.v,0);
+    const intensity = Math.min(1, (r.margin / tot) / Math.max(_maxMargin, .01));
+    return { fillColor: colorWithIntensity(r.winner.color, intensity), fillOpacity:.9, color:'rgba(124,58,237,.3)', weight:.8 };
+  }
+
+  function repaintMap(){
+    recomputeScales();
+    if (comunaLayer) comunaLayer.setStyle(f => _styleByComuna(_medComunaCode(f.properties.CODIGO)));
+    _refreshTerritoryCard();
+    // Header label
+    const cand = CANDIDATOS.find(c => c.id === selectedId);
+    document.getElementById('map-head-cand').textContent = cand ? cand.nombre : 'Ganador por comuna';
+    document.getElementById('map-head-pct').textContent = cand
+      ? `Color = fuerza local (${fmtPct(cand.pct)} nacional)`
+      : 'Bias intra-comuna calibrado';
+    if (cand) document.getElementById('map-head-cand').style.color = cand.color;
+    else document.getElementById('map-head-cand').style.color = '';
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // TARJETA DE TERRITORIO + HOVER CHIP + BOTTOM-SHEET
+  // ════════════════════════════════════════════════════════════════
+  let _territoryHovered = null, _territoryPinned = null, _lastPayload = null;
+
+  function _setHoverChip(e, name, color){
+    const chip = document.getElementById('hover-chip'); if (!chip) return;
+    chip.innerHTML = `<span class="hc-dot" style="background:${color || 'currentColor'}"></span><span class="hc-name">${name}</span>`;
+    chip.classList.add('show');
+    _moveHoverChip(e);
+  }
+  function _moveHoverChip(e){
+    const chip = document.getElementById('hover-chip'); if (!chip) return;
+    const oe = e?.originalEvent || e; if (!oe || oe.clientX == null) return;
+    chip.style.left = oe.clientX + 'px'; chip.style.top = oe.clientY + 'px';
+  }
+  function _clearHoverChip(){ document.getElementById('hover-chip')?.classList.remove('show'); }
+
+  function _renderTerritoryCard(payload){
+    const card = document.getElementById('territory-card');
+    const sheet = document.getElementById('territory-sheet');
+    const sheetBody = document.getElementById('territory-sheet-body');
+    if (!card) return;
+    if (!payload){
+      card.classList.remove('show'); card.innerHTML = '';
+      if (sheet) sheet.classList.remove('show');
+      if (sheetBody) sheetBody.innerHTML = '';
+      _lastPayload = null;
+      return;
+    }
+    _lastPayload = payload;
+    const compact = !!selectedId;
+    card.classList.toggle('compact', compact);
+    card.classList.add('show');
+    if (sheet){ sheet.classList.toggle('compact', compact); sheet.classList.add('show'); }
+    const ranking = computeComunaMedRanking(payload.comCod)?.ranked || [];
+    const total = ranking.reduce((s,x)=>s+x.v, 0);
+    const isPinned = _territoryPinned === payload.scopeKey;
+    const pinLabel = isPinned ? '📌 Fijado' : '📌 Fijar';
+    const parentsLine = payload.parents.join(' · ');
+    let body;
+    if (selectedId){
+      const cand = CANDIDATOS.find(c => c.id === selectedId);
+      const v = ranking.find(x => x.c.id === selectedId)?.v || 0;
+      const share = total > 0 ? v/total : 0;
+      body = `
+        <div class="tc-row" style="margin-bottom:.3rem">
+          <span class="nm" style="color:${cand?displayColorOnDark(cand.color):'#fff'}">${cand ? cand.nombre : '—'}</span>
+          <span class="pct">${(share*100).toFixed(1)}%</span>
+        </div>
+        <div class="tc-bar"><div class="tc-bar-fill" style="width:${(share*100).toFixed(1)}%;background:${cand?cand.color:'#666'}"></div></div>`;
+    } else {
+      const top = ranking.slice(0, 3);
+      if (!top.length) body = `<div class="tc-empty">Sin datos para esta comuna</div>`;
+      else {
+        body = top.map((x, i) => {
+          const pct = total > 0 ? x.v/total : 0;
+          return `
+            <div class="tc-row">
+              <span class="rank">${i+1}º</span>
+              <span class="nm" style="color:${displayColorOnDark(x.c.color)}">${x.c.nombre}</span>
+              <span class="pct">${(pct*100).toFixed(1)}%</span>
+            </div>
+            <div class="tc-bar"><div class="tc-bar-fill" style="width:${(pct*100).toFixed(1)}%;background:${x.c.color}"></div></div>`;
+        }).join('');
+        if (top.length >= 2){
+          const margin = (top[0].v - top[1].v) / total * 100;
+          body += `<div class="tc-margin"><span>Margen 1º vs 2º</span><b>+${margin.toFixed(1)} pp</b></div>`;
+        }
+      }
+    }
+    const html = `
+      <div class="tc-head">
+        <div class="tc-head-text">
+          <div class="tc-name">${payload.name}</div>
+          <div class="tc-parents">${payload.level}${parentsLine ? ' · ' + parentsLine : ''}</div>
+        </div>
+        <button class="tc-pin ${isPinned?'pinned':''}" onclick="_toggleTerritoryPin()">${pinLabel}</button>
+      </div>
+      ${body}
+      ${payload.fuente && !compact ? `<div class="tc-fuente">${payload.fuente}</div>` : ''}`;
+    card.innerHTML = html;
+    if (sheetBody) sheetBody.innerHTML = html;
+  }
+  function _refreshTerritoryCard(){ if (_lastPayload) _renderTerritoryCard(_lastPayload); }
+  function _hoverTerritory(payload){ _territoryHovered = payload.scopeKey; if (_territoryPinned) return; _renderTerritoryCard(payload); }
+  function _toggleTerritoryPin(){
+    if (_territoryPinned){ _territoryPinned = null; if (_lastPayload) _renderTerritoryCard(_lastPayload); }
+    else if (_lastPayload){ _territoryPinned = _lastPayload.scopeKey; _renderTerritoryCard(_lastPayload); }
+  }
+  function _closeTerritorySheet(){
+    document.getElementById('territory-sheet')?.classList.remove('show');
+    document.getElementById('territory-card')?.classList.remove('show');
+    _territoryHovered = null; _territoryPinned = null; _lastPayload = null;
+  }
+  window._toggleTerritoryPin = _toggleTerritoryPin;
+  window._closeTerritorySheet = _closeTerritorySheet;
+
+  function onEachComuna(feature, layer){
+    const p = feature.properties;
+    const name = p.NOMBRE || p.CODIGO || 'Comuna';
+    const comCod = _medComunaCode(p.CODIGO);
+    const isCorr = comCod === 'CORR';
+    const levelLabel = isCorr ? 'Corregimiento' : 'Comuna';
+    const tooltipFn = () => {
+      const r = computeComunaMedRanking(comCod);
+      if (selectedId){
+        const cand = CANDIDATOS.find(c => c.id === selectedId);
+        const total = CANDIDATOS.reduce((s,c) => s + projectedComunaMed(c, comCod), 0);
+        const v = projectedComunaMed(cand, comCod);
+        const share = total > 0 ? v/total : 0;
+        return `<div style="line-height:1.4"><b>${name}</b><br>${cand?cand.nombre:''}<br><b>${(share*100).toFixed(1)}%</b> local</div>`;
+      }
+      if (!r || !r.winner) return `<div>${name}</div>`;
+      const tot = r.ranked.reduce((s,x)=>s+x.v,0);
+      const winPct = tot > 0 ? r.winnerV/tot*100 : 0;
+      return `<div style="line-height:1.4"><b>${name}</b><br>1º ${r.winner.nombre} · ${winPct.toFixed(1)}%</div>`;
+    };
+    const payload = {
+      scopeKey: 'com:' + comCod,
+      level: levelLabel,
+      name,
+      parents: ['Medellín', 'Antioquia'],
+      comCod,
+      fuente: 'Bias comuna · pres 10-22 + alc/concejo + Congreso 2026 + consultas 2025-26',
+    };
+    layer.on({
+      mouseover(e){
+        layer.setStyle({ weight: 2, color: '#fff', fillOpacity: .98 });
+        const r = computeComunaMedRanking(comCod);
+        const winColor = r?.winner?.color || 'var(--purple)';
+        _setHoverChip(e, name, winColor);
+        _hoverTerritory(payload);
+        layer.bindTooltip(tooltipFn(), { sticky:true, className:'leaflet-dark-tooltip', opacity:1 }).openTooltip();
+      },
+      mousemove(e){ _moveHoverChip(e); },
+      mouseout(){ if (comunaLayer) comunaLayer.resetStyle(layer); layer.closeTooltip(); _clearHoverChip(); },
+    });
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // FAB / DRAWER MOBILE
+  // ════════════════════════════════════════════════════════════════
+  function _openPanelDrawer(){
+    document.getElementById('panel')?.classList.add('open');
+    document.getElementById('panel-backdrop')?.classList.add('show');
+    document.getElementById('ponderador-fab')?.classList.add('hidden');
+  }
+  function _closePanelDrawer(){
+    document.getElementById('panel')?.classList.remove('open');
+    document.getElementById('panel-backdrop')?.classList.remove('show');
+    document.getElementById('ponderador-fab')?.classList.remove('hidden');
+  }
+  window._openPanelDrawer = _openPanelDrawer;
+  window._closePanelDrawer = _closePanelDrawer;
+
+  // ════════════════════════════════════════════════════════════════
+  // BOOT
+  // ════════════════════════════════════════════════════════════════
+  async function boot(){
+    await loadPonderador();
+    renderPanel();
+    renderLegend();
+    await initMap();
+    await loadHistoricosMedComuna();
+    repaintMap();
+  }
+</script>
+
+</body>
+</html>
