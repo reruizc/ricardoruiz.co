@@ -406,11 +406,57 @@
       /* Botón "← Depto/Nacional" sobre el mapa: touch-friendly */
       .map-back-btn{padding:.6rem 1rem;font-size:.78rem;min-height:42px}
 
-      /* Layout: panel de sliders accesible vía botón flotante. La nota
-         al pie del panel se reduce un poco para no inflar el scroll. */
-      .panel{padding-bottom:1.5rem}
+      /* Panel de sliders como drawer flotante que se abre con el FAB.
+         Por defecto oculto debajo del viewport; .open lo desliza arriba. */
+      .panel{
+        position:fixed;left:0;right:0;bottom:0;top:auto;
+        max-height:78vh;overflow-y:auto;z-index:7500;
+        background:rgba(6,8,16,.99);
+        border-top:1px solid rgba(0,71,255,.45);
+        box-shadow:0 -8px 28px rgba(0,0,0,.5);
+        transform:translateY(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);
+        padding:1rem 1rem 1.6rem;
+      }
+      .panel.open{transform:translateY(0)}
+      body.day-mode .panel{background:rgba(255,255,255,.99);box-shadow:0 -8px 28px rgba(0,0,0,.18)}
+      /* Botón "cerrar" dentro del panel cuando está abierto en mobile */
+      .panel-close-mobile{
+        display:flex;align-items:center;justify-content:center;
+        position:absolute;top:.6rem;right:.7rem;
+        width:36px;height:36px;background:transparent;border:none;
+        color:rgba(255,255,255,.55);font-size:1.4rem;line-height:1;
+        cursor:pointer;padding:0;
+      }
+      body.day-mode .panel-close-mobile{color:rgba(0,0,0,.55)}
+      .panel-grip{width:36px;height:4px;background:rgba(255,255,255,.22);border-radius:2px;margin:0 auto .6rem}
+      body.day-mode .panel-grip{background:rgba(0,0,0,.22)}
+
+      /* Backdrop opcional cuando está abierto */
+      .panel-backdrop{position:fixed;inset:0;background:rgba(6,8,16,.5);z-index:7400;display:none}
+      .panel-backdrop.show{display:block}
+      body.day-mode .panel-backdrop{background:rgba(0,0,0,.35)}
+
+      /* FAB para abrir el drawer. Pegado abajo a la derecha, encima del
+         bottom-sheet pero por debajo del propio drawer. */
+      .ponderador-fab{
+        position:fixed;right:1rem;bottom:1rem;z-index:7000;
+        display:flex;align-items:center;gap:.45rem;
+        background:var(--blue);color:#fff;border:none;
+        font-family:Avenir,sans-serif;font-weight:600;font-size:.85rem;letter-spacing:.02em;
+        padding:.85rem 1.15rem;border-radius:999px;
+        box-shadow:0 6px 18px rgba(0,71,255,.45);
+        cursor:pointer;min-height:48px;
+        transition:transform .15s,box-shadow .15s;
+      }
+      .ponderador-fab:active{transform:scale(.96)}
+      .ponderador-fab .fab-icon{font-size:1.05rem;line-height:1}
+      .ponderador-fab.hidden{display:none}
 
       html{scroll-behavior:smooth}
+    }
+    /* Desktop: oculta los elementos que solo viven en mobile */
+    @media (min-width:1100px){
+      .panel-close-mobile,.panel-grip,.panel-backdrop,.ponderador-fab{display:none!important}
     }
 
     .map-legend{padding:.2rem 0 .6rem;display:flex;align-items:flex-start;gap:.75rem;flex-wrap:wrap;flex-direction:column}
@@ -597,7 +643,9 @@
     </div>
 
     <!-- PANEL -->
-    <aside class="panel">
+    <aside class="panel" id="panel">
+      <button class="panel-close-mobile" onclick="_closePanelDrawer()" aria-label="Cerrar panel">×</button>
+      <div class="panel-grip" aria-hidden="true"></div>
       <div class="panel-head">
         <div class="panel-title">Fórmulas presidenciales · mover el deslizador</div>
         <button class="btn btn-primary btn-sm" onclick="resetSim()">Restablecer</button>
@@ -3445,5 +3493,24 @@
   <button class="territory-sheet-close" onclick="_closeTerritorySheet()" aria-label="Cerrar">×</button>
   <div id="territory-sheet-body"></div>
 </div>
+<!-- Mobile only: backdrop + FAB para abrir el panel de sliders como drawer. -->
+<div id="panel-backdrop" class="panel-backdrop" onclick="_closePanelDrawer()" aria-hidden="true"></div>
+<button id="ponderador-fab" class="ponderador-fab" onclick="_openPanelDrawer()" aria-label="Ajustar ponderadores">
+  <span class="fab-icon">🎚</span><span>Ajustar ponderadores</span>
+</button>
+<script>
+  function _openPanelDrawer(){
+    document.getElementById('panel')?.classList.add('open');
+    document.getElementById('panel-backdrop')?.classList.add('show');
+    document.getElementById('ponderador-fab')?.classList.add('hidden');
+  }
+  function _closePanelDrawer(){
+    document.getElementById('panel')?.classList.remove('open');
+    document.getElementById('panel-backdrop')?.classList.remove('show');
+    document.getElementById('ponderador-fab')?.classList.remove('hidden');
+  }
+  window._openPanelDrawer = _openPanelDrawer;
+  window._closePanelDrawer = _closePanelDrawer;
+</script>
 </body>
 </html>
