@@ -165,6 +165,24 @@ def extract_description(html):
         or extract_meta(html, "description", "name")
     )
 
+JSONLD_DATE_RE = re.compile(r'"datePublished"\s*:\s*"([^"]+)"', re.IGNORECASE)
+
+def extract_jsonld_date(html):
+    """Fallback para sitios que solo exponen fecha en JSON-LD Schema.org
+    (ej. Q'Hubo Medellín). Acepta formatos 'YYYY-MM-DD HH:MM:SS ±ZZZZ' o ISO."""
+    m = JSONLD_DATE_RE.search(html)
+    if not m:
+        return None
+    raw = m.group(1).strip()
+    # Normalizar 'YYYY-MM-DD HH:MM:SS ±ZZZZ' → 'YYYY-MM-DDTHH:MM:SS±ZZZZ'
+    if " " in raw and "T" not in raw:
+        parts = raw.split(" ")
+        if len(parts) >= 2:
+            raw = parts[0] + "T" + parts[1]
+            if len(parts) >= 3:
+                raw += parts[2]
+    return parse_iso_date(raw)
+
 def extract_pub_date(html):
     raw = (
         extract_meta(html, "article:published_time")
@@ -172,7 +190,10 @@ def extract_pub_date(html):
         or extract_meta(html, "date", "name")
         or extract_meta(html, "DC.date", "name")
     )
-    return parse_iso_date(raw)
+    parsed = parse_iso_date(raw)
+    if parsed:
+        return parsed
+    return extract_jsonld_date(html)
 
 def extract_author(html):
     return (
