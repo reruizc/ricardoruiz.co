@@ -100,7 +100,7 @@
     .map-head-label { font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.12em; text-transform:uppercase; color:var(--text2); }
     .map-head-cand { font-family:'Syne',sans-serif; font-weight:700; font-size:1.05rem; letter-spacing:-.01em; margin-top:.15rem; color:var(--text); }
     .map-head-pct { font-family:Avenir,sans-serif; font-weight:500; font-size:.9rem; color:var(--text2); }
-    #leaflet-map { flex:1; min-height: 520px; background: var(--bg2); border:1px solid var(--border); }
+    #leaflet-map { flex:1; min-height: 460px; background: var(--bg2); border:1px solid var(--border); }
     .leaflet-container { background: var(--bg2)!important; }
     .leaflet-tile-pane { display:none; }
     .leaflet-control-attribution { display:none!important; }
@@ -170,11 +170,9 @@
     .btn { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.1em; text-transform:uppercase; padding:.3rem .65rem; border:1px solid var(--border2); background:transparent; color:var(--text2); cursor:none; transition:all .15s; }
     .btn:hover { color:var(--text); border-color:var(--text2); }
     #cand-list { display:flex; flex-direction:column; gap:.5rem; }
-    .cand-card { display:grid; grid-template-columns:6px 38px 1fr; gap:.55rem; padding:.5rem .65rem; border:1px solid var(--border); background:var(--surface); transition:border-color .15s,background .15s; }
+    .cand-card { display:grid; grid-template-columns:6px 1fr; gap:.65rem; padding:.55rem .75rem; border:1px solid var(--border); background:var(--surface); transition:border-color .15s,background .15s; }
     .cand-card.active { border-color:var(--purple); background:var(--purple-dim); }
     .cand-stripe { width:6px; border-radius:1px; align-self:stretch; }
-    .cand-photo { width:38px; height:38px; border-radius:50%; overflow:hidden; background:var(--bg2); border:1.5px solid; align-self:center; }
-    .cand-photo img { width:100%; height:100%; object-fit:cover; }
     .cand-body { display:flex; flex-direction:column; gap:.3rem; min-width:0; }
     .cand-top { display:flex; align-items:baseline; justify-content:space-between; gap:.45rem; }
     .cand-name { font-family:'Syne',sans-serif; font-weight:600; font-size:.86rem; letter-spacing:-.005em; line-height:1.15; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
@@ -802,16 +800,12 @@
       const card = document.createElement('div');
       card.className = 'cand-card' + (c.id === selectedId ? ' active' : '');
       card.dataset.id = c.id;
-      const photoHtml = c.foto
-        ? `<div class="cand-photo" style="border-color:${c.color}"><img src="${c.foto}" alt="${c.nombre}" onerror="this.style.display='none'"></div>`
-        : `<div class="cand-photo" style="border-color:${c.color};background:${c.color}33"></div>`;
       const deltaSpan = delta !== 0
         ? `<span class="delta ${delta>0?'delta-up':'delta-down'}">${delta>0?'+':''}${delta}</span>` : '';
       const lockBtn = _lockedIds.has(c.id)
         ? `<button class="cand-lock" onclick="unlockCand('${c.id}',event)" title="Desbloquear · vuelve a moverse cuando ajustes otros candidatos">🔒</button>` : '';
       card.innerHTML = `
         <div class="cand-stripe" style="background:${c.color}"></div>
-        ${photoHtml}
         <div class="cand-body">
           <div class="cand-top">
             <div style="min-width:0">
@@ -1134,7 +1128,28 @@
         style: f => _styleByComuna(_medComunaCode(f.properties.CODIGO)),
         onEachFeature: onEachComuna,
       }).addTo(map);
-      const b = comunaLayer.getBounds(); if (b.isValid()) map.fitBounds(b, { padding:[10,10] });
+      const b = comunaLayer.getBounds();
+      if (b.isValid()){
+        map.fitBounds(b, { padding:[6,6] });
+        // Re-fit cuando el layout flex termina de acomodarse. Sin esto el
+        // polígono queda en una posición computada antes de que el contenedor
+        // alcance su altura final, dejando espacio vacío arriba.
+        const refit = () => {
+          if (!map || !comunaLayer) return;
+          map.invalidateSize({ animate:false });
+          const bb = comunaLayer.getBounds();
+          if (bb.isValid()) map.fitBounds(bb, { padding:[6,6] });
+        };
+        requestAnimationFrame(() => requestAnimationFrame(refit));
+        setTimeout(refit, 350);
+        // Reaccionar a cambios futuros de tamaño (rotación, resize de ventana,
+        // expansión del FAB en mobile, etc.).
+        if (typeof ResizeObserver !== 'undefined'){
+          const ro = new ResizeObserver(() => refit());
+          ro.observe(document.getElementById('leaflet-map'));
+        }
+        window.addEventListener('resize', refit);
+      }
     } catch(e){
       console.error('[Med-1V] error mapa', e);
       showMapLoading('Error al cargar mapa');
