@@ -146,21 +146,41 @@
     .sent-neg { background: #ff6b7a; }
 
     .sent-bar {
-      display: flex; height: 8px; overflow: hidden;
+      display: flex; height: 22px; overflow: hidden;
       border: 1px solid var(--border);
-      margin-bottom: .8rem;
+      margin-bottom: .9rem;
     }
-    .sent-bar-seg { height: 100%; transition: width .3s; }
+    .sent-bar-seg {
+      height: 100%; transition: width .3s, opacity .15s, transform .15s;
+      cursor: none;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Arima', sans-serif; font-size: .72rem;
+      color: rgba(255,255,255,.95); font-weight: 500;
+      letter-spacing: .02em;
+    }
+    .sent-bar-seg:hover { opacity: .85; }
+    .sent-bar-seg.dim { opacity: .35; }
     .sent-bar-seg.sent-pos { background: #00d68f; }
     .sent-bar-seg.sent-neu { background: var(--text3); }
     .sent-bar-seg.sent-neg { background: #ff6b7a; }
     .sent-legend {
       display: flex; gap: 1.2rem; flex-wrap: wrap;
-      font-family: 'Arima', sans-serif; font-size: .72rem;
+      font-family: 'Arima', sans-serif; font-size: .75rem;
       color: var(--text2);
       margin-bottom: 1.6rem;
     }
-    .sent-legend-item { display: flex; align-items: center; gap: .35rem; }
+    .sent-legend-item {
+      display: flex; align-items: center; gap: .35rem;
+      cursor: none; padding: .25rem .5rem;
+      border: 1px solid transparent;
+      transition: border-color .15s, background .15s;
+    }
+    .sent-legend-item:hover { border-color: var(--border2); }
+    .sent-legend-item.active {
+      border-color: var(--purple);
+      background: var(--purple-dim);
+      color: var(--text);
+    }
 
     /* Listado */
     .titulares { display:flex; flex-direction:column; gap: 0; }
@@ -368,9 +388,31 @@
       if (win && ['6h','24h','5d'].includes(win)) currentWin = win;
       const ftype = p.get('filter');
       const fval = p.get('value');
-      if (ftype && fval && ['word','actor','tema'].includes(ftype)) {
+      if (ftype && fval && ['word','actor','tema','sentimiento'].includes(ftype)) {
         activeFilter = { type: ftype, value: fval };
       }
+    }
+
+    function toggleSentFilter(sent) {
+      if (activeFilter && activeFilter.type === 'sentimiento' && activeFilter.value === sent) {
+        clearFilter();
+        return;
+      }
+      activeFilter = { type: 'sentimiento', value: sent };
+      // sync URL params
+      const url = new URL(window.location.href);
+      url.searchParams.set('filter', 'sentimiento');
+      url.searchParams.set('value', sent);
+      window.history.replaceState({}, '', url);
+      updateFilterChip();
+      // re-aplicar dim a segmentos no seleccionados
+      document.querySelectorAll('.sent-bar-seg').forEach(seg => {
+        seg.classList.toggle('dim', seg.dataset.sent !== sent);
+      });
+      document.querySelectorAll('.sent-legend-item').forEach(it => {
+        it.classList.toggle('active', it.dataset.sent === sent);
+      });
+      renderTitulares();
     }
 
     async function loadWindow(win) {
@@ -418,13 +460,20 @@
       const map = {};
       sentimientos.forEach(s => map[s.sent] = s);
       const segments = order.map(s => map[s]).filter(Boolean);
-      const bar = segments.map(s =>
-        `<div class="sent-bar-seg ${SENT_CLASS[s.sent]}" style="width:${s.pct}%" title="${SENT_LABEL[s.sent]}: ${s.n} (${s.pct}%)"></div>`
-      ).join('');
-      const legend = segments.map(s =>
-        `<span class="sent-legend-item"><span class="sent-dot ${SENT_CLASS[s.sent]}"></span>${SENT_LABEL[s.sent]} · <b>${s.pct}%</b></span>`
-      ).join('');
+      const isFilteringSent = activeFilter && activeFilter.type === 'sentimiento';
+      const bar = segments.map(s => {
+        const dimClass = isFilteringSent && activeFilter.value !== s.sent ? ' dim' : '';
+        const pctTxt = s.pct >= 6 ? `${s.pct}%` : '';
+        return `<div class="sent-bar-seg ${SENT_CLASS[s.sent]}${dimClass}" data-sent="${s.sent}" style="width:${s.pct}%" title="${SENT_LABEL[s.sent]}: ${s.n} (${s.pct}%) — click para filtrar">${pctTxt}</div>`;
+      }).join('');
+      const legend = segments.map(s => {
+        const isActive = isFilteringSent && activeFilter.value === s.sent;
+        return `<span class="sent-legend-item${isActive ? ' active' : ''}" data-sent="${s.sent}"><span class="sent-dot ${SENT_CLASS[s.sent]}"></span>${SENT_LABEL[s.sent]} · <b>${s.n}</b> (${s.pct}%)</span>`;
+      }).join('');
       wrap.innerHTML = `<div class="sent-bar">${bar}</div><div class="sent-legend">${legend}</div>`;
+      wrap.querySelectorAll('.sent-bar-seg, .sent-legend-item').forEach(el => {
+        el.addEventListener('click', () => toggleSentFilter(el.dataset.sent));
+      });
     }
 
     function clearFilter() {
@@ -442,10 +491,11 @@
       const chip = document.getElementById('filter-chip');
       const wordEl = document.getElementById('filter-chip-word');
       if (activeFilter) {
-        const labelMap = { word: 'palabra', actor: 'actor', tema: 'tema' };
-        const display = activeFilter.type === 'tema'
-          ? (TEMA_LABEL[activeFilter.value] || activeFilter.value)
-          : activeFilter.value;
+        const labelMap = { word: 'palabra', actor: 'actor', tema: 'tema', sentimiento: 'sentimiento' };
+        const SENT_LABEL = { positivo: 'Positivo', neutro: 'Neutro', negativo: 'Negativo' };
+        let display = activeFilter.value;
+        if (activeFilter.type === 'tema') display = TEMA_LABEL[activeFilter.value] || activeFilter.value;
+        else if (activeFilter.type === 'sentimiento') display = SENT_LABEL[activeFilter.value] || activeFilter.value;
         wordEl.textContent = `${labelMap[activeFilter.type]}: ${display}`;
         chip.classList.add('visible');
       } else {
@@ -479,13 +529,16 @@
           list = list.filter(t => Array.isArray(t.actores) && t.actores.includes(activeFilter.value));
         } else if (activeFilter.type === 'tema') {
           list = list.filter(t => t.tema === activeFilter.value);
+        } else if (activeFilter.type === 'sentimiento') {
+          list = list.filter(t => t.sentimiento === activeFilter.value);
         }
       }
       if (!list.length) {
-        const labelMap = { word: 'palabra', actor: 'actor', tema: 'tema' };
-        const display = activeFilter.type === 'tema'
-          ? (TEMA_LABEL[activeFilter.value] || activeFilter.value)
-          : activeFilter.value;
+        const labelMap = { word: 'palabra', actor: 'actor', tema: 'tema', sentimiento: 'sentimiento' };
+        const SENT_LABEL2 = { positivo: 'Positivo', neutro: 'Neutro', negativo: 'Negativo' };
+        let display = activeFilter.value;
+        if (activeFilter.type === 'tema') display = TEMA_LABEL[activeFilter.value] || activeFilter.value;
+        else if (activeFilter.type === 'sentimiento') display = SENT_LABEL2[activeFilter.value] || activeFilter.value;
         el.innerHTML = `<div class="empty">Ningún titular coincide con ${labelMap[activeFilter.type]} &ldquo;${escapeHtml(display)}&rdquo;.</div>`;
         return;
       }
