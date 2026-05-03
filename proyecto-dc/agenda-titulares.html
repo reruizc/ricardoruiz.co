@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Listado de titulares · Agenda · Proyecto DC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=Arima:wght@300;400;500;600&family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f4f3ef; --bg2: #eeedea;
+      --surface: #ffffff; --surface2: #f0efe9;
+      --border: rgba(0,0,0,0.07); --border2: rgba(0,0,0,0.12);
+      --text: #0a0a0a; --text2: #555; --text3: #999;
+      --blue: #0047FF; --purple: #7c3aed;
+      --purple-dim: rgba(124,58,237,0.10);
+    }
+    [data-theme="dark"] {
+      --bg: #060810; --bg2: #0a0c14;
+      --surface: #0f1018; --surface2: #13151f;
+      --border: rgba(255,255,255,0.06); --border2: rgba(255,255,255,0.12);
+      --text: #f4f3ef; --text2: #888; --text3: #444;
+      --purple: #a78bfa;
+      --purple-dim: rgba(167,139,250,0.14);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'Fraunces', serif;
+      min-height: 100vh; cursor: none; overflow-x: hidden;
+      transition: background 0.4s, color 0.4s;
+    }
+
+    .gate { position: fixed; inset:0; z-index:5000; background:var(--bg); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:1rem; }
+    .gate-text { font-family:'Arima',sans-serif; font-size:.82rem; letter-spacing:.12em; text-transform:uppercase; color:var(--text2); }
+    .gate-bar { width:120px; height:1px; background:var(--border); position:relative; overflow:hidden; }
+    .gate-bar::after { content:''; position:absolute; inset:0; background:var(--purple); animation:gate-slide 1.4s ease-in-out infinite; }
+    @keyframes gate-slide { 0%{transform:translateX(-100%);} 50%{transform:translateX(0);} 100%{transform:translateX(100%);} }
+
+    .cursor { position:fixed; width:12px; height:12px; background:var(--purple); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s ease,background .2s; transform:translate(-50%,-50%); }
+    .cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--purple); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s ease,opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+
+    nav.top {
+      position:fixed; top:0; left:0; right:0; z-index:100;
+      display:flex; align-items:center; justify-content:space-between;
+      padding:.9rem 2.5rem;
+      background:var(--bg); border-bottom:1px solid var(--border);
+      backdrop-filter: blur(12px);
+    }
+    .nav-left, .nav-right { display:flex; align-items:center; gap:1rem; }
+    .e-btn-back {
+      font-family:'Syne',sans-serif; font-size:.78rem; letter-spacing:.08em;
+      text-transform:uppercase; color:var(--text2); text-decoration:none;
+      border:1.5px solid var(--border); padding:.3rem .8rem;
+      transition:color .2s, border-color .2s;
+    }
+    .e-btn-back:hover { color:var(--text); border-color:var(--text2); }
+    .private-badge {
+      font-family:'Arima',sans-serif; font-size:.65rem;
+      letter-spacing:.18em; text-transform:uppercase;
+      color:var(--purple); background:var(--purple-dim);
+      padding:.32rem .7rem; border:1px solid var(--purple-dim);
+    }
+    .logo-link { display:flex; align-items:center; gap:.55rem; text-decoration:none; opacity:.85; }
+    .logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
+    .logo-bar { width:5px; background:var(--purple); border-radius:1px 1px 0 0; }
+    .logo-text { font-family:'Syne',sans-serif; font-weight:800; font-size:1.3rem; letter-spacing:-.03em; color:var(--text); }
+    .logo-text span { color:var(--purple); }
+
+    main.wrap { max-width: 980px; margin: 0 auto; padding: 7rem 2.5rem 5rem; }
+
+    /* Hero compacto */
+    .hero { margin-bottom: 2rem; }
+    .hero-label { font-family:'Arima',sans-serif; font-size:.78rem; letter-spacing:.12em; text-transform:uppercase; color:var(--purple); margin-bottom:1rem; }
+    .hero-title {
+      font-family:'Fraunces',serif; font-weight:600;
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      line-height:1.05; letter-spacing:-.02em; margin-bottom:.6rem;
+    }
+    .hero-title em { font-style:italic; color:var(--purple); font-weight:400; }
+    .hero-sub { font-size:.95rem; line-height:1.5; color:var(--text2); max-width:680px; }
+
+    /* Controls */
+    .controls {
+      display:flex; flex-wrap:wrap; align-items:center; gap:1.5rem;
+      margin: 1.5rem 0 1.8rem;
+      padding: 1rem 1.3rem;
+      background: var(--surface); border:1px solid var(--border);
+    }
+    .ctrl-label { font-family:'Arima',sans-serif; font-size:.7rem; letter-spacing:.14em; text-transform:uppercase; color:var(--text3); margin-bottom:.5rem; }
+    .pill-group { display:flex; gap:.4rem; flex-wrap: wrap; }
+    .pill {
+      font-family:'Arima',sans-serif; font-size:.78rem; letter-spacing:.04em;
+      background:transparent; color:var(--text2);
+      border:1px solid var(--border); padding:.45rem .85rem;
+      cursor:none; transition: all .15s;
+    }
+    .pill:hover { color:var(--text); border-color:var(--text2); }
+    .pill.active { background:var(--purple); color:#fff; border-color:var(--purple); }
+    .meta {
+      margin-left:auto;
+      font-family:'Arima',sans-serif; font-size:.72rem; color:var(--text3);
+      letter-spacing:.04em;
+    }
+    .meta b { color:var(--text); font-weight:400; }
+
+    /* Filter chip */
+    .filter-chip {
+      display: none;
+      align-items: center; gap: .5rem;
+      margin-bottom: 1rem;
+      padding: .4rem .7rem;
+      background: var(--purple-dim);
+      border: 1px solid var(--purple);
+      font-family: 'Arima', sans-serif;
+      font-size: .8rem;
+      color: var(--purple);
+      width: max-content;
+    }
+    .filter-chip.visible { display: inline-flex; }
+    .filter-chip b { font-weight: 600; color: var(--text); }
+    .filter-chip-close {
+      cursor: none;
+      font-family: 'Arima', sans-serif;
+      font-size: .9rem; line-height: 1;
+      color: var(--purple);
+      background: none; border: none;
+      padding: 0 .15rem;
+    }
+    .filter-chip-close:hover { color: var(--text); }
+
+    /* Sentiment */
+    .sent-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      margin-right: .4rem;
+      vertical-align: middle;
+    }
+    .sent-pos { background: #00d68f; }
+    .sent-neu { background: var(--text3); }
+    .sent-neg { background: #ff6b7a; }
+
+    .sent-bar {
+      display: flex; height: 8px; overflow: hidden;
+      border: 1px solid var(--border);
+      margin-bottom: .8rem;
+    }
+    .sent-bar-seg { height: 100%; transition: width .3s; }
+    .sent-bar-seg.sent-pos { background: #00d68f; }
+    .sent-bar-seg.sent-neu { background: var(--text3); }
+    .sent-bar-seg.sent-neg { background: #ff6b7a; }
+    .sent-legend {
+      display: flex; gap: 1.2rem; flex-wrap: wrap;
+      font-family: 'Arima', sans-serif; font-size: .72rem;
+      color: var(--text2);
+      margin-bottom: 1.6rem;
+    }
+    .sent-legend-item { display: flex; align-items: center; gap: .35rem; }
+
+    /* Listado */
+    .titulares { display:flex; flex-direction:column; gap: 0; }
+    .titular {
+      padding: 1rem 0;
+      border-bottom: 1px solid var(--border);
+      display:flex; flex-direction:column; gap:.4rem;
+    }
+    .titular:last-child { border-bottom: none; }
+    .titular a {
+      color: var(--text); text-decoration:none;
+      font-family:'Fraunces',serif; font-weight:400; font-size: 1.05rem;
+      line-height:1.4;
+    }
+    .titular a:hover { color: var(--purple); }
+    .titular-meta {
+      font-family:'Arima',sans-serif; font-size:.72rem; color:var(--text3);
+      letter-spacing:.04em;
+      display: flex; align-items: center; flex-wrap: wrap; gap: .4rem;
+    }
+    .titular-meta b { font-weight:400; color:var(--text2); }
+    .titular-tags {
+      display: flex; flex-wrap: wrap; gap: .35rem;
+      margin-top: .25rem;
+    }
+    .tag-chip {
+      font-family: 'Arima', sans-serif; font-size: .65rem;
+      padding: .15rem .5rem;
+      background: var(--surface2); color: var(--text2);
+      border: 1px solid var(--border);
+    }
+    .tag-tema { color: var(--purple); border-color: var(--purple-dim); }
+
+    .empty {
+      padding: 2rem 1rem; text-align:center;
+      font-family:'Arima',sans-serif; font-size:.8rem;
+      color:var(--text3); letter-spacing:.04em;
+    }
+
+    @media (max-width: 768px) {
+      nav.top { padding: .8rem 1.2rem; }
+      main.wrap { padding: 5rem 1.2rem 3rem; }
+      .controls { padding: 1rem; gap: 1rem; }
+      .meta { margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="gate" class="gate">
+    <div class="gate-text">Verificando acceso</div>
+    <div class="gate-bar"></div>
+  </div>
+
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <nav class="top" hidden id="topNav">
+    <div class="nav-left">
+      <a href="agenda.html" class="e-btn-back">← Resumen agenda</a>
+      <span class="private-badge">Privado</span>
+    </div>
+    <div class="nav-right">
+      <a href="../index.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div>
+          <div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div>
+          <div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+  </nav>
+
+  <main class="wrap" hidden id="main">
+
+    <section class="hero">
+      <div class="hero-label">Módulo 07 · Agenda · Detalle</div>
+      <h1 class="hero-title">Listado de <em>titulares</em></h1>
+      <p class="hero-sub">Las últimas noticias capturadas en la ventana, con sentimiento, tema y actores detectados. Si llegaste con un filtro desde la página principal, aparece arriba como chip.</p>
+    </section>
+
+    <section class="controls">
+      <div>
+        <div class="ctrl-label">Ventana</div>
+        <div class="pill-group" id="ventana-pills">
+          <button class="pill" data-win="6h">Últimas 6 h</button>
+          <button class="pill active" data-win="24h">Últimas 24 h</button>
+          <button class="pill" data-win="5d">Últimos 5 d</button>
+        </div>
+      </div>
+      <div class="meta" id="meta"></div>
+    </section>
+
+    <div id="filter-chip" class="filter-chip">
+      <span>Filtrando por <b id="filter-chip-word"></b></span>
+      <button class="filter-chip-close" id="filter-chip-close" aria-label="Quitar filtro">×</button>
+    </div>
+
+    <div id="sent-bar-wrap"></div>
+
+    <div id="titulares" class="titulares"></div>
+
+  </main>
+
+  <script>
+    // ─── AUTH GATE ────────────────────────────────────────────────────
+    const ALLOWED = ['reruizc@gmail.com', 'nuevagemela@gmail.com'];
+    const token = localStorage.getItem('rr-token');
+    const userRaw = localStorage.getItem('rr-user');
+    let user = null; try { user = userRaw ? JSON.parse(userRaw) : null; } catch(e) {}
+    function emailAllowed(em){ return em && ALLOWED.includes(String(em).toLowerCase().trim()); }
+    function denyToLogin(){ localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); window.location.replace('../login.html'); }
+    function denyToDashboard(){ window.location.replace('../dashboard.html'); }
+    if (!token || !user) denyToLogin();
+    else if (!emailAllowed(user.email)) denyToDashboard();
+    else {
+      (async () => {
+        try {
+          const res = await fetch('https://rr-auth.reruizc.workers.dev/auth/me', { headers: { 'Authorization': `Bearer ${token}` } });
+          if (res.status === 401) return denyToLogin();
+          const data = await res.json();
+          if (!data.ok || !emailAllowed(data.user && data.user.email)) return denyToDashboard();
+          localStorage.setItem('rr-user', JSON.stringify(Object.assign({}, user, data.user)));
+          revealPage();
+        } catch (e) { revealPage(); }
+      })();
+    }
+    function revealPage(){
+      document.getElementById('gate').remove();
+      document.getElementById('topNav').hidden = false;
+      document.getElementById('main').hidden = false;
+      init();
+    }
+
+    function getAutoTheme(){ const h = new Date().getHours(); return (h >= 7 && h < 19) ? 'light' : 'dark'; }
+    const theme = localStorage.getItem('rr-theme') || getAutoTheme();
+    document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : '');
+
+    // ─── CURSOR ───────────────────────────────────────────────────────
+    const cur = document.getElementById('cursor');
+    const ring = document.getElementById('cursorRing');
+    document.addEventListener('mousemove', e => {
+      cur.style.left = ring.style.left = e.clientX + 'px';
+      cur.style.top  = ring.style.top  = e.clientY + 'px';
+    });
+    document.addEventListener('mouseover', e => {
+      const t = e.target;
+      const hover = t && (t.matches('a,button,select,.pill,.titular') || t.closest('a,button,select,.pill,.titular'));
+      if (hover) {
+        cur.style.transform = 'translate(-50%,-50%) scale(1.6)';
+        cur.style.background = 'transparent';
+        cur.style.border = '1.5px solid var(--purple)';
+        ring.style.opacity = '0';
+      } else {
+        cur.style.transform = 'translate(-50%,-50%) scale(1)';
+        cur.style.background = 'var(--purple)';
+        cur.style.border = 'none';
+        ring.style.opacity = '.4';
+      }
+    });
+
+    // ─── DATA ─────────────────────────────────────────────────────────
+    const S3_BASE = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/proyecto-dc/agenda/agregados';
+
+    const MEDIO_LABEL = {
+      'minuto30': 'Minuto30',
+      'telemedellin': 'Telemedellín',
+      'eltiempo-medellin': 'El Tiempo · Medellín',
+      'vivirenelpoblado': 'Vivir en El Poblado',
+      'mioriente': 'Mi Oriente',
+      'hacemosmemoria': 'Hacemos Memoria',
+      'periferia': 'Periferia',
+      'las2orillas': 'Las2Orillas',
+      'delaurbe': 'De La Urbe (UdeA)',
+      'centropolis': 'Centrópolis',
+      'noscogiolanoche': 'Nos Cogió la Noche',
+      'sinergia': 'Sinergia Informativa',
+      'elcolombiano': 'El Colombiano',
+      'bluradio': 'Blu Radio',
+      'pulzo': 'Pulzo',
+      'qhubomedellin': 'Q\'Hubo Medellín',
+      'semana': 'Semana',
+    };
+
+    const TEMA_LABEL = {
+      'seguridad': 'Seguridad', 'movilidad': 'Movilidad', 'corrupcion': 'Corrupción',
+      'empleo_economia': 'Empleo y economía', 'educacion': 'Educación', 'salud': 'Salud',
+      'ambiente': 'Ambiente', 'vivienda_pot': 'Vivienda y POT',
+      'politica': 'Política y elecciones', 'justicia': 'Justicia', 'internacional': 'Internacional',
+      'cultura_deportes': 'Cultura y deportes', 'drogas_narcotrafico': 'Drogas y narcotráfico',
+      'social_protesta': 'Social y protesta', 'infraestructura': 'Infraestructura y obras',
+      'otros': 'Otros',
+    };
+
+    let currentWin = '24h';
+    let allTitulares = [];
+    let activeFilter = null;        // {type: 'word'|'actor'|'tema', value: string}
+
+    // Leer URL params: ?win=24h&filter=actor&value=Federico+Gutiérrez
+    function readUrlParams() {
+      const p = new URLSearchParams(window.location.search);
+      const win = p.get('win');
+      if (win && ['6h','24h','5d'].includes(win)) currentWin = win;
+      const ftype = p.get('filter');
+      const fval = p.get('value');
+      if (ftype && fval && ['word','actor','tema'].includes(ftype)) {
+        activeFilter = { type: ftype, value: fval };
+      }
+    }
+
+    async function loadWindow(win) {
+      currentWin = win;
+      document.querySelectorAll('#ventana-pills .pill').forEach(p => {
+        p.classList.toggle('active', p.dataset.win === win);
+      });
+      const titEl = document.getElementById('titulares');
+      titEl.innerHTML = '<div class="empty">Cargando…</div>';
+      updateFilterChip();
+
+      try {
+        const [tit, temas] = await Promise.all([
+          fetch(`${S3_BASE}/titulares-${win}.json`, { cache: 'no-cache' }).then(r => r.json()),
+          fetch(`${S3_BASE}/temas-${win}.json`,     { cache: 'no-cache' }).then(r => r.json()).catch(() => null),
+        ]);
+        renderMeta(tit, temas);
+        renderSentBar(temas ? (temas.sentimientos || []) : []);
+        allTitulares = tit.titulares || [];
+        renderTitulares();
+      } catch (err) {
+        const msg = `<div class="empty">No hay datos disponibles todavía.</div>`;
+        titEl.innerHTML = msg;
+        document.getElementById('meta').textContent = '';
+        document.getElementById('sent-bar-wrap').innerHTML = '';
+        console.error(err);
+      }
+    }
+
+    function renderMeta(tit, temas) {
+      const t = new Date(tit.generado_en);
+      const ts = t.toLocaleString('es-CO', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+      const n = (allTitulares && allTitulares.length) || (tit.titulares ? tit.titulares.length : 0);
+      const enriched = temas && temas.n_enriquecidos ? ` · <b>${temas.n_enriquecidos}</b> enriquecidos` : '';
+      document.getElementById('meta').innerHTML =
+        `<b>${tit.titulares ? tit.titulares.length : 0}</b> titulares${enriched} · actualizado <b>${ts}</b>`;
+    }
+
+    function renderSentBar(sentimientos) {
+      const wrap = document.getElementById('sent-bar-wrap');
+      if (!sentimientos || !sentimientos.length) { wrap.innerHTML = ''; return; }
+      const SENT_LABEL = { positivo: 'Positivo', neutro: 'Neutro', negativo: 'Negativo' };
+      const SENT_CLASS = { positivo: 'sent-pos', neutro: 'sent-neu', negativo: 'sent-neg' };
+      const order = ['positivo', 'neutro', 'negativo'];
+      const map = {};
+      sentimientos.forEach(s => map[s.sent] = s);
+      const segments = order.map(s => map[s]).filter(Boolean);
+      const bar = segments.map(s =>
+        `<div class="sent-bar-seg ${SENT_CLASS[s.sent]}" style="width:${s.pct}%" title="${SENT_LABEL[s.sent]}: ${s.n} (${s.pct}%)"></div>`
+      ).join('');
+      const legend = segments.map(s =>
+        `<span class="sent-legend-item"><span class="sent-dot ${SENT_CLASS[s.sent]}"></span>${SENT_LABEL[s.sent]} · <b>${s.pct}%</b></span>`
+      ).join('');
+      wrap.innerHTML = `<div class="sent-bar">${bar}</div><div class="sent-legend">${legend}</div>`;
+    }
+
+    function clearFilter() {
+      activeFilter = null;
+      // limpiar URL params sin recargar
+      const url = new URL(window.location.href);
+      url.searchParams.delete('filter');
+      url.searchParams.delete('value');
+      window.history.replaceState({}, '', url);
+      updateFilterChip();
+      renderTitulares();
+    }
+
+    function updateFilterChip() {
+      const chip = document.getElementById('filter-chip');
+      const wordEl = document.getElementById('filter-chip-word');
+      if (activeFilter) {
+        const labelMap = { word: 'palabra', actor: 'actor', tema: 'tema' };
+        const display = activeFilter.type === 'tema'
+          ? (TEMA_LABEL[activeFilter.value] || activeFilter.value)
+          : activeFilter.value;
+        wordEl.textContent = `${labelMap[activeFilter.type]}: ${display}`;
+        chip.classList.add('visible');
+      } else {
+        chip.classList.remove('visible');
+      }
+    }
+
+    function matchWord(text, word) {
+      if (!text || !word) return false;
+      const re = new RegExp(`(^|[^a-záéíóúñü])${word.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}([^a-záéíóúñü]|$)`, 'i');
+      return re.test(text);
+    }
+
+    function escapeHtml(s) {
+      return (s || '').toString()
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    function renderTitulares() {
+      const el = document.getElementById('titulares');
+      if (!allTitulares.length) {
+        el.innerHTML = '<div class="empty">Sin titulares en esta ventana.</div>';
+        return;
+      }
+      let list = allTitulares;
+      if (activeFilter) {
+        if (activeFilter.type === 'word') {
+          list = list.filter(t => matchWord(t.titulo, activeFilter.value) || matchWord(t.resumen, activeFilter.value));
+        } else if (activeFilter.type === 'actor') {
+          list = list.filter(t => Array.isArray(t.actores) && t.actores.includes(activeFilter.value));
+        } else if (activeFilter.type === 'tema') {
+          list = list.filter(t => t.tema === activeFilter.value);
+        }
+      }
+      if (!list.length) {
+        const labelMap = { word: 'palabra', actor: 'actor', tema: 'tema' };
+        const display = activeFilter.type === 'tema'
+          ? (TEMA_LABEL[activeFilter.value] || activeFilter.value)
+          : activeFilter.value;
+        el.innerHTML = `<div class="empty">Ningún titular coincide con ${labelMap[activeFilter.type]} &ldquo;${escapeHtml(display)}&rdquo;.</div>`;
+        return;
+      }
+      const SENT_CLASS = { positivo: 'sent-pos', neutro: 'sent-neu', negativo: 'sent-neg' };
+      const SENT_LABEL = { positivo: 'Positivo', neutro: 'Neutro', negativo: 'Negativo' };
+      el.innerHTML = list.map(t => {
+        const medio = MEDIO_LABEL[t.medio] || t.medio;
+        const fp = t.fecha_pub ? new Date(t.fecha_pub) : null;
+        const fpTxt = fp ? fp.toLocaleString('es-CO', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) : '—';
+        const titulo = escapeHtml(t.titulo || '');
+        const sentDot = t.sentimiento
+          ? `<span class="sent-dot ${SENT_CLASS[t.sentimiento]}" title="Sentimiento: ${SENT_LABEL[t.sentimiento]}"></span>`
+          : '';
+        const tema = t.tema ? `<span class="tag-chip tag-tema">${escapeHtml(TEMA_LABEL[t.tema] || t.tema)}</span>` : '';
+        const actores = (t.actores || []).slice(0, 4).map(a => `<span class="tag-chip">${escapeHtml(a)}</span>`).join('');
+        const tags = (tema || actores) ? `<div class="titular-tags">${tema}${actores}</div>` : '';
+        return `
+          <div class="titular">
+            <a href="${t.url}" target="_blank" rel="noopener">${titulo}</a>
+            <div class="titular-meta">${sentDot}<b>${medio}</b> · ${fpTxt}</div>
+            ${tags}
+          </div>`;
+      }).join('');
+    }
+
+    function init() {
+      readUrlParams();
+      document.querySelectorAll('#ventana-pills .pill').forEach(p => {
+        p.classList.toggle('active', p.dataset.win === currentWin);
+        p.addEventListener('click', () => loadWindow(p.dataset.win));
+      });
+      document.getElementById('filter-chip-close').addEventListener('click', clearFilter);
+      loadWindow(currentWin);
+    }
+  </script>
+</body>
+</html>
