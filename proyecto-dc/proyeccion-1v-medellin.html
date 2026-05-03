@@ -305,10 +305,15 @@
         <div class="country-option" data-value="cn" onclick="selectCountry(this)"><span class="country-check">✓</span> 中国 / China</div>
       </div>
     </div>
-    <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">Tema</button>
+    <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">☀ Modo día</button>
     <a href="../index.html" class="logo-link">
-      <div class="logo-bars"><div class="logo-bar" style="height:11px"></div><div class="logo-bar" style="height:15px"></div><div class="logo-bar" style="height:8px"></div></div>
-      <div class="logo-text">RICARDO<span>.RUIZ</span></div>
+      <div class="logo-bars">
+        <div class="logo-bar" style="height:20px"></div>
+        <div class="logo-bar" style="height:15px"></div>
+        <div class="logo-bar" style="height:9px"></div>
+        <div class="logo-bar" style="height:4px"></div>
+      </div>
+      <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
     </a>
   </div>
 </nav>
@@ -409,17 +414,30 @@
   }
 
   // ════════════════════════════════════════════════════════════════
-  // THEME
+  // THEME · "light" = modo día, "dark" = modo noche.
+  // El texto del botón muestra el modo al que SWITCHEA al hacer click
+  // (cuando estás en día, dice "🌙 Modo noche"; cuando estás en noche,
+  // dice "☀ Modo día"). Mismo patrón que analisis-candidato.html.
   // ════════════════════════════════════════════════════════════════
+  function _applyThemeBtnLabel(theme){
+    const btn = document.getElementById('themeBtn');
+    if (!btn) return;
+    btn.textContent = theme === 'dark' ? '☀ Modo día' : '🌙 Modo noche';
+  }
   function initTheme(){
     let t = localStorage.getItem('rr-theme');
+    // Soporte legacy: si en otra página guardó 'day'/'night', traducimos.
+    if (t === 'day') t = 'light';
+    if (t === 'night') t = 'dark';
     if (!t){ const h = new Date().getHours(); t = (h>=7 && h<19) ? 'light' : 'dark'; }
     document.documentElement.setAttribute('data-theme', t);
+    _applyThemeBtnLabel(t);
   }
   function toggleTheme(){
     const cur = document.documentElement.getAttribute('data-theme') || 'light';
     const next = cur === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
+    _applyThemeBtnLabel(next);
     try { localStorage.setItem('rr-theme', next); } catch(e){}
   }
 
