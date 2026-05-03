@@ -241,6 +241,33 @@
 
     .titulares-card { grid-column: 1 / -1; }
 
+    /* Actores y temas (mismo patrón que medios-list) */
+    .actores-list, .temas-list { display:flex; flex-direction:column; gap:.55rem; }
+    .actor-row, .tema-row {
+      display:grid; grid-template-columns: 11rem 1fr 4rem;
+      align-items:center; gap:.7rem;
+      padding:.2rem 0;
+      cursor: none;
+      transition: background .12s;
+    }
+    .actor-row:hover, .tema-row:hover { background: var(--surface2); }
+    .actor-row.active, .tema-row.active { background: var(--purple-dim); }
+    .actor-name, .tema-name {
+      font-family:'Fraunces',serif; font-weight:400; font-size:.92rem;
+      color:var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .actor-row.active .actor-name, .tema-row.active .tema-name {
+      color: var(--purple); font-weight: 600;
+    }
+    .actor-bar-wrap, .tema-bar-wrap {
+      background:var(--surface2); height:6px; border:1px solid var(--border);
+    }
+    .actor-bar, .tema-bar { background:var(--purple); height:100%; }
+    .actor-pct, .tema-pct {
+      font-family:'Arima',sans-serif; font-size:.7rem; color:var(--text2); text-align:right;
+    }
+
     @media (max-width: 768px) {
       nav.top { padding: .8rem 1.2rem; }
       main.wrap { padding: 5rem 1.2rem 3rem; }
@@ -308,6 +335,18 @@
         <div class="card-label">Volumen por medio</div>
         <h2 class="card-title">Quién <em>cubre más</em></h2>
         <div id="medios" class="medios-list"></div>
+      </section>
+
+      <section class="card">
+        <div class="card-label">Top actores mencionados</div>
+        <h2 class="card-title">A quién <em>nombran</em></h2>
+        <div id="actores" class="actores-list"></div>
+      </section>
+
+      <section class="card">
+        <div class="card-label">Distribución por tema</div>
+        <h2 class="card-title">De qué se <em>habla</em></h2>
+        <div id="temas" class="temas-list"></div>
       </section>
 
       <section class="card titulares-card">
@@ -405,46 +444,86 @@
 
     let currentWin = '24h';
     let allTitulares = [];          // todos los titulares de la ventana actual
-    let activeWord = null;          // palabra clickeada que filtra titulares
+    let activeFilter = null;        // {type: 'word'|'actor'|'tema', value: string}
+
+    // Etiquetas legibles para temas (id → nombre) — manteniendo en sync con temas.json
+    const TEMA_LABEL = {
+      'seguridad': 'Seguridad',
+      'movilidad': 'Movilidad',
+      'corrupcion': 'Corrupción',
+      'empleo_economia': 'Empleo y economía',
+      'educacion': 'Educación',
+      'salud': 'Salud',
+      'ambiente': 'Ambiente',
+      'vivienda_pot': 'Vivienda y POT',
+      'politica': 'Política y elecciones',
+      'justicia': 'Justicia',
+      'internacional': 'Internacional',
+      'cultura_deportes': 'Cultura y deportes',
+      'drogas_narcotrafico': 'Drogas y narcotráfico',
+      'social_protesta': 'Social y protesta',
+      'infraestructura': 'Infraestructura y obras',
+      'otros': 'Otros',
+    };
 
     async function loadWindow(win) {
       currentWin = win;
-      activeWord = null;            // reset al cambiar ventana
+      activeFilter = null;          // reset al cambiar ventana
       document.querySelectorAll('#ventana-pills .pill').forEach(p => {
         p.classList.toggle('active', p.dataset.win === win);
       });
 
       const cloudEl = document.getElementById('cloud');
       const mediosEl = document.getElementById('medios');
+      const actoresEl = document.getElementById('actores');
+      const temasEl = document.getElementById('temas');
       const titularesEl = document.getElementById('titulares');
-      cloudEl.innerHTML = '<div class="empty">Cargando…</div>';
-      mediosEl.innerHTML = '<div class="empty">Cargando…</div>';
-      titularesEl.innerHTML = '<div class="empty">Cargando…</div>';
+      [cloudEl, mediosEl, actoresEl, temasEl, titularesEl].forEach(el => {
+        el.innerHTML = '<div class="empty">Cargando…</div>';
+      });
       updateFilterChip();
 
       try {
-        const [nube, medios, tit] = await Promise.all([
-          fetch(`${S3_BASE}/nube-${win}.json`,    { cache: 'no-cache' }).then(r => r.json()),
-          fetch(`${S3_BASE}/medios-${win}.json`,  { cache: 'no-cache' }).then(r => r.json()),
+        const [nube, medios, tit, actores, temas] = await Promise.all([
+          fetch(`${S3_BASE}/nube-${win}.json`,      { cache: 'no-cache' }).then(r => r.json()),
+          fetch(`${S3_BASE}/medios-${win}.json`,    { cache: 'no-cache' }).then(r => r.json()),
           fetch(`${S3_BASE}/titulares-${win}.json`, { cache: 'no-cache' }).then(r => r.json()),
+          fetch(`${S3_BASE}/actores-${win}.json`,   { cache: 'no-cache' }).then(r => r.json()).catch(() => null),
+          fetch(`${S3_BASE}/temas-${win}.json`,     { cache: 'no-cache' }).then(r => r.json()).catch(() => null),
         ]);
         renderMeta(nube);
         renderCloud(nube.palabras || [], cloudEl);
         renderMedios(medios.medios || [], mediosEl);
+        renderActores(actores ? (actores.actores || []) : [], actoresEl);
+        renderTemas(temas ? (temas.temas || []) : [], temasEl);
         allTitulares = tit.titulares || [];
         renderTitulares();
       } catch (err) {
         const msg = `<div class="empty">No hay datos disponibles todavía. El agregador corre cada hora — vuelve en un rato.</div>`;
-        cloudEl.innerHTML = mediosEl.innerHTML = titularesEl.innerHTML = msg;
+        cloudEl.innerHTML = mediosEl.innerHTML = actoresEl.innerHTML = temasEl.innerHTML = titularesEl.innerHTML = msg;
         document.getElementById('meta').textContent = '';
         console.error(err);
       }
     }
 
-    function setActiveWord(word) {
-      activeWord = (activeWord === word) ? null : word;   // toggle
+    function setFilter(type, value) {
+      // toggle: si ya estaba activo el mismo, quitarlo
+      if (activeFilter && activeFilter.type === type && activeFilter.value === value) {
+        activeFilter = null;
+      } else {
+        activeFilter = { type, value };
+      }
+      // sync UI: nube
       document.querySelectorAll('.cloud-word').forEach(el => {
-        el.classList.toggle('active', el.dataset.word === activeWord);
+        el.classList.toggle('active', activeFilter && activeFilter.type === 'word' && el.dataset.word === activeFilter.value);
+      });
+      // sync UI: actores
+      document.querySelectorAll('.actor-row').forEach(el => {
+        el.classList.toggle('active', activeFilter && activeFilter.type === 'actor' && el.dataset.actor === activeFilter.value);
+      });
+      // sync UI: temas
+      document.querySelectorAll('.tema-row').forEach(el => {
+        el.classList.toggle('active', activeFilter && activeFilter.type === 'tema' && el.dataset.tema === activeFilter.value);
       });
       updateFilterChip();
       renderTitulares();
@@ -453,8 +532,12 @@
     function updateFilterChip() {
       const chip = document.getElementById('filter-chip');
       const wordEl = document.getElementById('filter-chip-word');
-      if (activeWord) {
-        wordEl.textContent = activeWord;
+      if (activeFilter) {
+        const labelMap = { word: 'palabra', actor: 'actor', tema: 'tema' };
+        const display = activeFilter.type === 'tema'
+          ? (TEMA_LABEL[activeFilter.value] || activeFilter.value)
+          : activeFilter.value;
+        wordEl.textContent = `${labelMap[activeFilter.type]}: ${display}`;
         chip.classList.add('visible');
       } else {
         chip.classList.remove('visible');
@@ -486,16 +569,52 @@
         const t = (p.n - min) / span;            // 0..1
         const size = FONT_MIN + t * (FONT_MAX - FONT_MIN);
         const opacity = 0.55 + t * 0.45;          // palabras mas relevantes mas opacas
-        const isActive = activeWord === p.w;
+        const isActive = activeFilter && activeFilter.type === 'word' && activeFilter.value === p.w;
         return `<span class="cloud-word${isActive ? ' active' : ''}"
                        data-rank="${i}"
                        data-word="${p.w}"
                        data-count="${p.n}"
                        style="font-size:${size.toFixed(2)}rem;opacity:${opacity.toFixed(2)};">${p.w}</span>`;
       }).join('');
-      // delegación de click sobre palabras
       el.querySelectorAll('.cloud-word').forEach(span => {
-        span.addEventListener('click', () => setActiveWord(span.dataset.word));
+        span.addEventListener('click', () => setFilter('word', span.dataset.word));
+      });
+    }
+
+    function renderActores(actores, el) {
+      if (!actores.length) { el.innerHTML = '<div class="empty">Sin enriquecimiento todavía. La capa de actores corre cada hora.</div>'; return; }
+      const max = actores[0].n || 1;
+      el.innerHTML = actores.map(a => {
+        const w = (a.n / max * 100).toFixed(1);
+        const isActive = activeFilter && activeFilter.type === 'actor' && activeFilter.value === a.actor;
+        return `
+          <div class="actor-row${isActive ? ' active' : ''}" data-actor="${a.actor}">
+            <div class="actor-name" title="${a.actor}">${a.actor}</div>
+            <div class="actor-bar-wrap"><div class="actor-bar" style="width:${w}%"></div></div>
+            <div class="actor-pct">${a.n} · ${a.pct}%</div>
+          </div>`;
+      }).join('');
+      el.querySelectorAll('.actor-row').forEach(row => {
+        row.addEventListener('click', () => setFilter('actor', row.dataset.actor));
+      });
+    }
+
+    function renderTemas(temas, el) {
+      if (!temas.length) { el.innerHTML = '<div class="empty">Sin enriquecimiento todavía.</div>'; return; }
+      const max = temas[0].n || 1;
+      el.innerHTML = temas.map(t => {
+        const w = (t.n / max * 100).toFixed(1);
+        const label = TEMA_LABEL[t.tema] || t.tema;
+        const isActive = activeFilter && activeFilter.type === 'tema' && activeFilter.value === t.tema;
+        return `
+          <div class="tema-row${isActive ? ' active' : ''}" data-tema="${t.tema}">
+            <div class="tema-name" title="${label}">${label}</div>
+            <div class="tema-bar-wrap"><div class="tema-bar" style="width:${w}%"></div></div>
+            <div class="tema-pct">${t.n} · ${t.pct}%</div>
+          </div>`;
+      }).join('');
+      el.querySelectorAll('.tema-row').forEach(row => {
+        row.addEventListener('click', () => setFilter('tema', row.dataset.tema));
       });
     }
 
@@ -520,11 +639,22 @@
         el.innerHTML = '<div class="empty">Sin titulares en esta ventana.</div>';
         return;
       }
-      const list = activeWord
-        ? allTitulares.filter(t => matchWord(t.titulo, activeWord) || matchWord(t.resumen, activeWord))
-        : allTitulares;
+      let list = allTitulares;
+      if (activeFilter) {
+        if (activeFilter.type === 'word') {
+          list = list.filter(t => matchWord(t.titulo, activeFilter.value) || matchWord(t.resumen, activeFilter.value));
+        } else if (activeFilter.type === 'actor') {
+          list = list.filter(t => Array.isArray(t.actores) && t.actores.includes(activeFilter.value));
+        } else if (activeFilter.type === 'tema') {
+          list = list.filter(t => t.tema === activeFilter.value);
+        }
+      }
       if (!list.length) {
-        el.innerHTML = `<div class="empty">Ningún titular menciona &ldquo;${activeWord}&rdquo; en los últimos 20 capturados de esta ventana.</div>`;
+        const labelMap = { word: 'palabra', actor: 'actor', tema: 'tema' };
+        const display = activeFilter.type === 'tema'
+          ? (TEMA_LABEL[activeFilter.value] || activeFilter.value)
+          : activeFilter.value;
+        el.innerHTML = `<div class="empty">Ningún titular coincide con ${labelMap[activeFilter.type]} &ldquo;${display}&rdquo; en los últimos 20 capturados.</div>`;
         return;
       }
       el.innerHTML = list.map(t => {
@@ -545,7 +675,7 @@
         p.addEventListener('click', () => loadWindow(p.dataset.win));
       });
       document.getElementById('filter-chip-close').addEventListener('click', () => {
-        if (activeWord) setActiveWord(activeWord);   // toggle off
+        if (activeFilter) setFilter(activeFilter.type, activeFilter.value);   // toggle off
       });
       loadWindow('24h');
     }

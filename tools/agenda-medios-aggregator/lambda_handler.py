@@ -12,6 +12,8 @@ Salidas (todas en s3://elecciones-2026/ricardoruiz.co/proyecto-dc/agenda/agregad
     nube-{6h|24h|5d}.json       top 50 palabras + count
     medios-{6h|24h|5d}.json     volumen por medio
     titulares-{6h|24h|5d}.json  últimos 20 titulares de la ventana
+    actores-{6h|24h|5d}.json    top actores políticos mencionados (de enriched)
+    temas-{6h|24h|5d}.json      distribución por macrotema (de enriched)
 """
 
 import os
@@ -25,6 +27,7 @@ from datetime import datetime, timezone, timedelta
 S3_BUCKET = os.environ.get("AGENDA_S3_BUCKET", "elecciones-2026")
 S3_PREFIX = os.environ.get("AGENDA_S3_PREFIX", "ricardoruiz.co/proyecto-dc/agenda")
 RAW_PREFIX = f"{S3_PREFIX}/raw/medios"
+ENRICHED_PREFIX = f"{S3_PREFIX}/enriched"
 OUT_PREFIX = f"{S3_PREFIX}/agregados"
 
 WINDOWS = {
@@ -33,6 +36,7 @@ WINDOWS = {
     "5d":  timedelta(days=5),
 }
 TOP_WORDS = 50
+TOP_ACTORES = 30
 TOP_HEADLINES = 20
 MIN_WORD_LEN = 4
 
@@ -89,11 +93,11 @@ def good_token(t: str) -> bool:
     return True
 
 
-def list_jsonl_for_days(s3, days):
-    """Lista los keys .jsonl de raw/medios para los días dados (date objects)."""
+def list_jsonl_for_days(s3, days, base_prefix):
+    """Lista los keys .jsonl bajo base_prefix para los días dados (date objects)."""
     keys = []
     for d in days:
-        prefix = f"{RAW_PREFIX}/yyyy={d.year:04d}/mm={d.month:02d}/dd={d.day:02d}/"
+        prefix = f"{base_prefix}/yyyy={d.year:04d}/mm={d.month:02d}/dd={d.day:02d}/"
         token = None
         while True:
             kw = {"Bucket": S3_BUCKET, "Prefix": prefix}
@@ -138,6 +142,71 @@ def read_events(s3, keys, cutoff_iso):
     return out
 
 
+def read_enriched_index(s3, keys):
+    """Lee jsonl de enriched/ y devuelve dict {event_id: {actores, tema, sentimiento}}.
+    El más reciente gana si hay duplicados (improbable porque el enriquecedor
+    deduplica por state)."""
+    out = {}
+    for key in keys:
+        try:
+            body = s3.get_object(Bucket=S3_BUCKET, Key=key)["Body"].read()
+        except Exception as e:
+            print(f"[enriched-read] FAIL {key}: {e}")
+            continue
+        for line in body.decode("utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                ev = json.loads(line)
+            except Exception:
+                continue
+            eid = ev.get("id")
+            if not eid:
+                continue
+            out[eid] = {
+                "actores": ev.get("actores") or [],
+                "tema": ev.get("tema") or "otros",
+                "sentimiento": ev.get("sentimiento") or "neutro",
+            }
+    return out
+
+
+def compute_actores(events, enriched_idx):
+    """Top actores por número de menciones (count = noticias en que aparece)."""
+    counter = Counter()
+    for ev in events:
+        enr = enriched_idx.get(ev.get("id"))
+        if not enr:
+            continue
+        for actor in enr["actores"]:
+            counter[actor] += 1
+    total = sum(counter.values()) or 1
+    return [
+        {"actor": a, "n": n, "pct": round(n / total * 100, 1)}
+        for a, n in counter.most_common(TOP_ACTORES)
+    ]
+
+
+def compute_temas(events, enriched_idx):
+    """Distribución por tema (count = noticias clasificadas en ese tema)."""
+    counter = Counter()
+    n_enriched = 0
+    for ev in events:
+        enr = enriched_idx.get(ev.get("id"))
+        if not enr:
+            continue
+        n_enriched += 1
+        counter[enr["tema"]] += 1
+    total = sum(counter.values()) or 1
+    return {
+        "n_enriquecidos": n_enriched,
+        "items": [
+            {"tema": t, "n": n, "pct": round(n / total * 100, 1)}
+            for t, n in counter.most_common()
+        ],
+    }
+
+
 def compute_words(events):
     """Top palabras: título cuenta x2, resumen cuenta x1."""
     counter = Counter()
@@ -160,22 +229,29 @@ def compute_medios(events):
     ]
 
 
-def compute_titulares(events):
+def compute_titulares(events, enriched_idx=None):
     sorted_evs = sorted(
         events,
         key=lambda e: e.get("fecha_pub") or e.get("fecha_capturada") or "",
         reverse=True,
     )[:TOP_HEADLINES]
-    return [
-        {
+    out = []
+    for e in sorted_evs:
+        item = {
             "titulo": e.get("titulo"),
             "medio":  e.get("medio"),
             "url":    e.get("url"),
             "fecha_pub": e.get("fecha_pub"),
             "resumen": (URL_RE.sub("", e.get("resumen") or "")[:RESUMEN_MAX]).strip(),
         }
-        for e in sorted_evs
-    ]
+        if enriched_idx is not None:
+            enr = enriched_idx.get(e.get("id"))
+            if enr:
+                item["actores"] = enr["actores"]
+                item["tema"] = enr["tema"]
+                item["sentimiento"] = enr["sentimiento"]
+        out.append(item)
+    return out
 
 
 def write_json(s3, name, body):
@@ -198,13 +274,15 @@ def run():
     # Días candidatos para listar S3: hoy + 5 hacia atrás (cubre 5d).
     today = now.date()
     days = [today - timedelta(days=i) for i in range(6)]
-    keys = list_jsonl_for_days(s3, days)
-    print(f"[run] {len(keys)} archivos jsonl en {len(days)} días")
+    raw_keys = list_jsonl_for_days(s3, days, RAW_PREFIX)
+    enriched_keys = list_jsonl_for_days(s3, days, ENRICHED_PREFIX)
+    print(f"[run] {len(raw_keys)} archivos raw, {len(enriched_keys)} enriched en {len(days)} días")
 
     # Leer una sola vez todo lo que cae dentro de la ventana 5d
     cutoff_5d_iso = (now - WINDOWS["5d"]).isoformat()
-    all_events = read_events(s3, keys, cutoff_5d_iso)
-    print(f"[run] {len(all_events)} eventos únicos en últimos 5d")
+    all_events = read_events(s3, raw_keys, cutoff_5d_iso)
+    enriched_idx = read_enriched_index(s3, enriched_keys)
+    print(f"[run] {len(all_events)} eventos únicos en últimos 5d, {len(enriched_idx)} con enriquecimiento")
 
     out_paths = []
     for win, delta in WINDOWS.items():
@@ -232,14 +310,37 @@ def run():
         titulares = {
             "ventana": win,
             "generado_en": now.isoformat(),
-            "titulares": compute_titulares(events),
+            "titulares": compute_titulares(events, enriched_idx),
+        }
+        actores_data = compute_actores(events, enriched_idx)
+        actores = {
+            "ventana": win,
+            "generado_en": now.isoformat(),
+            "n_eventos": n_eventos,
+            "actores": actores_data,
+        }
+        temas_data = compute_temas(events, enriched_idx)
+        temas = {
+            "ventana": win,
+            "generado_en": now.isoformat(),
+            "n_eventos": n_eventos,
+            "n_enriquecidos": temas_data["n_enriquecidos"],
+            "temas": temas_data["items"],
         }
 
         out_paths.append(write_json(s3, f"nube-{win}.json", nube))
         out_paths.append(write_json(s3, f"medios-{win}.json", medios))
         out_paths.append(write_json(s3, f"titulares-{win}.json", titulares))
-        summary[win] = {"eventos": n_eventos, "palabras": len(nube["palabras"])}
-        print(f"[{win}] eventos={n_eventos} top_words={len(nube['palabras'])}")
+        out_paths.append(write_json(s3, f"actores-{win}.json", actores))
+        out_paths.append(write_json(s3, f"temas-{win}.json", temas))
+        summary[win] = {
+            "eventos": n_eventos,
+            "palabras": len(nube["palabras"]),
+            "actores": len(actores_data),
+            "temas": len(temas_data["items"]),
+            "enriquecidos": temas_data["n_enriquecidos"],
+        }
+        print(f"[{win}] eventos={n_eventos} top_words={len(nube['palabras'])} actores={len(actores_data)} temas={len(temas_data['items'])} enriquecidos={temas_data['n_enriquecidos']}")
 
     return {
         "generado_en": now.isoformat(),
