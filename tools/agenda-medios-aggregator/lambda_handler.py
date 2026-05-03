@@ -188,21 +188,29 @@ def compute_actores(events, enriched_idx):
 
 
 def compute_temas(events, enriched_idx):
-    """Distribución por tema (count = noticias clasificadas en ese tema)."""
-    counter = Counter()
+    """Distribución por tema (count = noticias clasificadas en ese tema)
+    + distribución por sentimiento global de la ventana."""
+    tema_counter = Counter()
+    sent_counter = Counter()
     n_enriched = 0
     for ev in events:
         enr = enriched_idx.get(ev.get("id"))
         if not enr:
             continue
         n_enriched += 1
-        counter[enr["tema"]] += 1
-    total = sum(counter.values()) or 1
+        tema_counter[enr["tema"]] += 1
+        sent_counter[enr["sentimiento"]] += 1
+    total_t = sum(tema_counter.values()) or 1
+    total_s = sum(sent_counter.values()) or 1
     return {
         "n_enriquecidos": n_enriched,
         "items": [
-            {"tema": t, "n": n, "pct": round(n / total * 100, 1)}
-            for t, n in counter.most_common()
+            {"tema": t, "n": n, "pct": round(n / total_t * 100, 1)}
+            for t, n in tema_counter.most_common()
+        ],
+        "sentimientos": [
+            {"sent": s, "n": n, "pct": round(n / total_s * 100, 1)}
+            for s, n in sent_counter.most_common()
         ],
     }
 
@@ -326,6 +334,7 @@ def run():
             "n_eventos": n_eventos,
             "n_enriquecidos": temas_data["n_enriquecidos"],
             "temas": temas_data["items"],
+            "sentimientos": temas_data["sentimientos"],
         }
 
         out_paths.append(write_json(s3, f"nube-{win}.json", nube))

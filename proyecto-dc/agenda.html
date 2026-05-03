@@ -268,6 +268,36 @@
       font-family:'Arima',sans-serif; font-size:.7rem; color:var(--text2); text-align:right;
     }
 
+    /* Sentimiento — dot inline en cada titular */
+    .sent-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      margin-right: .4rem;
+      vertical-align: middle;
+    }
+    .sent-pos { background: #00d68f; }
+    .sent-neu { background: var(--text3); }
+    .sent-neg { background: #ff6b7a; }
+
+    /* Barra de sentimiento agregado en header de titulares */
+    .sent-bar {
+      display: flex; height: 6px; overflow: hidden;
+      border: 1px solid var(--border);
+      margin-bottom: 1rem;
+    }
+    .sent-bar-seg { height: 100%; transition: width .3s; }
+    .sent-bar-seg.sent-pos { background: #00d68f; }
+    .sent-bar-seg.sent-neu { background: var(--text3); }
+    .sent-bar-seg.sent-neg { background: #ff6b7a; }
+    .sent-legend {
+      display: flex; gap: 1.2rem;
+      font-family: 'Arima', sans-serif; font-size: .72rem;
+      color: var(--text2);
+      margin-bottom: 1.2rem;
+    }
+    .sent-legend-item { display: flex; align-items: center; gap: .35rem; }
+
     @media (max-width: 768px) {
       nav.top { padding: .8rem 1.2rem; }
       main.wrap { padding: 5rem 1.2rem 3rem; }
@@ -352,6 +382,7 @@
       <section class="card titulares-card">
         <div class="card-label">Últimos titulares</div>
         <h2 class="card-title">Lo más <em>reciente</em></h2>
+        <div id="sent-bar-wrap"></div>
         <div id="filter-chip" class="filter-chip">
           <span>Filtrando por <b id="filter-chip-word"></b></span>
           <button class="filter-chip-close" id="filter-chip-close" aria-label="Quitar filtro">×</button>
@@ -496,6 +527,7 @@
         renderMedios(medios.medios || [], mediosEl);
         renderActores(actores ? (actores.actores || []) : [], actoresEl);
         renderTemas(temas ? (temas.temas || []) : [], temasEl);
+        renderSentBar(temas ? (temas.sentimientos || []) : []);
         allTitulares = tit.titulares || [];
         renderTitulares();
       } catch (err) {
@@ -618,6 +650,28 @@
       });
     }
 
+    function renderSentBar(sentimientos) {
+      const wrap = document.getElementById('sent-bar-wrap');
+      if (!sentimientos || !sentimientos.length) {
+        wrap.innerHTML = '';
+        return;
+      }
+      const SENT_LABEL = { positivo: 'Positivo', neutro: 'Neutro', negativo: 'Negativo' };
+      const SENT_CLASS = { positivo: 'sent-pos', neutro: 'sent-neu', negativo: 'sent-neg' };
+      // Orden visual fijo: positivo, neutro, negativo
+      const order = ['positivo', 'neutro', 'negativo'];
+      const map = {};
+      sentimientos.forEach(s => map[s.sent] = s);
+      const segments = order.map(s => map[s]).filter(Boolean);
+      const bar = segments.map(s =>
+        `<div class="sent-bar-seg ${SENT_CLASS[s.sent]}" style="width:${s.pct}%" title="${SENT_LABEL[s.sent]}: ${s.n} (${s.pct}%)"></div>`
+      ).join('');
+      const legend = segments.map(s =>
+        `<span class="sent-legend-item"><span class="sent-dot ${SENT_CLASS[s.sent]}"></span>${SENT_LABEL[s.sent]} · <b>${s.pct}%</b></span>`
+      ).join('');
+      wrap.innerHTML = `<div class="sent-bar">${bar}</div><div class="sent-legend">${legend}</div>`;
+    }
+
     function renderMedios(medios, el) {
       if (!medios.length) { el.innerHTML = '<div class="empty">Sin datos.</div>'; return; }
       const max = medios[0].n || 1;
@@ -657,15 +711,20 @@
         el.innerHTML = `<div class="empty">Ningún titular coincide con ${labelMap[activeFilter.type]} &ldquo;${display}&rdquo; en los últimos 20 capturados.</div>`;
         return;
       }
+      const SENT_CLASS = { positivo: 'sent-pos', neutro: 'sent-neu', negativo: 'sent-neg' };
+      const SENT_LABEL = { positivo: 'Positivo', neutro: 'Neutro', negativo: 'Negativo' };
       el.innerHTML = list.map(t => {
         const medio = MEDIO_LABEL[t.medio] || t.medio;
         const fp = t.fecha_pub ? new Date(t.fecha_pub) : null;
         const fpTxt = fp ? fp.toLocaleString('es-CO', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) : '—';
         const titulo = (t.titulo || '').replace(/</g, '&lt;');
+        const sentDot = t.sentimiento
+          ? `<span class="sent-dot ${SENT_CLASS[t.sentimiento]}" title="Sentimiento: ${SENT_LABEL[t.sentimiento]}"></span>`
+          : '';
         return `
           <div class="titular">
             <a href="${t.url}" target="_blank" rel="noopener">${titulo}</a>
-            <div class="titular-meta"><b>${medio}</b> · ${fpTxt}</div>
+            <div class="titular-meta">${sentDot}<b>${medio}</b> · ${fpTxt}</div>
           </div>`;
       }).join('');
     }
