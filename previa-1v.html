@@ -711,6 +711,56 @@
           mantiene rígidamente en 100%.
         </p>
 
+        <h4>¿Por qué un ponderador propio y no el de La Silla Vacía?</h4>
+        <p>
+          Cuando publicamos la primera versión del simulador en abril 2026,
+          usamos provisionalmente el ponderador de
+          <a href="https://www.lasillavacia.com/silla-nacional/ponderador-de-encuestas-presidenciales-2026/" target="_blank" rel="noopener" style="color:var(--blue)">La Silla Vacía</a>
+          —el agregador colombiano más serio disponible públicamente—.
+          Después de las consultas interpartidistas del 8 de marzo de 2026
+          tomamos la decisión de construir uno propio por tres razones
+          metodológicas concretas:
+        </p>
+        <ul style="margin:0 0 .6rem 1.2rem; padding:0">
+          <li style="margin-bottom:.35rem">
+            <b>El régimen cambió.</b> La Ley 2494 de 2025 elevó los
+            requisitos mínimos de muestra y transparencia para encuestas
+            electorales en Colombia. La precisión histórica de las firmas
+            antes de 2025 ya no es necesariamente predictiva de su
+            desempeño hoy: CNC era de las mejores antes de la ley y quedó
+            en el medio en su primer test post-Ley; firmas digitales como
+            Atlas Intel mejoraron relativamente. Cualquier ponderador que
+            siga usando reputaciones pre-2025 está calibrado a un mundo
+            que ya no existe.
+          </li>
+          <li style="margin-bottom:.35rem">
+            <b>Tenemos un nuevo benchmark verificable.</b> Las consultas
+            del 8 de marzo de 2026 son el único evento electoral
+            post-Ley 2494 con resultado oficial. Recalibrar contra ese
+            evento es lo metodológicamente correcto. El ponderador
+            propio asigna a cada firma un peso <code>q_firma ∈ [0,40 ; 1,00]</code>
+            linealmente inverso a su error medio absoluto (MAE) frente
+            al resultado real del 8M.
+          </li>
+          <li style="margin-bottom:.35rem">
+            <b>Transparencia radical.</b> Publicamos la matriz completa
+            de pesos por encuesta, el detalle del cálculo de bias por
+            firma y el cruce contra la distribución muestral declarada
+            (índice de representatividad muestral KL vs censo Divipole).
+            Ningún agregador colombiano publica este nivel de detalle
+            hoy. Los datos crudos están en
+            <a href="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_ponderador/ponderador-detalle.json" target="_blank" rel="noopener" style="color:var(--blue)">ponderador-detalle.json</a>.
+          </li>
+        </ul>
+        <p>
+          Eso no significa que nuestro ponderador sea más preciso que el
+          de La Silla en sentido absoluto —sería arrogante afirmarlo con
+          un solo evento de calibración—. Significa que el método es
+          <i>auditable</i>, está alineado al régimen normativo vigente,
+          y se actualizará con cada nuevo resultado verificable
+          (primera vuelta, segunda vuelta).
+        </p>
+
         <h4>1. Ponderador nacional (insumo)</h4>
         <p>
           El % de intención inicial de cada candidato se toma de nuestro
@@ -752,17 +802,36 @@
           Para proyectar el % nacional al nivel departamental usamos un modelo
           <b>proporcional multiplicativo</b>:
         </p>
-        <div class="modal-formula">p(c, d) = %nacional(c) × bias(c, d)</div>
+        <div class="modal-formula">p(c, t) = %nacional(c) × bias(c, t)</div>
         <p>
-          El <b>bias(c, d)</b> es un multiplicador regional: 1,0 significa que
-          el candidato vota en el depto al mismo nivel que el promedio
-          nacional; 1,8 que tiene 80% más fuerza; 0,5 que tiene la mitad.
-          Este coeficiente se calibra con señales empíricas: resultados
-          presidenciales históricos de candidatos equivalentes (2010–2022),
-          consultas interpartidistas 2025 y 2026, y votación al Congreso 2026
-          por partido o movimiento. La votación directa al candidato siempre
-          pesa más que la señal partidista (Oraculus, México 2024; Silver,
-          2024). Detalle completo de los seis perfiles de pesos y las
+          El <b>bias(c, t)</b> es un multiplicador regional: 1,0 significa que
+          el candidato vota en el territorio <i>t</i> al mismo nivel que el
+          promedio nacional; 1,8 que tiene 80% más fuerza; 0,5 que tiene la
+          mitad. Este coeficiente se calibra con señales empíricas:
+          resultados presidenciales históricos de candidatos equivalentes
+          (2010–2022), consultas interpartidistas 2025 y 2026, y votación al
+          Congreso 2026 por partido o movimiento. La votación directa al
+          candidato siempre pesa más que la señal partidista (Oraculus,
+          México 2024; Silver, 2024).
+        </p>
+        <p>
+          El territorio <i>t</i> puede ser uno de cinco niveles jerárquicos,
+          cada uno con su propia capa de bias calibrada con la señal a esa
+          resolución:
+        </p>
+        <ul style="margin:0 0 .6rem 1.2rem; padding:0">
+          <li style="margin-bottom:.2rem"><b>Departamento</b> (33 departamentos + circunscripciones especiales).</li>
+          <li style="margin-bottom:.2rem"><b>Municipio</b> (1.122 municipios — agregación nacional cubierta).</li>
+          <li style="margin-bottom:.2rem"><b>Comuna o localidad</b> (Bogotá: 20 localidades, Medellín: 16 comunas, Cali, Barranquilla, Ibagué, Manizales, Pereira y otras 7 ciudades capitales).</li>
+          <li style="margin-bottom:.2rem"><b>Puesto de votación</b> (en cobertura por ciudad — actualmente Bogotá y Medellín, resto en construcción).</li>
+          <li style="margin-bottom:.2rem"><b>Barrio</b> (cuando el puesto agrupa varios barrios — cobertura inicial Bogotá y Medellín).</li>
+        </ul>
+        <p>
+          En todos los niveles aplicamos el mismo formalismo y la misma
+          fuente de calibración. La granularidad puesto/barrio se construye
+          combinando la geoGeoreferenciación de puestos publicada por la
+          Registraduría con la cartografía de comunas y localidades de cada
+          ciudad. Detalle completo de los seis perfiles de pesos y las
           equivalencias históricas en el
           <a href="metodologia-simulador-presidencial-2026-grafico.pdf" target="_blank" rel="noopener" style="color:var(--blue)">documento metodológico</a>.
         </p>
@@ -817,9 +886,10 @@
           Este borrador reporta proyecciones puntuales. En la siguiente
           iteración incorporaremos una banda de incertidumbre de ±σ, donde σ
           combina error muestral y house effect (Shirani-Mehr, Rothschild, Goel
-          &amp; Gelman, JASA 2018). Además, migraremos del agregador externo a
-          uno propio construido directamente desde la tabla de sondeos de
-          Wikipedia, con pesos de reputación por encuestadora configurables.
+          &amp; Gelman, JASA 2018). El componente de house effect ya se calcula
+          a nivel firma × candidato comparando contra la mediana semanal de
+          encuestas post-marzo, y se publica en
+          <code>ponderador-detalle.json</code>; falta exponerlo en el frontend.
         </p>
       </div>
     </div>
