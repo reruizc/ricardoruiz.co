@@ -907,6 +907,10 @@
   const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
   const DEPARTAMENTOS_URL = `${S3}/mapas-2026/DEPARTAMENTOS2.json`;
   const SENADO_DEPTOS_URL = `${S3}/senado/departamentos.json`;
+  // Archivo nacional ligero con coords + censo + tier + ganadores históricos
+  // por puesto (~13.5k puntos, ~1.9 MB). Se carga la primera vez que se
+  // activa el toggle Puestos.
+  const PUESTOS_LIGHT_URL = `${S3}/puestos-nacional-light.json`;
   // Ponderador propio de ricardoruiz.co — calibrado contra el resultado oficial
   // de las consultas interpartidistas del 8 de marzo de 2026 (único ground truth
   // post-Ley 2494). Hosteado en S3 junto al resto de outputs del proyecto.
@@ -1371,6 +1375,18 @@
   let cityLayer = null;
   let currentCityKey = null;         // 'bogota', 'medellin', ... | null
   const _cityGeoCache = {};          // { cityKey: GeoJSON }
+
+  // ─── PUESTOS (LOD) ────────────────────────────────────────────
+  // Estado para la capa de puestos de votación. La vista nacional usa el
+  // archivo ligero (~1.9 MB) con tier por censo; los detalles de cada
+  // puesto (votos por candidato/partido) se cargan bajo demanda por depto
+  // desde senado/cámara/consultas.
+  let pueLayer = null;               // L.layerGroup con los circleMarkers
+  let _puestosLight = null;          // [{k,y,x,c,m,n,mn,t,p22,s26}, ...]
+  let _puestosLightLoading = null;   // Promise mientras se descarga
+  // Umbrales de zoom para el LOD: <=tier1Max → solo tier 1, <=tier2Max → tier 1+2, > → todos.
+  const PUE_ZOOM_TIER1 = 6.5;
+  const PUE_ZOOM_TIER2 = 8.0;
   const CITY_MAPS = {
     bogota:       { depCod:'16', munCod:'001', url:`${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`, rotate:true,  nameField:'LocNombre',  codeField:'LocCodigo', kind:'Localidades' },
     medellin:     { depCod:'01', munCod:'001', url:`${S3}/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`,       rotate:false, nameField:'NOMBRE',     codeField:'CODIGO',    kind:'Comunas' },
@@ -1409,8 +1425,10 @@
   }
 
   function initMap(){
-    // Mapa estático: sin zoom ni pan. Los controles de Leaflet quedan
-    // desactivados y el usuario no puede desplazar ni ampliar el mapa.
+    // Mapa estático en modos dep/mun: sin zoom ni pan. Los controles de
+    // Leaflet quedan desactivados por defecto. Sólo se habilitan cuando
+    // se activa el toggle "Puestos" (level='pue'), que requiere zoom real
+    // para el LOD. Ver setMapInteractive(on).
     map = L.map('leaflet-map', {
       center: [4.5, -74.0], zoom: 5, zoomSnap: .1,
       zoomControl: false,
@@ -1425,7 +1443,36 @@
     });
     map.getContainer().style.background = '#060810';
     setTimeout(() => map.invalidateSize(), 300);
+    // Re-render del LOD de puestos en cada zoom mientras la capa está activa.
+    map.on('zoomend', () => { if (currentLevel === 'pue') repaintPueLayer(); });
+    map.on('moveend', () => { if (currentLevel === 'pue') repaintPueLayer(); });
     loadDeptos();
+  }
+
+  // Habilita/deshabilita interacción del mapa. Sólo se activa cuando
+  // estamos en level='pue' (la vista por puestos requiere zoom continuo).
+  let _pueZoomCtrl = null;
+  function setMapInteractive(on){
+    if (!map) return;
+    if (on){
+      map.dragging.enable();
+      map.scrollWheelZoom.enable();
+      map.doubleClickZoom.enable();
+      map.boxZoom.enable();
+      map.touchZoom.enable();
+      map.keyboard.enable();
+      if (!_pueZoomCtrl){
+        _pueZoomCtrl = L.control.zoom({ position: 'topright' }).addTo(map);
+      }
+    } else {
+      map.dragging.disable();
+      map.scrollWheelZoom.disable();
+      map.doubleClickZoom.disable();
+      map.boxZoom.disable();
+      map.touchZoom.disable();
+      map.keyboard.disable();
+      if (_pueZoomCtrl){ map.removeControl(_pueZoomCtrl); _pueZoomCtrl = null; }
+    }
   }
 
   async function loadDeptos(){
@@ -2019,6 +2066,123 @@
     }
   }
 
+  // ─── PUESTOS LAYER (LOD) ──────────────────────────────────────
+  // Carga lazy del archivo nacional ligero. Se invoca al activar el toggle
+  // "Puestos" la primera vez. ~1.9 MB, ~13.5k puntos.
+  async function loadPuestosLight(){
+    if (_puestosLight) return _puestosLight;
+    if (_puestosLightLoading) return _puestosLightLoading;
+    showMapLoading('Cargando puestos de votación…');
+    _puestosLightLoading = fetch(PUESTOS_LIGHT_URL, { cache: 'force-cache' })
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(data => { _puestosLight = data; return data; })
+      .catch(e => { console.error('[Previa] error cargando puestos-light:', e); throw e; })
+      .finally(() => { hideMapLoading(); });
+    return _puestosLightLoading;
+  }
+
+  // Selecciona el subset visible según el zoom actual (LOD por tier).
+  function _puestosVisibleForZoom(z){
+    if (!_puestosLight) return [];
+    if (z <= PUE_ZOOM_TIER1) return _puestosLight.filter(p => p.t === 1);
+    if (z <= PUE_ZOOM_TIER2) return _puestosLight.filter(p => p.t <= 2);
+    return _puestosLight;
+  }
+
+  // Resuelve el ganador 2026 proyectado para un puesto a partir de su munKey.
+  // Si hay bias municipal calibrado para ese mun, usa la proyección del mun
+  // (que es estable y consistente con la vista municipal). Si no, cae a la
+  // del depto. Iteración futura (TODO precomputeBiasPue): modular por p22/s26
+  // para resolver heterogeneidad intra-mun.
+  function _puestoWinner(p){
+    const dep = p.k.slice(0, 2);
+    const mun = p.k.slice(3, 6);
+    const munKey = `${dep}-${mun}`;
+    const depEntry = Object.values(SENADO_BY_DEPTO).find(s => s.cod === dep);
+    const depNom = depEntry?.nombre || '';
+    const hasMunBias = _biasCacheMun && Object.values(_biasCacheMun).some(m => m[munKey] != null);
+    const r = hasMunBias ? computeMunRanking(munKey, depNom) : computeDeptoRanking(depNom);
+    return { ranking: r, depNom, munKey, hasMunBias };
+  }
+
+  // Calcula radio del marker en función del censo (raíz cuadrada para
+  // que un puesto 10x más grande luzca ~3x más grande, no 10x).
+  function _puestoRadius(censo, zoom){
+    const base = Math.sqrt(Math.max(censo, 1)) / 30;  // 1.000 → ~1.05px
+    // Con más zoom, agrandamos un poco para que se sigan viendo.
+    const scale = zoom <= PUE_ZOOM_TIER1 ? 1.0 : zoom <= PUE_ZOOM_TIER2 ? 1.4 : 1.8;
+    return Math.max(2, Math.min(14, base * scale));
+  }
+
+  function _puestoStyle(p){
+    const { ranking } = _puestoWinner(p);
+    if (selectedId){
+      const cand = CANDIDATOS.find(c => c.id === selectedId);
+      if (!cand) return { color: '#1a1d2e', fillColor: '#1a1d2e', fillOpacity: .35, weight: .5 };
+      // Intensidad por % proyectado del candidato seleccionado en el mun
+      // (no podemos diferenciar puestos del mismo mun aún — pendiente bias por puesto).
+      const total = ranking?.ranked.reduce((s,x)=>s+x.v, 0) || 0;
+      const v = ranking?.ranked.find(x => x.c.id === cand.id)?.v || 0;
+      const share = total > 0 ? v / total : 0;
+      const intensity = Math.min(1, share / Math.max(_maxSingleShare, .01));
+      return { color: 'rgba(255,255,255,0.5)', fillColor: colorWithIntensity(cand.color, intensity), fillOpacity: .85, weight: .5 };
+    }
+    if (!ranking || !ranking.winner){
+      return { color: 'rgba(255,255,255,.4)', fillColor: '#1a1d2e', fillOpacity: .5, weight: .5 };
+    }
+    const intensity = Math.min(1, ranking.margin / Math.max(_maxMargin, 1));
+    return { color: 'rgba(255,255,255,0.55)', fillColor: colorWithIntensity(ranking.winner.color, intensity), fillOpacity: .9, weight: .5 };
+  }
+
+  // Re-render completo de la capa según el zoom actual. Es destructivo
+  // (clear y rebuild de los markers) — Leaflet maneja bien ~5k circleMarker.
+  function repaintPueLayer(){
+    if (!map || !pueLayer) return;
+    const z = map.getZoom();
+    const visible = _puestosVisibleForZoom(z);
+    pueLayer.clearLayers();
+    for (const p of visible){
+      const r = _puestoRadius(p.c, z);
+      const style = _puestoStyle(p);
+      const m = L.circleMarker([p.y, p.x], { ...style, radius: r });
+      m._puData = p;
+      m.on('mouseover', _onPueHover);
+      m.on('mouseout',  _onPueOut);
+      m.on('click',     _onPueClick);
+      m.addTo(pueLayer);
+    }
+  }
+
+  function _onPueHover(e){
+    const layer = e.target;
+    const p = layer._puData;
+    layer.setStyle({ weight: 2, color: '#fff', fillOpacity: 1 });
+    const { ranking } = _puestoWinner(p);
+    const winColor = ranking?.winner?.color || 'rgba(255,255,255,.5)';
+    _setHoverChip(e, p.n || 'Puesto', winColor);
+    const html = (() => {
+      const cBase = `<b>${p.n || 'Puesto'}</b><br><span style="opacity:.7">${p.mn || ''}</span>`;
+      const censo = p.c ? `<br>Censo: <b>${p.c.toLocaleString('es-CO')}</b>` : '';
+      const win = ranking?.winner ? `<br>1º <span style="color:${displayColorOnDark(ranking.winner.color)}">${ranking.winner.nombre}</span> · ${(ranking.winShare*100).toFixed(1)}%` : '';
+      return `<div style="line-height:1.4">${cBase}${censo}${win}</div>`;
+    })();
+    layer.bindTooltip(html, { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }).openTooltip();
+  }
+  function _onPueOut(e){
+    const layer = e.target;
+    const p = layer._puData;
+    layer.setStyle({ ..._puestoStyle(p), radius: _puestoRadius(p.c, map.getZoom()) });
+    layer.closeTooltip();
+    _clearHoverChip();
+  }
+  function _onPueClick(e){
+    const p = e.target._puData;
+    // Por ahora: zoom-in al puesto para revelar más detalles del entorno.
+    // (TODO: cargar el puestos.json del depto y mostrar repartición exacta
+    // en una tarjeta lateral.)
+    map.flyTo([p.y, p.x], Math.max(map.getZoom() + 2, 12), { duration: .6 });
+  }
+
   // Cuenta cuántos deptos gana cada candidato (modo ganadores).
   function countWinners(){
     const counts = new Map();
@@ -2035,6 +2199,10 @@
     if (deptLayer) deptLayer.setStyle(featureStyle);
     if (munLayer) munLayer.setStyle(munFeatureStyle);
     if (nacionalMunLayer) nacionalMunLayer.setStyle(munFeatureStyle);
+    // Si la vista de puestos está activa, recolorear los markers tras un
+    // cambio del ponderador (los sliders mueven el `pct` de cada candidato
+    // y por tanto el ganador proyectado en cada puesto).
+    if (currentLevel === 'pue' && pueLayer) repaintPueLayer();
     // La tarjeta del territorio activo (si hay) refleja los sliders nuevos.
     _refreshTerritoryCard();
     const label = document.getElementById('map-head-label');
@@ -2949,6 +3117,14 @@
       b.classList.toggle('active', b.dataset.level === level);
     });
 
+    // Salir del modo puestos: limpia la capa, deshabilita el zoom y
+    // restaura las opciones del mapa estático (ver setMapInteractive).
+    if (level !== 'pue'){
+      if (pueLayer){ map.removeLayer(pueLayer); pueLayer = null; }
+      setMapInteractive(false);
+      hint.classList.remove('lg');
+    }
+
     if (level === 'dep'){
       // Vuelve a vista nacional por deptos. Remueve cualquier capa mun/city.
       if (cityLayer){ map.removeLayer(cityLayer); cityLayer = null; currentCityKey = null; }
@@ -2969,11 +3145,26 @@
       await loadMunicipalNacional();
       repaintMap();
     } else if (level === 'pue'){
-      hint.classList.add('lg');
-      hint.innerHTML = 'Mapa por puestos en preparación · llega en breve';
+      // Vista por puestos: oculta polígonos, activa zoom real, dibuja
+      // los markers según LOD (más puntos a medida que el usuario hace
+      // zoom). El archivo nacional ligero se descarga la primera vez.
+      if (cityLayer){ map.removeLayer(cityLayer); cityLayer = null; currentCityKey = null; }
+      if (munLayer){ map.removeLayer(munLayer); munLayer = null; }
+      if (nacionalMunLayer){ map.removeLayer(nacionalMunLayer); nacionalMunLayer = null; }
+      if (deptLayer) map.removeLayer(deptLayer);
+      currentDepCod = null;
+      document.getElementById('map-back-btn')?.classList.remove('show');
+      setMapInteractive(true);
+      try { await loadPuestosLight(); } catch(e){
+        hint.classList.add('lg');
+        hint.innerHTML = 'No se pudieron cargar los puestos · revisa la conexión';
+        return;
+      }
+      if (!pueLayer) pueLayer = L.layerGroup().addTo(map);
+      repaintPueLayer();
+      // Encuadre nacional inicial. El usuario puede zoomear/arrastrar libremente.
+      try { map.setView([4.5, -73.5], 6); } catch(e){}
     }
-    // Limpiar clase lg si cambiamos a otro nivel
-    if (level !== 'pue') hint.classList.remove('lg');
   }
 
   // ─── THEME ────────────────────────────────────────────────────
