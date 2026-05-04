@@ -585,7 +585,7 @@
   <!-- Nota de uso -->
   <section class="use-note">
     <strong>¿Cómo usar esta herramienta?</strong>
-    Esta simulación parte del <em>ponderador de encuestas de La Silla Vacía</em> —medida provisional mientras terminamos nuestro propio agregador— y lo proyecta al territorio.
+    Esta simulación parte de nuestro <em>ponderador propio de encuestas presidenciales 2026</em> —calibrado contra el resultado oficial del 8 de marzo, con pesos por firma derivados de su precisión predictiva post-Ley 2494— y lo proyecta al territorio.
     Mueve los deslizadores del panel derecho para modificar la intención de voto nacional de cada fórmula:
     el mapa repinta al ganador por departamento, y la votación estimada (basada en la participación real de Senado 2026 escalada al escenario presidencial 2022)
     se recalcula en vivo. Si subes a un candidato, el resto cede proporcionalmente — la suma total se mantiene fija en 100%.
@@ -711,23 +711,22 @@
           mantiene rígidamente en 100%.
         </p>
 
-        <h4>1. Ponderador nacional (insumo, provisional)</h4>
+        <h4>1. Ponderador nacional (insumo)</h4>
         <p>
-          Mientras terminamos nuestro propio agregador, el % de intención
-          inicial de cada candidato se toma —de manera provisional— del
-          <a href="https://www.lasillavacia.com/silla-nacional/ponderador-de-encuestas-presidenciales-2026/" target="_blank" rel="noopener" style="color:var(--blue)">Ponderador de Encuestas Presidenciales 2026 de La Silla Vacía</a>,
-          que agrega todas las encuestas públicas ponderando por recencia, tamaño muestral y
-          desempeño histórico de la firma —ver su
-          <a href="https://www.lasillavacia.com/wp-content/uploads/2026/03/Nota-tecnica-ponderacion-encuestas-Presidenciales-2026-V-Mar29.docx.pdf" target="_blank" rel="noopener" style="color:var(--blue)">nota técnica de marzo de 2026</a>—.
-          Cargamos los valores del corte más reciente desde
-          <b>ponderador-actual.json</b>. La próxima versión reemplazará esta
-          fuente por un agregador propio construido sobre la tabla de sondeos
-          de Wikipedia, con pesos de reputación por encuestadora configurables
-          localmente. <b>Sólo incluimos candidatos con intención superior al
-          1%</b>: las fórmulas residuales complicarían el modelo sin ganancia
-          analítica.
+          El % de intención inicial de cada candidato se toma de nuestro
+          <b>ponderador propio</b>, calibrado contra el resultado oficial de
+          las consultas interpartidistas del 8 de marzo de 2026 —único <i>ground
+          truth</i> disponible bajo el régimen de la Ley 2494 de 2025—. Para
+          cada firma encuestadora se computa el error medio absoluto (MAE)
+          entre su predicción pre-consultas y el resultado real, después se
+          le asigna un peso <code>q_firma ∈ [0,40 ; 1,00]</code> linealmente
+          inverso a su MAE. Sumamos los componentes <code>q_modo</code>
+          (presencial / digital / mixto / telefónico) y un decaimiento
+          exponencial por recencia. <b>Sólo incluimos candidatos con
+          intención superior al 1%</b>: las fórmulas residuales complican el
+          modelo sin ganancia analítica.
         </p>
-        <div class="modal-formula">%nacional(c) = Σ ( w<sub>i</sub> · %<sub>i</sub>(c) ) / Σ w<sub>i</sub></div>
+        <div class="modal-formula">%nacional(c) = Σ ( q_firma<sub>i</sub> · q_modo<sub>i</sub> · Δ_recencia<sub>i</sub> · %<sub>i</sub>(c) ) / Σ pesos</div>
 
         <h4>2. Suma total forzada a 100%</h4>
         <p>
@@ -877,15 +876,15 @@
       foto:'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/20240521_posesi%C3%B3n_canciller_Murillo-Joel_Gonz%C3%A1lez1536_%28Cropped%29.jpg/480px-20240521_posesi%C3%B3n_canciller_Murillo-Joel_Gonz%C3%A1lez1536_%28Cropped%29.jpg',
       bias:{ 'CHOCO':2.4,'ANTIOQUIA':1.3,'BOGOTA D.C.':1.2,'VALLE DEL CAUCA':1.1,'CAUCA':1.2,'NARIÑO':1.1,
              'SANTANDER':.7,'BOYACA':.7 } },
-    // Candidato agregador residual: Lizcano + M. Uribe Londoño + Caicedo +
-    // Santiago Botero + Clara López + S. Macollins. Se carga su pct desde
-    // ponderador-actual.json sumando los ids residuales (ver loadPonderador).
-    // Sin equivalencias → bias uniforme 1.0. NO compite en el ranking del
-    // mapa (igual tratamiento que 'nd'), pero sí cuenta en el ponderador
-    // nacional y en la leyenda de votos estimados.
-    { id:'otros', nombre:'Otros', partido:'Candidatos residuales (<2%)',  color:'#94a3b8', pct:5.3,
+    // Tres categorías de no-candidato separadas (vienen del ponderador propio
+    // como columnas independientes; sin equivalencias → bias uniforme 1.0).
+    // NO compiten en el ranking del mapa, pero sí cuentan en el stack del
+    // ponderador nacional y en la leyenda de votos estimados.
+    { id:'bl', nombre:'Voto en blanco',       partido:'Blanco / nulo',                 color:'#cbd5e1', pct:5.0,
       bias:{} },
-    { id:'nd', nombre:'Blanco / NS–NR',       partido:'Indecisos',                    color:'#64748b', pct:11.7,
+    { id:'ns', nombre:'NS / NR',              partido:'No sabe, no responde, no votaría', color:'#94a3b8', pct:5.0,
+      bias:{} },
+    { id:'ot', nombre:'Otros candidatos',     partido:'Botero · Lizcano · Caicedo · etc.', color:'#64748b', pct:1.7,
       bias:{} },
   ];
 
@@ -908,9 +907,27 @@
   const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
   const DEPARTAMENTOS_URL = `${S3}/mapas-2026/DEPARTAMENTOS2.json`;
   const SENADO_DEPTOS_URL = `${S3}/senado/departamentos.json`;
-  // Archivo local en la raíz del sitio. Cuando escalamos al ponderador propio
-  // (Opción C) cambiamos esta URL al JSON generado por el scraper en S3.
-  const PONDERADOR_URL = 'ponderador-actual.json';
+  // Ponderador propio de ricardoruiz.co — calibrado contra el resultado oficial
+  // de las consultas interpartidistas del 8 de marzo de 2026 (único ground truth
+  // post-Ley 2494). Hosteado en S3 junto al resto de outputs del proyecto.
+  const PONDERADOR_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_ponderador/ponderador-actual.json';
+  // Mapeo id_simulador → key en el ponderador. Nuestro ponderador usa apellidos
+  // (Cepeda, De la Espriella…) y tres categorías de no-voto separadas:
+  //   Blanco  — voto en blanco / nulo
+  //   NS-NR   — no sabe / no responde / no votaría / ninguno
+  //   Otros   — candidatos pequeños no soportados (Botero, Lizcano, etc.)
+  const PONDERADOR_KEY_BY_ID = {
+    ic: 'Cepeda',
+    ae: 'De la Espriella',
+    sf: 'Fajardo',
+    pv: 'Valencia',
+    rb: 'Barreras',
+    cl: 'Claudia López',
+    lm: 'Murillo',
+    bl: 'Blanco',
+    ns: 'NS-NR',
+    ot: 'Otros',
+  };
   // Los votantes de presidencial suelen superar a los de congreso por ~8-10%.
   // Senado 2026: 20,56M (~49,8%). Target presidencial ~54% → factor 1,087.
   // Ref histórica: 2022 pres/con = 1,157 · 2018 pres/con = 1,092.
@@ -1013,7 +1030,11 @@
       'pres-2022-v1': { cands: ['SERGIO FAJARDO', 'GUSTAVO PETRO'], peso: 0.20 },
       'pres-2018-v1': { cands: ['HUMBERTO DE LA CALLE'], peso: 0.10 },
     },
-    'nd': {  // Blanco / Indecisos — sin bias regional (uniforme)
+    'bl': {  // Voto en blanco — sin bias regional (uniforme)
+    },
+    'ns': {  // NS/NR — sin bias regional (uniforme)
+    },
+    'ot': {  // Otros candidatos pequeños — sin bias regional (uniforme)
     },
   };
 
@@ -1123,8 +1144,9 @@
       'pres-2014-mde':              { cands: ['CLARA LOPEZ', 'ENRIQUE PENALOSA'], peso: 0.04 },
       'pres-2010-mde':              { cands: ['JUAN MANUEL SANTOS CALDERON'], peso: 0.03 },
     },
-    'otros': {},  // sin bias específico → uniforme 1.0
-    'nd': {},
+    'bl': {},  // sin bias específico → uniforme 1.0 para todas las no-candidato
+    'ns': {},
+    'ot': {},
   };
   // Mapas en memoria que se llenan al primer drill a Medellín (lazy).
   //   HISTORICOS_MED[sig] = { ciudad: { keyNorm: pctFraccion },
@@ -1233,8 +1255,9 @@
       'pres-2014':                 { cands: ['CLARA LOPEZ', 'ENRIQUE PENALOSA'], peso: 0.10 },
       'pres-2010':                 { cands: ['JUAN MANUEL SANTOS CALDERON', 'Juan Manuel Santos Calderón'], peso: 0.10 },
     },
-    'otros': {},
-    'nd': {},
+    'bl': {},
+    'ns': {},
+    'ot': {},
   };
 
   // HISTORICOS_CITY[cityKey][sigKey] = { ciudad: {keyNorm: pct}, comunas: {comCod: {keyNorm: pct}} }
@@ -1309,14 +1332,16 @@
   }
 
   // Para cada feature/depto calcula ganador, segundo, y margen.
-  // IMPORTANTE: excluimos 'nd' (Blanco / Indecisos) y 'otros' (agregador de
-  // candidatos residuales) del ranking competitivo. Son categorías de
-  // agregación, no rivales de candidatos individuales. Ambos siguen
-  // contabilizándose en el stack del ponderador nacional y en la suma de
-  // votos estimados (leyenda del mapa).
+  // IMPORTANTE: excluimos las categorías no-candidato (bl, ns, ot) del
+  // ranking competitivo. El voto en blanco / NS-NR / candidatos pequeños
+  // son residuales, no rivales — incluirlos distorsionaba la lectura del
+  // mapa (p. ej. 2º en Putumayo/Nariño donde Cepeda domina, sólo porque
+  // tienen bias=1 uniforme y los demás tienen bias bajo). Se siguen
+  // contabilizando en votos estimados y en el stack del ponderador.
+  const NO_CANDIDATO_IDS = new Set(['bl', 'ns', 'ot']);
   function computeDeptoRanking(depNom){
     const ranked = CANDIDATOS
-      .filter(c => c.id !== 'nd' && c.id !== 'otros')
+      .filter(c => !NO_CANDIDATO_IDS.has(c.id))
       .map(c => ({ c, v: projected(c, depNom) }))
       .filter(x => x.v > 0)
       .sort((a,b) => b.v - a.v);
@@ -2263,7 +2288,7 @@
   // El ranking se recomputa en cada render — así los sliders y los cambios
   // en el bias actualizan la tarjeta sin necesidad de un nuevo mouseover.
   function _computeRankingForPayload(payload){
-    const cands = CANDIDATOS.filter(c => c.id !== 'nd');
+    const cands = CANDIDATOS.filter(c => !NO_CANDIDATO_IDS.has(c.id));
     let getV;
     if (payload.kind === 'depto'){
       const { depNom } = payload.args;
@@ -2751,7 +2776,7 @@
     const metaHtml = `
       <h3 style="font-family:Arial;margin:0 0 4px">${title}</h3>
       <p style="font-family:Arial;font-size:11px;color:#555;margin:0 0 12px">
-        Base ponderador: La Silla Vacía · ${PONDERADOR_META?.fecha_corte || 'sin fecha'} ·
+        Base ponderador: ricardoruiz.co · corte ${PONDERADOR_META?.fecha_corte || 'sin fecha'} ·
         Votantes estimados = potencial × 54% (escenario 2022), distribuido según Senado 2026.
       </p>`;
 
@@ -2983,26 +3008,16 @@
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const data = await r.json();
       if (!data || !data.candidatos) throw new Error('JSON inválido');
-      // IDs de candidatos principales (excluyendo agregadores locales 'otros' y 'nd')
-      const principalIds = new Set(CANDIDATOS.filter(c => c.id !== 'otros' && c.id !== 'nd').map(c => c.id));
-      // Sobrescribimos pct en CANDIDATOS para los ids que existan en el JSON
+      // Sobreescribimos pct en CANDIDATOS para los ids que tengan mapeo en
+      // PONDERADOR_KEY_BY_ID. Cada categoría (incluidas Blanco, NS-NR, Otros)
+      // viene del JSON con su % real. forzar100ResidualBlanco() sólo corrige
+      // el drift de redondeo (típicamente <0,1 pp).
       CANDIDATOS.forEach(c => {
-        if (c.id === 'otros') return;  // se calcula abajo como suma residual
-        const entry = data.candidatos[c.id];
+        const apellido = PONDERADOR_KEY_BY_ID[c.id];
+        if (!apellido) return;
+        const entry = data.candidatos[apellido];
         if (entry && typeof entry.pct === 'number') c.pct = entry.pct;
       });
-      // 'otros' = suma de pct de candidatos del JSON que NO son principales
-      //           ni 'nd' (Blanco). P.ej.: Lizcano, M. Uribe Londoño, Caicedo,
-      //           Santiago Botero, Clara López, Sondra Macollins.
-      const otrosCand = CANDIDATOS.find(c => c.id === 'otros');
-      if (otrosCand){
-        let sumOtros = 0;
-        for (const [id, entry] of Object.entries(data.candidatos)){
-          if (id === 'nd' || principalIds.has(id)) continue;
-          if (entry && typeof entry.pct === 'number') sumOtros += entry.pct;
-        }
-        if (sumOtros > 0) otrosCand.pct = +sumOtros.toFixed(2);
-      }
       PONDERADOR_META = {
         fuente: data.fuente,
         fecha_corte: data.fecha_corte,
@@ -3013,9 +3028,10 @@
       console.warn('[Previa] usando valores hardcoded (no se pudo cargar el ponderador):', e.message);
     }
     // Forzamos suma exacta a 100%: si el ponderador externo reporta una
-    // suma distinta (p.ej. 99 o 101 por redondeo), el residual lo absorbe
-    // el candidato 'nd' (Blanco / Indecisos). Los otros candidatos no se
-    // tocan — el ponderador total del header siempre marca 100.0%.
+    // suma distinta (p.ej. 99,98 o 100,02 por redondeo), el residual lo
+    // absorbe 'ot' (Otros candidatos pequeños) por ser la categoría más
+    // elástica. Los demás candidatos no se tocan — el ponderador total
+    // del header siempre marca 100,0%.
     forzar100ResidualBlanco();
     // Ordena de mayor a menor % (una sola vez, al boot). Luego los sliders
     // NO re-ordenan durante la interacción para evitar que las tarjetas
@@ -3024,13 +3040,15 @@
     BASE = CANDIDATOS.map(c => ({ ...c }));
   }
 
-  // Ajusta el candidato 'nd' (Blanco / Indecisos) para que la suma sea 100.
-  // Si 'nd' no existe, usa el de menor pct como absorbedor. Clamp ≥ 0.
+  // Ajusta 'ot' (Otros) para que la suma sea exactamente 100. Si 'ot' no
+  // existe, cae a 'ns' o 'bl' como absorbedor. Clamp ≥ 0.
   function forzar100ResidualBlanco(){
     const total = CANDIDATOS.reduce((s,c) => s + c.pct, 0);
     const diff = 100 - total;
     if (Math.abs(diff) < 0.001) return;
-    const absorbedor = CANDIDATOS.find(c => c.id === 'nd')
+    const absorbedor = CANDIDATOS.find(c => c.id === 'ot')
+                    || CANDIDATOS.find(c => c.id === 'ns')
+                    || CANDIDATOS.find(c => c.id === 'bl')
                     || [...CANDIDATOS].sort((a,b) => a.pct - b.pct)[0];
     if (!absorbedor) return;
     absorbedor.pct = Math.max(0, +(absorbedor.pct + diff).toFixed(2));
@@ -3367,9 +3385,9 @@
     return cand.pct * biasForMun(cand, munKey, parentDepName);
   }
   function computeMunRanking(munKey, parentDepName){
-    // Misma razón que computeDeptoRanking: excluimos agregadores.
+    // Misma razón que computeDeptoRanking: excluimos no-candidatos del ranking.
     const ranked = CANDIDATOS
-      .filter(c => c.id !== 'nd' && c.id !== 'otros')
+      .filter(c => !NO_CANDIDATO_IDS.has(c.id))
       .map(c => ({ c, v: projectedMun(c, munKey, parentDepName) }))
       .filter(x => x.v > 0)
       .sort((a,b) => b.v - a.v);
@@ -3554,7 +3572,7 @@
   }
   function computeComunaMedRanking(comCod){
     const ranked = CANDIDATOS
-      .filter(c => c.id !== 'nd' && c.id !== 'otros')
+      .filter(c => !NO_CANDIDATO_IDS.has(c.id))
       .map(c => ({ c, v: projectedComunaMed(c, comCod) }))
       .filter(x => x.v > 0)
       .sort((a,b) => b.v - a.v);
@@ -3735,7 +3753,7 @@
 
   function computeComunaCityRanking(cityKey, comCod){
     const ranked = CANDIDATOS
-      .filter(c => c.id !== 'nd' && c.id !== 'otros')
+      .filter(c => !NO_CANDIDATO_IDS.has(c.id))
       .map(c => ({ c, v: projectedComunaCity(c, cityKey, comCod) }))
       .filter(x => x.v > 0)
       .sort((a,b) => b.v - a.v);
@@ -3864,11 +3882,11 @@
     const el = document.getElementById('pond-fuente');
     if (!el || !PONDERADOR_META) return;
     const fecha = PONDERADOR_META.fecha_corte || '—';
-    const url = PONDERADOR_META.url_fuente || '#';
+    const url = PONDERADOR_META.url_fuente || 'metodologia-simulador-presidencial-2026.pdf';
     el.innerHTML =
       '<a href="' + url + '" target="_blank" rel="noopener" ' +
       'style="color:inherit;text-decoration:none;border-bottom:1px dotted currentColor">' +
-      'Base provisional: La Silla Vacía · ' + fecha + '</a>';
+      'Ponderador propio · ricardoruiz.co · corte ' + fecha + '</a>';
   }
 
   // ─── BOOT ─────────────────────────────────────────────────────
