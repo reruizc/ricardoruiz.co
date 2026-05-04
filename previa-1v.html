@@ -3145,23 +3145,30 @@
       await loadMunicipalNacional();
       repaintMap();
     } else if (level === 'pue'){
-      // Vista por puestos: oculta polígonos, activa zoom real, dibuja
-      // los markers según LOD (más puntos a medida que el usuario hace
-      // zoom). El archivo nacional ligero se descarga la primera vez.
+      // Vista por puestos: deja la capa de municipios como FONDO (mismo
+      // que el toggle 'mun') para que los puntos no floten en el vacío;
+      // encima dibuja los markers de puestos con LOD por zoom. El archivo
+      // nacional ligero se descarga la primera vez.
       if (cityLayer){ map.removeLayer(cityLayer); cityLayer = null; currentCityKey = null; }
       if (munLayer){ map.removeLayer(munLayer); munLayer = null; }
-      if (nacionalMunLayer){ map.removeLayer(nacionalMunLayer); nacionalMunLayer = null; }
       if (deptLayer) map.removeLayer(deptLayer);
       currentDepCod = null;
       document.getElementById('map-back-btn')?.classList.remove('show');
       setMapInteractive(true);
-      try { await loadPuestosLight(); } catch(e){
+      // Carga el fondo municipal (cacheado tras el primer fetch) y los puestos
+      // en paralelo. El fondo da contexto territorial mientras el usuario
+      // zoomea entre tiers.
+      try {
+        await Promise.all([loadMunicipalNacional(), loadPuestosLight()]);
+      } catch(e){
         hint.classList.add('lg');
         hint.innerHTML = 'No se pudieron cargar los puestos · revisa la conexión';
         return;
       }
+      // pueLayer va por encima del nacionalMunLayer al añadirse después.
       if (!pueLayer) pueLayer = L.layerGroup().addTo(map);
-      repaintPueLayer();
+      repaintMap();        // re-estiliza los muns (modo ganadores/filtro)
+      repaintPueLayer();   // dibuja los markers según el zoom actual
       // Encuadre nacional inicial. El usuario puede zoomear/arrastrar libremente.
       try { map.setView([4.5, -73.5], 6); } catch(e){}
     }
