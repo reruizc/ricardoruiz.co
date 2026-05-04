@@ -135,6 +135,48 @@
     .pond-chip .dot{width:11px;height:11px;display:inline-block;border-radius:2px}
     .pond-chip-num{font-weight:500}
 
+    /* EVOLUCIÓN — gráfico temporal de encuestas */
+    .evolucion{padding:1rem 2.5rem 1.4rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.015)}
+    .evolucion-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:.55rem;gap:.9rem;flex-wrap:wrap}
+    .evolucion-title{font-family:Avenir,sans-serif;font-weight:500;font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.55)}
+    .evolucion-sub{font-family:Avenir,sans-serif;font-weight:400;font-size:.68rem;letter-spacing:.05em;color:rgba(255,255,255,.45);margin-left:.6rem}
+    body.day-mode .evolucion{background:rgba(0,0,0,.02);border-bottom-color:rgba(0,0,0,.1)}
+    body.day-mode .evolucion-title{color:rgba(0,0,0,.65)}
+    body.day-mode .evolucion-sub{color:rgba(0,0,0,.55)}
+    #evolucion-svg{width:100%;height:auto;display:block;font-family:Avenir,sans-serif;overflow:visible}
+    .ev-grid line{stroke:rgba(255,255,255,.07);stroke-width:1}
+    body.day-mode .ev-grid line{stroke:rgba(0,0,0,.08)}
+    .ev-axis text{fill:rgba(255,255,255,.45);font-size:11px;font-weight:400}
+    body.day-mode .ev-axis text{fill:rgba(0,0,0,.55)}
+    .ev-line{fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+    .ev-halo{fill:none;stroke-width:6;stroke-linecap:round;stroke-linejoin:round;opacity:.18}
+    .ev-pred-zone{fill:rgba(167,139,250,.06)}
+    body.day-mode .ev-pred-zone{fill:rgba(124,58,237,.05)}
+    .ev-pred-line{stroke:rgba(167,139,250,.6);stroke-width:1;stroke-dasharray:4 4;fill:none}
+    body.day-mode .ev-pred-line{stroke:rgba(124,58,237,.7)}
+    .ev-pred-label{fill:rgba(167,139,250,.85);font-size:11px;font-weight:500;letter-spacing:.05em;text-transform:uppercase}
+    body.day-mode .ev-pred-label{fill:#7c3aed}
+    .ev-vert-line{stroke:rgba(167,139,250,.55);stroke-width:1.2;stroke-dasharray:5 5;fill:none}
+    body.day-mode .ev-vert-line{stroke:rgba(124,58,237,.7)}
+    .ev-vert-label{fill:rgba(167,139,250,.7);font-size:10px;font-weight:500}
+    body.day-mode .ev-vert-label{fill:#7c3aed}
+    .ev-end-label{font-family:Avenir,sans-serif;font-weight:600;font-size:11.5px}
+    .ev-end-pct{font-family:Avenir,sans-serif;font-weight:700;font-size:13px}
+    .ev-firmas{display:flex;gap:1.1rem;margin-top:.6rem;flex-wrap:wrap;font-family:Avenir,sans-serif;font-weight:400;font-size:.72rem;color:rgba(255,255,255,.55)}
+    body.day-mode .ev-firmas{color:rgba(0,0,0,.6)}
+    .ev-firma{display:inline-flex;align-items:center;gap:.4rem}
+    .ev-firma svg{flex-shrink:0}
+    .ev-cands{display:flex;gap:.85rem;margin-top:.7rem;flex-wrap:wrap;font-family:Avenir,sans-serif;font-weight:500;font-size:.74rem}
+    .ev-cand-chip{display:inline-flex;align-items:center;gap:.4rem;color:rgba(255,255,255,.78)}
+    body.day-mode .ev-cand-chip{color:rgba(0,0,0,.78)}
+    .ev-cand-chip .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+    @media (max-width:760px){
+      .evolucion{padding:.8rem 1rem 1rem}
+      .ev-end-label{font-size:10px}
+      .ev-end-pct{font-size:11.5px}
+      .evolucion-sub{display:block;margin-left:0;margin-top:.2rem}
+    }
+
     /* Auth buttons (nav) — copiados de electoral.html */
     .e-btn-login{font-family:'Syne',sans-serif;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-decoration:none;background:#f97316;border:1.5px solid #f97316;padding:.35rem .8rem;transition:background .2s,border-color .2s;cursor:pointer}
     .e-btn-login:hover{background:#ea6d0d;border-color:#ea6d0d}
@@ -607,6 +649,19 @@
     </div>
     <div id="stack" role="img" aria-label="Ponderador"></div>
     <div class="pond-legend" id="pond-legend"></div>
+  </section>
+
+  <!-- Evolución temporal de encuestas (primera vuelta 2026) -->
+  <section class="evolucion">
+    <div class="evolucion-head">
+      <div class="pond-title-wrap">
+        <div class="evolucion-title">Evolución de la intención de voto</div>
+        <span class="evolucion-sub" id="evolucion-sub">enero–mayo 2026 · ponderado por recencia, tamaño muestral y calidad de la firma</span>
+      </div>
+    </div>
+    <svg id="evolucion-svg" viewBox="0 0 880 360" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Evolución de la intención de voto"></svg>
+    <div class="ev-cands" id="evolucion-cands"></div>
+    <div class="ev-firmas" id="evolucion-firmas"></div>
   </section>
 
   <!-- Toggles nivel territorial -->
@@ -4207,6 +4262,279 @@
       'Ponderador propio · ricardoruiz.co · corte ' + fecha + '</a>';
   }
 
+  // ─── EVOLUCIÓN TEMPORAL DE ENCUESTAS ──────────────────────────
+  // Mismas 11 encuestas que alimentan el ponderador propio (categoría
+  // primera_vuelta · presidencial_nacional). Fuente local: encuestas_porcentajes.csv.
+  // Embebido para evitar un fetch adicional — la serie es chica (~3 KB).
+  const POLLS = [
+    { id:'1-atlasintel',          firma:'Atlas Intel',                     fecha:'2026-01-08', n:4520, modo:'digital',
+      cands:{ 'Cepeda':26.5,'De la Espriella':27.99,'Valencia':5.09,'Fajardo':9.38,'Claudia López':2.65,'Barreras':0.2 } },
+    { id:'11-genesis-crea',       firma:'Génesis Crea',                    fecha:'2026-01-22', n:1284, modo:'presencial',
+      cands:{ 'Cepeda':28.1,'De la Espriella':25.7,'Valencia':1.2,'Fajardo':3.1,'Claudia López':1.7,'Barreras':0.3 } },
+    { id:'13-atlasintel',         firma:'Atlas Intel',                     fecha:'2026-02-04', n:7298, modo:'presencial',
+      cands:{ 'Cepeda':27.83,'De la Espriella':28.4,'Valencia':3.36,'Fajardo':6.74,'Claudia López':3.27,'Barreras':0.34 } },
+    { id:'19-invamer',            firma:'Invamer',                         fecha:'2026-02-22', n:3800, modo:'presencial',
+      cands:{ 'Cepeda':43.0,'De la Espriella':23.4,'Valencia':7.8,'Fajardo':10.3,'Claudia López':12.5 } },
+    { id:'27-atlas-intel',        firma:'Atlas Intel',                     fecha:'2026-02-25', n:6468, modo:'presencial',
+      cands:{ 'Cepeda':34.01,'De la Espriella':31.91,'Valencia':3.92,'Fajardo':6.27,'Claudia López':1.85,'Barreras':0.75 } },
+    { id:'29-atlas-intel',        firma:'Atlas Intel',                     fecha:'2026-03-12', n:4291, modo:'digital',
+      cands:{ 'Cepeda':34.95,'De la Espriella':26.81,'Valencia':16.78,'Fajardo':7.45,'Claudia López':1.57,'Barreras':0.91,'Murillo':0.65 } },
+    { id:'31-gad3',               firma:'GAD3',                            fecha:'2026-03-18', n:1200, modo:'telefonico',
+      cands:{ 'Cepeda':35.25,'De la Espriella':20.59,'Valencia':15.56,'Fajardo':3.11,'Claudia López':4.03,'Barreras':0.06,'Murillo':0.53 } },
+    { id:'34-cnc',                firma:'Centro Nacional de Consultoría',  fecha:'2026-03-21', n:2494, modo:'presencial',
+      cands:{ 'Cepeda':34.5,'De la Espriella':15.4,'Valencia':22.2,'Fajardo':3.6,'Claudia López':3.7,'Barreras':0.5,'Murillo':0.2 } },
+    { id:'38-guarumo',            firma:'Guarumo / EcoAnalítica',          fecha:'2026-03-25', n:2022, modo:'presencial',
+      cands:{ 'Cepeda':38.0,'De la Espriella':23.9,'Valencia':22.8,'Fajardo':2.5,'Claudia López':2.4,'Barreras':0.3,'Murillo':0.3 } },
+    { id:'36-atlas-intel',        firma:'Atlas Intel',                     fecha:'2026-04-09', n:3617, modo:'digital',
+      cands:{ 'Cepeda':37.8,'De la Espriella':27.24,'Valencia':22.89,'Fajardo':4.98,'Claudia López':1.01,'Barreras':0.25,'Murillo':0.0 } },
+    { id:'39-cnc',                firma:'Centro Nacional de Consultoría',  fecha:'2026-04-28', n:2200, modo:'presencial',
+      cands:{ 'Cepeda':37.2,'De la Espriella':20.4,'Valencia':15.6,'Fajardo':2.7,'Claudia López':1.5,'Barreras':0.1,'Murillo':0.3 } },
+  ];
+
+  // q_firma calibrado vs consultas 8 mar 2026 (ver ponderador-detalle.json)
+  const FIRMA_Q = {
+    'Atlas Intel': 0.985,
+    'Invamer': 0.932,
+    'Centro Nacional de Consultoría': 0.943,
+    'GAD3': 0.549,
+    'YanHaas': 0.4,
+    'Guarumo / EcoAnalítica': 0.85,
+    'Génesis Crea': 0.7,
+  };
+  // Glifo por firma (para distinguir cada encuesta en el scatter)
+  const FIRMA_SHAPE = {
+    'Atlas Intel': 'circle',
+    'Invamer': 'tri-up',
+    'Centro Nacional de Consultoría': 'diamond',
+    'GAD3': 'square',
+    'YanHaas': 'tri-down',
+    'Guarumo / EcoAnalítica': 'plus',
+    'Génesis Crea': 'x',
+  };
+  const FIRMA_LABEL = {
+    'Atlas Intel': 'Atlas Intel',
+    'Invamer': 'Invamer',
+    'Centro Nacional de Consultoría': 'CNC',
+    'GAD3': 'GAD3',
+    'YanHaas': 'YanHaas',
+    'Guarumo / EcoAnalítica': 'Guarumo',
+    'Génesis Crea': 'Génesis Crea',
+  };
+
+  function _evParseDate(s){
+    const [y,m,d] = s.split('-').map(Number);
+    return Date.UTC(y, m-1, d);
+  }
+
+  // Promedio gaussiano: σ=14d, peso por √n y por q_firma. Decae naturalmente
+  // hacia la última encuesta cuando t supera la última fecha → línea de
+  // predicción ancla a los últimos datos.
+  function _evSmoothAt(t, candKey){
+    let sw = 0, sv = 0;
+    const sigma = 14;
+    for (const p of POLLS){
+      const v = p.cands[candKey];
+      if (v == null) continue;
+      const dt = (t - p._dateMs) / 86400000;
+      const k = Math.exp(-(dt*dt) / (2*sigma*sigma));
+      const wn = Math.sqrt(Math.max(p.n || 1500, 800) / 2000);
+      const wf = FIRMA_Q[p.firma] || 0.7;
+      const w = k * wn * wf;
+      sw += w; sv += w * v;
+    }
+    return sw > 0 ? sv / sw : null;
+  }
+
+  function _evMarker(shape, cx, cy, r, color, opts){
+    const fillOp = (opts && opts.fillOp != null) ? opts.fillOp : 0.35;
+    const sw = (opts && opts.sw != null) ? opts.sw : 1.4;
+    const common = `stroke="${color}" stroke-width="${sw}" stroke-linejoin="round" stroke-linecap="round"`;
+    switch(shape){
+      case 'circle':
+        return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" fill-opacity="${fillOp}" ${common}/>`;
+      case 'tri-up': {
+        const h = r * 1.15;
+        return `<polygon points="${cx},${cy-h} ${cx-h},${cy+h*.7} ${cx+h},${cy+h*.7}" fill="${color}" fill-opacity="${fillOp}" ${common}/>`;
+      }
+      case 'tri-down': {
+        const h = r * 1.15;
+        return `<polygon points="${cx},${cy+h} ${cx-h},${cy-h*.7} ${cx+h},${cy-h*.7}" fill="${color}" fill-opacity="${fillOp}" ${common}/>`;
+      }
+      case 'square': {
+        const s = r * 1.6;
+        return `<rect x="${cx-s/2}" y="${cy-s/2}" width="${s}" height="${s}" fill="${color}" fill-opacity="${fillOp}" ${common}/>`;
+      }
+      case 'diamond': {
+        const h = r * 1.3;
+        return `<polygon points="${cx},${cy-h} ${cx+h},${cy} ${cx},${cy+h} ${cx-h},${cy}" fill="${color}" fill-opacity="${fillOp}" ${common}/>`;
+      }
+      case 'plus': {
+        const a = r * 1.3;
+        return `<path d="M${cx-a} ${cy} H${cx+a} M${cx} ${cy-a} V${cy+a}" stroke="${color}" stroke-width="2" stroke-linecap="round" fill="none"/>`;
+      }
+      case 'x': {
+        const a = r * 1.05;
+        return `<path d="M${cx-a} ${cy-a} L${cx+a} ${cy+a} M${cx-a} ${cy+a} L${cx+a} ${cy-a}" stroke="${color}" stroke-width="2" stroke-linecap="round" fill="none"/>`;
+      }
+    }
+    return '';
+  }
+
+  function _evMarkerLegend(shape, color){
+    return `<svg width="14" height="14" viewBox="-7 -7 14 14" aria-hidden="true">${_evMarker(shape, 0, 0, 5, color, {fillOp:0.4, sw:1.3})}</svg>`;
+  }
+
+  function renderEvolucion(){
+    const svg = document.getElementById('evolucion-svg');
+    if (!svg) return;
+    for (const p of POLLS){ if (p._dateMs == null) p._dateMs = _evParseDate(p.fecha); }
+
+    const T0 = _evParseDate('2026-01-01');
+    const T1 = _evParseDate('2026-05-31'); // primera vuelta presidencial
+    const tLast = Math.max(...POLLS.map(p => p._dateMs));
+
+    const W = 880, H = 360;
+    const ML = 50, MR = 130, MT = 30, MB = 56;
+    const PW = W - ML - MR, PH = H - MT - MB;
+    const xOf = t => ML + ((t - T0) / (T1 - T0)) * PW;
+    const yMax = 50;
+    const yOf = pct => MT + (1 - pct/yMax) * PH;
+
+    const days = [];
+    for (let t = T0; t <= T1; t += 2 * 86400000) days.push(t);
+
+    const candCfg = {
+      ic: { color:'#7e6cd6', name:'Cepeda',   pondKey:'Cepeda' },
+      ae: { color:'#1c1c8c', name:'Abelardo', pondKey:'De la Espriella' },
+      pv: { color:'#1866DF', name:'Paloma',   pondKey:'Valencia' },
+      sf: { color:'#EEAA22', name:'Fajardo',  pondKey:'Fajardo' },
+      cl: { color:'#d9db24', name:'Claudia',  pondKey:'Claudia López' },
+      lm: { color:'#16a34a', name:'Murillo',  pondKey:'Murillo' },
+      rb: { color:'#F01E14', name:'Roy',      pondKey:'Barreras' },
+    };
+    // Para Cepeda usamos un morado un poco más claro que el del partido (#51458F)
+    // sólo para que su línea sea legible contra el fondo oscuro.
+
+    const order = ['ic','ae','pv','sf','cl','lm','rb'];
+    const finalVals = {};
+    order.forEach(id => { finalVals[id] = _evSmoothAt(T1, candCfg[id].pondKey) ?? 0; });
+    // Mostramos los que tienen al menos un dato y un valor razonable al final
+    const visibleIds = order.filter(id => {
+      const has = POLLS.some(p => p.cands[candCfg[id].pondKey] != null);
+      return has && finalVals[id] >= 0.5;
+    });
+
+    const parts = [];
+
+    // Zona de predicción (después de la última encuesta)
+    const xPred = xOf(tLast);
+    parts.push(
+      `<rect class="ev-pred-zone" x="${xPred}" y="${MT}" width="${ML+PW - xPred}" height="${PH}"/>`,
+      `<line class="ev-pred-line" x1="${xPred}" y1="${MT}" x2="${xPred}" y2="${MT+PH}"/>`,
+      `<text class="ev-pred-label" x="${xPred + 6}" y="${MT + 14}">Predicción</text>`
+    );
+
+    // Línea vertical en consultas 8 mar 2026
+    const xCons = xOf(_evParseDate('2026-03-08'));
+    parts.push(
+      `<line class="ev-vert-line" x1="${xCons}" y1="${MT}" x2="${xCons}" y2="${MT+PH}"/>`,
+      `<text class="ev-vert-label" x="${xCons - 5}" y="${MT - 8}" text-anchor="end">consultas 8 mar</text>`
+    );
+
+    // Grid horizontal y eje Y
+    const grid = [0, 10, 20, 30, 40, 50];
+    let g = '<g class="ev-grid">';
+    grid.forEach(v => { const y = yOf(v); g += `<line x1="${ML}" y1="${y}" x2="${ML+PW}" y2="${y}"/>`; });
+    g += '</g>';
+    parts.push(g);
+
+    let ax = '<g class="ev-axis">';
+    grid.forEach(v => { const y = yOf(v); ax += `<text x="${ML - 8}" y="${y + 4}" text-anchor="end">${v}%</text>`; });
+    const months = [
+      { t:_evParseDate('2026-01-01'), l:'ene' },
+      { t:_evParseDate('2026-02-01'), l:'feb' },
+      { t:_evParseDate('2026-03-01'), l:'mar' },
+      { t:_evParseDate('2026-04-01'), l:'abr' },
+      { t:_evParseDate('2026-05-01'), l:'may' },
+    ];
+    months.forEach(m => { const x = xOf(m.t); ax += `<text x="${x}" y="${MT+PH+18}" text-anchor="middle">${m.l}</text>`; });
+    ax += `<text x="${ML}" y="${MT+PH+38}" text-anchor="start" style="font-size:10px;opacity:.7">2026</text>`;
+    ax += '</g>';
+    parts.push(ax);
+
+    // Línea suavizada + halo + markers por encuesta
+    visibleIds.forEach(id => {
+      const cfg = candCfg[id];
+      let d = '';
+      let started = false;
+      days.forEach(t => {
+        const v = _evSmoothAt(t, cfg.pondKey);
+        if (v == null) return;
+        const x = xOf(t), y = yOf(Math.max(0, Math.min(yMax, v)));
+        d += (started ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1) + ' ';
+        started = true;
+      });
+      parts.push(
+        `<path class="ev-halo" stroke="${cfg.color}" d="${d}"/>`,
+        `<path class="ev-line" stroke="${cfg.color}" d="${d}"/>`
+      );
+      POLLS.forEach(p => {
+        const v = p.cands[cfg.pondKey];
+        if (v == null) return;
+        const x = xOf(p._dateMs);
+        const y = yOf(Math.max(0, Math.min(yMax, v)));
+        const sh = FIRMA_SHAPE[p.firma] || 'circle';
+        parts.push(_evMarker(sh, x, y, 4.5, cfg.color));
+      });
+    });
+
+    // Etiquetas finales a la derecha (con anti-colisión simple)
+    const labels = visibleIds.map(id => ({
+      id, color: candCfg[id].color, name: candCfg[id].name,
+      val: finalVals[id], y: yOf(Math.max(0, Math.min(yMax, finalVals[id]))),
+    })).sort((a,b) => a.y - b.y);
+    const minGap = 18;
+    for (let i = 1; i < labels.length; i++){
+      if (labels[i].y - labels[i-1].y < minGap) labels[i].y = labels[i-1].y + minGap;
+    }
+    const yMaxBound = MT + PH;
+    for (let i = labels.length - 1; i > 0; i--){
+      if (labels[i].y > yMaxBound){
+        labels[i].y = yMaxBound;
+        if (labels[i].y - labels[i-1].y < minGap) labels[i-1].y = labels[i].y - minGap;
+      }
+    }
+    const xLabel = ML + PW + 12;
+    labels.forEach(l => {
+      const realY = yOf(Math.max(0, Math.min(yMax, l.val)));
+      parts.push(
+        `<line x1="${ML+PW}" y1="${realY}" x2="${xLabel - 3}" y2="${l.y}" stroke="${l.color}" stroke-width="1" opacity=".5"/>`,
+        `<circle cx="${ML+PW + 2}" cy="${realY}" r="3" fill="${l.color}"/>`,
+        `<text class="ev-end-label" x="${xLabel}" y="${l.y - 1}" fill="${l.color}">${l.name}</text>`,
+        `<text class="ev-end-pct"   x="${xLabel}" y="${l.y + 13}" fill="${l.color}">${l.val.toFixed(1)}%</text>`
+      );
+    });
+
+    svg.innerHTML = parts.join('');
+
+    // Leyendas debajo
+    const candEl = document.getElementById('evolucion-cands');
+    if (candEl){
+      candEl.innerHTML = visibleIds.map(id => {
+        const cfg = candCfg[id];
+        return `<span class="ev-cand-chip"><span class="dot" style="background:${cfg.color}"></span>${cfg.name}</span>`;
+      }).join('');
+    }
+    const firmasEl = document.getElementById('evolucion-firmas');
+    if (firmasEl){
+      const firmasUsed = [...new Set(POLLS.map(p => p.firma))];
+      firmasEl.innerHTML = firmasUsed.map(f => {
+        const sh = FIRMA_SHAPE[f] || 'circle';
+        return `<span class="ev-firma">${_evMarkerLegend(sh, 'currentColor')}<span>${FIRMA_LABEL[f] || f}</span></span>`;
+      }).join('');
+    }
+  }
+
   // ─── BOOT ─────────────────────────────────────────────────────
   (async () => {
     // Paralelizamos todo lo que no tiene dependencia entre sí:
@@ -4233,6 +4561,7 @@
     console.log(`[Previa] calibración mun: ${sigMunOk}/${HISTORICO_KEYS.length} por-mun → ${biasMunCount} celdas bias municipio`);
 
     renderPonderador();
+    renderEvolucion();
     renderPanel();
     repaintMap();
     initMap();
