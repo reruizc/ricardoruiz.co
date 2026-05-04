@@ -2204,11 +2204,19 @@
 
   // Carga municipal NACIONAL: fetches paralelos por todos los deptos conocidos
   async function loadMunicipalNacional(){
-    if (nacionalMunLayer){ nacionalMunLayer.addTo(map); return; }
-    // Si ya tenemos los features cacheados, sólo reconstruimos la capa
+    // Style inicial según el modo: en 'pue' va transparente desde el
+    // primer pintado para evitar el flash de proyección por candidato
+    // que veíamos antes (creaba la capa coloreada y luego se reseteaba
+    // a neutro, dando un parpadeo visible).
+    const initialStyle = currentLevel === 'pue' ? _munNeutralStyle : munFeatureStyle;
+    if (nacionalMunLayer){
+      nacionalMunLayer.setStyle(initialStyle);
+      nacionalMunLayer.addTo(map);
+      return;
+    }
     if (_nacionalMunFeatures){
       nacionalMunLayer = L.geoJSON({ type:'FeatureCollection', features: _nacionalMunFeatures },
-        { style: munFeatureStyle, onEachFeature: onEachMunFeature }).addTo(map);
+        { style: initialStyle, onEachFeature: onEachMunFeature }).addTo(map);
       return;
     }
     showMapLoading('Cargando municipios de todo el país…');
@@ -2226,7 +2234,7 @@
       }
       _nacionalMunFeatures = features;
       nacionalMunLayer = L.geoJSON({ type:'FeatureCollection', features },
-        { style: munFeatureStyle, onEachFeature: onEachMunFeature }).addTo(map);
+        { style: initialStyle, onEachFeature: onEachMunFeature }).addTo(map);
     } catch(e){
       console.error('[Previa] error cargando muns nacionales:', e);
     } finally {
@@ -2237,13 +2245,26 @@
   // ─── PUESTOS LAYER (LOD) ──────────────────────────────────────
   // Carga lazy del archivo nacional ligero. Se invoca al activar el toggle
   // "Puestos" la primera vez. ~1.9 MB, ~13.5k puntos.
+  // Tier-override en cliente: el JSON viene con tier 1 = top 300 (criterio
+  // del script build-puestos-nacional-light.js); aquí re-asignamos según
+  // PUE_TIER1_TOP / PUE_TIER2_TOP para no depender de regenerar el archivo.
+  const PUE_TIER1_TOP = 500;    // visibles en la vista nacional inicial
+  const PUE_TIER2_TOP = 1700;   // visibles al primer nivel de zoom
   async function loadPuestosLight(){
     if (_puestosLight) return _puestosLight;
     if (_puestosLightLoading) return _puestosLightLoading;
     showMapLoading('Cargando puestos de votación…');
     _puestosLightLoading = fetch(PUESTOS_LIGHT_URL, { cache: 'force-cache' })
       .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(data => { _puestosLight = data; return data; })
+      .then(data => {
+        // Re-tier en cliente: ordena por censo descendente y asigna 1/2/3.
+        const sorted = [...data].sort((a, b) => (b.c || 0) - (a.c || 0));
+        sorted.forEach((p, i) => {
+          p.t = i < PUE_TIER1_TOP ? 1 : i < PUE_TIER2_TOP ? 2 : 3;
+        });
+        _puestosLight = data;
+        return data;
+      })
       .catch(e => { console.error('[Previa] error cargando puestos-light:', e); throw e; })
       .finally(() => { hideMapLoading(); });
     return _puestosLightLoading;
@@ -2290,19 +2311,28 @@
     if (selectedId){
       const cand = CANDIDATOS.find(c => c.id === selectedId);
       if (!cand) return { color: '#1a1d2e', fillColor: '#1a1d2e', fillOpacity: .35, weight: .5 };
-      // Intensidad por % proyectado del candidato seleccionado en el mun
-      // (no podemos diferenciar puestos del mismo mun aún — pendiente bias por puesto).
+      // Intensidad por % proyectado del candidato seleccionado en el puesto
+      // (con bias_pue calibrado, esto sí varía entre puestos del mismo mun).
       const total = ranking?.ranked.reduce((s,x)=>s+x.v, 0) || 0;
       const v = ranking?.ranked.find(x => x.c.id === cand.id)?.v || 0;
       const share = total > 0 ? v / total : 0;
-      const intensity = Math.min(1, share / Math.max(_maxSingleShare, .01));
+      // Mapeo absoluto: 0% → casi blanco, 60%+ → saturado. Más intuitivo
+      // para el usuario que normalizar contra max_depto (que satura todos
+      // los puntos cuando el candidato tiene alguna fuerza local).
+      const intensity = Math.min(1, share / 0.60);
       return { color: 'rgba(255,255,255,0.5)', fillColor: colorWithIntensity(cand.color, intensity), fillOpacity: .85, weight: .5 };
     }
     if (!ranking || !ranking.winner){
       return { color: 'rgba(255,255,255,.4)', fillColor: '#1a1d2e', fillOpacity: .5, weight: .5 };
     }
-    const intensity = Math.min(1, ranking.margin / Math.max(_maxMargin, 1));
-    return { color: 'rgba(255,255,255,0.55)', fillColor: colorWithIntensity(ranking.winner.color, intensity), fillOpacity: .9, weight: .5 };
+    // Intensidad por % del ganador local (winShare). Mapeo:
+    //   25%  → casi pastel  (puesto muy disputado)
+    //   75%+ → saturado     (bastión claro)
+    // No usamos margin / _maxMargin porque _maxMargin se calcula sobre
+    // deptos y los puestos pueden tener márgenes mucho más extremos —
+    // eso saturaba todos los puntos al máximo y borraba el degradado.
+    const intensity = Math.min(1, Math.max(0, (ranking.winShare - 0.25) / 0.50));
+    return { color: 'rgba(255,255,255,0.55)', fillColor: colorWithIntensity(ranking.winner.color, intensity), fillOpacity: .92, weight: .5 };
   }
 
   // Re-render completo de la capa según el zoom actual. Es destructivo
@@ -2399,13 +2429,13 @@
   }
 
   // Estilo del mun cuando se usa como fondo en la vista de puestos:
-  // sin color de proyección, solo un tono apenas distinto del fondo
-  // del mapa para no robar atención a los markers.
+  // fill 100% transparente — solo el borde fino para que se intuya la
+  // división municipal sin competir con los markers de puestos.
   function _munNeutralStyle(){
     return {
-      fillColor: '#0d1020',
-      fillOpacity: 0.55,
-      color: 'rgba(255,255,255,0.18)',
+      fillColor: 'transparent',
+      fillOpacity: 0,
+      color: 'rgba(255,255,255,0.22)',
       weight: 0.6,
     };
   }
