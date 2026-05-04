@@ -2245,26 +2245,15 @@
   // ─── PUESTOS LAYER (LOD) ──────────────────────────────────────
   // Carga lazy del archivo nacional ligero. Se invoca al activar el toggle
   // "Puestos" la primera vez. ~1.9 MB, ~13.5k puntos.
-  // Tier-override en cliente: el JSON viene con tier 1 = top 300 (criterio
-  // del script build-puestos-nacional-light.js); aquí re-asignamos según
-  // PUE_TIER1_TOP / PUE_TIER2_TOP para no depender de regenerar el archivo.
-  const PUE_TIER1_TOP = 500;    // visibles en la vista nacional inicial
-  const PUE_TIER2_TOP = 1700;   // visibles al primer nivel de zoom
+  // El archivo viene con tiers ya asignados por build-puestos-nacional-light.js
+  // (tier 1 = top 500, tier 2 = top 1700, tier 3 = resto).
   async function loadPuestosLight(){
     if (_puestosLight) return _puestosLight;
     if (_puestosLightLoading) return _puestosLightLoading;
     showMapLoading('Cargando puestos de votación…');
     _puestosLightLoading = fetch(PUESTOS_LIGHT_URL, { cache: 'force-cache' })
       .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(data => {
-        // Re-tier en cliente: ordena por censo descendente y asigna 1/2/3.
-        const sorted = [...data].sort((a, b) => (b.c || 0) - (a.c || 0));
-        sorted.forEach((p, i) => {
-          p.t = i < PUE_TIER1_TOP ? 1 : i < PUE_TIER2_TOP ? 2 : 3;
-        });
-        _puestosLight = data;
-        return data;
-      })
+      .then(data => { _puestosLight = data; return data; })
       .catch(e => { console.error('[Previa] error cargando puestos-light:', e); throw e; })
       .finally(() => { hideMapLoading(); });
     return _puestosLightLoading;
@@ -3091,7 +3080,7 @@
     },
     pue: {
       title: 'Descargar Excel · Puestos de votación',
-      text:  'Se exportará la proyección por <b>puesto de votación</b> (~13.500 filas): nombre, mun, depto, coordenadas, censo electoral, mesas, votantes estimados, votos y % por candidato, ganador y margen. Bias por puesto si la calibración con históricos por-puesto.json terminó; en caso contrario hereda del mun. La generación toma 1-2 segundos.',
+      text:  'Se exportará la proyección por <b>puesto de votación</b> (~13.500 filas): nombre, mun, depto, código electoral, votantes estimados, votos y % por candidato, ganador y margen. Bias por puesto si la calibración con históricos por-puesto.json terminó; en caso contrario hereda del mun. La generación toma 1-2 segundos.',
     },
   };
 
@@ -3378,7 +3367,10 @@
     const fecha = new Date().toISOString().slice(0,10);
     const title = `Previa Primera Vuelta 2026 · Proyección por Puesto · ${fecha}`;
     const cands = _candsSorted();
-    const headers = ['#', 'Puesto', 'Municipio', 'Departamento', 'Cód. (DD-MMM-ZZ-PP)', 'Lat', 'Lng', 'Censo electoral', 'Mesas', 'Votantes est. pres.', ..._candCols(cands), 'Ganador', 'Margen (pp)'];
+    // Sólo identificación (puesto, mun, depto, cód) + votantes esperados +
+    // candidatos. Lat/lng, censo y mesas se omiten para no exponer datos
+    // que el usuario final no necesita en el Excel.
+    const headers = ['#', 'Puesto', 'Municipio', 'Departamento', 'Cód. (DD-MMM-ZZ-PP)', 'Votantes est. pres.', ..._candCols(cands), 'Ganador', 'Margen (pp)'];
 
     const rows = _puestosLight.map((p, i) => {
       const dep = p.k.slice(0, 2);
@@ -3387,6 +3379,8 @@
       const winInfo = _puestoWinner(p);
       const ranking = winInfo.ranking;
       const total = ranking?.ranked.reduce((s,x) => s + x.v, 0) || 0;
+      // Censo se sigue usando internamente para estimar votantes esperados,
+      // pero no se emite como columna del archivo.
       const esperados = (p.c || 0) * 0.54;
 
       const shareById = new Map();
@@ -3403,10 +3397,6 @@
         p.mn || '',
         depNom,
         p.k,
-        p.y?.toFixed(6) || '',
-        p.x?.toFixed(6) || '',
-        p.c || 0,
-        p.m || 0,
         esperados ? Math.round(esperados) : '—',
       ];
       cands.forEach(c => {

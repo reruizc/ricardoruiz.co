@@ -164,13 +164,19 @@ function loadPres22Winners(jsonPath){
   return winners;
 }
 
+// Umbrales del LOD que el frontend espera. Si se modifican aquí, hay
+// que sincronizarlos en previa-1v.html (PUE_TIER1_TOP / PUE_TIER2_TOP).
+const TIER1_TOP = 500;
+const TIER2_TOP = 1700;
+
 function assignTiers(records){
-  // Ordena por censo descendente y asigna tier 1 a top-300, tier 2 a top-1500, tier 3 al resto.
+  // Ordena por censo descendente y asigna tier 1 a top TIER1_TOP, tier 2
+  // a top TIER2_TOP, tier 3 al resto.
   const sorted = [...records].sort((a, b) => b.c - a.c);
   for (let i = 0; i < sorted.length; i++){
     const r = sorted[i];
-    if (i < 300) r.t = 1;
-    else if (i < 1500) r.t = 2;
+    if (i < TIER1_TOP) r.t = 1;
+    else if (i < TIER2_TOP) r.t = 2;
     else r.t = 3;
   }
 }
@@ -219,9 +225,9 @@ async function main(){
   console.log(`    descartados: ${geoNull} sin coords · ${censoNull} sin censo`);
   console.log(`    con winner pres22: ${records.filter(r => r.p22).length}/${records.length}`);
   console.log(`    con winner sen26:  ${records.filter(r => r.s26).length}/${records.length}`);
-  console.log(`    tier 1 (top 300):   ${records.filter(r => r.t === 1).length}`);
-  console.log(`    tier 2 (top 1500):  ${records.filter(r => r.t === 2).length}`);
-  console.log(`    tier 3 (resto):     ${records.filter(r => r.t === 3).length}`);
+  console.log(`    tier 1 (top ${TIER1_TOP}):   ${records.filter(r => r.t === 1).length}`);
+  console.log(`    tier 2 (top ${TIER2_TOP}):  ${records.filter(r => r.t === 2).length}`);
+  console.log(`    tier 3 (resto):       ${records.filter(r => r.t === 3).length}`);
   console.log(`    tiempo total: ${((Date.now()-t0)/1000).toFixed(1)}s\n`);
 }
 
