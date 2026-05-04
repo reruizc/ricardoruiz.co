@@ -775,9 +775,9 @@
   <!-- Modal: confirmación descarga Excel -->
   <div class="dl-modal" id="dl-modal" onclick="if(event.target===this)closeDlModal()">
     <div class="dl-box">
-      <div class="dl-title">Descargar Excel</div>
-      <div class="dl-text">
-        Se exportará la proyección actual del simulador a nivel departamental: votos estimados por candidato, porcentaje, ganador y potencial electoral por departamento. La descarga refleja los valores que has ajustado en los deslizadores.
+      <div class="dl-title" id="dl-title">Descargar Excel</div>
+      <div class="dl-text" id="dl-text">
+        Se exportará la proyección actual del simulador. La descarga refleja los valores que has ajustado en los deslizadores.
       </div>
       <div class="dl-btns">
         <button class="dl-btn dl-btn-cancel" onclick="closeDlModal()">Cancelar</button>
@@ -3077,9 +3077,38 @@
   // Exporta la vista actual (proyección por depto) a un archivo .xls
   // estilo camara-2026: HTML con content-type Excel, abre en Numbers /
   // Excel / LibreOffice sin dependencias externas.
+  // Textos del modal según el nivel activo. La descarga emite un reporte
+  // distinto en cada caso (deps / muns / puestos), así que la confirmación
+  // refleja cuántas filas y qué columnas trae el archivo.
+  const _DL_TEXTS = {
+    dep: {
+      title: 'Descargar Excel · Departamental',
+      text:  'Se exportará la proyección por <b>departamento</b> (33 filas): votantes esperados, votos y % por candidato, ganador y margen 1º vs 2º. Refleja los valores actuales de los deslizadores.',
+    },
+    mun: {
+      title: 'Descargar Excel · Municipal',
+      text:  'Se exportará la proyección por <b>municipio</b> (~1.100 filas): código electoral, depto padre, votantes estimados, votos y % por candidato, ganador y margen. Bias municipal cuando hay cobertura histórica; en caso contrario hereda del depto.',
+    },
+    pue: {
+      title: 'Descargar Excel · Puestos de votación',
+      text:  'Se exportará la proyección por <b>puesto de votación</b> (~13.500 filas): nombre, mun, depto, coordenadas, censo electoral, mesas, votantes estimados, votos y % por candidato, ganador y margen. Bias por puesto si la calibración con históricos por-puesto.json terminó; en caso contrario hereda del mun. La generación toma 1-2 segundos.',
+    },
+  };
+
   function downloadExcelCurrentView(){
     if (!geoData || !geoData.features.length){
       alert('El mapa aún no ha terminado de cargar. Espera un momento y vuelve a intentar.');
+      return;
+    }
+    // En modo pue/mun, además del geoData básico, validamos que los
+    // datasets propios del nivel ya estén cargados (si no, el usuario
+    // descargaría una tabla con filas vacías).
+    if (currentLevel === 'pue' && (!_puestosLight || !_puestosLight.length)){
+      alert('Los puestos aún no terminaron de cargar. Espera un momento y vuelve a intentar.');
+      return;
+    }
+    if (currentLevel === 'mun' && (!_nacionalMunFeatures || !_nacionalMunFeatures.length)){
+      alert('Los municipios aún no terminaron de cargar. Espera un momento y vuelve a intentar.');
       return;
     }
     // Acceso restringido a planes Pro / Premium / Full (mismo modelo de
@@ -3089,6 +3118,12 @@
       showAccessToast('Descarga Excel sólo en plan <b>Premium</b> · <a href="pricing.html">Ver planes →</a>');
       return;
     }
+    // Texto del modal según nivel
+    const t = _DL_TEXTS[currentLevel] || _DL_TEXTS.dep;
+    const titleEl = document.getElementById('dl-title');
+    const textEl = document.getElementById('dl-text');
+    if (titleEl) titleEl.textContent = t.title;
+    if (textEl) textEl.innerHTML = t.text;
     document.getElementById('dl-modal').classList.add('show');
   }
 
@@ -3111,9 +3146,11 @@
   }
   function confirmDownloadExcel(){
     closeDlModal();
-    _doDownloadExcel();
+    if (currentLevel === 'pue')      _doDownloadExcelPue();
+    else if (currentLevel === 'mun') _doDownloadExcelMun();
+    else                              _doDownloadExcelDep();
   }
-  function _doDownloadExcel(){
+  function _doDownloadExcelDep(){
     if (!geoData) return;
     const fecha = new Date().toISOString().slice(0,10);
     const title = `Previa Primera Vuelta 2026 · Proyección Departamental · ${fecha}`;
@@ -3223,6 +3260,164 @@
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
+
+  // ─── Excel · helpers compartidos ─────────────────────────────
+  // Reutilizados por las versiones MUN y PUE (la versión DEP arriba se
+  // mantiene autocontenida por compatibilidad). Estos helpers ensamblan
+  // el HTML de tabla estilo Excel y disparan la descarga.
+  function _candsSorted(){
+    return [...CANDIDATOS].sort((a,b) => b.pct - a.pct);
+  }
+  function _candCols(cands){
+    const cols = [];
+    cands.forEach(c => {
+      cols.push(`${c.nombre} · Votos est.`);
+      cols.push(`${c.nombre} · %`);
+    });
+    return cols;
+  }
+  function _emitExcel(title, headers, rows, fileSuffix){
+    const fecha = new Date().toISOString().slice(0,10);
+    const thHtml = headers.map(h =>
+      `<th style="background:#1a1d2e;color:#fff;font-weight:bold;padding:8px 10px;border:1px solid #666;white-space:nowrap;font-family:Arial;font-size:11px">${h}</th>`
+    ).join('');
+    const tdHtml = rows.map((r, ri) => {
+      const bg = ri % 2 ? 'background:#f7f7f4;' : '';
+      return `<tr>${r.map(v => `<td style="${bg}padding:6px 10px;border:1px solid #ccc;font-family:Arial;font-size:11px">${v}</td>`).join('')}</tr>`;
+    }).join('');
+    const metaHtml = `
+      <h3 style="font-family:Arial;margin:0 0 4px">${title}</h3>
+      <p style="font-family:Arial;font-size:11px;color:#555;margin:0 0 12px">
+        Base ponderador: ricardoruiz.co · corte ${PONDERADOR_META?.fecha_corte || 'sin fecha'} ·
+        Votantes estimados = potencial × 54% (escenario 2022), distribuido según Senado 2026.
+      </p>`;
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head><meta charset="UTF-8"></head>
+      <body>${metaHtml}
+        <table border="1" cellpadding="5" style="border-collapse:collapse;font-family:Arial;font-size:11px">
+          <thead><tr>${thHtml}</tr></thead>
+          <tbody>${tdHtml}</tbody>
+        </table>
+      </body></html>`;
+    const blob = new Blob(['﻿' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `previa-1v-2026-${fileSuffix}-${fecha}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // ─── Excel · MUN ─────────────────────────────────────────────
+  // Una fila por municipio. Bias municipal cuando hay cobertura histórica;
+  // fallback al depto. Censo electoral aproximado por agregación de los
+  // censos de los puestos georeferenciados en el mun (sólo si el archivo
+  // light está cargado); sin él, las columnas Censo/Votantes/Votos quedan
+  // vacías y sólo se reportan los % y el ganador.
+  function _doDownloadExcelMun(){
+    if (!_nacionalMunFeatures || !_nacionalMunFeatures.length) return;
+    const fecha = new Date().toISOString().slice(0,10);
+    const title = `Previa Primera Vuelta 2026 · Proyección Municipal · ${fecha}`;
+    const cands = _candsSorted();
+    const headers = ['#', 'Municipio', 'Departamento', 'Cód. mun electoral', 'Censo (suma puestos)', 'Votantes est. pres.', ..._candCols(cands), 'Ganador', 'Margen (pp)'];
+
+    const censoByMun = new Map();
+    if (_puestosLight){
+      for (const p of _puestosLight){
+        const dep = p.k.slice(0, 2);
+        const mun = p.k.slice(3, 6);
+        const munKey = `${dep}-${mun}`;
+        censoByMun.set(munKey, (censoByMun.get(munKey) || 0) + (p.c || 0));
+      }
+    }
+
+    const rows = [];
+    _nacionalMunFeatures.forEach((f, i) => {
+      const props = f.properties || {};
+      const munName = props.mpio_cnmbr || props.NOMBRE_MPI || props.MPIO || 'Municipio';
+      const depNom = munParentDep(props);
+      const munKey = munKeyFromProps(props);
+      const munElec = munKey ? munKey.split('-')[1] : '';
+      const censoMun = munKey ? (censoByMun.get(munKey) || 0) : 0;
+      const esperados = censoMun > 0 ? censoMun * 0.54 : 0;
+      const hasMunBias = munKey && _biasCacheMun && Object.values(_biasCacheMun).some(m => m[munKey] != null);
+      const projections = cands.map(c => ({
+        c,
+        p: hasMunBias ? projectedMun(c, munKey, depNom) : projected(c, depNom),
+      }));
+      const localTotal = projections.reduce((s,x) => s + x.p, 0);
+      const localShares = projections.map(x => localTotal > 0 ? x.p / localTotal : 0);
+      const ranked = projections.map((x, idx) => ({ ...x, share: localShares[idx] }))
+                                .sort((a,b) => b.share - a.share);
+      const ganador = ranked[0]?.c.nombre || '';
+      const margenPp = ranked.length > 1 ? ((ranked[0].share - ranked[1].share) * 100).toFixed(1) : '';
+
+      const cells = [i + 1, munName, depNom, munElec, censoMun || '—', esperados ? Math.round(esperados) : '—'];
+      cands.forEach((c, idx) => {
+        const share = localShares[idx];
+        cells.push(esperados ? Math.round(esperados * share) : '—', (share * 100).toFixed(2) + '%');
+      });
+      cells.push(ganador, margenPp);
+      rows.push(cells);
+    });
+
+    _emitExcel(title, headers, rows, 'mun');
+  }
+
+  // ─── Excel · PUE ─────────────────────────────────────────────
+  // Una fila por puesto. Si _biasCachePue está calibrado, los % varían
+  // entre puestos del mismo mun (heterogeneidad intra-municipal). Si no,
+  // todos los puestos del mismo mun salen con la misma proyección
+  // heredada del bias municipal — al menos el reporte separa cada
+  // puesto con sus coords/censo/mesas únicos.
+  function _doDownloadExcelPue(){
+    if (!_puestosLight || !_puestosLight.length) return;
+    const fecha = new Date().toISOString().slice(0,10);
+    const title = `Previa Primera Vuelta 2026 · Proyección por Puesto · ${fecha}`;
+    const cands = _candsSorted();
+    const headers = ['#', 'Puesto', 'Municipio', 'Departamento', 'Cód. (DD-MMM-ZZ-PP)', 'Lat', 'Lng', 'Censo electoral', 'Mesas', 'Votantes est. pres.', ..._candCols(cands), 'Ganador', 'Margen (pp)'];
+
+    const rows = _puestosLight.map((p, i) => {
+      const dep = p.k.slice(0, 2);
+      const depEntry = Object.values(SENADO_BY_DEPTO).find(s => s.cod === dep);
+      const depNom = depEntry?.nombre || '';
+      const winInfo = _puestoWinner(p);
+      const ranking = winInfo.ranking;
+      const total = ranking?.ranked.reduce((s,x) => s + x.v, 0) || 0;
+      const esperados = (p.c || 0) * 0.54;
+
+      const shareById = new Map();
+      if (ranking) ranking.ranked.forEach(x => shareById.set(x.c.id, total > 0 ? x.v / total : 0));
+
+      const ganador = ranking?.winner?.nombre || '';
+      const margenPp = ranking && ranking.second
+        ? (((ranking.winner ? (shareById.get(ranking.winner.id) || 0) : 0) - (shareById.get(ranking.second.id) || 0)) * 100).toFixed(1)
+        : '';
+
+      const cells = [
+        i + 1,
+        p.n || '',
+        p.mn || '',
+        depNom,
+        p.k,
+        p.y?.toFixed(6) || '',
+        p.x?.toFixed(6) || '',
+        p.c || 0,
+        p.m || 0,
+        esperados ? Math.round(esperados) : '—',
+      ];
+      cands.forEach(c => {
+        const share = shareById.get(c.id) || 0;
+        cells.push(esperados ? Math.round(esperados * share) : '—', (share * 100).toFixed(2) + '%');
+      });
+      cells.push(ganador, margenPp);
+      return cells;
+    });
+
+    _emitExcel(title, headers, rows, 'puestos');
   }
 
   // ─── MODAL METODOLOGÍA ────────────────────────────────────────
