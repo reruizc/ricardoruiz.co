@@ -2153,13 +2153,34 @@
     }
   }
 
+  // Construye el payload para la tarjeta lateral (#territory-card) a partir
+  // de un registro de puesto. Reusa el mismo formato que deptos/muns; el
+  // ranking se computa en _computeRankingForPayload con kind='puesto'.
+  function _puestoPayload(p, winInfo){
+    const censoTxt = p.c ? p.c.toLocaleString('es-CO') : '—';
+    const mesasTxt = p.m ? `${p.m} mesa${p.m === 1 ? '' : 's'}` : '';
+    const fuente = `Censo electoral: ${censoTxt}${mesasTxt ? ' · ' + mesasTxt : ''} · proyección heredada del municipio`;
+    return {
+      scopeKey: 'pue:' + p.k,
+      level:    'Puesto de votación',
+      name:     p.n || 'Puesto',
+      parents:  [p.mn, winInfo.depNom].filter(Boolean),
+      kind:     'puesto',
+      args:     { puData: p, depNom: winInfo.depNom, munKey: winInfo.munKey, hasMunBias: winInfo.hasMunBias },
+      fuente,
+    };
+  }
+
   function _onPueHover(e){
     const layer = e.target;
     const p = layer._puData;
     layer.setStyle({ weight: 2, color: '#fff', fillOpacity: 1 });
-    const { ranking } = _puestoWinner(p);
+    const winInfo = _puestoWinner(p);
+    const ranking = winInfo.ranking;
     const winColor = ranking?.winner?.color || 'rgba(255,255,255,.5)';
     _setHoverChip(e, p.n || 'Puesto', winColor);
+    // Tooltip Leaflet (oculto en desktop ≥1100px por CSS, sirve como
+    // fallback en mobile mientras la tarjeta lateral hace el trabajo).
     const html = (() => {
       const cBase = `<b>${p.n || 'Puesto'}</b><br><span style="opacity:.7">${p.mn || ''}</span>`;
       const censo = p.c ? `<br>Censo: <b>${p.c.toLocaleString('es-CO')}</b>` : '';
@@ -2167,6 +2188,8 @@
       return `<div style="line-height:1.4">${cBase}${censo}${win}</div>`;
     })();
     layer.bindTooltip(html, { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }).openTooltip();
+    // Tarjeta lateral con la repartición proyectada del puesto.
+    _hoverTerritory(_puestoPayload(p, winInfo));
   }
   function _onPueOut(e){
     const layer = e.target;
@@ -2177,9 +2200,13 @@
   }
   function _onPueClick(e){
     const p = e.target._puData;
-    // Por ahora: zoom-in al puesto para revelar más detalles del entorno.
-    // (TODO: cargar el puestos.json del depto y mostrar repartición exacta
-    // en una tarjeta lateral.)
+    const winInfo = _puestoWinner(p);
+    const payload = _puestoPayload(p, winInfo);
+    // Fija el puesto en la tarjeta para que no se borre al pasar el mouse
+    // por otros markers, igual que el botón 📌 hace en deptos/muns.
+    _territoryPinned = payload.scopeKey;
+    _renderTerritoryCard(payload);
+    // FlyTo: zoom-in continuo al área del puesto.
     map.flyTo([p.y, p.x], Math.max(map.getZoom() + 2, 12), { duration: .6 });
   }
 
@@ -2194,11 +2221,28 @@
     return counts;
   }
 
+  // Estilo del mun cuando se usa como fondo en la vista de puestos:
+  // sin color de proyección, solo un tono apenas distinto del fondo
+  // del mapa para no robar atención a los markers.
+  function _munNeutralStyle(){
+    return {
+      fillColor: '#0d1020',
+      fillOpacity: 0.55,
+      color: 'rgba(255,255,255,0.18)',
+      weight: 0.6,
+    };
+  }
+
   function repaintMap(){
     recomputeScales();
     if (deptLayer) deptLayer.setStyle(featureStyle);
     if (munLayer) munLayer.setStyle(munFeatureStyle);
-    if (nacionalMunLayer) nacionalMunLayer.setStyle(munFeatureStyle);
+    if (nacionalMunLayer){
+      // En modo Puestos el mun es solo contexto territorial: estilo neutro
+      // para que los markers se vean limpios. En el resto de modos,
+      // proyección normal.
+      nacionalMunLayer.setStyle(currentLevel === 'pue' ? _munNeutralStyle() : munFeatureStyle);
+    }
     // Si la vista de puestos está activa, recolorear los markers tras un
     // cambio del ponderador (los sliders mueven el `pct` de cada candidato
     // y por tanto el ganador proyectado en cada puesto).
@@ -2469,6 +2513,12 @@
       if (hasMedBias)       getV = c => projectedComunaMed(c, comCod);
       else if (hasCityBias) getV = c => projectedComunaCity(c, cityKey, comCod);
       else                  getV = c => projected(c, depNom);
+    } else if (payload.kind === 'puesto'){
+      // Sin bias por puesto aún: hereda la proyección del mun (o del depto
+      // si no hay cobertura mun). Iteración 3 reemplazará esta heurística
+      // con un bias_pue calibrado contra los históricos por puesto.
+      const { munKey, depNom, hasMunBias } = payload.args;
+      getV = c => hasMunBias && munKey ? projectedMun(c, munKey, depNom) : projected(c, depNom);
     } else { getV = () => 0; }
     return cands.map(c => ({ c, v: getV(c) })).filter(x => x.v > 0).sort((a,b) => b.v - a.v);
   }
