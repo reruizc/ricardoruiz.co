@@ -1089,9 +1089,10 @@
   //   muns:     { "depCod-munCod": { nombreNorm: pctFraccion } }    (lazy/optional)
   // }
   let HISTORICOS = {};
-  // Cache calibrado de bias por candidato. Tres niveles:
-  //   _biasCache     [ candId ][ depNombreNorm ]  → bias raw a nivel depto
-  //   _biasCacheMun  [ candId ][ "depCod-munCod" ] → bias raw a nivel mun
+  // Cache calibrado de bias por candidato. Cuatro niveles:
+  //   _biasCache     [ candId ][ depNombreNorm ]            → bias raw a nivel depto
+  //   _biasCacheMun  [ candId ][ "depCod-munCod" ]          → bias raw a nivel mun
+  //   _biasCachePue  [ candId ][ "dep-mun-zon-pue" ]        → bias raw a nivel puesto
   //   _biasNormCache [ candId ][ depNombreNorm ]  → bias normalizado por
   //     candidato (raw / promedio_ponderado_por_voters). Garantiza la
   //     consistencia global: Σ_d voters(d)×bias_norm(c,d) = Σ_d voters(d).
@@ -1099,7 +1100,13 @@
   //     coloreado del mapa y el drill local siguen usando el bias raw.
   let _biasCache     = {};
   let _biasCacheMun  = {};
+  let _biasCachePue  = {};
   let _biasNormCache = {};
+  // El bias por puesto se calibra de forma lazy (sólo cuando el usuario
+  // entra al toggle Puestos) porque requiere cargar ~5 MB extra de
+  // históricos por-puesto.json. Esta promesa evita disparar la carga dos
+  // veces si el usuario alterna entre toggles rápidamente.
+  let _biasPueLoading = null;
 
   // ─── EQUIVALENCIAS: candidato 2026 → señales históricas ────────
   // Cada entrada es el perfil de ponderación descrito en el documento
@@ -2214,20 +2221,23 @@
     return _puestosLight;
   }
 
-  // Resuelve el ganador 2026 proyectado para un puesto a partir de su munKey.
-  // Si hay bias municipal calibrado para ese mun, usa la proyección del mun
-  // (que es estable y consistente con la vista municipal). Si no, cae a la
-  // del depto. Iteración futura (TODO precomputeBiasPue): modular por p22/s26
-  // para resolver heterogeneidad intra-mun.
+  // Resuelve el ganador 2026 proyectado para un puesto. Cascada:
+  //   1) bias por puesto (calibrado contra históricos por-puesto) si existe
+  //   2) bias municipal calibrado
+  //   3) bias departamental
+  // Cada nivel de granularidad sólo se usa si tiene cobertura real.
   function _puestoWinner(p){
     const dep = p.k.slice(0, 2);
     const mun = p.k.slice(3, 6);
     const munKey = `${dep}-${mun}`;
     const depEntry = Object.values(SENADO_BY_DEPTO).find(s => s.cod === dep);
     const depNom = depEntry?.nombre || '';
+    const hasPueBias = _biasCachePue && Object.values(_biasCachePue).some(m => m[p.k] != null);
     const hasMunBias = _biasCacheMun && Object.values(_biasCacheMun).some(m => m[munKey] != null);
-    const r = hasMunBias ? computeMunRanking(munKey, depNom) : computeDeptoRanking(depNom);
-    return { ranking: r, depNom, munKey, hasMunBias };
+    const r = hasPueBias ? computePuestoRanking(p.k, munKey, depNom)
+            : hasMunBias ? computeMunRanking(munKey, depNom)
+            : computeDeptoRanking(depNom);
+    return { ranking: r, depNom, munKey, hasMunBias, hasPueBias };
   }
 
   // Calcula radio del marker en función del censo (raíz cuadrada para
@@ -2284,14 +2294,20 @@
   function _puestoPayload(p, winInfo){
     const censoTxt = p.c ? p.c.toLocaleString('es-CO') : '—';
     const mesasTxt = p.m ? `${p.m} mesa${p.m === 1 ? '' : 's'}` : '';
-    const fuente = `Censo electoral: ${censoTxt}${mesasTxt ? ' · ' + mesasTxt : ''} · proyección heredada del municipio`;
+    // El pie de la tarjeta indica qué granularidad de bias está alimentando
+    // los porcentajes — útil para que el usuario sepa si está viendo la
+    // proyección del puesto o herencia del mun.
+    const granul = winInfo.hasPueBias ? 'bias calibrado por puesto'
+                 : winInfo.hasMunBias ? 'proyección heredada del municipio'
+                 : 'proyección heredada del departamento';
+    const fuente = `Censo electoral: ${censoTxt}${mesasTxt ? ' · ' + mesasTxt : ''} · ${granul}`;
     return {
       scopeKey: 'pue:' + p.k,
       level:    'Puesto de votación',
       name:     p.n || 'Puesto',
       parents:  [p.mn, winInfo.depNom].filter(Boolean),
       kind:     'puesto',
-      args:     { puData: p, depNom: winInfo.depNom, munKey: winInfo.munKey, hasMunBias: winInfo.hasMunBias },
+      args:     { puData: p, puKey: p.k, depNom: winInfo.depNom, munKey: winInfo.munKey, hasMunBias: winInfo.hasMunBias, hasPueBias: winInfo.hasPueBias },
       fuente,
     };
   }
@@ -2639,11 +2655,11 @@
       else if (hasCityBias) getV = c => projectedComunaCity(c, cityKey, comCod);
       else                  getV = c => projected(c, depNom);
     } else if (payload.kind === 'puesto'){
-      // Sin bias por puesto aún: hereda la proyección del mun (o del depto
-      // si no hay cobertura mun). Iteración 3 reemplazará esta heurística
-      // con un bias_pue calibrado contra los históricos por puesto.
-      const { munKey, depNom, hasMunBias } = payload.args;
-      getV = c => hasMunBias && munKey ? projectedMun(c, munKey, depNom) : projected(c, depNom);
+      // Cascada: bias_pue (calibrado contra por-puesto.json) → bias_mun → bias_depto.
+      const { puKey, munKey, depNom, hasPueBias, hasMunBias } = payload.args;
+      if (hasPueBias && puKey)        getV = c => projectedPue(c, puKey, munKey, depNom);
+      else if (hasMunBias && munKey)  getV = c => projectedMun(c, munKey, depNom);
+      else                            getV = c => projected(c, depNom);
     } else { getV = () => 0; }
     return cands.map(c => ({ c, v: getV(c) })).filter(x => x.v > 0).sort((a,b) => b.v - a.v);
   }
@@ -3346,6 +3362,29 @@
       repaintPueLayer();   // dibuja los markers según el zoom actual
       // Encuadre nacional inicial. El usuario puede zoomear/arrastrar libremente.
       try { map.setView([4.5, -73.5], 6); } catch(e){}
+      // Calibración lazy del bias por puesto: arranca en background, no
+      // bloquea el render. Cuando termina, repinta para aplicar la nueva
+      // granularidad y refresca la tarjeta lateral si está activa.
+      if (!_biasPueLoading && !Object.keys(_biasCachePue).length){
+        _biasPueLoading = (async () => {
+          try {
+            await loadHistoricosPue();
+            precomputeBiasPue();
+            if (currentLevel === 'pue'){
+              repaintPueLayer();
+              // Reconstruir el payload con flags actualizados — el guardado
+              // tiene hasPueBias=false del momento del hover. Sin esto, la
+              // tarjeta seguiría mostrando "proyección heredada del municipio".
+              if (_lastTerritoryPayload?.kind === 'puesto' && _lastTerritoryPayload.args?.puData){
+                const p = _lastTerritoryPayload.args.puData;
+                _renderTerritoryCard(_puestoPayload(p, _puestoWinner(p)));
+              }
+            }
+          } catch(e){
+            console.error('[Previa] error calibrando bias por puesto:', e);
+          }
+        })();
+      }
     }
   }
 
@@ -3527,6 +3566,41 @@
         munsByKey[munKey] = byName;
       }
       HISTORICOS[sig].muns = munsByKey;
+    });
+  }
+
+  // Carga lazy los `por-puesto.json` de cada elección histórica. El formato
+  // generado por tools/build-historicos-puestos.js es:
+  //   { candidatos:{COD:{nombre,...}}, puestos:{"DD-MMM-ZZ-PP":{vv,vb,vn,vm,v:{COD:votos}}} }
+  // Lo aplanamos al mismo shape que .deptos/.muns: HISTORICOS[sig].pues[k]
+  // = { byName: % }, listo para precomputeBiasPue().
+  async function loadHistoricosPue(){
+    const urls = HISTORICO_KEYS.map(k => `${HISTORICOS_URL}/${k}/por-puesto.json`);
+    const pues = await Promise.all(urls.map(u =>
+      fetch(u, { cache: 'force-cache' })
+        .then(r => r.ok ? r.json() : null)
+        .catch(() => null)
+    ));
+    pues.forEach((data, i) => {
+      if (!data || !data.puestos) return;
+      const sig = HISTORICO_KEYS[i];
+      if (!HISTORICOS[sig]) HISTORICOS[sig] = { nacional: {}, deptos: {} };
+      const codeToName = {};
+      for (const [cod, c] of Object.entries(data.candidatos || {})){
+        codeToName[cod] = norm(c.nombre || '');
+      }
+      const puesByKey = {};
+      for (const [puKey, p] of Object.entries(data.puestos)){
+        const valids = p.vv || 0;
+        if (valids <= 0) continue;
+        const byName = {};
+        for (const [cod, votos] of Object.entries(p.v || {})){
+          const name = codeToName[cod];
+          if (name) byName[name] = votos / valids;
+        }
+        puesByKey[puKey] = byName;
+      }
+      HISTORICOS[sig].pues = puesByKey;
     });
   }
 
@@ -3724,6 +3798,91 @@
         }
       }
     }
+  }
+
+  // Bias por puesto. Análogo a precomputeBiasMun pero a granularidad puesto.
+  // Sólo construye entradas donde haya cobertura histórica de puesto en al
+  // menos una señal con peso > 0. Para señales que sólo tienen cobertura
+  // mun/depto, hereda el valor del scope superior — así un puesto sin
+  // historia local pero en un mun bien cubierto sigue obteniendo señal.
+  function precomputeBiasPue(){
+    _biasCachePue = {};
+    const puKeys = new Set();
+    for (const sig of Object.keys(HISTORICOS)){
+      const pues = HISTORICOS[sig].pues;
+      if (pues) Object.keys(pues).forEach(k => puKeys.add(k));
+    }
+    if (!puKeys.size) return;
+
+    for (const cand of CANDIDATOS){
+      const equiv = EQUIVALENCIAS[cand.id];
+      if (!equiv || !Object.keys(equiv).length) continue;
+      _biasCachePue[cand.id] = {};
+
+      for (const puKey of puKeys){
+        const parts = puKey.split('-');
+        const depCod = parts[0];
+        const munKey = `${parts[0]}-${parts[1]}`;
+        let num = 0, wTot = 0;
+
+        for (const [sig, spec] of Object.entries(equiv)){
+          const dataset = HISTORICOS[sig];
+          if (!dataset) continue;
+          const names = spec.cands || spec.partidos || [];
+          if (!names.length) continue;
+
+          // Cascada de scope: puesto → mun → depto. Permite que un puesto
+          // sin historia propia (creado después de 2022, p.ej.) herede del
+          // mun y, si tampoco hay mun, del depto.
+          const scope = dataset.pues?.[puKey]
+                     || dataset.muns?.[munKey]
+                     || dataset.deptos?.[depCod];
+          if (!scope) continue;
+
+          let nacSum = 0, locSum = 0, foundAny = false;
+          for (const n of names){
+            const key = norm(n);
+            const nac = dataset.nacional[key];
+            if (nac == null) continue;
+            foundAny = true;
+            nacSum += nac;
+            locSum += scope[key] || 0;
+          }
+          if (!foundAny || nacSum <= 0) continue;
+
+          const rel = locSum / nacSum;
+          num  += spec.peso * rel;
+          wTot += spec.peso;
+        }
+        if (wTot > 0){
+          _biasCachePue[cand.id][puKey] = num / wTot;
+        }
+      }
+    }
+  }
+
+  // Bias por puesto con fallback al mun (y al depto vía biasForMun).
+  function biasForPue(cand, puKey, munKey, parentDepName){
+    const cached = _biasCachePue[cand.id]?.[puKey];
+    if (cached != null && cached > 0) return cached;
+    return biasForMun(cand, munKey, parentDepName);
+  }
+  function projectedPue(cand, puKey, munKey, parentDepName){
+    return cand.pct * biasForPue(cand, puKey, munKey, parentDepName);
+  }
+  function computePuestoRanking(puKey, munKey, parentDepName){
+    const ranked = CANDIDATOS
+      .filter(c => !NO_CANDIDATO_IDS.has(c.id))
+      .map(c => ({ c, v: projectedPue(c, puKey, munKey, parentDepName) }))
+      .filter(x => x.v > 0)
+      .sort((a,b) => b.v - a.v);
+    if (!ranked.length) return null;
+    const winner = ranked[0];
+    const second = ranked[1] || { c: null, v: 0 };
+    const total = ranked.reduce((s,x) => s + x.v, 0);
+    const winShare = total > 0 ? winner.v / total : 0;
+    const margin = winner.v - second.v;
+    return { winner: winner.c, winnerV: winner.v, second: second.c, secondV: second.v, margin, winShare, ranked };
   }
 
   // Etiqueta humana de las señales cargadas en HISTORICOS (para tooltips).
