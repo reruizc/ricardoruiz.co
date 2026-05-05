@@ -658,12 +658,15 @@
       .panel-close-mobile,.panel-grip,.panel-backdrop,.ponderador-fab{display:none!important}
     }
 
-    /* La map-legend ahora va DEBAJO de territory-card (orden invertido en
-       mid-col). Border-top hace de divisor entre las dos secciones; sólo
-       se aplica si la tarjeta arriba está visible (.territory-card.show). */
+    /* La map-legend ahora va DEBAJO de territory-card en desktop (orden
+       invertido en mid-col). Border-top hace de divisor entre las dos
+       secciones — sólo se aplica en desktop porque en mobile la
+       territory-card está oculta (vive en .territory-sheet flotante). */
     .map-legend{padding:.2rem 0 .6rem;display:flex;align-items:flex-start;gap:.75rem;flex-wrap:wrap;flex-direction:column}
-    .territory-card.show + .map-legend{margin-top:1rem;padding-top:.85rem;border-top:1px solid rgba(255,255,255,.08)}
-    body.day-mode .territory-card.show + .map-legend{border-top-color:rgba(0,0,0,.1)}
+    @media (min-width:1100px){
+      .territory-card.show + .map-legend{margin-top:1rem;padding-top:.85rem;border-top:1px solid rgba(255,255,255,.08)}
+      body.day-mode .territory-card.show + .map-legend{border-top-color:rgba(0,0,0,.1)}
+    }
     /* Chips de candidato en columna central: uno por renglón, alineados.
        Estructura: [dot] [nombre flex-grow] [valores tabular-nums]
        (La pond-legend de arriba del stack bar usa el mismo .pond-legend
@@ -2916,16 +2919,36 @@
       // Votación estimada por candidato, ordenada desc. La fila de totales
       // se recalcula cada repaint (responde a slider). Si hay drill-down,
       // muestra SÓLO el depto activo (estimatedVotesInScope).
-      const votes = CANDIDATOS.map(c => ({ c, v: estimatedVotesInScope(c) }))
-                              .filter(x => x.v > 0)
-                              .sort((a,b) => b.v - a.v);
-      const totalVotes = votes.reduce((s,x) => s + x.v, 0);
+      let votes = CANDIDATOS.map(c => ({ c, v: estimatedVotesInScope(c) }))
+                            .filter(x => x.v > 0)
+                            .sort((a,b) => b.v - a.v);
+      let totalVotes = votes.reduce((s,x) => s + x.v, 0);
+      // Fallback "puesto sin censo": ~5.5% de los puestos del país no
+      // tienen mujeres+hombres en PUESTOS_GEOREF.csv, así que su censo
+      // sale 0 y estimatedVotesForPue retorna 0 para todos los candidatos.
+      // Cuando esto pasa con un puesto activo, mostramos los % proyectados
+      // (el bias_pue sí está calibrado) y dejamos los votos como "—".
+      let noCensus = false;
+      const pueScope = _activePueScope();
+      if (!votes.length && pueScope){
+        const win = _puestoWinner(pueScope);
+        const t = win.ranking?.ranked.reduce((s,x) => s + x.v, 0) || 0;
+        if (t > 0){
+          votes = win.ranking.ranked
+            .map(x => ({ c: x.c, v: 0, _share: x.v / t }))
+            .sort((a,b) => b._share - a._share);
+          noCensus = true;
+        }
+      }
       const chips = votes.map(x => {
-        const pct = totalVotes > 0 ? (x.v / totalVotes * 100) : 0;
+        const pct = noCensus ? (x._share * 100) : (totalVotes > 0 ? (x.v / totalVotes * 100) : 0);
+        const votesCell = noCensus
+          ? '<b class="pond-chip-num" style="opacity:.4">—</b>'
+          : `<b class="pond-chip-num">${fmtCompact(x.v)}</b>`;
         return `<span class="pond-chip pond-chip-link" title="Ver detalle de ${x.c.nombre}" onclick="openCandDetail('${x.c.id}')">
           <span class="dot" style="background:${x.c.color}"></span>
           <span class="pond-chip-name">${x.c.nombre}</span>
-          <span class="pond-chip-vals"><b class="pond-chip-num">${fmtCompact(x.v)}</b> <span style="opacity:.55">(${pct.toFixed(1)}%)</span></span>
+          <span class="pond-chip-vals">${votesCell} <span style="opacity:.55">(${pct.toFixed(1)}%)</span></span>
         </span>`;
       }).join('');
       // Si hay drill ciudad con escalado propio (CITY_META) usamos el nombre
@@ -2944,9 +2967,11 @@
             ? (Object.values(SENADO_BY_DEPTO).find(s => s.cod === currentDepCod)?.nombre || 'depto')
             : null);
       const titleHint = Object.keys(SENADO_BY_DEPTO).length
-        ? (scopeLabel
-            ? `Votación estimada · ${scopeLabel}`
-            : 'Votación estimada · 54% del potencial como votantes (escenario 2022)')
+        ? (noCensus
+            ? `Proyección · ${scopeLabel} (puesto sin censo electoral disponible)`
+            : (scopeLabel
+                ? `Votación estimada · ${scopeLabel}`
+                : 'Votación estimada · 54% del potencial como votantes (escenario 2022)'))
         : 'Votación estimada · cargando base territorial…';
       el.innerHTML = `
         <div class="map-legend-title" title="Participación por depto calibrada con el comportamiento real de Senado 2026 y escalada al 54% típico de primera vuelta presidencial (referencia 2022)">${titleHint}</div>
