@@ -162,6 +162,7 @@
     body.day-mode .ev-vert-label{fill:#7c3aed}
     .ev-end-label{font-family:Avenir,sans-serif;font-weight:600;font-size:11.5px}
     .ev-end-pct{font-family:Avenir,sans-serif;font-weight:700;font-size:13px}
+    .ev-end-proj{font-family:Avenir,sans-serif;font-weight:500;font-size:10px;opacity:.7}
     .ev-firmas{display:flex;gap:1.1rem;margin-top:.6rem;flex-wrap:wrap;font-family:Avenir,sans-serif;font-weight:400;font-size:.72rem;color:rgba(255,255,255,.55)}
     body.day-mode .ev-firmas{color:rgba(0,0,0,.6)}
     .ev-firma{display:inline-flex;align-items:center;gap:.4rem}
@@ -5068,19 +5069,22 @@
   // garantizar que la suma sobre candidatos en cada depto = votantes(d) y
   // por tanto la suma nacional = total de votantes esperados.
   function estimatedVotes(cand){
-    if (!geoData) return 0;
-    // Versión consistente a nivel nacional: usa bias_norm (que está
-    // calibrado para que el promedio ponderado por votantes valga 1).
-    // Esto garantiza que ranking(votos) == ranking(pct nacional): si
-    // Abelardo tiene mayor pct que Paloma, sus votos también serán mayores.
-    // La normalización local se aplica solo en el drill por depto
-    // (estimatedVotesForDep) donde la suma local sí debe igualar voters(d).
+    // Itera el MISMO universo de deptos que precomputeBiasNorm() — entries
+    // únicas por `cod` de SENADO_BY_DEPTO. Con esto y bias_norm cumpliéndose
+    // (Σ voters(d)·bias_norm(c,d) / Σ voters(d) = 1), la share nacional
+    // del candidato coincide al pp con cand.pct, garantizando que
+    // map-legend = stack del ponderador = sliders.
+    // Antes iteraba geoData.features lo que rompía la igualdad por
+    // diferencias de aliasing/ausencias entre el GeoJSON y SENADO_BY_DEPTO.
+    const uniqueByCod = {};
+    for (const s of Object.values(SENADO_BY_DEPTO)){
+      if (s.cod && !uniqueByCod[s.cod]) uniqueByCod[s.cod] = s;
+    }
     let total = 0;
-    for (const f of geoData.features){
-      const nm = depName(f.properties);
-      const voters = expectedVoters(nm);
+    for (const sen of Object.values(uniqueByCod)){
+      const voters = (sen.votant || 0) * TURNOUT_SCALE;
       if (voters <= 0) continue;
-      total += voters * cand.pct * biasForNorm(cand, nm) / 100;
+      total += voters * cand.pct * biasForNorm(cand, sen.nombre) / 100;
     }
     return total;
   }
@@ -5190,7 +5194,11 @@
       cands:{ 'Cepeda':40.9,'De la Espriella':15.6,'Valencia':21.1,'Fajardo':3.9,'Claudia López':1.6,'Barreras':0.3,'Murillo':0.2 } },
     { id:'34-cnc',                firma:'Centro Nacional de Consultoría',  fecha:'2026-03-21', n:2494, modo:'presencial',
       cands:{ 'Cepeda':34.5,'De la Espriella':15.4,'Valencia':22.2,'Fajardo':3.6,'Claudia López':3.7,'Barreras':0.5,'Murillo':0.2 } },
-    { id:'38-guarumo',            firma:'Guarumo / EcoAnalítica',          fecha:'2026-03-25', n:2022, modo:'presencial',
+    // 38-guarumo: la entrada usa los pcts del PDF Guarumo abril (22-29 abr)
+    // — ahora con fecha real (2026-04-25) para que coincida con la
+    // fecha_efectiva que usa el ponderador (vía clasificadas.csv) y la
+    // línea del chart no la trate como una encuesta de marzo de hace 40d.
+    { id:'38-guarumo',            firma:'Guarumo / EcoAnalítica',          fecha:'2026-04-25', n:4680, modo:'presencial',
       cands:{ 'Cepeda':38.0,'De la Espriella':23.9,'Valencia':22.8,'Fajardo':2.5,'Claudia López':2.4,'Barreras':0.3,'Murillo':0.3 } },
     { id:'36-atlas-intel',        firma:'Atlas Intel',                     fecha:'2026-04-09', n:3617, modo:'digital',
       cands:{ 'Cepeda':37.8,'De la Espriella':27.24,'Valencia':22.89,'Fajardo':4.98,'Claudia López':1.01,'Barreras':0.25,'Murillo':0.0 } },
@@ -5211,18 +5219,30 @@
     // la línea suavizada).
   ];
 
-  // q_firma calibrado vs consultas 8 mar 2026 (ver ponderador-detalle.json)
-  // CELAG no entró al ponderador → fallback 0.7 hasta calibrarla.
+  // q_firma — debe matchear ponderador-detalle.json para que la línea
+  // suavizada del chart coincida con el promedio nacional al corte.
+  // Firmas sin datos pre-8M (Génesis, CELAG) caen al default Q_FIRMA_DEFAULT.
   const FIRMA_Q = {
     'Atlas Intel': 0.985,
     'Invamer': 0.932,
     'Centro Nacional de Consultoría': 0.943,
     'GAD3': 0.549,
     'YanHaas': 0.4,
-    'Guarumo / EcoAnalítica': 0.85,
-    'Génesis Crea': 0.7,
-    'CELAG': 0.7,
+    'Guarumo / EcoAnalítica': 1.0,  // sin MAE pre-8M → neutro 1.0 (igual que ponderador.py)
   };
+  const Q_FIRMA_DEFAULT = 1.0;
+  // q_modo — ponderador.py promedia q_firma de las firmas calibradas por modo
+  const Q_MODO = {
+    'presencial': 0.922,
+    'digital': 0.985,
+    'telefonico': 0.549,
+    'mixto': 0.943,
+    '': 1.0,
+  };
+  const Q_MODO_DEFAULT = 1.0;
+  // Parámetros del ponderador (ponderador.py)
+  const PONDERADOR_LAMBDA = 0.1;
+  const PONDERADOR_DIAS_VIGENCIA = 60;
   // Glifo por firma (para distinguir cada encuesta en el scatter)
   const FIRMA_SHAPE = {
     'Atlas Intel': 'circle',
@@ -5250,20 +5270,27 @@
     return Date.UTC(y, m-1, d);
   }
 
-  // Promedio gaussiano: σ=14d, peso por √n y por q_firma. Decae naturalmente
-  // hacia la última encuesta cuando t supera la última fecha → línea de
-  // predicción ancla a los últimos datos.
-  function _evSmoothAt(t, candKey){
+  // Modelo idéntico al ponderador.py:
+  //   peso = q_firma × q_modo × exp(-λ × max(0, días)),  λ=0.1
+  //   pct(c, t) = Σ peso × pct_p(c) / Σ peso
+  // Sólo se usan polls vigentes en el día t (fecha_fin ≤ t y días ≤ 60).
+  // Garantiza que en t = fecha_corte el resultado coincide al pp con
+  // ponderador-actual.json (si los q_firma/q_modo del cliente matchean los
+  // del backend, lo cual debe revisarse al cambiar el corte).
+  function _evRollingAt(t, candKey){
     let sw = 0, sv = 0;
-    const sigma = 14;
+    const lam = PONDERADOR_LAMBDA;
+    const vig = PONDERADOR_DIAS_VIGENCIA;
     for (const p of POLLS){
       const v = p.cands[candKey];
       if (v == null) continue;
-      const dt = (t - p._dateMs) / 86400000;
-      const k = Math.exp(-(dt*dt) / (2*sigma*sigma));
-      const wn = Math.sqrt(Math.max(p.n || 1500, 800) / 2000);
-      const wf = FIRMA_Q[p.firma] || 0.7;
-      const w = k * wn * wf;
+      const days = (t - p._dateMs) / 86400000;
+      if (days < 0) continue;
+      if (days > vig) continue;
+      const qf = (FIRMA_Q[p.firma] != null) ? FIRMA_Q[p.firma] : Q_FIRMA_DEFAULT;
+      const qm = (Q_MODO[p.modo]   != null) ? Q_MODO[p.modo]   : Q_MODO_DEFAULT;
+      const dr = Math.exp(-lam * days);
+      const w = qf * qm * dr;
       sw += w; sv += w * v;
     }
     return sw > 0 ? sv / sw : null;
@@ -5416,10 +5443,16 @@
 
     const T0 = _evParseDate('2026-01-01');
     const T1 = _evParseDate('2026-05-31'); // primera vuelta presidencial
+    // Hoy = fecha de corte del ponderador (cae a la fecha de la última
+    // encuesta si el ponderador aún no cargó). Las etiquetas grandes y
+    // los % numéricos corresponden a este día — NO al 31-may.
     const tLast = Math.max(...POLLS.map(p => p._dateMs));
+    const tHoy = (PONDERADOR_META?.fecha_corte
+                  ? _evParseDate(PONDERADOR_META.fecha_corte)
+                  : tLast);
 
     const W = 880, H = 360;
-    const ML = 50, MR = 130, MT = 30, MB = 56;
+    const ML = 50, MR = 140, MT = 30, MB = 56;
     const PW = W - ML - MR, PH = H - MT - MB;
     const xOf = t => ML + ((t - T0) / (T1 - T0)) * PW;
     const yMax = 50;
@@ -5441,18 +5474,26 @@
     // sólo para que su línea sea legible contra el fondo oscuro.
 
     const order = ['ic','ae','pv','sf','cl','lm','rb'];
-    const finalVals = {};
-    order.forEach(id => { finalVals[id] = _evSmoothAt(T1, candCfg[id].pondKey) ?? 0; });
-    // Mostramos los que tienen al menos un dato y un valor razonable al final
+    // Etiqueta principal = valor "hoy" (corte del ponderador) → coincide
+    // con el stack del ponderador y los sliders. Anotación secundaria al
+    // 31-may para mostrar la proyección si nada cambia.
+    const valHoy = {}, valProj = {};
+    order.forEach(id => {
+      valHoy[id]  = _evRollingAt(tHoy, candCfg[id].pondKey) ?? 0;
+      valProj[id] = _evRollingAt(T1,   candCfg[id].pondKey) ?? 0;
+    });
     const visibleIds = order.filter(id => {
       const has = POLLS.some(p => p.cands[candCfg[id].pondKey] != null);
-      return has && finalVals[id] >= 0.5;
+      return has && valHoy[id] >= 0.5;
     });
 
     const parts = [];
 
-    // Zona de predicción (después de la última encuesta)
-    const xPred = xOf(tLast);
+    // Zona de predicción: desde HOY (fecha_corte) hasta el 31-may. Antes
+    // del corte la línea es histórica (modelo retrospectivo); después es
+    // proyección (la curva se aplana hacia el promedio de los últimos
+    // sondeos por el decaimiento exponencial).
+    const xPred = xOf(tHoy);
     parts.push(
       `<rect class="ev-pred-zone" x="${xPred}" y="${MT}" width="${ML+PW - xPred}" height="${PH}"/>`,
       `<line class="ev-pred-line" x1="${xPred}" y1="${MT}" x2="${xPred}" y2="${MT+PH}"/>`,
@@ -5495,7 +5536,7 @@
       let d = '';
       let started = false;
       days.forEach(t => {
-        const v = _evSmoothAt(t, cfg.pondKey);
+        const v = _evRollingAt(t, cfg.pondKey);
         if (v == null) return;
         const x = xOf(t), y = yOf(Math.max(0, Math.min(yMax, v)));
         d += (started ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1) + ' ';
@@ -5525,12 +5566,15 @@
       });
     });
 
-    // Etiquetas finales a la derecha (con anti-colisión simple)
+    // Etiquetas a la altura del valor de HOY (fecha_corte). El % grande
+    // muestra el valor "hoy" — coincide con el stack del ponderador y
+    // los sliders. Anotación pequeña al 31-may con la proyección.
     const labels = visibleIds.map(id => ({
       id, color: candCfg[id].color, name: candCfg[id].name,
-      val: finalVals[id], y: yOf(Math.max(0, Math.min(yMax, finalVals[id]))),
+      val: valHoy[id], proj: valProj[id],
+      y: yOf(Math.max(0, Math.min(yMax, valHoy[id]))),
     })).sort((a,b) => a.y - b.y);
-    const minGap = 18;
+    const minGap = 22;
     for (let i = 1; i < labels.length; i++){
       if (labels[i].y - labels[i-1].y < minGap) labels[i].y = labels[i-1].y + minGap;
     }
@@ -5541,16 +5585,31 @@
         if (labels[i].y - labels[i-1].y < minGap) labels[i-1].y = labels[i].y - minGap;
       }
     }
-    const xLabel = ML + PW + 12;
+    const xToday = xOf(tHoy);
+    const xLabel = xToday + 10;
+    const xProj  = xOf(T1);
     labels.forEach(l => {
       const realY = yOf(Math.max(0, Math.min(yMax, l.val)));
+      const projY = yOf(Math.max(0, Math.min(yMax, l.proj)));
       parts.push(
-        `<line x1="${ML+PW}" y1="${realY}" x2="${xLabel - 3}" y2="${l.y}" stroke="${l.color}" stroke-width="1" opacity=".5"/>`,
-        `<circle cx="${ML+PW + 2}" cy="${realY}" r="3" fill="${l.color}"/>`,
+        // Conector dot HOY → label
+        `<circle cx="${xToday}" cy="${realY}" r="3" fill="${l.color}"/>`,
+        `<line x1="${xToday}" y1="${realY}" x2="${xLabel - 2}" y2="${l.y}" stroke="${l.color}" stroke-width="1" opacity=".5"/>`,
         `<text class="ev-end-label" x="${xLabel}" y="${l.y - 1}" fill="${l.color}">${l.name}</text>`,
-        `<text class="ev-end-pct"   x="${xLabel}" y="${l.y + 13}" fill="${l.color}">${l.val.toFixed(1)}%</text>`
+        `<text class="ev-end-pct"   x="${xLabel}" y="${l.y + 13}" fill="${l.color}">${l.val.toFixed(1)}%</text>`,
+        // Punta proyectada al 31-may (más tenue)
+        `<circle cx="${xProj}" cy="${projY}" r="2.4" fill="${l.color}" opacity=".55"/>`,
+        `<text class="ev-end-proj" x="${xProj + 4}" y="${projY + 3}" fill="${l.color}">${l.proj.toFixed(1)}</text>`
       );
     });
+    // Tick "hoy" en la línea de predicción
+    const fechaCorteLabel = PONDERADOR_META?.fecha_corte
+      ? `hoy · ${PONDERADOR_META.fecha_corte}`
+      : 'hoy';
+    parts.push(
+      `<text class="ev-vert-label" x="${xToday + 6}" y="${MT + PH + 18}" text-anchor="start">${fechaCorteLabel}</text>`,
+      `<text class="ev-vert-label" x="${xProj}" y="${MT + PH + 18}" text-anchor="end" style="opacity:.55">31 may</text>`
+    );
 
     svg.innerHTML = parts.join('');
     // Guardamos cfg en el svg para que los handlers de hover lo encuentren
