@@ -4795,19 +4795,30 @@
       cands:{ 'Cepeda':34.95,'De la Espriella':26.81,'Valencia':16.78,'Fajardo':7.45,'Claudia López':1.57,'Barreras':0.91,'Murillo':0.65 } },
     { id:'31-gad3',               firma:'GAD3',                            fecha:'2026-03-18', n:1200, modo:'telefonico',
       cands:{ 'Cepeda':35.25,'De la Espriella':20.59,'Valencia':15.56,'Fajardo':3.11,'Claudia López':4.03,'Barreras':0.06,'Murillo':0.53 } },
+    { id:'wiki-celag-mar',        firma:'CELAG',                           fecha:'2026-03-15', n:2019, modo:'mixto',
+      cands:{ 'Cepeda':40.9,'De la Espriella':15.6,'Valencia':21.1,'Fajardo':3.9,'Claudia López':1.6,'Barreras':0.3,'Murillo':0.2 } },
     { id:'34-cnc',                firma:'Centro Nacional de Consultoría',  fecha:'2026-03-21', n:2494, modo:'presencial',
       cands:{ 'Cepeda':34.5,'De la Espriella':15.4,'Valencia':22.2,'Fajardo':3.6,'Claudia López':3.7,'Barreras':0.5,'Murillo':0.2 } },
     { id:'38-guarumo',            firma:'Guarumo / EcoAnalítica',          fecha:'2026-03-25', n:2022, modo:'presencial',
       cands:{ 'Cepeda':38.0,'De la Espriella':23.9,'Valencia':22.8,'Fajardo':2.5,'Claudia López':2.4,'Barreras':0.3,'Murillo':0.3 } },
     { id:'36-atlas-intel',        firma:'Atlas Intel',                     fecha:'2026-04-09', n:3617, modo:'digital',
       cands:{ 'Cepeda':37.8,'De la Espriella':27.24,'Valencia':22.89,'Fajardo':4.98,'Claudia López':1.01,'Barreras':0.25,'Murillo':0.0 } },
+    { id:'wiki-celag-abr',        firma:'CELAG',                           fecha:'2026-04-15', n:2021, modo:'mixto',
+      cands:{ 'Cepeda':41.9,'De la Espriella':19.8,'Valencia':20.3,'Fajardo':1.6,'Claudia López':1.1,'Barreras':0.1,'Murillo':0.1 } },
+    { id:'42-gad3-abr',           firma:'GAD3',                            fecha:'2026-04-22', n:1500, modo:'telefonico',
+      cands:{ 'Cepeda':36.0,'De la Espriella':21.0,'Valencia':13.0,'Fajardo':2.0,'Claudia López':3.0,'Barreras':0.0,'Murillo':0.4 } },
     { id:'40-invamer',            firma:'Invamer',                         fecha:'2026-04-24', n:3800, modo:'presencial',
       cands:{ 'Cepeda':44.3,'De la Espriella':21.5,'Valencia':19.8,'Claudia López':6.6,'Fajardo':2.5,'Barreras':0.1,'Murillo':0.4 } },
     { id:'39-cnc',                firma:'Centro Nacional de Consultoría',  fecha:'2026-04-28', n:2200, modo:'presencial',
       cands:{ 'Cepeda':37.2,'De la Espriella':20.4,'Valencia':15.6,'Fajardo':2.7,'Claudia López':1.5,'Barreras':0.1,'Murillo':0.3 } },
+    { id:'41-atlas-abr29',        firma:'Atlas Intel',                     fecha:'2026-04-29', n:4037, modo:'digital',
+      cands:{ 'Cepeda':37.4,'De la Espriella':29.4,'Valencia':20.9,'Fajardo':4.1,'Claudia López':1.9,'Barreras':0.9,'Murillo':0.7 } },
+    { id:'41-guarumo-abr29',      firma:'Guarumo / EcoAnalítica',          fecha:'2026-04-29', n:4680, modo:'presencial',
+      cands:{ 'Cepeda':38.0,'De la Espriella':23.9,'Valencia':22.8,'Fajardo':2.5,'Claudia López':2.4,'Barreras':0.3,'Murillo':0.3 } },
   ];
 
   // q_firma calibrado vs consultas 8 mar 2026 (ver ponderador-detalle.json)
+  // CELAG no entró al ponderador → fallback 0.7 hasta calibrarla.
   const FIRMA_Q = {
     'Atlas Intel': 0.985,
     'Invamer': 0.932,
@@ -4816,6 +4827,7 @@
     'YanHaas': 0.4,
     'Guarumo / EcoAnalítica': 0.85,
     'Génesis Crea': 0.7,
+    'CELAG': 0.7,
   };
   // Glifo por firma (para distinguir cada encuesta en el scatter)
   const FIRMA_SHAPE = {
@@ -4826,6 +4838,7 @@
     'YanHaas': 'tri-down',
     'Guarumo / EcoAnalítica': 'plus',
     'Génesis Crea': 'x',
+    'CELAG': 'hex',
   };
   const FIRMA_LABEL = {
     'Atlas Intel': 'Atlas Intel',
@@ -4835,6 +4848,7 @@
     'YanHaas': 'YanHaas',
     'Guarumo / EcoAnalítica': 'Guarumo',
     'Génesis Crea': 'Génesis Crea',
+    'CELAG': 'CELAG',
   };
 
   function _evParseDate(s){
@@ -4891,6 +4905,15 @@
       case 'x': {
         const a = r * 1.05;
         return `<path d="M${cx-a} ${cy-a} L${cx+a} ${cy+a} M${cx-a} ${cy+a} L${cx+a} ${cy-a}" stroke="${color}" stroke-width="2" stroke-linecap="round" fill="none"/>`;
+      }
+      case 'hex': {
+        const r2 = r * 1.15;
+        let pts = '';
+        for (let i = 0; i < 6; i++){
+          const a = (i / 6) * 2 * Math.PI - Math.PI/2;
+          pts += (cx + r2 * Math.cos(a)).toFixed(2) + ',' + (cy + r2 * Math.sin(a)).toFixed(2) + ' ';
+        }
+        return `<polygon points="${pts.trim()}" fill="${color}" fill-opacity="${fillOp}" ${common}/>`;
       }
     }
     return '';
