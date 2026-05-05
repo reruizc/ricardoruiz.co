@@ -1339,9 +1339,14 @@
     'consulta-2026-soluciones',
   ]);
 
-  // Censo por puesto / nacional para corregir las señales sesgadas.
-  // Se llenan al cargar _puestosLight, antes de precomputeBiasPue.
+  // Censo por puesto / mun / dep / nacional. Se llenan al cargar
+  // _puestosLight. Sirven para dos cosas:
+  //   1) Corregir señales sesgadas en precomputeBiasPue (tasas vs censo).
+  //   2) Hibridar el factor de participación: votantes esperados
+  //      = censo_local × (participación real del depto en Senado 2026).
   let _censoByPueKey = null;   // Map<puKey, censo>
+  let _censoByMunKey = null;   // Map<"dep-mun", censo>
+  let _censoByDepCod = null;   // Map<depCod, censo>
   let _censoNacional = 0;
 
   // ─── EQUIVALENCIAS: candidato 2026 → señales históricas ────────
@@ -2515,13 +2520,22 @@
       .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(data => {
         _puestosLight = data;
-        // Índices de censo para corrección de sesgo en señales de consulta
-        // (ver SESGADAS_POR_UNIVERSO). Se calcula una sola vez por sesión.
+        // Índices de censo para (1) corregir sesgo en SESGADAS_POR_UNIVERSO
+        // y (2) hibridar el factor de participación por depto en
+        // estimatedVotesForPue / Excel mun / Excel pue. Se calculan
+        // una sola vez por sesión.
         _censoByPueKey = new Map();
+        _censoByMunKey = new Map();
+        _censoByDepCod = new Map();
         _censoNacional = 0;
         for (const p of data){
           if (!p.c) continue;
           _censoByPueKey.set(p.k, p.c);
+          const dep = p.k.slice(0, 2);
+          const mun = p.k.slice(3, 6);
+          const munKey = `${dep}-${mun}`;
+          _censoByMunKey.set(munKey, (_censoByMunKey.get(munKey) || 0) + p.c);
+          _censoByDepCod.set(dep, (_censoByDepCod.get(dep) || 0) + p.c);
           _censoNacional += p.c;
         }
         return data;
@@ -3715,8 +3729,13 @@
       const depNom = munParentDep(props);
       const munKey = munKeyFromProps(props);
       const munElec = munKey ? munKey.split('-')[1] : '';
+      const dep = munKey ? munKey.split('-')[0] : '';
       const censoMun = munKey ? (censoByMun.get(munKey) || 0) : 0;
-      const esperados = censoMun > 0 ? censoMun * 0.54 : 0;
+      // Híbrido: censo del mun × participación REAL del depto en Senado
+      // 2026 escalada al objetivo presidencial. Antes era 0.54 uniforme,
+      // ahora respeta heterogeneidad del depto (Vichada ~0.34,
+      // Cundinamarca ~0.59, etc.).
+      const esperados = censoMun > 0 ? censoMun * _factorParticipacionDep(dep) : 0;
       const hasMunBias = munKey && _biasCacheMun && Object.values(_biasCacheMun).some(m => m[munKey] != null);
       const projections = cands.map(c => ({
         c,
@@ -3765,8 +3784,9 @@
       const ranking = winInfo.ranking;
       const total = ranking?.ranked.reduce((s,x) => s + x.v, 0) || 0;
       // Censo se sigue usando internamente para estimar votantes esperados,
-      // pero no se emite como columna del archivo.
-      const esperados = (p.c || 0) * 0.54;
+      // pero no se emite como columna del archivo. Híbrido: censo del puesto
+      // × participación REAL del depto (no el 0.54 uniforme nacional).
+      const esperados = (p.c || 0) * _factorParticipacionDep(dep);
 
       const shareById = new Map();
       if (ranking) ranking.ranked.forEach(x => shareById.set(x.c.id, total > 0 ? x.v / total : 0));
@@ -5257,15 +5277,30 @@
     return expectedCity * share;
   }
 
-  // Estimación a nivel PUESTO. Censo del puesto × 54% (mismo factor de
-  // primera vuelta presidencial) = votantes esperados; share local con
-  // cascada bias_pue → bias_mun → bias_dep para que iguale lo que pinta
-  // el marker y la tarjeta lateral.
+  // Factor de participación REAL del depto = votantes presidenciales
+  // esperados / censo del depto. Captura heterogeneidad real:
+  //   Cundinamarca ~0.59 vs Vichada ~0.34 vs Bogotá ~0.57.
+  // En lugar del 0.54 uniforme nacional. Si SENADO_BY_DEPTO o el censo
+  // del depto no están cargados, cae al promedio nacional 0.54.
+  function _factorParticipacionDep(depCod){
+    if (!_censoByDepCod) return 0.54;
+    const censoDep = _censoByDepCod.get(depCod);
+    if (!censoDep) return 0.54;
+    const entry = Object.values(SENADO_BY_DEPTO).find(s => s.cod === depCod);
+    if (!entry) return 0.54;
+    return (entry.votant * TURNOUT_SCALE) / censoDep;
+  }
+
+  // Estimación a nivel PUESTO. Censo del puesto × factor de participación
+  // del depto (votantes Senado×1.087 / censo) = votantes esperados; share
+  // local con cascada bias_pue → bias_mun → bias_dep para que iguale lo
+  // que pinta el marker y la tarjeta lateral.
   function estimatedVotesForPue(cand, puData){
     const censo = puData?.c || 0;
-    const esperados = censo * 0.54;
-    if (esperados <= 0) return 0;
+    if (censo <= 0) return 0;
     const dep = puData.k.slice(0, 2);
+    const esperados = censo * _factorParticipacionDep(dep);
+    if (esperados <= 0) return 0;
     const mun = puData.k.slice(3, 6);
     const munKey = `${dep}-${mun}`;
     const depEntry = Object.values(SENADO_BY_DEPTO).find(s => s.cod === dep);
