@@ -400,6 +400,16 @@
     .tc-margin{display:flex;justify-content:space-between;margin-top:.45rem;padding-top:.55rem;border-top:1px solid rgba(255,255,255,.08);font-family:'Arima',sans-serif;font-weight:500;font-size:.82rem;letter-spacing:.02em;color:rgba(255,255,255,.7)}
     .tc-margin b{color:rgba(255,255,255,.95)}
     .tc-fuente{margin-top:.55rem;padding-top:.5rem;border-top:1px solid rgba(255,255,255,.06);font-family:'Arima',sans-serif;font-weight:400;font-size:.78rem;letter-spacing:.01em;color:rgba(255,255,255,.5);line-height:1.45}
+    /* Bloque "Antecedentes en este puesto": pres 2022 + senado 2026 */
+    .tc-historico{margin-top:.55rem;padding-top:.5rem;border-top:1px solid rgba(255,255,255,.08)}
+    .tc-historico .tc-h-title{font-family:Avenir,sans-serif;font-weight:500;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-bottom:.35rem}
+    .tc-historico > div:not(.tc-h-title){display:flex;justify-content:space-between;gap:.6rem;font-family:'Arima',sans-serif;font-size:.8rem;line-height:1.4;margin-bottom:.18rem}
+    .tc-historico .tc-h-lbl{color:rgba(255,255,255,.55);flex:0 0 auto}
+    .tc-historico .tc-h-val{color:rgba(255,255,255,.92);font-weight:500;text-align:right}
+    body.day-mode .tc-historico{border-top-color:rgba(0,0,0,.08)}
+    body.day-mode .tc-historico .tc-h-title{color:rgba(0,0,0,.45)}
+    body.day-mode .tc-historico .tc-h-lbl{color:rgba(0,0,0,.55)}
+    body.day-mode .tc-historico .tc-h-val{color:rgba(0,0,0,.9)}
     .tc-empty{font-family:'Arima',sans-serif;font-weight:400;font-size:.85rem;color:rgba(255,255,255,.5);padding:.3rem 0}
     .tc-drill{display:block;width:100%;margin-top:.65rem;padding:.55rem .75rem;background:rgba(0,71,255,.18);border:1px solid rgba(0,71,255,.45);color:#f4f3ef;font-family:Avenir,sans-serif;font-weight:500;font-size:.82rem;letter-spacing:.02em;cursor:pointer;text-align:center;transition:all .15s}
     .tc-drill:hover{background:rgba(0,71,255,.32);border-color:rgba(0,71,255,.7)}
@@ -1612,8 +1622,12 @@
     map.getContainer().style.background = '#060810';
     setTimeout(() => map.invalidateSize(), 300);
     // Re-render del LOD de puestos en cada zoom mientras la capa está activa.
-    map.on('zoomend', () => { if (currentLevel === 'pue') repaintPueLayer(); });
-    map.on('moveend', () => { if (currentLevel === 'pue') repaintPueLayer(); });
+    map.on('zoomend', () => {
+      if (currentLevel === 'pue'){ repaintPueLayer(); _updatePueBackBtn(); }
+    });
+    map.on('moveend', () => {
+      if (currentLevel === 'pue'){ repaintPueLayer(); _updatePueBackBtn(); }
+    });
     loadDeptos();
   }
 
@@ -2184,6 +2198,13 @@
   // muns de un depto → nacional. El botón "← Nacional" se rebautiza según
   // el contexto.
   async function exitOneLevel(){
+    // En modo Puestos, "volver a nacional" significa centrar el mapa en
+    // la vista inicial — no hay capas que destruir, solo reset del view.
+    if (currentLevel === 'pue'){
+      try { map.flyTo([4.5, -73.5], 6, { duration: .6 }); } catch(e){}
+      _updatePueBackBtn();
+      return;
+    }
     if (currentCityKey){
       // De ciudad → muns del depto padre
       const cfg = CITY_MAPS[currentCityKey];
@@ -2199,6 +2220,27 @@
       else exitToNacional();
     } else {
       exitToNacional();
+    }
+  }
+
+  // Muestra/oculta el botón "← Nacional" según el zoom actual en modo pue.
+  // Aparece cuando el usuario ya zoomeó o paneó significativamente (>7 ó
+  // distancia al centro inicial > ~2 grados).
+  function _updatePueBackBtn(){
+    const btn = document.getElementById('map-back-btn');
+    if (!btn || !map) return;
+    if (currentLevel !== 'pue'){
+      btn.classList.remove('show');
+      return;
+    }
+    const z = map.getZoom();
+    const c = map.getCenter();
+    const farFromHome = Math.abs(c.lat - 4.5) > 2 || Math.abs(c.lng + 73.5) > 2;
+    if (z > 6.3 || farFromHome){
+      btn.textContent = '← Vista nacional';
+      btn.classList.add('show');
+    } else {
+      btn.classList.remove('show');
     }
   }
 
@@ -2324,17 +2366,28 @@
     return { color: 'rgba(255,255,255,0.55)', fillColor: colorWithIntensity(ranking.winner.color, intensity), fillOpacity: .92, weight: .5 };
   }
 
+  // Renderer compartido para todos los markers de la capa. Pintar en un
+  // único canvas baja el costo de DOM de O(n) elementos SVG a un blit
+  // por frame — esencial cuando se muestran ~13.500 puntos a zoom alto.
+  let _pueRenderer = null;
+  function _ensurePueRenderer(){
+    if (!_pueRenderer) _pueRenderer = L.canvas({ padding: 0.3 });
+    return _pueRenderer;
+  }
+
   // Re-render completo de la capa según el zoom actual. Es destructivo
-  // (clear y rebuild de los markers) — Leaflet maneja bien ~5k circleMarker.
+  // (clear y rebuild de los markers); con canvas renderer el costo de
+  // recrear es prácticamente solo el filtro por tier + el sort de bbox.
   function repaintPueLayer(){
     if (!map || !pueLayer) return;
     const z = map.getZoom();
     const visible = _puestosVisibleForZoom(z);
+    const renderer = _ensurePueRenderer();
     pueLayer.clearLayers();
     for (const p of visible){
       const r = _puestoRadius(p.c, z);
       const style = _puestoStyle(p);
-      const m = L.circleMarker([p.y, p.x], { ...style, radius: r });
+      const m = L.circleMarker([p.y, p.x], { ...style, radius: r, renderer });
       m._puData = p;
       m.on('mouseover', _onPueHover);
       m.on('mouseout',  _onPueOut);
@@ -2719,6 +2772,50 @@
     return cands.map(c => ({ c, v: getV(c) })).filter(x => x.v > 0).sort((a,b) => b.v - a.v);
   }
 
+  // Mapeos para el bloque histórico de la tarjeta de puesto. Las claves
+  // cortas vienen del archivo nacional ligero (build-puestos-nacional-light.js
+  // emite p22 = ganador pres 2022 1V y s26 = sigla del partido dominante en
+  // senado 2026 en cada puesto).
+  const _PRES22_LONG = {
+    petro: 'Gustavo Petro',
+    rodolfo: 'Rodolfo Hernández',
+    fico: 'Federico Gutiérrez',
+    fajardo: 'Sergio Fajardo',
+    rodriguez: 'John Milton Rodríguez',
+    ingrid: 'Íngrid Betancourt',
+    gomez: 'Enrique Gómez',
+    perez: 'Luis Pérez',
+  };
+  const _SENADO_PARTIDO_LONG = {
+    PH:  'Pacto Histórico',
+    CD:  'Centro Democrático',
+    LIB: 'Partido Liberal',
+    CON: 'Partido Conservador',
+    U:   'Partido de la U',
+    OXI: 'Oxígeno',
+    CR:  'Cambio Radical · Alma',
+    CRE: 'Creemos',
+    AHO: 'Ahora Colombia',
+    AV:  'Alianza Verde',
+    CSP: 'Colombia Segura y Próspera',
+    OVI: 'Lista Oviedo',
+    FC:  'Fuerza Ciudadana',
+    MSN: 'Movimiento Salvación Nacional',
+    FAU: 'Frente Amplio Unitario',
+    PAT: 'Patriotas',
+  };
+
+  function _pueHistoricoBlockHTML(p){
+    if (!p) return '';
+    const pres22 = p.p22 ? (_PRES22_LONG[p.p22] || p.p22) : null;
+    const sen26  = p.s26 ? (_SENADO_PARTIDO_LONG[p.s26] || p.s26) : null;
+    if (!pres22 && !sen26) return '';
+    const lines = [];
+    if (pres22) lines.push(`<div><span class="tc-h-lbl">Pres. 2022 · 1ª vuelta</span><span class="tc-h-val">${pres22}</span></div>`);
+    if (sen26)  lines.push(`<div><span class="tc-h-lbl">Senado 2026 · partido dominante</span><span class="tc-h-val">${sen26}</span></div>`);
+    return `<div class="tc-historico"><div class="tc-h-title">Antecedentes en este puesto</div>${lines.join('')}</div>`;
+  }
+
   function _renderTerritoryCard(payload){
     const card = document.getElementById('territory-card');
     const sheetBody = document.getElementById('territory-sheet-body');
@@ -2781,6 +2878,12 @@
     const drillBtn = payload.drillTo
       ? `<button class="tc-drill" onclick="_drillFromSheet('${payload.drillTo.kind}',${(payload.drillTo.args || []).map(a => `'${String(a).replace(/'/g,'&#39;').replace(/&/g,'&amp;')}'`).join(',')})">${payload.drillTo.label}</button>`
       : '';
+    // Para puestos: bloque opcional con antecedentes históricos (pres
+    // 2022 1V + senado 2026 partido dominante) leídos del archivo
+    // nacional ligero. Sólo se muestra cuando hay al menos un dato.
+    const historicoBlock = (payload.kind === 'puesto' && !compact)
+      ? _pueHistoricoBlockHTML(payload.args?.puData)
+      : '';
     const cardHTML = `
       <div class="tc-head">
         <div class="tc-head-text">
@@ -2790,6 +2893,7 @@
         <button class="tc-pin ${isPinned ? 'pinned' : ''}" onclick="_toggleTerritoryPin()" title="${isPinned ? 'Soltar (volver a hover)' : 'Fijar este territorio'}">${pinLabel}</button>
       </div>
       ${body}
+      ${historicoBlock}
       ${drillBtn}
       ${payload.fuente && !compact ? `<div class="tc-fuente">${payload.fuente}</div>` : ''}`;
     card.innerHTML = cardHTML;
