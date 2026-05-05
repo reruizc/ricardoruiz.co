@@ -77,6 +77,12 @@
     body.day-mode .map-legend-title{color:rgba(0,0,0,.55)}
     body.day-mode .cand-photo .ph-plus{color:rgba(0,0,0,.45)}
     body.day-mode .leaflet-control-attribution{background:rgba(230,222,211,.9)!important;color:rgba(0,0,0,.4)!important}
+    /* En modo Puestos los muns son solo contexto territorial: el SVG
+       overlay (donde viven los polígonos) deja de capturar mouse para
+       que los hovers/clicks vayan al canvas con los markers de puestos.
+       Sin esto, mover el cursor sobre un puesto disparaba mouseover en
+       el polígono del mun y el tooltip mostraba el nombre del mun. */
+    body.pue-mode .leaflet-overlay-pane svg{pointer-events:none}
 
     /* NAV — mirror senado-2026.html */
     .electoral-nav{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(4,6,16,.6);backdrop-filter:blur(8px);flex-shrink:0}
@@ -1726,11 +1732,38 @@
   // puesto (votos por candidato/partido) se cargan bajo demanda por depto
   // desde senado/cámara/consultas.
   let pueLayer = null;               // L.layerGroup con los circleMarkers
+  let pueTileLayer = null;           // L.tileLayer con calles (solo en pue)
   let _puestosLight = null;          // [{k,y,x,c,m,n,mn,t,p22,s26}, ...]
   let _puestosLightLoading = null;   // Promise mientras se descarga
   // Umbrales de zoom para el LOD: <=tier1Max → solo tier 1, <=tier2Max → tier 1+2, > → todos.
   const PUE_ZOOM_TIER1 = 6.5;
   const PUE_ZOOM_TIER2 = 8.0;
+  // Tile providers gratis sin API key. OSM en día (excelente detalle de
+  // calles); Carto Dark en noche (estética minimalista que combina con
+  // el tema oscuro del sitio). Ambos exigen attribution explícita.
+  const PUE_TILE_LIGHT = {
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19,
+  };
+  const PUE_TILE_DARK = {
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 20,
+  };
+  function _buildPueTileLayer(){
+    const day = document.body.classList.contains('day-mode');
+    const cfg = day ? PUE_TILE_LIGHT : PUE_TILE_DARK;
+    return L.tileLayer(cfg.url, {
+      attribution: cfg.attribution,
+      subdomains: cfg.subdomains || 'abc',
+      maxZoom: cfg.maxZoom,
+      // Opacidad <1 atenúa los tiles para que los markers de puestos
+      // resalten y no compitan con el detalle del mapa.
+      opacity: day ? 0.55 : 0.65,
+    });
+  }
   const CITY_MAPS = {
     bogota:       { depCod:'16', munCod:'001', url:`${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`, rotate:true,  nameField:'LocNombre',  codeField:'LocCodigo', kind:'Localidades' },
     medellin:     { depCod:'01', munCod:'001', url:`${S3}/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`,       rotate:false, nameField:'NOMBRE',     codeField:'CODIGO',    kind:'Comunas' },
@@ -3845,8 +3878,10 @@
     // restaura las opciones del mapa estático (ver setMapInteractive).
     if (level !== 'pue'){
       if (pueLayer){ map.removeLayer(pueLayer); pueLayer = null; }
+      if (pueTileLayer){ map.removeLayer(pueTileLayer); pueTileLayer = null; }
       setMapInteractive(false);
       hint.classList.remove('lg');
+      document.body.classList.remove('pue-mode');
     }
 
     if (level === 'dep'){
@@ -3869,16 +3904,22 @@
       await loadMunicipalNacional();
       repaintMap();
     } else if (level === 'pue'){
-      // Vista por puestos: deja la capa de municipios como FONDO (mismo
-      // que el toggle 'mun') para que los puntos no floten en el vacío;
-      // encima dibuja los markers de puestos con LOD por zoom. El archivo
-      // nacional ligero se descarga la primera vez.
+      // Vista por puestos: tile layer con calles como base (OSM en modo día,
+      // Carto Dark en modo noche), encima los muns sólo como contorno
+      // (transparente), y arriba de todo los markers de puestos con LOD
+      // por zoom. El archivo nacional ligero se descarga la primera vez.
       if (cityLayer){ map.removeLayer(cityLayer); cityLayer = null; currentCityKey = null; }
       if (munLayer){ map.removeLayer(munLayer); munLayer = null; }
       if (deptLayer) map.removeLayer(deptLayer);
       currentDepCod = null;
       document.getElementById('map-back-btn')?.classList.remove('show');
       setMapInteractive(true);
+      // Body class: activa el CSS que apaga pointer-events del SVG overlay
+      // (los muns) para que los hovers vayan al canvas con los markers.
+      document.body.classList.add('pue-mode');
+      // Tile base — Carto Dark/Light según el tema. Se añade ANTES que el
+      // mun y los markers para que quede en el fondo del z-stack del mapa.
+      if (!pueTileLayer) pueTileLayer = _buildPueTileLayer().addTo(map);
       // Carga el fondo municipal (cacheado tras el primer fetch) y los puestos
       // en paralelo. El fondo da contexto territorial mientras el usuario
       // zoomea entre tiers.
@@ -3927,6 +3968,12 @@
     document.body.classList.toggle('day-mode', day);
     document.getElementById('theme-btn').textContent = day ? '🌙 Modo noche' : '☀ Modo día';
     localStorage.setItem('rr-theme', day ? 'day' : 'night');
+    // Sync de la tile layer con el tema. Solo si la capa está montada
+    // (es decir, en modo Puestos). La rebuild es barata: un L.tileLayer.
+    if (pueTileLayer && map){
+      map.removeLayer(pueTileLayer);
+      pueTileLayer = _buildPueTileLayer().addTo(map);
+    }
   }
   if (localStorage.getItem('rr-theme') === 'day'){
     document.body.classList.add('day-mode');
