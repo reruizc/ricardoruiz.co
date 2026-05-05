@@ -709,6 +709,25 @@
     .panel{padding:0;position:relative}
     .panel-head{display:flex;align-items:center;justify-content:space-between;gap:.7rem;flex-wrap:wrap;position:sticky;top:0;z-index:5;background:var(--bg);padding:1rem 1.2rem .75rem;border-bottom:1px solid var(--border);margin-bottom:.6rem}
     body.day-mode .panel-head{background:#e6ded3;border-bottom-color:rgba(0,0,0,.1)}
+
+    /* Control de participación esperada · 1ª vuelta */
+    .turnout-control{padding:.85rem 1.2rem 1rem;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:.7rem;display:flex;flex-direction:column;gap:.45rem}
+    body.day-mode .turnout-control{border-bottom-color:rgba(0,0,0,.08)}
+    .turnout-row{display:flex;align-items:center;justify-content:space-between;gap:.5rem}
+    .turnout-label{font-family:Avenir,sans-serif;font-weight:500;font-size:.68rem;letter-spacing:.13em;text-transform:uppercase;color:rgba(255,255,255,.55)}
+    body.day-mode .turnout-label{color:rgba(0,0,0,.55)}
+    .turnout-reset{background:none;border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.55);width:24px;height:24px;border-radius:3px;cursor:pointer;font-size:.85rem;line-height:1;display:flex;align-items:center;justify-content:center;transition:all .15s}
+    .turnout-reset:hover{background:rgba(0,71,255,.15);border-color:rgba(0,71,255,.5);color:#fff}
+    body.day-mode .turnout-reset{border-color:rgba(0,0,0,.18);color:rgba(0,0,0,.55)}
+    body.day-mode .turnout-reset:hover{background:rgba(0,71,255,.1);color:var(--blue)}
+    .turnout-slider-row{display:flex;align-items:center;gap:.7rem}
+    .turnout-slider{flex:1;-webkit-appearance:none;appearance:none;height:4px;background:rgba(255,255,255,.12);border-radius:2px;outline:none}
+    .turnout-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:var(--blue);cursor:pointer;border:2px solid var(--bg);box-shadow:0 0 0 1px rgba(0,71,255,.4)}
+    .turnout-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--blue);cursor:pointer;border:2px solid var(--bg);box-shadow:0 0 0 1px rgba(0,71,255,.4)}
+    body.day-mode .turnout-slider{background:rgba(0,0,0,.1)}
+    .turnout-value{font-family:Avenir,sans-serif;font-weight:500;font-size:1rem;color:var(--blue);min-width:54px;text-align:right;font-variant-numeric:tabular-nums}
+    .turnout-info{font-family:'Arima',sans-serif;font-weight:400;font-size:.72rem;line-height:1.45;color:rgba(255,255,255,.45)}
+    body.day-mode .turnout-info{color:rgba(0,0,0,.5)}
     .panel #cand-list{padding:0 1.2rem}
     .panel .note{margin:1rem 1.2rem 1.2rem}
     .panel-title{font-family:Avenir,sans-serif;font-weight:500;font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.5);flex:1;min-width:0}
@@ -915,6 +934,23 @@
         <div class="panel-title">Fórmulas presidenciales · mover el deslizador</div>
         <button class="btn btn-primary btn-sm" onclick="resetSim()">Restablecer</button>
       </div>
+
+      <!-- Slider de participación esperada en 1ª vuelta. Recalcula la
+           votación absoluta de todos los candidatos a nivel nacional,
+           depto, mun y puesto. NO afecta los % proyectados (esos
+           dependen de los sliders de pct y del bias). -->
+      <div class="turnout-control">
+        <div class="turnout-row">
+          <div class="turnout-label">Participación esperada · 1ª vuelta</div>
+          <button class="turnout-reset" onclick="resetTurnout()" title="Volver al default 54%">↺</button>
+        </div>
+        <div class="turnout-slider-row">
+          <input type="range" id="turnout-slider" class="turnout-slider" min="49" max="59" step="0.5" value="54" oninput="setTurnoutPct(parseFloat(this.value))">
+          <div class="turnout-value" id="turnout-value">54.0%</div>
+        </div>
+        <div class="turnout-info">Senado 2026 fue ~50% del padrón. Default presidencial 54% (referencia 2022). Mueve el deslizador entre 49% y 59% según el escenario que quieras explorar.</div>
+      </div>
+
       <div id="cand-list"></div>
 
       <div class="note">
@@ -1278,9 +1314,15 @@
     ot: 'Otros',
   };
   // Los votantes de presidencial suelen superar a los de congreso por ~8-10%.
-  // Senado 2026: 20,56M (~49,8%). Target presidencial ~54% → factor 1,087.
-  // Ref histórica: 2022 pres/con = 1,157 · 2018 pres/con = 1,092.
-  const TURNOUT_SCALE = 1.087;
+  // Senado 2026: 20,56M (~49,8% del padrón).
+  // El usuario puede ajustar en runtime (slider 49–59%) la participación
+  // esperada para 1ª vuelta presidencial; default 54% (referencia 2022).
+  // TURNOUT_SCALE = participación_pres / participación_senado_nac.
+  // Para 54% → 1.085 ; para 50% → 1.005 ; para 58% → 1.165.
+  const TURNOUT_SENADO_NAC_PCT = 49.78;   // referencia (~20,56 M / ~41,3 M)
+  const TURNOUT_DEFAULT_PCT = 54.0;
+  let TURNOUT_PCT = TURNOUT_DEFAULT_PCT;
+  let TURNOUT_SCALE = TURNOUT_PCT / TURNOUT_SENADO_NAC_PCT;
   // SENADO_BY_DEPTO[ norm(nombre) ] = { votant, votval, cod, nombre, partidos }
   // Se llena una vez al boot desde senado/departamentos.json
   let SENADO_BY_DEPTO = {};
@@ -3450,6 +3492,27 @@
     _lockedIds.clear();   // restablecer también suelta los candados manuales
     renderPonderador(); renderPanel(); repaintMap();
   }
+
+  // Slider de participación esperada en 1ª vuelta. Recalcula TURNOUT_SCALE
+  // (= participación_pres / participación_senado_nac) y dispara repaint
+  // del mapa + capa de puestos. Los % proyectados de cada candidato NO
+  // cambian (esos vienen de los sliders y del bias); solo cambia la
+  // ESCALA absoluta de votantes esperados.
+  function setTurnoutPct(pct){
+    TURNOUT_PCT = pct;
+    TURNOUT_SCALE = pct / TURNOUT_SENADO_NAC_PCT;
+    const valEl = document.getElementById('turnout-value');
+    if (valEl) valEl.textContent = pct.toFixed(1) + '%';
+    repaintMap();
+    if (currentLevel === 'pue' && pueLayer) repaintPueLayer();
+  }
+  function resetTurnout(){
+    const slider = document.getElementById('turnout-slider');
+    if (slider) slider.value = TURNOUT_DEFAULT_PCT;
+    setTurnoutPct(TURNOUT_DEFAULT_PCT);
+  }
+  window.setTurnoutPct = setTurnoutPct;
+  window.resetTurnout  = resetTurnout;
   // Desbloquea un candidato individual sin tocar los demás. Su % queda
   // donde estaba y volverá a redistribuir cuando muevas otros sliders.
   function unlockCand(id, ev){
