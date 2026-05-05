@@ -1154,6 +1154,26 @@
   // veces si el usuario alterna entre toggles rápidamente.
   let _biasPueLoading = null;
 
+  // Señales con universo SESGADO (consultas internas de un sector). El %
+  // del candidato dentro de la consulta no es comparable territorialmente
+  // porque solo votaron sus simpatizantes. Para estas señales usamos una
+  // métrica corregida: (votos_candidato_local / censo_local) vs nacional,
+  // que captura tanto la "preferencia dentro del sector" como la "fuerza
+  // del sector en ese territorio". Sin ella, la zona norte de Bogotá
+  // sale "muy pro-Cepeda" porque los pocos pacto-votantes del Chicó eligen
+  // a Cepeda en alta proporción — pero el sector entero allá es minoría.
+  const SESGADAS_POR_UNIVERSO = new Set([
+    'consulta-2025-pacto',
+    'consulta-2026-gran',
+    'consulta-2026-frente',
+    'consulta-2026-soluciones',
+  ]);
+
+  // Censo por puesto / nacional para corregir las señales sesgadas.
+  // Se llenan al cargar _puestosLight, antes de precomputeBiasPue.
+  let _censoByPueKey = null;   // Map<puKey, censo>
+  let _censoNacional = 0;
+
   // ─── EQUIVALENCIAS: candidato 2026 → señales históricas ────────
   // Cada entrada es el perfil de ponderación descrito en el documento
   // metodológico (Capítulo 5 · Esquema Final de Ponderación de Señales).
@@ -2295,7 +2315,19 @@
     showMapLoading('Cargando puestos de votación…');
     _puestosLightLoading = fetch(PUESTOS_LIGHT_URL, { cache: 'force-cache' })
       .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(data => { _puestosLight = data; return data; })
+      .then(data => {
+        _puestosLight = data;
+        // Índices de censo para corrección de sesgo en señales de consulta
+        // (ver SESGADAS_POR_UNIVERSO). Se calcula una sola vez por sesión.
+        _censoByPueKey = new Map();
+        _censoNacional = 0;
+        for (const p of data){
+          if (!p.c) continue;
+          _censoByPueKey.set(p.k, p.c);
+          _censoNacional += p.c;
+        }
+        return data;
+      })
       .catch(e => { console.error('[Previa] error cargando puestos-light:', e); throw e; })
       .finally(() => { hideMapLoading(); });
     return _puestosLightLoading;
@@ -3944,18 +3976,25 @@
       for (const [cod, c] of Object.entries(data.candidatos || {})){
         codeToName[cod] = norm(c.nombre || '');
       }
+      // pues[k] = { byName: {nombre: %dentro_de_consulta}, vv: votos_validos_local }
+      // Guardamos vv para que precomputeBiasPue pueda calcular tasas sobre
+      // censo en señales sesgadas por universo. nacVv (total nacional) lo
+      // acumulamos en HISTORICOS[sig].nacVv.
       const puesByKey = {};
+      let nacVv = 0;
       for (const [puKey, p] of Object.entries(data.puestos)){
         const valids = p.vv || 0;
         if (valids <= 0) continue;
+        nacVv += valids;
         const byName = {};
         for (const [cod, votos] of Object.entries(p.v || {})){
           const name = codeToName[cod];
           if (name) byName[name] = votos / valids;
         }
-        puesByKey[puKey] = byName;
+        puesByKey[puKey] = { byName, vv: valids };
       }
       HISTORICOS[sig].pues = puesByKey;
+      HISTORICOS[sig].nacVv = nacVv;
     });
   }
 
@@ -4189,10 +4228,15 @@
           // Cascada de scope: puesto → mun → depto. Permite que un puesto
           // sin historia propia (creado después de 2022, p.ej.) herede del
           // mun y, si tampoco hay mun, del depto.
-          const scope = dataset.pues?.[puKey]
-                     || dataset.muns?.[munKey]
-                     || dataset.deptos?.[depCod];
+          //
+          // Importante: el scope de pues[k] tiene shape { byName, vv } por
+          // el cambio de loadHistoricosPue; los de muns[]/deptos[] siguen
+          // siendo objetos planos. Normalizamos al leer.
+          const pueScope = dataset.pues?.[puKey];
+          const fallbackScope = dataset.muns?.[munKey] || dataset.deptos?.[depCod];
+          const scope = pueScope || fallbackScope;
           if (!scope) continue;
+          const byNameLocal = pueScope ? pueScope.byName : scope;
 
           let nacSum = 0, locSum = 0, foundAny = false;
           for (const n of names){
@@ -4201,11 +4245,33 @@
             if (nac == null) continue;
             foundAny = true;
             nacSum += nac;
-            locSum += scope[key] || 0;
+            locSum += byNameLocal[key] || 0;
           }
           if (!foundAny || nacSum <= 0) continue;
 
-          const rel = locSum / nacSum;
+          // Métrica corregida para señales sesgadas por universo (consultas):
+          // en lugar de "% dentro de la consulta" usamos
+          //   tasa_local  = votos_candidato_local / censo_local
+          //   tasa_nac    = votos_candidato_nac   / censo_nac
+          //   rel         = tasa_local / tasa_nac
+          // Esto pondera implícitamente por la capacidad de movilización
+          // del sector en cada territorio. Solo aplica en bias_pue donde
+          // el censo por puesto está disponible. Si falta algún dato, cae
+          // al cálculo viejo (locSum/nacSum) para no perder la señal.
+          let rel;
+          const censoLocal = _censoByPueKey?.get(puKey);
+          if (
+            SESGADAS_POR_UNIVERSO.has(sig) &&
+            pueScope && pueScope.vv &&
+            censoLocal && dataset.nacVv && _censoNacional
+          ){
+            const tasaLocal = (locSum * pueScope.vv) / censoLocal;
+            const tasaNac   = (nacSum * dataset.nacVv) / _censoNacional;
+            rel = tasaNac > 0 ? tasaLocal / tasaNac : 0;
+          } else {
+            rel = locSum / nacSum;
+          }
+
           num  += spec.peso * rel;
           wTot += spec.peso;
         }
