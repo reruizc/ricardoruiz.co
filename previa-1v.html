@@ -1246,6 +1246,10 @@
   // por puesto (~13.5k puntos, ~1.9 MB). Se carga la primera vez que se
   // activa el toggle Puestos.
   const PUESTOS_LIGHT_URL = `${S3}/puestos-nacional-light.json`;
+  // Censos agregados por dep/mun/nacional (~17 KB). Se carga al BOOT
+  // para que precomputeBias y precomputeBiasMun puedan aplicar la
+  // métrica corregida de SESGADAS_POR_UNIVERSO desde el primer pintado.
+  const PUESTOS_CENSOS_AGG_URL = `${S3}/puestos-censos-agg.json`;
   // Ponderador propio de ricardoruiz.co — calibrado contra el resultado oficial
   // de las consultas interpartidistas del 8 de marzo de 2026 (único ground truth
   // post-Ley 2494). Hosteado en S3 junto al resto de outputs del proyecto.
@@ -4361,6 +4365,24 @@
     }
   }
 
+  // Carga el archivo de censos agregados (~17 KB) y alimenta los índices
+  // _censoByDepCod, _censoByMunKey, _censoNacional. Estos se usan para
+  // aplicar la métrica corregida en SESGADAS_POR_UNIVERSO en
+  // precomputeBias y precomputeBiasMun (que corren al boot, antes de
+  // que el usuario active el toggle Puestos).
+  async function loadCensosAgregados(){
+    try {
+      const r = await fetch(PUESTOS_CENSOS_AGG_URL, { cache: 'force-cache' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const data = await r.json();
+      _censoByDepCod = new Map(Object.entries(data.porDep || {}));
+      _censoByMunKey = new Map(Object.entries(data.porMun || {}));
+      _censoNacional = data.nacional || 0;
+    } catch (e){
+      console.warn('[Previa] no se pudo cargar censos agregados:', e.message);
+    }
+  }
+
   // Carga las 5 señales históricas en paralelo y construye el índice.
   // Incluye por-depto (siempre) y por-mun (para calibración municipal).
   // por-mun son ~5 MB en total paralelizados, añade ~1–2 s al boot.
@@ -4376,11 +4398,15 @@
       Promise.all(urlsMun.map(fetcher)),
     ]);
 
-    // Índice por-depto + cálculo de pct nacional por agregación de votos
+    // Índice por-depto + cálculo de pct nacional por agregación de votos.
+    // Guardamos también vv (votos válidos) por scope: depVv[depCod] y nacVv,
+    // necesarios para la métrica corregida en SESGADAS_POR_UNIVERSO
+    // (precomputeBias sin sesgo de universo en consultas).
     deps.forEach((data, i) => {
       if (!data) return;
       const sig = HISTORICO_KEYS[i];
       const deptos = {};
+      const depVv = {};
       const nacCounts = {};
       let nacValidos = 0;
       for (const [depCod, dep] of Object.entries(data)){
@@ -4393,20 +4419,23 @@
         }
         nacValidos += depValidos;
         deptos[depCod] = byName;
+        depVv[depCod] = depValidos;
       }
       const nacional = {};
       for (const [n, v] of Object.entries(nacCounts)){
         nacional[n] = nacValidos > 0 ? v / nacValidos : 0;
       }
-      HISTORICOS[sig] = { nacional, deptos };
+      HISTORICOS[sig] = { nacional, deptos, depVv, nacVv: nacValidos };
     });
 
-    // Índice por-mun (se añade al mismo objeto HISTORICOS[sig].muns)
+    // Índice por-mun (se añade al mismo objeto HISTORICOS[sig].muns).
+    // Guardamos también vv por mun (munVv) por la misma razón.
     muns.forEach((data, i) => {
       if (!data) return;
       const sig = HISTORICO_KEYS[i];
       if (!HISTORICOS[sig]) HISTORICOS[sig] = { nacional: {}, deptos: {} };
       const munsByKey = {};
+      const munVv = {};
       for (const [munKey, mun] of Object.entries(data)){
         const byName = {};
         const valids = mun.votos_validos || 0;
@@ -4414,8 +4443,10 @@
           byName[norm(c.nombre)] = valids > 0 ? (c.votos / valids) : 0;
         }
         munsByKey[munKey] = byName;
+        munVv[munKey] = valids;
       }
       HISTORICOS[sig].muns = munsByKey;
+      HISTORICOS[sig].munVv = munVv;
     });
   }
 
@@ -4530,7 +4561,25 @@
           }
           if (!foundAny || nacSum <= 0) continue;
 
-          const rel = depSum / nacSum;
+          // Métrica corregida para señales sesgadas por universo (consultas):
+          // tasa_local = (votos_local/censo_local) vs tasa_nacional. Captura
+          // la "fuerza local del sector" en lugar del "% dentro de la consulta",
+          // que falla cuando el sector es minoría territorial. Solo aplica
+          // si tenemos vv del scope y censo cargados; si no, fallback al
+          // cálculo viejo (locSum/nacSum) para no perder la señal.
+          let rel;
+          const censoLocal = _censoByDepCod?.get(depCod);
+          if (
+            SESGADAS_POR_UNIVERSO.has(sig) &&
+            dataset.depVv?.[depCod] && dataset.nacVv &&
+            censoLocal && _censoNacional
+          ){
+            const tasaLocal = (depSum * dataset.depVv[depCod]) / censoLocal;
+            const tasaNac   = (nacSum * dataset.nacVv) / _censoNacional;
+            rel = tasaNac > 0 ? tasaLocal / tasaNac : 0;
+          } else {
+            rel = depSum / nacSum;
+          }
           num  += spec.peso * rel;
           wTot += spec.peso;
         }
@@ -4632,21 +4681,43 @@
           if (!names.length) continue;
 
           // Scope: mun si disponible, si no depto (p.ej. senado-2026 solo tiene deptos)
-          const scope = dataset.muns?.[munKey] || dataset.deptos?.[depCod];
+          const munScope = dataset.muns?.[munKey];
+          const scope = munScope || dataset.deptos?.[depCod];
           if (!scope) continue;
 
-          let nacSum = 0, depSum = 0, foundAny = false;
+          let nacSum = 0, locSum = 0, foundAny = false;
           for (const n of names){
             const key = norm(n);
             const nac = dataset.nacional[key];
             if (nac == null) continue;
             foundAny = true;
             nacSum += nac;
-            depSum += scope[key] || 0;
+            locSum += scope[key] || 0;
           }
           if (!foundAny || nacSum <= 0) continue;
 
-          const rel = depSum / nacSum;
+          // Métrica corregida para señales sesgadas (consultas). Usamos vv
+          // y censo del mismo scope que estamos leyendo (mun si hay, si no
+          // depto). Fallback al cálculo viejo si falta algún dato.
+          let rel;
+          let scopeVv = null, scopeCenso = null;
+          if (munScope){
+            scopeVv = dataset.munVv?.[munKey];
+            scopeCenso = _censoByMunKey?.get(munKey);
+          } else {
+            scopeVv = dataset.depVv?.[depCod];
+            scopeCenso = _censoByDepCod?.get(depCod);
+          }
+          if (
+            SESGADAS_POR_UNIVERSO.has(sig) &&
+            scopeVv && dataset.nacVv && scopeCenso && _censoNacional
+          ){
+            const tasaLocal = (locSum * scopeVv) / scopeCenso;
+            const tasaNac   = (nacSum * dataset.nacVv) / _censoNacional;
+            rel = tasaNac > 0 ? tasaLocal / tasaNac : 0;
+          } else {
+            rel = locSum / nacSum;
+          }
           num  += spec.peso * rel;
           wTot += spec.peso;
         }
@@ -5832,6 +5903,7 @@
       loadSenadoParticipacion(),
       loadHistoricos(),
       loadDiagnostico(),
+      loadCensosAgregados(),  // ~17 KB, alimenta _censoBy{Dep,Mun} para fix consultas en bias dep/mun
     ]);
     // Ahora que senado y los históricos cargaron, construimos la señal
     // 'senado-2026' y precomputamos bias(c, d) y bias(c, mun).
