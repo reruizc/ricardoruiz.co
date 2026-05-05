@@ -497,9 +497,11 @@
     /* Tarjeta de territorio en la columna central. Se apila debajo de la
        leyenda (modo ganadores) o aparece como cintillo compacto al fondo
        (modo filtro, cuando renderCandidateDetail ocupa la columna). */
-    .territory-card{display:none;margin-top:1.1rem;padding:.95rem 0 .2rem;border-top:1px solid rgba(255,255,255,.08);font-family:Avenir,sans-serif}
+    /* La territory-card va PRIMERA en mid-col (ver HTML); la map-legend
+       hereda el divisor inferior. Por eso ya no aplica border-top aquí. */
+    .territory-card{display:none;padding:.4rem 0 .2rem;font-family:Avenir,sans-serif}
     .territory-card.show{display:block}
-    .territory-card.compact{margin-top:.7rem;padding-top:.7rem}
+    .territory-card.compact{padding-top:.3rem}
     .tc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;margin-bottom:.65rem}
     .tc-head-text{min-width:0;flex:1}
     .tc-name{font-family:'Syne',sans-serif;font-weight:700;font-size:1.05rem;line-height:1.18;color:rgba(255,255,255,.96)}
@@ -656,7 +658,12 @@
       .panel-close-mobile,.panel-grip,.panel-backdrop,.ponderador-fab{display:none!important}
     }
 
+    /* La map-legend ahora va DEBAJO de territory-card (orden invertido en
+       mid-col). Border-top hace de divisor entre las dos secciones; sólo
+       se aplica si la tarjeta arriba está visible (.territory-card.show). */
     .map-legend{padding:.2rem 0 .6rem;display:flex;align-items:flex-start;gap:.75rem;flex-wrap:wrap;flex-direction:column}
+    .territory-card.show + .map-legend{margin-top:1rem;padding-top:.85rem;border-top:1px solid rgba(255,255,255,.08)}
+    body.day-mode .territory-card.show + .map-legend{border-top-color:rgba(0,0,0,.1)}
     /* Chips de candidato en columna central: uno por renglón, alineados.
        Estructura: [dot] [nombre flex-grow] [valores tabular-nums]
        (La pond-legend de arriba del stack bar usa el mismo .pond-legend
@@ -888,10 +895,13 @@
       </div>
     </div>
 
-    <!-- COLUMNA CENTRAL: leyenda o detalle candidato + tarjeta de territorio -->
+    <!-- COLUMNA CENTRAL: tarjeta de territorio + leyenda con votación estimada
+         Orden invertido (territory-card arriba) para que el detalle del
+         hover/pin se lea primero y la votación estimada del scope quede
+         de soporte abajo. -->
     <div class="mid-col" id="mid-col">
-      <div class="map-legend" id="map-legend"></div>
       <div class="territory-card" id="territory-card" aria-live="polite"></div>
+      <div class="map-legend" id="map-legend"></div>
     </div>
 
     <!-- PANEL -->
@@ -2656,6 +2666,12 @@
     layer.bindTooltip(html, { sticky: true, className: 'leaflet-dark-tooltip', opacity: 1 }).openTooltip();
     // Tarjeta lateral con la repartición proyectada del puesto.
     _hoverTerritory(_puestoPayload(p, winInfo));
+    // Recalcular la lista de votación estimada (#map-legend) para que muestre
+    // los votos absolutos que cada candidato sacaría EN este puesto (censo×54%
+    // × share local). La cabecera del mapa se actualiza por la misma vía.
+    _hoveredPueData = p;
+    renderMapLegend();
+    _refreshMapHeadVotes();
   }
   function _onPueOut(e){
     const layer = e.target;
@@ -2663,6 +2679,11 @@
     layer.setStyle({ ..._puestoStyle(p), radius: _puestoRadius(p.c, map.getZoom()) });
     layer.closeTooltip();
     _clearHoverChip();
+    // Si hay puesto pinneado, _activePueScope() seguirá devolviéndolo y la
+    // legend se mantiene en ese contexto. Si no, vuelve al scope normal.
+    _hoveredPueData = null;
+    renderMapLegend();
+    _refreshMapHeadVotes();
   }
   function _onPueClick(e){
     const p = e.target._puData;
@@ -2752,12 +2773,22 @@
       nameEl.style.color = '';
     }
 
-    // ─ PCT ─ siempre votos estimados en el scope vigente (nacional / depto).
+    // ─ PCT ─ siempre votos estimados en el scope vigente (nacional / depto / puesto).
+    _refreshMapHeadVotes();
+
+    renderMapLegend();
+  }
+
+  // Actualiza el chip "X votos estimados" del header del mapa según el
+  // scope vigente. Se invoca desde repaintMap (cambios de slider, drill,
+  // etc.) y también desde el hover/out de puestos para refrescar sin
+  // tener que repintar todo el mapa.
+  function _refreshMapHeadVotes(){
+    const pctEl = document.getElementById('map-cand-pct');
+    if (!pctEl) return;
     let totalVotes = 0;
     for (const c of CANDIDATOS) totalVotes += estimatedVotesInScope(c);
     pctEl.textContent = totalVotes > 0 ? `${fmtCompact(totalVotes)} votos estimados` : '';
-
-    renderMapLegend();
   }
 
   // Leyenda inferior: en modo ganadores muestra un chip por candidato
@@ -2904,7 +2935,11 @@
       const cityName = (currentCityKey && CITY_META[currentCityKey])
         ? (CITY_MAPS[currentCityKey]?.depCod === '16' ? 'BOGOTÁ' : currentCityKey.toUpperCase())
         : null;
-      const scopeLabel = cityName
+      // Prioridad del label del scope: puesto bajo hover/pin > ciudad > depto > nacional.
+      const pueScope = _activePueScope ? _activePueScope() : null;
+      const pueLabel = pueScope ? (pueScope.n || 'Puesto') : null;
+      const scopeLabel = pueLabel
+        || cityName
         || (currentDepCod
             ? (Object.values(SENADO_BY_DEPTO).find(s => s.cod === currentDepCod)?.nombre || 'depto')
             : null);
@@ -2935,6 +2970,10 @@
   let _territoryHovered = null;
   let _territoryPinned  = null;
   let _lastTerritoryPayload = null;  // último payload pintado (para repaintMap)
+  // Puesto bajo hover en el mapa (modo pue). Se usa en estimatedVotesInScope
+  // para que la lista de votación estimada (#map-legend) refleje los votos
+  // de ese puesto en vez del nacional/depto.
+  let _hoveredPueData = null;
 
   function _setHoverChip(e, name, color){
     const chip = document.getElementById('hover-chip'); if (!chip) return;
@@ -5193,9 +5232,44 @@
     return expectedCity * share;
   }
 
-  // Dispatcher: si hay drill ciudad → ciudad; si hay drill depto → depto;
-  // si no → nacional.
+  // Estimación a nivel PUESTO. Censo del puesto × 54% (mismo factor de
+  // primera vuelta presidencial) = votantes esperados; share local con
+  // cascada bias_pue → bias_mun → bias_dep para que iguale lo que pinta
+  // el marker y la tarjeta lateral.
+  function estimatedVotesForPue(cand, puData){
+    const censo = puData?.c || 0;
+    const esperados = censo * 0.54;
+    if (esperados <= 0) return 0;
+    const dep = puData.k.slice(0, 2);
+    const mun = puData.k.slice(3, 6);
+    const munKey = `${dep}-${mun}`;
+    const depEntry = Object.values(SENADO_BY_DEPTO).find(s => s.cod === dep);
+    const depNom = depEntry?.nombre || '';
+    const hasPueBias = _biasCachePue && Object.values(_biasCachePue).some(m => m[puData.k] != null);
+    const hasMunBias = _biasCacheMun && Object.values(_biasCacheMun).some(m => m[munKey] != null);
+    const proj = c => hasPueBias ? projectedPue(c, puData.k, munKey, depNom)
+                    : hasMunBias ? projectedMun(c, munKey, depNom)
+                    : projected(c, depNom);
+    const localTotal = CANDIDATOS.reduce((s,c) => s + proj(c), 0);
+    if (localTotal <= 0) return 0;
+    const shareLocal = proj(cand) / localTotal;
+    return esperados * shareLocal;
+  }
+
+  // Resuelve qué puesto debe alimentar el scope de la votación estimada.
+  // Prioridad: hover activo > puesto pinneado en territory-card > nada.
+  function _activePueScope(){
+    if (_hoveredPueData) return _hoveredPueData;
+    if (_territoryPinned && _lastTerritoryPayload?.kind === 'puesto'){
+      return _lastTerritoryPayload.args?.puData || null;
+    }
+    return null;
+  }
+
+  // Dispatcher: prioridad puesto (hover/pin) → ciudad → depto → nacional.
   function estimatedVotesInScope(cand){
+    const pueScope = _activePueScope();
+    if (pueScope) return estimatedVotesForPue(cand, pueScope);
     if (currentCityKey && CITY_META[currentCityKey]) {
       return estimatedVotesForCity(cand, currentCityKey);
     }
