@@ -307,7 +307,7 @@
     <section class="hero">
       <div class="hero-label">Módulo 02 · Mapa de seguridad</div>
       <h1 class="hero-title">Comisión de delitos · <em>Medellín</em>.</h1>
-      <p class="hero-sub">19 tipologías de delito reportadas por la Policía Nacional. Filtrá por tipología, mirá la distribución territorial por comuna, la tasa por 100k habitantes y la comparación con cifras nacionales.</p>
+      <p class="hero-sub">19 tipologías de delito reportadas por la Policía Nacional. Filtra por tipología, mira la distribución territorial a nivel barrio/vereda, la tasa por 100k habitantes y la comparación con cifras nacionales.</p>
       <div class="controls">
         <div class="ctrl-group">
           <div class="ctrl-label">Período</div>
@@ -340,12 +340,12 @@
         <div class="card-header">
           <div>
             <div class="card-title" id="map-title">Distribución territorial</div>
-            <div class="card-sub" id="map-sub">Color por intensidad · 16 comunas + corregimientos</div>
+            <div class="card-sub" id="map-sub">Color por intensidad · 349 barrios y veredas</div>
           </div>
         </div>
         <div id="map"></div>
         <div class="map-legend">
-          <div id="legend-label">Total de incidentes por comuna</div>
+          <div id="legend-label">Total de incidentes por barrio</div>
           <div class="legend-bar" id="legend-bar"></div>
           <div class="legend-ticks" id="legend-ticks"></div>
         </div>
@@ -446,7 +446,7 @@
     // ─── DATA ─────────────────────────────────────────────────────────
     const S3_BASE = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co';
     const SEG_BASE = `${S3_BASE}/bases+de+datos/output_seguridad/2026-01`;
-    const MEDELLIN_GEO_URL = `${S3_BASE}/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`;
+    const BARRIOS_GEO_URL = `${S3_BASE}/bases+de+datos/proyecto-dc/geo/barrios-veredas-medellin.json`;
 
     const TIP_LABEL = {
       'amenazas': 'Amenazas',
@@ -471,22 +471,24 @@
     };
 
     let dataResumen = null, dataComuna = null, dataDia = null, dataHora = null;
+    let dataBarrio = null;
     let geoCache = null;
     let map = null, mapLayer = null;
 
     async function fetchAll(){
-      const [r, c, d, h] = await Promise.all([
+      const [r, c, b, d, h] = await Promise.all([
         fetch(`${SEG_BASE}/resumen.json`).then(r => r.json()),
         fetch(`${SEG_BASE}/por-comuna.json`).then(r => r.json()),
+        fetch(`${SEG_BASE}/por-barrio.json`).then(r => r.json()),
         fetch(`${SEG_BASE}/por-dia.json`).then(r => r.json()),
         fetch(`${SEG_BASE}/por-hora.json`).then(r => r.json()),
       ]);
-      dataResumen = r; dataComuna = c; dataDia = d; dataHora = h;
+      dataResumen = r; dataComuna = c; dataBarrio = b; dataDia = d; dataHora = h;
     }
 
     async function loadGeo(){
       if (geoCache) return geoCache;
-      const r = await fetch(MEDELLIN_GEO_URL);
+      const r = await fetch(BARRIOS_GEO_URL);
       geoCache = await r.json();
       return geoCache;
     }
@@ -513,7 +515,7 @@
       try {
         await fetchAll();
       } catch (e) {
-        showError(`Error cargando datos. Verificá que estén públicos en S3 bajo bases+de+datos/output_seguridad/2026-01/. ${e.message}`);
+        showError(`Error cargando datos. Verifica que estén públicos en S3 bajo bases+de+datos/output_seguridad/2026-01/. ${e.message}`);
         return;
       }
 
@@ -609,53 +611,88 @@
         </div>
       `;
 
-      // MAP
+      // MAP — barrio polygons coloreados por:
+      //   absoluto → conteo real del barrio (granularidad fina)
+      //   tasa     → tasa de su comuna padre (sin censo barrio, fallback)
       const geo = await loadGeo();
       if (mapLayer){ map.removeLayer(mapLayer); mapLayer = null; }
 
       const useRate = state.metric === 'tasa';
-      const dataset = comEntries;
-      const values = dataset.map(d => useRate ? d.tasa : d.total).filter(v => Number.isFinite(v) && v > 0);
-      const minV = Math.min(...values, 0);
-      const maxV = Math.max(...values, 1);
+      const dataComByCode = Object.fromEntries(comEntries.map(d => [d.cod, d]));
 
-      const dataByCode = Object.fromEntries(dataset.map(d => [d.cod, d]));
+      // Dataset según métrica
+      let dataset, minV, maxV;
+      if (useRate){
+        const values = comEntries.map(d => d.tasa).filter(v => Number.isFinite(v) && v > 0);
+        minV = Math.min(...values, 0);
+        maxV = Math.max(...values, 1);
+      } else {
+        const barrios = dataBarrio.barrios || {};
+        const values = Object.values(barrios).map(b => getValue(b, tip)).filter(v => v > 0);
+        minV = 0;
+        maxV = values.length ? Math.max(...values) : 1;
+      }
+
+      // Gris claro neutro para "sin información" (no usar gris oscuro,
+      // se confunde con baja intensidad del color scale).
+      const NO_DATA_STYLE = {
+        fillColor: '#bcbcc4', fillOpacity: 0.55,
+        color: 'rgba(255,255,255,0.45)', weight: 0.5,
+      };
 
       const styleOf = (feat) => {
-        const code = String(feat.properties.CODIGO || '').padStart(2, '0');
-        const d = dataByCode[code];
-        if (!d){
-          return { fillColor: '#444', fillOpacity: .25, color: 'rgba(255,255,255,0.25)', weight: 1 };
+        const codigo = feat.properties.codigo;          // 4 dígitos: comuna+barrio
+        const comCod = feat.properties.comuna;          // 2 dígitos
+        if (useRate){
+          const dCom = dataComByCode[comCod];
+          if (!dCom) return { ...NO_DATA_STYLE };
+          const t = (dCom.tasa - minV) / (maxV - minV || 1);
+          return { fillColor: colorScale(t), fillOpacity: 0.82, color: 'rgba(255,255,255,0.25)', weight: 0.5 };
+        } else {
+          const dB = (dataBarrio.barrios || {})[codigo];
+          const v = dB ? getValue(dB, tip) : 0;
+          if (v <= 0) return { ...NO_DATA_STYLE };
+          const t = (v - minV) / (maxV - minV || 1);
+          return { fillColor: colorScale(t), fillOpacity: 0.85, color: 'rgba(255,255,255,0.3)', weight: 0.5 };
         }
-        const v = useRate ? d.tasa : d.total;
-        const t = (v - minV) / (maxV - minV || 1);
-        return {
-          fillColor: colorScale(t),
-          fillOpacity: 0.82,
-          color: 'rgba(255,255,255,0.4)',
-          weight: 1,
-        };
       };
 
       mapLayer = L.geoJSON(geo, {
         style: styleOf,
         onEachFeature: (feat, layer) => {
-          const code = String(feat.properties.CODIGO || '').padStart(2, '0');
-          const d = dataByCode[code];
+          const p = feat.properties;
+          const codigo = p.codigo;
+          const comCod = p.comuna;
+          const dCom = dataComByCode[comCod];
+          const dB = (dataBarrio.barrios || {})[codigo];
+          const isRural = p.indicador_ === 'R';
+          const territorioLabel = isRural ? 'Vereda' : 'Barrio';
+
           layer.on({
             mouseover: (e) => {
               layer.setStyle({ weight: 2, color: '#fff', fillOpacity: 0.96 });
-              if (d) {
-                const tt = `
-                  <div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.5">
-                    <span style="color:#a78bfa;font-weight:700">${d.nombre.toUpperCase()}</span><br/>
-                    <span style="color:#e63946;font-weight:700">${fmt(d.total)} incidentes</span><br/>
-                    <span style="color:#fff">Tasa: ${d.tasa.toFixed(1)}/100k</span><br/>
-                    <span style="color:#999;font-size:.7rem">Población: ${fmt(d.poblacion)} (est.)</span><br/>
-                    <span style="color:#999;font-size:.7rem">${tipLabel}</span>
-                  </div>`;
-                layer.bindTooltip(tt, { sticky: true, opacity: 1 }).openTooltip(e.latlng);
+              const valBarrio = dB ? getValue(dB, tip) : 0;
+              const valCom = dCom ? dCom.total : 0;
+              const tasaCom = dCom ? dCom.tasa.toFixed(1) : '—';
+              const head = `
+                  <span style="color:#a78bfa;font-weight:700">${(p.nombre_bar || '').toUpperCase()}</span>
+                  <span style="color:#999;font-size:.7rem"> · ${territorioLabel}</span><br/>
+                  <span style="color:#fff;font-size:.75rem">${(p.nombre_com || '').toUpperCase()} (${comCod})</span><br/>`;
+              let body;
+              if (valBarrio <= 0) {
+                body = `
+                  <span style="color:#888;font-style:italic;font-size:.78rem">Sin información disponible</span><br/>
+                  <span style="color:#666;font-size:.7rem">Por actualizar</span><br/>
+                  <span style="color:#fff;font-size:.7rem;margin-top:4px;display:inline-block">Comuna total: ${fmt(valCom)} · ${tasaCom}/100k</span><br/>
+                  <span style="color:#999;font-size:.7rem">${tipLabel}</span>`;
+              } else {
+                body = `
+                  <span style="color:#e63946;font-weight:700">${fmt(valBarrio)} incidentes en ${territorioLabel === 'Vereda' ? 'esta vereda' : 'este barrio'}</span><br/>
+                  <span style="color:#fff;font-size:.75rem">Comuna total: ${fmt(valCom)} · ${tasaCom}/100k</span><br/>
+                  <span style="color:#999;font-size:.7rem">${tipLabel}</span>`;
               }
+              const tt = `<div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.5">${head}${body}</div>`;
+              layer.bindTooltip(tt, { sticky: true, opacity: 1 }).openTooltip(e.latlng);
             },
             mouseout: () => { layer.setStyle(styleOf(feat)); layer.closeTooltip(); },
           });
@@ -676,11 +713,23 @@
       const fmtV = v => useRate ? v.toFixed(0) + '/100k' : fmt(Math.round(v));
       document.getElementById('legend-ticks').innerHTML = `<span>${fmtV(minV)}</span><span>${fmtV(maxV)}</span>`;
       document.getElementById('legend-label').textContent = useRate
-        ? `Tasa por 100k habitantes (${tipLabel})`
-        : `Total de incidentes (${tipLabel})`;
+        ? `Tasa por 100k hab. (comuna · ${tipLabel})`
+        : `Incidentes por barrio/vereda (${tipLabel})`;
       document.getElementById('map-title').textContent = useRate
         ? `Tasa por 100k · ${tipLabel}`
         : `Volumen absoluto · ${tipLabel}`;
+      // Subtítulo dinámico con cobertura + disclaimer modo tasa
+      const meta = (dataBarrio && dataBarrio.meta) || {};
+      const covered = meta.geocodificados_pct || 0;
+      const pendN = meta.pendientes_pct || 0;
+      const subEl = document.getElementById('map-sub');
+      if (subEl) {
+        if (useRate) {
+          subEl.innerHTML = `<span style="color:#f0c040">⚠ Tasa por 100k pintada a nivel comuna</span> · censo barrio pendiente`;
+        } else {
+          subEl.textContent = `${meta.barrios_total_geojson || 349} polígonos · ${covered}% incidentes geocodificados a barrio · ${pendN}% pendientes en fuente`;
+        }
+      }
 
       // RANK
       const sorted = useRate ? sortedRate : sortedAbs;
