@@ -14,12 +14,36 @@ deploy:          git push origin HEAD:main   (desde dentro del worktree)
 ```
 
 ## AWS / S3
-El usuario **NO tiene AWS CLI instalado localmente** y prefiere subir él
-mismo los artefactos a S3. No invocar `aws s3 cp` ni `aws s3 sync` ni
-confirmar credenciales AWS. Cuando un script produzca JSONs/CSVs para
-S3: dejarlos en disco local y entregar al usuario el comando exacto que
-debe correr él (incluyendo ruta origen → prefijo destino), junto con una
-lista clara de los archivos generados.
+AWS CLI v2 instalado vía Homebrew (`/opt/homebrew/bin/aws`).
+- Cuenta AWS: `167386641785`
+- Usuario IAM: `ricardo-mac-cli` (creado 2026-05-07, dedicado al CLI local)
+- Política adjunta: `elecciones-2026-rw` (custom, scoped sólo al bucket
+  `elecciones-2026`: `s3:ListBucket` + `GetBucketLocation` sobre el bucket
+  y `Get/Put/Delete/GetAcl/PutAclObject` sobre objetos)
+- Region default: `us-east-1`
+- Credenciales en `~/.aws/credentials` (modo 600)
+
+Comandos típicos que se pueden invocar directamente:
+```bash
+aws s3 cp <local> s3://elecciones-2026/<prefijo>/         # subir 1 archivo
+aws s3 cp <dir>/ s3://elecciones-2026/<prefijo>/ --recursive
+aws s3 sync <dir>/ s3://elecciones-2026/<prefijo>/         # solo cambios
+aws s3 ls s3://elecciones-2026/<prefijo>/                 # listar
+aws s3 rm s3://elecciones-2026/<prefijo>/<key>            # borrar
+```
+
+**Nunca usar `--delete` con `sync`** salvo confirmación explícita del
+usuario (borra del destino lo que no esté en origen — pérdida de datos
+silenciosa). Para el prefijo con espacio literal (`bases de datos/`),
+en CLI usar comillas: `"s3://elecciones-2026/bases de datos/..."` (NO
+codificar como `bases+de+datos/`; eso es solo para URLs públicas en el
+frontend).
+
+Aún así, **antes de borrados masivos o re-uploads de muchos archivos,
+confirmar con el usuario** la ruta destino y mostrar lista de archivos
+afectados. El usuario sigue prefiriendo control sobre cuándo y qué
+sube/borra; el CLI es para automatizar las tareas tediosas, no para
+actuar por iniciativa propia sobre datos en producción.
 
 ## Entrega de archivos al usuario
 **NUNCA** dejar artefactos en `~/Desktop`, `~/Downloads` o paths fuera del
