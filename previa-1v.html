@@ -926,7 +926,7 @@
       <div class="sankey-totals" id="sankey-totals"></div>
       <div class="sankey-note">
         <strong>Nota metodológica</strong>
-        Las bandas se calculan con <em>Iterative Proportional Fitting</em> (IPF/RAS) combinando dos señales: <b>(1)</b> el solape geográfico entre cada partido en Senado 2026 (8 marzo) y la proyección presidencial del modelo — donde un partido y un candidato concentran votos en los mismos territorios, su flujo es alto; <b>(2)</b> una <b>matriz de afinidad política</b> que descarta cruces inverosímiles (votos del Pacto Histórico no fluyen a Abelardo, votos de MSN no fluyen a Cepeda, etc.). Las afinidades parten de las equivalencias del modelo presidencial y se completan con criterio editorial para los partidos clientelares (Liberal, La U, Conservador, Cambio Radical) sin equivalencia ideológica directa. El <b>voto en blanco</b> aparece a ambos lados: el blanco Senado 996 fluye casi entero al blanco presidencial, y un pequeño residuo se redistribuye a los candidatos cuando el solape geográfico apunta a una zona donde el blanco local es bajo. <b>NS-NR y abstención no entran al gráfico</b> — porque en Senado siempre vota menos gente que en presidencial y un militante de partido casi nunca se "abstiene" por afinidad — pero el porcentaje se reporta en la plaquita superior para que el total cierre 100%. El método asume afinidad estable y <b>no captura realineamientos locales recientes</b> — por ejemplo, un acuerdo entre la maquinaria de un partido y un candidato distinto del que su patrón histórico sugeriría. Si conoces un caso así o ves un flujo que no cuadra, escríbenos a <a href="mailto:reruizc@gmail.com">reruizc@gmail.com</a> y lo ajustamos.
+        Las bandas se calculan con <em>Iterative Proportional Fitting</em> (IPF/RAS) combinando dos señales: <b>(1)</b> el solape geográfico entre cada partido en Senado 2026 (8 marzo) y la proyección presidencial del modelo — donde un partido y un candidato concentran votos en los mismos territorios, su flujo es alto; <b>(2)</b> una <b>matriz de afinidad política</b> que descarta cruces inverosímiles (votos del Pacto Histórico no fluyen a Abelardo, votos de MSN no fluyen a Cepeda, etc.). Las afinidades parten de las equivalencias del modelo presidencial y se completan con criterio editorial para los partidos clientelares (Liberal, La U, Conservador, Cambio Radical) sin equivalencia ideológica directa. El <b>voto en blanco</b> aparece a ambos lados: el blanco Senado 996 fluye casi entero al blanco presidencial, y un pequeño residuo se redistribuye a los candidatos cuando el solape geográfico apunta a una zona donde el blanco local es bajo. La banda gris <b>"No votó Senado"</b> a la izquierda representa el gap real entre votantes Senado (50.6%) y votantes Pres proyectados (54%): ~1.94M personas que llegan a la urna en mayo sin haber votado válidamente en marzo (1.13M cuyos votos en Senado fueron nulos o no marcados, 0.81M de abstención pura). Sin militancia previa, su voto se distribuye uniforme entre candidatos según la geografía. <b>NS-NR no entra al gráfico</b> — porque un militante de partido casi nunca "se abstiene" por afinidad — pero el porcentaje se reporta en la plaquita superior para que el total cierre 100%. El método asume afinidad estable y <b>no captura realineamientos locales recientes</b> — por ejemplo, un acuerdo entre la maquinaria de un partido y un candidato distinto del que su patrón histórico sugeriría. Si conoces un caso así o ves un flujo que no cuadra, escríbenos a <a href="mailto:reruizc@gmail.com">reruizc@gmail.com</a> y lo ajustamos.
       </div>
     </div>
     <div class="sankey-toggle-wrap">
@@ -6069,6 +6069,7 @@
   // Luego el RAS reescala filas/columnas hasta que sumen los marginales.
   const SANKEY_PARTY_COLORS = {
     '996': '#cbd5e1',  // voto en blanco Senado — gris muy claro
+    '__NEWVOTER__': '#94a3b8',  // nuevo votante Pres (no votó Senado válidamente) — gris medio
     'PACTO HISTÓRICO SENADO': '#51458F',
     'PARTIDO CENTRO DEMOCRÁTICO': '#1866DF',
     'PARTIDO LIBERAL COLOMBIANO': '#E11A24',
@@ -6088,6 +6089,7 @@
   };
   const SANKEY_PARTY_SHORT = {
     '996': 'Voto en blanco · Senado',
+    '__NEWVOTER__': 'No votó Senado',
     'PACTO HISTÓRICO SENADO': 'Pacto Histórico',
     'PARTIDO CENTRO DEMOCRÁTICO': 'Centro Democrático',
     'PARTIDO LIBERAL COLOMBIANO': 'Liberal',
@@ -6125,6 +6127,10 @@
     // blanco local, el solape geográfico hace que ese residuo se incline
     // al candidato dominante de la zona.
     '996':                               { bl:1.00, ic:0.10, ae:0.10, sf:0.10, pv:0.10, cl:0.10, lm:0.10, rb:0.10 },
+    // Nuevo votante presidencial — no votó Senado o su voto fue nulo/no marcado.
+    // Sin militancia previa: distribuye uniforme entre candidatos (la geografía
+    // del modelo decide a qué candidato cae cada votante en cada territorio).
+    '__NEWVOTER__':                      { ic:0.50, ae:0.50, sf:0.50, pv:0.50, rb:0.50, cl:0.50, lm:0.50, bl:0.05 },
     'PACTO HISTÓRICO SENADO':            { ic:1.00, lm:0.60, rb:0.40, sf:0.05, cl:0.05, ae:0.00, pv:0.00, bl:0.02 },
     'FRENTE AMPLIO UNITARIO':            { rb:1.00, ic:0.40, sf:0.20, cl:0.20, lm:0.20, ae:0.00, pv:0.00, bl:0.02 },
     'ALIANZA POR COLOMBIA':              { sf:1.00, cl:0.60, lm:0.30, rb:0.30, ic:0.20, pv:0.05, ae:0.00, bl:0.02 },
@@ -6256,14 +6262,32 @@
       units.push({ partidos, votval: m.votval || 0, proj });
     }
 
+    // ── Calcular nueva banda "No votó Senado" por unidad
+    // En cada unidad: u_newvoter = max(0, sum(proj_visible) - sum(partidos_visible)).
+    // Captura tanto la abstención pura (votó Pres pero no Senado) como los
+    // nulos/no-marcados de Senado (físicamente fueron pero el voto no contó —
+    // los excluimos de partidos pero igual aparecen como votantes en Pres).
+    let totalNewVoter = 0;
+    for (const u of units){
+      const projVisible = Object.entries(u.proj || {}).reduce((s, kv) => {
+        return kv[0] === 'ns' ? s : (s + kv[1]);
+      }, 0);
+      const partTotal = Object.values(u.partidos || {}).reduce((s,v) => s+v, 0);
+      u.newvoter = Math.max(0, projVisible - partTotal);
+      totalNewVoter += u.newvoter;
+    }
+    if (totalNewVoter > 0) partyTotals['__NEWVOTER__'] = totalNewVoter;
+
     // ── Agrupar partidos minoritarios
-    // El blanco Senado ('996') NUNCA se agrupa: es su propia banda gris.
+    // El blanco Senado ('996') y NEWVOTER nunca se agrupan: son sus propias
+    // bandas grises. Todo lo demás <1.5% del scope va a __OTROS__.
     const totalParties = Object.values(partyTotals).reduce((s,v) => s+v, 0);
     if (totalParties <= 0) return null;
     const major = {};
     let minorSum = 0;
     for (const [n,v] of Object.entries(partyTotals)){
       if (n === SANKEY_BLANCO_PARTY_KEY){ major[n] = v; continue; }
+      if (n === '__NEWVOTER__'){ major[n] = v; continue; }
       if (v / totalParties >= SANKEY_MIN_PARTY_PCT/100) major[n] = v;
       else minorSum += v;
     }
@@ -6340,6 +6364,12 @@
       for (const [n,v] of Object.entries(u.partidos || {})){
         const k = (major[n] != null) ? n : '__OTROS__';
         localP[k] = (localP[k] || 0) + v;
+      }
+      // El nuevo votante Pres por unit (gap proyección - votos Senado en ese
+      // territorio) entra como "partido virtual" para el prior. Si major no
+      // tiene la banda (gap=0 a nivel scope), no se aporta.
+      if (u.newvoter > 0 && major['__NEWVOTER__']){
+        localP['__NEWVOTER__'] = (localP['__NEWVOTER__'] || 0) + u.newvoter;
       }
       for (const p of partyKeys){
         const pv = localP[p] || 0;
@@ -6432,6 +6462,7 @@
     const _partyFull = p => {
       if (p === '__OTROS__') return 'Otros partidos minoritarios (<1.5% del scope)';
       if (p === SANKEY_BLANCO_PARTY_KEY) return 'Voto en blanco · Senado 2026';
+      if (p === '__NEWVOTER__') return 'Nuevo votante Pres · no votó Senado o su voto fue nulo/no marcado';
       return p;
     };
     const parties = partyKeys.map(p => ({
