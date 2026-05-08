@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Veleta · Municipios sensibles 2026 · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=Arima:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#060810; --surface:rgba(255,255,255,.04); --border:rgba(255,255,255,.08);
+      --white:#f4f3ef; --blue:#0047FF; --green:#4ade80;
+      --orange:#fb923c; --red:#f87171; --amber:#f59e0b;
+      /* Veleta palette */
+      --vel-low:#2d3340; --vel-mid:#f59e0b; --vel-high:#f87171;
+    }
+    html{scroll-behavior:smooth}
+    body{background:var(--bg);color:var(--white);font-family:Avenir,sans-serif;min-height:100vh;overflow-x:hidden}
+    body.day-mode{background:#e6ded3;color:#0d1120}
+    body.day-mode .electoral-nav{background:rgba(230,222,211,.93);border-bottom:1px solid rgba(0,0,0,.1)}
+    body.day-mode .logo-text{color:#0d1120}
+    body.day-mode .breadcrumb{color:rgba(0,0,0,.45);border-bottom-color:rgba(0,0,0,.1)}
+    body.day-mode .breadcrumb a{color:rgba(251,146,60,.95)}
+    body.day-mode .page-header{border-bottom-color:rgba(0,0,0,.1)}
+    body.day-mode .page-sub{color:rgba(0,0,0,.55)}
+    body.day-mode .page-title{color:#0d1120}
+    body.day-mode .bc-current{color:#0d1120}
+    body.day-mode .intro-section{background:rgba(0,0,0,.02);border-bottom-color:rgba(0,0,0,.1)}
+    body.day-mode .intro-title{color:rgba(0,0,0,.65)}
+    body.day-mode .metric-card{background:rgba(0,0,0,.025);border-color:rgba(0,0,0,.1)}
+    body.day-mode .metric-card-pct{color:var(--orange)}
+    body.day-mode .metric-card-name{color:#0d1120}
+    body.day-mode .metric-card-desc{color:rgba(0,0,0,.7)}
+    body.day-mode .formula-box{background:rgba(251,146,60,.08);border-color:rgba(251,146,60,.4);color:#0d1120}
+    body.day-mode .formula-box b{color:var(--orange)}
+    body.day-mode .toggle-bar{border-bottom-color:rgba(0,0,0,.1);background:rgba(0,0,0,.02)}
+    body.day-mode .toggle-label{color:rgba(0,0,0,.55)}
+    body.day-mode .toggle-btn{color:rgba(0,0,0,.55);background:rgba(0,0,0,.03);border-color:rgba(0,0,0,.12)}
+    body.day-mode .toggle-btn:hover{color:#0d1120;border-color:rgba(251,146,60,.5)}
+    body.day-mode .toggle-btn.active{color:#fff;background:var(--orange);border-color:var(--orange)}
+    body.day-mode .threshold-row{color:rgba(0,0,0,.65)}
+    body.day-mode .map-head{background:rgba(251,146,60,.1);border-bottom-color:rgba(251,146,60,.3)}
+    body.day-mode .map-head-title{color:rgba(0,0,0,.7)}
+    body.day-mode .map-wrap{border-right-color:rgba(0,0,0,.1)}
+    body.day-mode #leaflet-map{background:#dbd2c4!important}
+    body.day-mode .leaflet-container{background:#dbd2c4!important}
+    body.day-mode .panel{border-left-color:rgba(0,0,0,.1)}
+    body.day-mode .panel-card{background:rgba(0,0,0,.025);border-color:rgba(0,0,0,.1)}
+    body.day-mode .panel-section-title{color:rgba(0,0,0,.55)}
+    body.day-mode .leg-bar-end{color:rgba(0,0,0,.55)}
+    body.day-mode .top-row{border-bottom-color:rgba(0,0,0,.06)}
+    body.day-mode .top-row:hover{background:rgba(251,146,60,.06)}
+    body.day-mode .top-rank{color:rgba(0,0,0,.45)}
+    body.day-mode .top-name{color:#0d1120}
+    body.day-mode .top-meta{color:rgba(0,0,0,.55)}
+    body.day-mode .det-row .lbl{color:rgba(0,0,0,.5)}
+    body.day-mode .det-row .val{color:#0d1120}
+    body.day-mode .bar-track{background:rgba(0,0,0,.07)}
+    body.day-mode .cta-card{background:linear-gradient(135deg,rgba(251,146,60,.08),rgba(248,113,113,.06));border-color:rgba(251,146,60,.45)}
+    body.day-mode .cta-title{color:#0d1120}
+    body.day-mode .cta-desc{color:rgba(0,0,0,.7)}
+    body.day-mode .foot{border-top-color:rgba(0,0,0,.1);color:rgba(0,0,0,.55);background:rgba(0,0,0,.02)}
+    body.day-mode .foot a{color:var(--orange)}
+    body.day-mode .theme-btn{background:rgba(251,146,60,.1);border-color:rgba(251,146,60,.35);color:var(--orange)}
+    body.day-mode .map-loading{background:rgba(230,222,211,.85);color:rgba(0,0,0,.7)}
+    body.day-mode .leaflet-control-attribution{background:rgba(230,222,211,.9)!important;color:rgba(0,0,0,.4)!important}
+
+    /* NAV — espejo de previa-1v.html */
+    .electoral-nav{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(4,6,16,.6);backdrop-filter:blur(8px);flex-shrink:0}
+    .electoral-nav-auth{display:flex;align-items:center;gap:.75rem}
+    .e-btn-back{font-family:Avenir,sans-serif;font-weight:500;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--green);text-decoration:none;border:1.5px solid rgba(74,222,128,.4);padding:.3rem .8rem;transition:color .2s,border-color .2s,background .2s;flex-shrink:0}
+    .e-btn-back:hover{color:#060810;background:var(--green);border-color:var(--green)}
+    .logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.85;transition:opacity .2s}
+    .logo-link:hover{opacity:1}
+    .logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px}
+    .logo-bar{width:5px;background:var(--orange);border-radius:1px 1px 0 0;opacity:.85}
+    .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.1rem,2vw,1.8rem);letter-spacing:-.03em;color:var(--white)}
+    .logo-text span{color:var(--orange)}
+
+    .country-selector-wrap{position:relative}
+    .country-btn{font-family:Avenir,sans-serif;font-weight:500;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.4);background:none;border:1px solid rgba(255,255,255,.15);padding:.3rem .65rem;cursor:pointer;display:flex;align-items:center;transition:border-color .2s,color .2s}
+    .country-btn:hover,.country-btn.open{border-color:rgba(255,255,255,.35);color:rgba(255,255,255,.7)}
+    .country-dropdown{position:absolute;top:calc(100% + 8px);right:0;background:#0e1220;border:1px solid rgba(255,255,255,.12);min-width:190px;display:none;flex-direction:column;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+    .country-dropdown.open{display:flex}
+    .country-option{font-family:Avenir,sans-serif;font-weight:400;font-size:.68rem;letter-spacing:.05em;padding:.65rem 1rem;cursor:pointer;display:flex;align-items:center;gap:.5rem;color:rgba(255,255,255,.5);border-bottom:1px solid rgba(255,255,255,.07);transition:background .15s;user-select:none}
+    .country-option:last-child{border-bottom:none}
+    .country-option:hover{background:rgba(255,255,255,.05);color:rgba(255,255,255,.8)}
+    .country-option.selected{color:var(--orange)}
+    .country-check{font-size:.6rem;width:12px;opacity:0;color:var(--orange)}
+    .country-option.selected .country-check{opacity:1}
+
+    .theme-btn{display:flex;align-items:center;gap:.4rem;font-family:Avenir,sans-serif;font-weight:500;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);padding:.3rem .75rem;cursor:pointer;transition:all .2s;flex-shrink:0}
+    .theme-btn:hover{background:rgba(255,255,255,.15);color:var(--white)}
+
+    /* BREADCRUMB */
+    .breadcrumb{padding:.6rem 2.5rem;font-family:Avenir,sans-serif;font-weight:400;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.35);border-bottom:1px solid var(--border)}
+    .breadcrumb a{color:rgba(251,146,60,.85);text-decoration:none}
+    .breadcrumb a:hover{color:var(--orange)}
+
+    /* HEADER */
+    .page-header{padding:1.3rem 2.5rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+    .page-title{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.4rem,2.6vw,2.2rem);letter-spacing:-.025em;color:var(--white)}
+    .page-title span{color:var(--orange)}
+    .page-sub{font-family:Avenir,sans-serif;font-weight:400;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-top:.35rem}
+
+    /* INTRO + 3 metric cards + fórmula */
+    .intro-section{padding:1.3rem 2.5rem 1.4rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.015)}
+    .intro-title{font-family:Avenir,sans-serif;font-weight:500;font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:.85rem}
+    .intro-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.85rem;margin-bottom:1rem}
+    @media (max-width:900px){.intro-grid{grid-template-columns:1fr}}
+    .metric-card{background:rgba(255,255,255,.03);border:1px solid var(--border);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:.35rem}
+    .metric-card-pct{font-family:'Syne',sans-serif;font-weight:800;font-size:1.7rem;color:var(--orange);letter-spacing:-.02em;line-height:1}
+    .metric-card-name{font-family:'Syne',sans-serif;font-weight:700;font-size:.92rem;color:var(--white);letter-spacing:-.01em;margin-top:.2rem}
+    .metric-card-desc{font-family:Avenir,sans-serif;font-weight:400;font-size:.78rem;line-height:1.5;color:rgba(255,255,255,.7);margin-top:.15rem}
+    .metric-card-desc code{font-family:'Arima',sans-serif;background:rgba(251,146,60,.12);color:var(--orange);padding:.05rem .35rem;font-size:.78rem}
+    .formula-box{font-family:'Syne',sans-serif;font-weight:500;font-size:.92rem;background:rgba(251,146,60,.08);border:1px solid rgba(251,146,60,.35);border-left:3px solid var(--orange);padding:.65rem .95rem;color:rgba(255,255,255,.92);letter-spacing:.01em}
+    .formula-box b{color:var(--orange);font-weight:700}
+
+    /* TOGGLE BAR */
+    .toggle-bar{padding:.85rem 2.5rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.01);display:flex;align-items:center;gap:1.4rem;flex-wrap:wrap}
+    .toggle-group{display:flex;align-items:center;gap:.5rem}
+    .toggle-label{font-family:Avenir,sans-serif;font-weight:500;font-size:.68rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.45)}
+    .toggle-btn{font-family:Avenir,sans-serif;font-weight:500;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.65);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.15);padding:.42rem .9rem;cursor:pointer;transition:all .15s}
+    .toggle-btn:hover{color:var(--white);border-color:rgba(251,146,60,.5);background:rgba(251,146,60,.08)}
+    .toggle-btn.active{color:#fff;background:var(--orange);border-color:var(--orange)}
+    .threshold-row{display:flex;align-items:center;gap:.6rem;font-family:Avenir,sans-serif;font-size:.74rem;color:rgba(255,255,255,.65)}
+    .threshold-slider{-webkit-appearance:none;appearance:none;width:160px;height:4px;background:linear-gradient(to right,#2d3340,#f59e0b,#f87171);border-radius:2px;outline:none}
+    .threshold-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:#fff;cursor:pointer;border:2px solid var(--orange);box-shadow:0 0 0 1px rgba(251,146,60,.4)}
+    .threshold-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#fff;cursor:pointer;border:2px solid var(--orange);box-shadow:0 0 0 1px rgba(251,146,60,.4)}
+    .threshold-value{font-family:Avenir,sans-serif;font-weight:600;font-size:.92rem;color:var(--orange);font-variant-numeric:tabular-nums;min-width:32px;text-align:right}
+    .veleta-count{margin-left:auto;font-family:Avenir,sans-serif;font-weight:500;font-size:.78rem;color:rgba(255,255,255,.78)}
+    .veleta-count b{color:var(--red);font-weight:700}
+    .veleta-count .censo{color:rgba(255,255,255,.55);margin-left:.5rem}
+    body.day-mode .veleta-count{color:rgba(0,0,0,.78)}
+    body.day-mode .veleta-count .censo{color:rgba(0,0,0,.55)}
+
+    /* MAIN SHELL */
+    .shell{display:grid;grid-template-columns:1fr 380px;gap:0;min-height:calc(100vh - 460px)}
+    @media (max-width:1100px){.shell{grid-template-columns:1fr}}
+
+    .map-wrap{position:relative;border-right:1px solid var(--border);display:flex;flex-direction:column}
+    .map-head{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.75rem 1.3rem;background:rgba(251,146,60,.1);border-bottom:1px solid rgba(251,146,60,.3);flex-wrap:wrap}
+    .map-head-title{font-family:Avenir,sans-serif;font-weight:500;font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.7)}
+    .map-back-btn{font-family:Avenir,sans-serif;font-weight:500;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.7);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);padding:.32rem .7rem;cursor:pointer;transition:all .15s;display:none}
+    .map-back-btn:hover{background:rgba(251,146,60,.15);border-color:var(--orange);color:#fff}
+    .map-back-btn.show{display:inline-flex}
+    body.day-mode .map-back-btn{color:rgba(0,0,0,.65);background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.18)}
+    body.day-mode .map-back-btn:hover{background:rgba(251,146,60,.12);color:var(--orange);border-color:var(--orange)}
+    #leaflet-map{flex:1;min-height:560px;background:#060810}
+    .leaflet-container{background:#060810!important;cursor:default}
+    .leaflet-tile-pane{display:none}
+    #leaflet-map .leaflet-interactive{cursor:pointer}
+    .leaflet-control-attribution{background:rgba(6,8,16,.85)!important;color:rgba(255,255,255,.25)!important;font-family:Avenir,sans-serif!important;font-size:.55rem!important}
+    .leaflet-control-attribution a{color:rgba(251,146,60,.6)!important}
+    .leaflet-control-zoom a{background:rgba(13,15,28,.9)!important;color:var(--white)!important;border-color:rgba(255,255,255,.15)!important}
+    .leaflet-control-zoom a:hover{background:rgba(251,146,60,.3)!important}
+
+    .map-loading{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(6,8,16,.85);z-index:800;font-family:Avenir,sans-serif;font-weight:500;font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.75);pointer-events:none}
+    .map-loading.show{display:flex}
+    .map-loading .dot{width:8px;height:8px;border-radius:50%;background:var(--orange);margin:0 4px;animation:bounce 1.2s infinite}
+    .map-loading .dot:nth-child(2){animation-delay:.15s}
+    .map-loading .dot:nth-child(3){animation-delay:.3s}
+    @keyframes bounce{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
+
+    /* Hover chip flotante */
+    .hover-chip{position:fixed;z-index:9000;pointer-events:none;display:none;background:rgba(6,8,16,.96);color:#f4f3ef;font-family:Avenir,sans-serif;font-weight:500;font-size:.75rem;padding:.32rem .6rem;border:1px solid rgba(251,146,60,.5);letter-spacing:.02em;box-shadow:0 2px 10px rgba(0,0,0,.4);transform:translate(14px,18px)}
+    .hover-chip.show{display:flex;align-items:center;gap:.45rem}
+    .hover-chip .hc-score{font-weight:700;color:var(--red)}
+    body.day-mode .hover-chip{background:rgba(255,255,255,.97);color:rgba(0,0,0,.92);border-color:rgba(251,146,60,.55);box-shadow:0 2px 10px rgba(0,0,0,.18)}
+    @media (max-width:1099px){.hover-chip{display:none!important}}
+
+    /* PANEL DERECHO */
+    .panel{padding:1rem 1.1rem 1.5rem;border-left:1px solid var(--border);display:flex;flex-direction:column;gap:.95rem;overflow-y:auto;max-height:calc(100vh - 280px)}
+    @media (max-width:1100px){.panel{max-height:none;border-left:none;border-top:1px solid var(--border)}}
+    .panel-section-title{font-family:Avenir,sans-serif;font-weight:500;font-size:.66rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:.35rem}
+    .panel-card{background:rgba(255,255,255,.025);border:1px solid var(--border);padding:.85rem .95rem}
+
+    .leg-bar{height:10px;background:linear-gradient(to right,var(--vel-low) 0%,#463c3c 40%,#b46e32 60%,var(--vel-mid) 75%,var(--vel-high) 100%);border:1px solid rgba(255,255,255,.1);margin:.4rem 0 .25rem}
+    body.day-mode .leg-bar{border-color:rgba(0,0,0,.12)}
+    .leg-bar-ends{display:flex;justify-content:space-between;font-family:Avenir,sans-serif;font-size:.65rem;color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums}
+    .leg-bar-end{color:rgba(255,255,255,.5)}
+    .leg-stripes{margin-top:.6rem;display:flex;align-items:center;gap:.55rem;font-family:Avenir,sans-serif;font-size:.74rem;color:rgba(255,255,255,.7)}
+    .leg-stripe-swatch{width:36px;height:14px;border:1px solid rgba(255,255,255,.15);background:repeating-linear-gradient(45deg,#f87171 0 3px,#fff 3px 5px)}
+    body.day-mode .leg-stripe-swatch{border-color:rgba(0,0,0,.15);background:repeating-linear-gradient(45deg,#dc2626 0 3px,#fff 3px 5px)}
+    .leg-stripes b{color:var(--red);font-weight:700}
+
+    /* Detalle territorio (hover/click) */
+    .det-card{display:none;flex-direction:column;gap:.6rem}
+    .det-card.show{display:flex}
+    .det-empty{font-family:'Arima',sans-serif;font-weight:400;font-size:.84rem;color:rgba(255,255,255,.5);line-height:1.5;padding:.3rem 0}
+    body.day-mode .det-empty{color:rgba(0,0,0,.55)}
+    .det-name{font-family:'Syne',sans-serif;font-weight:700;font-size:1.15rem;letter-spacing:-.01em;line-height:1.2}
+    .det-parents{font-family:'Arima',sans-serif;font-weight:400;font-size:.74rem;color:rgba(255,255,255,.55);margin-top:.1rem}
+    body.day-mode .det-parents{color:rgba(0,0,0,.55)}
+    .det-score-big{font-family:'Syne',sans-serif;font-weight:800;font-size:2.2rem;line-height:1;letter-spacing:-.03em;color:var(--orange);margin:.2rem 0 .3rem}
+    .det-score-big.veleta-score{color:var(--red)}
+    .det-bars{display:flex;flex-direction:column;gap:.45rem;margin-top:.3rem}
+    .det-bar{display:grid;grid-template-columns:90px 1fr 38px;gap:.6rem;align-items:center;font-family:Avenir,sans-serif;font-size:.72rem}
+    .det-bar .lbl{color:rgba(255,255,255,.6);letter-spacing:.04em;text-transform:uppercase;font-size:.62rem;font-weight:500}
+    .det-bar .val{color:var(--white);font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+    .bar-track{height:6px;background:rgba(255,255,255,.07);overflow:hidden}
+    .bar-fill{height:100%;background:var(--orange)}
+    .bar-fill.swing{background:#a78bfa}
+    .bar-fill.comp{background:var(--amber)}
+    .bar-fill.peso{background:#0891b2}
+    .det-meta{display:grid;grid-template-columns:1fr 1fr;gap:.3rem .6rem;font-family:'Arima',sans-serif;font-size:.78rem;border-top:1px solid var(--border);padding-top:.55rem;margin-top:.4rem}
+    .det-row{display:contents}
+    .det-row .lbl{font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.45);font-family:Avenir,sans-serif;font-weight:500;align-self:center}
+    .det-row .val{font-weight:500;color:var(--white);font-variant-numeric:tabular-nums;text-align:right}
+    .det-flip{display:inline-block;margin-left:.3rem;padding:.05rem .35rem;font-size:.62rem;background:rgba(248,113,113,.18);color:var(--red);border:1px solid rgba(248,113,113,.5);letter-spacing:.04em;text-transform:uppercase;font-weight:600;font-family:Avenir,sans-serif}
+
+    /* Top-30 ranking */
+    .top-list{display:flex;flex-direction:column}
+    .top-row{display:grid;grid-template-columns:24px 1fr 56px;gap:.55rem;align-items:center;padding:.42rem .15rem;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;font-family:Avenir,sans-serif;font-size:.78rem;transition:background .12s}
+    .top-row:hover{background:rgba(251,146,60,.08)}
+    .top-row.active{background:rgba(251,146,60,.14)}
+    .top-rank{font-family:'Arima',sans-serif;font-weight:500;font-size:.72rem;color:rgba(255,255,255,.45);text-align:center}
+    .top-name{font-weight:500;color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+    .top-meta{font-family:'Arima',sans-serif;font-size:.7rem;color:rgba(255,255,255,.5);font-weight:400;line-height:1.15}
+    .top-meta-dep{display:block;font-size:.65rem;letter-spacing:.04em}
+    .top-score{font-family:'Syne',sans-serif;font-weight:700;font-size:.92rem;color:var(--orange);text-align:right;font-variant-numeric:tabular-nums}
+    .top-score.veleta{color:var(--red)}
+
+    /* CTA */
+    .cta-card{background:linear-gradient(135deg,rgba(251,146,60,.12),rgba(248,113,113,.08));border:1px solid rgba(251,146,60,.4);padding:1rem 1.05rem;display:flex;flex-direction:column;gap:.55rem}
+    .cta-title{font-family:'Syne',sans-serif;font-weight:700;font-size:.94rem;letter-spacing:-.01em;color:var(--white)}
+    .cta-desc{font-family:Avenir,sans-serif;font-size:.78rem;line-height:1.5;color:rgba(255,255,255,.78)}
+    .cta-price{font-family:'Syne',sans-serif;font-weight:800;font-size:1.05rem;color:var(--orange);letter-spacing:-.01em}
+    .cta-btn{display:inline-block;text-align:center;font-family:Avenir,sans-serif;font-weight:600;font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;color:#fff;background:var(--orange);border:1px solid var(--orange);padding:.55rem 1rem;text-decoration:none;transition:all .15s;cursor:pointer}
+    .cta-btn:hover{background:#ea7a26;border-color:#ea7a26}
+
+    /* FOOTER */
+    .foot{padding:1.4rem 2.5rem;border-top:1px solid var(--border);font-family:Avenir,sans-serif;font-weight:400;font-size:.72rem;line-height:1.6;color:rgba(255,255,255,.5);background:rgba(255,255,255,.01)}
+    .foot a{color:rgba(251,146,60,.85);text-decoration:none}
+    .foot a:hover{color:var(--orange);text-decoration:underline}
+    .foot strong{color:rgba(255,255,255,.78);font-weight:600}
+    body.day-mode .foot strong{color:#0d1120}
+    .foot p{margin-bottom:.55rem;max-width:1100px}
+  </style>
+</head>
+<body>
+
+  <!-- SVG patterns para municipios veleta (rayado rojo + blanco a 45°) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <pattern id="vel-stripes" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+        <rect width="6" height="6" fill="#f87171"/>
+        <line x1="0" y1="0" x2="0" y2="6" stroke="#fff" stroke-width="2.2" stroke-opacity=".45"/>
+      </pattern>
+      <pattern id="vel-stripes-day" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+        <rect width="6" height="6" fill="#dc2626"/>
+        <line x1="0" y1="0" x2="0" y2="6" stroke="#fff" stroke-width="2.2" stroke-opacity=".7"/>
+      </pattern>
+    </defs>
+  </svg>
+
+  <nav class="electoral-nav">
+    <div style="display:flex;align-items:center;gap:1rem">
+      <a href="electoral.html" class="e-btn-back">← Volver</a>
+      <div id="e-nav-auth" class="electoral-nav-auth"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:1.2rem">
+      <div class="country-selector-wrap">
+        <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
+          <span id="countryBtnLabel">Colombia</span>
+          <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style="margin-left:6px;transition:transform .2s" id="countryChevron"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <div class="country-dropdown" id="countryDropdown">
+          <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
+          <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
+          <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
+          <div class="country-option" data-value="cn" onclick="selectCountry(this)"><span class="country-check">✓</span> 中国 / China</div>
+        </div>
+      </div>
+      <a href="electoral.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+  </nav>
+
+  <div class="breadcrumb">
+    <a href="electoral.html">Electoral</a> &nbsp;/&nbsp; Inteligencia Territorial 2026 &nbsp;/&nbsp; <span class="bc-current">Veleta</span>
+  </div>
+
+  <header class="page-header">
+    <div>
+      <div class="page-title">Veleta · <span>municipios sensibles 2026</span></div>
+      <div class="page-sub">Score multidimensional 0–100 · swing histórico, competitividad y peso electoral</div>
+    </div>
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
+  </header>
+
+  <!-- INTRO: 3 metric cards + fórmula -->
+  <section class="intro-section">
+    <div class="intro-title">Cómo se construye el score</div>
+    <div class="intro-grid">
+      <div class="metric-card">
+        <div class="metric-card-pct">40%</div>
+        <div class="metric-card-name">Swing histórico</div>
+        <div class="metric-card-desc">Cambio absoluto en el voto por <code>Petro</code> entre presidencial 2018 y 2022, normalizado al percentil 95 nacional. Bonus +15 pts si cambió el ganador del municipio.</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-card-pct">40%</div>
+        <div class="metric-card-name">Competitividad</div>
+        <div class="metric-card-desc">Margen entre el 1° y 2° en presidencial 2022, sobre votos válidos. Lineal invertido: 0 pp → 100, ≥25 pp → 0. Más cerrada la elección, mayor el score.</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-card-pct">20%</div>
+        <div class="metric-card-name">Peso electoral</div>
+        <div class="metric-card-desc">log(censo electoral municipal 2026) normalizado entre el min y el max nacional. Filtra el ruido de municipios pequeños donde 50 votos cambian todo.</div>
+      </div>
+    </div>
+    <div class="formula-box">
+      Score Veleta = <b>0.4·swing</b> + <b>0.4·competitividad</b> + <b>0.2·peso</b> &nbsp;→&nbsp; escala 0–100
+    </div>
+  </section>
+
+  <!-- TOGGLE BAR -->
+  <section class="toggle-bar">
+    <div class="toggle-group">
+      <span class="toggle-label">Nivel</span>
+      <button class="toggle-btn active" id="lvl-dep" onclick="setLevel('dep')">Departamental</button>
+      <button class="toggle-btn" id="lvl-mun" onclick="setLevel('mun')">Municipal</button>
+    </div>
+    <div class="threshold-row">
+      <span class="toggle-label" style="margin-right:.2rem">Umbral rayado</span>
+      <input type="range" id="threshold-slider" class="threshold-slider" min="50" max="90" step="1" value="70" />
+      <span class="threshold-value" id="threshold-value">70</span>
+    </div>
+    <div class="veleta-count" id="veleta-count">— municipios veleta</div>
+  </section>
+
+  <!-- MAIN SHELL: mapa + panel -->
+  <main class="shell">
+    <div class="map-wrap">
+      <div class="map-head">
+        <div>
+          <div class="map-head-title" id="map-head-title">Vista nacional · Departamental</div>
+        </div>
+        <button class="map-back-btn" id="map-back-btn" onclick="onBack()">← Volver a nacional</button>
+      </div>
+      <div id="leaflet-map"></div>
+      <div class="map-loading" id="map-loading">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span style="margin-left:.7rem">Calculando scores</span>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <!-- Leyenda -->
+      <div class="panel-card">
+        <div class="panel-section-title">Escala de score</div>
+        <div class="leg-bar"></div>
+        <div class="leg-bar-ends">
+          <span class="leg-bar-end">0 · estable</span>
+          <span class="leg-bar-end">100 · veleta</span>
+        </div>
+        <div class="leg-stripes">
+          <div class="leg-stripe-swatch"></div>
+          <span>Score ≥ <b id="leg-thresh">70</b> · municipio <b>veleta</b></span>
+        </div>
+      </div>
+
+      <!-- Detalle territorio -->
+      <div class="panel-card">
+        <div class="panel-section-title">Territorio seleccionado</div>
+        <div id="det-empty" class="det-empty">Pasa el cursor sobre el mapa o haz clic en un departamento para ver sus municipios.</div>
+        <div id="det-card" class="det-card">
+          <div>
+            <div class="det-name" id="det-name">—</div>
+            <div class="det-parents" id="det-parents">—</div>
+          </div>
+          <div class="det-score-big" id="det-score">—</div>
+          <div class="det-bars">
+            <div class="det-bar">
+              <span class="lbl">Swing</span>
+              <div class="bar-track"><div class="bar-fill swing" id="bar-swing" style="width:0%"></div></div>
+              <span class="val" id="val-swing">—</span>
+            </div>
+            <div class="det-bar">
+              <span class="lbl">Competit.</span>
+              <div class="bar-track"><div class="bar-fill comp" id="bar-comp" style="width:0%"></div></div>
+              <span class="val" id="val-comp">—</span>
+            </div>
+            <div class="det-bar">
+              <span class="lbl">Peso</span>
+              <div class="bar-track"><div class="bar-fill peso" id="bar-peso" style="width:0%"></div></div>
+              <span class="val" id="val-peso">—</span>
+            </div>
+          </div>
+          <dl class="det-meta">
+            <div class="det-row"><dt class="lbl">Censo 2026</dt><dd class="val" id="det-censo">—</dd></div>
+            <div class="det-row"><dt class="lbl">Margen 1°-2° 2022</dt><dd class="val" id="det-margin">—</dd></div>
+            <div class="det-row"><dt class="lbl">Δ Petro 18→22</dt><dd class="val" id="det-swing">—</dd></div>
+            <div class="det-row"><dt class="lbl">Ganador</dt><dd class="val" id="det-winner">—</dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <!-- Top 30 -->
+      <div class="panel-card">
+        <div class="panel-section-title">Top 30 · municipios más veleta</div>
+        <div class="top-list" id="top-list"></div>
+      </div>
+
+      <!-- CTA comercial -->
+      <div class="cta-card">
+        <div class="cta-title">¿Equipo de campaña?</div>
+        <div class="cta-desc">Reporte territorial completo, mapa propio + listado priorizado, recomendaciones por bloque (izq/centro/der) y simulación de impacto en pisada de eventos.</div>
+        <div class="cta-price">3 M COP · entrega 5 días hábiles</div>
+        <a class="cta-btn" href="mailto:reruizc@gmail.com?subject=Veleta%20·%20Reporte%20territorial&body=Hola%20Ricardo%2C%20me%20interesa%20el%20reporte%20Veleta%20para%20mi%20campa%C3%B1a.">Solicitar propuesta →</a>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Hover chip flotante -->
+  <div class="hover-chip" id="hover-chip">
+    <span class="hc-name" id="hc-name">—</span>
+    <span class="hc-score" id="hc-score">—</span>
+  </div>
+
+  <!-- FOOTER · disclaimer metodológico -->
+  <footer class="foot">
+    <p><strong>Metodología.</strong> El score Veleta combina volatilidad histórica (swing Petro 18→22), competitividad reciente (margen 1°-2° en 2022) y tamaño electoral (log-censo 2026 oficial Registraduría). Datos: Registraduría Nacional del Estado Civil (presidenciales 2018, 2022; censo 2026 vía Divipole). Los componentes se normalizan al rango 0–100 y se ponderan 40/40/20 para llegar al score final.</p>
+    <p><strong>Riesgo metodológico.</strong> Anclar el swing en Petro carga el indicador hacia volatilidad sobre el eje izquierda↔resto. Es defendible para 2026 — Petro fue la división principal de 2018 y 2022 — pero un consultor experto puede preferir un score por bloque ideológico (izquierda/centro/derecha) que requiere mapeo manual de candidatos. Esta v1 mantiene la simplicidad y trazabilidad. <a href="mailto:reruizc@gmail.com?subject=Veleta%20·%20metodología">¿Dudas o ideas? escríbenos</a>.</p>
+    <p><strong>Uso recomendado.</strong> El score no predice resultado — identifica dónde la elección está más en juego. Es un input de priorización para asignar presupuesto, eventos y caravana. Lectura por componentes: alto swing + alta competitividad = territorio en disputa abierta; alto peso + bajo swing = bastión a defender.</p>
+    <p style="opacity:.7;margin-top:.8rem"><a href="electoral.html">← Volver a Electoral</a> &nbsp;·&nbsp; ricardoruiz.co · 2026</p>
+  </footer>
+
+  <script>
+  /* ════════════════════════════════════════════════════════════════
+     VELETA · cálculo de scores + render Leaflet
+     ════════════════════════════════════════════════════════════════ */
+
+  const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
+  const URLS = {
+    pres18:    `${S3}/historicos/pres-2018-v1/por-mun.json`,
+    pres22:    `${S3}/historicos/pres-2022-v1/por-mun.json`,
+    censos:    `${S3}/puestos-censos-agg.json`,
+    deptosGeo: `${S3}/mapas-2026/DEPARTAMENTOS2.json`,
+    depsIndex: `${S3}/mapas-2026/Departamentos-mps/index.json`,
+    depMps:    (depElec) => `${S3}/mapas-2026/Departamentos-mps/${depElec}.json`,
+  };
+
+  // Normalizar nombres para match (deptos)
+  const norm = (s) => (s||'').toString().normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
+
+  // Aliases para mapear nombres de DEPARTAMENTOS2.json a "nombre" del index.json
+  const DEP_NAME_ALIASES = {
+    'DISTRITO CAPITAL DE BOGOTA':'BOGOTA',
+    'BOGOTA':'BOGOTA',
+    'SAN ANDRES Y PROVIDENCIA':'SAN ANDRES',
+    'NORTE DE SANTANDER':'NORTE DE SANTANDER',
+    'VALLE DEL CAUCA':'VALLE',
+    'LA GUAJIRA':'GUAJIRA',
+  };
+
+  // Estado global
+  const STATE = {
+    pres18:null, pres22:null, censos:null, depIndex:null,
+    depGeo:null, depMpsCache:{},      // { '01': geojson }
+    depByElectoral:{}, depByName:{},  // index.json reorganizado
+    scoreByMun:{},                    // 'depElec-munElec' → registro
+    scoreByDep:{},                    // 'depElec' → registro agregado
+    threshold:70,
+    level:'dep',                      // 'dep' | 'mun'
+    selectedDep:null,                 // electoral_id si estamos drillados
+    map:null,
+    layer:null,
+    hoverFeature:null,
+    sumCensoNacional:0,
+  };
+
+  /* ───────── Carga de datos base ───────── */
+  async function loadAllData(){
+    const [p18, p22, cen, dep, idx] = await Promise.all([
+      fetch(URLS.pres18).then(r=>r.json()),
+      fetch(URLS.pres22).then(r=>r.json()),
+      fetch(URLS.censos).then(r=>r.json()),
+      fetch(URLS.deptosGeo).then(r=>r.json()),
+      fetch(URLS.depsIndex).then(r=>r.json()),
+    ]);
+    STATE.pres18 = p18;
+    STATE.pres22 = p22;
+    STATE.censos = cen;
+    STATE.depGeo = dep;
+    STATE.depIndex = idx;
+    STATE.sumCensoNacional = cen.nacional || 0;
+
+    idx.forEach(d=>{
+      STATE.depByElectoral[d.dep_electoral] = d;
+      STATE.depByName[norm(d.nombre)] = d;
+    });
+  }
+
+  /* ───────── Helpers de scoring ───────── */
+  const PETRO_RE = /\bPETRO\b/i;
+  function pctPetro(entry){
+    if (!entry || !entry.candidatos) return null;
+    for (const k of Object.keys(entry.candidatos)){
+      const c = entry.candidatos[k];
+      if (c && c.nombre && PETRO_RE.test(c.nombre)) return c.pct;
+    }
+    return null;
+  }
+  function topName(entry){
+    if (!entry || !entry.candidatos) return null;
+    const c = entry.candidatos['1'];
+    return c ? c.nombre : null;
+  }
+  function topPct(entry){
+    if (!entry || !entry.candidatos) return null;
+    const c = entry.candidatos['1'];
+    return c ? c.pct : null;
+  }
+  function secondPct(entry){
+    if (!entry || !entry.candidatos) return null;
+    const c = entry.candidatos['2'];
+    return c ? c.pct : null;
+  }
+  function marginTop12(entry){
+    const t1 = topPct(entry), t2 = secondPct(entry);
+    if (t1==null || t2==null) return null;
+    return Math.max(0, t1 - t2);
+  }
+  function clamp(v,lo,hi){ return Math.max(lo, Math.min(hi, v)); }
+  function quantile(arr, q){
+    const a = arr.slice().sort((x,y)=>x-y);
+    if (!a.length) return null;
+    const pos = (a.length-1)*q;
+    const base = Math.floor(pos), rest = pos - base;
+    return a[base+1]!=null ? a[base] + rest*(a[base+1]-a[base]) : a[base];
+  }
+
+  /* ───────── Cómputo de scores ───────── */
+  function computeScores(){
+    const censMun = STATE.censos.porMun || {};
+    const keys = new Set([...Object.keys(STATE.pres18 || {}), ...Object.keys(STATE.pres22 || {})]);
+    const recs = [];
+    for (const k of keys){
+      const e22 = STATE.pres22[k];
+      if (!e22) continue;                                  // 2022 obligatorio
+      const e18 = STATE.pres18[k];
+      const [depCod, munCod] = k.split('-');
+      const p18 = pctPetro(e18), p22 = pctPetro(e22);
+      const swingRaw = (p18!=null && p22!=null) ? Math.abs(p22 - p18) : null;
+      const margin22 = marginTop12(e22);
+      const t18 = topName(e18), t22 = topName(e22);
+      const flipped = !!(t18 && t22 && t18 !== t22);
+      const censo = censMun[k] || e22.votos_totales || 0;
+      recs.push({
+        key:k, depCod, munCod, p18, p22, swingRaw, margin22, flipped,
+        censo, winnerName:t22, winnerPct:topPct(e22),
+        votosValidos: e22.votos_validos
+      });
+    }
+
+    // Normalizadores
+    const swingVals = recs.map(r=>r.swingRaw).filter(v=>v!=null);
+    const swing95 = quantile(swingVals, 0.95) || 1;
+    const lcVals = recs.map(r=>Math.log(Math.max(1, r.censo)));
+    const lcMin = Math.min(...lcVals);
+    const lcMax = Math.max(...lcVals);
+    const lcRange = (lcMax - lcMin) || 1;
+
+    for (const r of recs){
+      const swing = (r.swingRaw == null) ? 50 : clamp(100 * r.swingRaw / swing95, 0, 100);
+      const swingFinal = r.flipped ? clamp(swing + 15, 0, 100) : swing;
+      const comp = (r.margin22 == null) ? 50 : clamp(100 * (1 - Math.min(r.margin22, 25) / 25), 0, 100);
+      const peso = clamp(100 * (Math.log(Math.max(1, r.censo)) - lcMin) / lcRange, 0, 100);
+      r.swing = swingFinal;
+      r.comp = comp;
+      r.peso = peso;
+      r.score = 0.4*swingFinal + 0.4*comp + 0.2*peso;
+      STATE.scoreByMun[r.key] = r;
+    }
+
+    // Agregado por depto: promedio ponderado por censo
+    const depAgg = {};
+    for (const r of recs){
+      const d = r.depCod;
+      if (!depAgg[d]) depAgg[d] = { depCod:d, sumW:0, sumScore:0, sumSwing:0, sumComp:0, sumPeso:0, sumCenso:0, nMun:0, nVeleta70:0, nVeleta:0 };
+      const w = Math.max(1, r.censo);
+      depAgg[d].sumW += w;
+      depAgg[d].sumScore += r.score * w;
+      depAgg[d].sumSwing += r.swing * w;
+      depAgg[d].sumComp += r.comp * w;
+      depAgg[d].sumPeso += r.peso * w;
+      depAgg[d].sumCenso += r.censo;
+      depAgg[d].nMun++;
+    }
+    for (const d of Object.keys(depAgg)){
+      const a = depAgg[d];
+      a.score = a.sumW ? a.sumScore / a.sumW : 0;
+      a.swing = a.sumW ? a.sumSwing / a.sumW : 0;
+      a.comp = a.sumW ? a.sumComp / a.sumW : 0;
+      a.peso = a.sumW ? a.sumPeso / a.sumW : 0;
+      a.censo = a.sumCenso;
+      a.nVeleta70 = recs.filter(r => r.depCod === d && r.score >= 70).length;
+      STATE.scoreByDep[d] = a;
+    }
+  }
+
+  /* ───────── Color del gradiente (no-veleta) ───────── */
+  function scoreColor(score){
+    // Stops: 0 → #2d3340, 40 → #463c3c, 60 → #b46e32, 75 → #f59e0b, 100 → #f87171
+    const stops = [
+      [0,   [45,51,64]],
+      [40,  [70,60,60]],
+      [60,  [180,110,50]],
+      [75,  [245,158,11]],
+      [100, [248,113,113]],
+    ];
+    if (score == null || isNaN(score)) return '#2d3340';
+    score = clamp(score, 0, 100);
+    for (let i=0;i<stops.length-1;i++){
+      const [s0,c0] = stops[i], [s1,c1] = stops[i+1];
+      if (score >= s0 && score <= s1){
+        const t = (score - s0) / (s1 - s0 || 1);
+        const r = Math.round(c0[0] + t*(c1[0]-c0[0]));
+        const g = Math.round(c0[1] + t*(c1[1]-c0[1]));
+        const b = Math.round(c0[2] + t*(c1[2]-c0[2]));
+        return `rgb(${r},${g},${b})`;
+      }
+    }
+    return '#f87171';
+  }
+
+  function isDay(){ return document.body.classList.contains('day-mode'); }
+
+  function styleByScore(score){
+    const isV = score != null && score >= STATE.threshold;
+    const fill = isV
+      ? `url(#${isDay() ? 'vel-stripes-day' : 'vel-stripes'})`
+      : scoreColor(score);
+    return {
+      fillColor: fill,
+      fillOpacity: 0.88,
+      color: isDay() ? 'rgba(0,0,0,.18)' : 'rgba(255,255,255,.14)',
+      weight: 0.6,
+    };
+  }
+
+  /* ───────── Acceso a datos del feature ───────── */
+  function depElectoralOfFeature(props){
+    if (props.electoral_id) return String(props.electoral_id).padStart(2,'0');
+    if (props.dep_electoral) return String(props.dep_electoral).padStart(2,'0');
+    if (props.id){
+      // DEPARTAMENTOS2.json viene con id tipo 'CONAR' (ISO) y no electoral_id.
+      // En ese caso, fallback por nombre.
+    }
+    if (props.name){
+      let n = norm(props.name);
+      if (DEP_NAME_ALIASES[n]) n = DEP_NAME_ALIASES[n];
+      // Buscar en depByName tolerando aliases
+      const cand = STATE.depByName[n];
+      if (cand) return cand.dep_electoral;
+      // Fallback: prefijo
+      for (const k of Object.keys(STATE.depByName)){
+        if (k.startsWith(n) || n.startsWith(k)) return STATE.depByName[k].dep_electoral;
+      }
+    }
+    return null;
+  }
+
+  function munKeyOfFeature(props){
+    const dep = props.dep_electoral || depElectoralOfFeature(props);
+    const mun = props.mun_elec || props.mun_electoral || props.mpio_ccdgo;
+    if (!dep || !mun) return null;
+    return `${String(dep).padStart(2,'0')}-${String(mun).padStart(3,'0')}`;
+  }
+
+  /* ───────── Render del mapa ───────── */
+  function ensureMap(){
+    if (STATE.map) return STATE.map;
+    STATE.map = L.map('leaflet-map', {
+      center:[4.5, -73.5],
+      zoom:6,
+      zoomControl:true,
+      preferCanvas:false,           // CRÍTICO: SVG renderer para que url(#vel-stripes) resuelva
+      attributionControl:true,
+    });
+    STATE.map.attributionControl.setPrefix('');
+    return STATE.map;
+  }
+
+  function clearLayer(){
+    if (STATE.layer){ STATE.map.removeLayer(STATE.layer); STATE.layer = null; }
+  }
+
+  function renderDeptos(){
+    ensureMap();
+    clearLayer();
+    const geo = STATE.depGeo;
+    STATE.layer = L.geoJSON(geo, {
+      style: (f) => {
+        const elec = depElectoralOfFeature(f.properties);
+        const a = elec ? STATE.scoreByDep[elec] : null;
+        return styleByScore(a ? a.score : null);
+      },
+      onEachFeature: (f, layer) => {
+        const elec = depElectoralOfFeature(f.properties);
+        const a = elec ? STATE.scoreByDep[elec] : null;
+        f.__elec = elec;
+        f.__rec = a;
+        f.__name = (STATE.depByElectoral[elec]||{}).nombre || f.properties.name;
+        layer.on('mouseover', (e) => onHover(f, e));
+        layer.on('mouseout',  () => onHoverOut(f));
+        layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
+        layer.on('click',     () => onDepClick(elec));
+      },
+    }).addTo(STATE.map);
+    STATE.map.fitBounds(STATE.layer.getBounds(), { padding:[20,20] });
+    document.getElementById('map-head-title').textContent = 'Vista nacional · Departamental';
+    document.getElementById('map-back-btn').classList.remove('show');
+  }
+
+  async function renderMunsOfDep(depElec){
+    ensureMap();
+    showLoading(true);
+    let geo = STATE.depMpsCache[depElec];
+    if (!geo){
+      geo = await fetch(URLS.depMps(depElec)).then(r=>r.json());
+      STATE.depMpsCache[depElec] = geo;
+    }
+    clearLayer();
+    STATE.layer = L.geoJSON(geo, {
+      style: (f) => {
+        const k = munKeyOfFeature(f.properties);
+        const r = k ? STATE.scoreByMun[k] : null;
+        return styleByScore(r ? r.score : null);
+      },
+      onEachFeature: (f, layer) => {
+        const k = munKeyOfFeature(f.properties);
+        const r = k ? STATE.scoreByMun[k] : null;
+        f.__key = k;
+        f.__rec = r;
+        f.__name = f.properties.mpio_cnmbr || f.properties.nombre || '—';
+        f.__depName = (STATE.depByElectoral[depElec]||{}).nombre || '';
+        layer.on('mouseover', (e) => onHover(f, e));
+        layer.on('mouseout',  () => onHoverOut(f));
+        layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
+      },
+    }).addTo(STATE.map);
+    STATE.map.fitBounds(STATE.layer.getBounds(), { padding:[20,20] });
+    const depName = (STATE.depByElectoral[depElec]||{}).nombre || depElec;
+    document.getElementById('map-head-title').textContent = `${depName} · Municipios`;
+    document.getElementById('map-back-btn').classList.add('show');
+    showLoading(false);
+  }
+
+  async function renderMunsNacional(){
+    ensureMap();
+    showLoading(true);
+    // Combinar 33 depMps en uno solo (en paralelo, cacheado)
+    const depCodes = STATE.depIndex.map(d => d.dep_electoral);
+    const fetches = depCodes.map(async dc => {
+      if (STATE.depMpsCache[dc]) return STATE.depMpsCache[dc];
+      const g = await fetch(URLS.depMps(dc)).then(r=>r.json());
+      STATE.depMpsCache[dc] = g;
+      return g;
+    });
+    const all = await Promise.all(fetches);
+    const features = [];
+    all.forEach(g => { if (g && g.features) features.push(...g.features); });
+
+    clearLayer();
+    STATE.layer = L.geoJSON({ type:'FeatureCollection', features }, {
+      style: (f) => {
+        const k = munKeyOfFeature(f.properties);
+        const r = k ? STATE.scoreByMun[k] : null;
+        return styleByScore(r ? r.score : null);
+      },
+      onEachFeature: (f, layer) => {
+        const k = munKeyOfFeature(f.properties);
+        const r = k ? STATE.scoreByMun[k] : null;
+        f.__key = k;
+        f.__rec = r;
+        f.__name = f.properties.mpio_cnmbr || '—';
+        const dep = f.properties.dep_electoral;
+        f.__depName = (STATE.depByElectoral[dep]||{}).nombre || '';
+        layer.on('mouseover', (e) => onHover(f, e));
+        layer.on('mouseout',  () => onHoverOut(f));
+        layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
+      },
+    }).addTo(STATE.map);
+    STATE.map.fitBounds(STATE.layer.getBounds(), { padding:[20,20] });
+    document.getElementById('map-head-title').textContent = 'Vista nacional · Municipal';
+    document.getElementById('map-back-btn').classList.remove('show');
+    showLoading(false);
+  }
+
+  function showLoading(on){ document.getElementById('map-loading').classList.toggle('show', !!on); }
+
+  /* ───────── Hover + click handlers ───────── */
+  function onHover(f, e){
+    STATE.hoverFeature = f;
+    if (e && e.target && e.target.setStyle){
+      e.target.setStyle({ weight: 1.4, color: isDay() ? 'rgba(0,0,0,.5)' : 'rgba(255,255,255,.55)' });
+      e.target.bringToFront();
+    }
+    showDetailFromFeature(f);
+    showHoverChip(f);
+  }
+  function onHoverOut(f){
+    if (STATE.layer) STATE.layer.resetStyle();
+    hideHoverChip();
+  }
+  function onDepClick(elec){
+    if (!elec) return;
+    STATE.selectedDep = elec;
+    renderMunsOfDep(elec);
+  }
+  function onBack(){
+    STATE.selectedDep = null;
+    if (STATE.level === 'dep') renderDeptos();
+    else renderMunsNacional();
+  }
+
+  /* ───────── Hover chip ───────── */
+  function showHoverChip(f){
+    const chip = document.getElementById('hover-chip');
+    const r = f.__rec;
+    if (!r){ chip.classList.remove('show'); return; }
+    document.getElementById('hc-name').textContent = f.__name || '—';
+    document.getElementById('hc-score').textContent = r.score!=null ? r.score.toFixed(0) : '—';
+    chip.classList.add('show');
+  }
+  function hideHoverChip(){ document.getElementById('hover-chip').classList.remove('show'); }
+  function moveHoverChip(ev){
+    const chip = document.getElementById('hover-chip');
+    chip.style.left = ev.clientX + 'px';
+    chip.style.top  = ev.clientY + 'px';
+  }
+  document.addEventListener('mousemove', moveHoverChip);
+
+  /* ───────── Panel detalle ───────── */
+  function fmtNum(n){ if (n==null||isNaN(n)) return '—'; return Math.round(n).toLocaleString('es-CO'); }
+  function fmtPct(n,d=1){ if (n==null||isNaN(n)) return '—'; return n.toFixed(d) + '%'; }
+  function fmtPP(n,d=1){ if (n==null||isNaN(n)) return '—'; return (n>=0?'':'') + n.toFixed(d) + ' pp'; }
+
+  function showDetailFromFeature(f){
+    const r = f.__rec;
+    document.getElementById('det-empty').style.display = 'none';
+    document.getElementById('det-card').classList.add('show');
+    if (!r){
+      document.getElementById('det-name').textContent = f.__name || '—';
+      document.getElementById('det-parents').textContent = f.__depName || '';
+      document.getElementById('det-score').textContent = '—';
+      document.getElementById('det-score').classList.remove('veleta-score');
+      document.getElementById('bar-swing').style.width = '0%';
+      document.getElementById('bar-comp').style.width  = '0%';
+      document.getElementById('bar-peso').style.width  = '0%';
+      document.getElementById('val-swing').textContent = '—';
+      document.getElementById('val-comp').textContent  = '—';
+      document.getElementById('val-peso').textContent  = '—';
+      document.getElementById('det-censo').textContent = '—';
+      document.getElementById('det-margin').textContent = '—';
+      document.getElementById('det-swing').textContent = '—';
+      document.getElementById('det-winner').textContent = '—';
+      return;
+    }
+    const isDep = !f.__key;
+    document.getElementById('det-name').textContent = f.__name || '—';
+    document.getElementById('det-parents').textContent = isDep
+      ? (r.nMun ? `${r.nMun} municipios · ${r.nVeleta70||0} con score ≥ 70` : '')
+      : (f.__depName || '');
+    const scEl = document.getElementById('det-score');
+    scEl.textContent = r.score!=null ? r.score.toFixed(0) : '—';
+    scEl.classList.toggle('veleta-score', r.score != null && r.score >= STATE.threshold);
+
+    document.getElementById('bar-swing').style.width = (r.swing||0).toFixed(0)+'%';
+    document.getElementById('bar-comp').style.width  = (r.comp ||0).toFixed(0)+'%';
+    document.getElementById('bar-peso').style.width  = (r.peso ||0).toFixed(0)+'%';
+    document.getElementById('val-swing').textContent = (r.swing!=null) ? r.swing.toFixed(0) : '—';
+    document.getElementById('val-comp').textContent  = (r.comp !=null) ? r.comp .toFixed(0) : '—';
+    document.getElementById('val-peso').textContent  = (r.peso !=null) ? r.peso .toFixed(0) : '—';
+
+    document.getElementById('det-censo').textContent = fmtNum(r.censo);
+    document.getElementById('det-margin').textContent = (r.margin22!=null) ? r.margin22.toFixed(1)+' pp' : '—';
+
+    const swingTxt = (r.swingRaw!=null)
+      ? `${r.swingRaw.toFixed(1)} pp${r.flipped ? ' · cambió ganador' : ''}`
+      : '—';
+    document.getElementById('det-swing').textContent = swingTxt;
+
+    if (isDep){
+      document.getElementById('det-winner').textContent = '—';
+    } else {
+      const winnerHtml = r.winnerName
+        ? `${r.winnerName.split(' ').slice(0,2).join(' ')} · ${fmtPct(r.winnerPct,1)}${r.flipped ? '<span class="det-flip">flip</span>' : ''}`
+        : '—';
+      document.getElementById('det-winner').innerHTML = winnerHtml;
+    }
+  }
+
+  /* ───────── Top 30 ranking + contador veleta ───────── */
+  function renderTop30(){
+    const arr = Object.values(STATE.scoreByMun).sort((a,b)=>b.score-a.score).slice(0,30);
+    patchTop30Names(arr);
+  }
+
+  // Mapa key→nombre se construye on-demand al cargar muns
+  STATE._munNameByKey = {};
+  function rememberMunName(key, name, depName){
+    if (key && name) STATE._munNameByKey[key] = { name, depName };
+  }
+
+  function patchTop30Names(arr){
+    const ul = document.getElementById('top-list');
+    ul.innerHTML = arr.map((r,i)=>{
+      const meta = STATE._munNameByKey[r.key];
+      const munName = meta ? meta.name : r.key;
+      const depName = meta ? meta.depName : ((STATE.depByElectoral[r.depCod]||{}).nombre || r.depCod);
+      const veletaCls = r.score >= STATE.threshold ? ' veleta' : '';
+      return `<div class="top-row" data-key="${r.key}" data-dep="${r.depCod}" onclick="onTopClick('${r.key}','${r.depCod}')">
+        <div class="top-rank">${i+1}</div>
+        <div>
+          <div class="top-name">${munName}</div>
+          <div class="top-meta"><span class="top-meta-dep">${depName}</span></div>
+        </div>
+        <div class="top-score${veletaCls}">${r.score.toFixed(0)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function onTopClick(key, dep){
+    STATE.selectedDep = dep;
+    setLevel('mun-from-top'); // entra en modo mun (drilled)
+    renderMunsOfDep(dep);
+  }
+
+  function updateVeletaCounter(){
+    const muns = Object.values(STATE.scoreByMun);
+    const veleta = muns.filter(r => r.score >= STATE.threshold);
+    const censoVeleta = veleta.reduce((s,r)=>s+(r.censo||0), 0);
+    const pct = STATE.sumCensoNacional ? (100*censoVeleta/STATE.sumCensoNacional) : 0;
+    document.getElementById('veleta-count').innerHTML =
+      `<b>${veleta.length}</b> municipios veleta <span class="censo">· ${pct.toFixed(1)}% del censo nacional en juego</span>`;
+    document.getElementById('leg-thresh').textContent = STATE.threshold;
+  }
+
+  /* ───────── Build mun-name lookup desde Departamentos-mps ─────────
+     Para que el top-30 tenga nombres, descargamos el primer batch
+     de deptos donde hay top-30 muns. Estrategia: fetch perezoso de
+     los deptos referenciados por el top-100 más pesado. */
+  async function bootstrapMunNames(){
+    const top = Object.values(STATE.scoreByMun)
+      .sort((a,b)=>b.score-a.score)
+      .slice(0,100);
+    const depsNeeded = [...new Set(top.map(r=>r.depCod))];
+    await Promise.all(depsNeeded.map(async dc => {
+      try {
+        if (STATE.depMpsCache[dc]) return;
+        const g = await fetch(URLS.depMps(dc)).then(r=>r.json());
+        STATE.depMpsCache[dc] = g;
+        const depName = (STATE.depByElectoral[dc]||{}).nombre || '';
+        g.features.forEach(f => {
+          const k = munKeyOfFeature(f.properties);
+          if (k) rememberMunName(k, f.properties.mpio_cnmbr || '—', depName);
+        });
+      } catch (e){ console.warn('[veleta] error fetching dep', dc, e); }
+    }));
+    renderTop30();
+  }
+
+  /* ───────── Toggle de nivel + slider ───────── */
+  function setLevel(lvl){
+    if (lvl === 'mun-from-top'){ STATE.level = 'mun'; document.getElementById('lvl-mun').classList.add('active'); document.getElementById('lvl-dep').classList.remove('active'); return; }
+    if (lvl === STATE.level && !STATE.selectedDep) return;
+    STATE.level = lvl;
+    document.getElementById('lvl-dep').classList.toggle('active', lvl==='dep');
+    document.getElementById('lvl-mun').classList.toggle('active', lvl==='mun');
+    STATE.selectedDep = null;
+    if (lvl === 'dep') renderDeptos();
+    else renderMunsNacional();
+  }
+
+  function setThreshold(v){
+    STATE.threshold = +v;
+    document.getElementById('threshold-value').textContent = v;
+    document.getElementById('leg-thresh').textContent = v;
+    if (STATE.layer){
+      STATE.layer.setStyle((f) => {
+        if (f.__key){
+          const r = STATE.scoreByMun[f.__key];
+          return styleByScore(r ? r.score : null);
+        } else {
+          const elec = depElectoralOfFeature(f.properties);
+          const a = elec ? STATE.scoreByDep[elec] : null;
+          return styleByScore(a ? a.score : null);
+        }
+      });
+    }
+    updateVeletaCounter();
+    patchTop30Names(Object.values(STATE.scoreByMun).sort((a,b)=>b.score-a.score).slice(0,30));
+  }
+
+  /* ───────── Theme toggle ───────── */
+  function toggleTheme(){
+    const day = !document.body.classList.contains('day-mode');
+    document.body.classList.toggle('day-mode', day);
+    document.getElementById('theme-btn').textContent = day ? '🌙 Modo noche' : '☀ Modo día';
+    localStorage.setItem('rr-theme-veleta', day ? 'day' : 'night');
+    // Re-aplicar estilos para que el pattern se actualice (vel-stripes vs vel-stripes-day)
+    if (STATE.layer){
+      setThreshold(STATE.threshold);
+    }
+  }
+  if (localStorage.getItem('rr-theme-veleta') === 'day'){
+    document.body.classList.add('day-mode');
+    const b = document.getElementById('theme-btn'); if (b) b.textContent = '🌙 Modo noche';
+  }
+
+  // Cerrar dropdown al click externo (si lang.js no está cargado)
+  document.addEventListener('click', (e) => {
+    const w = document.querySelector('.country-selector-wrap');
+    if (w && !w.contains(e.target)){
+      document.getElementById('countryDropdown')?.classList.remove('open');
+      document.getElementById('countryBtn')?.classList.remove('open');
+      const ch = document.getElementById('countryChevron'); if (ch) ch.style.transform = '';
+    }
+  });
+
+  /* ───────── Init ───────── */
+  (async function init(){
+    showLoading(true);
+    try {
+      await loadAllData();
+      computeScores();
+      ensureMap();
+      renderDeptos();
+      updateVeletaCounter();
+      renderTop30();
+      bootstrapMunNames();   // async, llena el top-30 con nombres reales
+      // Slider listener
+      const sl = document.getElementById('threshold-slider');
+      sl.addEventListener('input', e => setThreshold(e.target.value));
+    } catch (e){
+      console.error('[Veleta] init error', e);
+      document.getElementById('map-head-title').textContent = 'Error cargando datos · revisa la consola';
+    } finally {
+      showLoading(false);
+    }
+  })();
+  </script>
+
+  <script src="lang.js"></script>
+</body>
+</html>
