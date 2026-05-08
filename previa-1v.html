@@ -796,6 +796,17 @@
     .sankey-empty{padding:2.5rem 1rem;text-align:center;font-family:Avenir,sans-serif;font-size:.85rem;color:rgba(255,255,255,.45)}
     body.day-mode .sankey-empty{color:rgba(0,0,0,.55)}
     .sankey-loading{padding:2.5rem 1rem;text-align:center;font-family:Avenir,sans-serif;font-size:.78rem;color:rgba(255,255,255,.45);letter-spacing:.08em;text-transform:uppercase}
+    .sankey-totals{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.55rem;margin-top:.85rem;padding:.55rem .8rem;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);font-family:Avenir,sans-serif;font-size:.78rem}
+    body.day-mode .sankey-totals{background:rgba(0,0,0,.02);border-color:rgba(0,0,0,.08)}
+    .sankey-totals .sk-tot-item{display:inline-flex;align-items:baseline;gap:.4rem}
+    .sankey-totals .sk-tot-item .lbl{font-family:Avenir,sans-serif;font-weight:400;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.5)}
+    body.day-mode .sankey-totals .sk-tot-item .lbl{color:rgba(0,0,0,.55)}
+    .sankey-totals .sk-tot-item .val{font-family:'DM Mono',monospace;font-weight:500;font-size:.85rem;color:rgba(255,255,255,.92)}
+    body.day-mode .sankey-totals .sk-tot-item .val{color:#0d1120}
+    .sankey-totals .sk-tot-sep{color:rgba(255,255,255,.25);font-size:.85rem}
+    body.day-mode .sankey-totals .sk-tot-sep{color:rgba(0,0,0,.25)}
+    .sankey-totals .sk-tot-grand .lbl{color:var(--blue);font-weight:500}
+    .sankey-totals .sk-tot-grand .val{color:var(--blue);font-weight:700}
     .sankey-note{font-family:Avenir,sans-serif;font-size:.72rem;line-height:1.55;color:rgba(255,255,255,.6);margin-top:.85rem;padding:.7rem .85rem;background:rgba(167,139,250,.06);border-left:2px solid rgba(167,139,250,.4)}
     .sankey-note strong{font-family:'Syne',sans-serif;font-weight:700;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(167,139,250,.9);display:block;margin-bottom:.25rem}
     .sankey-note a{color:var(--blue);text-decoration:underline}
@@ -912,9 +923,10 @@
     <div class="sankey-body" id="sankey-body">
       <div class="sankey-loading" id="sankey-loading">Calculando flujos…</div>
       <svg id="sankey-svg" viewBox="0 0 880 560" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Trasvase de votos Senado a Presidencial"></svg>
+      <div class="sankey-totals" id="sankey-totals"></div>
       <div class="sankey-note">
         <strong>Nota metodológica</strong>
-        Las bandas se calculan con <em>Iterative Proportional Fitting</em> (IPF/RAS) combinando dos señales: <b>(1)</b> el solape geográfico entre cada partido en Senado 2026 (8 marzo) y la proyección presidencial del modelo — donde un partido y un candidato concentran votos en los mismos territorios, su flujo es alto; <b>(2)</b> una <b>matriz de afinidad política</b> que descarta cruces inverosímiles (votos del Pacto Histórico no fluyen a Abelardo, votos de MSN no fluyen a Cepeda, etc.). Las afinidades parten de las equivalencias del modelo presidencial y se completan con criterio editorial para los partidos clientelares (Liberal, La U, Conservador, Cambio Radical) sin equivalencia ideológica directa. El método asume que la afinidad es estable y <b>no captura realineamientos locales recientes</b> — por ejemplo, un acuerdo entre la maquinaria de un partido y un candidato distinto del que su patrón histórico sugeriría. Si conoces un caso así o ves un flujo que no cuadra, escríbenos a <a href="mailto:reruizc@gmail.com">reruizc@gmail.com</a> y lo ajustamos.
+        Las bandas se calculan con <em>Iterative Proportional Fitting</em> (IPF/RAS) combinando dos señales: <b>(1)</b> el solape geográfico entre cada partido en Senado 2026 (8 marzo) y la proyección presidencial del modelo — donde un partido y un candidato concentran votos en los mismos territorios, su flujo es alto; <b>(2)</b> una <b>matriz de afinidad política</b> que descarta cruces inverosímiles (votos del Pacto Histórico no fluyen a Abelardo, votos de MSN no fluyen a Cepeda, etc.). Las afinidades parten de las equivalencias del modelo presidencial y se completan con criterio editorial para los partidos clientelares (Liberal, La U, Conservador, Cambio Radical) sin equivalencia ideológica directa. El <b>voto en blanco</b> aparece a ambos lados: el blanco Senado 996 fluye casi entero al blanco presidencial, y un pequeño residuo se redistribuye a los candidatos cuando el solape geográfico apunta a una zona donde el blanco local es bajo. <b>NS-NR y abstención no entran al gráfico</b> — porque en Senado siempre vota menos gente que en presidencial y un militante de partido casi nunca se "abstiene" por afinidad — pero el porcentaje se reporta en la plaquita superior para que el total cierre 100%. El método asume afinidad estable y <b>no captura realineamientos locales recientes</b> — por ejemplo, un acuerdo entre la maquinaria de un partido y un candidato distinto del que su patrón histórico sugeriría. Si conoces un caso así o ves un flujo que no cuadra, escríbenos a <a href="mailto:reruizc@gmail.com">reruizc@gmail.com</a> y lo ajustamos.
       </div>
     </div>
     <div class="sankey-toggle-wrap">
@@ -6056,6 +6068,7 @@
   //   M[p,c] = Σ_d ( votos_p[d] × proyectado_c[d] ) / votos_validos[d]
   // Luego el RAS reescala filas/columnas hasta que sumen los marginales.
   const SANKEY_PARTY_COLORS = {
+    '996': '#cbd5e1',  // voto en blanco Senado — gris muy claro
     'PACTO HISTÓRICO SENADO': '#51458F',
     'PARTIDO CENTRO DEMOCRÁTICO': '#1866DF',
     'PARTIDO LIBERAL COLOMBIANO': '#E11A24',
@@ -6074,6 +6087,7 @@
     'PATRIOTAS': '#0d3b66',
   };
   const SANKEY_PARTY_SHORT = {
+    '996': 'Voto en blanco · Senado',
     'PACTO HISTÓRICO SENADO': 'Pacto Histórico',
     'PARTIDO CENTRO DEMOCRÁTICO': 'Centro Democrático',
     'PARTIDO LIBERAL COLOMBIANO': 'Liberal',
@@ -6092,8 +6106,7 @@
   const SANKEY_MIN_PARTY_PCT = 1.5;       // partidos < 1.5% del scope se agrupan
   const SANKEY_OTROS_PARTY_COLOR = '#64748b';
   const SANKEY_OTROS_CAND_COLOR  = '#475569';
-  const SANKEY_RESID_COLOR       = '#94a3b8';
-  const SANKEY_KEY_BLANCO = new Set(['996','997','998']);
+  const SANKEY_BLANCO_COLOR      = '#cbd5e1';   // voto en blanco a ambos lados
 
   // ── MATRIZ DE AFINIDAD POLÍTICA (partido → candidato presidencial) ──────
   // Filtro que se multiplica al prior espacial para evitar flujos
@@ -6107,26 +6120,32 @@
   // Si un partido NO está en este map, se usa _SANKEY_DEFAULT_AFF (clientelar
   // promedio). Si un candidato NO está en una entrada, se usa 0.
   const SANKEY_AFFINITY = {
-    'PACTO HISTÓRICO SENADO':            { ic:1.00, lm:0.60, rb:0.40, sf:0.05, cl:0.05, ae:0.00, pv:0.00 },
-    'FRENTE AMPLIO UNITARIO':            { rb:1.00, ic:0.40, sf:0.20, cl:0.20, lm:0.20, ae:0.00, pv:0.00 },
-    'ALIANZA POR COLOMBIA':              { sf:1.00, cl:0.60, lm:0.30, rb:0.30, ic:0.20, pv:0.05, ae:0.00 },
-    'AHORA COLOMBIA':                    { cl:1.00, sf:0.60, lm:0.20, rb:0.20, ic:0.10, pv:0.05, ae:0.00 },
-    'COALICIÓN FUERZA CIUDADANA':        { ic:0.40, sf:0.30, cl:0.30, lm:0.40, rb:0.30, pv:0.00, ae:0.00 },
-    'PARTIDO CENTRO DEMOCRÁTICO':        { pv:1.00, ae:0.60, sf:0.10, rb:0.05, cl:0.05, ic:0.00, lm:0.00 },
-    'MOVIMIENTO SALVACIÓN NACIONAL':     { ae:1.00, pv:0.30, sf:0.05, cl:0.05, rb:0.00, ic:0.00, lm:0.00 },
-    'COLOMBIA SEGURA Y PRÓSPERA':        { ae:0.70, pv:0.80, sf:0.05, cl:0.05, rb:0.00, ic:0.00, lm:0.00 },
-    'LA LISTA DE OVIEDO - CON TODA POR COLOMBIA': { pv:0.70, ae:0.60, sf:0.20, rb:0.10, cl:0.10, ic:0.00, lm:0.00 },
-    'PATRIOTAS':                         { ae:0.70, pv:0.50, sf:0.10, rb:0.05, cl:0.05, ic:0.00, lm:0.00 },
-    'PARTIDO POLÍTICO OXÍGENO':          { pv:0.50, ae:0.30, sf:0.40, cl:0.40, rb:0.20, lm:0.10, ic:0.05 },
-    'CREEMOS':                           { cl:0.40, sf:0.40, ae:0.30, pv:0.20, rb:0.20, ic:0.20, lm:0.10 },
+    // Voto en blanco Senado — fluye casi entero al voto en blanco presidencial.
+    // El residuo se reparte uniforme entre candidatos; en zonas con poco
+    // blanco local, el solape geográfico hace que ese residuo se incline
+    // al candidato dominante de la zona.
+    '996':                               { bl:1.00, ic:0.10, ae:0.10, sf:0.10, pv:0.10, cl:0.10, lm:0.10, rb:0.10 },
+    'PACTO HISTÓRICO SENADO':            { ic:1.00, lm:0.60, rb:0.40, sf:0.05, cl:0.05, ae:0.00, pv:0.00, bl:0.02 },
+    'FRENTE AMPLIO UNITARIO':            { rb:1.00, ic:0.40, sf:0.20, cl:0.20, lm:0.20, ae:0.00, pv:0.00, bl:0.02 },
+    'ALIANZA POR COLOMBIA':              { sf:1.00, cl:0.60, lm:0.30, rb:0.30, ic:0.20, pv:0.05, ae:0.00, bl:0.02 },
+    'AHORA COLOMBIA':                    { cl:1.00, sf:0.60, lm:0.20, rb:0.20, ic:0.10, pv:0.05, ae:0.00, bl:0.02 },
+    'COALICIÓN FUERZA CIUDADANA':        { ic:0.40, sf:0.30, cl:0.30, lm:0.40, rb:0.30, pv:0.00, ae:0.00, bl:0.02 },
+    'PARTIDO CENTRO DEMOCRÁTICO':        { pv:1.00, ae:0.60, sf:0.10, rb:0.05, cl:0.05, ic:0.00, lm:0.00, bl:0.02 },
+    'MOVIMIENTO SALVACIÓN NACIONAL':     { ae:1.00, pv:0.30, sf:0.05, cl:0.05, rb:0.00, ic:0.00, lm:0.00, bl:0.02 },
+    'COLOMBIA SEGURA Y PRÓSPERA':        { ae:0.70, pv:0.80, sf:0.05, cl:0.05, rb:0.00, ic:0.00, lm:0.00, bl:0.02 },
+    'LA LISTA DE OVIEDO - CON TODA POR COLOMBIA': { pv:0.70, ae:0.60, sf:0.20, rb:0.10, cl:0.10, ic:0.00, lm:0.00, bl:0.02 },
+    'PATRIOTAS':                         { ae:0.70, pv:0.50, sf:0.10, rb:0.05, cl:0.05, ic:0.00, lm:0.00, bl:0.02 },
+    'PARTIDO POLÍTICO OXÍGENO':          { pv:0.50, ae:0.30, sf:0.40, cl:0.40, rb:0.20, lm:0.10, ic:0.05, bl:0.02 },
+    'CREEMOS':                           { cl:0.40, sf:0.40, ae:0.30, pv:0.20, rb:0.20, ic:0.20, lm:0.10, bl:0.02 },
     // Clientelares — sin equivalencia ideológica directa
-    'PARTIDO LIBERAL COLOMBIANO':                       { ic:0.40, ae:0.70, sf:0.50, pv:0.40, rb:0.60, cl:0.40, lm:0.40 },
-    'PARTIDO DE LA UNIÓN POR LA GENTE - PARTIDO DE LA U': { ae:0.80, pv:0.50, sf:0.30, rb:0.40, cl:0.30, lm:0.20, ic:0.20 },
-    'PARTIDO CONSERVADOR COLOMBIANO':                    { ae:0.70, pv:0.70, sf:0.40, rb:0.30, cl:0.20, ic:0.15, lm:0.10 },
-    'COALICIÓN CAMBIO RADICAL - ALMA':                   { ae:0.70, pv:0.50, sf:0.50, rb:0.50, cl:0.40, ic:0.20, lm:0.20 },
+    'PARTIDO LIBERAL COLOMBIANO':                       { ic:0.40, ae:0.70, sf:0.50, pv:0.40, rb:0.60, cl:0.40, lm:0.40, bl:0.03 },
+    'PARTIDO DE LA UNIÓN POR LA GENTE - PARTIDO DE LA U': { ae:0.80, pv:0.50, sf:0.30, rb:0.40, cl:0.30, lm:0.20, ic:0.20, bl:0.03 },
+    'PARTIDO CONSERVADOR COLOMBIANO':                    { ae:0.70, pv:0.70, sf:0.40, rb:0.30, cl:0.20, ic:0.15, lm:0.10, bl:0.03 },
+    'COALICIÓN CAMBIO RADICAL - ALMA':                   { ae:0.70, pv:0.50, sf:0.50, rb:0.50, cl:0.40, ic:0.20, lm:0.20, bl:0.03 },
   };
-  const _SANKEY_DEFAULT_AFF = { ic:0.30, ae:0.40, sf:0.30, pv:0.30, rb:0.30, cl:0.25, lm:0.25 };
-  const _SANKEY_RESID_AFF   = 0.25;   // afinidad uniforme de cada partido a abstención/blanco/NS
+  const _SANKEY_DEFAULT_AFF = { ic:0.30, ae:0.40, sf:0.30, pv:0.30, rb:0.30, cl:0.25, lm:0.25, bl:0.03 };
+  const SANKEY_BLANCO_PARTY_KEY = '996';
+  const SANKEY_NULOS_KEYS = new Set(['997','998']);   // siempre excluidos
 
   function _sankeyAff(partyKey, candId){
     if (partyKey === '__OTROS__') return (_SANKEY_DEFAULT_AFF[candId] != null ? _SANKEY_DEFAULT_AFF[candId] : 0.30);
@@ -6185,7 +6204,7 @@
         const partidos = {};
         for (const [n,v] of Object.entries(sen.partidos || {})){
           if (typeof v !== 'number' || v <= 0) continue;
-          if (SANKEY_KEY_BLANCO.has(n)) continue;
+          if (SANKEY_NULOS_KEYS.has(n)) continue;
           partidos[n] = v;
           partyTotals[n] = (partyTotals[n] || 0) + v;
         }
@@ -6208,7 +6227,7 @@
         const partidos = {};
         for (const [n,v] of Object.entries(m.partidos || {})){
           if (typeof v !== 'number' || v <= 0) continue;
-          if (SANKEY_KEY_BLANCO.has(n)) continue;
+          if (SANKEY_NULOS_KEYS.has(n)) continue;
           partidos[n] = v;
           partyTotals[n] = (partyTotals[n] || 0) + v;
         }
@@ -6238,23 +6257,25 @@
     }
 
     // ── Agrupar partidos minoritarios
+    // El blanco Senado ('996') NUNCA se agrupa: es su propia banda gris.
     const totalParties = Object.values(partyTotals).reduce((s,v) => s+v, 0);
     if (totalParties <= 0) return null;
     const major = {};
     let minorSum = 0;
     for (const [n,v] of Object.entries(partyTotals)){
+      if (n === SANKEY_BLANCO_PARTY_KEY){ major[n] = v; continue; }
       if (v / totalParties >= SANKEY_MIN_PARTY_PCT/100) major[n] = v;
       else minorSum += v;
     }
     if (minorSum > 0) major['__OTROS__'] = minorSum;
 
-    // ── Construir candidatos finales (top5 + Otros + Resid)
-    // IMPORTANTE: usamos las funciones oficiales de marginal del modelo
-    // (estimatedVotes en nac, estimatedVotesForDep en dep) — NO la suma
-    // de proj por unidad — para que las cifras del Sankey coincidan
-    // exactamente con el ponderador (lado nac usa biasForNorm, recupera
-    // c.pct exacto) y con la tarjeta del depto (lado dep usa share local).
-    // En mun no hay función oficial, usamos la suma del único unit.
+    // ── Construir candidatos finales (top5 + Otros + Voto en blanco)
+    // NS-NR y abstención NO van en el gráfico: se reportan como total bajo
+    // la plaquita. Voto en blanco SÍ tiene su propia columna a la derecha
+    // (alimentada principalmente desde el blanco Senado, con un pequeño
+    // residuo aportado por los demás partidos vía afinidad bl≈0.02).
+    // 'ot' (Otros candidatos pequeños — Botero/Lizcano/Caicedo) cae en
+    // __OTROS__ junto con cl/lm/rb si quedan fuera del top5.
     const candVotesById = {};
     if (scope.kind === 'nac'){
       for (const c of CANDIDATOS) candVotesById[c.id] = estimatedVotes(c);
@@ -6271,17 +6292,25 @@
     let otrosCandsVotes = 0;
     for (const c of CANDIDATOS){
       if (topIds.has(c.id)) continue;
-      if (['bl','ns','ot'].includes(c.id)) continue;
-      otrosCandsVotes += candVotesById[c.id] || 0;
+      if (['bl','ns'].includes(c.id)) continue;   // bl tiene columna propia, ns excluido
+      otrosCandsVotes += candVotesById[c.id] || 0;   // incluye lm, rb, cl, ot fuera del top5
     }
     if (otrosCandsVotes > 0){
       candidates.push({ key:'__OTROS__', name:'Otros candidatos', color: SANKEY_OTROS_CAND_COLOR, votes: otrosCandsVotes });
     }
-    let residVotes = 0;
-    for (const id of ['bl','ns','ot']) residVotes += candVotesById[id] || 0;
-    if (residVotes > 0){
-      candidates.push({ key:'__RESID__', name:'Abstención · blanco · NS', color: SANKEY_RESID_COLOR, votes: residVotes });
+    const blVotes = candVotesById['bl'] || 0;
+    if (blVotes > 0){
+      candidates.push({ key:'bl', name:'Voto en blanco', color: SANKEY_BLANCO_COLOR, votes: blVotes });
     }
+    // Datos para la plaquita debajo del SVG (no entran en el IPF)
+    const nsVotes = candVotesById['ns'] || 0;
+    const totalCandsVotes = candidates.filter(c => c.key !== 'bl').reduce((s,c) => s+c.votes, 0);
+    const totalAllVotes = totalCandsVotes + blVotes + nsVotes;
+    const plaqueta = {
+      candPct:  totalAllVotes > 0 ? (totalCandsVotes / totalAllVotes * 100) : 0,
+      blPct:    totalAllVotes > 0 ? (blVotes        / totalAllVotes * 100) : 0,
+      nsPct:    totalAllVotes > 0 ? (nsVotes        / totalAllVotes * 100) : 0,
+    };
 
     const sumP = Object.values(major).reduce((s,v) => s+v, 0);
     const sumC = candidates.reduce((s,c) => s+c.votes, 0);
@@ -6324,12 +6353,17 @@
           if (topIds.has(c.id)){
             target = c.id;
             aff = _sankeyAff(p, c.id);
-          } else if (['bl','ns','ot'].includes(c.id)){
-            target = '__RESID__';
-            aff = _SANKEY_RESID_AFF;
+          } else if (c.id === 'bl'){
+            target = 'bl';
+            aff = _sankeyAff(p, 'bl');
+          } else if (c.id === 'ns'){
+            continue;   // NS-NR fuera del gráfico
+          } else if (c.id === 'ot'){
+            target = '__OTROS__';
+            aff = 0.30;   // genérico (ot es ya un agregado de pequeños)
           } else {
             target = '__OTROS__';
-            aff = _sankeyAff(p, c.id);  // afinidad real con cl/lm individual
+            aff = _sankeyAff(p, c.id);  // afinidad real con cl/lm/rb individuales
           }
           if (aff <= 0) continue;
           lcw[target] = (lcw[target] || 0) + proj * aff;
@@ -6346,14 +6380,15 @@
     // piso proporcional a las marginales SÓLO en celdas donde la afinidad
     // política lo permita. Si la afinidad es 0 (ej. Pacto → Abelardo),
     // el piso queda en 0 y el IPF respeta el cero.
+    const _floorAff = (p, c) => {
+      if (c === '__OTROS__') return 0.30;
+      return _sankeyAff(p, c);
+    };
     for (const p of partyKeys){
       const rs = candKeys.reduce((s,c) => s + M[p][c], 0);
       if (rs <= 0){
         for (const c of candKeys){
-          let aff;
-          if (c === '__RESID__') aff = _SANKEY_RESID_AFF;
-          else if (c === '__OTROS__') aff = 0.3;
-          else aff = _sankeyAff(p, c);
+          const aff = _floorAff(p, c);
           if (aff <= 0) continue;
           const cTot = candidates.find(x => x.key === c)?.scaled || 0;
           M[p][c] = (cTot > 0 ? cTot : 1) * aff * 1e-3;
@@ -6364,10 +6399,7 @@
       const cs = partyKeys.reduce((s,p) => s + M[p][c], 0);
       if (cs <= 0){
         for (const p of partyKeys){
-          let aff;
-          if (c === '__RESID__') aff = _SANKEY_RESID_AFF;
-          else if (c === '__OTROS__') aff = 0.3;
-          else aff = _sankeyAff(p, c);
+          const aff = _floorAff(p, c);
           if (aff <= 0) continue;
           M[p][c] = (major[p] || 1) * aff * 1e-3;
         }
@@ -6397,10 +6429,15 @@
     }
 
     // ── Salida ordenada
+    const _partyFull = p => {
+      if (p === '__OTROS__') return 'Otros partidos minoritarios (<1.5% del scope)';
+      if (p === SANKEY_BLANCO_PARTY_KEY) return 'Voto en blanco · Senado 2026';
+      return p;
+    };
     const parties = partyKeys.map(p => ({
       key: p,
       name: p === '__OTROS__' ? 'Otros partidos' : (SANKEY_PARTY_SHORT[p] || p),
-      full: p === '__OTROS__' ? 'Otros partidos minoritarios (<1.5% del scope)' : p,
+      full: _partyFull(p),
       color: p === '__OTROS__' ? SANKEY_OTROS_PARTY_COLOR : (SANKEY_PARTY_COLORS[p] || '#64748b'),
       votes: major[p],
     })).sort((a,b) => b.votes - a.votes);
@@ -6409,6 +6446,7 @@
       parties, candidates, flows: M,
       total: sumP,
       candTotalReal: sumC,
+      plaqueta,
     };
   }
 
@@ -6509,6 +6547,21 @@
     }
 
     svg.innerHTML = parts.join('');
+
+    // Plaquita debajo del SVG con el desglose total
+    const plEl = document.getElementById('sankey-totals');
+    if (plEl){
+      const pl = data.plaqueta || { candPct: 0, blPct: 0, nsPct: 0 };
+      const tot = pl.candPct + pl.blPct + pl.nsPct;
+      plEl.innerHTML =
+        `<span class="sk-tot-item"><span class="lbl">Total candidatos</span><span class="val">${pl.candPct.toFixed(2)}%</span></span>`+
+        `<span class="sk-tot-sep">·</span>`+
+        `<span class="sk-tot-item"><span class="lbl">Voto en blanco</span><span class="val">${pl.blPct.toFixed(2)}%</span></span>`+
+        `<span class="sk-tot-sep">·</span>`+
+        `<span class="sk-tot-item"><span class="lbl">Abstención y NS/NR</span><span class="val">${pl.nsPct.toFixed(2)}%</span></span>`+
+        `<span class="sk-tot-sep">·</span>`+
+        `<span class="sk-tot-item sk-tot-grand"><span class="lbl">TOTAL</span><span class="val">${tot.toFixed(2)}%</span></span>`;
+    }
 
     // Hover handlers
     const tip = document.getElementById('sankey-tip');
