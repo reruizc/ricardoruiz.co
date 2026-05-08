@@ -6170,6 +6170,66 @@
     return Math.round(n).toLocaleString('es-CO');
   }
 
+  // ──────────────────────────────────────────────────────────────
+  // Drill sub-mun: 14 muns tienen datos por comuna/localidad pre-procesados.
+  //   - Medellín (01-001)         → MED_S3/2026/senado/por-comuna.json (16 comunas)
+  //   - 13 ciudades en CITY_META  → CITY_S3/{cityKey}/2026/senado/por-comuna.json
+  // El resto de muns conserva el comportamiento de 1 unidad (rank-1, sin
+  // heterogeneidad geográfica intra-mun).
+  function _sankeyDetectCity(depCod, munCod){
+    if (depCod === '01' && munCod === '001') return { kind: 'med', cityKey: 'medellin' };
+    for (const [key, meta] of Object.entries(CITY_META || {})){
+      if (meta.depCod === depCod && meta.mun === munCod){
+        return { kind: 'city', cityKey: key, depName: meta.depName };
+      }
+    }
+    return null;
+  }
+
+  // Cache de raw partidos-por-comuna específico para el Sankey. La página
+  // ya tiene HISTORICOS_CITY/HISTORICOS_MED pero ahí los datos están
+  // normalizados a fracciones — aquí necesitamos los conteos absolutos.
+  let _sankeyComunaCache = {};
+  async function _sankeyLoadComunaSenate(cityInfo){
+    const ck = cityInfo.cityKey;
+    if (_sankeyComunaCache[ck]) return _sankeyComunaCache[ck];
+    const url = cityInfo.kind === 'med'
+      ? `${MED_S3}/2026/senado/por-comuna.json`
+      : `${CITY_S3}/${ck}/2026/senado/por-comuna.json`;
+    const r = await fetch(url, { cache: 'force-cache' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    const root = j.por_comuna || {};
+    const out = { units: [] };
+    for (const [comCod, com] of Object.entries(root)){
+      if (!com || typeof com !== 'object') continue;
+      // Excluir agregados que no tienen geografía propia (corregimientos
+      // sumados, mesas sin comuna identificada, etc.)
+      if (comCod === 'OTROS' || comCod === 'CORR' || comCod === 'SIN_COMUNA') continue;
+      // Medellín agrega por partido en `partidos`. Las 13 ciudades dejan los
+      // candidatos individuales en `candidatos` con campo .partido.
+      const list = Array.isArray(com.partidos) ? com.partidos
+                  : Array.isArray(com.candidatos) ? com.candidatos : [];
+      const partidos = {};
+      for (const row of list){
+        const k = row.partido || row.nombre;
+        if (!k) continue;
+        partidos[k] = (partidos[k] || 0) + (row.votos || 0);
+      }
+      const esp = com.especiales || {};
+      if (esp.blanco && esp.blanco > 0) partidos['996'] = (partidos['996'] || 0) + esp.blanco;
+      const votval = com.votos_validos || 0;
+      const votant = com.votos_totales || (votval + (esp.blanco||0) + (esp.nulos||0) + (esp.no_marcados||0));
+      out.units.push({
+        cod: String(comCod),
+        nombre: com.nombre || `Comuna ${comCod}`,
+        partidos, votval, votant,
+      });
+    }
+    _sankeyComunaCache[ck] = out;
+    return out;
+  }
+
   // Lazy fetch + cache de municipios.json para un depto.
   async function _sankeyLoadMuns(depCod){
     if (_sankeyMunCache[depCod]) return _sankeyMunCache[depCod];
@@ -6243,23 +6303,64 @@
       const m = scope.mun;
       const depNom = scope.depEntry?.nombre || '';
       const munKey = `${scope.depCod}-${m.cod}`;
-      const voters = (m.votant || 0) * TURNOUT_SCALE;
-      const hasMunBias = _biasCacheMun && Object.values(_biasCacheMun).some(mp => mp[munKey] != null);
-      const projFn = hasMunBias ? (c => projectedMun(c, munKey, depNom))
-                                : (c => projected(c, depNom));
-      const localProj = CANDIDATOS.reduce((s,c) => s + projFn(c), 0);
-      const proj = {};
-      if (voters > 0 && localProj > 0){
-        for (const c of CANDIDATOS) proj[c.id] = voters * (projFn(c) / localProj);
+
+      // Si el mun es una de las 14 ciudades con datos por comuna, cargamos
+      // sub-units (1 unidad por comuna/localidad). Eso recupera la
+      // heterogeneidad geográfica intra-mun y el IPF deja de ser rank-1.
+      const cityInfo = _sankeyDetectCity(scope.depCod, m.cod);
+      let comunaUnits = null;
+      if (cityInfo){
+        const biasLoad = cityInfo.kind === 'med'
+          ? loadHistoricosMedComuna().catch(() => {})
+          : loadHistoricosCity(cityInfo.cityKey).catch(() => {});
+        try {
+          const [cd] = await Promise.all([_sankeyLoadComunaSenate(cityInfo), biasLoad]);
+          if (cd && cd.units && cd.units.length > 0) comunaUnits = cd.units;
+        } catch(e){
+          console.warn('[Sankey] city comuna load failed', cityInfo.cityKey, e.message);
+        }
       }
-      const partidos = {};
-      for (const [n,v] of Object.entries(m.partidos || {})){
-        if (typeof v !== 'number' || v <= 0) continue;
-        if (SANKEY_NULOS_KEYS.has(n)) continue;
-        partidos[n] = v;
-        partyTotals[n] = v;
+
+      if (comunaUnits){
+        const projFnComuna = cityInfo.kind === 'med'
+          ? (c, comCod) => projectedComunaMed(c, comCod)
+          : (c, comCod) => projectedComunaCity(c, cityInfo.cityKey, comCod);
+        for (const com of comunaUnits){
+          const voters = (com.votant || 0) * TURNOUT_SCALE;
+          const localProj = CANDIDATOS.reduce((s,c) => s + projFnComuna(c, com.cod), 0);
+          const proj = {};
+          if (voters > 0 && localProj > 0){
+            for (const c of CANDIDATOS) proj[c.id] = voters * (projFnComuna(c, com.cod) / localProj);
+          }
+          const partidos = {};
+          for (const [n,v] of Object.entries(com.partidos || {})){
+            if (typeof v !== 'number' || v <= 0) continue;
+            if (SANKEY_NULOS_KEYS.has(n)) continue;
+            partidos[n] = v;
+            partyTotals[n] = (partyTotals[n] || 0) + v;
+          }
+          units.push({ partidos, votval: com.votval || 0, proj });
+        }
+      } else {
+        // Fallback: 1 unidad (rank-1, sin heterogeneidad intra-mun)
+        const voters = (m.votant || 0) * TURNOUT_SCALE;
+        const hasMunBias = _biasCacheMun && Object.values(_biasCacheMun).some(mp => mp[munKey] != null);
+        const projFn = hasMunBias ? (c => projectedMun(c, munKey, depNom))
+                                  : (c => projected(c, depNom));
+        const localProj = CANDIDATOS.reduce((s,c) => s + projFn(c), 0);
+        const proj = {};
+        if (voters > 0 && localProj > 0){
+          for (const c of CANDIDATOS) proj[c.id] = voters * (projFn(c) / localProj);
+        }
+        const partidos = {};
+        for (const [n,v] of Object.entries(m.partidos || {})){
+          if (typeof v !== 'number' || v <= 0) continue;
+          if (SANKEY_NULOS_KEYS.has(n)) continue;
+          partidos[n] = v;
+          partyTotals[n] = v;
+        }
+        units.push({ partidos, votval: m.votval || 0, proj });
       }
-      units.push({ partidos, votval: m.votval || 0, proj });
     }
 
     // ── Calcular nueva banda "No votó Senado" por unidad
