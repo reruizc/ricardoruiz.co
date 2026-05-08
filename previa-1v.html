@@ -6249,15 +6249,22 @@
     if (minorSum > 0) major['__OTROS__'] = minorSum;
 
     // ── Construir candidatos finales (top5 + Otros + Resid)
-    const totalProjAll = units.reduce((s,u) => {
-      let su = 0; for (const v of Object.values(u.proj || {})) su += v;
-      return s + su;
-    }, 0);
-    if (totalProjAll <= 0) return null;
+    // IMPORTANTE: usamos las funciones oficiales de marginal del modelo
+    // (estimatedVotes en nac, estimatedVotesForDep en dep) — NO la suma
+    // de proj por unidad — para que las cifras del Sankey coincidan
+    // exactamente con el ponderador (lado nac usa biasForNorm, recupera
+    // c.pct exacto) y con la tarjeta del depto (lado dep usa share local).
+    // En mun no hay función oficial, usamos la suma del único unit.
     const candVotesById = {};
-    for (const c of CANDIDATOS){
-      candVotesById[c.id] = units.reduce((s,u) => s + (u.proj?.[c.id] || 0), 0);
+    if (scope.kind === 'nac'){
+      for (const c of CANDIDATOS) candVotesById[c.id] = estimatedVotes(c);
+    } else if (scope.kind === 'dep'){
+      for (const c of CANDIDATOS) candVotesById[c.id] = estimatedVotesForDep(c, scope.depCod);
+    } else {
+      for (const c of CANDIDATOS) candVotesById[c.id] = units.reduce((s,u) => s + (u.proj?.[c.id] || 0), 0);
     }
+    const totalProjAll = Object.values(candVotesById).reduce((s,v) => s+v, 0);
+    if (totalProjAll <= 0) return null;
     const candidates = topCands.map(c => ({
       key: c.id, name: c.nombre, color: c.color, votes: candVotesById[c.id] || 0,
     }));
