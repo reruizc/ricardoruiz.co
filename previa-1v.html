@@ -6230,6 +6230,42 @@
     return out;
   }
 
+  // ──────────────────────────────────────────────────────────────
+  // Drill sub-mun para los ~1.100 muns SIN city support: cargar el
+  // puestos.json del depto (10-30 MB) y filtrar al mun pedido. Cada puesto
+  // se vuelve una unidad del IPF — ahí sí hay heterogeneidad geográfica.
+  // El cache es por depto, así que si el usuario explora 5 muns dentro de
+  // Antioquia solo descarga una vez.
+  let _sankeyPuestosCache = {};
+  async function _sankeyLoadPuestos(depCod){
+    if (_sankeyPuestosCache[depCod]) return _sankeyPuestosCache[depCod];
+    const url = `${S3}/senado/departamentos/${depCod}/puestos.json`;
+    const r = await fetch(url, { cache: 'force-cache' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const arr = await r.json();
+    _sankeyPuestosCache[depCod] = arr;
+    return arr;
+  }
+
+  // Asegura que _biasCachePue esté poblado. Sin esto, projectedPue cae a
+  // bias_mun (constante por mun) y el "drill por puesto" sería rank-1
+  // matemáticamente equivalente al modo 1-unidad — descarga inútil. Esta
+  // carga es global (5 históricos × ~1MB) y se hace una sola vez por sesión.
+  let _sankeyPueBiasLoading = null;
+  async function _sankeyEnsurePueBias(){
+    if (Object.keys(_biasCachePue).length > 0) return;
+    if (_sankeyPueBiasLoading) return _sankeyPueBiasLoading;
+    _sankeyPueBiasLoading = (async () => {
+      try {
+        await loadHistoricosPue();
+        precomputeBiasPue();
+      } catch(e){
+        console.warn('[Sankey] bias por puesto: load failed', e.message);
+      }
+    })();
+    return _sankeyPueBiasLoading;
+  }
+
   // Lazy fetch + cache de municipios.json para un depto.
   async function _sankeyLoadMuns(depCod){
     if (_sankeyMunCache[depCod]) return _sankeyMunCache[depCod];
@@ -6342,24 +6378,63 @@
           units.push({ partidos, votval: com.votval || 0, proj });
         }
       } else {
-        // Fallback: 1 unidad (rank-1, sin heterogeneidad intra-mun)
-        const voters = (m.votant || 0) * TURNOUT_SCALE;
-        const hasMunBias = _biasCacheMun && Object.values(_biasCacheMun).some(mp => mp[munKey] != null);
-        const projFn = hasMunBias ? (c => projectedMun(c, munKey, depNom))
-                                  : (c => projected(c, depNom));
-        const localProj = CANDIDATOS.reduce((s,c) => s + projFn(c), 0);
-        const proj = {};
-        if (voters > 0 && localProj > 0){
-          for (const c of CANDIDATOS) proj[c.id] = voters * (projFn(c) / localProj);
+        // No es city: intentamos cargar puestos del depto y filtrar al mun.
+        // Cada puesto se vuelve una unidad del IPF; junto con bias_pue
+        // calibrado contra históricos por-puesto.json, recupera la
+        // heterogeneidad geográfica intra-mun.
+        const loadingEl = document.getElementById('sankey-loading');
+        if (loadingEl) loadingEl.textContent = 'Cargando puestos del depto…';
+        let pueUnits = null;
+        try {
+          const [pues] = await Promise.all([
+            _sankeyLoadPuestos(scope.depCod),
+            _sankeyEnsurePueBias(),
+          ]);
+          if (pues) pueUnits = pues.filter(p => p.mun_cod === m.cod);
+        } catch(e){
+          console.warn('[Sankey] puestos load failed', scope.depCod, e.message);
         }
-        const partidos = {};
-        for (const [n,v] of Object.entries(m.partidos || {})){
-          if (typeof v !== 'number' || v <= 0) continue;
-          if (SANKEY_NULOS_KEYS.has(n)) continue;
-          partidos[n] = v;
-          partyTotals[n] = v;
+        if (loadingEl) loadingEl.textContent = 'Calculando flujos…';
+
+        if (pueUnits && pueUnits.length > 0){
+          for (const p of pueUnits){
+            const puKey = `${p.dep_cod}-${p.mun_cod}-${p.zon_cod}-${p.pue_cod_raw}`;
+            const voters = (p.votant || 0) * TURNOUT_SCALE;
+            const projFn = c => projectedPue(c, puKey, munKey, depNom);
+            const localProj = CANDIDATOS.reduce((s,c) => s + projFn(c), 0);
+            const proj = {};
+            if (voters > 0 && localProj > 0){
+              for (const c of CANDIDATOS) proj[c.id] = voters * (projFn(c) / localProj);
+            }
+            const partidos = {};
+            for (const [n,v] of Object.entries(p.partidos || {})){
+              if (typeof v !== 'number' || v <= 0) continue;
+              if (SANKEY_NULOS_KEYS.has(n)) continue;
+              partidos[n] = v;
+              partyTotals[n] = (partyTotals[n] || 0) + v;
+            }
+            units.push({ partidos, votval: p.votval || 0, proj });
+          }
+        } else {
+          // Fallback final: 1 unidad rank-1 (puestos.json no disponible o vacío)
+          const voters = (m.votant || 0) * TURNOUT_SCALE;
+          const hasMunBias = _biasCacheMun && Object.values(_biasCacheMun).some(mp => mp[munKey] != null);
+          const projFn = hasMunBias ? (c => projectedMun(c, munKey, depNom))
+                                    : (c => projected(c, depNom));
+          const localProj = CANDIDATOS.reduce((s,c) => s + projFn(c), 0);
+          const proj = {};
+          if (voters > 0 && localProj > 0){
+            for (const c of CANDIDATOS) proj[c.id] = voters * (projFn(c) / localProj);
+          }
+          const partidos = {};
+          for (const [n,v] of Object.entries(m.partidos || {})){
+            if (typeof v !== 'number' || v <= 0) continue;
+            if (SANKEY_NULOS_KEYS.has(n)) continue;
+            partidos[n] = v;
+            partyTotals[n] = v;
+          }
+          units.push({ partidos, votval: m.votval || 0, proj });
         }
-        units.push({ partidos, votval: m.votval || 0, proj });
       }
     }
 
@@ -6898,6 +6973,14 @@
           opt.value = m.cod;
           opt.textContent = m.nombre;
           munSel.appendChild(opt);
+        }
+        // Bogotá D.C. tiene un solo mun (001) y los datos por localidad ya
+        // están listos. Saltamos el paso intermedio "mun=Bogotá" (que sería
+        // visualmente idéntico al dep) y abrimos directo el drill por
+        // localidad. Mismo patrón que el mapa principal de la página.
+        if (val === '16' && sorted.some(m => m.cod === '001')){
+          munSel.value = '001';
+          _sankeyState.mun = '001';
         }
       } catch(e){
         console.warn('[Sankey] muns load failed', val, e);
