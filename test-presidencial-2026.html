@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Test Electoral Presidencial 2026 · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --black:#0a0a0a;
+      --white:#f4f3ef;
+      --blue:#0047FF;
+      --blue-light:#3d6fff;
+      --green:#4ade80;
+      --yellow:#f0e060;
+      --card-bg: rgba(10,10,16,0.75);
+      --card-border: rgba(255,255,255,0.07);
+    }
+    *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+    html,body { min-height:100%; }
+    body {
+      background:#060810; color:var(--white);
+      font-family:'Syne',sans-serif; cursor:none;
+      overflow-x:hidden;
+    }
+
+    /* ── CURSOR ── */
+    .cursor      { position:fixed; width:10px; height:10px; background:var(--blue); border-radius:50%; pointer-events:none; z-index:9999; transform:translate(-50%,-50%); transition:transform .15s, background .2s; }
+    .cursor-ring { position:fixed; width:32px; height:32px; border:1.5px solid var(--blue); border-radius:50%; pointer-events:none; z-index:9998; transform:translate(-50%,-50%); opacity:.4; }
+
+    /* ── BACKGROUND ── */
+    .bg-layer   { position:fixed; inset:0; z-index:0; background:url('foto-fondo.webp') center right / cover no-repeat; }
+    .bg-overlay {
+      position:fixed; inset:0; z-index:1;
+      background: linear-gradient(to right,
+        rgba(4,6,16,0.97) 0%,
+        rgba(4,6,16,0.92) 55%,
+        rgba(4,6,16,0.78) 80%,
+        rgba(4,6,16,0.55) 100%);
+    }
+    .bg-overlay::after {
+      content:''; position:absolute; inset:0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      opacity:.35; pointer-events:none;
+    }
+
+    /* ── SHELL ── */
+    .shell {
+      position:relative; z-index:2;
+      min-height:100vh;
+      display:flex; flex-direction:column;
+    }
+
+    /* ── TOP BAR ── */
+    .top-bar {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:1.1rem 2.2rem 0;
+      flex-shrink:0;
+    }
+    .logo-link { display:flex; align-items:center; gap:.55rem; text-decoration:none; opacity:.8; transition:opacity .2s; cursor:none; }
+    .logo-link:hover { opacity:1; }
+    .logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
+    .logo-bar  { width:5px; background:var(--blue); border-radius:1px 1px 0 0; opacity:.85; }
+    .logo-text { font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(1.1rem,2vw,1.8rem); letter-spacing:-.03em; color:var(--white); line-height:1; }
+    .logo-text span { color:var(--blue); }
+
+    .back-link {
+      font-family:'DM Mono',monospace; font-size:.8rem; letter-spacing:.12em;
+      text-transform:uppercase; color:rgba(255,255,255,0.55);
+      text-decoration:none; cursor:none; transition:color .2s;
+    }
+    .back-link:hover { color:var(--white); }
+
+    /* ── HEADER ── */
+    .head-wrap { padding: 1.6rem 2.2rem 0; }
+    .eyebrow {
+      font-family:'DM Mono',monospace; font-size:.78rem; letter-spacing:.22em;
+      text-transform:uppercase; color:var(--blue-light); margin-bottom:.6rem;
+    }
+    .title {
+      font-family:'Syne',sans-serif; font-weight:800;
+      font-size:clamp(1.8rem,3.6vw,3rem);
+      letter-spacing:-.035em; line-height:1.02;
+      text-shadow:0 2px 24px rgba(0,71,255,0.35);
+      max-width: 880px;
+    }
+    .title span { color:var(--blue); }
+    .subtitle {
+      font-family:'Fraunces',serif; font-weight:300;
+      font-size:clamp(1rem,1.6vw,1.2rem);
+      color:rgba(244,243,239,0.72);
+      margin-top:.9rem; max-width:680px; line-height:1.45;
+    }
+
+    /* ── CONTENT WRAPPER ── */
+    .main {
+      flex:1; padding: 1.4rem 2.2rem 3rem;
+      display:flex; flex-direction:column; gap:1.4rem;
+    }
+
+    /* ── PROGRESS BAR ── */
+    .progress-row {
+      display:flex; align-items:center; gap:1rem;
+      max-width:760px; width:100%;
+    }
+    .progress-track {
+      flex:1; height:4px; background:rgba(255,255,255,0.08);
+      position:relative; overflow:hidden;
+    }
+    .progress-fill {
+      position:absolute; left:0; top:0; bottom:0;
+      width:0%; background:var(--blue); transition:width .35s ease;
+    }
+    .progress-label {
+      font-family:'DM Mono',monospace; font-size:.72rem; letter-spacing:.15em;
+      text-transform:uppercase; color:rgba(255,255,255,0.5);
+      white-space:nowrap;
+    }
+
+    /* ── PANELS (steps) ── */
+    .panel {
+      display:none;
+      max-width:760px; width:100%;
+    }
+    .panel.active { display:block; animation: fadeIn .35s ease; }
+    @keyframes fadeIn { from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);} }
+
+    .panel-card {
+      background:var(--card-bg);
+      border:1px solid var(--card-border);
+      backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+      padding:1.8rem 1.9rem 1.7rem;
+    }
+
+    .qhead {
+      display:flex; align-items:baseline; justify-content:space-between;
+      gap:1rem; margin-bottom:1.1rem;
+    }
+    .qnum {
+      font-family:'DM Mono',monospace; font-size:.72rem; letter-spacing:.18em;
+      color:rgba(255,255,255,0.45); text-transform:uppercase;
+    }
+    .qtag {
+      font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.15em;
+      text-transform:uppercase; color:var(--blue-light);
+      border:1px solid rgba(0,71,255,0.4); padding:.2rem .5rem;
+    }
+    .qtext {
+      font-family:'Syne',sans-serif; font-weight:700;
+      font-size:clamp(1.15rem,2vw,1.5rem); line-height:1.18;
+      letter-spacing:-.015em; margin-bottom:1.4rem;
+    }
+
+    .opts { display:flex; flex-direction:column; gap:.55rem; }
+    .opt {
+      display:flex; align-items:flex-start; gap:.85rem;
+      padding:.85rem 1rem;
+      border:1px solid rgba(255,255,255,0.08);
+      background:rgba(255,255,255,0.025);
+      cursor:none; transition: border-color .15s, background .15s, transform .12s;
+      text-align:left; font-family:inherit; color:inherit; width:100%;
+    }
+    .opt:hover  { border-color: rgba(0,71,255,0.55); background:rgba(0,71,255,0.06); transform: translateX(2px); }
+    .opt.sel    { border-color: var(--blue); background: rgba(0,71,255,0.12); }
+    .opt-letter {
+      font-family:'DM Mono',monospace; font-weight:400; font-size:.85rem;
+      width:22px; min-width:22px; height:22px;
+      display:inline-flex; align-items:center; justify-content:center;
+      border:1px solid rgba(255,255,255,0.25);
+      color:rgba(255,255,255,0.7);
+      margin-top:.05rem;
+    }
+    .opt.sel .opt-letter { border-color: var(--blue); color:var(--white); background:var(--blue); }
+    .opt-text {
+      font-family:'Syne',sans-serif; font-weight:400; font-size:.98rem;
+      line-height:1.35; color:rgba(244,243,239,0.92);
+    }
+
+    /* ── DEMO FORM (datos demográficos) ── */
+    .form-grid {
+      display:grid; grid-template-columns: 1fr 1fr; gap:1rem 1.1rem;
+    }
+    @media (max-width:640px) { .form-grid { grid-template-columns: 1fr; } }
+    .field { display:flex; flex-direction:column; gap:.4rem; }
+    .field.full { grid-column: 1 / -1; }
+    .field label {
+      font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.15em;
+      text-transform:uppercase; color:rgba(255,255,255,0.55);
+    }
+    .field input, .field select {
+      font-family:'Syne',sans-serif; font-weight:400; font-size:.98rem;
+      color:var(--white); background:rgba(255,255,255,0.03);
+      border:1px solid rgba(255,255,255,0.12);
+      padding:.7rem .8rem;
+      cursor:none; outline:none;
+      transition: border-color .15s, background .15s;
+    }
+    .field input:focus, .field select:focus { border-color: var(--blue); background:rgba(0,71,255,0.07); }
+    .field select option { background:#0a0e1c; color:var(--white); }
+    .field .hint { font-family:'Fraunces',serif; font-weight:300; font-size:.82rem; color:rgba(244,243,239,0.5); }
+
+    /* ── ACTIONS ── */
+    .actions {
+      display:flex; align-items:center; justify-content:space-between;
+      gap:.8rem; margin-top:1.4rem;
+    }
+    .btn {
+      font-family:'Syne',sans-serif; font-weight:500; font-size:.85rem;
+      letter-spacing:.14em; text-transform:uppercase;
+      padding:.7rem 1.3rem;
+      border:1px solid var(--blue); color:var(--white);
+      background:var(--blue); cursor:none;
+      transition: background .15s, border-color .15s, opacity .15s;
+    }
+    .btn:hover { background:#1d5dff; border-color:#1d5dff; }
+    .btn[disabled], .btn.disabled { opacity:.35; pointer-events:none; }
+    .btn-ghost {
+      background:transparent; color:rgba(255,255,255,0.6);
+      border:1px solid rgba(255,255,255,0.18);
+    }
+    .btn-ghost:hover { background:rgba(255,255,255,0.04); color:var(--white); border-color:rgba(255,255,255,0.35); }
+
+    /* ── INTRO ── */
+    .intro-card { padding:2rem 2.1rem 1.9rem; }
+    .intro-list { display:flex; flex-direction:column; gap:.65rem; margin: 1.1rem 0 1.4rem; }
+    .intro-item { display:flex; gap:.7rem; align-items:flex-start; font-family:'Fraunces',serif; font-weight:300; font-size:.98rem; color:rgba(244,243,239,0.78); line-height:1.4; }
+    .intro-bullet { color:var(--blue-light); font-family:'DM Mono',monospace; font-size:.78rem; padding-top:.18rem; min-width:18px; }
+    .auth-tag {
+      display:inline-block; font-family:'DM Mono',monospace; font-size:.7rem;
+      letter-spacing:.15em; text-transform:uppercase;
+      padding:.25rem .55rem; margin-top:.2rem;
+      border:1px solid rgba(74,222,128,0.5); color:var(--green);
+      background:rgba(74,222,128,0.07);
+    }
+    .auth-tag.guest { border-color:rgba(240,224,96,0.55); color:var(--yellow); background:rgba(240,224,96,0.06); }
+
+    /* ── RESULT ── */
+    .result-hero {
+      display:flex; gap:1.4rem; align-items:center;
+      padding:1.6rem 1.7rem; margin-bottom:1.1rem;
+      background:rgba(255,255,255,0.025);
+      border:1px solid rgba(255,255,255,0.08);
+      border-left:6px solid var(--win-color, var(--blue));
+    }
+    .result-photo {
+      width:96px; height:96px; flex-shrink:0;
+      background:#0a0e1c center/cover no-repeat;
+      border:2px solid var(--win-color, var(--blue));
+      display:flex; align-items:center; justify-content:center;
+      font-family:'Syne',sans-serif; font-weight:800; font-size:1.6rem;
+      color:var(--white); text-transform:uppercase;
+    }
+    .result-meta { display:flex; flex-direction:column; gap:.3rem; min-width:0; }
+    .result-eyebrow {
+      font-family:'DM Mono',monospace; font-size:.72rem; letter-spacing:.2em;
+      text-transform:uppercase; color:rgba(255,255,255,0.55);
+    }
+    .result-name {
+      font-family:'Syne',sans-serif; font-weight:800;
+      font-size:clamp(1.4rem,2.4vw,1.9rem); letter-spacing:-.025em;
+      color:var(--white); line-height:1.05;
+    }
+    .result-party {
+      font-family:'Syne',sans-serif; font-weight:400; font-size:.98rem;
+      color:rgba(244,243,239,0.7);
+    }
+    .result-pct {
+      font-family:'Avenir',sans-serif; font-weight:400; font-size:.95rem;
+      color:var(--win-color, var(--blue));
+      margin-top:.15rem;
+    }
+
+    .bars-title {
+      font-family:'DM Mono',monospace; font-size:.72rem; letter-spacing:.18em;
+      text-transform:uppercase; color:rgba(255,255,255,0.55);
+      margin: 1.2rem 0 .65rem;
+    }
+    .bar-row {
+      display:grid; grid-template-columns: 130px 1fr 56px;
+      align-items:center; gap:.7rem;
+      padding:.45rem 0;
+    }
+    .bar-name { font-family:'Syne',sans-serif; font-weight:500; font-size:.9rem; color:rgba(244,243,239,0.85); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .bar-track { position:relative; height:8px; background:rgba(255,255,255,0.05); }
+    .bar-fill  { position:absolute; left:0; top:0; bottom:0; width:0%; transition: width .8s ease; }
+    .bar-pct   { font-family:'Avenir',sans-serif; font-size:.85rem; color:rgba(244,243,239,0.7); text-align:right; }
+
+    .result-foot {
+      margin-top:1.6rem;
+      font-family:'Fraunces',serif; font-weight:300; font-size:.92rem;
+      color:rgba(244,243,239,0.55); line-height:1.45;
+    }
+
+    /* ── FOOTER ── */
+    .full-footer {
+      flex-shrink:0; width:100%;
+      border-top:1px solid rgba(255,255,255,0.07);
+      padding:.45rem 2.2rem;
+      display:flex; align-items:center; justify-content:flex-end;
+    }
+    .footer-brand { font-family:'DM Mono',monospace; font-size:.72rem; letter-spacing:.09em; color:rgba(255,255,255,0.22); }
+
+    @media (max-width:680px) {
+      .top-bar, .head-wrap, .main, .full-footer { padding-left:1.1rem; padding-right:1.1rem; }
+      .panel-card { padding:1.3rem 1.2rem 1.2rem; }
+      .result-hero { flex-direction:column; align-items:flex-start; }
+    }
+
+    /* ── EMBED MODE ── */
+    /* Cuando el test corre dentro de un iframe externo (?embed=1), simplificamos
+       todo: sin nav, sin footer, sin fondo pesado, sin cursor custom. La altura
+       se reporta al parent vía postMessage para auto-resize. */
+    body.embed-mode { background:transparent; cursor:auto; }
+    body.embed-mode .cursor, body.embed-mode .cursor-ring { display:none !important; }
+    body.embed-mode .bg-layer, body.embed-mode .bg-overlay { display:none !important; }
+    body.embed-mode .top-bar, body.embed-mode .full-footer { display:none !important; }
+    body.embed-mode .head-wrap { padding: 0 0 0 0; }
+    body.embed-mode .main { padding: 0; gap:1rem; }
+    body.embed-mode .shell { min-height: 0; }
+    body.embed-mode .title { font-size: clamp(1.4rem, 3vw, 2rem); }
+    body.embed-mode .subtitle { font-size: .98rem; }
+    body.embed-mode .panel, body.embed-mode .progress-row { max-width: 100%; }
+    body.embed-mode * { cursor: auto; }
+    body.embed-mode button, body.embed-mode a, body.embed-mode .opt,
+    body.embed-mode input, body.embed-mode select, body.embed-mode label { cursor: pointer; }
+    body.embed-mode input, body.embed-mode select { cursor: text; }
+    body.embed-mode select { cursor: pointer; }
+    /* Borde sutil para cuando el embed se ve sobre un fondo claro */
+    body.embed-mode .panel-card { background: rgba(10,10,16,0.92); }
+
+    /* ── SHARE ── */
+    .share-row {
+      display:flex; flex-wrap:wrap; gap:.55rem;
+      margin-top:1.2rem; padding-top:1.1rem;
+      border-top:1px dashed rgba(255,255,255,0.12);
+    }
+    .share-btn {
+      display:inline-flex; align-items:center; gap:.5rem;
+      font-family:'Syne',sans-serif; font-weight:500; font-size:.78rem;
+      letter-spacing:.1em; text-transform:uppercase;
+      padding:.55rem .9rem;
+      border:1px solid rgba(255,255,255,0.18);
+      background:rgba(255,255,255,0.03);
+      color:rgba(244,243,239,0.85); cursor:none;
+      transition: border-color .15s, background .15s, color .15s;
+      text-decoration:none;
+    }
+    .share-btn:hover { border-color:var(--blue); background:rgba(0,71,255,0.08); color:var(--white); }
+    .share-btn .ic { width:14px; height:14px; display:inline-block; }
+    .share-toast {
+      position:fixed; left:50%; bottom:2.4rem; transform:translateX(-50%) translateY(20px);
+      background:#0a0e1c; border:1px solid var(--blue);
+      color:var(--white); padding:.65rem 1rem;
+      font-family:'DM Mono',monospace; font-size:.78rem; letter-spacing:.1em;
+      opacity:0; pointer-events:none; transition: opacity .25s, transform .25s;
+      z-index:10000;
+    }
+    .share-toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+  <div class="cursor"     id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+  <div class="bg-layer"></div>
+  <div class="bg-overlay"></div>
+
+  <div class="shell">
+    <div class="top-bar">
+      <a href="index.html" class="logo-link" aria-label="Inicio">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:8px"></div>
+          <div class="logo-bar" style="height:14px"></div>
+          <div class="logo-bar" style="height:20px"></div>
+        </div>
+        <div class="logo-text">Ricardo<span>.Ruiz</span></div>
+      </a>
+      <a href="electoral.html" class="back-link">← Volver a Electoral</a>
+    </div>
+
+    <div class="head-wrap">
+      <div class="eyebrow">Test · Primera Vuelta 2026</div>
+      <h1 class="title">¿Con qué candidato presidencial <span>te identificas más?</span></h1>
+      <p class="subtitle">Seis preguntas. Una sola respuesta por pregunta. Al final te decimos qué candidatura tiene mayor afinidad con tu posición en los temas que más mueven la elección.</p>
+    </div>
+
+    <div class="main">
+      <div class="progress-row" id="progressRow" style="display:none;">
+        <span class="progress-label" id="progressLabel">Pregunta 1 / 6</span>
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      </div>
+
+      <!-- ── INTRO ── -->
+      <div class="panel active" id="panel-intro">
+        <div class="panel-card intro-card">
+          <div id="auth-status"></div>
+          <h2 style="font-family:'Syne'; font-weight:700; font-size:1.45rem; margin-top:.7rem;">Cómo funciona</h2>
+          <div class="intro-list">
+            <div class="intro-item"><span class="intro-bullet">01</span><span>Te pedimos unos datos básicos para contextualizar tu resultado (rango de edad, departamento, género, posicionamiento ideológico).</span></div>
+            <div class="intro-item"><span class="intro-bullet">02</span><span>Luego respondes <b>6 preguntas</b> sobre los ejes que diferencian a las candidaturas: economía, seguridad, salud, política exterior, drogas y reformas institucionales.</span></div>
+            <div class="intro-item"><span class="intro-bullet">03</span><span>Calculamos un puntaje de afinidad con cada candidato con base en sus posiciones públicas y te mostramos el resultado.</span></div>
+          </div>
+          <p style="font-family:'Fraunces',serif; font-weight:300; font-size:.9rem; color:rgba(244,243,239,0.55); line-height:1.45;">Esto no es una predicción de voto ni una encuesta. Es una herramienta para ubicarte en el mapa político del 2026.</p>
+          <div class="actions">
+            <span></span>
+            <button class="btn" onclick="goTo('demo')">Empezar →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── DEMO ── -->
+      <div class="panel" id="panel-demo">
+        <div class="panel-card">
+          <div class="qhead">
+            <span class="qnum">Datos básicos</span>
+            <span class="qtag" id="demo-tag">Invitado</span>
+          </div>
+          <p class="qtext" style="font-size:1.15rem;">Cuéntanos un poco sobre ti.</p>
+          <div class="form-grid" id="form-grid">
+            <!-- inyectado por JS -->
+          </div>
+          <div class="actions">
+            <button class="btn btn-ghost" onclick="goTo('intro')">← Volver</button>
+            <button class="btn disabled" id="demo-next" onclick="submitDemo()">Continuar →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── PREGUNTAS ── -->
+      <div class="panel" id="panel-q">
+        <div class="panel-card">
+          <div class="qhead">
+            <span class="qnum" id="q-num">Pregunta 1 / 6</span>
+            <span class="qtag" id="q-tag">Tema</span>
+          </div>
+          <p class="qtext" id="q-text">…</p>
+          <div class="opts" id="q-opts"></div>
+          <div class="actions">
+            <button class="btn btn-ghost" id="q-back" onclick="prevQ()">← Anterior</button>
+            <button class="btn disabled" id="q-next" onclick="nextQ()">Siguiente →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── RESULTADO ── -->
+      <div class="panel" id="panel-result">
+        <div class="panel-card">
+          <div class="qhead">
+            <span class="qnum">Resultado</span>
+            <span class="qtag" id="result-tag">Afinidad</span>
+          </div>
+          <div class="result-hero" id="result-hero">
+            <div class="result-photo" id="result-photo">—</div>
+            <div class="result-meta">
+              <span class="result-eyebrow">Mayor afinidad</span>
+              <span class="result-name" id="result-name">—</span>
+              <span class="result-party" id="result-party">—</span>
+              <span class="result-pct" id="result-pct">—</span>
+            </div>
+          </div>
+          <div class="bars-title">Top de afinidad</div>
+          <div id="bars"></div>
+          <div class="share-row" id="share-row">
+            <button class="share-btn" id="share-native" onclick="shareNative()" style="display:none;">
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+              Compartir
+            </button>
+            <button class="share-btn" onclick="shareCopy()">
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar enlace
+            </button>
+            <a class="share-btn" id="share-wa" target="_blank" rel="noopener">
+              <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.1-1.7-.8-2-.9-.3-.1-.5-.1-.7.2-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.1-1.2-.4-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6.1-.1.3-.3.4-.5.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5 0-.1-.7-1.6-.9-2.2-.2-.6-.5-.5-.6-.5h-.6c-.2 0-.5.1-.7.4-.2.3-.9.9-.9 2.2 0 1.3.9 2.5 1 2.7.1.2 1.8 2.8 4.4 3.9 2.6 1.1 2.6.7 3 .7.4 0 1.4-.6 1.6-1.1.2-.6.2-1 .1-1.1-.1-.1-.3-.1-.6-.2zM12 2C6.5 2 2 6.5 2 12c0 1.8.5 3.5 1.3 5L2 22l5.1-1.3c1.4.8 3.1 1.2 4.9 1.2 5.5 0 10-4.5 10-10S17.5 2 12 2z"/></svg>
+              WhatsApp
+            </a>
+            <a class="share-btn" id="share-x" target="_blank" rel="noopener">
+              <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2H21l-6.52 7.45L22 22h-6.84l-5.36-6.84L3.6 22H.84l6.98-7.97L0 2h7.04l4.84 6.2L18.244 2zm-2.4 18h1.86L7.27 4H5.32l10.524 16z"/></svg>
+              X
+            </a>
+          </div>
+          <p class="result-foot">El resultado se calcula sumando puntos en cada pregunta según las posiciones públicas de cada campaña. La diferencia entre candidatos cercanos puede ser pequeña — toma esto como un mapa, no como un veredicto.</p>
+          <div class="actions">
+            <button class="btn btn-ghost" onclick="restart()">Repetir test</button>
+            <a class="btn" href="electoral.html" id="cta-electoral">Ir a Electoral →</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="share-toast" id="share-toast">Enlace copiado</div>
+    </div>
+
+    <div class="full-footer"><span class="footer-brand">ricardoruiz.co · Test electoral presidencial 2026</span></div>
+  </div>
+
+  <script>
+  'use strict';
+
+  // ── CURSOR ──
+  const cursor = document.getElementById('cursor');
+  const ring   = document.getElementById('cursorRing');
+  document.addEventListener('mousemove', e => {
+    cursor.style.left = e.clientX + 'px'; cursor.style.top = e.clientY + 'px';
+    ring.style.left   = e.clientX + 'px'; ring.style.top   = e.clientY + 'px';
+  });
+  document.addEventListener('mouseover', e => {
+    if (e.target.closest('button, a, .opt, input, select, label')) {
+      cursor.style.transform = 'translate(-50%,-50%) scale(2.4)';
+      cursor.style.background = 'transparent';
+      cursor.style.border = '1.5px solid var(--blue)';
+      ring.style.opacity = '0';
+    }
+  });
+  document.addEventListener('mouseout', e => {
+    if (e.target.closest('button, a, .opt, input, select, label')) {
+      cursor.style.transform = 'translate(-50%,-50%) scale(1)';
+      cursor.style.background = 'var(--blue)';
+      cursor.style.border = 'none';
+      ring.style.opacity = '.4';
+    }
+  });
+
+  // ── AUTH ──
+  const TOKEN = localStorage.getItem('rr-token');
+  const USER  = (() => { try { return JSON.parse(localStorage.getItem('rr-user') || 'null'); } catch(_) { return null; } })();
+  const IS_LOGGED = !!(TOKEN && USER && USER.email);
+
+  // ── EMBED MODE ──
+  // Activado por ?embed=1 o si la página carga dentro de un iframe externo.
+  // Cuando está activo: oculta nav/footer/cursor custom, simplifica el layout
+  // y reporta su altura al parent vía postMessage para auto-resize del iframe.
+  const QS = new URLSearchParams(location.search);
+  const IS_EMBED = QS.get('embed') === '1' || QS.get('embed') === 'true' ||
+                   (() => { try { return window.self !== window.top; } catch (_) { return true; } })();
+  if (IS_EMBED) document.body.classList.add('embed-mode');
+
+  function reportHeight() {
+    if (!IS_EMBED) return;
+    try {
+      const h = Math.max(
+        document.documentElement.scrollHeight,
+        document.body.scrollHeight
+      );
+      window.parent.postMessage({ type: 'rr-test-height', value: h }, '*');
+    } catch (_) {}
+  }
+  window.addEventListener('load',   reportHeight);
+  window.addEventListener('resize', reportHeight);
+
+  // ── ENDPOINT CENTRAL ──
+  // Cuando exista la Lambda Function URL la pegas aquí. Mientras esté vacío,
+  // el cliente sólo persiste en localStorage (modo offline). El POST nunca
+  // bloquea ni rompe el flujo (best-effort, fire-and-forget).
+  const LEAD_ENDPOINT = ''; // ej: 'https://abc123.lambda-url.us-east-1.on.aws/'
+  const TEST_VERSION  = 'v2';
+
+  // ── CANDIDATOS ──
+  // Nota: en S3 sólo viven fotos para cepeda, abelardo, paloma, claudia, fajardo,
+  // botero y "caicedo.jpg" (que en realidad es Roy Barreras — naming heredado del
+  // kart). Para Lizcano y Carlos Caicedo aún no hay foto: cae al placeholder de
+  // iniciales sobre el color del candidato. Murillo se retiró (nov 2026).
+  const FOTOS_S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/fotos-candidatos-ctr';
+  const CANDIDATES = {
+    cepeda:   { id:'cepeda',   name:'Iván Cepeda',              party:'Pacto Histórico',          color:'#51458F', photo: FOTOS_S3 + '/cepeda.jpg'   },
+    barreras: { id:'barreras', name:'Roy Barreras',             party:'La Fuerza',                color:'#a83246', photo: FOTOS_S3 + '/caicedo.jpg'  },
+    caicedo:  { id:'caicedo',  name:'Carlos Caicedo',           party:'Fuerza Ciudadana',         color:'#ff6eb4', photo: null                       },
+    claudia:  { id:'claudia',  name:'Claudia López',            party:'Independiente',            color:'#d9db24', photo: FOTOS_S3 + '/claudia.jpg'  },
+    lizcano:  { id:'lizcano',  name:'Mauricio Lizcano',         party:'En Marcha',                color:'#06b6d4', photo: null                       },
+    fajardo:  { id:'fajardo',  name:'Sergio Fajardo',           party:'Dignidad y Compromiso',    color:'#EEAA22', photo: FOTOS_S3 + '/fajardo.jpg'  },
+    botero:   { id:'botero',   name:'Santiago Botero',          party:'Independiente',            color:'#d4af37', photo: FOTOS_S3 + '/botero.jpg'   },
+    paloma:   { id:'paloma',   name:'Paloma Valencia',          party:'Centro Democrático',       color:'#1866DF', photo: FOTOS_S3 + '/paloma.jpg'   },
+    abelardo: { id:'abelardo', name:'Abelardo De La Espriella', party:'Mov. Salvación Nacional',  color:'#000062', photo: FOTOS_S3 + '/abelardo.jpg' },
+  };
+
+  // ── PREGUNTAS ──
+  // Cada opción asigna puntos a uno o varios candidatos según sus posiciones
+  // públicas. Espectro: izquierda (Cepeda) → centro-izq territorial (Caicedo,
+  // Barreras) → centro-progresista urbano (Claudia) → centro liberal (Lizcano,
+  // Fajardo) → centro-derecha empresarial (Botero) → derecha (Paloma) → derecha
+  // dura (Abelardo).
+  const QUESTIONS = [
+    {
+      tag:'Modelo económico',
+      text:'¿Cuál de estos modelos económicos crees que necesita Colombia?',
+      opts:[
+        { letter:'A', text:'Estado activo: industria nacional, empresas públicas fuertes y mayor redistribución vía impuestos progresivos.',
+          weights:{ cepeda:3, barreras:1, caicedo:1 } },
+        { letter:'B', text:'Modelo mixto con énfasis social: inversión pública en educación y salud, sector privado regulado.',
+          weights:{ barreras:2, claudia:2, caicedo:2, lizcano:1 } },
+        { letter:'C', text:'Modelo mixto con énfasis en eficiencia: meritocracia, simplificación tributaria, inversión en ciencia.',
+          weights:{ fajardo:3, claudia:1, lizcano:2, botero:1 } },
+        { letter:'D', text:'Mercado libre: bajos impuestos, menos regulación, atracción agresiva de inversión extranjera.',
+          weights:{ paloma:3, abelardo:3, botero:2 } },
+      ]
+    },
+    {
+      tag:'Seguridad y orden público',
+      text:'¿Cuál debería ser la prioridad en seguridad?',
+      opts:[
+        { letter:'A', text:'Continuar la Paz Total: diálogo con todos los grupos armados, incluso los más complejos.',
+          weights:{ cepeda:3, caicedo:1 } },
+        { letter:'B', text:'Negociación selectiva con sometimiento condicionado y rutas de paz sólo para grupos viables.',
+          weights:{ barreras:2, caicedo:2, claudia:1, lizcano:1, fajardo:1 } },
+        { letter:'C', text:'Recuperar control territorial con Fuerza Pública fortalecida y reforma a la Policía.',
+          weights:{ fajardo:2, claudia:2, lizcano:2, botero:2, paloma:2 } },
+        { letter:'D', text:'Mano dura: militarización, estados de excepción y máximas penas a quienes delinquen.',
+          weights:{ paloma:3, abelardo:3, botero:1 } },
+      ]
+    },
+    {
+      tag:'Reforma a la salud',
+      text:'¿Qué hacer con el sistema de salud?',
+      opts:[
+        { letter:'A', text:'Sistema único, público y descentralizado, con eliminación gradual de las EPS.',
+          weights:{ cepeda:3 } },
+        { letter:'B', text:'Reforma profunda manteniendo el aseguramiento, con mayor regulación y giro a las EPS.',
+          weights:{ barreras:2, caicedo:2, claudia:1 } },
+        { letter:'C', text:'Ajustes al sistema actual sin desmontar las EPS: mejor vigilancia y resolver la crisis financiera.',
+          weights:{ fajardo:2, claudia:2, lizcano:2 } },
+        { letter:'D', text:'Mantener el modelo, depurar EPS débiles y abrir más espacio al sector privado.',
+          weights:{ paloma:3, abelardo:3, botero:2 } },
+      ]
+    },
+    {
+      tag:'Política exterior',
+      text:'¿Qué postura debería tener Colombia frente a Venezuela y EE.UU.?',
+      opts:[
+        { letter:'A', text:'Multipolar y no alineada: relaciones plenas con Maduro, China, Rusia, BRICS.',
+          weights:{ cepeda:3, barreras:1, caicedo:1 } },
+        { letter:'B', text:'Equilibrio pragmático: relaciones diplomáticas con todos, sin alineación ideológica.',
+          weights:{ claudia:2, fajardo:2, barreras:2, lizcano:2, caicedo:1 } },
+        { letter:'C', text:'Acercamiento estratégico a EE.UU., UE y aliados occidentales sin romper con Venezuela.',
+          weights:{ paloma:2, fajardo:1, claudia:1, botero:2, lizcano:1 } },
+        { letter:'D', text:'Confrontación con Maduro y alineación total con EE.UU. e Israel.',
+          weights:{ paloma:3, abelardo:3, botero:1 } },
+      ]
+    },
+    {
+      tag:'Política de drogas',
+      text:'¿Qué enfoque le darías al narcotráfico y los cultivos de uso ilícito?',
+      opts:[
+        { letter:'A', text:'Regulación legal del cannabis y revisión integral del prohibicionismo.',
+          weights:{ cepeda:3, claudia:2 } },
+        { letter:'B', text:'Sustitución voluntaria, desarrollo rural y glifosato sólo focalizado.',
+          weights:{ barreras:2, caicedo:2, fajardo:2, claudia:1, lizcano:1 } },
+        { letter:'C', text:'Erradicación forzada, extradición y cooperación internacional ampliada.',
+          weights:{ paloma:2, fajardo:1, lizcano:1, botero:2 } },
+        { letter:'D', text:'Guerra frontal: glifosato aéreo, militarización antinarcóticos y penas más duras.',
+          weights:{ paloma:3, abelardo:3 } },
+      ]
+    },
+    {
+      tag:'Justicia y Cortes',
+      text:'¿Qué hacer con el poder judicial y las altas cortes?',
+      opts:[
+        { letter:'A', text:'Reforma profunda con participación social y consultas populares para temas judiciales.',
+          weights:{ cepeda:2, barreras:1, caicedo:1 } },
+        { letter:'B', text:'Reformas institucionales para acelerar procesos y mejorar el acceso a la justicia.',
+          weights:{ barreras:2, claudia:2, fajardo:2, caicedo:2, lizcano:2 } },
+        { letter:'C', text:'Defender la independencia judicial actual y combatir la politización de la Corte.',
+          weights:{ fajardo:1, paloma:1, claudia:1, lizcano:1, botero:1 } },
+        { letter:'D', text:'Endurecer: límites al activismo judicial y control político a la Corte Constitucional.',
+          weights:{ paloma:3, abelardo:3, botero:2 } },
+      ]
+    },
+    {
+      tag:'Asamblea Constituyente',
+      text:'¿Estás de acuerdo con convocar una Asamblea Nacional Constituyente?',
+      opts:[
+        { letter:'A', text:'Sí, urgente: el Estado actual no permite hacer las reformas profundas que el país necesita.',
+          weights:{ cepeda:3, caicedo:2 } },
+        { letter:'B', text:'Sí, pero limitada a temas puntuales (justicia, sistema político, descentralización).',
+          weights:{ barreras:2, claudia:1, caicedo:1 } },
+        { letter:'C', text:'No: las reformas se hacen vía Congreso, no es momento para abrir la Constitución entera.',
+          weights:{ fajardo:2, claudia:2, lizcano:2, barreras:1 } },
+        { letter:'D', text:'Rotundamente no: defender la Constitución del 91 sin tocarla.',
+          weights:{ paloma:3, abelardo:3, botero:3, lizcano:1, fajardo:1 } },
+      ]
+    },
+  ];
+
+  // ── ESTADO ──
+  const state = {
+    demo: {},
+    answers: new Array(QUESTIONS.length).fill(null), // índices de opción seleccionada
+    qIdx: 0,
+  };
+
+  // ── UTILIDADES ──
+  function $(sel) { return document.querySelector(sel); }
+  function show(panelId) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    $('#panel-' + panelId).classList.add('active');
+    if (IS_EMBED) {
+      // En embed pedimos al parent que haga scroll al iframe (no scroll interno).
+      try { window.parent.postMessage({ type:'rr-test-scroll-into-view' }, '*'); } catch(_) {}
+      requestAnimationFrame(reportHeight);
+    } else {
+      window.scrollTo({ top:0, behavior:'smooth' });
+    }
+  }
+  function setProgress(step) {
+    // step 0 = intro, 1 = demo, 2..7 = preguntas, 8 = resultado
+    const row = $('#progressRow');
+    if (step <= 0 || step > QUESTIONS.length + 1) { row.style.display = 'none'; return; }
+    row.style.display = 'flex';
+    if (step === 1) {
+      $('#progressLabel').textContent = 'Datos básicos';
+      $('#progressFill').style.width = '8%';
+    } else {
+      const q = step - 1; // 1..6
+      $('#progressLabel').textContent = `Pregunta ${q} / ${QUESTIONS.length}`;
+      $('#progressFill').style.width = (8 + (q / QUESTIONS.length) * 92) + '%';
+    }
+  }
+
+  // ── INTRO ──
+  function renderAuthStatus() {
+    const el = $('#auth-status');
+    if (IS_LOGGED) {
+      el.innerHTML = `<div class="auth-tag">● Sesión activa · ${escapeHtml(USER.email)}</div>
+        <p style="font-family:'Fraunces',serif; font-weight:300; font-size:.95rem; color:rgba(244,243,239,0.7); margin-top:.75rem; line-height:1.4;">
+          Te pediremos sólo algunos datos demográficos básicos para contextualizar tu resultado.
+        </p>`;
+    } else {
+      el.innerHTML = `<div class="auth-tag guest">○ Sin sesión · Modo invitado</div>
+        <p style="font-family:'Fraunces',serif; font-weight:300; font-size:.95rem; color:rgba(244,243,239,0.7); margin-top:.75rem; line-height:1.4;">
+          Puedes hacer el test sin registrarte. Te pediremos tu correo para que podamos enviarte futuras herramientas (no recibirás spam).
+          Si prefieres, <a href="login.html" style="color:var(--blue-light); text-decoration:underline;">iniciar sesión</a>.
+        </p>`;
+    }
+  }
+
+  // ── DEMO FORM ──
+  const DEPARTAMENTOS = [
+    'Amazonas','Antioquia','Arauca','Atlántico','Bogotá D.C.','Bolívar','Boyacá','Caldas','Caquetá',
+    'Casanare','Cauca','Cesar','Chocó','Córdoba','Cundinamarca','Guainía','Guaviare','Huila','La Guajira',
+    'Magdalena','Meta','Nariño','Norte de Santander','Putumayo','Quindío','Risaralda','San Andrés y Providencia',
+    'Santander','Sucre','Tolima','Valle del Cauca','Vaupés','Vichada','Exterior'
+  ];
+  const RANGOS_EDAD = ['18–24','25–34','35–44','45–54','55–64','65+'];
+  const GENEROS = ['Mujer','Hombre','No binario / Otro','Prefiero no decir'];
+  const IDEOLOGIA = [
+    'Izquierda',
+    'Centro-izquierda',
+    'Centro',
+    'Centro-derecha',
+    'Derecha',
+    'No me identifico / No sé',
+  ];
+
+  function renderDemoForm() {
+    $('#demo-tag').textContent = IS_LOGGED ? 'Sesión activa' : 'Invitado';
+    const grid = $('#form-grid');
+    const fields = [];
+
+    if (!IS_LOGGED) {
+      fields.push(`
+        <div class="field full">
+          <label for="d-email">Correo electrónico</label>
+          <input id="d-email" type="email" inputmode="email" autocomplete="email" placeholder="tucorreo@ejemplo.com" />
+          <span class="hint">Sólo lo usamos para enviarte resultados y futuras herramientas. No lo compartimos.</span>
+        </div>`);
+    }
+
+    fields.push(`
+      <div class="field">
+        <label for="d-edad">Rango de edad</label>
+        <select id="d-edad">
+          <option value="">Selecciona…</option>
+          ${RANGOS_EDAD.map(r => `<option value="${r}">${r} años</option>`).join('')}
+        </select>
+      </div>`);
+
+    fields.push(`
+      <div class="field">
+        <label for="d-depto">Departamento</label>
+        <select id="d-depto">
+          <option value="">Selecciona…</option>
+          ${DEPARTAMENTOS.map(d => `<option value="${d}">${d}</option>`).join('')}
+        </select>
+      </div>`);
+
+    fields.push(`
+      <div class="field">
+        <label for="d-genero">Género</label>
+        <select id="d-genero">
+          <option value="">Selecciona…</option>
+          ${GENEROS.map(g => `<option value="${g}">${g}</option>`).join('')}
+        </select>
+      </div>`);
+
+    fields.push(`
+      <div class="field">
+        <label for="d-ideol">¿Cómo te identificas políticamente?</label>
+        <select id="d-ideol">
+          <option value="">Selecciona…</option>
+          ${IDEOLOGIA.map(i => `<option value="${i}">${i}</option>`).join('')}
+        </select>
+      </div>`);
+
+    grid.innerHTML = fields.join('');
+
+    // Validación reactiva
+    grid.querySelectorAll('input, select').forEach(el => {
+      el.addEventListener('input',  validateDemo);
+      el.addEventListener('change', validateDemo);
+    });
+    validateDemo();
+  }
+
+  function validateDemo() {
+    const edad   = $('#d-edad')?.value;
+    const depto  = $('#d-depto')?.value;
+    const genero = $('#d-genero')?.value;
+    const ideol  = $('#d-ideol')?.value;
+    const email  = $('#d-email')?.value || '';
+    const emailOk = IS_LOGGED || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+    const ok = !!edad && !!depto && !!genero && !!ideol && emailOk;
+    $('#demo-next').classList.toggle('disabled', !ok);
+    return ok;
+  }
+
+  function submitDemo() {
+    if (!validateDemo()) return;
+    state.demo = {
+      email:  IS_LOGGED ? USER.email : ($('#d-email').value || '').trim().toLowerCase(),
+      edad:   $('#d-edad').value,
+      depto:  $('#d-depto').value,
+      genero: $('#d-genero').value,
+      ideol:  $('#d-ideol').value,
+      logged: IS_LOGGED,
+      ts:     new Date().toISOString(),
+    };
+    state.qIdx = 0;
+    show('q'); setProgress(2);
+    renderQuestion();
+  }
+
+  // ── PREGUNTAS ──
+  function renderQuestion() {
+    const i = state.qIdx;
+    const q = QUESTIONS[i];
+    $('#q-num').textContent  = `Pregunta ${i+1} / ${QUESTIONS.length}`;
+    $('#q-tag').textContent  = q.tag;
+    $('#q-text').textContent = q.text;
+    const opts = $('#q-opts');
+    opts.innerHTML = q.opts.map((o, idx) => `
+      <button class="opt ${state.answers[i] === idx ? 'sel' : ''}" data-idx="${idx}">
+        <span class="opt-letter">${o.letter}</span>
+        <span class="opt-text">${escapeHtml(o.text)}</span>
+      </button>`).join('');
+    opts.querySelectorAll('.opt').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = +btn.dataset.idx;
+        state.answers[i] = idx;
+        opts.querySelectorAll('.opt').forEach(b => b.classList.remove('sel'));
+        btn.classList.add('sel');
+        $('#q-next').classList.remove('disabled');
+      });
+    });
+    $('#q-next').classList.toggle('disabled', state.answers[i] === null);
+    $('#q-back').classList.toggle('disabled', i === 0);
+    $('#q-next').textContent = (i === QUESTIONS.length - 1) ? 'Ver resultado →' : 'Siguiente →';
+    setProgress(2 + i);
+  }
+  function prevQ() {
+    if (state.qIdx === 0) { show('demo'); setProgress(1); return; }
+    state.qIdx--; renderQuestion();
+  }
+  function nextQ() {
+    if (state.answers[state.qIdx] === null) return;
+    if (state.qIdx === QUESTIONS.length - 1) { computeResult(); show('result'); setProgress(0); return; }
+    state.qIdx++; renderQuestion();
+  }
+
+  // ── RESULTADO ──
+  function computeResult() {
+    const scores = {};
+    Object.keys(CANDIDATES).forEach(id => { scores[id] = 0; });
+    QUESTIONS.forEach((q, i) => {
+      const sel = state.answers[i];
+      if (sel === null) return;
+      const w = q.opts[sel].weights || {};
+      Object.keys(w).forEach(id => { scores[id] = (scores[id] || 0) + w[id]; });
+    });
+    const total = Object.values(scores).reduce((a, b) => a + b, 0) || 1;
+    const ranked = Object.keys(scores)
+      .map(id => ({ id, score: scores[id], pct: (scores[id] / total) * 100, c: CANDIDATES[id] }))
+      .sort((a, b) => b.score - a.score);
+
+    const winner = ranked[0];
+    const heroEl  = $('#result-hero');
+    heroEl.style.setProperty('--win-color', winner.c.color);
+
+    const photoEl = $('#result-photo');
+    photoEl.style.borderColor = winner.c.color;
+    photoEl.style.backgroundColor = winner.c.color;
+    photoEl.style.backgroundImage = `url('${winner.c.photo}')`;
+    photoEl.textContent = ''; // si la foto carga, queda vacía; si no, fallback initials
+    const probe = new Image();
+    probe.onerror = () => {
+      photoEl.style.backgroundImage = '';
+      photoEl.textContent = winner.c.name.split(' ').map(s => s[0]).slice(0,2).join('');
+    };
+    probe.src = winner.c.photo;
+
+    $('#result-name').textContent  = winner.c.name;
+    $('#result-party').textContent = winner.c.party;
+    $('#result-pct').style.color   = winner.c.color;
+    $('#result-pct').textContent   = `Afinidad: ${winner.pct.toFixed(0)}%`;
+
+    const bars = $('#bars');
+    bars.innerHTML = ranked.slice(0, 5).map(r => `
+      <div class="bar-row">
+        <span class="bar-name" title="${escapeHtml(r.c.name)}">${escapeHtml(r.c.name)}</span>
+        <div class="bar-track"><div class="bar-fill" style="background:${r.c.color}; width:0%;" data-pct="${r.pct}"></div></div>
+        <span class="bar-pct">${r.pct.toFixed(0)}%</span>
+      </div>`).join('');
+    requestAnimationFrame(() => {
+      bars.querySelectorAll('.bar-fill').forEach(b => { b.style.width = b.dataset.pct + '%'; });
+    });
+
+    state.lastWinner = winner;
+    state.lastRanked = ranked;
+    setupShare(winner);
+    persistResult(ranked, winner);
+  }
+
+  function persistResult(ranked, winner) {
+    const payload = {
+      version: TEST_VERSION,
+      finishedAt: new Date().toISOString(),
+      demo: state.demo,
+      answers: state.answers,
+      ranking: ranked.map(r => ({ id: r.id, score: r.score, pct: +r.pct.toFixed(1) })),
+      winner: winner.id,
+      // Contexto de origen — útil para distinguir embeds en distintos sitios.
+      embed:    IS_EMBED,
+      referrer: document.referrer || '',
+      origin:   location.origin,
+      ua:       navigator.userAgent.slice(0, 240),
+    };
+
+    // Persistencia local (siempre).
+    try {
+      const all = JSON.parse(localStorage.getItem('rr-test-presidencial-2026') || '[]');
+      all.push(payload);
+      localStorage.setItem('rr-test-presidencial-2026', JSON.stringify(all.slice(-20)));
+    } catch (_) { /* noop */ }
+
+    // POST al endpoint central (best-effort, no bloquea la UI ni el resultado).
+    if (LEAD_ENDPOINT) {
+      try {
+        const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+        // sendBeacon sobrevive a navegaciones y no requiere preflight CORS.
+        if (navigator.sendBeacon && navigator.sendBeacon(LEAD_ENDPOINT, blob)) return;
+        fetch(LEAD_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          keepalive: true,
+          mode: 'cors',
+        }).catch(() => {});
+      } catch (_) { /* noop */ }
+    }
+  }
+
+  // ── COMPARTIR ──
+  function buildShareURL(winnerId) {
+    // Usamos siempre la URL canónica (no la del iframe) para que el enlace
+    // compartido lleve al test propio en ricardoruiz.co.
+    const base = 'https://ricardoruiz.co/test-presidencial-2026.html';
+    return `${base}?r=${encodeURIComponent(winnerId)}`;
+  }
+  function buildShareText(winner) {
+    return `Mi resultado en el test electoral presidencial 2026: mayor afinidad con ${winner.c.name} (${winner.c.party}). Haz el tuyo:`;
+  }
+  function setupShare(winner) {
+    const url  = buildShareURL(winner.c.id);
+    const text = buildShareText(winner);
+    const wa = $('#share-wa');
+    const x  = $('#share-x');
+    if (wa) wa.href = `https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`;
+    if (x)  x.href  = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+    if (navigator.share) $('#share-native').style.display = '';
+  }
+  function shareNative() {
+    const w = state.lastWinner; if (!w) return;
+    const url = buildShareURL(w.c.id);
+    if (navigator.share) {
+      navigator.share({ title:'Test Electoral Presidencial 2026', text: buildShareText(w), url }).catch(()=>{});
+    } else { shareCopy(); }
+  }
+  function shareCopy() {
+    const w = state.lastWinner; if (!w) return;
+    const url = buildShareURL(w.c.id);
+    const ok = (msg) => {
+      const t = $('#share-toast'); if (!t) return;
+      t.textContent = msg; t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 1800);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(() => ok('Enlace copiado'))
+        .catch(() => fallbackCopy(url, ok));
+    } else { fallbackCopy(url, ok); }
+  }
+  function fallbackCopy(text, done) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done('Enlace copiado'); }
+    catch (_) { done('Copia manual: ' + text.slice(0,40) + '…'); }
+    document.body.removeChild(ta);
+  }
+  window.shareNative = shareNative;
+  window.shareCopy   = shareCopy;
+
+  function restart() {
+    state.answers = new Array(QUESTIONS.length).fill(null);
+    state.qIdx = 0;
+    show('intro'); setProgress(0);
+  }
+
+  // ── NAV ──
+  function goTo(panel) {
+    if (panel === 'demo')  { show('demo'); setProgress(1); }
+    else if (panel === 'intro') { show('intro'); setProgress(0); }
+  }
+  window.goTo = goTo;
+  window.submitDemo = submitDemo;
+  window.prevQ = prevQ;
+  window.nextQ = nextQ;
+  window.restart = restart;
+
+  // ── HELPERS ──
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ── INIT ──
+  renderAuthStatus();
+  renderDemoForm();
+  </script>
+</body>
+</html>
