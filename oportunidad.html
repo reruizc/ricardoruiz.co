@@ -1,0 +1,2602 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Oportunidad · Voto blando afín por candidato 2026 · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=Arima:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#060810; --surface:rgba(255,255,255,.04); --border:rgba(255,255,255,.08);
+      --white:#f4f3ef; --blue:#0047FF; --green:#4ade80;
+      --orange:#fb923c; --red:#f87171; --amber:#f59e0b; --purple:#a78bfa;
+      /* Oportunidad palette: divergente verde (oportunidad) ↔ púrpura (sobre-rep) */
+      --opo-low:#a78bfa;  /* sobre-representado (negativo) */
+      --opo-mid:#3a3f4d;  /* neutro / cero */
+      --opo-high:#4ade80; /* oportunidad alta */
+      --abs-low:#3a3f4d;
+      --abs-high:#f59e0b;
+    }
+    html{scroll-behavior:smooth}
+    body{background:var(--bg);color:var(--white);font-family:Avenir,sans-serif;min-height:100vh;overflow-x:hidden}
+    body.day-mode{background:#e6ded3;color:#0d1120}
+    body.day-mode .electoral-nav{background:rgba(230,222,211,.93);border-bottom:1px solid rgba(0,0,0,.1)}
+    body.day-mode .logo-text{color:#0d1120}
+    body.day-mode .breadcrumb{color:rgba(0,0,0,.45);border-bottom-color:rgba(0,0,0,.1)}
+    body.day-mode .breadcrumb a{color:rgba(220,38,38,.95)}
+    body.day-mode .page-title span{color:#dc2626}
+    body.day-mode .page-header{border-bottom-color:rgba(0,0,0,.1)}
+    body.day-mode .page-sub{color:rgba(0,0,0,.55)}
+    body.day-mode .page-title{color:#0d1120}
+    body.day-mode .bc-current{color:#0d1120}
+    body.day-mode .intro-section{background:rgba(0,0,0,.02);border-bottom-color:rgba(0,0,0,.1)}
+    body.day-mode .intro-title{color:rgba(0,0,0,.65)}
+    body.day-mode .metric-card{background:rgba(0,0,0,.025);border-color:rgba(0,0,0,.1)}
+    body.day-mode .metric-card-pct{color:#dc2626}
+    body.day-mode .metric-card-name{color:#0d1120}
+    body.day-mode .metric-card-desc{color:rgba(0,0,0,.7)}
+    body.day-mode .formula-box{background:rgba(220,38,38,.08);border-color:rgba(220,38,38,.45);color:#0d1120}
+    body.day-mode .formula-box b{color:#dc2626}
+    body.day-mode .toggle-bar{border-bottom-color:rgba(0,0,0,.1);background:rgba(0,0,0,.02)}
+    body.day-mode .toggle-label{color:rgba(0,0,0,.55)}
+    body.day-mode .toggle-btn{color:rgba(0,0,0,.55);background:rgba(0,0,0,.03);border-color:rgba(0,0,0,.12)}
+    body.day-mode .toggle-btn:hover{color:#0d1120;border-color:rgba(220,38,38,.5);background:rgba(220,38,38,.06)}
+    body.day-mode .toggle-btn.active{color:#fff;background:#dc2626;border-color:#dc2626}
+    body.day-mode .threshold-row{color:rgba(0,0,0,.65)}
+    body.day-mode .map-head{background:rgba(220,38,38,.08);border-bottom-color:rgba(220,38,38,.3)}
+    body.day-mode .map-head-title{color:rgba(0,0,0,.7)}
+    body.day-mode .map-wrap{border-right-color:rgba(0,0,0,.1)}
+    body.day-mode #leaflet-map{background:#dbd2c4!important}
+    body.day-mode .leaflet-container{background:#dbd2c4!important}
+    body.day-mode .panel{border-left-color:rgba(0,0,0,.1)}
+    body.day-mode .panel-card{background:rgba(0,0,0,.025);border-color:rgba(0,0,0,.1)}
+    body.day-mode .panel-section-title{color:rgba(0,0,0,.55)}
+    body.day-mode .leg-bar-end{color:rgba(0,0,0,.55)}
+    body.day-mode .top-row{border-bottom-color:rgba(0,0,0,.06)}
+    body.day-mode .top-row:hover{background:rgba(220,38,38,.07)}
+    body.day-mode .top-rank{color:rgba(0,0,0,.45)}
+    body.day-mode .top-name{color:#0d1120}
+    body.day-mode .top-meta{color:rgba(0,0,0,.55)}
+    body.day-mode .det-row .lbl{color:rgba(0,0,0,.5)}
+    body.day-mode .det-row .val{color:#0d1120}
+    body.day-mode .bar-track{background:rgba(0,0,0,.07)}
+    body.day-mode .cta-card{background:linear-gradient(135deg,rgba(220,38,38,.08),rgba(185,28,28,.05));border-color:rgba(220,38,38,.45)}
+    body.day-mode .cta-btn{background:#dc2626;border-color:#dc2626;color:#fff}
+    body.day-mode .cta-btn:hover{background:#b91c1c;border-color:#b91c1c}
+    body.day-mode .cta-price{color:#dc2626}
+    body.day-mode .e-btn-back{color:#dc2626;border-color:rgba(220,38,38,.45)}
+    body.day-mode .e-btn-back:hover{color:#fff;background:#dc2626;border-color:#dc2626}
+    body.day-mode .logo-bar{background:#dc2626}
+    body.day-mode .logo-text span{color:#dc2626}
+    body.day-mode .det-score-big{color:#dc2626}
+    body.day-mode .det-score-big.neg{color:var(--purple)}
+    body.day-mode .top-score{color:#dc2626}
+    body.day-mode .lider-cand-name,body.day-mode #lider-cand-name{color:#dc2626!important}
+    body.day-mode .threshold-value{color:#dc2626}
+    body.day-mode .threshold-slider{background:linear-gradient(to right,#cbd5e1,#dc2626)}
+    body.day-mode .threshold-slider::-webkit-slider-thumb{border-color:#dc2626;box-shadow:0 0 0 1px rgba(220,38,38,.4)}
+    body.day-mode .threshold-slider::-moz-range-thumb{border-color:#dc2626;box-shadow:0 0 0 1px rgba(220,38,38,.4)}
+    body.day-mode .src-row input[type=range]::-webkit-slider-thumb{border-color:#dc2626}
+    body.day-mode .src-row input[type=range]::-moz-range-thumb{border-color:#dc2626}
+    body.day-mode .src-reset{color:rgba(220,38,38,.85);border-color:rgba(220,38,38,.35)}
+    body.day-mode .src-reset:hover{color:#fff;border-color:#dc2626;background:#dc2626}
+    body.day-mode .cta-title{color:#0d1120}
+    body.day-mode .cta-desc{color:rgba(0,0,0,.7)}
+    body.day-mode .foot{border-top-color:rgba(0,0,0,.1);color:rgba(0,0,0,.55);background:rgba(0,0,0,.02)}
+    body.day-mode .foot a{color:#dc2626}
+    body.day-mode .theme-btn{background:rgba(220,38,38,.08);border-color:rgba(220,38,38,.4);color:#dc2626}
+    body.day-mode .map-loading{background:rgba(230,222,211,.85);color:rgba(0,0,0,.7)}
+    body.day-mode .leaflet-control-attribution{background:rgba(230,222,211,.9)!important;color:rgba(0,0,0,.4)!important}
+    body.day-mode .cand-name{color:rgba(0,0,0,.85)}
+    body.day-mode .cand-pill.active .cand-name{color:#0d1120}
+    body.day-mode .cand-photo{border-color:rgba(0,0,0,.18)}
+    body.day-mode .cand-pill.active{border-color:#dc2626;background:rgba(220,38,38,.08)}
+    body.day-mode .cand-pill:hover{background:rgba(220,38,38,.06)}
+    body.day-mode .cand-pill.active .cand-photo{border-color:#dc2626}
+    body.day-mode .cand-pill.active .cand-name{color:#0d1120}
+    body.day-mode .src-row{color:rgba(0,0,0,.7)}
+    body.day-mode .src-w{color:#dc2626}
+
+    /* NAV */
+    .electoral-nav{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(4,6,16,.6);backdrop-filter:blur(8px);flex-shrink:0}
+    .electoral-nav-auth{display:flex;align-items:center;gap:.75rem}
+    .e-btn-back{font-family:Avenir,sans-serif;font-weight:500;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--green);text-decoration:none;border:1.5px solid rgba(74,222,128,.4);padding:.3rem .8rem;transition:color .2s,border-color .2s,background .2s;flex-shrink:0}
+    .e-btn-back:hover{color:#060810;background:var(--green);border-color:var(--green)}
+    .logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.85;transition:opacity .2s}
+    .logo-link:hover{opacity:1}
+    .logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px}
+    .logo-bar{width:5px;background:var(--green);border-radius:1px 1px 0 0;opacity:.85}
+    .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.1rem,2vw,1.8rem);letter-spacing:-.03em;color:var(--white)}
+    .logo-text span{color:var(--green)}
+
+    .country-selector-wrap{position:relative}
+    .country-btn{font-family:Avenir,sans-serif;font-weight:500;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.4);background:none;border:1px solid rgba(255,255,255,.15);padding:.3rem .65rem;cursor:pointer;display:flex;align-items:center;transition:border-color .2s,color .2s}
+    .country-btn:hover,.country-btn.open{border-color:rgba(255,255,255,.35);color:rgba(255,255,255,.7)}
+    .country-dropdown{position:absolute;top:calc(100% + 8px);right:0;background:#0e1220;border:1px solid rgba(255,255,255,.12);min-width:190px;display:none;flex-direction:column;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+    .country-dropdown.open{display:flex}
+    .country-option{font-family:Avenir,sans-serif;font-weight:400;font-size:.68rem;letter-spacing:.05em;padding:.65rem 1rem;cursor:pointer;display:flex;align-items:center;gap:.5rem;color:rgba(255,255,255,.5);border-bottom:1px solid rgba(255,255,255,.07);transition:background .15s;user-select:none}
+    .country-option:last-child{border-bottom:none}
+    .country-option:hover{background:rgba(255,255,255,.05);color:rgba(255,255,255,.8)}
+    .country-option.selected{color:var(--green)}
+    .country-check{font-size:.6rem;width:12px;opacity:0;color:var(--green)}
+    .country-option.selected .country-check{opacity:1}
+
+    .theme-btn{display:flex;align-items:center;gap:.4rem;font-family:Avenir,sans-serif;font-weight:500;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);padding:.3rem .75rem;cursor:pointer;transition:all .2s;flex-shrink:0}
+    .theme-btn:hover{background:rgba(255,255,255,.15);color:var(--white)}
+
+    .breadcrumb{padding:.6rem 2.5rem;font-family:Avenir,sans-serif;font-weight:400;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.35);border-bottom:1px solid var(--border)}
+    .breadcrumb a{color:rgba(74,222,128,.85);text-decoration:none}
+    .breadcrumb a:hover{color:var(--green)}
+
+    /* HEADER */
+    .page-header{padding:1.3rem 2.5rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+    .page-title{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.4rem,2.6vw,2.2rem);letter-spacing:-.025em;color:var(--white)}
+    .page-title span{color:var(--green)}
+    .page-sub{font-family:Avenir,sans-serif;font-weight:400;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-top:.35rem}
+
+    /* INTRO */
+    .intro-section{padding:1.3rem 2.5rem 1.4rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.015)}
+    .intro-title{font-family:Avenir,sans-serif;font-weight:500;font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:.85rem}
+    .intro-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.85rem;margin-bottom:1rem}
+    @media (max-width:1100px){.intro-grid{grid-template-columns:repeat(2,1fr)}}
+    @media (max-width:600px){.intro-grid{grid-template-columns:1fr}}
+    .metric-card{background:rgba(255,255,255,.03);border:1px solid var(--border);padding:.95rem 1.05rem;display:flex;flex-direction:column;gap:.3rem}
+    .metric-card-pct{font-family:'Syne',sans-serif;font-weight:800;font-size:1.55rem;color:var(--green);letter-spacing:-.02em;line-height:1}
+    .metric-card-name{font-family:'Syne',sans-serif;font-weight:700;font-size:.88rem;color:var(--white);letter-spacing:-.01em;margin-top:.2rem}
+    .metric-card-desc{font-family:Avenir,sans-serif;font-weight:400;font-size:.74rem;line-height:1.45;color:rgba(255,255,255,.7);margin-top:.1rem}
+    .metric-card-desc code{font-family:'Arima',sans-serif;background:rgba(74,222,128,.13);color:var(--green);padding:.05rem .35rem;font-size:.74rem}
+    .formula-box{font-family:'Syne',sans-serif;font-weight:500;font-size:.92rem;background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.4);border-left:3px solid var(--green);padding:.65rem .95rem;color:rgba(255,255,255,.92);letter-spacing:.01em}
+    .formula-box b{color:var(--green);font-weight:700}
+
+    /* CANDIDATE PICKER */
+    .cand-picker{padding:1rem 2.5rem .9rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.01)}
+    .cand-picker-label{font-family:Avenir,sans-serif;font-weight:500;font-size:.66rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-bottom:.55rem}
+    body.day-mode .cand-picker-label{color:rgba(0,0,0,.5)}
+    .cand-row{display:flex;gap:.7rem;align-items:flex-start;overflow-x:auto;padding-bottom:.3rem;scrollbar-width:thin}
+    .cand-pill{display:flex;flex-direction:column;align-items:center;gap:.3rem;cursor:pointer;padding:.35rem .25rem;border:1.5px solid transparent;background:transparent;flex-shrink:0;transition:all .15s;min-width:78px}
+    .cand-pill:hover{background:rgba(74,222,128,.08)}
+    .cand-pill.active{border-color:var(--green);background:rgba(74,222,128,.10)}
+    .cand-photo{width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,.18);background:#0e1220;display:block}
+    .cand-pill.active .cand-photo{border-color:var(--green)}
+    .cand-photo-fallback{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:#fff;border:2px solid rgba(255,255,255,.18)}
+    .cand-name{font-family:Avenir,sans-serif;font-weight:500;font-size:.72rem;color:rgba(255,255,255,.85);text-align:center;line-height:1.2;max-width:88px}
+    .cand-pct{font-family:'Arima',sans-serif;font-weight:400;font-size:.66rem;color:rgba(255,255,255,.5);text-align:center}
+    body.day-mode .cand-pct{color:rgba(0,0,0,.5)}
+
+    /* TOGGLE BAR */
+    .toggle-bar{padding:.85rem 2.5rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.01);display:flex;align-items:center;gap:1.4rem;flex-wrap:wrap}
+    .toggle-group{display:flex;align-items:center;gap:.5rem}
+    .toggle-label{font-family:Avenir,sans-serif;font-weight:500;font-size:.68rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.45)}
+    .toggle-btn{font-family:Avenir,sans-serif;font-weight:500;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.65);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.15);padding:.42rem .9rem;cursor:pointer;transition:all .15s}
+    .toggle-btn:hover{color:var(--white);border-color:rgba(74,222,128,.5);background:rgba(74,222,128,.08)}
+    .toggle-btn.active{color:#06120a;background:var(--green);border-color:var(--green)}
+    .threshold-row{display:flex;align-items:center;gap:.6rem;font-family:Avenir,sans-serif;font-size:.74rem;color:rgba(255,255,255,.65)}
+    .threshold-slider{-webkit-appearance:none;appearance:none;width:160px;height:4px;background:linear-gradient(to right,#3a3f4d,#4ade80);border-radius:2px;outline:none}
+    .threshold-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:#fff;cursor:pointer;border:2px solid var(--green);box-shadow:0 0 0 1px rgba(74,222,128,.4)}
+    .threshold-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#fff;cursor:pointer;border:2px solid var(--green);box-shadow:0 0 0 1px rgba(74,222,128,.4)}
+    .threshold-value{font-family:Avenir,sans-serif;font-weight:600;font-size:.92rem;color:var(--green);font-variant-numeric:tabular-nums;min-width:42px;text-align:right}
+    .veleta-count{margin-left:auto;font-family:Avenir,sans-serif;font-weight:500;font-size:.78rem;color:rgba(255,255,255,.78)}
+    .veleta-count b{color:var(--green);font-weight:700}
+    .veleta-count .censo{color:rgba(255,255,255,.55);margin-left:.5rem}
+    body.day-mode .veleta-count{color:rgba(0,0,0,.78)}
+    body.day-mode .veleta-count .censo{color:rgba(0,0,0,.55)}
+    body.day-mode .veleta-count b{color:#dc2626}
+
+    /* MAIN SHELL */
+    .shell{display:grid;grid-template-columns:1fr 400px;gap:0;min-height:calc(100vh - 460px)}
+    @media (max-width:1100px){.shell{grid-template-columns:1fr}}
+
+    .map-wrap{position:relative;border-right:1px solid var(--border);display:flex;flex-direction:column}
+    .map-head{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.75rem 1.3rem;background:rgba(74,222,128,.1);border-bottom:1px solid rgba(74,222,128,.3);flex-wrap:wrap}
+    .map-head-title{font-family:Avenir,sans-serif;font-weight:500;font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.7)}
+    .map-back-btn{font-family:Avenir,sans-serif;font-weight:500;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.7);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);padding:.32rem .7rem;cursor:pointer;transition:all .15s;display:none}
+    .map-back-btn:hover{background:rgba(74,222,128,.15);border-color:var(--green);color:#fff}
+    .map-back-btn.show{display:inline-flex}
+    body.day-mode .map-back-btn{color:rgba(0,0,0,.65);background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.18)}
+    body.day-mode .map-back-btn:hover{background:rgba(220,38,38,.10);color:#dc2626;border-color:#dc2626}
+    #leaflet-map{flex:1;min-height:560px;background:#060810}
+    .leaflet-container{background:#060810!important;cursor:default}
+    .leaflet-tile-pane{display:none}
+    #leaflet-map .leaflet-interactive{cursor:pointer}
+    .leaflet-control-attribution{background:rgba(6,8,16,.85)!important;color:rgba(255,255,255,.25)!important;font-family:Avenir,sans-serif!important;font-size:.55rem!important}
+    .leaflet-control-attribution a{color:rgba(74,222,128,.6)!important}
+    .leaflet-control-zoom a{background:rgba(13,15,28,.9)!important;color:var(--white)!important;border-color:rgba(255,255,255,.15)!important}
+    .leaflet-control-zoom a:hover{background:rgba(74,222,128,.3)!important}
+
+    .map-loading{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(6,8,16,.85);z-index:800;font-family:Avenir,sans-serif;font-weight:500;font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.75);pointer-events:none}
+    .map-loading.show{display:flex}
+    .map-loading .dot{width:8px;height:8px;border-radius:50%;background:var(--green);margin:0 4px;animation:bounce 1.2s infinite}
+    .map-loading .dot:nth-child(2){animation-delay:.15s}
+    .map-loading .dot:nth-child(3){animation-delay:.3s}
+    @keyframes bounce{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
+
+    /* Hover chip */
+    .hover-chip{position:fixed;z-index:9000;pointer-events:none;display:none;background:rgba(6,8,16,.96);color:#f4f3ef;font-family:Avenir,sans-serif;font-weight:500;font-size:.75rem;padding:.32rem .6rem;border:1px solid rgba(74,222,128,.5);letter-spacing:.02em;box-shadow:0 2px 10px rgba(0,0,0,.4);transform:translate(14px,18px)}
+    .hover-chip.show{display:flex;align-items:center;gap:.45rem}
+    .hover-chip .hc-score{font-weight:700;color:var(--green)}
+    .hover-chip .hc-score.neg{color:var(--purple)}
+    body.day-mode .hover-chip{background:rgba(255,255,255,.97);color:rgba(0,0,0,.92);border-color:rgba(220,38,38,.55);box-shadow:0 2px 10px rgba(0,0,0,.18)}
+    body.day-mode .hover-chip .hc-score{color:#dc2626}
+    body.day-mode .hover-chip .hc-score.neg{color:var(--purple)}
+    @media (max-width:1099px){.hover-chip{display:none!important}}
+
+    /* PANEL */
+    .panel{padding:1rem 1.1rem 1.5rem;border-left:1px solid var(--border);display:flex;flex-direction:column;gap:.95rem;overflow-y:auto;max-height:calc(100vh - 280px)}
+    @media (max-width:1100px){.panel{max-height:none;border-left:none;border-top:1px solid var(--border)}}
+    .panel-section-title{font-family:Avenir,sans-serif;font-weight:500;font-size:.66rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:.35rem}
+    .panel-card{background:rgba(255,255,255,.025);border:1px solid var(--border);padding:.85rem .95rem}
+
+    /* Sliders por fuente */
+    .src-row{display:grid;grid-template-columns:1fr 110px 38px;gap:.55rem;align-items:center;font-family:Avenir,sans-serif;font-size:.74rem;color:rgba(255,255,255,.78);padding:.25rem 0}
+    .src-row .src-name{font-weight:500;line-height:1.2}
+    .src-row .src-name .src-sub{display:block;font-family:'Arima',sans-serif;font-size:.66rem;color:rgba(255,255,255,.45);font-weight:400}
+    body.day-mode .src-row .src-name .src-sub{color:rgba(0,0,0,.5)}
+    .src-row input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:3px;background:rgba(255,255,255,.18);border-radius:2px;outline:none}
+    .src-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:13px;height:13px;border-radius:50%;background:#fff;cursor:pointer;border:2px solid var(--green)}
+    .src-row input[type=range]::-moz-range-thumb{width:11px;height:11px;border-radius:50%;background:#fff;cursor:pointer;border:2px solid var(--green)}
+    body.day-mode .src-row input[type=range]{background:rgba(0,0,0,.18)}
+    .src-w{font-family:Avenir,sans-serif;font-weight:600;font-size:.78rem;color:var(--green);font-variant-numeric:tabular-nums;text-align:right}
+    .src-reset{display:inline-block;margin-top:.4rem;font-family:Avenir,sans-serif;font-weight:500;font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(74,222,128,.7);cursor:pointer;padding:.2rem .4rem;border:1px solid rgba(74,222,128,.25);background:transparent;transition:all .15s}
+    .src-reset:hover{color:var(--green);border-color:var(--green);background:rgba(74,222,128,.08)}
+
+    /* Leyenda divergente */
+    .leg-bar{height:10px;border:1px solid rgba(255,255,255,.1);margin:.4rem 0 .25rem}
+    .leg-bar.opo{background:linear-gradient(to right,#a78bfa 0%,#7e6dc2 25%,#3a3f4d 50%,#7cca8c 75%,#4ade80 100%)}
+    .leg-bar.abs{background:linear-gradient(to right,rgb(56,89,124) 0%,rgb(99,138,160) 25%,rgb(205,200,180) 42%,rgb(240,180,90) 58%,rgb(225,120,50) 75%,rgb(180,55,40) 100%)}
+    body.day-mode .leg-bar{border-color:rgba(0,0,0,.12)}
+    .leg-bar-ends{display:flex;justify-content:space-between;font-family:Avenir,sans-serif;font-size:.65rem;color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums}
+    .leg-bar-end{color:rgba(255,255,255,.5)}
+    .leg-stripes{margin-top:.6rem;display:flex;align-items:center;gap:.55rem;font-family:Avenir,sans-serif;font-size:.74rem;color:rgba(255,255,255,.7)}
+    .leg-stripe-swatch{width:36px;height:14px;border:1px solid rgba(255,255,255,.15);background:repeating-linear-gradient(45deg,#4ade80 0 3px,#fff 3px 5px)}
+    body.day-mode .leg-stripe-swatch{border-color:rgba(0,0,0,.15);background:repeating-linear-gradient(45deg,#dc2626 0 3px,#fff 3px 5px)}
+    .leg-stripes b{color:var(--green);font-weight:700}
+
+    /* Detalle */
+    .det-card{display:none;flex-direction:column;gap:.6rem}
+    .det-card.show{display:flex}
+    .det-empty{font-family:'Arima',sans-serif;font-weight:400;font-size:.84rem;color:rgba(255,255,255,.5);line-height:1.5;padding:.3rem 0}
+    body.day-mode .det-empty{color:rgba(0,0,0,.55)}
+    .det-name{font-family:'Syne',sans-serif;font-weight:700;font-size:1.15rem;letter-spacing:-.01em;line-height:1.2}
+    .det-parents{font-family:'Arima',sans-serif;font-weight:400;font-size:.74rem;color:rgba(255,255,255,.55);margin-top:.1rem}
+    body.day-mode .det-parents{color:rgba(0,0,0,.55)}
+    .det-score-big{font-family:'Syne',sans-serif;font-weight:800;font-size:2.1rem;line-height:1;letter-spacing:-.03em;color:var(--green);margin:.2rem 0 .3rem}
+    .det-score-big.neg{color:var(--purple)}
+    .det-score-sub{font-family:'Arima',sans-serif;font-weight:400;font-size:.74rem;color:rgba(255,255,255,.6);margin-top:-.1rem}
+    body.day-mode .det-score-sub{color:rgba(0,0,0,.6)}
+    .det-bars{display:flex;flex-direction:column;gap:.4rem;margin-top:.3rem}
+    .det-bar{display:grid;grid-template-columns:120px 1fr 50px;gap:.55rem;align-items:center;font-family:Avenir,sans-serif;font-size:.72rem}
+    .det-bar .lbl{color:rgba(255,255,255,.6);letter-spacing:.04em;text-transform:uppercase;font-size:.6rem;font-weight:500}
+    .det-bar .val{color:var(--white);font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+    .bar-track{height:6px;background:rgba(255,255,255,.07);overflow:hidden}
+    .bar-fill{height:100%;background:var(--green)}
+    .bar-fill.s2{background:#22d3ee}
+    .bar-fill.s3{background:#f59e0b}
+    .bar-fill.s4{background:#ec4899}
+    .det-meta{display:grid;grid-template-columns:1fr 1fr;gap:.3rem .6rem;font-family:'Arima',sans-serif;font-size:.78rem;border-top:1px solid var(--border);padding-top:.55rem;margin-top:.4rem}
+    .det-row{display:contents}
+    .det-row .lbl{font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.45);font-family:Avenir,sans-serif;font-weight:500;align-self:center}
+    .det-row .val{font-weight:500;color:var(--white);font-variant-numeric:tabular-nums;text-align:right}
+
+    /* Top-30 */
+    .top-list{display:flex;flex-direction:column}
+    .top-row{display:grid;grid-template-columns:24px 1fr 60px;gap:.55rem;align-items:center;padding:.42rem .15rem;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;font-family:Avenir,sans-serif;font-size:.78rem;transition:background .12s}
+    .top-row:hover{background:rgba(74,222,128,.08)}
+    .top-row.active{background:rgba(74,222,128,.14)}
+    .top-rank{font-family:'Arima',sans-serif;font-weight:500;font-size:.72rem;color:rgba(255,255,255,.45);text-align:center}
+    .top-name{font-weight:500;color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+    .top-meta{font-family:'Arima',sans-serif;font-size:.68rem;color:rgba(255,255,255,.5);font-weight:400;line-height:1.15}
+    .top-meta-dep{display:block;font-size:.64rem;letter-spacing:.04em}
+    .top-score{font-family:'Syne',sans-serif;font-weight:700;font-size:.92rem;color:var(--green);text-align:right;font-variant-numeric:tabular-nums}
+
+    /* CTA */
+    .cta-card{background:linear-gradient(135deg,rgba(74,222,128,.13),rgba(34,197,94,.07));border:1px solid rgba(74,222,128,.4);padding:1rem 1.05rem;display:flex;flex-direction:column;gap:.55rem}
+    .cta-title{font-family:'Syne',sans-serif;font-weight:700;font-size:.94rem;letter-spacing:-.01em;color:var(--white)}
+    .cta-desc{font-family:Avenir,sans-serif;font-size:.78rem;line-height:1.5;color:rgba(255,255,255,.78)}
+    .cta-price{font-family:'Syne',sans-serif;font-weight:800;font-size:1.0rem;color:var(--green);letter-spacing:-.01em}
+    .cta-btn{display:inline-block;text-align:center;font-family:Avenir,sans-serif;font-weight:600;font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;color:#06120a;background:var(--green);border:1px solid var(--green);padding:.55rem 1rem;text-decoration:none;transition:all .15s;cursor:pointer}
+    .cta-btn:hover{background:#22c55e;border-color:#22c55e}
+
+    /* FOOTER */
+    .foot{padding:1.4rem 2.5rem;border-top:1px solid var(--border);font-family:Avenir,sans-serif;font-weight:400;font-size:.72rem;line-height:1.6;color:rgba(255,255,255,.5);background:rgba(255,255,255,.01)}
+    .foot a{color:rgba(74,222,128,.85);text-decoration:none}
+    .foot a:hover{color:var(--green);text-decoration:underline}
+    .foot strong{color:rgba(255,255,255,.78);font-weight:600}
+    body.day-mode .foot strong{color:#0d1120}
+    .foot p{margin-bottom:.55rem;max-width:1100px}
+  </style>
+</head>
+<body>
+
+  <!-- SVG patterns para municipios "oportunidad alta" (rayado verde) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <pattern id="opo-stripes" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+        <rect width="6" height="6" fill="#4ade80"/>
+        <line x1="0" y1="0" x2="0" y2="6" stroke="#fff" stroke-width="2.2" stroke-opacity=".45"/>
+      </pattern>
+      <pattern id="opo-stripes-day" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+        <rect width="6" height="6" fill="#dc2626"/>
+        <line x1="0" y1="0" x2="0" y2="6" stroke="#fff" stroke-width="2.2" stroke-opacity=".75"/>
+      </pattern>
+    </defs>
+  </svg>
+
+  <nav class="electoral-nav">
+    <div style="display:flex;align-items:center;gap:1rem">
+      <a href="electoral.html" class="e-btn-back">← Volver</a>
+      <div id="e-nav-auth" class="electoral-nav-auth"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:1.2rem">
+      <div class="country-selector-wrap">
+        <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
+          <span id="countryBtnLabel">Colombia</span>
+          <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style="margin-left:6px;transition:transform .2s" id="countryChevron"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <div class="country-dropdown" id="countryDropdown">
+          <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
+          <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
+          <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
+          <div class="country-option" data-value="cn" onclick="selectCountry(this)"><span class="country-check">✓</span> 中国 / China</div>
+        </div>
+      </div>
+      <a href="electoral.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+  </nav>
+
+  <div class="breadcrumb">
+    <a href="electoral.html">Electoral</a> &nbsp;/&nbsp; Inteligencia Territorial 2026 &nbsp;/&nbsp; <span class="bc-current">Oportunidad</span>
+  </div>
+
+  <header class="page-header">
+    <div>
+      <div class="page-title">Oportunidad · <span>voto blando afín por candidato</span></div>
+      <div class="page-sub">Dónde un candidato puede crecer · Brecha entre techo afín y proyección actual · 1ª vuelta presidencial 2026</div>
+    </div>
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
+  </header>
+
+  <!-- INTRO: 4 metric cards (pesos por fuente) + fórmula -->
+  <section class="intro-section">
+    <div class="intro-title">Pesos por fuente histórica · default</div>
+    <div class="intro-grid">
+      <div class="metric-card">
+        <div class="metric-card-pct">40%</div>
+        <div class="metric-card-name">Presidencial 2022</div>
+        <div class="metric-card-desc">Última elección presidencial. Señal directa y reciente del comportamiento del electorado en una contienda equivalente.</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-card-pct">35%</div>
+        <div class="metric-card-name">Senado + Cámara 2026</div>
+        <div class="metric-card-desc">Medición más reciente del electorado actual. Captura patrones de participación 2026 y la fuerza territorial real de los partidos afines.</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-card-pct">15%</div>
+        <div class="metric-card-name">Presidencial 2018</div>
+        <div class="metric-card-desc">Profundidad de tendencia. Confirma o discrimina si la captura territorial 2022 fue coyuntural o estructural.</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-card-pct">10%</div>
+        <div class="metric-card-name">Consultas 2025 + 2026</div>
+        <div class="metric-card-desc">Lectura del votante militante. Sesgo de auto-selección — bajo peso, pero útil para confirmar bastiones del sector.</div>
+      </div>
+    </div>
+    <div class="formula-box">
+      Voto blando(C, M) = <b>factor_líder(C) · Σ wₛ · pct_afín_ₛ(C, M)</b> &nbsp;−&nbsp; <b>pct(C) · bias(C, M)</b> &nbsp;→&nbsp; techo realista − proyección actual
+    </div>
+  </section>
+
+  <!-- CANDIDATE PICKER -->
+  <section class="cand-picker">
+    <div class="cand-picker-label">Candidato activo</div>
+    <div class="cand-row" id="cand-row"><!-- pills inyectados por JS --></div>
+  </section>
+
+  <!-- TOGGLE BAR -->
+  <section class="toggle-bar">
+    <div class="toggle-group">
+      <span class="toggle-label">Capa</span>
+      <button class="toggle-btn active" id="layer-opo" onclick="setLayer('opo')">Oportunidad</button>
+      <button class="toggle-btn" id="layer-abs" onclick="setLayer('abs')">Abstención</button>
+      <button class="toggle-btn" id="layer-pue" onclick="setLayer('pue')">Puestos</button>
+    </div>
+    <div class="toggle-group">
+      <span class="toggle-label">Nivel</span>
+      <button class="toggle-btn active" id="lvl-dep" onclick="setLevel('dep')">Departamental</button>
+      <button class="toggle-btn" id="lvl-mun" onclick="setLevel('mun')">Municipal</button>
+    </div>
+    <div class="threshold-row">
+      <span class="toggle-label" style="margin-right:.2rem">Destacar brecha ≥</span>
+      <input type="range" id="threshold-slider" class="threshold-slider" min="1" max="20" step="1" value="5" />
+      <span class="threshold-value" id="threshold-value">+5 pp</span>
+    </div>
+    <div class="toggle-group" id="mde-view-toggle" style="display:none">
+      <span class="toggle-label">Medellín</span>
+      <button class="toggle-btn active" data-mde="comunas" onclick="setMdeView('comunas')">Comunas</button>
+      <button class="toggle-btn" data-mde="barrios" onclick="setMdeView('barrios')">Barrios</button>
+    </div>
+    <div class="veleta-count" id="opo-count">— municipios con oportunidad ≥ umbral</div>
+  </section>
+
+  <!-- MAIN SHELL -->
+  <main class="shell">
+    <div class="map-wrap">
+      <div class="map-head">
+        <div>
+          <div class="map-head-title" id="map-head-title">Vista nacional · Departamental</div>
+        </div>
+        <button class="map-back-btn" id="map-back-btn" onclick="onBack()"><span id="map-back-label">← Volver a nacional</span></button>
+      </div>
+      <div id="leaflet-map"></div>
+      <div class="map-loading" id="map-loading">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span style="margin-left:.7rem">Calculando voto blando</span>
+      </div>
+    </div>
+
+    <aside class="panel">
+
+      <!-- Factor de liderazgo del bloque (por candidato activo) -->
+      <div class="panel-card">
+        <div class="panel-section-title">Factor de liderazgo del bloque <span id="lider-cand-name" style="color:var(--green);text-transform:none;letter-spacing:0;font-weight:700">—</span></div>
+        <div class="src-row" style="grid-template-columns:1fr 110px 50px">
+          <div class="src-name">% del techo afín capturable<span class="src-sub">cuánto del bloque ideológico puede absorber este candidato</span></div>
+          <input type="range" id="lider-slider" min="5" max="100" step="1" value="95" oninput="onLiderChange(this.value)" />
+          <span class="src-w" id="lider-w">95%</span>
+        </div>
+        <button class="src-reset" onclick="resetLider()">Restablecer default</button>
+      </div>
+
+      <!-- Sliders por fuente -->
+      <div class="panel-card">
+        <div class="panel-section-title">Pesos por fuente · suma 100%</div>
+        <div id="src-sliders"></div>
+        <button class="src-reset" onclick="resetWeights()">Restablecer 40·35·15·10</button>
+      </div>
+
+      <!-- Leyenda -->
+      <div class="panel-card">
+        <div class="panel-section-title" id="leg-title">Voto blando · brecha (pp)</div>
+        <div class="leg-bar opo" id="leg-bar"></div>
+        <div class="leg-bar-ends" id="leg-ends">
+          <span class="leg-bar-end">−10 pp · sobre-rep</span>
+          <span class="leg-bar-end">0</span>
+          <span class="leg-bar-end">+10 pp · oportunidad</span>
+        </div>
+        <div class="leg-stripes" id="leg-stripes-row">
+          <div class="leg-stripe-swatch"></div>
+          <span>Brecha ≥ <b id="leg-thresh">+10 pp</b> · oportunidad alta</span>
+        </div>
+      </div>
+
+      <!-- Detalle territorio -->
+      <div class="panel-card">
+        <div class="panel-section-title" id="det-title">Territorio seleccionado</div>
+        <div id="det-empty" class="det-empty">Pasa el cursor sobre el mapa o haz clic en un departamento para ver la descomposición por fuente histórica.</div>
+        <div id="det-card" class="det-card">
+          <div>
+            <div class="det-name" id="det-name">—</div>
+            <div class="det-parents" id="det-parents">—</div>
+          </div>
+          <div class="det-score-big" id="det-score">—</div>
+          <div class="det-score-sub" id="det-score-sub">techo realista − proyección</div>
+          <div class="det-bars" id="det-bars">
+            <!-- inyectado por renderDetail -->
+          </div>
+          <dl class="det-meta">
+            <div class="det-row"><dt class="lbl">Censo 2026</dt><dd class="val" id="det-censo">—</dd></div>
+            <div class="det-row"><dt class="lbl">Abstención 2022</dt><dd class="val" id="det-abst">—</dd></div>
+            <div class="det-row"><dt class="lbl">Top candidato afín</dt><dd class="val" id="det-topafin">—</dd></div>
+            <div class="det-row"><dt class="lbl">Brecha vs techo</dt><dd class="val" id="det-brecha">—</dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <!-- Top 30 -->
+      <div class="panel-card">
+        <div class="panel-section-title" id="top-title">Top 30 · municipios de oportunidad</div>
+        <div class="top-list" id="top-list"></div>
+      </div>
+
+      <!-- CTA comercial -->
+      <div class="cta-card">
+        <div class="cta-title" id="cta-title">¿Candidato o equipo de campaña?</div>
+        <div class="cta-desc" id="cta-desc">Análisis customizado con escenarios A/B, datos a nivel puesto y actualización semanal hasta 1ª vuelta. Mapa de oportunidad propietario, propuesta de pisada por fuente y simulación de impacto por evento.</div>
+        <div class="cta-price">3 M COP · puntual · 5 días hábiles</div>
+        <div class="cta-price" style="font-size:.86rem;color:rgba(255,255,255,.78)">5 M COP · retainer hasta 1ª vuelta</div>
+        <a class="cta-btn" id="cta-btn" href="mailto:reruizc@gmail.com?subject=Oportunidad%20-%20propuesta">Solicitar propuesta →</a>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Hover chip -->
+  <div class="hover-chip" id="hover-chip">
+    <span class="hc-name" id="hc-name">—</span>
+    <span class="hc-score" id="hc-score">—</span>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="foot">
+    <p><strong>Metodología.</strong> Para un candidato C en un municipio M calculamos tres cosas:
+      <em>pct_afín(C, M)</em> = promedio ponderado por fuente del % de votos que obtuvieron en M, en cada elección histórica, los candidatos/partidos definidos como afines a C;
+      <em>techo(C, M)</em> = factor de liderazgo del bloque × pct_afín — el factor (editable por slider) corrige el hecho de que candidatos sub-líderes solo absorben una fracción del bloque, no el 100%; y
+      <em>proyección(C, M)</em> = pct nacional actual de C (ponderador propio) × bias(C, M), idéntico al simulador presidencial. La <strong>brecha</strong> = techo − proyección es el "voto blando capturable" realista. Antes de aplicar el factor, candidatos chicos como Claudia o Roy salían con brechas enormes y candidatos grandes como Cepeda con brechas nulas — el factor cierra esa asimetría.</p>
+    <p><strong>Riesgo metodológico.</strong> El mapeo de afinidades es <em>juicio editorial trazable, no algoritmo objetivo</em> (Cepeda hereda Petro, Paloma hereda Fico/Duque, Fajardo hereda verdes/centro, etc.). El factor de liderazgo es la pieza más subjetiva del modelo — defaults: Cepeda 95%, Paloma 70%, Fajardo 55%, Abelardo 45%, Claudia 20%, Roy 10%. El componente <em>proyección</em> depende del ponderador, fecha de corte: <span id="foot-pond-fecha">cargando…</span>. <strong>El modelo asume voto afín = voto capturable hasta el techo</strong> — falso en el margen por lealtades personales, vetos y contexto local. Léelo como <strong>orientación de prioridades</strong>, no como pronóstico de voto.</p>
+    <p><strong>Drilldown a ciudad.</strong> 14 ciudades soportadas con datos por comuna o localidad: Bogotá (localidades, abre directo desde el mapa nacional), Medellín (comunas + barrios), Cali, Barranquilla, Ibagué, Manizales, Pereira, Montería, Bucaramanga, Cúcuta, Neiva, Popayán, Sincelejo y Villavicencio. Click en el mun de la ciudad → drilldown automático. El bias se calcula contra el promedio de la propia ciudad (no contra el nacional-país) porque las ciudades tienen perfiles ideológicos distintos. <strong>Medellín · Barrios</strong>: cada uno de los 349 barrios y veredas hereda la métrica de su comuna padre — resolución espacial alta sin agregar granularidad analítica.</p>
+    <p><strong>Capa puestos.</strong> 13.492 puestos de votación con coordenadas. Se renderizan con LOD por zoom (a poca resolución solo los más grandes; al hacer zoom aparecen todos). Radio del círculo = log(censo del puesto). Color heredado de la brecha del municipio padre — o de la comuna padre si estás dentro de una de las 14 ciudades soportadas. Activar la capa habilita pan + zoom con la rueda; al volver a Oportunidad o Abstención el mapa se bloquea otra vez. <strong>Próximo paso (paquete v2)</strong>: bias propio por puesto usando histórico por puesto + agregación a barrio para Bogotá y Medellín — granularidad real al precio del retainer.</p>
+    <p><strong>Capa abstención.</strong> Métrica = 1 − (votos totales presidencial 2022 / censo electoral 2026). Capa complementaria: identifica dónde hay potencial no-activado además del afín. Útil para diseñar pisada de movilización junto al mapa de oportunidad. Cap superior: muchos municipios pequeños tienen abstención reportada baja por cierre de mesas, no por participación real — leer con cautela en mun &lt; 5.000 censo.</p>
+    <p><strong>Datos.</strong> Registraduría Nacional del Estado Civil (presidenciales 2018, 2022; consultas 2025 y marzo 2026; senado y cámara 2026; censo 2026 vía Divipole). Ponderador propio ricardoruiz.co — ver <a href="metodologia-simulador-presidencial-2026.docx">documento metodológico</a> y la página hermana <a href="previa-1v.html">Previa 1ª vuelta</a> para el detalle del simulador.</p>
+    <p style="opacity:.7;margin-top:.8rem"><a href="electoral.html">← Volver a Electoral</a> &nbsp;·&nbsp; <a href="veleta.html">Veleta</a> &nbsp;·&nbsp; ricardoruiz.co · 2026</p>
+  </footer>
+
+  <script>
+  /* ════════════════════════════════════════════════════════════════
+     OPORTUNIDAD · voto blando afín por candidato 2026
+     ════════════════════════════════════════════════════════════════ */
+
+  const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
+  const PONDERADOR_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_ponderador/ponderador-actual.json';
+
+  const URLS = {
+    pres18:    `${S3}/historicos/pres-2018-v1/por-mun.json`,
+    pres22:    `${S3}/historicos/pres-2022-v1/por-mun.json`,
+    cons25:    `${S3}/historicos/consulta-2025-pacto/por-mun.json`,
+    cons26g:   `${S3}/historicos/consulta-2026-gran/por-mun.json`,
+    cons26f:   `${S3}/historicos/consulta-2026-frente/por-mun.json`,
+    cons26s:   `${S3}/historicos/consulta-2026-soluciones/por-mun.json`,
+    senDeps:   `${S3}/senado/departamentos.json`,
+    senMuns:   (cod) => `${S3}/senado/departamentos/${cod}/municipios.json`,
+    camMuns:   `${S3}/camara/municipios.json`,
+    censos:    `${S3}/puestos-censos-agg.json`,
+    deptosGeo: `${S3}/mapas-2026/DEPARTAMENTOS2.json`,
+    depsIndex: `${S3}/mapas-2026/Departamentos-mps/index.json`,
+    depMps:    (depElec) => `${S3}/mapas-2026/Departamentos-mps/${depElec}.json`,
+  };
+
+  // ─── MEDELLÍN BARRIOS (Bloque D) ───────────────────────────────
+  // Drilldown adicional Medellín → barrios. Cada barrio hereda la
+  // métrica de su comuna padre (el GeoJSON ya trae 'comuna' y 'nombre_com').
+  // Útil visualmente: pintamos 349 polígonos en lugar de 16+5.
+  // Medellín: GeoJSON de barrios (subido a S3 en proyecto-dc/geo)
+  const MDE_BARRIOS_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/proyecto-dc/geo/barrios-veredas-medellin.json';
+  // Datos electorales por comuna Medellín — bucket separado de output_ciudades.
+  // Shape pres/consulta-2025/senado/cámara = idéntico al de las 13 ciudades.
+  // Las 3 consultas 2026 vienen unificadas en un archivo con shape distinto:
+  //   por_comuna[com].consultas[id].{slug:'soluciones'|'gran'|'frente', candidatos[]}
+  const MDE_DATA_BASE = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_medellin';
+
+  // ─── CIUDADES (Bloque B) ───────────────────────────────────────
+  // Drilldown a comuna/localidad para 13 capitales. Medellín queda
+  // aparte (Bloque D con barrios) porque sus datos viven en output_medellin
+  // con shape distinto.
+  const CITY_S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_ciudades';
+  const CITIES = {
+    medellin:      { depCod:'01', munCod:'001', label:'Medellín',       geoUrl:`${S3}/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`,       rotate:false, nameField:'NOMBRE',     codeField:'CODIGO',    kind:'Comunas',  dataBase:MDE_DATA_BASE, hasBarrios:true },
+    bogota:        { depCod:'16', munCod:'001', label:'Bogotá D.C.',    geoUrl:`${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`, rotate:true,  nameField:'LocNombre',  codeField:'LocCodigo', kind:'Localidades' },
+    cali:          { depCod:'31', munCod:'001', label:'Cali',           geoUrl:`${S3}/mapas-2026/Ciudades-COM-LOC/CALIX.json`,           rotate:false, nameField:'nombre',     codeField:'comuna',    kind:'Comunas' },
+    barranquilla:  { depCod:'03', munCod:'001', label:'Barranquilla',   geoUrl:`${S3}/mapas-2026/Ciudades-COM-LOC/BARRANQUILLAX.json`,   rotate:false, nameField:'nombre',     codeField:'id',        kind:'Localidades' },
+    ibague:        { depCod:'29', munCod:'001', label:'Ibagué',         geoUrl:`${S3}/mapas-2026/Ciudades-COM-LOC/IBAGUEX.json`,         rotate:false, nameField:'COMUNAS',    codeField:'COMUNAS',   kind:'Comunas' },
+    manizales:     { depCod:'09', munCod:'001', label:'Manizales',      geoUrl:`${S3}/mapas-2026/Ciudades-COM-LOC/MANIZALESX.json`,      rotate:false, nameField:'NOMBRES_CO', codeField:'ID_COMUNA', kind:'Comunas' },
+    pereira:       { depCod:'24', munCod:'001', label:'Pereira',        geoUrl:`${S3}/mapas-2026/Ciudades-COM-LOC/PEREIRAX.json`,        rotate:false, nameField:'Comuna',     codeField:'Comuna',    kind:'Comunas',  byName:true },
+    monteria:      { depCod:'13', munCod:'001', label:'Montería',       geoUrl:`${S3}/mapas-2026/Ciudades-COM-LOC/MONTERIAX.json`,       rotate:false, nameField:'NMG',        codeField:'CC_COMUNA', kind:'Comunas' },
+    bucaramanga:   { depCod:'27', munCod:'001', label:'Bucaramanga',    geoUrl:`${S3}/mapas-2026/Ciudades-COM-LOC/BUCARAMANGAX.json`,    rotate:false, nameField:'NOMBRE_COM', codeField:'NOMBRE_COD',kind:'Comunas' },
+    cucuta:        { depCod:'25', munCod:'001', label:'Cúcuta',         geoUrl:`${S3}/mapas-2026/Ciudades-COM-LOC/CUCUTAX.json`,         rotate:false, nameField:'Comuna',     codeField:'Comuna',    kind:'Comunas',  byName:true },
+    neiva:         { depCod:'19', munCod:'001', label:'Neiva',          geoUrl:`${S3}/mapas-2026/Ciudades-COM-LOC/NEIVAX.json`,          rotate:false, nameField:'comuna',     codeField:'comuna',    kind:'Comunas' },
+    popayan:       { depCod:'11', munCod:'001', label:'Popayán',        geoUrl:`${S3}/mapas-2026/Ciudades-COM-LOC/POPAYANX.json`,        rotate:false, nameField:'COMUNAS',    codeField:'Comuna',    kind:'Comunas' },
+    sincelejo:     { depCod:'28', munCod:'001', label:'Sincelejo',      geoUrl:`${S3}/mapas-2026/Ciudades-COM-LOC/SINCELEJOX.json`,      rotate:false, nameField:'Nombre',     codeField:'Layer',     kind:'Comunas' },
+    villavicencio: { depCod:'52', munCod:'001', label:'Villavicencio',  geoUrl:`${S3}/mapas-2026/Ciudades-COM-LOC/VILLAVICENCIOX.json`,  rotate:false, nameField:'Comuna',     codeField:'Comuna',    kind:'Comunas' },
+  };
+  // Señales por ciudad (mismas 10 para todas, paths iguales)
+  const CITY_SIGNALS = [
+    { key:'pres-2010',                folder:'historicos-comuna/pres-2010' },
+    { key:'pres-2014',                folder:'historicos-comuna/pres-2014' },
+    { key:'pres-2018',                folder:'historicos-comuna/pres-2018' },
+    { key:'pres-2022',                folder:'historicos-comuna/pres-2022' },
+    { key:'consulta-2025-pacto',      folder:'historicos-comuna/consulta-2025-pacto' },
+    { key:'senado-2026',              folder:'2026/senado' },
+    { key:'camara-2026',              folder:'2026/camara' },
+    { key:'consulta-2026-gran',       folder:'2026/consultas-gran' },
+    { key:'consulta-2026-frente',     folder:'2026/consultas-frente' },
+    { key:'consulta-2026-soluciones', folder:'2026/consultas-soluciones' },
+  ];
+  function detectCity(depCod, munCod){
+    const dc = String(depCod||'').padStart(2,'0');
+    const mc = String(munCod||'').padStart(3,'0');
+    for (const [k,c] of Object.entries(CITIES)){
+      if (c.depCod === dc && c.munCod === mc) return { key:k, ...c };
+    }
+    return null;
+  }
+  // Bogotá viene en proyección que requiere rotación 90° izq
+  function rotateGeoJSON90Left(geoData){
+    const cx = -74.08, cy = 4.65;
+    const rc = ([lon, lat]) => [cx - (lat - cy), cy + (lon - cx)];
+    const rg = geom => {
+      if (geom.type === 'Polygon')      return { ...geom, coordinates: geom.coordinates.map(ring => ring.map(rc)) };
+      if (geom.type === 'MultiPolygon') return { ...geom, coordinates: geom.coordinates.map(p => p.map(ring => ring.map(rc))) };
+      return geom;
+    };
+    return { ...geoData, features: geoData.features.map(f => ({ ...f, geometry: rg(f.geometry) })) };
+  }
+
+  const norm = s => String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
+  const clamp = (v,lo,hi) => Math.max(lo, Math.min(hi, v));
+  const fmtNum = n => (n==null||isNaN(n)) ? '—' : Math.round(n).toLocaleString('es-CO');
+  const fmtPct = (n,d=1) => (n==null||isNaN(n)) ? '—' : n.toFixed(d) + '%';
+  const fmtPP = (n,d=1) => {
+    if (n==null||isNaN(n)) return '—';
+    const s = n>=0 ? '+' : '';
+    return s + n.toFixed(d) + ' pp';
+  };
+
+  const DEP_NAME_ALIASES = {
+    'DISTRITO CAPITAL DE BOGOTA':'BOGOTA',
+    'BOGOTA':'BOGOTA',
+    'SAN ANDRES Y PROVIDENCIA':'SAN ANDRES',
+    'NORTE DE SANTANDER':'NORTE DE SANTANDER',
+    'VALLE DEL CAUCA':'VALLE',
+    'LA GUAJIRA':'GUAJIRA',
+  };
+
+  // Candidatos 2026 (id, nombre display, partido, color, foto, ponderadorKey)
+  const CANDIDATOS = [
+    { id:'ic', nombre:'Iván Cepeda',          partido:'Pacto Histórico',           color:'#51458F', pondKey:'Cepeda',
+      foto:'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/Fotos-presidenciales/IVAN+CEPEDA.jpg' },
+    { id:'ae', nombre:'A. de la Espriella',   partido:'Mov. Salvación Nacional',   color:'#000062', pondKey:'De la Espriella',
+      foto:'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/Fotos-presidenciales/abelardo.jpg' },
+    { id:'pv', nombre:'Paloma Valencia',      partido:'Centro Democrático',        color:'#1866DF', pondKey:'Valencia',
+      foto:'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/Fotos-presidenciales/PALOMA+VALENCIA.jpg' },
+    { id:'sf', nombre:'Sergio Fajardo',       partido:'Dignidad y Compromiso',     color:'#EEAA22', pondKey:'Fajardo',
+      foto:'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/SergioFajardo.jpg/480px-SergioFajardo.jpg' },
+    { id:'cl', nombre:'Claudia López',        partido:'Independiente',             color:'#d9db24', pondKey:'Claudia López',
+      foto:'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cf/Claudia_Lopez_H_26.jpg/480px-Claudia_Lopez_H_26.jpg' },
+    { id:'rb', nombre:'Roy Barreras',         partido:'La Fuerza',                 color:'#F01E14', pondKey:'Barreras',
+      foto:'https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/20250609_Comision_Procesos_Electorales-Juan_Cano01043.jpg/480px-20250609_Comision_Procesos_Electorales-Juan_Cano01043.jpg' },
+  ];
+
+  // ─── AFINIDADES ────────────────────────────────────────────────
+  // Por candidato y por fuente. Cada fuente aporta una lista de NOMBRES
+  // (cands o partidos según el dataset). El "*" final es prefix matcher
+  // para variantes regionales (PACTO HISTÓRICO ANTIOQUIA, FRENTE AMPLIO
+  // CALDAS, etc.). Las consultas 2026 son tres datasets separados
+  // (gran/frente/soluciones); cada candidato declara sólo los que apliquen.
+  //
+  // El criterio "afín" es ligeramente más amplio que "predecesor electoral"
+  // — incluye candidatos cercanos ideológicamente, no solo el bloque propio.
+  // Cada peso por candidato es defendible pero subjetivo (juicio editorial).
+  const AFINIDADES = {
+    'ic': {  // Cepeda — izquierda
+      pres22:    ['GUSTAVO PETRO'],
+      pres18:    ['GUSTAVO PETRO'],
+      senado26:  ['PACTO HISTÓRICO SENADO'],
+      camara26:  ['PACTO HISTÓRICO*', 'MOVIMIENTO POLÍTICO PACTO HISTÓRICO', 'PACTO FRENTE AMPLIO', 'PACTO POR RISARALDA'],
+      consultas: {
+        'consulta-2025-pacto':  ['IVAN CEPEDA CASTRO', 'DIANA CAROLINA CORCHO MEJIA', 'DANIEL QUINTERO CALLE'],
+        'consulta-2026-frente': ['DANIEL QUINTERO CALLE'],
+      },
+    },
+    'ae': {  // Abelardo — derecha dura / outsider
+      pres22:    ['FEDERICO GUTIERREZ', 'RODOLFO HERNANDEZ'],
+      pres18:    ['IVAN DUQUE'],
+      senado26:  ['MOVIMIENTO SALVACIÓN NACIONAL', 'PARTIDO CENTRO DEMOCRÁTICO', 'COALICIÓN CAMBIO RADICAL - ALMA'],
+      camara26:  ['MOVIMIENTO SALVACIÓN NACIONAL', 'CR-LAU-MSN-OXI', 'PARTIDO CENTRO DEMOCRÁTICO', 'CENTRO DEMOCRÁTICO*', 'PARTIDO CONSERVADOR - MOVIMIENTO SALVACIÓN NACIONAL', 'SALVACIÓN+ALMA+OXÍGENO', 'PARTIDO CAMBIO RADICAL', 'ALMA*', 'CREEMOS'],
+      consultas: {
+        'consulta-2026-gran':   ['PALOMA SUSANA VALENCIA LASERNA', 'JUAN CARLOS PINZON BUENO', 'VICTORIA EUGENIA DAVILA HOYOS'],
+      },
+    },
+    'pv': {  // Paloma — CD
+      pres22:    ['FEDERICO GUTIERREZ'],
+      pres18:    ['IVAN DUQUE'],
+      senado26:  ['PARTIDO CENTRO DEMOCRÁTICO'],
+      camara26:  ['PARTIDO CENTRO DEMOCRÁTICO', 'CENTRO DEMOCRÁTICO*'],
+      consultas: {
+        'consulta-2026-gran':   ['PALOMA SUSANA VALENCIA LASERNA'],
+      },
+    },
+    'sf': {  // Fajardo — centro / verde
+      pres22:    ['SERGIO FAJARDO'],
+      pres18:    ['SERGIO FAJARDO', 'HUMBERTO DE LA CALLE'],
+      senado26:  ['ALIANZA POR COLOMBIA', 'AHORA COLOMBIA'],
+      camara26:  ['AHORA COLOMBIA*', 'COALICIÓN ALIANZA VERDE*', 'ALIANZA VERDE Y EN MARCHA', 'PARTIDO ALIANZA VERDE', 'PARTIDO POLÍTICO EN MARCHA', 'PARTIDO POLÍTICO DIGNIDAD & COMPROMISO', 'VERDE EN MARCHA'],
+      consultas: {
+        'consulta-2026-soluciones': ['CLAUDIA NAYIBE LOPEZ HERNANDEZ', 'LEONARDO HUMBERTO HUERTA GUTIERREZ'],
+        'consulta-2026-frente':     ['ROY LEONARDO BARRERAS MONTEALEGRE'],
+        'consulta-2026-gran':       ['JUAN DANIEL OVIEDO ARANGO', 'JUAN MANUEL GALAN PACHON'],
+      },
+    },
+    'cl': {  // Claudia López — bogotana / verde
+      pres22:    ['SERGIO FAJARDO'],
+      pres18:    ['SERGIO FAJARDO', 'HUMBERTO DE LA CALLE'],
+      senado26:  ['AHORA COLOMBIA', 'ALIANZA POR COLOMBIA'],
+      camara26:  ['AHORA COLOMBIA*', 'COALICIÓN ALIANZA VERDE*', 'ALIANZA VERDE Y EN MARCHA', 'PARTIDO ALIANZA VERDE', 'BOGOTÁ ENTRE TODOS', 'ABC ALIANZA BOGOTÁ CONVERGENTE'],
+      consultas: {
+        'consulta-2026-soluciones': ['CLAUDIA NAYIBE LOPEZ HERNANDEZ'],
+        'consulta-2026-frente':     ['ROY LEONARDO BARRERAS MONTEALEGRE'],
+      },
+    },
+    'rb': {  // Roy — Frente Amplio Unitario
+      pres22:    ['GUSTAVO PETRO'],
+      pres18:    ['GUSTAVO PETRO', 'HUMBERTO DE LA CALLE'],
+      senado26:  ['FRENTE AMPLIO UNITARIO', 'PACTO HISTÓRICO SENADO'],
+      camara26:  ['FRENTE AMPLIO*', 'PACTO HISTÓRICO*', 'MOVIMIENTO POLÍTICO PACTO HISTÓRICO', 'PACTO HISTÓRICO - FRENTE AMPLIO', 'PACTO FRENTE AMPLIO'],
+      consultas: {
+        'consulta-2026-frente':     ['ROY LEONARDO BARRERAS MONTEALEGRE', 'DANIEL QUINTERO CALLE'],
+        'consulta-2025-pacto':      ['IVAN CEPEDA CASTRO'],
+      },
+    },
+  };
+
+  // ─── FACTOR DE LIDERAZGO DEL BLOQUE ──────────────────────────
+  // Fracción del techo afín que un candidato puede capturar realistamente,
+  // dado que comparte bloque ideológico con otros. Líderes consolidados
+  // capturan casi todo; sub-líderes apenas un residual. Defaults editables
+  // por slider en el panel.
+  //
+  // Cepeda 0.95: cara absoluta del Pacto, ganó consulta 2025 con 64%.
+  // Paloma 0.70: ganó consulta gran 2026 (68% en mun antioqueños), pero
+  //              Abelardo le disputa el bloque derecha en costa+oriente.
+  // Fajardo 0.55: histórico del centro, pero Claudia y Roy se llevan parte.
+  // Abelardo 0.45: outsider derecha, sin estructura previa, captura parcial
+  //                del bloque CD/MSN/CR.
+  // Claudia 0.20: perdió consulta soluciones (ganó pero sin volumen),
+  //                comparte centro con Fajardo y verde diluido.
+  // Roy 0.10: residual del Pacto, prácticamente todo va a Cepeda.
+  const LIDER_DEFAULTS = { ic:95, ae:45, pv:70, sf:55, cl:20, rb:10 };
+
+  // Mapeo de "fuente bucket" → datasets. Cada bucket tiene un slider.
+  const SOURCE_BUCKETS = [
+    { key:'pres22',     label:'Presidencial 2022',           sub:'pres-2022 / por-mun',                  defW:40 },
+    { key:'congreso26', label:'Senado + Cámara 2026',         sub:'promedio del % afín en cada cámara',   defW:35 },
+    { key:'pres18',     label:'Presidencial 2018',            sub:'pres-2018 / por-mun',                  defW:15 },
+    { key:'consultas',  label:'Consultas 2025 + 2026',        sub:'4 consultas · % sobre censo',          defW:10 },
+  ];
+
+  // ─── STATE ────────────────────────────────────────────────────
+  const STATE = {
+    pondData:null,
+    pres18:null, pres22:null,
+    cons25:null, cons26g:null, cons26f:null, cons26s:null,
+    senByDep:{},     // depCod → { partidos:{name:votos}, votval, votant }
+    senMunByKey:{},  // depCod-munCod → { partidos:{name:votos}, votval, votant }
+    camMunByKey:{},  // depCod-munCod → { partidos:{name:votos}, votval, votant }
+    censoNacional:0,
+    censoByMun:{},
+    censoByDep:{},
+    depGeo:null, depIndex:null,
+    depMpsCache:{},
+    depByElectoral:{}, depByName:{},
+    sumCensoNacional:0,
+
+    // Cómputo derivado por candidato — se recomputa al cambiar candidato/pesos
+    candId:'ic',
+    weights:{ pres22:40, congreso26:35, pres18:15, consultas:10 },
+    lider:{ ...LIDER_DEFAULTS },   // 0..100 por candidato (% de techo afín capturable)
+    threshold:5,         // pp (umbral para rayado de oportunidad — más bajo con techo realista)
+    layer:'opo',         // 'opo' | 'abs' | 'pue'
+    level:'dep',         // 'dep' | 'mun'
+    selectedDep:null,
+    map:null, mapLayer:null,
+
+    // Caches por candidato
+    munMetrics:{},      // munKey → { afin, proj, gap, abst, censo, byBucket: {...} }
+    depMetrics:{},      // depCod → agregado ponderado por censo
+    munNameByKey:{},    // munKey → { name, depName }
+
+    // Histórico afín nacional (para bias_proj)
+    nacAfinByBucket:{}, // bucket → pct nacional afín
+
+    // Ciudades (Bloque B)
+    cityData:{},        // { cityKey: { sigKey: por_comuna } }
+    cityLoading:{},     // { cityKey: Promise }
+    cityGeo:{},         // { cityKey: GeoJSON }
+    cityNacAfin:{},     // { cityKey: { candId: { bucket: pct_nacional_ciudad_afin } } }
+    cityComMetrics:{},  // { cityKey: { comCod: { afin, techo, proj, gap, abst, censo } } }
+    selectedCity:null,  // cityKey activo (en drilldown)
+
+    // Medellín barrios (Bloque D)
+    mdeBarriosGeo:null,
+    mdeBarriosLoading:null,
+    mdeView:'comunas',
+
+    // Puestos (Bloque C)
+    puestos:null,            // array de {k,y,x,c,m,n,mn,p22,s26,t}
+    puestosLoading:null,
+    puestosLayer:null,       // L.layerGroup activo
+    tileLayer:null,          // L.tileLayer activo (solo en modo puestos)
+    puestoNameByKey:{},      // 'd-m-z-p' → {n, mn} para tooltips
+  };
+
+  /* ───────── Carga de datos ───────── */
+  async function fetchJSON(url, optional=false){
+    try {
+      const r = await fetch(url);
+      if (!r.ok){
+        if (optional){ console.warn('[opo] optional fetch failed', url, r.status); return null; }
+        throw new Error(`fetch ${url}: ${r.status}`);
+      }
+      return await r.json();
+    } catch (e){
+      if (optional){ console.warn('[opo] optional fetch error', url, e); return null; }
+      throw e;
+    }
+  }
+
+  async function loadAllData(){
+    const [pond, p18, p22, c25, c26g, c26f, c26s, senDeps, camMuns, censos, depGeo, depIdx] = await Promise.all([
+      fetchJSON(PONDERADOR_URL, true),
+      fetchJSON(URLS.pres18),
+      fetchJSON(URLS.pres22),
+      fetchJSON(URLS.cons25, true),
+      fetchJSON(URLS.cons26g, true),
+      fetchJSON(URLS.cons26f, true),
+      fetchJSON(URLS.cons26s, true),
+      fetchJSON(URLS.senDeps),
+      fetchJSON(URLS.camMuns, true),
+      fetchJSON(URLS.censos),
+      fetchJSON(URLS.deptosGeo),
+      fetchJSON(URLS.depsIndex),
+    ]);
+    STATE.pondData = pond;
+    STATE.pres18 = p18; STATE.pres22 = p22;
+    STATE.cons25 = c25; STATE.cons26g = c26g; STATE.cons26f = c26f; STATE.cons26s = c26s;
+    STATE.depGeo = depGeo; STATE.depIndex = depIdx;
+    STATE.censoByMun = censos.porMun || {};
+    STATE.censoByDep = censos.porDep || {};
+    STATE.censoNacional = censos.nacional || 0;
+    STATE.sumCensoNacional = STATE.censoNacional;
+
+    // Index dep por electoral_id y por nombre
+    depIdx.forEach(d => {
+      STATE.depByElectoral[d.dep_electoral] = d;
+      STATE.depByName[norm(d.nombre)] = d;
+    });
+
+    // Senado deps
+    senDeps.forEach(d => {
+      STATE.senByDep[d.cod] = { partidos: d.partidos || {}, votval: d.votval||0, votant: d.votant||0 };
+    });
+
+    // Cámara muns (un solo archivo)
+    if (Array.isArray(camMuns)){
+      camMuns.forEach(m => {
+        const key = `${m.dep_cod}-${m.cod}`;
+        STATE.camMunByKey[key] = { partidos: m.partidos || {}, votval: m.votval||0, votant: m.votant||0 };
+        STATE.munNameByKey[key] = { name: m.nombre, depName: m.dep_nom };
+      });
+    }
+
+    // Senado muns: 33 deps en paralelo
+    const senPromises = depIdx.map(async d => {
+      const muns = await fetchJSON(URLS.senMuns(d.dep_electoral), true);
+      if (!Array.isArray(muns)) return;
+      muns.forEach(m => {
+        const key = `${m.dep_cod || d.dep_electoral}-${m.cod}`;
+        STATE.senMunByKey[key] = { partidos: m.partidos || {}, votval: m.votval||0, votant: m.votant||0 };
+        if (!STATE.munNameByKey[key]){
+          STATE.munNameByKey[key] = { name: m.nombre, depName: m.dep_nom || d.nombre };
+        }
+      });
+    });
+    await Promise.all(senPromises);
+
+    // Para nombres de muns que sólo existen en históricos (faltan en 2026):
+    // los rellenamos lazy desde Departamentos-mps al hacer drilldown.
+  }
+
+  /* ───────── Match de afines (con prefix '*') ───────── */
+  function matchesAffinity(name, patterns){
+    const n = norm(name);
+    for (const p of patterns){
+      const pn = norm(p);
+      if (pn.endsWith('*')){
+        const pref = pn.slice(0,-1);
+        if (n.startsWith(pref)) return true;
+      } else if (n === pn){
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /* ───────── Helpers de extracción de pct afín por dataset ───────── */
+
+  // Para datasets tipo presidencial / consulta (por-mun.json):
+  // entry = { candidatos: { '1': { nombre, votos, pct }, ... }, votos_validos, votos_totales }
+  // → suma votos afines / votos_validos
+  function pctAfinPresentry(entry, patterns){
+    if (!entry || !entry.candidatos) return null;
+    let sum = 0, found = false;
+    for (const k of Object.keys(entry.candidatos)){
+      const c = entry.candidatos[k];
+      if (!c || !c.nombre) continue;
+      if (matchesAffinity(c.nombre, patterns)){
+        sum += (c.votos || 0);
+        found = true;
+      }
+    }
+    if (!found) return null;
+    const den = entry.votos_validos || entry.votos_totales || 0;
+    if (den <= 0) return null;
+    return 100 * sum / den;
+  }
+
+  // Para datasets tipo congreso (senado/cámara):
+  // entry = { partidos: { name: votos }, votval }
+  function pctAfinCongresoEntry(entry, patterns){
+    if (!entry || !entry.partidos) return null;
+    let sum = 0, found = false;
+    for (const [name, votos] of Object.entries(entry.partidos)){
+      if (matchesAffinity(name, patterns)){ sum += (votos||0); found = true; }
+    }
+    if (!found || !entry.votval) return null;
+    return 100 * sum / entry.votval;
+  }
+
+  // Versión "share del censo" — para consultas (corrige el sesgo de universo):
+  //   = votos_afín_consulta / censo_municipio × 100
+  // Más comparable contra el % presidencial pero números bajos en absoluto.
+  function pctAfinConsultaCensoEntry(entry, censoMun, patterns){
+    if (!entry || !entry.candidatos || !censoMun) return null;
+    let sum = 0, found = false;
+    for (const k of Object.keys(entry.candidatos)){
+      const c = entry.candidatos[k];
+      if (!c || !c.nombre) continue;
+      if (matchesAffinity(c.nombre, patterns)){
+        sum += (c.votos || 0);
+        found = true;
+      }
+    }
+    if (!found) return null;
+    return 100 * sum / censoMun;
+  }
+
+  /* ───────── Pct afín por bucket para un municipio ───────── */
+  // Devuelve { value, hasData } por cada bucket, en una sola pasada.
+  function bucketsPctAfinForMun(candId, munKey){
+    const aff = AFINIDADES[candId];
+    const censo = STATE.censoByMun[munKey] || 0;
+
+    const buckets = {};
+
+    // pres22
+    {
+      const pat = aff.pres22 || [];
+      const v = pat.length ? pctAfinPresentry(STATE.pres22?.[munKey], pat) : null;
+      buckets.pres22 = v;
+    }
+    // pres18
+    {
+      const pat = aff.pres18 || [];
+      const v = pat.length ? pctAfinPresentry(STATE.pres18?.[munKey], pat) : null;
+      buckets.pres18 = v;
+    }
+    // congreso26 = average(senado, camara) si ambos disponibles
+    {
+      const senPat = aff.senado26 || [];
+      const camPat = aff.camara26 || [];
+      const vSen = senPat.length ? pctAfinCongresoEntry(STATE.senMunByKey[munKey], senPat) : null;
+      const vCam = camPat.length ? pctAfinCongresoEntry(STATE.camMunByKey[munKey], camPat) : null;
+      let v = null;
+      if (vSen != null && vCam != null) v = (vSen + vCam) / 2;
+      else if (vSen != null) v = vSen;
+      else if (vCam != null) v = vCam;
+      buckets.congreso26 = v;
+    }
+    // consultas — suma share-de-censo across las 4 consultas
+    {
+      const cmap = aff.consultas || {};
+      let total = 0, hasAny = false;
+      const dsByKey = {
+        'consulta-2025-pacto':       STATE.cons25?.[munKey],
+        'consulta-2026-gran':        STATE.cons26g?.[munKey],
+        'consulta-2026-frente':      STATE.cons26f?.[munKey],
+        'consulta-2026-soluciones':  STATE.cons26s?.[munKey],
+      };
+      for (const [ckey, pat] of Object.entries(cmap)){
+        if (!pat || !pat.length) continue;
+        const ds = dsByKey[ckey];
+        if (!ds) continue;
+        const v = pctAfinConsultaCensoEntry(ds, censo, pat);
+        if (v != null){ total += v; hasAny = true; }
+      }
+      buckets.consultas = hasAny ? total : null;
+    }
+
+    return buckets;
+  }
+
+  /* ───────── Pct afín nacional por bucket (para bias_proj) ───────── */
+  function precomputeNacionalAfin(candId){
+    const aff = AFINIDADES[candId];
+    const cache = {};
+
+    function nacFromPresMap(map, patterns){
+      if (!map || !patterns?.length) return null;
+      let sumV = 0, sumDen = 0, found = false;
+      for (const k of Object.keys(map)){
+        const e = map[k];
+        if (!e || !e.candidatos) continue;
+        let any = false;
+        for (const ck of Object.keys(e.candidatos)){
+          const c = e.candidatos[ck];
+          if (!c || !c.nombre) continue;
+          if (matchesAffinity(c.nombre, patterns)){
+            sumV += (c.votos||0); any = true;
+          }
+        }
+        if (any){
+          sumDen += (e.votos_validos || e.votos_totales || 0);
+          found = true;
+        }
+      }
+      return found && sumDen>0 ? 100*sumV/sumDen : null;
+    }
+
+    function nacFromCongresoMap(map, patterns){
+      if (!patterns?.length) return null;
+      let sumV = 0, sumDen = 0, found = false;
+      for (const k of Object.keys(map)){
+        const e = map[k];
+        if (!e || !e.partidos) continue;
+        let any = false;
+        for (const [pname, vt] of Object.entries(e.partidos)){
+          if (matchesAffinity(pname, patterns)){ sumV += (vt||0); any = true; }
+        }
+        if (any){ sumDen += (e.votval||0); found = true; }
+      }
+      return found && sumDen>0 ? 100*sumV/sumDen : null;
+    }
+
+    function nacFromConsultaMapCenso(ds, patterns){
+      if (!ds || !patterns?.length) return null;
+      let sumV = 0;
+      let found = false;
+      for (const k of Object.keys(ds)){
+        const e = ds[k];
+        if (!e || !e.candidatos) continue;
+        const censo = STATE.censoByMun[k] || 0;
+        if (!censo) continue;
+        for (const ck of Object.keys(e.candidatos)){
+          const c = e.candidatos[ck];
+          if (!c || !c.nombre) continue;
+          if (matchesAffinity(c.nombre, patterns)){
+            sumV += (c.votos||0); found = true;
+          }
+        }
+      }
+      return found && STATE.censoNacional>0 ? 100*sumV/STATE.censoNacional : null;
+    }
+
+    cache.pres22 = nacFromPresMap(STATE.pres22, aff.pres22);
+    cache.pres18 = nacFromPresMap(STATE.pres18, aff.pres18);
+
+    // congreso26 nacional = average de senado-nacional y cámara-nacional
+    {
+      const senPat = aff.senado26 || [];
+      const camPat = aff.camara26 || [];
+      // senado nacional desde STATE.senByDep agregado
+      let sSenV = 0, sSenD = 0;
+      for (const dc of Object.keys(STATE.senByDep)){
+        const e = STATE.senByDep[dc];
+        for (const [pn, vt] of Object.entries(e.partidos||{})){
+          if (matchesAffinity(pn, senPat)) sSenV += (vt||0);
+        }
+        sSenD += (e.votval||0);
+      }
+      const vSen = (senPat.length && sSenD>0) ? 100*sSenV/sSenD : null;
+      // cámara nacional desde STATE.camMunByKey
+      let sCamV = 0, sCamD = 0;
+      for (const k of Object.keys(STATE.camMunByKey)){
+        const e = STATE.camMunByKey[k];
+        for (const [pn, vt] of Object.entries(e.partidos||{})){
+          if (matchesAffinity(pn, camPat)) sCamV += (vt||0);
+        }
+        sCamD += (e.votval||0);
+      }
+      const vCam = (camPat.length && sCamD>0) ? 100*sCamV/sCamD : null;
+
+      let v = null;
+      if (vSen != null && vCam != null) v = (vSen + vCam)/2;
+      else if (vSen != null) v = vSen;
+      else if (vCam != null) v = vCam;
+      cache.congreso26 = v;
+    }
+
+    // consultas nacional = suma de shares-del-censo across 4 consultas
+    {
+      const cmap = aff.consultas || {};
+      let total = 0, hasAny = false;
+      const dsByKey = {
+        'consulta-2025-pacto':       STATE.cons25,
+        'consulta-2026-gran':        STATE.cons26g,
+        'consulta-2026-frente':      STATE.cons26f,
+        'consulta-2026-soluciones':  STATE.cons26s,
+      };
+      for (const [ckey, pat] of Object.entries(cmap)){
+        if (!pat || !pat.length) continue;
+        const v = nacFromConsultaMapCenso(dsByKey[ckey], pat);
+        if (v != null){ total += v; hasAny = true; }
+      }
+      cache.consultas = hasAny ? total : null;
+    }
+
+    return cache;
+  }
+
+  /* ───────── Cómputo principal por municipio ───────── */
+  function computeAllForCandidate(candId){
+    const aff = AFINIDADES[candId];
+    if (!aff){ STATE.munMetrics = {}; STATE.depMetrics = {}; return; }
+
+    const cand = CANDIDATOS.find(c => c.id === candId);
+    const candPctNac = pondPct(cand);
+
+    // 1) Pct afín nacional por bucket (denominador del bias)
+    const nacAfin = precomputeNacionalAfin(candId);
+    STATE.nacAfinByBucket = nacAfin;
+
+    // 2) Set de munKeys candidatos: union de todos los datasets
+    const munKeys = new Set();
+    [STATE.pres18, STATE.pres22, STATE.cons25, STATE.cons26g, STATE.cons26f, STATE.cons26s].forEach(m => {
+      if (m) Object.keys(m).forEach(k => munKeys.add(k));
+    });
+    Object.keys(STATE.senMunByKey).forEach(k => munKeys.add(k));
+    Object.keys(STATE.camMunByKey).forEach(k => munKeys.add(k));
+    Object.keys(STATE.censoByMun).forEach(k => munKeys.add(k));
+
+    const wRaw = STATE.weights;
+    const wSum = Math.max(1, wRaw.pres22 + wRaw.congreso26 + wRaw.pres18 + wRaw.consultas);
+    const wNorm = {
+      pres22:     wRaw.pres22 / wSum,
+      congreso26: wRaw.congreso26 / wSum,
+      pres18:     wRaw.pres18 / wSum,
+      consultas:  wRaw.consultas / wSum,
+    };
+
+    const munMetrics = {};
+    for (const munKey of munKeys){
+      const buckets = bucketsPctAfinForMun(candId, munKey);
+
+      // Afín ponderado: re-normaliza pesos a los buckets que SÍ tienen dato
+      // para ese mun (evita penalizar muns sin cobertura en una fuente).
+      let afinNum = 0, afinDen = 0;
+      let projBiasNum = 0, projBiasDen = 0;
+      for (const b of ['pres22','congreso26','pres18','consultas']){
+        const v = buckets[b];
+        const w = wNorm[b];
+        if (v != null){
+          afinNum += w * v;
+          afinDen += w;
+        }
+        const nac = nacAfin[b];
+        if (v != null && nac != null && nac > 0){
+          projBiasNum += w * (v / nac);
+          projBiasDen += w;
+        }
+      }
+      const afin = afinDen > 0 ? afinNum / afinDen : null;
+      const bias = projBiasDen > 0 ? projBiasNum / projBiasDen : 1.0;
+      const proj = candPctNac != null ? candPctNac * bias : null;
+      // Techo realista = factor liderazgo × techo afín del bloque.
+      // Captura el hecho de que candidatos sub-líderes del bloque sólo
+      // pueden absorber una fracción del voto histórico afín.
+      const factor = (STATE.lider[candId] ?? 100) / 100;
+      const techo = afin != null ? factor * afin : null;
+      const gap  = (techo != null && proj != null) ? (techo - proj) : null;
+
+      // Abstención 2022
+      const e22 = STATE.pres22?.[munKey];
+      const censo = STATE.censoByMun[munKey] || 0;
+      const totVot22 = e22 ? (e22.votos_totales || 0) : 0;
+      const abst = (censo > 0 && totVot22 > 0) ? clamp(1 - totVot22/censo, 0, 1) : null;
+
+      munMetrics[munKey] = {
+        munKey,
+        depCod: munKey.split('-')[0],
+        afin, techo, proj, gap, bias,
+        buckets,
+        abst,
+        censo,
+      };
+    }
+    STATE.munMetrics = munMetrics;
+
+    // 3) Agregado por depto: ponderado por censo
+    const depAgg = {};
+    for (const r of Object.values(munMetrics)){
+      const dc = r.depCod;
+      if (!depAgg[dc]){
+        depAgg[dc] = { depCod:dc, sumW:0, sumAfin:0, sumTecho:0, hasTecho:0, sumProj:0, sumGap:0, sumAbst:0, sumAbstW:0, sumBias:0, censo:0, nMun:0, nOpo:0, hasAfin:0, hasGap:0 };
+      }
+      const w = Math.max(1, r.censo);
+      const a = depAgg[dc];
+      if (r.afin != null){ a.sumAfin += r.afin * w; a.hasAfin += w; }
+      if (r.techo != null){ a.sumTecho += r.techo * w; a.hasTecho += w; }
+      if (r.proj != null) a.sumProj += r.proj * w;
+      if (r.gap != null){ a.sumGap += r.gap * w; a.hasGap += w; }
+      if (r.abst != null){ a.sumAbst += r.abst * w; a.sumAbstW += w; }
+      a.sumBias += (r.bias||1) * w;
+      a.sumW += w;
+      a.censo += r.censo || 0;
+      a.nMun++;
+    }
+    for (const dc of Object.keys(depAgg)){
+      const a = depAgg[dc];
+      a.afin = a.hasAfin > 0 ? a.sumAfin / a.hasAfin : null;
+      a.techo = a.hasTecho > 0 ? a.sumTecho / a.hasTecho : null;
+      a.proj = a.sumW > 0 ? a.sumProj / a.sumW : null;
+      a.gap  = a.hasGap > 0 ? a.sumGap / a.hasGap : null;
+      a.abst = a.sumAbstW > 0 ? a.sumAbst / a.sumAbstW : null;
+      a.bias = a.sumW > 0 ? a.sumBias / a.sumW : 1;
+      // Cuenta de muns con oportunidad ≥ umbral (se actualiza al cambiar threshold)
+      a.nOpo = Object.values(munMetrics).filter(r => r.depCod === dc && r.gap != null && r.gap >= STATE.threshold).length;
+    }
+    STATE.depMetrics = depAgg;
+  }
+
+  function pondPct(cand){
+    if (!cand) return null;
+    if (STATE.pondData?.candidatos?.[cand.pondKey]?.pct != null){
+      return STATE.pondData.candidatos[cand.pondKey].pct;
+    }
+    // Fallback (mismos que previa-1v hardcodeados)
+    const fb = { ic:38, ae:29, sf:11, pv:6.5, rb:1.5, cl:1.5, lm:.8 };
+    return fb[cand.id] ?? null;
+  }
+
+  /* ───────── Color helpers ───────── */
+  function isDay(){ return document.body.classList.contains('day-mode'); }
+
+  // Divergente: -10..0..+10 pp (techo realista comprime el rango)
+  function colorByGap(gap){
+    if (gap == null || isNaN(gap)) return '#2d3340';
+    const g = clamp(gap, -10, 10);
+    const stops = [
+      [-10, [167,139,250]],   // púrpura saturado (sobre-rep fuerte)
+      [ -4, [126,109,194]],
+      [  0, [ 58, 63, 77]],   // neutro
+      [  4, [124,202,140]],
+      [ 10, [ 74,222,128]],   // verde brillante (oportunidad fuerte)
+    ];
+    for (let i=0;i<stops.length-1;i++){
+      const [s0,c0] = stops[i], [s1,c1] = stops[i+1];
+      if (g >= s0 && g <= s1){
+        const t = (g - s0) / (s1 - s0 || 1);
+        const r = Math.round(c0[0] + t*(c1[0]-c0[0]));
+        const gg = Math.round(c0[1] + t*(c1[1]-c0[1]));
+        const b = Math.round(c0[2] + t*(c1[2]-c0[2]));
+        return `rgb(${r},${gg},${b})`;
+      }
+    }
+    return '#4ade80';
+  }
+
+  // Abstención: rango real Colombia ~35–75% por mun.
+  // Calibramos al rango efectivo con stops intermedios para que diferencias
+  // de 5-10 pp se distingan visualmente. Fuera de rango se satura.
+  function colorByAbst(a){
+    if (a == null || isNaN(a)) return '#2d3340';
+    const p = clamp(a, 0, 1) * 100;
+    // Stops: percent → [r,g,b]. Diverging-ish para mostrar el centro del país.
+    const stops = [
+      [35, [ 56, 89,124]],   // azul-gris frío (baja abstención · alta participación)
+      [45, [ 99,138,160]],   // azul claro
+      [52, [205,200,180]],   // beige neutro (mediana nacional)
+      [58, [240,180, 90]],   // ámbar
+      [65, [225,120, 50]],   // naranja intenso
+      [75, [180, 55, 40]],   // rojo profundo (alta abstención)
+    ];
+    if (p <= stops[0][0]) return `rgb(${stops[0][1].join(',')})`;
+    if (p >= stops[stops.length-1][0]) return `rgb(${stops[stops.length-1][1].join(',')})`;
+    for (let i=0;i<stops.length-1;i++){
+      const [s0,c0] = stops[i], [s1,c1] = stops[i+1];
+      if (p >= s0 && p <= s1){
+        const t = (p - s0) / (s1 - s0 || 1);
+        const r = Math.round(c0[0] + t*(c1[0]-c0[0]));
+        const gg = Math.round(c0[1] + t*(c1[1]-c0[1]));
+        const b = Math.round(c0[2] + t*(c1[2]-c0[2]));
+        return `rgb(${r},${gg},${b})`;
+      }
+    }
+    return '#2d3340';
+  }
+
+  function styleFor(rec){
+    if (STATE.layer === 'opo'){
+      const gap = rec ? rec.gap : null;
+      const isHigh = gap != null && gap >= STATE.threshold;
+      const fill = isHigh
+        ? `url(#${isDay() ? 'opo-stripes-day' : 'opo-stripes'})`
+        : colorByGap(gap);
+      return {
+        fillColor: fill,
+        fillOpacity: 0.88,
+        color: isDay() ? 'rgba(0,0,0,.18)' : 'rgba(255,255,255,.14)',
+        weight: 0.6,
+      };
+    } else {
+      const a = rec ? rec.abst : null;
+      return {
+        fillColor: colorByAbst(a),
+        fillOpacity: 0.88,
+        color: isDay() ? 'rgba(0,0,0,.18)' : 'rgba(255,255,255,.14)',
+        weight: 0.6,
+      };
+    }
+  }
+
+  /* ───────── Match dep electoral en GeoJSON nacional ───────── */
+  function depElectoralOfFeature(props){
+    if (props.electoral_id) return String(props.electoral_id).padStart(2,'0');
+    if (props.dep_electoral) return String(props.dep_electoral).padStart(2,'0');
+    if (props.name){
+      let n = norm(props.name);
+      if (DEP_NAME_ALIASES[n]) n = DEP_NAME_ALIASES[n];
+      const cand = STATE.depByName[n];
+      if (cand) return cand.dep_electoral;
+      for (const k of Object.keys(STATE.depByName)){
+        if (k.startsWith(n) || n.startsWith(k)) return STATE.depByName[k].dep_electoral;
+      }
+    }
+    return null;
+  }
+
+  function munKeyOfFeature(props){
+    const dep = props.dep_electoral || depElectoralOfFeature(props);
+    const mun = props.mun_elec || props.mun_electoral || props.mpio_ccdgo;
+    if (!dep || !mun) return null;
+    return `${String(dep).padStart(2,'0')}-${String(mun).padStart(3,'0')}`;
+  }
+
+  /* ───────── PUESTOS (Bloque C) ─────────
+     v1: pinta circleMarkers tamaño-por-censo, color heredado del gap del
+     mun padre (o comuna padre si estamos en una de las 14 ciudades).
+     LOD por zoom para no saturar a baja resolución.
+     v2 futuro: bias por puesto con por-puesto.json de cada señal — más
+     trabajo pero da granularidad real al precio del retainer. */
+  const PUESTOS_URL = `${S3}/puestos-nacional-light.json`;
+  const PUE_TILE_LIGHT = {
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19,
+    subdomains: 'abc',
+  };
+  const PUE_TILE_DARK = {
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    maxZoom: 20,
+    subdomains: 'abcd',
+  };
+  // Umbrales de zoom para LOD por tier (tier 1 = puestos más pesados)
+  const PUE_ZOOM_TIER1 = 7.5;
+  const PUE_ZOOM_TIER2 = 9.0;
+
+  async function loadPuestos(){
+    if (STATE.puestos) return STATE.puestos;
+    if (STATE.puestosLoading) return STATE.puestosLoading;
+    STATE.puestosLoading = (async () => {
+      const r = await fetch(PUESTOS_URL);
+      const arr = await r.json();
+      STATE.puestos = arr;
+      // Indexar nombre por key para tooltip
+      arr.forEach(p => { STATE.puestoNameByKey[p.k] = { n:p.n, mn:p.mn }; });
+      return arr;
+    })();
+    return STATE.puestosLoading;
+  }
+
+  // Resuelve el record de gap aplicable al puesto. Si estamos en una
+  // ciudad con drilldown a comuna, intenta usar la comuna del puesto
+  // (col zon = parts[2] del key 'dep-mun-zon-pue'). Si no, hereda
+  // del mun. Si tampoco, null.
+  function recForPuesto(p){
+    const parts = p.k.split('-');
+    const depCod = parts[0], munCod = parts[1], zon = parts[2];
+    const munKey = `${depCod}-${munCod}`;
+    // Ciudad activa: intentar match por comuna
+    if (STATE.selectedCity){
+      const metrics = STATE.cityComMetrics[STATE.selectedCity] || {};
+      const zonNorm = String(parseInt(zon,10)||0);
+      for (const k of Object.keys(metrics)){
+        if (String(parseInt(k,10)||0) === zonNorm) return metrics[k];
+      }
+    }
+    return STATE.munMetrics[munKey] || null;
+  }
+
+  function puestoRadius(censo){
+    // log-scale. censo ~ 100..30000 → radius ~ 2..12
+    if (!censo || censo <= 0) return 2;
+    const lc = Math.log(censo);   // ~4..10
+    const r = clamp((lc - 3.5) * 2.1, 2.5, 13);
+    return r;
+  }
+
+  function visiblePuestos(){
+    if (!STATE.puestos) return [];
+    const z = STATE.map ? STATE.map.getZoom() : 6;
+    let tierCap;
+    if (z < PUE_ZOOM_TIER1)      tierCap = 1;
+    else if (z < PUE_ZOOM_TIER2) tierCap = 2;
+    else                          tierCap = 3;
+    // Filtro por scope: si hay dep/city/mun activos, restringir
+    return STATE.puestos.filter(p => {
+      if ((p.t||3) > tierCap) return false;
+      if (STATE.selectedCity){
+        const cfg = CITIES[STATE.selectedCity];
+        return p.k.startsWith(`${cfg.depCod}-${cfg.munCod}-`);
+      }
+      if (STATE.selectedDep){
+        return p.k.startsWith(`${STATE.selectedDep}-`);
+      }
+      return true;
+    });
+  }
+
+  function renderPuestos(){
+    if (!STATE.map) return;
+    // Quitar capa previa
+    if (STATE.puestosLayer){ STATE.map.removeLayer(STATE.puestosLayer); STATE.puestosLayer = null; }
+    const arr = visiblePuestos();
+    const markers = arr.map(p => {
+      const rec = recForPuesto(p);
+      const gap = rec ? rec.gap : null;
+      const fill = colorByGap(gap);
+      const r = puestoRadius(p.c);
+      const marker = L.circleMarker([p.y, p.x], {
+        radius: r,
+        fillColor: fill,
+        color: isDay() ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.6)',
+        weight: 0.7,
+        fillOpacity: 0.88,
+      });
+      const gapTxt = gap != null ? fmtPP(gap, 1) : '—';
+      marker.bindTooltip(
+        `<div style="font-family:Avenir,sans-serif;font-size:.78rem;line-height:1.45;padding:.15rem .25rem">
+          <div style="font-weight:600;color:#fff">${p.n||'Puesto'}</div>
+          <div style="opacity:.7">${p.mn||''} · censo ${fmtNum(p.c)}</div>
+          <div style="margin-top:.2rem;color:${isDay()?'#fb923c':'var(--green)'};font-weight:600">brecha mun · ${gapTxt}</div>
+        </div>`,
+        { sticky:true, opacity:1 }
+      );
+      return marker;
+    });
+    STATE.puestosLayer = L.layerGroup(markers).addTo(STATE.map);
+  }
+
+  function ensureTileLayer(){
+    if (!STATE.map) return;
+    if (STATE.tileLayer){ STATE.map.removeLayer(STATE.tileLayer); STATE.tileLayer = null; }
+    const cfg = isDay() ? PUE_TILE_LIGHT : PUE_TILE_DARK;
+    STATE.tileLayer = L.tileLayer(cfg.url, {
+      attribution: cfg.attribution,
+      subdomains: cfg.subdomains,
+      maxZoom: cfg.maxZoom,
+      opacity: 1.0,
+    }).addTo(STATE.map);
+  }
+  function removeTileLayer(){
+    if (STATE.tileLayer){ STATE.map.removeLayer(STATE.tileLayer); STATE.tileLayer = null; }
+  }
+
+  // Habilita / deshabilita pan & wheel-zoom. En modo Puestos hace falta
+  // poder navegar; en los otros modos el mapa permanece bloqueado.
+  function setMapInteractive(on){
+    if (!STATE.map) return;
+    const m = STATE.map;
+    if (on){
+      m.dragging.enable();
+      m.scrollWheelZoom.enable();
+      m.doubleClickZoom.enable();
+      m.touchZoom.enable();
+    } else {
+      m.dragging.disable();
+      m.scrollWheelZoom.disable();
+      m.doubleClickZoom.disable();
+      m.touchZoom.disable();
+    }
+  }
+
+  // Listener de zoom/move para repintar LOD. Se registra una vez al init.
+  function _onPuestosZoom(){
+    if (STATE.layer === 'pue' && STATE.puestos){
+      renderPuestos();
+      updateCounter();
+    }
+  }
+
+  /* ───────── CIUDADES — carga lazy de señales por ciudad ───────── */
+  async function loadCitySignals(cityKey){
+    if (STATE.cityData[cityKey]) return STATE.cityData[cityKey];
+    if (STATE.cityLoading[cityKey]) return STATE.cityLoading[cityKey];
+    const cfg = CITIES[cityKey];
+    const isMde = cityKey === 'medellin';
+    const base = cfg.dataBase || `${CITY_S3}/${cityKey}`;
+
+    const promise = (async () => {
+      const out = {};
+      // Para Medellín, las 3 consultas 2026 vienen unificadas en un archivo
+      // (shape distinto). Las otras señales tienen el shape estándar.
+      const sigList = isMde
+        ? CITY_SIGNALS.filter(s => !s.key.startsWith('consulta-2026-'))
+        : CITY_SIGNALS;
+      const fetches = sigList.map(async sig => {
+        const url = `${base}/${sig.folder}/por-comuna.json`;
+        try {
+          const r = await fetch(url);
+          if (!r.ok) return;
+          const j = await r.json();
+          out[sig.key] = j.por_comuna || {};
+        } catch (e) {
+          console.warn('[opo·city]', cityKey, sig.key, 'fetch error', e);
+        }
+      });
+      // Medellín consultas 2026 unificadas: explotar a 3 señales con shape estándar.
+      if (isMde){
+        fetches.push((async () => {
+          try {
+            const r = await fetch(`${base}/2026/consultas/por-comuna.json`);
+            if (!r.ok) return;
+            const j = await r.json();
+            const por = j.por_comuna || {};
+            const slugMap = { 'soluciones':'consulta-2026-soluciones', 'gran':'consulta-2026-gran', 'frente':'consulta-2026-frente' };
+            const expanded = { gran:{}, frente:{}, soluciones:{} };
+            for (const [com, entry] of Object.entries(por)){
+              const consultas = entry.consultas || {};
+              for (const cdata of Object.values(consultas)){
+                const slug = cdata.slug;
+                if (!slug || !slugMap[slug]) continue;
+                expanded[slug][com] = {
+                  cod: com,
+                  nombre: entry.nombre,
+                  votos_validos: cdata.votos_validos || 0,
+                  candidatos: cdata.candidatos || [],
+                };
+              }
+            }
+            out['consulta-2026-soluciones'] = expanded.soluciones;
+            out['consulta-2026-gran']       = expanded.gran;
+            out['consulta-2026-frente']     = expanded.frente;
+          } catch (e) {
+            console.warn('[opo·mde] consultas unified fetch error', e);
+          }
+        })());
+      }
+      await Promise.all(fetches);
+      STATE.cityData[cityKey] = out;
+      return out;
+    })();
+    STATE.cityLoading[cityKey] = promise;
+    return promise;
+  }
+
+  async function loadCityGeo(cityKey){
+    if (STATE.cityGeo[cityKey]) return STATE.cityGeo[cityKey];
+    const cfg = CITIES[cityKey];
+    const r = await fetch(cfg.geoUrl);
+    let geo = await r.json();
+    if (cfg.rotate) geo = rotateGeoJSON90Left(geo);
+    STATE.cityGeo[cityKey] = geo;
+    return geo;
+  }
+
+  // Pct afín por bucket en una comuna específica de una ciudad.
+  // Shape uniforme: por_comuna[comCod] = { candidatos:[{nombre, partido, votos, pct}], votos_validos }
+  // Para senado/cámara, "nombre" en candidatos es el partido. matchesAffinity sirve.
+  function bucketsPctAfinForComuna(candId, cityData, comCod){
+    const aff = AFINIDADES[candId];
+    const buckets = {};
+
+    function pctFromComEntry(entry, patterns){
+      if (!entry || !Array.isArray(entry.candidatos)) return null;
+      let sum = 0, found = false;
+      for (const c of entry.candidatos){
+        if (!c || !c.nombre) continue;
+        if (matchesAffinity(c.nombre, patterns)){ sum += (c.votos||0); found = true; }
+      }
+      const den = entry.votos_validos || entry.votos_totales || 0;
+      if (!found || den<=0) return null;
+      return 100 * sum / den;
+    }
+
+    // pres22, pres18 (cands)
+    buckets.pres22 = pctFromComEntry(cityData['pres-2022']?.[comCod], aff.pres22||[]);
+    buckets.pres18 = pctFromComEntry(cityData['pres-2018']?.[comCod], aff.pres18||[]);
+
+    // congreso26 = avg(senado, camara). En este shape, senado/cámara
+    // tienen los partidos dentro de candidatos[].nombre.
+    const vSen = (aff.senado26||[]).length ? pctFromComEntry(cityData['senado-2026']?.[comCod], aff.senado26) : null;
+    const vCam = (aff.camara26||[]).length ? pctFromComEntry(cityData['camara-2026']?.[comCod], aff.camara26) : null;
+    let vCong = null;
+    if (vSen != null && vCam != null) vCong = (vSen + vCam) / 2;
+    else vCong = vSen ?? vCam;
+    buckets.congreso26 = vCong;
+
+    // consultas — suma de pct dentro del universo de cada consulta
+    // (a nivel comuna NO tenemos censo desagregado; usamos pct dentro de
+    //  consulta como proxy aceptable. La distorsión vs el modo mun queda
+    //  documentada en footer.)
+    const cmap = aff.consultas || {};
+    let total = 0, hasAny = false;
+    for (const [ckey, pat] of Object.entries(cmap)){
+      if (!pat?.length) continue;
+      const v = pctFromComEntry(cityData[ckey]?.[comCod], pat);
+      if (v != null){ total += v; hasAny = true; }
+    }
+    buckets.consultas = hasAny ? total : null;
+
+    return buckets;
+  }
+
+  // Pct afín nacional-de-la-ciudad (para bias_proj a nivel comuna).
+  // Usamos la propia ciudad como baseline porque comparar comuna vs
+  // nacional-país introduce ruido (la ciudad es un perfil distinto).
+  // Es decir: bias_intra_ciudad(C, com) = pct_afin_local / pct_afin_ciudad.
+  function precomputeCityNacAfin(candId, cityData){
+    const aff = AFINIDADES[candId];
+    const out = {};
+
+    function pctFromAllComs(sigKey, patterns){
+      const ds = cityData[sigKey];
+      if (!ds || !patterns?.length) return null;
+      let sumV = 0, sumDen = 0, found = false;
+      for (const com of Object.values(ds)){
+        if (!Array.isArray(com.candidatos)) continue;
+        let any = false;
+        for (const c of com.candidatos){
+          if (!c || !c.nombre) continue;
+          if (matchesAffinity(c.nombre, patterns)){ sumV += (c.votos||0); any = true; }
+        }
+        if (any){ sumDen += (com.votos_validos || com.votos_totales || 0); found = true; }
+      }
+      return found && sumDen>0 ? 100*sumV/sumDen : null;
+    }
+
+    out.pres22 = pctFromAllComs('pres-2022', aff.pres22);
+    out.pres18 = pctFromAllComs('pres-2018', aff.pres18);
+    const vSen = (aff.senado26||[]).length ? pctFromAllComs('senado-2026', aff.senado26) : null;
+    const vCam = (aff.camara26||[]).length ? pctFromAllComs('camara-2026', aff.camara26) : null;
+    let vCong = null;
+    if (vSen != null && vCam != null) vCong = (vSen + vCam) / 2;
+    else vCong = vSen ?? vCam;
+    out.congreso26 = vCong;
+
+    const cmap = aff.consultas || {};
+    let total = 0, hasAny = false;
+    for (const [ckey, pat] of Object.entries(cmap)){
+      if (!pat?.length) continue;
+      const v = pctFromAllComs(ckey, pat);
+      if (v != null){ total += v; hasAny = true; }
+    }
+    out.consultas = hasAny ? total : null;
+    return out;
+  }
+
+  // Calcula afín / techo / proj / gap por comuna para la ciudad activa.
+  function computeCityComunaMetrics(cityKey){
+    const candId = STATE.candId;
+    const cand = CANDIDATOS.find(c => c.id === candId);
+    const cityData = STATE.cityData[cityKey] || {};
+    const candPctNac = pondPct(cand);
+    const factor = (STATE.lider[candId] ?? 100) / 100;
+
+    // Baseline = ciudad. Si no hay datos en ciudad para el bucket, fallback al nacional-país.
+    const cityNac = precomputeCityNacAfin(candId, cityData);
+    STATE.cityNacAfin[cityKey] = STATE.cityNacAfin[cityKey] || {};
+    STATE.cityNacAfin[cityKey][candId] = cityNac;
+
+    const wRaw = STATE.weights;
+    const wSum = Math.max(1, wRaw.pres22 + wRaw.congreso26 + wRaw.pres18 + wRaw.consultas);
+    const wNorm = {
+      pres22:     wRaw.pres22 / wSum,
+      congreso26: wRaw.congreso26 / wSum,
+      pres18:     wRaw.pres18 / wSum,
+      consultas:  wRaw.consultas / wSum,
+    };
+
+    // Set de comunas: union de todas las señales
+    const comCods = new Set();
+    for (const sig of Object.keys(cityData)){
+      Object.keys(cityData[sig]).forEach(k => comCods.add(k));
+    }
+
+    const out = {};
+    for (const comCod of comCods){
+      const buckets = bucketsPctAfinForComuna(candId, cityData, comCod);
+      let afinNum = 0, afinDen = 0, biasNum = 0, biasDen = 0;
+      for (const b of ['pres22','congreso26','pres18','consultas']){
+        const v = buckets[b];
+        const w = wNorm[b];
+        if (v != null){
+          afinNum += w * v;
+          afinDen += w;
+        }
+        // Para bias usamos baseline de la ciudad si existe; si no, el nacional-país.
+        const nacCity = cityNac[b];
+        const nacPais = STATE.nacAfinByBucket?.[b];
+        const baseline = (nacCity != null && nacCity > 0) ? nacCity : nacPais;
+        if (v != null && baseline != null && baseline > 0){
+          biasNum += w * (v / baseline);
+          biasDen += w;
+        }
+      }
+      const afin = afinDen > 0 ? afinNum / afinDen : null;
+      const bias = biasDen > 0 ? biasNum / biasDen : 1.0;
+      const proj = candPctNac != null ? candPctNac * bias : null;
+      const techo = afin != null ? factor * afin : null;
+      const gap = (techo != null && proj != null) ? (techo - proj) : null;
+
+      // Abstención: votos_totales pres-2022 / votos_validos+especiales no es censo real.
+      // Aproximamos con (especiales)/(votos_totales) — útil para detectar comunas con baja participación.
+      // Mejor: dejamos null porque no tenemos censo real por comuna.
+      const abst = null;
+
+      out[comCod] = { comCod, afin, techo, proj, gap, bias, buckets, abst, censo:0 };
+    }
+    STATE.cityComMetrics[cityKey] = out;
+  }
+
+  /* ───────── Map ───────── */
+  function ensureMap(){
+    if (STATE.map) return STATE.map;
+    STATE.map = L.map('leaflet-map', {
+      center:[4.5, -73.5], zoom:6,
+      zoomControl:true,         // botones +/− habilitados
+      scrollWheelZoom:false,    // bloqueado: la rueda mueve, enreda
+      doubleClickZoom:false,    // bloqueado: al doble click recentra
+      touchZoom:false,
+      boxZoom:false,
+      keyboard:false,
+      dragging:false,
+      tap:false,
+      preferCanvas:false,
+      attributionControl:true,
+    });
+    STATE.map.attributionControl.setPrefix('');
+    STATE.map.on('zoomend', _onPuestosZoom);
+    STATE.map.on('moveend', _onPuestosZoom);
+    return STATE.map;
+  }
+  function clearLayer(){
+    if (STATE.mapLayer){ STATE.map.removeLayer(STATE.mapLayer); STATE.mapLayer = null; }
+  }
+  function showLoading(on){ document.getElementById('map-loading').classList.toggle('show', !!on); }
+
+  function renderDeptos(){
+    ensureMap(); clearLayer();
+    const geo = STATE.depGeo;
+    STATE.mapLayer = L.geoJSON(geo, {
+      style: (f) => {
+        const elec = depElectoralOfFeature(f.properties);
+        const r = elec ? STATE.depMetrics[elec] : null;
+        return styleFor(r);
+      },
+      onEachFeature: (f, layer) => {
+        const elec = depElectoralOfFeature(f.properties);
+        const r = elec ? STATE.depMetrics[elec] : null;
+        f.__elec = elec;
+        f.__rec = r;
+        f.__name = (STATE.depByElectoral[elec]||{}).nombre || f.properties.name;
+        layer.on('mouseover', (e) => onHover(f, e));
+        layer.on('mouseout',  () => onHoverOut(f));
+        layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
+        layer.on('click',     () => onDepClick(elec));
+      },
+    }).addTo(STATE.map);
+    STATE.map.fitBounds(STATE.mapLayer.getBounds(), { padding:[20,20] });
+    document.getElementById('map-head-title').textContent = 'Vista nacional · Departamental';
+    document.getElementById('map-back-btn').classList.remove('show');
+  }
+
+  async function renderMunsOfDep(depElec){
+    ensureMap(); showLoading(true);
+    let geo = STATE.depMpsCache[depElec];
+    if (!geo){
+      try { geo = await fetchJSON(URLS.depMps(depElec)); STATE.depMpsCache[depElec] = geo; }
+      catch (e){ console.warn('[opo] error fetching dep', depElec, e); showLoading(false); return; }
+    }
+    clearLayer();
+    STATE.mapLayer = L.geoJSON(geo, {
+      style: (f) => {
+        const k = munKeyOfFeature(f.properties);
+        return styleFor(k ? STATE.munMetrics[k] : null);
+      },
+      onEachFeature: (f, layer) => {
+        const k = munKeyOfFeature(f.properties);
+        const r = k ? STATE.munMetrics[k] : null;
+        f.__key = k;
+        f.__rec = r;
+        f.__name = f.properties.mpio_cnmbr || f.properties.nombre || '—';
+        f.__depName = (STATE.depByElectoral[depElec]||{}).nombre || '';
+        if (k && !STATE.munNameByKey[k]){
+          STATE.munNameByKey[k] = { name: f.__name, depName: f.__depName };
+        }
+        // Click en mun: si es una de las 13 ciudades, drilldown a comunas
+        const [dCod, mCod] = (k||'').split('-');
+        const cityHit = detectCity(dCod, mCod);
+        if (cityHit){
+          layer.on('click', () => onCityClick(cityHit.key));
+        }
+        layer.on('mouseover', (e) => onHover(f, e));
+        layer.on('mouseout',  () => onHoverOut(f));
+        layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
+      },
+    }).addTo(STATE.map);
+    STATE.map.fitBounds(STATE.mapLayer.getBounds(), { padding:[20,20] });
+    const depName = (STATE.depByElectoral[depElec]||{}).nombre || depElec;
+    document.getElementById('map-head-title').textContent = `${depName} · Municipios`;
+    document.getElementById('map-back-btn').classList.add('show');
+    document.getElementById('map-back-label').textContent = '← Volver a nacional';
+    showLoading(false);
+  }
+
+  async function renderMunsNacional(){
+    ensureMap(); showLoading(true);
+    const depCodes = STATE.depIndex.map(d => d.dep_electoral);
+    const fetches = depCodes.map(async dc => {
+      if (STATE.depMpsCache[dc]) return STATE.depMpsCache[dc];
+      try {
+        const g = await fetchJSON(URLS.depMps(dc));
+        STATE.depMpsCache[dc] = g;
+        return g;
+      } catch(e){ console.warn('[opo] err mps', dc, e); return null; }
+    });
+    const all = await Promise.all(fetches);
+    const features = [];
+    all.forEach(g => { if (g && g.features) features.push(...g.features); });
+    clearLayer();
+    STATE.mapLayer = L.geoJSON({ type:'FeatureCollection', features }, {
+      style: (f) => {
+        const k = munKeyOfFeature(f.properties);
+        return styleFor(k ? STATE.munMetrics[k] : null);
+      },
+      onEachFeature: (f, layer) => {
+        const k = munKeyOfFeature(f.properties);
+        const r = k ? STATE.munMetrics[k] : null;
+        f.__key = k;
+        f.__rec = r;
+        f.__name = f.properties.mpio_cnmbr || '—';
+        const dep = f.properties.dep_electoral;
+        f.__depName = (STATE.depByElectoral[dep]||{}).nombre || '';
+        if (k && !STATE.munNameByKey[k]){
+          STATE.munNameByKey[k] = { name: f.__name, depName: f.__depName };
+        }
+        layer.on('mouseover', (e) => onHover(f, e));
+        layer.on('mouseout',  () => onHoverOut(f));
+        layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
+      },
+    }).addTo(STATE.map);
+    STATE.map.fitBounds(STATE.mapLayer.getBounds(), { padding:[20,20] });
+    document.getElementById('map-head-title').textContent = 'Vista nacional · Municipal';
+    document.getElementById('map-back-btn').classList.remove('show');
+    showLoading(false);
+  }
+
+  function repaintLayer(){
+    if (!STATE.mapLayer) return;
+    // Si estamos en capa de ciudad, recomputar métricas y repintar con esas
+    if (STATE.selectedCity){
+      computeCityComunaMetrics(STATE.selectedCity);
+      const cityKey = STATE.selectedCity;
+      const cfg = CITIES[cityKey];
+      const metrics = STATE.cityComMetrics[cityKey] || {};
+      // Capa de barrios Medellín: hereda de comuna padre
+      if (cityKey === 'medellin' && STATE.mdeView === 'barrios'){
+        STATE.mapLayer.setStyle((f) => {
+          const com = String(f.properties.comuna||'').replace(/^0+/, '');
+          let r = null;
+          for (const k of Object.keys(metrics)){
+            if (String(k).replace(/^0+/, '') === com){ r = metrics[k]; break; }
+          }
+          f.__rec = r;
+          return styleFor(r);
+        });
+        return;
+      }
+      STATE.mapLayer.setStyle((f) => {
+        const com = comCodeOfCityFeature(cfg, f.properties);
+        const r = com ? metrics[com] : null;
+        f.__rec = r;
+        return styleFor(r);
+      });
+      return;
+    }
+    STATE.mapLayer.setStyle((f) => {
+      if (f.__key){
+        const r = STATE.munMetrics[f.__key];
+        f.__rec = r;
+        return styleFor(r);
+      } else {
+        const elec = depElectoralOfFeature(f.properties);
+        const r = elec ? STATE.depMetrics[elec] : null;
+        f.__rec = r;
+        return styleFor(r);
+      }
+    });
+  }
+
+  /* ───────── Hover / chip ───────── */
+  function onHover(f, e){
+    if (e && e.target && e.target.setStyle){
+      e.target.setStyle({ weight: 1.4, color: isDay() ? 'rgba(0,0,0,.5)' : 'rgba(255,255,255,.55)' });
+      e.target.bringToFront();
+    }
+    showDetailFromFeature(f);
+    showHoverChip(f);
+  }
+  function onHoverOut(f){
+    if (STATE.mapLayer) STATE.mapLayer.resetStyle();
+    hideHoverChip();
+  }
+  function onDepClick(elec){
+    if (!elec) return;
+    // Bogotá D.C. (electoral 16) tiene un solo "municipio" — saltar
+    // directo a la capa de localidades para no perder un click.
+    if (String(elec).padStart(2,'0') === '16'){
+      STATE.selectedDep = '16';
+      onCityClick('bogota');
+      return;
+    }
+    STATE.selectedDep = elec;
+    renderMunsOfDep(elec);
+  }
+  function onBack(){
+    // Si estamos en capa de ciudad, volver al depto padre.
+    if (STATE.selectedCity){
+      const cfg = CITIES[STATE.selectedCity];
+      const dep = cfg.depCod;
+      STATE.selectedCity = null;
+      STATE.selectedDep = dep;
+      refreshMdeViewToggle();
+      renderMunsOfDep(dep);
+      return;
+    }
+    STATE.selectedDep = null;
+    if (STATE.level === 'dep') renderDeptos();
+    else renderMunsNacional();
+  }
+
+  /* ───────── Medellín barrios — capa adicional ─────────
+     Hereda métrica de la comuna padre. v1: pintamos los 349 barrios
+     con el color de su comuna. v2 (pendiente, ver footer): agregar
+     puestos a barrios via point-in-polygon y recalcular bias por barrio. */
+  async function loadMdeBarriosGeo(){
+    if (STATE.mdeBarriosGeo) return STATE.mdeBarriosGeo;
+    if (STATE.mdeBarriosLoading) return STATE.mdeBarriosLoading;
+    STATE.mdeBarriosLoading = (async () => {
+      const r = await fetch(MDE_BARRIOS_URL);
+      const geo = await r.json();
+      STATE.mdeBarriosGeo = geo;
+      return geo;
+    })();
+    return STATE.mdeBarriosLoading;
+  }
+
+  function renderMdeBarriosLayer(){
+    ensureMap(); clearLayer();
+    const cfg = CITIES.medellin;
+    const geo = STATE.mdeBarriosGeo;
+    const metrics = STATE.cityComMetrics.medellin || {};
+    // Indexar métricas por comuna (codeField del JSON de comunas = '01'..'16').
+    // El GeoJSON de barrios trae props.comuna como string '1'..'16' o '50'..'90' (corregimientos).
+    function metricForBarrio(props){
+      const com = String(props.comuna||'').replace(/^0+/, '');
+      // Probar varias formas de match con las claves del por_comuna
+      for (const k of Object.keys(metrics)){
+        if (String(k).replace(/^0+/, '') === com) return metrics[k];
+      }
+      return null;
+    }
+    STATE.mapLayer = L.geoJSON(geo, {
+      style: (f) => styleFor(metricForBarrio(f.properties)),
+      onEachFeature: (f, layer) => {
+        const r = metricForBarrio(f.properties);
+        f.__rec = r;
+        f.__name = f.properties.nombre_bar || f.properties.barrio || '—';
+        f.__depName = `Medellín · ${f.properties.nombre_com || 'Comuna ' + (f.properties.comuna||'?')}`;
+        layer.on('mouseover', (e) => onHover(f, e));
+        layer.on('mouseout',  () => onHoverOut(f));
+        layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
+      },
+    }).addTo(STATE.map);
+    STATE.map.fitBounds(STATE.mapLayer.getBounds(), { padding:[20,20] });
+    document.getElementById('map-head-title').textContent = 'Medellín · Barrios y veredas (heredan de comuna)';
+    document.getElementById('map-back-btn').classList.add('show');
+    document.getElementById('map-back-label').textContent = '← Volver a Antioquia';
+  }
+
+  async function setMdeView(view){
+    if (view === STATE.mdeView && STATE.selectedCity === 'medellin') return;
+    STATE.mdeView = view;
+    if (STATE.selectedCity !== 'medellin') return;
+    showLoading(true);
+    try {
+      if (view === 'barrios'){
+        await loadMdeBarriosGeo();
+        renderMdeBarriosLayer();
+      } else {
+        renderCityComLayer('medellin');
+      }
+      refreshMdeViewToggle();
+    } catch (e){
+      console.error('[opo·mde] setMdeView error', e);
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  function refreshMdeViewToggle(){
+    const wrap = document.getElementById('mde-view-toggle');
+    if (!wrap) return;
+    const inMde = STATE.selectedCity === 'medellin';
+    wrap.style.display = inMde ? 'flex' : 'none';
+    wrap.querySelector('[data-mde="comunas"]')?.classList.toggle('active', STATE.mdeView === 'comunas');
+    wrap.querySelector('[data-mde="barrios"]')?.classList.toggle('active', STATE.mdeView === 'barrios');
+  }
+
+  /* ───────── Ciudades — drilldown a comuna/localidad ───────── */
+  async function onCityClick(cityKey){
+    showLoading(true);
+    try {
+      const [data, geo] = await Promise.all([loadCitySignals(cityKey), loadCityGeo(cityKey)]);
+      computeCityComunaMetrics(cityKey);
+      STATE.selectedCity = cityKey;
+      // Medellín: respeta el sub-view actual (comunas o barrios)
+      if (cityKey === 'medellin' && STATE.mdeView === 'barrios'){
+        await loadMdeBarriosGeo();
+        renderMdeBarriosLayer();
+      } else {
+        renderCityComLayer(cityKey);
+      }
+      refreshMdeViewToggle();
+    } catch (e){
+      console.error('[opo·city] error rendering', cityKey, e);
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  function renderCityComLayer(cityKey){
+    ensureMap(); clearLayer();
+    const cfg = CITIES[cityKey];
+    const geo = STATE.cityGeo[cityKey];
+    const metrics = STATE.cityComMetrics[cityKey] || {};
+
+    // Indexar también por nombre normalizado (para ciudades byName=true)
+    const byName = {};
+    for (const cc of Object.keys(metrics)){
+      // intentar matchear por nombre del feature después
+    }
+
+    STATE.mapLayer = L.geoJSON(geo, {
+      style: (f) => {
+        const com = comCodeOfCityFeature(cfg, f.properties);
+        const r = com ? metrics[com] : null;
+        return styleFor(r);
+      },
+      onEachFeature: (f, layer) => {
+        const com = comCodeOfCityFeature(cfg, f.properties);
+        const r = com ? metrics[com] : null;
+        f.__key = com ? `${cfg.depCod}-${cfg.munCod}-${com}` : null;
+        f.__rec = r;
+        f.__name = f.properties[cfg.nameField] || com || '—';
+        f.__depName = `${cfg.label} · ${cfg.kind}`;
+        layer.on('mouseover', (e) => onHover(f, e));
+        layer.on('mouseout',  () => onHoverOut(f));
+        layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
+      },
+    }).addTo(STATE.map);
+    STATE.map.fitBounds(STATE.mapLayer.getBounds(), { padding:[20,20] });
+    document.getElementById('map-head-title').textContent = `${cfg.label} · ${cfg.kind}`;
+    document.getElementById('map-back-btn').classList.add('show');
+    document.getElementById('map-back-label').textContent = `← Volver a ${(STATE.depByElectoral[cfg.depCod]||{}).nombre || 'departamento'}`;
+  }
+
+  // Resuelve el código de comuna del feature según el shape de cada ciudad.
+  // Las claves de los datos S3 vienen como cod string (ej: "10", "11").
+  // Algunas ciudades (Pereira, Cúcuta) usan el nombre como código.
+  function comCodeOfCityFeature(cfg, props){
+    const raw = props[cfg.codeField];
+    if (raw == null || raw === '') return null;
+    if (cfg.byName){
+      // Match por nombre normalizado en metrics
+      const want = norm(raw);
+      const metrics = STATE.cityComMetrics[ Object.keys(CITIES).find(k => CITIES[k] === cfg) ] || {};
+      // Buscar por nombre del campo nombre del primer entry
+      // Las metrics tienen como key el cod del JSON de datos.
+      // Para ciudades byName, el cod del JSON suele ser el mismo nombre normalizado o un slug.
+      // Iteramos para hacer match.
+      for (const k of Object.keys(metrics)){
+        if (norm(k) === want) return k;
+      }
+      return null;
+    }
+    // Normalización: la mayoría de comunas vienen como número entero
+    // o ya como string. Probamos varias formas.
+    const variants = [
+      String(raw),
+      String(raw).replace(/^0+/,''),
+      String(raw).padStart(2,'0'),
+    ];
+    const cityKey = Object.keys(CITIES).find(k => CITIES[k] === cfg);
+    const metrics = STATE.cityComMetrics[cityKey] || {};
+    for (const v of variants){
+      if (metrics[v] != null) return v;
+    }
+    return variants[0];
+  }
+
+  function showHoverChip(f){
+    const chip = document.getElementById('hover-chip');
+    const r = f.__rec;
+    if (!r){ chip.classList.remove('show'); return; }
+    const sc = document.getElementById('hc-score');
+    document.getElementById('hc-name').textContent = f.__name || '—';
+    if (STATE.layer === 'opo'){
+      sc.textContent = r.gap != null ? fmtPP(r.gap, 1) : '—';
+      sc.classList.toggle('neg', r.gap != null && r.gap < 0);
+    } else {
+      sc.textContent = r.abst != null ? (r.abst*100).toFixed(0)+'%' : '—';
+      sc.classList.remove('neg');
+    }
+    chip.classList.add('show');
+  }
+  function hideHoverChip(){ document.getElementById('hover-chip').classList.remove('show'); }
+  function moveHoverChip(ev){
+    const chip = document.getElementById('hover-chip');
+    chip.style.left = ev.clientX + 'px';
+    chip.style.top  = ev.clientY + 'px';
+  }
+  document.addEventListener('mousemove', moveHoverChip);
+
+  /* ───────── Detalle ───────── */
+  function showDetailFromFeature(f){
+    document.getElementById('det-empty').style.display = 'none';
+    document.getElementById('det-card').classList.add('show');
+    const r = f.__rec;
+    document.getElementById('det-name').textContent = f.__name || '—';
+    const isDep = !f.__key;
+    document.getElementById('det-parents').textContent = isDep
+      ? (r && r.nMun ? `${r.nMun} municipios · ${r.nOpo||0} con oportunidad ≥ ${STATE.threshold} pp` : '')
+      : (f.__depName || '');
+
+    const sc = document.getElementById('det-score');
+    if (STATE.layer === 'opo'){
+      sc.textContent = (r && r.gap != null) ? fmtPP(r.gap, 1) : '—';
+      sc.classList.toggle('neg', r && r.gap != null && r.gap < 0);
+      document.getElementById('det-score-sub').textContent = 'techo realista − proyección';
+    } else {
+      sc.textContent = (r && r.abst != null) ? (r.abst*100).toFixed(1)+'%' : '—';
+      sc.classList.remove('neg');
+      document.getElementById('det-score-sub').textContent = 'abstención presidencial 2022';
+    }
+
+    // Bars: descomposición por bucket (pct afín por fuente). Sólo en capa opo.
+    const barsEl = document.getElementById('det-bars');
+    if (STATE.layer === 'opo' && r && r.buckets){
+      const rows = [];
+      const labels = { pres22:'Pres-22', congreso26:'Cong-26', pres18:'Pres-18', consultas:'Consultas' };
+      const cls = { pres22:'', congreso26:'s2', pres18:'s3', consultas:'s4' };
+      const maxV = Math.max(1, ...['pres22','congreso26','pres18','consultas'].map(b => isDep ? null : r.buckets[b]).filter(v => v!=null));
+      for (const b of ['pres22','congreso26','pres18','consultas']){
+        let v = isDep ? null : r.buckets[b];
+        // Para deptos no precomputamos buckets — los dejamos en blanco
+        const w = (v != null && maxV > 0) ? (100 * v / maxV) : 0;
+        rows.push(`<div class="det-bar">
+          <span class="lbl">${labels[b]} · w ${STATE.weights[b]}%</span>
+          <div class="bar-track"><div class="bar-fill ${cls[b]}" style="width:${w.toFixed(0)}%"></div></div>
+          <span class="val">${v != null ? v.toFixed(1)+'%' : '—'}</span>
+        </div>`);
+      }
+      barsEl.innerHTML = rows.join('');
+    } else if (STATE.layer === 'abs'){
+      // Layer abstención: muestra una sola barra
+      const a = r ? r.abst : null;
+      barsEl.innerHTML = `<div class="det-bar">
+        <span class="lbl">Abstención</span>
+        <div class="bar-track"><div class="bar-fill s3" style="width:${a!=null?(a*100).toFixed(0):0}%"></div></div>
+        <span class="val">${a!=null ? (a*100).toFixed(1)+'%' : '—'}</span>
+      </div>`;
+    } else {
+      barsEl.innerHTML = '';
+    }
+
+    document.getElementById('det-censo').textContent = r ? fmtNum(r.censo) : '—';
+    document.getElementById('det-abst').textContent  = (r && r.abst!=null) ? (r.abst*100).toFixed(1)+'%' : '—';
+    document.getElementById('det-topafin').textContent = isDep ? '—' : (r ? topAfinNameForMun(STATE.candId, f.__key) : '—');
+    document.getElementById('det-brecha').textContent  = (r && r.techo!=null && r.proj!=null)
+      ? `${r.proj.toFixed(1)}% → ${r.techo.toFixed(1)}%`
+      : '—';
+  }
+
+  // Top candidato afín en M (el que más votos afines aporta en la fuente
+  // con mayor peso disponible). Heurística simple: revisa pres22 → congreso → pres18 → consultas.
+  function topAfinNameForMun(candId, munKey){
+    const aff = AFINIDADES[candId];
+    const e22 = STATE.pres22?.[munKey];
+    if (e22 && aff.pres22?.length){
+      const ranked = Object.values(e22.candidatos||{})
+        .filter(c => c && c.nombre && matchesAffinity(c.nombre, aff.pres22))
+        .sort((a,b) => (b.votos||0)-(a.votos||0));
+      if (ranked[0]) return `${ranked[0].nombre.split(' ').slice(0,2).join(' ')} · ${ranked[0].pct?.toFixed(1) ?? '?'}%`;
+    }
+    const sen = STATE.senMunByKey[munKey];
+    if (sen && aff.senado26?.length){
+      const list = Object.entries(sen.partidos||{})
+        .filter(([n]) => matchesAffinity(n, aff.senado26))
+        .sort((a,b)=>b[1]-a[1]);
+      if (list[0]){
+        const pct = sen.votval ? (100*list[0][1]/sen.votval).toFixed(1) : '?';
+        return `${list[0][0].slice(0,28)} · ${pct}%`;
+      }
+    }
+    return '—';
+  }
+
+  /* ───────── Top 30 ───────── */
+  function renderTop30(){
+    const arr = Object.values(STATE.munMetrics)
+      .filter(r => r.gap != null)
+      .sort((a,b) => b.gap - a.gap)
+      .slice(0,30);
+    const ul = document.getElementById('top-list');
+    ul.innerHTML = arr.map((r,i) => {
+      const meta = STATE.munNameByKey[r.munKey];
+      const munName = meta ? meta.name : r.munKey;
+      const depName = meta ? meta.depName : ((STATE.depByElectoral[r.depCod]||{}).nombre || r.depCod);
+      return `<div class="top-row" data-key="${r.munKey}" data-dep="${r.depCod}" onclick="onTopClick('${r.munKey}','${r.depCod}')">
+        <div class="top-rank">${i+1}</div>
+        <div>
+          <div class="top-name">${munName}</div>
+          <div class="top-meta"><span class="top-meta-dep">${depName}</span></div>
+        </div>
+        <div class="top-score">${fmtPP(r.gap,1)}</div>
+      </div>`;
+    }).join('');
+  }
+  function onTopClick(key, dep){
+    STATE.selectedDep = dep;
+    document.getElementById('lvl-dep').classList.remove('active');
+    document.getElementById('lvl-mun').classList.add('active');
+    STATE.level = 'mun';
+    renderMunsOfDep(dep);
+  }
+
+  /* ───────── Contador y leyenda ───────── */
+  function updateCounter(){
+    const muns = Object.values(STATE.munMetrics);
+    const opos = muns.filter(r => r.gap != null && r.gap >= STATE.threshold);
+    const censoOpo = opos.reduce((s,r)=>s+(r.censo||0), 0);
+    const pct = STATE.sumCensoNacional ? (100*censoOpo/STATE.sumCensoNacional) : 0;
+    const cand = CANDIDATOS.find(c=>c.id===STATE.candId);
+    if (STATE.layer === 'opo'){
+      document.getElementById('opo-count').innerHTML =
+        `<b>${opos.length}</b> municipios oportunidad para ${cand.nombre} <span class="censo">· ${pct.toFixed(1)}% del censo nacional en juego</span>`;
+    } else if (STATE.layer === 'abs'){
+      const high = muns.filter(r => r.abst != null && r.abst >= 0.5);
+      const censoHigh = high.reduce((s,r)=>s+(r.censo||0), 0);
+      const pctH = STATE.sumCensoNacional ? (100*censoHigh/STATE.sumCensoNacional) : 0;
+      document.getElementById('opo-count').innerHTML =
+        `<b>${high.length}</b> municipios con abstención ≥ 50% <span class="censo">· ${pctH.toFixed(1)}% del censo nacional</span>`;
+    } else if (STATE.layer === 'pue'){
+      const total = STATE.puestos ? STATE.puestos.length : 0;
+      const vis = STATE.puestos ? visiblePuestos().length : 0;
+      document.getElementById('opo-count').innerHTML =
+        `<b>${vis.toLocaleString('es-CO')}</b> puestos visibles <span class="censo">· ${total.toLocaleString('es-CO')} totales · zoom para ver más</span>`;
+    }
+    document.getElementById('leg-thresh').textContent = '+' + STATE.threshold + ' pp';
+  }
+
+  function updateLegend(){
+    const bar = document.getElementById('leg-bar');
+    const ends = document.getElementById('leg-ends');
+    const stripes = document.getElementById('leg-stripes-row');
+    const title = document.getElementById('leg-title');
+    if (STATE.layer === 'opo'){
+      bar.className = 'leg-bar opo';
+      ends.innerHTML = '<span class="leg-bar-end">−10 pp · sobre-rep</span><span class="leg-bar-end">0</span><span class="leg-bar-end">+10 pp · oportunidad</span>';
+      title.textContent = 'Voto blando · brecha (pp)';
+      stripes.style.display = 'flex';
+    } else if (STATE.layer === 'abs'){
+      bar.className = 'leg-bar abs';
+      ends.innerHTML = '<span class="leg-bar-end">35% · alta participación</span><span class="leg-bar-end">52% · mediana</span><span class="leg-bar-end">75% · alta abstención</span>';
+      title.textContent = 'Abstención presidencial 2022';
+      stripes.style.display = 'none';
+    } else if (STATE.layer === 'pue'){
+      bar.className = 'leg-bar opo';
+      ends.innerHTML = '<span class="leg-bar-end">−10 pp · sobre-rep</span><span class="leg-bar-end">0</span><span class="leg-bar-end">+10 pp · oportunidad</span>';
+      title.textContent = 'Puestos · color hereda brecha del mun · radio = log(censo)';
+      stripes.style.display = 'none';
+    }
+  }
+
+  /* ───────── UI: candidate picker ───────── */
+  function renderCandidatePicker(){
+    const row = document.getElementById('cand-row');
+    row.innerHTML = CANDIDATOS.map(c => {
+      const pct = pondPct(c);
+      const initials = c.nombre.split(' ').filter(w=>w.length>1).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+      return `<div class="cand-pill ${c.id===STATE.candId?'active':''}" data-id="${c.id}" onclick="setCandidate('${c.id}')">
+        <img class="cand-photo" src="${c.foto}" alt="${c.nombre}" loading="lazy" onerror="this.outerHTML='<div class=\\'cand-photo-fallback\\' style=\\'background:${c.color}\\'>${initials}</div>'"/>
+        <div class="cand-name">${c.nombre}</div>
+        <div class="cand-pct">${pct!=null?pct.toFixed(1)+'%':'—'}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function setCandidate(id){
+    if (id === STATE.candId) return;
+    STATE.candId = id;
+    document.querySelectorAll('.cand-pill').forEach(el => {
+      el.classList.toggle('active', el.dataset.id === id);
+    });
+    refreshLiderUI();
+    showLoading(true);
+    setTimeout(() => {
+      computeAllForCandidate(STATE.candId);
+      repaintLayer();
+      updateCounter();
+      renderTop30();
+      updateCTA();
+      showLoading(false);
+    }, 30);
+  }
+
+  /* ───────── UI: source sliders ───────── */
+  function renderSourceSliders(){
+    const wrap = document.getElementById('src-sliders');
+    wrap.innerHTML = SOURCE_BUCKETS.map(b => `
+      <div class="src-row">
+        <div class="src-name">${b.label}<span class="src-sub">${b.sub}</span></div>
+        <input type="range" min="0" max="80" step="1" value="${STATE.weights[b.key]}" data-key="${b.key}" oninput="onWeightChange('${b.key}', this.value)" />
+        <span class="src-w" id="src-w-${b.key}">${STATE.weights[b.key]}%</span>
+      </div>
+    `).join('');
+  }
+  function onWeightChange(key, val){
+    val = +val;
+    // Redistribuir para mantener suma = 100, sólo a las otras fuentes proporcionalmente
+    const oldVal = STATE.weights[key];
+    const others = SOURCE_BUCKETS.filter(b => b.key !== key).map(b => b.key);
+    const restSum = others.reduce((s,k)=>s+STATE.weights[k], 0);
+    const target = 100 - val;
+    if (restSum > 0 && target >= 0){
+      const factor = target / restSum;
+      others.forEach(k => { STATE.weights[k] = Math.max(0, STATE.weights[k] * factor); });
+    }
+    STATE.weights[key] = val;
+    // Round + ensure exact sum
+    let sum = 0;
+    SOURCE_BUCKETS.forEach(b => {
+      STATE.weights[b.key] = Math.round(STATE.weights[b.key]);
+      sum += STATE.weights[b.key];
+    });
+    if (sum !== 100){
+      const diff = 100 - sum;
+      const fixKey = others.find(k => STATE.weights[k] + diff >= 0) || others[0];
+      STATE.weights[fixKey] = Math.max(0, STATE.weights[fixKey] + diff);
+    }
+    // Refresh labels & sliders
+    SOURCE_BUCKETS.forEach(b => {
+      const el = document.querySelector(`input[data-key="${b.key}"]`);
+      if (el && b.key !== key) el.value = STATE.weights[b.key];
+      const lbl = document.getElementById('src-w-'+b.key);
+      if (lbl) lbl.textContent = STATE.weights[b.key] + '%';
+    });
+    // Recompute & repaint
+    showLoading(true);
+    setTimeout(() => {
+      computeAllForCandidate(STATE.candId);
+      repaintLayer();
+      updateCounter();
+      renderTop30();
+      showLoading(false);
+    }, 20);
+  }
+  function refreshLiderUI(){
+    const cand = CANDIDATOS.find(c => c.id === STATE.candId);
+    const v = STATE.lider[STATE.candId] ?? 100;
+    const nameEl = document.getElementById('lider-cand-name');
+    const slEl = document.getElementById('lider-slider');
+    const wEl = document.getElementById('lider-w');
+    if (nameEl) nameEl.textContent = '· ' + (cand ? cand.nombre : '—');
+    if (slEl) slEl.value = v;
+    if (wEl) wEl.textContent = v + '%';
+  }
+  function onLiderChange(v){
+    v = +v;
+    STATE.lider[STATE.candId] = v;
+    document.getElementById('lider-w').textContent = v + '%';
+    showLoading(true);
+    setTimeout(() => {
+      computeAllForCandidate(STATE.candId);
+      repaintLayer();
+      updateCounter();
+      renderTop30();
+      showLoading(false);
+    }, 20);
+  }
+  function resetLider(){
+    STATE.lider[STATE.candId] = LIDER_DEFAULTS[STATE.candId] ?? 100;
+    refreshLiderUI();
+    showLoading(true);
+    setTimeout(() => {
+      computeAllForCandidate(STATE.candId);
+      repaintLayer();
+      updateCounter();
+      renderTop30();
+      showLoading(false);
+    }, 20);
+  }
+
+  function resetWeights(){
+    SOURCE_BUCKETS.forEach(b => { STATE.weights[b.key] = b.defW; });
+    renderSourceSliders();
+    showLoading(true);
+    setTimeout(() => {
+      computeAllForCandidate(STATE.candId);
+      repaintLayer();
+      updateCounter();
+      renderTop30();
+      showLoading(false);
+    }, 20);
+  }
+
+  /* ───────── Toggles ───────── */
+  function setLayer(L){
+    if (L === STATE.layer) return;
+    const prev = STATE.layer;
+    STATE.layer = L;
+    document.getElementById('layer-opo').classList.toggle('active', L==='opo');
+    document.getElementById('layer-abs').classList.toggle('active', L==='abs');
+    document.getElementById('layer-pue').classList.toggle('active', L==='pue');
+    if (L === 'pue'){
+      // Activar tiles + interacción + cargar puestos lazy
+      ensureTileLayer();
+      setMapInteractive(true);
+      if (STATE.mapLayer){ STATE.map.removeLayer(STATE.mapLayer); STATE.mapLayer = null; }
+      showLoading(true);
+      loadPuestos().then(() => {
+        renderPuestos();
+        showLoading(false);
+        updateLegend();
+        updateCounter();
+      }).catch(e => {
+        console.error('[opo·pue] error', e);
+        showLoading(false);
+      });
+      return;
+    }
+    // Salir de pue: limpiar tiles + bloquear movimiento + restaurar polígonos
+    if (prev === 'pue'){
+      removeTileLayer();
+      if (STATE.puestosLayer){ STATE.map.removeLayer(STATE.puestosLayer); STATE.puestosLayer = null; }
+      setMapInteractive(false);
+      // Restaurar capa de polígonos según el contexto actual
+      if (STATE.selectedCity){
+        if (STATE.selectedCity === 'medellin' && STATE.mdeView === 'barrios') renderMdeBarriosLayer();
+        else renderCityComLayer(STATE.selectedCity);
+      } else if (STATE.selectedDep){
+        renderMunsOfDep(STATE.selectedDep);
+      } else if (STATE.level === 'mun'){
+        renderMunsNacional();
+      } else {
+        renderDeptos();
+      }
+    }
+    updateLegend();
+    repaintLayer();
+    updateCounter();
+  }
+  function setLevel(lvl){
+    if (lvl === STATE.level && !STATE.selectedDep && !STATE.selectedCity) return;
+    STATE.level = lvl;
+    document.getElementById('lvl-dep').classList.toggle('active', lvl==='dep');
+    document.getElementById('lvl-mun').classList.toggle('active', lvl==='mun');
+    STATE.selectedDep = null;
+    STATE.selectedCity = null;
+    if (lvl === 'dep') renderDeptos();
+    else renderMunsNacional();
+  }
+  function setThreshold(v){
+    STATE.threshold = +v;
+    document.getElementById('threshold-value').textContent = '+' + v + ' pp';
+    document.getElementById('leg-thresh').textContent = '+' + v + ' pp';
+    // Recalcular nOpo por dep (sólo el conteo, no los gaps)
+    for (const dc of Object.keys(STATE.depMetrics)){
+      STATE.depMetrics[dc].nOpo = Object.values(STATE.munMetrics).filter(r => r.depCod === dc && r.gap != null && r.gap >= STATE.threshold).length;
+    }
+    repaintLayer();
+    updateCounter();
+  }
+
+  /* ───────── CTA ───────── */
+  function updateCTA(){
+    const cand = CANDIDATOS.find(c=>c.id===STATE.candId);
+    const subj = encodeURIComponent(`Oportunidad - propuesta para ${cand.nombre}`);
+    document.getElementById('cta-btn').href = `mailto:reruizc@gmail.com?subject=${subj}`;
+    document.getElementById('cta-title').textContent = `¿Equipo de ${cand.nombre}?`;
+  }
+
+  /* ───────── Theme + dropdown plumbing ───────── */
+  function toggleTheme(){
+    const day = !document.body.classList.contains('day-mode');
+    document.body.classList.toggle('day-mode', day);
+    document.getElementById('theme-btn').textContent = day ? '🌙 Modo noche' : '☀ Modo día';
+    localStorage.setItem('rr-theme-opo', day ? 'day' : 'night');
+    if (STATE.mapLayer) repaintLayer();
+    if (STATE.layer === 'pue'){
+      ensureTileLayer();
+      renderPuestos();
+    }
+  }
+  if (localStorage.getItem('rr-theme-opo') === 'day'){
+    document.body.classList.add('day-mode');
+    const b = document.getElementById('theme-btn'); if (b) b.textContent = '🌙 Modo noche';
+  }
+  function toggleCountryDropdown(){
+    const d = document.getElementById('countryDropdown');
+    const b = document.getElementById('countryBtn');
+    const open = d.classList.toggle('open'); b.classList.toggle('open', open);
+    const ch = document.getElementById('countryChevron'); if (ch) ch.style.transform = open ? 'rotate(180deg)' : '';
+  }
+  function selectCountry(el){
+    document.querySelectorAll('.country-option').forEach(o => o.classList.remove('selected'));
+    el.classList.add('selected');
+    document.getElementById('countryBtnLabel').textContent = el.textContent.trim().replace(/^✓\s*/,'');
+    toggleCountryDropdown();
+  }
+  document.addEventListener('click', (e) => {
+    const w = document.querySelector('.country-selector-wrap');
+    if (w && !w.contains(e.target)){
+      document.getElementById('countryDropdown')?.classList.remove('open');
+      document.getElementById('countryBtn')?.classList.remove('open');
+      const ch = document.getElementById('countryChevron'); if (ch) ch.style.transform = '';
+    }
+  });
+
+  /* ───────── Init ───────── */
+  (async function init(){
+    showLoading(true);
+    try {
+      await loadAllData();
+      // Footer pond fecha
+      const fecha = STATE.pondData?.fecha_corte || '—';
+      const elFecha = document.getElementById('foot-pond-fecha');
+      if (elFecha) elFecha.textContent = fecha;
+
+      renderCandidatePicker();
+      renderSourceSliders();
+      refreshLiderUI();
+      computeAllForCandidate(STATE.candId);
+      ensureMap();
+      renderDeptos();
+      updateLegend();
+      updateCounter();
+      renderTop30();
+      updateCTA();
+
+      const sl = document.getElementById('threshold-slider');
+      sl.addEventListener('input', e => setThreshold(e.target.value));
+    } catch (e){
+      console.error('[Oportunidad] init error', e);
+      document.getElementById('map-head-title').textContent = 'Error cargando datos · revisa la consola';
+    } finally {
+      showLoading(false);
+    }
+  })();
+  </script>
+
+  <script src="lang.js"></script>
+</body>
+</html>
