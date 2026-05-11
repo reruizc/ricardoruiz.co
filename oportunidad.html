@@ -479,6 +479,12 @@
         </div>
       </div>
 
+      <!-- Banner techo afín copado (sólo visible cuando aplica) -->
+      <div class="panel-card cap-banner" id="cap-banner" style="display:none;border-left:3px solid var(--amber);background:rgba(240,192,64,0.08)">
+        <div class="panel-section-title" style="color:var(--amber)">Techo afín nacional copado</div>
+        <div id="cap-banner-body" style="font-family:'Fraunces',serif;font-weight:300;font-size:.92rem;line-height:1.45;margin-top:.35rem;opacity:.92">—</div>
+      </div>
+
       <!-- Detalle territorio -->
       <div class="panel-card">
         <div class="panel-section-title" id="det-title">Territorio seleccionado</div>
@@ -489,7 +495,7 @@
             <div class="det-parents" id="det-parents">—</div>
           </div>
           <div class="det-score-big" id="det-score">—</div>
-          <div class="det-score-sub" id="det-score-sub">techo realista − proyección</div>
+          <div class="det-score-sub" id="det-score-sub">espacio afín no capturado</div>
           <div class="det-bars" id="det-bars">
             <!-- inyectado por renderDetail -->
           </div>
@@ -649,13 +655,17 @@
     return s + n.toFixed(d) + ' pp';
   };
 
+  // Los nombres canónicos viven en STATE.depByName (cargado desde
+  // Departamentos-mps/index.json). Esta tabla mapea cualquier variante
+  // que el GeoJSON traiga en props.name al canónico del índice. Si el
+  // valor coincide con la clave normalizada del índice, basta repetirlo
+  // (auto-documenta los matches que no necesitan transformación).
   const DEP_NAME_ALIASES = {
-    'DISTRITO CAPITAL DE BOGOTA':'BOGOTA',
-    'BOGOTA':'BOGOTA',
-    'SAN ANDRES Y PROVIDENCIA':'SAN ANDRES',
-    'NORTE DE SANTANDER':'NORTE DE SANTANDER',
-    'VALLE DEL CAUCA':'VALLE',
-    'LA GUAJIRA':'GUAJIRA',
+    'DISTRITO CAPITAL DE BOGOTA':'BOGOTA, D.C.',
+    'BOGOTA D.C.':'BOGOTA, D.C.',
+    'BOGOTA':'BOGOTA, D.C.',
+    'SAN ANDRES Y PROVIDENCIA':'ARCHIPIELAGO DE SAN ANDRES, PROVIDENCIA Y SANTA CATALINA',
+    'SAN ANDRES':'ARCHIPIELAGO DE SAN ANDRES, PROVIDENCIA Y SANTA CATALINA',
   };
 
   // Candidatos 2026 (id, nombre display, partido, color, foto, ponderadorKey)
@@ -889,15 +899,17 @@
       });
     }
 
-    // Senado muns: 33 deps en paralelo
-    const senPromises = depIdx.map(async d => {
-      const muns = await fetchJSON(URLS.senMuns(d.dep_electoral), true);
+    // Senado muns: 33 deps + 88 (Consulados, no aparece en depIdx pero
+    // tiene 66 "municipios" = países con voto desde el exterior).
+    const senCods = depIdx.map(d => d.dep_electoral).concat(['88']);
+    const senPromises = senCods.map(async dc => {
+      const muns = await fetchJSON(URLS.senMuns(dc), true);
       if (!Array.isArray(muns)) return;
       muns.forEach(m => {
-        const key = `${m.dep_cod || d.dep_electoral}-${m.cod}`;
+        const key = `${m.dep_cod || dc}-${m.cod}`;
         STATE.senMunByKey[key] = { partidos: m.partidos || {}, votval: m.votval||0, votant: m.votant||0 };
         if (!STATE.munNameByKey[key]){
-          STATE.munNameByKey[key] = { name: m.nombre, depName: m.dep_nom || d.nombre };
+          STATE.munNameByKey[key] = { name: m.nombre, depName: m.dep_nom || (STATE.depByElectoral[dc]||{}).nombre || '' };
         }
       });
     });
@@ -1159,6 +1171,26 @@
     const nacAfin = precomputeNacionalAfin(candId);
     STATE.nacAfinByBucket = nacAfin;
 
+    // Techo afín nacional agregado (ponderado por buckets) × factor liderazgo.
+    // Si candPctNac excede este valor, el candidato ya está "copando" el
+    // bloque afín a nivel país — la oportunidad afín local es marginal y
+    // el banner del panel lo señala explícitamente.
+    {
+      const factor0 = (STATE.lider[candId] ?? 100) / 100;
+      const wR = STATE.weights;
+      const wS0 = Math.max(1, wR.pres22 + wR.congreso26 + wR.pres18 + wR.consultas);
+      let aggNum = 0, aggDen = 0;
+      for (const b of ['pres22','congreso26','pres18','consultas']){
+        const v = nacAfin[b]; const w = wR[b] / wS0;
+        if (v != null){ aggNum += w * v; aggDen += w; }
+      }
+      const afinNacAgg = aggDen > 0 ? aggNum / aggDen : null;
+      STATE.afinNacAgg   = afinNacAgg;
+      STATE.techoNacAgg  = afinNacAgg != null ? factor0 * afinNacAgg : null;
+      STATE.candPctNac   = candPctNac;
+      STATE.techoCopado  = (candPctNac != null && STATE.techoNacAgg != null && candPctNac > STATE.techoNacAgg);
+    }
+
     // 2) Set de munKeys candidatos: union de todos los datasets
     const munKeys = new Set();
     [STATE.pres18, STATE.pres22, STATE.cons25, STATE.cons26g, STATE.cons26f, STATE.cons26s].forEach(m => {
@@ -1206,7 +1238,11 @@
       // pueden absorber una fracción del voto histórico afín.
       const factor = (STATE.lider[candId] ?? 100) / 100;
       const techo = afin != null ? factor * afin : null;
-      const gap  = (techo != null && proj != null) ? (techo - proj) : null;
+      // gap se capa a 0: la oportunidad es "afín no capturado", no "afín
+      // menos proyección". Cuando proj > techo, el modelo ya cobró todo
+      // el bloque afín en ese mun — no hay margen, ni negativo ni positivo.
+      // El banner "techo afín nacional copado" lo explica en agregado.
+      const gap  = (techo != null && proj != null) ? Math.max(0, techo - proj) : null;
 
       // Abstención 2022
       const e22 = STATE.pres22?.[munKey];
@@ -1748,7 +1784,7 @@
       const bias = biasDen > 0 ? biasNum / biasDen : 1.0;
       const proj = candPctNac != null ? candPctNac * bias : null;
       const techo = afin != null ? factor * afin : null;
-      const gap = (techo != null && proj != null) ? (techo - proj) : null;
+      const gap = (techo != null && proj != null) ? Math.max(0, techo - proj) : null;
 
       // Abstención: votos_totales pres-2022 / votos_validos+especiales no es censo real.
       // Aproximamos con (especiales)/(votos_totales) — útil para detectar comunas con baja participación.
@@ -2120,7 +2156,7 @@
       const bias = biasDen>0 ? biasNum/biasDen : 1.0;
       const proj = candPctNac != null ? candPctNac * bias : null;
       const techo = afin != null ? factor * afin : null;
-      const gap = (techo!=null && proj!=null) ? (techo - proj) : null;
+      const gap = (techo!=null && proj!=null) ? Math.max(0, techo - proj) : null;
       // comuna del primer entry disponible (todas las señales coinciden por barrio)
       let comuna = null;
       for (const sig of Object.keys(data)){
@@ -2429,6 +2465,34 @@
         <div class="top-score">${fmtPP(r.gap,1)}</div>
       </div>`;
     }).join('');
+    updateCapBanner();
+  }
+
+  // Banner "techo afín nacional copado": aparece cuando la proyección
+  // nacional del candidato excede el techo afín agregado × factor. En ese
+  // estado, el módulo Oportunidad tiene poco valor para el candidato — las
+  // ganancias deben venir de movilizar abstención o capturar voto cross-block.
+  function updateCapBanner(){
+    const el = document.getElementById('cap-banner');
+    const body = document.getElementById('cap-banner-body');
+    if (!el || !body) return;
+    if (!STATE.techoCopado){
+      el.style.display = 'none';
+      return;
+    }
+    const cand = CANDIDATOS.find(c => c.id === STATE.candId);
+    const candName = cand ? cand.nombre : '—';
+    const proj = STATE.candPctNac, techo = STATE.techoNacAgg, afin = STATE.afinNacAgg;
+    const exceso = proj - techo;
+    el.style.display = 'block';
+    body.innerHTML =
+      `<b>${candName}</b> proyecta <b>${fmtPct(proj,1)}</b> a nivel país, pero el techo afín ` +
+      `agregado del bloque es <b>${fmtPct(techo,1)}</b> (${fmtPct(afin,1)} × factor liderazgo). ` +
+      `Excede en <b>${fmtPct(exceso,1)}</b>, así que el voto blando afín a nivel nacional ya está ` +
+      `copado y el ranking puede quedar pobre. ` +
+      `Las ganancias adicionales en 1ª vuelta vienen de <b>movilización de abstención</b> y ` +
+      `<b>flujo cross-block</b> — revisa el toggle <em>Abstención</em>, no este. ` +
+      `Para un Oportunidad útil: sube el factor de liderazgo o ajusta los pesos por fuente.`;
   }
   function onTopClick(key, dep){
     STATE.selectedDep = dep;
