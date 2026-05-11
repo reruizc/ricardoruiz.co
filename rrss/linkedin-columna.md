@@ -37,7 +37,7 @@ La intuición pública sugiere "transferencia de votos". Los datos sugieren otra
 
 **Segundo**: es ratificación simbólica. El respaldo de Tarazona valida el liderazgo de Paloma como continuadora del proyecto político del que Miguel Uribe formaba parte, en un momento donde la cohesión interna del bloque uribista está siendo disputada. La voz de la viuda del senador asesinado, en un contexto donde el padre del mismo senador es candidato rival, no es un dato cualquiera.
 
-**Tercero, y más importante**: es una señal dirigida al votante de derecha que aún no se ha decidido. El verdadero target del gesto no es el votante Miguel Uribe. Es el votante de derecha que todavía considera otras opciones — María Fernanda Cabal, Abelardo de la Espriella, o el propio Miguel Uribe Londoño en el Partido Demócrata.
+**Tercero, y más importante**: es una señal dirigida al votante de derecha que aún no se ha decidido. El verdadero target del gesto no es el votante Miguel Uribe. Es el votante de derecha que todavía considera otras opciones — Santiago Botero, Abelardo de la Espriella, o el propio Miguel Uribe Londoño en el Partido Demócrata.
 
 A ese votante, el respaldo le dice: el árbol genealógico del uribismo — el expresidente y la viuda del joven Uribe — acompaña a Paloma. Esa es la transferencia real que el gesto orquesta. No del capital Miguel Uribe a Paloma, sino del votante-Uribe-Londoño y del votante-derecha-indeciso hacia Paloma.
 
