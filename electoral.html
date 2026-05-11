@@ -112,7 +112,7 @@
     .year-tab.active::after { transform: scaleX(1); }
 
     /* ── PANELS ── */
-    .panels-wrap { flex: 0 0 auto; padding: 1rem 2.2rem 0; overflow: hidden; }
+    .panels-wrap { position: relative; flex: 0 0 auto; padding: 1rem 2.2rem 0; overflow: hidden; }
     .panel { display: none; opacity: 0; transform: translateY(10px); transition: opacity .35s ease, transform .35s ease; }
     .panel.active { display: grid; opacity: 1; transform: translateY(0); }
     /* Altura explícita — fr rows resuelven contra esta altura definida */
@@ -297,6 +297,68 @@
       margin-left: auto;
       font-size: .6rem;
       opacity: .4;
+    }
+
+    /* ── DRILL SUBPANEL (reemplaza el card-submenu cuando una tarjeta tiene data-drill) ── */
+    .subpanel {
+      position: absolute;
+      top: 1rem; left: 2.2rem; right: 2.2rem;
+      height: clamp(440px, calc(100vh - 315px), 760px);
+      display: none;
+      flex-direction: column;
+      background: transparent;
+      z-index: 5;
+    }
+    .subpanel.active { display: flex; }
+    .subpanel-head {
+      display: flex; align-items: center; gap: 1rem;
+      padding: 0 0 .9rem;
+      flex-shrink: 0;
+    }
+    .subpanel-back {
+      font-family: 'DM Mono', monospace;
+      font-size: .68rem; letter-spacing: .14em; text-transform: uppercase;
+      color: rgba(255,255,255,.55);
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.12);
+      padding: .38rem .85rem;
+      cursor: none;
+      transition: color .2s, border-color .2s, background .2s;
+    }
+    .subpanel-back:hover {
+      color: var(--white);
+      border-color: rgba(0,71,255,.55);
+      background: rgba(0,71,255,.1);
+    }
+    .subpanel-title {
+      font-family: 'Syne', sans-serif; font-weight: 700;
+      font-size: clamp(.88rem, 1.55vw, 1.18rem);
+      letter-spacing: -.01em;
+      color: var(--white);
+    }
+    .subpanel-title span { color: rgba(255,255,255,.4); font-weight: 400; padding: 0 .15rem; }
+    .subpanel-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: var(--gap);
+      flex: 1;
+      min-height: 0;
+    }
+    .subpanel .card {
+      padding: 0;
+      min-height: 130px;
+      justify-content: flex-end;
+    }
+    .subpanel .card-name { font-size: clamp(.85rem, 1.55vw, 1.2rem); }
+    .subpanel .card-sub {
+      font-family: 'Syne', sans-serif; font-weight: 400;
+      font-size: .66rem; letter-spacing: .1em; text-transform: uppercase;
+      color: rgba(255,255,255,.45); margin-top: .35rem;
+    }
+    .subpanel .card.locked { opacity: .5; pointer-events: none; }
+    .subpanel .card.locked::after {
+      content: '🔒'; position: absolute; top: .55rem; right: .65rem;
+      font-size: .8rem; opacity: .6;
     }
 
     /* Círculo PS */
@@ -756,7 +818,7 @@
 
         <!-- ══════ 2023 ══════ -->
         <div class="panel grid-main" id="p2023">
-          <div class="card card-img" style="grid-row:span 2; background-image:url('alcaldias-2023.png'); background-position:center 20%;" data-tape>
+          <div class="card card-img" style="grid-row:span 2; background-image:url('imagenes/alcaldias-2023.jpg'); background-position:center 20%;" data-tape>
             <div class="card-glow"></div>
             <div class="card-soon"><div class="card-tape"><div class="card-tape-inner" data-words></div></div></div>
             <div class="card-label"><div class="card-name" id="el-2023-alcaldias">Alcaldías</div></div>
@@ -796,14 +858,8 @@
 
         <!-- ══════ 2025 ══════ -->
         <div class="panel grid-main" id="p2025">
-          <div class="card card-img card-live" style="grid-row:span 2; background-image:url('consulta-oct.jpg'); background-position: center 18%; cursor:pointer;" onclick="openSubmenu(event,'Consulta Presidencial Oct 2025','Consulta-2025.html')">
+          <div class="card card-img card-live" data-drill="consulta-oct-2025" style="grid-row:span 2; background-image:url('consulta-oct.jpg'); background-position: center 18%; cursor:pointer;" onclick="drillFromCard(this)">
             <div class="card-glow"></div>
-            <div class="card-submenu" id="sub-consulta25">
-              <button class="submenu-close" onclick="closeSubmenu(event,'sub-consulta25')" id="el-close-consulta25">✕ cerrar</button>
-              <span class="submenu-label" id="el-lbl-consulta25">Consulta Presidencial Oct 2025</span>
-              <a class="submenu-opt" href="#" onclick="navigate(event,'Consulta-2025.html?v=escrutinio','Consulta · Escrutinio')" id="el-opt-consulta25-esc">Escrutinio</a>
-              <a class="submenu-opt locked" href="#" id="el-opt-consulta25-ana">Análisis Electoral</a>
-            </div>
             <div class="card-label"><div class="card-name" id="el-2025-consulta">Consulta Presidencial<br/>Octubre 2025</div></div>
           </div>
           <div class="card" data-tape>
@@ -836,67 +892,32 @@
 
         <!-- ══════ 2026 ══════ -->
         <div class="panel active grid-main" id="p2026" style="grid-template-rows: minmax(80px,2.7fr) minmax(80px,2.7fr) minmax(80px,4fr);">
-          <!-- Grande izquierda span 2: Consultas Presidenciales (imagen, disponible) -->
-          <div class="card card-img card-live" style="grid-row:span 2; background-image:url('consultas-2026.jpg'); background-position: center 20%; cursor:pointer;" onclick="openSubmenu(event,'Consultas Presidenciales 2026','consultas-2026.html')">
+          <!-- Grande izquierda span 2: Primera Vuelta (imagen, disponible) -->
+          <div class="card card-img card-live" data-drill="primera-vuelta-2026" style="grid-row:span 2; background-image:url('primera-vuelta.jpg'); background-position: center 20%; cursor:pointer;" onclick="drillFromCard(this)">
             <div class="card-glow"></div>
-            <div class="card-submenu" id="sub-consultas26">
-              <button class="submenu-close" onclick="closeSubmenu(event,'sub-consultas26')" id="el-close-consultas26">✕ cerrar</button>
-              <span class="submenu-label" id="el-lbl-consultas26">Consultas Presidenciales 2026</span>
-              <a class="submenu-opt" href="#" onclick="navigate(event,'consultas-2026.html?v=preconteo','Consultas · Preconteo')" id="el-opt-consultas26-prec">Preconteo</a>
-              <a class="submenu-opt" href="#" onclick="navigate(event,'consultas-escr-2026.html','Consultas · Escrutinio')" id="el-opt-consultas26-esc">Escrutinio</a>
-              <a class="submenu-opt locked" href="#" id="el-opt-consultas26-ana">Análisis Electoral</a>
-            </div>
-            <div class="card-label"><div class="card-name" id="el-2026-consultas">Consultas Presidenciales 2026</div></div>
+            <div class="card-label"><div class="card-name" id="el-2026-pv">Primera Vuelta 2026</div></div>
           </div>
           <!-- Derecha fila 1: Senado (imagen, disponible) -->
-          <div class="card card-img card-live" style="background-image:url('senado-2026.jpeg'); cursor:pointer;" onclick="openSubmenu(event,'Senado de la República 2026','Senado-2026.html')">
+          <div class="card card-img card-live" data-drill="senado-2026" style="background-image:url('senado-2026.jpeg'); cursor:pointer;" onclick="drillFromCard(this)">
             <div class="card-glow"></div>
-            <div class="card-submenu" id="sub-senado26">
-              <button class="submenu-close" onclick="closeSubmenu(event,'sub-senado26')" id="el-close-senado26">✕ cerrar</button>
-              <span class="submenu-label" id="el-lbl-senado26">Senado de la República 2026</span>
-              <a class="submenu-opt" href="#" onclick="navigate(event,'senado-prec-2026.html','Senado · Preconteo')" id="el-opt-senado26-prec">Preconteo</a>
-              <a class="submenu-opt" href="#" onclick="navigate(event,'senado-2026.html','Senado · Escrutinio')" id="el-opt-senado26-esc">Escrutinio</a>
-              <a class="submenu-opt locked" href="#" id="el-opt-senado26-ana">Análisis Electoral</a>
-            </div>
             <div class="card-label"><div class="card-name" id="el-2026-senado">Senado de la República 2026</div></div>
           </div>
           <!-- Derecha fila 2: Cámara (imagen, disponible) -->
-          <div class="card card-img card-live" style="background-image:url('camara-2026.png'); background-position: center 25%; cursor:pointer;" onclick="openSubmenu(event,'Cámara de Representantes 2026','Camara-2026.html')">
+          <div class="card card-img card-live" data-drill="camara-2026" style="background-image:url('imagenes/camara-2026.jpg'); background-position: center 25%; cursor:pointer;" onclick="drillFromCard(this)">
             <div class="card-glow"></div>
-            <div class="card-submenu" id="sub-camara26">
-              <button class="submenu-close" onclick="closeSubmenu(event,'sub-camara26')" id="el-close-camara26">✕ cerrar</button>
-              <span class="submenu-label" id="el-lbl-camara26">Cámara de Representantes 2026</span>
-              <a class="submenu-opt" href="#" onclick="navigate(event,'camara-prec-2026.html','Cámara · Preconteo')" id="el-opt-camara26-prec">Preconteo</a>
-              <a class="submenu-opt" href="#" onclick="navigate(event,'camara-2026.html','Cámara · Escrutinio')" id="el-opt-camara26-esc">Escrutinio</a>
-              <a class="submenu-opt locked" href="#" id="el-opt-camara26-ana">Análisis Electoral</a>
-            </div>
             <div class="card-label"><div class="card-name" id="el-2026-camara">Cámara de Representantes 2026</div></div>
           </div>
           <!-- Fila 3–4: 6 tarjetas en 2 filas de 3 -->
           <div class="bottom-row-6">
             <!-- CITREP (imagen) -->
-            <div class="card card-img card-live" style="background-image:url('CITREP.png'), url('citrep.png'); background-position: center 20%; cursor:pointer;" onclick="openSubmenu(event,'CITREP 2026','citrep-2026.html')">
+            <div class="card card-img card-live" data-drill="citrep-2026" style="background-image:url('imagenes/citrep.jpg'); background-position: center 20%; cursor:pointer;" onclick="drillFromCard(this)">
               <div class="card-glow"></div>
-              <div class="card-submenu" id="sub-citrep26">
-                <button class="submenu-close" onclick="closeSubmenu(event,'sub-citrep26')" id="el-close-citrep26">✕ cerrar</button>
-                <span class="submenu-label" id="el-lbl-citrep26">CITREP 2026</span>
-                <a class="submenu-opt" href="#" onclick="navigate(event,'citrep-2026.html','CITREP · Escrutinio')" id="el-opt-citrep26-esc">Escrutinio</a>
-                <a class="submenu-opt locked" href="#" id="el-opt-citrep26-ana">Análisis Electoral</a>
-              </div>
               <div class="card-label"><div class="card-name" id="el-2026-citrep">CITREP 2026</div></div>
             </div>
-            <!-- Primera Vuelta (imagen) -->
-            <div class="card card-img card-live" style="background-image:url('primera-vuelta.jpg'); background-position: center 20%; cursor:pointer;" onclick="openSubmenu(event,'Primera Vuelta 2026','Primera-Vuelta-2026.html')">
+            <!-- Consultas Presidenciales (imagen) -->
+            <div class="card card-img card-live" data-drill="consultas-2026" style="background-image:url('consultas-2026.jpg'); background-position: center 20%; cursor:pointer;" onclick="drillFromCard(this)">
               <div class="card-glow"></div>
-              <div class="card-submenu" id="sub-pv26">
-                <button class="submenu-close" onclick="closeSubmenu(event,'sub-pv26')" id="el-close-pv26">✕ cerrar</button>
-                <span class="submenu-label" id="el-lbl-pv26">Primera Vuelta 2026</span>
-                <a class="submenu-opt" href="#" onclick="navigate(event,'previa-1v.html','Primera Vuelta · Previa')" id="el-opt-pv26-previa">Previa</a>
-                <a class="submenu-opt" href="#" onclick="navigate(event,'veleta.html','Primera Vuelta · Sitios clave')" id="el-opt-pv26-veleta">Sitios clave</a>
-                <a class="submenu-opt locked" href="#" id="el-opt-pv26-prec">Preconteo</a>
-                <a class="submenu-opt locked" href="#" id="el-opt-pv26-esc">Escrutinio</a>
-              </div>
-              <div class="card-label"><div class="card-name" id="el-2026-pv">Primera Vuelta 2026</div></div>
+              <div class="card-label"><div class="card-name" id="el-2026-consultas">Consultas Presidenciales 2026</div></div>
             </div>
             <!-- Segunda Vuelta -->
             <div class="card" data-tape>
@@ -923,6 +944,17 @@
             </div>
           </div>
         </div><!-- /p2026 -->
+
+        <!-- DRILL SUBPANEL: se llena dinámicamente cuando se hace clic en una card con data-drill.
+             Cubre el área del panel activo y muestra las opciones hijas como cards.
+             Reemplaza el antiguo card-submenu (overlay negro dentro de la tarjeta). -->
+        <div class="subpanel" id="subpanel" aria-hidden="true">
+          <div class="subpanel-head">
+            <button class="subpanel-back" onclick="drillBack()">← Volver</button>
+            <div class="subpanel-title" id="subpanel-title"></div>
+          </div>
+          <div class="subpanel-grid" id="subpanel-grid"></div>
+        </div>
 
       </div><!-- /panels-wrap -->
 
@@ -1073,30 +1105,173 @@
       });
     });
 
-    // ── SUBMENU ──
-    function openSubmenu(e, label, url) {
-      // Find submenu inside this card
-      const card = e.currentTarget;
-      const menu = card.querySelector('.card-submenu');
-      if (!menu) { navigate(e, url, label); return; }
-      // If already open, close it
-      if (menu.classList.contains('open')) return;
-      e.stopPropagation();
-      // Close all other open submenus first
-      document.querySelectorAll('.card-submenu.open').forEach(m => m.classList.remove('open'));
-      menu.classList.add('open');
+    // ── DRILL DOWN ──
+    // Reemplaza al antiguo card-submenu (overlay negro dentro de la card).
+    // Al hacer clic en una card-live con data-drill, las cards del panel
+    // activo se "desintegran" y aparecen las cards hijas en un subpanel
+    // que cubre la misma área. ← Volver hace lo contrario.
+    const DRILL = {
+      'consulta-oct-2025': {
+        title: 'Consulta Presidencial · Octubre 2025',
+        children: [
+          { label:'Escrutinio',         sub:'Boletines oficiales',            href:'Consulta-2025.html?v=escrutinio' },
+          { label:'Análisis Electoral', sub:'Próximamente',                   locked:true },
+        ]
+      },
+      'consultas-2026': {
+        title: 'Consultas Presidenciales · 2026',
+        children: [
+          { label:'Preconteo',          sub:'Resultados en vivo · 8 marzo',   href:'consultas-2026.html?v=preconteo' },
+          { label:'Escrutinio',         sub:'Boletines oficiales',            href:'consultas-escr-2026.html' },
+          { label:'Análisis Electoral', sub:'Próximamente',                   locked:true },
+        ]
+      },
+      'senado-2026': {
+        title: 'Senado de la República · 2026',
+        children: [
+          { label:'Preconteo',          sub:'Resultados en vivo · 8 marzo',   href:'senado-prec-2026.html' },
+          { label:'Escrutinio',         sub:"Boletines oficiales · D'Hondt",  href:'senado-2026.html' },
+          { label:'Análisis Electoral', sub:'Próximamente',                   locked:true },
+        ]
+      },
+      'camara-2026': {
+        title: 'Cámara de Representantes · 2026',
+        children: [
+          { label:'Preconteo',          sub:'Resultados en vivo · 8 marzo',   href:'camara-prec-2026.html' },
+          { label:'Escrutinio',         sub:'Por circunscripción',            href:'camara-2026.html' },
+          { label:'Análisis Electoral', sub:'Próximamente',                   locked:true },
+        ]
+      },
+      'citrep-2026': {
+        title: 'CITREP · 2026',
+        children: [
+          { label:'Escrutinio',         sub:'Curules de paz',                 href:'citrep-2026.html' },
+          { label:'Análisis Electoral', sub:'Próximamente',                   locked:true },
+        ]
+      },
+      'primera-vuelta-2026': {
+        title: 'Primera Vuelta Presidencial · 2026',
+        children: [
+          { label:'Previa',       sub:'Simulador + ponderador',              href:'previa-1v.html' },
+          { label:'Veleta',       sub:'Municipios sensibles al cambio',      href:'veleta.html' },
+          { label:'Oportunidad',  sub:'Voto blando por candidato',           href:'oportunidad.html' },
+          { label:'Preconteo',    sub:'Resultados en vivo · 31 de mayo',     locked:true },
+        ]
+      },
+    };
+
+    let _drillActivePanel = null;
+    let _drillSwitching = false;
+
+    function drillFromCard(cardEl){
+      if (_drillSwitching || tabSwitching) return;
+      const key = cardEl.dataset.drill;
+      if (!key) return;
+      const entry = DRILL[key];
+      if (!entry) return;
+
+      const panel = document.querySelector('.panel.active');
+      if (!panel) return;
+      _drillActivePanel = panel;
+      _drillSwitching = true;
+
+      // Render subpanel content
+      const titleEl = document.getElementById('subpanel-title');
+      // Coloreamos el separador " · " en gris para jerarquía visual
+      titleEl.innerHTML = entry.title
+        .split(' · ')
+        .map((p,i,a) => i < a.length-1 ? p + '<span>·</span>' : p)
+        .join('');
+      const grid = document.getElementById('subpanel-grid');
+      grid.innerHTML = '';
+      entry.children.forEach(child => {
+        const c = document.createElement('div');
+        c.className = 'card card-live' + (child.locked ? ' locked' : '');
+        if (child.href && !child.locked) {
+          c.style.cursor = 'pointer';
+          c.addEventListener('click', (ev) => navigate(ev, child.href, child.label));
+        }
+        c.innerHTML = `
+          <div class="card-glow"></div>
+          <div class="card-label">
+            <div class="card-name">${child.label}</div>
+            ${child.sub ? `<div class="card-sub">${child.sub}</div>` : ''}
+          </div>
+        `;
+        grid.appendChild(c);
+      });
+
+      // Animación: desintegrar panel padre → activar subpanel → materializar hijos
+      disintegratePanel(panel, () => {
+        panel.style.visibility = 'hidden';
+        const subpanel = document.getElementById('subpanel');
+        subpanel.classList.add('active');
+        subpanel.setAttribute('aria-hidden', 'false');
+        const inCards = Array.from(grid.querySelectorAll('.card'));
+        inCards.forEach(card => {
+          const dx = (Math.random() - 0.5) * DISINTEGRATE_SPREAD;
+          const dy = (Math.random() - 0.5) * (DISINTEGRATE_SPREAD * 0.6);
+          card.style.transition = 'none';
+          card.style.transform = `translate(${dx}px,${dy}px) scale(0.72)`;
+          card.style.opacity = '0';
+          card.style.filter = 'blur(5px)';
+        });
+        subpanel.getBoundingClientRect(); // reflow
+        materializePanel(inCards, () => { _drillSwitching = false; });
+      });
     }
 
-    function closeSubmenu(e, id) {
-      e.stopPropagation();
-      const menu = document.getElementById(id);
-      if (menu) menu.classList.remove('open');
+    function drillBack(){
+      if (_drillSwitching) return;
+      const subpanel = document.getElementById('subpanel');
+      if (!subpanel.classList.contains('active') || !_drillActivePanel) return;
+      _drillSwitching = true;
+
+      const childCards = Array.from(subpanel.querySelectorAll('.subpanel-grid .card'));
+      childCards.forEach(card => {
+        const dx = (Math.random() - 0.5) * DISINTEGRATE_SPREAD;
+        const dy = (Math.random() - 0.5) * (DISINTEGRATE_SPREAD * 0.6);
+        const delay = Math.random() * 120;
+        card.style.transition = `opacity ${DISINTEGRATE_MS}ms ease-in ${delay}ms, transform ${DISINTEGRATE_MS}ms cubic-bezier(.4,0,1,1) ${delay}ms, filter ${DISINTEGRATE_MS}ms ease-in ${delay}ms`;
+        card.style.transform = `translate(${dx}px,${dy}px) scale(0.72)`;
+        card.style.opacity = '0';
+        card.style.filter = 'blur(5px)';
+      });
+      setTimeout(() => {
+        subpanel.classList.remove('active');
+        subpanel.setAttribute('aria-hidden', 'true');
+        const panel = _drillActivePanel;
+        panel.style.visibility = '';
+        const parentCards = Array.from(panel.querySelectorAll('.card'));
+        parentCards.forEach(card => {
+          const dx = (Math.random() - 0.5) * DISINTEGRATE_SPREAD;
+          const dy = (Math.random() - 0.5) * (DISINTEGRATE_SPREAD * 0.6);
+          card.style.transition = 'none';
+          card.style.transform = `translate(${dx}px,${dy}px) scale(0.72)`;
+          card.style.opacity = '0';
+          card.style.filter = 'blur(5px)';
+        });
+        panel.getBoundingClientRect(); // reflow
+        materializePanel(parentCards, () => { _drillSwitching = false; });
+        _drillActivePanel = null;
+      }, DISINTEGRATE_MS + 140);
     }
 
-    // Click outside closes submenus
-    document.addEventListener('click', () => {
-      document.querySelectorAll('.card-submenu.open').forEach(m => m.classList.remove('open'));
+    // ESC cierra el drill
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape'){
+        const sp = document.getElementById('subpanel');
+        if (sp && sp.classList.contains('active')) drillBack();
+      }
     });
+
+    // ── SUBMENU (legacy, queda como noop por compatibilidad) ──
+    function openSubmenu(e, label, url) {
+      const card = e.currentTarget;
+      if (card && card.dataset.drill) { drillFromCard(card); return; }
+      if (url) navigate(e, url, label);
+    }
+    function closeSubmenu(e, id) { e.stopPropagation(); }
 
     // ── TABS ──
     const tabs = ['p2023','p2025','p2026'];
@@ -1114,7 +1289,14 @@
 
       document.querySelectorAll('.year-tab').forEach(t => t.classList.remove('active'));
       btn.classList.add('active');
-      document.querySelectorAll('.card-submenu.open').forEach(m => m.classList.remove('open'));
+      // Cerrar drill activo (sin animación) al cambiar de año
+      const _sp = document.getElementById('subpanel');
+      if (_sp && _sp.classList.contains('active')){
+        _sp.classList.remove('active');
+        _sp.setAttribute('aria-hidden', 'true');
+        if (_drillActivePanel) _drillActivePanel.style.visibility = '';
+        _drillActivePanel = null;
+      }
 
       const outgoing = document.querySelector('.panel.active');
       const incoming = document.getElementById(panelId);

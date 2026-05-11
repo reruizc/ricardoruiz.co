@@ -5,7 +5,122 @@
 - `senado-2026.html` — escrutinio senado, todos los toggles y visualizaciones
 - `camara-2026.html` — (en construcción) espejo de senado para cámara
 - `endoso-2026.html` — comparación mesa a mesa senado vs cámara
+- `previa-1v.html` — simulador de intención presidencial 1ª vuelta
 - `lang.js` — i18n (co/us/cn); `CLAUDE.md` vive en la raíz del repo
+
+## Tareas pendientes — `previa-1v.html`
+- **Gráfico temporal de evolución por candidato** (pendiente, prioridad media):
+  un line chart ponderado que muestre cómo crece o decrece cada candidato a lo
+  largo del tiempo, usando los datos crudos de cada encuesta + los pesos del
+  ponderador propio (`Bases de datos/output_ponderador/ponderador-detalle.json`,
+  campo `contribuciones`). Cada punto del eje X es una semana ISO; cada línea
+  un candidato. Debería respetar el toggle día/noche y la paleta del proyecto.
+
+## Módulo Veleta — `veleta.html` (por construir, prioridad ALTA, ventana hasta 1ª vuelta)
+
+Producto B2B para equipos de campaña: mapa de **municipios veleta** (sensibles al
+cambio electoral) con score multidimensional. Es el bottom-of-funnel comercial
+del ciclo electoral 2026 — diferenciador frente a herramientas genéricas de
+visualización porque combina histórico + competitividad + peso en una sola métrica
+defendible.
+
+**Definición del Score Veleta (0–100)** — promedio ponderado:
+- **Swing histórico (40%)**: `|Δ pct_Petro_2022 − pct_Petro_2018|`, normalizado al
+  percentil 95 nacional. Bonus +15 pts si el ganador del municipio cambió entre
+  ciclos (`top1_2018 ≠ top1_2022`). Petro candidato en ambas presidenciales =
+  proxy directo del eje izquierda↔resto.
+- **Competitividad (40%)**: margen `top1 − top2` en presidencial 2022 sobre
+  votos válidos. Lineal invertido: margen 0 pp → 100, margen ≥25 pp → 0.
+- **Peso electoral (20%)**: `log(censo_municipal)` normalizado min/max nacional.
+  Filtra ruido de municipios pequeños sin sacrificar cobertura.
+
+`Score = 0.4·swing + 0.4·comp + 0.2·peso`. Municipios con score ≥ umbral (default
+70, slider 50–90) se renderizan con **patrón rayado SVG** (`<pattern>` global +
+`fillColor: 'url(#vel-stripes)'` — Leaflet pasa el fill textualmente al path,
+funciona porque la referencia se resuelve por id en el DOM). Resto del mapa:
+gradiente lineal gris frío → ámbar → rojo según score.
+
+**Datos de entrada** (todos en S3):
+```
+historicos/pres-2018-v1/por-mun.json   { "depCod-munCod": { candidatos:{1:{nombre,pct},...}, votos_validos } }
+historicos/pres-2022-v1/por-mun.json   misma estructura
+puestos-censos-agg.json                { porMun: { "depCod-munCod": int }, nacional: int }
+mapas-2026/DEPARTAMENTOS2.json         GeoJSON deptos
+mapas-2026/MUNICIPIOSX.json            GeoJSON municipios nacional (9 MB)
+```
+
+**Estructura UX**:
+1. Header + breadcrumb (mismo nav que `previa-1v.html`).
+2. Sección intro con 3 cards explicando los componentes del score (transparencia
+   metodológica = clave para venta B2B).
+3. Toggle nivel territorial (departamental por defecto / municipal). Slider de
+   umbral del rayado.
+4. Shell 2 columnas: mapa Leaflet + panel lateral con leyenda, detalle de
+   municipio en hover, top-30 ranking clickeable, CTA de venta ("¿Equipo de
+   campaña? Reporte territorial 3M COP").
+5. Drill-down por click en depto → muestra solo municipios de ese depto.
+
+**Componentes reutilizables de `previa-1v.html`**:
+- Nav, breadcrumb, header, day-mode (toggleTheme).
+- Helpers `pad()`, hover-chip flotante, estructura `.shell`/`.map-wrap`/`.panel`.
+- Patrón Leaflet: SVG renderer (NO canvas — el rayado necesita SVG).
+- `colorWithIntensity()` no aplica aquí (cambia paleta a gradiente score-driven).
+
+**Color tokens nuevos** (variantes a las globales):
+```css
+--vel-low:#2d3340;  --vel-mid:#f59e0b;  --vel-high:#f87171;
+/* Stops del gradiente: 0→#2d3340, 40→#463c3c, 60→#b46e32, 75→#f59e0b, 100→#f87171 */
+/* Acento del módulo (en lugar de --blue): --orange (#fb923c) */
+```
+
+**Patrón de rayado SVG** (insertar en `<body>` antes del nav, una sola vez):
+```html
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <pattern id="vel-stripes" patternUnits="userSpaceOnUse" width="6" height="6"
+             patternTransform="rotate(45)">
+      <rect width="6" height="6" fill="#f87171"/>
+      <line x1="0" y1="0" x2="0" y2="6" stroke="#fff" stroke-width="2.2" stroke-opacity=".45"/>
+    </pattern>
+    <!-- duplicar como #vel-stripes-day con fill #dc2626 + stroke-opacity .7 para day-mode -->
+  </defs>
+</svg>
+```
+
+**Notas de cálculo**:
+- En agregado por depto: promedio de score ponderado por censo. Conteo
+  independiente de "veleta count" (`recs.filter(r => r.score >= threshold).length`)
+  para que el slider del umbral repinte sin recomputar scores.
+- Header del mapa: número de municipios veleta + % del censo nacional que
+  representan ("censo en juego"). Es el número que un jefe de campaña quiere ver.
+
+**Riesgo metodológico**: la elección de Petro como ancla del swing carga el
+score hacia volatilidad en el eje izquierda. Es defendible (eje principal de la
+contienda 2026) pero documentar en el footer y en el reporte de venta — un
+consultor experto lo va a preguntar.
+
+## Ponderador propio (en construcción)
+Pipeline en `tools/ponderador/` que calibra firmas encuestadoras contra el
+único ground truth post-Ley 2494: las consultas del 8 de marzo de 2026.
+Ver `tools/ponderador/README.md` para flujo de uso.
+
+```
+Bases de datos/cne_pdfs/                 → PDFs descargados a mano del CNE
+Bases de datos/cne_encuestas_2026.json   → inventario scrapeado del CNE
+Bases de datos/cne_encuestas_clasificadas.csv  → con auto-clasificación
+Bases de datos/encuestas_porcentajes.csv → % por candidato (manual desde PDF)
+Bases de datos/encuestas_distribucion_muestral.csv → muestra por depto
+Bases de datos/output_ponderador/ponderador-actual.json  → consume previa-1v.html
+Bases de datos/output_ponderador/ponderador-detalle.json → transparencia total
+Bases de datos/output_ponderador/representatividad.json  → KL vs censo Divipole
+```
+
+Decisiones metodológicas (resumen):
+- Sólo el 8-mar como benchmark (Ley 2494 cambió la regla del juego).
+- MAE filtra candidatos extintos antes de normalizar (Cepeda no estuvo en Frente).
+- `q_firma` ∈ [0.40, 1.00]; firmas no calibradas entran con 1.00 + bandera.
+- House effect post-marzo vs mediana semanal por candidato.
+- Representatividad muestral: KL + χ² + bandera por depto |delta|≥5pp.
 
 ## Worktree y deploy
 ```
