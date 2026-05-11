@@ -495,7 +495,7 @@
             <div class="det-parents" id="det-parents">—</div>
           </div>
           <div class="det-score-big" id="det-score">—</div>
-          <div class="det-score-sub" id="det-score-sub">espacio afín no capturado</div>
+          <div class="det-score-sub" id="det-score-sub">espacio del bloque no capturado</div>
           <div class="det-bars" id="det-bars">
             <!-- inyectado por renderDetail -->
           </div>
@@ -772,6 +772,31 @@
   //                comparte centro con Fajardo y verde diluido.
   // Roy 0.10: residual del Pacto, prácticamente todo va a Cepeda.
   const LIDER_DEFAULTS = { ic:95, ae:45, pv:70, sf:55, cl:20, rb:10 };
+
+  // ─── BLOQUE AMPLIO (techo electoral 1ª vuelta) ─────────────────
+  // Universo de candidatos 2026 cuyos votos podría heredar el candidato
+  // principal en 1ª vuelta. Define el techo electoral realista del bloque:
+  //   pondPct_bloque = Σ pondPct(c) + NS-NR × (sumBloque / sumDeclarado)
+  // El NS-NR se distribuye proporcional al tamaño del bloque dentro del
+  // universo declarado (asignación neutral mínima — votos indecisos que
+  // pueden movilizarse a candidatos del mismo eje ideológico).
+  //
+  // Decisiones editoriales:
+  // - Cepeda/Roy/Claudia comparten un núcleo izq-centro común; cada uno
+  //   pone su propia AFINIDADES (shape geográfica) pero el techo es
+  //   compartido como bloque ampliado.
+  // - Fajardo NO incluye Cepeda (centro técnico ≠ izq orgánica).
+  // - Roy/Claudia/Cepeda incluyen Murillo (Liberal moderado afín).
+  // - Paloma/Abelardo: bloque derecha CD+MSN, contenido.
+  // - Blanco se deja afuera: no tiene shape territorial del bloque.
+  const BLOQUE_AMPLIO = {
+    ic: ['ic','rb','cl','lm'],
+    rb: ['rb','ic','cl','lm'],
+    cl: ['cl','sf','rb','lm'],
+    sf: ['sf','cl','lm'],
+    pv: ['pv','ae'],
+    ae: ['ae','pv'],
+  };
 
   // Mapeo de "fuente bucket" → datasets. Cada bucket tiene un slider.
   const SOURCE_BUCKETS = [
@@ -1171,24 +1196,17 @@
     const nacAfin = precomputeNacionalAfin(candId);
     STATE.nacAfinByBucket = nacAfin;
 
-    // Techo afín nacional agregado (ponderado por buckets) × factor liderazgo.
-    // Si candPctNac excede este valor, el candidato ya está "copando" el
-    // bloque afín a nivel país — la oportunidad afín local es marginal y
-    // el banner del panel lo señala explícitamente.
+    // Techo electoral nacional del bloque ampliado:
+    //   techo_nac = factor × (Σ pondPct(c in bloque)) × (1 + NS-NR/sumDecl)
+    // Si candPctNac excede este valor, incluso el bloque ampliado está
+    // copado — el banner del panel sugiere otras estrategias.
     {
       const factor0 = (STATE.lider[candId] ?? 100) / 100;
-      const wR = STATE.weights;
-      const wS0 = Math.max(1, wR.pres22 + wR.congreso26 + wR.pres18 + wR.consultas);
-      let aggNum = 0, aggDen = 0;
-      for (const b of ['pres22','congreso26','pres18','consultas']){
-        const v = nacAfin[b]; const w = wR[b] / wS0;
-        if (v != null){ aggNum += w * v; aggDen += w; }
-      }
-      const afinNacAgg = aggDen > 0 ? aggNum / aggDen : null;
-      STATE.afinNacAgg   = afinNacAgg;
-      STATE.techoNacAgg  = afinNacAgg != null ? factor0 * afinNacAgg : null;
-      STATE.candPctNac   = candPctNac;
-      STATE.techoCopado  = (candPctNac != null && STATE.techoNacAgg != null && candPctNac > STATE.techoNacAgg);
+      const blocPct = pondPctBlocAjustado(candId);   // Σ pondPct × (1+NS-NR/sumDecl)
+      STATE.blocPctAjustado = blocPct;
+      STATE.techoNacAgg     = blocPct != null ? factor0 * blocPct : null;
+      STATE.candPctNac      = candPctNac;
+      STATE.techoCopado     = (candPctNac != null && STATE.techoNacAgg != null && candPctNac > STATE.techoNacAgg);
     }
 
     // 2) Set de munKeys candidatos: union de todos los datasets
@@ -1208,6 +1226,22 @@
       pres18:     wRaw.pres18 / wSum,
       consultas:  wRaw.consultas / wSum,
     };
+
+    // Precompute nacAfin y pondPct para cada miembro del bloque amplio.
+    // Cada miembro tiene su propia shape (AFINIDADES) y su propio peso (pondPct);
+    // el techo del bloque por mun es la suma de sus proyecciones individuales.
+    const blocMems = BLOQUE_AMPLIO[candId] || [candId];
+    const blocData = blocMems.map(id => {
+      const c = CANDIDATOS.find(x => x.id === id);
+      return {
+        id,
+        cand: c,
+        pondPct: pondPct(c) || 0,
+        nacAfin: precomputeNacionalAfin(id),
+      };
+    });
+    const nsnrFactor = getNsNrFactor();   // pickup proporcional NS-NR
+    const factor    = (STATE.lider[candId] ?? 100) / 100;
 
     const munMetrics = {};
     for (const munKey of munKeys){
@@ -1233,16 +1267,27 @@
       const afin = afinDen > 0 ? afinNum / afinDen : null;
       const bias = projBiasDen > 0 ? projBiasNum / projBiasDen : 1.0;
       const proj = candPctNac != null ? candPctNac * bias : null;
-      // Techo realista = factor liderazgo × techo afín del bloque.
-      // Captura el hecho de que candidatos sub-líderes del bloque sólo
-      // pueden absorber una fracción del voto histórico afín.
-      const factor = (STATE.lider[candId] ?? 100) / 100;
-      const techo = afin != null ? factor * afin : null;
-      // gap se capa a 0: la oportunidad es "afín no capturado", no "afín
-      // menos proyección". Cuando proj > techo, el modelo ya cobró todo
-      // el bloque afín en ese mun — no hay margen, ni negativo ni positivo.
-      // El banner "techo afín nacional copado" lo explica en agregado.
-      const gap  = (techo != null && proj != null) ? Math.max(0, techo - proj) : null;
+
+      // Techo del bloque ampliado: Σ pondPct(c) × bias_c(mun) sobre los
+      // miembros del bloque, × factor liderazgo × (1 + NS-NR/sumDecl).
+      // Cada miembro contribuye con su pondPct redistribuido por su propia
+      // shape histórica. NS-NR pickup uniforme sobre el bloque.
+      let techoBlocNum = 0;
+      for (const m of blocData){
+        if (!m.pondPct) continue;
+        const bk = bucketsPctAfinForMun(m.id, munKey);
+        let bn=0, bd=0;
+        for (const b of ['pres22','congreso26','pres18','consultas']){
+          const v = bk[b]; const w = wNorm[b]; const n = m.nacAfin[b];
+          if (v != null && n != null && n > 0){ bn += w*(v/n); bd += w; }
+        }
+        const biasM = bd > 0 ? bn/bd : 1.0;
+        techoBlocNum += m.pondPct * biasM;
+      }
+      const techo = factor * (1 + nsnrFactor) * techoBlocNum;
+      // gap se capa a 0: si la proyección actual del candidato ya supera
+      // el techo del bloque ampliado en ese mun, no hay margen.
+      const gap = (proj != null) ? Math.max(0, techo - proj) : null;
 
       // Abstención 2022
       const e22 = STATE.pres22?.[munKey];
@@ -1302,6 +1347,34 @@
     // Fallback (mismos que previa-1v hardcodeados)
     const fb = { ic:38, ae:29, sf:11, pv:6.5, rb:1.5, cl:1.5, lm:.8 };
     return fb[cand.id] ?? null;
+  }
+
+  // Factor de NS-NR a sumar al bloque: NS-NR / sumDeclarado.
+  // Se distribuye proporcional al tamaño relativo de cada bloque dentro
+  // del universo de candidatos declarados.
+  function getNsNrFactor(){
+    const pond = STATE.pondData?.candidatos;
+    if (!pond) return 0;
+    const nsnr = pond['NS-NR']?.pct ?? 0;
+    let sumDecl = 0;
+    for (const c of CANDIDATOS){
+      const p = pond[c.pondKey]?.pct;
+      if (p != null) sumDecl += p;
+    }
+    return sumDecl > 0 ? nsnr / sumDecl : 0;
+  }
+
+  // Suma del pondPct del bloque amplio ajustada por NS-NR pickup.
+  // Es el techo electoral nacional realista del bloque.
+  function pondPctBlocAjustado(candId){
+    const mems = BLOQUE_AMPLIO[candId] || [candId];
+    let sum = 0;
+    for (const id of mems){
+      const c = CANDIDATOS.find(x => x.id === id);
+      const p = pondPct(c);
+      if (p != null) sum += p;
+    }
+    return sum * (1 + getNsNrFactor());
   }
 
   /* ───────── Color helpers ───────── */
@@ -1760,6 +1833,14 @@
       Object.keys(cityData[sig]).forEach(k => comCods.add(k));
     }
 
+    // Bloque ampliado: precompute baseline y pondPct para cada miembro.
+    const blocMems = BLOQUE_AMPLIO[candId] || [candId];
+    const blocData = blocMems.map(id => {
+      const c = CANDIDATOS.find(x => x.id === id);
+      return { id, cand: c, pondPct: pondPct(c) || 0, cityNac: precomputeCityNacAfin(id, cityData) };
+    });
+    const nsnrFactor = getNsNrFactor();
+
     const out = {};
     for (const comCod of comCods){
       const buckets = bucketsPctAfinForComuna(candId, cityData, comCod);
@@ -1783,8 +1864,25 @@
       const afin = afinDen > 0 ? afinNum / afinDen : null;
       const bias = biasDen > 0 ? biasNum / biasDen : 1.0;
       const proj = candPctNac != null ? candPctNac * bias : null;
-      const techo = afin != null ? factor * afin : null;
-      const gap = (techo != null && proj != null) ? Math.max(0, techo - proj) : null;
+
+      // Techo bloque: Σ_c pondPct(c) × bias_c(com) × factor × (1+NS-NR/sumDecl)
+      let techoBlocNum = 0;
+      for (const m of blocData){
+        if (!m.pondPct) continue;
+        const bk = bucketsPctAfinForComuna(m.id, cityData, comCod);
+        let bn=0, bd=0;
+        for (const b of ['pres22','congreso26','pres18','consultas']){
+          const v = bk[b]; const w = wNorm[b];
+          const nacCity = m.cityNac[b];
+          const nacPais = STATE.nacAfinByBucket?.[b];
+          const base = (nacCity != null && nacCity > 0) ? nacCity : nacPais;
+          if (v != null && base != null && base > 0){ bn += w*(v/base); bd += w; }
+        }
+        const biasM = bd > 0 ? bn/bd : 1.0;
+        techoBlocNum += m.pondPct * biasM;
+      }
+      const techo = factor * (1 + nsnrFactor) * techoBlocNum;
+      const gap = (proj != null) ? Math.max(0, techo - proj) : null;
 
       // Abstención: votos_totales pres-2022 / votos_validos+especiales no es censo real.
       // Aproximamos con (especiales)/(votos_totales) — útil para detectar comunas con baja participación.
@@ -2138,6 +2236,19 @@
     const keys = new Set();
     for (const sig of Object.keys(data)) Object.keys(data[sig]).forEach(k => keys.add(k));
 
+    // Bloque ampliado: precompute baseline barrio (con fallbacks a comuna y país)
+    // y pondPct para cada miembro.
+    const blocMems = BLOQUE_AMPLIO[candId] || [candId];
+    const blocData = blocMems.map(id => {
+      const c = CANDIDATOS.find(x => x.id === id);
+      return {
+        id, cand: c, pondPct: pondPct(c) || 0,
+        barrioNac: precomputeMdeBarrioNacAfin(id),
+        comunaNac: STATE.cityNacAfin.medellin?.[id] || {},
+      };
+    });
+    const nsnrFactor = getNsNrFactor();
+
     const out = {};
     for (const bk of keys){
       const buckets = bucketsPctAfinForComuna(candId, data, bk);
@@ -2155,8 +2266,25 @@
       const afin = afinDen>0 ? afinNum/afinDen : null;
       const bias = biasDen>0 ? biasNum/biasDen : 1.0;
       const proj = candPctNac != null ? candPctNac * bias : null;
-      const techo = afin != null ? factor * afin : null;
-      const gap = (techo!=null && proj!=null) ? Math.max(0, techo - proj) : null;
+
+      // Techo bloque: Σ_c pondPct(c) × bias_c(barrio) × factor × (1+NS-NR/sumDecl)
+      let techoBlocNum = 0;
+      for (const m of blocData){
+        if (!m.pondPct) continue;
+        const bkts = bucketsPctAfinForComuna(m.id, data, bk);
+        let bn=0, bd=0;
+        for (const b of ['pres22','congreso26','pres18','consultas']){
+          const v = bkts[b]; const w = wNorm[b];
+          const base = (m.barrioNac[b]!=null && m.barrioNac[b]>0) ? m.barrioNac[b]
+                    : (m.comunaNac[b]!=null && m.comunaNac[b]>0) ? m.comunaNac[b]
+                    : STATE.nacAfinByBucket?.[b];
+          if (v != null && base != null && base > 0){ bn += w*(v/base); bd += w; }
+        }
+        const biasM = bd > 0 ? bn/bd : 1.0;
+        techoBlocNum += m.pondPct * biasM;
+      }
+      const techo = factor * (1 + nsnrFactor) * techoBlocNum;
+      const gap = (proj != null) ? Math.max(0, techo - proj) : null;
       // comuna del primer entry disponible (todas las señales coinciden por barrio)
       let comuna = null;
       for (const sig of Object.keys(data)){
@@ -2468,10 +2596,10 @@
     updateCapBanner();
   }
 
-  // Banner "techo afín nacional copado": aparece cuando la proyección
-  // nacional del candidato excede el techo afín agregado × factor. En ese
-  // estado, el módulo Oportunidad tiene poco valor para el candidato — las
-  // ganancias deben venir de movilizar abstención o capturar voto cross-block.
+  // Banner "techo del bloque ampliado copado": aparece cuando la proyección
+  // nacional del candidato excede Σ pondPct(c in bloque) × factor × (1+NS-NR/sumDecl).
+  // En ese estado el techo electoral está saturado a nivel país — las
+  // ganancias adicionales vienen de fuera del bloque (abstención + cross-block).
   function updateCapBanner(){
     const el = document.getElementById('cap-banner');
     const body = document.getElementById('cap-banner-body');
@@ -2482,17 +2610,18 @@
     }
     const cand = CANDIDATOS.find(c => c.id === STATE.candId);
     const candName = cand ? cand.nombre : '—';
-    const proj = STATE.candPctNac, techo = STATE.techoNacAgg, afin = STATE.afinNacAgg;
+    const proj = STATE.candPctNac, techo = STATE.techoNacAgg, bloc = STATE.blocPctAjustado;
     const exceso = proj - techo;
+    const mems = (BLOQUE_AMPLIO[STATE.candId] || [STATE.candId])
+      .map(id => (CANDIDATOS.find(c => c.id === id)||{}).nombre).filter(Boolean).join(', ');
     el.style.display = 'block';
     body.innerHTML =
-      `<b>${candName}</b> proyecta <b>${fmtPct(proj,1)}</b> a nivel país, pero el techo afín ` +
-      `agregado del bloque es <b>${fmtPct(techo,1)}</b> (${fmtPct(afin,1)} × factor liderazgo). ` +
-      `Excede en <b>${fmtPct(exceso,1)}</b>, así que el voto blando afín a nivel nacional ya está ` +
-      `copado y el ranking puede quedar pobre. ` +
-      `Las ganancias adicionales en 1ª vuelta vienen de <b>movilización de abstención</b> y ` +
-      `<b>flujo cross-block</b> — revisa el toggle <em>Abstención</em>, no este. ` +
-      `Para un Oportunidad útil: sube el factor de liderazgo o ajusta los pesos por fuente.`;
+      `<b>${candName}</b> proyecta <b>${fmtPct(proj,1)}</b> a nivel país, pero el techo del ` +
+      `<b>bloque ampliado</b> (${mems}, incluido NS-NR proporcional) es <b>${fmtPct(techo,1)}</b> ` +
+      `(${fmtPct(bloc,1)} × factor liderazgo). Excede en <b>${fmtPct(exceso,1)}</b> — el bloque ` +
+      `entero está copado y el ranking saldrá pobre. Las ganancias adicionales en 1ª vuelta ` +
+      `vienen de <b>movilización de abstención</b> y <b>flujo cross-block</b>: revisa el toggle ` +
+      `<em>Abstención</em>. Para un Oportunidad útil: sube el factor de liderazgo del bloque.`;
   }
   function onTopClick(key, dep){
     STATE.selectedDep = dep;
