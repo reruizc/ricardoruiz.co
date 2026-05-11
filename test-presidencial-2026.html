@@ -330,6 +330,100 @@
     /* Borde sutil para cuando el embed se ve sobre un fondo claro */
     body.embed-mode .panel-card { background: rgba(10,10,16,0.92); }
 
+    /* ── GEO BOX ── */
+    .geo-box {
+      display:flex; flex-direction:column; gap:.7rem;
+      padding:.95rem 1.1rem;
+      background:rgba(0,71,255,0.06);
+      border:1px solid rgba(0,71,255,0.25);
+      margin-bottom:1.1rem;
+    }
+    .geo-row { display:flex; align-items:center; gap:.85rem; }
+    .geo-ic { width:18px; height:18px; color:var(--blue-light); flex-shrink:0; }
+    .geo-label { font-family:'DM Mono',monospace; font-size:.68rem; letter-spacing:.18em; text-transform:uppercase; color:rgba(255,255,255,0.55); }
+    .geo-place { font-family:'Syne',sans-serif; font-weight:500; font-size:1rem; color:var(--white); margin-top:.1rem; }
+    .geo-cross {
+      font-family:'Fraunces',serif; font-weight:300; font-size:.92rem;
+      color:rgba(244,243,239,0.78); line-height:1.45;
+    }
+    .geo-cross b { color:var(--white); font-weight:400; }
+
+    /* ── SUPPORT (apoyar campaña) ── */
+    .support-box {
+      margin-top:1.4rem; padding:1.1rem 1.2rem;
+      background: linear-gradient(135deg, rgba(0,71,255,0.07) 0%, rgba(255,255,255,0.02) 100%);
+      border:1px solid rgba(0,71,255,0.3);
+      border-left:3px solid var(--win-color, var(--blue));
+    }
+    .support-head {
+      display:flex; align-items:center; justify-content:space-between;
+      gap:1rem;
+    }
+    .support-eyebrow {
+      font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.18em;
+      text-transform:uppercase; color:var(--blue-light);
+    }
+    .support-title {
+      font-family:'Syne',sans-serif; font-weight:700; font-size:1.1rem;
+      color:var(--white); margin-top:.2rem; line-height:1.2;
+    }
+    .support-toggle { position:relative; display:inline-block; width:44px; height:24px; cursor:none; flex-shrink:0; }
+    .support-toggle input { opacity:0; width:0; height:0; }
+    .support-slider {
+      position:absolute; inset:0; cursor:none;
+      background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.18);
+      transition:.2s; border-radius:24px;
+    }
+    .support-slider::before {
+      content:''; position:absolute; height:18px; width:18px; left:2px; top:2px;
+      background:#f4f3ef; transition:.2s; border-radius:50%;
+    }
+    .support-toggle input:checked + .support-slider { background:var(--blue); border-color:var(--blue); }
+    .support-toggle input:checked + .support-slider::before { transform:translateX(20px); }
+    .support-body { margin-top:1rem; padding-top:1rem; border-top:1px dashed rgba(255,255,255,0.1); animation: fadeIn .3s ease; }
+    .support-help {
+      font-family:'Fraunces',serif; font-weight:300; font-size:.92rem;
+      color:rgba(244,243,239,0.7); line-height:1.45; margin-bottom:.9rem;
+    }
+    .support-modes {
+      display:grid; grid-template-columns: 1fr 1fr 1fr; gap:.55rem;
+    }
+    @media (max-width:680px) { .support-modes { grid-template-columns: 1fr; } }
+    .mode {
+      display:flex; flex-direction:column; align-items:flex-start; gap:.3rem;
+      padding:.85rem .9rem;
+      background:rgba(255,255,255,0.025);
+      border:1px solid rgba(255,255,255,0.1);
+      cursor:none; text-align:left;
+      font-family:inherit; color:inherit;
+      transition: border-color .15s, background .15s, transform .12s;
+    }
+    .mode:hover { border-color: rgba(0,71,255,0.5); background:rgba(0,71,255,0.05); }
+    .mode.sel { border-color: var(--blue); background:rgba(0,71,255,0.12); }
+    .mode-ic { font-size:1.15rem; line-height:1; }
+    .mode-name { font-family:'Syne',sans-serif; font-weight:700; font-size:.95rem; color:var(--white); letter-spacing:-.01em; }
+    .mode-desc { font-family:'Fraunces',serif; font-weight:300; font-size:.82rem; color:rgba(244,243,239,0.6); line-height:1.3; }
+
+    .consent {
+      display:flex; align-items:flex-start; gap:.6rem;
+      margin-top:1rem; cursor:none;
+      font-family:'Fraunces',serif; font-weight:300; font-size:.83rem;
+      color:rgba(244,243,239,0.7); line-height:1.45;
+    }
+    .consent input { margin-top:.25rem; cursor:none; accent-color: var(--blue); flex-shrink:0; }
+    .consent b { color:var(--white); font-weight:400; }
+
+    .support-done {
+      margin-top:1rem; padding:.7rem .9rem;
+      background:rgba(74,222,128,0.08); border:1px solid rgba(74,222,128,0.4);
+      color:var(--green);
+      font-family:'DM Mono',monospace; font-size:.78rem; letter-spacing:.08em;
+    }
+
+    body.embed-mode .support-modes { grid-template-columns: 1fr 1fr 1fr; }
+    body.embed-mode .support-toggle, body.embed-mode .mode, body.embed-mode .consent,
+    body.embed-mode .consent input, body.embed-mode .support-toggle * { cursor: pointer; }
+
     /* ── SHARE ── */
     .share-row {
       display:flex; flex-wrap:wrap; gap:.55rem;
@@ -459,8 +553,76 @@
               <span class="result-pct" id="result-pct">—</span>
             </div>
           </div>
+          <!-- Tu zona — geo por IP via Cloudflare worker -->
+          <div class="geo-box" id="geo-box" style="display:none;">
+            <div class="geo-row">
+              <svg class="geo-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <div>
+                <div class="geo-label">Tu zona</div>
+                <div class="geo-place" id="geo-place">…</div>
+              </div>
+            </div>
+            <div class="geo-cross" id="geo-cross"></div>
+          </div>
+
           <div class="bars-title">Top de afinidad</div>
           <div id="bars"></div>
+
+          <!-- Apoyar a la campaña — opt-in con menú de modalidad -->
+          <div class="support-box" id="support-box">
+            <div class="support-head">
+              <div>
+                <div class="support-eyebrow">Conecta con tu candidato</div>
+                <div class="support-title" id="support-title">¿Quieres apoyar la campaña de —?</div>
+              </div>
+              <label class="support-toggle">
+                <input type="checkbox" id="support-check" />
+                <span class="support-slider"></span>
+              </label>
+            </div>
+            <div class="support-body" id="support-body" hidden>
+              <p class="support-help">Te conectamos directamente con la campaña. Vas a recibir información sobre cómo aportar tu tiempo, según la modalidad que elijas.</p>
+              <div class="support-modes">
+                <button type="button" class="mode" data-mode="virtual">
+                  <span class="mode-ic">💻</span>
+                  <span class="mode-name">Virtual</span>
+                  <span class="mode-desc">Compartir contenido, voluntariado digital, llamadas.</span>
+                </button>
+                <button type="button" class="mode" data-mode="presencial">
+                  <span class="mode-ic">🚪</span>
+                  <span class="mode-name">Presencial</span>
+                  <span class="mode-desc">Puerta a puerta, eventos, mesas de votación.</span>
+                </button>
+                <button type="button" class="mode" data-mode="mixto">
+                  <span class="mode-ic">🔁</span>
+                  <span class="mode-name">Mixto</span>
+                  <span class="mode-desc">Las dos según tu disponibilidad.</span>
+                </button>
+              </div>
+              <div class="form-grid" style="margin-top:1rem;">
+                <div class="field">
+                  <label for="s-name">Nombre completo</label>
+                  <input id="s-name" type="text" autocomplete="name" placeholder="Tu nombre" />
+                </div>
+                <div class="field">
+                  <label for="s-phone">Teléfono</label>
+                  <input id="s-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="3001234567" />
+                </div>
+              </div>
+              <label class="consent">
+                <input type="checkbox" id="s-consent" />
+                <span>Autorizo a <b>ricardoruiz.co</b> a compartir mi nombre, correo, teléfono y ubicación con la campaña de <b id="s-cand-name">—</b> para que me contacten sobre cómo apoyar (Ley 1581/2012). Puedo retirar esta autorización en cualquier momento escribiendo a reruizc@gmail.com.</span>
+              </label>
+              <div class="actions" style="margin-top:.9rem;">
+                <span></span>
+                <button class="btn disabled" id="support-submit" onclick="submitSupport()">Conectarme con la campaña →</button>
+              </div>
+              <div class="support-done" id="support-done" hidden>
+                ✓ Listo. Te conectaremos pronto. Gracias por sumarte.
+              </div>
+            </div>
+          </div>
+
           <div class="share-row" id="share-row">
             <button class="share-btn" id="share-native" onclick="shareNative()" style="display:none;">
               <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
@@ -547,12 +709,23 @@
   window.addEventListener('load',   reportHeight);
   window.addEventListener('resize', reportHeight);
 
-  // ── ENDPOINT CENTRAL ──
-  // Cuando exista la Lambda Function URL la pegas aquí. Mientras esté vacío,
-  // el cliente sólo persiste en localStorage (modo offline). El POST nunca
-  // bloquea ni rompe el flujo (best-effort, fire-and-forget).
+  // ── ENDPOINTS ──
+  // LEAD_ENDPOINT: cuando exista la Lambda Function URL la pegas aquí.
+  //   Mientras esté vacío, el cliente sólo persiste en localStorage. El POST
+  //   nunca bloquea ni rompe el flujo (best-effort, fire-and-forget).
+  // GEO_ENDPOINT: ruta /geo del worker rr-auth (Cloudflare). Devuelve city,
+  //   region, lat, lon usando los headers cf.* — sin costo, sin pedir permiso.
   const LEAD_ENDPOINT = ''; // ej: 'https://abc123.lambda-url.us-east-1.on.aws/'
+  const GEO_ENDPOINT  = 'https://rr-auth.reruizc.workers.dev/geo';
   const TEST_VERSION  = 'v2';
+
+  // Geo del usuario — la cargamos en background al abrir el test, así
+  // está lista cuando llega al panel resultado.
+  let GEO = null;
+  fetch(GEO_ENDPOINT, { cache:'no-store' })
+    .then(r => r.ok ? r.json() : null)
+    .then(g => { GEO = g; })
+    .catch(() => { GEO = null; });
 
   // ── CANDIDATOS ──
   // Nota: en S3 sólo viven fotos para cepeda, abelardo, paloma, claudia, fajardo,
@@ -924,8 +1097,137 @@
     state.lastWinner = winner;
     state.lastRanked = ranked;
     setupShare(winner);
+    renderGeoBox();
+    renderSupport(winner);
     persistResult(ranked, winner);
   }
+
+  // ── GEO BOX ──
+  function renderGeoBox() {
+    const box   = $('#geo-box');
+    const place = $('#geo-place');
+    const cross = $('#geo-cross');
+    // Si el worker aún no respondió, esperamos hasta 1.2s más.
+    const tryRender = (attemptsLeft) => {
+      if (!GEO || !(GEO.city || GEO.region)) {
+        if (attemptsLeft <= 0) return; // sin geo: dejamos el box oculto
+        setTimeout(() => tryRender(attemptsLeft - 1), 200);
+        return;
+      }
+      const city   = GEO.city   || '';
+      const region = GEO.region || '';
+      const label  = [city, region].filter(Boolean).join(', ');
+      place.textContent = label || 'Ubicación aproximada';
+      cross.innerHTML = `<span style="font-style:italic; opacity:.72;">Próximamente: cómo proyectamos el voto presidencial en tu municipio.</span>`;
+      box.style.display = '';
+      if (IS_EMBED) requestAnimationFrame(reportHeight);
+    };
+    tryRender(6);
+  }
+
+  // ── SUPPORT (opt-in para campañas) ──
+  let SUPPORT = { mode: null, name: '', phone: '', consent: false, submitted: false };
+  function renderSupport(winner) {
+    SUPPORT = { mode: null, name: '', phone: '', consent: false, submitted: false };
+    const title = $('#support-title');
+    const cName = $('#s-cand-name');
+    title.textContent = `¿Quieres apoyar la campaña de ${winner.c.name}?`;
+    cName.textContent = winner.c.name;
+    $('#support-box').style.setProperty('--win-color', winner.c.color);
+
+    const check = $('#support-check');
+    const body  = $('#support-body');
+    const done  = $('#support-done');
+    body.hidden = true; done.hidden = true;
+    check.checked = false;
+    check.onchange = () => {
+      body.hidden = !check.checked;
+      if (check.checked && IS_LOGGED) {
+        // pre-fill nombre si lo tenemos
+        const n = USER.name || USER.fullName || '';
+        if (n && !$('#s-name').value) $('#s-name').value = n;
+      }
+      validateSupport();
+      if (IS_EMBED) requestAnimationFrame(reportHeight);
+    };
+
+    document.querySelectorAll('.mode').forEach(btn => {
+      btn.classList.remove('sel');
+      btn.onclick = () => {
+        document.querySelectorAll('.mode').forEach(b => b.classList.remove('sel'));
+        btn.classList.add('sel');
+        SUPPORT.mode = btn.dataset.mode;
+        validateSupport();
+      };
+    });
+
+    ['s-name','s-phone','s-consent'].forEach(id => {
+      const el = $('#' + id);
+      if (!el) return;
+      el.oninput  = validateSupport;
+      el.onchange = validateSupport;
+      if (id === 's-name') el.value = '';
+      if (id === 's-phone') el.value = '';
+      if (id === 's-consent') el.checked = false;
+    });
+  }
+
+  function validateSupport() {
+    const name = ($('#s-name')?.value || '').trim();
+    const phone = ($('#s-phone')?.value || '').trim();
+    const consent = $('#s-consent')?.checked;
+    const phoneOk = /^\+?\d[\d\s-]{6,}$/.test(phone);
+    const ok = !!SUPPORT.mode && name.length >= 2 && phoneOk && !!consent;
+    SUPPORT.name = name; SUPPORT.phone = phone; SUPPORT.consent = !!consent;
+    $('#support-submit').classList.toggle('disabled', !ok);
+    return ok;
+  }
+
+  function submitSupport() {
+    if (!validateSupport() || SUPPORT.submitted) return;
+    const winner = state.lastWinner;
+    if (!winner) return;
+    const payload = {
+      type: 'support-opt-in',
+      version: TEST_VERSION,
+      ts: new Date().toISOString(),
+      candidate: { id: winner.c.id, name: winner.c.name, party: winner.c.party },
+      mode: SUPPORT.mode, // 'virtual' | 'presencial' | 'mixto'
+      contact: {
+        name:  SUPPORT.name,
+        phone: SUPPORT.phone,
+        email: state.demo.email || (IS_LOGGED ? USER.email : '') || '',
+      },
+      demo: state.demo,
+      geo:  GEO || null,
+      consent: { granted: true, at: new Date().toISOString(), law: 'Ley 1581/2012' },
+      origin:   location.origin,
+      referrer: document.referrer || '',
+      embed:    IS_EMBED,
+    };
+    // Persistencia local + POST best-effort.
+    try {
+      const all = JSON.parse(localStorage.getItem('rr-test-opt-ins') || '[]');
+      all.push(payload);
+      localStorage.setItem('rr-test-opt-ins', JSON.stringify(all.slice(-20)));
+    } catch (_) {}
+    if (LEAD_ENDPOINT) {
+      try {
+        const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+        if (!(navigator.sendBeacon && navigator.sendBeacon(LEAD_ENDPOINT, blob))) {
+          fetch(LEAD_ENDPOINT, {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify(payload), keepalive:true, mode:'cors',
+          }).catch(() => {});
+        }
+      } catch (_) {}
+    }
+    SUPPORT.submitted = true;
+    $('#support-submit').classList.add('disabled');
+    $('#support-done').hidden = false;
+    if (IS_EMBED) requestAnimationFrame(reportHeight);
+  }
+  window.submitSupport = submitSupport;
 
   function persistResult(ranked, winner) {
     const payload = {
