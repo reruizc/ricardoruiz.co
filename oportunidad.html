@@ -532,7 +532,7 @@
       <em>techo(C, M)</em> = factor de liderazgo del bloque × pct_afín — el factor (editable por slider) corrige el hecho de que candidatos sub-líderes solo absorben una fracción del bloque, no el 100%; y
       <em>proyección(C, M)</em> = pct nacional actual de C (ponderador propio) × bias(C, M), idéntico al simulador presidencial. La <strong>brecha</strong> = techo − proyección es el "voto blando capturable" realista. Antes de aplicar el factor, candidatos chicos como Claudia o Roy salían con brechas enormes y candidatos grandes como Cepeda con brechas nulas — el factor cierra esa asimetría.</p>
     <p><strong>Riesgo metodológico.</strong> El mapeo de afinidades es <em>juicio editorial trazable, no algoritmo objetivo</em> (Cepeda hereda Petro, Paloma hereda Fico/Duque, Fajardo hereda verdes/centro, etc.). El factor de liderazgo es la pieza más subjetiva del modelo — defaults: Cepeda 95%, Paloma 70%, Fajardo 55%, Abelardo 45%, Claudia 20%, Roy 10%. El componente <em>proyección</em> depende del ponderador, fecha de corte: <span id="foot-pond-fecha">cargando…</span>. <strong>El modelo asume voto afín = voto capturable hasta el techo</strong> — falso en el margen por lealtades personales, vetos y contexto local. Léelo como <strong>orientación de prioridades</strong>, no como pronóstico de voto.</p>
-    <p><strong>Drilldown a ciudad.</strong> 14 ciudades soportadas con datos por comuna o localidad: Bogotá (localidades, abre directo desde el mapa nacional), Medellín (comunas + barrios), Cali, Barranquilla, Ibagué, Manizales, Pereira, Montería, Bucaramanga, Cúcuta, Neiva, Popayán, Sincelejo y Villavicencio. Click en el mun de la ciudad → drilldown automático. El bias se calcula contra el promedio de la propia ciudad (no contra el nacional-país) porque las ciudades tienen perfiles ideológicos distintos. <strong>Medellín · Barrios</strong>: cada uno de los 349 barrios y veredas hereda la métrica de su comuna padre — resolución espacial alta sin agregar granularidad analítica.</p>
+    <p><strong>Drilldown a ciudad.</strong> 14 ciudades soportadas con datos por comuna o localidad: Bogotá (localidades, abre directo desde el mapa nacional), Medellín (comunas + barrios), Cali, Barranquilla, Ibagué, Manizales, Pereira, Montería, Bucaramanga, Cúcuta, Neiva, Popayán, Sincelejo y Villavicencio. Click en el mun de la ciudad → drilldown automático. El bias se calcula contra el promedio de la propia ciudad (no contra el nacional-país) porque las ciudades tienen perfiles ideológicos distintos. <strong>Medellín · Barrios (v2)</strong>: 147 barrios con <em>bias propio</em> calculado al cruzar los puestos de votación de cada barrio (PUESTOS_GEOREF) con los <code>por-puesto.json</code> de 16 señales históricas. Los barrios sin puestos asignables (o sin polígono en el GeoJSON oficial) caen al heredado de la comuna padre — granularidad real a nivel intra-comuna.</p>
     <p><strong>Capa puestos.</strong> 13.492 puestos de votación con coordenadas. Se renderizan con LOD por zoom (a poca resolución solo los más grandes; al hacer zoom aparecen todos). Radio del círculo = log(censo del puesto). Color heredado de la brecha del municipio padre — o de la comuna padre si estás dentro de una de las 14 ciudades soportadas. Activar la capa habilita pan + zoom con la rueda; al volver a Oportunidad o Abstención el mapa se bloquea otra vez. <strong>Próximo paso (paquete v2)</strong>: bias propio por puesto usando histórico por puesto + agregación a barrio para Bogotá y Medellín — granularidad real al precio del retainer.</p>
     <p><strong>Capa abstención.</strong> Métrica = 1 − (votos totales presidencial 2022 / censo electoral 2026). Capa complementaria: identifica dónde hay potencial no-activado además del afín. Útil para diseñar pisada de movilización junto al mapa de oportunidad. Cap superior: muchos municipios pequeños tienen abstención reportada baja por cierre de mesas, no por participación real — leer con cautela en mun &lt; 5.000 censo.</p>
     <p><strong>Datos.</strong> Registraduría Nacional del Estado Civil (presidenciales 2018, 2022; consultas 2025 y marzo 2026; senado y cámara 2026; censo 2026 vía Divipole). Ponderador propio ricardoruiz.co — ver <a href="metodologia-simulador-presidencial-2026.docx">documento metodológico</a> y la página hermana <a href="previa-1v.html">Previa 1ª vuelta</a> para el detalle del simulador.</p>
@@ -569,6 +569,16 @@
   // Útil visualmente: pintamos 349 polígonos en lugar de 16+5.
   // Medellín: GeoJSON de barrios (subido a S3 en proyecto-dc/geo)
   const MDE_BARRIOS_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/proyecto-dc/geo/barrios-veredas-medellin.json';
+  // v2 (paquete Oportunidad): bias propio por barrio. 16 JSONs generados
+  // por tools/build-mde-por-barrio.js cruzando PUESTOS_GEOREF.csv con los
+  // por-puesto.json históricos. Cada uno = { barrios:{ KEY_NORM:{nombre, comuna, votos_validos, cands|partidos:[…]} } }.
+  const MDE_BARRIO_BASE = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_medellin/por-barrio';
+  const MDE_BARRIO_SIGNALS = [
+    'pres-2010','pres-2014','pres-2018','pres-2022',
+    'consulta-2025-pacto','consulta-2026-gran','consulta-2026-frente','consulta-2026-soluciones',
+    'alc-2015','concejo-2015','alc-2019','concejo-2019','alc-2023','concejo-2023',
+    'senado-2026','camara-2026',
+  ];
   // Datos electorales por comuna Medellín — bucket separado de output_ciudades.
   // Shape pres/consulta-2025/senado/cámara = idéntico al de las 13 ciudades.
   // Las 3 consultas 2026 vienen unificadas en un archivo con shape distinto:
@@ -803,10 +813,14 @@
     cityComMetrics:{},  // { cityKey: { comCod: { afin, techo, proj, gap, abst, censo } } }
     selectedCity:null,  // cityKey activo (en drilldown)
 
-    // Medellín barrios (Bloque D)
+    // Medellín barrios (Bloque D + v2)
     mdeBarriosGeo:null,
     mdeBarriosLoading:null,
     mdeView:'comunas',
+    mdeBarriosData:null,         // { sigKey: { barrioNormKey: { candidatos:[…], votos_validos } } }
+    mdeBarriosSigLoading:null,
+    mdeBarrioMetrics:{},         // { barrioNormKey: { afin, techo, proj, gap, bias, comuna } }
+    mdeBarrioNacAfin:{},         // { candId: { bucket: pct_medellin_afin } }
 
     // Puestos (Bloque C)
     puestos:null,            // array de {k,y,x,c,m,n,mn,p22,s26,t}
@@ -1890,13 +1904,18 @@
       const cityKey = STATE.selectedCity;
       const cfg = CITIES[cityKey];
       const metrics = STATE.cityComMetrics[cityKey] || {};
-      // Capa de barrios Medellín: hereda de comuna padre
+      // Capa de barrios Medellín: bias propio (v2) con fallback a comuna
       if (cityKey === 'medellin' && STATE.mdeView === 'barrios'){
+        if (STATE.mdeBarriosData) computeMdeBarrioMetrics();
+        const bMetrics = STATE.mdeBarrioMetrics || {};
         STATE.mapLayer.setStyle((f) => {
-          const com = String(f.properties.comuna||'').replace(/^0+/, '');
-          let r = null;
-          for (const k of Object.keys(metrics)){
-            if (String(k).replace(/^0+/, '') === com){ r = metrics[k]; break; }
+          const bk = normBarrioFront(f.properties.nombre_bar || '');
+          let r = (bk && bMetrics[bk]) ? bMetrics[bk] : null;
+          if (!r){
+            const com = String(f.properties.comuna||'').replace(/^0+/, '');
+            for (const k of Object.keys(metrics)){
+              if (String(k).replace(/^0+/, '') === com){ r = metrics[k]; break; }
+            }
           }
           f.__rec = r;
           return styleFor(r);
@@ -1966,10 +1985,152 @@
     else renderMunsNacional();
   }
 
-  /* ───────── Medellín barrios — capa adicional ─────────
-     Hereda métrica de la comuna padre. v1: pintamos los 349 barrios
-     con el color de su comuna. v2 (pendiente, ver footer): agregar
-     puestos a barrios via point-in-polygon y recalcular bias por barrio. */
+  /* ───────── Medellín barrios — bias propio (v2) ─────────
+     v1: cada barrio heredaba el color de su comuna padre. v2: bias propio
+     calculado a partir de los puestos asignados al barrio según el CSV
+     PUESTOS_GEOREF (script tools/build-mde-por-barrio.js). Si un barrio
+     no tiene puestos o quedó sin match en el GeoJSON, cae al heredado
+     de la comuna como antes. */
+
+  // Espejo de la normalización del script Node (build-mde-por-barrio.js).
+  // Debe quedar idéntica para que el lookup contra el GeoJSON cuadre.
+  function normBarrioFront(s){
+    if (!s) return '';
+    let t = String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase();
+    t = t.replace(/[#°ºª]/g,' NO ');
+    t = t.replace(/\bNO\.?\b/g,'NO');
+    t = t.replace(/[^A-Z0-9 ]+/g,' ');
+    t = t.replace(/\s+/g,' ').trim();
+    t = t.replace(/\bNO (\d+)\b/g,'NO$1');
+    return t;
+  }
+
+  // Carga las 16 señales por-barrio. Cada JSON viene { fuente, type,
+  // barrios:{ KEY:{ nombre, comuna, votos_validos, cands|partidos:[...] } } }.
+  // Para reusar la lógica de bucketsPctAfinForComuna (que espera
+  // entry.candidatos[]), normalizamos al cargar: el array se llama
+  // siempre `candidatos`, con cada item {nombre, votos, pct}.
+  async function loadMdeBarrioSignals(){
+    if (STATE.mdeBarriosData) return STATE.mdeBarriosData;
+    if (STATE.mdeBarriosSigLoading) return STATE.mdeBarriosSigLoading;
+    STATE.mdeBarriosSigLoading = (async () => {
+      const out = {};
+      await Promise.all(MDE_BARRIO_SIGNALS.map(async sig => {
+        try {
+          const r = await fetch(`${MDE_BARRIO_BASE}/${sig}-mde.json`);
+          if (!r.ok) return;
+          const j = await r.json();
+          const byBarrio = {};
+          for (const [k, b] of Object.entries(j.barrios || {})){
+            const arr = b.cands || b.partidos || [];
+            byBarrio[k] = {
+              nombre: b.nombre,
+              comuna: b.comuna,
+              votos_validos: b.votos_validos || 0,
+              candidatos: arr.map(e => ({ nombre:e.nombre, votos:e.votos, pct:e.pct })),
+            };
+          }
+          out[sig] = byBarrio;
+        } catch (e) {
+          console.warn('[opo·mde·barrio]', sig, e);
+        }
+      }));
+      STATE.mdeBarriosData = out;
+      return out;
+    })();
+    return STATE.mdeBarriosSigLoading;
+  }
+
+  // Baseline = promedio Medellín agregado sobre los barrios disponibles
+  // en cada señal. Análogo a precomputeCityNacAfin pero sobre barrios.
+  function precomputeMdeBarrioNacAfin(candId){
+    const aff = AFINIDADES[candId];
+    const data = STATE.mdeBarriosData || {};
+    function pctFromAllBarrios(sigKey, patterns){
+      const ds = data[sigKey];
+      if (!ds || !patterns?.length) return null;
+      let sumV = 0, sumDen = 0, found = false;
+      for (const b of Object.values(ds)){
+        if (!Array.isArray(b.candidatos)) continue;
+        let any = false;
+        for (const c of b.candidatos){
+          if (!c || !c.nombre) continue;
+          if (matchesAffinity(c.nombre, patterns)){ sumV += (c.votos||0); any = true; }
+        }
+        if (any){ sumDen += (b.votos_validos || 0); found = true; }
+      }
+      return found && sumDen>0 ? 100*sumV/sumDen : null;
+    }
+    const out = {};
+    out.pres22 = pctFromAllBarrios('pres-2022', aff.pres22);
+    out.pres18 = pctFromAllBarrios('pres-2018', aff.pres18);
+    const vSen = (aff.senado26||[]).length ? pctFromAllBarrios('senado-2026', aff.senado26) : null;
+    const vCam = (aff.camara26||[]).length ? pctFromAllBarrios('camara-2026', aff.camara26) : null;
+    out.congreso26 = (vSen!=null && vCam!=null) ? (vSen+vCam)/2 : (vSen ?? vCam);
+    const cmap = aff.consultas || {};
+    let total = 0, hasAny = false;
+    for (const [ckey, pat] of Object.entries(cmap)){
+      if (!pat?.length) continue;
+      const v = pctFromAllBarrios(ckey, pat);
+      if (v != null){ total += v; hasAny = true; }
+    }
+    out.consultas = hasAny ? total : null;
+    return out;
+  }
+
+  function computeMdeBarrioMetrics(){
+    const candId = STATE.candId;
+    const cand = CANDIDATOS.find(c => c.id === candId);
+    const data = STATE.mdeBarriosData || {};
+    const candPctNac = pondPct(cand);
+    const factor = (STATE.lider[candId] ?? 100) / 100;
+
+    const barrioNac = precomputeMdeBarrioNacAfin(candId);
+    STATE.mdeBarrioNacAfin[candId] = barrioNac;
+    // Fallback adicional: baseline ciudad-comuna (Medellín) si una señal
+    // está rota a nivel barrio pero tiene cobertura a nivel comuna.
+    const comunaNac = STATE.cityNacAfin.medellin?.[candId] || {};
+
+    const wRaw = STATE.weights;
+    const wSum = Math.max(1, wRaw.pres22 + wRaw.congreso26 + wRaw.pres18 + wRaw.consultas);
+    const wNorm = {
+      pres22: wRaw.pres22/wSum, congreso26: wRaw.congreso26/wSum,
+      pres18: wRaw.pres18/wSum, consultas: wRaw.consultas/wSum,
+    };
+
+    // Union de claves de barrio en todas las señales
+    const keys = new Set();
+    for (const sig of Object.keys(data)) Object.keys(data[sig]).forEach(k => keys.add(k));
+
+    const out = {};
+    for (const bk of keys){
+      const buckets = bucketsPctAfinForComuna(candId, data, bk);
+      let afinNum=0, afinDen=0, biasNum=0, biasDen=0;
+      for (const b of ['pres22','congreso26','pres18','consultas']){
+        const v = buckets[b], w = wNorm[b];
+        if (v != null){ afinNum += w*v; afinDen += w; }
+        const base = (barrioNac[b]!=null && barrioNac[b]>0) ? barrioNac[b]
+                  : (comunaNac[b]!=null && comunaNac[b]>0) ? comunaNac[b]
+                  : STATE.nacAfinByBucket?.[b];
+        if (v != null && base != null && base > 0){
+          biasNum += w * (v/base); biasDen += w;
+        }
+      }
+      const afin = afinDen>0 ? afinNum/afinDen : null;
+      const bias = biasDen>0 ? biasNum/biasDen : 1.0;
+      const proj = candPctNac != null ? candPctNac * bias : null;
+      const techo = afin != null ? factor * afin : null;
+      const gap = (techo!=null && proj!=null) ? (techo - proj) : null;
+      // comuna del primer entry disponible (todas las señales coinciden por barrio)
+      let comuna = null;
+      for (const sig of Object.keys(data)){
+        if (data[sig][bk]){ comuna = data[sig][bk].comuna; break; }
+      }
+      out[bk] = { afin, techo, proj, gap, bias, abst:null, censo:0, comuna };
+    }
+    STATE.mdeBarrioMetrics = out;
+  }
+
   async function loadMdeBarriosGeo(){
     if (STATE.mdeBarriosGeo) return STATE.mdeBarriosGeo;
     if (STATE.mdeBarriosLoading) return STATE.mdeBarriosLoading;
@@ -1987,11 +2148,14 @@
     const cfg = CITIES.medellin;
     const geo = STATE.mdeBarriosGeo;
     const metrics = STATE.cityComMetrics.medellin || {};
-    // Indexar métricas por comuna (codeField del JSON de comunas = '01'..'16').
-    // El GeoJSON de barrios trae props.comuna como string '1'..'16' o '50'..'90' (corregimientos).
+    const barrioMetrics = STATE.mdeBarrioMetrics || {};
+    // v2: primero busca métrica propia por barrio normalizado. Si no
+    // existe (barrio sin puestos asignables o sin match en alias), cae
+    // al heredado de la comuna padre — comportamiento v1.
     function metricForBarrio(props){
+      const bk = normBarrioFront(props.nombre_bar || '');
+      if (bk && barrioMetrics[bk]) return barrioMetrics[bk];
       const com = String(props.comuna||'').replace(/^0+/, '');
-      // Probar varias formas de match con las claves del por_comuna
       for (const k of Object.keys(metrics)){
         if (String(k).replace(/^0+/, '') === com) return metrics[k];
       }
@@ -2022,7 +2186,8 @@
     showLoading(true);
     try {
       if (view === 'barrios'){
-        await loadMdeBarriosGeo();
+        await Promise.all([loadMdeBarriosGeo(), loadMdeBarrioSignals()]);
+        computeMdeBarrioMetrics();
         renderMdeBarriosLayer();
       } else {
         renderCityComLayer('medellin');
@@ -2053,7 +2218,8 @@
       STATE.selectedCity = cityKey;
       // Medellín: respeta el sub-view actual (comunas o barrios)
       if (cityKey === 'medellin' && STATE.mdeView === 'barrios'){
-        await loadMdeBarriosGeo();
+        await Promise.all([loadMdeBarriosGeo(), loadMdeBarrioSignals()]);
+        computeMdeBarrioMetrics();
         renderMdeBarriosLayer();
       } else {
         renderCityComLayer(cityKey);
