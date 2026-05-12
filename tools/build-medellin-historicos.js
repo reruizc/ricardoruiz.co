@@ -43,12 +43,17 @@ const FILTRO_MUN   = 1;
 
 // COD_COR cambia entre años (2019: 6/7; 2023: 3/4). DES_COR también
 // varía: 2015 usa "ALCALDIA"/"GOBERNACION", 2019/2023 usan "ALCALDE"/
-// "GOBERNADOR". Aceptamos ambas formas.
+// "GOBERNADOR". Para JAL usa "JAL" (sin sinónimos detectados).
 const COR_DES_TO_NAME = {
   'ALCALDE': 'alcaldia',
   'ALCALDIA': 'alcaldia',
   'CONCEJO': 'concejo',
+  'JAL': 'jal',
 };
+
+// Path del PUESTOS_GEOREF.csv (mapea ZONA+PUESTO → BARRIO + LAT/LON).
+// Si no existe, el script funciona pero no produce `por-barrio.json`.
+const PUESTOS_GEOREF_PATH = '/Users/ricardoruiz/ricardoruiz.co/Bases de datos/PUESTOS_GEOREF.csv';
 
 // Curules de concejo en Medellín (D'Hondt)
 const CURULES_CONCEJO = 21;
@@ -89,6 +94,58 @@ const COMUNA_NOMBRE = {
 };
 
 function mapZZ(zz){ return ZZ_TO_COMUNA[zz] || 'OTROS'; }
+
+// ─── PUESTOS_GEOREF ────────────────────────────────────────────────
+// Carga sincrónica de PUESTOS_GEOREF para construir un mapa
+// "zz-pp" → { barrio, lat, lon, comunaPol }. Si el archivo no existe,
+// devuelve null y el script no produce por-barrio.json.
+function loadPuestosGeoref(){
+  if (!fs.existsSync(PUESTOS_GEOREF_PATH)){
+    console.warn(`  ! PUESTOS_GEOREF.csv no encontrado en ${PUESTOS_GEOREF_PATH} — saltando nivel barrio`);
+    return null;
+  }
+  const raw = fs.readFileSync(PUESTOS_GEOREF_PATH, 'utf8');
+  const lines = raw.split(/\r?\n/);
+  const headerCols = lines[0].replace(/^﻿/, '').split(';').map(s => s.trim());
+  const idxOf = (name) => headerCols.indexOf(name);
+  const I_DEP = idxOf('DEPARTAMENTO');
+  const I_MUN = idxOf('MUNICIPIO');
+  const I_ZON = idxOf('ZONA');
+  const I_PTO = idxOf('PUESTO');
+  const I_BAR = idxOf('BARRIO');
+  const I_LAT = idxOf('LATITUD');
+  const I_LON = idxOf('LONGITUD');
+  const I_COMC = idxOf('CÓDIGO COMUNA');
+  if ([I_DEP, I_MUN, I_ZON, I_PTO, I_BAR, I_LAT, I_LON].some(i => i < 0)){
+    console.warn('  ! PUESTOS_GEOREF.csv con columnas faltantes — saltando nivel barrio');
+    return null;
+  }
+
+  const map = new Map();
+  for (let i = 1; i < lines.length; i++){
+    const ln = lines[i];
+    if (!ln) continue;
+    const parts = ln.split(';');
+    if (parts[I_DEP] !== 'ANTIOQUIA') continue;
+    if (parts[I_MUN] !== 'MEDELLIN') continue;
+    const zz = String(parseInt(parts[I_ZON] || '0', 10)).padStart(2, '0');
+    const pp = String(parseInt(parts[I_PTO] || '0', 10)).padStart(2, '0');
+    const barrio = (parts[I_BAR] || '').trim();
+    const lat = parseFloat(parts[I_LAT]);
+    const lon = parseFloat(parts[I_LON]);
+    let comC = (parts[I_COMC] || '').trim().padStart(2, '0');
+    if (!barrio || !Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    map.set(`${zz}-${pp}`, { barrio, lat, lon, comunaPol: comC || mapZZ(zz) });
+  }
+  console.log(`  · PUESTOS_GEOREF cargado: ${map.size} puestos físicos de Medellín`);
+  return map;
+}
+
+// Normaliza nombre de barrio para uso como clave (sin variaciones tipográficas)
+function barrioKey(name){
+  return String(name || '').toUpperCase().normalize('NFD')
+    .replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+}
 
 function normName(s){
   return String(s || '').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -185,23 +242,29 @@ function serializeScope(scope, opts = {}){
   };
 }
 
-async function processCsv(csvPath){
+async function processCsv(csvPath, puestos){
   const stream = fs.createReadStream(csvPath, { encoding: 'utf8' });
   const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
 
   let idx = null;
-  let rowsRead = 0, rowsKept = 0;
+  let rowsRead = 0, rowsKept = 0, rowsSinBarrio = 0;
 
-  // 5 niveles × 2 corporaciones:
+  // 6 niveles × 3 corporaciones:
   //   ciudad        - todo Medellín
   //   comunaPol     - 16 comunas + CORR + OTROS (mapeo ZZ→comuna política)
+  //   barrio        - desde PUESTOS_GEOREF (~150 barrios)
   //   zona          - zonas electorales (1-32, 90, 98, 99)
   //   puesto        - zona-puesto
   //   mesa          - zona-puesto-mesa
-  const data = {
-    alcaldia: { ciudad: emptyScope(), comunaPol: new Map(), zona: new Map(), puesto: new Map(), mesa: new Map() },
-    concejo:  { ciudad: emptyScope(), comunaPol: new Map(), zona: new Map(), puesto: new Map(), mesa: new Map() },
-  };
+  // barrioMeta: { barrioKey: { nombre, comunaPol, lat, lon, votos } } para
+  // centroide promedio ponderado por votos (sirve para circleMarker).
+  const corpsData = ['alcaldia', 'concejo', 'jal'];
+  const data = {};
+  const barrioMeta = {};
+  for (const c of corpsData){
+    data[c] = { ciudad: emptyScope(), comunaPol: new Map(), barrio: new Map(), zona: new Map(), puesto: new Map(), mesa: new Map() };
+    barrioMeta[c] = new Map();
+  }
 
   for await (const rawLine of rl){
     if (idx === null){
@@ -241,10 +304,30 @@ async function processCsv(csvPath){
     accum(ensure(tgt.zona, zz), cod, candNombre, candPartido, votos);
     accum(ensure(tgt.puesto, `${zz}-${pp}`), cod, candNombre, candPartido, votos);
     accum(ensure(tgt.mesa,   `${zz}-${pp}-${ms}`), cod, candNombre, candPartido, votos);
+
+    // Nivel barrio (vía PUESTOS_GEOREF)
+    if (puestos){
+      const pgeo = puestos.get(`${zz}-${pp}`);
+      if (pgeo){
+        const bk = barrioKey(pgeo.barrio);
+        accum(ensure(tgt.barrio, bk), cod, candNombre, candPartido, votos);
+        // Centroide ponderado por votos
+        let meta = barrioMeta[corName].get(bk);
+        if (!meta){
+          meta = { nombre: pgeo.barrio, comunaPol: pgeo.comunaPol, latSum: 0, lonSum: 0, wSum: 0 };
+          barrioMeta[corName].set(bk, meta);
+        }
+        meta.latSum += pgeo.lat * votos;
+        meta.lonSum += pgeo.lon * votos;
+        meta.wSum   += votos;
+      } else {
+        rowsSinBarrio++;
+      }
+    }
     rowsKept++;
   }
 
-  return { data, rowsRead, rowsKept };
+  return { data, barrioMeta, rowsRead, rowsKept, rowsSinBarrio };
 }
 
 function fmtKB(b){ return Math.round(b/1024) + ' KB'; }
@@ -273,13 +356,22 @@ async function main(){
 
   console.log(`\n[medellin-historicos] procesando ${path.basename(csvPath)}`);
   const t0 = Date.now();
-  const { data, rowsRead, rowsKept } = await processCsv(csvPath);
+  const puestos = loadPuestosGeoref();
+  const { data, barrioMeta, rowsRead, rowsKept, rowsSinBarrio } = await processCsv(csvPath, puestos);
   const dt = ((Date.now() - t0) / 1000).toFixed(1);
 
   console.log(`  ${rowsRead.toLocaleString('es-CO')} filas leídas · ${rowsKept.toLocaleString('es-CO')} de Medellín en ${dt}s`);
+  if (puestos){
+    const pctSin = rowsKept > 0 ? (rowsSinBarrio / rowsKept * 100).toFixed(2) : 0;
+    console.log(`  · puestos sin mapeo a barrio: ${rowsSinBarrio.toLocaleString('es-CO')} filas (${pctSin}%)`);
+  }
 
-  for (const corp of ['alcaldia','concejo']){
+  for (const corp of ['alcaldia','concejo','jar_skip','jal']){
+    if (corp === 'jar_skip') continue;
     const d = data[corp];
+    // Si la corporación no aparece en este archivo (ej. JAL en GCS_*TER.csv),
+    // saltar para no producir directorios vacíos.
+    if (d.ciudad.cands.size === 0 && Array.from(d.ciudad.especiales.values()).every(v => v === 0)) continue;
     const opts = corp === 'concejo' ? { curules: CURULES_CONCEJO } : {};
 
     const resumen = {
@@ -295,6 +387,19 @@ async function main(){
       porComuna[k] = { nombre: COMUNA_NOMBRE[k] || k, ...serializeScope(scope, opts) };
     }
 
+    const porBarrio = {};
+    for (const [k, scope] of d.barrio){
+      const meta = barrioMeta[corp].get(k);
+      if (!meta || meta.wSum === 0) continue;
+      porBarrio[k] = {
+        nombre: meta.nombre,
+        comuna: meta.comunaPol,
+        lat: meta.latSum / meta.wSum,
+        lon: meta.lonSum / meta.wSum,
+        ...serializeScope(scope),
+      };
+    }
+
     const porZona = {};
     for (const [k, scope] of d.zona) porZona[k] = serializeScope(scope);
 
@@ -306,22 +411,25 @@ async function main(){
 
     const rp = path.join(outDir, corp, 'resumen.json');
     const cp = path.join(outDir, corp, 'por-comuna.json');
+    const bp = path.join(outDir, corp, 'por-barrio.json');
     const zp = path.join(outDir, corp, 'por-zona.json');
     const pp = path.join(outDir, corp, 'por-puesto.json');
     const mp = path.join(outDir, corp, 'por-mesa.json');
 
     writeJsonPretty(rp, resumen);
     writeJson(cp, porComuna);
+    if (Object.keys(porBarrio).length) writeJson(bp, porBarrio);
     writeJson(zp, porZona);
     writeJson(pp, porPuesto);
     writeJson(mp, porMesa);
 
-    console.log(`  ${corp.padEnd(9)} · resumen ${fmtKB(fs.statSync(rp).size)} · comuna ${fmtKB(fs.statSync(cp).size)} · zona ${fmtKB(fs.statSync(zp).size)} · puesto ${fmtKB(fs.statSync(pp).size)} · mesa ${fmtMB(fs.statSync(mp).size)}`);
+    const barrioSize = Object.keys(porBarrio).length ? fmtKB(fs.statSync(bp).size) : 'n/a';
+    console.log(`  ${corp.padEnd(9)} · resumen ${fmtKB(fs.statSync(rp).size)} · comuna ${fmtKB(fs.statSync(cp).size)} · barrio ${barrioSize} · zona ${fmtKB(fs.statSync(zp).size)} · puesto ${fmtKB(fs.statSync(pp).size)} · mesa ${fmtMB(fs.statSync(mp).size)}`);
 
     // Sanity
     const top = resumen.candidatos.slice(0, 3);
     console.log(`    top: ${top.map(c => `${c.nombre.slice(0,28)} (${c.votos.toLocaleString('es-CO')} · ${c.pct}%)`).join(' | ')}`);
-    console.log(`    total ${resumen.votos_validos.toLocaleString('es-CO')} válidos + ${(resumen.votos_totales - resumen.votos_validos).toLocaleString('es-CO')} especiales · ${Object.keys(porComuna).length} comunas · ${Object.keys(porZona).length} zonas · ${Object.keys(porPuesto).length} puestos · ${Object.keys(porMesa).length} mesas`);
+    console.log(`    total ${resumen.votos_validos.toLocaleString('es-CO')} válidos + ${(resumen.votos_totales - resumen.votos_validos).toLocaleString('es-CO')} especiales · ${Object.keys(porComuna).length} comunas · ${Object.keys(porBarrio).length} barrios · ${Object.keys(porZona).length} zonas · ${Object.keys(porPuesto).length} puestos · ${Object.keys(porMesa).length} mesas`);
   }
   console.log();
 }

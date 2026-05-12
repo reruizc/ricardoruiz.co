@@ -373,6 +373,14 @@
           <div class="pill-group" id="corp-pills">
             <button class="pill active" data-corp="alcaldia">Alcaldía</button>
             <button class="pill" data-corp="concejo">Concejo</button>
+            <button class="pill" data-corp="jal">JAL (ediles)</button>
+          </div>
+        </div>
+        <div class="ctrl-group">
+          <div class="ctrl-label">Vista del mapa</div>
+          <div class="pill-group" id="view-pills">
+            <button class="pill active" data-view="comuna">Por comuna</button>
+            <button class="pill" data-view="barrio">Por barrio</button>
           </div>
         </div>
       </div>
@@ -386,7 +394,7 @@
       <div class="map-card">
         <div class="card-header">
           <div>
-            <div class="card-title">Ganador por comuna</div>
+            <div class="card-title" id="map-title">Ganador por comuna</div>
             <div class="card-sub" id="map-sub">Color por partido del primer puesto</div>
           </div>
         </div>
@@ -563,11 +571,13 @@
     function fmt(n){ return new Intl.NumberFormat('es-CO').format(n || 0); }
 
     // ─── STATE ────────────────────────────────────────────────────────
-    const state = { year: '2023', corp: 'alcaldia' };
+    const state = { year: '2023', corp: 'alcaldia', view: 'comuna' };
     let map = null;
-    let mapLayer = null;
+    let mapLayer = null;      // capa de comunas (GeoJSON)
+    let barrioLayer = null;   // capa de barrios (circleMarkers)
     let currentResumen = null;
     let currentComunas = null;
+    let currentBarrios = null;
 
     // ─── INIT ─────────────────────────────────────────────────────────
     function init(){
@@ -589,6 +599,14 @@
           render();
         });
       });
+      document.querySelectorAll('#view-pills .pill').forEach(p => {
+        p.addEventListener('click', () => {
+          state.view = p.dataset.view;
+          document.querySelectorAll('#view-pills .pill').forEach(x => x.classList.remove('active'));
+          p.classList.add('active');
+          render();
+        });
+      });
 
       initMap();
       render();
@@ -605,19 +623,25 @@
     async function render(){
       clearError();
       try {
-        const [resumen, porComuna] = await Promise.all([
+        const fetches = [
           loadData(state.year, state.corp, 'resumen'),
           loadData(state.year, state.corp, 'por-comuna'),
-        ]);
+        ];
+        if (state.view === 'barrio'){
+          fetches.push(loadData(state.year, state.corp, 'por-barrio').catch(() => null));
+        }
+        const results = await Promise.all(fetches);
+        const [resumen, porComuna, porBarrio] = results;
         currentResumen = resumen;
         currentComunas = porComuna;
+        currentBarrios = porBarrio || null;
         renderSummary(resumen);
         renderCandTable(resumen);
-        await renderMap(porComuna);
+        await renderMap(porComuna, currentBarrios);
         renderComunaTable(porComuna);
       } catch (e) {
         console.error(e);
-        showError(`Error cargando datos: ${e.message}. ¿Ya subiste los JSON a S3 bajo proyecto-dc/historicos/medellin/${state.year}/${state.corp}/?`);
+        showError(`Error cargando datos: ${e.message}. ¿Ya subiste los JSON a S3 bajo bases+de+datos/output_medellin/${state.year}/${state.corp}/?`);
       }
     }
 
@@ -628,9 +652,12 @@
       const validos = r.votos_validos || 0;
       const especiales = total - validos;
 
+      const labelMap = { alcaldia: 'Ganador · Alcaldía', concejo: '1er en Concejo', jal: '1er en JAL (agregado ciudad)' };
+      const lbl = labelMap[state.corp] || 'Top';
+
       const winnerHtml = c1 ? `
         <div class="sum-card winner">
-          <div class="sum-label">Ganador · ${state.corp === 'alcaldia' ? 'Alcaldía' : '1er en Concejo'}</div>
+          <div class="sum-label">${lbl}</div>
           <div class="sum-value-big">${c1.nombre}</div>
           <div class="sum-meta">${c1.partido || 'Sin partido'} · ${fmt(c1.votos)} votos · <span style="color:var(--purple);font-weight:600">${c1.pct}%</span></div>
         </div>
@@ -673,43 +700,46 @@
           <td class="pct">${c.pct}%</td>
         </tr>
       `).join('');
-      document.getElementById('cand-title').textContent =
-        state.corp === 'alcaldia' ? 'Top candidatos · alcaldía' : 'Top candidatos / listas · concejo';
+      const titles = {
+        alcaldia: 'Top candidatos · alcaldía',
+        concejo:  'Top candidatos / listas · concejo',
+        jal:      'Top ediles agregados ciudad (mezcla 16 JALs)',
+      };
+      document.getElementById('cand-title').textContent = titles[state.corp] || 'Top';
     }
 
-    async function renderMap(porComuna){
+    async function renderMap(porComuna, porBarrio){
       const geo = await loadGeo();
       if (mapLayer){ map.removeLayer(mapLayer); mapLayer = null; }
+      if (barrioLayer){ map.removeLayer(barrioLayer); barrioLayer = null; }
 
-      // 16 comunas (CODIGO 01-16) están en GeoJSON. Corregimientos en GeoJSON
-      // tienen códigos 50/60/70/80/90 — los datos los tenemos agrupados como
-      // 'CORR'. Pintamos los 5 corregimientos del mismo color.
       const COMUNA_TO_KEY = (geoCode) => {
-        const c = String(geoCode || '').replace(/^0+/, '') || '0';
         const padded = String(geoCode || '').padStart(2, '0');
         if (['50','60','70','80','90'].includes(padded)) return 'CORR';
         return padded;
       };
 
+      // Capa base de comunas (siempre)
+      const showBarrios = state.view === 'barrio' && porBarrio && Object.keys(porBarrio).length;
       function styleOf(feat){
         const code = feat.properties.CODIGO;
         const key = COMUNA_TO_KEY(code);
         const data = porComuna[key];
+        if (showBarrios){
+          // En vista barrio, la capa de comunas queda como contorno tenue
+          return { fillColor: '#222', fillOpacity: 0.04, color: 'rgba(255,255,255,0.25)', weight: 1, dashArray: '2,3' };
+        }
         if (!data || !data.candidatos || !data.candidatos.length){
           return { fillColor: '#444', fillOpacity: .25, color: 'rgba(255,255,255,0.25)', weight: 1 };
         }
         const winner = data.candidatos[0];
-        return {
-          fillColor: getColor(winner.partido),
-          fillOpacity: 0.78,
-          color: 'rgba(255,255,255,0.35)',
-          weight: 1,
-        };
+        return { fillColor: getColor(winner.partido), fillOpacity: 0.78, color: 'rgba(255,255,255,0.35)', weight: 1 };
       }
 
       mapLayer = L.geoJSON(geo, {
         style: styleOf,
         onEachFeature: (feat, layer) => {
+          if (showBarrios) return;  // tooltip solo en vista comuna
           const code = feat.properties.CODIGO;
           const nombre = feat.properties.NOMBRE || code;
           const key = COMUNA_TO_KEY(code);
@@ -738,21 +768,72 @@
 
       try { map.fitBounds(mapLayer.getBounds(), { padding: [10, 10] }); } catch(_) {}
 
-      // Legend: top 6 partidos por número de comunas ganadas
+      // Capa de barrios (circleMarkers) si la vista es barrio
+      if (showBarrios){
+        const barrios = Object.entries(porBarrio).map(([k, d]) => ({
+          key: k, nombre: d.nombre, lat: d.lat, lon: d.lon, comuna: d.comuna,
+          total: d.votos_validos,
+          winner: d.candidatos && d.candidatos[0] ? d.candidatos[0] : null,
+        }));
+        const maxTotal = Math.max(...barrios.map(b => b.total || 0), 1);
+        const minR = 4, maxR = 22;
+        const r = (v) => minR + Math.sqrt(Math.max(0, v) / maxTotal) * (maxR - minR);
+        barrioLayer = L.layerGroup();
+        barrios.forEach(b => {
+          if (!Number.isFinite(b.lat) || !Number.isFinite(b.lon)) return;
+          const color = b.winner ? getColor(b.winner.partido) : '#666';
+          const cm = L.circleMarker([b.lat, b.lon], {
+            radius: r(b.total),
+            fillColor: color, fillOpacity: 0.8,
+            color: '#fff', weight: 1, opacity: 0.9,
+          });
+          const w = b.winner;
+          const tt = `
+            <div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.45">
+              <span style="color:#a78bfa;font-weight:700">${b.nombre.toUpperCase()}</span><br/>
+              <span style="color:#999;font-size:.7rem">Comuna ${b.comuna}</span><br/>
+              ${w ? `
+                <span style="color:${color};font-weight:700">${w.nombre}</span><br/>
+                ${w.partido || '—'}<br/>
+                <span style="color:#fff">${fmt(w.votos)} votos · ${w.pct}%</span><br/>
+                <span style="color:#999;font-size:.7rem">Total barrio: ${fmt(b.total)} válidos</span>
+              ` : 'Sin datos'}
+            </div>`;
+          cm.bindTooltip(tt, { sticky: true, opacity: 1 });
+          cm.addTo(barrioLayer);
+        });
+        barrioLayer.addTo(map);
+      }
+
+      // Legenda
       const winsByParty = new Map();
-      for (const k of Object.keys(porComuna)){
-        const w = porComuna[k].candidatos && porComuna[k].candidatos[0];
+      const source = showBarrios ? porBarrio : porComuna;
+      for (const k of Object.keys(source || {})){
+        const w = source[k].candidatos && source[k].candidatos[0];
         if (!w) continue;
         const p = w.partido || 'Sin partido';
         winsByParty.set(p, (winsByParty.get(p) || 0) + 1);
       }
       const sorted = Array.from(winsByParty.entries()).sort((a,b) => b[1] - a[1]).slice(0, 8);
+      const unit = showBarrios ? 'barrios' : 'comunas';
       document.getElementById('map-legend').innerHTML = sorted.map(([p, n]) => `
         <span class="lg-item">
           <span class="lg-dot" style="background:${getColor(p)}"></span>
-          ${p.length > 30 ? p.slice(0,28) + '…' : p} · ${n}
+          ${p.length > 30 ? p.slice(0,28) + '…' : p} · ${n} ${unit}
         </span>
       `).join('');
+
+      // Título y subtítulo del card del mapa
+      const mapTitle = document.getElementById('map-title');
+      const mapSub = document.getElementById('map-sub');
+      if (mapTitle){
+        mapTitle.textContent = showBarrios ? 'Ganador por barrio' : 'Ganador por comuna';
+      }
+      if (mapSub){
+        mapSub.textContent = showBarrios
+          ? 'Color por partido ganador · radio proporcional a votos válidos del barrio'
+          : 'Color por partido del primer puesto';
+      }
     }
 
     function renderComunaTable(porComuna){
