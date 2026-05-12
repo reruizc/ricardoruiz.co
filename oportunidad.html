@@ -412,7 +412,12 @@
       </div>
     </div>
     <div class="formula-box">
-      Oportunidad(C, M) = max(0, &nbsp;<b>factor_líder(C) · (1 + NS-NR / Σpond) · Σ<sub>c ∈ bloque</sub> pond(c) · bias<sub>c</sub>(M)</b> &nbsp;−&nbsp; <b>pond(C) · bias<sub>C</sub>(M)</b>&nbsp;) &nbsp;→&nbsp; techo del bloque ampliado − proyección actual
+      Nuestra fórmula<span class="help-q" data-tip="Cada candidato parte de su % nacional (el ponderador). El crecimiento posible viene de capturar SU pedazo de los indecisos (NS-NR), proporcional a su peso en el universo declarado. Ese pedacito se reparte por el territorio según la 'shape' histórica del candidato (dónde votó la gente afín en elecciones pasadas). Lo que ves en cada departamento o municipio es cuánto de ese crecimiento nacional aterriza ahí.">?</span>:
+      &nbsp;Contribución(C, M) &nbsp;=&nbsp; <b>pond(C) · bias<sub>C</sub>(M) · (NS-NR / Σpond) · (censo<sub>M</sub> / censo<sub>nacional</sub>)</b>
+      <br>
+      <span style="font-family:'Fraunces',serif;font-weight:300;font-size:.84rem;opacity:.85;display:block;margin-top:.35rem">
+        Σ<sub>M</sub> Contribución(C, M) = crecimiento total nacional de C (≈ 2 pp para Cepeda, ≈ 1 pp para Paloma). Cap superior: el modelo solo proyecta crecimientos positivos.
+      </span>
     </div>
   </section>
 
@@ -2625,8 +2630,9 @@
     const totalContrib = muns.reduce((s,r)=>s+(r.contrib||0), 0);
     const cand = CANDIDATOS.find(c=>c.id===STATE.candId);
     if (STATE.layer === 'opo'){
+      const candName = cand ? cand.nombre : '—';
       document.getElementById('opo-count').innerHTML =
-        `<b>${opos.length}</b> municipios con contribución ≥ ${STATE.threshold}pp · crecimiento total proyectado <b>+${totalContrib.toFixed(2)}pp</b> nacional <span class="censo">· ${pct.toFixed(1)}% del censo en juego</span>`;
+        `Crecimiento total proyectado para <b>${candName}</b> en 1ª vuelta: <b>+${totalContrib.toFixed(2)} pp</b> nacionales · <b>${opos.length}</b> municipios contribuyen al menos ${STATE.threshold} pp <span class="censo">· ${pct.toFixed(1)}% del electorado nacional vive ahí</span>`;
     } else if (STATE.layer === 'abs'){
       const high = muns.filter(r => r.abst != null && r.abst >= 0.5);
       const censoHigh = high.reduce((s,r)=>s+(r.censo||0), 0);
