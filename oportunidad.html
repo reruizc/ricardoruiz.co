@@ -378,7 +378,7 @@
   <header class="page-header">
     <div>
       <div class="page-title">Oportunidad · <span>voto blando afín por candidato</span></div>
-      <div class="page-sub">Dónde un candidato puede crecer · Brecha entre techo afín y proyección actual · 1ª vuelta presidencial 2026</div>
+      <div class="page-sub">Dónde un candidato puede crecer · Captura del NS-NR redistribuida por territorio · 1ª vuelta presidencial 2026</div>
     </div>
     <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
   </header>
@@ -436,9 +436,9 @@
       <button class="toggle-btn" id="lvl-mun" onclick="setLevel('mun')">Municipal</button>
     </div>
     <div class="threshold-row">
-      <span class="toggle-label" style="margin-right:.2rem">Destacar brecha ≥</span>
-      <input type="range" id="threshold-slider" class="threshold-slider" min="1" max="20" step="1" value="5" />
-      <span class="threshold-value" id="threshold-value">+5 pp</span>
+      <span class="toggle-label" style="margin-right:.2rem">Destacar contribución ≥</span>
+      <input type="range" id="threshold-slider" class="threshold-slider" min="0.01" max="0.30" step="0.01" value="0.05" />
+      <span class="threshold-value" id="threshold-value">+0.05 pp</span>
     </div>
     <div class="toggle-group" id="mde-view-toggle" style="display:none">
       <span class="toggle-label">Medellín</span>
@@ -486,7 +486,7 @@
 
       <!-- Leyenda -->
       <div class="panel-card">
-        <div class="panel-section-title" id="leg-title">Voto blando · brecha (pp)</div>
+        <div class="panel-section-title" id="leg-title">Contribución al crecimiento nacional (pp)</div>
         <div class="leg-bar opo" id="leg-bar"></div>
         <div class="leg-bar-ends" id="leg-ends">
           <span class="leg-bar-end">−10 pp · sobre-rep</span>
@@ -495,7 +495,7 @@
         </div>
         <div class="leg-stripes" id="leg-stripes-row">
           <div class="leg-stripe-swatch"></div>
-          <span>Brecha ≥ <b id="leg-thresh">+10 pp</b> · oportunidad alta</span>
+          <span>Contribución ≥ <b id="leg-thresh">+0.05 pp</b> · destaca con rayado</span>
         </div>
       </div>
 
@@ -523,7 +523,7 @@
             <div class="det-row"><dt class="lbl">Censo 2026</dt><dd class="val" id="det-censo">—</dd></div>
             <div class="det-row"><dt class="lbl">Abstención 2022</dt><dd class="val" id="det-abst">—</dd></div>
             <div class="det-row"><dt class="lbl">Top candidato afín</dt><dd class="val" id="det-topafin">—</dd></div>
-            <div class="det-row"><dt class="lbl">Brecha vs techo</dt><dd class="val" id="det-brecha">—</dd></div>
+            <div class="det-row"><dt class="lbl">Crecimiento local</dt><dd class="val" id="det-brecha">—</dd></div>
           </dl>
         </div>
       </div>
@@ -558,11 +558,13 @@
 
   <!-- FOOTER -->
   <footer class="foot">
-    <p><strong>Metodología.</strong> Para un candidato C en un municipio M calculamos tres cosas:
-      <em>pct_afín(C, M)</em> = promedio ponderado por fuente del % de votos que obtuvieron en M, en cada elección histórica, los candidatos/partidos definidos como afines a C;
-      <em>techo(C, M)</em> = factor de liderazgo del bloque × pct_afín — el factor (editable por slider) corrige el hecho de que candidatos sub-líderes solo absorben una fracción del bloque, no el 100%; y
-      <em>proyección(C, M)</em> = pct nacional actual de C (ponderador propio) × bias(C, M), idéntico al simulador presidencial. La <strong>brecha</strong> = techo − proyección es el "voto blando capturable" realista. Antes de aplicar el factor, candidatos chicos como Claudia o Roy salían con brechas enormes y candidatos grandes como Cepeda con brechas nulas — el factor cierra esa asimetría.</p>
-    <p><strong>Riesgo metodológico.</strong> El mapeo de afinidades es <em>juicio editorial trazable, no algoritmo objetivo</em> (Cepeda hereda Petro, Paloma hereda Fico/Duque, Fajardo hereda verdes/centro, etc.). El factor de liderazgo es la pieza más subjetiva del modelo — defaults: Cepeda 95%, Paloma 70%, Fajardo 55%, Abelardo 45%, Claudia 20%, Roy 10%. El componente <em>proyección</em> depende del ponderador, fecha de corte: <span id="foot-pond-fecha">cargando…</span>. <strong>El modelo asume voto afín = voto capturable hasta el techo</strong> — falso en el margen por lealtades personales, vetos y contexto local. Léelo como <strong>orientación de prioridades</strong>, no como pronóstico de voto.</p>
+    <p><strong>Metodología (v3 · mayo 2026).</strong> Cada candidato C parte de su posición nacional según el ponderador (<em>pondPct(C)</em>) y se redistribuye en el territorio según su shape histórica:
+      <em>proj_base(C, M)</em> = pondPct(C) × bias_C(M) — dónde está el candidato hoy en cada mun.
+      El crecimiento posible viene de capturar su pedazo del <strong>NS-NR</strong> (4.57% del ponderador) proporcional al peso del candidato:
+      <em>nsnr_share(C)</em> = NS-NR × pondPct(C) / sumDeclarado, distribuido geográficamente por la misma shape:
+      <em>gap_local(C, M)</em> = proj_base(C, M) × NS-NR/sumDeclarado.
+      La <strong>contribución nacional</strong> = gap_local × censo_M / censo_total — pondera por tamaño del territorio para que la suma de todos los municipios iguale exactamente el crecimiento nacional posible (~2pp para Cepeda, ~1pp para Paloma, ~1.2pp para Abelardo). El mapa colorea y rankea por contribución; el detalle muestra también el crecimiento local en pp. <strong>Ningún territorio queda en negativo</strong>: por construcción el modelo solo proyecta crecimientos posibles.</p>
+    <p><strong>Riesgo metodológico.</strong> El mapeo de afinidades es <em>juicio editorial trazable, no algoritmo objetivo</em> (Cepeda hereda Petro, Paloma hereda Fico/Duque, Fajardo hereda verdes/centro, etc.). El crecimiento por NS-NR asume distribución proporcional al peso de cada candidato dentro del universo declarado — los indecisos no se reparten uniformemente entre todos, sino con sesgo hacia los líderes. La componente <em>proj_base</em> depende del ponderador propio, fecha de corte: <span id="foot-pond-fecha">cargando…</span>. <strong>El modelo no contempla flujo cross-block</strong> (votos que migran entre ejes ideológicos) ni movilización de abstención — para eso usar el toggle <em>Abstención</em> o esperar fase 2 (transferencias intra-bloque editables). Léelo como <strong>orientación de prioridades</strong>, no como pronóstico de voto.</p>
     <p><strong>Drilldown a ciudad.</strong> 14 ciudades soportadas con datos por comuna o localidad: Bogotá (localidades, abre directo desde el mapa nacional), Medellín (comunas + barrios), Cali, Barranquilla, Ibagué, Manizales, Pereira, Montería, Bucaramanga, Cúcuta, Neiva, Popayán, Sincelejo y Villavicencio. Click en el mun de la ciudad → drilldown automático. El bias se calcula contra el promedio de la propia ciudad (no contra el nacional-país) porque las ciudades tienen perfiles ideológicos distintos. <strong>Medellín · Barrios (v2)</strong>: 147 barrios con <em>bias propio</em> calculado al cruzar los puestos de votación de cada barrio (PUESTOS_GEOREF) con los <code>por-puesto.json</code> de 16 señales históricas. Los barrios sin puestos asignables (o sin polígono en el GeoJSON oficial) caen al heredado de la comuna padre — granularidad real a nivel intra-comuna.</p>
     <p><strong>Capa puestos.</strong> 13.492 puestos de votación con coordenadas. Se renderizan con LOD por zoom (a poca resolución solo los más grandes; al hacer zoom aparecen todos). Radio del círculo = log(censo del puesto). Color heredado de la brecha del municipio padre — o de la comuna padre si estás dentro de una de las 14 ciudades soportadas. Activar la capa habilita pan + zoom con la rueda; al volver a Oportunidad o Abstención el mapa se bloquea otra vez. <strong>Próximo paso (paquete v2)</strong>: bias propio por puesto usando histórico por puesto + agregación a barrio para Bogotá y Medellín — granularidad real al precio del retainer.</p>
     <p><strong>Capa abstención.</strong> Métrica = 1 − (votos totales presidencial 2022 / censo electoral 2026). Capa complementaria: identifica dónde hay potencial no-activado además del afín. Útil para diseñar pisada de movilización junto al mapa de oportunidad. Cap superior: muchos municipios pequeños tienen abstención reportada baja por cierre de mesas, no por participación real — leer con cautela en mun &lt; 5.000 censo.</p>
@@ -851,7 +853,7 @@
     candId:'ic',
     weights:{ pres22:40, congreso26:35, pres18:15, consultas:10 },
     lider:{ ...LIDER_DEFAULTS },   // 0..100 por candidato (% de techo afín capturable)
-    threshold:5,         // pp (umbral para rayado de oportunidad — más bajo con techo realista)
+    threshold:0.05,      // pp nacional (umbral para rayado: contribución ≥ 0.05pp del total país)
     layer:'opo',         // 'opo' | 'abs' | 'pue'
     level:'dep',         // 'dep' | 'mun'
     selectedDep:null,
@@ -1252,21 +1254,19 @@
       consultas:  wRaw.consultas / wSum,
     };
 
-    // Precompute nacAfin y pondPct para cada miembro del bloque amplio.
-    // Cada miembro tiene su propia shape (AFINIDADES) y su propio peso (pondPct);
-    // el techo del bloque por mun es la suma de sus proyecciones individuales.
-    const blocMems = BLOQUE_AMPLIO[candId] || [candId];
-    const blocData = blocMems.map(id => {
-      const c = CANDIDATOS.find(x => x.id === id);
-      return {
-        id,
-        cand: c,
-        pondPct: pondPct(c) || 0,
-        nacAfin: precomputeNacionalAfin(id),
-      };
-    });
-    const nsnrFactor = getNsNrFactor();   // pickup proporcional NS-NR
-    const factor    = (STATE.lider[candId] ?? 100) / 100;
+    // Modelo nuevo (mayo 2026): el techo es la captura de NS-NR del propio
+    // candidato, redistribuido por su shape histórica. Cada candidato tiene
+    // su pedazo proporcional al pondPct dentro del universo declarado:
+    //   nsnr_share(C) = NS-NR × pondPct(C) / sumDeclarado   ← nacional
+    //   gap_local(C, M) = pondPct(C) × bias_C(M) × (NS-NR/sumDecl)
+    //                   = proj_base × nsnrFactor
+    //   contrib_nac(C, M) = gap_local × censo_M / censoNacional
+    // Σ_M contrib_nac = nsnr_share(C) por construcción (bias avg=1).
+    //
+    // Las transferencias intra-bloque (fase 2) se sumarán como término
+    // adicional sin reescribir esta lógica.
+    const nsnrFactor = getNsNrFactor();   // NS-NR / sumDeclarado
+    const censoNac   = STATE.sumCensoNacional || 1;
 
     const munMetrics = {};
     for (const munKey of munKeys){
@@ -1293,37 +1293,22 @@
       const bias = projBiasDen > 0 ? projBiasNum / projBiasDen : 1.0;
       const proj = candPctNac != null ? candPctNac * bias : null;
 
-      // Techo del bloque ampliado: Σ pondPct(c) × bias_c(mun) sobre los
-      // miembros del bloque, × factor liderazgo × (1 + NS-NR/sumDecl).
-      // Cada miembro contribuye con su pondPct redistribuido por su propia
-      // shape histórica. NS-NR pickup uniforme sobre el bloque.
-      let techoBlocNum = 0;
-      for (const m of blocData){
-        if (!m.pondPct) continue;
-        const bk = bucketsPctAfinForMun(m.id, munKey);
-        let bn=0, bd=0;
-        for (const b of ['pres22','congreso26','pres18','consultas']){
-          const v = bk[b]; const w = wNorm[b]; const n = m.nacAfin[b];
-          if (v != null && n != null && n > 0){ bn += w*(v/n); bd += w; }
-        }
-        const biasM = bd > 0 ? bn/bd : 1.0;
-        techoBlocNum += m.pondPct * biasM;
-      }
-      const techo = factor * (1 + nsnrFactor) * techoBlocNum;
-      // gap se capa a 0: si la proyección actual del candidato ya supera
-      // el techo del bloque ampliado en ese mun, no hay margen.
-      const gap = (proj != null) ? Math.max(0, techo - proj) : null;
+      // gap_local = crecimiento NS-NR en el mun (pp local).
+      // contrib   = aporte de ese crecimiento al total nacional (pp).
+      const censo   = STATE.censoByMun[munKey] || 0;
+      const gap     = proj != null ? proj * nsnrFactor : null;
+      const contrib = gap != null ? gap * censo / censoNac : null;
+      const techo   = proj != null ? proj + gap : null;
 
       // Abstención 2022
       const e22 = STATE.pres22?.[munKey];
-      const censo = STATE.censoByMun[munKey] || 0;
       const totVot22 = e22 ? (e22.votos_totales || 0) : 0;
       const abst = (censo > 0 && totVot22 > 0) ? clamp(1 - totVot22/censo, 0, 1) : null;
 
       munMetrics[munKey] = {
         munKey,
         depCod: munKey.split('-')[0],
-        afin, techo, proj, gap, bias,
+        afin, techo, proj, gap, contrib, bias,
         buckets,
         abst,
         censo,
@@ -1331,12 +1316,14 @@
     }
     STATE.munMetrics = munMetrics;
 
-    // 3) Agregado por depto: ponderado por censo
+    // 3) Agregado por depto: ponderado por censo + suma de contribuciones.
+    //    contrib se SUMA (no promedio) porque es aporte al total nacional;
+    //    los demás (proj, gap_local, afin, abst) se ponderan por censo.
     const depAgg = {};
     for (const r of Object.values(munMetrics)){
       const dc = r.depCod;
       if (!depAgg[dc]){
-        depAgg[dc] = { depCod:dc, sumW:0, sumAfin:0, sumTecho:0, hasTecho:0, sumProj:0, sumGap:0, sumAbst:0, sumAbstW:0, sumBias:0, censo:0, nMun:0, nOpo:0, hasAfin:0, hasGap:0 };
+        depAgg[dc] = { depCod:dc, sumW:0, sumAfin:0, sumTecho:0, hasTecho:0, sumProj:0, sumGap:0, sumAbst:0, sumAbstW:0, sumBias:0, sumContrib:0, censo:0, nMun:0, nOpo:0, hasAfin:0, hasGap:0 };
       }
       const w = Math.max(1, r.censo);
       const a = depAgg[dc];
@@ -1344,6 +1331,7 @@
       if (r.techo != null){ a.sumTecho += r.techo * w; a.hasTecho += w; }
       if (r.proj != null) a.sumProj += r.proj * w;
       if (r.gap != null){ a.sumGap += r.gap * w; a.hasGap += w; }
+      if (r.contrib != null) a.sumContrib += r.contrib;
       if (r.abst != null){ a.sumAbst += r.abst * w; a.sumAbstW += w; }
       a.sumBias += (r.bias||1) * w;
       a.sumW += w;
@@ -1356,10 +1344,11 @@
       a.techo = a.hasTecho > 0 ? a.sumTecho / a.hasTecho : null;
       a.proj = a.sumW > 0 ? a.sumProj / a.sumW : null;
       a.gap  = a.hasGap > 0 ? a.sumGap / a.hasGap : null;
+      a.contrib = a.sumContrib;   // ya viene sumado; en pp del total nacional
       a.abst = a.sumAbstW > 0 ? a.sumAbst / a.sumAbstW : null;
       a.bias = a.sumW > 0 ? a.sumBias / a.sumW : 1;
-      // Cuenta de muns con oportunidad ≥ umbral (se actualiza al cambiar threshold)
-      a.nOpo = Object.values(munMetrics).filter(r => r.depCod === dc && r.gap != null && r.gap >= STATE.threshold).length;
+      // Cuenta de muns con contribución ≥ umbral (threshold ahora es en pp nacional)
+      a.nOpo = Object.values(munMetrics).filter(r => r.depCod === dc && r.contrib != null && r.contrib >= STATE.threshold).length;
     }
     STATE.depMetrics = depAgg;
   }
@@ -1406,16 +1395,20 @@
   function isDay(){ return document.body.classList.contains('day-mode'); }
 
   // Divergente: -10..0..+10 pp (techo realista comprime el rango)
-  function colorByGap(gap){
-    if (gap == null || isNaN(gap)) return '#2d3340';
-    const g = clamp(gap, -10, 10);
+  // Color por contribución nacional (pp). Rango realista: 0 a ~0.2pp
+  // (territorios grandes con alta presencia del candidato). Stops calibrados
+  // a esa escala — escala superior asume top contributors entre 0.10-0.20pp.
+  function colorByGap(contrib){
+    if (contrib == null || isNaN(contrib)) return '#2d3340';
+    const g = clamp(contrib, 0, 0.20);
     const stops = [
-      [-10, [167,139,250]],   // púrpura saturado (sobre-rep fuerte)
-      [ -4, [126,109,194]],
-      [  0, [ 58, 63, 77]],   // neutro
-      [  4, [124,202,140]],
-      [ 10, [ 74,222,128]],   // verde brillante (oportunidad fuerte)
+      [0.00, [ 58, 63, 77]],   // neutro (poca contribución)
+      [0.02, [ 70, 95, 80]],
+      [0.05, [124,202,140]],
+      [0.10, [ 99,222,128]],
+      [0.20, [ 74,222,128]],   // verde brillante (contribuye fuerte al total)
     ];
+    if (g <= stops[0][0]) return `rgb(${stops[0][1].join(',')})`;
     for (let i=0;i<stops.length-1;i++){
       const [s0,c0] = stops[i], [s1,c1] = stops[i+1];
       if (g >= s0 && g <= s1){
@@ -1461,11 +1454,11 @@
 
   function styleFor(rec){
     if (STATE.layer === 'opo'){
-      const gap = rec ? rec.gap : null;
-      const isHigh = gap != null && gap >= STATE.threshold;
+      const contrib = rec ? rec.contrib : null;
+      const isHigh = contrib != null && contrib >= STATE.threshold;
       const fill = isHigh
         ? `url(#${isDay() ? 'opo-stripes-day' : 'opo-stripes'})`
-        : colorByGap(gap);
+        : colorByGap(contrib);
       return {
         fillColor: fill,
         fillOpacity: 0.88,
@@ -1858,13 +1851,23 @@
       Object.keys(cityData[sig]).forEach(k => comCods.add(k));
     }
 
-    // Bloque ampliado: precompute baseline y pondPct para cada miembro.
-    const blocMems = BLOQUE_AMPLIO[candId] || [candId];
-    const blocData = blocMems.map(id => {
-      const c = CANDIDATOS.find(x => x.id === id);
-      return { id, cand: c, pondPct: pondPct(c) || 0, cityNac: precomputeCityNacAfin(id, cityData) };
-    });
     const nsnrFactor = getNsNrFactor();
+
+    // Calcular peso censo (proxy: votos_validos) por comuna para que la
+    // contribución de cada comuna sume al total city-wide.
+    const censoByCom = {};
+    for (const comCod of comCods){
+      let totVv = 0, n = 0;
+      for (const sig of Object.keys(cityData)){
+        const e = cityData[sig]?.[comCod];
+        if (e && (e.votos_validos || e.votos_totales)){
+          totVv += (e.votos_validos || e.votos_totales);
+          n++;
+        }
+      }
+      censoByCom[comCod] = n > 0 ? totVv / n : 0;
+    }
+    const censoCity = Object.values(censoByCom).reduce((s,v)=>s+v,0) || 1;
 
     const out = {};
     for (const comCod of comCods){
@@ -1890,31 +1893,16 @@
       const bias = biasDen > 0 ? biasNum / biasDen : 1.0;
       const proj = candPctNac != null ? candPctNac * bias : null;
 
-      // Techo bloque: Σ_c pondPct(c) × bias_c(com) × factor × (1+NS-NR/sumDecl)
-      let techoBlocNum = 0;
-      for (const m of blocData){
-        if (!m.pondPct) continue;
-        const bk = bucketsPctAfinForComuna(m.id, cityData, comCod);
-        let bn=0, bd=0;
-        for (const b of ['pres22','congreso26','pres18','consultas']){
-          const v = bk[b]; const w = wNorm[b];
-          const nacCity = m.cityNac[b];
-          const nacPais = STATE.nacAfinByBucket?.[b];
-          const base = (nacCity != null && nacCity > 0) ? nacCity : nacPais;
-          if (v != null && base != null && base > 0){ bn += w*(v/base); bd += w; }
-        }
-        const biasM = bd > 0 ? bn/bd : 1.0;
-        techoBlocNum += m.pondPct * biasM;
-      }
-      const techo = factor * (1 + nsnrFactor) * techoBlocNum;
-      const gap = (proj != null) ? Math.max(0, techo - proj) : null;
+      // Modelo NS-NR a nivel comuna: igual que a nivel mun pero el contrib
+      // se calcula proporcional a la ciudad (no al nacional) para que el
+      // ranking intra-ciudad sea legible.
+      const gap     = proj != null ? proj * nsnrFactor : null;
+      const censo   = censoByCom[comCod] || 0;
+      const contrib = gap != null ? gap * censo / censoCity : null;
+      const techo   = proj != null ? proj + gap : null;
 
-      // Abstención: votos_totales pres-2022 / votos_validos+especiales no es censo real.
-      // Aproximamos con (especiales)/(votos_totales) — útil para detectar comunas con baja participación.
-      // Mejor: dejamos null porque no tenemos censo real por comuna.
       const abst = null;
-
-      out[comCod] = { comCod, afin, techo, proj, gap, bias, buckets, abst, censo:0 };
+      out[comCod] = { comCod, afin, techo, proj, gap, contrib, bias, buckets, abst, censo };
     }
     STATE.cityComMetrics[cityKey] = out;
   }
@@ -2261,18 +2249,19 @@
     const keys = new Set();
     for (const sig of Object.keys(data)) Object.keys(data[sig]).forEach(k => keys.add(k));
 
-    // Bloque ampliado: precompute baseline barrio (con fallbacks a comuna y país)
-    // y pondPct para cada miembro.
-    const blocMems = BLOQUE_AMPLIO[candId] || [candId];
-    const blocData = blocMems.map(id => {
-      const c = CANDIDATOS.find(x => x.id === id);
-      return {
-        id, cand: c, pondPct: pondPct(c) || 0,
-        barrioNac: precomputeMdeBarrioNacAfin(id),
-        comunaNac: STATE.cityNacAfin.medellin?.[id] || {},
-      };
-    });
     const nsnrFactor = getNsNrFactor();
+
+    // Censo proxy por barrio = promedio de votos_validos a través de señales.
+    const censoByBarrio = {};
+    for (const bk of keys){
+      let totVv = 0, n = 0;
+      for (const sig of Object.keys(data)){
+        const e = data[sig]?.[bk];
+        if (e && e.votos_validos){ totVv += e.votos_validos; n++; }
+      }
+      censoByBarrio[bk] = n > 0 ? totVv / n : 0;
+    }
+    const censoCity = Object.values(censoByBarrio).reduce((s,v)=>s+v,0) || 1;
 
     const out = {};
     for (const bk of keys){
@@ -2292,30 +2281,18 @@
       const bias = biasDen>0 ? biasNum/biasDen : 1.0;
       const proj = candPctNac != null ? candPctNac * bias : null;
 
-      // Techo bloque: Σ_c pondPct(c) × bias_c(barrio) × factor × (1+NS-NR/sumDecl)
-      let techoBlocNum = 0;
-      for (const m of blocData){
-        if (!m.pondPct) continue;
-        const bkts = bucketsPctAfinForComuna(m.id, data, bk);
-        let bn=0, bd=0;
-        for (const b of ['pres22','congreso26','pres18','consultas']){
-          const v = bkts[b]; const w = wNorm[b];
-          const base = (m.barrioNac[b]!=null && m.barrioNac[b]>0) ? m.barrioNac[b]
-                    : (m.comunaNac[b]!=null && m.comunaNac[b]>0) ? m.comunaNac[b]
-                    : STATE.nacAfinByBucket?.[b];
-          if (v != null && base != null && base > 0){ bn += w*(v/base); bd += w; }
-        }
-        const biasM = bd > 0 ? bn/bd : 1.0;
-        techoBlocNum += m.pondPct * biasM;
-      }
-      const techo = factor * (1 + nsnrFactor) * techoBlocNum;
-      const gap = (proj != null) ? Math.max(0, techo - proj) : null;
+      // Modelo NS-NR (igual lógica que mun): gap_local + contrib intra-ciudad.
+      const gap     = proj != null ? proj * nsnrFactor : null;
+      const censo   = censoByBarrio[bk] || 0;
+      const contrib = gap != null ? gap * censo / censoCity : null;
+      const techo   = proj != null ? proj + gap : null;
+
       // comuna del primer entry disponible (todas las señales coinciden por barrio)
       let comuna = null;
       for (const sig of Object.keys(data)){
         if (data[sig][bk]){ comuna = data[sig][bk].comuna; break; }
       }
-      out[bk] = { afin, techo, proj, gap, bias, abst:null, censo:0, comuna };
+      out[bk] = { afin, techo, proj, gap, contrib, bias, abst:null, censo, comuna };
     }
     STATE.mdeBarrioMetrics = out;
   }
@@ -2498,8 +2475,9 @@
     const sc = document.getElementById('hc-score');
     document.getElementById('hc-name').textContent = f.__name || '—';
     if (STATE.layer === 'opo'){
-      sc.textContent = r.gap != null ? fmtPP(r.gap, 1) : '—';
-      sc.classList.toggle('neg', r.gap != null && r.gap < 0);
+      // Hover chip muestra contribución nacional (pp).
+      sc.textContent = r.contrib != null ? fmtPP(r.contrib, 2) : '—';
+      sc.classList.toggle('neg', r.contrib != null && r.contrib < 0);
     } else {
       sc.textContent = r.abst != null ? (r.abst*100).toFixed(0)+'%' : '—';
       sc.classList.remove('neg');
@@ -2522,14 +2500,19 @@
     document.getElementById('det-name').textContent = f.__name || '—';
     const isDep = !f.__key;
     document.getElementById('det-parents').textContent = isDep
-      ? (r && r.nMun ? `${r.nMun} municipios · ${r.nOpo||0} con oportunidad ≥ ${STATE.threshold} pp` : '')
+      ? (r && r.nMun ? `${r.nMun} municipios · ${r.nOpo||0} con contribución ≥ ${STATE.threshold} pp` : '')
       : (f.__depName || '');
 
     const sc = document.getElementById('det-score');
     if (STATE.layer === 'opo'){
-      sc.textContent = (r && r.gap != null) ? fmtPP(r.gap, 1) : '—';
-      sc.classList.toggle('neg', r && r.gap != null && r.gap < 0);
-      document.getElementById('det-score-sub').textContent = 'techo realista − proyección';
+      // Score grande = contribución al total nacional (pp). Sub = crecimiento local (pp).
+      const contrib = r && r.contrib;
+      const gapLoc  = r && r.gap;
+      sc.textContent = (contrib != null) ? fmtPP(contrib, 2) : '—';
+      sc.classList.toggle('neg', contrib != null && contrib < 0);
+      document.getElementById('det-score-sub').textContent = gapLoc != null
+        ? `contribución al total país · localmente crece ${fmtPP(gapLoc, 1)}`
+        : 'contribución al total país';
     } else {
       sc.textContent = (r && r.abst != null) ? (r.abst*100).toFixed(1)+'%' : '—';
       sc.classList.remove('neg');
@@ -2569,8 +2552,8 @@
     document.getElementById('det-censo').textContent = r ? fmtNum(r.censo) : '—';
     document.getElementById('det-abst').textContent  = (r && r.abst!=null) ? (r.abst*100).toFixed(1)+'%' : '—';
     document.getElementById('det-topafin').textContent = isDep ? '—' : (r ? topAfinNameForMun(STATE.candId, f.__key) : '—');
-    document.getElementById('det-brecha').textContent  = (r && r.techo!=null && r.proj!=null)
-      ? `${r.proj.toFixed(1)}% → ${r.techo.toFixed(1)}%`
+    document.getElementById('det-brecha').textContent  = (r && r.gap!=null && r.proj!=null)
+      ? `${r.proj.toFixed(1)}% → ${(r.proj + r.gap).toFixed(1)}%`
       : '—';
   }
 
@@ -2599,10 +2582,13 @@
   }
 
   /* ───────── Top 30 ───────── */
+  // Rankea por contribución nacional (pp): cuánto aporta ese mun al total
+  // de crecimiento nacional del candidato. Si Cepeda crece 2.01pp a nivel
+  // país por NS-NR, el top-30 debe explicar el grueso de esos 2.01pp.
   function renderTop30(){
     const arr = Object.values(STATE.munMetrics)
-      .filter(r => r.gap != null)
-      .sort((a,b) => b.gap - a.gap)
+      .filter(r => r.contrib != null)
+      .sort((a,b) => b.contrib - a.contrib)
       .slice(0,30);
     const ul = document.getElementById('top-list');
     ul.innerHTML = arr.map((r,i) => {
@@ -2615,38 +2601,12 @@
           <div class="top-name">${munName}</div>
           <div class="top-meta"><span class="top-meta-dep">${depName}</span></div>
         </div>
-        <div class="top-score">${fmtPP(r.gap,1)}</div>
+        <div class="top-score">${fmtPP(r.contrib,2)}</div>
       </div>`;
     }).join('');
-    updateCapBanner();
-  }
-
-  // Banner "techo del bloque ampliado copado": aparece cuando la proyección
-  // nacional del candidato excede Σ pondPct(c in bloque) × factor × (1+NS-NR/sumDecl).
-  // En ese estado el techo electoral está saturado a nivel país — las
-  // ganancias adicionales vienen de fuera del bloque (abstención + cross-block).
-  function updateCapBanner(){
+    // Banner deprecado en el modelo NS-NR (no satura por construcción).
     const el = document.getElementById('cap-banner');
-    const body = document.getElementById('cap-banner-body');
-    if (!el || !body) return;
-    if (!STATE.techoCopado){
-      el.style.display = 'none';
-      return;
-    }
-    const cand = CANDIDATOS.find(c => c.id === STATE.candId);
-    const candName = cand ? cand.nombre : '—';
-    const proj = STATE.candPctNac, techo = STATE.techoNacAgg, bloc = STATE.blocPctAjustado;
-    const exceso = proj - techo;
-    const mems = (BLOQUE_AMPLIO[STATE.candId] || [STATE.candId])
-      .map(id => (CANDIDATOS.find(c => c.id === id)||{}).nombre).filter(Boolean).join(', ');
-    el.style.display = 'block';
-    body.innerHTML =
-      `<b>${candName}</b> proyecta <b>${fmtPct(proj,1)}</b> a nivel país, pero el techo del ` +
-      `<b>bloque ampliado</b> (${mems}, incluido NS-NR proporcional) es <b>${fmtPct(techo,1)}</b> ` +
-      `(${fmtPct(bloc,1)} × factor liderazgo). Excede en <b>${fmtPct(exceso,1)}</b> — el bloque ` +
-      `entero está copado y el ranking saldrá pobre. Las ganancias adicionales en 1ª vuelta ` +
-      `vienen de <b>movilización de abstención</b> y <b>flujo cross-block</b>: revisa el toggle ` +
-      `<em>Abstención</em>. Para un Oportunidad útil: sube el factor de liderazgo del bloque.`;
+    if (el) el.style.display = 'none';
   }
   function onTopClick(key, dep){
     STATE.selectedDep = dep;
@@ -2659,13 +2619,14 @@
   /* ───────── Contador y leyenda ───────── */
   function updateCounter(){
     const muns = Object.values(STATE.munMetrics);
-    const opos = muns.filter(r => r.gap != null && r.gap >= STATE.threshold);
+    const opos = muns.filter(r => r.contrib != null && r.contrib >= STATE.threshold);
     const censoOpo = opos.reduce((s,r)=>s+(r.censo||0), 0);
     const pct = STATE.sumCensoNacional ? (100*censoOpo/STATE.sumCensoNacional) : 0;
+    const totalContrib = muns.reduce((s,r)=>s+(r.contrib||0), 0);
     const cand = CANDIDATOS.find(c=>c.id===STATE.candId);
     if (STATE.layer === 'opo'){
       document.getElementById('opo-count').innerHTML =
-        `<b>${opos.length}</b> municipios oportunidad para ${cand.nombre} <span class="censo">· ${pct.toFixed(1)}% del censo nacional en juego</span>`;
+        `<b>${opos.length}</b> municipios con contribución ≥ ${STATE.threshold}pp · crecimiento total proyectado <b>+${totalContrib.toFixed(2)}pp</b> nacional <span class="censo">· ${pct.toFixed(1)}% del censo en juego</span>`;
     } else if (STATE.layer === 'abs'){
       const high = muns.filter(r => r.abst != null && r.abst >= 0.5);
       const censoHigh = high.reduce((s,r)=>s+(r.censo||0), 0);
@@ -2894,11 +2855,11 @@
   }
   function setThreshold(v){
     STATE.threshold = +v;
-    document.getElementById('threshold-value').textContent = '+' + v + ' pp';
-    document.getElementById('leg-thresh').textContent = '+' + v + ' pp';
+    document.getElementById('threshold-value').textContent = '+' + (+v).toFixed(2) + ' pp';
+    document.getElementById('leg-thresh').textContent = '+' + (+v).toFixed(2) + ' pp';
     // Recalcular nOpo por dep (sólo el conteo, no los gaps)
     for (const dc of Object.keys(STATE.depMetrics)){
-      STATE.depMetrics[dc].nOpo = Object.values(STATE.munMetrics).filter(r => r.depCod === dc && r.gap != null && r.gap >= STATE.threshold).length;
+      STATE.depMetrics[dc].nOpo = Object.values(STATE.munMetrics).filter(r => r.depCod === dc && r.contrib != null && r.contrib >= STATE.threshold).length;
     }
     repaintLayer();
     updateCounter();
