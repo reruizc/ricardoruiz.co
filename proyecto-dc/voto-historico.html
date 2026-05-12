@@ -495,7 +495,9 @@
     const S3_BASE = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co';
     const HIST_BASE = `${S3_BASE}/bases+de+datos/output_medellin`;
     const MEDELLIN_GEO_URL = `${S3_BASE}/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`;
-    const BARRIOS_GEO_URL = `${S3_BASE}/bases+de+datos/MEDELLIN_BARRIOS_VORONOI.json`;
+    // Prioridad: oficial (DAP Alcaldía) → Voronoi (aproximación) → circleMarkers
+    const BARRIOS_GEO_URL_OFICIAL = `${S3_BASE}/bases+de+datos/MEDELLIN_BARRIOS_OFICIAL.json`;
+    const BARRIOS_GEO_URL_VORONOI = `${S3_BASE}/bases+de+datos/MEDELLIN_BARRIOS_VORONOI.json`;
 
     const dataCache = {};
     async function loadData(year, corp, file){
@@ -517,25 +519,46 @@
       return geoCache;
     }
 
-    // GeoJSON aproximado de barrios (Voronoi sobre puestos de votación).
-    // Si no está disponible en S3, devuelve null y caemos a circleMarkers.
+    // GeoJSON de barrios. Carga el oficial DAP primero; si no, el Voronoi
+    // aproximado; si tampoco, null (caemos a circleMarkers).
     let barriosGeoCache = null;
+    let barriosGeoSource = null;  // 'oficial' | 'voronoi' | null
     let barriosGeoTried = false;
     async function loadBarriosGeo(){
       if (barriosGeoCache) return barriosGeoCache;
       if (barriosGeoTried) return null;
       barriosGeoTried = true;
-      try {
-        const r = await fetch(BARRIOS_GEO_URL);
-        if (!r.ok) return null;
-        barriosGeoCache = await r.json();
-        return barriosGeoCache;
-      } catch (e) {
-        return null;
+      for (const [src, url] of [['oficial', BARRIOS_GEO_URL_OFICIAL], ['voronoi', BARRIOS_GEO_URL_VORONOI]]){
+        try {
+          const r = await fetch(url);
+          if (!r.ok) continue;
+          barriosGeoCache = await r.json();
+          barriosGeoSource = src;
+          return barriosGeoCache;
+        } catch (e) {
+          continue;
+        }
       }
+      return null;
     }
     function normBarrio(s){
       return String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+    }
+    // Normalización agresiva equivalente a tools/build-barrios-oficial.py
+    // Resuelve diferencias #N/NO.N, prefijos CORREGIMIENTO/BARRIO, artículos.
+    function normBarrioAgg(s){
+      let n = normBarrio(s);
+      n = n.replace(/#\s*(\d+)/g, '$1');
+      n = n.replace(/\bNO\.?\s*(\d+)/g, '$1');
+      n = n.replace(/N[°º]\s*(\d+)/g, '$1');
+      n = n.replace(/[-.]/g, ' ').replace(/\s+/g, ' ').trim();
+      for (const p of ['CORREGIMIENTO ', 'BARRIO ', 'AREA DE EXPANSION ', 'CABECERA URBANA ']){
+        if (n.startsWith(p)) n = n.slice(p.length);
+      }
+      for (const a of ['EL ', 'LA ', 'LOS ', 'LAS ']){
+        if (n.startsWith(a) && n.length > a.length + 2) n = n.slice(a.length);
+      }
+      return n.trim();
     }
 
     // ─── COLOR PALETTE ────────────────────────────────────────────────
@@ -801,19 +824,29 @@
           winner: d.candidatos && d.candidatos[0] ? d.candidatos[0] : null,
         }));
 
-        // Intento usar GeoJSON poligonal (Voronoi) si está en S3
+        // Intento usar GeoJSON poligonal (oficial preferido, Voronoi fallback)
         const barriosGeo = await loadBarriosGeo();
         if (barriosGeo && barriosGeo.features && barriosGeo.features.length){
           usedPolygons = true;
-          // Indexar datos por barrio_key normalizado
-          const byKey = {};
-          barrios.forEach(b => { byKey[normBarrio(b.nombre)] = b; });
+          // Indexar datos del voto histórico por dos claves: directa y agresiva
+          const byDirect = {};
+          const byAgg = {};
+          barrios.forEach(b => {
+            byDirect[normBarrio(b.nombre)] = b;
+            byAgg[normBarrioAgg(b.nombre)] = b;
+          });
+          // Resolver feature → datos del voto histórico
+          const resolveFeat = (props) => {
+            const direct = props.NOMBRE_NORM || props.BARRIO_KEY || normBarrio(props.NOMBRE);
+            if (byDirect[direct]) return byDirect[direct];
+            const agg = props.NOMBRE_AGG || normBarrioAgg(props.NOMBRE);
+            if (byAgg[agg]) return byAgg[agg];
+            return null;
+          };
 
           barrioPolyLayer = L.geoJSON(barriosGeo, {
             style: (feat) => {
-              const props = feat.properties || {};
-              const k = props.BARRIO_KEY || normBarrio(props.NOMBRE);
-              const b = byKey[k];
+              const b = resolveFeat(feat.properties || {});
               if (!b || !b.winner){
                 return { fillColor: '#333', fillOpacity: 0.2, color: 'rgba(255,255,255,0.2)', weight: 1 };
               }
@@ -821,9 +854,8 @@
             },
             onEachFeature: (feat, layer) => {
               const props = feat.properties || {};
-              const k = props.BARRIO_KEY || normBarrio(props.NOMBRE);
-              const b = byKey[k];
-              const nombre = (b && b.nombre) || props.NOMBRE || k;
+              const b = resolveFeat(props);
+              const nombre = (b && b.nombre) || props.NOMBRE || '—';
               layer.on({
                 mouseover: (e) => {
                   layer.setStyle({ weight: 2, color: '#fff', fillOpacity: 0.96 });
@@ -908,9 +940,13 @@
       }
       if (mapSub){
         if (showBarrios){
-          mapSub.textContent = usedPolygons
-            ? 'Polígonos aproximados (Voronoi sobre puestos) · color por partido ganador'
-            : 'Color por partido ganador · radio proporcional a votos válidos del barrio';
+          if (usedPolygons){
+            mapSub.textContent = barriosGeoSource === 'oficial'
+              ? 'Polígonos oficiales (DAP Alcaldía de Medellín) · color por partido ganador'
+              : 'Polígonos aproximados (Voronoi sobre puestos) · color por partido ganador';
+          } else {
+            mapSub.textContent = 'Color por partido ganador · radio proporcional a votos válidos del barrio';
+          }
         } else {
           mapSub.textContent = 'Color por partido del primer puesto';
         }
