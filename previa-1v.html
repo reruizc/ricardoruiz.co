@@ -3985,6 +3985,103 @@
     _emitExcel(title, headers, rows, 'puestos');
   }
 
+  // ─── EXPORT JSON PROYECCIÓN POR PUESTO (uso interno) ──────────
+  // Genera el archivo proyeccion-por-puesto.json que el test electoral
+  // (test-presidencial-2026.html) consume desde S3 para hacer el cruce
+  // "votarías X, pero en tu puesto/UPL/barrio gana Y". Output minimizado
+  // (~2-3 MB sin gzip, ~500 KB gzipped) con lat/lon/censo + share% por
+  // candidato en cada puesto. Sin paywall — esto es uso admin, se dispara
+  // con Ctrl+Shift+E (o desde la consola: exportProyeccionPuestoJSON()).
+  //
+  // Flujo: garantiza puestos cargados → bias por puesto calibrado →
+  // recorre _puestosLight → para cada uno usa _puestoWinner() (la misma
+  // función que usa el Excel y el mapa) → emite share% normalizado.
+  async function exportProyeccionPuestoJSON(){
+    const status = (msg) => { console.log('[ExportJSON] ' + msg); };
+
+    // 1. Garantizar _puestosLight (lat/lon/censo + meta por puesto)
+    if (!_puestosLight || !_puestosLight.length){
+      status('Cargando puestos…');
+      try { await loadPuestosLight(); }
+      catch(e){ alert('No pude cargar los puestos: ' + e.message); return; }
+    }
+
+    // 2. Garantizar bias calibrado por puesto. Sin esto, todos los puestos
+    //    del mismo mun salen con la misma proyección (heredada de bias_mun)
+    //    y el archivo pierde su valor diferenciador intra-municipal.
+    status('Calibrando bias por puesto (puede tardar 1-2s)…');
+    try { await _sankeyEnsurePueBias(); }
+    catch(e){ console.warn('[ExportJSON] bias_pue falló, continúo con bias_mun:', e.message); }
+
+    // 3. Recorrer puestos y emitir filas
+    status(`Generando ${_puestosLight.length} filas…`);
+    const fecha = new Date().toISOString().slice(0,10);
+    const nacional = {};
+    CANDIDATOS.forEach(c => { nacional[c.id] = +Number(c.pct).toFixed(2); });
+
+    const puestos = [];
+    let sinGeo = 0, sinRanking = 0;
+    for (const p of _puestosLight){
+      if (!p.y || !p.x){ sinGeo++; continue; }
+      const winInfo = _puestoWinner(p);
+      const ranking = winInfo.ranking;
+      if (!ranking || !ranking.ranked || !ranking.ranked.length){ sinRanking++; continue; }
+      const total = ranking.ranked.reduce((s,x) => s + x.v, 0);
+      if (total <= 0){ sinRanking++; continue; }
+      const pct = {};
+      for (const x of ranking.ranked){
+        pct[x.c.id] = +((x.v / total) * 100).toFixed(2);
+      }
+      puestos.push({
+        k:   p.k,                     // "DD-MMM-ZZ-PP"
+        lat: +Number(p.y).toFixed(6),
+        lon: +Number(p.x).toFixed(6),
+        d:   p.k.slice(0, 2),         // dep code
+        m:   p.k.slice(3, 6),         // mun code
+        c:   p.c || 0,                // censo
+        n:   p.n  || '',              // nombre del puesto
+        mn:  p.mn || '',              // nombre municipio
+        p:   pct,                     // proyección %
+      });
+    }
+
+    const out = {
+      version: fecha,
+      generated_at: new Date().toISOString(),
+      // Hash de inputs (para que el test sepa si los sliders cambiaron desde
+      // que se generó el archivo). Es el pct de cada candidato concatenado.
+      sliders_signature: CANDIDATOS.map(c => `${c.id}:${(+c.pct).toFixed(2)}`).join(','),
+      nacional,
+      puestos,
+      meta: {
+        total_puestos: _puestosLight.length,
+        emitidos: puestos.length,
+        sin_geo: sinGeo,
+        sin_ranking: sinRanking,
+        bias_nivel: Object.keys(_biasCachePue).length > 0 ? 'puesto' : 'mun',
+      },
+    };
+
+    // Descarga al filesystem del usuario
+    const blob = new Blob([JSON.stringify(out)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `proyeccion-por-puesto-${fecha}.json`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+    status(`✓ ${puestos.length} puestos emitidos (${sinGeo} sin geo, ${sinRanking} sin ranking, bias=${out.meta.bias_nivel}).`);
+  }
+  // Expone en window para que se pueda invocar desde la consola.
+  window.exportProyeccionPuestoJSON = exportProyeccionPuestoJSON;
+  // Atajo de teclado: Ctrl+Shift+E (Cmd+Shift+E en macOS).
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'E' || e.key === 'e')){
+      e.preventDefault();
+      exportProyeccionPuestoJSON();
+    }
+  });
+
   // ─── MODAL METODOLOGÍA ────────────────────────────────────────
   function openMethodology(){
     document.getElementById('methodology-modal')?.classList.add('open');
