@@ -471,15 +471,13 @@
 
     <aside class="panel">
 
-      <!-- Factor de liderazgo del bloque (por candidato activo) -->
+      <!-- Transferencia intra-bloque (por candidato activo) -->
       <div class="panel-card">
-        <div class="panel-section-title">Factor de liderazgo del bloque <span id="lider-cand-name" style="color:var(--green);text-transform:none;letter-spacing:0;font-weight:700">—</span></div>
-        <div class="src-row" style="grid-template-columns:1fr 110px 50px">
-          <div class="src-name">% del techo afín capturable<span class="src-sub">cuánto del bloque ideológico puede absorber este candidato</span></div>
-          <input type="range" id="lider-slider" min="5" max="100" step="1" value="95" oninput="onLiderChange(this.value)" />
-          <span class="src-w" id="lider-w">95%</span>
+        <div class="panel-section-title">Transferencia intra-bloque <span class="help-q" data-tip="Simula qué pasa si el candidato activo absorbe parte del voto de otros candidatos de su bloque ideológico. Por defecto está en 0% (solo se proyecta el crecimiento del NS-NR). Si subes un slider al 50%, el candidato captura la mitad del voto de ese donante y el donante baja proporcionalmente.">?</span> <span id="xfer-cand-name" style="color:var(--green);text-transform:none;letter-spacing:0;font-weight:700">—</span></div>
+        <div id="xfer-sliders" style="display:flex;flex-direction:column;gap:.5rem;margin-top:.4rem">
+          <!-- inyectado por renderTransferSliders() -->
         </div>
-        <button class="src-reset" onclick="resetLider()">Restablecer default</button>
+        <button class="src-reset" onclick="resetTransfers()" style="margin-top:.6rem">Restablecer todos a 0%</button>
       </div>
 
       <!-- Sliders por fuente -->
@@ -803,7 +801,10 @@
   // Claudia 0.20: perdió consulta soluciones (ganó pero sin volumen),
   //                comparte centro con Fajardo y verde diluido.
   // Roy 0.10: residual del Pacto, prácticamente todo va a Cepeda.
-  const LIDER_DEFAULTS = { ic:95, ae:45, pv:70, sf:55, cl:20, rb:10 };
+  // Factor de liderazgo deprecado en v3 (mayo 2026). Lo reemplazó la
+  // transferencia intra-bloque explícita (sliders editables por donante).
+  // Si en el futuro hace falta un factor implícito, vive aquí, pero
+  // actualmente todos los cálculos lo asumen = 1.0.
 
   // ─── BLOQUE AMPLIO (techo electoral 1ª vuelta) ─────────────────
   // Universo de candidatos 2026 cuyos votos podría heredar el candidato
@@ -857,7 +858,10 @@
     // Cómputo derivado por candidato — se recomputa al cambiar candidato/pesos
     candId:'ic',
     weights:{ pres22:40, congreso26:35, pres18:15, consultas:10 },
-    lider:{ ...LIDER_DEFAULTS },   // 0..100 por candidato (% de techo afín capturable)
+    // Transferencias intra-bloque: por candidato principal, fracción [0..1]
+    // del voto de cada donante del bloque que el candidato absorbe.
+    // STATE.transfers = { candId: { donorId: 0.0 a 1.0 } }
+    transfers: {},
     threshold:0.05,      // pp nacional (umbral para rayado: contribución ≥ 0.05pp del total país)
     layer:'opo',         // 'opo' | 'abs' | 'pue'
     level:'dep',         // 'dep' | 'mun'
@@ -1228,18 +1232,8 @@
     const nacAfin = precomputeNacionalAfin(candId);
     STATE.nacAfinByBucket = nacAfin;
 
-    // Techo electoral nacional del bloque ampliado:
-    //   techo_nac = factor × (Σ pondPct(c in bloque)) × (1 + NS-NR/sumDecl)
-    // Si candPctNac excede este valor, incluso el bloque ampliado está
-    // copado — el banner del panel sugiere otras estrategias.
-    {
-      const factor0 = (STATE.lider[candId] ?? 100) / 100;
-      const blocPct = pondPctBlocAjustado(candId);   // Σ pondPct × (1+NS-NR/sumDecl)
-      STATE.blocPctAjustado = blocPct;
-      STATE.techoNacAgg     = blocPct != null ? factor0 * blocPct : null;
-      STATE.candPctNac      = candPctNac;
-      STATE.techoCopado     = (candPctNac != null && STATE.techoNacAgg != null && candPctNac > STATE.techoNacAgg);
-    }
+    STATE.candPctNac      = candPctNac;
+    STATE.techoCopado     = false;   // deprecated en v3 — el modelo NS-NR no satura
 
     // 2) Set de munKeys candidatos: union de todos los datasets
     const munKeys = new Set();
@@ -1259,19 +1253,32 @@
       consultas:  wRaw.consultas / wSum,
     };
 
-    // Modelo nuevo (mayo 2026): el techo es la captura de NS-NR del propio
-    // candidato, redistribuido por su shape histórica. Cada candidato tiene
-    // su pedazo proporcional al pondPct dentro del universo declarado:
-    //   nsnr_share(C) = NS-NR × pondPct(C) / sumDeclarado   ← nacional
-    //   gap_local(C, M) = pondPct(C) × bias_C(M) × (NS-NR/sumDecl)
-    //                   = proj_base × nsnrFactor
+    // Modelo v3 + transferencia intra-bloque (mayo 2026):
+    //   gap_local(C, M) = proj_base × nsnrFactor                  ← captura NS-NR
+    //                   + Σ_donor xfer[C ← donor] × pondPct(donor) × bias_donor(M)
     //   contrib_nac(C, M) = gap_local × censo_M / censoNacional
-    // Σ_M contrib_nac = nsnr_share(C) por construcción (bias avg=1).
-    //
-    // Las transferencias intra-bloque (fase 2) se sumarán como término
-    // adicional sin reescribir esta lógica.
-    const nsnrFactor = getNsNrFactor();   // NS-NR / sumDeclarado
+    // El primer término es siempre ≥ 0 (NS-NR redistribuido). El segundo
+    // representa voto absorbido de otros candidatos del bloque (slider
+    // editable, default 0). El donante pierde proporcionalmente: el modelo
+    // no lo muestra pero la conservación es matemática.
+    const nsnrFactor = getNsNrFactor();
     const censoNac   = STATE.sumCensoNacional || 1;
+
+    // Precompute donantes (candidatos del bloque - candidato actual) con
+    // sus shapes históricas y pondPct. Los biases por mun se calculan dentro
+    // del loop (uno por donante).
+    const xferMap = STATE.transfers[candId] || {};
+    const donors = (BLOQUE_AMPLIO[candId] || []).filter(id => id !== candId);
+    const donorData = donors.map(id => {
+      const c = CANDIDATOS.find(x => x.id === id);
+      return {
+        id,
+        cand: c,
+        pondPct: pondPct(c) || 0,
+        xferFrac: xferMap[id] || 0,    // 0..1
+        nacAfin: precomputeNacionalAfin(id),
+      };
+    }).filter(d => d.xferFrac > 0 && d.pondPct > 0);
 
     const munMetrics = {};
     for (const munKey of munKeys){
@@ -1298,10 +1305,24 @@
       const bias = projBiasDen > 0 ? projBiasNum / projBiasDen : 1.0;
       const proj = candPctNac != null ? candPctNac * bias : null;
 
-      // gap_local = crecimiento NS-NR en el mun (pp local).
-      // contrib   = aporte de ese crecimiento al total nacional (pp).
+      // Componente NS-NR (siempre presente).
+      const gapNsnr = proj != null ? proj * nsnrFactor : null;
+
+      // Componente transferencia (suma sobre donantes activos del bloque).
+      let gapXfer = 0;
+      for (const d of donorData){
+        const bk = bucketsPctAfinForMun(d.id, munKey);
+        let bn=0, bd=0;
+        for (const b of ['pres22','congreso26','pres18','consultas']){
+          const v = bk[b]; const w = wNorm[b]; const n = d.nacAfin[b];
+          if (v != null && n != null && n > 0){ bn += w*(v/n); bd += w; }
+        }
+        const biasD = bd > 0 ? bn/bd : 1.0;
+        gapXfer += d.xferFrac * d.pondPct * biasD;
+      }
+
       const censo   = STATE.censoByMun[munKey] || 0;
-      const gap     = proj != null ? proj * nsnrFactor : null;
+      const gap     = gapNsnr != null ? (gapNsnr + gapXfer) : null;
       const contrib = gap != null ? gap * censo / censoNac : null;
       const techo   = proj != null ? proj + gap : null;
 
@@ -1596,8 +1617,9 @@
     const arr = visiblePuestos();
     const markers = arr.map(p => {
       const rec = recForPuesto(p);
-      const gap = rec ? rec.gap : null;
-      const fill = colorByGap(gap);
+      const contrib = rec ? rec.contrib : null;
+      const gapLoc  = rec ? rec.gap : null;
+      const fill = colorByGap(contrib);
       const r = puestoRadius(p.c);
       const marker = L.circleMarker([p.y, p.x], {
         radius: r,
@@ -1606,12 +1628,19 @@
         weight: 0.7,
         fillOpacity: 0.88,
       });
-      const gapTxt = gap != null ? fmtPP(gap, 1) : '—';
+      // Colores adaptados al modo: en day-mode el tooltip de Leaflet es
+      // claro y el texto blanco quedaba invisible.
+      const colTitle = isDay() ? '#0d1120' : '#fff';
+      const colMeta  = isDay() ? 'rgba(0,0,0,.6)' : 'rgba(255,255,255,.7)';
+      const colHi    = isDay() ? '#dc2626' : 'var(--green)';
+      const contribTxt = contrib != null ? fmtPP(contrib, 2) : '—';
+      const gapLocTxt  = gapLoc  != null ? fmtPP(gapLoc, 1)  : '—';
       marker.bindTooltip(
-        `<div style="font-family:Avenir,sans-serif;font-size:.78rem;line-height:1.45;padding:.15rem .25rem">
-          <div style="font-weight:600;color:#fff">${p.n||'Puesto'}</div>
-          <div style="opacity:.7">${p.mn||''} · censo ${fmtNum(p.c)}</div>
-          <div style="margin-top:.2rem;color:${isDay()?'#fb923c':'var(--green)'};font-weight:600">brecha mun · ${gapTxt}</div>
+        `<div style="font-family:Avenir,sans-serif;font-size:.78rem;line-height:1.45;padding:.15rem .25rem;color:${colTitle}">
+          <div style="font-weight:600">${p.n||'Puesto'}</div>
+          <div style="color:${colMeta}">${p.mn||''} · censo ${fmtNum(p.c)}</div>
+          <div style="margin-top:.2rem;color:${colHi};font-weight:600">aporte nacional · ${contribTxt}</div>
+          <div style="color:${colMeta};font-size:.72rem">crece localmente ${gapLocTxt}</div>
         </div>`,
         { sticky:true, opacity:1 }
       );
@@ -1834,7 +1863,6 @@
     const cand = CANDIDATOS.find(c => c.id === candId);
     const cityData = STATE.cityData[cityKey] || {};
     const candPctNac = pondPct(cand);
-    const factor = (STATE.lider[candId] ?? 100) / 100;
 
     // Baseline = ciudad. Si no hay datos en ciudad para el bucket, fallback al nacional-país.
     const cityNac = precomputeCityNacAfin(candId, cityData);
@@ -1874,6 +1902,19 @@
     }
     const censoCity = Object.values(censoByCom).reduce((s,v)=>s+v,0) || 1;
 
+    // Donantes activos del bloque (transferencia intra-bloque).
+    const xferMap = STATE.transfers[candId] || {};
+    const donors = (BLOQUE_AMPLIO[candId] || []).filter(id => id !== candId);
+    const donorData = donors.map(id => {
+      const c = CANDIDATOS.find(x => x.id === id);
+      return {
+        id, cand: c,
+        pondPct: pondPct(c) || 0,
+        xferFrac: xferMap[id] || 0,
+        cityNac: precomputeCityNacAfin(id, cityData),
+      };
+    }).filter(d => d.xferFrac > 0 && d.pondPct > 0);
+
     const out = {};
     for (const comCod of comCods){
       const buckets = bucketsPctAfinForComuna(candId, cityData, comCod);
@@ -1885,7 +1926,6 @@
           afinNum += w * v;
           afinDen += w;
         }
-        // Para bias usamos baseline de la ciudad si existe; si no, el nacional-país.
         const nacCity = cityNac[b];
         const nacPais = STATE.nacAfinByBucket?.[b];
         const baseline = (nacCity != null && nacCity > 0) ? nacCity : nacPais;
@@ -1898,10 +1938,22 @@
       const bias = biasDen > 0 ? biasNum / biasDen : 1.0;
       const proj = candPctNac != null ? candPctNac * bias : null;
 
-      // Modelo NS-NR a nivel comuna: igual que a nivel mun pero el contrib
-      // se calcula proporcional a la ciudad (no al nacional) para que el
-      // ranking intra-ciudad sea legible.
-      const gap     = proj != null ? proj * nsnrFactor : null;
+      const gapNsnr = proj != null ? proj * nsnrFactor : null;
+      let gapXfer = 0;
+      for (const d of donorData){
+        const bk = bucketsPctAfinForComuna(d.id, cityData, comCod);
+        let bn=0, bd=0;
+        for (const b of ['pres22','congreso26','pres18','consultas']){
+          const v = bk[b]; const w = wNorm[b];
+          const nacCity = d.cityNac[b];
+          const nacPais = STATE.nacAfinByBucket?.[b];
+          const base = (nacCity != null && nacCity > 0) ? nacCity : nacPais;
+          if (v != null && base != null && base > 0){ bn += w*(v/base); bd += w; }
+        }
+        const biasD = bd > 0 ? bn/bd : 1.0;
+        gapXfer += d.xferFrac * d.pondPct * biasD;
+      }
+      const gap     = gapNsnr != null ? (gapNsnr + gapXfer) : null;
       const censo   = censoByCom[comCod] || 0;
       const contrib = gap != null ? gap * censo / censoCity : null;
       const techo   = proj != null ? proj + gap : null;
@@ -2235,7 +2287,6 @@
     const cand = CANDIDATOS.find(c => c.id === candId);
     const data = STATE.mdeBarriosData || {};
     const candPctNac = pondPct(cand);
-    const factor = (STATE.lider[candId] ?? 100) / 100;
 
     const barrioNac = precomputeMdeBarrioNacAfin(candId);
     STATE.mdeBarrioNacAfin[candId] = barrioNac;
@@ -2268,6 +2319,20 @@
     }
     const censoCity = Object.values(censoByBarrio).reduce((s,v)=>s+v,0) || 1;
 
+    // Donantes activos del bloque
+    const xferMap = STATE.transfers[candId] || {};
+    const donors = (BLOQUE_AMPLIO[candId] || []).filter(id => id !== candId);
+    const donorData = donors.map(id => {
+      const c = CANDIDATOS.find(x => x.id === id);
+      return {
+        id, cand: c,
+        pondPct: pondPct(c) || 0,
+        xferFrac: xferMap[id] || 0,
+        barrioNac: precomputeMdeBarrioNacAfin(id),
+        comunaNac: STATE.cityNacAfin.medellin?.[id] || {},
+      };
+    }).filter(d => d.xferFrac > 0 && d.pondPct > 0);
+
     const out = {};
     for (const bk of keys){
       const buckets = bucketsPctAfinForComuna(candId, data, bk);
@@ -2286,8 +2351,22 @@
       const bias = biasDen>0 ? biasNum/biasDen : 1.0;
       const proj = candPctNac != null ? candPctNac * bias : null;
 
-      // Modelo NS-NR (igual lógica que mun): gap_local + contrib intra-ciudad.
-      const gap     = proj != null ? proj * nsnrFactor : null;
+      const gapNsnr = proj != null ? proj * nsnrFactor : null;
+      let gapXfer = 0;
+      for (const d of donorData){
+        const bkts = bucketsPctAfinForComuna(d.id, data, bk);
+        let bn=0, bd=0;
+        for (const b of ['pres22','congreso26','pres18','consultas']){
+          const v = bkts[b]; const w = wNorm[b];
+          const base = (d.barrioNac[b]!=null && d.barrioNac[b]>0) ? d.barrioNac[b]
+                    : (d.comunaNac[b]!=null && d.comunaNac[b]>0) ? d.comunaNac[b]
+                    : STATE.nacAfinByBucket?.[b];
+          if (v != null && base != null && base > 0){ bn += w*(v/base); bd += w; }
+        }
+        const biasD = bd > 0 ? bn/bd : 1.0;
+        gapXfer += d.xferFrac * d.pondPct * biasD;
+      }
+      const gap     = gapNsnr != null ? (gapNsnr + gapXfer) : null;
       const censo   = censoByBarrio[bk] || 0;
       const contrib = gap != null ? gap * censo / censoCity : null;
       const techo   = proj != null ? proj + gap : null;
@@ -2754,41 +2833,72 @@
       showLoading(false);
     }, 20);
   }
+  // Renderiza los sliders de transferencia intra-bloque para el candidato
+  // activo. Un slider por cada donante (otros miembros del bloque).
   function refreshLiderUI(){
     const cand = CANDIDATOS.find(c => c.id === STATE.candId);
-    const v = STATE.lider[STATE.candId] ?? 100;
-    const nameEl = document.getElementById('lider-cand-name');
-    const slEl = document.getElementById('lider-slider');
-    const wEl = document.getElementById('lider-w');
+    const nameEl = document.getElementById('xfer-cand-name');
     if (nameEl) nameEl.textContent = '· ' + (cand ? cand.nombre : '—');
-    if (slEl) slEl.value = v;
-    if (wEl) wEl.textContent = v + '%';
+
+    const wrap = document.getElementById('xfer-sliders');
+    if (!wrap) return;
+    const xferMap = STATE.transfers[STATE.candId] || {};
+    const donors = (BLOQUE_AMPLIO[STATE.candId] || []).filter(id => id !== STATE.candId);
+    if (!donors.length){
+      wrap.innerHTML = '<div style="font-family:\'Fraunces\',serif;font-weight:300;font-size:.84rem;opacity:.7">Sin donantes en el bloque definido para este candidato.</div>';
+      return;
+    }
+    const rows = donors.map(id => {
+      const c = CANDIDATOS.find(x => x.id === id) || { nombre: id, color: '#888' };
+      const pp = pondPct(c);
+      const pct = Math.round(((xferMap[id] || 0) * 100));
+      // Absorción nacional estimada al 100%: pondPct(donor) en pp
+      const maxAbs = pp != null ? pp.toFixed(2) : '?';
+      return `<div class="src-row" style="grid-template-columns:1fr 110px 50px">
+        <div class="src-name">
+          <span style="display:inline-block;width:.55rem;height:.55rem;border-radius:50%;background:${c.color};margin-right:.4rem;vertical-align:middle"></span>
+          ${c.nombre}<span class="src-sub">tope nacional ${maxAbs} pp si capturas el 100% del voto histórico de este donante</span>
+        </div>
+        <input type="range" min="0" max="100" step="1" value="${pct}" oninput="onTransferChange('${id}', this.value)" />
+        <span class="src-w" id="xfer-w-${id}">${pct}%</span>
+      </div>`;
+    });
+    wrap.innerHTML = rows.join('');
   }
-  function onLiderChange(v){
+  function onTransferChange(donorId, v){
     v = +v;
-    STATE.lider[STATE.candId] = v;
-    document.getElementById('lider-w').textContent = v + '%';
+    if (!STATE.transfers[STATE.candId]) STATE.transfers[STATE.candId] = {};
+    STATE.transfers[STATE.candId][donorId] = v / 100;
+    const wEl = document.getElementById('xfer-w-' + donorId);
+    if (wEl) wEl.textContent = v + '%';
     showLoading(true);
     setTimeout(() => {
       computeAllForCandidate(STATE.candId);
+      if (STATE.selectedCity) computeCityComunaMetrics(STATE.selectedCity);
+      if (STATE.selectedCity === 'medellin' && STATE.mdeBarriosData) computeMdeBarrioMetrics();
       repaintLayer();
       updateCounter();
       renderTop30();
       showLoading(false);
     }, 20);
   }
-  function resetLider(){
-    STATE.lider[STATE.candId] = LIDER_DEFAULTS[STATE.candId] ?? 100;
+  function resetTransfers(){
+    STATE.transfers[STATE.candId] = {};
     refreshLiderUI();
     showLoading(true);
     setTimeout(() => {
       computeAllForCandidate(STATE.candId);
+      if (STATE.selectedCity) computeCityComunaMetrics(STATE.selectedCity);
+      if (STATE.selectedCity === 'medellin' && STATE.mdeBarriosData) computeMdeBarrioMetrics();
       repaintLayer();
       updateCounter();
       renderTop30();
       showLoading(false);
     }, 20);
   }
+  // Compat: algunos callers viejos llaman resetLider — redirigir.
+  function resetLider(){ resetTransfers(); }
+  function onLiderChange(){ /* deprecated en v3 */ }
 
   function resetWeights(){
     SOURCE_BUCKETS.forEach(b => { STATE.weights[b.key] = b.defW; });
