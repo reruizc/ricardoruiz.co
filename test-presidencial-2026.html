@@ -347,6 +347,39 @@
       color:rgba(244,243,239,0.78); line-height:1.45;
     }
     .geo-cross b { color:var(--white); font-weight:400; }
+    /* PoC: render del sector catastral cuando hay puesto cercano */
+    .geo-sca-wrap {
+      display:flex; gap:1rem; align-items:flex-start;
+      padding-top:.4rem; border-top:1px dashed rgba(255,255,255,0.08); margin-top:.2rem;
+    }
+    .geo-sca-svg {
+      width:120px; height:120px; flex-shrink:0;
+      background:rgba(0,0,0,0.25); border:1px solid rgba(0,71,255,0.18);
+    }
+    .geo-sca-meta { font-family:'Fraunces',serif; font-weight:300; font-size:.9rem; line-height:1.45; color:rgba(244,243,239,0.82); }
+    .geo-sca-meta b { color:var(--white); font-weight:400; font-family:'Syne',sans-serif; }
+    .geo-sca-tag {
+      display:inline-block; font-family:'DM Mono',monospace; font-size:.65rem;
+      letter-spacing:.16em; text-transform:uppercase; color:var(--blue-light);
+      margin-top:.35rem;
+    }
+    /* Cruce real "tu candidato vs ganador de tu zona" */
+    .geo-cross-line { font-family:'Fraunces',serif; font-weight:300; font-size:.95rem;
+      color:rgba(244,243,239,0.86); line-height:1.5; margin-bottom:.5rem; }
+    .geo-cross-line b { font-weight:500; }
+    .geo-cross-scope {
+      font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.16em;
+      text-transform:uppercase; color:rgba(255,255,255,0.42);
+      padding-top:.5rem; border-top:1px dashed rgba(255,255,255,0.08); margin-bottom:.45rem;
+    }
+    .geo-bars { display:flex; flex-direction:column; gap:.32rem; }
+    .geo-bar { display:grid; grid-template-columns: minmax(0, 1fr) 2fr 36px; gap:.55rem;
+      align-items:center; font-family:Avenir,sans-serif; font-size:.78rem; }
+    .geo-bar-name { color:rgba(244,243,239,0.78); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .geo-bar-track { background:rgba(255,255,255,0.05); height:6px; border-radius:1px; overflow:hidden; }
+    .geo-bar-fill { display:block; height:100%; border-radius:1px;
+      transition:width .5s cubic-bezier(.22,.61,.36,1); }
+    .geo-bar-pct { font-variant-numeric:tabular-nums; color:rgba(244,243,239,0.7); text-align:right; }
 
     /* ── SUPPORT (apoyar campaña) ── */
     .support-box {
@@ -727,6 +760,125 @@
     .then(g => { GEO = g; })
     .catch(() => { GEO = null; });
 
+  // ── PROYECCIÓN TERRITORIAL ──
+  // Tres niveles agregados, los carga lazy según la geo del usuario:
+  //   1. UPL Bogotá (10 KB)  → cuando GEO.upl viene del worker
+  //   2. Barrio Medellín (29 KB) → cuando bbox Medellín
+  //   3. Puestos nacional (2.6 MB) → fallback radio adaptativo
+  // El orden importa: los pequeños se piden primero, el grande sólo si no
+  // hay otra forma de ubicar al usuario.
+  const S3_OUT = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_ponderador';
+  const PROYECCION_UPL_URL    = `${S3_OUT}/proyeccion-por-upl-bogota.json`;
+  const PROYECCION_MED_URL    = `${S3_OUT}/proyeccion-por-barrio-medellin.json`;
+  const PROYECCION_PUESTO_URL = `${S3_OUT}/proyeccion-por-puesto.json`;
+
+  // Mapeo del ID de candidato del test al ID corto que usa el modelo de
+  // proyección (previa-1v.html). El modelo sólo trackea candidatos con
+  // intención de voto >1% — Carlos Caicedo y Santiago Botero no aparecen.
+  const CAND_PROJ_ID = {
+    cepeda:   'ic',
+    abelardo: 'ae',
+    paloma:   'pv',
+    fajardo:  'sf',
+    claudia:  'cl',
+    lizcano:  'lm',
+    barreras: 'rb',
+    // caicedo, botero → sin equivalente; el cruce queda en modo "informativo"
+  };
+  // Inverso: id corto → id del test (para resolver el ganador en la zona)
+  const PROJ_TO_CAND_ID = Object.fromEntries(Object.entries(CAND_PROJ_ID).map(([k,v]) => [v,k]));
+
+  // Bounding box Medellín D.M. (lat/lon aproximados). Si la geo del usuario
+  // cae aquí, intentamos el cruce a nivel barrio antes que radio adaptativo.
+  const MEDELLIN_BBOX = { minLat: 6.15, maxLat: 6.40, minLon: -75.70, maxLon: -75.45 };
+
+  let _bogUplCache = null, _medBarrioCache = null, _puestosCache = null;
+  function loadBogUpl()   { return _bogUplCache    ||= fetch(PROYECCION_UPL_URL).then(r => r.ok ? r.json() : null).catch(() => null); }
+  function loadMedBarrio(){ return _medBarrioCache ||= fetch(PROYECCION_MED_URL).then(r => r.ok ? r.json() : null).catch(() => null); }
+  function loadPuestos()  { return _puestosCache   ||= fetch(PROYECCION_PUESTO_URL).then(r => r.ok ? r.json() : null).catch(() => null); }
+
+  // Pre-fetch del archivo chico de Bogotá en background — la mayoría de
+  // tráfico va a ser de Bogotá; el resto se carga lazy cuando haga falta.
+  setTimeout(() => loadBogUpl(), 200);
+
+  // Haversine en km. Suficiente precisión para distancias urbanas (<50 km).
+  function haversineKm(lat1, lon1, lat2, lon2) {
+    const R = 6371, toRad = d => d * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+
+  function looksLikeDatacenter(asOrg) {
+    if (!asOrg) return false;
+    return /amazon|\baws\b|google|cloudflare|microsoft|azure|digital ?ocean|linode|vultr|hetzner|ovh/i.test(asOrg);
+  }
+
+  // Devuelve { scope, city, label, sub, distKm?, p } o null si no hay cruce.
+  // p es objeto { ic: pct, ae: pct, ... } con los IDs cortos del modelo.
+  async function projectionAtUserGeo() {
+    if (!GEO) return null;
+    if (looksLikeDatacenter(GEO.asOrg)) return null;
+    if (GEO.lat == null || GEO.lon == null) return null;
+
+    // 1) Bogotá — el worker ya hizo PiP server-side y nos pasó UPL+localidad.
+    if (GEO.upl && GEO.upl.codigo) {
+      const bog = await loadBogUpl();
+      const u = bog?.agregados?.[GEO.upl.codigo];
+      if (u) {
+        const locName = GEO.localidad?.nombre
+          ? GEO.localidad.nombre.replace(/\b\w/g, c => c.toUpperCase())  // CHAPINERO → Chapinero
+          : null;
+        return {
+          scope: 'upl',
+          city:  'Bogotá D.C.',
+          label: u.nombre,                          // ej "Chapinero"
+          sub:   locName ? `Localidad ${locName}` : null,
+          p:     u.p,
+        };
+      }
+    }
+
+    // 2) Medellín — bbox detection + lookup directo en agregados por barrio
+    //    usando el nombre del puesto más cercano para resolver el barrio.
+    //    El JSON de barrios viene indexado por código catastral (ej "0101");
+    //    como no tenemos el geojson cargado, usamos el atajo de buscar el
+    //    puesto más cercano y leer su "barrio" indirectamente desde el
+    //    nombre del puesto. Si la heurística falla, caemos al fallback nacional.
+    if (GEO.lat >= MEDELLIN_BBOX.minLat && GEO.lat <= MEDELLIN_BBOX.maxLat &&
+        GEO.lon >= MEDELLIN_BBOX.minLon && GEO.lon <= MEDELLIN_BBOX.maxLon) {
+      // De momento, en Medellín caemos al fallback puesto-más-cercano. El
+      // PiP por barrio queda como upgrade V2 (necesita geojson cargado).
+      // Igualmente da un buen "estás en el barrio X" porque el nombre del
+      // puesto en Medellín suele incluir referencia al barrio.
+    }
+
+    // 3) Resto del país — radio adaptativo. Cargamos el archivo grande de
+    //    puestos (2.6 MB) sólo aquí. Buscamos el puesto más cercano dentro
+    //    de un radio que crece hasta 20 km. En zona rural puede ser lejos;
+    //    mostramos la distancia honestamente.
+    const pues = await loadPuestos();
+    if (!pues?.puestos?.length) return null;
+    for (const radius of [1, 2, 5, 10, 20]) {
+      let best = null, bestD = Infinity;
+      for (const p of pues.puestos) {
+        const d = haversineKm(GEO.lat, GEO.lon, p.lat, p.lon);
+        if (d <= radius && d < bestD) { best = p; bestD = d; }
+      }
+      if (best) {
+        return {
+          scope:  'puesto',
+          city:   best.mn || GEO.city || '',
+          label:  best.n || 'Puesto de votación',
+          sub:    `a ${bestD.toFixed(1)} km`,
+          distKm: +bestD.toFixed(2),
+          p:      best.p,
+        };
+      }
+    }
+    return null;
+  }
+
   // ── CANDIDATOS ──
   // Nota: en S3 sólo viven fotos para cepeda, abelardo, paloma, claudia, fajardo,
   // botero y "caicedo.jpg" (que en realidad es Roy Barreras — naming heredado del
@@ -1103,26 +1255,164 @@
   }
 
   // ── GEO BOX ──
+  // PoC sector catastral: cuando geoloc cae fuera de Bog/Med en el futuro
+  // habrá un "puesto más cercano" con SCACODIGO precomputado. Por ahora,
+  // hardcoded el sample USAQUEN para validar layout/render. Producción:
+  // fetch S3 /mapas-2026/bog-sectores-s5.geojson (≈400 KB gz) o un endpoint
+  // per-sector {sca}.json (≈1 KB) — ver tradeoff en CLAUDE.md futuro.
+  const SCA_POC_SAMPLE = {
+    puesto: { nombre:'COLEGIO USAQUÉN', municipio:'Bogotá D.C.', zona:'01', puesto:'01' },
+    distancia_km: 0.4,
+    sector: {
+      codigo:'008407', nombre:'USAQUEN', tipo:0,
+      ring: [[-74.0246522,4.6955826],[-74.0253145,4.695751],[-74.0260278,4.6953126],[-74.0274398,4.6966616],[-74.0273002,4.6968921],[-74.0274818,4.6969179],[-74.0278031,4.6963909],[-74.0285659,4.6964781],[-74.0304411,4.697997],[-74.0321669,4.6956435],[-74.033209,4.6936644],[-74.0341414,4.6907795],[-74.0312583,4.6898614],[-74.0297895,4.6891487],[-74.0288041,4.6891181],[-74.0275138,4.6885206],[-74.0276655,4.6882244],[-74.0265054,4.6879182],[-74.0263261,4.6893159],[-74.0267146,4.689767],[-74.0265739,4.690652],[-74.0267722,4.6913043],[-74.0261439,4.6908454],[-74.02578,4.6923874],[-74.0263825,4.693437],[-74.0244108,4.6933206],[-74.0244193,4.6939895],[-74.0250585,4.6945172],[-74.0252083,4.6951565],[-74.0250439,4.695503],[-74.0244029,4.6955893],[-74.0246522,4.6955826]],
+    },
+  };
+
+  function renderSectorSVG(ring) {
+    const xs = ring.map(p => p[0]);
+    const ys = ring.map(p => p[1]);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const w = maxX - minX, h = maxY - minY;
+    const span = Math.max(w, h);
+    const pad = span * 0.12;
+    // Lat sube hacia arriba; SVG y crece hacia abajo → flip y con -y.
+    const d = 'M' + ring.map(([x,y]) => `${x.toFixed(6)},${(-y).toFixed(6)}`).join('L') + 'Z';
+    const vb = `${(minX - pad).toFixed(6)} ${(-maxY - pad).toFixed(6)} ${(w + 2*pad).toFixed(6)} ${(h + 2*pad).toFixed(6)}`;
+    const sw = (span * 0.005).toFixed(6);
+    return `<svg class="geo-sca-svg" viewBox="${vb}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Sector catastral">
+      <path d="${d}" fill="rgba(0,71,255,0.38)" stroke="rgba(91,143,255,0.95)" stroke-width="${sw}" stroke-linejoin="round"/>
+    </svg>`;
+  }
+
   function renderGeoBox() {
     const box   = $('#geo-box');
     const place = $('#geo-place');
     const cross = $('#geo-cross');
-    // Si el worker aún no respondió, esperamos hasta 1.2s más.
-    const tryRender = (attemptsLeft) => {
+
+    // PoC: si la URL trae ?poc=sector, mostramos el render del sector
+    // catastral con el sample USAQUEN. Cuando la pipeline real esté lista,
+    // este branch consume SCA_POC_SAMPLE-shape desde un fetch.
+    const pocMode = new URLSearchParams(location.search).get('poc') === 'sector';
+    if (pocMode) {
+      const d = SCA_POC_SAMPLE;
+      place.textContent = `${d.puesto.municipio} · ${d.sector.nombre}`;
+      cross.innerHTML = `
+        <div class="geo-sca-wrap">
+          ${renderSectorSVG(d.sector.ring)}
+          <div class="geo-sca-meta">
+            Tu puesto más cercano es <b>${escapeHtml(d.puesto.nombre)}</b>
+            (Zona ${d.puesto.zona}, Puesto ${d.puesto.puesto}), a ${d.distancia_km} km.
+            Cae en el sector catastral <b>${escapeHtml(d.sector.nombre)}</b>
+            (cód. ${d.sector.codigo}).
+            <div class="geo-sca-tag">PoC — sample USAQUEN</div>
+          </div>
+        </div>`;
+      box.style.display = '';
+      if (IS_EMBED) requestAnimationFrame(reportHeight);
+      return;
+    }
+
+    // Espera hasta 1.2s a que el worker responda con la geo. Sin geo no
+    // hay caja — preferimos esconder antes que mostrar info estéril.
+    const tryRender = async (attemptsLeft) => {
       if (!GEO || !(GEO.city || GEO.region)) {
-        if (attemptsLeft <= 0) return; // sin geo: dejamos el box oculto
+        if (attemptsLeft <= 0) return;
         setTimeout(() => tryRender(attemptsLeft - 1), 200);
         return;
       }
+
+      // Placeholder mientras llega la proyección (la del puesto puede tardar
+      // 1-2s la primera vez por el fetch del JSON nacional).
       const city   = GEO.city   || '';
       const region = GEO.region || '';
-      const label  = [city, region].filter(Boolean).join(', ');
-      place.textContent = label || 'Ubicación aproximada';
-      cross.innerHTML = `<span style="font-style:italic; opacity:.72;">Próximamente: cómo proyectamos el voto presidencial en tu municipio.</span>`;
+      place.textContent = [city, region].filter(Boolean).join(', ') || 'Ubicación aproximada';
+      cross.innerHTML = `<span style="opacity:.7;">Calculando proyección de tu zona…</span>`;
       box.style.display = '';
+      if (IS_EMBED) requestAnimationFrame(reportHeight);
+
+      const proj = await projectionAtUserGeo();
+      renderGeoCross(proj);
       if (IS_EMBED) requestAnimationFrame(reportHeight);
     };
     tryRender(6);
+  }
+
+  // Pinta el cruce "tu candidato vs el ganador en tu zona".
+  // proj = { scope, city, label, sub, distKm?, p } o null.
+  function renderGeoCross(proj) {
+    const box   = $('#geo-box');
+    const place = $('#geo-place');
+    const cross = $('#geo-cross');
+
+    if (!proj || !proj.p) {
+      // Sin proyección útil: dejamos solo "ubicación aproximada" sin cruce.
+      cross.innerHTML = `<span style="font-style:italic; opacity:.65;">No pudimos estimar la proyección presidencial en tu zona.</span>`;
+      return;
+    }
+
+    // Header: "Chapinero · Bogotá D.C. · Localidad Chapinero"
+    const headerParts = [proj.label, proj.city, proj.sub].filter(Boolean);
+    place.textContent = headerParts.join(' · ');
+
+    // Top-3 candidatos en la zona (orden por pct desc).
+    const entries = Object.entries(proj.p)
+      .filter(([id]) => PROJ_TO_CAND_ID[id])  // sólo IDs que mapean a candidatos del test
+      .sort((a, b) => b[1] - a[1]);
+    if (!entries.length) {
+      cross.innerHTML = `<span style="opacity:.65;">Modelo sin datos suficientes en tu zona.</span>`;
+      return;
+    }
+
+    const topId   = entries[0][0];
+    const topPct  = entries[0][1];
+    const topCand = CANDIDATES[PROJ_TO_CAND_ID[topId]];
+
+    // Cruce con el winner del test (lo guardamos en state.lastWinner)
+    const winner = state?.lastWinner;
+    let crossLine = '';
+    if (winner) {
+      const winProjId = CAND_PROJ_ID[winner.c.id];
+      if (winProjId && proj.p[winProjId] != null) {
+        const winPct = proj.p[winProjId];
+        if (winner.c.id === topCand.id) {
+          crossLine = `Aquí <b style="color:${winner.c.color}">${winner.c.name}</b> también gana, con <b>${winPct.toFixed(0)}%</b>.`;
+        } else {
+          crossLine = `Tu candidato afín es <b style="color:${winner.c.color}">${winner.c.name}</b> (<b>${winPct.toFixed(0)}%</b> en tu zona), pero gana <b style="color:${topCand.color}">${topCand.name}</b> con <b>${topPct.toFixed(0)}%</b>.`;
+        }
+      } else {
+        // Winner no está en el modelo (Carlos Caicedo / Botero).
+        crossLine = `${winner.c.name} no tiene cobertura suficiente en el modelo territorial. Aquí gana <b style="color:${topCand.color}">${topCand.name}</b> con <b>${topPct.toFixed(0)}%</b>.`;
+      }
+    } else {
+      crossLine = `Aquí gana <b style="color:${topCand.color}">${topCand.name}</b> con <b>${topPct.toFixed(0)}%</b>.`;
+    }
+
+    // Mini-barras top-3
+    const top3HTML = entries.slice(0, 3).map(([projId, pct]) => {
+      const c = CANDIDATES[PROJ_TO_CAND_ID[projId]];
+      return `
+        <div class="geo-bar">
+          <span class="geo-bar-name">${escapeHtml(c.name)}</span>
+          <span class="geo-bar-track"><span class="geo-bar-fill" style="background:${c.color}; width:${Math.min(100, pct * 2).toFixed(0)}%;"></span></span>
+          <span class="geo-bar-pct">${pct.toFixed(0)}%</span>
+        </div>`;
+    }).join('');
+
+    const scopeLabel = proj.scope === 'upl'
+      ? 'Promedio en tu UPL'
+      : proj.scope === 'barrio'
+        ? 'Promedio en tu barrio'
+        : proj.scope === 'puesto'
+          ? `Tu puesto más cercano${proj.distKm != null ? ` (${proj.distKm.toFixed(1)} km)` : ''}`
+          : 'En tu zona';
+
+    cross.innerHTML = `
+      <div class="geo-cross-line">${crossLine}</div>
+      <div class="geo-cross-scope">${scopeLabel}</div>
+      <div class="geo-bars">${top3HTML}</div>
+    `;
   }
 
   // ── SUPPORT (opt-in para campañas) ──
