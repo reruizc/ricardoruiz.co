@@ -495,6 +495,7 @@
     const S3_BASE = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co';
     const HIST_BASE = `${S3_BASE}/bases+de+datos/output_medellin`;
     const MEDELLIN_GEO_URL = `${S3_BASE}/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`;
+    const BARRIOS_GEO_URL = `${S3_BASE}/bases+de+datos/MEDELLIN_BARRIOS_VORONOI.json`;
 
     const dataCache = {};
     async function loadData(year, corp, file){
@@ -514,6 +515,27 @@
       if (!r.ok) throw new Error(`No se pudo cargar GeoJSON Medellín (${r.status})`);
       geoCache = await r.json();
       return geoCache;
+    }
+
+    // GeoJSON aproximado de barrios (Voronoi sobre puestos de votación).
+    // Si no está disponible en S3, devuelve null y caemos a circleMarkers.
+    let barriosGeoCache = null;
+    let barriosGeoTried = false;
+    async function loadBarriosGeo(){
+      if (barriosGeoCache) return barriosGeoCache;
+      if (barriosGeoTried) return null;
+      barriosGeoTried = true;
+      try {
+        const r = await fetch(BARRIOS_GEO_URL);
+        if (!r.ok) return null;
+        barriosGeoCache = await r.json();
+        return barriosGeoCache;
+      } catch (e) {
+        return null;
+      }
+    }
+    function normBarrio(s){
+      return String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
     }
 
     // ─── COLOR PALETTE ────────────────────────────────────────────────
@@ -573,8 +595,9 @@
     // ─── STATE ────────────────────────────────────────────────────────
     const state = { year: '2023', corp: 'alcaldia', view: 'comuna' };
     let map = null;
-    let mapLayer = null;      // capa de comunas (GeoJSON)
-    let barrioLayer = null;   // capa de barrios (circleMarkers)
+    let mapLayer = null;        // capa de comunas (GeoJSON)
+    let barrioLayer = null;     // capa de barrios (circleMarkers fallback)
+    let barrioPolyLayer = null; // capa de barrios (polígonos Voronoi)
     let currentResumen = null;
     let currentComunas = null;
     let currentBarrios = null;
@@ -712,6 +735,7 @@
       const geo = await loadGeo();
       if (mapLayer){ map.removeLayer(mapLayer); mapLayer = null; }
       if (barrioLayer){ map.removeLayer(barrioLayer); barrioLayer = null; }
+      if (barrioPolyLayer){ map.removeLayer(barrioPolyLayer); barrioPolyLayer = null; }
 
       const COMUNA_TO_KEY = (geoCode) => {
         const padded = String(geoCode || '').padStart(2, '0');
@@ -768,41 +792,94 @@
 
       try { map.fitBounds(mapLayer.getBounds(), { padding: [10, 10] }); } catch(_) {}
 
-      // Capa de barrios (circleMarkers) si la vista es barrio
+      // Capa de barrios si la vista es barrio
+      let usedPolygons = false;
       if (showBarrios){
         const barrios = Object.entries(porBarrio).map(([k, d]) => ({
           key: k, nombre: d.nombre, lat: d.lat, lon: d.lon, comuna: d.comuna,
           total: d.votos_validos,
           winner: d.candidatos && d.candidatos[0] ? d.candidatos[0] : null,
         }));
-        const maxTotal = Math.max(...barrios.map(b => b.total || 0), 1);
-        const minR = 4, maxR = 22;
-        const r = (v) => minR + Math.sqrt(Math.max(0, v) / maxTotal) * (maxR - minR);
-        barrioLayer = L.layerGroup();
-        barrios.forEach(b => {
-          if (!Number.isFinite(b.lat) || !Number.isFinite(b.lon)) return;
-          const color = b.winner ? getColor(b.winner.partido) : '#666';
-          const cm = L.circleMarker([b.lat, b.lon], {
-            radius: r(b.total),
-            fillColor: color, fillOpacity: 0.8,
-            color: '#fff', weight: 1, opacity: 0.9,
+
+        // Intento usar GeoJSON poligonal (Voronoi) si está en S3
+        const barriosGeo = await loadBarriosGeo();
+        if (barriosGeo && barriosGeo.features && barriosGeo.features.length){
+          usedPolygons = true;
+          // Indexar datos por barrio_key normalizado
+          const byKey = {};
+          barrios.forEach(b => { byKey[normBarrio(b.nombre)] = b; });
+
+          barrioPolyLayer = L.geoJSON(barriosGeo, {
+            style: (feat) => {
+              const props = feat.properties || {};
+              const k = props.BARRIO_KEY || normBarrio(props.NOMBRE);
+              const b = byKey[k];
+              if (!b || !b.winner){
+                return { fillColor: '#333', fillOpacity: 0.2, color: 'rgba(255,255,255,0.2)', weight: 1 };
+              }
+              return { fillColor: getColor(b.winner.partido), fillOpacity: 0.8, color: 'rgba(255,255,255,0.45)', weight: 1 };
+            },
+            onEachFeature: (feat, layer) => {
+              const props = feat.properties || {};
+              const k = props.BARRIO_KEY || normBarrio(props.NOMBRE);
+              const b = byKey[k];
+              const nombre = (b && b.nombre) || props.NOMBRE || k;
+              layer.on({
+                mouseover: (e) => {
+                  layer.setStyle({ weight: 2, color: '#fff', fillOpacity: 0.96 });
+                  const w = b && b.winner;
+                  const color = w ? getColor(w.partido) : '#666';
+                  const tt = `
+                    <div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.45">
+                      <span style="color:#a78bfa;font-weight:700">${String(nombre).toUpperCase()}</span><br/>
+                      <span style="color:#999;font-size:.7rem">Comuna ${(b && b.comuna) || props.COMUNA || '—'}</span><br/>
+                      ${w ? `
+                        <span style="color:${color};font-weight:700">${w.nombre}</span><br/>
+                        ${w.partido || '—'}<br/>
+                        <span style="color:#fff">${fmt(w.votos)} votos · ${w.pct}%</span><br/>
+                        <span style="color:#999;font-size:.7rem">Total barrio: ${fmt(b.total)} válidos</span>
+                      ` : '<span style="color:#999;font-size:.75rem">Sin datos electorales</span>'}
+                    </div>`;
+                  layer.bindTooltip(tt, { sticky: true, opacity: 1 }).openTooltip(e.latlng);
+                },
+                mouseout: () => {
+                  barrioPolyLayer.resetStyle(layer);
+                  layer.closeTooltip();
+                },
+              });
+            },
+          }).addTo(map);
+        } else {
+          // Fallback: circleMarkers proporcionales
+          const maxTotal = Math.max(...barrios.map(b => b.total || 0), 1);
+          const minR = 4, maxR = 22;
+          const r = (v) => minR + Math.sqrt(Math.max(0, v) / maxTotal) * (maxR - minR);
+          barrioLayer = L.layerGroup();
+          barrios.forEach(b => {
+            if (!Number.isFinite(b.lat) || !Number.isFinite(b.lon)) return;
+            const color = b.winner ? getColor(b.winner.partido) : '#666';
+            const cm = L.circleMarker([b.lat, b.lon], {
+              radius: r(b.total),
+              fillColor: color, fillOpacity: 0.8,
+              color: '#fff', weight: 1, opacity: 0.9,
+            });
+            const w = b.winner;
+            const tt = `
+              <div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.45">
+                <span style="color:#a78bfa;font-weight:700">${b.nombre.toUpperCase()}</span><br/>
+                <span style="color:#999;font-size:.7rem">Comuna ${b.comuna}</span><br/>
+                ${w ? `
+                  <span style="color:${color};font-weight:700">${w.nombre}</span><br/>
+                  ${w.partido || '—'}<br/>
+                  <span style="color:#fff">${fmt(w.votos)} votos · ${w.pct}%</span><br/>
+                  <span style="color:#999;font-size:.7rem">Total barrio: ${fmt(b.total)} válidos</span>
+                ` : 'Sin datos'}
+              </div>`;
+            cm.bindTooltip(tt, { sticky: true, opacity: 1 });
+            cm.addTo(barrioLayer);
           });
-          const w = b.winner;
-          const tt = `
-            <div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.45">
-              <span style="color:#a78bfa;font-weight:700">${b.nombre.toUpperCase()}</span><br/>
-              <span style="color:#999;font-size:.7rem">Comuna ${b.comuna}</span><br/>
-              ${w ? `
-                <span style="color:${color};font-weight:700">${w.nombre}</span><br/>
-                ${w.partido || '—'}<br/>
-                <span style="color:#fff">${fmt(w.votos)} votos · ${w.pct}%</span><br/>
-                <span style="color:#999;font-size:.7rem">Total barrio: ${fmt(b.total)} válidos</span>
-              ` : 'Sin datos'}
-            </div>`;
-          cm.bindTooltip(tt, { sticky: true, opacity: 1 });
-          cm.addTo(barrioLayer);
-        });
-        barrioLayer.addTo(map);
+          barrioLayer.addTo(map);
+        }
       }
 
       // Legenda
@@ -830,9 +907,13 @@
         mapTitle.textContent = showBarrios ? 'Ganador por barrio' : 'Ganador por comuna';
       }
       if (mapSub){
-        mapSub.textContent = showBarrios
-          ? 'Color por partido ganador · radio proporcional a votos válidos del barrio'
-          : 'Color por partido del primer puesto';
+        if (showBarrios){
+          mapSub.textContent = usedPolygons
+            ? 'Polígonos aproximados (Voronoi sobre puestos) · color por partido ganador'
+            : 'Color por partido ganador · radio proporcional a votos válidos del barrio';
+        } else {
+          mapSub.textContent = 'Color por partido del primer puesto';
+        }
       }
     }
 
