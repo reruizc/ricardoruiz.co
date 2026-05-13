@@ -200,6 +200,15 @@
     .field input:focus, .field select:focus { border-color: var(--blue); background:rgba(0,71,255,0.07); }
     .field select option { background:#0a0e1c; color:var(--white); }
     .field .hint { font-family:'Fraunces',serif; font-weight:300; font-size:.82rem; color:rgba(244,243,239,0.5); }
+    /* Link discreto "no vivo aquí" / "cambiar departamento" en el label
+       del campo de ubicación. Solo se ven los que lo necesitan (móviles
+       mal georeferenciados, principalmente). */
+    .field-change {
+      font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.1em;
+      color: var(--blue-light); margin-left:.5rem; cursor:pointer;
+      text-decoration:underline; text-transform:lowercase; opacity:.65;
+    }
+    .field-change:hover { opacity:1; }
 
     /* ── ACTIONS ── */
     .actions {
@@ -891,6 +900,17 @@
     .then(d => { CIUDADES_ZONAS = d; return d; })
     .catch(() => { CIUDADES_ZONAS = null; return null; });
 
+  // DIVIPOLE: lista de departamentos y municipios para la corrección manual
+  // ("no vivo aquí"). En conexiones móviles la geo IP cae a la ciudad del
+  // PoP regional (no la del usuario), así que necesitamos siempre la opción
+  // de declarar manualmente.
+  const DIVIPOLE_URL = `${location.origin}/preguntas/divipole.json`;
+  let DIVIPOLE = null;
+  const DIVIPOLE_PROMISE = fetch(DIVIPOLE_URL, { cache:'no-store' })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => { DIVIPOLE = d; return d; })
+    .catch(() => { DIVIPOLE = null; return null; });
+
   // Dado GEO.city (texto crudo de Cloudflare), busca la entrada de ciudad
   // que coincide. Hace match contra el key principal y aliases, tolerando
   // variaciones de mayúsculas y tildes (CF podría devolver "Medellin",
@@ -1478,6 +1498,185 @@
 
   let _demoLoadedOnce = false;
 
+  // Estado de corrección manual de ubicación (cuando el usuario hace click
+  // en "no vivo aquí"). Sobrescribe lo que detectó el IP.
+  let _manualLocation = null;  // { depto_codigo, depto_nombre, municipio_codigo, municipio_nombre }
+
+  // Construye el HTML del campo de ubicación según el estado actual:
+  // - Si hay corrección manual → usa ese municipio
+  // - Si no → usa GEO.city detectado
+  function buildZonaFieldHTML() {
+    // Si hay corrección manual y la persona ya eligió un municipio
+    if (_manualLocation?.municipio_nombre) {
+      const munNom = _manualLocation.municipio_nombre;
+      const ciudadKey = detectCiudad(munNom);
+      if (ciudadKey && CIUDADES_ZONAS) {
+        // El municipio elegido SÍ es una ciudad mapeada → dropdown de zonas
+        const info = CIUDADES_ZONAS.ciudades[ciudadKey];
+        return `
+          <div class="field full" id="d-zona-field">
+            <label for="d-zona">${escapeHtml(`¿En qué ${info.label} de ${ciudadKey} vives?`)}
+              ${changeLinkHTML()}
+            </label>
+            <select id="d-zona" data-zona-tipo="${info.label}" data-ciudad="${escapeHtml(ciudadKey)}">
+              <option value="">Selecciona…</option>
+              ${info.zonas.map(z => `<option value="${escapeHtml(z.codigo)}">${escapeHtml(z.nombre)}</option>`).join('')}
+              <option value="__no_se__">No sé / no quiero decir</option>
+            </select>
+          </div>`;
+      }
+      // Municipio no mapeado — el dato ya lo tenemos, no hacemos sub-pregunta
+      return `
+        <div class="field full" id="d-zona-field">
+          <label for="d-zona">¿En ${escapeHtml(munNom)} vives en zona urbana o rural?
+            ${changeLinkHTML()}
+          </label>
+          <select id="d-zona" data-zona-tipo="urbano-rural" data-ciudad="${escapeHtml(munNom)}">
+            <option value="">Selecciona…</option>
+            <option value="urbano">Zona urbana / cabecera municipal</option>
+            <option value="rural">Área rural / vereda / corregimiento</option>
+            <option value="__no_se__">No sé / no quiero decir</option>
+          </select>
+        </div>`;
+    }
+
+    // Sin corrección manual: usa la detección IP
+    const ciudadKey = detectCiudad(GEO?.city);
+    const country = GEO?.country;
+    if (ciudadKey && CIUDADES_ZONAS) {
+      const info = CIUDADES_ZONAS.ciudades[ciudadKey];
+      return `
+        <div class="field full" id="d-zona-field">
+          <label for="d-zona">${escapeHtml(`¿En qué ${info.label} de ${ciudadKey} vives?`)}
+            ${changeLinkHTML()}
+          </label>
+          <select id="d-zona" data-zona-tipo="${info.label}" data-ciudad="${escapeHtml(ciudadKey)}">
+            <option value="">Selecciona…</option>
+            ${info.zonas.map(z => `<option value="${escapeHtml(z.codigo)}">${escapeHtml(z.nombre)}</option>`).join('')}
+            <option value="__no_se__">No sé / no quiero decir</option>
+          </select>
+        </div>`;
+    }
+    if (country === 'CO' || (!country && GEO?.region)) {
+      const muni = GEO?.city || 'tu municipio';
+      return `
+        <div class="field full" id="d-zona-field">
+          <label for="d-zona">¿En ${escapeHtml(muni)} vives en zona urbana o rural?
+            ${changeLinkHTML()}
+          </label>
+          <select id="d-zona" data-zona-tipo="urbano-rural" data-ciudad="${escapeHtml(GEO?.city || '')}">
+            <option value="">Selecciona…</option>
+            <option value="urbano">Zona urbana / cabecera municipal</option>
+            <option value="rural">Área rural / vereda / corregimiento</option>
+            <option value="__no_se__">No sé / no quiero decir</option>
+          </select>
+        </div>`;
+    }
+    // Fuera de Colombia
+    const paises = CIUDADES_ZONAS?.paises || ['Otro'];
+    return `
+      <div class="field full" id="d-zona-field">
+        <label for="d-zona">¿En qué país vives?
+          ${changeLinkHTML('Sí vivo en Colombia')}
+        </label>
+        <select id="d-zona" data-zona-tipo="pais" data-ciudad="">
+          <option value="">Selecciona…</option>
+          ${paises.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('')}
+          <option value="__no_se__">No sé / no quiero decir</option>
+        </select>
+      </div>`;
+  }
+
+  function changeLinkHTML(label) {
+    const txt = label || 'no vivo aquí';
+    return `<a class="field-change" data-action="change-loc">${escapeHtml(txt)}</a>`;
+  }
+
+  // Cascada: depto → municipio → (si mapeada) localidad/comuna
+  function buildDeptoPickerHTML() {
+    const deptos = DIVIPOLE?.departamentos || [];
+    return `
+      <div class="field full" id="d-zona-field">
+        <label for="d-depto-picker">¿En qué departamento vives?</label>
+        <select id="d-depto-picker">
+          <option value="">Selecciona…</option>
+          ${deptos.map(d => `<option value="${escapeHtml(d.codigo)}">${escapeHtml(d.nombre)}</option>`).join('')}
+        </select>
+      </div>`;
+  }
+
+  function buildMuniPickerHTML(deptoCodigo, deptoNombre) {
+    const muns = DIVIPOLE?.municipios?.[deptoCodigo] || [];
+    return `
+      <div class="field full" id="d-zona-field">
+        <label for="d-muni-picker">¿En qué municipio de ${escapeHtml(deptoNombre)} vives?
+          <a class="field-change" data-action="reset-loc">cambiar departamento</a>
+        </label>
+        <select id="d-muni-picker">
+          <option value="">Selecciona…</option>
+          ${muns.map(m => `<option value="${escapeHtml(m.codigo)}">${escapeHtml(m.nombre)}</option>`).join('')}
+        </select>
+      </div>`;
+  }
+
+  // Re-attacha listeners de los pasos de la cascada
+  function attachZonaListeners() {
+    const link = document.querySelector('#d-zona-field .field-change');
+    if (link) {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const action = link.dataset.action;
+        if (action === 'change-loc' || action === 'reset-loc') {
+          _manualLocation = null;
+          $('#d-zona-field').outerHTML = buildDeptoPickerHTML();
+          // Attach depto change
+          const sel = $('#d-depto-picker');
+          if (sel) {
+            sel.addEventListener('change', () => {
+              const cod = sel.value;
+              if (!cod) return;
+              const dep = DIVIPOLE.departamentos.find(d => d.codigo === cod);
+              if (!dep) return;
+              _manualLocation = {
+                depto_codigo: cod,
+                depto_nombre: dep.nombre,
+                municipio_codigo: null,
+                municipio_nombre: null,
+              };
+              $('#d-zona-field').outerHTML = buildMuniPickerHTML(cod, dep.nombre);
+              attachZonaListeners();
+              validateDemo();
+            });
+          }
+          validateDemo();
+        }
+      });
+    }
+    // Si estamos en step de municipio
+    const muniPicker = $('#d-muni-picker');
+    if (muniPicker) {
+      muniPicker.addEventListener('change', () => {
+        const cod = muniPicker.value;
+        if (!cod) return;
+        const muns = DIVIPOLE.municipios[_manualLocation.depto_codigo] || [];
+        const mun = muns.find(m => m.codigo === cod);
+        if (!mun) return;
+        _manualLocation.municipio_codigo = cod;
+        _manualLocation.municipio_nombre = mun.nombre;
+        // Reconstruye el field con la nueva ciudad declarada
+        $('#d-zona-field').outerHTML = buildZonaFieldHTML();
+        attachZonaListeners();
+        validateDemo();
+      });
+    }
+    // Si estamos en step final (d-zona normal)
+    const zonaSel = $('#d-zona');
+    if (zonaSel) {
+      zonaSel.addEventListener('input',  validateDemo);
+      zonaSel.addEventListener('change', validateDemo);
+    }
+  }
+
   async function renderDemoForm() {
     $('#demo-tag').textContent = IS_LOGGED ? 'Sesión activa' : 'Invitado';
     const grid = $('#form-grid');
@@ -1493,7 +1692,7 @@
           <span class="form-load-text">Un momento</span>
         </div>`;
       const minDelay = new Promise(res => setTimeout(res, 1500));
-      const fetchOk  = Promise.all([GEO_PROMISE, CIUDADES_PROMISE]).catch(() => null);
+      const fetchOk  = Promise.all([GEO_PROMISE, CIUDADES_PROMISE, DIVIPOLE_PROMISE]).catch(() => null);
       const hardCap  = new Promise(res => setTimeout(res, 2500));
       // Espera lo más lento entre minDelay y fetches, pero no más de 2.5s.
       await Promise.race([Promise.all([minDelay, fetchOk]), hardCap]);
@@ -1529,48 +1728,9 @@
     //   1. CO + ciudad mapeada (17 ciudades) → dropdown localidad/comuna/barrio
     //   2. CO + otro municipio                → "¿zona urbana o rural?"
     //   3. fuera de CO o sin país             → "¿en qué país vives?"
-    const ciudadKey = detectCiudad(GEO?.city);
-    const country   = GEO?.country;
-    if (ciudadKey && CIUDADES_ZONAS) {
-      const info = CIUDADES_ZONAS.ciudades[ciudadKey];
-      const label = info.label;
-      const qText = `¿En qué ${label} de ${ciudadKey} vives?`;
-      fields.push(`
-        <div class="field full">
-          <label for="d-zona">${escapeHtml(qText)}</label>
-          <select id="d-zona" data-zona-tipo="${label}" data-ciudad="${escapeHtml(ciudadKey)}">
-            <option value="">Selecciona…</option>
-            ${info.zonas.map(z => `<option value="${escapeHtml(z.codigo)}">${escapeHtml(z.nombre)}</option>`).join('')}
-            <option value="__no_se__">No sé / no quiero decir</option>
-          </select>
-        </div>`);
-    } else if (country === 'CO' || (!country && GEO?.region)) {
-      // Está en Colombia pero no en una ciudad mapeada — preguntamos urbano/rural.
-      const muni = GEO?.city || 'tu municipio';
-      fields.push(`
-        <div class="field full">
-          <label for="d-zona">¿En ${escapeHtml(muni)} vives en zona urbana o rural?</label>
-          <select id="d-zona" data-zona-tipo="urbano-rural" data-ciudad="${escapeHtml(GEO?.city || '')}">
-            <option value="">Selecciona…</option>
-            <option value="urbano">Zona urbana / cabecera municipal</option>
-            <option value="rural">Área rural / vereda / corregimiento</option>
-            <option value="__no_se__">No sé / no quiero decir</option>
-          </select>
-        </div>`);
-    } else {
-      // Fuera de Colombia (o sin geo) — preguntamos país (para cruzar con
-      // circunscripción Exterior de la Registraduría).
-      const paises = CIUDADES_ZONAS?.paises || ['Otro'];
-      fields.push(`
-        <div class="field full">
-          <label for="d-zona">¿En qué país vives?</label>
-          <select id="d-zona" data-zona-tipo="pais" data-ciudad="">
-            <option value="">Selecciona…</option>
-            ${paises.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('')}
-            <option value="__no_se__">No sé / no quiero decir</option>
-          </select>
-        </div>`);
-    }
+    // Siempre va con link "no vivo aquí" para corregir manualmente — geo IP
+    // móvil no es fiable (mapea al PoP regional, ~50% de error en ciudad).
+    fields.push(buildZonaFieldHTML());
 
     fields.push(`
       <div class="field">
@@ -1610,6 +1770,8 @@
       el.addEventListener('input',  validateDemo);
       el.addEventListener('change', validateDemo);
     });
+    // Listener del link "no vivo aquí" y de la cascada manual.
+    attachZonaListeners();
     validateDemo();
   }
 
@@ -1637,15 +1799,20 @@
     const zonaVal = zonaEl?.value || null;
     const zonaTipo = zonaEl?.dataset.zonaTipo || null;   // 'localidad'|'comuna'|'barrio'|'urbano-rural'|'pais'
     const zonaCiudad = zonaEl?.dataset.ciudad || null;   // 'Bogotá', 'Medellín', etc.
+    // Si la persona corrigió manualmente, esos datos ganan sobre el IP.
+    const declared_depto = _manualLocation?.depto_nombre || null;
+    const declared_muni  = _manualLocation?.municipio_nombre || null;
     state.demo = {
       email:       IS_LOGGED ? USER.email : (emailEl ? emailEl.value.trim().toLowerCase() : null),
       edad:        $('#d-edad').value,
-      // Departamento se conserva como fallback del IP. La zona declarada por
-      // el usuario tiene prioridad para el cruce final con la proyección.
-      depto:       GEO?.region || null,
-      depto_src:   GEO?.region ? 'ip' : null,
-      ciudad:      zonaCiudad || GEO?.city || null,
-      zona_tipo:   zonaTipo,                              // qué tipo de zona se preguntó
+      // Departamento: declarado manualmente > IP
+      depto:         declared_depto || GEO?.region || null,
+      depto_codigo:  _manualLocation?.depto_codigo || null,
+      depto_src:     declared_depto ? 'manual' : (GEO?.region ? 'ip' : null),
+      ciudad:        declared_muni || zonaCiudad || GEO?.city || null,
+      ciudad_codigo: _manualLocation?.municipio_codigo || null,
+      ciudad_src:    declared_muni ? 'manual' : 'ip',
+      zona_tipo:   zonaTipo,                              // localidad|comuna|barrio|urbano-rural|pais
       zona_valor:  zonaVal === '__no_se__' ? null : zonaVal,
       zona_declarada: zonaVal === '__no_se__' ? false : !!zonaVal,
       genero:      $('#d-genero').value,
