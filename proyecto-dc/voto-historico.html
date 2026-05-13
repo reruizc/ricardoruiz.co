@@ -10,6 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=DM+Mono:wght@300;400&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
   <style>
     :root {
       --bg: #f4f3ef; --bg2: #eeedea;
@@ -148,6 +149,21 @@
       color: #fff; border-color: var(--purple);
       position: relative; z-index: 1;
     }
+
+    .dl-btn {
+      font-family:'Syne',sans-serif; font-weight: 500;
+      font-size: .82rem; letter-spacing: .04em;
+      padding: .55rem 1.1rem;
+      background: var(--surface);
+      border: 1px solid var(--purple);
+      color: var(--purple);
+      cursor: none;
+      transition: background .15s, color .15s;
+      display: inline-flex; align-items: center; gap: .4rem;
+      white-space: nowrap;
+    }
+    .dl-btn:hover { background: var(--purple); color: #fff; }
+    .dl-btn:disabled { opacity: .5; pointer-events: none; }
 
     .summary {
       display: grid; grid-template-columns: 2fr 1fr 1fr 1fr;
@@ -393,6 +409,10 @@
             <button class="pill" data-view="barrio">Por barrio</button>
             <button class="pill" data-view="puesto">Por puestos</button>
           </div>
+        </div>
+        <div class="ctrl-group" style="margin-left:auto">
+          <div class="ctrl-label">Descargar</div>
+          <button class="dl-btn" id="dl-excel" onclick="downloadExcel()">↓ Excel</button>
         </div>
       </div>
     </section>
@@ -1143,6 +1163,97 @@
         `;
       });
       tbody.innerHTML = rows.join('');
+    }
+
+    // ─── DESCARGA EXCEL ───────────────────────────────────────────────
+    // Genera un .xlsx con dos hojas: "Por comuna" y "Por barrio".
+    // Columnas = candidatos (orden por votos totales ciudad descendentes)
+    //   + Blancos + Nulos + No marcados + Total válidos
+    // Filas = territorios (comunas o barrios).
+    async function downloadExcel(){
+      const btn = document.getElementById('dl-excel');
+      if (!btn || !currentResumen || !currentComunas) return;
+      const oldLabel = btn.textContent;
+      btn.disabled = true; btn.textContent = '↓ Generando…';
+      try {
+        // Asegurar que tenemos por-barrio
+        let porBarrio = currentBarrios;
+        if (!porBarrio){
+          porBarrio = await loadData(state.year, state.corp, 'por-barrio').catch(() => null);
+        }
+
+        // Candidatos en orden de votación total (ciudad)
+        const cands = (currentResumen.candidatos || []).slice().sort((a,b) => b.votos - a.votos);
+
+        const headerBase = (extra) => ['Código', ...extra, 'Nombre', ...cands.map(c => `${c.nombre}${c.partido ? ' · '+c.partido : ''}`), 'Blanco', 'Nulos', 'No marcados', 'Total válidos', 'Total general'];
+
+        function rowFor(scope){
+          const row = [];
+          for (const c of cands){
+            const found = (scope.candidatos || []).find(x => x.cod === c.cod);
+            row.push(found ? found.votos : 0);
+          }
+          const esp = scope.especiales || {};
+          row.push(esp.blanco || 0);
+          row.push(esp.nulos || 0);
+          row.push(esp.no_marcados || 0);
+          row.push(scope.votos_validos || 0);
+          row.push(scope.votos_totales || 0);
+          return row;
+        }
+
+        // ── Hoja: Por comuna ──
+        const sheetComuna = [headerBase([])];
+        const orderCom = ['01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','CORR','OTROS'];
+        for (const k of orderCom){
+          const d = currentComunas[k];
+          if (!d) continue;
+          sheetComuna.push([k, d.nombre || k, ...rowFor(d)]);
+        }
+
+        // ── Hoja: Por barrio ──
+        const sheetBarrio = [['Código DAP', 'Comuna', 'Nombre barrio', ...cands.map(c => `${c.nombre}${c.partido ? ' · '+c.partido : ''}`), 'Blanco', 'Nulos', 'No marcados', 'Total válidos', 'Total general']];
+        if (porBarrio){
+          const barrios = Object.entries(porBarrio).sort((a,b) =>
+            String(a[1].comuna || '').localeCompare(String(b[1].comuna || '')) ||
+            String(a[0]).localeCompare(String(b[0]))
+          );
+          for (const [k, d] of barrios){
+            sheetBarrio.push([d.codigo || k, d.comuna || '—', d.nombre || k, ...rowFor(d)]);
+          }
+        }
+
+        // ── Hoja: Resumen ciudad (top tabla) ──
+        const sheetResumen = [['Posición', 'Candidato', 'Partido', 'Votos', '% sobre válidos']];
+        cands.forEach((c, i) => {
+          sheetResumen.push([i+1, c.nombre, c.partido || '—', c.votos, c.pct]);
+        });
+        sheetResumen.push([]);
+        sheetResumen.push(['Especiales']);
+        sheetResumen.push(['Voto en blanco', currentResumen.especiales?.blanco || 0]);
+        sheetResumen.push(['Voto nulo', currentResumen.especiales?.nulos || 0]);
+        sheetResumen.push(['No marcados', currentResumen.especiales?.no_marcados || 0]);
+        sheetResumen.push([]);
+        sheetResumen.push(['Total válidos', currentResumen.votos_validos]);
+        sheetResumen.push(['Total general', currentResumen.votos_totales]);
+
+        // ── Construir workbook ──
+        const wb = XLSX.utils.book_new();
+        const wsResumen = XLSX.utils.aoa_to_sheet(sheetResumen);
+        const wsComuna  = XLSX.utils.aoa_to_sheet(sheetComuna);
+        const wsBarrio  = XLSX.utils.aoa_to_sheet(sheetBarrio);
+        XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen ciudad');
+        XLSX.utils.book_append_sheet(wb, wsComuna,  'Por comuna');
+        XLSX.utils.book_append_sheet(wb, wsBarrio,  'Por barrio');
+
+        const filename = `medellin_${state.year}_${state.corp}_resultados.xlsx`;
+        XLSX.writeFile(wb, filename);
+      } catch(e){
+        console.error(e);
+        alert('Error generando el Excel: ' + e.message);
+      } finally {
+        btn.disabled = false; btn.textContent = oldLabel;
+      }
     }
 
     function showError(msg){
