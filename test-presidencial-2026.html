@@ -227,6 +227,34 @@
     .intro-list { display:flex; flex-direction:column; gap:.65rem; margin: 1.1rem 0 1.4rem; }
     .intro-item { display:flex; gap:.7rem; align-items:flex-start; font-family:'Fraunces',serif; font-weight:300; font-size:.98rem; color:rgba(244,243,239,0.78); line-height:1.4; }
     .intro-bullet { color:var(--blue-light); font-family:'DM Mono',monospace; font-size:.78rem; padding-top:.18rem; min-width:18px; }
+
+    /* Selector de registro (popular / digital / analítico) */
+    .registro-picker { display:flex; flex-direction:column; gap:.7rem; }
+    .registro-skeleton {
+      font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.14em; text-transform:uppercase;
+      color:rgba(255,255,255,0.4); padding:1.5rem; text-align:center;
+    }
+    .registro-card {
+      display:flex; gap:.9rem; align-items:flex-start;
+      background:rgba(255,255,255,0.02);
+      border:1px solid rgba(255,255,255,0.08);
+      padding:1rem 1.1rem; text-align:left;
+      color:var(--white); cursor:pointer;
+      transition: border-color .15s, background .15s, transform .15s;
+      font-family:inherit;
+    }
+    .registro-card:hover:not(:disabled) {
+      border-color:rgba(0,71,255,0.55);
+      background:rgba(0,71,255,0.05);
+      transform:translateY(-1px);
+    }
+    .registro-card:disabled { opacity:.55; cursor:default; }
+    .registro-card.loading { border-color:rgba(0,71,255,0.6); background:rgba(0,71,255,0.08); }
+    .registro-icon { font-size:1.7rem; line-height:1; padding-top:.15rem; flex-shrink:0; }
+    .registro-body { flex:1; min-width:0; }
+    .registro-title { font-family:'Syne',sans-serif; font-weight:500; font-size:1.05rem; margin-bottom:.25rem; }
+    .registro-lead { font-family:'Fraunces',serif; font-weight:300; font-size:.85rem; line-height:1.42;
+      color:rgba(244,243,239,0.66); }
     .auth-tag {
       display:inline-block; font-family:'DM Mono',monospace; font-size:.7rem;
       letter-spacing:.15em; text-transform:uppercase;
@@ -537,17 +565,17 @@
       <div class="panel active" id="panel-intro">
         <div class="panel-card intro-card">
           <div id="auth-status"></div>
-          <h2 style="font-family:'Syne'; font-weight:700; font-size:1.45rem; margin-top:.7rem;">Cómo funciona</h2>
-          <div class="intro-list">
-            <div class="intro-item"><span class="intro-bullet">01</span><span>Te pedimos unos datos básicos para contextualizar tu resultado (edad, género, posicionamiento ideológico y si votaste el 8 de marzo).</span></div>
-            <div class="intro-item"><span class="intro-bullet">02</span><span>Luego respondes <b>6 preguntas</b> sobre los ejes que diferencian a las candidaturas: economía, seguridad, salud, política exterior, drogas y reformas institucionales.</span></div>
-            <div class="intro-item"><span class="intro-bullet">03</span><span>Calculamos un puntaje de afinidad con cada candidato con base en sus posiciones públicas y te mostramos el resultado.</span></div>
+          <h2 style="font-family:'Syne'; font-weight:700; font-size:1.4rem; margin-top:.6rem;">¿Cómo te sientes más identificado?</h2>
+          <p style="font-family:'Fraunces',serif; font-weight:300; font-size:.95rem; color:rgba(244,243,239,0.72); line-height:1.45; margin-bottom:1.2rem;">
+            Elige el formato que más se acomode a ti. Te haremos las mismas preguntas pero en tu lenguaje.
+          </p>
+          <div id="registro-picker" class="registro-picker">
+            <!-- inyectado por JS desde preguntas/registros.json -->
+            <div class="registro-skeleton">Cargando opciones…</div>
           </div>
-          <p style="font-family:'Fraunces',serif; font-weight:300; font-size:.9rem; color:rgba(244,243,239,0.55); line-height:1.45;">Esto no es una predicción de voto ni una encuesta. Es una herramienta para ubicarte en el mapa político del 2026.</p>
-          <div class="actions">
-            <span></span>
-            <button class="btn" onclick="goTo('demo')">Empezar →</button>
-          </div>
+          <p style="font-family:'Fraunces',serif; font-weight:300; font-size:.82rem; color:rgba(244,243,239,0.5); line-height:1.45; margin-top:1.2rem;">
+            Esto no es una predicción de voto ni una encuesta. Es una herramienta para ubicarte en el mapa político del 2026.
+          </p>
         </div>
       </div>
 
@@ -1017,7 +1045,18 @@
   // Barreras) → centro-progresista urbano (Claudia) → centro liberal (Lizcano,
   // Fajardo) → centro-derecha empresarial (Botero) → derecha (Paloma) → derecha
   // dura (Abelardo).
-  const QUESTIONS = [
+  // QUESTIONS se llena dinámicamente cuando el usuario elige un registro
+  // (popular / digital / analítico) en el panel-intro. El banco vive en
+  // /preguntas/*.json y se carga via fetch. Cada eje del banco trae varias
+  // variantes; al elegir registro tomamos una variante random por eje y
+  // shuffleamos sus opts. Los pesos siguen pegados a cada opt, así el shuffle
+  // no afecta el scoring.
+  //
+  // Fallback: si el fetch falla por completo (offline, error de red), se
+  // restaura el banco analítico que estaba hardcodeado antes. Esto evita
+  // que el test se rompa cuando hay problemas de conexión con S3/GitHub Pages.
+  let QUESTIONS = [];
+  const FALLBACK_QUESTIONS = [
     {
       tag:'Modelo económico',
       text:'¿Cuál de estos modelos económicos crees que necesita Colombia?',
@@ -1119,11 +1158,108 @@
   ];
 
   // ── ESTADO ──
+  // state.answers se inicializa vacío y se llena cuando se elige un registro
+  // (chooseRegistro) y se construye el banco final QUESTIONS.
   const state = {
-    demo: {},
-    answers: new Array(QUESTIONS.length).fill(null), // índices de opción seleccionada
-    qIdx: 0,
+    demo:     {},
+    registro: null,        // 'popular' | 'digital' | 'analitico'
+    titulo:   null,        // título del banco elegido (mostrado en intro post-selección)
+    answers:  [],
+    qIdx:     0,
   };
+
+  // ── REGISTROS (formatos de comunicación) ──
+  // Se carga desde S3 / repo al abrir la página. Define los 3 tonos posibles
+  // (popular, digital, analitico) con su sample text. El usuario elige uno
+  // antes de pasar al formulario demográfico.
+  const PREGUNTAS_BASE = `${location.origin}/preguntas`;
+  let REGISTROS = null;
+  let BANCO     = null;  // banco crudo del registro elegido
+
+  async function loadRegistros() {
+    try {
+      const r = await fetch(`${PREGUNTAS_BASE}/registros.json`, { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      REGISTROS = await r.json();
+    } catch (e) {
+      console.warn('[registros] fallback — no se pudo cargar registros.json:', e);
+      REGISTROS = null;
+    }
+    renderRegistroPicker();
+  }
+
+  function renderRegistroPicker() {
+    const cont = $('#registro-picker');
+    if (!cont) return;
+    // Si el fetch falló, saltamos directo al banco analítico hardcoded.
+    if (!REGISTROS || !REGISTROS.registros?.length) {
+      console.warn('[registros] sin REGISTROS, usando fallback analítico');
+      useFallbackBank();
+      goTo('demo');
+      return;
+    }
+    cont.innerHTML = REGISTROS.registros.map(r => `
+      <button class="registro-card" data-id="${escapeHtml(r.id)}">
+        <span class="registro-icon">${escapeHtml(r.icono || '🎯')}</span>
+        <div class="registro-body">
+          <div class="registro-title">${escapeHtml(r.titulo)}</div>
+          <div class="registro-lead">${escapeHtml(r.lead)}</div>
+        </div>
+      </button>`).join('');
+    cont.querySelectorAll('.registro-card').forEach(btn => {
+      btn.addEventListener('click', () => chooseRegistro(btn.dataset.id));
+    });
+    if (IS_EMBED) requestAnimationFrame(reportHeight);
+  }
+
+  async function chooseRegistro(id) {
+    const reg = REGISTROS.registros.find(r => r.id === id);
+    if (!reg) return;
+    state.registro = id;
+
+    // UI: marca esa tarjeta como cargando, deshabilita las otras.
+    document.querySelectorAll('.registro-card').forEach(c => {
+      c.disabled = true;
+      if (c.dataset.id === id) c.classList.add('loading');
+    });
+
+    try {
+      const r = await fetch(`${PREGUNTAS_BASE}/${reg.banco_url}`, { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      BANCO = await r.json();
+      buildQuestionsFromBanco(BANCO);
+      state.titulo = BANCO.titulo;
+    } catch (e) {
+      console.warn(`[registros] fallback — no se pudo cargar ${reg.banco_url}:`, e);
+      useFallbackBank();
+    }
+
+    // Re-init state según el largo final del banco
+    state.answers = new Array(QUESTIONS.length).fill(null);
+    state.qIdx = 0;
+    goTo('demo');
+  }
+
+  // Construye el array de QUESTIONS a partir del banco: una variante random
+  // por eje + shuffle de opts.
+  function buildQuestionsFromBanco(banco) {
+    QUESTIONS = (banco.preguntas || []).map(p => {
+      const variantes = p.variantes || [];
+      const v = variantes[Math.floor(Math.random() * variantes.length)] || {};
+      const opts = [...(v.opts || [])].sort(() => Math.random() - 0.5);
+      return { eje: p.eje, tag: v.tag, text: v.text, opts };
+    });
+  }
+
+  function useFallbackBank() {
+    QUESTIONS = FALLBACK_QUESTIONS.slice();
+    state.titulo = 'Test de afinidad presidencial 2026';
+    state.registro = state.registro || 'analitico';
+  }
+
+  // Arranca la carga ni bien se ejecuta el script. El selector se rellena
+  // cuando llega la respuesta — mientras tanto el usuario ve "Cargando…".
+  loadRegistros();
 
   // ── UTILIDADES ──
   function $(sel) { return document.querySelector(sel); }
@@ -1308,9 +1444,11 @@
     $('#q-tag').textContent  = q.tag;
     $('#q-text').textContent = q.text;
     const opts = $('#q-opts');
+    // Letra A/B/C/D se asigna por posición (post-shuffle). Si la opción
+    // tiene `letter` precargada (banco fallback antiguo), la respetamos.
     opts.innerHTML = q.opts.map((o, idx) => `
       <button class="opt ${state.answers[i] === idx ? 'sel' : ''}" data-idx="${idx}">
-        <span class="opt-letter">${o.letter}</span>
+        <span class="opt-letter">${o.letter || String.fromCharCode(65 + idx)}</span>
         <span class="opt-text">${escapeHtml(o.text)}</span>
       </button>`).join('');
     opts.querySelectorAll('.opt').forEach(btn => {
@@ -1323,7 +1461,11 @@
       });
     });
     $('#q-next').classList.toggle('disabled', state.answers[i] === null);
-    $('#q-back').classList.toggle('disabled', i === 0);
+    // El botón "← Anterior" siempre está activo: en qIdx>0 retrocede a la
+    // pregunta previa; en qIdx===0 vuelve al formulario demográfico (la
+    // función prevQ ya maneja ambos casos).
+    $('#q-back').classList.remove('disabled');
+    $('#q-back').textContent = i === 0 ? '← Datos' : '← Anterior';
     $('#q-next').textContent = (i === QUESTIONS.length - 1) ? 'Ver resultado →' : 'Siguiente →';
     setProgress(2 + i);
   }
