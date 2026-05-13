@@ -38,6 +38,7 @@ from build import point_in_geom, bbox_of_geom  # noqa: E402
 
 PUESTOS_GLOB = str(ROOT / "Bases de datos" / "proyeccion-por-puesto-*.json")
 BOG_UPL      = ROOT / "CIUDADES" / "BOGOTA" / "BOG-UPL.geojson"
+BOG_BARRIOS  = ROOT / "CIUDADES" / "BOGOTA" / "BOG-BARRIOS-CATASTRALES.geojson"
 MED_BARRIOS  = ROOT / "Bases de datos" / "proyecto-dc" / "geo" / "barrios-veredas-medellin.geojson"
 CAL_COMUNAS  = ROOT / "CIUDADES" / "CALI" / "CALIX.json"
 OUT_DIR      = ROOT / "Bases de datos" / "output_ponderador"
@@ -191,6 +192,31 @@ def main():
     bog_path = OUT_DIR / "proyeccion-por-upl-bogota.json"
     bog_path.write_text(json.dumps(out_bog, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print(f"  ✓ {bog_path.relative_to(ROOT)} ({bog_path.stat().st_size/1024:.0f} KB)")
+    print()
+
+    # ── Bogotá barrios (1001 barrios catastrales con localidad) ──
+    print("→ Cargando barrios catastrales Bogotá…")
+    bogbar_geo = json.loads(BOG_BARRIOS.read_text(encoding="utf-8"))
+    bogbar_idx = index_features_by_bbox(bogbar_geo)
+    print(f"  {len(bogbar_idx)} barrios")
+    bogbar_agg, bogbar_hits = aggregate(
+        puestos, bogbar_idx,
+        code_key="codigo", name_key="nombre",
+        extra_keys=["loc_codigo", "loc_nombre"],
+    )
+    print(f"  {bogbar_hits} puestos asignados a barrio · {len(bogbar_agg)} barrios con datos")
+    out_bogbar = {
+        "version": pue_data["version"],
+        "source": Path(pue_path).name,
+        "sliders_signature": pue_data["sliders_signature"],
+        "nacional": pue_data["nacional"],
+        "ciudad": "bogota",
+        "tipo": "barrio",
+        "agregados": bogbar_agg,
+    }
+    bogbar_path = OUT_DIR / "proyeccion-por-barrio-bogota.json"
+    bogbar_path.write_text(json.dumps(out_bogbar, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    print(f"  ✓ {bogbar_path.relative_to(ROOT)} ({bogbar_path.stat().st_size/1024:.0f} KB)")
     print()
 
     # ── Medellín barrios ──

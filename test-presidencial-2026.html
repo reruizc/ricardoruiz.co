@@ -846,6 +846,7 @@
   // hay otra forma de ubicar al usuario.
   const S3_OUT = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_ponderador';
   const PROYECCION_UPL_URL    = `${S3_OUT}/proyeccion-por-upl-bogota.json`;
+  const PROYECCION_BOGBAR_URL = `${S3_OUT}/proyeccion-por-barrio-bogota.json`;
   const PROYECCION_MED_URL    = `${S3_OUT}/proyeccion-por-barrio-medellin.json`;
   const PROYECCION_CAL_URL    = `${S3_OUT}/proyeccion-por-comuna-cali.json`;
   const PROYECCION_PUESTO_URL = `${S3_OUT}/proyeccion-por-puesto.json`;
@@ -866,8 +867,9 @@
   // Inverso: id corto → id del test (para resolver el ganador en la zona)
   const PROJ_TO_CAND_ID = Object.fromEntries(Object.entries(CAND_PROJ_ID).map(([k,v]) => [v,k]));
 
-  let _bogUplCache = null, _medBarrioCache = null, _calComunaCache = null, _puestosCache = null;
+  let _bogUplCache = null, _bogBarrioCache = null, _medBarrioCache = null, _calComunaCache = null, _puestosCache = null;
   function loadBogUpl()    { return _bogUplCache     ||= fetch(PROYECCION_UPL_URL).then(r => r.ok ? r.json() : null).catch(() => null); }
+  function loadBogBarrio() { return _bogBarrioCache  ||= fetch(PROYECCION_BOGBAR_URL).then(r => r.ok ? r.json() : null).catch(() => null); }
   function loadMedBarrio() { return _medBarrioCache  ||= fetch(PROYECCION_MED_URL).then(r => r.ok ? r.json() : null).catch(() => null); }
   function loadCalComuna() { return _calComunaCache  ||= fetch(PROYECCION_CAL_URL).then(r => r.ok ? r.json() : null).catch(() => null); }
   function loadPuestos()   { return _puestosCache    ||= fetch(PROYECCION_PUESTO_URL).then(r => r.ok ? r.json() : null).catch(() => null); }
@@ -1965,13 +1967,17 @@
     let subOpts = null;
 
     if (proj.scope === 'localidad' && d?.ciudad === 'Bogotá') {
-      const bog = await loadBogUpl();
+      // Drill-down a BARRIO catastral real (no UPL), 1001 barrios totales,
+      // filtrados por loc_codigo. Los nombres son los que la gente reconoce
+      // socialmente (Galerías, Cedritos, Quinta Camacho, etc.).
+      const bog = await loadBogBarrio();
       if (bog?.agregados) {
-        const upls = Object.entries(bog.agregados)
-          .filter(([_, u]) => u.Localidades && u.Localidades[0] && u.Localidades[0].LocCodigo === d.zona_valor)
-          .map(([k, u]) => ({ codigo: k, nombre: u.nombre }));
-        if (upls.length > 1) {
-          subOpts = { scope: 'upl', label: 'Ver tu zona dentro de la localidad:', zonas: upls };
+        const barrios = Object.entries(bog.agregados)
+          .filter(([_, b]) => b.loc_codigo === d.zona_valor)
+          .map(([k, b]) => ({ codigo: k, nombre: b.nombre }));
+        if (barrios.length > 1) {
+          barrios.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+          subOpts = { scope: 'barrio-bog', label: 'Ver tu barrio dentro de la localidad:', zonas: barrios };
         }
       }
     } else if (proj.scope === 'comuna' && d?.ciudad === 'Medellín') {
@@ -2003,21 +2009,34 @@
   }
 
   // Maneja la selección del drill-down. Computa la proyección de la
-  // sub-zona elegida y refresca la caja "Tu zona".
+  // sub-zona elegida, refresca la caja "Tu zona" y persiste la selección
+  // en state.demo.zona_subnivel para enriquecer el lead.
   async function onSubZonaChange(value, scope) {
     if (!value) return;
     const d = state.demo;
     let proj = null;
 
-    if (scope === 'upl' && d.ciudad === 'Bogotá') {
-      const bog = await loadBogUpl();
-      const u = bog?.agregados?.[value];
-      if (u) {
+    if (scope === 'barrio-bog' && d.ciudad === 'Bogotá') {
+      const bog = await loadBogBarrio();
+      const b = bog?.agregados?.[value];
+      if (b) {
         proj = {
-          scope: 'upl', city: 'Bogotá D.C.',
-          label: u.nombre, sub: null, p: u.p,
-          precise: false, subSelected: true,
+          scope: 'barrio', city: 'Bogotá D.C.',
+          label: b.nombre,
+          sub: b.loc_nombre ? `Localidad ${titleCase(b.loc_nombre)}` : null,
+          p: b.p, precise: false, subSelected: true,
         };
+        // Persiste el barrio elegido para el lead (info muy valiosa para campañista)
+        if (state.demo) {
+          state.demo.zona_subnivel = {
+            tipo: 'barrio',
+            codigo: value,
+            nombre: b.nombre,
+            ciudad: 'Bogotá',
+            localidad_codigo: d.zona_valor,
+            localidad_nombre: b.loc_nombre,
+          };
+        }
       }
     } else if (scope === 'barrio' && d.ciudad === 'Medellín') {
       const med = await loadMedBarrio();
@@ -2029,6 +2048,16 @@
           sub: b.nombre_com ? titleCase(b.nombre_com) : null,
           p: b.p, precise: false, subSelected: true,
         };
+        if (state.demo) {
+          state.demo.zona_subnivel = {
+            tipo: 'barrio',
+            codigo: value,
+            nombre: b.nombre,
+            ciudad: 'Medellín',
+            comuna_codigo: d.zona_valor,
+            comuna_nombre: b.nombre_com,
+          };
+        }
       }
     }
 
