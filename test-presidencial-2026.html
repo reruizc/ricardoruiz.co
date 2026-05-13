@@ -200,6 +200,15 @@
     .field input:focus, .field select:focus { border-color: var(--blue); background:rgba(0,71,255,0.07); }
     .field select option { background:#0a0e1c; color:var(--white); }
     .field .hint { font-family:'Fraunces',serif; font-weight:300; font-size:.82rem; color:rgba(244,243,239,0.5); }
+    /* Link "no vivo allí, cambiar" en el label del campo de ubicación.
+       Discreto al lado del label, no compite visualmente con el dropdown. */
+    .field-change {
+      font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.12em;
+      text-transform:none; color: var(--blue-light);
+      margin-left:.6rem; cursor:pointer; text-decoration:underline;
+      text-transform:lowercase; opacity:.75;
+    }
+    .field-change:hover { opacity:1; }
 
     /* ── ACTIONS ── */
     .actions {
@@ -1469,28 +1478,157 @@
     'Prefiero no decir',
   ];
 
+  let _demoLoadedOnce = false;
+  // Si el usuario hace click en "No vivo en X" y elige otra ciudad,
+  // se guarda aquí y gana sobre GEO.city al construir el campo zona.
+  let _ciudadOverride = null;
+
+  // Construye el HTML del campo "ubicación contextual" según la ciudad
+  // efectiva (override del usuario > GEO.city > urbano/rural > país).
+  // Siempre incluye un link "no es esta mi ciudad" para corregir si la
+  // geo IP cayó al PoP central de un ISP grande.
+  function buildZonaFieldHTML() {
+    const effectiveCity = _ciudadOverride || GEO?.city || null;
+    const ciudadKey = detectCiudad(effectiveCity);
+    const country = GEO?.country;
+
+    // Link de corrección — siempre visible cuando hubo detección
+    const changeLink = `<a class="field-change" data-action="change-city">No vivo allí, cambiar</a>`;
+
+    if (ciudadKey && CIUDADES_ZONAS) {
+      const info = CIUDADES_ZONAS.ciudades[ciudadKey];
+      const label = info.label;
+      const qText = `¿En qué ${label} de ${ciudadKey} vives?`;
+      return `
+        <div class="field full" id="d-zona-field">
+          <label for="d-zona">${escapeHtml(qText)} ${changeLink}</label>
+          <select id="d-zona" data-zona-tipo="${label}" data-ciudad="${escapeHtml(ciudadKey)}">
+            <option value="">Selecciona…</option>
+            ${info.zonas.map(z => `<option value="${escapeHtml(z.codigo)}">${escapeHtml(z.nombre)}</option>`).join('')}
+            <option value="__no_se__">No sé / no quiero decir</option>
+          </select>
+        </div>`;
+    }
+    if (effectiveCity === '__urbano-rural__' || country === 'CO' || (!country && GEO?.region)) {
+      const muni = effectiveCity && effectiveCity !== '__urbano-rural__'
+        ? effectiveCity : (GEO?.city || 'tu municipio');
+      return `
+        <div class="field full" id="d-zona-field">
+          <label for="d-zona">¿En ${escapeHtml(muni)} vives en zona urbana o rural? ${changeLink}</label>
+          <select id="d-zona" data-zona-tipo="urbano-rural" data-ciudad="${escapeHtml(muni)}">
+            <option value="">Selecciona…</option>
+            <option value="urbano">Zona urbana / cabecera municipal</option>
+            <option value="rural">Área rural / vereda / corregimiento</option>
+            <option value="__no_se__">No sé / no quiero decir</option>
+          </select>
+        </div>`;
+    }
+    // Fuera de Colombia
+    const paises = CIUDADES_ZONAS?.paises || ['Otro'];
+    return `
+      <div class="field full" id="d-zona-field">
+        <label for="d-zona">¿En qué país vives? ${changeLink}</label>
+        <select id="d-zona" data-zona-tipo="pais" data-ciudad="">
+          <option value="">Selecciona…</option>
+          ${paises.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('')}
+          <option value="__no_se__">No sé / no quiero decir</option>
+        </select>
+      </div>`;
+  }
+
+  // HTML de la pantalla "elige tu ciudad" — reemplaza el campo zona cuando
+  // el usuario hace click en "No vivo allí". Lista las 17 ciudades mapeadas
+  // + "Otro municipio en Colombia" + "Vivo en el exterior".
+  function buildCityPickerHTML() {
+    const ciudades = CIUDADES_ZONAS?.ciudades ? Object.keys(CIUDADES_ZONAS.ciudades) : [];
+    ciudades.sort((a, b) => a.localeCompare(b, 'es'));
+    return `
+      <div class="field full" id="d-zona-field">
+        <label for="d-ciudad-picker">¿En qué ciudad o municipio vives?</label>
+        <select id="d-ciudad-picker">
+          <option value="">Selecciona…</option>
+          ${ciudades.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}
+          <option value="__urbano-rural__">Otro municipio en Colombia</option>
+          <option value="__exterior__">Vivo en el exterior</option>
+        </select>
+      </div>`;
+  }
+
+  // Re-attacha listeners del campo zona después de inyectar HTML nuevo.
+  function attachZonaFieldListeners() {
+    const link = document.querySelector('#d-zona-field .field-change');
+    if (link) {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        // Reemplaza el field por el city picker
+        const field = $('#d-zona-field');
+        if (!field) return;
+        field.outerHTML = buildCityPickerHTML();
+        // Listener del picker
+        const picker = $('#d-ciudad-picker');
+        if (picker) {
+          picker.addEventListener('change', () => {
+            const val = picker.value;
+            if (!val) return;
+            // Mapear al override: ciudad mapeada, __urbano-rural__ o __exterior__
+            _ciudadOverride = val === '__exterior__' ? '__no-co__' : val;
+            // Si __exterior__, forzamos GEO.country !== 'CO' lógicamente: como
+            // no podemos cambiar GEO, le ponemos un override especial que en
+            // buildZonaFieldHTML caiga al else final.
+            const newHTML = val === '__exterior__'
+              ? buildPaisFieldHTML()
+              : buildZonaFieldHTML();
+            picker.closest('.field').outerHTML = newHTML;
+            attachZonaFieldListeners();
+            validateDemo();
+          });
+        }
+        validateDemo();
+      });
+    }
+    // Re-attach también el listener general de validación
+    const sel = $('#d-zona') || $('#d-ciudad-picker');
+    if (sel) {
+      sel.addEventListener('input',  validateDemo);
+      sel.addEventListener('change', validateDemo);
+    }
+  }
+
+  // Helper: HTML del field cuando el usuario eligió "Vivo en el exterior"
+  // (no podemos confiar en GEO.country en ese caso).
+  function buildPaisFieldHTML() {
+    const paises = CIUDADES_ZONAS?.paises || ['Otro'];
+    return `
+      <div class="field full" id="d-zona-field">
+        <label for="d-zona">¿En qué país vives? <a class="field-change" data-action="change-city">No, sí vivo en Colombia</a></label>
+        <select id="d-zona" data-zona-tipo="pais" data-ciudad="">
+          <option value="">Selecciona…</option>
+          ${paises.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('')}
+          <option value="__no_se__">No sé / no quiero decir</option>
+        </select>
+      </div>`;
+  }
+
   async function renderDemoForm() {
     $('#demo-tag').textContent = IS_LOGGED ? 'Sesión activa' : 'Invitado';
     const grid = $('#form-grid');
 
-    // Espera hasta 2s a que GEO y CIUDADES_ZONAS estén listos antes de
-    // construir los fields. Si llegan a tiempo, el dropdown contextual
-    // de localidad/comuna aparece bien; si no, cae al "¿en qué país?".
-    // Mostramos un placeholder mientras tanto.
-    if (!GEO || !CIUDADES_ZONAS) {
-      // Barrita animada neutra mientras se completan los fetches. NO decimos
-      // "detectando tu ubicación" — eso dispara reflejos defensivos sobre
-      // privacidad aunque la persona después acepte compartir su zona.
+    // Barrita de carga: SIEMPRE visible por mínimo 1.5s la primera vez,
+    // aunque los fetches ya estén cacheados. Visual feedback consistente
+    // — sin esto, en cache hit la pantalla se sentía abrupta. En
+    // re-renders subsecuentes (cambio de ciudad, etc.) no se muestra.
+    if (!_demoLoadedOnce) {
       grid.innerHTML = `
         <div class="form-load">
           <div class="form-load-track"><div class="form-load-fill"></div></div>
           <span class="form-load-text">Un momento</span>
         </div>`;
-      const timeout = new Promise(res => setTimeout(res, 2000));
-      await Promise.race([
-        Promise.all([GEO_PROMISE, CIUDADES_PROMISE]),
-        timeout,
-      ]);
+      const minDelay = new Promise(res => setTimeout(res, 1500));
+      const fetchOk  = Promise.all([GEO_PROMISE, CIUDADES_PROMISE]).catch(() => null);
+      const hardCap  = new Promise(res => setTimeout(res, 2500));
+      // Espera lo más lento entre minDelay y fetches, pero no más de 2.5s.
+      await Promise.race([Promise.all([minDelay, fetchOk]), hardCap]);
+      _demoLoadedOnce = true;
     }
 
     const fields = [];
@@ -1522,48 +1660,9 @@
     //   1. CO + ciudad mapeada (17 ciudades) → dropdown localidad/comuna/barrio
     //   2. CO + otro municipio                → "¿zona urbana o rural?"
     //   3. fuera de CO o sin país             → "¿en qué país vives?"
-    const ciudadKey = detectCiudad(GEO?.city);
-    const country   = GEO?.country;
-    if (ciudadKey && CIUDADES_ZONAS) {
-      const info = CIUDADES_ZONAS.ciudades[ciudadKey];
-      const label = info.label;
-      const qText = `¿En qué ${label} de ${ciudadKey} vives?`;
-      fields.push(`
-        <div class="field full">
-          <label for="d-zona">${escapeHtml(qText)}</label>
-          <select id="d-zona" data-zona-tipo="${label}" data-ciudad="${escapeHtml(ciudadKey)}">
-            <option value="">Selecciona…</option>
-            ${info.zonas.map(z => `<option value="${escapeHtml(z.codigo)}">${escapeHtml(z.nombre)}</option>`).join('')}
-            <option value="__no_se__">No sé / no quiero decir</option>
-          </select>
-        </div>`);
-    } else if (country === 'CO' || (!country && GEO?.region)) {
-      // Está en Colombia pero no en una ciudad mapeada — preguntamos urbano/rural.
-      const muni = GEO?.city || 'tu municipio';
-      fields.push(`
-        <div class="field full">
-          <label for="d-zona">¿En ${escapeHtml(muni)} vives en zona urbana o rural?</label>
-          <select id="d-zona" data-zona-tipo="urbano-rural" data-ciudad="${escapeHtml(GEO?.city || '')}">
-            <option value="">Selecciona…</option>
-            <option value="urbano">Zona urbana / cabecera municipal</option>
-            <option value="rural">Área rural / vereda / corregimiento</option>
-            <option value="__no_se__">No sé / no quiero decir</option>
-          </select>
-        </div>`);
-    } else {
-      // Fuera de Colombia (o sin geo) — preguntamos país (para cruzar con
-      // circunscripción Exterior de la Registraduría).
-      const paises = CIUDADES_ZONAS?.paises || ['Otro'];
-      fields.push(`
-        <div class="field full">
-          <label for="d-zona">¿En qué país vives?</label>
-          <select id="d-zona" data-zona-tipo="pais" data-ciudad="">
-            <option value="">Selecciona…</option>
-            ${paises.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('')}
-            <option value="__no_se__">No sé / no quiero decir</option>
-          </select>
-        </div>`);
-    }
+    // El usuario puede corregir la ciudad detectada (caso típico: ISP grande
+    // que la mapea al PoP central). Ver buildZonaFieldHTML.
+    fields.push(buildZonaFieldHTML());
 
     fields.push(`
       <div class="field">
@@ -1603,6 +1702,8 @@
       el.addEventListener('input',  validateDemo);
       el.addEventListener('change', validateDemo);
     });
+    // Listener del link "no vivo allí" para corregir la ciudad detectada
+    attachZonaFieldListeners();
     validateDemo();
   }
 
