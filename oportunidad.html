@@ -549,7 +549,7 @@
           </div>
           <dl class="det-meta">
             <div class="det-row"><dt class="lbl">Censo 2026</dt><dd class="val" id="det-censo">—</dd></div>
-            <div class="det-row"><dt class="lbl">Abstención 2022</dt><dd class="val" id="det-abst">—</dd></div>
+            <div class="det-row"><dt class="lbl">Abstención presidencial</dt><dd class="val" id="det-abst">—</dd></div>
             <div class="det-row"><dt class="lbl">Top candidato afín</dt><dd class="val" id="det-topafin">—</dd></div>
             <div class="det-row"><dt class="lbl">Crecimiento local</dt><dd class="val" id="det-brecha">—</dd></div>
           </dl>
@@ -595,7 +595,7 @@
     <p><strong>Riesgo metodológico.</strong> El mapeo de afinidades es <em>juicio editorial trazable, no algoritmo objetivo</em> (Cepeda hereda Petro, Paloma hereda Fico/Duque, Fajardo hereda verdes/centro, etc.). El crecimiento por NS-NR asume distribución proporcional al peso de cada candidato dentro del universo declarado — los indecisos no se reparten uniformemente entre todos, sino con sesgo hacia los líderes. La componente <em>proj_base</em> depende del ponderador propio, fecha de corte: <span id="foot-pond-fecha">cargando…</span>. <strong>El modelo no contempla flujo cross-block</strong> (votos que migran entre ejes ideológicos) ni movilización de abstención — para eso usar el toggle <em>Abstención</em> o esperar fase 2 (transferencias intra-bloque editables). Léelo como <strong>orientación de prioridades</strong>, no como pronóstico de voto.</p>
     <p><strong>Drilldown a ciudad.</strong> 14 ciudades soportadas con datos por comuna o localidad: Bogotá (localidades, abre directo desde el mapa nacional), Medellín (comunas + barrios), Cali, Barranquilla, Ibagué, Manizales, Pereira, Montería, Bucaramanga, Cúcuta, Neiva, Popayán, Sincelejo y Villavicencio. Click en el mun de la ciudad → drilldown automático. El bias se calcula contra el promedio de la propia ciudad (no contra el nacional-país) porque las ciudades tienen perfiles ideológicos distintos. <strong>Medellín · Barrios (v2)</strong>: 147 barrios con <em>bias propio</em> calculado al cruzar los puestos de votación de cada barrio (PUESTOS_GEOREF) con los <code>por-puesto.json</code> de 16 señales históricas. Los barrios sin puestos asignables (o sin polígono en el GeoJSON oficial) caen al heredado de la comuna padre — granularidad real a nivel intra-comuna.</p>
     <p><strong>Capa puestos.</strong> 13.492 puestos de votación con coordenadas. Se renderizan con LOD por zoom (a poca resolución solo los más grandes; al hacer zoom aparecen todos). Radio del círculo = log(censo del puesto). Color heredado de la brecha del municipio padre — o de la comuna padre si estás dentro de una de las 14 ciudades soportadas. Activar la capa habilita pan + zoom con la rueda; al volver a Oportunidad o Abstención el mapa se bloquea otra vez. <strong>Próximo paso (paquete v2)</strong>: bias propio por puesto usando histórico por puesto + agregación a barrio para Bogotá y Medellín — granularidad real al precio del retainer.</p>
-    <p><strong>Capa abstención.</strong> Métrica = 1 − (votos totales presidencial 2022 / censo electoral 2026). Capa complementaria: identifica dónde hay potencial no-activado además del afín. Útil para diseñar pisada de movilización junto al mapa de oportunidad. Cap superior: muchos municipios pequeños tienen abstención reportada baja por cierre de mesas, no por participación real — leer con cautela en mun &lt; 5.000 censo.</p>
+    <p><strong>Capa abstención.</strong> Promedio de abstención presidencial 1ª vuelta en 2018 y 2022. Para cada año: abst = 1 − votos_totales / censo_de_la_época. Censo 2022 = Divipole oficial 23-09-2021 (38.6M nacional, cuadra contra cifra oficial). Censo 2018 = reconstruido a partir del % de participación por departamento publicado por Wikipedia (36.78M nacional, cuadra contra oficial 36.7M), distribuido a nivel municipio y comuna proporcionalmente al censo 2022 — es un proxy aceptable mientras llega el Divipole 2018 oficial. La capa identifica dónde hay potencial estructural no-activado además del afín. Útil para diseñar pisada de movilización junto al mapa de oportunidad. Cap superior: muchos municipios pequeños tienen abstención reportada baja por cierre de mesas, no por participación real — leer con cautela en mun &lt; 5.000 censo.</p>
     <p><strong>Datos.</strong> Registraduría Nacional del Estado Civil (presidenciales 2018, 2022; consultas 2025 y marzo 2026; senado y cámara 2026; censo 2026 vía Divipole). Ponderador propio ricardoruiz.co — ver <a href="metodologia-simulador-presidencial-2026.docx">documento metodológico</a> y la página hermana <a href="previa-1v.html">Previa 1ª vuelta</a> para el detalle del simulador.</p>
     <p style="opacity:.7;margin-top:.8rem"><a href="electoral.html">← Volver a Electoral</a> &nbsp;·&nbsp; <a href="veleta.html">Veleta</a> &nbsp;·&nbsp; ricardoruiz.co · 2026</p>
   </footer>
@@ -620,6 +620,7 @@
     camMuns:   `${S3}/camara/municipios.json`,
     censos:    `${S3}/puestos-censos-agg.json`,
     censos2022:`${S3}/puestos-censos-agg-2022.json`,
+    censos2018:`${S3}/puestos-censos-agg-2018.json`,
     deptosGeo: `${S3}/mapas-2026/DEPARTAMENTOS2.json`,
     depsIndex: `${S3}/mapas-2026/Departamentos-mps/index.json`,
     depMps:    (depElec) => `${S3}/mapas-2026/Departamentos-mps/${depElec}.json`,
@@ -878,7 +879,8 @@
     camMunByKey:{},  // depCod-munCod → { partidos:{name:votos}, votval, votant }
     censoNacional:0,
     censoByMun:{},        // 2026 Divipole — denominador de contrib (electorado actual)
-    censoByMun2022:{},    // 2021 Divipole (≈ censo pres-2022) — denominador de abstención
+    censoByMun2022:{},    // 2021 Divipole (≈ censo pres-2022) — denom. abst-2022
+    censoByMun2018:{},    // Wikipedia × shape 2022 (proxy) — denom. abst-2018
     censoByDep:{},
     depGeo:null, depIndex:null,
     depMpsCache:{},
@@ -912,7 +914,8 @@
     cityGeo:{},         // { cityKey: GeoJSON }
     cityNacAfin:{},     // { cityKey: { candId: { bucket: pct_nacional_ciudad_afin } } }
     cityCensoByCom:{},      // { cityKey: { comCod: { ..censo 2026 } } } Divipole actual
-    cityCensoByCom2022:{},  // { cityKey: { comCod: { ..censo 2022 } } } Divipole 23-09-2021 — para abstención
+    cityCensoByCom2022:{},  // { cityKey: { comCod: { ..censo 2022 } } } Divipole 23-09-2021
+    cityCensoByCom2018:{},  // { cityKey: { comCod: { ..censo 2018 } } } Wiki × shape 2022 (proxy)
     cityComMetrics:{},  // { cityKey: { comCod: { afin, techo, proj, gap, abst, censo } } }
     selectedCity:null,  // cityKey activo (en drilldown)
 
@@ -949,7 +952,7 @@
   }
 
   async function loadAllData(){
-    const [pond, p18, p22, c25, c26g, c26f, c26s, senDeps, camMuns, censos, censos22, depGeo, depIdx] = await Promise.all([
+    const [pond, p18, p22, c25, c26g, c26f, c26s, senDeps, camMuns, censos, censos22, censos18, depGeo, depIdx] = await Promise.all([
       fetchJSON(PONDERADOR_URL, true),
       fetchJSON(URLS.pres18),
       fetchJSON(URLS.pres22),
@@ -961,6 +964,7 @@
       fetchJSON(URLS.camMuns, true),
       fetchJSON(URLS.censos),
       fetchJSON(URLS.censos2022, true),
+      fetchJSON(URLS.censos2018, true),
       fetchJSON(URLS.deptosGeo),
       fetchJSON(URLS.depsIndex),
     ]);
@@ -972,10 +976,12 @@
     STATE.censoByDep = censos.porDep || {};
     STATE.censoNacional = censos.nacional || 0;
     STATE.sumCensoNacional = STATE.censoNacional;
-    // Censo electoral 2022 (Divipole sept-2021) — denominador correcto
-    // para abstención presidencial 2022. Si el fetch falla, caemos al
-    // censo 2026 actual con el caveat de sobreestimación documentado.
+    // Censo electoral 2022 (Divipole sept-2021) — denom. abst pres-2022.
     STATE.censoByMun2022 = (censos22 && censos22.porMun) ? censos22.porMun : {};
+    // Censo electoral 2018 (Wikipedia % participación × shape 2022) —
+    // proxy para abst pres-2018. Documentado en footer + CLAUDE.md como
+    // reemplazable por Divipole 2018 oficial cuando llegue.
+    STATE.censoByMun2018 = (censos18 && censos18.porMun) ? censos18.porMun : {};
 
     // Index dep por electoral_id y por nombre
     depIdx.forEach(d => {
@@ -1363,13 +1369,25 @@
       const contrib = gap != null ? gap * censo / censoNac : null;
       const techo   = proj != null ? proj + gap : null;
 
-      // Abstención presidencial 2022 = 1 − votos_totales(pres-2022) / censo_2022.
-      // Usa el censo Divipole 23-sept-2021 (≈ censo al momento de la elección).
-      // Si no hay censo 2022 para ese mun, cae al 2026 con caveat de sobreestimación.
+      // Abstención presidencial = promedio ponderado de pres-2018 y
+      // pres-2022, cada uno contra su censo de la época.
+      //   abst_yr = 1 − votos_totales(pres-yr) / censo_yr
+      //   abst    = avg(años con dato)
+      // Censo 2022 = Divipole sept-2021. Censo 2018 = reconstruido de
+      // Wikipedia + shape 2022 (proxy; cambiar por Divipole 2018 cuando
+      // llegue oficial). Si ningún año tiene dato, abst = null.
       const e22 = STATE.pres22?.[munKey];
+      const e18 = STATE.pres18?.[munKey];
       const totVot22 = e22 ? (e22.votos_totales || 0) : 0;
-      const censoAbst = STATE.censoByMun2022[munKey] || censo;
-      const abst = (censoAbst > 0 && totVot22 > 0) ? clamp(1 - totVot22/censoAbst, 0, 1) : null;
+      const totVot18 = e18 ? (e18.votos_totales || 0) : 0;
+      const censo22  = STATE.censoByMun2022[munKey] || censo;
+      const censo18  = STATE.censoByMun2018[munKey] || censo;
+      const abst22 = (censo22 > 0 && totVot22 > 0) ? clamp(1 - totVot22/censo22, 0, 1) : null;
+      const abst18 = (censo18 > 0 && totVot18 > 0) ? clamp(1 - totVot18/censo18, 0, 1) : null;
+      let abst = null;
+      if (abst18 != null && abst22 != null) abst = (abst18 + abst22) / 2;
+      else if (abst22 != null) abst = abst22;
+      else if (abst18 != null) abst = abst18;
 
       munMetrics[munKey] = {
         munKey,
@@ -1798,7 +1816,7 @@
           console.warn('[opo·city·censo]', cityKey, e);
         }
       })());
-      // Censo electoral 2022 por comuna (Divipole sept-2021 — denominador de abstención).
+      // Censo electoral 2022 por comuna (Divipole sept-2021 — denom. abst-2022).
       fetches.push((async () => {
         try {
           const url = `${CITY_S3}/${cityKey}/censo-comuna-2022.json`;
@@ -1808,6 +1826,18 @@
           STATE.cityCensoByCom2022[cityKey] = j.por_comuna || {};
         } catch (e){
           console.warn('[opo·city·censo2022]', cityKey, e);
+        }
+      })());
+      // Censo electoral 2018 por comuna (proxy escalado — denom. abst-2018).
+      fetches.push((async () => {
+        try {
+          const url = `${CITY_S3}/${cityKey}/censo-comuna-2018.json`;
+          const r = await fetch(url);
+          if (!r.ok) return;
+          const j = await r.json();
+          STATE.cityCensoByCom2018[cityKey] = j.por_comuna || {};
+        } catch (e){
+          console.warn('[opo·city·censo2018]', cityKey, e);
         }
       })());
 
@@ -2021,26 +2051,35 @@
       const contrib = gap != null ? gap * (censoByCom[comCod]||0) / censoCity : null;
       const techo   = proj != null ? proj + gap : null;
 
-      // Abstención presidencial 2022 por comuna:
-      //   abst = 1 − votos_totales(pres-2022) / censo_2022_oficial
-      // Censo 2022 = Divipole sept-2021 (≈ momento de la elección). Si
-      // falta para esa comuna (corregimientos con códigos divergentes en
-      // GeoJSON, p.ej. Medellín 17-21 vs 50-90), abst queda null → gris.
-      const censoDiv2022 = STATE.cityCensoByCom2022[cityKey]?.[comCod];
+      // Abstención presidencial por comuna = promedio de pres-2018 + pres-2022,
+      // cada uno contra su censo de la época. Si una comuna no aparece en
+      // el mapeo (corregimientos con códigos divergentes en GeoJSON),
+      // abst queda null → gris.
       const censoDiv2026 = STATE.cityCensoByCom[cityKey]?.[comCod];
-      const censoAbst    = censoDiv2022 ? censoDiv2022.censo
-                        : (censoDiv2026 ? censoDiv2026.censo : 0);
-      const ePres22 = cityData['pres-2022']?.[comCod];
-      let totPres22 = 0;
-      if (ePres22){
-        totPres22 = (ePres22.votos_validos || 0)
-                  + (ePres22.especiales?.blanco || 0)
-                  + (ePres22.especiales?.nulos || 0)
-                  + (ePres22.especiales?.no_marcados || 0);
-        if (!totPres22) totPres22 = ePres22.votos_totales || 0;
+      const censoDiv2022 = STATE.cityCensoByCom2022[cityKey]?.[comCod];
+      const censoDiv2018 = STATE.cityCensoByCom2018[cityKey]?.[comCod];
+      const censo22 = censoDiv2022 ? censoDiv2022.censo : 0;
+      const censo18 = censoDiv2018 ? censoDiv2018.censo : 0;
+
+      function totVotComuna(sigKey){
+        const e = cityData[sigKey]?.[comCod];
+        if (!e) return 0;
+        let t = (e.votos_validos || 0)
+              + (e.especiales?.blanco || 0)
+              + (e.especiales?.nulos || 0)
+              + (e.especiales?.no_marcados || 0);
+        if (!t) t = e.votos_totales || 0;
+        return t;
       }
-      const abst = (censoAbst > 0 && totPres22 > 0) ? clamp(1 - totPres22/censoAbst, 0, 1) : null;
-      // El campo `censo` exportado al panel = 2026 si está, si no 2022, si no proxy.
+      const totVot22 = totVotComuna('pres-2022');
+      const totVot18 = totVotComuna('pres-2018');
+      const abst22c = (censo22 > 0 && totVot22 > 0) ? clamp(1 - totVot22/censo22, 0, 1) : null;
+      const abst18c = (censo18 > 0 && totVot18 > 0) ? clamp(1 - totVot18/censo18, 0, 1) : null;
+      let abst = null;
+      if (abst18c != null && abst22c != null) abst = (abst18c + abst22c) / 2;
+      else if (abst22c != null) abst = abst22c;
+      else if (abst18c != null) abst = abst18c;
+
       const censoFinal = censoDiv2026 ? censoDiv2026.censo
                        : (censoDiv2022 ? censoDiv2022.censo
                        : (censoByCom[comCod] || 0));
@@ -2685,7 +2724,7 @@
     } else {
       sc.textContent = (r && r.abst != null) ? (r.abst*100).toFixed(1)+'%' : '—';
       sc.classList.remove('neg');
-      document.getElementById('det-score-sub').textContent = 'abstención presidencial 2022';
+      document.getElementById('det-score-sub').textContent = 'promedio abstención presidencial 2018 + 2022';
     }
 
     // Bars: descomposición por bucket (pct afín por fuente). Sólo en capa opo.
@@ -2825,7 +2864,7 @@
     } else if (STATE.layer === 'abs'){
       bar.className = 'leg-bar abs';
       ends.innerHTML = '<span class="leg-bar-end">35% · alta participación</span><span class="leg-bar-end">52% · mediana</span><span class="leg-bar-end">75% · alta abstención</span>';
-      title.textContent = 'Abstención presidencial 2022';
+      title.textContent = 'Abstención presidencial (promedio 2018 + 2022)';
       stripes.style.display = 'none';
     } else if (STATE.layer === 'pue'){
       bar.className = 'leg-bar opo';
