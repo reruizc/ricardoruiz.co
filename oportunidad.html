@@ -1699,6 +1699,24 @@
   async function loadPuestoSignals(){
     if (STATE.puestoSignalsData) return STATE.puestoSignalsData;
     if (STATE.puestoSignalsLoading) return STATE.puestoSignalsLoading;
+    // Construye un mapa DANE → electoral usando STATE.depByElectoral.
+    // Los por-puesto.json nacionales usan código DANE en la clave (p.ej.
+    // Bogotá '11-001-...'), pero todo lo demás (puestos-light, censos
+    // por puesto, senado/cámara depto) usa electoral ('16-001-...').
+    // Traducimos al cargar para que todas las keys queden en electoral.
+    const daneToElec = {};
+    for (const d of Object.values(STATE.depByElectoral || {})){
+      if (d && d.dep_dane && d.dep_electoral){
+        daneToElec[String(d.dep_dane).padStart(2,'0')] = d.dep_electoral;
+      }
+    }
+    function reKey(k){
+      const i = k.indexOf('-');
+      if (i < 0) return k;
+      const dane = k.slice(0, i);
+      const elec = daneToElec[dane];
+      return elec ? (elec + k.slice(i)) : k;
+    }
     STATE.puestoSignalsLoading = (async () => {
       const out = {};
       const sigFetches = PUESTO_NAC_SIGNALS.map(async sig => {
@@ -1706,7 +1724,7 @@
           const r = await fetch(sig.url);
           if (!r.ok) return;
           const j = await r.json();
-          // Indexamos por 'dd-mm-zz-pp' → { vv, votos: {nombre:int} }.
+          // Indexamos por 'electoral-mun-zz-pp' → { vv, votos: {nombre:int} }.
           const byKey = {};
           if (sig.fmt === 'nac-pres'){
             const cands = j.candidatos || {};
@@ -1716,11 +1734,11 @@
                 const nombre = cands[cod]?.nombre;
                 if (nombre) votos[nombre] = (votos[nombre] || 0) + (n || 0);
               }
-              byKey[k] = { vv: v.vv || 0, votos };
+              byKey[reKey(k)] = { vv: v.vv || 0, votos };
             }
           } else if (sig.fmt === 'nac-consulta'){
             for (const [k, v] of Object.entries(j.puestos || {})){
-              byKey[k] = { vv: v.vv || 0, votos: { ...(v.v || {}) } };
+              byKey[reKey(k)] = { vv: v.vv || 0, votos: { ...(v.v || {}) } };
             }
           }
           out[sig.key] = byKey;
