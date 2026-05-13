@@ -515,7 +515,13 @@
     deptosGeo: `${S3}/mapas-2026/DEPARTAMENTOS2.json`,
     depsIndex: `${S3}/mapas-2026/Departamentos-mps/index.json`,
     depMps:    (depElec) => `${S3}/mapas-2026/Departamentos-mps/${depElec}.json`,
+    cityBloques: (cityKey) => `${S3_BASES}/output_bloques/ciudades/${cityKey}.json`,
+    cityGeo:    (file)    => `${S3}/mapas-2026/Ciudades-COM-LOC/${file}`,
   };
+
+  // Helper: normaliza un código de comuna para matching consistente
+  function normCod(v){ const n = parseInt(v, 10); return Number.isFinite(n) ? String(n).padStart(2,'0') : String(v||'').trim(); }
+  function normCodFromString(s){ return String(s||'').trim(); }
 
   // Candidatos activos. Cada uno define el "modo" de la página.
   const CANDIDATES = [
@@ -523,6 +529,17 @@
     { id:'abelardo', nombre:'Abelardo De la Espriella',   bloque:'d',   enabled:true, pondKey:'De la Espriella' },
     { id:'paloma',   nombre:'Paloma Valencia',            bloque:'d',   enabled:true, pondKey:'Valencia' },
   ];
+
+  // Ciudades con drill-down a comuna. La key es la mun-key (depCod-munCod) del mun
+  // capital. geoProp + geoName son los campos del feature GeoJSON. Si rotate=true,
+  // se aplica rotateGeoJSON90Left (Bogotá).
+  const CITIES = {
+    '16-001': { key:'bogota',       nombre:'Bogotá D.C.',  geoFile:'BOG-LOCALIDADX.json',  geoProp:'LocCodigo',   geoName:'LocNombre',  rotate:true  },
+    '31-001': { key:'cali',         nombre:'Cali',         geoFile:'CALIX.json',           geoProp:'comuna',      geoName:'nombre',     rotate:false },
+    '03-001': { key:'barranquilla', nombre:'Barranquilla', geoFile:'BARRANQUILLAX.json',   geoProp:'id',          geoName:'nombre',     rotate:false },
+    '09-001': { key:'manizales',    nombre:'Manizales',    geoFile:'MANIZALESX.json',      geoProp:'ID_COMUNA',   geoName:'NOMBRES_CO', rotate:false },
+    '24-001': { key:'pereira',      nombre:'Pereira',      geoFile:'PEREIRAX.json',        geoProp:null,          geoName:'Comuna',     rotate:false, byName:true },
+  };
 
   // Home turf por candidato derecha. Multiplicador aplicado a la proyección por mun.
   // Heurística — sin polling regional, modela afinidad histórica de cada bloque.
@@ -566,6 +583,10 @@
     depByElectoral:{}, depByName:{},  // index.json reorganizado
     scoreByMun:{},                    // 'depElec-munElec' → registro
     scoreByDep:{},                    // 'depElec' → registro agregado
+    scoreByComuna:{},                 // cod → registro (sólo cuando hay cityActive)
+    cityActive:null,                  // munKey '16-001' si estamos en city-mode
+    cityBloquesCache:{},              // { key: cityBloques }
+    cityGeoCache:{},                  // { key: geojson }
     mode:'cepeda',                    // candidato activo
     level:'dep',                      // 'dep' | 'mun'
     selectedDep:null,                 // electoral_id si estamos drillados
@@ -721,6 +742,39 @@
       };
     }
     return null;
+  }
+
+  /* ───────── Scoring por comuna (city mode) ───────── */
+  async function loadCityBloques(cityKey){
+    if (STATE.cityBloquesCache[cityKey]) return STATE.cityBloquesCache[cityKey];
+    const j = await fetch(URLS.cityBloques(cityKey)).then(r => r.json());
+    STATE.cityBloquesCache[cityKey] = j;
+    return j;
+  }
+  async function loadCityGeo(cityKey, file){
+    if (STATE.cityGeoCache[cityKey]) return STATE.cityGeoCache[cityKey];
+    const j = await fetch(URLS.cityGeo(file)).then(r => r.json());
+    STATE.cityGeoCache[cityKey] = j;
+    return j;
+  }
+
+  // Aplica scoreMunForMode sobre cada comuna del cityBloques tratándola como mun.
+  // El depCod heredado del mun original se usa para el HOME_TURF.
+  function computeScoresComunas(cityKey, munKey){
+    STATE.scoreByComuna = {};
+    const data = STATE.cityBloquesCache[cityKey];
+    if (!data || !data.comunas) return;
+    const [depCod] = munKey.split('-');
+    for (const [cod, c] of Object.entries(data.comunas)){
+      const asMun = { ...c, depCod };
+      const s = scoreMunForMode(asMun, STATE.mode);
+      if (!s) continue;
+      STATE.scoreByComuna[cod] = {
+        cod, nombre: c.nombre || cod, depCod,
+        censo: 0, // censo por comuna se agrega luego si lo cargamos
+        ...s,
+      };
+    }
   }
 
   function computeScores(){
@@ -909,6 +963,7 @@
         layer.on('mouseover', (e) => onHover(f, e));
         layer.on('mouseout',  () => onHoverOut(f));
         layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
+        if (k && CITIES[k]) layer.on('click', () => renderCity(k));
       },
     }).addTo(STATE.map);
     STATE.map.fitBounds(STATE.layer.getBounds(), { padding:[20,20] });
@@ -916,6 +971,107 @@
     document.getElementById('map-head-title').textContent = `${depName} · Municipios`;
     document.getElementById('map-back-btn').classList.add('show');
     showLoading(false);
+  }
+
+  /* ───────── City mode: render comunas ───────── */
+  // Rota un GeoJSON 90° izq alrededor del centroide (sólo Bogotá).
+  function rotateGeoJSON90Left(geo){
+    const cx = -74.08, cy = 4.65;
+    function rotPt([lng, lat]){
+      const dx = lng - cx, dy = lat - cy;
+      // rotación 90° izq: (x,y) → (-y, x)
+      return [cx - dy, cy + dx];
+    }
+    function rotCoords(c){
+      if (typeof c[0] === 'number') return rotPt(c);
+      return c.map(rotCoords);
+    }
+    const out = JSON.parse(JSON.stringify(geo));
+    for (const f of out.features){
+      if (f.geometry && f.geometry.coordinates){
+        f.geometry.coordinates = rotCoords(f.geometry.coordinates);
+      }
+    }
+    return out;
+  }
+
+  // Resuelve la clave de comuna desde props del GeoJSON.
+  function comunaKeyOfFeature(props, cfg){
+    if (cfg.byName){
+      const nm = String(props[cfg.geoName] || '').trim();
+      if (!nm) return null;
+      // Match por nombre normalizado contra los nombres en STATE.scoreByComuna.
+      const target = norm(nm);
+      for (const [k, r] of Object.entries(STATE.scoreByComuna)){
+        if (norm(r.nombre) === target) return k;
+      }
+      return null;
+    }
+    const raw = props[cfg.geoProp];
+    if (raw == null) return null;
+    // Probar match directo, luego padded a 2 dígitos
+    if (STATE.scoreByComuna[String(raw)]) return String(raw);
+    const padded = String(parseInt(raw, 10)).padStart(2, '0');
+    if (STATE.scoreByComuna[padded]) return padded;
+    const unpadded = String(parseInt(raw, 10));
+    if (STATE.scoreByComuna[unpadded]) return unpadded;
+    return null;
+  }
+
+  async function renderCity(munKey){
+    const cfg = CITIES[munKey];
+    if (!cfg) return;
+    ensureMap();
+    showLoading(true);
+    try {
+      // Carga datos + geojson en paralelo
+      const [bloques, geoRaw] = await Promise.all([
+        loadCityBloques(cfg.key),
+        loadCityGeo(cfg.key, cfg.geoFile),
+      ]);
+      computeScoresComunas(cfg.key, munKey);
+      const geo = cfg.rotate ? rotateGeoJSON90Left(geoRaw) : geoRaw;
+
+      clearLayer();
+      STATE.layer = L.geoJSON(geo, {
+        style: (f) => {
+          const k = comunaKeyOfFeature(f.properties, cfg);
+          const r = k ? STATE.scoreByComuna[k] : null;
+          return styleByScore(r ? r.score : null);
+        },
+        onEachFeature: (f, layer) => {
+          const k = comunaKeyOfFeature(f.properties, cfg);
+          const r = k ? STATE.scoreByComuna[k] : null;
+          f.__key = k;
+          f.__rec = r;
+          f.__name = (r && r.nombre) || (f.properties[cfg.geoName] || cfg.byName ? f.properties[cfg.geoName] : (f.properties[cfg.geoProp] || '—'));
+          f.__depName = cfg.nombre;
+          layer.on('mouseover', (e) => onHover(f, e));
+          layer.on('mouseout',  () => onHoverOut(f));
+          layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
+        },
+      }).addTo(STATE.map);
+      STATE.map.fitBounds(STATE.layer.getBounds(), { padding:[20,20] });
+      document.getElementById('map-head-title').textContent = `${cfg.nombre} · Comunas`;
+      document.getElementById('map-back-btn').classList.add('show');
+      STATE.cityActive = munKey;
+      renderTop30();        // ahora muestra comunas
+      restoreOverview();    // overview leerá scoreByComuna
+    } catch (e){
+      console.error('[Veleta] error renderCity', e);
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  function exitCity(){
+    STATE.cityActive = null;
+    STATE.scoreByComuna = {};
+    if (STATE.selectedDep) renderMunsOfDep(STATE.selectedDep);
+    else if (STATE.level === 'dep') renderDeptos();
+    else renderMunsNacional();
+    renderTop30();
+    restoreOverview();
   }
 
   async function renderMunsNacional(){
@@ -951,6 +1107,7 @@
         layer.on('mouseover', (e) => onHover(f, e));
         layer.on('mouseout',  () => onHoverOut(f));
         layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
+        if (k && CITIES[k]) layer.on('click', () => renderCity(k));
       },
     }).addTo(STATE.map);
     STATE.map.fitBounds(STATE.layer.getBounds(), { padding:[20,20] });
@@ -983,9 +1140,14 @@
     renderMunsOfDep(elec);
   }
   function onBack(){
+    if (STATE.cityActive){
+      exitCity();
+      return;
+    }
     STATE.selectedDep = null;
     if (STATE.level === 'dep') renderDeptos();
     else renderMunsNacional();
+    restoreOverview();
   }
 
   /* ───────── Hover chip ───────── */
@@ -1050,16 +1212,19 @@
     const empty = document.getElementById('det-empty');
     if (!empty) return;
     const cand = currentCand();
+    const inCity = !!STATE.cityActive;
     const lvl  = STATE.level;        // 'dep' | 'mun'
-    const lvlLabel = lvl === 'dep' ? 'Departamentos' : 'Municipios';
-    const unit     = lvl === 'dep' ? 'departamentos' : 'municipios';
+    const lvlLabel = inCity ? 'Comunas / localidades' : (lvl === 'dep' ? 'Departamentos' : 'Municipios');
+    const unit     = inCity ? 'comunas' : (lvl === 'dep' ? 'departamentos' : 'municipios');
     const cands = (STATE.ponderador && STATE.ponderador.candidatos) || {};
     const candPct = (cands[cand.pondKey] && cands[cand.pondKey].pct) || 0;
 
-    // Universo: scoreByMun (siempre tenemos muns); para dep usamos scoreByDep.
-    const items = lvl === 'dep'
-      ? Object.values(STATE.scoreByDep || {})
-      : Object.values(STATE.scoreByMun || {});
+    // Universo: comunas si city-mode, si no dep o mun según level.
+    const items = inCity
+      ? Object.values(STATE.scoreByComuna || {})
+      : (lvl === 'dep'
+          ? Object.values(STATE.scoreByDep || {})
+          : Object.values(STATE.scoreByMun || {}));
     const total = items.length;
     const censoTotal = STATE.sumCensoNacional || 1;
 
@@ -1142,6 +1307,15 @@
 
   /* ───────── Top 30 ranking + contador veleta ───────── */
   function renderTop30(){
+    if (STATE.cityActive){
+      const arr = Object.values(STATE.scoreByComuna).sort((a,b)=>b.score-a.score).slice(0,15);
+      // Adaptamos al formato esperado por patchTop30Names
+      const adapted = arr.map(r => ({
+        key: r.cod, depCod: r.depCod || '', __cityName: r.nombre, score: r.score, __isComuna:true,
+      }));
+      patchTop30Names(adapted);
+      return;
+    }
     const arr = Object.values(STATE.scoreByMun).sort((a,b)=>b.score-a.score).slice(0,15);
     patchTop30Names(arr);
   }
@@ -1154,7 +1328,19 @@
 
   function patchTop30Names(arr){
     const ul = document.getElementById('top-list');
+    const cityCfg = STATE.cityActive ? CITIES[STATE.cityActive] : null;
     ul.innerHTML = arr.map((r,i)=>{
+      if (r.__isComuna){
+        const cityName = cityCfg ? cityCfg.nombre : '';
+        return `<div class="top-row">
+          <div class="top-rank">${i+1}</div>
+          <div>
+            <div class="top-name">${r.__cityName || r.key}</div>
+            <div class="top-meta"><span class="top-meta-dep">${cityName}</span></div>
+          </div>
+          <div class="top-score">${r.score.toFixed(0)}</div>
+        </div>`;
+      }
       const meta = STATE._munNameByKey[r.key];
       const munName = meta ? meta.name : r.key;
       const depName = meta ? meta.depName : ((STATE.depByElectoral[r.depCod]||{}).nombre || r.depCod);
@@ -1221,6 +1407,17 @@
       el.style.display = (el.getAttribute('data-mode') === activeBlockMode) ? '' : 'none';
     });
     computeScores();
+    // Si estamos en city-mode, recomputar también las comunas para el modo nuevo.
+    if (STATE.cityActive){
+      const cfg = CITIES[STATE.cityActive];
+      if (cfg){
+        computeScoresComunas(cfg.key, STATE.cityActive);
+        renderCity(STATE.cityActive);
+        renderTop30();
+        restoreOverview();
+        return;
+      }
+    }
     STATE.selectedDep = null;
     if (STATE.level === 'dep') renderDeptos(); else renderMunsNacional();
     renderTop30();
@@ -1230,13 +1427,16 @@
   /* ───────── Toggle de nivel ───────── */
   function setLevel(lvl){
     if (lvl === 'mun-from-top'){ STATE.level = 'mun'; document.getElementById('lvl-mun').classList.add('active'); document.getElementById('lvl-dep').classList.remove('active'); return; }
-    if (lvl === STATE.level && !STATE.selectedDep) return;
+    if (lvl === STATE.level && !STATE.selectedDep && !STATE.cityActive) return;
     STATE.level = lvl;
     document.getElementById('lvl-dep').classList.toggle('active', lvl==='dep');
     document.getElementById('lvl-mun').classList.toggle('active', lvl==='mun');
+    STATE.cityActive = null;        // cambiar nivel sale de city-mode
+    STATE.scoreByComuna = {};
     STATE.selectedDep = null;
     if (lvl === 'dep') renderDeptos();
     else renderMunsNacional();
+    renderTop30();
     restoreOverview();
   }
 
