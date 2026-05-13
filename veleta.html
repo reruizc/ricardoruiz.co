@@ -317,44 +317,83 @@
     </div>
 
     <details class="collapsible">
-      <summary>Cómo se construye el score · Modo Cepeda</summary>
+      <summary id="metodo-title">Cómo se construye el score · Modo Cepeda</summary>
       <div class="collapsible-body">
-        <div class="intro-grid">
-          <div class="metric-card">
-            <div class="metric-card-pct">PROY</div>
-            <div class="metric-card-name">Proyección 2026 por mun</div>
-            <div class="metric-card-desc">Voto Petro 2022 (1V) en el municipio, escalado al nivel nacional Cepeda 2026 según el ponderador propio. Define dónde Cepeda parte hoy.</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-card-pct">TECHO</div>
-            <div class="metric-card-name">Techo captable</div>
-            <div class="metric-card-desc">Proyección + un tercio del voto centro 2018 (Fajardo). Modela que parte del centro histórico es captable por izquierda en 2026.</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-card-pct">SCORE</div>
-            <div class="metric-card-name">Mezcla 60/40</div>
-            <div class="metric-card-desc">Proximidad al 50% (60%) + plausibilidad de cerrar la brecha dado el techo captable (40%). Si la proyección ya supera 50%, el mun cae a baja prioridad.</div>
-          </div>
-        </div>
-
-        <details class="collapsible-sub">
-          <summary>Conoce cómo lo formulamos matemáticamente</summary>
-          <div class="collapsible-sub-body">
-            <div class="formula-box">
-              proy = <b>izq_2022 × (Cepeda_2026 / izq_2022_nac)</b><br>
-              techo = <b>proy + c_2018 / 3</b> &nbsp;·&nbsp; brecha = max(0, 50 − proy)<br>
-              captable = min(techo − proy, 10 pp)<br>
-              score = (0.6 · proximidad + 0.4 · plausibilidad) × 100
+        <!-- Modo Cepeda -->
+        <div class="mode-block" data-mode="cepeda">
+          <div class="intro-grid">
+            <div class="metric-card">
+              <div class="metric-card-pct">PROY</div>
+              <div class="metric-card-name">Proyección 2026 por mun</div>
+              <div class="metric-card-desc">Voto Petro 2022 (1V) en el municipio, escalado al nivel nacional Cepeda 2026 según el ponderador propio. Define dónde Cepeda parte hoy.</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-card-pct">TECHO</div>
+              <div class="metric-card-name">Techo captable</div>
+              <div class="metric-card-desc">Proyección + un tercio del voto centro 2018 (Fajardo). Modela que parte del centro histórico es captable por izquierda en 2026.</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-card-pct">SCORE</div>
+              <div class="metric-card-name">Mezcla 60/40</div>
+              <div class="metric-card-desc">Proximidad al 50% (60%) + plausibilidad de cerrar la brecha dado el techo captable (40%). Si la proyección ya supera 50%, el mun cae a baja prioridad.</div>
             </div>
           </div>
-        </details>
+          <details class="collapsible-sub">
+            <summary>Conoce cómo lo formulamos matemáticamente</summary>
+            <div class="collapsible-sub-body">
+              <div class="formula-box">
+                proy = <b>izq_2022 × (Cepeda_2026 / izq_2022_nac)</b><br>
+                techo = <b>proy + c_2018 / 3</b> &nbsp;·&nbsp; brecha = max(0, 50 − proy)<br>
+                captable = min(techo − proy, 10 pp)<br>
+                score = (0.6 · proximidad + 0.4 · plausibilidad) × 100
+              </div>
+            </div>
+          </details>
+          <details class="collapsible-sub">
+            <summary>Limitación metodológica</summary>
+            <div class="collapsible-sub-body" style="font-family:Avenir,sans-serif;font-size:.78rem;line-height:1.55;color:rgba(255,255,255,.78);padding:.4rem .1rem .2rem">
+              La proyección por municipio asume que el desplazamiento Petro 2022 → Cepeda 2026 es uniforme geográficamente. Pierde información sobre el perfil diferente de Cepeda frente a Petro (costa, jóvenes, mujeres), que podría tener pull asimétrico. La v1 lo asume constante por trazabilidad; una v2 podría incorporar el detalle departamental del ponderador.
+            </div>
+          </details>
+        </div>
 
-        <details class="collapsible-sub">
-          <summary>Limitación metodológica</summary>
-          <div class="collapsible-sub-body" style="font-family:Avenir,sans-serif;font-size:.78rem;line-height:1.55;color:rgba(255,255,255,.78);padding:.4rem .1rem .2rem">
-            La proyección por municipio asume que el desplazamiento Petro 2022 → Cepeda 2026 es uniforme geográficamente. Pierde información sobre el perfil diferente de Cepeda frente a Petro (costa, jóvenes, mujeres), que sí podría tener pull asimétrico. La v1 lo asume constante por trazabilidad; una v2 podría incorporar el detalle departamental del ponderador.
+        <!-- Modo Abelardo / Paloma (compartido, mismo método) -->
+        <div class="mode-block" data-mode="abelardo" style="display:none">
+          <div class="intro-grid">
+            <div class="metric-card">
+              <div class="metric-card-pct">DER</div>
+              <div class="metric-card-name">Bloque derecha 2022</div>
+              <div class="metric-card-desc">Suma de los bloques <b>d</b> (Fico, Milton Rodríguez, Gómez) y <b>cd</b> (Rodolfo, Pérez) en cada municipio. Mide la base estructural de la derecha.</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-card-pct">PROY</div>
+              <div class="metric-card-name">Proyección por candidato</div>
+              <div class="metric-card-desc">Bloque derecha mun × share Abelardo/Paloma del ponderador 2026 × <b>boost regional</b> (home turf: Costa+Antioquia para Abelardo; Cauca+Valle+Antioquia para Paloma).</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-card-pct">SCORE</div>
+              <div class="metric-card-name">Mezcla 70/30</div>
+              <div class="metric-card-desc">Proximidad al techo realista (~30%) (70%) + plausibilidad del captable histórico der (30%). Muns donde el candidato puede cosechar más votos para asegurar el 2do lugar nacional.</div>
+            </div>
           </div>
-        </details>
+          <details class="collapsible-sub">
+            <summary>Conoce cómo lo formulamos matemáticamente</summary>
+            <div class="collapsible-sub-body">
+              <div class="formula-box">
+                derTotal = d_2022 + cd_2022 &nbsp;·&nbsp; scaleDer = (Abelardo + Paloma)_2026 / derTotal_nac_2022<br>
+                proy_cand = <b>derTotal × scaleDer × (cand_2026 / (Abelardo+Paloma)_2026) × boost</b><br>
+                captable = max(0, techo_der_histórico − proy_cand)<br>
+                score = (0.7 · proximidad + 0.3 · plausibilidad) × 100
+              </div>
+            </div>
+          </details>
+          <details class="collapsible-sub">
+            <summary>Limitación metodológica</summary>
+            <div class="collapsible-sub-body" style="font-family:Avenir,sans-serif;font-size:.78rem;line-height:1.55;color:rgba(255,255,255,.78);padding:.4rem .1rem .2rem">
+              No existe polling per-mun que diferencie a Abelardo de Paloma. Sin esa señal, los dos modos comparten la base del bloque derecha histórico y se diferencian sólo por un <b>boost regional manual</b> ("home turf"): Costa Atlántica + Antioquia para Abelardo, Cauca + Valle + Antioquia para Paloma. El boost refleja afinidad histórica del electorado de derecha por cada candidato, no resultados encuestados. Los mapas Abelardo vs Paloma serán similares fuera de las regiones de boost — esto es honesto a los datos disponibles, no un bug.
+            </div>
+          </details>
+        </div>
       </div>
     </details>
   </section>
@@ -364,8 +403,8 @@
     <div class="toggle-group">
       <span class="toggle-label">Candidato</span>
       <button class="toggle-btn active" id="cand-cepeda" onclick="setMode('cepeda')">Cepeda</button>
-      <button class="toggle-btn disabled" id="cand-abelardo" title="Próximamente" disabled>Abelardo · próx.</button>
-      <button class="toggle-btn disabled" id="cand-paloma" title="Próximamente" disabled>Paloma · próx.</button>
+      <button class="toggle-btn" id="cand-abelardo" onclick="setMode('abelardo')">Abelardo</button>
+      <button class="toggle-btn" id="cand-paloma" onclick="setMode('paloma')">Paloma</button>
     </div>
     <div class="toggle-group">
       <span class="toggle-label">Nivel</span>
@@ -411,14 +450,7 @@
             <div class="det-parents" id="det-parents">—</div>
           </div>
           <div class="det-score-big" id="det-score">—</div>
-          <dl class="det-meta">
-            <div class="det-row"><dt class="lbl">Proyección Cepeda 2026</dt><dd class="val" id="det-proy">—</dd></div>
-            <div class="det-row"><dt class="lbl">Brecha al 50% (1V)</dt><dd class="val" id="det-gap">—</dd></div>
-            <div class="det-row"><dt class="lbl">Techo captable</dt><dd class="val" id="det-techo">—</dd></div>
-            <div class="det-row"><dt class="lbl">Captable estimado</dt><dd class="val" id="det-captable">—</dd></div>
-            <div class="det-row"><dt class="lbl">Petro 2022 (1V)</dt><dd class="val" id="det-izq22">—</dd></div>
-            <div class="det-row"><dt class="lbl">Censo 2026</dt><dd class="val" id="det-censo">—</dd></div>
-          </dl>
+          <dl class="det-meta" id="det-meta"></dl>
         </div>
       </div>
 
@@ -446,7 +478,8 @@
   <!-- FOOTER · disclaimer metodológico -->
   <footer class="foot">
     <p><strong>Metodología.</strong> Veleta cruza la evolución del voto por bloque ideológico (izquierda, centro, derecha) entre 2010-2022 con el ponderador propio 2026, para identificar dónde el esfuerzo de campaña tiene mayor leverage por candidato. Datos: Registraduría Nacional (GCS 2010/2014/2018/2022 1V), ponderador propio (encuestas calibradas vs 8-mar 2026), censo Divipole.</p>
-    <p><strong>Modo Cepeda</strong> proyecta su votación por mun a partir del voto Petro 2022 escalado al nivel nacional del ponderador. El techo captable suma un tercio del voto centro 2018 (Fajardo), reflejando la redistribución del centro hacia los tres candidatos top. Score combina proximidad al 50% y plausibilidad del captable. Modos <b>Abelardo</b> y <b>Paloma</b> próximamente.</p>
+    <p><strong>Modo Cepeda</strong> proyecta su votación por mun a partir del voto Petro 2022 escalado al nivel nacional del ponderador. El techo captable suma un tercio del voto centro 2018 (Fajardo), reflejando la redistribución del centro. Score combina proximidad al 50% y plausibilidad del captable.</p>
+    <p><strong>Modos Abelardo y Paloma</strong> proyectan votación a partir del bloque derecha 2022 (Fico + Rodolfo + minor) escalado al peso 2026 de cada candidato, con un <b>boost regional manual</b> (home turf) que diferencia los dos mapas: Costa Atlántica + Antioquia para Abelardo; Cauca + Valle + Antioquia para Paloma. Sin polling per-mun que separe Abelardo de Paloma, el boost es una heurística declarada — la metodología la explicamos en el collapsible "Limitación".</p>
     <p style="opacity:.7;margin-top:.8rem"><a href="electoral.html">← Volver a Electoral</a> &nbsp;·&nbsp; ricardoruiz.co · 2026</p>
   </footer>
 
@@ -470,10 +503,31 @@
 
   // Candidatos activos. Cada uno define el "modo" de la página.
   const CANDIDATES = [
-    { id:'cepeda',   nombre:'Iván Cepeda',        bloque:'izq', enabled:true,  pondKey:'Cepeda' },
-    { id:'abelardo', nombre:'Abelardo De la Espriella', bloque:'d',   enabled:false, pondKey:'De la Espriella' },
-    { id:'paloma',   nombre:'Paloma Valencia',    bloque:'d',   enabled:false, pondKey:'Valencia' },
+    { id:'cepeda',   nombre:'Iván Cepeda',                bloque:'izq', enabled:true, pondKey:'Cepeda' },
+    { id:'abelardo', nombre:'Abelardo De la Espriella',   bloque:'d',   enabled:true, pondKey:'De la Espriella' },
+    { id:'paloma',   nombre:'Paloma Valencia',            bloque:'d',   enabled:true, pondKey:'Valencia' },
   ];
+
+  // Home turf por candidato derecha. Multiplicador aplicado a la proyección por mun.
+  // Heurística — sin polling regional, modela afinidad histórica de cada bloque.
+  const HOME_TURF = {
+    abelardo: {
+      // Costa Atlántica (su origen + base anti-establishment)
+      '03':1.20, '05':1.20, '12':1.20, '13':1.20, '21':1.20, '28':1.20, '48':1.20,
+      // Antioquia (uribista)
+      '01':1.10,
+    },
+    paloma: {
+      // Cauca (su origen)
+      '11':1.30,
+      // Valle del Cauca (CD natural)
+      '31':1.15,
+      // Antioquia (CD)
+      '01':1.10,
+      // Boyacá / Cundinamarca tradicional conservador
+      '07':1.05, '15':1.05,
+    },
+  };
 
   // Normalizar nombres para match (deptos)
   const norm = (s) => (s||'').toString().normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
@@ -583,6 +637,70 @@
         izq22, c18, techoIzq,
         proy: proyCepeda, techoCaptable: techoCepeda,
         gap: gapTo50, captable, plausibleGain,
+        score,
+      };
+    }
+
+    if (mode === 'abelardo' || mode === 'paloma'){
+      const d22 = b22.d, cd22 = b22.cd;
+      const derTotal22 = d22 + cd22;
+
+      const cands = (STATE.ponderador && STATE.ponderador.candidatos) || {};
+      const candNac     = (cands[cand.pondKey] && cands[cand.pondKey].pct) || 1;
+      const abelardoNac = (cands['De la Espriella'] && cands['De la Espriella'].pct) || 23.77;
+      const palomaNac   = (cands['Valencia'] && cands['Valencia'].pct) || 19.36;
+      const derPondNac  = abelardoNac + palomaNac;
+
+      const nacB = (STATE.bloquesNac && STATE.bloquesNac.nacional) || {};
+      const derNac22 = ((nacB['2022'] && nacB['2022'].d) || 25.9) + ((nacB['2022'] && nacB['2022'].cd) || 28.7);
+
+      // Proyección total derecha 2026 en mun
+      const scaleDer = derPondNac / derNac22;
+      const derProy  = derTotal22 * scaleDer;
+
+      // Share del candidato dentro del bloque derecha (asumido uniforme nacionalmente)
+      const shareCand = candNac / derPondNac;
+
+      // Home turf boost por dep electoral
+      const depCod = (mun.depCod || '').toString();
+      const boost  = (HOME_TURF[mode] || {})[depCod] || 1.0;
+
+      const candProy = derProy * shareCand * boost;
+
+      // Techo histórico bloque derecha amplio (d + cd) en este mun
+      const techoDer = Math.max(
+        ((b10 && b10.d) || 0) + ((b10 && b10.cd) || 0),
+        ((b14 && b14.d) || 0) + ((b14 && b14.cd) || 0),
+        ((b18 && b18.d) || 0) + ((b18 && b18.cd) || 0),
+        derTotal22
+      );
+      const techoCand = techoDer * scaleDer * shareCand * boost;
+      const captable  = Math.max(0, techoCand - candProy);
+
+      // Cepeda proy en este mun (referencia para 2do lugar)
+      const izq22 = b22.izq;
+      const cepedaNacRef = (cands['Cepeda'] && cands['Cepeda'].pct) || 38.67;
+      const izqNacRef    = (nacB['2022'] && nacB['2022'].izq) || 41.05;
+      const cepedaProy   = izq22 * (cepedaNacRef / izqNacRef);
+
+      // Score: qué tan rentable es competir aquí para este candidato derecha.
+      // - proximidad: candProy alto = base sólida (techo realista candidato individual ~30%)
+      // - plausibilidad: captable histórico relativo
+      let score;
+      if (candProy >= 50){
+        score = 35;                                          // gana 1V (improbable pero safe)
+      } else {
+        const proxScore  = Math.min(1, candProy / 30);
+        const plausScore = Math.min(1, captable / 5);
+        score = (proxScore * 0.7 + plausScore * 0.3) * 100;
+      }
+
+      return {
+        d22, cd22, derTotal22, techoDer,
+        derProy, candProy, techoCand, captable,
+        cepedaProy,
+        boost,
+        proy: candProy,
         score,
       };
     }
@@ -880,6 +998,41 @@
   function fmtPct(n,d=1){ if (n==null||isNaN(n)) return '—'; return n.toFixed(d) + '%'; }
   function fmtPP(n,d=1){ if (n==null||isNaN(n)) return '—'; return (n>=0?'':'') + n.toFixed(d) + ' pp'; }
 
+  function buildDetailRows(mode, r){
+    const cand = CANDIDATES.find(c => c.id === mode) || CANDIDATES[0];
+    const candFirst = cand.nombre.split(' ')[0];
+    if (!r) return '';
+
+    if (mode === 'cepeda'){
+      const gapTxt = r.gap > 0 ? (r.gap.toFixed(1) + ' pp') : 'ya en 1V';
+      return [
+        ['Proyección ' + candFirst + ' 2026', fmtPct(r.proy, 1)],
+        ['Brecha al 50% (1V)',                 gapTxt],
+        ['Techo captable',                     fmtPct(r.techoCaptable, 1)],
+        ['Captable estimado',                  (r.captable||0).toFixed(1) + ' pp'],
+        ['Petro 2022 (1V)',                    fmtPct(r.izq22, 1)],
+        ['Censo 2026',                         fmtNum(r.censo)],
+      ].map(([l,v]) => `<div class="det-row"><dt class="lbl">${l}</dt><dd class="val">${v}</dd></div>`).join('');
+    }
+
+    if (mode === 'abelardo' || mode === 'paloma'){
+      const boostTxt = r.boost > 1 ? `+${Math.round((r.boost-1)*100)}% home turf` : '—';
+      const vsCepeda = (r.candProy != null && r.cepedaProy != null)
+        ? (r.candProy >= r.cepedaProy ? 'lidera 2do' : `Cepeda +${(r.cepedaProy - r.candProy).toFixed(1)} pp`)
+        : '—';
+      return [
+        ['Proyección ' + candFirst + ' 2026', fmtPct(r.candProy, 1)],
+        ['Frente a Cepeda',                   vsCepeda],
+        ['Bloque derecha 2022 (mun)',         fmtPct(r.derTotal22, 1)],
+        ['Techo histórico derecha',           fmtPct(r.techoDer, 1)],
+        ['Captable estimado',                 (r.captable||0).toFixed(1) + ' pp'],
+        ['Boost regional',                    boostTxt],
+        ['Censo 2026',                        fmtNum(r.censo)],
+      ].map(([l,v]) => `<div class="det-row"><dt class="lbl">${l}</dt><dd class="val">${v}</dd></div>`).join('');
+    }
+    return '';
+  }
+
   function showDetailFromFeature(f){
     const r = f.__rec;
     document.getElementById('det-empty').style.display = 'none';
@@ -891,24 +1044,8 @@
       : (f.__depName || '');
     const scEl = document.getElementById('det-score');
     scEl.textContent = (r && r.score!=null) ? r.score.toFixed(0) : '—';
-
-    const cand = currentCand();
-    const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-
-    if (!r){
-      setText('det-proy', '—'); setText('det-gap', '—');
-      setText('det-techo', '—'); setText('det-captable', '—');
-      setText('det-censo', '—'); setText('det-izq22', '—');
-      return;
-    }
-
-    // Métricas modo Cepeda
-    setText('det-proy',     fmtPct(r.proy, 1));
-    setText('det-gap',      r.gap > 0 ? (r.gap.toFixed(1) + ' pp') : 'ya en 1V');
-    setText('det-techo',    fmtPct(r.techoCaptable, 1));
-    setText('det-captable', (r.captable||0).toFixed(1) + ' pp');
-    setText('det-censo',    fmtNum(r.censo));
-    setText('det-izq22',    fmtPct(r.izq22, 1));
+    const meta = document.getElementById('det-meta');
+    if (meta) meta.innerHTML = buildDetailRows(STATE.mode, r);
   }
 
   /* ───────── Top 30 ranking + contador veleta ───────── */
@@ -983,6 +1120,14 @@
     }
     const title = document.getElementById('top-title');
     if (title) title.textContent = `Top 30 · muns clave para ${cand.nombre.split(' ')[0]}`;
+    const metaTitle = document.getElementById('metodo-title');
+    if (metaTitle) metaTitle.textContent = `Cómo se construye el score · Modo ${cand.nombre.split(' ')[0]}`;
+    // Mostrar el bloque metodológico correspondiente.
+    // 'abelardo' y 'paloma' comparten bloque (data-mode='abelardo').
+    const activeBlockMode = (id === 'paloma') ? 'abelardo' : id;
+    document.querySelectorAll('.mode-block').forEach(el => {
+      el.style.display = (el.getAttribute('data-mode') === activeBlockMode) ? '' : 'none';
+    });
     computeScores();
     STATE.selectedDep = null;
     if (STATE.level === 'dep') renderDeptos(); else renderMunsNacional();
