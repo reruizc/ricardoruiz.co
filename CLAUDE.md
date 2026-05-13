@@ -214,6 +214,58 @@ Divipole-actualizado/COMUNAS_DATA.csv   → censo electoral oficial: dd, mm, zz,
                                           mujeres, hombres, total (41.287.084 total nacional)
 ```
 
+## Censos electorales históricos (Divipole por elección)
+
+Para calcular abstención de elecciones pasadas hace falta el censo
+*de la época*, no el actual. Los Divipole oficiales que tenemos:
+
+```
+Bases de datos/Divipol 23.09.2021.xlsx     → censo previo a pres-2022 1V (38.6M nacional)
+                                             shape: dd, mm, zz, pp + departamento, municipio,
+                                             puesto, mujeres, hombres, total, mesas, comuna,
+                                             dirección. Procesado a JSON por
+                                             tools/build-censo-divipole.py.
+Bases de datos/Edadygenero2018Congreso.xlsx → NO ES XLSX. Header TCicada v2.0 2017-05-26
+                                             (formato propietario Registraduría). No abre con
+                                             openpyxl/Excel — re-pedir a Registraduría en CSV.
+```
+
+Divipole 2018 oficial NO disponible. Para abstención pres-2018:
+opción A) pedir CSV a Registraduría; opción B) usar censo 2022 como
+proxy (cambios marginales 2018→2022); opción C) reconstruir con
+proyecciones DANE.
+
+## Análisis demográfico de votantes — `Bases de datos/Edadygenero.xlsx` (~135 MB)
+
+Archivo Registraduría con **votantes por mesa desglosados por edad y
+género** para 2018, 2019, 2022 y 2023. Estructura: 645k filas × 47
+columnas. Filtros: columna `Año` y columna `Datos de tipo de elección`
+(`Congreso de la República` / `Presidencia 1V` / `Presidencia 2V` /
+`Autoridades Locales`).
+
+Cobertura por (año, tipo):
+- 2018 Congreso (103.779 mesas, 17.8M votantes)
+- 2018 Presidencia 1V (97.638, 19.6M)  ← cuadra con oficial 19.61M
+- 2019 Autoridades Locales (107.684, 22.2M)
+- 2022 Congreso (112.012, 18.8M)
+- 2022 Presidencia 1V (112.012, 18.8M)  ← falta vs oficial 21.5M
+- 2022 Presidencia 2V (112.012, 18.8M)
+- 2023 Autoridades Locales (248 mesas — incompleto, ignorar)
+
+Las 3 elecciones 2022 con cifras idénticas (18.8M) sugiere que solo
+trajeron sufragantes con desglose válido — falta ~2.7M cuyas mesas no
+tenían breakdown demográfico. Para conteo total de votantes 2022 usar
+los archivos GCS, no este.
+
+**Columna "Cantidad de Sufragantes" = personas que VOTARON** (no
+censo). Confirmado al sumar 2018 contra cifra oficial (match 99.9%).
+**NO usar como denominador de abstención.** Sí usar para:
+- Análisis demográfico de votantes (módulo futuro: pirámide poblacional
+  electoral, sesgos de edad por candidato, etc.).
+- Validación cruzada de votos totales por mesa con GCS.
+
+Depto 88 (Consulados/Exterior) sí está incluido.
+
 ## Data local — históricos pre-2026 (GCS)
 Histórico electoral desde 2010 (Registraduría, formato GCS unificado). **Pesados, no se
 despliegan al navegador**: se procesan y se suben a S3 como JSON agregados.
