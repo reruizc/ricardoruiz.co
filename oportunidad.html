@@ -897,6 +897,7 @@
     cityLoading:{},     // { cityKey: Promise }
     cityGeo:{},         // { cityKey: GeoJSON }
     cityNacAfin:{},     // { cityKey: { candId: { bucket: pct_nacional_ciudad_afin } } }
+    cityCensoByCom:{},  // { cityKey: { comCod: { nombre, censo, mujeres, hombres } } } — Divipole
     cityComMetrics:{},  // { cityKey: { comCod: { afin, techo, proj, gap, abst, censo } } }
     selectedCity:null,  // cityKey activo (en drilldown)
 
@@ -1762,6 +1763,22 @@
           }
         })());
       }
+      // Censo electoral por comuna (Divipole, generado por
+      // tools/build-censo-comuna-ciudades.js). Vive bajo output_ciudades/
+      // para todas las 14 ciudades — incluso Medellín, aunque el resto
+      // de sus datos viva en output_medellin/.
+      fetches.push((async () => {
+        try {
+          const url = `${CITY_S3}/${cityKey}/censo-comuna.json`;
+          const r = await fetch(url);
+          if (!r.ok) return;
+          const j = await r.json();
+          STATE.cityCensoByCom[cityKey] = j.por_comuna || {};
+        } catch (e){
+          console.warn('[opo·city·censo]', cityKey, e);
+        }
+      })());
+
       await Promise.all(fetches);
       STATE.cityData[cityKey] = out;
       return out;
@@ -1969,12 +1986,32 @@
         gapXfer += d.xferFrac * d.pondPct * biasD;
       }
       const gap     = gapNsnr != null ? (gapNsnr + gapXfer) : null;
-      const censo   = censoByCom[comCod] || 0;
-      const contrib = gap != null ? gap * censo / censoCity : null;
+      const contrib = gap != null ? gap * (censoByCom[comCod]||0) / censoCity : null;
       const techo   = proj != null ? proj + gap : null;
 
-      const abst = null;
-      out[comCod] = { comCod, afin, techo, proj, gap, contrib, bias, buckets, abst, censo };
+      // Abstención por comuna: 1 − votos_totales(pres-2022) / censo_oficial.
+      // El censo viene del archivo censo-comuna.json (Divipole, agregado por
+      // tools/build-censo-comuna-ciudades.js). Si la comuna no aparece en el
+      // mapeo de censo (corregimientos con códigos divergentes en GeoJSON,
+      // p.ej. Medellín 17-21 vs 50-90), abst queda null y se pinta gris.
+      const censoDiv = STATE.cityCensoByCom[cityKey]?.[comCod];
+      const censoOf  = censoDiv ? censoDiv.censo : 0;
+      const ePres22  = cityData['pres-2022']?.[comCod];
+      const totVot22 = ePres22 ? ((ePres22.votos_validos||0) + (ePres22.votos_totales||0 ? 0 : 0)) : 0;
+      // pres-2022 trae votos_validos + especiales separados; total = válidos + blanco + nulos + no_marcados.
+      let totPres22 = 0;
+      if (ePres22){
+        totPres22 = (ePres22.votos_validos || 0)
+                  + (ePres22.especiales?.blanco || 0)
+                  + (ePres22.especiales?.nulos || 0)
+                  + (ePres22.especiales?.no_marcados || 0);
+        if (!totPres22) totPres22 = ePres22.votos_totales || 0;
+      }
+      const abst = (censoOf > 0 && totPres22 > 0) ? clamp(1 - totPres22/censoOf, 0, 1) : null;
+      // El campo `censo` que se exporta a metrics es el oficial (Divipole)
+      // si está disponible, para que el panel y los rankings lo muestren.
+      const censoFinal = censoOf > 0 ? censoOf : (censoByCom[comCod] || 0);
+      out[comCod] = { comCod, afin, techo, proj, gap, contrib, bias, buckets, abst, censo: censoFinal };
     }
     STATE.cityComMetrics[cityKey] = out;
   }
