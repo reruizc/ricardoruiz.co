@@ -2990,6 +2990,7 @@
         renderCityComLayer('medellin');
       }
       refreshMdeViewToggle();
+      renderTop30();
     } catch (e){
       console.error('[opo·mde] setMdeView error', e);
     } finally {
@@ -3286,6 +3287,7 @@
         renderCityComLayer('bogota');
       }
       refreshBogViewToggle();
+      renderTop30();
     } catch (e){
       console.error('[opo·bog] setBogView error', e);
     } finally {
@@ -3334,6 +3336,7 @@
       }
       refreshMdeViewToggle();
       refreshBogViewToggle();
+      renderTop30();
     } catch (e){
       console.error('[opo·city] error rendering', cityKey, e);
     } finally {
@@ -3548,31 +3551,100 @@
   // de crecimiento nacional del candidato. Si Cepeda crece 2.01pp a nivel
   // país por NS-NR, el top-30 debe explicar el grueso de esos 2.01pp.
   function renderTop30(){
-    // Si hay un depto seleccionado, filtra el top a los muns de ese depto.
-    // Si hay ciudad activa (drilldown), el top no aplica (esa vista usa
-    // comunas, no muns; se deja vacío con mensaje).
-    const dep = STATE.selectedDep;
-    const arr = Object.values(STATE.munMetrics)
-      .filter(r => r.contrib != null && (!dep || r.depCod === dep))
-      .sort((a,b) => b.contrib - a.contrib)
-      .slice(0,30);
-    const titleEl = document.getElementById('top-title');
-    if (titleEl){
-      const depName = dep ? ((STATE.depByElectoral[dep]||{}).nombre || dep) : null;
-      titleEl.textContent = depName
-        ? `Top ${Math.min(30, arr.length)} · municipios de ${depName}`
-        : 'Top 30 · municipios de oportunidad';
+    // El top se adapta al scope activo:
+    //   modo Puestos (cualquier scope)        → top puestos visibles
+    //   Medellín · Barrios                    → top barrios MDE
+    //   Bogotá · UPL                          → top UPL
+    //   Ciudad (modo comunas/localidades)     → top comunas/localidades
+    //   Depto (sin ciudad)                    → top muns del depto
+    //   Nacional                              → top muns nacionales
+    // Cada item se normaliza a { name, sub, contrib, click? }.
+    let items = [];
+    let unitLabel = 'municipios';
+    let scope = 'oportunidad';
+    const TOP_N = 30;
+
+    if (STATE.layer === 'pue' && STATE.puestoMetrics && Object.keys(STATE.puestoMetrics).length){
+      // Top de PUESTOS VISIBLES.
+      const visible = visiblePuestos();
+      const scopeName = STATE.selectedCity ? CITIES[STATE.selectedCity].label
+                      : STATE.selectedDep ? ((STATE.depByElectoral[STATE.selectedDep]||{}).nombre || STATE.selectedDep)
+                      : 'nacional';
+      items = visible.map(p => {
+        const m = STATE.puestoMetrics[p.k];
+        if (!m || m.contrib == null) return null;
+        return {
+          name: p.n || p.k,
+          sub: p.mn || '',
+          contrib: m.contrib,
+        };
+      }).filter(Boolean);
+      unitLabel = 'puestos'; scope = scopeName;
     }
+    else if (STATE.selectedCity === 'medellin' && STATE.mdeView === 'barrios' && STATE.mdeBarrioMetrics){
+      // Top de BARRIOS Medellín. El nombre vive en STATE.mdeBarriosData[sig][bk].nombre.
+      const data = STATE.mdeBarriosData || {};
+      const refSig = Object.values(data)[0] || {};
+      for (const [bk, m] of Object.entries(STATE.mdeBarrioMetrics)){
+        if (m.contrib == null) continue;
+        const e = refSig[bk] || {};
+        items.push({ name: e.nombre || bk, sub: 'Comuna ' + (m.comuna || '?'), contrib: m.contrib });
+      }
+      unitLabel = 'barrios'; scope = 'Medellín';
+    }
+    else if (STATE.selectedCity === 'bogota' && STATE.bogView === 'upl' && STATE.bogUplMetrics){
+      for (const [cod, m] of Object.entries(STATE.bogUplMetrics)){
+        if (m.contrib == null) continue;
+        items.push({ name: m.nombre || cod, sub: m.sector || '', contrib: m.contrib });
+      }
+      unitLabel = 'UPL'; scope = 'Bogotá';
+    }
+    else if (STATE.selectedCity && STATE.cityComMetrics[STATE.selectedCity]){
+      const cfg = CITIES[STATE.selectedCity];
+      const censoMap = STATE.cityCensoByCom[STATE.selectedCity] || {};
+      // Aliases manuales por (cityKey, comCod) para corregir nombres genéricos.
+      const aliasMap = CITY_COMUNA_ALIAS[STATE.selectedCity] || {};
+      for (const [cod, m] of Object.entries(STATE.cityComMetrics[STATE.selectedCity])){
+        if (m.contrib == null) continue;
+        const ce = censoMap[cod];
+        const nombre = aliasMap[cod] || (ce ? ce.nombre : cod);
+        const sub = ce && ce.tipo === 'corregimiento' ? 'corregimiento' : '';
+        items.push({ name: nombre, sub, contrib: m.contrib });
+      }
+      unitLabel = (cfg.kind || 'comunas').toLowerCase();
+      scope = cfg.label;
+    }
+    else {
+      // Default: muns nacionales (filtrar por depto si está activo).
+      const dep = STATE.selectedDep;
+      for (const r of Object.values(STATE.munMetrics)){
+        if (r.contrib == null) continue;
+        if (dep && r.depCod !== dep) continue;
+        const meta = STATE.munNameByKey[r.munKey];
+        const munName = meta ? meta.name : r.munKey;
+        const depName = meta ? meta.depName : ((STATE.depByElectoral[r.depCod]||{}).nombre || r.depCod);
+        items.push({
+          name: munName, sub: depName, contrib: r.contrib,
+          click: `onTopClick('${r.munKey}','${r.depCod}')`,
+        });
+      }
+      unitLabel = 'municipios';
+      scope = dep ? ((STATE.depByElectoral[dep]||{}).nombre || dep) : 'oportunidad';
+    }
+
+    items.sort((a,b) => b.contrib - a.contrib);
+    items = items.slice(0, TOP_N);
+    const titleEl = document.getElementById('top-title');
+    if (titleEl) titleEl.textContent = `Top ${items.length} · ${unitLabel} de ${scope}`;
+
     const ul = document.getElementById('top-list');
-    ul.innerHTML = arr.map((r,i) => {
-      const meta = STATE.munNameByKey[r.munKey];
-      const munName = meta ? meta.name : r.munKey;
-      const depName = meta ? meta.depName : ((STATE.depByElectoral[r.depCod]||{}).nombre || r.depCod);
-      return `<div class="top-row" data-key="${r.munKey}" data-dep="${r.depCod}" onclick="onTopClick('${r.munKey}','${r.depCod}')">
+    ul.innerHTML = items.map((r,i) => {
+      const clickAttr = r.click ? ` onclick="${r.click}"` : '';
+      return `<div class="top-row"${clickAttr}>
         <div class="top-rank">${i+1}</div>
         <div>
-          <div class="top-name">${munName}</div>
-          <div class="top-meta"><span class="top-meta-dep">${depName}</span></div>
+          <div class="top-name">${r.name}</div>
+          <div class="top-meta"><span class="top-meta-dep">${r.sub || ''}</span></div>
         </div>
         <div class="top-score">${fmtPP(r.contrib,2)}</div>
       </div>`;
@@ -3870,6 +3942,7 @@
         showLoading(false);
         updateLegend();
         updateCounter();
+        renderTop30();
       }).catch(e => {
         console.error('[opo·pue] error', e);
         showLoading(false);
@@ -3897,6 +3970,7 @@
     updateLegend();
     repaintLayer();
     updateCounter();
+    renderTop30();
   }
   function setLevel(lvl){
     // Salir del modo Puestos si estaba activo.
