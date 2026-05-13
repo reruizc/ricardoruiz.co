@@ -55,6 +55,14 @@ const COR_DES_TO_NAME = {
 // Si no existe, el script funciona pero no produce `por-barrio.json`.
 const PUESTOS_GEOREF_PATH = '/Users/ricardoruiz/ricardoruiz.co/Bases de datos/PUESTOS_GEOREF.csv';
 
+// Pre-cómputo point-in-polygon contra MEDELLIN_BARRIOS_OFICIAL.json (DAP).
+// Generado por tools/match-puestos-barrios.py. Tiene formato:
+//   { "01-01": { codigo, nombre, comuna, lat, lon, ... }, ... }
+// Si existe, usamos el código oficial como clave del nivel barrio
+// (en lugar del nombre aproximado del CSV). Match perfecto contra el
+// GeoJSON oficial vía CODIGO.
+const PUESTOS_TO_BARRIOS_PATH = '/Users/ricardoruiz/ricardoruiz.co/.claude/worktrees/clever-mclaren-9f6cfb/tools/puestos_to_barrios.json';
+
 // Curules de concejo en Medellín (D'Hondt)
 const CURULES_CONCEJO = 21;
 
@@ -95,15 +103,34 @@ const COMUNA_NOMBRE = {
 
 function mapZZ(zz){ return ZZ_TO_COMUNA[zz] || 'OTROS'; }
 
-// ─── PUESTOS_GEOREF ────────────────────────────────────────────────
-// Carga sincrónica de PUESTOS_GEOREF para construir un mapa
-// "zz-pp" → { barrio, lat, lon, comunaPol }. Si el archivo no existe,
-// devuelve null y el script no produce por-barrio.json.
+// ─── PUESTOS → BARRIO OFICIAL (point-in-polygon precomputado) ──────
+// Prefiere puestos_to_barrios.json (códigos oficiales DAP). Si no existe,
+// cae al PUESTOS_GEOREF.csv con nombres del CSV (modo legacy).
 function loadPuestosGeoref(){
+  // Modo preferido: mapping pre-computado por tools/match-puestos-barrios.py
+  if (fs.existsSync(PUESTOS_TO_BARRIOS_PATH)){
+    const data = JSON.parse(fs.readFileSync(PUESTOS_TO_BARRIOS_PATH, 'utf8'));
+    const map = new Map();
+    for (const [key, m] of Object.entries(data)){
+      // key formato "01-01" → matchea con `${zz}-${pp}` del TER
+      // Importante: usamos el CODIGO oficial como clave del barrio, no el nombre.
+      // Así el match con MEDELLIN_BARRIOS_OFICIAL.json es exacto.
+      map.set(key, {
+        barrio: m.codigo || m.nombre,   // clave: código oficial
+        barrioNombre: m.nombre,         // nombre legible
+        lat: m.lat, lon: m.lon,
+        comunaPol: m.comuna || mapZZ(key.split('-')[0]),
+      });
+    }
+    console.log(`  · puestos_to_barrios.json cargado: ${map.size} puestos → código DAP oficial`);
+    return map;
+  }
+  // Fallback legacy: leer PUESTOS_GEOREF.csv y usar nombre del barrio
   if (!fs.existsSync(PUESTOS_GEOREF_PATH)){
-    console.warn(`  ! PUESTOS_GEOREF.csv no encontrado en ${PUESTOS_GEOREF_PATH} — saltando nivel barrio`);
+    console.warn(`  ! Ni puestos_to_barrios.json ni PUESTOS_GEOREF.csv encontrados — saltando nivel barrio`);
     return null;
   }
+  console.warn(`  ! puestos_to_barrios.json no existe — usando PUESTOS_GEOREF.csv (nombres aproximados)`);
   const raw = fs.readFileSync(PUESTOS_GEOREF_PATH, 'utf8');
   const lines = raw.split(/\r?\n/);
   const headerCols = lines[0].replace(/^﻿/, '').split(';').map(s => s.trim());
@@ -135,7 +162,7 @@ function loadPuestosGeoref(){
     const lon = parseFloat(parts[I_LON]);
     let comC = (parts[I_COMC] || '').trim().padStart(2, '0');
     if (!barrio || !Number.isFinite(lat) || !Number.isFinite(lon)) continue;
-    map.set(`${zz}-${pp}`, { barrio, lat, lon, comunaPol: comC || mapZZ(zz) });
+    map.set(`${zz}-${pp}`, { barrio, barrioNombre: barrio, lat, lon, comunaPol: comC || mapZZ(zz) });
   }
   console.log(`  · PUESTOS_GEOREF cargado: ${map.size} puestos físicos de Medellín`);
   return map;
@@ -305,16 +332,21 @@ async function processCsv(csvPath, puestos){
     accum(ensure(tgt.puesto, `${zz}-${pp}`), cod, candNombre, candPartido, votos);
     accum(ensure(tgt.mesa,   `${zz}-${pp}-${ms}`), cod, candNombre, candPartido, votos);
 
-    // Nivel barrio (vía PUESTOS_GEOREF)
+    // Nivel barrio. Clave: código oficial DAP (preferido) o nombre
+    // normalizado (modo legacy). El nombre legible va en barrioMeta.
     if (puestos){
       const pgeo = puestos.get(`${zz}-${pp}`);
       if (pgeo){
-        const bk = barrioKey(pgeo.barrio);
+        const bk = pgeo.barrio;  // CODIGO oficial DAP, o barrio normalizado legacy
         accum(ensure(tgt.barrio, bk), cod, candNombre, candPartido, votos);
-        // Centroide ponderado por votos
         let meta = barrioMeta[corName].get(bk);
         if (!meta){
-          meta = { nombre: pgeo.barrio, comunaPol: pgeo.comunaPol, latSum: 0, lonSum: 0, wSum: 0 };
+          meta = {
+            codigo: bk,
+            nombre: pgeo.barrioNombre || pgeo.barrio,
+            comunaPol: pgeo.comunaPol,
+            latSum: 0, lonSum: 0, wSum: 0,
+          };
           barrioMeta[corName].set(bk, meta);
         }
         meta.latSum += pgeo.lat * votos;
@@ -392,6 +424,7 @@ async function main(){
       const meta = barrioMeta[corp].get(k);
       if (!meta || meta.wSum === 0) continue;
       porBarrio[k] = {
+        codigo: meta.codigo,
         nombre: meta.nombre,
         comuna: meta.comunaPol,
         lat: meta.latSum / meta.wSum,

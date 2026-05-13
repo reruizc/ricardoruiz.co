@@ -828,15 +828,26 @@
         const barriosGeo = await loadBarriosGeo();
         if (barriosGeo && barriosGeo.features && barriosGeo.features.length){
           usedPolygons = true;
-          // Indexar datos del voto histórico por dos claves: directa y agresiva
+          // Indexar datos del voto histórico por tres claves:
+          //   - código DAP oficial (cuando viene en porBarrio[k].codigo o k es código)
+          //   - nombre normalizado directo
+          //   - nombre normalizado agresivo
+          const byCode = {};
           const byDirect = {};
           const byAgg = {};
+          for (const [k, b] of Object.entries(porBarrio)){
+            const item = { ...b, _key: k };
+            const code = b.codigo || (/^\d{3,4}$/.test(k) ? k : null);
+            if (code) byCode[code] = item;
+            byDirect[normBarrio(b.nombre)] = item;
+            byAgg[normBarrioAgg(b.nombre)] = item;
+          }
           barrios.forEach(b => {
             byDirect[normBarrio(b.nombre)] = b;
             byAgg[normBarrioAgg(b.nombre)] = b;
           });
-          // Resolver feature → datos del voto histórico
           const resolveFeat = (props) => {
+            if (props.CODIGO && byCode[props.CODIGO]) return byCode[props.CODIGO];
             const direct = props.NOMBRE_NORM || props.BARRIO_KEY || normBarrio(props.NOMBRE);
             if (byDirect[direct]) return byDirect[direct];
             const agg = props.NOMBRE_AGG || normBarrioAgg(props.NOMBRE);
