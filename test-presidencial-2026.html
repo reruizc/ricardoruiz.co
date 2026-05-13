@@ -408,21 +408,26 @@
     .geo-bar-fill { display:block; height:100%; border-radius:1px;
       transition:width .5s cubic-bezier(.22,.61,.36,1); }
     .geo-bar-pct { font-variant-numeric:tabular-nums; color:rgba(244,243,239,0.7); text-align:right; }
-    .geo-refine {
-      display:inline-flex; align-items:center; gap:.45rem;
-      margin-top:.7rem;
-      padding:.55rem .8rem;
-      background:transparent;
-      border:1px solid rgba(0,71,255,0.45);
-      color:var(--blue-light);
-      font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.12em; text-transform:uppercase;
-      cursor:pointer;
-      transition:background .15s, border-color .15s;
+    /* Drill-down dropdown debajo de la caja "Tu zona" (Bogotá: localidad→UPL,
+       Medellín: comuna→barrio). Sin permisos de Geolocation. */
+    .geo-drill {
+      margin-top:.85rem;
+      padding-top:.7rem;
+      border-top:1px dashed rgba(255,255,255,0.1);
+      display:flex; flex-direction:column; gap:.4rem;
     }
-    .geo-refine:hover:not(:disabled) { background:rgba(0,71,255,0.12); border-color:rgba(0,71,255,0.75); }
-    .geo-refine:disabled { opacity:.55; cursor:default; }
-    .geo-refine.loading svg { animation: spinSlow 1.4s linear infinite; }
-    @keyframes spinSlow { to { transform: rotate(360deg); } }
+    .geo-drill-label {
+      font-family:'DM Mono',monospace; font-size:.66rem; letter-spacing:.14em;
+      text-transform:uppercase; color:rgba(255,255,255,0.55);
+    }
+    .geo-drill-select {
+      padding:.5rem .65rem;
+      background:rgba(0,0,0,0.3); color:var(--white);
+      border:1px solid rgba(0,71,255,0.35);
+      font-family:'Syne',sans-serif; font-weight:500; font-size:.9rem;
+      cursor:pointer; outline:none;
+    }
+    .geo-drill-select:focus { border-color:rgba(0,71,255,0.7); }
 
     /* Barrita de carga del form demográfico mientras llegan GEO + ciudades */
     .form-load {
@@ -1071,7 +1076,7 @@
           }
           for (const k of Object.keys(p)) p[k] = +(p[k] / total).toFixed(2);
           const nombreLoc = matching[0].Localidades[0].LocNombre || 'Localidad';
-          return { scope: 'upl', city: 'Bogotá D.C.', label: titleCase(nombreLoc), sub: null, p, precise: false };
+          return { scope: 'localidad', city: 'Bogotá D.C.', label: titleCase(nombreLoc), sub: null, p, precise: false };
         }
       }
     }
@@ -1890,55 +1895,149 @@
         </div>`;
     }).join('');
 
-    const scopeLabel = proj.scope === 'upl'
-      ? 'Promedio en tu barrio (UPL)'
-      : proj.scope === 'barrio'
-        ? 'Promedio en tu barrio'
-        : proj.scope === 'comuna'
-          ? 'Promedio en tu comuna'
-          : proj.scope === 'puesto'
-            ? `Tu puesto más cercano${proj.distKm != null ? ` (${proj.distKm.toFixed(1)} km)` : ''}`
-            : 'Promedio en tu ciudad';
-
-    // Botón "Ver mi entorno exacto" — solo cuando NO es ya preciso, hay
-    // Geolocation API y vale la pena refinar (ciudad-level o puesto fallback).
-    const showRefineBtn = !proj.precise && 'geolocation' in navigator &&
-      (proj.scope === 'ciudad' || proj.scope === 'puesto');
-    const refineBtn = showRefineBtn
-      ? `<button type="button" class="geo-refine" onclick="window._refineGeo()">
-           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;flex-shrink:0;"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-           <span>Ver mi entorno exacto</span>
-         </button>`
-      : '';
+    const scopeLabel = proj.scope === 'localidad'
+      ? 'Promedio en tu localidad'
+      : proj.scope === 'upl'
+        ? 'Promedio en tu zona (UPL)'
+        : proj.scope === 'barrio'
+          ? 'Promedio en tu barrio'
+          : proj.scope === 'comuna'
+            ? 'Promedio en tu comuna'
+            : proj.scope === 'puesto'
+              ? `Tu puesto más cercano${proj.distKm != null ? ` (${proj.distKm.toFixed(1)} km)` : ''}`
+              : 'Promedio en tu ciudad';
 
     cross.innerHTML = `
       <div class="geo-cross-line">${crossLine}</div>
-      <div class="geo-cross-scope">${scopeLabel}${proj.precise ? ' · 📍 ubicación precisa' : ''}</div>
+      <div class="geo-cross-scope">${scopeLabel}</div>
       <div class="geo-bars">${top3HTML}</div>
-      ${refineBtn}
+      <div id="geo-drill-slot"></div>
     `;
+
+    // Actualiza el CTA de apoyo con el cruce real (no genérico).
+    updateSupportTitleWithCross(proj);
+
+    // El drill-down se inyecta async (necesita esperar a que las caches
+    // estén resueltas). Mientras tanto la caja se ve completa.
+    populateDrillDown(proj);
   }
 
-  // Handler para el botón de refinar geo. Se expone en window porque el
-  // HTML inline lo invoca. Cambia el texto a "Pidiendo permiso…" mientras
-  // el browser muestra el prompt.
-  window._refineGeo = async function() {
-    const btn = document.querySelector('.geo-refine');
-    if (btn) {
-      btn.disabled = true;
-      btn.classList.add('loading');
-      btn.querySelector('span').textContent = 'Esperando permiso…';
+  // Actualiza el título del CTA de apoyo con el cruce contextual:
+  //   "En tu localidad/comuna/barrio gana X. ¿Quieres apoyar a Y?"
+  // Si winner coincide con el ganador de la zona, simplifica.
+  // Si no hay proyección útil, deja el texto genérico que vino de renderSupport.
+  function updateSupportTitleWithCross(proj) {
+    const winner = state?.lastWinner;
+    const title  = $('#support-title');
+    if (!winner || !title || !proj?.p) return;
+
+    const entries = Object.entries(proj.p)
+      .filter(([id]) => PROJ_TO_CAND_ID[id])
+      .sort((a, b) => b[1] - a[1]);
+    if (!entries.length) return;
+    const topId = entries[0][0];
+    const topCand = CANDIDATES[PROJ_TO_CAND_ID[topId]];
+
+    const zonaWord = proj.scope === 'localidad' ? 'localidad'
+                   : proj.scope === 'comuna'    ? 'comuna'
+                   : proj.scope === 'barrio'    ? 'barrio'
+                   : proj.scope === 'upl'       ? 'zona'
+                   : proj.scope === 'puesto'    ? 'puesto'
+                   : 'ciudad';
+
+    if (winner.c.id === topCand.id) {
+      // Coincide: tu afín es el que va ganando en tu zona
+      title.innerHTML = `En tu ${zonaWord} gana <b style="color:${winner.c.color}">${escapeHtml(winner.c.name)}</b>. ¿Quieres apoyar su campaña?`;
+    } else {
+      // No coincide: el cruce que vende el test
+      title.innerHTML = `En tu ${zonaWord} gana <b style="color:${topCand.color}">${escapeHtml(topCand.name)}</b>, pero tu candidato afín es <b style="color:${winner.c.color}">${escapeHtml(winner.c.name)}</b>. ¿Quieres apoyar su campaña?`;
     }
-    const ok = await refineWithBrowserGeo();
-    if (!ok && btn) {
-      btn.classList.remove('loading');
-      btn.querySelector('span').textContent = 'No pudimos acceder a tu ubicación';
-      setTimeout(() => {
-        btn.disabled = false;
-        btn.querySelector('span').textContent = 'Reintentar';
-      }, 2500);
+  }
+
+  // Construye y mete el drill-down si aplica. Async para poder esperar
+  // a que las caches (loadBogUpl / loadMedBarrio) estén resueltas.
+  async function populateDrillDown(proj) {
+    if (!proj || proj.subSelected) return;
+    const slot = $('#geo-drill-slot');
+    if (!slot) return;
+
+    const d = state.demo;
+    let subOpts = null;
+
+    if (proj.scope === 'localidad' && d?.ciudad === 'Bogotá') {
+      const bog = await loadBogUpl();
+      if (bog?.agregados) {
+        const upls = Object.entries(bog.agregados)
+          .filter(([_, u]) => u.Localidades && u.Localidades[0] && u.Localidades[0].LocCodigo === d.zona_valor)
+          .map(([k, u]) => ({ codigo: k, nombre: u.nombre }));
+        if (upls.length > 1) {
+          subOpts = { scope: 'upl', label: 'Ver tu zona dentro de la localidad:', zonas: upls };
+        }
+      }
+    } else if (proj.scope === 'comuna' && d?.ciudad === 'Medellín') {
+      const med = await loadMedBarrio();
+      if (med?.agregados) {
+        const barrios = Object.entries(med.agregados)
+          .filter(([_, b]) => b.comuna === d.zona_valor)
+          .map(([k, b]) => ({ codigo: k, nombre: b.nombre }));
+        if (barrios.length > 1) {
+          barrios.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+          subOpts = { scope: 'barrio', label: 'Ver tu barrio dentro de la comuna:', zonas: barrios };
+        }
+      }
     }
-  };
+
+    if (!subOpts) return;
+
+    slot.innerHTML = `
+      <div class="geo-drill">
+        <label class="geo-drill-label" for="geo-drill-select">${escapeHtml(subOpts.label)}</label>
+        <select id="geo-drill-select" class="geo-drill-select" data-scope="${subOpts.scope}">
+          <option value="">Selecciona…</option>
+          ${subOpts.zonas.map(z => `<option value="${escapeHtml(z.codigo)}">${escapeHtml(z.nombre)}</option>`).join('')}
+        </select>
+      </div>`;
+    const sel = $('#geo-drill-select');
+    sel.addEventListener('change', () => onSubZonaChange(sel.value, sel.dataset.scope));
+    if (IS_EMBED) requestAnimationFrame(reportHeight);
+  }
+
+  // Maneja la selección del drill-down. Computa la proyección de la
+  // sub-zona elegida y refresca la caja "Tu zona".
+  async function onSubZonaChange(value, scope) {
+    if (!value) return;
+    const d = state.demo;
+    let proj = null;
+
+    if (scope === 'upl' && d.ciudad === 'Bogotá') {
+      const bog = await loadBogUpl();
+      const u = bog?.agregados?.[value];
+      if (u) {
+        proj = {
+          scope: 'upl', city: 'Bogotá D.C.',
+          label: u.nombre, sub: null, p: u.p,
+          precise: false, subSelected: true,
+        };
+      }
+    } else if (scope === 'barrio' && d.ciudad === 'Medellín') {
+      const med = await loadMedBarrio();
+      const b = med?.agregados?.[value];
+      if (b) {
+        proj = {
+          scope: 'barrio', city: 'Medellín',
+          label: b.nombre,
+          sub: b.nombre_com ? titleCase(b.nombre_com) : null,
+          p: b.p, precise: false, subSelected: true,
+        };
+      }
+    }
+
+    if (proj) renderGeoCross(proj);
+  }
+
+  // Nota: el botón Geolocation ("Ver mi entorno exacto") fue reemplazado
+  // por el drill-down dropdown. La función refineWithBrowserGeo() sigue
+  // expuesta en window para uso futuro (no se invoca desde la UI actual).
 
   // ── SUPPORT (opt-in para campañas) ──
   let SUPPORT = { mode: null, name: '', phone: '', consent: false, submitted: false };
