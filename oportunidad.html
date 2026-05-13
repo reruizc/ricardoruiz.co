@@ -976,6 +976,8 @@
     puestoCongDepLoading:{},        // depCod → promesa de carga
     puestoMetrics:{},               // 'dd-mm-zz-pp' → { afin, gap, contrib, abst, bias, ... }
     puestoNacAfin:{},               // candId → bucket → pct
+    puestoContext:null,             // 'dd-mm-zz-pp' → { com_cod, com_nombre, upl_cod, upl_nombre, barrio }
+    puestoContextLoading:null,
   };
 
   /* ───────── Carga de datos ───────── */
@@ -1661,6 +1663,10 @@
     2018: `${S3}/censos-puesto-2018.json`,
   };
   const PUESTO_CONG_URL = (depCod, kind) => `${S3}/${kind}/departamentos/${depCod}/puestos.json`;
+  // Contexto territorial por puesto (solo para las 14 ciudades):
+  // comuna, localidad o UPL y nombre del puesto. Generado por
+  // tools/build-puesto-context.py cruzando PUESTOS_GEOREF + BOG-UPL.geojson.
+  const PUESTO_CONTEXT_URL = `${S3}/puesto-context.json`;
   const PUE_TILE_LIGHT = {
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -1757,11 +1763,38 @@
           console.warn('[opo·pue·censo]', year, e);
         }
       });
-      await Promise.all([...sigFetches, ...censoFetches]);
+      const contextFetch = (async () => {
+        try {
+          const r = await fetch(PUESTO_CONTEXT_URL);
+          if (!r.ok) return;
+          STATE.puestoContext = await r.json();
+        } catch (e){ console.warn('[opo·pue·context]', e); }
+      })();
+      await Promise.all([...sigFetches, ...censoFetches, contextFetch]);
       STATE.puestoSignalsData = out;
       return out;
     })();
     return STATE.puestoSignalsLoading;
+  }
+
+  // Resuelve el sub-label de un puesto según el scope activo de la ciudad.
+  // Devuelve la unidad más granular disponible:
+  //   - Medellín · Barrios → barrio canónico (o si no, "Comuna X")
+  //   - Bogotá · UPL       → "UPL Tintal" (o localidad como fallback)
+  //   - Otras ciudades      → "Comuna 5 Castilla" / "Localidad 1 Usaquén"
+  //   - Resto del país      → municipio (p.mn)
+  function puestoSubLabel(p){
+    if (!STATE.puestoContext) return p.mn || '';
+    const ctx = STATE.puestoContext[p.k];
+    if (!ctx) return p.mn || '';
+    if (STATE.selectedCity === 'medellin' && STATE.mdeView === 'barrios' && ctx.barrio){
+      return ctx.barrio;
+    }
+    if (STATE.selectedCity === 'bogota' && STATE.bogView === 'upl' && ctx.upl_nombre){
+      return 'UPL ' + ctx.upl_nombre;
+    }
+    if (ctx.com_nombre) return ctx.com_nombre;
+    return p.mn || '';
   }
 
   // Carga senado/cámara 2026 por puesto del depto indicado. Devuelve
@@ -2039,15 +2072,27 @@
       const colHi    = isDay() ? '#dc2626' : 'var(--green)';
       const contribTxt = contrib != null ? fmtPP(contrib, 2) : '—';
       const gapLocTxt  = gapLoc  != null ? fmtPP(gapLoc, 1)  : '—';
+      const sub = puestoSubLabel(p);
       marker.bindTooltip(
         `<div style="font-family:Avenir,sans-serif;font-size:.78rem;line-height:1.45;padding:.15rem .25rem;color:${colTitle}">
           <div style="font-weight:600">${p.n||'Puesto'}</div>
-          <div style="color:${colMeta}">${p.mn||''} · censo ${fmtNum(p.c)}</div>
+          <div style="color:${colMeta}">${sub} · censo ${fmtNum(p.c)}</div>
           <div style="margin-top:.2rem;color:${colHi};font-weight:600">aporte nacional · ${contribTxt}</div>
           <div style="color:${colMeta};font-size:.72rem">crece localmente ${gapLocTxt}</div>
         </div>`,
         { sticky:true, opacity:1 }
       );
+      // Hover sobre el puesto → actualizar panel "Territorio seleccionado"
+      // con la info del puesto (en lugar de la comuna/UPL que tenía antes).
+      marker.on('mouseover', () => {
+        const pseudoF = {
+          __rec: rec,
+          __key: p.k,
+          __name: p.n || 'Puesto',
+          __depName: `${sub || p.mn || ''}${p.c ? ' · censo ' + fmtNum(p.c) : ''}`,
+        };
+        showDetailFromFeature(pseudoF);
+      });
       return marker;
     });
     STATE.puestosLayer = L.layerGroup(markers).addTo(STATE.map);
@@ -3599,7 +3644,7 @@
         if (!m || m.gap == null) return null;
         return {
           name: p.n || p.k,
-          sub: p.mn || '',
+          sub: puestoSubLabel(p),
           contrib: m.gap,    // se muestra como "+X.X pp" — crecimiento local
         };
       }).filter(Boolean);
