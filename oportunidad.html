@@ -167,12 +167,15 @@
     .cand-row{display:flex;gap:.7rem;align-items:flex-start;overflow-x:auto;padding-bottom:.3rem;scrollbar-width:thin}
     .cand-pill{display:flex;flex-direction:column;align-items:center;gap:.3rem;cursor:pointer;padding:.35rem .25rem;border:1.5px solid transparent;background:transparent;flex-shrink:0;transition:all .15s;min-width:78px}
     .cand-pill:hover{background:rgba(74,222,128,.08)}
-    .cand-pill.active{border-color:var(--green);background:rgba(74,222,128,.10)}
-    .cand-photo{width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,.18);background:#0e1220;display:block}
-    .cand-pill.active .cand-photo{border-color:var(--green)}
+    .cand-pill.active{border-color:var(--green);background:rgba(74,222,128,.10);min-width:100px}
+    .cand-photo{width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,.18);background:#0e1220;display:block;transition:width .15s,height .15s}
+    .cand-pill.active .cand-photo{border-color:var(--green);width:70px;height:70px}
     .cand-photo-fallback{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:#fff;border:2px solid rgba(255,255,255,.18)}
+    .cand-pill.active .cand-photo-fallback{width:70px;height:70px;font-size:1.35rem}
     .cand-name{font-family:Avenir,sans-serif;font-weight:500;font-size:.72rem;color:rgba(255,255,255,.85);text-align:center;line-height:1.2;max-width:88px}
+    .cand-pill.active .cand-name{font-size:.94rem;max-width:110px}
     .cand-pct{font-family:'Arima',sans-serif;font-weight:400;font-size:.66rem;color:rgba(255,255,255,.5);text-align:center}
+    .cand-pill.active .cand-pct{font-size:.86rem}
     body.day-mode .cand-pct{color:rgba(0,0,0,.5)}
 
     /* TOGGLE BAR */
@@ -252,6 +255,10 @@
     .src-row input[type=range]::-moz-range-thumb{width:11px;height:11px;border-radius:50%;background:#fff;cursor:pointer;border:2px solid var(--green)}
     body.day-mode .src-row input[type=range]{background:rgba(0,0,0,.18)}
     .src-w{font-family:Avenir,sans-serif;font-weight:600;font-size:.78rem;color:var(--green);font-variant-numeric:tabular-nums;text-align:right}
+    /* Override para los sliders de transferencia intra-bloque: textos +20%. */
+    #xfer-sliders .src-row{font-size:.88rem}
+    #xfer-sliders .src-row .src-name .src-sub{font-size:.78rem}
+    #xfer-sliders .src-row .src-w{font-size:.92rem}
     .src-reset{display:inline-block;margin-top:.4rem;font-family:Avenir,sans-serif;font-weight:500;font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(74,222,128,.7);cursor:pointer;padding:.2rem .4rem;border:1px solid rgba(74,222,128,.25);background:transparent;transition:all .15s}
     .src-reset:hover{color:var(--green);border-color:var(--green);background:rgba(74,222,128,.08)}
 
@@ -563,7 +570,7 @@
 
       <!-- Top 30 -->
       <div class="panel-card">
-        <div class="panel-section-title" id="top-title">Top 30 · municipios de oportunidad</div>
+        <div class="panel-section-title" id="top-title">Top 12 · municipios de oportunidad</div>
         <div class="top-list" id="top-list"></div>
       </div>
 
@@ -597,9 +604,9 @@
       <em>nsnr_share(C)</em> = NS-NR × pondPct(C) / sumDeclarado, distribuido geográficamente por la misma shape:
       <em>gap_local(C, M)</em> = proj_base(C, M) × NS-NR/sumDeclarado.
       La <strong>contribución nacional</strong> = gap_local × censo_M / censo_total — pondera por tamaño del territorio para que la suma de todos los municipios iguale exactamente el crecimiento nacional posible (~2pp para Cepeda, ~1pp para Paloma, ~1.2pp para Abelardo). El mapa colorea y rankea por contribución; el detalle muestra también el crecimiento local en pp. <strong>Ningún territorio queda en negativo</strong>: por construcción el modelo solo proyecta crecimientos posibles.</p>
-    <p><strong>Riesgo metodológico.</strong> El mapeo de afinidades es <em>juicio editorial trazable, no algoritmo objetivo</em> (Cepeda hereda Petro, Paloma hereda Fico/Duque, Fajardo hereda verdes/centro, etc.). El crecimiento por NS-NR asume distribución proporcional al peso de cada candidato dentro del universo declarado — los indecisos no se reparten uniformemente entre todos, sino con sesgo hacia los líderes. La componente <em>proj_base</em> depende del ponderador propio, fecha de corte: <span id="foot-pond-fecha">cargando…</span>. <strong>El modelo no contempla flujo cross-block</strong> (votos que migran entre ejes ideológicos) ni movilización de abstención — para eso usar el toggle <em>Abstención</em> o esperar fase 2 (transferencias intra-bloque editables). Léelo como <strong>orientación de prioridades</strong>, no como pronóstico de voto.</p>
-    <p><strong>Drilldown a ciudad.</strong> 14 ciudades soportadas con datos por comuna o localidad: Bogotá (localidades, abre directo desde el mapa nacional), Medellín (comunas + barrios), Cali, Barranquilla, Ibagué, Manizales, Pereira, Montería, Bucaramanga, Cúcuta, Neiva, Popayán, Sincelejo y Villavicencio. Click en el mun de la ciudad → drilldown automático. El bias se calcula contra el promedio de la propia ciudad (no contra el nacional-país) porque las ciudades tienen perfiles ideológicos distintos. <strong>Medellín · Barrios (v2)</strong>: 147 barrios con <em>bias propio</em> calculado al cruzar los puestos de votación de cada barrio (PUESTOS_GEOREF) con los <code>por-puesto.json</code> de 16 señales históricas. Los barrios sin puestos asignables (o sin polígono en el GeoJSON oficial) caen al heredado de la comuna padre — granularidad real a nivel intra-comuna.</p>
-    <p><strong>Capa puestos.</strong> 13.492 puestos de votación con coordenadas. Se renderizan con LOD por zoom (a poca resolución solo los más grandes; al hacer zoom aparecen todos). Radio del círculo = log(censo del puesto). Color heredado de la brecha del municipio padre — o de la comuna padre si estás dentro de una de las 14 ciudades soportadas. Activar la capa habilita pan + zoom con la rueda; al volver a Oportunidad o Abstención el mapa se bloquea otra vez. <strong>Próximo paso (paquete v2)</strong>: bias propio por puesto usando histórico por puesto + agregación a barrio para Bogotá y Medellín — granularidad real al precio del retainer.</p>
+    <p><strong>Riesgo metodológico.</strong> El mapeo de afinidades es <em>juicio editorial trazable, no algoritmo objetivo</em> (Cepeda hereda Petro, Paloma hereda Fico/Duque, Fajardo hereda verdes/centro, etc.). El crecimiento por NS-NR asume distribución proporcional al peso de cada candidato dentro del universo declarado — los indecisos no se reparten uniformemente entre todos, sino con sesgo hacia los líderes. La componente <em>proj_base</em> depende del ponderador propio, fecha de corte: <span id="foot-pond-fecha">cargando…</span>. <strong>El modelo no contempla flujo cross-block</strong> (votos que migran entre ejes ideológicos) ni movilización de abstención — para eso usar el toggle <em>Abstención</em> o el slider <em>Transferencia intra-bloque</em> del panel lateral. Léelo como <strong>orientación de prioridades</strong>, no como pronóstico de voto.</p>
+    <p><strong>Drilldown a ciudad.</strong> 14 ciudades soportadas con datos por comuna o localidad: Bogotá (localidades + UPL), Medellín (comunas + barrios), Cali, Barranquilla, Ibagué, Manizales, Pereira, Montería, Bucaramanga, Cúcuta, Neiva, Popayán, Sincelejo y Villavicencio. Click en el mun de la ciudad → drilldown automático. El bias se calcula contra el promedio de la propia ciudad (no contra el nacional-país) porque las ciudades tienen perfiles ideológicos distintos. <strong>Bogotá · UPL</strong>: 33 Unidades de Planeamiento Local con bias propio (cada puesto asignado vía point-in-polygon al GeoJSON oficial). <strong>Medellín · Barrios</strong>: 147 barrios con bias propio cruzando PUESTOS_GEOREF y por-puesto.json. Barrios sin datos heredan del vecino más cercano (kNN por centroide) y solo en última instancia de la comuna padre.</p>
+    <p><strong>Capa puestos.</strong> ~13.500 puestos de votación con coordenadas. Cada puesto se calcula con su <strong>shape propia</strong> (8 señales presidenciales/consulta a nivel puesto + senado/cámara del depto activo cuando entras a uno). Modelo completo NS-NR + transferencia intra-bloque + abstención (promedio 2018+2022 contra censo de la época) aplicado por puesto. Para puestos en las 14 ciudades, el tooltip muestra comuna/UPL/barrio según el sub-view activo. El top del panel se rankea por <em>crecimiento local en pp</em> (no por contribución nacional, que es marginal por construcción para un puesto individual). LOD por zoom: a poca resolución solo los más grandes; al hacer zoom aparecen todos.</p>
     <p><strong>Capa abstención.</strong> Promedio de abstención presidencial 1ª vuelta en 2018 y 2022. Para cada año: abst = 1 − votos_totales / censo_de_la_época. Censo 2022 = Divipole oficial 23-09-2021 (38.6M nacional, cuadra contra cifra oficial). Censo 2018 = reconstruido a partir del % de participación por departamento publicado por Wikipedia (36.78M nacional, cuadra contra oficial 36.7M), distribuido a nivel municipio y comuna proporcionalmente al censo 2022 — es un proxy aceptable mientras llega el Divipole 2018 oficial. La capa identifica dónde hay potencial estructural no-activado además del afín. Útil para diseñar pisada de movilización junto al mapa de oportunidad. Cap superior: muchos municipios pequeños tienen abstención reportada baja por cierre de mesas, no por participación real — leer con cautela en mun &lt; 5.000 censo.</p>
     <p><strong>Datos.</strong> Registraduría Nacional del Estado Civil (presidenciales 2018, 2022; consultas 2025 y marzo 2026; senado y cámara 2026; censo 2026 vía Divipole). Ponderador propio ricardoruiz.co — ver <a href="metodologia-simulador-presidencial-2026.docx">documento metodológico</a> y la página hermana <a href="previa-1v.html">Previa 1ª vuelta</a> para el detalle del simulador.</p>
     <p style="opacity:.7;margin-top:.8rem"><a href="electoral.html">← Volver a Electoral</a> &nbsp;·&nbsp; <a href="veleta.html">Veleta</a> &nbsp;·&nbsp; ricardoruiz.co · 2026</p>
@@ -3481,12 +3488,21 @@
       }
       return null;
     }
-    // Normalización: la mayoría de comunas vienen como número entero
-    // o ya como string. Probamos varias formas.
+    // Normalización: la mayoría de comunas vienen como número entero,
+    // pero algunos GeoJSON (Ibagué, Neiva) usan texto "COMUNA 5". Si raw
+    // no es numérico, extraemos los dígitos del texto.
+    const rawStr = String(raw).trim();
+    const isPureNum = /^\d+$/.test(rawStr);
+    let numericPart = rawStr;
+    if (!isPureNum){
+      const m = rawStr.match(/(\d+)/);
+      if (m) numericPart = m[1];
+    }
     const variants = [
-      String(raw),
-      String(raw).replace(/^0+/,''),
-      String(raw).padStart(2,'0'),
+      rawStr,
+      numericPart,
+      numericPart.replace(/^0+/, '') || numericPart,
+      numericPart.padStart(2, '0'),
     ];
     const cityKey = Object.keys(CITIES).find(k => CITIES[k] === cfg);
     const metrics = STATE.cityComMetrics[cityKey] || {};
@@ -3625,8 +3641,8 @@
     let items = [];
     let unitLabel = 'municipios';
     let scope = 'oportunidad';
-    // Puestos: top 15. Resto: top 30.
-    let TOP_N = 30;
+    // Puestos: top 15. Resto: top 12.
+    let TOP_N = 12;
 
     if (STATE.layer === 'pue' && STATE.puestoMetrics && Object.keys(STATE.puestoMetrics).length){
       TOP_N = 15;
