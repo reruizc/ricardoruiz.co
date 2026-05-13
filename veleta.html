@@ -212,8 +212,24 @@
     /* Detalle territorio (hover/click) */
     .det-card{display:none;flex-direction:column;gap:.6rem}
     .det-card.show{display:flex}
-    .det-empty{font-family:'Arima',sans-serif;font-weight:400;font-size:.84rem;color:rgba(255,255,255,.5);line-height:1.5;padding:.3rem 0}
-    body.day-mode .det-empty{color:rgba(0,0,0,.55)}
+    .det-empty{font-family:'Arima',sans-serif;font-weight:400;font-size:.84rem;color:rgba(255,255,255,.78);line-height:1.5;padding:.1rem 0}
+    body.day-mode .det-empty{color:rgba(0,0,0,.78)}
+    .ov-cand{font-family:'Syne',sans-serif;font-weight:700;font-size:1.05rem;color:var(--white);letter-spacing:-.01em}
+    .ov-bloque{display:inline-block;font-family:Avenir,sans-serif;font-weight:500;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--orange);margin-left:.4rem;padding:.05rem .4rem;border:1px solid rgba(251,146,60,.4);background:rgba(251,146,60,.06)}
+    .ov-meta{font-family:Avenir,sans-serif;font-weight:400;font-size:.74rem;color:rgba(255,255,255,.55);margin-top:.15rem;letter-spacing:.02em}
+    .ov-section-title{font-family:Avenir,sans-serif;font-weight:500;font-size:.66rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.45);margin:.85rem 0 .35rem}
+    .ov-bullets{display:flex;flex-direction:column;gap:.45rem;font-family:'Arima',sans-serif;font-size:.85rem;line-height:1.4}
+    .ov-bullet{display:grid;grid-template-columns:auto 1fr;gap:.55rem;align-items:baseline}
+    .ov-bullet-n{font-family:'Syne',sans-serif;font-weight:800;font-size:1.05rem;color:var(--orange);font-variant-numeric:tabular-nums;line-height:1;min-width:2.4rem;text-align:right}
+    .ov-bullet-txt{color:rgba(255,255,255,.78)}
+    .ov-bullet-txt b{color:var(--white);font-weight:600}
+    .ov-foot{margin-top:.85rem;font-family:Avenir,sans-serif;font-size:.7rem;color:rgba(255,255,255,.45);letter-spacing:.02em;line-height:1.5}
+    body.day-mode .ov-cand{color:#0d1120}
+    body.day-mode .ov-meta{color:rgba(0,0,0,.6)}
+    body.day-mode .ov-section-title{color:rgba(0,0,0,.55)}
+    body.day-mode .ov-bullet-txt{color:rgba(0,0,0,.78)}
+    body.day-mode .ov-bullet-txt b{color:#0d1120}
+    body.day-mode .ov-foot{color:rgba(0,0,0,.55)}
     .det-name{font-family:'Syne',sans-serif;font-weight:700;font-size:1.15rem;letter-spacing:-.01em;line-height:1.2}
     .det-parents{font-family:'Arima',sans-serif;font-weight:400;font-size:.74rem;color:rgba(255,255,255,.55);margin-top:.1rem}
     body.day-mode .det-parents{color:rgba(0,0,0,.55)}
@@ -454,9 +470,9 @@
         </div>
       </div>
 
-      <!-- Top 30 -->
+      <!-- Top 15 -->
       <div class="panel-card">
-        <div class="panel-section-title" id="top-title">Top 30 · muns clave para Cepeda</div>
+        <div class="panel-section-title" id="top-title">Top 15 · muns clave para Cepeda</div>
         <div class="top-list" id="top-list"></div>
       </div>
 
@@ -964,6 +980,8 @@
   function onHoverOut(f){
     if (STATE.layer) STATE.layer.resetStyle();
     hideHoverChip();
+    STATE.hoverFeature = null;
+    restoreOverview();
   }
   function onDepClick(elec){
     if (!elec) return;
@@ -1033,6 +1051,86 @@
     return '';
   }
 
+  /* ───────── Overview del candidato (estado vacío del panel) ───────── */
+  function renderModeOverview(){
+    const empty = document.getElementById('det-empty');
+    if (!empty) return;
+    const cand = currentCand();
+    const lvl  = STATE.level;        // 'dep' | 'mun'
+    const lvlLabel = lvl === 'dep' ? 'Departamentos' : 'Municipios';
+    const unit     = lvl === 'dep' ? 'departamentos' : 'municipios';
+    const cands = (STATE.ponderador && STATE.ponderador.candidatos) || {};
+    const candPct = (cands[cand.pondKey] && cands[cand.pondKey].pct) || 0;
+
+    // Universo: scoreByMun (siempre tenemos muns); para dep usamos scoreByDep.
+    const items = lvl === 'dep'
+      ? Object.values(STATE.scoreByDep || {})
+      : Object.values(STATE.scoreByMun || {});
+    const total = items.length;
+    const censoTotal = STATE.sumCensoNacional || 1;
+
+    const bloqueLabel = ({izq:'izquierda', d:'derecha', cd:'centro-derecha', c:'centro', ci:'centro-izq'})[cand.bloque] || '—';
+
+    let bullets = [];
+    let metaLine = '';
+    let footLine = '';
+
+    if (cand.id === 'cepeda'){
+      const ganados   = items.filter(it => (it.proy||0) >= 50);
+      const cerca     = items.filter(it => (it.proy||0) <  50 && (50 - it.proy) <= 5);
+      const medios    = items.filter(it => (it.proy||0) <  50 && (50 - it.proy) >  5 && (50 - it.proy) <= 15);
+      const lejos     = items.filter(it => (it.proy||0) <  50 && (50 - it.proy) >  15);
+      const censoGanado = ganados.reduce((s,it)=>s + (it.censo||0), 0);
+      const pctGanado   = (100 * censoGanado / censoTotal).toFixed(1);
+
+      metaLine = `Proyectado nacional <b>${candPct.toFixed(1)}%</b> &nbsp;·&nbsp; meta: <b>&gt;50% en 1V</b>`;
+      bullets = [
+        { n: ganados.length, txt: `<b>ya proyecta &gt;50%</b> · asegura 1V (${pctGanado}% del censo nacional)` },
+        { n: cerca.length,   txt: `a <b>menos de 5 pp</b> del 50% · esfuerzo más rentable` },
+        { n: medios.length,  txt: `entre <b>5 y 15 pp</b> del 50% · alcanzables con campaña fuerte` },
+        { n: lejos.length,   txt: `a <b>más de 15 pp</b> del 50% · bastiones de derecha, baja prioridad` },
+      ];
+      footLine = `Total ${unit} analizados: ${total}. La proyección por ${lvl==='dep'?'departamento':'municipio'} usa voto Petro 2022 escalado al ponderador 2026.`;
+    } else if (cand.id === 'abelardo' || cand.id === 'paloma'){
+      const otroId = cand.id === 'abelardo' ? 'paloma' : 'abelardo';
+      const otro   = CANDIDATES.find(c => c.id === otroId);
+      const otroPct = (cands[otro.pondKey] && cands[otro.pondKey].pct) || 0;
+      const fuerte  = items.filter(it => (it.proy||0) >= 25);
+      const media   = items.filter(it => (it.proy||0) >= 15 && (it.proy||0) < 25);
+      const baja    = items.filter(it => (it.proy||0) <  15);
+      const conBoost = items.filter(it => (it.boost||1) > 1);
+      const censoFuerte = fuerte.reduce((s,it)=>s + (it.censo||0), 0);
+      const pctFuerte = (100 * censoFuerte / censoTotal).toFixed(1);
+
+      metaLine = `Proyectado nacional <b>${candPct.toFixed(1)}%</b> &nbsp;·&nbsp; meta: <b>2do lugar</b> (frente a ${otro.nombre.split(' ')[0]} ${otroPct.toFixed(1)}%)`;
+      bullets = [
+        { n: fuerte.length,   txt: `con <b>base sólida</b> (proy ≥ 25%) · ${pctFuerte}% del censo nacional` },
+        { n: media.length,    txt: `con <b>base media</b> (proy 15–25%) · territorio en disputa` },
+        { n: baja.length,     txt: `<b>sin base</b> (proy &lt; 15%) · esfuerzo poco rentable` },
+        { n: conBoost.length, txt: `con <b>boost regional</b> aplicado (home turf del candidato)` },
+      ];
+      footLine = `Total ${unit} analizados: ${total}. Sin polling per-${lvl==='dep'?'depto':'mun'} entre Abelardo y Paloma, los modos comparten base derecha y se diferencian por boost regional.`;
+    }
+
+    empty.innerHTML = `
+      <div class="ov-cand">${cand.nombre}<span class="ov-bloque">${bloqueLabel}</span></div>
+      <div class="ov-meta">${metaLine}</div>
+      <div class="ov-section-title">${lvlLabel} (${total})</div>
+      <div class="ov-bullets">
+        ${bullets.map(b => `<div class="ov-bullet"><span class="ov-bullet-n">${b.n}</span><span class="ov-bullet-txt">${b.txt}</span></div>`).join('')}
+      </div>
+      <div class="ov-foot">${footLine}</div>
+    `;
+  }
+
+  function restoreOverview(){
+    const empty = document.getElementById('det-empty');
+    const card  = document.getElementById('det-card');
+    if (empty) empty.style.display = '';
+    if (card)  card.classList.remove('show');
+    renderModeOverview();
+  }
+
   function showDetailFromFeature(f){
     const r = f.__rec;
     document.getElementById('det-empty').style.display = 'none';
@@ -1050,7 +1148,7 @@
 
   /* ───────── Top 30 ranking + contador veleta ───────── */
   function renderTop30(){
-    const arr = Object.values(STATE.scoreByMun).sort((a,b)=>b.score-a.score).slice(0,30);
+    const arr = Object.values(STATE.scoreByMun).sort((a,b)=>b.score-a.score).slice(0,15);
     patchTop30Names(arr);
   }
 
@@ -1119,7 +1217,7 @@
       if (btn) btn.classList.toggle('active', c.id === id);
     }
     const title = document.getElementById('top-title');
-    if (title) title.textContent = `Top 30 · muns clave para ${cand.nombre.split(' ')[0]}`;
+    if (title) title.textContent = `Top 15 · muns clave para ${cand.nombre.split(' ')[0]}`;
     const metaTitle = document.getElementById('metodo-title');
     if (metaTitle) metaTitle.textContent = `Cómo se construye el score · Modo ${cand.nombre.split(' ')[0]}`;
     // Mostrar el bloque metodológico correspondiente.
@@ -1132,6 +1230,7 @@
     STATE.selectedDep = null;
     if (STATE.level === 'dep') renderDeptos(); else renderMunsNacional();
     renderTop30();
+    restoreOverview();
   }
 
   /* ───────── Toggle de nivel ───────── */
@@ -1144,6 +1243,7 @@
     STATE.selectedDep = null;
     if (lvl === 'dep') renderDeptos();
     else renderMunsNacional();
+    restoreOverview();
   }
 
 
@@ -1179,7 +1279,8 @@
       ensureMap();
       renderDeptos();
       renderTop30();
-      bootstrapMunNames();   // async, llena el top-30 con nombres reales
+      restoreOverview();
+      bootstrapMunNames();   // async, llena el top-15 con nombres reales
     } catch (e){
       console.error('[Veleta] init error', e);
       document.getElementById('map-head-title').textContent = 'Error cargando datos · revisa la consola';
