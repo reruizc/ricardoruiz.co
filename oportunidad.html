@@ -453,12 +453,12 @@
       <span class="toggle-label">Capa</span>
       <button class="toggle-btn active" id="layer-opo" onclick="setLayer('opo')">Oportunidad</button>
       <button class="toggle-btn" id="layer-abs" onclick="setLayer('abs')">Abstención</button>
-      <button class="toggle-btn" id="layer-pue" onclick="setLayer('pue')">Puestos</button>
     </div>
     <div class="toggle-group">
       <span class="toggle-label">Nivel</span>
       <button class="toggle-btn active" id="lvl-dep" onclick="setLevel('dep')">Departamental</button>
       <button class="toggle-btn" id="lvl-mun" onclick="setLevel('mun')">Municipal</button>
+      <button class="toggle-btn" id="lvl-pue" onclick="setLayer('pue')">Puestos</button>
     </div>
     <!-- Threshold slider removido (los top contributors ya destacan por
          color en el mapa de calor y aparecen en el ranking del panel). -->
@@ -1132,14 +1132,18 @@
         'consulta-2026-frente':      STATE.cons26f?.[munKey],
         'consulta-2026-soluciones':  STATE.cons26s?.[munKey],
       };
+      let nConsultas = 0;
       for (const [ckey, pat] of Object.entries(cmap)){
         if (!pat || !pat.length) continue;
         const ds = dsByKey[ckey];
         if (!ds) continue;
         const v = pctAfinConsultaCensoEntry(ds, censo, pat);
-        if (v != null){ total += v; hasAny = true; }
+        if (v != null){ total += v; nConsultas++; hasAny = true; }
       }
-      buckets.consultas = hasAny ? total : null;
+      // Promedio (no suma): cuando un candidato aparece en varias consultas
+      // como Roy (2025-pacto + 2026-frente), la suma se dispara > 100% en
+      // zonas donde domina ambas. Promediar mantiene el bucket en escala 0-100.
+      buckets.consultas = hasAny ? (total / nConsultas) : null;
     }
 
     return buckets;
@@ -1252,12 +1256,13 @@
         'consulta-2026-frente':      STATE.cons26f,
         'consulta-2026-soluciones':  STATE.cons26s,
       };
+      let nConsultas = 0;
       for (const [ckey, pat] of Object.entries(cmap)){
         if (!pat || !pat.length) continue;
         const v = nacFromConsultaMapCenso(dsByKey[ckey], pat);
-        if (v != null){ total += v; hasAny = true; }
+        if (v != null){ total += v; nConsultas++; hasAny = true; }
       }
-      cache.consultas = hasAny ? total : null;
+      cache.consultas = hasAny ? (total / nConsultas) : null;
     }
 
     return cache;
@@ -1891,18 +1896,18 @@
     else vCong = vSen ?? vCam;
     buckets.congreso26 = vCong;
 
-    // consultas — suma de pct dentro del universo de cada consulta
-    // (a nivel comuna NO tenemos censo desagregado; usamos pct dentro de
-    //  consulta como proxy aceptable. La distorsión vs el modo mun queda
-    //  documentada en footer.)
+    // consultas — promedio de pct dentro del universo de cada consulta
+    // donde el candidato tiene patrón. Si fuera suma, candidatos que
+    // aparecen en varias consultas (Roy: pacto + frente) dan > 100% en
+    // zonas dominantes. Promediar mantiene el bucket en escala 0-100.
     const cmap = aff.consultas || {};
-    let total = 0, hasAny = false;
+    let total = 0, hasAny = false, nConsultas = 0;
     for (const [ckey, pat] of Object.entries(cmap)){
       if (!pat?.length) continue;
       const v = pctFromComEntry(cityData[ckey]?.[comCod], pat);
-      if (v != null){ total += v; hasAny = true; }
+      if (v != null){ total += v; nConsultas++; hasAny = true; }
     }
-    buckets.consultas = hasAny ? total : null;
+    buckets.consultas = hasAny ? (total / nConsultas) : null;
 
     return buckets;
   }
@@ -1941,13 +1946,13 @@
     out.congreso26 = vCong;
 
     const cmap = aff.consultas || {};
-    let total = 0, hasAny = false;
+    let total = 0, hasAny = false, nConsultas = 0;
     for (const [ckey, pat] of Object.entries(cmap)){
       if (!pat?.length) continue;
       const v = pctFromAllComs(ckey, pat);
-      if (v != null){ total += v; hasAny = true; }
+      if (v != null){ total += v; nConsultas++; hasAny = true; }
     }
-    out.consultas = hasAny ? total : null;
+    out.consultas = hasAny ? (total / nConsultas) : null;
     return out;
   }
 
@@ -2130,7 +2135,7 @@
         f.__rec = r;
         f.__name = (STATE.depByElectoral[elec]||{}).nombre || f.properties.name;
         layer.on('mouseover', (e) => onHover(f, e));
-        layer.on('mouseout',  () => onHoverOut(f));
+        layer.on('mouseout', (e) => onHoverOut(f, e));
         layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
         layer.on('click',     () => onDepClick(elec));
       },
@@ -2170,7 +2175,7 @@
           layer.on('click', () => onCityClick(cityHit.key));
         }
         layer.on('mouseover', (e) => onHover(f, e));
-        layer.on('mouseout',  () => onHoverOut(f));
+        layer.on('mouseout', (e) => onHoverOut(f, e));
         layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
       },
     }).addTo(STATE.map);
@@ -2214,7 +2219,7 @@
           STATE.munNameByKey[k] = { name: f.__name, depName: f.__depName };
         }
         layer.on('mouseover', (e) => onHover(f, e));
-        layer.on('mouseout',  () => onHoverOut(f));
+        layer.on('mouseout', (e) => onHoverOut(f, e));
         layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
       },
     }).addTo(STATE.map);
@@ -2281,8 +2286,15 @@
     showDetailFromFeature(f);
     showHoverChip(f);
   }
-  function onHoverOut(f){
-    if (STATE.mapLayer) STATE.mapLayer.resetStyle();
+  function onHoverOut(f, e){
+    // No usamos resetStyle() porque Leaflet revierte al style INICIAL del
+    // L.geoJSON, no al último setStyle. Cuando los sliders cambian las
+    // métricas, el repintado vía setStyle no actualiza el "initial style"
+    // de Leaflet — entonces resetStyle pierde el color actualizado.
+    // En su lugar reaplicamos el style correcto basado en f.__rec.
+    if (e && e.target && e.target.setStyle){
+      e.target.setStyle(styleFor(f && f.__rec));
+    }
     hideHoverChip();
   }
   function onDepClick(elec){
@@ -2292,10 +2304,12 @@
     if (String(elec).padStart(2,'0') === '16'){
       STATE.selectedDep = '16';
       onCityClick('bogota');
+      renderTop30();
       return;
     }
     STATE.selectedDep = elec;
     renderMunsOfDep(elec);
+    renderTop30();
   }
   function onBack(){
     // Si estamos en capa de ciudad, volver al depto padre.
@@ -2306,11 +2320,13 @@
       STATE.selectedDep = dep;
       refreshMdeViewToggle();
       renderMunsOfDep(dep);
+      renderTop30();
       return;
     }
     STATE.selectedDep = null;
     if (STATE.level === 'dep') renderDeptos();
     else renderMunsNacional();
+    renderTop30();
   }
 
   /* ───────── Medellín barrios — bias propio (v2) ─────────
@@ -2396,13 +2412,13 @@
     const vCam = (aff.camara26||[]).length ? pctFromAllBarrios('camara-2026', aff.camara26) : null;
     out.congreso26 = (vSen!=null && vCam!=null) ? (vSen+vCam)/2 : (vSen ?? vCam);
     const cmap = aff.consultas || {};
-    let total = 0, hasAny = false;
+    let total = 0, hasAny = false, nConsultas = 0;
     for (const [ckey, pat] of Object.entries(cmap)){
       if (!pat?.length) continue;
       const v = pctFromAllBarrios(ckey, pat);
-      if (v != null){ total += v; hasAny = true; }
+      if (v != null){ total += v; nConsultas++; hasAny = true; }
     }
-    out.consultas = hasAny ? total : null;
+    out.consultas = hasAny ? (total / nConsultas) : null;
     return out;
   }
 
@@ -2543,7 +2559,7 @@
         f.__name = f.properties.nombre_bar || f.properties.barrio || '—';
         f.__depName = `Medellín · ${f.properties.nombre_com || 'Comuna ' + (f.properties.comuna||'?')}`;
         layer.on('mouseover', (e) => onHover(f, e));
-        layer.on('mouseout',  () => onHoverOut(f));
+        layer.on('mouseout', (e) => onHoverOut(f, e));
         layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
       },
     }).addTo(STATE.map);
@@ -2632,7 +2648,7 @@
         f.__name = f.properties[cfg.nameField] || com || '—';
         f.__depName = `${cfg.label} · ${cfg.kind}`;
         layer.on('mouseover', (e) => onHover(f, e));
-        layer.on('mouseout',  () => onHoverOut(f));
+        layer.on('mouseout', (e) => onHoverOut(f, e));
         layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
       },
     }).addTo(STATE.map);
@@ -2794,10 +2810,21 @@
   // de crecimiento nacional del candidato. Si Cepeda crece 2.01pp a nivel
   // país por NS-NR, el top-30 debe explicar el grueso de esos 2.01pp.
   function renderTop30(){
+    // Si hay un depto seleccionado, filtra el top a los muns de ese depto.
+    // Si hay ciudad activa (drilldown), el top no aplica (esa vista usa
+    // comunas, no muns; se deja vacío con mensaje).
+    const dep = STATE.selectedDep;
     const arr = Object.values(STATE.munMetrics)
-      .filter(r => r.contrib != null)
+      .filter(r => r.contrib != null && (!dep || r.depCod === dep))
       .sort((a,b) => b.contrib - a.contrib)
       .slice(0,30);
+    const titleEl = document.getElementById('top-title');
+    if (titleEl){
+      const depName = dep ? ((STATE.depByElectoral[dep]||{}).nombre || dep) : null;
+      titleEl.textContent = depName
+        ? `Top ${Math.min(30, arr.length)} · municipios de ${depName}`
+        : 'Top 30 · municipios de oportunidad';
+    }
     const ul = document.getElementById('top-list');
     ul.innerHTML = arr.map((r,i) => {
       const meta = STATE.munNameByKey[r.munKey];
@@ -3064,7 +3091,15 @@
     STATE.layer = L;
     document.getElementById('layer-opo').classList.toggle('active', L==='opo');
     document.getElementById('layer-abs').classList.toggle('active', L==='abs');
-    document.getElementById('layer-pue').classList.toggle('active', L==='pue');
+    document.getElementById('lvl-pue')?.classList.toggle('active', L==='pue');
+    if (L !== 'pue'){
+      // Si salimos de puestos, los niveles dep/mun recuperan su estado active.
+      document.getElementById('lvl-dep').classList.toggle('active', STATE.level==='dep');
+      document.getElementById('lvl-mun').classList.toggle('active', STATE.level==='mun');
+    } else {
+      document.getElementById('lvl-dep').classList.remove('active');
+      document.getElementById('lvl-mun').classList.remove('active');
+    }
     if (L === 'pue'){
       // Activar tiles + interacción + cargar puestos lazy
       ensureTileLayer();
@@ -3104,10 +3139,13 @@
     updateCounter();
   }
   function setLevel(lvl){
+    // Salir del modo Puestos si estaba activo.
+    if (STATE.layer === 'pue') setLayer('opo');
     if (lvl === STATE.level && !STATE.selectedDep && !STATE.selectedCity) return;
     STATE.level = lvl;
     document.getElementById('lvl-dep').classList.toggle('active', lvl==='dep');
     document.getElementById('lvl-mun').classList.toggle('active', lvl==='mun');
+    document.getElementById('lvl-pue')?.classList.remove('active');
     STATE.selectedDep = null;
     STATE.selectedCity = null;
     if (lvl === 'dep') renderDeptos();
