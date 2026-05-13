@@ -145,6 +145,10 @@
     .collapsible-sub[open] > summary::before{transform:rotate(90deg)}
     .collapsible-sub > summary:hover{color:var(--orange)}
     .collapsible-sub-body{padding:.5rem 0 .15rem}
+    .limit-note{font-family:Avenir,sans-serif;font-size:1.09rem;line-height:1.55;color:rgba(255,255,255,.82);padding:.4rem .1rem .2rem}
+    body.day-mode .limit-note{color:rgba(0,0,0,.78)}
+    .limit-note b{color:var(--white)}
+    body.day-mode .limit-note b{color:#0d1120}
     body.day-mode .collapsible{background:rgba(0,0,0,.02);border-color:rgba(0,0,0,.1)}
     body.day-mode .collapsible[open]{background:rgba(0,0,0,.025)}
     body.day-mode .collapsible > summary{color:rgba(0,0,0,.65)}
@@ -367,7 +371,7 @@
           </details>
           <details class="collapsible-sub">
             <summary>Limitación metodológica</summary>
-            <div class="collapsible-sub-body" style="font-family:Avenir,sans-serif;font-size:.78rem;line-height:1.55;color:rgba(255,255,255,.78);padding:.4rem .1rem .2rem">
+            <div class="limit-note">
               La proyección por municipio asume que el desplazamiento Petro 2022 → Cepeda 2026 es uniforme geográficamente. Pierde información sobre el perfil diferente de Cepeda frente a Petro (costa, jóvenes, mujeres), que podría tener pull asimétrico. La v1 lo asume constante por trazabilidad; una v2 podría incorporar el detalle departamental del ponderador.
             </div>
           </details>
@@ -405,7 +409,7 @@
           </details>
           <details class="collapsible-sub">
             <summary>Limitación metodológica</summary>
-            <div class="collapsible-sub-body" style="font-family:Avenir,sans-serif;font-size:.78rem;line-height:1.55;color:rgba(255,255,255,.78);padding:.4rem .1rem .2rem">
+            <div class="limit-note">
               No existe polling per-mun que diferencie a Abelardo de Paloma. Sin esa señal, los dos modos comparten la base del bloque derecha histórico y se diferencian sólo por un <b>boost regional manual</b> ("home turf"): Costa Atlántica + Antioquia para Abelardo, Cauca + Valle + Antioquia para Paloma. El boost refleja afinidad histórica del electorado de derecha por cada candidato, no resultados encuestados. Los mapas Abelardo vs Paloma serán similares fuera de las regiones de boost — esto es honesto a los datos disponibles, no un bug.
             </div>
           </details>
@@ -517,7 +521,11 @@
     depMps:    (depElec) => `${S3}/mapas-2026/Departamentos-mps/${depElec}.json`,
     cityBloques: (cityKey) => `${S3_BASES}/output_bloques/ciudades/${cityKey}.json`,
     cityGeo:    (file)    => `${S3}/mapas-2026/Ciudades-COM-LOC/${file}`,
+    proyUPLBog: `${S3_BASES}/output_ponderador/proyeccion-por-upl-bogota.json`,
   };
+
+  // Mapeo modo → key en p (campo proyección por UPL del ponderador)
+  const UPL_PROY_KEY = { cepeda:'ic', abelardo:'ae', paloma:'pv' };
 
   // Helper: normaliza un código de comuna para matching consistente
   function normCod(v){ const n = parseInt(v, 10); return Number.isFinite(n) ? String(n).padStart(2,'0') : String(v||'').trim(); }
@@ -534,7 +542,7 @@
   // capital. geoProp + geoName son los campos del feature GeoJSON. Si rotate=true,
   // se aplica rotateGeoJSON90Left (Bogotá).
   const CITIES = {
-    '16-001': { key:'bogota',       nombre:'Bogotá D.C.',  geoFile:'BOG-LOCALIDADX.json',  geoProp:'LocCodigo',   geoName:'LocNombre',  rotate:true  },
+    '16-001': { key:'bogota',       nombre:'Bogotá D.C.',  geoFile:'BOG-UPL.json',         geoProp:'CODIGO_UPL',  geoName:'NOMBRE',     rotate:false, dataSource:'upl', granLabel:'UPL' },
     '31-001': { key:'cali',         nombre:'Cali',         geoFile:'CALIX.json',           geoProp:'comuna',      geoName:'nombre',     rotate:false },
     '03-001': { key:'barranquilla', nombre:'Barranquilla', geoFile:'BARRANQUILLAX.json',   geoProp:'id',          geoName:'nombre',     rotate:false },
     '09-001': { key:'manizales',    nombre:'Manizales',    geoFile:'MANIZALESX.json',      geoProp:'ID_COMUNA',   geoName:'NOMBRES_CO', rotate:false },
@@ -745,7 +753,47 @@
     return null;
   }
 
-  /* ───────── Scoring por comuna (city mode) ───────── */
+  /* ───────── Scoring por UPL (Bogotá, datos del ponderador) ───────── */
+  async function loadUPLProyeccion(){
+    if (STATE.cityBloquesCache['__upl_bog']) return STATE.cityBloquesCache['__upl_bog'];
+    const j = await fetch(URLS.proyUPLBog).then(r => r.json());
+    STATE.cityBloquesCache['__upl_bog'] = j;
+    return j;
+  }
+
+  function computeScoresUPL(proyUPL){
+    STATE.scoreByComuna = {};
+    const proyKey = UPL_PROY_KEY[STATE.mode];
+    if (!proyKey || !proyUPL || !proyUPL.agregados) return;
+    for (const [cod, u] of Object.entries(proyUPL.agregados)){
+      const proy = u.p ? u.p[proyKey] : null;
+      if (proy == null) continue;
+      let score, rec = { cod, nombre: u.nombre || cod, depCod:'16', censo: u.censo || 0, proy };
+      if (STATE.mode === 'cepeda'){
+        const gap = Math.max(0, 50 - proy);
+        rec.gap = gap;
+        rec.techoCaptable = null;
+        rec.captable = null;
+        rec.izq22 = null;
+        if (proy >= 50) score = 35;
+        else { const prox = Math.max(0, 1 - gap/15); score = prox * 100; }
+      } else if (STATE.mode === 'abelardo' || STATE.mode === 'paloma'){
+        const cepProy = (u.p && u.p.ic) || 0;
+        rec.candProy = proy;
+        rec.cepedaProy = cepProy;
+        rec.derTotal22 = null;
+        rec.techoDer = null;
+        rec.boost = 1;
+        rec.captable = null;
+        if (proy >= 50) score = 35;
+        else score = Math.min(1, proy/30) * 100;
+      } else continue;
+      rec.score = score;
+      STATE.scoreByComuna[cod] = rec;
+    }
+  }
+
+  /* ───────── Scoring por comuna (city mode con bloques históricos) ───────── */
   async function loadCityBloques(cityKey){
     if (STATE.cityBloquesCache[cityKey]) return STATE.cityBloquesCache[cityKey];
     const j = await fetch(URLS.cityBloques(cityKey)).then(r => r.json());
@@ -1025,12 +1073,23 @@
     ensureMap();
     showLoading(true);
     try {
-      // Carga datos + geojson en paralelo
-      const [bloques, geoRaw] = await Promise.all([
-        loadCityBloques(cfg.key),
-        loadCityGeo(cfg.key, cfg.geoFile),
-      ]);
-      computeScoresComunas(cfg.key, munKey);
+      // Carga datos + geojson en paralelo según fuente
+      let geoRaw;
+      if (cfg.dataSource === 'upl'){
+        const [proy, g] = await Promise.all([
+          loadUPLProyeccion(),
+          loadCityGeo(cfg.key, cfg.geoFile),
+        ]);
+        computeScoresUPL(proy);
+        geoRaw = g;
+      } else {
+        const [_bloques, g] = await Promise.all([
+          loadCityBloques(cfg.key),
+          loadCityGeo(cfg.key, cfg.geoFile),
+        ]);
+        computeScoresComunas(cfg.key, munKey);
+        geoRaw = g;
+      }
       const geo = cfg.rotate ? rotateGeoJSON90Left(geoRaw) : geoRaw;
 
       clearLayer();
@@ -1053,7 +1112,8 @@
         },
       }).addTo(STATE.map);
       STATE.map.fitBounds(STATE.layer.getBounds(), { padding:[20,20] });
-      document.getElementById('map-head-title').textContent = `${cfg.nombre} · Comunas`;
+      const granLabel = cfg.granLabel || 'Comunas';
+      document.getElementById('map-head-title').textContent = `${cfg.nombre} · ${granLabel}`;
       document.getElementById('map-back-btn').classList.add('show');
       STATE.cityActive = munKey;
       renderTop30();        // ahora muestra comunas
@@ -1138,6 +1198,11 @@
   function onDepClick(elec){
     if (!elec) return;
     STATE.selectedDep = elec;
+    // Bogotá tiene un solo mun (16-001); saltar directo a UPL.
+    if (elec === '16' && CITIES['16-001']){
+      renderCity('16-001');
+      return;
+    }
     renderMunsOfDep(elec);
   }
   function onBack(){
@@ -1178,24 +1243,39 @@
     const candFirst = cand.nombre.split(' ')[0];
     if (!r) return '';
 
+    // Si el record viene del ponderador por UPL, no hay techo histórico ni captable.
+    const isUPL = (r.techoCaptable == null && r.captable == null && r.izq22 == null && mode === 'cepeda')
+              || (r.techoDer == null && r.derTotal22 == null && (mode === 'abelardo' || mode === 'paloma'));
+
     if (mode === 'cepeda'){
       const gapTxt = r.gap > 0 ? (r.gap.toFixed(1) + ' pp') : 'ya en 1V';
-      return [
+      const rows = isUPL ? [
         ['Proyección ' + candFirst + ' 2026', fmtPct(r.proy, 1)],
-        ['Brecha al 50% (1V)',                 gapTxt],
-        ['Techo captable',                     fmtPct(r.techoCaptable, 1)],
-        ['Captable estimado',                  (r.captable||0).toFixed(1) + ' pp'],
-        ['Petro 2022 (1V)',                    fmtPct(r.izq22, 1)],
-        ['Censo 2026',                         fmtNum(r.censo)],
-      ].map(([l,v]) => `<div class="det-row"><dt class="lbl">${l}</dt><dd class="val">${v}</dd></div>`).join('');
+        ['Brecha al 50% (1V)',                gapTxt],
+        ['Censo 2026',                        fmtNum(r.censo)],
+        ['Fuente proyección',                 'Ponderador por UPL'],
+      ] : [
+        ['Proyección ' + candFirst + ' 2026', fmtPct(r.proy, 1)],
+        ['Brecha al 50% (1V)',                gapTxt],
+        ['Techo captable',                    fmtPct(r.techoCaptable, 1)],
+        ['Captable estimado',                 (r.captable||0).toFixed(1) + ' pp'],
+        ['Petro 2022 (1V)',                   fmtPct(r.izq22, 1)],
+        ['Censo 2026',                        fmtNum(r.censo)],
+      ];
+      return rows.map(([l,v]) => `<div class="det-row"><dt class="lbl">${l}</dt><dd class="val">${v}</dd></div>`).join('');
     }
 
     if (mode === 'abelardo' || mode === 'paloma'){
-      const boostTxt = r.boost > 1 ? `+${Math.round((r.boost-1)*100)}% home turf` : '—';
       const vsCepeda = (r.candProy != null && r.cepedaProy != null)
         ? (r.candProy >= r.cepedaProy ? 'lidera 2do' : `Cepeda +${(r.cepedaProy - r.candProy).toFixed(1)} pp`)
         : '—';
-      return [
+      const boostTxt = r.boost > 1 ? `+${Math.round((r.boost-1)*100)}% home turf` : '—';
+      const rows = isUPL ? [
+        ['Proyección ' + candFirst + ' 2026', fmtPct(r.candProy, 1)],
+        ['Frente a Cepeda',                   vsCepeda],
+        ['Censo 2026',                        fmtNum(r.censo)],
+        ['Fuente proyección',                 'Ponderador por UPL'],
+      ] : [
         ['Proyección ' + candFirst + ' 2026', fmtPct(r.candProy, 1)],
         ['Frente a Cepeda',                   vsCepeda],
         ['Bloque derecha 2022 (mun)',         fmtPct(r.derTotal22, 1)],
@@ -1203,7 +1283,8 @@
         ['Captable estimado',                 (r.captable||0).toFixed(1) + ' pp'],
         ['Boost regional',                    boostTxt],
         ['Censo 2026',                        fmtNum(r.censo)],
-      ].map(([l,v]) => `<div class="det-row"><dt class="lbl">${l}</dt><dd class="val">${v}</dd></div>`).join('');
+      ];
+      return rows.map(([l,v]) => `<div class="det-row"><dt class="lbl">${l}</dt><dd class="val">${v}</dd></div>`).join('');
     }
     return '';
   }
@@ -1408,14 +1489,11 @@
       el.style.display = (el.getAttribute('data-mode') === activeBlockMode) ? '' : 'none';
     });
     computeScores();
-    // Si estamos en city-mode, recomputar también las comunas para el modo nuevo.
+    // Si estamos en city-mode, renderCity recomputa el scoring según dataSource.
     if (STATE.cityActive){
       const cfg = CITIES[STATE.cityActive];
       if (cfg){
-        computeScoresComunas(cfg.key, STATE.cityActive);
         renderCity(STATE.cityActive);
-        renderTop30();
-        restoreOverview();
         return;
       }
     }
