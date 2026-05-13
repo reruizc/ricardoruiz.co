@@ -120,6 +120,40 @@
     .formula-box{font-family:'Syne',sans-serif;font-weight:500;font-size:.92rem;background:rgba(251,146,60,.08);border:1px solid rgba(251,146,60,.35);border-left:3px solid var(--orange);padding:.65rem .95rem;color:rgba(255,255,255,.92);letter-spacing:.01em}
     .formula-box b{color:var(--orange);font-weight:700}
 
+    /* USAGE BOX (intro permanente) */
+    .usage-box{background:rgba(255,255,255,.025);border:1px solid var(--border);border-left:3px solid var(--orange);padding:1rem 1.2rem;margin-bottom:1.1rem}
+    .usage-box-title{font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;color:var(--white);letter-spacing:-.01em;margin-bottom:.4rem}
+    .usage-box-desc{font-family:Avenir,sans-serif;font-weight:400;font-size:.82rem;line-height:1.55;color:rgba(255,255,255,.75)}
+    .usage-box-desc b{color:var(--orange);font-weight:600}
+    body.day-mode .usage-box{background:rgba(0,0,0,.025);border-color:rgba(0,0,0,.1);border-left-color:var(--orange)}
+    body.day-mode .usage-box-title{color:#0d1120}
+    body.day-mode .usage-box-desc{color:rgba(0,0,0,.7)}
+
+    /* COLLAPSIBLES (details/summary) */
+    .collapsible{border:1px solid var(--border);background:rgba(255,255,255,.02);margin-bottom:.7rem}
+    .collapsible[open]{background:rgba(255,255,255,.025)}
+    .collapsible > summary{font-family:Avenir,sans-serif;font-weight:500;font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.65);padding:.75rem 1rem;cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:.6rem;transition:color .15s,background .15s}
+    .collapsible > summary::-webkit-details-marker{display:none}
+    .collapsible > summary:hover{color:var(--orange);background:rgba(251,146,60,.04)}
+    .collapsible > summary::after{content:'+';font-family:'Syne',sans-serif;font-weight:500;font-size:1.1rem;color:var(--orange);line-height:1;transition:transform .2s}
+    .collapsible[open] > summary::after{content:'−'}
+    .collapsible-body{padding:.4rem 1rem 1rem}
+    .collapsible-body .intro-grid{margin-bottom:.85rem}
+    .collapsible-sub{margin-top:.6rem;border-top:1px dashed var(--border);padding-top:.6rem}
+    .collapsible-sub > summary{font-family:Avenir,sans-serif;font-weight:500;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);cursor:pointer;list-style:none;display:flex;align-items:center;gap:.5rem;padding:.3rem 0;transition:color .15s}
+    .collapsible-sub > summary::-webkit-details-marker{display:none}
+    .collapsible-sub > summary::before{content:'▸';font-size:.7rem;color:var(--orange);transition:transform .2s;display:inline-block}
+    .collapsible-sub[open] > summary::before{transform:rotate(90deg)}
+    .collapsible-sub > summary:hover{color:var(--orange)}
+    .collapsible-sub-body{padding:.5rem 0 .15rem}
+    body.day-mode .collapsible{background:rgba(0,0,0,.02);border-color:rgba(0,0,0,.1)}
+    body.day-mode .collapsible[open]{background:rgba(0,0,0,.025)}
+    body.day-mode .collapsible > summary{color:rgba(0,0,0,.65)}
+    body.day-mode .collapsible > summary:hover{color:var(--orange);background:rgba(251,146,60,.06)}
+    body.day-mode .collapsible-sub{border-top-color:rgba(0,0,0,.1)}
+    body.day-mode .collapsible-sub > summary{color:rgba(0,0,0,.55)}
+    body.day-mode .collapsible-sub > summary:hover{color:var(--orange)}
+
     /* TOGGLE BAR */
     .toggle-bar{padding:.85rem 2.5rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.01);display:flex;align-items:center;gap:1.4rem;flex-wrap:wrap}
     .toggle-group{display:flex;align-items:center;gap:.5rem}
@@ -298,29 +332,46 @@
     <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
   </header>
 
-  <!-- INTRO: 3 metric cards + fórmula -->
+  <!-- INTRO: caja de uso + colapsables -->
   <section class="intro-section">
-    <div class="intro-title">Cómo se construye el score</div>
-    <div class="intro-grid">
-      <div class="metric-card">
-        <div class="metric-card-pct">40%</div>
-        <div class="metric-card-name">Swing histórico</div>
-        <div class="metric-card-desc">Cambio absoluto en el voto por <code>Petro</code> entre presidencial 2018 y 2022, normalizado al percentil 95 nacional. Bonus +15 pts si cambió el ganador del municipio.</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-card-pct">40%</div>
-        <div class="metric-card-name">Competitividad</div>
-        <div class="metric-card-desc">Margen entre el 1° y 2° en presidencial 2022, sobre votos válidos. Lineal invertido: 0 pp → 100, ≥25 pp → 0. Más cerrada la elección, mayor el score.</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-card-pct">20%</div>
-        <div class="metric-card-name">Peso electoral</div>
-        <div class="metric-card-desc">log(censo electoral municipal 2026) normalizado entre el min y el max nacional. Filtra el ruido de municipios pequeños donde 50 votos cambian todo.</div>
+    <div class="usage-box">
+      <div class="usage-box-title">¿Para qué sirve esta página?</div>
+      <div class="usage-box-desc">
+        <b>Veleta</b> identifica los municipios de Colombia donde la elección presidencial 2026 está más en juego: territorios sensibles al cambio, con elecciones cerradas y peso electoral relevante. Cada municipio recibe un <b>score 0–100</b>; los que superan el umbral (default 70) se marcan con rayado en el mapa. Usá los toggles de arriba del mapa para alternar entre vista <b>departamental</b> y <b>municipal</b>, y mové el slider para ajustar el umbral. Hacé click en el mapa o en el ranking lateral para abrir el detalle de un territorio. Pensado para equipos de campaña que necesitan priorizar dónde gastar tiempo, presupuesto y caravana.
       </div>
     </div>
-    <div class="formula-box">
-      Score Veleta = <b>0.4·swing</b> + <b>0.4·competitividad</b> + <b>0.2·peso</b> &nbsp;→&nbsp; escala 0–100
-    </div>
+
+    <details class="collapsible">
+      <summary>Cómo se construye el score</summary>
+      <div class="collapsible-body">
+        <div class="intro-grid">
+          <div class="metric-card">
+            <div class="metric-card-pct">40%</div>
+            <div class="metric-card-name">Swing histórico</div>
+            <div class="metric-card-desc">Cambio absoluto en el voto por <code>Petro</code> entre presidencial 2018 y 2022, normalizado al percentil 95 nacional. Bonus +15 pts si cambió el ganador del municipio.</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-card-pct">40%</div>
+            <div class="metric-card-name">Competitividad</div>
+            <div class="metric-card-desc">Margen entre el 1° y 2° en presidencial 2022, sobre votos válidos. Lineal invertido: 0 pp → 100, ≥25 pp → 0. Más cerrada la elección, mayor el score.</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-card-pct">20%</div>
+            <div class="metric-card-name">Peso electoral</div>
+            <div class="metric-card-desc">log(censo electoral municipal 2026) normalizado entre el min y el max nacional. Filtra el ruido de municipios pequeños donde 50 votos cambian todo.</div>
+          </div>
+        </div>
+
+        <details class="collapsible-sub">
+          <summary>Conoce cómo lo formulamos matemáticamente</summary>
+          <div class="collapsible-sub-body">
+            <div class="formula-box">
+              Score Veleta = <b>0.4·swing</b> + <b>0.4·competitividad</b> + <b>0.2·peso</b> &nbsp;→&nbsp; escala 0–100
+            </div>
+          </div>
+        </details>
+      </div>
+    </details>
   </section>
 
   <!-- TOGGLE BAR -->
