@@ -846,6 +846,31 @@
   // fallback radio adaptativo (usuario fuera de las 3 ciudades).
   setTimeout(() => { loadBogUpl(); loadMedBarrio(); loadCalComuna(); }, 200);
 
+  // ── CIUDADES Y ZONAS (para el dropdown contextual del demo) ──
+  // 17 ciudades mapeadas con sus localidades/comunas/barrios + lista de
+  // países con diáspora colombiana. Se usa en el formulario demográfico
+  // para preguntar "¿en qué localidad/comuna vives?" según donde la geo
+  // sitúe al usuario. ~44 KB, se carga en background al cargar la página.
+  const CIUDADES_ZONAS_URL = `${location.origin}/preguntas/ciudades-zonas.json`;
+  let CIUDADES_ZONAS = null;
+  fetch(CIUDADES_ZONAS_URL, { cache:'no-store' })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => { CIUDADES_ZONAS = d; })
+    .catch(() => { CIUDADES_ZONAS = null; });
+
+  // Dado GEO.city (texto crudo de Cloudflare), busca la entrada de ciudad
+  // que coincide. Hace match exacto contra el key principal y contra los
+  // aliases listados en el JSON. Devuelve la clave canónica o null.
+  function detectCiudad(cityRaw) {
+    if (!cityRaw || !CIUDADES_ZONAS?.ciudades) return null;
+    const c = cityRaw.trim();
+    for (const [key, info] of Object.entries(CIUDADES_ZONAS.ciudades)) {
+      if (key === c) return key;
+      if ((info.aliases || []).some(a => a === c)) return key;
+    }
+    return null;
+  }
+
   // Computa el promedio ciudad-level a partir del agregado por unidad
   // (UPL/barrio/comuna), ponderado por censo del puesto. Devuelve {p, censo}.
   function aggregateCityFromUnits(json) {
@@ -936,7 +961,16 @@
       return await findNearestPuesto(true);
     }
 
-    // ── B) DEFAULT (coords del IP, posiblemente off) ──
+    // ── B) ZONA DECLARADA por el usuario en el form demográfico ──
+    // El usuario eligió una localidad/comuna en el dropdown del demo.
+    // Tiene prioridad sobre el IP (que cae al centroide del ISP) y se
+    // siente más preciso que la ciudad-level. Solo Bog/Med/Cali tienen
+    // agregados sub-ciudad disponibles; para otras ciudades el dropdown
+    // sirve para captura de lead pero la proyección queda ciudad-level.
+    const decl = await projFromZonaDeclarada();
+    if (decl) return decl;
+
+    // ── C) DEFAULT (coords del IP, posiblemente off) ──
     // Para Bogotá/Medellín/Cali → ciudad-level (sin sub-zona).
     if (GEO.zona?.city === 'Bogotá D.C.') {
       const bog = await loadBogUpl();
@@ -958,6 +992,69 @@
     // pasar si la geo cae justo fuera del bbox), igual usamos el nombre.
     // Como no tenemos agregado de esa ciudad, caemos a radio adaptativo.
     return await findNearestPuesto(false);
+  }
+
+  // Cruza la zona declarada por el usuario (state.demo.zona_*) con los
+  // agregados que tenemos. Devuelve {scope, city, label, p} o null.
+  // Solo aplica a Bogotá (localidad → UPL), Medellín (comuna → barrios),
+  // Cali (comuna → directo). Para otras ciudades cae al fallback.
+  async function projFromZonaDeclarada() {
+    const d = state.demo;
+    if (!d || !d.zona_valor || !d.zona_tipo) return null;
+    const ciudad = d.ciudad;
+
+    if (ciudad === 'Cali' && d.zona_tipo === 'comuna') {
+      const cal = await loadCalComuna();
+      const c = cal?.agregados?.[d.zona_valor];
+      if (c) return { scope: 'comuna', city: 'Cali', label: c.nombre, sub: null, p: c.p, precise: false };
+    }
+
+    if (ciudad === 'Medellín' && d.zona_tipo === 'comuna') {
+      const med = await loadMedBarrio();
+      if (med?.agregados) {
+        const matching = Object.values(med.agregados).filter(b => b.comuna === d.zona_valor);
+        if (matching.length) {
+          const total = matching.reduce((s, b) => s + (b.censo || 0), 0) || 1;
+          const p = {};
+          for (const b of matching) {
+            for (const [k, v] of Object.entries(b.p || {})) {
+              p[k] = (p[k] || 0) + (b.censo || 0) * v;
+            }
+          }
+          for (const k of Object.keys(p)) p[k] = +(p[k] / total).toFixed(2);
+          const nombreCom = matching[0].nombre_com || `Comuna ${d.zona_valor}`;
+          return { scope: 'comuna', city: 'Medellín', label: titleCase(nombreCom), sub: null, p, precise: false };
+        }
+      }
+    }
+
+    if (ciudad === 'Bogotá' && d.zona_tipo === 'localidad') {
+      const bog = await loadBogUpl();
+      if (bog?.agregados) {
+        // Filtra UPL cuya localidad principal (la del % más alto) coincida.
+        const matching = Object.values(bog.agregados).filter(u =>
+          u.Localidades && u.Localidades[0] && u.Localidades[0].LocCodigo === d.zona_valor
+        );
+        if (matching.length) {
+          const total = matching.reduce((s, u) => s + (u.censo || 0), 0) || 1;
+          const p = {};
+          for (const u of matching) {
+            for (const [k, v] of Object.entries(u.p || {})) {
+              p[k] = (p[k] || 0) + (u.censo || 0) * v;
+            }
+          }
+          for (const k of Object.keys(p)) p[k] = +(p[k] / total).toFixed(2);
+          const nombreLoc = matching[0].Localidades[0].LocNombre || 'Localidad';
+          return { scope: 'upl', city: 'Bogotá D.C.', label: titleCase(nombreLoc), sub: null, p, precise: false };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  function titleCase(s) {
+    return (s || '').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
   }
 
   // Encuentra el puesto más cercano dentro de un radio adaptativo
@@ -1362,9 +1459,53 @@
         </select>
       </div>`);
 
-    // Departamento eliminado del formulario: lo inferimos automáticamente
-    // de GEO.region (Cloudflare). Si no hay geo, queda como null y se
-    // resuelve después con la respuesta de Geolocation API.
+    // ── Ubicación contextual ──
+    // Tres casos según la geo del usuario:
+    //   1. CO + ciudad mapeada (17 ciudades) → dropdown localidad/comuna/barrio
+    //   2. CO + otro municipio                → "¿zona urbana o rural?"
+    //   3. fuera de CO o sin país             → "¿en qué país vives?"
+    const ciudadKey = detectCiudad(GEO?.city);
+    const country   = GEO?.country;
+    if (ciudadKey && CIUDADES_ZONAS) {
+      const info = CIUDADES_ZONAS.ciudades[ciudadKey];
+      const label = info.label;
+      const qText = `¿En qué ${label} de ${ciudadKey} vives?`;
+      fields.push(`
+        <div class="field full">
+          <label for="d-zona">${escapeHtml(qText)}</label>
+          <select id="d-zona" data-zona-tipo="${label}" data-ciudad="${escapeHtml(ciudadKey)}">
+            <option value="">Selecciona…</option>
+            ${info.zonas.map(z => `<option value="${escapeHtml(z.codigo)}">${escapeHtml(z.nombre)}</option>`).join('')}
+            <option value="__no_se__">No sé / no quiero decir</option>
+          </select>
+        </div>`);
+    } else if (country === 'CO' || (!country && GEO?.region)) {
+      // Está en Colombia pero no en una ciudad mapeada — preguntamos urbano/rural.
+      const muni = GEO?.city || 'tu municipio';
+      fields.push(`
+        <div class="field full">
+          <label for="d-zona">¿En ${escapeHtml(muni)} vives en zona urbana o rural?</label>
+          <select id="d-zona" data-zona-tipo="urbano-rural" data-ciudad="${escapeHtml(GEO?.city || '')}">
+            <option value="">Selecciona…</option>
+            <option value="urbano">Zona urbana / cabecera municipal</option>
+            <option value="rural">Área rural / vereda / corregimiento</option>
+            <option value="__no_se__">No sé / no quiero decir</option>
+          </select>
+        </div>`);
+    } else {
+      // Fuera de Colombia (o sin geo) — preguntamos país (para cruzar con
+      // circunscripción Exterior de la Registraduría).
+      const paises = CIUDADES_ZONAS?.paises || ['Otro'];
+      fields.push(`
+        <div class="field full">
+          <label for="d-zona">¿En qué país vives?</label>
+          <select id="d-zona" data-zona-tipo="pais" data-ciudad="">
+            <option value="">Selecciona…</option>
+            ${paises.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('')}
+            <option value="__no_se__">No sé / no quiero decir</option>
+          </select>
+        </div>`);
+    }
 
     fields.push(`
       <div class="field">
@@ -1412,10 +1553,14 @@
     const genero    = $('#d-genero')?.value;
     const ideol     = $('#d-ideol')?.value;
     const votoMarzo = $('#d-voto-marzo')?.value;
+    const zona      = $('#d-zona')?.value;
     const emailEl   = $('#d-email');
     // Email obligatorio sólo si el campo está renderizado (ricardoruiz.co + invitado).
     const emailOk = !emailEl || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailEl.value.trim());
-    const ok = !!edad && !!genero && !!ideol && !!votoMarzo && emailOk;
+    // Zona: si el campo existe, debe estar lleno (acepta "__no_se__" como
+    // respuesta válida — el usuario eligió no decirnos).
+    const zonaOk = !$('#d-zona') || !!zona;
+    const ok = !!edad && !!genero && !!ideol && !!votoMarzo && emailOk && zonaOk;
     $('#demo-next').classList.toggle('disabled', !ok);
     return ok;
   }
@@ -1423,14 +1568,21 @@
   function submitDemo() {
     if (!validateDemo()) return;
     const emailEl = $('#d-email');
+    const zonaEl  = $('#d-zona');
+    const zonaVal = zonaEl?.value || null;
+    const zonaTipo = zonaEl?.dataset.zonaTipo || null;   // 'localidad'|'comuna'|'barrio'|'urbano-rural'|'pais'
+    const zonaCiudad = zonaEl?.dataset.ciudad || null;   // 'Bogotá', 'Medellín', etc.
     state.demo = {
       email:       IS_LOGGED ? USER.email : (emailEl ? emailEl.value.trim().toLowerCase() : null),
       edad:        $('#d-edad').value,
-      // Departamento inferido de GEO.region (puede ser null si la geo aún no
-      // llegó cuando el usuario llenó el form rápido — el endpoint central
-      // lo puede recalcular después con el lat/lon final).
+      // Departamento se conserva como fallback del IP. La zona declarada por
+      // el usuario tiene prioridad para el cruce final con la proyección.
       depto:       GEO?.region || null,
       depto_src:   GEO?.region ? 'ip' : null,
+      ciudad:      zonaCiudad || GEO?.city || null,
+      zona_tipo:   zonaTipo,                              // qué tipo de zona se preguntó
+      zona_valor:  zonaVal === '__no_se__' ? null : zonaVal,
+      zona_declarada: zonaVal === '__no_se__' ? false : !!zonaVal,
       genero:      $('#d-genero').value,
       ideol:       $('#d-ideol').value,
       voto_marzo:  $('#d-voto-marzo').value,
