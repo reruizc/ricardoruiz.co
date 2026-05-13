@@ -522,6 +522,7 @@
     cityBloques: (cityKey) => `${S3_BASES}/output_bloques/ciudades/${cityKey}.json`,
     cityGeo:    (file)    => `${S3}/mapas-2026/Ciudades-COM-LOC/${file}`,
     proyUPLBog: `${S3_BASES}/output_ponderador/proyeccion-por-upl-bogota.json`,
+    proyBarrioBog: `${S3_BASES}/output_ponderador/proyeccion-por-barrio-bogota.json`,
   };
 
   // Mapeo modo → key en p (campo proyección por UPL del ponderador)
@@ -542,7 +543,8 @@
   // capital. geoProp + geoName son los campos del feature GeoJSON. Si rotate=true,
   // se aplica rotateGeoJSON90Left (Bogotá).
   const CITIES = {
-    '16-001': { key:'bogota',       nombre:'Bogotá D.C.',  geoFile:'BOG-UPL.json',         geoProp:'CODIGO_UPL',  geoName:'NOMBRE',     rotate:false, dataSource:'upl', granLabel:'UPL' },
+    '16-001': { key:'bogota',       nombre:'Bogotá D.C.',  geoFile:'BOG-UPL.json',         geoProp:'CODIGO_UPL',  geoName:'NOMBRE',     rotate:true,  dataSource:'upl', granLabel:'UPL',
+                barrioGeoFile:'BOG-BARRIOS-CATASTRALES.json', barrioGeoProp:'codigo', barrioGeoName:'nombre', barrioGeoLoc:'loc_codigo' },
     '31-001': { key:'cali',         nombre:'Cali',         geoFile:'CALIX.json',           geoProp:'comuna',      geoName:'nombre',     rotate:false },
     '03-001': { key:'barranquilla', nombre:'Barranquilla', geoFile:'BARRANQUILLAX.json',   geoProp:'id',          geoName:'nombre',     rotate:false },
     '09-001': { key:'manizales',    nombre:'Manizales',    geoFile:'MANIZALESX.json',      geoProp:'ID_COMUNA',   geoName:'NOMBRES_CO', rotate:false },
@@ -594,6 +596,10 @@
     scoreByDep:{},                    // 'depElec' → registro agregado
     scoreByComuna:{},                 // cod → registro (sólo cuando hay cityActive)
     cityActive:null,                  // munKey '16-001' si estamos en city-mode
+    barrioActive:null,                // upl code 'UPL13' si estamos drillados a barrios
+    scoreByBarrio:{},                 // codigo barrio → record
+    barrioGeoCache:{},                // { cityKey: geojson }
+    barrioProyCache:{},               // { cityKey: proyección barrios }
     cityBloquesCache:{},              // { key: cityBloques }
     cityGeoCache:{},                  // { key: geojson }
     mode:'cepeda',                    // candidato activo
@@ -790,6 +796,50 @@
       } else continue;
       rec.score = score;
       STATE.scoreByComuna[cod] = rec;
+    }
+  }
+
+  /* ───────── Scoring por barrio (Bogotá, datos del ponderador) ───────── */
+  async function loadBarrioProyeccion(){
+    if (STATE.barrioProyCache['bogota']) return STATE.barrioProyCache['bogota'];
+    const j = await fetch(URLS.proyBarrioBog).then(r => r.json());
+    STATE.barrioProyCache['bogota'] = j;
+    return j;
+  }
+  async function loadBarrioGeo(cityKey, file){
+    if (STATE.barrioGeoCache[cityKey]) return STATE.barrioGeoCache[cityKey];
+    const j = await fetch(URLS.cityGeo(file)).then(r => r.json());
+    STATE.barrioGeoCache[cityKey] = j;
+    return j;
+  }
+
+  function computeScoresBarrios(proyBarrio){
+    STATE.scoreByBarrio = {};
+    const proyKey = UPL_PROY_KEY[STATE.mode];
+    if (!proyKey || !proyBarrio || !proyBarrio.agregados) return;
+    for (const [cod, b] of Object.entries(proyBarrio.agregados)){
+      const proy = b.p ? b.p[proyKey] : null;
+      if (proy == null) continue;
+      let score, rec = {
+        cod, nombre: b.nombre || cod, depCod:'16',
+        loc_codigo: b.loc_codigo, loc_nombre: b.loc_nombre,
+        censo: b.censo || 0, proy,
+      };
+      if (STATE.mode === 'cepeda'){
+        const gap = Math.max(0, 50 - proy);
+        rec.gap = gap;
+        rec.techoCaptable = null; rec.captable = null; rec.izq22 = null;
+        if (proy >= 50) score = 35;
+        else { const prox = Math.max(0, 1 - gap/15); score = prox * 100; }
+      } else if (STATE.mode === 'abelardo' || STATE.mode === 'paloma'){
+        const cepProy = (b.p && b.p.ic) || 0;
+        rec.candProy = proy; rec.cepedaProy = cepProy;
+        rec.derTotal22 = null; rec.techoDer = null; rec.boost = 1; rec.captable = null;
+        if (proy >= 50) score = 35;
+        else score = Math.min(1, proy/30) * 100;
+      } else continue;
+      rec.score = score;
+      STATE.scoreByBarrio[cod] = rec;
     }
   }
 
@@ -1109,6 +1159,10 @@
           layer.on('mouseover', (e) => onHover(f, e));
           layer.on('mouseout',  () => onHoverOut(f));
           layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
+          // Click en UPL Bogotá → drill a barrios
+          if (cfg.dataSource === 'upl' && cfg.barrioGeoFile && k){
+            layer.on('click', () => renderBarriosFromUPL(k));
+          }
         },
       }).addTo(STATE.map);
       STATE.map.fitBounds(STATE.layer.getBounds(), { padding:[20,20] });
@@ -1123,6 +1177,87 @@
     } finally {
       showLoading(false);
     }
+  }
+
+  /* ───────── Render barrios (drill desde UPL Bogotá) ───────── */
+  async function renderBarriosFromUPL(uplCod){
+    const munKey = STATE.cityActive;
+    const cfg = munKey && CITIES[munKey];
+    if (!cfg || !cfg.barrioGeoFile) return;
+    ensureMap();
+    showLoading(true);
+    try {
+      const [proy, geoRaw] = await Promise.all([
+        loadBarrioProyeccion(),
+        loadBarrioGeo(cfg.key, cfg.barrioGeoFile),
+      ]);
+      computeScoresBarrios(proy);
+
+      // Identificar las localidades de la UPL clickeada (para zoom + filtro suave)
+      const uplGeo = STATE.cityGeoCache[cfg.key];
+      const uplFeat = uplGeo && uplGeo.features.find(f => f.properties[cfg.geoProp] === uplCod);
+      const uplLocs = (uplFeat && uplFeat.properties && uplFeat.properties.Localidades) || [];
+      const uplLocCods = new Set(uplLocs.map(l => String(l.LocCodigo).padStart(2,'0')));
+
+      const geo = cfg.rotate ? rotateGeoJSON90Left(geoRaw) : geoRaw;
+
+      clearLayer();
+      const allBarriosLayer = L.geoJSON(geo, {
+        style: (f) => {
+          const k = f.properties[cfg.barrioGeoProp];
+          const r = k ? STATE.scoreByBarrio[k] : null;
+          // Atenuamos barrios fuera de la UPL clickeada (visual focus)
+          const lc = String(f.properties[cfg.barrioGeoLoc] || '').padStart(2,'0');
+          const inUPL = uplLocCods.size === 0 || uplLocCods.has(lc);
+          const base = styleByScore(r ? r.score : null);
+          return inUPL ? base : { ...base, fillOpacity: 0.18, weight: 0.3 };
+        },
+        onEachFeature: (f, layer) => {
+          const k = f.properties[cfg.barrioGeoProp];
+          const r = k ? STATE.scoreByBarrio[k] : null;
+          f.__key = k;
+          f.__rec = r;
+          f.__name = (r && r.nombre) || f.properties[cfg.barrioGeoName] || k || '—';
+          f.__depName = `${cfg.nombre} · ${(r && r.loc_nombre) || ''}`;
+          layer.on('mouseover', (e) => onHover(f, e));
+          layer.on('mouseout',  () => onHoverOut(f));
+          layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
+        },
+      }).addTo(STATE.map);
+      STATE.layer = allBarriosLayer;
+
+      // Zoom: bounds de la UPL si la rotamos también, si no del feature original
+      if (uplFeat){
+        // bounds desde el polígono UPL (también rotado si aplica)
+        const tmpUPL = cfg.rotate ? rotateGeoJSON90Left({ type:'FeatureCollection', features:[uplFeat] }) : { type:'FeatureCollection', features:[uplFeat] };
+        const tmpLayer = L.geoJSON(tmpUPL);
+        STATE.map.fitBounds(tmpLayer.getBounds(), { padding:[30,30] });
+      } else {
+        STATE.map.fitBounds(allBarriosLayer.getBounds(), { padding:[20,20] });
+      }
+
+      const uplName = (uplFeat && uplFeat.properties[cfg.geoName]) || uplCod;
+      document.getElementById('map-head-title').textContent = `${cfg.nombre} · UPL ${uplName} · Barrios`;
+      document.getElementById('map-back-btn').classList.add('show');
+      STATE.barrioActive = uplCod;
+      // Adapta el ranking y overview a barrios
+      renderTop30();
+      restoreOverview();
+    } catch (e){
+      console.error('[Veleta] error renderBarrios', e);
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  function exitBarrios(){
+    STATE.barrioActive = null;
+    STATE.scoreByBarrio = {};
+    if (STATE.cityActive) renderCity(STATE.cityActive);
+    else if (STATE.selectedDep) renderMunsOfDep(STATE.selectedDep);
+    else renderDeptos();
+    renderTop30();
+    restoreOverview();
   }
 
   function exitCity(){
@@ -1206,6 +1341,10 @@
     renderMunsOfDep(elec);
   }
   function onBack(){
+    if (STATE.barrioActive){
+      exitBarrios();
+      return;
+    }
     if (STATE.cityActive){
       exitCity();
       return;
@@ -1294,19 +1433,22 @@
     const empty = document.getElementById('det-empty');
     if (!empty) return;
     const cand = currentCand();
-    const inCity = !!STATE.cityActive;
+    const inBarrio = !!STATE.barrioActive;
+    const inCity   = !!STATE.cityActive && !inBarrio;
     const lvl  = STATE.level;        // 'dep' | 'mun'
-    const lvlLabel = inCity ? 'Comunas / localidades' : (lvl === 'dep' ? 'Departamentos' : 'Municipios');
-    const unit     = inCity ? 'comunas' : (lvl === 'dep' ? 'departamentos' : 'municipios');
+    const lvlLabel = inBarrio ? 'Barrios' : (inCity ? 'Comunas / localidades / UPL' : (lvl === 'dep' ? 'Departamentos' : 'Municipios'));
+    const unit     = inBarrio ? 'barrios' : (inCity ? 'comunas' : (lvl === 'dep' ? 'departamentos' : 'municipios'));
     const cands = (STATE.ponderador && STATE.ponderador.candidatos) || {};
     const candPct = (cands[cand.pondKey] && cands[cand.pondKey].pct) || 0;
 
-    // Universo: comunas si city-mode, si no dep o mun según level.
-    const items = inCity
-      ? Object.values(STATE.scoreByComuna || {})
-      : (lvl === 'dep'
-          ? Object.values(STATE.scoreByDep || {})
-          : Object.values(STATE.scoreByMun || {}));
+    // Universo según drill activo
+    const items = inBarrio
+      ? Object.values(STATE.scoreByBarrio || {})
+      : (inCity
+          ? Object.values(STATE.scoreByComuna || {})
+          : (lvl === 'dep'
+              ? Object.values(STATE.scoreByDep || {})
+              : Object.values(STATE.scoreByMun || {})));
     const total = items.length;
     const censoTotal = STATE.sumCensoNacional || 1;
 
@@ -1389,9 +1531,16 @@
 
   /* ───────── Top 30 ranking + contador veleta ───────── */
   function renderTop30(){
+    if (STATE.barrioActive){
+      const arr = Object.values(STATE.scoreByBarrio).sort((a,b)=>b.score-a.score).slice(0,15);
+      const adapted = arr.map(r => ({
+        key: r.cod, depCod: r.depCod || '', __cityName: r.nombre, score: r.score, __isComuna:true,
+      }));
+      patchTop30Names(adapted);
+      return;
+    }
     if (STATE.cityActive){
       const arr = Object.values(STATE.scoreByComuna).sort((a,b)=>b.score-a.score).slice(0,15);
-      // Adaptamos al formato esperado por patchTop30Names
       const adapted = arr.map(r => ({
         key: r.cod, depCod: r.depCod || '', __cityName: r.nombre, score: r.score, __isComuna:true,
       }));
@@ -1489,7 +1638,11 @@
       el.style.display = (el.getAttribute('data-mode') === activeBlockMode) ? '' : 'none';
     });
     computeScores();
-    // Si estamos en city-mode, renderCity recomputa el scoring según dataSource.
+    // Si estamos en barrio-mode, recomputar barrios; si city-mode, renderCity recomputa.
+    if (STATE.barrioActive){
+      renderBarriosFromUPL(STATE.barrioActive);
+      return;
+    }
     if (STATE.cityActive){
       const cfg = CITIES[STATE.cityActive];
       if (cfg){
@@ -1506,12 +1659,14 @@
   /* ───────── Toggle de nivel ───────── */
   function setLevel(lvl){
     if (lvl === 'mun-from-top'){ STATE.level = 'mun'; document.getElementById('lvl-mun').classList.add('active'); document.getElementById('lvl-dep').classList.remove('active'); return; }
-    if (lvl === STATE.level && !STATE.selectedDep && !STATE.cityActive) return;
+    if (lvl === STATE.level && !STATE.selectedDep && !STATE.cityActive && !STATE.barrioActive) return;
     STATE.level = lvl;
     document.getElementById('lvl-dep').classList.toggle('active', lvl==='dep');
     document.getElementById('lvl-mun').classList.toggle('active', lvl==='mun');
-    STATE.cityActive = null;        // cambiar nivel sale de city-mode
+    STATE.cityActive = null;        // cambiar nivel sale de city/barrio-mode
+    STATE.barrioActive = null;
     STATE.scoreByComuna = {};
+    STATE.scoreByBarrio = {};
     STATE.selectedDep = null;
     if (lvl === 'dep') renderDeptos();
     else renderMunsNacional();
