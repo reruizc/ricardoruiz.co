@@ -190,8 +190,8 @@
     body.day-mode .veleta-count .censo{color:rgba(0,0,0,.55)}
     body.day-mode .veleta-count b{color:#dc2626}
 
-    /* MAIN SHELL */
-    .shell{display:grid;grid-template-columns:1fr 400px;gap:0;min-height:calc(100vh - 460px)}
+    /* MAIN SHELL — el mapa cede ~10% a la columna derecha (de 400px a 500px). */
+    .shell{display:grid;grid-template-columns:1fr 500px;gap:0;min-height:calc(100vh - 460px)}
     @media (max-width:1100px){.shell{grid-template-columns:1fr}}
 
     .map-wrap{position:relative;border-right:1px solid var(--border);display:flex;flex-direction:column}
@@ -228,9 +228,13 @@
     body.day-mode .hover-chip .hc-score.neg{color:var(--purple)}
     @media (max-width:1099px){.hover-chip{display:none!important}}
 
-    /* PANEL */
-    .panel{padding:1rem 1.1rem 1.5rem;border-left:1px solid var(--border);display:flex;flex-direction:column;gap:.95rem;overflow-y:auto;max-height:calc(100vh - 280px)}
-    @media (max-width:1100px){.panel{max-height:none;border-left:none;border-top:1px solid var(--border)}}
+    /* PANEL — sin scroll interno: el panel crece con su contenido y el
+       body de la página se encarga del scroll. El mapa queda sticky para
+       que no se pierda de vista al desplazarse por la columna derecha. */
+    .panel{padding:1rem 1.1rem 1.5rem;border-left:1px solid var(--border);display:flex;flex-direction:column;gap:.95rem}
+    .map-wrap{position:sticky;top:0;align-self:start;max-height:100vh}
+    #leaflet-map{min-height:calc(100vh - 60px)}
+    @media (max-width:1100px){.panel{border-left:none;border-top:1px solid var(--border)} .map-wrap{position:static;max-height:none}}
     .panel-section-title{font-family:Avenir,sans-serif;font-weight:500;font-size:.66rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:.35rem}
     .panel-card{background:rgba(255,255,255,.025);border:1px solid var(--border);padding:.85rem .95rem}
 
@@ -249,7 +253,7 @@
 
     /* Leyenda divergente */
     .leg-bar{height:10px;border:1px solid rgba(255,255,255,.1);margin:.4rem 0 .25rem}
-    .leg-bar.opo{background:linear-gradient(to right,#a78bfa 0%,#7e6dc2 25%,#3a3f4d 50%,#7cca8c 75%,#4ade80 100%)}
+    .leg-bar.opo{background:linear-gradient(to right,rgb(56,89,124) 0%,rgb(99,138,160) 20%,rgb(205,200,180) 38%,rgb(240,180,90) 58%,rgb(225,120,50) 78%,rgb(180,55,40) 100%)}
     .leg-bar.abs{background:linear-gradient(to right,rgb(56,89,124) 0%,rgb(99,138,160) 25%,rgb(205,200,180) 42%,rgb(240,180,90) 58%,rgb(225,120,50) 75%,rgb(180,55,40) 100%)}
     body.day-mode .leg-bar{border-color:rgba(0,0,0,.12)}
     .leg-bar-ends{display:flex;justify-content:space-between;font-family:Avenir,sans-serif;font-size:.65rem;color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums}
@@ -441,7 +445,7 @@
       <button class="toggle-btn" id="lvl-mun" onclick="setLevel('mun')">Municipal</button>
     </div>
     <div class="threshold-row">
-      <span class="toggle-label" style="margin-right:.2rem">Destacar contribución ≥</span>
+      <span class="toggle-label" style="margin-right:.2rem">Destacar contribución ≥ <span class="help-q" data-tip="Marca con rayado los municipios cuyo aporte al crecimiento nacional del candidato supera este umbral en puntos porcentuales. Subir el umbral filtra el mapa a los pocos territorios que más explican el crecimiento total; bajarlo destaca un universo más amplio. El valor por default (+0.05 pp) suele resaltar 50-100 municipios para los candidatos grandes y unas decenas para los pequeños.">?</span></span>
       <input type="range" id="threshold-slider" class="threshold-slider" min="0.01" max="0.30" step="0.01" value="0.05" />
       <span class="threshold-value" id="threshold-value">+0.05 pp</span>
     </div>
@@ -492,9 +496,9 @@
         <div class="panel-section-title" id="leg-title">Contribución al crecimiento nacional (pp)</div>
         <div class="leg-bar opo" id="leg-bar"></div>
         <div class="leg-bar-ends" id="leg-ends">
-          <span class="leg-bar-end">−10 pp · sobre-rep</span>
-          <span class="leg-bar-end">0</span>
-          <span class="leg-bar-end">+10 pp · oportunidad</span>
+          <span class="leg-bar-end">0 pp · sin aporte</span>
+          <span class="leg-bar-end">0.05</span>
+          <span class="leg-bar-end">+0.20 pp · top contributor</span>
         </div>
         <div class="leg-stripes" id="leg-stripes-row">
           <div class="leg-stripe-swatch"></div>
@@ -1424,31 +1428,33 @@
   function isDay(){ return document.body.classList.contains('day-mode'); }
 
   // Divergente: -10..0..+10 pp (techo realista comprime el rango)
-  // Color por contribución nacional (pp). Rango realista: 0 a ~0.2pp
-  // (territorios grandes con alta presencia del candidato). Stops calibrados
-  // a esa escala — escala superior asume top contributors entre 0.10-0.20pp.
+  // Color por contribución nacional (pp) — mapa de calor. Paleta paralela
+  // a colorByAbst: azul frío (baja contribución) → beige → ámbar → rojo
+  // profundo (top contributors). Rango realista 0–0.20 pp.
   function colorByGap(contrib){
     if (contrib == null || isNaN(contrib)) return '#2d3340';
     const g = clamp(contrib, 0, 0.20);
     const stops = [
-      [0.00, [ 58, 63, 77]],   // neutro (poca contribución)
-      [0.02, [ 70, 95, 80]],
-      [0.05, [124,202,140]],
-      [0.10, [ 99,222,128]],
-      [0.20, [ 74,222,128]],   // verde brillante (contribuye fuerte al total)
+      [0.000, [ 56, 89,124]],   // azul-gris frío (aporte casi nulo)
+      [0.010, [ 99,138,160]],   // azul claro
+      [0.030, [205,200,180]],   // beige neutro
+      [0.060, [240,180, 90]],   // ámbar
+      [0.100, [225,120, 50]],   // naranja intenso
+      [0.200, [180, 55, 40]],   // rojo profundo (top contributor)
     ];
     if (g <= stops[0][0]) return `rgb(${stops[0][1].join(',')})`;
+    if (g >= stops[stops.length-1][0]) return `rgb(${stops[stops.length-1][1].join(',')})`;
     for (let i=0;i<stops.length-1;i++){
       const [s0,c0] = stops[i], [s1,c1] = stops[i+1];
       if (g >= s0 && g <= s1){
         const t = (g - s0) / (s1 - s0 || 1);
-        const r = Math.round(c0[0] + t*(c1[0]-c0[0]));
+        const r  = Math.round(c0[0] + t*(c1[0]-c0[0]));
         const gg = Math.round(c0[1] + t*(c1[1]-c0[1]));
-        const b = Math.round(c0[2] + t*(c1[2]-c0[2]));
+        const b  = Math.round(c0[2] + t*(c1[2]-c0[2]));
         return `rgb(${r},${gg},${b})`;
       }
     }
-    return '#4ade80';
+    return '#b43728';
   }
 
   // Abstención: rango real Colombia ~35–75% por mun.
@@ -2737,8 +2743,8 @@
     const title = document.getElementById('leg-title');
     if (STATE.layer === 'opo'){
       bar.className = 'leg-bar opo';
-      ends.innerHTML = '<span class="leg-bar-end">−10 pp · sobre-rep</span><span class="leg-bar-end">0</span><span class="leg-bar-end">+10 pp · oportunidad</span>';
-      title.textContent = 'Voto blando · brecha (pp)';
+      ends.innerHTML = '<span class="leg-bar-end">0 pp · sin aporte</span><span class="leg-bar-end">0.05</span><span class="leg-bar-end">+0.20 pp · top contributor</span>';
+      title.textContent = 'Contribución al crecimiento nacional (pp)';
       stripes.style.display = 'flex';
     } else if (STATE.layer === 'abs'){
       bar.className = 'leg-bar abs';
@@ -2747,8 +2753,8 @@
       stripes.style.display = 'none';
     } else if (STATE.layer === 'pue'){
       bar.className = 'leg-bar opo';
-      ends.innerHTML = '<span class="leg-bar-end">−10 pp · sobre-rep</span><span class="leg-bar-end">0</span><span class="leg-bar-end">+10 pp · oportunidad</span>';
-      title.textContent = 'Puestos · color hereda brecha del mun · radio = log(censo)';
+      ends.innerHTML = '<span class="leg-bar-end">0 pp · sin aporte</span><span class="leg-bar-end">0.05</span><span class="leg-bar-end">+0.20 pp · top contributor</span>';
+      title.textContent = 'Puestos · color hereda contribución del mun · radio = log(censo)';
       stripes.style.display = 'none';
     }
   }
