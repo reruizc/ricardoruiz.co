@@ -75,11 +75,18 @@ def main():
                 # Algunos puestos tienen códigos no numéricos (ej. "A1"); los
                 # ignoramos porque no van a coincidir con el TER tampoco
                 continue
+            try:
+                mesas = int(row.get('MESAS') or 0)
+            except (ValueError, TypeError):
+                mesas = 0
             puestos.append({
                 'key': f'{zz}-{pp}',
                 'zz': zz, 'pp': pp,
                 'lat': lat, 'lon': lon,
                 'barrio_csv': (row.get('BARRIO') or '').strip(),
+                'nombre_puesto': (row.get('NOMBRE PUESTO') or '').strip(),
+                'direccion': (row.get('DIRECCIÓN') or row.get('DIRECCION') or '').strip(),
+                'mesas': mesas,
             })
     print(f'  · {len(puestos)} puestos con coordenadas válidas')
 
@@ -120,6 +127,9 @@ def main():
             'lat': p['lat'],
             'lon': p['lon'],
             'barrio_csv': p['barrio_csv'],
+            'nombre_puesto': p['nombre_puesto'],
+            'direccion': p['direccion'],
+            'mesas': p['mesas'],
         }
 
     # Sanity: cuántos barrios distintos cubre el mapping

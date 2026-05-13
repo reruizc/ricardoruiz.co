@@ -391,6 +391,7 @@
           <div class="pill-group" id="view-pills">
             <button class="pill active" data-view="comuna">Por comuna</button>
             <button class="pill" data-view="barrio">Por barrio</button>
+            <button class="pill" data-view="puesto">Por puestos</button>
           </div>
         </div>
       </div>
@@ -508,6 +509,8 @@
     // Prioridad: oficial (DAP Alcaldía) → Voronoi (aproximación) → circleMarkers
     const BARRIOS_GEO_URL_OFICIAL = `${S3_BASE}/bases+de+datos/MEDELLIN_BARRIOS_OFICIAL.json`;
     const BARRIOS_GEO_URL_VORONOI = `${S3_BASE}/bases+de+datos/MEDELLIN_BARRIOS_VORONOI.json`;
+    // Metadata por puesto (lat/lon, nombre del lugar, dirección, mesas, barrio oficial)
+    const PUESTOS_META_URL = `${S3_BASE}/bases+de+datos/puestos_to_barrios.json`;
 
     const dataCache = {};
     async function loadData(year, corp, file){
@@ -534,6 +537,16 @@
     let barriosGeoCache = null;
     let barriosGeoSource = null;  // 'oficial' | 'voronoi' | null
     let barriosGeoTried = false;
+    let puestosMetaCache = null;
+    async function loadPuestosMeta(){
+      if (puestosMetaCache) return puestosMetaCache;
+      try {
+        const r = await fetch(PUESTOS_META_URL);
+        if (!r.ok) return null;
+        puestosMetaCache = await r.json();
+        return puestosMetaCache;
+      } catch(e){ return null; }
+    }
     async function loadBarriosGeo(){
       if (barriosGeoCache) return barriosGeoCache;
       if (barriosGeoTried) return null;
@@ -631,6 +644,7 @@
     let mapLayer = null;        // capa de comunas (GeoJSON)
     let barrioLayer = null;     // capa de barrios (circleMarkers fallback)
     let barrioPolyLayer = null; // capa de barrios (polígonos Voronoi)
+    let puestoLayer = null;     // capa de puestos (circleMarkers en lat/lon)
     let currentResumen = null;
     let currentComunas = null;
     let currentBarrios = null;
@@ -685,15 +699,19 @@
         ];
         if (state.view === 'barrio'){
           fetches.push(loadData(state.year, state.corp, 'por-barrio').catch(() => null));
+          fetches.push(Promise.resolve(null));
+        } else if (state.view === 'puesto'){
+          fetches.push(Promise.resolve(null));
+          fetches.push(loadData(state.year, state.corp, 'por-puesto').catch(() => null));
         }
         const results = await Promise.all(fetches);
-        const [resumen, porComuna, porBarrio] = results;
+        const [resumen, porComuna, porBarrio, porPuesto] = results;
         currentResumen = resumen;
         currentComunas = porComuna;
         currentBarrios = porBarrio || null;
         renderSummary(resumen);
         renderCandTable(resumen);
-        await renderMap(porComuna, currentBarrios);
+        await renderMap(porComuna, currentBarrios, porPuesto);
         renderComunaTable(porComuna);
       } catch (e) {
         console.error(e);
@@ -764,11 +782,12 @@
       document.getElementById('cand-title').textContent = titles[state.corp] || 'Top';
     }
 
-    async function renderMap(porComuna, porBarrio){
+    async function renderMap(porComuna, porBarrio, porPuesto){
       const geo = await loadGeo();
       if (mapLayer){ map.removeLayer(mapLayer); mapLayer = null; }
       if (barrioLayer){ map.removeLayer(barrioLayer); barrioLayer = null; }
       if (barrioPolyLayer){ map.removeLayer(barrioPolyLayer); barrioPolyLayer = null; }
+      if (puestoLayer){ map.removeLayer(puestoLayer); puestoLayer = null; }
 
       const COMUNA_TO_KEY = (geoCode) => {
         const padded = String(geoCode || '').padStart(2, '0');
@@ -776,14 +795,15 @@
         return padded;
       };
 
-      // Capa base de comunas (siempre)
+      // Capa base de comunas (siempre dibujada, pero estilo cambia según vista)
       const showBarrios = state.view === 'barrio' && porBarrio && Object.keys(porBarrio).length;
+      const showPuestos = state.view === 'puesto' && porPuesto && Object.keys(porPuesto).length;
       function styleOf(feat){
         const code = feat.properties.CODIGO;
         const key = COMUNA_TO_KEY(code);
         const data = porComuna[key];
-        if (showBarrios){
-          // En vista barrio, la capa de comunas queda como contorno tenue
+        if (showBarrios || showPuestos){
+          // En vistas más granulares, la capa de comunas es contorno tenue
           return { fillColor: '#222', fillOpacity: 0.04, color: 'rgba(255,255,255,0.25)', weight: 1, dashArray: '2,3' };
         }
         if (!data || !data.candidatos || !data.candidatos.length){
@@ -796,7 +816,7 @@
       mapLayer = L.geoJSON(geo, {
         style: styleOf,
         onEachFeature: (feat, layer) => {
-          if (showBarrios) return;  // tooltip solo en vista comuna
+          if (showBarrios || showPuestos) return;  // tooltip solo en vista comuna
           const code = feat.properties.CODIGO;
           const nombre = feat.properties.NOMBRE || code;
           const key = COMUNA_TO_KEY(code);
@@ -1006,9 +1026,58 @@
         }
       }
 
+      // Capa de puestos: circleMarker en lat/lon de cada puesto físico
+      if (showPuestos){
+        const meta = await loadPuestosMeta();
+        if (meta){
+          const items = [];
+          for (const [key, data] of Object.entries(porPuesto)){
+            const m = meta[key];
+            if (!m || !Number.isFinite(m.lat) || !Number.isFinite(m.lon)) continue;
+            const winner = data.candidatos && data.candidatos[0];
+            items.push({
+              key, lat: m.lat, lon: m.lon,
+              nombre_puesto: m.nombre_puesto || `Puesto ${key}`,
+              direccion: m.direccion,
+              barrio: m.nombre, comuna: m.comuna,
+              mesas: m.mesas, total: data.votos_validos || 0,
+              winner,
+            });
+          }
+          const maxTotal = Math.max(...items.map(p => p.total), 1);
+          const r = v => 4 + Math.sqrt(Math.max(0, v) / maxTotal) * 18;  // 4 a 22 px
+          puestoLayer = L.layerGroup();
+          items.forEach(p => {
+            const color = p.winner ? getColor(p.winner.partido) : '#666';
+            const cm = L.circleMarker([p.lat, p.lon], {
+              radius: r(p.total),
+              fillColor: color, fillOpacity: 0.85,
+              color: '#fff', weight: 1, opacity: 0.9,
+            });
+            const w = p.winner;
+            const tt = `
+              <div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.82rem;line-height:1.5">
+                <span style="color:#a78bfa;font-weight:700">${p.nombre_puesto.toUpperCase()}</span><br/>
+                <span style="color:#999;font-size:.7rem">${p.direccion || ''}</span><br/>
+                <span style="color:#999;font-size:.7rem">Barrio: ${p.barrio || '—'} · Comuna: ${p.comuna || '—'}</span><br/>
+                <span style="color:#999;font-size:.7rem">${p.mesas} mesas · ZZ-PP ${p.key}</span><br/>
+                ${w ? `
+                  <span style="color:${color};font-weight:700">${w.nombre}</span><br/>
+                  ${w.partido || '—'}<br/>
+                  <span style="color:#fff">${fmt(w.votos)} votos · ${w.pct}%</span><br/>
+                  <span style="color:#999;font-size:.7rem">Total puesto: ${fmt(p.total)} válidos</span>
+                ` : '<span style="color:#999;font-size:.75rem">Sin datos electorales</span>'}
+              </div>`;
+            cm.bindTooltip(tt, { sticky: true, opacity: 1 });
+            cm.addTo(puestoLayer);
+          });
+          puestoLayer.addTo(map);
+        }
+      }
+
       // Legenda
       const winsByParty = new Map();
-      const source = showBarrios ? porBarrio : porComuna;
+      const source = showPuestos ? porPuesto : (showBarrios ? porBarrio : porComuna);
       for (const k of Object.keys(source || {})){
         const w = source[k].candidatos && source[k].candidatos[0];
         if (!w) continue;
@@ -1016,7 +1085,7 @@
         winsByParty.set(p, (winsByParty.get(p) || 0) + 1);
       }
       const sorted = Array.from(winsByParty.entries()).sort((a,b) => b[1] - a[1]).slice(0, 8);
-      const unit = showBarrios ? 'barrios' : 'comunas';
+      const unit = showPuestos ? 'puestos' : (showBarrios ? 'barrios' : 'comunas');
       document.getElementById('map-legend').innerHTML = sorted.map(([p, n]) => `
         <span class="lg-item">
           <span class="lg-dot" style="background:${getColor(p)}"></span>
@@ -1028,10 +1097,14 @@
       const mapTitle = document.getElementById('map-title');
       const mapSub = document.getElementById('map-sub');
       if (mapTitle){
-        mapTitle.textContent = showBarrios ? 'Ganador por barrio' : 'Ganador por comuna';
+        mapTitle.textContent = showPuestos ? 'Ganador por puesto de votación'
+                             : showBarrios ? 'Ganador por barrio'
+                             : 'Ganador por comuna';
       }
       if (mapSub){
-        if (showBarrios){
+        if (showPuestos){
+          mapSub.textContent = `${Object.keys(porPuesto).length} puestos físicos · radio proporcional a votos válidos · color por partido ganador`;
+        } else if (showBarrios){
           if (usedPolygons){
             mapSub.textContent = barriosGeoSource === 'oficial'
               ? 'Polígonos oficiales DAP · barrios opacos = con puesto · barrios traslúcidos = heredados del vecino más cercano'
