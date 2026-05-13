@@ -523,6 +523,7 @@
     cityGeo:    (file)    => `${S3}/mapas-2026/Ciudades-COM-LOC/${file}`,
     proyUPLBog: `${S3_BASES}/output_ponderador/proyeccion-por-upl-bogota.json`,
     proyBarrioBog: `${S3_BASES}/output_ponderador/proyeccion-por-barrio-bogota.json`,
+    proyBarrioMde: `${S3_BASES}/output_ponderador/proyeccion-por-barrio-medellin.json`,
   };
 
   // Mapeo modo → key en p (campo proyección por UPL del ponderador)
@@ -545,6 +546,8 @@
   const CITIES = {
     '16-001': { key:'bogota',       nombre:'Bogotá D.C.',  geoFile:'BOG-UPL.json',         geoProp:'CODIGO_UPL',  geoName:'NOMBRE',     rotate:true,  dataSource:'upl', granLabel:'UPL',
                 barrioGeoFile:'BOG-BARRIOS-CATASTRALES.json', barrioGeoProp:'codigo', barrioGeoName:'nombre', barrioGeoLoc:'loc_codigo' },
+    '01-001': { key:'medellin',     nombre:'Medellín',     geoFile:'MEDELLINX.json',       geoProp:'CODIGO',      geoName:'NOMBRE',     rotate:false, dataSource:'agg-barrio', granLabel:'Comunas',
+                barrioProyKey:'comuna' },
     '31-001': { key:'cali',         nombre:'Cali',         geoFile:'CALIX.json',           geoProp:'comuna',      geoName:'nombre',     rotate:false },
     '03-001': { key:'barranquilla', nombre:'Barranquilla', geoFile:'BARRANQUILLAX.json',   geoProp:'id',          geoName:'nombre',     rotate:false },
     '09-001': { key:'manizales',    nombre:'Manizales',    geoFile:'MANIZALESX.json',      geoProp:'ID_COMUNA',   geoName:'NOMBRES_CO', rotate:false },
@@ -640,6 +643,38 @@
   /* ───────── Helpers ───────── */
   function clamp(v,lo,hi){ return Math.max(lo, Math.min(hi, v)); }
   function currentCand(){ return CANDIDATES.find(c => c.id === STATE.mode) || CANDIDATES[0]; }
+
+  // Asigna score como ranking percentil sobre la cohorte. Garantiza:
+  //  - uso completo de la escala 0..100 (mejor=100, peor=0)
+  //  - unicidad por desempate vía índice (no quedan dos con mismo score)
+  // Métrica primaria por modo:
+  //  - cepeda    : "proximidad al 50%" (proy si <50, sino se penaliza el overshoot)
+  //  - abelardo  : proy directo (más alto, más clave)
+  //  - paloma    : proy directo
+  // Conserva el record original; solo sobreescribe r.score.
+  function assignPercentileScores(records){
+    if (!records || !records.length) return;
+    const mode = STATE.mode;
+    function priority(r){
+      const p = r.candProy != null ? r.candProy : (r.proy != null ? r.proy : 0);
+      if (mode === 'cepeda'){
+        // Pico en proy=50; cae a ambos lados linealmente.
+        return p <= 50 ? p : (100 - p);
+      }
+      return p;
+    }
+    // Tiebreak estable por censo (más grande prevalece)
+    const sorted = records.slice().sort((a,b) => {
+      const dp = priority(b) - priority(a);
+      if (Math.abs(dp) > 1e-9) return dp;
+      return (b.censo||0) - (a.censo||0);
+    });
+    const N = sorted.length;
+    if (N === 1){ sorted[0].score = 100; return; }
+    sorted.forEach((r, i) => {
+      r.score = +(100 * (N - 1 - i) / (N - 1)).toFixed(1);
+    });
+  }
 
   /* ───────── Cómputo del score por mun, según modo activo ─────────
      Modo Cepeda (izquierda · meta: ganar 1V > 50%):
@@ -797,6 +832,69 @@
       rec.score = score;
       STATE.scoreByComuna[cod] = rec;
     }
+    assignPercentileScores(Object.values(STATE.scoreByComuna));
+  }
+
+  /* ───────── Agregación barrio → comuna (Medellín) ───────── */
+  async function loadBarrioMdeProyeccion(){
+    if (STATE.barrioProyCache['medellin']) return STATE.barrioProyCache['medellin'];
+    const j = await fetch(URLS.proyBarrioMde).then(r => r.json());
+    STATE.barrioProyCache['medellin'] = j;
+    return j;
+  }
+
+  // Suma proy ponderado por censo de los barrios que comparten comuna.
+  // Devuelve un dict {comunaCod: {nombre, censo, p:{ic,ae,pv,...}}}.
+  function aggregateBarriosByComuna(proyBarrio, keyField){
+    const groups = {};
+    for (const [bcod, b] of Object.entries(proyBarrio.agregados || {})){
+      const comCod = String(b[keyField] || '').padStart(2, '0');
+      if (!comCod) continue;
+      let g = groups[comCod];
+      if (!g){ g = { cod: comCod, nombre: b.nombre_com || b.com_nombre || comCod, sumW:0, p:{}, censo:0 }; groups[comCod] = g; }
+      const w = Math.max(1, b.censo || 0);
+      g.sumW += w;
+      g.censo += (b.censo || 0);
+      for (const k of Object.keys(b.p || {})){
+        g.p[k] = (g.p[k] || 0) + (b.p[k] * w);
+      }
+    }
+    // Normalizar
+    for (const g of Object.values(groups)){
+      for (const k of Object.keys(g.p)){
+        g.p[k] = +(g.p[k] / g.sumW).toFixed(2);
+      }
+    }
+    return groups;
+  }
+
+  // Scoring por comuna usando datos agregados desde el ponderador-barrio.
+  function computeScoresAggBarrio(proyBarrio, cfg){
+    STATE.scoreByComuna = {};
+    const proyKey = UPL_PROY_KEY[STATE.mode];
+    if (!proyKey || !proyBarrio || !proyBarrio.agregados) return;
+    const groups = aggregateBarriosByComuna(proyBarrio, cfg.barrioProyKey || 'comuna');
+    for (const [cod, g] of Object.entries(groups)){
+      const proy = g.p[proyKey];
+      if (proy == null) continue;
+      let score, rec = { cod, nombre: g.nombre, depCod: cfg.depCod || (cfg.key === 'medellin' ? '01' : ''), censo: g.censo, proy };
+      if (STATE.mode === 'cepeda'){
+        const gap = Math.max(0, 50 - proy);
+        rec.gap = gap;
+        rec.techoCaptable = null; rec.captable = null; rec.izq22 = null;
+        if (proy >= 50) score = 35;
+        else { const prox = Math.max(0, 1 - gap/15); score = prox * 100; }
+      } else if (STATE.mode === 'abelardo' || STATE.mode === 'paloma'){
+        const cepProy = g.p.ic || 0;
+        rec.candProy = proy; rec.cepedaProy = cepProy;
+        rec.derTotal22 = null; rec.techoDer = null; rec.boost = 1; rec.captable = null;
+        if (proy >= 50) score = 35;
+        else score = Math.min(1, proy/30) * 100;
+      } else continue;
+      rec.score = score;
+      STATE.scoreByComuna[cod] = rec;
+    }
+    assignPercentileScores(Object.values(STATE.scoreByComuna));
   }
 
   /* ───────── Scoring por barrio (Bogotá, datos del ponderador) ───────── */
@@ -841,6 +939,7 @@
       rec.score = score;
       STATE.scoreByBarrio[cod] = rec;
     }
+    assignPercentileScores(Object.values(STATE.scoreByBarrio));
   }
 
   /* ───────── Scoring por comuna (city mode con bloques históricos) ───────── */
@@ -874,6 +973,7 @@
         ...s,
       };
     }
+    assignPercentileScores(Object.values(STATE.scoreByComuna));
   }
 
   function computeScores(){
@@ -909,6 +1009,9 @@
         ...s,
       };
     }
+    // Reescala score como percentil dentro de cada cohorte (uso completo 0-100, unicidad)
+    assignPercentileScores(Object.values(STATE.scoreByMun));
+    assignPercentileScores(Object.values(STATE.scoreByDep));
   }
 
   /* ───────── Color del mapa de calor (paleta paralela a oportunidad.html) ───────── */
@@ -1131,6 +1234,13 @@
           loadCityGeo(cfg.key, cfg.geoFile),
         ]);
         computeScoresUPL(proy);
+        geoRaw = g;
+      } else if (cfg.dataSource === 'agg-barrio'){
+        const [proy, g] = await Promise.all([
+          loadBarrioMdeProyeccion(),
+          loadCityGeo(cfg.key, cfg.geoFile),
+        ]);
+        computeScoresAggBarrio(proy, cfg);
         geoRaw = g;
       } else {
         const [_bloques, g] = await Promise.all([
@@ -1534,7 +1644,10 @@
     if (STATE.barrioActive){
       const arr = Object.values(STATE.scoreByBarrio).sort((a,b)=>b.score-a.score).slice(0,15);
       const adapted = arr.map(r => ({
-        key: r.cod, depCod: r.depCod || '', __cityName: r.nombre, score: r.score, __isComuna:true,
+        key: r.cod, depCod: r.depCod || '',
+        __cityName: r.nombre,
+        __subLabel: r.loc_nombre || '',
+        score: r.score, __isComuna:true,
       }));
       patchTop30Names(adapted);
       return;
@@ -1542,7 +1655,10 @@
     if (STATE.cityActive){
       const arr = Object.values(STATE.scoreByComuna).sort((a,b)=>b.score-a.score).slice(0,15);
       const adapted = arr.map(r => ({
-        key: r.cod, depCod: r.depCod || '', __cityName: r.nombre, score: r.score, __isComuna:true,
+        key: r.cod, depCod: r.depCod || '',
+        __cityName: r.nombre,
+        __subLabel: '',  // se rellena con el nombre de la ciudad
+        score: r.score, __isComuna:true,
       }));
       patchTop30Names(adapted);
       return;
@@ -1563,11 +1679,13 @@
     ul.innerHTML = arr.map((r,i)=>{
       if (r.__isComuna){
         const cityName = cityCfg ? cityCfg.nombre : '';
+        // Si es barrio, mostrar la localidad como sublabel; si es comuna/UPL, mostrar nombre de ciudad
+        const sub = r.__subLabel ? r.__subLabel : cityName;
         return `<div class="top-row">
           <div class="top-rank">${i+1}</div>
           <div>
             <div class="top-name">${r.__cityName || r.key}</div>
-            <div class="top-meta"><span class="top-meta-dep">${cityName}</span></div>
+            <div class="top-meta"><span class="top-meta-dep">${sub}</span></div>
           </div>
           <div class="top-score">${r.score.toFixed(0)}</div>
         </div>`;
