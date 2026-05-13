@@ -539,7 +539,7 @@
           <div id="auth-status"></div>
           <h2 style="font-family:'Syne'; font-weight:700; font-size:1.45rem; margin-top:.7rem;">Cómo funciona</h2>
           <div class="intro-list">
-            <div class="intro-item"><span class="intro-bullet">01</span><span>Te pedimos unos datos básicos para contextualizar tu resultado (rango de edad, departamento, género, posicionamiento ideológico).</span></div>
+            <div class="intro-item"><span class="intro-bullet">01</span><span>Te pedimos unos datos básicos para contextualizar tu resultado (edad, género, posicionamiento ideológico y si votaste el 8 de marzo).</span></div>
             <div class="intro-item"><span class="intro-bullet">02</span><span>Luego respondes <b>6 preguntas</b> sobre los ejes que diferencian a las candidaturas: economía, seguridad, salud, política exterior, drogas y reformas institucionales.</span></div>
             <div class="intro-item"><span class="intro-bullet">03</span><span>Calculamos un puntaje de afinidad con cada candidato con base en sus posiciones públicas y te mostramos el resultado.</span></div>
           </div>
@@ -1187,13 +1187,25 @@
     'Derecha',
     'No me identifico / No sé',
   ];
+  // Voto 8 de marzo de 2026 (consultas interpartidistas — el ground truth
+  // post-Ley 2494). Sirve para segmentar leads y calibrar la muestra.
+  const VOTO_MARZO = [
+    'Sí, voté',
+    'No voté',
+    'No podía votar (no estaba inscrito/menor)',
+    'Prefiero no decir',
+  ];
 
   function renderDemoForm() {
     $('#demo-tag').textContent = IS_LOGGED ? 'Sesión activa' : 'Invitado';
     const grid = $('#form-grid');
     const fields = [];
 
-    if (!IS_LOGGED) {
+    // Email: solo en ricardoruiz.co (no en embed) y solo si NO está logueado.
+    // En embed pedirlo añade fricción para captura de leads anónima; el
+    // teléfono se pide más tarde en el opt-in con consentimiento Habeas Data.
+    const showEmail = !IS_LOGGED && !IS_EMBED;
+    if (showEmail) {
       fields.push(`
         <div class="field full">
           <label for="d-email">Correo electrónico</label>
@@ -1211,14 +1223,9 @@
         </select>
       </div>`);
 
-    fields.push(`
-      <div class="field">
-        <label for="d-depto">Departamento</label>
-        <select id="d-depto">
-          <option value="">Selecciona…</option>
-          ${DEPARTAMENTOS.map(d => `<option value="${d}">${d}</option>`).join('')}
-        </select>
-      </div>`);
+    // Departamento eliminado del formulario: lo inferimos automáticamente
+    // de GEO.region (Cloudflare). Si no hay geo, queda como null y se
+    // resuelve después con la respuesta de Geolocation API.
 
     fields.push(`
       <div class="field">
@@ -1238,6 +1245,15 @@
         </select>
       </div>`);
 
+    fields.push(`
+      <div class="field full">
+        <label for="d-voto-marzo">¿Votaste el 8 de marzo de 2026 (consultas)?</label>
+        <select id="d-voto-marzo">
+          <option value="">Selecciona…</option>
+          ${VOTO_MARZO.map(v => `<option value="${v}">${v}</option>`).join('')}
+        </select>
+      </div>`);
+
     grid.innerHTML = fields.join('');
 
     // Validación reactiva
@@ -1249,27 +1265,35 @@
   }
 
   function validateDemo() {
-    const edad   = $('#d-edad')?.value;
-    const depto  = $('#d-depto')?.value;
-    const genero = $('#d-genero')?.value;
-    const ideol  = $('#d-ideol')?.value;
-    const email  = $('#d-email')?.value || '';
-    const emailOk = IS_LOGGED || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-    const ok = !!edad && !!depto && !!genero && !!ideol && emailOk;
+    const edad      = $('#d-edad')?.value;
+    const genero    = $('#d-genero')?.value;
+    const ideol     = $('#d-ideol')?.value;
+    const votoMarzo = $('#d-voto-marzo')?.value;
+    const emailEl   = $('#d-email');
+    // Email obligatorio sólo si el campo está renderizado (ricardoruiz.co + invitado).
+    const emailOk = !emailEl || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailEl.value.trim());
+    const ok = !!edad && !!genero && !!ideol && !!votoMarzo && emailOk;
     $('#demo-next').classList.toggle('disabled', !ok);
     return ok;
   }
 
   function submitDemo() {
     if (!validateDemo()) return;
+    const emailEl = $('#d-email');
     state.demo = {
-      email:  IS_LOGGED ? USER.email : ($('#d-email').value || '').trim().toLowerCase(),
-      edad:   $('#d-edad').value,
-      depto:  $('#d-depto').value,
-      genero: $('#d-genero').value,
-      ideol:  $('#d-ideol').value,
-      logged: IS_LOGGED,
-      ts:     new Date().toISOString(),
+      email:       IS_LOGGED ? USER.email : (emailEl ? emailEl.value.trim().toLowerCase() : null),
+      edad:        $('#d-edad').value,
+      // Departamento inferido de GEO.region (puede ser null si la geo aún no
+      // llegó cuando el usuario llenó el form rápido — el endpoint central
+      // lo puede recalcular después con el lat/lon final).
+      depto:       GEO?.region || null,
+      depto_src:   GEO?.region ? 'ip' : null,
+      genero:      $('#d-genero').value,
+      ideol:       $('#d-ideol').value,
+      voto_marzo:  $('#d-voto-marzo').value,
+      logged:      IS_LOGGED,
+      embed:       IS_EMBED,
+      ts:          new Date().toISOString(),
     };
     state.qIdx = 0;
     show('q'); setProgress(2);
