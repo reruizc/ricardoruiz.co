@@ -469,6 +469,11 @@
       <button class="toggle-btn active" data-mde="comunas" onclick="setMdeView('comunas')">Comunas</button>
       <button class="toggle-btn" data-mde="barrios" onclick="setMdeView('barrios')">Barrios</button>
     </div>
+    <div class="toggle-group" id="bog-view-toggle" style="display:none">
+      <span class="toggle-label">Bogotá</span>
+      <button class="toggle-btn active" data-bog="localidades" onclick="setBogView('localidades')">Localidades</button>
+      <button class="toggle-btn" data-bog="upl" onclick="setBogView('upl')">UPL</button>
+    </div>
     <div class="veleta-count" id="opo-count">— municipios con oportunidad ≥ umbral</div>
   </section>
 
@@ -640,6 +645,19 @@
     'pres-2010','pres-2014','pres-2018','pres-2022',
     'consulta-2025-pacto','consulta-2026-gran','consulta-2026-frente','consulta-2026-soluciones',
     'alc-2015','concejo-2015','alc-2019','concejo-2019','alc-2023','concejo-2023',
+    'senado-2026','camara-2026',
+  ];
+
+  // ─── BOGOTÁ UPL (drilldown intra-localidad) ───────────────────
+  // 33 UPL (Unidades de Planeamiento Local) bajo las 20 localidades. Cada
+  // puesto de Bogotá fue asignado a su UPL via point-in-polygon (script
+  // tools/build-bog-upl-signals.py). Match 99.8% sobre 1084 puestos.
+  // Las 10 señales del módulo Oportunidad ya agregadas a nivel UPL.
+  const BOG_UPL_GEO_URL  = `${S3}/mapas-2026/Ciudades-COM-LOC/BOG-UPL.json`;
+  const BOG_UPL_DATA_BASE = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_ciudades/bogota';
+  const BOG_UPL_SIGNALS = [
+    'pres-2010','pres-2014','pres-2018','pres-2022',
+    'consulta-2025-pacto','consulta-2026-gran','consulta-2026-frente','consulta-2026-soluciones',
     'senado-2026','camara-2026',
   ];
   // Datos electorales por comuna Medellín — bucket separado de output_ciudades.
@@ -927,6 +945,15 @@
     mdeBarriosSigLoading:null,
     mdeBarrioMetrics:{},         // { barrioNormKey: { afin, techo, proj, gap, bias, comuna } }
     mdeBarrioNacAfin:{},         // { candId: { bucket: pct_medellin_afin } }
+
+    // Bogotá UPL (drilldown intra-localidad — análogo a Medellín barrios)
+    bogUplGeo:null,
+    bogUplLoading:null,
+    bogView:'localidades',       // 'localidades' | 'upl'
+    bogUplData:null,             // { sigKey: { uplCod: { candidatos:[…], votos_validos } } }
+    bogUplSigLoading:null,
+    bogUplMetrics:{},            // { uplCod: { afin, techo, proj, gap, contrib, bias } }
+    bogUplNacAfin:{},            // { candId: { bucket: pct_bogota_afin } }
 
     // Puestos (Bloque C)
     puestos:null,            // array de {k,y,x,c,m,n,mn,p22,s26,t}
@@ -2255,6 +2282,26 @@
         });
         return;
       }
+      // Capa UPL Bogotá: bias propio con fallback a localidad padre
+      if (cityKey === 'bogota' && STATE.bogView === 'upl'){
+        if (STATE.bogUplData) computeBogUplMetrics();
+        const uMetrics = STATE.bogUplMetrics || {};
+        STATE.mapLayer.setStyle((f) => {
+          const cod = f.properties.CODIGO_UPL;
+          let r = (cod && uMetrics[cod]) ? uMetrics[cod] : null;
+          if (!r){
+            const locs = f.properties.Localidades || [];
+            const top = [...locs].sort((a,b)=> (b.pct||0) - (a.pct||0))[0];
+            if (top){
+              const lc = String(top.LocCodigo).padStart(2,'0');
+              if (metrics[lc]) r = metrics[lc];
+            }
+          }
+          f.__rec = r;
+          return styleFor(r);
+        });
+        return;
+      }
       STATE.mapLayer.setStyle((f) => {
         const com = comCodeOfCityFeature(cfg, f.properties);
         const r = com ? metrics[com] : null;
@@ -2651,6 +2698,255 @@
     wrap.querySelector('[data-mde="barrios"]')?.classList.toggle('active', STATE.mdeView === 'barrios');
   }
 
+  /* ───────── Bogotá · UPL (Bloque E) ─────────
+     Análogo a Medellín barrios: una división intermedia (33 UPL) entre las
+     20 localidades y los ~3000 barrios. Construida vía point-in-polygon
+     de puestos sobre BOG-UPL.geojson (script tools/build-bog-upl-signals.py).
+     Las 10 señales del módulo Oportunidad ya agregadas a nivel UPL. */
+  async function loadBogUplGeo(){
+    if (STATE.bogUplGeo) return STATE.bogUplGeo;
+    if (STATE.bogUplLoading) return STATE.bogUplLoading;
+    STATE.bogUplLoading = (async () => {
+      const r = await fetch(BOG_UPL_GEO_URL);
+      let geo = await r.json();
+      // Las UPL del GeoJSON oficial están en CRS84 sin rotar — Bogotá
+      // se renderiza rotada 90° izq para encajar con la proyección del
+      // mapa principal (igual que LOCALIDADX.json).
+      geo = rotateGeoJSON90Left(geo);
+      STATE.bogUplGeo = geo;
+      return geo;
+    })();
+    return STATE.bogUplLoading;
+  }
+
+  async function loadBogUplSignals(){
+    if (STATE.bogUplData) return STATE.bogUplData;
+    if (STATE.bogUplSigLoading) return STATE.bogUplSigLoading;
+    STATE.bogUplSigLoading = (async () => {
+      const out = {};
+      await Promise.all(BOG_UPL_SIGNALS.map(async sig => {
+        try {
+          const r = await fetch(`${BOG_UPL_DATA_BASE}/${sig}-upl.json`);
+          if (!r.ok) return;
+          const j = await r.json();
+          // Normalizamos al mismo shape de cityData: { uplCod: { candidatos:[…], votos_validos } }.
+          out[sig] = j.por_upl || {};
+        } catch (e){
+          console.warn('[opo·bog·upl]', sig, e);
+        }
+      }));
+      STATE.bogUplData = out;
+      return out;
+    })();
+    return STATE.bogUplSigLoading;
+  }
+
+  // Baseline = Bogotá agregado sobre las UPL disponibles en cada señal.
+  // Equivalente a precomputeCityNacAfin pero sobre UPL.
+  function precomputeBogUplNacAfin(candId){
+    const aff = AFINIDADES[candId];
+    const data = STATE.bogUplData || {};
+    function pctFromAllUpl(sigKey, patterns){
+      const ds = data[sigKey];
+      if (!ds || !patterns?.length) return null;
+      let sumV = 0, sumDen = 0, found = false;
+      for (const u of Object.values(ds)){
+        if (!Array.isArray(u.candidatos)) continue;
+        let any = false;
+        for (const c of u.candidatos){
+          if (!c || !c.nombre) continue;
+          if (matchesAffinity(c.nombre, patterns)){ sumV += (c.votos||0); any = true; }
+        }
+        if (any){ sumDen += (u.votos_validos || 0); found = true; }
+      }
+      return found && sumDen>0 ? 100*sumV/sumDen : null;
+    }
+    const out = {};
+    out.pres22 = pctFromAllUpl('pres-2022', aff.pres22);
+    out.pres18 = pctFromAllUpl('pres-2018', aff.pres18);
+    const vSen = (aff.senado26||[]).length ? pctFromAllUpl('senado-2026', aff.senado26) : null;
+    const vCam = (aff.camara26||[]).length ? pctFromAllUpl('camara-2026', aff.camara26) : null;
+    out.congreso26 = (vSen!=null && vCam!=null) ? (vSen+vCam)/2 : (vSen ?? vCam);
+    const cmap = aff.consultas || {};
+    let total = 0, hasAny = false, nC = 0;
+    for (const [ckey, pat] of Object.entries(cmap)){
+      if (!pat?.length) continue;
+      const v = pctFromAllUpl(ckey, pat);
+      if (v != null){ total += v; nC++; hasAny = true; }
+    }
+    out.consultas = hasAny ? (total / nC) : null;
+    return out;
+  }
+
+  function computeBogUplMetrics(){
+    const candId = STATE.candId;
+    const cand = CANDIDATOS.find(c => c.id === candId);
+    const data = STATE.bogUplData || {};
+    const candPctNac = pondPct(cand);
+    const uplNac = precomputeBogUplNacAfin(candId);
+    STATE.bogUplNacAfin[candId] = uplNac;
+    // Fallback adicional: baseline Bogotá-localidad si una señal está
+    // rota a nivel UPL pero tiene cobertura a nivel localidad.
+    const locNac = STATE.cityNacAfin.bogota?.[candId] || {};
+
+    const wRaw = STATE.weights;
+    const wSum = Math.max(1, wRaw.pres22 + wRaw.congreso26 + wRaw.pres18 + wRaw.consultas);
+    const wNorm = {
+      pres22: wRaw.pres22/wSum, congreso26: wRaw.congreso26/wSum,
+      pres18: wRaw.pres18/wSum, consultas: wRaw.consultas/wSum,
+    };
+
+    const keys = new Set();
+    for (const sig of Object.keys(data)) Object.keys(data[sig]).forEach(k => keys.add(k));
+
+    // Censo proxy por UPL = promedio de votos_validos a través de señales.
+    const censoByUpl = {};
+    for (const uk of keys){
+      let totVv = 0, n = 0;
+      for (const sig of Object.keys(data)){
+        const e = data[sig]?.[uk];
+        if (e && e.votos_validos){ totVv += e.votos_validos; n++; }
+      }
+      censoByUpl[uk] = n > 0 ? totVv / n : 0;
+    }
+    const censoCity = Object.values(censoByUpl).reduce((s,v)=>s+v,0) || 1;
+    const nsnrFactor = getNsNrFactor();
+
+    // Donantes activos del bloque (transferencia intra-bloque)
+    const xferMap = STATE.transfers[candId] || {};
+    const donors = (BLOQUE_AMPLIO[candId] || []).filter(id => id !== candId);
+    const donorData = donors.map(id => {
+      const c = CANDIDATOS.find(x => x.id === id);
+      return {
+        id, cand: c,
+        pondPct: pondPct(c) || 0,
+        xferFrac: xferMap[id] || 0,
+        uplNac: precomputeBogUplNacAfin(id),
+        locNac: STATE.cityNacAfin.bogota?.[id] || {},
+      };
+    }).filter(d => d.xferFrac > 0 && d.pondPct > 0);
+
+    const out = {};
+    for (const uk of keys){
+      // bucketsPctAfinForComuna funciona genérico — usa `data` y `uk` igual.
+      const buckets = bucketsPctAfinForComuna(candId, data, uk);
+      let afinNum=0, afinDen=0, biasNum=0, biasDen=0;
+      for (const b of ['pres22','congreso26','pres18','consultas']){
+        const v = buckets[b], w = wNorm[b];
+        if (v != null){ afinNum += w*v; afinDen += w; }
+        const base = (uplNac[b]!=null && uplNac[b]>0) ? uplNac[b]
+                  : (locNac[b]!=null && locNac[b]>0) ? locNac[b]
+                  : STATE.nacAfinByBucket?.[b];
+        if (v != null && base != null && base > 0){
+          biasNum += w * (v/base); biasDen += w;
+        }
+      }
+      const afin = afinDen>0 ? afinNum/afinDen : null;
+      const bias = biasDen>0 ? biasNum/biasDen : 1.0;
+      const proj = candPctNac != null ? candPctNac * bias : null;
+
+      const gapNsnr = proj != null ? proj * nsnrFactor : null;
+      let gapXfer = 0;
+      for (const d of donorData){
+        const bkts = bucketsPctAfinForComuna(d.id, data, uk);
+        let bn=0, bd=0;
+        for (const b of ['pres22','congreso26','pres18','consultas']){
+          const v = bkts[b]; const w = wNorm[b];
+          const base = (d.uplNac[b]!=null && d.uplNac[b]>0) ? d.uplNac[b]
+                    : (d.locNac[b]!=null && d.locNac[b]>0) ? d.locNac[b]
+                    : STATE.nacAfinByBucket?.[b];
+          if (v != null && base != null && base > 0){ bn += w*(v/base); bd += w; }
+        }
+        const biasD = bd > 0 ? bn/bd : 1.0;
+        gapXfer += d.xferFrac * d.pondPct * biasD;
+      }
+      const gap     = gapNsnr != null ? (gapNsnr + gapXfer) : null;
+      const censo   = censoByUpl[uk] || 0;
+      const contrib = gap != null ? gap * censo / censoCity : null;
+      const techo   = proj != null ? proj + gap : null;
+
+      // Nombre y sector vienen del primer entry disponible.
+      let nombre = null, sector = null;
+      for (const sig of Object.keys(data)){
+        const e = data[sig][uk];
+        if (e){ nombre = e.nombre; sector = e.sector; break; }
+      }
+      out[uk] = { uplCod: uk, nombre, sector, afin, techo, proj, gap, contrib, bias, abst:null, censo };
+    }
+    STATE.bogUplMetrics = out;
+  }
+
+  function renderBogUplLayer(){
+    ensureMap(); clearLayer();
+    const cfg = CITIES.bogota;
+    const geo = STATE.bogUplGeo;
+    const uplMetrics = STATE.bogUplMetrics || {};
+    const locMetrics = STATE.cityComMetrics.bogota || {};
+
+    function metricForUpl(props){
+      const cod = props.CODIGO_UPL;
+      if (cod && uplMetrics[cod]) return uplMetrics[cod];
+      // Fallback: localidad con mayor % de área (de Localidades[].pct).
+      const locs = props.Localidades || [];
+      if (locs.length){
+        const top = [...locs].sort((a,b)=> (b.pct||0) - (a.pct||0))[0];
+        if (top && top.LocCodigo){
+          const lc = String(top.LocCodigo).padStart(2,'0');
+          if (locMetrics[lc]) return locMetrics[lc];
+        }
+      }
+      return null;
+    }
+    STATE.mapLayer = L.geoJSON(geo, {
+      style: (f) => styleFor(metricForUpl(f.properties)),
+      onEachFeature: (f, layer) => {
+        const r = metricForUpl(f.properties);
+        f.__rec = r;
+        const cod = f.properties.CODIGO_UPL || '';
+        const um = uplMetrics[cod];
+        f.__name = (um && um.nombre) || f.properties.NOMBRE || cod || '—';
+        f.__depName = `Bogotá · UPL${f.properties.SECTOR ? ' · ' + f.properties.SECTOR : ''}`;
+        layer.on('mouseover', (e) => onHover(f, e));
+        layer.on('mouseout', (e) => onHoverOut(f, e));
+        layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
+      },
+    }).addTo(STATE.map);
+    STATE.map.fitBounds(STATE.mapLayer.getBounds(), { padding:[20,20] });
+    document.getElementById('map-head-title').textContent = 'Bogotá · UPL (33 unidades de planeamiento local)';
+    document.getElementById('map-back-btn').classList.add('show');
+    document.getElementById('map-back-label').textContent = '← Volver a Cundinamarca';
+  }
+
+  async function setBogView(view){
+    if (view === STATE.bogView && STATE.selectedCity === 'bogota') return;
+    STATE.bogView = view;
+    if (STATE.selectedCity !== 'bogota') return;
+    showLoading(true);
+    try {
+      if (view === 'upl'){
+        await Promise.all([loadBogUplGeo(), loadBogUplSignals()]);
+        computeBogUplMetrics();
+        renderBogUplLayer();
+      } else {
+        renderCityComLayer('bogota');
+      }
+      refreshBogViewToggle();
+    } catch (e){
+      console.error('[opo·bog] setBogView error', e);
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  function refreshBogViewToggle(){
+    const wrap = document.getElementById('bog-view-toggle');
+    if (!wrap) return;
+    const inBog = STATE.selectedCity === 'bogota';
+    wrap.style.display = inBog ? 'flex' : 'none';
+    wrap.querySelector('[data-bog="localidades"]')?.classList.toggle('active', STATE.bogView === 'localidades');
+    wrap.querySelector('[data-bog="upl"]')?.classList.toggle('active', STATE.bogView === 'upl');
+  }
+
   // Alias manuales por (ciudad, comCod) cuando el nombre Divipole es
   // genérico ("CORREGIMIENTOS AREA 1") y queremos uno reconocible. Si la
   // entrada existe, se prefiere al nombre Divipole.
@@ -2674,10 +2970,15 @@
         await Promise.all([loadMdeBarriosGeo(), loadMdeBarrioSignals()]);
         computeMdeBarrioMetrics();
         renderMdeBarriosLayer();
+      } else if (cityKey === 'bogota' && STATE.bogView === 'upl'){
+        await Promise.all([loadBogUplGeo(), loadBogUplSignals()]);
+        computeBogUplMetrics();
+        renderBogUplLayer();
       } else {
         renderCityComLayer(cityKey);
       }
       refreshMdeViewToggle();
+      refreshBogViewToggle();
     } catch (e){
       console.error('[opo·city] error rendering', cityKey, e);
     } finally {
@@ -3109,6 +3410,7 @@
       computeAllForCandidate(STATE.candId);
       if (STATE.selectedCity) computeCityComunaMetrics(STATE.selectedCity);
       if (STATE.selectedCity === 'medellin' && STATE.mdeBarriosData) computeMdeBarrioMetrics();
+      if (STATE.selectedCity === 'bogota' && STATE.bogUplData) computeBogUplMetrics();
       repaintLayer();
       updateCounter();
       renderTop30();
@@ -3123,6 +3425,7 @@
       computeAllForCandidate(STATE.candId);
       if (STATE.selectedCity) computeCityComunaMetrics(STATE.selectedCity);
       if (STATE.selectedCity === 'medellin' && STATE.mdeBarriosData) computeMdeBarrioMetrics();
+      if (STATE.selectedCity === 'bogota' && STATE.bogUplData) computeBogUplMetrics();
       repaintLayer();
       updateCounter();
       renderTop30();
@@ -3207,6 +3510,7 @@
       // Restaurar capa de polígonos según el contexto actual
       if (STATE.selectedCity){
         if (STATE.selectedCity === 'medellin' && STATE.mdeView === 'barrios') renderMdeBarriosLayer();
+        else if (STATE.selectedCity === 'bogota' && STATE.bogView === 'upl') renderBogUplLayer();
         else renderCityComLayer(STATE.selectedCity);
       } else if (STATE.selectedDep){
         renderMunsOfDep(STATE.selectedDep);
