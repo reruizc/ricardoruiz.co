@@ -964,6 +964,18 @@
     puestosLayer:null,       // L.layerGroup activo
     tileLayer:null,          // L.tileLayer activo (solo en modo puestos)
     puestoNameByKey:{},      // 'd-m-z-p' → {n, mn} para tooltips
+
+    // Bias propio por puesto (Nivel C)
+    puestoSignalsData:null,         // { sigKey: { 'dd-mm-zz-pp': { vv, votos:{nombre:n} } } }
+    puestoSignalsLoading:null,
+    puestoCenso2026:null,           // { 'dd-mm-zz-pp': int }
+    puestoCenso2022:null,
+    puestoCenso2018:null,
+    puestoCenso2026Nac:0,           // total nacional (denom de contrib)
+    puestoCongDepData:{},           // depCod → { 'senado-2026': {…}, 'camara-2026': {…} } cargado lazy
+    puestoCongDepLoading:{},        // depCod → promesa de carga
+    puestoMetrics:{},               // 'dd-mm-zz-pp' → { afin, gap, contrib, abst, bias, ... }
+    puestoNacAfin:{},               // candId → bucket → pct
   };
 
   /* ───────── Carga de datos ───────── */
@@ -1624,6 +1636,31 @@
      v2 futuro: bias por puesto con por-puesto.json de cada señal — más
      trabajo pero da granularidad real al precio del retainer. */
   const PUESTOS_URL = `${S3}/puestos-nacional-light.json`;
+
+  // ─── BIAS PROPIO POR PUESTO (Nivel C) ─────────────────────────────
+  // Cuando el toggle "Puestos" está activo, cada puesto se calcula con
+  // su propia shape histórica (8 señales nacionales por puesto + senado/
+  // cámara del depto activo si aplica). Sin esto, todos los puestos de
+  // un mismo municipio quedaban con el mismo color (herencia del mun).
+  //
+  // Carga lazy. Las 8 señales nacionales son ~12 MB. Senado/cámara por
+  // depto son ~10 MB/depto y solo se cargan al entrar a un depto.
+  const PUESTO_NAC_SIGNALS = [
+    { key:'pres-2010',                fmt:'nac-pres',     url:`${S3}/historicos/pres-2010-v1/por-puesto.json` },
+    { key:'pres-2014',                fmt:'nac-pres',     url:`${S3}/historicos/pres-2014-v1/por-puesto.json` },
+    { key:'pres-2018',                fmt:'nac-pres',     url:`${S3}/historicos/pres-2018-v1/por-puesto.json` },
+    { key:'pres-2022',                fmt:'nac-pres',     url:`${S3}/historicos/pres-2022-v1/por-puesto.json` },
+    { key:'consulta-2025-pacto',      fmt:'nac-consulta', url:`${S3}/historicos/consulta-2025-pacto/por-puesto.json` },
+    { key:'consulta-2026-gran',       fmt:'nac-consulta', url:`${S3}/historicos/consulta-2026-gran/por-puesto.json` },
+    { key:'consulta-2026-frente',     fmt:'nac-consulta', url:`${S3}/historicos/consulta-2026-frente/por-puesto.json` },
+    { key:'consulta-2026-soluciones', fmt:'nac-consulta', url:`${S3}/historicos/consulta-2026-soluciones/por-puesto.json` },
+  ];
+  const PUESTO_CENSO_URLS = {
+    2026: `${S3}/censos-puesto-2026.json`,
+    2022: `${S3}/censos-puesto-2022.json`,
+    2018: `${S3}/censos-puesto-2018.json`,
+  };
+  const PUESTO_CONG_URL = (depCod, kind) => `${S3}/${kind}/departamentos/${depCod}/puestos.json`;
   const PUE_TILE_LIGHT = {
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -1656,9 +1693,266 @@
 
   // Resuelve el record de gap aplicable al puesto. Si estamos en una
   // ciudad con drilldown a comuna, intenta usar la comuna del puesto
+  // ─── Bias propio por puesto (Nivel C) — funciones de carga ──────
+  // Carga lazy de las 8 señales nacionales por puesto + 3 censos por puesto.
+  // Se invoca al primer toggle a "Puestos".
+  async function loadPuestoSignals(){
+    if (STATE.puestoSignalsData) return STATE.puestoSignalsData;
+    if (STATE.puestoSignalsLoading) return STATE.puestoSignalsLoading;
+    STATE.puestoSignalsLoading = (async () => {
+      const out = {};
+      const sigFetches = PUESTO_NAC_SIGNALS.map(async sig => {
+        try {
+          const r = await fetch(sig.url);
+          if (!r.ok) return;
+          const j = await r.json();
+          // Indexamos por 'dd-mm-zz-pp' → { vv, votos: {nombre:int} }.
+          const byKey = {};
+          if (sig.fmt === 'nac-pres'){
+            const cands = j.candidatos || {};
+            for (const [k, v] of Object.entries(j.puestos || {})){
+              const votos = {};
+              for (const [cod, n] of Object.entries(v.v || {})){
+                const nombre = cands[cod]?.nombre;
+                if (nombre) votos[nombre] = (votos[nombre] || 0) + (n || 0);
+              }
+              byKey[k] = { vv: v.vv || 0, votos };
+            }
+          } else if (sig.fmt === 'nac-consulta'){
+            for (const [k, v] of Object.entries(j.puestos || {})){
+              byKey[k] = { vv: v.vv || 0, votos: { ...(v.v || {}) } };
+            }
+          }
+          out[sig.key] = byKey;
+        } catch (e){
+          console.warn('[opo·pue·sig]', sig.key, e);
+        }
+      });
+      const censoFetches = [2026, 2022, 2018].map(async year => {
+        try {
+          const r = await fetch(PUESTO_CENSO_URLS[year]);
+          if (!r.ok) return;
+          const j = await r.json();
+          STATE['puestoCenso' + year] = j.porPuesto || {};
+          if (year === 2026) STATE.puestoCenso2026Nac = j.nacional || 0;
+        } catch (e){
+          console.warn('[opo·pue·censo]', year, e);
+        }
+      });
+      await Promise.all([...sigFetches, ...censoFetches]);
+      STATE.puestoSignalsData = out;
+      return out;
+    })();
+    return STATE.puestoSignalsLoading;
+  }
+
+  // Carga senado/cámara 2026 por puesto del depto indicado. Devuelve
+  // promesa que se resuelve cuando ambos están listos.
+  async function loadPuestoCongDepto(depCod){
+    if (!depCod) return;
+    const dc = String(depCod).padStart(2,'0');
+    if (STATE.puestoCongDepData[dc]) return STATE.puestoCongDepData[dc];
+    if (STATE.puestoCongDepLoading[dc]) return STATE.puestoCongDepLoading[dc];
+    STATE.puestoCongDepLoading[dc] = (async () => {
+      const out = {};
+      await Promise.all(['senado','camara'].map(async kind => {
+        try {
+          const r = await fetch(PUESTO_CONG_URL(dc, kind));
+          if (!r.ok) return;
+          const arr = await r.json();
+          const byKey = {};
+          for (const p of (arr || [])){
+            if (p.dep_cod !== dc) continue;
+            const k = `${p.dep_cod}-${p.mun_cod}-${String(p.zon_cod).padStart(2,'0')}-${String(p.pue_cod_raw).padStart(2,'0')}`;
+            const votos = {};
+            for (const [name, n] of Object.entries(p.partidos || {})){
+              if (/^99[6-9]$/.test(name)) continue;   // 996/997/998 = blanco/nulo/no_marc
+              votos[name] = (votos[name] || 0) + (n || 0);
+            }
+            byKey[k] = { vv: p.votval || 0, votos };
+          }
+          out[kind === 'senado' ? 'senado-2026' : 'camara-2026'] = byKey;
+        } catch (e){
+          console.warn('[opo·pue·cong]', dc, kind, e);
+        }
+      }));
+      STATE.puestoCongDepData[dc] = out;
+      return out;
+    })();
+    return STATE.puestoCongDepLoading[dc];
+  }
+
+  // ─── Cómputo de afín nacional por bucket para puestos ───────────
+  // Equivalente a precomputeNacionalAfin pero usando las señales por
+  // puesto (que ya tienen vv y votos individuales). Cache por candId.
+  function precomputePuestoNacAfin(candId){
+    if (STATE.puestoNacAfin[candId]) return STATE.puestoNacAfin[candId];
+    const aff = AFINIDADES[candId];
+    if (!aff){ STATE.puestoNacAfin[candId] = {}; return {}; }
+    const data = STATE.puestoSignalsData || {};
+    function pctFromAllPuestos(sigKey, patterns){
+      const ds = data[sigKey];
+      if (!ds || !patterns?.length) return null;
+      let sumV = 0, sumDen = 0, found = false;
+      for (const e of Object.values(ds)){
+        let any = false;
+        for (const [nombre, n] of Object.entries(e.votos)){
+          if (matchesAffinity(nombre, patterns)){ sumV += n; any = true; }
+        }
+        if (any){ sumDen += e.vv || 0; found = true; }
+      }
+      return found && sumDen > 0 ? 100 * sumV / sumDen : null;
+    }
+    const out = {};
+    out.pres22 = pctFromAllPuestos('pres-2022', aff.pres22);
+    out.pres18 = pctFromAllPuestos('pres-2018', aff.pres18);
+    // congreso26 nacional NO disponible a nivel puesto (150 MB). Caemos al
+    // nacAfin del bucket congreso26 del cómputo nacional-mun (ya en STATE.nacAfinByBucket).
+    out.congreso26 = STATE.nacAfinByBucket?.congreso26 ?? null;
+    const cmap = aff.consultas || {};
+    let total = 0, nC = 0, hasAny = false;
+    for (const [ckey, pat] of Object.entries(cmap)){
+      if (!pat?.length) continue;
+      const v = pctFromAllPuestos(ckey, pat);
+      if (v != null){ total += v; nC++; hasAny = true; }
+    }
+    out.consultas = hasAny ? (total / nC) : null;
+    STATE.puestoNacAfin[candId] = out;
+    return out;
+  }
+
+  // Buckets por puesto: pct afín local para cada bucket. Para congreso26:
+  // si hay senado+cámara del depto cargado, usa puesto-level; si no,
+  // hereda del bucket congreso26 del mun padre.
+  function bucketsPctAfinForPuesto(candId, puestoKey){
+    const aff = AFINIDADES[candId];
+    const data = STATE.puestoSignalsData || {};
+    const dc = puestoKey.split('-')[0];
+    const congDep = STATE.puestoCongDepData[dc] || {};
+    function pctFromPuesto(sigKey, patterns){
+      const e = data[sigKey]?.[puestoKey] ?? congDep[sigKey]?.[puestoKey];
+      if (!e || !patterns?.length) return null;
+      let sum = 0, found = false;
+      for (const [nombre, n] of Object.entries(e.votos)){
+        if (matchesAffinity(nombre, patterns)){ sum += n; found = true; }
+      }
+      const den = e.vv || 0;
+      return found && den > 0 ? 100 * sum / den : null;
+    }
+    const buckets = {};
+    buckets.pres22 = pctFromPuesto('pres-2022', aff.pres22);
+    buckets.pres18 = pctFromPuesto('pres-2018', aff.pres18);
+    // congreso26: solo si tenemos senado/cámara cargado para ese depto.
+    const vSen = (aff.senado26||[]).length ? pctFromPuesto('senado-2026', aff.senado26) : null;
+    const vCam = (aff.camara26||[]).length ? pctFromPuesto('camara-2026', aff.camara26) : null;
+    let vCong = null;
+    if (vSen != null && vCam != null) vCong = (vSen + vCam) / 2;
+    else if (vSen != null || vCam != null) vCong = vSen ?? vCam;
+    buckets.congreso26 = vCong;
+    // consultas: promedio (no suma) de las consultas donde aparece.
+    const cmap = aff.consultas || {};
+    let total = 0, nC = 0, hasAny = false;
+    for (const [ckey, pat] of Object.entries(cmap)){
+      if (!pat?.length) continue;
+      const v = pctFromPuesto(ckey, pat);
+      if (v != null){ total += v; nC++; hasAny = true; }
+    }
+    buckets.consultas = hasAny ? (total / nC) : null;
+    return buckets;
+  }
+
+  function computePuestoMetrics(){
+    if (!STATE.puestoSignalsData || !STATE.puestos) return;
+    const candId = STATE.candId;
+    const cand = CANDIDATOS.find(c => c.id === candId);
+    const candPctNac = pondPct(cand);
+    const nacAfin = precomputePuestoNacAfin(candId);
+    const wR = STATE.weights;
+    const wSum = Math.max(1, wR.pres22 + wR.congreso26 + wR.pres18 + wR.consultas);
+    const wNorm = { pres22: wR.pres22/wSum, congreso26: wR.congreso26/wSum,
+                    pres18: wR.pres18/wSum, consultas: wR.consultas/wSum };
+    const nsnrFactor = getNsNrFactor();
+    const censoNac = STATE.puestoCenso2026Nac || STATE.sumCensoNacional || 1;
+
+    // Donantes activos del bloque (transferencia intra-bloque)
+    const xferMap = STATE.transfers[candId] || {};
+    const donors = (BLOQUE_AMPLIO[candId] || []).filter(id => id !== candId);
+    const donorData = donors.map(id => {
+      const c = CANDIDATOS.find(x => x.id === id);
+      return {
+        id, cand: c,
+        pondPct: pondPct(c) || 0,
+        xferFrac: xferMap[id] || 0,
+        nacAfin: precomputePuestoNacAfin(id),
+      };
+    }).filter(d => d.xferFrac > 0 && d.pondPct > 0);
+
+    const out = {};
+    // Iteramos sobre los puestos cargados (la unión de claves entre señales).
+    // Para evitar duplicación, usamos pres-2022 como guía (cobertura más alta).
+    const refSig = STATE.puestoSignalsData['pres-2022'] || {};
+    const senDep = {}; // depCod → bool si tiene cong cargado
+    for (const dc of Object.keys(STATE.puestoCongDepData)) senDep[dc] = true;
+
+    for (const pkey of Object.keys(refSig)){
+      const buckets = bucketsPctAfinForPuesto(candId, pkey);
+      let afinNum=0, afinDen=0, biasNum=0, biasDen=0;
+      // Fallback congreso26: si no hay cong del depto, usa el del mun padre
+      const munKey = pkey.split('-').slice(0,2).join('-');
+      const munRec = STATE.munMetrics[munKey];
+      if (buckets.congreso26 == null && munRec?.buckets?.congreso26 != null){
+        buckets.congreso26 = munRec.buckets.congreso26;
+      }
+      for (const b of ['pres22','congreso26','pres18','consultas']){
+        const v = buckets[b], w = wNorm[b], n = nacAfin[b];
+        if (v != null){ afinNum += w*v; afinDen += w; }
+        if (v != null && n != null && n > 0){ biasNum += w*(v/n); biasDen += w; }
+      }
+      const afin = afinDen > 0 ? afinNum / afinDen : null;
+      const bias = biasDen > 0 ? biasNum / biasDen : 1.0;
+      const proj = candPctNac != null ? candPctNac * bias : null;
+      const gapNsnr = proj != null ? proj * nsnrFactor : null;
+      // Transferencia intra-bloque por puesto
+      let gapXfer = 0;
+      for (const d of donorData){
+        const bk = bucketsPctAfinForPuesto(d.id, pkey);
+        let bn=0, bd=0;
+        for (const b of ['pres22','congreso26','pres18','consultas']){
+          const v = bk[b], w = wNorm[b], n = d.nacAfin[b];
+          if (v != null && n != null && n > 0){ bn += w*(v/n); bd += w; }
+        }
+        const biasD = bd > 0 ? bn/bd : 1.0;
+        gapXfer += d.xferFrac * d.pondPct * biasD;
+      }
+      const gap = gapNsnr != null ? (gapNsnr + gapXfer) : null;
+      const censo26 = STATE.puestoCenso2026?.[pkey] || 0;
+      const contrib = gap != null && censo26 > 0 ? gap * censo26 / censoNac : null;
+      // Abstención: promedio 2018+2022. Para votos totales por puesto
+      // usamos vv del puesto (no incluye especiales — cota baja).
+      const censo22 = STATE.puestoCenso2022?.[pkey] || 0;
+      const censo18 = STATE.puestoCenso2018?.[pkey] || 0;
+      const vv22 = refSig[pkey]?.vv || 0;
+      const e18 = STATE.puestoSignalsData['pres-2018']?.[pkey];
+      const vv18 = e18?.vv || 0;
+      const abst22 = (censo22 > 0 && vv22 > 0) ? clamp(1 - vv22/censo22, 0, 1) : null;
+      const abst18 = (censo18 > 0 && vv18 > 0) ? clamp(1 - vv18/censo18, 0, 1) : null;
+      let abst = null;
+      if (abst18 != null && abst22 != null) abst = (abst18 + abst22) / 2;
+      else if (abst22 != null) abst = abst22;
+      else if (abst18 != null) abst = abst18;
+
+      out[pkey] = { afin, gap, contrib, bias, proj, abst, censo: censo26 };
+    }
+    STATE.puestoMetrics = out;
+  }
+
   // (col zon = parts[2] del key 'dep-mun-zon-pue'). Si no, hereda
   // del mun. Si tampoco, null.
   function recForPuesto(p){
+    // Bias propio por puesto si está cargado y calculado.
+    if (STATE.puestoMetrics && STATE.puestoMetrics[p.k]){
+      return STATE.puestoMetrics[p.k];
+    }
     const parts = p.k.split('-');
     const depCod = parts[0], munCod = parts[1], zon = parts[2];
     const munKey = `${depCod}-${munCod}`;
@@ -2360,6 +2654,17 @@
     STATE.selectedDep = elec;
     renderMunsOfDep(elec);
     renderTop30();
+    // Si estamos en modo Puestos y aún no cargamos senado/cámara de este
+    // depto, lanzar carga lazy y recomputar al terminar.
+    if (STATE.layer === 'pue' && STATE.puestoSignalsData){
+      showLoading(true);
+      loadPuestoCongDepto(elec).then(() => {
+        STATE.puestoNacAfin = {};
+        computePuestoMetrics();
+        renderPuestos();
+        showLoading(false);
+      }).catch(e => { console.error('[opo·pue·dep] error', e); showLoading(false); });
+    }
   }
   function onBack(){
     // Si estamos en capa de ciudad, volver al depto padre.
@@ -3358,6 +3663,10 @@
     showLoading(true);
     setTimeout(() => {
       computeAllForCandidate(STATE.candId);
+      if (STATE.selectedCity) computeCityComunaMetrics(STATE.selectedCity);
+      if (STATE.selectedCity === 'medellin' && STATE.mdeBarriosData) computeMdeBarrioMetrics();
+      if (STATE.selectedCity === 'bogota' && STATE.bogUplData) computeBogUplMetrics();
+      if (STATE.layer === 'pue' && STATE.puestoSignalsData){ STATE.puestoNacAfin = {}; computePuestoMetrics(); }
       repaintLayer();
       updateCounter();
       renderTop30();
@@ -3411,6 +3720,10 @@
     showLoading(true);
     setTimeout(() => {
       computeAllForCandidate(STATE.candId);
+      if (STATE.selectedCity) computeCityComunaMetrics(STATE.selectedCity);
+      if (STATE.selectedCity === 'medellin' && STATE.mdeBarriosData) computeMdeBarrioMetrics();
+      if (STATE.selectedCity === 'bogota' && STATE.bogUplData) computeBogUplMetrics();
+      if (STATE.layer === 'pue' && STATE.puestoSignalsData){ STATE.puestoNacAfin = {}; computePuestoMetrics(); }
       repaintLayer();
       updateCounter();
       renderTop30();
@@ -3461,6 +3774,7 @@
       if (STATE.selectedCity) computeCityComunaMetrics(STATE.selectedCity);
       if (STATE.selectedCity === 'medellin' && STATE.mdeBarriosData) computeMdeBarrioMetrics();
       if (STATE.selectedCity === 'bogota' && STATE.bogUplData) computeBogUplMetrics();
+      if (STATE.layer === 'pue' && STATE.puestoSignalsData){ STATE.puestoNacAfin = {}; computePuestoMetrics(); }
       repaintLayer();
       updateCounter();
       renderTop30();
@@ -3476,6 +3790,7 @@
       if (STATE.selectedCity) computeCityComunaMetrics(STATE.selectedCity);
       if (STATE.selectedCity === 'medellin' && STATE.mdeBarriosData) computeMdeBarrioMetrics();
       if (STATE.selectedCity === 'bogota' && STATE.bogUplData) computeBogUplMetrics();
+      if (STATE.layer === 'pue' && STATE.puestoSignalsData){ STATE.puestoNacAfin = {}; computePuestoMetrics(); }
       repaintLayer();
       updateCounter();
       renderTop30();
@@ -3541,7 +3856,16 @@
       setMapInteractive(true);
       if (STATE.mapLayer){ STATE.map.removeLayer(STATE.mapLayer); STATE.mapLayer = null; }
       showLoading(true);
-      loadPuestos().then(() => {
+      // Carga paralela: puestos light + 8 señales por puesto + 3 censos.
+      // Si hay depto activo, también senado/cámara de ese depto.
+      const tasks = [loadPuestos(), loadPuestoSignals()];
+      if (STATE.selectedDep) tasks.push(loadPuestoCongDepto(STATE.selectedDep));
+      else if (STATE.selectedCity){
+        const dc = CITIES[STATE.selectedCity]?.depCod;
+        if (dc) tasks.push(loadPuestoCongDepto(dc));
+      }
+      Promise.all(tasks).then(() => {
+        computePuestoMetrics();
         renderPuestos();
         showLoading(false);
         updateLegend();
