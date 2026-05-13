@@ -619,6 +619,7 @@
     senMuns:   (cod) => `${S3}/senado/departamentos/${cod}/municipios.json`,
     camMuns:   `${S3}/camara/municipios.json`,
     censos:    `${S3}/puestos-censos-agg.json`,
+    censos2022:`${S3}/puestos-censos-agg-2022.json`,
     deptosGeo: `${S3}/mapas-2026/DEPARTAMENTOS2.json`,
     depsIndex: `${S3}/mapas-2026/Departamentos-mps/index.json`,
     depMps:    (depElec) => `${S3}/mapas-2026/Departamentos-mps/${depElec}.json`,
@@ -876,7 +877,8 @@
     senMunByKey:{},  // depCod-munCod → { partidos:{name:votos}, votval, votant }
     camMunByKey:{},  // depCod-munCod → { partidos:{name:votos}, votval, votant }
     censoNacional:0,
-    censoByMun:{},
+    censoByMun:{},        // 2026 Divipole — denominador de contrib (electorado actual)
+    censoByMun2022:{},    // 2021 Divipole (≈ censo pres-2022) — denominador de abstención
     censoByDep:{},
     depGeo:null, depIndex:null,
     depMpsCache:{},
@@ -909,7 +911,8 @@
     cityLoading:{},     // { cityKey: Promise }
     cityGeo:{},         // { cityKey: GeoJSON }
     cityNacAfin:{},     // { cityKey: { candId: { bucket: pct_nacional_ciudad_afin } } }
-    cityCensoByCom:{},  // { cityKey: { comCod: { nombre, censo, mujeres, hombres } } } — Divipole
+    cityCensoByCom:{},      // { cityKey: { comCod: { ..censo 2026 } } } Divipole actual
+    cityCensoByCom2022:{},  // { cityKey: { comCod: { ..censo 2022 } } } Divipole 23-09-2021 — para abstención
     cityComMetrics:{},  // { cityKey: { comCod: { afin, techo, proj, gap, abst, censo } } }
     selectedCity:null,  // cityKey activo (en drilldown)
 
@@ -946,7 +949,7 @@
   }
 
   async function loadAllData(){
-    const [pond, p18, p22, c25, c26g, c26f, c26s, senDeps, camMuns, censos, depGeo, depIdx] = await Promise.all([
+    const [pond, p18, p22, c25, c26g, c26f, c26s, senDeps, camMuns, censos, censos22, depGeo, depIdx] = await Promise.all([
       fetchJSON(PONDERADOR_URL, true),
       fetchJSON(URLS.pres18),
       fetchJSON(URLS.pres22),
@@ -957,6 +960,7 @@
       fetchJSON(URLS.senDeps),
       fetchJSON(URLS.camMuns, true),
       fetchJSON(URLS.censos),
+      fetchJSON(URLS.censos2022, true),
       fetchJSON(URLS.deptosGeo),
       fetchJSON(URLS.depsIndex),
     ]);
@@ -968,6 +972,10 @@
     STATE.censoByDep = censos.porDep || {};
     STATE.censoNacional = censos.nacional || 0;
     STATE.sumCensoNacional = STATE.censoNacional;
+    // Censo electoral 2022 (Divipole sept-2021) — denominador correcto
+    // para abstención presidencial 2022. Si el fetch falla, caemos al
+    // censo 2026 actual con el caveat de sobreestimación documentado.
+    STATE.censoByMun2022 = (censos22 && censos22.porMun) ? censos22.porMun : {};
 
     // Index dep por electoral_id y por nombre
     depIdx.forEach(d => {
@@ -1355,10 +1363,13 @@
       const contrib = gap != null ? gap * censo / censoNac : null;
       const techo   = proj != null ? proj + gap : null;
 
-      // Abstención 2022
+      // Abstención presidencial 2022 = 1 − votos_totales(pres-2022) / censo_2022.
+      // Usa el censo Divipole 23-sept-2021 (≈ censo al momento de la elección).
+      // Si no hay censo 2022 para ese mun, cae al 2026 con caveat de sobreestimación.
       const e22 = STATE.pres22?.[munKey];
       const totVot22 = e22 ? (e22.votos_totales || 0) : 0;
-      const abst = (censo > 0 && totVot22 > 0) ? clamp(1 - totVot22/censo, 0, 1) : null;
+      const censoAbst = STATE.censoByMun2022[munKey] || censo;
+      const abst = (censoAbst > 0 && totVot22 > 0) ? clamp(1 - totVot22/censoAbst, 0, 1) : null;
 
       munMetrics[munKey] = {
         munKey,
@@ -1775,10 +1786,7 @@
           }
         })());
       }
-      // Censo electoral por comuna (Divipole, generado por
-      // tools/build-censo-comuna-ciudades.js). Vive bajo output_ciudades/
-      // para todas las 14 ciudades — incluso Medellín, aunque el resto
-      // de sus datos viva en output_medellin/.
+      // Censo electoral por comuna (Divipole 2026 — denominador de contrib).
       fetches.push((async () => {
         try {
           const url = `${CITY_S3}/${cityKey}/censo-comuna.json`;
@@ -1788,6 +1796,18 @@
           STATE.cityCensoByCom[cityKey] = j.por_comuna || {};
         } catch (e){
           console.warn('[opo·city·censo]', cityKey, e);
+        }
+      })());
+      // Censo electoral 2022 por comuna (Divipole sept-2021 — denominador de abstención).
+      fetches.push((async () => {
+        try {
+          const url = `${CITY_S3}/${cityKey}/censo-comuna-2022.json`;
+          const r = await fetch(url);
+          if (!r.ok) return;
+          const j = await r.json();
+          STATE.cityCensoByCom2022[cityKey] = j.por_comuna || {};
+        } catch (e){
+          console.warn('[opo·city·censo2022]', cityKey, e);
         }
       })());
 
@@ -2001,16 +2021,16 @@
       const contrib = gap != null ? gap * (censoByCom[comCod]||0) / censoCity : null;
       const techo   = proj != null ? proj + gap : null;
 
-      // Abstención por comuna: 1 − votos_totales(pres-2022) / censo_oficial.
-      // El censo viene del archivo censo-comuna.json (Divipole, agregado por
-      // tools/build-censo-comuna-ciudades.js). Si la comuna no aparece en el
-      // mapeo de censo (corregimientos con códigos divergentes en GeoJSON,
-      // p.ej. Medellín 17-21 vs 50-90), abst queda null y se pinta gris.
-      const censoDiv = STATE.cityCensoByCom[cityKey]?.[comCod];
-      const censoOf  = censoDiv ? censoDiv.censo : 0;
-      const ePres22  = cityData['pres-2022']?.[comCod];
-      const totVot22 = ePres22 ? ((ePres22.votos_validos||0) + (ePres22.votos_totales||0 ? 0 : 0)) : 0;
-      // pres-2022 trae votos_validos + especiales separados; total = válidos + blanco + nulos + no_marcados.
+      // Abstención presidencial 2022 por comuna:
+      //   abst = 1 − votos_totales(pres-2022) / censo_2022_oficial
+      // Censo 2022 = Divipole sept-2021 (≈ momento de la elección). Si
+      // falta para esa comuna (corregimientos con códigos divergentes en
+      // GeoJSON, p.ej. Medellín 17-21 vs 50-90), abst queda null → gris.
+      const censoDiv2022 = STATE.cityCensoByCom2022[cityKey]?.[comCod];
+      const censoDiv2026 = STATE.cityCensoByCom[cityKey]?.[comCod];
+      const censoAbst    = censoDiv2022 ? censoDiv2022.censo
+                        : (censoDiv2026 ? censoDiv2026.censo : 0);
+      const ePres22 = cityData['pres-2022']?.[comCod];
       let totPres22 = 0;
       if (ePres22){
         totPres22 = (ePres22.votos_validos || 0)
@@ -2019,10 +2039,11 @@
                   + (ePres22.especiales?.no_marcados || 0);
         if (!totPres22) totPres22 = ePres22.votos_totales || 0;
       }
-      const abst = (censoOf > 0 && totPres22 > 0) ? clamp(1 - totPres22/censoOf, 0, 1) : null;
-      // El campo `censo` que se exporta a metrics es el oficial (Divipole)
-      // si está disponible, para que el panel y los rankings lo muestren.
-      const censoFinal = censoOf > 0 ? censoOf : (censoByCom[comCod] || 0);
+      const abst = (censoAbst > 0 && totPres22 > 0) ? clamp(1 - totPres22/censoAbst, 0, 1) : null;
+      // El campo `censo` exportado al panel = 2026 si está, si no 2022, si no proxy.
+      const censoFinal = censoDiv2026 ? censoDiv2026.censo
+                       : (censoDiv2022 ? censoDiv2022.censo
+                       : (censoByCom[comCod] || 0));
       out[comCod] = { comCod, afin, techo, proj, gap, contrib, bias, buckets, abst, censo: censoFinal };
     }
     STATE.cityComMetrics[cityKey] = out;
