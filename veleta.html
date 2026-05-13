@@ -727,40 +727,34 @@
     STATE.scoreByMun = {};
     STATE.scoreByDep = {};
     const censMun = STATE.censos.porMun || {};
-    const recs = [];
+    const censDep = STATE.censos.porDep || {};
 
+    // Scoring por mun
     for (const [key, mun] of Object.entries(STATE.bloques)){
       const s = scoreMunForMode(mun, STATE.mode);
       if (!s) continue;
       const [depCod, munCod] = key.split('-');
       const censo = censMun[key] || mun['2022'].vv || 0;
-      const rec = { key, depCod, munCod, censo, ...s };
-      STATE.scoreByMun[key] = rec;
-      recs.push(rec);
+      STATE.scoreByMun[key] = { key, depCod, munCod, censo, ...s };
     }
 
-    // Agregado por depto: promedio ponderado por censo
-    const depAgg = {};
-    for (const r of recs){
-      const d = r.depCod;
-      if (!depAgg[d]) depAgg[d] = { depCod:d, sumW:0, sumScore:0, sumProy:0, sumGap:0, sumCaptable:0, sumCenso:0, nMun:0 };
-      const w = Math.max(1, r.censo);
-      depAgg[d].sumW += w;
-      depAgg[d].sumScore += r.score * w;
-      depAgg[d].sumProy  += r.proy  * w;
-      depAgg[d].sumGap   += r.gap   * w;
-      depAgg[d].sumCaptable += r.captable * w;
-      depAgg[d].sumCenso += r.censo;
-      depAgg[d].nMun++;
+    // Scoring por depto: aplica el mismo scoreMunForMode sobre la agregación
+    // del bloque por depto (mismo shape: { depCod, '2010':{...}, '2014':{...}, '2018':{...}, '2022':{...} }).
+    // Esto da números internamente consistentes a nivel mun y dep.
+    const munCountByDep = {};
+    for (const r of Object.values(STATE.scoreByMun)){
+      munCountByDep[r.depCod] = (munCountByDep[r.depCod] || 0) + 1;
     }
-    for (const d of Object.keys(depAgg)){
-      const a = depAgg[d];
-      a.score    = a.sumW ? a.sumScore / a.sumW : 0;
-      a.proy     = a.sumW ? a.sumProy  / a.sumW : 0;
-      a.gap      = a.sumW ? a.sumGap   / a.sumW : 0;
-      a.captable = a.sumW ? a.sumCaptable / a.sumW : 0;
-      a.censo    = a.sumCenso;
-      STATE.scoreByDep[d] = a;
+    for (const [depCod, dep] of Object.entries(STATE.bloquesDep || {})){
+      const depAsMun = { ...dep, depCod };
+      const s = scoreMunForMode(depAsMun, STATE.mode);
+      if (!s) continue;
+      const censo = censDep[depCod] || 0;
+      STATE.scoreByDep[depCod] = {
+        depCod, censo,
+        nMun: munCountByDep[depCod] || 0,
+        ...s,
+      };
     }
   }
 
