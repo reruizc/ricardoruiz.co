@@ -424,6 +424,30 @@
     .geo-refine.loading svg { animation: spinSlow 1.4s linear infinite; }
     @keyframes spinSlow { to { transform: rotate(360deg); } }
 
+    /* Barrita de carga del form demográfico mientras llegan GEO + ciudades */
+    .form-load {
+      grid-column: 1 / -1;
+      display:flex; flex-direction:column; align-items:center; gap:.65rem;
+      padding:1.5rem .8rem;
+    }
+    .form-load-track {
+      width: min(280px, 80%); height: 2px;
+      background: rgba(255,255,255,0.08); overflow: hidden; position: relative;
+    }
+    .form-load-fill {
+      height: 100%; width: 0%; background: var(--blue);
+      animation: formLoadFill 1.9s cubic-bezier(.4,0,.2,1) forwards;
+    }
+    .form-load-text {
+      font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.14em;
+      text-transform:uppercase; color:rgba(255,255,255,0.4);
+    }
+    @keyframes formLoadFill {
+      0%   { width: 0%; }
+      55%  { width: 65%; }
+      100% { width: 100%; }
+    }
+
     /* ── SUPPORT (apoyar campaña) ── */
     .support-box {
       margin-top:1.4rem; padding:1.1rem 1.2rem;
@@ -1447,7 +1471,14 @@
     // de localidad/comuna aparece bien; si no, cae al "¿en qué país?".
     // Mostramos un placeholder mientras tanto.
     if (!GEO || !CIUDADES_ZONAS) {
-      grid.innerHTML = `<div style="font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.14em; text-transform:uppercase; color:rgba(255,255,255,0.4); padding:1.2rem; text-align:center;">Detectando tu ubicación…</div>`;
+      // Barrita animada neutra mientras se completan los fetches. NO decimos
+      // "detectando tu ubicación" — eso dispara reflejos defensivos sobre
+      // privacidad aunque la persona después acepte compartir su zona.
+      grid.innerHTML = `
+        <div class="form-load">
+          <div class="form-load-track"><div class="form-load-fill"></div></div>
+          <span class="form-load-text">Un momento</span>
+        </div>`;
       const timeout = new Promise(res => setTimeout(res, 2000));
       await Promise.race([
         Promise.all([GEO_PROMISE, CIUDADES_PROMISE]),
