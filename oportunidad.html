@@ -90,6 +90,10 @@
     body.day-mode .cta-cta-prompt{color:rgba(0,0,0,.85)}
     body.day-mode .det-bar .lbl{color:rgba(0,0,0,.55)}
     body.day-mode .det-bar .val{color:#0d1120}
+    .cta-mail{display:inline-block;text-align:center;font-family:Avenir,sans-serif;font-weight:500;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.7);text-decoration:none;padding:.35rem 0}
+    .cta-mail:hover{color:var(--green)}
+    body.day-mode .cta-mail{color:rgba(0,0,0,.7)}
+    body.day-mode .cta-mail:hover{color:#dc2626}
     body.day-mode .foot{border-top-color:rgba(0,0,0,.1);color:rgba(0,0,0,.55);background:rgba(0,0,0,.02)}
     body.day-mode .foot a{color:#dc2626}
     body.day-mode .theme-btn{background:rgba(220,38,38,.08);border-color:rgba(220,38,38,.4);color:#dc2626}
@@ -323,7 +327,7 @@
     .cta-btn:hover{background:#22c55e;border-color:#22c55e}
 
     /* FOOTER */
-    .foot{padding:1.4rem 2.5rem;border-top:1px solid var(--border);font-family:Avenir,sans-serif;font-weight:400;font-size:.72rem;line-height:1.6;color:rgba(255,255,255,.5);background:rgba(255,255,255,.01)}
+    .foot{padding:1.4rem 2.5rem;border-top:1px solid var(--border);font-family:Avenir,sans-serif;font-weight:400;font-size:.86rem;line-height:1.6;color:rgba(255,255,255,.5);background:rgba(255,255,255,.01)}
     .foot a{color:rgba(74,222,128,.85);text-decoration:none}
     .foot a:hover{color:var(--green);text-decoration:underline}
     .foot strong{color:rgba(255,255,255,.78);font-weight:600}
@@ -444,11 +448,10 @@
       <button class="toggle-btn active" id="lvl-dep" onclick="setLevel('dep')">Departamental</button>
       <button class="toggle-btn" id="lvl-mun" onclick="setLevel('mun')">Municipal</button>
     </div>
-    <div class="threshold-row">
-      <span class="toggle-label" style="margin-right:.2rem">Destacar contribución ≥ <span class="help-q" data-tip="Marca con rayado los municipios cuyo aporte al crecimiento nacional del candidato supera este umbral en puntos porcentuales. Subir el umbral filtra el mapa a los pocos territorios que más explican el crecimiento total; bajarlo destaca un universo más amplio. El valor por default (+0.05 pp) suele resaltar 50-100 municipios para los candidatos grandes y unas decenas para los pequeños.">?</span></span>
-      <input type="range" id="threshold-slider" class="threshold-slider" min="0.01" max="0.30" step="0.01" value="0.05" />
-      <span class="threshold-value" id="threshold-value">+0.05 pp</span>
-    </div>
+    <!-- Threshold slider removido (los top contributors ya destacan por
+         color en el mapa de calor y aparecen en el ranking del panel). -->
+    <input type="hidden" id="threshold-slider" value="0.05" />
+    <span id="threshold-value" style="display:none">+0.05 pp</span>
     <div class="toggle-group" id="mde-view-toggle" style="display:none">
       <span class="toggle-label">Medellín</span>
       <button class="toggle-btn active" data-mde="comunas" onclick="setMdeView('comunas')">Comunas</button>
@@ -484,11 +487,16 @@
         <button class="src-reset" onclick="resetTransfers()" style="margin-top:.6rem">Restablecer todos a 0%</button>
       </div>
 
-      <!-- Sliders por fuente -->
+      <!-- Sliders por fuente (colapsable — se abre con clic en el título) -->
       <div class="panel-card">
-        <div class="panel-section-title">Pesos por fuente · suma 100%</div>
-        <div id="src-sliders"></div>
-        <button class="src-reset" onclick="resetWeights()">Restablecer 40·35·15·10</button>
+        <div class="panel-section-title src-toggle" id="src-toggle" onclick="toggleSrcSliders()" style="cursor:pointer;display:flex;align-items:center;gap:.4rem;user-select:none">
+          <span style="display:inline-block;transition:transform .15s" id="src-caret">▸</span>
+          Pesos por fuente · suma 100%
+        </div>
+        <div id="src-collapse" style="display:none;margin-top:.5rem">
+          <div id="src-sliders"></div>
+          <button class="src-reset" onclick="resetWeights()">Restablecer 40·35·15·10</button>
+        </div>
       </div>
 
       <!-- Leyenda -->
@@ -500,10 +508,11 @@
           <span class="leg-bar-end">0.05</span>
           <span class="leg-bar-end">+0.20 pp · top contributor</span>
         </div>
-        <div class="leg-stripes" id="leg-stripes-row">
-          <div class="leg-stripe-swatch"></div>
-          <span>Contribución ≥ <b id="leg-thresh">+0.05 pp</b> · destaca con rayado</span>
-        </div>
+        <!-- leg-stripes-row removido — el mapa de calor expresa la contribución
+             directamente sin necesidad de un swatch separado. Mantengo el id
+             oculto para no romper referencias en JS. -->
+        <span id="leg-stripes-row" style="display:none"></span>
+        <span id="leg-thresh" style="display:none">+0.05 pp</span>
       </div>
 
       <!-- Banner techo afín copado (sólo visible cuando aplica) -->
@@ -552,7 +561,7 @@
           </svg>
           Chatear por WhatsApp
         </a>
-        <a id="cta-btn" href="mailto:reruizc@gmail.com?subject=Oportunidad%20-%20propuesta" style="display:inline-block;text-align:center;font-family:Avenir,sans-serif;font-weight:500;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.7);text-decoration:none;padding:.35rem 0">o por correo →</a>
+        <a id="cta-btn" class="cta-mail" href="mailto:reruizc@gmail.com?subject=Oportunidad%20-%20propuesta">o por correo →</a>
       </div>
     </aside>
   </main>
@@ -1490,10 +1499,7 @@
   function styleFor(rec){
     if (STATE.layer === 'opo'){
       const contrib = rec ? rec.contrib : null;
-      const isHigh = contrib != null && contrib >= STATE.threshold;
-      const fill = isHigh
-        ? `url(#${isDay() ? 'opo-stripes-day' : 'opo-stripes'})`
-        : colorByGap(contrib);
+      const fill = colorByGap(contrib);
       return {
         fillColor: fill,
         fillOpacity: 0.88,
@@ -2908,6 +2914,16 @@
   // Compat: algunos callers viejos llaman resetLider — redirigir.
   function resetLider(){ resetTransfers(); }
   function onLiderChange(){ /* deprecated en v3 */ }
+
+  // Colapsable "Pesos por fuente": click en el título abre/cierra los sliders.
+  function toggleSrcSliders(){
+    const wrap = document.getElementById('src-collapse');
+    const caret = document.getElementById('src-caret');
+    if (!wrap) return;
+    const open = wrap.style.display !== 'none';
+    wrap.style.display = open ? 'none' : 'block';
+    if (caret) caret.style.transform = open ? '' : 'rotate(90deg)';
+  }
 
   function resetWeights(){
     SOURCE_BUCKETS.forEach(b => { STATE.weights[b.key] = b.defW; });
