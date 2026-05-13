@@ -480,6 +480,7 @@
       <span class="toggle-label">Bogotá</span>
       <button class="toggle-btn active" data-bog="localidades" onclick="setBogView('localidades')">Localidades</button>
       <button class="toggle-btn" data-bog="upl" onclick="setBogView('upl')">UPL</button>
+      <button class="toggle-btn" data-bog="barrios" onclick="setBogView('barrios')">Barrios</button>
     </div>
     <div class="veleta-count" id="opo-count">— municipios con oportunidad ≥ umbral</div>
   </section>
@@ -663,6 +664,20 @@
   const BOG_UPL_GEO_URL  = `${S3}/mapas-2026/Ciudades-COM-LOC/BOG-UPL.json`;
   const BOG_UPL_DATA_BASE = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_ciudades/bogota';
   const BOG_UPL_SIGNALS = [
+    'pres-2010','pres-2014','pres-2018','pres-2022',
+    'consulta-2025-pacto','consulta-2026-gran','consulta-2026-frente','consulta-2026-soluciones',
+    'senado-2026','camara-2026',
+  ];
+
+  // ─── BOGOTÁ BARRIOS CATASTRALES (drilldown más granular) ─────────
+  // 1.000 barrios oficiales. Cobertura señal: las 4 presidenciales viejas
+  // tienen ~30 barrios c/u por formato sintético del por-puesto.json;
+  // senado/cámara 2026 cubre ~615 barrios. Para barrios sin métrica
+  // propia, herencia por vecino más cercano (kNN por centroide) → fallback
+  // a localidad padre — mismo patrón que Medellín barrios.
+  const BOG_BARRIOS_GEO_URL = `${S3}/mapas-2026/Ciudades-COM-LOC/BOG-BARRIOS-CATASTRALES.json`;
+  const BOG_BARRIO_DATA_BASE = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_ciudades/bogota';
+  const BOG_BARRIO_SIGNALS = [
     'pres-2010','pres-2014','pres-2018','pres-2022',
     'consulta-2025-pacto','consulta-2026-gran','consulta-2026-frente','consulta-2026-soluciones',
     'senado-2026','camara-2026',
@@ -964,6 +979,17 @@
     bogUplCenso2026:null,        // { uplCod: { censo, mujeres, hombres } } — denom contrib
     bogUplCenso2022:null,        // idem, censo Divipole 2021 — denom abst-2022
     bogUplCenso2018:null,        // idem, escalado — denom abst-2018
+
+    // Bogotá Barrios catastrales (drilldown más granular)
+    bogBarrioGeo:null,
+    bogBarrioGeoLoading:null,
+    bogBarrioData:null,
+    bogBarrioSigLoading:null,
+    bogBarrioMetrics:{},
+    bogBarrioNacAfin:{},
+    bogBarrioCenso2026:null,
+    bogBarrioCenso2022:null,
+    bogBarrioCenso2018:null,
 
     // Puestos (Bloque C)
     puestos:null,            // array de {k,y,x,c,m,n,mn,p22,s26,t}
@@ -2669,6 +2695,13 @@
         });
         return;
       }
+      // Capa Barrios Bogotá: bias propio + kNN vecino + fallback localidad
+      if (cityKey === 'bogota' && STATE.bogView === 'barrios'){
+        if (STATE.bogBarrioData) computeBogBarrioMetrics();
+        // Re-render full porque la cascada kNN requiere re-compute de cache.
+        renderBogBarrioLayer();
+        return;
+      }
       STATE.mapLayer.setStyle((f) => {
         const com = comCodeOfCityFeature(cfg, f.properties);
         const r = com ? metrics[com] : null;
@@ -3353,6 +3386,10 @@
         await Promise.all([loadBogUplGeo(), loadBogUplSignals()]);
         computeBogUplMetrics();
         renderBogUplLayer();
+      } else if (view === 'barrios'){
+        await Promise.all([loadBogBarrioGeo(), loadBogBarrioSignals()]);
+        computeBogBarrioMetrics();
+        renderBogBarrioLayer();
       } else {
         renderCityComLayer('bogota');
       }
@@ -3372,6 +3409,267 @@
     wrap.style.display = inBog ? 'flex' : 'none';
     wrap.querySelector('[data-bog="localidades"]')?.classList.toggle('active', STATE.bogView === 'localidades');
     wrap.querySelector('[data-bog="upl"]')?.classList.toggle('active', STATE.bogView === 'upl');
+    wrap.querySelector('[data-bog="barrios"]')?.classList.toggle('active', STATE.bogView === 'barrios');
+  }
+
+  /* ───────── Bogotá · Barrios catastrales (Bloque F) ─────────
+     1.000 barrios oficiales. Mismo patrón que UPL: load/compute/render
+     y herencia por vecino más cercano cuando un barrio no tiene puestos
+     asignados (la mayoría — solo ~600 barrios tienen senado/cámara y
+     ~30 tienen presidenciales viejas). */
+  async function loadBogBarrioGeo(){
+    if (STATE.bogBarrioGeo) return STATE.bogBarrioGeo;
+    if (STATE.bogBarrioGeoLoading) return STATE.bogBarrioGeoLoading;
+    STATE.bogBarrioGeoLoading = (async () => {
+      const r = await fetch(BOG_BARRIOS_GEO_URL);
+      let geo = await r.json();
+      geo = rotateGeoJSON90Left(geo);   // misma rotación que LOCALIDADX
+      STATE.bogBarrioGeo = geo;
+      return geo;
+    })();
+    return STATE.bogBarrioGeoLoading;
+  }
+
+  async function loadBogBarrioSignals(){
+    if (STATE.bogBarrioData) return STATE.bogBarrioData;
+    if (STATE.bogBarrioSigLoading) return STATE.bogBarrioSigLoading;
+    STATE.bogBarrioSigLoading = (async () => {
+      const out = {};
+      const fetches = BOG_BARRIO_SIGNALS.map(async sig => {
+        try {
+          const r = await fetch(`${BOG_BARRIO_DATA_BASE}/bog-barrio-${sig}.json`);
+          if (!r.ok) return;
+          const j = await r.json();
+          out[sig] = j.por_barrio || {};
+        } catch (e){ console.warn('[opo·bog·barrio]', sig, e); }
+      });
+      const censoLoads = [
+        ['Censo2026', `${BOG_BARRIO_DATA_BASE}/censo-barrio-2026.json`],
+        ['Censo2022', `${BOG_BARRIO_DATA_BASE}/censo-barrio-2022.json`],
+        ['Censo2018', `${BOG_BARRIO_DATA_BASE}/censo-barrio-2018.json`],
+      ].map(async ([slot, url]) => {
+        try {
+          const r = await fetch(url);
+          if (!r.ok) return;
+          const j = await r.json();
+          STATE['bogBarrio' + slot] = j.por_barrio || {};
+        } catch (e){ console.warn('[opo·bog·barrio·censo]', slot, e); }
+      });
+      await Promise.all([...fetches, ...censoLoads]);
+      STATE.bogBarrioData = out;
+      return out;
+    })();
+    return STATE.bogBarrioSigLoading;
+  }
+
+  function precomputeBogBarrioNacAfin(candId){
+    if (STATE.bogBarrioNacAfin[candId]) return STATE.bogBarrioNacAfin[candId];
+    const aff = AFINIDADES[candId];
+    const data = STATE.bogBarrioData || {};
+    function pctFromAll(sigKey, patterns){
+      const ds = data[sigKey];
+      if (!ds || !patterns?.length) return null;
+      let sumV = 0, sumDen = 0, found = false;
+      for (const u of Object.values(ds)){
+        if (!Array.isArray(u.candidatos)) continue;
+        let any = false;
+        for (const c of u.candidatos){
+          if (!c || !c.nombre) continue;
+          if (matchesAffinity(c.nombre, patterns)){ sumV += (c.votos||0); any = true; }
+        }
+        if (any){ sumDen += (u.votos_validos || 0); found = true; }
+      }
+      return found && sumDen > 0 ? 100 * sumV / sumDen : null;
+    }
+    const out = {};
+    out.pres22 = pctFromAll('pres-2022', aff.pres22);
+    out.pres18 = pctFromAll('pres-2018', aff.pres18);
+    const vSen = (aff.senado26||[]).length ? pctFromAll('senado-2026', aff.senado26) : null;
+    const vCam = (aff.camara26||[]).length ? pctFromAll('camara-2026', aff.camara26) : null;
+    out.congreso26 = (vSen!=null && vCam!=null) ? (vSen+vCam)/2 : (vSen ?? vCam);
+    const cmap = aff.consultas || {};
+    let total = 0, nC = 0, hasAny = false;
+    for (const [ckey, pat] of Object.entries(cmap)){
+      if (!pat?.length) continue;
+      const v = pctFromAll(ckey, pat);
+      if (v != null){ total += v; nC++; hasAny = true; }
+    }
+    out.consultas = hasAny ? (total / nC) : null;
+    STATE.bogBarrioNacAfin[candId] = out;
+    return out;
+  }
+
+  function computeBogBarrioMetrics(){
+    const candId = STATE.candId;
+    const cand = CANDIDATOS.find(c => c.id === candId);
+    const data = STATE.bogBarrioData || {};
+    const candPctNac = pondPct(cand);
+    const barNac = precomputeBogBarrioNacAfin(candId);
+    const locNac = STATE.cityNacAfin.bogota?.[candId] || {};
+
+    const wRaw = STATE.weights;
+    const wSum = Math.max(1, wRaw.pres22 + wRaw.congreso26 + wRaw.pres18 + wRaw.consultas);
+    const wNorm = { pres22: wRaw.pres22/wSum, congreso26: wRaw.congreso26/wSum,
+                    pres18: wRaw.pres18/wSum, consultas: wRaw.consultas/wSum };
+    const nsnrFactor = getNsNrFactor();
+
+    // Censo real por barrio cuando está disponible.
+    const censoReal = STATE.bogBarrioCenso2026 || null;
+    const keys = new Set();
+    for (const sig of Object.keys(data)) Object.keys(data[sig]).forEach(k => keys.add(k));
+    if (censoReal) Object.keys(censoReal).forEach(k => keys.add(k));
+
+    const censoByB = {};
+    for (const k of keys){
+      if (censoReal && censoReal[k]?.censo) censoByB[k] = censoReal[k].censo;
+      else {
+        let totVv = 0, n = 0;
+        for (const sig of Object.keys(data)){
+          const e = data[sig]?.[k];
+          if (e && e.votos_validos){ totVv += e.votos_validos; n++; }
+        }
+        censoByB[k] = n > 0 ? totVv / n : 0;
+      }
+    }
+    const censoCity = Object.values(censoByB).reduce((s,v)=>s+v,0) || 1;
+
+    const xferMap = STATE.transfers[candId] || {};
+    const donors = (BLOQUE_AMPLIO[candId] || []).filter(id => id !== candId);
+    const donorData = donors.map(id => {
+      const c = CANDIDATOS.find(x => x.id === id);
+      return { id, cand: c, pondPct: pondPct(c) || 0,
+               xferFrac: xferMap[id] || 0,
+               barNac: precomputeBogBarrioNacAfin(id),
+               locNac: STATE.cityNacAfin.bogota?.[id] || {} };
+    }).filter(d => d.xferFrac > 0 && d.pondPct > 0);
+
+    const out = {};
+    for (const bk of keys){
+      const buckets = bucketsPctAfinForComuna(candId, data, bk);
+      let afinNum=0, afinDen=0, biasNum=0, biasDen=0;
+      for (const b of ['pres22','congreso26','pres18','consultas']){
+        const v = buckets[b], w = wNorm[b];
+        if (v != null){ afinNum += w*v; afinDen += w; }
+        const base = (barNac[b]!=null && barNac[b]>0) ? barNac[b]
+                  : (locNac[b]!=null && locNac[b]>0) ? locNac[b]
+                  : STATE.nacAfinByBucket?.[b];
+        if (v != null && base != null && base > 0){
+          biasNum += w * (v/base); biasDen += w;
+        }
+      }
+      const afin = afinDen>0 ? afinNum/afinDen : null;
+      const bias = biasDen>0 ? biasNum/biasDen : 1.0;
+      const proj = candPctNac != null ? candPctNac * bias : null;
+      const gapNsnr = proj != null ? proj * nsnrFactor : null;
+      let gapXfer = 0;
+      for (const d of donorData){
+        const bkts = bucketsPctAfinForComuna(d.id, data, bk);
+        let bn=0, bd=0;
+        for (const b of ['pres22','congreso26','pres18','consultas']){
+          const v = bkts[b]; const w = wNorm[b];
+          const base = (d.barNac[b]!=null && d.barNac[b]>0) ? d.barNac[b]
+                    : (d.locNac[b]!=null && d.locNac[b]>0) ? d.locNac[b]
+                    : STATE.nacAfinByBucket?.[b];
+          if (v != null && base != null && base > 0){ bn += w*(v/base); bd += w; }
+        }
+        const biasD = bd > 0 ? bn/bd : 1.0;
+        gapXfer += d.xferFrac * d.pondPct * biasD;
+      }
+      const gap     = gapNsnr != null ? (gapNsnr + gapXfer) : null;
+      const censo   = censoByB[bk] || 0;
+      const contrib = gap != null && censo > 0 ? gap * censo / censoCity : null;
+      const techo   = proj != null ? proj + gap : null;
+      // Abstención: cota baja con votos_validos
+      const c22 = STATE.bogBarrioCenso2022?.[bk]?.censo || 0;
+      const c18 = STATE.bogBarrioCenso2018?.[bk]?.censo || 0;
+      const v22 = data['pres-2022']?.[bk]?.votos_validos || 0;
+      const v18 = data['pres-2018']?.[bk]?.votos_validos || 0;
+      const a22 = (c22 > 0 && v22 > 0) ? clamp(1 - v22/c22, 0, 1) : null;
+      const a18 = (c18 > 0 && v18 > 0) ? clamp(1 - v18/c18, 0, 1) : null;
+      let abst = null;
+      if (a18 != null && a22 != null) abst = (a18 + a22) / 2;
+      else if (a22 != null) abst = a22;
+      else if (a18 != null) abst = a18;
+      // Nombre y localidad: del primer entry disponible
+      let nombre = null, loc_nombre = null, loc_cod = null;
+      for (const sig of Object.keys(data)){
+        const e = data[sig][bk];
+        if (e){ nombre = e.nombre; loc_nombre = e.loc_nombre; loc_cod = e.loc_cod; break; }
+      }
+      if (!nombre && censoReal && censoReal[bk]){
+        nombre = censoReal[bk].nombre;
+        loc_nombre = censoReal[bk].loc_nombre;
+        loc_cod = censoReal[bk].loc_cod;
+      }
+      out[bk] = { barCod: bk, nombre, loc_nombre, loc_cod, afin, techo, proj, gap, contrib, bias, abst, censo };
+    }
+    STATE.bogBarrioMetrics = out;
+  }
+
+  function renderBogBarrioLayer(){
+    ensureMap(); clearLayer();
+    const geo = STATE.bogBarrioGeo;
+    const barMetrics = STATE.bogBarrioMetrics || {};
+    const locMetrics = STATE.cityComMetrics.bogota || {};
+
+    // Precompute centroides + lista de barrios CON métrica para kNN
+    const featByKey = {};
+    const keysWithMetric = [];
+    for (const f of geo.features){
+      const cod = f.properties.codigo;
+      if (!cod) continue;
+      const c = geoCentroid(f);
+      if (!c) continue;
+      featByKey[cod] = { centroid: c, feature: f };
+      const m = barMetrics[cod];
+      if (m && m.contrib != null) keysWithMetric.push(cod);
+    }
+    const neighborCache = {};
+    function nearestNeighborMetric(bk){
+      if (bk in neighborCache) return neighborCache[bk];
+      const me = featByKey[bk];
+      if (!me){ neighborCache[bk] = null; return null; }
+      const [mx, my] = me.centroid;
+      let bestD = Infinity, bestKey = null;
+      for (const ok of keysWithMetric){
+        if (ok === bk) continue;
+        const [ox, oy] = featByKey[ok].centroid;
+        const d = (ox-mx)*(ox-mx) + (oy-my)*(oy-my);
+        if (d < bestD){ bestD = d; bestKey = ok; }
+      }
+      const inherited = bestKey ? barMetrics[bestKey] : null;
+      neighborCache[bk] = inherited;
+      return inherited;
+    }
+    // Cascada: barrio propio → vecino más cercano con métrica → localidad padre
+    function metricForBarrio(props){
+      const cod = props.codigo;
+      if (cod && barMetrics[cod] && barMetrics[cod].contrib != null) return barMetrics[cod];
+      if (cod){
+        const fromNeighbor = nearestNeighborMetric(cod);
+        if (fromNeighbor) return fromNeighbor;
+      }
+      const loc = String(props.loc_codigo || '').padStart(2, '0');
+      if (loc && locMetrics[loc]) return locMetrics[loc];
+      return null;
+    }
+
+    STATE.mapLayer = L.geoJSON(geo, {
+      style: (f) => styleFor(metricForBarrio(f.properties)),
+      onEachFeature: (f, layer) => {
+        const r = metricForBarrio(f.properties);
+        f.__rec = r;
+        f.__name = f.properties.nombre || f.properties.codigo || '—';
+        f.__depName = `Bogotá · Localidad ${f.properties.loc_nombre || '?'}`;
+        layer.on('mouseover', (e) => onHover(f, e));
+        layer.on('mouseout',  (e) => onHoverOut(f, e));
+        layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
+      },
+    }).addTo(STATE.map);
+    STATE.map.fitBounds(STATE.mapLayer.getBounds(), { padding:[20,20] });
+    document.getElementById('map-head-title').textContent = 'Bogotá · 1.000 barrios catastrales (heredan de vecino o localidad)';
+    document.getElementById('map-back-btn').classList.add('show');
+    document.getElementById('map-back-label').textContent = '← Volver a Cundinamarca';
   }
 
   // Alias manuales por (ciudad, comCod) cuando el nombre Divipole es
@@ -3401,6 +3699,10 @@
         await Promise.all([loadBogUplGeo(), loadBogUplSignals()]);
         computeBogUplMetrics();
         renderBogUplLayer();
+      } else if (cityKey === 'bogota' && STATE.bogView === 'barrios'){
+        await Promise.all([loadBogBarrioGeo(), loadBogBarrioSignals()]);
+        computeBogBarrioMetrics();
+        renderBogBarrioLayer();
       } else {
         renderCityComLayer(cityKey);
       }
@@ -3684,6 +3986,13 @@
       }
       unitLabel = 'UPL'; scope = 'Bogotá';
     }
+    else if (STATE.selectedCity === 'bogota' && STATE.bogView === 'barrios' && STATE.bogBarrioMetrics){
+      for (const [cod, m] of Object.entries(STATE.bogBarrioMetrics)){
+        if (m.contrib == null) continue;
+        items.push({ name: m.nombre || cod, sub: m.loc_nombre || '', contrib: m.contrib });
+      }
+      unitLabel = 'barrios'; scope = 'Bogotá';
+    }
     else if (STATE.selectedCity && STATE.cityComMetrics[STATE.selectedCity]){
       const cfg = CITIES[STATE.selectedCity];
       const censoMap = STATE.cityCensoByCom[STATE.selectedCity] || {};
@@ -3823,6 +4132,7 @@
       if (STATE.selectedCity) computeCityComunaMetrics(STATE.selectedCity);
       if (STATE.selectedCity === 'medellin' && STATE.mdeBarriosData) computeMdeBarrioMetrics();
       if (STATE.selectedCity === 'bogota' && STATE.bogUplData) computeBogUplMetrics();
+      if (STATE.selectedCity === 'bogota' && STATE.bogBarrioData){ STATE.bogBarrioNacAfin = {}; computeBogBarrioMetrics(); }
       if (STATE.layer === 'pue' && STATE.puestoSignalsData){ STATE.puestoNacAfin = {}; computePuestoMetrics(); renderPuestos(); }
       repaintLayer();
       updateCounter();
@@ -3880,6 +4190,7 @@
       if (STATE.selectedCity) computeCityComunaMetrics(STATE.selectedCity);
       if (STATE.selectedCity === 'medellin' && STATE.mdeBarriosData) computeMdeBarrioMetrics();
       if (STATE.selectedCity === 'bogota' && STATE.bogUplData) computeBogUplMetrics();
+      if (STATE.selectedCity === 'bogota' && STATE.bogBarrioData){ STATE.bogBarrioNacAfin = {}; computeBogBarrioMetrics(); }
       if (STATE.layer === 'pue' && STATE.puestoSignalsData){ STATE.puestoNacAfin = {}; computePuestoMetrics(); renderPuestos(); }
       repaintLayer();
       updateCounter();
@@ -3938,6 +4249,7 @@
       if (STATE.selectedCity) computeCityComunaMetrics(STATE.selectedCity);
       if (STATE.selectedCity === 'medellin' && STATE.mdeBarriosData) computeMdeBarrioMetrics();
       if (STATE.selectedCity === 'bogota' && STATE.bogUplData) computeBogUplMetrics();
+      if (STATE.selectedCity === 'bogota' && STATE.bogBarrioData){ STATE.bogBarrioNacAfin = {}; computeBogBarrioMetrics(); }
       if (STATE.layer === 'pue' && STATE.puestoSignalsData){ STATE.puestoNacAfin = {}; computePuestoMetrics(); renderPuestos(); }
       repaintLayer();
       updateCounter();
@@ -3954,6 +4266,7 @@
       if (STATE.selectedCity) computeCityComunaMetrics(STATE.selectedCity);
       if (STATE.selectedCity === 'medellin' && STATE.mdeBarriosData) computeMdeBarrioMetrics();
       if (STATE.selectedCity === 'bogota' && STATE.bogUplData) computeBogUplMetrics();
+      if (STATE.selectedCity === 'bogota' && STATE.bogBarrioData){ STATE.bogBarrioNacAfin = {}; computeBogBarrioMetrics(); }
       if (STATE.layer === 'pue' && STATE.puestoSignalsData){ STATE.puestoNacAfin = {}; computePuestoMetrics(); renderPuestos(); }
       repaintLayer();
       updateCounter();
@@ -4050,6 +4363,7 @@
       if (STATE.selectedCity){
         if (STATE.selectedCity === 'medellin' && STATE.mdeView === 'barrios') renderMdeBarriosLayer();
         else if (STATE.selectedCity === 'bogota' && STATE.bogView === 'upl') renderBogUplLayer();
+        else if (STATE.selectedCity === 'bogota' && STATE.bogView === 'barrios') renderBogBarrioLayer();
         else renderCityComLayer(STATE.selectedCity);
       } else if (STATE.selectedDep){
         renderMunsOfDep(STATE.selectedDep);
