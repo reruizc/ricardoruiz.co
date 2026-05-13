@@ -954,6 +954,9 @@
     bogUplSigLoading:null,
     bogUplMetrics:{},            // { uplCod: { afin, techo, proj, gap, contrib, bias } }
     bogUplNacAfin:{},            // { candId: { bucket: pct_bogota_afin } }
+    bogUplCenso2026:null,        // { uplCod: { censo, mujeres, hombres } } — denom contrib
+    bogUplCenso2022:null,        // idem, censo Divipole 2021 — denom abst-2022
+    bogUplCenso2018:null,        // idem, escalado — denom abst-2018
 
     // Puestos (Bloque C)
     puestos:null,            // array de {k,y,x,c,m,n,mn,p22,s26,t}
@@ -2724,17 +2727,35 @@
     if (STATE.bogUplSigLoading) return STATE.bogUplSigLoading;
     STATE.bogUplSigLoading = (async () => {
       const out = {};
-      await Promise.all(BOG_UPL_SIGNALS.map(async sig => {
+      const fetches = BOG_UPL_SIGNALS.map(async sig => {
         try {
           const r = await fetch(`${BOG_UPL_DATA_BASE}/${sig}-upl.json`);
           if (!r.ok) return;
           const j = await r.json();
-          // Normalizamos al mismo shape de cityData: { uplCod: { candidatos:[…], votos_validos } }.
           out[sig] = j.por_upl || {};
         } catch (e){
           console.warn('[opo·bog·upl]', sig, e);
         }
-      }));
+      });
+      // Censos por UPL — 2026 (denom de contrib actual), 2022 (denom de
+      // abst-2022) y 2018 escalado (denom de abst-2018). Construidos por
+      // tools/build-bog-upl-censo.py con puesto→UPL via point-in-polygon
+      // y censo por puesto desde Divipole.
+      const censoLoads = [
+        ['Censo2026', `${BOG_UPL_DATA_BASE}/censo-upl-2026.json`],
+        ['Censo2022', `${BOG_UPL_DATA_BASE}/censo-upl-2022.json`],
+        ['Censo2018', `${BOG_UPL_DATA_BASE}/censo-upl-2018.json`],
+      ].map(async ([slot, url]) => {
+        try {
+          const r = await fetch(url);
+          if (!r.ok) return;
+          const j = await r.json();
+          STATE['bogUpl' + slot] = j.por_upl || {};
+        } catch (e){
+          console.warn('[opo·bog·upl·censo]', slot, e);
+        }
+      });
+      await Promise.all([...fetches, ...censoLoads]);
       STATE.bogUplData = out;
       return out;
     })();
@@ -2799,15 +2820,21 @@
     const keys = new Set();
     for (const sig of Object.keys(data)) Object.keys(data[sig]).forEach(k => keys.add(k));
 
-    // Censo proxy por UPL = promedio de votos_validos a través de señales.
+    // Censo por UPL: usamos el real (Divipole 2026 via point-in-polygon)
+    // si está cargado; si no, proxy = promedio de votos_validos.
+    const censoOfReal = STATE.bogUplCenso2026 || null;
     const censoByUpl = {};
     for (const uk of keys){
-      let totVv = 0, n = 0;
-      for (const sig of Object.keys(data)){
-        const e = data[sig]?.[uk];
-        if (e && e.votos_validos){ totVv += e.votos_validos; n++; }
+      if (censoOfReal && censoOfReal[uk] && censoOfReal[uk].censo){
+        censoByUpl[uk] = censoOfReal[uk].censo;
+      } else {
+        let totVv = 0, n = 0;
+        for (const sig of Object.keys(data)){
+          const e = data[sig]?.[uk];
+          if (e && e.votos_validos){ totVv += e.votos_validos; n++; }
+        }
+        censoByUpl[uk] = n > 0 ? totVv / n : 0;
       }
-      censoByUpl[uk] = n > 0 ? totVv / n : 0;
     }
     const censoCity = Object.values(censoByUpl).reduce((s,v)=>s+v,0) || 1;
     const nsnrFactor = getNsNrFactor();
@@ -2865,13 +2892,36 @@
       const contrib = gap != null ? gap * censo / censoCity : null;
       const techo   = proj != null ? proj + gap : null;
 
+      // Abstención presidencial por UPL: promedio de pres-2018 y pres-2022,
+      // cada uno contra su censo de la época. Censos cargados desde S3
+      // (build-bog-upl-censo.py los construye via point-in-polygon).
+      function totVotUpl(sigKey){
+        const e = data[sigKey]?.[uk];
+        if (!e || !Array.isArray(e.candidatos)) return 0;
+        // El total = suma de votos de candidatos (los UPL no traen especiales
+        // desagregados; la suma de cands aproxima votos_validos del puesto).
+        // Para abst usaríamos votos totales incluyendo blanco/nulo/no_marc,
+        // pero a nivel UPL solo tenemos votos_validos. Esa es la cota baja.
+        return e.votos_validos || 0;
+      }
+      const c22 = STATE.bogUplCenso2022?.[uk]?.censo || 0;
+      const c18 = STATE.bogUplCenso2018?.[uk]?.censo || 0;
+      const v22 = totVotUpl('pres-2022');
+      const v18 = totVotUpl('pres-2018');
+      const abst22 = (c22 > 0 && v22 > 0) ? clamp(1 - v22/c22, 0, 1) : null;
+      const abst18 = (c18 > 0 && v18 > 0) ? clamp(1 - v18/c18, 0, 1) : null;
+      let abst = null;
+      if (abst18 != null && abst22 != null) abst = (abst18 + abst22) / 2;
+      else if (abst22 != null) abst = abst22;
+      else if (abst18 != null) abst = abst18;
+
       // Nombre y sector vienen del primer entry disponible.
       let nombre = null, sector = null;
       for (const sig of Object.keys(data)){
         const e = data[sig][uk];
         if (e){ nombre = e.nombre; sector = e.sector; break; }
       }
-      out[uk] = { uplCod: uk, nombre, sector, afin, techo, proj, gap, contrib, bias, abst:null, censo };
+      out[uk] = { uplCod: uk, nombre, sector, afin, techo, proj, gap, contrib, bias, abst, censo };
     }
     STATE.bogUplMetrics = out;
   }
