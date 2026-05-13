@@ -89,7 +89,16 @@ function main(){
 
     const bucket = result[cityKey].byCom;
     if (!bucket[parsed.cod]){
-      bucket[parsed.cod] = { comCod: parsed.cod, nombre: parsed.nombre, censo: 0, mujeres: 0, hombres: 0, n_puestos: 0 };
+      // Detectar corregimientos / áreas rurales por palabras clave en el
+      // nombre Divipole. El frontend puede filtrar estos del análisis
+      // urbano y/o pintarlos distinto.
+      const isCorr = /CORREGIMIENTO|CORR\.?\s+|\bVEREDA|\bRURAL\b/i.test(parsed.nombre);
+      bucket[parsed.cod] = {
+        comCod: parsed.cod,
+        nombre: parsed.nombre,
+        tipo: isCorr ? 'corregimiento' : 'comuna',
+        censo: 0, mujeres: 0, hombres: 0, n_puestos: 0,
+      };
     }
     const b = bucket[parsed.cod];
     b.censo += tot;
@@ -108,18 +117,22 @@ function main(){
     }
     const cityDir = path.join(outDir, cityKey);
     fs.mkdirSync(cityDir, { recursive: true });
+    const nUrbanas = cods.filter(c => r.byCom[c].tipo !== 'corregimiento').length;
+    const nCorr    = cods.length - nUrbanas;
     const out = {
       city: cityKey,
       depCod: r.city.depCod,
       munCod: r.city.munCod,
       ciudad_total: r.ciudad_total,
-      n_comunas: cods.length,
+      n_comunas: nUrbanas,
+      n_corregimientos: nCorr,
       generado_en: new Date().toISOString(),
       por_comuna: r.byCom,
     };
     const fp = path.join(cityDir, 'censo-comuna.json');
     fs.writeFileSync(fp, JSON.stringify(out));
-    console.log(`✓ ${cityKey.padEnd(14)} ${String(cods.length).padStart(3)} comunas · censo total ${r.ciudad_total.toLocaleString('es-CO')}`);
+    const corrTxt = nCorr ? ` + ${nCorr} corregimientos` : '';
+    console.log(`✓ ${cityKey.padEnd(14)} ${String(nUrbanas).padStart(3)} comunas${corrTxt} · censo total ${r.ciudad_total.toLocaleString('es-CO')}`);
   }
 }
 
