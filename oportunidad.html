@@ -2645,7 +2645,15 @@
         const r = com ? metrics[com] : null;
         f.__key = com ? `${cfg.depCod}-${cfg.munCod}-${com}` : null;
         f.__rec = r;
-        f.__name = f.properties[cfg.nameField] || com || '—';
+        // Si la unidad es un corregimiento (según Divipole), usamos el
+        // nombre real (p.ej. "CORREGIMIENTOS AREA 1" en Sincelejo) en
+        // vez del rótulo genérico del GeoJSON ("Comuna 10").
+        const censoEntry = STATE.cityCensoByCom[cityKey]?.[com];
+        let displayName = f.properties[cfg.nameField] || com || '—';
+        if (censoEntry && censoEntry.tipo === 'corregimiento' && censoEntry.nombre){
+          displayName = censoEntry.nombre;
+        }
+        f.__name = displayName;
         f.__depName = `${cfg.label} · ${cfg.kind}`;
         layer.on('mouseover', (e) => onHover(f, e));
         layer.on('mouseout', (e) => onHoverOut(f, e));
@@ -2662,8 +2670,16 @@
   // Las claves de los datos S3 vienen como cod string (ej: "10", "11").
   // Algunas ciudades (Pereira, Cúcuta) usan el nombre como código.
   function comCodeOfCityFeature(cfg, props){
-    const raw = props[cfg.codeField];
-    if (raw == null || raw === '') return null;
+    let raw = props[cfg.codeField];
+    // Fallback Sincelejo: la "Comuna 10" del GeoJSON tiene Layer=' '
+    // (vacío) pero el nombre la identifica. Si el código viene vacío
+    // y el nombre contiene dígitos, los usamos como código.
+    if ((raw == null || String(raw).trim() === '') && cfg.nameField){
+      const nm = String(props[cfg.nameField] || '');
+      const m = nm.match(/(\d+)/);
+      if (m) raw = m[1];
+    }
+    if (raw == null || String(raw).trim() === '') return null;
     if (cfg.byName){
       // Match por nombre normalizado en metrics
       const want = norm(raw);
