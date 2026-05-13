@@ -800,11 +800,13 @@
 
   // Geo del usuario — la cargamos en background al abrir el test, así
   // está lista cuando llega al panel resultado.
+  // GEO_PROMISE permite a quien lo necesite (ej. renderDemoForm) hacer
+  // un await/race con timeout antes de renderizar.
   let GEO = null;
-  fetch(GEO_ENDPOINT, { cache:'no-store' })
+  const GEO_PROMISE = fetch(GEO_ENDPOINT, { cache:'no-store' })
     .then(r => r.ok ? r.json() : null)
-    .then(g => { GEO = g; })
-    .catch(() => { GEO = null; });
+    .then(g => { GEO = g; return g; })
+    .catch(() => { GEO = null; return null; });
 
   // ── PROYECCIÓN TERRITORIAL ──
   // Tres niveles agregados, los carga lazy según la geo del usuario:
@@ -853,10 +855,10 @@
   // sitúe al usuario. ~44 KB, se carga en background al cargar la página.
   const CIUDADES_ZONAS_URL = `${location.origin}/preguntas/ciudades-zonas.json`;
   let CIUDADES_ZONAS = null;
-  fetch(CIUDADES_ZONAS_URL, { cache:'no-store' })
+  const CIUDADES_PROMISE = fetch(CIUDADES_ZONAS_URL, { cache:'no-store' })
     .then(r => r.ok ? r.json() : null)
-    .then(d => { CIUDADES_ZONAS = d; })
-    .catch(() => { CIUDADES_ZONAS = null; });
+    .then(d => { CIUDADES_ZONAS = d; return d; })
+    .catch(() => { CIUDADES_ZONAS = null; return null; });
 
   // Dado GEO.city (texto crudo de Cloudflare), busca la entrada de ciudad
   // que coincide. Hace match exacto contra el key principal y contra los
@@ -1337,6 +1339,10 @@
     // Re-init state según el largo final del banco
     state.answers = new Array(QUESTIONS.length).fill(null);
     state.qIdx = 0;
+    // Re-render del demo para que los campos contextuales (ubicación)
+    // se construyan con la GEO y CIUDADES_ZONAS más actuales. Si aún no
+    // llegaron, renderDemoForm hace su propio await con timeout 2s.
+    await renderDemoForm();
     goTo('demo');
   }
 
@@ -1432,9 +1438,23 @@
     'Prefiero no decir',
   ];
 
-  function renderDemoForm() {
+  async function renderDemoForm() {
     $('#demo-tag').textContent = IS_LOGGED ? 'Sesión activa' : 'Invitado';
     const grid = $('#form-grid');
+
+    // Espera hasta 2s a que GEO y CIUDADES_ZONAS estén listos antes de
+    // construir los fields. Si llegan a tiempo, el dropdown contextual
+    // de localidad/comuna aparece bien; si no, cae al "¿en qué país?".
+    // Mostramos un placeholder mientras tanto.
+    if (!GEO || !CIUDADES_ZONAS) {
+      grid.innerHTML = `<div style="font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.14em; text-transform:uppercase; color:rgba(255,255,255,0.4); padding:1.2rem; text-align:center;">Detectando tu ubicación…</div>`;
+      const timeout = new Promise(res => setTimeout(res, 2000));
+      await Promise.race([
+        Promise.all([GEO_PROMISE, CIUDADES_PROMISE]),
+        timeout,
+      ]);
+    }
+
     const fields = [];
 
     // Email: solo en ricardoruiz.co (no en embed) y solo si NO está logueado.
