@@ -2533,18 +2533,70 @@
     return STATE.mdeBarriosLoading;
   }
 
+  // Centroide aproximado de un Polygon/MultiPolygon GeoJSON (promedio
+  // simple de las coordenadas del primer anillo externo). Suficiente
+  // para kNN entre barrios — no necesitamos precisión cartográfica.
+  function geoCentroid(f){
+    let coords;
+    if (!f.geometry) return null;
+    if (f.geometry.type === 'Polygon') coords = f.geometry.coordinates[0];
+    else if (f.geometry.type === 'MultiPolygon') coords = f.geometry.coordinates[0][0];
+    else return null;
+    let sx=0, sy=0, n=0;
+    for (const [x,y] of coords){ sx+=x; sy+=y; n++; }
+    return n ? [sx/n, sy/n] : null;
+  }
+
   function renderMdeBarriosLayer(){
     ensureMap(); clearLayer();
     const cfg = CITIES.medellin;
     const geo = STATE.mdeBarriosGeo;
     const metrics = STATE.cityComMetrics.medellin || {};
     const barrioMetrics = STATE.mdeBarrioMetrics || {};
-    // v2: primero busca métrica propia por barrio normalizado. Si no
-    // existe (barrio sin puestos asignables o sin match en alias), cae
-    // al heredado de la comuna padre — comportamiento v1.
+
+    // Pre-cómputo: centroide de cada feature del GeoJSON, indexado por
+    // barrioNorm. Lo usamos para heredar la métrica del barrio vecino
+    // más cercano cuando un barrio no tiene métrica propia.
+    const featByKey = {};        // barrioKey → { centroid, feature }
+    const keysWithMetric = [];   // barrioKeys que SÍ tienen metric propia
+    for (const f of geo.features){
+      const k = normBarrioFront(f.properties.nombre_bar || '');
+      if (!k) continue;
+      const c = geoCentroid(f);
+      if (!c) continue;
+      featByKey[k] = { centroid: c, feature: f };
+      if (barrioMetrics[k]) keysWithMetric.push(k);
+    }
+
+    // Cache de herencia por vecino (calculada lazy una sola vez por render).
+    const neighborCache = {};
+    function nearestNeighborMetric(bk){
+      if (bk in neighborCache) return neighborCache[bk];
+      const me = featByKey[bk];
+      if (!me){ neighborCache[bk] = null; return null; }
+      const [mx, my] = me.centroid;
+      let bestD = Infinity, bestKey = null;
+      for (const ok of keysWithMetric){
+        if (ok === bk) continue;
+        const [ox, oy] = featByKey[ok].centroid;
+        const d = (ox-mx)*(ox-mx) + (oy-my)*(oy-my);
+        if (d < bestD){ bestD = d; bestKey = ok; }
+      }
+      const inherited = bestKey ? barrioMetrics[bestKey] : null;
+      neighborCache[bk] = inherited;
+      return inherited;
+    }
+
+    // v3: cascada de fallbacks. (1) métrica propia del barrio; (2) métrica
+    // del barrio vecino más cercano que sí tenga datos; (3) métrica de la
+    // comuna padre. Antes saltaba directo de (1) a (3).
     function metricForBarrio(props){
       const bk = normBarrioFront(props.nombre_bar || '');
       if (bk && barrioMetrics[bk]) return barrioMetrics[bk];
+      if (bk){
+        const fromNeighbor = nearestNeighborMetric(bk);
+        if (fromNeighbor) return fromNeighbor;
+      }
       const com = String(props.comuna||'').replace(/^0+/, '');
       for (const k of Object.keys(metrics)){
         if (String(k).replace(/^0+/, '') === com) return metrics[k];
@@ -2564,7 +2616,7 @@
       },
     }).addTo(STATE.map);
     STATE.map.fitBounds(STATE.mapLayer.getBounds(), { padding:[20,20] });
-    document.getElementById('map-head-title').textContent = 'Medellín · Barrios y veredas (heredan de comuna)';
+    document.getElementById('map-head-title').textContent = 'Medellín · Barrios y veredas (heredan del vecino más cercano si no hay puesto)';
     document.getElementById('map-back-btn').classList.add('show');
     document.getElementById('map-back-label').textContent = '← Volver a Antioquia';
   }
@@ -2598,6 +2650,17 @@
     wrap.querySelector('[data-mde="comunas"]')?.classList.toggle('active', STATE.mdeView === 'comunas');
     wrap.querySelector('[data-mde="barrios"]')?.classList.toggle('active', STATE.mdeView === 'barrios');
   }
+
+  // Alias manuales por (ciudad, comCod) cuando el nombre Divipole es
+  // genérico ("CORREGIMIENTOS AREA 1") y queremos uno reconocible. Si la
+  // entrada existe, se prefiere al nombre Divipole.
+  const CITY_COMUNA_ALIAS = {
+    sincelejo: {
+      '10': 'Corregimiento Chocho',   // CASTAÑEDA / CHOCHO / LAS PALMAS (principal: Chocho)
+      // 11/12/13 quedan con su nombre Divipole genérico hasta que el
+      // cliente confirme cuál es el corregimiento principal de cada uno.
+    },
+  };
 
   /* ───────── Ciudades — drilldown a comuna/localidad ───────── */
   async function onCityClick(cityKey){
@@ -2647,12 +2710,15 @@
         f.__rec = r;
         // Si la unidad es un corregimiento (según Divipole), usamos el
         // nombre real (p.ej. "CORREGIMIENTOS AREA 1" en Sincelejo) en
-        // vez del rótulo genérico del GeoJSON ("Comuna 10").
+        // vez del rótulo genérico del GeoJSON ("Comuna 10"). Si además
+        // hay un alias manual por (ciudad, comCod), gana sobre todo.
         const censoEntry = STATE.cityCensoByCom[cityKey]?.[com];
         let displayName = f.properties[cfg.nameField] || com || '—';
         if (censoEntry && censoEntry.tipo === 'corregimiento' && censoEntry.nombre){
           displayName = censoEntry.nombre;
         }
+        const aliasName = CITY_COMUNA_ALIAS[cityKey]?.[com];
+        if (aliasName) displayName = aliasName;
         f.__name = displayName;
         f.__depName = `${cfg.label} · ${cfg.kind}`;
         layer.on('mouseover', (e) => onHover(f, e));
