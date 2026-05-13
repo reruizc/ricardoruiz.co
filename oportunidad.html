@@ -3585,18 +3585,22 @@
 
     if (STATE.layer === 'pue' && STATE.puestoMetrics && Object.keys(STATE.puestoMetrics).length){
       TOP_N = 15;
-      // Top de PUESTOS VISIBLES.
+      // Top de PUESTOS VISIBLES. Para puestos individuales rankeamos por
+      // CRECIMIENTO LOCAL (gap), no por contribución nacional — la contrib
+      // de un puesto chico es marginal por construcción (censo_puesto/censo_nac
+      // ~ 10⁻⁴). El gap local en cambio dice "aquí el candidato puede crecer
+      // X pp", que es lo accionable para el equipo de campaña.
       const visible = visiblePuestos();
       const scopeName = STATE.selectedCity ? CITIES[STATE.selectedCity].label
                       : STATE.selectedDep ? ((STATE.depByElectoral[STATE.selectedDep]||{}).nombre || STATE.selectedDep)
                       : 'nacional';
       items = visible.map(p => {
         const m = STATE.puestoMetrics[p.k];
-        if (!m || m.contrib == null) return null;
+        if (!m || m.gap == null) return null;
         return {
           name: p.n || p.k,
           sub: p.mn || '',
-          contrib: m.contrib,
+          contrib: m.gap,    // se muestra como "+X.X pp" — crecimiento local
         };
       }).filter(Boolean);
       unitLabel = 'puestos'; scope = scopeName;
@@ -3839,27 +3843,34 @@
     }
     const rows = donors.map(id => {
       const c = CANDIDATOS.find(x => x.id === id) || { nombre: id, color: '#888' };
-      const pp = pondPct(c);
-      const pct = Math.round(((xferMap[id] || 0) * 100));
-      // Absorción nacional estimada al 100%: pondPct(donor) en pp
-      const maxAbs = pp != null ? pp.toFixed(2) : '?';
-      return `<div class="src-row" style="grid-template-columns:1fr 110px 50px">
+      const pp = pondPct(c) || 0;
+      // Slider en pp absolutos (más intuitivo para el cliente: "le quito
+      // 1 pp a Cepeda y se lo paso a Roy"). Internamente convertimos a
+      // xferFrac = ppAbs/pondPct(donor) para mantener la fórmula.
+      const xferFrac = xferMap[id] || 0;
+      const ppAbs = (xferFrac * pp).toFixed(1);
+      const maxPp = Math.min(15, Math.round(pp * 10) / 10);
+      return `<div class="src-row" style="grid-template-columns:1fr 110px 60px">
         <div class="src-name">
           <span style="display:inline-block;width:.55rem;height:.55rem;border-radius:50%;background:${c.color};margin-right:.4rem;vertical-align:middle"></span>
-          ${c.nombre}<span class="src-sub">tope nacional ${maxAbs} pp si capturas el 100% del voto histórico de este donante</span>
+          ${c.nombre}<span class="src-sub">${pp.toFixed(2)} pp disponibles · transfiere hasta ${maxPp} pp</span>
         </div>
-        <input type="range" min="0" max="100" step="1" value="${pct}" oninput="onTransferChange('${id}', this.value)" />
-        <span class="src-w" id="xfer-w-${id}">${pct}%</span>
+        <input type="range" min="0" max="${maxPp}" step="0.5" value="${ppAbs}" data-maxpp="${pp}" oninput="onTransferChange('${id}', this.value)" />
+        <span class="src-w" id="xfer-w-${id}">${ppAbs} pp</span>
       </div>`;
     });
     wrap.innerHTML = rows.join('');
   }
   function onTransferChange(donorId, v){
-    v = +v;
+    const ppAbs = +v;
+    const c = CANDIDATOS.find(x => x.id === donorId);
+    const pp = pondPct(c) || 0;
+    // Convertir pp_abs → xferFrac internamente para mantener la fórmula.
+    const xferFrac = pp > 0 ? Math.min(1, ppAbs / pp) : 0;
     if (!STATE.transfers[STATE.candId]) STATE.transfers[STATE.candId] = {};
-    STATE.transfers[STATE.candId][donorId] = v / 100;
+    STATE.transfers[STATE.candId][donorId] = xferFrac;
     const wEl = document.getElementById('xfer-w-' + donorId);
-    if (wEl) wEl.textContent = v + '%';
+    if (wEl) wEl.textContent = ppAbs.toFixed(1) + ' pp';
     showLoading(true);
     setTimeout(() => {
       computeAllForCandidate(STATE.candId);
