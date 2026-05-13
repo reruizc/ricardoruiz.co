@@ -39,6 +39,7 @@ from build import point_in_geom, bbox_of_geom  # noqa: E402
 PUESTOS_GLOB = str(ROOT / "Bases de datos" / "proyeccion-por-puesto-*.json")
 BOG_UPL      = ROOT / "CIUDADES" / "BOGOTA" / "BOG-UPL.geojson"
 MED_BARRIOS  = ROOT / "Bases de datos" / "proyecto-dc" / "geo" / "barrios-veredas-medellin.geojson"
+CAL_COMUNAS  = ROOT / "CIUDADES" / "CALI" / "CALIX.json"
 OUT_DIR      = ROOT / "Bases de datos" / "output_ponderador"
 
 
@@ -217,6 +218,30 @@ def main():
     print(f"  ✓ {med_path.relative_to(ROOT)} ({med_path.stat().st_size/1024:.0f} KB)")
     print()
 
+    # ── Cali comunas ──
+    print("→ Cargando comunas Cali…")
+    cal_geo = json.loads(CAL_COMUNAS.read_text(encoding="utf-8"))
+    cal_idx = index_features_by_bbox(cal_geo)
+    print(f"  {len(cal_idx)} comunas")
+    cal_agg, cal_hits = aggregate(
+        puestos, cal_idx,
+        code_key="comuna", name_key="nombre",
+    )
+    print(f"  {cal_hits} puestos asignados a comuna · {len(cal_agg)} comunas con datos")
+    out_cal = {
+        "version": pue_data["version"],
+        "source": Path(pue_path).name,
+        "sliders_signature": pue_data["sliders_signature"],
+        "nacional": pue_data["nacional"],
+        "ciudad": "cali",
+        "tipo": "comuna",
+        "agregados": cal_agg,
+    }
+    cal_path = OUT_DIR / "proyeccion-por-comuna-cali.json"
+    cal_path.write_text(json.dumps(out_cal, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    print(f"  ✓ {cal_path.relative_to(ROOT)} ({cal_path.stat().st_size/1024:.0f} KB)")
+    print()
+
     # ── Sanity check: top-3 UPL y barrios ──
     print("Top-5 UPL Bogotá por censo:")
     for cod, u in sorted(bog_agg.items(), key=lambda kv: -kv[1]["censo"])[:5]:
@@ -227,6 +252,11 @@ def main():
     for cod, b in sorted(med_agg.items(), key=lambda kv: -kv[1]["censo"])[:5]:
         top = list(b["p"].items())[:3]
         print(f"  {cod} {b['nombre'][:30]:<30}  censo={b['censo']:>8,}  → " + " · ".join(f"{c}={v}%" for c,v in top))
+    print()
+    print("Top-5 comunas Cali por censo:")
+    for cod, c in sorted(cal_agg.items(), key=lambda kv: -kv[1]["censo"])[:5]:
+        top = list(c["p"].items())[:3]
+        print(f"  {cod} {c['nombre'][:30]:<30}  censo={c['censo']:>8,}  → " + " · ".join(f"{x}={v}%" for x,v in top))
 
 
 if __name__ == "__main__":

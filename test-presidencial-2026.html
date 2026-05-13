@@ -380,6 +380,21 @@
     .geo-bar-fill { display:block; height:100%; border-radius:1px;
       transition:width .5s cubic-bezier(.22,.61,.36,1); }
     .geo-bar-pct { font-variant-numeric:tabular-nums; color:rgba(244,243,239,0.7); text-align:right; }
+    .geo-refine {
+      display:inline-flex; align-items:center; gap:.45rem;
+      margin-top:.7rem;
+      padding:.55rem .8rem;
+      background:transparent;
+      border:1px solid rgba(0,71,255,0.45);
+      color:var(--blue-light);
+      font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.12em; text-transform:uppercase;
+      cursor:pointer;
+      transition:background .15s, border-color .15s;
+    }
+    .geo-refine:hover:not(:disabled) { background:rgba(0,71,255,0.12); border-color:rgba(0,71,255,0.75); }
+    .geo-refine:disabled { opacity:.55; cursor:default; }
+    .geo-refine.loading svg { animation: spinSlow 1.4s linear infinite; }
+    @keyframes spinSlow { to { transform: rotate(360deg); } }
 
     /* ── SUPPORT (apoyar campaña) ── */
     .support-box {
@@ -770,6 +785,7 @@
   const S3_OUT = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_ponderador';
   const PROYECCION_UPL_URL    = `${S3_OUT}/proyeccion-por-upl-bogota.json`;
   const PROYECCION_MED_URL    = `${S3_OUT}/proyeccion-por-barrio-medellin.json`;
+  const PROYECCION_CAL_URL    = `${S3_OUT}/proyeccion-por-comuna-cali.json`;
   const PROYECCION_PUESTO_URL = `${S3_OUT}/proyeccion-por-puesto.json`;
 
   // Mapeo del ID de candidato del test al ID corto que usa el modelo de
@@ -788,18 +804,33 @@
   // Inverso: id corto → id del test (para resolver el ganador en la zona)
   const PROJ_TO_CAND_ID = Object.fromEntries(Object.entries(CAND_PROJ_ID).map(([k,v]) => [v,k]));
 
-  // Bounding box Medellín D.M. (lat/lon aproximados). Si la geo del usuario
-  // cae aquí, intentamos el cruce a nivel barrio antes que radio adaptativo.
-  const MEDELLIN_BBOX = { minLat: 6.15, maxLat: 6.40, minLon: -75.70, maxLon: -75.45 };
+  let _bogUplCache = null, _medBarrioCache = null, _calComunaCache = null, _puestosCache = null;
+  function loadBogUpl()    { return _bogUplCache     ||= fetch(PROYECCION_UPL_URL).then(r => r.ok ? r.json() : null).catch(() => null); }
+  function loadMedBarrio() { return _medBarrioCache  ||= fetch(PROYECCION_MED_URL).then(r => r.ok ? r.json() : null).catch(() => null); }
+  function loadCalComuna() { return _calComunaCache  ||= fetch(PROYECCION_CAL_URL).then(r => r.ok ? r.json() : null).catch(() => null); }
+  function loadPuestos()   { return _puestosCache    ||= fetch(PROYECCION_PUESTO_URL).then(r => r.ok ? r.json() : null).catch(() => null); }
 
-  let _bogUplCache = null, _medBarrioCache = null, _puestosCache = null;
-  function loadBogUpl()   { return _bogUplCache    ||= fetch(PROYECCION_UPL_URL).then(r => r.ok ? r.json() : null).catch(() => null); }
-  function loadMedBarrio(){ return _medBarrioCache ||= fetch(PROYECCION_MED_URL).then(r => r.ok ? r.json() : null).catch(() => null); }
-  function loadPuestos()  { return _puestosCache   ||= fetch(PROYECCION_PUESTO_URL).then(r => r.ok ? r.json() : null).catch(() => null); }
+  // Pre-fetch los archivos chicos (Bog ~10 KB, Med ~29 KB, Cali ~3 KB) en
+  // background. El JSON nacional de puestos (2.6 MB) se carga sólo si hay
+  // fallback radio adaptativo (usuario fuera de las 3 ciudades).
+  setTimeout(() => { loadBogUpl(); loadMedBarrio(); loadCalComuna(); }, 200);
 
-  // Pre-fetch del archivo chico de Bogotá en background — la mayoría de
-  // tráfico va a ser de Bogotá; el resto se carga lazy cuando haga falta.
-  setTimeout(() => loadBogUpl(), 200);
+  // Computa el promedio ciudad-level a partir del agregado por unidad
+  // (UPL/barrio/comuna), ponderado por censo del puesto. Devuelve {p, censo}.
+  function aggregateCityFromUnits(json) {
+    if (!json?.agregados) return null;
+    const totalCenso = Object.values(json.agregados).reduce((s, u) => s + (u.censo || 0), 0);
+    if (!totalCenso) return null;
+    const acc = {};
+    for (const u of Object.values(json.agregados)) {
+      for (const [cid, pct] of Object.entries(u.p || {})) {
+        acc[cid] = (acc[cid] || 0) + (u.censo * pct);
+      }
+    }
+    const p = {};
+    for (const [cid, sum] of Object.entries(acc)) p[cid] = +(sum / totalCenso).toFixed(2);
+    return { p, censo: totalCenso };
+  }
 
   // Haversine en km. Suficiente precisión para distancias urbanas (<50 km).
   function haversineKm(lat1, lon1, lat2, lon2) {
@@ -814,49 +845,93 @@
     return /amazon|\baws\b|google|cloudflare|microsoft|azure|digital ?ocean|linode|vultr|hetzner|ovh/i.test(asOrg);
   }
 
-  // Devuelve { scope, city, label, sub, distKm?, p } o null si no hay cruce.
-  // p es objeto { ic: pct, ae: pct, ... } con los IDs cortos del modelo.
+  // Devuelve { scope, city, label, sub, distKm?, p, precise? }
+  //   scope ∈ 'ciudad' | 'upl' | 'barrio' | 'comuna' | 'puesto'
+  //   precise: true si vino de Geolocation API (coords reales del dispositivo)
+  // Estrategia:
+  //   - Sin coords precisas → ciudad-level (Bogotá/Medellín/Cali) o null
+  //   - Con coords precisas + en una de las 3 ciudades → sub-zona
+  //   - Con coords precisas fuera de las 3 ciudades → puesto más cercano
   async function projectionAtUserGeo() {
     if (!GEO) return null;
     if (looksLikeDatacenter(GEO.asOrg)) return null;
     if (GEO.lat == null || GEO.lon == null) return null;
 
-    // 1) Bogotá — el worker ya hizo PiP server-side y nos pasó UPL+localidad.
-    if (GEO.upl && GEO.upl.codigo) {
-      const bog = await loadBogUpl();
-      const u = bog?.agregados?.[GEO.upl.codigo];
-      if (u) {
-        const locName = GEO.localidad?.nombre
-          ? GEO.localidad.nombre.replace(/\b\w/g, c => c.toUpperCase())  // CHAPINERO → Chapinero
-          : null;
-        return {
-          scope: 'upl',
-          city:  'Bogotá D.C.',
-          label: u.nombre,                          // ej "Chapinero"
-          sub:   locName ? `Localidad ${locName}` : null,
-          p:     u.p,
-        };
+    const precise = !!GEO.overridden;
+
+    // ── A) PRECISIÓN (override por Geolocation API) ──
+    if (precise && GEO.zona) {
+      // El worker ya resolvió la zona (UPL/barrio/comuna) con las coords
+      // reales. Buscamos el agregado correspondiente.
+      const z = GEO.zona;
+      if (z.city === 'Bogotá D.C.' && z.codigo) {
+        const bog = await loadBogUpl();
+        const u = bog?.agregados?.[z.codigo];
+        if (u) {
+          const subName = z.sub ? z.sub.replace(/\b\w/g, c => c.toUpperCase()) : null;
+          return {
+            scope: 'upl', city: 'Bogotá D.C.',
+            label: u.nombre,
+            sub:   subName ? `Localidad ${subName}` : null,
+            p:     u.p, precise: true,
+          };
+        }
       }
+      if (z.city === 'Medellín' && z.codigo) {
+        const med = await loadMedBarrio();
+        const b = med?.agregados?.[z.codigo];
+        if (b) {
+          const comunaName = z.sub ? z.sub.replace(/\b\w/g, c => c.toUpperCase()) : null;
+          return {
+            scope: 'barrio', city: 'Medellín',
+            label: b.nombre,
+            sub:   comunaName ? `Comuna ${comunaName}` : null,
+            p:     b.p, precise: true,
+          };
+        }
+      }
+      if (z.city === 'Cali' && z.codigo != null) {
+        const cal = await loadCalComuna();
+        const c = cal?.agregados?.[String(z.codigo)] || cal?.agregados?.[z.codigo];
+        if (c) {
+          return {
+            scope: 'comuna', city: 'Cali',
+            label: c.nombre, sub: null,
+            p:     c.p, precise: true,
+          };
+        }
+      }
+      // Precisión activa pero zona null → resto del país, radio adaptativo.
+      return await findNearestPuesto(true);
     }
 
-    // 2) Medellín — bbox detection + lookup directo en agregados por barrio
-    //    usando el nombre del puesto más cercano para resolver el barrio.
-    //    El JSON de barrios viene indexado por código catastral (ej "0101");
-    //    como no tenemos el geojson cargado, usamos el atajo de buscar el
-    //    puesto más cercano y leer su "barrio" indirectamente desde el
-    //    nombre del puesto. Si la heurística falla, caemos al fallback nacional.
-    if (GEO.lat >= MEDELLIN_BBOX.minLat && GEO.lat <= MEDELLIN_BBOX.maxLat &&
-        GEO.lon >= MEDELLIN_BBOX.minLon && GEO.lon <= MEDELLIN_BBOX.maxLon) {
-      // De momento, en Medellín caemos al fallback puesto-más-cercano. El
-      // PiP por barrio queda como upgrade V2 (necesita geojson cargado).
-      // Igualmente da un buen "estás en el barrio X" porque el nombre del
-      // puesto en Medellín suele incluir referencia al barrio.
+    // ── B) DEFAULT (coords del IP, posiblemente off) ──
+    // Para Bogotá/Medellín/Cali → ciudad-level (sin sub-zona).
+    if (GEO.zona?.city === 'Bogotá D.C.') {
+      const bog = await loadBogUpl();
+      const city = aggregateCityFromUnits(bog);
+      if (city) return { scope: 'ciudad', city: 'Bogotá D.C.', label: 'Bogotá D.C.', sub: null, p: city.p, precise: false };
+    }
+    if (GEO.zona?.city === 'Medellín') {
+      const med = await loadMedBarrio();
+      const city = aggregateCityFromUnits(med);
+      if (city) return { scope: 'ciudad', city: 'Medellín', label: 'Medellín', sub: null, p: city.p, precise: false };
+    }
+    if (GEO.zona?.city === 'Cali') {
+      const cal = await loadCalComuna();
+      const city = aggregateCityFromUnits(cal);
+      if (city) return { scope: 'ciudad', city: 'Cali', label: 'Cali', sub: null, p: city.p, precise: false };
     }
 
-    // 3) Resto del país — radio adaptativo. Cargamos el archivo grande de
-    //    puestos (2.6 MB) sólo aquí. Buscamos el puesto más cercano dentro
-    //    de un radio que crece hasta 20 km. En zona rural puede ser lejos;
-    //    mostramos la distancia honestamente.
+    // Si CF dice una ciudad pero el bbox del worker no la matcheó (puede
+    // pasar si la geo cae justo fuera del bbox), igual usamos el nombre.
+    // Como no tenemos agregado de esa ciudad, caemos a radio adaptativo.
+    return await findNearestPuesto(false);
+  }
+
+  // Encuentra el puesto más cercano dentro de un radio adaptativo
+  // 1km → 2 → 5 → 10 → 20. Honesto con la distancia.
+  async function findNearestPuesto(precise) {
     const pues = await loadPuestos();
     if (!pues?.puestos?.length) return null;
     for (const radius of [1, 2, 5, 10, 20]) {
@@ -873,11 +948,50 @@
           sub:    `a ${bestD.toFixed(1)} km`,
           distKm: +bestD.toFixed(2),
           p:      best.p,
+          precise,
         };
       }
     }
     return null;
   }
+
+  // Activa la Geolocation API del navegador. Si el usuario acepta el permiso,
+  // re-fetcheamos /geo con las coords reales y refresca la caja con la
+  // resolución precisa (UPL/barrio/comuna). Si rechaza, no pasa nada y
+  // queda la versión ciudad-level que ya estaba en pantalla.
+  async function refineWithBrowserGeo() {
+    if (!('geolocation' in navigator)) {
+      console.warn('[geo] Geolocation API no disponible');
+      return false;
+    }
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          try {
+            const r = await fetch(`${GEO_ENDPOINT}?lat=${lat}&lon=${lon}`, { cache:'no-store' });
+            const newGeo = r.ok ? await r.json() : null;
+            if (newGeo) {
+              GEO = newGeo;
+              renderGeoBox();
+              resolve(true);
+              return;
+            }
+          } catch (e) {
+            console.warn('[geo] refresh failed:', e);
+          }
+          resolve(false);
+        },
+        (err) => {
+          console.warn('[geo] permiso denegado o error:', err.message);
+          resolve(false);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    });
+  }
+  window.refineWithBrowserGeo = refineWithBrowserGeo;
 
   // ── CANDIDATOS ──
   // Nota: en S3 sólo viven fotos para cepeda, abelardo, paloma, claudia, fajardo,
@@ -1401,19 +1515,54 @@
     }).join('');
 
     const scopeLabel = proj.scope === 'upl'
-      ? 'Promedio en tu UPL'
+      ? 'Promedio en tu barrio (UPL)'
       : proj.scope === 'barrio'
         ? 'Promedio en tu barrio'
-        : proj.scope === 'puesto'
-          ? `Tu puesto más cercano${proj.distKm != null ? ` (${proj.distKm.toFixed(1)} km)` : ''}`
-          : 'En tu zona';
+        : proj.scope === 'comuna'
+          ? 'Promedio en tu comuna'
+          : proj.scope === 'puesto'
+            ? `Tu puesto más cercano${proj.distKm != null ? ` (${proj.distKm.toFixed(1)} km)` : ''}`
+            : 'Promedio en tu ciudad';
+
+    // Botón "Ver mi entorno exacto" — solo cuando NO es ya preciso, hay
+    // Geolocation API y vale la pena refinar (ciudad-level o puesto fallback).
+    const showRefineBtn = !proj.precise && 'geolocation' in navigator &&
+      (proj.scope === 'ciudad' || proj.scope === 'puesto');
+    const refineBtn = showRefineBtn
+      ? `<button type="button" class="geo-refine" onclick="window._refineGeo()">
+           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;flex-shrink:0;"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+           <span>Ver mi entorno exacto</span>
+         </button>`
+      : '';
 
     cross.innerHTML = `
       <div class="geo-cross-line">${crossLine}</div>
-      <div class="geo-cross-scope">${scopeLabel}</div>
+      <div class="geo-cross-scope">${scopeLabel}${proj.precise ? ' · 📍 ubicación precisa' : ''}</div>
       <div class="geo-bars">${top3HTML}</div>
+      ${refineBtn}
     `;
   }
+
+  // Handler para el botón de refinar geo. Se expone en window porque el
+  // HTML inline lo invoca. Cambia el texto a "Pidiendo permiso…" mientras
+  // el browser muestra el prompt.
+  window._refineGeo = async function() {
+    const btn = document.querySelector('.geo-refine');
+    if (btn) {
+      btn.disabled = true;
+      btn.classList.add('loading');
+      btn.querySelector('span').textContent = 'Esperando permiso…';
+    }
+    const ok = await refineWithBrowserGeo();
+    if (!ok && btn) {
+      btn.classList.remove('loading');
+      btn.querySelector('span').textContent = 'No pudimos acceder a tu ubicación';
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.querySelector('span').textContent = 'Reintentar';
+      }, 2500);
+    }
+  };
 
   // ── SUPPORT (opt-in para campañas) ──
   let SUPPORT = { mode: null, name: '', phone: '', consent: false, submitted: false };
