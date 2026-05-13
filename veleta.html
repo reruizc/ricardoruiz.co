@@ -15,8 +15,6 @@
       --bg:#060810; --surface:rgba(255,255,255,.04); --border:rgba(255,255,255,.08);
       --white:#f4f3ef; --blue:#0047FF; --green:#4ade80;
       --orange:#fb923c; --red:#f87171; --amber:#f59e0b;
-      /* Veleta palette */
-      --vel-low:#2d3340; --vel-mid:#f59e0b; --vel-high:#f87171;
     }
     html{scroll-behavior:smooth}
     body{background:var(--bg);color:var(--white);font-family:Avenir,sans-serif;min-height:100vh;overflow-x:hidden}
@@ -165,7 +163,7 @@
     .shell{display:grid;grid-template-columns:1fr 380px;gap:0;min-height:calc(100vh - 460px)}
     @media (max-width:1100px){.shell{grid-template-columns:1fr}}
 
-    .map-wrap{position:relative;border-right:1px solid var(--border);display:flex;flex-direction:column}
+    .map-wrap{position:sticky;top:0;align-self:start;max-height:100vh;border-right:1px solid var(--border);display:flex;flex-direction:column}
     .map-head{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.75rem 1.3rem;background:rgba(251,146,60,.1);border-bottom:1px solid rgba(251,146,60,.3);flex-wrap:wrap}
     .map-head-title{font-family:Avenir,sans-serif;font-weight:500;font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.7)}
     .map-back-btn{font-family:Avenir,sans-serif;font-weight:500;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.7);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);padding:.32rem .7rem;cursor:pointer;transition:all .15s;display:none}
@@ -197,12 +195,12 @@
     @media (max-width:1099px){.hover-chip{display:none!important}}
 
     /* PANEL DERECHO */
-    .panel{padding:1rem 1.1rem 1.5rem;border-left:1px solid var(--border);display:flex;flex-direction:column;gap:.95rem;overflow-y:auto;max-height:calc(100vh - 280px)}
-    @media (max-width:1100px){.panel{max-height:none;border-left:none;border-top:1px solid var(--border)}}
+    .panel{padding:1rem 1.1rem 1.5rem;border-left:1px solid var(--border);display:flex;flex-direction:column;gap:.95rem}
+    @media (max-width:1100px){.panel{border-left:none;border-top:1px solid var(--border)} .map-wrap{position:static;max-height:none}}
     .panel-section-title{font-family:Avenir,sans-serif;font-weight:500;font-size:.66rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:.35rem}
     .panel-card{background:rgba(255,255,255,.025);border:1px solid var(--border);padding:.85rem .95rem}
 
-    .leg-bar{height:10px;background:linear-gradient(to right,var(--vel-low) 0%,#463c3c 40%,#b46e32 60%,var(--vel-mid) 75%,var(--vel-high) 100%);border:1px solid rgba(255,255,255,.1);margin:.4rem 0 .25rem}
+    .leg-bar{height:10px;background:linear-gradient(to right,rgb(56,89,124) 0%,rgb(99,138,160) 20%,rgb(205,200,180) 38%,rgb(240,180,90) 58%,rgb(225,120,50) 78%,rgb(180,55,40) 100%);border:1px solid rgba(255,255,255,.1);margin:.4rem 0 .25rem}
     body.day-mode .leg-bar{border-color:rgba(0,0,0,.12)}
     .leg-bar-ends{display:flex;justify-content:space-between;font-family:Avenir,sans-serif;font-size:.65rem;color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums}
     .leg-bar-end{color:rgba(255,255,255,.5)}
@@ -630,29 +628,31 @@
     }
   }
 
-  /* ───────── Color del gradiente (no-veleta) ───────── */
+  /* ───────── Color del mapa de calor (paleta paralela a oportunidad.html) ───────── */
   function scoreColor(score){
-    // Stops: 0 → #2d3340, 40 → #463c3c, 60 → #b46e32, 75 → #f59e0b, 100 → #f87171
-    const stops = [
-      [0,   [45,51,64]],
-      [40,  [70,60,60]],
-      [60,  [180,110,50]],
-      [75,  [245,158,11]],
-      [100, [248,113,113]],
-    ];
     if (score == null || isNaN(score)) return '#2d3340';
-    score = clamp(score, 0, 100);
+    const s = clamp(score, 0, 100);
+    const stops = [
+      [0,   [ 56, 89,124]],  // azul-gris frío (score muy bajo)
+      [20,  [ 99,138,160]],  // azul claro
+      [38,  [205,200,180]],  // beige neutro
+      [58,  [240,180, 90]],  // ámbar
+      [78,  [225,120, 50]],  // naranja intenso
+      [100, [180, 55, 40]],  // rojo profundo (más sensible)
+    ];
+    if (s <= stops[0][0]) return `rgb(${stops[0][1].join(',')})`;
+    if (s >= stops[stops.length-1][0]) return `rgb(${stops[stops.length-1][1].join(',')})`;
     for (let i=0;i<stops.length-1;i++){
       const [s0,c0] = stops[i], [s1,c1] = stops[i+1];
-      if (score >= s0 && score <= s1){
-        const t = (score - s0) / (s1 - s0 || 1);
+      if (s >= s0 && s <= s1){
+        const t = (s - s0) / (s1 - s0 || 1);
         const r = Math.round(c0[0] + t*(c1[0]-c0[0]));
         const g = Math.round(c0[1] + t*(c1[1]-c0[1]));
         const b = Math.round(c0[2] + t*(c1[2]-c0[2]));
         return `rgb(${r},${g},${b})`;
       }
     }
-    return '#f87171';
+    return 'rgb(180,55,40)';
   }
 
   function isDay(){ return document.body.classList.contains('day-mode'); }
