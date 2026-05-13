@@ -328,6 +328,16 @@
 </head>
 <body>
 
+  <!-- SVG defs globales: pattern de rayado para barrios sin puesto (datos heredados del vecino más cercano) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <pattern id="barrio-inferido-stripes" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+        <rect width="6" height="6" fill="#cccccc" fill-opacity="0.6"/>
+        <line x1="0" y1="0" x2="0" y2="6" stroke="#666" stroke-width="2" stroke-opacity="0.45"/>
+      </pattern>
+    </defs>
+  </svg>
+
   <div id="gate" class="gate">
     <div class="gate-text">Verificando acceso</div>
     <div class="gate-bar"></div>
@@ -846,7 +856,7 @@
             byDirect[normBarrio(b.nombre)] = b;
             byAgg[normBarrioAgg(b.nombre)] = b;
           });
-          const resolveFeat = (props) => {
+          const resolveFeatDirect = (props) => {
             if (props.CODIGO && byCode[props.CODIGO]) return byCode[props.CODIGO];
             const direct = props.NOMBRE_NORM || props.BARRIO_KEY || normBarrio(props.NOMBRE);
             if (byDirect[direct]) return byDirect[direct];
@@ -855,23 +865,93 @@
             return null;
           };
 
+          // ── Inferencia por vecino más cercano ──────────────────────
+          // Para cada feature sin datos directos, encontrar la feature CON
+          // datos cuyo centroide esté más cerca. Heredar y marcar inferido.
+          function centroidOf(geom){
+            if (!geom) return null;
+            const r = geom.type === 'Polygon' ? geom.coordinates[0]
+                    : geom.type === 'MultiPolygon' ? geom.coordinates[0][0]
+                    : null;
+            if (!r || !r.length) return null;
+            let sx = 0, sy = 0;
+            for (const c of r) { sx += c[0]; sy += c[1]; }
+            return [sx/r.length, sy/r.length];
+          }
+          // Pre-calcular: featuresConDatos, featuresSinDatos
+          const featCentroids = barriosGeo.features.map(f => centroidOf(f.geometry));
+          const conDatos = [];
+          const sinDatos = [];
+          barriosGeo.features.forEach((f, i) => {
+            const b = resolveFeatDirect(f.properties || {});
+            if (b) conDatos.push({ idx: i, props: f.properties, b });
+            else   sinDatos.push({ idx: i, props: f.properties });
+          });
+          // Para cada sin datos, encontrar el con datos más cercano
+          const herencia = {};   // featureIdx → { b, fromIdx, fromName }
+          sinDatos.forEach(s => {
+            const ci = featCentroids[s.idx];
+            if (!ci) return;
+            let bestDist = Infinity, bestRef = null;
+            for (const c of conDatos){
+              const cj = featCentroids[c.idx];
+              if (!cj) continue;
+              const dx = cj[0] - ci[0], dy = cj[1] - ci[1];
+              const d = dx*dx + dy*dy;  // distancia² es suficiente
+              if (d < bestDist){ bestDist = d; bestRef = c; }
+            }
+            if (bestRef){
+              herencia[s.idx] = {
+                b: bestRef.b,
+                fromName: bestRef.props && bestRef.props.NOMBRE,
+              };
+            }
+          });
+          const featIdxByProp = new WeakMap();
+          barriosGeo.features.forEach((f, i) => featIdxByProp.set(f.properties || {}, i));
+
+          // resolveFeat unificado: devuelve { b, inferido, fromName }
+          const resolveFeat = (props) => {
+            const direct = resolveFeatDirect(props);
+            if (direct) return { b: direct, inferido: false };
+            const idx = featIdxByProp.get(props);
+            if (idx !== undefined && herencia[idx]){
+              return { b: herencia[idx].b, inferido: true, fromName: herencia[idx].fromName };
+            }
+            return { b: null, inferido: false };
+          };
+
           barrioPolyLayer = L.geoJSON(barriosGeo, {
             style: (feat) => {
-              const b = resolveFeat(feat.properties || {});
-              if (!b || !b.winner){
+              const r = resolveFeat(feat.properties || {});
+              if (!r.b || !r.b.winner){
                 return { fillColor: '#333', fillOpacity: 0.2, color: 'rgba(255,255,255,0.2)', weight: 1 };
               }
-              return { fillColor: getColor(b.winner.partido), fillOpacity: 0.8, color: 'rgba(255,255,255,0.45)', weight: 1 };
+              if (r.inferido){
+                // Patrón rayado + color del ganador heredado (con opacidad menor)
+                return {
+                  fillColor: getColor(r.b.winner.partido),
+                  fillOpacity: 0.45,
+                  color: 'rgba(255,255,255,0.3)',
+                  weight: 1,
+                  dashArray: '2,3',
+                };
+              }
+              return { fillColor: getColor(r.b.winner.partido), fillOpacity: 0.82, color: 'rgba(255,255,255,0.45)', weight: 1 };
             },
             onEachFeature: (feat, layer) => {
               const props = feat.properties || {};
-              const b = resolveFeat(props);
-              const nombre = (b && b.nombre) || props.NOMBRE || '—';
+              const r = resolveFeat(props);
+              const b = r.b;
+              const nombre = props.NOMBRE || (b && b.nombre) || '—';
               layer.on({
                 mouseover: (e) => {
-                  layer.setStyle({ weight: 2, color: '#fff', fillOpacity: 0.96 });
+                  layer.setStyle({ weight: 2, color: '#fff', fillOpacity: r.inferido ? 0.7 : 0.96 });
                   const w = b && b.winner;
                   const color = w ? getColor(w.partido) : '#666';
+                  const inferidoNote = r.inferido
+                    ? `<br/><span style="color:#fbbf24;font-size:.7rem;font-style:italic">⚠ Sin puesto físico · datos heredados de ${r.fromName || '—'}</span>`
+                    : '';
                   const tt = `
                     <div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.45">
                       <span style="color:#a78bfa;font-weight:700">${String(nombre).toUpperCase()}</span><br/>
@@ -880,7 +960,8 @@
                         <span style="color:${color};font-weight:700">${w.nombre}</span><br/>
                         ${w.partido || '—'}<br/>
                         <span style="color:#fff">${fmt(w.votos)} votos · ${w.pct}%</span><br/>
-                        <span style="color:#999;font-size:.7rem">Total barrio: ${fmt(b.total)} válidos</span>
+                        <span style="color:#999;font-size:.7rem">${r.inferido ? 'Total vecino' : 'Total barrio'}: ${fmt(b.total)} válidos</span>
+                        ${inferidoNote}
                       ` : '<span style="color:#999;font-size:.75rem">Sin datos electorales</span>'}
                     </div>`;
                   layer.bindTooltip(tt, { sticky: true, opacity: 1 }).openTooltip(e.latlng);
@@ -953,7 +1034,7 @@
         if (showBarrios){
           if (usedPolygons){
             mapSub.textContent = barriosGeoSource === 'oficial'
-              ? 'Polígonos oficiales (DAP Alcaldía de Medellín) · color por partido ganador'
+              ? 'Polígonos oficiales DAP · barrios opacos = con puesto · barrios traslúcidos = heredados del vecino más cercano'
               : 'Polígonos aproximados (Voronoi sobre puestos) · color por partido ganador';
           } else {
             mapSub.textContent = 'Color por partido ganador · radio proporcional a votos válidos del barrio';
