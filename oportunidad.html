@@ -198,9 +198,17 @@
     .threshold-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:#fff;cursor:pointer;border:2px solid var(--green);box-shadow:0 0 0 1px rgba(74,222,128,.4)}
     .threshold-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#fff;cursor:pointer;border:2px solid var(--green);box-shadow:0 0 0 1px rgba(74,222,128,.4)}
     .threshold-value{font-family:Avenir,sans-serif;font-weight:600;font-size:.92rem;color:var(--green);font-variant-numeric:tabular-nums;min-width:42px;text-align:right}
-    .veleta-count{margin-left:auto;font-family:Avenir,sans-serif;font-weight:500;font-size:.78rem;color:rgba(255,255,255,.78)}
+    /* Banner centrado con el mensaje táctico + métricas del candidato.
+       Vive bajo la toggle-bar para destacar la lectura por candidato. */
+    .opo-banner{padding:.95rem 2.5rem 1.05rem;border-bottom:1px solid var(--border);background:rgba(74,222,128,.045);text-align:center;display:flex;flex-direction:column;align-items:center;gap:.35rem}
+    .opo-banner .opo-mensaje{font-family:'Fraunces',serif;font-weight:300;font-size:1.12rem;line-height:1.45;color:rgba(255,255,255,.94);max-width:980px;letter-spacing:.005em}
+    .opo-banner .opo-mensaje b{font-weight:500;color:#fff}
+    .veleta-count{font-family:Avenir,sans-serif;font-weight:500;font-size:.94rem;color:rgba(255,255,255,.78);max-width:980px}
     .veleta-count b{color:var(--green);font-weight:700}
     .veleta-count .censo{color:rgba(255,255,255,.55);margin-left:.5rem}
+    body.day-mode .opo-banner{background:rgba(220,38,38,.045);border-color:rgba(0,0,0,.1)}
+    body.day-mode .opo-banner .opo-mensaje{color:rgba(0,0,0,.88)}
+    body.day-mode .opo-banner .opo-mensaje b{color:#0d1120}
     body.day-mode .veleta-count{color:rgba(0,0,0,.78)}
     body.day-mode .veleta-count .censo{color:rgba(0,0,0,.55)}
     body.day-mode .veleta-count b{color:#dc2626}
@@ -501,6 +509,11 @@
       <button class="toggle-btn" data-bog="upl" onclick="setBogView('upl')">UPL</button>
       <button class="toggle-btn" data-bog="barrios" onclick="setBogView('barrios')">Barrios</button>
     </div>
+  </section>
+
+  <!-- Banner centrado: mensaje táctico por candidato + métricas. -->
+  <section class="opo-banner" id="opo-banner">
+    <div class="opo-mensaje" id="opo-mensaje">—</div>
     <div class="veleta-count" id="opo-count">— municipios con oportunidad ≥ umbral</div>
   </section>
 
@@ -2582,10 +2595,10 @@
       },
     }).addTo(STATE.map);
     STATE.map.fitBounds(STATE.mapLayer.getBounds(), { padding:[20,20] });
-    // Boost de zoom ~+19% (scale) sólo en la vista nacional/departamental.
-    // log2(1.19) ≈ 0.25 ⇒ +0.25 en zoom level. Bajamos 10% respecto al
-    // boost inicial de +0.4 (que quedaba muy cerrado).
-    STATE.map.setZoom(STATE.map.getZoom() + 0.25);
+    // Boost de zoom ~+5% (scale) sólo en la vista nacional/departamental.
+    // Recortamos otro 12% del scale anterior (+19%) → ~+5%.
+    // log2(1.046) ≈ 0.065 ⇒ +0.07 en zoom level.
+    STATE.map.setZoom(STATE.map.getZoom() + 0.07);
     document.getElementById('map-head-title').textContent = 'Vista nacional · Departamental';
     document.getElementById('map-back-btn').classList.remove('show');
   }
@@ -4164,6 +4177,18 @@
   }
 
   /* ───────── Contador y leyenda ───────── */
+  // Lectura táctica por candidato — se muestra arriba del veleta-count
+  // como mensaje destacado para clientes B2B. Cada texto describe dónde
+  // vive el espacio de crecimiento dado el punto de partida del ponderador.
+  const CANDIDATE_INSIGHT = {
+    ic: 'Cepeda parte como puntero: el espacio de crecimiento marginal vive en clases medias urbanas, costa Caribe y juventud abstencionista.',
+    ae: 'De la Espriella necesita absorber al uribismo sin alienar su base dura. El voto en juego está en Antioquia, Eje Cafetero y municipios medios.',
+    pv: 'Paloma tiene techo natural en regiones uribistas: crecer exige romper el cerco antioqueño y disputar el Caribe occidental.',
+    sf: 'Fajardo crece si reactiva la Antioquia educada y la franja antipolarización en Bogotá, Cali y capitales medias.',
+    cl: 'Claudia exporta marca desde Bogotá: su crecimiento depende del cinturón cundiboyacense y de capitales medias afines a la gestión urbana.',
+    rb: 'Roy parte muy abajo: la única ruta viable es disputarle base al Pacto en regiones donde Petro sacó margen amplio en 2022.',
+  };
+
   function updateCounter(){
     const muns = Object.values(STATE.munMetrics);
     const opos = muns.filter(r => r.contrib != null && r.contrib >= STATE.threshold);
@@ -4171,17 +4196,29 @@
     const pct = STATE.sumCensoNacional ? (100*censoOpo/STATE.sumCensoNacional) : 0;
     const totalContrib = muns.reduce((s,r)=>s+(r.contrib||0), 0);
     const cand = CANDIDATOS.find(c=>c.id===STATE.candId);
+    const msgEl = document.getElementById('opo-mensaje');
     if (STATE.layer === 'opo'){
       const candName = cand ? cand.nombre : '—';
+      if (msgEl){
+        const txt = (cand && CANDIDATE_INSIGHT[cand.id]) || '';
+        msgEl.innerHTML = txt;
+        msgEl.style.display = txt ? '' : 'none';
+      }
       document.getElementById('opo-count').innerHTML =
         `Crecimiento total proyectado para <b>${candName}</b> en 1ª vuelta: <b>+${totalContrib.toFixed(2)} pp</b> nacionales · <b>${opos.length}</b> municipios contribuyen al menos ${STATE.threshold} pp <span class="censo">· ${pct.toFixed(1)}% del electorado nacional vive ahí</span>`;
     } else if (STATE.layer === 'abs'){
+      if (msgEl) msgEl.style.display = 'none';
       const high = muns.filter(r => r.abst != null && r.abst >= 0.5);
       const censoHigh = high.reduce((s,r)=>s+(r.censo||0), 0);
       const pctH = STATE.sumCensoNacional ? (100*censoHigh/STATE.sumCensoNacional) : 0;
       document.getElementById('opo-count').innerHTML =
         `<b>${high.length}</b> municipios con abstención ≥ 50% <span class="censo">· ${pctH.toFixed(1)}% del censo nacional</span>`;
     } else if (STATE.layer === 'pue'){
+      if (msgEl){
+        const txt = (cand && CANDIDATE_INSIGHT[cand.id]) || '';
+        msgEl.innerHTML = txt;
+        msgEl.style.display = txt ? '' : 'none';
+      }
       const total = STATE.puestos ? STATE.puestos.length : 0;
       const vis = STATE.puestos ? visiblePuestos().length : 0;
       document.getElementById('opo-count').innerHTML =
