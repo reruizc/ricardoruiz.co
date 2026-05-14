@@ -1175,8 +1175,22 @@
   async function loadCityBloques(cityKey){
     if (STATE.cityBloquesCache[cityKey]) return STATE.cityBloquesCache[cityKey];
     const j = await fetch(URLS.cityBloques(cityKey)).then(r => r.json());
+    patchCityBloques(cityKey, j);
     STATE.cityBloquesCache[cityKey] = j;
     return j;
+  }
+
+  // Patches puntuales por ciudad para reconciliar GeoJSON con bloques.
+  // Sincelejo: el polígono "Comuna 10" del GeoJSON es el Corregimiento Chocho
+  // (no existe una comuna 10 real). El bloques agrupa ese voto rural en 'OTROS'.
+  // Re-key 'OTROS' → '10' con nombre real para que el match por byNumber funcione
+  // y elimino 'OTROS' del set para no contar dos veces.
+  function patchCityBloques(cityKey, j){
+    if (!j || !j.comunas) return;
+    if (cityKey === 'sincelejo' && j.comunas['OTROS'] && !j.comunas['10']){
+      j.comunas['10'] = { ...j.comunas['OTROS'], nombre: 'Corregimiento Chocho' };
+      delete j.comunas['OTROS'];
+    }
   }
   async function loadCityGeo(cityKey, file){
     if (STATE.cityGeoCache[cityKey]) return STATE.cityGeoCache[cityKey];
