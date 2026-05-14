@@ -4616,11 +4616,13 @@
       const m = barMetrics[cod];
       if (m && m.contrib != null) keysWithMetric.push(cod);
     }
-    const neighborCache = {};
-    function nearestNeighborMetric(bk){
-      if (bk in neighborCache) return neighborCache[bk];
+    // Cache del barrio vecino más cercano CON métrica (sirve para abst,
+    // censo y para fallback del top candidato afín).
+    const neighborCodCache = {};
+    function nearestNeighborCod(bk){
+      if (bk in neighborCodCache) return neighborCodCache[bk];
       const me = featByKey[bk];
-      if (!me){ neighborCache[bk] = null; return null; }
+      if (!me){ neighborCodCache[bk] = null; return null; }
       const [mx, my] = me.centroid;
       let bestD = Infinity, bestKey = null;
       for (const ok of keysWithMetric){
@@ -4629,27 +4631,34 @@
         const d = (ox-mx)*(ox-mx) + (oy-my)*(oy-my);
         if (d < bestD){ bestD = d; bestKey = ok; }
       }
-      const inherited = bestKey ? barMetrics[bestKey] : null;
-      neighborCache[bk] = inherited;
-      return inherited;
+      neighborCodCache[bk] = bestKey;
+      return bestKey;
     }
-    // Cascada: barrio propio → vecino más cercano con métrica → localidad padre.
-    // Devolvemos un record nuevo (no mutamos el barMetrics original) y
-    // completamos campos faltantes (abst, censo) con el de la localidad.
+    function nearestNeighborMetric(bk){
+      const cod = nearestNeighborCod(bk);
+      return cod ? barMetrics[cod] : null;
+    }
+    // Cascada: barrio propio → vecino más cercano con métrica → localidad
+    // padre. Para campos sueltos (abst, censo) aplicamos la misma cascada
+    // de forma independiente, no atada al "base" elegido para contrib.
+    // Devolvemos un record nuevo (no mutamos el barMetrics original).
     function metricForBarrio(props){
       const cod = props.codigo;
       const loc = String(props.loc_codigo || '').padStart(2, '0');
       const locM = (loc && locMetrics[loc]) ? locMetrics[loc] : null;
       const own  = (cod && barMetrics[cod] && barMetrics[cod].contrib != null) ? barMetrics[cod] : null;
-      const neighbor = (cod && !own) ? nearestNeighborMetric(cod) : null;
+      const neighbor = cod ? nearestNeighborMetric(cod) : null;
       const base = own || neighbor || locM;
       if (!base) return null;
-      // Si el barrio propio o vecino no traen abst/censo (sin datos
-      // suficientes en pres-2018/22), heredamos de la localidad.
-      const merged = { ...base };
-      if (merged.abst == null && locM && locM.abst != null) merged.abst = locM.abst;
-      if (!merged.censo && locM && locM.censo) merged.censo = locM.censo;
-      return merged;
+      const pick = (key) => (own && own[key] != null && own[key] !== 0) ? own[key]
+                          : (neighbor && neighbor[key] != null && neighbor[key] !== 0) ? neighbor[key]
+                          : (locM && locM[key] != null) ? locM[key]
+                          : null;
+      return {
+        ...base,
+        abst:  pick('abst'),
+        censo: pick('censo') || 0,
+      };
     }
 
     STATE.mapLayer = L.geoJSON(geo, {
@@ -4663,6 +4672,10 @@
         // correctos (top candidato afín a nivel barrio/localidad).
         f.__bog_barrio_cod = f.properties.codigo || null;
         f.__bog_loc_cod    = String(f.properties.loc_codigo || '').padStart(2, '0');
+        // Cod del barrio vecino más cercano CON métrica — útil para
+        // resolver top candidato afín cuando el barrio propio no tiene
+        // cobertura en pres-2018/22.
+        f.__bog_barrio_neighbor = f.__bog_barrio_cod ? nearestNeighborCod(f.__bog_barrio_cod) : null;
         layer.on('mouseover', (e) => onHover(f, e));
         layer.on('mouseout',  (e) => onHoverOut(f, e));
         layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
@@ -4906,7 +4919,7 @@
     //   - depto (vista nacional con dep seleccionado) → suma los muns del depto
     if (f.__bog_barrio_cod){
       document.getElementById('det-topafin').textContent =
-        topAfinNameForBogBarrio(STATE.candId, f.__bog_barrio_cod, f.__bog_loc_cod);
+        topAfinNameForBogBarrio(STATE.candId, f.__bog_barrio_cod, f.__bog_loc_cod, f.__bog_barrio_neighbor);
     } else if (isDep){
       const depCod = f.__elec || (r && r.depCod) || null;
       document.getElementById('det-topafin').textContent =
@@ -4947,33 +4960,43 @@
   // Top candidato afín a nivel barrio catastral de Bogotá. Cascada:
   //   1) pres-2022 del barrio propio (señal más reciente disponible).
   //   2) pres-2018 del barrio propio.
-  //   3) Fallback a la localidad padre: busca en los muns de Bogotá
-  //      (depCod 16) usando topAfinNameForDepto.
+  //   3) pres-2022 del barrio vecino más cercano con métrica.
+  //   4) pres-2018 del barrio vecino más cercano con métrica.
+  //   5) Fallback al depto Bogotá (cod 16) — sólo si ningún vecino aporta.
   // El nombre del barrio en bogBarrioData usa la misma key (codigo) que
-  // el GeoJSON catastral.
-  function topAfinNameForBogBarrio(candId, barrioCod, locCod){
+  // el GeoJSON catastral. La data viene del cruce GEOREF_DATA.csv ×
+  // COMUNAS.csv que asigna cada puesto a su barrio catastral.
+  function topAfinNameForBogBarrio(candId, barrioCod, locCod, neighborCod){
     const aff = AFINIDADES[candId];
     if (!aff || !barrioCod) return '—';
     const data = STATE.bogBarrioData || {};
-    // Intentar señales presidenciales del barrio en orden de preferencia.
-    for (const sigKey of ['pres-2022','pres-2018']){
-      const e = data[sigKey]?.[barrioCod];
-      const patterns = sigKey === 'pres-2022' ? aff.pres22 : aff.pres18;
-      if (!e || !patterns || !patterns.length) continue;
-      const cands = e.candidatos || e.cands || {};
-      const votval = e.votos_validos || 0;
-      const ranked = Object.values(cands)
-        .filter(c => c && c.nombre && matchesAffinity(c.nombre, patterns))
-        .sort((a,b) => (b.votos||0)-(a.votos||0));
-      if (ranked[0]){
-        const pct = ranked[0].pct != null
-          ? ranked[0].pct
-          : (votval > 0 ? (100*(ranked[0].votos||0)/votval) : null);
-        return `${ranked[0].nombre.split(' ').slice(0,2).join(' ')} · ${pct != null ? pct.toFixed(1)+'%' : '?'}`;
+
+    function tryAtBarrio(bk){
+      for (const sigKey of ['pres-2022','pres-2018']){
+        const e = data[sigKey]?.[bk];
+        const patterns = sigKey === 'pres-2022' ? aff.pres22 : aff.pres18;
+        if (!e || !patterns || !patterns.length) continue;
+        const cands = e.candidatos || e.cands || {};
+        const votval = e.votos_validos || 0;
+        const ranked = Object.values(cands)
+          .filter(c => c && c.nombre && matchesAffinity(c.nombre, patterns))
+          .sort((a,b) => (b.votos||0)-(a.votos||0));
+        if (ranked[0]){
+          const pct = ranked[0].pct != null
+            ? ranked[0].pct
+            : (votval > 0 ? (100*(ranked[0].votos||0)/votval) : null);
+          return `${ranked[0].nombre.split(' ').slice(0,2).join(' ')} · ${pct != null ? pct.toFixed(1)+'%' : '?'}`;
+        }
       }
+      return null;
     }
-    // Fallback: aproximar con depto Bogotá (16) — útil cuando el barrio
-    // no tiene cobertura en las señales presidenciales viejas.
+
+    const own = tryAtBarrio(barrioCod);
+    if (own) return own;
+    if (neighborCod && neighborCod !== barrioCod){
+      const fromNeighbor = tryAtBarrio(neighborCod);
+      if (fromNeighbor) return fromNeighbor;
+    }
     return topAfinNameForDepto(candId, '16');
   }
 
