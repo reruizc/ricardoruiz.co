@@ -405,6 +405,12 @@
                 <div id="hemiciclo-map" style="width:100%;height:400px;background:#060810"></div>
                 <button id="hemiciclo-back" type="button" style="display:none;position:absolute;top:.55rem;right:.55rem;z-index:500;background:rgba(0,71,255,.92);color:#fff;border:none;padding:.4rem .7rem;font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;border-radius:2px">← Nacional</button>
               </div>
+              <div id="map-info-card" style="margin-top:.85rem;padding:.85rem 1rem;background:rgba(255,255,255,.04);border:1px solid var(--card-border);min-height:128px">
+                <div id="map-info-placeholder" style="font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.12em;color:rgba(255,255,255,.3);text-transform:uppercase;text-align:center;padding:1.8rem 0;line-height:1.7">
+                  Pasa el mouse sobre el mapa<br/>para ver el detalle
+                </div>
+                <div id="map-info-content" style="display:none"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -433,10 +439,18 @@
               <div class="donut-legend" id="leg-citrep"></div>
             </div>
             <div class="umbral-bar">
-              <div class="umbral-label">Cifra repartidora</div>
-              <div class="umbral-val" id="cifra-rep">—</div>
-              <div class="umbral-label" style="margin-top:.5rem">Umbral</div>
-              <div class="umbral-val" id="umbral-val">—</div>
+              <div class="umbral-label">Curules por tipo de organización</div>
+              <div id="tipo-org-bars" style="margin-top:.55rem;display:flex;flex-direction:column;gap:.4rem"></div>
+              <div style="display:flex;gap:1.2rem;margin-top:.85rem;padding-top:.7rem;border-top:1px solid var(--border)">
+                <div style="flex:1">
+                  <div class="umbral-label">Organizaciones</div>
+                  <div class="umbral-val" id="cit-stat-orgs">—</div>
+                </div>
+                <div style="flex:1">
+                  <div class="umbral-label">Candidatos/as</div>
+                  <div class="umbral-val" id="cit-stat-cands">—</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -564,8 +578,7 @@
         document.getElementById('main-content').classList.remove('hidden');
         renderKPI();
         renderDonut();
-        if(resumenData.cifra) document.getElementById('cifra-rep').textContent = fmt(resumenData.cifra);
-        if(resumenData.umbral) document.getElementById('umbral-val').textContent = fmt(resumenData.umbral);
+        renderTipoOrgBars();
         renderNacional();
       }catch(e){
         document.getElementById('load-state').innerHTML=`<div style="font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,100,100,.8);text-align:center;line-height:1.8">Error al cargar datos.<br/><span style="color:rgba(255,255,255,.3);font-size:.6rem">${e.message}</span></div>`;
@@ -927,6 +940,49 @@
         <tbody>${res.map((r,i)=>`<tr><td style="color:rgba(255,255,255,.25)">${String(i+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif">${r.nombre}</td><td style="color:rgba(255,255,255,.45);font-family:'Syne',sans-serif">${r.partido}</td><td class="r" style="color:rgba(255,255,255,.3)">#${r.pos}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(r.votos)}</td></tr>`).join('')}</tbody></table>`;
     }
 
+    // ─── Composición por tipo de organización ───────────────
+    const CITREP_CAT_LABEL = {IND:'Indígenas',AFRO:'Afro / Consejos comunitarios',VIC:'Víctimas / Reclamantes',MUJ:'Mujeres',CAMP:'Campesinos / Agro',FUND:'Fundaciones / Corporaciones',OTR:'Otras organizaciones'};
+    async function renderTipoOrgBars(){
+      const box = document.getElementById('tipo-org-bars');
+      const orgsEl = document.getElementById('cit-stat-orgs');
+      const candsEl = document.getElementById('cit-stat-cands');
+      if(!box || !resumenData) return;
+      try{
+        const circs = await getJSON('circunscripciones');
+        // Para cada circ, calcula partido ganador y su categoría
+        const catCount = {};
+        circs.forEach(circ => {
+          const map = {};
+          Object.entries(circ.candidatos||{}).forEach(([nom,v])=>{
+            const p = resumenData._c2p[nom];
+            if(!p || !v) return;
+            map[p] = (map[p]||0) + v;
+          });
+          const top = Object.entries(map).sort((a,b)=>b[1]-a[1])[0];
+          if(!top) return;
+          const cat = citrepCat(top[0]);
+          catCount[cat] = (catCount[cat]||0) + 1;
+        });
+        const entries = Object.entries(catCount).sort((a,b)=>b[1]-a[1]);
+        const maxN = entries[0] ? entries[0][1] : 1;
+        box.innerHTML = entries.map(([cat, n])=>{
+          const col = (CITREP_PALETTES[cat]||CITREP_PALETTES.OTR)[0];
+          const wpct = ((n/16)*100).toFixed(0);
+          const bw = ((n/maxN)*100).toFixed(1);
+          return `<div style="display:flex;align-items:center;gap:.55rem;font-family:'DM Mono',monospace;font-size:.66rem;color:rgba(255,255,255,.7)">
+            <span style="width:9px;height:9px;background:${col};flex-shrink:0;border-radius:2px"></span>
+            <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${CITREP_CAT_LABEL[cat]||cat}</span>
+            <span style="width:60px;height:4px;background:var(--bar-bg);overflow:hidden"><span style="display:block;height:100%;width:${bw}%;background:${col}"></span></span>
+            <span style="font-family:'Syne',sans-serif;font-weight:800;color:var(--white);min-width:18px;text-align:right">${n}</span>
+          </div>`;
+        }).join('');
+      } catch(e){
+        box.innerHTML = '<div style="font-family:DM Mono,monospace;font-size:.62rem;color:rgba(255,100,100,.6)">No se pudo cargar</div>';
+      }
+      if(orgsEl) orgsEl.textContent = fmt((resumenData.partidos||[]).length);
+      if(candsEl) candsEl.textContent = fmt((resumenData.candidatos||[]).length);
+    }
+
     // ─── RESULTADOS GENERALES: hemiciclo + mapa ─────────────
     let activeView = 'LISTADO';
     let mapMode = 'circ'; // 'circ' | 'mun'
@@ -1152,11 +1208,76 @@
       }
     }
 
+    function _showMapInfo(html){
+      const ph = document.getElementById('map-info-placeholder');
+      const ct = document.getElementById('map-info-content');
+      if(!ct) return;
+      if(ph) ph.style.display = 'none';
+      ct.style.display = '';
+      ct.innerHTML = html;
+    }
+    function showCircInfo(feat){
+      const cc = feat.properties.com_cod;
+      const w = _circWinner && _circWinner[cc];
+      const partidoCol = w && w.partido ? getColor(w.partido) : '#555';
+      const partidoCat = w && w.partido ? (CITREP_CAT_LABEL[citrepCat(w.partido)] || 'Otra') : '—';
+      _showMapInfo(`
+        <div style="display:flex;align-items:flex-start;gap:.75rem;margin-bottom:.55rem">
+          <span style="width:14px;height:14px;background:${partidoCol};border-radius:3px;flex-shrink:0;margin-top:.2rem"></span>
+          <div style="flex:1;min-width:0">
+            <div style="font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(0,71,255,.85);margin-bottom:.15rem">Circunscripción ${parseInt(cc,10)}</div>
+            <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.05rem;letter-spacing:-.02em;line-height:1.15">${feat.properties.com_nom||'—'}</div>
+          </div>
+        </div>
+        ${w && w.electo ? `
+        <div style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:.2rem;padding-top:.55rem;border-top:1px solid var(--border)">Electo/a</div>
+        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:.92rem;margin-bottom:.25rem">${w.electo}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:.68rem;color:rgba(255,255,255,.55);line-height:1.5">${w.partido} · <span style="color:rgba(255,255,255,.85)">${fmt(w.electoVotos||0)}</span> votos</div>
+        ` : ''}
+        <div style="display:flex;gap:1.2rem;margin-top:.7rem;padding-top:.55rem;border-top:1px solid var(--border);font-family:'DM Mono',monospace;font-size:.62rem;color:rgba(255,255,255,.4)">
+          <span>${feat.properties.mun_count} municipios</span>
+          <span>${partidoCat}</span>
+        </div>
+      `);
+    }
+    function showMunInfo(feat){
+      const p = feat.properties;
+      const k = `${p.dep_cod}-${p.mun_cod}`;
+      const w = _munWinner && _munWinner[k];
+      const partidoCol = w && w.partido ? getColor(w.partido) : '#555';
+      const partidoCat = w && w.partido ? (CITREP_CAT_LABEL[citrepCat(w.partido)] || 'Otra') : '—';
+      const pctShare = w && w.total ? ((w.votos/w.total)*100).toFixed(1) : null;
+      _showMapInfo(`
+        <div style="display:flex;align-items:flex-start;gap:.75rem;margin-bottom:.55rem">
+          <span style="width:14px;height:14px;background:${partidoCol};border-radius:3px;flex-shrink:0;margin-top:.2rem"></span>
+          <div style="flex:1;min-width:0">
+            <div style="font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(0,71,255,.85);margin-bottom:.15rem">${p.dep_nom||''}</div>
+            <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.05rem;letter-spacing:-.02em;line-height:1.15">${p.nombre}</div>
+            <div style="font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.05em;color:rgba(255,255,255,.4);margin-top:.2rem">Circ ${parseInt(p.com_cod,10)}</div>
+          </div>
+        </div>
+        ${w && w.partido ? `
+        <div style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:.2rem;padding-top:.55rem;border-top:1px solid var(--border)">Puntero</div>
+        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:.92rem;margin-bottom:.25rem;line-height:1.2">${w.partido}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:.68rem;color:rgba(255,255,255,.55);line-height:1.5"><span style="color:rgba(255,255,255,.85)">${fmt(w.votos)}</span> de ${fmt(w.total)} votos${pctShare!==null?` · <span style="color:rgba(255,255,255,.85)">${pctShare}%</span>`:''}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:.62rem;color:rgba(255,255,255,.4);margin-top:.55rem;padding-top:.45rem;border-top:1px solid var(--border)">${partidoCat}</div>
+        ` : '<div style="font-family:DM Mono,monospace;font-size:.62rem;color:rgba(255,255,255,.3);padding-top:.55rem;border-top:1px solid var(--border)">Sin datos de ganador</div>'}
+      `);
+    }
+
+    function _resetMapInfo(){
+      const ph = document.getElementById('map-info-placeholder');
+      const ct = document.getElementById('map-info-content');
+      if(ph) ph.style.display = '';
+      if(ct){ ct.style.display = 'none'; ct.innerHTML = ''; }
+    }
+
     async function setMapMode(mode){
       if(mode !== 'circ' && mode !== 'mun') return;
       mapMode = mode;
       document.getElementById('map-mode-circ').classList.toggle('active', mode === 'circ');
       document.getElementById('map-mode-mun').classList.toggle('active', mode === 'mun');
+      _resetMapInfo();
       if(hemicicloMap) await renderMapLayer();
     }
 
@@ -1185,14 +1306,9 @@
           style: styleCirc,
           onEachFeature: (feat, layer)=>{
             const cc = feat.properties.com_cod;
-            const w = _circWinner && _circWinner[cc];
-            const tip = `<div style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(0,71,255,.85);margin-bottom:.3rem">Circunscripción ${parseInt(cc,10)}</div>
-              <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:.92rem;margin-bottom:.35rem">${feat.properties.com_nom||'—'}</div>
-              ${w ? `<div style="font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,255,255,.7)">Electo/a: <b style="color:#fff">${w.electo||'—'}</b></div>
-              <div style="font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,255,255,.55)">${w.partido||'s/d'} · ${fmt(w.electoVotos||0)} votos</div>` : ''}
-              <div style="font-family:'DM Mono',monospace;font-size:.6rem;color:rgba(255,255,255,.35);margin-top:.35rem">${feat.properties.mun_count} municipios</div>`;
+            const tip = `<div style="font-family:'Syne',sans-serif;font-weight:700;font-size:.88rem">Circunscripción ${parseInt(cc,10)}</div>`;
             layer.bindTooltip(tip, {sticky:true, direction:'top'});
-            layer.on('mouseover', ()=>layer.setStyle({weight:2.2, color:'#fff', fillOpacity:0.92}));
+            layer.on('mouseover', ()=>{ layer.setStyle({weight:2.2, color:'#fff', fillOpacity:0.92}); showCircInfo(feat); });
             layer.on('mouseout', ()=>_circLayer.resetStyle(layer));
             layer.on('click', ()=>{
               activeView = 'LISTADO';
@@ -1217,15 +1333,10 @@
           style: styleMun,
           onEachFeature: (feat, layer)=>{
             const p = feat.properties;
-            const k = `${p.dep_cod}-${p.mun_cod}`;
-            const w = _munWinner && _munWinner[k];
-            const tip = `<div style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(0,71,255,.85);margin-bottom:.3rem">${p.dep_nom||''}</div>
-              <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:.95rem;margin-bottom:.35rem">${p.nombre}</div>
-              <div style="font-family:'DM Mono',monospace;font-size:.62rem;color:rgba(255,255,255,.5);margin-bottom:.35rem">Circ ${parseInt(p.com_cod,10)} · ${p.com_nom||''}</div>
-              ${w && w.partido ? `<div style="font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,255,255,.7)">Puntero: <b style="color:#fff">${w.partido}</b></div>
-              <div style="font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,255,255,.55)">${fmt(w.votos)} de ${fmt(w.total)} votos</div>` : ''}`;
+            const tip = `<div style="font-family:'Syne',sans-serif;font-weight:700;font-size:.92rem;line-height:1.2">${p.nombre}</div>
+              <div style="font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.06em;color:rgba(255,255,255,.55);text-transform:uppercase;margin-top:.15rem">${p.dep_nom||''}</div>`;
             layer.bindTooltip(tip, {sticky:true, direction:'top'});
-            layer.on('mouseover', ()=>layer.setStyle({weight:1.8, color:'#fff', fillOpacity:0.92}));
+            layer.on('mouseover', ()=>{ layer.setStyle({weight:1.8, color:'#fff', fillOpacity:0.92}); showMunInfo(feat); });
             layer.on('mouseout', ()=>_munLayer.resetStyle(layer));
             layer.on('click', ()=>{
               activeView = 'LISTADO';
