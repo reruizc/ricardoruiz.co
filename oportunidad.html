@@ -90,6 +90,9 @@
     body.day-mode .cta-cta-prompt{color:rgba(0,0,0,.85)}
     body.day-mode .det-bar .lbl{color:rgba(0,0,0,.55)}
     body.day-mode .det-bar .val{color:#0d1120}
+    body.day-mode .det-bars-toggle{color:rgba(0,0,0,.55)}
+    .det-bars-toggle:hover{color:rgba(255,255,255,.85)}
+    body.day-mode .det-bars-toggle:hover{color:#0d1120}
     .cta-mail{display:inline-block;text-align:center;font-family:Avenir,sans-serif;font-weight:500;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.7);text-decoration:none;padding:.35rem 0}
     .cta-mail:hover{color:var(--green)}
     body.day-mode .cta-mail{color:rgba(0,0,0,.7)}
@@ -199,13 +202,14 @@
     .threshold-slider::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#fff;cursor:pointer;border:2px solid var(--green);box-shadow:0 0 0 1px rgba(74,222,128,.4)}
     .threshold-value{font-family:Avenir,sans-serif;font-weight:600;font-size:.92rem;color:var(--green);font-variant-numeric:tabular-nums;min-width:42px;text-align:right}
     /* Banner centrado con el mensaje táctico + métricas del candidato.
-       Vive bajo la toggle-bar para destacar la lectura por candidato. */
-    .opo-banner{padding:.95rem 2.5rem 1.05rem;border-bottom:1px solid var(--border);background:rgba(74,222,128,.045);text-align:center;display:flex;flex-direction:column;align-items:center;gap:.35rem}
-    .opo-banner .opo-mensaje{font-family:'Fraunces',serif;font-weight:300;font-size:1.12rem;line-height:1.45;color:rgba(255,255,255,.94);max-width:980px;letter-spacing:.005em}
-    .opo-banner .opo-mensaje b{font-weight:500;color:#fff}
-    .veleta-count{font-family:Avenir,sans-serif;font-weight:500;font-size:.94rem;color:rgba(255,255,255,.78);max-width:980px}
-    .veleta-count b{color:var(--green);font-weight:700}
-    .veleta-count .censo{color:rgba(255,255,255,.55);margin-left:.5rem}
+       Vive bajo la toggle-bar para destacar la lectura por candidato.
+       Todo en Arima, tamaño uniforme. */
+    .opo-banner{padding:.95rem 2.5rem 1.05rem;border-bottom:1px solid var(--border);background:rgba(74,222,128,.045);text-align:center;display:flex;flex-direction:column;align-items:center;gap:.35rem;font-family:'Arima',sans-serif}
+    .opo-banner .opo-mensaje{font-family:'Arima',sans-serif;font-weight:400;font-size:1.22rem;line-height:1.45;color:rgba(255,255,255,.94);max-width:980px;letter-spacing:.005em}
+    .opo-banner .opo-mensaje b{font-weight:600;color:#fff}
+    .veleta-count{font-family:'Arima',sans-serif;font-weight:400;font-size:1.22rem;line-height:1.45;color:rgba(255,255,255,.82);max-width:980px}
+    .veleta-count b{color:var(--green);font-weight:600}
+    .veleta-count .censo{color:rgba(255,255,255,.6);margin-left:.5rem;font-size:1.22rem}
     body.day-mode .opo-banner{background:rgba(220,38,38,.045);border-color:rgba(0,0,0,.1)}
     body.day-mode .opo-banner .opo-mensaje{color:rgba(0,0,0,.88)}
     body.day-mode .opo-banner .opo-mensaje b{color:#0d1120}
@@ -589,7 +593,11 @@
           </div>
           <div class="det-score-big" id="det-score">—</div>
           <div class="det-score-sub" id="det-score-sub">espacio del bloque no capturado</div>
-          <div class="det-bars" id="det-bars">
+          <div class="det-bars-toggle" id="det-bars-toggle" onclick="toggleDetBars()" style="cursor:pointer;display:flex;align-items:center;gap:.4rem;user-select:none;font-family:Avenir,sans-serif;font-weight:500;font-size:.66rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-top:.5rem">
+            <span id="det-bars-caret" style="display:inline-block;transition:transform .15s">▸</span>
+            Desglose por fuente histórica
+          </div>
+          <div class="det-bars" id="det-bars" style="display:none">
             <!-- inyectado por renderDetail -->
           </div>
           <dl class="det-meta">
@@ -2595,10 +2603,9 @@
       },
     }).addTo(STATE.map);
     STATE.map.fitBounds(STATE.mapLayer.getBounds(), { padding:[20,20] });
-    // Boost de zoom ~+5% (scale) sólo en la vista nacional/departamental.
-    // Recortamos otro 12% del scale anterior (+19%) → ~+5%.
-    // log2(1.046) ≈ 0.065 ⇒ +0.07 en zoom level.
-    STATE.map.setZoom(STATE.map.getZoom() + 0.07);
+    // Boost de zoom ~+1% (scale) sólo en la vista nacional/departamental.
+    // Bajamos otro 5% sobre el boost anterior → +0.02 zoom level.
+    STATE.map.setZoom(STATE.map.getZoom() + 0.02);
     document.getElementById('map-head-title').textContent = 'Vista nacional · Departamental';
     document.getElementById('map-back-btn').classList.remove('show');
   }
@@ -4448,6 +4455,17 @@
       }
     } catch(_){}
   })();
+
+  // Colapsable del desglose por fuente histórica en el panel TERRITORIO.
+  // Por defecto está cerrado; se abre con clic en el header.
+  function toggleDetBars(){
+    const wrap = document.getElementById('det-bars');
+    const caret = document.getElementById('det-bars-caret');
+    if (!wrap) return;
+    const open = wrap.style.display !== 'none';
+    wrap.style.display = open ? 'none' : 'flex';
+    if (caret) caret.style.transform = open ? '' : 'rotate(90deg)';
+  }
 
   // Colapsable "Pesos por fuente": click en el título abre/cierra los sliders.
   function toggleSrcSliders(){
