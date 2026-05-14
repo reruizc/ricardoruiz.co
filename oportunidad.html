@@ -930,19 +930,39 @@
       priceEl.style.display = priceSubEl.style.display = 'none';
     }
     // CTA primario: anónimo → register; resto → pricing.
+    // CTA login secundario: sólo visible para anónimos.
     const ctaPrimary = document.getElementById('gate-cta-primary');
+    const ctaLogin   = document.getElementById('gate-cta-login');
     if (isAnon){
       ctaPrimary.href = 'register.html';
       ctaPrimary.textContent = 'Crear cuenta gratis';
+      if (ctaLogin) ctaLogin.style.display = '';
     } else {
       ctaPrimary.href = 'pricing.html';
       ctaPrimary.textContent = `Empezar con ${PLAN_LABEL[needed]}`;
+      if (ctaLogin) ctaLogin.style.display = 'none';
     }
     document.getElementById('gate-modal').classList.add('show');
   }
   function closeBlockedModal(){
     document.getElementById('gate-modal').classList.remove('show');
   }
+
+  /* ─── WELCOME MODAL (anónimos primer visit) ──────────────────── */
+  function showWelcomeIfFirst(){
+    if (_userPlan !== 'anonymous') return;
+    try {
+      if (localStorage.getItem('opo-welcome-shown') === '1') return;
+    } catch(_) {}
+    const el = document.getElementById('welcome-modal');
+    if (el) el.classList.add('show');
+  }
+  function closeWelcomeModal(){
+    const el = document.getElementById('welcome-modal');
+    if (el) el.classList.remove('show');
+    try { localStorage.setItem('opo-welcome-shown', '1'); } catch(_) {}
+  }
+  window.closeWelcomeModal = closeWelcomeModal;
 
   // Helper: ejecuta una acción si el feature está disponible; si no,
   // abre el modal y retorna false. Para usar al inicio de cada función.
@@ -3209,6 +3229,8 @@
   }
   function onDepClick(elec){
     if (!elec) return;
+    // Anónimo: drill-in al depto requiere cuenta gratis.
+    if (!requireFeature('nivel-dep-mun')) return;
     // Bogotá D.C. (electoral 16) tiene un solo "municipio" — saltar
     // directo a la capa de localidades para no perder un click.
     if (String(elec).padStart(2,'0') === '16'){
@@ -5070,7 +5092,15 @@
     renderPlanChip();
     applyLockState();
     renderDlCounter();
-    refreshUserFromAPI().then(() => { renderPlanChip(); applyLockState(); renderDlCounter(); });
+    // Welcome modal sólo se dispara después del refresh contra el worker:
+    // si el usuario ya tiene sesión válida, NO queremos enseñarle el modal
+    // de "modo invitado" sólo porque el localStorage llegó vacío.
+    refreshUserFromAPI().then(() => {
+      renderPlanChip();
+      applyLockState();
+      renderDlCounter();
+      showWelcomeIfFirst();
+    });
 
     showLoading(true);
     try {
@@ -5112,7 +5142,28 @@
       <div class="gate-price-sub" id="gate-price-sub"></div>
       <div class="gate-actions">
         <a class="gate-btn gate-btn-primary" id="gate-cta-primary" href="pricing.html">Ver planes</a>
+        <a class="gate-btn gate-btn-ghost" id="gate-cta-login" href="login.html" style="display:none">Ya tengo cuenta</a>
         <button class="gate-btn gate-btn-ghost" id="gate-cta-secondary" onclick="closeBlockedModal()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Welcome modal · primer visit anónimo -->
+  <div class="gate-overlay" id="welcome-modal" onclick="if(event.target===this) closeWelcomeModal()">
+    <div class="gate-card" style="max-width:540px">
+      <div class="gate-tag">Modo invitado</div>
+      <div class="gate-title">Estás explorando Oportunidad como invitado</div>
+      <div class="gate-desc">
+        Este módulo te muestra <b>dónde un candidato puede crecer</b> con base en las cuatro fuentes históricas que mejor leen al electorado colombiano.
+        <br/><br/>
+        <b>Sin cuenta puedes:</b> ver el mapa nacional, leer el ranking de departamentos y pasar el cursor por el mapa para ver el detalle.
+        <br/><br/>
+        <b>Con cuenta gratis se desbloquea:</b> cambiar de candidato, alternar entre capa Oportunidad y Abstención, abrir cualquier departamento para ver sus municipios, y el desglose por fuente histórica.
+      </div>
+      <div class="gate-actions">
+        <a class="gate-btn gate-btn-primary" href="register.html">Crear cuenta gratis</a>
+        <a class="gate-btn gate-btn-ghost" href="login.html">Ya tengo cuenta</a>
+        <button class="gate-btn gate-btn-ghost" onclick="closeWelcomeModal()">Explorar como invitado</button>
       </div>
     </div>
   </div>
