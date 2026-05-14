@@ -456,8 +456,41 @@
     const CITREP_CIRC_GEO_URL = `${S3}/mapas-2026/citrep/citrep-circunscripciones.geojson`;
     const fmt = n => Number(n).toLocaleString('es-CO');
     const pct = (n,t) => t ? ((n/t)*100).toFixed(2) : '0.00';
-    const CP = {'Pacto Histórico':'#6B2D8B','Centro Democrático':'#0088BB','Partido Liberal Colombiano':'#C8102E','Partido de la U':'#F7941D','Cambio Radical':'#E91E8C','Partido Conservador Colombiano':'#003580','Alianza Verde':'#4CAF50','MIRA':'#1A3FC4','Comunes':'#007755','Nuevo Liberalismo':'#E53935'};
-    function getColor(n){if(CP[n])return CP[n];if(/pacto hist/i.test(n))return'#6B2D8B';if(/centro dem/i.test(n))return'#0088BB';if(/liberal/i.test(n))return'#C8102E';if(/conservador/i.test(n))return'#003580';if(/cambio radical/i.test(n))return'#E91E8C';if(/partido de la u/i.test(n))return'#F7941D';if(/alianza (verde|por col)/i.test(n))return'#4CAF50';if(/\bMIRA\b/i.test(n))return'#1A3FC4';if(/comunes/i.test(n))return'#007755';if(/nuevo liberalismo/i.test(n))return'#E53935';return'#555';}
+    // CITREP no tiene partidos tradicionales: son organizaciones de víctimas, resguardos
+    // indígenas, consejos comunitarios afro, mujeres, campesinos, fundaciones. Coloreamos
+    // por categoría (regex sobre el nombre) y desambiguamos dentro de cada categoría con
+    // un hash determinístico que escoge un tono del paleta de esa categoría.
+    const CITREP_PALETTES = {
+      IND:  ['#16a34a','#22c55e','#4ade80','#65a30d','#84cc16'],                     // indígena · verdes
+      AFRO: ['#eab308','#f59e0b','#facc15','#ca8a04','#fbbf24'],                     // afro · amarillos
+      VIC:  ['#dc2626','#ef4444','#f43f5e','#e11d48','#be123c'],                     // víctimas · rojos
+      MUJ:  ['#ec4899','#f472b6','#db2777','#be185d','#f9a8d4'],                     // mujeres · rosas
+      CAMP: ['#ea580c','#c2410c','#92400e','#b45309','#d97706'],                     // campesinos/agro · naranjas-marrones
+      FUND: ['#2563eb','#0ea5e9','#0891b2','#0284c7','#06b6d4'],                     // fundaciones/corporaciones · azules-cyan
+      OTR:  ['#7c3aed','#a855f7','#9333ea','#8b5cf6','#6d28d9'],                     // otros · púrpuras
+    };
+    function citrepCat(n){
+      const u = (n||'').toUpperCase();
+      if(/RESGUARDO|COMUNIDAD IND[IÍ]GENA|\bIND[IÍ]GENA\b/.test(u)) return 'IND';
+      if(/CONSEJO COMUNITARIO|CONCEJO COMUNITARIO|COCOMA|RECOMPAS|AFRO|\bNEGRA\b|\bNEGROS\b|\bCCCN\b|\bOEAP\b|ÉTNI|ETNI/.test(u)) return 'AFRO';
+      if(/V[IÍ]CTIMA|DESPLAZAD|RECLAMANTE|RESTITUCI[OÓ]N|MOVICE|RETORNANTE|TIERRA Y PAZ/.test(u)) return 'VIC';
+      if(/MUJER/.test(u)) return 'MUJ';
+      if(/CAMPESIN|AGROPECUARI|AGR[IÍ]COLA|CACAOTER|GANADER|PRODUCTOR|PISCICULTOR|MADEREROS|MINERA|MINERO|CACAO|CAUCHO|PL[AÁ]TANO|HORTEL|PARCELERO|\bCAFE\b|\bANUC\b|^AGRO|^APRO|^COOAGRO|RURAL|CAMPO/.test(u)) return 'CAMP';
+      if(/FUNDACI[OÓ]N|CORPORACI[OÓ]N|COOPERATIVA|^FUND/.test(u)) return 'FUND';
+      return 'OTR';
+    }
+    // FNV-1a 32-bit determinístico → índice dentro del array de tonos de la categoría
+    function _hashStr(s){let h=2166136261>>>0;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+    const _colorCache = {};
+    function getColor(n){
+      if(!n) return '#555';
+      if(_colorCache[n]) return _colorCache[n];
+      const cat = citrepCat(n);
+      const pal = CITREP_PALETTES[cat] || CITREP_PALETTES.OTR;
+      const c = pal[_hashStr(n) % pal.length];
+      _colorCache[n] = c;
+      return c;
+    }
 
     // CAMBIO: método d'Hondt — se ejecuta por circunscripción, no por departamento
     function calcDhondt(votosArr, nCurules) {
