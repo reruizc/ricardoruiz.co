@@ -725,9 +725,16 @@
     .ext-header-sub{font-size:.72rem;color:rgba(255,255,255,.5);margin-top:.15rem}
     body.day-mode .ext-header-sub{color:rgba(0,0,0,.55)}
 
-    /* Label del inset "Exterior" sobre el cuadrado del Caribe */
-    .ext-inset-label{font-family:'DM Mono',monospace;font-weight:400;font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.7);background:transparent;border:none;text-shadow:0 1px 2px rgba(0,0,0,.8);pointer-events:none;white-space:nowrap}
-    body.day-mode .ext-inset-label{color:rgba(0,0,0,.55);text-shadow:0 1px 2px rgba(255,255,255,.6)}
+    /* Botón "Votos en el exterior" — entre map-head y el mapa */
+    .ext-trigger-btn{display:flex;align-items:center;gap:.55rem;width:100%;padding:.55rem .9rem;background:rgba(13,18,42,.6);border:none;border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;font-family:Avenir,sans-serif;font-weight:500;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.75);transition:all .15s;text-align:left}
+    .ext-trigger-btn:hover{background:rgba(0,71,255,.12);color:#fff;border-color:rgba(0,71,255,.35)}
+    .ext-trigger-icon{font-size:.95rem;opacity:.7;transition:transform .2s,opacity .15s}
+    .ext-trigger-btn:hover .ext-trigger-icon{opacity:1;transform:translateX(2px) translateY(-1px)}
+    .ext-trigger-label{flex:1}
+    .ext-trigger-meta{font-family:'DM Mono',monospace;font-weight:400;font-size:.66rem;letter-spacing:.06em;text-transform:none;color:rgba(255,255,255,.45)}
+    body.day-mode .ext-trigger-btn{background:rgba(0,71,255,.04);border-top-color:rgba(0,0,0,.08);border-bottom-color:rgba(0,0,0,.08);color:rgba(0,0,0,.65)}
+    body.day-mode .ext-trigger-btn:hover{background:rgba(0,71,255,.1);color:var(--blue);border-color:rgba(0,71,255,.3)}
+    body.day-mode .ext-trigger-meta{color:rgba(0,0,0,.45)}
     .map-legend-title{font-family:Avenir,sans-serif;font-weight:500;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.4)}
     .map-legend-bar{width:260px;height:8px;background:linear-gradient(to right,#0d1b3e,#1d4ed8,#0891b2,#15803d,#ca8a04,#fef08a,#ea580c,#dc2626)}
     .map-legend-ends{display:flex;justify-content:space-between;width:260px;font-family:Avenir,sans-serif;font-weight:400;font-size:.68rem;color:rgba(255,255,255,.5)}
@@ -1041,6 +1048,11 @@
         </div>
         <div class="map-head-pct" id="map-cand-pct"></div>
       </div>
+      <button class="ext-trigger-btn" id="ext-trigger-btn" onclick="drillToExterior()" title="Ver consulados (votos del exterior)">
+        <span class="ext-trigger-icon">✈</span>
+        <span class="ext-trigger-label">Votos en el exterior</span>
+        <span class="ext-trigger-meta" id="ext-trigger-meta"></span>
+      </button>
       <div style="position:relative;flex:1;display:flex;flex-direction:column">
         <div id="leaflet-map"></div>
         <div class="exterior-grid" id="exterior-grid"></div>
@@ -2059,56 +2071,12 @@
     }
   }
 
-  // Bbox del inset "Exterior" al este de Colombia, sobre territorio que
-  // de otro modo quedaría vacío (Venezuela / Amazonas venezolano). Evita
-  // bajar el mapa de Colombia (lo que sí pasaba al ponerlo al norte sobre
-  // el Caribe) y se lee como "lo que está afuera" sin tapar deptos. El
-  // cuadrado entra al flujo normal de deptLayer como un feature más:
-  // `featureStyle` lo colorea por ganador proyectado de depto 88,
-  // `onEachFeature` lo hace hoverable y clickeable. El click dispara
-  // `drillToExterior()` en vez del drill geográfico estándar.
-  const EXT_BBOX = { south: 4.5, north: 7.5, west: -64.5, east: -61.5 };
-  function _extInsetFeature(){
-    return {
-      type: 'Feature',
-      properties: { name: 'CONSULADOS', __ext: true, electoral_id: '88' },
-      geometry: {
-        type: 'Polygon',
-        coordinates: [[
-          [EXT_BBOX.west, EXT_BBOX.south],
-          [EXT_BBOX.east, EXT_BBOX.south],
-          [EXT_BBOX.east, EXT_BBOX.north],
-          [EXT_BBOX.west, EXT_BBOX.north],
-          [EXT_BBOX.west, EXT_BBOX.south],
-        ]],
-      },
-    };
-  }
-  let _extLabelMarker = null;
-  function _addExtLabel(){
-    if (_extLabelMarker || !map) return;
-    const cy = (EXT_BBOX.south + EXT_BBOX.north) / 2;
-    const cx = (EXT_BBOX.west + EXT_BBOX.east) / 2;
-    _extLabelMarker = L.marker([cy, cx], {
-      interactive: false,
-      icon: L.divIcon({
-        className: 'ext-inset-label-wrap',
-        html: '<span class="ext-inset-label">Exterior</span>',
-        iconSize: [80, 14],
-        iconAnchor: [40, 7],
-      }),
-    }).addTo(map);
-  }
-
   async function loadDeptos(){
     try{
       const r = await fetch(DEPARTAMENTOS_URL);
       geoData = await r.json();
-      // Inyecta el inset "Exterior" como un feature sintético adicional.
-      geoData.features.push(_extInsetFeature());
       recomputeScales();
       deptLayer = L.geoJSON(geoData, { style: featureStyle, onEachFeature }).addTo(map);
-      _addExtLabel();
       try{ const b = deptLayer.getBounds(); if (b.isValid()) map.fitBounds(b, { padding:[12,12] }); }catch(e){}
       // Segunda pasada para pintar con escalas correctas y poblar la leyenda.
       repaintMap();
@@ -2121,10 +2089,6 @@
     if (!geoData) return;
     let mMargin = 0, mShare = 0;
     for (const f of geoData.features){
-      // El inset Exterior se excluye del cálculo de escala para que su
-      // margen (a veces extremo, p.ej. Cepeda 30+ pp en algunos países)
-      // no comprima la intensidad de color del resto del mapa.
-      if (f.properties && f.properties.__ext) continue;
       const nm = depName(f.properties);
       const r = computeDeptoRanking(nm);
       if (r && r.margin > mMargin) mMargin = r.margin;
@@ -2174,43 +2138,31 @@
   }
 
   function onEachFeature(feature, layer){
-    const rawNm = depName(feature.properties);
-    const isExt = !!feature.properties.__ext;
-    // Label visible: el inset usa el alias "Exterior" porque "CONSULADOS"
-    // en el contexto del mapa de Colombia se lee mejor como "lo que está
-    // fuera del país" que como nombre de territorio.
-    const nm = isExt ? 'Exterior' : rawNm;
-    // Para todas las funciones que leen históricos/SENADO_BY_DEPTO el
-    // nombre canónico sigue siendo CONSULADOS — solo cambiamos el display.
-    const depNomData = isExt ? 'CONSULADOS' : rawNm;
+    const nm = depName(feature.properties);
     // Code para drill (electoral_id si existe, si no via SENADO_BY_DEPTO)
     let _drillDepCod = feature.properties.electoral_id || feature.properties.dep_electoral;
     if (!_drillDepCod){
-      const entry = SENADO_BY_DEPTO[norm(depNomData)];
+      const entry = SENADO_BY_DEPTO[norm(nm)];
       _drillDepCod = entry?.cod;
     }
     const payload = {
-      scopeKey: 'dep:' + depNomData,
-      level:    isExt ? 'Exterior' : 'Departamento',
+      scopeKey: 'dep:' + nm,
+      level:    'Departamento',
       name:     nm,
       parents:  [],
       kind:     'depto',
-      args:     { depNom: depNomData },
-      fuente:   isExt
-        ? 'Bias depto · históricos pres 2010-2022 + senado 2026 (consulados)'
-        : `Bias depto · ${_fuentesDisponibles ? _fuentesDisponibles() : 'señales históricas'}`,
-      drillTo:  isExt
-        ? { label: 'Ver países →', kind: 'exterior', args: [] }
-        : (_drillDepCod ? { label: 'Ver municipios →', kind: 'depto', args: [String(_drillDepCod).padStart(2,'0'), nm] } : null),
+      args:     { depNom: nm },
+      fuente:   `Bias depto · ${_fuentesDisponibles ? _fuentesDisponibles() : 'señales históricas'}`,
+      drillTo:  _drillDepCod ? { label: 'Ver municipios →', kind: 'depto', args: [String(_drillDepCod).padStart(2,'0'), nm] } : null,
     };
     // Tooltip Leaflet sigue presente como fallback en mobile (CSS lo oculta
     // en desktop ≥1100px). En desktop el detalle vive en #territory-card.
     const tooltipHtmlFn = () => {
-      const r = computeDeptoRanking(depNomData);
+      const r = computeDeptoRanking(nm);
       if (selectedId){
         const cand = CANDIDATOS.find(c => c.id === selectedId);
-        const total = CANDIDATOS.reduce((s,c) => s + projected(c, depNomData), 0);
-        const v = cand ? projected(cand, depNomData) : 0;
+        const total = CANDIDATOS.reduce((s,c) => s + projected(c, nm), 0);
+        const v = cand ? projected(cand, nm) : 0;
         const share = total > 0 ? v / total : 0;
         return `<div style="line-height:1.4"><b>${nm}</b><br>${cand?cand.nombre:''}<br><b>${(share*100).toFixed(1)}%</b> local</div>`;
       }
@@ -2222,7 +2174,7 @@
     layer.on({
       mouseover(e){
         layer.setStyle({ weight:2.5, color:'#fff', fillOpacity:.98 });
-        const r = computeDeptoRanking(depNomData);
+        const r = computeDeptoRanking(nm);
         const winColor = r?.winner?.color || 'rgba(255,255,255,.5)';
         _setHoverChip(e, nm, winColor);
         _hoverTerritory(payload);
@@ -2231,13 +2183,12 @@
       mousemove(e){ _moveHoverChip(e); },
       mouseout(){ if (deptLayer) deptLayer.resetStyle(layer); layer.closeTooltip(); _clearHoverChip(); },
       click(){
-        if (isExt){ drillToExterior(); return; }
         // Click en un depto → drill-down a sus municipios.
         // Usa electoral_id si existe, si no el nombre → código via SENADO_BY_DEPTO.
         const props = feature.properties;
         let depCod = props.electoral_id || props.dep_electoral;
         if (!depCod){
-          const entry = SENADO_BY_DEPTO[norm(depNomData)];
+          const entry = SENADO_BY_DEPTO[norm(nm)];
           depCod = entry?.cod;
         }
         if (depCod) drillToDepto(String(depCod).padStart(2,'0'), nm);
@@ -2502,6 +2453,14 @@
     const r = await fetch(EXT_MUN_URL, { cache: 'force-cache' });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     _extPaisesData = await r.json();
+    // Popular el meta del botón con el total de votantes Senado 2026 una
+    // vez tengamos los datos. Si el botón ya existía, queda informativo
+    // antes incluso de hacer click.
+    const metaEl = document.getElementById('ext-trigger-meta');
+    if (metaEl){
+      const tot = _extPaisesData.reduce((s,p) => s + (p.votant||0), 0);
+      metaEl.textContent = `${_extPaisesData.length} consulados · ${tot.toLocaleString('es-CO')} votantes`;
+    }
     return _extPaisesData;
   }
 
@@ -7356,6 +7315,7 @@
       loadHistoricos(),
       loadDiagnostico(),
       loadCensosAgregados(),  // ~17 KB, alimenta _censoBy{Dep,Mun} para fix consultas en bias dep/mun
+      _loadExteriorData().catch(() => null),  // ~28 KB, popular meta del botón "Votos en el exterior"
     ]);
     // Ahora que senado y los históricos cargaron, construimos la señal
     // 'senado-2026' y precomputamos bias(c, d) y bias(c, mun).
