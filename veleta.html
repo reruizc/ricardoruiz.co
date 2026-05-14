@@ -713,13 +713,25 @@
     if (!records || !records.length) return;
     const mode = STATE.mode;
     const scope = (opts && opts.scope) || 'local';
+    function priority(r){ return priorityForRecord(r, mode); }
     if (scope === 'nacional' && STATE.scoreByMun && Object.keys(STATE.scoreByMun).length){
+      // Percentil contra distribución nacional + desempate sub-rank por (priority, censo)
+      // para garantizar unicidad estricta dentro del set entregado.
       records.forEach(r => {
-        r.score = +percentileInNational(priorityForRecord(r, mode), mode).toFixed(1);
+        r.score = percentileInNational(priority(r), mode);
       });
+      const sorted = records.slice().sort((a,b) => {
+        const ds = b.score - a.score;
+        if (Math.abs(ds) > 1e-9) return ds;
+        const dp = priority(b) - priority(a);
+        if (Math.abs(dp) > 1e-9) return dp;
+        return (b.censo||0) - (a.censo||0);
+      });
+      // Espacio mínimo entre records empatados (epsilon decreciente).
+      const N = sorted.length;
+      sorted.forEach((r, i) => { r.score = r.score - (i * 1e-6); });
       return;
     }
-    function priority(r){ return priorityForRecord(r, mode); }
     // Tiebreak estable por censo (más grande prevalece)
     const sorted = records.slice().sort((a,b) => {
       const dp = priority(b) - priority(a);
@@ -728,8 +740,10 @@
     });
     const N = sorted.length;
     if (N === 1){ sorted[0].score = 100; return; }
+    // Sin rounding interno: el score raw es único (step = 100/(N-1)). El display
+    // formatea con 1 decimal y los enteros como entero (ver patchTop30Names).
     sorted.forEach((r, i) => {
-      r.score = +(100 * (N - 1 - i) / (N - 1)).toFixed(1);
+      r.score = 100 * (N - 1 - i) / (N - 1);
     });
   }
 
@@ -1043,6 +1057,60 @@
     assignPercentileScores(Object.values(STATE.scoreByBarrio), { scope: STATE.scoreScope });
   }
 
+  // Centroide aproximado (promedio simple de vértices) — suficiente para kNN local.
+  function centroidOfFeature(f){
+    const g = f && f.geometry;
+    if (!g || !g.coordinates) return null;
+    let sx = 0, sy = 0, n = 0;
+    function visit(c){
+      if (typeof c[0] === 'number'){ sx += c[0]; sy += c[1]; n++; }
+      else c.forEach(visit);
+    }
+    visit(g.coordinates);
+    return n ? [sx/n, sy/n] : null;
+  }
+
+  // Para cada feature de la comuna sin score, hereda del barrio contiguo con score
+  // (vecino más cercano por centroide). Marca el rec heredado con _heredado=true
+  // y _heredadoDe (nombre del barrio donador) para mostrarlo en el detail card.
+  // Modifica STATE.scoreByBarrio in-place; los códigos heredados sólo viven mientras
+  // la capa está activa — al re-render desde otra comuna, computeScoresBarriosMde
+  // los limpia (resetea scoreByBarrio = {}).
+  function inheritBarriosMdeSinMedicion(features){
+    const conScore = [];
+    const sinScore = [];
+    for (const f of features){
+      const k = f && f.properties && f.properties.codigo;
+      if (!k) continue;
+      if (STATE.scoreByBarrio[k]){
+        const c = centroidOfFeature(f);
+        if (c) conScore.push({ k, c });
+      } else {
+        const c = centroidOfFeature(f);
+        if (c) sinScore.push({ f, k, c });
+      }
+    }
+    if (!conScore.length || !sinScore.length) return;
+    for (const item of sinScore){
+      let bestK = null, bestD = Infinity;
+      for (const ws of conScore){
+        const dx = ws.c[0] - item.c[0], dy = ws.c[1] - item.c[1];
+        const d = dx*dx + dy*dy;
+        if (d < bestD){ bestD = d; bestK = ws.k; }
+      }
+      if (!bestK) continue;
+      const src = STATE.scoreByBarrio[bestK];
+      const props = item.f.properties || {};
+      STATE.scoreByBarrio[item.k] = {
+        ...src,
+        cod: item.k,
+        nombre: props.nombre_bar || item.k,
+        _heredado: true,
+        _heredadoDe: STATE.scoreByBarrio[bestK] && STATE.scoreByBarrio[bestK].nombre || bestK,
+      };
+    }
+  }
+
   async function renderBarriosFromComunaMde(comunaCod){
     ensureMap();
     showLoading(true);
@@ -1054,7 +1122,10 @@
       computeScoresBarriosMde(proy);
 
       // Filtrar a barrios de la comuna clickeada. El GeoJSON trae 349 features
-      // (165 urbanos + corregimientos); proyección sólo cubre comunas 01-16.
+      // (165 urbanos + corregimientos); proyección sólo cubre comunas 01-16,
+      // y dentro de ellas faltan ~100 barrios. Para esos, heredamos del barrio
+      // contiguo con score (kNN por centroide del polígono) sólo en el set
+      // visible — sin contaminar STATE.scoreByBarrio para otras comunas.
       const filtered = {
         type:'FeatureCollection',
         features: geoRaw.features.filter(f => {
@@ -1062,6 +1133,7 @@
           return cm === comunaCod;
         }),
       };
+      inheritBarriosMdeSinMedicion(filtered.features);
 
       clearLayer();
       STATE.layer = L.geoJSON(filtered, {
@@ -1258,6 +1330,7 @@
     STATE.map = L.map('leaflet-map', {
       center:[4.5, -73.5],
       zoom:6,
+      zoomSnap:0.1,                 // permite zoom no-entero para el bump +10% inicial
       zoomControl:true,
       preferCanvas:false,           // CRÍTICO: SVG renderer para que url(#vel-stripes) resuelva
       attributionControl:true,
@@ -1293,8 +1366,11 @@
       },
     }).addTo(STATE.map);
     STATE.map.fitBounds(STATE.layer.getBounds(), { padding:[20,20] });
+    // +10% de zoom sobre el fit nacional (∆ ~+0.5 niveles ≈ 1.4× lineal).
+    STATE.map.setZoom(STATE.map.getZoom() + 0.5);
     document.getElementById('map-head-title').textContent = 'Vista nacional · Departamental';
     document.getElementById('map-back-btn').classList.remove('show');
+    renderTop30();
   }
 
   async function renderMunsOfDep(depElec){
@@ -1329,6 +1405,7 @@
     const depName = (STATE.depByElectoral[depElec]||{}).nombre || depElec;
     document.getElementById('map-head-title').textContent = `${depName} · Municipios`;
     document.getElementById('map-back-btn').classList.add('show');
+    renderTop30();
     showLoading(false);
   }
 
@@ -1595,6 +1672,7 @@
     STATE.map.fitBounds(STATE.layer.getBounds(), { padding:[20,20] });
     document.getElementById('map-head-title').textContent = 'Vista nacional · Municipal';
     document.getElementById('map-back-btn').classList.remove('show');
+    renderTop30();
     showLoading(false);
   }
 
@@ -1662,6 +1740,14 @@
   function fmtNum(n){ if (n==null||isNaN(n)) return '—'; return Math.round(n).toLocaleString('es-CO'); }
   function fmtPct(n,d=1){ if (n==null||isNaN(n)) return '—'; return n.toFixed(d) + '%'; }
   function fmtPP(n,d=1){ if (n==null||isNaN(n)) return '—'; return (n>=0?'':'') + n.toFixed(d) + ' pp'; }
+  // Display de score: entero si es 0/100 exactos; 1 decimal en el resto.
+  // Mantiene unicidad visual para top-N grandes (muns ~1.100, donde el rounding
+  // a 0 decimales generaba duplicados).
+  function fmtScore(n){
+    if (n == null || isNaN(n)) return '—';
+    if (Math.abs(n - Math.round(n)) < 0.05 && (n === 0 || n === 100)) return Math.round(n).toString();
+    return n.toFixed(1);
+  }
 
   function buildDetailRows(mode, r){
     const cand = CANDIDATES.find(c => c.id === mode) || CANDIDATES[0];
@@ -1806,41 +1892,95 @@
     document.getElementById('det-card').classList.add('show');
     const isDep = !f.__key;
     document.getElementById('det-name').textContent = f.__name || '—';
-    document.getElementById('det-parents').textContent = isDep
+    // Sub-label: para barrios Medellín heredados, mostrar el origen del score.
+    let parents = isDep
       ? (r && r.nMun ? `${r.nMun} municipios` : '')
       : (f.__depName || '');
+    if (r && r._heredado && r._heredadoDe){
+      parents = parents
+        ? `${parents} · score heredado del barrio contiguo «${r._heredadoDe}»`
+        : `Score heredado del barrio contiguo «${r._heredadoDe}»`;
+    }
+    document.getElementById('det-parents').textContent = parents;
     const scEl = document.getElementById('det-score');
-    scEl.textContent = (r && r.score!=null) ? r.score.toFixed(0) : '—';
+    scEl.textContent = (r && r.score!=null) ? fmtScore(r.score) : '—';
     const meta = document.getElementById('det-meta');
     if (meta) meta.innerHTML = buildDetailRows(STATE.mode, r);
   }
 
-  /* ───────── Top 30 ranking + contador veleta ───────── */
+  /* ───────── Top 10 ranking dinámico según vista activa ─────────
+     Reglas:
+       barrioActive   → top 10 barrios del territorio (UPL Bog / Comuna Mde)
+       cityActive     → top 10 comunas/UPL de la ciudad
+       selectedDep    → top 10 municipios del departamento
+       level==='mun'  → top 10 municipios nacional
+       (default)      → top 10 departamentos
+     Actualiza también el #top-title con el label contextual. */
+  const TOP_N = 10;
   function renderTop30(){
+    const titleEl = document.getElementById('top-title');
+    const cand = currentCand();
+    const candShort = cand ? cand.nombre.split(' ')[0] : '';
+
     if (STATE.barrioActive){
-      const arr = Object.values(STATE.scoreByBarrio).sort((a,b)=>b.score-a.score).slice(0,15);
+      const arr = Object.values(STATE.scoreByBarrio).sort((a,b)=>b.score-a.score).slice(0, TOP_N);
       const adapted = arr.map(r => ({
         key: r.cod, depCod: r.depCod || '',
         __cityName: r.nombre,
         __subLabel: r.loc_nombre || '',
         score: r.score, __isComuna:true,
       }));
+      if (titleEl){
+        const lbl = (STATE.barrioCity === 'medellin')
+          ? `Top ${TOP_N} · barrios de la comuna seleccionada`
+          : `Top ${TOP_N} · barrios de la UPL seleccionada`;
+        titleEl.textContent = lbl;
+      }
       patchTop30Names(adapted);
       return;
     }
     if (STATE.cityActive){
-      const arr = Object.values(STATE.scoreByComuna).sort((a,b)=>b.score-a.score).slice(0,15);
+      const arr = Object.values(STATE.scoreByComuna).sort((a,b)=>b.score-a.score).slice(0, TOP_N);
       const adapted = arr.map(r => ({
         key: r.cod, depCod: r.depCod || '',
         __cityName: r.nombre,
         __subLabel: '',  // se rellena con el nombre de la ciudad
         score: r.score, __isComuna:true,
       }));
+      const cfg = CITIES[STATE.cityActive];
+      const granLbl = (cfg && cfg.granLabel) ? cfg.granLabel.toLowerCase() : 'comunas';
+      if (titleEl) titleEl.textContent = `Top ${TOP_N} · ${granLbl} clave en ${cfg ? cfg.nombre : 'la ciudad'}`;
       patchTop30Names(adapted);
       return;
     }
-    const arr = Object.values(STATE.scoreByMun).sort((a,b)=>b.score-a.score).slice(0,15);
-    patchTop30Names(arr);
+    if (STATE.selectedDep){
+      // Top muns del depto en drill territorial.
+      const arr = Object.values(STATE.scoreByMun)
+        .filter(r => r.depCod === STATE.selectedDep)
+        .sort((a,b)=>b.score-a.score)
+        .slice(0, TOP_N);
+      const depName = (STATE.depByElectoral[STATE.selectedDep] || {}).nombre || STATE.selectedDep;
+      if (titleEl) titleEl.textContent = `Top ${TOP_N} · municipios clave de ${depName}`;
+      patchTop30Names(arr);
+      return;
+    }
+    if (STATE.level === 'mun'){
+      const arr = Object.values(STATE.scoreByMun).sort((a,b)=>b.score-a.score).slice(0, TOP_N);
+      if (titleEl) titleEl.textContent = `Top ${TOP_N} · municipios clave para ${candShort}`;
+      patchTop30Names(arr);
+      return;
+    }
+    // Default: vista inicial nacional con deptos
+    const arr = Object.values(STATE.scoreByDep).sort((a,b)=>b.score-a.score).slice(0, TOP_N);
+    const adapted = arr.map(r => ({
+      key: r.depCod, depCod: r.depCod,
+      __isDep: true,
+      __depName: (STATE.depByElectoral[r.depCod] || {}).nombre || r.depCod,
+      __nMun: r.nMun || 0,
+      score: r.score,
+    }));
+    if (titleEl) titleEl.textContent = `Top ${TOP_N} · departamentos clave para ${candShort}`;
+    patchTop30Names(adapted);
   }
 
   // Mapa key→nombre se construye on-demand al cargar muns
@@ -1853,6 +1993,17 @@
     const ul = document.getElementById('top-list');
     const cityCfg = STATE.cityActive ? CITIES[STATE.cityActive] : null;
     ul.innerHTML = arr.map((r,i)=>{
+      if (r.__isDep){
+        const sub = r.__nMun ? `${r.__nMun} municipios` : '';
+        return `<div class="top-row" data-dep="${r.depCod}" onclick="onTopClickDep('${r.depCod}')">
+          <div class="top-rank">${i+1}</div>
+          <div>
+            <div class="top-name">${r.__depName || r.depCod}</div>
+            <div class="top-meta"><span class="top-meta-dep">${sub}</span></div>
+          </div>
+          <div class="top-score">${fmtScore(r.score)}</div>
+        </div>`;
+      }
       if (r.__isComuna){
         const cityName = cityCfg ? cityCfg.nombre : '';
         // Si es barrio, mostrar la localidad como sublabel; si es comuna/UPL, mostrar nombre de ciudad
@@ -1863,7 +2014,7 @@
             <div class="top-name">${r.__cityName || r.key}</div>
             <div class="top-meta"><span class="top-meta-dep">${sub}</span></div>
           </div>
-          <div class="top-score">${r.score.toFixed(0)}</div>
+          <div class="top-score">${fmtScore(r.score)}</div>
         </div>`;
       }
       const meta = STATE._munNameByKey[r.key];
@@ -1875,9 +2026,14 @@
           <div class="top-name">${munName}</div>
           <div class="top-meta"><span class="top-meta-dep">${depName}</span></div>
         </div>
-        <div class="top-score">${r.score.toFixed(0)}</div>
+        <div class="top-score">${fmtScore(r.score)}</div>
       </div>`;
     }).join('');
+  }
+
+  function onTopClickDep(depElec){
+    if (!depElec) return;
+    onDepClick(depElec);
   }
 
   function onTopClick(key, dep){
@@ -1960,8 +2116,7 @@
       const btn = document.getElementById('cand-' + c.id);
       if (btn) btn.classList.toggle('active', c.id === id);
     }
-    const title = document.getElementById('top-title');
-    if (title) title.textContent = `Top 15 · muns clave para ${cand.nombre.split(' ')[0]}`;
+    // El título del top se actualiza dinámicamente en renderTop30 según vista activa.
     const metaTitle = document.getElementById('metodo-title');
     if (metaTitle) metaTitle.textContent = `Cómo se construye el score · Modo ${cand.nombre.split(' ')[0]}`;
     // Mostrar el bloque metodológico correspondiente.
