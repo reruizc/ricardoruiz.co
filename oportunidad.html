@@ -240,6 +240,15 @@
     .leaflet-control-zoom a{background:rgba(13,15,28,.9)!important;color:var(--white)!important;border-color:rgba(255,255,255,.15)!important}
     .leaflet-control-zoom a:hover{background:rgba(74,222,128,.3)!important}
 
+    /* Chip de nombre del feature al tocar (sólo móvil). En desktop usamos
+       el hover-chip que sigue el cursor; en móvil mostramos un chip fijo
+       sobre el mapa con el nombre del barrio/feature que el usuario tocó. */
+    .map-tap-name{display:none}
+    @media (max-width:1099px){
+      .map-tap-name{display:block;position:absolute;top:.55rem;left:50%;transform:translateX(-50%) translateY(-6px);z-index:900;background:rgba(6,8,16,0.96);color:#f4f3ef;font-family:Avenir,sans-serif;font-weight:500;font-size:.86rem;letter-spacing:.01em;padding:.35rem .7rem;border:1px solid rgba(74,222,128,0.55);box-shadow:0 2px 10px rgba(0,0,0,.4);max-width:calc(100% - 1.6rem);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s,transform .15s}
+      .map-tap-name.show{opacity:1;transform:translateX(-50%) translateY(0)}
+      body.day-mode .map-tap-name{background:rgba(255,255,255,.96);color:#0d1120;border-color:rgba(220,38,38,.55);box-shadow:0 2px 10px rgba(0,0,0,.15)}
+    }
     .map-loading{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(6,8,16,.85);z-index:800;font-family:Avenir,sans-serif;font-weight:500;font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.75);pointer-events:none}
     .map-loading.show{display:flex}
     .map-loading .dot{width:8px;height:8px;border-radius:50%;background:var(--green);margin:0 4px;animation:bounce 1.2s infinite}
@@ -812,6 +821,8 @@
         <button class="map-back-btn" id="map-back-btn" onclick="onBack()"><span id="map-back-label">← Volver a nacional</span></button>
       </div>
       <div id="leaflet-map"></div>
+      <!-- Chip de nombre al tap (sólo visible en mobile, sobre el mapa) -->
+      <div class="map-tap-name" id="map-tap-name" aria-hidden="true"></div>
       <div class="map-loading" id="map-loading">
         <span class="dot"></span><span class="dot"></span><span class="dot"></span>
         <span style="margin-left:.7rem">Calculando voto blando</span>
@@ -3523,6 +3534,21 @@
   }
   function showLoading(on){ document.getElementById('map-loading').classList.toggle('show', !!on); }
 
+  // Muestra un chip pequeño con el nombre del feature tocado, sobre el mapa.
+  // Pensado para mobile (CSS lo oculta en desktop). Auto-hide a los 2.5s.
+  let _tapNameHideTimer = null;
+  function showTapName(name){
+    const el = document.getElementById('map-tap-name');
+    if (!el || !name) return;
+    el.textContent = name;
+    el.classList.add('show');
+    if (_tapNameHideTimer){ clearTimeout(_tapNameHideTimer); }
+    _tapNameHideTimer = setTimeout(() => {
+      el.classList.remove('show');
+      _tapNameHideTimer = null;
+    }, 2500);
+  }
+
   function renderDeptos(){
     ensureMap(); clearLayer();
     const geo = STATE.depGeo;
@@ -4679,6 +4705,10 @@
         layer.on('mouseover', (e) => onHover(f, e));
         layer.on('mouseout',  (e) => onHoverOut(f, e));
         layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
+        // En móvil: al tocar el barrio, además del panel detalle (que
+        // queda debajo del mapa), mostramos el nombre como chip flotante
+        // sobre el mapa para feedback inmediato.
+        layer.on('click', () => showTapName(f.__name));
       },
     }).addTo(STATE.map);
     STATE.map.fitBounds(STATE.mapLayer.getBounds(), { padding:[20,20] });
