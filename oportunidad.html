@@ -473,6 +473,27 @@
     body.day-mode .gate-btn-ghost{border-color:rgba(0,0,0,.25);color:rgba(0,0,0,.7)}
     body.day-mode .gate-btn-ghost:hover{border-color:rgba(0,0,0,.5);color:#0d1120}
 
+    /* Login inline dentro del modal */
+    .gate-login{display:none;margin-top:1.1rem;padding-top:1.1rem;border-top:1px solid rgba(255,255,255,.1);font-family:Avenir,sans-serif}
+    .gate-login.show{display:block}
+    body.day-mode .gate-login{border-top-color:rgba(0,0,0,.1)}
+    .gate-login-title{font-family:Avenir,sans-serif;font-weight:600;font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:.7rem}
+    body.day-mode .gate-login-title{color:rgba(0,0,0,.55)}
+    .gate-login-field{display:flex;flex-direction:column;gap:.3rem;margin-bottom:.7rem}
+    .gate-login-field label{font-family:Avenir,sans-serif;font-weight:500;font-size:.78rem;color:rgba(255,255,255,.7);letter-spacing:.02em}
+    body.day-mode .gate-login-field label{color:rgba(0,0,0,.7)}
+    .gate-login-field input{font-family:Avenir,sans-serif;font-size:.92rem;padding:.55rem .7rem;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);color:var(--white);outline:none;transition:border-color .15s}
+    .gate-login-field input:focus{border-color:var(--green)}
+    body.day-mode .gate-login-field input{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.18);color:#0d1120}
+    body.day-mode .gate-login-field input:focus{border-color:#dc2626}
+    .gate-login-err{font-family:Avenir,sans-serif;font-size:.82rem;color:#f87171;min-height:1.2rem;margin-top:.2rem}
+    body.day-mode .gate-login-err{color:#b91c1c}
+    .gate-login-actions{display:flex;align-items:center;justify-content:space-between;gap:.65rem;margin-top:.7rem;flex-wrap:wrap}
+    .gate-login-forgot{font-family:Avenir,sans-serif;font-size:.78rem;color:rgba(255,255,255,.55);text-decoration:none}
+    .gate-login-forgot:hover{color:var(--green)}
+    body.day-mode .gate-login-forgot{color:rgba(0,0,0,.55)}
+    body.day-mode .gate-login-forgot:hover{color:#dc2626}
+
     /* Candado sobre el panel-card cuando el feature está bloqueado.
        El panel-card es relativo para que el overlay lo cubra. */
     .panel-card{position:relative}
@@ -841,7 +862,8 @@
   // Mapping declarativo: feature → plan mínimo. Cualquier acción
   // bloqueable se nombra aquí.
   const FEATURE_PLAN = {
-    'candidato':         'free',     // cambiar de candidato requiere cuenta
+    'candidato':         'free',     // cambiar de candidato requiere cuenta (excepto el 1er switch anónimo)
+    'candidato-anonimo-agotado': 'free',  // alias: ya usaste tu cambio de muestra
     'capa-opo-abs':      'free',
     'nivel-dep-mun':     'free',
     'hover-detalle':     'free',
@@ -860,6 +882,7 @@
   // Copy del modal por feature. Si falta entry, se usa el genérico.
   const FEATURE_COPY = {
     'candidato':        { title:'Selecciona el candidato a analizar', desc:'Crea tu cuenta gratis para explorar el mapa de oportunidad de cualquier candidato.' },
+    'candidato-anonimo-agotado': { title:'Ya usaste tu cambio de muestra', desc:'Como invitado puedes ver dos candidatos: Cepeda (por defecto) y uno a tu elección. Para alternar libremente entre los seis candidatos del ponderador, crea tu cuenta gratis.' },
     'capa-opo-abs':     { title:'Capa Oportunidad / Abstención', desc:'Necesitas una cuenta gratis para alternar entre las dos capas de análisis.' },
     'nivel-dep-mun':    { title:'Cambiar nivel territorial', desc:'Necesitas una cuenta gratis para alternar entre vista departamental y municipal.' },
     'hover-detalle':    { title:'Detalle del territorio', desc:'Necesitas una cuenta gratis para ver el desglose por fuente histórica al pasar el cursor por el mapa.' },
@@ -958,7 +981,86 @@
   }
   function closeBlockedModal(){
     document.getElementById('gate-modal').classList.remove('show');
+    // Reset del form de login para que la próxima vez no muestre el panel.
+    const form = document.getElementById('gate-login');
+    const err  = document.getElementById('gate-login-err');
+    if (form){ form.classList.remove('show'); form.reset(); }
+    if (err){ err.textContent = ''; }
   }
+
+  // Click en "Ya tengo cuenta" dentro del modal de bloqueo:
+  // toggle del form inline de login.
+  function toggleGateLogin(){
+    const form = document.getElementById('gate-login');
+    if (!form) return;
+    form.classList.toggle('show');
+    if (form.classList.contains('show')){
+      // foco al email después de un tick para que la animación no se lo coma
+      setTimeout(() => { document.getElementById('gate-login-email')?.focus(); }, 30);
+    }
+  }
+  window.toggleGateLogin = toggleGateLogin;
+
+  // Submit del form de login inline → POST /auth/login → recarga estado.
+  async function onInlineLogin(ev){
+    ev.preventDefault();
+    const emailEl = document.getElementById('gate-login-email');
+    const pwEl    = document.getElementById('gate-login-pw');
+    const errEl   = document.getElementById('gate-login-err');
+    const btn     = document.getElementById('gate-login-submit');
+    if (!emailEl || !pwEl) return false;
+    errEl.textContent = '';
+    btn.disabled = true;
+    const prevText = btn.textContent;
+    btn.textContent = 'Entrando…';
+    try {
+      const res = await fetch('https://rr-auth.reruizc.workers.dev/auth/login', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ email: emailEl.value.trim(), password: pwEl.value }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data && data.ok && data.token && data.user){
+        localStorage.setItem('rr-token', data.token);
+        localStorage.setItem('rr-user',  JSON.stringify(data.user));
+        _userInfo = data.user;
+        _userPlan = data.user.plan || 'free';
+        renderPlanChip();
+        applyLockState();
+        await dlRefreshStatus();
+        renderDlCounter();
+        closeBlockedModal();
+        // Ahora que está logueado, el botón que disparó el modal puede
+        // re-intentarse — pero por simplicidad cerramos y el usuario
+        // vuelve a hacer click. Mejor UX que reintentos automáticos
+        // que pueden cambiar de candidato sin intención.
+      } else {
+        errEl.textContent = (data && data.error) || 'Email o contraseña incorrectos.';
+      }
+    } catch(e){
+      errEl.textContent = 'No se pudo conectar. Revisa tu conexión e intenta de nuevo.';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = prevText;
+    }
+    return false;
+  }
+  window.onInlineLogin = onInlineLogin;
+
+  // Click en "Ya tengo cuenta" desde el welcome modal: cierra welcome y
+  // abre el de bloqueo con el form ya desplegado.
+  function welcomeOpenLogin(){
+    closeWelcomeModal();
+    // Usamos 'candidato' como feature genérica para mostrar el modal.
+    openBlockedModal('candidato');
+    // Desplegar el form de login automáticamente.
+    setTimeout(() => {
+      const form = document.getElementById('gate-login');
+      if (form) form.classList.add('show');
+      document.getElementById('gate-login-email')?.focus();
+    }, 40);
+  }
+  window.welcomeOpenLogin = welcomeOpenLogin;
 
   /* ─── WELCOME MODAL (anónimos primer visit) ──────────────────── */
   function showWelcomeIfFirst(){
@@ -5009,9 +5111,27 @@
     }).join('');
   }
 
+  // Anónimo: permite UN cambio de candidato gratis antes de exigir cuenta.
+  // Contador persistido para que no se "reset" al refrescar.
+  function _anonCandSwitches(){
+    try { return parseInt(localStorage.getItem('opo-anon-cand-switches')||'0',10)||0; }
+    catch(_){ return 0; }
+  }
+  function _anonCandSwitchBump(){
+    try { localStorage.setItem('opo-anon-cand-switches', String(_anonCandSwitches()+1)); }
+    catch(_){}
+  }
+
   function setCandidate(id){
     if (id === STATE.candId) return;
-    if (!requireFeature('candidato')) return;
+    // Anónimo: 1 cambio gratis. Después → modal.
+    if (_userPlan === 'anonymous'){
+      if (_anonCandSwitches() >= 1){
+        openBlockedModal('candidato-anonimo-agotado');
+        return;
+      }
+      _anonCandSwitchBump();
+    } else if (!requireFeature('candidato')) return;
     STATE.candId = id;
     document.querySelectorAll('.cand-pill').forEach(el => {
       el.classList.toggle('active', el.dataset.id === id);
@@ -5433,9 +5553,26 @@
       <div class="gate-price-sub" id="gate-price-sub"></div>
       <div class="gate-actions">
         <a class="gate-btn gate-btn-primary" id="gate-cta-primary" href="pricing.html">Ver planes</a>
-        <a class="gate-btn gate-btn-ghost" id="gate-cta-login" href="login.html" style="display:none">Ya tengo cuenta</a>
+        <button class="gate-btn gate-btn-ghost" id="gate-cta-login" onclick="toggleGateLogin()" style="display:none">Ya tengo cuenta</button>
         <button class="gate-btn gate-btn-ghost" id="gate-cta-secondary" onclick="closeBlockedModal()">Cerrar</button>
       </div>
+      <!-- Login inline (se despliega al click en "Ya tengo cuenta") -->
+      <form class="gate-login" id="gate-login" onsubmit="onInlineLogin(event)">
+        <div class="gate-login-title">Iniciar sesión</div>
+        <div class="gate-login-field">
+          <label for="gate-login-email">Email</label>
+          <input id="gate-login-email" type="email" autocomplete="email" required />
+        </div>
+        <div class="gate-login-field">
+          <label for="gate-login-pw">Contraseña</label>
+          <input id="gate-login-pw" type="password" autocomplete="current-password" required />
+        </div>
+        <div class="gate-login-err" id="gate-login-err"></div>
+        <div class="gate-login-actions">
+          <a class="gate-login-forgot" href="forgot.html">¿Olvidaste tu contraseña?</a>
+          <button type="submit" class="gate-btn gate-btn-primary" id="gate-login-submit">Entrar</button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -5447,13 +5584,13 @@
       <div class="gate-desc">
         Este módulo te muestra <b>dónde un candidato puede crecer</b> con base en las cuatro fuentes históricas que mejor leen al electorado colombiano.
         <br/><br/>
-        <b>Sin cuenta puedes:</b> ver el mapa nacional, leer el ranking de departamentos y pasar el cursor por el mapa para ver el detalle.
+        <b>Sin cuenta puedes:</b> ver el mapa nacional con Cepeda activo, leer el ranking de departamentos, pasar el cursor por el mapa para ver el detalle, y <b>cambiar a un segundo candidato</b> de muestra.
         <br/><br/>
-        <b>Con cuenta gratis se desbloquea:</b> cambiar de candidato, alternar entre capa Oportunidad y Abstención, abrir cualquier departamento para ver sus municipios, y el desglose por fuente histórica.
+        <b>Con cuenta gratis se desbloquea:</b> alternar libremente entre los seis candidatos, capa Oportunidad y Abstención, abrir cualquier departamento para ver sus municipios, y el desglose por fuente histórica.
       </div>
       <div class="gate-actions">
         <a class="gate-btn gate-btn-primary" href="register.html">Crear cuenta gratis</a>
-        <a class="gate-btn gate-btn-ghost" href="login.html">Ya tengo cuenta</a>
+        <button class="gate-btn gate-btn-ghost" onclick="welcomeOpenLogin()">Ya tengo cuenta</button>
         <button class="gate-btn gate-btn-ghost" onclick="closeWelcomeModal()">Explorar como invitado</button>
       </div>
     </div>
