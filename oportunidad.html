@@ -3897,7 +3897,17 @@
 
     document.getElementById('det-censo').textContent = r ? fmtNum(r.censo) : '—';
     document.getElementById('det-abst').textContent  = (r && r.abst!=null) ? (r.abst*100).toFixed(1)+'%' : '—';
-    document.getElementById('det-topafin').textContent = isDep ? '—' : (r ? topAfinNameForMun(STATE.candId, f.__key) : '—');
+    // Top candidato afín:
+    //   - mun/comuna/UPL/barrio → busca en pres-2022 (o senado fallback) del puesto
+    //   - depto (vista nacional con dep seleccionado) → suma los muns del depto
+    if (isDep){
+      const depCod = f.__elec || (r && r.depCod) || null;
+      document.getElementById('det-topafin').textContent =
+        depCod ? topAfinNameForDepto(STATE.candId, depCod) : '—';
+    } else {
+      document.getElementById('det-topafin').textContent =
+        r ? topAfinNameForMun(STATE.candId, f.__key) : '—';
+    }
     document.getElementById('det-brecha').textContent  = (r && r.gap!=null && r.proj!=null)
       ? `${r.proj.toFixed(1)}% → ${(r.proj + r.gap).toFixed(1)}%`
       : '—';
@@ -3922,6 +3932,55 @@
       if (list[0]){
         const pct = sen.votval ? (100*list[0][1]/sen.votval).toFixed(1) : '?';
         return `${list[0][0].slice(0,28)} · ${pct}%`;
+      }
+    }
+    return '—';
+  }
+
+  // Versión agregada por depto: suma los votos de candidatos afines en
+  // todos los muns del depto y devuelve el más votado con su % del total.
+  function topAfinNameForDepto(candId, depCod){
+    const aff = AFINIDADES[candId];
+    if (!aff || !depCod) return '—';
+    const pref = String(depCod).padStart(2,'0') + '-';
+
+    // pres-2022 (preferido — señal más reciente y comparable)
+    if (STATE.pres22 && aff.pres22?.length){
+      const accum = new Map();
+      let totVv = 0;
+      for (const [k, e] of Object.entries(STATE.pres22)){
+        if (!k.startsWith(pref)) continue;
+        totVv += (e.votos_validos || 0);
+        for (const c of Object.values(e.candidatos || {})){
+          if (c && c.nombre && matchesAffinity(c.nombre, aff.pres22)){
+            accum.set(c.nombre, (accum.get(c.nombre) || 0) + (c.votos || 0));
+          }
+        }
+      }
+      if (accum.size && totVv > 0){
+        const arr = [...accum.entries()].sort((a,b) => b[1] - a[1]);
+        const [name, votos] = arr[0];
+        const pct = 100 * votos / totVv;
+        return `${name.split(' ').slice(0,2).join(' ')} · ${pct.toFixed(1)}%`;
+      }
+    }
+    // Fallback senado 2026 (por partido afín)
+    if (aff.senado26?.length){
+      const accum = new Map();
+      let totVv = 0;
+      for (const [k, s] of Object.entries(STATE.senMunByKey)){
+        if (!k.startsWith(pref)) continue;
+        totVv += (s.votval || 0);
+        for (const [name, v] of Object.entries(s.partidos || {})){
+          if (matchesAffinity(name, aff.senado26)){
+            accum.set(name, (accum.get(name) || 0) + (v || 0));
+          }
+        }
+      }
+      if (accum.size && totVv > 0){
+        const [name, v] = [...accum.entries()].sort((a,b) => b[1] - a[1])[0];
+        const pct = 100 * v / totVv;
+        return `${name.slice(0,28)} · ${pct.toFixed(1)}%`;
       }
     }
     return '—';
