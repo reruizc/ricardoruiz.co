@@ -1299,6 +1299,7 @@
     </div>
   </div>
 
+<script src="theme.js"></script>
 <script src="lang.js"></script>
 <script>
   // ─── CANDIDATOS: promedios últimas encuestas 2025–2026 ──────────
@@ -4319,23 +4320,14 @@
     }
   }
 
-  // ─── THEME ────────────────────────────────────────────────────
-  function toggleTheme(){
-    const day = !document.body.classList.contains('day-mode');
-    document.body.classList.toggle('day-mode', day);
-    document.getElementById('theme-btn').textContent = day ? '🌙 Modo noche' : '☀ Modo día';
-    localStorage.setItem('rr-theme', day ? 'day' : 'night');
-    // Sync de la tile layer con el tema. Solo si la capa está montada
-    // (es decir, en modo Puestos). La rebuild es barata: un L.tileLayer.
+  // ─── THEME ── lógica compartida en theme.js. Side effect: re-build tile
+  // layer del mapa cuando estamos en modo Puestos.
+  window.__onThemeChange = function(){
     if (pueTileLayer && map){
       map.removeLayer(pueTileLayer);
       pueTileLayer = _buildPueTileLayer().addTo(map);
     }
-  }
-  if (localStorage.getItem('rr-theme') === 'day'){
-    document.body.classList.add('day-mode');
-    const b = document.getElementById('theme-btn'); if (b) b.textContent = '🌙 Modo noche';
-  }
+  };
 
   // Cerrar dropdown al clic externo
   document.addEventListener('click', (e) => {
