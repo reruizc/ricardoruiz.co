@@ -431,6 +431,11 @@
       <button class="toggle-btn active" id="lvl-dep" onclick="setLevel('dep')">Departamental</button>
       <button class="toggle-btn" id="lvl-mun" onclick="setLevel('mun')">Municipal</button>
     </div>
+    <div class="toggle-group" id="scope-group" style="display:none">
+      <span class="toggle-label" title="Cómo se comparan las unidades sub-municipales (UPL, comunas, barrios)">Comparar contra</span>
+      <button class="toggle-btn active" data-scope="local" onclick="setScope('local')" title="Percentila dentro del set visible (ej. comunas de Cali entre sí)">Local</button>
+      <button class="toggle-btn" data-scope="nacional" onclick="setScope('nacional')" title="Percentila contra los ~1.100 municipios del país (lectura país-wide)">Nacional</button>
+    </div>
   </section>
 
   <!-- MAIN SHELL: mapa + panel -->
@@ -524,6 +529,7 @@
     proyUPLBog: `${S3_BASES}/output_ponderador/proyeccion-por-upl-bogota.json`,
     proyBarrioBog: `${S3_BASES}/output_ponderador/proyeccion-por-barrio-bogota.json`,
     proyBarrioMde: `${S3_BASES}/output_ponderador/proyeccion-por-barrio-medellin.json`,
+    geoBarriosMde: `${S3_BASES}/proyecto-dc/geo/barrios-veredas-medellin.json`,
   };
 
   // Mapeo modo → key en p (campo proyección por UPL del ponderador)
@@ -547,11 +553,19 @@
     '16-001': { key:'bogota',       nombre:'Bogotá D.C.',  geoFile:'BOG-UPL.json',         geoProp:'CODIGO_UPL',  geoName:'NOMBRE',     rotate:true,  dataSource:'upl', granLabel:'UPL',
                 barrioGeoFile:'BOG-BARRIOS-CATASTRALES.json', barrioGeoProp:'codigo', barrioGeoName:'nombre', barrioGeoLoc:'loc_codigo' },
     '01-001': { key:'medellin',     nombre:'Medellín',     geoFile:'MEDELLINX.json',       geoProp:'CODIGO',      geoName:'NOMBRE',     rotate:false, dataSource:'agg-barrio', granLabel:'Comunas',
-                barrioProyKey:'comuna' },
+                barrioProyKey:'comuna', barrioDrill:'mde' },
     '31-001': { key:'cali',         nombre:'Cali',         geoFile:'CALIX.json',           geoProp:'comuna',      geoName:'nombre',     rotate:false },
     '03-001': { key:'barranquilla', nombre:'Barranquilla', geoFile:'BARRANQUILLAX.json',   geoProp:'id',          geoName:'nombre',     rotate:false },
     '09-001': { key:'manizales',    nombre:'Manizales',    geoFile:'MANIZALESX.json',      geoProp:'ID_COMUNA',   geoName:'NOMBRES_CO', rotate:false },
     '24-001': { key:'pereira',      nombre:'Pereira',      geoFile:'PEREIRAX.json',        geoProp:null,          geoName:'Comuna',     rotate:false, byName:true },
+    '29-001': { key:'ibague',        nombre:'Ibagué',        geoFile:'IBAGUEX.json',         geoProp:null,          geoName:'COMUNAS',    rotate:false, byNumber:true },
+    '13-001': { key:'monteria',      nombre:'Montería',      geoFile:'MONTERIAX.json',       geoProp:'CC_COMUNA',   geoName:'NMG',        rotate:false },
+    '27-001': { key:'bucaramanga',   nombre:'Bucaramanga',   geoFile:'BUCARAMANGAX.json',    geoProp:'COD_COMUNA',  geoName:'NOMBRE_COM', rotate:false },
+    '25-001': { key:'cucuta',        nombre:'Cúcuta',        geoFile:'CUCUTAX.json',         geoProp:'Comuna',      geoName:'Comuna',     rotate:false },
+    '19-001': { key:'neiva',         nombre:'Neiva',         geoFile:'NEIVAX.json',          geoProp:null,          geoName:'comuna',     rotate:false, byNumber:true },
+    '11-001': { key:'popayan',       nombre:'Popayán',       geoFile:'POPAYANX.json',        geoProp:'Comuna',      geoName:'COMUNAS',    rotate:false },
+    '28-001': { key:'sincelejo',     nombre:'Sincelejo',     geoFile:'SINCELEJOX.json',      geoProp:null,          geoName:'Nombre',     rotate:false, byNumber:true },
+    '52-001': { key:'villavicencio', nombre:'Villavicencio', geoFile:'VILLAVICENCIOX.json',  geoProp:null,          geoName:'Comuna',     rotate:false, byNumber:true },
   };
 
   // Home turf por candidato derecha. Multiplicador aplicado a la proyección por mun.
@@ -599,13 +613,17 @@
     scoreByDep:{},                    // 'depElec' → registro agregado
     scoreByComuna:{},                 // cod → registro (sólo cuando hay cityActive)
     cityActive:null,                  // munKey '16-001' si estamos en city-mode
-    barrioActive:null,                // upl code 'UPL13' si estamos drillados a barrios
+    barrioActive:null,                // upl code 'UPL13' (Bogotá) o comuna code '01' (Medellín)
+    barrioCity:null,                  // 'bogota' | 'medellin' — para dispatch correcto del re-render
     scoreByBarrio:{},                 // codigo barrio → record
     barrioGeoCache:{},                // { cityKey: geojson }
     barrioProyCache:{},               // { cityKey: proyección barrios }
+    mdeBarrioGeoCache:null,           // geojson barrios-veredas-medellin (cacheado una vez)
     cityBloquesCache:{},              // { key: cityBloques }
     cityGeoCache:{},                  // { key: geojson }
     mode:'cepeda',                    // candidato activo
+    scoreScope:'local',               // 'local' | 'nacional' — sólo aplica a capas sub-mun
+    nationalPrioritiesByMode:{},      // cache: priorities sorted (asc) por modo, para percentilar nacional
     level:'dep',                      // 'dep' | 'mun'
     selectedDep:null,                 // electoral_id si estamos drillados
     map:null,
@@ -652,17 +670,56 @@
   //  - abelardo  : proy directo (más alto, más clave)
   //  - paloma    : proy directo
   // Conserva el record original; solo sobreescribe r.score.
-  function assignPercentileScores(records){
+  // Calcula la "priority" (proxy del valor a ranquear) según modo activo.
+  // En cepeda, proximidad al 50%; en resto, proy directa.
+  function priorityForRecord(r, mode){
+    const p = r.candProy != null ? r.candProy : (r.proy != null ? r.proy : 0);
+    if (mode === 'cepeda') return p <= 50 ? p : (100 - p);
+    return p;
+  }
+
+  // Cache de priorities nacionales (sorted asc) por modo. Sirve para percentilar
+  // capas sub-municipales contra la distribución de municipios del país.
+  // Se invalida en cada cambio de modo (setMode bumpea por reinit).
+  function buildNationalPriorities(mode){
+    const cached = STATE.nationalPrioritiesByMode[mode];
+    if (cached) return cached;
+    const prios = [];
+    for (const r of Object.values(STATE.scoreByMun)){
+      prios.push(priorityForRecord(r, mode));
+    }
+    prios.sort((a,b) => a - b);
+    STATE.nationalPrioritiesByMode[mode] = prios;
+    return prios;
+  }
+
+  function percentileInNational(value, mode){
+    const prios = buildNationalPriorities(mode);
+    if (!prios.length) return 50;
+    let lo = 0, hi = prios.length;
+    while (lo < hi){
+      const mid = (lo + hi) >>> 1;
+      if (prios[mid] < value) lo = mid + 1;
+      else hi = mid;
+    }
+    return (lo / prios.length) * 100;
+  }
+
+  // Asigna score como ranking percentil. `opts.scope`:
+  //  - 'local'    (default): percentila dentro del set entregado (ranking puro 0..100, unicidad)
+  //  - 'nacional': percentila contra la distribución de municipios del país
+  //                (sirve para entender "esta comuna en el contexto del país")
+  function assignPercentileScores(records, opts){
     if (!records || !records.length) return;
     const mode = STATE.mode;
-    function priority(r){
-      const p = r.candProy != null ? r.candProy : (r.proy != null ? r.proy : 0);
-      if (mode === 'cepeda'){
-        // Pico en proy=50; cae a ambos lados linealmente.
-        return p <= 50 ? p : (100 - p);
-      }
-      return p;
+    const scope = (opts && opts.scope) || 'local';
+    if (scope === 'nacional' && STATE.scoreByMun && Object.keys(STATE.scoreByMun).length){
+      records.forEach(r => {
+        r.score = +percentileInNational(priorityForRecord(r, mode), mode).toFixed(1);
+      });
+      return;
     }
+    function priority(r){ return priorityForRecord(r, mode); }
     // Tiebreak estable por censo (más grande prevalece)
     const sorted = records.slice().sort((a,b) => {
       const dp = priority(b) - priority(a);
@@ -832,7 +889,7 @@
       rec.score = score;
       STATE.scoreByComuna[cod] = rec;
     }
-    assignPercentileScores(Object.values(STATE.scoreByComuna));
+    assignPercentileScores(Object.values(STATE.scoreByComuna), { scope: STATE.scoreScope });
   }
 
   /* ───────── Agregación barrio → comuna (Medellín) ───────── */
@@ -894,7 +951,7 @@
       rec.score = score;
       STATE.scoreByComuna[cod] = rec;
     }
-    assignPercentileScores(Object.values(STATE.scoreByComuna));
+    assignPercentileScores(Object.values(STATE.scoreByComuna), { scope: STATE.scoreScope });
   }
 
   /* ───────── Scoring por barrio (Bogotá, datos del ponderador) ───────── */
@@ -939,7 +996,107 @@
       rec.score = score;
       STATE.scoreByBarrio[cod] = rec;
     }
-    assignPercentileScores(Object.values(STATE.scoreByBarrio));
+    assignPercentileScores(Object.values(STATE.scoreByBarrio), { scope: STATE.scoreScope });
+  }
+
+  /* ───────── Barrios Medellín (drill desde comuna en city mode) ───────── */
+  async function loadMdeBarriosGeo(){
+    if (STATE.mdeBarrioGeoCache) return STATE.mdeBarrioGeoCache;
+    const j = await fetch(URLS.geoBarriosMde).then(r => r.json());
+    STATE.mdeBarrioGeoCache = j;
+    return j;
+  }
+
+  // Popula STATE.scoreByBarrio con los 165 barrios urbanos de Medellín (comunas 01-16)
+  // a partir de proyeccion-por-barrio-medellin.json. Mismo shape que computeScoresBarrios
+  // de Bogotá para que renderTop30 / showDetailFromFeature funcionen sin cambios.
+  function computeScoresBarriosMde(proyBarrio){
+    STATE.scoreByBarrio = {};
+    const proyKey = UPL_PROY_KEY[STATE.mode];
+    if (!proyKey || !proyBarrio || !proyBarrio.agregados) return;
+    for (const [cod, b] of Object.entries(proyBarrio.agregados)){
+      const proy = b.p ? b.p[proyKey] : null;
+      if (proy == null) continue;
+      let score, rec = {
+        cod, nombre: b.nombre || cod, depCod:'01',
+        // Reusamos loc_codigo/loc_nombre como "comuna" para que el detail card
+        // muestre "Comuna 1 · POPULAR" sin tocar showDetailFromFeature.
+        loc_codigo: b.comuna, loc_nombre: b.nombre_com,
+        censo: b.censo || 0, proy,
+      };
+      if (STATE.mode === 'cepeda'){
+        const gap = Math.max(0, 50 - proy);
+        rec.gap = gap;
+        rec.techoCaptable = null; rec.captable = null; rec.izq22 = null;
+        if (proy >= 50) score = 35;
+        else { const prox = Math.max(0, 1 - gap/15); score = prox * 100; }
+      } else if (STATE.mode === 'abelardo' || STATE.mode === 'paloma'){
+        const cepProy = (b.p && b.p.ic) || 0;
+        rec.candProy = proy; rec.cepedaProy = cepProy;
+        rec.derTotal22 = null; rec.techoDer = null; rec.boost = 1; rec.captable = null;
+        if (proy >= 50) score = 35;
+        else score = Math.min(1, proy/30) * 100;
+      } else continue;
+      rec.score = score;
+      STATE.scoreByBarrio[cod] = rec;
+    }
+    assignPercentileScores(Object.values(STATE.scoreByBarrio), { scope: STATE.scoreScope });
+  }
+
+  async function renderBarriosFromComunaMde(comunaCod){
+    ensureMap();
+    showLoading(true);
+    try {
+      const [proy, geoRaw] = await Promise.all([
+        loadBarrioMdeProyeccion(),
+        loadMdeBarriosGeo(),
+      ]);
+      computeScoresBarriosMde(proy);
+
+      // Filtrar a barrios de la comuna clickeada. El GeoJSON trae 349 features
+      // (165 urbanos + corregimientos); proyección sólo cubre comunas 01-16.
+      const filtered = {
+        type:'FeatureCollection',
+        features: geoRaw.features.filter(f => {
+          const cm = String(f.properties.comuna || '').padStart(2,'0');
+          return cm === comunaCod;
+        }),
+      };
+
+      clearLayer();
+      STATE.layer = L.geoJSON(filtered, {
+        style: (f) => {
+          const k = f.properties.codigo;
+          const r = k ? STATE.scoreByBarrio[k] : null;
+          return styleByScore(r ? r.score : null);
+        },
+        onEachFeature: (f, layer) => {
+          const k = f.properties.codigo;
+          const r = k ? STATE.scoreByBarrio[k] : null;
+          f.__key = k;
+          f.__rec = r;
+          f.__name = (r && r.nombre) || f.properties.nombre_bar || k || '—';
+          f.__depName = `Medellín · ${(r && r.loc_nombre) ? 'Comuna ' + comunaCod + ' · ' + r.loc_nombre : 'Comuna ' + comunaCod}`;
+          layer.on('mouseover', (e) => onHover(f, e));
+          layer.on('mouseout',  () => onHoverOut(f));
+          layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
+        },
+      }).addTo(STATE.map);
+      if (STATE.layer.getBounds().isValid()){
+        STATE.map.fitBounds(STATE.layer.getBounds(), { padding:[30,30] });
+      }
+      document.getElementById('map-head-title').textContent = `Medellín · Comuna ${comunaCod} · Barrios`;
+      document.getElementById('map-back-btn').classList.add('show');
+      STATE.barrioActive = comunaCod;
+      STATE.barrioCity = 'medellin';
+      updateScopeToggleVisibility();
+      renderTop30();
+      restoreOverview();
+    } catch (e){
+      console.error('[Veleta] error renderBarriosFromComunaMde', e);
+    } finally {
+      showLoading(false);
+    }
   }
 
   /* ───────── Scoring por comuna (city mode con bloques históricos) ───────── */
@@ -973,7 +1130,7 @@
         ...s,
       };
     }
-    assignPercentileScores(Object.values(STATE.scoreByComuna));
+    assignPercentileScores(Object.values(STATE.scoreByComuna), { scope: STATE.scoreScope });
   }
 
   function computeScores(){
@@ -1199,6 +1356,15 @@
 
   // Resuelve la clave de comuna desde props del GeoJSON.
   function comunaKeyOfFeature(props, cfg){
+    if (cfg.byNumber){
+      // GeoJSON con código embebido en texto: "COMUNA 7", "Comuna  9", "Comuna 5"…
+      // Extrae el primer entero y matchea contra clave padded a 2 dígitos.
+      const raw = String(props[cfg.geoName] || '');
+      const m = raw.match(/\d+/);
+      if (!m) return null;
+      const padded = m[0].padStart(2, '0');
+      return STATE.scoreByComuna[padded] ? padded : null;
+    }
     if (cfg.byName){
       const nm = String(props[cfg.geoName] || '').trim();
       if (!nm) return null;
@@ -1269,9 +1435,13 @@
           layer.on('mouseover', (e) => onHover(f, e));
           layer.on('mouseout',  () => onHoverOut(f));
           layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
-          // Click en UPL Bogotá → drill a barrios
+          // Click en UPL Bogotá → drill a barrios catastrales
           if (cfg.dataSource === 'upl' && cfg.barrioGeoFile && k){
             layer.on('click', () => renderBarriosFromUPL(k));
+          }
+          // Click en comuna Medellín → drill a barrios de esa comuna
+          if (cfg.barrioDrill === 'mde' && k){
+            layer.on('click', () => renderBarriosFromComunaMde(k));
           }
         },
       }).addTo(STATE.map);
@@ -1280,6 +1450,7 @@
       document.getElementById('map-head-title').textContent = `${cfg.nombre} · ${granLabel}`;
       document.getElementById('map-back-btn').classList.add('show');
       STATE.cityActive = munKey;
+      updateScopeToggleVisibility();
       renderTop30();        // ahora muestra comunas
       restoreOverview();    // overview leerá scoreByComuna
     } catch (e){
@@ -1350,6 +1521,8 @@
       document.getElementById('map-head-title').textContent = `${cfg.nombre} · UPL ${uplName} · Barrios`;
       document.getElementById('map-back-btn').classList.add('show');
       STATE.barrioActive = uplCod;
+      STATE.barrioCity = 'bogota';
+      updateScopeToggleVisibility();
       // Adapta el ranking y overview a barrios
       renderTop30();
       restoreOverview();
@@ -1362,10 +1535,12 @@
 
   function exitBarrios(){
     STATE.barrioActive = null;
+    STATE.barrioCity = null;
     STATE.scoreByBarrio = {};
     if (STATE.cityActive) renderCity(STATE.cityActive);
     else if (STATE.selectedDep) renderMunsOfDep(STATE.selectedDep);
     else renderDeptos();
+    updateScopeToggleVisibility();
     renderTop30();
     restoreOverview();
   }
@@ -1376,6 +1551,7 @@
     if (STATE.selectedDep) renderMunsOfDep(STATE.selectedDep);
     else if (STATE.level === 'dep') renderDeptos();
     else renderMunsNacional();
+    updateScopeToggleVisibility();
     renderTop30();
     restoreOverview();
   }
@@ -1735,6 +1911,45 @@
     renderTop30();
   }
 
+  // Muestra/oculta el grupo "Comparar contra" según si hay capa sub-mun activa.
+  function updateScopeToggleVisibility(){
+    const el = document.getElementById('scope-group');
+    if (!el) return;
+    const subMunActive = !!STATE.cityActive || !!STATE.barrioActive;
+    el.style.display = subMunActive ? '' : 'none';
+  }
+
+  /* ───────── Toggle Local / Nacional ─────────
+     Sólo afecta a capas sub-municipales (UPL, comunas, barrios). En 'nacional',
+     cada unidad sub-mun se percentila contra la distribución de munmun del país,
+     no contra su cohorte local. Repaint sin recargar geo ni fetch. */
+  function setScope(scope){
+    if (scope !== 'local' && scope !== 'nacional') return;
+    if (STATE.scoreScope === scope) return;
+    STATE.scoreScope = scope;
+    document.querySelectorAll('[data-scope]').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-scope') === scope);
+    });
+    // Re-percentilar in-place el set sub-mun activo, sin tocar muns/dep
+    // (que siempre operan contra su cohorte natural).
+    const inBarrio = !!STATE.barrioActive;
+    const inCity   = !!STATE.cityActive && !inBarrio;
+    if (inBarrio){
+      assignPercentileScores(Object.values(STATE.scoreByBarrio), { scope });
+    } else if (inCity){
+      assignPercentileScores(Object.values(STATE.scoreByComuna), { scope });
+    } else {
+      return; // No hay capa sub-mun activa: nada que repintar
+    }
+    // Restyle leyendo f.__rec (asignado en cada onEachFeature sub-mun); como
+    // mutamos r.score in-place al re-percentilar, los features quedan al día.
+    if (STATE.layer){
+      STATE.layer.setStyle((f) => styleByScore(f.__rec ? f.__rec.score : null));
+    }
+    renderTop30();
+    restoreOverview();
+  }
+
   /* ───────── Toggle de candidato (modo) ───────── */
   function setMode(id){
     const cand = CANDIDATES.find(c => c.id === id);
@@ -1755,10 +1970,13 @@
     document.querySelectorAll('.mode-block').forEach(el => {
       el.style.display = (el.getAttribute('data-mode') === activeBlockMode) ? '' : 'none';
     });
+    // Invalidar cache de priorities nacionales: cambia el set de scoreByMun.
+    STATE.nationalPrioritiesByMode = {};
     computeScores();
     // Si estamos en barrio-mode, recomputar barrios; si city-mode, renderCity recomputa.
     if (STATE.barrioActive){
-      renderBarriosFromUPL(STATE.barrioActive);
+      if (STATE.barrioCity === 'medellin') renderBarriosFromComunaMde(STATE.barrioActive);
+      else renderBarriosFromUPL(STATE.barrioActive);
       return;
     }
     if (STATE.cityActive){
