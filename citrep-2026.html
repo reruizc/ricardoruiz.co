@@ -7,6 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <style>
     :root{--white:#f4f3ef;--blue:#0047FF;--green:#4ade80;--card-border:rgba(255,255,255,0.1);--border:rgba(255,255,255,0.08);--bar-bg:rgba(255,255,255,0.1);--td-hover:rgba(255,255,255,0.04)}
@@ -154,8 +156,37 @@
     .curtain.closing .curtain-word.from-left,.curtain.closing .curtain-word.from-right{transform:translateX(0);opacity:1;transition-delay:.62s}
     .curtain.closing .curtain-tag{opacity:1;transform:translateY(0);transition-delay:.68s}
     .curtain.closing .curtain-sub{opacity:1;transform:translateY(0);transition-delay:.72s}
+    .circ-toggle{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap}
+    .circ-btn{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;padding:.28rem .9rem;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;transition:all .15s}
+    .circ-btn:hover{border-color:rgba(167,139,250,.4);color:rgba(167,139,250,.8)}
+    .circ-btn.circ-btn-active{background:rgba(167,139,250,.12);border-color:rgba(167,139,250,.4);color:rgba(167,139,250,.9)}
+    body.day-mode .circ-btn{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.15);color:rgba(0,0,0,.4)}
+    body.day-mode .circ-btn.circ-btn-active{background:rgba(120,80,200,.1);border-color:rgba(120,80,200,.35);color:rgba(120,80,200,.9)}
+    .map-mode-toggle{display:inline-flex;gap:.3rem;margin-left:auto}
+    .map-mode-btn{font-family:'DM Mono',monospace;font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;padding:.22rem .65rem;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.4);cursor:pointer;transition:all .15s}
+    .map-mode-btn:hover{border-color:rgba(0,71,255,.4);color:rgba(0,71,255,.8)}
+    .map-mode-btn.active{background:rgba(0,71,255,.14);border-color:rgba(0,71,255,.45);color:rgba(0,71,255,.95)}
+    body.day-mode .map-mode-btn{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.12);color:rgba(0,0,0,.45)}
+    body.day-mode .map-mode-btn.active{background:rgba(0,71,255,.08);border-color:rgba(0,71,255,.3);color:var(--blue)}
+    .leaflet-container{background:#060810 !important}
+    .leaflet-tile-pane{display:none}
+    .leaflet-control-attribution{background:rgba(6,8,16,.75) !important;color:rgba(255,255,255,.2) !important;font-size:.4rem !important}
+    .leaflet-control-attribution a{color:rgba(0,71,255,.5) !important}
+    .leaflet-control-zoom a{background:rgba(13,15,28,.9) !important;color:var(--white) !important;border-color:rgba(255,255,255,.15) !important}
+    .leaflet-control-zoom a:hover{background:rgba(0,71,255,.3) !important}
+    body.day-mode .leaflet-container{background:#f7f8fc !important}
+    body.day-mode .leaflet-control-attribution{background:rgba(255,255,255,.85) !important;color:rgba(0,0,0,.4) !important}
+    body.day-mode .leaflet-control-zoom a{background:#fff !important;color:#1a1a2e !important;border-color:rgba(0,0,0,.15) !important}
+    #hemiciclo-map .leaflet-interactive{cursor:pointer !important}
+    .leaflet-tooltip{font-family:Avenir,sans-serif!important;font-weight:400!important;font-size:.85rem!important;background:rgba(6,8,16,0.97)!important;border:1px solid rgba(0,71,255,0.4)!important;color:#f4f3ef!important;box-shadow:none!important;padding:.45rem .65rem!important;border-radius:0!important;width:220px!important;white-space:normal!important;line-height:1.45!important;overflow-wrap:break-word!important;word-break:normal!important}
+    .leaflet-tooltip:before{display:none!important}
+    body.day-mode .leaflet-tooltip{background:rgba(255,255,255,.98)!important;border-color:rgba(0,71,255,.45)!important;color:#0d1120!important}
+    .hemi-seat{transition:opacity .2s,transform .2s;transform-origin:center;transform-box:fill-box}
+    .hemi-seat:hover{opacity:.85}
+    .rg-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.5rem}
+    @media(max-width:1100px){.rg-grid{grid-template-columns:1fr}}
     @media(max-width:1000px){.results-grid{grid-template-columns:1fr}}
-    @media(max-width:900px){body{cursor:auto}.cursor,.cursor-ring{display:none}.top-bar,.breadcrumb,.meta-bar,.content-area,.full-footer{padding-left:1.2rem;padding-right:1.2rem}.bg-overlay{background:rgba(4,6,16,.93)}.kpi-row{grid-template-columns:1fr 1fr;gap:.75rem}}
+    @media(max-width:900px){body{cursor:auto}.cursor,.cursor-ring{display:none}.top-bar,.breadcrumb,.meta-bar,.content-area,.full-footer{padding-left:1.2rem;padding-right:1.2rem}.bg-overlay{background:rgba(4,6,16,.93)}.kpi-row{grid-template-columns:1fr 1fr;gap:.75rem}#hemiciclo-map{height:300px !important}}
     @media(max-width:600px){.kpi-row{grid-template-columns:1fr}.sub-selector{flex-direction:column;align-items:flex-start}.search-input{width:100%}}
     .hidden{display:none!important}
     .copy-toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) translateY(24px);background:rgba(10,10,20,.97);border:1.5px solid rgba(255,100,100,.5);color:rgba(255,180,180,.9);font-family:'DM Mono',monospace;font-size:.88rem;letter-spacing:.08em;padding:1rem 2rem;z-index:99998;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;text-align:center}
@@ -351,6 +382,32 @@
         </div>
         <div id="citrep-search-results" style="display:none;margin-bottom:1.5rem"></div>
         <div class="kpi-row" id="kpi-row"></div>
+        <div class="circ-toggle" id="circ-toggle">
+          <button class="circ-btn circ-btn-active" id="circ-btn-listado" onclick="onCircChange('LISTADO')">Listado</button>
+          <button class="circ-btn" id="circ-btn-resultados-generales" onclick="onCircChange('RESULTADOS_GENERALES')">Resultados Generales</button>
+        </div>
+        <div style="display:none" id="panel-resultados-generales">
+          <div class="rg-grid">
+            <div class="card">
+              <div class="card-label" id="hemiciclo-card-label" style="margin-bottom:1rem">Hemiciclo · 16 curules · Circunscripciones Transitorias de Paz</div>
+              <svg id="hemiciclo-svg" viewBox="0 0 600 330" style="width:100%;height:auto;display:block"></svg>
+              <div id="hemiciclo-legend" style="display:flex;flex-direction:column;gap:.4rem;margin-top:.85rem;padding-top:.85rem;border-top:1px solid rgba(255,255,255,0.07)"></div>
+            </div>
+            <div class="card" style="padding:1.3rem 1.3rem .75rem">
+              <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.75rem;flex-wrap:wrap">
+                <div class="card-label" style="margin-bottom:0">Mapa CITREP · Partido ganador</div>
+                <div class="map-mode-toggle">
+                  <button class="map-mode-btn active" id="map-mode-circ" onclick="setMapMode('circ')">16 Circunscripciones</button>
+                  <button class="map-mode-btn" id="map-mode-mun" onclick="setMapMode('mun')">168 Municipios</button>
+                </div>
+              </div>
+              <div style="position:relative">
+                <div id="hemiciclo-map" style="width:100%;height:400px;background:#060810"></div>
+                <button id="hemiciclo-back" type="button" style="display:none;position:absolute;top:.55rem;right:.55rem;z-index:500;background:rgba(0,71,255,.92);color:#fff;border:none;padding:.4rem .7rem;font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;border-radius:2px">← Nacional</button>
+              </div>
+            </div>
+          </div>
+        </div>
         <div class="results-grid" id="citrep-main-grid">
           <div class="card">
             <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.8rem;flex-wrap:wrap">
@@ -395,6 +452,8 @@
   <script>
     const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
     const CURULES = 16;
+    const CITREP_MUN_GEO_URL = `${S3}/mapas-2026/citrep/citrep-municipios.geojson`;
+    const CITREP_CIRC_GEO_URL = `${S3}/mapas-2026/citrep/citrep-circunscripciones.geojson`;
     const fmt = n => Number(n).toLocaleString('es-CO');
     const pct = (n,t) => t ? ((n/t)*100).toFixed(2) : '0.00';
     const CP = {'Pacto Histórico':'#6B2D8B','Centro Democrático':'#0088BB','Partido Liberal Colombiano':'#C8102E','Partido de la U':'#F7941D','Cambio Radical':'#E91E8C','Partido Conservador Colombiano':'#003580','Alianza Verde':'#4CAF50','MIRA':'#1A3FC4','Comunes':'#007755','Nuevo Liberalismo':'#E53935'};
@@ -833,6 +892,331 @@
         :`<div style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;color:rgba(255,255,255,.3);text-transform:uppercase;padding:.75rem 0 .5rem">${res.length} resultado${res.length!==1?'s':''} para "${q}"</div>
         <table class="results-table"><thead><tr><th>#</th><th>Candidato/a</th><th>Partido</th><th class="r">Pos.</th><th class="r">Votos</th></tr></thead>
         <tbody>${res.map((r,i)=>`<tr><td style="color:rgba(255,255,255,.25)">${String(i+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif">${r.nombre}</td><td style="color:rgba(255,255,255,.45);font-family:'Syne',sans-serif">${r.partido}</td><td class="r" style="color:rgba(255,255,255,.3)">#${r.pos}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(r.votos)}</td></tr>`).join('')}</tbody></table>`;
+    }
+
+    // ─── RESULTADOS GENERALES: hemiciclo + mapa ─────────────
+    let activeView = 'LISTADO';
+    let mapMode = 'circ'; // 'circ' | 'mun'
+    let hemicicloMap = null;
+    let _circGeoRaw = null, _munGeoRaw = null;
+    let _circLayer = null, _munLayer = null;
+    let _circWinner = null; // {com_cod: {partido, votos, nombre, total}}
+    let _munWinner = null;  // {'dep_cod-mun_cod': {partido, votos, nombre, total}}
+
+    function buildCircWinner(circs){
+      const out = {};
+      circs.forEach(circ => {
+        const map = {};
+        let total = 0;
+        Object.entries(circ.candidatos||{}).forEach(([nombre,votos])=>{
+          if(!votos) return;
+          const partido = resumenData._c2p[nombre];
+          if(!partido) return;
+          map[partido] = (map[partido]||0) + votos;
+          total += votos;
+        });
+        const entries = Object.entries(map).sort((a,b)=>b[1]-a[1]);
+        const top = entries[0];
+        // Nombre del electo (candidato con más votos en la circ)
+        let electo = null, electoVotos = 0;
+        Object.entries(circ.candidatos||{}).forEach(([nom,v])=>{
+          if(v > electoVotos){ electoVotos = v; electo = nom; }
+        });
+        out[circ.cod] = {
+          partido: top ? top[0] : null,
+          votos: top ? top[1] : 0,
+          total,
+          nombre: circ.nombre,
+          electo,
+          electoVotos,
+        };
+      });
+      return out;
+    }
+
+    function buildMunWinner(muns){
+      const out = {};
+      muns.forEach(mn => {
+        const map = {};
+        let total = 0;
+        Object.entries(mn.candidatos||{}).forEach(([nombre,votos])=>{
+          if(!votos) return;
+          const partido = resumenData._c2p[nombre];
+          if(!partido) return;
+          map[partido] = (map[partido]||0) + votos;
+          total += votos;
+        });
+        const entries = Object.entries(map).sort((a,b)=>b[1]-a[1]);
+        const top = entries[0];
+        out[`${mn.dep_cod}-${mn.cod}`] = {
+          partido: top ? top[0] : null,
+          votos: top ? top[1] : 0,
+          total,
+          nombre: mn.nombre,
+          dep_nom: mn.dep_nom,
+        };
+      });
+      return out;
+    }
+
+    function onCircChange(view){
+      activeView = view;
+      document.querySelectorAll('.circ-btn').forEach(b=>b.classList.remove('circ-btn-active'));
+      const btnMap = {'LISTADO':'circ-btn-listado','RESULTADOS_GENERALES':'circ-btn-resultados-generales'};
+      const btn = document.getElementById(btnMap[view]);
+      if(btn) btn.classList.add('circ-btn-active');
+      const panel = document.getElementById('panel-resultados-generales');
+      const main = document.getElementById('citrep-main-grid');
+      const subSel = document.querySelector('.sub-selector');
+      if(view === 'RESULTADOS_GENERALES'){
+        panel.style.display = '';
+        main.style.display = 'none';
+        if(subSel) subSel.style.display = 'none';
+        renderHemicicloCitrep();
+        initHemicicloMap();
+      } else {
+        panel.style.display = 'none';
+        main.style.display = '';
+        if(subSel) subSel.style.display = '';
+      }
+    }
+
+    // ─── Hemiciclo SVG: 16 curules en 2 anillos (6 + 10) ────
+    function renderHemicicloCitrep(){
+      const svg = document.getElementById('hemiciclo-svg');
+      if(!svg || !resumenData) return;
+      if(!_circWinner){
+        // dispara fetch async; cuando llegue redibuja
+        getJSON('circunscripciones').then(c=>{ _circWinner = buildCircWinner(c); renderHemicicloCitrep(); });
+        svg.innerHTML = '';
+        return;
+      }
+      // Lista de circs ordenadas por cod ascendente para asignación estable
+      const circList = Object.keys(_circWinner).sort();
+      // Conteo de curules por partido (1 por circ)
+      const partyCount = {};
+      circList.forEach(cc => {
+        const w = _circWinner[cc];
+        if(!w.partido) return;
+        partyCount[w.partido] = (partyCount[w.partido]||0) + 1;
+      });
+      const partiesByCount = Object.entries(partyCount).sort((a,b)=>b[1]-a[1]);
+      // Asignar circs a posición global (left→right) agrupando por partido
+      const circsOrdered = [];
+      partiesByCount.forEach(([partido, _n])=>{
+        circList.filter(cc => _circWinner[cc].partido === partido).forEach(cc => circsOrdered.push(cc));
+      });
+      circList.filter(cc => !_circWinner[cc].partido).forEach(cc => circsOrdered.push(cc));
+      // 2 anillos: inner 6, outer 10
+      const innerN = 6, outerN = 10;
+      const cx = 300, cy = 295;
+      const rInner = 125, rOuter = 215;
+      const seatR = 18;
+      // Asignación left→right: outer ring contiene los más grandes (más visible),
+      // pero para limpieza visual con 16 vamos: inner = primeros 6, outer = restantes 10
+      // Reasignar para que las posiciones angulares vayan left→right intercaladas por anillo
+      const positions = [];
+      // outer ring: 10 seats from 180° to 0°
+      for(let i=0; i<outerN; i++){
+        const t = i/(outerN-1);
+        const ang = Math.PI - t*Math.PI;
+        positions.push({ring:'outer', ang, x: cx + rOuter*Math.cos(ang), y: cy - rOuter*Math.sin(ang)});
+      }
+      // inner ring: 6 seats from 180° to 0°
+      for(let i=0; i<innerN; i++){
+        const t = i/(innerN-1);
+        const ang = Math.PI - t*Math.PI;
+        positions.push({ring:'inner', ang, x: cx + rInner*Math.cos(ang), y: cy - rInner*Math.sin(ang)});
+      }
+      // Para asignar circs a positions, intercalamos: el más a la izquierda (outer) recibe la primera circ,
+      // luego el más a la izquierda inner, etc., para que los partidos queden contiguos visualmente.
+      // Más simple: ordenamos positions por ángulo desc (180 → 0) y vamos llenando.
+      positions.sort((a,b)=>b.ang - a.ang);
+      let html = '';
+      // Línea base
+      html += `<line x1="${cx-rOuter-seatR}" y1="${cy+1}" x2="${cx+rOuter+seatR}" y2="${cy+1}" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>`;
+      circsOrdered.forEach((cc, i)=>{
+        if(i >= positions.length) return;
+        const pos = positions[i];
+        const w = _circWinner[cc];
+        const color = w.partido ? getColor(w.partido) : '#444';
+        const circNum = String(parseInt(cc,10));
+        const tip = `${w.nombre || ('Circ '+cc)} — ${w.electo || '—'} (${w.partido || 's/d'}) · ${fmt(w.electoVotos||0)} votos`;
+        html += `<circle class="hemi-seat" cx="${pos.x.toFixed(1)}" cy="${pos.y.toFixed(1)}" r="${seatR}" fill="${color}" stroke="rgba(255,255,255,0.18)" stroke-width="1.5" data-cc="${cc}" data-tip="${tip.replace(/"/g,'&quot;')}"/>`;
+        html += `<text x="${pos.x.toFixed(1)}" y="${(pos.y+4).toFixed(1)}" text-anchor="middle" font-family="DM Mono,monospace" font-size="11" font-weight="700" fill="rgba(255,255,255,0.95)" pointer-events="none">${circNum}</text>`;
+      });
+      svg.innerHTML = html;
+      // Tooltips hover
+      svg.querySelectorAll('.hemi-seat').forEach(seat => {
+        seat.addEventListener('mouseenter', e => {
+          let tip = document.getElementById('hemi-tooltip');
+          if(!tip){
+            tip = document.createElement('div');
+            tip.id = 'hemi-tooltip';
+            tip.style.cssText = 'position:fixed;background:rgba(6,8,16,0.97);border:1px solid rgba(0,71,255,0.4);color:#f4f3ef;padding:.5rem .85rem;font-size:.78rem;pointer-events:none;z-index:10000;font-family:Avenir,sans-serif;font-weight:400;white-space:normal;line-height:1.5;max-width:280px';
+            document.body.appendChild(tip);
+          }
+          tip.textContent = seat.getAttribute('data-tip');
+          tip.style.display = 'block';
+        });
+        seat.addEventListener('mousemove', e => {
+          const tip = document.getElementById('hemi-tooltip');
+          if(tip){ tip.style.left = (e.clientX+14)+'px'; tip.style.top = (e.clientY+14)+'px'; }
+        });
+        seat.addEventListener('mouseleave', ()=>{ const tip=document.getElementById('hemi-tooltip'); if(tip) tip.style.display='none'; });
+        seat.addEventListener('click', ()=>{
+          // Click → filtrar vista por esa circunscripción
+          activeView = 'LISTADO';
+          onCircChange('LISTADO');
+          const vSel = document.getElementById('vista-select');
+          vSel.value = 'circ';
+          switchVista('circ').then(()=>{
+            const cc = seat.getAttribute('data-cc');
+            const dSel = document.getElementById('dep-select');
+            const opt = [...dSel.options].find(o => o.value === cc);
+            if(opt){ dSel.value = cc; onDepChange(cc); }
+          });
+        });
+      });
+      // Leyenda agregada por partido (curules ganadas)
+      const leg = document.getElementById('hemiciclo-legend');
+      leg.innerHTML = partiesByCount.map(([p, n])=>{
+        const c = getColor(p);
+        return `<div style="display:flex;align-items:center;gap:.6rem;font-family:'DM Mono',monospace;font-size:.72rem;color:rgba(255,255,255,.7)">
+          <span style="width:11px;height:11px;background:${c};border-radius:50%;flex-shrink:0"></span>
+          <span style="flex:1;font-family:'Syne',sans-serif;font-weight:500">${p}</span>
+          <span style="font-family:'Syne',sans-serif;font-weight:800;color:var(--white)">${n}</span>
+        </div>`;
+      }).join('');
+    }
+
+    // ─── Mapa Leaflet ───────────────────────────────────────
+    async function initHemicicloMap(){
+      const container = document.getElementById('hemiciclo-map');
+      if(!container) return;
+      if(hemicicloMap){ hemicicloMap.invalidateSize(); return; }
+      hemicicloMap = L.map('hemiciclo-map', {
+        center: [4.5, -74.0],
+        zoom: 5,
+        zoomControl: true,
+        scrollWheelZoom: false,
+        attributionControl: true,
+        preferCanvas: false,
+      });
+      hemicicloMap.attributionControl.setPrefix(false);
+      await ensureWinners();
+      await renderMapLayer();
+    }
+
+    async function ensureWinners(){
+      if(!_circWinner){
+        const c = await getJSON('circunscripciones');
+        _circWinner = buildCircWinner(c);
+      }
+      if(!_munWinner){
+        const m = await getJSON('municipios');
+        _munWinner = buildMunWinner(m);
+      }
+    }
+
+    async function setMapMode(mode){
+      if(mode !== 'circ' && mode !== 'mun') return;
+      mapMode = mode;
+      document.getElementById('map-mode-circ').classList.toggle('active', mode === 'circ');
+      document.getElementById('map-mode-mun').classList.toggle('active', mode === 'mun');
+      if(hemicicloMap) await renderMapLayer();
+    }
+
+    function styleCirc(feat){
+      const cc = feat.properties.com_cod;
+      const w = _circWinner && _circWinner[cc];
+      const color = w && w.partido ? getColor(w.partido) : '#2a2f3d';
+      return {fillColor: color, weight: 1.2, color: 'rgba(255,255,255,0.35)', fillOpacity: w && w.partido ? 0.8 : 0.35, opacity: 0.9};
+    }
+    function styleMun(feat){
+      const k = `${feat.properties.dep_cod}-${feat.properties.mun_cod}`;
+      const w = _munWinner && _munWinner[k];
+      const color = w && w.partido ? getColor(w.partido) : '#2a2f3d';
+      return {fillColor: color, weight: 0.6, color: 'rgba(255,255,255,0.25)', fillOpacity: w && w.partido ? 0.78 : 0.3, opacity: 0.85};
+    }
+
+    async function renderMapLayer(){
+      if(_circLayer){ hemicicloMap.removeLayer(_circLayer); _circLayer = null; }
+      if(_munLayer){ hemicicloMap.removeLayer(_munLayer); _munLayer = null; }
+      if(mapMode === 'circ'){
+        if(!_circGeoRaw){
+          const r = await fetch(CITREP_CIRC_GEO_URL);
+          _circGeoRaw = await r.json();
+        }
+        _circLayer = L.geoJSON(_circGeoRaw, {
+          style: styleCirc,
+          onEachFeature: (feat, layer)=>{
+            const cc = feat.properties.com_cod;
+            const w = _circWinner && _circWinner[cc];
+            const tip = `<div style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(0,71,255,.85);margin-bottom:.3rem">Circunscripción ${parseInt(cc,10)}</div>
+              <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:.92rem;margin-bottom:.35rem">${feat.properties.com_nom||'—'}</div>
+              ${w ? `<div style="font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,255,255,.7)">Electo/a: <b style="color:#fff">${w.electo||'—'}</b></div>
+              <div style="font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,255,255,.55)">${w.partido||'s/d'} · ${fmt(w.electoVotos||0)} votos</div>` : ''}
+              <div style="font-family:'DM Mono',monospace;font-size:.6rem;color:rgba(255,255,255,.35);margin-top:.35rem">${feat.properties.mun_count} municipios</div>`;
+            layer.bindTooltip(tip, {sticky:true, direction:'top'});
+            layer.on('mouseover', ()=>layer.setStyle({weight:2.2, color:'#fff', fillOpacity:0.92}));
+            layer.on('mouseout', ()=>_circLayer.resetStyle(layer));
+            layer.on('click', ()=>{
+              activeView = 'LISTADO';
+              onCircChange('LISTADO');
+              const vSel = document.getElementById('vista-select');
+              vSel.value = 'circ';
+              switchVista('circ').then(()=>{
+                const dSel = document.getElementById('dep-select');
+                const opt = [...dSel.options].find(o => o.value === cc);
+                if(opt){ dSel.value = cc; onDepChange(cc); }
+              });
+            });
+          }
+        }).addTo(hemicicloMap);
+        try{ hemicicloMap.fitBounds(_circLayer.getBounds(), {padding:[8,8]}); }catch(e){}
+      } else {
+        if(!_munGeoRaw){
+          const r = await fetch(CITREP_MUN_GEO_URL);
+          _munGeoRaw = await r.json();
+        }
+        _munLayer = L.geoJSON(_munGeoRaw, {
+          style: styleMun,
+          onEachFeature: (feat, layer)=>{
+            const p = feat.properties;
+            const k = `${p.dep_cod}-${p.mun_cod}`;
+            const w = _munWinner && _munWinner[k];
+            const tip = `<div style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(0,71,255,.85);margin-bottom:.3rem">${p.dep_nom||''}</div>
+              <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:.95rem;margin-bottom:.35rem">${p.nombre}</div>
+              <div style="font-family:'DM Mono',monospace;font-size:.62rem;color:rgba(255,255,255,.5);margin-bottom:.35rem">Circ ${parseInt(p.com_cod,10)} · ${p.com_nom||''}</div>
+              ${w && w.partido ? `<div style="font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,255,255,.7)">Puntero: <b style="color:#fff">${w.partido}</b></div>
+              <div style="font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,255,255,.55)">${fmt(w.votos)} de ${fmt(w.total)} votos</div>` : ''}`;
+            layer.bindTooltip(tip, {sticky:true, direction:'top'});
+            layer.on('mouseover', ()=>layer.setStyle({weight:1.8, color:'#fff', fillOpacity:0.92}));
+            layer.on('mouseout', ()=>_munLayer.resetStyle(layer));
+            layer.on('click', ()=>{
+              activeView = 'LISTADO';
+              onCircChange('LISTADO');
+              const vSel = document.getElementById('vista-select');
+              vSel.value = 'mun';
+              switchVista('mun').then(async ()=>{
+                const dSel = document.getElementById('dep-select');
+                const opt = [...dSel.options].find(o => o.value === p.dep_cod);
+                if(opt){
+                  dSel.value = p.dep_cod;
+                  await onDepChange(p.dep_cod);
+                  const mSel = document.getElementById('mun-select');
+                  const mo = [...mSel.options].find(o => o.value === p.mun_cod);
+                  if(mo){ mSel.value = p.mun_cod; onMunChange(p.mun_cod); }
+                }
+              });
+            });
+          }
+        }).addTo(hemicicloMap);
+        try{ hemicicloMap.fitBounds(_munLayer.getBounds(), {padding:[8,8]}); }catch(e){}
+      }
+      const back = document.getElementById('hemiciclo-back');
+      if(back) back.style.display = 'none';
     }
 
     const curtain=document.getElementById('curtain');
