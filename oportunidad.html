@@ -486,6 +486,23 @@
     body.day-mode .lock-ico{color:#dc2626}
     body.day-mode .lock-label{color:#0d1120}
     body.day-mode .lock-sub{color:rgba(0,0,0,.7)}
+
+    /* ─── Botón descargar Top (CSV) ─── */
+    .dl-row{display:flex;align-items:center;justify-content:space-between;margin-top:.85rem;padding-top:.75rem;border-top:1px solid rgba(255,255,255,.07);gap:.55rem}
+    body.day-mode .dl-row{border-top-color:rgba(0,0,0,.08)}
+    .dl-btn{display:inline-flex;align-items:center;gap:.45rem;font-family:Avenir,sans-serif;font-weight:600;font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--green);background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.45);padding:.42rem .85rem;cursor:pointer;transition:all .15s}
+    .dl-btn:hover{background:var(--green);color:#06120a;border-color:var(--green)}
+    .dl-btn:disabled{opacity:.45;cursor:not-allowed}
+    .dl-btn:disabled:hover{background:rgba(74,222,128,.08);color:var(--green)}
+    .dl-btn .dl-ico{font-size:1rem;line-height:1}
+    .dl-counter{font-family:Avenir,sans-serif;font-weight:500;font-size:.78rem;color:rgba(255,255,255,.55);font-variant-numeric:tabular-nums;letter-spacing:.04em}
+    .dl-counter.exhausted{color:#f59e0b}
+    .dl-counter.locked{color:rgba(255,255,255,.4)}
+    body.day-mode .dl-btn{color:#dc2626;background:rgba(220,38,38,.06);border-color:rgba(220,38,38,.45)}
+    body.day-mode .dl-btn:hover{background:#dc2626;color:#fff;border-color:#dc2626}
+    body.day-mode .dl-counter{color:rgba(0,0,0,.55)}
+    body.day-mode .dl-counter.exhausted{color:#b45309}
+    body.day-mode .dl-counter.locked{color:rgba(0,0,0,.4)}
   </style>
 </head>
 <body>
@@ -745,6 +762,13 @@
       <div class="panel-card">
         <div class="panel-section-title" id="top-title">Top 12 · municipios de oportunidad</div>
         <div class="top-list" id="top-list"></div>
+        <div class="dl-row" id="dl-row">
+          <button class="dl-btn" id="dl-btn" onclick="onDownloadTopCSV()">
+            <span class="dl-ico" aria-hidden="true">⬇</span>
+            <span class="dl-label">Descargar Top (CSV)</span>
+          </button>
+          <span class="dl-counter" id="dl-counter">— / —</span>
+        </div>
       </div>
 
       <!-- CTA comercial -->
@@ -816,6 +840,7 @@
     'transferencia':     'pro',
     'pesos-fuente':      'pro',
     'descarga-csv':      'pro',
+    'descarga-csv-quota':'premium',  // upgrade path cuando se agota la cuota Pro
     'capa-puestos':      'premium',
     'reporte-pdf':       'premium',
   };
@@ -832,7 +857,8 @@
     'mde-barrios':      { title:'Medellín · barrios', desc:'El mapa por los 147 barrios oficiales de Medellín está en Pro.' },
     'transferencia':    { title:'Transferencia intra-bloque', desc:'Simula qué pasa si tu candidato absorbe parte del voto de otros candidatos de su mismo bloque ideológico. Disponible en Pro.' },
     'pesos-fuente':     { title:'Pesos por fuente histórica', desc:'Ajusta cuánto pesa cada elección pasada (Pres-22, Cong-26, Pres-18, Consultas) al construir el mapa. Disponible en Pro.' },
-    'descarga-csv':     { title:'Descargar Top 30 (CSV)', desc:'Descarga el ranking de territorios de oportunidad para usarlo en tu CRM o Excel. Pro: 3 descargas/mes. Premium: 10/mes.' },
+    'descarga-csv':     { title:'Descargar Top (CSV)', desc:'Descarga el ranking de territorios de oportunidad para usarlo en tu CRM o Excel. Pro: 3 descargas/mes. Premium: 10/mes.' },
+    'descarga-csv-quota': { title:'Cuota mensual alcanzada', desc:'Ya usaste todas tus descargas de este mes. La cuota se renueva el primer día del próximo mes. Considera subir a Premium para 10 descargas/mes.' },
     'capa-puestos':     { title:'Capa Puestos de votación', desc:'El mapa de los 13.500+ puestos de votación con bias propio por puesto está disponible en Premium.' },
     'reporte-pdf':      { title:'Reporte territorial PDF', desc:'Reporte mensual personalizado con análisis territorial y recomendaciones tácticas. Disponible en Premium.' },
   };
@@ -950,6 +976,105 @@
   // Exponer al global scope (necesario porque algunos handlers usan onclick="...")
   window.openBlockedModal  = openBlockedModal;
   window.closeBlockedModal = closeBlockedModal;
+
+  /* ─── DESCARGA TOP CSV ─────────────────────────────────────────
+     Quota mensual por plan: free=0 / pro=3 / premium=10 / full=∞.
+     Persistida en localStorage por mes (YYYY-MM) → se autoresetea
+     al cambiar de mes. v1 es client-side: para v2 (con cuenta) hay
+     que mover el contador al worker para evitar trampas vaciando
+     localStorage. */
+  const DL_QUOTA = { anonymous:0, free:0, pro:3, premium:10, full:9999 };
+
+  function _dlKey(){
+    const d = new Date();
+    const ym = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    return `opo-dl-${ym}`;
+  }
+  function dlQuota(){ return DL_QUOTA[_userPlan] || 0; }
+  function dlUsed(){
+    try { return parseInt(localStorage.getItem(_dlKey()) || '0', 10) || 0; }
+    catch(_) { return 0; }
+  }
+  function dlBump(){
+    try { localStorage.setItem(_dlKey(), String(dlUsed() + 1)); }
+    catch(_) {}
+  }
+
+  // Renderiza el contador y el estado del botón.
+  function renderDlCounter(){
+    const btn = document.getElementById('dl-btn');
+    const cnt = document.getElementById('dl-counter');
+    if (!btn || !cnt) return;
+    const quota = dlQuota();
+    const used  = dlUsed();
+    cnt.classList.remove('exhausted','locked');
+    if (quota === 0){
+      // Plan no permite descargas (anónimo o Básico)
+      cnt.textContent = 'Pro / Premium';
+      cnt.classList.add('locked');
+      btn.disabled = false; // dejamos el botón clickeable para que abra el modal
+      return;
+    }
+    if (quota >= 9999){
+      cnt.textContent = 'ilimitadas';
+      btn.disabled = false;
+      return;
+    }
+    cnt.textContent = `${used} / ${quota} este mes`;
+    if (used >= quota) cnt.classList.add('exhausted');
+    btn.disabled = false;
+  }
+
+  // Click en "Descargar Top (CSV)": gate por plan + quota.
+  function onDownloadTopCSV(){
+    if (!requireFeature('descarga-csv')) return;
+    const quota = dlQuota();
+    const used  = dlUsed();
+    if (quota > 0 && used >= quota){
+      // Tiene plan pero ya copó la quota del mes
+      openBlockedModal('descarga-csv-quota');
+      return;
+    }
+    const items = STATE._topItems || [];
+    if (!items.length){
+      alert('No hay datos para descargar todavía. Espera a que cargue el top.');
+      return;
+    }
+    const meta = STATE._topMeta || { unitLabel:'territorio', scope:'oportunidad' };
+    const cand = CANDIDATOS.find(c => c.id === STATE.candId);
+    const candName = cand ? cand.nombre : '—';
+    const fecha = new Date().toISOString().slice(0,10);
+
+    // Construir CSV. Comas en valores → escapar con comillas.
+    const esc = (v) => {
+      if (v == null) return '';
+      const s = String(v);
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+    };
+    const header = ['candidato','scope','unidad','rank','nombre','contexto','contribucion_pp','fecha_export'];
+    const rows = items.map((r,i) => [
+      candName, meta.scope, meta.unitLabel, i+1, r.name, r.sub || '',
+      (r.contrib != null ? r.contrib.toFixed(4) : ''), fecha,
+    ]);
+    const csv = [header, ...rows].map(arr => arr.map(esc).join(',')).join('\r\n');
+
+    // BOM para que Excel detecte UTF-8.
+    const blob = new Blob(['﻿' + csv], { type:'text/csv;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const safeCand  = (cand ? cand.id : 'cand');
+    const safeScope = (meta.scope || 'opo').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+    a.href = url;
+    a.download = `oportunidad_top_${safeCand}_${safeScope}_${fecha}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+
+    dlBump();
+    renderDlCounter();
+  }
+
+  window.onDownloadTopCSV = onDownloadTopCSV;
 
   const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
   const PONDERADOR_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_ponderador/ponderador-actual.json';
@@ -4447,6 +4572,11 @@
 
     items.sort((a,b) => b.contrib - a.contrib);
     items = items.slice(0, TOP_N);
+    // Persistir el top actual para que el botón de descarga CSV
+    // lo lea sin duplicar la lógica de scope.
+    STATE._topItems    = items;
+    STATE._topMeta     = { unitLabel, scope };
+
     const titleEl = document.getElementById('top-title');
     if (titleEl) titleEl.textContent = `Top ${items.length} · ${unitLabel} de ${scope}`;
 
@@ -4465,6 +4595,8 @@
     // Banner deprecado en el modelo NS-NR (no satura por construcción).
     const el = document.getElementById('cap-banner');
     if (el) el.style.display = 'none';
+    // Refresca el contador de descargas (depende del scope visible).
+    renderDlCounter();
   }
   function onTopClick(key, dep){
     STATE.selectedDep = dep;
@@ -4937,7 +5069,8 @@
     loadUserFromStorage();
     renderPlanChip();
     applyLockState();
-    refreshUserFromAPI().then(() => { renderPlanChip(); applyLockState(); });
+    renderDlCounter();
+    refreshUserFromAPI().then(() => { renderPlanChip(); applyLockState(); renderDlCounter(); });
 
     showLoading(true);
     try {
