@@ -700,6 +700,34 @@
     .map-loading{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(6,8,16,.85);z-index:800;font-family:Avenir,sans-serif;font-weight:500;font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.75);pointer-events:none}
     .map-loading.show{display:flex}
     body.day-mode .map-loading{background:rgba(230,222,211,.85);color:rgba(0,0,0,.7)}
+
+    /* Vista de países (Consulados / Exterior) — reemplaza el mapa cuando
+       el usuario hace drill al inset del Caribe. No es geográfico: los
+       consulados son puestos por país, sin polígono natural. */
+    .exterior-grid{display:none;position:absolute;inset:0;background:rgba(6,8,16,.4);overflow:auto;padding:.8rem;z-index:400}
+    .exterior-grid.show{display:block}
+    body.day-mode .exterior-grid{background:rgba(230,222,211,.5)}
+    .ext-grid-inner{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.45rem}
+    .ext-card{position:relative;padding:.55rem .7rem;border:1px solid rgba(255,255,255,.08);border-left:3px solid var(--win-color,rgba(255,255,255,.2));background:rgba(13,18,42,.6);cursor:pointer;transition:all .12s;font-family:Avenir,sans-serif}
+    .ext-card:hover{background:rgba(13,18,42,.95);border-color:rgba(255,255,255,.25);transform:translateY(-1px)}
+    body.day-mode .ext-card{background:rgba(255,255,255,.55);border-color:rgba(0,0,0,.08)}
+    body.day-mode .ext-card:hover{background:rgba(255,255,255,.9);border-color:rgba(0,0,0,.2)}
+    .ext-card-name{font-family:Syne,sans-serif;font-weight:500;font-size:.78rem;letter-spacing:.02em;line-height:1.15;color:var(--white);margin-bottom:.18rem;text-transform:uppercase}
+    body.day-mode .ext-card-name{color:#1a1a2e}
+    .ext-card-winner{font-size:.72rem;color:var(--win-color,rgba(255,255,255,.55));font-weight:500;line-height:1.2;margin-bottom:.15rem}
+    .ext-card-pct{font-family:Avenir,sans-serif;font-size:.72rem;color:rgba(255,255,255,.55)}
+    body.day-mode .ext-card-pct{color:rgba(0,0,0,.55)}
+    .ext-card-vot{font-family:Avenir,sans-serif;font-size:.68rem;color:rgba(255,255,255,.4);margin-top:.12rem}
+    body.day-mode .ext-card-vot{color:rgba(0,0,0,.45)}
+    .ext-header{padding:.4rem .25rem .8rem;font-family:Avenir,sans-serif}
+    .ext-header-title{font-family:Syne,sans-serif;font-weight:800;font-size:1rem;color:var(--white);letter-spacing:.02em}
+    body.day-mode .ext-header-title{color:#1a1a2e}
+    .ext-header-sub{font-size:.72rem;color:rgba(255,255,255,.5);margin-top:.15rem}
+    body.day-mode .ext-header-sub{color:rgba(0,0,0,.55)}
+
+    /* Label del inset "Exterior" sobre el cuadrado del Caribe */
+    .ext-inset-label{font-family:'DM Mono',monospace;font-weight:400;font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.7);background:transparent;border:none;text-shadow:0 1px 2px rgba(0,0,0,.8);pointer-events:none;white-space:nowrap}
+    body.day-mode .ext-inset-label{color:rgba(0,0,0,.55);text-shadow:0 1px 2px rgba(255,255,255,.6)}
     .map-legend-title{font-family:Avenir,sans-serif;font-weight:500;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.4)}
     .map-legend-bar{width:260px;height:8px;background:linear-gradient(to right,#0d1b3e,#1d4ed8,#0891b2,#15803d,#ca8a04,#fef08a,#ea580c,#dc2626)}
     .map-legend-ends{display:flex;justify-content:space-between;width:260px;font-family:Avenir,sans-serif;font-weight:400;font-size:.68rem;color:rgba(255,255,255,.5)}
@@ -1015,6 +1043,7 @@
       </div>
       <div style="position:relative;flex:1;display:flex;flex-direction:column">
         <div id="leaflet-map"></div>
+        <div class="exterior-grid" id="exterior-grid"></div>
         <button class="map-back-btn" id="map-back-btn" onclick="exitOneLevel()">← Nacional</button>
         <div class="map-loading" id="map-loading">Cargando municipios…</div>
       </div>
@@ -2030,12 +2059,54 @@
     }
   }
 
+  // Bbox del inset "Exterior" en el Caribe (al norte de La Guajira, en mar
+  // abierto, al este de San Andrés y al oeste de Aruba). El cuadrado entra
+  // al flujo normal de deptLayer como un feature más — `featureStyle` lo
+  // colorea por ganador proyectado de depto 88, `onEachFeature` lo hace
+  // hoverable y clickeable. El click dispara `drillToExterior()` en vez
+  // del drill geográfico estándar.
+  const EXT_BBOX = { south: 13.0, north: 15.5, west: -74.0, east: -71.0 };
+  function _extInsetFeature(){
+    return {
+      type: 'Feature',
+      properties: { name: 'CONSULADOS', __ext: true, electoral_id: '88' },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[
+          [EXT_BBOX.west, EXT_BBOX.south],
+          [EXT_BBOX.east, EXT_BBOX.south],
+          [EXT_BBOX.east, EXT_BBOX.north],
+          [EXT_BBOX.west, EXT_BBOX.north],
+          [EXT_BBOX.west, EXT_BBOX.south],
+        ]],
+      },
+    };
+  }
+  let _extLabelMarker = null;
+  function _addExtLabel(){
+    if (_extLabelMarker || !map) return;
+    const cy = (EXT_BBOX.south + EXT_BBOX.north) / 2;
+    const cx = (EXT_BBOX.west + EXT_BBOX.east) / 2;
+    _extLabelMarker = L.marker([cy, cx], {
+      interactive: false,
+      icon: L.divIcon({
+        className: 'ext-inset-label-wrap',
+        html: '<span class="ext-inset-label">Exterior</span>',
+        iconSize: [80, 14],
+        iconAnchor: [40, 7],
+      }),
+    }).addTo(map);
+  }
+
   async function loadDeptos(){
     try{
       const r = await fetch(DEPARTAMENTOS_URL);
       geoData = await r.json();
+      // Inyecta el inset "Exterior" como un feature sintético adicional.
+      geoData.features.push(_extInsetFeature());
       recomputeScales();
       deptLayer = L.geoJSON(geoData, { style: featureStyle, onEachFeature }).addTo(map);
+      _addExtLabel();
       try{ const b = deptLayer.getBounds(); if (b.isValid()) map.fitBounds(b, { padding:[12,12] }); }catch(e){}
       // Segunda pasada para pintar con escalas correctas y poblar la leyenda.
       repaintMap();
@@ -2048,6 +2119,10 @@
     if (!geoData) return;
     let mMargin = 0, mShare = 0;
     for (const f of geoData.features){
+      // El inset Exterior se excluye del cálculo de escala para que su
+      // margen (a veces extremo, p.ej. Cepeda 30+ pp en algunos países)
+      // no comprima la intensidad de color del resto del mapa.
+      if (f.properties && f.properties.__ext) continue;
       const nm = depName(f.properties);
       const r = computeDeptoRanking(nm);
       if (r && r.margin > mMargin) mMargin = r.margin;
@@ -2097,31 +2172,43 @@
   }
 
   function onEachFeature(feature, layer){
-    const nm = depName(feature.properties);
+    const rawNm = depName(feature.properties);
+    const isExt = !!feature.properties.__ext;
+    // Label visible: el inset usa el alias "Exterior" porque "CONSULADOS"
+    // en el contexto del mapa de Colombia se lee mejor como "lo que está
+    // fuera del país" que como nombre de territorio.
+    const nm = isExt ? 'Exterior' : rawNm;
+    // Para todas las funciones que leen históricos/SENADO_BY_DEPTO el
+    // nombre canónico sigue siendo CONSULADOS — solo cambiamos el display.
+    const depNomData = isExt ? 'CONSULADOS' : rawNm;
     // Code para drill (electoral_id si existe, si no via SENADO_BY_DEPTO)
     let _drillDepCod = feature.properties.electoral_id || feature.properties.dep_electoral;
     if (!_drillDepCod){
-      const entry = SENADO_BY_DEPTO[norm(nm)];
+      const entry = SENADO_BY_DEPTO[norm(depNomData)];
       _drillDepCod = entry?.cod;
     }
     const payload = {
-      scopeKey: 'dep:' + nm,
-      level:    'Departamento',
+      scopeKey: 'dep:' + depNomData,
+      level:    isExt ? 'Exterior' : 'Departamento',
       name:     nm,
       parents:  [],
       kind:     'depto',
-      args:     { depNom: nm },
-      fuente:   `Bias depto · ${_fuentesDisponibles ? _fuentesDisponibles() : 'señales históricas'}`,
-      drillTo:  _drillDepCod ? { label: 'Ver municipios →', kind: 'depto', args: [String(_drillDepCod).padStart(2,'0'), nm] } : null,
+      args:     { depNom: depNomData },
+      fuente:   isExt
+        ? 'Bias depto · históricos pres 2010-2022 + senado 2026 (consulados)'
+        : `Bias depto · ${_fuentesDisponibles ? _fuentesDisponibles() : 'señales históricas'}`,
+      drillTo:  isExt
+        ? { label: 'Ver países →', kind: 'exterior', args: [] }
+        : (_drillDepCod ? { label: 'Ver municipios →', kind: 'depto', args: [String(_drillDepCod).padStart(2,'0'), nm] } : null),
     };
     // Tooltip Leaflet sigue presente como fallback en mobile (CSS lo oculta
     // en desktop ≥1100px). En desktop el detalle vive en #territory-card.
     const tooltipHtmlFn = () => {
-      const r = computeDeptoRanking(nm);
+      const r = computeDeptoRanking(depNomData);
       if (selectedId){
         const cand = CANDIDATOS.find(c => c.id === selectedId);
-        const total = CANDIDATOS.reduce((s,c) => s + projected(c, nm), 0);
-        const v = cand ? projected(cand, nm) : 0;
+        const total = CANDIDATOS.reduce((s,c) => s + projected(c, depNomData), 0);
+        const v = cand ? projected(cand, depNomData) : 0;
         const share = total > 0 ? v / total : 0;
         return `<div style="line-height:1.4"><b>${nm}</b><br>${cand?cand.nombre:''}<br><b>${(share*100).toFixed(1)}%</b> local</div>`;
       }
@@ -2133,7 +2220,7 @@
     layer.on({
       mouseover(e){
         layer.setStyle({ weight:2.5, color:'#fff', fillOpacity:.98 });
-        const r = computeDeptoRanking(nm);
+        const r = computeDeptoRanking(depNomData);
         const winColor = r?.winner?.color || 'rgba(255,255,255,.5)';
         _setHoverChip(e, nm, winColor);
         _hoverTerritory(payload);
@@ -2142,12 +2229,13 @@
       mousemove(e){ _moveHoverChip(e); },
       mouseout(){ if (deptLayer) deptLayer.resetStyle(layer); layer.closeTooltip(); _clearHoverChip(); },
       click(){
+        if (isExt){ drillToExterior(); return; }
         // Click en un depto → drill-down a sus municipios.
         // Usa electoral_id si existe, si no el nombre → código via SENADO_BY_DEPTO.
         const props = feature.properties;
         let depCod = props.electoral_id || props.dep_electoral;
         if (!depCod){
-          const entry = SENADO_BY_DEPTO[norm(nm)];
+          const entry = SENADO_BY_DEPTO[norm(depNomData)];
           depCod = entry?.cod;
         }
         if (depCod) drillToDepto(String(depCod).padStart(2,'0'), nm);
@@ -2398,6 +2486,138 @@
     repaintMap();
   }
 
+  // ─── DRILL-DOWN: Exterior (Consulados) ───────────────────────
+  // Reemplaza el mapa por una grilla de 66 países (los "muns" del depto 88).
+  // No es geográfico: cada país es una tarjeta clickable con su ganador
+  // proyectado. El bias por país ya viene de `precomputeBiasMun` porque
+  // los datasets históricos tienen las keys `88-XXX`.
+  let _extActive = false;
+  let _extPaisesData = null;  // [{ cod, nombre, votant, votval, ... }]
+  const EXT_MUN_URL = `${S3}/senado/departamentos/88/municipios.json`;
+
+  async function _loadExteriorData(){
+    if (_extPaisesData) return _extPaisesData;
+    const r = await fetch(EXT_MUN_URL, { cache: 'force-cache' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    _extPaisesData = await r.json();
+    return _extPaisesData;
+  }
+
+  async function drillToExterior(){
+    if (_extActive) return;
+    showMapLoading('Cargando consulados…');
+    try {
+      await _loadExteriorData();
+      _extActive = true;
+      // Oculta el mapa (con todas sus capas) y muestra la grilla.
+      const mapEl = document.getElementById('leaflet-map');
+      const grid  = document.getElementById('exterior-grid');
+      if (mapEl) mapEl.style.visibility = 'hidden';
+      if (grid)  grid.classList.add('show');
+      const backBtn = document.getElementById('map-back-btn');
+      if (backBtn){ backBtn.textContent = '← Nacional'; backBtn.classList.add('show'); }
+      _renderExteriorGrid();
+      // Header del mapa: refleja el modo Exterior.
+      const label = document.getElementById('map-head-label');
+      const nameEl = document.getElementById('map-cand-name');
+      if (label) label.textContent = `Exterior · ${_extPaisesData.length} consulados`;
+      if (nameEl){
+        nameEl.textContent = 'Bias por país calibrado · presidenciales 2010-2022 (muns 88-XXX) + senado 2026';
+        nameEl.style.color = '';
+      }
+    } catch(e){
+      console.error('[Previa] error cargando exterior:', e);
+    } finally {
+      hideMapLoading();
+    }
+  }
+
+  function exitFromExterior(){
+    _extActive = false;
+    const mapEl = document.getElementById('leaflet-map');
+    const grid  = document.getElementById('exterior-grid');
+    if (mapEl) mapEl.style.visibility = '';
+    if (grid)  grid.classList.remove('show');
+    document.getElementById('map-back-btn')?.classList.remove('show');
+    // Restaurar header al estado nacional.
+    repaintMap();
+  }
+
+  // Renderiza las 66 tarjetas. Ordenadas por votantes Senado 2026 desc
+  // (Venezuela y EE.UU. arriba). Reusa `computeMunRanking('88-XXX',
+  // 'CONSULADOS')` para que el bias y el ganador coincidan exactamente con
+  // el resto del mapa. Se llama también desde `repaintMap` cuando el
+  // usuario mueve un slider o selecciona un candidato.
+  function _renderExteriorGrid(){
+    const grid = document.getElementById('exterior-grid');
+    if (!grid || !_extPaisesData) return;
+    const items = _extPaisesData.slice().sort((a,b) => (b.votant||0) - (a.votant||0));
+    const cards = items.map(p => {
+      const munKey = `88-${String(p.cod).padStart(3,'0')}`;
+      const depNom = 'CONSULADOS';
+      const hasMunBias = _biasCacheMun && Object.values(_biasCacheMun).some(m => m[munKey] != null);
+      const r = hasMunBias ? computeMunRanking(munKey, depNom) : computeDeptoRanking(depNom);
+      let winName = '—', winColor = 'rgba(255,255,255,.4)', winPct = 0, selPct = null;
+      const total = r ? r.ranked.reduce((s,x)=>s+x.v,0) : 0;
+      if (r && r.winner){
+        winName = r.winner.nombre;
+        winColor = r.winner.color;
+        winPct = total > 0 ? r.winnerV/total*100 : 0;
+      }
+      if (selectedId){
+        const cand = CANDIDATOS.find(c => c.id === selectedId);
+        if (cand){
+          const candV = hasMunBias ? projectedMun(cand, munKey, depNom) : projected(cand, depNom);
+          const totAll = hasMunBias
+            ? CANDIDATOS.reduce((s,c) => s + projectedMun(c, munKey, depNom), 0)
+            : CANDIDATOS.reduce((s,c) => s + projected(c, depNom), 0);
+          selPct = totAll > 0 ? candV/totAll*100 : 0;
+        }
+      }
+      const vot = (p.votant || 0).toLocaleString('es-CO');
+      const main = selectedId
+        ? `<div class="ext-card-winner">${(CANDIDATOS.find(c=>c.id===selectedId)?.nombre)||'—'}</div>
+           <div class="ext-card-pct"><b>${(selPct||0).toFixed(1)}%</b> local</div>`
+        : `<div class="ext-card-winner">${winName}</div>
+           <div class="ext-card-pct">${winPct.toFixed(1)}% · ganador</div>`;
+      const borderColor = selectedId
+        ? (CANDIDATOS.find(c=>c.id===selectedId)?.color || winColor)
+        : winColor;
+      return `<div class="ext-card" data-pais="${p.cod}" data-nombre="${p.nombre.replace(/"/g,'&quot;')}" style="--win-color:${borderColor}">
+        <div class="ext-card-name">${p.nombre}</div>
+        ${main}
+        <div class="ext-card-vot">${vot} votantes · Senado 2026</div>
+      </div>`;
+    }).join('');
+    grid.innerHTML = `
+      <div class="ext-header">
+        <div class="ext-header-title">Exterior · 66 consulados</div>
+        <div class="ext-header-sub">${(_extPaisesData.reduce((s,p)=>s+(p.votant||0),0)).toLocaleString('es-CO')} votantes en Senado 2026 · ordenados por tamaño</div>
+      </div>
+      <div class="ext-grid-inner">${cards}</div>`;
+    // Hover de cada tarjeta dispara el #territory-card con el payload
+    // estilo "mun" para que se vea idéntico a navegar por municipios.
+    grid.querySelectorAll('.ext-card').forEach(el => {
+      const paisCod = el.dataset.pais;
+      const paisNom = el.dataset.nombre;
+      const munKey = `88-${String(paisCod).padStart(3,'0')}`;
+      const hasMunBias = _biasCacheMun && Object.values(_biasCacheMun).some(m => m[munKey] != null);
+      const payload = {
+        scopeKey: 'mun:' + munKey,
+        level: 'Consulado',
+        name: paisNom,
+        parents: ['Exterior'],
+        kind: 'mun',
+        args: { munKey, depNom: 'CONSULADOS', hasMunBias },
+        fuente: hasMunBias
+          ? 'Bias país calibrado · históricos pres 2010-2022 (88-XXX) + senado 2026'
+          : 'Bias hereda del depto Consulados (país sin cobertura histórica)',
+        drillTo: null,
+      };
+      el.addEventListener('mouseenter', () => _hoverTerritory(payload));
+    });
+  }
+
   function updateMapHeadForDrill(depNom, nMuns){
     const label = document.getElementById('map-head-label');
     const nameEl = document.getElementById('map-cand-name');
@@ -2571,6 +2791,8 @@
   // muns de un depto → nacional. El botón "← Nacional" se rebautiza según
   // el contexto.
   async function exitOneLevel(){
+    // Salida del modo Exterior (grilla de consulados) → vista nacional.
+    if (_extActive){ exitFromExterior(); return; }
     // En modo Puestos, "volver a nacional" significa centrar el mapa en
     // la vista inicial — no hay capas que destruir, solo reset del view.
     if (currentLevel === 'pue'){
@@ -2891,6 +3113,7 @@
     recomputeScales();
     if (deptLayer) deptLayer.setStyle(featureStyle);
     if (munLayer) munLayer.setStyle(munFeatureStyle);
+    if (_extActive) _renderExteriorGrid();
     if (nacionalMunLayer){
       // En modo Puestos el mun es solo contexto territorial: estilo neutro
       // para que los markers se vean limpios. En el resto de modos,
@@ -3355,6 +3578,11 @@
       } else if (kind === 'city'){
         const cfg = detectCity(args[0], args[1]);
         if (cfg) loadCityLayer(cfg, args[2], args[3]);
+      } else if (kind === 'exterior'){
+        drillToExterior();
+      } else if (kind === 'pais'){
+        // args = [paisCod, paisNom] — placeholder por si más adelante
+        // queremos detalle por consulado (hoy el grid ya muestra todo).
       }
     } finally {
       _closeTerritorySheet();
