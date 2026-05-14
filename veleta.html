@@ -615,6 +615,7 @@
     cityActive:null,                  // munKey '16-001' si estamos en city-mode
     barrioActive:null,                // upl code 'UPL13' (Bogotá) o comuna code '01' (Medellín)
     barrioCity:null,                  // 'bogota' | 'medellin' — para dispatch correcto del re-render
+    barrioFilterCods:null,            // Set de loc_codigo permitidos en el top (UPL Bog → sus localidades; Mde → la comuna)
     scoreByBarrio:{},                 // codigo barrio → record
     barrioGeoCache:{},                // { cityKey: geojson }
     barrioProyCache:{},               // { cityKey: proyección barrios }
@@ -1103,10 +1104,17 @@
       if (!bestK) continue;
       const src = STATE.scoreByBarrio[bestK];
       const props = item.f.properties || {};
+      // El receptor conserva su PROPIA localidad/comuna (no la del donador) —
+      // crítico para que el top 10 filtrado por UPL/Comuna funcione bien.
+      const locCod  = props.loc_codigo
+                      ?? (props.comuna != null ? String(props.comuna).padStart(2,'0') : src.loc_codigo);
+      const locName = props.loc_nombre || props.nombre_com || src.loc_nombre;
       STATE.scoreByBarrio[item.k] = {
         ...src,
         cod: item.k,
         nombre: props.nombre_bar || item.k,
+        loc_codigo: locCod,
+        loc_nombre: locName,
         _heredado: true,
         _heredadoDe: STATE.scoreByBarrio[bestK] && STATE.scoreByBarrio[bestK].nombre || bestK,
       };
@@ -1163,6 +1171,9 @@
       document.getElementById('map-back-btn').classList.add('show');
       STATE.barrioActive = comunaCod;
       STATE.barrioCity = 'medellin';
+      // El top 10 sólo cuenta barrios de la comuna clickeada (Medellín filtra
+      // el render por comuna, así que aquí coincide con el set visible).
+      STATE.barrioFilterCods = new Set([comunaCod]);
       updateScopeToggleVisibility();
       renderTop30();
       restoreOverview();
@@ -1382,8 +1393,8 @@
       },
     }).addTo(STATE.map);
     STATE.map.fitBounds(STATE.layer.getBounds(), { padding:[20,20] });
-    // Bump suave sobre el fit nacional (+0.25 niveles ≈ 1.2× lineal).
-    STATE.map.setZoom(STATE.map.getZoom() + 0.25);
+    // Bump sutil idéntico al de oportunidad.html (+0.02 niveles).
+    STATE.map.setZoom(STATE.map.getZoom() + 0.02);
     document.getElementById('map-head-title').textContent = 'Vista nacional · Departamental';
     document.getElementById('map-back-btn').classList.remove('show');
     renderTop30();
@@ -1621,6 +1632,9 @@
       document.getElementById('map-back-btn').classList.add('show');
       STATE.barrioActive = uplCod;
       STATE.barrioCity = 'bogota';
+      // El top 10 sólo cuenta barrios cuyo loc_codigo esté en las localidades
+      // de la UPL clickeada (mismo set que el filtro visual "inUPL").
+      STATE.barrioFilterCods = new Set(uplLocCods);
       updateScopeToggleVisibility();
       // Adapta el ranking y overview a barrios
       renderTop30();
@@ -1635,6 +1649,7 @@
   function exitBarrios(){
     STATE.barrioActive = null;
     STATE.barrioCity = null;
+    STATE.barrioFilterCods = null;
     STATE.scoreByBarrio = {};
     if (STATE.cityActive) renderCity(STATE.cityActive);
     else if (STATE.selectedDep) renderMunsOfDep(STATE.selectedDep);
@@ -1945,7 +1960,13 @@
     const candShort = cand ? cand.nombre.split(' ')[0] : '';
 
     if (STATE.barrioActive){
-      const arr = Object.values(STATE.scoreByBarrio).sort((a,b)=>b.score-a.score).slice(0, TOP_N);
+      // Filtrar barrios por la UPL (Bog) o comuna (Mde) activa: el top sólo
+      // refleja barrios del territorio drillado, no de toda la ciudad.
+      const filt = STATE.barrioFilterCods;
+      const pool = filt
+        ? Object.values(STATE.scoreByBarrio).filter(r => r && r.loc_codigo && filt.has(String(r.loc_codigo).padStart(2,'0')))
+        : Object.values(STATE.scoreByBarrio);
+      const arr = pool.sort((a,b)=>b.score-a.score).slice(0, TOP_N);
       const adapted = arr.map(r => ({
         key: r.cod, depCod: r.depCod || '',
         __cityName: r.nombre,
