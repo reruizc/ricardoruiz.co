@@ -1070,13 +1070,15 @@
     return n ? [sx/n, sy/n] : null;
   }
 
-  // Para cada feature de la comuna sin score, hereda del barrio contiguo con score
-  // (vecino más cercano por centroide). Marca el rec heredado con _heredado=true
+  // Para cada feature sin score, hereda del barrio contiguo con score (vecino más
+  // cercano por centroide del polígono). Marca el rec heredado con _heredado=true
   // y _heredadoDe (nombre del barrio donador) para mostrarlo en el detail card.
   // Modifica STATE.scoreByBarrio in-place; los códigos heredados sólo viven mientras
-  // la capa está activa — al re-render desde otra comuna, computeScoresBarriosMde
+  // la capa está activa — al re-render desde otra comuna/UPL, computeScoresBarrios(Mde)
   // los limpia (resetea scoreByBarrio = {}).
-  function inheritBarriosMdeSinMedicion(features){
+  // Funciona para Bog y Mde porque ambos GeoJSON usan `properties.codigo` como llave
+  // y veleta unifica el record en STATE.scoreByBarrio.
+  function inheritBarriosSinMedicion(features){
     const conScore = [];
     const sinScore = [];
     for (const f of features){
@@ -1133,7 +1135,7 @@
           return cm === comunaCod;
         }),
       };
-      inheritBarriosMdeSinMedicion(filtered.features);
+      inheritBarriosSinMedicion(filtered.features);
 
       clearLayer();
       STATE.layer = L.geoJSON(filtered, {
@@ -1380,8 +1382,8 @@
       },
     }).addTo(STATE.map);
     STATE.map.fitBounds(STATE.layer.getBounds(), { padding:[20,20] });
-    // +10% de zoom sobre el fit nacional (∆ ~+0.5 niveles ≈ 1.4× lineal).
-    STATE.map.setZoom(STATE.map.getZoom() + 0.5);
+    // Bump suave sobre el fit nacional (+0.25 niveles ≈ 1.2× lineal).
+    STATE.map.setZoom(STATE.map.getZoom() + 0.25);
     document.getElementById('map-head-title').textContent = 'Vista nacional · Departamental';
     document.getElementById('map-back-btn').classList.remove('show');
     renderTop30();
@@ -1572,6 +1574,12 @@
       const uplLocCods = new Set(uplLocs.map(l => String(l.LocCodigo).padStart(2,'0')));
 
       const geo = cfg.rotate ? rotateGeoJSON90Left(geoRaw) : geoRaw;
+
+      // Herencia kNN: ~387 de 1001 barrios catastrales de Bogotá no tienen
+      // proyección propia. Para esos, hereda del barrio contiguo con score.
+      // La rotación 90° es isométrica → la distancia euclidiana sigue siendo
+      // válida sin desrotar.
+      inheritBarriosSinMedicion(geo.features);
 
       clearLayer();
       const allBarriosLayer = L.geoJSON(geo, {
