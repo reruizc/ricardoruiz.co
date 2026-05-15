@@ -4645,20 +4645,25 @@
   async function loadBogBarrioSignals(){
     if (STATE.bogBarrioData) return STATE.bogBarrioData;
     if (STATE.bogBarrioSigLoading) return STATE.bogBarrioSigLoading;
+    // Cache buster: garantiza que se cargue la versión actual del JSON.
+    // Bump cuando se regeneren los outputs (no fix por fix; es un sello
+    // de versión por release de datos). Útil porque Safari es agresivo
+    // con cache de JSON sin Cache-Control.
+    const v = '20260515';
     STATE.bogBarrioSigLoading = (async () => {
       const out = {};
       const fetches = BOG_BARRIO_SIGNALS.map(async sig => {
         try {
-          const r = await fetch(`${BOG_BARRIO_DATA_BASE}/bog-barrio-${sig}.json`);
+          const r = await fetch(`${BOG_BARRIO_DATA_BASE}/bog-barrio-${sig}.json?v=${v}`);
           if (!r.ok) return;
           const j = await r.json();
           out[sig] = j.por_barrio || {};
         } catch (e){ console.warn('[opo·bog·barrio]', sig, e); }
       });
       const censoLoads = [
-        ['Censo2026', `${BOG_BARRIO_DATA_BASE}/censo-barrio-2026.json`],
-        ['Censo2022', `${BOG_BARRIO_DATA_BASE}/censo-barrio-2022.json`],
-        ['Censo2018', `${BOG_BARRIO_DATA_BASE}/censo-barrio-2018.json`],
+        ['Censo2026', `${BOG_BARRIO_DATA_BASE}/censo-barrio-2026.json?v=${v}`],
+        ['Censo2022', `${BOG_BARRIO_DATA_BASE}/censo-barrio-2022.json?v=${v}`],
+        ['Censo2018', `${BOG_BARRIO_DATA_BASE}/censo-barrio-2018.json?v=${v}`],
       ].map(async ([slot, url]) => {
         try {
           const r = await fetch(url);
