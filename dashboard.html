@@ -591,6 +591,71 @@
       transition: border-color .2s, color .2s;
     }
     .cancel-modal-back:hover { border-color: var(--blue); color: var(--blue); }
+
+    /* ── SYNC PAYMENT MODAL ── (reaprovecha estética de cancel-modal) */
+    .sync-modal {
+      display:none; position:fixed; inset:0; z-index:3000;
+      background:rgba(0,0,0,.7); backdrop-filter:blur(6px);
+      align-items:center; justify-content:center; padding:1.5rem;
+    }
+    .sync-modal.show { display:flex; }
+    .sync-modal-card {
+      background:var(--surface); border:1px solid var(--border);
+      padding:2rem; max-width:440px; width:100%;
+    }
+    .sync-modal-title {
+      font-family:'Syne',sans-serif; font-weight:800;
+      font-size:1.3rem; letter-spacing:-.02em;
+      margin-bottom:.5rem; color:var(--text);
+    }
+    .sync-modal-desc {
+      font-family:'Fraunces',serif; font-weight:300;
+      font-size:.9rem; color:var(--text2); line-height:1.6;
+      margin-bottom:1.25rem;
+    }
+    .sync-modal-input {
+      width:100%; font-family:'DM Mono',monospace; font-size:.8rem;
+      color:var(--text); background:var(--surface2); border:1px solid var(--border);
+      padding:.7rem .85rem; margin-bottom:.75rem; cursor:text;
+      letter-spacing:.02em;
+    }
+    .sync-modal-input:focus { outline:none; border-color:var(--blue); }
+    .sync-modal-msg {
+      font-family:'DM Mono',monospace; font-size:.7rem;
+      color:var(--text2); margin-bottom:1rem; min-height:1.1em;
+      letter-spacing:.04em;
+    }
+    .sync-modal-msg.success { color:var(--success); }
+    .sync-modal-msg.error { color:#ff4757; }
+    .sync-modal-actions { display:flex; gap:.75rem; }
+    .sync-modal-confirm {
+      flex:1; font-family:'DM Mono',monospace; font-size:.65rem;
+      letter-spacing:.08em; text-transform:uppercase;
+      color:#fff; background:var(--blue);
+      border:none; padding:.75rem; cursor:none;
+      transition:background .2s;
+    }
+    .sync-modal-confirm:hover { background:#0035cc; }
+    .sync-modal-confirm:disabled { opacity:.5; pointer-events:none; }
+    .sync-modal-back {
+      flex:1; font-family:'DM Mono',monospace; font-size:.65rem;
+      letter-spacing:.08em; text-transform:uppercase;
+      color:var(--text2); background:none;
+      border:1px solid var(--border); padding:.75rem; cursor:none;
+      transition:border-color .2s, color .2s;
+    }
+    .sync-modal-back:hover { border-color:var(--blue); color:var(--blue); }
+
+    /* Pequeño link en la plan-card */
+    .plan-sync-link {
+      display:block; width:100%; margin-top:.5rem; padding:.4rem 0;
+      background:none; border:none; cursor:pointer;
+      font-family:'DM Mono',monospace; font-size:.6rem;
+      letter-spacing:.08em; text-transform:uppercase;
+      color:var(--text3); text-align:center;
+      transition:color .2s;
+    }
+    .plan-sync-link:hover { color:var(--blue); }
   </style>
 </head>
 <body>
@@ -625,6 +690,22 @@
       <div class="cancel-modal-actions">
         <button class="cancel-modal-back" onclick="closeCancelModal()">Volver</button>
         <button class="cancel-modal-confirm" id="cancel-confirm-btn" onclick="confirmCancel()">Sí, cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SYNC PAYMENT MODAL -->
+  <div class="sync-modal" id="sync-modal">
+    <div class="sync-modal-card">
+      <div class="sync-modal-title" id="sync-modal-title">Sincronizar mi pago</div>
+      <div class="sync-modal-desc" id="sync-modal-desc">
+        Si pagaste por Wompi y tu plan no se actualizó, pega aquí el ID de la transacción. Lo encuentras en el correo de confirmación de Wompi (formato <code>1401350-…-…</code>).
+      </div>
+      <input type="text" class="sync-modal-input" id="sync-tx-input" placeholder="1401350-1234567890-12345" autocomplete="off" />
+      <div class="sync-modal-msg" id="sync-modal-msg"></div>
+      <div class="sync-modal-actions">
+        <button class="sync-modal-back" onclick="closeSyncModal()" id="sync-back-btn">Cerrar</button>
+        <button class="sync-modal-confirm" id="sync-confirm-btn" onclick="runSync()">Sincronizar</button>
       </div>
     </div>
   </div>
@@ -759,7 +840,23 @@
     const user  = JSON.parse(localStorage.getItem('rr-user') || 'null');
     if (!token || !user) window.location.href = 'login.html';
 
-    // ─── THEME ── lógica compartida en theme.js ──────────────────────────────
+    // ─── THEME ────────────────────────────────────────────────────────────────
+    function getAutoTheme() {
+      const h = new Date().getHours();
+      return (h >= 7 && h < 19) ? 'light' : 'dark';
+    }
+    let currentTheme = localStorage.getItem('rr-theme') || getAutoTheme();
+
+    function applyTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : '');
+      // theme-btn removed from nav
+      currentTheme = theme;
+      localStorage.setItem('rr-theme', theme);
+    }
+    function toggleTheme() {
+      applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+    }
+    applyTheme(currentTheme);
 
     // ─── GREETING ─────────────────────────────────────────────────────────────
     function getGreeting() {
@@ -862,6 +959,22 @@
           memberSince: 'Miembro desde', memberDate: 'Marzo 2026',
           changePassword: 'Cambiar contraseña', closeSession: 'Cerrar sesión',
           planBasic: 'Básico', planPro: 'Pro', planPremium: 'Premium',
+          syncPaid: '¿Pagaste y no se activó? Sincronizar →',
+          syncTitle: 'Sincronizar mi pago',
+          syncDesc: 'Si pagaste por Wompi y tu plan no se actualizó, pega aquí el ID de la transacción. Lo encuentras en el correo de confirmación de Wompi.',
+          syncPlaceholder: '1401350-1234567890-12345',
+          syncCta: 'Sincronizar', syncClose: 'Cerrar',
+          syncQuerying: 'Consultando Wompi…',
+          syncOkPrefix: 'Plan',
+          syncOkSuffix: 'activado hasta',
+          syncAlreadyOk: 'Esta transacción ya fue aplicada.',
+          syncErrUnknownLink: 'Este pago no corresponde a un plan reconocido.',
+          syncErrEmailMismatch: 'Esa transacción corresponde a otra cuenta. Inicia sesión con el mismo email del pago.',
+          syncErrUserNotFound: 'No existe cuenta registrada con el email del pago.',
+          syncErrNotApproved: 'El pago no está aprobado todavía.',
+          syncErrNotFound: 'No encontré esa transacción en Wompi. Revisa el ID.',
+          syncErrGeneric: 'No pude sincronizar. Intenta de nuevo o escríbeme.',
+          syncErrEmpty: 'Pega el ID de la transacción.',
         },
         us: {
           logout: 'Log out', tools: 'Tools', locked: 'Locked',
@@ -877,6 +990,22 @@
           memberSince: 'Member since', memberDate: 'March 2026',
           changePassword: 'Change password', closeSession: 'Log out',
           planBasic: 'Basic', planPro: 'Pro', planPremium: 'Premium',
+          syncPaid: 'Paid but plan not activated? Sync →',
+          syncTitle: 'Sync my payment',
+          syncDesc: 'If you paid via Wompi and your plan was not activated, paste the transaction ID here. You can find it in the Wompi confirmation email.',
+          syncPlaceholder: '1401350-1234567890-12345',
+          syncCta: 'Sync', syncClose: 'Close',
+          syncQuerying: 'Querying Wompi…',
+          syncOkPrefix: 'Plan',
+          syncOkSuffix: 'active until',
+          syncAlreadyOk: 'This transaction was already applied.',
+          syncErrUnknownLink: 'This payment does not match a recognized plan.',
+          syncErrEmailMismatch: 'That transaction belongs to another account. Log in with the email used for payment.',
+          syncErrUserNotFound: 'There is no account registered with the payment email.',
+          syncErrNotApproved: 'The payment is not approved yet.',
+          syncErrNotFound: 'I could not find that transaction at Wompi. Check the ID.',
+          syncErrGeneric: 'Could not sync. Try again or reach out.',
+          syncErrEmpty: 'Paste the transaction ID.',
         },
         cn: {
           logout: '退出', tools: '工具', locked: '已锁定',
@@ -892,6 +1021,22 @@
           memberSince: '注册时间', memberDate: '2026年3月',
           changePassword: '修改密码', closeSession: '退出登录',
           planBasic: '基础版', planPro: 'Pro', planPremium: 'Premium',
+          syncPaid: '已付款但未激活？同步 →',
+          syncTitle: '同步我的付款',
+          syncDesc: '如果你通过 Wompi 付款但计划未激活，请在此粘贴交易 ID。可在 Wompi 的确认邮件中找到。',
+          syncPlaceholder: '1401350-1234567890-12345',
+          syncCta: '同步', syncClose: '关闭',
+          syncQuerying: '正在查询 Wompi…',
+          syncOkPrefix: '计划',
+          syncOkSuffix: '已激活至',
+          syncAlreadyOk: '此交易已应用。',
+          syncErrUnknownLink: '此付款不对应已识别的计划。',
+          syncErrEmailMismatch: '该交易属于其他账户。请使用付款时的邮箱登录。',
+          syncErrUserNotFound: '没有使用该付款邮箱注册的账户。',
+          syncErrNotApproved: '付款尚未批准。',
+          syncErrNotFound: '在 Wompi 找不到该交易。请检查 ID。',
+          syncErrGeneric: '无法同步。请重试或联系我。',
+          syncErrEmpty: '请粘贴交易 ID。',
         },
       };
       const t = T[lang] || T.co;
@@ -958,7 +1103,15 @@
         ${user.plan !== 'free' && !isCancelled
           ? `<button class="plan-cancel-btn" onclick="openCancelModal()">${t.cancelSub}</button>`
           : ''}
+        <button class="plan-sync-link" onclick="openSyncModal()">${t.syncPaid}</button>
       `;
+
+      // Sync modal — textos traducibles
+      document.getElementById('sync-modal-title').textContent = t.syncTitle;
+      document.getElementById('sync-modal-desc').innerHTML = t.syncDesc + ' <code>1401350-…-…</code>';
+      document.getElementById('sync-tx-input').placeholder = t.syncPlaceholder;
+      document.getElementById('sync-back-btn').textContent = t.syncClose;
+      document.getElementById('sync-confirm-btn').textContent = t.syncCta;
 
       // Downloads
       const used = user.plan === 'free' ? 0 : 1;
@@ -1067,6 +1220,111 @@
       } catch {
         alert('Error de conexión');
         btn.textContent = 'Sí, cancelar';
+        btn.disabled = false;
+      }
+    }
+
+    // ─── SYNC PAYMENT MODAL ───────────────────────────────────────────────────
+    function _syncTexts() {
+      const lang = localStorage.getItem('rr-lang') || 'co';
+      // Mapeo perezoso: los textos viven dentro del objeto T de render(); los redefinimos compactos
+      const sets = {
+        co: { querying:'Consultando Wompi…', okPre:'Plan', okSuf:'activado hasta',
+              already:'Esta transacción ya fue aplicada.',
+              errUnknownLink:'Este pago no corresponde a un plan reconocido.',
+              errEmailMismatch:'Esa transacción corresponde a otra cuenta. Inicia sesión con el mismo email del pago.',
+              errUserNotFound:'No existe cuenta registrada con el email del pago.',
+              errNotApproved:'El pago no está aprobado todavía.',
+              errNotFound:'No encontré esa transacción en Wompi. Revisa el ID.',
+              errGeneric:'No pude sincronizar. Intenta de nuevo o escríbeme.',
+              errEmpty:'Pega el ID de la transacción.', cta:'Sincronizar' },
+        us: { querying:'Querying Wompi…', okPre:'Plan', okSuf:'active until',
+              already:'This transaction was already applied.',
+              errUnknownLink:'This payment does not match a recognized plan.',
+              errEmailMismatch:'That transaction belongs to another account. Log in with the email used for payment.',
+              errUserNotFound:'There is no account registered with the payment email.',
+              errNotApproved:'The payment is not approved yet.',
+              errNotFound:'I could not find that transaction at Wompi. Check the ID.',
+              errGeneric:'Could not sync. Try again or reach out.',
+              errEmpty:'Paste the transaction ID.', cta:'Sync' },
+        cn: { querying:'正在查询 Wompi…', okPre:'计划', okSuf:'已激活至',
+              already:'此交易已应用。',
+              errUnknownLink:'此付款不对应已识别的计划。',
+              errEmailMismatch:'该交易属于其他账户。请使用付款时的邮箱登录。',
+              errUserNotFound:'没有使用该付款邮箱注册的账户。',
+              errNotApproved:'付款尚未批准。',
+              errNotFound:'在 Wompi 找不到该交易。请检查 ID。',
+              errGeneric:'无法同步。请重试或联系我。',
+              errEmpty:'请粘贴交易 ID。', cta:'同步' },
+      };
+      return sets[lang] || sets.co;
+    }
+
+    function _setSyncMsg(text, kind) {
+      const el = document.getElementById('sync-modal-msg');
+      el.textContent = text || '';
+      el.classList.remove('success','error');
+      if (kind) el.classList.add(kind);
+    }
+
+    function openSyncModal() {
+      document.getElementById('sync-tx-input').value = '';
+      _setSyncMsg('', null);
+      document.getElementById('sync-modal').classList.add('show');
+      setTimeout(() => document.getElementById('sync-tx-input').focus(), 50);
+    }
+
+    function closeSyncModal() {
+      document.getElementById('sync-modal').classList.remove('show');
+      // Reset cursor por si el botón estaba en hover (mismo gotcha que .dl-modal)
+      const c = document.getElementById('cursor'), r = document.getElementById('cursorRing');
+      if (c) { c.style.transform = 'translate(-50%,-50%) scale(1)'; c.style.background = 'var(--blue)'; c.style.border = 'none'; }
+      if (r) r.style.opacity = '.4';
+    }
+
+    function _mapReconcileError(reason, S) {
+      if (!reason) return S.errGeneric;
+      if (reason === 'email_mismatch') return S.errEmailMismatch;
+      if (reason.startsWith('user_not_found')) return S.errUserNotFound;
+      if (reason.startsWith('unknown_link_id')) return S.errUnknownLink;
+      if (reason.startsWith('status=')) return S.errNotApproved;
+      if (reason === 'no_customer_email') return S.errUserNotFound;
+      return reason;
+    }
+
+    async function runSync() {
+      const S = _syncTexts();
+      const txId = document.getElementById('sync-tx-input').value.trim();
+      const btn = document.getElementById('sync-confirm-btn');
+      if (!txId) { _setSyncMsg(S.errEmpty, 'error'); return; }
+      btn.disabled = true;
+      _setSyncMsg(S.querying, null);
+      try {
+        const res = await fetch('https://rr-auth.reruizc.workers.dev/wompi/reconcile', {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ transactionId: txId }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          if (data.already_processed) {
+            _setSyncMsg(S.already, 'success');
+          } else {
+            const exp = data.expiresAt ? formatExpiry(data.expiresAt) : '—';
+            const planLabel = (data.plan || '').replace(/^./, c => c.toUpperCase());
+            _setSyncMsg(`${S.okPre} ${planLabel} ${S.okSuf} ${exp}`, 'success');
+          }
+          await refreshUser();
+          setTimeout(closeSyncModal, 2200);
+        } else {
+          const msg = res.status === 404 && !data.error?.startsWith('user_not_found')
+            ? S.errNotFound
+            : _mapReconcileError(data.error, S);
+          _setSyncMsg(msg, 'error');
+          btn.disabled = false;
+        }
+      } catch {
+        _setSyncMsg(S.errGeneric, 'error');
         btn.disabled = false;
       }
     }
@@ -1182,7 +1440,6 @@
     // Exponer __applyLang para lang.js — al cambiar idioma re-renderiza el dashboard
     window.__applyLang = function() { render(); };
   </script>
-  <script src="theme.js"></script>
   <script src="lang.js"></script>
 </body>
 </html>
