@@ -1110,6 +1110,7 @@
     <span class="toggle-label">Nivel territorial</span>
     <button class="toggle-btn active" data-level="dep" onclick="switchView('dep')">Departamental</button>
     <button class="toggle-btn" data-level="mun" onclick="switchView('mun')">Municipal <span class="lock">🔒</span></button>
+    <button class="toggle-btn" data-level="bar" id="barrio-toggle-btn" onclick="switchView('bar')" style="display:none">Barrios <span class="lock">🔒</span></button>
     <button class="toggle-btn" data-level="pue" onclick="switchView('pue')">Puestos <span class="lock">🔒</span></button>
     <button class="excel-btn" id="excel-btn" onclick="downloadExcelCurrentView()" title="Descargar la tabla actual en Excel">⬇ Excel</button>
     <span class="toggle-hint" id="toggle-hint"></span>
@@ -2729,6 +2730,7 @@
         onEachFeature: (f, layer) => onEachCityFeature(f, layer, cfg, depNom, munNom),
       }).addTo(map);
       currentCityKey = cfg.key;
+      _updateBarrioToggleVisibility?.();
       try { const b = cityLayer.getBounds(); if (b.isValid()) map.fitBounds(b, { padding:[10,10] }); } catch(e){}
       // Header: "Bogotá D.C. · Localidades" o "Medellín · Comunas"
       const label = document.getElementById('map-head-label');
@@ -2873,7 +2875,17 @@
       // De ciudad → muns del depto padre
       const cfg = CITY_MAPS[currentCityKey];
       if (cityLayer){ map.removeLayer(cityLayer); cityLayer = null; }
+      if (barrioLayer){ map.removeLayer(barrioLayer); barrioLayer = null; }
       currentCityKey = null;
+      _updateBarrioToggleVisibility?.();
+      // Si estábamos en vista de barrios, volver a 'mun' como default
+      // visualmente — la vista mun se reconstruirá tras drillToDepto.
+      if (currentLevel === 'bar'){
+        currentLevel = 'mun';
+        document.querySelectorAll('#view-toggles .toggle-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.level === 'mun');
+        });
+      }
       const sen = Object.values(SENADO_BY_DEPTO).find(s => s.cod === cfg.depCod);
       // currentDepCod está seteado al mismo cod del depto padre (entramos a
       // la ciudad desde dentro del drill del depto). drillToDepto chequea
@@ -3193,6 +3205,12 @@
     // cambio del ponderador (los sliders mueven el `pct` de cada candidato
     // y por tanto el ganador proyectado en cada puesto).
     if (currentLevel === 'pue' && pueLayer) repaintPueLayer();
+    // Mismo principio para la capa de barrios: el slider/candidato seleccionado
+    // cambia el ganador o la fuerza local de cada polígono.
+    if (currentLevel === 'bar' && barrioLayer && currentCityKey){
+      const cfg = BARRIO_S3[currentCityKey];
+      barrioLayer.setStyle(f => _styleByBarrio(currentCityKey, cfg.keyFromProps(f.properties), _barrioParentCom(currentCityKey, f.properties)));
+    }
     // La tarjeta del territorio activo (si hay) refleja los sliders nuevos.
     _refreshTerritoryCard();
     const label = document.getElementById('map-head-label');
@@ -3505,6 +3523,10 @@
       if (hasPueBias && puKey)        getV = c => projectedPue(c, puKey, munKey, depNom);
       else if (hasMunBias && munKey)  getV = c => projectedMun(c, munKey, depNom);
       else                            getV = c => projected(c, depNom);
+    } else if (payload.kind === 'barrio'){
+      // Cascada: bias_barrio → bias_comuna/localidad padre (heredado).
+      const { cityKey, barrioCod, comFallback } = payload.args;
+      getV = c => projectedBarrio(c, cityKey, barrioCod, comFallback);
     } else { getV = () => 0; }
     return cands.map(c => ({ c, v: getV(c) })).filter(x => x.v > 0).sort((a,b) => b.v - a.v);
   }
@@ -4523,6 +4545,16 @@
       hint.innerHTML = 'Nivel puestos requiere plan Premium · <a href="pricing.html">Ver planes →</a>';
       return;
     }
+    if (level === 'bar'){
+      if (!isLogged){
+        hint.innerHTML = 'Nivel barrios solo para usuarios registrados · <a href="register.html">Crear cuenta →</a>';
+        return;
+      }
+      if (!currentCityKey || !['medellin','bogota'].includes(currentCityKey)){
+        hint.innerHTML = 'Vista de barrios disponible sólo dentro de Medellín o Bogotá';
+        return;
+      }
+    }
     hint.innerHTML = '';
     currentLevel = level;
     document.querySelectorAll('#view-toggles .toggle-btn').forEach(b => {
@@ -4537,6 +4569,10 @@
       setMapInteractive(false);
       hint.classList.remove('lg');
       document.body.classList.remove('pue-mode');
+    }
+    // Salir del modo barrios: limpia la capa.
+    if (level !== 'bar' && barrioLayer){
+      map.removeLayer(barrioLayer); barrioLayer = null;
     }
 
     if (level === 'dep'){
@@ -4557,6 +4593,14 @@
       currentDepCod = null;
       document.getElementById('map-back-btn')?.classList.remove('show');
       await loadMunicipalNacional();
+      repaintMap();
+    } else if (level === 'bar'){
+      // Vista por barrios: requiere que ya estemos en Medellín o Bogotá
+      // (cityLayer activo). Mantiene currentCityKey y dibuja la capa de
+      // barrios encima, reemplazando la capa de comunas/localidades.
+      if (munLayer){ map.removeLayer(munLayer); munLayer = null; }
+      if (deptLayer && map.hasLayer(deptLayer)) map.removeLayer(deptLayer);
+      await loadBarrioLayer(currentCityKey);
       repaintMap();
     } else if (level === 'pue'){
       // Vista por puestos: tile layer con calles como base (OSM en modo día,
@@ -4615,6 +4659,9 @@
         })();
       }
     }
+    // Refrescar visibilidad del botón Barrios — se muestra sólo si después
+    // del switch quedamos dentro de una city compatible (cityLayer activo).
+    _updateBarrioToggleVisibility?.();
   }
 
   // ─── THEME ── lógica compartida en theme.js. Side effect: re-build tile
@@ -5813,6 +5860,353 @@
     const cache = _biasCacheCity[cityKey];
     if (!cache) return false;
     return Object.values(cache).some(m => m[comCod] != null);
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // BARRIOS — Medellín y Bogotá (drilldown intra-comuna/intra-localidad)
+  // ════════════════════════════════════════════════════════════════
+  // Modelo paralelo a CITY (precomputeBiasCity) pero indexado por barrio.
+  // Reusa EQUIVALENCIAS_CITY_COMUNA y CITY_SIGNALS — la afinidad del
+  // candidato → señales históricas es la misma a cualquier nivel.
+  // - Medellín: GeoJSON `barrios-veredas-medellin.json`, key del data =
+  //   nombre normalizado del barrio. Comuna padre vive en props.comuna.
+  // - Bogotá:   GeoJSON `BOG-BARRIOS-CATASTRALES.json` (rotado), key
+  //   del data = props.codigo. Localidad padre en props.loc_codigo.
+  // Si un barrio no tiene señal propia, se cae al bias de su comuna/
+  // localidad padre (calculado en _biasCacheCity), que es lo que la
+  // vista de "Comunas/Localidades" ya muestra.
+  const BARRIO_S3 = {
+    medellin: {
+      geoUrl: 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/proyecto-dc/geo/barrios-veredas-medellin.json',
+      base:   'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_medellin/por-barrio',
+      suffix: '-mde.json',
+      rotate: false,
+      // El JSON de MDE expone {barrios:{key: {nombre, comuna, votos_validos, cands|partidos}}}
+      // donde key = nombre normalizado del barrio (NFD upper, sin tildes).
+      dataRoot: 'barrios',
+      nameField: 'nombre_bar',
+      comField:  'comuna',
+      // Para conseguir la key en el GeoJSON: normalizar nombre_bar.
+      keyFromProps: (p) => normBarrioFront(p.nombre_bar || p.barrio || ''),
+    },
+    bogota: {
+      geoUrl: `${S3}/mapas-2026/Ciudades-COM-LOC/BOG-BARRIOS-CATASTRALES.json`,
+      base:   'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_ciudades/bogota',
+      prefix: 'bog-barrio-',
+      cacheBuster: '20260515',  // bumpear cuando se regeneren los outputs
+      rotate: true,             // misma rotación que LOCALIDADX
+      dataRoot: 'por_barrio',
+      nameField: 'nombre',
+      comField:  'loc_codigo',
+      keyFromProps: (p) => p.codigo || null,
+    },
+  };
+  // Subset de señales con cobertura por barrio. (Las alc/concejo de MDE
+  // no tienen extracción por barrio en la equivalencia del candidato,
+  // así que se omiten para evitar fetches que no aportan.)
+  const BARRIO_SIGNALS = [
+    'pres-2010','pres-2014','pres-2018','pres-2022',
+    'consulta-2025-pacto','consulta-2026-gran','consulta-2026-frente','consulta-2026-soluciones',
+    'senado-2026','camara-2026',
+  ];
+
+  let HISTORICOS_BARRIO     = { medellin:{}, bogota:{} };
+  let _biasCacheBarrio      = { medellin:{}, bogota:{} };
+  let _barrioGeoCache       = {};
+  let _barrioLoadingPromise = {};
+  let barrioLayer           = null;
+
+  // Normalización idéntica a oportunidad.html — la key del data MDE se
+  // construyó con esta misma forma.
+  function normBarrioFront(s){
+    if (!s) return '';
+    let t = String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase();
+    t = t.replace(/[#°ºª]/g,' NO ');
+    t = t.replace(/\bNO\.?\b/g,'NO');
+    t = t.replace(/[^A-Z0-9 ]+/g,' ');
+    t = t.replace(/\s+/g,' ').trim();
+    t = t.replace(/\bNO (\d+)\b/g,'NO$1');
+    return t;
+  }
+
+  function _barrioFetchUrl(cityKey, sigKey){
+    const cfg = BARRIO_S3[cityKey];
+    if (cityKey === 'medellin') return `${cfg.base}/${sigKey}${cfg.suffix}`;
+    return `${cfg.base}/${cfg.prefix}${sigKey}.json?v=${cfg.cacheBuster}`;
+  }
+
+  function _barrioExtractEntries(j, sigType, cityKey){
+    const out = { ciudad:{}, barrios:{} };
+    if (!j || typeof j !== 'object') return out;
+    const cfg = BARRIO_S3[cityKey];
+    const root = j[cfg.dataRoot] || {};
+    const ciudadCounts = {};
+    let ciudadTotal = 0;
+    for (const [bk, b] of Object.entries(root)){
+      if (!b || typeof b !== 'object') continue;
+      const totalLocal = b.votos_validos || 0;
+      // BOG: candidatos. MDE: cands o partidos según sigType.
+      const list = b.candidatos || b.cands || b.partidos || [];
+      const merged = {};
+      for (const r of list){
+        if (!r) continue;
+        const key = sigType === 'partidos' ? (r.partido || r.nombre) : r.nombre;
+        if (!key) continue;
+        merged[key] = (merged[key] || 0) + (r.votos || 0);
+      }
+      const byKey = {};
+      for (const [k, v] of Object.entries(merged)){
+        const kn = norm(k);
+        byKey[kn] = totalLocal > 0 ? v / totalLocal : 0;
+        ciudadCounts[kn] = (ciudadCounts[kn] || 0) + v;
+      }
+      ciudadTotal += totalLocal;
+      out.barrios[bk] = byKey;
+    }
+    for (const [k, v] of Object.entries(ciudadCounts)){
+      out.ciudad[k] = ciudadTotal > 0 ? v / ciudadTotal : 0;
+    }
+    return out;
+  }
+
+  async function loadBarrioGeo(cityKey){
+    if (_barrioGeoCache[cityKey]) return _barrioGeoCache[cityKey];
+    const cfg = BARRIO_S3[cityKey];
+    const r = await fetch(cfg.geoUrl);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    let geo = await r.json();
+    if (cfg.rotate) geo = rotateGeoJSON90Left(geo);
+    _barrioGeoCache[cityKey] = geo;
+    return geo;
+  }
+
+  async function loadHistoricosBarrio(cityKey){
+    if (_barrioLoadingPromise[cityKey]) return _barrioLoadingPromise[cityKey];
+    _barrioLoadingPromise[cityKey] = (async () => {
+      HISTORICOS_BARRIO[cityKey] = {};
+      const sigType = {};
+      CITY_SIGNALS.forEach(s => { sigType[s.key] = s.type; });
+      const fetcher = url => fetch(url, { cache:'force-cache' })
+        .then(r => r.ok ? r.json() : null)
+        .catch(() => null);
+      const results = await Promise.all(BARRIO_SIGNALS.map(sk => fetcher(_barrioFetchUrl(cityKey, sk))));
+      BARRIO_SIGNALS.forEach((sk, i) => {
+        const j = results[i];
+        if (!j) { console.warn(`[Previa barrio ${cityKey}] no carga`, sk); return; }
+        try { HISTORICOS_BARRIO[cityKey][sk] = _barrioExtractEntries(j, sigType[sk] || 'cands', cityKey); }
+        catch(e){ console.warn(`[Previa barrio ${cityKey}] parse`, sk, e.message); }
+      });
+      precomputeBiasBarrio(cityKey);
+      const sigOk = Object.keys(HISTORICOS_BARRIO[cityKey]).length;
+      const cells = Object.values(_biasCacheBarrio[cityKey] || {}).reduce((s,m) => s + Object.keys(m).length, 0);
+      console.log(`[Previa barrio ${cityKey}]: ${sigOk}/${BARRIO_SIGNALS.length} señales → ${cells} celdas bias`);
+    })();
+    return _barrioLoadingPromise[cityKey];
+  }
+
+  function precomputeBiasBarrio(cityKey){
+    _biasCacheBarrio[cityKey] = {};
+    const data = HISTORICOS_BARRIO[cityKey] || {};
+    const barrioSet = new Set();
+    for (const sig of Object.keys(data)){
+      Object.keys(data[sig].barrios || {}).forEach(b => barrioSet.add(b));
+    }
+    const barrios = Array.from(barrioSet);
+    for (const cand of CANDIDATOS){
+      const equiv = EQUIVALENCIAS_CITY_COMUNA[cand.id];
+      if (!equiv || !Object.keys(equiv).length) continue;
+      _biasCacheBarrio[cityKey][cand.id] = {};
+      for (const b of barrios){
+        let num = 0, den = 0;
+        for (const [sig, spec] of Object.entries(equiv)){
+          const ds = data[sig];
+          if (!ds) continue;
+          const wantedKeys = (spec.cands || spec.partidos || []).map(k => norm(k));
+          if (!wantedKeys.length) continue;
+          const matchKey = (storeMap, wanted) => {
+            const keys = Object.keys(storeMap);
+            const exact = keys.filter(k => wanted.includes(k));
+            if (exact.length) return exact;
+            return keys.filter(k => wanted.some(w => k.startsWith(w)));
+          };
+          const localKeys  = matchKey(ds.barrios[b] || {}, wantedKeys);
+          const ciudadKeys = matchKey(ds.ciudad   || {}, wantedKeys);
+          const pctLocal  = localKeys.reduce((s,k)  => s + (ds.barrios[b]?.[k] || 0), 0);
+          const pctCiudad = ciudadKeys.reduce((s,k) => s + (ds.ciudad[k] || 0), 0);
+          if (pctCiudad <= 0) continue;
+          num += spec.peso * (pctLocal / pctCiudad);
+          den += spec.peso;
+        }
+        if (den > 0){
+          const raw = num / den;
+          _biasCacheBarrio[cityKey][cand.id][b] = Math.max(0.15, Math.min(3.50, raw));
+        }
+      }
+    }
+  }
+
+  function biasForBarrio(cand, cityKey, bCod){
+    const cached = _biasCacheBarrio[cityKey]?.[cand.id]?.[bCod];
+    return (cached != null && cached > 0) ? cached : null;
+  }
+
+  // p(c, barrio) = pct_nacional(c) × bias_mun(c, depCod-001) × bias_intra
+  // donde bias_intra = bias propio del barrio si existe; si no, bias de la
+  // comuna/localidad padre (el que muestra la vista de Comunas).
+  function projectedBarrio(cand, cityKey, bCod, fallbackComCod){
+    const meta = CITY_META[cityKey];
+    if (!meta) return cand.pct;
+    const munKey = `${meta.depCod}-${meta.mun}`;
+    const baseFactor = cand.pct * biasForMun(cand, munKey, meta.depName);
+    const bb = biasForBarrio(cand, cityKey, bCod);
+    if (bb != null) return baseFactor * bb;
+    if (fallbackComCod) return baseFactor * biasForComunaCity(cand, cityKey, fallbackComCod);
+    return baseFactor;
+  }
+
+  function computeBarrioRanking(cityKey, bCod, fallbackComCod){
+    const ranked = CANDIDATOS
+      .filter(c => !NO_CANDIDATO_IDS.has(c.id))
+      .map(c => ({ c, v: projectedBarrio(c, cityKey, bCod, fallbackComCod) }))
+      .filter(x => x.v > 0)
+      .sort((a,b) => b.v - a.v);
+    if (!ranked.length) return null;
+    const winner = ranked[0];
+    const second = ranked[1] || { c:null, v:0 };
+    return {
+      winner: winner.c, winnerV: winner.v,
+      second: second.c, secondV: second.v,
+      margin:  winner.v - second.v,
+      ranked,
+    };
+  }
+
+  function hasBarrioBiasFor(cityKey, bCod){
+    const cache = _biasCacheBarrio[cityKey];
+    if (!cache) return false;
+    return Object.values(cache).some(m => m[bCod] != null);
+  }
+
+  // Estilo del polígono: análogo a _styleByComunaCity. Si hay candidato
+  // seleccionado → color del candidato con intensidad = share local;
+  // si no → color del ganador a tope.
+  function _styleByBarrio(cityKey, bCod, fallbackComCod){
+    if (selectedId){
+      const cand = CANDIDATOS.find(c => c.id === selectedId);
+      if (!cand) return _emptyBarrioStyle();
+      const v = projectedBarrio(cand, cityKey, bCod, fallbackComCod);
+      const total = CANDIDATOS.reduce((s,c) => s + projectedBarrio(c, cityKey, bCod, fallbackComCod), 0);
+      const share = total > 0 ? v / total : 0;
+      return { color: cand.color, fillColor: cand.color, weight: 0.6, fillOpacity: Math.max(.18, Math.min(.95, share*1.4)) };
+    }
+    const r = computeBarrioRanking(cityKey, bCod, fallbackComCod);
+    if (!r || !r.winner) return _emptyBarrioStyle();
+    return { color: r.winner.color, fillColor: r.winner.color, weight: 0.6, fillOpacity: .85 };
+  }
+  function _emptyBarrioStyle(){
+    return { color:'rgba(255,255,255,.3)', fillColor:'rgba(255,255,255,.05)', weight:0.5, fillOpacity:.5 };
+  }
+
+  function _barrioParentCom(cityKey, props){
+    if (cityKey === 'bogota') return String(props.loc_codigo || '').padStart(2,'0') || null;
+    return String(props.comuna || '').padStart(2,'0') || null;
+  }
+  function _barrioName(cityKey, props){
+    if (cityKey === 'bogota') return props.nombre || props.codigo || '—';
+    return props.nombre_bar || props.barrio || '—';
+  }
+
+  // Carga geo + señales y dibuja la capa de barrios sobre el mapa.
+  // Se usa con switchView('bar'); requiere que currentCityKey ya esté
+  // en 'medellin' o 'bogota'.
+  async function loadBarrioLayer(cityKey){
+    const cityName = cityKey === 'bogota' ? 'Bogotá D.C.' : 'Medellín';
+    showMapLoading(`Cargando barrios de ${cityName}…`);
+    try {
+      await Promise.all([loadBarrioGeo(cityKey), loadHistoricosBarrio(cityKey)]);
+      const geo = _barrioGeoCache[cityKey];
+      if (barrioLayer){ map.removeLayer(barrioLayer); barrioLayer = null; }
+      if (cityLayer){  map.removeLayer(cityLayer);   cityLayer  = null; }
+      if (munLayer){   map.removeLayer(munLayer);    munLayer   = null; }
+      const cfg = BARRIO_S3[cityKey];
+      barrioLayer = L.geoJSON(geo, {
+        style: (f) => _styleByBarrio(cityKey, cfg.keyFromProps(f.properties), _barrioParentCom(cityKey, f.properties)),
+        onEachFeature: (f, layer) => onEachBarrioFeature(f, layer, cityKey, cfg),
+      }).addTo(map);
+      try { const b = barrioLayer.getBounds(); if (b.isValid()) map.fitBounds(b, { padding:[10,10] }); } catch(e){}
+      const label  = document.getElementById('map-head-label');
+      const nameEl = document.getElementById('map-cand-name');
+      if (label) label.textContent = `${cityName} · Barrios`;
+      if (nameEl){
+        nameEl.textContent = 'Bias por barrio · pres 2010-2022 + Senado/Cámara 2026 + consultas; barrios sin señal heredan de la comuna/localidad';
+        nameEl.style.color = '';
+      }
+      const backBtn = document.getElementById('map-back-btn');
+      if (backBtn){ backBtn.textContent = `← ${cityName}`; backBtn.classList.add('show'); }
+    } catch(e){
+      console.error('[Previa barrio]', cityKey, e);
+    } finally {
+      hideMapLoading();
+    }
+  }
+
+  function onEachBarrioFeature(feature, layer, cityKey, cfg){
+    const p = feature.properties;
+    const name = _barrioName(cityKey, p);
+    const bk   = cfg.keyFromProps(p);
+    const com  = _barrioParentCom(cityKey, p);
+    const cityName = cityKey === 'bogota' ? 'Bogotá D.C.' : 'Medellín';
+    const depNom   = cityKey === 'bogota' ? 'BOGOTA D.C.' : 'ANTIOQUIA';
+    const tooltipHtmlFn = () => {
+      const r = computeBarrioRanking(cityKey, bk, com);
+      if (selectedId){
+        const cand = CANDIDATOS.find(c => c.id === selectedId);
+        const v = projectedBarrio(cand, cityKey, bk, com);
+        const total = CANDIDATOS.reduce((s,c) => s + projectedBarrio(c, cityKey, bk, com), 0);
+        const share = total > 0 ? v / total : 0;
+        return `<div style="line-height:1.4"><b>${name}</b><br>${cand?cand.nombre:''}<br><b>${(share*100).toFixed(1)}%</b> local</div>`;
+      }
+      if (!r || !r.winner) return `<div>${name}</div>`;
+      const total = r.ranked.reduce((s,x)=>s+x.v,0);
+      const winPct = total > 0 ? r.winnerV/total*100 : 0;
+      return `<div style="line-height:1.4"><b>${name}</b><br>1º ${r.winner.nombre} · ${winPct.toFixed(1)}%</div>`;
+    };
+    layer.on({
+      mouseover(e){
+        layer.setStyle({ weight:2, color:'#fff', fillOpacity:.98 });
+        const r = computeBarrioRanking(cityKey, bk, com);
+        const winColor = r?.winner?.color || 'rgba(255,255,255,.5)';
+        _setHoverChip(e, name, winColor);
+        const fuente = hasBarrioBiasFor(cityKey, bk)
+          ? 'Bias barrio · pres 10-22 + Senado/Cámara 2026 + consultas 2025-26'
+          : `Bias hereda de la ${cityKey === 'bogota' ? 'localidad' : 'comuna'} padre · barrio sin señal propia`;
+        _hoverTerritory({
+          scopeKey: 'bar:' + cityKey + ':' + (bk || name),
+          level:    'Barrio',
+          name,
+          parents:  [cityName, depNom],
+          kind:     'barrio',
+          args:     { cityKey, barrioCod: bk, comFallback: com },
+          fuente,
+        });
+        layer.bindTooltip(tooltipHtmlFn(), { sticky:true, className:'leaflet-dark-tooltip', opacity:1 }).openTooltip();
+      },
+      mousemove(e){ _moveHoverChip(e); },
+      mouseout(){
+        if (barrioLayer) barrioLayer.resetStyle(layer);
+        layer.closeTooltip();
+        _clearHoverChip();
+      }
+    });
+  }
+
+  // Visibilidad del botón "Barrios" en el toggle bar — sólo cuando
+  // estamos dentro de Medellín o Bogotá (cityLayer activo).
+  function _updateBarrioToggleVisibility(){
+    const btn = document.getElementById('barrio-toggle-btn');
+    if (!btn) return;
+    const visible = currentCityKey && (currentCityKey === 'medellin' || currentCityKey === 'bogota');
+    btn.style.display = visible ? 'inline-flex' : 'none';
   }
 
   // Votantes presidenciales esperados para el depto, escalados sobre la
