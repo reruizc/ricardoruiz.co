@@ -103,6 +103,13 @@ function fetchCached(url){
 // ── 1) PUESTOS_GEOREF.csv → puesto_lookup ─────────────────────────────
 // puesto_lookup: { 'ZZ-PP': { barrioRaw, barrioNorm, comuna } }
 function loadPuestoLookup(csvPath){
+  // Zonas especiales (puestos censo / cárceles) — NO se asignan a barrios.
+  // En Medellín:
+  //   90 = puestos censo (Estadio Atanasio, Plaza Mayor Alpujarra).
+  //   98 = cárceles (Pedregal x2, Llerass Restrepo).
+  // Zona 99 SÍ se mantiene: son los corregimientos (Altavista, San Antonio
+  // de Prado, Palmitas, San Cristóbal, Santa Elena) — territorio real.
+  const SPECIAL_ZONAS = new Set(['90', '98']);
   const raw = fs.readFileSync(csvPath, 'utf8');
   const lines = raw.split(/\r?\n/);
   const header = lines[0].replace(/^﻿/,'').split(';');
@@ -114,23 +121,24 @@ function loadPuestoLookup(csvPath){
     throw new Error('Columnas faltantes en PUESTOS_GEOREF. Encontradas: '+header.join('|'));
   }
   const lookup = {};
-  let nMde = 0, nNoBarrio = 0;
+  let nMde = 0, nNoBarrio = 0, nSpecial = 0;
   for(let i=1;i<lines.length;i++){
     const ln = lines[i]; if(!ln) continue;
     const c = ln.split(';');
     const dep = (c[iDep]||'').toUpperCase();
     const mun = (c[iMun]||'').toUpperCase();
     if(!dep.includes('ANTIOQUIA') || !mun.includes('MEDELL')) continue;
-    nMde++;
     const zz = pad2(c[iZon]);
     const pp = pad2(c[iPue]);
+    if(SPECIAL_ZONAS.has(zz)){ nSpecial++; continue; }
+    nMde++;
     const key = `${zz}-${pp}`;
     const barrioRaw = (c[iBar]||'').trim();
     const comuna = pad2(c[iComCod]);
     if(!barrioRaw) nNoBarrio++;
     lookup[key] = { barrioRaw, barrioNorm: normBarrio(barrioRaw), comuna };
   }
-  console.log(`[geo] PUESTOS_GEOREF: ${nMde} puestos de Medellín, ${nNoBarrio} sin BARRIO`);
+  console.log(`[geo] PUESTOS_GEOREF: ${nMde} puestos de Medellín, ${nNoBarrio} sin BARRIO, ${nSpecial} especiales excluidos (zonas 90/98)`);
   return lookup;
 }
 

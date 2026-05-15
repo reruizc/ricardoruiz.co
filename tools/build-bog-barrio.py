@@ -107,7 +107,15 @@ def feature_bbox(geom):
 
 # ── Carga puestos Bogotá ────────────────────────────────────────────
 def load_puestos_bogota(csv_path):
+    # Zonas especiales (puestos censo / cárceles) — NO se asignan a barrios:
+    #   90 = PUESTO CENSO (FERIA EXPOSICIÓN / CORFERIAS).
+    #        Recoge votos de ciudadanos sin asignación específica; al hacer
+    #        PIP cae artificialmente en el barrio donde está físicamente
+    #        (Centro Nariño / La Esmeralda) e infla esas señales.
+    #   98 = Cárceles (Picota, Modelo, Buen Pastor, Cárcel Distrital).
+    SPECIAL_ZONAS = {'90', '98'}
     out = {}
+    n_skip = 0
     with open(csv_path, encoding='utf-8') as f:
         reader = csv.reader(f, delimiter=';')
         header = next(reader); header[0] = header[0].replace('﻿', '')
@@ -117,13 +125,18 @@ def load_puestos_bogota(csv_path):
         for row in reader:
             if not row or len(row) <= iLon: continue
             if 'BOGOTA' not in (row[iDep] or '').upper(): continue
+            zz = pad2(row[iZon]); pp = pad2(row[iPue])
+            if zz in SPECIAL_ZONAS:
+                n_skip += 1
+                continue
             try:
                 lat = float((row[iLat] or '').replace(',', '.'))
                 lon = float((row[iLon] or '').replace(',', '.'))
             except ValueError:
                 continue
-            zz = pad2(row[iZon]); pp = pad2(row[iPue])
             out[f'{zz}-{pp}'] = {'lat': lat, 'lon': lon, 'nombre': row[iNom] or ''}
+    if n_skip:
+        print(f'    {n_skip} puestos especiales (zona 90 censo, 98 cárceles) excluidos', file=sys.stderr)
     return out
 
 
