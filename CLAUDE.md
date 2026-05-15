@@ -6,6 +6,9 @@
 - `camara-2026.html` — (en construcción) espejo de senado para cámara
 - `endoso-2026.html` — comparación mesa a mesa senado vs cámara
 - `previa-1v.html` — simulador de intención presidencial 1ª vuelta
+- `oportunidad.html` — **módulo B2B** voto blando afín por candidato (LISTO, ver sección dedicada)
+- `veleta.html` — municipios sensibles al cambio (score multidimensional)
+- `pricing.html` — planes (Básico / Pro 39.900 COP · Premium 99.900 COP · Personalizado)
 - `lang.js` — i18n (co/us/cn); `CLAUDE.md` vive en la raíz del repo
 
 ## Tareas pendientes — `previa-1v.html`
@@ -98,6 +101,145 @@ mapas-2026/MUNICIPIOSX.json            GeoJSON municipios nacional (9 MB)
 score hacia volatilidad en el eje izquierda. Es defendible (eje principal de la
 contienda 2026) pero documentar en el footer y en el reporte de venta — un
 consultor experto lo va a preguntar.
+
+## Módulo Oportunidad — `oportunidad.html` (LISTO · B2B)
+
+Producto B2B complementario a Veleta: si Veleta dice **dónde se decide la
+elección**, Oportunidad dice **dónde un candidato específico puede crecer**.
+Voto blando afín por candidato sobre 4 fuentes históricas, NS-NR redistribuido
+por territorio + transferencia intra-bloque + abstención.
+
+### Fórmula vigente (v3)
+- `proj_base(C, M) = pondPct(C) × bias_C(M)` — punto de partida del candidato.
+- `gap_local = proj_base × (NS-NR/sumDeclarado) + Σ_donor xferFrac × pondPct(donor) × bias_donor(M)`.
+- `contrib_nac = gap_local × censo_M / censo_nacional`.
+- `bias_C(M)` = pct afín local / pct afín nacional, ponderado por 4 buckets
+  (pres-22, congreso-26, pres-18, consultas) con pesos editables.
+- Bloques amplios para transferencia: ic↔rb↔cl↔lm, pv↔ae, sf↔cl↔rb↔lm.
+- 6 candidatos: ic (Cepeda) · ae (De la Espriella) · pv (Paloma) · sf (Fajardo)
+  · cl (Claudia) · rb (Roy).
+
+### Niveles de granularidad (drill-in)
+1. Nacional · departamental (33 deptos).
+2. Depto → municipios (~1.100).
+3. 14 ciudades · comunas/localidades.
+4. Medellín · barrios (147) — click en comuna abre **sólo los barrios de esa comuna**.
+5. Bogotá · UPL (33) o Localidades — click abre **barrios de esa UPL/localidad**.
+6. Bogotá · barrios catastrales (1.000).
+7. Puestos (~13.5k a nivel país) — capa Premium.
+
+**Bogotá** salta el nivel "municipio" desde el mapa nacional (un solo mun 001
+= Bogotá D.C., no aporta nada como paso intermedio). Onclick depto 16 →
+directo a localidades. Back desde Bogotá ciudad → directo a nacional.
+
+### Plan gate (modelo B2B)
+Estados: **anonymous → free → pro → premium → full**. Lee `user.plan` del
+worker `rr-auth.reruizc.workers.dev/auth/me` (mismo contrato que dashboard).
+
+| Feature | Anónimo | Básico | Pro | Premium |
+|---|---|---|---|---|
+| Mapa nacional + dep + mun + hover detalle | ✗ modal | ✓ | ✓ | ✓ |
+| Cambio de candidato | 1 switch gratis (Cepeda+1) | ✓ | ✓ | ✓ |
+| Capa Oportunidad + Abstención | ✗ modal | ✓ | ✓ | ✓ |
+| Ciudades comunas (8) + UPL Bogotá + Barrios MDE/BOG | ✗ | ✗ modal Pro | ✓ | ✓ |
+| Transferencia intra-bloque + sliders pesos | ✗ | ✗ candado Pro | ✓ | ✓ |
+| Descarga CSV (lista completa) | ✗ | ✗ modal Pro | 3/mes | 10/mes |
+| Capa Puestos (~13.5k) | ✗ | ✗ | ✗ modal Premium | ✓ |
+| Reporte territorial PDF (top 50) | — | — | — | ✓ |
+
+Helpers JS: `loadUserFromStorage` + `refreshUserFromAPI` (al cargar);
+`hasFeature(name)` + `requireFeature(name)` (gate por acción);
+`openBlockedModal(feat)` con copy específico por feature.
+
+UI del gate:
+- **Chip "Plan: X · ↑ Upgrade"** en la nav (link a `pricing.html`).
+- **Modal de bloqueo** con tag, título, descripción, precio (Pro $39.900 ·
+  Premium $99.900), CTA primario (`pricing.html` o `register.html` si anónimo)
+  + **login inline** dentro del mismo modal (form email+password → POST
+  `/auth/login`, sin sacar al usuario de la página).
+- **Lock overlay 🔒** sobre los panel-cards de Transferencia y Pesos cuando
+  tier < Pro (captura el click → modal).
+- **Welcome modal** anónimo en primer visit (flag `opo-welcome-shown` en
+  localStorage).
+
+### Cuota de descargas
+Persistida client-side por mes (`opo-dl-YYYY-MM` en localStorage). El frontend
+intenta hablar primero con el worker (`GET /dl/status`, `POST /dl/consume`) y
+cae a localStorage si retorna 404. **Snippet listo para pegar en el worker
+`rr-auth`** vive en `tools/rr-auth-downloads-route.md` — usa KV namespace
+`RR_DL` con TTL 45 días. Bumpear `DL_QUOTA` en frontend si cambian los números.
+
+### Descarga CSV vs PDF
+- **CSV (`Lista (CSV)`)**: exporta `STATE._topItemsAll` — lista COMPLETA del
+  scope visible (33 deptos / N muns del depto / N comunas / 33 UPL / ~1k
+  barrios BOG / 147 barrios MDE / puestos visibles).
+- **PDF (`Top 50 (PDF)`)**: jsPDF cargado por CDN al primer click. Header con
+  candidato + mensaje táctico + métricas globales + tabla top 50 + footer
+  metodológico. Sólo visible para Premium+.
+- Ambos consumen del mismo contador.
+
+### Limpieza de datos · puestos especiales (mayo 2026)
+Aprendizaje doloroso: los puestos zona **90 (PUESTO CENSO, ej CORFERIAS)** y
+**98 (cárceles)** son ruido para el cruce geográfico — recogen votantes sin
+asignación específica e inflan artificialmente el barrio donde están
+físicamente.
+
+Fix por capa:
+- `tools/build-bog-barrio.py` y `tools/build-mde-por-barrio.js`: filtran
+  zona 90 y 98 antes del cruce a barrios. Re-correr y subir a S3 cuando se
+  modifiquen los inputs (PUESTOS_GEOREF.csv o las señales).
+- Frontend (`computeCityComunaMetrics`, `precomputeCityNacAfin`): excluye los
+  agregados especiales `OTROS`, `CORR`, `CIUDAD` que los build scripts dejan
+  en `por_comuna.json`. Cubre las 13 ciudades por comuna sin re-correr nada.
+
+### Match puesto → barrio catastral (Bogotá)
+El GeoJSON catastral oficial (1.000 barrios) NO coincide 1:1 con los nombres
+del CSV PUESTOS_GEOREF. Ejemplo: el puesto físico "CENTRO NARIÑO" tiene un
+centroide que cae en el polígono catastral "Ortezal" por PIP. Fix en
+`build_puesto_to_barrio` (cascada de 3 niveles):
+1. **Match por nombre normalizado** (BARRIO del CSV vs `nombre` del GeoJSON) → 551 puestos.
+2. Match removiendo sufijo de 1-2 caracteres ("QUINTA PAREDES B" → "QUINTA PAREDES").
+3. Fallback PIP por lat/lon → 493 puestos sin match nominal.
+
+### Cache de JSONs (cache-buster)
+Safari es agresivo con cache de JSON sin Cache-Control. `loadBogBarrioSignals`
+agrega `?v=YYYYMMDD` a las URLs de `bog-barrio-*.json` y `censo-barrio-*.json`.
+**Bumpear el valor (`v = 'YYYYMMDD'` dentro de la función) cuando se
+regeneren outputs.**
+
+### Mobile (`@media (max-width:640px)`)
+Bloque completo de overrides al final del `<style>`. Padding lateral 2.5rem→1rem
+en todos los containers, chips/fuentes escalados, `cand-pill` 15% más
+pequeños, top-row con grid apretado, descargas en 2 columnas full-width,
+modal scrollable, **chip de nombre al tap** sobre el mapa de barrios Bogotá
+(`#map-tap-name`, auto-hide 2.5s, sólo mobile vía CSS).
+
+### Estructura del top + scope label
+`collectScopeItems()` devuelve `{ items, unitLabel, scope, displayTopN }` con
+la lista COMPLETA del scope activo (ordenada por contribución desc). El
+`scope` refleja el padre cuando hay drill a barrios: "Medellín · Comuna 14 El
+Poblado", "Bogotá · Chapinero", "Bogotá · UPL CHAPINERO ALTO". Vista general
+muestra **top 10 departamentos**; con depto activo, **top 10 muns**; en
+puestos, top 15; resto, top 12.
+
+### S3 paths (datos del módulo)
+```
+bases+de+datos/output_ciudades/bogota/
+  bog-barrio-{pres-2010,2014,2018,2022,consulta-2025-pacto,
+              consulta-2026-{gran,frente,soluciones},senado-2026,camara-2026}.json
+  censo-barrio-{2018,2022,2026}.json
+  bog-puesto-to-barrio.json
+  por_comuna por_upl etc.
+bases+de+datos/output_medellin/por-barrio/
+  {alc,concejo}-{2015,2019,2023}-mde.json + pres + consultas + senado/cámara 2026.
+bases+de+datos/output_ciudades/{cali,barranquilla,…}/   por-comuna por señal.
+```
+
+### Estado actual
+**LISTO en producción.** Bloques A→D del plan gate cerrados. Build scripts de
+Bogotá y Medellín actualizados. Datos limpios en S3. Mobile OK. PDF Premium
+operativo. Pendiente cuando haya tiempo: desplegar el snippet `/dl/*` en el
+worker `rr-auth` para mover la quota fuera del localStorage del cliente.
 
 ## Ponderador propio (en construcción)
 Pipeline en `tools/ponderador/` que calibra firmas encuestadoras contra el
