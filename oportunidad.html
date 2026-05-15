@@ -919,11 +919,11 @@
           <div class="dl-btn-group">
             <button class="dl-btn" id="dl-btn" onclick="onDownloadTopCSV()">
               <span class="dl-ico" aria-hidden="true">⬇</span>
-              <span class="dl-label">Top (CSV)</span>
+              <span class="dl-label">Lista (CSV)</span>
             </button>
             <button class="dl-btn dl-btn-pdf" id="dl-btn-pdf" onclick="onDownloadTopPDF()" style="display:none">
               <span class="dl-ico" aria-hidden="true">📄</span>
-              <span class="dl-label">Reporte (PDF)</span>
+              <span class="dl-label">Top 50 (PDF)</span>
             </button>
           </div>
           <span class="dl-counter" id="dl-counter">— / —</span>
@@ -1018,7 +1018,7 @@
     'mde-barrios':      { title:'Medellín · barrios', desc:'El mapa por los 147 barrios oficiales de Medellín está en Pro.' },
     'transferencia':    { title:'Transferencia intra-bloque', desc:'Simula qué pasa si tu candidato absorbe parte del voto de otros candidatos de su mismo bloque ideológico. Disponible en Pro.' },
     'pesos-fuente':     { title:'Pesos por fuente histórica', desc:'Ajusta cuánto pesa cada elección pasada (Pres-22, Cong-26, Pres-18, Consultas) al construir el mapa. Disponible en Pro.' },
-    'descarga-csv':     { title:'Descargar Top (CSV)', desc:'Descarga el ranking de territorios de oportunidad para usarlo en tu CRM o Excel. Pro: 3 descargas/mes. Premium: 10/mes.' },
+    'descarga-csv':     { title:'Descargar lista completa (CSV)', desc:'Descarga el ranking completo del territorio donde estás posicionado (departamentos, municipios, comunas/UPL/barrios o puestos). Pro: 3 descargas/mes. Premium: 10/mes.' },
     'descarga-csv-quota': { title:'Cuota mensual alcanzada', desc:'Ya usaste todas tus descargas de este mes. La cuota se renueva el primer día del próximo mes. Considera subir a Premium para 10 descargas/mes.' },
     'capa-puestos':     { title:'Capa Puestos de votación', desc:'El mapa de los 13.500+ puestos de votación con bias propio por puesto está disponible en Premium.' },
     'reporte-pdf':      { title:'Reporte territorial PDF', desc:'Reporte mensual personalizado con análisis territorial y recomendaciones tácticas. Disponible en Premium.' },
@@ -1361,11 +1361,15 @@
   }
 
   // Click en "Descargar Top (CSV)": gate por plan + intenta consumir
-  // una descarga en el worker (con fallback local).
+  // una descarga en el worker (con fallback local). Exporta TODA la
+  // lista del scope activo, no sólo el top mostrado en el panel.
   async function onDownloadTopCSV(){
     if (!requireFeature('descarga-csv')) return;
-    const items = STATE._topItems || [];
-    if (!items.length){
+    // Recolecta la lista completa del scope actual.
+    const full = (STATE._topItemsAll && STATE._topItemsAll.length)
+      ? STATE._topItemsAll
+      : collectScopeItems().items;
+    if (!full.length){
       alert('No hay datos para descargar todavía. Espera a que cargue el top.');
       return;
     }
@@ -1378,7 +1382,7 @@
         renderDlCounter();
         return;
       }
-      _buildAndDownloadCSV(items);
+      _buildAndDownloadCSV(full);
       renderDlCounter();
     } finally {
       if (btn) btn.disabled = false;
@@ -1435,7 +1439,11 @@
 
   async function onDownloadTopPDF(){
     if (!requireFeature('reporte-pdf')) return;
-    const items = STATE._topItems || [];
+    // Tomamos hasta el top 50 del scope activo.
+    const full = (STATE._topItemsAll && STATE._topItemsAll.length)
+      ? STATE._topItemsAll
+      : collectScopeItems().items;
+    const items = full.slice(0, 50);
     if (!items.length){
       alert('No hay datos para el reporte todavía. Espera a que cargue el top.');
       return;
@@ -5079,32 +5087,25 @@
     return '—';
   }
 
-  /* ───────── Top 30 ───────── */
-  // Rankea por contribución nacional (pp): cuánto aporta ese mun al total
-  // de crecimiento nacional del candidato. Si Cepeda crece 2.01pp a nivel
-  // país por NS-NR, el top-30 debe explicar el grueso de esos 2.01pp.
-  function renderTop30(){
-    // El top se adapta al scope activo:
-    //   modo Puestos (cualquier scope)        → top puestos visibles
-    //   Medellín · Barrios                    → top barrios MDE
-    //   Bogotá · UPL                          → top UPL
-    //   Ciudad (modo comunas/localidades)     → top comunas/localidades
-    //   Depto (sin ciudad)                    → top muns del depto
-    //   Nacional                              → top muns nacionales
-    // Cada item se normaliza a { name, sub, contrib, click? }.
+  /* ───────── Collect / Top ─────────
+     collectScopeItems devuelve la LISTA COMPLETA (sin slice) de items
+     para el scope actualmente visible. Se usa para:
+       · renderTop30: corta a displayTopN para mostrar en el panel.
+       · descarga CSV: lista completa.
+       · descarga PDF: top 50.
+     Cada item se normaliza a { name, sub, contrib, click? }. */
+  function collectScopeItems(){
     let items = [];
     let unitLabel = 'municipios';
     let scope = 'oportunidad';
-    // Puestos: top 15. Resto: top 12.
-    let TOP_N = 12;
+    // displayTopN es el límite para el panel lateral; CSV/PDF lo ignoran.
+    let displayTopN = 12;
 
     if (STATE.layer === 'pue' && STATE.puestoMetrics && Object.keys(STATE.puestoMetrics).length){
-      TOP_N = 15;
-      // Top de PUESTOS VISIBLES. Para puestos individuales rankeamos por
-      // CRECIMIENTO LOCAL (gap), no por contribución nacional — la contrib
-      // de un puesto chico es marginal por construcción (censo_puesto/censo_nac
-      // ~ 10⁻⁴). El gap local en cambio dice "aquí el candidato puede crecer
-      // X pp", que es lo accionable para el equipo de campaña.
+      displayTopN = 15;
+      // Top de PUESTOS VISIBLES. Rankeamos por CRECIMIENTO LOCAL (gap),
+      // no por contribución nacional — la contrib de un puesto chico es
+      // marginal por construcción.
       const visible = visiblePuestos();
       const scopeName = STATE.selectedCity ? CITIES[STATE.selectedCity].label
                       : STATE.selectedDep ? ((STATE.depByElectoral[STATE.selectedDep]||{}).nombre || STATE.selectedDep)
@@ -5121,7 +5122,6 @@
       unitLabel = 'puestos'; scope = scopeName;
     }
     else if (STATE.selectedCity === 'medellin' && STATE.mdeView === 'barrios' && STATE.mdeBarrioMetrics){
-      // Top de BARRIOS Medellín. El nombre vive en STATE.mdeBarriosData[sig][bk].nombre.
       const data = STATE.mdeBarriosData || {};
       const refSig = Object.values(data)[0] || {};
       for (const [bk, m] of Object.entries(STATE.mdeBarrioMetrics)){
@@ -5148,7 +5148,6 @@
     else if (STATE.selectedCity && STATE.cityComMetrics[STATE.selectedCity]){
       const cfg = CITIES[STATE.selectedCity];
       const censoMap = STATE.cityCensoByCom[STATE.selectedCity] || {};
-      // Aliases manuales por (cityKey, comCod) para corregir nombres genéricos.
       const aliasMap = CITY_COMUNA_ALIAS[STATE.selectedCity] || {};
       for (const [cod, m] of Object.entries(STATE.cityComMetrics[STATE.selectedCity])){
         if (m.contrib == null) continue;
@@ -5161,8 +5160,7 @@
       scope = cfg.label;
     }
     else if (STATE.selectedDep) {
-      // Depto activo: top 10 muns del depto.
-      TOP_N = 10;
+      displayTopN = 10;
       const dep = STATE.selectedDep;
       for (const r of Object.values(STATE.munMetrics)){
         if (r.contrib == null) continue;
@@ -5179,8 +5177,7 @@
       scope = (STATE.depByElectoral[dep]||{}).nombre || dep;
     }
     else {
-      // Vista general (sin depto, sin ciudad): top 10 departamentos.
-      TOP_N = 10;
+      displayTopN = 10;
       for (const [dc, r] of Object.entries(STATE.depMetrics || {})){
         if (!r || r.contrib == null) continue;
         const depName = (STATE.depByElectoral[dc]||{}).nombre || dc;
@@ -5197,11 +5194,20 @@
     }
 
     items.sort((a,b) => b.contrib - a.contrib);
-    items = items.slice(0, TOP_N);
-    // Persistir el top actual para que el botón de descarga CSV
-    // lo lea sin duplicar la lógica de scope.
+    return { items, unitLabel, scope, displayTopN };
+  }
+
+  function renderTop30(){
+    const full = collectScopeItems();
+    const items = full.items.slice(0, full.displayTopN);
+    // Persistir tanto el top visible como la lista completa, para
+    // que CSV exporte todo y PDF tome el top 50 sin recomputar.
     STATE._topItems    = items;
-    STATE._topMeta     = { unitLabel, scope };
+    STATE._topItemsAll = full.items;
+    STATE._topMeta     = { unitLabel: full.unitLabel, scope: full.scope };
+    // Compat alias para el resto de la función renderTop30 abajo.
+    const unitLabel = full.unitLabel;
+    const scope = full.scope;
 
     const titleEl = document.getElementById('top-title');
     if (titleEl) titleEl.textContent = `Top ${items.length} · ${unitLabel} de ${scope}`;
