@@ -8,26 +8,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet" />
   <style>
-    /* ── THEME VARIABLES ── */
+    /* ── THEME VARIABLES ──
+       Convención del resto del sitio: noche por default, body.day-mode override.
+       rr-theme en localStorage: 'day' | 'night'. */
     :root {
-      --bg: #f4f3ef;
-      --bg2: #eeedea;
-      --surface: #ffffff;
-      --surface2: #f0efe9;
-      --border: rgba(0,0,0,0.07);
-      --text: #0a0a0a;
-      --text2: #555;
-      --text3: #999;
-      --blue: #0047FF;
-      --blue-light: #3d6fff;
-      --blue-dim: rgba(0,71,255,0.08);
-      --black: #0a0a0a;
-      --white: #f4f3ef;
-      --success: #00d68f;
-      --warning: #f0c040;
-      --lock: #ccc;
-    }
-    [data-theme="dark"] {
       --bg: #060810;
       --bg2: #0a0c14;
       --surface: #0f1018;
@@ -36,8 +20,26 @@
       --text: #f4f3ef;
       --text2: #888;
       --text3: #444;
+      --blue: #0047FF;
+      --blue-light: #3d6fff;
       --blue-dim: rgba(0,71,255,0.12);
+      --black: #0a0a0a;
+      --white: #f4f3ef;
+      --success: #00d68f;
+      --warning: #f0c040;
       --lock: #333;
+    }
+    body.day-mode {
+      --bg: #f4f3ef;
+      --bg2: #eeedea;
+      --surface: #ffffff;
+      --surface2: #f0efe9;
+      --border: rgba(0,0,0,0.07);
+      --text: #0a0a0a;
+      --text2: #555;
+      --text3: #999;
+      --blue-dim: rgba(0,71,255,0.08);
+      --lock: #ccc;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -88,6 +90,12 @@
     .country-option.selected { color:var(--blue); }
     .country-check { font-size:.6rem; width:12px; opacity:0; color:var(--blue); }
     .country-option.selected .country-check { opacity:1; }
+
+    /* ── THEME TOGGLE ── (mismo patrón que senado/cámara/previa) */
+    .theme-btn{display:flex;align-items:center;gap:.4rem;font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);padding:.3rem .75rem;cursor:none;transition:all .2s;flex-shrink:0}
+    .theme-btn:hover{background:rgba(255,255,255,.15);color:var(--white)}
+    body.day-mode .theme-btn{background:rgba(0,71,255,.08);border-color:rgba(0,71,255,.25);color:var(--blue)}
+    body.day-mode .theme-btn:hover{background:rgba(0,71,255,.15)}
 
     /* ── LAYOUT ── */
     .dashboard-wrap {
@@ -207,14 +215,14 @@
       padding:.15rem .5rem;
     }
     .tool-tag.locked-tag { color:var(--lock); background:transparent; border:1px solid var(--lock); }
-    .tool-tag.private-tag { color:#7c3aed; background:rgba(124,58,237,0.10); }
-    [data-theme="dark"] .tool-tag.private-tag { color:#a78bfa; background:rgba(167,139,250,0.14); }
-    .tool-item.private { border-left:2px solid #7c3aed; }
-    [data-theme="dark"] .tool-item.private { border-left-color:#a78bfa; }
-    .tool-item.private .tool-num { color:#7c3aed; }
-    [data-theme="dark"] .tool-item.private .tool-num { color:#a78bfa; }
-    .tool-item.private .tool-arrow { color:#7c3aed; }
-    [data-theme="dark"] .tool-item.private .tool-arrow { color:#a78bfa; }
+    .tool-tag.private-tag { color:#a78bfa; background:rgba(167,139,250,0.14); }
+    body.day-mode .tool-tag.private-tag { color:#7c3aed; background:rgba(124,58,237,0.10); }
+    .tool-item.private { border-left:2px solid #a78bfa; }
+    body.day-mode .tool-item.private { border-left-color:#7c3aed; }
+    .tool-item.private .tool-num { color:#a78bfa; }
+    body.day-mode .tool-item.private .tool-num { color:#7c3aed; }
+    .tool-item.private .tool-arrow { color:#a78bfa; }
+    body.day-mode .tool-item.private .tool-arrow { color:#7c3aed; }
 
     /* ── PLAN CARD (right col, row 1) ── */
     .plan-card { grid-column:4; grid-row:1; }
@@ -720,6 +728,7 @@
       <div id="e-nav-auth" class="electoral-nav-auth"></div>
     </div>
     <div style="display:flex;align-items:center;gap:1.2rem">
+      <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
       <div class="country-selector-wrap">
         <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
           <span id="countryBtnLabel">Colombia</span>
@@ -841,22 +850,18 @@
     if (!token || !user) window.location.href = 'login.html';
 
     // ─── THEME ────────────────────────────────────────────────────────────────
-    function getAutoTheme() {
-      const h = new Date().getHours();
-      return (h >= 7 && h < 19) ? 'light' : 'dark';
-    }
-    let currentTheme = localStorage.getItem('rr-theme') || getAutoTheme();
-
-    function applyTheme(theme) {
-      document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : '');
-      // theme-btn removed from nav
-      currentTheme = theme;
-      localStorage.setItem('rr-theme', theme);
+    // Convención compartida con senado/cámara/previa: body.day-mode + rr-theme:'day'|'night'.
+    function isDayHour() { const h = new Date().getHours(); return h >= 7 && h < 19; }
+    function applyTheme(day) {
+      document.body.classList.toggle('day-mode', day);
+      const btn = document.getElementById('theme-btn');
+      if (btn) btn.textContent = day ? '🌙 Modo noche' : '☀ Modo día';
+      localStorage.setItem('rr-theme', day ? 'day' : 'night');
     }
     function toggleTheme() {
-      applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+      applyTheme(!document.body.classList.contains('day-mode'));
     }
-    applyTheme(currentTheme);
+    (function(){ const s = localStorage.getItem('rr-theme'); if (s) applyTheme(s === 'day'); else applyTheme(isDayHour()); })();
 
     // ─── GREETING ─────────────────────────────────────────────────────────────
     function getGreeting() {
@@ -926,16 +931,12 @@
     ];
 
     const DOWNLOADS_DEMO = [
-      { name:'Escrutinio Congreso y Consultas 2026', date:'Mar 2026', href:'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/Congreso_2026_MMV170326.csv' },
-      { name:'Consulta Presidencial · Oct 2025',    date:'Mar 2026', href:'#' },
-      { name:'Más archivos disponibles en descargas.html', date:'Abr 2026', href:'descargas.html' },
+      { name:'Centro de descargas', date:'Bases por departamento y corporación', href:'descargas.html' },
     ];
 
-    const NEWS = [
-      { date:'9 Abr 2026', title:'Centro de descargas disponible', desc:'Estrena descargas.html: archivos Excel organizados por departamento, circunscripción y corporación, con detalle hasta puesto de votación. Acceso con plan Pro o superior.', plan:'pro' },
-      { date:'8 Abr 2026', title:'CITREP: candidatos y curules por circunscripción', desc:'La vista de CITREP ahora muestra candidatos expandibles por circunscripción y señala el ganador de curul aplicando el cociente de D\'Hondt.', plan:'free' },
-      { date:'5 Abr 2026', title:'Mapas por comunas y localidades en más ciudades', desc:'Se incorporaron mapas de análisis territorial por comunas y localidades para Bogotá, Medellín, Cali, Pereira, Ibagué, Barranquilla, Montería y Manizales.', plan:'free' },
-    ];
+    // Noticias se cargan de noticias.json (raíz del repo) — ordenadas por date desc, top 4.
+    // Para actualizar: editar noticias.json y desplegar.
+    let NEWS = [];
 
     // ─── RENDER ───────────────────────────────────────────────────────────────
     function render() {
@@ -1136,15 +1137,20 @@
           </a>
         </div>`).join('');
 
-      // News
+      // News (NEWS se llena async desde noticias.json)
       document.getElementById('news-label').textContent = t.news;
-      document.getElementById('news-list').innerHTML = NEWS.map(n => `
-        <div class="news-item">
-          <div class="news-date">${n.date}</div>
-          <div class="news-title">${n.title}</div>
-          <div class="news-desc">${n.desc}</div>
-          <span class="news-plan-tag ${n.plan}">${n.plan === 'free' ? t.planBasic : n.plan === 'pro' ? t.planPro : t.planPremium}</span>
-        </div>`).join('');
+      const newsList = document.getElementById('news-list');
+      if (!NEWS.length) {
+        newsList.innerHTML = `<div class="news-item" style="opacity:.5"><div class="news-desc">Cargando…</div></div>`;
+      } else {
+        newsList.innerHTML = NEWS.map(n => `
+          <div class="news-item">
+            <div class="news-date">${formatNewsDate(n.date, lang)}</div>
+            <div class="news-title">${n.title}</div>
+            <div class="news-desc">${n.desc}</div>
+            <span class="news-plan-tag ${n.plan}">${n.plan === 'free' ? t.planBasic : n.plan === 'pro' ? t.planPro : t.planPremium}</span>
+          </div>`).join('');
+      }
 
       // Profile
       const initials = user.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
@@ -1184,6 +1190,28 @@
       if (!ts) return null;
       const lang = localStorage.getItem('rr-lang') || 'co';
       return new Date(ts).toLocaleDateString(lang === 'us' ? 'en-US' : 'es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
+    }
+
+    function formatNewsDate(iso, lang) {
+      if (!iso) return '';
+      // Acepta ISO yyyy-mm-dd o cadena ya formateada; si no parsea, devuelve tal cual.
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return iso;
+      const locale = lang === 'us' ? 'en-US' : lang === 'cn' ? 'zh-CN' : 'es-CO';
+      return d.toLocaleDateString(locale, { year:'numeric', month:'short', day:'numeric' });
+    }
+
+    // ─── NEWS LOADER ──────────────────────────────────────────────────────────
+    async function loadNews() {
+      try {
+        const res = await fetch('noticias.json', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        const items = Array.isArray(data) ? data : (data.items || []);
+        items.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+        NEWS = items.slice(0, 4);
+        render();
+      } catch {}
     }
 
     // ─── CANCEL PLAN ──────────────────────────────────────────────────────────
@@ -1436,6 +1464,7 @@
     // ─── INIT ─────────────────────────────────────────────────────────────────
     render();
     refreshUser();
+    loadNews();
     checkPaymentSuccess();
 
     // Exponer __applyLang para lang.js — al cambiar idioma re-renderiza el dashboard
