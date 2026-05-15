@@ -106,6 +106,15 @@ def feature_bbox(geom):
 
 
 # ── Carga puestos Bogotá ────────────────────────────────────────────
+def norm_barrio(s):
+    """Normaliza un nombre de barrio para matching. Idéntica lógica del
+    frontend (normBarrioFront): strip tildes + UPPER + colapsar no-alfanum."""
+    if not s: return ''
+    import unicodedata
+    s = unicodedata.normalize('NFD', str(s)).encode('ascii', 'ignore').decode('ascii').upper()
+    return re.sub(r'[^A-Z0-9 ]+', ' ', s).strip()
+
+
 def load_puestos_bogota(csv_path):
     # Zonas especiales (puestos censo / cárceles) — NO se asignan a barrios:
     #   90 = PUESTO CENSO (FERIA EXPOSICIÓN / CORFERIAS).
@@ -122,6 +131,7 @@ def load_puestos_bogota(csv_path):
         col = lambda n: next(i for i, h in enumerate(header) if h.strip().upper() == n.upper())
         iDep = col('DEPARTAMENTO'); iZon = col('ZONA'); iPue = col('PUESTO')
         iLat = col('LATITUD'); iLon = col('LONGITUD'); iNom = col('NOMBRE PUESTO')
+        iBar = col('BARRIO')
         for row in reader:
             if not row or len(row) <= iLon: continue
             if 'BOGOTA' not in (row[iDep] or '').upper(): continue
@@ -134,26 +144,66 @@ def load_puestos_bogota(csv_path):
                 lon = float((row[iLon] or '').replace(',', '.'))
             except ValueError:
                 continue
-            out[f'{zz}-{pp}'] = {'lat': lat, 'lon': lon, 'nombre': row[iNom] or ''}
+            out[f'{zz}-{pp}'] = {
+                'lat': lat, 'lon': lon,
+                'nombre': row[iNom] or '',
+                'barrio': (row[iBar] or '').strip(),
+                'barrio_norm': norm_barrio(row[iBar] or ''),
+            }
     if n_skip:
         print(f'    {n_skip} puestos especiales (zona 90 censo, 98 cárceles) excluidos', file=sys.stderr)
     return out
 
 
 def build_puesto_to_barrio(puestos, barrio_geo):
-    barrios = []
+    """Asigna cada puesto a un barrio catastral.
+
+    Estrategia (en orden de preferencia):
+    1) Match por NOMBRE: si el campo BARRIO del CSV de Registraduría
+       coincide (normalizado) con el `nombre` del GeoJSON catastral.
+       Es la fuente más confiable porque ambos vienen de listas
+       oficiales y los nombres se corresponden bien.
+    2) Match con sufijo: a veces el CSV trae "QUINTA PAREDES B" y el
+       catastral sólo "QUINTA PAREDES". Probamos quitar el último token
+       si es una letra/dígito suelto.
+    3) Fallback PIP: punto-en-polígono del lat/lon contra el catastral.
+       Es el viejo método; sólo se usa cuando los pasos 1-2 fallan."""
+    # Index por nombre normalizado
+    by_name = {}
+    barrios_geo = []
     for f in barrio_geo['features']:
         cod = f['properties'].get('codigo')
         if not cod: continue
-        barrios.append((cod, f['properties'], feature_bbox(f['geometry']), f['geometry']))
+        nm = norm_barrio(f['properties'].get('nombre', ''))
+        if nm:
+            by_name.setdefault(nm, []).append(cod)
+        barrios_geo.append((cod, f['properties'], feature_bbox(f['geometry']), f['geometry']))
+
     out = {}; unmatched = []
+    n_by_name = 0; n_by_suffix = 0; n_by_pip = 0
     for zzpp, p in puestos.items():
-        x, y = p['lon'], p['lat']; assigned = None
-        for cod, props, bb, geom in barrios:
-            if x < bb[0] or x > bb[2] or y < bb[1] or y > bb[3]: continue
-            if point_in_feature(x, y, geom): assigned = cod; break
+        assigned = None
+        # 1) Match por nombre exacto
+        bn = p.get('barrio_norm', '')
+        if bn and bn in by_name and len(by_name[bn]) == 1:
+            assigned = by_name[bn][0]; n_by_name += 1
+        # 2) Sufijo de una letra/dígito ("QUINTA PAREDES B" → "QUINTA PAREDES")
+        if not assigned and bn:
+            toks = bn.split()
+            if len(toks) >= 2 and len(toks[-1]) <= 2:
+                bn2 = ' '.join(toks[:-1])
+                if bn2 in by_name and len(by_name[bn2]) == 1:
+                    assigned = by_name[bn2][0]; n_by_suffix += 1
+        # 3) Fallback PIP por lat/lon
+        if not assigned:
+            x, y = p['lon'], p['lat']
+            for cod, props, bb, geom in barrios_geo:
+                if x < bb[0] or x > bb[2] or y < bb[1] or y > bb[3]: continue
+                if point_in_feature(x, y, geom):
+                    assigned = cod; n_by_pip += 1; break
         if assigned: out[zzpp] = assigned
         else: unmatched.append(zzpp)
+    print(f'    match: {n_by_name} por nombre + {n_by_suffix} por sufijo + {n_by_pip} por PIP', file=sys.stderr)
     return out, unmatched
 
 
