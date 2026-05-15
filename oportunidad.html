@@ -1959,6 +1959,13 @@
     cityCensoByCom2018:{},  // { cityKey: { comCod: { ..censo 2018 } } } Wiki × shape 2022 (proxy)
     cityComMetrics:{},  // { cityKey: { comCod: { afin, techo, proj, gap, abst, censo } } }
     selectedCity:null,  // cityKey activo (en drilldown)
+    // Padre activo cuando estamos drillados a barrios DENTRO de
+    // una comuna/localidad/UPL específica. Filtra el mapa y el top.
+    //   { city:'medellin'|'bogota', kind:'comuna'|'localidad'|'upl', code:string, name:string }
+    barrioParent:null,
+    // Cache lazy: barrioCod (Bogotá) → uplCod, computado con PIP la
+    // primera vez que se necesita.
+    bogBarrioToUpl:null,
 
     // Medellín barrios (Bloque D + v2)
     mdeBarriosGeo:null,
@@ -3792,10 +3799,95 @@
       }).catch(e => { console.error('[opo·pue·dep] error', e); showLoading(false); });
     }
   }
+  /* ─── Drill a barrios filtrados por comuna/localidad/UPL ─────── */
+  // Medellín: click en una comuna → barrios de esa comuna.
+  // Bogotá:   click en una localidad → barrios de esa localidad.
+  async function drillToBarriosOfCom(cityKey, comCod, comName){
+    if (cityKey === 'medellin'){
+      if (!requireFeature('mde-barrios')) return;
+      showLoading(true);
+      try {
+        await Promise.all([loadMdeBarriosGeo(), loadMdeBarrioSignals()]);
+        computeMdeBarrioMetrics();
+        STATE.mdeView = 'barrios';
+        STATE.barrioParent = { city:'medellin', kind:'comuna', code: String(comCod), name: comName || `Comuna ${comCod}` };
+        renderMdeBarriosLayer();
+        refreshMdeViewToggle();
+        renderTop30();
+      } catch(e){ console.error('[opo·drill·mde]', e); }
+      finally { showLoading(false); }
+      return;
+    }
+    if (cityKey === 'bogota'){
+      if (!requireFeature('bog-barrios')) return;
+      showLoading(true);
+      try {
+        await Promise.all([loadBogBarrioGeo(), loadBogBarrioSignals()]);
+        computeBogBarrioMetrics();
+        STATE.bogView = 'barrios';
+        STATE.barrioParent = { city:'bogota', kind:'localidad', code: String(comCod).padStart(2,'0'), name: comName || `Localidad ${comCod}` };
+        renderBogBarrioLayer();
+        refreshBogViewToggle();
+        renderTop30();
+      } catch(e){ console.error('[opo·drill·bog·loc]', e); }
+      finally { showLoading(false); }
+      return;
+    }
+  }
+  // Bogotá UPL: click en una UPL → barrios contenidos por PIP.
+  async function drillToBarriosOfUpl(uplCod, uplName){
+    if (!requireFeature('bog-barrios')) return;
+    showLoading(true);
+    try {
+      await Promise.all([loadBogBarrioGeo(), loadBogBarrioSignals()]);
+      computeBogBarrioMetrics();
+      STATE.bogView = 'barrios';
+      STATE.barrioParent = { city:'bogota', kind:'upl', code: String(uplCod), name: uplName || uplCod };
+      renderBogBarrioLayer();
+      refreshBogViewToggle();
+      renderTop30();
+    } catch(e){ console.error('[opo·drill·bog·upl]', e); }
+    finally { showLoading(false); }
+  }
+
   function onBack(){
-    // Si estamos en capa de ciudad, volver al depto padre.
+    // 1) Si estamos drillados a barrios de un padre específico,
+    //    sólo limpiamos el padre y volvemos al nivel superior.
+    if (STATE.barrioParent){
+      const parent = STATE.barrioParent;
+      STATE.barrioParent = null;
+      if (parent.city === 'medellin'){
+        // Volver a las comunas de Medellín.
+        STATE.mdeView = 'comunas';
+        renderCityComLayer('medellin');
+        refreshMdeViewToggle();
+      } else if (parent.city === 'bogota'){
+        if (parent.kind === 'localidad'){
+          STATE.bogView = 'localidades';
+          renderCityComLayer('bogota');
+        } else if (parent.kind === 'upl'){
+          STATE.bogView = 'upl';
+          renderBogUplLayer();
+        }
+        refreshBogViewToggle();
+      }
+      renderTop30();
+      return;
+    }
+    // 2) Si estamos en capa de ciudad, volver al depto padre.
+    //    Caso especial Bogotá D.C.: tiene un solo mun (001) que no
+    //    aporta nada como nivel intermedio → saltamos directo a nacional.
     if (STATE.selectedCity){
       const cfg = CITIES[STATE.selectedCity];
+      if (STATE.selectedCity === 'bogota'){
+        STATE.selectedCity = null;
+        STATE.selectedDep = null;
+        refreshBogViewToggle();
+        if (STATE.level === 'dep') renderDeptos();
+        else renderMunsNacional();
+        renderTop30();
+        return;
+      }
       const dep = cfg.depCod;
       STATE.selectedCity = null;
       STATE.selectedDep = dep;
@@ -3804,6 +3896,8 @@
       renderTop30();
       return;
     }
+    // 3) Vista nacional o de muns nacionales: limpiar selectedDep y
+    //    volver al nivel correspondiente.
     STATE.selectedDep = null;
     if (STATE.level === 'dep') renderDeptos();
     else renderMunsNacional();
@@ -4028,12 +4122,74 @@
     return n ? [sx/n, sy/n] : null;
   }
 
+  // Point-in-polygon (ray cast). vs es un anillo [[x,y], ...]. Soporta
+  // MultiPolygon iterando cada anillo exterior.
+  function pointInRing(px, py, ring){
+    let inside = false;
+    for (let i=0, j=ring.length-1; i<ring.length; j=i++){
+      const xi=ring[i][0], yi=ring[i][1], xj=ring[j][0], yj=ring[j][1];
+      if (((yi>py)!==(yj>py)) && (px < (xj-xi)*(py-yi)/(yj-yi+1e-12) + xi)) inside = !inside;
+    }
+    return inside;
+  }
+  function pointInFeature(px, py, feat){
+    if (!feat || !feat.geometry) return false;
+    const g = feat.geometry;
+    if (g.type === 'Polygon'){
+      // Anillo exterior; ignoramos hoyos (no relevantes para UPL/barrios).
+      return pointInRing(px, py, g.coordinates[0]);
+    }
+    if (g.type === 'MultiPolygon'){
+      for (const poly of g.coordinates){
+        if (pointInRing(px, py, poly[0])) return true;
+      }
+    }
+    return false;
+  }
+
+  // Construye (lazy, una sola vez) el mapeo bog-barrio → upl, usando PIP
+  // del centroide del barrio contra cada UPL. Necesita que ambos geos
+  // estén cargados. Si no, devuelve null y se reintenta más tarde.
+  function getBogBarrioToUplMap(){
+    if (STATE.bogBarrioToUpl) return STATE.bogBarrioToUpl;
+    const bg = STATE.bogBarrioGeo;
+    const ug = STATE.bogUplGeo;
+    if (!bg || !ug) return null;
+    const map = {};
+    for (const bf of bg.features){
+      const cod = bf.properties.codigo;
+      if (!cod) continue;
+      const c = geoCentroid(bf);
+      if (!c) continue;
+      const [px, py] = c;
+      for (const uf of ug.features){
+        if (pointInFeature(px, py, uf)){
+          map[cod] = uf.properties.CODIGO_UPL || uf.properties.codigo_upl || null;
+          break;
+        }
+      }
+    }
+    STATE.bogBarrioToUpl = map;
+    return map;
+  }
+
   function renderMdeBarriosLayer(){
     ensureMap(); clearLayer();
     const cfg = CITIES.medellin;
-    const geo = STATE.mdeBarriosGeo;
+    const rawGeo = STATE.mdeBarriosGeo;
     const metrics = STATE.cityComMetrics.medellin || {};
     const barrioMetrics = STATE.mdeBarrioMetrics || {};
+
+    // Si hay un padre activo (comuna específica), filtramos las features
+    // para mostrar SÓLO los barrios de esa comuna. Si no, mostramos todos.
+    const parent = STATE.barrioParent;
+    const filtered = (parent && parent.city === 'medellin' && parent.kind === 'comuna')
+      ? { ...rawGeo, features: rawGeo.features.filter(f => {
+          const c = String(f.properties.comuna||'').replace(/^0+/, '');
+          return c === String(parent.code).replace(/^0+/, '');
+        }) }
+      : rawGeo;
+    const geo = filtered;
 
     // Pre-cómputo: centroide de cada feature del GeoJSON, indexado por
     // barrioNorm. Lo usamos para heredar la métrica del barrio vecino
@@ -4094,18 +4250,27 @@
         layer.on('mouseover', (e) => onHover(f, e));
         layer.on('mouseout', (e) => onHoverOut(f, e));
         layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
+        layer.on('click', () => showTapName(f.__name));
       },
     }).addTo(STATE.map);
     STATE.map.fitBounds(STATE.mapLayer.getBounds(), { padding:[20,20] });
-    document.getElementById('map-head-title').textContent = 'Medellín · Barrios y veredas (heredan del vecino más cercano si no hay puesto)';
+    // Título y back-button cambian si hay drill a una comuna específica.
+    if (parent && parent.kind === 'comuna'){
+      document.getElementById('map-head-title').textContent = `Medellín · ${parent.name} · Barrios`;
+      document.getElementById('map-back-label').textContent = '← Volver a Medellín';
+    } else {
+      document.getElementById('map-head-title').textContent = 'Medellín · Barrios (heredan del vecino más cercano si no hay puesto)';
+      document.getElementById('map-back-label').textContent = '← Volver a Antioquia';
+    }
     document.getElementById('map-back-btn').classList.add('show');
-    document.getElementById('map-back-label').textContent = '← Volver a Antioquia';
   }
 
   async function setMdeView(view){
     if (view === STATE.mdeView && STATE.selectedCity === 'medellin') return;
     if (view === 'barrios' && !requireFeature('mde-barrios')) return;
     STATE.mdeView = view;
+    // Toggle manual del sub-view limpia cualquier drill a una comuna específica.
+    STATE.barrioParent = null;
     if (STATE.selectedCity !== 'medellin') return;
     showLoading(true);
     try {
@@ -4362,7 +4527,8 @@
   function renderBogUplLayer(){
     ensureMap(); clearLayer();
     const cfg = CITIES.bogota;
-    const geo = STATE.bogUplGeo;
+    const geoFull = STATE.bogUplGeo;
+    const geo = geoFull;
     const uplMetrics = STATE.bogUplMetrics || {};
     const locMetrics = STATE.cityComMetrics.bogota || {};
 
@@ -4392,12 +4558,16 @@
         layer.on('mouseover', (e) => onHover(f, e));
         layer.on('mouseout', (e) => onHoverOut(f, e));
         layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
+        // Click en UPL → drill a barrios de esa UPL (con PIP).
+        if (cod){
+          layer.on('click', () => drillToBarriosOfUpl(cod, f.__name));
+        }
       },
     }).addTo(STATE.map);
     STATE.map.fitBounds(STATE.mapLayer.getBounds(), { padding:[20,20] });
     document.getElementById('map-head-title').textContent = 'Bogotá · UPL (33 unidades de planeamiento local)';
     document.getElementById('map-back-btn').classList.add('show');
-    document.getElementById('map-back-label').textContent = '← Volver a Cundinamarca';
+    document.getElementById('map-back-label').textContent = '← Volver a Bogotá';
   }
 
   async function setBogView(view){
@@ -4405,6 +4575,8 @@
     if (view === 'upl' && !requireFeature('bog-upl')) return;
     if (view === 'barrios' && !requireFeature('bog-barrios')) return;
     STATE.bogView = view;
+    // Toggle manual del sub-view limpia cualquier drill a una localidad/UPL específica.
+    STATE.barrioParent = null;
     if (STATE.selectedCity !== 'bogota') return;
     showLoading(true);
     try {
@@ -4634,9 +4806,28 @@
 
   function renderBogBarrioLayer(){
     ensureMap(); clearLayer();
-    const geo = STATE.bogBarrioGeo;
+    const rawGeo = STATE.bogBarrioGeo;
     const barMetrics = STATE.bogBarrioMetrics || {};
     const locMetrics = STATE.cityComMetrics.bogota || {};
+
+    // Filtro por padre activo (localidad o UPL específica). Para UPL,
+    // necesitamos el mapeo barrio→UPL que se construye lazy con PIP.
+    const parent = STATE.barrioParent;
+    let geo = rawGeo;
+    if (parent && parent.city === 'bogota'){
+      if (parent.kind === 'localidad'){
+        const target = String(parent.code).padStart(2,'0');
+        geo = { ...rawGeo, features: rawGeo.features.filter(f =>
+          String(f.properties.loc_codigo||'').padStart(2,'0') === target
+        )};
+      } else if (parent.kind === 'upl'){
+        const target = String(parent.code).toUpperCase();
+        const map = getBogBarrioToUplMap() || {};
+        geo = { ...rawGeo, features: rawGeo.features.filter(f =>
+          String(map[f.properties.codigo] || '').toUpperCase() === target
+        )};
+      }
+    }
 
     // Precompute centroides + lista de barrios CON métrica para kNN
     const featByKey = {};
@@ -4720,9 +4911,17 @@
       },
     }).addTo(STATE.map);
     STATE.map.fitBounds(STATE.mapLayer.getBounds(), { padding:[20,20] });
-    document.getElementById('map-head-title').textContent = 'Bogotá · 1.000 barrios catastrales (heredan de vecino o localidad)';
     document.getElementById('map-back-btn').classList.add('show');
-    document.getElementById('map-back-label').textContent = '← Volver a Cundinamarca';
+    if (parent && parent.kind === 'localidad'){
+      document.getElementById('map-head-title').textContent = `Bogotá · ${parent.name} · Barrios`;
+      document.getElementById('map-back-label').textContent = '← Volver a Bogotá';
+    } else if (parent && parent.kind === 'upl'){
+      document.getElementById('map-head-title').textContent = `Bogotá · UPL ${parent.name} · Barrios`;
+      document.getElementById('map-back-label').textContent = '← Volver a UPL';
+    } else {
+      document.getElementById('map-head-title').textContent = 'Bogotá · 1.000 barrios catastrales (heredan de vecino o localidad)';
+      document.getElementById('map-back-label').textContent = '← Volver a Cundinamarca';
+    }
   }
 
   // Alias manuales por (ciudad, comCod) cuando el nombre Divipole es
@@ -4739,6 +4938,9 @@
   /* ───────── Ciudades — drilldown a comuna/localidad ───────── */
   async function onCityClick(cityKey){
     if (!requireFeature('ciudades-comunas')) return;
+    // Entrar a una ciudad nueva limpia cualquier drill anterior a barrios
+    // de una comuna/localidad/UPL.
+    STATE.barrioParent = null;
     showLoading(true);
     try {
       const [data, geo] = await Promise.all([loadCitySignals(cityKey), loadCityGeo(cityKey)]);
@@ -4809,12 +5011,24 @@
         layer.on('mouseover', (e) => onHover(f, e));
         layer.on('mouseout', (e) => onHoverOut(f, e));
         layer.on('mousemove', (e) => moveHoverChip(e.originalEvent));
+        // Drill-in a barrios:
+        //  · Medellín: click en comuna → barrios de esa comuna
+        //  · Bogotá:   click en localidad → barrios de esa localidad
+        if (com){
+          layer.on('click', () => drillToBarriosOfCom(cityKey, com, displayName));
+        }
       },
     }).addTo(STATE.map);
     STATE.map.fitBounds(STATE.mapLayer.getBounds(), { padding:[20,20] });
     document.getElementById('map-head-title').textContent = `${cfg.label} · ${cfg.kind}`;
     document.getElementById('map-back-btn').classList.add('show');
-    document.getElementById('map-back-label').textContent = `← Volver a ${(STATE.depByElectoral[cfg.depCod]||{}).nombre || 'departamento'}`;
+    // Bogotá D.C. tiene un solo "municipio", saltar el nivel intermedio
+    // y volver directo a nacional desde las localidades.
+    if (cityKey === 'bogota'){
+      document.getElementById('map-back-label').textContent = '← Volver a nacional';
+    } else {
+      document.getElementById('map-back-label').textContent = `← Volver a ${(STATE.depByElectoral[cfg.depCod]||{}).nombre || 'departamento'}`;
+    }
   }
 
   // Resuelve el código de comuna del feature según el shape de cada ciudad.
@@ -5124,12 +5338,17 @@
     else if (STATE.selectedCity === 'medellin' && STATE.mdeView === 'barrios' && STATE.mdeBarrioMetrics){
       const data = STATE.mdeBarriosData || {};
       const refSig = Object.values(data)[0] || {};
+      const parent = STATE.barrioParent;
+      const filterCom = (parent && parent.city === 'medellin' && parent.kind === 'comuna')
+        ? String(parent.code).replace(/^0+/, '') : null;
       for (const [bk, m] of Object.entries(STATE.mdeBarrioMetrics)){
         if (m.contrib == null) continue;
+        if (filterCom && String(m.comuna||'').replace(/^0+/, '') !== filterCom) continue;
         const e = refSig[bk] || {};
         items.push({ name: e.nombre || bk, sub: 'Comuna ' + (m.comuna || '?'), contrib: m.contrib });
       }
-      unitLabel = 'barrios'; scope = 'Medellín';
+      unitLabel = 'barrios';
+      scope = parent && parent.kind === 'comuna' ? `Medellín · ${parent.name}` : 'Medellín';
     }
     else if (STATE.selectedCity === 'bogota' && STATE.bogView === 'upl' && STATE.bogUplMetrics){
       for (const [cod, m] of Object.entries(STATE.bogUplMetrics)){
@@ -5139,11 +5358,22 @@
       unitLabel = 'UPL'; scope = 'Bogotá';
     }
     else if (STATE.selectedCity === 'bogota' && STATE.bogView === 'barrios' && STATE.bogBarrioMetrics){
+      const parent = STATE.barrioParent;
+      const filterLoc = (parent && parent.kind === 'localidad')
+        ? String(parent.code).padStart(2,'0') : null;
+      const filterUplCod = (parent && parent.kind === 'upl')
+        ? String(parent.code).toUpperCase() : null;
+      const b2u = filterUplCod ? (getBogBarrioToUplMap() || {}) : null;
       for (const [cod, m] of Object.entries(STATE.bogBarrioMetrics)){
         if (m.contrib == null) continue;
+        if (filterLoc && String(m.loc_cod||'').padStart(2,'0') !== filterLoc) continue;
+        if (filterUplCod && String(b2u[cod] || '').toUpperCase() !== filterUplCod) continue;
         items.push({ name: m.nombre || cod, sub: m.loc_nombre || '', contrib: m.contrib });
       }
-      unitLabel = 'barrios'; scope = 'Bogotá';
+      unitLabel = 'barrios';
+      if (parent && parent.kind === 'localidad')      scope = `Bogotá · ${parent.name}`;
+      else if (parent && parent.kind === 'upl')       scope = `Bogotá · UPL ${parent.name}`;
+      else                                            scope = 'Bogotá';
     }
     else if (STATE.selectedCity && STATE.cityComMetrics[STATE.selectedCity]){
       const cfg = CITIES[STATE.selectedCity];
