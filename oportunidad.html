@@ -3347,12 +3347,15 @@
   function precomputeCityNacAfin(candId, cityData){
     const aff = AFINIDADES[candId];
     const out = {};
+    // Excluir agregados especiales del build (mismo set que computeCityComunaMetrics).
+    const SPECIAL_AGG = new Set(['OTROS','CORR','CIUDAD']);
 
     function pctFromAllComs(sigKey, patterns){
       const ds = cityData[sigKey];
       if (!ds || !patterns?.length) return null;
       let sumV = 0, sumDen = 0, found = false;
-      for (const com of Object.values(ds)){
+      for (const [key, com] of Object.entries(ds)){
+        if (SPECIAL_AGG.has(key)) continue;
         if (!Array.isArray(com.candidatos)) continue;
         let any = false;
         for (const c of com.candidatos){
@@ -3405,10 +3408,21 @@
       consultas:  wRaw.consultas / wSum,
     };
 
-    // Set de comunas: union de todas las señales
+    // Set de comunas: union de todas las señales. Excluimos claves que
+    // los build scripts usan como agregados especiales para que no
+    // entren al cómputo como si fueran comunas reales:
+    //   · OTROS  → puestos censo (zona 90) + cárceles (zona 98).
+    //              En Bogotá agrupa CORFERIAS + cárceles; en otras
+    //              ciudades, los puestos zona 90/98.
+    //   · CORR   → agregado de corregimientos en Medellín (se ven uno
+    //              a uno en el GeoJSON con CODIGO 50/60/70/80/90).
+    //   · CIUDAD → resumen city-wide del build script.
+    const SPECIAL_AGG = new Set(['OTROS','CORR','CIUDAD']);
     const comCods = new Set();
     for (const sig of Object.keys(cityData)){
-      Object.keys(cityData[sig]).forEach(k => comCods.add(k));
+      Object.keys(cityData[sig]).forEach(k => {
+        if (!SPECIAL_AGG.has(k)) comCods.add(k);
+      });
     }
 
     const nsnrFactor = getNsNrFactor();
