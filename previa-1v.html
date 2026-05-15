@@ -401,6 +401,27 @@
     .info-btn{width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:700;font-size:.7rem;color:rgba(255,255,255,.55);background:none;border:1.5px solid rgba(255,255,255,.3);cursor:pointer;transition:color .15s,border-color .15s;padding:0;line-height:1}
     .info-btn:hover{color:var(--blue);border-color:var(--blue)}
 
+    /* Toggles de sección principal (mapa / evolución / trasvase / diagnóstico) */
+    .main-tabs{padding:.85rem 2.5rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02);display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;position:sticky;top:0;z-index:50;backdrop-filter:blur(8px)}
+    body.day-mode .main-tabs{background:rgba(255,255,255,.85);border-bottom-color:rgba(0,0,0,.1)}
+    .main-tab{font-family:Avenir,sans-serif;font-weight:500;font-size:.92rem;letter-spacing:.05em;color:rgba(255,255,255,.7);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.18);padding:.6rem 1.1rem;cursor:pointer;transition:color .15s,border-color .15s,background .15s;display:inline-flex;align-items:center;gap:.45rem;min-height:44px}
+    .main-tab:hover{color:var(--white);border-color:rgba(0,71,255,.55);background:rgba(0,71,255,.1)}
+    .main-tab.active{color:#fff;background:var(--blue);border-color:var(--blue)}
+    body.day-mode .main-tab{color:rgba(0,0,0,.7);background:rgba(0,0,0,.03);border-color:rgba(0,0,0,.18)}
+    body.day-mode .main-tab:hover{color:#0d1120;border-color:rgba(0,71,255,.5)}
+    body.day-mode .main-tab.active{color:#fff;background:var(--blue);border-color:var(--blue)}
+    .section-view{display:none}
+    .section-view.active{display:block}
+    /* Cuando una sección colapsable vive bajo .section-view, su .open la inyectamos
+       siempre desde JS para que el body interno se muestre completo. */
+    @media (max-width:760px){
+      .main-tabs{padding:.6rem 1rem;gap:.4rem}
+      .main-tab{font-size:.8rem;padding:.5rem .75rem;min-height:40px}
+    }
+    /* Con las pestañas globales, los toggles internos de cada sección
+       (mostrar/ocultar) ya no aplican: la pestaña controla la visibilidad. */
+    .sankey-toggle-wrap, .ev-toggle-wrap, .diag-toggle-wrap{display:none}
+
     /* Toggles de nivel territorial */
     .toggle-bar{padding:.75rem 2.5rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.01);display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
     .toggle-label{font-family:Avenir,sans-serif;font-weight:500;font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-right:.5rem}
@@ -869,7 +890,44 @@
       .sankey-sub{display:block;margin-left:0;margin-top:.2rem}
       .sankey-controls{width:100%}
       .sankey-controls select{flex:1;min-width:0}
-      .sankey-tip{font-size:.72rem;min-width:170px;max-width:240px}
+      .sankey-tip{font-size:.78rem;min-width:170px;max-width:240px}
+    }
+
+    /* ─── Readability bumps (lectura cómoda para 50+) ───
+       Subimos pisos de tipografía sin cambiar la jerarquía visual:
+       textos descriptivos / sublabels van a ~12.5px, labels uppercase
+       con tracking se quedan en ~11px (siguen siendo legibles), y el
+       texto vectorial de SVG sube a 12px mínimo (donde 1px se nota mucho). */
+    .pond-fuente,
+    .evolucion-sub,
+    .diag-sub,
+    .sankey-sub,
+    .ext-card-vot,
+    .cand-party,
+    .map-legend-ends{font-size:.78rem}
+    .cand-meta,
+    .det-meta dt,
+    .det-propuesta-lbl,
+    .toggle-btn .lock,
+    .ct-stat-lbl,
+    .mae-mode,
+    .diag-pr-row.h{font-size:.74rem}
+    .ev-tip-meta,
+    .sankey-tip-meta,
+    .ext-trigger-meta{font-size:.78rem}
+    .btn-sm{font-size:.72rem;padding:.36rem .6rem}
+    .ct-flag{font-size:.7rem}
+    .cand-photo .ph-plus{font-size:.72rem}
+    .leaflet-control-attribution{font-size:.65rem!important}
+    /* SVG axes / labels (px absolutos) */
+    .ev-axis text,
+    .ev-pred-label{font-size:12px}
+    .ev-vert-label,
+    .ev-end-proj{font-size:12px}
+    .sankey-node-label{font-size:12.5px}
+    .sankey-node-pct{font-size:11.5px}
+    @media (max-width:760px){
+      .ev-end-label{font-size:11.5px}
     }
   </style>
 </head>
@@ -942,6 +1000,16 @@
     <div class="pond-legend" id="pond-legend"></div>
   </section>
 
+  <!-- Pestañas principales: separa las 4 vistas que comparten el ponderador como insumo. -->
+  <nav class="main-tabs" id="main-section-tabs" role="tablist" aria-label="Vistas del simulador">
+    <button class="main-tab active" data-section="mapa"        role="tab" aria-selected="true"  onclick="switchSection('mapa')">Efectos de encuestas en mapa</button>
+    <button class="main-tab"        data-section="evolucion"   role="tab" aria-selected="false" onclick="switchSection('evolucion')">Evolución de la intención de voto</button>
+    <button class="main-tab"        data-section="trasvase"    role="tab" aria-selected="false" onclick="switchSection('trasvase')">Trasvase Senado 2026 → Presidencial 1V</button>
+    <button class="main-tab"        data-section="diagnostico" role="tab" aria-selected="false" onclick="switchSection('diagnostico')">Diagnóstico de encuestas</button>
+  </nav>
+
+  <!-- Vista: TRASVASE -->
+  <div class="section-view" data-view="trasvase">
   <!-- Sankey: trasvase Senado 2026 → Presidencial 1V (IPF/RAS) -->
   <section class="sankey" id="sankey-section">
     <div class="sankey-head">
@@ -972,7 +1040,10 @@
     </div>
   </section>
   <div class="sankey-tip" id="sankey-tip" role="tooltip"></div>
+  </div><!-- /section-view trasvase -->
 
+  <!-- Vista: EVOLUCIÓN -->
+  <div class="section-view" data-view="evolucion">
   <!-- Evolución temporal de encuestas (primera vuelta 2026) -->
   <section class="evolucion" id="evolucion-section">
     <div class="evolucion-head">
@@ -992,7 +1063,10 @@
     </div>
   </section>
   <div class="ev-tip" id="evolucion-tip" role="tooltip"></div>
+  </div><!-- /section-view evolucion -->
 
+  <!-- Vista: DIAGNÓSTICO -->
+  <div class="section-view" data-view="diagnostico">
   <!-- Diagnóstico: house effect + crosstabs de microdatos -->
   <section class="diag" id="diag-section">
     <div class="diag-head">
@@ -1027,7 +1101,10 @@
       </button>
     </div>
   </section>
+  </div><!-- /section-view diagnostico -->
 
+  <!-- Vista: MAPA (default) -->
+  <div class="section-view active" data-view="mapa">
   <!-- Toggles nivel territorial -->
   <section class="toggle-bar" id="view-toggles">
     <span class="toggle-label">Nivel territorial</span>
@@ -1105,6 +1182,7 @@
       </div>
     </aside>
   </div>
+  </div><!-- /section-view mapa -->
 
   <footer class="foot">
     © Ricardo Ruiz · Elecciones 2026 · <a href="index.html">ricardoruiz.co</a>
@@ -1356,7 +1434,7 @@
              'BOLIVAR':1.3,'ATLANTICO':1.2,'MAGDALENA':1.3,'SUCRE':1.3,'CORDOBA':1.1,'LA GUAJIRA':1.3,
              'BOGOTA D.C.':1.2,'VALLE DEL CAUCA':1.2,'HUILA':1.0,'TOLIMA':1.0,
              'ANTIOQUIA':.7,'SANTANDER':.65,'NORTE DE SANTANDER':.7,'BOYACA':.8,'CASANARE':.7 } },
-    { id:'ae', nombre:'Abelardo de la Espriella', partido:'Mov. Salvación Nacional',  color:'#000062', pct:23.94,
+    { id:'ae', nombre:'Abelardo de la Espriella', partido:'Mov. Salvación Nacional',  color:'#a16207', pct:23.94,
       origen:'Montería (Córdoba)', edad:53, propuesta:'Mano dura contra el crimen, defensa del estado de derecho, economía de libre mercado.',
       foto:'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/Fotos-presidenciales/abelardo.jpg',
       bias:{ 'CORDOBA':2.0,'SUCRE':1.6,'BOLIVAR':1.5,'MAGDALENA':1.5,'ATLANTICO':1.4,'CESAR':1.5,'LA GUAJIRA':1.3,
@@ -1888,7 +1966,7 @@
   }
 
   // Para texto sobre fondo oscuro (tooltips): los colores demasiado oscuros
-  // (Abelardo #000062, por ejemplo) se aclaran preservando el tinte de modo
+  // se aclaran preservando el tinte de modo
   // que el nombre del candidato siga siendo legible sobre el tooltip negro.
   // Mantiene intacto el color del mapa (que va con fillColor saturado).
   function displayColorOnDark(hex){
@@ -1993,8 +2071,34 @@
     neiva:          { depCod:'19', munCod:'001', url:`${S3}/mapas-2026/Ciudades-COM-LOC/NEIVAX.json`,          rotate:false, nameField:'comuna',     codeField:'comuna',    kind:'Comunas' },
     popayan:        { depCod:'11', munCod:'001', url:`${S3}/mapas-2026/Ciudades-COM-LOC/POPAYANX.json`,        rotate:false, nameField:'COMUNAS',    codeField:'Comuna',    kind:'Comunas' },
     sincelejo:      { depCod:'28', munCod:'001', url:`${S3}/mapas-2026/Ciudades-COM-LOC/SINCELEJOX.json`,      rotate:false, nameField:'Nombre',     codeField:'Layer',     kind:'Comunas' },
+    // Lo que el geojson de Sincelejo marca como "Comuna 10" es realmente el
+    // corregimiento Chochó (no existe una comuna 10 urbana). El build script
+    // agrupa todos los puestos rurales bajo 'OTROS'; el patch en
+    // loadHistoricosCity lo re-keya a '10' y este alias lo etiqueta en el UI.
     villavicencio:  { depCod:'52', munCod:'001', url:`${S3}/mapas-2026/Ciudades-COM-LOC/VILLAVICENCIOX.json`,  rotate:false, nameField:'Comuna',     codeField:'Comuna',    kind:'Comunas' },
   };
+  // Aliases manuales por (ciudad, código de comuna). Sobrescribe el nombre
+  // que viene del GeoJSON cuando el polígono no corresponde a su etiqueta
+  // genérica (típicamente "Comuna 10" del shape catastral, que en realidad
+  // es un corregimiento rural).
+  const CITY_COMUNA_ALIAS = {
+    sincelejo: { '10': 'Corregimiento Chochó' },
+  };
+  // Renombre de claves en el por_comuna crudo: cuando el build script agrega
+  // los puestos rurales bajo 'OTROS' / 'CORR' / 'CIUDAD' pero el geojson trae
+  // un polígono con código numérico (ej. '10' en Sincelejo), promovemos esa
+  // clave para que el match contra el shape funcione sin perder el voto rural.
+  function _patchCityRawJson(cityKey, j){
+    if (!j || typeof j !== 'object' || !j.por_comuna) return;
+    if (cityKey === 'sincelejo' && !j.por_comuna['10']){
+      const src = j.por_comuna['OTROS'] || j.por_comuna['CORR'];
+      if (src){
+        j.por_comuna['10'] = { ...src, nombre: 'Corregimiento Chochó' };
+        delete j.por_comuna['OTROS'];
+        delete j.por_comuna['CORR'];
+      }
+    }
+  }
   function detectCity(depCod, munCod){
     const key = Object.keys(CITY_MAPS).find(k =>
       CITY_MAPS[k].depCod === String(depCod).padStart(2,'0') &&
@@ -2687,6 +2791,10 @@
     const comCod = isMed
       ? _medComunaCode(p[cfg.codeField])
       : (hasCitySupport ? _cityComunaCode(cfg.key, p[cfg.codeField]) : null);
+    // Alias manual: si el polígono no corresponde a su etiqueta genérica
+    // (ej. "Comuna 10" de Sincelejo = Corregimiento Chochó), sobrescribe.
+    const aliasName = comCod && CITY_COMUNA_ALIAS[cfg.key]?.[comCod];
+    if (aliasName) name = aliasName;
     const levelLabel = cfg.kind === 'Localidades' ? 'Localidad' : 'Comuna';
     // Helpers locales para abstraer Medellín vs ciudad nueva
     const checkBias = () => isMed
@@ -3239,9 +3347,9 @@
       const short = d.nm.length > 14 ? d.nm.slice(0, 13) + '…' : d.nm;
       return `
         <text x="${lx}" y="${ly}" text-anchor="${anchor}" fill="currentColor"
-              style="font-family:Avenir,sans-serif;font-size:10px;font-weight:500;dominant-baseline:middle">${short}</text>
-        <text x="${lx}" y="${ly + 12}" text-anchor="${anchor}" fill="currentColor"
-              style="font-family:Avenir,sans-serif;font-size:10px;opacity:.6;dominant-baseline:middle">${(d.share*100).toFixed(1)}%</text>`;
+              style="font-family:Avenir,sans-serif;font-size:12px;font-weight:500;dominant-baseline:middle">${short}</text>
+        <text x="${lx}" y="${ly + 13}" text-anchor="${anchor}" fill="currentColor"
+              style="font-family:Avenir,sans-serif;font-size:12px;opacity:.6;dominant-baseline:middle">${(d.share*100).toFixed(1)}%</text>`;
     }).join('');
 
     return `
@@ -5613,6 +5721,7 @@
       CITY_SIGNALS.forEach((s, i) => {
         const j = results[i];
         if (!j) { console.warn(`[Previa ${cityKey}] no carga`, s.key); return; }
+        _patchCityRawJson(cityKey, j);
         try { HISTORICOS_CITY[cityKey][s.key] = _cityExtractEntries(j, s.type); }
         catch(e){ console.warn(`[Previa ${cityKey}] parse`, s.key, e.message); }
       });
@@ -6165,7 +6274,7 @@
 
     const candCfg = {
       ic: { color:'#7e6cd6', name:'Cepeda',   pondKey:'Cepeda' },
-      ae: { color:'#1c1c8c', name:'Abelardo', pondKey:'De la Espriella' },
+      ae: { color:'#ca8a04', name:'Abelardo', pondKey:'De la Espriella' },
       pv: { color:'#1866DF', name:'Paloma',   pondKey:'Valencia' },
       sf: { color:'#EEAA22', name:'Fajardo',  pondKey:'Fajardo' },
       cl: { color:'#d9db24', name:'Claudia',  pondKey:'Claudia López' },
@@ -6226,7 +6335,7 @@
       { t:_evParseDate('2026-05-01'), l:'may' },
     ];
     months.forEach(m => { const x = xOf(m.t); ax += `<text x="${x}" y="${MT+PH+18}" text-anchor="middle">${m.l}</text>`; });
-    ax += `<text x="${ML}" y="${MT+PH+38}" text-anchor="start" style="font-size:10px;opacity:.7">2026</text>`;
+    ax += `<text x="${ML}" y="${MT+PH+38}" text-anchor="start" style="font-size:12px;opacity:.7">2026</text>`;
     ax += '</g>';
     parts.push(ax);
 
@@ -6357,7 +6466,7 @@
     'ALIANZA POR COLOMBIA': '#15803D',
     'AHORA COLOMBIA': '#10b981',
     'FRENTE AMPLIO UNITARIO': '#F01E14',
-    'MOVIMIENTO SALVACIÓN NACIONAL': '#000062',
+    'MOVIMIENTO SALVACIÓN NACIONAL': '#a16207',
     'COLOMBIA SEGURA Y PRÓSPERA': '#7c2d12',
     'PARTIDO POLÍTICO OXÍGENO': '#0ea5e9',
     'LA LISTA DE OVIEDO - CON TODA POR COLOMBIA': '#fbbf24',
@@ -7303,6 +7412,46 @@
     return r;
   };
 
+  // ─── PESTAÑAS PRINCIPALES ──────────────────────────────────────
+  // Cada vista comparte el ponderador como insumo, pero solo una se ve.
+  // Forzamos que las secciones colapsables (sankey, diag, evolucion) queden
+  // siempre desplegadas internamente: la pestaña controla la visibilidad.
+  function switchSection(name){
+    const VALID = ['mapa','evolucion','trasvase','diagnostico'];
+    if (!VALID.includes(name)) name = 'mapa';
+    document.querySelectorAll('.section-view').forEach(v => {
+      v.classList.toggle('active', v.dataset.view === name);
+    });
+    document.querySelectorAll('#main-section-tabs .main-tab').forEach(b => {
+      const isActive = b.dataset.section === name;
+      b.classList.toggle('active', isActive);
+      b.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+    // Mantener cada sección siempre "abierta" internamente (los toggles
+    // viejos ya no se muestran, pero su clase sigue gobernando display).
+    document.getElementById('sankey-section')?.classList.add('open');
+    document.getElementById('diag-section')?.classList.add('open');
+    document.getElementById('evolucion-section')?.classList.remove('collapsed');
+
+    if (name === 'trasvase'){
+      try { _sankeyInit(); _sankeyRefresh(); } catch(e){}
+    }
+    if (name === 'diagnostico'){
+      try { renderDiag(); } catch(e){}
+    }
+    if (name === 'mapa'){
+      // Si el mapa se inicializó mientras estaba oculto, Leaflet se queda
+      // con tamaño 0×0. Forzamos recálculo cada vez que la pestaña vuelve.
+      setTimeout(() => { try { if (typeof map !== 'undefined' && map) map.invalidateSize(); } catch(e){} }, 60);
+    }
+    // Esconder tooltips flotantes de secciones no activas para que no
+    // queden colgando sobre la pestaña actual.
+    if (name !== 'trasvase')   document.getElementById('sankey-tip')?.classList.remove('show');
+    if (name !== 'evolucion'){ try { _evHideTip(); } catch(e){} }
+    try { localStorage.setItem('previa-section', name); } catch(e){}
+  }
+  window.switchSection = switchSection;
+
   // ─── BOOT ─────────────────────────────────────────────────────
   (async () => {
     // Paralelizamos todo lo que no tiene dependencia entre sí:
@@ -7336,6 +7485,10 @@
     renderPanel();
     repaintMap();
     initMap();
+    // Inicializa la pestaña activa (recupera la última usada).
+    let _initialTab = 'mapa';
+    try { _initialTab = localStorage.getItem('previa-section') || 'mapa'; } catch(e){}
+    switchSection(_initialTab);
   })();
 </script>
 <div id="hover-chip" class="hover-chip" aria-hidden="true"></div>
