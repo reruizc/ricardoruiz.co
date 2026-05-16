@@ -1109,9 +1109,9 @@
   <section class="toggle-bar" id="view-toggles">
     <span class="toggle-label">Nivel territorial</span>
     <button class="toggle-btn active" data-level="dep" onclick="switchView('dep')">Departamental</button>
-    <button class="toggle-btn" data-level="mun" onclick="switchView('mun')">Municipal <span class="lock">🔒</span></button>
-    <button class="toggle-btn" data-level="bar" id="barrio-toggle-btn" onclick="switchView('bar')" style="display:none">Barrios <span class="lock">🔒</span></button>
-    <button class="toggle-btn" data-level="pue" onclick="switchView('pue')">Puestos <span class="lock">🔒</span></button>
+    <button class="toggle-btn" data-level="mun" onclick="switchView('mun')">Municipal <span class="lock" data-gate="logged">🔒</span></button>
+    <button class="toggle-btn" data-level="bar" id="barrio-toggle-btn" onclick="switchView('bar')" style="display:none">Barrios <span class="lock" data-gate="logged">🔒</span></button>
+    <button class="toggle-btn" data-level="pue" onclick="switchView('pue')">Puestos <span class="lock" data-gate="premium">🔒</span></button>
     <button class="excel-btn" id="excel-btn" onclick="downloadExcelCurrentView()" title="Descargar la tabla actual en Excel">⬇ Excel</button>
     <span class="toggle-hint" id="toggle-hint"></span>
   </section>
@@ -3949,6 +3949,10 @@
       title: 'Descargar Excel · Puestos de votación',
       text:  'Se exportará la proyección por <b>puesto de votación</b> (~13.500 filas): nombre, mun, depto, código electoral, votantes estimados, votos y % por candidato, ganador y margen. Bias por puesto si la calibración con históricos por-puesto.json terminó; en caso contrario hereda del mun. La generación toma 1-2 segundos.',
     },
+    bar: {
+      title: 'Descargar Excel · Barrios',
+      text:  'Se exportará la proyección por <b>barrio</b> de la ciudad activa (Bogotá ~1.000 · Medellín ~270): nombre, comuna/localidad padre, % por candidato, ganador y margen. Bias por barrio cuando hay señal histórica; en caso contrario hereda de la comuna/localidad.',
+    },
   };
 
   function downloadExcelCurrentView(){
@@ -3965,6 +3969,10 @@
     }
     if (currentLevel === 'mun' && (!_nacionalMunFeatures || !_nacionalMunFeatures.length)){
       alert('Los municipios aún no terminaron de cargar. Espera un momento y vuelve a intentar.');
+      return;
+    }
+    if (currentLevel === 'bar' && (!currentCityKey || !_barrioGeoCache[currentCityKey])){
+      alert('Los barrios aún no terminaron de cargar. Espera un momento y vuelve a intentar.');
       return;
     }
     // Acceso restringido a planes Pro / Premium / Full (mismo modelo de
@@ -4004,6 +4012,7 @@
     closeDlModal();
     if (currentLevel === 'pue')      _doDownloadExcelPue();
     else if (currentLevel === 'mun') await _doDownloadExcelMun();
+    else if (currentLevel === 'bar') _doDownloadExcelBar();
     else                              _doDownloadExcelDep();
   }
   function _doDownloadExcelDep(){
@@ -4290,6 +4299,48 @@
     _emitExcel(title, headers, rows, 'puestos');
   }
 
+  // ─── Excel · BAR ─────────────────────────────────────────────
+  // Una fila por barrio de la ciudad activa (Bogotá ~1.000 catastrales,
+  // Medellín ~270 barrios). Sin censo a nivel barrio en el modelo actual,
+  // así que se omiten las columnas de votantes/votos absolutos: sólo % y
+  // ganador. Si un barrio no tiene señal propia hereda del bias de su
+  // comuna/localidad padre, igual que en el mapa.
+  function _doDownloadExcelBar(){
+    const cityKey = currentCityKey;
+    if (!cityKey || !_barrioGeoCache[cityKey]) return;
+    const cfg = BARRIO_S3[cityKey];
+    const feats = (_barrioGeoCache[cityKey].features || []);
+    if (!feats.length) return;
+    const fecha = new Date().toISOString().slice(0,10);
+    const cityName = cityKey === 'bogota' ? 'Bogotá D.C.' : 'Medellín';
+    const parentLbl = cityKey === 'bogota' ? 'Localidad' : 'Comuna';
+    const title = `Previa Primera Vuelta 2026 · Proyección por Barrio · ${cityName} · ${fecha}`;
+    const cands = _candsSorted();
+    const headers = ['#', 'Barrio', parentLbl, 'Cód. barrio', ...cands.flatMap(c => [`${c.nombre} · %`]), 'Ganador', 'Margen (pp)'];
+
+    const rows = feats.map((f, i) => {
+      const p = f.properties || {};
+      const name = _barrioName(cityKey, p);
+      const bk   = cfg.keyFromProps(p);
+      const com  = _barrioParentCom(cityKey, p);
+      const projections = cands.map(c => ({ c, p: projectedBarrio(c, cityKey, bk, com) }));
+      const localTotal  = projections.reduce((s,x) => s + x.p, 0);
+      const localShares = projections.map(x => localTotal > 0 ? x.p / localTotal : 0);
+      const ranked = projections.map((x, idx) => ({ ...x, share: localShares[idx] }))
+                                .sort((a,b) => b.share - a.share);
+      const ganador = ranked[0]?.c.nombre || '';
+      const margenPp = ranked.length > 1
+        ? ((ranked[0].share - ranked[1].share) * 100).toFixed(1)
+        : '';
+      const cells = [i + 1, name, com || '—', bk || '—'];
+      cands.forEach((c, idx) => cells.push((localShares[idx] * 100).toFixed(2) + '%'));
+      cells.push(ganador, margenPp);
+      return cells;
+    });
+
+    _emitExcel(title, headers, rows, `barrios-${cityKey}`);
+  }
+
   // ─── EXPORT JSON PROYECCIÓN POR PUESTO (uso interno) ──────────
   // Genera el archivo proyeccion-por-puesto.json que el test electoral
   // (test-presidencial-2026.html) consume desde S3 para hacer el cruce
@@ -4434,6 +4485,8 @@
     }
     // Botón Excel: candado visible cuando no es Premium
     refreshExcelBtnLockState();
+    // Candados de los toggles (mun/bar/pue) según plan del usuario
+    refreshToggleLockStates();
   }
 
   function refreshExcelBtnLockState(){
@@ -4449,6 +4502,18 @@
       btn.innerHTML = '⬇ Excel 🔒';
       btn.title = 'Descarga Excel sólo en plan Premium';
     }
+  }
+
+  // Oculta los 🔒 de los toggles cuando el usuario cumple el requisito:
+  // data-gate="logged"  → oculto si isLogged
+  // data-gate="premium" → oculto si isPremium
+  function refreshToggleLockStates(){
+    const { isLogged, isPremium } = authInfo();
+    document.querySelectorAll('#view-toggles .toggle-btn .lock').forEach(el => {
+      const gate = el.getAttribute('data-gate');
+      const ok = gate === 'premium' ? isPremium : isLogged;
+      el.style.display = ok ? 'none' : '';
+    });
   }
 
   async function eLogOut(){
