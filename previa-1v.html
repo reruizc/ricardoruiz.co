@@ -2487,7 +2487,13 @@
   // Entra al drill-down de un depto: quita deptLayer, añade munLayer de ese depto
   async function drillToDepto(depCod, depNom){
     if (currentLevel !== 'dep') return;  // sólo desde vista departamental
-    if (currentDepCod === depCod) return;
+    if (currentDepCod === depCod && !uplLayer) return;
+    // Bogotá es 1 sólo mun (001 = Bogotá D.C.) — saltamos la capa de muns
+    // y entramos directo a la vista UPL (33 unidades de planeamiento).
+    if (String(depCod).padStart(2,'0') === '16'){
+      await loadBogUplLayer(depNom);
+      return;
+    }
     showMapLoading(`Cargando ${depNom}…`);
     try {
       const geo = await getMunGeo(depCod);
@@ -2844,6 +2850,22 @@
     if (currentLevel === 'pue'){
       try { map.flyTo([4.5, -73.5], 6, { duration: .6 }); } catch(e){}
       _updatePueBackBtn();
+      return;
+    }
+    // Bogotá: barrios filtrados por UPL → vuelve a la capa UPL.
+    if (currentUplCod && currentCityKey === 'bogota'){
+      currentUplCod = null;
+      currentUplName = null;
+      if (barrioLayer){ map.removeLayer(barrioLayer); barrioLayer = null; }
+      await loadBogUplLayer('BOGOTA D.C.');
+      return;
+    }
+    // Bogotá: capa UPL → vuelve al mapa nacional.
+    if (uplLayer && currentCityKey === 'bogota'){
+      if (uplLayer){ map.removeLayer(uplLayer); uplLayer = null; }
+      currentCityKey = null;
+      _updateBarrioToggleVisibility?.();
+      exitToNacional();
       return;
     }
     if (currentCityKey){
@@ -4620,10 +4642,16 @@
       hint.classList.remove('lg');
       document.body.classList.remove('pue-mode');
     }
-    // Salir del modo barrios: limpia la capa.
-    if (level !== 'bar' && barrioLayer){
+    // Salir del modo barrios: limpia la capa. En el caso 'bar' también
+    // limpiamos para reconstruir sin filtro de UPL (la vista "todos los
+    // barrios" del toggle).
+    if (barrioLayer){
       map.removeLayer(barrioLayer); barrioLayer = null;
     }
+    // Salir de la capa UPL (sub-estado de Bogotá): limpia y reseta filtros.
+    if (uplLayer){ map.removeLayer(uplLayer); uplLayer = null; }
+    currentUplCod  = null;
+    currentUplName = null;
 
     if (level === 'dep'){
       // Vuelve a vista nacional por deptos. Remueve cualquier capa mun/city.
@@ -6178,6 +6206,7 @@
       if (barrioLayer){ map.removeLayer(barrioLayer); barrioLayer = null; }
       if (cityLayer){  map.removeLayer(cityLayer);   cityLayer  = null; }
       if (munLayer){   map.removeLayer(munLayer);    munLayer   = null; }
+      if (uplLayer){   map.removeLayer(uplLayer);    uplLayer   = null; }
       const cfg = BARRIO_S3[cityKey];
       barrioLayer = L.geoJSON(geo, {
         style: (f) => _styleByBarrio(cityKey, cfg.keyFromProps(f.properties), _barrioParentCom(cityKey, f.properties)),
@@ -6248,6 +6277,425 @@
         _clearHoverChip();
       }
     });
+  }
+
+  // ─── BOGOTÁ · UPL (Unidades de Planeamiento Local) ─────────────
+  // 33 UPL como capa intermedia entre las 20 localidades y los 1001
+  // barrios catastrales. Cuando el usuario hace click en Bogotá desde el
+  // mapa de deptos, en vez de caer en muns (Bogotá es 1 solo mun),
+  // saltamos directo a UPLs. Click en una UPL → barrios de esa UPL via
+  // PIP (centroide del barrio sobre el polígono UPL).
+  const UPL_S3 = {
+    geoUrl: `${S3}/mapas-2026/Ciudades-COM-LOC/BOG-UPL.json`,
+    base:   'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_ciudades/bogota',
+    suffix: '-upl.json',
+    rotate: true,
+  };
+  // Mismas 10 señales que BARRIO_SIGNALS (afinidad histórica del candidato
+  // funciona a cualquier granularidad).
+  const UPL_SIGNALS = BARRIO_SIGNALS.slice();
+
+  let HISTORICOS_UPL    = {};            // { sigKey: { ciudad:{kn:pct}, upls:{uplCod:{kn:pct}} } }
+  let _biasCacheUpl     = {};            // { candId: { uplCod: bias } }
+  let _uplGeoCache      = null;
+  let _uplLoadingPromise = null;
+  let _uplToBarriosCache = null;         // { uplCod: Set<barrioCod> } — lazy via PIP
+  let uplLayer          = null;
+  let currentUplCod     = null;          // UPL activa cuando filtramos barrios
+  let currentUplName    = null;
+
+  async function loadUplGeo(){
+    if (_uplGeoCache) return _uplGeoCache;
+    const r = await fetch(UPL_S3.geoUrl);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    let geo = await r.json();
+    if (UPL_S3.rotate) geo = rotateGeoJSON90Left(geo);
+    _uplGeoCache = geo;
+    return geo;
+  }
+
+  // Extrae bias por UPL/candidato a partir de las 10 señales por_upl.
+  // Mismo esquema que precomputeBiasBarrio: bias = pct_local / pct_ciudad,
+  // ponderado por las EQUIVALENCIAS_CITY_COMUNA (mismas equivalencias que
+  // se usan a nivel comuna/localidad y a nivel barrio).
+  function _uplExtractEntries(j, sigType){
+    const out = { ciudad:{}, upls:{} };
+    if (!j || typeof j !== 'object') return out;
+    const root = j.por_upl || {};
+    const ciudadCounts = {};
+    let ciudadTotal = 0;
+    for (const [uk, u] of Object.entries(root)){
+      if (!u || typeof u !== 'object') continue;
+      const totalLocal = u.votos_validos || 0;
+      const list = u.candidatos || u.cands || u.partidos || [];
+      const merged = {};
+      for (const r of list){
+        if (!r) continue;
+        const key = sigType === 'partidos' ? (r.partido || r.nombre) : r.nombre;
+        if (!key) continue;
+        merged[key] = (merged[key] || 0) + (r.votos || 0);
+      }
+      const byKey = {};
+      for (const [k, v] of Object.entries(merged)){
+        const kn = norm(k);
+        byKey[kn] = totalLocal > 0 ? v / totalLocal : 0;
+        ciudadCounts[kn] = (ciudadCounts[kn] || 0) + v;
+      }
+      ciudadTotal += totalLocal;
+      out.upls[uk] = byKey;
+    }
+    for (const [k, v] of Object.entries(ciudadCounts)){
+      out.ciudad[k] = ciudadTotal > 0 ? v / ciudadTotal : 0;
+    }
+    return out;
+  }
+
+  async function loadHistoricosUpl(){
+    if (_uplLoadingPromise) return _uplLoadingPromise;
+    _uplLoadingPromise = (async () => {
+      HISTORICOS_UPL = {};
+      const sigType = {};
+      CITY_SIGNALS.forEach(s => { sigType[s.key] = s.type; });
+      const fetcher = url => fetch(url, { cache:'force-cache' })
+        .then(r => r.ok ? r.json() : null)
+        .catch(() => null);
+      const results = await Promise.all(UPL_SIGNALS.map(sk =>
+        fetcher(`${UPL_S3.base}/${sk}${UPL_S3.suffix}`)));
+      UPL_SIGNALS.forEach((sk, i) => {
+        const j = results[i];
+        if (!j) { console.warn('[Previa upl] no carga', sk); return; }
+        try { HISTORICOS_UPL[sk] = _uplExtractEntries(j, sigType[sk] || 'cands'); }
+        catch(e){ console.warn('[Previa upl] parse', sk, e.message); }
+      });
+      precomputeBiasUpl();
+      const sigOk = Object.keys(HISTORICOS_UPL).length;
+      const cells = Object.values(_biasCacheUpl).reduce((s,m) => s + Object.keys(m).length, 0);
+      console.log(`[Previa upl]: ${sigOk}/${UPL_SIGNALS.length} señales → ${cells} celdas bias`);
+    })();
+    return _uplLoadingPromise;
+  }
+
+  function precomputeBiasUpl(){
+    _biasCacheUpl = {};
+    const data = HISTORICOS_UPL || {};
+    const uplSet = new Set();
+    for (const sig of Object.keys(data)){
+      Object.keys(data[sig].upls || {}).forEach(u => uplSet.add(u));
+    }
+    const upls = Array.from(uplSet);
+    for (const cand of CANDIDATOS){
+      const equiv = EQUIVALENCIAS_CITY_COMUNA[cand.id];
+      if (!equiv || !Object.keys(equiv).length) continue;
+      _biasCacheUpl[cand.id] = {};
+      for (const u of upls){
+        let num = 0, den = 0;
+        for (const [sig, spec] of Object.entries(equiv)){
+          const ds = data[sig];
+          if (!ds) continue;
+          const wantedKeys = (spec.cands || spec.partidos || []).map(k => norm(k));
+          if (!wantedKeys.length) continue;
+          const matchKey = (storeMap, wanted) => {
+            const keys = Object.keys(storeMap);
+            const exact = keys.filter(k => wanted.includes(k));
+            if (exact.length) return exact;
+            return keys.filter(k => wanted.some(w => k.startsWith(w)));
+          };
+          const localKeys  = matchKey(ds.upls[u] || {}, wantedKeys);
+          const ciudadKeys = matchKey(ds.ciudad   || {}, wantedKeys);
+          const pctLocal  = localKeys.reduce((s,k)  => s + (ds.upls[u]?.[k] || 0), 0);
+          const pctCiudad = ciudadKeys.reduce((s,k) => s + (ds.ciudad[k] || 0), 0);
+          if (pctCiudad <= 0) continue;
+          num += spec.peso * (pctLocal / pctCiudad);
+          den += spec.peso;
+        }
+        if (den > 0){
+          const raw = num / den;
+          _biasCacheUpl[cand.id][u] = Math.max(0.15, Math.min(3.50, raw));
+        }
+      }
+    }
+  }
+
+  function biasForUpl(cand, uplCod){
+    const cached = _biasCacheUpl?.[cand.id]?.[uplCod];
+    return (cached != null && cached > 0) ? cached : null;
+  }
+
+  // Localidad dominante (mayor pct) en la UPL, para fallback cuando la UPL
+  // no tiene señal propia.
+  function _uplFallbackLoc(props){
+    const locs = props?.Localidades || [];
+    if (!Array.isArray(locs) || !locs.length) return null;
+    let best = null, bestPct = -1;
+    for (const l of locs){
+      const pct = l?.pct ?? 0;
+      if (pct > bestPct){ bestPct = pct; best = l; }
+    }
+    return best?.LocCodigo ? String(best.LocCodigo).padStart(2,'0') : null;
+  }
+
+  // p(c, UPL) = pct_nacional(c) × bias_mun(c, '16-001') × bias_intra
+  // bias_intra = bias UPL propio si existe; si no, bias de la localidad
+  // dominante (mismo cache que la vista de Localidades).
+  function projectedUpl(cand, uplCod, fallbackLocCod){
+    const meta = CITY_META.bogota;
+    if (!meta) return cand.pct;
+    const munKey = `${meta.depCod}-${meta.mun}`;
+    const baseFactor = cand.pct * biasForMun(cand, munKey, meta.depName);
+    const bu = biasForUpl(cand, uplCod);
+    if (bu != null) return baseFactor * bu;
+    if (fallbackLocCod) return baseFactor * biasForComunaCity(cand, 'bogota', fallbackLocCod);
+    return baseFactor;
+  }
+
+  function computeUplRanking(uplCod, fallbackLocCod){
+    const ranked = CANDIDATOS
+      .filter(c => !NO_CANDIDATO_IDS.has(c.id))
+      .map(c => ({ c, v: projectedUpl(c, uplCod, fallbackLocCod) }))
+      .filter(x => x.v > 0)
+      .sort((a,b) => b.v - a.v);
+    if (!ranked.length) return null;
+    const winner = ranked[0];
+    const second = ranked[1] || { c:null, v:0 };
+    return {
+      winner: winner.c, winnerV: winner.v,
+      second: second.c, secondV: second.v,
+      margin:  winner.v - second.v,
+      ranked,
+    };
+  }
+
+  function hasUplBiasFor(uplCod){
+    if (!_biasCacheUpl) return false;
+    return Object.values(_biasCacheUpl).some(m => m[uplCod] != null);
+  }
+
+  function _styleByUpl(uplCod, fallbackLocCod){
+    if (selectedId){
+      const cand = CANDIDATOS.find(c => c.id === selectedId);
+      if (!cand) return _emptyBarrioStyle();
+      const v = projectedUpl(cand, uplCod, fallbackLocCod);
+      const total = CANDIDATOS.reduce((s,c) => s + projectedUpl(c, uplCod, fallbackLocCod), 0);
+      const share = total > 0 ? v / total : 0;
+      return { color: cand.color, fillColor: cand.color, weight:.7, fillOpacity: Math.max(.18, Math.min(.95, share*1.4)) };
+    }
+    const r = computeUplRanking(uplCod, fallbackLocCod);
+    if (!r || !r.winner) return _emptyBarrioStyle();
+    return { color: r.winner.color, fillColor: r.winner.color, weight:.7, fillOpacity:.85 };
+  }
+
+  // ─── Point-in-polygon — para mapear barrios → UPL via centroide ─
+  function _ringCentroid(ring){
+    let sx = 0, sy = 0, n = 0;
+    for (const pt of ring){
+      sx += pt[0]; sy += pt[1]; n++;
+    }
+    return n ? [sx/n, sy/n] : null;
+  }
+  function _featureCentroid(feature){
+    const g = feature.geometry;
+    if (!g) return null;
+    if (g.type === 'Polygon')      return _ringCentroid(g.coordinates[0] || []);
+    if (g.type === 'MultiPolygon'){
+      let best = null, bestLen = -1;
+      for (const poly of g.coordinates){
+        const r = poly[0] || [];
+        if (r.length > bestLen){ bestLen = r.length; best = r; }
+      }
+      return best ? _ringCentroid(best) : null;
+    }
+    return null;
+  }
+  function _pointInRing(pt, ring){
+    let inside = false;
+    const x = pt[0], y = pt[1];
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++){
+      const xi = ring[i][0], yi = ring[i][1];
+      const xj = ring[j][0], yj = ring[j][1];
+      const intersects = ((yi > y) !== (yj > y)) &&
+        (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-12) + xi);
+      if (intersects) inside = !inside;
+    }
+    return inside;
+  }
+  function _pointInFeature(pt, feature){
+    const g = feature.geometry;
+    if (!g) return false;
+    const polys = g.type === 'Polygon' ? [g.coordinates] : (g.type === 'MultiPolygon' ? g.coordinates : []);
+    for (const poly of polys){
+      const outer = poly[0] || [];
+      if (!_pointInRing(pt, outer)) continue;
+      let inHole = false;
+      for (let i = 1; i < poly.length; i++){
+        if (_pointInRing(pt, poly[i])){ inHole = true; break; }
+      }
+      if (!inHole) return true;
+    }
+    return false;
+  }
+
+  // Construye el mapeo barrio→UPL una sola vez (1001 × 33 = ~33k tests).
+  // Usa centroide del barrio porque los barrios son chicos y casi siempre
+  // caen completos dentro de una UPL.
+  async function _buildUplToBarriosMap(){
+    if (_uplToBarriosCache) return _uplToBarriosCache;
+    const [uplGeo] = await Promise.all([loadUplGeo(), loadBarrioGeo('bogota')]);
+    const barrioGeo = _barrioGeoCache['bogota'];
+    const out = {};
+    for (const ufeat of uplGeo.features){
+      const code = ufeat.properties?.CODIGO_UPL;
+      if (code) out[code] = new Set();
+    }
+    for (const bfeat of (barrioGeo?.features || [])){
+      const ctr = _featureCentroid(bfeat);
+      if (!ctr) continue;
+      const bcod = bfeat.properties?.codigo;
+      if (!bcod) continue;
+      for (const ufeat of uplGeo.features){
+        const ucode = ufeat.properties?.CODIGO_UPL;
+        if (!ucode) continue;
+        if (_pointInFeature(ctr, ufeat)){ out[ucode].add(bcod); break; }
+      }
+    }
+    _uplToBarriosCache = out;
+    return out;
+  }
+
+  // ─── Capa UPL (sustituye la capa de muns para Bogotá) ──────────
+  async function loadBogUplLayer(depNom){
+    showMapLoading('Cargando UPL de Bogotá…');
+    try {
+      await Promise.all([loadUplGeo(), loadHistoricosUpl()]);
+      // Limpieza de capas que no aplican en este modo
+      if (munLayer){ map.removeLayer(munLayer); munLayer = null; }
+      if (nacionalMunLayer){ map.removeLayer(nacionalMunLayer); nacionalMunLayer = null; }
+      if (cityLayer){ map.removeLayer(cityLayer); cityLayer = null; }
+      if (barrioLayer){ map.removeLayer(barrioLayer); barrioLayer = null; }
+      if (deptLayer) map.removeLayer(deptLayer);
+      if (uplLayer){ map.removeLayer(uplLayer); uplLayer = null; }
+      const geo = _uplGeoCache;
+      uplLayer = L.geoJSON(geo, {
+        style: (f) => _styleByUpl(f.properties?.CODIGO_UPL, _uplFallbackLoc(f.properties)),
+        onEachFeature: onEachUplFeature,
+      }).addTo(map);
+      currentCityKey = 'bogota';
+      currentDepCod  = '16';
+      currentUplCod  = null;
+      currentUplName = null;
+      _updateBarrioToggleVisibility?.();
+      try { const b = uplLayer.getBounds(); if (b.isValid()) map.fitBounds(b, { padding:[10,10] }); } catch(e){}
+      const label  = document.getElementById('map-head-label');
+      const nameEl = document.getElementById('map-cand-name');
+      if (label) label.textContent = 'Bogotá D.C. · UPL';
+      if (nameEl){
+        nameEl.textContent = 'Bias por UPL · pres 2010-2022 + Senado/Cámara 2026 + consultas; UPL sin señal hereda de la localidad dominante';
+        nameEl.style.color = '';
+      }
+      const backBtn = document.getElementById('map-back-btn');
+      if (backBtn){ backBtn.textContent = '← Nacional'; backBtn.classList.add('show'); }
+      repaintMap();
+    } catch(e){
+      console.error('[Previa upl]', e);
+    } finally {
+      hideMapLoading();
+    }
+  }
+
+  function onEachUplFeature(feature, layer){
+    const p = feature.properties || {};
+    const uplCod = p.CODIGO_UPL;
+    const name   = p.NOMBRE || uplCod || '—';
+    const locFb  = _uplFallbackLoc(p);
+    const tooltipHtmlFn = () => {
+      const r = computeUplRanking(uplCod, locFb);
+      if (selectedId){
+        const cand = CANDIDATOS.find(c => c.id === selectedId);
+        const v = cand ? projectedUpl(cand, uplCod, locFb) : 0;
+        const total = CANDIDATOS.reduce((s,c) => s + projectedUpl(c, uplCod, locFb), 0);
+        const share = total > 0 ? v / total : 0;
+        return `<div style="line-height:1.4"><b>UPL ${name}</b><br>${cand?cand.nombre:''}<br><b>${(share*100).toFixed(1)}%</b> local</div>`;
+      }
+      if (!r || !r.winner) return `<div>UPL ${name}</div>`;
+      const total = r.ranked.reduce((s,x)=>s+x.v,0);
+      const winPct = total > 0 ? r.winnerV/total*100 : 0;
+      return `<div style="line-height:1.4"><b>UPL ${name}</b><br>1º ${r.winner.nombre} · ${winPct.toFixed(1)}%</div>`;
+    };
+    layer.on({
+      mouseover(e){
+        layer.setStyle({ weight:2.5, color:'#fff', fillOpacity:.98 });
+        const r = computeUplRanking(uplCod, locFb);
+        const winColor = r?.winner?.color || 'rgba(255,255,255,.5)';
+        _setHoverChip(e, `UPL ${name}`, winColor);
+        const fuente = hasUplBiasFor(uplCod)
+          ? 'Bias UPL · pres 10-22 + Senado/Cámara 2026 + consultas 2025-26'
+          : 'Bias hereda de la localidad dominante · UPL sin señal propia';
+        _hoverTerritory({
+          scopeKey: 'upl:bogota:' + uplCod,
+          level:    'UPL',
+          name:     'UPL ' + name,
+          parents:  ['Bogotá D.C.', 'BOGOTA D.C.'],
+          kind:     'upl',
+          args:     { uplCod, locFallback: locFb },
+          fuente,
+        });
+        layer.bindTooltip(tooltipHtmlFn(), { sticky:true, className:'leaflet-dark-tooltip', opacity:1 }).openTooltip();
+      },
+      mousemove(e){ _moveHoverChip(e); },
+      mouseout(){
+        if (uplLayer) uplLayer.resetStyle(layer);
+        layer.closeTooltip();
+        _clearHoverChip();
+      },
+      click(){
+        loadBarriosForUpl(uplCod, name);
+      }
+    });
+  }
+
+  // Subset del barrioLayer: solo los barrios cuyo centroide cae dentro
+  // de la UPL clickeada.
+  async function loadBarriosForUpl(uplCod, uplName){
+    showMapLoading(`Cargando barrios de UPL ${uplName}…`);
+    try {
+      const [map_, _2] = await Promise.all([
+        _buildUplToBarriosMap(),
+        loadHistoricosBarrio('bogota'),
+      ]);
+      const codes = map_[uplCod];
+      const barrioGeo = _barrioGeoCache['bogota'];
+      if (!codes || !codes.size || !barrioGeo){
+        console.warn('[Previa upl→bar] sin barrios para', uplCod);
+        return;
+      }
+      const subset = {
+        type: 'FeatureCollection',
+        features: barrioGeo.features.filter(f => codes.has(f.properties?.codigo)),
+      };
+      if (uplLayer){ map.removeLayer(uplLayer); uplLayer = null; }
+      if (barrioLayer){ map.removeLayer(barrioLayer); barrioLayer = null; }
+      const cfg = BARRIO_S3.bogota;
+      barrioLayer = L.geoJSON(subset, {
+        style: (f) => _styleByBarrio('bogota', cfg.keyFromProps(f.properties), _barrioParentCom('bogota', f.properties)),
+        onEachFeature: (f, layer) => onEachBarrioFeature(f, layer, 'bogota', cfg),
+      }).addTo(map);
+      currentUplCod  = uplCod;
+      currentUplName = uplName;
+      try { const b = barrioLayer.getBounds(); if (b.isValid()) map.fitBounds(b, { padding:[10,10] }); } catch(e){}
+      const label  = document.getElementById('map-head-label');
+      const nameEl = document.getElementById('map-cand-name');
+      if (label) label.textContent = `Bogotá · UPL ${uplName} · Barrios`;
+      if (nameEl){
+        nameEl.textContent = `Subset de ${subset.features.length} barrios cuyo centroide cae dentro de la UPL`;
+        nameEl.style.color = '';
+      }
+      const backBtn = document.getElementById('map-back-btn');
+      if (backBtn){ backBtn.textContent = '← UPL'; backBtn.classList.add('show'); }
+      repaintMap();
+    } catch(e){
+      console.error('[Previa upl→bar]', e);
+    } finally {
+      hideMapLoading();
+    }
   }
 
   // Visibilidad del botón "Barrios" en el toggle bar — sólo cuando
