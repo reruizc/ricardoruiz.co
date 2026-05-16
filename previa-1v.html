@@ -402,7 +402,7 @@
     .info-btn:hover{color:var(--blue);border-color:var(--blue)}
 
     /* Toggles de sección principal (mapa / evolución / trasvase / diagnóstico) */
-    .main-tabs{padding:.85rem 2.5rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02);display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;position:sticky;top:0;z-index:50;backdrop-filter:blur(8px)}
+    .main-tabs{padding:.85rem 2.5rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02);display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;position:sticky;top:0;z-index:1100;backdrop-filter:blur(8px)}
     body.day-mode .main-tabs{background:rgba(255,255,255,.85);border-bottom-color:rgba(0,0,0,.1)}
     .main-tab{font-family:Avenir,sans-serif;font-weight:500;font-size:.92rem;letter-spacing:.05em;color:rgba(255,255,255,.7);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.18);padding:.6rem 1.1rem;cursor:pointer;transition:color .15s,border-color .15s,background .15s;display:inline-flex;align-items:center;gap:.45rem;min-height:44px}
     .main-tab:hover{color:var(--white);border-color:rgba(0,71,255,.55);background:rgba(0,71,255,.1)}
@@ -493,6 +493,13 @@
     .map-head-cand{font-family:'Syne',sans-serif;font-weight:700;font-size:1.05rem;letter-spacing:-.01em;margin-top:.15rem}
     .map-head-pct{font-family:Avenir,sans-serif;font-weight:500;font-size:.9rem;color:rgba(255,255,255,.8)}
     #leaflet-map{flex:1;min-height:520px;background:#060810}
+    /* En web (≥1100px) el mapa era muy alto y empujaba el panel de territorio
+       fuera de vista cuando el usuario hacía hover sobre un depto. Reducimos
+       ~30% en desktop manteniendo el min-height de mobile. */
+    @media (min-width:1100px){
+      #leaflet-map{min-height:360px;max-height:calc(100vh - 280px)}
+      .shell{min-height:0}
+    }
     .leaflet-container{background:#060810!important}
     .leaflet-tile-pane{display:none}
     .leaflet-control-attribution{background:rgba(6,8,16,.85)!important;color:rgba(255,255,255,.25)!important;font-family:Avenir,sans-serif!important;font-size:.55rem!important}
@@ -3527,6 +3534,10 @@
       // Cascada: bias_barrio → bias_comuna/localidad padre (heredado).
       const { cityKey, barrioCod, comFallback } = payload.args;
       getV = c => projectedBarrio(c, cityKey, barrioCod, comFallback);
+    } else if (payload.kind === 'upl'){
+      // Cascada: bias_upl → bias_localidad padre dominante (heredado).
+      const { uplCod, locFallback } = payload.args;
+      getV = c => projectedUpl(c, uplCod, locFallback);
     } else { getV = () => 0; }
     return cands.map(c => ({ c, v: getV(c) })).filter(x => x.v > 0).sort((a,b) => b.v - a.v);
   }
@@ -8327,7 +8338,14 @@
     document.getElementById('evolucion-section')?.classList.remove('collapsed');
 
     if (name === 'trasvase'){
+      // El sankey antes se abría/cerraba con un toggle propio que seteaba
+      // _sankeyState.open. Ahora la pestaña controla la visibilidad, pero
+      // _sankeyRefresh sigue bailout-eando si open === false → el loading
+      // se queda en 'Calculando flujos…' para siempre. Forzamos open=true.
+      _sankeyState.open = true;
       try { _sankeyInit(); _sankeyRefresh(); } catch(e){}
+    } else {
+      _sankeyState.open = false;
     }
     if (name === 'diagnostico'){
       try { renderDiag(); } catch(e){}
