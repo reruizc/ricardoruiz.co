@@ -2916,7 +2916,10 @@
     try {
       // Lista de codes de deptos — los tomamos de senado si está cargado,
       // sino de una lista fallback completa de Registraduría.
-      let codes = Object.values(SENADO_BY_DEPTO).map(x => x.cod).filter(Boolean);
+      // Dedup: SENADO_BY_DEPTO contiene aliases (NORTE DE SAN/NORTE DE SANTANDER,
+      // VALLE/VALLE DEL CAUCA, varios SA y Bogotá) que apuntan al mismo cod;
+      // sin Set, los muns de esos deptos se concatenarían 2-4 veces al array.
+      let codes = [...new Set(Object.values(SENADO_BY_DEPTO).map(x => x.cod).filter(Boolean))];
       if (!codes.length){
         codes = ['01','02','03','05','07','08','09','11','12','13','15','16','17','19','21','23','24','25','26','27','28','29','31','40','44','46','48','50','52','54','56','60','64','68','72','88'];
       }
@@ -3997,10 +4000,10 @@
   function closeDlModal(){
     document.getElementById('dl-modal').classList.remove('show');
   }
-  function confirmDownloadExcel(){
+  async function confirmDownloadExcel(){
     closeDlModal();
     if (currentLevel === 'pue')      _doDownloadExcelPue();
-    else if (currentLevel === 'mun') _doDownloadExcelMun();
+    else if (currentLevel === 'mun') await _doDownloadExcelMun();
     else                              _doDownloadExcelDep();
   }
   function _doDownloadExcelDep(){
@@ -4170,8 +4173,15 @@
   // censos de los puestos georeferenciados en el mun (sólo si el archivo
   // light está cargado); sin él, las columnas Censo/Votantes/Votos quedan
   // vacías y sólo se reportan los % y el ganador.
-  function _doDownloadExcelMun(){
+  async function _doDownloadExcelMun(){
     if (!_nacionalMunFeatures || !_nacionalMunFeatures.length) return;
+    // El censo por mun se agrega desde _puestosLight. Si el usuario no ha
+    // activado el toggle Puestos, _puestosLight aún no se descargó y todas
+    // las columnas numéricas (censo, votantes, votos esperados) saldrían
+    // en '—'. Cargamos en demanda; si falla la red se sigue sin censo.
+    if (!_puestosLight){
+      try { await loadPuestosLight(); } catch(e){}
+    }
     const fecha = new Date().toISOString().slice(0,10);
     const title = `Previa Primera Vuelta 2026 · Proyección Municipal · ${fecha}`;
     const cands = _candsSorted();
