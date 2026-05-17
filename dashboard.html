@@ -1,1463 +1,1871 @@
 <!DOCTYPE html>
 <html lang="es" id="htmlRoot">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title id="pageTitle">Dashboard · Ricardo Ruiz</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet" />
-  <style>
-    /* ── THEME VARIABLES ──
-       Noche por default, body.day-mode override. Lógica del toggle vive en theme.js. */
-    :root {
-      --bg: #060810;
-      --bg2: #0a0c14;
-      --surface: #0f1018;
-      --surface2: #13151f;
-      --border: rgba(255,255,255,0.06);
-      --text: #f4f3ef;
-      --text2: #888;
-      --text3: #444;
-      --blue: #0047FF;
-      --blue-light: #3d6fff;
-      --blue-dim: rgba(0,71,255,0.12);
-      --black: #0a0a0a;
-      --white: #f4f3ef;
-      --success: #00d68f;
-      --warning: #f0c040;
-      --lock: #333;
-    }
-    body.day-mode {
-      --bg: #f4f3ef;
-      --bg2: #eeedea;
-      --surface: #ffffff;
-      --surface2: #f0efe9;
-      --border: rgba(0,0,0,0.07);
-      --text: #0a0a0a;
-      --text2: #555;
-      --text3: #999;
-      --blue-dim: rgba(0,71,255,0.08);
-      --lock: #ccc;
-    }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title id="pageTitle">Panel · Ricardo.Ruiz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet">
+<style>
+/* ───────────────────────────────────────────────────────────────
+   RICARDO.RUIZ · PANEL
+   Convención del sitio: por defecto = noche (oscuro). body.day-mode
+   = día (cream/salmón claro). theme.js togglea body.day-mode.
+   Paleta tomada del modelo (cream #f4f3ef · oxblood #8a1e16).
+─────────────────────────────────────────────────────────────── */
+:root {
+  /* NIGHT — default */
+  --paper:        #1a1610;
+  --paper-2:      #221d15;
+  --paper-3:      #2a241b;
+  --ink:          #f4f3ef;
+  --ink-2:        #b8b1a0;
+  --ink-3:        #807a6c;
+  --rule:         #f4f3ef1c;
+  --rule-strong:  #f4f3ef38;
+  --accent:       #d96a50;
+  --accent-soft:  #d96a5018;
+  --accent-tint:  #d96a5036;
+  --gold:         #d6a83a;
+  --on-accent:    #14110a;
+  --danger:       #d96a50;
 
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Fraunces', serif;
-      min-height: 100vh;
-      cursor: none;
-      overflow-x: hidden;
-      transition: background 0.4s, color 0.4s;
-    }
+  --sans:    'Familjen Grotesk', system-ui, sans-serif;
+  --italic:  'Petrona', Georgia, serif;
+  --mono:    'Space Mono', ui-monospace, monospace;
+  --display: 'Syne', sans-serif;
+}
+body.day-mode {
+  /* DAY — cream/salmón claro (identidad de marca) */
+  --paper:        #f4f3ef;
+  --paper-2:      #ecebe5;
+  --paper-3:      #e0ddd2;
+  --ink:          #14110a;
+  --ink-2:        #5a5448;
+  --ink-3:        #948e80;
+  --rule:         #14110a1f;
+  --rule-strong:  #14110a40;
+  --accent:       #8a1e16;
+  --accent-soft:  #8a1e161a;
+  --accent-tint:  #8a1e1633;
+  --gold:         #8a6a1a;
+  --on-accent:    #f4f3ef;
+  --danger:       #b03524;
+}
 
-    /* CURSOR */
-    .cursor { position:fixed; width:12px; height:12px; background:var(--blue); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s ease,background .2s; transform:translate(-50%,-50%); }
-    .cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--blue); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s ease,opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 18px;
+  line-height: 1.55;
+  font-weight: 400;
+  min-height: 100vh;
+  overflow-x: hidden;
+  cursor: none;
+  font-feature-settings: "ss01","kern","liga";
+  text-rendering: optimizeLegibility;
+  transition: background .35s ease, color .35s ease;
+}
+::selection { background: var(--accent); color: var(--on-accent); }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: none; }
+code { font-family: var(--mono); font-size: .88em; }
 
-    /* ── NAV ── */
-    .electoral-nav {
-      position: fixed; top:0; left:0; right:0; z-index:100;
-      display: flex; align-items:center; justify-content:space-between;
-      padding: .9rem 2.5rem;
-      background: var(--bg); border-bottom: 1px solid var(--border);
-      backdrop-filter: blur(12px);
-    }
-    .electoral-nav-auth { display:flex; align-items:center; gap:.75rem; }
-    .e-btn-back { font-family:'Syne',sans-serif; font-size:.782rem; letter-spacing:.08em; text-transform:uppercase; color:var(--text2); text-decoration:none; border:1.5px solid var(--border); padding:.3rem .8rem; transition:color .2s,border-color .2s; }
-    .e-btn-back:hover { color:var(--text); border-color:var(--text2); }
-    .e-user-name { font-family:'Syne',sans-serif; font-size:.782rem; letter-spacing:.08em; text-transform:uppercase; color:var(--text); text-decoration:none; border:1.5px solid var(--border); padding:.3rem .8rem; }
-    .e-user-plan { font-family:'Syne',sans-serif; font-size:.69rem; letter-spacing:.08em; text-transform:uppercase; color:var(--blue); background:var(--blue-dim); padding:.2rem .6rem; }
-    .e-btn-logout { font-family:'Syne',sans-serif; font-size:.782rem; letter-spacing:.08em; text-transform:uppercase; color:var(--text2); background:none; border:1.5px solid var(--border); padding:.3rem .8rem; cursor:none; transition:color .2s,border-color .2s; }
-    .e-btn-logout:hover { color:var(--text); border-color:var(--text2); }
-    .logo-link { display:flex; align-items:center; gap:.55rem; text-decoration:none; opacity:.8; transition:opacity .2s; }
-    .logo-link:hover { opacity:1; }
-    .logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
-    .logo-bar { width:5px; background:var(--blue); border-radius:1px 1px 0 0; }
-    .logo-text { font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(1.155rem,2.1vw,1.89rem); letter-spacing:-.03em; color:var(--text); }
-    .logo-text span { color:var(--blue); }
-    .country-selector-wrap { position:relative; }
-    .country-btn { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.08em; text-transform:uppercase; color:var(--text2); background:none; border:1px solid var(--border); padding:.3rem .65rem; cursor:none; display:flex; align-items:center; transition:border-color .2s,color .2s; }
-    .country-btn:hover,.country-btn.open { border-color:var(--blue); color:var(--blue); }
-    .country-dropdown { position:absolute; top:calc(100% + 8px); right:0; background:var(--bg); border:1px solid var(--border); min-width:190px; display:none; flex-direction:column; z-index:200; box-shadow:0 8px 24px rgba(0,0,0,.12); }
-    .country-dropdown.open { display:flex; }
-    .country-option { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.05em; padding:.65rem 1rem; cursor:pointer; display:flex; align-items:center; gap:.5rem; color:var(--text2); border-bottom:1px solid var(--border); transition:background .15s; user-select:none; }
-    .country-option:last-child { border-bottom:none; }
-    .country-option:hover { background:var(--blue-dim); color:var(--blue); }
-    .country-option.selected { color:var(--blue); }
-    .country-check { font-size:.6rem; width:12px; opacity:0; color:var(--blue); }
-    .country-option.selected .country-check { opacity:1; }
+/* faint dot grain solo en día */
+body.day-mode::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image: radial-gradient(rgba(20,17,10,.035) 1px, transparent 1.4px);
+  background-size: 4px 4px;
+  opacity: .9; mix-blend-mode: multiply;
+}
 
-    /* ── THEME TOGGLE ── (mismo patrón que senado/cámara/previa) */
-    .theme-btn{display:flex;align-items:center;gap:.4rem;font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);padding:.3rem .75rem;cursor:none;transition:all .2s;flex-shrink:0}
-    .theme-btn:hover{background:rgba(255,255,255,.15);color:var(--white)}
-    body.day-mode .theme-btn{background:rgba(0,71,255,.08);border-color:rgba(0,71,255,.25);color:var(--blue)}
-    body.day-mode .theme-btn:hover{background:rgba(0,71,255,.15)}
+/* CURSOR (se mantiene del sitio) */
+.cursor { position:fixed; width:12px; height:12px; background:var(--accent); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s ease,background .2s; transform:translate(-50%,-50%); }
+.cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--accent); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s ease,opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
 
-    /* ── LAYOUT ── */
-    .dashboard-wrap {
-      max-width: 1400px; margin:0 auto;
-      padding: 6rem 2.5rem 4rem;
-    }
+/* ───────── TOP BAR ───────── */
+.topbar {
+  position: sticky; top: 0; z-index: 60;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1rem 1.75rem;
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+  backdrop-filter: blur(8px);
+}
+.topbar-left, .topbar-center, .topbar-right { display: flex; align-items: center; gap: 1.1rem; }
+.topbar-right { justify-content: flex-end; }
 
-    /* ── HERO GREETING ── */
-    .dash-hero {
-      margin-bottom: 3rem;
-      display: flex; align-items:flex-end; justify-content:space-between;
-      flex-wrap: wrap; gap:1.5rem;
-    }
-    .dash-hero-left {}
-    .dash-time-label {
-      font-family:'DM Mono',monospace; font-size:.65rem;
-      letter-spacing:.18em; text-transform:uppercase;
-      color:var(--blue); margin-bottom:.75rem;
-      display:flex; align-items:center; gap:.75rem;
-    }
-    .dash-time-label::before { content:''; display:block; width:20px; height:1px; background:var(--blue); }
-    .dash-greeting-title {
-      font-family:'Syne',sans-serif; font-weight:800;
-      font-size:clamp(2rem,4vw,3.5rem);
-      letter-spacing:-.03em; line-height:.95;
-    }
-    .dash-greeting-title em { font-style:italic; font-family:'Fraunces',serif; font-weight:300; color:var(--blue); }
-    .dash-hero-right {
-      display:flex; align-items:center; gap:1rem; flex-wrap:wrap;
-    }
-    .plan-badge-hero {
-      display:flex; align-items:center; gap:.5rem;
-      font-family:'DM Mono',monospace; font-size:.65rem;
-      letter-spacing:.12em; text-transform:uppercase;
-    }
-    .plan-dot { width:8px; height:8px; border-radius:50%; background:var(--blue); }
-    .plan-name-hero { color:var(--blue); }
-    .upgrade-btn {
-      font-family:'DM Mono',monospace; font-size:.65rem;
-      letter-spacing:.1em; text-transform:uppercase;
-      color:var(--white); background:var(--blue);
-      border:1.5px solid var(--blue); padding:.4rem 1rem;
-      text-decoration:none; cursor:none;
-      transition:background .2s, border-color .2s;
-    }
-    .upgrade-btn:hover { background:#0035cc; border-color:#0035cc; }
+.btn-back {
+  display: inline-flex; align-items: center; gap: .55rem;
+  font-family: var(--sans); font-size: 14.5px; font-weight: 500;
+  letter-spacing: .04em; color: var(--ink);
+  padding: .55rem .9rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  transition: background .2s, border-color .2s;
+}
+.btn-back:hover { background: var(--paper-2); border-color: var(--ink); }
+.btn-back .arr { transition: transform .25s ease; }
+.btn-back:hover .arr { transform: translateX(-3px); }
 
-    /* ── GRID ── */
-    .dash-grid {
-      display:grid;
-      grid-template-columns: 1fr 1fr 1fr 320px;
-      grid-template-rows: auto auto auto;
-      gap: 1rem;
-    }
+.user-block {
+  display: flex; align-items: center; gap: .85rem;
+  padding-left: 1rem;
+  border-left: 1px solid var(--rule-strong);
+}
+.user-mono {
+  width: 36px; height: 36px;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--sans); font-weight: 700;
+  font-size: 13px; color: var(--ink);
+  letter-spacing: -.02em;
+}
+.user-text { display: flex; flex-direction: column; line-height: 1.2; }
+.user-name {
+  font-family: var(--sans); font-weight: 600; font-size: 14.5px; color: var(--ink);
+}
+.user-name:hover { color: var(--accent); }
+.user-email { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
 
-    /* ── CARDS ── */
-    .dash-card {
-      background:var(--surface);
-      border:1px solid var(--border);
-      padding:1.5rem;
-      position:relative; overflow:hidden;
-      transition:background .4s, border-color .4s;
-    }
-    .card-label {
-      font-family:'DM Mono',monospace; font-size:.6rem;
-      letter-spacing:.18em; text-transform:uppercase;
-      color:var(--text3); margin-bottom:1rem;
-    }
-    .card-title {
-      font-family:'Syne',sans-serif; font-weight:800;
-      font-size:1.1rem; letter-spacing:-.02em;
-      margin-bottom:.4rem; color:var(--text);
-    }
+.plan-chip {
+  display: inline-flex; align-items: center; gap: .5rem;
+  font-family: var(--mono); font-size: 12px; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--accent);
+  padding: .35rem .7rem;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+}
+.plan-chip .marker { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; }
 
-    /* ── TOOLS GRID (span 3) ── */
-    .tools-card { grid-column: span 3; }
-    .tools-grid {
-      display:grid; grid-template-columns:repeat(3,1fr);
-      gap:.75rem; margin-top:.5rem;
-    }
-    .tool-item {
-      background:var(--surface2); border:1px solid var(--border);
-      padding:1.2rem; position:relative; overflow:hidden;
-      cursor:none; transition:background .2s, border-color .2s;
-      text-decoration:none; display:block;
-    }
-    .tool-item:hover:not(.locked) { border-color:var(--blue); }
-    .tool-item.locked { cursor:not-allowed; opacity:.6; }
-    .tool-num {
-      font-family:'DM Mono',monospace; font-size:.77rem;
-      letter-spacing:.15em; color:var(--blue); margin-bottom:.75rem;
-    }
-    .tool-name {
-      font-family:'Syne',sans-serif; font-weight:700;
-      font-size:1.33rem; letter-spacing:-.01em;
-      color:var(--text); margin-bottom:.3rem;
-    }
-    .tool-desc {
-      font-family:'Fraunces',serif; font-weight:300;
-      font-size:1.12rem; line-height:1.5; color:var(--text2);
-    }
-    .tool-lock {
-      position:absolute; top:.9rem; right:.9rem;
-      font-size:.8rem; color:var(--lock);
-    }
-    .tool-arrow {
-      position:absolute; bottom:.9rem; right:.9rem;
-      font-size:.8rem; color:var(--blue); opacity:0;
-      transition:opacity .2s, transform .2s;
-    }
-    .tool-item:hover:not(.locked) .tool-arrow { opacity:1; transform:translate(2px,-2px); }
-    .tool-tag {
-      display:inline-block; margin-top:.6rem;
-      font-family:'DM Mono',monospace; font-size:.77rem;
-      letter-spacing:.1em; text-transform:uppercase;
-      color:var(--blue); background:var(--blue-dim);
-      padding:.15rem .5rem;
-    }
-    .tool-tag.locked-tag { color:var(--lock); background:transparent; border:1px solid var(--lock); }
-    .tool-tag.private-tag { color:#a78bfa; background:rgba(167,139,250,0.14); }
-    body.day-mode .tool-tag.private-tag { color:#7c3aed; background:rgba(124,58,237,0.10); }
-    .tool-item.private { border-left:2px solid #a78bfa; }
-    body.day-mode .tool-item.private { border-left-color:#7c3aed; }
-    .tool-item.private .tool-num { color:#a78bfa; }
-    body.day-mode .tool-item.private .tool-num { color:#7c3aed; }
-    .tool-item.private .tool-arrow { color:#a78bfa; }
-    body.day-mode .tool-item.private .tool-arrow { color:#7c3aed; }
+.theme-btn, .country-btn, .iconbtn {
+  display: inline-flex; align-items: center; gap: .4rem;
+  font-family: var(--mono); font-size: 12px; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-2);
+  padding: .35rem .75rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  transition: background .2s, color .2s, border-color .2s;
+  white-space: nowrap;
+}
+.theme-btn:hover, .country-btn:hover, .iconbtn:hover {
+  background: var(--paper-2); color: var(--ink); border-color: var(--ink);
+}
+.theme-btn { font-size: 11.5px; }
 
-    /* ── PLAN CARD (right col, row 1) ── */
-    .plan-card { grid-column:4; grid-row:1; }
-    .plan-card-name {
-      font-family:'Syne',sans-serif; font-weight:800;
-      font-size:2rem; letter-spacing:-.04em; color:var(--blue);
-      margin-bottom:.25rem;
-    }
-    .plan-card-desc {
-      font-family:'Fraunces',serif; font-weight:300;
-      font-size:.85rem; color:var(--text2); line-height:1.6;
-      margin-bottom:1.2rem;
-    }
-    .plan-perks { list-style:none; display:flex; flex-direction:column; gap:.5rem; margin-bottom:1.5rem; }
-    .plan-perks li {
-      font-family:'DM Mono',monospace; font-size:.84rem;
-      letter-spacing:.06em; color:var(--text2);
-      display:flex; gap:.5rem; align-items:flex-start;
-    }
-    .plan-perks li::before { content:'→'; color:var(--blue); flex-shrink:0; }
-    .plan-upgrade-link {
-      display:block; text-align:center;
-      font-family:'DM Mono',monospace; font-size:.65rem;
-      letter-spacing:.1em; text-transform:uppercase;
-      color:var(--white); background:var(--blue);
-      border:1.5px solid var(--blue); padding:.75rem;
-      text-decoration:none; transition:background .2s;
-    }
-    .plan-upgrade-link:hover { background:#0035cc; }
-    .plan-current-tag {
-      display:block; text-align:center;
-      font-family:'DM Mono',monospace; font-size:.62rem;
-      letter-spacing:.1em; text-transform:uppercase;
-      color:var(--text3); padding:.75rem;
-      border:1px solid var(--border);
-    }
+/* country dropdown */
+.country-selector-wrap { position: relative; }
+.country-dropdown {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  background: var(--paper); border: 1px solid var(--rule-strong);
+  min-width: 200px; display: none; flex-direction: column;
+  z-index: 200; box-shadow: 0 8px 24px rgba(0,0,0,.18);
+}
+.country-dropdown.open { display: flex; }
+.country-option {
+  font-family: var(--mono); font-size: 12px; letter-spacing: .04em;
+  padding: .7rem 1rem; cursor: none;
+  display: flex; align-items: center; gap: .5rem;
+  color: var(--ink-2); border-bottom: 1px solid var(--rule);
+  transition: background .15s, color .15s; user-select: none;
+}
+.country-option:last-child { border-bottom: none; }
+.country-option:hover { background: var(--paper-2); color: var(--ink); }
+.country-option.selected { color: var(--accent); }
+.country-check { font-size: 11px; width: 12px; opacity: 0; color: var(--accent); }
+.country-option.selected .country-check { opacity: 1; }
 
-    /* ── DOWNLOADS CARD ── */
-    .downloads-card { grid-column:span 2; }
-    .downloads-bar-wrap { margin-bottom:1.2rem; }
-    .downloads-numbers {
-      display:flex; justify-content:space-between; align-items:baseline;
-      margin-bottom:.4rem;
-    }
-    .downloads-used {
-      font-family:'Syne',sans-serif; font-weight:800;
-      font-size:2rem; letter-spacing:-.04em; color:var(--blue);
-    }
-    .downloads-total {
-      font-family:'DM Mono',monospace; font-size:.65rem;
-      letter-spacing:.08em; color:var(--text3);
-    }
-    .downloads-track {
-      height:4px; background:var(--surface2); border-radius:2px; overflow:hidden;
-    }
-    .downloads-fill {
-      height:100%; background:var(--blue); border-radius:2px;
-      transition:width 1s ease;
-    }
-    .downloads-list { display:flex; flex-direction:column; gap:.5rem; margin-top:1rem; }
-    .download-item {
-      display:flex; align-items:center; justify-content:space-between;
-      padding:.6rem .75rem; background:var(--surface2); border:1px solid var(--border);
-    }
-    .download-item-name {
-      font-family:'DM Mono',monospace; font-size:.87rem;
-      letter-spacing:.06em; color:var(--text);
-    }
-    .download-item-date {
-      font-family:'DM Mono',monospace; font-size:.81rem;
-      letter-spacing:.06em; color:var(--text3);
-    }
-    .download-btn {
-      font-family:'DM Mono',monospace; font-size:.81rem;
-      letter-spacing:.08em; text-transform:uppercase;
-      color:var(--blue); background:none;
-      border:1px solid rgba(0,71,255,0.3); padding:.25rem .6rem;
-      cursor:none; transition:background .2s, color .2s;
-      text-decoration:none;
-    }
-    .download-btn:hover { background:var(--blue); color:#fff; }
-    .download-btn.locked-btn { color:var(--lock); border-color:var(--lock); pointer-events:none; }
+/* LOGO — mismo del resto del sitio (barras + Ricardo.Ruiz + . accent) */
+.logo-link { display: flex; align-items: center; gap: .55rem; text-decoration: none; opacity: .9; transition: opacity .2s; }
+.logo-link:hover { opacity: 1; }
+.logo-bars { display: flex; align-items: flex-end; gap: 3px; height: 20px; }
+.logo-bar { width: 5px; background: var(--accent); border-radius: 1px 1px 0 0; }
+.logo-text {
+  font-family: var(--display); font-weight: 800;
+  font-size: 1.55rem; letter-spacing: -.045em; line-height: 1;
+  color: var(--ink);
+}
+.logo-text span { color: var(--accent); }
 
-    /* ── NEWS CARD ── */
-    .news-card { grid-column:span 1; }
-    .news-list { display:flex; flex-direction:column; gap:0; margin-top:.5rem; }
-    .news-item {
-      padding:.9rem 0; border-bottom:1px solid var(--border);
-    }
-    .news-item:last-child { border-bottom:none; }
-    .news-date {
-      font-family:'DM Mono',monospace; font-size:.77rem;
-      letter-spacing:.12em; text-transform:uppercase; color:var(--blue);
-      margin-bottom:.3rem;
-    }
-    .news-title {
-      font-family:'Syne',sans-serif; font-weight:700;
-      font-size:1.1rem; letter-spacing:-.01em; color:var(--text);
-      margin-bottom:.2rem;
-    }
-    .news-desc {
-      font-family:'Fraunces',serif; font-weight:300;
-      font-size:1rem; line-height:1.6; color:var(--text2);
-    }
-    .news-plan-tag {
-      display:inline-block; margin-top:.4rem;
-      font-family:'DM Mono',monospace; font-size:.73rem;
-      letter-spacing:.1em; text-transform:uppercase;
-      padding:.15rem .5rem;
-    }
-    .news-plan-tag.pro { color:#f0c040; background:rgba(240,192,64,0.08); }
-    .news-plan-tag.premium { color:var(--blue); background:var(--blue-dim); }
-    .news-plan-tag.free { color:var(--success); background:rgba(0,214,143,0.08); }
+/* ───────── PAGE WRAP ───────── */
+.page {
+  position: relative; z-index: 1;
+  max-width: 1340px;
+  margin: 0 auto;
+  padding: 2.5rem 2.25rem 4rem;
+}
 
-    /* ── PROFILE CARD ── */
-    .profile-card { grid-column:4; grid-row:2 / span 2; }
-    .profile-avatar {
-      width:52px; height:52px; border-radius:50%;
-      background:var(--blue-dim); border:2px solid var(--blue);
-      display:flex; align-items:center; justify-content:center;
-      font-family:'Syne',sans-serif; font-weight:800;
-      font-size:1.2rem; color:var(--blue); margin-bottom:1rem;
-    }
-    .profile-name {
-      font-family:'Syne',sans-serif; font-weight:800;
-      font-size:1.1rem; letter-spacing:-.02em; margin-bottom:.2rem;
-    }
-    .profile-email {
-      font-family:'DM Mono',monospace; font-size:.6rem;
-      letter-spacing:.06em; color:var(--text3); margin-bottom:1.2rem;
-    }
-    .profile-field {
-      margin-bottom:.9rem; padding-bottom:.9rem;
-      border-bottom:1px solid var(--border);
-    }
-    .profile-field:last-of-type { border-bottom:none; }
-    .profile-field-label {
-      font-family:'DM Mono',monospace; font-size:.55rem;
-      letter-spacing:.15em; text-transform:uppercase; color:var(--text3);
-      margin-bottom:.3rem;
-    }
-    .profile-field-value {
-      font-family:'Fraunces',serif; font-weight:300;
-      font-size:.9rem; color:var(--text);
-    }
-    .profile-actions { margin-top:1rem; display:flex; flex-direction:column; gap:.5rem; }
-    .profile-action-btn {
-      font-family:'DM Mono',monospace; font-size:.62rem;
-      letter-spacing:.08em; text-transform:uppercase;
-      color:var(--text2); background:none;
-      border:1px solid var(--border); padding:.6rem;
-      cursor:none; text-align:center; text-decoration:none;
-      transition:border-color .2s, color .2s; display:block;
-    }
-    .profile-action-btn:hover { border-color:var(--blue); color:var(--blue); }
-    .profile-action-btn.danger:hover { border-color:#ff4757; color:#ff4757; }
+/* ───────── KICKER ROW ───────── */
+.kicker {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem;
+  font-family: var(--mono); font-size: 13px; font-weight: 400;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-3);
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+.kicker .left, .kicker .right { display: flex; align-items: center; gap: 1rem; }
+.kicker .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 0 var(--accent); animation: pulse 2.5s ease-out infinite; }
+@keyframes pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in oklch, var(--accent) 50%, transparent); }
+  70%  { box-shadow: 0 0 0 10px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.kicker .dot { color: var(--rule-strong); }
 
-    /* RESPONSIVE */
-    @media (max-width: 1100px) {
-      .dash-grid { grid-template-columns:1fr 1fr 320px; }
-      .tools-card { grid-column:span 2; }
-      .tools-grid { grid-template-columns:repeat(2,1fr); }
-    }
-    @media (max-width: 768px) {
-      nav { padding:.9rem 1.5rem; }
-      .dashboard-wrap { padding:5rem 1.5rem 3rem; }
-      .dash-grid { grid-template-columns:1fr; }
-      .tools-card, .downloads-card, .news-card, .plan-card, .profile-card { grid-column:1; grid-row:auto; }
-      .tools-grid { grid-template-columns:1fr 1fr; }
-      body { cursor:auto; }
-      .cursor,.cursor-ring { display:none; }
-    }
-    @media (max-width: 480px) {
-      .tools-grid { grid-template-columns:1fr; }
-    }
+/* ───────── HERO ───────── */
+.hero {
+  display: grid;
+  grid-template-columns: 1.55fr 1fr;
+  gap: 4.5rem;
+  align-items: flex-end;
+  padding: 4.5rem 0 4.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+.hero-greeting {
+  font-family: var(--sans); font-weight: 700;
+  font-size: clamp(3.2rem, 6.4vw, 5.4rem);
+  line-height: .98;
+  letter-spacing: -.035em;
+  color: var(--ink);
+}
+.hero-greeting .word { display: block; font-weight: 400; }
+.hero-greeting .name {
+  display: inline;
+  font-family: var(--italic); font-style: italic; font-weight: 500;
+  letter-spacing: -.025em; color: var(--accent);
+  padding-right: .04em;
+}
+.hero-greeting .period { color: var(--accent); }
 
-    /* ── PAYMENT BANNER & CANCEL MODAL ── */
-    .payment-banner {
-      display:none; position:fixed; inset:0; z-index:2000;
-      background:rgba(0,0,0,.7); backdrop-filter:blur(6px);
-      align-items:center; justify-content:center; padding:1.5rem;
-    }
-    .payment-banner.show { display:flex; }
-    .payment-banner-card {
-      background:var(--surface); border:1px solid var(--border);
-      padding:2.5rem 2rem; max-width:480px; width:100%;
-    }
-    .pbc-check {
-      width:52px; height:52px; background:rgba(0,71,255,.1); border-radius:50%;
-      display:flex; align-items:center; justify-content:center; margin-bottom:1.25rem;
-    }
-    .pbc-check svg { color:var(--blue); }
-    .pbc-label {
-      font-family:'DM Mono',monospace; font-size:.6rem;
-      letter-spacing:.18em; text-transform:uppercase;
-      color:var(--blue); margin-bottom:.5rem;
-    }
-    .pbc-title {
-      font-family:'Syne',sans-serif; font-weight:800;
-      font-size:1.6rem; letter-spacing:-.03em;
-      color:var(--text); margin-bottom:.5rem;
-    }
-    .pbc-sub {
-      font-family:'Fraunces',serif; font-weight:300;
-      font-size:.9rem; color:var(--text2); line-height:1.6; margin-bottom:1.5rem;
-    }
-    .pbc-benefits { border-top:1px solid var(--border); padding-top:1.25rem; margin-bottom:1.5rem; }
-    .pbc-benefits-title {
-      font-family:'DM Mono',monospace; font-size:.58rem;
-      letter-spacing:.15em; text-transform:uppercase;
-      color:var(--text3); margin-bottom:.75rem;
-    }
-    .pbc-benefit {
-      font-family:'DM Mono',monospace; font-size:.7rem;
-      letter-spacing:.04em; color:var(--text2);
-      display:flex; gap:.6rem; align-items:flex-start;
-      margin-bottom:.6rem; line-height:1.4;
-    }
-    .pbc-benefit::before { content:'→'; color:var(--blue); flex-shrink:0; }
-    .pbc-close {
-      width:100%; font-family:'DM Mono',monospace; font-size:.7rem;
-      letter-spacing:.1em; text-transform:uppercase;
-      color:var(--white); background:var(--blue);
-      border:none; padding:.85rem; cursor:pointer; transition:background .2s;
-    }
-    .pbc-close:hover { background:#0035cc; }
-    .pbc-polling {
-      font-family:'DM Mono',monospace; font-size:.55rem;
-      letter-spacing:.08em; text-transform:uppercase;
-      color:var(--text3); text-align:center; margin-bottom:.75rem; min-height:1rem;
-    }
-    .plan-expires {
-      font-family:'DM Mono',monospace; font-size:.62rem;
-      letter-spacing:.08em; color:var(--blue);
-      margin-bottom:1rem; padding:.4rem .75rem;
-      background:var(--blue-dim);
-    }
-    .plan-expires.cancelled { color:#f0c040; background:rgba(240,192,64,.08); }
-    .plan-cancel-btn {
-      width:100%; font-family:'DM Mono',monospace; font-size:.62rem;
-      letter-spacing:.08em; text-transform:uppercase;
-      color:#ff4757; background:none; border:1px solid rgba(255,71,87,.3);
-      padding:.6rem; cursor:pointer; margin-top:.5rem; transition:border-color .2s, background .2s;
-    }
-    .plan-cancel-btn:hover { background:rgba(255,71,87,.06); border-color:#ff4757; }
+.hero-aside {
+  font-family: var(--sans); font-size: 18px; line-height: 1.55;
+  color: var(--ink-2);
+  padding-bottom: .3rem;
+}
+.hero-aside .stat {
+  font-family: var(--italic); font-style: italic; font-weight: 600;
+  color: var(--ink);
+  border-bottom: 2px solid var(--accent);
+  padding-bottom: 1px;
+}
+.hero-aside .quick-stats {
+  display: flex; gap: 1.5rem; margin-top: 1.75rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--rule);
+  flex-wrap: wrap;
+}
+.qs { display: flex; flex-direction: column; gap: .25rem; }
+.qs .v {
+  font-family: var(--sans); font-weight: 700;
+  font-size: 28px; line-height: 1; letter-spacing: -.02em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.qs .v .of {
+  font-family: var(--italic); font-style: italic; font-weight: 400;
+  font-size: 18px; color: var(--ink-3);
+}
+.qs .l {
+  font-family: var(--mono); font-size: 11.5px; font-weight: 400;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-3);
+}
 
-    /* ── PAYMENT SUCCESS BANNER ── */
-    .payment-banner {
-      display: none;
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      z-index: 2000;
-      background: rgba(0,0,0,.7);
-      backdrop-filter: blur(6px);
-      align-items: center; justify-content: center;
-      padding: 1.5rem;
-    }
-    .payment-banner.show { display: flex; }
-    .payment-banner-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: 2.5rem 2rem;
-      max-width: 480px; width: 100%;
-      position: relative;
-    }
-    .pbc-check {
-      width: 52px; height: 52px;
-      background: rgba(0,71,255,.1);
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      margin-bottom: 1.25rem;
-    }
-    .pbc-check svg { color: var(--blue); }
-    .pbc-label {
-      font-family: 'DM Mono', monospace; font-size: .6rem;
-      letter-spacing: .18em; text-transform: uppercase;
-      color: var(--blue); margin-bottom: .5rem;
-    }
-    .pbc-title {
-      font-family: 'Syne', sans-serif; font-weight: 800;
-      font-size: 1.6rem; letter-spacing: -.03em;
-      color: var(--text); margin-bottom: .5rem;
-    }
-    .pbc-sub {
-      font-family: 'Fraunces', serif; font-weight: 300;
-      font-size: .9rem; color: var(--text2);
-      line-height: 1.6; margin-bottom: 1.5rem;
-    }
-    .pbc-benefits {
-      border-top: 1px solid var(--border);
-      padding-top: 1.25rem; margin-bottom: 1.5rem;
-    }
-    .pbc-benefits-title {
-      font-family: 'DM Mono', monospace; font-size: .58rem;
-      letter-spacing: .15em; text-transform: uppercase;
-      color: var(--text3); margin-bottom: .75rem;
-    }
-    .pbc-benefit {
-      font-family: 'DM Mono', monospace; font-size: .7rem;
-      letter-spacing: .04em; color: var(--text2);
-      display: flex; gap: .6rem; align-items: flex-start;
-      margin-bottom: .6rem; line-height: 1.4;
-    }
-    .pbc-benefit::before { content: '→'; color: var(--blue); flex-shrink: 0; }
-    .pbc-close {
-      width: 100%;
-      font-family: 'DM Mono', monospace; font-size: .7rem;
-      letter-spacing: .1em; text-transform: uppercase;
-      color: var(--white); background: var(--blue);
-      border: none; padding: .85rem;
-      cursor: none; transition: background .2s;
-    }
-    .pbc-close:hover { background: #0035cc; }
-    .pbc-polling {
-      font-family: 'DM Mono', monospace; font-size: .55rem;
-      letter-spacing: .08em; text-transform: uppercase;
-      color: var(--text3); text-align: center;
-      margin-top: .75rem; min-height: 1rem;
-    }
+/* ───────── SECTION HEADER ───────── */
+.section-head {
+  margin: 4rem 0 2rem;
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 1.5rem;
+  padding-bottom: 1.1rem;
+  border-bottom: 2px solid var(--ink);
+}
+.section-head h2 {
+  font-family: var(--sans); font-weight: 700;
+  font-size: 1.4rem; letter-spacing: -.01em;
+  color: var(--ink);
+  display: flex; align-items: baseline; gap: .85rem;
+}
+.section-head h2 .num {
+  font-family: var(--mono); font-size: 14px; font-weight: 400;
+  letter-spacing: .15em; color: var(--ink-3);
+}
+.section-head .meta {
+  font-family: var(--mono); font-size: 13px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-2);
+}
 
-    /* ── PLAN EXPIRY / CANCEL ── */
-    .plan-expires {
-      font-family: 'DM Mono', monospace; font-size: .62rem;
-      letter-spacing: .06em; color: var(--text3);
-      margin-bottom: .75rem; line-height: 1.5;
-    }
-    .plan-expires.cancelled { color: #ff4757; }
-    .plan-cancel-btn {
-      display: block; width: 100%; text-align: center;
-      font-family: 'DM Mono', monospace; font-size: .6rem;
-      letter-spacing: .08em; text-transform: uppercase;
-      color: var(--text3); background: none;
-      border: 1px solid var(--border); padding: .6rem;
-      cursor: none; margin-top: .5rem;
-      transition: border-color .2s, color .2s;
-    }
-    .plan-cancel-btn:hover { border-color: #ff4757; color: #ff4757; }
+/* ───────── TOOLS GRID ───────── */
+.tools-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+}
+.tool {
+  position: relative;
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  padding: 1.85rem 1.85rem 1.6rem;
+  display: flex; flex-direction: column; gap: 1rem;
+  min-height: 220px;
+  transition: background .25s ease, border-color .25s ease;
+  overflow: hidden;
+}
+.tool:hover { background: var(--paper-2); border-color: var(--ink); }
+.tool.locked { opacity: .82; }
+.tool.locked:hover { background: var(--paper); border-color: var(--rule-strong); }
 
-    /* ── CANCEL MODAL ── */
-    .cancel-modal {
-      display: none; position: fixed; inset: 0; z-index: 3000;
-      background: rgba(0,0,0,.7); backdrop-filter: blur(6px);
-      align-items: center; justify-content: center; padding: 1.5rem;
-    }
-    .cancel-modal.show { display: flex; }
-    .cancel-modal-card {
-      background: var(--surface); border: 1px solid var(--border);
-      padding: 2rem; max-width: 400px; width: 100%;
-    }
-    .cancel-modal-title {
-      font-family: 'Syne', sans-serif; font-weight: 800;
-      font-size: 1.3rem; letter-spacing: -.02em;
-      margin-bottom: .5rem; color: var(--text);
-    }
-    .cancel-modal-desc {
-      font-family: 'Fraunces', serif; font-weight: 300;
-      font-size: .9rem; color: var(--text2); line-height: 1.6;
-      margin-bottom: 1.5rem;
-    }
-    .cancel-modal-actions { display: flex; gap: .75rem; }
-    .cancel-modal-confirm {
-      flex: 1; font-family: 'DM Mono', monospace; font-size: .65rem;
-      letter-spacing: .08em; text-transform: uppercase;
-      color: #fff; background: #ff4757;
-      border: none; padding: .75rem; cursor: none;
-      transition: background .2s;
-    }
-    .cancel-modal-confirm:hover { background: #e03347; }
-    .cancel-modal-confirm:disabled { opacity: .5; pointer-events: none; }
-    .cancel-modal-back {
-      flex: 1; font-family: 'DM Mono', monospace; font-size: .65rem;
-      letter-spacing: .08em; text-transform: uppercase;
-      color: var(--text2); background: none;
-      border: 1px solid var(--border); padding: .75rem; cursor: none;
-      transition: border-color .2s, color .2s;
-    }
-    .cancel-modal-back:hover { border-color: var(--blue); color: var(--blue); }
+.tool-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
+}
+.tool-folio {
+  font-family: var(--mono); font-weight: 700;
+  font-size: 14px; letter-spacing: .12em;
+  color: var(--accent);
+}
+.tool-status {
+  font-family: var(--mono); font-size: 11.5px; font-weight: 700;
+  letter-spacing: .16em; text-transform: uppercase;
+  padding: .3rem .65rem;
+  border-radius: 999px;
+  display: inline-flex; align-items: center; gap: .4rem;
+  white-space: nowrap;
+}
+.tool-status .d { width: 5px; height: 5px; border-radius: 50%; }
+.tool-status.included { color: var(--accent); background: var(--accent-soft); }
+.tool-status.included .d { background: var(--accent); }
+.tool-status.locked { color: var(--ink-3); background: transparent; border: 1px solid var(--rule-strong); }
+.tool-status.locked .d { background: var(--ink-3); }
 
-    /* ── SYNC PAYMENT MODAL ── (reaprovecha estética de cancel-modal) */
-    .sync-modal {
-      display:none; position:fixed; inset:0; z-index:3000;
-      background:rgba(0,0,0,.7); backdrop-filter:blur(6px);
-      align-items:center; justify-content:center; padding:1.5rem;
-    }
-    .sync-modal.show { display:flex; }
-    .sync-modal-card {
-      background:var(--surface); border:1px solid var(--border);
-      padding:2rem; max-width:440px; width:100%;
-    }
-    .sync-modal-title {
-      font-family:'Syne',sans-serif; font-weight:800;
-      font-size:1.3rem; letter-spacing:-.02em;
-      margin-bottom:.5rem; color:var(--text);
-    }
-    .sync-modal-desc {
-      font-family:'Fraunces',serif; font-weight:300;
-      font-size:.9rem; color:var(--text2); line-height:1.6;
-      margin-bottom:1.25rem;
-    }
-    .sync-modal-input {
-      width:100%; font-family:'DM Mono',monospace; font-size:.8rem;
-      color:var(--text); background:var(--surface2); border:1px solid var(--border);
-      padding:.7rem .85rem; margin-bottom:.75rem; cursor:text;
-      letter-spacing:.02em;
-    }
-    .sync-modal-input:focus { outline:none; border-color:var(--blue); }
-    .sync-modal-msg {
-      font-family:'DM Mono',monospace; font-size:.7rem;
-      color:var(--text2); margin-bottom:1rem; min-height:1.1em;
-      letter-spacing:.04em;
-    }
-    .sync-modal-msg.success { color:var(--success); }
-    .sync-modal-msg.error { color:#ff4757; }
-    .sync-modal-actions { display:flex; gap:.75rem; }
-    .sync-modal-confirm {
-      flex:1; font-family:'DM Mono',monospace; font-size:.65rem;
-      letter-spacing:.08em; text-transform:uppercase;
-      color:#fff; background:var(--blue);
-      border:none; padding:.75rem; cursor:none;
-      transition:background .2s;
-    }
-    .sync-modal-confirm:hover { background:#0035cc; }
-    .sync-modal-confirm:disabled { opacity:.5; pointer-events:none; }
-    .sync-modal-back {
-      flex:1; font-family:'DM Mono',monospace; font-size:.65rem;
-      letter-spacing:.08em; text-transform:uppercase;
-      color:var(--text2); background:none;
-      border:1px solid var(--border); padding:.75rem; cursor:none;
-      transition:border-color .2s, color .2s;
-    }
-    .sync-modal-back:hover { border-color:var(--blue); color:var(--blue); }
+.tool-name {
+  font-family: var(--sans); font-weight: 700;
+  font-size: 1.65rem; line-height: 1.08;
+  letter-spacing: -.02em; color: var(--ink);
+  position: relative; align-self: flex-start;
+}
+.tool-name::after {
+  content: ""; position: absolute; left: 0; bottom: -4px; height: 2px;
+  background: var(--accent); width: 0;
+  transition: width .4s cubic-bezier(.2,.7,.2,1);
+}
+.tool:hover:not(.locked) .tool-name::after { width: 3.5rem; }
+.tool.locked .tool-name { color: var(--ink-2); }
 
-    /* Pequeño link en la plan-card */
-    .plan-sync-link {
-      display:block; width:100%; margin-top:.5rem; padding:.4rem 0;
-      background:none; border:none; cursor:pointer;
-      font-family:'DM Mono',monospace; font-size:.6rem;
-      letter-spacing:.08em; text-transform:uppercase;
-      color:var(--text3); text-align:center;
-      transition:color .2s;
-    }
-    .plan-sync-link:hover { color:var(--blue); }
-  </style>
+.tool-dek {
+  font-family: var(--sans); font-weight: 400;
+  font-size: 16.5px; line-height: 1.5;
+  color: var(--ink-2); flex: 1;
+}
+.tool.locked .tool-dek { color: var(--ink-3); }
+
+.tool-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+  font-family: var(--mono); font-size: 12.5px; font-weight: 700;
+  letter-spacing: .15em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+.tool-cta {
+  display: inline-flex; align-items: center; gap: .5rem;
+  color: var(--ink);
+  transition: gap .25s ease, color .25s ease;
+}
+.tool:hover:not(.locked) .tool-cta { gap: .85rem; color: var(--accent); }
+.tool.locked .tool-cta { color: var(--ink-3); }
+
+/* watermark number */
+.tool::after {
+  content: attr(data-folio);
+  position: absolute; right: 1rem; bottom: -.7rem;
+  font-family: var(--display); font-weight: 800;
+  font-size: 7.5rem; line-height: 1;
+  color: var(--ink);
+  opacity: .04;
+  pointer-events: none;
+  letter-spacing: -.04em;
+}
+
+/* ───────── PROYECTO DC (privado) ───────── */
+.private-wrap { margin-top: 1rem; }
+.private {
+  position: relative;
+  background:
+    repeating-linear-gradient(135deg,
+      var(--paper-2) 0 12px,
+      var(--paper-3) 12px 13px);
+  border: 1px solid var(--ink);
+  padding: 2rem 2rem 1.75rem;
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) 1fr auto;
+  gap: 2rem;
+  align-items: center;
+  overflow: hidden;
+}
+.private::before {
+  content: "Acceso restringido · Proyecto DC";
+  position: absolute; top: 0; right: 0;
+  font-family: var(--mono); font-size: 11.5px; font-weight: 700;
+  letter-spacing: .2em; text-transform: uppercase;
+  padding: .4rem .8rem;
+  background: var(--ink); color: var(--paper);
+}
+.private-stamp {
+  display: flex; flex-direction: column; gap: .35rem;
+  font-family: var(--mono); font-size: 12px; font-weight: 400;
+  letter-spacing: .1em;
+  color: var(--ink-2);
+  line-height: 1.5;
+  border-left: 2px solid var(--gold);
+  padding-left: 1rem;
+}
+.private-stamp .k {
+  color: var(--ink-3); text-transform: uppercase;
+  letter-spacing: .15em; font-size: 10.5px; font-weight: 700;
+}
+.private-body { padding-top: .25rem; }
+.private-eyebrow {
+  font-family: var(--mono); font-size: 12px; font-weight: 700;
+  letter-spacing: .18em; text-transform: uppercase;
+  color: var(--gold); margin-bottom: .55rem;
+  display: inline-flex; align-items: center; gap: .55rem;
+}
+.private-eyebrow::before {
+  content: ""; display: inline-block; width: 22px; height: 1.5px; background: var(--gold);
+}
+.private h3 {
+  font-family: var(--sans); font-weight: 700;
+  font-size: 2.4rem; line-height: 1;
+  letter-spacing: -.025em;
+  margin-bottom: .65rem;
+  color: var(--ink);
+}
+.private h3 em {
+  font-family: var(--italic); font-style: italic; font-weight: 500;
+  letter-spacing: -.02em;
+  color: var(--gold);
+}
+.private-dek {
+  font-family: var(--sans); font-weight: 400;
+  font-size: 17px; line-height: 1.55;
+  color: var(--ink-2);
+  max-width: 56ch;
+}
+.private-cta {
+  display: flex; flex-direction: column; gap: .65rem; align-items: stretch;
+  min-width: 200px;
+}
+.private-cta .btn {
+  font-family: var(--mono); font-size: 13px; font-weight: 700;
+  letter-spacing: .18em; text-transform: uppercase;
+  padding: 1rem 1.25rem;
+  background: var(--ink); color: var(--paper);
+  text-align: center;
+  transition: background .25s, color .25s;
+}
+.private-cta .btn:hover { background: var(--gold); color: var(--ink); }
+.private-cta .note {
+  font-family: var(--mono); font-size: 11.5px;
+  letter-spacing: .15em; text-transform: uppercase;
+  color: var(--ink-3); text-align: center;
+}
+
+/* ───────── LOWER FOLD ───────── */
+.fold {
+  display: grid;
+  grid-template-columns: 1.05fr 1.25fr .9fr;
+  gap: 0;
+  margin-top: 1.5rem;
+  border-top: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
+}
+.col {
+  padding: 2.5rem 1.85rem;
+  border-right: 1px solid var(--rule);
+}
+.col:last-child { border-right: none; }
+.col-kicker {
+  font-family: var(--mono); font-size: 12px; font-weight: 700;
+  letter-spacing: .2em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 1rem;
+  display: flex; align-items: center; gap: .65rem;
+}
+.col-kicker::after { content: ""; flex: 1; height: 1px; background: var(--rule-strong); }
+.col h3 {
+  font-family: var(--sans); font-weight: 700;
+  font-size: 1.6rem; letter-spacing: -.02em; line-height: 1.05;
+  margin-bottom: 1.5rem; color: var(--ink);
+}
+.col h3 em {
+  font-family: var(--italic); font-style: italic; font-weight: 500;
+  letter-spacing: -.015em; color: var(--accent);
+}
+
+/* DESCARGAS */
+.quota { padding-bottom: 1.5rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--rule); }
+.quota-row {
+  display: flex; align-items: baseline; gap: .65rem;
+  margin-bottom: .9rem;
+}
+.quota-used {
+  font-family: var(--sans); font-weight: 700;
+  font-size: 5rem; line-height: 1; letter-spacing: -.045em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.quota-divider {
+  font-family: var(--italic); font-style: italic; font-weight: 400;
+  font-size: 3rem; color: var(--ink-3); line-height: 1;
+}
+.quota-total {
+  font-family: var(--sans); font-weight: 600;
+  font-size: 2.4rem; line-height: 1;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.quota-label {
+  font-family: var(--sans); font-size: 14.5px; font-weight: 500;
+  color: var(--ink-2); margin-bottom: .85rem;
+}
+.quota-bar { display: flex; height: 10px; gap: 2px; }
+.quota-tick { flex: 1; background: var(--paper-3); transition: background .3s ease; }
+.quota-tick.full { background: var(--accent); }
+
+.dl-list { display: flex; flex-direction: column; gap: 0; }
+.dl-item {
+  display: grid; grid-template-columns: 70px 1fr auto;
+  gap: 1rem; align-items: baseline;
+  padding: .9rem 0;
+  border-bottom: 1px dashed var(--rule-strong);
+  font-family: var(--sans);
+}
+.dl-item:last-child { border-bottom: none; }
+.dl-date {
+  font-family: var(--mono); font-size: 13px; font-weight: 700;
+  letter-spacing: .06em; color: var(--accent);
+}
+.dl-name {
+  font-family: var(--sans); font-weight: 500;
+  font-size: 16px; line-height: 1.35;
+  color: var(--ink); text-decoration: none;
+}
+.dl-name:hover { color: var(--accent); }
+.dl-name .sub {
+  display: block;
+  font-family: var(--italic); font-style: italic; font-weight: 300;
+  font-size: 14.5px; color: var(--ink-3); margin-top: .15rem;
+}
+.dl-cta {
+  font-family: var(--mono); font-size: 12px; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-2);
+  white-space: nowrap;
+  transition: color .2s;
+}
+.dl-cta:hover { color: var(--accent); }
+.dl-cta.locked { color: var(--ink-3); }
+
+/* NOVEDADES */
+.news-list { display: flex; flex-direction: column; gap: 0; }
+.news-item {
+  display: grid; grid-template-columns: 72px 1fr;
+  gap: 1.1rem; padding: 1.15rem 0;
+  border-bottom: 1px solid var(--rule);
+  align-items: baseline;
+}
+.news-item:first-child { padding-top: 0; }
+.news-item:last-child  { border-bottom: none; padding-bottom: 0; }
+.news-date {
+  font-family: var(--mono); font-size: 13px; font-weight: 700;
+  letter-spacing: .08em; color: var(--accent);
+  line-height: 1.3; white-space: nowrap;
+}
+.news-date .y {
+  display: block;
+  color: var(--ink-3); font-size: 11px; font-weight: 400;
+  letter-spacing: .15em;
+}
+.news-body h4 {
+  font-family: var(--sans); font-weight: 700;
+  font-size: 17.5px; line-height: 1.25;
+  letter-spacing: -.005em;
+  margin-bottom: .35rem; color: var(--ink);
+}
+.news-body p {
+  font-family: var(--sans); font-weight: 400;
+  font-size: 15.5px; line-height: 1.5; color: var(--ink-2);
+}
+.news-body .tag {
+  display: inline-block; margin-top: .55rem;
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .18em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+.news-body .tag.free { color: var(--accent); }
+.news-body .tag.pro { color: var(--gold); }
+.news-body .tag.premium { color: var(--accent); }
+
+/* SUSCRIPCIÓN / PERFIL */
+.sub-name {
+  font-family: var(--sans); font-weight: 700;
+  font-size: 1.35rem; letter-spacing: -.02em; line-height: 1.1;
+}
+.sub-role {
+  font-family: var(--italic); font-style: italic; font-weight: 400;
+  font-size: 16px; color: var(--ink-2);
+  margin-top: .15rem; margin-bottom: 1.5rem;
+}
+.kv {
+  display: grid; grid-template-columns: 1fr auto; gap: 1rem;
+  padding: .85rem 0;
+  border-top: 1px solid var(--rule);
+  align-items: baseline;
+}
+.kv:last-of-type { border-bottom: 1px solid var(--rule); }
+.kv .k {
+  font-family: var(--mono); font-size: 11.5px; font-weight: 700;
+  letter-spacing: .15em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+.kv .v {
+  font-family: var(--sans); font-weight: 500;
+  font-size: 15.5px; color: var(--ink); text-align: right;
+}
+.kv .v .badge {
+  font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--accent); margin-left: .5rem;
+}
+.kv .v .badge.cancelled { color: var(--gold); }
+.sub-actions { margin-top: 1.5rem; display: flex; flex-direction: column; gap: .65rem; }
+.sub-action {
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: var(--sans); font-weight: 600;
+  font-size: 14.5px; letter-spacing: .01em;
+  padding: .9rem 1.05rem;
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  color: var(--ink);
+  text-align: left; text-decoration: none;
+  transition: background .2s, color .2s, border-color .2s;
+}
+.sub-action:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.sub-action.danger { color: var(--ink-2); }
+.sub-action.danger:hover { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.sub-action .arr { transition: transform .2s; }
+.sub-action:hover .arr { transform: translateX(4px); }
+.sub-sync {
+  display: block; width: 100%; margin-top: .65rem;
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-3); text-align: center;
+  padding: .55rem 0; transition: color .2s;
+}
+.sub-sync:hover { color: var(--accent); }
+
+/* ───────── FOOTER ───────── */
+.footer {
+  margin-top: 3.5rem;
+  padding: 1.5rem 0 0;
+  border-top: 1px solid var(--rule);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1.5rem;
+  font-family: var(--mono); font-size: 12px; font-weight: 400;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-3);
+  flex-wrap: wrap;
+}
+.footer .credit {
+  font-family: var(--italic); font-style: italic; font-weight: 400;
+  font-size: 15px; text-transform: none; letter-spacing: 0;
+  color: var(--ink-2);
+}
+
+/* ───────── MODALS ───────── */
+.modal-bg {
+  position: fixed; inset: 0; z-index: 3000;
+  background: color-mix(in oklch, var(--ink) 60%, transparent);
+  backdrop-filter: blur(4px);
+  display: none; align-items: center; justify-content: center;
+  padding: 1.5rem;
+}
+.modal-bg.show { display: flex; }
+.modal {
+  background: var(--paper); color: var(--ink);
+  border: 1px solid var(--ink);
+  max-width: 580px; width: 100%;
+  box-shadow: 12px 12px 0 var(--ink);
+}
+.modal-head {
+  padding: .85rem 1.25rem;
+  border-bottom: 1px solid var(--ink);
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: var(--mono); font-size: 11.5px; font-weight: 700;
+  letter-spacing: .2em; text-transform: uppercase;
+  color: var(--ink-2);
+}
+.modal-head .x { font-family: var(--sans); font-size: 22px; line-height: 1; padding: 0 .25rem; }
+.modal-body { padding: 1.85rem 1.6rem 1.6rem; }
+.modal h2 {
+  font-family: var(--sans); font-weight: 700;
+  font-size: 2.1rem; line-height: 1.04; letter-spacing: -.025em;
+  margin-bottom: .55rem;
+}
+.modal h2 em {
+  font-family: var(--italic); font-style: italic; font-weight: 500;
+  letter-spacing: -.02em; color: var(--accent);
+}
+.modal .lead {
+  font-family: var(--sans); font-weight: 400;
+  font-size: 17px; line-height: 1.5; color: var(--ink-2);
+  margin-bottom: 1.5rem;
+}
+.modal-actions { display: flex; gap: .75rem; margin-top: 1.5rem; }
+.modal-actions button, .modal-actions a {
+  flex: 1;
+  font-family: var(--sans); font-weight: 600;
+  font-size: 14.5px; letter-spacing: .02em;
+  padding: .95rem;
+  border: 1px solid var(--ink);
+  text-align: center; text-decoration: none;
+  transition: background .2s, color .2s;
+}
+.modal-actions .secondary { background: transparent; color: var(--ink); }
+.modal-actions .secondary:hover { background: var(--paper-2); }
+.modal-actions .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.modal-actions .primary:hover { filter: brightness(1.08); }
+.modal-actions .danger { background: var(--ink); color: var(--paper); }
+.modal-actions .danger:hover { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.modal-actions button:disabled, .modal-actions a:disabled { opacity: .5; pointer-events: none; }
+
+.cancel-info {
+  font-family: var(--mono); font-size: 12.5px; font-weight: 400;
+  letter-spacing: .08em;
+  color: var(--ink-2);
+  background: var(--paper-2);
+  border: 1px solid var(--rule-strong);
+  padding: 1rem 1.1rem;
+  margin-bottom: 1.25rem;
+  line-height: 1.6;
+}
+
+.sync-input {
+  width: 100%;
+  font-family: var(--mono); font-size: 14px;
+  color: var(--ink); background: var(--paper-2);
+  border: 1px solid var(--rule-strong);
+  padding: .85rem .95rem; margin-bottom: .75rem;
+  cursor: text; letter-spacing: .02em;
+}
+.sync-input:focus { outline: none; border-color: var(--accent); }
+.sync-msg {
+  font-family: var(--mono); font-size: 12.5px;
+  color: var(--ink-2); margin-bottom: 1rem; min-height: 1.2em;
+  letter-spacing: .04em;
+}
+.sync-msg.success { color: var(--accent); }
+.sync-msg.error { color: var(--danger); }
+
+/* PAYMENT BANNER */
+.pay-banner {
+  display: none; position: fixed; inset: 0; z-index: 2500;
+  background: color-mix(in oklch, var(--ink) 65%, transparent);
+  backdrop-filter: blur(6px);
+  align-items: center; justify-content: center; padding: 1.5rem;
+}
+.pay-banner.show { display: flex; }
+.pay-banner-card {
+  background: var(--paper); border: 1px solid var(--ink);
+  box-shadow: 12px 12px 0 var(--ink);
+  padding: 2.25rem 1.85rem; max-width: 520px; width: 100%;
+}
+.pbc-check {
+  width: 52px; height: 52px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 1.25rem;
+}
+.pbc-check svg { color: var(--accent); }
+.pbc-label {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .2em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: .55rem;
+}
+.pbc-title {
+  font-family: var(--sans); font-weight: 700;
+  font-size: 1.8rem; letter-spacing: -.025em; line-height: 1.05;
+  color: var(--ink); margin-bottom: .55rem;
+}
+.pbc-title em { font-family: var(--italic); font-style: italic; font-weight: 500; color: var(--accent); }
+.pbc-sub {
+  font-family: var(--sans); font-weight: 400;
+  font-size: 16px; color: var(--ink-2);
+  line-height: 1.5; margin-bottom: 1.5rem;
+}
+.pbc-benefits {
+  border-top: 1px solid var(--rule); padding-top: 1.1rem; margin-bottom: 1.25rem;
+}
+.pbc-benefits-title {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .18em; text-transform: uppercase;
+  color: var(--ink-3); margin-bottom: .75rem;
+}
+.pbc-benefit {
+  font-family: var(--sans); font-size: 14.5px;
+  color: var(--ink-2);
+  display: flex; gap: .55rem; align-items: flex-start;
+  margin-bottom: .5rem; line-height: 1.45;
+}
+.pbc-benefit::before { content: '→'; color: var(--accent); flex-shrink: 0; font-family: var(--mono); }
+.pbc-close {
+  width: 100%; font-family: var(--mono); font-size: 12.5px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--on-accent); background: var(--accent);
+  border: 1px solid var(--accent);
+  padding: .95rem;
+  transition: filter .2s;
+}
+.pbc-close:hover { filter: brightness(1.08); }
+.pbc-polling {
+  font-family: var(--mono); font-size: 11px;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-3); text-align: center;
+  margin-top: .85rem; min-height: 1rem;
+}
+
+/* ───────── RESPONSIVE ───────── */
+@media (max-width: 1080px) {
+  .hero { grid-template-columns: 1fr; gap: 2.5rem; padding: 3rem 0; }
+  .hero-aside { padding-bottom: 0; border-top: 1px solid var(--rule-strong); padding-top: 2rem; }
+  .private { grid-template-columns: 1fr; gap: 1.5rem; }
+  .private-stamp { border-left: none; border-top: 2px solid var(--gold); padding-left: 0; padding-top: 1rem; }
+  .fold { grid-template-columns: 1fr; }
+  .col { border-right: none; border-bottom: 1px solid var(--rule); }
+  .col:last-child { border-bottom: none; }
+}
+@media (max-width: 760px) {
+  body { font-size: 17px; cursor: auto; }
+  .cursor, .cursor-ring { display: none; }
+  .topbar { grid-template-columns: 1fr auto; gap: .75rem; padding: .85rem 1rem; }
+  .topbar-center { display: none; }
+  .topbar-right { gap: .5rem; }
+  .country-btn { padding: .35rem .55rem; }
+  .country-btn .country-label { display: none; }
+  .user-block { display: none; }
+  .plan-chip { display: none; }
+  .page { padding: 1.5rem 1.25rem 3rem; }
+  .kicker { font-size: 11.5px; flex-wrap: wrap; gap: .5rem; }
+  .hero { padding: 2rem 0 2.5rem; }
+  .hero-greeting { font-size: clamp(2.4rem, 11vw, 3.6rem); }
+  .tools-grid { grid-template-columns: 1fr; }
+  .tool { min-height: 180px; padding: 1.5rem; }
+  .tool::after { font-size: 5.5rem; }
+  .quota-used { font-size: 4rem; }
+}
+</style>
 </head>
 <body>
 
-  <!-- PAYMENT SUCCESS BANNER (aparece si Wompi redirige aquí con ?status=APPROVED) -->
-  <div class="payment-banner" id="payment-banner">
-    <div class="payment-banner-card">
-      <div class="pbc-check">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
-      </div>
-      <div class="pbc-label">Pago confirmado</div>
-      <div class="pbc-title" id="pbc-title">¡Bienvenido al plan Pro!</div>
-      <div class="pbc-sub" id="pbc-sub">Tu plan ha sido activado. Ya tienes acceso a todo lo incluido a continuación.</div>
-      <div class="pbc-benefits">
-        <div class="pbc-benefits-title">Lo que incluye tu plan</div>
-        <div id="pbc-benefits-list"></div>
-      </div>
-      <button class="pbc-close" onclick="closePlanBanner()">Entendido, ir a mi dashboard →</button>
-      <div class="pbc-polling" id="pbc-polling"></div>
-    </div>
-  </div>
+<!-- CURSOR (se mantiene del sitio) -->
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
 
-  <!-- CANCEL CONFIRMATION MODAL -->
-  <div class="cancel-modal" id="cancel-modal">
-    <div class="cancel-modal-card">
-      <div class="cancel-modal-title">¿Cancelar tu plan?</div>
-      <div class="cancel-modal-desc">
-        Tu acceso continuará activo hasta <strong id="cancel-expires-date">—</strong>. Después de esa fecha pasarás al plan gratuito automáticamente.
-      </div>
-      <div class="cancel-modal-actions">
-        <button class="cancel-modal-back" onclick="closeCancelModal()">Volver</button>
-        <button class="cancel-modal-confirm" id="cancel-confirm-btn" onclick="confirmCancel()">Sí, cancelar</button>
+<!-- ═══════════════════ TOP BAR ═══════════════════ -->
+<nav class="topbar">
+  <div class="topbar-left">
+    <a href="index.html" class="btn-back"><span class="arr">←</span> <span id="back-label">Volver</span></a>
+    <div class="user-block">
+      <div class="user-mono" id="user-mono">—</div>
+      <div class="user-text">
+        <a href="perfil.html" class="user-name" id="user-name">—</a>
+        <span class="user-email" id="user-email">—</span>
       </div>
     </div>
   </div>
+  <div class="topbar-center">
+    <span class="plan-chip" id="plan-chip"><span class="marker"></span><span id="plan-chip-label">—</span></span>
+  </div>
+  <div class="topbar-right">
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
+    <div class="country-selector-wrap">
+      <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
+        <span class="country-label" id="countryBtnLabel">Colombia</span>
+        <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style="margin-left:6px;transition:transform 0.2s" id="countryChevron"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+      <div class="country-dropdown" id="countryDropdown">
+        <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
+        <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
+        <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
+        <div class="country-option" data-value="cn" onclick="selectCountry(this)"><span class="country-check">✓</span> 中国 / China</div>
+      </div>
+    </div>
+    <a href="index.html" class="logo-link" aria-label="Ricardo.Ruiz">
+      <div class="logo-bars">
+        <div class="logo-bar" style="height:20px"></div>
+        <div class="logo-bar" style="height:15px"></div>
+        <div class="logo-bar" style="height:9px"></div>
+        <div class="logo-bar" style="height:4px"></div>
+      </div>
+      <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+    </a>
+  </div>
+</nav>
 
-  <!-- SYNC PAYMENT MODAL -->
-  <div class="sync-modal" id="sync-modal">
-    <div class="sync-modal-card">
-      <div class="sync-modal-title" id="sync-modal-title">Sincronizar mi pago</div>
-      <div class="sync-modal-desc" id="sync-modal-desc">
-        Si pagaste por Wompi y tu plan no se actualizó, pega aquí el ID de la transacción. Lo encuentras en el correo de confirmación de Wompi (formato <code>1401350-…-…</code>).
-      </div>
-      <input type="text" class="sync-modal-input" id="sync-tx-input" placeholder="1401350-1234567890-12345" autocomplete="off" />
-      <div class="sync-modal-msg" id="sync-modal-msg"></div>
-      <div class="sync-modal-actions">
-        <button class="sync-modal-back" onclick="closeSyncModal()" id="sync-back-btn">Cerrar</button>
-        <button class="sync-modal-confirm" id="sync-confirm-btn" onclick="runSync()">Sincronizar</button>
-      </div>
+<!-- ═══════════════════ PAGE ═══════════════════ -->
+<main class="page">
+
+  <!-- KICKER ROW -->
+  <div class="kicker">
+    <div class="left">
+      <span class="pulse" aria-hidden="true"></span>
+      <span id="kicker-label">Panel personal</span>
+      <span class="dot">·</span>
+      <span id="kicker-date">—</span>
+    </div>
+    <div class="right">
+      <span id="kicker-time">—</span>
+      <span class="dot">·</span>
+      <span id="kicker-city">Bogotá</span>
     </div>
   </div>
 
-  <div class="cursor" id="cursor"></div>
-  <div class="cursor-ring" id="cursorRing"></div>
-
-  <!-- NAV -->
-  <nav class="electoral-nav">
-    <div style="display:flex;align-items:center;gap:1rem">
-      <a href="index.html" class="e-btn-back">← Volver</a>
-      <div id="e-nav-auth" class="electoral-nav-auth"></div>
+  <!-- HERO / GREETING -->
+  <section class="hero">
+    <div class="hero-greeting">
+      <span class="word" id="hero-word">—</span>
+      <span class="name" id="hero-name">—</span><span class="period">.</span>
     </div>
-    <div style="display:flex;align-items:center;gap:1.2rem">
-      <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
-      <div class="country-selector-wrap">
-        <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
-          <span id="countryBtnLabel">Colombia</span>
-          <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style="margin-left:6px;transition:transform 0.2s" id="countryChevron"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        </button>
-        <div class="country-dropdown" id="countryDropdown">
-          <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
-          <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
-          <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
-          <div class="country-option" data-value="cn" onclick="selectCountry(this)"><span class="country-check">✓</span> 中国 / China</div>
+    <aside class="hero-aside">
+      <p id="hero-aside-text">—</p>
+      <div class="quick-stats" id="hero-quick-stats"></div>
+    </aside>
+  </section>
+
+  <!-- TOOLS -->
+  <div class="section-head">
+    <h2><span class="num">— 01</span> <span id="tools-h2">Herramientas</span></h2>
+    <span class="meta" id="tools-meta">—</span>
+  </div>
+  <section class="tools-grid" id="tools-grid"></section>
+
+  <!-- PROYECTO DC -->
+  <div class="private-wrap" id="private-wrap"></div>
+
+  <!-- LOWER FOLD -->
+  <div class="section-head" style="margin-top: 4.5rem;">
+    <h2><span class="num">— 02</span> <span id="fold-h2">Movimiento del mes</span></h2>
+    <span class="meta" id="fold-meta">Descargas · novedades · suscripción</span>
+  </div>
+
+  <section class="fold">
+    <!-- COL 1: DESCARGAS -->
+    <div class="col">
+      <div class="col-kicker" id="dl-kicker">Centro de descargas</div>
+      <h3 id="dl-h3">Cuota <em>del mes</em></h3>
+
+      <div class="quota">
+        <div class="quota-row">
+          <span class="quota-used" id="quota-used">0</span>
+          <span class="quota-divider">/</span>
+          <span class="quota-total" id="quota-total">0</span>
         </div>
+        <div class="quota-label" id="quota-label">—</div>
+        <div class="quota-bar" id="quota-bar"></div>
       </div>
-      <a href="index.html" class="logo-link">
-        <div class="logo-bars">
-          <div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div>
-          <div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div>
+
+      <div class="dl-list" id="dl-list"></div>
+    </div>
+
+    <!-- COL 2: NOVEDADES -->
+    <div class="col">
+      <div class="col-kicker" id="news-kicker">Novedades de producto</div>
+      <h3 id="news-h3">Cambios <em>recientes</em></h3>
+      <div class="news-list" id="news-list"></div>
+    </div>
+
+    <!-- COL 3: SUSCRIPCIÓN -->
+    <div class="col">
+      <div class="col-kicker" id="sub-kicker">Suscripción</div>
+      <h3 id="sub-plan-title">Plan</h3>
+
+      <div class="sub-name" id="sub-name">—</div>
+      <div class="sub-role" id="sub-role">—</div>
+
+      <div id="sub-kv-list"></div>
+
+      <div class="sub-actions" id="sub-actions"></div>
+      <button class="sub-sync" id="sub-sync" onclick="openSyncModal()">—</button>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <span>ricardoruiz.co · 2026</span>
+    <span class="credit" id="footer-credit">Inteligencia electoral, política y territorial. Bogotá.</span>
+    <span>Composición: Familjen · Petrona · Mono</span>
+  </footer>
+</main>
+
+<!-- ═══════════════════ PAYMENT SUCCESS BANNER ═══════════════════ -->
+<div class="pay-banner" id="payment-banner">
+  <div class="pay-banner-card">
+    <div class="pbc-check">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+    </div>
+    <div class="pbc-label">Pago confirmado</div>
+    <div class="pbc-title" id="pbc-title">¡Bienvenido al plan <em>Pro</em>!</div>
+    <div class="pbc-sub" id="pbc-sub">Tu plan ha sido activado. Ya tienes acceso a todo lo incluido.</div>
+    <div class="pbc-benefits">
+      <div class="pbc-benefits-title">Lo que incluye tu plan</div>
+      <div id="pbc-benefits-list"></div>
+    </div>
+    <button class="pbc-close" onclick="closePlanBanner()">Entendido, ir a mi panel →</button>
+    <div class="pbc-polling" id="pbc-polling"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════ CANCEL MODAL ═══════════════════ -->
+<div class="modal-bg" id="cancel-modal">
+  <div class="modal">
+    <div class="modal-head"><span>Cancelar suscripción</span><span class="x" onclick="closeCancelModal()">×</span></div>
+    <div class="modal-body">
+      <h2>¿Cancelar tu <em>suscripción</em>?</h2>
+      <p class="lead">Conservarás acceso a todas las herramientas hasta <strong id="cancel-expires-date">—</strong>. Después de esa fecha tu cuenta pasará al plan Básico y se interrumpirán las descargas, el análisis de partidos y la medición de endoso. Puedes reactivarla en cualquier momento.</p>
+      <div class="modal-actions">
+        <button class="secondary" onclick="closeCancelModal()">Volver</button>
+        <button class="danger" id="cancel-confirm-btn" onclick="confirmCancel()">Sí, cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ SYNC PAYMENT MODAL ═══════════════════ -->
+<div class="modal-bg" id="sync-modal">
+  <div class="modal">
+    <div class="modal-head"><span id="sync-modal-head">Sincronizar mi pago</span><span class="x" onclick="closeSyncModal()">×</span></div>
+    <div class="modal-body">
+      <h2 id="sync-modal-h2">Sincronizar mi <em>pago</em>.</h2>
+      <p class="lead" id="sync-modal-desc">Si pagaste por Wompi y tu plan no se actualizó, pega aquí el ID de la transacción. Lo encuentras en el correo de confirmación de Wompi (formato <code>1401350-…-…</code>).</p>
+      <input type="text" class="sync-input" id="sync-tx-input" placeholder="1401350-1234567890-12345" autocomplete="off" />
+      <div class="sync-msg" id="sync-modal-msg"></div>
+      <div class="modal-actions">
+        <button class="secondary" id="sync-back-btn" onclick="closeSyncModal()">Cerrar</button>
+        <button class="primary" id="sync-confirm-btn" onclick="runSync()">Sincronizar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ─── AUTH CHECK ─── */
+const token = localStorage.getItem('rr-token');
+const user  = JSON.parse(localStorage.getItem('rr-user') || 'null');
+if (!token || !user) window.location.href = 'login.html';
+
+/* ─── PLAN CONFIG ─── */
+const PLANS = {
+  free: {
+    label: 'Básico', downloads: 0,
+    desc: 'Acceso a resultados electorales 2025-2026 y visualizaciones básicas.',
+    perks: ['Histórico electoral 2025 y 2026', 'Análisis con filtros básicos', 'Visualizaciones territoriales esenciales'],
+    tools: ['electoral', 'consulta2025'],
+  },
+  pro: {
+    label: 'Pro', downloads: 3,
+    desc: 'Análisis avanzado de partidos, endoso y 3 descargas mensuales.',
+    perks: ['3 descargas al mes', 'Análisis de partidos y medición de endoso', 'Mapas por comunas y localidades'],
+    tools: ['electoral', 'consulta2025', 'partidos', 'endoso'],
+  },
+  premium: {
+    label: 'Premium', downloads: 10,
+    desc: 'Acceso completo, centro de descargas y 10 archivos mensuales.',
+    perks: ['10 descargas al mes', 'Centro de descargas completo', 'Notificaciones de actualización'],
+    tools: ['electoral', 'consulta2025', 'partidos', 'endoso', 'descargas'],
+  },
+  full: {
+    label: 'Full', downloads: 999,
+    desc: 'Acceso ilimitado. Todas las herramientas y asesoría directa.',
+    perks: ['Descargas ilimitadas', 'Acceso completo a todas las herramientas', 'Asesoría directa'],
+    tools: ['electoral', 'consulta2025', 'partidos', 'endoso', 'descargas'],
+  },
+};
+
+const ALL_TOOLS = [
+  { id:'electoral',    name:'Histórico Electoral', desc:'Resultados 2025 y 2026 con drill-down hasta puesto de votación. Senado, Cámara, CITREP y Consultas.', href:'electoral.html',           tag:'Datos territoriales' },
+  { id:'consulta2025', name:'Consulta 2025',       desc:'Análisis completo de la consulta presidencial del Pacto Histórico, octubre de 2025.',                  href:'Consulta-2025.html',       tag:'Análisis profundo' },
+  { id:'partidos',     name:'Análisis Partidos',   desc:'Desempeño territorial por partido y movimiento. Drill-down hasta comuna y localidad.',                 href:'analisis-partidos.html',   tag:'Mapas y métricas' },
+  { id:'endoso',       name:'Medición de Endoso',  desc:'Índice de endoso de candidatos a partir del comportamiento electoral territorial en las elecciones 2026.', href:'endoso-2026.html',     tag:'Índice 2026' },
+  { id:'descargas',    name:'Centro de Descargas', desc:'Archivos Excel por departamento, circunscripción y corporación hasta nivel de puesto de votación.',     href:'descargas.html',           tag:'Bases · Excel' },
+];
+
+const PRIVATE_TOOLS = [
+  {
+    id: 'proyecto-dc',
+    name: 'Proyecto DC',
+    desc: 'Investigación no declarativa sobre la elección de Medellín 2027. Lectura cruzada de huellas digitales, movimientos institucionales y configuración territorial. Material no público, distribución por invitación únicamente.',
+    href: 'proyecto-dc.html',
+    allowedEmails: ['reruizc@gmail.com', 'nuevagemela@gmail.com'],
+  },
+];
+
+/* Demo dummy de descargas recientes (la lista real no se rastrea client-side aún). */
+const DOWNLOADS_DEMO = [
+  { name:'Centro de descargas', sub:'Bases por departamento y corporación', href:'descargas.html' },
+];
+
+let NEWS = [];
+
+/* ─── i18n ─── */
+const I18N = {
+  co: {
+    morning:'Buenos días', afternoon:'Buenas tardes', evening:'Buenas noches',
+    back:'Volver', kickerLabel:'Panel personal',
+    tools:'Herramientas',
+    toolsMetaAll:'todas disponibles', toolsMetaLocked:c=>`${c} bloqueada${c!==1?'s':''}`,
+    toolsMeta:(n,c)=>`${n} secciones · ${c}`,
+    locked:'Bloqueado', included:'Incluido',
+    proUp:'Pro ↑', premiumUp:'Premium ↑',
+    foldH2:'Movimiento del mes', foldMeta:'Descargas · novedades · suscripción',
+    dlKicker:'Centro de descargas', dlH3html:'Cuota <em>del mes</em>',
+    quotaUnlimited:'Descargas ilimitadas', renews:'renueva el',
+    available:'disponibles', noDownloads:'Plan sin descargas mensuales',
+    download:'Descargar', openCenter:'Abrir centro',
+    newsKicker:'Novedades de producto', newsH3html:'Cambios <em>recientes</em>',
+    newsLoading:'Cargando…',
+    subKicker:'Suscripción',
+    subRole:'Cuenta personal · Bogotá',
+    kPlan:'Plan actual', kCycle:'Ciclo de cobro', kRenews:'Próxima renovación',
+    kAccessUntil:'Acceso hasta', kMember:'Miembro desde', kAccount:'Cuenta',
+    cycleMonthly:'Mensual', cycleAnnual:'Anual',
+    badgeActive:'activo', badgeCancelled:'cancelado',
+    memberDefault:'Marzo 2026', accountFree:'Cuenta gratuita',
+    aUpgrade:'Mejorar plan', aCancel:'Cancelar suscripción', aChangePass:'Cambiar contraseña', aLogout:'Cerrar sesión',
+    syncPaid:'¿Pagaste y no se activó? Sincronizar →',
+    asideTpl:(n,r)=>`Tu mesa de trabajo de hoy reúne <span class="stat">${n} actualizaciones</span> sobre el ciclo 2026, la primera lectura territorial de la consulta del Pacto Histórico y el módulo de endoso publicado anoche.${r>0?` Quedan pendientes <span class="stat">${r} descargas</span> de tu cuota mensual.`:''}`,
+    qsDownloads:'Descargas mes', qsTools:'Herramientas activas', qsRenewal:'Próxima renovación', qsRenewalNone:'Sin vencimiento',
+    cancelTitleHtml:'¿Cancelar tu <em>suscripción</em>?',
+    cancelLeadHtml:exp=>`Conservarás acceso a todas las herramientas hasta <strong>${exp}</strong>. Después de esa fecha tu cuenta pasará al plan Básico y se interrumpirán las descargas, el análisis de partidos y la medición de endoso. Puedes reactivarla en cualquier momento.`,
+    cancelBack:'Volver', cancelConfirm:'Sí, cancelar', cancelGoing:'Cancelando…',
+    syncHead:'Sincronizar mi pago', syncH2html:'Sincronizar mi <em>pago</em>.',
+    syncDescHtml:'Si pagaste por Wompi y tu plan no se actualizó, pega aquí el ID de la transacción. Lo encuentras en el correo de confirmación de Wompi (formato <code>1401350-…-…</code>).',
+    syncPlaceholder:'1401350-1234567890-12345', syncCta:'Sincronizar', syncClose:'Cerrar',
+    syncQuerying:'Consultando Wompi…', syncOkPre:'Plan', syncOkSuf:'activado hasta',
+    syncAlready:'Esta transacción ya fue aplicada.',
+    syncErrUnknownLink:'Este pago no corresponde a un plan reconocido.',
+    syncErrEmailMismatch:'Esa transacción corresponde a otra cuenta. Inicia sesión con el mismo email del pago.',
+    syncErrUserNotFound:'No existe cuenta registrada con el email del pago.',
+    syncErrNotApproved:'El pago no está aprobado todavía.',
+    syncErrNotFound:'No encontré esa transacción en Wompi. Revisa el ID.',
+    syncErrGeneric:'No pude sincronizar. Intenta de nuevo o escríbeme.',
+    syncErrEmpty:'Pega el ID de la transacción.',
+    pbcLabel:'Pago confirmado', pbcTitleTpl:n=>`¡Bienvenido al plan <em>${n}</em>!`,
+    pbcSubTpl:n=>`Tu plan ${n} ha sido activado. Ya tienes acceso a todo lo incluido.`,
+    pbcBenefits:'Lo que incluye tu plan', pbcClose:'Entendido, ir a mi panel →',
+    pbcActivating:'Activando plan en el sistema…',
+    footerCredit:'Inteligencia electoral, política y territorial. Bogotá.',
+  },
+  us: {
+    morning:'Good morning', afternoon:'Good afternoon', evening:'Good evening',
+    back:'Back', kickerLabel:'Personal panel',
+    tools:'Tools',
+    toolsMetaAll:'all available', toolsMetaLocked:c=>`${c} locked`,
+    toolsMeta:(n,c)=>`${n} sections · ${c}`,
+    locked:'Locked', included:'Included', proUp:'Pro ↑', premiumUp:'Premium ↑',
+    foldH2:'This month', foldMeta:'Downloads · changelog · subscription',
+    dlKicker:'Download center', dlH3html:'Monthly <em>quota</em>',
+    quotaUnlimited:'Unlimited downloads', renews:'renews on',
+    available:'available', noDownloads:'Plan without monthly downloads',
+    download:'Download', openCenter:'Open center',
+    newsKicker:'Product updates', newsH3html:'Recent <em>changes</em>',
+    newsLoading:'Loading…',
+    subKicker:'Subscription',
+    subRole:'Personal account · Bogotá',
+    kPlan:'Current plan', kCycle:'Billing cycle', kRenews:'Next renewal',
+    kAccessUntil:'Access until', kMember:'Member since', kAccount:'Account',
+    cycleMonthly:'Monthly', cycleAnnual:'Annual',
+    badgeActive:'active', badgeCancelled:'cancelled',
+    memberDefault:'March 2026', accountFree:'Free account',
+    aUpgrade:'Upgrade plan', aCancel:'Cancel subscription', aChangePass:'Change password', aLogout:'Log out',
+    syncPaid:'Paid but plan not activated? Sync →',
+    asideTpl:(n,r)=>`Today's desk includes <span class="stat">${n} updates</span> on the 2026 cycle, the first territorial read of the Pacto Histórico primary and the endorsement module shipped last night.${r>0?` <span class="stat">${r} downloads</span> remain in your monthly quota.`:''}`,
+    qsDownloads:'Monthly downloads', qsTools:'Active tools', qsRenewal:'Next renewal', qsRenewalNone:'No expiry',
+    cancelTitleHtml:'Cancel your <em>subscription</em>?',
+    cancelLeadHtml:exp=>`You will keep access to all tools until <strong>${exp}</strong>. After that, your account will move to Basic and downloads, party analysis and endorsement scoring will stop. You can reactivate any time.`,
+    cancelBack:'Back', cancelConfirm:'Yes, cancel', cancelGoing:'Cancelling…',
+    syncHead:'Sync my payment', syncH2html:'Sync my <em>payment</em>.',
+    syncDescHtml:'If you paid via Wompi and your plan was not activated, paste the transaction ID here. You can find it in the Wompi confirmation email (format <code>1401350-…-…</code>).',
+    syncPlaceholder:'1401350-1234567890-12345', syncCta:'Sync', syncClose:'Close',
+    syncQuerying:'Querying Wompi…', syncOkPre:'Plan', syncOkSuf:'active until',
+    syncAlready:'This transaction was already applied.',
+    syncErrUnknownLink:'This payment does not match a recognized plan.',
+    syncErrEmailMismatch:'That transaction belongs to another account. Log in with the email used for payment.',
+    syncErrUserNotFound:'There is no account registered with the payment email.',
+    syncErrNotApproved:'The payment is not approved yet.',
+    syncErrNotFound:'I could not find that transaction at Wompi. Check the ID.',
+    syncErrGeneric:'Could not sync. Try again or reach out.',
+    syncErrEmpty:'Paste the transaction ID.',
+    pbcLabel:'Payment confirmed', pbcTitleTpl:n=>`Welcome to the <em>${n}</em> plan!`,
+    pbcSubTpl:n=>`Your ${n} plan is now active. You have access to everything below.`,
+    pbcBenefits:'What your plan includes', pbcClose:'Got it, go to my panel →',
+    pbcActivating:'Activating plan in the system…',
+    footerCredit:'Electoral, political and territorial intelligence. Bogotá.',
+  },
+  cn: {
+    morning:'早上好', afternoon:'下午好', evening:'晚上好',
+    back:'返回', kickerLabel:'个人面板',
+    tools:'工具',
+    toolsMetaAll:'全部可用', toolsMetaLocked:c=>`${c} 个已锁`,
+    toolsMeta:(n,c)=>`${n} 个版块 · ${c}`,
+    locked:'已锁定', included:'已包含', proUp:'Pro ↑', premiumUp:'Premium ↑',
+    foldH2:'本月动态', foldMeta:'下载 · 更新 · 订阅',
+    dlKicker:'下载中心', dlH3html:'本月 <em>额度</em>',
+    quotaUnlimited:'无限下载', renews:'续费日',
+    available:'可用', noDownloads:'此计划无月度下载额度',
+    download:'下载', openCenter:'打开中心',
+    newsKicker:'产品更新', newsH3html:'最近 <em>变更</em>',
+    newsLoading:'加载中…',
+    subKicker:'订阅',
+    subRole:'个人账户 · 波哥大',
+    kPlan:'当前计划', kCycle:'计费周期', kRenews:'下次续费',
+    kAccessUntil:'访问至', kMember:'注册时间', kAccount:'账户',
+    cycleMonthly:'月付', cycleAnnual:'年付',
+    badgeActive:'有效', badgeCancelled:'已取消',
+    memberDefault:'2026年3月', accountFree:'免费账户',
+    aUpgrade:'升级计划', aCancel:'取消订阅', aChangePass:'修改密码', aLogout:'退出登录',
+    syncPaid:'已付款但未激活？同步 →',
+    asideTpl:(n,r)=>`今日工作台汇集 <span class="stat">${n} 项更新</span>，关于2026选举周期、协约党初选首次区域读取以及昨夜发布的背书模块。${r>0?` 您本月还有 <span class="stat">${r} 次下载</span> 可用。`:''}`,
+    qsDownloads:'本月下载', qsTools:'已启用工具', qsRenewal:'下次续费', qsRenewalNone:'无到期',
+    cancelTitleHtml:'确认 <em>取消</em>？',
+    cancelLeadHtml:exp=>`您将保留全部工具访问权限直到 <strong>${exp}</strong>。之后账户将转为基础版，下载、政党分析和背书指数将停止。可随时重新激活。`,
+    cancelBack:'返回', cancelConfirm:'是的，取消', cancelGoing:'取消中…',
+    syncHead:'同步我的付款', syncH2html:'同步我的 <em>付款</em>。',
+    syncDescHtml:'如果您通过 Wompi 付款但计划未激活，请在此粘贴交易 ID。可在 Wompi 的确认邮件中找到（格式 <code>1401350-…-…</code>）。',
+    syncPlaceholder:'1401350-1234567890-12345', syncCta:'同步', syncClose:'关闭',
+    syncQuerying:'正在查询 Wompi…', syncOkPre:'计划', syncOkSuf:'已激活至',
+    syncAlready:'此交易已应用。',
+    syncErrUnknownLink:'此付款不对应已识别的计划。',
+    syncErrEmailMismatch:'该交易属于其他账户。请使用付款时的邮箱登录。',
+    syncErrUserNotFound:'没有使用该付款邮箱注册的账户。',
+    syncErrNotApproved:'付款尚未批准。',
+    syncErrNotFound:'在 Wompi 找不到该交易。请检查 ID。',
+    syncErrGeneric:'无法同步。请重试或联系我。',
+    syncErrEmpty:'请粘贴交易 ID。',
+    pbcLabel:'付款已确认', pbcTitleTpl:n=>`欢迎加入 <em>${n}</em> 计划！`,
+    pbcSubTpl:n=>`您的 ${n} 计划已激活。您可以访问以下所有内容。`,
+    pbcBenefits:'您的计划包含', pbcClose:'明白，前往我的面板 →',
+    pbcActivating:'正在系统中激活计划…',
+    footerCredit:'选举、政治与区域情报。波哥大。',
+  },
+};
+I18N.mx = I18N.co;
+
+function getT() {
+  const lang = localStorage.getItem('rr-lang') || 'co';
+  return I18N[lang] || I18N.co;
+}
+function getLang() { return localStorage.getItem('rr-lang') || 'co'; }
+
+/* ─── HELPERS ─── */
+function getGreeting() {
+  const h = new Date().getHours();
+  const t = getT();
+  if (h >= 5 && h < 12)  return t.morning;
+  if (h >= 12 && h < 19) return t.afternoon;
+  return t.evening;
+}
+
+function formatExpiry(ts) {
+  if (!ts) return null;
+  const lang = getLang();
+  const locale = lang === 'us' ? 'en-US' : lang === 'cn' ? 'zh-CN' : 'es-CO';
+  return new Date(ts).toLocaleDateString(locale, { year:'numeric', month:'long', day:'numeric' });
+}
+function formatExpiryShort(ts) {
+  if (!ts) return null;
+  const lang = getLang();
+  const locale = lang === 'us' ? 'en-US' : lang === 'cn' ? 'zh-CN' : 'es-CO';
+  return new Date(ts).toLocaleDateString(locale, { month:'short', day:'numeric' });
+}
+function formatKickerDate() {
+  const d = new Date();
+  const lang = getLang();
+  if (lang === 'us') {
+    return d.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+  }
+  if (lang === 'cn') {
+    return d.toLocaleDateString('zh-CN', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  }
+  const dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  return `${dias[d.getDay()]} ${d.getDate()} de ${meses[d.getMonth()]} · ${d.getFullYear()}`;
+}
+function formatTime() {
+  const d = new Date();
+  const lang = getLang();
+  if (lang === 'us') {
+    let h = d.getHours(); const m = d.getMinutes();
+    const ampm = h < 12 ? 'a.m.' : 'p.m.';
+    h = h % 12; if (h === 0) h = 12;
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')} ${ampm}`;
+  }
+  if (lang === 'cn') {
+    return d.toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit', hour12:false });
+  }
+  let h = d.getHours(); const m = d.getMinutes();
+  const ampm = h < 12 ? 'a.m.' : 'p.m.';
+  h = h % 12; if (h === 0) h = 12;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+function formatNewsDate(iso) {
+  if (!iso) return { d:'—', m:'—', y:'' };
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return { d:iso, m:'', y:'' };
+  const lang = getLang();
+  if (lang === 'us') {
+    const meses = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    return { d:String(d.getDate()).padStart(2,'0'), m:meses[d.getMonth()], y:String(d.getFullYear()) };
+  }
+  if (lang === 'cn') {
+    return { d:String(d.getDate()).padStart(2,'0'), m:`${d.getMonth()+1}月`, y:String(d.getFullYear()) };
+  }
+  const meses = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+  return { d:String(d.getDate()).padStart(2,'0'), m:meses[d.getMonth()], y:String(d.getFullYear()) };
+}
+
+/* ─── RENDER ─── */
+function render() {
+  if (!user) return;
+  const t = getT();
+  const plan = PLANS[user.plan] || PLANS.free;
+  const planKey = user.plan || 'free';
+  const isFull = planKey === 'full' || planKey === 'premium';
+  const isCancelled = !!user.cancelledAt;
+
+  /* TOP BAR */
+  document.getElementById('back-label').textContent = t.back;
+  const firstName = (user.name || '').split(' ')[0] || '—';
+  const initials = (user.name || '—').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase() || '—';
+  document.getElementById('user-mono').textContent = initials;
+  document.getElementById('user-name').textContent = (user.name || '').split(' ').slice(0,2).join(' ');
+  document.getElementById('user-email').textContent = user.email || '';
+  document.getElementById('plan-chip-label').textContent = plan.label.toUpperCase();
+
+  /* KICKER */
+  document.getElementById('kicker-label').textContent = t.kickerLabel;
+  document.getElementById('kicker-date').textContent = formatKickerDate();
+  document.getElementById('kicker-time').textContent = formatTime();
+
+  /* HERO */
+  document.getElementById('hero-word').textContent = getGreeting() + ',';
+  document.getElementById('hero-name').textContent = firstName;
+  const remaining = Math.max(0, plan.downloads - (planKey === 'free' ? 0 : 1));
+  const updates = NEWS.length || 47;
+  document.getElementById('hero-aside-text').innerHTML = t.asideTpl(updates, remaining);
+
+  const renewalShort = user.planExpiresAt ? formatExpiryShort(user.planExpiresAt) : t.qsRenewalNone;
+  const usedNow = planKey === 'free' ? 0 : (plan.downloads === 999 ? 0 : 1);
+  const totalNow = plan.downloads === 999 ? '∞' : (plan.downloads === 0 ? '—' : plan.downloads);
+  const qsHtml = `
+    <div class="qs">
+      <span class="v">${usedNow}<span class="of">/${totalNow}</span></span>
+      <span class="l">${t.qsDownloads}</span>
+    </div>
+    <div class="qs">
+      <span class="v">${plan.tools.length}</span>
+      <span class="l">${t.qsTools}</span>
+    </div>
+    <div class="qs">
+      <span class="v">${renewalShort}</span>
+      <span class="l">${t.qsRenewal}</span>
+    </div>`;
+  document.getElementById('hero-quick-stats').innerHTML = qsHtml;
+
+  /* TOOLS */
+  document.getElementById('tools-h2').textContent = t.tools;
+  const unlockedIds = plan.tools;
+  const lockedCount = ALL_TOOLS.filter(x => !unlockedIds.includes(x.id)).length;
+  document.getElementById('tools-meta').textContent = t.toolsMeta(ALL_TOOLS.length,
+    lockedCount === 0 ? t.toolsMetaAll : t.toolsMetaLocked(lockedCount));
+
+  document.getElementById('tools-grid').innerHTML = ALL_TOOLS.map((tool, i) => {
+    const isOpen = unlockedIds.includes(tool.id);
+    const folio = String(i+1).padStart(2,'0');
+    const statusText = isOpen ? t.included : (tool.id === 'descargas' ? t.premiumUp : t.proUp);
+    const statusClass = isOpen ? 'included' : 'locked';
+    const href = isOpen ? tool.href : '#';
+    const onclick = isOpen ? '' : 'onclick="event.preventDefault();return false"';
+    return `
+      <a href="${href}" class="tool ${isOpen ? '' : 'locked'}" data-folio="${folio}" ${onclick}>
+        <div class="tool-head">
+          <span class="tool-folio">— ${folio}</span>
+          <span class="tool-status ${statusClass}"><span class="d"></span>${statusText}</span>
         </div>
-        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+        <h3 class="tool-name">${tool.name}</h3>
+        <p class="tool-dek">${tool.desc}</p>
+        <div class="tool-foot">
+          <span>${tool.tag}</span>
+          <span class="tool-cta">${isOpen ? t.openCenter : t.locked} <span>${isOpen ? '↗' : '⌧'}</span></span>
+        </div>
+      </a>`;
+  }).join('');
+
+  /* PRIVATE — Proyecto DC */
+  const wrap = document.getElementById('private-wrap');
+  const userEmail = (user.email || '').toLowerCase().trim();
+  const visiblePrivate = PRIVATE_TOOLS.filter(p => (p.allowedEmails || []).map(x => x.toLowerCase()).includes(userEmail));
+  if (visiblePrivate.length === 0) {
+    wrap.innerHTML = '';
+  } else {
+    const dc = visiblePrivate[0];
+    wrap.innerHTML = `
+      <div class="private">
+        <div class="private-stamp">
+          <div><span class="k">Expediente</span> RR-DC-2027</div>
+          <div><span class="k">Titular</span> ${firstName}</div>
+          <div><span class="k">Acceso</span> Por invitación</div>
+        </div>
+        <div class="private-body">
+          <div class="private-eyebrow">Acceso reservado</div>
+          <h3>Proyecto <em>DC</em></h3>
+          <p class="private-dek">${dc.desc}</p>
+        </div>
+        <div class="private-cta">
+          <a href="${dc.href}" class="btn">Abrir expediente ↗</a>
+          <span class="note">No descargable · Solo lectura</span>
+        </div>
+      </div>`;
+  }
+
+  /* DOWNLOADS (col 1) */
+  document.getElementById('dl-kicker').textContent = t.dlKicker;
+  document.getElementById('dl-h3').innerHTML = t.dlH3html;
+  const total = plan.downloads;
+  const used  = planKey === 'free' ? 0 : (total === 999 ? 0 : 1);
+  const rem   = total === 999 ? '∞' : Math.max(0, total - used);
+  document.getElementById('quota-used').textContent = used;
+  document.getElementById('quota-total').textContent = total === 999 ? '∞' : total;
+  const renewLong = user.planExpiresAt ? formatExpiry(user.planExpiresAt) : null;
+  if (total === 0) {
+    document.getElementById('quota-label').textContent = t.noDownloads;
+  } else if (total === 999) {
+    document.getElementById('quota-label').textContent = renewLong ? `${t.quotaUnlimited} · ${t.renews} ${renewLong}` : t.quotaUnlimited;
+  } else {
+    document.getElementById('quota-label').textContent = renewLong
+      ? `${rem} ${t.available} · ${t.renews} ${renewLong}`
+      : `${rem} ${t.available}`;
+  }
+  const bar = document.getElementById('quota-bar');
+  bar.innerHTML = '';
+  const segs = total === 999 ? 20 : Math.max(total, 1);
+  const filled = total === 999 ? Math.round(segs * .35) : used;
+  for (let i = 0; i < segs; i++) {
+    const s = document.createElement('div');
+    s.className = 'quota-tick' + (i < filled ? ' full' : '');
+    bar.appendChild(s);
+  }
+  const canDownload = planKey !== 'free';
+  document.getElementById('dl-list').innerHTML = DOWNLOADS_DEMO.map(d => `
+    <div class="dl-item">
+      <span class="dl-date">— · ${t.openCenter.split(' ')[0]}</span>
+      <a href="${canDownload ? d.href : '#'}" class="dl-name" ${canDownload ? '' : 'onclick="event.preventDefault();return false"'}>
+        ${d.name}<span class="sub">${d.sub}</span>
       </a>
-    </div>
-  </nav>
+      <a href="${canDownload ? d.href : '#'}" class="dl-cta ${canDownload ? '' : 'locked'}" ${canDownload ? '' : 'onclick="event.preventDefault();return false"'}>
+        ${canDownload ? t.download + ' ↗' : t.locked}
+      </a>
+    </div>`).join('');
 
-  <!-- DASHBOARD -->
-  <div class="dashboard-wrap">
-
-    <!-- HERO -->
-    <div class="dash-hero">
-      <div class="dash-hero-left">
-        <div class="dash-time-label" id="time-label">Buenos días</div>
-        <h1 class="dash-greeting-title" id="greeting-title">Hola, <em id="greeting-name">—</em>.</h1>
-      </div>
-      <div class="dash-hero-right" id="hero-right">
-        <!-- plan badge + upgrade btn populated by JS -->
-      </div>
-    </div>
-
-    <!-- GRID -->
-    <div class="dash-grid">
-
-      <!-- TOOLS -->
-      <div class="dash-card tools-card">
-        <div class="card-label" id="tools-label">Herramientas</div>
-        <div class="tools-grid" id="tools-grid">
-          <!-- populated by JS -->
-        </div>
-      </div>
-
-      <!-- PLAN CARD -->
-      <div class="dash-card plan-card" id="plan-card">
-        <!-- populated by JS -->
-      </div>
-
-      <!-- DOWNLOADS -->
-      <div class="dash-card downloads-card">
-        <div class="card-label" id="downloads-label">Descargas este mes</div>
-        <div class="downloads-bar-wrap">
-          <div class="downloads-numbers">
-            <span class="downloads-used" id="downloads-used">0</span>
-            <span class="downloads-total" id="downloads-total">/ 0 disponibles</span>
+  /* NEWS (col 2) */
+  document.getElementById('news-kicker').textContent = t.newsKicker;
+  document.getElementById('news-h3').innerHTML = t.newsH3html;
+  const newsList = document.getElementById('news-list');
+  if (!NEWS.length) {
+    newsList.innerHTML = `<div class="news-item" style="opacity:.5"><div></div><div class="news-body"><p>${t.newsLoading}</p></div></div>`;
+  } else {
+    newsList.innerHTML = NEWS.map(n => {
+      const fd = formatNewsDate(n.date);
+      const tagClass = n.plan === 'pro' ? 'pro' : (n.plan === 'premium' ? 'premium' : 'free');
+      const tagLabel = n.plan === 'pro' ? PLANS.pro.label : (n.plan === 'premium' ? PLANS.premium.label : PLANS.free.label);
+      return `
+        <div class="news-item">
+          <div class="news-date">${fd.d}<br>${fd.m}<span class="y">${fd.y}</span></div>
+          <div class="news-body">
+            <h4>${n.title}</h4>
+            <p>${n.desc}</p>
+            <span class="tag ${tagClass}">${tagLabel}</span>
           </div>
-          <div class="downloads-track">
-            <div class="downloads-fill" id="downloads-fill" style="width:0%"></div>
-          </div>
-        </div>
-        <div class="downloads-list" id="downloads-list">
-          <!-- populated by JS -->
-        </div>
-      </div>
+        </div>`;
+    }).join('');
+  }
 
-      <!-- NEWS -->
-      <div class="dash-card news-card">
-        <div class="card-label" id="news-label">Noticias</div>
-        <div class="news-list" id="news-list">
-          <!-- populated by JS -->
-        </div>
-      </div>
+  /* SUBSCRIPTION (col 3) */
+  document.getElementById('sub-kicker').textContent = t.subKicker;
+  document.getElementById('sub-plan-title').innerHTML = `${t.kPlan.split(' ')[0]} <em>${plan.label}</em>`;
+  document.getElementById('sub-name').textContent = user.name || '—';
+  document.getElementById('sub-role').textContent = t.subRole;
 
-      <!-- PROFILE -->
-      <div class="dash-card profile-card" id="profile-card">
-        <!-- populated by JS -->
-      </div>
+  const kvParts = [];
+  kvParts.push(`<div class="kv"><span class="k">${t.kPlan}</span><span class="v">${plan.label} <span class="badge ${isCancelled ? 'cancelled' : ''}">${isCancelled ? t.badgeCancelled : t.badgeActive}</span></span></div>`);
+  if (planKey !== 'free' && user.billingCycle) {
+    kvParts.push(`<div class="kv"><span class="k">${t.kCycle}</span><span class="v">${user.billingCycle === 'monthly' ? t.cycleMonthly : t.cycleAnnual}</span></div>`);
+  }
+  if (planKey !== 'free' && user.planExpiresAt) {
+    kvParts.push(`<div class="kv"><span class="k">${isCancelled ? t.kAccessUntil : t.kRenews}</span><span class="v">${formatExpiry(user.planExpiresAt)}</span></div>`);
+  }
+  kvParts.push(`<div class="kv"><span class="k">${t.kMember}</span><span class="v">${t.memberDefault}</span></div>`);
+  if (planKey === 'free') {
+    kvParts.push(`<div class="kv"><span class="k">${t.kAccount}</span><span class="v">${t.accountFree}</span></div>`);
+  }
+  document.getElementById('sub-kv-list').innerHTML = kvParts.join('');
 
-    </div>
-  </div>
+  const actions = [];
+  if (!isFull) {
+    actions.push(`<a class="sub-action" href="pricing.html">${t.aUpgrade} <span class="arr">→</span></a>`);
+  }
+  if (planKey !== 'free' && !isCancelled) {
+    actions.push(`<button class="sub-action danger" onclick="openCancelModal()">${t.aCancel} <span class="arr">→</span></button>`);
+  }
+  actions.push(`<a class="sub-action" href="forgot.html">${t.aChangePass} <span class="arr">→</span></a>`);
+  actions.push(`<button class="sub-action" onclick="logOut()">${t.aLogout} <span class="arr">→</span></button>`);
+  document.getElementById('sub-actions').innerHTML = actions.join('');
+  document.getElementById('sub-sync').textContent = t.syncPaid;
 
-  <!-- BANNER PAGO EXITOSO -->
-  <div class="payment-banner" id="payment-banner">
-    <div class="payment-banner-card">
-      <div class="pbc-check">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-      </div>
-      <div class="pbc-label">Pago confirmado</div>
-      <div class="pbc-title" id="pbc-title">¡Bienvenido al plan Pro!</div>
-      <div class="pbc-sub" id="pbc-sub">Tu plan ha sido activado. Ya tienes acceso a todo lo incluido.</div>
-      <div class="pbc-benefits">
-        <div class="pbc-benefits-title">Lo que incluye tu plan</div>
-        <div id="pbc-benefits-list"></div>
-      </div>
-      <div class="pbc-polling" id="pbc-polling"></div>
-      <button class="pbc-close" onclick="closePlanBanner()">Entendido, ir a mi dashboard →</button>
-    </div>
-  </div>
+  /* FOOTER + SECTION HEADS */
+  document.getElementById('fold-h2').textContent = t.foldH2;
+  document.getElementById('fold-meta').textContent = t.foldMeta;
+  document.getElementById('footer-credit').textContent = t.footerCredit;
 
-  <!-- MODAL CANCELAR PLAN -->
-  <div class="payment-banner" id="cancel-modal">
-    <div class="payment-banner-card">
-      <div class="pbc-label" style="color:#ff4757;">Cancelar suscripción</div>
-      <div class="pbc-title" style="font-size:1.3rem;">¿Estás seguro?</div>
-      <div class="pbc-sub">Tu acceso se mantendrá activo hasta el <strong id="cancel-expires-date">—</strong>. Después pasarás al plan Básico.</div>
-      <button class="pbc-close" id="cancel-confirm-btn" onclick="confirmCancel()" style="background:#ff4757;margin-bottom:.75rem;">Sí, cancelar</button>
-      <button class="pbc-close" onclick="closeCancelModal()" style="background:transparent;border:1px solid var(--border);color:var(--text2);">Volver</button>
-    </div>
-  </div>
+  /* SYNC modal i18n */
+  document.getElementById('sync-modal-head').textContent = t.syncHead;
+  document.getElementById('sync-modal-h2').innerHTML = t.syncH2html;
+  document.getElementById('sync-modal-desc').innerHTML = t.syncDescHtml;
+  document.getElementById('sync-tx-input').placeholder = t.syncPlaceholder;
+  document.getElementById('sync-back-btn').textContent = t.syncClose;
+  document.getElementById('sync-confirm-btn').textContent = t.syncCta;
 
-  <script>
-    // ─── AUTH CHECK ───────────────────────────────────────────────────────────
-    const token = localStorage.getItem('rr-token');
-    const user  = JSON.parse(localStorage.getItem('rr-user') || 'null');
-    if (!token || !user) window.location.href = 'login.html';
+  /* CANCEL modal i18n */
+  const cancelTitleEl = document.querySelector('#cancel-modal h2');
+  if (cancelTitleEl) cancelTitleEl.innerHTML = t.cancelTitleHtml;
+  const cancelBackEl = document.querySelector('#cancel-modal .secondary');
+  if (cancelBackEl) cancelBackEl.textContent = t.cancelBack;
+  const cancelConfirmEl = document.getElementById('cancel-confirm-btn');
+  if (cancelConfirmEl) cancelConfirmEl.textContent = t.cancelConfirm;
+}
 
-    // ─── THEME ── lógica compartida en theme.js (cargado al final del archivo) ──
+/* ─── NEWS LOADER ─── */
+async function loadNews() {
+  try {
+    const res = await fetch('noticias.json', { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    const items = Array.isArray(data) ? data : (data.items || []);
+    items.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+    NEWS = items.slice(0, 5);
+    render();
+  } catch {}
+}
 
-    // ─── GREETING ─────────────────────────────────────────────────────────────
-    function getGreeting() {
-      const h = new Date().getHours();
-      const lang = localStorage.getItem('rr-lang') || 'co';
-      if (lang === 'us') {
-        if (h >= 5  && h < 12) return 'Good morning';
-        if (h >= 12 && h < 19) return 'Good afternoon';
-        return 'Good evening';
-      }
-      if (lang === 'cn') {
-        if (h >= 5  && h < 12) return '早上好';
-        if (h >= 12 && h < 19) return '下午好';
-        return '晚上好';
-      }
-      if (h >= 5  && h < 12) return 'Buenos días';
-      if (h >= 12 && h < 19) return 'Buenas tardes';
-      return 'Buenas noches';
+/* ─── CANCEL PLAN ─── */
+function openCancelModal() {
+  const t = getT();
+  const exp = user.planExpiresAt ? formatExpiry(user.planExpiresAt) : '—';
+  document.getElementById('cancel-expires-date').textContent = exp;
+  const leadEl = document.querySelector('#cancel-modal .lead');
+  if (leadEl) leadEl.innerHTML = t.cancelLeadHtml(exp);
+  document.getElementById('cancel-modal').classList.add('show');
+}
+function closeCancelModal() {
+  document.getElementById('cancel-modal').classList.remove('show');
+  resetCursor();
+}
+async function confirmCancel() {
+  const t = getT();
+  const btn = document.getElementById('cancel-confirm-btn');
+  btn.textContent = t.cancelGoing;
+  btn.disabled = true;
+  try {
+    const res  = await fetch('https://rr-auth.reruizc.workers.dev/auth/cancel', {
+      method: 'POST', headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const data = await res.json();
+    if (data.ok) {
+      user.cancelledAt = Date.now();
+      localStorage.setItem('rr-user', JSON.stringify(user));
+      closeCancelModal();
+      render();
+    } else {
+      alert(data.error || 'Error');
+      btn.textContent = t.cancelConfirm; btn.disabled = false;
     }
+  } catch {
+    alert('Error de conexión');
+    btn.textContent = t.cancelConfirm; btn.disabled = false;
+  }
+}
 
-    // ─── PLAN CONFIG ──────────────────────────────────────────────────────────
-    const PLANS = {
-      free: {
-        label: 'Básico', downloads: 0,
-        desc: 'Acceso a resultados electorales 2025-2026 y visualizaciones básicas.',
-        perks: ['Histórico electoral 2025 y 2026', 'Análisis con filtros básicos', 'Visualizaciones territoriales esenciales'],
-        tools: ['electoral', 'consulta2025'],
-      },
-      pro: {
-        label: 'Pro', downloads: 3,
-        desc: 'Análisis avanzado de partidos, endoso y 3 descargas mensuales.',
-        perks: ['3 descargas al mes', 'Análisis de partidos y medición de endoso', 'Mapas por comunas y localidades'],
-        tools: ['electoral', 'consulta2025', 'partidos', 'endoso'],
-      },
-      premium: {
-        label: 'Premium', downloads: 10,
-        desc: 'Acceso completo, centro de descargas y 10 archivos mensuales.',
-        perks: ['10 descargas al mes', 'Centro de descargas completo', 'Notificaciones de actualización'],
-        tools: ['electoral', 'consulta2025', 'partidos', 'endoso', 'descargas'],
-      },
-      full: {
-        label: 'Full', downloads: 999,
-        desc: 'Acceso ilimitado. Todas las herramientas y asesoría directa.',
-        perks: ['Descargas ilimitadas', 'Acceso completo a todas las herramientas', 'Asesoría directa'],
-        tools: ['electoral', 'consulta2025', 'partidos', 'endoso', 'descargas'],
-      },
-    };
-
-    const ALL_TOOLS = [
-      { id:'electoral',    name:'Histórico Electoral', desc:'Resultados electorales 2025 y 2026. Senado, Cámara, CITREP y Consultas con filtros hasta puesto de votación.', href:'electoral.html', tag:'Electoral' },
-      { id:'consulta2025', name:'Consulta 2025',       desc:'Análisis completo de la consulta presidencial del Pacto Histórico, octubre 2025.', href:'Consulta-2025.html', tag:'Consulta' },
-      { id:'partidos',     name:'Análisis Partidos',   desc:'Desempeño territorial por partido y movimiento. Drill-down hasta municipio con mapas por comunas y localidades.', href:'analisis-partidos.html', tag:'Partidos' },
-      { id:'endoso',       name:'Medición de Endoso',  desc:'Índice de endoso de candidatos a partir del comportamiento electoral territorial en las elecciones 2026.', href:'endoso-2026.html', tag:'Endoso' },
-      { id:'descargas',    name:'Centro de Descargas', desc:'Archivos Excel por departamento, circunscripción y corporación hasta nivel de puesto de votación.', href:'descargas.html', tag:'Descargas' },
-    ];
-
-    // Herramientas privadas: visibles solo si el email del usuario está en allowedEmails.
-    const PRIVATE_TOOLS = [
-      {
-        id: 'proyecto-dc',
-        name: 'Proyecto DC',
-        desc: 'Investigación no declarativa Medellín 2027. Lectura de huellas digitales, institucionales y territoriales.',
-        href: 'proyecto-dc.html',
-        tag: 'Privado',
-        allowedEmails: ['reruizc@gmail.com', 'nuevagemela@gmail.com'],
-      },
-    ];
-
-    const DOWNLOADS_DEMO = [
-      { name:'Centro de descargas', date:'Bases por departamento y corporación', href:'descargas.html' },
-    ];
-
-    // Noticias se cargan de noticias.json (raíz del repo) — ordenadas por date desc, top 4.
-    // Para actualizar: editar noticias.json y desplegar.
-    let NEWS = [];
-
-    // ─── RENDER ───────────────────────────────────────────────────────────────
-    function render() {
-      if (!user) return;
-      const plan = PLANS[user.plan] || PLANS.free;
-      const lang = localStorage.getItem('rr-lang') || 'co';
-
-      // Textos por idioma
-      const T = {
-        co: {
-          logout: 'Salir', tools: 'Herramientas', locked: 'Bloqueado',
-          upgradePlan: 'Mejorar plan ↑', yourPlan: 'Tu plan',
-          upgradeLink: 'Mejorar plan →', topPlan: 'Plan máximo activo',
-          cancelledUntil: 'Cancelado · acceso hasta', activeUntil: 'Vigente hasta',
-          cancelSub: 'Cancelar suscripción',
-          downloadsMonth: 'Descargas este mes', available: 'disponibles',
-          download: 'Descargar', news: 'Noticias',
-          profile: 'Perfil', planLabel: 'Plan',
-          billingCycle: 'Ciclo de cobro', monthly: 'Mensual', annual: 'Anual',
-          accessUntil: 'Acceso hasta', nextRenewal: 'Próxima renovación',
-          memberSince: 'Miembro desde', memberDate: 'Marzo 2026',
-          changePassword: 'Cambiar contraseña', closeSession: 'Cerrar sesión',
-          planBasic: 'Básico', planPro: 'Pro', planPremium: 'Premium',
-          syncPaid: '¿Pagaste y no se activó? Sincronizar →',
-          syncTitle: 'Sincronizar mi pago',
-          syncDesc: 'Si pagaste por Wompi y tu plan no se actualizó, pega aquí el ID de la transacción. Lo encuentras en el correo de confirmación de Wompi.',
-          syncPlaceholder: '1401350-1234567890-12345',
-          syncCta: 'Sincronizar', syncClose: 'Cerrar',
-          syncQuerying: 'Consultando Wompi…',
-          syncOkPrefix: 'Plan',
-          syncOkSuffix: 'activado hasta',
-          syncAlreadyOk: 'Esta transacción ya fue aplicada.',
-          syncErrUnknownLink: 'Este pago no corresponde a un plan reconocido.',
-          syncErrEmailMismatch: 'Esa transacción corresponde a otra cuenta. Inicia sesión con el mismo email del pago.',
-          syncErrUserNotFound: 'No existe cuenta registrada con el email del pago.',
-          syncErrNotApproved: 'El pago no está aprobado todavía.',
-          syncErrNotFound: 'No encontré esa transacción en Wompi. Revisa el ID.',
-          syncErrGeneric: 'No pude sincronizar. Intenta de nuevo o escríbeme.',
-          syncErrEmpty: 'Pega el ID de la transacción.',
-        },
-        us: {
-          logout: 'Log out', tools: 'Tools', locked: 'Locked',
-          upgradePlan: 'Upgrade plan ↑', yourPlan: 'Your plan',
-          upgradeLink: 'Upgrade →', topPlan: 'Top plan active',
-          cancelledUntil: 'Cancelled · access until', activeUntil: 'Active until',
-          cancelSub: 'Cancel subscription',
-          downloadsMonth: 'Downloads this month', available: 'available',
-          download: 'Download', news: 'News',
-          profile: 'Profile', planLabel: 'Plan',
-          billingCycle: 'Billing cycle', monthly: 'Monthly', annual: 'Annual',
-          accessUntil: 'Access until', nextRenewal: 'Next renewal',
-          memberSince: 'Member since', memberDate: 'March 2026',
-          changePassword: 'Change password', closeSession: 'Log out',
-          planBasic: 'Basic', planPro: 'Pro', planPremium: 'Premium',
-          syncPaid: 'Paid but plan not activated? Sync →',
-          syncTitle: 'Sync my payment',
-          syncDesc: 'If you paid via Wompi and your plan was not activated, paste the transaction ID here. You can find it in the Wompi confirmation email.',
-          syncPlaceholder: '1401350-1234567890-12345',
-          syncCta: 'Sync', syncClose: 'Close',
-          syncQuerying: 'Querying Wompi…',
-          syncOkPrefix: 'Plan',
-          syncOkSuffix: 'active until',
-          syncAlreadyOk: 'This transaction was already applied.',
-          syncErrUnknownLink: 'This payment does not match a recognized plan.',
-          syncErrEmailMismatch: 'That transaction belongs to another account. Log in with the email used for payment.',
-          syncErrUserNotFound: 'There is no account registered with the payment email.',
-          syncErrNotApproved: 'The payment is not approved yet.',
-          syncErrNotFound: 'I could not find that transaction at Wompi. Check the ID.',
-          syncErrGeneric: 'Could not sync. Try again or reach out.',
-          syncErrEmpty: 'Paste the transaction ID.',
-        },
-        cn: {
-          logout: '退出', tools: '工具', locked: '已锁定',
-          upgradePlan: '升级计划 ↑', yourPlan: '您的计划',
-          upgradeLink: '升级 →', topPlan: '最高计划已激活',
-          cancelledUntil: '已取消 · 访问至', activeUntil: '有效期至',
-          cancelSub: '取消订阅',
-          downloadsMonth: '本月下载', available: '可用',
-          download: '下载', news: '新闻',
-          profile: '个人资料', planLabel: '计划',
-          billingCycle: '计费周期', monthly: '月付', annual: '年付',
-          accessUntil: '访问至', nextRenewal: '下次续费',
-          memberSince: '注册时间', memberDate: '2026年3月',
-          changePassword: '修改密码', closeSession: '退出登录',
-          planBasic: '基础版', planPro: 'Pro', planPremium: 'Premium',
-          syncPaid: '已付款但未激活？同步 →',
-          syncTitle: '同步我的付款',
-          syncDesc: '如果你通过 Wompi 付款但计划未激活，请在此粘贴交易 ID。可在 Wompi 的确认邮件中找到。',
-          syncPlaceholder: '1401350-1234567890-12345',
-          syncCta: '同步', syncClose: '关闭',
-          syncQuerying: '正在查询 Wompi…',
-          syncOkPrefix: '计划',
-          syncOkSuffix: '已激活至',
-          syncAlreadyOk: '此交易已应用。',
-          syncErrUnknownLink: '此付款不对应已识别的计划。',
-          syncErrEmailMismatch: '该交易属于其他账户。请使用付款时的邮箱登录。',
-          syncErrUserNotFound: '没有使用该付款邮箱注册的账户。',
-          syncErrNotApproved: '付款尚未批准。',
-          syncErrNotFound: '在 Wompi 找不到该交易。请检查 ID。',
-          syncErrGeneric: '无法同步。请重试或联系我。',
-          syncErrEmpty: '请粘贴交易 ID。',
-        },
-      };
-      const t = T[lang] || T.co;
-
-      // Nav
-      const navAuth = document.getElementById('e-nav-auth');
-      if (navAuth) navAuth.innerHTML = `<span class="e-user-plan">${plan.label}</span><a href="perfil.html" class="e-user-name">${user.name.split(' ')[0]}</a><button class="e-btn-logout" onclick="logOut()">${t.logout}</button>`;
-
-      // Greeting
-      const greeting = getGreeting();
-      document.getElementById('time-label').textContent = greeting;
-      document.getElementById('greeting-name').textContent = user.name.split(' ')[0];
-
-      // Hero right
-      const isFull = user.plan === 'full' || user.plan === 'premium';
-      document.getElementById('hero-right').innerHTML = `
-        <div class="plan-badge-hero">
-          <div class="plan-dot"></div>
-          <span class="plan-name-hero">${plan.label}</span>
-        </div>
-        ${!isFull ? `<a href="pricing.html" class="upgrade-btn">${t.upgradePlan}</a>` : ''}
-      `;
-
-      // Tools
-      const unlockedIds = plan.tools;
-      const userEmail = (user.email || '').toLowerCase().trim();
-      const visiblePrivate = PRIVATE_TOOLS.filter(p => (p.allowedEmails || []).includes(userEmail));
-      const allRendered = ALL_TOOLS.concat(visiblePrivate);
-      document.getElementById('tools-label').textContent = t.tools;
-      document.getElementById('tools-grid').innerHTML = allRendered.map((tool, i) => {
-        const isPrivate = !!tool.allowedEmails;
-        const unlocked = isPrivate ? true : unlockedIds.includes(tool.id);
-        const tagClass = isPrivate ? 'private-tag' : (unlocked ? '' : 'locked-tag');
-        const itemClass = (unlocked ? '' : 'locked') + (isPrivate ? ' private' : '');
-        const num = String(i+1).padStart(2, '0');
-        return `
-          <a href="${unlocked && tool.href !== '#' ? tool.href : '#'}"
-             class="tool-item ${itemClass}"
-             ${!unlocked || tool.href === '#' ? 'onclick="return false"' : ''}>
-            <div class="tool-num">${num} —</div>
-            <div class="tool-name">${tool.name}</div>
-            <div class="tool-desc">${tool.desc}</div>
-            <span class="tool-tag ${tagClass}">${unlocked ? tool.tag : t.locked}</span>
-            ${unlocked && tool.href !== '#' ? '<span class="tool-arrow">↗</span>' : '<span class="tool-lock">🔒</span>'}
-          </a>`;
-      }).join('');
-
-      // Plan card
-      const isTopPlan = user.plan === 'full' || user.plan === 'premium';
-      const isCancelled = !!user.cancelledAt;
-      const expiresStr = user.planExpiresAt ? formatExpiry(user.planExpiresAt) : null;
-      document.getElementById('plan-card').innerHTML = `
-        <div class="card-label">${t.yourPlan}</div>
-        <div class="plan-card-name">${plan.label}</div>
-        <div class="plan-card-desc">${plan.desc}</div>
-        <ul class="plan-perks">${plan.perks.map(p => `<li>${p}</li>`).join('')}</ul>
-        ${user.plan !== 'free' && expiresStr ? `
-          <div class="plan-expires ${isCancelled ? 'cancelled' : ''}">
-            ${isCancelled ? `${t.cancelledUntil} ${expiresStr}` : `${t.activeUntil} ${expiresStr}`}
-          </div>` : ''}
-        ${!isTopPlan
-          ? `<a href="pricing.html" class="plan-upgrade-link">${t.upgradeLink}</a>`
-          : `<span class="plan-current-tag">${t.topPlan}</span>`}
-        ${user.plan !== 'free' && !isCancelled
-          ? `<button class="plan-cancel-btn" onclick="openCancelModal()">${t.cancelSub}</button>`
-          : ''}
-        <button class="plan-sync-link" onclick="openSyncModal()">${t.syncPaid}</button>
-      `;
-
-      // Sync modal — textos traducibles
-      document.getElementById('sync-modal-title').textContent = t.syncTitle;
-      document.getElementById('sync-modal-desc').innerHTML = t.syncDesc + ' <code>1401350-…-…</code>';
-      document.getElementById('sync-tx-input').placeholder = t.syncPlaceholder;
-      document.getElementById('sync-back-btn').textContent = t.syncClose;
-      document.getElementById('sync-confirm-btn').textContent = t.syncCta;
-
-      // Downloads
-      const used = user.plan === 'free' ? 0 : 1;
-      const total = plan.downloads === 999 ? '∞' : plan.downloads;
-      const pct = plan.downloads === 0 ? 0 : plan.downloads === 999 ? 20 : (used / plan.downloads) * 100;
-      document.getElementById('downloads-label').textContent = t.downloadsMonth;
-      document.getElementById('downloads-used').textContent = used;
-      document.getElementById('downloads-total').textContent = `/ ${total} ${t.available}`;
-      setTimeout(() => { document.getElementById('downloads-fill').style.width = pct + '%'; }, 300);
-
-      const canDownload = user.plan !== 'free';
-      document.getElementById('downloads-list').innerHTML = DOWNLOADS_DEMO.map(d => `
-        <div class="download-item">
-          <div>
-            <div class="download-item-name">${d.name}</div>
-            <div class="download-item-date">${d.date}</div>
-          </div>
-          <a href="${canDownload ? d.href : '#'}"
-             class="download-btn ${canDownload ? '' : 'locked-btn'}"
-             ${!canDownload ? 'onclick="return false"' : ''}>
-            ${canDownload ? t.download : '🔒'}
-          </a>
-        </div>`).join('');
-
-      // News (NEWS se llena async desde noticias.json)
-      document.getElementById('news-label').textContent = t.news;
-      const newsList = document.getElementById('news-list');
-      if (!NEWS.length) {
-        newsList.innerHTML = `<div class="news-item" style="opacity:.5"><div class="news-desc">Cargando…</div></div>`;
+/* ─── SYNC PAYMENT MODAL ─── */
+function _setSyncMsg(text, kind) {
+  const el = document.getElementById('sync-modal-msg');
+  el.textContent = text || '';
+  el.classList.remove('success','error');
+  if (kind) el.classList.add(kind);
+}
+function openSyncModal() {
+  document.getElementById('sync-tx-input').value = '';
+  _setSyncMsg('', null);
+  document.getElementById('sync-confirm-btn').disabled = false;
+  document.getElementById('sync-modal').classList.add('show');
+  setTimeout(() => document.getElementById('sync-tx-input').focus(), 50);
+}
+function closeSyncModal() {
+  document.getElementById('sync-modal').classList.remove('show');
+  resetCursor();
+}
+function _mapReconcileError(reason, T) {
+  if (!reason) return T.syncErrGeneric;
+  if (reason === 'email_mismatch') return T.syncErrEmailMismatch;
+  if (reason.startsWith('user_not_found')) return T.syncErrUserNotFound;
+  if (reason.startsWith('unknown_link_id')) return T.syncErrUnknownLink;
+  if (reason.startsWith('status=')) return T.syncErrNotApproved;
+  if (reason === 'no_customer_email') return T.syncErrUserNotFound;
+  return reason;
+}
+async function runSync() {
+  const t = getT();
+  const txId = document.getElementById('sync-tx-input').value.trim();
+  const btn = document.getElementById('sync-confirm-btn');
+  if (!txId) { _setSyncMsg(t.syncErrEmpty, 'error'); return; }
+  btn.disabled = true;
+  _setSyncMsg(t.syncQuerying, null);
+  try {
+    const res = await fetch('https://rr-auth.reruizc.workers.dev/wompi/reconcile', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ transactionId: txId }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      if (data.already_processed) {
+        _setSyncMsg(t.syncAlready, 'success');
       } else {
-        newsList.innerHTML = NEWS.map(n => `
-          <div class="news-item">
-            <div class="news-date">${formatNewsDate(n.date, lang)}</div>
-            <div class="news-title">${n.title}</div>
-            <div class="news-desc">${n.desc}</div>
-            <span class="news-plan-tag ${n.plan}">${n.plan === 'free' ? t.planBasic : n.plan === 'pro' ? t.planPro : t.planPremium}</span>
-          </div>`).join('');
+        const exp = data.expiresAt ? formatExpiry(data.expiresAt) : '—';
+        const planLabel = (data.plan || '').replace(/^./, c => c.toUpperCase());
+        _setSyncMsg(`${t.syncOkPre} ${planLabel} ${t.syncOkSuf} ${exp}`, 'success');
       }
-
-      // Profile
-      const initials = user.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
-      const countryLabels = { co:'Colombia', us:'United States', mx:'México', pe:'Perú', py:'Paraguay', uk:'United Kingdom', cn:'中国' };
-      document.getElementById('profile-card').innerHTML = `
-        <div class="card-label">${t.profile}</div>
-        <div class="profile-avatar">${initials}</div>
-        <div class="profile-name">${user.name}</div>
-        <div class="profile-email">${user.email}</div>
-        <div class="profile-field">
-          <div class="profile-field-label">${t.planLabel}</div>
-          <div class="profile-field-value">${plan.label}</div>
-        </div>
-        ${user.plan !== 'free' && user.billingCycle ? `
-        <div class="profile-field">
-          <div class="profile-field-label">${t.billingCycle}</div>
-          <div class="profile-field-value">${user.billingCycle === 'monthly' ? t.monthly : t.annual}</div>
-        </div>` : ''}
-        ${user.plan !== 'free' && user.planExpiresAt ? `
-        <div class="profile-field">
-          <div class="profile-field-label">${user.cancelledAt ? t.accessUntil : t.nextRenewal}</div>
-          <div class="profile-field-value">${formatExpiry(user.planExpiresAt)}</div>
-        </div>` : ''}
-        <div class="profile-field">
-          <div class="profile-field-label">${t.memberSince}</div>
-          <div class="profile-field-value">${t.memberDate}</div>
-        </div>
-        <div class="profile-actions">
-          <a href="forgot.html" class="profile-action-btn">${t.changePassword}</a>
-          <button class="profile-action-btn danger" onclick="logOut()">${t.closeSession}</button>
-        </div>
-      `;
+      await refreshUser();
+      setTimeout(closeSyncModal, 2200);
+    } else {
+      const msg = res.status === 404 && !data.error?.startsWith('user_not_found')
+        ? t.syncErrNotFound
+        : _mapReconcileError(data.error, t);
+      _setSyncMsg(msg, 'error');
+      btn.disabled = false;
     }
+  } catch {
+    _setSyncMsg(t.syncErrGeneric, 'error');
+    btn.disabled = false;
+  }
+}
 
-    // ─── HELPERS ──────────────────────────────────────────────────────────────
-    function formatExpiry(ts) {
-      if (!ts) return null;
-      const lang = localStorage.getItem('rr-lang') || 'co';
-      return new Date(ts).toLocaleDateString(lang === 'us' ? 'en-US' : 'es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
-    }
-
-    function formatNewsDate(iso, lang) {
-      if (!iso) return '';
-      // Acepta ISO yyyy-mm-dd o cadena ya formateada; si no parsea, devuelve tal cual.
-      const d = new Date(iso);
-      if (isNaN(d.getTime())) return iso;
-      const locale = lang === 'us' ? 'en-US' : lang === 'cn' ? 'zh-CN' : 'es-CO';
-      return d.toLocaleDateString(locale, { year:'numeric', month:'short', day:'numeric' });
-    }
-
-    // ─── NEWS LOADER ──────────────────────────────────────────────────────────
-    async function loadNews() {
-      try {
-        const res = await fetch('noticias.json', { cache: 'no-store' });
-        if (!res.ok) return;
-        const data = await res.json();
-        const items = Array.isArray(data) ? data : (data.items || []);
-        items.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
-        NEWS = items.slice(0, 4);
-        render();
-      } catch {}
-    }
-
-    // ─── CANCEL PLAN ──────────────────────────────────────────────────────────
-    function openCancelModal() {
-      const expiresStr = user.planExpiresAt ? formatExpiry(user.planExpiresAt) : '—';
-      document.getElementById('cancel-expires-date').textContent = expiresStr;
-      document.getElementById('cancel-modal').classList.add('show');
-    }
-
-    function closeCancelModal() {
-      document.getElementById('cancel-modal').classList.remove('show');
-    }
-
-    async function confirmCancel() {
-      const btn = document.getElementById('cancel-confirm-btn');
-      btn.textContent = 'Cancelando...';
-      btn.disabled = true;
-      try {
-        const res  = await fetch('https://rr-auth.reruizc.workers.dev/auth/cancel', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        const data = await res.json();
-        if (data.ok) {
-          user.cancelledAt = Date.now();
-          localStorage.setItem('rr-user', JSON.stringify(user));
-          closeCancelModal();
-          render();
-        } else {
-          alert(data.error || 'Error al cancelar');
-          btn.textContent = 'Sí, cancelar';
-          btn.disabled = false;
-        }
-      } catch {
-        alert('Error de conexión');
-        btn.textContent = 'Sí, cancelar';
-        btn.disabled = false;
-      }
-    }
-
-    // ─── SYNC PAYMENT MODAL ───────────────────────────────────────────────────
-    function _syncTexts() {
-      const lang = localStorage.getItem('rr-lang') || 'co';
-      // Mapeo perezoso: los textos viven dentro del objeto T de render(); los redefinimos compactos
-      const sets = {
-        co: { querying:'Consultando Wompi…', okPre:'Plan', okSuf:'activado hasta',
-              already:'Esta transacción ya fue aplicada.',
-              errUnknownLink:'Este pago no corresponde a un plan reconocido.',
-              errEmailMismatch:'Esa transacción corresponde a otra cuenta. Inicia sesión con el mismo email del pago.',
-              errUserNotFound:'No existe cuenta registrada con el email del pago.',
-              errNotApproved:'El pago no está aprobado todavía.',
-              errNotFound:'No encontré esa transacción en Wompi. Revisa el ID.',
-              errGeneric:'No pude sincronizar. Intenta de nuevo o escríbeme.',
-              errEmpty:'Pega el ID de la transacción.', cta:'Sincronizar' },
-        us: { querying:'Querying Wompi…', okPre:'Plan', okSuf:'active until',
-              already:'This transaction was already applied.',
-              errUnknownLink:'This payment does not match a recognized plan.',
-              errEmailMismatch:'That transaction belongs to another account. Log in with the email used for payment.',
-              errUserNotFound:'There is no account registered with the payment email.',
-              errNotApproved:'The payment is not approved yet.',
-              errNotFound:'I could not find that transaction at Wompi. Check the ID.',
-              errGeneric:'Could not sync. Try again or reach out.',
-              errEmpty:'Paste the transaction ID.', cta:'Sync' },
-        cn: { querying:'正在查询 Wompi…', okPre:'计划', okSuf:'已激活至',
-              already:'此交易已应用。',
-              errUnknownLink:'此付款不对应已识别的计划。',
-              errEmailMismatch:'该交易属于其他账户。请使用付款时的邮箱登录。',
-              errUserNotFound:'没有使用该付款邮箱注册的账户。',
-              errNotApproved:'付款尚未批准。',
-              errNotFound:'在 Wompi 找不到该交易。请检查 ID。',
-              errGeneric:'无法同步。请重试或联系我。',
-              errEmpty:'请粘贴交易 ID。', cta:'同步' },
-      };
-      return sets[lang] || sets.co;
-    }
-
-    function _setSyncMsg(text, kind) {
-      const el = document.getElementById('sync-modal-msg');
-      el.textContent = text || '';
-      el.classList.remove('success','error');
-      if (kind) el.classList.add(kind);
-    }
-
-    function openSyncModal() {
-      document.getElementById('sync-tx-input').value = '';
-      _setSyncMsg('', null);
-      document.getElementById('sync-confirm-btn').disabled = false;
-      document.getElementById('sync-modal').classList.add('show');
-      setTimeout(() => document.getElementById('sync-tx-input').focus(), 50);
-    }
-
-    function closeSyncModal() {
-      document.getElementById('sync-modal').classList.remove('show');
-      // Reset cursor por si el botón estaba en hover (mismo gotcha que .dl-modal)
-      const c = document.getElementById('cursor'), r = document.getElementById('cursorRing');
-      if (c) { c.style.transform = 'translate(-50%,-50%) scale(1)'; c.style.background = 'var(--blue)'; c.style.border = 'none'; }
-      if (r) r.style.opacity = '.4';
-    }
-
-    function _mapReconcileError(reason, S) {
-      if (!reason) return S.errGeneric;
-      if (reason === 'email_mismatch') return S.errEmailMismatch;
-      if (reason.startsWith('user_not_found')) return S.errUserNotFound;
-      if (reason.startsWith('unknown_link_id')) return S.errUnknownLink;
-      if (reason.startsWith('status=')) return S.errNotApproved;
-      if (reason === 'no_customer_email') return S.errUserNotFound;
-      return reason;
-    }
-
-    async function runSync() {
-      const S = _syncTexts();
-      const txId = document.getElementById('sync-tx-input').value.trim();
-      const btn = document.getElementById('sync-confirm-btn');
-      if (!txId) { _setSyncMsg(S.errEmpty, 'error'); return; }
-      btn.disabled = true;
-      _setSyncMsg(S.querying, null);
-      try {
-        const res = await fetch('https://rr-auth.reruizc.workers.dev/wompi/reconcile', {
-          method: 'POST',
-          headers: { 'Content-Type':'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ transactionId: txId }),
-        });
-        const data = await res.json();
-        if (data.ok) {
-          if (data.already_processed) {
-            _setSyncMsg(S.already, 'success');
-          } else {
-            const exp = data.expiresAt ? formatExpiry(data.expiresAt) : '—';
-            const planLabel = (data.plan || '').replace(/^./, c => c.toUpperCase());
-            _setSyncMsg(`${S.okPre} ${planLabel} ${S.okSuf} ${exp}`, 'success');
-          }
-          await refreshUser();
-          setTimeout(closeSyncModal, 2200);
-        } else {
-          const msg = res.status === 404 && !data.error?.startsWith('user_not_found')
-            ? S.errNotFound
-            : _mapReconcileError(data.error, S);
-          _setSyncMsg(msg, 'error');
-          btn.disabled = false;
-        }
-      } catch {
-        _setSyncMsg(S.errGeneric, 'error');
-        btn.disabled = false;
-      }
-    }
-
-    // ─── REFRESH USER FROM API ────────────────────────────────────────────────
-    async function refreshUser() {
-      if (!token) return;
-      try {
-        const res  = await fetch('https://rr-auth.reruizc.workers.dev/auth/me', {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        const data = await res.json();
-        if (data.ok) {
-          Object.assign(user, data.user);
-          localStorage.setItem('rr-user', JSON.stringify(user));
-          render();
-        } else if (res.status === 401) {
-          localStorage.removeItem('rr-token');
-          localStorage.removeItem('rr-user');
-          window.location.href = 'login.html';
-        }
-      } catch {}
-    }
-
-    // ─── LOGOUT ───────────────────────────────────────────────────────────────
-    async function logOut() {
-      try {
-        await fetch('https://rr-auth.reruizc.workers.dev/auth/logout', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-      } catch {}
+/* ─── REFRESH USER ─── */
+async function refreshUser() {
+  if (!token) return;
+  try {
+    const res  = await fetch('https://rr-auth.reruizc.workers.dev/auth/me', {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const data = await res.json();
+    if (data.ok) {
+      Object.assign(user, data.user);
+      localStorage.setItem('rr-user', JSON.stringify(user));
+      render();
+    } else if (res.status === 401) {
       localStorage.removeItem('rr-token');
       localStorage.removeItem('rr-user');
       window.location.href = 'login.html';
     }
+  } catch {}
+}
 
-    // ─── CURSOR ───────────────────────────────────────────────────────────────
-    const cursor = document.getElementById('cursor');
-    const ring   = document.getElementById('cursorRing');
-    let mx=0,my=0,rx=0,ry=0;
-    document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; cursor.style.left=mx+'px'; cursor.style.top=my+'px'; });
-    (function ar(){ rx+=(mx-rx)*.12; ry+=(my-ry)*.12; ring.style.left=rx+'px'; ring.style.top=ry+'px'; requestAnimationFrame(ar); })();
-    document.querySelectorAll('a,button').forEach(el => {
-      el.addEventListener('mouseenter', () => { cursor.style.transform='translate(-50%,-50%) scale(2.5)'; cursor.style.background='transparent'; cursor.style.border='1.5px solid var(--blue)'; ring.style.opacity='0'; });
-      el.addEventListener('mouseleave', () => { cursor.style.transform='translate(-50%,-50%) scale(1)'; cursor.style.background='var(--blue)'; cursor.style.border='none'; ring.style.opacity='.4'; });
+/* ─── LOGOUT ─── */
+async function logOut() {
+  try {
+    await fetch('https://rr-auth.reruizc.workers.dev/auth/logout', {
+      method: 'POST', headers: { 'Authorization': `Bearer ${token}` },
     });
+  } catch {}
+  localStorage.removeItem('rr-token');
+  localStorage.removeItem('rr-user');
+  window.location.href = 'login.html';
+}
 
-    // ─── PAYMENT SUCCESS DETECTION ────────────────────────────────────────────
-    const PLAN_BENEFITS_DASH = {
-      pro: {
-        name: 'Pro',
-        items: ['Todo lo del plan Básico','3 descargas de bases de datos al mes','Visualizaciones avanzadas e interactivas','Datos históricos con análisis avanzado','Cruces demográfico, seguridad y socioeconómico']
-      },
-      premium: {
-        name: 'Premium',
-        items: ['Todo lo del plan Pro','10 descargas de bases de datos e infografías al mes','Todos los tipos de datos disponibles','Análisis y visualizaciones profundas','Cruces de información exclusivos','Notificación de cada actualización mensual']
+/* ─── CURSOR ─── */
+const cursor = document.getElementById('cursor');
+const ring   = document.getElementById('cursorRing');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove', e => {
+  mx=e.clientX; my=e.clientY;
+  cursor.style.left=mx+'px'; cursor.style.top=my+'px';
+});
+(function ar(){
+  rx+=(mx-rx)*.12; ry+=(my-ry)*.12;
+  ring.style.left=rx+'px'; ring.style.top=ry+'px';
+  requestAnimationFrame(ar);
+})();
+function bindCursorHover() {
+  document.querySelectorAll('a,button').forEach(el => {
+    if (el.__rrCursorBound) return;
+    el.__rrCursorBound = true;
+    el.addEventListener('mouseenter', () => {
+      cursor.style.transform='translate(-50%,-50%) scale(2.5)';
+      cursor.style.background='transparent';
+      cursor.style.border='1.5px solid var(--accent)';
+      ring.style.opacity='0';
+    });
+    el.addEventListener('mouseleave', resetCursor);
+  });
+}
+function resetCursor() {
+  cursor.style.transform='translate(-50%,-50%) scale(1)';
+  cursor.style.background='var(--accent)';
+  cursor.style.border='none';
+  ring.style.opacity='.4';
+}
+
+/* ─── COUNTRY SELECTOR (interfaz mínima para lang.js) ─── */
+function toggleCountryDropdown() {
+  const dd = document.getElementById('countryDropdown');
+  const chev = document.getElementById('countryChevron');
+  const open = dd.classList.toggle('open');
+  document.getElementById('countryBtn').classList.toggle('open', open);
+  if (chev) chev.style.transform = open ? 'rotate(180deg)' : 'rotate(0deg)';
+}
+function selectCountry(el) {
+  document.querySelectorAll('.country-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  const val = el.dataset.value;
+  localStorage.setItem('rr-lang', val);
+  document.getElementById('countryBtnLabel').textContent = el.textContent.trim();
+  toggleCountryDropdown();
+  if (typeof window.__applyLang === 'function') window.__applyLang();
+  render();
+}
+document.addEventListener('click', e => {
+  const wrap = document.querySelector('.country-selector-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('countryDropdown').classList.remove('open');
+    document.getElementById('countryBtn').classList.remove('open');
+    const chev = document.getElementById('countryChevron');
+    if (chev) chev.style.transform = 'rotate(0deg)';
+  }
+});
+/* Inicializa label del selector con el lang guardado */
+(function initCountryLabel(){
+  const lang = getLang();
+  const opt = document.querySelector(`.country-option[data-value="${lang}"]`);
+  if (opt) {
+    document.querySelectorAll('.country-option').forEach(o => o.classList.remove('selected'));
+    opt.classList.add('selected');
+    document.getElementById('countryBtnLabel').textContent = opt.textContent.trim();
+  }
+})();
+
+/* ─── THEME (compat con theme.js compartido) ─── */
+function toggleTheme() {
+  const isDay = document.body.classList.toggle('day-mode');
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = isDay ? '🌙 Modo noche' : '☀ Modo día';
+}
+
+/* ─── PAYMENT SUCCESS BANNER ─── */
+const PLAN_BENEFITS_DASH = {
+  pro: {
+    name: 'Pro',
+    items: ['Todo lo del plan Básico','3 descargas de bases de datos al mes','Visualizaciones avanzadas e interactivas','Datos históricos con análisis avanzado','Cruces demográfico, seguridad y socioeconómico']
+  },
+  premium: {
+    name: 'Premium',
+    items: ['Todo lo del plan Pro','10 descargas de bases de datos e infografías al mes','Todos los tipos de datos disponibles','Análisis y visualizaciones profundas','Cruces de información exclusivos','Notificación de cada actualización mensual']
+  }
+};
+async function checkPaymentSuccess() {
+  const pendingRaw = localStorage.getItem('rr-pending-plan');
+  if (!pendingRaw) return;
+  let pending;
+  try { pending = JSON.parse(pendingRaw); } catch { return; }
+  if (Date.now() - pending.timestamp > 30 * 60 * 1000) {
+    localStorage.removeItem('rr-pending-plan'); return;
+  }
+  const planMap  = { pro_mensual:'pro', pro_anual:'pro', premium_mensual:'premium', premium_anual:'premium' };
+  const planId   = planMap[pending?.planId] || 'pro';
+  const planInfo = PLAN_BENEFITS_DASH[planId] || PLAN_BENEFITS_DASH.pro;
+  localStorage.removeItem('rr-pending-plan');
+
+  const t = getT();
+  document.getElementById('pbc-title').innerHTML = t.pbcTitleTpl(planInfo.name);
+  document.getElementById('pbc-sub').textContent = t.pbcSubTpl(planInfo.name);
+  document.querySelector('#payment-banner .pbc-label').textContent = t.pbcLabel;
+  document.querySelector('#payment-banner .pbc-benefits-title').textContent = t.pbcBenefits;
+  document.querySelector('#payment-banner .pbc-close').textContent = t.pbcClose;
+  document.getElementById('pbc-benefits-list').innerHTML = planInfo.items.map(b => `<div class="pbc-benefit">${b}</div>`).join('');
+  document.getElementById('payment-banner').classList.add('show');
+
+  const pollingEl = document.getElementById('pbc-polling');
+  pollingEl.textContent = t.pbcActivating;
+  for (let i = 0; i < 12; i++) {
+    await new Promise(r => setTimeout(r, 5000));
+    try {
+      const res  = await fetch('https://rr-auth.reruizc.workers.dev/auth/me', { headers: { 'Authorization': `Bearer ${token}` } });
+      const data = await res.json();
+      if (data.ok && data.user.plan === planId) {
+        Object.assign(user, data.user);
+        localStorage.setItem('rr-user', JSON.stringify(user));
+        pollingEl.textContent = '';
+        render();
+        break;
       }
-    };
+    } catch {}
+  }
+  pollingEl.textContent = '';
+}
+function closePlanBanner() {
+  document.getElementById('payment-banner').classList.remove('show');
+  resetCursor();
+}
 
-    async function checkPaymentSuccess() {
-      // Wompi no agrega parámetros a la URL de redirección en enlaces de pago.
-      // Detectamos el pago por el rr-pending-plan guardado antes de ir al checkout.
-      const pendingRaw = localStorage.getItem('rr-pending-plan');
-      if (!pendingRaw) return;
-      const pending = JSON.parse(pendingRaw);
-      // Ignorar si el pending tiene más de 30 minutos (sesión vieja)
-      if (Date.now() - pending.timestamp > 30 * 60 * 1000) {
-        localStorage.removeItem('rr-pending-plan');
-        return;
-      }
-      const planMap  = { pro_mensual:'pro', pro_anual:'pro', premium_mensual:'premium', premium_anual:'premium' };
-      const planId   = planMap[pending?.planId] || 'pro';
-      const planInfo = PLAN_BENEFITS_DASH[planId] || PLAN_BENEFITS_DASH.pro;
+/* ─── INIT ─── */
+render();
+bindCursorHover();
+refreshUser();
+loadNews();
+checkPaymentSuccess();
+setInterval(() => {
+  const el = document.getElementById('kicker-time');
+  if (el) el.textContent = formatTime();
+  /* re-bind por si entró HTML nuevo */
+  bindCursorHover();
+}, 30_000);
 
-      localStorage.removeItem('rr-pending-plan');
-
-      // Mostrar banner
-      document.getElementById('pbc-title').textContent = `¡Bienvenido al plan ${planInfo.name}!`;
-      document.getElementById('pbc-sub').textContent   = `Tu plan ${planInfo.name} ha sido activado. Ya tienes acceso a todo lo incluido.`;
-      document.getElementById('pbc-benefits-list').innerHTML = planInfo.items.map(b => `<div class="pbc-benefit">${b}</div>`).join('');
-      document.getElementById('payment-banner').classList.add('show');
-
-      // Polling: esperar a que el webhook de Wompi actualice el plan en KV
-      const pollingEl = document.getElementById('pbc-polling');
-      pollingEl.textContent = 'Activando plan en el sistema...';
-      for (let i = 0; i < 12; i++) {
-        await new Promise(r => setTimeout(r, 5000));
-        try {
-          const res  = await fetch('https://rr-auth.reruizc.workers.dev/auth/me', { headers: { 'Authorization': `Bearer ${token}` } });
-          const data = await res.json();
-          if (data.ok && data.user.plan === planId) {
-            Object.assign(user, data.user);
-            localStorage.setItem('rr-user', JSON.stringify(user));
-            pollingEl.textContent = '';
-            render();
-            break;
-          }
-        } catch {}
-      }
-      pollingEl.textContent = '';
-    }
-
-    function closePlanBanner() {
-      document.getElementById('payment-banner').classList.remove('show');
-    }
-
-    // ─── INIT ─────────────────────────────────────────────────────────────────
-    render();
-    refreshUser();
-    loadNews();
-    checkPaymentSuccess();
-
-    // Exponer __applyLang para lang.js — al cambiar idioma re-renderiza el dashboard
-    window.__applyLang = function() { render(); };
-  </script>
-  <script src="lang.js"></script>
-  <script src="theme.js"></script>
+/* Expone para lang.js */
+window.__applyLang = function() { render(); bindCursorHover(); };
+/* Sincroniza label del botón con el tema actual cuando theme.js lo aplique */
+window.__onThemeChange = function(day) {
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = day ? '🌙 Modo noche' : '☀ Modo día';
+};
+</script>
+<script src="lang.js"></script>
+<script src="theme.js"></script>
 </body>
 </html>
