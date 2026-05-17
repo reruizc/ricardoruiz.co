@@ -238,8 +238,9 @@ bases+de+datos/output_ciudades/{cali,barranquilla,…}/   por-comuna por señal.
 ### Estado actual
 **LISTO en producción.** Bloques A→D del plan gate cerrados. Build scripts de
 Bogotá y Medellín actualizados. Datos limpios en S3. Mobile OK. PDF Premium
-operativo. Pendiente cuando haya tiempo: desplegar el snippet `/dl/*` en el
-worker `rr-auth` para mover la quota fuera del localStorage del cliente.
+operativo. Cuota de descargas server-side: `/dl/status` + `/dl/consume`
+desplegados en `rr-auth` (binding KV `RR_DL`) — el frontend ya consume
+estos endpoints; si el worker falla cae a localStorage como fallback.
 
 ## Ponderador propio (en construcción)
 Pipeline en `tools/ponderador/` que calibra firmas encuestadoras contra el

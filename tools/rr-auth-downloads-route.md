@@ -1,9 +1,29 @@
 # Rutas `/dl/*` para el worker `rr-auth`
 
+> **Estado: DESPLEGADO** (2026-05-16, versión `dc3b88e5`). Binding
+> `RR_DL` = `60a2d95728344556b494afd3646ff809`. El snippet de abajo
+> queda como referencia histórica del contrato; la implementación
+> real vive en `/Users/ricardoruiz/rr-auth/src/index.js`
+> (funciones `dlLoadUser`, `dlStatus`, `dlConsume`).
+
 Mueve el contador mensual de descargas (módulo Oportunidad, etc.) del
 localStorage del cliente al worker. Sin esto, un usuario Pro puede
 "regenerar" descargas vaciando `localStorage` y subir efectivamente a
 ilimitadas.
+
+## Adaptación importante respecto al snippet original
+
+`rr-auth` no usa JWT — usa **sesiones opacas** en KV (`sessions:${token}` →
+`{ email, name, plan }`). La implementación desplegada:
+
+1. Lee el token Bearer y resuelve `sessions:${token}` en `RR_STORE`.
+2. Carga `users:${email}` para obtener el plan canónico.
+3. Aplica downgrade en memoria si `planExpiresAt < Date.now()` (mismo
+   patrón que `me()`; no persiste el downgrade, eso lo hace el próximo
+   `/auth/me`).
+4. Identifica al usuario por **email** (no `id`) → key `dl:${email}:YYYY-MM`.
+5. CORS heredado del helper `cors()` global del worker (origin estricto
+   `https://ricardoruiz.co`).
 
 ## Requisitos
 
