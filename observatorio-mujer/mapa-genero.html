@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex,nofollow" />
+<title>Mapa de las Mujeres · Observatorio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+:root {
+  --paper:        #1a1610;
+  --paper-2:      #221d15;
+  --paper-3:      #2a241b;
+  --ink:          #f4f3ef;
+  --ink-2:        #b8b1a0;
+  --ink-3:        #807a6c;
+  --rule:         #f4f3ef1c;
+  --rule-strong:  #f4f3ef38;
+  --accent:       #d96a50;
+  --accent-soft:  #d96a5018;
+  --accent-tint:  #d96a5036;
+  --gold:         #d6a83a;
+  --on-accent:    #14110a;
+
+  --sans:    'Familjen Grotesk', system-ui, sans-serif;
+  --italic:  'Petrona', Georgia, serif;
+  --mono:    'Space Mono', ui-monospace, monospace;
+  --display: 'Syne', sans-serif;
+
+  /* Escala choropleth: hombres-mayoría → paridad → mujeres-mayoría */
+  --scale-low:  #6b5d52;   /* hombres mayoritarios */
+  --scale-mid:  #b8b1a0;   /* paridad */
+  --scale-hi:   #d96a50;   /* mujeres mayoritarias */
+}
+body.day-mode {
+  --paper:        #f4f3ef;
+  --paper-2:      #ecebe5;
+  --paper-3:      #e0ddd2;
+  --ink:          #14110a;
+  --ink-2:        #5a5448;
+  --ink-3:        #948e80;
+  --rule:         #14110a1f;
+  --rule-strong:  #14110a40;
+  --accent:       #8a1e16;
+  --accent-soft:  #8a1e161a;
+  --accent-tint:  #8a1e1633;
+  --gold:         #8a6a1a;
+  --on-accent:    #f4f3ef;
+
+  --scale-low:  #c6bfb1;
+  --scale-mid:  #948e80;
+  --scale-hi:   #8a1e16;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.55;
+  min-height: 100vh;
+  cursor: none;
+  overflow-x: hidden;
+  transition: background .35s, color .35s;
+}
+::selection { background: var(--accent); color: var(--on-accent); }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: none; }
+
+/* GATE */
+.gate {
+  position: fixed; inset: 0; z-index: 5000;
+  background: var(--paper);
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 1rem;
+}
+.gate-text {
+  font-family: var(--mono); font-size: 12px; font-weight: 700;
+  letter-spacing: .2em; text-transform: uppercase; color: var(--ink-2);
+}
+.gate-bar {
+  width: 120px; height: 1px; background: var(--rule-strong);
+  position: relative; overflow: hidden;
+}
+.gate-bar::after {
+  content: ''; position: absolute; inset: 0;
+  background: var(--accent);
+  animation: gate-slide 1.4s ease-in-out infinite;
+}
+@keyframes gate-slide {
+  0%   { transform: translateX(-100%); }
+  50%  { transform: translateX(0); }
+  100% { transform: translateX(100%); }
+}
+
+/* CURSOR */
+.cursor { position:fixed; width:12px; height:12px; background:var(--accent); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s,background .2s; transform:translate(-50%,-50%); }
+.cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--accent); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s,opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+
+/* TOP BAR */
+.topbar {
+  position: sticky; top: 0; z-index: 60;
+  display: grid; grid-template-columns: 1fr auto 1fr;
+  align-items: center; gap: 1.5rem;
+  padding: 1rem 1.75rem;
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+  backdrop-filter: blur(8px);
+}
+.topbar-left, .topbar-center, .topbar-right { display: flex; align-items: center; gap: 1.1rem; }
+.topbar-right { justify-content: flex-end; }
+
+.btn-back {
+  display: inline-flex; align-items: center; gap: .55rem;
+  font-family: var(--sans); font-size: 14.5px; font-weight: 500;
+  letter-spacing: .04em; color: var(--ink);
+  padding: .55rem .9rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  transition: background .2s, border-color .2s;
+}
+.btn-back:hover { background: var(--paper-2); border-color: var(--ink); }
+.btn-back .arr { transition: transform .25s; }
+.btn-back:hover .arr { transform: translateX(-3px); }
+
+.module-chip {
+  display: inline-flex; align-items: center; gap: .5rem;
+  font-family: var(--mono); font-size: 11.5px; font-weight: 700;
+  letter-spacing: .18em; text-transform: uppercase;
+  color: var(--accent);
+  padding: .35rem .75rem;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+}
+.module-chip .marker { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; }
+
+.theme-btn {
+  font-family: var(--mono); font-size: 11.5px; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-2);
+  padding: .35rem .75rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  transition: background .2s, color .2s, border-color .2s;
+}
+.theme-btn:hover { background: var(--paper-2); color: var(--ink); border-color: var(--ink); }
+
+.logo-link { display: flex; align-items: center; gap: .55rem; opacity: .9; transition: opacity .2s; }
+.logo-link:hover { opacity: 1; }
+.logo-bars { display: flex; align-items: flex-end; gap: 3px; height: 20px; }
+.logo-bar { width: 5px; background: var(--accent); border-radius: 1px 1px 0 0; }
+.logo-text {
+  font-family: var(--display); font-weight: 800;
+  font-size: 1.55rem; letter-spacing: -.045em; line-height: 1;
+  color: var(--ink);
+}
+.logo-text span { color: var(--accent); }
+
+/* PAGE */
+.page {
+  max-width: 1340px; margin: 0 auto;
+  padding: 2rem 2.25rem 4rem;
+}
+
+/* HERO compacto */
+.module-hero {
+  padding: 2rem 0 2.5rem;
+  border-bottom: 1px solid var(--rule);
+  display: grid; grid-template-columns: 2fr 1fr;
+  gap: 3rem; align-items: flex-end;
+}
+.module-hero .label {
+  font-family: var(--mono); font-size: 12px; font-weight: 700;
+  letter-spacing: .2em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 1rem;
+  display: flex; align-items: center; gap: .65rem;
+}
+.module-hero .label::before {
+  content: ''; display: block; width: 26px; height: 1.5px; background: var(--accent);
+}
+.module-hero h1 {
+  font-family: var(--sans); font-weight: 700;
+  font-size: clamp(2.2rem, 4.4vw, 3.6rem);
+  letter-spacing: -.03em; line-height: 1.02;
+}
+.module-hero h1 em {
+  font-family: var(--italic); font-style: italic; font-weight: 500;
+  color: var(--accent);
+}
+.module-hero .dek {
+  font-family: var(--sans); font-size: 16px; color: var(--ink-2);
+  line-height: 1.55;
+}
+.kpi-strip {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+.kpi {
+  padding: .9rem 0;
+  border-top: 1px solid var(--rule);
+}
+.kpi .v {
+  font-family: var(--sans); font-weight: 700;
+  font-size: 26px; line-height: 1; letter-spacing: -.015em;
+  color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.kpi .v .of { font-family: var(--italic); font-style: italic; font-weight: 400; font-size: 16px; color: var(--ink-3); }
+.kpi .l {
+  font-family: var(--mono); font-size: 10.5px;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-3); margin-top: .35rem;
+}
+
+/* SHELL principal: mapa + panel */
+.shell {
+  margin-top: 2rem;
+  display: grid; grid-template-columns: 1.6fr 1fr;
+  gap: 1.25rem;
+}
+.map-card, .panel-card {
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  position: relative;
+}
+.card-head {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--rule);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem;
+}
+.card-head .t {
+  font-family: var(--sans); font-weight: 700; font-size: 14.5px;
+  letter-spacing: .02em;
+}
+.card-head .sub {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .15em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+#map {
+  height: 620px; width: 100%;
+  background: var(--paper-2);
+}
+
+/* Leaflet overrides */
+.leaflet-container { background: var(--paper-2); font-family: var(--sans); }
+.leaflet-control-zoom a {
+  background: var(--paper); color: var(--ink);
+  border: 1px solid var(--rule-strong);
+}
+.leaflet-control-zoom a:hover { background: var(--paper-2); }
+.leaflet-control-attribution { display: none; }
+.leaflet-tooltip {
+  background: var(--paper) !important;
+  border: 1px solid var(--ink) !important;
+  color: var(--ink) !important;
+  font-family: var(--sans) !important;
+  font-size: 13px !important;
+  padding: .55rem .75rem !important;
+  border-radius: 0 !important;
+  box-shadow: 4px 4px 0 var(--ink) !important;
+}
+.leaflet-tooltip:before { display: none !important; }
+.tt-name {
+  font-family: var(--sans); font-weight: 700; font-size: 14.5px;
+  margin-bottom: .25rem;
+}
+.tt-pct {
+  font-family: var(--italic); font-style: italic; font-weight: 600;
+  color: var(--accent);
+}
+.tt-meta {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+  color: var(--ink-3); margin-top: .35rem;
+}
+
+/* Legend */
+.legend {
+  position: absolute; bottom: 1rem; left: 1rem; z-index: 400;
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  padding: .75rem .9rem;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+  color: var(--ink-2);
+}
+.legend .t {
+  font-weight: 700; letter-spacing: .15em; text-transform: uppercase;
+  font-size: 10.5px; color: var(--ink-3); margin-bottom: .5rem;
+}
+.legend-scale {
+  display: flex; align-items: center; gap: .35rem;
+}
+.legend-step {
+  width: 26px; height: 12px;
+}
+.legend-labels {
+  display: flex; justify-content: space-between;
+  margin-top: .35rem; font-size: 10px; color: var(--ink-3);
+}
+
+/* PANEL */
+.panel-body { padding: 1.25rem 1.4rem 1.5rem; }
+.panel-pre {
+  font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+  letter-spacing: .18em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: .65rem;
+}
+.panel-name {
+  font-family: var(--sans); font-weight: 700;
+  font-size: 1.9rem; letter-spacing: -.02em; line-height: 1.05;
+  margin-bottom: 1.25rem;
+}
+.panel-row {
+  display: grid; grid-template-columns: 1fr auto;
+  padding: .7rem 0;
+  border-top: 1px solid var(--rule);
+  align-items: baseline;
+  font-family: var(--sans);
+}
+.panel-row .k {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+.panel-row .v {
+  font-family: var(--sans); font-weight: 600;
+  font-size: 17px; color: var(--ink); text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.panel-row .v em {
+  font-family: var(--italic); font-style: italic; font-weight: 400;
+  color: var(--accent);
+  font-size: 18px;
+}
+.panel-row:last-of-type { border-bottom: 1px solid var(--rule); }
+
+.bar-block { margin-top: 1.5rem; }
+.bar-block .lbl {
+  font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-3); margin-bottom: .55rem;
+}
+.bar {
+  display: flex; height: 26px;
+  border: 1px solid var(--rule-strong);
+}
+.bar-m { background: var(--accent); }
+.bar-h { background: var(--paper-3); }
+.bar-legend {
+  display: flex; gap: 1.25rem; margin-top: .55rem;
+  font-family: var(--mono); font-size: 11px; color: var(--ink-2);
+}
+.bar-legend .sw { display: inline-block; width: 10px; height: 10px; margin-right: .35rem; vertical-align: middle; }
+.bar-legend .sw.m { background: var(--accent); }
+.bar-legend .sw.h { background: var(--paper-3); border: 1px solid var(--rule-strong); }
+
+/* RANKING */
+.ranking {
+  margin-top: 2.5rem;
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+.rank-card {
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+}
+.rank-list { padding: .25rem 0; }
+.rank-item {
+  display: grid; grid-template-columns: 30px 1fr auto;
+  gap: .85rem; align-items: baseline;
+  padding: .65rem 1.25rem;
+  border-bottom: 1px dashed var(--rule);
+  cursor: none;
+  transition: background .15s;
+}
+.rank-item:last-child { border-bottom: none; }
+.rank-item:hover { background: var(--paper-2); }
+.rank-item.active { background: var(--accent-soft); }
+.rank-n {
+  font-family: var(--mono); font-size: 12px; font-weight: 700;
+  color: var(--ink-3); letter-spacing: .05em;
+}
+.rank-name {
+  font-family: var(--sans); font-weight: 500;
+  font-size: 14.5px; color: var(--ink);
+}
+.rank-v {
+  font-family: var(--sans); font-weight: 700; font-size: 14.5px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* DISCLAIMER */
+.disclaimer {
+  margin-top: 2.5rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px dashed var(--rule-strong);
+  font-family: var(--mono); font-size: 12px;
+  letter-spacing: .04em;
+  color: var(--ink-2);
+  line-height: 1.65;
+}
+.disclaimer strong { color: var(--ink); font-weight: 700; }
+
+/* FOOTER */
+.footer {
+  margin-top: 3rem;
+  padding: 1.5rem 0 0;
+  border-top: 1px solid var(--rule);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1.5rem;
+  font-family: var(--mono); font-size: 12px;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-3);
+  flex-wrap: wrap;
+}
+
+/* RESPONSIVE */
+@media (max-width: 1080px) {
+  .module-hero { grid-template-columns: 1fr; gap: 1.5rem; }
+  .shell { grid-template-columns: 1fr; }
+  #map { height: 480px; }
+  .ranking { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  body { cursor: auto; }
+  .cursor, .cursor-ring { display: none; }
+  .topbar { grid-template-columns: 1fr auto; padding: .85rem 1rem; }
+  .topbar-center { display: none; }
+  .page { padding: 1.25rem 1rem 2.5rem; }
+  .kpi-strip { grid-template-columns: 1fr; gap: 0; }
+}
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- GATE -->
+<div id="gate" class="gate">
+  <div class="gate-text">Verificando acceso</div>
+  <div class="gate-bar"></div>
+</div>
+
+<!-- TOP BAR -->
+<nav class="topbar" id="topbar" hidden>
+  <div class="topbar-left">
+    <a href="../observatorio-mujer.html" class="btn-back"><span class="arr">←</span> Observatorio</a>
+  </div>
+  <div class="topbar-center">
+    <span class="module-chip"><span class="marker"></span>Módulo 01 · Mapeo</span>
+  </div>
+  <div class="topbar-right">
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
+    <a href="../index.html" class="logo-link" aria-label="Ricardo.Ruiz">
+      <div class="logo-bars">
+        <div class="logo-bar" style="height:20px"></div>
+        <div class="logo-bar" style="height:15px"></div>
+        <div class="logo-bar" style="height:9px"></div>
+        <div class="logo-bar" style="height:4px"></div>
+      </div>
+      <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+    </a>
+  </div>
+</nav>
+
+<main class="page" id="main" hidden>
+
+  <section class="module-hero">
+    <div>
+      <div class="label">Censo electoral · Divipole 2024</div>
+      <h1>Mapa de las <em>Mujeres</em>.<br>Dónde están las <em>21,2 millones</em>.</h1>
+    </div>
+    <div>
+      <p class="dek" style="margin-bottom:1.25rem">Censo electoral femenino agregado por departamento. Cinco regiones donde las mujeres son mayoría clara; cinco zonas de frontera donde son minoría por contexto extractivo y militar.</p>
+      <div class="kpi-strip">
+        <div class="kpi">
+          <div class="v">51,44<span class="of">%</span></div>
+          <div class="l">Promedio nacional</div>
+        </div>
+        <div class="kpi">
+          <div class="v">+8,4<span class="of">pp</span></div>
+          <div class="l">Brecha max–min</div>
+        </div>
+        <div class="kpi">
+          <div class="v">21,2<span class="of">M</span></div>
+          <div class="l">Mujeres en censo</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="shell">
+    <div class="map-card">
+      <div class="card-head">
+        <span class="t">Choropleth departamental</span>
+        <span class="sub">Pasa el cursor · click para fijar</span>
+      </div>
+      <div id="map"></div>
+      <div class="legend">
+        <div class="t">% mujeres en censo</div>
+        <div class="legend-scale" id="legend-scale"></div>
+        <div class="legend-labels"><span>44%</span><span>51,4%</span><span>55%</span></div>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <div class="card-head">
+        <span class="t">Detalle</span>
+        <span class="sub" id="panel-sub">Selección actual</span>
+      </div>
+      <div class="panel-body">
+        <div class="panel-pre" id="p-pre">Promedio nacional</div>
+        <div class="panel-name" id="p-name">Colombia</div>
+
+        <div class="panel-row"><span class="k">% mujeres</span><span class="v"><em id="p-pct">51,44%</em></span></div>
+        <div class="panel-row"><span class="k">Mujeres</span><span class="v" id="p-muj">21.236.349</span></div>
+        <div class="panel-row"><span class="k">Hombres</span><span class="v" id="p-hom">20.050.735</span></div>
+        <div class="panel-row"><span class="k">Total censo</span><span class="v" id="p-tot">41.287.084</span></div>
+        <div class="panel-row"><span class="k">Municipios</span><span class="v" id="p-mun">1.103</span></div>
+        <div class="panel-row"><span class="k">Puestos votación</span><span class="v" id="p-pue">12.575</span></div>
+
+        <div class="bar-block">
+          <div class="lbl">Distribución por género</div>
+          <div class="bar">
+            <div class="bar-m" id="bar-m" style="width:51.44%"></div>
+            <div class="bar-h" id="bar-h" style="width:48.56%"></div>
+          </div>
+          <div class="bar-legend">
+            <span><span class="sw m"></span>Mujeres</span>
+            <span><span class="sw h"></span>Hombres</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ranking">
+    <div class="rank-card">
+      <div class="card-head">
+        <span class="t">Top 10 · Mujeres mayoría</span>
+        <span class="sub">% mujeres más alto</span>
+      </div>
+      <div class="rank-list" id="rank-top"></div>
+    </div>
+    <div class="rank-card">
+      <div class="card-head">
+        <span class="t">Bottom 10 · Hombres mayoría</span>
+        <span class="sub">Territorios de frontera</span>
+      </div>
+      <div class="rank-list" id="rank-bot"></div>
+    </div>
+  </section>
+
+  <section class="disclaimer">
+    <strong>Sobre los datos.</strong> Censo electoral colombiano agregado del Divipole oficial (41,29M habilitados). El indicador es <strong>población habilitada para votar</strong>, no votantes efectivos ni distribución poblacional total (las mujeres son ~50,8% del país según DANE proyección 2024, pero alcanzan 51,4% del censo electoral por mayor longevidad). Cobertura: 33 departamentos · 1.103 municipios · 12.575 puestos de votación. La capa municipal y de puestos llegará en la versión siguiente del módulo, junto con el cruce de participación femenina histórica 2018–2026.
+  </section>
+
+  <footer class="footer">
+    <div>Mapa de las Mujeres · Observatorio · v0.1</div>
+    <div style="font-family:var(--italic);font-style:italic;font-weight:400;font-size:15px;text-transform:none;letter-spacing:0;color:var(--ink-2)">Fuente: Registraduría · Divipole 2024</div>
+  </footer>
+
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  // ─── EMAIL GATE ───────────────────────────────────────────────────
+  const ALLOWED = ['reruizc@gmail.com'];
+  const token = localStorage.getItem('rr-token');
+  const userRaw = localStorage.getItem('rr-user');
+  const user = userRaw ? JSON.parse(userRaw) : null;
+
+  function denyToLogin() {
+    localStorage.removeItem('rr-token');
+    localStorage.removeItem('rr-user');
+    window.location.replace('../login.html');
+  }
+  function denyToDashboard() { window.location.replace('../dashboard.html'); }
+  function emailAllowed(em) { return em && ALLOWED.includes(String(em).toLowerCase().trim()); }
+
+  if (!token || !user) {
+    denyToLogin();
+  } else if (!emailAllowed(user.email)) {
+    denyToDashboard();
+  } else {
+    (async () => {
+      try {
+        const res = await fetch('https://rr-auth.reruizc.workers.dev/auth/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.status === 401) return denyToLogin();
+        const data = await res.json();
+        if (!data.ok || !emailAllowed(data.user && data.user.email)) {
+          return denyToDashboard();
+        }
+        revealPage();
+      } catch (e) { revealPage(); }
+    })();
+  }
+
+  function revealPage() {
+    const gate = document.getElementById('gate');
+    if (gate) gate.remove();
+    document.getElementById('topbar').hidden = false;
+    document.getElementById('main').hidden = false;
+    initModule();
+  }
+
+  // ─── THEME ────────────────────────────────────────────────────────
+  function getAutoTheme() {
+    const h = new Date().getHours();
+    return (h >= 7 && h < 19) ? 'day' : 'night';
+  }
+  function applyTheme(t) {
+    if (t === 'day') document.body.classList.add('day-mode');
+    else document.body.classList.remove('day-mode');
+    const btn = document.getElementById('theme-btn');
+    if (btn) btn.textContent = t === 'day' ? '☾ Modo noche' : '☀ Modo día';
+    // Re-render the map style on theme change
+    if (window._mapReady) restyleAll();
+    buildLegend();
+  }
+  function toggleTheme() {
+    const isDay = document.body.classList.contains('day-mode');
+    const next = isDay ? 'night' : 'day';
+    localStorage.setItem('rr-theme', next);
+    applyTheme(next);
+  }
+  applyTheme(localStorage.getItem('rr-theme') || getAutoTheme());
+
+  // ─── CURSOR ───────────────────────────────────────────────────────
+  const cursor = document.getElementById('cursor');
+  const cursorRing = document.getElementById('cursorRing');
+  document.addEventListener('mousemove', (e) => {
+    cursor.style.left = e.clientX + 'px';
+    cursor.style.top  = e.clientY + 'px';
+    cursorRing.style.left = e.clientX + 'px';
+    cursorRing.style.top  = e.clientY + 'px';
+  });
+  document.addEventListener('mouseover', (e) => {
+    if (e.target.closest('a, button, .rank-item, .leaflet-interactive')) {
+      cursor.style.transform = 'translate(-50%,-50%) scale(2.5)';
+      cursor.style.background = 'transparent';
+      cursor.style.border = '1.5px solid var(--accent)';
+      cursorRing.style.opacity = '0';
+    } else {
+      cursor.style.transform = 'translate(-50%,-50%) scale(1)';
+      cursor.style.background = 'var(--accent)';
+      cursor.style.border = 'none';
+      cursorRing.style.opacity = '.4';
+    }
+  });
+
+  // ─── DATA (agregado Divipole 2024 por depto, embebido) ───────────
+  // Generado con script Python sobre Bases de datos/COMUNAS_DATA.csv
+  // Para producción: mover a S3 como por-depto.json y consumir vía fetch.
+  const DATA = {
+    "01": {nombre:"Antioquia", mujeres:2796016, hombres:2608910, total:5404926, pct:51.73, municipios:125, puestos:1282},
+    "03": {nombre:"Atlántico", mujeres:1105632, hombres:1027503, total:2133135, pct:51.83, municipios:23, puestos:345},
+    "05": {nombre:"Bolívar", mujeres:903489, hombres:890679, total:1794168, pct:50.36, municipios:46, puestos:639},
+    "07": {nombre:"Boyacá", mujeres:527824, hombres:517876, total:1045700, pct:50.48, municipios:123, puestos:398},
+    "09": {nombre:"Caldas", mujeres:424515, hombres:409588, total:834103, pct:50.89, municipios:27, puestos:339},
+    "11": {nombre:"Cauca", mujeres:547973, hombres:530235, total:1078208, pct:50.82, municipios:42, puestos:819},
+    "12": {nombre:"Cesar", mujeres:468997, hombres:462356, total:931353, pct:50.36, municipios:25, puestos:300},
+    "13": {nombre:"Córdoba", mujeres:705722, hombres:701263, total:1406985, pct:50.16, municipios:30, puestos:594},
+    "15": {nombre:"Cundinamarca", mujeres:1168170, hombres:1119960, total:2288130, pct:51.05, municipios:116, puestos:684},
+    "16": {nombre:"Bogotá D.C.", mujeres:3216020, hombres:2885459, total:6101479, pct:52.71, municipios:1, puestos:1083},
+    "17": {nombre:"Chocó", mujeres:185114, hombres:178629, total:363743, pct:50.89, municipios:31, puestos:449},
+    "19": {nombre:"Huila", mujeres:471566, hombres:468174, total:939740, pct:50.18, municipios:37, puestos:268},
+    "21": {nombre:"Magdalena", mujeres:548954, hombres:546795, total:1095749, pct:50.10, municipios:30, puestos:389},
+    "23": {nombre:"Nariño", mujeres:630482, hombres:603275, total:1233757, pct:51.10, municipios:64, puestos:941},
+    "24": {nombre:"Risaralda", mujeres:455331, hombres:419364, total:874695, pct:52.06, municipios:14, puestos:226},
+    "25": {nombre:"Norte de Santander", mujeres:705171, hombres:677537, total:1382708, pct:51.00, municipios:40, puestos:472},
+    "26": {nombre:"Quindío", mujeres:261138, hombres:243405, total:504543, pct:51.76, municipios:12, puestos:129},
+    "27": {nombre:"Santander", mujeres:951579, hombres:915766, total:1867345, pct:50.96, municipios:87, puestos:825},
+    "28": {nombre:"Sucre", mujeres:380592, hombres:387994, total:768586, pct:49.52, municipios:26, puestos:419},
+    "29": {nombre:"Tolima", mujeres:591141, hombres:586209, total:1177350, pct:50.21, municipios:47, puestos:514},
+    "31": {nombre:"Valle del Cauca", mujeres:2015355, hombres:1785422, total:3800777, pct:53.02, municipios:42, puestos:1152},
+    "40": {nombre:"Arauca", mujeres:109406, hombres:113974, total:223380, pct:48.98, municipios:7, puestos:75},
+    "44": {nombre:"Caquetá", mujeres:162598, hombres:167855, total:330453, pct:49.20, municipios:16, puestos:152},
+    "46": {nombre:"Casanare", mujeres:162583, hombres:166415, total:328998, pct:49.42, municipios:19, puestos:171},
+    "48": {nombre:"La Guajira", mujeres:363147, hombres:345724, total:708871, pct:51.23, municipios:15, puestos:218},
+    "50": {nombre:"Guainía", mujeres:17464, hombres:19465, total:36929, pct:47.29, municipios:8, puestos:25},
+    "52": {nombre:"Meta", mujeres:420700, hombres:428887, total:849587, pct:49.52, municipios:29, puestos:289},
+    "54": {nombre:"Guaviare", mujeres:31308, hombres:38839, total:70147, pct:44.63, municipios:4, puestos:47},
+    "56": {nombre:"San Andrés", mujeres:28033, hombres:26034, total:54067, pct:51.85, municipios:2, puestos:8},
+    "60": {nombre:"Amazonas", mujeres:27681, hombres:29759, total:57440, pct:48.19, municipios:11, puestos:30},
+    "64": {nombre:"Putumayo", mujeres:130500, hombres:134320, total:264820, pct:49.28, municipios:13, puestos:121},
+    "68": {nombre:"Vaupés", mujeres:11953, hombres:14209, total:26162, pct:45.69, municipios:6, puestos:31},
+    "72": {nombre:"Vichada", mujeres:26908, hombres:31296, total:58204, pct:46.23, municipios:4, puestos:59}
+  };
+
+  const NAC = {
+    nombre:"Colombia", mujeres:21236349, hombres:20050735, total:41287084,
+    pct:51.44, municipios:1103, puestos:12575
+  };
+
+  // Mapa nombre normalizado → cod, para hacer matching con el GeoJSON
+  function norm(s) {
+    return String(s||'').toUpperCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g,'')
+      .replace(/\./g,'').replace(/\s+/g,' ').trim();
+  }
+  const NAME_TO_COD = {};
+  Object.entries(DATA).forEach(([cod, v]) => { NAME_TO_COD[norm(v.nombre)] = cod; });
+  // Aliases manuales (variaciones esperadas en el GeoJSON oficial)
+  Object.assign(NAME_TO_COD, {
+    'BOGOTA': '16', 'BOGOTA DC': '16', 'BOGOTA D C': '16', 'SANTAFE DE BOGOTA': '16',
+    'NORTE DE SAN': '25', 'NORTE SANTANDER': '25', 'N DE SANTANDER': '25',
+    'VALLE': '31',
+    'SAN ANDRES Y PROVIDENCIA': '56', 'SAN ANDRES PROVIDENCIA': '56', 'ARCHIPIELAGO DE SAN ANDRES': '56'
+  });
+
+  // ─── COLOR SCALE ─────────────────────────────────────────────────
+  // 44% → low (hombres); 51.4% (paridad+nacional) → mid; 55% → hi (mujeres)
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function hexToRgb(h) {
+    h = h.replace('#','');
+    return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+  }
+  function rgbToHex(r,g,b) {
+    return '#' + [r,g,b].map(x => Math.round(x).toString(16).padStart(2,'0')).join('');
+  }
+  function getScale() {
+    const cs = getComputedStyle(document.body);
+    return {
+      low: cs.getPropertyValue('--scale-low').trim() || '#6b5d52',
+      mid: cs.getPropertyValue('--scale-mid').trim() || '#b8b1a0',
+      hi:  cs.getPropertyValue('--scale-hi').trim()  || '#d96a50'
+    };
+  }
+  function color(pct) {
+    const s = getScale();
+    if (pct == null) return '#444';
+    let c1, c2, t;
+    if (pct <= 51.44) {
+      c1 = hexToRgb(s.low); c2 = hexToRgb(s.mid);
+      t = Math.max(0, Math.min(1, (pct - 44) / (51.44 - 44)));
+    } else {
+      c1 = hexToRgb(s.mid); c2 = hexToRgb(s.hi);
+      t = Math.max(0, Math.min(1, (pct - 51.44) / (55 - 51.44)));
+    }
+    return rgbToHex(lerp(c1[0],c2[0],t), lerp(c1[1],c2[1],t), lerp(c1[2],c2[2],t));
+  }
+
+  function buildLegend() {
+    const wrap = document.getElementById('legend-scale');
+    if (!wrap) return;
+    const stops = [44, 46, 48, 50, 51.44, 53, 54, 55];
+    wrap.innerHTML = stops.map(p =>
+      `<div class="legend-step" style="background:${color(p)}"></div>`
+    ).join('');
+  }
+
+  // ─── FORMATTING ──────────────────────────────────────────────────
+  const fmt = n => new Intl.NumberFormat('es-CO').format(Math.round(n || 0));
+  const pct = n => (n == null ? '—' : n.toFixed(2).replace('.', ',') + '%');
+
+  // ─── PANEL UPDATE ────────────────────────────────────────────────
+  function showPanel(d, scope) {
+    document.getElementById('p-pre').textContent = scope || 'Departamento seleccionado';
+    document.getElementById('p-name').textContent = d.nombre;
+    document.getElementById('p-pct').textContent = pct(d.pct);
+    document.getElementById('p-muj').textContent = fmt(d.mujeres);
+    document.getElementById('p-hom').textContent = fmt(d.hombres);
+    document.getElementById('p-tot').textContent = fmt(d.total);
+    document.getElementById('p-mun').textContent = fmt(d.municipios);
+    document.getElementById('p-pue').textContent = fmt(d.puestos);
+    const pm = d.pct, ph = 100 - d.pct;
+    document.getElementById('bar-m').style.width = pm + '%';
+    document.getElementById('bar-h').style.width = ph + '%';
+  }
+  function showNacional() { showPanel(NAC, 'Promedio nacional'); }
+
+  // ─── MAP ─────────────────────────────────────────────────────────
+  const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
+  const GEO_URL = `${S3}/mapas-2026/DEPARTAMENTOS2.json`;
+  let _map, _layer, _geoData;
+
+  async function initMap() {
+    _map = L.map('map', {
+      zoomControl: true,
+      attributionControl: false,
+      zoomSnap: 0.25,
+      preferCanvas: false
+    }).setView([4.6, -74.1], 5);
+
+    try {
+      const r = await fetch(GEO_URL);
+      _geoData = await r.json();
+    } catch (e) {
+      document.getElementById('map').innerHTML =
+        '<div style="padding:2rem;color:var(--ink-2);font-family:var(--mono);font-size:12px">No se pudo cargar el GeoJSON de departamentos. Reintenta.</div>';
+      return;
+    }
+
+    drawLayer();
+    window._mapReady = true;
+    _map.fitBounds(_layer.getBounds(), { padding: [10, 10] });
+  }
+
+  function depCodFromFeature(props) {
+    if (props.electoral_id && DATA[String(props.electoral_id).padStart(2,'0')]) {
+      return String(props.electoral_id).padStart(2,'0');
+    }
+    if (props.dpto_ccdgo) {
+      const c = String(props.dpto_ccdgo).padStart(2,'0');
+      if (DATA[c]) return c;
+    }
+    const nm = norm(props.name || props.NOMBRE_DPT || props.dpto_cnmbr || '');
+    if (NAME_TO_COD[nm]) return NAME_TO_COD[nm];
+    for (const k of Object.keys(NAME_TO_COD)) {
+      if (nm.startsWith(k) || k.startsWith(nm)) return NAME_TO_COD[k];
+    }
+    return null;
+  }
+
+  function styleFor(feature) {
+    const cod = depCodFromFeature(feature.properties);
+    const d = cod ? DATA[cod] : null;
+    const fill = d ? color(d.pct) : '#444';
+    return {
+      fillColor: fill,
+      weight: 1,
+      color: 'var(--paper)',
+      fillOpacity: 0.92
+    };
+  }
+
+  function drawLayer() {
+    if (_layer) _map.removeLayer(_layer);
+    _layer = L.geoJSON(_geoData, {
+      style: styleFor,
+      onEachFeature: (feat, layer) => {
+        const cod = depCodFromFeature(feat.properties);
+        const d = cod ? DATA[cod] : null;
+        const nm = d ? d.nombre : (feat.properties.name || '—');
+        const tt = d
+          ? `<div class="tt-name">${nm}</div>
+             <div><span class="tt-pct">${pct(d.pct)}</span> mujeres</div>
+             <div class="tt-meta">${fmt(d.mujeres)} de ${fmt(d.total)}</div>`
+          : `<div class="tt-name">${nm}</div><div class="tt-meta">Sin datos</div>`;
+        layer.bindTooltip(tt, { sticky: true, direction: 'top' });
+        layer.on('mouseover', () => {
+          layer.setStyle({ weight: 2.5, color: '#fff' });
+          if (d) showPanel(d, 'Departamento');
+        });
+        layer.on('mouseout', () => {
+          _layer.resetStyle(layer);
+          showNacional();
+        });
+        layer.on('click', () => {
+          if (d) {
+            showPanel(d, 'Departamento · fijado');
+            highlightRank(cod);
+          }
+        });
+      }
+    }).addTo(_map);
+  }
+
+  function restyleAll() {
+    if (_layer) _layer.setStyle(styleFor);
+  }
+
+  // ─── RANKING ─────────────────────────────────────────────────────
+  function renderRanking() {
+    const arr = Object.entries(DATA).map(([cod, v]) => ({ cod, ...v }));
+    const top = [...arr].sort((a,b) => b.pct - a.pct).slice(0,10);
+    const bot = [...arr].sort((a,b) => a.pct - b.pct).slice(0,10);
+    const html = (items) => items.map((d, i) => `
+      <div class="rank-item" data-cod="${d.cod}">
+        <span class="rank-n">${String(i+1).padStart(2,'0')}</span>
+        <span class="rank-name">${d.nombre}</span>
+        <span class="rank-v">${pct(d.pct)}</span>
+      </div>
+    `).join('');
+    document.getElementById('rank-top').innerHTML = html(top);
+    document.getElementById('rank-bot').innerHTML = html(bot);
+    document.querySelectorAll('.rank-item').forEach(el => {
+      el.addEventListener('mouseenter', () => {
+        const d = DATA[el.dataset.cod];
+        if (d) showPanel(d, 'Departamento · ranking');
+      });
+      el.addEventListener('mouseleave', () => showNacional());
+    });
+  }
+  function highlightRank(cod) {
+    document.querySelectorAll('.rank-item').forEach(el => {
+      el.classList.toggle('active', el.dataset.cod === cod);
+    });
+  }
+
+  // ─── BOOT ────────────────────────────────────────────────────────
+  function initModule() {
+    buildLegend();
+    showNacional();
+    renderRanking();
+    initMap();
+  }
+</script>
+</body>
+</html>

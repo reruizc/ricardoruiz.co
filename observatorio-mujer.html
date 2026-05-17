@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex,nofollow" />
+<title>Observatorio Mujer · Ricardo.Ruiz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet">
+<style>
+/* ───────────────────────────────────────────────────────────────
+   RICARDO.RUIZ · OBSERVATORIO MUJER (capa privada)
+   Hereda paleta cream/oxblood del dashboard. Default = noche.
+─────────────────────────────────────────────────────────────── */
+:root {
+  --paper:        #1a1610;
+  --paper-2:      #221d15;
+  --paper-3:      #2a241b;
+  --ink:          #f4f3ef;
+  --ink-2:        #b8b1a0;
+  --ink-3:        #807a6c;
+  --rule:         #f4f3ef1c;
+  --rule-strong:  #f4f3ef38;
+  --accent:       #d96a50;
+  --accent-soft:  #d96a5018;
+  --accent-tint:  #d96a5036;
+  --gold:         #d6a83a;
+  --on-accent:    #14110a;
+
+  --sans:    'Familjen Grotesk', system-ui, sans-serif;
+  --italic:  'Petrona', Georgia, serif;
+  --mono:    'Space Mono', ui-monospace, monospace;
+  --display: 'Syne', sans-serif;
+}
+body.day-mode {
+  --paper:        #f4f3ef;
+  --paper-2:      #ecebe5;
+  --paper-3:      #e0ddd2;
+  --ink:          #14110a;
+  --ink-2:        #5a5448;
+  --ink-3:        #948e80;
+  --rule:         #14110a1f;
+  --rule-strong:  #14110a40;
+  --accent:       #8a1e16;
+  --accent-soft:  #8a1e161a;
+  --accent-tint:  #8a1e1633;
+  --gold:         #8a6a1a;
+  --on-accent:    #f4f3ef;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 18px;
+  line-height: 1.55;
+  min-height: 100vh;
+  cursor: none;
+  overflow-x: hidden;
+  transition: background .35s ease, color .35s ease;
+}
+::selection { background: var(--accent); color: var(--on-accent); }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: none; }
+
+body.day-mode::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image: radial-gradient(rgba(20,17,10,.035) 1px, transparent 1.4px);
+  background-size: 4px 4px;
+  opacity: .9; mix-blend-mode: multiply;
+}
+
+/* ── GATE ── */
+.gate {
+  position: fixed; inset: 0; z-index: 5000;
+  background: var(--paper);
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 1rem;
+}
+.gate-text {
+  font-family: var(--mono); font-size: 12px; font-weight: 700;
+  letter-spacing: .2em; text-transform: uppercase; color: var(--ink-2);
+}
+.gate-bar {
+  width: 120px; height: 1px; background: var(--rule-strong);
+  position: relative; overflow: hidden;
+}
+.gate-bar::after {
+  content: ''; position: absolute; inset: 0;
+  background: var(--accent);
+  animation: gate-slide 1.4s ease-in-out infinite;
+}
+@keyframes gate-slide {
+  0%   { transform: translateX(-100%); }
+  50%  { transform: translateX(0); }
+  100% { transform: translateX(100%); }
+}
+
+/* CURSOR */
+.cursor { position:fixed; width:12px; height:12px; background:var(--accent); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s ease,background .2s; transform:translate(-50%,-50%); }
+.cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--accent); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s ease,opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+
+/* ───────── TOP BAR ───────── */
+.topbar {
+  position: sticky; top: 0; z-index: 60;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1rem 1.75rem;
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+  backdrop-filter: blur(8px);
+}
+.topbar-left, .topbar-center, .topbar-right { display: flex; align-items: center; gap: 1.1rem; }
+.topbar-right { justify-content: flex-end; }
+
+.btn-back {
+  display: inline-flex; align-items: center; gap: .55rem;
+  font-family: var(--sans); font-size: 14.5px; font-weight: 500;
+  letter-spacing: .04em; color: var(--ink);
+  padding: .55rem .9rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  transition: background .2s, border-color .2s;
+}
+.btn-back:hover { background: var(--paper-2); border-color: var(--ink); }
+.btn-back .arr { transition: transform .25s ease; }
+.btn-back:hover .arr { transform: translateX(-3px); }
+
+.private-chip {
+  display: inline-flex; align-items: center; gap: .5rem;
+  font-family: var(--mono); font-size: 11.5px; font-weight: 700;
+  letter-spacing: .18em; text-transform: uppercase;
+  color: var(--gold);
+  padding: .35rem .75rem;
+  border: 1px solid var(--gold);
+  background: transparent;
+  border-radius: 999px;
+}
+.private-chip .marker {
+  width: 6px; height: 6px; background: var(--gold); border-radius: 50%;
+}
+
+.theme-btn {
+  display: inline-flex; align-items: center; gap: .4rem;
+  font-family: var(--mono); font-size: 11.5px; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-2);
+  padding: .35rem .75rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  transition: background .2s, color .2s, border-color .2s;
+  white-space: nowrap;
+}
+.theme-btn:hover { background: var(--paper-2); color: var(--ink); border-color: var(--ink); }
+
+.logo-link { display: flex; align-items: center; gap: .55rem; text-decoration: none; opacity: .9; transition: opacity .2s; }
+.logo-link:hover { opacity: 1; }
+.logo-bars { display: flex; align-items: flex-end; gap: 3px; height: 20px; }
+.logo-bar { width: 5px; background: var(--accent); border-radius: 1px 1px 0 0; }
+.logo-text {
+  font-family: var(--display); font-weight: 800;
+  font-size: 1.55rem; letter-spacing: -.045em; line-height: 1;
+  color: var(--ink);
+}
+.logo-text span { color: var(--accent); }
+
+/* ───────── PAGE ───────── */
+.page {
+  position: relative; z-index: 1;
+  max-width: 1340px;
+  margin: 0 auto;
+  padding: 2.5rem 2.25rem 4rem;
+}
+
+/* ───────── KICKER ───────── */
+.kicker {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem;
+  font-family: var(--mono); font-size: 13px;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-3);
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+.kicker .left, .kicker .right { display: flex; align-items: center; gap: 1rem; }
+.kicker .pulse {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 0 0 var(--accent);
+  animation: pulse 2.5s ease-out infinite;
+}
+@keyframes pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in oklch, var(--accent) 50%, transparent); }
+  70%  { box-shadow: 0 0 0 10px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.kicker .dot { color: var(--rule-strong); }
+
+/* ───────── HERO ───────── */
+.hero {
+  display: grid;
+  grid-template-columns: 1.55fr 1fr;
+  gap: 4.5rem;
+  align-items: flex-end;
+  padding: 4.5rem 0 4.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+.hero-title {
+  font-family: var(--sans); font-weight: 700;
+  font-size: clamp(3rem, 6vw, 5.2rem);
+  line-height: .98;
+  letter-spacing: -.035em;
+  color: var(--ink);
+}
+.hero-title .word { display: block; font-weight: 400; }
+.hero-title .em {
+  display: inline;
+  font-family: var(--italic); font-style: italic; font-weight: 500;
+  letter-spacing: -.025em; color: var(--accent);
+  padding-right: .04em;
+}
+.hero-title .period { color: var(--accent); }
+
+.hero-aside {
+  font-family: var(--sans); font-size: 18px; line-height: 1.55;
+  color: var(--ink-2);
+  padding-bottom: .3rem;
+}
+.hero-aside .stat {
+  font-family: var(--italic); font-style: italic; font-weight: 600;
+  color: var(--ink);
+  border-bottom: 2px solid var(--accent);
+  padding-bottom: 1px;
+}
+.hero-aside .quick-stats {
+  display: flex; gap: 1.5rem; margin-top: 1.75rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--rule);
+  flex-wrap: wrap;
+}
+.qs { display: flex; flex-direction: column; gap: .25rem; }
+.qs .v {
+  font-family: var(--sans); font-weight: 700;
+  font-size: 28px; line-height: 1; letter-spacing: -.02em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.qs .v .of {
+  font-family: var(--italic); font-style: italic; font-weight: 400;
+  font-size: 18px; color: var(--ink-3);
+}
+.qs .l {
+  font-family: var(--mono); font-size: 11.5px;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* ───────── SECTION HEAD ───────── */
+.section-head {
+  margin: 4rem 0 2rem;
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 1.5rem;
+  padding-bottom: 1.1rem;
+  border-bottom: 2px solid var(--ink);
+}
+.section-head h2 {
+  font-family: var(--sans); font-weight: 700;
+  font-size: 1.4rem; letter-spacing: -.01em;
+  color: var(--ink);
+  display: flex; align-items: baseline; gap: .85rem;
+}
+.section-head h2 .num {
+  font-family: var(--mono); font-size: 14px; font-weight: 400;
+  letter-spacing: .15em; color: var(--ink-3);
+}
+.section-head .meta {
+  font-family: var(--mono); font-size: 13px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-2);
+}
+
+/* ───────── MODULES GRID ───────── */
+.modules-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+}
+.module {
+  position: relative;
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  padding: 1.85rem 1.85rem 1.6rem;
+  display: flex; flex-direction: column; gap: 1rem;
+  min-height: 240px;
+  transition: background .25s ease, border-color .25s ease;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+}
+.module:hover { background: var(--paper-2); border-color: var(--ink); }
+.module.locked { opacity: .82; pointer-events: none; }
+
+.module-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
+}
+.module-folio {
+  font-family: var(--mono); font-weight: 700;
+  font-size: 14px; letter-spacing: .12em;
+  color: var(--accent);
+}
+.module-status {
+  font-family: var(--mono); font-size: 11.5px; font-weight: 700;
+  letter-spacing: .16em; text-transform: uppercase;
+  padding: .3rem .65rem;
+  border-radius: 999px;
+  display: inline-flex; align-items: center; gap: .4rem;
+  white-space: nowrap;
+}
+.module-status .d { width: 5px; height: 5px; border-radius: 50%; }
+.module-status.live    { color: var(--accent); background: var(--accent-soft); }
+.module-status.live .d { background: var(--accent); }
+.module-status.draft   { color: var(--gold); background: transparent; border: 1px solid var(--gold); }
+.module-status.draft .d{ background: var(--gold); }
+.module-status.soon    { color: var(--ink-3); background: transparent; border: 1px solid var(--rule-strong); }
+.module-status.soon .d { background: var(--ink-3); }
+
+.module-name {
+  font-family: var(--sans); font-weight: 700;
+  font-size: 1.65rem; line-height: 1.08;
+  letter-spacing: -.02em; color: var(--ink);
+  position: relative; align-self: flex-start;
+}
+.module-name .em {
+  font-family: var(--italic); font-style: italic; font-weight: 500;
+  color: var(--accent);
+}
+.module-name::after {
+  content: ""; position: absolute; left: 0; bottom: -4px; height: 2px;
+  background: var(--accent); width: 0;
+  transition: width .4s cubic-bezier(.2,.7,.2,1);
+}
+.module:hover:not(.locked) .module-name::after { width: 3.5rem; }
+
+.module-dek {
+  font-family: var(--sans); font-weight: 400;
+  font-size: 16.5px; line-height: 1.5;
+  color: var(--ink-2); flex: 1;
+}
+
+.module-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+  font-family: var(--mono); font-size: 12.5px; font-weight: 700;
+  letter-spacing: .15em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+.module-cta {
+  display: inline-flex; align-items: center; gap: .5rem;
+  color: var(--ink);
+  transition: gap .25s ease, color .25s ease;
+}
+.module:hover:not(.locked) .module-cta { gap: .85rem; color: var(--accent); }
+.module.locked .module-cta { color: var(--ink-3); }
+
+.module::after {
+  content: attr(data-folio);
+  position: absolute; right: 1rem; bottom: -.7rem;
+  font-family: var(--display); font-weight: 800;
+  font-size: 7.5rem; line-height: 1;
+  color: var(--ink);
+  opacity: .04;
+  pointer-events: none;
+  letter-spacing: -.04em;
+}
+
+/* ───────── DISCLOSURE BLOCK ───────── */
+.disclosure {
+  margin-top: 4rem;
+  padding: 2rem;
+  background:
+    repeating-linear-gradient(135deg,
+      var(--paper-2) 0 12px,
+      var(--paper-3) 12px 13px);
+  border: 1px solid var(--ink);
+  position: relative;
+}
+.disclosure::before {
+  content: "Brief interno · Mujeres por la Democracia";
+  position: absolute; top: 0; right: 0;
+  font-family: var(--mono); font-size: 11.5px; font-weight: 700;
+  letter-spacing: .2em; text-transform: uppercase;
+  padding: .4rem .8rem;
+  background: var(--ink); color: var(--paper);
+}
+.disclosure-eyebrow {
+  font-family: var(--mono); font-size: 12px; font-weight: 700;
+  letter-spacing: .18em; text-transform: uppercase;
+  color: var(--gold); margin-bottom: .75rem;
+  display: inline-flex; align-items: center; gap: .55rem;
+}
+.disclosure-eyebrow::before {
+  content: ""; display: inline-block; width: 22px; height: 1.5px; background: var(--gold);
+}
+.disclosure h3 {
+  font-family: var(--sans); font-weight: 700;
+  font-size: 1.8rem; line-height: 1.05;
+  letter-spacing: -.025em;
+  margin-bottom: .85rem;
+  max-width: 56ch;
+}
+.disclosure h3 em {
+  font-family: var(--italic); font-style: italic; font-weight: 500;
+  letter-spacing: -.02em; color: var(--gold);
+}
+.disclosure p {
+  font-family: var(--sans); font-weight: 400;
+  font-size: 16.5px; line-height: 1.55;
+  color: var(--ink-2);
+  max-width: 64ch;
+  margin-bottom: .6rem;
+}
+.disclosure p:last-child { margin-bottom: 0; }
+.disclosure strong { color: var(--ink); font-weight: 600; }
+
+/* ───────── FOOTER ───────── */
+.footer {
+  margin-top: 3.5rem;
+  padding: 1.5rem 0 0;
+  border-top: 1px solid var(--rule);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1.5rem;
+  font-family: var(--mono); font-size: 12px;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-3);
+  flex-wrap: wrap;
+}
+.footer .credit {
+  font-family: var(--italic); font-style: italic; font-weight: 400;
+  font-size: 15px; text-transform: none; letter-spacing: 0;
+  color: var(--ink-2);
+}
+
+/* ───────── RESPONSIVE ───────── */
+@media (max-width: 1080px) {
+  .hero { grid-template-columns: 1fr; gap: 2.5rem; padding: 3rem 0; }
+  .hero-aside { padding-bottom: 0; border-top: 1px solid var(--rule-strong); padding-top: 2rem; }
+  .modules-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  body { font-size: 17px; cursor: auto; }
+  .cursor, .cursor-ring { display: none; }
+  .topbar { grid-template-columns: 1fr auto; gap: .75rem; padding: .85rem 1rem; }
+  .topbar-center { display: none; }
+  .page { padding: 1.5rem 1.25rem 3rem; }
+  .hero { padding: 2rem 0 2.5rem; }
+  .hero-title { font-size: clamp(2.4rem, 11vw, 3.6rem); }
+  .module { min-height: 200px; padding: 1.5rem; }
+  .module::after { font-size: 5.5rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- GATE -->
+<div id="gate" class="gate">
+  <div class="gate-text">Verificando acceso</div>
+  <div class="gate-bar"></div>
+</div>
+
+<!-- TOP BAR -->
+<nav class="topbar" id="topbar" hidden>
+  <div class="topbar-left">
+    <a href="dashboard.html" class="btn-back"><span class="arr">←</span> Panel</a>
+  </div>
+  <div class="topbar-center">
+    <span class="private-chip"><span class="marker"></span>Capa privada · solo Ricardo</span>
+  </div>
+  <div class="topbar-right">
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
+    <a href="index.html" class="logo-link" aria-label="Ricardo.Ruiz">
+      <div class="logo-bars">
+        <div class="logo-bar" style="height:20px"></div>
+        <div class="logo-bar" style="height:15px"></div>
+        <div class="logo-bar" style="height:9px"></div>
+        <div class="logo-bar" style="height:4px"></div>
+      </div>
+      <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+    </a>
+  </div>
+</nav>
+
+<!-- PAGE -->
+<main class="page" id="main" hidden>
+
+  <!-- KICKER -->
+  <div class="kicker">
+    <div class="left">
+      <span class="pulse" aria-hidden="true"></span>
+      <span>Observatorio Mujer · prototipo v0</span>
+      <span class="dot">·</span>
+      <span id="kicker-date">—</span>
+    </div>
+    <div class="right">
+      <span>Bogotá</span>
+    </div>
+  </div>
+
+  <!-- HERO -->
+  <section class="hero">
+    <h1 class="hero-title">
+      <span class="word">Datos para nombrar lo</span>
+      <span class="em">que se calla</span><span class="period">.</span>
+    </h1>
+    <aside class="hero-aside">
+      <p>Un observatorio territorial sobre <span class="stat">21,2 millones</span> de mujeres en el censo electoral colombiano: dónde están, cómo viven, quién las representa y qué tan visible es lo que les pasa.</p>
+      <div class="quick-stats">
+        <div class="qs">
+          <span class="v">51,44<span class="of">%</span></span>
+          <span class="l">Censo electoral femenino</span>
+        </div>
+        <div class="qs">
+          <span class="v">33<span class="of">/33</span></span>
+          <span class="l">Departamentos cubiertos</span>
+        </div>
+        <div class="qs">
+          <span class="v">1<span class="of">/4</span></span>
+          <span class="l">Módulos en producción</span>
+        </div>
+      </div>
+    </aside>
+  </section>
+
+  <!-- MÓDULOS -->
+  <div class="section-head">
+    <h2><span class="num">— 01</span> Módulos del observatorio</h2>
+    <span class="meta">Hoja de ruta · 8 semanas</span>
+  </div>
+
+  <section class="modules-grid">
+
+    <a class="module" href="observatorio-mujer/mapa-genero.html" data-folio="01">
+      <div class="module-head">
+        <span class="module-folio">01 · Mapeo</span>
+        <span class="module-status live"><span class="d"></span>Prototipo</span>
+      </div>
+      <h3 class="module-name">Mapa de las <span class="em">Mujeres</span></h3>
+      <p class="module-dek">Dónde están las mujeres que votan en Colombia. Censo electoral femenino por departamento y municipio, brechas de participación, territorios con voto femenino dormido.</p>
+      <div class="module-foot">
+        <span>Datos · Divipole 2024</span>
+        <span class="module-cta">Abrir →</span>
+      </div>
+    </a>
+
+    <a class="module locked" data-folio="02">
+      <div class="module-head">
+        <span class="module-folio">02 · Bienestar</span>
+        <span class="module-status soon"><span class="d"></span>Próximamente</span>
+      </div>
+      <h3 class="module-name">Pulso <span class="em">Mujer</span></h3>
+      <p class="module-dek">Observatorio multi-capa de seguridad, salud, economía y justicia. Femicidios, embarazo adolescente, brecha salarial, denuncias e impunidad por municipio. Alertas rojas para territorios en crisis.</p>
+      <div class="module-foot">
+        <span>Fuentes · INMLCF · FGN · SISPRO · DANE</span>
+        <span class="module-cta">Sem 3–5</span>
+      </div>
+    </a>
+
+    <a class="module locked" data-folio="03">
+      <div class="module-head">
+        <span class="module-folio">03 · Política</span>
+        <span class="module-status soon"><span class="d"></span>Próximamente</span>
+      </div>
+      <h3 class="module-name">Representación <span class="em">en cargos</span></h3>
+      <p class="module-dek">Mujeres electas Senado, Cámara, alcaldías y gobernaciones 2014–2026. Desiertos de representación: municipios que nunca han tenido alcaldesa. Cumplimiento de cuotas Ley 581 y 1475 por bancada.</p>
+      <div class="module-foot">
+        <span>Fuentes · Registraduría · CNE</span>
+        <span class="module-cta">Sem 6</span>
+      </div>
+    </a>
+
+    <a class="module locked" data-folio="04">
+      <div class="module-head">
+        <span class="module-folio">04 · Saliencia</span>
+        <span class="module-status soon"><span class="d"></span>Próximamente</span>
+      </div>
+      <h3 class="module-name">Agenda <span class="em">mediática</span></h3>
+      <p class="module-dek">Cuánto espacio reciben los temas mujer en 15 medios nacionales. Word cloud y ranking de voceras citadas. Comparativo de saliencia con seguridad, economía y otros frames.</p>
+      <div class="module-foot">
+        <span>Lambda RSS · agregador 1h</span>
+        <span class="module-cta">Sem 7</span>
+      </div>
+    </a>
+
+  </section>
+
+  <!-- BRIEF INTERNO -->
+  <section class="disclosure">
+    <div class="disclosure-eyebrow">Encargo · Laura · MxD</div>
+    <h3>Una herramienta para <em>posicionar la fundación</em> en la opinión pública.</h3>
+    <p>El observatorio entrega <strong>datos crudos descargables y citables</strong>, sin línea editorial. La narrativa la pone Laura y su equipo en cada comunicación pública. Cada módulo termina en un <strong>número titulable</strong> (ranking municipal, alerta roja, brecha cuantificada) que puede ser citado por prensa o por la propia fundación.</p>
+    <p>Cronograma: <strong>2 meses</strong> para los 4 módulos · mantenimiento mensual a partir del tercer mes con actualización de datos y Lambda corriendo. Hospedado bajo <strong>ricardoruiz.co/observatorio-mujer/</strong> con acceso restringido durante el desarrollo y apertura pública en lanzamiento.</p>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div>Observatorio Mujer · ricardoruiz.co · capa privada · 2026</div>
+    <div class="credit">Solo datos públicos · agregados · sin información personal</div>
+  </footer>
+
+</main>
+
+<script>
+  // ─── EMAIL GATE ───────────────────────────────────────────────────
+  const ALLOWED = ['reruizc@gmail.com'];
+
+  const token = localStorage.getItem('rr-token');
+  const userRaw = localStorage.getItem('rr-user');
+  const user = userRaw ? JSON.parse(userRaw) : null;
+
+  function denyToLogin() {
+    localStorage.removeItem('rr-token');
+    localStorage.removeItem('rr-user');
+    window.location.replace('login.html');
+  }
+  function denyToDashboard() {
+    window.location.replace('dashboard.html');
+  }
+  function emailAllowed(em) {
+    return em && ALLOWED.includes(String(em).toLowerCase().trim());
+  }
+
+  if (!token || !user) {
+    denyToLogin();
+  } else if (!emailAllowed(user.email)) {
+    denyToDashboard();
+  } else {
+    (async () => {
+      try {
+        const res = await fetch('https://rr-auth.reruizc.workers.dev/auth/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.status === 401) return denyToLogin();
+        const data = await res.json();
+        if (!data.ok || !emailAllowed(data.user && data.user.email)) {
+          return denyToDashboard();
+        }
+        localStorage.setItem('rr-user', JSON.stringify(Object.assign({}, user, data.user)));
+        revealPage();
+      } catch (e) {
+        revealPage();
+      }
+    })();
+  }
+
+  function revealPage() {
+    const gate = document.getElementById('gate');
+    if (gate) gate.remove();
+    document.getElementById('topbar').hidden = false;
+    document.getElementById('main').hidden = false;
+    renderAll();
+  }
+
+  // ─── THEME ────────────────────────────────────────────────────────
+  function getAutoTheme() {
+    const h = new Date().getHours();
+    return (h >= 7 && h < 19) ? 'day' : 'night';
+  }
+  function applyTheme(t) {
+    if (t === 'day') document.body.classList.add('day-mode');
+    else document.body.classList.remove('day-mode');
+    const btn = document.getElementById('theme-btn');
+    if (btn) btn.textContent = t === 'day' ? '☾ Modo noche' : '☀ Modo día';
+  }
+  function toggleTheme() {
+    const isDay = document.body.classList.contains('day-mode');
+    const next = isDay ? 'night' : 'day';
+    localStorage.setItem('rr-theme', next);
+    applyTheme(next);
+  }
+  applyTheme(localStorage.getItem('rr-theme') || getAutoTheme());
+
+  // ─── CURSOR ───────────────────────────────────────────────────────
+  const cursor = document.getElementById('cursor');
+  const cursorRing = document.getElementById('cursorRing');
+  document.addEventListener('mousemove', (e) => {
+    cursor.style.left = e.clientX + 'px';
+    cursor.style.top  = e.clientY + 'px';
+    cursorRing.style.left = e.clientX + 'px';
+    cursorRing.style.top  = e.clientY + 'px';
+  });
+  document.addEventListener('mouseover', (e) => {
+    const t = e.target;
+    if (t.closest('a, button, .module')) {
+      cursor.style.transform = 'translate(-50%,-50%) scale(2.5)';
+      cursor.style.background = 'transparent';
+      cursor.style.border = '1.5px solid var(--accent)';
+      cursorRing.style.opacity = '0';
+    } else {
+      cursor.style.transform = 'translate(-50%,-50%) scale(1)';
+      cursor.style.background = 'var(--accent)';
+      cursor.style.border = 'none';
+      cursorRing.style.opacity = '.4';
+    }
+  });
+
+  // ─── RENDER ───────────────────────────────────────────────────────
+  function renderAll() {
+    const d = new Date();
+    const months = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    document.getElementById('kicker-date').textContent =
+      `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  }
+</script>
+</body>
+</html>

@@ -397,7 +397,7 @@ body.day-mode::before {
 }
 
 /* ───────── PROYECTO DC (privado) ───────── */
-.private-wrap { margin-top: 1rem; }
+.private-wrap { margin-top: 1rem; display: flex; flex-direction: column; gap: 1rem; }
 .private {
   position: relative;
   background:
@@ -1113,9 +1113,26 @@ const PRIVATE_TOOLS = [
   {
     id: 'proyecto-dc',
     name: 'Proyecto DC',
+    expediente: 'RR-DC-2027',
+    eyebrow: 'Acceso reservado',
+    titleHTML: 'Proyecto <em>DC</em>',
     desc: 'Investigación no declarativa sobre la elección de Medellín 2027. Lectura cruzada de huellas digitales, movimientos institucionales y configuración territorial. Material no público, distribución por invitación únicamente.',
     href: 'proyecto-dc.html',
+    cta: 'Abrir expediente ↗',
+    note: 'No descargable · Solo lectura',
     allowedEmails: ['reruizc@gmail.com', 'nuevagemela@gmail.com'],
+  },
+  {
+    id: 'observatorio-mujer',
+    name: 'Observatorio Mujer',
+    expediente: 'RR-OBS-MUJER',
+    eyebrow: 'Encargo · Mujeres por la Democracia',
+    titleHTML: 'Observatorio <em>Mujer</em>',
+    desc: 'Plataforma territorial sobre 21,2M de mujeres en el censo electoral colombiano. Cuatro módulos: mapeo, observatorio de seguridad y salud, representación en cargos y agenda mediática. Prototipo en construcción · 1 de 4 módulos vivos.',
+    href: 'observatorio-mujer.html',
+    cta: 'Abrir prototipo ↗',
+    note: 'Prototipo v0 · solo Ricardo',
+    allowedEmails: ['reruizc@gmail.com'],
   },
 ];
 
@@ -1420,32 +1437,27 @@ function render() {
       </a>`;
   }).join('');
 
-  /* PRIVATE — Proyecto DC */
+  /* PRIVATE — capa de acceso restringido */
   const wrap = document.getElementById('private-wrap');
   const userEmail = (user.email || '').toLowerCase().trim();
   const visiblePrivate = PRIVATE_TOOLS.filter(p => (p.allowedEmails || []).map(x => x.toLowerCase()).includes(userEmail));
-  if (visiblePrivate.length === 0) {
-    wrap.innerHTML = '';
-  } else {
-    const dc = visiblePrivate[0];
-    wrap.innerHTML = `
-      <div class="private">
-        <div class="private-stamp">
-          <div><span class="k">Expediente</span> RR-DC-2027</div>
-          <div><span class="k">Titular</span> ${firstName}</div>
-          <div><span class="k">Acceso</span> Por invitación</div>
-        </div>
-        <div class="private-body">
-          <div class="private-eyebrow">Acceso reservado</div>
-          <h3>Proyecto <em>DC</em></h3>
-          <p class="private-dek">${dc.desc}</p>
-        </div>
-        <div class="private-cta">
-          <a href="${dc.href}" class="btn">Abrir expediente ↗</a>
-          <span class="note">No descargable · Solo lectura</span>
-        </div>
-      </div>`;
-  }
+  wrap.innerHTML = visiblePrivate.map(p => `
+    <div class="private">
+      <div class="private-stamp">
+        <div><span class="k">Expediente</span> ${p.expediente}</div>
+        <div><span class="k">Titular</span> ${firstName}</div>
+        <div><span class="k">Acceso</span> Por invitación</div>
+      </div>
+      <div class="private-body">
+        <div class="private-eyebrow">${p.eyebrow}</div>
+        <h3>${p.titleHTML}</h3>
+        <p class="private-dek">${p.desc}</p>
+      </div>
+      <div class="private-cta">
+        <a href="${p.href}" class="btn">${p.cta}</a>
+        <span class="note">${p.note}</span>
+      </div>
+    </div>`).join('');
 
   /* DOWNLOADS (col 1) */
   document.getElementById('dl-kicker').textContent = t.dlKicker;
