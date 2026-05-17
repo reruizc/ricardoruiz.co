@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Analítica · Acceso reservado</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=DM+Mono:wght@300;400&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f4f3ef; --bg2: #eeedea;
+      --surface: #ffffff; --surface2: #f0efe9;
+      --border: rgba(0,0,0,0.07); --border2: rgba(0,0,0,0.12);
+      --text: #0a0a0a; --text2: #555; --text3: #999;
+      --blue: #0047FF; --purple: #7c3aed;
+      --purple-dim: rgba(124,58,237,0.10);
+      --green: #16a34a; --warn: #f0c040; --danger: #e63946;
+    }
+    [data-theme="dark"] {
+      --bg: #060810; --bg2: #0a0c14;
+      --surface: #0f1018; --surface2: #13151f;
+      --border: rgba(255,255,255,0.06); --border2: rgba(255,255,255,0.12);
+      --text: #f4f3ef; --text2: #888; --text3: #444;
+      --purple: #a78bfa;
+      --purple-dim: rgba(167,139,250,0.14);
+      --green: #4ade80;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'Fraunces', serif;
+      min-height: 100vh; cursor: none; overflow-x: hidden;
+      transition: background 0.4s, color 0.4s;
+    }
+
+    .gate { position: fixed; inset: 0; z-index: 5000; background: var(--bg); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 1rem; }
+    .gate-text { font-family:'DM Mono',monospace; font-size:.82rem; letter-spacing:.12em; text-transform:uppercase; color:var(--text2); }
+    .gate-bar { width:120px; height:1px; background:var(--border); position:relative; overflow:hidden; }
+    .gate-bar::after { content:''; position:absolute; inset:0; background:var(--purple); animation:gate-slide 1.4s ease-in-out infinite; }
+    @keyframes gate-slide { 0%{transform:translateX(-100%);} 50%{transform:translateX(0);} 100%{transform:translateX(100%);} }
+
+    .cursor { position:fixed; width:12px; height:12px; background:var(--purple); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s ease,background .2s; transform:translate(-50%,-50%); }
+    .cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--purple); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s ease,opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+
+    nav.top {
+      position: fixed; top:0; left:0; right:0; z-index:100;
+      display: flex; align-items:center; justify-content:space-between;
+      padding: .9rem 2.5rem;
+      background: var(--bg); border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+    }
+    .nav-left { display:flex; align-items:center; gap:1rem; }
+    .nav-right { display:flex; align-items:center; gap:1.2rem; }
+    .e-btn-back { font-family:'Syne',sans-serif; font-size:.78rem; letter-spacing:.08em; text-transform:uppercase; color:var(--text2); text-decoration:none; border:1.5px solid var(--border); padding:.3rem .8rem; transition:color .2s,border-color .2s; cursor: none; }
+    .e-btn-back:hover { color:var(--text); border-color:var(--text2); }
+    .private-badge { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.18em; text-transform:uppercase; color: var(--purple); background: var(--purple-dim); padding:.32rem .7rem; border:1px solid var(--purple-dim); }
+    .logo-link { display:flex; align-items:center; gap:.55rem; text-decoration:none; opacity:.85; }
+    .logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
+    .logo-bar { width:5px; background:var(--purple); border-radius:1px 1px 0 0; }
+    .logo-text { font-family:'Syne',sans-serif; font-weight:800; font-size:1.3rem; letter-spacing:-.03em; color:var(--text); }
+    .logo-text span { color:var(--purple); }
+
+    main.wrap { max-width: 1400px; margin: 0 auto; padding: 6rem 2.5rem 4rem; }
+
+    .hero { padding: 1rem 0 1.5rem; }
+    .hero-label {
+      font-family:'DM Mono',monospace; font-size:.7rem;
+      letter-spacing:.2em; text-transform:uppercase;
+      color:var(--purple); margin-bottom: .9rem;
+      display:flex; align-items:center; gap:.6rem;
+    }
+    .hero-label::before { content:''; display:block; width:24px; height:1px; background:var(--purple); }
+    .hero-title {
+      font-family:'Syne',sans-serif; font-weight:800;
+      font-size: clamp(1.8rem, 4vw, 3rem);
+      letter-spacing:-.025em; line-height:1;
+    }
+    .hero-title em { font-style:italic; font-family:'Fraunces',serif; font-weight:300; color:var(--purple); }
+    .hero-sub {
+      margin-top: .85rem; max-width: 760px;
+      font-family:'Fraunces',serif; font-weight: 300;
+      font-size: 1rem; line-height: 1.55; color: var(--text2);
+    }
+
+    .controls { margin-top: 1.5rem; display: flex; gap: 1.2rem; align-items: flex-start; flex-wrap: wrap; }
+    .ctrl-group { display: flex; flex-direction: column; gap: .35rem; }
+    .ctrl-label { font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.18em; text-transform:uppercase; color: var(--text3); }
+    .pill-group { display: flex; gap: 0; flex-wrap: wrap; }
+    .pill {
+      font-family:'Syne',sans-serif; font-weight:500;
+      font-size: .78rem; letter-spacing: .04em;
+      padding: .45rem .9rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      cursor: none; color: var(--text2);
+      transition: all .15s;
+    }
+    .pill + .pill { margin-left: -1px; }
+    .pill:hover { color: var(--text); }
+    .pill.active { background: var(--purple); color: #fff; border-color: var(--purple); position: relative; z-index: 1; }
+
+    .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+    .sum-card { background: var(--surface); border: 1px solid var(--border); padding: 1.4rem; border-left: 3px solid var(--purple); }
+    .sum-card.green { border-left-color: var(--green); }
+    .sum-card.blue { border-left-color: var(--blue); }
+    .sum-card.warn { border-left-color: var(--warn); }
+    .sum-label { font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing: .18em; text-transform: uppercase; color: var(--text3); margin-bottom: .55rem; }
+    .sum-value-big { font-family:'Syne',sans-serif; font-weight: 800; font-size: clamp(1.5rem, 3vw, 2.4rem); line-height: 1.05; letter-spacing: -.02em; margin-bottom: .35rem; }
+    .sum-value-big.purple { color: var(--purple); }
+    .sum-value-big.green { color: var(--green); }
+    .sum-value-big.blue { color: var(--blue); }
+    .sum-meta { font-family:'DM Mono',monospace; font-size: .68rem; color: var(--text2); letter-spacing: .04em; }
+    .sum-meta strong { font-weight: 600; color: var(--text); }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1rem; }
+    .panel { background: var(--surface); border: 1px solid var(--border); }
+    .panel-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .panel-title { font-family:'Syne',sans-serif; font-weight: 800; font-size: 1.05rem; letter-spacing: -.01em; }
+    .panel-sub { font-family:'DM Mono',monospace; font-size: .62rem; letter-spacing: .1em; color: var(--text3); text-transform: uppercase; }
+    .panel-body { padding: 1.25rem; }
+
+    /* Sparkline / bar chart */
+    .svg-chart { width: 100%; display: block; }
+    .ts-bar { fill: var(--purple); opacity: .85; transition: opacity .15s; }
+    .ts-bar:hover { opacity: 1; }
+    .ts-bar.signup { fill: var(--green); }
+    .ts-axis { stroke: var(--border2); stroke-width: 1; }
+    .ts-tick { font-family:'DM Mono',monospace; font-size: 9px; fill: var(--text3); }
+
+    /* Top list (paths, countries, refs) */
+    .top-list { display: flex; flex-direction: column; }
+    .top-row { display: grid; grid-template-columns: 36px 1fr 90px 60px; gap: .8rem; align-items: center; padding: .55rem 1.25rem; border-bottom: 1px solid var(--border); font-family:'Fraunces',serif; font-weight: 300; font-size: .9rem; }
+    .top-row:last-child { border-bottom: none; }
+    .top-row .pos { font-family:'DM Mono',monospace; font-size: .7rem; color: var(--text3); }
+    .top-row .label { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .top-row .bar { height: 6px; background: var(--bg2); position: relative; }
+    .top-row .bar > div { position: absolute; top:0; left:0; bottom:0; background: var(--purple); }
+    .top-row .v { font-family:'Avenir',sans-serif; text-align: right; white-space: nowrap; font-size: .85rem; }
+
+    /* Plan distribution donut */
+    .donut-wrap { display: flex; align-items: center; gap: 1.5rem; padding: 1.25rem; }
+    .donut-wrap svg { flex-shrink: 0; }
+    .donut-legend { flex: 1; display: flex; flex-direction: column; gap: .5rem; }
+    .legend-row { display: flex; align-items: center; gap: .65rem; font-family:'DM Mono',monospace; font-size: .75rem; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .legend-row .v { margin-left: auto; font-weight: 400; }
+    .legend-row .pct { color: var(--text3); font-size: .65rem; }
+
+    .err-banner { padding: 1rem 1.25rem; background: rgba(230,57,70,0.08); border: 1px solid rgba(230,57,70,0.3); color: var(--danger); font-family:'DM Mono',monospace; font-size: .8rem; margin-bottom: 1rem; }
+    .info-banner { padding: 1rem 1.25rem; background: rgba(240,192,64,0.08); border: 1px solid rgba(240,192,64,0.3); color: var(--warn); font-family:'DM Mono',monospace; font-size: .75rem; margin-bottom: 1rem; line-height: 1.5; }
+
+    @media (max-width: 980px) {
+      main.wrap { padding: 5rem 1.5rem 3rem; }
+      nav.top { padding: .9rem 1.5rem; }
+      .summary { grid-template-columns: 1fr 1fr; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      body { cursor: auto; }
+      .cursor, .cursor-ring { display: none; }
+    }
+    @media (max-width: 540px) { .summary { grid-template-columns: 1fr; } }
+  </style>
+  <script defer src="/track.js"></script>
+</head>
+<body>
+
+  <div id="gate" class="gate">
+    <div class="gate-text">Verificando acceso de administrador</div>
+    <div class="gate-bar"></div>
+  </div>
+
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <nav class="top" hidden id="topNav">
+    <div class="nav-left">
+      <a href="dashboard.html" class="e-btn-back">← Panel</a>
+      <span class="private-badge">Admin</span>
+    </div>
+    <div class="nav-right">
+      <a href="index.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div>
+          <div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div>
+          <div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+  </nav>
+
+  <main class="wrap" hidden id="main">
+    <section class="hero">
+      <div class="hero-label">Seguimiento operativo · Acceso reservado</div>
+      <h1 class="hero-title">Visitas, miembros y <em>plan vigente</em>.</h1>
+      <p class="hero-sub">Telemetría diaria del sitio: pageviews por país y por sección, registros nuevos, plan vigente de la base de usuarios. Datos agregados directamente desde el worker rr-auth (KV). No persistimos IP, user-agent ni eventos individuales — solo agregados por día.</p>
+      <div class="controls">
+        <div class="ctrl-group">
+          <div class="ctrl-label">Ventana</div>
+          <div class="pill-group" id="window-pills">
+            <button class="pill" data-days="7">7 días</button>
+            <button class="pill active" data-days="30">30 días</button>
+            <button class="pill" data-days="90">90 días</button>
+          </div>
+        </div>
+        <div class="ctrl-group">
+          <div class="ctrl-label">Última actualización</div>
+          <div id="last-updated" style="font-family:'DM Mono',monospace;font-size:.78rem;color:var(--text2);padding:.45rem 0">—</div>
+        </div>
+      </div>
+    </section>
+
+    <div id="err-area"></div>
+
+    <section class="summary" id="summary"></section>
+
+    <section class="grid-2">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Pageviews · diarios</div>
+            <div class="panel-sub">Eventos registrados desde el pixel</div>
+          </div>
+        </div>
+        <div class="panel-body">
+          <svg id="pv-chart" class="svg-chart" viewBox="0 0 800 220" preserveAspectRatio="none"></svg>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Nuevos miembros · diarios</div>
+            <div class="panel-sub">Cuentas creadas (registro + magic link)</div>
+          </div>
+        </div>
+        <div class="panel-body">
+          <svg id="su-chart" class="svg-chart" viewBox="0 0 800 220" preserveAspectRatio="none"></svg>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid-2">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Distribución de planes</div>
+            <div class="panel-sub">Cuentas totales por tier</div>
+          </div>
+        </div>
+        <div id="plan-donut-wrap" class="donut-wrap"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Miembros activos pagos</div>
+            <div class="panel-sub">No cancelados · plan vigente</div>
+          </div>
+        </div>
+        <div class="panel-body" id="active-paying-body">—</div>
+      </div>
+    </section>
+
+    <section class="grid-3">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Top secciones</div>
+            <div class="panel-sub">URL más visitadas</div>
+          </div>
+        </div>
+        <div id="top-paths" class="top-list"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Países de origen</div>
+            <div class="panel-sub">IP geolocalizada por Cloudflare</div>
+          </div>
+        </div>
+        <div id="top-countries" class="top-list"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Cómo llegan</div>
+            <div class="panel-sub">Referrer del navegador</div>
+          </div>
+        </div>
+        <div id="top-refs" class="top-list"></div>
+      </div>
+    </section>
+
+    <div class="info-banner" style="margin-top:1.5rem">
+      Privacidad: el pixel respeta DNT y Sec-GPC, no envía IP, no usa cookies, no guarda eventos individuales — solo contadores agregados por día con TTL 180 días. Las páginas privadas con <code>noindex</code> (Proyecto DC, Observatorio Mujer) no se registran. Cuentas con cuota mensual no se cruzan con sesiones de tracking.
+    </div>
+  </main>
+
+  <script>
+    // ─── ADMIN GATE ───────────────────────────────────────────────────
+    // Triple chequeo: localStorage email + isAdmin del backend + whitelist.
+    const ADMIN_WHITELIST = ['reruizc@gmail.com'];
+    const tok = localStorage.getItem('rr-token');
+    const userRaw = localStorage.getItem('rr-user');
+    const lsUser = userRaw ? JSON.parse(userRaw) : null;
+
+    function denyLogin(){ localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); window.location.replace('login.html'); }
+    function denyDashboard(){ window.location.replace('dashboard.html'); }
+    function inWhitelist(em){ return em && ADMIN_WHITELIST.includes(String(em).toLowerCase().trim()); }
+
+    if (!tok || !lsUser) denyLogin();
+    else if (!inWhitelist(lsUser.email)) denyDashboard();
+    else {
+      (async () => {
+        try {
+          const res = await fetch('https://rr-auth.reruizc.workers.dev/auth/me', { headers: { 'Authorization': `Bearer ${tok}` } });
+          if (res.status === 401) return denyLogin();
+          const data = await res.json();
+          if (!data.ok) return denyLogin();
+          if (!inWhitelist(data.user && data.user.email)) return denyDashboard();
+          if (!data.user.isAdmin) return denyDashboard();
+          // Sync localStorage user (incluye isAdmin, role)
+          localStorage.setItem('rr-user', JSON.stringify(Object.assign({}, lsUser, data.user)));
+          revealPage();
+        } catch (e) {
+          // Si el backend falla y la whitelist+token están OK, dejamos pasar
+          // (no rompemos el panel por intermitencia de red).
+          revealPage();
+        }
+      })();
+    }
+    function revealPage(){
+      const g = document.getElementById('gate'); if (g) g.remove();
+      document.getElementById('topNav').hidden = false;
+      document.getElementById('main').hidden = false;
+      init();
+    }
+
+    function getAutoTheme(){ const h = new Date().getHours(); return (h >= 7 && h < 19) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', (localStorage.getItem('rr-theme') || getAutoTheme()) === 'dark' ? 'dark' : '');
+
+    // ─── CURSOR ──────────────────────────────────────────────────────
+    const cursor = document.getElementById('cursor'), cring = document.getElementById('cursorRing');
+    document.addEventListener('mousemove', (e) => {
+      if (cursor) { cursor.style.left = e.clientX + 'px'; cursor.style.top = e.clientY + 'px'; }
+      if (cring) { cring.style.left = e.clientX + 'px'; cring.style.top = e.clientY + 'px'; }
+    });
+
+    // ─── STATE & RENDER ──────────────────────────────────────────────
+    const API_BASE = 'https://rr-auth.reruizc.workers.dev';
+    let CURRENT_DAYS = 30;
+    let analytics = null;  // /admin/analytics?days=N
+    let userStats = null;  // /admin/users-stats
+
+    function fmtNum(n){ return new Intl.NumberFormat('es-CO').format(Math.round(n || 0)); }
+    function fmtPct(num, den){ if (!den) return '0%'; return ((num/den) * 100).toFixed(1) + '%'; }
+    function fmtDate(ymd){
+      // ymd = "2026-05-17"
+      const [y, m, d] = ymd.split('-');
+      return `${d}/${m}`;
+    }
+
+    async function fetchAll(days){
+      const a = await fetch(`${API_BASE}/admin/analytics?days=${days}`, { headers: { 'Authorization': `Bearer ${tok}` } });
+      if (a.status === 401) return denyLogin();
+      if (a.status === 403) return denyDashboard();
+      const aData = await a.json();
+      if (!aData.ok) throw new Error('analytics: ' + (aData.error || 'fail'));
+      analytics = aData;
+
+      // /admin/users-stats no depende de la ventana — cachear entre toggles
+      if (!userStats) {
+        const u = await fetch(`${API_BASE}/admin/users-stats`, { headers: { 'Authorization': `Bearer ${tok}` } });
+        if (u.status === 401) return denyLogin();
+        if (u.status === 403) return denyDashboard();
+        const uData = await u.json();
+        if (!uData.ok) throw new Error('users-stats: ' + (uData.error || 'fail'));
+        userStats = uData;
+      }
+    }
+
+    function renderSummary(){
+      const t = analytics.totals;
+      const us = userStats;
+      const tot = (us.planCount.free || 0) + (us.planCount.pro || 0) + (us.planCount.premium || 0);
+      // signups dentro de la ventana — usar el agregado del worker (más confiable que sumar createdAt al vuelo)
+      const sumSignups = analytics.days.reduce((s, d) => s + (d.signups || 0), 0);
+      const html = `
+        <div class="sum-card">
+          <div class="sum-label">Pageviews · ${CURRENT_DAYS}d</div>
+          <div class="sum-value-big purple">${fmtNum(t.pageviews)}</div>
+          <div class="sum-meta">${fmtNum(t.sessions)} sesiones · ${fmtNum(t.visitors)} visitantes nuevos</div>
+        </div>
+        <div class="sum-card green">
+          <div class="sum-label">Nuevos miembros · ${CURRENT_DAYS}d</div>
+          <div class="sum-value-big green">${fmtNum(sumSignups)}</div>
+          <div class="sum-meta">Promedio: <strong>${(sumSignups / CURRENT_DAYS).toFixed(1)}</strong> / día</div>
+        </div>
+        <div class="sum-card blue">
+          <div class="sum-label">Miembros totales</div>
+          <div class="sum-value-big blue">${fmtNum(tot)}</div>
+          <div class="sum-meta">Pro: <strong>${fmtNum(us.planCount.pro || 0)}</strong> · Premium: <strong>${fmtNum(us.planCount.premium || 0)}</strong></div>
+        </div>
+        <div class="sum-card warn">
+          <div class="sum-label">Activos pagos · vigentes</div>
+          <div class="sum-value-big">${fmtNum((us.planActivePaying.pro || 0) + (us.planActivePaying.premium || 0))}</div>
+          <div class="sum-meta">+${fmtNum((us.planCancelled.pro || 0) + (us.planCancelled.premium || 0))} cancelados con acceso</div>
+        </div>
+      `;
+      document.getElementById('summary').innerHTML = html;
+    }
+
+    function renderTimeSeries(svgId, days, valueKey, color){
+      const svg = document.getElementById(svgId);
+      svg.innerHTML = '';
+      if (!days.length) return;
+      const W = 800, H = 220, PAD_L = 32, PAD_R = 8, PAD_T = 10, PAD_B = 30;
+      const innerW = W - PAD_L - PAD_R, innerH = H - PAD_T - PAD_B;
+      const max = Math.max(1, ...days.map(d => d[valueKey] || 0));
+      const barW = innerW / days.length;
+      const ns = 'http://www.w3.org/2000/svg';
+      // y-axis
+      const ax = document.createElementNS(ns, 'line');
+      ax.setAttribute('x1', PAD_L); ax.setAttribute('y1', PAD_T);
+      ax.setAttribute('x2', PAD_L); ax.setAttribute('y2', PAD_T + innerH);
+      ax.setAttribute('class', 'ts-axis');
+      svg.appendChild(ax);
+      // x-axis
+      const ax2 = document.createElementNS(ns, 'line');
+      ax2.setAttribute('x1', PAD_L); ax2.setAttribute('y1', PAD_T + innerH);
+      ax2.setAttribute('x2', PAD_L + innerW); ax2.setAttribute('y2', PAD_T + innerH);
+      ax2.setAttribute('class', 'ts-axis');
+      svg.appendChild(ax2);
+      // y-axis ticks (0, max/2, max)
+      [0, max/2, max].forEach((v, i) => {
+        const y = PAD_T + innerH - (v / max) * innerH;
+        const t = document.createElementNS(ns, 'text');
+        t.setAttribute('x', PAD_L - 4); t.setAttribute('y', y + 3);
+        t.setAttribute('text-anchor', 'end'); t.setAttribute('class', 'ts-tick');
+        t.textContent = fmtNum(v);
+        svg.appendChild(t);
+      });
+      // bars
+      days.forEach((d, i) => {
+        const v = d[valueKey] || 0;
+        const h = (v / max) * innerH;
+        const x = PAD_L + i * barW + 1;
+        const y = PAD_T + innerH - h;
+        const r = document.createElementNS(ns, 'rect');
+        r.setAttribute('x', x); r.setAttribute('y', y);
+        r.setAttribute('width', Math.max(1, barW - 2)); r.setAttribute('height', h);
+        r.setAttribute('class', 'ts-bar' + (color === 'green' ? ' signup' : ''));
+        const tip = document.createElementNS(ns, 'title');
+        tip.textContent = `${d.date} · ${fmtNum(v)}`;
+        r.appendChild(tip);
+        svg.appendChild(r);
+      });
+      // x-axis labels (cada N para no apelmazar)
+      const step = Math.max(1, Math.floor(days.length / 8));
+      days.forEach((d, i) => {
+        if (i % step !== 0 && i !== days.length - 1) return;
+        const x = PAD_L + i * barW + barW / 2;
+        const t = document.createElementNS(ns, 'text');
+        t.setAttribute('x', x); t.setAttribute('y', PAD_T + innerH + 14);
+        t.setAttribute('text-anchor', 'middle'); t.setAttribute('class', 'ts-tick');
+        t.textContent = fmtDate(d.date);
+        svg.appendChild(t);
+      });
+    }
+
+    function renderPlanDonut(){
+      const wrap = document.getElementById('plan-donut-wrap');
+      const c = userStats.planCount;
+      const data = [
+        { key: 'premium', label: 'Premium', value: c.premium || 0, color: '#a78bfa' },
+        { key: 'pro',     label: 'Pro',     value: c.pro || 0,     color: '#0047FF' },
+        { key: 'free',    label: 'Básico',  value: c.free || 0,    color: '#888' },
+      ];
+      const total = data.reduce((s, d) => s + d.value, 0) || 1;
+      // SVG donut 140x140
+      const R = 60, CX = 70, CY = 70, STROKE = 18;
+      let acc = 0;
+      const segments = data.map(d => {
+        const frac = d.value / total;
+        const start = acc; const end = acc + frac;
+        acc = end;
+        if (frac === 0) return '';
+        // arco SVG
+        const a0 = start * 2 * Math.PI - Math.PI / 2;
+        const a1 = end * 2 * Math.PI - Math.PI / 2;
+        const large = (frac > 0.5) ? 1 : 0;
+        const x0 = CX + R * Math.cos(a0), y0 = CY + R * Math.sin(a0);
+        const x1 = CX + R * Math.cos(a1), y1 = CY + R * Math.sin(a1);
+        return `<path d="M ${x0} ${y0} A ${R} ${R} 0 ${large} 1 ${x1} ${y1}" stroke="${d.color}" stroke-width="${STROKE}" fill="none"/>`;
+      }).join('');
+      const svg = `<svg width="140" height="140" viewBox="0 0 140 140"><circle cx="${CX}" cy="${CY}" r="${R}" stroke="var(--bg2)" stroke-width="${STROKE}" fill="none"/>${segments}<text x="${CX}" y="${CY - 2}" text-anchor="middle" font-family="Syne" font-weight="800" font-size="22" fill="var(--text)">${fmtNum(total)}</text><text x="${CX}" y="${CY + 14}" text-anchor="middle" font-family="DM Mono" font-size="9" fill="var(--text3)" letter-spacing=".15em">CUENTAS</text></svg>`;
+      const legend = data.map(d => `
+        <div class="legend-row">
+          <span class="legend-dot" style="background:${d.color}"></span>
+          <span>${d.label}</span>
+          <span class="v">${fmtNum(d.value)} <span class="pct">${fmtPct(d.value, total)}</span></span>
+        </div>
+      `).join('');
+      wrap.innerHTML = svg + `<div class="donut-legend">${legend}</div>`;
+    }
+
+    function renderActivePaying(){
+      const us = userStats;
+      const ap = us.planActivePaying;
+      const ca = us.planCancelled;
+      const byCycle = us.byCycle || {};
+      const monthly = byCycle.monthly || 0;
+      const annual = byCycle.annual || 0;
+      const html = `
+        <div class="top-list">
+          <div class="top-row"><span class="pos">●</span><span class="label">Premium activos</span><span class="bar"><div style="width:100%;background:#a78bfa"></div></span><span class="v">${fmtNum(ap.premium || 0)}</span></div>
+          <div class="top-row"><span class="pos">●</span><span class="label">Pro activos</span><span class="bar"><div style="width:100%;background:#0047FF"></div></span><span class="v">${fmtNum(ap.pro || 0)}</span></div>
+          <div class="top-row"><span class="pos">⊘</span><span class="label">Premium cancelados con acceso</span><span class="bar"><div style="width:100%;background:#e63946"></div></span><span class="v">${fmtNum(ca.premium || 0)}</span></div>
+          <div class="top-row"><span class="pos">⊘</span><span class="label">Pro cancelados con acceso</span><span class="bar"><div style="width:100%;background:#e63946"></div></span><span class="v">${fmtNum(ca.pro || 0)}</span></div>
+          <div class="top-row"><span class="pos">$</span><span class="label">Ciclo mensual</span><span class="bar"><div style="width:100%;background:#f0c040"></div></span><span class="v">${fmtNum(monthly)}</span></div>
+          <div class="top-row"><span class="pos">$</span><span class="label">Ciclo anual</span><span class="bar"><div style="width:100%;background:#16a34a"></div></span><span class="v">${fmtNum(annual)}</span></div>
+        </div>
+      `;
+      document.getElementById('active-paying-body').innerHTML = html;
+      document.getElementById('active-paying-body').style.padding = '0';
+    }
+
+    function renderTopList(containerId, dict, opts = {}){
+      const entries = Object.entries(dict || {})
+        .filter(([k, v]) => k !== '_otros' && v > 0)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, opts.limit || 10);
+      const max = Math.max(1, ...entries.map(([, v]) => v));
+      const total = Object.values(dict || {}).reduce((s, v) => s + v, 0);
+      const fmt = opts.formatLabel || (k => k);
+      const html = entries.map(([k, v], i) => `
+        <div class="top-row" title="${k.replace(/"/g, '&quot;')}">
+          <span class="pos">${String(i + 1).padStart(2, '0')}</span>
+          <span class="label">${fmt(k)}</span>
+          <span class="bar"><div style="width:${(v / max * 100).toFixed(1)}%"></div></span>
+          <span class="v">${fmtNum(v)}<br><span style="color:var(--text3);font-size:.65rem">${fmtPct(v, total)}</span></span>
+        </div>
+      `).join('') || '<div style="padding:1.5rem;color:var(--text3);font-family:DM Mono,monospace;font-size:.75rem">Sin datos aún en esta ventana</div>';
+      document.getElementById(containerId).innerHTML = html;
+    }
+
+    // ISO 3166 alpha-2 → bandera + nombre (subset común). Fallback al código.
+    const COUNTRY = {
+      CO: '🇨🇴 Colombia', US: '🇺🇸 EE.UU.', MX: '🇲🇽 México', ES: '🇪🇸 España',
+      AR: '🇦🇷 Argentina', CL: '🇨🇱 Chile', PE: '🇵🇪 Perú', VE: '🇻🇪 Venezuela',
+      EC: '🇪🇨 Ecuador', BR: '🇧🇷 Brasil', PA: '🇵🇦 Panamá', CR: '🇨🇷 Costa Rica',
+      GT: '🇬🇹 Guatemala', UY: '🇺🇾 Uruguay', PY: '🇵🇾 Paraguay', BO: '🇧🇴 Bolivia',
+      DO: '🇩🇴 R. Dominicana', SV: '🇸🇻 El Salvador', HN: '🇭🇳 Honduras', NI: '🇳🇮 Nicaragua',
+      CU: '🇨🇺 Cuba', PR: '🇵🇷 Puerto Rico', CA: '🇨🇦 Canadá', GB: '🇬🇧 Reino Unido',
+      FR: '🇫🇷 Francia', DE: '🇩🇪 Alemania', IT: '🇮🇹 Italia', PT: '🇵🇹 Portugal',
+      NL: '🇳🇱 Países Bajos', BE: '🇧🇪 Bélgica', CH: '🇨🇭 Suiza', AT: '🇦🇹 Austria',
+      SE: '🇸🇪 Suecia', NO: '🇳🇴 Noruega', DK: '🇩🇰 Dinamarca', FI: '🇫🇮 Finlandia',
+      IE: '🇮🇪 Irlanda', PL: '🇵🇱 Polonia', CZ: '🇨🇿 R. Checa', RO: '🇷🇴 Rumanía',
+      RU: '🇷🇺 Rusia', UA: '🇺🇦 Ucrania', TR: '🇹🇷 Turquía', IL: '🇮🇱 Israel',
+      AE: '🇦🇪 Emiratos', SA: '🇸🇦 Arabia Saudita', IN: '🇮🇳 India', PK: '🇵🇰 Pakistán',
+      JP: '🇯🇵 Japón', KR: '🇰🇷 Corea del Sur', CN: '🇨🇳 China', TW: '🇹🇼 Taiwán',
+      HK: '🇭🇰 Hong Kong', SG: '🇸🇬 Singapur', PH: '🇵🇭 Filipinas', ID: '🇮🇩 Indonesia',
+      TH: '🇹🇭 Tailandia', VN: '🇻🇳 Vietnam', MY: '🇲🇾 Malasia', AU: '🇦🇺 Australia',
+      NZ: '🇳🇿 Nueva Zelanda', ZA: '🇿🇦 Sudáfrica', EG: '🇪🇬 Egipto', MA: '🇲🇦 Marruecos',
+      UNK: '∅ Desconocido',
+    };
+
+    function renderAll(){
+      renderSummary();
+      renderTimeSeries('pv-chart', analytics.days, 'pageviews', 'purple');
+      renderTimeSeries('su-chart', analytics.days, 'signups', 'green');
+      renderPlanDonut();
+      renderActivePaying();
+      renderTopList('top-paths', analytics.totals.byPath, { formatLabel: p => p });
+      renderTopList('top-countries', analytics.totals.byCountry, { formatLabel: c => COUNTRY[c] || c });
+      renderTopList('top-refs', analytics.totals.byRef, { formatLabel: r => r === 'direct' ? 'Directo / app' : r === 'interno' ? 'Interno (otra página del sitio)' : r });
+      document.getElementById('last-updated').textContent = new Date().toLocaleString('es-CO', { hour12: false });
+    }
+
+    function showErr(msg){
+      document.getElementById('err-area').innerHTML = `<div class="err-banner">${msg}</div>`;
+    }
+
+    async function reload(){
+      try {
+        document.getElementById('err-area').innerHTML = '';
+        await fetchAll(CURRENT_DAYS);
+        renderAll();
+      } catch (e) {
+        console.error(e);
+        showErr('No pude cargar los datos: ' + e.message);
+      }
+    }
+
+    async function init(){
+      // wire up window pills
+      document.querySelectorAll('#window-pills .pill').forEach(p => {
+        p.addEventListener('click', () => {
+          if (p.classList.contains('active')) return;
+          document.querySelectorAll('#window-pills .pill').forEach(x => x.classList.remove('active'));
+          p.classList.add('active');
+          CURRENT_DAYS = parseInt(p.dataset.days, 10);
+          reload();
+        });
+      });
+      await reload();
+    }
+  </script>
+</body>
+</html>

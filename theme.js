@@ -84,4 +84,12 @@
 
   if (document.body) init();
   else document.addEventListener('DOMContentLoaded', init);
+
+  // Carga el pixel de tracking de forma asíncrona (no bloqueante).
+  // Vive en /track.js; respeta DNT, noindex y localhost por sí mismo.
+  try {
+    var s = document.createElement('script');
+    s.src = '/track.js'; s.async = true; s.defer = true;
+    (document.head || document.body || document.documentElement).appendChild(s);
+  } catch (e) {}
 })();
