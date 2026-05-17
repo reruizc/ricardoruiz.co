@@ -763,7 +763,9 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   let DEP_AGG  = null;  // agregado por depto (electoral_id-style cod): { "01": { "2018":{...}, ... } }
   let NAC_AGG  = null;  // nacional: { "2018":{...}, ... }
 
-  const DANE_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_observatorio_mujer/dane-pob-mun.json';
+  // Cache buster: bumpear cuando se regeneren los outputs DANE.
+  const DANE_V = '20260517';
+  const DANE_URL = `https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_observatorio_mujer/dane-pob-mun.json?v=${DANE_V}`;
 
   // Mapping DANE depto code (DPNOM normalizado) → Registraduría code
   // (la registraduría es la que usa el GeoJSON DEPARTAMENTOS2 vía electoral_id
@@ -1143,16 +1145,34 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   }
 
   // ─── BOOT ────────────────────────────────────────────────────────
+  async function fetchDANE(attempt = 1) {
+    try {
+      const r = await fetch(DANE_URL, { cache: 'reload', mode: 'cors' });
+      if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
+      return await r.json();
+    } catch (e) {
+      console.error(`DANE fetch attempt ${attempt} failed:`, e);
+      if (attempt < 2) {
+        await new Promise(r => setTimeout(r, 800));
+        return fetchDANE(attempt + 1);
+      }
+      throw e;
+    }
+  }
+
   async function initModule() {
     wirePills();
     try {
-      const r = await fetch(DANE_URL);
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      DANE_MUN = await r.json();
+      DANE_MUN = await fetchDANE();
     } catch (e) {
       document.getElementById('map').innerHTML =
-        '<div class="loading-msg">No se pudo cargar el dataset DANE.<br>Verifica la conexión y recarga.</div>';
-      console.error('DANE fetch failed:', e);
+        `<div class="loading-msg">No se pudo cargar el dataset DANE.<br>` +
+        `<span style="font-size:10px;color:var(--ink-3);display:block;margin-top:.5rem">` +
+        `${(e && e.message) || 'error desconocido'}</span>` +
+        `<button onclick="window.location.reload()" style="margin-top:1rem;padding:.5rem 1rem;` +
+        `border:1px solid var(--accent);color:var(--accent);background:transparent;` +
+        `font-family:var(--mono);font-size:11px;letter-spacing:.15em;text-transform:uppercase">` +
+        `Recargar</button></div>`;
       return;
     }
     buildAggregates();
