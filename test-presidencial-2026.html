@@ -458,6 +458,7 @@
     registros:  `${S3_BASE}/registros.json`,
     miniTest:   `${S3_BASE}/mini_test.json`,
     preguntas:  `${S3_BASE}/preguntas.json`,
+    variantes:  `${S3_BASE}/variantes-tematicas.json`,
   };
 
   // ── STATE ──
@@ -487,7 +488,7 @@
     return a;
   }
 
-  let DATA = { arquetipos: null, candidatos: null, registros: null, miniTest: null, preguntas: null };
+  let DATA = { arquetipos: null, candidatos: null, registros: null, miniTest: null, preguntas: null, variantes: null };
 
   const $ = sel => document.querySelector(sel);
   const $$ = sel => Array.from(document.querySelectorAll(sel));
@@ -504,14 +505,15 @@
   // ── CARGA DE DATA ──
   async function loadAll() {
     try {
-      const [arq, cand, reg, mt, preg] = await Promise.all([
+      const [arq, cand, reg, mt, preg, vars] = await Promise.all([
         fetch(DATA_URLS.arquetipos).then(r => r.json()),
         fetch(DATA_URLS.candidatos).then(r => r.json()),
         fetch(DATA_URLS.registros).then(r => r.json()),
         fetch(DATA_URLS.miniTest).then(r => r.json()),
         fetch(DATA_URLS.preguntas).then(r => r.json()),
+        fetch(DATA_URLS.variantes).then(r => r.json()).catch(() => ({ variantes: [] })),
       ]);
-      DATA = { arquetipos: arq, candidatos: cand, registros: reg, miniTest: mt, preguntas: preg };
+      DATA = { arquetipos: arq, candidatos: cand, registros: reg, miniTest: mt, preguntas: preg, variantes: vars };
       renderRegistros();
       renderCandidatos();
     } catch (e) {
@@ -808,9 +810,33 @@
     return getComputedStyle(document.documentElement).getPropertyValue(`--arq-${arq}`).trim() || '#0047FF';
   }
 
+  // Resuelve qué variante de la pregunta usar.
+  // Si STATE.prio incluye un tema_id que matchea con una variante temática
+  // disponible para esta pregunta, devuelve esa variante (con sus opciones).
+  // Si no, devuelve la pregunta mainstream.
+  function resolverVariantePregunta(q) {
+    const variantes = (DATA.variantes && DATA.variantes.variantes) || [];
+    if (!STATE.prio || STATE.prio.length === 0) return q;
+    for (const tema of STATE.prio) {
+      const match = variantes.find(v => v.pregunta_id === q.id && v.tema_id === tema);
+      if (match && match.opciones && match.opciones.length === q.opciones.length) {
+        return {
+          id: q.id,
+          tema: q.tema + ' · ' + match.tema_nombre,
+          enunciado: match.enunciado,
+          opciones: match.opciones,
+          _esVariante: true,
+          _tema_id: match.tema_id,
+        };
+      }
+    }
+    return q;
+  }
+
   function renderPregunta() {
     const preguntas = DATA.preguntas.preguntas;
-    const q = preguntas[STATE.qIndex];
+    const qBase = preguntas[STATE.qIndex];
+    const q = resolverVariantePregunta(qBase);
     const total = preguntas.length;
     $('#q-num').textContent = `Tema ${STATE.qIndex + 1}`;
     $('#q-tag').textContent = q.tema;
