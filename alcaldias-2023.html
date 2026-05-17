@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alcaldías 2023 · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <style>
+    :root{--white:#f4f3ef;--blue:#0047FF;--green:#4ade80;--card-border:rgba(255,255,255,0.1);--border:rgba(255,255,255,0.08);--bar-bg:rgba(255,255,255,0.1);--td-hover:rgba(255,255,255,0.04)}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{background:#060810;color:var(--white);font-family:'Syne',sans-serif;cursor:none;min-height:100vh;overflow-x:hidden}
+    body.day-mode{background:#e6ded3;color:#1a1a2e}
+    body.day-mode .bg-overlay{background:linear-gradient(to right,rgba(230,222,211,.97) 0%,rgba(230,222,211,.92) 60%,rgba(230,222,211,.6) 100%)!important}
+    body.day-mode .breadcrumb,body.day-mode .meta-bar,body.day-mode .sub-selector,body.day-mode .results-table th,body.day-mode .full-footer{border-color:rgba(0,0,0,.1)}
+    body.day-mode .breadcrumb,body.day-mode .meta-bar,body.day-mode .kpi-label,body.day-mode .card-label,body.day-mode .results-table th,body.day-mode .footer-brand,body.day-mode .sub-label,body.day-mode .drill-crumb{color:rgba(0,0,0,.5)}
+    body.day-mode .results-table td{color:rgba(0,0,0,.78);border-color:rgba(0,0,0,.06)}
+    body.day-mode .kpi-card,body.day-mode .card{background:rgba(255,255,255,.55);border-color:rgba(0,0,0,.08);backdrop-filter:blur(6px)}
+    body.day-mode .kpi-val.wh{color:#1a1a2e}
+    body.day-mode .donut-pct{color:#1a1a2e}
+    body.day-mode .donut-sub{color:rgba(0,0,0,.45)}
+    body.day-mode .dep-select{background-color:rgba(255,255,255,.55);border-color:rgba(0,0,0,.15);color:#1a1a2e}
+    body.day-mode .toggle-btn{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.15);color:rgba(0,0,0,.5)}
+    body.day-mode .toggle-btn.active{background:var(--blue);border-color:var(--blue);color:#fff}
+    body.day-mode .day-toggle{color:rgba(0,0,0,.55);border-color:rgba(0,0,0,.18)}
+    .cursor{position:fixed;width:10px;height:10px;background:var(--blue);border-radius:50%;pointer-events:none;z-index:999999;transform:translate(-50%,-50%);transition:transform .15s,background .2s}
+    .cursor-ring{position:fixed;width:32px;height:32px;border:1.5px solid var(--blue);border-radius:50%;pointer-events:none;z-index:999998;transform:translate(-50%,-50%);opacity:.4}
+    .bg-overlay{position:fixed;inset:0;z-index:1;background:linear-gradient(to right,rgba(4,6,16,.97) 0%,rgba(4,6,16,.94) 55%,rgba(4,6,16,.85) 100%)}
+    .shell{position:relative;z-index:2;min-height:100vh;display:flex;flex-direction:column}
+    .electoral-nav{display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(4,6,16,.6);backdrop-filter:blur(8px);flex-shrink:0}
+    body.day-mode .electoral-nav{background:rgba(230,222,211,.6);border-color:rgba(0,0,0,.08)}
+    .logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.85;transition:opacity .2s}
+    .logo-link:hover{opacity:1}
+    .logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px}
+    .logo-bar{width:5px;background:var(--blue);border-radius:1px 1px 0 0;opacity:.85}
+    .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.1rem,2vw,1.8rem);letter-spacing:-.03em;color:var(--white)}
+    body.day-mode .logo-text{color:#1a1a2e}
+    .logo-text span{color:var(--blue)}
+    .nav-right{display:flex;align-items:center;gap:.75rem}
+    .e-btn-back{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--green);text-decoration:none;border:1.5px solid rgba(74,222,128,.4);padding:.3rem .8rem;transition:color .2s,border-color .2s,background .2s;flex-shrink:0;cursor:none}
+    .e-btn-back:hover{color:#060810;background:var(--green);border-color:var(--green)}
+    .day-toggle{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.55);background:none;border:1px solid rgba(255,255,255,.18);padding:.3rem .65rem;cursor:none;transition:all .2s}
+    .day-toggle:hover{color:var(--white);border-color:rgba(255,255,255,.4)}
+    @media(max-width:900px){.electoral-nav{display:none}}
+    .top-bar{display:flex;align-items:flex-start;justify-content:space-between;padding:1.1rem 2.5rem 0;flex-shrink:0}
+    .page-title{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.5rem,2.8vw,2.5rem);letter-spacing:-.04em;line-height:1.05;color:var(--white);text-shadow:0 2px 24px rgba(0,71,255,.4)}
+    body.day-mode .page-title{color:#1a1a2e;text-shadow:none}
+    .page-title span{color:var(--blue)}
+    .breadcrumb{padding:.6rem 2.5rem 0;font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3);border-bottom:1px solid var(--border);padding-bottom:.7rem;flex-shrink:0}
+    .breadcrumb a{color:rgba(0,71,255,.7);text-decoration:none}
+    .breadcrumb a:hover{color:var(--blue)}
+    .meta-bar{display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap;padding:.5rem 2.5rem;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.08em;color:rgba(255,255,255,.35);flex-shrink:0}
+    .meta-item b{color:rgba(74,222,128,.85);font-weight:700}
+    body.day-mode .meta-item b{color:#198a5a}
+    .source-badge{margin-left:auto;font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:.3rem .8rem}
+    .source-badge b{color:var(--blue)}
+    body.day-mode .source-badge{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.1);color:rgba(0,0,0,.55)}
+    .content-area{flex:1;padding:1.4rem 2.5rem 1.5rem}
+    .toggle-row{display:flex;gap:.55rem;margin-bottom:1.2rem;flex-wrap:wrap;align-items:center}
+    .toggle-label{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.32);margin-right:.4rem}
+    body.day-mode .toggle-label{color:rgba(0,0,0,.45)}
+    .toggle-btn{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;padding:.4rem 1rem;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.55);cursor:none;transition:all .15s;display:inline-flex;align-items:center;gap:.4rem}
+    .toggle-btn:hover{border-color:var(--blue);color:var(--white)}
+    .toggle-btn.active{background:var(--blue);border-color:var(--blue);color:#fff}
+    .toggle-btn.soon{cursor:not-allowed;opacity:.6}
+    .toggle-btn .soon-tag{font-size:.52rem;letter-spacing:.12em;color:rgba(255,255,255,.4);background:rgba(255,255,255,.08);padding:.1rem .35rem;border-radius:1px}
+    .sub-selector{display:flex;gap:.6rem;margin-bottom:1.2rem;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--border);padding-bottom:1rem}
+    .sub-label{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-right:.2rem}
+    .dep-select{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.06em;text-transform:uppercase;background:rgba(255,255,255,.05);border:1.5px solid var(--card-border);color:var(--white);padding:.45rem 2rem .45rem .8rem;cursor:none;outline:none;transition:border-color .2s;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23aaa' stroke-width='1.5' stroke-linecap='round' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .75rem center;min-width:160px}
+    .dep-select:hover,.dep-select:focus{border-color:var(--blue)}
+    .dep-select option{background:#0e1220;color:var(--white)}
+    body.day-mode .dep-select option{background:#fafafa;color:#1a1a2e}
+    .clear-btn{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(0,71,255,.7);background:none;border:none;cursor:none;padding:.2rem .4rem;transition:color .15s}
+    .clear-btn:hover{color:var(--blue)}
+    .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.4rem}
+    .kpi-card{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1.1rem 1.3rem;backdrop-filter:blur(4px)}
+    .kpi-label{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:.4rem}
+    .kpi-val{font-family:'Syne',sans-serif;font-weight:800;font-size:1.7rem;letter-spacing:-.04em;line-height:1;color:var(--blue)}
+    .kpi-val.wh{color:var(--white)}
+    .kpi-val.gr{color:var(--green)}
+    .kpi-val.sm{font-size:1.05rem;line-height:1.3}
+    .kpi-delta{font-family:'DM Mono',monospace;font-size:.6rem;color:rgba(255,255,255,.4);margin-top:.3rem}
+    body.day-mode .kpi-delta{color:rgba(0,0,0,.5)}
+    .results-grid{display:grid;grid-template-columns:1fr 360px;gap:1.2rem}
+    .card{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1.2rem;overflow:hidden;backdrop-filter:blur(4px)}
+    .card-label{font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-bottom:1rem}
+    body.day-mode .card-label{color:rgba(0,0,0,.55)}
+    #map-wrap{position:relative;height:560px}
+    #alc-map{width:100%;height:100%;background:#060810}
+    body.day-mode #alc-map{background:#e6ded3}
+    #map-back-btn{position:absolute;top:10px;right:10px;display:none;align-items:center;gap:.4rem;font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:#fff;background:rgba(0,71,255,.85);border:1px solid rgba(0,71,255,.4);padding:.35rem .8rem;cursor:none;z-index:401}
+    #map-back-btn:hover{background:var(--blue)}
+    #map-back-btn.show{display:inline-flex}
+    .leaflet-container{background:#060810!important;font-family:'DM Mono',monospace}
+    body.day-mode .leaflet-container{background:#e6ded3!important}
+    .leaflet-tile-pane{display:none}
+    .leaflet-control-attribution{display:none!important}
+    .leaflet-control-zoom a{background:rgba(13,15,28,.9)!important;color:var(--white)!important;border-color:rgba(255,255,255,.15)!important}
+    .leaflet-control-zoom a:hover{background:rgba(0,71,255,.3)!important}
+    body.day-mode .leaflet-control-zoom a{background:rgba(255,255,255,.9)!important;color:#1a1a2e!important;border-color:rgba(0,0,0,.15)!important}
+    .leaflet-tooltip{font-family:'DM Mono',monospace!important;font-weight:400!important;font-size:.72rem!important;background:rgba(6,8,16,0.97)!important;border:1px solid rgba(0,71,255,0.4)!important;color:#f4f3ef!important;box-shadow:none!important;padding:.5rem .7rem!important;border-radius:0!important;width:230px!important;white-space:normal!important;line-height:1.5!important;overflow-wrap:break-word!important}
+    .leaflet-tooltip:before{display:none!important}
+    .tt-title{font-family:'Syne',sans-serif;font-weight:700;font-size:.78rem;color:#fff;margin-bottom:.3rem;letter-spacing:-.01em}
+    .tt-row{display:flex;justify-content:space-between;gap:.4rem;font-size:.7rem;color:rgba(255,255,255,.75);margin:.15rem 0}
+    .tt-row b{color:#fff;font-weight:400}
+    .tt-cand{font-family:'Syne',sans-serif;font-weight:500;font-size:.84rem;color:#fff;margin-top:.45rem;line-height:1.25}
+    .tt-party{font-size:.62rem;color:rgba(255,255,255,.6);letter-spacing:.06em;margin-top:.15rem;line-height:1.3}
+    .tt-pct{font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;color:var(--green);margin-top:.3rem}
+    #alc-map .leaflet-interactive{cursor:pointer!important}
+    .panel{display:flex;flex-direction:column;gap:1rem}
+    .donut-wrap{display:flex;flex-direction:column;align-items:center;gap:.85rem}
+    .donut-cw{position:relative;width:150px;height:150px}
+    .donut-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+    .donut-pct{font-family:Avenir,sans-serif;font-weight:800;font-size:1.4rem;letter-spacing:-.04em;color:var(--white);line-height:1}
+    .donut-sub{font-family:Avenir,sans-serif;font-size:.5rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.32);margin-top:2px}
+    .donut-legend{width:100%;display:flex;flex-direction:column;gap:.45rem}
+    .li{display:flex;align-items:center;gap:.55rem;font-family:Avenir,sans-serif;font-weight:400;font-size:.72rem;color:rgba(255,255,255,.6)}
+    body.day-mode .li{color:rgba(0,0,0,.7)}
+    .ld{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+    .lv{margin-left:auto;color:var(--white);font-weight:400}
+    body.day-mode .lv{color:#1a1a2e}
+    .ranking-table{width:100%;border-collapse:collapse;font-family:'DM Mono',monospace;font-size:.7rem}
+    .ranking-table th{text-align:left;padding:.4rem .5rem;border-bottom:1px solid var(--border);color:rgba(255,255,255,.3);font-weight:400;font-size:.55rem;letter-spacing:.12em;text-transform:uppercase}
+    .ranking-table th.r{text-align:right}
+    .ranking-table td{padding:.5rem .5rem;border-bottom:1px solid rgba(255,255,255,.04);color:rgba(255,255,255,.78);vertical-align:middle}
+    .ranking-table td.r{text-align:right}
+    .ranking-table tr:hover td{background:var(--td-hover)}
+    body.day-mode .ranking-table td{color:rgba(0,0,0,.78);border-color:rgba(0,0,0,.05)}
+    body.day-mode .ranking-table tr:hover td{background:rgba(0,0,0,.025)}
+    .swatch{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:.45rem;vertical-align:middle;border:1px solid rgba(255,255,255,.15)}
+    body.day-mode .swatch{border-color:rgba(0,0,0,.18)}
+    .row-name{font-family:'Syne',sans-serif;font-weight:500;color:var(--white);font-size:.78rem;letter-spacing:-.01em}
+    body.day-mode .row-name{color:#1a1a2e}
+    .row-sub{font-size:.6rem;color:rgba(255,255,255,.42);margin-top:.1rem;letter-spacing:.04em}
+    body.day-mode .row-sub{color:rgba(0,0,0,.5)}
+    .num{font-family:Avenir,sans-serif;color:var(--white)}
+    body.day-mode .num{color:#1a1a2e}
+    .pct{color:var(--green);font-weight:500}
+    .mun-detail{margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)}
+    .mun-detail-title{font-family:'Syne',sans-serif;font-weight:700;font-size:.95rem;color:var(--white);margin-bottom:.15rem;letter-spacing:-.01em}
+    body.day-mode .mun-detail-title{color:#1a1a2e}
+    .mun-detail-sub{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:.9rem}
+    body.day-mode .mun-detail-sub{color:rgba(0,0,0,.5)}
+    .cand-row{display:grid;grid-template-columns:14px 1fr auto;align-items:center;gap:.55rem;padding:.45rem 0;border-bottom:1px solid var(--border)}
+    .cand-row:last-child{border-bottom:none}
+    .cand-rank{font-family:'DM Mono',monospace;font-size:.65rem;color:rgba(255,255,255,.3);text-align:right}
+    .cand-name{font-family:'Syne',sans-serif;font-weight:500;font-size:.78rem;color:var(--white);letter-spacing:-.01em;line-height:1.2}
+    body.day-mode .cand-name{color:#1a1a2e}
+    .cand-party{font-size:.58rem;color:rgba(255,255,255,.42);letter-spacing:.04em;margin-top:.1rem;line-height:1.3}
+    body.day-mode .cand-party{color:rgba(0,0,0,.5)}
+    .cand-pct{font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;color:var(--green);min-width:48px;text-align:right}
+    .cand-votos{font-family:Avenir,sans-serif;font-size:.68rem;color:rgba(255,255,255,.55);text-align:right;margin-top:.1rem}
+    body.day-mode .cand-votos{color:rgba(0,0,0,.6)}
+    .full-footer{flex-shrink:0;width:100%;border-top:1px solid var(--border);padding:.5rem 2.5rem;display:flex;align-items:center;justify-content:space-between}
+    .footer-brand{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.09em;color:rgba(255,255,255,.2)}
+    .footer-brand a{color:rgba(255,255,255,.25);text-decoration:none}
+    .loader-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;min-height:300px}
+    .loader-ring{width:40px;height:40px;border:2px solid rgba(0,71,255,.2);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .loader-label{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3)}
+    body.day-mode .loader-label{color:rgba(0,0,0,.5)}
+    .soon-modal{position:fixed;inset:0;z-index:99996;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(4px)}
+    .soon-modal.show{display:flex}
+    .soon-panel{background:#0e1220;border:1px solid var(--card-border);padding:2rem;max-width:480px;width:100%}
+    body.day-mode .soon-panel{background:#fafafa;border-color:rgba(0,0,0,.15)}
+    .soon-tag{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.15em;text-transform:uppercase;color:var(--blue);margin-bottom:.5rem}
+    .soon-title{font-family:'Syne',sans-serif;font-weight:800;font-size:1.4rem;color:var(--white);margin-bottom:.8rem;letter-spacing:-.02em}
+    body.day-mode .soon-title{color:#1a1a2e}
+    .soon-body{font-family:'Syne',sans-serif;font-size:.88rem;line-height:1.55;color:rgba(255,255,255,.72);margin-bottom:1.3rem}
+    body.day-mode .soon-body{color:rgba(0,0,0,.72)}
+    .soon-close{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;background:var(--blue);color:#fff;border:none;padding:.55rem 1.3rem;cursor:none}
+    .soon-close:hover{background:#0035cc}
+    @media(max-width:1100px){.results-grid{grid-template-columns:1fr}.kpi-row{grid-template-columns:repeat(2,1fr)}#map-wrap{height:440px}}
+    @media(max-width:640px){body{cursor:auto}.cursor,.cursor-ring{display:none}.top-bar,.breadcrumb,.meta-bar,.content-area,.full-footer{padding-left:1rem;padding-right:1rem}.kpi-row{grid-template-columns:1fr}.toggle-row,.sub-selector{flex-direction:column;align-items:stretch}.toggle-btn,.dep-select{width:100%;justify-content:center}#map-wrap{height:340px}}
+  </style>
+</head>
+<body>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+  <div class="bg-overlay"></div>
+
+  <div class="shell">
+    <nav class="electoral-nav">
+      <a class="logo-link" href="index.html">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:50%"></div>
+          <div class="logo-bar" style="height:75%"></div>
+          <div class="logo-bar" style="height:90%"></div>
+          <div class="logo-bar" style="height:60%"></div>
+        </div>
+        <div class="logo-text">Ricardo<span>.</span>Ruiz</div>
+      </a>
+      <div class="nav-right">
+        <button class="day-toggle" id="dayToggle" onclick="toggleTheme()">DÍA</button>
+        <a class="e-btn-back" href="electoral.html">← Electoral</a>
+      </div>
+    </nav>
+
+    <div class="top-bar">
+      <h1 class="page-title">Alcaldías<span>.</span> 2023</h1>
+    </div>
+    <div class="breadcrumb"><a href="index.html">RICARDO RUIZ</a> · <a href="electoral.html">ELECTORAL</a> · ALCALDÍAS 2023</div>
+    <div class="meta-bar">
+      <span class="meta-item">Fecha: <b id="m-fecha">—</b></span>
+      <span class="meta-item">Municipios: <b id="m-muns">—</b></span>
+      <span class="meta-item">Censo: <b id="m-censo">—</b></span>
+      <span class="meta-item">Votos válidos: <b id="m-vv">—</b></span>
+      <span class="source-badge">FUENTE: <b>REGISTRADURÍA · GCS</b></span>
+    </div>
+
+    <div class="content-area">
+      <div id="loader" class="loader-wrap">
+        <div class="loader-ring"></div>
+        <div class="loader-label">Cargando datos electorales</div>
+      </div>
+
+      <div id="main" style="display:none">
+        <div class="toggle-row">
+          <span class="toggle-label">Visualizar:</span>
+          <button class="toggle-btn active" data-view="candidato" onclick="setView('candidato')">Por candidato</button>
+          <button class="toggle-btn" data-view="partido" onclick="setView('partido')">Por partido</button>
+          <button class="toggle-btn soon" data-view="bloque" onclick="showSoon()">Por bloque <span class="soon-tag">PRÓXIMAMENTE</span></button>
+        </div>
+
+        <div class="sub-selector">
+          <span class="sub-label">Filtrar:</span>
+          <select id="dep-select" class="dep-select" onchange="onDepChange(this.value)">
+            <option value="">Todos los deptos</option>
+          </select>
+          <select id="mun-select" class="dep-select" onchange="onMunChange(this.value)" disabled>
+            <option value="">Todos los muns</option>
+          </select>
+          <button class="clear-btn" id="clear-btn" onclick="clearFilters()" style="display:none">× Limpiar</button>
+        </div>
+
+        <div class="kpi-row">
+          <div class="kpi-card">
+            <div class="kpi-label" id="kpi1-l">Municipios</div>
+            <div class="kpi-val wh" id="kpi1-v">—</div>
+            <div class="kpi-delta" id="kpi1-d"></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label" id="kpi2-l">Censo electoral</div>
+            <div class="kpi-val wh" id="kpi2-v">—</div>
+            <div class="kpi-delta" id="kpi2-d"></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label" id="kpi3-l">Votos válidos</div>
+            <div class="kpi-val wh" id="kpi3-v">—</div>
+            <div class="kpi-delta" id="kpi3-d"></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label" id="kpi4-l">Participación</div>
+            <div class="kpi-val gr" id="kpi4-v">—</div>
+            <div class="kpi-delta" id="kpi4-d"></div>
+          </div>
+        </div>
+
+        <div class="results-grid">
+          <div class="card">
+            <div class="card-label" id="map-label">Mapa nacional · por candidato ganador</div>
+            <div id="map-wrap">
+              <button id="map-back-btn" onclick="mapBack()">← Volver</button>
+              <div id="alc-map"></div>
+            </div>
+          </div>
+
+          <div class="card panel" id="panel">
+            <div class="donut-wrap" id="donut-wrap">
+              <div class="card-label" style="margin:0">Participación</div>
+              <div class="donut-cw">
+                <canvas id="donut" width="150" height="150"></canvas>
+                <div class="donut-center">
+                  <div class="donut-pct" id="donut-pct">—</div>
+                  <div class="donut-sub" id="donut-sub">% participación</div>
+                </div>
+              </div>
+              <div class="donut-legend" id="donut-legend"></div>
+            </div>
+            <div id="ranking-area"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="full-footer">
+      <span class="footer-brand">© 2026 Ricardo Ruiz · <a href="index.html">ricardoruiz.co</a></span>
+      <span class="footer-brand">Datos: Registraduría</span>
+    </footer>
+  </div>
+
+  <!-- Modal "próximamente" para bloque -->
+  <div class="soon-modal" id="soon-modal">
+    <div class="soon-panel">
+      <div class="soon-tag">En construcción</div>
+      <div class="soon-title">Vista por bloque ideológico</div>
+      <div class="soon-body">
+        En las elecciones territoriales colombianas, la mayoría de candidatos
+        relevantes corren por <b>coaliciones ad-hoc</b> o <b>movimientos
+        significativos de ciudadanos</b> sin alineación clara con un partido
+        nacional ("Revivamos Cali", "Defendamos Bucaramanga", "Primero
+        Pereira"…). La sigla cruda no captura el verdadero alineamiento.
+        <br><br>
+        Estoy curando manualmente, candidato por candidato, la clasificación
+        de las ~80 alcaldías más importantes en bloques ideológicos
+        (izquierda · centro-izquierda · centro · centro-derecha · derecha ·
+        cívico). Esta vista quedará disponible cuando la curación esté
+        validada políticamente.
+      </div>
+      <button class="soon-close" onclick="hideSoon()">Entendido</button>
+    </div>
+  </div>
+
+  <script>
+  // ─── Cursor custom + day-mode ─────────────────────────
+  const cursor = document.getElementById('cursor');
+  const ring = document.getElementById('cursorRing');
+  document.addEventListener('mousemove', e => {
+    cursor.style.left = ring.style.left = e.clientX + 'px';
+    cursor.style.top = ring.style.top = e.clientY + 'px';
+  });
+  document.addEventListener('mouseover', e => {
+    if (e.target.closest('a, button, select, .leaflet-interactive')){
+      cursor.style.transform = 'translate(-50%,-50%) scale(2)';
+      cursor.style.background = 'transparent';
+      cursor.style.border = '1.5px solid var(--blue)';
+      ring.style.opacity = '0';
+    } else {
+      cursor.style.transform = 'translate(-50%,-50%) scale(1)';
+      cursor.style.background = 'var(--blue)';
+      cursor.style.border = 'none';
+      ring.style.opacity = '.4';
+    }
+  });
+  function toggleTheme(){
+    document.body.classList.toggle('day-mode');
+    const day = document.body.classList.contains('day-mode');
+    document.getElementById('dayToggle').textContent = day ? 'NOCHE' : 'DÍA';
+    if (donutChart){ updateDonutColors(); donutChart.update(); }
+    if (alcMap && currentLayer){ currentLayer.eachLayer(l => l.setStyle && l.setStyle({color: themeStroke()})); }
+  }
+  function themeStroke(){ return document.body.classList.contains('day-mode') ? 'rgba(0,0,0,.25)' : 'rgba(255,255,255,.18)'; }
+
+  // ─── Constantes / fuentes ──────────────────────────────
+  const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co';
+  const BASE = `${S3}/bases+de+datos/output_alcaldias_2023`;
+  const MAPS = `${S3}/congreso-2026/output/mapas-2026`;
+  const DEP_GEO_URL = `${MAPS}/DEPARTAMENTOS2.json`;
+  const DEP_MUN_GEO_URL = (dep) => `${MAPS}/Departamentos-mps/${dep}.json`;
+
+  // Paleta de partidos (top siglas conocidas; resto → gris)
+  const PARTY_COLORS = {
+    'PARTIDO POLITICO CREEMOS': '#1866DF',
+    'PARTIDO CAMBIO RADICAL': '#f59e0b',
+    'PARTIDO NUEVO LIBERALISMO': '#d9db24',
+    'PARTIDO ALIANZA VERDE': '#16a34a',
+    'PARTIDO CENTRO DEMOCRATICO': '#003D7A',
+    'PARTIDO LIBERAL COLOMBIANO': '#c81e1e',
+    'PARTIDO CONSERVADOR COLOMBIANO': '#2563eb',
+    'PARTIDO DE LA UNION POR LA GENTE - PARTIDO DE LA U': '#ff6b00',
+    'PARTIDO DE LA U': '#ff6b00',
+    'MOVIMIENTO POLITICO COLOMBIA HUMANA': '#dc2626',
+    'PACTO HISTORICO': '#dc2626',
+    'PACTO HISTORICO BOGOTA': '#dc2626',
+    'PACTO HISTORICO COLOMBIA PUEDE': '#dc2626',
+    'COLOMBIA HUMANA-PACTO HISTORICO': '#dc2626',
+    'PARTIDO POLITICO DIGNIDAD & COMPROMISO': '#eab308',
+    'MOVIMIENTO POLITICO FUERZA CIUDADANA': '#a855f7',
+    'AGRUPACION POLITICA EN MARCHA': '#0ea5e9',
+    'MOVIMIENTO ALIANZA DEMOCRATICA AMPLIA': '#7c3aed',
+    'PARTIDO COLOMBIA RENACIENTE': '#10b981',
+    'MOVIMIENTO ALTERNATIVO INDIGENA Y SOCIAL "MAIS"': '#f97316',
+    'PARTIDO POLO DEMOCRATICO ALTERNATIVO': '#fbbf24',
+    'PARTIDO POLITICO LA FUERZA DE LA PAZ': '#84cc16',
+    'PARTIDO VERDE OXIGENO': '#22d3ee',
+    'NUEVA FUERZA DEMOCRATICA': '#6366f1',
+    'PARTIDO POLITICO GENTE EN MOVIMIENTO': '#ec4899',
+    'PARTIDO DEMOCRATA COLOMBIANO': '#0891b2',
+    'PARTIDO POLITICO ESPERANZA DEMOCRATICA': '#facc15',
+    'PARTIDO ECOLOGISTA COLOMBIANO': '#65a30d',
+    'PARTIDO LIGA GOBERNANTES ANTICORRUPCION - LIGA': '#e11d48',
+    'MOVIMIENTO SALVACION NACIONAL': '#1e40af',
+    'INDEPENDIENTES': '#94a3b8',
+  };
+  const NO_PARTY = '#475569';   // gris para sin clasificar / sigla no en paleta
+
+  function colorForPartido(p){
+    if (!p) return NO_PARTY;
+    return PARTY_COLORS[p] || hashColor(p);
+  }
+  // Color determinístico para candidato (HSL hash)
+  function hashColor(s){
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+    const hue = Math.abs(h) % 360;
+    const sat = 55 + (Math.abs(h >> 4) % 25);     // 55-80
+    const lig = 48 + (Math.abs(h >> 8) % 14);     // 48-62
+    return `hsl(${hue}, ${sat}%, ${lig}%)`;
+  }
+  function colorForCandidato(c){
+    if (!c || !c.nombre) return NO_PARTY;
+    return hashColor(c.nombre);
+  }
+  // Color del mapa según vista activa: candidato (por nombre) | partido (sigla) | bloque (próx)
+  function colorForFeature(rec){
+    if (!rec) return 'rgba(120,120,120,.18)';
+    const g = rec.ganador || rec;
+    if (currentView === 'partido') return colorForPartido(g.partido || rec.partido);
+    return colorForCandidato(g);
+  }
+
+  // ─── Helpers ──────────────────────────────────────────
+  const norm = s => String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  const fmtN = n => (n || 0).toLocaleString('es-CO');
+  const fmtPct = n => (n == null) ? '—' : (Math.round(n * 10) / 10).toFixed(1) + '%';
+  function pad(v, w){ return String(parseInt(v,10) || 0).padStart(w, '0'); }
+
+  // ─── Estado global ────────────────────────────────────
+  let resumen, deptos, munsAll, deptoCache = {};
+  let currentView = 'candidato';
+  let currentDep = '', currentMun = '';
+  let alcMap = null, currentLayer = null, depGeoRaw = null;
+  let donutChart = null;
+  let depByName = {};   // {NOMBRE_NORM: depCod}
+  let munByDepName = {};   // {depCod: {NOMBRE_NORM: munCod}}
+
+  // ─── Bootstrap ────────────────────────────────────────
+  async function init(){
+    try {
+      [resumen, deptos, munsAll] = await Promise.all([
+        fetch(`${BASE}/nacional/resumen.json`).then(r => r.json()),
+        fetch(`${BASE}/nacional/por-depto.json`).then(r => r.json()),
+        fetch(`${BASE}/nacional/por-mun.json`).then(r => r.json()),
+      ]);
+      // Index para lookup por nombre
+      for (const d of deptos){ depByName[norm(d.nombre)] = d.dep; }
+      // Aliases comunes que difieren en GeoJSON
+      depByName[norm('NORTE DE SANTANDER')] = depByName[norm('NORTE DE SAN')] || depByName[norm('NORTE DE SANTANDER')];
+      depByName[norm('SAN ANDRES Y PROVIDENCIA')] = depByName[norm('SAN ANDRES')];
+      depByName[norm('BOGOTA D.C.')] = depByName[norm('BOGOTA D C')] || depByName[norm('BOGOTA DC')] || depByName[norm('BOGOTA')] || depByName[norm('BOGOTA. D.C.')];
+      depByName[norm('BOGOTA')] = depByName[norm('BOGOTA')] || depByName[norm('BOGOTA. D.C.')];
+      depByName[norm('VALLE DEL CAUCA')] = depByName[norm('VALLE')];
+      for (const m of munsAll){
+        const d = m.dep;
+        if (!munByDepName[d]) munByDepName[d] = {};
+        munByDepName[d][norm(m.nombre_mun)] = m.mun;
+      }
+      populateDeptos();
+      renderAll();
+      document.getElementById('loader').style.display = 'none';
+      document.getElementById('main').style.display = '';
+      initMap();
+    } catch (e){
+      console.error(e);
+      document.getElementById('loader').innerHTML = '<div class="loader-label" style="color:#ef4444">Error al cargar datos. Recarga la página.</div>';
+    }
+  }
+
+  function populateDeptos(){
+    const sel = document.getElementById('dep-select');
+    const opts = [...deptos].sort((a,b) => a.nombre.localeCompare(b.nombre, 'es'));
+    for (const d of opts){
+      const o = document.createElement('option');
+      o.value = d.dep;
+      o.textContent = d.nombre;
+      sel.appendChild(o);
+    }
+  }
+
+  async function ensureDepLoaded(dep){
+    if (deptoCache[dep]) return deptoCache[dep];
+    const res = await fetch(`${BASE}/departamentos/${dep}/municipios.json`).then(r => r.json());
+    deptoCache[dep] = res;
+    return res;
+  }
+
+  // ─── Selects en cascada ──────────────────────────────
+  async function onDepChange(dep){
+    currentDep = dep;
+    currentMun = '';
+    const munSel = document.getElementById('mun-select');
+    munSel.innerHTML = '<option value="">Todos los muns</option>';
+    if (!dep){ munSel.disabled = true; document.getElementById('clear-btn').style.display = 'none'; renderAll(); return; }
+    const muns = await ensureDepLoaded(dep);
+    const sorted = [...muns].sort((a,b) => a.nombre.localeCompare(b.nombre, 'es'));
+    for (const m of sorted){
+      const o = document.createElement('option');
+      o.value = m.mun;
+      o.textContent = m.nombre + (m.es_capital ? ' ★' : '');
+      munSel.appendChild(o);
+    }
+    munSel.disabled = false;
+    document.getElementById('clear-btn').style.display = '';
+    renderAll();
+  }
+  async function onMunChange(mun){
+    currentMun = mun;
+    document.getElementById('clear-btn').style.display = (currentDep || currentMun) ? '' : 'none';
+    renderAll();
+  }
+  function clearFilters(){
+    currentDep = ''; currentMun = '';
+    document.getElementById('dep-select').value = '';
+    document.getElementById('mun-select').innerHTML = '<option value="">Todos los muns</option>';
+    document.getElementById('mun-select').disabled = true;
+    document.getElementById('clear-btn').style.display = 'none';
+    renderAll();
+  }
+
+  function setView(v){
+    currentView = v;
+    document.querySelectorAll('.toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+    renderAll();
+  }
+  function showSoon(){ document.getElementById('soon-modal').classList.add('show'); }
+  function hideSoon(){ document.getElementById('soon-modal').classList.remove('show'); }
+
+  // ─── Render unificado ────────────────────────────────
+  async function renderAll(){
+    if (currentMun && currentDep){
+      const muns = await ensureDepLoaded(currentDep);
+      const m = muns.find(x => x.mun === currentMun);
+      const munMeta = munsAll.find(x => x.dep === currentDep && x.mun === currentMun);
+      renderMunView(m, munMeta);
+    } else if (currentDep){
+      renderDeptoView(currentDep);
+    } else {
+      renderNacionalView();
+    }
+    updateMap();
+  }
+
+  // ─── Vista NACIONAL ────────
+  function renderNacionalView(){
+    // KPIs
+    setKPI(1, 'Municipios', fmtN(resumen.municipios), '');
+    setKPI(2, 'Censo electoral', fmtN(resumen.censo_total), '');
+    setKPI(3, 'Votos válidos', fmtN(resumen.votos_validos), '');
+    const part = resumen.votos_totales / resumen.censo_total * 100;
+    setKPI(4, 'Participación', fmtPct(part), '');
+
+    setMeta('29 Oct 2023', fmtN(resumen.municipios), fmtN(resumen.censo_total), fmtN(resumen.votos_validos));
+    setMapLabel(`Mapa nacional · ${viewLabel()}`);
+
+    // Donut
+    drawDonut({ votos_totales: resumen.votos_totales, votos_validos: resumen.votos_validos, censo: resumen.censo_total, especiales: resumen.especiales });
+
+    // Ranking
+    let html = '';
+    if (currentView === 'candidato'){
+      // Top 30 candidatos nacionales por votos del ganador
+      const sorted = [...munsAll].sort((a,b) => b.ganador.votos - a.ganador.votos).slice(0, 30);
+      html = '<div class="card-label">Top 30 ganadores · por votos</div>' + renderCandRankingTable(sorted);
+    } else if (currentView === 'partido'){
+      // Tabla de partidos: # alcaldías + capitales + censo + votos
+      const sorted = [...resumen.partidos].sort((a,b) => b.muns_ganados - a.muns_ganados || b.votos - a.votos).filter(p => p.muns_ganados > 0).slice(0, 40);
+      html = '<div class="card-label">Partidos · por alcaldías ganadas</div>' + renderPartyRankingTable(sorted);
+    }
+    document.getElementById('ranking-area').innerHTML = html;
+  }
+
+  // ─── Vista DEPTO ────────
+  function renderDeptoView(dep){
+    const d = deptos.find(x => x.dep === dep);
+    if (!d) return renderNacionalView();
+    setKPI(1, 'Municipios', fmtN(d.municipios), '');
+    setKPI(2, 'Censo electoral', fmtN(d.censo), '');
+    setKPI(3, 'Votos válidos', fmtN(d.votos_validos), '');
+    const part = d.votos_totales / d.censo * 100;
+    setKPI(4, 'Participación', fmtPct(part), '');
+    setMeta('29 Oct 2023', d.nombre + ' · ' + d.municipios + ' muns', fmtN(d.censo), fmtN(d.votos_validos));
+    setMapLabel(`${d.nombre} · muns · ${viewLabel()}`);
+    drawDonut({ votos_totales: d.votos_totales, votos_validos: d.votos_validos, censo: d.censo, especiales: d.especiales });
+
+    let html = '';
+    if (currentView === 'candidato'){
+      const munsDep = munsAll.filter(m => m.dep === dep).sort((a,b) => b.ganador.votos - a.ganador.votos);
+      html = `<div class="card-label">${d.nombre} · ganadores por mun</div>` + renderCandRankingTable(munsDep);
+    } else if (currentView === 'partido'){
+      const ps = (d.partidos || []).sort((a,b) => b.muns - a.muns || b.votos_totales - a.votos_totales);
+      html = `<div class="card-label">${d.nombre} · partidos</div>` + renderPartyRankingTable(ps.map(p => ({ partido: p.partido, votos: p.votos_totales, pct: 0, muns_ganados: p.muns, capitales_ganadas: 0, censo_gobernado: p.censo })));
+    }
+    document.getElementById('ranking-area').innerHTML = html;
+  }
+
+  // ─── Vista MUN (drill final) ────────
+  function renderMunView(mFull, mMeta){
+    if (!mFull) return renderDeptoView(currentDep);
+    setKPI(1, 'Censo electoral', fmtN(mFull.censo), '');
+    setKPI(2, 'Votos válidos', fmtN(mFull.votos_validos), '');
+    const part = mFull.votos_totales / mFull.censo * 100;
+    setKPI(3, 'Participación', fmtPct(part), '');
+    const top = mFull.candidatos[0];
+    setKPI(4, 'Ganador', top ? top.nombre.split(' ').slice(0,2).join(' ') : '—', top ? fmtPct(top.pct) : '');
+    document.getElementById('kpi4-v').classList.remove('gr'); document.getElementById('kpi4-v').classList.add('wh');
+    document.getElementById('kpi4-v').style.fontSize = '1.05rem'; document.getElementById('kpi4-v').style.lineHeight = '1.3';
+    setMeta('29 Oct 2023', mFull.nombre + (mFull.es_capital ? ' (capital)' : ''), fmtN(mFull.censo), fmtN(mFull.votos_validos));
+    setMapLabel(`${mFull.nombre} · ${viewLabel()}`);
+    drawDonut({ votos_totales: mFull.votos_totales, votos_validos: mFull.votos_validos, censo: mFull.censo, especiales: mFull.especiales, mujeres: mFull.mujeres, hombres: mFull.hombres });
+
+    // Panel: top candidatos completos
+    let html = `<div class="mun-detail">
+      <div class="mun-detail-title">${mFull.nombre}</div>
+      <div class="mun-detail-sub">${(deptos.find(d => d.dep === currentDep) || {}).nombre || ''} · ${mFull.candidatos.length} candidatos</div>`;
+    const cands = mFull.candidatos.slice(0, 10);
+    for (let i = 0; i < cands.length; i++){
+      const c = cands[i];
+      const col = currentView === 'partido' ? colorForPartido(c.partido) : hashColor(c.nombre);
+      html += `<div class="cand-row">
+        <div class="cand-rank">${i+1}</div>
+        <div>
+          <div class="cand-name"><span class="swatch" style="background:${col}"></span>${c.nombre}</div>
+          <div class="cand-party">${c.partido || '—'}</div>
+        </div>
+        <div>
+          <div class="cand-pct">${fmtPct(c.pct)}</div>
+          <div class="cand-votos">${fmtN(c.votos)}</div>
+        </div>
+      </div>`;
+    }
+    html += '</div>';
+    document.getElementById('ranking-area').innerHTML = html;
+  }
+  function viewLabel(){ return currentView === 'partido' ? 'por partido ganador' : 'por candidato ganador'; }
+
+  // ─── Tablas de ranking ────────
+  function renderCandRankingTable(rows){
+    let h = '<table class="ranking-table"><thead><tr><th>Municipio</th><th class="r">Votos</th><th class="r">%</th></tr></thead><tbody>';
+    for (const r of rows){
+      const g = r.ganador;
+      const col = currentView === 'partido' ? colorForPartido(g.partido) : hashColor(g.nombre);
+      const muncss = (r.es_capital ? ' ★' : '');
+      const onClick = `goToMun('${r.dep}','${r.mun}')`;
+      h += `<tr style="cursor:pointer" onclick="${onClick}">
+        <td><div class="row-name"><span class="swatch" style="background:${col}"></span>${r.nombre_mun}${muncss}</div>
+          <div class="row-sub">${g.nombre.split(' ').slice(0,3).join(' ')} · ${(g.partido || '—').slice(0,28)}</div></td>
+        <td class="r"><span class="num">${fmtN(g.votos)}</span></td>
+        <td class="r"><span class="pct">${fmtPct(g.pct)}</span></td>
+      </tr>`;
+    }
+    h += '</tbody></table>';
+    return h;
+  }
+  function renderPartyRankingTable(rows){
+    let h = '<table class="ranking-table"><thead><tr><th>Partido</th><th class="r">Muns</th><th class="r">Censo gob.</th></tr></thead><tbody>';
+    for (const p of rows){
+      const col = colorForPartido(p.partido);
+      h += `<tr>
+        <td><div class="row-name"><span class="swatch" style="background:${col}"></span>${(p.partido || '—').slice(0,46)}</div>
+          ${p.capitales_ganadas ? `<div class="row-sub">${p.capitales_ganadas} capital${p.capitales_ganadas > 1 ? 'es' : ''}</div>` : ''}</td>
+        <td class="r"><span class="num">${fmtN(p.muns_ganados)}</span></td>
+        <td class="r"><span class="num">${fmtN(p.censo_gobernado || 0)}</span></td>
+      </tr>`;
+    }
+    h += '</tbody></table>';
+    return h;
+  }
+
+  function goToMun(dep, mun){
+    document.getElementById('dep-select').value = dep;
+    onDepChange(dep).then(() => {
+      document.getElementById('mun-select').value = mun;
+      onMunChange(mun);
+    });
+  }
+
+  // ─── KPIs / meta ──────────────
+  function setKPI(i, label, val, delta){
+    document.getElementById(`kpi${i}-l`).textContent = label;
+    document.getElementById(`kpi${i}-v`).textContent = val;
+    document.getElementById(`kpi${i}-d`).textContent = delta || '';
+    if (i === 4){
+      document.getElementById('kpi4-v').classList.remove('wh');
+      document.getElementById('kpi4-v').classList.add('gr');
+      document.getElementById('kpi4-v').style.fontSize = '';
+      document.getElementById('kpi4-v').style.lineHeight = '';
+    }
+  }
+  function setMeta(fecha, mun, censo, vv){
+    document.getElementById('m-fecha').textContent = fecha;
+    document.getElementById('m-muns').textContent = mun;
+    document.getElementById('m-censo').textContent = censo;
+    document.getElementById('m-vv').textContent = vv;
+  }
+  function setMapLabel(t){ document.getElementById('map-label').textContent = t; }
+
+  // ─── Donut ────────────────────
+  function drawDonut({ votos_totales, votos_validos, censo, especiales = {}, mujeres, hombres }){
+    const ctx = document.getElementById('donut').getContext('2d');
+    const blanco = especiales.blanco || 0, nulos = especiales.nulos || 0, no_mark = especiales.no_marcados || 0;
+    const votant = votos_totales || (votos_validos + blanco + nulos + no_mark);
+    const usingPart = censo && censo > 0;
+    const abst = usingPart ? Math.max(0, censo - votant) : 0;
+    const data = usingPart
+      ? [votos_validos, blanco, nulos, no_mark, abst]
+      : [votos_validos, blanco, nulos, no_mark];
+    const labels = usingPart
+      ? ['Válidos', 'Blanco', 'Nulos', 'No marcados', 'Abstención']
+      : ['Válidos', 'Blanco', 'Nulos', 'No marcados'];
+    const colors = currentDonutColors(usingPart);
+
+    if (donutChart){ donutChart.data.datasets[0].data = data; donutChart.data.datasets[0].backgroundColor = colors; donutChart.data.labels = labels; donutChart.update(); }
+    else {
+      donutChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] },
+        options: { cutout: '72%', plugins: { legend: { display: false }, tooltip: { enabled: false } }, animation: { duration: 600 } }
+      });
+    }
+
+    document.getElementById('donut-pct').textContent = usingPart ? fmtPct(votant / censo * 100) : fmtPct(votos_validos / votant * 100);
+    document.getElementById('donut-sub').textContent = usingPart ? '% participación' : '% válidos';
+
+    const total = data.reduce((s,v) => s+v, 0) || 1;
+    let leg = '';
+    for (let i = 0; i < labels.length; i++){
+      const v = data[i]; if (!v) continue;
+      const p = (v / total * 100).toFixed(1);
+      leg += `<div class="li"><span class="ld" style="background:${colors[i]}"></span>${labels[i]}<span class="lv">${fmtN(v)} · ${p}%</span></div>`;
+    }
+    document.getElementById('donut-legend').innerHTML = leg;
+  }
+  function currentDonutColors(usingPart){
+    const day = document.body.classList.contains('day-mode');
+    return [
+      '#4ade80',                                  // válidos = verde
+      day ? '#94a3b8' : '#cbd5e1',                // blanco
+      day ? '#64748b' : '#94a3b8',                // nulos
+      day ? '#475569' : '#64748b',                // no marcados
+      ...(usingPart ? [day ? '#1f2937' : '#374151'] : [])  // abstención = gris oscuro
+    ];
+  }
+  function updateDonutColors(){
+    if (!donutChart) return;
+    const usingPart = donutChart.data.labels.includes('Abstención');
+    donutChart.data.datasets[0].backgroundColor = currentDonutColors(usingPart);
+  }
+
+  // ─── Mapa Leaflet ─────────────
+  async function initMap(){
+    alcMap = L.map('alc-map', { zoomControl: true, attributionControl: false, preferCanvas: false, scrollWheelZoom: true }).setView([4.5, -73.5], 6);
+    depGeoRaw = await fetch(DEP_GEO_URL).then(r => r.json());
+    // ResizeObserver: si el container cambia de tamaño (preview iframe, resize de
+    // ventana, mostrar/ocultar panel), invalidamos size y reajustamos bounds.
+    const wrap = document.getElementById('alc-map');
+    let resizeT;
+    new ResizeObserver(() => {
+      clearTimeout(resizeT);
+      resizeT = setTimeout(() => {
+        if (!alcMap) return;
+        alcMap.invalidateSize();
+        if (currentLayer && currentLayer.getBounds && currentLayer.getBounds().isValid()){
+          alcMap.fitBounds(currentLayer.getBounds(), { padding: [12, 12] });
+        }
+      }, 60);
+    }).observe(wrap);
+    updateMap();
+  }
+  function clearLayer(){ if (currentLayer){ alcMap.removeLayer(currentLayer); currentLayer = null; } }
+
+  async function updateMap(){
+    if (!alcMap) return;
+    clearLayer();
+    if (currentMun && currentDep){
+      // Vista mun: capa del depto pero zoom al mun
+      await renderDepLayer(currentDep, currentMun);
+      document.getElementById('map-back-btn').classList.add('show');
+      document.getElementById('map-back-btn').textContent = '← Departamento';
+    } else if (currentDep){
+      await renderDepLayer(currentDep);
+      document.getElementById('map-back-btn').classList.add('show');
+      document.getElementById('map-back-btn').textContent = '← Nacional';
+    } else {
+      renderNacionalLayer();
+      document.getElementById('map-back-btn').classList.remove('show');
+    }
+  }
+  function renderNacionalLayer(){
+    // Index por nombre normalizado → depto
+    const byNorm = {};
+    for (const d of deptos) byNorm[norm(d.nombre)] = d;
+    // Aliases adicionales para nombres del GeoJSON
+    const aliases = {
+      'BOGOTA D.C.': norm('BOGOTA. D.C.'), 'BOGOTA': norm('BOGOTA. D.C.'),
+      'NORTE DE SANTANDER': norm('NORTE DE SAN'),
+      'SAN ANDRES Y PROVIDENCIA': norm('SAN ANDRES'),
+      'VALLE DEL CAUCA': norm('VALLE'),
+    };
+
+    currentLayer = L.geoJSON(depGeoRaw, {
+      style: f => {
+        const name = norm(f.properties.name || f.properties.NOMBRE_DPT || '');
+        const key = aliases[f.properties.name] || name;
+        const d = byNorm[key];
+        const dominant = d && d.partidos && d.partidos[0] ? d.partidos[0].partido : null;
+        return {
+          fillColor: dominant ? colorForPartido(dominant) : 'rgba(120,120,120,.2)',
+          fillOpacity: 0.78, color: themeStroke(), weight: 0.6,
+        };
+      },
+      onEachFeature: (f, lyr) => {
+        const name = norm(f.properties.name || f.properties.NOMBRE_DPT || '');
+        const key = aliases[f.properties.name] || name;
+        const d = byNorm[key];
+        if (!d) return;
+        const dominant = d.partidos && d.partidos[0];
+        const top = d.top_candidatos && d.top_candidatos[0];
+        const tt = `<div class="tt-title">${d.nombre}</div>
+          <div class="tt-row"><span>Municipios</span><b>${d.municipios}</b></div>
+          <div class="tt-row"><span>Censo</span><b>${fmtN(d.censo)}</b></div>
+          ${dominant ? `<div class="tt-row"><span>Partido top</span><b>${dominant.muns} muns</b></div><div class="tt-party">${dominant.partido}</div>` : ''}
+          ${top ? `<div class="tt-cand">${top.nombre}</div><div class="tt-pct">${fmtPct(top.pct)} · ${fmtN(top.votos)} votos</div>` : ''}`;
+        lyr.bindTooltip(tt, { sticky: true, direction: 'top', offset: [0, -8] });
+        lyr.on('click', () => { document.getElementById('dep-select').value = d.dep; onDepChange(d.dep); });
+        lyr.on('mouseover', e => e.target.setStyle({ weight: 1.4, color: '#fff' }));
+        lyr.on('mouseout', e => currentLayer && currentLayer.resetStyle(e.target));
+      }
+    }).addTo(alcMap);
+    alcMap.fitBounds(currentLayer.getBounds(), { padding: [12, 12] });
+  }
+  async function renderDepLayer(dep, zoomMun){
+    const padded = pad(dep, 2);
+    let geo;
+    try {
+      geo = await fetch(DEP_MUN_GEO_URL(padded)).then(r => { if (!r.ok) throw new Error('404'); return r.json(); });
+    } catch (e){
+      console.warn('No GeoJSON for dep', padded, e);
+      renderNacionalLayer();
+      return;
+    }
+    const muns = await ensureDepLoaded(dep);
+    const byMun = {};
+    for (const m of muns) byMun[m.mun] = m;
+    const byMunName = munByDepName[dep] || {};
+
+    currentLayer = L.geoJSON(geo, {
+      style: f => {
+        const m = matchMun(f.properties, byMun, byMunName);
+        const g = m ? m.candidatos[0] : null;
+        return {
+          fillColor: g ? (currentView === 'partido' ? colorForPartido(g.partido) : hashColor(g.nombre)) : 'rgba(120,120,120,.18)',
+          fillOpacity: 0.78, color: themeStroke(), weight: 0.5,
+        };
+      },
+      onEachFeature: (f, lyr) => {
+        const m = matchMun(f.properties, byMun, byMunName);
+        if (!m){
+          lyr.bindTooltip(`<div class="tt-title">${f.properties.name || 'Sin datos'}</div><div class="tt-row"><span>Sin información</span></div>`, { sticky: true, direction: 'top', offset: [0, -8] });
+          return;
+        }
+        const g = m.candidatos[0];
+        const tt = `<div class="tt-title">${m.nombre}${m.es_capital ? ' ★' : ''}</div>
+          <div class="tt-row"><span>Censo</span><b>${fmtN(m.censo)}</b></div>
+          <div class="tt-row"><span>Válidos</span><b>${fmtN(m.votos_validos)}</b></div>
+          <div class="tt-row"><span>Partic.</span><b>${fmtPct(m.votos_totales / m.censo * 100)}</b></div>
+          <div class="tt-cand">${g.nombre}</div>
+          <div class="tt-party">${g.partido || '—'}</div>
+          <div class="tt-pct">${fmtPct(g.pct)} · ${fmtN(g.votos)} votos</div>`;
+        lyr.bindTooltip(tt, { sticky: true, direction: 'top', offset: [0, -8] });
+        lyr.on('click', () => { document.getElementById('mun-select').value = m.mun; onMunChange(m.mun); });
+        lyr.on('mouseover', e => e.target.setStyle({ weight: 1.4, color: '#fff' }));
+        lyr.on('mouseout', e => currentLayer && currentLayer.resetStyle(e.target));
+      }
+    }).addTo(alcMap);
+    // Si pediste zoom a mun, intenta zoom a esa feature
+    if (zoomMun){
+      let zoomed = false;
+      currentLayer.eachLayer(l => {
+        if (zoomed) return;
+        const m = matchMun(l.feature.properties, byMun, byMunName);
+        if (m && m.mun === zoomMun){
+          alcMap.fitBounds(l.getBounds(), { padding: [40, 40], maxZoom: 12 });
+          l.setStyle({ weight: 2.5, color: '#fff' });
+          zoomed = true;
+        }
+      });
+      if (!zoomed) alcMap.fitBounds(currentLayer.getBounds(), { padding: [12, 12] });
+    } else {
+      alcMap.fitBounds(currentLayer.getBounds(), { padding: [12, 12] });
+    }
+  }
+  function matchMun(props, byMun, byMunName){
+    // 1) por código numérico (electoral_id puede coincidir o no con Registraduría)
+    const candKeys = ['mun_elec', 'CODIGO', 'mun_code', 'COD_MPIO', 'cod_mun', 'electoral_id'];
+    for (const k of candKeys){
+      if (props[k] != null){
+        const c = pad(props[k], 3);
+        if (byMun[c]) return byMun[c];
+      }
+    }
+    // 2) por nombre normalizado
+    const nameKeys = ['name', 'NOMBRE', 'NOMBRE_MPI', 'nombre', 'NOM_MPIO', 'MPIO_CNMBR'];
+    for (const k of nameKeys){
+      if (props[k]){
+        const c = byMunName[norm(props[k])];
+        if (c && byMun[c]) return byMun[c];
+      }
+    }
+    return null;
+  }
+  function mapBack(){
+    if (currentMun){ currentMun = ''; document.getElementById('mun-select').value = ''; renderAll(); }
+    else if (currentDep){ clearFilters(); }
+  }
+
+  // ─── Boot ─────────────────────
+  init();
+  </script>
+</body>
+</html>
