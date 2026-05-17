@@ -1044,6 +1044,7 @@ y similares por módulo.
 - **S3 + fetch**: datasets pesados o periódicos
   - Módulo 01 (voto histórico): 30 JSONs / ~43 MB total
   - Módulo 02 (seguridad): 7 JSONs por mes / ~60 KB total
+  - Módulo 05 (arquetipos): 7 JSONs + 10 escudos + 10 PNGs de cartografía + PPTX
 
 ### Módulos disponibles (estado actual)
 | # | Módulo | Datos | Estado |
@@ -1052,7 +1053,7 @@ y similares por módulo.
 | 02 | Seguridad y delitos | enero 2026 PNP (S3) | ✓ |
 | 03 | Comportamiento electoral & MOE | paquete socia 2021-2026 (embebido) | ✓ |
 | 04 | Pobreza e IPM | simulado v0 (embebido) | ✓ datos simulados |
-| 05 | Arquetipos territoriales | — | pendiente |
+| 05 | Arquetipos territoriales | paquete socia 2015-2027 (S3) | ✓ |
 | 06 | Gobierno criminal | paquete socia 2023-2026 (embebido) | ✓ |
 | 07 | Saliencia/agenda pública | 10 medios RSS + agregador (S3) | ✓ v1 (medios) |
 | 08 | Fricción ciudadana / PQRSD | — | pendiente datos |
@@ -1078,6 +1079,95 @@ y similares por módulo.
 - Senado/Cámara 2026 a nivel comuna Medellín (S3 actual solo tiene a
   nivel municipio — reprocesar `Congreso_2026_MMV170326.csv` similar al
   script de TER si se necesita drilldown)
+
+### Módulo 05 — arquetipos territoriales (cartografía emocional)
+
+Paquete cerrado de la socia (Nury, mayo 2026) sobre el voto barrial
+en Medellín entre 2015 y 2027 (proyectado). Cubre 152 barrios DAP, 16
+comunas + 5 corregimientos. **Clave de cruce:** `Código DAP` mapea 1:1
+con `properties.CODIGO` de `MEDELLIN_BARRIOS_OFICIAL.json` (100%
+coverage, sin fuzzy matching). PUESTOS_GEOREF.csv NO es necesario
+para este módulo.
+
+**Taxonomía de los 5 arquetipos × 2 versiones (10 entradas en
+`arquetipos.json`):**
+- Protección (azul `#2563eb`): base "Protección y orden cotidiano" → evol "Protección con resultados y orden competente"
+- Continuidad (verde `#16a34a`): "Estabilidad y continuidad" → "Continuidad pragmática y gestión barrial"
+- Supervivencia (cobrizo `#b45309`): "Supervivencia económica y servicios básicos" → "…y servicios cotidianos"
+- Castigo (rojo `#dc2626`): "Desconfianza y castigo" → "Castigo a la restauración y demanda de alternancia"
+- Pertenencia (fucsia `#a21caf`, distinto del cursor morado `#7c3aed`): "Pertenencia y dignidad territorial" → "Pertenencia comunitaria y autonomía territorial"
+
+Las 5 versiones base 2015-2023 usan estética vintage propaganda; las 5
+evolucionadas 2027 son rediseño moderno con vectores limpios. El tab
+switch base/evol en cada card del módulo se lee como "antes/después"
+sin etiqueta explícita.
+
+**Pipeline de ingesta** — `tools/build-arquetipos-medellin/build.py`:
+- Python + openpyxl (sin deps externas más allá de openpyxl).
+- Lee 3 Excel en `Insumos /` y emite 7 JSONs:
+  - `arquetipos.json` (6 KB) — definición canónica 5×2
+  - `por-barrio.json` (430 KB) — master keyed por DAP
+  - `por-comuna.json` (20 KB) — agregado 21 comunas × 4 años
+  - `proyeccion-2027-resumen.json` (3 KB) — KPI ciudad
+  - `correlaciones-top.json` (55 KB) — top 50 trías por año
+  - `transiciones.json` (12 KB) — matrices 6×6 + trayectorias
+  - `metodologia.json` (4 KB) — texto fuente para footer
+- Round a 4 decimales para JSON compacto.
+- 152 barrios validados contra GeoJSON oficial al final del run.
+
+**Outputs en S3** (todos públicos, bajo `ricardoruiz.co/bases+de+datos/Proyecto+DC/`):
+```
+arquetipos/arquetipos.json
+arquetipos/por-barrio.json
+arquetipos/por-comuna.json
+arquetipos/proyeccion-2027-resumen.json
+arquetipos/correlaciones-top.json
+arquetipos/transiciones.json
+arquetipos/metodologia.json
+arquetipos/escudos/{proteccion-orden,proteccion-resultados,
+                    estabilidad-continuidad,continuidad-gestion,
+                    supervivencia-basicos,supervivencia-cotidianos,
+                    desconfianza-castigo,castigo-restauracion,
+                    pertenencia-dignidad,pertenencia-comunitaria}.jpg
+arquetipos/cartografia/slide_{01..10}.png
+pdfs/cartografia_emocional_medellin_2015_2023.pptx (16 MB)
+```
+
+**Gotcha del bucket** (aprendido en este módulo): las URLs públicas
+usan `Proyecto+DC/` (donde `+` decodifica a espacio), pero las keys
+reales del bucket son `Proyecto DC/` con **espacio literal**. Si subís
+con `aws s3 cp` y pasás `Proyecto+DC/` la CLI lo interpreta como
+literal `+` → crea una key paralela que la bucket policy NO cubre y
+queda 403 anonymous. **Subir siempre con espacio en la key**:
+`aws s3 cp ... "s3://elecciones-2026/ricardoruiz.co/bases de datos/Proyecto DC/..."`.
+La política del bucket ya cubre todo `bases de datos/Proyecto DC/*`
+(con espacio); el frontend usa `+` en la URL y S3 decodifica al
+servir.
+
+**Módulo frontend** — `proyecto-dc/arquetipos.html`:
+- Chasis privado idéntico a `gobierno-criminal.html` (gate por
+  whitelist + `noindex,nofollow` + cursor morado + theme auto).
+- Layout 2 col: mapa Leaflet (BARRIOS_OFICIAL.json) + panel ficha.
+- Toggle año 2015/2019/2023/Proyección 2027 + toggle nivel barrio/comuna.
+- Click barrio → ficha completa: escudo, scores 0–1 de 5 familias,
+  trayectoria 2015→2027 con probabilidades 2027, ganadores
+  Alcaldía/Concejo/JAL, correlaciones triádicas (firmadas + nivel),
+  contexto territorial, comportamiento probable 2027.
+- Click comuna → zoom a barrios de esa comuna + ficha de distribución
+  por arquetipo + evolución 4 años.
+- Vista comuna: GeoJSON Ciudades-COM-LOC/MEDELLINX.json (compartido
+  con voto-historico).
+- Secciones: 5 arquetipos con tab base/evol · trayectorias (85 cambio
+  parcial / 45 volátiles / 13 estables + top 12 patrones) · proyección
+  2027 (5 bolsas) · top correlaciones triádicas por año · 6 slides
+  seleccionadas del PPTX inline.
+
+**Cuando agregar más datos:**
+- Re-correr `build.py` sobre los Excel actualizados → 7 JSONs nuevos.
+- `aws s3 cp Bases\ de\ datos/proyecto-dc/arquetipos/ "s3://elecciones-2026/ricardoruiz.co/bases de datos/Proyecto DC/arquetipos/" --recursive --exclude "escudos/*" --exclude "cartografia/*"`
+- Safari cachea JSON agresivo: si actualizás, considerar bumpear un
+  query string `?v=YYYYMMDD` en `URL.*` dentro del HTML (patrón
+  `oportunidad.html`). Hoy no hace falta porque el módulo es nuevo.
 
 ### Módulo 07 — agenda pública (saliencia mediática)
 
