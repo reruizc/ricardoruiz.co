@@ -336,6 +336,21 @@
         </div>
       </div>
 
+      <!-- ── 2c-bis. DEMOGRAFÍA (edad + identidad cotidiana, no scoring) ── -->
+      <div class="panel" id="panel-demo">
+        <div class="qhead">
+          <span class="qnum" id="demo-num">Datos básicos 1/2</span>
+          <span class="qtag">Sobre ti</span>
+        </div>
+        <p class="qtext" id="demo-text">…</p>
+        <p class="qhint" id="demo-hint">Ayuda a personalizar tu lectura final. No suma puntos a ningún arquetipo.</p>
+        <div class="opts" id="demo-opts"></div>
+        <div class="actions">
+          <button class="btn btn-ghost" id="demo-back" onclick="demoBack()">← Volver</button>
+          <button class="btn disabled" id="demo-next" onclick="demoNext()">Siguiente →</button>
+        </div>
+      </div>
+
       <!-- ── 2d. PRIORIDAD TEMÁTICA (multi-respuesta, no scoring) ── -->
       <div class="panel" id="panel-prio">
         <div class="qhead">
@@ -346,7 +361,7 @@
         <p class="qhint">Marca uno o dos. Esto calibra algunas preguntas y se usa al final para la lectura personalizada.</p>
         <div class="opts" id="prio-opts"></div>
         <div class="actions">
-          <button class="btn btn-ghost" onclick="goTo('cand')">← Volver</button>
+          <button class="btn btn-ghost" onclick="prioBack()">← Volver</button>
           <button class="btn disabled" id="prio-next" onclick="prioNext()">Continuar →</button>
         </div>
       </div>
@@ -452,6 +467,8 @@
     candOrigen: null,  // 'declarado' | 'sugerido'
     mtAnswers: {},     // {MT1: value, MT2: ...}
     mtIndex: 0,
+    demo: { edad: null, identidad: null },  // edad e identidad cotidiana, no scoring
+    demoIndex: 0,      // 0 = EDAD, 1 = IDENTIDAD
     prio: [],          // ['salud', 'costo_vida'] — multi-respuesta hasta 2
     answers: {},       // {P1: 'P1a', P2: ...}
     qIndex: 0,
@@ -553,8 +570,70 @@
   function selectCandidato(id, origen) {
     STATE.candidato = id;
     STATE.candOrigen = origen;
-    renderPrio();
-    show('prio');
+    STATE.demoIndex = 0;
+    renderDemo();
+    show('demo');
+  }
+
+  // ── 2c-bis. DEMOGRAFÍA (edad + identidad cotidiana) ──
+  // El campo en STATE.demo se llena por id ('edad' o 'identidad') para que
+  // el LLM y el reporte B2B lo lean por nombre, no por índice.
+  const DEMO_KEYS = ['edad', 'identidad'];
+
+  function renderDemo() {
+    const demoPregs = (DATA.preguntas.demografia || {}).preguntas || [];
+    if (demoPregs.length === 0) { renderPrio(); show('prio'); return; }
+    const q = demoPregs[STATE.demoIndex];
+    const key = DEMO_KEYS[STATE.demoIndex];
+    $('#demo-num').textContent = `Datos básicos ${STATE.demoIndex + 1}/${demoPregs.length}`;
+    $('#demo-text').textContent = q.enunciado[STATE.registro] || q.enunciado.analitico;
+    const opts = $('#demo-opts');
+    opts.innerHTML = q.opciones.map(op => {
+      const label = (op.etiqueta && (op.etiqueta[STATE.registro] || op.etiqueta.analitico)) || op.id;
+      return `
+        <button type="button" class="opt" data-id="${op.id}">
+          <span class="opt-dot"></span>
+          <span class="opt-text">${label}</span>
+        </button>
+      `;
+    }).join('');
+    opts.querySelectorAll('.opt').forEach(b => {
+      b.addEventListener('click', () => {
+        opts.querySelectorAll('.opt').forEach(x => x.classList.remove('sel'));
+        b.classList.add('sel');
+        STATE.demo[key] = b.dataset.id;
+        $('#demo-next').classList.remove('disabled');
+      });
+    });
+    if (STATE.demo[key]) {
+      const sel = opts.querySelector(`.opt[data-id="${STATE.demo[key]}"]`);
+      if (sel) sel.classList.add('sel');
+      $('#demo-next').classList.remove('disabled');
+    } else {
+      $('#demo-next').classList.add('disabled');
+    }
+  }
+
+  function demoNext() {
+    const demoPregs = (DATA.preguntas.demografia || {}).preguntas || [];
+    const key = DEMO_KEYS[STATE.demoIndex];
+    if (!STATE.demo[key]) return;
+    if (STATE.demoIndex < demoPregs.length - 1) {
+      STATE.demoIndex++;
+      renderDemo();
+    } else {
+      renderPrio();
+      show('prio');
+    }
+  }
+
+  function demoBack() {
+    if (STATE.demoIndex > 0) {
+      STATE.demoIndex--;
+      renderDemo();
+    } else {
+      goTo('cand');
+    }
   }
 
   // ── 2d. PRIORIDAD TEMÁTICA ──
@@ -592,6 +671,14 @@
     if (STATE.prio.length === 0) return;
     initPreguntas();
     show('q');
+  }
+
+  function prioBack() {
+    // Volver a la última pregunta demográfica (identidad), no a candidato
+    const demoPregs = (DATA.preguntas.demografia || {}).preguntas || [];
+    STATE.demoIndex = Math.max(0, demoPregs.length - 1);
+    renderDemo();
+    show('demo');
   }
 
   // ── 2b. MINI-TEST ──
@@ -865,6 +952,8 @@
     STATE.candOrigen = null;
     STATE.mtAnswers = {};
     STATE.mtIndex = 0;
+    STATE.demo = { edad: null, identidad: null };
+    STATE.demoIndex = 0;
     STATE.prio = [];
     STATE.answers = {};
     STATE.qIndex = 0;
