@@ -319,6 +319,18 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
   color: var(--ink-2);
 }
+.back-drill {
+  position: absolute; top: 1rem; right: 1rem; z-index: 400;
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink); background: var(--paper);
+  padding: .5rem .85rem;
+  border: 1px solid var(--ink);
+  cursor: none;
+  transition: background .2s, color .2s;
+}
+.back-drill:hover { background: var(--ink); color: var(--paper); }
+.back-drill .arr { margin-right: .35rem; }
 .legend .t {
   font-weight: 700; letter-spacing: .15em; text-transform: uppercase;
   font-size: 10.5px; color: var(--ink-3); margin-bottom: .5rem;
@@ -596,6 +608,7 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
         <span class="sub">% del total de mujeres del depto</span>
       </div>
       <div id="map"><div class="loading-msg">Descargando proyecciones DANE…</div></div>
+      <button class="back-drill" id="back-drill" hidden onclick="exitDrill()"><span class="arr">←</span>Volver al país</button>
       <div class="legend" id="legend" hidden>
         <div class="t">% del total de mujeres</div>
         <div class="legend-scale" id="legend-scale"></div>
@@ -773,7 +786,7 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   function norm(s) {
     return String(s||'').toUpperCase()
       .normalize('NFD').replace(/[̀-ͯ]/g,'')
-      .replace(/\./g,'').replace(/\s+/g,' ').trim();
+      .replace(/[.,]/g,'').replace(/\s+/g,' ').trim();
   }
   // Códigos Registraduría usados en mapa-electoral y el GeoJSON DEPARTAMENTOS2
   const REG_DEP_BY_NAME = {
@@ -886,6 +899,18 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   // ─── LEGEND ──────────────────────────────────────────────────────
   function buildLegend() {
     if (!DEP_AGG) return;
+    // En modo drill, la leyenda + título los maneja drillIntoDep + buildLegendForMun.
+    if (window._activeDep) {
+      buildLegendForMun(window._activeDep);
+      const dep = DEP_AGG[window._activeDep];
+      const depName = dep ? dep.nombre : '';
+      const mapT = STATE.cohort === 'muj'
+        ? `Mujeres / total · ${STATE.year} · ${depName}`
+        : `Mujeres ${COHORT_LABEL[STATE.cohort]} años · ${STATE.year} · ${depName}`;
+      document.getElementById('map-title').textContent = mapT;
+      document.getElementById('legend').hidden = false;
+      return;
+    }
     const wrap = document.getElementById('legend-scale');
     if (!wrap) return;
     const dom = depDomain();
@@ -965,7 +990,11 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   // ─── MAP ─────────────────────────────────────────────────────────
   const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
   const GEO_URL = `${S3}/mapas-2026/DEPARTAMENTOS2.json`;
+  const DEP_MUNS_URL = (depReg) => `${S3}/mapas-2026/Departamentos-mps/${depReg}.json`;
   let _map, _layer, _geoData;
+  let _munLayer = null;
+  const _munGeoCache = {};       // depReg → GeoJSON
+  const _munNameMapCache = {};   // depReg → Map<normName, mpio (DANE)>
 
   async function initMap() {
     document.getElementById('map').innerHTML = '';
@@ -1033,10 +1062,154 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
           showNacional();
         });
         layer.on('click', () => {
-          if (d) { window._activeDepCode = cod; showPanel(d.years[STATE.year], d.nombre, 'Departamento · fijado'); }
+          if (d) {
+            window._activeDepCode = cod;
+            showPanel(d.years[STATE.year], d.nombre, 'Departamento · fijado');
+            drillIntoDep(cod, d.nombre);
+          }
         });
       }
     }).addTo(_map);
+  }
+
+  // ─── DRILL MUNICIPAL ─────────────────────────────────────────────
+  function munsForDep(depReg) {
+    // Devuelve Map<normName, mpio_dane> para los muns del depto.
+    if (_munNameMapCache[depReg]) return _munNameMapCache[depReg];
+    const m = new Map();
+    for (const mpio in DANE_MUN) {
+      const d = DANE_MUN[mpio];
+      if (REG_DEP_BY_NAME[norm(d.depnom)] !== depReg) continue;
+      m.set(norm(d.nombre), mpio);
+    }
+    _munNameMapCache[depReg] = m;
+    return m;
+  }
+
+  function munDomain(depReg) {
+    const arr = [];
+    const nameMap = munsForDep(depReg);
+    for (const mpio of nameMap.values()) {
+      const m = DANE_MUN[mpio]; const r = m[STATE.year]; if (!r || !r.muj) continue;
+      const v = metricFor(r);
+      if (v == null || isNaN(v)) continue;
+      arr.push(v);
+    }
+    if (!arr.length) return depDomain();
+    const min = Math.min(...arr), max = Math.max(...arr);
+    const dep = DEP_AGG[depReg];
+    const mid = dep && dep.years[STATE.year] ? metricFor(dep.years[STATE.year]) : (min+max)/2;
+    return { min, max, mid };
+  }
+
+  function munStyleFor(depReg) {
+    const nameMap = munsForDep(depReg);
+    const dom = munDomain(depReg);
+    return (feat) => {
+      const fname = norm(feat.properties.mun_name || feat.properties.MUN_NAME || feat.properties.nombre || feat.properties.NOMBRE_MPI || '');
+      const mpio = nameMap.get(fname);
+      const m = mpio ? DANE_MUN[mpio] : null;
+      const r = m && m[STATE.year];
+      const val = r ? metricFor(r) : null;
+      return {
+        fillColor: colorFor(val, dom),
+        weight: 1,
+        color: 'var(--paper)',
+        fillOpacity: 0.92
+      };
+    };
+  }
+
+  function munTooltip(feat, depReg) {
+    const fname = feat.properties.mun_name || feat.properties.MUN_NAME || feat.properties.nombre || feat.properties.NOMBRE_MPI || '—';
+    const nameMap = munsForDep(depReg);
+    const mpio = nameMap.get(norm(fname));
+    const m = mpio ? DANE_MUN[mpio] : null;
+    const r = m && m[STATE.year];
+    if (!r || !r.muj) return `<div class="tt-name">${fname}</div><div class="tt-meta">Sin datos DANE</div>`;
+    const v = metricFor(r);
+    const ck = STATE.cohort === 'muj' ? 'muj' : STATE.cohort;
+    return `<div class="tt-name">${fname}</div>
+            <div><span class="tt-pct">${pct(v)}</span> ${STATE.cohort === 'muj' ? 'mujeres' : COHORT_LABEL[STATE.cohort]}</div>
+            <div class="tt-meta">${fmt(r[ck])} mujeres · ${STATE.year}</div>`;
+  }
+
+  async function drillIntoDep(depReg, depName) {
+    window._activeDep = depReg;
+    // Fetch + cache GeoJSON
+    let geo = _munGeoCache[depReg];
+    if (!geo) {
+      try {
+        const r = await fetch(DEP_MUNS_URL(depReg));
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        geo = await r.json();
+        _munGeoCache[depReg] = geo;
+      } catch (e) {
+        console.error('Drill fetch failed:', e);
+        return;
+      }
+    }
+    // Hide nacional, draw muns
+    if (_layer) _map.removeLayer(_layer);
+    if (_munLayer) _map.removeLayer(_munLayer);
+    _munLayer = L.geoJSON(geo, {
+      style: munStyleFor(depReg),
+      onEachFeature: (feat, layer) => {
+        const fname = feat.properties.mun_name || feat.properties.MUN_NAME || feat.properties.nombre || feat.properties.NOMBRE_MPI || '—';
+        layer.bindTooltip(munTooltip(feat, depReg), { sticky: true, direction: 'top' });
+        layer.on('mouseover', () => {
+          layer.setStyle({ weight: 2.5, color: '#fff' });
+          const nameMap = munsForDep(depReg);
+          const mpio = nameMap.get(norm(fname));
+          const m = mpio ? DANE_MUN[mpio] : null;
+          const r = m && m[STATE.year];
+          if (r) showPanel(r, fname, 'Municipio');
+        });
+        layer.on('mouseout', () => {
+          _munLayer.resetStyle(layer);
+          // Al salir de un mun mostramos el agregado del depto
+          const dep = DEP_AGG[depReg];
+          if (dep) showPanel(dep.years[STATE.year], dep.nombre, 'Departamento (agregado)');
+        });
+      }
+    }).addTo(_map);
+    _map.fitBounds(_munLayer.getBounds(), { padding: [10, 10] });
+
+    // UI updates
+    document.getElementById('back-drill').hidden = false;
+    const mapT = STATE.cohort === 'muj'
+      ? `Mujeres / total · ${STATE.year} · ${depName}`
+      : `Mujeres ${COHORT_LABEL[STATE.cohort]} años · ${STATE.year} · ${depName}`;
+    document.getElementById('map-title').textContent = mapT;
+    // Update legend with mun domain
+    buildLegendForMun(depReg);
+    // Mostrar agregado del depto en panel
+    const dep = DEP_AGG[depReg];
+    if (dep) showPanel(dep.years[STATE.year], dep.nombre, 'Departamento (agregado)');
+  }
+
+  function exitDrill() {
+    if (_munLayer) { _map.removeLayer(_munLayer); _munLayer = null; }
+    window._activeDep = null;
+    if (_layer) _layer.addTo(_map);
+    if (_layer) _map.fitBounds(_layer.getBounds(), { padding: [10, 10] });
+    document.getElementById('back-drill').hidden = true;
+    buildLegend();
+    showNacional();
+  }
+  window.exitDrill = exitDrill;  // expuesta para el onclick inline
+
+  function buildLegendForMun(depReg) {
+    const wrap = document.getElementById('legend-scale');
+    if (!wrap) return;
+    const dom = munDomain(depReg);
+    const stops = [];
+    for (let i = 0; i <= 7; i++) stops.push(dom.min + (dom.max - dom.min) * i / 7);
+    wrap.innerHTML = stops.map(v =>
+      `<div class="legend-step" style="background:${colorFor(v, dom)}"></div>`
+    ).join('');
+    document.getElementById('legend-labels').innerHTML =
+      `<span>${fmtPctOne(dom.min)}</span><span>${fmtPctOne(dom.mid)}</span><span>${fmtPctOne(dom.max)}</span>`;
   }
 
   function makeTooltip(d, cod, nm) {
@@ -1050,6 +1223,17 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   }
 
   function restyleAll() {
+    // Si está en drill, repintar muns; si no, repintar deptos.
+    if (window._activeDep && _munLayer) {
+      const depReg = window._activeDep;
+      _munLayer.setStyle(munStyleFor(depReg));
+      _munLayer.eachLayer(l => l.unbindTooltip());
+      _munLayer.eachLayer(l => {
+        l.bindTooltip(munTooltip(l.feature, depReg), { sticky: true, direction: 'top' });
+      });
+      buildLegendForMun(depReg);
+      return;
+    }
     if (!_layer) return;
     _layer.setStyle(styleFor);
     _layer.eachLayer(l => l.unbindTooltip());
@@ -1123,7 +1307,12 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     if (window._mapReady) restyleAll();
     renderRanking();
     updateKPIs();
-    showNacional();
+    if (window._activeDep) {
+      const dep = DEP_AGG[window._activeDep];
+      if (dep) showPanel(dep.years[STATE.year], dep.nombre, 'Departamento (agregado)');
+    } else {
+      showNacional();
+    }
   }
 
   // ─── PILLS ───────────────────────────────────────────────────────

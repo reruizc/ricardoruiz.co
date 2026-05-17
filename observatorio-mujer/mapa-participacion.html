@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="robots" content="noindex,nofollow" />
-<title>Mapa electoral · Observatorio Mujer</title>
+<title>Mapa de participación · Observatorio Mujer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet">
@@ -523,7 +523,7 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     <a href="../observatorio-mujer.html" class="btn-back"><span class="arr">←</span> Observatorio</a>
   </div>
   <div class="topbar-center">
-    <span class="module-chip"><span class="marker"></span>Módulo 02 · Electoral</span>
+    <span class="module-chip"><span class="marker"></span>Módulo 02 · Participación</span>
   </div>
   <div class="topbar-right">
     <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
@@ -544,10 +544,10 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   <section class="module-hero">
     <div>
       <div class="label">Divipole 2024 · Edad y género 2018–2022</div>
-      <h1>Mapa <em>electoral</em>.<br>Dónde votan las <em>mujeres</em>.</h1>
+      <h1>Mapa de <em>participación</em>.<br>Cómo se mueve el voto <em>femenino</em>.</h1>
     </div>
     <div>
-      <p class="dek" style="margin-bottom:1.25rem">Tres capas sobre el voto femenino: censo de habilitadas (Divipole), participación histórica (Pres 2018 · 2022) y composición etaria de las votantes. Cambia la capa para que el mapa cuente otra historia.</p>
+      <p class="dek" style="margin-bottom:1.25rem">Cuatro capas: censo de habilitadas, participación histórica 2018 y 2022 con tres lecturas posibles (% del total de votos, brecha vs hombres, tasa sobre censo femenino), y composición etaria de las votantes. La métrica cambia el coloreo del mapa, pero el panel siempre muestra los números absolutos.</p>
       <div class="kpi-strip">
         <div class="kpi">
           <div class="v">21,2<span class="of">M</span></div>
@@ -578,6 +578,12 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
       <button class="cp" data-cohort="b26">26–40</button>
       <button class="cp" data-cohort="b41">41–60</button>
       <button class="cp" data-cohort="b60">60+</button>
+    </div>
+    <div class="cohort-pills" id="metric-pills" hidden>
+      <span class="cohort-lbl">Métrica</span>
+      <button class="cp active" data-metric="pct_total">% del total de votos</button>
+      <button class="cp" data-metric="brecha">Brecha vs hombres</button>
+      <button class="cp" data-metric="tasa_fem">Tasa sobre censo</button>
     </div>
   </section>
 
@@ -652,7 +658,7 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   </section>
 
   <footer class="footer">
-    <div>Mapa electoral · Observatorio Mujer · v0.2</div>
+    <div>Mapa de participación · Observatorio Mujer · v0.3</div>
     <div style="font-family:var(--italic);font-style:italic;font-weight:400;font-size:15px;text-transform:none;letter-spacing:0;color:var(--ink-2)">Fuente: Registraduría · Divipole + Edad y género</div>
   </footer>
 
@@ -914,7 +920,8 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   })();
 
   // ─── STATE ───────────────────────────────────────────────────────
-  const STATE = { layer: 'censo', cohort: 'b18' };
+  // metric: 'pct_total' | 'brecha' | 'tasa_fem'  — solo aplica cuando layer es vot22/vot18
+  const STATE = { layer: 'censo', cohort: 'b18', metric: 'pct_total' };
 
   // Mapa nombre normalizado → cod, para hacer matching con el GeoJSON
   function norm(s) {
@@ -935,15 +942,49 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   // ─── METRICA POR CAPA ─────────────────────────────────────────────
   const COHORT_LABEL = { b18: '18–25', b26: '26–40', b41: '41–60', b60: '60+' };
 
+  function metricForElection(d, year) {
+    // year: '22' o '18'
+    const V_muj = d['vot' + year + '_muj'] || 0;
+    const V_hom = d['vot' + year + '_hom'] || 0;
+    const V_tot = V_muj + V_hom;
+    const C_muj = d.censo_muj || 0;
+    const C_hom = d.censo_hom || 0;
+    const tasa_muj = C_muj ? (V_muj / C_muj * 100) : 0;
+    const tasa_hom = C_hom ? (V_hom / C_hom * 100) : 0;
+    const yLabel = year === '22' ? '2022' : '2018';
+    switch (STATE.metric) {
+      case 'pct_total':
+        return {
+          value: V_tot ? (V_muj / V_tot * 100) : 0,
+          label: `% mujeres en el total de votos ${yLabel}`,
+          metricKey: `% mujeres del voto ${yLabel}`
+        };
+      case 'brecha':
+        return {
+          value: tasa_muj - tasa_hom,
+          label: `Brecha de participación mujeres − hombres (pp) ${yLabel}`,
+          metricKey: `Brecha M−H ${yLabel}`,
+          isSigned: true
+        };
+      case 'tasa_fem':
+      default:
+        return {
+          value: tasa_muj,
+          label: `Tasa de participación femenina ${yLabel} (sobre censo)`,
+          metricKey: `Tasa ♀ ${yLabel}`
+        };
+    }
+  }
+
   function getMetric(d) {
     if (!d) return null;
     switch (STATE.layer) {
       case 'censo':
         return { value: d.pct_censo, label: '% mujeres en censo', metricKey: '% mujeres en censo' };
       case 'vot22':
-        return { value: d.tasa22, label: 'Tasa participación femenina 2022', metricKey: 'Tasa 2022' };
+        return metricForElection(d, '22');
       case 'vot18':
-        return { value: d.tasa18, label: 'Tasa participación femenina 2018', metricKey: 'Tasa 2018' };
+        return metricForElection(d, '18');
       case 'cohorte': {
         const k = 'pct_' + STATE.cohort;
         return {
@@ -999,7 +1040,15 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   }
 
   // ─── LEGEND + TITLES ─────────────────────────────────────────────
-  function fmtPct(n) { return n == null || isNaN(n) ? '—' : n.toFixed(1).replace('.', ',') + '%'; }
+  function isBrechaLayer() {
+    return (STATE.layer === 'vot22' || STATE.layer === 'vot18') && STATE.metric === 'brecha';
+  }
+  function fmtPct(n) { return n == null || isNaN(n) ? '—' : n.toFixed(1).replace('.', ',') + (isBrechaLayer() ? 'pp' : '%'); }
+  function fmtSignedPct(n) {
+    if (n == null || isNaN(n)) return '—';
+    const s = n > 0 ? '+' : '';
+    return s + n.toFixed(2).replace('.', ',') + (isBrechaLayer() ? 'pp' : '%');
+  }
   function buildLegend() {
     const wrap = document.getElementById('legend-scale');
     if (!wrap) return;
@@ -1009,25 +1058,41 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     wrap.innerHTML = stops.map(v =>
       `<div class="legend-step" style="background:${colorFor(v, dom)}"></div>`
     ).join('');
+    const fmtForLegend = isBrechaLayer() ? fmtSignedPct : fmtPct;
     document.getElementById('legend-labels').innerHTML =
-      `<span>${fmtPct(dom.min)}</span><span>${fmtPct(dom.mid)}</span><span>${fmtPct(dom.max)}</span>`;
-    const titles = {
-      'censo': { map: 'Censo electoral femenino', leg: '% mujeres en censo' },
-      'vot22': { map: 'Participación femenina · Pres 2022', leg: 'Tasa de participación 2022' },
-      'vot18': { map: 'Participación femenina · Pres 2018', leg: 'Tasa de participación 2018' },
-      'cohorte': {
-        map: `Cohorte ${COHORT_LABEL[STATE.cohort]} · votantes 2022`,
-        leg: `% mujeres ${COHORT_LABEL[STATE.cohort]} (de votantes 2022)`
-      }
+      `<span>${fmtForLegend(dom.min)}</span><span>${fmtForLegend(dom.mid)}</span><span>${fmtForLegend(dom.max)}</span>`;
+
+    const METRIC_TITLE = {
+      'pct_total': { mapPrefix: '% mujeres del total de votos',   legPrefix: '% mujeres del total de votos' },
+      'brecha':    { mapPrefix: 'Brecha de participación M−H',     legPrefix: 'Tasa fem − tasa masc (pp)' },
+      'tasa_fem':  { mapPrefix: 'Tasa de participación femenina', legPrefix: 'Tasa femenina (sobre censo)' }
     };
-    const tt = titles[STATE.layer];
-    document.getElementById('map-title').textContent = tt.map;
-    document.getElementById('legend-title').textContent = tt.leg;
+    let map_t, leg_t;
+    if (STATE.layer === 'censo') {
+      map_t = 'Censo electoral femenino'; leg_t = '% mujeres en censo';
+    } else if (STATE.layer === 'cohorte') {
+      map_t = `Cohorte ${COHORT_LABEL[STATE.cohort]} · votantes 2022`;
+      leg_t = `% mujeres ${COHORT_LABEL[STATE.cohort]} (de votantes 2022)`;
+    } else {
+      const y = STATE.layer === 'vot22' ? '2022' : '2018';
+      const mt = METRIC_TITLE[STATE.metric];
+      map_t = `${mt.mapPrefix} · Pres ${y}`;
+      leg_t = `${mt.legPrefix} · ${y}`;
+    }
+    document.getElementById('map-title').textContent = map_t;
+    document.getElementById('legend-title').textContent = leg_t;
   }
 
   // ─── FORMATTING ──────────────────────────────────────────────────
   const fmt = n => new Intl.NumberFormat('es-CO').format(Math.round(n || 0));
-  const pct = n => (n == null || isNaN(n) ? '—' : n.toFixed(2).replace('.', ',') + '%');
+  const pct = n => {
+    if (n == null || isNaN(n)) return '—';
+    if (isBrechaLayer()) {
+      const s = n > 0 ? '+' : '';
+      return s + n.toFixed(2).replace('.', ',') + 'pp';
+    }
+    return n.toFixed(2).replace('.', ',') + '%';
+  };
 
   // ─── PANEL UPDATE ────────────────────────────────────────────────
   function showPanel(d, scope) {
@@ -1189,13 +1254,25 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 
     // Titulos del ranking según capa
     const cap = ({ b18: '18–25', b26: '26–40', b41: '41–60', b60: '60+' })[STATE.cohort];
-    const RTITLES = {
-      'censo':   { top: 'Top 10 · Mujeres mayoría', topSub: 'Mayor % en censo', bot: 'Bottom 10 · Hombres mayoría', botSub: 'Territorios de frontera' },
-      'vot22':   { top: 'Top 10 · Más participación', topSub: 'Tasa femenina 2022 alta', bot: 'Bottom 10 · Voto femenino dormido', botSub: 'Donde la mujer no votó' },
-      'vot18':   { top: 'Top 10 · Más participación', topSub: 'Tasa femenina 2018 alta', bot: 'Bottom 10 · Menor participación', botSub: 'Histórico de abstención' },
-      'cohorte': { top: `Top 10 · Cohorte ${cap}`, topSub: `Mayor peso de ${cap}`, bot: `Bottom 10 · Cohorte ${cap}`, botSub: `Menor peso de ${cap}` }
+    const METRIC_SUB = {
+      'pct_total': '% mujeres del voto total',
+      'brecha':    'Brecha femenina − masculina',
+      'tasa_fem':  'Tasa sobre censo femenino'
     };
-    const t = RTITLES[STATE.layer];
+    let t;
+    if (STATE.layer === 'censo') {
+      t = { top: 'Top 10 · Mujeres mayoría', topSub: 'Mayor % en censo', bot: 'Bottom 10 · Hombres mayoría', botSub: 'Territorios de frontera' };
+    } else if (STATE.layer === 'cohorte') {
+      t = { top: `Top 10 · Cohorte ${cap}`, topSub: `Mayor peso de ${cap}`, bot: `Bottom 10 · Cohorte ${cap}`, botSub: `Menor peso de ${cap}` };
+    } else {
+      const y = STATE.layer === 'vot22' ? '2022' : '2018';
+      const sub = METRIC_SUB[STATE.metric];
+      if (STATE.metric === 'brecha') {
+        t = { top: `Top 10 · Brecha ${y}`, topSub: 'Mujeres participan más', bot: `Bottom 10 · Brecha ${y}`, botSub: 'Mujeres participan menos' };
+      } else {
+        t = { top: `Top 10 · ${y}`, topSub: sub, bot: `Bottom 10 · ${y}`, botSub: sub };
+      }
+    }
     document.getElementById('rt-title').textContent = t.top;
     document.getElementById('rt-sub').textContent   = t.topSub;
     document.getElementById('rb-title').textContent = t.bot;
@@ -1215,13 +1292,14 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     });
   }
 
-  // ─── LAYER + COHORT WIRING ───────────────────────────────────────
+  // ─── LAYER + COHORT + METRIC WIRING ──────────────────────────────
   function setLayer(layer) {
     STATE.layer = layer;
     document.querySelectorAll('#layer-pills .lp').forEach(b => {
       b.classList.toggle('active', b.dataset.layer === layer);
     });
     document.getElementById('cohort-pills').hidden = (layer !== 'cohorte');
+    document.getElementById('metric-pills').hidden = !(layer === 'vot22' || layer === 'vot18');
     repaintAll();
   }
   function setCohort(c) {
@@ -1230,6 +1308,13 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
       b.classList.toggle('active', b.dataset.cohort === c);
     });
     if (STATE.layer === 'cohorte') repaintAll();
+  }
+  function setMetric(m) {
+    STATE.metric = m;
+    document.querySelectorAll('#metric-pills .cp').forEach(b => {
+      b.classList.toggle('active', b.dataset.metric === m);
+    });
+    if (STATE.layer === 'vot22' || STATE.layer === 'vot18') repaintAll();
   }
   function repaintAll() {
     buildLegend();
@@ -1243,6 +1328,9 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     });
     document.querySelectorAll('#cohort-pills .cp').forEach(b => {
       b.addEventListener('click', () => setCohort(b.dataset.cohort));
+    });
+    document.querySelectorAll('#metric-pills .cp').forEach(b => {
+      b.addEventListener('click', () => setMetric(b.dataset.metric));
     });
   }
 
