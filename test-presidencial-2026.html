@@ -336,6 +336,21 @@
         </div>
       </div>
 
+      <!-- ── 2d. PRIORIDAD TEMÁTICA (multi-respuesta, no scoring) ── -->
+      <div class="panel" id="panel-prio">
+        <div class="qhead">
+          <span class="qnum">Paso 3 de 3</span>
+          <span class="qtag">Tus temas</span>
+        </div>
+        <p class="qtext" id="prio-text">Antes de las preguntas: ¿en cuáles temas te juegas más tu voto?</p>
+        <p class="qhint">Marca uno o dos. Esto calibra algunas preguntas y se usa al final para la lectura personalizada.</p>
+        <div class="opts" id="prio-opts"></div>
+        <div class="actions">
+          <button class="btn btn-ghost" onclick="goTo('cand')">← Volver</button>
+          <button class="btn disabled" id="prio-next" onclick="prioNext()">Continuar →</button>
+        </div>
+      </div>
+
       <!-- ── 3. PREGUNTAS arquetipo ── -->
       <div class="panel" id="panel-q">
         <div class="qhead">
@@ -437,10 +452,23 @@
     candOrigen: null,  // 'declarado' | 'sugerido'
     mtAnswers: {},     // {MT1: value, MT2: ...}
     mtIndex: 0,
+    prio: [],          // ['salud', 'costo_vida'] — multi-respuesta hasta 2
     answers: {},       // {P1: 'P1a', P2: ...}
     qIndex: 0,
     arqScore: {},      // {proteccion: 0, ...}
   };
+
+  // Shuffle Fisher-Yates — barajamos las opciones al renderizar
+  // para que el patrón "siempre seguridad arriba, siempre castigo abajo"
+  // no se note. data-id y data-arq mantienen identidad para el scoring.
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
 
   let DATA = { arquetipos: null, candidatos: null, registros: null, miniTest: null, preguntas: null };
 
@@ -525,6 +553,43 @@
   function selectCandidato(id, origen) {
     STATE.candidato = id;
     STATE.candOrigen = origen;
+    renderPrio();
+    show('prio');
+  }
+
+  // ── 2d. PRIORIDAD TEMÁTICA ──
+  function renderPrio() {
+    const prio = DATA.preguntas.prioridad_tematica;
+    if (!prio) { initPreguntas(); show('q'); return; }
+    $('#prio-text').textContent = prio.enunciado[STATE.registro] || prio.enunciado.analitico;
+    const opts = $('#prio-opts');
+    const max = prio.max_seleccion || 2;
+    opts.innerHTML = prio.opciones.map(op => `
+      <button type="button" class="opt" data-id="${op.id}">
+        <span class="opt-dot"></span>
+        <span class="opt-text">${op.etiqueta[STATE.registro] || op.etiqueta.analitico}</span>
+      </button>
+    `).join('');
+    STATE.prio = [];
+    opts.querySelectorAll('.opt').forEach(b => {
+      b.addEventListener('click', () => {
+        const id = b.dataset.id;
+        const i = STATE.prio.indexOf(id);
+        if (i >= 0) {
+          STATE.prio.splice(i, 1);
+          b.classList.remove('sel');
+        } else if (STATE.prio.length < max) {
+          STATE.prio.push(id);
+          b.classList.add('sel');
+        }
+        $('#prio-next').classList.toggle('disabled', STATE.prio.length === 0);
+      });
+    });
+    $('#prio-next').classList.add('disabled');
+  }
+
+  function prioNext() {
+    if (STATE.prio.length === 0) return;
     initPreguntas();
     show('q');
   }
@@ -647,6 +712,7 @@
     STATE.qIndex = 0;
     STATE.answers = {};
     STATE.arqScore = { proteccion: 0, estabilidad: 0, supervivencia: 0, castigo: 0, pertenencia: 0 };
+    STATE._shuffled = {};
     $('#progressRow').style.display = '';
     renderPregunta();
   }
@@ -666,7 +732,12 @@
     $('#progressFill').style.width = `${((STATE.qIndex) / total) * 100}%`;
 
     const opts = $('#q-opts');
-    opts.innerHTML = q.opciones.map(op => {
+    // Shuffle de opciones — el patrón "arquetipo X siempre en posición Y" se nota a la 3ra pregunta.
+    // Memoizamos el orden por pregunta para que volver atrás no las re-baraje.
+    if (!STATE._shuffled) STATE._shuffled = {};
+    if (!STATE._shuffled[q.id]) STATE._shuffled[q.id] = shuffle(q.opciones);
+    const opciones = STATE._shuffled[q.id];
+    opts.innerHTML = opciones.map(op => {
       const enun = (op.enunciados[STATE.candidato] || {})[STATE.registro] ||
                    (op.enunciados[STATE.candidato] || {}).analitico ||
                    '(enunciado pendiente)';
@@ -794,9 +865,11 @@
     STATE.candOrigen = null;
     STATE.mtAnswers = {};
     STATE.mtIndex = 0;
+    STATE.prio = [];
     STATE.answers = {};
     STATE.qIndex = 0;
     STATE.arqScore = {};
+    STATE._shuffled = {};
     $('#progressRow').style.display = 'none';
     $('#progressFill').style.width = '0%';
     show('intro');

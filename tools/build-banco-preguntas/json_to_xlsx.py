@@ -213,6 +213,29 @@ def sheet_opciones_registro(wb, preg_data, cands, registro):
     ws.freeze_panes = "C2"
 
 
+# ---------- PRIORIDAD TEMÁTICA ----------
+def sheet_prioridad(wb, preg_data):
+    prio = preg_data.get("prioridad_tematica")
+    if not prio:
+        return
+    ws = wb.create_sheet("prioridad_tematica")
+    headers = ["id", "registro", "tipo", "campo", "enunciado", "needs_review"]
+    ws.append(headers)
+    # Pregunta enunciado por registro
+    for reg in REGISTROS:
+        texto = (prio.get("enunciado") or {}).get(reg)
+        ws.append([prio["id"], reg, prio.get("tipo", ""), "pregunta", texto or "", "FALSE" if texto else "TRUE"])
+    # Opciones
+    for op in prio.get("opciones", []):
+        for reg in REGISTROS:
+            txt = (op.get("etiqueta") or {}).get(reg)
+            ws.append([op["id"], reg, "opcion", "etiqueta", txt or "", "FALSE" if txt else "TRUE"])
+    style_header(ws, len(headers))
+    autosize(ws, [16, 12, 18, 14, 75, 14])
+    wrap_rows(ws)
+    ws.freeze_panes = "A2"
+
+
 def main():
     arq = load("arquetipos")
     cand = load("candidatos")
@@ -230,6 +253,7 @@ def main():
     sheet_preguntas_base(wb, preg)
     for r in REGISTROS:
         sheet_opciones_registro(wb, preg, cand["candidatos"], r)
+    sheet_prioridad(wb, preg)
 
     wb.save(OUT)
     print(f"OK · {OUT}")
