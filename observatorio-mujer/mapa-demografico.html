@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex,nofollow" />
+<title>Mapa demográfico · Observatorio Mujer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+:root {
+  --paper:        #1a1610;
+  --paper-2:      #221d15;
+  --paper-3:      #2a241b;
+  --ink:          #f4f3ef;
+  --ink-2:        #b8b1a0;
+  --ink-3:        #807a6c;
+  --rule:         #f4f3ef1c;
+  --rule-strong:  #f4f3ef38;
+  --accent:       #d96a50;
+  --accent-soft:  #d96a5018;
+  --accent-tint:  #d96a5036;
+  --gold:         #d6a83a;
+  --on-accent:    #14110a;
+
+  --sans:    'Familjen Grotesk', system-ui, sans-serif;
+  --italic:  'Petrona', Georgia, serif;
+  --mono:    'Space Mono', ui-monospace, monospace;
+  --display: 'Syne', sans-serif;
+
+  --scale-low:  #6b5d52;
+  --scale-mid:  #b8b1a0;
+  --scale-hi:   #d96a50;
+}
+body.day-mode {
+  --paper:        #f4f3ef;
+  --paper-2:      #ecebe5;
+  --paper-3:      #e0ddd2;
+  --ink:          #14110a;
+  --ink-2:        #5a5448;
+  --ink-3:        #948e80;
+  --rule:         #14110a1f;
+  --rule-strong:  #14110a40;
+  --accent:       #8a1e16;
+  --accent-soft:  #8a1e161a;
+  --accent-tint:  #8a1e1633;
+  --gold:         #8a6a1a;
+  --on-accent:    #f4f3ef;
+
+  --scale-low:  #c6bfb1;
+  --scale-mid:  #948e80;
+  --scale-hi:   #8a1e16;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.55;
+  min-height: 100vh;
+  cursor: none;
+  overflow-x: hidden;
+  transition: background .35s, color .35s;
+}
+::selection { background: var(--accent); color: var(--on-accent); }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: none; }
+
+/* GATE */
+.gate {
+  position: fixed; inset: 0; z-index: 5000;
+  background: var(--paper);
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 1rem;
+}
+.gate-text {
+  font-family: var(--mono); font-size: 12px; font-weight: 700;
+  letter-spacing: .2em; text-transform: uppercase; color: var(--ink-2);
+}
+.gate-bar {
+  width: 120px; height: 1px; background: var(--rule-strong);
+  position: relative; overflow: hidden;
+}
+.gate-bar::after {
+  content: ''; position: absolute; inset: 0;
+  background: var(--accent);
+  animation: gate-slide 1.4s ease-in-out infinite;
+}
+@keyframes gate-slide {
+  0%   { transform: translateX(-100%); }
+  50%  { transform: translateX(0); }
+  100% { transform: translateX(100%); }
+}
+
+/* CURSOR */
+.cursor { position:fixed; width:12px; height:12px; background:var(--accent); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s,background .2s; transform:translate(-50%,-50%); }
+.cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--accent); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s,opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+
+/* TOP BAR */
+.topbar {
+  position: sticky; top: 0; z-index: 60;
+  display: grid; grid-template-columns: 1fr auto 1fr;
+  align-items: center; gap: 1.5rem;
+  padding: 1rem 1.75rem;
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+  backdrop-filter: blur(8px);
+}
+.topbar-left, .topbar-center, .topbar-right { display: flex; align-items: center; gap: 1.1rem; }
+.topbar-right { justify-content: flex-end; }
+
+.btn-back {
+  display: inline-flex; align-items: center; gap: .55rem;
+  font-family: var(--sans); font-size: 14.5px; font-weight: 500;
+  letter-spacing: .04em; color: var(--ink);
+  padding: .55rem .9rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  transition: background .2s, border-color .2s;
+}
+.btn-back:hover { background: var(--paper-2); border-color: var(--ink); }
+.btn-back .arr { transition: transform .25s; }
+.btn-back:hover .arr { transform: translateX(-3px); }
+
+.module-chip {
+  display: inline-flex; align-items: center; gap: .5rem;
+  font-family: var(--mono); font-size: 11.5px; font-weight: 700;
+  letter-spacing: .18em; text-transform: uppercase;
+  color: var(--accent);
+  padding: .35rem .75rem;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+}
+.module-chip .marker { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; }
+
+.theme-btn {
+  font-family: var(--mono); font-size: 11.5px; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-2);
+  padding: .35rem .75rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  transition: background .2s, color .2s, border-color .2s;
+}
+.theme-btn:hover { background: var(--paper-2); color: var(--ink); border-color: var(--ink); }
+
+.logo-link { display: flex; align-items: center; gap: .55rem; opacity: .9; transition: opacity .2s; }
+.logo-link:hover { opacity: 1; }
+.logo-bars { display: flex; align-items: flex-end; gap: 3px; height: 20px; }
+.logo-bar { width: 5px; background: var(--accent); border-radius: 1px 1px 0 0; }
+.logo-text {
+  font-family: var(--display); font-weight: 800;
+  font-size: 1.55rem; letter-spacing: -.045em; line-height: 1;
+  color: var(--ink);
+}
+.logo-text span { color: var(--accent); }
+
+/* PAGE */
+.page {
+  max-width: 1340px; margin: 0 auto;
+  padding: 2rem 2.25rem 4rem;
+}
+
+/* HERO */
+.module-hero {
+  padding: 2rem 0 2.5rem;
+  border-bottom: 1px solid var(--rule);
+  display: grid; grid-template-columns: 2fr 1fr;
+  gap: 3rem; align-items: flex-end;
+}
+.module-hero .label {
+  font-family: var(--mono); font-size: 12px; font-weight: 700;
+  letter-spacing: .2em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 1rem;
+  display: flex; align-items: center; gap: .65rem;
+}
+.module-hero .label::before {
+  content: ''; display: block; width: 26px; height: 1.5px; background: var(--accent);
+}
+.module-hero h1 {
+  font-family: var(--sans); font-weight: 700;
+  font-size: clamp(2.2rem, 4.4vw, 3.6rem);
+  letter-spacing: -.03em; line-height: 1.02;
+}
+.module-hero h1 em {
+  font-family: var(--italic); font-style: italic; font-weight: 500;
+  color: var(--accent);
+}
+.module-hero .dek {
+  font-family: var(--sans); font-size: 16px; color: var(--ink-2);
+  line-height: 1.55;
+}
+.kpi-strip {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+.kpi {
+  padding: .9rem 0;
+  border-top: 1px solid var(--rule);
+}
+.kpi .v {
+  font-family: var(--sans); font-weight: 700;
+  font-size: 24px; line-height: 1; letter-spacing: -.015em;
+  color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.kpi .v .of { font-family: var(--italic); font-style: italic; font-weight: 400; font-size: 15px; color: var(--ink-3); }
+.kpi .l {
+  font-family: var(--mono); font-size: 10.5px;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-3); margin-top: .35rem;
+}
+
+/* SELECTOR BAR */
+.selector-bar {
+  margin-top: 1.75rem; padding: 1rem 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  display: flex; flex-direction: column;
+  gap: .75rem;
+}
+.selector-row {
+  display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+}
+.selector-row .lbl {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .18em; text-transform: uppercase;
+  color: var(--ink-3); margin-right: .5rem;
+  min-width: 75px;
+}
+.pill {
+  font-family: var(--mono); font-size: 11.5px; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-2);
+  padding: .42rem .75rem;
+  border: 1px solid var(--rule-strong);
+  background: transparent;
+  border-radius: 999px;
+  cursor: none;
+  transition: background .2s, color .2s, border-color .2s;
+  white-space: nowrap;
+}
+.pill:hover { background: var(--paper-2); color: var(--ink); border-color: var(--ink); }
+.pill.active {
+  color: var(--on-accent); background: var(--accent); border-color: var(--accent);
+}
+
+/* SHELL */
+.shell {
+  margin-top: 1.5rem;
+  display: grid; grid-template-columns: 1.6fr 1fr;
+  gap: 1.25rem;
+}
+.map-card, .panel-card {
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  position: relative;
+}
+.card-head {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--rule);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem;
+}
+.card-head .t {
+  font-family: var(--sans); font-weight: 700; font-size: 14.5px;
+  letter-spacing: .02em;
+}
+.card-head .sub {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .15em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+#map {
+  height: 620px; width: 100%;
+  background: var(--paper-2);
+}
+.leaflet-container { background: var(--paper-2); font-family: var(--sans); }
+.leaflet-control-zoom a {
+  background: var(--paper); color: var(--ink);
+  border: 1px solid var(--rule-strong);
+}
+.leaflet-control-zoom a:hover { background: var(--paper-2); }
+.leaflet-control-attribution { display: none; }
+.leaflet-tooltip {
+  background: var(--paper) !important;
+  border: 1px solid var(--ink) !important;
+  color: var(--ink) !important;
+  font-family: var(--sans) !important;
+  font-size: 13px !important;
+  padding: .55rem .75rem !important;
+  border-radius: 0 !important;
+  box-shadow: 4px 4px 0 var(--ink) !important;
+}
+.leaflet-tooltip:before { display: none !important; }
+.tt-name {
+  font-family: var(--sans); font-weight: 700; font-size: 14.5px;
+  margin-bottom: .25rem;
+}
+.tt-pct {
+  font-family: var(--italic); font-style: italic; font-weight: 600;
+  color: var(--accent);
+}
+.tt-meta {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+  color: var(--ink-3); margin-top: .35rem;
+}
+
+.legend {
+  position: absolute; bottom: 1rem; left: 1rem; z-index: 400;
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  padding: .75rem .9rem;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+  color: var(--ink-2);
+}
+.legend .t {
+  font-weight: 700; letter-spacing: .15em; text-transform: uppercase;
+  font-size: 10.5px; color: var(--ink-3); margin-bottom: .5rem;
+}
+.legend-scale { display: flex; align-items: center; gap: .35rem; }
+.legend-step { width: 26px; height: 12px; }
+.legend-labels {
+  display: flex; justify-content: space-between;
+  margin-top: .35rem; font-size: 10px; color: var(--ink-3);
+}
+
+/* PANEL */
+.panel-body { padding: 1.25rem 1.4rem 1.5rem; }
+.panel-pre {
+  font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+  letter-spacing: .18em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: .65rem;
+}
+.panel-name {
+  font-family: var(--sans); font-weight: 700;
+  font-size: 1.9rem; letter-spacing: -.02em; line-height: 1.05;
+  margin-bottom: 1.25rem;
+}
+.panel-row {
+  display: grid; grid-template-columns: 1fr auto;
+  padding: .65rem 0;
+  border-top: 1px solid var(--rule);
+  align-items: baseline;
+  font-family: var(--sans);
+}
+.panel-row .k {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+.panel-row .v {
+  font-family: var(--sans); font-weight: 600;
+  font-size: 16px; color: var(--ink); text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.panel-row .v em {
+  font-family: var(--italic); font-style: italic; font-weight: 400;
+  color: var(--accent);
+  font-size: 18px;
+}
+.panel-row:last-of-type { border-bottom: 1px solid var(--rule); }
+
+/* COHORT BARS in panel */
+.cohort-block { margin-top: 1.5rem; }
+.cohort-block .lbl {
+  font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-3); margin-bottom: .65rem;
+}
+.cohort-rows { display: flex; flex-direction: column; gap: .55rem; }
+.cohort-row {
+  display: grid; grid-template-columns: 70px 1fr 60px;
+  gap: .65rem; align-items: center;
+  font-family: var(--sans); font-size: 13px;
+}
+.cohort-row .cr-lbl {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .08em; color: var(--ink-2);
+}
+.cohort-row .cr-bar {
+  height: 12px; background: var(--paper-3);
+  border: 1px solid var(--rule-strong);
+  position: relative; overflow: hidden;
+}
+.cohort-row .cr-bar > span {
+  position: absolute; top: 0; left: 0; bottom: 0;
+  background: var(--accent);
+}
+.cohort-row.active .cr-bar > span { background: var(--gold); }
+.cohort-row .cr-pct {
+  font-family: var(--sans); font-weight: 700; font-size: 13px;
+  color: var(--ink); text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.cohort-row.active .cr-pct { color: var(--gold); }
+
+/* DELTA block */
+.delta-block {
+  margin-top: 1.25rem;
+  padding: .9rem 1rem;
+  background: var(--paper-2);
+  border-left: 2px solid var(--gold);
+}
+.delta-block .lbl {
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  letter-spacing: .15em; text-transform: uppercase;
+  color: var(--gold); margin-bottom: .35rem;
+}
+.delta-block .v {
+  font-family: var(--sans); font-weight: 600; font-size: 14px;
+  color: var(--ink);
+}
+.delta-block .v em {
+  font-family: var(--italic); font-style: italic; font-weight: 500;
+  font-size: 15px; color: var(--gold);
+}
+
+/* RANKING */
+.ranking {
+  margin-top: 2.5rem;
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+.rank-card {
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+}
+.rank-list { padding: .25rem 0; }
+.rank-item {
+  display: grid; grid-template-columns: 30px 1fr auto;
+  gap: .85rem; align-items: baseline;
+  padding: .6rem 1.25rem;
+  border-bottom: 1px dashed var(--rule);
+  cursor: none;
+  transition: background .15s;
+}
+.rank-item:last-child { border-bottom: none; }
+.rank-item:hover { background: var(--paper-2); }
+.rank-n {
+  font-family: var(--mono); font-size: 12px; font-weight: 700;
+  color: var(--ink-3); letter-spacing: .05em;
+}
+.rank-name {
+  font-family: var(--sans); font-weight: 500;
+  font-size: 14px; color: var(--ink);
+}
+.rank-name .rd {
+  font-family: var(--italic); font-style: italic; font-weight: 300;
+  font-size: 12.5px; color: var(--ink-3); margin-left: .35rem;
+}
+.rank-v {
+  font-family: var(--sans); font-weight: 700; font-size: 14px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* DISCLAIMER */
+.disclaimer {
+  margin-top: 2.5rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px dashed var(--rule-strong);
+  font-family: var(--mono); font-size: 12px;
+  letter-spacing: .04em;
+  color: var(--ink-2);
+  line-height: 1.65;
+}
+.disclaimer strong { color: var(--ink); font-weight: 700; }
+
+/* FOOTER */
+.footer {
+  margin-top: 3rem;
+  padding: 1.5rem 0 0;
+  border-top: 1px solid var(--rule);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1.5rem;
+  font-family: var(--mono); font-size: 12px;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-3);
+  flex-wrap: wrap;
+}
+
+/* LOADING state */
+.loading-msg {
+  padding: 4rem 2rem;
+  text-align: center;
+  font-family: var(--mono); font-size: 12px;
+  letter-spacing: .15em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* RESPONSIVE */
+@media (max-width: 1080px) {
+  .module-hero { grid-template-columns: 1fr; gap: 1.5rem; }
+  .shell { grid-template-columns: 1fr; }
+  #map { height: 480px; }
+  .ranking { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  body { cursor: auto; }
+  .cursor, .cursor-ring { display: none; }
+  .topbar { grid-template-columns: 1fr auto; padding: .85rem 1rem; }
+  .topbar-center { display: none; }
+  .page { padding: 1.25rem 1rem 2.5rem; }
+  .kpi-strip { grid-template-columns: 1fr; gap: 0; }
+}
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<div id="gate" class="gate">
+  <div class="gate-text">Verificando acceso</div>
+  <div class="gate-bar"></div>
+</div>
+
+<nav class="topbar" id="topbar" hidden>
+  <div class="topbar-left">
+    <a href="../observatorio-mujer.html" class="btn-back"><span class="arr">←</span> Observatorio</a>
+  </div>
+  <div class="topbar-center">
+    <span class="module-chip"><span class="marker"></span>Módulo 01 · Demografía</span>
+  </div>
+  <div class="topbar-right">
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
+    <a href="../index.html" class="logo-link" aria-label="Ricardo.Ruiz">
+      <div class="logo-bars">
+        <div class="logo-bar" style="height:20px"></div>
+        <div class="logo-bar" style="height:15px"></div>
+        <div class="logo-bar" style="height:9px"></div>
+        <div class="logo-bar" style="height:4px"></div>
+      </div>
+      <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+    </a>
+  </div>
+</nav>
+
+<main class="page" id="main" hidden>
+
+  <section class="module-hero">
+    <div>
+      <div class="label">DANE · proyecciones de población 2018–2042 · edad simple</div>
+      <h1>Mapa <em>demográfico</em>.<br>Cómo se mueven las <em>mujeres colombianas</em>.</h1>
+    </div>
+    <div>
+      <p class="dek" style="margin-bottom:1.25rem">Selecciona una cohorte y un año. El mapa departamental muestra qué porcentaje de las mujeres del territorio cae en ese rango etario; el ranking lista los <strong style="color:var(--ink)">municipios</strong> donde la cohorte pesa más.</p>
+      <div class="kpi-strip">
+        <div class="kpi">
+          <div class="v" id="kpi-muj">—</div>
+          <div class="l">Mujeres en Colombia</div>
+        </div>
+        <div class="kpi">
+          <div class="v" id="kpi-coh">—</div>
+          <div class="l" id="kpi-coh-lbl">Cohorte seleccionada</div>
+        </div>
+        <div class="kpi">
+          <div class="v" id="kpi-delta">—</div>
+          <div class="l">Δ 2026 → 2030 nacional</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="selector-bar">
+    <div class="selector-row">
+      <span class="lbl">Cohorte</span>
+      <button class="pill" data-cohort="muj"        >Total</button>
+      <button class="pill active" data-cohort="muj_12_17">12–17</button>
+      <button class="pill" data-cohort="muj_18_28">18–28</button>
+      <button class="pill" data-cohort="muj_29_40">29–40</button>
+      <button class="pill" data-cohort="muj_41_59">41–59</button>
+      <button class="pill" data-cohort="muj_60p"   >60+</button>
+    </div>
+    <div class="selector-row">
+      <span class="lbl">Año</span>
+      <button class="pill" data-year="2018">2018</button>
+      <button class="pill" data-year="2022">2022</button>
+      <button class="pill" data-year="2025">2025</button>
+      <button class="pill active" data-year="2026">2026</button>
+      <button class="pill" data-year="2030">2030</button>
+      <button class="pill" data-year="2042">2042</button>
+    </div>
+  </section>
+
+  <section class="shell">
+    <div class="map-card">
+      <div class="card-head">
+        <span class="t" id="map-title">Mujeres 12–17 años · 2026</span>
+        <span class="sub">% del total de mujeres del depto</span>
+      </div>
+      <div id="map"><div class="loading-msg">Descargando proyecciones DANE…</div></div>
+      <div class="legend" id="legend" hidden>
+        <div class="t">% del total de mujeres</div>
+        <div class="legend-scale" id="legend-scale"></div>
+        <div class="legend-labels" id="legend-labels"></div>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <div class="card-head">
+        <span class="t">Detalle</span>
+        <span class="sub" id="panel-sub">Promedio nacional</span>
+      </div>
+      <div class="panel-body">
+        <div class="panel-pre" id="p-pre">Promedio nacional</div>
+        <div class="panel-name" id="p-name">Colombia</div>
+
+        <div class="panel-row"><span class="k" id="p-metric-k">% mujeres 12–17</span><span class="v"><em id="p-metric">—</em></span></div>
+        <div class="panel-row"><span class="k">Mujeres totales</span><span class="v" id="p-muj">—</span></div>
+        <div class="panel-row"><span class="k" id="p-coh-k">Mujeres 12–17</span><span class="v" id="p-coh">—</span></div>
+        <div class="panel-row"><span class="k">Población total</span><span class="v" id="p-tot">—</span></div>
+
+        <div class="cohort-block">
+          <div class="lbl">Composición etaria (mujeres del territorio)</div>
+          <div class="cohort-rows" id="cohort-rows"></div>
+        </div>
+
+        <div class="delta-block" id="delta-block">
+          <div class="lbl">Δ cohorte 2026 → 2030</div>
+          <div class="v" id="delta-v">—</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ranking">
+    <div class="rank-card">
+      <div class="card-head">
+        <span class="t" id="rt-title">Top 15 municipios · 12–17</span>
+        <span class="sub">Mayor peso de la cohorte</span>
+      </div>
+      <div class="rank-list" id="rank-top"></div>
+    </div>
+    <div class="rank-card">
+      <div class="card-head">
+        <span class="t" id="rb-title">Bottom 15 municipios · 12–17</span>
+        <span class="sub">Menor peso de la cohorte</span>
+      </div>
+      <div class="rank-list" id="rank-bot"></div>
+    </div>
+  </section>
+
+  <section class="disclaimer">
+    <strong>Sobre los datos.</strong> Proyecciones DANE de población municipal por área, sexo y edad simple, archivo <strong>PPED-AreaSexoEdadMun-2018-2042</strong> (actualización 8-ago-2025). 1.122 municipios · 25 años · cohortes calculadas sobre el área Total (cabecera + centros poblados + rural disperso). El indicador es <strong>% de mujeres en la cohorte sobre el total de mujeres del territorio</strong>, no sobre la población total ni sobre las habilitadas para votar — para la lectura electoral usar el <a href="mapa-electoral.html" style="color:var(--accent);border-bottom:1px solid var(--accent)">módulo electoral</a>. Las proyecciones del DANE son escenarios, no certezas: el rango 2030–2042 supone migración, fecundidad y mortalidad observadas hasta 2024 y puede revisarse en censos siguientes.
+  </section>
+
+  <footer class="footer">
+    <div>Mapa demográfico · Observatorio Mujer · v0.1</div>
+    <div style="font-family:var(--italic);font-style:italic;font-weight:400;font-size:15px;text-transform:none;letter-spacing:0;color:var(--ink-2)">Fuente: DANE · proyecciones de población municipal 2018–2042</div>
+  </footer>
+
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  // ─── EMAIL GATE ───────────────────────────────────────────────────
+  const ALLOWED = ['reruizc@gmail.com'];
+  const token = localStorage.getItem('rr-token');
+  const userRaw = localStorage.getItem('rr-user');
+  const user = userRaw ? JSON.parse(userRaw) : null;
+
+  function denyToLogin() {
+    localStorage.removeItem('rr-token');
+    localStorage.removeItem('rr-user');
+    window.location.replace('../login.html');
+  }
+  function denyToDashboard() { window.location.replace('../dashboard.html'); }
+  function emailAllowed(em) { return em && ALLOWED.includes(String(em).toLowerCase().trim()); }
+
+  if (!token || !user) {
+    denyToLogin();
+  } else if (!emailAllowed(user.email)) {
+    denyToDashboard();
+  } else {
+    (async () => {
+      try {
+        const res = await fetch('https://rr-auth.reruizc.workers.dev/auth/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.status === 401) return denyToLogin();
+        const data = await res.json();
+        if (!data.ok || !emailAllowed(data.user && data.user.email)) {
+          return denyToDashboard();
+        }
+        revealPage();
+      } catch (e) { revealPage(); }
+    })();
+  }
+
+  function revealPage() {
+    const gate = document.getElementById('gate');
+    if (gate) gate.remove();
+    document.getElementById('topbar').hidden = false;
+    document.getElementById('main').hidden = false;
+    initModule();
+  }
+
+  // ─── THEME ────────────────────────────────────────────────────────
+  function getAutoTheme() {
+    const h = new Date().getHours();
+    return (h >= 7 && h < 19) ? 'day' : 'night';
+  }
+  function applyTheme(t) {
+    if (t === 'day') document.body.classList.add('day-mode');
+    else document.body.classList.remove('day-mode');
+    const btn = document.getElementById('theme-btn');
+    if (btn) btn.textContent = t === 'day' ? '☾ Modo noche' : '☀ Modo día';
+    if (window._mapReady) { restyleAll(); buildLegend(); }
+  }
+  function toggleTheme() {
+    const isDay = document.body.classList.contains('day-mode');
+    const next = isDay ? 'night' : 'day';
+    localStorage.setItem('rr-theme', next);
+    applyTheme(next);
+  }
+  applyTheme(localStorage.getItem('rr-theme') || getAutoTheme());
+
+  // ─── CURSOR ───────────────────────────────────────────────────────
+  const cursor = document.getElementById('cursor');
+  const cursorRing = document.getElementById('cursorRing');
+  document.addEventListener('mousemove', (e) => {
+    cursor.style.left = e.clientX + 'px';
+    cursor.style.top  = e.clientY + 'px';
+    cursorRing.style.left = e.clientX + 'px';
+    cursorRing.style.top  = e.clientY + 'px';
+  });
+  document.addEventListener('mouseover', (e) => {
+    if (e.target.closest('a, button, .rank-item, .leaflet-interactive')) {
+      cursor.style.transform = 'translate(-50%,-50%) scale(2.5)';
+      cursor.style.background = 'transparent';
+      cursor.style.border = '1.5px solid var(--accent)';
+      cursorRing.style.opacity = '0';
+    } else {
+      cursor.style.transform = 'translate(-50%,-50%) scale(1)';
+      cursor.style.background = 'var(--accent)';
+      cursor.style.border = 'none';
+      cursorRing.style.opacity = '.4';
+    }
+  });
+
+  // ─── STATE ───────────────────────────────────────────────────────
+  const STATE = { cohort: 'muj_12_17', year: '2026' };
+  const COHORT_LABEL = {
+    'muj':        'Total mujeres',
+    'muj_12_17':  '12–17',
+    'muj_18_28':  '18–28',
+    'muj_29_40':  '29–40',
+    'muj_41_59':  '41–59',
+    'muj_60p':    '60+'
+  };
+  const COHORT_KEYS = ['muj_12_17','muj_18_28','muj_29_40','muj_41_59','muj_60p'];
+
+  // ─── DATA ────────────────────────────────────────────────────────
+  // DANE_MUN[mpio] = { nombre, depnom, dep_cod, "2018":{tot,hom,muj,muj_12_17,...}, ... }
+  let DANE_MUN = null;
+  let DEP_AGG  = null;  // agregado por depto (electoral_id-style cod): { "01": { "2018":{...}, ... } }
+  let NAC_AGG  = null;  // nacional: { "2018":{...}, ... }
+
+  const DANE_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_observatorio_mujer/dane-pob-mun.json';
+
+  // Mapping DANE depto code (DPNOM normalizado) → Registraduría code
+  // (la registraduría es la que usa el GeoJSON DEPARTAMENTOS2 vía electoral_id
+  //  o vía name lookup como ya hace mapa-electoral).
+  function norm(s) {
+    return String(s||'').toUpperCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g,'')
+      .replace(/\./g,'').replace(/\s+/g,' ').trim();
+  }
+  // Códigos Registraduría usados en mapa-electoral y el GeoJSON DEPARTAMENTOS2
+  const REG_DEP_BY_NAME = {
+    'ANTIOQUIA':'01', 'ATLANTICO':'03', 'BOLIVAR':'05', 'BOYACA':'07',
+    'CALDAS':'09', 'CAUCA':'11', 'CESAR':'12', 'CORDOBA':'13',
+    'CUNDINAMARCA':'15', 'BOGOTA DC':'16', 'BOGOTA D C':'16', 'BOGOTA':'16',
+    'CHOCO':'17', 'HUILA':'19', 'MAGDALENA':'21', 'NARINO':'23',
+    'RISARALDA':'24', 'NORTE DE SANTANDER':'25', 'QUINDIO':'26',
+    'SANTANDER':'27', 'SUCRE':'28', 'TOLIMA':'29', 'VALLE DEL CAUCA':'31', 'VALLE':'31',
+    'ARAUCA':'40', 'CAQUETA':'44', 'CASANARE':'46', 'LA GUAJIRA':'48', 'GUAJIRA':'48',
+    'GUAINIA':'50', 'META':'52', 'GUAVIARE':'54',
+    'ARCHIPIELAGO DE SAN ANDRES PROVIDENCIA Y SANTA CATALINA':'56',
+    'SAN ANDRES Y PROVIDENCIA':'56', 'SAN ANDRES':'56',
+    'AMAZONAS':'60', 'PUTUMAYO':'64', 'VAUPES':'68', 'VICHADA':'72'
+  };
+
+  function buildAggregates() {
+    DEP_AGG = {};
+    NAC_AGG = {};
+    const years = ['2018','2022','2025','2026','2030','2042'];
+
+    for (const mpio in DANE_MUN) {
+      const m = DANE_MUN[mpio];
+      const depReg = REG_DEP_BY_NAME[norm(m.depnom)];
+      if (!depReg) continue;
+      if (!DEP_AGG[depReg]) {
+        DEP_AGG[depReg] = { nombre: m.depnom, years: {} };
+      }
+      for (const y of years) {
+        const r = m[y]; if (!r) continue;
+        const da = (DEP_AGG[depReg].years[y] ||= { tot:0, hom:0, muj:0, muj_12_17:0, muj_18_28:0, muj_29_40:0, muj_41_59:0, muj_60p:0 });
+        const na = (NAC_AGG[y]                ||= { tot:0, hom:0, muj:0, muj_12_17:0, muj_18_28:0, muj_29_40:0, muj_41_59:0, muj_60p:0 });
+        for (const k of ['tot','hom','muj','muj_12_17','muj_18_28','muj_29_40','muj_41_59','muj_60p']) {
+          da[k] += r[k] || 0;
+          na[k] += r[k] || 0;
+        }
+      }
+    }
+  }
+
+  // ─── METRIC HELPERS ──────────────────────────────────────────────
+  function metricFor(rec) {
+    // rec = { tot, hom, muj, muj_12_17, ... }
+    if (!rec || !rec.muj) return null;
+    if (STATE.cohort === 'muj') {
+      // % mujeres sobre la población total del territorio
+      return rec.muj / rec.tot * 100;
+    }
+    return rec[STATE.cohort] / rec.muj * 100;
+  }
+  function metricLabel() {
+    if (STATE.cohort === 'muj') return '% mujeres sobre población total';
+    return `% mujeres ${COHORT_LABEL[STATE.cohort]} sobre total mujeres`;
+  }
+
+  function depDomain() {
+    const arr = Object.values(DEP_AGG)
+      .map(d => metricFor(d.years[STATE.year]))
+      .filter(v => v != null && !isNaN(v));
+    if (!arr.length) return { min:0, max:100, mid:50 };
+    const min = Math.min(...arr), max = Math.max(...arr);
+    const nac = NAC_AGG[STATE.year] ? metricFor(NAC_AGG[STATE.year]) : (min+max)/2;
+    return { min, max, mid: nac };
+  }
+
+  // ─── COLOR SCALE ─────────────────────────────────────────────────
+  function lerp(a,b,t){return a+(b-a)*t;}
+  function hexToRgb(h){h=h.replace('#','');return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
+  function rgbToHex(r,g,b){return '#'+[r,g,b].map(x=>Math.round(x).toString(16).padStart(2,'0')).join('');}
+  function getScale() {
+    const cs = getComputedStyle(document.body);
+    return {
+      low: cs.getPropertyValue('--scale-low').trim() || '#6b5d52',
+      mid: cs.getPropertyValue('--scale-mid').trim() || '#b8b1a0',
+      hi:  cs.getPropertyValue('--scale-hi').trim()  || '#d96a50'
+    };
+  }
+  function colorFor(val, dom) {
+    if (val == null || isNaN(val)) return '#444';
+    const s = getScale();
+    let c1, c2, t;
+    if (val <= dom.mid) {
+      c1 = hexToRgb(s.low); c2 = hexToRgb(s.mid);
+      t = (val - dom.min) / (dom.mid - dom.min || 1);
+    } else {
+      c1 = hexToRgb(s.mid); c2 = hexToRgb(s.hi);
+      t = (val - dom.mid) / (dom.max - dom.mid || 1);
+    }
+    t = Math.max(0, Math.min(1, t));
+    return rgbToHex(lerp(c1[0],c2[0],t), lerp(c1[1],c2[1],t), lerp(c1[2],c2[2],t));
+  }
+
+  // ─── FORMAT ──────────────────────────────────────────────────────
+  const fmt = n => new Intl.NumberFormat('es-CO').format(Math.round(n || 0));
+  const pct = n => (n == null || isNaN(n) ? '—' : n.toFixed(2).replace('.', ',') + '%');
+  const fmtPctOne = n => (n == null || isNaN(n) ? '—' : n.toFixed(1).replace('.', ',') + '%');
+  const fmtSigned = (n, suf) => {
+    if (n == null || isNaN(n)) return '—';
+    const s = n > 0 ? '+' : '';
+    return s + n.toFixed(1).replace('.', ',') + (suf || '');
+  };
+  const fmtM = n => (n == null || isNaN(n)) ? '—' : (n / 1e6).toFixed(2).replace('.', ',') + 'M';
+  const fmtK = n => {
+    if (n == null || isNaN(n)) return '—';
+    if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(2).replace('.', ',') + 'M';
+    if (Math.abs(n) >= 1e3) return (n / 1e3).toFixed(0).replace('.', ',') + 'K';
+    return String(Math.round(n));
+  };
+
+  // ─── LEGEND ──────────────────────────────────────────────────────
+  function buildLegend() {
+    if (!DEP_AGG) return;
+    const wrap = document.getElementById('legend-scale');
+    if (!wrap) return;
+    const dom = depDomain();
+    const stops = [];
+    for (let i = 0; i <= 7; i++) stops.push(dom.min + (dom.max - dom.min) * i / 7);
+    wrap.innerHTML = stops.map(v =>
+      `<div class="legend-step" style="background:${colorFor(v, dom)}"></div>`
+    ).join('');
+    document.getElementById('legend-labels').innerHTML =
+      `<span>${fmtPctOne(dom.min)}</span><span>${fmtPctOne(dom.mid)}</span><span>${fmtPctOne(dom.max)}</span>`;
+    document.getElementById('legend').hidden = false;
+
+    const mapT = STATE.cohort === 'muj'
+      ? `Mujeres sobre población total · ${STATE.year}`
+      : `Mujeres ${COHORT_LABEL[STATE.cohort]} años · ${STATE.year}`;
+    document.getElementById('map-title').textContent = mapT;
+  }
+
+  // ─── PANEL ───────────────────────────────────────────────────────
+  function showPanel(rec, name, scope) {
+    if (!rec) { showNacional(); return; }
+    const m = metricFor(rec);
+    document.getElementById('p-pre').textContent = scope || 'Departamento';
+    document.getElementById('p-name').textContent = name || '—';
+    document.getElementById('panel-sub').textContent = scope || 'Departamento';
+    document.getElementById('p-metric-k').textContent = metricLabel();
+    document.getElementById('p-metric').textContent = pct(m);
+    document.getElementById('p-muj').textContent = fmt(rec.muj);
+    document.getElementById('p-coh-k').textContent =
+      STATE.cohort === 'muj' ? 'Mujeres totales' : `Mujeres ${COHORT_LABEL[STATE.cohort]}`;
+    document.getElementById('p-coh').textContent = fmt(rec[STATE.cohort === 'muj' ? 'muj' : STATE.cohort]);
+    document.getElementById('p-tot').textContent = fmt(rec.tot);
+
+    // Cohort bars: % de cada cohorte sobre el total de mujeres
+    const rows = COHORT_KEYS.map(k => ({
+      k, lbl: COHORT_LABEL[k], v: rec.muj ? (rec[k] / rec.muj * 100) : 0
+    }));
+    const maxV = Math.max(...rows.map(r => r.v || 0), 1);
+    document.getElementById('cohort-rows').innerHTML = rows.map(r => {
+      const w = Math.max(0, Math.min(100, (r.v || 0) / maxV * 100));
+      const act = (r.k === STATE.cohort) ? ' active' : '';
+      return `<div class="cohort-row${act}">
+        <span class="cr-lbl">${r.lbl}</span>
+        <span class="cr-bar"><span style="width:${w}%"></span></span>
+        <span class="cr-pct">${fmtPctOne(r.v)}</span>
+      </div>`;
+    }).join('');
+
+    // Delta block: cambio en cifras absolutas de la cohorte 2026→2030 (o año actual → +4 si está disponible)
+    updateDelta(rec);
+  }
+  function updateDelta(rec) {
+    // Get records for the current scope (depto or nacional) at 2026 and 2030
+    const dep = window._activeDepCode;
+    const cohKey = STATE.cohort === 'muj' ? 'muj' : STATE.cohort;
+    let r26, r30;
+    if (dep && DEP_AGG[dep]) {
+      r26 = DEP_AGG[dep].years['2026'];
+      r30 = DEP_AGG[dep].years['2030'];
+    } else {
+      r26 = NAC_AGG['2026'];
+      r30 = NAC_AGG['2030'];
+    }
+    const dv = document.getElementById('delta-v');
+    if (!r26 || !r30) { dv.innerHTML = '—'; return; }
+    const a26 = r26[cohKey], a30 = r30[cohKey];
+    const abs = a30 - a26;
+    const rel = a26 ? (abs / a26 * 100) : 0;
+    dv.innerHTML = `<em>${fmtSigned(rel,'%')}</em> · ${abs >= 0 ? '+' : ''}${fmt(abs)} ${COHORT_LABEL[STATE.cohort].toLowerCase()}`;
+  }
+  function showNacional() {
+    window._activeDepCode = null;
+    const rec = NAC_AGG[STATE.year];
+    showPanel(rec, 'Colombia', 'Promedio nacional');
+  }
+
+  // ─── MAP ─────────────────────────────────────────────────────────
+  const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
+  const GEO_URL = `${S3}/mapas-2026/DEPARTAMENTOS2.json`;
+  let _map, _layer, _geoData;
+
+  async function initMap() {
+    document.getElementById('map').innerHTML = '';
+    _map = L.map('map', {
+      zoomControl: true,
+      attributionControl: false,
+      zoomSnap: 0.25,
+      preferCanvas: false
+    }).setView([4.6, -74.1], 5);
+
+    try {
+      const r = await fetch(GEO_URL);
+      _geoData = await r.json();
+    } catch (e) {
+      document.getElementById('map').innerHTML =
+        '<div class="loading-msg">No se pudo cargar el GeoJSON de departamentos. Reintenta.</div>';
+      return;
+    }
+    drawLayer();
+    window._mapReady = true;
+    _map.fitBounds(_layer.getBounds(), { padding: [10, 10] });
+  }
+
+  function depCodFromFeature(props) {
+    if (props.electoral_id && DEP_AGG[String(props.electoral_id).padStart(2,'0')]) {
+      return String(props.electoral_id).padStart(2,'0');
+    }
+    const nm = norm(props.name || '');
+    if (REG_DEP_BY_NAME[nm]) return REG_DEP_BY_NAME[nm];
+    for (const k of Object.keys(REG_DEP_BY_NAME)) {
+      if (nm.startsWith(k) || k.startsWith(nm)) return REG_DEP_BY_NAME[k];
+    }
+    return null;
+  }
+
+  function styleFor(feature) {
+    const cod = depCodFromFeature(feature.properties);
+    const d = cod ? DEP_AGG[cod] : null;
+    const dom = depDomain();
+    const val = d && d.years[STATE.year] ? metricFor(d.years[STATE.year]) : null;
+    return {
+      fillColor: colorFor(val, dom),
+      weight: 1,
+      color: 'var(--paper)',
+      fillOpacity: 0.92
+    };
+  }
+
+  function drawLayer() {
+    if (_layer) _map.removeLayer(_layer);
+    _layer = L.geoJSON(_geoData, {
+      style: styleFor,
+      onEachFeature: (feat, layer) => {
+        const cod = depCodFromFeature(feat.properties);
+        const d = cod ? DEP_AGG[cod] : null;
+        const nm = d ? d.nombre : (feat.properties.name || '—');
+        layer._cod = cod;
+        layer.bindTooltip(() => makeTooltip(d, cod, nm), { sticky: true, direction: 'top' });
+        layer.on('mouseover', () => {
+          layer.setStyle({ weight: 2.5, color: '#fff' });
+          if (d) { window._activeDepCode = cod; showPanel(d.years[STATE.year], d.nombre, 'Departamento'); }
+        });
+        layer.on('mouseout', () => {
+          _layer.resetStyle(layer);
+          showNacional();
+        });
+        layer.on('click', () => {
+          if (d) { window._activeDepCode = cod; showPanel(d.years[STATE.year], d.nombre, 'Departamento · fijado'); }
+        });
+      }
+    }).addTo(_map);
+  }
+
+  function makeTooltip(d, cod, nm) {
+    if (!d || !d.years[STATE.year]) return `<div class="tt-name">${nm}</div><div class="tt-meta">Sin datos</div>`;
+    const rec = d.years[STATE.year];
+    const m = metricFor(rec);
+    const ck = STATE.cohort === 'muj' ? 'muj' : STATE.cohort;
+    return `<div class="tt-name">${nm}</div>
+            <div><span class="tt-pct">${pct(m)}</span> ${STATE.cohort === 'muj' ? 'mujeres' : COHORT_LABEL[STATE.cohort]}</div>
+            <div class="tt-meta">${fmt(rec[ck])} mujeres · ${STATE.year}</div>`;
+  }
+
+  function restyleAll() {
+    if (!_layer) return;
+    _layer.setStyle(styleFor);
+    _layer.eachLayer(l => l.unbindTooltip());
+    _layer.eachLayer(l => {
+      const cod = l._cod;
+      const d = cod ? DEP_AGG[cod] : null;
+      const nm = d ? d.nombre : '—';
+      l.bindTooltip(makeTooltip(d, cod, nm), { sticky: true, direction: 'top' });
+    });
+  }
+
+  // ─── RANKING (MUNICIPIOS) ────────────────────────────────────────
+  function renderRanking() {
+    if (!DANE_MUN) return;
+    const ck = STATE.cohort === 'muj' ? 'muj' : STATE.cohort;
+    const arr = [];
+    for (const mpio in DANE_MUN) {
+      const m = DANE_MUN[mpio];
+      const r = m[STATE.year]; if (!r || !r.muj) continue;
+      // Filtro de tamaño mínimo (>=2000 mujeres) para que los muns chiquitos no inunden el top
+      if (r.muj < 2000) continue;
+      const v = metricFor(r);
+      if (v == null || isNaN(v)) continue;
+      arr.push({ mpio, nombre: m.nombre, depnom: m.depnom, v, abs: r[ck] });
+    }
+    const top = [...arr].sort((a,b) => b.v - a.v).slice(0,15);
+    const bot = [...arr].sort((a,b) => a.v - b.v).slice(0,15);
+    const html = (items) => items.map((d, i) => `
+      <div class="rank-item">
+        <span class="rank-n">${String(i+1).padStart(2,'0')}</span>
+        <span class="rank-name">${d.nombre}<span class="rd">${d.depnom}</span></span>
+        <span class="rank-v">${fmtPctOne(d.v)}</span>
+      </div>
+    `).join('');
+    document.getElementById('rank-top').innerHTML = html(top);
+    document.getElementById('rank-bot').innerHTML = html(bot);
+
+    const lbl = STATE.cohort === 'muj' ? 'Mujeres / total' : COHORT_LABEL[STATE.cohort];
+    document.getElementById('rt-title').textContent = `Top 15 municipios · ${lbl}`;
+    document.getElementById('rb-title').textContent = `Bottom 15 municipios · ${lbl}`;
+  }
+
+  // ─── KPIs ────────────────────────────────────────────────────────
+  function updateKPIs() {
+    const r = NAC_AGG[STATE.year]; if (!r) return;
+    // fmtM ya retorna "23,09M" así que separamos el sufijo para que la M quede en --of
+    const fmtMSplit = n => {
+      if (n == null || isNaN(n)) return ['—', ''];
+      return [(n / 1e6).toFixed(2).replace('.', ','), 'M'];
+    };
+    const [muj, suf1] = fmtMSplit(r.muj);
+    document.getElementById('kpi-muj').innerHTML = muj + `<span class="of">${suf1}</span>`;
+    const cohK = STATE.cohort === 'muj' ? 'muj' : STATE.cohort;
+    const [coh, suf2] = fmtMSplit(r[cohK]);
+    document.getElementById('kpi-coh').innerHTML = coh + `<span class="of">${suf2}</span>`;
+    document.getElementById('kpi-coh-lbl').textContent =
+      STATE.cohort === 'muj' ? 'Total nacional' : `Mujeres ${COHORT_LABEL[STATE.cohort]} (nacional)`;
+
+    const r26 = NAC_AGG['2026'], r30 = NAC_AGG['2030'];
+    if (r26 && r30 && r26[cohK]) {
+      const rel = (r30[cohK] - r26[cohK]) / r26[cohK] * 100;
+      document.getElementById('kpi-delta').innerHTML = `<em style="font-style:italic;font-weight:500">${fmtSigned(rel, '%')}</em>`;
+    } else {
+      document.getElementById('kpi-delta').textContent = '—';
+    }
+  }
+
+  // ─── REPAINT ─────────────────────────────────────────────────────
+  function repaintAll() {
+    buildLegend();
+    if (window._mapReady) restyleAll();
+    renderRanking();
+    updateKPIs();
+    showNacional();
+  }
+
+  // ─── PILLS ───────────────────────────────────────────────────────
+  function wirePills() {
+    document.querySelectorAll('[data-cohort]').forEach(b => {
+      b.addEventListener('click', () => {
+        STATE.cohort = b.dataset.cohort;
+        document.querySelectorAll('[data-cohort]').forEach(x => x.classList.toggle('active', x === b));
+        repaintAll();
+      });
+    });
+    document.querySelectorAll('[data-year]').forEach(b => {
+      b.addEventListener('click', () => {
+        STATE.year = b.dataset.year;
+        document.querySelectorAll('[data-year]').forEach(x => x.classList.toggle('active', x === b));
+        repaintAll();
+      });
+    });
+  }
+
+  // ─── BOOT ────────────────────────────────────────────────────────
+  async function initModule() {
+    wirePills();
+    try {
+      const r = await fetch(DANE_URL);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      DANE_MUN = await r.json();
+    } catch (e) {
+      document.getElementById('map').innerHTML =
+        '<div class="loading-msg">No se pudo cargar el dataset DANE.<br>Verifica la conexión y recarga.</div>';
+      console.error('DANE fetch failed:', e);
+      return;
+    }
+    buildAggregates();
+    updateKPIs();
+    buildLegend();
+    renderRanking();
+    showNacional();
+    initMap();
+  }
+</script>
+</body>
+</html>
