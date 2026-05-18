@@ -34,6 +34,7 @@ from openpyxl.utils import get_column_letter
 ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "Bases de datos" / "test-presidencial"
 OUT = DATA / "banco-preguntas-v1.xlsx"
+VARIANTES_FILE = DATA / "variantes-tematicas.json"
 
 REGISTROS = ["analitico", "popular", "digital"]
 
@@ -236,12 +237,58 @@ def sheet_prioridad(wb, preg_data):
     ws.freeze_panes = "A2"
 
 
+def sheet_variantes_registro(wb, variantes_data, cands, registro):
+    """Una hoja por registro con todas las opciones de las 5 variantes
+    temáticas (P1-salud, P2-costo_vida, etc.). Misma estructura que las
+    hojas opciones_*."""
+    ws = wb.create_sheet(f"variantes_{registro}")
+    headers = [
+        "pregunta_id", "tema_variante", "opcion_id", "arquetipo", "arq_secundario",
+        "candidato_id", "candidato_nombre", "enunciado", "needs_review",
+    ]
+    ws.append(headers)
+    cand_by_id = {c["id"]: c["nombre"] for c in cands}
+    arq_color_map = {
+        "proteccion": "e8f1f8", "estabilidad": "ebf4ee",
+        "supervivencia": "fbeee2", "castigo": "f6e0e0", "pertenencia": "efe5f3",
+    }
+    for v in variantes_data.get("variantes", []):
+        for op in v.get("opciones", []):
+            for c in cands:
+                cid = c["id"]
+                txt = (op["enunciados"].get(cid) or {}).get(registro)
+                ws.append([
+                    v["pregunta_id"], v.get("tema_nombre") or v["tema_id"], op["id"],
+                    op["arquetipo"], op.get("arquetipo_secundario") or "",
+                    cid, cand_by_id[cid],
+                    txt if txt else "",
+                    "FALSE" if txt else "TRUE",
+                ])
+                last_row = ws.max_row
+                fill = arq_color_map.get(op["arquetipo"])
+                if fill:
+                    for c_idx in range(1, len(headers) + 1):
+                        ws.cell(row=last_row, column=c_idx).fill = PatternFill("solid", fgColor=fill)
+    style_header(ws, len(headers))
+    autosize(ws, [12, 22, 16, 14, 14, 9, 22, 88, 14])
+    wrap_rows(ws)
+    ws.freeze_panes = "C2"
+
+
+def load_variantes():
+    if VARIANTES_FILE.exists():
+        with open(VARIANTES_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    return {"variantes": []}
+
+
 def main():
     arq = load("arquetipos")
     cand = load("candidatos")
     reg = load("registros")
     mt = load("mini_test")
     preg = load("preguntas")
+    variantes = load_variantes()
 
     wb = openpyxl.Workbook()
     wb.remove(wb.active)  # quita la hoja default
@@ -254,6 +301,8 @@ def main():
     for r in REGISTROS:
         sheet_opciones_registro(wb, preg, cand["candidatos"], r)
     sheet_prioridad(wb, preg)
+    for r in REGISTROS:
+        sheet_variantes_registro(wb, variantes, cand["candidatos"], r)
 
     wb.save(OUT)
     print(f"OK · {OUT}")
