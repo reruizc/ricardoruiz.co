@@ -190,10 +190,12 @@ Redacta la lectura en JSON estricto."""
         ],
         "temperature": 0.3,
         "response_format": {"type": "json_object"},
-        # DeepSeek V4 usa parte del max_tokens en reasoning_content interno;
-        # 1500 deja margen para el reasoning (~200-400 tokens) más los 3
-        # párrafos de la respuesta (~500-700 tokens).
-        "max_tokens": 1500,
+        # DeepSeek V4 consume tokens en reasoning_content interno antes
+        # de generar el content. En prompts complejos (state largo + system
+        # prompt detallado) ese reasoning puede gastar 1500+ tokens.
+        # 4000 cubre con margen los 3 párrafos de salida más cualquier
+        # reasoning razonable.
+        "max_tokens": 4000,
     }).encode("utf-8")
 
     req = urllib.request.Request(
