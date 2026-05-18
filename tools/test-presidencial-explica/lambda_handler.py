@@ -68,48 +68,39 @@ CORS_HEADERS = {
     "Content-Type": "application/json; charset=utf-8",
 }
 
-# Tono por registro: el LLM lo recibe como instrucción al redactar.
+# Tono por registro.
 TONO = {
-    "popular": "coloquial colombiano, frases cortas, sin tecnicismos, sin argentinismos. Muletillas suaves OK ('la verdad', 'pues', 'uno'). Máximo 2 oraciones por idea.",
-    "digital": "irónico, formato POV/'imaginate que', referencias de redes, máximo 1 emoji por párrafo, tono de conversación tuit. Sin argentinismos.",
-    "analitico": "neutro elevado, vocabulario político preciso, frases completas. Como una columna de opinión seria. Sin argentinismos.",
+    "popular": "coloquial colombiano, frases cortas. Muletillas suaves OK ('pues', 'la verdad').",
+    "digital": "irónico, formato POV, máximo 1 emoji por párrafo.",
+    "analitico": "neutro elevado, vocabulario político preciso, frases completas.",
 }
 
-# Tono regional según el departamento del usuario. Esto se SOBREPONE al
-# default del registro (que era tuteo bogotano). Si el usuario es de
-# Antioquia o el Eje Cafetero, el LLM usa voseo paisa; si es del Valle,
-# voseo caleño; si es de Boyacá, ustedeo formal; si es costeño, tuteo
-# costeño relajado; el resto, tuteo neutro de Bogotá.
+# Tono regional según el departamento. Sobrepone el default del registro.
 TONO_REGIONAL = {
-    "voseo_paisa": "Usa voseo paisa colombiano ('vos pensás', 'te digo', 'vení', 'sabés'). Es paisa de Medellín / Eje Cafetero, NO voseo argentino. Permite muletillas paisas suaves ('pues', 'ome' con moderación). NO uses 'che' ni vocabulario argentino.",
-    "voseo_caleño": "Usa voseo caleño/vallecaucano ('vos sabés', 'mirá vos', 've'). Es caleño relajado, NO voseo argentino. NO uses 'che' ni vocabulario argentino.",
-    "ustedeo_boyacense": "Usa ustedeo formal boyacense ('usted dice', 'usted prioriza', 'lo que usted siente'). Tono respetuoso y reposado, característico del altiplano cundi-boyacense. NO tutees.",
-    "tuteo_costeño": "Usa tuteo costeño relajado ('tú dices', 'tú sientes'). Frases con cadencia caribeña, sin tecnicismos. Permite muletillas costeñas suaves ('ajá', 'mira') con moderación.",
-    "tuteo_neutro": "Usa tuteo neutro colombiano de Bogotá ('tú dices', 'tú sientes'). NUNCA uses voseo ni argentinismos.",
+    "voseo_paisa": "voseo paisa colombiano ('vos pensás', 'sabés', 'querés'). Paisa de Medellín/Eje Cafetero.",
+    "voseo_caleño": "voseo caleño/vallecaucano ('vos sabés', 'mirá vos', 've').",
+    "ustedeo_boyacense": "ustedeo formal boyacense ('usted dice', 'lo que usted siente'). NO tutees.",
+    "tuteo_costeño": "tuteo costeño relajado ('tú dices', 'ajá').",
+    "tuteo_neutro": "tuteo neutro colombiano de Bogotá ('tú dices', 'tú sientes').",
 }
 
-SYSTEM_PROMPT = """Eres un analista electoral que ayuda a un ciudadano colombiano a entender el resultado de un test de arquetipo emocional para las presidenciales 2026. Te paso un objeto STATE con: registro de tono, candidato declarado, demografía, ubicación con su tono regional, prioridad temática y arquetipo dominante calculado.
+SYSTEM_PROMPT = """Eres un analista electoral colombiano que ayuda a un ciudadano a entender el resultado de un test de arquetipo emocional para la presidencial 2026. Recibes un STATE con candidato declarado, demografía, ubicación con tono regional, prioridad temática y arquetipo dominante.
 
-Tu trabajo es REDACTAR una lectura honesta y diagnóstica del resultado. NO inventas datos. NO mencionas a otros candidatos. NO recomiendas voto.
+Tu trabajo: REDACTAR una lectura diagnóstica honesta. No inventas datos. No mencionas otros candidatos. No recomiendas voto.
 
-IMPORTANTE — TONO REGIONAL COLOMBIANO: el STATE incluye un campo 'tono_regional' que indica cómo hablan en la región del usuario. DEBES adaptar tu lenguaje a ese tono: paisa usa voseo paisa, vallecaucano usa voseo caleño, boyacense usa ustedeo formal, costeño usa tuteo costeño, neutro usa tuteo de Bogotá. NUNCA uses voseo argentino (con 'che' o vocabulario argentino).
-
-Devuelves JSON estricto con esta estructura exacta:
+Devuelves JSON estricto:
 {
-  "lectura": "Tres párrafos de 60-80 palabras cada uno, separados por \\n\\n. Estructura: (1) 'Lo que dijiste' — recap del candidato declarado y la prioridad temática. (2) 'Lo que muestran tus respuestas' — qué arquetipo dominó y por qué (en términos de emoción, miedo, deseo según el arquetipo). (3) 'El contraste' — si el candidato y el arquetipo van en el mismo sentido o en vientos cruzados, sin alarmar.",
-  "mensaje_corto": "Una frase de 12 a 18 palabras, lista para usar como pie de meme o post en redes. Refuerza el insight central.",
-  "alineacion": "alineado" o "vientos_cruzados" o "neutro"
+  "lectura": "Dos párrafos de 70-90 palabras cada uno, separados por \\n\\n. (1) Lo que el usuario declaró + lo que arrojó su arquetipo. (2) El contraste: alineado o vientos cruzados, sin alarmar.",
+  "mensaje_corto": "Frase de 12-18 palabras para meme o redes.",
+  "alineacion": "alineado" | "vientos_cruzados" | "neutro"
 }
 
-REGLAS DURAS:
-1. Tono diagnóstico, NUNCA veredicto. Nada de 'no te conviene' ni 'deberías votar otra cosa'.
-2. Honra el REGISTRO indicado en STATE.tono — popular es coloquial, digital es irónico, analitico es neutro elevado.
-3. NO inventes números, propuestas ni cifras del candidato. Solo describe lo que el usuario declaró y lo que arrojó el arquetipo.
-4. NO menciones a otros candidatos.
-5. Si el usuario eligió un candidato como 'sugerido' (mini-test), reconócelo: 'el mini-test te sugirió X'.
-6. La identidad cotidiana del usuario (gremio, barrio, ciudad, familia, etc.) calibra el lenguaje cuando hables de Pertenencia.
-7. Si hay un arquetipo secundario fuerte (>20% del puntaje), menciónalo como matiz.
-8. Responde SOLO el JSON, sin texto adicional ni markdown."""
+REGLAS:
+1. Adapta el lenguaje al 'tono_regional' del STATE. NUNCA uses voseo argentino, 'che' ni vocabulario argentino.
+2. Honra el REGISTRO (popular/digital/analítico).
+3. Si el candidato fue 'sugerido' por el mini-test, dilo.
+4. Si hay arquetipo secundario fuerte (>20%), menciónalo como matiz.
+5. Solo el JSON, sin markdown ni texto extra."""
 
 
 # ---- AWS clients (lazy) ----
