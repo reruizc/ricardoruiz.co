@@ -149,7 +149,10 @@
     }
     .cand-card:hover { border-color: var(--cand-color, var(--blue)); box-shadow: 0 2px 12px rgba(0,71,255,0.08); transform:translateY(-1px); }
     .cand-card.sel { border-color: var(--cand-color, var(--blue)); background: color-mix(in srgb, var(--cand-color, var(--blue)) 8%, white); }
-    .cand-avatar { width:42px; height:42px; min-width:42px; border-radius:50%; background:var(--cand-color, var(--blue)); display:flex; align-items:center; justify-content:center; font-family:'Syne',sans-serif; font-weight:700; font-size:.9rem; color:#fff; text-transform:uppercase; flex-shrink:0; }
+    .cand-avatar { width:42px; height:42px; min-width:42px; border-radius:50%; background:var(--cand-color, var(--blue)); display:flex; align-items:center; justify-content:center; font-family:'Syne',sans-serif; font-weight:700; font-size:.9rem; color:#fff; text-transform:uppercase; flex-shrink:0; overflow:hidden; position:relative; }
+    .cand-avatar img { width:100%; height:100%; object-fit:cover; display:block; }
+    .cand-avatar .cand-initials { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+    .cand-avatar img + .cand-initials { display:none; }
     .cand-info { flex:1; min-width:0; }
     .cand-name { font-family:'Fraunces',serif; font-weight:700; font-size:.95rem; color:var(--text); line-height:1.15; }
     .cand-party { font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.05em; color:var(--text-meta); margin-top:.18rem; text-transform:uppercase; }
@@ -212,7 +215,8 @@
       border-radius:14px;
       margin-bottom:1rem;
     }
-    .cand-block-avatar { width:60px; height:60px; min-width:60px; border-radius:50%; background:var(--cand-color, var(--blue)); display:flex; align-items:center; justify-content:center; font-family:'Syne',sans-serif; font-weight:700; font-size:1.15rem; color:#fff; }
+    .cand-block-avatar { width:60px; height:60px; min-width:60px; border-radius:50%; background:var(--cand-color, var(--blue)); display:flex; align-items:center; justify-content:center; font-family:'Syne',sans-serif; font-weight:700; font-size:1.15rem; color:#fff; overflow:hidden; }
+    .cand-block-avatar img { width:100%; height:100%; object-fit:cover; display:block; }
     .cand-block-meta { flex:1; }
     .cand-block-eyebrow { font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.18em; text-transform:uppercase; color:var(--text-meta); font-weight:500; }
     .cand-block-name { font-family:'Fraunces',serif; font-weight:700; font-size:1.3rem; color:var(--text); line-height:1.15; margin-top:.15rem; }
@@ -477,6 +481,12 @@
     arqScore: {},      // {proteccion: 0, ...}
   };
 
+  function escapeHtml(s) {
+    return String(s)
+      .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+  }
+
   // Shuffle Fisher-Yates — barajamos las opciones al renderizar
   // para que el patrón "siempre seguridad arriba, siempre castigo abajo"
   // no se note. data-id y data-arq mantienen identidad para el scoring.
@@ -550,11 +560,26 @@
     return name.split(' ').filter(Boolean).slice(0, 2).map(s => s[0]).join('').toUpperCase();
   }
 
+  function fotoUrl(c) {
+    const base = DATA.candidatos.fotos_base;
+    if (base && c.foto) return `${base}/${c.foto}`;
+    return null;
+  }
+
+  function avatarHtml(c, size = 'sm') {
+    const url = fotoUrl(c);
+    const ini = initials(c.nombre);
+    if (url) {
+      return `<img src="${url}" alt="${escapeHtml(c.nombre)}" loading="lazy" onerror="this.remove()" /><span class="cand-initials">${ini}</span>`;
+    }
+    return ini;
+  }
+
   function renderCandidatos() {
     const grid = $('#cand-grid');
     const cards = DATA.candidatos.candidatos.map(c => `
       <button type="button" class="cand-card" data-id="${c.id}" style="--cand-color:${c.color}">
-        <div class="cand-avatar" style="background:${c.color}">${initials(c.nombre)}</div>
+        <div class="cand-avatar" style="background:${c.color}">${avatarHtml(c)}</div>
         <div class="cand-info">
           <div class="cand-name">${c.nombre}</div>
           <div class="cand-party">${c.partido}</div>
@@ -783,7 +808,7 @@
     const suggest = $('#cand-suggest');
     suggest.innerHTML = `
       <div class="cand-block" style="--cand-color:${winner.color}; margin-top:.8rem;">
-        <div class="cand-block-avatar" style="background:${winner.color}">${initials(winner.nombre)}</div>
+        <div class="cand-block-avatar" style="background:${winner.color}">${avatarHtml(winner)}</div>
         <div class="cand-block-meta">
           <div class="cand-block-name">${winner.nombre}</div>
           <div class="cand-block-party">${winner.partido}</div>
@@ -946,7 +971,7 @@
     block.style.setProperty('--cand-color', cand.color);
     const avatar = $('#cand-block-avatar');
     avatar.style.background = cand.color;
-    avatar.textContent = initials(cand.nombre);
+    avatar.innerHTML = avatarHtml(cand);
     $('#cand-block-name').textContent = cand.nombre;
     $('#cand-block-party').textContent = cand.partido + (STATE.candOrigen === 'sugerido' ? ' · sugerido por el mini-test' : '');
 
@@ -986,12 +1011,6 @@
         </div>
       `;
     }).join('');
-  }
-
-  function escapeHtml(s) {
-    return String(s)
-      .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;').replaceAll("'", '&#39;');
   }
 
   // Llama al endpoint test-presidencial-explica con el state actual.
