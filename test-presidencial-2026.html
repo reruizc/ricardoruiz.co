@@ -234,6 +234,29 @@
     }
     .ai-message .ai-eyebrow { display:block; font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.2em; text-transform:uppercase; color:var(--text-meta); font-weight:500; margin-bottom:.6rem; }
 
+    /* ── Loading dedicado para la lectura personalizada ── */
+    .ai-loader { padding:.5rem 0 1rem; }
+    .ai-loader-text {
+      font-family:'Fraunces',serif; font-weight:400; font-size:.95rem;
+      color:var(--text-soft); margin-bottom:.95rem; min-height:1.4em;
+      font-style:italic;
+    }
+    .ai-loader-bar {
+      height:3px; background:var(--border-soft); border-radius:2px;
+      overflow:hidden; position:relative;
+    }
+    .ai-loader-fill {
+      position:absolute; left:0; top:0; bottom:0; width:30%;
+      background: var(--blue);
+      border-radius:2px;
+      animation: aiLoaderSlide 1.6s ease-in-out infinite;
+    }
+    @keyframes aiLoaderSlide {
+      0%   { left:-30%; width:30%; }
+      50%  { left:30%;  width:50%; }
+      100% { left:100%; width:30%; }
+    }
+
     .bars-title { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.18em; text-transform:uppercase; color:var(--text-meta); font-weight:500; margin: 1.2rem 0 .65rem; }
     .bar-row { display:grid; grid-template-columns: 130px 1fr 56px; align-items:center; gap:.7rem; padding:.45rem 0; }
     .bar-name { font-family:'Fraunces',serif; font-weight:500; font-size:.92rem; color:var(--text); }
@@ -977,9 +1000,30 @@
 
     // Lectura personalizada vía DeepSeek (Lambda test-presidencial-explica)
     const aiBody = $('#ai-message-body');
-    aiBody.innerHTML = `<p style="opacity:.7; font-style:italic;">Generando tu lectura personalizada…</p>`;
+    const loaderMsgs = [
+      'Cruzando tu candidato con tu arquetipo dominante…',
+      'Mirando lo que dijiste y lo que muestran tus respuestas…',
+      'Buscando alineación o vientos cruzados…',
+      'Calibrando el tono para ti…',
+      'Redactando tu lectura personalizada…',
+    ];
+    aiBody.innerHTML = `
+      <div class="ai-loader">
+        <div class="ai-loader-text" id="ai-loader-text">${loaderMsgs[0]}</div>
+        <div class="ai-loader-bar"><div class="ai-loader-fill"></div></div>
+      </div>
+    `;
+    let loaderIdx = 0;
+    const loaderTimer = setInterval(() => {
+      loaderIdx = (loaderIdx + 1) % loaderMsgs.length;
+      const t = document.getElementById('ai-loader-text');
+      if (t) t.textContent = loaderMsgs[loaderIdx];
+    }, 2200);
+    const clearLoader = () => clearInterval(loaderTimer);
+
     fetchLectura({ cand, winner, winnerPct, second, secondPct })
       .then(data => {
+        clearLoader();
         if (!data || !data.lectura) throw new Error('Sin lectura');
         const parrafos = (data.lectura || '').split(/\n\n+/).map(p => `<p style="margin-bottom:.7rem;">${escapeHtml(p)}</p>`).join('');
         aiBody.innerHTML = parrafos;
@@ -990,6 +1034,7 @@
         }
       })
       .catch(err => {
+        clearLoader();
         console.warn('[explica] fallback:', err);
         aiBody.innerHTML = `
           <p><b>Lo que dijiste:</b> tu apuesta de hoy es ${escapeHtml(cand.nombre)} (${escapeHtml(cand.partido)}).</p>
