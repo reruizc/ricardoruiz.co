@@ -988,6 +988,25 @@
     .wiz-share-hint{margin-top:.7rem;padding:.6rem .8rem;font-family:'Fraunces',serif;font-weight:300;font-size:.82rem;line-height:1.5;color:rgba(255,255,255,.7);background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.22);border-radius:10px}
     body.day-mode .wiz-share-hint{color:rgba(0,0,0,.7);background:rgba(30,143,90,.06);border-color:rgba(30,143,90,.18)}
 
+    /* Estado de guardado del pronóstico */
+    .wiz-save-status{display:flex;align-items:center;gap:.7rem;padding:.85rem 1.05rem;border-radius:12px;font-family:'Fraunces',serif;font-weight:400;font-size:.88rem;line-height:1.45;margin-bottom:.85rem;transition:background .2s,border-color .2s,color .2s}
+    .wiz-save-status .wiz-save-ico{width:18px;height:18px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-weight:500}
+    .wiz-save-status[data-state="idle"],.wiz-save-status[data-state="saving"]{background:rgba(0,71,255,.10);border:1px solid rgba(0,71,255,.22);color:rgba(255,255,255,.85)}
+    body.day-mode .wiz-save-status[data-state="idle"],body.day-mode .wiz-save-status[data-state="saving"]{color:#0a0a0a;background:rgba(0,71,255,.06)}
+    .wiz-save-status[data-state="saving"] .wiz-save-ico::after{content:"";display:inline-block;width:12px;height:12px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:wizSpin .8s linear infinite}
+    @keyframes wizSpin{to{transform:rotate(360deg)}}
+    .wiz-save-status[data-state="saved"]{background:rgba(74,222,128,.12);border:1px solid rgba(74,222,128,.30);color:#86efac}
+    body.day-mode .wiz-save-status[data-state="saved"]{background:rgba(30,143,90,.08);border-color:rgba(30,143,90,.25);color:#1e8f5a}
+    .wiz-save-status[data-state="saved"] .wiz-save-ico::after{content:"✓";font-weight:700}
+    .wiz-save-status[data-state="noauth"]{background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.28);color:#fbbf24}
+    body.day-mode .wiz-save-status[data-state="noauth"]{background:rgba(217,119,6,.08);border-color:rgba(217,119,6,.22);color:#9a6107}
+    .wiz-save-status[data-state="noauth"] .wiz-save-ico::after{content:"!";font-weight:700}
+    .wiz-save-status[data-state="error"]{background:rgba(248,113,113,.10);border:1px solid rgba(248,113,113,.28);color:#fca5a5}
+    body.day-mode .wiz-save-status[data-state="error"]{background:rgba(220,38,38,.08);border-color:rgba(220,38,38,.22);color:#a02020}
+    .wiz-save-status[data-state="error"] .wiz-save-ico::after{content:"×";font-weight:700;font-size:1.05rem}
+    .wiz-save-status a{color:inherit;text-decoration:underline;font-weight:500}
+    .wiz-save-status a:hover{opacity:.8}
+
     /* Cross-sell: card hacia electoral.html */
     .wiz-explore{display:flex;align-items:center;gap:.95rem;padding:1rem 1.15rem;margin-top:.4rem;margin-bottom:.6rem;background:rgba(0,71,255,.08);border:1px solid rgba(0,71,255,.22);border-radius:14px;text-decoration:none;cursor:none;transition:background .15s,border-color .15s,transform .12s}
     body.day-mode .wiz-explore{background:rgba(0,71,255,.05);border-color:rgba(0,71,255,.2)}
@@ -1248,6 +1267,12 @@
         </div>
         <h2 class="wiz-qtext">¡Tu pronóstico está listo!</h2>
         <p class="wiz-qhint">El 31 de mayo veremos quién se acercó más al resultado real. El más certero se gana <b>$100.000</b>. Comparte tu pronóstico para que tus contactos hagan el suyo y compitan contigo.</p>
+        <!-- Estado del guardado en backend (para el concurso $100k) -->
+        <div class="wiz-save-status" id="wiz-save-status" data-state="idle">
+          <span class="wiz-save-ico"></span>
+          <span class="wiz-save-text">Guardando tu pronóstico…</span>
+        </div>
+
         <div class="wiz-share-card">
           <div style="font-family:'Fraunces',serif;font-weight:500;font-size:.95rem;margin-bottom:.2rem">Enlace de tu pronóstico</div>
           <div style="font-family:'Fraunces',serif;font-weight:300;font-size:.82rem;color:rgba(255,255,255,.55);line-height:1.45">Cualquier persona que abra este enlace verá el mapa con tus cifras.</div>
@@ -8226,7 +8251,65 @@
     const url = buildShareUrl();
     const el = $('wiz-share-url');
     if (el) el.textContent = url;
+    // Auto-guardado en el backend del concurso. Idempotente — si el usuario
+    // entra y sale del paso, se reescribe el mismo registro (deliberado,
+    // permite ajustar antes del 31 de mayo).
+    wizSavePronostico();
   }
+
+  // Guarda el pronóstico actual en rr-auth (POST /pron/save) si el usuario
+  // tiene sesión. El chip #wiz-save-status muestra los 4 estados:
+  // idle/saving → mientras carga, saved → 200 OK, noauth → 401 (pedimos
+  // login), error → cualquier otro fallo (red, 500, etc.).
+  const _PRON_AUTH_BASE = 'https://rr-auth.reruizc.workers.dev';
+  function _setSaveStatus(state, html){
+    const el = $('wiz-save-status');
+    if (!el) return;
+    el.dataset.state = state;
+    const txt = el.querySelector('.wiz-save-text');
+    if (txt && html != null) txt.innerHTML = html;
+  }
+  async function wizSavePronostico(){
+    const token = (() => { try { return localStorage.getItem('rr-token'); } catch { return null; }})();
+    if (!token){
+      _setSaveStatus('noauth',
+        '<b>No estás identificado.</b> Para participar por los <b>$100.000</b>, ' +
+        '<a href="login.html">inicia sesión</a> o ' +
+        '<a href="register.html">regístrate</a>. Tu pronóstico ya queda en el enlace de abajo.');
+      return;
+    }
+    _setSaveStatus('saving', 'Guardando tu pronóstico para el concurso…');
+    // Construir payload con los pcts del state actual
+    const pcts = {};
+    (window.CANDIDATOS||[]).forEach(c => { pcts[c.id] = +c.pct.toFixed(2); });
+    try {
+      const r = await fetch(`${_PRON_AUTH_BASE}/pron/save`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ p: window.TURNOUT_PCT || 54, pcts }),
+      });
+      if (r.status === 401){
+        _setSaveStatus('noauth',
+          '<b>Tu sesión expiró.</b> <a href="login.html">Inicia sesión</a> de nuevo para guardar tu pronóstico y participar por los $100.000.');
+        return;
+      }
+      if (!r.ok){
+        const data = await r.json().catch(() => ({}));
+        _setSaveStatus('error',
+          `No pudimos guardar tu pronóstico${data.error ? ': ' + data.error : ''}. El enlace de abajo sigue funcionando.`);
+        return;
+      }
+      _setSaveStatus('saved',
+        '<b>¡Tu pronóstico está guardado!</b> Te avisamos por correo al final del concurso. Puedes seguir ajustándolo hasta el 31 de mayo.');
+    } catch (e){
+      _setSaveStatus('error',
+        'No pudimos conectar para guardar tu pronóstico. El enlace de abajo sigue funcionando — vuelve a entrar al paso para reintentar.');
+    }
+  }
+  window.wizSavePronostico = wizSavePronostico;
   async function wizCopyLink(){
     const url = buildShareUrl();
     try {
