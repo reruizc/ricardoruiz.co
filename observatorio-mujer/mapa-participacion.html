@@ -1160,17 +1160,32 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   const BOG_CENSO_BARRIO_URL = `${S3_DATOS}/output_ciudades/bogota/censo-barrio-2026.json`;
   const BOG_EG_UPL_URL    = `${S3_DATOS}/output_observatorio_mujer/bog-upl-edadgenero.json?v=${BOG_V}`;
   const BOG_EG_BARRIO_URL = `${S3_DATOS}/output_observatorio_mujer/bog-barrio-edadgenero.json?v=${BOG_V}`;
+  // Medellín (depto 01 mun 001) — comunas + barrios oficiales
+  const MDE_V = '20260518';
+  const MDE_COMUNA_GEO_URL  = `${S3}/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`;
+  const MDE_BARRIOS_GEO_URL = `${S3_DATOS}/MEDELLIN_BARRIOS_OFICIAL.json`;
+  const MDE_COMUNA_DATA_URL = `${S3_DATOS}/output_observatorio_mujer/mde-comuna-edadgenero.json?v=${MDE_V}`;
+  const MDE_BARRIO_DATA_URL = `${S3_DATOS}/output_observatorio_mujer/mde-barrio-edadgenero.json?v=${MDE_V}`;
+  // Mapeo de comuna nombre (como viene en mde-barrio-edadgenero) → cod
+  const MDE_COMUNA_NAME_TO_COD = {
+    'Popular':'01','Santa Cruz':'02','Manrique':'03','Aranjuez':'04',
+    'Castilla':'05','Doce de Octubre':'06','Robledo':'07','Villa Hermosa':'08',
+    'Buenos Aires':'09','La Candelaria':'10','Laureles Estadio':'11',
+    'La América':'12','San Javier':'13','El Poblado':'14','Guayabal':'15','Belén':'16'
+  };
   let _map, _layer, _geoData;
   let _munLayer = null, _uplLayer = null, _barLayer = null;
   const _munGeoCache = {};
-  // MUN_DATA keyed por "dep-mun" (códigos Registraduría, ej "01-001" Medellín)
-  // con la misma forma que DATA[depReg] para que getMetric funcione directo.
   let MUN_DATA = null;
-  let BOG_UPL_DATA = null;     // keyed por CODIGO_UPL ('UPL25'), shape igual a DATA
-  let BOG_BARRIO_DATA = null;  // keyed por codigo barrio ('008407'), shape igual a DATA
+  let BOG_UPL_DATA = null;     // BOG UPL
+  let BOG_BARRIO_DATA = null;  // BOG barrio
+  let MDE_COMUNA_DATA = null;  // MDE comuna (reusa _uplLayer en mapa)
+  let MDE_BARRIO_DATA = null;  // MDE barrio (reusa _barLayer en mapa)
   let _bogUplGeo = null;
   let _bogBarriosGeo = null;
   let _bogBarrioToUpl = null;  // cache barrio_cod → upl_cod (PIP runtime)
+  let _mdeComunaGeo = null;
+  let _mdeBarriosGeo = null;
 
   async function fetchMunData() {
     if (MUN_DATA) return MUN_DATA;
@@ -1333,6 +1348,174 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     return out;
   }
 
+  // ─── Medellín (comuna política + barrio oficial) ────────────────
+  function normalizeMde(cod, info, censo, eg) {
+    const cm = censo.muj || 0, ch = censo.hom || 0, ct = censo.tot || 0;
+    const pct_censo = ct ? cm/ct*100 : 0;
+    const v22 = eg && eg.vot22 || {muj:0,hom:0,b18:0,b26:0,b41:0,b60:0};
+    const v18 = eg && eg.vot18 || {muj:0,hom:0,b18:0,b26:0,b41:0,b60:0};
+    const tasa22 = cm ? v22.muj/cm*100 : 0;
+    const tasa18 = cm ? v18.muj/cm*100 : 0;
+    const tot22 = v22.muj || 1;
+    return {
+      cod, nombre: info.nombre, depnom: 'ANTIOQUIA', dep_cod: '01',
+      censo_muj: cm, censo_hom: ch, censo_tot: ct, pct_censo,
+      municipios: 0, puestos: info.n_puestos || 0,
+      vot22_muj: v22.muj, vot22_hom: v22.hom,
+      vot18_muj: v18.muj, vot18_hom: v18.hom,
+      tasa22, tasa18,
+      b18: v22.b18, b26: v22.b26, b41: v22.b41, b60: v22.b60,
+      pct_b18: (v22.b18||0)/tot22*100,
+      pct_b26: (v22.b26||0)/tot22*100,
+      pct_b41: (v22.b41||0)/tot22*100,
+      pct_b60: (v22.b60||0)/tot22*100,
+      comuna_nombre: info.comuna_nombre || null
+    };
+  }
+  async function fetchMdeComunaData() {
+    if (MDE_COMUNA_DATA) return MDE_COMUNA_DATA;
+    try {
+      const raw = await fetch(MDE_COMUNA_DATA_URL).then(r => r.json());
+      const out = {};
+      for (const cod in raw) {
+        const r = raw[cod];
+        const censo = { muj: r.censo_muj, hom: r.censo_hom, tot: r.censo_tot };
+        const eg = { vot18: r.vot18, vot22: r.vot22 };
+        out[cod] = normalizeMde(cod, { nombre: r.nombre, n_puestos: r.n_puestos }, censo, eg);
+      }
+      MDE_COMUNA_DATA = out; return out;
+    } catch (e) { console.error('MDE_COMUNA fetch fail:', e); return null; }
+  }
+  async function fetchMdeBarrioData() {
+    if (MDE_BARRIO_DATA) return MDE_BARRIO_DATA;
+    try {
+      const raw = await fetch(MDE_BARRIO_DATA_URL).then(r => r.json());
+      const out = {};
+      for (const cod in raw) {
+        const r = raw[cod];
+        const censo = { muj: r.censo_muj, hom: r.censo_hom, tot: r.censo_tot };
+        const eg = { vot18: r.vot18, vot22: r.vot22 };
+        out[cod] = normalizeMde(cod, { nombre: r.nombre, comuna_nombre: r.comuna, n_puestos: r.n_puestos }, censo, eg);
+      }
+      MDE_BARRIO_DATA = out; return out;
+    } catch (e) { console.error('MDE_BARRIO fetch fail:', e); return null; }
+  }
+
+  function mdeComunaStyle() {
+    const arr = Object.values(MDE_COMUNA_DATA || {})
+      .map(d => getMetric(d) ? getMetric(d).value : null)
+      .filter(v => v != null && !isNaN(v));
+    const min = arr.length ? Math.min(...arr) : 0;
+    const max = arr.length ? Math.max(...arr) : 100;
+    const mun = MUN_DATA && MUN_DATA['01-001'];
+    const mid = mun && getMetric(mun) ? getMetric(mun).value : (min+max)/2;
+    const dom = { min, max, mid };
+    return (feat) => {
+      const cod = feat.properties.CODIGO;
+      const d = cod && MDE_COMUNA_DATA ? MDE_COMUNA_DATA[cod] : null;
+      const m = d ? getMetric(d) : null;
+      return { fillColor: colorFor(m ? m.value : null, dom), weight: 1, color: 'var(--paper)', fillOpacity: 0.92 };
+    };
+  }
+  function mdeComunaTooltip(feat) {
+    const cod = feat.properties.CODIGO;
+    const d = cod && MDE_COMUNA_DATA ? MDE_COMUNA_DATA[cod] : null;
+    const nm = d ? d.nombre : (feat.properties.NOMBRE || '—');
+    if (!d || !d.censo_muj) return `<div class="tt-name">${nm}</div><div class="tt-meta">Sin datos · ${feat.properties.IDENTIFICACION || ''}</div>`;
+    const m = getMetric(d);
+    return `<div class="tt-name">${nm}</div>
+            <div><span class="tt-pct">${pct(m.value)}</span> ${m.metricKey.toLowerCase()}</div>
+            <div class="tt-meta">Comuna · ${fmt(d.censo_muj)} habilitadas · ${fmt(d.vot22_muj)} votaron 2022</div>`;
+  }
+  function mdeBarrioStyle(comunaCod) {
+    const comunaNom = (Object.entries(MDE_COMUNA_NAME_TO_COD).find(([,v]) => v === comunaCod) || [])[0];
+    const arr = Object.values(MDE_BARRIO_DATA || {})
+      .filter(d => d.comuna_nombre === comunaNom)
+      .map(d => getMetric(d) ? getMetric(d).value : null)
+      .filter(v => v != null && !isNaN(v));
+    const min = arr.length ? Math.min(...arr) : 0;
+    const max = arr.length ? Math.max(...arr) : 100;
+    const com = MDE_COMUNA_DATA[comunaCod];
+    const mid = com ? getMetric(com).value : (min+max)/2;
+    const dom = { min, max, mid };
+    return (feat) => {
+      const cod = feat.properties.CODIGO;
+      const d = cod && MDE_BARRIO_DATA ? MDE_BARRIO_DATA[cod] : null;
+      const m = d ? getMetric(d) : null;
+      return { fillColor: colorFor(m ? m.value : null, dom), weight: 1, color: 'var(--paper)', fillOpacity: 0.92 };
+    };
+  }
+  function mdeBarrioTooltip(feat) {
+    const cod = feat.properties.CODIGO;
+    const d = cod && MDE_BARRIO_DATA ? MDE_BARRIO_DATA[cod] : null;
+    const nm = d ? d.nombre : (feat.properties.NOMBRE || '—');
+    if (!d || !d.censo_muj) return `<div class="tt-name">${nm}</div><div class="tt-meta">Sin datos</div>`;
+    const m = getMetric(d);
+    return `<div class="tt-name">${nm}</div>
+            <div><span class="tt-pct">${pct(m.value)}</span> ${m.metricKey.toLowerCase()}</div>
+            <div class="tt-meta">Barrio · ${fmt(d.censo_muj)} habilitadas · ${fmt(d.vot22_muj)} votaron 2022</div>`;
+  }
+
+  async function drillIntoMedellin() {
+    if (!MDE_COMUNA_DATA) await fetchMdeComunaData();
+    if (!MDE_COMUNA_DATA) return;
+    if (!_mdeComunaGeo) _mdeComunaGeo = await fetch(MDE_COMUNA_GEO_URL).then(r => r.json()).catch(e => { console.error(e); return null; });
+    if (!_mdeComunaGeo) return;
+    window._activeMun = '01-001';
+    window._activeUpl = null;
+    if (_layer) _map.removeLayer(_layer);
+    if (_munLayer) _map.removeLayer(_munLayer);
+    if (_uplLayer) _map.removeLayer(_uplLayer);
+    if (_barLayer) _map.removeLayer(_barLayer);
+    _uplLayer = L.geoJSON(_mdeComunaGeo, {
+      style: mdeComunaStyle(),
+      onEachFeature: (feat, layer) => {
+        const cod = feat.properties.CODIGO;
+        const d = cod && MDE_COMUNA_DATA ? MDE_COMUNA_DATA[cod] : null;
+        layer.bindTooltip(mdeComunaTooltip(feat), { sticky: true, direction: 'top' });
+        layer.on('mouseover', () => { layer.setStyle({ weight: 2.5, color: '#fff' }); if (d) showPanel(d, 'Comuna'); });
+        layer.on('mouseout', () => { _uplLayer.resetStyle(layer); const mun = MUN_DATA && MUN_DATA['01-001']; if (mun) showPanel(mun, 'Medellín (agregado)'); });
+        layer.on('click', () => { if (d) drillIntoMdeComuna(cod, d.nombre); });
+      }
+    }).addTo(_map);
+    _map.fitBounds(_uplLayer.getBounds(), { padding: [10, 10] });
+    setBackButton('antioquia');
+    const mun = MUN_DATA && MUN_DATA['01-001'];
+    if (mun) showPanel(mun, 'Medellín (agregado)');
+    renderRanking();
+    buildLegend();
+  }
+  async function drillIntoMdeComuna(comunaCod, comunaName) {
+    if (!MDE_BARRIO_DATA) await fetchMdeBarrioData();
+    if (!_mdeBarriosGeo) _mdeBarriosGeo = await fetch(MDE_BARRIOS_GEO_URL).then(r => r.json()).catch(e => { console.error(e); return null; });
+    if (!_mdeBarriosGeo) return;
+    window._activeUpl = comunaCod;
+    // Filter barrios cuya propiedad COMUNA (nombre) coincida con la comuna activa
+    const comunaNom = (Object.entries(MDE_COMUNA_NAME_TO_COD).find(([,v]) => v === comunaCod) || [])[0];
+    const filtered = {
+      type: 'FeatureCollection',
+      features: _mdeBarriosGeo.features.filter(f => f.properties.COMUNA === comunaNom)
+    };
+    if (_uplLayer) _map.removeLayer(_uplLayer);
+    if (_barLayer) _map.removeLayer(_barLayer);
+    _barLayer = L.geoJSON(filtered, {
+      style: mdeBarrioStyle(comunaCod),
+      onEachFeature: (feat, layer) => {
+        const cod = feat.properties.CODIGO;
+        const d = cod && MDE_BARRIO_DATA ? MDE_BARRIO_DATA[cod] : null;
+        layer.bindTooltip(mdeBarrioTooltip(feat), { sticky: true, direction: 'top' });
+        layer.on('mouseover', () => { layer.setStyle({ weight: 2.5, color: '#fff' }); if (d) showPanel(d, 'Barrio'); });
+        layer.on('mouseout', () => { _barLayer.resetStyle(layer); const com = MDE_COMUNA_DATA[comunaCod]; if (com) showPanel(com, 'Comuna (agregado)'); });
+      }
+    }).addTo(_map);
+    if (filtered.features.length) _map.fitBounds(_barLayer.getBounds(), { padding: [10, 10] });
+    setBackButton('medellin');
+    const com = MDE_COMUNA_DATA[comunaCod];
+    if (com) showPanel(com, 'Comuna (agregado)');
+    renderRanking();
+    buildLegend();
+  }
+
   async function initMap() {
     _map = L.map('map', {
       zoomControl: true,
@@ -1493,6 +1676,10 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
         layer.bindTooltip(munTooltip(feat), { sticky: true, direction: 'top' });
         layer.on('mouseover', () => { layer.setStyle({ weight: 2.5, color: '#fff' }); if (d) showPanel(d, 'Municipio'); });
         layer.on('mouseout', () => { _munLayer.resetStyle(layer); const dep = DATA[depReg]; if (dep) showPanel(dep, 'Departamento (agregado)'); });
+        // Click: drilldown a comunas si el mun tiene drill propio (Medellín por ahora).
+        layer.on('click', () => {
+          if (k === '01-001') drillIntoMedellin();
+        });
       }
     }).addTo(_map);
     _map.fitBounds(_munLayer.getBounds(), { padding: [10, 10] });
@@ -1621,11 +1808,14 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   function setBackButton(mode) {
     const btn = document.getElementById('back-drill');
     if (!btn) return;
-    if (mode === 'país') {
-      btn.innerHTML = '<span class="arr">←</span>Volver al país';
-      btn.hidden = false;
-    } else if (mode === 'bogota') {
-      btn.innerHTML = '<span class="arr">←</span>Volver a Bogotá';
+    const map = {
+      'país':      'Volver al país',
+      'bogota':    'Volver a Bogotá',
+      'medellin':  'Volver a comunas',
+      'antioquia': 'Volver a Antioquia'
+    };
+    if (map[mode]) {
+      btn.innerHTML = `<span class="arr">←</span>${map[mode]}`;
       btn.hidden = false;
     } else {
       btn.hidden = true;
@@ -1633,19 +1823,34 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   }
 
   function exitDrill() {
-    // Si estamos en nivel barrio (Bogotá), volver a UPL
-    if (window._activeUpl) {
+    // Caso 1: nivel barrio Medellín → volver a comunas Medellín
+    if (window._activeUpl && window._activeMun === '01-001') {
+      if (_barLayer) { _map.removeLayer(_barLayer); _barLayer = null; }
+      window._activeUpl = null;
+      drillIntoMedellin();
+      return;
+    }
+    // Caso 2: nivel comuna Medellín → volver a muns Antioquia
+    if (window._activeMun === '01-001' && !window._activeUpl) {
+      if (_uplLayer) { _map.removeLayer(_uplLayer); _uplLayer = null; }
+      window._activeMun = null;
+      drillIntoDep('01', 'Antioquia');
+      return;
+    }
+    // Caso 3: nivel barrio Bogotá → volver a UPL
+    if (window._activeUpl && window._activeDep === '16') {
       if (_barLayer) { _map.removeLayer(_barLayer); _barLayer = null; }
       window._activeUpl = null;
       drillIntoBogota();
       return;
     }
-    // Si estamos en nivel UPL o mun, volver al país
+    // Caso default: volver al país
     if (_munLayer) { _map.removeLayer(_munLayer); _munLayer = null; }
     if (_uplLayer) { _map.removeLayer(_uplLayer); _uplLayer = null; }
     if (_barLayer) { _map.removeLayer(_barLayer); _barLayer = null; }
     window._activeDep = null;
     window._activeUpl = null;
+    window._activeMun = null;
     if (_layer) _layer.addTo(_map);
     if (_layer) _map.fitBounds(_layer.getBounds(), { padding: [10, 10] });
     setBackButton('hide');
@@ -1674,9 +1879,16 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
       return;
     }
     if (window._activeUpl && _barLayer) {
-      _barLayer.setStyle(bogBarrioStyle(window._activeUpl));
+      const isMde = window._activeMun === '01-001';
+      _barLayer.setStyle(isMde ? mdeBarrioStyle(window._activeUpl) : bogBarrioStyle(window._activeUpl));
       _barLayer.eachLayer(l => l.unbindTooltip());
-      _barLayer.eachLayer(l => l.bindTooltip(bogBarrioTooltip(l.feature), { sticky: true, direction: 'top' }));
+      _barLayer.eachLayer(l => l.bindTooltip(isMde ? mdeBarrioTooltip(l.feature) : bogBarrioTooltip(l.feature), { sticky: true, direction: 'top' }));
+      return;
+    }
+    if (window._activeMun === '01-001' && _uplLayer) {
+      _uplLayer.setStyle(mdeComunaStyle());
+      _uplLayer.eachLayer(l => l.unbindTooltip());
+      _uplLayer.eachLayer(l => l.bindTooltip(mdeComunaTooltip(l.feature), { sticky: true, direction: 'top' }));
       return;
     }
     if (window._activeDep === '16' && _uplLayer) {
@@ -1696,9 +1908,23 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 
   // ─── RANKING ─────────────────────────────────────────────────────
   function renderRanking() {
-    // Niveles: nacional (deptos), drill mun, drill Bogotá UPL, drill Bogotá barrio
+    // Niveles: nacional (deptos), drill mun, BOG UPL/barrio, MDE comuna/barrio
     let arr, level = 'depto';
-    if (window._activeUpl && BOG_BARRIO_DATA) {
+    if (window._activeUpl && window._activeMun === '01-001' && MDE_BARRIO_DATA) {
+      // Medellín barrio
+      const comunaCod = window._activeUpl;
+      const comunaNom = (Object.entries(MDE_COMUNA_NAME_TO_COD).find(([,v]) => v === comunaCod) || [])[0];
+      level = 'mde-barrio';
+      arr = Object.values(MDE_BARRIO_DATA)
+        .filter(d => d.comuna_nombre === comunaNom)
+        .map(d => ({ ...d, _v: getMetric(d) ? getMetric(d).value : null }))
+        .filter(d => d._v != null && !isNaN(d._v));
+    } else if (window._activeMun === '01-001' && MDE_COMUNA_DATA) {
+      level = 'mde-comuna';
+      arr = Object.values(MDE_COMUNA_DATA)
+        .map(d => ({ ...d, _v: getMetric(d) ? getMetric(d).value : null }))
+        .filter(d => d._v != null && !isNaN(d._v));
+    } else if (window._activeUpl && BOG_BARRIO_DATA) {
       const map = buildBogBarrioToUpl() || {};
       level = 'barrio';
       arr = Object.keys(BOG_BARRIO_DATA)
@@ -1740,14 +1966,22 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     document.querySelectorAll('.rank-item').forEach(el => {
       el.addEventListener('mouseenter', () => {
         let d = null, scope = 'Departamento · ranking';
-        if (level === 'barrio') { d = BOG_BARRIO_DATA[el.dataset.cod]; scope = 'Barrio · ranking'; }
+        if (level === 'mde-barrio') { d = MDE_BARRIO_DATA[el.dataset.cod]; scope = 'Barrio · ranking'; }
+        else if (level === 'mde-comuna') { d = MDE_COMUNA_DATA[el.dataset.cod]; scope = 'Comuna · ranking'; }
+        else if (level === 'barrio') { d = BOG_BARRIO_DATA[el.dataset.cod]; scope = 'Barrio · ranking'; }
         else if (level === 'upl') { d = BOG_UPL_DATA[el.dataset.cod]; scope = 'UPL · ranking'; }
         else if (level === 'mun') { d = MUN_DATA && MUN_DATA[el.dataset.cod]; scope = 'Municipio · ranking'; }
         else { d = DATA[el.dataset.cod]; }
         if (d) showPanel(d, scope);
       });
       el.addEventListener('mouseleave', () => {
-        if (window._activeUpl) {
+        if (window._activeUpl && window._activeMun === '01-001') {
+          const com = MDE_COMUNA_DATA[window._activeUpl];
+          if (com) showPanel(com, 'Comuna (agregado)');
+        } else if (window._activeMun === '01-001') {
+          const mun = MUN_DATA && MUN_DATA['01-001'];
+          if (mun) showPanel(mun, 'Medellín (agregado)');
+        } else if (window._activeUpl) {
           const upl = BOG_UPL_DATA[window._activeUpl];
           if (upl) showPanel(upl, 'UPL (agregado)');
         } else if (window._activeDep === '16') {
@@ -1786,7 +2020,13 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     // En drill, ajustamos el label "Top 10" según el nivel
     if (isMun) {
       let unit, parent;
-      if (level === 'barrio') {
+      if (level === 'mde-barrio') {
+        unit = 'barrios';
+        parent = (MDE_COMUNA_DATA[window._activeUpl] && MDE_COMUNA_DATA[window._activeUpl].nombre) || 'Comuna';
+      } else if (level === 'mde-comuna') {
+        unit = 'comunas';
+        parent = 'Medellín';
+      } else if (level === 'barrio') {
         unit = 'barrios';
         parent = (BOG_UPL_DATA[window._activeUpl] && BOG_UPL_DATA[window._activeUpl].nombre) || 'UPL';
       } else if (level === 'upl') {
@@ -1842,7 +2082,13 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     buildLegend();
     if (window._mapReady) restyleAll();
     renderRanking();
-    if (window._activeUpl) {
+    if (window._activeUpl && window._activeMun === '01-001') {
+      const com = MDE_COMUNA_DATA[window._activeUpl];
+      if (com) showPanel(com, 'Comuna (agregado)');
+    } else if (window._activeMun === '01-001') {
+      const mun = MUN_DATA && MUN_DATA['01-001'];
+      if (mun) showPanel(mun, 'Medellín (agregado)');
+    } else if (window._activeUpl) {
       const upl = BOG_UPL_DATA[window._activeUpl];
       if (upl) showPanel(upl, 'UPL (agregado)');
     } else if (window._activeDep === '16') {
