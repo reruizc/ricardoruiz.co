@@ -1428,6 +1428,9 @@ Funcionalidades visuales:
   (`STATE._shuffled`).
 - Variante temática activa según PRIO: el tag de la pregunta muestra
   "Tema · Subtema" cuando se activa.
+- **Distribución de arquetipos** se guarda en el STATE y se envía a la
+  Lambda como `arq_score`, pero **NO se muestra al usuario**. Es señal
+  interna que se almacena en el cache de S3 para análisis posterior.
 
 Estado del usuario:
 ```js
@@ -1441,51 +1444,156 @@ STATE = {
   answers: { P1, P2, ..., P8 },
   arqScore: { proteccion, estabilidad, supervivencia, castigo, pertenencia }
 }
+// window.STATE y window.DATA están expuestos a propósito para debugging.
+// DATA se llena con Object.assign(DATA, {...}) — NO reasignar a literal.
 ```
 
-### Lo que falta (pendiente al cerrar conversación)
+### Pantalla final del test (2 sub-vistas + pre-fetch)
 
-1. **Datos por barrio para huella territorial** — el ponderador de
-   `previa-1v.html` (EQUIVALENCIAS por candidato 2026 → señales históricas
-   con pesos) tiene que aplicarse a nivel barrio para BOG/MED y otras
-   ciudades principales, y a nivel municipio para zonas rurales.
+El `#panel-result` se divide en dos sub-vistas dentro del mismo panel:
 
-   **Bug encontrado en los archivos pre-procesados:** los
-   `bog-barrio-pres-{2010,2014,2018,2022}.json` actuales solo cubren
-   29-31 barrios de los 1.000 catastrales de Bogotá. Razón: el script
-   anterior cruzaba puesto→barrio por código exacto (`CÓDIGO COMPLETO`)
-   y la Registraduría renumera puestos entre años, así que la mayoría
-   no calzó. Senado/Cámara 2026 sí tiene buena cobertura (566 barrios)
-   porque los códigos son del año actual.
+**Sub-vista A — `#result-summary`** (visible al terminar las 8 preguntas):
+- `arq-hero` con el arquetipo dominante (color del arquetipo de fondo).
+- `cand-block` con la apuesta declarada (foto + nombre + partido).
+- `barrio-block` con el gráfico **"Cómo se inclinaría tu zona"** — 6 barras
+  horizontales con `pondPct_nac × bias_local` renormalizado a 100%. La
+  barra del candidato declarado lleva la clase `.mine` (negrita + bullet).
+- Pie del bloque con 3 hechos crudos del territorio (top 2022, top
+  consulta Pacto 2025, consulta 2026 ganadora).
+- Botón CTA `#btn-ver-lectura` (clase `.btn-primary`, azul fuerte).
+  Empieza disabled, se habilita cuando la lectura llega.
+- `#cta-status` con estado del pre-fetch: "Preparando…" → "Listo. Toca
+  el botón." (clase `.ready`) o error.
 
-   **Solución acordada (opción C):** reprocesar los CSVs crudos
-   (`GCS_2010PRES1V.csv` ... `GCS_2022PRES1V.csv` + `GCS_2022CONSU.csv` +
-   `GCS_2025CONSU.csv` + senado/cámara 2026) cruzando puesto → barrio
-   con `PUESTOS_GEOREF.csv` (usando `lat/lon` o `CÓDIGO COMPLETO` actual
-   con fallback nearest-neighbor para puestos huérfanos). Aplicar la
-   fórmula del ponderador con las EQUIVALENCIAS de `previa-1v.html`
-   (líneas 1636-1685) para cada uno de los 6 candidatos × barrio.
+**Sub-vista B — `#result-lectura`** (oculta hasta el click):
+- `.ai-message` con la lectura personalizada (2 párrafos + frase final).
+- Si la lectura llega antes del click: renderiza al click (instantáneo).
+- Si el usuario clickea antes: muestra el loader de 5 frases rotando.
+- Si falla: cae al texto fallback (sin DeepSeek).
 
-   Trabajo estimado: 6-8 horas. Output: un archivo por ciudad
-   (`bog-barrios-ponderado.json`, `mde-barrios-ponderado.json`, etc.)
-   y uno nacional `muns-ponderado.json` para zonas rurales.
+**Pre-fetch en paralelo** (clave del UX): `renderResultado()` dispara
+`iniciarPrefetchLectura()` inmediatamente al pintar la sub-vista A.
+DeepSeek toma 10-15s warm; mientras tanto el usuario ve candidato +
+arquetipo + gráfico de barrio (mucho contenido para leer). Al click del
+botón, la lectura **suele estar ya cacheada** en `_lecturaData`.
 
-2. **Lambda lee la huella y la inyecta al prompt** — después de tener
-   los JSON arriba, la Lambda al recibir `STATE.ubicacion.barrio` (o
-   `mun_cod`) hace un fetch al archivo apropiado, extrae los datos del
-   candidato del usuario, y los inyecta como hechos al system prompt.
-   Trabajo: 30 min.
+El `result-tag` cambia: "Resultado" en A → "Análisis" en B.
 
-3. **Memes procedurales** — 30 imágenes (6 candidatos × 5 arquetipos),
+### Huella territorial — pipeline + integración
+
+Pipeline en `tools/build-huella-territorial/build.py` (Python, una
+corrida ~3 minutos):
+- Lookup directo desde `PUESTOS_GEOREF.csv` (columna `BARRIO` poblada al
+  100% en los 13.508 puestos del país — sin necesidad de polígonos).
+- Cruza 9 señales electorales: 5 GCS crudos (`GCS_2010/14/18/22PRES1V`,
+  `GCS_2025CONSU` Pacto) + 4 desde S3 (`consulta-2026-gran/frente/soluciones`
+  como `por-puesto.json` con wrapper `{puestos: {...}}`, y `senado-2026`
+  por depto).
+- Cascada de matching: **A** exacto `(DD,MMM,ZZ,PP)` (87-99% según
+  señal), **B** por zona `(DD,MMM,ZZ)` → barrio modal, **C** solo
+  municipio. Sin descarte.
+- Aplica la fórmula del ponderador con las `EQUIVALENCIAS` de
+  `previa-1v.html` (líneas 1636-1685, copiadas literalmente al script):
+  `bias_c(M) = afín_local(c,M) / afín_nacional(c)`. 1.0 = neutral.
+- Output: `huella-territorial.json` (~1.27 MB · 2.506 barrios + 1.122
+  muns) en
+  `s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/huella/`
+  (prefijo público bajo la bucket policy ya existente).
+
+**Ciudades con desagregación por barrio** (27, definidas en
+`CIUDADES_BARRIO` del script): Bogotá, Medellín, Cali, Barranquilla,
+Cartagena, Ibagué, Montería, Villavicencio, Manizales, Cúcuta,
+Bucaramanga, Pereira, Pasto, Santa Marta, Popayán, Valledupar,
+Riohacha, Neiva, Armenia, Palmira, Buenaventura, Barrancabermeja, Tuluá,
+Bello, Soledad, Soacha, Tumaco. El resto del país queda a nivel
+municipio.
+
+Shape (keys cortas):
+```jsonc
+{
+  "v": "2026-05-18", "cands": ["ic","ae","pv","sf","cl","rb"],
+  "afin_nac": { "ic": 0.395, "ae": 0.256, ... },
+  "barrios": {
+    "medellin::comuna-11-laureles::laureles": {
+      "n": "LAURELES", "ciudad":"Medellín", "subloc":"COMUNA 11 LAURELES",
+      "mun":"01-001", "dep":"ANTIOQUIA", "puestos":3, "censo":30824,
+      "b": { "ic":0.79, "ae":1.50, "pv":1.77, "sf":0.99, "cl":1.04, "rb":0.88 },
+      "h": {
+        "p22":  { "n":"FEDERICO GUTIERREZ", "pct":66.0 },
+        "c25p": { "n":"IVAN CEPEDA CASTRO", "pct":66.2 },
+        "c26":  "gran",  // gran|frente|soluciones
+        "s26":  { "n":"PARTIDO CENTRO DEMOCRATICO", "pct":53.2 }
+      }
+    }
+  },
+  "muns": { "01-151": { "n":"ITAGUI", "dep":"ANTIOQUIA", "puestos":18,
+                        "censo":24500, "b":{...}, "h":{...} } }
+}
+```
+
+**Lambda integración** (`tools/test-presidencial-explica/lambda_handler.py`):
+- `_load_huella()` con cache por contenedor warm. Lee de S3 vía IAM.
+- `_resolver_huella(ubi)` cascada: barrio (match por slug del barrio +
+  comuna como tiebreaker) → mun → None.
+- `_format_huella_block(entry, level, candidato_id)` arma bloque de
+  texto que se appendea al `user_msg`. Incluye: ubicación, censo, top
+  2022, top consulta Pacto 2025, consulta 2026 ganadora, top partido
+  senado 2026, **6 bias por candidato** (1 marcado como `← CANDIDATO
+  DECLARADO`), y una interpretación textual del bias del declarado
+  (MÁS afín / MENOS afín / neutro).
+- Regla 6 al SYSTEM_PROMPT: el modelo usa la huella como evidencia
+  objetiva, no inventa nada.
+- `_cache_key` incluye `mun_cod` + `barrio` (slug) para que dos usuarios
+  de barrios distintos no compartan respuesta cacheada.
+- `max_tokens` subido a **8000** (era 4000): V4 con bloque de huella
+  agotaba todo en reasoning_tokens y dejaba `content` vacío con
+  `finish_reason=length`.
+
+**IAM** — `lambda-test-presidencial-explica` inline policy `s3-cache`:
+- `Get/PutObject` sobre `ricardoruiz.co/test-presidencial-2026/cache/*`
+- `GetObject` sobre `ricardoruiz.co/congreso-2026/output/huella/*`
+
+**Frontend integración** (`test-presidencial-2026.html`):
+- `HUELLA_URL` apunta al mismo prefijo público. **Precarga en
+  `ubiNext()`** (apenas el user sale de la pantalla de ubicación), así
+  durante los 30s de las 8 preguntas se descarga (1.27 MB con gzip
+  ~250 KB).
+- `cargarHuella()` lazy con `_huellaCache` / `_huellaPromise` para no
+  duplicar fetches.
+- `resolverHuella(huella)` espejo del de la Lambda (slug barrio + comuna
+  tiebreaker → fallback mun).
+- `calcularIntencionBarrio(entry)` = `POND_NAC × bias` renormalizado.
+  `POND_NAC` está hardcoded al inicio del script y debe sincronizarse
+  con `previa-1v.html` si el ponderador cambia.
+- `renderIntencionBarrio(cand)` pinta las 6 barras animadas (delay 60ms
+  para que el width:0→pct anime) + footnote de hechos.
+
+**Cómo regenerar la huella**:
+```bash
+python3 tools/build-huella-territorial/build.py
+# → escribe Bases de datos/output_huella/huella-territorial.json (~3 min)
+
+aws s3 cp "Bases de datos/output_huella/huella-territorial.json" \
+  "s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/huella/huella-territorial.json" \
+  --content-type "application/json" --cache-control "public, max-age=300"
+```
+Cache S3 del frontend dura 5 min — si necesitas invalidar antes,
+bumpear un `?v=YYYYMMDD` en `HUELLA_URL`.
+
+### Lo que falta (pendientes activos)
+
+1. **Memes procedurales** — 30 imágenes (6 candidatos × 5 arquetipos),
    1080×1080 sin texto encima. Ricardo los genera. Render en canvas
-   con `mensaje_corto` superpuesto + botón compartir.
+   con `mensaje_corto` superpuesto + botón compartir. Ver
+   `Bases de datos/test-presidencial/memes-spec.txt` para concepto de
+   cada celda.
 
-4. **Revisión humana del banco de preguntas** — Ricardo edita el Excel
+2. **Revisión humana del banco de preguntas** — Ricardo edita el Excel
    `Bases de datos/test-presidencial/banco-preguntas-v1.xlsx` (12 hojas).
    Solo edita columna `enunciado`. Falta escribir `xlsx_to_json.py`
    para reintegrar al JSON.
 
-5. **Embed para El País Cali** — `?embed=1&brand=elpais&territorio=valle`
+3. **Embed para El País Cali** — `?embed=1&brand=elpais&territorio=valle`
    con paleta + tipografía del medio + filtro territorial. Dashboard
    `elpais-cali-dashboard.html` con resultados en tiempo real para ellos.
 

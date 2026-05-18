@@ -60,7 +60,7 @@ DEEPSEEK_URL = os.environ.get("DEEPSEEK_URL", "https://api.deepseek.com/chat/com
 DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash")
 S3_BUCKET = os.environ.get("S3_BUCKET", "elecciones-2026")
 CACHE_PREFIX = os.environ.get("CACHE_PREFIX", "ricardoruiz.co/test-presidencial-2026/cache")
-HUELLA_KEY = os.environ.get("HUELLA_KEY", "ricardoruiz.co/test-presidencial-2026/huella/huella-territorial.json")
+HUELLA_KEY = os.environ.get("HUELLA_KEY", "ricardoruiz.co/congreso-2026/output/huella/huella-territorial.json")
 CACHE_TTL_DIAS = int(os.environ.get("CACHE_TTL_DIAS", "14"))
 HTTP_TIMEOUT = 55
 

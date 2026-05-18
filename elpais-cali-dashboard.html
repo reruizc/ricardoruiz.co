@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>El País Cali · Dashboard Test Presidencial 2026 · Ricardo Ruiz</title>
+<style>
+  :root {
+    --elpais-blue:   #003B71;
+    --elpais-blue-2: #1D6FB8;
+    --elpais-red:    #E2161F;
+    --bg:            #f7f6f3;
+    --card:          #ffffff;
+    --text:          #14202C;
+    --text-soft:     #5C6975;
+    --text-meta:     #889099;
+    --border:        #E2E2E0;
+    --border-soft:   #ECECEA;
+    --green:         #0E8C5F;
+    --amber:         #B58200;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; padding:0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Source Sans Pro', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 1.6rem 1.5rem 3rem; }
+
+  header.elpais-bar {
+    background: var(--elpais-blue); color: #fff;
+    padding: 1rem 1.5rem;
+  }
+  .elpais-bar-inner {
+    max-width: 1180px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .elpais-mark {
+    font-family: 'Playfair Display', 'Fraunces', serif;
+    font-weight: 900; font-size: 1.7rem; letter-spacing: -0.01em;
+  }
+  .elpais-mark span { color: var(--elpais-red); }
+  .elpais-bar-meta {
+    font-size: .72rem; letter-spacing: .12em; text-transform: uppercase;
+    opacity: .85;
+  }
+
+  h1.title {
+    font-family: 'Playfair Display', 'Fraunces', serif;
+    font-weight: 800; font-size: clamp(1.7rem, 3.2vw, 2.6rem);
+    letter-spacing: -0.015em; line-height: 1.1;
+    margin: 1.4rem 0 .35rem;
+  }
+  h1.title span { color: var(--elpais-blue); }
+  p.subtitle {
+    color: var(--text-soft); font-size: 1rem; line-height: 1.5;
+    max-width: 70ch; margin: 0 0 1.8rem;
+  }
+
+  h2.section {
+    font-family: 'Playfair Display', 'Fraunces', serif;
+    font-weight: 700; font-size: 1.3rem; color: var(--elpais-blue);
+    margin: 2rem 0 1rem; padding-bottom: .35rem;
+    border-bottom: 2px solid var(--elpais-blue);
+  }
+
+  .kpi-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+  }
+  .kpi {
+    background: var(--card); border: 1px solid var(--border);
+    border-left: 4px solid var(--elpais-blue);
+    border-radius: 6px; padding: 1.1rem 1.2rem;
+  }
+  .kpi .kpi-label {
+    font-size: .68rem; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--text-meta); font-weight: 600;
+  }
+  .kpi .kpi-value {
+    font-family: 'Playfair Display', 'Fraunces', serif;
+    font-weight: 800; font-size: 2rem; line-height: 1.05;
+    color: var(--text); margin-top: .25rem;
+  }
+  .kpi .kpi-delta { font-size: .85rem; color: var(--text-soft); margin-top: .3rem; }
+  .kpi .kpi-delta.up { color: var(--green); }
+  .kpi .kpi-delta.down { color: var(--elpais-red); }
+
+  .panel {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 6px; padding: 1.3rem 1.4rem;
+    margin-bottom: 1.2rem;
+  }
+  .panel h3 {
+    margin: 0 0 .9rem; font-size: 1rem; font-weight: 700;
+    color: var(--text); display: flex; align-items: center; justify-content: space-between;
+  }
+  .panel h3 .badge {
+    font-size: .62rem; letter-spacing: .14em; text-transform: uppercase;
+    background: var(--border-soft); color: var(--text-meta);
+    padding: .2rem .55rem; border-radius: 3px; font-weight: 600;
+  }
+  .panel h3 .badge.live { background: var(--green); color: #fff; }
+  .panel h3 .badge.todo { background: var(--amber); color: #fff; }
+
+  .bar-row {
+    display: grid; grid-template-columns: 160px 1fr 56px;
+    align-items: center; gap: .8rem; padding: .42rem 0;
+  }
+  .bar-row .bar-name { font-size: .92rem; color: var(--text); }
+  .bar-row .bar-track { height: 10px; background: var(--border-soft); border-radius: 5px; overflow: hidden; }
+  .bar-row .bar-fill { height: 100%; background: var(--elpais-blue); border-radius: 5px; }
+  .bar-row .bar-pct { font-variant-numeric: tabular-nums; font-size: .86rem; color: var(--text-soft); text-align: right; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+  @media (max-width: 760px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  pre.embed-snippet {
+    background: #14202C; color: #d8e3ee; padding: 1rem 1.2rem;
+    border-radius: 6px; font-family: 'JetBrains Mono', 'DM Mono', monospace;
+    font-size: .82rem; line-height: 1.5;
+    overflow-x: auto; margin: 0;
+  }
+  .copy-btn {
+    margin-top: .7rem; padding: .55rem 1rem;
+    background: var(--elpais-blue); color: #fff; border: none; border-radius: 4px;
+    font-family: inherit; font-size: .88rem; font-weight: 600;
+    cursor: pointer; transition: background .15s;
+  }
+  .copy-btn:hover { background: var(--elpais-blue-2); }
+
+  .live-feed { max-height: 380px; overflow-y: auto; }
+  .live-feed .feed-item {
+    display: grid; grid-template-columns: 90px 1fr auto;
+    gap: .8rem; padding: .55rem 0;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: .9rem;
+  }
+  .live-feed .feed-item:last-child { border-bottom: none; }
+  .live-feed .feed-time {
+    color: var(--text-meta); font-variant-numeric: tabular-nums;
+    font-size: .82rem; padding-top: .12rem;
+  }
+  .live-feed .feed-cand { font-weight: 600; }
+  .live-feed .feed-meta { color: var(--text-soft); font-size: .85rem; padding-top: .12rem; }
+
+  .footer-note {
+    margin-top: 2rem; padding: 1rem 1.2rem;
+    background: #FFF8E5; border: 1px solid #F0E0A3;
+    border-radius: 6px; font-size: .88rem; color: #6B5A0F;
+  }
+  .footer-note b { color: #5A4900; }
+</style>
+</head>
+<body>
+
+<header class="elpais-bar">
+  <div class="elpais-bar-inner">
+    <div class="elpais-mark">EL <span>PAÍS</span> · CALI</div>
+    <div class="elpais-bar-meta">Dashboard interno · Test Presidencial 2026</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <h1 class="title">¿Cómo vota <span>el Valle</span> en el test presidencial?</h1>
+  <p class="subtitle">
+    Panel privado para el equipo editorial de El País Cali. Agregados en tiempo real
+    de los lectores que completan el test embebido en el sitio. Los datos provienen
+    del cache de la Lambda de DeepSeek; cada respuesta queda anonimizada
+    (sin email, sin coordenadas, solo barrio y municipio del Valle).
+  </p>
+
+  <!-- ───────────── KPIs ───────────── -->
+  <h2 class="section">Lo esencial</h2>
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-label">Tests completados</div>
+      <div class="kpi-value" id="kpi-total">—</div>
+      <div class="kpi-delta" id="kpi-total-delta">esperando datos</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Candidato más declarado</div>
+      <div class="kpi-value" id="kpi-cand">—</div>
+      <div class="kpi-delta" id="kpi-cand-pct">—</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Arquetipo dominante</div>
+      <div class="kpi-value" id="kpi-arq">—</div>
+      <div class="kpi-delta" id="kpi-arq-pct">—</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Tasa de vientos cruzados</div>
+      <div class="kpi-value" id="kpi-cross">—</div>
+      <div class="kpi-delta" id="kpi-cross-delta">candidato declarado vs huella barrial</div>
+    </div>
+  </div>
+
+  <!-- ───────────── Distribución candidatos ───────────── -->
+  <div class="grid-2">
+    <div class="panel">
+      <h3>Candidato declarado · Valle <span class="badge live">live</span></h3>
+      <div id="bars-cand"></div>
+    </div>
+    <div class="panel">
+      <h3>Arquetipo dominante · Valle <span class="badge live">live</span></h3>
+      <div id="bars-arq"></div>
+    </div>
+  </div>
+
+  <!-- ───────────── Cruce candidato × arquetipo ───────────── -->
+  <div class="panel">
+    <h3>Cruce candidato × arquetipo (heatmap) <span class="badge todo">próximamente</span></h3>
+    <p style="color:var(--text-soft); font-size:.92rem; margin:0;">
+      Matriz 6×5 con la frecuencia de cada combinación. Útil para ver qué
+      arquetipo emocional gravita a cada candidato dentro del Valle.
+    </p>
+  </div>
+
+  <!-- ───────────── Feed en vivo ───────────── -->
+  <h2 class="section">Últimos lectores</h2>
+  <div class="panel">
+    <h3>Stream de respuestas <span class="badge live">live · anónimo</span></h3>
+    <div class="live-feed" id="live-feed">
+      <div class="feed-item">
+        <span class="feed-time">—</span>
+        <span class="feed-meta">esperando datos del primer lector…</span>
+        <span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────────── Embed code ───────────── -->
+  <h2 class="section">Cómo embeber el test</h2>
+  <div class="panel">
+    <h3>Snippet para publicar en cualquier nota de El País Cali</h3>
+    <p style="color:var(--text-soft); font-size:.92rem; margin:0 0 .8rem;">
+      Pega este iframe en el cuerpo del artículo. El test se carga con la
+      paleta de El País y filtra el dropdown de ubicación al Valle del Cauca
+      por defecto (el lector puede cambiarlo si está en otra zona).
+    </p>
+    <pre class="embed-snippet" id="embed-snippet">&lt;iframe
+  src="https://ricardoruiz.co/test-presidencial-2026.html?embed=1&amp;brand=elpais&amp;territorio=valle"
+  width="100%" height="900"
+  style="border:none; max-width:760px; display:block; margin:0 auto;"
+  loading="lazy"
+  title="Test Presidencial 2026 · El País Cali"
+  allow="geolocation">
+&lt;/iframe></pre>
+    <button class="copy-btn" id="copy-embed">Copiar código</button>
+  </div>
+
+  <!-- ───────────── Notas técnicas ───────────── -->
+  <div class="footer-note">
+    <b>Estado del backend (mayo 2026 · borrador v1):</b><br>
+    Los KPIs y el stream en vivo están conectados a un mock de datos para
+    diseño. Para conectar a producción se necesita una Lambda agregadora
+    que lea el cache de DeepSeek
+    (<code>s3://elecciones-2026/ricardoruiz.co/test-presidencial-2026/cache/</code>)
+    y emita JSON con conteos por candidato / arquetipo / barrio del Valle.
+    Pendiente:
+    <ul style="margin:.5rem 0 0; padding-left:1.2rem;">
+      <li>Lambda <code>dashboard-aggregator</code> con cron cada 5 min.</li>
+      <li>Endpoint público (CORS El País) con la última agregación.</li>
+      <li>Filtro territorial server-side (solo dep_cod=31).</li>
+      <li>Decisión legal: ¿retener cache 14 días como ahora, o purgar a 7?</li>
+    </ul>
+  </div>
+
+</div>
+
+<script>
+  // ── Mock data para diseño (reemplazar por fetch a la Lambda agregadora) ──
+  const MOCK = {
+    total: 1842,
+    deltaSemana: '+ 312 esta semana',
+    cand: { id: 'cl', nombre: 'Claudia López', pct: 28 },
+    arq: { id: 'castigo', nombre: 'Castigo y alternancia', pct: 32 },
+    cross: 41,
+    crossNote: 'declararon candidato menos afín que el promedio del barrio',
+    bars_cand: [
+      { id:'cl', n:'Claudia López',      pct: 28, color: '#d9db24' },
+      { id:'rb', n:'Roy Barreras',       pct: 22, color: '#3d8b3d' },
+      { id:'ic', n:'Iván Cepeda',        pct: 19, color: '#51458F' },
+      { id:'sf', n:'Sergio Fajardo',     pct: 14, color: '#EEAA22' },
+      { id:'ae', n:'Abelardo De la Espriella', pct: 10, color: '#000062' },
+      { id:'pv', n:'Paloma Valencia',    pct:  7, color: '#1866DF' },
+    ],
+    bars_arq: [
+      { id:'castigo',      n:'Castigo y alternancia',  pct: 32, color: '#a02020' },
+      { id:'supervivencia',n:'Supervivencia cotidiana', pct: 24, color: '#c9682e' },
+      { id:'pertenencia',  n:'Pertenencia comunitaria', pct: 18, color: '#7a3b8f' },
+      { id:'proteccion',   n:'Protección y orden',     pct: 16, color: '#1e6fb8' },
+      { id:'estabilidad',  n:'Continuidad pragmática',  pct: 10, color: '#2f6b3f' },
+    ],
+    feed: [
+      { t:'09:42', cand:'Claudia López',    arq:'Castigo y alternancia',  zona:'San Fernando, Cali' },
+      { t:'09:39', cand:'Iván Cepeda',      arq:'Pertenencia comunitaria',zona:'Aguablanca, Cali' },
+      { t:'09:36', cand:'Roy Barreras',     arq:'Continuidad pragmática', zona:'Granada, Cali' },
+      { t:'09:31', cand:'Claudia López',    arq:'Protección y orden',     zona:'Versalles, Cali' },
+      { t:'09:28', cand:'Sergio Fajardo',   arq:'Castigo y alternancia',  zona:'Sebastián de Belalcázar, Cali' },
+      { t:'09:24', cand:'Iván Cepeda',      arq:'Supervivencia cotidiana',zona:'Mojica, Cali' },
+      { t:'09:18', cand:'Abelardo De la Espriella', arq:'Protección y orden', zona:'Ciudad Jardín, Cali' },
+      { t:'09:11', cand:'Roy Barreras',     arq:'Pertenencia comunitaria',zona:'Comuna 18, Palmira' },
+    ],
+  };
+
+  // ── Render ──
+  function renderKPIs() {
+    document.getElementById('kpi-total').textContent = MOCK.total.toLocaleString('es-CO');
+    document.getElementById('kpi-total-delta').textContent = MOCK.deltaSemana;
+    document.getElementById('kpi-cand').textContent = MOCK.cand.nombre;
+    document.getElementById('kpi-cand-pct').textContent = `${MOCK.cand.pct}% de declaraciones`;
+    document.getElementById('kpi-arq').textContent = MOCK.arq.nombre;
+    document.getElementById('kpi-arq-pct').textContent = `${MOCK.arq.pct}% dominante`;
+    document.getElementById('kpi-cross').textContent = MOCK.cross + '%';
+    document.getElementById('kpi-cross-delta').textContent = MOCK.crossNote;
+  }
+  function renderBars(targetId, rows) {
+    const max = Math.max(...rows.map(r => r.pct));
+    document.getElementById(targetId).innerHTML = rows.map(r => `
+      <div class="bar-row">
+        <span class="bar-name">${r.n}</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${(r.pct/max)*100}%; background:${r.color}"></div></div>
+        <span class="bar-pct">${r.pct}%</span>
+      </div>`).join('');
+  }
+  function renderFeed() {
+    document.getElementById('live-feed').innerHTML = MOCK.feed.map(f => `
+      <div class="feed-item">
+        <span class="feed-time">${f.t}</span>
+        <span><span class="feed-cand">${f.cand}</span> · <span class="feed-meta">${f.arq}</span></span>
+        <span class="feed-meta">${f.zona}</span>
+      </div>`).join('');
+  }
+  document.getElementById('copy-embed').addEventListener('click', () => {
+    const code = document.getElementById('embed-snippet').textContent;
+    navigator.clipboard.writeText(code).then(() => {
+      const b = document.getElementById('copy-embed');
+      const orig = b.textContent;
+      b.textContent = '✓ Copiado';
+      setTimeout(() => { b.textContent = orig; }, 1500);
+    });
+  });
+
+  renderKPIs(); renderBars('bars-cand', MOCK.bars_cand); renderBars('bars-arq', MOCK.bars_arq); renderFeed();
+
+  // ── TODO al conectar Lambda agregadora ──
+  // const AGG_URL = 'https://<api>.execute-api.us-east-1.amazonaws.com/dashboard/elpais-cali';
+  // async function refresh() {
+  //   const r = await fetch(AGG_URL); const d = await r.json();
+  //   // mapear d.* a los renderers de arriba
+  // }
+  // setInterval(refresh, 5*60*1000);
+</script>
+
+</body>
+</html>

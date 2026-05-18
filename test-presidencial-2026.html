@@ -257,12 +257,45 @@
       100% { left:100%; width:30%; }
     }
 
-    .bars-title { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.18em; text-transform:uppercase; color:var(--text-meta); font-weight:500; margin: 1.2rem 0 .65rem; }
-    .bar-row { display:grid; grid-template-columns: 130px 1fr 56px; align-items:center; gap:.7rem; padding:.45rem 0; }
+    /* ── Gráfico de intención de voto del barrio ── */
+    .barrio-block {
+      padding:1.2rem 1.3rem;
+      background:var(--card);
+      border:1.5px solid var(--border);
+      border-radius:14px;
+      margin-bottom:1.2rem;
+    }
+    .barrio-eyebrow { display:block; font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.2em; text-transform:uppercase; color:var(--text-meta); font-weight:500; margin-bottom:.4rem; }
+    .barrio-label { font-family:'Fraunces',serif; font-weight:700; font-size:1.05rem; color:var(--text); line-height:1.25; margin-bottom:.95rem; }
+    .barrio-label .barrio-context { display:block; font-family:'Fraunces',serif; font-weight:300; font-size:.82rem; color:var(--text-soft); margin-top:.2rem; }
+    .bar-row { display:grid; grid-template-columns: 130px 1fr 56px; align-items:center; gap:.7rem; padding:.4rem 0; }
     .bar-name { font-family:'Fraunces',serif; font-weight:500; font-size:.92rem; color:var(--text); }
+    .bar-name.mine { font-weight:700; }
+    .bar-name.mine::after { content:" •"; color:var(--text-meta); }
     .bar-track { position:relative; height:8px; background:var(--border-soft); border-radius:4px; overflow:hidden; }
-    .bar-fill { position:absolute; left:0; top:0; bottom:0; width:0%; transition: width .8s ease; border-radius:4px; background:var(--text-meta); }
+    .bar-fill { position:absolute; left:0; top:0; bottom:0; width:0%; transition: width .9s cubic-bezier(.22,.61,.36,1); border-radius:4px; background:var(--text-meta); }
     .bar-pct { font-family:'DM Mono',monospace; font-weight:500; font-size:.78rem; color:var(--text-soft); text-align:right; }
+    .barrio-foot { font-family:'Fraunces',serif; font-weight:300; font-size:.78rem; color:var(--text-meta); line-height:1.4; margin-top:.85rem; }
+    .barrio-empty { font-family:'Fraunces',serif; font-weight:300; font-size:.88rem; color:var(--text-soft); line-height:1.5; padding:.6rem 0; }
+
+    /* ── Botón pre-resultado → lectura ── */
+    .cta-row { display:flex; flex-direction:column; gap:.55rem; align-items:stretch; margin-top:.4rem; margin-bottom:.8rem; }
+    .cta-row .btn-primary {
+      padding:.95rem 1.4rem; font-family:'Syne',sans-serif; font-weight:700; font-size:.95rem;
+      background:var(--blue); color:#fff; border:none; border-radius:10px;
+      cursor:none; transition: transform .15s, box-shadow .15s, opacity .15s;
+      letter-spacing:.01em;
+    }
+    .cta-row .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,71,255,0.25); }
+    .cta-row .btn-primary[disabled] { opacity:.55; cursor:none; }
+    .cta-status {
+      font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.06em;
+      color:var(--text-meta); text-align:center;
+      min-height:1.1em;
+    }
+    .cta-status.ready { color:var(--blue); }
+    .cta-status.ready::before { content:"✓ "; }
+    .cta-status.error { color:#e63946; }
 
     .result-foot { margin-top:1.6rem; font-family:'Fraunces',serif; font-weight:300; font-size:.88rem; color:var(--text-soft); line-height:1.5; }
 
@@ -274,6 +307,42 @@
     @media (max-width:680px) {
       .top-bar, .head-wrap, .main, .full-footer { padding-left:1.1rem; padding-right:1.1rem; }
     }
+
+    /* ── Modo EMBED (iframe en medios aliados) ── */
+    /* Activado con ?embed=1. Esconde top-bar y footer global, ajusta paddings */
+    /* para vivir dentro de un iframe. El cursor custom también se oculta porque */
+    /* el iframe puede no recibir todos los eventos del mouse del parent. */
+    /* Background del body se mantiene (var(--bg)) para que el embed se vea */
+    /* limpio aunque el medio aliado tenga otro color de página. */
+    html.embed .top-bar,
+    html.embed .full-footer,
+    html.embed .cursor,
+    html.embed .cursor-ring { display: none !important; }
+    html.embed body { cursor: auto; }
+    html.embed { cursor: auto; }
+    html.embed .head-wrap { padding-top: .8rem; padding-bottom: 1rem; }
+    html.embed .head-wrap .eyebrow { display:none; }
+    html.embed .head-wrap .subtitle { font-size: .82rem; }
+    html.embed .main { padding-top: 0; }
+    html.embed .embed-attrib {
+      display:flex; align-items:center; justify-content:space-between;
+      padding: .55rem 1.5rem;
+      background: var(--card);
+      border-bottom: 1px solid var(--border-soft);
+      font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.14em;
+      text-transform:uppercase; color:var(--text-meta);
+    }
+    html.embed .embed-attrib a { color: var(--blue); text-decoration:none; }
+    html:not(.embed) .embed-attrib { display:none; }
+
+    /* Brand: El País Cali — azul corporativo + tipografía Fraunces para títulos. */
+    /* Se aplica como overlay sobre el theme base; respeta day/night. */
+    html[data-brand="elpais"] {
+      --blue: #003B71;
+    }
+    html[data-brand="elpais"] .title span { color: var(--blue); }
+    html[data-brand="elpais"] .embed-attrib { color: var(--blue); }
+    html[data-brand="elpais"] .embed-attrib::before { content: "EL PAÍS CALI · "; font-weight: 700; letter-spacing:.14em; }
   </style>
 </head>
 <body>
@@ -291,6 +360,12 @@
         <div class="logo-text">Ricardo<span>.Ruiz</span></div>
       </a>
       <a href="electoral.html" class="back-link">← Volver a Electoral</a>
+    </div>
+
+    <!-- Barra de atribución visible solo en modo embed -->
+    <div class="embed-attrib">
+      <span id="embed-attrib-brand">Test presidencial 2026</span>
+      <a href="https://ricardoruiz.co/test-presidencial-2026.html" target="_blank" rel="noopener">datos · ricardoruiz.co</a>
     </div>
 
     <div class="head-wrap">
@@ -453,34 +528,55 @@
       <div class="panel" id="panel-result">
         <div class="qhead">
           <span class="qnum">Tu lectura</span>
-          <span class="qtag">Resultado</span>
+          <span class="qtag" id="result-tag">Resultado</span>
         </div>
 
-        <div class="arq-hero" id="arq-hero">
-          <span class="arq-eyebrow" id="arq-eyebrow">Tu arquetipo dominante</span>
-          <div class="arq-name" id="arq-name">—</div>
-          <div class="arq-desc" id="arq-desc">—</div>
-          <div class="arq-second" id="arq-second" style="display:none;"></div>
-        </div>
+        <!-- Sub-vista A: pre-resultado (candidato + arquetipo + intención del barrio) -->
+        <div id="result-summary">
+          <div class="arq-hero" id="arq-hero">
+            <span class="arq-eyebrow" id="arq-eyebrow">Tu arquetipo dominante</span>
+            <div class="arq-name" id="arq-name">—</div>
+            <div class="arq-desc" id="arq-desc">—</div>
+            <div class="arq-second" id="arq-second" style="display:none;"></div>
+          </div>
 
-        <div class="cand-block" id="cand-block">
-          <div class="cand-block-avatar" id="cand-block-avatar">—</div>
-          <div class="cand-block-meta">
-            <span class="cand-block-eyebrow">Tu apuesta declarada</span>
-            <div class="cand-block-name" id="cand-block-name">—</div>
-            <div class="cand-block-party" id="cand-block-party">—</div>
+          <div class="cand-block" id="cand-block">
+            <div class="cand-block-avatar" id="cand-block-avatar">—</div>
+            <div class="cand-block-meta">
+              <span class="cand-block-eyebrow">Tu apuesta declarada</span>
+              <div class="cand-block-name" id="cand-block-name">—</div>
+              <div class="cand-block-party" id="cand-block-party">—</div>
+            </div>
+          </div>
+
+          <div class="barrio-block" id="barrio-block">
+            <span class="barrio-eyebrow">Cómo se inclinaría tu zona</span>
+            <div class="barrio-label" id="barrio-label">
+              Calculando…
+              <span class="barrio-context" id="barrio-context"></span>
+            </div>
+            <div id="intencion-bars"></div>
+            <p class="barrio-foot" id="barrio-foot"></p>
+          </div>
+
+          <div class="cta-row">
+            <button class="btn-primary" id="btn-ver-lectura" onclick="mostrarLectura()" disabled>
+              Ver la conveniencia de tu candidato en tu zona →
+            </button>
+            <span class="cta-status" id="cta-status">Preparando tu análisis personalizado…</span>
           </div>
         </div>
 
-        <div class="ai-message" id="ai-message">
-          <span class="ai-eyebrow">Lectura personalizada</span>
-          <div id="ai-message-body">El módulo de lectura personalizada se activa cuando conectemos el endpoint de DeepSeek. Por ahora ves la información base.</div>
+        <!-- Sub-vista B: lectura personalizada -->
+        <div id="result-lectura" style="display:none;">
+          <div class="arq-hero" id="arq-hero-b" style="display:none;"></div>
+          <div class="ai-message" id="ai-message">
+            <span class="ai-eyebrow">Tu lectura personalizada</span>
+            <div id="ai-message-body">—</div>
+          </div>
         </div>
 
-        <div class="bars-title">Distribución de tu perfil emocional</div>
-        <div id="bars"></div>
-
-        <p class="result-foot">El resultado se calcula sumando puntos en cada pregunta según el arquetipo emocional al que apunta cada opción. Cada opción está escrita en el lenguaje del candidato que elegiste — la metodología y los arquetipos provienen del marco de Cartografía Emocional del Votante (Nury Astrid, 2026).</p>
+        <p class="result-foot">Los arquetipos provienen del marco de Cartografía Emocional del Votante (Nury Astrid, 2026). La intención de voto barrial es una proyección sobre el ponderador propio aplicado a la huella histórica de tu zona — no es una predicción de la primera vuelta.</p>
 
         <div class="actions">
           <button class="btn btn-ghost" onclick="restart()">Repetir test</button>
@@ -532,6 +628,64 @@
     puestos:    `${S3_BASE}/puestos-light.json`,
   };
   const EXPLICA_URL = 'https://9w1xcwe2sj.execute-api.us-east-1.amazonaws.com/explica';
+  const HUELLA_URL  = `https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/huella/huella-territorial.json`;
+
+  // ── Modo EMBED para medios aliados ──
+  // ?embed=1                    → activa estilos de iframe
+  // &brand=elpais|<otro>        → paleta del medio
+  // &territorio=valle|<region>  → pre-selecciona el dropdown de depto
+  const URL_PARAMS = new URLSearchParams(window.location.search);
+  const EMBED_MODE = URL_PARAMS.get('embed') === '1';
+  const BRAND      = (URL_PARAMS.get('brand') || '').toLowerCase() || null;
+  const TERRITORIO = (URL_PARAMS.get('territorio') || '').toLowerCase() || null;
+
+  // Mapeo territorio → códigos electorales de depto a permitir.
+  // Cuando hay una sola opción, el dropdown se auto-selecciona.
+  const TERRITORIO_TO_DEP = {
+    valle:     ['31'],
+    antioquia: ['01'],
+    bogota:    ['16'],
+    atlantico: ['03'],
+    santander: ['27'],
+    costa:     ['03','05','12','13','21','23','48'],   // ejemplo regional
+  };
+
+  if (EMBED_MODE) {
+    document.documentElement.classList.add('embed');
+    if (BRAND) document.documentElement.dataset.brand = BRAND;
+    if (TERRITORIO) document.documentElement.dataset.territorio = TERRITORIO;
+    // Texto de la barra de atribución según brand
+    const ATTRIB_LABEL = {
+      elpais: 'Edición Cali · Test presidencial 2026',
+    };
+    document.addEventListener('DOMContentLoaded', () => {
+      const el = document.getElementById('embed-attrib-brand');
+      if (el && BRAND && ATTRIB_LABEL[BRAND]) el.textContent = ATTRIB_LABEL[BRAND];
+    });
+    // Notificar al parent que el embed ya cargó
+    window.addEventListener('load', () => notifyParent('ready', {}));
+  }
+
+  // postMessage al frame padre — útil para que el medio aliado registre
+  // eventos clave (inicio del test, terminado, candidato declarado).
+  function notifyParent(type, payload) {
+    if (window.parent === window) return;
+    try {
+      window.parent.postMessage({
+        source: 'rr-test-presidencial-2026',
+        brand: BRAND, territorio: TERRITORIO,
+        type, payload,
+      }, '*');
+    } catch (_) {}
+  }
+
+  // Ponderador nacional (% intención 1ª vuelta) — sincronizado con previa-1v.html.
+  // Si cambian los pesos del ponderador propio, actualizar aquí también.
+  const POND_NAC = {
+    ic: 38.75, ae: 23.94, pv: 19.55, sf: 3.03, cl: 2.58, rb: 0.37,
+  };
+  // Suma de los 6 ≈ 88.2% — el resto se atribuye a blancos / otros / NS-NR.
+  // Para el gráfico barrial renormalizamos a 100% sobre estos 6 candidatos.
 
   // ── STATE ──
   const STATE = {
@@ -593,7 +747,7 @@
         fetch(DATA_URLS.variantes).then(r => r.json()).catch(() => ({ variantes: [] })),
         fetch(DATA_URLS.divipola).then(r => r.json()).catch(() => ({ deptos: [] })),
       ]);
-      DATA = { arquetipos: arq, candidatos: cand, registros: reg, miniTest: mt, preguntas: preg, variantes: vars, divipola: divi };
+      Object.assign(DATA, { arquetipos: arq, candidatos: cand, registros: reg, miniTest: mt, preguntas: preg, variantes: vars, divipola: divi });
       populateDepDropdown();
       renderRegistros();
       renderCandidatos();
@@ -751,10 +905,21 @@
   function populateDepDropdown() {
     const sel = $('#ubi-dep');
     if (!sel || !DATA.divipola) return;
-    const deptos = (DATA.divipola.deptos || []).slice().sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    let deptos = (DATA.divipola.deptos || []).slice().sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    // Filtro territorial cuando viene de un embed (?territorio=...)
+    if (TERRITORIO && TERRITORIO_TO_DEP[TERRITORIO]) {
+      const allow = new Set(TERRITORIO_TO_DEP[TERRITORIO]);
+      deptos = deptos.filter(d => allow.has(d.cod));
+    }
     sel.innerHTML = '<option value="">Selecciona…</option>' + deptos.map(d =>
       `<option value="${d.cod}">${escapeHtml(d.nombre)}</option>`
     ).join('');
+    // Si el filtro deja una sola opción, auto-seleccionar — el usuario sigue
+    // pudiendo cambiar a otro municipio del depto, pero el depto queda fijo.
+    if (deptos.length === 1) {
+      sel.value = deptos[0].cod;
+      onDepChange();
+    }
   }
 
   function onDepChange() {
@@ -952,8 +1117,84 @@
   function ubiNext() {
     if (!STATE.ubicacion.mun_cod) return;
     STATE.ubicacion.tono_regional = tonoRegional(STATE.ubicacion.dep_cod);
+    // Disparar precarga de la huella en background — tendrá ~30s mientras
+    // el usuario responde las 8 preguntas. Para cuando llegue al resultado
+    // ya está en cache local y el gráfico del barrio renderiza inmediato.
+    cargarHuella().catch(err => console.warn('[huella] precarga falló:', err));
     renderPrio();
     show('prio');
+  }
+
+  // ── Huella territorial (lazy load, ~1.27 MB con gzip) ──
+  let _huellaCache = null;
+  let _huellaPromise = null;
+  async function cargarHuella() {
+    if (_huellaCache) return _huellaCache;
+    if (_huellaPromise) return _huellaPromise;
+    _huellaPromise = (async () => {
+      const r = await fetch(HUELLA_URL, { cache: 'force-cache' });
+      if (!r.ok) throw new Error(`huella HTTP ${r.status}`);
+      const data = await r.json();
+      _huellaCache = data;
+      return data;
+    })();
+    return _huellaPromise;
+  }
+
+  function slugSimple(s) {
+    if (!s) return '';
+    return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase();
+  }
+
+  // Resuelve la entrada de huella para el usuario actual.
+  // Devuelve { entry, level: 'barrio'|'mun' } o null.
+  function resolverHuella(huella) {
+    if (!huella) return null;
+    const ubi = STATE.ubicacion || {};
+    if (!ubi.dep_cod) return null;
+    const dd = String(ubi.dep_cod).padStart(2, '0');
+    const mmm = String(ubi.mun_cod || '').padStart(3, '0');
+    const munKey = `${dd}-${mmm}`;
+
+    if (ubi.barrio && huella.barrios) {
+      const barrioSlug = slugSimple(ubi.barrio);
+      const comunaSlug = ubi.comuna ? slugSimple(ubi.comuna) : null;
+      let best = null, bestScore = 0;
+      for (const bk in huella.barrios) {
+        const e = huella.barrios[bk];
+        if (e.mun !== munKey) continue;
+        const parts = bk.split('::');
+        if (parts.length !== 3) continue;
+        if (parts[2] !== barrioSlug) continue;
+        const score = (comunaSlug && parts[1] === comunaSlug) ? 2 : 1;
+        if (score > bestScore) { best = e; bestScore = score; }
+      }
+      if (best) return { entry: best, level: 'barrio' };
+    }
+    if (huella.muns && huella.muns[munKey]) {
+      return { entry: huella.muns[munKey], level: 'mun' };
+    }
+    return null;
+  }
+
+  // Convierte bias × ponderador_nac en pct estimado por candidato, renormalizado.
+  function calcularIntencionBarrio(entry) {
+    const bias = entry && entry.b ? entry.b : {};
+    const cands = ['ic','ae','pv','sf','cl','rb'];
+    const raw = {};
+    let total = 0;
+    for (const c of cands) {
+      const b = bias[c];
+      const base = POND_NAC[c] || 0;
+      const v = (b == null) ? base : (base * b);
+      raw[c] = Math.max(0, v);
+      total += raw[c];
+    }
+    if (total <= 0) return null;
+    const out = {};
+    for (const c of cands) out[c] = (raw[c] / total) * 100;
+    return out;
   }
 
   // ── Nearest-neighbor sobre puestos georeferenciados ──
@@ -1286,6 +1527,12 @@
     renderResultado();
   }
 
+  // Estado de pre-fetch de la lectura DeepSeek
+  let _lecturaPromise = null;
+  let _lecturaData = null;
+  let _lecturaError = null;
+  let _resultCtx = null; // { cand, winner, winnerPct, second, secondPct }
+
   function renderResultado() {
     const ranking = Object.entries(STATE.arqScore).sort((a, b) => b[1] - a[1]);
     const winnerId = ranking[0][0];
@@ -1294,6 +1541,13 @@
     const total = Object.values(STATE.arqScore).reduce((a, b) => a + b, 0) || 1;
     const winnerPct = Math.round((ranking[0][1] / total) * 100);
     const secondPct = Math.round((ranking[1][1] / total) * 100);
+
+    // Asegurar que arrancamos en sub-vista A
+    $('#result-summary').style.display = '';
+    $('#result-lectura').style.display = 'none';
+    $('#result-tag').textContent = 'Resultado';
+    _lecturaData = null;
+    _lecturaError = null;
 
     const hero = $('#arq-hero');
     hero.style.setProperty('--arq-color', winner.color);
@@ -1317,7 +1571,92 @@
     $('#cand-block-name').textContent = cand.nombre;
     $('#cand-block-party').textContent = cand.partido + (STATE.candOrigen === 'sugerido' ? ' · sugerido por el mini-test' : '');
 
-    // Lectura personalizada vía DeepSeek (Lambda test-presidencial-explica)
+    _resultCtx = { cand, winner, winnerPct, second, secondPct };
+
+    // Notificar al frame padre (embed mode) — payload sin info personal
+    notifyParent('result', {
+      candidato: cand.id,
+      candidato_origen: STATE.candOrigen,
+      arquetipo_dominante: winner.id,
+      arquetipo_dominante_pct: winnerPct,
+      arquetipo_secundario: second?.id || null,
+      registro: STATE.registro,
+      dep_cod: STATE.ubicacion?.dep_cod || null,
+      mun_cod: STATE.ubicacion?.mun_cod || null,
+    });
+
+    // Pre-fetch de la lectura EN PARALELO al render de la pantalla A.
+    // El usuario ve candidato + arquetipo + gráfico del barrio mientras
+    // DeepSeek redacta. Si termina antes del click, el botón pasa a "Listo".
+    iniciarPrefetchLectura();
+
+    // Render del gráfico de intención de voto en el barrio.
+    renderIntencionBarrio(cand);
+  }
+
+  function iniciarPrefetchLectura() {
+    if (!_resultCtx) return;
+    const status = $('#cta-status');
+    const btn = $('#btn-ver-lectura');
+    btn.disabled = true;
+    status.className = 'cta-status';
+    status.textContent = 'Preparando tu análisis personalizado…';
+
+    _lecturaPromise = fetchLectura(_resultCtx)
+      .then(data => {
+        if (!data || !data.lectura) throw new Error('Sin lectura');
+        _lecturaData = data;
+        _lecturaError = null;
+        // Si el user ya está mirando la pantalla B (clickeó antes), pintarla
+        const lecturaDiv = $('#result-lectura');
+        if (lecturaDiv && lecturaDiv.style.display !== 'none') {
+          renderLectura(data);
+        } else {
+          btn.disabled = false;
+          status.className = 'cta-status ready';
+          status.textContent = 'Listo. Toca el botón para verlo.';
+        }
+        return data;
+      })
+      .catch(err => {
+        console.warn('[explica] error pre-fetch:', err);
+        _lecturaError = err;
+        _lecturaData = null;
+        const lecturaDiv = $('#result-lectura');
+        if (lecturaDiv && lecturaDiv.style.display !== 'none') {
+          renderLecturaError();
+        } else {
+          btn.disabled = false;
+          status.className = 'cta-status error';
+          status.textContent = 'Análisis temporalmente no disponible. Toca para ver el resumen.';
+        }
+        throw err;
+      });
+  }
+
+  function mostrarLectura() {
+    $('#result-summary').style.display = 'none';
+    $('#result-lectura').style.display = '';
+    $('#result-tag').textContent = 'Análisis';
+    notifyParent('lectura_open', { candidato: STATE.candidato });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    if (_lecturaData) {
+      renderLectura(_lecturaData);
+    } else if (_lecturaError) {
+      renderLecturaError();
+    } else if (_lecturaPromise) {
+      // Click prematuro: la lectura todavía cargando — mostrar loader
+      renderLecturaLoader();
+      _lecturaPromise
+        .then(d => renderLectura(d))
+        .catch(_ => renderLecturaError());
+    } else {
+      renderLecturaError();
+    }
+  }
+
+  function renderLecturaLoader() {
     const aiBody = $('#ai-message-body');
     const loaderMsgs = [
       'Cruzando tu candidato con tu arquetipo dominante…',
@@ -1332,49 +1671,133 @@
         <div class="ai-loader-bar"><div class="ai-loader-fill"></div></div>
       </div>
     `;
-    let loaderIdx = 0;
-    const loaderTimer = setInterval(() => {
-      loaderIdx = (loaderIdx + 1) % loaderMsgs.length;
+    let i = 0;
+    if (window._aiLoaderTimer) clearInterval(window._aiLoaderTimer);
+    window._aiLoaderTimer = setInterval(() => {
+      i = (i + 1) % loaderMsgs.length;
       const t = document.getElementById('ai-loader-text');
-      if (t) t.textContent = loaderMsgs[loaderIdx];
+      if (t) t.textContent = loaderMsgs[i];
     }, 2200);
-    const clearLoader = () => clearInterval(loaderTimer);
+  }
 
-    fetchLectura({ cand, winner, winnerPct, second, secondPct })
-      .then(data => {
-        clearLoader();
-        if (!data || !data.lectura) throw new Error('Sin lectura');
-        const parrafos = (data.lectura || '').split(/\n\n+/).map(p => `<p style="margin-bottom:.7rem;">${escapeHtml(p)}</p>`).join('');
-        aiBody.innerHTML = parrafos;
-        if (data.mensaje_corto) {
-          aiBody.insertAdjacentHTML('beforeend',
-            `<p style="margin-top:1rem; padding-top:.85rem; border-top:1px dashed var(--border); font-family:'DM Mono',monospace; font-size:.78rem; color:var(--text-meta); letter-spacing:.04em;">${escapeHtml(data.mensaje_corto)}</p>`
-          );
-        }
-      })
-      .catch(err => {
-        clearLoader();
-        console.warn('[explica] fallback:', err);
-        aiBody.innerHTML = `
-          <p><b>Lo que dijiste:</b> tu apuesta de hoy es ${escapeHtml(cand.nombre)} (${escapeHtml(cand.partido)}).</p>
-          <p style="margin-top:.6rem;"><b>Lo que muestran tus respuestas:</b> tu arquetipo dominante es <b>${escapeHtml(winner.nombre_2027)}</b> (${winnerPct}%), con miedo dominante a "${escapeHtml(winner.miedo.toLowerCase())}".</p>
-          <p style="margin-top:.6rem;"><b>El cruce:</b> la lectura personalizada quedó temporalmente sin servicio. Vuelve a intentar en un momento.</p>
-        `;
-      });
+  function renderLectura(data) {
+    if (window._aiLoaderTimer) { clearInterval(window._aiLoaderTimer); window._aiLoaderTimer = null; }
+    const aiBody = $('#ai-message-body');
+    const parrafos = (data.lectura || '').split(/\n\n+/).map(p => `<p style="margin-bottom:.7rem;">${escapeHtml(p)}</p>`).join('');
+    aiBody.innerHTML = parrafos;
+    if (data.mensaje_corto) {
+      aiBody.insertAdjacentHTML('beforeend',
+        `<p style="margin-top:1rem; padding-top:.85rem; border-top:1px dashed var(--border); font-family:'DM Mono',monospace; font-size:.78rem; color:var(--text-meta); letter-spacing:.04em;">${escapeHtml(data.mensaje_corto)}</p>`
+      );
+    }
+  }
 
-    const bars = $('#bars');
-    const maxScore = Math.max(...Object.values(STATE.arqScore), 1);
-    bars.innerHTML = ranking.map(([id, val]) => {
-      const a = DATA.arquetipos.arquetipos.find(x => x.id === id);
-      const pct = Math.round((val / maxScore) * 100);
+  function renderLecturaError() {
+    if (window._aiLoaderTimer) { clearInterval(window._aiLoaderTimer); window._aiLoaderTimer = null; }
+    const aiBody = $('#ai-message-body');
+    const ctx = _resultCtx;
+    if (!ctx) {
+      aiBody.innerHTML = `<p>El análisis personalizado quedó temporalmente sin servicio. Vuelve a intentar en un momento.</p>`;
+      return;
+    }
+    const { cand, winner, winnerPct } = ctx;
+    aiBody.innerHTML = `
+      <p><b>Lo que dijiste:</b> tu apuesta de hoy es ${escapeHtml(cand.nombre)} (${escapeHtml(cand.partido)}).</p>
+      <p style="margin-top:.6rem;"><b>Lo que muestran tus respuestas:</b> tu arquetipo dominante es <b>${escapeHtml(winner.nombre_2027)}</b> (${winnerPct}%), con miedo dominante a "${escapeHtml(winner.miedo.toLowerCase())}".</p>
+      <p style="margin-top:.6rem;"><b>El cruce:</b> la lectura personalizada quedó temporalmente sin servicio. Vuelve a intentar en un momento.</p>
+    `;
+  }
+
+  // Renderiza el gráfico de intención de voto barrial — pondPct × bias renormalizado a 100%.
+  async function renderIntencionBarrio(cand) {
+    const block = $('#barrio-block');
+    const label = $('#barrio-label');
+    const ctx = $('#barrio-context');
+    const bars = $('#intencion-bars');
+    const foot = $('#barrio-foot');
+
+    if (!STATE.ubicacion || !STATE.ubicacion.dep_cod) {
+      block.style.display = 'none';
+      return;
+    }
+
+    label.innerHTML = `Calculando huella de tu zona… <span class="barrio-context" id="barrio-context"></span>`;
+    bars.innerHTML = '';
+    foot.textContent = '';
+
+    let huella;
+    try {
+      huella = await cargarHuella();
+    } catch (e) {
+      console.warn('[huella] no se pudo cargar:', e);
+      label.innerHTML = `Sin datos territoriales para tu zona <span class="barrio-context">No pudimos cargar la huella histórica. Tu lectura personalizada igual estará disponible.</span>`;
+      return;
+    }
+
+    const res = resolverHuella(huella);
+    if (!res) {
+      label.innerHTML = `Sin huella exacta de tu zona <span class="barrio-context">${escapeHtml(STATE.ubicacion.mun_nombre || '')}${STATE.ubicacion.dep_nombre ? ', ' + escapeHtml(STATE.ubicacion.dep_nombre) : ''}</span>`;
+      bars.innerHTML = `<p class="barrio-empty">No tenemos suficiente histórico electoral en este municipio para proyectar tu zona. Tu lectura personalizada igual queda disponible.</p>`;
+      return;
+    }
+
+    const { entry, level } = res;
+    const intencion = calcularIntencionBarrio(entry);
+    if (!intencion) {
+      label.innerHTML = `Tu zona <span class="barrio-context">Datos insuficientes para proyectar.</span>`;
+      return;
+    }
+
+    // Header del bloque: barrio o municipio
+    const nombre = entry.n || (level === 'barrio' ? STATE.ubicacion.barrio : STATE.ubicacion.mun_nombre);
+    const subloc = entry.subloc || '';
+    const ciudad = entry.ciudad || '';
+    const dep = entry.dep || STATE.ubicacion.dep_nombre || '';
+    let context;
+    if (level === 'barrio') {
+      const partes = [];
+      if (subloc) partes.push(subloc);
+      if (ciudad) partes.push(ciudad);
+      if (dep) partes.push(dep);
+      context = `${partes.join(' · ')} · ${entry.censo ? entry.censo.toLocaleString('es-CO') + ' electores' : ''}`;
+    } else {
+      context = `${dep} · ${entry.censo ? entry.censo.toLocaleString('es-CO') + ' electores' : ''}`;
+    }
+    label.innerHTML = `${escapeHtml(nombre)} <span class="barrio-context">${escapeHtml(context.trim())}</span>`;
+
+    // Ordenar candidatos por % desc
+    const ordered = Object.entries(intencion).sort((a, b) => b[1] - a[1]);
+    const myId = cand && cand.id;
+    bars.innerHTML = ordered.map(([id, pct]) => {
+      const c = DATA.candidatos.candidatos.find(x => x.id === id);
+      if (!c) return '';
+      const isMine = id === myId;
       return `
         <div class="bar-row">
-          <span class="bar-name">${a.nombre_corto}</span>
-          <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${a.color}"></div></div>
-          <span class="bar-pct">${Math.round((val / total) * 100)}%</span>
+          <span class="bar-name${isMine ? ' mine' : ''}">${escapeHtml(c.nombre)}</span>
+          <div class="bar-track"><div class="bar-fill" style="width:0%; background:${c.color}"></div></div>
+          <span class="bar-pct">${pct.toFixed(1)}%</span>
         </div>
       `;
     }).join('');
+    // Animar las barras tras un tick
+    setTimeout(() => {
+      const fills = bars.querySelectorAll('.bar-fill');
+      ordered.forEach(([, pct], i) => {
+        if (fills[i]) fills[i].style.width = pct + '%';
+      });
+    }, 60);
+
+    // Pie del bloque con hechos del territorio
+    const h = entry.h || {};
+    const partesFoot = [];
+    if (h.p22 && h.p22.n) partesFoot.push(`En 2022 ganó <b>${escapeHtml(h.p22.n)}</b> con ${h.p22.pct}%`);
+    if (h.c25p && h.c25p.n) partesFoot.push(`En la consulta Pacto 2025: <b>${escapeHtml(h.c25p.n)}</b> (${h.c25p.pct}%)`);
+    if (h.c26) {
+      const consNombre = { gran: 'Gran Consulta (derecha)', frente: 'Frente por la Vida (centro-izq)', soluciones: 'Soluciones (centro)' }[h.c26] || h.c26;
+      partesFoot.push(`Consulta 2026 más votada: <b>${escapeHtml(consNombre)}</b>`);
+    }
+    foot.innerHTML = partesFoot.length ? partesFoot.join(' · ') : '';
   }
 
   // Llama al endpoint test-presidencial-explica con el state actual.
@@ -1391,6 +1814,9 @@
         dep_nombre: STATE.ubicacion.dep_nombre,
         mun_cod: STATE.ubicacion.mun_cod,
         mun_nombre: STATE.ubicacion.mun_nombre,
+        barrio: STATE.ubicacion.barrio,
+        comuna: STATE.ubicacion.comuna,
+        cod_puesto: STATE.ubicacion.cod_puesto,
         tono_regional: STATE.ubicacion.tono_regional || 'tuteo_neutro',
         fuente: STATE.ubicacion.fuente,
       } : null,
@@ -1433,6 +1859,10 @@
     $('#progressFill').style.width = '0%';
     show('intro');
   }
+
+  // Exposición a window para inspección/debug (no afecta producción).
+  window.STATE = STATE;
+  window.DATA = DATA;
 
   // ── BOOT ──
   document.addEventListener('DOMContentLoaded', loadAll);
