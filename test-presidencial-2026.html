@@ -529,6 +529,7 @@
     preguntas:  `${S3_BASE}/preguntas.json`,
     variantes:  `${S3_BASE}/variantes-tematicas.json`,
     divipola:   `${S3_BASE}/divipola.json`,
+    puestos:    `${S3_BASE}/puestos-light.json`,
   };
   const EXPLICA_URL = 'https://9w1xcwe2sj.execute-api.us-east-1.amazonaws.com/explica';
 
@@ -541,7 +542,7 @@
     mtIndex: 0,
     demo: { edad: null, identidad: null },  // edad e identidad cotidiana, no scoring
     demoIndex: 0,      // 0 = EDAD, 1 = IDENTIDAD
-    ubicacion: { dep_cod: null, dep_nombre: null, mun_cod: null, mun_nombre: null, fuente: null, lat: null, lon: null },
+    ubicacion: { dep_cod: null, dep_nombre: null, mun_cod: null, mun_nombre: null, barrio: null, comuna: null, fuente: null, lat: null, lon: null },
     prio: [],          // ['salud', 'costo_vida'] — multi-respuesta hasta 2
     answers: {},       // {P1: 'P1a', P2: ...}
     qIndex: 0,
@@ -886,6 +887,7 @@
       STATE.ubicacion.lon = lon;
       status.textContent = 'Resolviendo tu zona…';
       try {
+        // 1) Reverse geocoding con Nominatim para depto y municipio
         const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=es&zoom=10`, {
           headers: { 'Accept': 'application/json' },
         });
@@ -893,26 +895,47 @@
         const addr = j.address || {};
         const depNombreRaw = addr.state || addr.region || '';
         const munNombreRaw = addr.city || addr.town || addr.village || addr.municipality || addr.county || addr.suburb || '';
-        // Match con tabla de aliases
+
         const dep = buscarDepPorNombre(depNombreRaw);
-        if (dep) {
-          $('#ubi-dep').value = dep.cod;
-          onDepChange();
-          if (munNombreRaw) {
-            const mun = buscarMunPorNombre(dep, munNombreRaw);
-            if (mun) {
-              $('#ubi-mun').value = mun.cod;
-              onMunChange();
-              STATE.ubicacion.fuente = 'geo';
-              status.textContent = `Listo. Te ubicamos en ${mun.nombre}, ${dep.nombre}. Puedes corregir abajo si quieres.`;
-              return;
-            }
-          }
-          STATE.ubicacion.fuente = 'geo_parcial';
-          status.textContent = `Te ubicamos en ${dep.nombre}. Selecciona tu municipio abajo.`;
-        } else {
+        if (!dep) {
           console.warn('[geo] no se reconoció el departamento:', depNombreRaw, addr);
           status.textContent = `No reconocimos "${depNombreRaw || 'tu zona'}". Usa los menús abajo.`;
+          return;
+        }
+        $('#ubi-dep').value = dep.cod;
+        onDepChange();
+        let mun = null;
+        if (munNombreRaw) {
+          mun = buscarMunPorNombre(dep, munNombreRaw);
+          if (mun) {
+            $('#ubi-mun').value = mun.cod;
+            onMunChange();
+          }
+        }
+
+        // 2) Nearest neighbor para resolver barrio + comuna desde el puesto más cercano
+        status.textContent = 'Buscando tu barrio…';
+        const puestos = await cargarPuestos();
+        const cercano = puestoMasCercano(lat, lon, puestos);
+        if (cercano) {
+          STATE.ubicacion.barrio = cercano.barrio || null;
+          STATE.ubicacion.comuna = cercano.comuna || null;
+          STATE.ubicacion.cod_puesto = cercano.cod_completo;
+          STATE.ubicacion.fuente = 'geo';
+          const partes = [];
+          if (cercano.barrio) partes.push(cercano.barrio);
+          if (cercano.comuna && cercano.comuna.toLowerCase() !== (cercano.barrio || '').toLowerCase()) partes.push(cercano.comuna);
+          partes.push(mun?.nombre || cercano.mun);
+          partes.push(dep.nombre);
+          const dist = cercano.dist_km < 1
+            ? `${Math.round(cercano.dist_km * 1000)} m`
+            : `${cercano.dist_km.toFixed(1)} km`;
+          status.textContent = `Listo. ${partes.join(' · ')} (puesto a ${dist}). Si no es exacto, corrige abajo.`;
+        } else {
+          STATE.ubicacion.fuente = mun ? 'geo' : 'geo_parcial';
+          status.textContent = mun
+            ? `Listo. Te ubicamos en ${mun.nombre}, ${dep.nombre}.`
+            : `Te ubicamos en ${dep.nombre}. Selecciona tu municipio abajo.`;
         }
       } catch (e) {
         console.warn('[geo] error:', e);
@@ -931,6 +954,50 @@
     STATE.ubicacion.tono_regional = tonoRegional(STATE.ubicacion.dep_cod);
     renderPrio();
     show('prio');
+  }
+
+  // ── Nearest-neighbor sobre puestos georeferenciados ──
+  // Cargamos puestos-light.json (~1.2 MB) bajo demanda: solo cuando el
+  // usuario aprieta "Usar mi ubicación". El JSON viene compactado como
+  // {fields:[...], puestos:[[lat,lon,dep,mun,barrio,comuna,com_cod,cod_completo],...]}.
+  let _puestosCache = null;
+  async function cargarPuestos() {
+    if (_puestosCache) return _puestosCache;
+    const r = await fetch(DATA_URLS.puestos);
+    _puestosCache = await r.json();
+    return _puestosCache;
+  }
+
+  // Haversine — distancia esférica en km entre dos puntos (suficiente
+  // para distinguir puestos a nivel barrial; cm de error a 10 km son irrelevantes).
+  function distKm(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 +
+              Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
+              Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  // O(N) linear scan: 13.500 puestos × distKm en JS = ~10-15 ms. Sin
+  // index espacial porque el ahorro no se nota a esa escala.
+  function puestoMasCercano(lat, lon, data) {
+    const ps = data.puestos;
+    let minD = Infinity, idx = -1;
+    for (let i = 0; i < ps.length; i++) {
+      const d = distKm(lat, lon, ps[i][0], ps[i][1]);
+      if (d < minD) { minD = d; idx = i; }
+    }
+    if (idx === -1) return null;
+    const p = ps[idx];
+    return {
+      lat: p[0], lon: p[1],
+      dep: p[2], mun: p[3],
+      barrio: p[4], comuna: p[5],
+      com_cod: p[6], cod_completo: p[7],
+      dist_km: minD,
+    };
   }
 
   function demoBack() {
