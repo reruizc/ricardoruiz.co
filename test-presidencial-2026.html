@@ -800,6 +800,77 @@
     $('#ubi-next').classList.remove('disabled');
   }
 
+  // Aliases para los nombres de departamentos que Nominatim devuelve
+  // distinto a los del CSV de Registraduría. Mapea palabras clave en
+  // el nombre devuelto al código del depto en el divipola.
+  const DEP_ALIAS = [
+    // [keyword en lowercase y sin tildes, dep_cod en divipola]
+    ['bogota', '16'], ['cundinamarca', '15'],
+    ['antioquia', '01'],
+    ['atlantico', '03'],
+    ['bolivar', '05'],
+    ['boyaca', '07'],
+    ['caldas', '09'],
+    ['cauca', '11'],
+    ['cesar', '12'],
+    ['cordoba', '13'],
+    ['choco', '17'],
+    ['huila', '19'],
+    ['magdalena', '21'],
+    ['narino', '23'],
+    ['risaralda', '24'],
+    ['norte de santander', '25'],
+    ['quindio', '26'],
+    ['santander', '27'],
+    ['sucre', '28'],
+    ['tolima', '29'],
+    ['valle del cauca', '31'], ['valle', '31'],
+    ['arauca', '40'],
+    ['caqueta', '44'],
+    ['casanare', '46'],
+    ['la guajira', '48'], ['guajira', '48'],
+    ['guainia', '50'],
+    ['meta', '52'],
+    ['guaviare', '54'],
+    ['san andres', '56'], ['san andres y providencia', '56'],
+    ['amazonas', '60'],
+    ['putumayo', '64'],
+    ['vaupes', '68'],
+    ['vichada', '72'],
+  ];
+
+  function normTexto(s) {
+    return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+  }
+
+  // Aliases ordenados por longitud descendente: "valle del cauca" antes que
+  // "cauca", "norte de santander" antes que "santander", etc. Así el match
+  // específico siempre gana.
+  const DEP_ALIAS_SORTED = DEP_ALIAS.slice().sort((a, b) => b[0].length - a[0].length);
+
+  function buscarDepPorNombre(nombreRaw) {
+    if (!nombreRaw) return null;
+    const n = normTexto(nombreRaw);
+    for (const [kw, cod] of DEP_ALIAS_SORTED) {
+      if (n.includes(kw)) {
+        const dep = (DATA.divipola.deptos || []).find(d => d.cod === cod);
+        if (dep) return dep;
+      }
+    }
+    return null;
+  }
+
+  function buscarMunPorNombre(dep, nombreRaw) {
+    if (!dep || !nombreRaw) return null;
+    const n = normTexto(nombreRaw);
+    // Match exacto normalizado primero
+    let mun = (dep.muns || []).find(m => normTexto(m.nombre) === n);
+    if (mun) return mun;
+    // Match por substring (Nominatim a veces incluye "Localidad" o sufijos)
+    mun = (dep.muns || []).find(m => n.includes(normTexto(m.nombre)) || normTexto(m.nombre).includes(n));
+    return mun || null;
+  }
+
   // Reverse geocoding gratis vía Nominatim (OpenStreetMap). 1 req/usuario,
   // sin auth, devuelve depto y municipio en español.
   async function usarGeo() {
@@ -820,16 +891,15 @@
         });
         const j = await r.json();
         const addr = j.address || {};
-        const depNombre = (addr.state || '').replace(/^Departamento de /i, '').trim();
-        const munNombre = (addr.city || addr.town || addr.village || addr.county || '').trim();
-        // Buscar match en divipola
-        const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
-        const dep = (DATA.divipola.deptos || []).find(d => norm(d.nombre) === norm(depNombre));
+        const depNombreRaw = addr.state || addr.region || '';
+        const munNombreRaw = addr.city || addr.town || addr.village || addr.municipality || addr.county || addr.suburb || '';
+        // Match con tabla de aliases
+        const dep = buscarDepPorNombre(depNombreRaw);
         if (dep) {
           $('#ubi-dep').value = dep.cod;
           onDepChange();
-          if (munNombre) {
-            const mun = (dep.muns || []).find(m => norm(m.nombre) === norm(munNombre));
+          if (munNombreRaw) {
+            const mun = buscarMunPorNombre(dep, munNombreRaw);
             if (mun) {
               $('#ubi-mun').value = mun.cod;
               onMunChange();
@@ -841,9 +911,11 @@
           STATE.ubicacion.fuente = 'geo_parcial';
           status.textContent = `Te ubicamos en ${dep.nombre}. Selecciona tu municipio abajo.`;
         } else {
-          status.textContent = 'No pudimos resolver el departamento. Usa los menús abajo.';
+          console.warn('[geo] no se reconoció el departamento:', depNombreRaw, addr);
+          status.textContent = `No reconocimos "${depNombreRaw || 'tu zona'}". Usa los menús abajo.`;
         }
       } catch (e) {
+        console.warn('[geo] error:', e);
         status.textContent = 'No pudimos resolver tu ubicación. Usa los menús abajo.';
       }
     }, err => {
