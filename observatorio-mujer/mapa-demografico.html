@@ -994,7 +994,6 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   let _map, _layer, _geoData;
   let _munLayer = null;
   const _munGeoCache = {};       // depReg → GeoJSON
-  const _munNameMapCache = {};   // depReg → Map<normName, mpio (DANE)>
 
   async function initMap() {
     document.getElementById('map').innerHTML = '';
@@ -1073,24 +1072,22 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   }
 
   // ─── DRILL MUNICIPAL ─────────────────────────────────────────────
-  function munsForDep(depReg) {
-    // Devuelve Map<normName, mpio_dane> para los muns del depto.
-    if (_munNameMapCache[depReg]) return _munNameMapCache[depReg];
-    const m = new Map();
-    for (const mpio in DANE_MUN) {
-      const d = DANE_MUN[mpio];
-      if (REG_DEP_BY_NAME[norm(d.depnom)] !== depReg) continue;
-      m.set(norm(d.nombre), mpio);
-    }
-    _munNameMapCache[depReg] = m;
-    return m;
+  // GeoJSON properties confirmadas (mapas-2026/Departamentos-mps/{cod}.json):
+  //   mpio_cdpmp = código DANE 5 dígitos (ej "05001" = Medellín) ← match directo
+  //   mpio_cnmbr = nombre municipio (UPPERCASE con tildes)
+  function munCodFromFeature(props) {
+    return props.mpio_cdpmp || null;
+  }
+  function munNameFromFeature(props) {
+    return props.mpio_cnmbr || '—';
   }
 
   function munDomain(depReg) {
     const arr = [];
-    const nameMap = munsForDep(depReg);
-    for (const mpio of nameMap.values()) {
-      const m = DANE_MUN[mpio]; const r = m[STATE.year]; if (!r || !r.muj) continue;
+    for (const mpio in DANE_MUN) {
+      const d = DANE_MUN[mpio];
+      if (REG_DEP_BY_NAME[norm(d.depnom)] !== depReg) continue;
+      const r = d[STATE.year]; if (!r || !r.muj) continue;
       const v = metricFor(r);
       if (v == null || isNaN(v)) continue;
       arr.push(v);
@@ -1103,11 +1100,9 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   }
 
   function munStyleFor(depReg) {
-    const nameMap = munsForDep(depReg);
     const dom = munDomain(depReg);
     return (feat) => {
-      const fname = norm(feat.properties.mun_name || feat.properties.MUN_NAME || feat.properties.nombre || feat.properties.NOMBRE_MPI || '');
-      const mpio = nameMap.get(fname);
+      const mpio = munCodFromFeature(feat.properties);
       const m = mpio ? DANE_MUN[mpio] : null;
       const r = m && m[STATE.year];
       const val = r ? metricFor(r) : null;
@@ -1121,9 +1116,8 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   }
 
   function munTooltip(feat, depReg) {
-    const fname = feat.properties.mun_name || feat.properties.MUN_NAME || feat.properties.nombre || feat.properties.NOMBRE_MPI || '—';
-    const nameMap = munsForDep(depReg);
-    const mpio = nameMap.get(norm(fname));
+    const fname = munNameFromFeature(feat.properties);
+    const mpio = munCodFromFeature(feat.properties);
     const m = mpio ? DANE_MUN[mpio] : null;
     const r = m && m[STATE.year];
     if (!r || !r.muj) return `<div class="tt-name">${fname}</div><div class="tt-meta">Sin datos DANE</div>`;
@@ -1155,12 +1149,11 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     _munLayer = L.geoJSON(geo, {
       style: munStyleFor(depReg),
       onEachFeature: (feat, layer) => {
-        const fname = feat.properties.mun_name || feat.properties.MUN_NAME || feat.properties.nombre || feat.properties.NOMBRE_MPI || '—';
+        const fname = munNameFromFeature(feat.properties);
+        const mpio = munCodFromFeature(feat.properties);
         layer.bindTooltip(munTooltip(feat, depReg), { sticky: true, direction: 'top' });
         layer.on('mouseover', () => {
           layer.setStyle({ weight: 2.5, color: '#fff' });
-          const nameMap = munsForDep(depReg);
-          const mpio = nameMap.get(norm(fname));
           const m = mpio ? DANE_MUN[mpio] : null;
           const r = m && m[STATE.year];
           if (r) showPanel(r, fname, 'Municipio');

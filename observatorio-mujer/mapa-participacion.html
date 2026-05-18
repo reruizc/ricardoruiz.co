@@ -323,6 +323,18 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
   color: var(--ink-2);
 }
+.back-drill {
+  position: absolute; top: 1rem; right: 1rem; z-index: 400;
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink); background: var(--paper);
+  padding: .5rem .85rem;
+  border: 1px solid var(--ink);
+  cursor: none;
+  transition: background .2s, color .2s;
+}
+.back-drill:hover { background: var(--ink); color: var(--paper); }
+.back-drill .arr { margin-right: .35rem; }
 .legend .t {
   font-weight: 700; letter-spacing: .15em; text-transform: uppercase;
   font-size: 10.5px; color: var(--ink-3); margin-bottom: .5rem;
@@ -594,6 +606,7 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
         <span class="sub">Pasa el cursor · click para fijar</span>
       </div>
       <div id="map"></div>
+      <button class="back-drill" id="back-drill" hidden onclick="exitDrill()"><span class="arr">←</span>Volver al país</button>
       <div class="legend">
         <div class="t" id="legend-title">% mujeres en censo</div>
         <div class="legend-scale" id="legend-scale"></div>
@@ -1135,7 +1148,53 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   // ─── MAP ─────────────────────────────────────────────────────────
   const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
   const GEO_URL = `${S3}/mapas-2026/DEPARTAMENTOS2.json`;
+  const DEP_MUNS_URL = (depReg) => `${S3}/mapas-2026/Departamentos-mps/${depReg}.json`;
+  const MUN_DATA_V = '20260518';
+  const MUN_DATA_URL = `https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_observatorio_mujer/participacion-mun.json?v=${MUN_DATA_V}`;
   let _map, _layer, _geoData;
+  let _munLayer = null;
+  const _munGeoCache = {};
+  // MUN_DATA keyed por "dep-mun" (códigos Registraduría, ej "01-001" Medellín)
+  // con la misma forma que DATA[depReg] para que getMetric funcione directo.
+  let MUN_DATA = null;
+
+  async function fetchMunData() {
+    if (MUN_DATA) return MUN_DATA;
+    try {
+      const r = await fetch(MUN_DATA_URL, { cache: 'reload' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const raw = await r.json();
+      // Normalizar a la misma forma que DATA (depto-level) para reusar getMetric.
+      const out = {};
+      for (const k in raw) {
+        const m = raw[k];
+        const cm = m.censo_muj, ch = m.censo_hom, ct = m.censo_tot;
+        const pct_censo = ct ? (cm/ct*100) : 0;
+        const tasa22 = cm ? (m.vot22_muj/cm*100) : 0;
+        const tasa18 = cm ? (m.vot18_muj/cm*100) : 0;
+        const tot22 = m.vot22_muj || 1;
+        out[k] = {
+          cod: k, nombre: m.nombre, depnom: m.depnom, dep_cod: m.dep_cod,
+          censo_muj: cm, censo_hom: ch, censo_tot: ct, pct_censo,
+          municipios: 1, puestos: 0,
+          vot22_muj: m.vot22_muj, vot22_hom: m.vot22_hom,
+          vot18_muj: m.vot18_muj, vot18_hom: m.vot18_hom,
+          tasa22, tasa18,
+          // cohortes (alias a v22_* para compatibilidad con getMetric en cohorte layer)
+          b18: m.v22_b18, b26: m.v22_b26, b41: m.v22_b41, b60: m.v22_b60,
+          pct_b18: m.v22_b18/tot22*100,
+          pct_b26: m.v22_b26/tot22*100,
+          pct_b41: m.v22_b41/tot22*100,
+          pct_b60: m.v22_b60/tot22*100
+        };
+      }
+      MUN_DATA = out;
+      return MUN_DATA;
+    } catch (e) {
+      console.error('MUN_DATA fetch failed:', e);
+      return null;
+    }
+  }
 
   async function initMap() {
     _map = L.map('map', {
@@ -1210,11 +1269,123 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
           if (d) {
             showPanel(d, 'Departamento · fijado');
             highlightRank(cod);
+            drillIntoDep(cod, d.nombre);
           }
         });
       }
     }).addTo(_map);
   }
+
+  // ─── DRILL MUNICIPAL ─────────────────────────────────────────────
+  function munCodFromFeature(props) {
+    // GeoJSON Departamentos-mps usa códigos Registraduría en mun_elec/mun_electoral.
+    const dep = props.dep_electoral;
+    const mun = props.mun_elec || props.mun_electoral;
+    if (dep && mun) return `${String(dep).padStart(2,'0')}-${String(mun).padStart(3,'0')}`;
+    return null;
+  }
+  function munNameFromFeature(props) {
+    return props.mpio_cnmbr || props.mun_name || '—';
+  }
+  function munsForDep(depReg) {
+    if (!MUN_DATA) return [];
+    return Object.values(MUN_DATA).filter(m => m.dep_cod === depReg);
+  }
+  function munDomain(depReg) {
+    const arr = munsForDep(depReg)
+      .map(d => getMetric(d) ? getMetric(d).value : null)
+      .filter(v => v != null && !isNaN(v));
+    if (!arr.length) return { min: 0, max: 100, mid: 50 };
+    const min = Math.min(...arr), max = Math.max(...arr);
+    const dep = DATA[depReg];
+    const mid = dep ? getMetric(dep).value : (min+max)/2;
+    return { min, max, mid };
+  }
+  function munStyleFor(depReg) {
+    const dom = munDomain(depReg);
+    return (feat) => {
+      const k = munCodFromFeature(feat.properties);
+      const d = k && MUN_DATA ? MUN_DATA[k] : null;
+      const m = d ? getMetric(d) : null;
+      return {
+        fillColor: colorFor(m ? m.value : null, dom),
+        weight: 1,
+        color: 'var(--paper)',
+        fillOpacity: 0.92
+      };
+    };
+  }
+  function munTooltip(feat) {
+    const nm = munNameFromFeature(feat.properties);
+    const k = munCodFromFeature(feat.properties);
+    const d = k && MUN_DATA ? MUN_DATA[k] : null;
+    if (!d || !d.censo_muj) return `<div class="tt-name">${nm}</div><div class="tt-meta">Sin datos</div>`;
+    const m = getMetric(d);
+    return `<div class="tt-name">${nm}</div>
+            <div><span class="tt-pct">${pct(m.value)}</span> ${m.metricKey.toLowerCase()}</div>
+            <div class="tt-meta">${fmt(d.censo_muj)} habilitadas · ${fmt(d.vot22_muj)} votaron 2022</div>`;
+  }
+
+  async function drillIntoDep(depReg, depName) {
+    // Asegurar MUN_DATA en memoria
+    if (!MUN_DATA) await fetchMunData();
+    if (!MUN_DATA) {
+      console.warn('No se pudo cargar MUN_DATA, drill abortado');
+      return;
+    }
+    window._activeDep = depReg;
+    // GeoJSON
+    let geo = _munGeoCache[depReg];
+    if (!geo) {
+      try {
+        const r = await fetch(DEP_MUNS_URL(depReg));
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        geo = await r.json();
+        _munGeoCache[depReg] = geo;
+      } catch (e) {
+        console.error('Drill GeoJSON fetch failed:', e);
+        return;
+      }
+    }
+    if (_layer) _map.removeLayer(_layer);
+    if (_munLayer) _map.removeLayer(_munLayer);
+    _munLayer = L.geoJSON(geo, {
+      style: munStyleFor(depReg),
+      onEachFeature: (feat, layer) => {
+        const k = munCodFromFeature(feat.properties);
+        const d = k && MUN_DATA ? MUN_DATA[k] : null;
+        const nm = munNameFromFeature(feat.properties);
+        layer.bindTooltip(munTooltip(feat), { sticky: true, direction: 'top' });
+        layer.on('mouseover', () => {
+          layer.setStyle({ weight: 2.5, color: '#fff' });
+          if (d) showPanel(d, 'Municipio');
+        });
+        layer.on('mouseout', () => {
+          _munLayer.resetStyle(layer);
+          const dep = DATA[depReg];
+          if (dep) showPanel(dep, 'Departamento (agregado)');
+        });
+      }
+    }).addTo(_map);
+    _map.fitBounds(_munLayer.getBounds(), { padding: [10, 10] });
+    document.getElementById('back-drill').hidden = false;
+    const dep = DATA[depReg];
+    if (dep) showPanel(dep, 'Departamento (agregado)');
+    renderRanking();
+    buildLegend();
+  }
+
+  function exitDrill() {
+    if (_munLayer) { _map.removeLayer(_munLayer); _munLayer = null; }
+    window._activeDep = null;
+    if (_layer) _layer.addTo(_map);
+    if (_layer) _map.fitBounds(_layer.getBounds(), { padding: [10, 10] });
+    document.getElementById('back-drill').hidden = true;
+    renderRanking();
+    buildLegend();
+    showNacional();
+  }
+  window.exitDrill = exitDrill;
 
   function makeTooltip(d, nm) {
     if (!d) return `<div class="tt-name">${nm}</div><div class="tt-meta">Sin datos</div>`;
@@ -1225,6 +1396,15 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   }
 
   function restyleAll() {
+    // Si está en drill, repintar muns
+    if (window._activeDep && _munLayer) {
+      _munLayer.setStyle(munStyleFor(window._activeDep));
+      _munLayer.eachLayer(l => l.unbindTooltip());
+      _munLayer.eachLayer(l => {
+        l.bindTooltip(munTooltip(l.feature), { sticky: true, direction: 'top' });
+      });
+      return;
+    }
     if (_layer) _layer.setStyle(styleFor);
     if (_layer) _layer.eachLayer(l => l.unbindTooltip());
     if (_layer) _layer.eachLayer(l => {
@@ -1236,10 +1416,20 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 
   // ─── RANKING ─────────────────────────────────────────────────────
   function renderRanking() {
-    const arr = Object.values(DATA)
-      .filter(d => d.cod !== '88')
-      .map(d => ({ ...d, _v: getMetric(d).value }))
-      .filter(d => d._v != null && !isNaN(d._v));
+    // Si hay drill activo, mostramos top/bottom 10 muns del depto.
+    let arr, isMun = false;
+    if (window._activeDep && MUN_DATA) {
+      isMun = true;
+      arr = munsForDep(window._activeDep)
+        .filter(d => (d.censo_muj || 0) >= 800)
+        .map(d => ({ ...d, _v: getMetric(d) ? getMetric(d).value : null }))
+        .filter(d => d._v != null && !isNaN(d._v));
+    } else {
+      arr = Object.values(DATA)
+        .filter(d => d.cod !== '88')
+        .map(d => ({ ...d, _v: getMetric(d).value }))
+        .filter(d => d._v != null && !isNaN(d._v));
+    }
     const top = [...arr].sort((a,b) => b._v - a._v).slice(0,10);
     const bot = [...arr].sort((a,b) => a._v - b._v).slice(0,10);
     const html = (items) => items.map((d, i) => `
@@ -1251,6 +1441,21 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     `).join('');
     document.getElementById('rank-top').innerHTML = html(top);
     document.getElementById('rank-bot').innerHTML = html(bot);
+    // En drill el panel del ranking apunta a muns; en nacional sigue siendo deptos.
+    document.querySelectorAll('.rank-item').forEach(el => {
+      el.addEventListener('mouseenter', () => {
+        const d = isMun ? (MUN_DATA && MUN_DATA[el.dataset.cod]) : DATA[el.dataset.cod];
+        if (d) showPanel(d, isMun ? 'Municipio · ranking' : 'Departamento · ranking');
+      });
+      el.addEventListener('mouseleave', () => {
+        if (window._activeDep) {
+          const dep = DATA[window._activeDep];
+          if (dep) showPanel(dep, 'Departamento (agregado)');
+        } else {
+          showNacional();
+        }
+      });
+    });
 
     // Titulos del ranking según capa
     const cap = ({ b18: '18–25', b26: '26–40', b41: '41–60', b60: '60+' })[STATE.cohort];
@@ -1273,18 +1478,20 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
         t = { top: `Top 10 · ${y}`, topSub: sub, bot: `Bottom 10 · ${y}`, botSub: sub };
       }
     }
+    // En drill, reemplaza "Top 10 ·" por "Top 10 muns ·" para que sea claro.
+    if (isMun) {
+      const depNm = DATA[window._activeDep] && DATA[window._activeDep].nombre || '';
+      t = {
+        top: t.top.replace('Top 10', 'Top 10 muns'),
+        topSub: `${t.topSub} · ${depNm}`,
+        bot: t.bot.replace('Bottom 10', 'Bottom 10 muns'),
+        botSub: `${t.botSub} · ${depNm}`
+      };
+    }
     document.getElementById('rt-title').textContent = t.top;
     document.getElementById('rt-sub').textContent   = t.topSub;
     document.getElementById('rb-title').textContent = t.bot;
     document.getElementById('rb-sub').textContent   = t.botSub;
-
-    document.querySelectorAll('.rank-item').forEach(el => {
-      el.addEventListener('mouseenter', () => {
-        const d = DATA[el.dataset.cod];
-        if (d) showPanel(d, 'Departamento · ranking');
-      });
-      el.addEventListener('mouseleave', () => showNacional());
-    });
   }
   function highlightRank(cod) {
     document.querySelectorAll('.rank-item').forEach(el => {
@@ -1320,7 +1527,12 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     buildLegend();
     if (window._mapReady) restyleAll();
     renderRanking();
-    showNacional();
+    if (window._activeDep) {
+      const dep = DATA[window._activeDep];
+      if (dep) showPanel(dep, 'Departamento (agregado)');
+    } else {
+      showNacional();
+    }
   }
   function wirePills() {
     document.querySelectorAll('#layer-pills .lp').forEach(b => {
@@ -1341,6 +1553,8 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     showNacional();
     renderRanking();
     initMap();
+    // Precargar MUN_DATA en background para que el drill sea instantáneo.
+    fetchMunData();
   }
 </script>
 </body>
