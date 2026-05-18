@@ -18,7 +18,7 @@ tools/test-presidencial-explica/
 |---|---|---|
 | `DEEPSEEK_API_KEY` | (vacío) | Obligatoria. Reusa la de agenda-medios-recomienda. |
 | `DEEPSEEK_URL` | `https://api.deepseek.com/chat/completions` | |
-| `DEEPSEEK_MODEL` | `deepseek-chat` | DeepSeek V3 |
+| `DEEPSEEK_MODEL` | `deepseek-v4-flash` | DeepSeek V4 Flash — rápido y barato, óptimo para redacción estructurada. |
 | `S3_BUCKET` | `elecciones-2026` | Para cache |
 | `CACHE_PREFIX` | `ricardoruiz.co/test-presidencial-2026/cache` | |
 | `CACHE_TTL_DIAS` | `14` | Una respuesta cacheada vence en 14 días |

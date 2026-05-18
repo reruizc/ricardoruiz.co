@@ -55,7 +55,7 @@ from datetime import datetime, timezone
 # ---- Config ----
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 DEEPSEEK_URL = os.environ.get("DEEPSEEK_URL", "https://api.deepseek.com/chat/completions")
-DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")
+DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash")
 S3_BUCKET = os.environ.get("S3_BUCKET", "elecciones-2026")
 CACHE_PREFIX = os.environ.get("CACHE_PREFIX", "ricardoruiz.co/test-presidencial-2026/cache")
 CACHE_TTL_DIAS = int(os.environ.get("CACHE_TTL_DIAS", "14"))
@@ -190,7 +190,10 @@ Redacta la lectura en JSON estricto."""
         ],
         "temperature": 0.3,
         "response_format": {"type": "json_object"},
-        "max_tokens": 700,
+        # DeepSeek V4 usa parte del max_tokens en reasoning_content interno;
+        # 1500 deja margen para el reasoning (~200-400 tokens) más los 3
+        # párrafos de la respuesta (~500-700 tokens).
+        "max_tokens": 1500,
     }).encode("utf-8")
 
     req = urllib.request.Request(
@@ -204,9 +207,26 @@ Redacta la lectura en JSON estricto."""
     )
     with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
         raw = resp.read().decode("utf-8")
-    data = json.loads(raw)
-    content = data["choices"][0]["message"]["content"]
-    parsed = json.loads(content)
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        print(f"[deepseek] respuesta no es JSON. raw[:400]={raw[:400]}")
+        raise
+
+    choice = data["choices"][0]
+    content = choice["message"].get("content") or ""
+    finish = choice.get("finish_reason")
+    usage = data.get("usage", {})
+    if not content:
+        # Cuando V4 se queda sin tokens en el reasoning, content queda vacío.
+        print(f"[deepseek] content vacío. finish_reason={finish}, usage={usage}")
+        raise ValueError(f"DeepSeek devolvió content vacío (finish_reason={finish}). Sube max_tokens.")
+
+    try:
+        parsed = json.loads(content)
+    except json.JSONDecodeError:
+        print(f"[deepseek] content no es JSON. content[:400]={content[:400]}")
+        raise
 
     # Validación mínima
     for k in ("lectura", "mensaje_corto", "alineacion"):

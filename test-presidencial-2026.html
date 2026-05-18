@@ -460,6 +460,7 @@
     preguntas:  `${S3_BASE}/preguntas.json`,
     variantes:  `${S3_BASE}/variantes-tematicas.json`,
   };
+  const EXPLICA_URL = 'https://9w1xcwe2sj.execute-api.us-east-1.amazonaws.com/explica';
 
   // ── STATE ──
   const STATE = {
@@ -949,13 +950,28 @@
     $('#cand-block-name').textContent = cand.nombre;
     $('#cand-block-party').textContent = cand.partido + (STATE.candOrigen === 'sugerido' ? ' · sugerido por el mini-test' : '');
 
-    // Placeholder de la lectura personalizada
+    // Lectura personalizada vía DeepSeek (Lambda test-presidencial-explica)
     const aiBody = $('#ai-message-body');
-    aiBody.innerHTML = `
-      <p><b>Lo que dijiste:</b> tu apuesta de hoy es ${cand.nombre} (${cand.partido}).</p>
-      <p style="margin-top:.6rem;"><b>Lo que muestran tus respuestas:</b> tu arquetipo dominante es <b>${winner.nombre_2027}</b> (${winnerPct}%), con miedo dominante a "${winner.miedo.toLowerCase()}".</p>
-      <p style="margin-top:.6rem;"><b>El cruce:</b> el módulo de huella territorial y la lectura personalizada vía DeepSeek se activarán cuando despleguemos la Lambda. Por ahora ves los datos base del cálculo determinístico.</p>
-    `;
+    aiBody.innerHTML = `<p style="opacity:.7; font-style:italic;">Generando tu lectura personalizada…</p>`;
+    fetchLectura({ cand, winner, winnerPct, second, secondPct })
+      .then(data => {
+        if (!data || !data.lectura) throw new Error('Sin lectura');
+        const parrafos = (data.lectura || '').split(/\n\n+/).map(p => `<p style="margin-bottom:.7rem;">${escapeHtml(p)}</p>`).join('');
+        aiBody.innerHTML = parrafos;
+        if (data.mensaje_corto) {
+          aiBody.insertAdjacentHTML('beforeend',
+            `<p style="margin-top:1rem; padding-top:.85rem; border-top:1px dashed var(--border); font-family:'DM Mono',monospace; font-size:.78rem; color:var(--text-meta); letter-spacing:.04em;">${escapeHtml(data.mensaje_corto)}</p>`
+          );
+        }
+      })
+      .catch(err => {
+        console.warn('[explica] fallback:', err);
+        aiBody.innerHTML = `
+          <p><b>Lo que dijiste:</b> tu apuesta de hoy es ${escapeHtml(cand.nombre)} (${escapeHtml(cand.partido)}).</p>
+          <p style="margin-top:.6rem;"><b>Lo que muestran tus respuestas:</b> tu arquetipo dominante es <b>${escapeHtml(winner.nombre_2027)}</b> (${winnerPct}%), con miedo dominante a "${escapeHtml(winner.miedo.toLowerCase())}".</p>
+          <p style="margin-top:.6rem;"><b>El cruce:</b> la lectura personalizada quedó temporalmente sin servicio. Vuelve a intentar en un momento.</p>
+        `;
+      });
 
     const bars = $('#bars');
     const maxScore = Math.max(...Object.values(STATE.arqScore), 1);
@@ -970,6 +986,42 @@
         </div>
       `;
     }).join('');
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+  }
+
+  // Llama al endpoint test-presidencial-explica con el state actual.
+  // Devuelve { lectura, mensaje_corto, alineacion, ... } o lanza error.
+  async function fetchLectura({ cand, winner, winnerPct, second, secondPct }) {
+    if (!EXPLICA_URL) throw new Error('EXPLICA_URL no configurado');
+    const body = {
+      registro: STATE.registro,
+      candidato: { id: cand.id, nombre: cand.nombre, partido: cand.partido },
+      candidato_origen: STATE.candOrigen,
+      demografia: { edad: STATE.demo?.edad || null, identidad: STATE.demo?.identidad || null },
+      prio: STATE.prio || [],
+      arquetipo_dominante: { id: winner.id, nombre: winner.nombre_2027, pct: winnerPct },
+      arquetipo_secundario: second ? { id: second.id, nombre: second.nombre_2027, pct: secondPct } : null,
+      arq_score: STATE.arqScore,
+    };
+    const ctl = new AbortController();
+    const timeout = setTimeout(() => ctl.abort(), 30000);
+    try {
+      const r = await fetch(EXPLICA_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: ctl.signal,
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return await r.json();
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   function restart() {
