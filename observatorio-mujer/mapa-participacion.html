@@ -1147,16 +1147,30 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 
   // ─── MAP ─────────────────────────────────────────────────────────
   const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
+  const S3_DATOS = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos';
   const GEO_URL = `${S3}/mapas-2026/DEPARTAMENTOS2.json`;
   const DEP_MUNS_URL = (depReg) => `${S3}/mapas-2026/Departamentos-mps/${depReg}.json`;
   const MUN_DATA_V = '20260518';
-  const MUN_DATA_URL = `https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_observatorio_mujer/participacion-mun.json?v=${MUN_DATA_V}`;
+  const MUN_DATA_URL = `${S3_DATOS}/output_observatorio_mujer/participacion-mun.json?v=${MUN_DATA_V}`;
+  // Bogotá UPL + barrios (ver tools/build-bog-upl-barrio.py + datos pre-procesados de oportunidad.html)
+  const BOG_V = '20260518';
+  const BOG_UPL_GEO_URL     = `${S3}/mapas-2026/Ciudades-COM-LOC/BOG-UPL.json`;
+  const BOG_BARRIOS_GEO_URL = `${S3}/mapas-2026/Ciudades-COM-LOC/BOG-BARRIOS-CATASTRALES.json`;
+  const BOG_CENSO_UPL_URL    = `${S3_DATOS}/output_ciudades/bogota/censo-upl-2026.json`;
+  const BOG_CENSO_BARRIO_URL = `${S3_DATOS}/output_ciudades/bogota/censo-barrio-2026.json`;
+  const BOG_EG_UPL_URL    = `${S3_DATOS}/output_observatorio_mujer/bog-upl-edadgenero.json?v=${BOG_V}`;
+  const BOG_EG_BARRIO_URL = `${S3_DATOS}/output_observatorio_mujer/bog-barrio-edadgenero.json?v=${BOG_V}`;
   let _map, _layer, _geoData;
-  let _munLayer = null;
+  let _munLayer = null, _uplLayer = null, _barLayer = null;
   const _munGeoCache = {};
   // MUN_DATA keyed por "dep-mun" (códigos Registraduría, ej "01-001" Medellín)
   // con la misma forma que DATA[depReg] para que getMetric funcione directo.
   let MUN_DATA = null;
+  let BOG_UPL_DATA = null;     // keyed por CODIGO_UPL ('UPL25'), shape igual a DATA
+  let BOG_BARRIO_DATA = null;  // keyed por codigo barrio ('008407'), shape igual a DATA
+  let _bogUplGeo = null;
+  let _bogBarriosGeo = null;
+  let _bogBarrioToUpl = null;  // cache barrio_cod → upl_cod (PIP runtime)
 
   async function fetchMunData() {
     if (MUN_DATA) return MUN_DATA;
@@ -1194,6 +1208,129 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
       console.error('MUN_DATA fetch failed:', e);
       return null;
     }
+  }
+
+  // Normaliza un registro UPL/barrio a la forma de DATA[depReg]
+  // para que getMetric, panel y ranking funcionen sin cambios.
+  function normalizeBog(cod, info, censo, eg) {
+    const cm = censo.mujeres || 0, ch = censo.hombres || 0, ct = censo.censo || 0;
+    const pct_censo = ct ? cm/ct*100 : 0;
+    const v22 = (eg && eg.vot22) || {muj:0,hom:0,b18:0,b26:0,b41:0,b60:0};
+    const v18 = (eg && eg.vot18) || {muj:0,hom:0,b18:0,b26:0,b41:0,b60:0};
+    const tasa22 = cm ? v22.muj/cm*100 : 0;
+    const tasa18 = cm ? v18.muj/cm*100 : 0;
+    const tot22 = v22.muj || 1;
+    return {
+      cod, nombre: info.nombre, depnom: 'BOGOTA D.C.', dep_cod: '16',
+      censo_muj: cm, censo_hom: ch, censo_tot: ct, pct_censo,
+      municipios: 0, puestos: info.n_puestos || 0,
+      vot22_muj: v22.muj, vot22_hom: v22.hom,
+      vot18_muj: v18.muj, vot18_hom: v18.hom,
+      tasa22, tasa18,
+      b18: v22.b18, b26: v22.b26, b41: v22.b41, b60: v22.b60,
+      pct_b18: (v22.b18||0)/tot22*100,
+      pct_b26: (v22.b26||0)/tot22*100,
+      pct_b41: (v22.b41||0)/tot22*100,
+      pct_b60: (v22.b60||0)/tot22*100,
+      // metadata extra Bogotá
+      loc_cod: info.loc_cod,
+      loc_nombre: info.loc_nombre,
+      sector: info.sector
+    };
+  }
+
+  async function fetchBogUplData() {
+    if (BOG_UPL_DATA) return BOG_UPL_DATA;
+    try {
+      const [censo, eg] = await Promise.all([
+        fetch(BOG_CENSO_UPL_URL).then(r => r.json()),
+        fetch(BOG_EG_UPL_URL).then(r => r.json())
+      ]);
+      const por_upl = censo.por_upl || {};
+      const out = {};
+      for (const cod in por_upl) {
+        const c = por_upl[cod];
+        out[cod] = normalizeBog(cod, { nombre: c.nombre, sector: c.sector, n_puestos: c.n_puestos }, c, eg[cod]);
+      }
+      BOG_UPL_DATA = out;
+      return out;
+    } catch (e) {
+      console.error('BOG_UPL_DATA fetch failed:', e);
+      return null;
+    }
+  }
+  async function fetchBogBarrioData() {
+    if (BOG_BARRIO_DATA) return BOG_BARRIO_DATA;
+    try {
+      const [censo, eg] = await Promise.all([
+        fetch(BOG_CENSO_BARRIO_URL).then(r => r.json()),
+        fetch(BOG_EG_BARRIO_URL).then(r => r.json())
+      ]);
+      const por_b = censo.por_barrio || {};
+      const out = {};
+      for (const cod in por_b) {
+        const c = por_b[cod];
+        out[cod] = normalizeBog(cod, { nombre: c.nombre, loc_cod: c.loc_cod, loc_nombre: c.loc_nombre, n_puestos: c.n_puestos }, c, eg[cod]);
+      }
+      BOG_BARRIO_DATA = out;
+      return out;
+    } catch (e) {
+      console.error('BOG_BARRIO_DATA fetch failed:', e);
+      return null;
+    }
+  }
+
+  // Point-in-polygon (ray casting) sobre Polygon o MultiPolygon GeoJSON.
+  function pipRing(x, y, ring) {
+    let inside = false, j = ring.length - 1;
+    for (let i = 0; i < ring.length; i++) {
+      const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-12) + xi)) inside = !inside;
+      j = i;
+    }
+    return inside;
+  }
+  function pipGeometry(x, y, geom) {
+    if (!geom) return false;
+    const polys = geom.type === 'Polygon' ? [geom.coordinates] : (geom.type === 'MultiPolygon' ? geom.coordinates : []);
+    for (const poly of polys) {
+      if (!poly || !poly[0]) continue;
+      if (!pipRing(x, y, poly[0])) continue;
+      let inHole = false;
+      for (let i = 1; i < poly.length; i++) if (pipRing(x, y, poly[i])) { inHole = true; break; }
+      if (!inHole) return true;
+    }
+    return false;
+  }
+  function centroidGeometry(geom) {
+    // Centroide simple del primer ring del primer polígono (suficiente para barrios).
+    const polys = geom.type === 'Polygon' ? [geom.coordinates] : (geom.type === 'MultiPolygon' ? geom.coordinates : []);
+    if (!polys.length || !polys[0][0]) return null;
+    const ring = polys[0][0];
+    let sx = 0, sy = 0;
+    for (const p of ring) { sx += p[0]; sy += p[1]; }
+    return [sx/ring.length, sy/ring.length];
+  }
+  // Construir mapeo barrio_cod → upl_cod via PIP del centroide del barrio contra UPL polygons.
+  function buildBogBarrioToUpl() {
+    if (_bogBarrioToUpl) return _bogBarrioToUpl;
+    if (!_bogBarriosGeo || !_bogUplGeo) return null;
+    const upl = _bogUplGeo.features || [];
+    const out = {};
+    for (const f of _bogBarriosGeo.features || []) {
+      const cod = f.properties && f.properties.codigo;
+      if (!cod) continue;
+      const c = centroidGeometry(f.geometry);
+      if (!c) continue;
+      for (const u of upl) {
+        if (pipGeometry(c[0], c[1], u.geometry)) {
+          out[cod] = u.properties.CODIGO_UPL;
+          break;
+        }
+      }
+    }
+    _bogBarrioToUpl = out;
+    return out;
   }
 
   async function initMap() {
@@ -1327,14 +1464,12 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   }
 
   async function drillIntoDep(depReg, depName) {
-    // Asegurar MUN_DATA en memoria
+    // Bogotá tiene su propio drill (UPL + barrios) en vez de muns.
+    if (depReg === '16') return drillIntoBogota();
     if (!MUN_DATA) await fetchMunData();
-    if (!MUN_DATA) {
-      console.warn('No se pudo cargar MUN_DATA, drill abortado');
-      return;
-    }
+    if (!MUN_DATA) { console.warn('No se pudo cargar MUN_DATA, drill abortado'); return; }
     window._activeDep = depReg;
-    // GeoJSON
+    window._activeUpl = null;
     let geo = _munGeoCache[depReg];
     if (!geo) {
       try {
@@ -1343,44 +1478,177 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
         geo = await r.json();
         _munGeoCache[depReg] = geo;
       } catch (e) {
-        console.error('Drill GeoJSON fetch failed:', e);
-        return;
+        console.error('Drill GeoJSON fetch failed:', e); return;
       }
     }
     if (_layer) _map.removeLayer(_layer);
     if (_munLayer) _map.removeLayer(_munLayer);
+    if (_uplLayer) _map.removeLayer(_uplLayer);
+    if (_barLayer) _map.removeLayer(_barLayer);
     _munLayer = L.geoJSON(geo, {
       style: munStyleFor(depReg),
       onEachFeature: (feat, layer) => {
         const k = munCodFromFeature(feat.properties);
         const d = k && MUN_DATA ? MUN_DATA[k] : null;
-        const nm = munNameFromFeature(feat.properties);
         layer.bindTooltip(munTooltip(feat), { sticky: true, direction: 'top' });
-        layer.on('mouseover', () => {
-          layer.setStyle({ weight: 2.5, color: '#fff' });
-          if (d) showPanel(d, 'Municipio');
-        });
-        layer.on('mouseout', () => {
-          _munLayer.resetStyle(layer);
-          const dep = DATA[depReg];
-          if (dep) showPanel(dep, 'Departamento (agregado)');
-        });
+        layer.on('mouseover', () => { layer.setStyle({ weight: 2.5, color: '#fff' }); if (d) showPanel(d, 'Municipio'); });
+        layer.on('mouseout', () => { _munLayer.resetStyle(layer); const dep = DATA[depReg]; if (dep) showPanel(dep, 'Departamento (agregado)'); });
       }
     }).addTo(_map);
     _map.fitBounds(_munLayer.getBounds(), { padding: [10, 10] });
-    document.getElementById('back-drill').hidden = false;
+    setBackButton('país');
     const dep = DATA[depReg];
     if (dep) showPanel(dep, 'Departamento (agregado)');
     renderRanking();
     buildLegend();
   }
 
+  // ─── DRILL BOGOTÁ (UPL → Barrio) ────────────────────────────────
+  function bogUplStyle() {
+    const arr = Object.values(BOG_UPL_DATA || {}).map(d => getMetric(d) ? getMetric(d).value : null).filter(v => v != null && !isNaN(v));
+    const min = arr.length ? Math.min(...arr) : 0;
+    const max = arr.length ? Math.max(...arr) : 100;
+    const dep = DATA['16'];
+    const mid = dep ? getMetric(dep).value : (min+max)/2;
+    const dom = { min, max, mid };
+    return (feat) => {
+      const cod = feat.properties.CODIGO_UPL;
+      const d = cod && BOG_UPL_DATA ? BOG_UPL_DATA[cod] : null;
+      const m = d ? getMetric(d) : null;
+      return { fillColor: colorFor(m ? m.value : null, dom), weight: 1, color: 'var(--paper)', fillOpacity: 0.92 };
+    };
+  }
+  function bogUplTooltip(feat) {
+    const cod = feat.properties.CODIGO_UPL;
+    const d = cod && BOG_UPL_DATA ? BOG_UPL_DATA[cod] : null;
+    const nm = d ? d.nombre : (feat.properties.NOMBRE || '—');
+    if (!d || !d.censo_muj) return `<div class="tt-name">${nm}</div><div class="tt-meta">Sin datos</div>`;
+    const m = getMetric(d);
+    return `<div class="tt-name">${nm}</div>
+            <div><span class="tt-pct">${pct(m.value)}</span> ${m.metricKey.toLowerCase()}</div>
+            <div class="tt-meta">UPL · ${fmt(d.censo_muj)} habilitadas · ${fmt(d.vot22_muj)} votaron 2022</div>`;
+  }
+  function bogBarrioStyle(uplCod) {
+    const map = buildBogBarrioToUpl();
+    const inUpl = map ? Object.keys(map).filter(b => map[b] === uplCod) : [];
+    const arr = inUpl.map(b => BOG_BARRIO_DATA[b]).filter(Boolean)
+      .map(d => getMetric(d) ? getMetric(d).value : null)
+      .filter(v => v != null && !isNaN(v));
+    const min = arr.length ? Math.min(...arr) : 0;
+    const max = arr.length ? Math.max(...arr) : 100;
+    const upl = BOG_UPL_DATA[uplCod];
+    const mid = upl ? getMetric(upl).value : (min+max)/2;
+    const dom = { min, max, mid };
+    return (feat) => {
+      const cod = feat.properties.codigo;
+      const d = cod && BOG_BARRIO_DATA ? BOG_BARRIO_DATA[cod] : null;
+      const m = d ? getMetric(d) : null;
+      return { fillColor: colorFor(m ? m.value : null, dom), weight: 1, color: 'var(--paper)', fillOpacity: 0.92 };
+    };
+  }
+  function bogBarrioTooltip(feat) {
+    const cod = feat.properties.codigo;
+    const d = cod && BOG_BARRIO_DATA ? BOG_BARRIO_DATA[cod] : null;
+    const nm = d ? d.nombre : (feat.properties.nombre || '—');
+    if (!d || !d.censo_muj) return `<div class="tt-name">${nm}</div><div class="tt-meta">Sin datos</div>`;
+    const m = getMetric(d);
+    return `<div class="tt-name">${nm}</div>
+            <div><span class="tt-pct">${pct(m.value)}</span> ${m.metricKey.toLowerCase()}</div>
+            <div class="tt-meta">Barrio · ${fmt(d.censo_muj)} habilitadas · ${fmt(d.vot22_muj)} votaron 2022</div>`;
+  }
+
+  async function drillIntoBogota() {
+    if (!BOG_UPL_DATA) await fetchBogUplData();
+    if (!BOG_UPL_DATA) { console.warn('Bogotá UPL data fail'); return; }
+    if (!_bogUplGeo) _bogUplGeo = await fetch(BOG_UPL_GEO_URL).then(r => r.json()).catch(e => { console.error(e); return null; });
+    if (!_bogUplGeo) return;
+    window._activeDep = '16';
+    window._activeUpl = null;
+    if (_layer) _map.removeLayer(_layer);
+    if (_munLayer) _map.removeLayer(_munLayer);
+    if (_uplLayer) _map.removeLayer(_uplLayer);
+    if (_barLayer) _map.removeLayer(_barLayer);
+    _uplLayer = L.geoJSON(_bogUplGeo, {
+      style: bogUplStyle(),
+      onEachFeature: (feat, layer) => {
+        const cod = feat.properties.CODIGO_UPL;
+        const d = cod && BOG_UPL_DATA ? BOG_UPL_DATA[cod] : null;
+        layer.bindTooltip(bogUplTooltip(feat), { sticky: true, direction: 'top' });
+        layer.on('mouseover', () => { layer.setStyle({ weight: 2.5, color: '#fff' }); if (d) showPanel(d, 'UPL'); });
+        layer.on('mouseout', () => { _uplLayer.resetStyle(layer); const dep = DATA['16']; if (dep) showPanel(dep, 'Bogotá D.C. (agregado)'); });
+        layer.on('click', () => { if (d) drillIntoUpl(cod, d.nombre); });
+      }
+    }).addTo(_map);
+    _map.fitBounds(_uplLayer.getBounds(), { padding: [10, 10] });
+    setBackButton('país');
+    const dep = DATA['16'];
+    if (dep) showPanel(dep, 'Bogotá D.C. (agregado)');
+    renderRanking();
+    buildLegend();
+  }
+
+  async function drillIntoUpl(uplCod, uplName) {
+    if (!BOG_BARRIO_DATA) await fetchBogBarrioData();
+    if (!_bogBarriosGeo) _bogBarriosGeo = await fetch(BOG_BARRIOS_GEO_URL).then(r => r.json()).catch(e => { console.error(e); return null; });
+    if (!_bogBarriosGeo) return;
+    const map = buildBogBarrioToUpl();
+    if (!map) return;
+    window._activeUpl = uplCod;
+    const filtered = {
+      type: 'FeatureCollection',
+      features: _bogBarriosGeo.features.filter(f => map[f.properties.codigo] === uplCod)
+    };
+    if (_uplLayer) _map.removeLayer(_uplLayer);
+    if (_barLayer) _map.removeLayer(_barLayer);
+    _barLayer = L.geoJSON(filtered, {
+      style: bogBarrioStyle(uplCod),
+      onEachFeature: (feat, layer) => {
+        const cod = feat.properties.codigo;
+        const d = cod && BOG_BARRIO_DATA ? BOG_BARRIO_DATA[cod] : null;
+        layer.bindTooltip(bogBarrioTooltip(feat), { sticky: true, direction: 'top' });
+        layer.on('mouseover', () => { layer.setStyle({ weight: 2.5, color: '#fff' }); if (d) showPanel(d, 'Barrio'); });
+        layer.on('mouseout', () => { _barLayer.resetStyle(layer); const upl = BOG_UPL_DATA[uplCod]; if (upl) showPanel(upl, 'UPL (agregado)'); });
+      }
+    }).addTo(_map);
+    if (filtered.features.length) _map.fitBounds(_barLayer.getBounds(), { padding: [10, 10] });
+    setBackButton('bogota');
+    const upl = BOG_UPL_DATA[uplCod];
+    if (upl) showPanel(upl, 'UPL (agregado)');
+    renderRanking();
+    buildLegend();
+  }
+
+  function setBackButton(mode) {
+    const btn = document.getElementById('back-drill');
+    if (!btn) return;
+    if (mode === 'país') {
+      btn.innerHTML = '<span class="arr">←</span>Volver al país';
+      btn.hidden = false;
+    } else if (mode === 'bogota') {
+      btn.innerHTML = '<span class="arr">←</span>Volver a Bogotá';
+      btn.hidden = false;
+    } else {
+      btn.hidden = true;
+    }
+  }
+
   function exitDrill() {
+    // Si estamos en nivel barrio (Bogotá), volver a UPL
+    if (window._activeUpl) {
+      if (_barLayer) { _map.removeLayer(_barLayer); _barLayer = null; }
+      window._activeUpl = null;
+      drillIntoBogota();
+      return;
+    }
+    // Si estamos en nivel UPL o mun, volver al país
     if (_munLayer) { _map.removeLayer(_munLayer); _munLayer = null; }
+    if (_uplLayer) { _map.removeLayer(_uplLayer); _uplLayer = null; }
+    if (_barLayer) { _map.removeLayer(_barLayer); _barLayer = null; }
     window._activeDep = null;
+    window._activeUpl = null;
     if (_layer) _layer.addTo(_map);
     if (_layer) _map.fitBounds(_layer.getBounds(), { padding: [10, 10] });
-    document.getElementById('back-drill').hidden = true;
+    setBackButton('hide');
     renderRanking();
     buildLegend();
     showNacional();
@@ -1405,6 +1673,18 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
       });
       return;
     }
+    if (window._activeUpl && _barLayer) {
+      _barLayer.setStyle(bogBarrioStyle(window._activeUpl));
+      _barLayer.eachLayer(l => l.unbindTooltip());
+      _barLayer.eachLayer(l => l.bindTooltip(bogBarrioTooltip(l.feature), { sticky: true, direction: 'top' }));
+      return;
+    }
+    if (window._activeDep === '16' && _uplLayer) {
+      _uplLayer.setStyle(bogUplStyle());
+      _uplLayer.eachLayer(l => l.unbindTooltip());
+      _uplLayer.eachLayer(l => l.bindTooltip(bogUplTooltip(l.feature), { sticky: true, direction: 'top' }));
+      return;
+    }
     if (_layer) _layer.setStyle(styleFor);
     if (_layer) _layer.eachLayer(l => l.unbindTooltip());
     if (_layer) _layer.eachLayer(l => {
@@ -1416,10 +1696,24 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 
   // ─── RANKING ─────────────────────────────────────────────────────
   function renderRanking() {
-    // Si hay drill activo, mostramos top/bottom 10 muns del depto.
-    let arr, isMun = false;
-    if (window._activeDep && MUN_DATA) {
-      isMun = true;
+    // Niveles: nacional (deptos), drill mun, drill Bogotá UPL, drill Bogotá barrio
+    let arr, level = 'depto';
+    if (window._activeUpl && BOG_BARRIO_DATA) {
+      const map = buildBogBarrioToUpl() || {};
+      level = 'barrio';
+      arr = Object.keys(BOG_BARRIO_DATA)
+        .filter(cod => map[cod] === window._activeUpl)
+        .map(cod => BOG_BARRIO_DATA[cod])
+        .filter(d => (d.censo_muj || 0) >= 300)
+        .map(d => ({ ...d, _v: getMetric(d) ? getMetric(d).value : null }))
+        .filter(d => d._v != null && !isNaN(d._v));
+    } else if (window._activeDep === '16' && BOG_UPL_DATA) {
+      level = 'upl';
+      arr = Object.values(BOG_UPL_DATA)
+        .map(d => ({ ...d, _v: getMetric(d) ? getMetric(d).value : null }))
+        .filter(d => d._v != null && !isNaN(d._v));
+    } else if (window._activeDep && MUN_DATA) {
+      level = 'mun';
       arr = munsForDep(window._activeDep)
         .filter(d => (d.censo_muj || 0) >= 800)
         .map(d => ({ ...d, _v: getMetric(d) ? getMetric(d).value : null }))
@@ -1430,6 +1724,7 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
         .map(d => ({ ...d, _v: getMetric(d).value }))
         .filter(d => d._v != null && !isNaN(d._v));
     }
+    const isMun = level !== 'depto';
     const top = [...arr].sort((a,b) => b._v - a._v).slice(0,10);
     const bot = [...arr].sort((a,b) => a._v - b._v).slice(0,10);
     const html = (items) => items.map((d, i) => `
@@ -1441,14 +1736,24 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     `).join('');
     document.getElementById('rank-top').innerHTML = html(top);
     document.getElementById('rank-bot').innerHTML = html(bot);
-    // En drill el panel del ranking apunta a muns; en nacional sigue siendo deptos.
+    // Wire hover en el ranking según nivel
     document.querySelectorAll('.rank-item').forEach(el => {
       el.addEventListener('mouseenter', () => {
-        const d = isMun ? (MUN_DATA && MUN_DATA[el.dataset.cod]) : DATA[el.dataset.cod];
-        if (d) showPanel(d, isMun ? 'Municipio · ranking' : 'Departamento · ranking');
+        let d = null, scope = 'Departamento · ranking';
+        if (level === 'barrio') { d = BOG_BARRIO_DATA[el.dataset.cod]; scope = 'Barrio · ranking'; }
+        else if (level === 'upl') { d = BOG_UPL_DATA[el.dataset.cod]; scope = 'UPL · ranking'; }
+        else if (level === 'mun') { d = MUN_DATA && MUN_DATA[el.dataset.cod]; scope = 'Municipio · ranking'; }
+        else { d = DATA[el.dataset.cod]; }
+        if (d) showPanel(d, scope);
       });
       el.addEventListener('mouseleave', () => {
-        if (window._activeDep) {
+        if (window._activeUpl) {
+          const upl = BOG_UPL_DATA[window._activeUpl];
+          if (upl) showPanel(upl, 'UPL (agregado)');
+        } else if (window._activeDep === '16') {
+          const dep = DATA['16'];
+          if (dep) showPanel(dep, 'Bogotá D.C. (agregado)');
+        } else if (window._activeDep) {
           const dep = DATA[window._activeDep];
           if (dep) showPanel(dep, 'Departamento (agregado)');
         } else {
@@ -1478,14 +1783,24 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
         t = { top: `Top 10 · ${y}`, topSub: sub, bot: `Bottom 10 · ${y}`, botSub: sub };
       }
     }
-    // En drill, reemplaza "Top 10 ·" por "Top 10 muns ·" para que sea claro.
+    // En drill, ajustamos el label "Top 10" según el nivel
     if (isMun) {
-      const depNm = DATA[window._activeDep] && DATA[window._activeDep].nombre || '';
+      let unit, parent;
+      if (level === 'barrio') {
+        unit = 'barrios';
+        parent = (BOG_UPL_DATA[window._activeUpl] && BOG_UPL_DATA[window._activeUpl].nombre) || 'UPL';
+      } else if (level === 'upl') {
+        unit = 'UPL';
+        parent = 'Bogotá D.C.';
+      } else {
+        unit = 'muns';
+        parent = (DATA[window._activeDep] && DATA[window._activeDep].nombre) || '';
+      }
       t = {
-        top: t.top.replace('Top 10', 'Top 10 muns'),
-        topSub: `${t.topSub} · ${depNm}`,
-        bot: t.bot.replace('Bottom 10', 'Bottom 10 muns'),
-        botSub: `${t.botSub} · ${depNm}`
+        top: t.top.replace('Top 10', `Top 10 ${unit}`),
+        topSub: `${t.topSub} · ${parent}`,
+        bot: t.bot.replace('Bottom 10', `Bottom 10 ${unit}`),
+        botSub: `${t.botSub} · ${parent}`
       };
     }
     document.getElementById('rt-title').textContent = t.top;
@@ -1527,7 +1842,13 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     buildLegend();
     if (window._mapReady) restyleAll();
     renderRanking();
-    if (window._activeDep) {
+    if (window._activeUpl) {
+      const upl = BOG_UPL_DATA[window._activeUpl];
+      if (upl) showPanel(upl, 'UPL (agregado)');
+    } else if (window._activeDep === '16') {
+      const dep = DATA['16'];
+      if (dep) showPanel(dep, 'Bogotá D.C. (agregado)');
+    } else if (window._activeDep) {
       const dep = DATA[window._activeDep];
       if (dep) showPanel(dep, 'Departamento (agregado)');
     } else {
