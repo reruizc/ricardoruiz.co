@@ -378,6 +378,48 @@
         </div>
       </div>
 
+      <!-- ── 2c-ter. UBICACIÓN (geo + dropdown) ── -->
+      <div class="panel" id="panel-ubicacion">
+        <div class="qhead">
+          <span class="qnum">Sobre ti · 3/3</span>
+          <span class="qtag">Ubicación</span>
+        </div>
+        <p class="qtext">¿De dónde nos cuentas?</p>
+        <p class="qhint">Calibramos la lectura final con la realidad de tu zona. También adaptamos el tono según la región (paisa, costeño, etc.).</p>
+
+        <button type="button" class="btn" id="ubi-geo-btn" style="width:100%; justify-content:center; display:flex; align-items:center; gap:.5rem;" onclick="usarGeo()">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          Usar mi ubicación
+        </button>
+        <p id="ubi-geo-status" style="font-family:'DM Mono',monospace; font-size:.7rem; color:var(--text-meta); text-align:center; margin:.55rem 0 1.3rem;">Pediremos permiso al navegador. Si prefieres no compartir, llena los menús abajo.</p>
+
+        <div style="display:flex; align-items:center; gap:.8rem; margin: .3rem 0 .9rem;">
+          <div style="flex:1; height:1px; background:var(--border-soft);"></div>
+          <span style="font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.18em; color:var(--text-meta); text-transform:uppercase;">o elige a mano</span>
+          <div style="flex:1; height:1px; background:var(--border-soft);"></div>
+        </div>
+
+        <div class="form-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:.85rem;">
+          <div class="field">
+            <label for="ubi-dep" style="font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.14em; text-transform:uppercase; color:var(--text-meta); font-weight:500; margin-bottom:.35rem; display:block;">Departamento</label>
+            <select id="ubi-dep" onchange="onDepChange()" style="width:100%; padding:.7rem .8rem; border:1.5px solid var(--border); background:var(--card); color:var(--text); border-radius:10px; font-family:'Fraunces',serif; font-size:.94rem; cursor:pointer; outline:none;">
+              <option value="">Selecciona…</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ubi-mun" style="font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.14em; text-transform:uppercase; color:var(--text-meta); font-weight:500; margin-bottom:.35rem; display:block;">Municipio</label>
+            <select id="ubi-mun" onchange="onMunChange()" disabled style="width:100%; padding:.7rem .8rem; border:1.5px solid var(--border); background:var(--card); color:var(--text); border-radius:10px; font-family:'Fraunces',serif; font-size:.94rem; cursor:pointer; outline:none; opacity:.6;">
+              <option value="">Selecciona departamento primero</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn btn-ghost" onclick="goTo('demo')">← Volver</button>
+          <button class="btn disabled" id="ubi-next" onclick="ubiNext()">Siguiente →</button>
+        </div>
+      </div>
+
       <!-- ── 2d. PRIORIDAD TEMÁTICA (multi-respuesta, no scoring) ── -->
       <div class="panel" id="panel-prio">
         <div class="qhead">
@@ -486,6 +528,7 @@
     miniTest:   `${S3_BASE}/mini_test.json`,
     preguntas:  `${S3_BASE}/preguntas.json`,
     variantes:  `${S3_BASE}/variantes-tematicas.json`,
+    divipola:   `${S3_BASE}/divipola.json`,
   };
   const EXPLICA_URL = 'https://9w1xcwe2sj.execute-api.us-east-1.amazonaws.com/explica';
 
@@ -498,6 +541,7 @@
     mtIndex: 0,
     demo: { edad: null, identidad: null },  // edad e identidad cotidiana, no scoring
     demoIndex: 0,      // 0 = EDAD, 1 = IDENTIDAD
+    ubicacion: { dep_cod: null, dep_nombre: null, mun_cod: null, mun_nombre: null, fuente: null, lat: null, lon: null },
     prio: [],          // ['salud', 'costo_vida'] — multi-respuesta hasta 2
     answers: {},       // {P1: 'P1a', P2: ...}
     qIndex: 0,
@@ -522,7 +566,7 @@
     return a;
   }
 
-  let DATA = { arquetipos: null, candidatos: null, registros: null, miniTest: null, preguntas: null, variantes: null };
+  let DATA = { arquetipos: null, candidatos: null, registros: null, miniTest: null, preguntas: null, variantes: null, divipola: null };
 
   const $ = sel => document.querySelector(sel);
   const $$ = sel => Array.from(document.querySelectorAll(sel));
@@ -539,15 +583,17 @@
   // ── CARGA DE DATA ──
   async function loadAll() {
     try {
-      const [arq, cand, reg, mt, preg, vars] = await Promise.all([
+      const [arq, cand, reg, mt, preg, vars, divi] = await Promise.all([
         fetch(DATA_URLS.arquetipos).then(r => r.json()),
         fetch(DATA_URLS.candidatos).then(r => r.json()),
         fetch(DATA_URLS.registros).then(r => r.json()),
         fetch(DATA_URLS.miniTest).then(r => r.json()),
         fetch(DATA_URLS.preguntas).then(r => r.json()),
         fetch(DATA_URLS.variantes).then(r => r.json()).catch(() => ({ variantes: [] })),
+        fetch(DATA_URLS.divipola).then(r => r.json()).catch(() => ({ deptos: [] })),
       ]);
-      DATA = { arquetipos: arq, candidatos: cand, registros: reg, miniTest: mt, preguntas: preg, variantes: vars };
+      DATA = { arquetipos: arq, candidatos: cand, registros: reg, miniTest: mt, preguntas: preg, variantes: vars, divipola: divi };
+      populateDepDropdown();
       renderRegistros();
       renderCandidatos();
     } catch (e) {
@@ -673,9 +719,146 @@
       STATE.demoIndex++;
       renderDemo();
     } else {
-      renderPrio();
-      show('prio');
+      show('ubicacion');
     }
+  }
+
+  // ── 2c-ter. UBICACIÓN ──
+  // Mapeo dep_cod → región lingüística para calibrar el tono del LLM.
+  // Los códigos son los de Registraduría (mismo CSV COMUNAS_DATA),
+  // NO los DIVIPOLA del DANE. Lo demás cae en 'tuteo_neutro'.
+  const TONO_REGIONAL = {
+    '01': 'voseo_paisa',        // Antioquia
+    '09': 'voseo_paisa',        // Caldas
+    '24': 'voseo_paisa',        // Risaralda
+    '26': 'voseo_paisa',        // Quindío
+    '31': 'voseo_caleño',       // Valle del Cauca
+    '07': 'ustedeo_boyacense',  // Boyacá
+    '03': 'tuteo_costeño',      // Atlántico
+    '05': 'tuteo_costeño',      // Bolívar
+    '12': 'tuteo_costeño',      // Cesar
+    '13': 'tuteo_costeño',      // Córdoba
+    '21': 'tuteo_costeño',      // Magdalena
+    '28': 'tuteo_costeño',      // Sucre
+    '48': 'tuteo_costeño',      // La Guajira
+    '56': 'tuteo_costeño',      // San Andrés
+  };
+  function tonoRegional(depCod) {
+    return TONO_REGIONAL[depCod] || 'tuteo_neutro';
+  }
+
+  function populateDepDropdown() {
+    const sel = $('#ubi-dep');
+    if (!sel || !DATA.divipola) return;
+    const deptos = (DATA.divipola.deptos || []).slice().sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    sel.innerHTML = '<option value="">Selecciona…</option>' + deptos.map(d =>
+      `<option value="${d.cod}">${escapeHtml(d.nombre)}</option>`
+    ).join('');
+  }
+
+  function onDepChange() {
+    const sel = $('#ubi-dep');
+    const munSel = $('#ubi-mun');
+    const cod = sel.value;
+    if (!cod) {
+      munSel.innerHTML = '<option value="">Selecciona departamento primero</option>';
+      munSel.disabled = true;
+      munSel.style.opacity = '.6';
+      STATE.ubicacion = { dep_cod: null, dep_nombre: null, mun_cod: null, mun_nombre: null, fuente: null, lat: null, lon: null };
+      $('#ubi-next').classList.add('disabled');
+      return;
+    }
+    const dep = (DATA.divipola.deptos || []).find(d => d.cod === cod);
+    if (!dep) return;
+    STATE.ubicacion.dep_cod = dep.cod;
+    STATE.ubicacion.dep_nombre = dep.nombre;
+    STATE.ubicacion.fuente = STATE.ubicacion.fuente === 'geo' ? 'geo' : 'manual';
+    munSel.innerHTML = '<option value="">Selecciona…</option>' + (dep.muns || []).map(m =>
+      `<option value="${m.cod}">${escapeHtml(m.nombre)}</option>`
+    ).join('');
+    munSel.disabled = false;
+    munSel.style.opacity = '1';
+    STATE.ubicacion.mun_cod = null;
+    STATE.ubicacion.mun_nombre = null;
+    $('#ubi-next').classList.add('disabled');
+  }
+
+  function onMunChange() {
+    const sel = $('#ubi-mun');
+    const cod = sel.value;
+    if (!cod) {
+      STATE.ubicacion.mun_cod = null;
+      STATE.ubicacion.mun_nombre = null;
+      $('#ubi-next').classList.add('disabled');
+      return;
+    }
+    const dep = (DATA.divipola.deptos || []).find(d => d.cod === STATE.ubicacion.dep_cod);
+    const mun = (dep?.muns || []).find(m => m.cod === cod);
+    if (!mun) return;
+    STATE.ubicacion.mun_cod = mun.cod;
+    STATE.ubicacion.mun_nombre = mun.nombre;
+    $('#ubi-next').classList.remove('disabled');
+  }
+
+  // Reverse geocoding gratis vía Nominatim (OpenStreetMap). 1 req/usuario,
+  // sin auth, devuelve depto y municipio en español.
+  async function usarGeo() {
+    const status = $('#ubi-geo-status');
+    if (!navigator.geolocation) {
+      status.textContent = 'Tu navegador no soporta geolocalización. Usa los menús abajo.';
+      return;
+    }
+    status.textContent = 'Pidiendo permiso al navegador…';
+    navigator.geolocation.getCurrentPosition(async pos => {
+      const { latitude: lat, longitude: lon } = pos.coords;
+      STATE.ubicacion.lat = lat;
+      STATE.ubicacion.lon = lon;
+      status.textContent = 'Resolviendo tu zona…';
+      try {
+        const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=es&zoom=10`, {
+          headers: { 'Accept': 'application/json' },
+        });
+        const j = await r.json();
+        const addr = j.address || {};
+        const depNombre = (addr.state || '').replace(/^Departamento de /i, '').trim();
+        const munNombre = (addr.city || addr.town || addr.village || addr.county || '').trim();
+        // Buscar match en divipola
+        const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
+        const dep = (DATA.divipola.deptos || []).find(d => norm(d.nombre) === norm(depNombre));
+        if (dep) {
+          $('#ubi-dep').value = dep.cod;
+          onDepChange();
+          if (munNombre) {
+            const mun = (dep.muns || []).find(m => norm(m.nombre) === norm(munNombre));
+            if (mun) {
+              $('#ubi-mun').value = mun.cod;
+              onMunChange();
+              STATE.ubicacion.fuente = 'geo';
+              status.textContent = `Listo. Te ubicamos en ${mun.nombre}, ${dep.nombre}. Puedes corregir abajo si quieres.`;
+              return;
+            }
+          }
+          STATE.ubicacion.fuente = 'geo_parcial';
+          status.textContent = `Te ubicamos en ${dep.nombre}. Selecciona tu municipio abajo.`;
+        } else {
+          status.textContent = 'No pudimos resolver el departamento. Usa los menús abajo.';
+        }
+      } catch (e) {
+        status.textContent = 'No pudimos resolver tu ubicación. Usa los menús abajo.';
+      }
+    }, err => {
+      const msg = err.code === err.PERMISSION_DENIED
+        ? 'Diste no al permiso. Usa los menús abajo.'
+        : 'No se pudo obtener tu ubicación. Usa los menús abajo.';
+      status.textContent = msg;
+    }, { timeout: 12000, enableHighAccuracy: false });
+  }
+
+  function ubiNext() {
+    if (!STATE.ubicacion.mun_cod) return;
+    STATE.ubicacion.tono_regional = tonoRegional(STATE.ubicacion.dep_cod);
+    renderPrio();
+    show('prio');
   }
 
   function demoBack() {
@@ -725,11 +908,8 @@
   }
 
   function prioBack() {
-    // Volver a la última pregunta demográfica (identidad), no a candidato
-    const demoPregs = (DATA.preguntas.demografia || {}).preguntas || [];
-    STATE.demoIndex = Math.max(0, demoPregs.length - 1);
-    renderDemo();
-    show('demo');
+    // Volver al panel de ubicación
+    show('ubicacion');
   }
 
   // ── 2b. MINI-TEST ──
@@ -1067,6 +1247,14 @@
       candidato: { id: cand.id, nombre: cand.nombre, partido: cand.partido },
       candidato_origen: STATE.candOrigen,
       demografia: { edad: STATE.demo?.edad || null, identidad: STATE.demo?.identidad || null },
+      ubicacion: STATE.ubicacion?.dep_cod ? {
+        dep_cod: STATE.ubicacion.dep_cod,
+        dep_nombre: STATE.ubicacion.dep_nombre,
+        mun_cod: STATE.ubicacion.mun_cod,
+        mun_nombre: STATE.ubicacion.mun_nombre,
+        tono_regional: STATE.ubicacion.tono_regional || 'tuteo_neutro',
+        fuente: STATE.ubicacion.fuente,
+      } : null,
       prio: STATE.prio || [],
       arquetipo_dominante: { id: winner.id, nombre: winner.nombre_2027, pct: winnerPct },
       arquetipo_secundario: second ? { id: second.id, nombre: second.nombre_2027, pct: secondPct } : null,
@@ -1096,6 +1284,7 @@
     STATE.mtIndex = 0;
     STATE.demo = { edad: null, identidad: null };
     STATE.demoIndex = 0;
+    STATE.ubicacion = { dep_cod: null, dep_nombre: null, mun_cod: null, mun_nombre: null, fuente: null, lat: null, lon: null };
     STATE.prio = [];
     STATE.answers = {};
     STATE.qIndex = 0;

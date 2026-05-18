@@ -59,7 +59,7 @@ DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash")
 S3_BUCKET = os.environ.get("S3_BUCKET", "elecciones-2026")
 CACHE_PREFIX = os.environ.get("CACHE_PREFIX", "ricardoruiz.co/test-presidencial-2026/cache")
 CACHE_TTL_DIAS = int(os.environ.get("CACHE_TTL_DIAS", "14"))
-HTTP_TIMEOUT = 25
+HTTP_TIMEOUT = 55
 
 CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
@@ -70,14 +70,29 @@ CORS_HEADERS = {
 
 # Tono por registro: el LLM lo recibe como instrucción al redactar.
 TONO = {
-    "popular": "coloquial colombiano, frases cortas, tuteo de Bogotá, sin tecnicismos, sin argentinismos. Muletillas suaves OK ('la verdad', 'pues', 'uno'). Máximo 2 oraciones por idea.",
-    "digital": "irónico, formato POV/'imaginate que', referencias de redes, máximo 1 emoji por párrafo, tono de conversación tuit. Tuteo de Bogotá, sin argentinismos.",
-    "analitico": "neutro elevado, vocabulario político preciso, frases completas. Como una columna de opinión seria. Tuteo de Bogotá, sin argentinismos.",
+    "popular": "coloquial colombiano, frases cortas, sin tecnicismos, sin argentinismos. Muletillas suaves OK ('la verdad', 'pues', 'uno'). Máximo 2 oraciones por idea.",
+    "digital": "irónico, formato POV/'imaginate que', referencias de redes, máximo 1 emoji por párrafo, tono de conversación tuit. Sin argentinismos.",
+    "analitico": "neutro elevado, vocabulario político preciso, frases completas. Como una columna de opinión seria. Sin argentinismos.",
 }
 
-SYSTEM_PROMPT = """Eres un analista electoral que ayuda a un ciudadano colombiano a entender el resultado de un test de arquetipo emocional para las presidenciales 2026. Te paso un objeto STATE con: registro de tono, candidato declarado, demografía, prioridad temática y arquetipo dominante calculado.
+# Tono regional según el departamento del usuario. Esto se SOBREPONE al
+# default del registro (que era tuteo bogotano). Si el usuario es de
+# Antioquia o el Eje Cafetero, el LLM usa voseo paisa; si es del Valle,
+# voseo caleño; si es de Boyacá, ustedeo formal; si es costeño, tuteo
+# costeño relajado; el resto, tuteo neutro de Bogotá.
+TONO_REGIONAL = {
+    "voseo_paisa": "Usa voseo paisa colombiano ('vos pensás', 'te digo', 'vení', 'sabés'). Es paisa de Medellín / Eje Cafetero, NO voseo argentino. Permite muletillas paisas suaves ('pues', 'ome' con moderación). NO uses 'che' ni vocabulario argentino.",
+    "voseo_caleño": "Usa voseo caleño/vallecaucano ('vos sabés', 'mirá vos', 've'). Es caleño relajado, NO voseo argentino. NO uses 'che' ni vocabulario argentino.",
+    "ustedeo_boyacense": "Usa ustedeo formal boyacense ('usted dice', 'usted prioriza', 'lo que usted siente'). Tono respetuoso y reposado, característico del altiplano cundi-boyacense. NO tutees.",
+    "tuteo_costeño": "Usa tuteo costeño relajado ('tú dices', 'tú sientes'). Frases con cadencia caribeña, sin tecnicismos. Permite muletillas costeñas suaves ('ajá', 'mira') con moderación.",
+    "tuteo_neutro": "Usa tuteo neutro colombiano de Bogotá ('tú dices', 'tú sientes'). NUNCA uses voseo ni argentinismos.",
+}
 
-Tu trabajo es REDACTAR una lectura honesta y diagnóstica del resultado. NO inventas datos. NO mencionas a otros candidatos. NO recomiendas voto. NO usas argentinismos ni voseo: tuteo colombiano.
+SYSTEM_PROMPT = """Eres un analista electoral que ayuda a un ciudadano colombiano a entender el resultado de un test de arquetipo emocional para las presidenciales 2026. Te paso un objeto STATE con: registro de tono, candidato declarado, demografía, ubicación con su tono regional, prioridad temática y arquetipo dominante calculado.
+
+Tu trabajo es REDACTAR una lectura honesta y diagnóstica del resultado. NO inventas datos. NO mencionas a otros candidatos. NO recomiendas voto.
+
+IMPORTANTE — TONO REGIONAL COLOMBIANO: el STATE incluye un campo 'tono_regional' que indica cómo hablan en la región del usuario. DEBES adaptar tu lenguaje a ese tono: paisa usa voseo paisa, vallecaucano usa voseo caleño, boyacense usa ustedeo formal, costeño usa tuteo costeño, neutro usa tuteo de Bogotá. NUNCA uses voseo argentino (con 'che' o vocabulario argentino).
 
 Devuelves JSON estricto con esta estructura exacta:
 {
@@ -109,13 +124,17 @@ def _s3_client():
 
 # ---- Cache ----
 def _cache_key(state):
-    """Hash determinista del state, ignorando órdenes irrelevantes (lista de prio)."""
+    """Hash determinista del state, ignorando órdenes irrelevantes (lista de prio).
+    Incluye tono_regional para que el cache no mezcle paisas con bogotanos."""
+    ubi = state.get("ubicacion") or {}
     canon = {
         "registro": state.get("registro"),
         "candidato_id": (state.get("candidato") or {}).get("id"),
         "candidato_origen": state.get("candidato_origen"),
         "edad": (state.get("demografia") or {}).get("edad"),
         "identidad": (state.get("demografia") or {}).get("identidad"),
+        "tono_regional": ubi.get("tono_regional") or "tuteo_neutro",
+        "dep_cod": ubi.get("dep_cod"),
         "prio": sorted(state.get("prio") or []),
         "arq_dom_id": (state.get("arquetipo_dominante") or {}).get("id"),
         "arq_sec_id": (state.get("arquetipo_secundario") or {}).get("id"),
@@ -164,23 +183,33 @@ def _call_deepseek(state):
 
     cand = state.get("candidato") or {}
     demo = state.get("demografia") or {}
+    ubi = state.get("ubicacion") or {}
+    tono_reg_key = ubi.get("tono_regional") or "tuteo_neutro"
+    tono_regional_instr = TONO_REGIONAL.get(tono_reg_key, TONO_REGIONAL["tuteo_neutro"])
     arq_dom = state.get("arquetipo_dominante") or {}
     arq_sec = state.get("arquetipo_secundario") or {}
     arq_score = state.get("arq_score") or {}
     prio = state.get("prio") or []
 
+    ubi_linea = (
+        f"{ubi.get('mun_nombre')}, {ubi.get('dep_nombre')}"
+        if ubi.get("mun_nombre") else "sin declarar"
+    )
+
     user_msg = f"""STATE:
 - Registro (tono): {registro} → {tono}
+- Tono regional: {tono_reg_key} → {tono_regional_instr}
 - Candidato declarado: {cand.get('nombre')} ({cand.get('partido')})
 - Origen del candidato: {state.get('candidato_origen', 'declarado')}
 - Edad: {demo.get('edad', 'sin dato')}
 - Identidad cotidiana: {demo.get('identidad', 'sin dato')}
+- Ubicación: {ubi_linea}
 - Prioridades temáticas: {', '.join(prio) if prio else 'sin declarar'}
 - Arquetipo dominante: {arq_dom.get('nombre')} ({arq_dom.get('pct')}%)
 - Arquetipo secundario: {arq_sec.get('nombre')} ({arq_sec.get('pct')}%)
 - Distribución completa: {json.dumps(arq_score, ensure_ascii=False)}
 
-Redacta la lectura en JSON estricto."""
+Redacta la lectura en JSON estricto. RECUERDA: usa el tono regional indicado arriba (NO voseo argentino)."""
 
     body = json.dumps({
         "model": DEEPSEEK_MODEL,
