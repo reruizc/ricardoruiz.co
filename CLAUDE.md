@@ -8,6 +8,7 @@
 - `previa-1v.html` — simulador de intención presidencial 1ª vuelta
 - `oportunidad.html` — **módulo B2B** voto blando afín por candidato (LISTO, ver sección dedicada)
 - `veleta.html` — municipios sensibles al cambio (score multidimensional)
+- `test-presidencial-2026.html` — **test de arquetipo emocional + lectura LLM** (LISTO v1, ver sección dedicada)
 - `pricing.html` — planes (Básico / Pro 39.900 COP · Premium 99.900 COP · Personalizado)
 - `lang.js` — i18n (co/us/cn); `CLAUDE.md` vive en la raíz del repo
 
@@ -1288,6 +1289,221 @@ proyecto-dc/agenda.html ◀──── fetch directo a S3 (cache 5min)
   Los corregimientos NO están en el análisis de comportamiento electoral
   ni de gobierno criminal — se pintan en gris con tooltip "No incluido en
   este análisis".
+
+## Test Presidencial 2026 — `test-presidencial-2026.html` (v1 LISTO · B2C/B2B híbrido)
+
+Test de **arquetipo emocional del votante** que contrasta el candidato
+declarado del usuario con su perfil emocional y, próximamente, con la
+huella territorial del bloque del candidato en su barrio/municipio.
+
+### Arquetipos (5 + 5 variantes evolucionadas)
+
+Adoptados del paquete de Nury Astrid (mismo modelo usado en módulo 05
+de proyecto-dc · Cartografía Emocional 2015-2027):
+
+| ID | Nombre 2027 (mostrado al usuario) | Color hex | Marco teórico |
+|---|---|---|---|
+| `proteccion` | Protección con resultados y orden competente | #1e6fb8 | Securitization (Buzan & Wæver) + RWA (Altemeyer) |
+| `estabilidad` | Continuidad pragmática y gestión barrial | #2f6b3f | System Justification (Jost) + Loss Aversion (Kahneman) |
+| `supervivencia` | Supervivencia económica y servicios cotidianos | #c9682e | Economic Voting (Lewis-Beck) + Pocketbook (Achen & Bartels) |
+| `castigo` | Castigo a la restauración y demanda de alternancia | #a02020 | Affective Intelligence (Marcus) + Negativity Bias |
+| `pertenencia` | Pertenencia comunitaria y autonomía territorial | #7a3b8f | Social Identity (Tajfel & Turner) + Politics of Resentment (Cramer) |
+
+### Candidatos (6 del set de `oportunidad.html`)
+
+```
+ic — Iván Cepeda          (Pacto Histórico)          #51458F
+ae — Abelardo De la Espriella (Independiente)        #000062
+pv — Paloma Valencia      (Centro Democrático)       #1866DF
+cl — Claudia López        (Centro/Centroizquierda)   #d9db24
+sf — Sergio Fajardo       (Coalición de Centro)      #EEAA22
+rb — Roy Barreras         (Frente por la Vida)       #3d8b3d
+```
+Fotos en S3: `bases+de+datos/fotos-candidatos-ctr/{cepeda,abelardo,paloma,claudia,fajardo,roy}.jpg`
+(comparte con `kart-presidencial1v.html`).
+
+### Flujo del usuario (6 pasos)
+
+1. **Registro** (popular · digital · analítico) — cambia el tono del texto.
+2. **Candidato declarado** (6 cards con foto) o `Aún no me decido` → mini-test
+   de 4 preguntas con scoring sobre los 6 candidatos.
+3. **Demografía** (2 preguntas, no scoring): edad (5 rangos) + identidad
+   cotidiana (7 opciones: trabajo, barrio, familia, ciudad, gremio,
+   comunidad, región).
+4. **Ubicación** — botón geo (Nominatim reverse + nearest-neighbor sobre
+   13.506 puestos de PUESTOS_GEOREF para resolver barrio) + dropdowns
+   dep→mun como fallback. Identifica barrio, comuna, mun, dep, y calcula
+   `tono_regional` (voseo paisa / voseo caleño / ustedeo boyacense /
+   tuteo costeño / tuteo neutro).
+5. **PRIO** (prioridad temática, multi-respuesta hasta 2 de 10 temas:
+   seguridad, economía, salud, costo de vida, anticorrupción, política
+   exterior, agraria, instituciones, educación, ambiente). Calibra
+   cuál variante temática se muestra en P1/P2/P3/P4/P6.
+6. **7 preguntas de arquetipo + 1 de balance Petro (P8)**. Opciones
+   barajadas con Fisher-Yates. Cada opción cambia según candidato +
+   registro elegido.
+
+### Banco de preguntas (1.268 textos)
+
+- 720 mainstream (8 preguntas × 5 opciones × 6 candidatos × 3 registros)
+- 450 variantes temáticas (5 preguntas con variante × 5 × 6 × 3)
+- 33 PRIO (10 temas × 3 registros + 3 enunciados)
+- 18 demografía (edad + identidad × 3)
+- 32 mini-test (4 preguntas × scoring × 6 candidatos)
+- P6 con casos reales: UNGRD, Odebrecht, Centros Poblados, Nicolás Petro,
+  OCAD-Paz, Agro Ingreso Seguro — distribuidos según el lente del candidato.
+- Pertenencia diversificada por candidato (no más sesgo región-vs-Bogotá):
+  · ic → comunidades populares, sindicatos
+  · ae → pequeño empresariado, gente del común
+  · pv → gremios productivos, sectores que sostienen al país
+  · cl → ciudades capitales, profesionales urbanos, localidades
+  · sf → clase media educada, profesionales, maestros
+  · rb → regiones del posconflicto, víctimas
+
+### Datos del banco — paths S3
+
+```
+S3_BASE = ricardoruiz.co/congreso-2026/output/test-presidencial/
+  arquetipos.json           5 arquetipos con marco teórico + color
+  candidatos.json           6 candidatos con lente, tono_propio, foto
+  registros.json            3 registros con tono_redaccion
+  mini_test.json            4 preguntas con scoring por candidato
+  preguntas.json            8 preguntas + 5 opciones × 6 cand × 3 reg
+                            + sección demografia (edad + identidad)
+                            + sección prioridad_tematica (10 temas)
+  variantes-tematicas.json  5 variantes (salud, costo_vida, agraria,
+                            exterior, instituciones) × 5 × 6 × 3
+  divipola.json             34 deptos + 1.189 muns (cód. Registraduría)
+  puestos-light.json        13.506 puestos con lat/lon + barrio + comuna
+```
+
+Ediciones manuales del banco: `Bases de datos/test-presidencial/banco-preguntas-v1.xlsx`
+(12 hojas, gitignored). Script `tools/build-banco-preguntas/json_to_xlsx.py`
+exporta JSON → Excel. Script inverso (`xlsx_to_json.py`) pendiente.
+
+### Lambda DeepSeek — `tools/test-presidencial-explica/`
+
+- **Función:** `test-presidencial-explica` en us-east-1.
+- **Endpoint:** `https://9w1xcwe2sj.execute-api.us-east-1.amazonaws.com/explica`
+  (POST con CORS abierto, OPTIONS preflight 204).
+- **Modelo:** `deepseek-v4-flash` (DEEPSEEK_MODEL env var). API key
+  compartida con `agenda-medios-recomienda` y `agenda-medios-enrich`.
+- **HTTP_TIMEOUT 55s · Lambda timeout 60s** (V4 con reasoning largo
+  puede llegar a 30s en cold call). max_tokens 4000.
+- **Cache S3:** `ricardoruiz.co/test-presidencial-2026/cache/{hash24}.json`
+  con TTL 14 días. Key incluye registro + candidato + edad + identidad
+  + tono_regional + dep_cod + prio (sorted) + arq_dom + arq_sec.
+- **Tono regional** controlado por `TONO_REGIONAL` dict en
+  `lambda_handler.py`. El system prompt obliga a usar el tono regional
+  del usuario (voseo paisa para Antioquia/Eje Cafetero, voseo caleño
+  para Valle, ustedeo formal para Boyacá, tuteo costeño para Caribe,
+  tuteo neutro para Bogotá/Santanderes/Llanos/Sur). Prohibe explícitamente
+  voseo argentino y "che".
+- **Output del LLM:** JSON estricto con `lectura` (2 párrafos de 70-90
+  palabras), `mensaje_corto` (12-18 palabras para meme/redes), `alineacion`
+  (alineado/vientos_cruzados/neutro).
+- **Tiempos:** ~10-12s warm, ~25-30s cold start, ~1-3s cache hit.
+- **Costo:** ~$0.00015 USD por test (V4 Flash). Con cache razonable a
+  ~$5-15 USD por cada 100.000 tests.
+
+IAM role `lambda-test-presidencial-explica`:
+- `AWSLambdaBasicExecutionRole` (CloudWatch logs)
+- Inline `s3-cache` (Get/Put sobre `cache/*`)
+
+Usuario IAM `ricardo-mac-cli` tiene:
+- `elecciones-2026-rw` (S3 sobre el bucket)
+- `AWSLambda_FullAccess` (gestión Lambda)
+- `AmazonAPIGatewayAdministrator` (API Gateway)
+- `test-presidencial-deploy` inline (PassRole + Logs + roles `lambda-*`)
+
+### Frontend (`test-presidencial-2026.html`)
+
+Funcionalidades visuales:
+- Cursor custom azul (`var(--blue)`).
+- Cards de candidatos con foto circular + iniciales fallback.
+- Hero del arquetipo dominante con color hex del arquetipo.
+- Loader animado durante la espera de DeepSeek: 5 mensajes que rotan
+  cada 2.2s + barra de progreso indeterminada con animación CSS.
+- Shuffle Fisher-Yates de opciones, memoizado por pregunta
+  (`STATE._shuffled`).
+- Variante temática activa según PRIO: el tag de la pregunta muestra
+  "Tema · Subtema" cuando se activa.
+
+Estado del usuario:
+```js
+STATE = {
+  registro, candidato, candOrigen,
+  mtAnswers, mtIndex,
+  demo: { edad, identidad },
+  ubicacion: { dep_cod, dep_nombre, mun_cod, mun_nombre, barrio, comuna,
+               cod_puesto, fuente, lat, lon, tono_regional },
+  prio: [tema1, tema2],
+  answers: { P1, P2, ..., P8 },
+  arqScore: { proteccion, estabilidad, supervivencia, castigo, pertenencia }
+}
+```
+
+### Lo que falta (pendiente al cerrar conversación)
+
+1. **Datos por barrio para huella territorial** — el ponderador de
+   `previa-1v.html` (EQUIVALENCIAS por candidato 2026 → señales históricas
+   con pesos) tiene que aplicarse a nivel barrio para BOG/MED y otras
+   ciudades principales, y a nivel municipio para zonas rurales.
+
+   **Bug encontrado en los archivos pre-procesados:** los
+   `bog-barrio-pres-{2010,2014,2018,2022}.json` actuales solo cubren
+   29-31 barrios de los 1.000 catastrales de Bogotá. Razón: el script
+   anterior cruzaba puesto→barrio por código exacto (`CÓDIGO COMPLETO`)
+   y la Registraduría renumera puestos entre años, así que la mayoría
+   no calzó. Senado/Cámara 2026 sí tiene buena cobertura (566 barrios)
+   porque los códigos son del año actual.
+
+   **Solución acordada (opción C):** reprocesar los CSVs crudos
+   (`GCS_2010PRES1V.csv` ... `GCS_2022PRES1V.csv` + `GCS_2022CONSU.csv` +
+   `GCS_2025CONSU.csv` + senado/cámara 2026) cruzando puesto → barrio
+   con `PUESTOS_GEOREF.csv` (usando `lat/lon` o `CÓDIGO COMPLETO` actual
+   con fallback nearest-neighbor para puestos huérfanos). Aplicar la
+   fórmula del ponderador con las EQUIVALENCIAS de `previa-1v.html`
+   (líneas 1636-1685) para cada uno de los 6 candidatos × barrio.
+
+   Trabajo estimado: 6-8 horas. Output: un archivo por ciudad
+   (`bog-barrios-ponderado.json`, `mde-barrios-ponderado.json`, etc.)
+   y uno nacional `muns-ponderado.json` para zonas rurales.
+
+2. **Lambda lee la huella y la inyecta al prompt** — después de tener
+   los JSON arriba, la Lambda al recibir `STATE.ubicacion.barrio` (o
+   `mun_cod`) hace un fetch al archivo apropiado, extrae los datos del
+   candidato del usuario, y los inyecta como hechos al system prompt.
+   Trabajo: 30 min.
+
+3. **Memes procedurales** — 30 imágenes (6 candidatos × 5 arquetipos),
+   1080×1080 sin texto encima. Ricardo los genera. Render en canvas
+   con `mensaje_corto` superpuesto + botón compartir.
+
+4. **Revisión humana del banco de preguntas** — Ricardo edita el Excel
+   `Bases de datos/test-presidencial/banco-preguntas-v1.xlsx` (12 hojas).
+   Solo edita columna `enunciado`. Falta escribir `xlsx_to_json.py`
+   para reintegrar al JSON.
+
+5. **Embed para El País Cali** — `?embed=1&brand=elpais&territorio=valle`
+   con paleta + tipografía del medio + filtro territorial. Dashboard
+   `elpais-cali-dashboard.html` con resultados en tiempo real para ellos.
+
+### Convenciones del módulo
+
+- **Cuando edites el banco**: editar el JSON canónico en
+  `Bases de datos/test-presidencial/` y subir a S3 con
+  `aws s3 cp ... s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/test-presidencial/`.
+  Los JSON son gitignored, no van al repo.
+- **Cuando actualices la Lambda**: zip + `aws lambda update-function-code`.
+  El zip vive en `/tmp/lambda-test-explica.zip` durante deploy.
+- **No metas el voseo argentino**. El usuario Ricardo está en Bogotá,
+  prefiere tuteo. Para textos del banco el lente lo da el candidato +
+  el registro + el tono regional (paisa/caleño/boyacense/etc.).
+  Argentinismos NUNCA: ni "che", ni "vos sos", ni "tenés que laburar".
+- **El prompt sistémico de la Lambda** está en `tools/test-presidencial-explica/lambda_handler.py`
+  líneas 71-92. Es corto a propósito — V4 consume reasoning con prompts
+  largos. Si quieres ampliarlo, mide el tiempo después.
 
 ## Convenciones de commit
 ```
