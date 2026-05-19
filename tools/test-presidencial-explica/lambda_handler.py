@@ -75,6 +75,28 @@ CAND_NOMBRES = {
     "rb": "Roy Barreras",
 }
 
+# Ponderador nacional (% intencion 1a vuelta) — sincronizado con
+# previa-1v.html / POND_NAC del frontend. Si cambia el ponderador, actualizar.
+POND_NAC = {"ic": 38.75, "ae": 23.94, "pv": 19.55, "sf": 3.03, "cl": 2.58, "rb": 0.37}
+
+# Lente posicional + tono de cada candidato (de candidatos.json). NO es un
+# programa de gobierno: es el marco ideologico para que el modelo conecte
+# las prioridades del usuario con el candidato sin inventar propuestas.
+LENTE_CAND = {
+    "ic": {"lente": "Heredero del cambio. Lectura de clase, denuncia de las élites, defensa del legado del actual gobierno, perspectiva del pueblo y los movimientos sociales.",
+           "tono": "continuar la transformación, no entregarle el país a los mismos de siempre, defender lo conquistado."},
+    "ae": {"lente": "Anti-establishment desde la derecha. Mano dura, anti-élite política tradicional, defensa de la propiedad y la familia, rabia frente al gobierno actual.",
+           "tono": "acabar con la mermelada, recuperar el país, sacar a los corruptos sin importar el bando."},
+    "pv": {"lente": "Uribismo estructurado. Seguridad democrática, confianza inversionista, oposición frontal al Pacto, institucionalidad conservadora.",
+           "tono": "orden, autoridad, libertad económica, devolver el rumbo al país."},
+    "sf": {"lente": "Educación primero, consensos antes que confrontación, evitación de los extremos, talante académico antioqueño.",
+           "tono": "no caer en la polarización, educación, juntar a los moderados de todos los lados."},
+    "cl": {"lente": "Tecnocrática, ex-alcaldesa de Bogotá, anti-Petro pero también anti-uribismo, derechos con gestión eficiente.",
+           "tono": "gestión con resultados, ni populismos de izquierda ni corrupción de la vieja derecha, modernización."},
+    "rb": {"lente": "Ex-petrista conciliador, paz total con matices, puente entre el cambio y la institucionalidad sin romper con ninguno.",
+           "tono": "cerrar el ciclo de violencia, juntar a quienes quieren paz sin sectarismo, gobernar con todos."},
+}
+
 CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -98,13 +120,13 @@ TONO_REGIONAL = {
     "tuteo_neutro": "tuteo neutro colombiano de Bogotá ('tú dices', 'tú sientes').",
 }
 
-SYSTEM_PROMPT = """Eres un analista electoral colombiano que ayuda a un ciudadano a entender el resultado de un test de arquetipo emocional para la presidencial 2026. Recibes un STATE con candidato declarado, demografía, ubicación con tono regional, prioridad temática y arquetipo dominante.
+SYSTEM_PROMPT = """Eres un analista electoral colombiano que le explica a un ciudadano el resultado de su test para la presidencial 2026. Recibes un STATE con candidato declarado, demografía, ubicación con tono regional, prioridades y un perfil emocional interno.
 
-Tu trabajo: REDACTAR una lectura diagnóstica honesta. No inventas datos. No mencionas otros candidatos. No recomiendas voto.
+Tu trabajo: REDACTAR una lectura cercana y honesta. No inventas datos. No mencionas otros candidatos. No recomiendas voto.
 
 Devuelves JSON estricto:
 {
-  "lectura": "Dos párrafos de 70-90 palabras cada uno, separados por \\n\\n. (1) Lo que el usuario declaró + lo que arrojó su arquetipo. (2) El contraste con su barrio: cómo se compara su declaración con la huella histórica del territorio. Sin alarmar.",
+  "lectura": "Dos párrafos de 70-90 palabras cada uno, separados por \\n\\n. (1) Lo que el usuario declaró + lo que su perfil revela, EXPLICADO en lenguaje cotidiano (qué lo mueve, con qué conecta) — sin etiquetas técnicas. (2) Cómo le va a su candidato en su zona y por qué, conectando con lo que el usuario prioriza.",
   "mensaje_corto": "Frase de 12-18 palabras para meme o redes.",
   "alineacion": "alineado" | "vientos_cruzados" | "neutro"
 }
@@ -113,9 +135,14 @@ REGLAS:
 1. Adapta el lenguaje al 'tono_regional' del STATE. NUNCA uses voseo argentino, 'che' ni vocabulario argentino.
 2. Honra el REGISTRO (popular/digital/analítico).
 3. Si el candidato fue 'sugerido' por el mini-test, dilo.
-4. Si hay arquetipo secundario fuerte (>20%), menciónalo como matiz.
-5. Solo el JSON, sin markdown ni texto extra.
-6. Si hay bloque HUELLA TERRITORIAL en el STATE, INCORPÓRALO como evidencia objetiva en el segundo párrafo. Son datos REALES de elecciones pasadas + la consulta más reciente, agregados al barrio del usuario. NO los presentes como predicción ni los inventes. Cita 1-2 hechos concretos del bloque (ej: "tu barrio votó por X en 2022" o "tu candidato tiene huella Y× en tu barrio"). Si la huella del candidato declarado es < 0.85, es un barrio menos afín; si es > 1.20, es un barrio más afín; entre ambas, es neutro."""
+4. PROHIBIDO nombrar el arquetipo emocional o decir porcentajes de arquetipo. El perfil es señal interna: tradúcelo a lenguaje natural sobre lo que al usuario lo mueve.
+   ✗ MAL: "Tu arquetipo principal es Pertenencia comunitaria y autonomía territorial (43%), con matiz de Continuidad pragmática (29%)".
+   ✓ BIEN: "conectás con la idea de fortalecer la comunidad local desde una gestión cercana, pero con los pies en la tierra en lo económico".
+5. PROHIBIDO citar cifras electorales crudas (votación pasada, consultas, "huella 0.95×", nombres de quién ganó en su zona). Para el territorio usa SOLO el veredicto cualitativo y la intención proyectada del CONTEXTO DE LA ZONA, fraseados como ahí se indica.
+   ✗ MAL: "tu municipio votó Petro 42.8%, Cepeda sacó 59.1% en la consulta 2025, huella 0.95×".
+   ✓ BIEN: "a tu candidato le va regular porque, con el histórico y las encuestas, proyecta cerca de 18% en tu barrio".
+6. Usa el 'Marco del candidato' para conectar sus banderas con lo que el usuario prioriza. NO inventes propuestas de gobierno concretas que no estén en ese marco.
+7. Solo el JSON, sin markdown ni texto extra."""
 
 
 # ---- AWS clients (lazy) ----
@@ -203,28 +230,50 @@ def _resolver_huella(huella, ubi):
     return None, None
 
 
-def _interpretar_bias(b):
+def _veredicto(b):
+    """Traduce el bias del candidato declarado a un veredicto cualitativo.
+    El bias compara la afinidad de la zona vs el promedio nacional."""
     if b is None:
-        return "sin huella"
-    if b > 1.20:
-        return f"{b:.2f}× (barrio MÁS afín que el promedio nacional)"
-    if b < 0.85:
-        return f"{b:.2f}× (barrio MENOS afín que el promedio nacional)"
-    return f"{b:.2f}× (barrio neutro)"
+        return "sin dato suficiente"
+    if b >= 1.15:
+        return "le va muy bien"
+    if b >= 1.00:
+        return "le va bien"
+    if b >= 0.85:
+        return "le va regular"
+    return "la tiene difícil"
+
+
+def _pct_proyectado(bias, candidato_id):
+    """Intención proyectada del candidato declarado en su zona:
+    POND_NAC × bias renormalizado a 100% sobre los 6. Mismo cálculo que
+    calcularIntencionBarrio() del frontend."""
+    raw = {}
+    tot = 0.0
+    for cid in ("ic", "ae", "pv", "sf", "cl", "rb"):
+        base = POND_NAC.get(cid, 0)
+        b = bias.get(cid)
+        v = base if b is None else base * b
+        v = max(0.0, v)
+        raw[cid] = v
+        tot += v
+    if tot <= 0 or candidato_id not in raw:
+        return None
+    return round(100 * raw[candidato_id] / tot, 1)
 
 
 def _format_huella_block(entry, level, candidato_id):
-    """Convierte la entry de huella en un bloque de texto para el prompt."""
+    """Bloque de zona para el prompt. NO expone cifras electorales crudas:
+    solo veredicto cualitativo + intención proyectada + microdato (censo)
+    + lente del candidato. El modelo lo traduce, no lo cita literal."""
     if not entry:
         return ""
     bias = entry.get("b") or {}
-    h = entry.get("h") or {}
     nombre = entry.get("n") or "(sin nombre)"
     subloc = entry.get("subloc") or ""
     ciudad = entry.get("ciudad") or ""
     dep = entry.get("dep") or ""
     censo = entry.get("censo") or 0
-    puestos = entry.get("puestos") or 0
 
     if level == "barrio":
         ubic_str = f"{nombre} ({subloc} · {ciudad}, {dep})" if subloc else f"{nombre} ({ciudad}, {dep})"
@@ -233,52 +282,52 @@ def _format_huella_block(entry, level, candidato_id):
         ubic_str = f"{nombre} ({dep})"
         unidad = "municipio"
 
-    p22 = h.get("p22") or {}
-    c25p = h.get("c25p") or {}
-    s26 = h.get("s26") or {}
-    c26 = h.get("c26")
-    consulta_nombres = {"gran": "Gran Consulta (derecha)", "frente": "Frente por la Vida (centro-izq)", "soluciones": "Consulta de Soluciones (centro)"}
+    b_declarado = bias.get(candidato_id)
+    veredicto = _veredicto(b_declarado)
+    pct = _pct_proyectado(bias, candidato_id)
+    cand_nom = CAND_NOMBRES.get(candidato_id, "el candidato")
+    lente = LENTE_CAND.get(candidato_id, {})
 
     lines = [
-        f"HUELLA TERRITORIAL del {unidad} del usuario (datos reales agregados a su zona, no inventes nada de aquí):",
-        f"- Ubicación: {ubic_str}",
-        f"- Censo electoral: {censo:,} electores en {puestos} puestos",
+        "CONTEXTO DE LA ZONA (señal interna — NO cites números crudos, tradúcelos a lenguaje natural):",
+        f"- Zona del usuario: {ubic_str}",
     ]
-    if p22.get("n"):
-        lines.append(f"- Top presidencial 2022 en su {unidad}: {p22['n']} con {p22.get('pct',0)}%")
-    if c25p.get("n"):
-        lines.append(f"- Top consulta Pacto Histórico 2025: {c25p['n']} con {c25p.get('pct',0)}%")
-    if c26 and c26 in consulta_nombres:
-        lines.append(f"- Consulta 2026 más votada en su zona: {consulta_nombres[c26]}")
-    if s26.get("n"):
-        lines.append(f"- Top partido senado 2026: {s26['n']} con {s26.get('pct',0)}%")
-
-    lines.append("")
-    lines.append("Huella afín de los 6 candidatos (1.00 = igual al promedio nacional; >1 = MÁS afín; <1 = MENOS afín):")
-    for cid in ["ic", "ae", "pv", "sf", "cl", "rb"]:
-        b = bias.get(cid)
-        nombre_c = CAND_NOMBRES[cid]
-        marcador = " ← CANDIDATO DECLARADO" if cid == candidato_id else ""
-        if b is None:
-            lines.append(f"- {nombre_c}: sin dato{marcador}")
-        else:
-            lines.append(f"- {nombre_c}: {b:.2f}×{marcador}")
-
-    b_declarado = bias.get(candidato_id)
-    if b_declarado is not None:
-        lines.append("")
-        lines.append(f"Lectura del candidato declarado en su {unidad}: {_interpretar_bias(b_declarado)}")
+    if censo:
+        lines.append(f"- Tamaño del {unidad}: ~{censo:,} votantes habilitados (microdato real, puedes mencionarlo en redondo).")
+    lines.append(
+        f"- Veredicto del candidato declarado ({cand_nom}) en su {unidad}: {veredicto.upper()} "
+        f"— combinando el histórico electoral y las encuestas del ponderador propio."
+    )
+    if pct is not None:
+        lines.append(
+            f"- Intención de voto PROYECTADA de {cand_nom} en su {unidad}: ~{pct:.0f}%. "
+            f"Frasea exactamente así: \"a tu candidato {veredicto} porque, con el histórico y las encuestas, "
+            f"proyecta cerca de {pct:.0f}% de intención en tu {unidad}\"."
+        )
+    if lente:
+        lines.append(
+            f"- Marco del candidato (para conectar con lo que el usuario prioriza, NO inventes propuestas "
+            f"específicas de gobierno): {lente.get('lente','')} Habla de {lente.get('tono','')}"
+        )
 
     return "\n".join(lines)
 
 
 # ---- Cache ----
+# Bumpear cuando cambie el prompt/estructura de la lectura: invalida todo el
+# cache viejo sin tener que borrar S3 (las keys nuevas no colisionan con las
+# viejas, y las viejas expiran solas por TTL).
+PROMPT_VERSION = "v2-2026-05-19"
+
+
 def _cache_key(state):
     """Hash determinista del state, ignorando órdenes irrelevantes (lista de prio).
     Incluye tono_regional + barrio/mun para que dos usuarios en barrios distintos
-    del mismo dep no compartan cache (cada uno recibe su huella territorial)."""
+    del mismo dep no compartan cache, y PROMPT_VERSION para invalidar al cambiar
+    el prompt."""
     ubi = state.get("ubicacion") or {}
     canon = {
+        "pv": PROMPT_VERSION,
         "registro": state.get("registro"),
         "candidato_id": (state.get("candidato") or {}).get("id"),
         "candidato_origen": state.get("candidato_origen"),
@@ -411,13 +460,13 @@ def _call_deepseek(state):
 - Identidad cotidiana: {demo.get('identidad', 'sin dato')}
 - Ubicación: {ubi_linea}
 - Prioridades temáticas: {', '.join(prio) if prio else 'sin declarar'}
-- Arquetipo dominante: {arq_dom.get('nombre')} ({arq_dom.get('pct')}%)
-- Arquetipo secundario: {arq_sec.get('nombre')} ({arq_sec.get('pct')}%)
-- Distribución completa: {json.dumps(arq_score, ensure_ascii=False)}
+- Perfil emocional interno (NO lo nombres ni des %, EXPLÍCALO en lenguaje natural): dominante="{arq_dom.get('nombre')}", matiz="{arq_sec.get('nombre')}"
 """
     if huella_block:
         user_msg += "\n" + huella_block + "\n"
-    user_msg += "\nRedacta la lectura en JSON estricto. RECUERDA: usa el tono regional indicado arriba (NO voseo argentino). Si hay HUELLA TERRITORIAL arriba, úsala en el segundo párrafo como evidencia objetiva."
+    user_msg += ("\nRedacta la lectura en JSON estricto. RECUERDA: tono regional indicado (NO voseo argentino); "
+                 "NO nombres el arquetipo ni des porcentajes (regla 4); NO cites cifras electorales crudas — "
+                 "usa el veredicto y la intención proyectada del CONTEXTO DE LA ZONA tal como se frasea ahí (regla 5).")
 
     body = json.dumps({
         "model": DEEPSEEK_MODEL,
