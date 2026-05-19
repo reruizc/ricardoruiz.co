@@ -266,6 +266,48 @@ Decisiones metodológicas (resumen):
 - House effect post-marzo vs mediana semanal por candidato.
 - Representatividad muestral: KL + χ² + bandera por depto |delta|≥5pp.
 
+## Admin del sitio
+- **Email administrador único: `reruizc@gmail.com`** (whitelist en
+  `admin-analytics.html`, `admin-pronosticos.html` y `PRIVATE_TOOLS` de
+  `dashboard.html`). El gate hace triple chequeo: localStorage user +
+  `/auth/me` del worker + whitelist hardcodeada.
+
+## Concurso "Tu Pronóstico" — `pronostico-1v.html` (wizard) + backend
+
+Wizard mobile-first (10 pasos) que recoge un pronóstico de 1ª vuelta y
+lo guarda para el concurso de **$100.000 al más certero** (menor MAE vs
+resultado oficial). Flujo: intro → concurso+PDF reglas → ponderador →
+participación → candidatos (2 slides de 3) → voto blanco → mapa
+(municipal, bloqueado) → **datos del participante** → compartir.
+
+- **Sin login.** El concurso es abierto: el paso "datos" pide nombre,
+  apellido, depto, municipio (+ comuna/localidad si Bogotá/Medellín/
+  Cali), correo y WhatsApp. El correo es el identificador único.
+- **Backend en worker `rr-auth`** (`/Users/ricardoruiz/rr-auth/src/index.js`,
+  no es repo git — deploy con `cd /Users/ricardoruiz/rr-auth && npx
+  wrangler deploy`):
+  - `POST /pron/save` — sin auth. Valida campos + suma de pcts ≈ 100.
+    Guarda en `RR_STORE` bajo `pron:${correo}`. Conserva `createdAt`
+    del primer envío, refresca `updatedAt`. Reescribe si reenvía.
+  - `GET /pron/me?correo=` — devuelve el registro de ese correo.
+  - `GET /pron/admin/all` — `adminGuard` (sesión admin). Dump paginado
+    (hasta 5k) para calcular el ganador.
+- **Dashboard admin:** `admin-pronosticos.html` (card en `PRIVATE_TOOLS`,
+  solo `reruizc@gmail.com`). KPIs + tabla + exporta CSV. Tiene un bloque
+  para ingresar el resultado oficial y calcular el ranking por **MAE**
+  (promedio de |pronóstico − real| en pp sobre participación + cada
+  candidato + blanco); desempate por `createdAt` más antiguo.
+- **PDF de reglas:** `tools/build-reglas-pronostico-pdf.py` (reportlab)
+  → `Bases de datos/pronostico-1v/reglas-pronostico-1v-2026.pdf` →
+  S3 `DESCARGAS/reglas-pronostico-1v-2026.pdf` (prefijo público).
+  Cubre: en qué consiste, sistema de elección del ganador, cláusula de
+  que NO es apuesta (Ley 643/2001), tratamiento de datos (Ley 1581/2012).
+  Re-generar y re-subir si cambian las reglas.
+- Cifras del wizard arrancan del ponderador (`ponderador-actual.json`,
+  igual que `previa-1v.html`); el mapa reusa todo el motor de bias
+  territorial de `previa-1v.html`. `WIZ_PHOTO` apunta a fotos en
+  `Fotos-presidenciales/` (S3, slugs lowercase).
+
 ## Worktree y deploy
 ```
 worktree activo: /Users/ricardoruiz/ricardoruiz.co/.claude/worktrees/agitated-rosalind/
