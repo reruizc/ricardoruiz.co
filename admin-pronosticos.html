@@ -58,7 +58,14 @@
     .card-s{font-family:'Fraunces',serif;font-weight:300;font-size:.85rem;color:var(--text2);margin-bottom:1.1rem;line-height:1.5}
 
     .toolbar{display:flex;flex-wrap:wrap;gap:.7rem;align-items:center;margin-bottom:1rem}
-    .toolbar input{font-family:'DM Mono',monospace;font-size:.78rem;padding:.5rem .7rem;background:var(--surface2);border:1px solid var(--border2);border-radius:9px;color:var(--text);outline:none;cursor:none}
+    .toolbar input,.toolbar select{font-family:'DM Mono',monospace;font-size:.78rem;padding:.5rem .7rem;background:var(--surface2);border:1px solid var(--border2);border-radius:9px;color:var(--text);outline:none;cursor:none}
+    .avg-bars{display:flex;flex-direction:column;gap:.55rem}
+    .avg-row{display:flex;align-items:center;gap:.8rem}
+    .avg-name{flex:0 0 96px;font-family:'Fraunces',serif;font-weight:700;font-size:.9rem;color:var(--text)}
+    .avg-track{flex:1;height:22px;background:var(--surface2);border-radius:6px;position:relative;overflow:hidden}
+    .avg-fill{position:absolute;left:0;top:0;bottom:0;border-radius:6px;transition:width .4s ease}
+    .avg-val{flex:0 0 118px;text-align:right;font-family:Avenir,sans-serif;font-weight:600;font-size:.9rem;color:var(--text);font-variant-numeric:tabular-nums}
+    .avg-val small{color:var(--text3);font-weight:400;font-size:.74rem}
     .btn{font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;padding:.55rem .9rem;background:var(--purple);color:#fff;border:none;border-radius:9px;cursor:none;transition:filter .15s}
     .btn:hover{filter:brightness(1.1)}
     .btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border2)}
@@ -111,6 +118,12 @@
     </div>
 
     <div class="card">
+      <div class="card-h">Promedio por candidato</div>
+      <div class="card-s">Promedio del % que la gente le asigna a cada candidato sobre todas las respuestas. Cambia con el filtro de departamento.</div>
+      <div class="avg-bars" id="avg-bars"><div class="empty">Cargando…</div></div>
+    </div>
+
+    <div class="card">
       <div class="card-h">Resultado oficial (para calcular el ganador)</div>
       <div class="card-s">Déjalo vacío hasta que la Registraduría publique. Al llenar y calcular, la tabla de abajo se ordena por menor MAE y se resalta el ganador.</div>
       <div class="official-grid" id="official-grid"></div>
@@ -120,6 +133,7 @@
 
     <div class="card">
       <div class="toolbar">
+        <select id="filtro-depto" onchange="applyFilters()"><option value="">Todos los departamentos</option></select>
         <input type="text" id="q" placeholder="Buscar nombre / correo / depto…" oninput="renderTable()" />
         <button class="btn btn-ghost" onclick="exportCSV()">Exportar CSV</button>
         <button class="btn btn-ghost" onclick="reload()">Recargar</button>
@@ -172,6 +186,10 @@
       ['ic','Cepeda'],['ae','Abelardo'],['pv','Paloma'],['sf','Fajardo'],
       ['cl','Claudia'],['rb','Roy'],['bl','Blanco'],['ns','NS/NR'],['ot','Otros'],
     ];
+    const CAND_COLOR = {
+      ic:'#51458F', ae:'#a16207', pv:'#1866DF', sf:'#EEAA22',
+      cl:'#d9db24', rb:'#F01E14', bl:'#94a3b8', ns:'#64748b', ot:'#475569',
+    };
     let ROWS = [];      // pronósticos crudos
     let RANKED = null;  // con mae si se calculó
 
@@ -193,28 +211,72 @@
         const data = await r.json();
         ROWS = (data.pronosticos || []).filter(p => p && p.correo);
         RANKED = null;
+        populateDeptoFilter();
         renderKPIs();
+        renderAvgCands();
         renderTable();
       } catch(e){
         document.getElementById('tbody').innerHTML = `<tr><td class="err" colspan="20">No se pudo cargar: ${e.message}</td></tr>`;
       }
     }
 
+    // Departamento seleccionado en el filtro (afecta KPIs, promedio y tabla).
+    function deptoFilter(){ return (document.getElementById('filtro-depto')?.value || '').trim(); }
+    function rowsByDepto(){
+      const d = deptoFilter();
+      return d ? ROWS.filter(r => (r.depto||'').trim() === d) : ROWS.slice();
+    }
+    function populateDeptoFilter(){
+      const sel = document.getElementById('filtro-depto');
+      if (!sel) return;
+      const prev = sel.value;
+      const deptos = [...new Set(ROWS.map(r => (r.depto||'').trim()).filter(Boolean))]
+        .sort((a,b)=>a.localeCompare(b,'es'));
+      sel.innerHTML = '<option value="">Todos los departamentos</option>' +
+        deptos.map(d => `<option value="${d}">${d}</option>`).join('');
+      if (prev && deptos.includes(prev)) sel.value = prev;
+    }
+    // Recalcula todo cuando cambia el filtro de departamento.
+    function applyFilters(){ renderKPIs(); renderAvgCands(); renderTable(); }
+
     function renderKPIs(){
-      document.getElementById('k-total').textContent = fmt(ROWS.length);
+      const base = rowsByDepto();
+      document.getElementById('k-total').textContent = fmt(base.length);
       const deptos = new Set(ROWS.map(r => (r.depto||'').trim()).filter(Boolean));
-      document.getElementById('k-deptos').textContent = fmt(deptos.size);
+      document.getElementById('k-deptos').textContent = deptoFilter() ? '1' : fmt(deptos.size);
       const dayAgo = Date.now() - 864e5;
-      const recent = ROWS.filter(r => { const t = Date.parse(r.updatedAt||r.createdAt||0); return t && t >= dayAgo; });
+      const recent = base.filter(r => { const t = Date.parse(r.updatedAt||r.createdAt||0); return t && t >= dayAgo; });
       document.getElementById('k-hoy').textContent = fmt(recent.length);
-      const ps = ROWS.map(r => +r.p).filter(x => isFinite(x));
+      const ps = base.map(r => +r.p).filter(x => isFinite(x));
       const avg = ps.length ? (ps.reduce((a,b)=>a+b,0)/ps.length) : 0;
       document.getElementById('k-part').textContent = avg ? avg.toFixed(1)+'%' : '—';
     }
 
+    // Promedio del % que la gente le asigna a cada candidato.
+    function renderAvgCands(){
+      const wrap = document.getElementById('avg-bars');
+      if (!wrap) return;
+      const base = rowsByDepto();
+      if (!base.length){ wrap.innerHTML = '<div class="empty">Sin respuestas para este filtro.</div>'; return; }
+      const avg = CANDS.map(([id,nm]) => {
+        const vals = base.map(r => r.pcts ? +r.pcts[id] : NaN).filter(x => isFinite(x));
+        const m = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+        return { id, nm, m, n: vals.length };
+      });
+      const max = Math.max(1, ...avg.map(a => a.m));
+      wrap.innerHTML = avg.map(a => `
+        <div class="avg-row">
+          <span class="avg-name">${a.nm}</span>
+          <span class="avg-track"><span class="avg-fill" style="width:${(a.m/max*100).toFixed(1)}%;background:${CAND_COLOR[a.id]||'#888'}"></span></span>
+          <span class="avg-val">${a.m.toFixed(2)}% <small>(n=${a.n})</small></span>
+        </div>`).join('');
+    }
+
     function currentList(){
       const q = (document.getElementById('q').value||'').trim().toLowerCase();
+      const d = deptoFilter();
       let list = RANKED || ROWS.map(r => ({ ...r, mae:null }));
+      if (d) list = list.filter(r => (r.depto||'').trim() === d);
       if (q){
         list = list.filter(r =>
           (`${r.nombre} ${r.apellido} ${r.correo} ${r.depto} ${r.municipio||''}`).toLowerCase().includes(q));
