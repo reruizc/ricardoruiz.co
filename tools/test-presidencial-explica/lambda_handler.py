@@ -60,6 +60,7 @@ DEEPSEEK_URL = os.environ.get("DEEPSEEK_URL", "https://api.deepseek.com/chat/com
 DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash")
 S3_BUCKET = os.environ.get("S3_BUCKET", "elecciones-2026")
 CACHE_PREFIX = os.environ.get("CACHE_PREFIX", "ricardoruiz.co/test-presidencial-2026/cache")
+RESPONSES_PREFIX = os.environ.get("RESPONSES_PREFIX", "ricardoruiz.co/test-presidencial-2026/responses")
 HUELLA_KEY = os.environ.get("HUELLA_KEY", "ricardoruiz.co/congreso-2026/output/huella/huella-territorial.json")
 CACHE_TTL_DIAS = int(os.environ.get("CACHE_TTL_DIAS", "14"))
 HTTP_TIMEOUT = 55
@@ -311,6 +312,52 @@ def _cache_get(key):
         return None
 
 
+def _emit_event(state, alineacion):
+    """Escribe un evento anónimo por completación del test, listable por fecha.
+    SIN PII: no email (nunca se recibe), no lat/lon, no cod_puesto, no lectura.
+    Solo señales agregables para el dashboard. Se llama también en cache-hit
+    (dos personas con el mismo perfil = dos completaciones reales)."""
+    try:
+        import uuid
+        now = datetime.now(timezone.utc)
+        cand = state.get("candidato") or {}
+        ubi = state.get("ubicacion") or {}
+        arq_dom = state.get("arquetipo_dominante") or {}
+        arq_sec = state.get("arquetipo_secundario") or {}
+        canal = state.get("canal") or {}
+        ev = {
+            "ts": now.isoformat(),
+            "canal": {
+                "embed": bool(canal.get("embed")),
+                "brand": (canal.get("brand") or None),
+                "territorio": (canal.get("territorio") or None),
+            },
+            "registro": state.get("registro"),
+            "candidato": cand.get("id"),
+            "candidato_origen": state.get("candidato_origen"),
+            "arq_dom": arq_dom.get("id"),
+            "arq_dom_pct": arq_dom.get("pct"),
+            "arq_sec": arq_sec.get("id"),
+            "dep_cod": ubi.get("dep_cod"),
+            "mun_cod": ubi.get("mun_cod"),
+            "mun_nombre": ubi.get("mun_nombre"),
+            "barrio": _slug(ubi.get("barrio") or "") or None,
+            "alineacion": alineacion,
+        }
+        key = (
+            f"{RESPONSES_PREFIX}/"
+            f"yyyy={now:%Y}/mm={now:%m}/dd={now:%d}/"
+            f"{now:%Y%m%dT%H%M%S}_{uuid.uuid4().hex[:12]}.json"
+        )
+        _s3_client().put_object(
+            Bucket=S3_BUCKET, Key=key,
+            Body=json.dumps(ev, ensure_ascii=False).encode("utf-8"),
+            ContentType="application/json",
+        )
+    except Exception as e:
+        print(f"[event] WARN no se escribió evento: {e}")
+
+
 def _cache_put(key, data):
     try:
         _s3_client().put_object(
@@ -461,6 +508,7 @@ def handler(event, context):
     cached = _cache_get(key)
     if cached:
         cached["cache_hit"] = True
+        _emit_event(state, cached.get("alineacion"))
         return _ok(cached)
 
     # DeepSeek call
@@ -481,6 +529,7 @@ def handler(event, context):
         "cache_hit": False,
     }
     _cache_put(key, out)
+    _emit_event(state, out.get("alineacion"))
     return _ok(out)
 
 
