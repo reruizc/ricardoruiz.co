@@ -112,6 +112,14 @@ body.day-mode::before {
   font-size:15px; color:var(--ink-2); line-height:1.5;
 }
 
+/* Periodo (rango temporal del chart) */
+.range-pills { align-items:center; }
+.range-lbl {
+  font-family:var(--mono); font-size:10.5px; font-weight:700;
+  letter-spacing:.16em; text-transform:uppercase; color:var(--ink-3);
+  margin-right:.5rem;
+}
+
 /* Selector de ciudad (ficha) */
 .fc-selector { margin-top:1.25rem; display:flex; align-items:center; gap:.85rem; flex-wrap:wrap; }
 .fc-selector label {
@@ -560,6 +568,14 @@ body.day-mode::before {
           <button class="ip" data-find="to">TO · ocupación</button>
           <button class="ip" data-find="td">TD · desocupación</button>
         </div>
+        <div class="indicator-pills range-pills" id="fc-range-pills" style="margin-top:.6rem">
+          <span class="range-lbl">Periodo</span>
+          <button class="ip active" data-frange="all">Desde 2007</button>
+          <button class="ip" data-frange="120">Últimos 10 años</button>
+          <button class="ip" data-frange="60">Últimos 5 años</button>
+          <button class="ip" data-frange="24">Últimos 2 años</button>
+          <button class="ip" data-frange="12">Último año</button>
+        </div>
       </div>
       <div class="chart-card">
         <svg class="chart-line" viewBox="0 0 720 340" preserveAspectRatio="xMidYMid meet" id="fc-chart"></svg>
@@ -636,6 +652,14 @@ body.day-mode::before {
         <button class="ip active" data-ind="tgp">TGP · Tasa global de participación</button>
         <button class="ip" data-ind="to">TO · Tasa de ocupación</button>
         <button class="ip" data-ind="td">TD · Tasa de desocupación</button>
+      </div>
+      <div class="indicator-pills range-pills" id="range-pills" style="margin-top:.6rem">
+        <span class="range-lbl">Periodo</span>
+        <button class="ip active" data-range="all">Desde 2007</button>
+        <button class="ip" data-range="120">Últimos 10 años</button>
+        <button class="ip" data-range="60">Últimos 5 años</button>
+        <button class="ip" data-range="24">Últimos 2 años</button>
+        <button class="ip" data-range="12">Último año</button>
       </div>
     </div>
 
@@ -793,7 +817,7 @@ body.day-mode::before {
   const CIIU_URL = `${S3_OBS}/dane-ciiu-mensual.json?v=${DATA_V}`;
   let DATA = null;
   let CIIU = null;
-  const STATE = { indicator: 'tgp', sortCol: 'brecha_tgp', sortDir: 'desc' };
+  const STATE = { indicator: 'tgp', range: 'all', sortCol: 'brecha_tgp', sortDir: 'desc' };
   const IND_LABEL = { tgp: 'TGP · Tasa global de participación', to: 'TO · Tasa de ocupación', td: 'TD · Tasa de desocupación' };
 
   // ─── FORMAT ───────────────────────────────────────────────────────
@@ -887,12 +911,24 @@ body.day-mode::before {
       html += `<line class="grid" x1="${M.l}" y1="${y}" x2="${M.l + innerW}" y2="${y}"/>`;
       html += `<text class="axis-text" x="${M.l - 8}" y="${y + 4}" text-anchor="end">${v.toFixed(0)}%</text>`;
     }
-    for (let i = 0; i < tms.length; i += 24) {
-      html += `<text class="axis-text" x="${xScale(i)}" y="${M.t + innerH + 20}" text-anchor="middle">${tms[i].split('-')[0]}</text>`;
+    // Eje X adaptativo según cuántos puntos hay en el rango.
+    const n = tms.length;
+    const MES_ABR = ['','ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    let step, useMonth;
+    if (n <= 14)      { step = 2;  useMonth = true;  }
+    else if (n <= 30) { step = 3;  useMonth = true;  }
+    else if (n <= 72) { step = 12; useMonth = false; }
+    else              { step = 24; useMonth = false; }
+    const xlab = idx => {
+      const [y, mo] = tms[idx].split('-');
+      return useMonth ? `${MES_ABR[parseInt(mo,10)]} '${y.slice(2)}` : y;
+    };
+    for (let i = 0; i < n; i += step) {
+      html += `<text class="axis-text" x="${xScale(i)}" y="${M.t + innerH + 20}" text-anchor="middle">${xlab(i)}</text>`;
     }
-    const lastIdx = tms.length - 1;
-    if (lastIdx % 24 !== 0) {
-      html += `<text class="axis-text" x="${xScale(lastIdx)}" y="${M.t + innerH + 20}" text-anchor="middle">${tms[lastIdx].split('-')[0]}</text>`;
+    const lastIdx = n - 1;
+    if (lastIdx % step !== 0) {
+      html += `<text class="axis-text" x="${xScale(lastIdx)}" y="${M.t + innerH + 20}" text-anchor="middle">${xlab(lastIdx)}</text>`;
     }
     function buildPath(series) {
       let d = '', moved = false;
@@ -917,14 +953,20 @@ body.day-mode::before {
     svg.innerHTML = html;
   }
 
+  // Recorta serie+tms a los últimos N meses (range='all' = completo)
+  function sliceRange(sm, sh, tms, range) {
+    if (range === 'all' || !range) return [sm, sh, tms];
+    const n = parseInt(range, 10);
+    if (!n || n >= tms.length) return [sm, sh, tms];
+    return [sm.slice(-n), sh.slice(-n), tms.slice(-n)];
+  }
+
   function renderChart() {
     if (!DATA) return;
     const svg = document.getElementById('chart-serie');
     if (!svg) return;
     const ind = STATE.indicator;
-    const tms = DATA.tms;
-    const sm  = DATA.nacional.mujeres[ind];
-    const sh  = DATA.nacional.hombres[ind];
+    const [sm, sh, tms] = sliceRange(DATA.nacional.mujeres[ind], DATA.nacional.hombres[ind], DATA.tms, STATE.range);
     drawLineChart(svg, sm, sh, tms, IND_LABEL[ind]);
     window._chartReady = true;
     renderTakeaway();
@@ -974,7 +1016,7 @@ body.day-mode::before {
   }
 
   // ─── FICHA DE CIUDAD ──────────────────────────────────────────────
-  const FICHA = { city: 'Bogotá D.C.', ind: 'tgp' };
+  const FICHA = { city: 'Bogotá D.C.', ind: 'tgp', range: 'all' };
   function initFicha() {
     if (!DATA) return;
     const sel = document.getElementById('fc-select');
@@ -986,6 +1028,13 @@ body.day-mode::before {
       b.addEventListener('click', () => {
         FICHA.ind = b.dataset.find;
         document.querySelectorAll('#fc-ind-pills .ip').forEach(x => x.classList.toggle('active', x === b));
+        renderFichaChart();
+      });
+    });
+    document.querySelectorAll('#fc-range-pills .ip').forEach(b => {
+      b.addEventListener('click', () => {
+        FICHA.range = b.dataset.frange;
+        document.querySelectorAll('#fc-range-pills .ip').forEach(x => x.classList.toggle('active', x === b));
         renderFichaChart();
       });
     });
@@ -1008,8 +1057,8 @@ body.day-mode::before {
   function renderFichaChart() {
     const c = DATA.ciudades[FICHA.city];
     if (!c) return;
-    drawLineChart(document.getElementById('fc-chart'),
-      c.mujeres[FICHA.ind], c.hombres[FICHA.ind], DATA.tms, IND_LABEL[FICHA.ind]);
+    const [sm, sh, tms] = sliceRange(c.mujeres[FICHA.ind], c.hombres[FICHA.ind], DATA.tms, FICHA.range);
+    drawLineChart(document.getElementById('fc-chart'), sm, sh, tms, IND_LABEL[FICHA.ind]);
   }
   function renderFicha() {
     if (!DATA) return;
@@ -1313,10 +1362,17 @@ body.day-mode::before {
     });
   }
   function wirePills() {
-    document.querySelectorAll('.ip').forEach(b => {
+    document.querySelectorAll('#ind-pills .ip').forEach(b => {
       b.addEventListener('click', () => {
         STATE.indicator = b.dataset.ind;
-        document.querySelectorAll('.ip').forEach(x => x.classList.toggle('active', x === b));
+        document.querySelectorAll('#ind-pills .ip').forEach(x => x.classList.toggle('active', x === b));
+        renderChart();
+      });
+    });
+    document.querySelectorAll('#range-pills .ip').forEach(b => {
+      b.addEventListener('click', () => {
+        STATE.range = b.dataset.range;
+        document.querySelectorAll('#range-pills .ip').forEach(x => x.classList.toggle('active', x === b));
         renderChart();
       });
     });
