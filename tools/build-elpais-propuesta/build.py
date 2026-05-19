@@ -102,7 +102,8 @@ def build():
                                        onPage=header)])
 
     s = []
-    s.append(Paragraph("LA RECTA FINAL, CON DATOS Y NO CON RUIDO", st_kicker))
+    s.append(Paragraph("PRIMERA VUELTA · DEL 20 AL 31 DE MAYO DE 2026",
+                       st_kicker))
     s.append(Paragraph("Un test que convierte a tu lector del Valle "
                        "en tu mejor fuente de audiencia", st_h1))
     s.append(Paragraph("Interactivo, embebible en cualquier nota, con la "
@@ -128,10 +129,13 @@ def build():
     s.append(bullet("<b>Inteligencia de audiencia, en vivo y solo para "
                     "ustedes.</b> Un tablero privado les dice — de forma "
                     "anónima — quién es la audiencia que El País moviliza en "
-                    "el Valle."))
-    s.append(bullet("<b>La ventana es ahora.</b> Cada día de campaña que pasa "
-                    "sin medir es señal perdida. Lo que capturen hasta primera "
-                    "vuelta es exactamente el insumo para encuadrar la segunda."))
+                    "el Valle. Es <i>insumo editorial interno</i>, no la "
+                    "publicación de un sondeo: les sirve para decidir su "
+                    "cobertura, sin entrar en la regulación de encuestas."))
+    s.append(bullet("<b>La ventana son 11 días.</b> El test corre del 20 al "
+                    "31 de mayo (primera vuelta). Cada día de campaña que pasa "
+                    "sin medir es señal perdida; lo que capturen hasta el cierre "
+                    "es el insumo para encuadrar toda su cobertura final."))
 
     s.append(Paragraph("Lo que sabrán de su propia audiencia", st_sec))
     s.append(bullet("<b>Por quién vota su lector del Valle</b>: candidato más "
@@ -145,11 +149,12 @@ def build():
                     "clic a clic. Todo anónimo; contacto solo de quien lo "
                     "autoriza expresamente (Ley 1581)."))
 
-    s.append(Paragraph("El ángulo editorial para segunda vuelta, servido", st_sec))
+    s.append(Paragraph("El ángulo editorial, servido", st_sec))
     s.append(Paragraph(
-        "Cuando cierre la primera vuelta sabrán qué arquetipo predomina en su "
-        "audiencia. Ese dato es un encuadre narrativo listo para su cobertura "
-        "de la segunda:", S("bodytight", spaceAfter=5)))
+        "Durante estos 11 días sabrán qué arquetipo predomina en su audiencia. "
+        "Ese dato es un encuadre narrativo listo: orienta cómo cubrir la recta "
+        "final y, cuando se defina, el paso a segunda vuelta.", S("bodytight",
+        spaceAfter=5)))
 
     data = [
         [Paragraph("Si su audiencia es mayoría…", st_cellb),
@@ -188,11 +193,17 @@ def build():
 
     s.append(Paragraph("Los términos", st_sec))
     s.append(bullet("<b>Sin costo.</b> No cobramos por embeber el test ni por "
-                    "el tablero de audiencia. Solo pedimos publicarlo en sus "
-                    "notas durante la recta final y la segunda vuelta."))
+                    "el tablero. Vigencia primera vuelta: del 20 al 31 de mayo "
+                    "de 2026. (La segunda vuelta sería un módulo aparte.)"))
     s.append(bullet("<b>Su marca, su territorio.</b> Embed con la identidad "
                     "de El País y filtrado al Valle por defecto. Listo para "
                     "pegar hoy."))
+    s.append(bullet("<b>Inteligencia editorial, no un sondeo.</b> El tablero "
+                    "es insumo interno para decidir cobertura — el test es "
+                    "audiencia autoseleccionada, no muestra probabilística. "
+                    "Publicar cifras al aire queda a criterio de su jurídica "
+                    "(Ley 2494/2025 de encuestas); el uso editorial interno "
+                    "no tiene esa restricción."))
     s.append(bullet("<b>Datos con respaldo.</b> Anonimato por defecto; el "
                     "contacto de un lector con una campaña solo ocurre si él "
                     "lo autoriza, bajo Ley 1581."))
@@ -209,7 +220,7 @@ def build():
                    st_step)],
         [Paragraph("<b>3</b>", st_cellb),
          Paragraph("Abren el tablero privado y ven crecer, en vivo, el "
-                   "retrato de su audiencia rumbo a segunda vuelta.",
+                   "retrato de su audiencia rumbo al 31 de mayo.",
                    st_step)],
     ]
     ts = Table(steps, colWidths=[10 * mm, W - 2 * MX - 10 * mm])
@@ -227,7 +238,7 @@ def build():
         "<b>El trato es simple:</b> ustedes ponen la audiencia y la pauta "
         "editorial; nosotros ponemos la tecnología, los datos electorales y "
         "la lectura con IA. En una campaña donde todos opinan, El País Cali "
-        "llegaría a la segunda vuelta sabiendo — con evidencia — qué mueve "
+        "llegaría al 31 de mayo sabiendo — con evidencia — qué mueve "
         "a su gente del Valle. Lo único que se necesita para arrancar es "
         "decir “sí”.",
         S("close", fontName="Helvetica", fontSize=10, leading=14.5,
