@@ -1338,11 +1338,11 @@
           </div>
           <div class="wiz-field">
             <label for="wzf-mun">Municipio</label>
-            <input type="text" id="wzf-mun" placeholder="Tu municipio" oninput="wizOnMunInput()">
+            <select id="wzf-mun" onchange="wizOnMunChange()" disabled><option value="">— Selecciona el departamento primero —</option></select>
           </div>
           <div class="wiz-field" id="wzf-comuna-wrap" hidden>
             <label for="wzf-comuna" id="wzf-comuna-label">Comuna / Localidad</label>
-            <input type="text" id="wzf-comuna" placeholder="Tu comuna o localidad">
+            <select id="wzf-comuna"><option value="">— Selecciona —</option></select>
           </div>
           <div class="wiz-form-row">
             <div class="wiz-field">
@@ -7971,6 +7971,12 @@
     cl: `${_WIZ_PHOTO_BASE}/lopez.jpg`,
     rb: `${_WIZ_PHOTO_BASE}/barreras.jpg`,
   };
+  // Nombre corto por id (para el banner de hover del mapa).
+  const WIZ_SHORT = {
+    ic: 'Cepeda', ae: 'Abelardo', pv: 'Paloma',
+    sf: 'Fajardo', cl: 'Claudia', rb: 'Roy',
+    bl: 'Voto en blanco', ns: 'NS/NR', ot: 'Otros',
+  };
 
   let WIZ_STEP = 1;
   let _hidWizard = false;  // si vino con URL params, arranca en step del mapa
@@ -8285,19 +8291,26 @@
           }
         }
       } catch(_){}
-      // Buscar el color del candidato puntero por nombre (best-effort)
+      // Match del candidato por nombre → color + nombre corto (Cepeda,
+      // Abelardo, Paloma, Fajardo, Claudia, Roy…).
+      let candShort = candName;
       if (candName && Array.isArray(window.CANDIDATOS)){
         const match = window.CANDIDATOS.find(c => candName.includes(c.nombre) || c.nombre.includes(candName));
-        if (match) candColor = match.color;
+        if (match){
+          candColor = match.color;
+          candShort = WIZ_SHORT[match.id] || match.nombre;
+        }
       }
+      // Depto en 3 siglas (Antioquia → ANT, Bogotá D.C. → BOG)
+      const depSig = depName ? depName.trim().slice(0,3).toUpperCase() : '';
       banner.innerHTML =
         `<span class="mh-mun">${munName}` +
-          (depName ? `<em class="mh-dep">${depName}</em>` : '') +
+          (depSig ? `<em class="mh-dep">(${depSig})</em>` : '') +
         `</span>` +
-        (candName ? `<span class="mh-sep">·</span>` +
+        (candShort ? `<span class="mh-sep">·</span>` +
           `<span class="mh-cand">` +
             (candColor ? `<span class="mh-dot" style="background:${candColor}"></span>` : '') +
-            `<span>${candName}</span>` +
+            `<span>Gana ${candShort}</span>` +
             (candPct ? `<span class="mh-pct">${candPct}</span>` : '') +
           `</span>` : '');
       banner.classList.add('show');
@@ -8400,19 +8413,43 @@
   // subido el botón cae al placeholder pero no rompe.
   const WIZ_REGLAS_PDF = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/DESCARGAS/reglas-pronostico-1v-2026.pdf';
 
-  // Ciudades con drill a comuna/localidad. Si el municipio escrito coincide
-  // (normalizado), pedimos también comuna/localidad.
-  const WIZ_COMUNA_CITIES = {
-    'bogota': 'Localidad',
-    'bogota d.c.': 'Localidad',
-    'bogota dc': 'Localidad',
-    'medellin': 'Comuna',
-    'cali': 'Comuna',
-    'santiago de cali': 'Comuna',
-  };
   function _wizNorm(s){
     return String(s||'').trim().toLowerCase()
       .normalize('NFD').replace(/[̀-ͯ]/g, '');
+  }
+
+  // Drill comuna/localidad para las 3 ciudades grandes. Por nombre de
+  // municipio normalizado → { kind, opts[] }.
+  const WIZ_CITY_DRILL = {
+    'bogota d.c.': { kind:'Localidad', opts:[
+      'Usaquén','Chapinero','Santa Fe','San Cristóbal','Usme','Tunjuelito',
+      'Bosa','Kennedy','Fontibón','Engativá','Suba','Barrios Unidos',
+      'Teusaquillo','Los Mártires','Antonio Nariño','Puente Aranda',
+      'La Candelaria','Rafael Uribe Uribe','Ciudad Bolívar','Sumapaz'] },
+    'medellin': { kind:'Comuna', opts:[
+      'Comuna 1 · Popular','Comuna 2 · Santa Cruz','Comuna 3 · Manrique',
+      'Comuna 4 · Aranjuez','Comuna 5 · Castilla','Comuna 6 · Doce de Octubre',
+      'Comuna 7 · Robledo','Comuna 8 · Villa Hermosa','Comuna 9 · Buenos Aires',
+      'Comuna 10 · La Candelaria','Comuna 11 · Laureles-Estadio',
+      'Comuna 12 · La América','Comuna 13 · San Javier','Comuna 14 · El Poblado',
+      'Comuna 15 · Guayabal','Comuna 16 · Belén',
+      'Corregimiento · San Sebastián de Palmitas','Corregimiento · San Cristóbal',
+      'Corregimiento · Altavista','Corregimiento · San Antonio de Prado',
+      'Corregimiento · Santa Elena'] },
+    'cali': { kind:'Comuna', opts: Array.from({length:22}, (_,i)=>`Comuna ${i+1}`) },
+  };
+
+  // divipola.json (≈43 KB): { deptos:[{cod,nombre,muns:[{cod,nombre}]}] }
+  const WIZ_DIVIPOLA_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/test-presidencial/divipola.json';
+  let _wizDivipola = null, _wizDivipolaPromise = null;
+  function _wizLoadDivipola(){
+    if (_wizDivipola) return Promise.resolve(_wizDivipola);
+    if (_wizDivipolaPromise) return _wizDivipolaPromise;
+    _wizDivipolaPromise = fetch(WIZ_DIVIPOLA_URL)
+      .then(r => r.json())
+      .then(d => { _wizDivipola = d; return d; })
+      .catch(() => { _wizDivipola = { deptos: [] }; return _wizDivipola; });
+    return _wizDivipolaPromise;
   }
 
   // Linkea todos los <a> de reglas (paso concurso + paso datos) al PDF S3.
@@ -8423,16 +8460,17 @@
   }
 
   // PASO 9: datos del participante
-  function renderDatosPanel(){
+  async function renderDatosPanel(){
     _wizLinkReglasPDF();
-    // Llenar el select de departamentos una vez
     const sel = $('wzf-depto');
-    if (sel && sel.options.length <= 1 && Array.isArray(window.DEPTOS)){
-      window.DEPTOS.forEach(([cod, nom]) => {
-        const o = document.createElement('option');
-        o.value = nom; o.textContent = nom;
-        sel.appendChild(o);
-      });
+    if (sel && sel.options.length <= 1){
+      const d = await _wizLoadDivipola();
+      (d.deptos || []).slice().sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'))
+        .forEach(dep => {
+          const o = document.createElement('option');
+          o.value = dep.nombre; o.textContent = dep.nombre;
+          sel.appendChild(o);
+        });
     }
     // Prefill si el usuario tiene sesión (comodidad, no obligatorio)
     try {
@@ -8445,30 +8483,49 @@
       }
     } catch {}
   }
-  function wizOnDeptoChange(){
-    // Si el depto es Bogotá, el municipio es Bogotá D.C. (autocompleta)
-    const dep = $('wzf-depto')?.value || '';
-    if (_wizNorm(dep).startsWith('bogota')){
-      const mun = $('wzf-mun');
-      if (mun && !mun.value) { mun.value = 'Bogotá D.C.'; wizOnMunInput(); }
+
+  async function wizOnDeptoChange(){
+    const depName = $('wzf-depto')?.value || '';
+    const munSel = $('wzf-mun');
+    if (!munSel) return;
+    munSel.innerHTML = '<option value="">— Selecciona —</option>';
+    munSel.disabled = true;
+    $('wzf-comuna-wrap').hidden = true;
+    if (!depName) { munSel.options[0].textContent = '— Selecciona el departamento primero —'; return; }
+    const d = await _wizLoadDivipola();
+    const dep = (d.deptos || []).find(x => x.nombre === depName);
+    if (!dep || !dep.muns || !dep.muns.length){
+      // Sin lista (ej. Exterior): permitir continuar con el depto solamente
+      munSel.innerHTML = '<option value="">(No aplica / no listado)</option>';
+      return;
     }
+    dep.muns.slice().sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'))
+      .forEach(m => {
+        const o = document.createElement('option');
+        o.value = m.nombre; o.textContent = m.nombre;
+        munSel.appendChild(o);
+      });
+    munSel.disabled = false;
   }
-  function wizOnMunInput(){
-    const mun = _wizNorm($('wzf-mun')?.value);
+
+  function wizOnMunChange(){
+    const munName = $('wzf-mun')?.value || '';
     const wrap = $('wzf-comuna-wrap');
     const lbl = $('wzf-comuna-label');
-    const kind = WIZ_COMUNA_CITIES[mun];
-    if (kind){
+    const comSel = $('wzf-comuna');
+    const drill = WIZ_CITY_DRILL[_wizNorm(munName)];
+    if (drill && comSel){
+      if (lbl) lbl.textContent = drill.kind;
+      comSel.innerHTML = '<option value="">— Selecciona —</option>' +
+        drill.opts.map(o => `<option value="${o}">${o}</option>`).join('');
       if (wrap) wrap.hidden = false;
-      if (lbl) lbl.textContent = kind;
-      const ph = $('wzf-comuna');
-      if (ph) ph.placeholder = kind === 'Localidad' ? 'Tu localidad (ej. Chapinero)' : 'Tu comuna (ej. Comuna 14)';
     } else {
       if (wrap) wrap.hidden = true;
+      if (comSel) comSel.innerHTML = '<option value="">— Selecciona —</option>';
     }
   }
   window.wizOnDeptoChange = wizOnDeptoChange;
-  window.wizOnMunInput = wizOnMunInput;
+  window.wizOnMunChange = wizOnMunChange;
 
   function _setSaveStatus(state, html){
     const el = $('wiz-save-status');
@@ -8497,7 +8554,12 @@
     if (!nombre)   return showErr('Escribe tu nombre.');
     if (!apellido) return showErr('Escribe tu apellido.');
     if (!depto)    return showErr('Selecciona el departamento.');
-    if (!municipio)return showErr('Escribe tu municipio.');
+    // Municipio obligatorio salvo que el depto no tenga lista (ej. Exterior).
+    const munSelEl = $('wzf-mun');
+    const munHasOpts = munSelEl && [...munSelEl.options].some(o => o.value);
+    if (munHasOpts && !municipio) return showErr('Selecciona tu municipio.');
+    const comWrap = $('wzf-comuna-wrap');
+    if (comWrap && !comWrap.hidden && !comuna) return showErr('Selecciona tu comuna o localidad.');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) return showErr('El correo no parece válido.');
     if (whatsapp.replace(/\D/g,'').length < 7) return showErr('El WhatsApp no parece válido.');
     if (!consent)  return showErr('Necesitamos tu autorización para contactarte si ganas.');
