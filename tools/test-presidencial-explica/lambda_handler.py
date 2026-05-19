@@ -127,12 +127,14 @@ TONO = {
 }
 
 # Tono regional según el departamento. Sobrepone el default del registro.
+# Cada entrada dice la forma OBLIGATORIA y prohíbe explícitamente las otras
+# (el modelo tiende a deslizar voseo en zonas de tuteo).
 TONO_REGIONAL = {
-    "voseo_paisa": "voseo paisa colombiano ('vos pensás', 'sabés', 'querés'). Paisa de Medellín/Eje Cafetero.",
-    "voseo_caleño": "voseo caleño/vallecaucano ('vos sabés', 'mirá vos', 've').",
-    "ustedeo_boyacense": "ustedeo formal boyacense ('usted dice', 'lo que usted siente'). NO tutees.",
-    "tuteo_costeño": "tuteo costeño relajado ('tú dices', 'ajá').",
-    "tuteo_neutro": "tuteo neutro colombiano de Bogotá ('tú dices', 'tú sientes').",
+    "voseo_paisa": "VOSEO paisa en TODOS los verbos: 'vos pensás/sabés/querés/vivís/sentís'. PROHIBIDO 'tú' o 'usted'. Paisa de Medellín/Eje Cafetero.",
+    "voseo_caleño": "VOSEO caleño en TODOS los verbos: 'vos sabés/querés', 'mirá vos', 've'. PROHIBIDO 'tú' o 'usted'.",
+    "ustedeo_boyacense": "USTEDEO formal boyacense en TODO: 'usted dice/quiere/siente'. PROHIBIDO tutear o vosear.",
+    "tuteo_costeño": "TUTEO costeño en TODOS los verbos: 'tú dices/quieres/vives', 'ajá'. PROHIBIDO el voseo ('vos/querés/vivís/sabés').",
+    "tuteo_neutro": "TUTEO neutro bogotano en TODOS los verbos: 'tú dices/quieres/sientes/vives'. PROHIBIDO el voseo ('vos/querés/vivís/sabés/pensás').",
 }
 
 SYSTEM_PROMPT = """Eres un analista electoral colombiano que le explica a un ciudadano el resultado de su test para la presidencial 2026. Recibes un STATE con candidato declarado, demografía, ubicación con tono regional, prioridades y un perfil emocional interno.
@@ -141,13 +143,15 @@ Tu trabajo: REDACTAR una lectura cercana y honesta. No inventas datos. No mencio
 
 Devuelves JSON estricto:
 {
-  "lectura": "Dos párrafos de 70-90 palabras cada uno, separados por \\n\\n. (1) Lo que el usuario declaró + lo que su perfil revela, EXPLICADO en lenguaje cotidiano (qué lo mueve, con qué conecta) — sin etiquetas técnicas. (2) Cómo le va a su candidato en su zona y por qué, conectando con lo que el usuario prioriza.",
+  "lectura": "Dos párrafos de 70-90 palabras cada uno, separados por \\n\\n. (1) Lo que el usuario declaró + lo que su perfil revela, EXPLICADO en lenguaje cotidiano (qué lo mueve, con qué conecta) — sin etiquetas técnicas. (2) Cómo le va a su candidato en su zona y por qué, conectando lo que el usuario prioriza con 1-2 propuestas reales y ATERRIZANDO una de ellas al nombre de su barrio/municipio como ejemplo tangible.",
   "mensaje_corto": "Frase de 12-18 palabras para meme o redes.",
   "alineacion": "alineado" | "vientos_cruzados" | "neutro"
 }
 
 REGLAS:
-1. Adapta el lenguaje al 'tono_regional' del STATE. NUNCA uses voseo argentino, 'che' ni vocabulario argentino.
+1. El 'tono_regional' del STATE es OBLIGATORIO en CADA verbo y pronombre, sin deslizar otra forma a mitad de texto. NUNCA voseo argentino ni 'che'.
+   ✗ MAL (tono=tuteo pero desliza voseo): "tú declaraste… y vos querés… vivís en…".
+   ✓ BIEN (tuteo): "tú declaraste… tú quieres… vives en…".  ✓ BIEN (voseo): "vos declaraste… vos querés… vivís en…".
 2. Honra el REGISTRO (popular/digital/analítico).
 3. Si el candidato fue 'sugerido' por el mini-test, dilo.
 4. PROHIBIDO nombrar el arquetipo emocional o decir porcentajes de arquetipo. El perfil es señal interna: tradúcelo a lenguaje natural sobre lo que al usuario lo mueve.
@@ -157,7 +161,10 @@ REGLAS:
    ✗ MAL: "tu municipio votó Petro 42.8%, Cepeda sacó 59.1% en la consulta 2025, huella 0.95×".
    ✓ BIEN: "a tu candidato le va regular porque, con el histórico y las encuestas, proyecta cerca de 18% en tu barrio".
 6. Hay un bloque PROGRAMA OFICIAL con propuestas REALES del plan de gobierno del candidato. En el 2º párrafo, conecta lo que el usuario priorizó con 1-2 propuestas concretas de ese bloque (cítalas en lenguaje natural, ej: "su plan propone X"). Es la única fuente de propuestas: lo que NO esté en ese bloque NO existe — jamás inventes una propuesta.
-7. Solo el JSON, sin markdown ni texto extra."""
+7. ATERRIZA una de esas propuestas al barrio/municipio del usuario como ejemplo tangible, usando SOLO su nombre y tamaño (los del CONTEXTO DE LA ZONA). PROHIBIDO inventar rasgos del barrio (inseguridad, pobreza, abandono, etc.) que no estén dados.
+   ✗ MAL (inventa): "en tu barrio, golpeado por la inseguridad y el abandono, esta propuesta…".
+   ✓ BIEN: "una propuesta así, en un barrio como Laureles —con sus ~31 mil votantes—, se notaría si de verdad se cumple".
+8. Solo el JSON, sin markdown ni texto extra."""
 
 
 # ---- AWS clients (lazy) ----
@@ -179,6 +186,43 @@ def _slug(s):
     s = unicodedata.normalize("NFKD", s)
     s = "".join(c for c in s if not unicodedata.combining(c))
     return re.sub(r"[^a-zA-Z0-9]+", "-", s).strip("-").lower()
+
+
+# Formas de voseo colombiano (presente agudo con tilde + 'vos/sos') →
+# tuteo. Diccionario CERRADO de tokens inequívocos: el voseo presente
+# lleva tilde final que el tuteo no tiene, así que no hay falsos
+# positivos con formas tuteo válidas (tú estás, tú vas...). Se aplica
+# solo cuando el tono regional es de tuteo.
+_VOSEO_TUTEO = {
+    "querés": "quieres", "sabés": "sabes", "vivís": "vives", "pensás": "piensas",
+    "tenés": "tienes", "sentís": "sientes", "podés": "puedes", "hacés": "haces",
+    "decís": "dices", "priorizás": "priorizas", "conectás": "conectas",
+    "buscás": "buscas", "necesitás": "necesitas", "votás": "votas",
+    "preferís": "prefieres", "elegís": "eliges", "creés": "crees",
+    "andás": "andas", "estás harto": "estás harto", "vení": "ven",
+    "mirá": "mira", "fijate": "fíjate", "dejá": "deja", "ponés": "pones",
+    "sos": "eres", "vos": "tú", "tuyo": "tuyo",
+}
+_VOSEO_RE = re.compile(
+    r"\b(" + "|".join(re.escape(k) for k in _VOSEO_TUTEO if " " not in k) + r")\b",
+    re.IGNORECASE,
+)
+
+
+def _voseo_a_tuteo(txt):
+    """Normaliza voseo→tuteo de forma determinista (no toca formas tuteo
+    válidas porque el voseo presente es agudo con tilde)."""
+    if not txt:
+        return txt
+
+    def _r(m):
+        w = m.group(0)
+        rep = _VOSEO_TUTEO.get(w.lower())
+        if not rep:
+            return w
+        return rep[:1].upper() + rep[1:] if w[:1].isupper() else rep
+
+    return _VOSEO_RE.sub(_r, txt)
 
 
 def _pad2(s):
@@ -392,7 +436,7 @@ def _format_huella_block(entry, level, candidato_id):
 # Bumpear cuando cambie el prompt/estructura de la lectura: invalida todo el
 # cache viejo sin tener que borrar S3 (las keys nuevas no colisionan con las
 # viejas, y las viejas expiran solas por TTL).
-PROMPT_VERSION = "v3-2026-05-19-prog"
+PROMPT_VERSION = "v4-2026-05-19-tono-barrio"
 
 
 def _cache_key(state):
@@ -602,6 +646,13 @@ def _call_deepseek(state):
             raise ValueError(f"DeepSeek devolvió JSON sin campo '{k}'")
     if parsed["alineacion"] not in ("alineado", "vientos_cruzados", "neutro"):
         parsed["alineacion"] = "neutro"
+
+    # Adherencia de tono: si la región es de TUTEO, el modelo a veces
+    # desliza voseo (sobre todo en registro 'digital'). Lo normalizamos
+    # de forma determinista — no depende del modelo, latencia ~0.
+    if tono_reg_key in ("tuteo_neutro", "tuteo_costeño"):
+        parsed["lectura"] = _voseo_a_tuteo(parsed.get("lectura", ""))
+        parsed["mensaje_corto"] = _voseo_a_tuteo(parsed.get("mensaje_corto", ""))
 
     return parsed
 
