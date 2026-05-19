@@ -112,6 +112,39 @@ body.day-mode::before {
   font-size:15px; color:var(--ink-2); line-height:1.5;
 }
 
+/* Selector de ciudad (ficha) */
+.fc-selector { margin-top:1.25rem; display:flex; align-items:center; gap:.85rem; flex-wrap:wrap; }
+.fc-selector label {
+  font-family:var(--mono); font-size:11px; font-weight:700;
+  letter-spacing:.16em; text-transform:uppercase; color:var(--ink-3);
+}
+.fc-selector select {
+  font-family:var(--sans); font-weight:600; font-size:15px;
+  color:var(--ink); background:var(--paper);
+  border:1px solid var(--ink); border-radius:999px;
+  padding:.55rem 2.2rem .55rem 1rem; cursor:none;
+  appearance:none;
+  background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 1rem center;
+}
+.fc-selector select:focus { outline:none; border-color:var(--accent); }
+
+/* CIIU por ciudad — placeholder */
+.fc-ciiu-soon {
+  margin-top:2.5rem; padding:1.5rem 1.75rem;
+  border:1px dashed var(--gold); background:transparent;
+}
+.fc-ciiu-soon .lbl {
+  font-family:var(--mono); font-size:11px; font-weight:700;
+  letter-spacing:.16em; text-transform:uppercase; color:var(--gold);
+  margin-bottom:.6rem;
+}
+.fc-ciiu-soon p {
+  font-family:var(--sans); font-size:15px; line-height:1.55; color:var(--ink-2);
+  max-width:680px;
+}
+.fc-ciiu-soon p b { color:var(--gold); font-weight:700; }
+
 /* LECTURA automática (boletín por reglas) */
 .lectura {
   padding:1.5rem 1.75rem; background:var(--paper-2);
@@ -415,6 +448,7 @@ body.day-mode::before {
       <button class="mode-pill active" data-mode="general">Panorama general</button>
       <button class="mode-pill" data-mode="mensual">Análisis del mes</button>
       <button class="mode-pill" data-mode="ciudad">El mes · por ciudad</button>
+      <button class="mode-pill" data-mode="ficha">Ficha de ciudad</button>
     </div>
     <div class="mode-hint" id="mode-hint">Estructura, histórico y composición sectorial — la foto de fondo.</div>
   </section>
@@ -478,6 +512,73 @@ body.day-mode::before {
         </thead>
         <tbody id="mc-tbody"></tbody>
       </table>
+    </section>
+  </div>
+
+  <!-- ░░░ MODO FICHA DE CIUDAD ░░░ -->
+  <div id="mode-ficha" hidden>
+    <section class="s">
+      <div class="s-head">
+        <div class="s-kicker">Ficha de ciudad · <span id="fc-tm">—</span></div>
+        <h2 class="s-title">La situación laboral de las mujeres en <em><span id="fc-name">—</span></em>.</h2>
+        <p class="s-dek">Toda la información del módulo enfocada en una ciudad. Selecciona la ciudad y obtén su panel, su serie histórica propia y su lugar frente al resto del país.</p>
+        <div class="fc-selector">
+          <label for="fc-select">Ciudad</label>
+          <select id="fc-select"></select>
+        </div>
+      </div>
+
+      <div class="kpi-strip-big" id="fc-kpis">
+        <div class="kpi-big">
+          <div class="lbl">TGP femenina</div>
+          <div class="val" id="fc-tgp">—</div>
+          <div class="sub" id="fc-tgp-sub">—</div>
+        </div>
+        <div class="kpi-big">
+          <div class="lbl">Brecha TGP H–M</div>
+          <div class="val" id="fc-brecha">—</div>
+          <div class="sub" id="fc-brecha-sub">—</div>
+        </div>
+        <div class="kpi-big">
+          <div class="lbl">TD femenina</div>
+          <div class="val" id="fc-td">—</div>
+          <div class="sub" id="fc-td-sub">—</div>
+        </div>
+        <div class="kpi-big">
+          <div class="lbl">Δ participación este mes</div>
+          <div class="val" id="fc-dmes">—</div>
+          <div class="sub" id="fc-dmes-sub">—</div>
+        </div>
+      </div>
+
+      <div class="lectura" id="fc-rank" style="margin-top:1.75rem">—</div>
+
+      <div class="s-head" style="margin-top:2.5rem; border:none; padding-bottom:0">
+        <h2 class="s-title" style="font-size:1.4rem">Serie histórica de <em><span id="fc-name2">—</span></em></h2>
+        <div class="indicator-pills" id="fc-ind-pills">
+          <button class="ip active" data-find="tgp">TGP · participación</button>
+          <button class="ip" data-find="to">TO · ocupación</button>
+          <button class="ip" data-find="td">TD · desocupación</button>
+        </div>
+      </div>
+      <div class="chart-card">
+        <svg class="chart-line" viewBox="0 0 720 340" preserveAspectRatio="xMidYMid meet" id="fc-chart"></svg>
+        <div class="chart-foot">
+          <div class="chart-legend">
+            <span><span class="sw sw-accent"></span>Mujeres</span>
+            <span><span class="sw sw-ink-2"></span>Hombres</span>
+          </div>
+          <div>Fuente: DANE GEIH-MLS</div>
+        </div>
+      </div>
+
+      <div class="lectura" id="fc-mes" style="margin-top:1.5rem">—</div>
+
+      <!-- CIIU por ciudad: espacio reservado -->
+      <div class="fc-ciiu-soon">
+        <div class="lbl">Empleo por sector económico (CIIU) en esta ciudad</div>
+        <p>El anexo del DANE no publica el desglose sectorial por ciudad individual — requiere procesar los microdatos de la GEIH. Espacio reservado: <b>sujeto a avances con la Fundación MxD</b>.</p>
+      </div>
     </section>
   </div>
 
@@ -765,28 +866,20 @@ body.day-mode::before {
   }
 
   // ─── CHART serie nacional ─────────────────────────────────────────
-  function renderChart() {
-    if (!DATA) return;
-    const svg = document.getElementById('chart-serie');
+  // Core reutilizable: dibuja 2 series (M/H) en el svg dado
+  function drawLineChart(svg, sm, sh, tms, indLabel) {
     if (!svg) return;
     const W = 720, H = 340;
     const M = { t: 30, r: 30, b: 50, l: 50 };
     const innerW = W - M.l - M.r, innerH = H - M.t - M.b;
-    const ind = STATE.indicator;
-    const tms = DATA.tms;
-    const sm  = DATA.nacional.mujeres[ind];
-    const sh  = DATA.nacional.hombres[ind];
-    // Find min/max
     const allValid = [...sm, ...sh].filter(v => v != null && !isNaN(v));
+    if (!allValid.length) { svg.innerHTML = ''; return; }
     let yMin = Math.min(...allValid), yMax = Math.max(...allValid);
-    // round to nearest 5 below/above
     yMin = Math.max(0, Math.floor((yMin - 2) / 5) * 5);
     yMax = Math.ceil((yMax + 2) / 5) * 5;
     const xScale = i => M.l + (i / (tms.length - 1)) * innerW;
     const yScale = v => M.t + (1 - (v - yMin) / (yMax - yMin)) * innerH;
-
     let html = '';
-    // gridlines + y labels
     const ySteps = 5;
     for (let k = 0; k <= ySteps; k++) {
       const v = yMin + (yMax - yMin) * k / ySteps;
@@ -794,21 +887,13 @@ body.day-mode::before {
       html += `<line class="grid" x1="${M.l}" y1="${y}" x2="${M.l + innerW}" y2="${y}"/>`;
       html += `<text class="axis-text" x="${M.l - 8}" y="${y + 4}" text-anchor="end">${v.toFixed(0)}%</text>`;
     }
-    // x-axis labels: every 24 months (each 24 TMs = ~2 years)
     for (let i = 0; i < tms.length; i += 24) {
-      const x = xScale(i);
-      const yr = tms[i].split('-')[0];
-      html += `<text class="axis-text" x="${x}" y="${M.t + innerH + 20}" text-anchor="middle">${yr}</text>`;
+      html += `<text class="axis-text" x="${xScale(i)}" y="${M.t + innerH + 20}" text-anchor="middle">${tms[i].split('-')[0]}</text>`;
     }
-    // Last year label
     const lastIdx = tms.length - 1;
     if (lastIdx % 24 !== 0) {
-      const x = xScale(lastIdx);
-      const lastYr = tms[lastIdx].split('-')[0];
-      html += `<text class="axis-text" x="${x}" y="${M.t + innerH + 20}" text-anchor="middle">${lastYr}</text>`;
+      html += `<text class="axis-text" x="${xScale(lastIdx)}" y="${M.t + innerH + 20}" text-anchor="middle">${tms[lastIdx].split('-')[0]}</text>`;
     }
-
-    // Build paths
     function buildPath(series) {
       let d = '', moved = false;
       for (let i = 0; i < series.length; i++) {
@@ -822,17 +907,25 @@ body.day-mode::before {
     }
     html += `<path class="line line-hom" d="${buildPath(sh)}"/>`;
     html += `<path class="line line-muj" d="${buildPath(sm)}"/>`;
-
-    // Last point dots + labels
     const lastValid = (s) => { for (let i = s.length - 1; i >= 0; i--) if (s[i] != null) return [i, s[i]]; return null; };
     const lpM = lastValid(sm), lpH = lastValid(sh);
     if (lpH) html += `<circle class="dot dot-hom" cx="${xScale(lpH[0])}" cy="${yScale(lpH[1])}" r="4"/>`;
     if (lpM) html += `<circle class="dot dot-muj" cx="${xScale(lpM[0])}" cy="${yScale(lpM[1])}" r="4"/>`;
     if (lpH) html += `<text class="dot-label" x="${xScale(lpH[0]) + 8}" y="${yScale(lpH[1]) - 6}" fill="var(--ink-2)">H ${lpH[1].toFixed(1)}</text>`;
     if (lpM) html += `<text class="dot-label" x="${xScale(lpM[0]) + 8}" y="${yScale(lpM[1]) + 16}" fill="var(--accent)">M ${lpM[1].toFixed(1)}</text>`;
-
-    html += `<text class="axis-label" x="${M.l}" y="${M.t - 12}" text-anchor="start">${IND_LABEL[ind]}</text>`;
+    html += `<text class="axis-label" x="${M.l}" y="${M.t - 12}" text-anchor="start">${indLabel}</text>`;
     svg.innerHTML = html;
+  }
+
+  function renderChart() {
+    if (!DATA) return;
+    const svg = document.getElementById('chart-serie');
+    if (!svg) return;
+    const ind = STATE.indicator;
+    const tms = DATA.tms;
+    const sm  = DATA.nacional.mujeres[ind];
+    const sh  = DATA.nacional.hombres[ind];
+    drawLineChart(svg, sm, sh, tms, IND_LABEL[ind]);
     window._chartReady = true;
     renderTakeaway();
   }
@@ -858,23 +951,108 @@ body.day-mode::before {
   const MODE_HINT = {
     general: 'Estructura, histórico y composición sectorial — la foto de fondo.',
     mensual: 'Qué cambió este mes frente al anterior y frente a hace un año. Solo cifras DANE.',
-    ciudad:  'El mismo análisis del mes, ciudad por ciudad. 23 ciudades y áreas metropolitanas.'
+    ciudad:  'El mismo análisis del mes, ciudad por ciudad. 23 ciudades y áreas metropolitanas.',
+    ficha:   'Toda la información enfocada en la ciudad que elijas: panel, serie propia y su lugar en el país.'
   };
-  let _mensualDone = false, _ciudadDone = false;
+  let _mensualDone = false, _ciudadDone = false, _fichaDone = false;
   function switchMode(mode) {
     document.querySelectorAll('.mode-pill').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
     document.getElementById('mode-general').hidden  = (mode !== 'general');
     document.getElementById('mode-mensual').hidden  = (mode !== 'mensual');
     document.getElementById('mode-ciudad').hidden   = (mode !== 'ciudad');
+    document.getElementById('mode-ficha').hidden    = (mode !== 'ficha');
     document.getElementById('mode-hint').textContent = MODE_HINT[mode] || '';
     if (mode === 'mensual' && !_mensualDone) { renderMensual(); _mensualDone = true; }
     if (mode === 'ciudad'  && !_ciudadDone)  { renderCiudadMensual(); _ciudadDone = true; }
+    if (mode === 'ficha'   && !_fichaDone)   { initFicha(); _fichaDone = true; }
     window.scrollTo({ top: 0, behavior: 'instant' });
   }
   function wireMode() {
     document.querySelectorAll('.mode-pill').forEach(b => {
       b.addEventListener('click', () => switchMode(b.dataset.mode));
     });
+  }
+
+  // ─── FICHA DE CIUDAD ──────────────────────────────────────────────
+  const FICHA = { city: 'Bogotá D.C.', ind: 'tgp' };
+  function initFicha() {
+    if (!DATA) return;
+    const sel = document.getElementById('fc-select');
+    const cities = Object.keys(DATA.ciudades).filter(c => !c.startsWith('TOTAL')).sort((a,b)=>a.localeCompare(b));
+    if (!cities.includes(FICHA.city)) FICHA.city = cities[0];
+    sel.innerHTML = cities.map(c => `<option value="${c}"${c===FICHA.city?' selected':''}>${c}</option>`).join('');
+    sel.addEventListener('change', () => { FICHA.city = sel.value; renderFicha(); });
+    document.querySelectorAll('#fc-ind-pills .ip').forEach(b => {
+      b.addEventListener('click', () => {
+        FICHA.ind = b.dataset.find;
+        document.querySelectorAll('#fc-ind-pills .ip').forEach(x => x.classList.toggle('active', x === b));
+        renderFichaChart();
+      });
+    });
+    renderFicha();
+  }
+  function fichaRankPos() {
+    // posición de la ciudad en brecha TGP H-M (1 = peor brecha)
+    const rows = [];
+    for (const c in DATA.ciudades) {
+      if (c.startsWith('TOTAL')) continue;
+      const cc = DATA.ciudades[c];
+      const tm = lastNonNull(cc.mujeres.tgp), th = lastNonNull(cc.hombres.tgp);
+      if (tm == null || th == null) continue;
+      rows.push({ c, br: th - tm });
+    }
+    rows.sort((a,b) => b.br - a.br);
+    const idx = rows.findIndex(r => r.c === FICHA.city);
+    return { pos: idx + 1, total: rows.length, br: rows[idx] ? rows[idx].br : null };
+  }
+  function renderFichaChart() {
+    const c = DATA.ciudades[FICHA.city];
+    if (!c) return;
+    drawLineChart(document.getElementById('fc-chart'),
+      c.mujeres[FICHA.ind], c.hombres[FICHA.ind], DATA.tms, IND_LABEL[FICHA.ind]);
+  }
+  function renderFicha() {
+    if (!DATA) return;
+    const c = DATA.ciudades[FICHA.city];
+    if (!c) return;
+    const tm = DATA.actualizado_a;
+    document.getElementById('fc-tm').textContent = fmtTM(tm);
+    ['fc-name','fc-name2'].forEach(id => { const e = document.getElementById(id); if (e) e.textContent = FICHA.city; });
+
+    const tgpM = lastNonNull(c.mujeres.tgp), tgpH = lastNonNull(c.hombres.tgp);
+    const tdM = lastNonNull(c.mujeres.td), tdH = lastNonNull(c.hombres.td);
+    const [, , dMes] = deltaBack(c.mujeres.tgp, 1);
+    const [, , dAno] = deltaBack(c.mujeres.tgp, 12);
+    const brecha = tgpH - tgpM;
+
+    document.getElementById('fc-tgp').innerHTML = `${tgpM.toFixed(1).replace('.', ',')}<span class="of">%</span>`;
+    document.getElementById('fc-tgp-sub').textContent = `Hombres ${fmtPct(tgpH)}`;
+    document.getElementById('fc-brecha').innerHTML = `<span style="color:var(--accent)">${brecha.toFixed(1).replace('.', ',')}</span><span class="of">pp</span>`;
+    document.getElementById('fc-brecha-sub').innerHTML = `<em>Hombres por encima</em>`;
+    document.getElementById('fc-td').innerHTML = `${tdM.toFixed(1).replace('.', ',')}<span class="of">%</span>`;
+    document.getElementById('fc-td-sub').textContent = `Hombres ${fmtPct(tdH)}`;
+    document.getElementById('fc-dmes').innerHTML = (dMes==null) ? '—' :
+      `<span style="color:var(--accent)">${(dMes>0?'+':'−')}${Math.abs(dMes).toFixed(1).replace('.', ',')}</span><span class="of">pp</span>`;
+    document.getElementById('fc-dmes-sub').innerHTML = `<em>${verbo(dMes)}</em> vs mes anterior`;
+
+    const rk = fichaRankPos();
+    const nac = lastNonNull(DATA.nacional.hombres.tgp) - lastNonNull(DATA.nacional.mujeres.tgp);
+    const posTxt = rk.pos === 1 ? 'la <b>peor</b> brecha de participación del país'
+                 : rk.pos === rk.total ? 'la <b>brecha más estrecha</b> del país'
+                 : `la <b>${rk.pos}ª peor</b> brecha de participación entre las ${rk.total} ciudades`;
+    const rel = brecha > nac ? `por encima del promedio nacional (${nac.toFixed(1).replace('.', ',')}pp)`
+                             : `por debajo del promedio nacional (${nac.toFixed(1).replace('.', ',')}pp)`;
+    document.getElementById('fc-rank').innerHTML =
+      `<b>${FICHA.city}</b> tiene ${posTxt}, con <b>${brecha.toFixed(1).replace('.', ',')}pp</b> de diferencia entre la participación de hombres y mujeres — ${rel}.`;
+
+    const meses = ['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    const [y, mo] = tm.split('-');
+    document.getElementById('fc-mes').innerHTML =
+      `En el trimestre que cierra en <b>${meses[parseInt(mo,10)]} de ${y}</b>, la participación femenina en ${FICHA.city} ` +
+      `${verbo(dMes)} frente al mes anterior y ${verbo(dAno)} frente a hace un año. ` +
+      `La ocupación femenina está en <b>${fmtPct(lastNonNull(c.mujeres.to))}</b> y el desempleo femenino en <b>${fmtPct(tdM)}</b>.`;
+
+    renderFichaChart();
   }
 
   // Helper: [valor actual, valor backN meses atrás, delta] sobre serie con nulos
