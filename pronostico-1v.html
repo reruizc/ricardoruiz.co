@@ -1341,8 +1341,24 @@
         </div>
       </section>
 
-      <!-- ── PANEL 9: Datos del participante ── -->
-      <section class="wiz-panel" id="wiz-panel-datos" data-step="9">
+      <!-- ── PANEL 9: Confirmación del pronóstico ── -->
+      <section class="wiz-panel" id="wiz-panel-confirma" data-step="9">
+        <div class="wiz-qhead">
+          <span class="wiz-qnum">Paso 6 · Confirma</span>
+          <span class="wiz-qtag">Revisa antes de enviar</span>
+        </div>
+        <h2 class="wiz-qtext">¿Confirmas esta votación?</h2>
+        <p class="wiz-qhint">Esto es lo que vas a registrar para el concurso. Si algo no te cuadra, vuelve y ajústalo — una vez enviado puedes reenviarlo hasta el cierre, pero mejor déjalo como lo quieres.</p>
+        <div class="wiz-pond-list" id="wiz-confirma-list"></div>
+        <div class="wiz-pond-foot" id="wiz-confirma-foot"></div>
+        <div class="wiz-actions">
+          <button class="wiz-btn wiz-btn-ghost" onclick="wizGoto(5)">← Ajustar cifras</button>
+          <button class="wiz-btn" onclick="wizNext()">Confirmar y continuar →</button>
+        </div>
+      </section>
+
+      <!-- ── PANEL 10: Datos del participante ── -->
+      <section class="wiz-panel" id="wiz-panel-datos" data-step="10">
         <div class="wiz-qhead">
           <span class="wiz-qnum">Paso 6 · Tus datos</span>
           <span class="wiz-qtag">Para el concurso</span>
@@ -1396,13 +1412,13 @@
           <div class="wiz-form-err" id="wiz-form-err" hidden></div>
         </div>
         <div class="wiz-actions">
-          <button class="wiz-btn wiz-btn-ghost" onclick="wizGoto(8)">← Ver el mapa</button>
+          <button class="wiz-btn wiz-btn-ghost" onclick="wizGoto(9)">← Atrás</button>
           <button class="wiz-btn" id="wiz-datos-submit" onclick="wizSubmitDatos()">Enviar pronóstico →</button>
         </div>
       </section>
 
-      <!-- ── PANEL 10: Compartir ── -->
-      <section class="wiz-panel" id="wiz-panel-share" data-step="10">
+      <!-- ── PANEL 11: Compartir ── -->
+      <section class="wiz-panel" id="wiz-panel-share" data-step="11">
         <div class="wiz-qhead">
           <span class="wiz-qnum">Paso 7 · Listo</span>
           <span class="wiz-qtag">Comparte</span>
@@ -8010,11 +8026,12 @@
 <!-- ─── WIZARD JS: navegación, sliders, residual, mapa, share ─── -->
 <script>
 (function(){
-  const WIZ_TOTAL = 10;
-  const WIZ_PANELS = ['intro','concurso','pond','turnout','cands-1','cands-2','blanco','mapa','datos','share'];
+  const WIZ_TOTAL = 11;
+  const WIZ_PANELS = ['intro','concurso','pond','turnout','cands-1','cands-2','blanco','mapa','confirma','datos','share'];
   const WIZ_MAPA_STEP = 8;
-  const WIZ_DATOS_STEP = 9;
-  const WIZ_SHARE_STEP = 10;
+  const WIZ_CONFIRMA_STEP = 9;
+  const WIZ_DATOS_STEP = 10;
+  const WIZ_SHARE_STEP = 11;
   // Censo electoral nacional 2026: ~41,3 M
   const PADRON_NACIONAL = 41.3;
   // Top-3 candidatos + resto (orden fijo por convención; el orden visible se
@@ -8077,6 +8094,7 @@
     if (n===6) renderCandSliders('2');
     if (n===7) renderBlancoSlider();
     if (n===WIZ_MAPA_STEP) renderMapaPanel();
+    if (n===WIZ_CONFIRMA_STEP) renderConfirmaPanel();
     if (n===WIZ_DATOS_STEP) renderDatosPanel();
     if (n===WIZ_SHARE_STEP) renderSharePanel();
 
@@ -8481,6 +8499,37 @@
   function renderSharePanel(){
     const el = $('wiz-share-url');
     if (el) el.textContent = buildShareUrl();
+  }
+
+  // PASO 9: confirmación — resumen de lo que el usuario va a registrar.
+  function renderConfirmaPanel(){
+    const wrap = $('wiz-confirma-list');
+    if (!wrap || !window.CANDIDATOS) return;
+    // Candidatos + voto en blanco + Otros (fijo). NS/NR ya está en 0
+    // (repartido) — no lo mostramos. Orden de mayor a menor.
+    const filas = window.CANDIDATOS
+      .filter(c => c.id !== 'ns')
+      .slice().sort((a,b) => b.pct - a.pct);
+    const maxPct = filas[0]?.pct || 100;
+    wrap.innerHTML = filas.map(c => {
+      const fillW = Math.min(100, (c.pct / maxPct) * 100);
+      const sub = c.id === 'bl' ? 'Voto en blanco / nulo'
+                : c.id === 'ot' ? 'Otros (fijo, &lt;1%)'
+                : (c.partido || '');
+      return `<div class="wiz-pond-row no-photo" style="--cand-color:${c.color}">
+        <div class="wiz-pond-fill" style="width:${fillW}%;background:${c.color}"></div>
+        <span class="wiz-pond-dot" style="background:${c.color}"></span>
+        <div class="wiz-pond-name">${c.nombre}<span class="wiz-pond-party">${sub}</span></div>
+        <span class="wiz-pond-pct">${c.pct.toFixed(1)}%</span>
+      </div>`;
+    }).join('');
+    const foot = $('wiz-confirma-foot');
+    if (foot){
+      const turnout = window.TURNOUT_PCT || 54;
+      const votM = (PADRON_NACIONAL * turnout / 100).toFixed(1).replace('.', ',');
+      foot.innerHTML = `Participación esperada: <b>${turnout.toFixed(1)}%</b> del censo · ≈ <b>${votM} M</b> de votantes. ` +
+        `El total cierra 100% (NS/NR ya repartido entre los candidatos).`;
+    }
   }
 
   const _PRON_AUTH_BASE = 'https://rr-auth.reruizc.workers.dev';
