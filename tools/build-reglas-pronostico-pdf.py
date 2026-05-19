@@ -102,8 +102,10 @@ def build():
         "decimales, gana quien haya enviado primero su pronóstico (se usa la "
         "fecha de creación del registro).",
         "Solo cuenta el <b>último pronóstico guardado por cada correo</b> antes "
-        "del cierre. Puedes ajustarlo cuantas veces quieras hasta el "
-        "30 de mayo de 2026 a las 23:59 (hora de Colombia).",
+        "del cierre. El concurso cierra <b>3 días antes de la primera "
+        "vuelta</b>: se reciben pronósticos hasta el <b>28 de mayo de "
+        "2026 a las 23:59 (hora de Colombia)</b>. Puedes ajustar tu "
+        "pronóstico cuantas veces quieras hasta ese momento.",
     ]))
     s.append(Paragraph(
         "El cálculo y la lista ordenada de resultados se publican después de la "
