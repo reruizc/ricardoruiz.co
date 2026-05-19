@@ -162,6 +162,58 @@ body.day-mode::before {
 
 @media (max-width:880px){ .glos-grid { grid-template-columns:1fr; } }
 
+/* CIIU sectores */
+.ciiu-note {
+  margin-top:.75rem; padding:.7rem 1rem;
+  border:1px dashed var(--gold); background:transparent;
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.04em;
+  color:var(--ink-2); line-height:1.5;
+}
+.ciiu-note b { color:var(--gold); font-weight:700; }
+.ciiu-list { margin-top:1.5rem; display:flex; flex-direction:column; gap:.65rem; }
+.ciiu-row {
+  display:grid; grid-template-columns:200px 1fr 132px;
+  gap:1rem; align-items:center;
+}
+.ciiu-row .cr-name {
+  font-family:var(--sans); font-weight:600; font-size:14px; color:var(--ink);
+  text-align:right;
+}
+.ciiu-bar {
+  height:26px; display:flex; border:1px solid var(--rule-strong);
+  overflow:hidden; position:relative;
+}
+.ciiu-bar .seg-m { background:var(--accent); height:100%; }
+.ciiu-bar .seg-h { background:var(--paper-3); height:100%; }
+.ciiu-bar .pct-lbl {
+  position:absolute; left:8px; top:50%; transform:translateY(-50%);
+  font-family:var(--sans); font-weight:700; font-size:12px;
+  color:var(--on-accent); font-variant-numeric:tabular-nums;
+  pointer-events:none;
+}
+.ciiu-meta {
+  display:flex; flex-direction:column; gap:.15rem;
+  font-family:var(--mono); font-size:11.5px; color:var(--ink-2);
+}
+.ciiu-meta .abs { color:var(--ink); font-weight:700; }
+.ciiu-meta .trend { font-size:10.5px; letter-spacing:.06em; }
+.ciiu-meta .trend.up   { color:var(--accent); }
+.ciiu-meta .trend.down { color:var(--ink-3); }
+.ciiu-meta .trend.flat { color:var(--ink-3); }
+.ciiu-legend {
+  margin-top:1.25rem; display:flex; gap:1.5rem; flex-wrap:wrap;
+  font-family:var(--mono); font-size:11px; letter-spacing:.1em;
+  color:var(--ink-2); text-transform:uppercase;
+}
+.ciiu-legend .sw { display:inline-block; width:12px; height:12px; margin-right:.4rem; vertical-align:middle; }
+.ciiu-legend .sw.m { background:var(--accent); }
+.ciiu-legend .sw.h { background:var(--paper-3); border:1px solid var(--rule-strong); }
+@media (max-width:760px){
+  .ciiu-row { grid-template-columns:1fr; gap:.35rem; }
+  .ciiu-row .cr-name { text-align:left; }
+  .ciiu-meta { flex-direction:row; gap:1rem; }
+}
+
 /* SECTIONS */
 .s { margin-top:4rem; padding-bottom:1.5rem; }
 .s-head { margin-bottom:1.75rem; border-bottom:1px solid var(--rule); padding-bottom:1rem; }
@@ -376,10 +428,36 @@ body.day-mode::before {
     </div>
   </section>
 
-  <!-- SECTION 2 -->
+  <!-- SECTION 2 · CIIU -->
   <section class="s">
     <div class="s-head">
-      <div class="s-kicker">02 · Las 23 ciudades</div>
+      <div class="s-kicker">02 · ¿En qué trabajan las mujeres?</div>
+      <h2 class="s-title">El empleo femenino está <em>encajonado</em> en unos pocos sectores.</h2>
+      <p class="s-dek">Población ocupada por rama de actividad económica (clasificación CIIU del DANE), último trimestre móvil. Las barras muestran qué porcentaje de cada sector son mujeres. Ordenadas de más a menos feminizado.</p>
+      <div class="ciiu-note">
+        <b>Abrebocas, no pronóstico.</b> La flecha de tendencia es la variación observada de la feminización del sector en los últimos 2 años — una lectura simple, no un modelo de proyección macroeconómica. La proyección sectorial seria (tipo DNP, con supuestos de PIB y modelos de equilibrio) es un desarrollo aparte.
+      </div>
+    </div>
+
+    <div class="ciiu-list" id="ciiu-list">
+      <div class="loading">Cargando empleo por sector…</div>
+    </div>
+    <div class="ciiu-legend">
+      <span><span class="sw m"></span>Mujeres</span>
+      <span><span class="sw h"></span>Hombres</span>
+      <span style="color:var(--ink-3)">▲ feminizándose · ▼ masculinizándose · → estable (Δ 2 años)</span>
+    </div>
+
+    <div class="takeaway">
+      <div class="lbl">Lectura</div>
+      <div class="copy" id="ciiu-takeaway">—</div>
+    </div>
+  </section>
+
+  <!-- SECTION 3 -->
+  <section class="s">
+    <div class="s-head">
+      <div class="s-kicker">03 · Las 23 ciudades</div>
       <h2 class="s-title">Dónde es <em>peor</em>, dónde es <em>menos peor</em>.</h2>
       <p class="s-dek">Cifras del último trimestre móvil disponible. La brecha TGP H−M es el diferencial estructural entre la participación masculina y femenina. La brecha TD M−H mide cuánto más alto es el desempleo femenino respecto del masculino. Click en el encabezado de una columna para ordenar.</p>
     </div>
@@ -481,8 +559,11 @@ body.day-mode::before {
 
   // ─── DATA ─────────────────────────────────────────────────────────
   const DATA_V = '20260518';
-  const DATA_URL = `https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_observatorio_mujer/dane-empleo-mensual.json?v=${DATA_V}`;
+  const S3_OBS = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_observatorio_mujer';
+  const DATA_URL = `${S3_OBS}/dane-empleo-mensual.json?v=${DATA_V}`;
+  const CIIU_URL = `${S3_OBS}/dane-ciiu-mensual.json?v=${DATA_V}`;
   let DATA = null;
+  let CIIU = null;
   const STATE = { indicator: 'tgp', sortCol: 'brecha_tgp', sortDir: 'desc' };
   const IND_LABEL = { tgp: 'TGP · Tasa global de participación', to: 'TO · Tasa de ocupación', td: 'TD · Tasa de desocupación' };
 
@@ -645,6 +726,73 @@ body.day-mode::before {
     document.getElementById('takeaway-copy').innerHTML = copy;
   }
 
+  // ─── CIIU · empleo femenino por sector ────────────────────────────
+  function lastN(arr, n) {
+    // último valor no nulo y el valor ~n posiciones atrás (no nulo)
+    const valid = [];
+    for (let i = 0; i < arr.length; i++) if (arr[i] != null) valid.push([i, arr[i]]);
+    if (!valid.length) return [null, null];
+    const last = valid[valid.length - 1][1];
+    let prev = valid[0][1];
+    const lastIdx = valid[valid.length - 1][0];
+    for (let k = valid.length - 1; k >= 0; k--) {
+      if (lastIdx - valid[k][0] >= n) { prev = valid[k][1]; break; }
+    }
+    return [last, prev];
+  }
+  function renderCiiu() {
+    if (!CIIU) return;
+    const ramas = CIIU.ramas;
+    const rows = ramas.map(nombre => {
+      const sm = CIIU.mujeres[nombre] || [];
+      const sh = CIIU.hombres[nombre] || [];
+      const [muL] = lastN(sm, 0);
+      const [hoL] = lastN(sh, 0);
+      const tot = (muL || 0) + (hoL || 0);
+      const pctF = tot ? (muL / tot * 100) : 0;
+      // Tendencia: feminización hace ~24 TMs (2 años) vs hoy
+      const femSerie = sm.map((v, i) => {
+        const h = sh[i];
+        if (v == null || h == null || (v + h) === 0) return null;
+        return v / (v + h) * 100;
+      });
+      const [femNow, femPrev] = lastN(femSerie, 24);
+      const delta = (femNow != null && femPrev != null) ? femNow - femPrev : 0;
+      let trend = 'flat', tArr = '→', tTxt = 'estable';
+      if (delta >= 1)      { trend = 'up';   tArr = '▲'; tTxt = `+${delta.toFixed(1)}pp`; }
+      else if (delta <= -1){ trend = 'down'; tArr = '▼'; tTxt = `${delta.toFixed(1)}pp`; }
+      return { nombre, muL, hoL, tot, pctF, delta, trend, tArr, tTxt };
+    }).sort((a, b) => b.pctF - a.pctF);
+
+    const fmtK = v => {
+      if (v == null) return '—';
+      if (v >= 1000) return (v/1000).toFixed(2).replace('.', ',') + 'M';
+      return Math.round(v) + 'k';
+    };
+    document.getElementById('ciiu-list').innerHTML = rows.map(r => `
+      <div class="ciiu-row">
+        <div class="cr-name">${r.nombre}</div>
+        <div class="ciiu-bar">
+          <div class="seg-m" style="width:${r.pctF.toFixed(1)}%"></div>
+          <div class="seg-h" style="width:${(100-r.pctF).toFixed(1)}%"></div>
+          <span class="pct-lbl">${r.pctF.toFixed(0)}% ♀</span>
+        </div>
+        <div class="ciiu-meta">
+          <span class="abs">${fmtK(r.muL)} mujeres</span>
+          <span class="trend ${r.trend}">${r.tArr} ${r.tTxt} · 2 años</span>
+        </div>
+      </div>`).join('');
+
+    // Takeaway
+    const top = rows[0], bot = rows[rows.length - 1];
+    const feminizandose = rows.filter(r => r.trend === 'up').sort((a,b)=>b.delta-a.delta)[0];
+    document.getElementById('ciiu-takeaway').innerHTML =
+      `Las mujeres son <strong>mayoría sólo en servicios</strong>: ${top.nombre.toLowerCase()} (${top.pctF.toFixed(0)}%) las concentra, ` +
+      `mientras que <strong>${bot.nombre.toLowerCase()}</strong> apenas tiene ${bot.pctF.toFixed(0)}% de mujeres. ` +
+      (feminizandose ? `El sector que más se está feminizando es <strong>${feminizandose.nombre.toLowerCase()}</strong> (+${feminizandose.delta.toFixed(1)}pp en 2 años). ` : '') +
+      `Esta segregación ocupacional es estructural y explica buena parte de la brecha de ingresos.`;
+  }
+
   // ─── TABLA 23 CIUDADES ────────────────────────────────────────────
   function getCitiesRows() {
     if (!DATA) return [];
@@ -742,6 +890,16 @@ body.day-mode::before {
     wireSort();
     renderChart();
     renderTable();
+    // CIIU (abrebocas sectorial) — fetch aparte, no bloquea lo demás
+    try {
+      const rc = await fetch(CIIU_URL, { cache: 'reload' });
+      if (rc.ok) { CIIU = await rc.json(); renderCiiu(); }
+      else throw new Error('HTTP ' + rc.status);
+    } catch (e) {
+      console.error('CIIU fetch fail:', e);
+      const el = document.getElementById('ciiu-list');
+      if (el) el.innerHTML = '<div class="loading">No se pudo cargar el desglose sectorial.</div>';
+    }
   }
 </script>
 </body>
