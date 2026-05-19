@@ -117,6 +117,8 @@
       <div class="kpi"><div class="kpi-n" id="k-part">—</div><div class="kpi-l">Participación media</div></div>
     </div>
 
+    <div class="card" id="legacy-note" hidden style="border-color:rgba(201,122,58,.4);background:rgba(201,122,58,.06);font-family:'DM Mono',monospace;font-size:.74rem;line-height:1.5;color:var(--warn)"></div>
+
     <div class="card">
       <div class="card-h">Promedio por candidato</div>
       <div class="card-s">Promedio del % que la gente le asigna a cada candidato sobre todas las respuestas. Cambia con el filtro de departamento.</div>
@@ -203,14 +205,49 @@
       reload();
     }
 
+    // Normaliza un pronóstico a la metodología del concurso: el NS/NR se
+    // reparte proporcionalmente entre los 6 candidatos + voto en blanco
+    // (ns → 0); "Otros" se deja como vino. Idempotente: los registros
+    // nuevos ya llegan con ns=0, así que no se alteran. Solo afecta a los
+    // enviados antes del ajuste de NS/NR. No se toca la base en KV: el
+    // dato crudo original se conserva en r._raw.
+    const NORM_GRP = ['ic','ae','pv','sf','cl','rb','bl'];
+    function normalizePcts(p){
+      if (!p) return p;
+      const o = { ...p };
+      const ns = +o.ns || 0;
+      if (ns > 0.001){
+        const G = NORM_GRP.reduce((s,id) => s + (+o[id]||0), 0);
+        if (G > 0){
+          NORM_GRP.forEach(id => { o[id] = +(((+o[id]||0) + ns*((+o[id]||0)/G))).toFixed(2); });
+          o.ns = 0;
+        }
+      }
+      return o;
+    }
+
     async function reload(){
       document.getElementById('tbody').innerHTML = '<tr><td class="empty" colspan="20">Cargando…</td></tr>';
       try {
         const r = await fetch(`${API_BASE}/pron/admin/all`, { headers: { 'Authorization': `Bearer ${tok}` } });
         if (!r.ok){ throw new Error('HTTP ' + r.status); }
         const data = await r.json();
-        ROWS = (data.pronosticos || []).filter(p => p && p.correo);
+        ROWS = (data.pronosticos || []).filter(p => p && p.correo).map(p => {
+          const raw = p.pcts || {};
+          const legacy = (+raw.ns || 0) > 0.01;     // enviado antes del ajuste
+          return { ...p, _raw: raw, _legacy: legacy, pcts: normalizePcts(raw) };
+        });
         RANKED = null;
+        const nLegacy = ROWS.filter(r => r._legacy).length;
+        const banner = document.getElementById('legacy-note');
+        if (banner){
+          if (nLegacy > 0){
+            banner.hidden = false;
+            banner.innerHTML = `⚠ ${nLegacy} pronóstico(s) se enviaron antes del ajuste de NS/NR. ` +
+              `Se normalizan automáticamente aquí (NS/NR repartido entre candidatos + blanco) ` +
+              `para que el ranking sea justo. El dato original se conserva intacto en el servidor.`;
+          } else { banner.hidden = true; }
+        }
         populateDeptoFilter();
         renderKPIs();
         renderAvgCands();
@@ -321,10 +358,13 @@
     function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
     function calcRanking(){
-      const off = { p: parseFloat(document.getElementById('off-p').value) };
+      let off = { p: parseFloat(document.getElementById('off-p').value) };
       let any = isFinite(off.p);
       CANDS.forEach(([id]) => { const v = parseFloat(document.getElementById('off-'+id).value); off[id] = v; if (isFinite(v)) any = true; });
       if (!any){ alert('Ingresa al menos un valor del resultado oficial.'); return; }
+      // El oficial se normaliza con la misma regla que los pronósticos
+      // (NS/NR repartido) para que la comparación sea simétrica.
+      off = Object.assign({ p: off.p }, normalizePcts(off));
       RANKED = ROWS.map(r => {
         const diffs = [];
         if (isFinite(off.p) && isFinite(+r.p)) diffs.push(Math.abs(off.p - (+r.p)));
