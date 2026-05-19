@@ -98,6 +98,20 @@
   .serie-labels { display:flex; justify-content:space-between; font-family:'DM Mono',monospace; font-size:.6rem; color:var(--text-meta); margin-top:.4rem; }
 
   .footer { margin-top:2.5rem; font-family:'DM Mono',monospace; font-size:.66rem; color:var(--text-meta); letter-spacing:.06em; }
+
+  .map-hint { color:var(--text-soft); font-size:.9rem; margin:0 0 .9rem; }
+  #map { height:540px; border:1px solid var(--border); border-radius:10px; background:var(--shell); }
+  #map .leaflet-interactive { cursor:pointer; }
+  .leaflet-tooltip.rr-tip {
+    background:rgba(13,17,28,.96) !important; border:1px solid var(--blue) !important;
+    color:#f4f3ef !important; font-family:'DM Mono',monospace !important; font-size:.74rem !important;
+    border-radius:6px !important; padding:.5rem .65rem !important; box-shadow:0 6px 20px rgba(0,0,0,.3) !important;
+  }
+  .leaflet-tooltip.rr-tip:before { display:none !important; }
+  .map-legend { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin-top:.9rem; }
+  .map-legend .li { display:flex; align-items:center; gap:.4rem; font-size:.8rem; color:var(--text-soft); }
+  .map-legend .sw { width:14px; height:14px; border-radius:3px; display:inline-block; }
+  .map-loading { padding:2rem 1rem; text-align:center; color:var(--text-meta); font-family:'DM Mono',monospace; font-size:.78rem; }
 </style>
 </head>
 <body>
@@ -142,6 +156,16 @@
   <div class="grid-2">
     <div class="panel"><h3>Top municipios <span class="tag" id="t-mun">live</span></h3><div id="bars-mun"></div></div>
     <div class="panel"><h3>Completaciones por día <span class="tag" id="t-serie">live</span></h3><div id="serie-wrap"></div></div>
+  </div>
+
+  <h2 class="section">Mapa de Colombia</h2>
+  <div class="panel">
+    <h3>Distribución territorial <span class="tag muted" id="t-map">bajo demanda</span></h3>
+    <p class="map-hint">Choropleth por departamento: candidato más declarado en cada zona. El mapa
+      carga Leaflet + el detalle geográfico solo cuando lo pides — así el dashboard se mantiene liviano.</p>
+    <button class="refresh-btn" id="btn-map">🗺  Ver mapa de Colombia</button>
+    <div id="map" style="display:none; margin-top:1rem;"></div>
+    <div class="map-legend" id="map-legend" style="display:none;"></div>
   </div>
 
   <h2 class="section">Últimos lectores</h2>
@@ -327,6 +351,110 @@ function render() {
     `Fuente: agregador test-presidencial-dashboard-agg · ventana ${DATA.ventana_dias||30} días · ` +
     `${total} respuestas en el segmento. Sin PII (ni email ni coordenadas ni la lectura personalizada).`;
 }
+
+// ── Mapa de Colombia (lazy: Leaflet + GeoJSON + aggregates-geo bajo demanda) ──
+const GEO_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/DEPARTAMENTOS2.json';
+const AGG_GEO_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/test-presidencial/dashboard/aggregates-geo.json';
+
+// Código electoral Registraduría → nombre canónico (fallback si el evento
+// viejo no trae dep_nombre). El match final contra el GeoJSON es por slug.
+const DEP_COD_NOMBRE = {
+  '01':'Antioquia','03':'Atlántico','05':'Bolívar','07':'Boyacá','09':'Caldas',
+  '11':'Cauca','12':'Cesar','13':'Córdoba','15':'Cundinamarca','16':'Bogotá',
+  '17':'Chocó','19':'Huila','21':'Magdalena','23':'Nariño','24':'Risaralda',
+  '25':'Norte de Santander','26':'Quindío','27':'Santander','28':'Sucre',
+  '29':'Tolima','31':'Valle del Cauca','40':'Arauca','44':'Casanare',
+  '46':'Putumayo','48':'San Andrés y Providencia','50':'Amazonas','52':'Guainía',
+  '54':'Guaviare','56':'Vaupés','60':'Vichada','64':'Caquetá','68':'La Guajira','72':'Meta',
+};
+function depKey(s){
+  if(!s) return '';
+  s = String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+  s = s.replace(/\bd\.?\s*c\.?\b/g,'').replace(/[^a-z\s]/g,'').replace(/\s+/g,' ').trim();
+  if(s.startsWith('bogota')) return 'bogota';
+  if(s.startsWith('valle')) return 'valle del cauca';
+  if(s.startsWith('san andres')) return 'san andres y providencia';
+  if(s.startsWith('norte de santander')) return 'norte de santander';
+  return s;
+}
+
+let _mapDone=false, _leafletP=null;
+function cargarLeaflet(){
+  if(window.L) return Promise.resolve();
+  if(_leafletP) return _leafletP;
+  _leafletP = new Promise((res,rej)=>{
+    const css=document.createElement('link');
+    css.rel='stylesheet'; css.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(css);
+    const js=document.createElement('script');
+    js.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    js.onload=()=>res(); js.onerror=()=>rej(new Error('Leaflet no cargó'));
+    document.head.appendChild(js);
+  });
+  return _leafletP;
+}
+
+async function cargarMapa(){
+  if(_mapDone) return;
+  const btn=$('#btn-map'), box=$('#map'), leg=$('#map-legend');
+  btn.disabled=true; btn.textContent='Cargando mapa…';
+  box.style.display='block'; box.innerHTML='<div class="map-loading">Cargando Leaflet y datos territoriales…</div>';
+  try{
+    const [_, geo, agg] = await Promise.all([
+      cargarLeaflet(),
+      fetch(GEO_URL,{cache:'force-cache'}).then(r=>r.json()),
+      fetch(AGG_GEO_URL+'?t='+Date.now(),{cache:'no-store'}).then(r=>r.json()),
+    ]);
+    // Índice de datos por nombre de depto
+    const idx={};
+    let conDatos=0;
+    for(const code in (agg.por_dep||{})){
+      const row=agg.por_dep[code];
+      const nom=(row.n && row.n!==code)?row.n:(DEP_COD_NOMBRE[code]||code);
+      const k=depKey(nom);
+      if(k){ idx[k]=row; conDatos+=row.total; }
+    }
+    box.innerHTML='';
+    const map=L.map(box,{zoomControl:true,attributionControl:false}).setView([4.6,-73.8],5);
+    function styleFor(f){
+      const row=idx[depKey(f.properties.name)];
+      if(!row||!row.cand_top) return {fillColor:'#e3ddd0',fillOpacity:.55,color:'#fff',weight:1};
+      const c=(CAND[row.cand_top]||{}).c||'#888';
+      return {fillColor:c,fillOpacity:.78,color:'#fff',weight:1};
+    }
+    L.geoJSON(geo,{
+      style:styleFor,
+      onEachFeature:(f,layer)=>{
+        const row=idx[depKey(f.properties.name)];
+        let html=`<b>${f.properties.name}</b><br>`;
+        if(row && row.cand_top){
+          html+=`${row.total} respuesta(s)<br>`+
+                `Candidato: <b>${(CAND[row.cand_top]||{}).n||row.cand_top}</b><br>`+
+                `Perfil top: ${(ARQ[row.arq_top]||{}).n||row.arq_top||'—'}`;
+        }else{ html+='<i>sin respuestas aún</i>'; }
+        layer.bindTooltip(html,{className:'rr-tip',sticky:true});
+        layer.on('mouseover',()=>layer.setStyle({weight:2.5}));
+        layer.on('mouseout',()=>layer.setStyle({weight:1}));
+      }
+    }).addTo(map);
+    // Leyenda
+    leg.style.display='flex';
+    leg.innerHTML = Object.keys(CAND).map(id=>
+      `<span class="li"><span class="sw" style="background:${CAND[id].c}"></span>${CAND[id].n}</span>`
+    ).join('') + `<span class="li"><span class="sw" style="background:#e3ddd0"></span>sin datos</span>`;
+    btn.style.display='none';
+    _mapDone=true;
+    if(conDatos===0){
+      leg.insertAdjacentHTML('afterbegin',
+        '<span class="li" style="color:var(--text-meta)">Aún sin respuestas geolocalizadas — el mapa se llena con el uso real.</span>');
+    }
+  }catch(e){
+    console.warn('[mapa]',e);
+    box.innerHTML='<div class="map-loading">No se pudo cargar el mapa: '+e.message+'</div>';
+    btn.disabled=false; btn.textContent='🗺  Reintentar';
+  }
+}
+$('#btn-map').addEventListener('click', cargarMapa);
 
 $('#scope').addEventListener('change', render);
 $('#refresh').addEventListener('click', load);

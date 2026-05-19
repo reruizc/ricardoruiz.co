@@ -389,6 +389,7 @@ def _emit_event(state, alineacion):
             "arq_sec": arq_sec.get("id"),
             "dep_cod": ubi.get("dep_cod"),
             "mun_cod": ubi.get("mun_cod"),
+            "dep_nombre": ubi.get("dep_nombre"),
             "mun_nombre": ubi.get("mun_nombre"),
             "barrio": _slug(ubi.get("barrio") or "") or None,
             "alineacion": alineacion,

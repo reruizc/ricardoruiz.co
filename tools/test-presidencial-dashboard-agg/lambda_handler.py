@@ -32,6 +32,9 @@ RESPONSES_PREFIX = os.environ.get("RESPONSES_PREFIX", "ricardoruiz.co/test-presi
 # Bajo congreso-2026/output/* — ese prefijo ya es público en la bucket policy
 # (los prefijos privados de test-presidencial-2026/* dan 403 a anónimos).
 OUT_KEY = os.environ.get("OUT_KEY", "ricardoruiz.co/congreso-2026/output/test-presidencial/dashboard/aggregates.json")
+# Archivo geo separado — pesado/granular, el dashboard lo carga solo al
+# pulsar "Ver mapa de Colombia" (lazy). Mantiene aggregates.json liviano.
+OUT_KEY_GEO = os.environ.get("OUT_KEY_GEO", "ricardoruiz.co/congreso-2026/output/test-presidencial/dashboard/aggregates-geo.json")
 VENTANA_DIAS = int(os.environ.get("VENTANA_DIAS", "30"))
 STREAM_N = int(os.environ.get("STREAM_N", "40"))
 
@@ -92,6 +95,9 @@ def _blank_scope():
         "por_mun": Counter(),                 # "dep-mun" -> n  (para top zonas)
         "mun_nombre": {},                     # "dep-mun" -> nombre
         "serie_dia": Counter(),               # YYYY-MM-DD -> n
+        # Detalle geográfico completo (alimenta aggregates-geo.json / mapa)
+        "geo_dep": {},                        # dep_cod -> {n,total,cand,arq}
+        "geo_mun": {},                        # "dep-mun" -> {n,dep,total,cand,arq}
     }
 
 
@@ -120,6 +126,28 @@ def _accumulate(scope, ev):
         scope["por_mun"][mk] += 1
         if ev.get("mun_nombre"):
             scope["mun_nombre"][mk] = ev["mun_nombre"]
+    # Geo detallado por depto y municipio (para el mapa)
+    if dep:
+        gd = scope["geo_dep"].setdefault(
+            dep, {"n": None, "total": 0, "cand": Counter(), "arq": Counter()})
+        gd["total"] += 1
+        if ev.get("dep_nombre"):
+            gd["n"] = ev["dep_nombre"]
+        if c:
+            gd["cand"][c] += 1
+        if a:
+            gd["arq"][a] += 1
+        if mun:
+            mk = f"{dep}-{mun}"
+            gm = scope["geo_mun"].setdefault(
+                mk, {"n": None, "dep": dep, "total": 0, "cand": Counter(), "arq": Counter()})
+            gm["total"] += 1
+            if ev.get("mun_nombre"):
+                gm["n"] = ev["mun_nombre"]
+            if c:
+                gm["cand"][c] += 1
+            if a:
+                gm["arq"][a] += 1
     ts = ev.get("ts") or ""
     if len(ts) >= 10:
         scope["serie_dia"][ts[:10]] += 1
@@ -158,6 +186,33 @@ def _finalize(scope):
             for mk, n in top_muns
         ],
         "serie_dia": dict(sorted(scope["serie_dia"].items())),
+    }
+
+
+def _finalize_geo(scope):
+    """Detalle geográfico completo para el mapa: TODOS los deptos y muns
+    (no solo el top 12). cand_top/arq_top pre-calculados."""
+    def pack(d):
+        out = {}
+        for code, v in d.items():
+            cand = v["cand"]; arq = v["arq"]
+            ct = cand.most_common(1)
+            at = arq.most_common(1)
+            row = {
+                "n": v.get("n") or code,
+                "total": v["total"],
+                "cand_top": ct[0][0] if ct else None,
+                "arq_top": at[0][0] if at else None,
+                "cand": dict(cand),
+                "arq": dict(arq),
+            }
+            if "dep" in v:
+                row["dep"] = v["dep"]
+            out[code] = row
+        return out
+    return {
+        "por_dep": pack(scope["geo_dep"]),
+        "por_mun": pack(scope["geo_mun"]),
     }
 
 
@@ -215,9 +270,28 @@ def handler(event, context):
             CacheControl="public, max-age=120",
         )
     except Exception as e:
-        print(f"[agg] WARN no se escribió S3: {e}")
+        print(f"[agg] WARN no se escribió S3 (aggregates): {e}")
+
+    # Archivo geo separado (lazy en el dashboard)
+    geo_out = {
+        "generado_en": out["generado_en"],
+        "ventana_dias": VENTANA_DIAS,
+        "cands": CANDS,
+        "arqs": ARQS,
+        **_finalize_geo(g),
+    }
+    try:
+        _s3c().put_object(
+            Bucket=S3_BUCKET, Key=OUT_KEY_GEO,
+            Body=json.dumps(geo_out, ensure_ascii=False).encode("utf-8"),
+            ContentType="application/json",
+            CacheControl="public, max-age=120",
+        )
+    except Exception as e:
+        print(f"[agg] WARN no se escribió S3 (geo): {e}")
     print(f"[agg] total={out['all']['total']} "
-          f"brands={list(out['por_brand'])} terrs={list(out['por_territorio'])}")
+          f"brands={list(out['por_brand'])} terrs={list(out['por_territorio'])} "
+          f"deps={len(geo_out['por_dep'])} muns={len(geo_out['por_mun'])}")
 
     # Si fue invocada por Function URL (HTTP) devolver el JSON con CORS;
     # EventBridge ignora la respuesta.
