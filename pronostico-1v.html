@@ -8458,19 +8458,29 @@
   }
 
   // PASO 8: compartir
+  // Link LIMPIO (sin params): quien lo abre arranca el wizard desde el
+  // inicio y hace SU pronóstico. Antes se compartía con ?ic=..&ae=..
+  // y el recién llegado caía en el mapa del que compartió, sin
+  // contexto. El "presumir" ahora va en el texto (sus 3 primeros).
   function buildShareUrl(){
-    const base = location.origin + location.pathname;
-    const params = new URLSearchParams();
-    params.set('p', (window.TURNOUT_PCT || 54).toFixed(1));
-    (window.CANDIDATOS||[]).forEach(c => {
-      params.set(c.id, c.pct.toFixed(2));
-    });
-    return base + '?' + params.toString();
+    return location.origin + location.pathname;
+  }
+  // "Cepeda 41%, Abelardo 28%, Paloma 18%" — top 3 candidatos reales
+  // del pronóstico de quien comparte (excluye blanco/NS-NR/Otros).
+  function _shareTop3(){
+    return (window.CANDIDATOS||[])
+      .filter(c => !['bl','ns','ot'].includes(c.id))
+      .slice().sort((a,b) => b.pct - a.pct)
+      .slice(0,3)
+      .map(c => `${WIZ_SHORT[c.id] || c.nombre} ${Math.round(c.pct)}%`)
+      .join(', ');
+  }
+  function buildShareText(){
+    return `Mi resultado es ${_shareTop3()}. Participa y gana si le atinas a quién gana la primera vuelta!`;
   }
   function renderSharePanel(){
-    const url = buildShareUrl();
     const el = $('wiz-share-url');
-    if (el) el.textContent = url;
+    if (el) el.textContent = buildShareUrl();
   }
 
   const _PRON_AUTH_BASE = 'https://rr-auth.reruizc.workers.dev';
@@ -8743,8 +8753,8 @@
   async function wizShareNative(){
     const url = buildShareUrl();
     const data = {
-      title: 'Mi pronóstico · Primera vuelta 2026',
-      text: 'Este es mi pronóstico para la primera vuelta presidencial 2026 — ¿cuál es el tuyo?',
+      title: 'Tu Pronóstico · Primera vuelta 2026',
+      text: buildShareText(),
       url: url
     };
     if (navigator.share){
@@ -8754,16 +8764,13 @@
     }
   }
   // ── Compartir en redes específicas ──
-  const SHARE_TEXT = 'Mi pronóstico para la 1ª vuelta presidencial 2026. ¿Cuál es el tuyo?';
   function wizShareWA(){
-    const url = buildShareUrl();
-    const msg = encodeURIComponent(`${SHARE_TEXT}\n${url}`);
+    const msg = encodeURIComponent(`${buildShareText()}\n${buildShareUrl()}`);
     window.open(`https://wa.me/?text=${msg}`, '_blank', 'noopener');
   }
   function wizShareX(){
-    const url = buildShareUrl();
-    const text = encodeURIComponent(SHARE_TEXT);
-    const u = encodeURIComponent(url);
+    const text = encodeURIComponent(buildShareText());
+    const u = encodeURIComponent(buildShareUrl());
     window.open(`https://twitter.com/intent/tweet?text=${text}&url=${u}`, '_blank', 'noopener');
   }
   async function wizShareIG(){
