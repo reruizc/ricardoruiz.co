@@ -1245,7 +1245,7 @@
         </div>
         <h2 class="wiz-qtext">Esto dice nuestro ponderador hoy</h2>
         <div class="wiz-pond-list" id="wiz-pond-list"></div>
-        <div class="wiz-pond-foot">Los % corresponden a la intención sobre el total que se asoma a votar.</div>
+        <div class="wiz-pond-foot">Esta es la foto de las encuestas hoy. Para <b>tu pronóstico</b> repartimos el <b>NS/NR</b> entre los candidatos —el 31 de mayo esa gente vota por alguien—; <b>«Otros»</b> (candidaturas por debajo del 1%) queda fijo. Tú ajustas los 6 candidatos y el voto en blanco.</div>
         <div class="wiz-actions">
           <button class="wiz-btn wiz-btn-ghost" onclick="wizPrev()">← Atrás</button>
           <button class="wiz-btn" onclick="wizNext()">Siguiente →</button>
@@ -4800,6 +4800,34 @@
     // NO re-ordenan durante la interacción para evitar que las tarjetas
     // salten mientras el usuario arrastra.
     CANDIDATOS.sort((a, b) => b.pct - a.pct);
+
+    // ── Renormalización para el concurso ──────────────────────────
+    // En una elección real no existe el "NS/NR": esa gente vota por
+    // alguien o vota en blanco. Para que el pronóstico sea comparable
+    // con el resultado oficial, repartimos el NS/NR proporcionalmente
+    // entre los 6 candidatos + voto en blanco. "Otros" (candidaturas
+    // <1%) SÍ existe en el tarjetón → queda fijo en su valor del
+    // ponderador. Guardamos antes una foto cruda para el paso de
+    // referencia (ahí sí se muestra el NS/NR de las encuestas).
+    window.PONDERADOR_CRUDO = CANDIDATOS.map(c => ({ ...c }));
+    (function _renormConcurso(){
+      const ns = CANDIDATOS.find(c => c.id === 'ns');
+      if (!ns || ns.pct <= 0) return;
+      const grupo = CANDIDATOS.filter(c => !['ns','ot'].includes(c.id)); // 6 cand + bl
+      const G = grupo.reduce((s,c) => s + c.pct, 0);
+      if (G <= 0) return;
+      const aRepartir = ns.pct;
+      grupo.forEach(c => { c.pct = +(c.pct + aRepartir * (c.pct / G)).toFixed(2); });
+      ns.pct = 0;
+      // Ajuste fino de redondeo: el sumatorio debe cerrar 100 con 'ot' fijo.
+      const total = CANDIDATOS.reduce((s,c) => s + c.pct, 0);
+      const drift = +(100 - total).toFixed(2);
+      if (Math.abs(drift) >= 0.01){
+        const top = grupo.slice().sort((a,b) => b.pct - a.pct)[0];
+        if (top) top.pct = +(top.pct + drift).toFixed(2);
+      }
+    })();
+
     BASE = CANDIDATOS.map(c => ({ ...c }));
     window.BASE = BASE;
   }
@@ -8111,8 +8139,11 @@
   // PASO 3: tarjetas del ponderador (con foto + barra de relleno)
   function renderPondList(){
     const wrap = $('wiz-pond-list');
-    if (!wrap || !window.CANDIDATOS) return;
-    const ordered = [...window.CANDIDATOS].sort((a,b)=>b.pct-a.pct);
+    // Foto cruda de las encuestas (con NS/NR y Otros). El pronóstico que
+    // hace el usuario después parte de la versión renormalizada.
+    const fuente = window.PONDERADOR_CRUDO || window.CANDIDATOS;
+    if (!wrap || !fuente) return;
+    const ordered = [...fuente].sort((a,b)=>b.pct-a.pct);
     // Normalizamos la barra contra el max para que el #1 quede al 100% del ancho.
     const maxPct = ordered[0]?.pct || 100;
     wrap.innerHTML = ordered.map(c => {
@@ -8360,20 +8391,11 @@
   // PASO 8: mapa
   let _mapInited = false;
   function renderMapaPanel(){
-    // Cierre suave del residual: si quedó <0 ó >0 abierto, ajustamos ns+ot
-    // proporcional al BASE para que CANDIDATOS sume 100 antes de repintar.
-    const r = calcResidual();
-    if (Math.abs(r) > 0.01){
-      const ns = _idCand('ns');
-      const ot = _idCand('ot');
-      if (ns && ot){
-        const baseNs = (window.BASE||[]).find(b=>b.id==='ns')?.pct || 4.43;
-        const baseOt = (window.BASE||[]).find(b=>b.id==='ot')?.pct || 2.11;
-        const totBase = baseNs + baseOt || 1;
-        ns.pct = Math.max(0, +(ns.pct + r*(baseNs/totBase)).toFixed(2));
-        ot.pct = Math.max(0, +(ot.pct + r*(baseOt/totBase)).toFixed(2));
-      }
-    }
+    // El residual ya viene cerrado: wizGotoMapa bloquea el paso si los
+    // 6 candidatos + blanco (con NS/NR repartido y "Otros" fijo) no
+    // suman 100. No tocamos ns/ot aquí — NS/NR debe quedar en 0 y
+    // "Otros" fijo en su valor del ponderador.
+
     // Inicializa el mapa solo cuando el panel ya está visible (con tamaño real).
     // Inicializarlo con display:none deja los polígonos mal proyectados.
     requestAnimationFrame(() => requestAnimationFrame(() => {

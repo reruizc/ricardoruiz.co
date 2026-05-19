@@ -81,15 +81,23 @@ def build():
     s.append(Paragraph("2. Premio y cómo se elige al ganador", H2))
     s.append(Paragraph(
         "Quien más se acerque al resultado oficial recibe <b>cien mil pesos "
-        "colombianos (COP $100.000)</b>. El criterio es objetivo, público y "
+        "colombianos (COP $100.000) más seis (6) meses gratis del plan "
+        "Premium</b> de la plataforma. El criterio es objetivo, público y "
         "replicable por cualquiera:", BODY))
     s.append(bullets([
         "Se toma el resultado oficial publicado por la Registraduría Nacional "
         "del Estado Civil para la primera vuelta presidencial 2026.",
+        "El pronóstico se compara sobre <b>los seis candidatos modelados, el "
+        "voto en blanco y la participación</b>. Como en una elección real no "
+        "existe el «no sabe / no responde», ese porcentaje de las encuestas se "
+        "reparte de forma proporcional entre esos renglones antes de empezar; "
+        "las candidaturas por debajo del 1% («Otros») se mantienen fijas en su "
+        "valor del ponderador. El resultado oficial se normaliza igual para "
+        "que la comparación sea simétrica.",
         "Para cada participante se calcula el <b>error absoluto medio (MAE)</b>: "
         "el promedio de la diferencia absoluta, en puntos porcentuales, entre "
-        "el porcentaje que pronosticó y el porcentaje real de cada candidato, "
-        "más el voto en blanco y la participación.",
+        "lo que pronosticó y el porcentaje real de cada candidato, más el voto "
+        "en blanco y la participación.",
         "Gana el participante con el <b>menor MAE</b>. Si hay empate a dos "
         "decimales, gana quien haya enviado primero su pronóstico (se usa la "
         "fecha de creación del registro).",
