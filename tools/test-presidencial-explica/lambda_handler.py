@@ -61,6 +61,10 @@ DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash")
 S3_BUCKET = os.environ.get("S3_BUCKET", "elecciones-2026")
 CACHE_PREFIX = os.environ.get("CACHE_PREFIX", "ricardoruiz.co/test-presidencial-2026/cache")
 RESPONSES_PREFIX = os.environ.get("RESPONSES_PREFIX", "ricardoruiz.co/test-presidencial-2026/responses")
+# Store SEPARADO de opt-in. NUNCA se mezcla con responses/ (que es anónimo
+# y sin PII). Aquí sí hay datos personales: solo de quien autorizó
+# explícitamente el contacto de campaña (Ley 1581).
+OPTIN_PREFIX = os.environ.get("OPTIN_PREFIX", "ricardoruiz.co/test-presidencial-2026/optin")
 HUELLA_KEY = os.environ.get("HUELLA_KEY", "ricardoruiz.co/congreso-2026/output/huella/huella-territorial.json")
 PROGRAMAS_KEY = os.environ.get("PROGRAMAS_KEY", "ricardoruiz.co/congreso-2026/output/test-presidencial/programas-candidatos.json")
 
@@ -480,6 +484,54 @@ def _cache_get(key):
         return None
 
 
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _save_optin(state):
+    """Guarda un opt-in de contacto de campaña en un store SEPARADO.
+    Datos personales (email/celular) — solo de quien autorizó. Nunca
+    toca responses/ (anónimo)."""
+    email = (state.get("email") or "").strip()
+    cel = re.sub(r"\D", "", (state.get("celular") or ""))
+    if not _EMAIL_RE.match(email):
+        return _err(400, "bad_email", "Correo inválido")
+    if len(cel) < 7:
+        return _err(400, "bad_cel", "Celular inválido")
+    try:
+        import uuid
+        now = datetime.now(timezone.utc)
+        canal = state.get("canal") or {}
+        rec = {
+            "ts": now.isoformat(),
+            "email": email,
+            "celular": cel,
+            "candidato": state.get("candidato"),
+            "registro": state.get("registro"),
+            "dep_cod": state.get("dep_cod"),
+            "mun_cod": state.get("mun_cod"),
+            "barrio": _slug(state.get("barrio") or "") or None,
+            "canal": {
+                "embed": bool(canal.get("embed")),
+                "brand": canal.get("brand") or None,
+                "territorio": canal.get("territorio") or None,
+            },
+            "consentimiento": True,
+            "base_legal": "Ley 1581/2012 — autorización explícita de contacto político",
+        }
+        key = (f"{OPTIN_PREFIX}/yyyy={now:%Y}/mm={now:%m}/dd={now:%d}/"
+               f"{now:%Y%m%dT%H%M%S}_{uuid.uuid4().hex[:12]}.json")
+        _s3_client().put_object(
+            Bucket=S3_BUCKET, Key=key,
+            Body=json.dumps(rec, ensure_ascii=False).encode("utf-8"),
+            ContentType="application/json",
+        )
+        print(f"[optin] guardado cand={rec['candidato']} dep={rec['dep_cod']} mun={rec['mun_cod']}")
+        return _ok({"ok": True})
+    except Exception as e:
+        print(f"[optin] ERROR: {type(e).__name__}: {e}")
+        return _err(500, "optin_failed", "No se pudo guardar")
+
+
 def _emit_event(state, alineacion):
     """Escribe un evento anónimo por completación del test, listable por fecha.
     SIN PII: no email (nunca se recibe), no lat/lon, no cod_puesto, no lectura.
@@ -677,6 +729,10 @@ def handler(event, context):
         state = json.loads(body) if isinstance(body, str) else body
     except Exception as e:
         return _err(400, "bad_json", f"Body no es JSON válido: {e}")
+
+    # Rama opt-in (consentimiento de contacto de campaña). No usa DeepSeek.
+    if state.get("accion") == "optin":
+        return _save_optin(state)
 
     # Validación mínima del state
     required = ["registro", "candidato", "arquetipo_dominante"]
