@@ -62,6 +62,21 @@ S3_BUCKET = os.environ.get("S3_BUCKET", "elecciones-2026")
 CACHE_PREFIX = os.environ.get("CACHE_PREFIX", "ricardoruiz.co/test-presidencial-2026/cache")
 RESPONSES_PREFIX = os.environ.get("RESPONSES_PREFIX", "ricardoruiz.co/test-presidencial-2026/responses")
 HUELLA_KEY = os.environ.get("HUELLA_KEY", "ricardoruiz.co/congreso-2026/output/huella/huella-territorial.json")
+PROGRAMAS_KEY = os.environ.get("PROGRAMAS_KEY", "ricardoruiz.co/congreso-2026/output/test-presidencial/programas-candidatos.json")
+
+# Temas de PRIO del test → palabras clave para casar con el "tema" de un eje
+PRIO_KEYWORDS = {
+    "seguridad": ["segur", "justicia", "crimen", "orden", "paz"],
+    "economia": ["econom", "fiscal", "empleo", "trabajo", "macro", "tribut"],
+    "salud": ["salud"],
+    "costo_vida": ["costo", "pobreza", "social", "cuidado", "vivienda", "ingreso"],
+    "anticorrupcion": ["corrup", "transparen"],
+    "exterior": ["exterior", "internacional", "política exterior"],
+    "agraria": ["campo", "agrar", "rural", "tierra"],
+    "instituciones": ["instituc", "constitu", "estado", "descentral", "democra"],
+    "educacion": ["educ", "ciencia", "tecnolog"],
+    "ambiente": ["ambient", "energ", "climá", "transición"],
+}
 CACHE_TTL_DIAS = int(os.environ.get("CACHE_TTL_DIAS", "14"))
 HTTP_TIMEOUT = 55
 
@@ -141,7 +156,7 @@ REGLAS:
 5. PROHIBIDO citar cifras electorales crudas (votación pasada, consultas, "huella 0.95×", nombres de quién ganó en su zona). Para el territorio usa SOLO el veredicto cualitativo y la intención proyectada del CONTEXTO DE LA ZONA, fraseados como ahí se indica.
    ✗ MAL: "tu municipio votó Petro 42.8%, Cepeda sacó 59.1% en la consulta 2025, huella 0.95×".
    ✓ BIEN: "a tu candidato le va regular porque, con el histórico y las encuestas, proyecta cerca de 18% en tu barrio".
-6. Usa el 'Marco del candidato' para conectar sus banderas con lo que el usuario prioriza. NO inventes propuestas de gobierno concretas que no estén en ese marco.
+6. Hay un bloque PROGRAMA OFICIAL con propuestas REALES del plan de gobierno del candidato. En el 2º párrafo, conecta lo que el usuario priorizó con 1-2 propuestas concretas de ese bloque (cítalas en lenguaje natural, ej: "su plan propone X"). Es la única fuente de propuestas: lo que NO esté en ese bloque NO existe — jamás inventes una propuesta.
 7. Solo el JSON, sin markdown ni texto extra."""
 
 
@@ -189,6 +204,72 @@ def _load_huella():
         print(f"[huella] WARN no cargo: {e}")
         _huella = {}
     return _huella
+
+
+_programas = None
+def _load_programas():
+    """Carga programas-candidatos.json (destilado de los PDFs oficiales),
+    cachea en memoria del contenedor warm."""
+    global _programas
+    if _programas is not None:
+        return _programas
+    try:
+        obj = _s3_client().get_object(Bucket=S3_BUCKET, Key=PROGRAMAS_KEY)
+        data = json.loads(obj["Body"].read().decode("utf-8"))
+        _programas = data.get("candidatos") or data
+        print(f"[programas] cargados: {list(_programas.keys())}")
+    except Exception as e:
+        print(f"[programas] WARN no cargo: {e}")
+        _programas = {}
+    return _programas
+
+
+def _format_programa_block(candidato_id, prio):
+    """Bloque del PROGRAMA REAL del candidato declarado. Compacto: slogan +
+    banderas + los ejes que casan con lo que el usuario priorizó. Estas SÍ
+    son propuestas oficiales — el modelo puede citarlas; lo que no esté aquí
+    no existe. Fallback a LENTE_CAND si el programa no cargó."""
+    progs = _load_programas()
+    p = (progs or {}).get(candidato_id)
+    cand_nom = CAND_NOMBRES.get(candidato_id, "el candidato")
+    if not p:
+        lente = LENTE_CAND.get(candidato_id, {})
+        if not lente:
+            return ""
+        return (f"PROGRAMA de {cand_nom} (marco posicional, sin propuestas "
+                f"específicas — NO inventes): {lente.get('lente','')} "
+                f"Habla de {lente.get('tono','')}")
+
+    lines = [f"PROGRAMA OFICIAL de {cand_nom} (propuestas REALES de su plan de "
+             f"gobierno — puedes citar las que conecten; lo que no esté aquí, NO existe):"]
+    if p.get("slogan"):
+        lines.append(f"- Lema: {p['slogan']}")
+    bands = (p.get("banderas") or [])[:5]
+    if bands:
+        lines.append("- Banderas: " + " | ".join(bands))
+    # Ejes que casan con la PRIO del usuario (lo que de verdad le importa)
+    ejes = p.get("ejes") or []
+    prio_kw = []
+    for t in (prio or []):
+        prio_kw += PRIO_KEYWORDS.get(t, [t])
+    elegidos = []
+    for e in ejes:
+        tema = (e.get("tema") or "").lower()
+        if any(kw in tema for kw in prio_kw):
+            elegidos.append(e)
+    for e in elegidos[:3]:
+        prop = e.get("propuestas", "")
+        if len(prop) > 360:
+            prop = prop[:360].rsplit(";", 1)[0] + "…"
+        lines.append(f"- En {e.get('tema')}: {prop}")
+    if not elegidos and ejes:
+        # Sin match con prio: dar los 2 primeros ejes como muestra
+        for e in ejes[:2]:
+            prop = e.get("propuestas", "")
+            if len(prop) > 280:
+                prop = prop[:280].rsplit(";", 1)[0] + "…"
+            lines.append(f"- En {e.get('tema')}: {prop}")
+    return "\n".join(lines)
 
 
 def _resolver_huella(huella, ubi):
@@ -286,7 +367,6 @@ def _format_huella_block(entry, level, candidato_id):
     veredicto = _veredicto(b_declarado)
     pct = _pct_proyectado(bias, candidato_id)
     cand_nom = CAND_NOMBRES.get(candidato_id, "el candidato")
-    lente = LENTE_CAND.get(candidato_id, {})
 
     lines = [
         "CONTEXTO DE LA ZONA (señal interna — NO cites números crudos, tradúcelos a lenguaje natural):",
@@ -304,11 +384,6 @@ def _format_huella_block(entry, level, candidato_id):
             f"Frasea exactamente así: \"a tu candidato {veredicto} porque, con el histórico y las encuestas, "
             f"proyecta cerca de {pct:.0f}% de intención en tu {unidad}\"."
         )
-    if lente:
-        lines.append(
-            f"- Marco del candidato (para conectar con lo que el usuario prioriza, NO inventes propuestas "
-            f"específicas de gobierno): {lente.get('lente','')} Habla de {lente.get('tono','')}"
-        )
 
     return "\n".join(lines)
 
@@ -317,7 +392,7 @@ def _format_huella_block(entry, level, candidato_id):
 # Bumpear cuando cambie el prompt/estructura de la lectura: invalida todo el
 # cache viejo sin tener que borrar S3 (las keys nuevas no colisionan con las
 # viejas, y las viejas expiran solas por TTL).
-PROMPT_VERSION = "v2-2026-05-19"
+PROMPT_VERSION = "v3-2026-05-19-prog"
 
 
 def _cache_key(state):
@@ -450,7 +525,9 @@ def _call_deepseek(state):
     # Resolver huella territorial del usuario
     huella = _load_huella()
     entry, level = _resolver_huella(huella, ubi)
-    huella_block = _format_huella_block(entry, level, (cand.get("id") or "").lower()) if entry else ""
+    cand_id = (cand.get("id") or "").lower()
+    huella_block = _format_huella_block(entry, level, cand_id) if entry else ""
+    programa_block = _format_programa_block(cand_id, prio)
 
     user_msg = f"""STATE:
 - Registro (tono): {registro} → {tono}
@@ -465,9 +542,12 @@ def _call_deepseek(state):
 """
     if huella_block:
         user_msg += "\n" + huella_block + "\n"
+    if programa_block:
+        user_msg += "\n" + programa_block + "\n"
     user_msg += ("\nRedacta la lectura en JSON estricto. RECUERDA: tono regional indicado (NO voseo argentino); "
                  "NO nombres el arquetipo ni des porcentajes (regla 4); NO cites cifras electorales crudas — "
-                 "usa el veredicto y la intención proyectada del CONTEXTO DE LA ZONA tal como se frasea ahí (regla 5).")
+                 "usa el veredicto y la intención proyectada del CONTEXTO DE LA ZONA tal como se frasea ahí (regla 5); "
+                 "en el 2º párrafo conecta lo que el usuario prioriza con 1-2 propuestas REALES del PROGRAMA OFICIAL (regla 6).")
 
     body = json.dumps({
         "model": DEEPSEEK_MODEL,
