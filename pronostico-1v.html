@@ -923,8 +923,11 @@
     body.day-mode .wiz-slider-name{color:#0a0a0a}
     .wiz-slider-party{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-top:.15rem}
     body.day-mode .wiz-slider-party{color:rgba(0,0,0,.45)}
-    .wiz-slider-pct{font-family:Avenir,sans-serif;font-weight:500;font-size:1.25rem;color:var(--white);font-variant-numeric:tabular-nums;min-width:62px;text-align:right}
+    .wiz-slider-pcwrap{display:flex;flex-direction:column;align-items:flex-end;min-width:96px}
+    .wiz-slider-pct{font-family:Avenir,sans-serif;font-weight:500;font-size:1.25rem;color:var(--white);font-variant-numeric:tabular-nums;text-align:right}
     body.day-mode .wiz-slider-pct{color:#0a0a0a}
+    .wiz-slider-votes{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.04em;color:var(--blue);text-align:right;margin-top:.18rem;white-space:nowrap}
+    body.day-mode .wiz-slider-votes{color:var(--blue)}
     .wiz-slider-range{width:100%;-webkit-appearance:none;appearance:none;background:transparent;cursor:none;margin-top:.55rem}
     .wiz-slider-range:focus{outline:none}
     .wiz-slider-range::-webkit-slider-runnable-track{height:6px;background:rgba(255,255,255,.10);border-radius:3px}
@@ -1130,7 +1133,7 @@
 </head>
 <body>
 
-  <nav class="electoral-nav">
+  <nav class="electoral-nav wiz-nav-min">
     <div style="display:flex;align-items:center;gap:1rem">
       <a href="electoral.html" class="e-btn-back">← Volver</a>
       <div id="e-nav-auth" class="electoral-nav-auth"></div>
@@ -8021,27 +8024,22 @@
     window.scrollTo({top:0, behavior:'smooth'});
   }
 
-  // Desde el paso 2 en adelante el nav completo (Volver / país / auth /
-  // logo) distrae del flujo. Lo ocultamos y dejamos solo el logo
-  // Ricardo.Ruiz centrado. En el paso 1 (intro) el nav va completo.
+  // El nav completo (Volver / país / auth / logo) distrae del flujo en
+  // TODO el wizard. Desde el primer paso dejamos solo el logo
+  // Ricardo.Ruiz centrado.
   let _wizNavLogo = null;
   function _wizSyncNav(n){
     const nav = document.querySelector('.electoral-nav');
     if (!nav) return;
-    if (n >= 2){
-      nav.classList.add('wiz-nav-min');
-      if (!_wizNavLogo){
-        // Clonamos el logo existente para tenerlo centrado y solo.
-        const logo = nav.querySelector('.logo-link');
-        _wizNavLogo = document.createElement('div');
-        _wizNavLogo.className = 'wiz-nav-logo';
-        _wizNavLogo.innerHTML = logo ? logo.outerHTML : '<span class="logo-text">Ricardo<span>.</span>Ruiz</span>';
-        nav.appendChild(_wizNavLogo);
-      }
-      nav.classList.add('show-wiz-logo');
-    } else {
-      nav.classList.remove('wiz-nav-min','show-wiz-logo');
+    nav.classList.add('wiz-nav-min');
+    if (!_wizNavLogo){
+      const logo = nav.querySelector('.logo-link');
+      _wizNavLogo = document.createElement('div');
+      _wizNavLogo.className = 'wiz-nav-logo';
+      _wizNavLogo.innerHTML = logo ? logo.outerHTML : '<span class="logo-text">Ricardo<span>.</span>Ruiz</span>';
+      nav.appendChild(_wizNavLogo);
     }
+    nav.classList.add('show-wiz-logo');
   }
   function wizNext(){ wizGoto(WIZ_STEP+1); }
   function wizPrev(){ wizGoto(WIZ_STEP-1); }
@@ -8179,6 +8177,17 @@
     ['c1','c2','bl'].forEach(updateResidualChip);
   }
 
+  // Votos estimados para un % dado: pct × (censo × participación).
+  // PADRON_NACIONAL está en millones (~41,3). Devuelve string corto.
+  function _wizVotosStr(pct){
+    const turnout = window.TURNOUT_PCT || 54;
+    const totM = PADRON_NACIONAL * turnout / 100;       // M de votantes
+    const v = (pct / 100) * totM;                        // M de votos
+    if (v >= 1)  return '≈ ' + v.toFixed(2).replace('.', ',') + ' M votos';
+    if (v > 0)   return '≈ ' + Math.round(v * 1000) + ' K votos';
+    return '0 votos';
+  }
+
   function refreshVisibleSliderValues(){
     document.querySelectorAll('[data-wiz-slider]').forEach(input => {
       const id = input.dataset.wizSlider;
@@ -8187,6 +8196,8 @@
       if (parseFloat(input.value) !== +c.pct.toFixed(1)) input.value = c.pct;
       const pctEl = document.querySelector('[data-wiz-pct="'+id+'"]');
       if (pctEl) pctEl.textContent = c.pct.toFixed(1) + '%';
+      const vEl = document.querySelector('[data-wiz-votes="'+id+'"]');
+      if (vEl) vEl.textContent = _wizVotosStr(c.pct);
     });
   }
 
@@ -8225,7 +8236,10 @@
             <div class="wiz-slider-name">${c.nombre}</div>
             <div class="wiz-slider-party">${c.partido}</div>
           </div>
-          <div class="wiz-slider-pct" data-wiz-pct="${id}">${c.pct.toFixed(1)}%</div>
+          <div class="wiz-slider-pcwrap">
+            <div class="wiz-slider-pct" data-wiz-pct="${id}">${c.pct.toFixed(1)}%</div>
+            <div class="wiz-slider-votes" data-wiz-votes="${id}">${_wizVotosStr(c.pct)}</div>
+          </div>
         </div>
         <input type="range" class="wiz-slider-range" data-wiz-slider="${id}" min="0" max="60" step="0.1" value="${c.pct}" oninput="wizSetCandPct('${id}', parseFloat(this.value))">
         <div class="wiz-slider-base">Ponderador: ${baseStr}%</div>
@@ -8249,7 +8263,10 @@
           <div class="wiz-slider-name">${c.nombre}</div>
           <div class="wiz-slider-party">Blanco / nulo</div>
         </div>
-        <div class="wiz-slider-pct" data-wiz-pct="bl">${c.pct.toFixed(1)}%</div>
+        <div class="wiz-slider-pcwrap">
+          <div class="wiz-slider-pct" data-wiz-pct="bl">${c.pct.toFixed(1)}%</div>
+          <div class="wiz-slider-votes" data-wiz-votes="bl">${_wizVotosStr(c.pct)}</div>
+        </div>
       </div>
       <input type="range" class="wiz-slider-range" data-wiz-slider="bl" min="0" max="20" step="0.1" value="${c.pct}" oninput="wizSetCandPct('bl', parseFloat(this.value))">
       <div class="wiz-slider-base">Ponderador: ${baseStr}%</div>
