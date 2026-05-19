@@ -95,6 +95,57 @@ body.day-mode::before {
 .kpi-big .sub { font-family:var(--sans); font-size:14px; color:var(--ink-2); margin-top:.35rem; }
 .kpi-big .sub em { font-family:var(--italic); font-style:italic; font-weight:600; color:var(--accent); }
 
+/* TOGGLE MACRO DE MODOS */
+.mode-bar { margin-top:2.5rem; padding-bottom:.5rem; }
+.mode-pills { display:flex; gap:.5rem; flex-wrap:wrap; border-bottom:2px solid var(--ink); padding-bottom:1rem; }
+.mode-pill {
+  font-family:var(--sans); font-weight:700; font-size:15px;
+  letter-spacing:-.01em; color:var(--ink-3);
+  padding:.6rem 1.1rem; border:1px solid var(--rule-strong);
+  background:transparent; border-radius:999px; cursor:none;
+  transition:background .2s,color .2s,border-color .2s;
+}
+.mode-pill:hover { color:var(--ink); border-color:var(--ink); }
+.mode-pill.active { color:var(--on-accent); background:var(--accent); border-color:var(--accent); }
+.mode-hint {
+  margin-top:.85rem; font-family:var(--italic); font-style:italic;
+  font-size:15px; color:var(--ink-2); line-height:1.5;
+}
+
+/* LECTURA automática (boletín por reglas) */
+.lectura {
+  padding:1.5rem 1.75rem; background:var(--paper-2);
+  border-left:3px solid var(--accent);
+  font-family:var(--italic); font-style:italic; font-weight:400;
+  font-size:18px; line-height:1.6; color:var(--ink);
+}
+.lectura b, .lectura strong { font-family:var(--sans); font-style:normal; font-weight:700; color:var(--accent); }
+
+/* Δ chips en tablas */
+.dlt { font-variant-numeric:tabular-nums; font-weight:700; }
+.dlt.up   { color:#3f9b5e; }
+.dlt.down { color:var(--accent); }
+.dlt.flat { color:var(--ink-3); }
+
+/* Ranking 2 columnas (modo ciudad) */
+.rank-2col { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+.rank-card { background:var(--paper); border:1px solid var(--rule-strong); }
+.rank-card-head {
+  padding:.85rem 1.25rem; border-bottom:1px solid var(--rule);
+  font-family:var(--mono); font-size:11.5px; font-weight:700;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--accent);
+}
+.rk-item {
+  display:grid; grid-template-columns:24px 1fr auto;
+  gap:.85rem; align-items:baseline;
+  padding:.6rem 1.25rem; border-bottom:1px dashed var(--rule);
+}
+.rk-item:last-child { border-bottom:none; }
+.rk-item .rk-n { font-family:var(--mono); font-size:12px; font-weight:700; color:var(--ink-3); }
+.rk-item .rk-city { font-family:var(--sans); font-weight:500; font-size:14.5px; color:var(--ink); }
+.rk-item .rk-d { font-family:var(--sans); font-weight:700; font-size:14.5px; font-variant-numeric:tabular-nums; }
+@media (max-width:760px){ .rank-2col { grid-template-columns:1fr; } }
+
 /* GLOSARIO pedagógico */
 .glosario { margin-top:3rem; }
 .glos-intro {
@@ -358,6 +409,81 @@ body.day-mode::before {
     </div>
   </section>
 
+  <!-- TOGGLE MACRO DE MODOS -->
+  <section class="mode-bar">
+    <div class="mode-pills" id="mode-pills">
+      <button class="mode-pill active" data-mode="general">Panorama general</button>
+      <button class="mode-pill" data-mode="mensual">Análisis del mes</button>
+      <button class="mode-pill" data-mode="ciudad">El mes · por ciudad</button>
+    </div>
+    <div class="mode-hint" id="mode-hint">Estructura, histórico y composición sectorial — la foto de fondo.</div>
+  </section>
+
+  <!-- ░░░ MODO MENSUAL ░░░ -->
+  <div id="mode-mensual" hidden>
+    <section class="s">
+      <div class="s-head">
+        <div class="s-kicker">Boletín del mes · <span id="mm-tm">—</span></div>
+        <h2 class="s-title">Qué pasó este mes con el <em>empleo femenino</em>.</h2>
+        <p class="s-dek">Comparativo del último trimestre móvil contra el mes anterior y contra el mismo mes del año pasado. Cifras directas del DANE — sin interpretación, solo variación.</p>
+      </div>
+      <div class="lectura" id="mm-lectura">—</div>
+      <table class="t-table" id="mm-table" style="margin-top:1.5rem">
+        <thead>
+          <tr>
+            <th>Indicador</th>
+            <th class="num">Mujeres</th>
+            <th class="num">vs mes anterior</th>
+            <th class="num">vs hace 1 año</th>
+            <th class="num">Hombres</th>
+            <th class="num">Brecha H−M</th>
+          </tr>
+        </thead>
+        <tbody id="mm-tbody"></tbody>
+      </table>
+      <div class="takeaway">
+        <div class="lbl">Cómo leerlo</div>
+        <div class="copy" id="mm-takeaway">—</div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ░░░ MODO MENSUAL · POR CIUDAD ░░░ -->
+  <div id="mode-ciudad" hidden>
+    <section class="s">
+      <div class="s-head">
+        <div class="s-kicker">El mes por ciudad · <span id="mc-tm">—</span></div>
+        <h2 class="s-title">Dónde <em>mejoró</em>, dónde <em>retrocedió</em> este mes.</h2>
+        <p class="s-dek">Variación de la participación laboral femenina (TGP ♀) en cada una de las 23 ciudades, frente al mes anterior. El GEIH del DANE no baja a departamento — la unidad territorial disponible es la ciudad / área metropolitana.</p>
+      </div>
+      <div class="lectura" id="mc-lectura">—</div>
+      <div class="rank-2col" style="margin-top:1.5rem">
+        <div class="rank-card">
+          <div class="rank-card-head">↑ Mayor mejora del mes</div>
+          <div id="mc-top"></div>
+        </div>
+        <div class="rank-card">
+          <div class="rank-card-head">↓ Mayor retroceso del mes</div>
+          <div id="mc-bot"></div>
+        </div>
+      </div>
+      <table class="t-table" id="mc-table" style="margin-top:2rem">
+        <thead>
+          <tr>
+            <th data-sort="ciudad">Ciudad</th>
+            <th class="num" data-sort="tgp_m">TGP ♀ ahora</th>
+            <th class="num" data-sort="d_mes">Δ vs mes anterior</th>
+            <th class="num" data-sort="d_ano">Δ vs hace 1 año</th>
+          </tr>
+        </thead>
+        <tbody id="mc-tbody"></tbody>
+      </table>
+    </section>
+  </div>
+
+  <!-- ░░░ MODO GENERAL ░░░ -->
+  <div id="mode-general">
+
   <!-- GLOSARIO PEDAGÓGICO -->
   <section class="s glosario">
     <div class="s-head">
@@ -482,6 +608,8 @@ body.day-mode::before {
       <div class="copy" id="cities-takeaway">—</div>
     </div>
   </section>
+
+  </div><!-- /mode-general -->
 
   <!-- DISCLAIMER -->
   <section class="disclaimer">
@@ -726,6 +854,149 @@ body.day-mode::before {
     document.getElementById('takeaway-copy').innerHTML = copy;
   }
 
+  // ─── MODOS (general / mensual / ciudad) ───────────────────────────
+  const MODE_HINT = {
+    general: 'Estructura, histórico y composición sectorial — la foto de fondo.',
+    mensual: 'Qué cambió este mes frente al anterior y frente a hace un año. Solo cifras DANE.',
+    ciudad:  'El mismo análisis del mes, ciudad por ciudad. 23 ciudades y áreas metropolitanas.'
+  };
+  let _mensualDone = false, _ciudadDone = false;
+  function switchMode(mode) {
+    document.querySelectorAll('.mode-pill').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    document.getElementById('mode-general').hidden  = (mode !== 'general');
+    document.getElementById('mode-mensual').hidden  = (mode !== 'mensual');
+    document.getElementById('mode-ciudad').hidden   = (mode !== 'ciudad');
+    document.getElementById('mode-hint').textContent = MODE_HINT[mode] || '';
+    if (mode === 'mensual' && !_mensualDone) { renderMensual(); _mensualDone = true; }
+    if (mode === 'ciudad'  && !_ciudadDone)  { renderCiudadMensual(); _ciudadDone = true; }
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }
+  function wireMode() {
+    document.querySelectorAll('.mode-pill').forEach(b => {
+      b.addEventListener('click', () => switchMode(b.dataset.mode));
+    });
+  }
+
+  // Helper: [valor actual, valor backN meses atrás, delta] sobre serie con nulos
+  function deltaBack(serie, backN) {
+    const valid = [];
+    for (let i = 0; i < serie.length; i++) if (serie[i] != null) valid.push([i, serie[i]]);
+    if (!valid.length) return [null, null, null];
+    const lastIdx = valid[valid.length - 1][0];
+    const now = valid[valid.length - 1][1];
+    let then = null;
+    for (let k = valid.length - 1; k >= 0; k--) {
+      if (lastIdx - valid[k][0] >= backN) { then = valid[k][1]; break; }
+    }
+    return [now, then, (then != null) ? now - then : null];
+  }
+  function dChip(d) {
+    if (d == null || isNaN(d)) return '<span class="dlt flat">—</span>';
+    const cls = d > 0.05 ? 'up' : (d < -0.05 ? 'down' : 'flat');
+    const arr = d > 0.05 ? '▲' : (d < -0.05 ? '▼' : '→');
+    const s = d > 0 ? '+' : (d < 0 ? '−' : '');
+    return `<span class="dlt ${cls}">${arr} ${s}${Math.abs(d).toFixed(1).replace('.', ',')}pp</span>`;
+  }
+  function verbo(d) {
+    if (d == null) return 'se mantuvo';
+    if (d > 0.05) return `subió ${Math.abs(d).toFixed(1).replace('.', ',')}pp`;
+    if (d < -0.05) return `bajó ${Math.abs(d).toFixed(1).replace('.', ',')}pp`;
+    return 'se mantuvo estable';
+  }
+
+  function renderMensual() {
+    if (!DATA) return;
+    const tm = DATA.actualizado_a;
+    document.getElementById('mm-tm').textContent = fmtTM(tm);
+    const m = DATA.nacional.mujeres, h = DATA.nacional.hombres;
+    const inds = [
+      ['Participación (TGP)', 'tgp'],
+      ['Ocupación (TO)', 'to'],
+      ['Desocupación (TD)', 'td'],
+    ];
+    let tb = '';
+    const dat = {};
+    inds.forEach(([label, k]) => {
+      const [mNow,, dMes] = deltaBack(m[k], 1);
+      const [, , dAno] = deltaBack(m[k], 12);
+      const hNow = lastNonNull(h[k]);
+      const brecha = (k === 'td') ? (mNow - hNow) : (hNow - mNow);
+      dat[k] = { mNow, dMes, dAno, hNow, brecha };
+      tb += `<tr>
+        <td><strong>${label}</strong></td>
+        <td class="num">${fmtPct(mNow)}</td>
+        <td class="num">${dChip(dMes)}</td>
+        <td class="num">${dChip(dAno)}</td>
+        <td class="num">${fmtPct(hNow)}</td>
+        <td class="num"><em>${(k==='td'?'+':'') }${fmtPP(brecha).replace('+','+')}</em></td>
+      </tr>`;
+    });
+    document.getElementById('mm-tbody').innerHTML = tb;
+
+    const meses = ['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    const [y, mo] = tm.split('-');
+    const mesNom = meses[parseInt(mo,10)];
+    const tgp = dat.tgp, td = dat.td;
+    document.getElementById('mm-lectura').innerHTML =
+      `En el trimestre móvil que cierra en <b>${mesNom} de ${y}</b>, la participación laboral femenina nacional se ubicó en <b>${fmtPct(tgp.mNow)}</b>: ` +
+      `${verbo(tgp.dMes)} frente al mes anterior y ${verbo(tgp.dAno)} frente a hace un año. ` +
+      `El desempleo femenino quedó en <b>${fmtPct(td.mNow)}</b> (${verbo(td.dMes)} en el mes). ` +
+      `La brecha de participación con los hombres sigue en <b>${fmtPP(tgp.brecha)}</b>.`;
+
+    document.getElementById('mm-takeaway').innerHTML =
+      `La columna <strong>“vs hace 1 año”</strong> es la que importa: las variaciones mes a mes son ruido estadístico ` +
+      `(el trimestre móvil se solapa). La señal real es la comparación interanual — si esa no se mueve, ` +
+      `la estructura no está cambiando, por más que el titular del mes diga otra cosa.`;
+  }
+
+  function cityRows() {
+    const out = [];
+    for (const city in DATA.ciudades) {
+      if (city.startsWith('TOTAL')) continue;
+      const c = DATA.ciudades[city];
+      const [tgpNow,, dMes] = deltaBack(c.mujeres.tgp, 1);
+      const [, , dAno] = deltaBack(c.mujeres.tgp, 12);
+      if (tgpNow == null) continue;
+      out.push({ ciudad: city, tgp_m: tgpNow, d_mes: dMes, d_ano: dAno });
+    }
+    return out;
+  }
+  function renderCiudadMensual() {
+    if (!DATA) return;
+    document.getElementById('mc-tm').textContent = fmtTM(DATA.actualizado_a);
+    const rows = cityRows();
+    const byMes = [...rows].filter(r => r.d_mes != null).sort((a,b) => b.d_mes - a.d_mes);
+    const top = byMes.slice(0, 5);
+    const bot = byMes.slice(-5).reverse();
+    const rkHtml = (items) => items.map((r, i) => `
+      <div class="rk-item">
+        <span class="rk-n">${String(i+1).padStart(2,'0')}</span>
+        <span class="rk-city">${r.ciudad}</span>
+        <span class="rk-d">${dChip(r.d_mes)}</span>
+      </div>`).join('');
+    document.getElementById('mc-top').innerHTML = rkHtml(top);
+    document.getElementById('mc-bot').innerHTML = rkHtml(bot);
+
+    const subieron = byMes.filter(r => r.d_mes > 0.05).length;
+    const bajaron  = byMes.filter(r => r.d_mes < -0.05).length;
+    const mejor = byMes[0], peor = byMes[byMes.length - 1];
+    document.getElementById('mc-lectura').innerHTML =
+      `Este mes la participación femenina mejoró en <b>${subieron}</b> de las 23 ciudades y retrocedió en <b>${bajaron}</b>. ` +
+      `La mayor mejora fue <b>${mejor.ciudad}</b> (${dChip(mejor.d_mes).replace(/<[^>]+>/g,'')}); ` +
+      `el mayor retroceso, <b>${peor.ciudad}</b> (${dChip(peor.d_mes).replace(/<[^>]+>/g,'')}). ` +
+      `Recordá que el movimiento de un solo mes es volátil — la lectura sólida es la tendencia de varios meses.`;
+
+    const tbody = document.getElementById('mc-tbody');
+    const all = [...rows].sort((a,b) => b.tgp_m - a.tgp_m);
+    tbody.innerHTML = all.map(r => `
+      <tr>
+        <td>${r.ciudad}</td>
+        <td class="num">${fmtPct(r.tgp_m)}</td>
+        <td class="num">${dChip(r.d_mes)}</td>
+        <td class="num">${dChip(r.d_ano)}</td>
+      </tr>`).join('');
+  }
+
   // ─── CIIU · empleo femenino por sector ────────────────────────────
   function lastN(arr, n) {
     // último valor no nulo y el valor ~n posiciones atrás (no nulo)
@@ -888,6 +1159,7 @@ body.day-mode::before {
     renderGlosario();
     wirePills();
     wireSort();
+    wireMode();
     renderChart();
     renderTable();
     // CIIU (abrebocas sectorial) — fetch aparte, no bloquea lo demás
