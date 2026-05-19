@@ -1338,7 +1338,7 @@
             <label for="wzf-depto">Departamento donde votas</label>
             <select id="wzf-depto" onchange="wizOnDeptoChange()"><option value="">— Selecciona —</option></select>
           </div>
-          <div class="wiz-field">
+          <div class="wiz-field" id="wzf-mun-wrap">
             <label for="wzf-mun">Municipio</label>
             <select id="wzf-mun" onchange="wizOnMunChange()" disabled><option value="">— Selecciona el departamento primero —</option></select>
           </div>
@@ -8497,11 +8497,25 @@
   async function wizOnDeptoChange(){
     const depName = $('wzf-depto')?.value || '';
     const munSel = $('wzf-mun');
+    const munWrap = $('wzf-mun-wrap');
     if (!munSel) return;
     munSel.innerHTML = '<option value="">— Selecciona —</option>';
     munSel.disabled = true;
+    if (munWrap) munWrap.hidden = false;
     $('wzf-comuna-wrap').hidden = true;
     if (!depName) { munSel.options[0].textContent = '— Selecciona el departamento primero —'; return; }
+
+    // Bogotá: no tiene sentido preguntar municipio (es uno solo).
+    // Ocultamos el campo municipio, lo fijamos internamente y vamos
+    // directo a Localidad.
+    if (_wizNorm(depName).startsWith('bogota')){
+      munSel.innerHTML = '<option value="Bogotá D.C." selected>Bogotá D.C.</option>';
+      munSel.disabled = false;
+      if (munWrap) munWrap.hidden = true;     // no se muestra el paso municipio
+      wizOnMunChange();                        // dispara el drill de Localidad
+      return;
+    }
+
     const d = await _wizLoadDivipola();
     const dep = (d.deptos || []).find(x => x.nombre === depName);
     if (!dep || !dep.muns || !dep.muns.length){
@@ -8545,6 +8559,42 @@
     if (txt && html != null) txt.innerHTML = html;
   }
 
+  // Nombres/apellidos basura más comunes (normalizados sin tildes).
+  const _WIZ_NOMBRE_BLACKLIST = new Set([
+    'john','doe','johndoe','jane','janedoe','test','testing','tester',
+    'prueba','pruebas','asd','asdf','asdfg','asdfgh','qwerty','qwe',
+    'nombre','apellido','sinnombre','sin','ninguno','ninguna','nadie',
+    'fulano','mengano','sutano','zutano','perengano','pepito','pepe',
+    'ejemplo','usuario','user','admin','administrador','anonimo','anon',
+    'aaa','aaaa','xxx','xxxx','zzz','abc','abcd','lorem','ipsum','hola',
+  ]);
+  // Valida un campo (nombre o apellido) individual. Mín 2 letras porque
+  // hay nombres/apellidos reales de 3 letras (Ana, Eva, Paz, Roa, Cid).
+  // La exigencia de longitud combinada se hace en wizSubmitDatos.
+  function _wizNombreValido(s){
+    const v = String(s||'').trim();
+    if (v.length < 2) return false;
+    if (!/^[A-Za-zÀ-ÿ'’\-\.\s]+$/.test(v)) return false;     // sin dígitos/símbolos
+    const norm = _wizNorm(v).replace(/[^a-z\s]/g,'');
+    const flat = norm.replace(/\s+/g,'');
+    if (flat.length < 2) return false;
+    if (_WIZ_NOMBRE_BLACKLIST.has(flat)) return false;
+    if (norm.split(/\s+/).filter(Boolean).every(w => _WIZ_NOMBRE_BLACKLIST.has(w))) return false;
+    if (/^(.)\1+$/.test(flat)) return false;                 // aaaa, xxxx
+    if (new Set(flat).size < 2) return false;                // ≥2 letras distintas
+    return true;
+  }
+  // WhatsApp: 10 dígitos para Colombia, o prefijo internacional (+57,
+  // +1, etc.) con 8–15 dígitos en total.
+  function _wizWhatsappValido(s){
+    const v = String(s||'').trim().replace(/[\s\-().]/g,'');
+    if (v.startsWith('+')){
+      const d = v.slice(1);
+      return /^\d{8,15}$/.test(d);
+    }
+    return /^\d{10}$/.test(v);
+  }
+
   // Enviar el pronóstico + datos al backend (concurso abierto, sin login).
   async function wizSubmitDatos(){
     const errEl = $('wiz-form-err');
@@ -8562,16 +8612,22 @@
     const consent  = $('wzf-consent')?.checked;
 
     if (!nombre)   return showErr('Escribe tu nombre.');
+    if (!_wizNombreValido(nombre))   return showErr('Escribe tu nombre real (solo letras, sin nombres de ejemplo).');
     if (!apellido) return showErr('Escribe tu apellido.');
+    if (!_wizNombreValido(apellido)) return showErr('Escribe tu apellido real (solo letras, sin apellidos de ejemplo).');
+    if ((nombre + apellido).replace(/\s+/g,'').length < 6) return showErr('El nombre y apellido juntos son muy cortos. Escribe tu nombre completo.');
     if (!depto)    return showErr('Selecciona el departamento.');
-    // Municipio obligatorio salvo que el depto no tenga lista (ej. Exterior).
+    // Municipio obligatorio salvo que el depto no tenga lista (ej. Exterior)
+    // o sea Bogotá (su campo se oculta y se fija internamente).
     const munSelEl = $('wzf-mun');
+    const munWrapEl = $('wzf-mun-wrap');
     const munHasOpts = munSelEl && [...munSelEl.options].some(o => o.value);
-    if (munHasOpts && !municipio) return showErr('Selecciona tu municipio.');
+    const munRequired = munHasOpts && munWrapEl && !munWrapEl.hidden;
+    if (munRequired && !municipio) return showErr('Selecciona tu municipio.');
     const comWrap = $('wzf-comuna-wrap');
     if (comWrap && !comWrap.hidden && !comuna) return showErr('Selecciona tu comuna o localidad.');
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) return showErr('El correo no parece válido.');
-    if (whatsapp.replace(/\D/g,'').length < 7) return showErr('El WhatsApp no parece válido.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) return showErr('El correo debe ser válido e incluir una arroba (@).');
+    if (!_wizWhatsappValido(whatsapp)) return showErr('El WhatsApp debe tener 10 dígitos (o incluir el indicativo del país, ej. +57 300 1234567).');
     if (!consent)  return showErr('Necesitamos tu autorización para contactarte si ganas.');
 
     const btn = $('wiz-datos-submit');
