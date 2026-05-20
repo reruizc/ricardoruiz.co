@@ -1622,38 +1622,139 @@ aws s3 cp "Bases de datos/output_huella/huella-territorial.json" \
 Cache S3 del frontend dura 5 min — si necesitas invalidar antes,
 bumpear un `?v=YYYYMMDD` en `HUELLA_URL`.
 
+### Estado al 2026-05-20 (snapshot de handoff)
+
+Calendario en marcha: **1ª vuelta el 31 de mayo de 2026**, 2ª vuelta el
+21 de junio. El módulo cubre **solo 1ª vuelta**; la 2ª sería un módulo
+aparte (decisión de Ricardo).
+
+**En producción (todo desplegado y verificado):**
+
+- **Pantalla welcome inicial** — único panel al abrir el test.
+  Título *"¿De qué te sirve votar por **tu candidato** en tu barrio o
+  vereda?"*, subtítulo expandido (qué le beneficia + proyecciones +
+  qué propone su candidato), hint con cita a la **Ley 1581 de 2012**
+  (habeas data, +20% de tamaño), botón "Empecemos →". Se eliminó el
+  `.head-wrap` global; los pasos siguientes traen su propio header de
+  paso. Aplica a formato general y embed.
+- **Pregunta de registro renombrada**: *"¿Cómo te sientes más cómodo
+  respondiendo? Escoge un modelo."*
+- **Embed El País Cali** (`?embed=1&brand=elpais&territorio=valle`):
+  paleta El País (Lato, azul `#0067b1`, esquinas a 2px), barra de marca
+  full-bleed con **logo oficial de El País centrado** + "POWERED BY ·
+  Ricardo.Ruiz" a la derecha (mismo lockup del header del test normal).
+  Logo a 80 px desktop / stack vertical en móvil ≤640 px.
+  Logo en S3: `…/test-presidencial/brand/elpais-logo.png`.
+- **Programa real del candidato** inyectado al prompt de DeepSeek según
+  prioridades del usuario. JSON destilado de los 10 PDFs oficiales
+  (`Bases de datos/programas_candidatos/`) → 6 candidatos cubiertos,
+  Miguel Uribe sobra. Roy solo tiene 4 sectoriales (declarado en `nota`).
+  Pipeline: `tools/build-apoyo-reco/build.py` parsea
+  `apoyo-recomendaciones.txt` y regenera el JSON; mismo patrón con
+  `programas-candidatos.json`. Validado: el bloque de Abelardo línea
+  por línea contra el PDF — 100% fiel, cero invención.
+- **Lectura DeepSeek (v4 del prompt)**: NO nombra el arquetipo ni da
+  porcentajes; explica el perfil en lenguaje natural. NO cita cifras
+  electorales crudas; usa veredicto cualitativo (*"le va muy bien /
+  bien / regular / la tiene difícil"*) + **% proyectado** en su barrio
+  (`POND_NAC × bias` renormalizado). Aterriza una propuesta al nombre
+  del barrio + censo (microdato real), **sin inventar rasgos** del
+  territorio (regla 7, prohibido inventar "inseguridad/pobreza" no
+  declaradas). `PROMPT_VERSION` versionado para invalidar cache al
+  cambiar el prompt.
+- **Adherencia de tono determinista** — `_voseo_a_tuteo()` con
+  diccionario CERRADO (formas voseo presente con tilde + vos/sos)
+  aplicado solo si tono ∈ {tuteo_neutro, tuteo_costeño}. No depende del
+  modelo, sin falsos positivos.
+- **Persistencia + dashboard live**:
+  · `_emit_event` escribe un evento anónimo por completación a
+    `responses/yyyy=Y/mm=M/dd=D/{ts}_{uuid}.json` (sin PII).
+  · Lambda agregadora (`test-presidencial-dashboard-agg`) con
+    **EventBridge cada 5 min** → `aggregates.json` (resumen liviano)
+    y `aggregates-geo.json` (todos los deptos y muns) en prefijo
+    público `congreso-2026/output/test-presidencial/dashboard/`.
+  · `dashboard-general.html` — selector de scope (todo/medio/territorio)
+    + KPIs + cruce candidato×arquetipo + top municipios + serie diaria
+    + stream + **mapa Colombia lazy** (botón "Ver mapa", carga Leaflet
+    + GeoJSON + geo solo al pulsarlo).
+  · `elpais-cali-dashboard.html` consume el mismo `aggregates.json`
+    filtrado a `por_brand.elpais` (fallback a `por_territorio.valle`).
+- **Botones de compartir** (general + embed): WhatsApp / X / copiar /
+  Web Share. Comparten el `mensaje_corto` de DeepSeek.
+- **Párrafo de apoyo según posición del candidato en el barrio**
+  (template determinista cliente-side, 0 latencia) + **botón "Cómo
+  apoyar"** que carga la matriz registro × arquetipo de
+  `apoyo-recomendaciones.json` (incluye hashtags por candidato).
+- **Opt-in con datos para campaña** (rompe el modelo anónimo solo si el
+  user lo autoriza): email + celular + checkbox Ley 1581, va a un store
+  S3 separado `opt-in/`. PII aislada del flujo anónimo.
+
+**Latencia DeepSeek:** ~23-26 s cache miss · ~1 s cache hit. Cerca del
+límite del API Gateway (30 s); el **pre-fetch** del frontend lo cubre
+(la lectura se pide en background mientras el user ve el gráfico del
+barrio, ~10-15 s).
+
+**Marco legal verificado (fuente Registraduría + CNE):**
+- 1ª vuelta presidencial **31 may 2026**, 2ª vuelta 21 jun 2026.
+- Veda general de encuestas: 1 semana antes (último día de publicación
+  para 1ª vuelta = 24 may 2026; del 25 al 31, veda).
+- **Ley 2494 de 2025** (encuestas electorales) — exige muestra
+  probabilística + auditable + registro CNE. El test es audiencia
+  autoseleccionada, NO califica como encuesta. Distingue "sondeo" pero
+  el disparador es la **publicación** de cualquier estudio cuantitativo
+  con propósito electoral. Por eso el tablero se vende como
+  **inteligencia editorial INTERNA** (no se activa la ley) y publicar
+  cifras al aire queda a criterio de la jurídica del medio.
+
+**Entregable comercial:** `Bases de datos/test-presidencial/elpais-propuesta-test-presidencial.pdf`
+— 1.5 páginas, generado con `tools/build-elpais-propuesta/build.py`.
+Tono comercial, identidad El País, encuadre legal correcto (test +
+inteligencia editorial, NO publicación de sondeo).
+
 ### Lo que falta (pendientes activos)
 
 1. **Memes procedurales** — 30 imágenes (6 candidatos × 5 arquetipos),
-   1080×1080 sin texto encima. Ricardo los genera. Render en canvas
-   con `mensaje_corto` superpuesto + botón compartir. Ver
-   `Bases de datos/test-presidencial/memes-spec.txt` para concepto de
-   cada celda.
-
+   1080×1080 JPG sin texto encima. Ricardo los va generando.
+   Naming: `{candidato}-{arquetipo}.jpg` (ej `cepeda-proteccion.jpg`).
+   Local: `Bases de datos/test-presidencial/memes/` (gitignored).
+   S3: `congreso-2026/output/test-presidencial/memes/` (prefijo
+   público). Brief y referentes culturales por arquetipo en
+   `memes-spec.txt`. Cuando haya ≥1 set completo, prender el módulo
+   de "compartir como meme" (canvas que pinta el mensaje_corto +
+   watermark + descarga PNG / compartir).
 2. **Revisión humana del banco de preguntas** — Ricardo edita el Excel
-   `Bases de datos/test-presidencial/banco-preguntas-v1.xlsx` (12 hojas).
-   Solo edita columna `enunciado`. Falta escribir `xlsx_to_json.py`
-   para reintegrar al JSON.
-
-3. **Embed para El País Cali** — `?embed=1&brand=elpais&territorio=valle`
-   con paleta + tipografía del medio + filtro territorial. Dashboard
-   `elpais-cali-dashboard.html` con resultados en tiempo real para ellos.
+   `banco-preguntas-v1.xlsx`. Falta `xlsx_to_json.py` (script inverso)
+   para reintegrar al JSON canónico.
+3. **Contactar a El País Cali** — enviar la propuesta PDF y arrancar
+   el embed antes del 24 de mayo idealmente. Lanzar 20-23 may, correr
+   hasta 31 may.
+4. **Iterar el prompt de DeepSeek** según comportamiento real (la
+   adherencia de tono ya está blindada por post-proceso; la regla de
+   no inventar rasgos del barrio funciona bien; vigilar la latencia
+   contra el límite de 30 s).
 
 ### Convenciones del módulo
 
-- **Cuando edites el banco**: editar el JSON canónico en
-  `Bases de datos/test-presidencial/` y subir a S3 con
-  `aws s3 cp ... s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/test-presidencial/`.
-  Los JSON son gitignored, no van al repo.
-- **Cuando actualices la Lambda**: zip + `aws lambda update-function-code`.
-  El zip vive en `/tmp/lambda-test-explica.zip` durante deploy.
-- **No metas el voseo argentino**. El usuario Ricardo está en Bogotá,
-  prefiere tuteo. Para textos del banco el lente lo da el candidato +
-  el registro + el tono regional (paisa/caleño/boyacense/etc.).
-  Argentinismos NUNCA: ni "che", ni "vos sos", ni "tenés que laburar".
+- **Datos del módulo viven en `Bases de datos/test-presidencial/`**
+  (gitignored). Solo el código va al repo. Los JSON/PNG/PDF se suben
+  a S3 con `aws s3 cp`. Prefijo público:
+  `s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/test-presidencial/`
+  (NO `test-presidencial-2026/*`, ese da 403 anónimo).
+- **El `.txt` es la fuente de verdad** para listas editables por
+  Ricardo (apoyo-recomendaciones, memes-spec). Un script en `tools/`
+  parsea el `.txt` y regenera el `.json` con validación dura. Patrón:
+  editar `.txt` → `python3 tools/build-…/build.py` → `aws s3 cp`.
+- **Cuando actualices la Lambda explica**: zip + `aws lambda
+  update-function-code`. Si cambias el SYSTEM_PROMPT, **bumpea
+  `PROMPT_VERSION`** (entra al `_cache_key`) para invalidar cache v
+  anterior. Cache TTL 14 días.
+- **No metas el voseo argentino**. Para tuteo neutro/costeño la red
+  determinista `_voseo_a_tuteo` ya lo blinda. Para textos del banco el
+  tono regional viene del `tono_regional` del state.
 - **El prompt sistémico de la Lambda** está en `tools/test-presidencial-explica/lambda_handler.py`
-  líneas 71-92. Es corto a propósito — V4 consume reasoning con prompts
-  largos. Si quieres ampliarlo, mide el tiempo después.
+  buscar `SYSTEM_PROMPT = `. Es corto a propósito — V4 consume reasoning
+  con prompts largos. Si lo amplías, mide la latencia después (límite
+  blando 30 s por API Gateway).
 
 ## Convenciones de commit
 ```
