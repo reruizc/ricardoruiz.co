@@ -919,7 +919,7 @@
           <div class="dl-btn-group">
             <button class="dl-btn" id="dl-btn" onclick="onDownloadTopCSV()">
               <span class="dl-ico" aria-hidden="true">⬇</span>
-              <span class="dl-label">Lista (CSV)</span>
+              <span class="dl-label">Lista (Excel)</span>
             </button>
             <button class="dl-btn dl-btn-pdf" id="dl-btn-pdf" onclick="onDownloadTopPDF()" style="display:none">
               <span class="dl-ico" aria-hidden="true">📄</span>
@@ -1382,39 +1382,121 @@
         renderDlCounter();
         return;
       }
-      _buildAndDownloadCSV(full);
+      await _buildAndDownloadXLSX(full);
       renderDlCounter();
     } finally {
       if (btn) btn.disabled = false;
     }
   }
 
-  function _buildAndDownloadCSV(items){
+  // Construye un .xlsx con DOS hojas: "Metodología" (cómo leer cada
+  // columna — clave porque la métrica cambia de significado según el
+  // nivel) y "Datos" (la lista completa del scope visible con columnas
+  // territoriales separadas, censo y ambas métricas pp). Reemplaza al
+  // CSV legacy que confundía a usuarios cuando Excel ES leía el punto
+  // decimal como separador de miles.
+  async function _buildAndDownloadXLSX(items){
     const meta = STATE._topMeta || { unitLabel:'territorio', scope:'oportunidad' };
     const cand = CANDIDATOS.find(c => c.id === STATE.candId);
     const candName = cand ? cand.nombre : '—';
     const fecha = new Date().toISOString().slice(0,10);
-    const esc = (v) => {
-      if (v == null) return '';
-      const s = String(v);
-      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
-    };
-    const header = ['candidato','scope','unidad','rank','nombre','contexto','contribucion_pp','fecha_export'];
-    const rows = items.map((r,i) => [
-      candName, meta.scope, meta.unitLabel, i+1, r.name, r.sub || '',
-      (r.contrib != null ? r.contrib.toFixed(4) : ''), fecha,
+
+    const XLSX = await loadXLSX();
+    const wb = XLSX.utils.book_new();
+
+    // ── Hoja 1 · Metodología ──────────────────────────────────────────
+    // Texto crudo en filas; primera columna ancha. La meta es que el
+    // cliente abra el archivo, vea esta hoja primero y entienda qué
+    // significa cada columna ANTES de mirar los datos.
+    const metaRows = [
+      ['Módulo Oportunidad · ricardoruiz.co'],
+      [`Candidato: ${candName}`],
+      [`Scope: ${meta.scope}  ·  Nivel: ${meta.unitLabel}`],
+      [`Fecha de descarga: ${fecha}`],
+      [''],
+      ['CÓMO LEER ESTE ARCHIVO'],
+      [''],
+      ['Las columnas territoriales (departamento, municipio, comuna_upl,'],
+      ['localidad, barrio, puesto) se llenan según el nivel del scope que'],
+      ['descargaste. Las que no aplican quedan vacías.'],
+      [''],
+      ['Las dos columnas de métrica son distintas — léelas con cuidado:'],
+      [''],
+      ['• aporte_nacional_pp'],
+      ['    Contribución del territorio al crecimiento NACIONAL del candidato,'],
+      ['    expresada en puntos porcentuales (pp). Calculado como:'],
+      ['        gap_local × censo_local / censo_nacional'],
+      ['    Valores típicos: 0,001 a 0,5 pp por territorio.'],
+      ['    La suma de todos los territorios del país ≈ 1–2 pp (el techo de'],
+      ['    crecimiento nacional del candidato vía NS-NR y transferencias).'],
+      ['    En la vista de PUESTOS este valor suele ser muy chico (un puesto'],
+      ['    individual aporta marginalmente al total país).'],
+      [''],
+      ['• crecimiento_local_pp'],
+      ['    Crecimiento proyectado del candidato DENTRO de ese territorio,'],
+      ['    en puntos porcentuales (pp). NO ponderado por censo.'],
+      ['    Valores típicos: 0 a ~30 pp.'],
+      ['    Útil para identificar dónde el candidato tiene espacio para crecer'],
+      ['    localmente (más alto = más oportunidad relativa al tamaño del'],
+      ['    territorio). En la vista de PUESTOS rankeamos por esta métrica.'],
+      [''],
+      ['IMPORTANTE'],
+      ['Estas columnas están en pp (porcentaje), NO en votos. No las sumes'],
+      ['como si fueran votos absolutos. Para estimar votos proyectados usa:'],
+      ['        votos ≈ (proj% + crecimiento_local_pp) × censo / 100'],
+      ['donde proj% es la proyección base del candidato en el territorio'],
+      ['(no incluida en esta descarga — disponible en el panel detalle del'],
+      ['módulo, formato "X% → Y%").'],
+      [''],
+      ['• censo'],
+      ['    Potencial electoral del territorio (Divipole 2026 cuando está'],
+      ['    disponible, censo histórico cuando no). Es el denominador para'],
+      ['    convertir pp a votos.'],
+      [''],
+      ['METODOLOGÍA RESUMIDA'],
+      [''],
+      ['gap_local(C, M) = proj_base(C) × bias_C(M) × NS-NR/sumDeclarado'],
+      ['                + Σ_donor xfer × pondPct(donor) × bias_donor(M)'],
+      [''],
+      ['donde bias_C(M) = afinidad local del candidato / afinidad nacional,'],
+      ['ponderado por 4 fuentes históricas (pres-22, congreso-26, pres-18,'],
+      ['consultas) con pesos editables en el panel del módulo.'],
+      [''],
+      ['Documentación completa: https://ricardoruiz.co/oportunidad.html'],
+      ['Detalle metodológico: https://ricardoruiz.co/previa-1v.html'],
+    ];
+    const wsMeta = XLSX.utils.aoa_to_sheet(metaRows);
+    wsMeta['!cols'] = [{ wch: 80 }];
+    XLSX.utils.book_append_sheet(wb, wsMeta, 'Metodología');
+
+    // ── Hoja 2 · Datos ────────────────────────────────────────────────
+    const header = [
+      'candidato','scope','nivel','rank','nombre',
+      'departamento','municipio','comuna_upl','localidad','barrio','puesto',
+      'censo','aporte_nacional_pp','crecimiento_local_pp',
+      'fecha_export',
+    ];
+    const num4 = (n) => (n == null || isNaN(n)) ? null : Number(n.toFixed(4));
+    const rows = items.map((r, i) => [
+      candName, meta.scope, r.level || meta.unitLabel, i + 1, r.name || '',
+      r.dep || '', r.mun || '', r.comuna || '', r.localidad || '', r.barrio || '', r.puesto || '',
+      (r.censo != null ? r.censo : null),
+      num4(r.aporte_nac),
+      num4(r.gap),
+      fecha,
     ]);
-    const csv = [header, ...rows].map(arr => arr.map(esc).join(',')).join('\r\n');
-    const blob = new Blob(['﻿' + csv], { type:'text/csv;charset=utf-8' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
+    const wsData = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    wsData['!cols'] = [
+      { wch: 18 }, { wch: 22 }, { wch: 14 }, { wch: 6 }, { wch: 30 },
+      { wch: 18 }, { wch: 18 }, { wch: 22 }, { wch: 18 }, { wch: 22 }, { wch: 24 },
+      { wch: 12 }, { wch: 18 }, { wch: 20 },
+      { wch: 12 },
+    ];
+    XLSX.utils.book_append_sheet(wb, wsData, 'Datos');
+
     const safeCand  = (cand ? cand.id : 'cand');
     const safeScope = (meta.scope || 'opo').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-    a.href = url;
-    a.download = `oportunidad_top_${safeCand}_${safeScope}_${fecha}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+    XLSX.writeFile(wb, `oportunidad_top_${safeCand}_${safeScope}_${fecha}.xlsx`);
   }
 
   /* ─── REPORTE TERRITORIAL PDF (Premium) ─────────────────────────
@@ -1435,6 +1517,24 @@
       document.head.appendChild(s);
     });
     return _jspdfLoading;
+  }
+
+  // SheetJS (xlsx) bajo demanda — para la descarga "Lista (Excel)" con
+  // 2 hojas (Metodología + Datos). Se carga al primer click. Igual que
+  // jsPDF: cdnjs es confiable, peso ~900 KB minified.
+  const XLSX_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  let _xlsxLoading = null;
+  function loadXLSX(){
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    if (_xlsxLoading) return _xlsxLoading;
+    _xlsxLoading = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = XLSX_CDN;
+      s.onload  = () => resolve(window.XLSX);
+      s.onerror = () => reject(new Error('No se pudo cargar XLSX'));
+      document.head.appendChild(s);
+    });
+    return _xlsxLoading;
   }
 
   async function onDownloadTopPDF(){
@@ -5346,10 +5446,26 @@
       items = visible.map(p => {
         const m = STATE.puestoMetrics[p.k];
         if (!m || m.gap == null) return null;
+        const parts = (p.k || '').split('-');
+        const depCod = parts[0] || '';
+        const depName = (STATE.depByElectoral[depCod]||{}).nombre || '';
+        const ctx = (STATE.puestoContext && STATE.puestoContext[p.k]) || {};
         return {
           name: p.n || p.k,
           sub: puestoSubLabel(p),
           contrib: m.gap,    // se muestra como "+X.X pp" — crecimiento local
+          // Campos enriquecidos para export
+          level: 'puesto',
+          dep: depName,
+          mun: p.mn || '',
+          comuna: ctx.com_nombre || '',
+          localidad: '',
+          upl: ctx.upl_nombre ? ('UPL ' + ctx.upl_nombre) : '',
+          barrio: ctx.barrio || '',
+          puesto: p.n || '',
+          censo: p.c != null ? p.c : null,
+          gap: m.gap,
+          aporte_nac: m.contrib != null ? m.contrib : null,
         };
       }).filter(Boolean);
       unitLabel = 'puestos'; scope = scopeName;
@@ -5364,7 +5480,16 @@
         if (m.contrib == null) continue;
         if (filterCom && String(m.comuna||'').replace(/^0+/, '') !== filterCom) continue;
         const e = refSig[bk] || {};
-        items.push({ name: e.nombre || bk, sub: 'Comuna ' + (m.comuna || '?'), contrib: m.contrib });
+        const barrioName = e.nombre || bk;
+        items.push({
+          name: barrioName, sub: 'Comuna ' + (m.comuna || '?'), contrib: m.contrib,
+          level: 'barrio', dep: 'Antioquia', mun: 'Medellín',
+          comuna: m.comuna ? ('Comuna ' + m.comuna) : '', localidad: '', upl: '',
+          barrio: barrioName, puesto: '',
+          censo: m.censo != null ? m.censo : null,
+          gap: m.gap != null ? m.gap : null,
+          aporte_nac: m.contrib,
+        });
       }
       unitLabel = 'barrios';
       scope = parent && parent.kind === 'comuna' ? `Medellín · ${parent.name}` : 'Medellín';
@@ -5372,7 +5497,16 @@
     else if (STATE.selectedCity === 'bogota' && STATE.bogView === 'upl' && STATE.bogUplMetrics){
       for (const [cod, m] of Object.entries(STATE.bogUplMetrics)){
         if (m.contrib == null) continue;
-        items.push({ name: m.nombre || cod, sub: m.sector || '', contrib: m.contrib });
+        const uplName = m.nombre || cod;
+        items.push({
+          name: uplName, sub: m.sector || '', contrib: m.contrib,
+          level: 'upl', dep: 'Bogotá D.C.', mun: 'Bogotá D.C.',
+          comuna: '', localidad: m.sector || '', upl: uplName,
+          barrio: '', puesto: '',
+          censo: m.censo != null ? m.censo : null,
+          gap: m.gap != null ? m.gap : null,
+          aporte_nac: m.contrib,
+        });
       }
       unitLabel = 'UPL'; scope = 'Bogotá';
     }
@@ -5387,7 +5521,16 @@
         if (m.contrib == null) continue;
         if (filterLoc && String(m.loc_cod||'').padStart(2,'0') !== filterLoc) continue;
         if (filterUplCod && String(b2u[cod] || '').toUpperCase() !== filterUplCod) continue;
-        items.push({ name: m.nombre || cod, sub: m.loc_nombre || '', contrib: m.contrib });
+        const barName = m.nombre || cod;
+        items.push({
+          name: barName, sub: m.loc_nombre || '', contrib: m.contrib,
+          level: 'barrio', dep: 'Bogotá D.C.', mun: 'Bogotá D.C.',
+          comuna: '', localidad: m.loc_nombre || '', upl: '',
+          barrio: barName, puesto: '',
+          censo: m.censo != null ? m.censo : null,
+          gap: m.gap != null ? m.gap : null,
+          aporte_nac: m.contrib,
+        });
       }
       unitLabel = 'barrios';
       if (parent && parent.kind === 'localidad')      scope = `Bogotá · ${parent.name}`;
@@ -5398,12 +5541,24 @@
       const cfg = CITIES[STATE.selectedCity];
       const censoMap = STATE.cityCensoByCom[STATE.selectedCity] || {};
       const aliasMap = CITY_COMUNA_ALIAS[STATE.selectedCity] || {};
+      const depCityName = (STATE.depByElectoral[cfg.depCod]||{}).nombre || '';
+      const isLoc = /localidad/i.test(cfg.kind || '');
       for (const [cod, m] of Object.entries(STATE.cityComMetrics[STATE.selectedCity])){
         if (m.contrib == null) continue;
         const ce = censoMap[cod];
         const nombre = aliasMap[cod] || (ce ? ce.nombre : cod);
         const sub = ce && ce.tipo === 'corregimiento' ? 'corregimiento' : '';
-        items.push({ name: nombre, sub, contrib: m.contrib });
+        items.push({
+          name: nombre, sub, contrib: m.contrib,
+          level: isLoc ? 'localidad' : 'comuna',
+          dep: depCityName, mun: cfg.label,
+          comuna: isLoc ? '' : nombre,
+          localidad: isLoc ? nombre : '',
+          upl: '', barrio: '', puesto: '',
+          censo: m.censo != null ? m.censo : null,
+          gap: m.gap != null ? m.gap : null,
+          aporte_nac: m.contrib,
+        });
       }
       unitLabel = (cfg.kind || 'comunas').toLowerCase();
       scope = cfg.label;
@@ -5420,6 +5575,11 @@
         items.push({
           name: munName, sub: depName, contrib: r.contrib,
           click: `onTopClick('${r.munKey}','${r.depCod}')`,
+          level: 'municipio', dep: depName, mun: munName,
+          comuna: '', localidad: '', upl: '', barrio: '', puesto: '',
+          censo: r.censo != null ? r.censo : null,
+          gap: r.gap != null ? r.gap : null,
+          aporte_nac: r.contrib,
         });
       }
       unitLabel = 'municipios';
@@ -5436,6 +5596,11 @@
           sub: nm ? `${nm} municipios` : '',
           contrib: r.contrib,
           click: `onTopClickDep('${dc}')`,
+          level: 'departamento', dep: depName, mun: '',
+          comuna: '', localidad: '', upl: '', barrio: '', puesto: '',
+          censo: r.censo != null ? r.censo : null,
+          gap: r.gap != null ? r.gap : null,
+          aporte_nac: r.contrib,
         });
       }
       unitLabel = 'departamentos';
