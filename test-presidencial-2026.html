@@ -79,6 +79,17 @@
     .title span { color:var(--blue); font-style:italic; font-weight:400; }
     .subtitle { font-family:'Fraunces',serif; font-weight:300; font-size:.95rem; color:var(--text-soft); margin:.85rem auto 0; max-width:480px; line-height:1.5; text-align:center; }
 
+    /* Pantalla inicial de bienvenida: única cosa en pantalla, con respiro. */
+    .panel-welcome { text-align:center; padding:2.5rem 1rem 2rem; max-width:720px; margin:0 auto; }
+    .welcome-eyebrow { font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.22em; text-transform:uppercase; color:var(--blue); font-weight:500; margin-bottom:.85rem; }
+    .welcome-title { font-family:'Fraunces',serif; font-weight:700; font-size:clamp(2.1rem, 5.4vw, 3rem); line-height:1.08; letter-spacing:-.02em; color:var(--text); margin:.4rem 0 1.4rem; }
+    .welcome-title span { color:var(--blue); font-style:italic; }
+    .welcome-sub { font-family:'Fraunces',serif; font-weight:300; font-size:clamp(1rem, 1.6vw, 1.15rem); line-height:1.55; color:var(--text-soft); max-width:58ch; margin:0 auto 1.2rem; }
+    .welcome-hint { font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.06em; line-height:1.5; color:var(--text-meta); max-width:50ch; margin:1.4rem auto 1.6rem; }
+    .welcome-cta { margin-top:1.3rem; }
+    .welcome-btn { font-size:1.05rem; padding:1rem 2.2rem; border-radius:12px; font-family:'Fraunces',serif; font-weight:500; }
+    @media (max-width:640px) { .panel-welcome { padding:1.8rem .9rem 1.4rem; } }
+
     .main {
       flex:1; padding: 1.2rem 1.5rem 1.5rem;
       display:flex; flex-direction:column; gap:1.1rem;
@@ -458,13 +469,17 @@
     html.embed #panel-result .actions a.btn { display: none !important; }
     html.embed #panel-result .actions { justify-content: flex-start; }
     html[data-brand="elpais"] .title,
+    html[data-brand="elpais"] .welcome-title,
     html[data-brand="elpais"] .arq-name,
     html[data-brand="elpais"] .cand-block-name {
       font-family: 'Lato', system-ui, sans-serif !important;
       font-weight: 900; letter-spacing: -0.02em;
     }
-    html[data-brand="elpais"] .title span { color: var(--blue); font-style: normal; }
-    html[data-brand="elpais"] .subtitle { font-weight: 400; }
+    html[data-brand="elpais"] .title span,
+    html[data-brand="elpais"] .welcome-title span { color: var(--blue); font-style: normal; }
+    html[data-brand="elpais"] .subtitle,
+    html[data-brand="elpais"] .welcome-sub { font-weight: 400; font-family: 'Lato', system-ui, sans-serif !important; }
+    html[data-brand="elpais"] .welcome-btn { font-family: 'Lato', system-ui, sans-serif !important; font-weight: 700; }
     /* Esquinas rectas + sombras planas — estética periódico */
     html[data-brand="elpais"] .panel,
     html[data-brand="elpais"] .opt,
@@ -492,9 +507,25 @@
       background: #ffffff;
     }
     html[data-brand="elpais"] #embed-attrib-brand img {
-      display:block; height: 36px; width:auto;
+      display:block; height: 56px; width:auto;
     }
     html[data-brand="elpais"] .embed-attrib a { color: var(--blue); }
+
+    /* Mobile: stack vertical para que el cluster powered+RR no se sobreponga
+       al logo grande de El País. Bajo 640px, una sola columna centrada. */
+    @media (max-width: 640px) {
+      html.embed .embed-attrib {
+        grid-template-columns: 1fr; gap: .35rem;
+        padding: .55rem 1rem .7rem;
+      }
+      html.embed .embed-attrib .ea-left { display: none; }
+      html.embed .embed-attrib .ea-center { justify-content: center; }
+      html.embed .embed-attrib .ea-right { justify-content: center; gap: .5rem; }
+      html.embed .embed-attrib .ea-powered { font-size: .54rem; }
+      html.embed .embed-attrib .ea-rr-text { font-size: .82rem; }
+      html.embed .embed-attrib .ea-rr-bars i { width: 2.5px; }
+      html[data-brand="elpais"] #embed-attrib-brand img { height: 46px; }
+    }
   </style>
 </head>
 <body>
@@ -530,25 +561,30 @@
       </div>
     </div>
 
-    <div class="head-wrap">
-      <div class="eyebrow">Test · Primera Vuelta 2026</div>
-      <h1 class="title">¿Qué tan cerca estás de <span>tu candidato</span>?</h1>
-      <p class="subtitle">No te decimos por quién votar. Contrastamos tu apuesta con tu arquetipo de votante y con la huella real del bloque de tu candidato en tu zona.</p>
-    </div>
-
     <div class="main">
       <div class="progress-row" id="progressRow" style="display:none;">
         <span class="progress-label" id="progressLabel">Pregunta 1 / 7</span>
         <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
       </div>
 
+      <!-- ── 0. WELCOME (la única cosa en pantalla al abrir) ── -->
+      <div class="panel active panel-welcome" id="panel-welcome">
+        <div class="welcome-eyebrow">Test · Primera Vuelta 2026</div>
+        <h1 class="welcome-title">¿De qué te sirve <span>tu candidato</span> en tu barrio o vereda?</h1>
+        <p class="welcome-sub">No te decimos por quién votar, a menos de que no te hayas definido. Te decimos, más bien, qué es lo que más te beneficia a ti y a tu familia o comunidad, cómo están las proyecciones en ese lugar y qué propone tu candidato para tu barrio, comuna o vereda.</p>
+        <p class="welcome-hint">Tarda menos de cinco minutos. Tus respuestas son anónimas; solo si lo autorizas al final, una campaña podría contactarte.</p>
+        <div class="welcome-cta">
+          <button class="btn welcome-btn" onclick="startTest()">Empecemos →</button>
+        </div>
+      </div>
+
       <!-- ── 1. INTRO: Registro ── -->
-      <div class="panel active" id="panel-intro">
+      <div class="panel" id="panel-intro">
         <div class="qhead">
           <span class="qnum">Paso 1 de 3</span>
           <span class="qtag">Lenguaje</span>
         </div>
-        <p class="qtext">¿En qué lenguaje prefieres que te hable este test?</p>
+        <p class="qtext">¿Cómo te sientes más cómodo respondiendo? Escoge un modelo.</p>
         <p class="qhint">Las mismas preguntas, distinto tono. Elige el que te quede más cómodo — puedes cambiar más adelante.</p>
         <div id="registro-picker" class="registro-picker">
           <div class="skeleton">Cargando opciones…</div>
@@ -933,6 +969,7 @@
   }
 
   function goTo(id) { show(id); }
+  function startTest() { show('intro'); }
 
   // ── CARGA DE DATA ──
   async function loadAll() {
@@ -2194,6 +2231,7 @@
   }
 
   function restart() {
+    // Volver al welcome (no a la pregunta de registro)
     STATE.registro = null;
     STATE.candidato = null;
     STATE.candOrigen = null;
@@ -2212,7 +2250,7 @@
     const ab = $('#apoyo-block'); if (ab) ab.style.display = 'none';
     $('#progressRow').style.display = 'none';
     $('#progressFill').style.width = '0%';
-    show('intro');
+    show('welcome');
   }
 
   // Exposición a window para inspección/debug (no afecta producción).
