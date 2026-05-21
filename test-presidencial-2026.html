@@ -219,12 +219,14 @@
     .scale-lbl { font-size:.6rem; letter-spacing:.05em; line-height:1.05; text-align:center; max-width:100%; word-break:keep-all; }
 
     /* ── Loading entre la octava pregunta y el resultado ── */
-    #panel-loading-result {
+    /* Las propiedades de layout solo aplican cuando el panel está activo,
+       para que cuando .panel hide los oculte (display:none) no quede
+       overridden por el id-selector con display:flex. */
+    #panel-loading-result.active {
       min-height: 55vh;
       display: flex; align-items: center; justify-content: center;
       padding: 2.5rem 1.2rem;
     }
-    #panel-loading-result.active { display: flex; }
     .loading-result-wrap { width: 100%; max-width: 460px; text-align: center; }
     .loading-result-text {
       font-family: 'Fraunces', serif; font-weight: 400;
@@ -239,6 +241,22 @@
       height: 100%; width: 0%;
       background: var(--blue); border-radius: 999px;
     }
+    .loading-result-pct {
+      font-family: 'DM Mono', monospace; font-size: .82rem;
+      letter-spacing: .12em; color: var(--text-meta);
+      margin: .8rem 0 0; text-align: center;
+    }
+    .loading-result-pct span { color: var(--text); font-weight: 500; }
+    #loading-result-btn {
+      margin-top: 1.6rem;
+      padding: .9rem 1.6rem;
+      font-family: 'Fraunces', serif; font-size: 1rem; font-weight: 500;
+      background: var(--blue); color: #fff;
+      border: none; border-radius: 999px;
+      cursor: none;
+      transition: transform .15s, box-shadow .15s;
+    }
+    #loading-result-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,71,255,.25); }
 
     /* ── Resultado ── */
     .arq-hero {
@@ -809,13 +827,15 @@
 
       <!-- ── 3b. LOADING TRAS LA OCTAVA PREGUNTA ──
            Transición de 4s para que DeepSeek alcance a contestar antes de
-           que el usuario llegue al resultado. La barra anima 0→100% con un
-           transition de width; iniciarPrefetchLectura() ya arrancó al pintar
-           renderResultado() detrás. -->
+           que el usuario llegue al resultado. La barra y el % animan con
+           requestAnimationFrame; iniciarPrefetchLectura() ya arrancó al
+           pintar renderResultado() detrás. -->
       <div class="panel" id="panel-loading-result">
         <div class="loading-result-wrap">
           <p class="loading-result-text">¡Terminado! Cargando tus resultados…</p>
           <div class="loading-result-bar"><div class="loading-result-fill" id="loading-result-fill"></div></div>
+          <p class="loading-result-pct"><span id="loading-result-pct">0</span>%</p>
+          <button type="button" class="btn-primary" id="loading-result-btn" style="display:none;" onclick="show('result')">Ver resultados →</button>
         </div>
       </div>
 
@@ -1851,23 +1871,44 @@
     } else {
       // Última pregunta: computeArquetipo() ya dispara renderResultado() +
       // iniciarPrefetchLectura(), así que DeepSeek arranca en background.
-      // Mientras tanto mostramos una transición de 4s con barra de
-      // progreso. Al terminar, mostramos el panel de resultado.
+      // Mientras tanto mostramos una transición de 4s con barra animada de
+      // 0→100% (rAF) y el % en texto. Al llegar a 100% aparece el botón
+      // "Ver resultados" en lugar de auto-avanzar.
       computeArquetipo();
       $('#progressFill').style.width = '100%';
       $('#progressRow').style.display = 'none';
       show('loading-result');
-      const fill = $('#loading-result-fill');
-      if (fill) {
-        fill.style.transition = 'none';
-        fill.style.width = '0%';
-        // Forzar reflow para que la transition de 4s arranque desde 0%.
-        void fill.offsetWidth;
-        fill.style.transition = 'width 4s linear';
-        fill.style.width = '100%';
-      }
-      setTimeout(() => show('result'), 4000);
+      animarLoadingResultado(4000);
     }
+  }
+
+  function animarLoadingResultado(duration) {
+    const fill   = $('#loading-result-fill');
+    const pctEl  = $('#loading-result-pct');
+    const btn    = $('#loading-result-btn');
+    if (!fill || !pctEl || !btn) return;
+    // Reset estado visual
+    fill.style.transition = 'none';
+    fill.style.width = '0%';
+    pctEl.textContent = '0';
+    btn.style.display = 'none';
+    void fill.offsetWidth;
+
+    // setInterval (no rAF) para que la animación siga corriendo aunque
+    // el usuario tenga la pestaña en background.
+    if (window._loadingResultadoTimer) clearInterval(window._loadingResultadoTimer);
+    const start = Date.now();
+    window._loadingResultadoTimer = setInterval(() => {
+      const elapsed = Date.now() - start;
+      const pct = Math.min(100, (elapsed / duration) * 100);
+      fill.style.width = pct + '%';
+      pctEl.textContent = Math.round(pct);
+      if (pct >= 100) {
+        clearInterval(window._loadingResultadoTimer);
+        window._loadingResultadoTimer = null;
+        btn.style.display = '';
+      }
+    }, 40);
   }
 
   function qPrev() {
