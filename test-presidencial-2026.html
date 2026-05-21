@@ -237,7 +237,8 @@
     .arq-second b { color:#fff; font-weight:500; }
 
     .cand-block {
-      display:flex; gap:1rem; align-items:center;
+      display:grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+      gap:1.2rem; align-items:center;
       padding:1.1rem 1.2rem;
       background:var(--card);
       border:1.5px solid var(--border);
@@ -245,12 +246,17 @@
       border-radius:14px;
       margin-bottom:1rem;
     }
-    .cand-block-avatar { width:60px; height:60px; min-width:60px; border-radius:50%; background:var(--cand-color, var(--blue)); display:flex; align-items:center; justify-content:center; font-family:'Syne',sans-serif; font-weight:700; font-size:1.15rem; color:#fff; overflow:hidden; }
-    .cand-block-avatar img { width:100%; height:100%; object-fit:cover; display:block; }
-    .cand-block-meta { flex:1; }
-    .cand-block-eyebrow { font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.18em; text-transform:uppercase; color:var(--text-meta); font-weight:500; }
-    .cand-block-name { font-family:'Fraunces',serif; font-weight:700; font-size:1.3rem; color:var(--text); line-height:1.15; margin-top:.15rem; }
-    .cand-block-party { font-family:'Fraunces',serif; font-weight:300; font-size:.88rem; color:var(--text-soft); }
+    .cand-block-meta { min-width:0; }
+    .cand-block-name { font-family:'Fraunces',serif; font-weight:700; font-size:1.3rem; color:var(--text); line-height:1.15; }
+    .cand-block-party { font-family:'Fraunces',serif; font-weight:300; font-size:.88rem; color:var(--text-soft); margin-top:.1rem; }
+    .cand-block-arq {
+      font-family:'Fraunces',serif; font-weight:300; font-size:.85rem;
+      line-height:1.4; color:var(--text-soft); margin:0;
+    }
+    .cand-block-arq b { font-weight:600; color:var(--text); }
+    @media (max-width: 640px) {
+      .cand-block { grid-template-columns: 1fr; gap:.6rem; }
+    }
 
     /* Bloque del meme — cuadrado 1:1, centrado, fallback "Imagen pendiente". */
     .meme-block {
@@ -789,12 +795,11 @@
         <!-- Sub-vista A: pre-resultado (candidato + arquetipo + intención del barrio) -->
         <div id="result-summary">
           <div class="cand-block" id="cand-block">
-            <div class="cand-block-avatar" id="cand-block-avatar">—</div>
             <div class="cand-block-meta">
-              <span class="cand-block-eyebrow">Tu apuesta declarada</span>
               <div class="cand-block-name" id="cand-block-name">—</div>
               <div class="cand-block-party" id="cand-block-party">—</div>
             </div>
+            <p class="cand-block-arq" id="cand-block-arq">—</p>
           </div>
 
           <!-- Meme del candidato según el arquetipo dominante (se carga
@@ -803,8 +808,6 @@
             <img id="meme-img" alt="" />
             <span class="meme-pending" id="meme-pending">Imagen pendiente</span>
           </div>
-
-          <p class="arq-summary" id="arq-summary">—</p>
 
           <div class="barrio-block" id="barrio-block">
             <span class="barrio-eyebrow">Cómo se inclinaría tu zona</span>
@@ -1866,11 +1869,13 @@
     const cand = DATA.candidatos.candidatos.find(c => c.id === STATE.candidato);
     const block = $('#cand-block');
     block.style.setProperty('--cand-color', cand.color);
-    const avatar = $('#cand-block-avatar');
-    avatar.style.background = cand.color;
-    avatar.innerHTML = avatarHtml(cand);
     $('#cand-block-name').textContent = cand.nombre;
     $('#cand-block-party').textContent = cand.partido + (STATE.candOrigen === 'sugerido' ? ' · sugerido por el mini-test' : '');
+    $('#cand-block-arq').innerHTML = `<b>${winner.nombre_2027}:</b> ${winner.deseo}`;
+
+    // Oculta el contador "Pregunta X / N" + barra de progreso al llegar al resultado.
+    const progressRow = $('#progressRow');
+    if (progressRow) progressRow.style.display = 'none';
 
     // Meme del candidato según arquetipo dominante. Si el JPG no existe en
     // S3 (todavía solo subimos los de Cepeda), cae al placeholder "Imagen
@@ -1886,9 +1891,6 @@
       memeImg.alt = `${cand.nombre} · ${winner.nombre_2027}`;
       memeImg.src = `${S3_BASE}/memes/${candSlug}-${winner.id}.jpg`;
     }
-
-    // Resumen del arquetipo en una sola línea: "Nombre: descripción".
-    $('#arq-summary').innerHTML = `<b>${winner.nombre_2027}:</b> ${winner.deseo}`;
 
     _resultCtx = { cand, winner, winnerPct, second, secondPct };
 
@@ -2226,11 +2228,13 @@
       if (subloc) partes.push(subloc);
       if (ciudad) partes.push(ciudad);
       if (dep) partes.push(dep);
-      context = `${partes.join(' · ')} · ${entry.censo ? entry.censo.toLocaleString('es-CO') + ' electores' : ''}`;
+      context = partes.join(' · ');
     } else {
-      context = `${dep} · ${entry.censo ? entry.censo.toLocaleString('es-CO') + ' electores' : ''}`;
+      context = dep;
     }
-    label.innerHTML = `${escapeHtml(nombre)} <span class="barrio-context">${escapeHtml(context.trim())}</span>`;
+    // Limpia separadores colgando si algún campo quedó vacío.
+    context = context.replace(/(\s·\s)+$/, '').replace(/^(\s·\s)+/, '');
+    label.innerHTML = `${escapeHtml(nombre)} <span class="barrio-context">${escapeHtml(context)}</span>`;
 
     // Ordenar candidatos por % desc
     const ordered = Object.entries(intencion).sort((a, b) => b[1] - a[1]);
@@ -2258,16 +2262,10 @@
       });
     }, 60);
 
-    // Pie del bloque con hechos del territorio
-    const h = entry.h || {};
-    const partesFoot = [];
-    if (h.p22 && h.p22.n) partesFoot.push(`En 2022 ganó <b>${escapeHtml(h.p22.n)}</b> con ${h.p22.pct}%`);
-    if (h.c25p && h.c25p.n) partesFoot.push(`En la consulta Pacto 2025: <b>${escapeHtml(h.c25p.n)}</b> (${h.c25p.pct}%)`);
-    if (h.c26) {
-      const consNombre = { gran: 'Gran Consulta (derecha)', frente: 'Frente por la Vida (centro-izq)', soluciones: 'Soluciones (centro)' }[h.c26] || h.c26;
-      partesFoot.push(`Consulta 2026 más votada: <b>${escapeHtml(consNombre)}</b>`);
-    }
-    foot.innerHTML = partesFoot.length ? partesFoot.join(' · ') : '';
+    // Pie del bloque: nota metodológica genérica (los hechos crudos del
+    // territorio quedan disponibles internamente vía entry.h para la lectura
+    // del LLM, pero no se muestran aquí para no abrumar al usuario).
+    foot.innerHTML = 'Calculamos que en tu zona la primera vuelta puede llegar a quedar así, teniendo en cuenta el histórico de primeras vueltas, así como la consulta del Pacto Histórico de 2025 y las consultas presidenciales del año 2026.';
   }
 
   // Llama al endpoint test-presidencial-explica con el state actual.
