@@ -6928,6 +6928,16 @@
       cands:{ 'Cepeda':37.4,'De la Espriella':29.4,'Valencia':20.9,'Fajardo':4.1,'Claudia López':1.9,'Barreras':0.9,'Murillo':0.7 } },
     { id:'44-atlas-may14',        firma:'Atlas Intel',                     fecha:'2026-05-14', n:5039, modo:'presencial',
       cands:{ 'Cepeda':36.0,'De la Espriella':31.5,'Valencia':16.0,'Fajardo':4.7,'Claudia López':3.4,'Barreras':0.1 } },
+    // Génesis Crea (4-11 may) y Corp. MMM (12-17 may) — primera vez que ambas
+    // firmas radican una encuesta nacional. Históricamente solo regionales y
+    // operan como la misma cocina (id 24-genesis y 26-corp-mmm son el mismo
+    // operativo Casanare 27-feb radicado bajo dos sellos). Se sub-ponderan
+    // a q_firma=0.45 cada una para evitar doble conteo (override aplicado
+    // en FIRMA_Q abajo + Q_FIRMA_OVERRIDE en ponderador.py).
+    { id:'45-genesis-may11',      firma:'Génesis Crea',                    fecha:'2026-05-11', n:4352, modo:'presencial',
+      cands:{ 'Cepeda':35.1,'De la Espriella':21.6,'Valencia':25.4,'Fajardo':2.9,'Claudia López':3.6,'Barreras':0.7,'Murillo':0.0 } },
+    { id:'46-corp-mmm-may17',     firma:'Corp. Miguel Maldonado Manjarrez',fecha:'2026-05-17', n:5558, modo:'presencial',
+      cands:{ 'Cepeda':35.3,'De la Espriella':20.4,'Valencia':27.5,'Fajardo':2.0,'Claudia López':2.1,'Barreras':0.2,'Murillo':0.1 } },
     // OJO: la Guarumo de abril (22-29 abr, n=4680) ya entra arriba como
     // `38-guarumo` con fecha 25-mar — etiquetado heredado en
     // encuestas_porcentajes.csv, pero los pcts son los del PDF abril.
@@ -6945,6 +6955,12 @@
     'GAD3': 0.549,
     'YanHaas': 0.4,
     'Guarumo / EcoAnalítica': 1.0,  // sin MAE pre-8M → neutro 1.0 (igual que ponderador.py)
+    // Génesis Crea y Corp. MMM se sub-ponderan a 0.45 cada una. La cocina
+    // operativa es la misma (ver POLLS arriba). El backend usa
+    // Q_FIRMA_OVERRIDE por encuesta_id; acá replicamos por firma porque
+    // la única encuesta vigente (<60d) de cada una es la nacional may-2026.
+    'Génesis Crea': 0.45,
+    'Corp. Miguel Maldonado Manjarrez': 0.45,
   };
   const Q_FIRMA_DEFAULT = 1.0;
   // q_modo — ponderador.py promedia q_firma de las firmas calibradas por modo
@@ -6968,6 +6984,7 @@
     'YanHaas': 'tri-down',
     'Guarumo / EcoAnalítica': 'plus',
     'Génesis Crea': 'x',
+    'Corp. Miguel Maldonado Manjarrez': 'star',
     'CELAG': 'hex',
   };
   const FIRMA_LABEL = {
@@ -6978,6 +6995,7 @@
     'YanHaas': 'YanHaas',
     'Guarumo / EcoAnalítica': 'Guarumo',
     'Génesis Crea': 'Génesis Crea',
+    'Corp. Miguel Maldonado Manjarrez': 'Corp. MMM',
     'CELAG': 'CELAG',
   };
 
@@ -7049,6 +7067,16 @@
         for (let i = 0; i < 6; i++){
           const a = (i / 6) * 2 * Math.PI - Math.PI/2;
           pts += (cx + r2 * Math.cos(a)).toFixed(2) + ',' + (cy + r2 * Math.sin(a)).toFixed(2) + ' ';
+        }
+        return `<polygon points="${pts.trim()}" fill="${color}" fill-opacity="${fillOp}" ${common}/>`;
+      }
+      case 'star': {
+        const rO = r * 1.30, rI = r * 0.55;
+        let pts = '';
+        for (let i = 0; i < 10; i++){
+          const a = (i / 10) * 2 * Math.PI - Math.PI/2;
+          const rad = (i % 2 === 0) ? rO : rI;
+          pts += (cx + rad * Math.cos(a)).toFixed(2) + ',' + (cy + rad * Math.sin(a)).toFixed(2) + ' ';
         }
         return `<polygon points="${pts.trim()}" fill="${color}" fill-opacity="${fillOp}" ${common}/>`;
       }

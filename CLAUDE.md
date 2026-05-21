@@ -243,14 +243,63 @@ operativo. Cuota de descargas server-side: `/dl/status` + `/dl/consume`
 desplegados en `rr-auth` (binding KV `RR_DL`) — el frontend ya consume
 estos endpoints; si el worker falla cae a localStorage como fallback.
 
-## Ponderador propio (en construcción)
+## Ponderador propio
+
 Pipeline en `tools/ponderador/` que calibra firmas encuestadoras contra el
 único ground truth post-Ley 2494: las consultas del 8 de marzo de 2026.
-Ver `tools/ponderador/README.md` para flujo de uso.
 
+### Scripts (todos stdlib pura, sin deps)
+```
+tools/ponderador/
+  scrape_cne.py    refresca cne_encuestas_2026.{json,csv} desde
+                   https://www.cne.gov.co/encuestas-2026 (paginado).
+                   Maneja casos rotos del CNE (firma=fecha, texto truncado).
+                   Flags: --dry-run --diff --out-dir. Curl por subprocess
+                   (esquiva el TLS de python 3.14 sin certifi).
+  remap_ids.py     renombra ids del ponderador a los ids reales del CNE
+                   cuando una encuesta entró a mano antes de radicación.
+                   Mapping hardcoded; --apply para escribir (deja .bak).
+  ponderador.py    re-calcula q_firma/q_modo/promedios y emite
+                   ponderador-actual.json + ponderador-detalle.json.
+```
+
+### Reconstrucción del `ponderador.py` (2026-05-20)
+El .py original se extravió; solo sobrevivía
+`__pycache__/ponderador.cpython-314.pyc`. La reconstrucción combina:
+- **docstring + nombres de funciones** del .pyc vía `marshal` + `dis`
+- **bytecode** de `calcular_q_firma` / `calcular_q_modo` / `delta_recencia`
+  — el mapeo lineal MAE→q_firma quedó confirmado:
+  `q = 1 - 0.6·(mae - mn)/(mx - mn)`, MAE [mn, mx] → q ∈ [1.0, 0.4]
+- **re-cómputo client-side en `previa-1v.html` líneas 6938-7013**
+  (mismas constantes, fórmula `peso = q_firma × q_modo × exp(-λ·d)`)
+
+Validado: `python3 ponderador.py` sin overrides + HOY=2026-05-15 reproduce
+el `ponderador-actual.json` original al cent.
+
+Si el .pyc también se pierde: `previa-1v.html` tiene la fórmula y todas
+las constantes documentadas en comentarios. Re-validar contra el último
+`ponderador-actual.json` archivado.
+
+### Q_FIRMA_OVERRIDE — sub-pondera por encuesta_id
+Dict hardcoded al inicio de `ponderador.py`. Para casos puntuales en que
+una firma sin calibración debe entrar atenuada (cocina compartida entre
+dos firmas, sospecha de manipulación, etc.). Se aplica ANTES del fallback
+a q_firma calibrada / default 1.0.
+
+Estado actual (2026-05-20):
+```python
+Q_FIRMA_OVERRIDE = {
+    "45-genesis-may11":   0.45,  # cocina compartida con Corp MMM
+    "46-corp-mmm-may17":  0.45,  # Casanare 27-feb radicado bajo
+                                 # ambos sellos con cifras idénticas
+                                 # (id 24-genesis-crea y 26-corp-mmm)
+}
+```
+
+### Datos de entrada y salida
 ```
 Bases de datos/cne_pdfs/                 → PDFs descargados a mano del CNE
-Bases de datos/cne_encuestas_2026.json   → inventario scrapeado del CNE
+Bases de datos/cne_encuestas_2026.json   → inventario scrapeado (scrape_cne.py)
 Bases de datos/cne_encuestas_clasificadas.csv  → con auto-clasificación
 Bases de datos/encuestas_porcentajes.csv → % por candidato (manual desde PDF)
 Bases de datos/encuestas_distribucion_muestral.csv → muestra por depto
@@ -259,7 +308,26 @@ Bases de datos/output_ponderador/ponderador-detalle.json → transparencia total
 Bases de datos/output_ponderador/representatividad.json  → KL vs censo Divipole
 ```
 
-Decisiones metodológicas (resumen):
+### Flujo típico cuando aparece encuesta nueva
+1. `python3 tools/ponderador/scrape_cne.py --diff` — ve qué hay nuevo en CNE.
+2. Si la encuesta NO está en CNE (heyzine/Wikipedia/prensa): agregar a mano
+   filas a `cne_encuestas_clasificadas.csv` (id + metadatos) y
+   `encuestas_porcentajes.csv` (un row por candidato).
+3. Si los ids manuales coinciden con ids posteriores del CNE:
+   `python3 tools/ponderador/remap_ids.py --apply`.
+4. `python3 tools/ponderador/ponderador.py` — regenera JSONs.
+5. Subir a S3 para que el frontend los consuma:
+   ```
+   aws s3 cp "Bases de datos/output_ponderador/ponderador-actual.json" \
+     "s3://elecciones-2026/ricardoruiz.co/bases de datos/output_ponderador/ponderador-actual.json"
+   aws s3 cp "Bases de datos/output_ponderador/ponderador-detalle.json" \
+     "s3://elecciones-2026/ricardoruiz.co/bases de datos/output_ponderador/ponderador-detalle.json"
+   ```
+6. Si actualizas `previa-1v.html` para mostrar firmas/Q nuevas, bumpear
+   también las constantes `FIRMA_Q` y `POLLS` (línea 6890-6936)
+   para que el chart temporal y el promedio coincidan.
+
+### Decisiones metodológicas (resumen)
 - Sólo el 8-mar como benchmark (Ley 2494 cambió la regla del juego).
 - MAE filtra candidatos extintos antes de normalizar (Cepeda no estuvo en Frente).
 - `q_firma` ∈ [0.40, 1.00]; firmas no calibradas entran con 1.00 + bandera.
