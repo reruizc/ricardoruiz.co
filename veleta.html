@@ -167,6 +167,20 @@
     .toggle-btn.disabled,.toggle-btn:disabled{cursor:not-allowed;opacity:.4}
     .toggle-btn.disabled:hover{color:rgba(255,255,255,.65);background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.15)}
 
+    /* Grupo de descarga: se va al final de la barra; cuando aparece el toggle
+       "Comparar contra" (sub-mun), el grupo se desplaza naturalmente a la
+       derecha porque margin-left:auto lo empuja al borde. */
+    .dl-group{margin-left:auto}
+    .dl-counter{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.55);padding:.42rem .55rem .42rem 0;font-variant-numeric:tabular-nums}
+    .dl-counter.locked{color:rgba(251,146,60,.75)}
+    .dl-counter.exhausted{color:var(--red)}
+    body.day-mode .dl-counter{color:rgba(0,0,0,.55)}
+    body.day-mode .dl-counter.locked{color:var(--orange)}
+    body.day-mode .dl-counter.exhausted{color:var(--red)}
+    .toggle-btn.dl-btn{background:var(--orange);border-color:var(--orange);color:#fff;font-weight:600}
+    .toggle-btn.dl-btn:hover{background:#e87f2e;border-color:#e87f2e;color:#fff}
+    .toggle-btn.dl-btn:disabled{background:rgba(251,146,60,.25);border-color:rgba(251,146,60,.25);color:#fff;cursor:wait;opacity:.7}
+
     /* MAIN SHELL */
     /* shell con tres columnas: caja del mapa (9fr) · gutter vacío (1fr) · panel (380px).
        El gutter da aire entre la caja del mapa y el panel para drill-down cómodo. */
@@ -504,6 +518,10 @@
       <button class="toggle-btn active" data-scope="local" onclick="setScope('local')" title="Percentila dentro del set visible (ej. comunas de Cali entre sí)">Local</button>
       <button class="toggle-btn" data-scope="nacional" onclick="setScope('nacional')" title="Percentila contra los ~1.100 municipios del país (lectura país-wide)">Nacional</button>
     </div>
+    <div class="toggle-group dl-group">
+      <span class="dl-counter" id="dl-counter" title="Descargas usadas este mes (compartido con Oportunidad)">…</span>
+      <button class="toggle-btn dl-btn" id="dl-btn" onclick="onDownloadVeletaXLSX()" title="Descarga la lista completa del scope actual">Descargar Excel</button>
+    </div>
   </section>
 
   <!-- MAIN SHELL: mapa + panel -->
@@ -600,6 +618,8 @@
     'toggle-scope':              'pro',      // toggle Local / Nacional
     'bog-barrios':               'premium',  // drill a barrios catastrales de Bogotá
     'mde-barrios':               'premium',  // drill a barrios de Medellín
+    'descarga-xlsx':             'pro',      // Pro 3/mes, Premium 10/mes (compartido con Oportunidad)
+    'descarga-xlsx-quota':       'pro',      // alias para el modal de "quota agotada"
   };
 
   // Copy del modal por feature
@@ -611,6 +631,8 @@
     'toggle-scope':              { title:'Comparar Local vs Nacional', desc:'Alterna la lectura del score: dentro del set local (UPL/comunas entre sí) o contra los ~1.100 municipios del país. Disponible en Pro.' },
     'bog-barrios':               { title:'Bogotá · barrios catastrales', desc:'El mapa por los 1.001 barrios catastrales de Bogotá, con herencia kNN de los barrios sin medición, está disponible en Premium.' },
     'mde-barrios':               { title:'Medellín · barrios', desc:'El mapa por los barrios oficiales de Medellín, con herencia kNN de los barrios sin medición, está disponible en Premium.' },
+    'descarga-xlsx':             { title:'Descargar resultados (Excel)', desc:'La descarga en Excel se habilita desde Pro (3/mes) y Premium (10/mes). El contador es mensual y compartido con el módulo Oportunidad.' },
+    'descarga-xlsx-quota':       { title:'Llegaste al límite del mes', desc:'Tu cuota mensual de descargas (compartida entre Veleta y Oportunidad) ya se agotó. Se reinicia el día 1 del próximo mes. Si necesitas más, pasa a Premium para 10/mes.' },
   };
 
   const PLAN_PRICE = {
@@ -2350,6 +2372,9 @@
         <div class="top-score">${fmtScore(r.score)}</div>
       </div>`;
     }).join('');
+    // Refresca el contador del botón de descarga (label "X deptos" o "X muns",
+    // etc.) cada vez que cambia el scope visible.
+    try { if (typeof renderDlCounter === 'function') renderDlCounter(); } catch(_){}
   }
 
   function onTopClickDep(depElec){
@@ -2511,6 +2536,327 @@
     }
   });
 
+  /* ───────── Descargas · cuota mensual (compartida con Oportunidad) ─────────
+     Reusa los endpoints /dl/status y /dl/consume del worker rr-auth y la
+     misma llave de fallback en localStorage (`opo-dl-YYYY-MM`), para que el
+     contador sea efectivamente uno solo: bajar en Veleta y Oportunidad
+     descuenta del mismo balance. */
+  const DL_QUOTA = { anonymous:0, free:0, pro:3, premium:10, full:9999 };
+  const DL_API   = 'https://rr-auth.reruizc.workers.dev/dl';
+  let _dlState   = { used:0, quota:0, source:'local' };
+
+  function _dlLocalKey(){
+    const d = new Date();
+    const ym = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    return `opo-dl-${ym}`;        // misma llave que oportunidad.html (compartido).
+  }
+  function _dlLocalUsed(){
+    try { return parseInt(localStorage.getItem(_dlLocalKey()) || '0', 10) || 0; }
+    catch(_){ return 0; }
+  }
+  function _dlLocalBump(){
+    try { localStorage.setItem(_dlLocalKey(), String(_dlLocalUsed() + 1)); } catch(_){}
+  }
+  function _dlLocalQuota(){ return DL_QUOTA[_userPlan] || 0; }
+
+  async function dlRefreshStatus(){
+    const tok = localStorage.getItem('rr-token');
+    if (!tok){
+      _dlState = { used: _dlLocalUsed(), quota: _dlLocalQuota(), source:'local' };
+      return _dlState;
+    }
+    try {
+      const res = await fetch(`${DL_API}/status`, { headers:{ 'Authorization':`Bearer ${tok}` } });
+      if (res.ok){
+        const data = await res.json();
+        _dlState = { used:data.used|0, quota:data.quota|0, source:'worker' };
+        return _dlState;
+      }
+    } catch(_){}
+    _dlState = { used:_dlLocalUsed(), quota:_dlLocalQuota(), source:'local-fallback' };
+    return _dlState;
+  }
+
+  async function dlConsume(){
+    const tok = localStorage.getItem('rr-token');
+    if (!tok) return { ok:false, reason:'plan', used:0, quota:0, source:'local' };
+    try {
+      const res = await fetch(`${DL_API}/consume`, {
+        method:'POST', headers:{ 'Authorization':`Bearer ${tok}` }
+      });
+      if (res.ok){
+        const data = await res.json();
+        _dlState = { used:data.used|0, quota:data.quota|0, source:'worker' };
+        return { ok:true, used:_dlState.used, quota:_dlState.quota, source:'worker' };
+      }
+      if (res.status === 403){
+        const data = await res.json();
+        _dlState = { used:data.used|0, quota:data.quota|0, source:'worker' };
+        return { ok:false, reason:data.reason||'quota', used:_dlState.used, quota:_dlState.quota, source:'worker' };
+      }
+    } catch(_){}
+    const quota = _dlLocalQuota();
+    const used  = _dlLocalUsed();
+    if (quota === 0) return { ok:false, reason:'plan',  used, quota, source:'local-fallback' };
+    if (used >= quota) return { ok:false, reason:'quota', used, quota, source:'local-fallback' };
+    _dlLocalBump();
+    _dlState = { used: used+1, quota, source:'local-fallback' };
+    return { ok:true, used: used+1, quota, source:'local-fallback' };
+  }
+
+  /* SheetJS lazy: ~900 KB. Carga al primer click. */
+  const XLSX_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  let _xlsxLoading = null;
+  function loadXLSX(){
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    if (_xlsxLoading) return _xlsxLoading;
+    _xlsxLoading = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = XLSX_CDN;
+      s.onload  = () => resolve(window.XLSX);
+      s.onerror = () => reject(new Error('No se pudo cargar XLSX'));
+      document.head.appendChild(s);
+    });
+    return _xlsxLoading;
+  }
+
+  /* Determina el scope visible y devuelve { items, scope, level, unitLabel,
+     unitPlural, count }. items: array completo (no sólo el top), ordenado
+     por score desc. Refleja exactamente lo que el usuario ve en el mapa. */
+  function collectVeletaScopeItems(){
+    const cand = currentCand();
+    const candShort = cand ? cand.nombre.split(' ')[0] : '';
+    if (STATE.barrioActive){
+      const filt = STATE.barrioFilterCods;
+      const pool = filt
+        ? Object.values(STATE.scoreByBarrio).filter(r => r && r.loc_codigo && filt.has(String(r.loc_codigo).padStart(2,'0')))
+        : Object.values(STATE.scoreByBarrio);
+      const arr = pool.slice().sort((a,b)=>b.score-a.score);
+      const cityKey = STATE.barrioCity || (CITIES[STATE.cityActive] && CITIES[STATE.cityActive].key) || '';
+      const cityName = cityKey === 'medellin' ? 'Medellín' : 'Bogotá D.C.';
+      const sublocLabel = cityKey === 'medellin' ? 'comuna' : 'UPL';
+      const territ = (cityKey === 'medellin')
+        ? `Comuna ${STATE.barrioActive}`
+        : (Object.values(STATE.scoreByComuna).find(r => String(r.cod) === String(STATE.barrioActive))||{}).nombre || STATE.barrioActive;
+      return {
+        items: arr, scope:`${cityName} · ${sublocLabel} ${territ} · barrios`,
+        level:'barrio', unitLabel:'barrio', unitPlural:'barrios', count: arr.length,
+      };
+    }
+    if (STATE.cityActive){
+      const cfg = CITIES[STATE.cityActive];
+      const arr = Object.values(STATE.scoreByComuna).slice().sort((a,b)=>b.score-a.score);
+      const granLbl = (cfg && cfg.granLabel) ? cfg.granLabel.toLowerCase() : 'comunas';
+      const unit = (granLbl === 'upl') ? 'UPL' : 'comuna';
+      return {
+        items: arr, scope:`${cfg ? cfg.nombre : 'Ciudad'} · ${granLbl}`,
+        level:'subloc', unitLabel:unit, unitPlural:granLbl, count: arr.length,
+      };
+    }
+    if (STATE.selectedDep){
+      const arr = Object.values(STATE.scoreByMun)
+        .filter(r => r.depCod === STATE.selectedDep)
+        .slice().sort((a,b)=>b.score-a.score);
+      const depName = (STATE.depByElectoral[STATE.selectedDep] || {}).nombre || STATE.selectedDep;
+      return {
+        items: arr, scope:`${depName} · municipios`,
+        level:'mun', unitLabel:'municipio', unitPlural:'municipios', count: arr.length,
+      };
+    }
+    if (STATE.level === 'mun'){
+      const arr = Object.values(STATE.scoreByMun).slice().sort((a,b)=>b.score-a.score);
+      return {
+        items: arr, scope:`Nacional · municipios para ${candShort}`,
+        level:'mun', unitLabel:'municipio', unitPlural:'municipios', count: arr.length,
+      };
+    }
+    // Default: deptos nacional
+    const arr = Object.values(STATE.scoreByDep).slice().sort((a,b)=>b.score-a.score);
+    return {
+      items: arr, scope:`Nacional · departamentos para ${candShort}`,
+      level:'dep', unitLabel:'departamento', unitPlural:'departamentos', count: arr.length,
+    };
+  }
+
+  /* Render del contador + label del botón. Lo llaman patchTop30Names()
+     (cada cambio de scope) y dlRefreshStatus()/dlConsume() (cambio de cuota). */
+  function renderDlCounter(){
+    const cnt = document.getElementById('dl-counter');
+    const btn = document.getElementById('dl-btn');
+    if (!cnt || !btn) return;
+    const quota = _dlState.quota;
+    const used  = _dlState.used;
+    cnt.classList.remove('exhausted','locked');
+    let countLabel = '';
+    try {
+      const scope = collectVeletaScopeItems();
+      if (scope && scope.count){
+        countLabel = `${scope.count} ${scope.unitPlural}`;
+      }
+    } catch(_){}
+    if (quota === 0){
+      cnt.textContent = countLabel ? `${countLabel} · Pro/Premium` : 'Pro/Premium';
+      cnt.classList.add('locked');
+    } else if (quota >= 9999){
+      cnt.textContent = countLabel ? `${countLabel} · ilimitadas` : 'ilimitadas';
+    } else {
+      const remaining = Math.max(0, quota - used);
+      cnt.textContent = countLabel
+        ? `${countLabel} · ${used}/${quota} este mes`
+        : `${used}/${quota} este mes`;
+      if (used >= quota) cnt.classList.add('exhausted');
+    }
+    btn.disabled = false; // siempre clickeable: si no tiene plan/quota, abre modal.
+  }
+
+  function _dlErrorModalFor(reason){
+    if (reason === 'quota') openBlockedModal('descarga-xlsx-quota');
+    else                    openBlockedModal('descarga-xlsx');
+  }
+
+  /* Construye el .xlsx con 2 hojas (Metodología + Datos). Columnas
+     territoriales adaptadas al level (dep / mun / subloc / barrio). */
+  async function _buildAndDownloadVeletaXLSX(scope){
+    const cand   = currentCand();
+    const candId = cand ? cand.id : 'cand';
+    const candName = cand ? cand.nombre : '—';
+    const modeShort = candId === 'cepeda' ? 'Modo Cepeda · 1V'
+                    : candId === 'abelardo' ? 'Modo Abelardo · 2do en derecha'
+                    : candId === 'paloma'   ? 'Modo Paloma · 2do en derecha'
+                    : 'Modo';
+    const fecha = new Date().toISOString().slice(0,10);
+    const items = scope.items;
+
+    const XLSX = await loadXLSX();
+    const wb = XLSX.utils.book_new();
+
+    // ── Hoja 1 · Metodología ──
+    const metaRows = [
+      ['Módulo Veleta · ricardoruiz.co'],
+      [`Candidato: ${candName}`],
+      [modeShort],
+      [`Scope: ${scope.scope}  ·  Unidad: ${scope.unitLabel}  ·  Total: ${scope.count}`],
+      [`Fecha de descarga: ${fecha}`],
+      [''],
+      ['CÓMO LEER EL SCORE'],
+      [''],
+      ['El score es 0–100. Tonos cálidos en el mapa = más clave para'],
+      ['el candidato. Se construye así según el modo:'],
+      [''],
+      ['• Modo Cepeda (objetivo: ganar 1ª vuelta con >50%)'],
+      ['    score = (0.6 · proximidad + 0.4 · plausibilidad) × 100'],
+      ['    proximidad = qué tan cerca está el voto Cepeda proyectado del 50%'],
+      ['    plausibilidad = qué tan creíble es que cubra la brecha sumando'],
+      ['                    un tercio del voto centro 2018 (Fajardo).'],
+      [''],
+      ['• Modo Abelardo / Paloma (objetivo: 2do lugar dentro del bloque derecha)'],
+      ['    score = (0.7 · proximidad + 0.3 · plausibilidad) × 100'],
+      ['    proximidad = qué tan cerca está su voto proyectado del techo del bloque'],
+      ['    plausibilidad = espacio disponible al considerar el techo captable'],
+      [''],
+      ['El score que aparece acá es un RANK por percentil dentro de la cohorte'],
+      ['(deptos entre sí, muns nacionales entre sí, comunas de la ciudad entre sí).'],
+      ['No es directamente comparable entre niveles distintos.'],
+      [''],
+      ['COLUMNAS'],
+      [''],
+      ['rank     : posición de mayor a menor score dentro del scope.'],
+      ['nombre   : nombre del territorio (depto, municipio, comuna/UPL, barrio).'],
+      ['depto    : departamento Registraduría que contiene el territorio.'],
+      ['mun_elec : código electoral municipal Registraduría (cuando aplica).'],
+      ['score    : 0–100, dos decimales.'],
+      [''],
+      ['Documentación completa: https://ricardoruiz.co/veleta.html'],
+      ['Detalle metodológico: https://ricardoruiz.co/previa-1v.html'],
+    ];
+    const wsMeta = XLSX.utils.aoa_to_sheet(metaRows);
+    wsMeta['!cols'] = [{ wch: 80 }];
+    XLSX.utils.book_append_sheet(wb, wsMeta, 'Metodología');
+
+    // ── Hoja 2 · Datos ──
+    // Columnas territoriales según el nivel. Las que no aplican quedan vacías
+    // — así una sola plantilla cubre los 5 scopes sin perder claridad.
+    const header = [
+      'candidato','modo','scope','nivel','rank','nombre',
+      'depto','mun_elec','upl_o_comuna','barrio',
+      'score',
+      'fecha_export',
+    ];
+    const num2 = (n) => (n == null || isNaN(n)) ? null : Number(Number(n).toFixed(2));
+    const depNameOf = (r) => {
+      const cod = r.depCod || '';
+      return (STATE.depByElectoral[cod] || {}).nombre || cod || '';
+    };
+    const rows = items.map((r, i) => {
+      const lvl = scope.level;
+      let nombre = r.nombre || r.__cityName || r.name || '';
+      let depto  = depNameOf(r);
+      let munCod = '';
+      let uplComuna = '';
+      let barrio = '';
+      if (lvl === 'dep'){
+        nombre = (STATE.depByElectoral[r.depCod] || {}).nombre || r.depCod;
+        depto  = nombre;
+      } else if (lvl === 'mun'){
+        const meta = STATE._munNameByKey && STATE._munNameByKey[r.key];
+        nombre = (meta && meta.name) || r.nombre || r.key || '';
+        munCod = (r.key || '').split('-')[1] || '';
+      } else if (lvl === 'subloc'){
+        uplComuna = r.nombre || r.cod || '';
+        nombre = uplComuna;
+      } else if (lvl === 'barrio'){
+        barrio = r.nombre || r.cod || '';
+        nombre = barrio;
+        uplComuna = r.loc_nombre || '';
+      }
+      return [
+        candName, modeShort, scope.scope, lvl, i + 1, nombre,
+        depto, munCod, uplComuna, barrio,
+        num2(r.score),
+        fecha,
+      ];
+    });
+    const wsData = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    wsData['!cols'] = [
+      { wch: 22 }, { wch: 26 }, { wch: 30 }, { wch: 10 }, { wch: 6 }, { wch: 32 },
+      { wch: 22 }, { wch: 10 }, { wch: 26 }, { wch: 26 },
+      { wch: 8 },
+      { wch: 12 },
+    ];
+    XLSX.utils.book_append_sheet(wb, wsData, 'Datos');
+
+    const safeScope = (scope.scope || 'veleta').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,50);
+    XLSX.writeFile(wb, `veleta_${candId}_${safeScope}_${fecha}.xlsx`);
+  }
+
+  async function onDownloadVeletaXLSX(){
+    if (!requireFeature('descarga-xlsx')) return;
+    const scope = collectVeletaScopeItems();
+    if (!scope || !scope.items || !scope.items.length){
+      alert('No hay datos para descargar todavía. Espera a que terminen de cargar los scores.');
+      return;
+    }
+    const btn = document.getElementById('dl-btn');
+    const prev = btn ? btn.textContent : '';
+    if (btn){ btn.disabled = true; btn.textContent = 'Generando…'; }
+    try {
+      const consumed = await dlConsume();
+      if (!consumed.ok){
+        _dlErrorModalFor(consumed.reason);
+        renderDlCounter();
+        return;
+      }
+      await _buildAndDownloadVeletaXLSX(scope);
+      renderDlCounter();
+    } catch (e){
+      console.error('[Veleta dl] error', e);
+      alert('No se pudo generar el archivo. Intenta de nuevo.');
+    } finally {
+      if (btn){ btn.disabled = false; btn.textContent = prev || 'Descargar Excel'; }
+    }
+  }
+  window.onDownloadVeletaXLSX = onDownloadVeletaXLSX;
+
   /* ───────── Init ───────── */
   (async function init(){
     // Auth sync (localStorage) → renderea plan-chip de inmediato, sin parpadeo.
@@ -2518,7 +2864,10 @@
     // el chip (sirve para invalidar tokens vencidos o reflejar upgrades).
     loadUserFromStorage();
     renderPlanChip();
-    refreshUserFromAPI().then(() => renderPlanChip());
+    refreshUserFromAPI().then(() => { renderPlanChip(); dlRefreshStatus().then(renderDlCounter); });
+    // Refresh inicial con lo que ya hay en localStorage (instant) mientras el
+    // worker responde — evita un parpadeo del contador en el primer paint.
+    dlRefreshStatus().then(renderDlCounter);
 
     showLoading(true);
     try {
