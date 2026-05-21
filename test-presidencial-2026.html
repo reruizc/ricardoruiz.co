@@ -218,6 +218,28 @@
     .scale-num { font-size:1rem; font-weight:700; }
     .scale-lbl { font-size:.6rem; letter-spacing:.05em; line-height:1.05; text-align:center; max-width:100%; word-break:keep-all; }
 
+    /* ── Loading entre la octava pregunta y el resultado ── */
+    #panel-loading-result {
+      min-height: 55vh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 2.5rem 1.2rem;
+    }
+    #panel-loading-result.active { display: flex; }
+    .loading-result-wrap { width: 100%; max-width: 460px; text-align: center; }
+    .loading-result-text {
+      font-family: 'Fraunces', serif; font-weight: 400;
+      font-size: 1.18rem; color: var(--text); line-height: 1.4;
+      margin: 0 0 1.5rem;
+    }
+    .loading-result-bar {
+      width: 100%; height: 6px; background: var(--border-soft);
+      border-radius: 999px; overflow: hidden;
+    }
+    .loading-result-fill {
+      height: 100%; width: 0%;
+      background: var(--blue); border-radius: 999px;
+    }
+
     /* ── Resultado ── */
     .arq-hero {
       padding: 1.5rem 1.4rem;
@@ -782,6 +804,18 @@
         <div class="actions">
           <button class="btn btn-ghost" id="q-back" onclick="qPrev()">← Anterior</button>
           <button class="btn disabled" id="q-next" onclick="qNext()">Siguiente →</button>
+        </div>
+      </div>
+
+      <!-- ── 3b. LOADING TRAS LA OCTAVA PREGUNTA ──
+           Transición de 4s para que DeepSeek alcance a contestar antes de
+           que el usuario llegue al resultado. La barra anima 0→100% con un
+           transition de width; iniciarPrefetchLectura() ya arrancó al pintar
+           renderResultado() detrás. -->
+      <div class="panel" id="panel-loading-result">
+        <div class="loading-result-wrap">
+          <p class="loading-result-text">¡Terminado! Cargando tus resultados…</p>
+          <div class="loading-result-bar"><div class="loading-result-fill" id="loading-result-fill"></div></div>
         </div>
       </div>
 
@@ -1815,9 +1849,24 @@
       STATE.qIndex++;
       renderPregunta();
     } else {
+      // Última pregunta: computeArquetipo() ya dispara renderResultado() +
+      // iniciarPrefetchLectura(), así que DeepSeek arranca en background.
+      // Mientras tanto mostramos una transición de 4s con barra de
+      // progreso. Al terminar, mostramos el panel de resultado.
       computeArquetipo();
       $('#progressFill').style.width = '100%';
-      show('result');
+      $('#progressRow').style.display = 'none';
+      show('loading-result');
+      const fill = $('#loading-result-fill');
+      if (fill) {
+        fill.style.transition = 'none';
+        fill.style.width = '0%';
+        // Forzar reflow para que la transition de 4s arranque desde 0%.
+        void fill.offsetWidth;
+        fill.style.transition = 'width 4s linear';
+        fill.style.width = '100%';
+      }
+      setTimeout(() => show('result'), 4000);
     }
   }
 
