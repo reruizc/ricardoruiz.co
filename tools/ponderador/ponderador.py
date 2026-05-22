@@ -306,7 +306,20 @@ def delta_recencia(dias, lam):
     return math.exp(-lam * max(0, dias))
 
 
-def calcular_promedio_primera_vuelta(encuestas, predicciones, q_firma, q_modo):
+def calcular_promedio_primera_vuelta(encuestas, predicciones, q_firma, q_modo,
+                                     house_effect=None, debias_min_n=2):
+    """
+    Promedio ponderado de primera vuelta sobre polls vigentes (<= DIAS_VIGENCIA días).
+
+    Si `house_effect` viene, aplica de-bias por (firma, candidato):
+        pct_corregido = max(0, pct_observado − house_effect[firma][cand].house_effect_pp)
+    Sólo cuando house_effect[firma][cand].n_polls >= debias_min_n (default 2),
+    para no propagar ruido de firmas con una sola observación.
+
+    Cuando house_effect es None, devuelve el promedio crudo (sin de-bias).
+
+    Retorna (promedio, contribuciones, excluidas).
+    """
     contribuciones = []
     excluidas = []
     candidatos_universo = set()
@@ -339,6 +352,27 @@ def calcular_promedio_primera_vuelta(encuestas, predicciones, q_firma, q_modo):
         qm = q_modo.get(enc.modo, 1.0)
         dr = delta_recencia(dias, LAMBDA_RECENCIA)
         peso = qf * qm * dr
+
+        # De-bias por candidato si tenemos house_effect aplicable.
+        preds_corregidas = {}
+        ajustes = {}  # para transparencia
+        firma = enc.encuestadora
+        he_firma = (house_effect or {}).get(firma, {})
+        for cand, pct in preds.items():
+            he_entry = he_firma.get(cand)
+            if he_entry and he_entry.get("n_polls", 0) >= debias_min_n:
+                ajuste = he_entry["house_effect_pp"]
+                pct_corr = max(0.0, pct - ajuste)
+                preds_corregidas[cand] = pct_corr
+                ajustes[cand] = {
+                    "pct_observado": pct,
+                    "house_effect_pp": ajuste,
+                    "pct_corregido": round(pct_corr, 2),
+                }
+            else:
+                preds_corregidas[cand] = pct
+                # no anotamos en `ajustes` los candidatos sin de-bias
+
         contribuciones.append({
             "encuesta_id": eid,
             "encuestadora": enc.encuestadora,
@@ -351,13 +385,17 @@ def calcular_promedio_primera_vuelta(encuestas, predicciones, q_firma, q_modo):
             "delta_recencia": round(dr, 4),
             "peso_final": round(peso, 5),
             "predicciones": preds,
+            "predicciones_debiased": preds_corregidas,
+            "ajustes_house_effect": ajustes,
         })
 
     promedio = {}
     if contribuciones:
         total = sum(c["peso_final"] for c in contribuciones)
+        # Usar predicciones_debiased si vienen, si no crudas (son iguales en ese caso).
+        key_pred = "predicciones_debiased" if house_effect is not None else "predicciones"
         for cand in candidatos_universo:
-            num = sum(c["peso_final"] * c["predicciones"].get(cand, 0) for c in contribuciones)
+            num = sum(c["peso_final"] * c[key_pred].get(cand, 0) for c in contribuciones)
             promedio[cand] = round(num / total, 2) if total else 0
         for c in contribuciones:
             c["peso_relativo_pct"] = round(c["peso_final"] / total * 100, 2) if total else 0
@@ -365,40 +403,84 @@ def calcular_promedio_primera_vuelta(encuestas, predicciones, q_firma, q_modo):
     return promedio, contribuciones, excluidas
 
 
-def calcular_house_effect(encuestas, predicciones):
+HOUSE_EFFECT_WINDOW_DAYS = 14
+
+
+def calcular_house_effect(encuestas, predicciones, q_firma):
     """
-    Por candidato: desviación promedio (pp) de cada firma frente a la mediana
-    semanal de todas las firmas. Solo polls post-marzo (>= 2026-03-09).
+    Para cada (firma, candidato): desviación promedio (pp) frente al consenso
+    de OTRAS firmas en ventana ±HOUSE_EFFECT_WINDOW_DAYS, ponderado por
+    n_muestra × q_firma_other × exp(−λ × |Δdías|).
+
+    Mejoras vs v1 (mediana semanal):
+      · Ya no se pierden polls por bucketing estricto a semana ISO.
+      · Cada poll de la firma F se compara contra un consenso PONDERADO
+        (n × q × recencia) de TODAS las otras firmas dentro de ±14d,
+        no contra una mediana cruda de 2-3 firmas en su semana.
+      · Devuelve también la lista de desviaciones por poll (transparencia)
+        y la std de las desviaciones (incertidumbre del house effect).
+
+    Solo polls post-marzo (>= FECHA_CONSULTAS) — el universo de candidatos
+    cambió radicalmente con las consultas del 8-mar.
     """
-    por_semana = defaultdict(lambda: defaultdict(list))  # {(yr,wk): {cand: [(firma, pct), ...]}}
+    # 1) Construir lista de polls vigentes con sus predicciones de primera vuelta.
+    polls = []
     for eid, enc in encuestas.items():
         if not enc.fecha_efectiva or enc.fecha_efectiva <= FECHA_CONSULTAS:
             continue
         preds = predicciones.get(eid, {}).get("primera_vuelta", {})
         if not preds:
             continue
-        iso_year, iso_week, _ = enc.fecha_efectiva.isocalendar()
+        polls.append((eid, enc, preds))
+
+    desvs_por_firma_cand = defaultdict(lambda: defaultdict(list))
+
+    # 2) Para cada poll, calcular consenso por candidato (excluyendo su propia firma)
+    #    y registrar la desviación.
+    for eid, enc, preds in polls:
+        firma = enc.encuestadora
+        d = enc.fecha_efectiva
+
         for cand, pct in preds.items():
-            por_semana[(iso_year, iso_week)][cand].append((enc.encuestadora, pct))
+            num = 0.0
+            den = 0.0
+            for other_eid, other_enc, other_preds in polls:
+                if other_enc.encuestadora == firma:
+                    continue
+                if cand not in other_preds:
+                    continue
+                delta = abs((other_enc.fecha_efectiva - d).days)
+                if delta > HOUSE_EFFECT_WINDOW_DAYS:
+                    continue
+                # peso = n_muestra × q_firma_other × recencia(delta)
+                n = max(1, other_enc.n_muestra or 1)
+                qf_other = q_firma.get(other_enc.encuestadora, Q_FIRMA_DEFAULT)
+                w = n * qf_other * math.exp(-LAMBDA_RECENCIA * delta)
+                num += w * other_preds[cand]
+                den += w
 
-    # Desviación por (firma, cand): valor − mediana_semanal_cand
-    desvs = defaultdict(lambda: defaultdict(list))
-    for _semana, por_cand in por_semana.items():
-        for cand, vals in por_cand.items():
-            if len(vals) < 2:
-                continue
-            mediana = statistics.median([v for _, v in vals])
-            for firma, pct in vals:
-                desvs[firma][cand].append(pct - mediana)
+            if den <= 0:
+                continue  # no hay polls de otras firmas en la ventana para este candidato
+            consensus = num / den
+            desvs_por_firma_cand[firma][cand].append({
+                "encuesta_id": eid,
+                "fecha_fin": d.isoformat(),
+                "pct": round(pct, 2),
+                "consenso": round(consensus, 2),
+                "desv_pp": round(pct - consensus, 2),
+            })
 
+    # 3) Agregar a métricas finales por (firma, cand).
     out = {}
-    for firma, por_cand in desvs.items():
+    for firma, por_cand in desvs_por_firma_cand.items():
         out[firma] = {}
-        for cand, ds in por_cand.items():
+        for cand, items in por_cand.items():
+            desvs = [it["desv_pp"] for it in items]
             out[firma][cand] = {
-                "house_effect_pp": round(statistics.mean(ds), 2),
-                "n_polls": len(ds),
-                "std_pp": round(statistics.pstdev(ds), 2) if len(ds) > 1 else 0.0,
+                "house_effect_pp": round(statistics.mean(desvs), 2),
+                "n_polls": len(desvs),
+                "std_pp": round(statistics.pstdev(desvs), 2) if len(desvs) > 1 else 0.0,
+                "desviaciones": items,
             }
     return out
 
@@ -447,10 +529,16 @@ def main():
 
     q_firma, calibracion = calcular_q_firma(encuestas, predicciones, resultados)
     q_modo = calcular_q_modo(encuestas, q_firma)
-    promedio, contribuciones, excluidas = calcular_promedio_primera_vuelta(
+    # 1) Calcular house_effect ANTES del promedio para poder de-biasear.
+    house = calcular_house_effect(encuestas, predicciones, q_firma)
+    # 2) Promedio crudo (sin de-bias) — para transparencia/comparación.
+    promedio_raw, _, _ = calcular_promedio_primera_vuelta(
         encuestas, predicciones, q_firma, q_modo
     )
-    house = calcular_house_effect(encuestas, predicciones)
+    # 3) Promedio oficial: de-biased por house_effect medido (Capa 1).
+    promedio, contribuciones, excluidas = calcular_promedio_primera_vuelta(
+        encuestas, predicciones, q_firma, q_modo, house_effect=house
+    )
 
     meta = {
         "encuestas_usadas": len(contribuciones),
@@ -459,6 +547,8 @@ def main():
         "lambda_recencia": LAMBDA_RECENCIA,
         "sigma_house_pp": SIGMA_HOUSE_PP,
         "dias_vigencia": DIAS_VIGENCIA,
+        "debias_aplicado": True,
+        "debias_min_n_polls": 2,
     }
 
     publico = construir_publico(promedio, meta)
@@ -470,12 +560,20 @@ def main():
             "lambda_recencia": LAMBDA_RECENCIA,
             "sigma_house_pp": SIGMA_HOUSE_PP,
             "dias_vigencia": DIAS_VIGENCIA,
+            "house_effect_window_days": HOUSE_EFFECT_WINDOW_DAYS,
         },
+        "metodologia_house_effect": (
+            "v2 — ventana móvil ±%d días. Para cada poll de la firma F se compara su "
+            "pct vs un consenso ponderado de OTRAS firmas (excluyendo F) dentro de "
+            "±%d días, con peso = n_muestra × q_firma_other × exp(-λ × |Δdías|). "
+            "λ=%.2f. Sólo polls post-marzo (Ley 2494)."
+        ) % (HOUSE_EFFECT_WINDOW_DAYS, HOUSE_EFFECT_WINDOW_DAYS, LAMBDA_RECENCIA),
         "calibracion_8mar": calibracion,
         "q_firma": q_firma,
         "q_firma_override": Q_FIRMA_OVERRIDE,
         "q_modo": q_modo,
-        "promedio_primera_vuelta": promedio,
+        "promedio_primera_vuelta": promedio,           # de-biased (oficial)
+        "promedio_primera_vuelta_raw": promedio_raw,   # sin de-bias (comparación)
         "contribuciones": contribuciones,
         "excluidas": excluidas,
         "house_effect": house,

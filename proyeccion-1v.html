@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Proyección · Primera Vuelta 2026 · Ricardo Ruiz</title>
+  <meta name="description" content="Proyección probabilística de la primera vuelta presidencial Colombia 2026. Monte Carlo de 1.000 simulaciones, calibrado contra el error real de las encuestas en 2022." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=Arima:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#060810;--surface:rgba(255,255,255,.04);--border:rgba(255,255,255,.08);
+      --white:#f4f3ef;--blue:#0047FF;--green:#4ade80;--purple:#a78bfa;
+      --orange:#fb923c;--red:#f87171;--amber:#f59e0b;
+      --c-cepeda:#51458F;--c-abelardo:#000062;--c-paloma:#1866DF;
+      --c-fajardo:#EEAA22;--c-claudia:#d9db24;--c-botero:#d4af37;
+      --c-murillo:#16a34a;
+    }
+    html{scroll-behavior:smooth}
+    body{background:var(--bg);color:var(--white);font-family:Avenir,sans-serif;min-height:100vh;overflow-x:hidden;cursor:none}
+    body.day-mode{background:#e6ded3;color:#0d1120}
+    body.day-mode .electoral-nav{background:rgba(230,222,211,.93);border-bottom:1px solid rgba(0,0,0,.1)}
+    body.day-mode .logo-text{color:#0d1120}
+    body.day-mode .breadcrumb{color:rgba(0,0,0,.45);border-bottom-color:rgba(0,0,0,.1)}
+    body.day-mode .breadcrumb a{color:rgba(0,71,255,.8)}
+    body.day-mode .bc-current{color:#0d1120}
+    body.day-mode .page-header{border-bottom-color:rgba(0,0,0,.1)}
+    body.day-mode .page-sub{color:rgba(0,0,0,.55)}
+    body.day-mode .page-title{color:#0d1120}
+    body.day-mode .theme-btn{background:rgba(0,71,255,.08);border-color:rgba(0,71,255,.25);color:var(--blue)}
+    body.day-mode .pcard{background:rgba(0,0,0,.025);border-color:rgba(0,0,0,.1)}
+    body.day-mode .pcard-label{color:rgba(0,0,0,.55)}
+    body.day-mode .pcard-value{color:#0d1120}
+    body.day-mode .pcard-sub{color:rgba(0,0,0,.4)}
+    body.day-mode .section-title{color:#0d1120}
+    body.day-mode .section-sub{color:rgba(0,0,0,.55)}
+    body.day-mode .row-name{color:#0d1120}
+    body.day-mode .row-pct{color:#0d1120}
+    body.day-mode .row-int{color:rgba(0,0,0,.55)}
+    body.day-mode .axis text{fill:rgba(0,0,0,.5)}
+    body.day-mode .axis line,body.day-mode .axis path{stroke:rgba(0,0,0,.2)}
+    body.day-mode .grid line{stroke:rgba(0,0,0,.05)}
+    body.day-mode .pair-bar{background:rgba(0,0,0,.03)}
+    body.day-mode .src-card{background:rgba(0,0,0,.025);border-color:rgba(0,0,0,.1)}
+    body.day-mode .src-label{color:rgba(0,0,0,.55)}
+    body.day-mode .src-body{color:#0d1120}
+    body.day-mode .lesson{background:rgba(0,71,255,.04);border-color:rgba(0,71,255,.2)}
+    body.day-mode .lesson b,body.day-mode .lesson strong{color:#0d1120}
+    body.day-mode .foot{border-top-color:rgba(0,0,0,.1);color:rgba(0,0,0,.5)}
+    body.day-mode .table-2022 th,body.day-mode .table-2022 td{border-color:rgba(0,0,0,.1);color:#0d1120}
+    body.day-mode .table-2022 th{background:rgba(0,71,255,.06)}
+    body.day-mode .donut-track{stroke:rgba(0,0,0,.08)}
+    body.day-mode .vline{stroke:rgba(0,0,0,.5)}
+
+    /* NAV — idéntica a previa-1v */
+    .electoral-nav{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(4,6,16,.6);backdrop-filter:blur(8px);flex-shrink:0}
+    .e-btn-back{font-family:Avenir,sans-serif;font-weight:500;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--green);text-decoration:none;border:1.5px solid rgba(74,222,128,.4);padding:.3rem .8rem;transition:all .2s}
+    .e-btn-back:hover{color:#060810;background:var(--green);border-color:var(--green)}
+    .logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.85;transition:opacity .2s}
+    .logo-link:hover{opacity:1}
+    .logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px}
+    .logo-bar{width:5px;background:var(--blue);border-radius:1px 1px 0 0;opacity:.85}
+    .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.1rem,2vw,1.8rem);letter-spacing:-.03em;color:var(--white)}
+    .logo-text span{color:var(--blue)}
+    .theme-btn{display:flex;align-items:center;gap:.4rem;font-family:Avenir,sans-serif;font-weight:500;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);padding:.3rem .75rem;cursor:pointer;transition:all .2s}
+    .theme-btn:hover{background:rgba(255,255,255,.15);color:var(--white)}
+
+    /* Breadcrumb + header */
+    .breadcrumb{padding:.6rem 2.5rem;font-family:Avenir,sans-serif;font-weight:400;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.35);border-bottom:1px solid var(--border)}
+    .breadcrumb a{color:rgba(0,71,255,.8);text-decoration:none}
+    .breadcrumb a:hover{color:var(--blue)}
+    .bc-current{color:var(--white)}
+    .page-header{padding:2rem 2.5rem 1rem;display:flex;justify-content:space-between;align-items:flex-end;gap:1rem;border-bottom:1px solid var(--border);flex-wrap:wrap}
+    .page-title{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.4rem,2.6vw,2.2rem);letter-spacing:-.025em;color:var(--white)}
+    .page-title span{color:var(--blue)}
+    .page-sub{font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;color:rgba(255,255,255,.5);margin-top:.4rem;max-width:700px;line-height:1.5}
+
+    /* Hero — cards de probabilidades clave */
+    .hero{padding:2.5rem 2.5rem 1.5rem}
+    .hero-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem}
+    .pcard{background:var(--surface);border:1px solid var(--border);padding:1.25rem 1.5rem;border-radius:2px;position:relative}
+    .pcard.headline{grid-column:span 2;background:linear-gradient(135deg,rgba(0,71,255,.06),rgba(0,71,255,.02))}
+    .pcard-label{font-family:'DM Mono','SF Mono',monospace;font-weight:400;font-size:.65rem;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-bottom:.5rem}
+    .pcard-value{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(2.2rem,4vw,3.6rem);letter-spacing:-.04em;line-height:1;color:var(--white)}
+    .pcard-value.win{color:var(--green)}
+    .pcard-value.warn{color:var(--amber)}
+    .pcard-value.surprise{color:var(--orange)}
+    .pcard-sub{font-family:Avenir,sans-serif;font-weight:400;font-size:.75rem;color:rgba(255,255,255,.5);margin-top:.5rem;line-height:1.4}
+    @media (max-width:640px){.pcard.headline{grid-column:auto}}
+
+    /* Sections genéricas */
+    section.block{padding:2rem 2.5rem;border-top:1px solid var(--border)}
+    .section-title{font-family:'Syne',sans-serif;font-weight:700;font-size:1.4rem;letter-spacing:-.02em;color:var(--white);margin-bottom:.3rem}
+    .section-sub{font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;color:rgba(255,255,255,.5);margin-bottom:1.5rem;max-width:780px;line-height:1.5}
+
+    /* Distribución por candidato — fila por candidato con barra + intervalos */
+    .dist-row{display:grid;grid-template-columns:160px 80px 1fr;gap:.75rem;align-items:center;padding:.6rem 0;border-bottom:1px solid var(--border)}
+    .dist-row:last-child{border-bottom:none}
+    .row-name{font-family:'Syne',sans-serif;font-weight:500;font-size:.95rem;color:var(--white)}
+    .row-pct{font-family:Avenir,sans-serif;font-weight:500;font-size:1.1rem;color:var(--white);text-align:right}
+    .row-int{font-family:'DM Mono',monospace;font-weight:400;font-size:.7rem;color:rgba(255,255,255,.5);margin-top:.2rem}
+    .row-bar-wrap{position:relative;height:30px}
+    .row-bar-svg{width:100%;height:30px;overflow:visible}
+    .vline{stroke:rgba(255,255,255,.5);stroke-width:1}
+
+    /* Trayectoria temporal */
+    .chart-wrap{position:relative;width:100%;height:380px;margin-top:1rem}
+    .axis text{font-family:'DM Mono',monospace;font-size:.65rem;fill:rgba(255,255,255,.5)}
+    .axis line,.axis path{stroke:rgba(255,255,255,.15);stroke-width:.5}
+    .grid line{stroke:rgba(255,255,255,.05);stroke-width:.5}
+    .trend-line{fill:none;stroke-width:2}
+    .legend{display:flex;flex-wrap:wrap;gap:.85rem;margin-top:.5rem;font-family:Avenir,sans-serif;font-weight:400;font-size:.75rem;color:rgba(255,255,255,.7)}
+    .legend-item{display:flex;align-items:center;gap:.4rem}
+    .legend-dot{width:10px;height:10px;border-radius:50%}
+
+    /* Pares 2V */
+    .pair-row{display:grid;grid-template-columns:1fr 60px;gap:1rem;align-items:center;padding:.55rem 0;border-bottom:1px solid var(--border)}
+    .pair-row:last-child{border-bottom:none}
+    .pair-bar{position:relative;height:24px;background:rgba(255,255,255,.04);border-radius:2px;overflow:hidden;display:flex;align-items:center}
+    .pair-fill{height:100%;background:linear-gradient(90deg,rgba(0,71,255,.4),rgba(0,71,255,.7));transition:width .6s}
+    .pair-label{padding:0 .75rem;font-family:Avenir,sans-serif;font-weight:500;font-size:.85rem;color:var(--white);z-index:1;position:relative;width:100%}
+    .pair-pct{font-family:'Syne',sans-serif;font-weight:700;font-size:.95rem;text-align:right;color:var(--white)}
+
+    /* Cards de fuentes de incertidumbre */
+    .sources-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem}
+    .src-card{background:var(--surface);border:1px solid var(--border);padding:1.1rem 1.25rem;border-radius:2px}
+    .src-num{font-family:'Syne',sans-serif;font-weight:800;font-size:1rem;color:var(--blue);letter-spacing:.05em}
+    .src-label{font-family:'DM Mono',monospace;font-weight:400;font-size:.65rem;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-bottom:.4rem;display:flex;align-items:center;gap:.5rem}
+    .src-body{font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;color:rgba(255,255,255,.8);line-height:1.55}
+
+    /* Lección 2022 — tabla */
+    .lesson{background:rgba(0,71,255,.04);border:1px solid rgba(0,71,255,.2);padding:1.25rem 1.5rem;border-radius:2px;margin-top:1rem}
+    .lesson p{font-family:Avenir,sans-serif;font-weight:400;font-size:.9rem;color:rgba(255,255,255,.85);line-height:1.6;margin-bottom:.75rem}
+    .lesson b{color:var(--white)}
+    .table-2022{width:100%;border-collapse:collapse;margin-top:1rem;font-family:Avenir,sans-serif;font-weight:400;font-size:.82rem}
+    .table-2022 th,.table-2022 td{border:1px solid var(--border);padding:.45rem .7rem;text-align:right;color:rgba(255,255,255,.85)}
+    .table-2022 th{background:rgba(0,71,255,.06);font-weight:500;text-align:left;color:var(--white)}
+    .table-2022 td.cand{text-align:left}
+    .table-2022 td.err-bad{color:var(--red);font-weight:500}
+    .table-2022 td.err-ok{color:var(--green);font-weight:500}
+
+    .foot{padding:2rem 2.5rem;font-family:Avenir,sans-serif;font-weight:400;font-size:.75rem;color:rgba(255,255,255,.4);line-height:1.7;border-top:1px solid var(--border)}
+    .foot a{color:rgba(0,71,255,.8);text-decoration:none}
+    .foot a:hover{color:var(--blue)}
+
+    /* Cursor custom */
+    .cursor{position:fixed;width:14px;height:14px;border-radius:50%;background:var(--blue);pointer-events:none;z-index:100000;transform:translate(-50%,-50%);transition:transform .15s cubic-bezier(.4,0,.2,1)}
+    .cursor-ring{position:fixed;width:40px;height:40px;border-radius:50%;border:1.5px solid var(--blue);pointer-events:none;z-index:99999;transform:translate(-50%,-50%);opacity:.4;transition:transform .25s cubic-bezier(.4,0,.2,1),opacity .25s}
+    body.day-mode .cursor{background:var(--blue)}
+    body.day-mode .cursor-ring{border-color:var(--blue)}
+    @media (hover:none){.cursor,.cursor-ring{display:none}body{cursor:auto}}
+
+    /* Loading */
+    .loading{padding:3rem 2.5rem;text-align:center;font-family:Avenir,sans-serif;font-weight:300;font-size:.95rem;color:rgba(255,255,255,.5);letter-spacing:.05em}
+    .loading.day-mode{color:rgba(0,0,0,.5)}
+
+    @media (max-width:640px){
+      .electoral-nav{padding:.7rem 1rem}
+      .breadcrumb,.page-header,.hero,section.block,.foot{padding-left:1rem;padding-right:1rem}
+      .dist-row{grid-template-columns:110px 60px 1fr;gap:.5rem;font-size:.85rem}
+      .row-name{font-size:.85rem}
+      .pcard{padding:1rem 1.1rem}
+    }
+  </style>
+</head>
+<body>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <nav class="electoral-nav">
+    <div style="display:flex;align-items:center;gap:1rem">
+      <a href="electoral.html" class="e-btn-back">← Volver</a>
+    </div>
+    <a href="electoral.html" class="logo-link">
+      <div class="logo-bars">
+        <div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div>
+        <div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div>
+      </div>
+      <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+    </a>
+  </nav>
+
+  <div class="breadcrumb">
+    <a href="electoral.html">Electoral</a> &nbsp;/&nbsp; Primera Vuelta 2026 &nbsp;/&nbsp; <span class="bc-current">Proyección Monte Carlo</span>
+  </div>
+
+  <header class="page-header">
+    <div>
+      <div class="page-title">Proyección <span>Primera Vuelta 2026</span></div>
+      <div class="page-sub">Monte Carlo de 1.000 simulaciones · de-bias por house effects medidos · shock late-campaign calibrado contra el error real de las encuestas en 2022.</div>
+    </div>
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
+  </header>
+
+  <main>
+    <div class="loading" id="loading">Cargando proyección…</div>
+    <div id="app" style="display:none">
+
+      <!-- HERO: probabilidades clave -->
+      <section class="hero">
+        <div class="hero-grid" id="hero-cards"></div>
+        <div style="margin-top:1rem;font-family:Avenir,sans-serif;font-size:.78rem;color:rgba(255,255,255,.5);line-height:1.5" id="hero-meta"></div>
+      </section>
+
+      <!-- Distribución por candidato -->
+      <section class="block">
+        <div class="section-title">Distribución por candidato al 31 de mayo</div>
+        <div class="section-sub">Cada barra muestra el intervalo del 5% al 95% (cajas claras) y del 25% al 75% (cajas sólidas) de las 1.000 simulaciones. La línea blanca es la mediana. La caja sólida es donde cae la mitad central del escenario.</div>
+        <div id="dist-list"></div>
+      </section>
+
+      <!-- Trayectoria histórica -->
+      <section class="block">
+        <div class="section-title">Trayectoria histórica · ensemble de-biaseado</div>
+        <div class="section-sub">Promedio diario ponderado de las 12 encuestas vigentes (KSWA gaussiano σ=7d), con corrección por house effect medido. La línea punteada es la proyección Holt al 31-may.</div>
+        <div class="chart-wrap"><svg id="trend-svg" width="100%" height="380"></svg></div>
+        <div class="legend" id="trend-legend"></div>
+      </section>
+
+      <!-- Pares de 2da vuelta -->
+      <section class="block">
+        <div class="section-title">¿Cuál es la 2da vuelta más probable?</div>
+        <div class="section-sub">Probabilidad de cada par ganador-vs-segundo en primera vuelta, sobre 1.000 simulaciones. Sólo pares con ≥1% se muestran.</div>
+        <div id="pairs-list"></div>
+      </section>
+
+      <!-- Las 4 fuentes de incertidumbre -->
+      <section class="block">
+        <div class="section-title">Las 4 fuentes de incertidumbre</div>
+        <div class="section-sub">Cada simulación combina cuatro perturbaciones independientes sobre la proyección puntual. La renormalización a 100% por simulación preserva la correlación negativa entre candidatos.</div>
+        <div class="sources-grid">
+          <div class="src-card">
+            <div class="src-label"><span class="src-num">01</span> Sampling noise</div>
+            <div class="src-body">Error binomial por candidato según el tamaño efectivo de muestra de las polls de los últimos 14 días. Captura el ruido normal de cualquier encuesta.</div>
+          </div>
+          <div class="src-card">
+            <div class="src-label"><span class="src-num">02</span> House effect uncertainty</div>
+            <div class="src-body">La desviación estándar del house effect medido en cada firma. Refleja que el de-bias no es perfecto — las firmas pueden tener variabilidad genuina, no solo sesgo.</div>
+          </div>
+          <div class="src-card">
+            <div class="src-label"><span class="src-num">03</span> Trend uncertainty</div>
+            <div class="src-body">1.5× la pendiente local de Holt aplicada a los días restantes. Refleja que la tendencia puede revertir antes de la elección.</div>
+          </div>
+          <div class="src-card">
+            <div class="src-label"><span class="src-num">04</span> Shock late-campaign 2022</div>
+            <div class="src-body">Perturbación por arquetipo, calibrada contra el error real polls-vs-resultado del 29-may-2022. Es el diferencial editorial: el modelo aprende del último ciclo.</div>
+          </div>
+        </div>
+
+        <!-- Lección 2022 -->
+        <div class="lesson">
+          <p><b>¿Por qué calibrar contra 2022?</b> Porque en esa elección, <strong>todas</strong> las firmas subestimaron a Rodolfo Hernández — la última encuesta de campo (Atlas, 17-20 may 2022) lo daba en 21.4%; salió en 28.17%. En 9 días movió +7 puntos que ningún modelo basado solo en encuestas pudo captar.</p>
+          <table class="table-2022">
+            <thead>
+              <tr><th style="text-align:left">Candidato 2022</th><th>Promedio polls finales</th><th>Resultado real</th><th>Error (pp)</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="cand">Petro</td><td>41.5%</td><td>40.34%</td><td class="err-ok">+1.2</td></tr>
+              <tr><td class="cand">Fico Gutiérrez</td><td>26.8%</td><td>23.94%</td><td class="err-bad">+2.9</td></tr>
+              <tr><td class="cand">Rodolfo Hernández</td><td>21.0%</td><td>28.17%</td><td class="err-bad">−7.3</td></tr>
+              <tr><td class="cand">Sergio Fajardo</td><td>5.4%</td><td>4.18%</td><td class="err-ok">+1.2</td></tr>
+            </tbody>
+          </table>
+          <p style="margin-top:1rem;font-size:.82rem;color:rgba(255,255,255,.65)">El modelo asigna a cada candidato 2026 un <b>arquetipo</b> con base en su perfil político y aplica una perturbación calibrada contra el error histórico de ese arquetipo. Atenuamos los sesgos brutos porque ya hicimos de-bias por house effect en Capa 1.</p>
+        </div>
+
+        <!-- Arquetipos asignados a 2026 -->
+        <div style="margin-top:1.5rem">
+          <div class="section-title" style="font-size:1.1rem;margin-bottom:.5rem">Arquetipos asignados en 2026</div>
+          <div id="archetypes-list"></div>
+        </div>
+      </section>
+
+      <footer class="foot">
+        <p><b style="color:rgba(255,255,255,.7)">Metodología</b> · El modelo se construye en 3 capas: (1) de-bias de cada poll por su house effect medido contra el consenso de otras firmas en ventana móvil ±14d, (2) serie diaria ensemble por kernel smoothing gaussiano + Holt double-exponential sobre log-odds, (3) Monte Carlo de 1.000 simulaciones con shock late-campaign calibrado contra 2022. Detalle completo en <a href="https://ricardoruiz.co/bases+de+datos/output_forecast/forecast-montecarlo.json" target="_blank">forecast-montecarlo.json</a> y <a href="https://ricardoruiz.co/bases+de+datos/output_ponderador/ponderador-detalle.json" target="_blank">ponderador-detalle.json</a>.</p>
+        <p style="margin-top:.6rem">Ricardo Ruiz · Plataforma Electoral Colombia 2026 · No es una predicción puntual. Es una distribución de escenarios.</p>
+      </footer>
+    </div>
+  </main>
+
+  <script>
+    // ─── CURSOR CUSTOM ─────────────────────────────────────────────────
+    const cursor=document.getElementById('cursor'),cursorRing=document.getElementById('cursorRing');
+    document.addEventListener('mousemove',e=>{
+      cursor.style.left=e.clientX+'px';cursor.style.top=e.clientY+'px';
+      cursorRing.style.left=e.clientX+'px';cursorRing.style.top=e.clientY+'px';
+    });
+    document.addEventListener('mouseover',e=>{
+      if(e.target.matches('a,button,[onclick]')){
+        cursor.style.transform='translate(-50%,-50%) scale(.4)';
+        cursorRing.style.transform='translate(-50%,-50%) scale(1.5)';
+        cursorRing.style.opacity='.9';
+      }else{
+        cursor.style.transform='translate(-50%,-50%) scale(1)';
+        cursorRing.style.transform='translate(-50%,-50%) scale(1)';
+        cursorRing.style.opacity='.4';
+      }
+    });
+
+    // ─── THEME TOGGLE ──────────────────────────────────────────────────
+    function toggleTheme(){
+      document.body.classList.toggle('day-mode');
+      const day=document.body.classList.contains('day-mode');
+      document.getElementById('theme-btn').textContent=day?'☾ Modo noche':'☀ Modo día';
+      // Re-render charts to update colors that depend on theme
+      if(window.__data) render(window.__data);
+    }
+
+    // ─── COLOR MAP PER CANDIDATO ───────────────────────────────────────
+    const CAND_COLOR={
+      'Cepeda':         '#51458F',
+      'De la Espriella':'#000062',
+      'Valencia':       '#1866DF',
+      'Fajardo':        '#EEAA22',
+      'Claudia López':  '#d9db24',
+      'Botero':         '#d4af37',
+      'Murillo':        '#16a34a',
+      'Blanco':         '#9ca3af',
+      'NS-NR':          '#6b7280',
+      'Ninguno':        '#52525b',
+    };
+    function colorFor(c){return CAND_COLOR[c]||'#7c7c8a'}
+
+    // Descripciones de arquetipos para mostrar al usuario
+    const ARQ_DESC={
+      'incumbent_left':           'Oficialismo. En 2022, Petro estuvo bien calibrado en las encuestas finales — error ~+1pp.',
+      'opposition_outsider':      'Híbrido outsider + consolidador opositor. No hay análogo claro en 2022 — alta varianza por convención.',
+      'opposition_establishment': 'Derecha clásica. En 2022, Fico se sobreestimó ~+3pp en las encuestas finales.',
+      'centrist':                 'Centro. En 2022, Fajardo se sobreestimó marginalmente — ~+1pp.',
+      'outsider_anti_sistema':    'Outsider anti-sistema. En 2022, Rodolfo fue subestimado por ~7pp en TODAS las encuestas finales. Es el sesgo más grande del último ciclo.',
+      'minor':                    'Candidato <1.5%. Sin shock arquetípico significativo.',
+    };
+
+    // ─── DATA SOURCES ──────────────────────────────────────────────────
+    const S3='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_forecast';
+    const URL_MC = `${S3}/forecast-montecarlo.json?v=${new Date().toISOString().slice(0,10).replace(/-/g,'')}`;
+    const URL_TREND = `${S3}/forecast-trend.json?v=${new Date().toISOString().slice(0,10).replace(/-/g,'')}`;
+
+    async function load(){
+      try{
+        const [mc,trend]=await Promise.all([
+          fetch(URL_MC).then(r=>r.json()),
+          fetch(URL_TREND).then(r=>r.json()),
+        ]);
+        window.__data={mc,trend};
+        document.getElementById('loading').style.display='none';
+        document.getElementById('app').style.display='block';
+        render(window.__data);
+      }catch(e){
+        document.getElementById('loading').textContent='Error cargando datos. Recargá la página.';
+        console.error(e);
+      }
+    }
+
+    // ─── RENDER ────────────────────────────────────────────────────────
+    function render({mc,trend}){
+      renderHero(mc);
+      renderDistribution(mc);
+      renderTrend(trend);
+      renderPairs(mc);
+      renderArchetypes(mc);
+    }
+
+    function fmtPct(p){return (p*100).toFixed(1)+'%'}
+    function fmtNum(n){return n.toFixed(2)}
+
+    function renderHero(mc){
+      const cards=document.getElementById('hero-cards');
+      const podio=mc.probabilidades.podio_top6;
+      const pCepedaPasa = (podio['Cepeda']||{}).p_pasa_2v || 0;
+      const pAbelardoPasa = (podio['De la Espriella']||{}).p_pasa_2v || 0;
+      const pPalomaPasa = (podio['Valencia']||{}).p_pasa_2v || 0;
+      const pCepeda50 = mc.probabilidades.cepeda_gana_1v;
+      const dias = mc.dias_para_eleccion;
+
+      cards.innerHTML = `
+        <div class="pcard headline">
+          <div class="pcard-label">Quedan ${dias} días para la elección · proyección al 31-may</div>
+          <div class="pcard-value win">${fmtPct(pCepedaPasa)}</div>
+          <div class="pcard-sub">Probabilidad de que <b>Iván Cepeda</b> pase a 2da vuelta.</div>
+        </div>
+        <div class="pcard">
+          <div class="pcard-label">Cepeda gana 1V (>50%)</div>
+          <div class="pcard-value">${fmtPct(pCepeda50)}</div>
+          <div class="pcard-sub">El umbral del 50% queda fuera de su rango simulado.</div>
+        </div>
+        <div class="pcard">
+          <div class="pcard-label">De la Espriella pasa a 2V</div>
+          <div class="pcard-value warn">${fmtPct(pAbelardoPasa)}</div>
+          <div class="pcard-sub">Sigue siendo el rival más probable, pero no certeza.</div>
+        </div>
+        <div class="pcard">
+          <div class="pcard-label">Sorpresa Paloma Valencia</div>
+          <div class="pcard-value surprise">${fmtPct(pPalomaPasa)}</div>
+          <div class="pcard-sub">Probabilidad de que Paloma desplace a Abelardo en 2V.</div>
+        </div>
+      `;
+      const meta=document.getElementById('hero-meta');
+      meta.innerHTML = `Cierre del modelo: ${mc.fecha_corte} · ${mc.n_simulaciones} simulaciones · seed ${mc.seed}.`;
+    }
+
+    const NOT_CANDIDATES = new Set(['Blanco','NS-NR','Ninguno','Otros','Clara López']);
+
+    function renderDistribution(mc){
+      const stats = mc.estadisticos;
+      const all = mc.candidatos_simulados.slice();
+      const cands = all.filter(c=>!NOT_CANDIDATES.has(c));
+      const noCands = all.filter(c=>NOT_CANDIDATES.has(c));
+      cands.sort((a,b)=>(stats[b].mean||0)-(stats[a].mean||0));
+      noCands.sort((a,b)=>(stats[b].mean||0)-(stats[a].mean||0));
+
+      const maxP95 = Math.max(...all.map(c=>stats[c].p95));
+      const W = 100;
+      const list = document.getElementById('dist-list');
+      list.innerHTML = '';
+
+      const buildRow = (cand, opts={dim:false}) => {
+        const s = stats[cand];
+        const color = colorFor(cand);
+        const x_p5  = (s.p5  / maxP95) * W;
+        const x_p25 = (s.p25 / maxP95) * W;
+        const x_p50 = (s.median/maxP95)* W;
+        const x_p75 = (s.p75 / maxP95) * W;
+        const x_p95 = (s.p95 / maxP95) * W;
+        const row = document.createElement('div');
+        row.className='dist-row';
+        if(opts.dim) row.style.opacity='.65';
+        row.innerHTML = `
+          <div>
+            <div class="row-name">${cand}</div>
+            <div class="row-int">media ${s.mean}% · σ ${s.std}pp</div>
+          </div>
+          <div class="row-pct">${s.median}%</div>
+          <div class="row-bar-wrap">
+            <svg class="row-bar-svg" viewBox="0 0 100 30" preserveAspectRatio="none">
+              <rect x="${x_p5}" y="13" width="${x_p95 - x_p5}" height="4" fill="${color}" fill-opacity=".18"/>
+              <rect x="${x_p25}" y="9" width="${x_p75 - x_p25}" height="12" fill="${color}" fill-opacity=".85"/>
+              <line class="vline" x1="${x_p50}" x2="${x_p50}" y1="6" y2="24"/>
+            </svg>
+          </div>
+        `;
+        return row;
+      };
+
+      for(const cand of cands) list.appendChild(buildRow(cand));
+
+      if(noCands.length){
+        const sep = document.createElement('div');
+        sep.style.cssText='font-family:DM Mono,monospace;font-size:.65rem;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.4);padding:1.2rem 0 .4rem;border-bottom:1px solid var(--border)';
+        sep.textContent='Otras opciones de voto (no candidatos)';
+        list.appendChild(sep);
+        for(const cand of noCands) list.appendChild(buildRow(cand,{dim:true}));
+      }
+
+      // Si hay "Otros" minor bucket, añadirlo como fila informativa
+      if(mc.otros && mc.otros.base > 0){
+        const o = mc.otros;
+        const x = (o.mean / maxP95) * W;
+        const row = document.createElement('div');
+        row.className='dist-row';
+        row.style.opacity='.55';
+        row.innerHTML = `
+          <div>
+            <div class="row-name" style="font-style:italic">Otros candidatos minoritarios</div>
+            <div class="row-int">${o.candidatos_incluidos.join(' · ')}</div>
+          </div>
+          <div class="row-pct">${o.mean}%</div>
+          <div class="row-bar-wrap">
+            <svg class="row-bar-svg" viewBox="0 0 100 30" preserveAspectRatio="none">
+              <rect x="0" y="11" width="${x}" height="8" fill="rgba(255,255,255,.25)"/>
+            </svg>
+          </div>
+        `;
+        list.appendChild(row);
+      }
+    }
+
+    function renderTrend(trend){
+      const svg = document.getElementById('trend-svg');
+      const W = svg.clientWidth || 1000;
+      const H = 380;
+      const pad = {top:20, right:80, bottom:30, left:40};
+      const cw = W - pad.left - pad.right;
+      const ch = H - pad.top - pad.bottom;
+
+      // Eligir candidatos top
+      const candTop = ['Cepeda','De la Espriella','Valencia','Fajardo','Claudia López','Botero'];
+      const series = candTop.filter(c=>trend.serie_diaria[c]);
+
+      // Eje X: fechas
+      const dates = trend.serie_diaria[series[0]].map(p=>p.date);
+      const t0 = new Date(dates[0]+'T00:00:00');
+      const tEnd = new Date(trend.fecha_eleccion+'T00:00:00');
+      const tNow = new Date(dates[dates.length-1]+'T00:00:00');
+      const xRange = tEnd - t0;
+      const xScale = d => pad.left + ((new Date(d+'T00:00:00')-t0)/xRange) * cw;
+      const xScaleAbs = ts => pad.left + ((ts-t0)/xRange) * cw;
+
+      // Eje Y: %
+      const allVals = series.flatMap(c=>trend.serie_diaria[c].map(p=>p.kswa));
+      const yMin = 0;
+      const yMax = Math.ceil(Math.max(...allVals)/5)*5 + 5;
+      const yScale = v => pad.top + ch - (v/yMax)*ch;
+
+      // Limpiar
+      while(svg.firstChild) svg.removeChild(svg.firstChild);
+
+      // Grid horizontal
+      const gGrid = document.createElementNS('http://www.w3.org/2000/svg','g');
+      gGrid.setAttribute('class','grid');
+      for(let v=0; v<=yMax; v+=10){
+        const y = yScale(v);
+        const ln = document.createElementNS('http://www.w3.org/2000/svg','line');
+        ln.setAttribute('x1',pad.left);ln.setAttribute('x2',W-pad.right);
+        ln.setAttribute('y1',y);ln.setAttribute('y2',y);
+        gGrid.appendChild(ln);
+        const tx = document.createElementNS('http://www.w3.org/2000/svg','text');
+        tx.setAttribute('x',pad.left-6);tx.setAttribute('y',y+3);
+        tx.setAttribute('text-anchor','end');
+        tx.setAttribute('class','axis-label');
+        tx.setAttribute('style','font-family:DM Mono,monospace;font-size:.65rem;fill:rgba(255,255,255,.45)');
+        tx.textContent = v+'%';
+        gGrid.appendChild(tx);
+      }
+      svg.appendChild(gGrid);
+
+      // Eje X: marcas mensuales
+      const months = [];
+      let m = new Date(t0.getFullYear(), t0.getMonth(), 1);
+      while(m <= tEnd){
+        months.push(new Date(m));
+        m.setMonth(m.getMonth()+1);
+      }
+      const xAxis = document.createElementNS('http://www.w3.org/2000/svg','g');
+      xAxis.setAttribute('class','axis');
+      for(const mo of months){
+        const x = xScaleAbs(mo);
+        if(x < pad.left || x > W-pad.right) continue;
+        const ln = document.createElementNS('http://www.w3.org/2000/svg','line');
+        ln.setAttribute('x1',x);ln.setAttribute('x2',x);
+        ln.setAttribute('y1',pad.top+ch);ln.setAttribute('y2',pad.top+ch+4);
+        ln.setAttribute('stroke','rgba(255,255,255,.3)');
+        xAxis.appendChild(ln);
+        const tx = document.createElementNS('http://www.w3.org/2000/svg','text');
+        tx.setAttribute('x',x);tx.setAttribute('y',pad.top+ch+18);
+        tx.setAttribute('text-anchor','middle');
+        tx.setAttribute('style','font-family:DM Mono,monospace;font-size:.65rem;fill:rgba(255,255,255,.5)');
+        tx.textContent = mo.toLocaleDateString('es',{month:'short'});
+        xAxis.appendChild(tx);
+      }
+      svg.appendChild(xAxis);
+
+      // Vertical line at today
+      const vToday = document.createElementNS('http://www.w3.org/2000/svg','line');
+      vToday.setAttribute('x1',xScaleAbs(tNow));vToday.setAttribute('x2',xScaleAbs(tNow));
+      vToday.setAttribute('y1',pad.top);vToday.setAttribute('y2',pad.top+ch);
+      vToday.setAttribute('stroke','rgba(255,255,255,.3)');
+      vToday.setAttribute('stroke-dasharray','3,3');
+      svg.appendChild(vToday);
+      const tToday = document.createElementNS('http://www.w3.org/2000/svg','text');
+      tToday.setAttribute('x',xScaleAbs(tNow)+4);
+      tToday.setAttribute('y',pad.top+10);
+      tToday.setAttribute('style','font-family:DM Mono,monospace;font-size:.6rem;fill:rgba(255,255,255,.5)');
+      tToday.textContent='HOY';
+      svg.appendChild(tToday);
+
+      // Vertical line at election day
+      const vElec = document.createElementNS('http://www.w3.org/2000/svg','line');
+      vElec.setAttribute('x1',xScaleAbs(tEnd));vElec.setAttribute('x2',xScaleAbs(tEnd));
+      vElec.setAttribute('y1',pad.top);vElec.setAttribute('y2',pad.top+ch);
+      vElec.setAttribute('stroke','rgba(255,71,71,.5)');
+      vElec.setAttribute('stroke-dasharray','3,3');
+      svg.appendChild(vElec);
+      const tElec = document.createElementNS('http://www.w3.org/2000/svg','text');
+      tElec.setAttribute('x',xScaleAbs(tEnd)-4);
+      tElec.setAttribute('y',pad.top+10);
+      tElec.setAttribute('text-anchor','end');
+      tElec.setAttribute('style','font-family:DM Mono,monospace;font-size:.6rem;fill:rgba(255,71,71,.7)');
+      tElec.textContent='31-MAY';
+      svg.appendChild(tElec);
+
+      // Líneas históricas + extensión proyectada
+      const proj = trend.proyeccion_31may;
+      const candTopColors = [];
+      for(const cand of series){
+        const color = colorFor(cand);
+        candTopColors.push({cand,color});
+        const pts = trend.serie_diaria[cand];
+        const d = pts.map(p=>`${xScale(p.date)},${yScale(p.kswa)}`).join(' L');
+        const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+        path.setAttribute('class','trend-line');
+        path.setAttribute('d',`M${d}`);
+        path.setAttribute('stroke',color);
+        svg.appendChild(path);
+
+        // Proyección al 31-may (línea punteada desde último punto al holt_31may)
+        if(proj[cand]){
+          const lastPt = pts[pts.length-1];
+          const dProj = `M${xScale(lastPt.date)},${yScale(lastPt.kswa)} L${xScaleAbs(tEnd)},${yScale(proj[cand].holt_31may)}`;
+          const pProj = document.createElementNS('http://www.w3.org/2000/svg','path');
+          pProj.setAttribute('class','trend-line');
+          pProj.setAttribute('d',dProj);
+          pProj.setAttribute('stroke',color);
+          pProj.setAttribute('stroke-dasharray','5,3');
+          pProj.setAttribute('opacity','.7');
+          svg.appendChild(pProj);
+
+          // Punto al final
+          const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+          c.setAttribute('cx',xScaleAbs(tEnd));c.setAttribute('cy',yScale(proj[cand].holt_31may));
+          c.setAttribute('r',3.5);
+          c.setAttribute('fill',color);
+          svg.appendChild(c);
+
+          // Label del valor al final
+          const lab = document.createElementNS('http://www.w3.org/2000/svg','text');
+          lab.setAttribute('x',xScaleAbs(tEnd)+7);
+          lab.setAttribute('y',yScale(proj[cand].holt_31may)+4);
+          lab.setAttribute('style',`font-family:DM Mono,monospace;font-size:.65rem;fill:${color};font-weight:500`);
+          lab.textContent = proj[cand].holt_31may.toFixed(1);
+          svg.appendChild(lab);
+        }
+      }
+
+      // Legend
+      const leg = document.getElementById('trend-legend');
+      leg.innerHTML = candTopColors.map(({cand,color})=>
+        `<span class="legend-item"><span class="legend-dot" style="background:${color}"></span>${cand}</span>`
+      ).join('');
+    }
+
+    function renderPairs(mc){
+      const pairs = Object.entries(mc.probabilidades.pares_2v||{});
+      pairs.sort((a,b)=>b[1]-a[1]);
+      const list = document.getElementById('pairs-list');
+      list.innerHTML = '';
+      const maxP = pairs[0]?pairs[0][1]:1;
+      for(const [pair,p] of pairs){
+        const row=document.createElement('div');
+        row.className='pair-row';
+        row.innerHTML = `
+          <div class="pair-bar">
+            <div class="pair-fill" style="width:${(p/maxP*100).toFixed(0)}%"></div>
+            <div class="pair-label">${pair}</div>
+          </div>
+          <div class="pair-pct">${fmtPct(p)}</div>
+        `;
+        list.appendChild(row);
+      }
+    }
+
+    function renderArchetypes(mc){
+      const arqs = mc.arquetipos;
+      const list = document.getElementById('archetypes-list');
+      list.innerHTML = '';
+      // Top candidates first
+      const order = ['Cepeda','De la Espriella','Valencia','Fajardo','Claudia López','Botero'];
+      for(const cand of order){
+        const arq = arqs[cand];
+        if(!arq) continue;
+        const sh = mc.shock_2022[arq] || {};
+        const color = colorFor(cand);
+        const row = document.createElement('div');
+        row.style.cssText = 'display:grid;grid-template-columns:180px 200px 1fr;gap:1rem;padding:.7rem 0;border-bottom:1px solid var(--border);align-items:start';
+        row.innerHTML = `
+          <div style="font-family:Syne,sans-serif;font-weight:500;color:${color}">${cand}</div>
+          <div style="font-family:DM Mono,monospace;font-size:.75rem;color:rgba(255,255,255,.6)">
+            <div>${arq}</div>
+            <div style="margin-top:.2rem;font-size:.7rem">shock μ=${sh.bias>=0?'+':''}${sh.bias} · σ=${sh.std}</div>
+          </div>
+          <div style="font-family:Avenir,sans-serif;font-size:.82rem;color:rgba(255,255,255,.8);line-height:1.5">${ARQ_DESC[arq]||''}</div>
+        `;
+        list.appendChild(row);
+      }
+    }
+
+    // ─── INIT ──────────────────────────────────────────────────────────
+    load();
+  </script>
+</body>
+</html>
