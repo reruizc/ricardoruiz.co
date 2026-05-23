@@ -1,0 +1,1684 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Análisis Estructural de Sistemas · Ricardo Ruiz</title>
+  <meta name="description" content="Herramienta de análisis estructural para identificar las variables clave de un sistema. Inspirada en la escuela de prospectiva estratégica (Godet, Mojica) con actualizaciones metodológicas modernas." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --black: #0a0a0a;
+      --white: #e6ded3;
+      --paper: #f4f0e8;
+      --blue: #0047FF;
+      --blue-light: #3d6fff;
+      --blue-soft: rgba(0,71,255,0.08);
+      --gray: #888;
+      --gray-light: #d6cfc1;
+      --gray-line: rgba(10,10,10,0.10);
+      --green: #2f8f4f;
+      --red: #c2342f;
+      --amber: #d68a18;
+      --purple: #7c3aed;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--white);
+      color: var(--black);
+      font-family: 'Fraunces', serif;
+      overflow-x: hidden;
+      cursor: none;
+      min-height: 100vh;
+    }
+
+    /* ── Cursor ── */
+    .cursor { position: fixed; width: 12px; height: 12px; background: var(--blue); border-radius: 50%; pointer-events: none; z-index: 9999; transform: translate(-50%,-50%); transition: transform .15s, background .2s; }
+    .cursor-ring { position: fixed; width: 36px; height: 36px; border: 1.5px solid var(--blue); border-radius: 50%; pointer-events: none; z-index: 9998; transform: translate(-50%,-50%); opacity: .5; transition: transform .35s, opacity .3s; }
+
+    /* ── Nav (clon de index.html simplificado) ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: .9rem 2.5rem;
+      z-index: 100;
+      background: rgba(230,222,211,0.88);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--gray-line);
+    }
+    .nav-logo-wrap { display: flex; align-items: center; gap: .75rem; text-decoration: none; }
+    .nav-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: clamp(1.1rem, 2vw, 1.6rem); letter-spacing: -0.03em; color: var(--black); line-height: 1; }
+    .nav-logo span { color: var(--blue); }
+    .nav-bars { display: flex; align-items: flex-end; gap: 3px; height: 18px; }
+    .nav-bar { width: 5px; background: var(--blue); border-radius: 1px 1px 0 0; opacity: .85; }
+    nav ul { list-style: none; display: flex; gap: 2.2rem; align-items: center; }
+    nav ul a {
+      font-family: 'Syne', sans-serif; font-size: .75rem; letter-spacing: .08em;
+      text-transform: uppercase; color: var(--black); text-decoration: none; transition: color .2s;
+    }
+    nav ul a:hover { color: var(--blue); }
+    .nav-cta {
+      font-family: 'Syne', sans-serif; font-size: .72rem; letter-spacing: .08em;
+      text-transform: uppercase; padding: .45rem .9rem; border: 1.5px solid var(--blue);
+      color: var(--blue); background: transparent; transition: background .2s, color .2s;
+    }
+    .nav-cta:hover { background: var(--blue); color: var(--white); }
+    .nav-hamburger { display: none; flex-direction: column; gap: 4px; width: 28px; cursor: none; background: none; border: none; padding: 0; }
+    .nav-hamburger span { display: block; width: 100%; height: 2px; background: var(--black); }
+    @media (max-width: 860px) {
+      nav ul { display: none; }
+      .nav-hamburger { display: flex; }
+    }
+
+    /* ── Main shell ── */
+    main { padding-top: 5.5rem; max-width: 1240px; margin: 0 auto; padding-left: 2rem; padding-right: 2rem; padding-bottom: 6rem; }
+
+    /* ── Breadcrumb ── */
+    .crumb {
+      font-family: 'DM Mono', monospace; font-size: .7rem; letter-spacing: .14em;
+      text-transform: uppercase; color: var(--gray); margin-bottom: 1.2rem;
+    }
+    .crumb a { color: var(--gray); text-decoration: none; transition: color .2s; }
+    .crumb a:hover { color: var(--blue); }
+    .crumb .sep { margin: 0 .55rem; opacity: .5; }
+
+    /* ── Hero del módulo ── */
+    .hero-mod {
+      padding: 0.5rem 0 2.4rem;
+      border-bottom: 1px solid var(--gray-line);
+      margin-bottom: 2.5rem;
+    }
+    .hero-tag {
+      font-family: 'DM Mono', monospace; font-size: .75rem; letter-spacing: .18em;
+      text-transform: uppercase; color: var(--blue); margin-bottom: 1rem;
+    }
+    .hero-title {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: clamp(2rem, 5vw, 3.6rem); letter-spacing: -0.025em; line-height: 1.05;
+      color: var(--black); margin-bottom: 1.1rem;
+    }
+    .hero-title span { color: var(--blue); }
+    .hero-sub {
+      font-family: 'Fraunces', serif; font-weight: 300; font-style: italic;
+      font-size: clamp(1rem, 1.6vw, 1.2rem); line-height: 1.55; color: #333;
+      max-width: 780px;
+    }
+
+    /* ── Tarjetas explicativas (3 cards intro) ── */
+    .intro-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem;
+      margin-bottom: 3rem;
+    }
+    @media (max-width: 860px) { .intro-grid { grid-template-columns: 1fr; } }
+    .intro-card {
+      background: var(--paper); border: 1px solid var(--gray-line);
+      padding: 1.4rem 1.4rem 1.5rem; border-radius: 2px;
+      transition: border-color .25s, transform .2s;
+    }
+    .intro-card:hover { border-color: rgba(0,71,255,0.4); transform: translateY(-2px); }
+    .intro-num {
+      font-family: 'DM Mono', monospace; font-size: .72rem; letter-spacing: .14em;
+      color: var(--blue); margin-bottom: .8rem;
+    }
+    .intro-title {
+      font-family: 'Syne', sans-serif; font-weight: 700;
+      font-size: 1.05rem; margin-bottom: .55rem; letter-spacing: -0.01em;
+    }
+    .intro-body {
+      font-family: 'Fraunces', serif; font-size: .92rem; line-height: 1.55; color: #333;
+    }
+
+    /* ── Section blocks ── */
+    .section {
+      background: var(--paper);
+      border: 1px solid var(--gray-line);
+      padding: 2rem 2.2rem;
+      margin-bottom: 1.8rem;
+    }
+    .section-label {
+      font-family: 'DM Mono', monospace; font-size: .7rem; letter-spacing: .16em;
+      text-transform: uppercase; color: var(--gray); margin-bottom: .55rem;
+    }
+    .section-title {
+      font-family: 'Syne', sans-serif; font-weight: 700;
+      font-size: 1.5rem; letter-spacing: -0.01em; margin-bottom: .9rem;
+    }
+    .section-desc {
+      font-family: 'Fraunces', serif; font-size: .96rem; line-height: 1.55;
+      color: #444; margin-bottom: 1.5rem; max-width: 760px;
+    }
+
+    /* ── Wizard ── */
+    .wizard-step { margin-bottom: 1.8rem; }
+    .wizard-step:last-child { margin-bottom: 0; }
+    .wizard-q {
+      font-family: 'Syne', sans-serif; font-weight: 600;
+      font-size: 1.05rem; margin-bottom: .9rem;
+    }
+    .wizard-q-num {
+      font-family: 'DM Mono', monospace; font-size: .7rem; color: var(--blue);
+      letter-spacing: .14em; margin-right: .55rem;
+    }
+    .wizard-options { display: grid; grid-template-columns: repeat(2, 1fr); gap: .55rem; }
+    @media (max-width: 640px) { .wizard-options { grid-template-columns: 1fr; } }
+    .wizard-opt {
+      font-family: 'Syne', sans-serif; font-weight: 400;
+      font-size: .88rem; line-height: 1.4;
+      padding: .9rem 1.1rem; border: 1.5px solid var(--gray-light);
+      background: var(--white); color: var(--black);
+      cursor: none; transition: border-color .2s, background .2s, color .2s;
+      text-align: left; user-select: none;
+    }
+    .wizard-opt:hover { border-color: var(--blue); }
+    .wizard-opt.selected { background: var(--blue); border-color: var(--blue); color: var(--white); }
+    .wizard-opt.selected .opt-hint { color: rgba(255,255,255,.75); }
+    .opt-label { display: block; font-weight: 600; margin-bottom: .15rem; }
+    .opt-hint { display: block; font-family: 'Fraunces', serif; font-size: .82rem; font-style: italic; color: var(--gray); }
+
+    .wizard-cta-row {
+      display: flex; gap: .8rem; align-items: center; margin-top: 1.5rem; flex-wrap: wrap;
+    }
+    .btn-primary {
+      font-family: 'Syne', sans-serif; font-weight: 600; font-size: .82rem;
+      letter-spacing: .08em; text-transform: uppercase;
+      padding: .7rem 1.4rem; border: none; background: var(--blue); color: var(--white);
+      cursor: none; transition: background .2s;
+    }
+    .btn-primary:hover { background: var(--blue-light); }
+    .btn-primary:disabled { background: var(--gray-light); color: var(--gray); cursor: not-allowed; }
+    .btn-ghost {
+      font-family: 'Syne', sans-serif; font-weight: 500; font-size: .78rem;
+      letter-spacing: .08em; text-transform: uppercase;
+      padding: .65rem 1.1rem; border: 1.5px solid var(--gray-light); background: transparent; color: var(--black);
+      cursor: none; transition: border-color .2s, color .2s;
+    }
+    .btn-ghost:hover { border-color: var(--blue); color: var(--blue); }
+
+    /* ── Plantilla sugerida ── */
+    .tpl-suggested {
+      background: var(--blue-soft); border-left: 3px solid var(--blue);
+      padding: 1.1rem 1.3rem; margin-top: 1.2rem;
+    }
+    .tpl-suggested-label {
+      font-family: 'DM Mono', monospace; font-size: .68rem; letter-spacing: .14em;
+      text-transform: uppercase; color: var(--blue); margin-bottom: .4rem;
+    }
+    .tpl-suggested-name {
+      font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.1rem; margin-bottom: .4rem;
+    }
+    .tpl-suggested-desc {
+      font-family: 'Fraunces', serif; font-size: .9rem; line-height: 1.5; color: #333;
+    }
+    .tpl-alt-row { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .9rem; }
+    .tpl-alt {
+      font-family: 'DM Mono', monospace; font-size: .68rem; letter-spacing: .08em;
+      padding: .35rem .7rem; border: 1px solid var(--gray-light); background: transparent;
+      cursor: none; transition: border-color .2s, color .2s;
+    }
+    .tpl-alt:hover { border-color: var(--blue); color: var(--blue); }
+
+    /* ── Editor de variables ── */
+    .vars-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: .55rem; margin-bottom: 1.2rem;
+    }
+    .var-chip {
+      display: flex; align-items: center; gap: .5rem;
+      background: var(--white); border: 1px solid var(--gray-light);
+      padding: .5rem .7rem; font-family: 'Syne', sans-serif; font-size: .85rem;
+      min-width: 0;
+    }
+    .var-chip-code {
+      font-family: 'DM Mono', monospace; font-size: .68rem; color: var(--blue);
+      letter-spacing: .08em; flex-shrink: 0;
+    }
+    .var-chip-name { flex: 1; outline: none; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .var-chip-name:focus { outline: 1px solid var(--blue); outline-offset: 2px; }
+    .var-chip-del {
+      font-family: 'DM Mono', monospace; font-size: .85rem; color: var(--gray);
+      background: none; border: none; cursor: none; padding: 0 .2rem;
+      transition: color .2s;
+    }
+    .var-chip-del:hover { color: var(--red); }
+
+    .vars-add-row { display: flex; gap: .55rem; margin-top: .8rem; flex-wrap: wrap; }
+    .vars-add-input {
+      flex: 1; min-width: 200px;
+      font-family: 'Syne', sans-serif; font-size: .9rem;
+      padding: .55rem .8rem; border: 1.5px solid var(--gray-light);
+      background: var(--white); color: var(--black); outline: none;
+    }
+    .vars-add-input:focus { border-color: var(--blue); }
+    .vars-meta {
+      display: flex; gap: 1.5rem; font-family: 'DM Mono', monospace; font-size: .72rem;
+      color: var(--gray); letter-spacing: .08em; margin-top: 1rem; flex-wrap: wrap;
+    }
+    .vars-meta b { color: var(--blue); font-weight: 500; }
+
+    /* ── Captura de matriz: modo toggle ── */
+    .mode-toggle { display: flex; gap: .5rem; margin-bottom: 1.2rem; flex-wrap: wrap; }
+    .mode-btn {
+      font-family: 'Syne', sans-serif; font-size: .8rem; font-weight: 500;
+      letter-spacing: .06em; padding: .55rem 1rem;
+      border: 1.5px solid var(--gray-light); background: var(--white); color: var(--black);
+      cursor: none; transition: border-color .2s, background .2s, color .2s;
+    }
+    .mode-btn.active { border-color: var(--blue); background: var(--blue); color: var(--white); }
+    .mode-btn:not(.active):hover { border-color: var(--blue); color: var(--blue); }
+
+    /* ── Modo tabla ── */
+    .matrix-wrap { overflow-x: auto; margin-bottom: 1rem; }
+    table.matrix {
+      border-collapse: collapse;
+      font-family: 'DM Mono', monospace; font-size: .82rem;
+      background: var(--white);
+    }
+    table.matrix th, table.matrix td {
+      border: 1px solid var(--gray-line);
+      min-width: 36px; height: 36px;
+      text-align: center; vertical-align: middle;
+      padding: 0; position: relative;
+    }
+    table.matrix th.row-h, table.matrix th.col-h {
+      font-family: 'Syne', sans-serif; font-weight: 500; font-size: .75rem;
+      background: var(--paper); color: var(--black);
+      padding: .3rem .55rem; max-width: 180px;
+      text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    table.matrix th.col-h { text-align: center; min-width: 40px; max-width: 60px; }
+    table.matrix th.col-h .col-h-inner {
+      writing-mode: vertical-rl; transform: rotate(180deg);
+      font-size: .68rem; letter-spacing: .04em;
+      max-height: 110px; overflow: hidden; text-overflow: ellipsis;
+      padding: .3rem 0;
+    }
+    table.matrix th.corner {
+      background: var(--paper); font-family: 'DM Mono', monospace;
+      font-size: .65rem; color: var(--gray); letter-spacing: .12em;
+      text-align: center; vertical-align: bottom; padding-bottom: .5rem;
+    }
+    table.matrix td.cell {
+      cursor: none; user-select: none;
+      transition: background .15s;
+    }
+    table.matrix td.cell:hover { background: var(--blue-soft); }
+    table.matrix td.cell.diag { background: #2a2a2a; color: #555; cursor: not-allowed; }
+    table.matrix td.cell.v-0 { color: #aaa; }
+    table.matrix td.cell.v-1 { color: var(--black); background: rgba(0,71,255,0.06); }
+    table.matrix td.cell.v-2 { color: var(--blue); background: rgba(0,71,255,0.18); font-weight: 700; }
+    table.matrix td.cell.v-3 { color: var(--white); background: var(--blue); font-weight: 700; }
+    table.matrix td.cell.v-P { color: var(--purple); background: rgba(124,58,237,0.13); font-weight: 700; }
+    table.matrix td.cell.focus { outline: 2px solid var(--blue); outline-offset: -2px; z-index: 2; }
+    .matrix-legend {
+      display: flex; flex-wrap: wrap; gap: 1.1rem;
+      font-family: 'DM Mono', monospace; font-size: .72rem; color: var(--gray);
+      margin-bottom: .9rem; letter-spacing: .04em;
+    }
+    .matrix-legend span b { color: var(--blue); font-weight: 700; margin-right: .25rem; }
+    .matrix-legend .legend-P b { color: var(--purple); }
+
+    /* ── Modo guiado ── */
+    .guided {
+      background: var(--white); border: 1px solid var(--gray-line);
+      padding: 2rem 2rem; text-align: center;
+    }
+    .guided-progress {
+      font-family: 'DM Mono', monospace; font-size: .7rem; letter-spacing: .12em;
+      color: var(--gray); margin-bottom: 1.2rem;
+    }
+    .guided-progress b { color: var(--blue); }
+    .guided-progress-bar {
+      max-width: 320px; margin: .7rem auto 0; height: 3px;
+      background: var(--gray-light); position: relative; overflow: hidden;
+    }
+    .guided-progress-bar .fill {
+      position: absolute; left: 0; top: 0; bottom: 0; background: var(--blue);
+      transition: width .3s ease;
+    }
+    .guided-q {
+      font-family: 'Fraunces', serif; font-size: 1.3rem; line-height: 1.4;
+      max-width: 640px; margin: 1.5rem auto 1.8rem; color: #222;
+    }
+    .guided-q .var-a, .guided-q .var-b { font-weight: 600; color: var(--blue); }
+    .guided-buttons { display: flex; gap: .55rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1.4rem; }
+    .gbtn {
+      width: 70px; height: 70px;
+      font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.5rem;
+      border: 2px solid var(--gray-light); background: var(--white); color: var(--black);
+      cursor: none; transition: border-color .15s, background .15s, color .15s, transform .1s;
+    }
+    .gbtn:hover { border-color: var(--blue); color: var(--blue); transform: translateY(-2px); }
+    .gbtn:active { transform: translateY(0); }
+    .gbtn[data-v="0"] { color: #aaa; }
+    .gbtn[data-v="P"] { font-size: 1.05rem; color: var(--purple); }
+    .gbtn[data-v="P"]:hover { border-color: var(--purple); color: var(--purple); }
+    .gbtn-label {
+      display: block; font-family: 'DM Mono', monospace; font-size: .58rem;
+      letter-spacing: .08em; color: var(--gray); margin-top: .15rem; font-weight: 400;
+    }
+    .gnav { display: flex; gap: .8rem; justify-content: center; flex-wrap: wrap; }
+
+    /* ── Resultados ── */
+    .results-grid {
+      display: grid; grid-template-columns: 1.4fr 1fr; gap: 1.5rem;
+    }
+    @media (max-width: 980px) { .results-grid { grid-template-columns: 1fr; } }
+    .chart-wrap {
+      position: relative; background: var(--white); border: 1px solid var(--gray-line);
+      padding: 1.2rem; min-height: 480px;
+    }
+    .chart-quadrant-label {
+      position: absolute; font-family: 'DM Mono', monospace; font-size: .65rem;
+      letter-spacing: .12em; text-transform: uppercase; color: var(--gray); pointer-events: none;
+    }
+    .chart-quadrant-label.q1 { top: 1.5rem; left: 1.5rem; }
+    .chart-quadrant-label.q2 { top: 1.5rem; right: 1.5rem; color: var(--blue); }
+    .chart-quadrant-label.q3 { bottom: 3rem; left: 1.5rem; }
+    .chart-quadrant-label.q4 { bottom: 3rem; right: 1.5rem; }
+
+    .ranking-card {
+      background: var(--white); border: 1px solid var(--gray-line);
+      padding: 1rem 1.2rem;
+    }
+    .rank-group { margin-bottom: 1rem; }
+    .rank-group:last-child { margin-bottom: 0; }
+    .rank-title {
+      font-family: 'Syne', sans-serif; font-weight: 700; font-size: .85rem;
+      letter-spacing: .04em; margin-bottom: .4rem;
+      padding-bottom: .35rem; border-bottom: 1px solid var(--gray-line);
+    }
+    .rank-title .rank-dot { display: inline-block; width: 8px; height: 8px; margin-right: .4rem; vertical-align: middle; }
+    .rank-title.t-key .rank-dot { background: var(--blue); }
+    .rank-title.t-motri .rank-dot { background: var(--green); }
+    .rank-title.t-dep .rank-dot { background: var(--amber); }
+    .rank-title.t-auto .rank-dot { background: var(--gray); }
+    .rank-list {
+      list-style: none; font-family: 'Fraunces', serif; font-size: .88rem; line-height: 1.5;
+    }
+    .rank-list li {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: .2rem 0; gap: .55rem;
+    }
+    .rank-list li .rk-code {
+      font-family: 'DM Mono', monospace; font-size: .68rem; color: var(--gray);
+      letter-spacing: .04em; flex-shrink: 0;
+    }
+    .rank-list li .rk-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rank-list li .rk-score {
+      font-family: 'DM Mono', monospace; font-size: .72rem; color: var(--blue);
+      flex-shrink: 0; min-width: 36px; text-align: right;
+    }
+
+    .empty-msg {
+      font-family: 'Fraunces', serif; font-style: italic; font-size: .92rem;
+      color: var(--gray); text-align: center; padding: 1.5rem 0;
+    }
+
+    /* ── Export row ── */
+    .export-row { display: flex; gap: .7rem; flex-wrap: wrap; margin-top: 1.5rem; }
+
+    /* ── Footer ── */
+    footer {
+      max-width: 1240px; margin: 0 auto; padding: 2.5rem 2rem 1.5rem;
+      border-top: 1px solid var(--gray-line);
+      font-family: 'DM Mono', monospace; font-size: .72rem; letter-spacing: .08em;
+      color: var(--gray); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
+    }
+    footer a { color: var(--gray); text-decoration: none; transition: color .2s; }
+    footer a:hover { color: var(--blue); }
+    .methodology-note {
+      max-width: 760px; margin-top: 1.2rem;
+      font-family: 'Fraunces', serif; font-size: .85rem; line-height: 1.55;
+      color: #555; font-style: italic;
+    }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem;
+      background: var(--black); color: var(--white);
+      padding: .8rem 1.2rem; font-family: 'Syne', sans-serif; font-size: .82rem;
+      letter-spacing: .03em; z-index: 9000;
+      opacity: 0; transform: translateY(15px); pointer-events: none;
+      transition: opacity .25s, transform .25s;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    /* ── Hide sections until wizard done ── */
+    .stage-hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <nav>
+    <a href="index.html" class="nav-logo-wrap">
+      <div class="nav-bars">
+        <div class="nav-bar" style="height:18px"></div>
+        <div class="nav-bar" style="height:14px"></div>
+        <div class="nav-bar" style="height:9px"></div>
+        <div class="nav-bar" style="height:5px"></div>
+      </div>
+      <span class="nav-logo">Ricardo<span>.</span>Ruiz</span>
+    </a>
+    <ul>
+      <li><a href="index.html#proyectos">Proyectos</a></li>
+      <li><a href="pricing.html">Planes</a></li>
+      <li><a href="login.html">Iniciar sesión</a></li>
+      <li><a href="register.html" class="nav-cta">Registrarse</a></li>
+    </ul>
+    <button class="nav-hamburger" onclick="document.querySelector('nav ul').style.display='flex'" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+
+  <main>
+    <div class="crumb">
+      <a href="index.html">Inicio</a>
+      <span class="sep">/</span>
+      <a href="index.html#proyectos">Proyectos</a>
+      <span class="sep">/</span>
+      <span>Análisis Estructural</span>
+    </div>
+
+    <header class="hero-mod">
+      <div class="hero-tag">Herramienta de prospectiva estratégica</div>
+      <h1 class="hero-title">Análisis estructural<br/>de <span>sistemas complejos</span>.</h1>
+      <p class="hero-sub">
+        Identifica las variables clave de un sistema mapeando cómo se influencian
+        entre sí. Útil para visiones territoriales de largo plazo, diagnósticos
+        sectoriales y diseño de política pública. Inspirada en la escuela de
+        prospectiva estratégica (Godet, Mojica) y actualizada con técnicas
+        contemporáneas de análisis estructural.
+      </p>
+    </header>
+
+    <section class="intro-grid">
+      <article class="intro-card">
+        <div class="intro-num">01 — Qué hace</div>
+        <h3 class="intro-title">Mide influencia y dependencia</h3>
+        <p class="intro-body">
+          Defines un conjunto de variables del sistema (entre 8 y 30) y calificas
+          cuánto influye cada una sobre las demás. La herramienta calcula tanto
+          las relaciones directas como las indirectas que aparecen al propagar
+          la matriz.
+        </p>
+      </article>
+      <article class="intro-card">
+        <div class="intro-num">02 — Qué entrega</div>
+        <h3 class="intro-title">Mapa de variables clave</h3>
+        <p class="intro-body">
+          Ubica cada variable en cuatro cuadrantes según su poder de influencia
+          y su grado de dependencia. Distingue las variables que mueven el
+          sistema, las que son críticas, las que resultan del sistema y las que
+          quedan al margen.
+        </p>
+      </article>
+      <article class="intro-card">
+        <div class="intro-num">03 — Para qué sirve</div>
+        <h3 class="intro-title">Decidir dónde intervenir</h3>
+        <p class="intro-body">
+          El resultado orienta sobre qué variables conviene mover primero para
+          transformar el sistema y cuáles solo cambian si se actúa antes sobre
+          sus causas. Sirve para alinear equipos, priorizar inversiones y
+          construir escenarios de futuro.
+        </p>
+      </article>
+    </section>
+
+    <section class="section" id="stage-wizard">
+      <div class="section-label">Paso 1 de 4</div>
+      <h2 class="section-title">Cuéntanos para qué lo vas a usar</h2>
+      <p class="section-desc">
+        Con tres preguntas cortas te sugerimos una plantilla pensada para tu
+        contexto. Puedes cambiarla o partir desde cero en cualquier momento.
+      </p>
+
+      <div class="wizard-step">
+        <div class="wizard-q"><span class="wizard-q-num">P1</span>¿Qué tipo de organización eres?</div>
+        <div class="wizard-options" id="q1-options"></div>
+      </div>
+      <div class="wizard-step">
+        <div class="wizard-q"><span class="wizard-q-num">P2</span>¿Para qué necesitas el análisis?</div>
+        <div class="wizard-options" id="q2-options"></div>
+      </div>
+      <div class="wizard-step">
+        <div class="wizard-q"><span class="wizard-q-num">P3</span>¿Qué tan técnico es el equipo que va a trabajar?</div>
+        <div class="wizard-options" id="q3-options"></div>
+      </div>
+
+      <div id="tpl-suggested-box"></div>
+
+      <div class="wizard-cta-row">
+        <button class="btn-primary" id="btn-start" disabled onclick="startProject()">Empezar análisis →</button>
+        <button class="btn-ghost" onclick="startBlank()">Empezar desde cero</button>
+      </div>
+    </section>
+
+    <section class="section stage-hidden" id="stage-vars">
+      <div class="section-label">Paso 2 de 4</div>
+      <h2 class="section-title">Define las variables del sistema</h2>
+      <p class="section-desc">
+        Las variables son los componentes que describen tu sistema. Edítalas,
+        agrega las que faltan, retira las que no aplican. Recomendamos entre 10
+        y 25 variables: por debajo de 8 el análisis pierde resolución; por
+        encima de 30 la captura de la matriz se vuelve pesada.
+      </p>
+
+      <div class="vars-grid" id="vars-grid"></div>
+
+      <div class="vars-add-row">
+        <input type="text" class="vars-add-input" id="vars-add-input" placeholder="Nombre de la nueva variable..." onkeydown="if(event.key==='Enter')addVar()"/>
+        <button class="btn-ghost" onclick="addVar()">+ Agregar variable</button>
+      </div>
+
+      <div class="vars-meta">
+        <span>Variables: <b id="vars-count">0</b></span>
+        <span>Celdas a llenar: <b id="vars-cells">0</b></span>
+        <span>Plantilla: <b id="vars-tpl">—</b></span>
+      </div>
+
+      <div class="wizard-cta-row">
+        <button class="btn-primary" onclick="goToCapture()">Continuar →</button>
+        <button class="btn-ghost" onclick="backToWizard()">← Cambiar plantilla</button>
+      </div>
+    </section>
+
+    <section class="section stage-hidden" id="stage-capture">
+      <div class="section-label">Paso 3 de 4</div>
+      <h2 class="section-title">Califica las relaciones</h2>
+      <p class="section-desc">
+        Para cada par de variables (A, B), califica cuánto influye A sobre B en
+        una escala de 0 a 3: <b>0</b> nula, <b>1</b> débil, <b>2</b> media,
+        <b>3</b> fuerte. Usa <b>P</b> (potencial) cuando la relación no exista
+        hoy pero pueda activarse en el futuro. La diagonal queda inhabilitada
+        (una variable no se influye a sí misma).
+      </p>
+
+      <div class="mode-toggle">
+        <button class="mode-btn active" id="mode-table-btn" onclick="setMode('table')">Modo matriz</button>
+        <button class="mode-btn" id="mode-guided-btn" onclick="setMode('guided')">Modo guiado</button>
+      </div>
+
+      <div class="matrix-legend">
+        <span><b>0</b> nula</span>
+        <span><b>1</b> débil</span>
+        <span><b>2</b> media</span>
+        <span><b>3</b> fuerte</span>
+        <span class="legend-P"><b>P</b> potencial</span>
+        <span style="margin-left:auto"><b id="cells-filled">0</b>/<b id="cells-total">0</b> celdas</span>
+      </div>
+
+      <div id="mode-table">
+        <div class="matrix-wrap" id="matrix-wrap"></div>
+      </div>
+
+      <div id="mode-guided" class="stage-hidden">
+        <div class="guided" id="guided-box"></div>
+      </div>
+
+      <div class="wizard-cta-row">
+        <button class="btn-primary" onclick="goToResults()">Ver resultados →</button>
+        <button class="btn-ghost" onclick="backToVars()">← Editar variables</button>
+        <button class="btn-ghost" onclick="resetMatrix()">Limpiar matriz</button>
+      </div>
+    </section>
+
+    <section class="section stage-hidden" id="stage-results">
+      <div class="section-label">Paso 4 de 4</div>
+      <h2 class="section-title">Variables clave del sistema</h2>
+      <p class="section-desc" id="results-desc">
+        Cada variable aparece ubicada según su <b>motricidad indirecta</b> (eje
+        Y, cuánto influye sobre el sistema cuando se propagan las relaciones) y
+        su <b>dependencia indirecta</b> (eje X, cuánto la determina el sistema).
+        Los ejes están normalizados al máximo observado.
+      </p>
+
+      <div class="results-grid">
+        <div class="chart-wrap">
+          <span class="chart-quadrant-label q1">Motrices</span>
+          <span class="chart-quadrant-label q2">Clave</span>
+          <span class="chart-quadrant-label q3">Autónomas</span>
+          <span class="chart-quadrant-label q4">Resultado</span>
+          <canvas id="chart-scatter"></canvas>
+        </div>
+        <div class="ranking-card" id="ranking-card"></div>
+      </div>
+
+      <div class="export-row">
+        <button class="btn-primary" onclick="exportJSON()">Descargar análisis (.json)</button>
+        <button class="btn-ghost" onclick="exportCSV()">Descargar matriz (.csv)</button>
+        <button class="btn-ghost" onclick="backToCapture()">← Editar matriz</button>
+      </div>
+
+      <p class="methodology-note">
+        Esta herramienta toma como base el método de análisis estructural
+        propuesto por Michel Godet (LIPSOR) y desarrollado en Colombia por
+        Francisco José Mojica (Universidad Externado). Las multiplicaciones
+        sucesivas de la matriz hacen visibles las relaciones indirectas que el
+        ojo humano no detecta cuando observa solo las influencias directas. En
+        futuras versiones la herramienta incorporará scoring difuso, valencias
+        firmadas (facilitación / inhibición), jerarquía estructural y un
+        copiloto de inteligencia artificial para sugerir variables y validar la
+        consistencia de la matriz.
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    <span>Ricardo Ruiz · Consultoría en datos y política pública</span>
+    <span>Bogotá, Colombia · <a href="index.html#contacto">Contacto</a></span>
+  </footer>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+// ─────────────────────────────────────────────────────────────────────────
+// PLANTILLAS
+// Cada plantilla define un set de variables semilla + metadata. El usuario
+// puede editarlas, agregar y quitar en el paso 2. Las plantillas no son
+// camisa de fuerza: son punto de partida.
+// ─────────────────────────────────────────────────────────────────────────
+
+const TEMPLATES = {
+  'pdt-mixto': {
+    nombre: 'Plan de Desarrollo Territorial — Visión integral',
+    descripcion: 'Variables clave para alinear un PDT de 4 años. Cubre dimensiones del Kit de Planeación Territorial del DNP: capacidades, oferta sectorial, condiciones de vida.',
+    perfil: 'Alcaldías y gobernaciones que están formulando o ajustando su Plan de Desarrollo. Lenguaje accionable, sin jerga prospectiva.',
+    nivel: 'mixto',
+    vars: [
+      'Capacidades institucionales',
+      'Recursos fiscales propios',
+      'Cobertura de salud',
+      'Cobertura educativa',
+      'Seguridad ciudadana',
+      'Movilidad y conectividad',
+      'Espacio público',
+      'Gestión de residuos y agua',
+      'Participación ciudadana',
+      'Transparencia y anticorrupción',
+      'Empleo formal',
+      'Pobreza multidimensional'
+    ]
+  },
+  'prospectiva-2040': {
+    nombre: 'Prospectiva territorial 2040',
+    descripcion: 'Visión territorial de largo plazo (10–20 años). Variables estructurales del desarrollo territorial: capital humano, innovación, sostenibilidad, gobernanza.',
+    perfil: 'Gobernaciones, comisiones regionales de competitividad y equipos que construyen visión 2040 / 2050. Equipo técnico con experiencia.',
+    nivel: 'tecnico',
+    vars: [
+      'Diversificación productiva',
+      'Innovación y desarrollo tecnológico',
+      'Infraestructura conectiva',
+      'Capital humano calificado',
+      'Sostenibilidad ambiental',
+      'Resiliencia al cambio climático',
+      'Cohesión social',
+      'Brecha urbano-rural',
+      'Gobernanza territorial',
+      'Articulación nación–territorio',
+      'Cultura y patrimonio',
+      'Demografía y migración',
+      'Conectividad digital',
+      'Seguridad multidimensional',
+      'Justicia y acceso',
+      'Salud pública',
+      'Educación terciaria',
+      'Finanzas territoriales'
+    ]
+  },
+  'seguridad-urbana': {
+    nombre: 'Diagnóstico estructural de seguridad urbana',
+    descripcion: 'Sistema de seguridad ciudadana en contextos urbanos. Cruza variables delictivas con factores socioeconómicos, institucionales y comunitarios.',
+    perfil: 'Secretarías de seguridad, gobierno y convivencia. Pensado para Bogotá, Medellín, Cali y ciudades intermedias con tradición de análisis cuantitativo.',
+    nivel: 'avanzado',
+    vars: [
+      'Homicidios',
+      'Hurto a personas',
+      'Hurto a residencias',
+      'Hurto a comercio',
+      'Lesiones personales',
+      'Violencia intrafamiliar',
+      'Pie de fuerza policial',
+      'Alumbrado público',
+      'Espacio público recuperado',
+      'Pobreza multidimensional',
+      'Jóvenes que ni estudian ni trabajan',
+      'Presencia de economías ilegales',
+      'Cohesión comunitaria',
+      'Confianza en instituciones',
+      'Migración pendular'
+    ]
+  },
+  'taller-actores': {
+    nombre: 'Taller estructural con actores',
+    descripcion: 'Plantilla abierta para diagnóstico participativo. Trae las 6 dimensiones del análisis PESTEL como sugerencia inicial; el taller llena las variables específicas.',
+    perfil: 'Consultorías, ONG, organismos multilaterales que conducen talleres con grupos heterogéneos. Lenguaje neutral, vocación participativa.',
+    nivel: 'mixto',
+    vars: [
+      'Variable política 1',
+      'Variable política 2',
+      'Variable económica 1',
+      'Variable económica 2',
+      'Variable social 1',
+      'Variable social 2',
+      'Variable tecnológica 1',
+      'Variable ambiental 1',
+      'Variable legal 1'
+    ]
+  },
+  'academia-blank': {
+    nombre: 'Investigación académica',
+    descripcion: 'Plantilla mínima para trabajo académico o tesis. Sin variables sugeridas: el investigador construye su set según el marco teórico que esté usando.',
+    perfil: 'Estudiantes y profesores de pregrado, maestrías y doctorados en prospectiva, planeación, gestión pública o áreas afines.',
+    nivel: 'tecnico',
+    vars: [
+      'Variable 1',
+      'Variable 2',
+      'Variable 3',
+      'Variable 4',
+      'Variable 5',
+      'Variable 6',
+      'Variable 7',
+      'Variable 8'
+    ]
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────
+// WIZARD
+// 3 preguntas → mapping a una plantilla sugerida.
+// El mapping no es exhaustivo; muchos cruces caen a la misma plantilla,
+// y siempre se ofrecen alternativas para que el usuario explore.
+// ─────────────────────────────────────────────────────────────────────────
+
+const Q1_OPTIONS = [
+  { id: 'planeacion',  label: 'Oficina de planeación',  hint: 'Alcaldía, gobernación, departamento de planeación' },
+  { id: 'sectorial',   label: 'Secretaría sectorial',   hint: 'Seguridad, movilidad, salud, educación, ambiente' },
+  { id: 'consultoria', label: 'Consultoría o firma',    hint: 'Consultoras, ONG, organismos multilaterales' },
+  { id: 'academia',    label: 'Academia o investigación', hint: 'Universidad, posgrado, tesis, centros de pensamiento' }
+];
+const Q2_OPTIONS = [
+  { id: 'vision',     label: 'Visión de largo plazo',         hint: '10–20 años, prospectiva territorial' },
+  { id: 'pdt',        label: 'Plan de Desarrollo Territorial', hint: '4 años, articulación con el KPT del DNP' },
+  { id: 'politica',   label: 'Política sectorial específica', hint: 'Diagnóstico de un problema concreto' },
+  { id: 'taller',     label: 'Diagnóstico participativo',     hint: 'Taller con varios actores y miradas' }
+];
+const Q3_OPTIONS = [
+  { id: 'mixto',     label: 'Equipo mixto',         hint: 'Técnicos, políticos y comunidad. Sin jerga.' },
+  { id: 'tecnico',   label: 'Equipo técnico estándar', hint: 'Analistas con experiencia en planeación' },
+  { id: 'avanzado',  label: 'Equipo técnico avanzado', hint: 'Con tradición cuantitativa y datos propios' }
+];
+
+// Mapping (q1, q2, q3) → plantilla. Tabla con prioridades.
+function suggestTemplate(q1, q2, q3) {
+  // Sectorial + política → seguridad urbana siempre que sea avanzado
+  if (q2 === 'politica' && q1 === 'sectorial') return 'seguridad-urbana';
+  // PDT siempre va a la plantilla PDT
+  if (q2 === 'pdt') return 'pdt-mixto';
+  // Visión LP → prospectiva 2040
+  if (q2 === 'vision') return 'prospectiva-2040';
+  // Taller participativo → taller abierto
+  if (q2 === 'taller') return 'taller-actores';
+  // Academia → blank
+  if (q1 === 'academia') return 'academia-blank';
+  // Default
+  return 'pdt-mixto';
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// STATE
+// Persistido en localStorage. Una sola "sesión" por navegador en esta v1.
+// Sprint 2 introducirá proyectos múltiples + backend multiusuario.
+// ─────────────────────────────────────────────────────────────────────────
+
+const LS_KEY = 'micmac-current-v1';
+
+const STATE = {
+  wizard: { q1: null, q2: null, q3: null, tpl: null },
+  meta: { tplId: null, nombre: '', createdAt: null, updatedAt: null },
+  vars: [],         // array de strings (nombres de variables)
+  matrix: [],       // matriz NxN, valores '0' '1' '2' '3' 'P' o '' (sin llenar)
+  captureIdx: 0,    // índice (0..N²-1) del modo guiado, saltando diagonal
+  mode: 'table'     // 'table' | 'guided'
+};
+
+function saveState() {
+  STATE.meta.updatedAt = new Date().toISOString();
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(STATE));
+  } catch (e) {
+    console.warn('No se pudo guardar en localStorage:', e);
+  }
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return false;
+    const obj = JSON.parse(raw);
+    Object.assign(STATE.wizard, obj.wizard || {});
+    Object.assign(STATE.meta, obj.meta || {});
+    STATE.vars = obj.vars || [];
+    STATE.matrix = obj.matrix || [];
+    STATE.captureIdx = obj.captureIdx || 0;
+    STATE.mode = obj.mode || 'table';
+    return true;
+  } catch (e) {
+    console.warn('No se pudo restaurar localStorage:', e);
+    return false;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// MATRIZ — helpers
+// Almacenamos como array bidimensional STATE.matrix[i][j].
+// '0' '1' '2' '3' 'P' o '' (vacía). 'P' se trata numéricamente como 1.
+// ─────────────────────────────────────────────────────────────────────────
+
+function newMatrix(n) {
+  const m = [];
+  for (let i = 0; i < n; i++) {
+    const row = new Array(n).fill('');
+    row[i] = '-'; // diagonal
+    m.push(row);
+  }
+  return m;
+}
+
+function valToNum(v) {
+  if (v === '' || v === '-' || v == null) return 0;
+  if (v === 'P') return 1;
+  const n = parseInt(v, 10);
+  return isNaN(n) ? 0 : n;
+}
+
+function resizeMatrix(newN) {
+  const oldN = STATE.matrix.length;
+  if (newN === oldN) return;
+  if (newN > oldN) {
+    // Crece: extender filas existentes con '' y agregar filas nuevas
+    for (let i = 0; i < oldN; i++) {
+      while (STATE.matrix[i].length < newN) STATE.matrix[i].push('');
+    }
+    for (let i = oldN; i < newN; i++) {
+      const row = new Array(newN).fill('');
+      row[i] = '-';
+      STATE.matrix.push(row);
+    }
+  } else {
+    // Decrece: cortar filas y columnas
+    STATE.matrix = STATE.matrix.slice(0, newN).map(r => r.slice(0, newN));
+  }
+  // Asegurar diagonal '-'
+  for (let i = 0; i < newN; i++) STATE.matrix[i][i] = '-';
+}
+
+function countFilled() {
+  let filled = 0, total = 0;
+  const n = STATE.vars.length;
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      if (i === j) continue;
+      total++;
+      if (STATE.matrix[i] && STATE.matrix[i][j] !== '' && STATE.matrix[i][j] !== '-') filled++;
+    }
+  }
+  return { filled, total };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// CÁLCULO MICMAC
+// Motricidad directa = suma por fila. Dependencia directa = suma por columna.
+// Motricidad indirecta = mismo cálculo sobre M^k, donde k se elige tal que
+// el ranking de motricidad indirecta se estabilice (típicamente k=2..5).
+// ─────────────────────────────────────────────────────────────────────────
+
+function matToNumeric() {
+  const n = STATE.vars.length;
+  const M = [];
+  for (let i = 0; i < n; i++) {
+    const row = new Array(n);
+    for (let j = 0; j < n; j++) row[j] = (i === j) ? 0 : valToNum(STATE.matrix[i][j]);
+    M.push(row);
+  }
+  return M;
+}
+
+function matMul(A, B) {
+  const n = A.length;
+  const C = [];
+  for (let i = 0; i < n; i++) {
+    const row = new Array(n).fill(0);
+    for (let k = 0; k < n; k++) {
+      const aik = A[i][k];
+      if (aik === 0) continue;
+      for (let j = 0; j < n; j++) row[j] += aik * B[k][j];
+    }
+    C.push(row);
+  }
+  return C;
+}
+
+function rowSums(M) { return M.map(r => r.reduce((s, x) => s + x, 0)); }
+function colSums(M) {
+  const n = M.length;
+  const c = new Array(n).fill(0);
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) c[j] += M[i][j];
+  return c;
+}
+
+function rankingOf(arr) {
+  // Devuelve un array donde rank[i] = posición de i ordenando arr de mayor a menor.
+  const idx = arr.map((v, i) => [v, i]).sort((a, b) => b[0] - a[0]);
+  const rank = new Array(arr.length);
+  idx.forEach(([_, i], pos) => { rank[i] = pos; });
+  return rank;
+}
+
+function ranksEqual(r1, r2) {
+  if (r1.length !== r2.length) return false;
+  for (let i = 0; i < r1.length; i++) if (r1[i] !== r2[i]) return false;
+  return true;
+}
+
+function computeMicMac() {
+  const n = STATE.vars.length;
+  if (n < 2) return null;
+  const M = matToNumeric();
+
+  // Directas
+  const motriDir = rowSums(M);
+  const depDir = colSums(M);
+
+  // Iterar M^k hasta que el ranking de motricidad y dependencia se estabilice
+  // (o llegar a 6 iteraciones para evitar amplificación numérica).
+  let Mk = M;
+  let prevRankM = rankingOf(motriDir);
+  let prevRankD = rankingOf(depDir);
+  let stableAt = 1;
+  for (let k = 2; k <= 6; k++) {
+    Mk = matMul(Mk, M);
+    const rm = rankingOf(rowSums(Mk));
+    const rd = rankingOf(colSums(Mk));
+    if (ranksEqual(rm, prevRankM) && ranksEqual(rd, prevRankD) && k >= 3) {
+      stableAt = k;
+      break;
+    }
+    prevRankM = rm; prevRankD = rd;
+    stableAt = k;
+  }
+
+  const motriInd = rowSums(Mk);
+  const depInd = colSums(Mk);
+
+  // Normalizar 0–100 al máximo observado para el plot
+  const maxM = Math.max(1, ...motriInd);
+  const maxD = Math.max(1, ...depInd);
+  const motriN = motriInd.map(v => (v / maxM) * 100);
+  const depN = depInd.map(v => (v / maxD) * 100);
+
+  // Clasificación por cuadrantes: divido por la media normalizada (50 en
+  // distribución uniforme; en la práctica usamos la mediana para que el
+  // resultado no se distorsione cuando hay outliers).
+  const sortedM = [...motriN].sort((a, b) => a - b);
+  const sortedD = [...depN].sort((a, b) => a - b);
+  const medM = sortedM[Math.floor(n / 2)];
+  const medD = sortedD[Math.floor(n / 2)];
+
+  const cuadrante = motriN.map((m, i) => {
+    const d = depN[i];
+    if (m >= medM && d < medD) return 'motriz';
+    if (m >= medM && d >= medD) return 'clave';
+    if (m < medM && d < medD) return 'autonoma';
+    return 'resultado';
+  });
+
+  return {
+    n, stableAt,
+    motriDir, depDir,
+    motriInd, depInd,
+    motriN, depN,
+    medM, medD,
+    cuadrante
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// RENDER — Wizard
+// ─────────────────────────────────────────────────────────────────────────
+
+function renderWizard() {
+  ['q1', 'q2', 'q3'].forEach(q => {
+    const opts = ({ q1: Q1_OPTIONS, q2: Q2_OPTIONS, q3: Q3_OPTIONS })[q];
+    const cont = document.getElementById(q + '-options');
+    cont.innerHTML = opts.map(o =>
+      `<button class="wizard-opt${STATE.wizard[q] === o.id ? ' selected' : ''}" onclick="pickWizard('${q}','${o.id}')">
+        <span class="opt-label">${o.label}</span>
+        <span class="opt-hint">${o.hint}</span>
+      </button>`).join('');
+  });
+  renderSuggestedTemplate();
+  document.getElementById('btn-start').disabled = !(STATE.wizard.q1 && STATE.wizard.q2 && STATE.wizard.q3);
+}
+
+function pickWizard(q, id) {
+  STATE.wizard[q] = id;
+  saveState();
+  renderWizard();
+}
+
+function renderSuggestedTemplate() {
+  const box = document.getElementById('tpl-suggested-box');
+  const { q1, q2, q3 } = STATE.wizard;
+  if (!q1 || !q2 || !q3) { box.innerHTML = ''; return; }
+  const tplId = suggestTemplate(q1, q2, q3);
+  STATE.wizard.tpl = tplId;
+  const tpl = TEMPLATES[tplId];
+  const altsHtml = Object.entries(TEMPLATES)
+    .filter(([k]) => k !== tplId)
+    .map(([k, t]) => `<button class="tpl-alt" onclick="overrideTpl('${k}')">${t.nombre}</button>`).join('');
+  box.innerHTML = `
+    <div class="tpl-suggested">
+      <div class="tpl-suggested-label">Plantilla sugerida</div>
+      <div class="tpl-suggested-name">${tpl.nombre}</div>
+      <div class="tpl-suggested-desc">${tpl.descripcion}<br/><br/><b>Para:</b> ${tpl.perfil}</div>
+      <div class="tpl-alt-row">
+        <span style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--gray);letter-spacing:.14em;align-self:center;text-transform:uppercase;margin-right:.4rem">Otras:</span>
+        ${altsHtml}
+      </div>
+    </div>`;
+}
+
+function overrideTpl(tplId) {
+  STATE.wizard.tpl = tplId;
+  saveState();
+  const tpl = TEMPLATES[tplId];
+  showToast('Plantilla cambiada a: ' + tpl.nombre);
+  // No re-renderizar todo el wizard; solo cambiar el box manualmente
+  // para no perder selecciones del usuario.
+  const allAlts = Object.entries(TEMPLATES)
+    .filter(([k]) => k !== tplId)
+    .map(([k, t]) => `<button class="tpl-alt" onclick="overrideTpl('${k}')">${t.nombre}</button>`).join('');
+  document.getElementById('tpl-suggested-box').innerHTML = `
+    <div class="tpl-suggested">
+      <div class="tpl-suggested-label">Plantilla seleccionada</div>
+      <div class="tpl-suggested-name">${tpl.nombre}</div>
+      <div class="tpl-suggested-desc">${tpl.descripcion}<br/><br/><b>Para:</b> ${tpl.perfil}</div>
+      <div class="tpl-alt-row">
+        <span style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--gray);letter-spacing:.14em;align-self:center;text-transform:uppercase;margin-right:.4rem">Cambiar a:</span>
+        ${allAlts}
+      </div>
+    </div>`;
+}
+
+function startProject() {
+  const tplId = STATE.wizard.tpl;
+  if (!tplId) return;
+  const tpl = TEMPLATES[tplId];
+  STATE.meta.tplId = tplId;
+  STATE.meta.nombre = tpl.nombre;
+  STATE.meta.createdAt = STATE.meta.createdAt || new Date().toISOString();
+  STATE.vars = tpl.vars.slice();
+  STATE.matrix = newMatrix(STATE.vars.length);
+  STATE.captureIdx = 0;
+  saveState();
+  goToVars();
+}
+
+function startBlank() {
+  STATE.meta.tplId = null;
+  STATE.meta.nombre = 'Análisis personalizado';
+  STATE.meta.createdAt = STATE.meta.createdAt || new Date().toISOString();
+  STATE.vars = ['Variable 1', 'Variable 2', 'Variable 3', 'Variable 4', 'Variable 5'];
+  STATE.matrix = newMatrix(STATE.vars.length);
+  STATE.captureIdx = 0;
+  saveState();
+  goToVars();
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// RENDER — Editor de variables
+// ─────────────────────────────────────────────────────────────────────────
+
+function renderVars() {
+  const grid = document.getElementById('vars-grid');
+  grid.innerHTML = STATE.vars.map((v, i) =>
+    `<div class="var-chip">
+      <span class="var-chip-code">V${String(i + 1).padStart(2, '0')}</span>
+      <span class="var-chip-name" contenteditable="true" spellcheck="false"
+            onblur="renameVar(${i}, this.innerText)"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${escapeHtml(v)}</span>
+      <button class="var-chip-del" onclick="delVar(${i})" title="Eliminar">×</button>
+    </div>`).join('');
+  const n = STATE.vars.length;
+  document.getElementById('vars-count').textContent = n;
+  document.getElementById('vars-cells').textContent = n * (n - 1);
+  document.getElementById('vars-tpl').textContent = STATE.meta.nombre || '—';
+}
+
+function addVar() {
+  const inp = document.getElementById('vars-add-input');
+  const name = inp.value.trim();
+  if (!name) {
+    inp.focus();
+    return;
+  }
+  STATE.vars.push(name);
+  resizeMatrix(STATE.vars.length);
+  inp.value = '';
+  saveState();
+  renderVars();
+  inp.focus();
+}
+
+function delVar(i) {
+  if (STATE.vars.length <= 2) {
+    showToast('Necesitas al menos 2 variables para hacer el análisis.');
+    return;
+  }
+  STATE.vars.splice(i, 1);
+  STATE.matrix.splice(i, 1);
+  STATE.matrix.forEach(r => r.splice(i, 1));
+  // Reasegurar diagonal
+  for (let k = 0; k < STATE.matrix.length; k++) STATE.matrix[k][k] = '-';
+  STATE.captureIdx = 0;
+  saveState();
+  renderVars();
+}
+
+function renameVar(i, newName) {
+  const name = (newName || '').trim();
+  if (!name) {
+    showToast('El nombre no puede estar vacío.');
+    renderVars();
+    return;
+  }
+  STATE.vars[i] = name;
+  saveState();
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// RENDER — Captura modo tabla
+// ─────────────────────────────────────────────────────────────────────────
+
+function renderMatrixTable() {
+  const wrap = document.getElementById('matrix-wrap');
+  const n = STATE.vars.length;
+  if (n < 2) {
+    wrap.innerHTML = '<p class="empty-msg">Define al menos 2 variables para construir la matriz.</p>';
+    return;
+  }
+  let html = '<table class="matrix"><thead><tr>';
+  html += '<th class="corner">influye sobre →</th>';
+  for (let j = 0; j < n; j++) {
+    html += `<th class="col-h" title="${escapeHtml(STATE.vars[j])}"><div class="col-h-inner">V${String(j + 1).padStart(2, '0')} · ${escapeHtml(STATE.vars[j])}</div></th>`;
+  }
+  html += '</tr></thead><tbody>';
+  for (let i = 0; i < n; i++) {
+    html += `<tr><th class="row-h" title="${escapeHtml(STATE.vars[i])}">V${String(i + 1).padStart(2, '0')} · ${escapeHtml(STATE.vars[i])}</th>`;
+    for (let j = 0; j < n; j++) {
+      const v = STATE.matrix[i][j];
+      if (i === j) {
+        html += `<td class="cell diag">·</td>`;
+      } else {
+        const cls = v === '' ? '' : `v-${v}`;
+        html += `<td class="cell ${cls}" data-i="${i}" data-j="${j}" tabindex="0" onclick="cycleCell(${i},${j})" onkeydown="cellKey(event,${i},${j})">${v === '' ? '' : v}</td>`;
+      }
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+  updateCellsCounter();
+}
+
+function cycleCell(i, j) {
+  // Ciclo: '' → '1' → '2' → '3' → 'P' → '0' → ''
+  const cur = STATE.matrix[i][j];
+  const order = ['', '1', '2', '3', 'P', '0'];
+  const idx = order.indexOf(cur === undefined ? '' : cur);
+  const next = order[(idx + 1) % order.length];
+  STATE.matrix[i][j] = next;
+  saveState();
+  renderMatrixTable();
+}
+
+function cellKey(ev, i, j) {
+  const k = ev.key;
+  if (k === '0' || k === '1' || k === '2' || k === '3') {
+    STATE.matrix[i][j] = k;
+    saveState();
+    renderMatrixTable();
+    ev.preventDefault();
+  } else if (k === 'p' || k === 'P') {
+    STATE.matrix[i][j] = 'P';
+    saveState();
+    renderMatrixTable();
+    ev.preventDefault();
+  } else if (k === 'Backspace' || k === 'Delete') {
+    STATE.matrix[i][j] = '';
+    saveState();
+    renderMatrixTable();
+    ev.preventDefault();
+  } else if (k === 'ArrowRight' || k === 'Tab') {
+    const next = document.querySelector(`td.cell[data-i="${i}"][data-j="${j + 1}"]`);
+    if (next) { next.focus(); ev.preventDefault(); }
+  } else if (k === 'ArrowLeft') {
+    const prev = document.querySelector(`td.cell[data-i="${i}"][data-j="${j - 1}"]`);
+    if (prev) { prev.focus(); ev.preventDefault(); }
+  } else if (k === 'ArrowDown') {
+    const down = document.querySelector(`td.cell[data-i="${i + 1}"][data-j="${j}"]`);
+    if (down) { down.focus(); ev.preventDefault(); }
+  } else if (k === 'ArrowUp') {
+    const up = document.querySelector(`td.cell[data-i="${i - 1}"][data-j="${j}"]`);
+    if (up) { up.focus(); ev.preventDefault(); }
+  }
+}
+
+function updateCellsCounter() {
+  const { filled, total } = countFilled();
+  document.getElementById('cells-filled').textContent = filled;
+  document.getElementById('cells-total').textContent = total;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// RENDER — Captura modo guiado
+// Recorre todas las celdas no-diagonales en orden (i, j).
+// ─────────────────────────────────────────────────────────────────────────
+
+function guidedCells() {
+  const n = STATE.vars.length;
+  const cells = [];
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      if (i !== j) cells.push([i, j]);
+    }
+  }
+  return cells;
+}
+
+function renderGuided() {
+  const box = document.getElementById('guided-box');
+  const n = STATE.vars.length;
+  if (n < 2) {
+    box.innerHTML = '<p class="empty-msg">Define al menos 2 variables para empezar.</p>';
+    return;
+  }
+  const cells = guidedCells();
+  const total = cells.length;
+  // Saltar a la primera celda vacía si STATE.captureIdx apunta a una llena.
+  while (STATE.captureIdx < total) {
+    const [i, j] = cells[STATE.captureIdx];
+    if (STATE.matrix[i][j] === '' || STATE.matrix[i][j] === undefined) break;
+    STATE.captureIdx++;
+  }
+  if (STATE.captureIdx >= total) {
+    box.innerHTML = `
+      <div class="guided-progress">Matriz completa · <b>${total}/${total}</b></div>
+      <div class="guided-q">Has calificado todas las relaciones. Continúa al paso 4 para ver los resultados.</div>
+      <div class="gnav">
+        <button class="btn-ghost" onclick="STATE.captureIdx=0; renderGuided();">Revisar desde el inicio</button>
+      </div>`;
+    return;
+  }
+  const [i, j] = cells[STATE.captureIdx];
+  const pct = ((STATE.captureIdx + 1) / total) * 100;
+  box.innerHTML = `
+    <div class="guided-progress">
+      Pregunta <b>${STATE.captureIdx + 1}</b> de <b>${total}</b>
+      <div class="guided-progress-bar"><div class="fill" style="width:${pct}%"></div></div>
+    </div>
+    <div class="guided-q">
+      ¿Cuánto influye <span class="var-a">${escapeHtml(STATE.vars[i])}</span>
+      sobre <span class="var-b">${escapeHtml(STATE.vars[j])}</span>?
+    </div>
+    <div class="guided-buttons">
+      <button class="gbtn" data-v="0" onclick="guidedAnswer('0')">0<span class="gbtn-label">Nula</span></button>
+      <button class="gbtn" data-v="1" onclick="guidedAnswer('1')">1<span class="gbtn-label">Débil</span></button>
+      <button class="gbtn" data-v="2" onclick="guidedAnswer('2')">2<span class="gbtn-label">Media</span></button>
+      <button class="gbtn" data-v="3" onclick="guidedAnswer('3')">3<span class="gbtn-label">Fuerte</span></button>
+      <button class="gbtn" data-v="P" onclick="guidedAnswer('P')">P<span class="gbtn-label">Potencial</span></button>
+    </div>
+    <div class="gnav">
+      <button class="btn-ghost" onclick="guidedBack()" ${STATE.captureIdx === 0 ? 'disabled' : ''}>← Atrás</button>
+      <button class="btn-ghost" onclick="guidedSkip()">Saltar →</button>
+    </div>`;
+}
+
+function guidedAnswer(v) {
+  const cells = guidedCells();
+  const [i, j] = cells[STATE.captureIdx];
+  STATE.matrix[i][j] = v;
+  STATE.captureIdx++;
+  saveState();
+  renderGuided();
+  updateCellsCounter();
+}
+
+function guidedBack() {
+  if (STATE.captureIdx > 0) STATE.captureIdx--;
+  saveState();
+  renderGuided();
+}
+
+function guidedSkip() {
+  STATE.captureIdx++;
+  saveState();
+  renderGuided();
+}
+
+function setMode(mode) {
+  STATE.mode = mode;
+  saveState();
+  document.getElementById('mode-table-btn').classList.toggle('active', mode === 'table');
+  document.getElementById('mode-guided-btn').classList.toggle('active', mode === 'guided');
+  document.getElementById('mode-table').classList.toggle('stage-hidden', mode !== 'table');
+  document.getElementById('mode-guided').classList.toggle('stage-hidden', mode !== 'guided');
+  if (mode === 'table') renderMatrixTable();
+  else renderGuided();
+}
+
+function resetMatrix() {
+  if (!confirm('¿Limpiar todas las celdas de la matriz? Las variables se mantienen.')) return;
+  STATE.matrix = newMatrix(STATE.vars.length);
+  STATE.captureIdx = 0;
+  saveState();
+  if (STATE.mode === 'table') renderMatrixTable();
+  else renderGuided();
+  updateCellsCounter();
+  showToast('Matriz limpiada.');
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// RENDER — Resultados
+// ─────────────────────────────────────────────────────────────────────────
+
+let _chartInstance = null;
+
+function renderResults() {
+  const res = computeMicMac();
+  if (!res) {
+    document.getElementById('results-desc').textContent = 'Necesitas al menos 2 variables y algunas celdas llenas para ver resultados.';
+    document.getElementById('ranking-card').innerHTML = '<p class="empty-msg">Sin datos.</p>';
+    return;
+  }
+  const { filled, total } = countFilled();
+  if (filled === 0) {
+    document.getElementById('ranking-card').innerHTML = '<p class="empty-msg">Aún no has calificado ninguna relación. Vuelve al paso 3.</p>';
+    if (_chartInstance) { _chartInstance.destroy(); _chartInstance = null; }
+    return;
+  }
+
+  // Render scatter
+  const ctx = document.getElementById('chart-scatter').getContext('2d');
+  const data = STATE.vars.map((v, i) => ({
+    x: res.depN[i],
+    y: res.motriN[i],
+    label: 'V' + String(i + 1).padStart(2, '0'),
+    name: v,
+    cuadrante: res.cuadrante[i]
+  }));
+  const colorOf = c => ({ motriz: '#2f8f4f', clave: '#0047FF', autonoma: '#888', resultado: '#d68a18' }[c]);
+
+  if (_chartInstance) _chartInstance.destroy();
+  _chartInstance = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: [{
+        label: 'Variables',
+        data: data,
+        backgroundColor: data.map(d => colorOf(d.cuadrante)),
+        borderColor: data.map(d => colorOf(d.cuadrante)),
+        pointRadius: 7,
+        pointHoverRadius: 11,
+        pointBorderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          title: { display: true, text: 'Dependencia (0–100)', font: { family: 'DM Mono', size: 11 }, color: '#666' },
+          min: 0, max: 100,
+          grid: { color: 'rgba(0,0,0,0.05)' },
+          ticks: { font: { family: 'DM Mono', size: 10 }, color: '#888' }
+        },
+        y: {
+          title: { display: true, text: 'Motricidad (0–100)', font: { family: 'DM Mono', size: 11 }, color: '#666' },
+          min: 0, max: 100,
+          grid: { color: 'rgba(0,0,0,0.05)' },
+          ticks: { font: { family: 'DM Mono', size: 10 }, color: '#888' }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(10,10,10,0.95)',
+          titleFont: { family: 'Syne', size: 12, weight: '700' },
+          bodyFont: { family: 'DM Mono', size: 11 },
+          padding: 10,
+          callbacks: {
+            title: items => items[0].raw.name,
+            label: ctx => [
+              ctx.raw.label + ' · ' + ctx.raw.cuadrante.toUpperCase(),
+              'Motricidad: ' + ctx.raw.y.toFixed(1),
+              'Dependencia: ' + ctx.raw.x.toFixed(1)
+            ]
+          }
+        }
+      }
+    },
+    plugins: [{
+      id: 'quadrantLines',
+      afterDraw(chart) {
+        const { ctx, chartArea, scales } = chart;
+        const xMid = scales.x.getPixelForValue(res.medD);
+        const yMid = scales.y.getPixelForValue(res.medM);
+        ctx.save();
+        ctx.strokeStyle = 'rgba(0,71,255,0.25)';
+        ctx.setLineDash([4, 4]);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(chartArea.left, yMid); ctx.lineTo(chartArea.right, yMid);
+        ctx.moveTo(xMid, chartArea.top); ctx.lineTo(xMid, chartArea.bottom);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }, {
+      id: 'pointLabels',
+      afterDatasetsDraw(chart) {
+        const { ctx } = chart;
+        const ds = chart.getDatasetMeta(0);
+        ctx.save();
+        ctx.font = '600 9px "DM Mono", monospace';
+        ctx.fillStyle = '#0a0a0a';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ds.data.forEach((pt, i) => {
+          ctx.fillText(data[i].label, pt.x + 9, pt.y);
+        });
+        ctx.restore();
+      }
+    }]
+  });
+
+  // Ranking
+  const groups = {
+    clave: { title: 'Variables clave', cls: 't-key', desc: 'Alta influencia + alta dependencia. Críticas e inestables.' },
+    motriz: { title: 'Variables motrices', cls: 't-motri', desc: 'Mueven el sistema. Palancas de intervención.' },
+    resultado: { title: 'Variables resultado', cls: 't-dep', desc: 'Determinadas por el sistema. Indicadores de salida.' },
+    autonoma: { title: 'Variables autónomas', cls: 't-auto', desc: 'Bajo poder e independientes. Marginales.' }
+  };
+  let html = '';
+  for (const key of ['clave', 'motriz', 'resultado', 'autonoma']) {
+    const vars = STATE.vars
+      .map((v, i) => ({ name: v, i, code: 'V' + String(i + 1).padStart(2, '0'), m: res.motriN[i], d: res.depN[i] }))
+      .filter(x => res.cuadrante[x.i] === key)
+      .sort((a, b) => (b.m + b.d) - (a.m + a.d));
+    if (vars.length === 0) continue;
+    html += `<div class="rank-group">
+      <div class="rank-title ${groups[key].cls}"><span class="rank-dot"></span>${groups[key].title} <span style="font-family:'Fraunces';font-weight:300;font-style:italic;font-size:.74rem;color:var(--gray);margin-left:.4rem">(${vars.length})</span></div>
+      <ul class="rank-list">
+        ${vars.map(x => `<li>
+          <span class="rk-code">${x.code}</span>
+          <span class="rk-name" title="${escapeHtml(x.name)}">${escapeHtml(x.name)}</span>
+          <span class="rk-score">M${x.m.toFixed(0)} D${x.d.toFixed(0)}</span>
+        </li>`).join('')}
+      </ul>
+    </div>`;
+  }
+  document.getElementById('ranking-card').innerHTML = html;
+  document.getElementById('results-desc').innerHTML = `
+    Cada variable aparece ubicada según su <b>motricidad indirecta</b> (eje Y,
+    cuánto influye sobre el sistema cuando se propagan las relaciones a
+    través de la matriz, estabilizado al paso ${res.stableAt}) y su
+    <b>dependencia indirecta</b> (eje X, cuánto la determina el sistema).
+    ${filled < total ? `<br/><br/><b style="color:var(--amber)">Atención:</b> sólo has calificado ${filled} de ${total} relaciones. Las variables sin información se procesan con 0.` : ''}
+  `;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// NAVEGACIÓN ENTRE ETAPAS
+// ─────────────────────────────────────────────────────────────────────────
+
+function showStage(id) {
+  ['stage-wizard', 'stage-vars', 'stage-capture', 'stage-results'].forEach(s => {
+    document.getElementById(s).classList.toggle('stage-hidden', s !== id);
+  });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function goToVars()    { renderVars(); showStage('stage-vars'); }
+function goToCapture() {
+  if (STATE.vars.length < 2) { showToast('Necesitas al menos 2 variables.'); return; }
+  setMode(STATE.mode);
+  showStage('stage-capture');
+}
+function goToResults() { showStage('stage-results'); renderResults(); }
+function backToWizard()  { showStage('stage-wizard'); renderWizard(); }
+function backToVars()    { goToVars(); }
+function backToCapture() { goToCapture(); }
+
+// ─────────────────────────────────────────────────────────────────────────
+// EXPORT
+// ─────────────────────────────────────────────────────────────────────────
+
+function exportJSON() {
+  const res = computeMicMac();
+  const out = {
+    meta: STATE.meta,
+    wizard: STATE.wizard,
+    vars: STATE.vars,
+    matrix: STATE.matrix,
+    resultados: res ? {
+      stableAt: res.stableAt,
+      motricidad_directa: STATE.vars.map((v, i) => ({ var: v, valor: res.motriDir[i] })),
+      dependencia_directa: STATE.vars.map((v, i) => ({ var: v, valor: res.depDir[i] })),
+      motricidad_indirecta: STATE.vars.map((v, i) => ({ var: v, valor: res.motriInd[i], normalizada: res.motriN[i] })),
+      dependencia_indirecta: STATE.vars.map((v, i) => ({ var: v, valor: res.depInd[i], normalizada: res.depN[i] })),
+      cuadrante: STATE.vars.map((v, i) => ({ var: v, cuadrante: res.cuadrante[i] }))
+    } : null,
+    exportedAt: new Date().toISOString()
+  };
+  downloadFile(JSON.stringify(out, null, 2), `analisis-estructural-${slugDate()}.json`, 'application/json');
+}
+
+function exportCSV() {
+  const n = STATE.vars.length;
+  if (n === 0) return;
+  let csv = ',' + STATE.vars.map(v => '"' + v.replace(/"/g, '""') + '"').join(',') + '\n';
+  for (let i = 0; i < n; i++) {
+    csv += '"' + STATE.vars[i].replace(/"/g, '""') + '"';
+    for (let j = 0; j < n; j++) {
+      csv += ',' + (i === j ? '-' : (STATE.matrix[i][j] || '0'));
+    }
+    csv += '\n';
+  }
+  downloadFile(csv, `matriz-influencia-${slugDate()}.csv`, 'text/csv;charset=utf-8');
+}
+
+function slugDate() {
+  const d = new Date();
+  return d.toISOString().slice(0, 10);
+}
+
+function downloadFile(content, filename, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Archivo descargado.');
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// UTILITIES
+// ─────────────────────────────────────────────────────────────────────────
+
+let _toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// CURSOR
+// ─────────────────────────────────────────────────────────────────────────
+
+(function initCursor() {
+  const c = document.getElementById('cursor');
+  const r = document.getElementById('cursorRing');
+  document.addEventListener('mousemove', e => {
+    c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px';
+    r.style.left = e.clientX + 'px'; r.style.top = e.clientY + 'px';
+  });
+  document.addEventListener('mouseover', e => {
+    if (e.target.closest && e.target.closest('a,button,td.cell,.wizard-opt,.tpl-alt,.mode-btn,.gbtn,.var-chip-del,.var-chip-name,input')) {
+      c.style.transform = 'translate(-50%,-50%) scale(0.5)';
+      c.style.background = 'transparent';
+      c.style.border = '2px solid var(--blue)';
+      r.style.transform = 'translate(-50%,-50%) scale(1.5)';
+      r.style.opacity = '0.8';
+    } else {
+      c.style.transform = 'translate(-50%,-50%) scale(1)';
+      c.style.background = 'var(--blue)';
+      c.style.border = 'none';
+      r.style.transform = 'translate(-50%,-50%) scale(1)';
+      r.style.opacity = '0.5';
+    }
+  });
+})();
+
+// ─────────────────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────────────────
+
+(function init() {
+  const restored = loadState();
+  renderWizard();
+  // Si hay state previo con variables → mostrar al wizard pero permitir
+  // saltar a la última etapa donde se quedó.
+  if (restored && STATE.vars.length >= 2) {
+    showToast('Restauramos tu análisis anterior.');
+  }
+})();
+</script>
+</body>
+</html>
