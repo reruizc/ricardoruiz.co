@@ -228,7 +228,7 @@ def build():
          Paragraph("Mixto · Técnico estándar · Técnico avanzado", wcell_style)],
         ["P4",
          Paragraph("¿Sobre qué dominio es el análisis?", wcell_style),
-         Paragraph("Desarrollo · Seguridad · Movilidad · Salud · Educación · Economía · Ambiente · Gobernanza", wcell_style)],
+         Paragraph("16 opciones alineadas con la estructura ministerial colombiana: Desarrollo · Seguridad · Salud · Educación · Movilidad · Agricultura · Vivienda · Energía · Economía · Ambiente · Cultura · Tecnología · Ciencia · Justicia · Exteriores · Gobernanza", wcell_style)],
     ]
     wt = Table(wq, colWidths=[1.0*cm, 4.6*cm, 9.4*cm])
     wt.setStyle(TableStyle([
@@ -248,9 +248,11 @@ def build():
     elems.append(Paragraph(
         "La sugerencia hace un <i>scoring de overlap</i> entre tus respuestas y "
         "los tags de cada plantilla (organización × propósito × nivel × dominio). "
-        "El dominio temático tiene el mayor peso. La plantilla sugerida "
-        "abre con entre 8 y 18 variables ya cargadas y un perfil de uso "
-        "esperado.",
+        "El dominio temático tiene el mayor peso. La herramienta trae 19 "
+        "plantillas cubriendo desde el Plan de Desarrollo Territorial hasta "
+        "agricultura, vivienda, energía, cultura, ciencia, justicia y "
+        "relaciones internacionales — cada plantilla abre con entre 9 y 18 "
+        "variables ya cargadas y un perfil de uso esperado.",
         body_style))
 
     # ─── 04 ─── Matriz
