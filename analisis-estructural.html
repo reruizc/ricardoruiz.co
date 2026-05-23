@@ -589,6 +589,41 @@ table.matrix td.cell:focus { outline: 2px solid var(--accent); outline-offset: -
   letter-spacing: .08em; color: var(--ink-3); margin-top: .15rem; font-weight: 400;
 }
 
+/* ───────── FUZZY BAR (selector de incertidumbre) ───────── */
+.fuzzy-bar {
+  display: flex; align-items: center; gap: .85rem; flex-wrap: wrap;
+  padding: .8rem 1.1rem;
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--gold);
+  margin-bottom: 1.4rem;
+  font-family: var(--mono); font-size: 12px; color: var(--ink-2);
+}
+.fuzzy-label {
+  display: inline-flex; align-items: center; gap: .55rem;
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: .04em;
+  color: var(--ink-2);
+}
+.fuzzy-icon {
+  font-family: var(--sans); font-weight: 700; font-size: 1.15rem;
+  color: var(--gold);
+}
+.fuzzy-options { display: flex; gap: .35rem; flex-wrap: wrap; }
+.fuzzy-opt {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .04em;
+  padding: .4rem .7rem;
+  background: transparent; color: var(--ink-2);
+  border: 1px solid var(--rule-strong);
+  transition: border-color .2s, color .2s, background .2s;
+}
+.fuzzy-opt:hover { border-color: var(--gold); color: var(--gold); }
+.fuzzy-opt.active { background: var(--gold); color: var(--on-accent); border-color: var(--gold); }
+.fuzzy-help {
+  flex: 1; min-width: 220px;
+  font-family: var(--italic); font-style: italic; font-size: .82rem;
+  color: var(--ink-3);
+}
+
 /* ───────── CLOUD BAR ───────── */
 .cloud-bar {
   display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
@@ -1210,6 +1245,19 @@ footer.foot a:hover { color: var(--accent); }
       <button class="btn-mini" id="cb-save-capture" onclick="cloudSave()">Guardar en la nube</button>
     </div>
 
+    <div class="fuzzy-bar">
+      <label class="fuzzy-label">
+        <span class="fuzzy-icon" title="Confianza con la que calificaste la matriz">≈</span>
+        Confianza en las calificaciones:
+      </label>
+      <div class="fuzzy-options">
+        <button class="fuzzy-opt active" data-u="high" onclick="setUncertainty('high')">Alta · valor puntual</button>
+        <button class="fuzzy-opt" data-u="medium" onclick="setUncertainty('medium')">Media · ±0.5</button>
+        <button class="fuzzy-opt" data-u="low" onclick="setUncertainty('low')">Baja · ±1.0</button>
+      </div>
+      <span class="fuzzy-help" id="fuzzy-help">Sin incertidumbre. Los resultados se muestran como puntos exactos.</span>
+    </div>
+
     <div class="mode-toggle">
       <button class="mode-btn active" id="mode-table-btn" onclick="setMode('table')">Modo matriz</button>
       <button class="mode-btn" id="mode-guided-btn" onclick="setMode('guided')">Modo guiado</button>
@@ -1345,9 +1393,13 @@ footer.foot a:hover { color: var(--accent); }
       Externado), <b>DEMATEL</b> (Fontela y Gabus, Battelle Memorial Institute,
       1972 · descomposición causa-efecto vía total relation matrix) e
       <b>ISM</b> (Warfield, 1973 · jerarquía estructural por reachability).
-      Próximas versiones incorporarán scoring difuso, valencias firmadas
-      (facilitación / inhibición), y asistencia de IA para sugerir
-      variables y validar consistencia.
+      El modo difuso opcional captura la incertidumbre del panel de
+      expertos. Próximas versiones incorporarán valencias firmadas
+      (facilitación / inhibición) y asistencia de IA para sugerir
+      variables y validar consistencia.<br/><br/>
+      <a href="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/analisis-estructural/metodologia-paso-a-paso.pdf" target="_blank" rel="noopener" style="color:var(--accent);font-style:normal">↓ Guía paso a paso (PDF)</a>
+      &nbsp;·&nbsp;
+      <a href="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/analisis-estructural/respaldo-academico.pdf" target="_blank" rel="noopener" style="color:var(--accent);font-style:normal">↓ Respaldo metodológico (PDF)</a>
     </p>
   </section>
 </main>
@@ -1407,6 +1459,13 @@ footer.foot a:hover { color: var(--accent); }
         El cálculo es 100% local en tu navegador. Si guardas en la nube,
         solo viajan la matriz y los nombres de variables — nunca enviamos
         los resultados a terceros.
+      </p>
+      <p style="border-top:1px solid var(--rule);padding-top:1rem;margin-top:1.4rem">
+        <b>Documentos descargables:</b><br/>
+        <a href="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/analisis-estructural/metodologia-paso-a-paso.pdf" target="_blank" rel="noopener" style="color:var(--accent)">↓ Guía paso a paso (PDF, ~15 KB)</a> ·
+        manual de uso para tu equipo.<br/>
+        <a href="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/analisis-estructural/respaldo-academico.pdf" target="_blank" rel="noopener" style="color:var(--accent)">↓ Respaldo metodológico (PDF, ~20 KB)</a> ·
+        fundamentación, fórmulas y bibliografía, por si alguien quiere auditar el rigor.
       </p>
     </div>
   </div>
@@ -1673,8 +1732,35 @@ const STATE = {
   vars: [],
   matrix: [],
   captureIdx: 0,
-  mode: 'table'
+  mode: 'table',
+  uncertainty: 'high'   // high (puntual) · medium (±0.5) · low (±1.0)
 };
+
+// Banda de incertidumbre alrededor del valor probable.
+// Devuelve [delta_min, delta_max] que se aplican a cada celda numérica.
+const UNCERTAINTY_BAND = {
+  high:   [0, 0],
+  medium: [0.5, 0.5],
+  low:    [1.0, 1.0]
+};
+
+function setUncertainty(level) {
+  if (!UNCERTAINTY_BAND[level]) return;
+  STATE.uncertainty = level;
+  saveState();
+  document.querySelectorAll('.fuzzy-opt').forEach(b => b.classList.toggle('active', b.dataset.u === level));
+  const helps = {
+    high:   'Sin incertidumbre. Los resultados se muestran como puntos exactos.',
+    medium: 'Cada valor se interpreta como ±0.5 alrededor del valor central. Los scatters muestran cruces de incertidumbre.',
+    low:    'Cada valor se interpreta como ±1.0 alrededor del valor central. Útil cuando la calificación viene de un solo experto o hay debate metodológico.'
+  };
+  const h = document.getElementById('fuzzy-help');
+  if (h) h.textContent = helps[level];
+  // Re-render resultados si están visibles
+  if (!document.getElementById('stage-results').classList.contains('is-hidden')) {
+    setView(_currentView || 'micmac');
+  }
+}
 
 function saveState() {
   STATE.meta.updatedAt = new Date().toISOString();
@@ -1691,6 +1777,7 @@ function loadState() {
     STATE.matrix = obj.matrix || [];
     STATE.captureIdx = obj.captureIdx || 0;
     STATE.mode = obj.mode || 'table';
+    STATE.uncertainty = obj.uncertainty || 'high';
     return true;
   } catch { return false; }
 }
@@ -1756,6 +1843,30 @@ function matToNumeric() {
   }
   return M;
 }
+
+// Variantes con banda de incertidumbre. Aplica el delta solo a celdas con
+// valor > 0 (las nulas se mantienen como 0 — no inventamos influencia).
+function matToNumericBanded(bandDelta) {
+  const n = STATE.vars.length;
+  const [dn, dp] = bandDelta;
+  const Mmin = [], Mmax = [];
+  for (let i = 0; i < n; i++) {
+    const rmin = new Array(n), rmax = new Array(n);
+    for (let j = 0; j < n; j++) {
+      if (i === j) { rmin[j] = 0; rmax[j] = 0; continue; }
+      const v = valToNum(STATE.matrix[i][j]);
+      if (v === 0) { rmin[j] = 0; rmax[j] = 0; }
+      else {
+        rmin[j] = Math.max(0, v - dn);
+        rmax[j] = Math.min(3, v + dp);
+      }
+    }
+    Mmin.push(rmin); Mmax.push(rmax);
+  }
+  return { Mmin, Mmax };
+}
+
+function isFuzzyActive() { return STATE.uncertainty && STATE.uncertainty !== 'high'; }
 function matMul(A, B) {
   const n = A.length;
   const C = [];
@@ -1788,13 +1899,9 @@ function ranksEqual(r1, r2) {
   for (let i = 0; i < r1.length; i++) if (r1[i] !== r2[i]) return false;
   return true;
 }
-function computeMicMac() {
-  const n = STATE.vars.length;
-  if (n < 2) return null;
-  const M = matToNumeric();
-  const motriDir = rowSums(M);
-  const depDir = colSums(M);
-  let Mk = M, prevRankM = rankingOf(motriDir), prevRankD = rankingOf(depDir), stableAt = 1;
+function _computeMicMacOn(M) {
+  const n = M.length;
+  let Mk = M, prevRankM = rankingOf(rowSums(M)), prevRankD = rankingOf(colSums(M)), stableAt = 1;
   for (let k = 2; k <= 6; k++) {
     Mk = matMul(Mk, M);
     const rm = rankingOf(rowSums(Mk));
@@ -1802,7 +1909,16 @@ function computeMicMac() {
     if (ranksEqual(rm, prevRankM) && ranksEqual(rd, prevRankD) && k >= 3) { stableAt = k; break; }
     prevRankM = rm; prevRankD = rd; stableAt = k;
   }
-  const motriInd = rowSums(Mk), depInd = colSums(Mk);
+  return { motriInd: rowSums(Mk), depInd: colSums(Mk), stableAt };
+}
+
+function computeMicMac() {
+  const n = STATE.vars.length;
+  if (n < 2) return null;
+  const M = matToNumeric();
+  const motriDir = rowSums(M), depDir = colSums(M);
+  const core = _computeMicMacOn(M);
+  const motriInd = core.motriInd, depInd = core.depInd;
   const maxM = Math.max(1, ...motriInd), maxD = Math.max(1, ...depInd);
   const motriN = motriInd.map(v => (v / maxM) * 100);
   const depN = depInd.map(v => (v / maxD) * 100);
@@ -1816,7 +1932,22 @@ function computeMicMac() {
     if (m < medM && d < medD) return 'autonoma';
     return 'resultado';
   });
-  return { n, stableAt, motriDir, depDir, motriInd, depInd, motriN, depN, medM, medD, cuadrante };
+  // Bandas de incertidumbre (si fuzzy activo). Clamp a [0, 100] para que
+  // los cruces no escapen del plot — el max usado para normalizar es el del
+  // escenario central, no del extremo.
+  let bands = null;
+  if (isFuzzyActive()) {
+    const { Mmin, Mmax } = matToNumericBanded(UNCERTAINTY_BAND[STATE.uncertainty]);
+    const lo = _computeMicMacOn(Mmin), hi = _computeMicMacOn(Mmax);
+    const clamp = v => Math.max(0, Math.min(100, v));
+    bands = {
+      motriN_lo: lo.motriInd.map(v => clamp((v / maxM) * 100)),
+      motriN_hi: hi.motriInd.map(v => clamp((v / maxM) * 100)),
+      depN_lo:   lo.depInd.map(v => clamp((v / maxD) * 100)),
+      depN_hi:   hi.depInd.map(v => clamp((v / maxD) * 100))
+    };
+  }
+  return { n, stableAt: core.stableAt, motriDir, depDir, motriInd, depInd, motriN, depN, medM, medD, cuadrante, bands };
 }
 
 // ═════════════════════════════════════════════════════════════════════════
@@ -2262,6 +2393,35 @@ function renderResults() {
         ctx.stroke(); ctx.restore();
       }
     }, {
+      id: 'fuzzyCrosshairs',
+      beforeDatasetsDraw(chart) {
+        if (!res.bands) return;
+        const { ctx, scales } = chart;
+        ctx.save();
+        ctx.lineWidth = 1.4; ctx.globalAlpha = .55;
+        for (let i = 0; i < res.n; i++) {
+          const xLo = scales.x.getPixelForValue(res.bands.depN_lo[i]);
+          const xHi = scales.x.getPixelForValue(res.bands.depN_hi[i]);
+          const yLo = scales.y.getPixelForValue(res.bands.motriN_lo[i]);
+          const yHi = scales.y.getPixelForValue(res.bands.motriN_hi[i]);
+          const xC  = scales.x.getPixelForValue(res.depN[i]);
+          const yC  = scales.y.getPixelForValue(res.motriN[i]);
+          ctx.strokeStyle = colorOf(res.cuadrante[i]);
+          ctx.beginPath();
+          ctx.moveTo(xLo, yC); ctx.lineTo(xHi, yC); // horizontal
+          ctx.moveTo(xC, yLo); ctx.lineTo(xC, yHi); // vertical
+          ctx.stroke();
+          // caps en los extremos
+          ctx.beginPath();
+          ctx.moveTo(xLo, yC - 4); ctx.lineTo(xLo, yC + 4);
+          ctx.moveTo(xHi, yC - 4); ctx.lineTo(xHi, yC + 4);
+          ctx.moveTo(xC - 4, yLo); ctx.lineTo(xC + 4, yLo);
+          ctx.moveTo(xC - 4, yHi); ctx.lineTo(xC + 4, yHi);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }, {
       id: 'pointLabels',
       afterDatasetsDraw(chart) {
         const { ctx } = chart;
@@ -2302,10 +2462,14 @@ function renderResults() {
     </div>`;
   }
   document.getElementById('ranking-card').innerHTML = html;
+  const uText = STATE.uncertainty === 'medium' ? '<br/><br/><b style="color:var(--gold)">Confianza media (±0.5):</b> los cruces alrededor de cada punto muestran el rango si las calificaciones se mueven medio paso.'
+              : STATE.uncertainty === 'low'    ? '<br/><br/><b style="color:var(--gold)">Confianza baja (±1.0):</b> los cruces alrededor de cada punto muestran el rango si las calificaciones se mueven un paso completo. Variables cuyo cruce cruza una mediana son sensibles al panel de expertos.'
+              : '';
   document.getElementById('results-desc').innerHTML = `
     Cada variable aparece según su <b>motricidad indirecta</b> (eje Y) y su
     <b>dependencia indirecta</b> (eje X), normalizadas al máximo observado y
     estabilizadas al paso ${res.stableAt}.
+    ${uText}
     ${filled < total ? `<br/><br/><b style="color:var(--amber)">Atención:</b> sólo has calificado ${filled} de ${total} relaciones. Las variables sin información se procesan con 0.` : ''}
   `;
 }
@@ -2359,35 +2523,38 @@ function matInverse(A) {
   return I;
 }
 
-function computeDEMATEL() {
-  const n = STATE.vars.length;
-  if (n < 2) return null;
-  const M = matToNumeric();
-  // 1) Normalización
+function _computeDEMATELOn(M) {
+  const n = M.length;
   const rs = rowSums(M), cs = colSums(M);
   const s = Math.max(Math.max(...rs), Math.max(...cs));
   if (s <= 0) return null;
   const D = M.map(row => row.map(v => v / s));
-  // 2) (I − D)
   const ImD = [];
   for (let i = 0; i < n; i++) {
     const row = new Array(n).fill(0);
     for (let j = 0; j < n; j++) row[j] = (i === j ? 1 : 0) - D[i][j];
     ImD.push(row);
   }
-  // 3) (I − D)^{-1}
   const inv = matInverse(ImD);
   if (!inv) return null;
-  // 4) T = D · inv
   const T = matMul(D, inv);
-  // 5) R y C
   const R = rowSums(T), C = colSums(T);
-  const prom = R.map((r, i) => r + C[i]);          // prominencia
-  const rel  = R.map((r, i) => r - C[i]);           // causa-efecto
-  // Mediana de prominencia para dividir cuadrantes
+  return {
+    T, R, C,
+    prom: R.map((r, i) => r + C[i]),
+    rel:  R.map((r, i) => r - C[i])
+  };
+}
+
+function computeDEMATEL() {
+  const n = STATE.vars.length;
+  if (n < 2) return null;
+  const M = matToNumeric();
+  const core = _computeDEMATELOn(M);
+  if (!core) return null;
+  const { T, R, C, prom, rel } = core;
   const sortedP = [...prom].sort((a, b) => a - b);
   const medP = sortedP[Math.floor(n / 2)];
-  // Clasificación
   const cuadrante = prom.map((p, i) => {
     const r = rel[i];
     if (r >= 0 && p < medP) return 'causa';
@@ -2395,7 +2562,20 @@ function computeDEMATEL() {
     if (r < 0 && p < medP)  return 'efecto-autonomo';
     return 'efecto-central';
   });
-  return { n, T, R, C, prom, rel, medP, cuadrante };
+  // Bandas de incertidumbre
+  let bands = null;
+  if (isFuzzyActive()) {
+    const { Mmin, Mmax } = matToNumericBanded(UNCERTAINTY_BAND[STATE.uncertainty]);
+    const lo = _computeDEMATELOn(Mmin);
+    const hi = _computeDEMATELOn(Mmax);
+    if (lo && hi) {
+      bands = {
+        prom_lo: lo.prom, prom_hi: hi.prom,
+        rel_lo:  lo.rel,  rel_hi:  hi.rel
+      };
+    }
+  }
+  return { n, T, R, C, prom, rel, medP, cuadrante, bands };
 }
 
 // ═════════════════════════════════════════════════════════════════════════
@@ -2566,6 +2746,34 @@ function renderDEMATEL() {
         ctx.moveTo(chartArea.left, yZero); ctx.lineTo(chartArea.right, yZero);
         ctx.moveTo(xMid, chartArea.top); ctx.lineTo(xMid, chartArea.bottom);
         ctx.stroke(); ctx.restore();
+      }
+    }, {
+      id: 'demFuzzyCrosshairs',
+      beforeDatasetsDraw(chart) {
+        if (!res.bands) return;
+        const { ctx, scales } = chart;
+        ctx.save();
+        ctx.lineWidth = 1.4; ctx.globalAlpha = .55;
+        for (let i = 0; i < res.n; i++) {
+          const xLo = scales.x.getPixelForValue(res.bands.prom_lo[i]);
+          const xHi = scales.x.getPixelForValue(res.bands.prom_hi[i]);
+          const yLo = scales.y.getPixelForValue(res.bands.rel_lo[i]);
+          const yHi = scales.y.getPixelForValue(res.bands.rel_hi[i]);
+          const xC  = scales.x.getPixelForValue(res.prom[i]);
+          const yC  = scales.y.getPixelForValue(res.rel[i]);
+          ctx.strokeStyle = colorOf(res.cuadrante[i]);
+          ctx.beginPath();
+          ctx.moveTo(xLo, yC); ctx.lineTo(xHi, yC);
+          ctx.moveTo(xC, yLo); ctx.lineTo(xC, yHi);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(xLo, yC - 4); ctx.lineTo(xLo, yC + 4);
+          ctx.moveTo(xHi, yC - 4); ctx.lineTo(xHi, yC + 4);
+          ctx.moveTo(xC - 4, yLo); ctx.lineTo(xC + 4, yLo);
+          ctx.moveTo(xC - 4, yHi); ctx.lineTo(xC + 4, yHi);
+          ctx.stroke();
+        }
+        ctx.restore();
       }
     }, {
       id: 'demLabels',
@@ -3053,6 +3261,15 @@ function toggleTheme() {
   const restored = loadState();
   renderWizardOpts();
   if (restored && STATE.wizard.step) setWizardStep(STATE.wizard.step);
+  // Aplica botón activo de confianza según STATE.uncertainty restaurado
+  document.querySelectorAll('.fuzzy-opt').forEach(b => b.classList.toggle('active', b.dataset.u === (STATE.uncertainty || 'high')));
+  const helps = {
+    high:   'Sin incertidumbre. Los resultados se muestran como puntos exactos.',
+    medium: 'Cada valor se interpreta como ±0.5 alrededor del valor central. Los scatters muestran cruces de incertidumbre.',
+    low:    'Cada valor se interpreta como ±1.0 alrededor del valor central. Útil cuando la calificación viene de un solo experto o hay debate metodológico.'
+  };
+  const h = document.getElementById('fuzzy-help');
+  if (h) h.textContent = helps[STATE.uncertainty || 'high'];
   // Auth
   await loadUserFromAPI();
   renderAuthChip();
