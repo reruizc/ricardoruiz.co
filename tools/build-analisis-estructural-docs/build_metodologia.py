@@ -130,9 +130,10 @@ def build():
         ["03", "El wizard de cuatro preguntas"],
         ["04", "Capturar la matriz de influencias"],
         ["05", "Leer los resultados: MicMac, DEMATEL e ISM"],
-        ["06", "Modo difuso: cuando la confianza importa"],
-        ["07", "Compartir con tu equipo (multiusuario)"],
-        ["08", "Errores comunes y cómo evitarlos"],
+        ["06", "Copiloto IA: cuándo y cómo usarlo"],
+        ["07", "Modo difuso: cuando la confianza importa"],
+        ["08", "Compartir con tu equipo (multiusuario)"],
+        ["09", "Errores comunes y cómo evitarlos"],
     ]
     toc = Table(toc_rows, colWidths=[1.2*cm, 13.5*cm])
     toc.setStyle(TableStyle([
@@ -355,8 +356,51 @@ def build():
         "el sistema queda muy denso o muy disperso.",
         body_style))
 
-    # 06 Difuso
-    elems.append(Paragraph("06 · Modo difuso: cuando la confianza importa", h2_style))
+    # 06-bis · Copiloto IA
+    elems.append(Paragraph("06 · Copiloto IA: cuándo y cómo usarlo", h2_style))
+    elems.append(Paragraph(
+        "La herramienta tiene un copiloto de inteligencia artificial que asiste "
+        "en dos momentos del análisis. No reemplaza tu juicio — lo asiste. "
+        "Disponible solo con cuenta y según el plan:",
+        body_style))
+    cop = [
+        ["Revisar variables",
+         "En el paso 02, después de definir tu lista, el copiloto la lee "
+         "y detecta cuatro tipos de problema: duplicados conceptuales, "
+         "variables ambiguas, variables contenidas en otras y nombres "
+         "ambiguos que conviene estandarizar. Lo hace en 5-10 segundos. "
+         "Disponible en plan <b>Pro</b> o superior."],
+        ["Lectura interpretativa",
+         "En el paso 04, después de ver los resultados, el copiloto "
+         "toma MicMac, DEMATEL e ISM y redacta una lectura con cuatro "
+         "bloques: diagnóstico, palancas, variables críticas a vigilar, "
+         "trampas comunes de lectura, y tres recomendaciones concretas "
+         "para llevar a comité. Toma 15-25 segundos. Disponible en plan "
+         "<b>Premium</b> o superior."],
+    ]
+    ct2 = Table(cop, colWidths=[3.5*cm, 11.5*cm])
+    ct2.setStyle(TableStyle([
+        ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 9.5),
+        ('TEXTCOLOR', (0,0), (0,-1), ACCENT),
+        ('FONTNAME', (1,0), (1,-1), 'Helvetica'),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+        ('TOPPADDING', (0,0), (-1,-1), 8),
+        ('LINEBELOW', (0,0), (-1,-1), 0.3, RULE),
+    ]))
+    elems.append(ct2)
+    elems.append(Spacer(1, 6))
+    elems.append(Paragraph(
+        "<b>Regla básica:</b> el copiloto sugiere, tú decides. Una observación "
+        "del copiloto que contradice el criterio experto del equipo no debe "
+        "tener más peso que el debate del equipo. La cita y la fuente de "
+        "cualquier dato cualitativo siempre tiene que verificarse antes de "
+        "llevarse a comité directivo.",
+        callout_style))
+
+    # 07 Difuso
+    elems.append(Paragraph("07 · Modo difuso: cuando la confianza importa", h2_style))
     elems.append(Paragraph(
         "Por defecto la herramienta interpreta cada calificación como un "
         "valor exacto. Pero las calificaciones de expertos suelen tener "
@@ -394,7 +438,7 @@ def build():
         body_style))
 
     # 07 Multiusuario
-    elems.append(Paragraph("07 · Compartir con tu equipo (multiusuario)", h2_style))
+    elems.append(Paragraph("08 · Compartir con tu equipo (multiusuario)", h2_style))
     elems.append(Paragraph(
         "Si inicias sesión, puedes guardar el análisis en la nube y trabajarlo "
         "con tu equipo. El botón <b>Guardar en la nube</b> aparece en la "
@@ -418,7 +462,7 @@ def build():
     ], bulletType='bullet'))
 
     # 08 Errores comunes
-    elems.append(Paragraph("08 · Errores comunes y cómo evitarlos", h2_style))
+    elems.append(Paragraph("09 · Errores comunes y cómo evitarlos", h2_style))
     errors = [
         ("Llenar solo la mitad de la matriz",
          "Las celdas sin información se procesan como 0 (sin influencia). Si "
