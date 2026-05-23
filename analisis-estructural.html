@@ -1,1100 +1,1487 @@
 <!DOCTYPE html>
 <html lang="es" id="htmlRoot">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Análisis Estructural de Sistemas · Ricardo Ruiz</title>
-  <meta name="description" content="Herramienta de análisis estructural para identificar las variables clave de un sistema. Inspirada en la escuela de prospectiva estratégica (Godet, Mojica) con actualizaciones metodológicas modernas." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600&display=swap" rel="stylesheet" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-  <style>
-    :root {
-      --black: #0a0a0a;
-      --white: #e6ded3;
-      --paper: #f4f0e8;
-      --blue: #0047FF;
-      --blue-light: #3d6fff;
-      --blue-soft: rgba(0,71,255,0.08);
-      --gray: #888;
-      --gray-light: #d6cfc1;
-      --gray-line: rgba(10,10,10,0.10);
-      --green: #2f8f4f;
-      --red: #c2342f;
-      --amber: #d68a18;
-      --purple: #7c3aed;
-    }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Análisis Estructural · Ricardo.Ruiz</title>
+<meta name="description" content="Herramienta de análisis estructural para identificar las pocas variables que mueven un sistema. Útil para planeación territorial, política pública y diagnóstico estratégico." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* ──────────────────────────────────────────────────────────────────
+   ANÁLISIS ESTRUCTURAL · paleta dashboard (noche por defecto, día opcional)
+   Salmón en noche · oxblood en día. Sin azul. Sin Syne en titulares.
+──────────────────────────────────────────────────────────────────── */
+:root {
+  --paper:        #1a1610;
+  --paper-2:      #221d15;
+  --paper-3:      #2a241b;
+  --ink:          #f4f3ef;
+  --ink-2:        #b8b1a0;
+  --ink-3:        #807a6c;
+  --rule:         #f4f3ef1c;
+  --rule-strong:  #f4f3ef38;
+  --accent:       #d96a50;
+  --accent-2:     #e08266;
+  --accent-soft:  #d96a5018;
+  --accent-tint:  #d96a5036;
+  --gold:         #d6a83a;
+  --on-accent:    #14110a;
+  --green:        #6fa07a;
+  --amber:        #d6a83a;
+  --danger:       #d96a50;
 
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
-    body {
-      background: var(--white);
-      color: var(--black);
-      font-family: 'Fraunces', serif;
-      overflow-x: hidden;
-      cursor: none;
-      min-height: 100vh;
-    }
+  --sans:    'Familjen Grotesk', system-ui, sans-serif;
+  --italic:  'Petrona', Georgia, serif;
+  --mono:    'Space Mono', ui-monospace, monospace;
+  --display: 'Syne', sans-serif;
+}
+body.day-mode {
+  --paper:        #f4f3ef;
+  --paper-2:      #ecebe5;
+  --paper-3:      #e0ddd2;
+  --ink:          #14110a;
+  --ink-2:        #5a5448;
+  --ink-3:        #948e80;
+  --rule:         #14110a1f;
+  --rule-strong:  #14110a40;
+  --accent:       #8a1e16;
+  --accent-2:     #a02a20;
+  --accent-soft:  #8a1e161a;
+  --accent-tint:  #8a1e1633;
+  --gold:         #8a6a1a;
+  --on-accent:    #f4f3ef;
+  --green:        #2f6b3f;
+  --amber:        #8a6a1a;
+  --danger:       #b03524;
+}
 
-    /* ── Cursor ── */
-    .cursor { position: fixed; width: 12px; height: 12px; background: var(--blue); border-radius: 50%; pointer-events: none; z-index: 9999; transform: translate(-50%,-50%); transition: transform .15s, background .2s; }
-    .cursor-ring { position: fixed; width: 36px; height: 36px; border: 1.5px solid var(--blue); border-radius: 50%; pointer-events: none; z-index: 9998; transform: translate(-50%,-50%); opacity: .5; transition: transform .35s, opacity .3s; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.55;
+  font-weight: 400;
+  min-height: 100vh;
+  overflow-x: hidden;
+  cursor: none;
+  font-feature-settings: "ss01","kern","liga";
+  text-rendering: optimizeLegibility;
+  transition: background .35s ease, color .35s ease;
+}
+::selection { background: var(--accent); color: var(--on-accent); }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: none; }
+code, kbd { font-family: var(--mono); font-size: .88em; }
 
-    /* ── Nav (clon de index.html simplificado) ── */
-    nav {
-      position: fixed; top: 0; left: 0; right: 0;
-      display: flex; justify-content: space-between; align-items: center;
-      padding: .9rem 2.5rem;
-      z-index: 100;
-      background: rgba(230,222,211,0.88);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--gray-line);
-    }
-    .nav-logo-wrap { display: flex; align-items: center; gap: .75rem; text-decoration: none; }
-    .nav-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: clamp(1.1rem, 2vw, 1.6rem); letter-spacing: -0.03em; color: var(--black); line-height: 1; }
-    .nav-logo span { color: var(--blue); }
-    .nav-bars { display: flex; align-items: flex-end; gap: 3px; height: 18px; }
-    .nav-bar { width: 5px; background: var(--blue); border-radius: 1px 1px 0 0; opacity: .85; }
-    nav ul { list-style: none; display: flex; gap: 2.2rem; align-items: center; }
-    nav ul a {
-      font-family: 'Syne', sans-serif; font-size: .75rem; letter-spacing: .08em;
-      text-transform: uppercase; color: var(--black); text-decoration: none; transition: color .2s;
-    }
-    nav ul a:hover { color: var(--blue); }
-    .nav-cta {
-      font-family: 'Syne', sans-serif; font-size: .72rem; letter-spacing: .08em;
-      text-transform: uppercase; padding: .45rem .9rem; border: 1.5px solid var(--blue);
-      color: var(--blue); background: transparent; transition: background .2s, color .2s;
-    }
-    .nav-cta:hover { background: var(--blue); color: var(--white); }
-    .nav-hamburger { display: none; flex-direction: column; gap: 4px; width: 28px; cursor: none; background: none; border: none; padding: 0; }
-    .nav-hamburger span { display: block; width: 100%; height: 2px; background: var(--black); }
-    @media (max-width: 860px) {
-      nav ul { display: none; }
-      .nav-hamburger { display: flex; }
-    }
+body.day-mode::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image: radial-gradient(rgba(20,17,10,.035) 1px, transparent 1.4px);
+  background-size: 4px 4px;
+  opacity: .9; mix-blend-mode: multiply;
+}
 
-    /* ── Main shell ── */
-    main { padding-top: 5.5rem; max-width: 1240px; margin: 0 auto; padding-left: 2rem; padding-right: 2rem; padding-bottom: 6rem; }
+/* CURSOR */
+.cursor      { position:fixed; width:12px; height:12px; background:var(--accent); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s, background .2s; transform:translate(-50%,-50%); }
+.cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--accent); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s, opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
 
-    /* ── Breadcrumb ── */
-    .crumb {
-      font-family: 'DM Mono', monospace; font-size: .7rem; letter-spacing: .14em;
-      text-transform: uppercase; color: var(--gray); margin-bottom: 1.2rem;
-    }
-    .crumb a { color: var(--gray); text-decoration: none; transition: color .2s; }
-    .crumb a:hover { color: var(--blue); }
-    .crumb .sep { margin: 0 .55rem; opacity: .5; }
+/* ───────── TOP BAR ───────── */
+.topbar {
+  position: sticky; top: 0; z-index: 60;
+  display: grid; grid-template-columns: 1fr auto 1fr;
+  align-items: center; gap: 1.5rem;
+  padding: 1rem 1.75rem;
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+  backdrop-filter: blur(8px);
+}
+.topbar-left, .topbar-center, .topbar-right { display: flex; align-items: center; gap: 1.1rem; }
+.topbar-right { justify-content: flex-end; }
+.btn-back {
+  display: inline-flex; align-items: center; gap: .55rem;
+  font-family: var(--sans); font-size: 14px; font-weight: 500;
+  letter-spacing: .04em; color: var(--ink);
+  padding: .5rem .9rem;
+  border: 1px solid var(--rule-strong);
+  background: transparent; transition: background .2s, border-color .2s;
+}
+.btn-back:hover { background: var(--paper-2); border-color: var(--ink); }
+.theme-btn {
+  font-family: var(--mono); font-size: 12px; font-weight: 700;
+  letter-spacing: .04em; color: var(--ink-2);
+  padding: .45rem .8rem;
+  border: 1px solid var(--rule-strong);
+  background: transparent; transition: color .2s, border-color .2s;
+}
+.theme-btn:hover { color: var(--ink); border-color: var(--ink); }
 
-    /* ── Hero del módulo ── */
-    .hero-mod {
-      padding: 0.5rem 0 2.4rem;
-      border-bottom: 1px solid var(--gray-line);
-      margin-bottom: 2.5rem;
-    }
-    .hero-tag {
-      font-family: 'DM Mono', monospace; font-size: .75rem; letter-spacing: .18em;
-      text-transform: uppercase; color: var(--blue); margin-bottom: 1rem;
-    }
-    .hero-title {
-      font-family: 'Syne', sans-serif; font-weight: 800;
-      font-size: clamp(2rem, 5vw, 3.6rem); letter-spacing: -0.025em; line-height: 1.05;
-      color: var(--black); margin-bottom: 1.1rem;
-    }
-    .hero-title span { color: var(--blue); }
-    .hero-sub {
-      font-family: 'Fraunces', serif; font-weight: 300; font-style: italic;
-      font-size: clamp(1rem, 1.6vw, 1.2rem); line-height: 1.55; color: #333;
-      max-width: 780px;
-    }
+.plan-chip {
+  display: inline-flex; align-items: center; gap: .45rem;
+  font-family: var(--mono); font-size: 12px; font-weight: 700;
+  letter-spacing: .06em; color: var(--accent);
+  padding: .35rem .65rem;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+}
+.plan-chip .marker { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; }
+.user-mono { font-family: var(--mono); font-size: 12px; color: var(--ink-3); letter-spacing: .04em; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.btn-logout {
+  font-family: var(--mono); font-size: 11.5px; color: var(--ink-3);
+  background: none; border: none; padding: 0;
+  transition: color .2s;
+}
+.btn-logout:hover { color: var(--danger); }
 
-    /* ── Tarjetas explicativas (3 cards intro) ── */
-    .intro-grid {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem;
-      margin-bottom: 3rem;
-    }
-    @media (max-width: 860px) { .intro-grid { grid-template-columns: 1fr; } }
-    .intro-card {
-      background: var(--paper); border: 1px solid var(--gray-line);
-      padding: 1.4rem 1.4rem 1.5rem; border-radius: 2px;
-      transition: border-color .25s, transform .2s;
-    }
-    .intro-card:hover { border-color: rgba(0,71,255,0.4); transform: translateY(-2px); }
-    .intro-num {
-      font-family: 'DM Mono', monospace; font-size: .72rem; letter-spacing: .14em;
-      color: var(--blue); margin-bottom: .8rem;
-    }
-    .intro-title {
-      font-family: 'Syne', sans-serif; font-weight: 700;
-      font-size: 1.05rem; margin-bottom: .55rem; letter-spacing: -0.01em;
-    }
-    .intro-body {
-      font-family: 'Fraunces', serif; font-size: .92rem; line-height: 1.55; color: #333;
-    }
+.logo-link { display: inline-flex; align-items: center; gap: .55rem; text-decoration: none; opacity: .9; }
+.logo-link:hover { opacity: 1; }
+.logo-bars { display: flex; align-items: flex-end; gap: 3px; height: 20px; }
+.logo-bar { width: 5px; background: var(--accent); border-radius: 1px 1px 0 0; opacity: .9; }
+.logo-text {
+  font-family: var(--display); font-weight: 800;
+  font-size: clamp(1.05rem, 2vw, 1.4rem);
+  letter-spacing: -.03em; color: var(--ink); line-height: 1;
+}
+.logo-text span { color: var(--accent); }
 
-    /* ── Section blocks ── */
-    .section {
-      background: var(--paper);
-      border: 1px solid var(--gray-line);
-      padding: 2rem 2.2rem;
-      margin-bottom: 1.8rem;
-    }
-    .section-label {
-      font-family: 'DM Mono', monospace; font-size: .7rem; letter-spacing: .16em;
-      text-transform: uppercase; color: var(--gray); margin-bottom: .55rem;
-    }
-    .section-title {
-      font-family: 'Syne', sans-serif; font-weight: 700;
-      font-size: 1.5rem; letter-spacing: -0.01em; margin-bottom: .9rem;
-    }
-    .section-desc {
-      font-family: 'Fraunces', serif; font-size: .96rem; line-height: 1.55;
-      color: #444; margin-bottom: 1.5rem; max-width: 760px;
-    }
+/* ───────── PAGE ───────── */
+.page {
+  position: relative; z-index: 1;
+  max-width: 880px; width: 100%;
+  margin: 0 auto;
+  padding: 2.4rem 1.75rem 5rem;
+}
+@media (max-width: 720px) {
+  .page { padding: 1.6rem 1.1rem 3rem; }
+  .topbar { grid-template-columns: 1fr auto; padding: .85rem 1rem; }
+  .topbar-center { display: none; }
+  .topbar-right { gap: .55rem; }
+  .topbar-right .logo-link { display: none; }
+}
 
-    /* ── Wizard ── */
-    .wizard-step { margin-bottom: 1.8rem; }
-    .wizard-step:last-child { margin-bottom: 0; }
-    .wizard-q {
-      font-family: 'Syne', sans-serif; font-weight: 600;
-      font-size: 1.05rem; margin-bottom: .9rem;
-    }
-    .wizard-q-num {
-      font-family: 'DM Mono', monospace; font-size: .7rem; color: var(--blue);
-      letter-spacing: .14em; margin-right: .55rem;
-    }
-    .wizard-options { display: grid; grid-template-columns: repeat(2, 1fr); gap: .55rem; }
-    @media (max-width: 640px) { .wizard-options { grid-template-columns: 1fr; } }
-    .wizard-opt {
-      font-family: 'Syne', sans-serif; font-weight: 400;
-      font-size: .88rem; line-height: 1.4;
-      padding: .9rem 1.1rem; border: 1.5px solid var(--gray-light);
-      background: var(--white); color: var(--black);
-      cursor: none; transition: border-color .2s, background .2s, color .2s;
-      text-align: left; user-select: none;
-    }
-    .wizard-opt:hover { border-color: var(--blue); }
-    .wizard-opt.selected { background: var(--blue); border-color: var(--blue); color: var(--white); }
-    .wizard-opt.selected .opt-hint { color: rgba(255,255,255,.75); }
-    .opt-label { display: block; font-weight: 600; margin-bottom: .15rem; }
-    .opt-hint { display: block; font-family: 'Fraunces', serif; font-size: .82rem; font-style: italic; color: var(--gray); }
+.crumb {
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-3); margin-bottom: 1.8rem;
+}
+.crumb a { color: var(--ink-3); transition: color .2s; }
+.crumb a:hover { color: var(--accent); }
+.crumb .sep { margin: 0 .55rem; opacity: .55; }
 
-    .wizard-cta-row {
-      display: flex; gap: .8rem; align-items: center; margin-top: 1.5rem; flex-wrap: wrap;
-    }
-    .btn-primary {
-      font-family: 'Syne', sans-serif; font-weight: 600; font-size: .82rem;
-      letter-spacing: .08em; text-transform: uppercase;
-      padding: .7rem 1.4rem; border: none; background: var(--blue); color: var(--white);
-      cursor: none; transition: background .2s;
-    }
-    .btn-primary:hover { background: var(--blue-light); }
-    .btn-primary:disabled { background: var(--gray-light); color: var(--gray); cursor: not-allowed; }
-    .btn-ghost {
-      font-family: 'Syne', sans-serif; font-weight: 500; font-size: .78rem;
-      letter-spacing: .08em; text-transform: uppercase;
-      padding: .65rem 1.1rem; border: 1.5px solid var(--gray-light); background: transparent; color: var(--black);
-      cursor: none; transition: border-color .2s, color .2s;
-    }
-    .btn-ghost:hover { border-color: var(--blue); color: var(--blue); }
+/* ───────── WELCOME PANEL ───────── */
+.welcome {
+  text-align: center;
+  padding: 1.5rem 0 2rem;
+}
+.eyebrow {
+  font-family: var(--mono); font-size: 12px; letter-spacing: .22em;
+  text-transform: uppercase; color: var(--accent); font-weight: 700;
+  margin-bottom: 1.4rem;
+}
+.welcome-title {
+  font-family: var(--sans); font-weight: 700;
+  font-size: clamp(2rem, 5vw, 3rem);
+  letter-spacing: -.025em; line-height: 1.1;
+  color: var(--ink);
+  max-width: 22ch; margin: 0 auto 1.4rem;
+}
+.welcome-title em {
+  font-family: var(--italic); font-style: italic; font-weight: 400;
+  color: var(--accent);
+}
+.welcome-sub {
+  font-family: var(--sans); font-weight: 400;
+  font-size: clamp(1rem, 1.5vw, 1.18rem);
+  line-height: 1.55; color: var(--ink-2);
+  max-width: 50ch; margin: 0 auto 2rem;
+}
+.welcome-hint {
+  font-family: var(--mono); font-size: 12px; letter-spacing: .04em;
+  color: var(--ink-3); max-width: 50ch; margin: 0 auto 2rem; line-height: 1.6;
+}
+.method-link {
+  display: inline-flex; align-items: center; gap: .4rem;
+  font-family: var(--mono); font-size: 12px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--ink-2);
+  padding: .55rem .95rem;
+  border: 1px solid var(--rule-strong);
+  background: transparent;
+  transition: color .2s, border-color .2s;
+}
+.method-link:hover { color: var(--accent); border-color: var(--accent); }
 
-    /* ── Plantilla sugerida ── */
-    .tpl-suggested {
-      background: var(--blue-soft); border-left: 3px solid var(--blue);
-      padding: 1.1rem 1.3rem; margin-top: 1.2rem;
-    }
-    .tpl-suggested-label {
-      font-family: 'DM Mono', monospace; font-size: .68rem; letter-spacing: .14em;
-      text-transform: uppercase; color: var(--blue); margin-bottom: .4rem;
-    }
-    .tpl-suggested-name {
-      font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.1rem; margin-bottom: .4rem;
-    }
-    .tpl-suggested-desc {
-      font-family: 'Fraunces', serif; font-size: .9rem; line-height: 1.5; color: #333;
-    }
-    .tpl-alt-row { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .9rem; }
-    .tpl-alt {
-      font-family: 'DM Mono', monospace; font-size: .68rem; letter-spacing: .08em;
-      padding: .35rem .7rem; border: 1px solid var(--gray-light); background: transparent;
-      cursor: none; transition: border-color .2s, color .2s;
-    }
-    .tpl-alt:hover { border-color: var(--blue); color: var(--blue); }
+/* ───────── ACCORDIONS (qué hace / qué entrega / para qué sirve) ───────── */
+.accordion-stack {
+  display: flex; flex-direction: column; gap: .5rem;
+  max-width: 620px; margin: 2.6rem auto 2.4rem;
+  text-align: left;
+}
+.accordion {
+  border: 1px solid var(--rule-strong);
+  background: var(--paper-2);
+  transition: background .2s, border-color .2s;
+}
+.accordion[open] { border-color: var(--accent-tint); background: var(--paper-3); }
+.accordion summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 1rem 1.2rem;
+  list-style: none; cursor: none;
+  font-family: var(--sans); font-weight: 600; font-size: .98rem;
+  color: var(--ink);
+  user-select: none;
+}
+.accordion summary::-webkit-details-marker { display: none; }
+.accordion summary::after {
+  content: "+"; font-family: var(--mono); font-size: 1.2rem;
+  color: var(--accent); transition: transform .2s;
+  width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;
+}
+.accordion[open] summary::after { content: "−"; }
+.accordion summary .acc-num {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-3);
+  letter-spacing: .12em; margin-right: .9rem; font-weight: 400;
+}
+.accordion-body {
+  padding: 0 1.2rem 1.2rem;
+  font-family: var(--italic); font-style: italic; font-weight: 400;
+  font-size: 1rem; line-height: 1.6; color: var(--ink-2);
+}
 
-    /* ── Editor de variables ── */
-    .vars-grid {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: .55rem; margin-bottom: 1.2rem;
-    }
-    .var-chip {
-      display: flex; align-items: center; gap: .5rem;
-      background: var(--white); border: 1px solid var(--gray-light);
-      padding: .5rem .7rem; font-family: 'Syne', sans-serif; font-size: .85rem;
-      min-width: 0;
-    }
-    .var-chip-code {
-      font-family: 'DM Mono', monospace; font-size: .68rem; color: var(--blue);
-      letter-spacing: .08em; flex-shrink: 0;
-    }
-    .var-chip-name { flex: 1; outline: none; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .var-chip-name:focus { outline: 1px solid var(--blue); outline-offset: 2px; }
-    .var-chip-del {
-      font-family: 'DM Mono', monospace; font-size: .85rem; color: var(--gray);
-      background: none; border: none; cursor: none; padding: 0 .2rem;
-      transition: color .2s;
-    }
-    .var-chip-del:hover { color: var(--red); }
+/* ───────── BUTTONS ───────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  font-family: var(--sans); font-weight: 600; font-size: .98rem;
+  padding: .95rem 1.8rem;
+  background: var(--accent); color: var(--on-accent);
+  border: none; cursor: none;
+  transition: background .2s, transform .1s;
+}
+.btn:hover { background: var(--accent-2); }
+.btn:active { transform: scale(.98); }
+.btn[disabled], .btn.disabled { opacity: .35; pointer-events: none; }
+.btn-ghost {
+  background: transparent; color: var(--ink-2);
+  border: 1px solid var(--rule-strong);
+  padding: .85rem 1.4rem;
+}
+.btn-ghost:hover { color: var(--ink); border-color: var(--ink); background: var(--paper-2); }
+.btn-big {
+  font-size: 1.05rem; padding: 1.15rem 2.4rem;
+  letter-spacing: .02em;
+}
 
-    .vars-add-row { display: flex; gap: .55rem; margin-top: .8rem; flex-wrap: wrap; }
-    .vars-add-input {
-      flex: 1; min-width: 200px;
-      font-family: 'Syne', sans-serif; font-size: .9rem;
-      padding: .55rem .8rem; border: 1.5px solid var(--gray-light);
-      background: var(--white); color: var(--black); outline: none;
-    }
-    .vars-add-input:focus { border-color: var(--blue); }
-    .vars-meta {
-      display: flex; gap: 1.5rem; font-family: 'DM Mono', monospace; font-size: .72rem;
-      color: var(--gray); letter-spacing: .08em; margin-top: 1rem; flex-wrap: wrap;
-    }
-    .vars-meta b { color: var(--blue); font-weight: 500; }
+/* ───────── WIZARD (panel a panel) ───────── */
+.progress-row {
+  display: flex; align-items: center; gap: .8rem; margin-bottom: 2rem;
+}
+.progress-track {
+  flex: 1; height: 3px; background: var(--rule); position: relative; overflow: hidden;
+}
+.progress-fill {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 0;
+  background: var(--accent); transition: width .35s ease;
+}
+.progress-label {
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-3); white-space: nowrap;
+}
 
-    /* ── Captura de matriz: modo toggle ── */
-    .mode-toggle { display: flex; gap: .5rem; margin-bottom: 1.2rem; flex-wrap: wrap; }
-    .mode-btn {
-      font-family: 'Syne', sans-serif; font-size: .8rem; font-weight: 500;
-      letter-spacing: .06em; padding: .55rem 1rem;
-      border: 1.5px solid var(--gray-light); background: var(--white); color: var(--black);
-      cursor: none; transition: border-color .2s, background .2s, color .2s;
-    }
-    .mode-btn.active { border-color: var(--blue); background: var(--blue); color: var(--white); }
-    .mode-btn:not(.active):hover { border-color: var(--blue); color: var(--blue); }
+.panel { display: none; width: 100%; }
+.panel.active {
+  display: block;
+  animation: fadeInUp .35s ease both;
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
-    /* ── Modo tabla ── */
-    .matrix-wrap { overflow-x: auto; margin-bottom: 1rem; }
-    table.matrix {
-      border-collapse: collapse;
-      font-family: 'DM Mono', monospace; font-size: .82rem;
-      background: var(--white);
-    }
-    table.matrix th, table.matrix td {
-      border: 1px solid var(--gray-line);
-      min-width: 36px; height: 36px;
-      text-align: center; vertical-align: middle;
-      padding: 0; position: relative;
-    }
-    table.matrix th.row-h, table.matrix th.col-h {
-      font-family: 'Syne', sans-serif; font-weight: 500; font-size: .75rem;
-      background: var(--paper); color: var(--black);
-      padding: .3rem .55rem; max-width: 180px;
-      text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    table.matrix th.col-h { text-align: center; min-width: 40px; max-width: 60px; }
-    table.matrix th.col-h .col-h-inner {
-      writing-mode: vertical-rl; transform: rotate(180deg);
-      font-size: .68rem; letter-spacing: .04em;
-      max-height: 110px; overflow: hidden; text-overflow: ellipsis;
-      padding: .3rem 0;
-    }
-    table.matrix th.corner {
-      background: var(--paper); font-family: 'DM Mono', monospace;
-      font-size: .65rem; color: var(--gray); letter-spacing: .12em;
-      text-align: center; vertical-align: bottom; padding-bottom: .5rem;
-    }
-    table.matrix td.cell {
-      cursor: none; user-select: none;
-      transition: background .15s;
-    }
-    table.matrix td.cell:hover { background: var(--blue-soft); }
-    table.matrix td.cell.diag { background: #2a2a2a; color: #555; cursor: not-allowed; }
-    table.matrix td.cell.v-0 { color: #aaa; }
-    table.matrix td.cell.v-1 { color: var(--black); background: rgba(0,71,255,0.06); }
-    table.matrix td.cell.v-2 { color: var(--blue); background: rgba(0,71,255,0.18); font-weight: 700; }
-    table.matrix td.cell.v-3 { color: var(--white); background: var(--blue); font-weight: 700; }
-    table.matrix td.cell.v-P { color: var(--purple); background: rgba(124,58,237,0.13); font-weight: 700; }
-    table.matrix td.cell.focus { outline: 2px solid var(--blue); outline-offset: -2px; z-index: 2; }
-    .matrix-legend {
-      display: flex; flex-wrap: wrap; gap: 1.1rem;
-      font-family: 'DM Mono', monospace; font-size: .72rem; color: var(--gray);
-      margin-bottom: .9rem; letter-spacing: .04em;
-    }
-    .matrix-legend span b { color: var(--blue); font-weight: 700; margin-right: .25rem; }
-    .matrix-legend .legend-P b { color: var(--purple); }
+.qhead {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
+  margin-bottom: 1.2rem;
+}
+.qnum {
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: .18em;
+  color: var(--ink-3); text-transform: uppercase;
+}
+.qtag {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--accent);
+  background: var(--accent-soft); border: 1px solid var(--accent-tint);
+  padding: .25rem .6rem;
+}
+.qtext {
+  font-family: var(--sans); font-weight: 700;
+  font-size: clamp(1.3rem, 2.5vw, 1.7rem);
+  line-height: 1.2; letter-spacing: -.015em;
+  color: var(--ink); margin-bottom: .55rem;
+}
+.qhint {
+  font-family: var(--italic); font-style: italic; font-weight: 400;
+  font-size: .98rem; line-height: 1.5;
+  color: var(--ink-2); margin-bottom: 1.6rem; max-width: 56ch;
+}
 
-    /* ── Modo guiado ── */
-    .guided {
-      background: var(--white); border: 1px solid var(--gray-line);
-      padding: 2rem 2rem; text-align: center;
-    }
-    .guided-progress {
-      font-family: 'DM Mono', monospace; font-size: .7rem; letter-spacing: .12em;
-      color: var(--gray); margin-bottom: 1.2rem;
-    }
-    .guided-progress b { color: var(--blue); }
-    .guided-progress-bar {
-      max-width: 320px; margin: .7rem auto 0; height: 3px;
-      background: var(--gray-light); position: relative; overflow: hidden;
-    }
-    .guided-progress-bar .fill {
-      position: absolute; left: 0; top: 0; bottom: 0; background: var(--blue);
-      transition: width .3s ease;
-    }
-    .guided-q {
-      font-family: 'Fraunces', serif; font-size: 1.3rem; line-height: 1.4;
-      max-width: 640px; margin: 1.5rem auto 1.8rem; color: #222;
-    }
-    .guided-q .var-a, .guided-q .var-b { font-weight: 600; color: var(--blue); }
-    .guided-buttons { display: flex; gap: .55rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1.4rem; }
-    .gbtn {
-      width: 70px; height: 70px;
-      font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.5rem;
-      border: 2px solid var(--gray-light); background: var(--white); color: var(--black);
-      cursor: none; transition: border-color .15s, background .15s, color .15s, transform .1s;
-    }
-    .gbtn:hover { border-color: var(--blue); color: var(--blue); transform: translateY(-2px); }
-    .gbtn:active { transform: translateY(0); }
-    .gbtn[data-v="0"] { color: #aaa; }
-    .gbtn[data-v="P"] { font-size: 1.05rem; color: var(--purple); }
-    .gbtn[data-v="P"]:hover { border-color: var(--purple); color: var(--purple); }
-    .gbtn-label {
-      display: block; font-family: 'DM Mono', monospace; font-size: .58rem;
-      letter-spacing: .08em; color: var(--gray); margin-top: .15rem; font-weight: 400;
-    }
-    .gnav { display: flex; gap: .8rem; justify-content: center; flex-wrap: wrap; }
+.opts { display: grid; gap: .65rem; }
+.opts.two-col { grid-template-columns: 1fr 1fr; }
+.opts.three-col { grid-template-columns: 1fr 1fr 1fr; }
+@media (max-width: 560px) {
+  .opts.two-col, .opts.three-col { grid-template-columns: 1fr; }
+}
+.opt {
+  display: grid; grid-template-columns: 44px 1fr; gap: 1rem;
+  align-items: flex-start;
+  padding: 1.05rem 1.15rem;
+  background: var(--paper-2);
+  border: 1.5px solid var(--rule-strong);
+  cursor: none; text-align: left;
+  transition: border-color .15s, background .15s, transform .1s;
+  position: relative;
+}
+.opt:hover { border-color: var(--accent); background: var(--paper-3); }
+.opt.sel { border-color: var(--accent); background: var(--accent-soft); }
+.opt.sel::before {
+  content: ""; position: absolute; top: -1px; left: -1px; bottom: -1px;
+  width: 3px; background: var(--accent);
+}
+.opt:active { transform: scale(.995); }
+.opt-icon {
+  width: 44px; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--accent); flex-shrink: 0;
+  background: var(--accent-soft);
+}
+.opt-icon svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+.opt-body { min-width: 0; }
+.opt-label {
+  font-family: var(--sans); font-weight: 600; font-size: 1.02rem;
+  color: var(--ink); margin-bottom: .2rem; letter-spacing: -.01em;
+}
+.opt-hint {
+  font-family: var(--italic); font-style: italic; font-weight: 400;
+  font-size: .87rem; line-height: 1.5; color: var(--ink-2);
+}
 
-    /* ── Resultados ── */
-    .results-grid {
-      display: grid; grid-template-columns: 1.4fr 1fr; gap: 1.5rem;
-    }
-    @media (max-width: 980px) { .results-grid { grid-template-columns: 1fr; } }
-    .chart-wrap {
-      position: relative; background: var(--white); border: 1px solid var(--gray-line);
-      padding: 1.2rem; min-height: 480px;
-    }
-    .chart-quadrant-label {
-      position: absolute; font-family: 'DM Mono', monospace; font-size: .65rem;
-      letter-spacing: .12em; text-transform: uppercase; color: var(--gray); pointer-events: none;
-    }
-    .chart-quadrant-label.q1 { top: 1.5rem; left: 1.5rem; }
-    .chart-quadrant-label.q2 { top: 1.5rem; right: 1.5rem; color: var(--blue); }
-    .chart-quadrant-label.q3 { bottom: 3rem; left: 1.5rem; }
-    .chart-quadrant-label.q4 { bottom: 3rem; right: 1.5rem; }
+.actions {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .8rem; margin-top: 1.8rem; flex-wrap: wrap;
+}
+.actions .right-group { display: flex; gap: .6rem; }
 
-    .ranking-card {
-      background: var(--white); border: 1px solid var(--gray-line);
-      padding: 1rem 1.2rem;
-    }
-    .rank-group { margin-bottom: 1rem; }
-    .rank-group:last-child { margin-bottom: 0; }
-    .rank-title {
-      font-family: 'Syne', sans-serif; font-weight: 700; font-size: .85rem;
-      letter-spacing: .04em; margin-bottom: .4rem;
-      padding-bottom: .35rem; border-bottom: 1px solid var(--gray-line);
-    }
-    .rank-title .rank-dot { display: inline-block; width: 8px; height: 8px; margin-right: .4rem; vertical-align: middle; }
-    .rank-title.t-key .rank-dot { background: var(--blue); }
-    .rank-title.t-motri .rank-dot { background: var(--green); }
-    .rank-title.t-dep .rank-dot { background: var(--amber); }
-    .rank-title.t-auto .rank-dot { background: var(--gray); }
-    .rank-list {
-      list-style: none; font-family: 'Fraunces', serif; font-size: .88rem; line-height: 1.5;
-    }
-    .rank-list li {
-      display: flex; justify-content: space-between; align-items: baseline;
-      padding: .2rem 0; gap: .55rem;
-    }
-    .rank-list li .rk-code {
-      font-family: 'DM Mono', monospace; font-size: .68rem; color: var(--gray);
-      letter-spacing: .04em; flex-shrink: 0;
-    }
-    .rank-list li .rk-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .rank-list li .rk-score {
-      font-family: 'DM Mono', monospace; font-size: .72rem; color: var(--blue);
-      flex-shrink: 0; min-width: 36px; text-align: right;
-    }
+/* ───────── PLANTILLA SUGERIDA ───────── */
+.tpl-suggest {
+  border: 1px solid var(--accent-tint);
+  background: var(--accent-soft);
+  padding: 1.6rem 1.6rem 1.8rem;
+}
+.tpl-suggest-eyebrow {
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--accent); font-weight: 700;
+  margin-bottom: .7rem;
+}
+.tpl-suggest-name {
+  font-family: var(--sans); font-weight: 700; font-size: 1.4rem;
+  letter-spacing: -.015em; color: var(--ink); margin-bottom: .6rem;
+}
+.tpl-suggest-desc {
+  font-family: var(--italic); font-style: italic; font-weight: 400;
+  font-size: 1rem; line-height: 1.55; color: var(--ink-2); margin-bottom: .8rem;
+}
+.tpl-suggest-meta {
+  font-family: var(--mono); font-size: 11.5px; color: var(--ink-3);
+  letter-spacing: .08em;
+}
+.tpl-suggest-meta b { color: var(--ink); font-weight: 700; }
 
-    .empty-msg {
-      font-family: 'Fraunces', serif; font-style: italic; font-size: .92rem;
-      color: var(--gray); text-align: center; padding: 1.5rem 0;
-    }
+.tpl-alt-row {
+  margin-top: 1.4rem;
+  display: flex; flex-wrap: wrap; gap: .5rem; align-items: center;
+}
+.tpl-alt-row-label {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-3); margin-right: .4rem;
+}
+.tpl-alt {
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: .04em;
+  padding: .4rem .7rem;
+  border: 1px solid var(--rule-strong);
+  background: transparent; color: var(--ink-2);
+  cursor: none; transition: border-color .2s, color .2s;
+}
+.tpl-alt:hover { border-color: var(--accent); color: var(--accent); }
 
-    /* ── Export row ── */
-    .export-row { display: flex; gap: .7rem; flex-wrap: wrap; margin-top: 1.5rem; }
+/* ───────── VARS EDITOR ───────── */
+.section-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 1rem; margin-bottom: 1.2rem; flex-wrap: wrap;
+}
+.section-head h2 {
+  font-family: var(--sans); font-weight: 700; font-size: 1.55rem;
+  letter-spacing: -.015em;
+}
+.section-head h2 .num {
+  font-family: var(--mono); font-size: .65em; letter-spacing: .12em;
+  color: var(--ink-3); margin-right: .5rem; font-weight: 400;
+}
+.section-head .meta {
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: .08em;
+  color: var(--ink-3);
+}
+.section-desc {
+  font-family: var(--italic); font-style: italic; font-weight: 400;
+  font-size: 1.02rem; line-height: 1.55; color: var(--ink-2);
+  max-width: 56ch; margin-bottom: 1.6rem;
+}
 
-    /* ── Footer ── */
-    footer {
-      max-width: 1240px; margin: 0 auto; padding: 2.5rem 2rem 1.5rem;
-      border-top: 1px solid var(--gray-line);
-      font-family: 'DM Mono', monospace; font-size: .72rem; letter-spacing: .08em;
-      color: var(--gray); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
-    }
-    footer a { color: var(--gray); text-decoration: none; transition: color .2s; }
-    footer a:hover { color: var(--blue); }
-    .methodology-note {
-      max-width: 760px; margin-top: 1.2rem;
-      font-family: 'Fraunces', serif; font-size: .85rem; line-height: 1.55;
-      color: #555; font-style: italic;
-    }
+.vars-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: .5rem; margin-bottom: 1rem;
+}
+.var-chip {
+  display: flex; align-items: center; gap: .55rem;
+  background: var(--paper-2);
+  border: 1px solid var(--rule-strong);
+  padding: .55rem .75rem;
+  font-family: var(--sans); font-size: .92rem;
+  min-width: 0;
+}
+.var-chip-code {
+  font-family: var(--mono); font-size: 11px; color: var(--accent);
+  letter-spacing: .04em; flex-shrink: 0;
+}
+.var-chip-name {
+  flex: 1; outline: none; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--ink);
+}
+.var-chip-name:focus { outline: 1px solid var(--accent); outline-offset: 2px; }
+.var-chip-del {
+  font-family: var(--mono); font-size: .95rem; color: var(--ink-3);
+  background: none; border: none; cursor: none; padding: 0 .25rem;
+  transition: color .2s;
+}
+.var-chip-del:hover { color: var(--danger); }
+.vars-add-row { display: flex; gap: .55rem; margin-top: .8rem; flex-wrap: wrap; }
+.vars-add-input {
+  flex: 1; min-width: 200px;
+  font-family: var(--sans); font-size: .94rem;
+  padding: .65rem .9rem;
+  background: var(--paper-2); color: var(--ink);
+  border: 1px solid var(--rule-strong); outline: none;
+}
+.vars-add-input:focus { border-color: var(--accent); }
+.vars-meta {
+  display: flex; gap: 1.6rem; margin-top: 1rem; flex-wrap: wrap;
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: .04em;
+  color: var(--ink-3);
+}
+.vars-meta b { color: var(--accent); font-weight: 700; }
 
-    /* ── Toast ── */
-    .toast {
-      position: fixed; bottom: 1.5rem; right: 1.5rem;
-      background: var(--black); color: var(--white);
-      padding: .8rem 1.2rem; font-family: 'Syne', sans-serif; font-size: .82rem;
-      letter-spacing: .03em; z-index: 9000;
-      opacity: 0; transform: translateY(15px); pointer-events: none;
-      transition: opacity .25s, transform .25s;
-    }
-    .toast.show { opacity: 1; transform: translateY(0); }
+/* ───────── CAPTURE / MATRIX ───────── */
+.mode-toggle { display: flex; gap: .4rem; margin-bottom: 1.2rem; flex-wrap: wrap; }
+.mode-btn {
+  font-family: var(--sans); font-size: .88rem; font-weight: 500;
+  padding: .6rem 1.1rem;
+  background: var(--paper-2); color: var(--ink-2);
+  border: 1px solid var(--rule-strong);
+  transition: border-color .2s, background .2s, color .2s;
+}
+.mode-btn.active { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.mode-btn:not(.active):hover { border-color: var(--accent); color: var(--accent); }
 
-    /* ── Hide sections until wizard done ── */
-    .stage-hidden { display: none; }
+.matrix-legend {
+  display: flex; flex-wrap: wrap; gap: 1.2rem;
+  font-family: var(--mono); font-size: 11.5px; color: var(--ink-3);
+  margin-bottom: 1rem; letter-spacing: .04em;
+}
+.matrix-legend b { color: var(--accent); font-weight: 700; margin-right: .25rem; }
+.matrix-legend .leg-P b { color: var(--gold); }
+.matrix-legend .counter { margin-left: auto; }
 
-    /* ── Auth chip en nav ── */
-    .nav-user-chip {
-      display: flex; align-items: center; gap: .55rem;
-      font-family: 'DM Mono', monospace; font-size: .68rem;
-      letter-spacing: .08em; color: var(--black);
-    }
-    .nav-user-email {
-      max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .nav-user-plan {
-      font-family: 'Syne', sans-serif; font-size: .58rem; font-weight: 700;
-      letter-spacing: .12em; text-transform: uppercase;
-      padding: .2rem .55rem; background: var(--blue-soft); color: var(--blue);
-    }
-    .nav-user-logout {
-      font-family: 'DM Mono', monospace; font-size: .65rem; color: var(--gray);
-      background: none; border: none; cursor: none; padding: 0;
-      transition: color .2s;
-    }
-    .nav-user-logout:hover { color: var(--red); }
+.matrix-wrap {
+  overflow-x: auto; margin-bottom: 1rem;
+  background: var(--paper-2); padding: .9rem;
+  border: 1px solid var(--rule);
+}
+table.matrix {
+  border-collapse: collapse;
+  font-family: var(--mono); font-size: .78rem;
+}
+table.matrix th, table.matrix td {
+  border: 1px solid var(--rule);
+  min-width: 36px; height: 36px;
+  text-align: center; vertical-align: middle;
+  padding: 0;
+}
+table.matrix th.row-h, table.matrix th.col-h {
+  font-family: var(--sans); font-weight: 500; font-size: .8rem;
+  background: var(--paper-3); color: var(--ink);
+  padding: .3rem .55rem; max-width: 200px;
+  text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+table.matrix th.col-h { text-align: center; min-width: 40px; max-width: 60px; }
+table.matrix th.col-h .col-h-inner {
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  font-size: .7rem; letter-spacing: .04em;
+  max-height: 120px; overflow: hidden; text-overflow: ellipsis;
+  padding: .35rem 0;
+}
+table.matrix th.corner {
+  background: var(--paper-3);
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-3);
+  letter-spacing: .12em; text-align: center; vertical-align: bottom; padding-bottom: .5rem;
+}
+table.matrix td.cell { cursor: none; user-select: none; transition: background .15s; color: var(--ink); }
+table.matrix td.cell:hover { background: var(--accent-soft); }
+table.matrix td.cell.diag { background: var(--paper-3); color: var(--ink-3); cursor: not-allowed; }
+table.matrix td.cell.v-0 { color: var(--ink-3); }
+table.matrix td.cell.v-1 { background: var(--accent-soft); }
+table.matrix td.cell.v-2 { background: var(--accent-tint); color: var(--accent); font-weight: 700; }
+table.matrix td.cell.v-3 { background: var(--accent); color: var(--on-accent); font-weight: 700; }
+table.matrix td.cell.v-P { background: rgba(214,168,58,0.18); color: var(--gold); font-weight: 700; }
+table.matrix td.cell:focus { outline: 2px solid var(--accent); outline-offset: -2px; z-index: 2; }
 
-    /* ── Cloud save toolbar ── */
-    .cloud-bar {
-      display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
-      padding: .9rem 1.1rem; background: var(--blue-soft);
-      border-left: 3px solid var(--blue);
-      margin-bottom: 1.5rem;
-      font-family: 'DM Mono', monospace; font-size: .75rem; color: #333;
-    }
-    .cloud-bar .cb-icon { font-family: 'Syne', sans-serif; font-weight: 700; color: var(--blue); }
-    .cloud-bar .cb-spacer { flex: 1; }
-    .cloud-bar .cb-status {
-      font-style: italic; color: var(--gray);
-    }
-    .cloud-bar .cb-status.saving { color: var(--amber); }
-    .cloud-bar .cb-status.saved { color: var(--green); }
-    .cloud-bar .cb-status.error { color: var(--red); }
-    .cloud-bar .cb-editor {
-      font-size: .68rem; color: var(--gray);
-      padding-left: .8rem; border-left: 1px solid var(--gray-light);
-    }
-    .cloud-bar.anon {
-      background: rgba(214, 138, 24, 0.08);
-      border-left-color: var(--amber);
-    }
-    .cloud-bar.anon .cb-icon { color: var(--amber); }
+/* ── Modo guiado ── */
+.guided {
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  padding: 2rem 1.5rem; text-align: center;
+}
+.guided-progress {
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: .12em;
+  color: var(--ink-3); margin-bottom: 1.2rem;
+}
+.guided-progress b { color: var(--accent); }
+.guided-progress-bar {
+  max-width: 320px; margin: .7rem auto 0; height: 3px;
+  background: var(--rule); position: relative; overflow: hidden;
+}
+.guided-progress-bar .fill {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  background: var(--accent); transition: width .3s ease;
+}
+.guided-q {
+  font-family: var(--italic); font-style: italic; font-weight: 400;
+  font-size: 1.35rem; line-height: 1.4;
+  max-width: 640px; margin: 1.6rem auto 1.8rem;
+}
+.guided-q .var-a, .guided-q .var-b { font-style: normal; font-weight: 700; color: var(--accent); }
+.guided-buttons {
+  display: flex; gap: .55rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1.4rem;
+}
+.gbtn {
+  width: 70px; height: 70px;
+  font-family: var(--sans); font-weight: 700; font-size: 1.45rem;
+  background: var(--paper-3); color: var(--ink);
+  border: 1.5px solid var(--rule-strong);
+  transition: border-color .15s, background .15s, color .15s, transform .1s;
+}
+.gbtn:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); }
+.gbtn:active { transform: translateY(0); }
+.gbtn[data-v="0"] { color: var(--ink-3); }
+.gbtn[data-v="P"] { font-size: 1.05rem; color: var(--gold); }
+.gbtn[data-v="P"]:hover { border-color: var(--gold); color: var(--gold); }
+.gbtn-label {
+  display: block; font-family: var(--mono); font-size: .58rem;
+  letter-spacing: .08em; color: var(--ink-3); margin-top: .15rem; font-weight: 400;
+}
 
-    /* ── Mis proyectos card ── */
-    .projects-card {
-      background: var(--paper); border: 1px solid var(--gray-line);
-      padding: 1.6rem 1.8rem; margin-bottom: 1.8rem;
-    }
-    .projects-card.collapsed .projects-body { display: none; }
-    .projects-head {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 1.2rem; cursor: none;
-    }
-    .projects-head h3 {
-      font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.05rem;
-      letter-spacing: -0.01em;
-    }
-    .projects-head .ph-meta {
-      font-family: 'DM Mono', monospace; font-size: .68rem; color: var(--gray);
-      letter-spacing: .08em;
-    }
-    .projects-list {
-      display: grid; grid-template-columns: 1fr; gap: .5rem; margin-bottom: 1rem;
-    }
-    .project-row {
-      display: grid; grid-template-columns: 1fr auto auto; gap: 1rem;
-      align-items: center; padding: .7rem .9rem;
-      background: var(--white); border: 1px solid var(--gray-line);
-      font-family: 'DM Mono', monospace; font-size: .78rem;
-    }
-    .project-row .pr-name {
-      font-family: 'Syne', sans-serif; font-weight: 500; font-size: .9rem;
-      color: var(--black); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .project-row .pr-meta {
-      font-size: .68rem; color: var(--gray); letter-spacing: .05em;
-    }
-    .project-row .pr-role {
-      font-family: 'Syne', sans-serif; font-size: .6rem; font-weight: 700;
-      letter-spacing: .12em; text-transform: uppercase;
-      padding: .15rem .5rem; background: var(--gray-light); color: #555;
-    }
-    .project-row .pr-role.owner { background: var(--blue); color: var(--white); }
-    .project-row .pr-actions { display: flex; gap: .4rem; }
-    .project-row button {
-      font-family: 'DM Mono', monospace; font-size: .65rem; letter-spacing: .04em;
-      padding: .35rem .65rem; background: none; border: 1px solid var(--gray-light);
-      color: var(--black); cursor: none; transition: border-color .2s, color .2s;
-    }
-    .project-row button:hover { border-color: var(--blue); color: var(--blue); }
-    .project-row button.danger:hover { border-color: var(--red); color: var(--red); }
-    .projects-empty {
-      font-family: 'Fraunces', serif; font-style: italic; color: var(--gray);
-      text-align: center; padding: 1rem;
-    }
+/* ───────── CLOUD BAR ───────── */
+.cloud-bar {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  padding: .85rem 1.1rem;
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+  margin-bottom: 1.4rem;
+  font-family: var(--mono); font-size: 12px; color: var(--ink-2);
+}
+.cloud-bar .cb-icon { font-family: var(--sans); font-weight: 700; color: var(--accent); }
+.cloud-bar .cb-spacer { flex: 1; }
+.cloud-bar .cb-status { font-style: italic; color: var(--ink-3); font-family: var(--italic); font-size: 12.5px; }
+.cloud-bar .cb-status.saving { color: var(--amber); }
+.cloud-bar .cb-status.saved { color: var(--green); }
+.cloud-bar .cb-status.error { color: var(--danger); }
+.cloud-bar .cb-editor { font-size: 11px; color: var(--ink-3); padding-left: .8rem; border-left: 1px solid var(--rule); }
+.cloud-bar.anon {
+  background: rgba(214,168,58,0.10);
+  border-left-color: var(--amber);
+}
+.cloud-bar.anon .cb-icon { color: var(--amber); }
+.cloud-bar .btn-mini {
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em;
+  padding: .4rem .8rem;
+  border: 1px solid var(--rule-strong); background: transparent; color: var(--ink-2);
+  transition: border-color .2s, color .2s;
+}
+.cloud-bar .btn-mini:hover { border-color: var(--accent); color: var(--accent); }
 
-    /* ── Modal genérico ── */
-    .modal-back {
-      position: fixed; inset: 0; background: rgba(10,10,16,0.55);
-      display: none; align-items: center; justify-content: center;
-      z-index: 8500; padding: 1rem;
-    }
-    .modal-back.open { display: flex; }
-    .modal {
-      background: var(--paper); padding: 2rem 2.2rem;
-      max-width: 480px; width: 100%; position: relative;
-      max-height: 90vh; overflow-y: auto;
-    }
-    .modal-close {
-      position: absolute; top: .8rem; right: 1rem;
-      font-family: 'DM Mono', monospace; font-size: 1.2rem;
-      background: none; border: none; color: var(--gray); cursor: none;
-      transition: color .2s;
-    }
-    .modal-close:hover { color: var(--red); }
-    .modal h2 {
-      font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.25rem;
-      margin-bottom: .6rem; letter-spacing: -0.01em;
-    }
-    .modal p {
-      font-family: 'Fraunces', serif; font-size: .95rem; line-height: 1.5;
-      color: #333; margin-bottom: 1rem;
-    }
-    .modal label {
-      display: block; font-family: 'DM Mono', monospace; font-size: .7rem;
-      letter-spacing: .08em; text-transform: uppercase; color: var(--gray);
-      margin-bottom: .35rem; margin-top: 1rem;
-    }
-    .modal input[type=email], .modal input[type=text] {
-      width: 100%; padding: .6rem .8rem; font-family: 'Syne', sans-serif;
-      font-size: .9rem; background: var(--white);
-      border: 1.5px solid var(--gray-light); color: var(--black); outline: none;
-    }
-    .modal input[type=email]:focus, .modal input[type=text]:focus { border-color: var(--blue); }
-    .modal .modal-actions {
-      display: flex; gap: .55rem; margin-top: 1.4rem; flex-wrap: wrap;
-    }
-    .modal .collab-list {
-      list-style: none; margin-top: .8rem;
-    }
-    .modal .collab-list li {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: .5rem 0; border-bottom: 1px solid var(--gray-line);
-      font-family: 'DM Mono', monospace; font-size: .78rem; color: #444;
-    }
-    .modal .collab-list li:last-child { border-bottom: none; }
-    .modal .collab-list li .role {
-      font-size: .58rem; padding: .15rem .45rem; background: var(--gray-light); color: #555;
-      font-family: 'Syne', sans-serif; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
-    }
-    .modal .collab-list li .role.owner { background: var(--blue); color: var(--white); }
-  </style>
+/* ───────── PROJECTS CARD ───────── */
+.projects-card {
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  padding: 1.6rem 1.6rem 1.4rem;
+  margin-bottom: 2rem;
+}
+.projects-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; margin-bottom: 1.2rem; flex-wrap: wrap;
+}
+.projects-head h3 {
+  font-family: var(--sans); font-weight: 700; font-size: 1.15rem;
+  letter-spacing: -.01em;
+}
+.projects-head .ph-meta {
+  font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); letter-spacing: .05em;
+}
+.projects-list {
+  display: flex; flex-direction: column; gap: .5rem; margin-bottom: 1rem;
+}
+.project-row {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 1rem;
+  align-items: center;
+  padding: .8rem 1rem;
+  background: var(--paper-3);
+  border: 1px solid var(--rule);
+}
+.project-row .pr-name {
+  font-family: var(--sans); font-weight: 600; font-size: .95rem; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.project-row .pr-meta {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-3); letter-spacing: .04em;
+  margin-top: .15rem;
+}
+.project-row .pr-role {
+  font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase;
+  padding: .2rem .55rem;
+  background: var(--paper); color: var(--ink-3);
+  border: 1px solid var(--rule-strong);
+}
+.project-row .pr-role.owner { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.project-row .pr-actions { display: flex; gap: .4rem; }
+.project-row .pr-actions button {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .04em;
+  padding: .35rem .7rem;
+  background: transparent; color: var(--ink-2);
+  border: 1px solid var(--rule-strong);
+  transition: border-color .2s, color .2s;
+}
+.project-row .pr-actions button:hover { border-color: var(--accent); color: var(--accent); }
+.project-row .pr-actions button.danger:hover { border-color: var(--danger); color: var(--danger); }
+.projects-empty {
+  font-family: var(--italic); font-style: italic; color: var(--ink-3);
+  text-align: center; padding: 1rem;
+}
+
+/* ───────── RESULTS ───────── */
+.results-grid {
+  display: grid; grid-template-columns: 1.4fr 1fr; gap: 1.5rem; margin-top: .5rem;
+}
+@media (max-width: 900px) { .results-grid { grid-template-columns: 1fr; } }
+.chart-wrap {
+  position: relative;
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  padding: 1.2rem; min-height: 480px;
+}
+.chart-quadrant-label {
+  position: absolute;
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-3); pointer-events: none;
+}
+.chart-quadrant-label.q1 { top: 1.2rem; left: 1.2rem; }
+.chart-quadrant-label.q2 { top: 1.2rem; right: 1.2rem; color: var(--accent); }
+.chart-quadrant-label.q3 { bottom: 2.7rem; left: 1.2rem; }
+.chart-quadrant-label.q4 { bottom: 2.7rem; right: 1.2rem; }
+
+.ranking-card {
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  padding: 1rem 1.2rem;
+}
+.rank-group { margin-bottom: 1rem; }
+.rank-group:last-child { margin-bottom: 0; }
+.rank-title {
+  font-family: var(--sans); font-weight: 700; font-size: .9rem;
+  letter-spacing: -.005em; margin-bottom: .45rem;
+  padding-bottom: .35rem;
+  border-bottom: 1px solid var(--rule);
+}
+.rank-title .rank-dot {
+  display: inline-block; width: 8px; height: 8px; margin-right: .45rem; vertical-align: middle;
+}
+.rank-title.t-key .rank-dot { background: var(--accent); }
+.rank-title.t-motri .rank-dot { background: var(--green); }
+.rank-title.t-dep .rank-dot { background: var(--amber); }
+.rank-title.t-auto .rank-dot { background: var(--ink-3); }
+.rank-title .group-count {
+  font-family: var(--italic); font-style: italic; font-weight: 400;
+  font-size: .78rem; color: var(--ink-3); margin-left: .4rem;
+}
+.rank-list { list-style: none; font-family: var(--sans); font-size: .9rem; line-height: 1.5; }
+.rank-list li {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: .2rem 0; gap: .55rem;
+}
+.rank-list li .rk-code {
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-3);
+  letter-spacing: .04em; flex-shrink: 0;
+}
+.rank-list li .rk-name {
+  flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink);
+}
+.rank-list li .rk-score {
+  font-family: var(--mono); font-size: 11px; color: var(--accent);
+  flex-shrink: 0; min-width: 56px; text-align: right;
+}
+
+.empty-msg {
+  font-family: var(--italic); font-style: italic; color: var(--ink-3);
+  text-align: center; padding: 1.5rem 0;
+}
+
+.export-row {
+  display: flex; gap: .65rem; flex-wrap: wrap; margin-top: 1.5rem;
+}
+
+.methodology-note {
+  max-width: 64ch; margin-top: 1.4rem;
+  font-family: var(--italic); font-style: italic; font-weight: 400;
+  font-size: .9rem; line-height: 1.6; color: var(--ink-3);
+}
+
+/* ───────── MODAL ───────── */
+.modal-back {
+  position: fixed; inset: 0; background: rgba(10,8,4,0.7);
+  display: none; align-items: center; justify-content: center;
+  z-index: 8500; padding: 1rem;
+  backdrop-filter: blur(4px);
+}
+.modal-back.open { display: flex; }
+.modal {
+  background: var(--paper-2);
+  border: 1px solid var(--rule-strong);
+  padding: 2rem 2.2rem;
+  max-width: 540px; width: 100%; position: relative;
+  max-height: 90vh; overflow-y: auto;
+}
+.modal-close {
+  position: absolute; top: .9rem; right: 1.1rem;
+  font-family: var(--mono); font-size: 1.2rem;
+  background: none; border: none; color: var(--ink-3);
+  transition: color .2s;
+}
+.modal-close:hover { color: var(--danger); }
+.modal h2 {
+  font-family: var(--sans); font-weight: 700; font-size: 1.35rem;
+  letter-spacing: -.01em; margin-bottom: .7rem; max-width: 28ch;
+}
+.modal p, .modal .modal-body {
+  font-family: var(--sans); font-size: .98rem; line-height: 1.55;
+  color: var(--ink-2); margin-bottom: 1rem;
+}
+.modal .modal-body p { margin-bottom: 1rem; }
+.modal .modal-body p:last-child { margin-bottom: 0; }
+.modal .modal-body em { font-family: var(--italic); font-style: italic; }
+.modal .modal-body code { background: var(--paper-3); padding: 1px 5px; color: var(--accent); }
+.modal label {
+  display: block; font-family: var(--mono); font-size: 11.5px;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3);
+  margin-bottom: .4rem; margin-top: 1.1rem;
+}
+.modal input[type=email], .modal input[type=text] {
+  width: 100%; padding: .7rem .85rem;
+  font-family: var(--sans); font-size: .95rem;
+  background: var(--paper-3); color: var(--ink);
+  border: 1px solid var(--rule-strong); outline: none;
+}
+.modal input:focus { border-color: var(--accent); }
+.modal .modal-actions {
+  display: flex; gap: .55rem; margin-top: 1.4rem; flex-wrap: wrap;
+}
+.modal .collab-list { list-style: none; margin-top: .8rem; }
+.modal .collab-list li {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: .5rem 0; border-bottom: 1px solid var(--rule);
+  font-family: var(--mono); font-size: 12px; color: var(--ink-2);
+}
+.modal .collab-list li:last-child { border-bottom: none; }
+.modal .collab-list li .role {
+  font-size: 10px; padding: .15rem .45rem;
+  background: var(--paper-3); color: var(--ink-3);
+  font-family: var(--sans); font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+}
+.modal .collab-list li .role.owner { background: var(--accent); color: var(--on-accent); }
+
+/* ───────── TOAST ───────── */
+.toast {
+  position: fixed; bottom: 1.5rem; right: 1.5rem;
+  background: var(--ink); color: var(--paper);
+  padding: .85rem 1.2rem; font-family: var(--sans); font-size: .9rem;
+  letter-spacing: .02em; z-index: 9000;
+  opacity: 0; transform: translateY(15px); pointer-events: none;
+  transition: opacity .25s, transform .25s;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+
+.is-hidden { display: none !important; }
+
+footer.foot {
+  max-width: 880px; margin: 0 auto; padding: 2rem 1.75rem 1.5rem;
+  border-top: 1px solid var(--rule);
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em;
+  color: var(--ink-3);
+  display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
+}
+footer.foot a { color: var(--ink-3); transition: color .2s; }
+footer.foot a:hover { color: var(--accent); }
+</style>
 </head>
 <body>
-  <div class="cursor" id="cursor"></div>
-  <div class="cursor-ring" id="cursorRing"></div>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
 
-  <nav>
-    <a href="index.html" class="nav-logo-wrap">
-      <div class="nav-bars">
-        <div class="nav-bar" style="height:18px"></div>
-        <div class="nav-bar" style="height:14px"></div>
-        <div class="nav-bar" style="height:9px"></div>
-        <div class="nav-bar" style="height:5px"></div>
+<nav class="topbar">
+  <div class="topbar-left">
+    <a href="index.html#proyectos" class="btn-back"><span>←</span> Volver</a>
+    <div id="nav-user-block" class="is-hidden" style="display:flex;align-items:center;gap:.7rem">
+      <span class="user-mono" id="nav-user-email">—</span>
+      <a href="pricing.html" class="plan-chip"><span class="marker"></span><span id="nav-user-plan">FREE</span></a>
+      <button class="btn-logout" onclick="logoutUser()">salir ↗</button>
+    </div>
+    <div id="nav-auth-anon" style="display:flex;gap:.85rem">
+      <a href="login.html" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)">Iniciar sesión</a>
+      <a href="register.html" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);padding:.3rem .65rem">Registrarse</a>
+    </div>
+  </div>
+  <div class="topbar-center">
+    <span class="eyebrow" style="margin:0;font-size:11px">Análisis Estructural</span>
+  </div>
+  <div class="topbar-right">
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
+    <a href="index.html" class="logo-link">
+      <div class="logo-bars">
+        <div class="logo-bar" style="height:20px"></div>
+        <div class="logo-bar" style="height:15px"></div>
+        <div class="logo-bar" style="height:9px"></div>
+        <div class="logo-bar" style="height:4px"></div>
       </div>
-      <span class="nav-logo">Ricardo<span>.</span>Ruiz</span>
+      <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
     </a>
-    <ul id="nav-list">
-      <li><a href="index.html#proyectos">Proyectos</a></li>
-      <li><a href="pricing.html">Planes</a></li>
-      <li id="nav-auth-anon">
-        <a href="login.html" style="margin-right:1.2rem">Iniciar sesión</a>
-      </li>
-      <li id="nav-auth-anon-2"><a href="register.html" class="nav-cta">Registrarse</a></li>
-      <li id="nav-auth-user" class="stage-hidden">
-        <div class="nav-user-chip">
-          <span class="nav-user-email" id="nav-user-email"></span>
-          <a href="pricing.html" class="nav-user-plan" id="nav-user-plan">FREE</a>
-          <button class="nav-user-logout" onclick="logoutUser()" title="Cerrar sesión">salir ↗</button>
-        </div>
-      </li>
-    </ul>
-    <button class="nav-hamburger" onclick="document.querySelector('nav ul').style.display='flex'" aria-label="Menu">
-      <span></span><span></span><span></span>
-    </button>
-  </nav>
+  </div>
+</nav>
 
-  <main>
-    <div class="crumb">
-      <a href="index.html">Inicio</a>
-      <span class="sep">/</span>
-      <a href="index.html#proyectos">Proyectos</a>
-      <span class="sep">/</span>
-      <span>Análisis Estructural</span>
+<main class="page">
+  <div class="crumb">
+    <a href="index.html">Inicio</a>
+    <span class="sep">/</span>
+    <a href="index.html#proyectos">Proyectos</a>
+    <span class="sep">/</span>
+    <span>Análisis Estructural</span>
+  </div>
+
+  <!-- ════════════════ MIS PROYECTOS (logged only) ════════════════ -->
+  <section class="projects-card is-hidden" id="my-projects">
+    <div class="projects-head">
+      <div>
+        <h3>Tus proyectos en la nube</h3>
+        <div class="ph-meta" id="my-projects-meta">—</div>
+      </div>
+      <button class="btn-ghost" onclick="newProject()">+ Nuevo proyecto</button>
+    </div>
+    <div class="projects-list" id="my-projects-list"></div>
+  </section>
+
+  <!-- ════════════════ STAGE: WELCOME ════════════════ -->
+  <section id="stage-welcome">
+    <div class="welcome">
+      <div class="eyebrow">Herramienta de prospectiva</div>
+      <h1 class="welcome-title">¿Qué <em>pocas variables</em> mueven tu sistema?</h1>
+      <p class="welcome-sub">
+        Te ayudamos a identificar las variables clave de un problema complejo
+        — las que mueven el resto. Útil para planeación territorial, diseño
+        de política pública y diagnóstico estratégico.
+      </p>
+      <p class="welcome-hint">
+        Cargas las variables del sistema, calificas cómo se influyen entre sí
+        y la herramienta te muestra cuáles son las palancas y cuáles son los
+        resultados. Toma entre 20 minutos y dos horas según la profundidad.
+      </p>
+      <button class="method-link" onclick="openModal('modal-method')">¿Cómo lo calculamos? →</button>
+
+      <div class="accordion-stack">
+        <details class="accordion">
+          <summary><span><span class="acc-num">01</span>Qué hace exactamente</span></summary>
+          <div class="accordion-body">
+            Tomas las variables que describen tu sistema (entre 8 y 30) y para
+            cada par calificas cuánto influye una sobre la otra en una escala
+            de 0 a 3. La herramienta multiplica la matriz consigo misma para
+            descubrir las relaciones indirectas — las que conectan variables
+            a través de otras — que el ojo humano no detecta cuando solo
+            mira influencias directas.
+          </div>
+        </details>
+        <details class="accordion">
+          <summary><span><span class="acc-num">02</span>Qué te entrega</span></summary>
+          <div class="accordion-body">
+            Un mapa de las variables ubicadas en cuatro cuadrantes según su
+            poder de influencia y su grado de dependencia: <em>motrices</em>
+            (mueven el sistema), <em>clave</em> (críticas e inestables),
+            <em>resultado</em> (dependen del sistema) y <em>autónomas</em>
+            (marginales). Además un ranking ordenado y exportes en JSON y CSV.
+          </div>
+        </details>
+        <details class="accordion">
+          <summary><span><span class="acc-num">03</span>Para qué te sirve</span></summary>
+          <div class="accordion-body">
+            Decidir dónde intervenir primero para transformar el sistema y
+            qué variables solo cambian si se actúa antes sobre sus causas.
+            Sirve para alinear equipos, priorizar inversiones, construir
+            escenarios de futuro y argumentar decisiones de política pública
+            con evidencia estructural.
+          </div>
+        </details>
+      </div>
+
+      <button class="btn btn-big" onclick="startWizard()">Empezar →</button>
+    </div>
+  </section>
+
+  <!-- ════════════════ STAGE: WIZARD (4 preguntas + plantilla) ════════════════ -->
+  <section id="stage-wizard" class="is-hidden">
+    <div class="progress-row">
+      <span class="progress-label" id="wiz-progress">Pregunta 1 / 4</span>
+      <div class="progress-track"><div class="progress-fill" id="wiz-progress-fill" style="width:25%"></div></div>
     </div>
 
-    <header class="hero-mod">
-      <div class="hero-tag">Herramienta de prospectiva estratégica</div>
-      <h1 class="hero-title">Análisis estructural<br/>de <span>sistemas complejos</span>.</h1>
-      <p class="hero-sub">
-        Identifica las variables clave de un sistema mapeando cómo se influencian
-        entre sí. Útil para visiones territoriales de largo plazo, diagnósticos
-        sectoriales y diseño de política pública. Inspirada en la escuela de
-        prospectiva estratégica (Godet, Mojica) y actualizada con técnicas
-        contemporáneas de análisis estructural.
-      </p>
-    </header>
-
-    <section class="intro-grid">
-      <article class="intro-card">
-        <div class="intro-num">01 — Qué hace</div>
-        <h3 class="intro-title">Mide influencia y dependencia</h3>
-        <p class="intro-body">
-          Defines un conjunto de variables del sistema (entre 8 y 30) y calificas
-          cuánto influye cada una sobre las demás. La herramienta calcula tanto
-          las relaciones directas como las indirectas que aparecen al propagar
-          la matriz.
-        </p>
-      </article>
-      <article class="intro-card">
-        <div class="intro-num">02 — Qué entrega</div>
-        <h3 class="intro-title">Mapa de variables clave</h3>
-        <p class="intro-body">
-          Ubica cada variable en cuatro cuadrantes según su poder de influencia
-          y su grado de dependencia. Distingue las variables que mueven el
-          sistema, las que son críticas, las que resultan del sistema y las que
-          quedan al margen.
-        </p>
-      </article>
-      <article class="intro-card">
-        <div class="intro-num">03 — Para qué sirve</div>
-        <h3 class="intro-title">Decidir dónde intervenir</h3>
-        <p class="intro-body">
-          El resultado orienta sobre qué variables conviene mover primero para
-          transformar el sistema y cuáles solo cambian si se actúa antes sobre
-          sus causas. Sirve para alinear equipos, priorizar inversiones y
-          construir escenarios de futuro.
-        </p>
-      </article>
-    </section>
-
-    <section class="projects-card stage-hidden" id="my-projects" style="display:none">
-      <div class="projects-head">
-        <div>
-          <h3>Mis proyectos en la nube</h3>
-          <div class="ph-meta" id="my-projects-meta">—</div>
-        </div>
-        <div>
-          <button class="btn-ghost" onclick="newProject()">+ Nuevo proyecto</button>
+    <!-- Q1 -->
+    <div class="panel active" id="wp-q1">
+      <div class="qhead">
+        <span class="qnum">Pregunta 1 de 4</span>
+        <span class="qtag">Tu organización</span>
+      </div>
+      <p class="qtext">¿Qué tipo de organización eres?</p>
+      <p class="qhint">Esto nos ayuda a sugerir la plantilla y el lenguaje adecuado.</p>
+      <div class="opts two-col" id="wp-q1-opts"></div>
+      <div class="actions">
+        <button class="btn-ghost" onclick="backToWelcome()">← Volver al inicio</button>
+        <div class="right-group">
+          <button class="btn disabled" id="wp-q1-next" onclick="wizardNext(2)">Siguiente →</button>
         </div>
       </div>
-      <div class="projects-body">
-        <div class="projects-list" id="my-projects-list"></div>
+    </div>
+
+    <!-- Q2 -->
+    <div class="panel" id="wp-q2">
+      <div class="qhead">
+        <span class="qnum">Pregunta 2 de 4</span>
+        <span class="qtag">Tu propósito</span>
       </div>
-    </section>
-
-    <section class="section" id="stage-wizard">
-      <div class="section-label">Paso 1 de 4</div>
-      <h2 class="section-title">Cuéntanos para qué lo vas a usar</h2>
-      <p class="section-desc">
-        Con tres preguntas cortas te sugerimos una plantilla pensada para tu
-        contexto. Puedes cambiarla o partir desde cero en cualquier momento.
-      </p>
-
-      <div class="wizard-step">
-        <div class="wizard-q"><span class="wizard-q-num">P1</span>¿Qué tipo de organización eres?</div>
-        <div class="wizard-options" id="q1-options"></div>
+      <p class="qtext">¿Para qué vas a usarlo?</p>
+      <p class="qhint">El propósito orienta qué variables tienen más sentido y qué horizonte temporal manejamos.</p>
+      <div class="opts two-col" id="wp-q2-opts"></div>
+      <div class="actions">
+        <button class="btn-ghost" onclick="wizardBack(1)">← Anterior</button>
+        <div class="right-group">
+          <button class="btn disabled" id="wp-q2-next" onclick="wizardNext(3)">Siguiente →</button>
+        </div>
       </div>
-      <div class="wizard-step">
-        <div class="wizard-q"><span class="wizard-q-num">P2</span>¿Para qué necesitas el análisis?</div>
-        <div class="wizard-options" id="q2-options"></div>
+    </div>
+
+    <!-- Q3 -->
+    <div class="panel" id="wp-q3">
+      <div class="qhead">
+        <span class="qnum">Pregunta 3 de 4</span>
+        <span class="qtag">Tu equipo</span>
       </div>
-      <div class="wizard-step">
-        <div class="wizard-q"><span class="wizard-q-num">P3</span>¿Qué tan técnico es el equipo que va a trabajar?</div>
-        <div class="wizard-options" id="q3-options"></div>
+      <p class="qtext">¿Qué tan técnico es el equipo que va a trabajar la matriz?</p>
+      <p class="qhint">Afina la jerga, el nivel de detalle y si conviene precargar capas de datos para análisis avanzado.</p>
+      <div class="opts three-col" id="wp-q3-opts"></div>
+      <div class="actions">
+        <button class="btn-ghost" onclick="wizardBack(2)">← Anterior</button>
+        <div class="right-group">
+          <button class="btn disabled" id="wp-q3-next" onclick="wizardNext(4)">Siguiente →</button>
+        </div>
       </div>
+    </div>
 
-      <div id="tpl-suggested-box"></div>
-
-      <div class="wizard-cta-row">
-        <button class="btn-primary" id="btn-start" disabled onclick="startProject()">Empezar análisis →</button>
-        <button class="btn-ghost" onclick="startBlank()">Empezar desde cero</button>
+    <!-- Q4 -->
+    <div class="panel" id="wp-q4">
+      <div class="qhead">
+        <span class="qnum">Pregunta 4 de 4</span>
+        <span class="qtag">Tu dominio</span>
       </div>
-    </section>
-
-    <section class="section stage-hidden" id="stage-vars">
-      <div class="section-label">Paso 2 de 4</div>
-      <h2 class="section-title">Define las variables del sistema</h2>
-      <p class="section-desc">
-        Las variables son los componentes que describen tu sistema. Edítalas,
-        agrega las que faltan, retira las que no aplican. Recomendamos entre 10
-        y 25 variables: por debajo de 8 el análisis pierde resolución; por
-        encima de 30 la captura de la matriz se vuelve pesada.
-      </p>
-
-      <div class="vars-grid" id="vars-grid"></div>
-
-      <div class="vars-add-row">
-        <input type="text" class="vars-add-input" id="vars-add-input" placeholder="Nombre de la nueva variable..." onkeydown="if(event.key==='Enter')addVar()"/>
-        <button class="btn-ghost" onclick="addVar()">+ Agregar variable</button>
+      <p class="qtext">¿Sobre qué dominio es el análisis?</p>
+      <p class="qhint">El dominio temático determina qué variables vienen sugeridas en la plantilla. Si no estás seguro, elige el más cercano.</p>
+      <div class="opts two-col" id="wp-q4-opts"></div>
+      <div class="actions">
+        <button class="btn-ghost" onclick="wizardBack(3)">← Anterior</button>
+        <div class="right-group">
+          <button class="btn disabled" id="wp-q4-next" onclick="wizardNext(5)">Ver plantilla →</button>
+        </div>
       </div>
+    </div>
 
-      <div class="vars-meta">
-        <span>Variables: <b id="vars-count">0</b></span>
-        <span>Celdas a llenar: <b id="vars-cells">0</b></span>
-        <span>Plantilla: <b id="vars-tpl">—</b></span>
+    <!-- Resultado plantilla sugerida -->
+    <div class="panel" id="wp-result">
+      <div class="qhead">
+        <span class="qnum">Plantilla sugerida</span>
+        <span class="qtag">Casi listo</span>
       </div>
-
-      <div class="wizard-cta-row">
-        <button class="btn-primary" onclick="goToCapture()">Continuar →</button>
-        <button class="btn-ghost" onclick="backToWizard()">← Cambiar plantilla</button>
+      <div id="tpl-suggest-box"></div>
+      <div class="actions">
+        <button class="btn-ghost" onclick="wizardBack(4)">← Cambiar respuestas</button>
+        <div class="right-group">
+          <button class="btn-ghost" onclick="startBlank()">Empezar en blanco</button>
+          <button class="btn" onclick="startProject()">Empezar análisis →</button>
+        </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <section class="section stage-hidden" id="stage-capture">
-      <div class="section-label">Paso 3 de 4</div>
-      <h2 class="section-title">Califica las relaciones</h2>
-      <p class="section-desc">
-        Para cada par de variables (A, B), califica cuánto influye A sobre B en
-        una escala de 0 a 3: <b>0</b> nula, <b>1</b> débil, <b>2</b> media,
-        <b>3</b> fuerte. Usa <b>P</b> (potencial) cuando la relación no exista
-        hoy pero pueda activarse en el futuro. La diagonal queda inhabilitada
-        (una variable no se influye a sí misma).
-      </p>
-
-      <div class="cloud-bar" id="cloud-bar-capture">
-        <span class="cb-icon">☁</span>
-        <span id="cb-text-capture">Trabajando local</span>
-        <span class="cb-spacer"></span>
-        <span class="cb-status" id="cb-status-capture"></span>
-        <span class="cb-editor" id="cb-editor-capture"></span>
-        <button class="btn-ghost" id="cb-save-capture" onclick="cloudSave()" style="padding:.4rem .75rem;font-size:.7rem">Guardar en la nube</button>
+  <!-- ════════════════ STAGE: VARS ════════════════ -->
+  <section id="stage-vars" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 02</span>Variables del sistema</h2>
+      <span class="meta" id="vars-tpl">—</span>
+    </div>
+    <p class="section-desc">
+      Edita, agrega o quita variables según tu caso. Recomendamos entre 10 y
+      25: menos pierde resolución, más vuelve pesada la captura de la matriz.
+    </p>
+    <div class="vars-grid" id="vars-grid"></div>
+    <div class="vars-add-row">
+      <input type="text" class="vars-add-input" id="vars-add-input" placeholder="Nombre de la nueva variable…" onkeydown="if(event.key==='Enter')addVar()"/>
+      <button class="btn-ghost" onclick="addVar()">+ Agregar variable</button>
+    </div>
+    <div class="vars-meta">
+      <span>Variables: <b id="vars-count">0</b></span>
+      <span>Celdas a calificar: <b id="vars-cells">0</b></span>
+    </div>
+    <div class="actions">
+      <button class="btn-ghost" onclick="backToWizard()">← Cambiar plantilla</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToCapture()">Continuar →</button>
       </div>
+    </div>
+  </section>
 
-      <div class="mode-toggle">
-        <button class="mode-btn active" id="mode-table-btn" onclick="setMode('table')">Modo matriz</button>
-        <button class="mode-btn" id="mode-guided-btn" onclick="setMode('guided')">Modo guiado</button>
-      </div>
+  <!-- ════════════════ STAGE: CAPTURE ════════════════ -->
+  <section id="stage-capture" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 03</span>Califica las relaciones</h2>
+      <span class="meta"><b id="cells-filled">0</b>/<b id="cells-total">0</b> celdas</span>
+    </div>
+    <p class="section-desc">
+      Para cada par (A, B), califica cuánto influye A sobre B: <b>0</b> nula,
+      <b>1</b> débil, <b>2</b> media, <b>3</b> fuerte. Usa <b>P</b> para
+      relaciones potenciales (que no existen hoy pero podrían activarse).
+    </p>
 
-      <div class="matrix-legend">
-        <span><b>0</b> nula</span>
-        <span><b>1</b> débil</span>
-        <span><b>2</b> media</span>
-        <span><b>3</b> fuerte</span>
-        <span class="legend-P"><b>P</b> potencial</span>
-        <span style="margin-left:auto"><b id="cells-filled">0</b>/<b id="cells-total">0</b> celdas</span>
-      </div>
+    <div class="cloud-bar" id="cloud-bar-capture">
+      <span class="cb-icon">●</span>
+      <span id="cb-text-capture">Trabajando local</span>
+      <span class="cb-spacer"></span>
+      <span class="cb-status" id="cb-status-capture"></span>
+      <span class="cb-editor" id="cb-editor-capture"></span>
+      <button class="btn-mini" id="cb-save-capture" onclick="cloudSave()">Guardar en la nube</button>
+    </div>
 
-      <div id="mode-table">
-        <div class="matrix-wrap" id="matrix-wrap"></div>
-      </div>
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="mode-table-btn" onclick="setMode('table')">Modo matriz</button>
+      <button class="mode-btn" id="mode-guided-btn" onclick="setMode('guided')">Modo guiado</button>
+    </div>
 
-      <div id="mode-guided" class="stage-hidden">
-        <div class="guided" id="guided-box"></div>
-      </div>
+    <div class="matrix-legend">
+      <span><b>0</b> nula</span>
+      <span><b>1</b> débil</span>
+      <span><b>2</b> media</span>
+      <span><b>3</b> fuerte</span>
+      <span class="leg-P"><b>P</b> potencial</span>
+    </div>
 
-      <div class="wizard-cta-row">
-        <button class="btn-primary" onclick="goToResults()">Ver resultados →</button>
-        <button class="btn-ghost" onclick="backToVars()">← Editar variables</button>
+    <div id="mode-table">
+      <div class="matrix-wrap" id="matrix-wrap"></div>
+    </div>
+    <div id="mode-guided" class="is-hidden">
+      <div class="guided" id="guided-box"></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="backToVars()">← Editar variables</button>
+      <div class="right-group">
         <button class="btn-ghost" onclick="resetMatrix()">Limpiar matriz</button>
-      </div>
-    </section>
-
-    <section class="section stage-hidden" id="stage-results">
-      <div class="section-label">Paso 4 de 4</div>
-      <h2 class="section-title">Variables clave del sistema</h2>
-      <p class="section-desc" id="results-desc">
-        Cada variable aparece ubicada según su <b>motricidad indirecta</b> (eje
-        Y, cuánto influye sobre el sistema cuando se propagan las relaciones) y
-        su <b>dependencia indirecta</b> (eje X, cuánto la determina el sistema).
-        Los ejes están normalizados al máximo observado.
-      </p>
-
-      <div class="results-grid">
-        <div class="chart-wrap">
-          <span class="chart-quadrant-label q1">Motrices</span>
-          <span class="chart-quadrant-label q2">Clave</span>
-          <span class="chart-quadrant-label q3">Autónomas</span>
-          <span class="chart-quadrant-label q4">Resultado</span>
-          <canvas id="chart-scatter"></canvas>
-        </div>
-        <div class="ranking-card" id="ranking-card"></div>
-      </div>
-
-      <div class="cloud-bar" id="cloud-bar-results" style="margin-top:1.5rem">
-        <span class="cb-icon">☁</span>
-        <span id="cb-text-results">Trabajando local</span>
-        <span class="cb-spacer"></span>
-        <span class="cb-status" id="cb-status-results"></span>
-        <span class="cb-editor" id="cb-editor-results"></span>
-        <button class="btn-ghost" id="cb-save-results" onclick="cloudSave()" style="padding:.4rem .75rem;font-size:.7rem">Guardar en la nube</button>
-        <button class="btn-ghost stage-hidden" id="cb-invite-results" onclick="openInviteModal()" style="padding:.4rem .75rem;font-size:.7rem">Invitar colaborador</button>
-      </div>
-
-      <div class="export-row">
-        <button class="btn-primary" onclick="exportJSON()">Descargar análisis (.json)</button>
-        <button class="btn-ghost" onclick="exportCSV()">Descargar matriz (.csv)</button>
-        <button class="btn-ghost" onclick="backToCapture()">← Editar matriz</button>
-      </div>
-
-      <p class="methodology-note">
-        Esta herramienta toma como base el método de análisis estructural
-        propuesto por Michel Godet (LIPSOR) y desarrollado en Colombia por
-        Francisco José Mojica (Universidad Externado). Las multiplicaciones
-        sucesivas de la matriz hacen visibles las relaciones indirectas que el
-        ojo humano no detecta cuando observa solo las influencias directas. En
-        futuras versiones la herramienta incorporará scoring difuso, valencias
-        firmadas (facilitación / inhibición), jerarquía estructural y un
-        copiloto de inteligencia artificial para sugerir variables y validar la
-        consistencia de la matriz.
-      </p>
-    </section>
-  </main>
-
-  <footer>
-    <span>Ricardo Ruiz · Consultoría en datos y política pública</span>
-    <span>Bogotá, Colombia · <a href="index.html#contacto">Contacto</a></span>
-  </footer>
-
-  <div class="toast" id="toast"></div>
-
-  <!-- Modal: requiere login para guardar -->
-  <div class="modal-back" id="modal-login">
-    <div class="modal">
-      <button class="modal-close" onclick="closeModal('modal-login')">×</button>
-      <h2>Para guardar en la nube necesitas una cuenta</h2>
-      <p>
-        Tu trabajo se guarda localmente en este navegador y no se pierde. Para
-        compartir un proyecto con tu equipo o acceder desde otro dispositivo,
-        necesitas iniciar sesión o crear una cuenta gratuita.
-      </p>
-      <div class="modal-actions">
-        <a href="login.html" class="btn-primary" style="text-decoration:none;text-align:center">Iniciar sesión</a>
-        <a href="register.html" class="btn-ghost" style="text-decoration:none;text-align:center">Crear cuenta gratis</a>
+        <button class="btn" onclick="goToResults()">Ver resultados →</button>
       </div>
     </div>
-  </div>
+  </section>
 
-  <!-- Modal: invitar colaborador -->
-  <div class="modal-back" id="modal-invite">
-    <div class="modal">
-      <button class="modal-close" onclick="closeModal('modal-invite')">×</button>
-      <h2>Invitar a un colaborador</h2>
-      <p>
-        Solo los colaboradores invitados pueden ver y editar este proyecto. Les
-        llegará un correo con un enlace para aceptar y entrar.
-      </p>
-      <label for="invite-email">Correo del colaborador</label>
-      <input type="email" id="invite-email" placeholder="colega@entidad.gov.co" autocomplete="off"/>
-      <div class="modal-actions">
-        <button class="btn-primary" onclick="submitInvite()">Enviar invitación</button>
-        <button class="btn-ghost" onclick="closeModal('modal-invite')">Cancelar</button>
+  <!-- ════════════════ STAGE: RESULTS ════════════════ -->
+  <section id="stage-results" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 04</span>Variables clave del sistema</h2>
+    </div>
+    <p class="section-desc" id="results-desc">
+      Cada variable aparece según su <b>motricidad indirecta</b> (eje Y,
+      cuánto influye sobre el sistema cuando se propagan las relaciones) y
+      su <b>dependencia indirecta</b> (eje X, cuánto la determina el sistema).
+    </p>
+
+    <div class="results-grid">
+      <div class="chart-wrap">
+        <span class="chart-quadrant-label q1">Motrices</span>
+        <span class="chart-quadrant-label q2">Clave</span>
+        <span class="chart-quadrant-label q3">Autónomas</span>
+        <span class="chart-quadrant-label q4">Resultado</span>
+        <canvas id="chart-scatter"></canvas>
       </div>
-      <label style="margin-top:1.5rem">Personas con acceso</label>
-      <ul class="collab-list" id="collab-list"></ul>
+      <div class="ranking-card" id="ranking-card"></div>
+    </div>
+
+    <div class="cloud-bar" id="cloud-bar-results" style="margin-top:1.5rem">
+      <span class="cb-icon">●</span>
+      <span id="cb-text-results">Trabajando local</span>
+      <span class="cb-spacer"></span>
+      <span class="cb-status" id="cb-status-results"></span>
+      <span class="cb-editor" id="cb-editor-results"></span>
+      <button class="btn-mini" id="cb-save-results" onclick="cloudSave()">Guardar en la nube</button>
+      <button class="btn-mini is-hidden" id="cb-invite-results" onclick="openInviteModal()">Invitar colaborador</button>
+    </div>
+
+    <div class="export-row">
+      <button class="btn" onclick="exportJSON()">Descargar análisis (.json)</button>
+      <button class="btn-ghost" onclick="exportCSV()">Descargar matriz (.csv)</button>
+      <button class="btn-ghost" onclick="backToCapture()">← Editar matriz</button>
+    </div>
+
+    <p class="methodology-note">
+      La herramienta toma como base el método de análisis estructural
+      propuesto por Michel Godet (LIPSOR) y desarrollado en Colombia por
+      Francisco José Mojica (Universidad Externado). Las multiplicaciones
+      sucesivas de la matriz hacen visibles las relaciones indirectas que el
+      ojo humano no detecta. Próximas versiones incorporarán scoring difuso,
+      valencias firmadas (facilitación / inhibición), jerarquía estructural y
+      asistencia de IA.
+    </p>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>ricardoruiz.co · 2026</span>
+  <span>Composición: Familjen · Petrona · Mono</span>
+</footer>
+
+<!-- ════════════════ MODALS ════════════════ -->
+<div class="modal-back" id="modal-method">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-method')">×</button>
+    <h2>Cómo lo calculamos</h2>
+    <div class="modal-body">
+      <p>
+        Construyes una <em>matriz NxN</em> donde la celda <code>(i, j)</code>
+        es cuánto influye la variable <code>i</code> sobre la <code>j</code>,
+        en una escala de 0 a 3. La suma de cada fila te da la
+        <em>motricidad directa</em> (cuánto influye); la suma de cada columna,
+        la <em>dependencia directa</em>.
+      </p>
+      <p>
+        Pero las variables se afectan también de forma <em>indirecta</em> a
+        través de otras. Para verlo, elevamos la matriz a la k-ésima
+        potencia hasta que el ordenamiento de las variables se estabilice
+        (típicamente entre 3 y 6 iteraciones). Las sumas de filas y columnas
+        de esa matriz indirecta son las que ploteamos.
+      </p>
+      <p>
+        El método viene de la <em>escuela francesa de prospectiva
+        estratégica</em> (Michel Godet, LIPSOR, 1971) y en Colombia tiene
+        como referente a <em>Francisco José Mojica</em> (Universidad
+        Externado), formado directamente con Godet en la Sorbona. La
+        herramienta moderniza esa base con familia ISM–MICMAC y, en
+        próximas versiones, scoring difuso (con números triangulares para
+        reducir sobreconfianza del experto) y valencias firmadas para
+        distinguir <em>facilitación</em> de <em>inhibición</em>.
+      </p>
+      <p>
+        El cálculo numérico es completamente local en tu navegador. Si
+        guardas en la nube, solo viaja la matriz y los nombres de variables
+        — nunca enviamos los resultados a terceros.
+      </p>
     </div>
   </div>
+</div>
+
+<div class="modal-back" id="modal-login">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-login')">×</button>
+    <h2>Para guardar en la nube necesitas una cuenta</h2>
+    <p>
+      Tu trabajo se guarda localmente en este navegador y no se pierde. Para
+      compartir un proyecto con tu equipo o acceder desde otro dispositivo,
+      inicia sesión o crea una cuenta gratuita.
+    </p>
+    <div class="modal-actions">
+      <a href="login.html" class="btn">Iniciar sesión</a>
+      <a href="register.html" class="btn-ghost">Crear cuenta gratis</a>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" id="modal-invite">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-invite')">×</button>
+    <h2>Invitar a un colaborador</h2>
+    <p>
+      Solo los colaboradores invitados pueden ver y editar este proyecto. Les
+      llegará un correo con un enlace para aceptar y entrar.
+    </p>
+    <label for="invite-email">Correo del colaborador</label>
+    <input type="email" id="invite-email" placeholder="colega@entidad.gov.co" autocomplete="off"/>
+    <div class="modal-actions">
+      <button class="btn" onclick="submitInvite()">Enviar invitación</button>
+      <button class="btn-ghost" onclick="closeModal('modal-invite')">Cancelar</button>
+    </div>
+    <label style="margin-top:1.5rem">Personas con acceso</label>
+    <ul class="collab-list" id="collab-list"></ul>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
 
 <script>
 'use strict';
 
-// ─────────────────────────────────────────────────────────────────────────
-// PLANTILLAS
-// Cada plantilla define un set de variables semilla + metadata. El usuario
-// puede editarlas, agregar y quitar en el paso 2. Las plantillas no son
-// camisa de fuerza: son punto de partida.
-// ─────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════
+// PLANTILLAS (11) — cada una con tags para matching automático con wizard
+// ═════════════════════════════════════════════════════════════════════════
 
 const TEMPLATES = {
   'pdt-mixto': {
-    nombre: 'Plan de Desarrollo Territorial — Visión integral',
-    descripcion: 'Variables clave para alinear un PDT de 4 años. Cubre dimensiones del Kit de Planeación Territorial del DNP: capacidades, oferta sectorial, condiciones de vida.',
-    perfil: 'Alcaldías y gobernaciones que están formulando o ajustando su Plan de Desarrollo. Lenguaje accionable, sin jerga prospectiva.',
-    nivel: 'mixto',
+    nombre: 'Plan de Desarrollo Territorial · visión integral',
+    descripcion: 'Variables transversales para alinear un PDT de 4 años. Cubre las dimensiones del Kit de Planeación Territorial del DNP: capacidades, oferta sectorial y condiciones de vida.',
+    perfil: 'Alcaldías y gobernaciones que están formulando o ajustando su Plan de Desarrollo.',
+    tags: { org:['planeacion'], proposito:['pdt'], nivel:['mixto','tecnico'], dominio:['desarrollo','gobernanza'] },
     vars: [
-      'Capacidades institucionales',
-      'Recursos fiscales propios',
-      'Cobertura de salud',
-      'Cobertura educativa',
-      'Seguridad ciudadana',
-      'Movilidad y conectividad',
-      'Espacio público',
-      'Gestión de residuos y agua',
-      'Participación ciudadana',
-      'Transparencia y anticorrupción',
-      'Empleo formal',
-      'Pobreza multidimensional'
+      'Capacidades institucionales','Recursos fiscales propios','Cobertura de salud',
+      'Cobertura educativa','Seguridad ciudadana','Movilidad y conectividad',
+      'Espacio público','Gestión de residuos y agua','Participación ciudadana',
+      'Transparencia y anticorrupción','Empleo formal','Pobreza multidimensional'
     ]
   },
   'prospectiva-2040': {
     nombre: 'Prospectiva territorial 2040',
-    descripcion: 'Visión territorial de largo plazo (10–20 años). Variables estructurales del desarrollo territorial: capital humano, innovación, sostenibilidad, gobernanza.',
-    perfil: 'Gobernaciones, comisiones regionales de competitividad y equipos que construyen visión 2040 / 2050. Equipo técnico con experiencia.',
-    nivel: 'tecnico',
+    descripcion: 'Visión territorial de largo plazo. Variables estructurales del desarrollo regional: capital humano, innovación, sostenibilidad, gobernanza.',
+    perfil: 'Gobernaciones, comisiones regionales de competitividad y equipos que construyen visión 2040 o 2050.',
+    tags: { org:['planeacion'], proposito:['vision'], nivel:['tecnico','avanzado'], dominio:['desarrollo','economia','gobernanza'] },
     vars: [
-      'Diversificación productiva',
-      'Innovación y desarrollo tecnológico',
-      'Infraestructura conectiva',
-      'Capital humano calificado',
-      'Sostenibilidad ambiental',
-      'Resiliencia al cambio climático',
-      'Cohesión social',
-      'Brecha urbano-rural',
-      'Gobernanza territorial',
-      'Articulación nación–territorio',
-      'Cultura y patrimonio',
-      'Demografía y migración',
-      'Conectividad digital',
-      'Seguridad multidimensional',
-      'Justicia y acceso',
-      'Salud pública',
-      'Educación terciaria',
-      'Finanzas territoriales'
+      'Diversificación productiva','Innovación y desarrollo tecnológico','Infraestructura conectiva',
+      'Capital humano calificado','Sostenibilidad ambiental','Resiliencia al cambio climático',
+      'Cohesión social','Brecha urbano-rural','Gobernanza territorial',
+      'Articulación nación–territorio','Cultura y patrimonio','Demografía y migración',
+      'Conectividad digital','Seguridad multidimensional','Justicia y acceso',
+      'Salud pública','Educación terciaria','Finanzas territoriales'
     ]
   },
   'seguridad-urbana': {
-    nombre: 'Diagnóstico estructural de seguridad urbana',
+    nombre: 'Seguridad urbana · diagnóstico estructural',
     descripcion: 'Sistema de seguridad ciudadana en contextos urbanos. Cruza variables delictivas con factores socioeconómicos, institucionales y comunitarios.',
-    perfil: 'Secretarías de seguridad, gobierno y convivencia. Pensado para Bogotá, Medellín, Cali y ciudades intermedias con tradición de análisis cuantitativo.',
-    nivel: 'avanzado',
+    perfil: 'Secretarías de seguridad, gobierno y convivencia de ciudades grandes e intermedias.',
+    tags: { org:['sectorial'], proposito:['politica','pdt'], nivel:['tecnico','avanzado'], dominio:['seguridad'] },
     vars: [
-      'Homicidios',
-      'Hurto a personas',
-      'Hurto a residencias',
-      'Hurto a comercio',
-      'Lesiones personales',
-      'Violencia intrafamiliar',
-      'Pie de fuerza policial',
-      'Alumbrado público',
-      'Espacio público recuperado',
-      'Pobreza multidimensional',
-      'Jóvenes que ni estudian ni trabajan',
-      'Presencia de economías ilegales',
-      'Cohesión comunitaria',
-      'Confianza en instituciones',
-      'Migración pendular'
+      'Homicidios','Hurto a personas','Hurto a residencias','Hurto a comercio',
+      'Lesiones personales','Violencia intrafamiliar','Pie de fuerza policial',
+      'Alumbrado público','Espacio público recuperado','Pobreza multidimensional',
+      'Jóvenes que ni estudian ni trabajan','Presencia de economías ilegales',
+      'Cohesión comunitaria','Confianza en instituciones','Migración pendular'
+    ]
+  },
+  'movilidad': {
+    nombre: 'Movilidad urbana sostenible',
+    descripcion: 'Sistema de transporte urbano cruzando demanda, infraestructura, externalidades y cultura ciudadana. Modelo aplicable a ciudades capitales y áreas metropolitanas.',
+    perfil: 'Secretarías de movilidad, áreas metropolitanas, empresas de transporte público.',
+    tags: { org:['sectorial'], proposito:['politica','vision'], nivel:['tecnico','avanzado'], dominio:['movilidad'] },
+    vars: [
+      'Demanda transporte público','Demanda vehículo particular','Demanda no motorizada',
+      'Infraestructura vial','Calidad del transporte masivo','Tarifa del transporte público',
+      'Tiempos de viaje','Accidentalidad vial','Emisiones de CO2 en transporte',
+      'Cobertura de ciclorrutas','Espacio público peatonal','Subsidios al transporte',
+      'Mantenimiento vial','Conectividad multimodal','Cultura ciudadana de movilidad'
+    ]
+  },
+  'salud-publica': {
+    nombre: 'Salud pública territorial',
+    descripcion: 'Determinantes de la salud en un territorio: cobertura, calidad de la red, indicadores trazadores y determinantes sociales del bienestar.',
+    perfil: 'Secretarías de salud, oficinas de aseguramiento, programas de salud pública.',
+    tags: { org:['sectorial','planeacion'], proposito:['politica','vision'], nivel:['tecnico','avanzado'], dominio:['salud'] },
+    vars: [
+      'Cobertura de aseguramiento','Calidad de la red prestadora','Mortalidad infantil',
+      'Esperanza de vida al nacer','Carga de enfermedades crónicas','Salud mental',
+      'Salud sexual y reproductiva','Cobertura de vacunación','Agua potable y saneamiento',
+      'Seguridad alimentaria','Nutrición infantil','Acceso al primer nivel',
+      'Personal de salud','Inversión per cápita en salud','Brecha urbano-rural en acceso',
+      'Determinantes sociales'
+    ]
+  },
+  'educacion': {
+    nombre: 'Educación territorial · diagnóstico estructural',
+    descripcion: 'Sistema educativo en un territorio: cobertura por niveles, calidad, deserción, infraestructura y articulación con el trabajo.',
+    perfil: 'Secretarías de educación, programas de calidad educativa, articulación nación-territorio.',
+    tags: { org:['sectorial','planeacion'], proposito:['politica','pdt'], nivel:['tecnico','avanzado'], dominio:['educacion'] },
+    vars: [
+      'Cobertura primera infancia','Cobertura básica primaria','Cobertura básica secundaria',
+      'Cobertura media','Cobertura terciaria','Calidad en pruebas Saber',
+      'Deserción escolar','Infraestructura escolar','Dotación tecnológica',
+      'Calidad docente','Articulación educación-trabajo','Bilingüismo',
+      'Permanencia escolar','Cierre de brechas regionales'
+    ]
+  },
+  'economia-empleo': {
+    nombre: 'Economía y empleo local',
+    descripcion: 'Sistema productivo y laboral territorial: empleo, productividad, diversificación, encadenamientos y capacidad fiscal.',
+    perfil: 'Secretarías de desarrollo económico, cámaras de comercio, agencias de promoción de inversión.',
+    tags: { org:['sectorial','planeacion'], proposito:['vision','politica'], nivel:['tecnico','avanzado'], dominio:['economia'] },
+    vars: [
+      'Empleo formal','Empleo informal','Tasa de desempleo','Empleo juvenil',
+      'Diversificación productiva','Productividad por sector','Inversión extranjera',
+      'Emprendimiento','Acceso a crédito','Encadenamientos productivos',
+      'Comercio exterior','Infraestructura logística','Innovación empresarial',
+      'Calidad regulatoria','Capacidad fiscal del territorio'
+    ]
+  },
+  'ambiente-clima': {
+    nombre: 'Ambiente y cambio climático',
+    descripcion: 'Sistema socioambiental territorial cruzando calidad ambiental, biodiversidad, riesgos climáticos y conflictos por uso de los recursos.',
+    perfil: 'CARs, secretarías de ambiente, programas de cambio climático y gestión del riesgo.',
+    tags: { org:['sectorial','planeacion'], proposito:['vision','politica'], nivel:['tecnico','avanzado'], dominio:['ambiente'] },
+    vars: [
+      'Calidad del aire','Calidad del agua','Cobertura forestal','Áreas protegidas',
+      'Gestión de residuos','Emisiones GEI per cápita','Resiliencia a eventos extremos',
+      'Sequías e inundaciones','Pérdida de biodiversidad','Deforestación',
+      'Economía circular','Energías renovables','Cultura ambiental','Conflictos socioambientales'
+    ]
+  },
+  'gobernanza': {
+    nombre: 'Gobernanza institucional',
+    descripcion: 'Capacidades del Estado en un territorio: institucionalidad, transparencia, participación, coordinación y confianza.',
+    perfil: 'Oficinas de planeación, secretarías de gobierno, programas de fortalecimiento institucional.',
+    tags: { org:['planeacion','consultoria'], proposito:['politica','vision'], nivel:['avanzado','tecnico'], dominio:['gobernanza'] },
+    vars: [
+      'Capacidad institucional','Transparencia','Anticorrupción','Participación ciudadana',
+      'Confianza institucional','Coordinación interinstitucional','Eficiencia del gasto',
+      'Rendición de cuentas','Gobierno digital','Calidad regulatoria',
+      'Acceso a justicia','Sistema electoral','Libertad de prensa','Sociedad civil organizada'
     ]
   },
   'taller-actores': {
     nombre: 'Taller estructural con actores',
-    descripcion: 'Plantilla abierta para diagnóstico participativo. Trae las 6 dimensiones del análisis PESTEL como sugerencia inicial; el taller llena las variables específicas.',
-    perfil: 'Consultorías, ONG, organismos multilaterales que conducen talleres con grupos heterogéneos. Lenguaje neutral, vocación participativa.',
-    nivel: 'mixto',
+    descripcion: 'Plantilla abierta para diagnóstico participativo. Trae las 6 dimensiones PESTEL como sugerencia inicial; el taller llena las variables específicas.',
+    perfil: 'Consultorías, ONG, organismos multilaterales en talleres con grupos heterogéneos.',
+    tags: { org:['consultoria'], proposito:['taller'], nivel:['mixto','tecnico'], dominio:['*'] },
     vars: [
-      'Variable política 1',
-      'Variable política 2',
-      'Variable económica 1',
-      'Variable económica 2',
-      'Variable social 1',
-      'Variable social 2',
-      'Variable tecnológica 1',
-      'Variable ambiental 1',
-      'Variable legal 1'
+      'Variable política 1','Variable política 2',
+      'Variable económica 1','Variable económica 2',
+      'Variable social 1','Variable social 2',
+      'Variable tecnológica 1','Variable ambiental 1','Variable legal 1'
     ]
   },
   'academia-blank': {
     nombre: 'Investigación académica',
-    descripcion: 'Plantilla mínima para trabajo académico o tesis. Sin variables sugeridas: el investigador construye su set según el marco teórico que esté usando.',
-    perfil: 'Estudiantes y profesores de pregrado, maestrías y doctorados en prospectiva, planeación, gestión pública o áreas afines.',
-    nivel: 'tecnico',
-    vars: [
-      'Variable 1',
-      'Variable 2',
-      'Variable 3',
-      'Variable 4',
-      'Variable 5',
-      'Variable 6',
-      'Variable 7',
-      'Variable 8'
-    ]
+    descripcion: 'Plantilla mínima para trabajo académico o tesis. Sin variables sugeridas: el investigador construye su set según el marco teórico.',
+    perfil: 'Estudiantes y profesores de pregrado, maestrías y doctorados.',
+    tags: { org:['academia'], proposito:['*'], nivel:['*'], dominio:['*'] },
+    vars: ['Variable 1','Variable 2','Variable 3','Variable 4','Variable 5','Variable 6','Variable 7','Variable 8']
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────
-// WIZARD
-// 3 preguntas → mapping a una plantilla sugerida.
-// El mapping no es exhaustivo; muchos cruces caen a la misma plantilla,
-// y siempre se ofrecen alternativas para que el usuario explore.
-// ─────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════
+// WIZARD — 4 preguntas con icono SVG
+// ═════════════════════════════════════════════════════════════════════════
+
+// Iconos pequeños SVG inline (consistentes con estética minimal)
+const ICONS = {
+  building:  '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>',
+  shield:    '<svg viewBox="0 0 24 24"><path d="M12 2L4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6z"/></svg>',
+  briefcase: '<svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="1"/><path d="M8 7V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v3"/></svg>',
+  book:      '<svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/><line x1="4" y1="22" x2="20" y2="22"/></svg>',
+  telescope: '<svg viewBox="0 0 24 24"><path d="M11 19l-3 3"/><path d="M14 17l-3 3"/><path d="M5 8l3-3 5 8-3 3z"/><path d="M14 5l3-2 4 6-3 2z"/></svg>',
+  doc:       '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>',
+  target:    '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
+  users:     '<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  gauge:     '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 18 0M12 12l4-4"/></svg>',
+  brain:     '<svg viewBox="0 0 24 24"><path d="M9 4a4 4 0 0 0-3.5 6 4 4 0 0 0-.5 6.5 4 4 0 0 0 4 3.5 4 4 0 0 0 3 1 4 4 0 0 0 3-1 4 4 0 0 0 4-3.5 4 4 0 0 0-.5-6.5A4 4 0 0 0 15 4a3 3 0 0 0-3-1.5A3 3 0 0 0 9 4z"/></svg>',
+  city:      '<svg viewBox="0 0 24 24"><path d="M2 22h20"/><path d="M5 22V8l4-2v16"/><path d="M9 22V4l5 2v16"/><path d="M14 22V10l5 2v10"/></svg>',
+  car:       '<svg viewBox="0 0 24 24"><path d="M3 17h2v3H3zm16 0h2v3h-2zM5 17v-5l2-5h10l2 5v5"/><circle cx="7.5" cy="17" r="1.5"/><circle cx="16.5" cy="17" r="1.5"/></svg>',
+  heart:     '<svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',
+  leaf:      '<svg viewBox="0 0 24 24"><path d="M6 22c0-12 9-15 16-15-1 7-4 15-16 15z"/><path d="M6 22c0-8 6-12 12-12"/></svg>',
+  scales:    '<svg viewBox="0 0 24 24"><path d="M12 3v18M5 8h14M5 8l-2 6h6zm14 0l-2 6h6z"/></svg>',
+  chart:     '<svg viewBox="0 0 24 24"><line x1="3" y1="21" x2="21" y2="21"/><polyline points="3 17 9 11 13 15 21 7"/></svg>',
+  star:      '<svg viewBox="0 0 24 24"><polygon points="12 2 15 9 22 9 16.5 14 18.5 21 12 17 5.5 21 7.5 14 2 9 9 9"/></svg>'
+};
 
 const Q1_OPTIONS = [
-  { id: 'planeacion',  label: 'Oficina de planeación',  hint: 'Alcaldía, gobernación, departamento de planeación' },
-  { id: 'sectorial',   label: 'Secretaría sectorial',   hint: 'Seguridad, movilidad, salud, educación, ambiente' },
-  { id: 'consultoria', label: 'Consultoría o firma',    hint: 'Consultoras, ONG, organismos multilaterales' },
-  { id: 'academia',    label: 'Academia o investigación', hint: 'Universidad, posgrado, tesis, centros de pensamiento' }
+  { id: 'planeacion',  label: 'Oficina de planeación',  hint: 'Alcaldía, gobernación, departamento de planeación', icon: 'building' },
+  { id: 'sectorial',   label: 'Secretaría sectorial',   hint: 'Seguridad, movilidad, salud, educación, ambiente',  icon: 'shield' },
+  { id: 'consultoria', label: 'Consultoría o firma',    hint: 'Consultoras, ONG, organismos multilaterales',       icon: 'briefcase' },
+  { id: 'academia',    label: 'Academia o investigación', hint: 'Universidad, posgrado, tesis, centros de pensamiento', icon: 'book' }
 ];
 const Q2_OPTIONS = [
-  { id: 'vision',     label: 'Visión de largo plazo',         hint: '10–20 años, prospectiva territorial' },
-  { id: 'pdt',        label: 'Plan de Desarrollo Territorial', hint: '4 años, articulación con el KPT del DNP' },
-  { id: 'politica',   label: 'Política sectorial específica', hint: 'Diagnóstico de un problema concreto' },
-  { id: 'taller',     label: 'Diagnóstico participativo',     hint: 'Taller con varios actores y miradas' }
+  { id: 'vision',   label: 'Visión de largo plazo',         hint: '10 a 20 años. Prospectiva territorial.',          icon: 'telescope' },
+  { id: 'pdt',      label: 'Plan de Desarrollo Territorial', hint: '4 años. Articulación con el KPT del DNP.',        icon: 'doc' },
+  { id: 'politica', label: 'Política sectorial específica', hint: 'Diagnóstico de un problema concreto.',             icon: 'target' },
+  { id: 'taller',   label: 'Diagnóstico participativo',     hint: 'Taller con varios actores y miradas.',             icon: 'users' }
 ];
 const Q3_OPTIONS = [
-  { id: 'mixto',     label: 'Equipo mixto',         hint: 'Técnicos, políticos y comunidad. Sin jerga.' },
-  { id: 'tecnico',   label: 'Equipo técnico estándar', hint: 'Analistas con experiencia en planeación' },
-  { id: 'avanzado',  label: 'Equipo técnico avanzado', hint: 'Con tradición cuantitativa y datos propios' }
+  { id: 'mixto',    label: 'Equipo mixto',           hint: 'Técnicos, políticos y comunidad. Sin jerga.', icon: 'gauge' },
+  { id: 'tecnico',  label: 'Equipo técnico estándar', hint: 'Analistas con experiencia en planeación.',  icon: 'chart' },
+  { id: 'avanzado', label: 'Equipo técnico avanzado', hint: 'Con tradición cuantitativa y datos propios.', icon: 'brain' }
+];
+const Q4_OPTIONS = [
+  { id: 'desarrollo', label: 'Desarrollo territorial integral', hint: 'Mirada transversal del territorio.', icon: 'city' },
+  { id: 'seguridad',  label: 'Seguridad y convivencia',         hint: 'Sistema delictivo y factores asociados.', icon: 'shield' },
+  { id: 'movilidad',  label: 'Movilidad e infraestructura',     hint: 'Transporte, vías, conectividad.', icon: 'car' },
+  { id: 'salud',      label: 'Salud pública',                   hint: 'Acceso, calidad, determinantes.', icon: 'heart' },
+  { id: 'educacion',  label: 'Educación',                       hint: 'Cobertura, calidad, articulación.', icon: 'book' },
+  { id: 'economia',   label: 'Economía y empleo',               hint: 'Productividad, mercado laboral.', icon: 'chart' },
+  { id: 'ambiente',   label: 'Ambiente y clima',                hint: 'Sostenibilidad, riesgos, recursos.', icon: 'leaf' },
+  { id: 'gobernanza', label: 'Gobernanza institucional',        hint: 'Capacidades del Estado, transparencia.', icon: 'scales' }
 ];
 
-// Mapping (q1, q2, q3) → plantilla. Tabla con prioridades.
-function suggestTemplate(q1, q2, q3) {
-  // Sectorial + política → seguridad urbana siempre que sea avanzado
-  if (q2 === 'politica' && q1 === 'sectorial') return 'seguridad-urbana';
-  // PDT siempre va a la plantilla PDT
-  if (q2 === 'pdt') return 'pdt-mixto';
-  // Visión LP → prospectiva 2040
-  if (q2 === 'vision') return 'prospectiva-2040';
-  // Taller participativo → taller abierto
-  if (q2 === 'taller') return 'taller-actores';
-  // Academia → blank
-  if (q1 === 'academia') return 'academia-blank';
-  // Default
-  return 'pdt-mixto';
+// Sugiere plantilla por scoring de overlap entre respuestas del wizard y tags.
+function suggestTemplate(q1, q2, q3, q4) {
+  let best = null, bestScore = -1;
+  for (const [id, tpl] of Object.entries(TEMPLATES)) {
+    let s = 0;
+    const T = tpl.tags;
+    if (T.org.includes(q1)) s += 3;
+    if (T.proposito.includes(q2) || T.proposito.includes('*')) s += 2;
+    if (T.nivel.includes(q3) || T.nivel.includes('*')) s += 1;
+    if (T.dominio.includes(q4) || T.dominio.includes('*')) s += 4;
+    if (s > bestScore) { best = id; bestScore = s; }
+  }
+  return best;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════
 // STATE
-// Persistido en localStorage. Una sola "sesión" por navegador en esta v1.
-// Sprint 2 introducirá proyectos múltiples + backend multiusuario.
-// ─────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════
 
-const LS_KEY = 'micmac-current-v1';
-
+const LS_KEY = 'micmac-current-v2';
 const STATE = {
-  wizard: { q1: null, q2: null, q3: null, tpl: null },
+  wizard: { q1: null, q2: null, q3: null, q4: null, tpl: null, step: 1 },
   meta: { tplId: null, nombre: '', createdAt: null, updatedAt: null },
-  vars: [],         // array de strings (nombres de variables)
-  matrix: [],       // matriz NxN, valores '0' '1' '2' '3' 'P' o '' (sin llenar)
-  captureIdx: 0,    // índice (0..N²-1) del modo guiado, saltando diagonal
-  mode: 'table'     // 'table' | 'guided'
+  vars: [],
+  matrix: [],
+  captureIdx: 0,
+  mode: 'table'
 };
 
 function saveState() {
   STATE.meta.updatedAt = new Date().toISOString();
-  try {
-    localStorage.setItem(LS_KEY, JSON.stringify(STATE));
-  } catch (e) {
-    console.warn('No se pudo guardar en localStorage:', e);
-  }
+  try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); } catch {}
 }
-
 function loadState() {
   try {
     const raw = localStorage.getItem(LS_KEY);
@@ -1107,40 +1494,32 @@ function loadState() {
     STATE.captureIdx = obj.captureIdx || 0;
     STATE.mode = obj.mode || 'table';
     return true;
-  } catch (e) {
-    console.warn('No se pudo restaurar localStorage:', e);
-    return false;
-  }
+  } catch { return false; }
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// MATRIZ — helpers
-// Almacenamos como array bidimensional STATE.matrix[i][j].
-// '0' '1' '2' '3' 'P' o '' (vacía). 'P' se trata numéricamente como 1.
-// ─────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════
+// MATRIZ helpers — preservados del Sprint 1
+// ═════════════════════════════════════════════════════════════════════════
 
 function newMatrix(n) {
   const m = [];
   for (let i = 0; i < n; i++) {
     const row = new Array(n).fill('');
-    row[i] = '-'; // diagonal
+    row[i] = '-';
     m.push(row);
   }
   return m;
 }
-
 function valToNum(v) {
   if (v === '' || v === '-' || v == null) return 0;
   if (v === 'P') return 1;
   const n = parseInt(v, 10);
   return isNaN(n) ? 0 : n;
 }
-
 function resizeMatrix(newN) {
   const oldN = STATE.matrix.length;
   if (newN === oldN) return;
   if (newN > oldN) {
-    // Crece: extender filas existentes con '' y agregar filas nuevas
     for (let i = 0; i < oldN; i++) {
       while (STATE.matrix[i].length < newN) STATE.matrix[i].push('');
     }
@@ -1150,32 +1529,24 @@ function resizeMatrix(newN) {
       STATE.matrix.push(row);
     }
   } else {
-    // Decrece: cortar filas y columnas
     STATE.matrix = STATE.matrix.slice(0, newN).map(r => r.slice(0, newN));
   }
-  // Asegurar diagonal '-'
   for (let i = 0; i < newN; i++) STATE.matrix[i][i] = '-';
 }
-
 function countFilled() {
   let filled = 0, total = 0;
   const n = STATE.vars.length;
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      if (i === j) continue;
-      total++;
-      if (STATE.matrix[i] && STATE.matrix[i][j] !== '' && STATE.matrix[i][j] !== '-') filled++;
-    }
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+    if (i === j) continue;
+    total++;
+    if (STATE.matrix[i] && STATE.matrix[i][j] !== '' && STATE.matrix[i][j] !== '-') filled++;
   }
   return { filled, total };
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// CÁLCULO MICMAC
-// Motricidad directa = suma por fila. Dependencia directa = suma por columna.
-// Motricidad indirecta = mismo cálculo sobre M^k, donde k se elige tal que
-// el ranking de motricidad indirecta se estabilice (típicamente k=2..5).
-// ─────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════
+// CÁLCULO MICMAC — preservado del Sprint 1
+// ═════════════════════════════════════════════════════════════════════════
 
 function matToNumeric() {
   const n = STATE.vars.length;
@@ -1187,7 +1558,6 @@ function matToNumeric() {
   }
   return M;
 }
-
 function matMul(A, B) {
   const n = A.length;
   const C = [];
@@ -1202,7 +1572,6 @@ function matMul(A, B) {
   }
   return C;
 }
-
 function rowSums(M) { return M.map(r => r.reduce((s, x) => s + x, 0)); }
 function colSums(M) {
   const n = M.length;
@@ -1210,65 +1579,38 @@ function colSums(M) {
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) c[j] += M[i][j];
   return c;
 }
-
 function rankingOf(arr) {
-  // Devuelve un array donde rank[i] = posición de i ordenando arr de mayor a menor.
   const idx = arr.map((v, i) => [v, i]).sort((a, b) => b[0] - a[0]);
   const rank = new Array(arr.length);
   idx.forEach(([_, i], pos) => { rank[i] = pos; });
   return rank;
 }
-
 function ranksEqual(r1, r2) {
   if (r1.length !== r2.length) return false;
   for (let i = 0; i < r1.length; i++) if (r1[i] !== r2[i]) return false;
   return true;
 }
-
 function computeMicMac() {
   const n = STATE.vars.length;
   if (n < 2) return null;
   const M = matToNumeric();
-
-  // Directas
   const motriDir = rowSums(M);
   const depDir = colSums(M);
-
-  // Iterar M^k hasta que el ranking de motricidad y dependencia se estabilice
-  // (o llegar a 6 iteraciones para evitar amplificación numérica).
-  let Mk = M;
-  let prevRankM = rankingOf(motriDir);
-  let prevRankD = rankingOf(depDir);
-  let stableAt = 1;
+  let Mk = M, prevRankM = rankingOf(motriDir), prevRankD = rankingOf(depDir), stableAt = 1;
   for (let k = 2; k <= 6; k++) {
     Mk = matMul(Mk, M);
     const rm = rankingOf(rowSums(Mk));
     const rd = rankingOf(colSums(Mk));
-    if (ranksEqual(rm, prevRankM) && ranksEqual(rd, prevRankD) && k >= 3) {
-      stableAt = k;
-      break;
-    }
-    prevRankM = rm; prevRankD = rd;
-    stableAt = k;
+    if (ranksEqual(rm, prevRankM) && ranksEqual(rd, prevRankD) && k >= 3) { stableAt = k; break; }
+    prevRankM = rm; prevRankD = rd; stableAt = k;
   }
-
-  const motriInd = rowSums(Mk);
-  const depInd = colSums(Mk);
-
-  // Normalizar 0–100 al máximo observado para el plot
-  const maxM = Math.max(1, ...motriInd);
-  const maxD = Math.max(1, ...depInd);
+  const motriInd = rowSums(Mk), depInd = colSums(Mk);
+  const maxM = Math.max(1, ...motriInd), maxD = Math.max(1, ...depInd);
   const motriN = motriInd.map(v => (v / maxM) * 100);
   const depN = depInd.map(v => (v / maxD) * 100);
-
-  // Clasificación por cuadrantes: divido por la media normalizada (50 en
-  // distribución uniforme; en la práctica usamos la mediana para que el
-  // resultado no se distorsione cuando hay outliers).
   const sortedM = [...motriN].sort((a, b) => a - b);
   const sortedD = [...depN].sort((a, b) => a - b);
-  const medM = sortedM[Math.floor(n / 2)];
-  const medD = sortedD[Math.floor(n / 2)];
-
+  const medM = sortedM[Math.floor(n / 2)], medD = sortedD[Math.floor(n / 2)];
   const cuadrante = motriN.map((m, i) => {
     const d = depN[i];
     if (m >= medM && d < medD) return 'motriz';
@@ -1276,83 +1618,120 @@ function computeMicMac() {
     if (m < medM && d < medD) return 'autonoma';
     return 'resultado';
   });
-
-  return {
-    n, stableAt,
-    motriDir, depDir,
-    motriInd, depInd,
-    motriN, depN,
-    medM, medD,
-    cuadrante
-  };
+  return { n, stableAt, motriDir, depDir, motriInd, depInd, motriN, depN, medM, medD, cuadrante };
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// RENDER — Wizard
-// ─────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════
+// RENDER · WIZARD
+// ═════════════════════════════════════════════════════════════════════════
 
-function renderWizard() {
-  ['q1', 'q2', 'q3'].forEach(q => {
-    const opts = ({ q1: Q1_OPTIONS, q2: Q2_OPTIONS, q3: Q3_OPTIONS })[q];
-    const cont = document.getElementById(q + '-options');
-    cont.innerHTML = opts.map(o =>
-      `<button class="wizard-opt${STATE.wizard[q] === o.id ? ' selected' : ''}" onclick="pickWizard('${q}','${o.id}')">
-        <span class="opt-label">${o.label}</span>
-        <span class="opt-hint">${o.hint}</span>
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function renderWizardOpts() {
+  const cfg = [
+    { q: 'q1', container: 'wp-q1-opts', opts: Q1_OPTIONS, next: 'wp-q1-next' },
+    { q: 'q2', container: 'wp-q2-opts', opts: Q2_OPTIONS, next: 'wp-q2-next' },
+    { q: 'q3', container: 'wp-q3-opts', opts: Q3_OPTIONS, next: 'wp-q3-next' },
+    { q: 'q4', container: 'wp-q4-opts', opts: Q4_OPTIONS, next: 'wp-q4-next' }
+  ];
+  for (const c of cfg) {
+    const cont = document.getElementById(c.container);
+    cont.innerHTML = c.opts.map(o =>
+      `<button class="opt${STATE.wizard[c.q] === o.id ? ' sel' : ''}" data-q="${c.q}" data-id="${o.id}">
+        <div class="opt-icon">${ICONS[o.icon] || ICONS.target}</div>
+        <div class="opt-body">
+          <div class="opt-label">${o.label}</div>
+          <div class="opt-hint">${o.hint}</div>
+        </div>
       </button>`).join('');
+    cont.querySelectorAll('.opt').forEach(b => {
+      b.addEventListener('click', () => {
+        STATE.wizard[c.q] = b.dataset.id;
+        saveState();
+        renderWizardOpts();
+      });
+    });
+    document.getElementById(c.next).classList.toggle('disabled', !STATE.wizard[c.q]);
+  }
+}
+
+function setWizardStep(step) {
+  STATE.wizard.step = step;
+  ['wp-q1', 'wp-q2', 'wp-q3', 'wp-q4', 'wp-result'].forEach((id, i) => {
+    document.getElementById(id).classList.toggle('active', (i + 1) === step);
   });
-  renderSuggestedTemplate();
-  document.getElementById('btn-start').disabled = !(STATE.wizard.q1 && STATE.wizard.q2 && STATE.wizard.q3);
-}
-
-function pickWizard(q, id) {
-  STATE.wizard[q] = id;
+  document.getElementById('wiz-progress').textContent = step <= 4 ? `Pregunta ${step} / 4` : 'Plantilla sugerida';
+  document.getElementById('wiz-progress-fill').style.width = (step <= 4 ? step * 25 : 100) + '%';
   saveState();
-  renderWizard();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function wizardNext(targetStep) {
+  if (targetStep === 5) renderTplSuggested();
+  setWizardStep(targetStep);
+}
+function wizardBack(targetStep) { setWizardStep(targetStep); }
+
+function renderTplSuggested() {
+  const { q1, q2, q3, q4 } = STATE.wizard;
+  if (!(q1 && q2 && q3 && q4)) { document.getElementById('tpl-suggest-box').innerHTML = ''; return; }
+  const tplId = suggestTemplate(q1, q2, q3, q4);
+  STATE.wizard.tpl = tplId;
+  saveState();
+  renderTplBox(tplId);
 }
 
-function renderSuggestedTemplate() {
-  const box = document.getElementById('tpl-suggested-box');
-  const { q1, q2, q3 } = STATE.wizard;
-  if (!q1 || !q2 || !q3) { box.innerHTML = ''; return; }
-  const tplId = suggestTemplate(q1, q2, q3);
-  STATE.wizard.tpl = tplId;
+function renderTplBox(tplId) {
   const tpl = TEMPLATES[tplId];
-  const altsHtml = Object.entries(TEMPLATES)
+  const box = document.getElementById('tpl-suggest-box');
+  const alts = Object.entries(TEMPLATES)
     .filter(([k]) => k !== tplId)
-    .map(([k, t]) => `<button class="tpl-alt" onclick="overrideTpl('${k}')">${t.nombre}</button>`).join('');
+    .map(([k, t]) => `<button class="tpl-alt" data-tpl="${k}">${t.nombre}</button>`).join('');
   box.innerHTML = `
-    <div class="tpl-suggested">
-      <div class="tpl-suggested-label">Plantilla sugerida</div>
-      <div class="tpl-suggested-name">${tpl.nombre}</div>
-      <div class="tpl-suggested-desc">${tpl.descripcion}<br/><br/><b>Para:</b> ${tpl.perfil}</div>
+    <div class="tpl-suggest">
+      <div class="tpl-suggest-eyebrow">Plantilla sugerida</div>
+      <div class="tpl-suggest-name">${tpl.nombre}</div>
+      <div class="tpl-suggest-desc">${tpl.descripcion}</div>
+      <div class="tpl-suggest-meta">
+        <span><b>${tpl.vars.length}</b> variables sugeridas</span> ·
+        <span>Para: ${tpl.perfil}</span>
+      </div>
       <div class="tpl-alt-row">
-        <span style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--gray);letter-spacing:.14em;align-self:center;text-transform:uppercase;margin-right:.4rem">Otras:</span>
-        ${altsHtml}
+        <span class="tpl-alt-row-label">Cambiar a:</span>
+        ${alts}
       </div>
     </div>`;
+  box.querySelectorAll('.tpl-alt').forEach(b => {
+    b.addEventListener('click', () => {
+      STATE.wizard.tpl = b.dataset.tpl;
+      saveState();
+      renderTplBox(b.dataset.tpl);
+      showToast('Plantilla cambiada a: ' + TEMPLATES[b.dataset.tpl].nombre);
+    });
+  });
 }
 
-function overrideTpl(tplId) {
-  STATE.wizard.tpl = tplId;
-  saveState();
-  const tpl = TEMPLATES[tplId];
-  showToast('Plantilla cambiada a: ' + tpl.nombre);
-  // No re-renderizar todo el wizard; solo cambiar el box manualmente
-  // para no perder selecciones del usuario.
-  const allAlts = Object.entries(TEMPLATES)
-    .filter(([k]) => k !== tplId)
-    .map(([k, t]) => `<button class="tpl-alt" onclick="overrideTpl('${k}')">${t.nombre}</button>`).join('');
-  document.getElementById('tpl-suggested-box').innerHTML = `
-    <div class="tpl-suggested">
-      <div class="tpl-suggested-label">Plantilla seleccionada</div>
-      <div class="tpl-suggested-name">${tpl.nombre}</div>
-      <div class="tpl-suggested-desc">${tpl.descripcion}<br/><br/><b>Para:</b> ${tpl.perfil}</div>
-      <div class="tpl-alt-row">
-        <span style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--gray);letter-spacing:.14em;align-self:center;text-transform:uppercase;margin-right:.4rem">Cambiar a:</span>
-        ${allAlts}
-      </div>
-    </div>`;
+// ═════════════════════════════════════════════════════════════════════════
+// START / NAVIGATION
+// ═════════════════════════════════════════════════════════════════════════
+
+function startWizard() {
+  renderWizardOpts();
+  setWizardStep(1);
+  showStage('stage-wizard');
+}
+function backToWelcome() { showStage('stage-welcome'); }
+function backToWizard() {
+  renderWizardOpts();
+  setWizardStep(STATE.wizard.q4 ? 5 : (STATE.wizard.q3 ? 4 : (STATE.wizard.q2 ? 3 : (STATE.wizard.q1 ? 2 : 1))));
+  showStage('stage-wizard');
+}
+function backToVars() { renderVars(); showStage('stage-vars'); }
+function backToCapture() {
+  if (STATE.vars.length < 2) { showToast('Necesitas al menos 2 variables.'); return; }
+  setMode(STATE.mode);
+  showStage('stage-capture');
 }
 
 function startProject() {
@@ -1365,24 +1744,40 @@ function startProject() {
   STATE.vars = tpl.vars.slice();
   STATE.matrix = newMatrix(STATE.vars.length);
   STATE.captureIdx = 0;
+  CLOUD.projId = null; CLOUD.lastSavedAt = null; CLOUD.lastEditor = null;
+  CLOUD.owner = null; CLOUD.collaborators = [];
+  stopPolling();
   saveState();
-  goToVars();
+  renderVars();
+  showStage('stage-vars');
+  renderCloudBars();
 }
-
 function startBlank() {
   STATE.meta.tplId = null;
   STATE.meta.nombre = 'Análisis personalizado';
   STATE.meta.createdAt = STATE.meta.createdAt || new Date().toISOString();
-  STATE.vars = ['Variable 1', 'Variable 2', 'Variable 3', 'Variable 4', 'Variable 5'];
+  STATE.vars = ['Variable 1','Variable 2','Variable 3','Variable 4','Variable 5'];
   STATE.matrix = newMatrix(STATE.vars.length);
   STATE.captureIdx = 0;
+  CLOUD.projId = null; CLOUD.lastSavedAt = null; CLOUD.lastEditor = null;
+  CLOUD.owner = null; CLOUD.collaborators = [];
+  stopPolling();
   saveState();
-  goToVars();
+  renderVars();
+  showStage('stage-vars');
+  renderCloudBars();
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// RENDER — Editor de variables
-// ─────────────────────────────────────────────────────────────────────────
+function showStage(id) {
+  ['stage-welcome','stage-wizard','stage-vars','stage-capture','stage-results'].forEach(s => {
+    document.getElementById(s).classList.toggle('is-hidden', s !== id);
+  });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// VARS EDITOR
+// ═════════════════════════════════════════════════════════════════════════
 
 function renderVars() {
   const grid = document.getElementById('vars-grid');
@@ -1399,14 +1794,10 @@ function renderVars() {
   document.getElementById('vars-cells').textContent = n * (n - 1);
   document.getElementById('vars-tpl').textContent = STATE.meta.nombre || '—';
 }
-
 function addVar() {
   const inp = document.getElementById('vars-add-input');
   const name = inp.value.trim();
-  if (!name) {
-    inp.focus();
-    return;
-  }
+  if (!name) { inp.focus(); return; }
   STATE.vars.push(name);
   resizeMatrix(STATE.vars.length);
   inp.value = '';
@@ -1414,48 +1805,31 @@ function addVar() {
   renderVars();
   inp.focus();
 }
-
 function delVar(i) {
-  if (STATE.vars.length <= 2) {
-    showToast('Necesitas al menos 2 variables para hacer el análisis.');
-    return;
-  }
+  if (STATE.vars.length <= 2) { showToast('Necesitas al menos 2 variables.'); return; }
   STATE.vars.splice(i, 1);
   STATE.matrix.splice(i, 1);
   STATE.matrix.forEach(r => r.splice(i, 1));
-  // Reasegurar diagonal
   for (let k = 0; k < STATE.matrix.length; k++) STATE.matrix[k][k] = '-';
   STATE.captureIdx = 0;
   saveState();
   renderVars();
 }
-
 function renameVar(i, newName) {
   const name = (newName || '').trim();
-  if (!name) {
-    showToast('El nombre no puede estar vacío.');
-    renderVars();
-    return;
-  }
+  if (!name) { showToast('El nombre no puede estar vacío.'); renderVars(); return; }
   STATE.vars[i] = name;
   saveState();
 }
 
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// RENDER — Captura modo tabla
-// ─────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════
+// CAPTURE — modo tabla
+// ═════════════════════════════════════════════════════════════════════════
 
 function renderMatrixTable() {
   const wrap = document.getElementById('matrix-wrap');
   const n = STATE.vars.length;
-  if (n < 2) {
-    wrap.innerHTML = '<p class="empty-msg">Define al menos 2 variables para construir la matriz.</p>';
-    return;
-  }
+  if (n < 2) { wrap.innerHTML = '<p class="empty-msg">Define al menos 2 variables para construir la matriz.</p>'; return; }
   let html = '<table class="matrix"><thead><tr>';
   html += '<th class="corner">influye sobre →</th>';
   for (let j = 0; j < n; j++) {
@@ -1466,9 +1840,8 @@ function renderMatrixTable() {
     html += `<tr><th class="row-h" title="${escapeHtml(STATE.vars[i])}">V${String(i + 1).padStart(2, '0')} · ${escapeHtml(STATE.vars[i])}</th>`;
     for (let j = 0; j < n; j++) {
       const v = STATE.matrix[i][j];
-      if (i === j) {
-        html += `<td class="cell diag">·</td>`;
-      } else {
+      if (i === j) html += '<td class="cell diag">·</td>';
+      else {
         const cls = v === '' ? '' : `v-${v}`;
         html += `<td class="cell ${cls}" data-i="${i}" data-j="${j}" tabindex="0" onclick="cycleCell(${i},${j})" onkeydown="cellKey(event,${i},${j})">${v === '' ? '' : v}</td>`;
       }
@@ -1479,82 +1852,45 @@ function renderMatrixTable() {
   wrap.innerHTML = html;
   updateCellsCounter();
 }
-
 function cycleCell(i, j) {
-  // Ciclo: '' → '1' → '2' → '3' → 'P' → '0' → ''
   const cur = STATE.matrix[i][j];
   const order = ['', '1', '2', '3', 'P', '0'];
   const idx = order.indexOf(cur === undefined ? '' : cur);
-  const next = order[(idx + 1) % order.length];
-  STATE.matrix[i][j] = next;
+  STATE.matrix[i][j] = order[(idx + 1) % order.length];
   saveState();
   renderMatrixTable();
 }
-
 function cellKey(ev, i, j) {
   const k = ev.key;
-  if (k === '0' || k === '1' || k === '2' || k === '3') {
-    STATE.matrix[i][j] = k;
-    saveState();
-    renderMatrixTable();
-    ev.preventDefault();
-  } else if (k === 'p' || k === 'P') {
-    STATE.matrix[i][j] = 'P';
-    saveState();
-    renderMatrixTable();
-    ev.preventDefault();
-  } else if (k === 'Backspace' || k === 'Delete') {
-    STATE.matrix[i][j] = '';
-    saveState();
-    renderMatrixTable();
-    ev.preventDefault();
-  } else if (k === 'ArrowRight' || k === 'Tab') {
-    const next = document.querySelector(`td.cell[data-i="${i}"][data-j="${j + 1}"]`);
-    if (next) { next.focus(); ev.preventDefault(); }
-  } else if (k === 'ArrowLeft') {
-    const prev = document.querySelector(`td.cell[data-i="${i}"][data-j="${j - 1}"]`);
-    if (prev) { prev.focus(); ev.preventDefault(); }
-  } else if (k === 'ArrowDown') {
-    const down = document.querySelector(`td.cell[data-i="${i + 1}"][data-j="${j}"]`);
-    if (down) { down.focus(); ev.preventDefault(); }
-  } else if (k === 'ArrowUp') {
-    const up = document.querySelector(`td.cell[data-i="${i - 1}"][data-j="${j}"]`);
-    if (up) { up.focus(); ev.preventDefault(); }
-  }
+  if (['0','1','2','3'].includes(k)) { STATE.matrix[i][j] = k; saveState(); renderMatrixTable(); ev.preventDefault(); }
+  else if (k === 'p' || k === 'P') { STATE.matrix[i][j] = 'P'; saveState(); renderMatrixTable(); ev.preventDefault(); }
+  else if (k === 'Backspace' || k === 'Delete') { STATE.matrix[i][j] = ''; saveState(); renderMatrixTable(); ev.preventDefault(); }
+  else if (k === 'ArrowRight' || k === 'Tab') { const n = document.querySelector(`td.cell[data-i="${i}"][data-j="${j + 1}"]`); if (n) { n.focus(); ev.preventDefault(); } }
+  else if (k === 'ArrowLeft') { const n = document.querySelector(`td.cell[data-i="${i}"][data-j="${j - 1}"]`); if (n) { n.focus(); ev.preventDefault(); } }
+  else if (k === 'ArrowDown') { const n = document.querySelector(`td.cell[data-i="${i + 1}"][data-j="${j}"]`); if (n) { n.focus(); ev.preventDefault(); } }
+  else if (k === 'ArrowUp') { const n = document.querySelector(`td.cell[data-i="${i - 1}"][data-j="${j}"]`); if (n) { n.focus(); ev.preventDefault(); } }
 }
-
 function updateCellsCounter() {
   const { filled, total } = countFilled();
   document.getElementById('cells-filled').textContent = filled;
   document.getElementById('cells-total').textContent = total;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// RENDER — Captura modo guiado
-// Recorre todas las celdas no-diagonales en orden (i, j).
-// ─────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════
+// CAPTURE — modo guiado
+// ═════════════════════════════════════════════════════════════════════════
 
 function guidedCells() {
   const n = STATE.vars.length;
   const cells = [];
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      if (i !== j) cells.push([i, j]);
-    }
-  }
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) if (i !== j) cells.push([i, j]);
   return cells;
 }
-
 function renderGuided() {
   const box = document.getElementById('guided-box');
   const n = STATE.vars.length;
-  if (n < 2) {
-    box.innerHTML = '<p class="empty-msg">Define al menos 2 variables para empezar.</p>';
-    return;
-  }
-  const cells = guidedCells();
-  const total = cells.length;
-  // Saltar a la primera celda vacía si STATE.captureIdx apunta a una llena.
+  if (n < 2) { box.innerHTML = '<p class="empty-msg">Define al menos 2 variables.</p>'; return; }
+  const cells = guidedCells(), total = cells.length;
   while (STATE.captureIdx < total) {
     const [i, j] = cells[STATE.captureIdx];
     if (STATE.matrix[i][j] === '' || STATE.matrix[i][j] === undefined) break;
@@ -1564,9 +1900,7 @@ function renderGuided() {
     box.innerHTML = `
       <div class="guided-progress">Matriz completa · <b>${total}/${total}</b></div>
       <div class="guided-q">Has calificado todas las relaciones. Continúa al paso 4 para ver los resultados.</div>
-      <div class="gnav">
-        <button class="btn-ghost" onclick="STATE.captureIdx=0; renderGuided();">Revisar desde el inicio</button>
-      </div>`;
+      <div class="actions" style="justify-content:center"><button class="btn-ghost" onclick="STATE.captureIdx=0;saveState();renderGuided();">Revisar desde el inicio</button></div>`;
     return;
   }
   const [i, j] = cells[STATE.captureIdx];
@@ -1587,12 +1921,11 @@ function renderGuided() {
       <button class="gbtn" data-v="3" onclick="guidedAnswer('3')">3<span class="gbtn-label">Fuerte</span></button>
       <button class="gbtn" data-v="P" onclick="guidedAnswer('P')">P<span class="gbtn-label">Potencial</span></button>
     </div>
-    <div class="gnav">
+    <div class="actions" style="justify-content:center">
       <button class="btn-ghost" onclick="guidedBack()" ${STATE.captureIdx === 0 ? 'disabled' : ''}>← Atrás</button>
       <button class="btn-ghost" onclick="guidedSkip()">Saltar →</button>
     </div>`;
 }
-
 function guidedAnswer(v) {
   const cells = guidedCells();
   const [i, j] = cells[STATE.captureIdx];
@@ -1602,46 +1935,40 @@ function guidedAnswer(v) {
   renderGuided();
   updateCellsCounter();
 }
-
-function guidedBack() {
-  if (STATE.captureIdx > 0) STATE.captureIdx--;
-  saveState();
-  renderGuided();
-}
-
-function guidedSkip() {
-  STATE.captureIdx++;
-  saveState();
-  renderGuided();
-}
+function guidedBack() { if (STATE.captureIdx > 0) STATE.captureIdx--; saveState(); renderGuided(); }
+function guidedSkip() { STATE.captureIdx++; saveState(); renderGuided(); }
 
 function setMode(mode) {
   STATE.mode = mode;
   saveState();
   document.getElementById('mode-table-btn').classList.toggle('active', mode === 'table');
   document.getElementById('mode-guided-btn').classList.toggle('active', mode === 'guided');
-  document.getElementById('mode-table').classList.toggle('stage-hidden', mode !== 'table');
-  document.getElementById('mode-guided').classList.toggle('stage-hidden', mode !== 'guided');
-  if (mode === 'table') renderMatrixTable();
-  else renderGuided();
+  document.getElementById('mode-table').classList.toggle('is-hidden', mode !== 'table');
+  document.getElementById('mode-guided').classList.toggle('is-hidden', mode !== 'guided');
+  if (mode === 'table') renderMatrixTable(); else renderGuided();
 }
-
 function resetMatrix() {
   if (!confirm('¿Limpiar todas las celdas de la matriz? Las variables se mantienen.')) return;
   STATE.matrix = newMatrix(STATE.vars.length);
   STATE.captureIdx = 0;
   saveState();
-  if (STATE.mode === 'table') renderMatrixTable();
-  else renderGuided();
+  if (STATE.mode === 'table') renderMatrixTable(); else renderGuided();
   updateCellsCounter();
   showToast('Matriz limpiada.');
 }
+function goToCapture() {
+  if (STATE.vars.length < 2) { showToast('Necesitas al menos 2 variables.'); return; }
+  setMode(STATE.mode);
+  showStage('stage-capture');
+}
 
-// ─────────────────────────────────────────────────────────────────────────
-// RENDER — Resultados
-// ─────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════
+// RESULTS
+// ═════════════════════════════════════════════════════════════════════════
 
 let _chartInstance = null;
+
+function goToResults() { showStage('stage-results'); renderResults(); }
 
 function renderResults() {
   const res = computeMicMac();
@@ -1657,62 +1984,59 @@ function renderResults() {
     return;
   }
 
-  // Render scatter
+  const accent = getComputedStyle(document.body).getPropertyValue('--accent').trim();
+  const green = getComputedStyle(document.body).getPropertyValue('--green').trim();
+  const amber = getComputedStyle(document.body).getPropertyValue('--amber').trim();
+  const ink3 = getComputedStyle(document.body).getPropertyValue('--ink-3').trim();
+  const ink = getComputedStyle(document.body).getPropertyValue('--ink').trim();
+  const ruleStrong = getComputedStyle(document.body).getPropertyValue('--rule-strong').trim();
+  const colorOf = c => ({ motriz: green, clave: accent, autonoma: ink3, resultado: amber }[c]);
+
   const ctx = document.getElementById('chart-scatter').getContext('2d');
   const data = STATE.vars.map((v, i) => ({
-    x: res.depN[i],
-    y: res.motriN[i],
+    x: res.depN[i], y: res.motriN[i],
     label: 'V' + String(i + 1).padStart(2, '0'),
-    name: v,
-    cuadrante: res.cuadrante[i]
+    name: v, cuadrante: res.cuadrante[i]
   }));
-  const colorOf = c => ({ motriz: '#2f8f4f', clave: '#0047FF', autonoma: '#888', resultado: '#d68a18' }[c]);
-
   if (_chartInstance) _chartInstance.destroy();
   _chartInstance = new Chart(ctx, {
     type: 'scatter',
     data: {
       datasets: [{
-        label: 'Variables',
-        data: data,
+        label: 'Variables', data,
         backgroundColor: data.map(d => colorOf(d.cuadrante)),
         borderColor: data.map(d => colorOf(d.cuadrante)),
-        pointRadius: 7,
-        pointHoverRadius: 11,
-        pointBorderWidth: 2
+        pointRadius: 7, pointHoverRadius: 11, pointBorderWidth: 2
       }]
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       scales: {
         x: {
-          title: { display: true, text: 'Dependencia (0–100)', font: { family: 'DM Mono', size: 11 }, color: '#666' },
+          title: { display: true, text: 'Dependencia (0–100)', font: { family: 'Space Mono', size: 11 }, color: ink3 },
           min: 0, max: 100,
-          grid: { color: 'rgba(0,0,0,0.05)' },
-          ticks: { font: { family: 'DM Mono', size: 10 }, color: '#888' }
+          grid: { color: ruleStrong },
+          ticks: { font: { family: 'Space Mono', size: 10 }, color: ink3 }
         },
         y: {
-          title: { display: true, text: 'Motricidad (0–100)', font: { family: 'DM Mono', size: 11 }, color: '#666' },
+          title: { display: true, text: 'Motricidad (0–100)', font: { family: 'Space Mono', size: 11 }, color: ink3 },
           min: 0, max: 100,
-          grid: { color: 'rgba(0,0,0,0.05)' },
-          ticks: { font: { family: 'DM Mono', size: 10 }, color: '#888' }
+          grid: { color: ruleStrong },
+          ticks: { font: { family: 'Space Mono', size: 10 }, color: ink3 }
         }
       },
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: 'rgba(10,10,10,0.95)',
-          titleFont: { family: 'Syne', size: 12, weight: '700' },
-          bodyFont: { family: 'DM Mono', size: 11 },
+          backgroundColor: 'rgba(20,17,10,0.95)',
+          titleFont: { family: 'Familjen Grotesk', size: 12, weight: '700' },
+          bodyFont: { family: 'Space Mono', size: 11 },
           padding: 10,
           callbacks: {
             title: items => items[0].raw.name,
-            label: ctx => [
-              ctx.raw.label + ' · ' + ctx.raw.cuadrante.toUpperCase(),
-              'Motricidad: ' + ctx.raw.y.toFixed(1),
-              'Dependencia: ' + ctx.raw.x.toFixed(1)
-            ]
+            label: c => [c.raw.label + ' · ' + c.raw.cuadrante.toUpperCase(),
+                         'Motricidad: ' + c.raw.y.toFixed(1),
+                         'Dependencia: ' + c.raw.x.toFixed(1)]
           }
         }
       }
@@ -1724,14 +2048,13 @@ function renderResults() {
         const xMid = scales.x.getPixelForValue(res.medD);
         const yMid = scales.y.getPixelForValue(res.medM);
         ctx.save();
-        ctx.strokeStyle = 'rgba(0,71,255,0.25)';
-        ctx.setLineDash([4, 4]);
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = accent;
+        ctx.globalAlpha = .35;
+        ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(chartArea.left, yMid); ctx.lineTo(chartArea.right, yMid);
         ctx.moveTo(xMid, chartArea.top); ctx.lineTo(xMid, chartArea.bottom);
-        ctx.stroke();
-        ctx.restore();
+        ctx.stroke(); ctx.restore();
       }
     }, {
       id: 'pointLabels',
@@ -1739,13 +2062,10 @@ function renderResults() {
         const { ctx } = chart;
         const ds = chart.getDatasetMeta(0);
         ctx.save();
-        ctx.font = '600 9px "DM Mono", monospace';
-        ctx.fillStyle = '#0a0a0a';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        ds.data.forEach((pt, i) => {
-          ctx.fillText(data[i].label, pt.x + 9, pt.y);
-        });
+        ctx.font = '600 9px "Space Mono", monospace';
+        ctx.fillStyle = ink;
+        ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ds.data.forEach((pt, i) => ctx.fillText(data[i].label, pt.x + 9, pt.y));
         ctx.restore();
       }
     }]
@@ -1753,20 +2073,20 @@ function renderResults() {
 
   // Ranking
   const groups = {
-    clave: { title: 'Variables clave', cls: 't-key', desc: 'Alta influencia + alta dependencia. Críticas e inestables.' },
-    motriz: { title: 'Variables motrices', cls: 't-motri', desc: 'Mueven el sistema. Palancas de intervención.' },
-    resultado: { title: 'Variables resultado', cls: 't-dep', desc: 'Determinadas por el sistema. Indicadores de salida.' },
-    autonoma: { title: 'Variables autónomas', cls: 't-auto', desc: 'Bajo poder e independientes. Marginales.' }
+    clave:    { title: 'Variables clave',     cls: 't-key',   desc: 'Alta influencia + alta dependencia. Críticas e inestables.' },
+    motriz:   { title: 'Variables motrices',  cls: 't-motri', desc: 'Mueven el sistema. Palancas de intervención.' },
+    resultado:{ title: 'Variables resultado', cls: 't-dep',   desc: 'Determinadas por el sistema. Indicadores de salida.' },
+    autonoma: { title: 'Variables autónomas', cls: 't-auto',  desc: 'Bajo poder e independientes. Marginales.' }
   };
   let html = '';
-  for (const key of ['clave', 'motriz', 'resultado', 'autonoma']) {
+  for (const key of ['clave','motriz','resultado','autonoma']) {
     const vars = STATE.vars
       .map((v, i) => ({ name: v, i, code: 'V' + String(i + 1).padStart(2, '0'), m: res.motriN[i], d: res.depN[i] }))
       .filter(x => res.cuadrante[x.i] === key)
       .sort((a, b) => (b.m + b.d) - (a.m + a.d));
     if (vars.length === 0) continue;
     html += `<div class="rank-group">
-      <div class="rank-title ${groups[key].cls}"><span class="rank-dot"></span>${groups[key].title} <span style="font-family:'Fraunces';font-weight:300;font-style:italic;font-size:.74rem;color:var(--gray);margin-left:.4rem">(${vars.length})</span></div>
+      <div class="rank-title ${groups[key].cls}"><span class="rank-dot"></span>${groups[key].title}<span class="group-count">(${vars.length})</span></div>
       <ul class="rank-list">
         ${vars.map(x => `<li>
           <span class="rk-code">${x.code}</span>
@@ -1778,79 +2098,46 @@ function renderResults() {
   }
   document.getElementById('ranking-card').innerHTML = html;
   document.getElementById('results-desc').innerHTML = `
-    Cada variable aparece ubicada según su <b>motricidad indirecta</b> (eje Y,
-    cuánto influye sobre el sistema cuando se propagan las relaciones a
-    través de la matriz, estabilizado al paso ${res.stableAt}) y su
-    <b>dependencia indirecta</b> (eje X, cuánto la determina el sistema).
+    Cada variable aparece según su <b>motricidad indirecta</b> (eje Y) y su
+    <b>dependencia indirecta</b> (eje X), normalizadas al máximo observado y
+    estabilizadas al paso ${res.stableAt}.
     ${filled < total ? `<br/><br/><b style="color:var(--amber)">Atención:</b> sólo has calificado ${filled} de ${total} relaciones. Las variables sin información se procesan con 0.` : ''}
   `;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// NAVEGACIÓN ENTRE ETAPAS
-// ─────────────────────────────────────────────────────────────────────────
-
-function showStage(id) {
-  ['stage-wizard', 'stage-vars', 'stage-capture', 'stage-results'].forEach(s => {
-    document.getElementById(s).classList.toggle('stage-hidden', s !== id);
-  });
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function goToVars()    { renderVars(); showStage('stage-vars'); }
-function goToCapture() {
-  if (STATE.vars.length < 2) { showToast('Necesitas al menos 2 variables.'); return; }
-  setMode(STATE.mode);
-  showStage('stage-capture');
-}
-function goToResults() { showStage('stage-results'); renderResults(); }
-function backToWizard()  { showStage('stage-wizard'); renderWizard(); }
-function backToVars()    { goToVars(); }
-function backToCapture() { goToCapture(); }
-
-// ─────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════
 // EXPORT
-// ─────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════
 
 function exportJSON() {
   const res = computeMicMac();
   const out = {
-    meta: STATE.meta,
-    wizard: STATE.wizard,
-    vars: STATE.vars,
-    matrix: STATE.matrix,
+    meta: STATE.meta, wizard: STATE.wizard,
+    vars: STATE.vars, matrix: STATE.matrix,
     resultados: res ? {
       stableAt: res.stableAt,
-      motricidad_directa: STATE.vars.map((v, i) => ({ var: v, valor: res.motriDir[i] })),
-      dependencia_directa: STATE.vars.map((v, i) => ({ var: v, valor: res.depDir[i] })),
+      motricidad_directa:   STATE.vars.map((v, i) => ({ var: v, valor: res.motriDir[i] })),
+      dependencia_directa:  STATE.vars.map((v, i) => ({ var: v, valor: res.depDir[i] })),
       motricidad_indirecta: STATE.vars.map((v, i) => ({ var: v, valor: res.motriInd[i], normalizada: res.motriN[i] })),
-      dependencia_indirecta: STATE.vars.map((v, i) => ({ var: v, valor: res.depInd[i], normalizada: res.depN[i] })),
+      dependencia_indirecta:STATE.vars.map((v, i) => ({ var: v, valor: res.depInd[i], normalizada: res.depN[i] })),
       cuadrante: STATE.vars.map((v, i) => ({ var: v, cuadrante: res.cuadrante[i] }))
     } : null,
     exportedAt: new Date().toISOString()
   };
   downloadFile(JSON.stringify(out, null, 2), `analisis-estructural-${slugDate()}.json`, 'application/json');
 }
-
 function exportCSV() {
   const n = STATE.vars.length;
   if (n === 0) return;
   let csv = ',' + STATE.vars.map(v => '"' + v.replace(/"/g, '""') + '"').join(',') + '\n';
   for (let i = 0; i < n; i++) {
     csv += '"' + STATE.vars[i].replace(/"/g, '""') + '"';
-    for (let j = 0; j < n; j++) {
-      csv += ',' + (i === j ? '-' : (STATE.matrix[i][j] || '0'));
-    }
+    for (let j = 0; j < n; j++) csv += ',' + (i === j ? '-' : (STATE.matrix[i][j] || '0'));
     csv += '\n';
   }
   downloadFile(csv, `matriz-influencia-${slugDate()}.csv`, 'text/csv;charset=utf-8');
 }
-
-function slugDate() {
-  const d = new Date();
-  return d.toISOString().slice(0, 10);
-}
-
+function slugDate() { return new Date().toISOString().slice(0, 10); }
 function downloadFile(content, filename, mime) {
   const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
@@ -1861,74 +2148,21 @@ function downloadFile(content, filename, mime) {
   showToast('Archivo descargado.');
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// UTILITIES
-// ─────────────────────────────────────────────────────────────────────────
-
-let _toastTimer = null;
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// CURSOR
-// ─────────────────────────────────────────────────────────────────────────
-
-(function initCursor() {
-  const c = document.getElementById('cursor');
-  const r = document.getElementById('cursorRing');
-  document.addEventListener('mousemove', e => {
-    c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px';
-    r.style.left = e.clientX + 'px'; r.style.top = e.clientY + 'px';
-  });
-  document.addEventListener('mouseover', e => {
-    if (e.target.closest && e.target.closest('a,button,td.cell,.wizard-opt,.tpl-alt,.mode-btn,.gbtn,.var-chip-del,.var-chip-name,input')) {
-      c.style.transform = 'translate(-50%,-50%) scale(0.5)';
-      c.style.background = 'transparent';
-      c.style.border = '2px solid var(--blue)';
-      r.style.transform = 'translate(-50%,-50%) scale(1.5)';
-      r.style.opacity = '0.8';
-    } else {
-      c.style.transform = 'translate(-50%,-50%) scale(1)';
-      c.style.background = 'var(--blue)';
-      c.style.border = 'none';
-      r.style.transform = 'translate(-50%,-50%) scale(1)';
-      r.style.opacity = '0.5';
-    }
-  });
-})();
-
-// ─────────────────────────────────────────────────────────────────────────
-// AUTH + CLOUD (Sprint 2)
-// El backend vive en el worker rr-auth (Cloudflare Worker) y guarda
-// proyectos en KV bajo `micmac:proj:<projId>`. Multiusuario por polling.
-// ─────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════
+// AUTH + CLOUD (preservado del Sprint 2, ajustado al nuevo DOM)
+// ═════════════════════════════════════════════════════════════════════════
 
 const AUTH_URL = 'https://rr-auth.reruizc.workers.dev';
 const POLL_INTERVAL_MS = 10000;
 
-const AUTH = {
-  token: null,
-  user: null,           // { name, email, plan, isAdmin, ... }
-  isLogged: false
-};
-
-// Estado del proyecto en la nube (separado del STATE local)
+const AUTH = { token: null, user: null, isLogged: false };
 const CLOUD = {
-  projId: null,         // si está set → el STATE actual está sincronizado con un proyecto remoto
-  lastSavedAt: null,    // ISO timestamp del último save remoto exitoso
-  lastEditor: null,     // email del último editor remoto
-  collaborators: [],    // emails de colaboradores (vacío si soy anónimo)
-  owner: null,          // email del owner
-  _pollTimer: null,
-  _saving: false
+  projId: null, lastSavedAt: null, lastEditor: null,
+  collaborators: [], owner: null,
+  _pollTimer: null, _saving: false
 };
 
-function _authToken()  { return localStorage.getItem('rr-token'); }
+function _authToken() { return localStorage.getItem('rr-token'); }
 function _authStoreUser(u) { if (u) localStorage.setItem('rr-user', JSON.stringify(u)); }
 function _authReadStoredUser() {
   try { return JSON.parse(localStorage.getItem('rr-user') || 'null'); } catch { return null; }
@@ -1942,54 +2176,43 @@ async function loadUserFromAPI() {
     const r = await fetch(AUTH_URL + '/auth/me', { headers: { 'Authorization': 'Bearer ' + token } });
     const data = await r.json();
     if (!r.ok || !data.ok) {
-      // Sesión inválida: limpiar
-      localStorage.removeItem('rr-token');
-      localStorage.removeItem('rr-user');
+      localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user');
       AUTH.isLogged = false; AUTH.user = null; AUTH.token = null;
       return null;
     }
-    AUTH.user = data.user;
-    AUTH.isLogged = true;
+    AUTH.user = data.user; AUTH.isLogged = true;
     _authStoreUser(data.user);
     return data.user;
-  } catch (e) {
-    // Sin red: usar lo que haya en localStorage como fallback
+  } catch {
     const cached = _authReadStoredUser();
-    if (cached && token) {
-      AUTH.user = cached; AUTH.isLogged = true; return cached;
-    }
+    if (cached && token) { AUTH.user = cached; AUTH.isLogged = true; return cached; }
     return null;
   }
 }
 
 function renderAuthChip() {
-  const anon1 = document.getElementById('nav-auth-anon');
-  const anon2 = document.getElementById('nav-auth-anon-2');
-  const userLi = document.getElementById('nav-auth-user');
+  const anon = document.getElementById('nav-auth-anon');
+  const userBlock = document.getElementById('nav-user-block');
   if (AUTH.isLogged && AUTH.user) {
-    anon1.classList.add('stage-hidden');
-    anon2.classList.add('stage-hidden');
-    userLi.classList.remove('stage-hidden');
+    anon.classList.add('is-hidden');
+    userBlock.classList.remove('is-hidden');
     document.getElementById('nav-user-email').textContent = AUTH.user.email;
     document.getElementById('nav-user-plan').textContent = (AUTH.user.plan || 'free').toUpperCase();
   } else {
-    anon1.classList.remove('stage-hidden');
-    anon2.classList.remove('stage-hidden');
-    userLi.classList.add('stage-hidden');
+    anon.classList.remove('is-hidden');
+    userBlock.classList.add('is-hidden');
   }
 }
 
 function logoutUser() {
   if (!confirm('¿Cerrar sesión? Tu análisis local se conserva.')) return;
-  localStorage.removeItem('rr-token');
-  localStorage.removeItem('rr-user');
+  localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user');
   AUTH.token = null; AUTH.user = null; AUTH.isLogged = false;
   CLOUD.projId = null; CLOUD.lastSavedAt = null; CLOUD.lastEditor = null;
   CLOUD.collaborators = []; CLOUD.owner = null;
   stopPolling();
-  renderAuthChip();
-  renderCloudBars();
-  document.getElementById('my-projects').style.display = 'none';
+  renderAuthChip(); renderCloudBars();
+  document.getElementById('my-projects').classList.add('is-hidden');
   showToast('Sesión cerrada.');
 }
 
@@ -2006,20 +2229,17 @@ async function apiCall(path, opts = {}) {
   return { status: r.status, ok: r.ok && data.ok !== false, data };
 }
 
-// ── Cloud-bar UI ─────────────────────────────────────────────────────────
-
 function setCbStatus(kind, msg) {
-  ['capture', 'results'].forEach(s => {
+  ['capture','results'].forEach(s => {
     const el = document.getElementById('cb-status-' + s);
     if (!el) return;
     el.className = 'cb-status ' + (kind || '');
     el.textContent = msg || '';
   });
 }
-
 function renderCloudBars() {
   const inCloud = !!CLOUD.projId;
-  ['capture', 'results'].forEach(s => {
+  ['capture','results'].forEach(s => {
     const bar = document.getElementById('cloud-bar-' + s);
     const txt = document.getElementById('cb-text-' + s);
     const editorEl = document.getElementById('cb-editor-' + s);
@@ -2031,10 +2251,7 @@ function renderCloudBars() {
       saveBtn.textContent = 'Guardar cambios';
       if (CLOUD.lastEditor && CLOUD.lastEditor !== (AUTH.user?.email)) {
         editorEl.textContent = 'última edición: ' + CLOUD.lastEditor;
-        editorEl.style.display = '';
-      } else {
-        editorEl.textContent = '';
-      }
+      } else { editorEl.textContent = ''; }
     } else if (AUTH.isLogged) {
       bar.classList.remove('anon');
       txt.textContent = 'Trabajando local — aún no guardado en la nube';
@@ -2047,15 +2264,12 @@ function renderCloudBars() {
       editorEl.textContent = '';
     }
   });
-  // Botón invitar solo si soy owner del proyecto
   const inviteBtn = document.getElementById('cb-invite-results');
   if (inviteBtn) {
-    const canInvite = inCloud && AUTH.isLogged && CLOUD.owner === AUTH.user?.email;
-    inviteBtn.classList.toggle('stage-hidden', !canInvite);
+    const canInvite = !!CLOUD.projId && AUTH.isLogged && CLOUD.owner === AUTH.user?.email;
+    inviteBtn.classList.toggle('is-hidden', !canInvite);
   }
 }
-
-// ── Cloud actions ────────────────────────────────────────────────────────
 
 async function cloudSave() {
   if (!AUTH.isLogged) { openModal('modal-login'); return; }
@@ -2063,13 +2277,7 @@ async function cloudSave() {
   if (CLOUD._saving) return;
   CLOUD._saving = true;
   setCbStatus('saving', 'Guardando…');
-  const body = {
-    projId: CLOUD.projId || undefined,
-    meta: STATE.meta,
-    vars: STATE.vars,
-    matrix: STATE.matrix,
-    mode: STATE.mode
-  };
+  const body = { projId: CLOUD.projId || undefined, meta: STATE.meta, vars: STATE.vars, matrix: STATE.matrix, mode: STATE.mode };
   const r = await apiCall('/micmac/save', { method: 'POST', body });
   CLOUD._saving = false;
   if (!r.ok) {
@@ -2105,38 +2313,27 @@ async function cloudLoad(projId) {
   saveState();
   renderCloudBars();
   renderVars();
-  if (STATE.vars.length >= 2) {
-    goToCapture();
-  } else {
-    showStage('stage-vars');
-  }
+  if (STATE.vars.length >= 2) goToCapture(); else showStage('stage-vars');
   startPolling();
   showToast('Proyecto cargado.');
   return true;
 }
 
 async function refreshProjectsList() {
-  if (!AUTH.isLogged) {
-    document.getElementById('my-projects').style.display = 'none';
-    return;
-  }
+  if (!AUTH.isLogged) { document.getElementById('my-projects').classList.add('is-hidden'); return; }
   const r = await apiCall('/micmac/list');
-  if (!r.ok) {
-    document.getElementById('my-projects').style.display = 'none';
-    return;
-  }
+  if (!r.ok) { document.getElementById('my-projects').classList.add('is-hidden'); return; }
   renderProjectsList(r.data.projects, r.data.count, r.data.plan, r.data.ownedLimit);
 }
-
 function renderProjectsList(projects, count, plan, limit) {
   const card = document.getElementById('my-projects');
-  card.style.display = '';
+  card.classList.remove('is-hidden');
   const owned = projects.filter(p => p.role === 'owner').length;
   document.getElementById('my-projects-meta').textContent =
     `${count} proyecto${count === 1 ? '' : 's'} · ${owned}/${limit} propios · plan ${plan}`;
   const list = document.getElementById('my-projects-list');
   if (projects.length === 0) {
-    list.innerHTML = '<div class="projects-empty">No tienes proyectos aún. Crea uno desde el wizard de abajo o haz clic en + Nuevo proyecto.</div>';
+    list.innerHTML = '<div class="projects-empty">No tienes proyectos guardados. Empieza uno desde el wizard.</div>';
     return;
   }
   list.innerHTML = projects.map(p => {
@@ -2150,12 +2347,11 @@ function renderProjectsList(projects, count, plan, limit) {
       <span class="pr-role ${isOwner ? 'owner' : ''}">${isOwner ? 'Propio' : 'Invitado'}</span>
       <div class="pr-actions">
         <button onclick="cloudLoad('${p.projId}')">Abrir →</button>
-        ${isOwner ? `<button class="danger" onclick="cloudDelete('${p.projId}','${escapeHtml(p.nombre)}')">Borrar</button>` : ''}
+        ${isOwner ? `<button class="danger" onclick="cloudDelete('${p.projId}','${escapeHtml(p.nombre).replace(/'/g,'')}')">Borrar</button>` : ''}
       </div>
     </div>`;
   }).join('');
 }
-
 async function cloudDelete(projId, name) {
   if (!confirm(`¿Borrar el proyecto "${name}"? Esta acción no se puede deshacer.`)) return;
   const r = await apiCall('/micmac/delete?projId=' + encodeURIComponent(projId), { method: 'DELETE' });
@@ -2164,27 +2360,23 @@ async function cloudDelete(projId, name) {
   if (CLOUD.projId === projId) {
     CLOUD.projId = null; CLOUD.lastSavedAt = null; CLOUD.lastEditor = null;
     CLOUD.owner = null; CLOUD.collaborators = [];
-    stopPolling();
-    renderCloudBars();
+    stopPolling(); renderCloudBars();
   }
   refreshProjectsList();
 }
-
 function newProject() {
   CLOUD.projId = null; CLOUD.lastSavedAt = null; CLOUD.lastEditor = null;
   CLOUD.owner = null; CLOUD.collaborators = [];
   stopPolling();
-  // Reset state local
-  STATE.wizard = { q1: null, q2: null, q3: null, tpl: null };
+  STATE.wizard = { q1: null, q2: null, q3: null, q4: null, tpl: null, step: 1 };
   STATE.meta = { tplId: null, nombre: '', createdAt: null, updatedAt: null };
   STATE.vars = []; STATE.matrix = []; STATE.captureIdx = 0;
   saveState();
-  renderWizard();
+  renderWizardOpts();
+  setWizardStep(1);
   renderCloudBars();
   showStage('stage-wizard');
 }
-
-// ── Invitar colaborador ──────────────────────────────────────────────────
 
 function openInviteModal() {
   if (!CLOUD.projId) { showToast('Primero guarda el proyecto en la nube.'); return; }
@@ -2194,17 +2386,12 @@ function openInviteModal() {
   openModal('modal-invite');
   setTimeout(() => document.getElementById('invite-email').focus(), 100);
 }
-
 function renderCollabList() {
   const list = document.getElementById('collab-list');
-  const items = [];
-  items.push(`<li><span>${escapeHtml(CLOUD.owner)}</span><span class="role owner">Dueño</span></li>`);
-  for (const c of CLOUD.collaborators) {
-    items.push(`<li><span>${escapeHtml(c)}</span><span class="role">Colaborador</span></li>`);
-  }
+  const items = [`<li><span>${escapeHtml(CLOUD.owner)}</span><span class="role owner">Dueño</span></li>`];
+  for (const c of CLOUD.collaborators) items.push(`<li><span>${escapeHtml(c)}</span><span class="role">Colaborador</span></li>`);
   list.innerHTML = items.join('');
 }
-
 async function submitInvite() {
   const email = document.getElementById('invite-email').value.trim().toLowerCase();
   if (!email) { showToast('Escribe un correo.'); return; }
@@ -2214,8 +2401,6 @@ async function submitInvite() {
   showToast('Invitación enviada a ' + email + '.');
   closeModal('modal-invite');
 }
-
-// ── Aceptar invitación entrante (?invite=token) ──────────────────────────
 
 async function handleInviteOnLoad() {
   const url = new URL(window.location.href);
@@ -2235,67 +2420,107 @@ async function handleInviteOnLoad() {
   refreshProjectsList();
 }
 
-// ── Polling cada 10s para detectar cambios remotos ───────────────────────
-
 function startPolling() {
   stopPolling();
   if (!CLOUD.projId) return;
   CLOUD._pollTimer = setInterval(async () => {
-    if (CLOUD._saving) return; // no pollear mientras guardamos
-    if (document.hidden) return; // pausa cuando la pestaña no está visible
+    if (CLOUD._saving || document.hidden) return;
     const r = await apiCall('/micmac/load?projId=' + encodeURIComponent(CLOUD.projId) + '&since=' + encodeURIComponent(CLOUD.lastSavedAt || ''));
-    if (!r.ok) return;
-    if (r.data.unchanged) return;
-    if (!r.data.project) return;
+    if (!r.ok || r.data.unchanged || !r.data.project) return;
     const p = r.data.project;
-    // Aplicar el remoto solo si vengo de otro editor (evitar pisar mi propio guardado)
     if (p.lastEditor && p.lastEditor !== AUTH.user?.email) {
       STATE.vars = p.vars || []; STATE.matrix = p.matrix || [];
       STATE.meta = p.meta || STATE.meta; STATE.mode = p.mode || STATE.mode;
-      CLOUD.lastSavedAt = p.updatedAt;
-      CLOUD.lastEditor = p.lastEditor;
+      CLOUD.lastSavedAt = p.updatedAt; CLOUD.lastEditor = p.lastEditor;
       CLOUD.collaborators = p.collaborators || CLOUD.collaborators;
       saveState();
-      // Re-render según la stage activa
-      if (!document.getElementById('stage-vars').classList.contains('stage-hidden')) renderVars();
-      if (!document.getElementById('stage-capture').classList.contains('stage-hidden')) {
+      if (!document.getElementById('stage-vars').classList.contains('is-hidden')) renderVars();
+      if (!document.getElementById('stage-capture').classList.contains('is-hidden')) {
         if (STATE.mode === 'table') renderMatrixTable(); else renderGuided();
         updateCellsCounter();
       }
-      if (!document.getElementById('stage-results').classList.contains('stage-hidden')) renderResults();
+      if (!document.getElementById('stage-results').classList.contains('is-hidden')) renderResults();
       renderCloudBars();
       showToast('Cambios de ' + p.lastEditor);
     }
   }, POLL_INTERVAL_MS);
 }
-
 function stopPolling() {
   if (CLOUD._pollTimer) { clearInterval(CLOUD._pollTimer); CLOUD._pollTimer = null; }
 }
 
-// ── Modales ──────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════
+// MODALES / TOAST / THEME / CURSOR
+// ═════════════════════════════════════════════════════════════════════════
 
 function openModal(id)  { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
-// ─────────────────────────────────────────────────────────────────────────
+let _toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+function toggleTheme() {
+  const isDay = document.body.classList.toggle('day-mode');
+  localStorage.setItem('rr-theme', isDay ? 'day' : 'night');
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = isDay ? '☾ Modo noche' : '☀ Modo día';
+  // Re-render chart con nuevos colores si está visible
+  if (_chartInstance && !document.getElementById('stage-results').classList.contains('is-hidden')) {
+    renderResults();
+  }
+}
+(function applyInitialTheme() {
+  if (localStorage.getItem('rr-theme') === 'day') {
+    document.body.classList.add('day-mode');
+    const btn = document.getElementById('theme-btn');
+    if (btn) btn.textContent = '☾ Modo noche';
+  }
+})();
+
+(function initCursor() {
+  const c = document.getElementById('cursor');
+  const r = document.getElementById('cursorRing');
+  document.addEventListener('mousemove', e => {
+    c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px';
+    r.style.left = e.clientX + 'px'; r.style.top = e.clientY + 'px';
+  });
+  document.addEventListener('mouseover', e => {
+    if (e.target.closest && e.target.closest('a,button,td.cell,.opt,.tpl-alt,.mode-btn,.gbtn,.var-chip-del,.var-chip-name,input,summary,.accordion')) {
+      c.style.transform = 'translate(-50%,-50%) scale(0.5)';
+      c.style.background = 'transparent';
+      c.style.border = '2px solid var(--accent)';
+      r.style.transform = 'translate(-50%,-50%) scale(1.5)';
+      r.style.opacity = '0.7';
+    } else {
+      c.style.transform = 'translate(-50%,-50%) scale(1)';
+      c.style.background = 'var(--accent)';
+      c.style.border = 'none';
+      r.style.transform = 'translate(-50%,-50%) scale(1)';
+      r.style.opacity = '0.4';
+    }
+  });
+})();
+
+// ═════════════════════════════════════════════════════════════════════════
 // INIT
-// ─────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════
 
 (async function init() {
   const restored = loadState();
-  renderWizard();
-  if (restored && STATE.vars.length >= 2) {
-    showToast('Restauramos tu análisis anterior.');
-  }
+  renderWizardOpts();
+  if (restored && STATE.wizard.step) setWizardStep(STATE.wizard.step);
   // Auth
   await loadUserFromAPI();
   renderAuthChip();
   renderCloudBars();
-  if (AUTH.isLogged) {
-    refreshProjectsList();
-    handleInviteOnLoad();
-  }
+  if (AUTH.isLogged) { refreshProjectsList(); handleInviteOnLoad(); }
+  if (restored && STATE.vars.length >= 2) showToast('Restauramos tu análisis anterior.');
 })();
 </script>
 </body>
