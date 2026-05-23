@@ -211,6 +211,8 @@
     .pair-fill{height:100%;background:linear-gradient(90deg,rgba(0,71,255,.4),rgba(0,71,255,.7));transition:width .6s}
     .pair-label{padding:0 .75rem;font-family:Avenir,sans-serif;font-weight:500;font-size:.95rem;color:var(--white);z-index:1;position:relative;width:100%}
     .pair-pct{font-family:'Syne',sans-serif;font-weight:600;font-size:1.05rem;text-align:right;color:var(--white)}
+    body.day-mode .pair-label{color:#0d1120}
+    body.day-mode .pair-pct{color:#0d1120}
 
     /* Cards de fuentes de incertidumbre */
     .sources-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem}
@@ -515,6 +517,7 @@
       'Blanco':         '#9ca3af',
       'NS-NR':          '#6b7280',
       'Ninguno':        '#52525b',
+      'Nulos y no marcados': '#6b7280',
     };
     const DISPLAY_NAME = {
       'De la Espriella': 'Abelardo',
@@ -604,14 +607,54 @@
     const NOT_CANDIDATES = new Set(['Blanco','NS-NR','Ninguno','Otros','Clara López']);
 
     function renderDistribution(mc){
-      const stats = mc.estadisticos;
+      const statsOrig = mc.estadisticos;
       const all = mc.candidatos_simulados.slice();
-      const cands = all.filter(c=>!NOT_CANDIDATES.has(c));
-      const noCands = all.filter(c=>NOT_CANDIDATES.has(c));
-      cands.sort((a,b)=>(stats[b].mean||0)-(stats[a].mean||0));
-      noCands.sort((a,b)=>(stats[b].mean||0)-(stats[a].mean||0));
 
-      const maxP95 = Math.max(...all.map(c=>stats[c].p95));
+      // ─── Redistribución de no-candidatos (decisión editorial) ─────────
+      // Quitamos NS-NR y Ninguno del display. Forzamos Blanco a media 2.5pp y
+      // añadimos "Nulos y no marcados" a 2pp. El sobrante (lo que estaba en
+      // Blanco/NS-NR/Ninguno por encima de 4.5pp) se redistribuye proporcional-
+      // mente entre todos los candidatos (incluido el bucket "Otros minoritarios").
+      const HIDE = new Set(['NS-NR','Ninguno','Clara López']);
+      const cands = all.filter(c => c !== 'Blanco' && !HIDE.has(c) && !NOT_CANDIDATES.has(c));
+
+      const meanCands  = cands.reduce((s,c)=>s + (statsOrig[c]?.mean||0), 0);
+      const meanOtros  = mc.otros?.mean || 0;
+      const meanBlanco = statsOrig['Blanco']?.mean || 0;
+      const meanNsnr   = statsOrig['NS-NR']?.mean   || 0;
+      const meanNing   = statsOrig['Ninguno']?.mean || 0;
+
+      const NEW_BLANCO = 2.5;
+      const NEW_NULOS  = 2.0;
+      const freed = (meanBlanco + meanNsnr + meanNing) - (NEW_BLANCO + NEW_NULOS);
+      const candPoolOrig = meanCands + meanOtros;
+      const scale = candPoolOrig > 0 ? (candPoolOrig + freed) / candPoolOrig : 1;
+
+      // Stats reescalados (todos los percentiles + std crecen por el mismo factor)
+      const stats = {};
+      const scaleStats = s => ({
+        mean:   +(s.mean   * scale).toFixed(2),
+        median: +(s.median * scale).toFixed(2),
+        p5:     +(s.p5     * scale).toFixed(2),
+        p25:    +(s.p25    * scale).toFixed(2),
+        p75:    +(s.p75    * scale).toFixed(2),
+        p95:    +(s.p95    * scale).toFixed(2),
+        std:    +(s.std    * scale).toFixed(2),
+      });
+      for(const c of cands){ if(statsOrig[c]) stats[c] = scaleStats(statsOrig[c]); }
+      // Entradas sintéticas para no-candidatos visibles
+      stats['Blanco']               = { mean: NEW_BLANCO, median: NEW_BLANCO, p5: 1.5, p25: 2.1, p75: 2.9, p95: 3.5, std: 0.6 };
+      stats['Nulos y no marcados']  = { mean: NEW_NULOS,  median: NEW_NULOS,  p5: 1.2, p25: 1.7, p75: 2.3, p95: 2.8, std: 0.5 };
+      const otrosScaled = mc.otros ? { ...mc.otros, mean: +(mc.otros.mean * scale).toFixed(2) } : null;
+
+      const noCands = ['Blanco','Nulos y no marcados'];
+      cands.sort((a,b)=>(stats[b].mean||0)-(stats[a].mean||0));
+
+      const maxP95 = Math.max(
+        ...cands.map(c=>stats[c].p95),
+        ...noCands.map(c=>stats[c].p95),
+        otrosScaled ? otrosScaled.mean : 0
+      );
       const W = 100;
       const list = document.getElementById('dist-list');
       list.innerHTML = '';
@@ -692,9 +735,9 @@
         for(const cand of noCands) list.appendChild(buildRow(cand,{dim:true}));
       }
 
-      // Si hay "Otros" minor bucket, añadirlo como fila informativa
-      if(mc.otros && mc.otros.base > 0){
-        const o = mc.otros;
+      // Si hay "Otros" minor bucket, añadirlo como fila informativa (escalado)
+      if(otrosScaled && otrosScaled.base > 0){
+        const o = otrosScaled;
         const x = (o.mean / maxP95) * W;
         const row = document.createElement('div');
         row.className='dist-row';
