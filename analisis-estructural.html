@@ -677,6 +677,125 @@ table.matrix td.cell:focus { outline: 2px solid var(--accent); outline-offset: -
   text-align: center; padding: 1rem;
 }
 
+/* ───────── VIEW TABS (MicMac / DEMATEL / ISM) ───────── */
+.view-tabs {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .4rem;
+  margin-bottom: 1.5rem;
+}
+@media (max-width: 720px) { .view-tabs { grid-template-columns: 1fr; } }
+.view-tab {
+  display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto;
+  gap: .15rem .9rem; align-items: baseline;
+  padding: .85rem 1.1rem;
+  background: var(--paper-2);
+  border: 1px solid var(--rule-strong);
+  text-align: left; cursor: none;
+  transition: border-color .2s, background .2s, color .2s;
+  position: relative;
+}
+.view-tab:hover { border-color: var(--accent); background: var(--paper-3); }
+.view-tab.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.view-tab.active::before {
+  content: ""; position: absolute; top: -1px; left: -1px; bottom: -1px;
+  width: 3px; background: var(--accent);
+}
+.view-tab .vt-num {
+  grid-row: 1 / span 2;
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .12em; color: var(--accent);
+  padding: .3rem .55rem; border: 1px solid var(--accent-tint);
+  background: var(--paper); align-self: start;
+}
+.view-tab .vt-label {
+  font-family: var(--sans); font-weight: 700; font-size: 1.02rem;
+  letter-spacing: -.01em; color: var(--ink);
+}
+.view-tab .vt-hint {
+  font-family: var(--italic); font-style: italic; font-weight: 400;
+  font-size: .78rem; line-height: 1.4; color: var(--ink-3);
+}
+
+.view-pane { display: none; }
+.view-pane.active { display: block; animation: fadeInUp .25s ease both; }
+
+/* ───────── ISM DIAGRAM ───────── */
+.ism-controls {
+  display: flex; align-items: center; gap: .8rem; flex-wrap: wrap;
+  background: var(--paper-2); border: 1px solid var(--rule);
+  padding: .85rem 1.1rem; margin-bottom: 1.4rem;
+  font-family: var(--mono); font-size: 12px; color: var(--ink-2);
+}
+.ism-controls label {
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: .04em;
+  color: var(--ink-2);
+}
+.ism-controls select {
+  font-family: var(--mono); font-size: 12px;
+  background: var(--paper-3); color: var(--ink);
+  border: 1px solid var(--rule-strong); padding: .4rem .6rem;
+  outline: none; cursor: none;
+}
+.ism-controls select:focus { border-color: var(--accent); }
+.ism-controls .ism-help {
+  font-family: var(--italic); font-style: italic; font-size: .85rem;
+  color: var(--ink-3); flex: 1; min-width: 250px;
+}
+
+.ism-diagram {
+  display: flex; flex-direction: column; gap: .85rem;
+  background: var(--paper-2); border: 1px solid var(--rule);
+  padding: 1.2rem;
+}
+.ism-level {
+  display: grid; grid-template-columns: 110px 1fr; gap: 1.2rem;
+  align-items: stretch;
+  position: relative;
+}
+.ism-level + .ism-level::before {
+  content: ""; position: absolute; left: 50px; top: -.85rem;
+  height: .85rem; width: 1px; background: var(--accent); opacity: .35;
+}
+.ism-level + .ism-level::after {
+  content: "▼"; position: absolute; left: 44px; top: -1.05rem;
+  color: var(--accent); opacity: .55; font-size: 10px;
+}
+.ism-level-tag {
+  display: flex; flex-direction: column; justify-content: center;
+  align-items: center; gap: .3rem;
+  background: var(--paper-3); border: 1px solid var(--rule-strong);
+  padding: .6rem;
+}
+.ism-level-tag .lvl-num {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .14em;
+  color: var(--ink-3); text-transform: uppercase;
+}
+.ism-level-tag .lvl-name {
+  font-family: var(--sans); font-weight: 700; font-size: .9rem;
+  letter-spacing: -.005em; color: var(--accent); text-align: center; line-height: 1.2;
+}
+.ism-level-vars {
+  display: flex; flex-wrap: wrap; gap: .4rem;
+  background: var(--paper-3); border: 1px solid var(--rule);
+  padding: .75rem;
+}
+.ism-var {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .4rem .65rem;
+  background: var(--paper); border: 1px solid var(--rule-strong);
+  font-family: var(--sans); font-size: .88rem; color: var(--ink);
+}
+.ism-var .iv-code {
+  font-family: var(--mono); font-size: 10.5px; color: var(--accent);
+  letter-spacing: .04em;
+}
+.ism-empty {
+  font-family: var(--italic); font-style: italic; color: var(--ink-3);
+  text-align: center; padding: 2rem;
+}
+
 /* ───────── RESULTS ───────── */
 .results-grid {
   display: grid; grid-template-columns: 1.4fr 1fr; gap: 1.5rem; margin-top: .5rem;
@@ -1123,23 +1242,84 @@ footer.foot a:hover { color: var(--accent); }
   <!-- ════════════════ STAGE: RESULTS ════════════════ -->
   <section id="stage-results" class="is-hidden">
     <div class="section-head">
-      <h2><span class="num">— 04</span>Variables clave del sistema</h2>
+      <h2><span class="num">— 04</span>Resultados del sistema</h2>
+      <span class="meta" id="results-counter">—</span>
     </div>
-    <p class="section-desc" id="results-desc">
-      Cada variable aparece según su <b>motricidad indirecta</b> (eje Y,
-      cuánto influye sobre el sistema cuando se propagan las relaciones) y
-      su <b>dependencia indirecta</b> (eje X, cuánto la determina el sistema).
-    </p>
 
-    <div class="results-grid">
-      <div class="chart-wrap">
-        <span class="chart-quadrant-label q1">Motrices</span>
-        <span class="chart-quadrant-label q2">Clave</span>
-        <span class="chart-quadrant-label q3">Autónomas</span>
-        <span class="chart-quadrant-label q4">Resultado</span>
-        <canvas id="chart-scatter"></canvas>
+    <div class="view-tabs">
+      <button class="view-tab active" data-view="micmac" onclick="setView('micmac')">
+        <span class="vt-num">A</span><span class="vt-label">MicMac</span>
+        <span class="vt-hint">cuadrantes motricidad / dependencia</span>
+      </button>
+      <button class="view-tab" data-view="dematel" onclick="setView('dematel')">
+        <span class="vt-num">B</span><span class="vt-label">DEMATEL</span>
+        <span class="vt-hint">causas / efectos · prominencia</span>
+      </button>
+      <button class="view-tab" data-view="ism" onclick="setView('ism')">
+        <span class="vt-num">C</span><span class="vt-label">ISM</span>
+        <span class="vt-hint">jerarquía estructural en niveles</span>
+      </button>
+    </div>
+
+    <!-- MICMAC VIEW -->
+    <div class="view-pane active" id="view-micmac">
+      <p class="section-desc" id="results-desc">
+        Cada variable aparece según su <b>motricidad indirecta</b> (eje Y,
+        cuánto influye sobre el sistema cuando se propagan las relaciones) y
+        su <b>dependencia indirecta</b> (eje X, cuánto la determina el sistema).
+      </p>
+      <div class="results-grid">
+        <div class="chart-wrap">
+          <span class="chart-quadrant-label q1">Motrices</span>
+          <span class="chart-quadrant-label q2">Clave</span>
+          <span class="chart-quadrant-label q3">Autónomas</span>
+          <span class="chart-quadrant-label q4">Resultado</span>
+          <canvas id="chart-scatter"></canvas>
+        </div>
+        <div class="ranking-card" id="ranking-card"></div>
       </div>
-      <div class="ranking-card" id="ranking-card"></div>
+    </div>
+
+    <!-- DEMATEL VIEW -->
+    <div class="view-pane" id="view-dematel">
+      <p class="section-desc">
+        DEMATEL separa <b>causas</b> de <b>efectos</b> mediante la matriz de
+        relación total. El eje X muestra la <b>prominencia</b> (R+C, qué tan
+        involucrada está la variable en el sistema) y el eje Y la
+        <b>relación</b> (R−C, positivo = lanza más de lo que recibe = causa;
+        negativo = recibe más de lo que lanza = efecto).
+      </p>
+      <div class="results-grid">
+        <div class="chart-wrap">
+          <span class="chart-quadrant-label q1">Causas</span>
+          <span class="chart-quadrant-label q2">Causas centrales</span>
+          <span class="chart-quadrant-label q3">Efectos autónomos</span>
+          <span class="chart-quadrant-label q4">Efectos centrales</span>
+          <canvas id="chart-dematel"></canvas>
+        </div>
+        <div class="ranking-card" id="dematel-ranking"></div>
+      </div>
+    </div>
+
+    <!-- ISM VIEW -->
+    <div class="view-pane" id="view-ism">
+      <p class="section-desc">
+        ISM (Interpretive Structural Modeling) ordena las variables en
+        niveles desde las que <b>determinan</b> el sistema (arriba, raíces) hasta
+        las que <b>resultan</b> de él (abajo, hojas). Usa la matriz de
+        alcanzabilidad: si A puede llegar a B por una cadena de influencias,
+        A está en un nivel superior a B.
+      </p>
+      <div class="ism-controls">
+        <label>Umbral de influencia para binarizar la matriz:</label>
+        <select id="ism-threshold" onchange="renderISM()">
+          <option value="1">≥ 1 (débil o mayor)</option>
+          <option value="2" selected>≥ 2 (media o mayor)</option>
+          <option value="3">≥ 3 (fuerte)</option>
+        </select>
+        <span class="ism-help">El umbral filtra qué relaciones cuentan como "influye realmente sobre". Sube si el sistema es muy denso.</span>
+      </div>
+      <div class="ism-diagram" id="ism-diagram"></div>
     </div>
 
     <div class="cloud-bar" id="cloud-bar-results" style="margin-top:1.5rem">
@@ -1159,13 +1339,15 @@ footer.foot a:hover { color: var(--accent); }
     </div>
 
     <p class="methodology-note">
-      La herramienta toma como base el método de análisis estructural
-      propuesto por Michel Godet (LIPSOR) y desarrollado en Colombia por
-      Francisco José Mojica (Universidad Externado). Las multiplicaciones
-      sucesivas de la matriz hacen visibles las relaciones indirectas que el
-      ojo humano no detecta. Próximas versiones incorporarán scoring difuso,
-      valencias firmadas (facilitación / inhibición), jerarquía estructural y
-      asistencia de IA.
+      La herramienta combina tres lentes complementarios sobre la misma
+      matriz de influencias: <b>MicMac</b> (Godet, LIPSOR · escuela francesa
+      de prospectiva, con referente colombiano Francisco José Mojica del
+      Externado), <b>DEMATEL</b> (Fontela y Gabus, Battelle Memorial Institute,
+      1972 · descomposición causa-efecto vía total relation matrix) e
+      <b>ISM</b> (Warfield, 1973 · jerarquía estructural por reachability).
+      Próximas versiones incorporarán scoring difuso, valencias firmadas
+      (facilitación / inhibición), y asistencia de IA para sugerir
+      variables y validar consistencia.
     </p>
   </section>
 </main>
@@ -1184,31 +1366,47 @@ footer.foot a:hover { color: var(--accent); }
       <p>
         Construyes una <em>matriz NxN</em> donde la celda <code>(i, j)</code>
         es cuánto influye la variable <code>i</code> sobre la <code>j</code>,
-        en una escala de 0 a 3. La suma de cada fila te da la
-        <em>motricidad directa</em> (cuánto influye); la suma de cada columna,
-        la <em>dependencia directa</em>.
+        en una escala de 0 a 3. A partir de la misma matriz aplicamos tres
+        lentes que ven cosas distintas del sistema.
       </p>
       <p>
-        Pero las variables se afectan también de forma <em>indirecta</em> a
-        través de otras. Para verlo, elevamos la matriz a la k-ésima
-        potencia hasta que el ordenamiento de las variables se estabilice
-        (típicamente entre 3 y 6 iteraciones). Las sumas de filas y columnas
-        de esa matriz indirecta son las que ploteamos.
+        <b>1 · MicMac</b> (Godet, LIPSOR, 1971) — escuela francesa de
+        prospectiva estratégica, con referente colombiano <em>Francisco José
+        Mojica</em> (Externado), formado con Godet en la Sorbona. Suma cada
+        fila para la <em>motricidad directa</em> y cada columna para la
+        <em>dependencia directa</em>, luego eleva la matriz a la k-ésima
+        potencia (entre 3 y 6 iteraciones) hasta que el ordenamiento se
+        estabilice. Las sumas indirectas son las que ploteamos en el
+        cuadrante motrices/clave/autónomas/resultado.
       </p>
       <p>
-        El método viene de la <em>escuela francesa de prospectiva
-        estratégica</em> (Michel Godet, LIPSOR, 1971) y en Colombia tiene
-        como referente a <em>Francisco José Mojica</em> (Universidad
-        Externado), formado directamente con Godet en la Sorbona. La
-        herramienta moderniza esa base con familia ISM–MICMAC y, en
-        próximas versiones, scoring difuso (con números triangulares para
-        reducir sobreconfianza del experto) y valencias firmadas para
-        distinguir <em>facilitación</em> de <em>inhibición</em>.
+        <b>2 · DEMATEL</b> (Fontela & Gabus, Battelle Memorial Institute,
+        1972) — descomposición causa-efecto. Normalizamos la matriz por su
+        máxima suma de filas o columnas, calculamos <code>T = D · (I − D)^(−1)</code>
+        (la <em>total relation matrix</em>) y de ahí salen dos números por
+        variable: <em>R+C</em> (qué tan involucrada está) y <em>R−C</em>
+        (positivo = causa, negativo = efecto). Captura algo que MicMac no
+        ve: la dirección causal, no solo la intensidad.
       </p>
       <p>
-        El cálculo numérico es completamente local en tu navegador. Si
-        guardas en la nube, solo viaja la matriz y los nombres de variables
-        — nunca enviamos los resultados a terceros.
+        <b>3 · ISM</b> (Warfield, 1973) — Interpretive Structural Modeling.
+        Binarizamos la matriz con un umbral (¿qué cuenta como "realmente
+        influye"?), calculamos la <em>reachability matrix</em> por algoritmo
+        de Warshall (¿quién puede llegar a quién por una cadena?) y
+        extraemos niveles por intersección de los conjuntos de alcance y
+        antecedentes. El resultado es una jerarquía: variables raíz arriba
+        (determinan), hojas abajo (resultan).
+      </p>
+      <p>
+        Próximas versiones añadirán scoring difuso (números triangulares
+        para reducir la sobreconfianza del experto), valencias firmadas
+        (distinguir <em>facilitación</em> de <em>inhibición</em>), y
+        asistencia de IA para sugerir variables y validar consistencia.
+      </p>
+      <p>
+        El cálculo es 100% local en tu navegador. Si guardas en la nube,
+        solo viajan la matriz y los nombres de variables — nunca enviamos
+        los resultados a terceros.
       </p>
     </div>
   </div>
@@ -1968,7 +2166,14 @@ function goToCapture() {
 
 let _chartInstance = null;
 
-function goToResults() { showStage('stage-results'); renderResults(); }
+function goToResults() {
+  showStage('stage-results');
+  const { filled, total } = countFilled();
+  const counter = document.getElementById('results-counter');
+  if (counter) counter.textContent = `${filled}/${total} relaciones · ${STATE.vars.length} variables`;
+  // Re-render la vista activa (default: micmac al primer ingreso)
+  setView(_currentView || 'micmac');
+}
 
 function renderResults() {
   const res = computeMicMac();
@@ -2103,6 +2308,339 @@ function renderResults() {
     estabilizadas al paso ${res.stableAt}.
     ${filled < total ? `<br/><br/><b style="color:var(--amber)">Atención:</b> sólo has calificado ${filled} de ${total} relaciones. Las variables sin información se procesan con 0.` : ''}
   `;
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// DEMATEL · Fontela & Gabus 1972
+// Pasos:
+//   1) Normalizar M dividiendo por max(maxRowSum, maxColSum).
+//   2) T = D · (I − D)^(−1)  — matriz de relación total.
+//   3) R[i] = sum(T[i,:])  — influencia que i ejerce sobre el sistema.
+//   4) C[i] = sum(T[:,i])  — influencia que el sistema ejerce sobre i.
+//   5) Prominencia (R+C) en X · Relación (R−C) en Y.
+//      R−C > 0  → causa  (lanza más de lo que recibe)
+//      R−C < 0  → efecto (recibe más de lo que lanza)
+// ═════════════════════════════════════════════════════════════════════════
+
+function matInverse(A) {
+  // Gauss-Jordan in-place. Devuelve A^{-1} o null si es singular.
+  const n = A.length;
+  const M = A.map(r => r.slice());
+  const I = [];
+  for (let i = 0; i < n; i++) {
+    const row = new Array(n).fill(0);
+    row[i] = 1;
+    I.push(row);
+  }
+  for (let col = 0; col < n; col++) {
+    // pivot: fila con max |valor| en columna col, desde col en adelante
+    let piv = col, maxV = Math.abs(M[col][col]);
+    for (let r = col + 1; r < n; r++) {
+      const v = Math.abs(M[r][col]);
+      if (v > maxV) { maxV = v; piv = r; }
+    }
+    if (maxV < 1e-12) return null; // singular
+    if (piv !== col) {
+      [M[col], M[piv]] = [M[piv], M[col]];
+      [I[col], I[piv]] = [I[piv], I[col]];
+    }
+    const pivVal = M[col][col];
+    for (let j = 0; j < n; j++) { M[col][j] /= pivVal; I[col][j] /= pivVal; }
+    for (let r = 0; r < n; r++) {
+      if (r === col) continue;
+      const factor = M[r][col];
+      if (factor === 0) continue;
+      for (let j = 0; j < n; j++) {
+        M[r][j] -= factor * M[col][j];
+        I[r][j] -= factor * I[col][j];
+      }
+    }
+  }
+  return I;
+}
+
+function computeDEMATEL() {
+  const n = STATE.vars.length;
+  if (n < 2) return null;
+  const M = matToNumeric();
+  // 1) Normalización
+  const rs = rowSums(M), cs = colSums(M);
+  const s = Math.max(Math.max(...rs), Math.max(...cs));
+  if (s <= 0) return null;
+  const D = M.map(row => row.map(v => v / s));
+  // 2) (I − D)
+  const ImD = [];
+  for (let i = 0; i < n; i++) {
+    const row = new Array(n).fill(0);
+    for (let j = 0; j < n; j++) row[j] = (i === j ? 1 : 0) - D[i][j];
+    ImD.push(row);
+  }
+  // 3) (I − D)^{-1}
+  const inv = matInverse(ImD);
+  if (!inv) return null;
+  // 4) T = D · inv
+  const T = matMul(D, inv);
+  // 5) R y C
+  const R = rowSums(T), C = colSums(T);
+  const prom = R.map((r, i) => r + C[i]);          // prominencia
+  const rel  = R.map((r, i) => r - C[i]);           // causa-efecto
+  // Mediana de prominencia para dividir cuadrantes
+  const sortedP = [...prom].sort((a, b) => a - b);
+  const medP = sortedP[Math.floor(n / 2)];
+  // Clasificación
+  const cuadrante = prom.map((p, i) => {
+    const r = rel[i];
+    if (r >= 0 && p < medP) return 'causa';
+    if (r >= 0 && p >= medP) return 'causa-central';
+    if (r < 0 && p < medP)  return 'efecto-autonomo';
+    return 'efecto-central';
+  });
+  return { n, T, R, C, prom, rel, medP, cuadrante };
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// ISM · Warfield 1973
+// Binariza la matriz con un umbral, calcula reachability por Warshall y
+// extrae niveles por intersección Reach(i) ∩ Antecedent(i).
+// ═════════════════════════════════════════════════════════════════════════
+
+function computeISM(threshold) {
+  const n = STATE.vars.length;
+  if (n < 2) return null;
+  threshold = threshold || 2;
+  const M = matToNumeric();
+  // 1) Binarizar (con diagonal en 1, cada variable se alcanza a sí misma)
+  const B = [];
+  for (let i = 0; i < n; i++) {
+    const row = new Array(n).fill(0);
+    for (let j = 0; j < n; j++) row[j] = (i === j || M[i][j] >= threshold) ? 1 : 0;
+    B.push(row);
+  }
+  // 2) Reachability matrix por Warshall: R[i,j] = 1 si i puede llegar a j
+  for (let k = 0; k < n; k++) {
+    for (let i = 0; i < n; i++) {
+      if (B[i][k] === 0) continue;
+      for (let j = 0; j < n; j++) {
+        if (B[k][j] === 1 && B[i][j] === 0) B[i][j] = 1;
+      }
+    }
+  }
+  // 3) Reach(i) y Antecedent(i)
+  const reach = [], anteced = [];
+  for (let i = 0; i < n; i++) {
+    const ri = new Set(), ai = new Set();
+    for (let j = 0; j < n; j++) {
+      if (B[i][j] === 1) ri.add(j);
+      if (B[j][i] === 1) ai.add(j);
+    }
+    reach.push(ri); anteced.push(ai);
+  }
+  // 4) Extracción iterativa de niveles
+  const levels = [];
+  const assigned = new Set();
+  let safety = 0;
+  while (assigned.size < n && safety++ < n + 2) {
+    const lvl = [];
+    for (let i = 0; i < n; i++) {
+      if (assigned.has(i)) continue;
+      // intersección de reach[i] y anteced[i], restringida a no asignados
+      const R = [...reach[i]].filter(x => !assigned.has(x));
+      const A = [...anteced[i]].filter(x => !assigned.has(x));
+      const inter = R.filter(x => A.includes(x));
+      // Si Reach ∩ Antecedent == Reach (sin contar los ya asignados) → este nivel
+      if (R.length === inter.length && R.every(x => inter.includes(x))) lvl.push(i);
+    }
+    if (lvl.length === 0) {
+      // ciclo no resoluble: meter el resto en un último nivel
+      for (let i = 0; i < n; i++) if (!assigned.has(i)) lvl.push(i);
+    }
+    lvl.forEach(i => assigned.add(i));
+    levels.push(lvl);
+  }
+  // El primer nivel extraído es el de abajo (más dependientes). Invertimos
+  // para que el array vaya de raíces (arriba) → hojas (abajo).
+  levels.reverse();
+  return { n, threshold, levels };
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// VIEWS — tabs (MicMac / DEMATEL / ISM)
+// ═════════════════════════════════════════════════════════════════════════
+
+let _currentView = 'micmac';
+let _chartDemInstance = null;
+
+function setView(view) {
+  _currentView = view;
+  document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
+  document.querySelectorAll('.view-pane').forEach(p => p.classList.toggle('active', p.id === 'view-' + view));
+  if (view === 'micmac') renderResults();
+  else if (view === 'dematel') renderDEMATEL();
+  else if (view === 'ism') renderISM();
+}
+
+function renderDEMATEL() {
+  const res = computeDEMATEL();
+  const rankEl = document.getElementById('dematel-ranking');
+  if (!res) {
+    rankEl.innerHTML = '<p class="empty-msg">Necesitas al menos 2 variables y celdas calificadas para ver DEMATEL.</p>';
+    if (_chartDemInstance) { _chartDemInstance.destroy(); _chartDemInstance = null; }
+    return;
+  }
+  const accent = getComputedStyle(document.body).getPropertyValue('--accent').trim();
+  const green = getComputedStyle(document.body).getPropertyValue('--green').trim();
+  const amber = getComputedStyle(document.body).getPropertyValue('--amber').trim();
+  const ink3 = getComputedStyle(document.body).getPropertyValue('--ink-3').trim();
+  const ink = getComputedStyle(document.body).getPropertyValue('--ink').trim();
+  const ruleStrong = getComputedStyle(document.body).getPropertyValue('--rule-strong').trim();
+  const colorOf = c => ({
+    'causa': green,
+    'causa-central': accent,
+    'efecto-autonomo': ink3,
+    'efecto-central': amber
+  }[c]);
+
+  const data = STATE.vars.map((v, i) => ({
+    x: res.prom[i], y: res.rel[i],
+    label: 'V' + String(i + 1).padStart(2, '0'),
+    name: v, cuadrante: res.cuadrante[i]
+  }));
+
+  const maxP = Math.max(...res.prom);
+  const maxAbsR = Math.max(...res.rel.map(Math.abs));
+  const xMax = Math.max(0.001, maxP * 1.05);
+  const yLim = Math.max(0.001, maxAbsR * 1.15);
+
+  const ctx = document.getElementById('chart-dematel').getContext('2d');
+  if (_chartDemInstance) _chartDemInstance.destroy();
+  _chartDemInstance = new Chart(ctx, {
+    type: 'scatter',
+    data: { datasets: [{
+      label: 'Variables', data,
+      backgroundColor: data.map(d => colorOf(d.cuadrante)),
+      borderColor: data.map(d => colorOf(d.cuadrante)),
+      pointRadius: 7, pointHoverRadius: 11, pointBorderWidth: 2
+    }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: {
+          title: { display: true, text: 'Prominencia · R+C (cuánto se involucra)', font: { family: 'Space Mono', size: 11 }, color: ink3 },
+          min: 0, max: xMax,
+          grid: { color: ruleStrong },
+          ticks: { font: { family: 'Space Mono', size: 10 }, color: ink3 }
+        },
+        y: {
+          title: { display: true, text: 'Relación · R−C  (+ causa · − efecto)', font: { family: 'Space Mono', size: 11 }, color: ink3 },
+          min: -yLim, max: yLim,
+          grid: { color: ruleStrong },
+          ticks: { font: { family: 'Space Mono', size: 10 }, color: ink3 }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(20,17,10,0.95)',
+          titleFont: { family: 'Familjen Grotesk', size: 12, weight: '700' },
+          bodyFont: { family: 'Space Mono', size: 11 },
+          padding: 10,
+          callbacks: {
+            title: items => items[0].raw.name,
+            label: c => [c.raw.label + ' · ' + c.raw.cuadrante.replace('-', ' ').toUpperCase(),
+                         'R+C: ' + c.raw.x.toFixed(2),
+                         'R−C: ' + c.raw.y.toFixed(2)]
+          }
+        }
+      }
+    },
+    plugins: [{
+      id: 'dematelLines',
+      afterDraw(chart) {
+        const { ctx, chartArea, scales } = chart;
+        const xMid = scales.x.getPixelForValue(res.medP);
+        const yZero = scales.y.getPixelForValue(0);
+        ctx.save();
+        ctx.strokeStyle = accent; ctx.globalAlpha = .35;
+        ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(chartArea.left, yZero); ctx.lineTo(chartArea.right, yZero);
+        ctx.moveTo(xMid, chartArea.top); ctx.lineTo(xMid, chartArea.bottom);
+        ctx.stroke(); ctx.restore();
+      }
+    }, {
+      id: 'demLabels',
+      afterDatasetsDraw(chart) {
+        const { ctx } = chart;
+        const ds = chart.getDatasetMeta(0);
+        ctx.save();
+        ctx.font = '600 9px "Space Mono", monospace';
+        ctx.fillStyle = ink;
+        ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ds.data.forEach((pt, i) => ctx.fillText(data[i].label, pt.x + 9, pt.y));
+        ctx.restore();
+      }
+    }]
+  });
+
+  // Ranking DEMATEL: cuadrantes
+  const groups = {
+    'causa-central':  { title: 'Causas centrales',  cls: 't-key',   desc: 'Lanzan mucho y están muy involucradas. Palancas.' },
+    'causa':          { title: 'Causas',            cls: 't-motri', desc: 'Lanzan más de lo que reciben.' },
+    'efecto-central': { title: 'Efectos centrales', cls: 't-dep',   desc: 'Reciben mucho y muy involucradas. Resultados clave.' },
+    'efecto-autonomo':{ title: 'Efectos autónomos', cls: 't-auto',  desc: 'Reciben pero poco involucradas. Marginales.' }
+  };
+  let html = '';
+  for (const key of ['causa-central','causa','efecto-central','efecto-autonomo']) {
+    const vars = STATE.vars
+      .map((v, i) => ({ name: v, i, code: 'V' + String(i + 1).padStart(2, '0'), p: res.prom[i], r: res.rel[i] }))
+      .filter(x => res.cuadrante[x.i] === key)
+      .sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
+    if (vars.length === 0) continue;
+    html += `<div class="rank-group">
+      <div class="rank-title ${groups[key].cls}"><span class="rank-dot"></span>${groups[key].title}<span class="group-count">(${vars.length})</span></div>
+      <ul class="rank-list">
+        ${vars.map(x => `<li>
+          <span class="rk-code">${x.code}</span>
+          <span class="rk-name" title="${escapeHtml(x.name)}">${escapeHtml(x.name)}</span>
+          <span class="rk-score">${x.r >= 0 ? '+' : ''}${x.r.toFixed(2)}</span>
+        </li>`).join('')}
+      </ul>
+    </div>`;
+  }
+  rankEl.innerHTML = html || '<p class="empty-msg">Sin datos suficientes.</p>';
+}
+
+function renderISM() {
+  const sel = document.getElementById('ism-threshold');
+  const threshold = sel ? parseInt(sel.value, 10) : 2;
+  const res = computeISM(threshold);
+  const diag = document.getElementById('ism-diagram');
+  if (!res) {
+    diag.innerHTML = '<p class="ism-empty">Necesitas al menos 2 variables y celdas calificadas para ver la jerarquía.</p>';
+    return;
+  }
+  if (res.levels.length === 0 || res.levels.every(l => l.length === 0)) {
+    diag.innerHTML = '<p class="ism-empty">Con este umbral no hay influencias suficientes para construir la jerarquía. Prueba un umbral más bajo.</p>';
+    return;
+  }
+  const totalLvls = res.levels.length;
+  const labelFor = (idx, total) => {
+    if (total === 1) return 'Nivel único';
+    if (idx === 0) return 'Raíces · determinan';
+    if (idx === total - 1) return 'Hojas · resultan';
+    return 'Intermedio';
+  };
+  const html = res.levels.map((lvl, idx) => {
+    const lvlVars = lvl.map(i => `<span class="ism-var"><span class="iv-code">V${String(i + 1).padStart(2, '0')}</span><span>${escapeHtml(STATE.vars[i])}</span></span>`).join('');
+    return `<div class="ism-level">
+      <div class="ism-level-tag">
+        <span class="lvl-num">Nivel ${idx + 1} / ${totalLvls}</span>
+        <span class="lvl-name">${labelFor(idx, totalLvls)}</span>
+      </div>
+      <div class="ism-level-vars">${lvlVars || '<span style="font-family:var(--italic);font-style:italic;color:var(--ink-3)">vacío</span>'}</div>
+    </div>`;
+  }).join('');
+  diag.innerHTML = html;
 }
 
 // ═════════════════════════════════════════════════════════════════════════
