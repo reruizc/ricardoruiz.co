@@ -680,6 +680,97 @@ table.matrix td.cell:focus { outline: 2px solid var(--accent); outline-offset: -
   letter-spacing: .08em; color: var(--ink-3); margin-top: .15rem; font-weight: 400;
 }
 
+/* ───────── TERRITORIO bar — selector compacto ───────── */
+.terri-bar {
+  display: flex; align-items: center; gap: .85rem; flex-wrap: wrap;
+  padding: .8rem 1.1rem;
+  background: var(--paper-2); border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent-2);
+  margin-bottom: 1.2rem;
+  font-family: var(--mono); font-size: 12px; color: var(--ink-2);
+}
+.terri-label {
+  display: inline-flex; align-items: center; gap: .5rem;
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: .04em;
+  color: var(--ink-2);
+}
+.terri-icon { font-family: var(--sans); font-size: 1.1rem; color: var(--accent); }
+.terri-select {
+  font-family: var(--mono); font-size: 12px;
+  background: var(--paper-3); color: var(--ink);
+  border: 1px solid var(--rule-strong); padding: .45rem .65rem;
+  outline: none; cursor: none; min-width: 220px;
+}
+.terri-select:focus { border-color: var(--accent); }
+.terri-select option { background: var(--paper); color: var(--ink); }
+.terri-help {
+  flex: 1; min-width: 240px;
+  font-family: var(--italic); font-style: italic; font-size: .82rem;
+  color: var(--ink-3);
+}
+
+/* Badge "DATO" sobre chips de variables que matchean un indicador */
+.var-chip-ind {
+  font-family: var(--mono); font-size: 9.5px; font-weight: 700;
+  letter-spacing: .12em; padding: .15rem .42rem;
+  background: var(--accent-soft); color: var(--accent);
+  border: 1px solid var(--accent-tint);
+  cursor: none; margin-left: .3rem;
+  transition: background .15s, color .15s;
+}
+.var-chip-ind:hover { background: var(--accent); color: var(--on-accent); }
+
+/* Panel de indicador (inline, abajo del grid de chips) */
+#indicator-panel {
+  margin-top: 1rem;
+}
+.indicator-card {
+  background: var(--paper-2); border-left: 3px solid var(--accent);
+  border: 1px solid var(--accent-tint); padding: 1.2rem 1.4rem;
+}
+.indicator-card .ind-eyebrow {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--accent); margin-bottom: .5rem;
+}
+.indicator-card .ind-name {
+  font-family: var(--sans); font-weight: 700; font-size: 1.15rem;
+  color: var(--ink); margin-bottom: .85rem; letter-spacing: -.01em;
+}
+.indicator-card .ind-value-row {
+  display: flex; gap: 2rem; flex-wrap: wrap; margin-bottom: .8rem;
+}
+.indicator-card .ind-value-block { min-width: 120px; }
+.indicator-card .ind-value-label {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--ink-3); margin-bottom: .2rem;
+}
+.indicator-card .ind-value {
+  font-family: var(--sans); font-weight: 700; font-size: 1.8rem;
+  color: var(--accent); line-height: 1;
+}
+.indicator-card .ind-unit {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-3);
+  margin-left: .35rem; font-weight: 400;
+}
+.indicator-card .ind-nota {
+  font-family: var(--italic); font-style: italic; font-size: .92rem;
+  line-height: 1.55; color: var(--ink-2); margin-bottom: .7rem;
+}
+.indicator-card .ind-fuente {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-3);
+  letter-spacing: .04em;
+}
+.indicator-card .ind-close {
+  float: right; font-family: var(--mono); font-size: 1.1rem;
+  background: none; border: none; color: var(--ink-3); cursor: none;
+  margin: -.4rem -.4rem 0 0;
+}
+.indicator-card .ind-close:hover { color: var(--danger); }
+.indicator-card .ind-disc {
+  font-family: var(--italic); font-style: italic; font-size: .82rem;
+  color: var(--ink-3); margin-top: .9rem; padding-top: .6rem; border-top: 1px solid var(--rule);
+}
+
 /* ───────── COPILOTO IA — barra de acción y resultado ───────── */
 .ia-bar {
   display: flex; align-items: center; gap: 1.1rem; flex-wrap: wrap;
@@ -1560,7 +1651,21 @@ footer.foot a:hover { color: var(--accent); }
         Edita, agrega o quita variables según tu caso. Recomendamos entre 10 y
         25: menos pierde resolución, más vuelve pesada la captura de la matriz.
       </p>
+
+      <div class="terri-bar">
+        <label class="terri-label">
+          <span class="terri-icon">⌖</span>
+          Territorio del análisis (opcional):
+        </label>
+        <select id="terri-select" class="terri-select" onchange="setTerritorio(this.value)">
+          <option value="">— sin definir —</option>
+          <option value="nacional">Colombia (nacional)</option>
+        </select>
+        <span class="terri-help">Si lo eliges, te mostramos cifras públicas de referencia sobre las variables sugeridas que coinciden con indicadores oficiales.</span>
+      </div>
+
       <div class="vars-grid" id="vars-grid"></div>
+      <div class="ia-result" id="indicator-panel" style="display:none"></div>
       <div class="vars-add-row">
         <input type="text" class="vars-add-input" id="vars-add-input" placeholder="Nombre de la nueva variable…" onkeydown="if(event.key==='Enter')addVar()"/>
         <button class="btn-ghost" onclick="addVar()">+ Agregar variable</button>
@@ -1631,7 +1736,7 @@ footer.foot a:hover { color: var(--accent); }
       <div class="ia-icon">✦</div>
       <div class="ia-body">
         <div class="ia-title">Revisar consistencia de la matriz con IA</div>
-        <div class="ia-sub">El copiloto detecta triángulos contradictorios, variables huérfanas y patrones improbables. Útil antes de ver resultados. Plan Pro o superior.</div>
+        <div class="ia-sub">El copiloto detecta triángulos contradictorios, variables huérfanas y patrones improbables. Útil antes de ver resultados. Plan Premium o superior.</div>
       </div>
       <button class="btn" id="ia-matriz-btn" onclick="iaValidarMatriz()">Revisar matriz</button>
     </div>
@@ -1965,6 +2070,105 @@ footer.foot a:hover { color: var(--accent); }
 
 <script>
 'use strict';
+
+// ═════════════════════════════════════════════════════════════════════════
+// CATÁLOGO DE INDICADORES PÚBLICOS DE COLOMBIA
+// 16 indicadores clave del DANE, MOE, MinSalud y PNP. Valores nacionales
+// más recientes a 2024-2025. Sirven como referencia de magnitud cuando la
+// variable de tu sistema corresponde a un fenómeno medido oficialmente.
+// El usuario tiene los datos crudos a un clic — no le proponemos un valor
+// para que califique la matriz; le damos contexto para que decida mejor.
+// ═════════════════════════════════════════════════════════════════════════
+
+const INDICATORS = [
+  { id:'ipm',           nombre:'Pobreza multidimensional (IPM)',  keywords:['pobreza multidimensional','ipm','pobreza multi'],
+    valor_nal:12.1, unidad:'% personas', anio:2023, fuente:'DANE · IPM',
+    nota:'Hogares con privaciones en 5 dimensiones: educación, niñez, trabajo, salud, vivienda.' },
+  { id:'pobreza-monetaria', nombre:'Pobreza monetaria',           keywords:['pobreza monetaria','pobreza por ingresos','linea de pobreza'],
+    valor_nal:33.0, unidad:'% personas', anio:2023, fuente:'DANE · GEIH',
+    nota:'Personas en hogares con ingreso per cápita por debajo de la línea de pobreza.' },
+  { id:'pobreza-extrema', nombre:'Pobreza extrema',                keywords:['pobreza extrema','indigencia'],
+    valor_nal:11.4, unidad:'% personas', anio:2023, fuente:'DANE · GEIH',
+    nota:'Personas en hogares por debajo de la línea de pobreza extrema (canasta básica alimentaria).' },
+  { id:'desempleo',     nombre:'Tasa de desempleo',                keywords:['desempleo','desocupacion','td','tasa de desempleo'],
+    valor_nal:10.1, unidad:'% PEA', anio:2024, fuente:'DANE · GEIH',
+    nota:'Personas en edad de trabajar que buscan empleo activamente y no encuentran.' },
+  { id:'informalidad',  nombre:'Informalidad laboral',             keywords:['informalidad','empleo informal','informales','informal'],
+    valor_nal:56.2, unidad:'% ocupados', anio:2024, fuente:'DANE · GEIH',
+    nota:'Ocupados que no cotizan a salud o pensión por su empleo principal.' },
+  { id:'empleo-formal', nombre:'Empleo formal',                    keywords:['empleo formal','formalidad','formalidad laboral','trabajo formal'],
+    valor_nal:43.8, unidad:'% ocupados', anio:2024, fuente:'DANE · GEIH (calculado como 100-informalidad)',
+    nota:'Complemento de la informalidad: ocupados que sí cotizan.' },
+  { id:'homicidios',    nombre:'Tasa de homicidios',               keywords:['homicidio','homicidios','tasa de homicidio'],
+    valor_nal:25.7, unidad:'por 100 mil hab.', anio:2024, fuente:'Policía Nacional · DIJIN',
+    nota:'Casos por año por cada 100.000 habitantes. Colombia tuvo ~13.300 homicidios en 2024.' },
+  { id:'hurto-personas', nombre:'Hurto a personas',                keywords:['hurto a personas','hurto personas','robo a personas'],
+    valor_nal:760, unidad:'por 100 mil hab.', anio:2024, fuente:'Policía Nacional · DIJIN',
+    nota:'Denuncias formales por año. El subregistro real es estimado en 50-70%.' },
+  { id:'violencia-intrafamiliar', nombre:'Violencia intrafamiliar', keywords:['violencia intrafamiliar','vif','violencia familiar'],
+    valor_nal:215, unidad:'por 100 mil hab.', anio:2024, fuente:'Medicina Legal · INMLCF',
+    nota:'Casos atendidos por Medicina Legal. Tres cuartas partes con víctima mujer.' },
+  { id:'cobertura-salud', nombre:'Cobertura de aseguramiento en salud', keywords:['cobertura salud','aseguramiento salud','cobertura aseguramiento'],
+    valor_nal:99.6, unidad:'% población', anio:2024, fuente:'MinSalud · BDUA',
+    nota:'Afiliación a régimen contributivo + subsidiado. No mide calidad ni acceso real.' },
+  { id:'cobertura-primaria', nombre:'Cobertura educativa básica primaria', keywords:['cobertura primaria','cobertura basica primaria','primaria'],
+    valor_nal:98.5, unidad:'% neta', anio:2023, fuente:'MEN · SIMAT',
+    nota:'Niños 6-10 años matriculados en primaria sobre población de esa edad.' },
+  { id:'cobertura-media', nombre:'Cobertura educativa media',     keywords:['cobertura media','educacion media','cobertura secundaria media'],
+    valor_nal:48.2, unidad:'% neta', anio:2023, fuente:'MEN · SIMAT',
+    nota:'Jóvenes 15-16 años matriculados en grados 10-11. El indicador con mayor brecha urbano-rural.' },
+  { id:'cobertura-terciaria', nombre:'Cobertura en educación superior', keywords:['cobertura terciaria','educacion superior','cobertura superior','universidad'],
+    valor_nal:54.6, unidad:'% bruta', anio:2023, fuente:'MEN · SNIES',
+    nota:'Matriculados en pregrado o posgrado sobre población 17-21 años (incluye estudiantes fuera del rango etario).' },
+  { id:'internet',      nombre:'Cobertura de internet móvil',       keywords:['internet','cobertura internet','conectividad','banda ancha'],
+    valor_nal:82.4, unidad:'% hogares', anio:2024, fuente:'DANE · ENCV / MinTIC',
+    nota:'Hogares con acceso a internet (fijo o móvil). Brecha urbano-rural significativa.' },
+  { id:'agua-potable',  nombre:'Cobertura de agua potable',        keywords:['agua potable','acueducto','agua segura'],
+    valor_nal:93.5, unidad:'% hogares', anio:2023, fuente:'SUI · Superservicios',
+    nota:'Hogares conectados a acueducto. Rural cae a ~70%, hay brechas regionales fuertes.' },
+  { id:'embarazo-adolescente', nombre:'Embarazo adolescente',      keywords:['embarazo adolescente','embarazo en adolescentes','fecundidad adolescente'],
+    valor_nal:13.5, unidad:'% mujeres 15-19', anio:2023, fuente:'DANE · estadísticas vitales',
+    nota:'Adolescentes 15-19 que ya son madres o están embarazadas (ENDS).' }
+];
+
+function _normName(s) {
+  return String(s || '').toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+function matchIndicator(varName) {
+  const n = _normName(varName);
+  if (!n) return null;
+  for (const ind of INDICATORS) {
+    for (const kw of ind.keywords) {
+      if (n.includes(kw)) return ind;
+    }
+  }
+  return null;
+}
+
+// Departamentos de Colombia (cod DANE + nombre). Se usa en el selector
+// de territorio de la etapa 02.
+const DEPTOS_CO = [
+  { cod:'05', n:'Antioquia' },         { cod:'08', n:'Atlántico' },
+  { cod:'11', n:'Bogotá D.C.' },       { cod:'13', n:'Bolívar' },
+  { cod:'15', n:'Boyacá' },            { cod:'17', n:'Caldas' },
+  { cod:'18', n:'Caquetá' },           { cod:'19', n:'Cauca' },
+  { cod:'20', n:'Cesar' },             { cod:'23', n:'Córdoba' },
+  { cod:'25', n:'Cundinamarca' },      { cod:'27', n:'Chocó' },
+  { cod:'41', n:'Huila' },             { cod:'44', n:'La Guajira' },
+  { cod:'47', n:'Magdalena' },         { cod:'50', n:'Meta' },
+  { cod:'52', n:'Nariño' },            { cod:'54', n:'Norte de Santander' },
+  { cod:'63', n:'Quindío' },           { cod:'66', n:'Risaralda' },
+  { cod:'68', n:'Santander' },         { cod:'70', n:'Sucre' },
+  { cod:'73', n:'Tolima' },            { cod:'76', n:'Valle del Cauca' },
+  { cod:'81', n:'Arauca' },            { cod:'85', n:'Casanare' },
+  { cod:'86', n:'Putumayo' },          { cod:'88', n:'San Andrés y Providencia' },
+  { cod:'91', n:'Amazonas' },          { cod:'94', n:'Guainía' },
+  { cod:'95', n:'Guaviare' },          { cod:'97', n:'Vaupés' },
+  { cod:'99', n:'Vichada' }
+];
 
 // ═════════════════════════════════════════════════════════════════════════
 // PLANTILLAS (11) — cada una con tags para matching automático con wizard
@@ -2779,18 +2983,86 @@ function showStage(id) {
 
 function renderVars() {
   const grid = document.getElementById('vars-grid');
-  grid.innerHTML = STATE.vars.map((v, i) =>
-    `<div class="var-chip">
+  grid.innerHTML = STATE.vars.map((v, i) => {
+    const ind = matchIndicator(v);
+    const indBadge = ind ? `<button class="var-chip-ind" onclick="showIndicator('${ind.id}',${i})" title="Indicador público asociado: ${escapeHtml(ind.nombre)}">DATO</button>` : '';
+    return `<div class="var-chip">
       <span class="var-chip-code">V${String(i + 1).padStart(2, '0')}</span>
       <span class="var-chip-name" contenteditable="true" spellcheck="false"
             onblur="renameVar(${i}, this.innerText)"
             onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${escapeHtml(v)}</span>
+      ${indBadge}
       <button class="var-chip-del" onclick="delVar(${i})" title="Eliminar">×</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   const n = STATE.vars.length;
   document.getElementById('vars-count').textContent = n;
   document.getElementById('vars-cells').textContent = n * (n - 1);
   document.getElementById('vars-tpl').textContent = STATE.meta.nombre || '—';
+  _populateTerritorioSelect();
+}
+
+function _populateTerritorioSelect() {
+  const sel = document.getElementById('terri-select');
+  if (!sel) return;
+  // Solo poblar una vez (si ya tiene 3+ opciones, ya está)
+  if (sel.options.length < 3) {
+    const optsHtml = DEPTOS_CO.map(d => `<option value="depto:${d.cod}">${d.n}</option>`).join('');
+    sel.insertAdjacentHTML('beforeend', optsHtml);
+  }
+  const t = STATE.meta?.territorio;
+  if (t) sel.value = t.tipo === 'nacional' ? 'nacional' : (t.tipo === 'depto' ? 'depto:' + t.codigo : '');
+  else sel.value = '';
+}
+
+function setTerritorio(val) {
+  if (!val) { STATE.meta.territorio = null; }
+  else if (val === 'nacional') { STATE.meta.territorio = { tipo:'nacional', codigo:null, nombre:'Colombia' }; }
+  else if (val.startsWith('depto:')) {
+    const cod = val.slice(6);
+    const d = DEPTOS_CO.find(x => x.cod === cod);
+    STATE.meta.territorio = d ? { tipo:'depto', codigo:d.cod, nombre:d.n } : null;
+  }
+  saveState();
+}
+
+function showIndicator(indId, varIdx) {
+  const ind = INDICATORS.find(i => i.id === indId);
+  if (!ind) return;
+  const panel = document.getElementById('indicator-panel');
+  const terri = STATE.meta?.territorio;
+  const valStr = (typeof ind.valor_nal === 'number') ? ind.valor_nal.toFixed(ind.valor_nal % 1 === 0 ? 0 : 1) : ind.valor_nal;
+  const territorioLinea = terri && terri.tipo !== 'nacional'
+    ? `<div class="ind-value-block">
+        <div class="ind-value-label">Tu territorio · ${escapeHtml(terri.nombre)}</div>
+        <div class="ind-value" style="color:var(--ink-3)">—</div>
+       </div>
+       <div class="ind-disc" style="margin:0;padding:0;border:none">
+         Aún no precargamos el dato departamental para este indicador. Aparecerá en una próxima versión con datos DANE/PNP territoriales.
+       </div>`
+    : '';
+  panel.style.display = 'block';
+  panel.innerHTML = `
+    <div class="indicator-card">
+      <button class="ind-close" onclick="hideIndicator()">×</button>
+      <div class="ind-eyebrow">Indicador público · referencia para V${String(varIdx+1).padStart(2,'0')}</div>
+      <div class="ind-name">${escapeHtml(ind.nombre)}</div>
+      <div class="ind-value-row">
+        <div class="ind-value-block">
+          <div class="ind-value-label">Colombia · ${ind.anio}</div>
+          <div class="ind-value">${valStr}<span class="ind-unit">${escapeHtml(ind.unidad)}</span></div>
+        </div>
+        ${territorioLinea}
+      </div>
+      <div class="ind-nota">${escapeHtml(ind.nota)}</div>
+      <div class="ind-fuente">Fuente: ${escapeHtml(ind.fuente)}</div>
+      <div class="ind-disc">Esta cifra es <b>referencia de magnitud</b>, no tu medición. Sirve para que sepas en qué orden están las cifras nacionales cuando estés calificando la matriz. El copiloto IA puede usar este contexto si lo activas en el paso 04.</div>
+    </div>`;
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+function hideIndicator() {
+  const p = document.getElementById('indicator-panel');
+  if (p) { p.style.display = 'none'; p.innerHTML = ''; }
 }
 function addVar() {
   const inp = document.getElementById('vars-add-input');
@@ -4051,12 +4323,24 @@ async function iaNarrativa() {
   out.style.display = 'block';
   out.innerHTML = '<div class="ia-result-eyebrow">Copiloto · redactando lectura</div><div class="ia-loading"><span class="ia-loading-dot"></span> El consultor IA está leyendo MicMac, DEMATEL e ISM y redactando la interpretación. Toma 15-25 segundos.</div>';
 
+  // Construir contexto: nombre del proyecto + territorio + indicadores que matchean
+  const terri = STATE.meta?.territorio;
+  const indicadoresMatch = STATE.vars.map((v, i) => {
+    const ind = matchIndicator(v);
+    return ind ? `V${String(i+1).padStart(2,'0')} (${v}) ≈ ${ind.nombre}: ${ind.valor_nal}${ind.unidad} ${ind.anio} (${ind.fuente})` : null;
+  }).filter(Boolean);
+  const ctxParts = [];
+  if (STATE.meta?.nombre) ctxParts.push('Plantilla: ' + STATE.meta.nombre);
+  if (terri) ctxParts.push('Territorio: ' + terri.nombre + ' (' + terri.tipo + ')');
+  if (indicadoresMatch.length) ctxParts.push('Indicadores oficiales asociados a variables:\n' + indicadoresMatch.join('\n'));
+  const contextoFull = ctxParts.join('\n');
+
   const payload = {
     vars: STATE.vars,
     micmac: { motriN: mic.motriN, depN: mic.depN, cuadrante: mic.cuadrante },
     dematel: dem ? { prom: dem.prom, rel: dem.rel, cuadrante: dem.cuadrante } : null,
     ism: ism ? { levels: ism.levels, threshold: ism.threshold } : null,
-    contexto: STATE.meta?.nombre || ''
+    contexto: contextoFull
   };
   const r = await apiCall('/micmac/copiloto', {
     method: 'POST',
@@ -4191,7 +4475,7 @@ async function iaContextoRelacion(i, j) {
 // ── Acción · validar-matriz (consistencia) ─────────────────────────────
 async function iaValidarMatriz() {
   if (!AUTH.isLogged) { openModal('modal-login'); return; }
-  if (!_userHasTier(1)) { iaShowGate('ia-matriz-result', 'Pro', 'La revisión de consistencia de matriz está disponible en plan Pro o superior.'); return; }
+  if (!_userHasTier(2)) { iaShowGate('ia-matriz-result', 'Premium', 'La revisión de consistencia de matriz está disponible en plan Premium o superior.'); return; }
   if (STATE.vars.length < 3) { showToast('Necesitas al menos 3 variables para detectar contradicciones.'); return; }
   const { filled, total } = countFilled();
   if (filled < 6) { showToast('Califica al menos 6 celdas antes de revisar consistencia.'); return; }
