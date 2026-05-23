@@ -1,0 +1,1850 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Análisis de Actores y Conflictos · Ricardo.Ruiz</title>
+<meta name="description" content="Mapa de actores, alianzas y conflictos sobre objetivos de política pública. Inspirado en el método Mactor (Godet) y adaptado para Colombia." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --paper:#1a1610; --paper-2:#221d15; --paper-3:#2a241b;
+  --ink:#f4f3ef; --ink-2:#b8b1a0; --ink-3:#807a6c;
+  --rule:#f4f3ef1c; --rule-strong:#f4f3ef38;
+  --accent:#d96a50; --accent-2:#e08266;
+  --accent-soft:#d96a5018; --accent-tint:#d96a5036;
+  --gold:#d6a83a; --on-accent:#14110a;
+  --green:#6fa07a; --amber:#d6a83a; --danger:#d96a50;
+  --sans:'Familjen Grotesk',system-ui,sans-serif;
+  --italic:'Petrona',Georgia,serif;
+  --mono:'Space Mono',ui-monospace,monospace;
+  --display:'Syne',sans-serif;
+}
+body.day-mode {
+  --paper:#f4f3ef; --paper-2:#ecebe5; --paper-3:#e0ddd2;
+  --ink:#14110a; --ink-2:#5a5448; --ink-3:#948e80;
+  --rule:#14110a1f; --rule-strong:#14110a40;
+  --accent:#8a1e16; --accent-2:#a02a20;
+  --accent-soft:#8a1e161a; --accent-tint:#8a1e1633;
+  --gold:#8a6a1a; --on-accent:#f4f3ef;
+  --green:#2f6b3f; --amber:#8a6a1a; --danger:#b03524;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html { scroll-behavior:smooth; }
+body {
+  background:var(--paper); color:var(--ink);
+  font-family:var(--sans); font-size:17px; line-height:1.55;
+  min-height:100vh; overflow-x:hidden; cursor:none;
+  transition:background .35s, color .35s;
+}
+a { color:inherit; text-decoration:none; }
+button { font:inherit; color:inherit; background:none; border:none; cursor:none; }
+::selection { background:var(--accent); color:var(--on-accent); }
+body.day-mode::before {
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image:radial-gradient(rgba(20,17,10,.035) 1px, transparent 1.4px);
+  background-size:4px 4px; opacity:.9; mix-blend-mode:multiply;
+}
+.cursor { position:fixed; width:12px; height:12px; background:var(--accent); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s, background .2s; transform:translate(-50%,-50%); }
+.cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--accent); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s, opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+
+/* Topbar */
+.topbar {
+  position:sticky; top:0; z-index:60;
+  display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:1.5rem;
+  padding:1rem 1.75rem;
+  background:var(--paper); border-bottom:1px solid var(--rule); backdrop-filter:blur(8px);
+}
+.topbar-left,.topbar-center,.topbar-right { display:flex; align-items:center; gap:1.1rem; }
+.topbar-right { justify-content:flex-end; }
+.btn-back {
+  display:inline-flex; align-items:center; gap:.55rem;
+  font-family:var(--sans); font-size:14px; font-weight:500; letter-spacing:.04em;
+  padding:.5rem .9rem; border:1px solid var(--rule-strong); transition:background .2s, border-color .2s;
+}
+.btn-back:hover { background:var(--paper-2); border-color:var(--ink); }
+.theme-btn {
+  font-family:var(--mono); font-size:12px; font-weight:700; color:var(--ink-2);
+  padding:.45rem .8rem; border:1px solid var(--rule-strong);
+  transition:color .2s, border-color .2s;
+}
+.theme-btn:hover { color:var(--ink); border-color:var(--ink); }
+.logo-link { display:inline-flex; align-items:center; gap:.55rem; opacity:.9; }
+.logo-link:hover { opacity:1; }
+.logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
+.logo-bar { width:5px; background:var(--accent); border-radius:1px 1px 0 0; opacity:.9; }
+.logo-text { font-family:var(--display); font-weight:800; font-size:clamp(1.05rem,2vw,1.4rem); letter-spacing:-.03em; line-height:1; }
+.logo-text span { color:var(--accent); }
+
+.page {
+  position:relative; z-index:1;
+  max-width:980px; width:100%; margin:0 auto;
+  padding:2.4rem 1.75rem 5rem;
+}
+@media (max-width:720px) {
+  .page { padding:1.6rem 1.1rem 3rem; }
+  .topbar { grid-template-columns:1fr auto; padding:.85rem 1rem; }
+  .topbar-center { display:none; }
+  .topbar-right .logo-link { display:none; }
+}
+.crumb {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3); margin-bottom:1.8rem;
+}
+.crumb a { color:var(--ink-3); transition:color .2s; }
+.crumb a:hover { color:var(--accent); }
+.crumb .sep { margin:0 .55rem; opacity:.55; }
+
+/* Welcome */
+.welcome { text-align:center; padding:1.5rem 0 2rem; }
+.eyebrow {
+  font-family:var(--mono); font-size:12px; letter-spacing:.22em;
+  text-transform:uppercase; color:var(--accent); font-weight:700; margin-bottom:1.4rem;
+}
+.welcome-title {
+  font-family:var(--sans); font-weight:700;
+  font-size:clamp(2rem,5vw,3rem); letter-spacing:-.025em; line-height:1.1;
+  max-width:24ch; margin:0 auto 1.4rem;
+}
+.welcome-title em { font-family:var(--italic); font-style:italic; font-weight:400; color:var(--accent); }
+.welcome-sub {
+  font-family:var(--sans); font-size:clamp(1rem,1.5vw,1.18rem); line-height:1.55;
+  color:var(--ink-2); max-width:54ch; margin:0 auto 2rem;
+}
+.welcome-hint {
+  font-family:var(--mono); font-size:12px; letter-spacing:.04em; color:var(--ink-3);
+  max-width:54ch; margin:0 auto 2rem; line-height:1.6;
+}
+
+.accordion-stack {
+  display:flex; flex-direction:column; gap:.5rem;
+  max-width:640px; margin:2.6rem auto 2.4rem; text-align:left;
+}
+.accordion {
+  border:1px solid var(--rule-strong); background:var(--paper-2);
+  transition:background .2s, border-color .2s;
+}
+.accordion[open] { border-color:var(--accent-tint); background:var(--paper-3); }
+.accordion summary {
+  display:flex; align-items:center; justify-content:space-between; gap:1rem;
+  padding:1rem 1.2rem; list-style:none; cursor:none;
+  font-family:var(--sans); font-weight:600; font-size:.98rem;
+  user-select:none;
+}
+.accordion summary::-webkit-details-marker { display:none; }
+.accordion summary::after {
+  content:"+"; font-family:var(--mono); font-size:1.2rem; color:var(--accent);
+  width:18px; height:18px; display:flex; align-items:center; justify-content:center;
+  transition:transform .2s;
+}
+.accordion[open] summary::after { content:"−"; }
+.accordion summary .acc-num {
+  font-family:var(--mono); font-size:11px; color:var(--ink-3);
+  letter-spacing:.12em; margin-right:.9rem; font-weight:400;
+}
+.accordion-body {
+  padding:0 1.2rem 1.2rem;
+  font-family:var(--italic); font-style:italic; font-size:1rem; line-height:1.6; color:var(--ink-2);
+}
+.accordion-body em { color:var(--accent); }
+
+/* Botones */
+.btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+  font-family:var(--sans); font-weight:600; font-size:.98rem;
+  padding:.95rem 1.8rem;
+  background:var(--accent); color:var(--on-accent); border:none;
+  transition:background .2s, transform .1s;
+}
+.btn:hover { background:var(--accent-2); }
+.btn:active { transform:scale(.98); }
+.btn[disabled] { opacity:.35; pointer-events:none; }
+.btn-ghost {
+  background:transparent; color:var(--ink-2);
+  border:1px solid var(--rule-strong);
+  padding:.85rem 1.4rem;
+}
+.btn-ghost:hover { color:var(--ink); border-color:var(--ink); background:var(--paper-2); }
+.btn-big { font-size:1.05rem; padding:1.15rem 2.4rem; letter-spacing:.02em; }
+
+/* Stages */
+.is-hidden { display:none !important; }
+
+/* Section head */
+.section-head {
+  display:flex; align-items:baseline; justify-content:space-between;
+  gap:1rem; margin-bottom:1.2rem; flex-wrap:wrap;
+}
+.section-head h2 {
+  font-family:var(--sans); font-weight:700; font-size:1.55rem; letter-spacing:-.015em;
+}
+.section-head h2 .num {
+  font-family:var(--mono); font-size:.65em; letter-spacing:.12em;
+  color:var(--ink-3); margin-right:.5rem; font-weight:400;
+}
+.section-head .meta {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.08em; color:var(--ink-3);
+}
+.section-desc {
+  font-family:var(--italic); font-style:italic; font-size:1.02rem; line-height:1.55;
+  color:var(--ink-2); max-width:56ch; margin-bottom:1.6rem;
+}
+
+/* Chips de actores/objetivos */
+.entity-grid {
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));
+  gap:.5rem; margin-bottom:1rem;
+}
+.entity-chip {
+  display:flex; align-items:center; gap:.55rem;
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+  padding:.55rem .75rem; font-family:var(--sans); font-size:.92rem; min-width:0;
+}
+.entity-chip-code {
+  font-family:var(--mono); font-size:11px; color:var(--accent);
+  letter-spacing:.04em; flex-shrink:0;
+}
+.entity-chip-name {
+  flex:1; outline:none; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.entity-chip-name:focus { outline:1px solid var(--accent); outline-offset:2px; }
+.entity-chip-del {
+  font-family:var(--mono); font-size:.95rem; color:var(--ink-3);
+  padding:0 .25rem; transition:color .2s;
+}
+.entity-chip-del:hover { color:var(--danger); }
+.entity-add-row { display:flex; gap:.55rem; margin-top:.8rem; flex-wrap:wrap; }
+.entity-add-input {
+  flex:1; min-width:200px;
+  font-family:var(--sans); font-size:.94rem;
+  padding:.65rem .9rem;
+  background:var(--paper-2); color:var(--ink);
+  border:1px solid var(--rule-strong); outline:none;
+}
+.entity-add-input:focus { border-color:var(--accent); }
+.entity-meta {
+  display:flex; gap:1.6rem; margin-top:1rem; flex-wrap:wrap;
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.04em; color:var(--ink-3);
+}
+.entity-meta b { color:var(--accent); font-weight:700; }
+
+.actions {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:.8rem; margin-top:1.8rem; flex-wrap:wrap;
+}
+.actions .right-group { display:flex; gap:.6rem; }
+
+/* Stage intro */
+.stage-intro {
+  background:var(--paper-2); border:1px solid var(--rule);
+  border-left:3px solid var(--accent);
+  padding:1.6rem 1.8rem; margin-bottom:1.6rem;
+}
+.stage-intro-p {
+  font-family:var(--sans); font-size:1rem; line-height:1.6; color:var(--ink); margin-bottom:1rem;
+}
+.stage-intro-p:last-of-type { margin-bottom:0; }
+.stage-intro-p em { font-family:var(--italic); font-style:italic; color:var(--ink-2); }
+.stage-intro-p b { color:var(--accent); font-weight:600; }
+
+/* Captura · escala MID (0-4) y MAO (-4..+4) */
+.scale-legend {
+  display:flex; flex-wrap:wrap; gap:1.2rem;
+  font-family:var(--mono); font-size:11.5px; color:var(--ink-3);
+  margin-bottom:1rem; letter-spacing:.04em;
+}
+.scale-legend b { color:var(--accent); font-weight:700; margin-right:.25rem; }
+.scale-legend .neg b { color:var(--green); }
+
+.matrix-wrap {
+  overflow-x:auto; margin-bottom:1rem;
+  background:var(--paper-2); padding:.9rem; border:1px solid var(--rule);
+}
+table.matrix {
+  border-collapse:collapse;
+  font-family:var(--mono); font-size:.78rem;
+}
+table.matrix th, table.matrix td {
+  border:1px solid var(--rule);
+  min-width:40px; height:36px;
+  text-align:center; vertical-align:middle; padding:0;
+}
+table.matrix th.row-h, table.matrix th.col-h {
+  font-family:var(--sans); font-weight:500; font-size:.8rem;
+  background:var(--paper-3); color:var(--ink);
+  padding:.3rem .55rem; max-width:220px;
+  text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+table.matrix th.col-h { text-align:center; min-width:44px; max-width:64px; }
+table.matrix th.col-h .col-h-inner {
+  writing-mode:vertical-rl; transform:rotate(180deg);
+  font-size:.7rem; letter-spacing:.04em;
+  max-height:130px; overflow:hidden; text-overflow:ellipsis; padding:.35rem 0;
+}
+table.matrix th.corner {
+  background:var(--paper-3); font-family:var(--mono); font-size:10.5px; color:var(--ink-3);
+  letter-spacing:.12em; text-align:center; vertical-align:bottom; padding-bottom:.5rem;
+}
+table.matrix td.cell { cursor:none; user-select:none; transition:background .15s; color:var(--ink); }
+table.matrix td.cell:hover { background:var(--accent-soft); }
+table.matrix td.cell.diag { background:var(--paper-3); color:var(--ink-3); cursor:not-allowed; }
+table.matrix td.cell.v-0 { color:var(--ink-3); }
+table.matrix td.cell.v-1 { background:var(--accent-soft); }
+table.matrix td.cell.v-2 { background:var(--accent-tint); color:var(--accent); font-weight:700; }
+table.matrix td.cell.v-3 { background:var(--accent); color:var(--on-accent); font-weight:700; }
+table.matrix td.cell.v-4 {
+  background:var(--accent); color:var(--on-accent); font-weight:700;
+  box-shadow:inset 0 0 0 2px var(--accent-2);
+}
+table.matrix td.cell.v-n1 { background:rgba(111,160,122,0.13); color:var(--green); font-weight:600; }
+table.matrix td.cell.v-n2 { background:rgba(111,160,122,0.28); color:var(--green); font-weight:700; }
+table.matrix td.cell.v-n3 { background:var(--green); color:var(--on-accent); font-weight:700; }
+table.matrix td.cell.v-n4 {
+  background:var(--green); color:var(--on-accent); font-weight:700;
+  box-shadow:inset 0 0 0 2px var(--green);
+}
+table.matrix td.cell:focus { outline:2px solid var(--accent); outline-offset:-2px; z-index:2; }
+
+.matrix-hint {
+  font-family:var(--italic); font-style:italic; font-weight:400;
+  font-size:.92rem; line-height:1.5; color:var(--ink-2);
+  background:var(--paper-2); border:1px dashed var(--rule-strong);
+  padding:.85rem 1.05rem; margin-bottom:1.1rem;
+}
+.matrix-hint b { font-family:var(--sans); font-style:normal; color:var(--accent); font-weight:600; }
+
+/* Resultados */
+.view-tabs {
+  display:grid; grid-template-columns:1fr 1fr 1fr; gap:.4rem; margin-bottom:1.5rem;
+}
+@media (max-width:720px) { .view-tabs { grid-template-columns:1fr; } }
+.view-tab {
+  display:grid; grid-template-columns:auto 1fr; grid-template-rows:auto auto;
+  gap:.15rem .9rem; align-items:baseline;
+  padding:.85rem 1.1rem;
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+  text-align:left; cursor:none; transition:border-color .2s, background .2s; position:relative;
+}
+.view-tab:hover { border-color:var(--accent); background:var(--paper-3); }
+.view-tab.active { border-color:var(--accent); background:var(--accent-soft); }
+.view-tab.active::before {
+  content:""; position:absolute; top:-1px; left:-1px; bottom:-1px; width:3px; background:var(--accent);
+}
+.view-tab .vt-num {
+  grid-row:1/span 2; font-family:var(--mono); font-size:11px; font-weight:700;
+  letter-spacing:.12em; color:var(--accent);
+  padding:.3rem .55rem; border:1px solid var(--accent-tint);
+  background:var(--paper); align-self:start;
+}
+.view-tab .vt-label { font-family:var(--sans); font-weight:700; font-size:1.02rem; letter-spacing:-.01em; color:var(--ink); }
+.view-tab .vt-hint { font-family:var(--italic); font-style:italic; font-weight:400; font-size:.78rem; line-height:1.4; color:var(--ink-3); }
+
+.view-pane { display:none; }
+.view-pane.active { display:block; animation:fadeInUp .25s ease both; }
+@keyframes fadeInUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+.results-grid {
+  display:grid; grid-template-columns:1.4fr 1fr; gap:1.5rem; margin-top:.5rem;
+}
+@media (max-width:900px) { .results-grid { grid-template-columns:1fr; } }
+.chart-wrap {
+  position:relative; background:var(--paper-2); border:1px solid var(--rule);
+  padding:1.2rem; min-height:480px;
+}
+.chart-quadrant-label {
+  position:absolute; font-family:var(--mono); font-size:10.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3); pointer-events:none;
+}
+.chart-quadrant-label.q1 { top:1.2rem; left:1.2rem; }
+.chart-quadrant-label.q2 { top:1.2rem; right:1.2rem; color:var(--accent); }
+.chart-quadrant-label.q3 { bottom:2.7rem; left:1.2rem; }
+.chart-quadrant-label.q4 { bottom:2.7rem; right:1.2rem; }
+.ranking-card { background:var(--paper-2); border:1px solid var(--rule); padding:1rem 1.2rem; }
+.rank-group { margin-bottom:1rem; }
+.rank-group:last-child { margin-bottom:0; }
+.rank-title {
+  font-family:var(--sans); font-weight:700; font-size:.9rem;
+  letter-spacing:-.005em; margin-bottom:.45rem;
+  padding-bottom:.35rem; border-bottom:1px solid var(--rule);
+}
+.rank-list { list-style:none; font-family:var(--sans); font-size:.9rem; line-height:1.5; }
+.rank-list li {
+  display:flex; justify-content:space-between; align-items:baseline;
+  padding:.2rem 0; gap:.55rem;
+}
+.rank-list li .rk-code { font-family:var(--mono); font-size:10.5px; color:var(--ink-3); letter-spacing:.04em; flex-shrink:0; }
+.rank-list li .rk-name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink); }
+.rank-list li .rk-score { font-family:var(--mono); font-size:11px; color:var(--accent); flex-shrink:0; min-width:60px; text-align:right; }
+
+.empty-msg { font-family:var(--italic); font-style:italic; color:var(--ink-3); text-align:center; padding:1.5rem 0; }
+
+.export-row { display:flex; gap:.65rem; flex-wrap:wrap; margin-top:1.5rem; }
+
+.methodology-note {
+  max-width:64ch; margin-top:1.4rem;
+  font-family:var(--italic); font-style:italic; font-size:.9rem; line-height:1.6; color:var(--ink-3);
+}
+.methodology-note a { color:var(--accent); font-style:normal; }
+
+/* Modal */
+.modal-back {
+  position:fixed; inset:0; background:rgba(10,8,4,0.7);
+  display:none; align-items:center; justify-content:center;
+  z-index:8500; padding:1rem; backdrop-filter:blur(4px);
+}
+.modal-back.open { display:flex; }
+.modal {
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+  padding:2rem 2.2rem; max-width:540px; width:100%; position:relative;
+  max-height:90vh; overflow-y:auto;
+}
+.modal-close {
+  position:absolute; top:.9rem; right:1.1rem;
+  font-family:var(--mono); font-size:1.2rem; color:var(--ink-3); transition:color .2s;
+}
+.modal-close:hover { color:var(--danger); }
+.modal h2 {
+  font-family:var(--sans); font-weight:700; font-size:1.35rem;
+  letter-spacing:-.01em; margin-bottom:.7rem; max-width:28ch;
+}
+.modal p {
+  font-family:var(--sans); font-size:.98rem; line-height:1.55; color:var(--ink-2); margin-bottom:1rem;
+}
+.modal p em { font-family:var(--italic); font-style:italic; }
+.modal p b { color:var(--ink); }
+
+/* Toast */
+.toast {
+  position:fixed; bottom:1.5rem; right:1.5rem;
+  background:var(--ink); color:var(--paper);
+  padding:.85rem 1.2rem; font-family:var(--sans); font-size:.9rem;
+  letter-spacing:.02em; z-index:9000;
+  opacity:0; transform:translateY(15px); pointer-events:none;
+  transition:opacity .25s, transform .25s;
+}
+.toast.show { opacity:1; transform:translateY(0); }
+
+/* Method link button */
+.method-link {
+  display:inline-flex; align-items:center; gap:.4rem;
+  font-family:var(--mono); font-size:12px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--ink-2);
+  padding:.55rem .95rem; border:1px solid var(--rule-strong);
+  transition:color .2s, border-color .2s;
+}
+.method-link:hover { color:var(--accent); border-color:var(--accent); }
+
+footer.foot {
+  max-width:980px; margin:0 auto; padding:2rem 1.75rem 1.5rem;
+  border-top:1px solid var(--rule);
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.06em; color:var(--ink-3);
+  display:flex; justify-content:space-between; flex-wrap:wrap; gap:1rem;
+}
+
+/* Plantilla sugerida en wizard */
+.tpl-suggest {
+  border:1px solid var(--accent-tint); background:var(--accent-soft);
+  padding:1.6rem 1.6rem 1.8rem; margin-top:1.5rem;
+}
+.tpl-suggest-eyebrow {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.18em;
+  text-transform:uppercase; color:var(--accent); font-weight:700; margin-bottom:.7rem;
+}
+.tpl-suggest-name {
+  font-family:var(--sans); font-weight:700; font-size:1.4rem;
+  letter-spacing:-.015em; margin-bottom:.6rem;
+}
+.tpl-suggest-desc {
+  font-family:var(--italic); font-style:italic; font-weight:400;
+  font-size:1rem; line-height:1.55; color:var(--ink-2); margin-bottom:.8rem;
+}
+.tpl-suggest-meta {
+  font-family:var(--mono); font-size:11.5px; color:var(--ink-3); letter-spacing:.08em;
+}
+.tpl-suggest-meta b { color:var(--ink); font-weight:700; }
+</style>
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<nav class="topbar">
+  <div class="topbar-left">
+    <a href="index.html#proyectos" class="btn-back"><span>←</span> Volver</a>
+  </div>
+  <div class="topbar-center">
+    <span class="eyebrow" style="margin:0;font-size:11px">Análisis de Actores</span>
+  </div>
+  <div class="topbar-right">
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
+    <a href="index.html" class="logo-link">
+      <div class="logo-bars">
+        <div class="logo-bar" style="height:20px"></div>
+        <div class="logo-bar" style="height:15px"></div>
+        <div class="logo-bar" style="height:9px"></div>
+        <div class="logo-bar" style="height:4px"></div>
+      </div>
+      <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+    </a>
+  </div>
+</nav>
+
+<main class="page">
+  <div class="crumb">
+    <a href="index.html">Inicio</a> <span class="sep">/</span>
+    <a href="index.html#proyectos">Proyectos</a> <span class="sep">/</span>
+    <span>Análisis de Actores</span>
+  </div>
+
+  <!-- WELCOME -->
+  <section id="stage-welcome">
+    <div class="welcome">
+      <div class="eyebrow">Mapa de alianzas y conflictos de política pública</div>
+      <h1 class="welcome-title">Quién apoya, quién <em>bloquea</em>, quién decide</h1>
+      <p class="welcome-sub">
+        Una política pública no falla por mal diseño técnico — falla porque
+        no entendió a tiempo el juego de actores que la rodea. Esta
+        herramienta te ayuda a mapear los actores, ver sobre qué objetivos
+        están alineados o en conflicto, y entender quién tiene el poder
+        real de bloquear o impulsar.
+      </p>
+      <p class="welcome-hint">
+        Defines los actores (gremios, ministerios, sindicatos, comunidades,
+        ONG), los objetivos en disputa, y calificas cómo cada actor se
+        posiciona sobre cada objetivo. La herramienta calcula el poder
+        relativo de cada uno, las alianzas posibles y los conflictos
+        latentes. Toma entre 30 minutos y dos horas según la profundidad.
+      </p>
+      <button class="method-link" onclick="openModal('modal-method')">¿Cómo lo calculamos? →</button>
+
+      <div class="accordion-stack">
+        <details class="accordion">
+          <summary><span><span class="acc-num">01</span>Qué hace exactamente</span></summary>
+          <div class="accordion-body">
+            Toma a los <em>actores</em> que importan para una decisión
+            (instituciones, gremios, sindicatos, comunidades, partidos) y
+            los <em>objetivos</em> en disputa (proyectos, reformas, leyes,
+            decisiones). Calificas dos cosas: cuánto influye cada actor
+            sobre cada uno de los demás (0 a 4), y qué tan a favor o en
+            contra está cada actor sobre cada objetivo (−4 a +4). Con
+            esas calificaciones la herramienta calcula el poder relativo
+            de cada actor, sus alianzas posibles, sus conflictos
+            latentes y el grado de movilización de cada objetivo.
+          </div>
+        </details>
+        <details class="accordion">
+          <summary><span><span class="acc-num">02</span>Qué te entrega</span></summary>
+          <div class="accordion-body">
+            Un mapa con dos lentes: <em>Influencia × Dependencia</em>
+            (¿qué actor manda y cuál es manejado por otros?) y
+            <em>Convergencia × Divergencia</em> (¿qué pares de actores
+            comparten objetivos y cuáles están claramente en oposición?).
+            Además un ranking de actores por poder y un ranking de
+            objetivos por nivel de movilización (qué tan disputado está).
+          </div>
+        </details>
+        <details class="accordion">
+          <summary><span><span class="acc-num">03</span>Para qué te sirve</span></summary>
+          <div class="accordion-body">
+            Para diseñar una <em>estrategia de incidencia</em>: con quién
+            sentarse primero, qué argumentos usar para cada actor, dónde
+            están los conflictos que hay que arbitrar antes de que
+            exploten. Es el complemento natural del análisis estructural
+            de variables: ese te dice qué mover, este te dice quiénes
+            son los que pueden moverlo o frenarlo.
+          </div>
+        </details>
+      </div>
+      <button class="btn btn-big" onclick="startWizard()">Empezar →</button>
+    </div>
+  </section>
+
+  <!-- WIZARD (mínimo, 1 pregunta + plantilla sugerida) -->
+  <section id="stage-wizard" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 01</span>Cuéntanos sobre qué vas a trabajar</h2>
+    </div>
+    <p class="section-desc">
+      Una pregunta para sugerirte una plantilla. Puedes cambiarla o empezar
+      en blanco en el siguiente paso.
+    </p>
+
+    <div class="wizard-step">
+      <p style="font-family:var(--sans);font-weight:600;font-size:1.05rem;margin-bottom:.9rem">¿Qué tipo de proceso vas a analizar?</p>
+      <div class="opts-list" id="wp-q1-opts" style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem"></div>
+    </div>
+
+    <div id="tpl-suggest-box" style="margin-top:1.2rem"></div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="backToWelcome()">← Volver al inicio</button>
+      <div class="right-group">
+        <button class="btn-ghost" onclick="startBlank()">Empezar en blanco</button>
+        <button class="btn" id="wp-q1-next" disabled onclick="startProject()">Empezar análisis →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE: ACTORES -->
+  <section id="stage-actores" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 02</span>Actores del sistema</h2>
+      <span class="meta" id="actores-meta">—</span>
+    </div>
+    <div class="stage-intro" id="actores-intro">
+      <p class="stage-intro-p">
+        Los actores son los individuos, organizaciones o grupos que
+        tienen <em>intereses</em> sobre el proceso que estás analizando
+        — y por lo tanto tienen incentivos para apoyarlo o frenarlo.
+      </p>
+      <p class="stage-intro-p">
+        <b>Reglas prácticas:</b> que sean nombres específicos (no
+        &laquo;sociedad civil&raquo; sino &laquo;ANDI&raquo;, &laquo;Fedegan&raquo;, &laquo;CUT&raquo;,
+        &laquo;Min. Hacienda&raquo;). Entre 6 y 15 actores: por debajo de 5 el
+        análisis pierde resolución, por encima de 20 la matriz se vuelve
+        impractica. Incluye <b>actores en conflicto</b> y <b>árbitros</b>:
+        si todos están del mismo lado, el análisis no te dirá nada nuevo.
+      </p>
+      <div class="actions" style="margin-top:1.4rem">
+        <button class="btn-ghost" onclick="backToWizard()">← Cambiar plantilla</button>
+        <div class="right-group">
+          <button class="btn" onclick="actoresShowEditor()">Editar actores →</button>
+        </div>
+      </div>
+    </div>
+    <div id="actores-editor" class="is-hidden">
+      <p class="section-desc">Edita, agrega o quita actores según tu caso.</p>
+      <div class="entity-grid" id="actores-grid"></div>
+      <div class="entity-add-row">
+        <input type="text" class="entity-add-input" id="actores-add-input" placeholder="Nombre del nuevo actor…" onkeydown="if(event.key==='Enter')addActor()"/>
+        <button class="btn-ghost" onclick="addActor()">+ Agregar actor</button>
+      </div>
+      <div class="entity-meta">
+        <span>Actores: <b id="actores-count">0</b></span>
+      </div>
+      <div class="actions">
+        <button class="btn-ghost" onclick="backToActoresIntro()">← Volver a la introducción</button>
+        <div class="right-group">
+          <button class="btn" onclick="goToObjetivos()">Continuar a objetivos →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE: OBJETIVOS -->
+  <section id="stage-objetivos" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 03</span>Objetivos en disputa</h2>
+    </div>
+    <p class="section-desc">
+      Los objetivos son las decisiones, proyectos o reformas concretas
+      sobre las que los actores se posicionan. Idealmente entre 5 y 15:
+      lo suficientemente específicos para que un actor pueda estar
+      claramente a favor o en contra de cada uno.
+    </p>
+    <div class="entity-grid" id="objetivos-grid"></div>
+    <div class="entity-add-row">
+      <input type="text" class="entity-add-input" id="objetivos-add-input" placeholder="Objetivo específico…" onkeydown="if(event.key==='Enter')addObjetivo()"/>
+      <button class="btn-ghost" onclick="addObjetivo()">+ Agregar objetivo</button>
+    </div>
+    <div class="entity-meta">
+      <span>Objetivos: <b id="objetivos-count">0</b></span>
+    </div>
+    <div class="actions">
+      <button class="btn-ghost" onclick="backToActores()">← Editar actores</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToMID()">Continuar a matriz de influencias →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE: MID (actor × actor) -->
+  <section id="stage-mid" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 04</span>Matriz de influencias entre actores</h2>
+      <span class="meta"><b id="mid-filled">0</b>/<b id="mid-total">0</b> celdas</span>
+    </div>
+    <p class="section-desc">
+      Para cada par (A, B), califica cuánto influye A sobre B en una
+      escala de 0 a 4. La escala captura la profundidad del impacto: si
+      A puede afectar a B a nivel de procesos cotidianos, proyectos
+      estratégicos, su misión institucional, o hasta su existencia
+      misma.
+    </p>
+    <div class="scale-legend">
+      <span><b>0</b> nula</span>
+      <span><b>1</b> sobre procesos operativos</span>
+      <span><b>2</b> sobre proyectos</span>
+      <span><b>3</b> sobre su misión</span>
+      <span><b>4</b> sobre su existencia</span>
+    </div>
+    <p class="matrix-hint">
+      <b>Tip:</b> cada clic en una celda <em>sube</em> el valor (0 → 1 → 2 → 3 → 4 → vuelve a 0).
+      Las flechas del teclado navegan entre celdas. La diagonal está
+      bloqueada (un actor no se influye a sí mismo).
+    </p>
+    <div class="matrix-wrap" id="mid-wrap"></div>
+    <div class="actions">
+      <button class="btn-ghost" onclick="backToObjetivos()">← Editar objetivos</button>
+      <div class="right-group">
+        <button class="btn-ghost" onclick="resetMID()">Limpiar matriz</button>
+        <button class="btn" onclick="goToMAO()">Continuar a posiciones →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE: MAO (actor × objetivo) -->
+  <section id="stage-mao" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 05</span>Posición de cada actor sobre cada objetivo</h2>
+      <span class="meta"><b id="mao-filled">0</b>/<b id="mao-total">0</b> celdas</span>
+    </div>
+    <p class="section-desc">
+      Para cada actor (filas) y cada objetivo (columnas), califica qué
+      tan a favor (+) o en contra (−) está el actor de ese objetivo, en
+      una escala que también captura intensidad: si el objetivo afecta
+      a los procesos del actor, a sus proyectos, a su misión, o a su
+      existencia.
+    </p>
+    <div class="scale-legend">
+      <span><b>+4 / −4</b> existencia</span>
+      <span><b>+3 / −3</b> misión</span>
+      <span><b>+2 / −2</b> proyectos</span>
+      <span><b>+1 / −1</b> procesos</span>
+      <span><b>0</b> nula</span>
+    </div>
+    <p class="matrix-hint">
+      <b>Tip:</b> cada clic cicla el valor: 0 → +1 → +2 → +3 → +4 → −1 → −2 → −3 → −4 → 0.
+      Las posiciones positivas (apoyo, salmón) y negativas (oposición, verde) se distinguen por color.
+    </p>
+    <div class="matrix-wrap" id="mao-wrap"></div>
+    <div class="actions">
+      <button class="btn-ghost" onclick="backToMID()">← Editar influencias</button>
+      <div class="right-group">
+        <button class="btn-ghost" onclick="resetMAO()">Limpiar matriz</button>
+        <button class="btn" onclick="goToResults()">Ver resultados →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE: RESULTS -->
+  <section id="stage-results" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 06</span>Mapa de actores</h2>
+      <span class="meta" id="results-counter">—</span>
+    </div>
+    <div class="view-tabs">
+      <button class="view-tab active" data-view="influ" onclick="setView('influ')">
+        <span class="vt-num">A</span><span class="vt-label">Influencia</span>
+        <span class="vt-hint">quién manda · quién es manejado</span>
+      </button>
+      <button class="view-tab" data-view="alianzas" onclick="setView('alianzas')">
+        <span class="vt-num">B</span><span class="vt-label">Alianzas</span>
+        <span class="vt-hint">convergencia · divergencia entre actores</span>
+      </button>
+      <button class="view-tab" data-view="objetivos" onclick="setView('objetivos')">
+        <span class="vt-num">C</span><span class="vt-label">Objetivos</span>
+        <span class="vt-hint">movilización · saldo neto por objetivo</span>
+      </button>
+    </div>
+
+    <div class="view-pane active" id="view-influ">
+      <p class="section-desc">
+        Cada actor según su <b>influencia total</b> (eje Y, cuánto manda
+        sobre los demás) y su <b>dependencia total</b> (eje X, cuánto los
+        demás mandan sobre él). Los <b>dominantes</b> (mucha influencia,
+        poca dependencia) tienen el poder estratégico. Los <b>dominados</b>
+        son los que el sistema empuja. Los <b>autónomos</b> están al margen.
+      </p>
+      <div class="results-grid">
+        <div class="chart-wrap">
+          <span class="chart-quadrant-label q1">Dominantes</span>
+          <span class="chart-quadrant-label q2">De enlace</span>
+          <span class="chart-quadrant-label q3">Autónomos</span>
+          <span class="chart-quadrant-label q4">Dominados</span>
+          <canvas id="chart-influ"></canvas>
+        </div>
+        <div class="ranking-card" id="rank-influ"></div>
+      </div>
+    </div>
+
+    <div class="view-pane" id="view-alianzas">
+      <p class="section-desc">
+        Para cada par de actores, sumamos los objetivos en los que están
+        del <em>mismo lado</em> (convergencia) y los que están en
+        <em>oposición</em> (divergencia). Eje Y: convergencia total con el
+        resto del sistema. Eje X: divergencia total. Los actores con alta
+        convergencia y baja divergencia son <b>candidatos a coalición</b>;
+        los de alta divergencia son los focos de conflicto a arbitrar.
+      </p>
+      <div class="results-grid">
+        <div class="chart-wrap">
+          <span class="chart-quadrant-label q1">Coaliciones</span>
+          <span class="chart-quadrant-label q2">Conflictivos</span>
+          <span class="chart-quadrant-label q3">Marginales</span>
+          <span class="chart-quadrant-label q4">Opositores</span>
+          <canvas id="chart-alianzas"></canvas>
+        </div>
+        <div class="ranking-card" id="rank-alianzas"></div>
+      </div>
+    </div>
+
+    <div class="view-pane" id="view-objetivos">
+      <p class="section-desc">
+        Para cada objetivo: <b>movilización</b> (suma de |posiciones|, qué
+        tan disputado está) y <b>saldo neto</b> (suma de posiciones
+        ponderadas por poder del actor, signo positivo = apoyo neto,
+        negativo = oposición neta). Los objetivos con alta movilización
+        y saldo cercano a cero son los <em>conflictos sin resolver</em>;
+        los de alto saldo positivo son los que tienen camino libre.
+      </p>
+      <div class="ranking-card" id="rank-objetivos"></div>
+    </div>
+
+    <div class="export-row">
+      <button class="btn" onclick="exportJSON()">Descargar análisis (.json)</button>
+      <button class="btn-ghost" onclick="backToMAO()">← Editar posiciones</button>
+    </div>
+
+    <p class="methodology-note">
+      Esta herramienta es una versión simplificada del método <b>Mactor</b>
+      (Matrix of Alliances and Conflicts: Tactics, Objectives,
+      Recommendations) propuesto por Michel Godet, LIPSOR, 1991, como
+      complemento natural del análisis estructural MICMAC. Mientras MICMAC
+      diagnostica las variables que mueven el sistema, Mactor analiza
+      a los actores que tienen poder sobre esas variables.
+      Próximas versiones incorporarán cálculo de influencias indirectas
+      (matriz pivotada MIDI), pesos por poder ponderado y copiloto IA
+      para sugerir actores y validar la lista de objetivos.
+    </p>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>ricardoruiz.co · 2026</span>
+  <span>Composición: Familjen · Petrona · Mono</span>
+</footer>
+
+<!-- Modal metodología -->
+<div class="modal-back" id="modal-method">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-method')">×</button>
+    <h2>Cómo lo calculamos</h2>
+    <p>
+      <b>En palabras simples:</b> estás describiendo el juego político de una
+      decisión. Por un lado, quién manda sobre quién (matriz <em>MID</em>:
+      actor × actor). Por otro, cómo se posiciona cada actor sobre cada
+      objetivo de tu lista (matriz <em>MAO</em>: actor × objetivo).
+    </p>
+    <p>
+      <b>Tres lentes sobre el mismo juego.</b>
+    </p>
+    <p>
+      <b>Influencia y Dependencia.</b> La suma de cada fila de MID te da la
+      <em>influencia total</em> de cada actor (cuánto manda). La suma de
+      cada columna, su <em>dependencia</em> (cuánto le mandan). El ratio
+      Influencia/Dependencia es el <b>poder relativo</b> Ri del actor — y
+      es lo que se usa para ponderar sus posiciones sobre objetivos.
+    </p>
+    <p>
+      <b>Convergencia y Divergencia.</b> Para cada par de actores, miramos
+      sus posiciones en MAO. Si en un objetivo ambos están del mismo lado
+      (los dos a favor o los dos en contra), suma a la convergencia. Si
+      están en lados opuestos, suma a la divergencia. La intensidad del
+      acuerdo o desacuerdo se cuenta por el <em>mínimo</em> de sus
+      posiciones (un actor con +4 y otro con +1 cuentan como +1 de
+      convergencia).
+    </p>
+    <p>
+      <b>Movilización por objetivo.</b> Para cada objetivo, sumamos las
+      posiciones absolutas de todos los actores (ponderadas por su poder
+      Ri). Un objetivo con alta movilización es uno que mucha gente quiere
+      mover — para arriba o para abajo. El saldo neto (sin valor absoluto)
+      dice hacia dónde gana el empate de fuerzas.
+    </p>
+    <p>
+      <b>Origen.</b> El método viene de Michel Godet en LIPSOR (París, 1991)
+      como contraparte del análisis estructural MICMAC. En Colombia el
+      referente es Francisco José Mojica (Externado), formado con Godet
+      en la Sorbona. Esta implementación es una versión simplificada
+      del original — adecuada para diagnóstico estratégico rápido, pero
+      no reemplaza un Mactor completo con software LIPSOR.
+    </p>
+    <p>
+      <b>Tu privacidad.</b> El cálculo es 100% local en tu navegador.
+    </p>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+// ═════════════════════════════════════════════════════════════════════════
+// PLANTILLAS — 4 plantillas seed (procesos típicos)
+// ═════════════════════════════════════════════════════════════════════════
+const TEMPLATES = {
+  'reforma-tributaria': {
+    nombre: 'Reforma tributaria nacional',
+    descripcion: 'Mapa típico de actores y objetivos cuando se discute una reforma fiscal en el Congreso colombiano.',
+    perfil: 'Equipos de incidencia política, oficinas de planeación nacional, consultorías estratégicas.',
+    actores: [
+      'MinHacienda','Presidencia','Bancada de gobierno','Bancada de oposición',
+      'ANDI','Fedegan','Asobancaria','Confecámaras',
+      'CUT','CGT','DIAN','Banco de la República'
+    ],
+    objetivos: [
+      'Aumentar tarifa renta empresas grandes',
+      'Reducir IVA en canasta básica',
+      'Impuesto a dividendos',
+      'Impuesto a patrimonio',
+      'Sobretasa al sector financiero',
+      'Recortar exenciones tributarias',
+      'Impuesto al carbono efectivo',
+      'Régimen tributario simplificado para pymes'
+    ]
+  },
+  'reforma-pensional': {
+    nombre: 'Reforma pensional',
+    descripcion: 'Actores y objetivos típicos cuando se discute el sistema pensional colombiano (Régimen de Prima Media vs RAIS, edad de jubilación, pilar solidario).',
+    perfil: 'Equipos de política social, fondos privados, sindicatos, oficinas de planeación.',
+    actores: [
+      'MinTrabajo','MinHacienda','Presidencia',
+      'Colpensiones','Fondos privados (AFP)','Banco de la República',
+      'CUT','CGT','Asobancaria','Bancada gobierno','Bancada oposición','Corte Constitucional'
+    ],
+    objetivos: [
+      'Aumentar pilar solidario para mayores en pobreza',
+      'Subir el umbral de cotización al RPM',
+      'Aumentar edad de jubilación',
+      'Eliminar régimen de excepción (Ecopetrol, Fuerzas Armadas)',
+      'Aumentar semanas mínimas de cotización',
+      'Cobertura universal con pilar no contributivo',
+      'Sostenibilidad fiscal del sistema'
+    ]
+  },
+  'paz-territorial': {
+    nombre: 'Implementación de paz territorial',
+    descripcion: 'Actores del Acuerdo de Paz 2016 + 2026, sobre objetivos de implementación en una región específica.',
+    perfil: 'Oficinas de paz, ONG, cooperación internacional, gobiernos locales.',
+    actores: [
+      'Gobierno nacional','JEP','Comisión de la Verdad','Unidad de Víctimas',
+      'Fuerza Pública','Partidos políticos de oposición','FARC reincorporación',
+      'Disidencias','ELN','Iglesia católica','ONU','Cooperación internacional',
+      'Comunidades étnicas','Empresarios agroindustriales'
+    ],
+    objetivos: [
+      'Reforma rural integral · acceso a tierras',
+      'Sustitución de cultivos ilícitos',
+      'Reincorporación económica de excombatientes',
+      'Verdad, justicia y reparación a víctimas',
+      'Garantías de seguridad para líderes sociales',
+      'Aplicación efectiva del enfoque étnico y de género',
+      'Inversión en infraestructura rural'
+    ]
+  },
+  'politica-mde': {
+    nombre: 'Alcaldía de ciudad capital',
+    descripcion: 'Plantilla genérica de actores y objetivos típicos en una alcaldía de ciudad capital colombiana (Bogotá, Medellín, Cali).',
+    perfil: 'Equipos de gobierno local, consultorías de campaña, oficinas de planeación municipal.',
+    actores: [
+      'Alcalde/Alcaldesa','Concejo Municipal','Personería','Contraloría',
+      'Sindicatos sector público','ANDI seccional','Cámara de Comercio',
+      'Universidades','Iglesias','ONG locales','Medios locales',
+      'Comunidades barriales','Gobernación','Gobierno nacional'
+    ],
+    objetivos: [
+      'Aumentar inversión en seguridad ciudadana',
+      'Reforma a la movilidad / transporte público',
+      'Inversión en vivienda social',
+      'Recuperación de espacio público',
+      'Política de cultura y deporte',
+      'Programas para jóvenes en riesgo',
+      'Transparencia y lucha contra la corrupción'
+    ]
+  }
+};
+
+const Q1_OPTIONS = [
+  { id:'reforma-tributaria', label:'Reforma tributaria o fiscal' },
+  { id:'reforma-pensional',  label:'Reforma pensional o de seguridad social' },
+  { id:'paz-territorial',    label:'Implementación de paz territorial' },
+  { id:'politica-mde',       label:'Gestión de alcaldía o gobernación' }
+];
+
+// ═════════════════════════════════════════════════════════════════════════
+// STATE
+// ═════════════════════════════════════════════════════════════════════════
+const LS_KEY = 'mactor-current-v1';
+const STATE = {
+  wizard:{ tpl:null },
+  meta:{ tplId:null, nombre:'', createdAt:null, updatedAt:null },
+  actores:[],
+  objetivos:[],
+  mid:[],   // matriz [actores][actores] valores '0'..'4' o '' o '-' (diagonal)
+  mao:[]    // matriz [actores][objetivos] valores '-4'..'+4' o '' o '0'
+};
+function saveState() {
+  STATE.meta.updatedAt = new Date().toISOString();
+  try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); } catch {}
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return false;
+    const obj = JSON.parse(raw);
+    Object.assign(STATE.wizard, obj.wizard||{});
+    Object.assign(STATE.meta, obj.meta||{});
+    STATE.actores = obj.actores||[];
+    STATE.objetivos = obj.objetivos||[];
+    STATE.mid = obj.mid||[];
+    STATE.mao = obj.mao||[];
+    return true;
+  } catch { return false; }
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MATRIX HELPERS
+// ═════════════════════════════════════════════════════════════════════════
+function newMID(n) {
+  const m = [];
+  for (let i=0; i<n; i++) {
+    const row = new Array(n).fill('');
+    row[i] = '-';
+    m.push(row);
+  }
+  return m;
+}
+function newMAO(nA, nO) {
+  const m = [];
+  for (let i=0; i<nA; i++) m.push(new Array(nO).fill(''));
+  return m;
+}
+function resizeMID(newN) {
+  const oldN = STATE.mid.length;
+  if (newN === oldN) return;
+  if (newN > oldN) {
+    for (let i=0; i<oldN; i++) while (STATE.mid[i].length < newN) STATE.mid[i].push('');
+    for (let i=oldN; i<newN; i++) {
+      const row = new Array(newN).fill('');
+      row[i] = '-';
+      STATE.mid.push(row);
+    }
+  } else {
+    STATE.mid = STATE.mid.slice(0,newN).map(r => r.slice(0,newN));
+  }
+  for (let i=0; i<newN; i++) STATE.mid[i][i] = '-';
+}
+function resizeMAO() {
+  const nA = STATE.actores.length, nO = STATE.objetivos.length;
+  // Ajustar filas
+  while (STATE.mao.length < nA) STATE.mao.push(new Array(nO).fill(''));
+  STATE.mao = STATE.mao.slice(0, nA);
+  // Ajustar columnas
+  for (let i=0; i<nA; i++) {
+    while (STATE.mao[i].length < nO) STATE.mao[i].push('');
+    STATE.mao[i] = STATE.mao[i].slice(0, nO);
+  }
+}
+function valToNum(v) {
+  if (v==='' || v==='-' || v==null) return 0;
+  const n = parseInt(v,10);
+  return isNaN(n) ? 0 : n;
+}
+function rowSums(M) { return M.map(r => r.reduce((s,x)=>s+x,0)); }
+function colSums(M) {
+  const n = M.length, c = new Array(M[0]?.length||0).fill(0);
+  for (let i=0;i<n;i++) for (let j=0;j<M[i].length;j++) c[j]+=M[i][j];
+  return c;
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// CÁLCULOS MACTOR
+// ═════════════════════════════════════════════════════════════════════════
+function midNumeric() {
+  const n = STATE.actores.length;
+  const M = [];
+  for (let i=0;i<n;i++) {
+    const row = new Array(n);
+    for (let j=0;j<n;j++) row[j] = (i===j) ? 0 : valToNum(STATE.mid[i][j]);
+    M.push(row);
+  }
+  return M;
+}
+function maoNumeric() {
+  const nA = STATE.actores.length, nO = STATE.objetivos.length;
+  const M = [];
+  for (let i=0;i<nA;i++) {
+    const row = new Array(nO);
+    for (let j=0;j<nO;j++) row[j] = valToNum(STATE.mao[i][j]);
+    M.push(row);
+  }
+  return M;
+}
+
+function computeMactor() {
+  const nA = STATE.actores.length;
+  const nO = STATE.objetivos.length;
+  if (nA < 2 || nO < 1) return null;
+
+  const MID = midNumeric();
+  const MAO = maoNumeric();
+
+  // Influencia directa Ii = sum_j MID[i,j]
+  // Dependencia directa Di = sum_j MID[j,i]
+  const Ii = rowSums(MID);
+  const Di = colSums(MID);
+
+  // Poder relativo Ri = Ii / (Ii + Di) normalizado. Si Di=0 y Ii>0, Ri=1.
+  const Ri = Ii.map((ii, i) => {
+    const dd = Di[i];
+    if (ii + dd === 0) return 0;
+    return ii / (ii + dd);
+  });
+
+  // Normalizar Influencia y Dependencia a 0-100 para el plot
+  const maxI = Math.max(1, ...Ii);
+  const maxD = Math.max(1, ...Di);
+  const IiN = Ii.map(v => (v/maxI)*100);
+  const DiN = Di.map(v => (v/maxD)*100);
+
+  // Clasificación por cuadrantes Influencia × Dependencia (mediana)
+  const sortedI = [...IiN].sort((a,b)=>a-b);
+  const sortedD = [...DiN].sort((a,b)=>a-b);
+  const medI = sortedI[Math.floor(nA/2)];
+  const medD = sortedD[Math.floor(nA/2)];
+  const cuadIDep = IiN.map((iv, i) => {
+    const dv = DiN[i];
+    if (iv >= medI && dv < medD) return 'dominante';
+    if (iv >= medI && dv >= medD) return 'enlace';
+    if (iv < medI && dv < medD) return 'autonomo';
+    return 'dominado';
+  });
+
+  // Convergencia y Divergencia entre pares de actores
+  // Conv[i,j] = sum_k min(|MAO[i,k]|, |MAO[j,k]|) si signo(MAO[i,k])=signo(MAO[j,k])
+  // Div[i,j]  = sum_k min(|MAO[i,k]|, |MAO[j,k]|) si signos opuestos
+  const Conv = Array.from({length:nA}, () => new Array(nA).fill(0));
+  const Div  = Array.from({length:nA}, () => new Array(nA).fill(0));
+  for (let i=0;i<nA;i++) for (let j=i+1;j<nA;j++) {
+    let c = 0, d = 0;
+    for (let k=0;k<nO;k++) {
+      const a = MAO[i][k], b = MAO[j][k];
+      if (a===0 || b===0) continue;
+      const inten = Math.min(Math.abs(a), Math.abs(b));
+      if (Math.sign(a) === Math.sign(b)) c += inten;
+      else d += inten;
+    }
+    Conv[i][j] = Conv[j][i] = c;
+    Div[i][j]  = Div[j][i]  = d;
+  }
+  // Convergencia/Divergencia totales por actor
+  const ConvI = rowSums(Conv);
+  const DivI  = rowSums(Div);
+  const maxC = Math.max(1, ...ConvI);
+  const maxDV = Math.max(1, ...DivI);
+  const ConvN = ConvI.map(v => (v/maxC)*100);
+  const DivN  = DivI.map(v => (v/maxDV)*100);
+
+  // Cuadrantes Convergencia × Divergencia
+  const sortedC = [...ConvN].sort((a,b)=>a-b);
+  const sortedDv = [...DivN].sort((a,b)=>a-b);
+  const medC = sortedC[Math.floor(nA/2)];
+  const medDv = sortedDv[Math.floor(nA/2)];
+  const cuadCD = ConvN.map((cv, i) => {
+    const dv = DivN[i];
+    if (cv >= medC && dv < medDv) return 'coalicion';
+    if (cv >= medC && dv >= medDv) return 'conflictivo';
+    if (cv < medC && dv < medDv) return 'marginal';
+    return 'opositor';
+  });
+
+  // Por objetivo: movilización (sum |MAO[*,k]|) y saldo neto ponderado por Ri
+  const movilizacion = new Array(nO).fill(0);
+  const saldoNeto = new Array(nO).fill(0);
+  for (let k=0;k<nO;k++) {
+    let mov = 0, saldo = 0;
+    for (let i=0;i<nA;i++) {
+      mov += Math.abs(MAO[i][k]);
+      saldo += MAO[i][k] * Ri[i];
+    }
+    movilizacion[k] = mov;
+    saldoNeto[k] = saldo;
+  }
+
+  return {
+    nA, nO,
+    Ii, Di, Ri, IiN, DiN, medI, medD, cuadIDep,
+    Conv, Div, ConvI, DivI, ConvN, DivN, medC, medDv, cuadCD,
+    movilizacion, saldoNeto
+  };
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// RENDER · WIZARD
+// ═════════════════════════════════════════════════════════════════════════
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderWizard() {
+  const cont = document.getElementById('wp-q1-opts');
+  cont.innerHTML = Q1_OPTIONS.map(o => {
+    const sel = STATE.wizard.tpl === o.id;
+    return `<button class="entity-chip" style="padding:1rem 1.1rem;text-align:left;${sel?'border-color:var(--accent);background:var(--accent-soft)':''}" data-id="${o.id}">
+      <span class="entity-chip-name" style="font-family:var(--sans);font-size:1rem;font-weight:600;color:var(--ink)">${o.label}</span>
+    </button>`;
+  }).join('');
+  cont.querySelectorAll('button').forEach(b => b.addEventListener('click', () => pickTpl(b.dataset.id)));
+  renderTplSuggest();
+}
+function pickTpl(id) {
+  STATE.wizard.tpl = id;
+  saveState();
+  renderWizard();
+}
+function renderTplSuggest() {
+  const box = document.getElementById('tpl-suggest-box');
+  const id = STATE.wizard.tpl;
+  if (!id) { box.innerHTML = ''; document.getElementById('wp-q1-next').disabled = true; return; }
+  const tpl = TEMPLATES[id];
+  box.innerHTML = `
+    <div class="tpl-suggest">
+      <div class="tpl-suggest-eyebrow">Plantilla sugerida</div>
+      <div class="tpl-suggest-name">${escapeHtml(tpl.nombre)}</div>
+      <div class="tpl-suggest-desc">${escapeHtml(tpl.descripcion)}</div>
+      <div class="tpl-suggest-meta">
+        <b>${tpl.actores.length}</b> actores · <b>${tpl.objetivos.length}</b> objetivos · <em>${escapeHtml(tpl.perfil)}</em>
+      </div>
+    </div>`;
+  document.getElementById('wp-q1-next').disabled = false;
+}
+
+function startProject() {
+  const tplId = STATE.wizard.tpl;
+  if (!tplId) return;
+  const tpl = TEMPLATES[tplId];
+  STATE.meta.tplId = tplId;
+  STATE.meta.nombre = tpl.nombre;
+  STATE.meta.createdAt = STATE.meta.createdAt || new Date().toISOString();
+  STATE.actores = tpl.actores.slice();
+  STATE.objetivos = tpl.objetivos.slice();
+  STATE.mid = newMID(STATE.actores.length);
+  STATE.mao = newMAO(STATE.actores.length, STATE.objetivos.length);
+  saveState();
+  document.getElementById('actores-intro').classList.remove('is-hidden');
+  document.getElementById('actores-editor').classList.add('is-hidden');
+  renderActores();
+  showStage('stage-actores');
+}
+function startBlank() {
+  STATE.meta.tplId = null;
+  STATE.meta.nombre = 'Análisis personalizado';
+  STATE.actores = ['Actor 1','Actor 2','Actor 3','Actor 4'];
+  STATE.objetivos = ['Objetivo 1','Objetivo 2','Objetivo 3'];
+  STATE.mid = newMID(STATE.actores.length);
+  STATE.mao = newMAO(STATE.actores.length, STATE.objetivos.length);
+  saveState();
+  document.getElementById('actores-intro').classList.remove('is-hidden');
+  document.getElementById('actores-editor').classList.add('is-hidden');
+  renderActores();
+  showStage('stage-actores');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// ACTORES
+// ═════════════════════════════════════════════════════════════════════════
+function renderActores() {
+  const grid = document.getElementById('actores-grid');
+  grid.innerHTML = STATE.actores.map((a, i) =>
+    `<div class="entity-chip">
+      <span class="entity-chip-code">A${String(i+1).padStart(2,'0')}</span>
+      <span class="entity-chip-name" contenteditable="true" spellcheck="false"
+            onblur="renameActor(${i}, this.innerText)"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${escapeHtml(a)}</span>
+      <button class="entity-chip-del" onclick="delActor(${i})" title="Eliminar">×</button>
+    </div>`).join('');
+  document.getElementById('actores-count').textContent = STATE.actores.length;
+  document.getElementById('actores-meta').textContent = STATE.meta.nombre || '—';
+}
+function addActor() {
+  const inp = document.getElementById('actores-add-input');
+  const name = inp.value.trim();
+  if (!name) { inp.focus(); return; }
+  STATE.actores.push(name);
+  resizeMID(STATE.actores.length);
+  resizeMAO();
+  inp.value = '';
+  saveState();
+  renderActores();
+  inp.focus();
+}
+function delActor(i) {
+  if (STATE.actores.length <= 2) { showToast('Necesitas al menos 2 actores.'); return; }
+  STATE.actores.splice(i,1);
+  STATE.mid.splice(i,1);
+  STATE.mid.forEach(r => r.splice(i,1));
+  for (let k=0; k<STATE.mid.length; k++) STATE.mid[k][k] = '-';
+  STATE.mao.splice(i,1);
+  saveState();
+  renderActores();
+}
+function renameActor(i, newName) {
+  const n = (newName||'').trim();
+  if (!n) { showToast('El nombre no puede estar vacío.'); renderActores(); return; }
+  STATE.actores[i] = n;
+  saveState();
+}
+function actoresShowEditor() {
+  document.getElementById('actores-intro').classList.add('is-hidden');
+  document.getElementById('actores-editor').classList.remove('is-hidden');
+  renderActores();
+}
+function backToActoresIntro() {
+  document.getElementById('actores-editor').classList.add('is-hidden');
+  document.getElementById('actores-intro').classList.remove('is-hidden');
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// OBJETIVOS
+// ═════════════════════════════════════════════════════════════════════════
+function renderObjetivos() {
+  const grid = document.getElementById('objetivos-grid');
+  grid.innerHTML = STATE.objetivos.map((o, i) =>
+    `<div class="entity-chip">
+      <span class="entity-chip-code">O${String(i+1).padStart(2,'0')}</span>
+      <span class="entity-chip-name" contenteditable="true" spellcheck="false"
+            onblur="renameObjetivo(${i}, this.innerText)"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${escapeHtml(o)}</span>
+      <button class="entity-chip-del" onclick="delObjetivo(${i})" title="Eliminar">×</button>
+    </div>`).join('');
+  document.getElementById('objetivos-count').textContent = STATE.objetivos.length;
+}
+function addObjetivo() {
+  const inp = document.getElementById('objetivos-add-input');
+  const name = inp.value.trim();
+  if (!name) { inp.focus(); return; }
+  STATE.objetivos.push(name);
+  resizeMAO();
+  inp.value = '';
+  saveState();
+  renderObjetivos();
+  inp.focus();
+}
+function delObjetivo(i) {
+  if (STATE.objetivos.length <= 1) { showToast('Necesitas al menos 1 objetivo.'); return; }
+  STATE.objetivos.splice(i,1);
+  STATE.mao.forEach(r => r.splice(i,1));
+  saveState();
+  renderObjetivos();
+}
+function renameObjetivo(i, newName) {
+  const n = (newName||'').trim();
+  if (!n) { showToast('El nombre no puede estar vacío.'); renderObjetivos(); return; }
+  STATE.objetivos[i] = n;
+  saveState();
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MATRIZ MID (actor × actor, 0-4)
+// ═════════════════════════════════════════════════════════════════════════
+function renderMID() {
+  const wrap = document.getElementById('mid-wrap');
+  const n = STATE.actores.length;
+  if (n < 2) { wrap.innerHTML = '<p class="empty-msg">Necesitas al menos 2 actores.</p>'; return; }
+  let html = '<table class="matrix"><thead><tr>';
+  html += '<th class="corner">influye sobre →</th>';
+  for (let j=0;j<n;j++) {
+    html += `<th class="col-h" title="${escapeHtml(STATE.actores[j])}"><div class="col-h-inner">A${String(j+1).padStart(2,'0')} · ${escapeHtml(STATE.actores[j])}</div></th>`;
+  }
+  html += '</tr></thead><tbody>';
+  for (let i=0;i<n;i++) {
+    html += `<tr><th class="row-h" title="${escapeHtml(STATE.actores[i])}">A${String(i+1).padStart(2,'0')} · ${escapeHtml(STATE.actores[i])}</th>`;
+    for (let j=0;j<n;j++) {
+      const v = STATE.mid[i][j];
+      if (i===j) html += '<td class="cell diag">·</td>';
+      else {
+        const cls = v === '' ? '' : `v-${v}`;
+        html += `<td class="cell ${cls}" data-i="${i}" data-j="${j}" tabindex="0" onclick="cycleMID(${i},${j})" onkeydown="cellKeyMID(event,${i},${j})">${v === '' ? '' : v}</td>`;
+      }
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+  updateMIDCounter();
+}
+function cycleMID(i,j) {
+  const cur = STATE.mid[i][j];
+  const order = ['','1','2','3','4','0'];
+  const idx = order.indexOf(cur === undefined ? '' : cur);
+  STATE.mid[i][j] = order[(idx+1) % order.length];
+  saveState();
+  renderMID();
+}
+function cellKeyMID(ev, i, j) {
+  const k = ev.key;
+  if (['0','1','2','3','4'].includes(k)) { STATE.mid[i][j]=k; saveState(); renderMID(); ev.preventDefault(); }
+  else if (k === 'Backspace' || k === 'Delete') { STATE.mid[i][j]=''; saveState(); renderMID(); ev.preventDefault(); }
+  else if (k === 'ArrowRight'||k==='Tab') { const n=document.querySelector(`td.cell[data-i="${i}"][data-j="${j+1}"]`); if(n){n.focus();ev.preventDefault();} }
+  else if (k === 'ArrowLeft') { const n=document.querySelector(`td.cell[data-i="${i}"][data-j="${j-1}"]`); if(n){n.focus();ev.preventDefault();} }
+  else if (k === 'ArrowDown') { const n=document.querySelector(`td.cell[data-i="${i+1}"][data-j="${j}"]`); if(n){n.focus();ev.preventDefault();} }
+  else if (k === 'ArrowUp') { const n=document.querySelector(`td.cell[data-i="${i-1}"][data-j="${j}"]`); if(n){n.focus();ev.preventDefault();} }
+}
+function updateMIDCounter() {
+  let filled = 0, total = 0;
+  const n = STATE.actores.length;
+  for (let i=0;i<n;i++) for (let j=0;j<n;j++) {
+    if (i===j) continue; total++;
+    if (STATE.mid[i] && STATE.mid[i][j]!=='' && STATE.mid[i][j]!=='-') filled++;
+  }
+  document.getElementById('mid-filled').textContent = filled;
+  document.getElementById('mid-total').textContent = total;
+}
+function resetMID() {
+  if (!confirm('¿Limpiar la matriz de influencias?')) return;
+  STATE.mid = newMID(STATE.actores.length);
+  saveState();
+  renderMID();
+  showToast('Matriz de influencias limpiada.');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MATRIZ MAO (actor × objetivo, -4..+4)
+// ═════════════════════════════════════════════════════════════════════════
+function renderMAO() {
+  const wrap = document.getElementById('mao-wrap');
+  const nA = STATE.actores.length, nO = STATE.objetivos.length;
+  if (nA < 2 || nO < 1) { wrap.innerHTML = '<p class="empty-msg">Necesitas actores y objetivos.</p>'; return; }
+  let html = '<table class="matrix"><thead><tr>';
+  html += '<th class="corner">posición sobre →</th>';
+  for (let j=0;j<nO;j++) {
+    html += `<th class="col-h" title="${escapeHtml(STATE.objetivos[j])}"><div class="col-h-inner">O${String(j+1).padStart(2,'0')} · ${escapeHtml(STATE.objetivos[j])}</div></th>`;
+  }
+  html += '</tr></thead><tbody>';
+  for (let i=0;i<nA;i++) {
+    html += `<tr><th class="row-h" title="${escapeHtml(STATE.actores[i])}">A${String(i+1).padStart(2,'0')} · ${escapeHtml(STATE.actores[i])}</th>`;
+    for (let j=0;j<nO;j++) {
+      const v = STATE.mao[i][j];
+      let cls = '', disp = '';
+      if (v === '') { cls = ''; disp = ''; }
+      else if (v === '0') { cls = 'v-0'; disp = '0'; }
+      else if (v === '-1') { cls = 'v-n1'; disp = '−1'; }
+      else if (v === '-2') { cls = 'v-n2'; disp = '−2'; }
+      else if (v === '-3') { cls = 'v-n3'; disp = '−3'; }
+      else if (v === '-4') { cls = 'v-n4'; disp = '−4'; }
+      else if (['1','2','3','4'].includes(v)) { cls = 'v-' + v; disp = '+' + v; }
+      else { cls = ''; disp = v; }
+      html += `<td class="cell ${cls}" data-i="${i}" data-j="${j}" tabindex="0" onclick="cycleMAO(${i},${j})" onkeydown="cellKeyMAO(event,${i},${j})">${disp}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+  updateMAOCounter();
+}
+function cycleMAO(i,j) {
+  const cur = STATE.mao[i][j];
+  const order = ['','1','2','3','4','-1','-2','-3','-4','0'];
+  const idx = order.indexOf(cur === undefined ? '' : cur);
+  STATE.mao[i][j] = order[(idx+1) % order.length];
+  saveState();
+  renderMAO();
+}
+function cellKeyMAO(ev, i, j) {
+  const k = ev.key;
+  if (['0','1','2','3','4'].includes(k)) { STATE.mao[i][j]=k; saveState(); renderMAO(); ev.preventDefault(); }
+  else if (k === '-' || k === '_') {
+    const cur = STATE.mao[i][j];
+    if (cur && cur !== '' && cur !== '0') {
+      const n = valToNum(cur);
+      STATE.mao[i][j] = String(-n);
+      saveState();
+      renderMAO();
+    }
+    ev.preventDefault();
+  }
+  else if (k === 'Backspace' || k === 'Delete') { STATE.mao[i][j]=''; saveState(); renderMAO(); ev.preventDefault(); }
+  else if (k === 'ArrowRight'||k==='Tab') { const n=document.querySelector(`td.cell[data-i="${i}"][data-j="${j+1}"]`); if(n){n.focus();ev.preventDefault();} }
+  else if (k === 'ArrowLeft') { const n=document.querySelector(`td.cell[data-i="${i}"][data-j="${j-1}"]`); if(n){n.focus();ev.preventDefault();} }
+  else if (k === 'ArrowDown') { const n=document.querySelector(`td.cell[data-i="${i+1}"][data-j="${j}"]`); if(n){n.focus();ev.preventDefault();} }
+  else if (k === 'ArrowUp') { const n=document.querySelector(`td.cell[data-i="${i-1}"][data-j="${j}"]`); if(n){n.focus();ev.preventDefault();} }
+}
+function updateMAOCounter() {
+  let filled = 0, total = 0;
+  const nA = STATE.actores.length, nO = STATE.objetivos.length;
+  for (let i=0;i<nA;i++) for (let j=0;j<nO;j++) {
+    total++;
+    if (STATE.mao[i] && STATE.mao[i][j]!=='' && STATE.mao[i][j]!=='-') filled++;
+  }
+  document.getElementById('mao-filled').textContent = filled;
+  document.getElementById('mao-total').textContent = total;
+}
+function resetMAO() {
+  if (!confirm('¿Limpiar la matriz de posiciones?')) return;
+  STATE.mao = newMAO(STATE.actores.length, STATE.objetivos.length);
+  saveState();
+  renderMAO();
+  showToast('Matriz de posiciones limpiada.');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// RESULTADOS
+// ═════════════════════════════════════════════════════════════════════════
+let _chartInflu = null, _chartAlianzas = null;
+let _currentView = 'influ';
+
+function setView(view) {
+  _currentView = view;
+  document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
+  document.querySelectorAll('.view-pane').forEach(p => p.classList.toggle('active', p.id === 'view-' + view));
+  if (view === 'influ') renderInflu();
+  else if (view === 'alianzas') renderAlianzas();
+  else if (view === 'objetivos') renderObjResults();
+}
+
+function renderInflu() {
+  const res = computeMactor();
+  const rankEl = document.getElementById('rank-influ');
+  if (!res) { rankEl.innerHTML = '<p class="empty-msg">Sin datos suficientes.</p>'; return; }
+  const accent = getComputedStyle(document.body).getPropertyValue('--accent').trim();
+  const green = getComputedStyle(document.body).getPropertyValue('--green').trim();
+  const amber = getComputedStyle(document.body).getPropertyValue('--amber').trim();
+  const ink3 = getComputedStyle(document.body).getPropertyValue('--ink-3').trim();
+  const ink = getComputedStyle(document.body).getPropertyValue('--ink').trim();
+  const ruleStrong = getComputedStyle(document.body).getPropertyValue('--rule-strong').trim();
+  const colorOf = c => ({dominante:green, enlace:accent, autonomo:ink3, dominado:amber}[c]);
+
+  const data = STATE.actores.map((a, i) => ({
+    x: res.DiN[i], y: res.IiN[i],
+    label: 'A' + String(i+1).padStart(2,'0'),
+    name: a, cuadrante: res.cuadIDep[i]
+  }));
+
+  const ctx = document.getElementById('chart-influ').getContext('2d');
+  if (_chartInflu) _chartInflu.destroy();
+  _chartInflu = new Chart(ctx, {
+    type:'scatter',
+    data:{ datasets:[{ label:'Actores', data, backgroundColor: data.map(d=>colorOf(d.cuadrante)), borderColor: data.map(d=>colorOf(d.cuadrante)), pointRadius:8, pointHoverRadius:12, pointBorderWidth:2 }] },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      scales:{
+        x:{ title:{display:true, text:'Dependencia (0–100)', font:{family:'Space Mono', size:11}, color:ink3}, min:0, max:100, grid:{color:ruleStrong}, ticks:{font:{family:'Space Mono', size:10}, color:ink3} },
+        y:{ title:{display:true, text:'Influencia (0–100)', font:{family:'Space Mono', size:11}, color:ink3}, min:0, max:100, grid:{color:ruleStrong}, ticks:{font:{family:'Space Mono', size:10}, color:ink3} }
+      },
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'rgba(20,17,10,0.95)',
+          titleFont:{family:'Familjen Grotesk', size:12, weight:'700'},
+          bodyFont:{family:'Space Mono', size:11}, padding:10,
+          callbacks:{
+            title:items => items[0].raw.name,
+            label:c => [c.raw.label + ' · ' + c.raw.cuadrante.toUpperCase(), 'Influencia: ' + c.raw.y.toFixed(1), 'Dependencia: ' + c.raw.x.toFixed(1)]
+          }
+        }
+      }
+    },
+    plugins:[{
+      id:'quadrantLines',
+      afterDraw(chart) {
+        const { ctx, chartArea, scales } = chart;
+        const xMid = scales.x.getPixelForValue(res.medD);
+        const yMid = scales.y.getPixelForValue(res.medI);
+        ctx.save(); ctx.strokeStyle = accent; ctx.globalAlpha = .35;
+        ctx.setLineDash([4,4]); ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(chartArea.left, yMid); ctx.lineTo(chartArea.right, yMid);
+        ctx.moveTo(xMid, chartArea.top); ctx.lineTo(xMid, chartArea.bottom);
+        ctx.stroke(); ctx.restore();
+      }
+    }, {
+      id:'pointLabels',
+      afterDatasetsDraw(chart) {
+        const { ctx } = chart;
+        const ds = chart.getDatasetMeta(0);
+        ctx.save(); ctx.font = '600 9px "Space Mono", monospace'; ctx.fillStyle = ink;
+        ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ds.data.forEach((pt, i) => ctx.fillText(data[i].label, pt.x + 9, pt.y));
+        ctx.restore();
+      }
+    }]
+  });
+
+  // Ranking por poder relativo Ri
+  const ranked = STATE.actores.map((a, i) => ({ name:a, code:'A'+String(i+1).padStart(2,'0'), Ri:res.Ri[i], Ii:res.Ii[i], Di:res.Di[i], cuad:res.cuadIDep[i] }))
+    .sort((a,b) => b.Ri - a.Ri);
+  rankEl.innerHTML = `<div class="rank-group">
+    <div class="rank-title">Poder relativo Ri (Influencia / total)</div>
+    <ul class="rank-list">
+      ${ranked.map(r => `<li>
+        <span class="rk-code">${r.code}</span>
+        <span class="rk-name" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</span>
+        <span class="rk-score">${(r.Ri*100).toFixed(0)}%</span>
+      </li>`).join('')}
+    </ul>
+  </div>`;
+}
+
+function renderAlianzas() {
+  const res = computeMactor();
+  const rankEl = document.getElementById('rank-alianzas');
+  if (!res) { rankEl.innerHTML = '<p class="empty-msg">Sin datos suficientes.</p>'; return; }
+  const accent = getComputedStyle(document.body).getPropertyValue('--accent').trim();
+  const green = getComputedStyle(document.body).getPropertyValue('--green').trim();
+  const amber = getComputedStyle(document.body).getPropertyValue('--amber').trim();
+  const ink3 = getComputedStyle(document.body).getPropertyValue('--ink-3').trim();
+  const ink = getComputedStyle(document.body).getPropertyValue('--ink').trim();
+  const ruleStrong = getComputedStyle(document.body).getPropertyValue('--rule-strong').trim();
+  const colorOf = c => ({coalicion:green, conflictivo:accent, marginal:ink3, opositor:amber}[c]);
+
+  const data = STATE.actores.map((a, i) => ({
+    x: res.DivN[i], y: res.ConvN[i],
+    label: 'A' + String(i+1).padStart(2,'0'),
+    name: a, cuadrante: res.cuadCD[i]
+  }));
+
+  const ctx = document.getElementById('chart-alianzas').getContext('2d');
+  if (_chartAlianzas) _chartAlianzas.destroy();
+  _chartAlianzas = new Chart(ctx, {
+    type:'scatter',
+    data:{ datasets:[{ label:'Actores', data, backgroundColor: data.map(d=>colorOf(d.cuadrante)), borderColor: data.map(d=>colorOf(d.cuadrante)), pointRadius:8, pointHoverRadius:12, pointBorderWidth:2 }] },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      scales:{
+        x:{ title:{display:true, text:'Divergencia (0–100)', font:{family:'Space Mono', size:11}, color:ink3}, min:0, max:100, grid:{color:ruleStrong}, ticks:{font:{family:'Space Mono', size:10}, color:ink3} },
+        y:{ title:{display:true, text:'Convergencia (0–100)', font:{family:'Space Mono', size:11}, color:ink3}, min:0, max:100, grid:{color:ruleStrong}, ticks:{font:{family:'Space Mono', size:10}, color:ink3} }
+      },
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'rgba(20,17,10,0.95)',
+          titleFont:{family:'Familjen Grotesk', size:12, weight:'700'},
+          bodyFont:{family:'Space Mono', size:11}, padding:10,
+          callbacks:{
+            title:items => items[0].raw.name,
+            label:c => [c.raw.label + ' · ' + c.raw.cuadrante.toUpperCase(), 'Convergencia: ' + c.raw.y.toFixed(1), 'Divergencia: ' + c.raw.x.toFixed(1)]
+          }
+        }
+      }
+    },
+    plugins:[{
+      id:'quadrantLines',
+      afterDraw(chart) {
+        const { ctx, chartArea, scales } = chart;
+        const xMid = scales.x.getPixelForValue(res.medDv);
+        const yMid = scales.y.getPixelForValue(res.medC);
+        ctx.save(); ctx.strokeStyle = accent; ctx.globalAlpha = .35;
+        ctx.setLineDash([4,4]); ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(chartArea.left, yMid); ctx.lineTo(chartArea.right, yMid);
+        ctx.moveTo(xMid, chartArea.top); ctx.lineTo(xMid, chartArea.bottom);
+        ctx.stroke(); ctx.restore();
+      }
+    }, {
+      id:'pointLabels',
+      afterDatasetsDraw(chart) {
+        const { ctx } = chart;
+        const ds = chart.getDatasetMeta(0);
+        ctx.save(); ctx.font = '600 9px "Space Mono", monospace'; ctx.fillStyle = ink;
+        ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ds.data.forEach((pt, i) => ctx.fillText(data[i].label, pt.x + 9, pt.y));
+        ctx.restore();
+      }
+    }]
+  });
+
+  // Ranking: top 5 pares con mayor convergencia y top 5 con mayor divergencia
+  const pairsConv = [], pairsDiv = [];
+  for (let i=0;i<STATE.actores.length;i++) for (let j=i+1;j<STATE.actores.length;j++) {
+    if (res.Conv[i][j] > 0) pairsConv.push({ i, j, val:res.Conv[i][j] });
+    if (res.Div[i][j] > 0)  pairsDiv.push({ i, j, val:res.Div[i][j] });
+  }
+  pairsConv.sort((a,b) => b.val - a.val);
+  pairsDiv.sort((a,b) => b.val - a.val);
+  const cName = i => 'A' + String(i+1).padStart(2,'0') + ' ' + STATE.actores[i];
+
+  rankEl.innerHTML = `
+    <div class="rank-group">
+      <div class="rank-title" style="color:${green}">Top alianzas (convergencia ↑)</div>
+      <ul class="rank-list">
+        ${pairsConv.slice(0,6).map(p => `<li>
+          <span class="rk-name" title="${escapeHtml(cName(p.i))} ↔ ${escapeHtml(cName(p.j))}">${escapeHtml('A'+String(p.i+1).padStart(2,'0'))} ↔ ${escapeHtml('A'+String(p.j+1).padStart(2,'0'))}</span>
+          <span class="rk-score">${p.val}</span>
+        </li>`).join('') || '<li><span class="rk-name" style="font-style:italic;color:var(--ink-3)">sin alianzas detectadas</span></li>'}
+      </ul>
+    </div>
+    <div class="rank-group">
+      <div class="rank-title" style="color:${accent}">Top conflictos (divergencia ↑)</div>
+      <ul class="rank-list">
+        ${pairsDiv.slice(0,6).map(p => `<li>
+          <span class="rk-name" title="${escapeHtml(cName(p.i))} ⇄ ${escapeHtml(cName(p.j))}">${escapeHtml('A'+String(p.i+1).padStart(2,'0'))} ⇄ ${escapeHtml('A'+String(p.j+1).padStart(2,'0'))}</span>
+          <span class="rk-score">${p.val}</span>
+        </li>`).join('') || '<li><span class="rk-name" style="font-style:italic;color:var(--ink-3)">sin conflictos detectados</span></li>'}
+      </ul>
+    </div>`;
+}
+
+function renderObjResults() {
+  const res = computeMactor();
+  const rankEl = document.getElementById('rank-objetivos');
+  if (!res) { rankEl.innerHTML = '<p class="empty-msg">Sin datos suficientes.</p>'; return; }
+  const ranked = STATE.objetivos.map((o, k) => ({
+    name:o, code:'O'+String(k+1).padStart(2,'0'),
+    mov:res.movilizacion[k], saldo:res.saldoNeto[k]
+  })).sort((a,b) => b.mov - a.mov);
+  const accent = getComputedStyle(document.body).getPropertyValue('--accent').trim();
+  const green = getComputedStyle(document.body).getPropertyValue('--green').trim();
+  rankEl.innerHTML = `
+    <div class="rank-group">
+      <div class="rank-title">Objetivos por movilización (top → menor)</div>
+      <ul class="rank-list">
+        ${ranked.map(r => {
+          const saldoColor = r.saldo > 0 ? green : (r.saldo < 0 ? accent : 'var(--ink-3)');
+          const saldoStr = (r.saldo > 0 ? '+' : '') + r.saldo.toFixed(1);
+          return `<li>
+            <span class="rk-code">${r.code}</span>
+            <span class="rk-name" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</span>
+            <span class="rk-score">M${r.mov} <span style="color:${saldoColor}">${saldoStr}</span></span>
+          </li>`;
+        }).join('')}
+      </ul>
+    </div>
+    <p style="font-family:var(--italic);font-style:italic;font-size:.85rem;color:var(--ink-3);margin-top:1rem">
+      <b style="font-family:var(--sans);font-style:normal;color:var(--accent)">M</b> es la movilización total (suma de |posiciones|).
+      El número en color es el <em>saldo neto ponderado por poder Ri de cada actor</em>: positivo (verde) significa apoyo neto al objetivo, negativo (salmón) oposición neta, y cerca de cero significa empate de fuerzas — esos son los conflictos sin resolver.
+    </p>`;
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// NAVEGACIÓN
+// ═════════════════════════════════════════════════════════════════════════
+function showStage(id) {
+  ['stage-welcome','stage-wizard','stage-actores','stage-objetivos','stage-mid','stage-mao','stage-results'].forEach(s => {
+    document.getElementById(s).classList.toggle('is-hidden', s !== id);
+  });
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+function startWizard() { renderWizard(); showStage('stage-wizard'); }
+function backToWelcome() { showStage('stage-welcome'); }
+function backToWizard() { renderWizard(); showStage('stage-wizard'); }
+function backToActores() {
+  document.getElementById('actores-intro').classList.add('is-hidden');
+  document.getElementById('actores-editor').classList.remove('is-hidden');
+  renderActores();
+  showStage('stage-actores');
+}
+function backToObjetivos() { renderObjetivos(); showStage('stage-objetivos'); }
+function backToMID() { renderMID(); showStage('stage-mid'); }
+function backToMAO() { renderMAO(); showStage('stage-mao'); }
+function goToObjetivos() {
+  if (STATE.actores.length < 2) { showToast('Necesitas al menos 2 actores.'); return; }
+  renderObjetivos();
+  showStage('stage-objetivos');
+}
+function goToMID() {
+  if (STATE.objetivos.length < 1) { showToast('Necesitas al menos 1 objetivo.'); return; }
+  renderMID();
+  showStage('stage-mid');
+}
+function goToMAO() {
+  if (STATE.actores.length < 2 || STATE.objetivos.length < 1) { showToast('Necesitas actores y objetivos.'); return; }
+  resizeMAO();
+  renderMAO();
+  showStage('stage-mao');
+}
+function goToResults() {
+  const counter = document.getElementById('results-counter');
+  if (counter) counter.textContent = `${STATE.actores.length} actores · ${STATE.objetivos.length} objetivos`;
+  showStage('stage-results');
+  setView(_currentView);
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// EXPORT
+// ═════════════════════════════════════════════════════════════════════════
+function exportJSON() {
+  const res = computeMactor();
+  const out = {
+    meta:STATE.meta, wizard:STATE.wizard,
+    actores:STATE.actores, objetivos:STATE.objetivos,
+    mid:STATE.mid, mao:STATE.mao,
+    resultados:res ? {
+      influencia:STATE.actores.map((a,i)=>({actor:a, I:res.Ii[i], D:res.Di[i], Ri:res.Ri[i], cuadrante:res.cuadIDep[i]})),
+      alianzas:STATE.actores.map((a,i)=>({actor:a, convergencia:res.ConvI[i], divergencia:res.DivI[i], cuadrante:res.cuadCD[i]})),
+      objetivos:STATE.objetivos.map((o,k)=>({objetivo:o, movilizacion:res.movilizacion[k], saldo_neto:res.saldoNeto[k]}))
+    } : null,
+    exportedAt:new Date().toISOString()
+  };
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `analisis-actores-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Archivo descargado.');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// UTILITIES (modal, toast, theme, cursor)
+// ═════════════════════════════════════════════════════════════════════════
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+let _toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+function toggleTheme() {
+  const isDay = document.body.classList.toggle('day-mode');
+  localStorage.setItem('rr-theme', isDay ? 'day' : 'night');
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = isDay ? '☾ Modo noche' : '☀ Modo día';
+}
+(function applyInitialTheme() {
+  if (localStorage.getItem('rr-theme') === 'day') {
+    document.body.classList.add('day-mode');
+    const btn = document.getElementById('theme-btn');
+    if (btn) btn.textContent = '☾ Modo noche';
+  }
+})();
+
+(function initCursor() {
+  const c = document.getElementById('cursor');
+  const r = document.getElementById('cursorRing');
+  document.addEventListener('mousemove', e => {
+    c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px';
+    r.style.left = e.clientX + 'px'; r.style.top = e.clientY + 'px';
+  });
+  document.addEventListener('mouseover', e => {
+    if (e.target.closest && e.target.closest('a,button,td.cell,.entity-chip,input,summary,.accordion')) {
+      c.style.transform = 'translate(-50%,-50%) scale(0.5)'; c.style.background = 'transparent'; c.style.border = '2px solid var(--accent)';
+      r.style.transform = 'translate(-50%,-50%) scale(1.5)'; r.style.opacity = '0.7';
+    } else {
+      c.style.transform = 'translate(-50%,-50%) scale(1)'; c.style.background = 'var(--accent)'; c.style.border = 'none';
+      r.style.transform = 'translate(-50%,-50%) scale(1)'; r.style.opacity = '0.4';
+    }
+  });
+})();
+
+// ═════════════════════════════════════════════════════════════════════════
+// INIT
+// ═════════════════════════════════════════════════════════════════════════
+(function init() {
+  const restored = loadState();
+  renderWizard();
+  if (restored && STATE.actores.length >= 2) showToast('Restauramos tu análisis anterior.');
+})();
+</script>
+</body>
+</html>
