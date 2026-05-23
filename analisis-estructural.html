@@ -3022,26 +3022,50 @@ function setTerritorio(val) {
     const cod = val.slice(6);
     const d = DEPTOS_CO.find(x => x.cod === cod);
     STATE.meta.territorio = d ? { tipo:'depto', codigo:d.cod, nombre:d.n } : null;
+    // Precargar el JSON departamental en background
+    loadIndicadoresDepto();
   }
   saveState();
 }
 
-function showIndicator(indId, varIdx) {
+// ── Carga lazy del JSON de indicadores departamentales ───────────────────
+const INDICADORES_DEPTO_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/analisis-estructural/indicadores-depto.json?v=20260523';
+let _indicadoresDepto = null;
+let _indicadoresDeptoPromise = null;
+function loadIndicadoresDepto() {
+  if (_indicadoresDepto) return Promise.resolve(_indicadoresDepto);
+  if (_indicadoresDeptoPromise) return _indicadoresDeptoPromise;
+  _indicadoresDeptoPromise = fetch(INDICADORES_DEPTO_URL)
+    .then(r => r.ok ? r.json() : null)
+    .then(data => { _indicadoresDepto = data; return data; })
+    .catch(() => null);
+  return _indicadoresDeptoPromise;
+}
+function getDeptoValue(indId, deptoCod) {
+  if (!_indicadoresDepto) return null;
+  const ind = _indicadoresDepto.indicadores?.[indId];
+  if (!ind) return null;
+  const v = ind.por_depto?.[deptoCod];
+  return v == null ? null : { valor: v, anio: ind.anio, fuente: ind.fuente, unidad: ind.unidad };
+}
+
+async function showIndicator(indId, varIdx) {
   const ind = INDICATORS.find(i => i.id === indId);
   if (!ind) return;
   const panel = document.getElementById('indicator-panel');
   const terri = STATE.meta?.territorio;
   const valStr = (typeof ind.valor_nal === 'number') ? ind.valor_nal.toFixed(ind.valor_nal % 1 === 0 ? 0 : 1) : ind.valor_nal;
-  const territorioLinea = terri && terri.tipo !== 'nacional'
-    ? `<div class="ind-value-block">
-        <div class="ind-value-label">Tu territorio · ${escapeHtml(terri.nombre)}</div>
-        <div class="ind-value" style="color:var(--ink-3)">—</div>
-       </div>
-       <div class="ind-disc" style="margin:0;padding:0;border:none">
-         Aún no precargamos el dato departamental para este indicador. Aparecerá en una próxima versión con datos DANE/PNP territoriales.
-       </div>`
-    : '';
   panel.style.display = 'block';
+
+  // Construir el slot territorial primero como loading si aún no tenemos los datos.
+  let territorioLinea = '';
+  if (terri && terri.tipo === 'depto') {
+    territorioLinea = `<div class="ind-value-block" id="ind-terri-slot">
+      <div class="ind-value-label">Tu territorio · ${escapeHtml(terri.nombre)}</div>
+      <div class="ind-value" style="color:var(--ink-3)">…</div>
+    </div>`;
+  }
+
   panel.innerHTML = `
     <div class="indicator-card">
       <button class="ind-close" onclick="hideIndicator()">×</button>
@@ -3056,9 +3080,40 @@ function showIndicator(indId, varIdx) {
       </div>
       <div class="ind-nota">${escapeHtml(ind.nota)}</div>
       <div class="ind-fuente">Fuente: ${escapeHtml(ind.fuente)}</div>
-      <div class="ind-disc">Esta cifra es <b>referencia de magnitud</b>, no tu medición. Sirve para que sepas en qué orden están las cifras nacionales cuando estés calificando la matriz. El copiloto IA puede usar este contexto si lo activas en el paso 04.</div>
+      <div class="ind-disc">Esta cifra es <b>referencia de magnitud</b>, no tu medición. Sirve para que sepas en qué orden están las cifras nacionales y departamentales cuando estés calificando la matriz. El copiloto IA puede usar este contexto si lo activas en el paso 04.</div>
     </div>`;
   panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  // Resolver el valor departamental (puede ser instantáneo si ya está cacheado)
+  if (terri && terri.tipo === 'depto') {
+    await loadIndicadoresDepto();
+    const v = getDeptoValue(indId, terri.codigo);
+    const slot = document.getElementById('ind-terri-slot');
+    if (!slot) return;
+    if (v) {
+      const valD = (typeof v.valor === 'number') ? v.valor.toFixed(v.valor % 1 === 0 ? 0 : 1) : v.valor;
+      const diff = (typeof v.valor === 'number' && typeof ind.valor_nal === 'number')
+        ? (v.valor - ind.valor_nal)
+        : null;
+      let diffBadge = '';
+      if (diff !== null) {
+        const sig = diff > 0 ? '+' : '';
+        const colorVar = diff > 0 ? '--gold' : '--green';
+        diffBadge = `<div style="font-family:var(--mono);font-size:10.5px;color:var(${colorVar});margin-top:.3rem">vs Colombia: ${sig}${diff.toFixed(1)}</div>`;
+      }
+      slot.innerHTML = `
+        <div class="ind-value-label">Tu territorio · ${escapeHtml(terri.nombre)}</div>
+        <div class="ind-value">${valD}<span class="ind-unit">${escapeHtml(v.unidad || ind.unidad)}</span></div>
+        ${diffBadge}
+      `;
+    } else {
+      slot.innerHTML = `
+        <div class="ind-value-label">Tu territorio · ${escapeHtml(terri.nombre)}</div>
+        <div class="ind-value" style="color:var(--ink-3);font-size:1rem;font-weight:400;font-family:var(--italic);font-style:italic">sin dato preprocesado</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--ink-3);margin-top:.3rem">Este indicador aún no está cargado a nivel departamental. Llegará en versión siguiente.</div>
+      `;
+    }
+  }
 }
 function hideIndicator() {
   const p = document.getElementById('indicator-panel');
@@ -4323,11 +4378,21 @@ async function iaNarrativa() {
   out.style.display = 'block';
   out.innerHTML = '<div class="ia-result-eyebrow">Copiloto · redactando lectura</div><div class="ia-loading"><span class="ia-loading-dot"></span> El consultor IA está leyendo MicMac, DEMATEL e ISM y redactando la interpretación. Toma 15-25 segundos.</div>';
 
-  // Construir contexto: nombre del proyecto + territorio + indicadores que matchean
+  // Construir contexto: nombre del proyecto + territorio + indicadores que matchean.
+  // Si el usuario eligió un departamento y tenemos el dato preprocesado, lo
+  // incluimos en el contexto para que el modelo cite cifras territoriales.
   const terri = STATE.meta?.territorio;
+  if (terri && terri.tipo === 'depto') await loadIndicadoresDepto();
+
   const indicadoresMatch = STATE.vars.map((v, i) => {
     const ind = matchIndicator(v);
-    return ind ? `V${String(i+1).padStart(2,'0')} (${v}) ≈ ${ind.nombre}: ${ind.valor_nal}${ind.unidad} ${ind.anio} (${ind.fuente})` : null;
+    if (!ind) return null;
+    let line = `V${String(i+1).padStart(2,'0')} (${v}) ≈ ${ind.nombre}: nacional ${ind.valor_nal}${ind.unidad} ${ind.anio} (${ind.fuente})`;
+    if (terri && terri.tipo === 'depto') {
+      const dval = getDeptoValue(ind.id, terri.codigo);
+      if (dval) line += ` · ${terri.nombre} ${dval.valor}${dval.unidad} ${dval.anio} (${dval.fuente})`;
+    }
+    return line;
   }).filter(Boolean);
   const ctxParts = [];
   if (STATE.meta?.nombre) ctxParts.push('Plantilla: ' + STATE.meta.nombre);
