@@ -257,14 +257,19 @@ def build():
     elems.append(Paragraph("04 · Capturar la matriz de influencias", h2_style))
     elems.append(Paragraph(
         "Aquí está el corazón del trabajo. Para cada par de variables (A, B), "
-        "calificas <b>cuánto influye A sobre B</b> en una escala discreta:",
+        "calificas <b>cuánto influye A sobre B</b> y en qué dirección. La escala "
+        "combina dos decisiones del experto: la <b>intensidad</b> (0 a 3) y la "
+        "<b>dirección</b> (+ facilita · − inhibe):",
         body_style))
     sc = [
-        ["0", "Nula", "A no influye sobre B"],
-        ["1", "Débil", "A influye marginalmente sobre B"],
-        ["2", "Media", "A influye de forma notoria sobre B"],
-        ["3", "Fuerte", "A influye decisivamente sobre B"],
-        ["P", "Potencial", "Relación que no existe hoy pero podría activarse"],
+        ["0",  "Nula",            "A no influye sobre B"],
+        ["+1", "Facilita débil",  "A promueve a B, pero marginalmente"],
+        ["+2", "Facilita medio",  "A promueve a B de forma notoria"],
+        ["+3", "Facilita fuerte", "A promueve decisivamente a B"],
+        ["−1", "Inhibe débil",    "A frena a B, pero marginalmente"],
+        ["−2", "Inhibe medio",    "A frena a B de forma notoria"],
+        ["−3", "Inhibe fuerte",   "A frena decisivamente a B"],
+        ["P",  "Potencial",       "Relación que no existe hoy pero podría activarse"],
     ]
     st = Table(sc, colWidths=[1.3*cm, 2.2*cm, 11.5*cm])
     st.setStyle(TableStyle([

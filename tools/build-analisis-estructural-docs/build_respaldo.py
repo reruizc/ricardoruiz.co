@@ -289,6 +289,39 @@ def build():
         "scoring triangular completo {min, mod, max} por celda.",
         callout_style))
 
+    # Sección extra · valencias firmadas
+    e.append(Paragraph("5.1 · Valencias firmadas (facilita / inhibe)", h2_style))
+    e.append(Paragraph(
+        "La escala de calificación se amplía con dirección causal. Cada "
+        "celda M[i,j] toma valores en {0, +1, +2, +3, -1, -2, -3, P}, donde "
+        "el signo positivo significa que A <i>facilita</i> a B y el negativo "
+        "que A <i>inhibe</i> a B. Esto resuelve una crítica histórica al "
+        "análisis estructural clásico (Saritas &amp; Smith 2011): la "
+        "imposibilidad de distinguir un sistema en el que A promueve B de "
+        "uno en el que A frena B.",
+        body_style))
+    e.append(Paragraph("Cada lente integra los signos de manera distinta:", body_style))
+    e.append(Paragraph(
+        "MicMac sigue trabajando con magnitudes absolutas (|M[i,j]|), pues "
+        "se enfoca en intensidad. Una inhibición fuerte cuenta como "
+        "influencia fuerte: A sí mueve a B, simplemente lo hace en sentido "
+        "contrario.",
+        body_style))
+    e.append(Paragraph(
+        "DEMATEL preserva signos a lo largo del cálculo. La normalización "
+        "usa max(rowSums(|M|), colSums(|M|)) para garantizar invertibilidad "
+        "de (I - D) incluso con muchos negativos. R y C se calculan sobre "
+        "la T firmada; R-C captura ahora <i>facilitación neta</i> versus "
+        "<i>inhibición neta</i>: una variable con R-C muy negativo puede ser "
+        "causa-inhibidora (lanza más, pero en sentido frenador), no solo "
+        "efecto.",
+        body_style))
+    e.append(Paragraph(
+        "ISM aplica el umbral sobre la magnitud (|M[i,j]| &gt;= t), igual "
+        "que con los positivos. La jerarquía estructural responde a "
+        "alcanzabilidad, no a sentido causal.",
+        body_style))
+
     # 6. Bibliografía
     e.append(PageBreak())
     e.append(Paragraph("6 · Bibliografía", h2_style))
