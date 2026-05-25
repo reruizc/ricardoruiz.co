@@ -589,6 +589,51 @@ body.day-mode::before {
 }
 .methodology-note a { color:var(--accent); font-style:normal; }
 
+/* Mis proyectos (lista de proyectos del usuario logueado) */
+.proj-row {
+  display:grid; grid-template-columns:1fr auto auto; gap:1rem; align-items:center;
+  padding:.8rem 1rem; background:var(--paper-3); border:1px solid var(--rule);
+}
+.proj-row .pr-name { font-family:var(--sans); font-weight:600; font-size:.95rem; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.proj-row .pr-meta { font-family:var(--mono); font-size:11px; color:var(--ink-3); letter-spacing:.04em; margin-top:.15rem; }
+.proj-row .pr-role {
+  font-family:var(--mono); font-size:10.5px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+  padding:.2rem .55rem; background:var(--paper); color:var(--ink-3); border:1px solid var(--rule-strong);
+}
+.proj-row .pr-role.owner { background:var(--accent); color:var(--on-accent); border-color:var(--accent); }
+.proj-row .pr-actions { display:flex; gap:.4rem; }
+.proj-row .pr-actions button {
+  font-family:var(--mono); font-size:11px; letter-spacing:.04em;
+  padding:.35rem .7rem; background:transparent; color:var(--ink-2); border:1px solid var(--rule-strong);
+  transition:border-color .2s, color .2s;
+}
+.proj-row .pr-actions button:hover { border-color:var(--accent); color:var(--accent); }
+.proj-row .pr-actions button.danger:hover { border-color:var(--danger); color:var(--danger); }
+
+/* Cloud bar (estado de sincronización) */
+.cloud-bar {
+  display:flex; align-items:center; gap:1rem; flex-wrap:wrap;
+  padding:.85rem 1.1rem;
+  background:var(--accent-soft); border-left:3px solid var(--accent);
+  font-family:var(--mono); font-size:12px; color:var(--ink-2);
+}
+.cloud-bar .cb-icon { font-family:var(--sans); font-weight:700; color:var(--accent); }
+.cloud-bar .cb-spacer { flex:1; }
+.cloud-bar .cb-status { font-style:italic; color:var(--ink-3); font-family:var(--italic); font-size:12.5px; }
+.cloud-bar .cb-status.saving { color:var(--amber); }
+.cloud-bar .cb-status.saved { color:var(--green); }
+.cloud-bar .cb-status.error { color:var(--danger); }
+.cloud-bar .cb-editor { font-size:11px; color:var(--ink-3); padding-left:.8rem; border-left:1px solid var(--rule); }
+.cloud-bar.anon { background:rgba(214,168,58,0.10); border-left-color:var(--amber); }
+.cloud-bar.anon .cb-icon { color:var(--amber); }
+.cloud-bar .btn-mini {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.06em;
+  padding:.4rem .8rem; border:1px solid var(--rule-strong);
+  background:transparent; color:var(--ink-2);
+  transition:border-color .2s, color .2s;
+}
+.cloud-bar .btn-mini:hover { border-color:var(--accent); color:var(--accent); }
+
 footer.foot {
   max-width:980px; margin:0 auto; padding:2rem 1.75rem 1.5rem;
   border-top:1px solid var(--rule);
@@ -604,6 +649,15 @@ footer.foot {
 <nav class="topbar">
   <div class="topbar-left">
     <a href="analisis-estructural.html" class="btn-back"><span>←</span> Volver al lab</a>
+    <div id="nav-user-block" class="is-hidden" style="display:flex;align-items:center;gap:.7rem;margin-left:.5rem">
+      <span id="nav-user-email" style="font-family:var(--mono);font-size:12px;color:var(--ink-3);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+      <a href="pricing.html" id="nav-user-plan" style="font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--accent);padding:.25rem .55rem;border:1px solid var(--accent);background:var(--accent-soft)">FREE</a>
+      <button onclick="logoutUser()" style="font-family:var(--mono);font-size:11px;color:var(--ink-3);background:none;border:none;padding:0">salir ↗</button>
+    </div>
+    <div id="nav-auth-anon" style="display:flex;gap:.7rem;margin-left:.5rem">
+      <a href="login.html" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)">Iniciar sesión</a>
+      <a href="register.html" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);padding:.3rem .65rem">Registrarse</a>
+    </div>
   </div>
   <div class="topbar-center">
     <span class="eyebrow" style="margin:0;font-size:11px">Lab · Problema Público</span>
@@ -628,6 +682,18 @@ footer.foot {
     <a href="analisis-estructural.html">Lab de Políticas Públicas y Prospectiva</a> <span class="sep">/</span>
     <span>Problema Público</span>
   </div>
+
+  <!-- MIS PROYECTOS (visible solo cuando AUTH.isLogged) -->
+  <section class="is-hidden" id="my-projects" style="background:var(--paper-2);border:1px solid var(--rule);padding:1.6rem 1.6rem 1.4rem;margin-bottom:2rem">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.2rem;flex-wrap:wrap">
+      <div>
+        <h3 style="font-family:var(--sans);font-weight:700;font-size:1.15rem;letter-spacing:-.01em">Tus análisis Problema Público en la nube</h3>
+        <div id="my-projects-meta" style="font-family:var(--mono);font-size:11.5px;color:var(--ink-3);letter-spacing:.05em">—</div>
+      </div>
+      <button class="btn-ghost" onclick="newProject()">+ Nuevo análisis</button>
+    </div>
+    <div id="my-projects-list" style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:1rem"></div>
+  </section>
 
   <!-- WELCOME -->
   <section id="stage-welcome">
@@ -703,6 +769,14 @@ footer.foot {
   <!-- STEPS NAV (shared across all 5 mechanics) -->
   <div id="steps-nav" class="is-hidden">
     <div class="steps-row" id="steps-row"></div>
+    <div class="cloud-bar" id="cloud-bar-flow" style="margin-bottom:1.6rem">
+      <span class="cb-icon">●</span>
+      <span id="cb-text-flow">Trabajando local</span>
+      <span class="cb-spacer"></span>
+      <span class="cb-status" id="cb-status-flow"></span>
+      <span class="cb-editor" id="cb-editor-flow"></span>
+      <button class="btn-mini" id="cb-save-flow" onclick="cloudSave()">Guardar en la nube</button>
+    </div>
   </div>
 
   <!-- STAGE 1: DEFINICIÓN -->
@@ -908,6 +982,16 @@ footer.foot {
 
     <div id="res-content"></div>
 
+    <div class="cloud-bar" id="cloud-bar-results" style="margin-top:1.5rem">
+      <span class="cb-icon">●</span>
+      <span id="cb-text-results">Trabajando local</span>
+      <span class="cb-spacer"></span>
+      <span class="cb-status" id="cb-status-results"></span>
+      <span class="cb-editor" id="cb-editor-results"></span>
+      <button class="btn-mini" id="cb-save-results" onclick="cloudSave()">Guardar en la nube</button>
+      <button class="btn-mini is-hidden" id="cb-invite-results" onclick="openInviteModal()">Invitar colaborador</button>
+    </div>
+
     <div class="export-row">
       <button class="btn" onclick="downloadMemo()">↓ Descargar memo (.md)</button>
       <button class="btn-ghost" onclick="downloadCSV()">↓ Descargar matriz (.csv)</button>
@@ -986,6 +1070,36 @@ footer.foot {
       Jaime Torres-Melo &amp; Jairo Santander, <em>Introducción a las
       políticas públicas</em> (IEMP, 2013).
     </p>
+  </div>
+</div>
+
+<!-- Modal login -->
+<div class="modal-back" id="modal-login">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-login')">×</button>
+    <h2>Para guardar y compartir necesitas una cuenta</h2>
+    <p>Tu trabajo se guarda localmente en este navegador. Para guardarlo en la nube, compartirlo con tu equipo o acceder desde otro dispositivo, inicia sesión o crea una cuenta gratuita.</p>
+    <div style="display:flex;gap:.55rem;margin-top:1.4rem;flex-wrap:wrap">
+      <a href="login.html" class="btn">Iniciar sesión</a>
+      <a href="register.html" class="btn-ghost">Crear cuenta gratis</a>
+    </div>
+  </div>
+</div>
+
+<!-- Modal invitación -->
+<div class="modal-back" id="modal-invite">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-invite')">×</button>
+    <h2>Invitar a un colaborador</h2>
+    <p>Solo los colaboradores invitados pueden ver y editar este análisis. Les llegará un correo con un enlace para aceptar.</p>
+    <label style="display:block;font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:1rem 0 .4rem">Correo del colaborador</label>
+    <input type="email" id="invite-email" placeholder="colega@entidad.gov.co" style="width:100%;padding:.7rem .85rem;font-family:var(--sans);font-size:.95rem;background:var(--paper-3);color:var(--ink);border:1px solid var(--rule-strong);outline:none"/>
+    <div style="display:flex;gap:.55rem;margin-top:1.4rem;flex-wrap:wrap">
+      <button class="btn" onclick="submitInvite()">Enviar invitación</button>
+      <button class="btn-ghost" onclick="closeModal('modal-invite')">Cancelar</button>
+    </div>
+    <label style="display:block;font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:1.5rem 0 .4rem">Personas con acceso</label>
+    <ul id="collab-list" style="list-style:none"></ul>
   </div>
 </div>
 
@@ -1663,8 +1777,308 @@ function toggleTheme() {
   });
 })();
 
+// ═════════════════════════════════════════════════════════════════════════
+// AUTH + CLOUD (espejo del patrón de mactor.html con endpoints /pp/*)
+// ═════════════════════════════════════════════════════════════════════════
+const AUTH_URL = 'https://rr-auth.reruizc.workers.dev';
+const POLL_INTERVAL_MS = 10000;
+const AUTH = { token:null, user:null, isLogged:false };
+const CLOUD = { projId:null, lastSavedAt:null, lastEditor:null, collaborators:[], owner:null, _pollTimer:null, _saving:false };
+
+function _authToken() { return localStorage.getItem('rr-token'); }
+function _authStoreUser(u) { if (u) localStorage.setItem('rr-user', JSON.stringify(u)); }
+function _authReadStored() { try { return JSON.parse(localStorage.getItem('rr-user') || 'null'); } catch { return null; } }
+
+async function loadUserFromAPI() {
+  const token = _authToken();
+  if (!token) { AUTH.isLogged=false; AUTH.user=null; AUTH.token=null; return null; }
+  AUTH.token = token;
+  try {
+    const r = await fetch(AUTH_URL + '/auth/me', { headers:{ 'Authorization':'Bearer ' + token } });
+    const data = await r.json();
+    if (!r.ok || !data.ok) {
+      localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user');
+      AUTH.isLogged=false; AUTH.user=null; AUTH.token=null; return null;
+    }
+    AUTH.user = data.user; AUTH.isLogged = true;
+    _authStoreUser(data.user);
+    return data.user;
+  } catch {
+    const cached = _authReadStored();
+    if (cached && token) { AUTH.user=cached; AUTH.isLogged=true; return cached; }
+    return null;
+  }
+}
+
+function renderAuthChip() {
+  const anon = document.getElementById('nav-auth-anon');
+  const userBlock = document.getElementById('nav-user-block');
+  if (AUTH.isLogged && AUTH.user) {
+    anon.classList.add('is-hidden');
+    userBlock.classList.remove('is-hidden');
+    document.getElementById('nav-user-email').textContent = AUTH.user.email;
+    document.getElementById('nav-user-plan').textContent = (AUTH.user.plan || 'free').toUpperCase();
+  } else {
+    anon.classList.remove('is-hidden');
+    userBlock.classList.add('is-hidden');
+  }
+}
+
+function logoutUser() {
+  if (!confirm('¿Cerrar sesión? Tu análisis local se conserva.')) return;
+  localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user');
+  AUTH.token=null; AUTH.user=null; AUTH.isLogged=false;
+  CLOUD.projId=null; CLOUD.lastSavedAt=null; CLOUD.lastEditor=null; CLOUD.collaborators=[]; CLOUD.owner=null;
+  stopPolling();
+  renderAuthChip(); renderCloudBars();
+  document.getElementById('my-projects').classList.add('is-hidden');
+  showToast('Sesión cerrada.');
+}
+
+async function apiCall(path, opts={}) {
+  const token = _authToken();
+  const headers = Object.assign({}, opts.headers || {});
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  if (opts.body && typeof opts.body !== 'string') {
+    headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(opts.body);
+  }
+  const r = await fetch(AUTH_URL + path, Object.assign({}, opts, { headers }));
+  const data = await r.json().catch(() => ({ ok:false, error:'Respuesta no JSON' }));
+  return { status:r.status, ok:r.ok && data.ok !== false, data };
+}
+
+function setCbStatus(kind, msg) {
+  ['flow','results'].forEach(s => {
+    const el = document.getElementById('cb-status-' + s);
+    if (!el) return;
+    el.className = 'cb-status ' + (kind || '');
+    el.textContent = msg || '';
+  });
+}
+function renderCloudBars() {
+  const inCloud = !!CLOUD.projId;
+  ['flow','results'].forEach(s => {
+    const bar = document.getElementById('cloud-bar-' + s);
+    const txt = document.getElementById('cb-text-' + s);
+    const editorEl = document.getElementById('cb-editor-' + s);
+    const saveBtn = document.getElementById('cb-save-' + s);
+    if (!bar) return;
+    if (inCloud) {
+      bar.classList.remove('anon');
+      txt.textContent = 'Sincronizado · análisis ' + CLOUD.projId.slice(0,6);
+      saveBtn.textContent = 'Guardar cambios';
+      if (CLOUD.lastEditor && CLOUD.lastEditor !== (AUTH.user?.email)) editorEl.textContent = 'última edición: ' + CLOUD.lastEditor;
+      else editorEl.textContent = '';
+    } else if (AUTH.isLogged) {
+      bar.classList.remove('anon');
+      txt.textContent = 'Trabajando local — aún no guardado en la nube';
+      saveBtn.textContent = 'Guardar en la nube';
+      editorEl.textContent = '';
+    } else {
+      bar.classList.add('anon');
+      txt.textContent = 'Trabajando local · inicia sesión para guardar y compartir';
+      saveBtn.textContent = 'Iniciar sesión';
+      editorEl.textContent = '';
+    }
+  });
+  const inviteBtn = document.getElementById('cb-invite-results');
+  if (inviteBtn) {
+    const canInvite = !!CLOUD.projId && AUTH.isLogged && CLOUD.owner === AUTH.user?.email;
+    inviteBtn.classList.toggle('is-hidden', !canInvite);
+  }
+}
+
+async function cloudSave() {
+  if (!AUTH.isLogged) { openModal('modal-login'); return; }
+  if (!STATE.definicion.enunciado || !STATE.definicion.enunciado.trim()) {
+    showToast('Define el enunciado del problema antes de guardar.');
+    return;
+  }
+  if (CLOUD._saving) return;
+  CLOUD._saving = true;
+  setCbStatus('saving', 'Guardando…');
+  const body = {
+    projId: CLOUD.projId || undefined,
+    meta: { nombre: STATE.definicion.enunciado.slice(0, 60) },
+    definicion:   STATE.definicion,
+    evidencia:    STATE.evidencia,
+    alternativas: STATE.alternativas,
+    criterios:    STATE.criterios,
+    scores:       STATE.scores
+  };
+  const r = await apiCall('/pp/save', { method:'POST', body });
+  CLOUD._saving = false;
+  if (!r.ok) {
+    setCbStatus('error', r.data.error || 'Error al guardar');
+    showToast(r.data.error || 'No se pudo guardar.');
+    return;
+  }
+  CLOUD.projId = r.data.projId;
+  CLOUD.lastSavedAt = r.data.updatedAt;
+  CLOUD.lastEditor = r.data.lastEditor;
+  if (!CLOUD.owner) CLOUD.owner = AUTH.user.email;
+  const t = new Date(r.data.updatedAt);
+  setCbStatus('saved', 'Guardado · ' + t.toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit' }));
+  renderCloudBars();
+  startPolling();
+  refreshProjectsList();
+}
+
+async function cloudLoad(projId) {
+  const r = await apiCall('/pp/load?projId=' + encodeURIComponent(projId));
+  if (!r.ok) { showToast(r.data.error || 'No se pudo cargar'); return false; }
+  const p = r.data.project;
+  // Reemplaza state local con el remoto.
+  if (p.definicion)   Object.assign(STATE.definicion, p.definicion);
+  if (Array.isArray(p.evidencia))    STATE.evidencia    = p.evidencia;
+  if (Array.isArray(p.alternativas)) STATE.alternativas = p.alternativas;
+  if (Array.isArray(p.criterios))    STATE.criterios    = p.criterios;
+  if (p.scores && typeof p.scores === 'object') STATE.scores = p.scores;
+  CLOUD.projId = projId;
+  CLOUD.lastSavedAt = p.updatedAt;
+  CLOUD.lastEditor = p.lastEditor;
+  CLOUD.owner = p.owner;
+  CLOUD.collaborators = p.collaborators || [];
+  STATE.step = 1;
+  saveState();
+  renderAll();
+  renderCloudBars();
+  showStage('stage-definicion');
+  goToStep(1);
+  startPolling();
+  showToast('Análisis cargado desde la nube.');
+  return true;
+}
+
+async function refreshProjectsList() {
+  if (!AUTH.isLogged) { document.getElementById('my-projects').classList.add('is-hidden'); return; }
+  const r = await apiCall('/pp/list');
+  if (!r.ok) { document.getElementById('my-projects').classList.add('is-hidden'); return; }
+  renderProjectsList(r.data.projects, r.data.count, r.data.plan, r.data.ownedLimit);
+}
+function renderProjectsList(projects, count, plan, limit) {
+  const card = document.getElementById('my-projects');
+  card.classList.remove('is-hidden');
+  const owned = projects.filter(p => p.role === 'owner').length;
+  document.getElementById('my-projects-meta').textContent =
+    `${count} análisis · ${owned}/${limit} propios · plan ${plan}`;
+  const list = document.getElementById('my-projects-list');
+  if (projects.length === 0) {
+    list.innerHTML = '<div style="font-family:var(--italic);font-style:italic;color:var(--ink-3);text-align:center;padding:1rem">No tienes análisis guardados. Empieza uno y guárdalo desde la barra azul.</div>';
+    return;
+  }
+  list.innerHTML = projects.map(p => {
+    const date = p.updatedAt ? new Date(p.updatedAt).toLocaleString('es-CO', { dateStyle:'short', timeStyle:'short' }) : '—';
+    const isOwner = p.role === 'owner';
+    return `<div class="proj-row">
+      <div>
+        <div class="pr-name">${escapeHtml(p.nombre)}</div>
+        <div class="pr-meta">${p.alt_count} alternativas · ${p.crit_count} criterios · ${p.evid_count} fuentes · ${date} · ${escapeHtml(p.owner)}</div>
+      </div>
+      <span class="pr-role ${isOwner ? 'owner' : ''}">${isOwner ? 'Propio' : 'Invitado'}</span>
+      <div class="pr-actions">
+        <button onclick="cloudLoad('${p.projId}')">Abrir →</button>
+        ${isOwner ? `<button class="danger" onclick="cloudDelete('${p.projId}','${escapeHtml(p.nombre).replace(/'/g,'')}')">Borrar</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+async function cloudDelete(projId, name) {
+  if (!confirm(`¿Borrar "${name}"? Esta acción no se puede deshacer.`)) return;
+  const r = await apiCall('/pp/delete?projId=' + encodeURIComponent(projId), { method:'DELETE' });
+  if (!r.ok) { showToast(r.data.error || 'No se pudo borrar'); return; }
+  showToast('Análisis borrado.');
+  if (CLOUD.projId === projId) {
+    CLOUD.projId=null; CLOUD.lastSavedAt=null; CLOUD.lastEditor=null; CLOUD.owner=null; CLOUD.collaborators=[];
+    stopPolling(); renderCloudBars();
+  }
+  refreshProjectsList();
+}
+function newProject() {
+  CLOUD.projId=null; CLOUD.lastSavedAt=null; CLOUD.lastEditor=null; CLOUD.owner=null; CLOUD.collaborators=[];
+  stopPolling();
+  STATE.definicion = { enunciado:'', magnitud:'', urgencia:'media', afectados: [], evidenciaInicial: '' };
+  STATE.evidencia = [];
+  STATE.alternativas = [];
+  STATE.criterios = DEFAULT_CRITERIOS.map(c => ({ ...c }));
+  STATE.scores = {};
+  STATE.step = 1;
+  saveState();
+  renderAll();
+  renderCloudBars();
+  showStage('stage-welcome');
+}
+
+function openInviteModal() {
+  if (!CLOUD.projId) { showToast('Primero guarda el análisis en la nube.'); return; }
+  if (CLOUD.owner !== AUTH.user?.email) { showToast('Solo el dueño puede invitar.'); return; }
+  document.getElementById('invite-email').value = '';
+  renderCollabList();
+  openModal('modal-invite');
+  setTimeout(() => document.getElementById('invite-email').focus(), 100);
+}
+function renderCollabList() {
+  const list = document.getElementById('collab-list');
+  const items = [`<li style="display:flex;justify-content:space-between;padding:.5rem 0;border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-2)"><span>${escapeHtml(CLOUD.owner)}</span><span style="font-size:10px;padding:.15rem .45rem;background:var(--accent);color:var(--on-accent);font-family:var(--sans);font-weight:700;letter-spacing:.1em;text-transform:uppercase">Dueño</span></li>`];
+  for (const c of CLOUD.collaborators) items.push(`<li style="display:flex;justify-content:space-between;padding:.5rem 0;border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-2)"><span>${escapeHtml(c)}</span><span style="font-size:10px;padding:.15rem .45rem;background:var(--paper-3);color:var(--ink-3);font-family:var(--sans);font-weight:700;letter-spacing:.1em;text-transform:uppercase">Colaborador</span></li>`);
+  list.innerHTML = items.join('');
+}
+async function submitInvite() {
+  const email = document.getElementById('invite-email').value.trim().toLowerCase();
+  if (!email) { showToast('Escribe un correo.'); return; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { showToast('Correo inválido.'); return; }
+  const r = await apiCall('/pp/invite', { method:'POST', body:{ projId:CLOUD.projId, email } });
+  if (!r.ok) { showToast(r.data.error || 'No se pudo invitar'); return; }
+  showToast('Invitación enviada a ' + email + '.');
+  closeModal('modal-invite');
+}
+
+async function handleInviteOnLoad() {
+  const url = new URL(window.location.href);
+  const token = url.searchParams.get('invite');
+  if (!token) return;
+  if (!AUTH.isLogged) {
+    showToast('Inicia sesión para aceptar la invitación.');
+    setTimeout(() => { window.location.href = 'login.html?next=' + encodeURIComponent(window.location.pathname + window.location.search); }, 1800);
+    return;
+  }
+  const r = await apiCall('/pp/accept?token=' + encodeURIComponent(token));
+  if (!r.ok) { showToast(r.data.error || 'No se pudo aceptar la invitación'); return; }
+  showToast('Te uniste al análisis.');
+  url.searchParams.delete('invite');
+  window.history.replaceState({}, '', url.toString());
+  await cloudLoad(r.data.projId);
+  refreshProjectsList();
+}
+
+function startPolling() {
+  stopPolling();
+  if (!CLOUD.projId) return;
+  CLOUD._pollTimer = setInterval(async () => {
+    if (CLOUD._saving || document.hidden) return;
+    const r = await apiCall('/pp/load?projId=' + encodeURIComponent(CLOUD.projId) + '&since=' + encodeURIComponent(CLOUD.lastSavedAt || ''));
+    if (!r.ok || r.data.unchanged || !r.data.project) return;
+    const p = r.data.project;
+    if (p.lastEditor && p.lastEditor !== AUTH.user?.email) {
+      if (p.definicion)   Object.assign(STATE.definicion, p.definicion);
+      if (Array.isArray(p.evidencia))    STATE.evidencia    = p.evidencia;
+      if (Array.isArray(p.alternativas)) STATE.alternativas = p.alternativas;
+      if (Array.isArray(p.criterios))    STATE.criterios    = p.criterios;
+      if (p.scores && typeof p.scores === 'object') STATE.scores = p.scores;
+      CLOUD.lastSavedAt = p.updatedAt; CLOUD.lastEditor = p.lastEditor;
+      CLOUD.collaborators = p.collaborators || CLOUD.collaborators;
+      saveState();
+      renderAll();
+      renderCloudBars();
+      showToast('Cambios de ' + p.lastEditor);
+    }
+  }, POLL_INTERVAL_MS);
+}
+function stopPolling() { if (CLOUD._pollTimer) { clearInterval(CLOUD._pollTimer); CLOUD._pollTimer = null; } }
+
 // Init
-(function init() {
+(async function init() {
   const restored = loadState();
   renderAll();
   bindDefinicionInputs();
@@ -1675,6 +2089,11 @@ function toggleTheme() {
   } else {
     showStage('stage-welcome');
   }
+  // Auth + cloud
+  await loadUserFromAPI();
+  renderAuthChip();
+  renderCloudBars();
+  if (AUTH.isLogged) { refreshProjectsList(); handleInviteOnLoad(); }
 })();
 </script>
 </body>
