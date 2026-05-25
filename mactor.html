@@ -2065,12 +2065,21 @@ function toggleTheme() {
   const btn = document.getElementById('theme-btn');
   if (btn) btn.textContent = isDay ? '☾ Modo noche' : '☀ Modo día';
 }
+// Auto día/noche (norma del sitio): si el usuario no ha tocado el toggle,
+// activa modo día entre las 6h y las 19h locales. Si ya hay preferencia
+// guardada, la respeta.
 (function applyInitialTheme() {
-  if (localStorage.getItem('rr-theme') === 'day') {
-    document.body.classList.add('day-mode');
-    const btn = document.getElementById('theme-btn');
-    if (btn) btn.textContent = '☾ Modo noche';
+  const pref = localStorage.getItem('rr-theme');
+  let isDay;
+  if (pref === 'day') isDay = true;
+  else if (pref === 'night') isDay = false;
+  else {
+    const h = new Date().getHours();
+    isDay = h >= 6 && h < 19;
   }
+  if (isDay) document.body.classList.add('day-mode');
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = isDay ? '☾ Modo noche' : '☀ Modo día';
 })();
 
 (function initCursor() {
