@@ -1,0 +1,1681 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Problema Público · Ricardo.Ruiz</title>
+<meta name="description" content="Diseña una política pública con método: define el problema, recoge evidencia, construye alternativas, fija criterios y compara. Inspirado en el Eightfold Path de Eugene Bardach y el marco de Ortegón." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper:#1a1610; --paper-2:#221d15; --paper-3:#2a241b;
+  --ink:#f4f3ef; --ink-2:#b8b1a0; --ink-3:#807a6c;
+  --rule:#f4f3ef1c; --rule-strong:#f4f3ef38;
+  --accent:#d96a50; --accent-2:#e08266;
+  --accent-soft:#d96a5018; --accent-tint:#d96a5036;
+  --gold:#d6a83a; --on-accent:#14110a;
+  --green:#6fa07a; --amber:#d6a83a; --danger:#d96a50;
+  --sans:'Familjen Grotesk',system-ui,sans-serif;
+  --italic:'Petrona',Georgia,serif;
+  --mono:'Space Mono',ui-monospace,monospace;
+  --display:'Syne',sans-serif;
+}
+body.day-mode {
+  --paper:#f4f3ef; --paper-2:#ecebe5; --paper-3:#e0ddd2;
+  --ink:#14110a; --ink-2:#5a5448; --ink-3:#948e80;
+  --rule:#14110a1f; --rule-strong:#14110a40;
+  --accent:#8a1e16; --accent-2:#a02a20;
+  --accent-soft:#8a1e161a; --accent-tint:#8a1e1633;
+  --gold:#8a6a1a; --on-accent:#f4f3ef;
+  --green:#2f6b3f; --amber:#8a6a1a; --danger:#b03524;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html { scroll-behavior:smooth; }
+body {
+  background:var(--paper); color:var(--ink);
+  font-family:var(--sans); font-size:17px; line-height:1.55;
+  min-height:100vh; overflow-x:hidden; cursor:none;
+  transition:background .35s, color .35s;
+}
+a { color:inherit; text-decoration:none; }
+button { font:inherit; color:inherit; background:none; border:none; cursor:none; }
+::selection { background:var(--accent); color:var(--on-accent); }
+body.day-mode::before {
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image:radial-gradient(rgba(20,17,10,.035) 1px, transparent 1.4px);
+  background-size:4px 4px; opacity:.9; mix-blend-mode:multiply;
+}
+.cursor { position:fixed; width:12px; height:12px; background:var(--accent); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s, background .2s; transform:translate(-50%,-50%); }
+.cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--accent); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s, opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+
+/* Topbar */
+.topbar {
+  position:sticky; top:0; z-index:60;
+  display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:1.5rem;
+  padding:1rem 1.75rem;
+  background:var(--paper); border-bottom:1px solid var(--rule); backdrop-filter:blur(8px);
+}
+.topbar-left,.topbar-center,.topbar-right { display:flex; align-items:center; gap:1.1rem; }
+.topbar-right { justify-content:flex-end; }
+.btn-back {
+  display:inline-flex; align-items:center; gap:.55rem;
+  font-family:var(--sans); font-size:14px; font-weight:500; letter-spacing:.04em;
+  padding:.5rem .9rem; border:1px solid var(--rule-strong); transition:background .2s, border-color .2s;
+}
+.btn-back:hover { background:var(--paper-2); border-color:var(--ink); }
+.theme-btn {
+  font-family:var(--mono); font-size:12px; font-weight:700; color:var(--ink-2);
+  padding:.45rem .8rem; border:1px solid var(--rule-strong);
+  transition:color .2s, border-color .2s;
+}
+.theme-btn:hover { color:var(--ink); border-color:var(--ink); }
+.logo-link { display:inline-flex; align-items:center; gap:.55rem; opacity:.9; }
+.logo-link:hover { opacity:1; }
+.logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
+.logo-bar { width:5px; background:var(--accent); border-radius:1px 1px 0 0; opacity:.9; }
+.logo-text { font-family:var(--display); font-weight:800; font-size:clamp(1.05rem,2vw,1.4rem); letter-spacing:-.03em; line-height:1; }
+.logo-text span { color:var(--accent); }
+
+.page {
+  position:relative; z-index:1;
+  max-width:980px; width:100%; margin:0 auto;
+  padding:2.4rem 1.75rem 5rem;
+}
+@media (max-width:720px) {
+  .page { padding:1.6rem 1.1rem 3rem; }
+  .topbar { grid-template-columns:1fr auto; padding:.85rem 1rem; }
+  .topbar-center { display:none; }
+  .topbar-right .logo-link { display:none; }
+}
+.crumb {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3); margin-bottom:1.8rem;
+}
+.crumb a { color:var(--ink-3); transition:color .2s; }
+.crumb a:hover { color:var(--accent); }
+.crumb .sep { margin:0 .55rem; opacity:.55; }
+
+/* Welcome */
+.welcome { text-align:center; padding:1.5rem 0 2rem; }
+.eyebrow {
+  font-family:var(--mono); font-size:12px; letter-spacing:.22em;
+  text-transform:uppercase; color:var(--accent); font-weight:700; margin-bottom:1.4rem;
+}
+.welcome-title {
+  font-family:var(--sans); font-weight:700;
+  font-size:clamp(2rem,5vw,3rem); letter-spacing:-.025em; line-height:1.1;
+  max-width:24ch; margin:0 auto 1.4rem;
+}
+.welcome-title em { font-family:var(--italic); font-style:italic; font-weight:400; color:var(--accent); }
+.welcome-sub {
+  font-family:var(--sans); font-size:clamp(1rem,1.5vw,1.18rem); line-height:1.55;
+  color:var(--ink-2); max-width:54ch; margin:0 auto 2rem;
+}
+.welcome-hint {
+  font-family:var(--mono); font-size:12px; letter-spacing:.04em; color:var(--ink-3);
+  max-width:54ch; margin:0 auto 2rem; line-height:1.6;
+}
+
+.accordion-stack {
+  display:flex; flex-direction:column; gap:.5rem;
+  max-width:640px; margin:2.6rem auto 2.4rem; text-align:left;
+}
+.accordion {
+  border:1px solid var(--rule-strong); background:var(--paper-2);
+  transition:background .2s, border-color .2s;
+}
+.accordion[open] { border-color:var(--accent-tint); background:var(--paper-3); }
+.accordion summary {
+  display:flex; align-items:center; justify-content:space-between; gap:1rem;
+  padding:1rem 1.2rem; list-style:none; cursor:none;
+  font-family:var(--sans); font-weight:600; font-size:.98rem;
+  user-select:none;
+}
+.accordion summary::-webkit-details-marker { display:none; }
+.accordion summary::after {
+  content:"+"; font-family:var(--mono); font-size:1.2rem; color:var(--accent);
+  width:18px; height:18px; display:flex; align-items:center; justify-content:center;
+  transition:transform .2s;
+}
+.accordion[open] summary::after { content:"−"; }
+.accordion summary .acc-num {
+  font-family:var(--mono); font-size:11px; color:var(--ink-3);
+  letter-spacing:.12em; margin-right:.9rem; font-weight:400;
+}
+.accordion-body {
+  padding:0 1.2rem 1.2rem;
+  font-family:var(--italic); font-style:italic; font-size:1rem; line-height:1.6; color:var(--ink-2);
+}
+.accordion-body em { color:var(--accent); }
+
+/* Botones */
+.btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+  font-family:var(--sans); font-weight:600; font-size:.98rem;
+  padding:.95rem 1.8rem;
+  background:var(--accent); color:var(--on-accent); border:none;
+  transition:background .2s, transform .1s;
+}
+.btn:hover { background:var(--accent-2); }
+.btn:active { transform:scale(.98); }
+.btn[disabled], .btn.disabled { opacity:.35; pointer-events:none; }
+.btn-ghost {
+  background:transparent; color:var(--ink-2);
+  border:1px solid var(--rule-strong);
+  padding:.85rem 1.4rem;
+}
+.btn-ghost:hover { color:var(--ink); border-color:var(--ink); background:var(--paper-2); }
+.btn-big { font-size:1.05rem; padding:1.15rem 2.4rem; letter-spacing:.02em; }
+
+.is-hidden { display:none !important; }
+
+/* Method link */
+.method-link {
+  display:inline-flex; align-items:center; gap:.4rem;
+  font-family:var(--mono); font-size:12px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--ink-2);
+  padding:.55rem .95rem; border:1px solid var(--rule-strong);
+  transition:color .2s, border-color .2s;
+}
+.method-link:hover { color:var(--accent); border-color:var(--accent); }
+
+/* Section head */
+.section-head {
+  display:flex; align-items:baseline; justify-content:space-between;
+  gap:1rem; margin-bottom:1.2rem; flex-wrap:wrap;
+}
+.section-head h2 {
+  font-family:var(--sans); font-weight:700; font-size:1.55rem; letter-spacing:-.015em;
+}
+.section-head h2 .num {
+  font-family:var(--mono); font-size:.65em; letter-spacing:.12em;
+  color:var(--ink-3); margin-right:.5rem; font-weight:400;
+}
+.section-head .meta {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.08em; color:var(--ink-3);
+}
+.section-desc {
+  font-family:var(--italic); font-style:italic; font-size:1.02rem; line-height:1.55;
+  color:var(--ink-2); max-width:60ch; margin-bottom:1.6rem;
+}
+
+/* Stage intro banner */
+.stage-intro {
+  background:var(--paper-2); border:1px solid var(--rule);
+  border-left:3px solid var(--accent);
+  padding:1.1rem 1.4rem; margin-bottom:1.6rem;
+}
+.stage-intro p {
+  font-family:var(--sans); font-size:.96rem; line-height:1.55; color:var(--ink);
+}
+.stage-intro p b { color:var(--accent); font-weight:600; }
+.stage-intro p em { font-family:var(--italic); font-style:italic; color:var(--ink-2); }
+
+/* Progress bar (steps) */
+.steps-row {
+  display:flex; gap:.4rem; margin-bottom:2rem;
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.1em;
+  text-transform:uppercase;
+}
+.step-pill {
+  flex:1; padding:.65rem .55rem;
+  text-align:center;
+  background:var(--paper-2); color:var(--ink-3);
+  border:1px solid var(--rule-strong);
+  position:relative;
+}
+.step-pill .step-n { color:var(--accent); font-weight:700; margin-right:.45rem; }
+.step-pill.done { color:var(--ink-2); border-color:var(--rule-strong); }
+.step-pill.done::after {
+  content:"✓"; position:absolute; right:.55rem; top:50%; transform:translateY(-50%);
+  color:var(--green); font-size:1rem; font-family:var(--sans);
+}
+.step-pill.active {
+  color:var(--ink); background:var(--accent-soft);
+  border-color:var(--accent);
+}
+@media (max-width:720px) {
+  .steps-row { display:none; }
+}
+
+/* Form fields */
+.field { margin-bottom:1.4rem; }
+.field-label {
+  display:block;
+  font-family:var(--mono); font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3); margin-bottom:.5rem;
+}
+.field-label .req { color:var(--accent); }
+.field-hint {
+  font-family:var(--italic); font-style:italic; font-size:.86rem;
+  color:var(--ink-3); margin-top:.4rem; line-height:1.5;
+}
+.field input[type="text"], .field input[type="number"], .field input[type="url"], .field textarea, .field select {
+  width:100%;
+  font-family:var(--sans); font-size:.96rem; line-height:1.5;
+  padding:.7rem .9rem;
+  background:var(--paper-2); color:var(--ink);
+  border:1px solid var(--rule-strong); outline:none;
+  transition:border-color .15s;
+}
+.field input:focus, .field textarea:focus, .field select:focus { border-color:var(--accent); }
+.field textarea { min-height:120px; resize:vertical; line-height:1.55; }
+.field-row {
+  display:grid; grid-template-columns:1fr 1fr; gap:1rem;
+}
+@media (max-width:560px) { .field-row { grid-template-columns:1fr; } }
+
+/* Radio group estilo pill */
+.pill-group {
+  display:flex; gap:.45rem; flex-wrap:wrap;
+}
+.pill {
+  font-family:var(--sans); font-weight:500; font-size:.92rem;
+  padding:.55rem 1.1rem;
+  background:var(--paper-2); color:var(--ink-2);
+  border:1px solid var(--rule-strong);
+  transition:border-color .15s, color .15s, background .15s;
+}
+.pill:hover { color:var(--ink); border-color:var(--ink); }
+.pill.sel {
+  background:var(--accent-soft); color:var(--accent);
+  border-color:var(--accent); font-weight:700;
+}
+
+/* Chips de afectados */
+.chip-grid {
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));
+  gap:.5rem; margin-bottom:1rem;
+}
+.chip {
+  display:flex; align-items:center; gap:.55rem;
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+  padding:.55rem .75rem; font-family:var(--sans); font-size:.92rem; min-width:0;
+}
+.chip-name {
+  flex:1; outline:none; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.chip-name:focus { outline:1px solid var(--accent); outline-offset:2px; }
+.chip-del {
+  font-family:var(--mono); font-size:.95rem; color:var(--ink-3);
+  padding:0 .25rem; transition:color .2s;
+}
+.chip-del:hover { color:var(--danger); }
+.chip-add-row { display:flex; gap:.55rem; margin-top:.8rem; flex-wrap:wrap; }
+.chip-add-input {
+  flex:1; min-width:200px;
+  font-family:var(--sans); font-size:.94rem;
+  padding:.65rem .9rem;
+  background:var(--paper-2); color:var(--ink);
+  border:1px solid var(--rule-strong); outline:none;
+}
+.chip-add-input:focus { border-color:var(--accent); }
+
+/* Tabla de evidencia */
+.evid-table { width:100%; border-collapse:collapse; margin-bottom:.8rem; }
+.evid-table th, .evid-table td {
+  border:1px solid var(--rule);
+  padding:.55rem .65rem;
+  font-family:var(--sans); font-size:.9rem;
+  text-align:left; vertical-align:top;
+  background:var(--paper-2);
+}
+.evid-table th {
+  background:var(--paper-3);
+  font-family:var(--mono); font-size:11px; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--ink-3); font-weight:700;
+}
+.evid-table td input, .evid-table td textarea {
+  width:100%; padding:.3rem .45rem;
+  font-family:var(--sans); font-size:.88rem; line-height:1.4;
+  background:transparent; color:var(--ink);
+  border:1px solid transparent; outline:none;
+  transition:border-color .15s, background .15s;
+}
+.evid-table td input:focus, .evid-table td textarea:focus { border-color:var(--accent); background:var(--paper); }
+.evid-table td textarea { min-height:42px; resize:vertical; }
+.evid-table .col-anyo { width:80px; }
+.evid-table .col-dato { width:130px; }
+.evid-table .col-link { width:160px; }
+.evid-table .col-del { width:36px; text-align:center; }
+.evid-del-btn {
+  font-family:var(--mono); font-size:.95rem; color:var(--ink-3);
+  padding:0 .25rem;
+}
+.evid-del-btn:hover { color:var(--danger); }
+@media (max-width:720px) {
+  .evid-table, .evid-table thead, .evid-table tbody, .evid-table th, .evid-table tr { display:block; }
+  .evid-table thead { display:none; }
+  .evid-table tr { margin-bottom:.8rem; border:1px solid var(--rule); padding:.4rem; }
+  .evid-table td { border:none; padding:.3rem .45rem; }
+  .evid-table .col-anyo, .evid-table .col-dato, .evid-table .col-link, .evid-table .col-del { width:auto; }
+}
+
+/* Cards de alternativas */
+.alt-grid {
+  display:grid; grid-template-columns:1fr; gap:1rem; margin-bottom:1rem;
+}
+@media (min-width:760px) { .alt-grid { grid-template-columns:1fr 1fr; } }
+.alt-card {
+  padding:1.1rem 1.2rem;
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+  position:relative;
+}
+.alt-card.is-baseline { border-left:3px solid var(--gold); }
+.alt-card .alt-code {
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--accent); font-weight:700;
+  margin-bottom:.5rem;
+}
+.alt-card .alt-code .baseline-tag {
+  background:var(--gold); color:var(--on-accent); padding:.1rem .4rem; margin-left:.5rem;
+  font-size:9.5px;
+}
+.alt-card .alt-name-input {
+  width:100%;
+  font-family:var(--sans); font-weight:700; font-size:1.05rem;
+  padding:.4rem .5rem; margin-bottom:.6rem;
+  background:transparent; color:var(--ink);
+  border:1px solid transparent; outline:none;
+}
+.alt-card .alt-name-input:focus { border-color:var(--accent); background:var(--paper); }
+.alt-card .alt-field { margin-bottom:.55rem; }
+.alt-card .alt-field-label {
+  font-family:var(--mono); font-size:10px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--ink-3); margin-bottom:.2rem; display:block;
+}
+.alt-card textarea, .alt-card input {
+  width:100%; padding:.4rem .5rem;
+  font-family:var(--sans); font-size:.88rem; line-height:1.45;
+  background:var(--paper); color:var(--ink);
+  border:1px solid var(--rule); outline:none;
+  transition:border-color .15s;
+}
+.alt-card textarea:focus, .alt-card input:focus { border-color:var(--accent); }
+.alt-card textarea { min-height:54px; resize:vertical; }
+.alt-card .alt-del-btn {
+  position:absolute; top:.6rem; right:.8rem;
+  font-family:var(--mono); font-size:.95rem; color:var(--ink-3);
+  padding:.15rem .35rem; transition:color .15s;
+}
+.alt-card .alt-del-btn:hover { color:var(--danger); }
+.alt-meta {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.05em; color:var(--ink-3);
+}
+.alt-meta b { color:var(--accent); }
+
+/* Criterios */
+.crit-list {
+  display:flex; flex-direction:column; gap:.6rem; margin-bottom:1rem;
+}
+.crit-row {
+  display:grid; grid-template-columns:1fr 100px 1fr 36px; gap:.7rem;
+  align-items:center;
+  padding:.7rem .9rem;
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+}
+@media (max-width:680px) {
+  .crit-row { grid-template-columns:1fr 80px 36px; }
+  .crit-row .crit-bar { grid-column:1 / -1; }
+}
+.crit-row .crit-name-input {
+  font-family:var(--sans); font-weight:600; font-size:.96rem;
+  padding:.35rem .45rem;
+  background:transparent; color:var(--ink);
+  border:1px solid transparent; outline:none;
+}
+.crit-row .crit-name-input:focus { border-color:var(--accent); background:var(--paper); }
+.crit-row .crit-peso-input {
+  font-family:var(--mono); font-size:.92rem;
+  padding:.4rem .5rem;
+  background:var(--paper); color:var(--ink);
+  border:1px solid var(--rule); outline:none;
+  text-align:right;
+}
+.crit-row .crit-peso-input:focus { border-color:var(--accent); }
+.crit-bar {
+  height:8px; background:var(--paper-3); position:relative; overflow:hidden;
+}
+.crit-bar-fill {
+  position:absolute; left:0; top:0; bottom:0;
+  background:var(--accent);
+  transition:width .25s;
+}
+.crit-del-btn {
+  font-family:var(--mono); font-size:.95rem; color:var(--ink-3);
+  padding:0 .25rem; transition:color .15s;
+}
+.crit-del-btn:hover { color:var(--danger); }
+.crit-sum {
+  font-family:var(--mono); font-size:12px; letter-spacing:.04em;
+  color:var(--ink-3); margin-top:.6rem;
+}
+.crit-sum b { color:var(--accent); font-weight:700; }
+.crit-sum.warn b { color:var(--amber); }
+
+/* Matriz de comparación */
+.cmp-wrap { overflow-x:auto; margin-bottom:1rem; background:var(--paper-2); padding:.8rem; border:1px solid var(--rule); }
+.cmp-table { border-collapse:collapse; font-family:var(--mono); font-size:.8rem; min-width:520px; }
+.cmp-table th, .cmp-table td {
+  border:1px solid var(--rule); padding:.4rem .55rem;
+  text-align:center; vertical-align:middle; min-width:62px;
+}
+.cmp-table th {
+  background:var(--paper-3); color:var(--ink);
+  font-family:var(--sans); font-weight:600; font-size:.85rem;
+}
+.cmp-table th.row-h {
+  text-align:left; max-width:200px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis;
+}
+.cmp-table th.col-h .col-h-inner {
+  display:flex; flex-direction:column; align-items:center; gap:.15rem;
+}
+.cmp-table th.col-h .col-h-peso {
+  font-family:var(--mono); font-size:10px; color:var(--accent); letter-spacing:.04em;
+}
+.cmp-table td.cmp-cell {
+  background:var(--paper); cursor:none; user-select:none;
+  transition:background .15s, color .15s;
+  position:relative;
+}
+.cmp-table td.cmp-cell:hover { background:var(--accent-soft); }
+.cmp-table td.cmp-cell.v-1 { background:rgba(180,180,180,0.08); color:var(--ink-3); }
+.cmp-table td.cmp-cell.v-2 { color:var(--ink); }
+.cmp-table td.cmp-cell.v-3 { background:var(--accent-soft); color:var(--accent); font-weight:700; }
+.cmp-table td.cmp-cell.v-4 { background:var(--accent-tint); color:var(--accent); font-weight:700; }
+.cmp-table td.cmp-cell.v-5 { background:var(--accent); color:var(--on-accent); font-weight:700; }
+.cmp-table td.cmp-score {
+  background:var(--paper-3); color:var(--accent);
+  font-weight:700; font-family:var(--mono);
+}
+
+/* Ranking de alternativas */
+.rank-bars { display:flex; flex-direction:column; gap:.6rem; }
+.rank-bar-row {
+  display:grid; grid-template-columns:30px 1fr 70px; gap:.7rem;
+  align-items:center;
+  padding:.55rem .8rem;
+  background:var(--paper-2); border:1px solid var(--rule);
+}
+.rank-bar-row.winner {
+  border-color:var(--accent); background:var(--accent-soft);
+}
+.rank-bar-row .rk-pos {
+  font-family:var(--mono); font-size:13px; font-weight:700;
+  color:var(--accent); text-align:center;
+}
+.rank-bar-row .rk-info { min-width:0; }
+.rank-bar-row .rk-name {
+  font-family:var(--sans); font-weight:600; font-size:.96rem;
+  color:var(--ink); margin-bottom:.25rem;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.rank-bar-row .rk-bar {
+  height:5px; background:var(--paper-3); position:relative; overflow:hidden;
+}
+.rank-bar-row .rk-bar-fill {
+  position:absolute; left:0; top:0; bottom:0;
+  background:var(--accent);
+}
+.rank-bar-row .rk-score {
+  font-family:var(--mono); font-size:13px; color:var(--accent); text-align:right;
+  font-weight:700;
+}
+
+/* Tabla compacta de resultados */
+.res-table { width:100%; border-collapse:collapse; margin-top:1.2rem; }
+.res-table th, .res-table td {
+  border:1px solid var(--rule); padding:.5rem .65rem;
+  font-family:var(--sans); font-size:.88rem;
+  text-align:left;
+}
+.res-table th { background:var(--paper-3); font-family:var(--mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); font-weight:700; }
+.res-table td.num { font-family:var(--mono); text-align:right; color:var(--accent); font-weight:700; }
+.res-table tr.winner td { background:var(--accent-soft); }
+
+.export-row { display:flex; gap:.65rem; flex-wrap:wrap; margin-top:1.5rem; }
+
+.actions {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:.8rem; margin-top:1.8rem; flex-wrap:wrap;
+}
+.actions .right-group { display:flex; gap:.6rem; flex-wrap:wrap; }
+
+/* Modal */
+.modal-back {
+  position:fixed; inset:0; background:rgba(10,8,4,0.7);
+  display:none; align-items:center; justify-content:center;
+  z-index:8500; padding:1rem; backdrop-filter:blur(4px);
+}
+.modal-back.open { display:flex; }
+.modal {
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+  padding:2rem 2.2rem; max-width:600px; width:100%; position:relative;
+  max-height:90vh; overflow-y:auto;
+}
+.modal-close {
+  position:absolute; top:.9rem; right:1.1rem;
+  font-family:var(--mono); font-size:1.2rem; color:var(--ink-3); transition:color .2s;
+}
+.modal-close:hover { color:var(--danger); }
+.modal h2 {
+  font-family:var(--sans); font-weight:700; font-size:1.35rem;
+  letter-spacing:-.01em; margin-bottom:.7rem; max-width:32ch;
+}
+.modal p {
+  font-family:var(--sans); font-size:.96rem; line-height:1.55; color:var(--ink-2); margin-bottom:1rem;
+}
+.modal p em { font-family:var(--italic); font-style:italic; }
+.modal p b { color:var(--ink); }
+
+/* Toast */
+.toast {
+  position:fixed; bottom:1.5rem; right:1.5rem;
+  background:var(--ink); color:var(--paper);
+  padding:.85rem 1.2rem; font-family:var(--sans); font-size:.9rem;
+  letter-spacing:.02em; z-index:9000;
+  opacity:0; transform:translateY(15px); pointer-events:none;
+  transition:opacity .25s, transform .25s;
+}
+.toast.show { opacity:1; transform:translateY(0); }
+
+.methodology-note {
+  max-width:64ch; margin-top:1.6rem;
+  font-family:var(--italic); font-style:italic; font-size:.9rem; line-height:1.6; color:var(--ink-3);
+}
+.methodology-note a { color:var(--accent); font-style:normal; }
+
+footer.foot {
+  max-width:980px; margin:0 auto; padding:2rem 1.75rem 1.5rem;
+  border-top:1px solid var(--rule);
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.06em; color:var(--ink-3);
+  display:flex; justify-content:space-between; flex-wrap:wrap; gap:1rem;
+}
+</style>
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<nav class="topbar">
+  <div class="topbar-left">
+    <a href="analisis-estructural.html" class="btn-back"><span>←</span> Volver al lab</a>
+  </div>
+  <div class="topbar-center">
+    <span class="eyebrow" style="margin:0;font-size:11px">Lab · Problema Público</span>
+  </div>
+  <div class="topbar-right">
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
+    <a href="index.html" class="logo-link">
+      <div class="logo-bars">
+        <div class="logo-bar" style="height:20px"></div>
+        <div class="logo-bar" style="height:15px"></div>
+        <div class="logo-bar" style="height:9px"></div>
+        <div class="logo-bar" style="height:4px"></div>
+      </div>
+      <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+    </a>
+  </div>
+</nav>
+
+<main class="page">
+  <div class="crumb">
+    <a href="index.html">Inicio</a> <span class="sep">/</span>
+    <a href="analisis-estructural.html">Lab de Políticas Públicas y Prospectiva</a> <span class="sep">/</span>
+    <span>Problema Público</span>
+  </div>
+
+  <!-- WELCOME -->
+  <section id="stage-welcome">
+    <div class="welcome">
+      <div class="eyebrow">Módulo · Definición y diseño de problema público</div>
+      <h1 class="welcome-title">Diseña tu política <em>con método</em></h1>
+      <p class="welcome-sub">
+        Una política pública no empieza con una solución — empieza con un
+        problema bien planteado. Este módulo te acompaña por las cinco
+        decisiones que tu análisis tiene que tomar antes de que valga la
+        pena defender una alternativa frente a un comité.
+      </p>
+      <p class="welcome-hint">
+        Definir el problema · acopiar evidencia · construir alternativas ·
+        fijar criterios · comparar y decidir. Toma entre 30 minutos y dos
+        horas según la profundidad y el tamaño del equipo.
+      </p>
+      <button class="method-link" onclick="openModal('modal-method')">¿En qué se basa? →</button>
+
+      <div class="accordion-stack">
+        <details class="accordion">
+          <summary><span><span class="acc-num">01</span>Qué hace exactamente</span></summary>
+          <div class="accordion-body">
+            Te guía por las cinco mecánicas del <em>Eightfold Path</em> de
+            Bardach condensadas y adaptadas a la práctica colombiana:
+            (1) definir el problema con precisión, (2) acopiar la evidencia
+            que lo sustenta, (3) construir al menos tres alternativas
+            reales — incluyendo siempre «no hacer nada» como baseline —,
+            (4) fijar criterios explícitos para comparar antes de mirar
+            los resultados, y (5) puntuar cada alternativa en cada
+            criterio para producir un ranking ponderado.
+          </div>
+        </details>
+        <details class="accordion">
+          <summary><span><span class="acc-num">02</span>Qué te entrega</span></summary>
+          <div class="accordion-body">
+            Un <em>memo de política</em> estructurado y descargable en
+            Markdown con el problema, la evidencia, las alternativas con
+            sus supuestos y costos, la lista de criterios con sus pesos,
+            y la matriz de comparación con la alternativa recomendada.
+            Más una matriz de comparación en CSV para llevar a Excel o a
+            un comité técnico.
+          </div>
+        </details>
+        <details class="accordion">
+          <summary><span><span class="acc-num">03</span>Para qué te sirve</span></summary>
+          <div class="accordion-body">
+            Para <em>blindar tu propuesta contra el sesgo de
+            confirmación</em>: al fijar los criterios <b>antes</b> de
+            mirar los resultados, te obligas a defender la mejor opción y
+            no la que ya tenías en mente. También sirve para alinear a un
+            equipo: hacer este ejercicio juntos obliga a poner el
+            problema, los supuestos y los criterios sobre la mesa antes
+            de discutir soluciones.
+          </div>
+        </details>
+      </div>
+
+      <div style="display:flex;gap:.7rem;justify-content:center;flex-wrap:wrap">
+        <a class="btn-ghost" href="analisis-estructural.html">← Volver al lab</a>
+        <button class="btn btn-big" onclick="startFlow()">Empecemos →</button>
+      </div>
+
+      <p style="margin-top:2.5rem;font-family:var(--italic);font-style:italic;color:var(--ink-3);font-size:.92rem;max-width:54ch;margin-left:auto;margin-right:auto;line-height:1.55">
+        ¿Ya tienes claras las variables y quieres entender <em>cómo se
+        influyen entre sí</em>? El módulo de
+        <a href="analisis-estructural.html" style="color:var(--accent);font-style:normal;font-weight:600">análisis estructural →</a>
+        es el siguiente paso natural.
+      </p>
+    </div>
+  </section>
+
+  <!-- STEPS NAV (shared across all 5 mechanics) -->
+  <div id="steps-nav" class="is-hidden">
+    <div class="steps-row" id="steps-row"></div>
+  </div>
+
+  <!-- STAGE 1: DEFINICIÓN -->
+  <section id="stage-definicion" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 01</span>Define el problema</h2>
+    </div>
+    <div class="stage-intro">
+      <p>
+        <b>El error más común</b> es saltarse este paso. Si no puedes
+        escribir el problema en una frase concreta, no podrás defender
+        ninguna alternativa después. <em>Magnitud, urgencia y afectados
+        no son retórica — son los tres ejes que harán que tu propuesta
+        compita por presupuesto.</em>
+      </p>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="def-enunciado">Enunciado del problema <span class="req">*</span></label>
+      <textarea id="def-enunciado" placeholder="Ej.: La tasa de deserción escolar en los grados 9-11 del Distrito subió 4 pp en los últimos 3 años, concentrada en localidades de mayor pobreza, y supera la meta del PDT 2024-2027."></textarea>
+      <div class="field-hint">Una sola frase. Incluye <em>qué pasa</em>, <em>dónde</em>, <em>cuánto</em> y <em>desde cuándo</em>. Evita verbos vagos como «mejorar» o «fortalecer».</div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label class="field-label" for="def-magnitud">Magnitud actual</label>
+        <input type="text" id="def-magnitud" placeholder="Ej.: 12.3 % deserción · 18.000 estudiantes" />
+        <div class="field-hint">Cifra concreta + unidad. Sin esto, no podrás medir si la política funciona.</div>
+      </div>
+      <div class="field">
+        <label class="field-label">Urgencia</label>
+        <div class="pill-group" id="def-urgencia">
+          <button class="pill" type="button" data-val="alta">Alta · explosiva</button>
+          <button class="pill" type="button" data-val="media">Media · sostenida</button>
+          <button class="pill" type="button" data-val="baja">Baja · crónica</button>
+        </div>
+        <div class="field-hint">¿El problema empeora rápido (alta), se mantiene constante (media), o lleva años igual (baja)?</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Población afectada</label>
+      <div class="chip-grid" id="def-afectados-grid"></div>
+      <div class="chip-add-row">
+        <input type="text" class="chip-add-input" id="def-afectados-input" placeholder="Ej.: jóvenes 14-17 años de Ciudad Bolívar" onkeydown="if(event.key==='Enter')addAfectado()"/>
+        <button class="btn-ghost" onclick="addAfectado()">+ Agregar grupo</button>
+      </div>
+      <div class="field-hint">Grupos específicos. Sé concreto: «familias de estrato 1-2 del rural disperso de Cauca» dice mucho más que «población vulnerable».</div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="backToWelcome()">← Volver al inicio</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToStep(2)">Acopiar evidencia →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE 2: EVIDENCIA -->
+  <section id="stage-evidencia" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 02</span>Acopiar evidencia</h2>
+      <span class="meta" id="evid-meta">—</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        <b>Toda afirmación necesita una fuente.</b> Aquí coleccionas las
+        cifras y referencias que sostienen tu problema y, después, tus
+        alternativas. <em>Una evidencia débil es una alternativa
+        débil.</em>
+      </p>
+    </div>
+
+    <div style="overflow-x:auto">
+      <table class="evid-table" id="evid-table">
+        <thead>
+          <tr>
+            <th>Fuente</th>
+            <th class="col-anyo">Año</th>
+            <th class="col-dato">Dato / cifra</th>
+            <th class="col-link">Link / referencia</th>
+            <th>Nota</th>
+            <th class="col-del"></th>
+          </tr>
+        </thead>
+        <tbody id="evid-tbody"></tbody>
+      </table>
+    </div>
+
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.5rem">
+      <button class="btn-ghost" onclick="addEvidencia()">+ Agregar fila</button>
+      <button class="btn-ghost" onclick="seedEvidencia()">Cargar 3 fuentes típicas de referencia</button>
+    </div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goToStep(1)">← Editar problema</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToStep(3)">Construir alternativas →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE 3: ALTERNATIVAS -->
+  <section id="stage-alternativas" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 03</span>Construye al menos 3 alternativas</h2>
+      <span class="meta" id="alt-meta">—</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        Una alternativa es una <b>opción real de política</b> — no un
+        objetivo. Incluye siempre <b>«no hacer nada»</b> como baseline:
+        sin él, no puedes argumentar que valga la pena moverse. Entre 3 y
+        5 alternativas es el rango útil; menos no compara, más se vuelve
+        difícil de defender.
+      </p>
+    </div>
+
+    <div class="alt-grid" id="alt-grid"></div>
+
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.5rem">
+      <button class="btn-ghost" id="alt-add-btn" onclick="addAlternativa()">+ Agregar alternativa</button>
+    </div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goToStep(2)">← Editar evidencia</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToStep(4)">Establecer criterios →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE 4: CRITERIOS -->
+  <section id="stage-criterios" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 04</span>Establece los criterios</h2>
+      <span class="meta" id="crit-meta">—</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        Los criterios deben quedar <b>explícitos antes de comparar</b> —
+        este es el blindaje contra el sesgo de confirmación. Si los
+        defines después de ver los resultados, vas a inventarlos para
+        favorecer tu intuición. <em>Los pesos relativos los puedes
+        ajustar; los criterios mismos deben ser sólidos.</em>
+      </p>
+    </div>
+
+    <div class="crit-list" id="crit-list"></div>
+
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.5rem">
+      <button class="btn-ghost" onclick="addCriterio()">+ Agregar criterio</button>
+      <button class="btn-ghost" onclick="resetCriterios()">Restaurar 5 criterios por defecto</button>
+    </div>
+
+    <div class="crit-sum" id="crit-sum">—</div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goToStep(3)">← Editar alternativas</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToStep(5)">Comparar y decidir →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE 5: COMPARACIÓN -->
+  <section id="stage-comparacion" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 05</span>Compara y decide</h2>
+      <span class="meta" id="cmp-meta">—</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        Para cada par (alternativa, criterio), califica de <b>1 a 5</b>
+        cómo se desempeña la alternativa en ese criterio (1 = muy bajo · 5
+        = muy alto). El score final se calcula como
+        <b>Σ (valor × peso normalizado)</b> por alternativa. <em>Cada clic
+        en una celda sube el valor: 1 → 2 → 3 → 4 → 5 → vuelve a 1.</em>
+      </p>
+    </div>
+
+    <div class="cmp-wrap">
+      <table class="cmp-table" id="cmp-table"></table>
+    </div>
+
+    <h3 style="font-family:var(--sans);font-weight:700;font-size:1.1rem;margin:1.6rem 0 .8rem;letter-spacing:-.01em">Ranking de alternativas</h3>
+    <div class="rank-bars" id="rank-bars"></div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goToStep(4)">← Editar criterios</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToResults()">Ver memo final →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE 6: RESULTS / MEMO -->
+  <section id="stage-results" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 06</span>Memo de política</h2>
+      <span class="meta" id="res-meta">—</span>
+    </div>
+
+    <div id="res-content"></div>
+
+    <div class="export-row">
+      <button class="btn" onclick="downloadMemo()">↓ Descargar memo (.md)</button>
+      <button class="btn-ghost" onclick="downloadCSV()">↓ Descargar matriz (.csv)</button>
+      <button class="btn-ghost" onclick="goToStep(5)">← Editar comparación</button>
+    </div>
+
+    <div style="margin-top:2rem;display:flex;align-items:center;gap:1.1rem;flex-wrap:wrap;padding:1.1rem 1.3rem;background:rgba(214,168,58,0.10);border:1px solid var(--rule);border-left:3px solid var(--gold);font-family:var(--mono);font-size:12px;color:var(--ink-2)">
+      <div style="font-family:var(--sans);font-size:1.4rem;color:var(--gold);flex-shrink:0">→</div>
+      <div style="flex:1;min-width:240px">
+        <div style="font-family:var(--sans);font-weight:700;font-size:1rem;color:var(--ink);margin-bottom:.25rem">¿Y qué variables y actores rodean a esta política?</div>
+        <div style="font-family:var(--italic);font-style:italic;font-weight:400;font-size:.9rem;line-height:1.5;color:var(--ink-2)">Aquí decidiste <em>qué</em> hacer. El análisis estructural te dice <em>cuáles</em> palancas mueven el sistema y Mactor te dice <em>quiénes</em> pueden bloquearlo o impulsarlo.</div>
+      </div>
+      <a href="analisis-estructural.html" class="btn" style="background:var(--gold)">Volver al lab →</a>
+    </div>
+
+    <p class="methodology-note">
+      Esta herramienta condensa los ocho pasos del <b>Eightfold Path</b> de
+      Eugene Bardach (<em>A Practical Guide for Policy Analysis</em>, 4ª
+      edición con Eric M. Patashnik, 2016) en cinco mecánicas operativas.
+      El énfasis en evidencia explícita y criterios anteriores a la
+      comparación viene del marco de Edgar Ortegón
+      (<em>Manual de prospectiva y decisión estratégica</em>, ILPES/CEPAL,
+      2007) y de la tradición colombiana de Jaime Torres-Melo y Jairo
+      Santander (<em>Introducción a las políticas públicas</em>, IEMP, 2013).
+      Próximas versiones incorporarán copiloto IA para sugerir alternativas
+      y validar el conjunto de criterios, plantillas seed por sector y
+      respaldo PDF descargable.
+    </p>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>ricardoruiz.co · 2026</span>
+  <span>Composición: Familjen · Petrona · Mono</span>
+</footer>
+
+<!-- Modal metodología -->
+<div class="modal-back" id="modal-method">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-method')">×</button>
+    <h2>¿En qué se basa?</h2>
+    <p>
+      <b>Cinco mecánicas, no ocho pasos.</b> Eugene Bardach popularizó el
+      <em>Eightfold Path</em> (define el problema · acopia evidencia ·
+      construye alternativas · selecciona criterios · proyecta resultados ·
+      confronta trade-offs · decide · cuenta tu historia). Este módulo
+      condensa esos ocho pasos en cinco mecánicas operativas: las tres
+      del medio (proyecta · confronta · decide) quedan integradas en la
+      matriz de comparación con score ponderado.
+    </p>
+    <p>
+      <b>Criterios antes que resultados.</b> El orden importa: si fijas
+      los criterios <em>después</em> de ver las alternativas, vas a
+      ajustarlos para favorecer tu intuición. Este sesgo de confirmación
+      es la falla más común en análisis de política y la razón por la
+      que el método separa estrictamente la mecánica 4 (criterios) de la
+      5 (comparación).
+    </p>
+    <p>
+      <b>Pesos normalizados.</b> No exigimos que los pesos sumen
+      exactamente 100. Internamente se normalizan al calcular el score:
+      <code>score = Σ valor_ij × (peso_j / Σ pesos)</code>. Así puedes
+      ajustar la importancia relativa sin pelearte con la aritmética.
+    </p>
+    <p>
+      <b>Tu privacidad.</b> El cálculo es 100% local en tu navegador. No
+      enviamos nada a ningún servidor. Si más adelante quieres guardar
+      en la nube o invitar a tu equipo, será opt-in con cuenta.
+    </p>
+    <p style="border-top:1px solid var(--rule);padding-top:1rem;margin-top:1.4rem">
+      <b>Origen del método.</b><br/>
+      Eugene Bardach &amp; Eric M. Patashnik, <em>A Practical Guide for
+      Policy Analysis</em> (CQ Press, 4ª ed. 2016).<br/>
+      Edgar Ortegón, <em>Manual de prospectiva y decisión estratégica</em>
+      (ILPES/CEPAL, 2007).<br/>
+      Jaime Torres-Melo &amp; Jairo Santander, <em>Introducción a las
+      políticas públicas</em> (IEMP, 2013).
+    </p>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+// ═════════════════════════════════════════════════════════════════════════
+// STATE
+// ═════════════════════════════════════════════════════════════════════════
+const LS_KEY = 'pp-current-v1';
+
+const DEFAULT_CRITERIOS = [
+  { nombre: 'Eficiencia',           peso: 20 },
+  { nombre: 'Equidad',              peso: 20 },
+  { nombre: 'Factibilidad política',peso: 20 },
+  { nombre: 'Costo',                peso: 20 },
+  { nombre: 'Sostenibilidad',       peso: 20 }
+];
+
+const STATE = {
+  step: 1,
+  definicion: {
+    enunciado:'', magnitud:'', urgencia:'media',
+    afectados: [],
+    evidenciaInicial: ''
+  },
+  evidencia: [],  // [{ fuente, anyo, dato, link, nota }]
+  alternativas: [], // [{ nombre, desc, supuestos, costo, plazo, baseline }]
+  criterios: DEFAULT_CRITERIOS.map(c => ({ ...c })),
+  scores: {}  // { 'altIdx-critIdx': 1..5 }
+};
+
+function saveState() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); } catch {}
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return false;
+    const p = JSON.parse(raw);
+    if (!p || typeof p !== 'object') return false;
+    Object.assign(STATE.definicion, p.definicion || {});
+    if (Array.isArray(p.evidencia)) STATE.evidencia = p.evidencia;
+    if (Array.isArray(p.alternativas)) STATE.alternativas = p.alternativas;
+    if (Array.isArray(p.criterios) && p.criterios.length) STATE.criterios = p.criterios;
+    if (p.scores && typeof p.scores === 'object') STATE.scores = p.scores;
+    if (typeof p.step === 'number') STATE.step = p.step;
+    return true;
+  } catch { return false; }
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ═════════════════════════════════════════════════════════════════════════
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function pad2(n) { return String(n).padStart(2,'0'); }
+
+let _toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ═════════════════════════════════════════════════════════════════════════
+// NAVEGACIÓN ENTRE STAGES
+// ═════════════════════════════════════════════════════════════════════════
+const STAGES = ['stage-welcome','stage-definicion','stage-evidencia','stage-alternativas','stage-criterios','stage-comparacion','stage-results'];
+const STEP_LABELS = [
+  { n:1, key:'definicion',  label:'Definir' },
+  { n:2, key:'evidencia',   label:'Evidencia' },
+  { n:3, key:'alternativas',label:'Alternativas' },
+  { n:4, key:'criterios',   label:'Criterios' },
+  { n:5, key:'comparacion', label:'Comparar' }
+];
+
+function showStage(id) {
+  STAGES.forEach(s => {
+    const el = document.getElementById(s);
+    if (el) el.classList.toggle('is-hidden', s !== id);
+  });
+  // Mostrar steps-nav solo en las 5 mecánicas (no en welcome ni results).
+  const showSteps = (id !== 'stage-welcome' && id !== 'stage-results');
+  document.getElementById('steps-nav').classList.toggle('is-hidden', !showSteps);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function renderStepsNav() {
+  const row = document.getElementById('steps-row');
+  if (!row) return;
+  row.innerHTML = STEP_LABELS.map(s => {
+    const cls = s.n === STATE.step ? 'active' : (s.n < STATE.step ? 'done' : '');
+    return `<button class="step-pill ${cls}" type="button" onclick="goToStep(${s.n})">
+      <span class="step-n">${pad2(s.n)}</span>${s.label}
+    </button>`;
+  }).join('');
+}
+
+function startFlow() {
+  STATE.step = 1;
+  saveState();
+  renderAll();
+  showStage('stage-definicion');
+}
+function backToWelcome() { showStage('stage-welcome'); }
+
+function goToStep(n) {
+  // Asegura tener mínimos antes de saltar adelante: 3 alternativas + criterios cargados.
+  if (n >= 3 && STATE.alternativas.length === 0) ensureBaseAlternativas();
+  if (n >= 4 && STATE.criterios.length === 0) STATE.criterios = DEFAULT_CRITERIOS.map(c => ({ ...c }));
+  STATE.step = n;
+  saveState();
+  renderStepsNav();
+  if      (n === 1) { renderDefinicion();  showStage('stage-definicion'); }
+  else if (n === 2) { renderEvidencia();   showStage('stage-evidencia'); }
+  else if (n === 3) { renderAlternativas();showStage('stage-alternativas'); }
+  else if (n === 4) { renderCriterios();   showStage('stage-criterios'); }
+  else if (n === 5) { renderComparacion(); showStage('stage-comparacion'); }
+}
+function goToResults() {
+  renderResults();
+  showStage('stage-results');
+}
+
+function renderAll() {
+  renderStepsNav();
+  renderDefinicion();
+  renderEvidencia();
+  renderAlternativas();
+  renderCriterios();
+  renderComparacion();
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 1 · DEFINICIÓN
+// ═════════════════════════════════════════════════════════════════════════
+function renderDefinicion() {
+  const en = document.getElementById('def-enunciado');
+  const ma = document.getElementById('def-magnitud');
+  if (en) en.value = STATE.definicion.enunciado || '';
+  if (ma) ma.value = STATE.definicion.magnitud || '';
+  // Urgencia pills
+  document.querySelectorAll('#def-urgencia .pill').forEach(p => {
+    p.classList.toggle('sel', p.dataset.val === (STATE.definicion.urgencia || 'media'));
+  });
+  renderAfectados();
+}
+function renderAfectados() {
+  const grid = document.getElementById('def-afectados-grid');
+  if (!grid) return;
+  const items = STATE.definicion.afectados || [];
+  if (items.length === 0) {
+    grid.innerHTML = '<div style="grid-column:1/-1;font-family:var(--italic);font-style:italic;color:var(--ink-3);font-size:.92rem">Aún no agregaste grupos afectados.</div>';
+    return;
+  }
+  grid.innerHTML = items.map((v, i) => `
+    <div class="chip">
+      <span class="chip-name" contenteditable="true" spellcheck="false"
+            onblur="renameAfectado(${i}, this.innerText)"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${escapeHtml(v)}</span>
+      <button class="chip-del" onclick="delAfectado(${i})" title="Eliminar">×</button>
+    </div>`).join('');
+}
+function addAfectado() {
+  const inp = document.getElementById('def-afectados-input');
+  const v = (inp.value || '').trim();
+  if (!v) return;
+  STATE.definicion.afectados.push(v);
+  inp.value = '';
+  saveState(); renderAfectados();
+}
+function delAfectado(i) { STATE.definicion.afectados.splice(i,1); saveState(); renderAfectados(); }
+function renameAfectado(i, name) {
+  const v = (name || '').trim();
+  if (!v) { delAfectado(i); return; }
+  STATE.definicion.afectados[i] = v;
+  saveState();
+}
+
+// Bindings live para inputs de definición
+function bindDefinicionInputs() {
+  const en = document.getElementById('def-enunciado');
+  const ma = document.getElementById('def-magnitud');
+  if (en) en.addEventListener('input', () => { STATE.definicion.enunciado = en.value; saveState(); });
+  if (ma) ma.addEventListener('input', () => { STATE.definicion.magnitud  = ma.value; saveState(); });
+  document.querySelectorAll('#def-urgencia .pill').forEach(p => {
+    p.addEventListener('click', () => {
+      STATE.definicion.urgencia = p.dataset.val;
+      document.querySelectorAll('#def-urgencia .pill').forEach(x => x.classList.toggle('sel', x === p));
+      saveState();
+    });
+  });
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 2 · EVIDENCIA
+// ═════════════════════════════════════════════════════════════════════════
+function renderEvidencia() {
+  const tb = document.getElementById('evid-tbody');
+  if (!tb) return;
+  const meta = document.getElementById('evid-meta');
+  if (meta) meta.textContent = (STATE.evidencia.length || 0) + ' fuentes';
+  if (STATE.evidencia.length === 0) {
+    tb.innerHTML = '<tr><td colspan="6" style="text-align:center;font-family:var(--italic);font-style:italic;color:var(--ink-3);padding:1.2rem">Aún no agregaste fuentes. Usa «+ Agregar fila» o «Cargar 3 fuentes típicas».</td></tr>';
+    return;
+  }
+  tb.innerHTML = STATE.evidencia.map((e, i) => `
+    <tr>
+      <td><input type="text" value="${escapeHtml(e.fuente)}" placeholder="DANE · MEN · DNP…" oninput="updateEvid(${i},'fuente',this.value)"/></td>
+      <td class="col-anyo"><input type="text" value="${escapeHtml(e.anyo)}" placeholder="2024" oninput="updateEvid(${i},'anyo',this.value)"/></td>
+      <td class="col-dato"><input type="text" value="${escapeHtml(e.dato)}" placeholder="12.3 %" oninput="updateEvid(${i},'dato',this.value)"/></td>
+      <td class="col-link"><input type="url" value="${escapeHtml(e.link)}" placeholder="https://…" oninput="updateEvid(${i},'link',this.value)"/></td>
+      <td><textarea oninput="updateEvid(${i},'nota',this.value)" placeholder="Contexto u observación">${escapeHtml(e.nota)}</textarea></td>
+      <td class="col-del"><button class="evid-del-btn" onclick="delEvidencia(${i})" title="Eliminar">×</button></td>
+    </tr>`).join('');
+}
+function addEvidencia() {
+  STATE.evidencia.push({ fuente:'', anyo:'', dato:'', link:'', nota:'' });
+  saveState(); renderEvidencia();
+}
+function delEvidencia(i) { STATE.evidencia.splice(i,1); saveState(); renderEvidencia(); }
+function updateEvid(i, key, val) {
+  if (!STATE.evidencia[i]) return;
+  STATE.evidencia[i][key] = val;
+  saveState();
+  const meta = document.getElementById('evid-meta');
+  if (meta) meta.textContent = (STATE.evidencia.length || 0) + ' fuentes';
+}
+function seedEvidencia() {
+  // 3 fuentes típicas de referencia genéricas. El usuario las edita.
+  const seed = [
+    { fuente:'DANE — Encuesta de calidad de vida',  anyo:'2024', dato:'', link:'https://www.dane.gov.co/', nota:'Fuente nacional oficial.' },
+    { fuente:'DNP — TerriData',                     anyo:'2024', dato:'', link:'https://terridata.dnp.gov.co/', nota:'Indicadores territoriales.' },
+    { fuente:'Datos Abiertos — datos.gov.co',       anyo:'2024', dato:'', link:'https://www.datos.gov.co/', nota:'Datasets sectoriales abiertos.' }
+  ];
+  seed.forEach(s => STATE.evidencia.push(s));
+  saveState(); renderEvidencia();
+  showToast('3 fuentes típicas cargadas. Edita los datos según tu caso.');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 3 · ALTERNATIVAS
+// ═════════════════════════════════════════════════════════════════════════
+function ensureBaseAlternativas() {
+  if (STATE.alternativas.length > 0) return;
+  STATE.alternativas = [
+    { nombre:'No hacer nada (baseline)', desc:'Mantener la situación actual sin nueva intervención.', supuestos:'El problema sigue su trayectoria sin cambios estructurales.', costo:'$0', plazo:'—', baseline:true },
+    { nombre:'Alternativa A',  desc:'',  supuestos:'',  costo:'',  plazo:'', baseline:false },
+    { nombre:'Alternativa B',  desc:'',  supuestos:'',  costo:'',  plazo:'', baseline:false }
+  ];
+  saveState();
+}
+function renderAlternativas() {
+  const grid = document.getElementById('alt-grid');
+  if (!grid) return;
+  if (STATE.alternativas.length === 0) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;font-family:var(--italic);font-style:italic;color:var(--ink-3);padding:1.2rem">Aún no hay alternativas. Apenas avances al paso 3 cargaremos 3 vacías + el baseline.</div>';
+    return;
+  }
+  grid.innerHTML = STATE.alternativas.map((a, i) => `
+    <div class="alt-card ${a.baseline ? 'is-baseline' : ''}">
+      ${i > 0 ? `<button class="alt-del-btn" onclick="delAlternativa(${i})" title="Eliminar">×</button>` : ''}
+      <div class="alt-code">
+        ${pad2(i + 1)} · Alternativa
+        ${a.baseline ? '<span class="baseline-tag">baseline</span>' : ''}
+      </div>
+      <input type="text" class="alt-name-input" value="${escapeHtml(a.nombre)}" placeholder="Nombre corto" oninput="updateAlt(${i},'nombre',this.value)"/>
+      <div class="alt-field">
+        <label class="alt-field-label">Descripción</label>
+        <textarea oninput="updateAlt(${i},'desc',this.value)" placeholder="¿En qué consiste la intervención?">${escapeHtml(a.desc)}</textarea>
+      </div>
+      <div class="alt-field">
+        <label class="alt-field-label">Supuestos clave</label>
+        <textarea oninput="updateAlt(${i},'supuestos',this.value)" placeholder="¿De qué depende que funcione?">${escapeHtml(a.supuestos)}</textarea>
+      </div>
+      <div class="alt-field" style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem">
+        <div>
+          <label class="alt-field-label">Costo estimado</label>
+          <input type="text" value="${escapeHtml(a.costo)}" placeholder="Ej.: $1.500 mill / año" oninput="updateAlt(${i},'costo',this.value)"/>
+        </div>
+        <div>
+          <label class="alt-field-label">Plazo</label>
+          <input type="text" value="${escapeHtml(a.plazo)}" placeholder="Ej.: 18 meses" oninput="updateAlt(${i},'plazo',this.value)"/>
+        </div>
+      </div>
+    </div>`).join('');
+  const meta = document.getElementById('alt-meta');
+  if (meta) meta.textContent = STATE.alternativas.length + ' alternativas';
+  const addBtn = document.getElementById('alt-add-btn');
+  if (addBtn) addBtn.classList.toggle('disabled', STATE.alternativas.length >= 5);
+}
+function addAlternativa() {
+  if (STATE.alternativas.length >= 5) { showToast('Máximo 5 alternativas. Si necesitas más, agrupa similares.'); return; }
+  STATE.alternativas.push({ nombre:'Nueva alternativa', desc:'', supuestos:'', costo:'', plazo:'', baseline:false });
+  saveState(); renderAlternativas();
+}
+function delAlternativa(i) {
+  if (i === 0 && STATE.alternativas[i].baseline) {
+    showToast('No puedes eliminar el baseline. Renómbralo si quieres redefinirlo.');
+    return;
+  }
+  STATE.alternativas.splice(i, 1);
+  // Reindexa scores: borrar los del idx y desplazar los siguientes.
+  const newScores = {};
+  for (const k of Object.keys(STATE.scores)) {
+    const [ai, ci] = k.split('-').map(Number);
+    if (ai === i) continue;
+    const newAi = ai > i ? ai - 1 : ai;
+    newScores[`${newAi}-${ci}`] = STATE.scores[k];
+  }
+  STATE.scores = newScores;
+  saveState(); renderAlternativas();
+}
+function updateAlt(i, key, val) {
+  if (!STATE.alternativas[i]) return;
+  STATE.alternativas[i][key] = val;
+  saveState();
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 4 · CRITERIOS
+// ═════════════════════════════════════════════════════════════════════════
+function renderCriterios() {
+  const list = document.getElementById('crit-list');
+  if (!list) return;
+  if (STATE.criterios.length === 0) {
+    STATE.criterios = DEFAULT_CRITERIOS.map(c => ({ ...c }));
+    saveState();
+  }
+  const sumPesos = STATE.criterios.reduce((s, c) => s + (Number(c.peso) || 0), 0) || 1;
+  list.innerHTML = STATE.criterios.map((c, i) => {
+    const pct = ((c.peso / sumPesos) * 100).toFixed(0);
+    return `<div class="crit-row">
+      <input type="text" class="crit-name-input" value="${escapeHtml(c.nombre)}" oninput="updateCrit(${i},'nombre',this.value)"/>
+      <input type="number" class="crit-peso-input" min="0" max="100" step="1" value="${c.peso}" oninput="updateCritPeso(${i}, this.value)"/>
+      <div class="crit-bar"><div class="crit-bar-fill" style="width:${pct}%"></div></div>
+      <button class="crit-del-btn" onclick="delCriterio(${i})" title="Eliminar">×</button>
+    </div>`;
+  }).join('');
+  const meta = document.getElementById('crit-meta');
+  if (meta) meta.textContent = STATE.criterios.length + ' criterios';
+  const sumEl = document.getElementById('crit-sum');
+  if (sumEl) {
+    const raw = STATE.criterios.reduce((s, c) => s + (Number(c.peso) || 0), 0);
+    if (Math.round(raw) === 100) {
+      sumEl.innerHTML = `Suma de pesos: <b>${raw}</b> · ✓ suman 100`;
+      sumEl.classList.remove('warn');
+    } else {
+      sumEl.innerHTML = `Suma de pesos: <b>${raw}</b> · se normalizará al calcular (no es obligatorio que sume 100).`;
+      sumEl.classList.add('warn');
+    }
+  }
+}
+function updateCrit(i, key, val) {
+  if (!STATE.criterios[i]) return;
+  STATE.criterios[i][key] = val;
+  saveState();
+}
+function updateCritPeso(i, val) {
+  if (!STATE.criterios[i]) return;
+  const n = Math.max(0, Math.min(100, Number(val) || 0));
+  STATE.criterios[i].peso = n;
+  saveState(); renderCriterios();
+}
+function addCriterio() {
+  if (STATE.criterios.length >= 8) { showToast('Máximo 8 criterios. Más se vuelve difícil de defender.'); return; }
+  STATE.criterios.push({ nombre:'Nuevo criterio', peso: 10 });
+  saveState(); renderCriterios();
+}
+function delCriterio(i) {
+  if (STATE.criterios.length <= 2) { showToast('Mínimo 2 criterios.'); return; }
+  STATE.criterios.splice(i, 1);
+  // Reindexar scores en su segunda coordenada (criterio)
+  const newScores = {};
+  for (const k of Object.keys(STATE.scores)) {
+    const [ai, ci] = k.split('-').map(Number);
+    if (ci === i) continue;
+    const newCi = ci > i ? ci - 1 : ci;
+    newScores[`${ai}-${newCi}`] = STATE.scores[k];
+  }
+  STATE.scores = newScores;
+  saveState(); renderCriterios();
+}
+function resetCriterios() {
+  if (!confirm('Restaurar los 5 criterios por defecto? Tus pesos personalizados se pierden.')) return;
+  STATE.criterios = DEFAULT_CRITERIOS.map(c => ({ ...c }));
+  STATE.scores = {};
+  saveState(); renderCriterios();
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 5 · COMPARACIÓN
+// ═════════════════════════════════════════════════════════════════════════
+function getScore(ai, ci) { return STATE.scores[`${ai}-${ci}`] || 0; }
+function setScore(ai, ci, v) {
+  if (v === 0 || v == null) delete STATE.scores[`${ai}-${ci}`];
+  else STATE.scores[`${ai}-${ci}`] = v;
+  saveState();
+}
+function cycleScore(ai, ci) {
+  const cur = getScore(ai, ci);
+  const next = cur >= 5 ? 1 : (cur + 1);
+  setScore(ai, ci, next);
+  renderComparacion();
+}
+
+// Calcula el score ponderado de una alternativa (suma normalizada).
+// Si una celda no tiene valor, cuenta como 0 — no se rellena
+// implícitamente para no inflar artificialmente.
+function computeAltScore(ai) {
+  const sumPesos = STATE.criterios.reduce((s, c) => s + (Number(c.peso) || 0), 0) || 1;
+  let total = 0;
+  STATE.criterios.forEach((c, ci) => {
+    const v = getScore(ai, ci);
+    const wn = (Number(c.peso) || 0) / sumPesos;
+    total += v * wn;
+  });
+  return total;  // rango aprox 0..5
+}
+
+function renderComparacion() {
+  // Asegura tener al menos 3 alternativas y criterios.
+  if (STATE.alternativas.length === 0) ensureBaseAlternativas();
+  if (STATE.criterios.length === 0) STATE.criterios = DEFAULT_CRITERIOS.map(c => ({ ...c }));
+
+  const tbl = document.getElementById('cmp-table');
+  if (!tbl) return;
+  const sumPesos = STATE.criterios.reduce((s, c) => s + (Number(c.peso) || 0), 0) || 1;
+  let html = '<thead><tr><th class="row-h">Alternativa \\ Criterio</th>';
+  STATE.criterios.forEach(c => {
+    const pct = ((c.peso / sumPesos) * 100).toFixed(0);
+    html += `<th class="col-h"><div class="col-h-inner">${escapeHtml(c.nombre)}<span class="col-h-peso">${pct}%</span></div></th>`;
+  });
+  html += '<th>Score</th></tr></thead><tbody>';
+  STATE.alternativas.forEach((a, ai) => {
+    html += `<tr><th class="row-h">${escapeHtml(a.nombre)}${a.baseline ? ' <span style="font-size:9.5px;color:var(--gold);letter-spacing:.1em">★</span>' : ''}</th>`;
+    STATE.criterios.forEach((c, ci) => {
+      const v = getScore(ai, ci);
+      const cls = v ? `cmp-cell v-${v}` : 'cmp-cell v-0';
+      html += `<td class="${cls}" onclick="cycleScore(${ai},${ci})">${v || '—'}</td>`;
+    });
+    const sc = computeAltScore(ai);
+    html += `<td class="cmp-score">${sc.toFixed(2)}</td></tr>`;
+  });
+  html += '</tbody>';
+  tbl.innerHTML = html;
+
+  const meta = document.getElementById('cmp-meta');
+  if (meta) {
+    const filled = Object.keys(STATE.scores).length;
+    const total = STATE.alternativas.length * STATE.criterios.length;
+    meta.textContent = `${filled} / ${total} celdas`;
+  }
+  renderRankBars();
+}
+
+function renderRankBars() {
+  const container = document.getElementById('rank-bars');
+  if (!container) return;
+  const items = STATE.alternativas.map((a, i) => ({ name: a.nombre || `Alternativa ${i+1}`, score: computeAltScore(i), baseline: a.baseline }))
+                                   .sort((a, b) => b.score - a.score);
+  const maxSc = Math.max(...items.map(it => it.score), 0.001);
+  container.innerHTML = items.map((it, pos) => {
+    const pct = (it.score / maxSc * 100).toFixed(0);
+    const cls = pos === 0 && it.score > 0 ? 'rank-bar-row winner' : 'rank-bar-row';
+    return `<div class="${cls}">
+      <div class="rk-pos">${pad2(pos + 1)}</div>
+      <div class="rk-info">
+        <div class="rk-name">${escapeHtml(it.name)}${it.baseline ? ' <span style="color:var(--gold);font-size:.85em">★ baseline</span>' : ''}</div>
+        <div class="rk-bar"><div class="rk-bar-fill" style="width:${pct}%"></div></div>
+      </div>
+      <div class="rk-score">${it.score.toFixed(2)}</div>
+    </div>`;
+  }).join('');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// RESULTS · MEMO
+// ═════════════════════════════════════════════════════════════════════════
+function renderResults() {
+  const cont = document.getElementById('res-content');
+  if (!cont) return;
+  const meta = document.getElementById('res-meta');
+  if (meta) meta.textContent = (new Date()).toLocaleDateString('es-CO', { year:'numeric', month:'short', day:'numeric' });
+
+  const items = STATE.alternativas.map((a, i) => ({
+    idx: i, name: a.nombre || `Alternativa ${i+1}`, score: computeAltScore(i), baseline: a.baseline
+  })).sort((x, y) => y.score - x.score);
+  const winner = items[0];
+
+  const sumPesos = STATE.criterios.reduce((s, c) => s + (Number(c.peso) || 0), 0) || 1;
+  const critHeader = STATE.criterios.map(c => {
+    const pct = ((c.peso / sumPesos) * 100).toFixed(0);
+    return `<th>${escapeHtml(c.nombre)} <span style="color:var(--accent);font-family:var(--mono);font-size:10px">${pct}%</span></th>`;
+  }).join('');
+
+  const tableRows = STATE.alternativas.map((a, ai) => {
+    const cells = STATE.criterios.map((c, ci) => {
+      const v = getScore(ai, ci);
+      return `<td class="num">${v || '—'}</td>`;
+    }).join('');
+    const sc = computeAltScore(ai);
+    const winnerCls = (winner && winner.idx === ai) ? 'winner' : '';
+    return `<tr class="${winnerCls}"><td>${escapeHtml(a.nombre)}${a.baseline ? ' <span style="color:var(--gold)">★</span>' : ''}</td>${cells}<td class="num">${sc.toFixed(2)}</td></tr>`;
+  }).join('');
+
+  cont.innerHTML = `
+    <div style="background:var(--paper-2);padding:1.6rem 1.8rem;border:1px solid var(--rule);margin-bottom:1.2rem">
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3);margin-bottom:.5rem">Enunciado del problema</div>
+      <div style="font-family:var(--sans);font-size:1.05rem;line-height:1.55;color:var(--ink)">${escapeHtml(STATE.definicion.enunciado) || '<em style="font-family:var(--italic);color:var(--ink-3)">(sin definir)</em>'}</div>
+      <div style="display:flex;gap:1.8rem;margin-top:.8rem;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;color:var(--ink-3)">
+        <span>Magnitud: <b style="color:var(--accent)">${escapeHtml(STATE.definicion.magnitud) || '—'}</b></span>
+        <span>Urgencia: <b style="color:var(--accent)">${escapeHtml(STATE.definicion.urgencia || '—')}</b></span>
+        <span>Afectados: <b style="color:var(--accent)">${STATE.definicion.afectados.length}</b> grupos</span>
+        <span>Evidencia: <b style="color:var(--accent)">${STATE.evidencia.length}</b> fuentes</span>
+      </div>
+    </div>
+
+    <h3 style="font-family:var(--sans);font-weight:700;font-size:1.1rem;margin:.4rem 0 .6rem">Recomendación</h3>
+    <div style="background:var(--accent-soft);border:1px solid var(--accent-tint);border-left:3px solid var(--accent);padding:1.2rem 1.4rem">
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:.4rem">Alternativa con mayor score ponderado</div>
+      <div style="font-family:var(--sans);font-weight:700;font-size:1.25rem;color:var(--ink);margin-bottom:.3rem">${winner ? escapeHtml(winner.name) : '—'}</div>
+      <div style="font-family:var(--mono);font-size:13px;color:var(--ink-2)">Score: <b style="color:var(--accent)">${winner ? winner.score.toFixed(2) : '0'}</b> / 5.00</div>
+    </div>
+
+    <h3 style="font-family:var(--sans);font-weight:700;font-size:1.1rem;margin:1.4rem 0 .6rem">Matriz de comparación</h3>
+    <div style="overflow-x:auto">
+      <table class="res-table">
+        <thead><tr><th>Alternativa</th>${critHeader}<th>Score</th></tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// DESCARGAS
+// ═════════════════════════════════════════════════════════════════════════
+function _download(filename, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
+}
+
+function downloadMemo() {
+  const date = new Date().toISOString().slice(0, 10);
+  const sumPesos = STATE.criterios.reduce((s, c) => s + (Number(c.peso) || 0), 0) || 1;
+  const items = STATE.alternativas.map((a, i) => ({
+    idx: i, name: a.nombre || `Alternativa ${i+1}`, score: computeAltScore(i)
+  })).sort((x, y) => y.score - x.score);
+
+  let md = `# Memo de política pública\n\n`;
+  md += `**Fecha:** ${date}\n\n`;
+  md += `## 1. Problema\n\n${STATE.definicion.enunciado || '_(sin definir)_'}\n\n`;
+  md += `- **Magnitud:** ${STATE.definicion.magnitud || '—'}\n`;
+  md += `- **Urgencia:** ${STATE.definicion.urgencia || '—'}\n`;
+  md += `- **Afectados:**\n`;
+  if (STATE.definicion.afectados.length === 0) md += `  - _(sin definir)_\n`;
+  else STATE.definicion.afectados.forEach(a => md += `  - ${a}\n`);
+
+  md += `\n## 2. Evidencia\n\n`;
+  if (STATE.evidencia.length === 0) md += `_(sin fuentes registradas)_\n\n`;
+  else {
+    md += `| Fuente | Año | Dato | Link | Nota |\n|---|---|---|---|---|\n`;
+    STATE.evidencia.forEach(e => {
+      const link = e.link ? `[link](${e.link})` : '—';
+      md += `| ${(e.fuente||'—').replace(/\|/g,'\\|')} | ${e.anyo||'—'} | ${(e.dato||'—').replace(/\|/g,'\\|')} | ${link} | ${(e.nota||'').replace(/\|/g,'\\|')} |\n`;
+    });
+    md += '\n';
+  }
+
+  md += `## 3. Alternativas\n\n`;
+  STATE.alternativas.forEach((a, i) => {
+    md += `### ${i+1}. ${a.nombre}${a.baseline ? ' _(baseline)_' : ''}\n\n`;
+    if (a.desc)      md += `**Descripción:** ${a.desc}\n\n`;
+    if (a.supuestos) md += `**Supuestos:** ${a.supuestos}\n\n`;
+    if (a.costo || a.plazo) md += `**Costo:** ${a.costo || '—'} · **Plazo:** ${a.plazo || '—'}\n\n`;
+  });
+
+  md += `## 4. Criterios de comparación\n\n`;
+  md += `| Criterio | Peso (raw) | Peso normalizado |\n|---|---|---|\n`;
+  STATE.criterios.forEach(c => {
+    const pct = ((c.peso / sumPesos) * 100).toFixed(1);
+    md += `| ${c.nombre} | ${c.peso} | ${pct}% |\n`;
+  });
+
+  md += `\n## 5. Matriz de comparación\n\n`;
+  md += `| Alternativa | ${STATE.criterios.map(c => c.nombre).join(' | ')} | **Score** |\n`;
+  md += `|---|${STATE.criterios.map(() => '---').join('|')}|---|\n`;
+  STATE.alternativas.forEach((a, ai) => {
+    const cells = STATE.criterios.map((_, ci) => getScore(ai, ci) || '—').join(' | ');
+    md += `| ${a.nombre} | ${cells} | **${computeAltScore(ai).toFixed(2)}** |\n`;
+  });
+
+  md += `\n## 6. Recomendación\n\n`;
+  if (items.length && items[0].score > 0) {
+    md += `La alternativa con mayor score ponderado es **${items[0].name}** (${items[0].score.toFixed(2)} / 5.00).\n\n`;
+    if (items.length > 1) md += `Como referencia, le sigue **${items[1].name}** con ${items[1].score.toFixed(2)}.\n\n`;
+  } else {
+    md += `_(sin scores asignados — completa la matriz de comparación antes de leer la recomendación)_\n\n`;
+  }
+
+  md += `---\n\n_Generado con el módulo de problema público del Lab de Políticas Públicas y Prospectiva de ricardoruiz.co. Método basado en el Eightfold Path de Eugene Bardach, con referentes de Ortegón (ILPES/CEPAL) y Torres-Melo & Santander (IEMP)._\n`;
+
+  _download(`memo-politica-${date}.md`, md, 'text/markdown;charset=utf-8');
+  showToast('Memo descargado.');
+}
+
+function downloadCSV() {
+  const headers = ['Alternativa', ...STATE.criterios.map(c => `${c.nombre} (peso ${c.peso})`), 'Score'];
+  const rows = STATE.alternativas.map((a, ai) => {
+    const cells = STATE.criterios.map((_, ci) => getScore(ai, ci) || '');
+    return [a.nombre, ...cells, computeAltScore(ai).toFixed(2)];
+  });
+  const esc = v => {
+    const s = String(v == null ? '' : v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const csv = [headers, ...rows].map(r => r.map(esc).join(',')).join('\n');
+  const date = new Date().toISOString().slice(0, 10);
+  _download(`matriz-comparacion-${date}.csv`, csv, 'text/csv;charset=utf-8');
+  showToast('Matriz CSV descargada.');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// THEME + CURSOR + INIT
+// ═════════════════════════════════════════════════════════════════════════
+function toggleTheme() {
+  const isDay = document.body.classList.toggle('day-mode');
+  localStorage.setItem('rr-theme', isDay ? 'day' : 'night');
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = isDay ? '☾ Modo noche' : '☀ Modo día';
+}
+// Auto día/noche (norma del sitio).
+(function applyInitialTheme() {
+  const pref = localStorage.getItem('rr-theme');
+  let isDay;
+  if (pref === 'day') isDay = true;
+  else if (pref === 'night') isDay = false;
+  else {
+    const h = new Date().getHours();
+    isDay = h >= 6 && h < 19;
+  }
+  if (isDay) document.body.classList.add('day-mode');
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = isDay ? '☾ Modo noche' : '☀ Modo día';
+})();
+
+(function initCursor() {
+  const c = document.getElementById('cursor');
+  const r = document.getElementById('cursorRing');
+  document.addEventListener('mousemove', e => {
+    c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px';
+    r.style.left = e.clientX + 'px'; r.style.top = e.clientY + 'px';
+  });
+  document.addEventListener('mouseover', e => {
+    if (e.target.closest && e.target.closest('a,button,td.cmp-cell,.chip,input,textarea,summary,.accordion,.pill,.step-pill')) {
+      c.style.transform = 'translate(-50%,-50%) scale(0.5)'; c.style.background = 'transparent'; c.style.border = '2px solid var(--accent)';
+      r.style.transform = 'translate(-50%,-50%) scale(1.5)'; r.style.opacity = '0.7';
+    } else {
+      c.style.transform = 'translate(-50%,-50%) scale(1)'; c.style.background = 'var(--accent)'; c.style.border = 'none';
+      r.style.transform = 'translate(-50%,-50%) scale(1)'; r.style.opacity = '0.4';
+    }
+  });
+})();
+
+// Init
+(function init() {
+  const restored = loadState();
+  renderAll();
+  bindDefinicionInputs();
+  if (restored && STATE.step >= 1 && STATE.definicion.enunciado) {
+    // Si había trabajo previo, aterriza en la mecánica donde se quedó.
+    goToStep(STATE.step || 1);
+    showToast('Restauramos tu sesión anterior.');
+  } else {
+    showStage('stage-welcome');
+  }
+})();
+</script>
+</body>
+</html>
