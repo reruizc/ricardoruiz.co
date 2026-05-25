@@ -9,6 +9,10 @@
 - `oportunidad.html` — **módulo B2B** voto blando afín por candidato (LISTO, ver sección dedicada)
 - `veleta.html` — municipios sensibles al cambio (score multidimensional)
 - `test-presidencial-2026.html` — **test de arquetipo emocional + lectura LLM** (LISTO v1, ver sección dedicada)
+- `analisis-estructural.html` — **Lab de Políticas Públicas y Prospectiva** · hub del lab + módulo análisis estructural (MicMac · DEMATEL · ISM modernizado, fuzzy, valencias firmadas, copiloto IA). LISTO, ver sección dedicada.
+- `mactor.html` — **Lab** · módulo análisis de actores y conflictos (MID + MAO, copiloto IA). LISTO.
+- `problema-publico.html` — **Lab** · módulo problema público (Eightfold Path de Bardach condensado a 5 mecánicas + capa metodológica profunda con wizard de síntoma, árbol del problema CEPAL/Ortegón, test Rittel-Webber y selector de marco analítico). Cloud-save + 3 acciones IA + Issue Paper export. LISTO (Sprint A).
+- `lab-recursos.js` — catálogo compartido de 27 recursos en 5 categorías; cargado por los 3 módulos del lab.
 - `pricing.html` — planes (Básico / Pro 39.900 COP · Premium 99.900 COP · Personalizado)
 - `lang.js` — i18n (co/us/cn); `CLAUDE.md` vive en la raíz del repo
 
@@ -1823,6 +1827,426 @@ inteligencia editorial, NO publicación de sondeo).
   buscar `SYSTEM_PROMPT = `. Es corto a propósito — V4 consume reasoning
   con prompts largos. Si lo amplías, mide la latencia después (límite
   blando 30 s por API Gateway).
+
+## Lab de Políticas Públicas y Prospectiva (Sprint A · LISTO)
+
+**El hub vive en `analisis-estructural.html`** (mismo archivo, rebrandeado).
+4 módulos del lab:
+
+| # | Módulo | Archivo | Estado |
+|---|---|---|---|
+| 1 | Problema público | `problema-publico.html` | ✓ vivo |
+| 2 | Análisis estructural | `analisis-estructural.html` (mismo HTML que el hub) | ✓ vivo |
+| 3 | Análisis de actores | `mactor.html` | ✓ vivo |
+| 4 | Evaluación de política | — | Próximamente |
+
+Sólo `analisis-estructural.html` figura en el listado de proyectos de
+`index.html` (como "Análisis Estructural de Sistemas"). Desde su hub se
+llega a los otros 3 módulos. Cada módulo tiene cross-links amarillos a
+los otros 2 en su stage-results.
+
+### Hub del lab (`stage-hub` en analisis-estructural.html)
+
+- **Hero** "Para diseñar política pública *con método*" + bajada que
+  cita 3 escuelas: francesa de prospectiva (Godet · Mojica · LIPSOR) +
+  análisis de políticas (Bardach · UNDP · Ortegón) + evaluación
+  (OCDE-DAC · SINERGIA · Ivàlua).
+- **Grid de 4 cards** (1/2/4 cols según breakpoint). Cada card tiene
+  badge "Recomendado para ti" oculto que se anima cuando el wizard
+  entry-point la sugiere. La de "Evaluación" tiene badge "Próximamente".
+- **CTA bottom-grid** "Ayúdame a escoger →" abre el wizard
+  entry-point de 5 preguntas (`stage-hub-wizard`).
+- **Sección colapsable "Recursos & Datos"** al pie con todo el catálogo
+  agrupado por las 5 categorías (Sprint A.1, ver abajo).
+
+### Wizard entry-point de 5 preguntas (`stage-hub-wizard`)
+
+5 preguntas binarias/ternarias (pregunta dominante · momento del
+proceso · mayor incertidumbre · escala del equipo · entregable
+esperado). Cada opción suma 0/1/2 a cada uno de los 4 módulos. Tiebreak
+estructural > mactor > problema > evaluacion. Si el ganador es un
+módulo `soon`, se highlight el fallback con badge "Empieza por aquí".
+Animación: panel "thinking" de 1.8s con frases rotativas → vuelve al
+hub → pulse de borde + scroll-into-view + badge salmón.
+
+### Estructura visual común (los 4 módulos)
+
+Heredan el chasis de `dashboard.html`:
+- Fuentes: Familjen Grotesk (sans), Petrona italic (énfasis serif),
+  Space Mono (técnico), Syne 800 solo en logo.
+- Paleta: paper `#1a1610` · accent salmón `#d96a50` (modo noche) o
+  paper cream · accent oxblood `#8a1e16` (modo día).
+- **Auto día/noche** según hora local (6-19h → día) si no hay
+  preferencia en `localStorage.rr-theme`. Patrón clonado de
+  `proyeccion-1v.html`. Replicado en los 3 módulos del lab.
+- Cursor custom salmón 12px + ring 36px.
+- Topbar con btn-back, center label, toggle día/noche, logo y auth chip.
+
+### `analisis-estructural.html` (MicMac + DEMATEL + ISM)
+
+**Etapas (showStage):**
+1. `stage-welcome` — título "Entiende lo que mueve tu política pública",
+   3 accordions explicativos (qué hace · qué entrega · para qué sirve),
+   botón "¿Cómo lo calculamos?" abre `modal-method`, link sutil a Mactor
+   al final.
+2. `stage-wizard` — 4 preguntas (org · propósito · nivel técnico · dominio).
+   Q4 con **16 dominios alineados a ministerios** (4×4 grid, cada uno
+   con icono SVG y hint corto). Sugiere plantilla por scoring de overlap
+   de tags `{org, proposito, nivel, dominio}`.
+3. `stage-vars` — sub-vistas:
+   - `vars-intro` con cita a Mojica y 3 reglas prácticas + botón "Empezar módulo".
+   - `vars-editor` con grid de chips editables, badge `DATO` salmón en
+     chips que matchean un indicador del catálogo, selector de territorio
+     (33 deptos + Colombia), barra IA con 2 botones (Pro+).
+4. `stage-capture` — captura matriz NxN. Dos modos:
+   - Tabla: ciclo extendido `'' → +1 → +2 → +3 → P → −1 → −2 → −3 → 0`.
+     Shift+click invierte signo. Tecla `-` también.
+   - Guiado: magnitud (0/1/2/3/P) → si magnitud ∈ {1,2,3} aparece
+     toggle Facilita/Inhibe. Botón "✦ Pista de IA (Premium)" opt-in
+     para sugerencia contextual del par.
+   - Selector de confianza global (Alta/Media/Baja → bandas ±0/±0.5/±1).
+   - Barra IA "Revisar matriz" (Premium+).
+5. `stage-results` — sub-vistas:
+   - `results-intro` con explicación de las 3 lentes y botón "Ver resultados".
+   - `results-content` con tabs MicMac · DEMATEL · ISM. Las bandas fuzzy
+     dibujan cruces de incertidumbre alrededor de cada punto en MicMac
+     y DEMATEL. Barra IA "Generar lectura" (Premium+).
+
+**11 plantillas + 8 plantillas por dominio = 19 plantillas totales**
+en `TEMPLATES`: pdt-mixto, prospectiva-2040, seguridad-urbana, taller-
+actores, academia-blank, movilidad, salud-publica, educacion, economia-
+empleo, ambiente-clima, gobernanza, agricultura, vivienda, energia,
+cultura, tecnologia, ciencia, justicia, exteriores. Cada una con tags
+para el scoring del wizard.
+
+**Catálogo de indicadores embebido (`INDICATORS`):** 16 indicadores
+oficiales nacionales 2023-2024 (IPM, homicidios, desempleo, etc.) con
+fuente, año, unidad, nota. `matchIndicator(varName)` busca match por
+keyword normalizada. Si una variable matchea, su chip muestra badge
+`DATO` clickable que abre panel inline con cifra nacional + cifra
+departamental (si hay territorio elegido).
+
+**JSON de indicadores departamentales** en S3:
+```
+s3://elecciones-2026/ricardoruiz.co/bases de datos/analisis-estructural/
+  indicadores-depto.json   (5.9 KB · 33 deptos × 5 indicadores · v=20260523)
+  metodologia-paso-a-paso.pdf  (16.9 KB)
+  respaldo-academico.pdf       (20.8 KB)
+```
+5 indicadores con dato departamental: ipm, homicidios, desempleo,
+pobreza-monetaria, cobertura-media. Pipeline en
+`tools/build-indicadores-depto/build.py`. Regenerar con
+`python3 tools/build-indicadores-depto/build.py` + `aws s3 cp`. Bump
+`?v=YYYYMMDD` en `INDICADORES_DEPTO_URL` si cambian datos.
+
+**Cálculos (todo cliente, sin libs externas):**
+- `computeMicMac()` — magnitud absoluta. Eleva matriz hasta estabilizar
+  ranking (k ≤ 6). Devuelve motri/dep directos e indirectos +
+  cuadrantes (motriz/clave/autonoma/resultado) + bandas si fuzzy.
+- `computeDEMATEL()` — preserva signos. `D = M / max(sumRow|M|, sumCol|M|)`,
+  `T = D · (I-D)^(-1)` (Gauss-Jordan local). R, C, R+C, R-C +
+  cuadrantes (causa/causa-central/efecto-autonomo/efecto-central).
+- `computeISM(threshold)` — magnitud absoluta sobre umbral.
+  Reachability por Warshall + niveles por intersección Reach∩Antec.
+
+### `mactor.html` (análisis de actores)
+
+**Etapas:**
+1. `stage-welcome` — título "Quién apoya, quién bloquea, quién decide".
+   3 accordions + botón método + link sutil a analisis-estructural.
+2. `stage-wizard` — 1 pregunta (tipo de proceso) sugiere una de **4
+   plantillas seed**: reforma-tributaria, reforma-pensional,
+   paz-territorial, politica-mde.
+3. `stage-actores` — intro + editor de chips. Barra IA "Sugerir actores"
+   (Pro+) que devuelve 8-15 actores típicos del contexto colombiano con
+   familia conceptual y botón "+ Agregar" por sugerencia.
+4. `stage-objetivos` — editor simple de objetivos.
+5. `stage-mid` — matriz NxN actor × actor, escala 0-4 (nula · procesos
+   · proyectos · misión · existencia).
+6. `stage-mao` — matriz N×M actor × objetivo, escala -4..+4 (signo
+   captura facilitación vs inhibición). Cloud-bar + barra IA "Revisar
+   posiciones" (Premium+).
+7. `stage-results` — 3 tabs:
+   - Influencia × Dependencia (cuadrantes dominantes / enlace /
+     autónomos / dominados, ranking por Ri).
+   - Convergencia × Divergencia (cuadrantes coaliciones / conflictivos
+     / marginales / opositores, top 6 alianzas y top 6 conflictos por
+     pares).
+   - Objetivos por movilización con saldo neto ponderado por Ri.
+   Cloud-bar + barra IA "Generar lectura" (Premium+) + bloque amarillo
+   cross-link a analisis-estructural.
+
+**Cálculos Mactor:**
+- `Ii = sum_j MID[i,j]` (influencia directa)
+- `Di = sum_j MID[j,i]` (dependencia directa)
+- `Ri = Ii / (Ii + Di)` (poder relativo, [0,1])
+- `Conv[i,j] = sum_k min(|MAO[i,k]|, |MAO[j,k]|)` si signos iguales
+- `Div[i,j]` igual pero signos opuestos
+- Movilización objetivo k: `sum_i |MAO[i,k]|`
+- Saldo neto k: `sum_i MAO[i,k] · Ri[i]`
+
+**PDFs Mactor en S3:**
+```
+s3://elecciones-2026/ricardoruiz.co/bases de datos/mactor/
+  metodologia-paso-a-paso.pdf  (11 KB)
+  respaldo-academico.pdf       (10 KB)
+```
+Pipeline en `tools/build-mactor-docs/{build_metodologia.py, build_respaldo.py}`.
+
+### `problema-publico.html` (problema público con método)
+
+Módulo de definición y diseño de política basado en el **Eightfold
+Path** de Bardach (condensado a 5 mecánicas operativas) + capa
+metodológica profunda con wizard de síntoma, test Rittel-Webber +
+selector de marco analítico y árbol del problema CEPAL/Ortegón.
+
+**Flow completo:**
+```
+Welcome → Wizard de síntoma (00) → Definir (01)
+                                      ↓
+                                  [opcional ↘]
+                              Rittel-Webber (01·b) → Marco analítico (01·c)
+                                      ↓
+                              Evidencia (02) → Alternativas (03)
+                              → Criterios (04) → Comparar (05) → Results (06)
+```
+
+**6 stages principales + 2 sub-stages opcionales** (todos en `STAGES`
+array, navegados por `showStage`):
+
+1. **`stage-welcome`** — 3 accordions explicativos + botón "Empecemos →".
+2. **`stage-sintoma`** (A.7.1) — 4 preguntas que arman un draft del
+   enunciado en vivo. Pre-rellena `STATE.definicion.enunciado` y
+   `STATE.definicion.afectados` si el usuario acepta. Botón "Ya tengo
+   el problema claro →" salta.
+3. **`stage-definicion`** (mecánica 1) — toggle Formulario / Árbol.
+   Formulario: enunciado · magnitud · urgencia (pills) · afectados
+   (chips). Árbol (A.7.4): causas raíz arriba + problema central +
+   efectos abajo, ≤5 nodos cada lado, editables inline. Botón
+   "Profundizar diagnóstico →" lleva al sub-flow Rittel-Webber.
+4. **`stage-rittel`** (A.7.2 · opcional) — 10 propiedades canónicas de
+   Rittel-Webber (1973) como preguntas SÍ/NO. Score 0-10 con barra
+   visual. Clasificación: tame (0-2) · complejo (3-5) · wicked (6-8) ·
+   meta-wicked (9-10) en `rittelTipo(score)`.
+5. **`stage-marco`** (A.7.3 · opcional) — 4 cards con el marco
+   sugerido auto-destacado: racional simple (Bardach·CEPAL) ·
+   multi-criterio adaptativo (Walker·Lempert) · participativo
+   (Roberts·Head&Alford) · gobernanza colaborativa (Ansell&Gash).
+   Se persiste en `STATE.diagnostico.marco` y entra al memo final.
+6. **`stage-evidencia`** (mecánica 2) — tabla editable con
+   fuente·año·dato·link·nota. Botón "Cargar 3 fuentes típicas"
+   (DANE·TerriData·datos.gov.co) como seed.
+7. **`stage-alternativas`** (mecánica 3) — 3-5 cards con
+   nombre·desc·supuestos·costo·plazo. **Baseline "No hacer nada"**
+   primera card fija, no eliminable, renombrable. IA bar Pro+ "Sugerir
+   alternativas".
+8. **`stage-criterios`** (mecánica 4) — 5 default (eficiencia·
+   equidad·factibilidad política·costo·sostenibilidad) con pesos
+   0-100 editables (mínimo 2, máximo 8). NO exige sumar 100 (se
+   normaliza al calcular). IA bar Premium+ "Revisar criterios".
+9. **`stage-comparacion`** (mecánica 5) — matriz alternativas ×
+   criterios, cycle on click 1→5. Score = `Σ valor × (peso / Σ pesos)`.
+   Ranking visual con barras y winner highlighted.
+10. **`stage-results`** — resumen + recomendación + tabla compacta.
+    3 botones de descarga: **memo .md**, **Issue Paper Bardach .md**
+    (A.7.5), **matriz .csv**. IA bar Premium+ "Generar lectura
+    interpretativa". 2 cross-links amarillos a estructural y mactor.
+
+**STATE shape:**
+```js
+STATE = {
+  step: 1,
+  sintoma:    { sintoma, quienes, cuando, evidencia },
+  diagnostico:{ rittel: [null×10], marco: null|<id> },
+  definicion: { enunciado, magnitud, urgencia, afectados[],
+                evidenciaInicial, causas[], efectos[] },
+  evidencia:    [{ fuente, anyo, dato, link, nota }],
+  alternativas: [{ nombre, desc, supuestos, costo, plazo, baseline }],
+  criterios:    [{ nombre, peso }],   // 5 default
+  scores:       { 'ai-ci': 1..5 }     // celdas matriz
+}
+```
+Persistido en `localStorage['pp-current-v1']`. `loadState()` defensivo
+(las sesiones previas siguen funcionando si faltan campos nuevos).
+
+**PDFs Problema Público en S3** (Sprint A.6):
+```
+s3://elecciones-2026/ricardoruiz.co/bases de datos/pp/
+  metodologia-paso-a-paso.pdf  (16 KB · 12 secciones operativas)
+  respaldo-academico.pdf       (15 KB · fórmulas + ~25 referencias)
+```
+Pipeline en `tools/build-pp-docs/{build_metodologia.py, build_respaldo.py}`.
+Reportlab, sin más deps. Para regenerar:
+```bash
+python3 tools/build-pp-docs/build_metodologia.py
+python3 tools/build-pp-docs/build_respaldo.py
+aws s3 cp "Bases de datos/pp/metodologia-paso-a-paso.pdf" \
+  "s3://elecciones-2026/ricardoruiz.co/bases de datos/pp/metodologia-paso-a-paso.pdf" \
+  --content-type "application/pdf" --cache-control "public, max-age=300"
+aws s3 cp "Bases de datos/pp/respaldo-academico.pdf" \
+  "s3://elecciones-2026/ricardoruiz.co/bases de datos/pp/respaldo-academico.pdf" \
+  --content-type "application/pdf" --cache-control "public, max-age=300"
+```
+
+### Recursos & Datos · catálogo compartido `lab-recursos.js` (Sprint A.1)
+
+Catálogo curado de 27 recursos en 5 categorías (Colombia política
+pública · Colombia datos abiertos · Evaluación · Diseño/participación ·
+Prospectiva). Cada item etiquetado con qué módulos del lab destaca.
+
+**Distribución por módulo:**
+- problema: 19 recursos · evaluación: 13 · estructural: 12 · mactor: 5
+
+**Dos puntos de carga:**
+1. **Hub** (`stage-hub` de analisis-estructural.html) muestra TODO el
+   catálogo en `<details>` colapsable al pie.
+2. **FAB "Recursos"** en los 3 módulos (`.lab-fab` bottom-left,
+   z-index 8000) abre `modal-recursos` filtrado por
+   `LAB_CURRENT_MODULE` ∈ {'estructural','mactor','problema'}.
+
+Cargado vía `<script src="lab-recursos.js">` en los 3 HTMLs.
+Mantener URLs estables (dominios oficiales). Si un link rompe, se
+actualiza en un solo archivo y los 4 puntos lo recogen.
+
+### Worker rr-auth — endpoints del lab
+
+Total **21 endpoints** (7 micmac + 7 mactor + 7 pp), agrupados en
+3 módulos paralelos con el mismo patrón CRUD + invite + copiloto.
+
+**MicMac (`/micmac/*`):**
+- `GET    /micmac/list` — lista proyectos (owner + collab).
+- `POST   /micmac/save` — crea o actualiza. Plan gate por cuota.
+- `GET    /micmac/load?projId=&since=` — carga con polling.
+- `DELETE /micmac/delete?projId=` — solo owner.
+- `POST   /micmac/invite` — manda correo Resend con link 14d.
+- `GET    /micmac/accept?token=` — acepta invitación.
+- `POST   /micmac/copiloto` — 5 acciones IA.
+
+**Mactor (`/mactor/*`):** mismos 6 endpoints CRUD/invite + uno copiloto.
+
+**Problema Público (`/pp/*`)** — Sprint A.3 y A.4:
+- `GET    /pp/list` — lista análisis (owner + collab).
+- `POST   /pp/save` — crea o actualiza. Validación dura:
+  `definicion.enunciado` no vacío, ≤5 alternativas, 2-8 criterios,
+  ≤60 fuentes evidencia, scores 1-5.
+- `GET    /pp/load?projId=&since=` — carga con polling.
+- `DELETE /pp/delete?projId=` — solo owner.
+- `POST   /pp/invite` — correo Resend con link 14d, copy "Problema Público".
+- `GET    /pp/accept?token=` — acepta invitación.
+- `POST   /pp/copiloto` — 3 acciones IA (Sprint A.4).
+
+**Acciones IA por módulo (action en body):**
+| Módulo | Acción | Plan |
+|---|---|---|
+| micmac | `validar-vars` | Pro+ |
+| micmac | `categorizar` | Pro+ |
+| micmac | `contexto-relacion` | Premium+ |
+| micmac | `validar-matriz` | Premium+ |
+| micmac | `narrativa` | Premium+ |
+| mactor | `sugerir-actores` | Pro+ |
+| mactor | `validar-mao` | Premium+ |
+| mactor | `narrativa` | Premium+ |
+| pp     | `sugerir-alternativas` | Pro+ |
+| pp     | `validar-criterios` | Premium+ |
+| pp     | `narrativa-memo` | Premium+ |
+
+**Storage KV (`RR_STORE`):**
+```
+micmac:proj:<projId>         JSON completo del proyecto
+micmac:owner:<email>:<projId>  "1" (índice owner)
+micmac:collab:<email>:<projId> "1" (índice collab)
+micmac:invite:<token>        invitación TTL 14d
+micmac:copiloto:<hash24>     respuestas IA TTL 7d
+mactor:* (mismo layout con prefijo mactor)
+pp:*     (mismo layout con prefijo pp)
+```
+
+**DeepSeek:** API key `DEEPSEEK_API_KEY` como secret del worker
+(misma que la Lambda `test-presidencial-explica`). Modelo
+`deepseek-v4-flash`. AbortSignal 28s. Cache hash24 con
+`PROMPT_VERSION='v1'` (bumpear al cambiar prompts para invalidar cache).
+
+**Plan gate (común a los 3 módulos):**
+```js
+MICMAC_MAX_PROJ = MACTOR_MAX_PROJ = PP_MAX_PROJ = { free:1, pro:5, premium:25, full:50 }
+PP_MAX_ALTERNATIVAS = 5
+PP_MAX_CRITERIOS    = 8
+PP_MAX_EVIDENCIA    = 60
+PP_MAX_AFECTADOS    = 30
+```
+
+**Deploy del worker:**
+```bash
+cd /Users/ricardoruiz/rr-auth && npx wrangler deploy
+```
+**Atención:** este worker es compartido — cambios afectan también a
+micmac, mactor y los demás módulos del sitio. Pedir luz verde antes
+de deployar en producción.
+
+**Helpers compartidos:** `sessionGuard(request, env)` valida Bearer
+token + plan. `_callDeepSeek(env, systemPrompt, userMsg, opts)`. `_hash24(str)`.
+
+### Cómo agregar una acción IA nueva
+
+1. Definir un `PROMPT` constante con regla JSON estricta.
+2. Crear `_micmacNueva(env, payload)` que devuelve `{ok, data}` o
+   `{ok:false, error}`.
+3. Registrar en `COPILOTO_ACTIONS` con `{fn, planes, plan}`.
+4. Frontend: nueva función `iaNueva()` en analisis-estructural.html
+   con loading state, plan gate y render del resultado.
+
+### Backlog del lab
+
+**Sprints próximos del lab (B / C / D)** — módulos nuevos que faltan:
+- **Sprint B** — módulo de **Evaluación de política** (4ª caja del
+  hub, hoy con badge "Próximamente"). Diseñar pregunta evaluativa,
+  teoría de cambio, indicadores SMART y método (RCT · diff-in-diff ·
+  regression discontinuity · cualitativo · value-for-money). Marco:
+  OCDE-DAC + SINERGIA + Ivàlua.
+- **Sprint C** — módulo **Alternativas** (pendiente; complementa
+  problema-publico con generación más sistemática de opciones).
+- **Sprint D** — módulo **AIA** (Análisis de Impacto Adicional);
+  pendiente de scope.
+
+**Reservados para después de los 4 módulos:**
+- **Sprint E** (antes "Sprint 7") — datos municipales (~1.100 muns ×
+  5 indicadores) precargados desde DANE / Policía / MEN microdatos.
+  Beneficia a los 4 módulos cuando estén.
+- **Sprint F** (antes "Sprint 8") — escenarios prospectivos: vista
+  "what-if" sobre MicMac, Mactor y problema-publico.
+- **Sprint G** (antes "Sprint 9") — informe combinado de los 4
+  módulos exportado como PDF dinámico.
+
+**Mejoras de módulos vivos:**
+- **Mactor MIDI** (opcional) — matriz pivotada de influencias
+  indirectas entre actores (multiplica MID consigo misma).
+- **Problema-Público v2** — sub-vista de árbol de objetivos (espejo
+  del árbol del problema, lado positivo) y exportación PowerPoint.
+
+### Reglas de oro para Lab de Políticas Públicas y Prospectiva
+
+- **Cita siempre las raíces metodológicas** en textos públicos:
+  Godet/Mojica/LIPSOR/Externado para prospectiva; Bardach/Patashnik/
+  Ortegón/Torres-Melo para análisis de políticas; OCDE-DAC/SINERGIA/
+  Ivàlua para evaluación. Es lo que da legitimidad académica frente
+  a un consultor experto.
+- **El copiloto IA sugiere; el humano decide.** Siempre repetir esa
+  línea en disclaimers, evitar UI que parezca "decisión automática del
+  modelo".
+- **No inventar referencias bibliográficas** con autor+año específicos
+  en prompts del modelo. Si tenemos cita, va al respaldo PDF.
+  Descriptor genérico "estudios de CEPAL sobre X" es OK.
+- **Bumpear `PROMPT_VERSION` al cambiar prompts** del copiloto (entra
+  al hash de cache).
+- **Tuteo neutro Bogotá** en todos los textos del lab (sin voseo
+  argentino, sin regionalismos paisa/costeño).
+- **Cross-links entre módulos siempre contextuales.** No "abrir otro
+  módulo" genérico, sino "Las variables que mueven este problema →"
+  o "Los actores que pueden bloquear esta política →". Cada cross-link
+  explica por qué tiene sentido el encadenamiento.
+- **Sesiones previas deben seguir funcionando.** `loadState()` es
+  defensivo: si faltan campos del state nuevo, los inicializa con
+  defaults sin romper. Aplica a los 3 módulos.
 
 ## Convenciones de commit
 ```
