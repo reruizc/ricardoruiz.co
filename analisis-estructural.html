@@ -129,7 +129,8 @@ body.day-mode::before {
   background: var(--accent-soft);
 }
 .plan-chip .marker { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; }
-.user-mono { font-family: var(--mono); font-size: 12px; color: var(--ink-3); letter-spacing: .04em; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.user-name-link { font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--ink); text-decoration: none; letter-spacing: 0; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; transition: color .2s; }
+.user-name-link:hover { color: var(--accent); }
 .btn-logout {
   font-family: var(--mono); font-size: 11.5px; color: var(--ink-3);
   background: none; border: none; padding: 0;
@@ -1655,6 +1656,12 @@ footer.foot {
 }
 footer.foot a { color: var(--ink-3); transition: color .2s; }
 footer.foot a:hover { color: var(--accent); }
+/* Disclosure compacto de proyectos en la nube (D.2) */
+.proj-disclosure summary::-webkit-details-marker { display:none; }
+.proj-disclosure summary::marker { content:''; }
+.proj-disclosure summary:hover { background:var(--paper-3); }
+.proj-disclosure .proj-caret { display:inline-block; transition:transform .15s; }
+.proj-disclosure[open] .proj-caret { transform:rotate(90deg); }
 </style>
 </head>
 <body>
@@ -1665,7 +1672,7 @@ footer.foot a:hover { color: var(--accent); }
   <div class="topbar-left">
     <a href="index.html#proyectos" class="btn-back"><span>←</span> Volver</a>
     <div id="nav-user-block" class="is-hidden" style="display:flex;align-items:center;gap:.7rem">
-      <span class="user-mono" id="nav-user-email">—</span>
+      <a href="dashboard.html" class="user-name-link" id="nav-user-name" title="Ir al dashboard">—</a>
       <a href="pricing.html" class="plan-chip"><span class="marker"></span><span id="nav-user-plan">FREE</span></a>
       <button class="btn-logout" onclick="logoutUser()">salir ↗</button>
     </div>
@@ -1675,7 +1682,7 @@ footer.foot a:hover { color: var(--accent); }
     </div>
   </div>
   <div class="topbar-center">
-    <span class="eyebrow" style="margin:0;font-size:11px">Lab de Políticas Públicas y Prospectiva</span>
+    <span class="eyebrow" style="margin:0;font-size:11px">Laboratorio de Políticas</span>
   </div>
   <div class="topbar-right">
     <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
@@ -1697,34 +1704,44 @@ footer.foot a:hover { color: var(--accent); }
     <span class="sep">/</span>
     <a href="index.html#proyectos">Proyectos</a>
     <span class="sep">/</span>
-    <span>Lab de Políticas Públicas y Prospectiva</span>
+    <span>Laboratorio de Políticas</span>
   </div>
 
   <!-- ════════════════ MIS PROYECTOS (logged only) ════════════════ -->
-  <section class="projects-card is-hidden" id="my-projects">
-    <div class="projects-head">
-      <div>
-        <h3>Tus proyectos en la nube</h3>
-        <div class="ph-meta" id="my-projects-meta">—</div>
-      </div>
-      <button class="btn-ghost" onclick="newProject()">+ Nuevo proyecto</button>
-    </div>
-    <div class="projects-list" id="my-projects-list"></div>
+  <section class="is-hidden" id="my-projects" style="margin-bottom:1.4rem;max-width:980px;margin-left:auto;margin-right:auto;padding:0 1.75rem">
+    <details class="proj-disclosure" style="background:var(--paper-2);border:1px solid var(--rule)">
+      <summary style="display:flex;align-items:center;justify-content:space-between;gap:.8rem;padding:.7rem 1.1rem;list-style:none;cursor:none;flex-wrap:wrap;transition:background .15s">
+        <span style="display:flex;align-items:baseline;gap:.85rem;flex-wrap:wrap">
+          <span style="font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700"><span class="proj-caret">▸</span> Cargar o abrir proyecto</span>
+          <span id="my-projects-meta" style="font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.04em">—</span>
+        </span>
+        <button class="btn-ghost" style="padding:.4rem .85rem;font-size:.85rem" onclick="event.preventDefault();event.stopPropagation();newProject()">+ Nuevo</button>
+      </summary>
+      <div class="projects-list" id="my-projects-list" style="padding:.5rem 1.1rem 1.1rem"></div>
+    </details>
   </section>
 
   <!-- ════════════════ STAGE: HUB del LAB ════════════════ -->
   <section id="stage-hub">
+    <!-- Chip de análisis en progreso (visible solo si hay state restaurado) -->
+    <div id="hub-inprogress-chip" class="is-hidden" style="margin-bottom:1.2rem;padding:.7rem 1rem;background:var(--accent-soft);border:1px solid var(--accent-tint);border-left:3px solid var(--accent);display:flex;align-items:center;gap:.85rem;flex-wrap:wrap">
+      <span style="font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700">En progreso</span>
+      <span style="font-family:var(--italic);font-style:italic;font-size:.92rem;color:var(--ink-2);flex:1;min-width:220px">Tienes un análisis estructural sin terminar.</span>
+      <button class="btn-ghost" style="padding:.4rem .85rem;font-size:.85rem;border-color:var(--accent);color:var(--accent)" onclick="showStage('stage-welcome')">Retomar análisis estructural →</button>
+    </div>
+
     <div class="hub-hero">
-      <div class="eyebrow">Lab integrado · Políticas Públicas y Prospectiva</div>
-      <h1>Para diseñar política pública <em>con método</em></h1>
+      <div class="eyebrow">Laboratorio de Políticas · 5 módulos integrados</div>
+      <h1>Política pública que <em>aguanta en comité</em></h1>
       <p>
-        Cinco módulos complementarios para enmarcar problemas, construir
-        alternativas defendibles, mapear actores, entender la estructura
-        del sistema y evaluar la política. Anclados en la escuela
-        francesa de prospectiva (Godet · Mojica · LIPSOR), el análisis
-        de políticas (Bardach · UNDP · Ortegón), el análisis morfológico
-        (Zwicky · Ritchey · Lempert) y los marcos de evaluación
-        (OCDE-DAC · SINERGIA · Ivàlua).
+        Cinco herramientas conectadas para equipos técnicos y consultoras
+        que necesitan sustentar decisiones — desde enmarcar el problema
+        hasta defender la alternativa elegida frente a quien firma. Método
+        riguroso, salida defendible, copiloto IA para no empezar de cero.
+        Cada módulo se usa solo o encadenado con los demás.
+      </p>
+      <p style="margin-top:1rem">
+        <button class="method-link" type="button" onclick="openModal('modal-why')" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;padding:.55rem .95rem;border:1px solid var(--rule-strong);background:transparent;color:var(--ink-2);cursor:none;transition:color .2s,border-color .2s">¿Por qué este es el mejor modelo? →</button>
       </p>
     </div>
 
@@ -2549,6 +2566,96 @@ footer.foot a:hover { color: var(--accent); }
         manual para usar la herramienta en equipo.<br/>
         <a href="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/analisis-estructural/respaldo-academico.pdf" target="_blank" rel="noopener" style="color:var(--accent)">↓ Respaldo metodológico (PDF, ~20 KB)</a> ·
         fórmulas, autores y bibliografía, por si alguien quiere auditar el rigor.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: ¿Por qué este es el mejor modelo? (D.5) -->
+<div class="modal-back" id="modal-why">
+  <div class="modal" style="max-width:720px">
+    <button class="modal-close" onclick="closeModal('modal-why')">×</button>
+    <h2>¿Por qué este es el mejor modelo?</h2>
+    <div class="modal-body">
+      <p>
+        Tres razones — orden, frescura y aterrizaje — diferencian este lab
+        del clásico <em>"tres opciones y la recomendada"</em> que produce
+        media consultoría de política pública.
+      </p>
+
+      <h3 style="font-family:var(--sans);font-weight:700;font-size:1.05rem;color:var(--accent);margin:1.4rem 0 .55rem">1. Anclaje en la literatura canónica</h3>
+      <p>
+        Cada uno de los cinco módulos está construido sobre las escuelas
+        que la disciplina considera fundacionales — citadas por nombre y
+        con bibliografía completa en cada respaldo metodológico:
+      </p>
+      <ul style="font-family:var(--sans);font-size:.94rem;line-height:1.55;color:var(--ink-2);margin:0 0 1rem 1.2rem">
+        <li style="margin-bottom:.4rem"><b>Problema público:</b> <em>Eightfold Path</em> de Eugene Bardach (Berkeley) + marco lógico CEPAL/ILPES (Ortegón, Pacheco, Prieto) + test Rittel-Webber para wicked problems.</li>
+        <li style="margin-bottom:.4rem"><b>Análisis estructural:</b> escuela francesa de prospectiva — Michel Godet, Francisco José Mojica (Externado), LIPSOR. MicMac · DEMATEL · ISM.</li>
+        <li style="margin-bottom:.4rem"><b>Análisis de actores:</b> Mactor de Godet · Roubelat (1991), referente colombiano Mojica.</li>
+        <li style="margin-bottom:.4rem"><b>Alternativas:</b> análisis morfológico de Fritz Zwicky (Caltech 1969) + General Morphological Analysis de Tom Ritchey (Swedish Morphological Society 2011) + Robust Decision Making de Lempert &amp; Walker (RAND 2003) + Decision Analysis de Howard (Stanford 1968) + Value-Focused Thinking de Keeney (USC 1992).</li>
+        <li><b>Evaluación:</b> criterios OCDE-DAC (versión 2019/2021) + theory-based evaluation de Mayne y Pawson + marco lógico CEPAL/ILPES + Pre-Analysis Plans del AEA RCT Registry.</li>
+      </ul>
+
+      <h3 style="font-family:var(--sans);font-weight:700;font-size:1.05rem;color:var(--accent);margin:1.4rem 0 .55rem">2. Actualización metodológica continua (2020-2026)</h3>
+      <p>
+        La mayoría de consultorías repite la receta canónica genérica de
+        los noventas. Este lab incorpora explícitamente investigaciones
+        recientes que <em>cambian la forma de hacer las cosas</em>:
+      </p>
+      <ul style="font-family:var(--sans);font-size:.94rem;line-height:1.55;color:var(--ink-2);margin:0 0 1rem 1.2rem">
+        <li style="margin-bottom:.4rem"><b>DID escalonado</b> (Callaway-Sant'Anna 2021, de Chaisemartin-D'Haultfœuille 2022) reemplaza al TWFE clásico que invalidó cientos de evaluaciones publicadas.</li>
+        <li style="margin-bottom:.4rem"><b>MVPF</b> (Hendren &amp; Sprung-Keyser, NBER 2020): métrica unificada beneficio/costo que permite comparar políticas heterogéneas. MVPF &gt; 1 es Pareto-superior. Implementado en la lente económica del módulo Alternativas.</li>
+        <li style="margin-bottom:.4rem"><b>Control sintético aumentado</b> (Ben-Michael 2021) y <b>Double ML</b> (Chernozhukov 2018) para evaluaciones con muchas covariables — el OLS+matching ya no es defendible.</li>
+        <li style="margin-bottom:.4rem"><b>Robust Decision Making</b> de Lempert/Walker (RAND 2003 + retrospectiva 2019): cuando la incertidumbre es profunda, la alternativa robusta es la que aguanta el peor caso, no la que maximiza valor esperado. Operacionalizado con 4 escenarios + bonus de robustez en Alternativas.</li>
+        <li style="margin-bottom:.4rem"><b>Cross-consistency assessment</b> de Ritchey (2011) modernizando Zwicky: el filtrado de combinaciones inviables es lo que vuelve manejable un espacio morfológico de 1.024 alternativas.</li>
+        <li><b>Análisis de contribución</b> de Mayne (retrospectiva CJPE 2024) + guía del World Bank IEG sobre evaluación cuando RCT no es factible.</li>
+      </ul>
+      <p style="font-family:var(--italic);font-style:italic;font-size:.9rem;color:var(--ink-3)">
+        La literatura completa que usamos para iterar los módulos vive en
+        nuestro corpus interno y se actualiza con cada nueva publicación
+        relevante.
+      </p>
+
+      <h3 style="font-family:var(--sans);font-weight:700;font-size:1.05rem;color:var(--accent);margin:1.4rem 0 .55rem">3. Aterrizaje regulatorio colombiano</h3>
+      <p>
+        Las herramientas anglo (Theory Maker, Causal Map, DevResults, Logframer)
+        no hablan el idioma institucional latinoamericano. Este lab sí:
+      </p>
+      <ul style="font-family:var(--sans);font-size:.94rem;line-height:1.55;color:var(--ink-2);margin:0 0 1rem 1.2rem">
+        <li style="margin-bottom:.4rem"><b>SINERGIA · DNP</b> como protocolo de referencia para evaluaciones; formato CONPES light disponible como export en Alternativas.</li>
+        <li style="margin-bottom:.4rem"><b>MGA del DNP</b> (Metodología General Ajustada) compatible con la estructura de variables y indicadores.</li>
+        <li style="margin-bottom:.4rem"><b>Bibliografía colombiana</b>: Torres-Melo, Ortegón, Mojica — además de las referencias anglo.</li>
+        <li><b>Datos territoriales</b>: catálogo de 30 recursos curados con DANE, TerriData, datos.gov.co, SECOP, SISPRO, MEN-SNIES, Policía Nacional, Banco de la República.</li>
+      </ul>
+
+      <h3 style="font-family:var(--sans);font-weight:700;font-size:1.05rem;color:var(--accent);margin:1.4rem 0 .55rem">Diferenciación frente al estado del arte</h3>
+      <p>
+        No existe otra herramienta web que combine <b>(a)</b> selector de
+        método actualizado a literatura 2020-2026, <b>(b)</b> análisis
+        morfológico con robustez en escenarios y lente económica MVPF/CEA,
+        <b>(c)</b> integración de cinco módulos encadenables, <b>(d)</b>
+        copiloto IA en español, y <b>(e)</b> anclaje regulatorio colombiano.
+        Theory Maker hace solo Theory of Change; Causal Map hace solo coding
+        cualitativo; DevResults es M&amp;E operativo caro. Este lab cierra
+        el ciclo desde el diagnóstico del problema hasta el plan de evaluación.
+      </p>
+
+      <p style="font-family:var(--italic);font-style:italic;font-size:.9rem;color:var(--ink-3);border-top:1px solid var(--rule);padding-top:.9rem;margin-top:1.4rem">
+        El copiloto IA <em>sugiere</em>; el humano <em>decide</em>. Cada
+        propuesta del modelo viene con botón <i>+ Agregar</i> para
+        inyectarla al state pero requiere revisión humana antes de ir a
+        comité. La decisión final siempre se documenta con justificación
+        textual auditable.
+      </p>
+
+      <p style="border-top:1px solid var(--rule);padding-top:1rem;margin-top:1.4rem">
+        <b>Cada módulo trae su propia guía y respaldo:</b><br/>
+        <a href="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/pp/respaldo-academico.pdf" target="_blank" rel="noopener" style="color:var(--accent)">Problema público</a> ·
+        <a href="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/analisis-estructural/respaldo-academico.pdf" target="_blank" rel="noopener" style="color:var(--accent)">Análisis estructural</a> ·
+        <a href="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/mactor/respaldo-academico.pdf" target="_blank" rel="noopener" style="color:var(--accent)">Mactor</a> ·
+        <a href="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/alt/respaldo-academico.pdf" target="_blank" rel="noopener" style="color:var(--accent)">Alternativas</a> ·
+        <a href="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/ev/respaldo-academico.pdf" target="_blank" rel="noopener" style="color:var(--accent)">Evaluación</a>
       </p>
     </div>
   </div>
@@ -4885,7 +4992,11 @@ function renderAuthChip() {
   if (AUTH.isLogged && AUTH.user) {
     anon.classList.add('is-hidden');
     userBlock.classList.remove('is-hidden');
-    document.getElementById('nav-user-email').textContent = AUTH.user.email;
+    const _u = AUTH.user;
+    const _first = ((_u.name || '').trim().split(/\s+/)[0]) || ((_u.email || '').split('@')[0]) || 'mi cuenta';
+    const _el = document.getElementById('nav-user-name');
+    _el.textContent = _first;
+    _el.title = 'Ir al dashboard · ' + (_u.email || '');
     document.getElementById('nav-user-plan').textContent = (AUTH.user.plan || 'free').toUpperCase();
   } else {
     anon.classList.remove('is-hidden');
@@ -5556,11 +5667,13 @@ function toggleTheme() {
   renderWizardOpts();
   if (restored && STATE.wizard.step) setWizardStep(STATE.wizard.step);
   renderHubResources();
-  // Default landing: el hub del lab. Si hay estado previo del módulo de
-  // análisis estructural (variables levantadas o wizard arrancado),
-  // aterriza en el welcome del módulo para que el usuario retome desde ahí.
+  // Landing SIEMPRE en el hub del lab (D.3). El usuario decide desde el
+  // hub si quiere retomar el análisis estructural u otro módulo.
+  showStage('stage-hub');
+  // Si hay un análisis estructural en progreso, muestra un chip en el hub.
   const hasInProgress = restored && (STATE.vars.length >= 2 || (STATE.wizard && STATE.wizard.q1));
-  showStage(hasInProgress ? 'stage-welcome' : 'stage-hub');
+  const inProgressChip = document.getElementById('hub-inprogress-chip');
+  if (inProgressChip) inProgressChip.classList.toggle('is-hidden', !hasInProgress);
   // Aplica botón activo de confianza según STATE.uncertainty restaurado
   document.querySelectorAll('.fuzzy-opt').forEach(b => b.classList.toggle('active', b.dataset.u === (STATE.uncertainty || 'high')));
   const helps = {
