@@ -9,13 +9,14 @@
 - `oportunidad.html` — **módulo B2B** voto blando afín por candidato (LISTO, ver sección dedicada)
 - `veleta.html` — municipios sensibles al cambio (score multidimensional)
 - `test-presidencial-2026.html` — **test de arquetipo emocional + lectura LLM** (LISTO v1, ver sección dedicada)
-- `analisis-estructural.html` — **Lab de Políticas Públicas y Prospectiva** · hub del lab + módulo análisis estructural (MicMac · DEMATEL · ISM modernizado, fuzzy, valencias firmadas, copiloto IA). LISTO, ver sección dedicada.
+- `analisis-estructural.html` — **Lab de Políticas Públicas y Prospectiva** · hub del lab + módulo análisis estructural (MicMac · DEMATEL · ISM modernizado, fuzzy, valencias firmadas, copiloto IA) + **sección "Mi informe del lab" (Sprint G)** que une los 6 módulos en un memo combinado (PDF + Markdown). LISTO, ver sección dedicada.
 - `mactor.html` — **Lab** · módulo análisis de actores y conflictos (MID + MAO, copiloto IA). LISTO.
 - `problema-publico.html` — **Lab** · módulo problema público (Eightfold Path de Bardach condensado a 5 mecánicas + capa metodológica profunda con wizard de síntoma, árbol del problema CEPAL/Ortegón, test Rittel-Webber y selector de marco analítico). Cloud-save + 3 acciones IA + Issue Paper export. LISTO (Sprint A).
 - `evaluacion.html` — **Lab** · módulo evaluación de política (OCDE-DAC + Mayne + CEPAL/ILPES + Pre-Analysis Plans + literatura 2020-2026). **8 mecánicas**: pregunta evaluativa (tipo + alcance + tipología Sinergia DNP) · teoría de cambio · indicadores SMART · selector de método (14 métodos · frontera 2020-2026) · criterios OCDE-DAC · análisis económico (CBA · MVPF · CEA) · plan operativo · resultados. Detección automática de tratamiento escalonado con warning TWFE (Goodman-Bacon 2021) redirigiendo a DID escalonado (Callaway-Sant'Anna 2021). Cloud-save + 3 acciones IA + plan .md + **Pre-Analysis Plan .md** (AEA RCT Registry / OSF compatible, 13 secciones con MHT correction pre-registrada) + matriz .csv. LISTO (Sprint B + B v2).
 - `alternativas.html` — **Lab** · módulo Alternativas de Política (Zwicky 1969 + Lempert/Walker RDM 2003 + Ritchey + Howard + Keeney + MVPF Hendren 2020 + CEA J-PAL). 6 mecánicas: variables de decisión · opciones por variable · matriz morfológica · alternativas ensambladas · robustez en 4 escenarios + lente económica · decisión final. Cloud-save + 4 acciones IA + memo .md + matriz .csv + ficha CONPES light .pdf + envío bidireccional a problema-publico + envío a AIN. LISTO (Sprint C).
 - `ain.html` — **Lab** · módulo Análisis de Impacto Normativo (DNP/Función Pública Decreto 1081/2015 + 1273/2020 + RIA OCDE 2012/2022 + Sunstein Simpler 2013 + Hahn-Tetlock 2008 + Stigler 1971 + Mashaw 2018). 6 mecánicas: problema regulatorio (tipo de falla) · objetivos normativos medibles · opciones regulatorias (6 familias) · matriz de impactos (5 categorías) · consulta pública + 5 riesgos regulatorios · implementación + monitoreo + cláusula de revisión. Cloud-save + 3 acciones IA + memo .md + matriz .csv + memo CONPES regulatorio .pdf + auto-import desde pp/alt + envío a evaluacion. LISTO (Sprint D).
 - `lab-recursos.js` — catálogo compartido de 32 recursos en 5 categorías; cargado por los 6 módulos del lab.
+- `lab-informe.js` — **Sprint G** · helpers + generador PDF/MD del informe combinado del lab. Lee los 6 localStorage keys y produce un memo CONPES integrado. Cargado solo desde el hub.
 - `pricing.html` — planes (Básico / Pro 39.900 COP · Premium 99.900 COP · Personalizado)
 - `lang.js` — i18n (co/us/cn); `CLAUDE.md` vive en la raíz del repo
 
@@ -2485,6 +2486,94 @@ Cargado vía `<script src="lab-recursos.js">` en los 5 HTMLs.
 Mantener URLs estables (dominios oficiales). Si un link rompe, se
 actualiza en un solo archivo y los 5 puntos lo recogen.
 
+### Sprint G · informe combinado del lab (`lab-informe.js`)
+
+Cierre natural del lab: un solo PDF/MD que une el trabajo del usuario
+en los 6 módulos en un memo CONPES integrado. **Cliente-side puro,
+sin backend** — el archivo `lab-informe.js` lee los 6 localStorage
+keys del navegador del usuario y arma el informe con jsPDF (carga
+on-demand desde CDN, mismo patrón de `alternativas.html` y `ain.html`).
+
+**Punto de entrada:** sección `Mi informe del lab` en el `stage-hub`
+de `analisis-estructural.html`, después del wizard y antes del
+catálogo de Recursos. Cards de los 6 módulos con badge ✓/○ según
+estado de localStorage, snippet del contenido principal de cada
+módulo, y 2 botones de export: `↓ Informe combinado (.pdf)` y
+`↓ Memo .md`. Disclaimer recordando que los datos se leen del
+navegador (no se envían a ningún servidor).
+
+**Estructura del informe** (8 secciones, ~5-8 páginas A4):
+
+1. **Portada** — fecha, descripción, lista de los 6 módulos con
+   estado ✓/○.
+2. **Resumen ejecutivo** — auto-generado a partir del state combinado.
+   Hila enunciado del problema + Rittel-Webber + variables motrices +
+   actores dominantes + alternativa recomendada + opción regulatoria
+   + método evaluativo en un solo párrafo.
+3. **Diagnóstico del problema** (PP) — enunciado · magnitud · urgencia
+   · afectados · causas · efectos · Rittel-Webber · marco analítico ·
+   evidencia.
+4. **Variables motrices del sistema** (MicMac) — top 5 motrices
+   calculadas a partir de `s.matrix` con valencias firmadas, cuadrante
+   asignado por mediana de motricidad/dependencia.
+5. **Mapa de actores y conflictos** (Mactor) — top 5 dominantes por
+   poder relativo Ri = Ii / (Ii+Di) + objetivos por saldo neto
+   ponderado.
+6. **Espacio de alternativas** (Alt) — recomendación final (decision
+   explícita o ranking por score esperado) + lente económica (MVPF ·
+   CEA si disponibles).
+7. **Análisis de Impacto Normativo** (AIN) — tipo de falla · opción
+   recomendada · riesgos regulatorios (Hahn-Tetlock 2008) ·
+   justificación.
+8. **Plan de evaluación** (Ev) — pregunta + tipo + Sinergia DNP +
+   método (con warning TWFE si tratamiento escalonado) + indicadores
+   SMART + análisis económico tripartito.
+9. **Próximos pasos operativos** — derivados automáticamente del state:
+   "levantar más evidencia" si pp.evidencia.length < 3; "estrategia
+   con dominantes opositores" si saldo del objetivo principal < 0;
+   "completar matriz robustez" si alt sin recomendada; etc.
+
+**Footer metodológico:** cita las escuelas combinadas (Bardach 2020 ·
+Godet/Mojica/LIPSOR · Lempert-Walker RAND 2003 · Zwicky 1969 · Ritchey
+2011 · OCDE RIA · Hendren NBER 2020 · OCDE-DAC · AEA RCT Registry ·
+frontera causal 2020-2026).
+
+**Archivos involucrados:**
+```
+lab-informe.js                            (~720 líneas · helpers + PDF + MD)
+analisis-estructural.html                 (Sección "Mi informe del lab" + wiring)
+problema-publico.html · mactor.html       (cross-links amarillos a #informe)
+evaluacion.html · alternativas.html · ain.html  (cross-links amarillos a #informe)
+```
+
+**API pública en `window.LabInforme`:**
+- `getLabState()` → `{ pp:{exists,data,resumen}, micmac:{...}, mactor:{...}, alt:{...}, ain:{...}, ev:{...} }`
+- `countActiveModules(state)` → número 0-6 de módulos con contenido.
+- `buildLabPDF(state?)` → `Promise<filename>`; carga jsPDF si hace falta, dispara descarga.
+- `buildLabMarkdown(state?)` → `string` con el informe en markdown.
+- `buildResumenEjecutivo(state)` → `string` con el párrafo de exec summary.
+
+**Anchor `#informe`:** cualquier link a
+`analisis-estructural.html#informe` hace scroll a la sección al cargar
+la página (handler en `init()`). Los 5 módulos sub-lab tienen un
+cross-link visualmente distinto (acento oxblood, símbolo ∑) que apunta
+ahí.
+
+**Limitaciones conocidas:**
+- El cálculo de PP recomendada usa los `scores` cliente-side del
+  módulo Problema Público; si el usuario no completó la matriz, no
+  hay recomendación visible (solo lista de alternativas).
+- MicMac: el script asume que `s.matrix[i-j]` puede ser número o
+  objeto `{valor}`; usa magnitud absoluta para calcular cuadrantes
+  (no preserva signos). DEMATEL/ISM no entran al informe — solo
+  MicMac.
+- Si el usuario tiene contenido en localStorage de versiones previas
+  con shape distinto, los resumidores devuelven `isEmpty:true`
+  defensivamente.
+- PDF se descarga directo sin pre-vista. Si el usuario quiere editar
+  antes de comité, exportar `.md` y editarlo en su editor preferido
+  es la ruta recomendada.
+
 ### Worker rr-auth — endpoints del lab
 
 Total **42 endpoints** (7 micmac + 7 mactor + 7 pp + 7 ev + 7 alt + 7 ain),
@@ -2657,16 +2746,17 @@ Posibles iteraciones futuras (no urgentes):
 - Power calculator integrado (no solo placeholder): inputs ICC/atrición/N
   + cálculo de MDE bajo distintos diseños.
 
-**Reservados para después de los 6 módulos:**
+**Sprint G · Informe combinado** ✓ LISTO. Ver sección "Sprint G ·
+informe combinado" más abajo. Cierre natural del lab: un solo PDF/MD
+que une el trabajo del usuario en los 6 módulos.
+
+**Reservados para próximas iteraciones:**
 - **Sprint E** — datos municipales (~1.100 muns × 5 indicadores)
   precargados desde DANE / Policía / MEN microdatos. Beneficia a los
-  6 módulos cuando estén.
+  6 módulos.
 - **Sprint F** — escenarios prospectivos: vista "what-if" sobre MicMac,
   Mactor, problema-publico, alternativas y AIN. Los 4 escenarios de
   Alternativas (C.5) son un primer paso editable.
-- **Sprint G** — informe combinado de los 6 módulos exportado como PDF
-  dinámico (un solo entregable con problema + variables del sistema +
-  actores + alternativas + AIN + plan de evaluación).
 
 **Mejoras de módulos vivos:**
 - **Mactor MIDI** (opcional) — matriz pivotada de influencias
