@@ -1302,7 +1302,7 @@ footer.foot {
         Cuatro escenarios pre-definidos (baseline · optimista ·
         pesimista · disruptivo) con probabilidad subjetiva editable.
         Calificas cada alternativa 1-5 en cada escenario. Score
-        esperado = <em>Σ probabilidad × rating</em>. Bonus de robustez:
+        esperado = <em>Σ (probabilidad × rating)</em>. Bonus de robustez:
         +0.5 si el peor caso de la alternativa es ≥ 3. <em>La lente
         económica</em> (MVPF de Hendren · CEA de J-PAL) es opcional:
         si llenas costo y beneficio, se calcula MVPF (β/c) y CEA
@@ -1310,10 +1310,21 @@ footer.foot {
       </p>
     </div>
 
-    <div class="placeholder-box">
-      <b>En construcción · C.5</b>
-      4 escenarios editables + matriz de rating + lente económica MVPF/CEA opcional llegan en la siguiente iteración.
+    <h3 style="font-family:var(--sans);font-weight:700;font-size:1.05rem;margin:1.2rem 0 .75rem;color:var(--ink)">Escenarios &middot; probabilidad subjetiva</h3>
+    <div class="scen-grid" id="scen-grid"></div>
+    <div class="scen-probsum" id="scen-probsum"></div>
+    <div style="margin-bottom:1.4rem;display:flex;gap:.5rem;flex-wrap:wrap">
+      <button class="btn-ghost" onclick="resetEscenarios()" style="font-size:.85rem;padding:.5rem 1rem">Restablecer escenarios por defecto</button>
     </div>
+
+    <h3 style="font-family:var(--sans);font-weight:700;font-size:1.05rem;margin:1.5rem 0 .75rem;color:var(--ink)">Matriz de robustez</h3>
+    <div class="rob-table-wrap" id="rob-table-wrap"></div>
+
+    <h3 style="font-family:var(--sans);font-weight:700;font-size:1.05rem;margin:1.5rem 0 .55rem;color:var(--ink)">Lente económica <span style="font-family:var(--mono);font-size:11px;font-weight:400;color:var(--gold);letter-spacing:.08em;margin-left:.4rem">OPCIONAL · MVPF · CEA</span></h3>
+    <p style="font-family:var(--italic);font-style:italic;font-size:.92rem;line-height:1.5;color:var(--ink-2);margin-bottom:.95rem;max-width:64ch">
+      Si para una alternativa tienes <em>costo total</em> y <em>beneficio total</em> en COP, se calcula <b>MVPF</b> (Hendren &amp; Sprung-Keyser, NBER 2020): cuando MVPF &gt; 1 la política es Pareto-superior. Si tienes costo y un outcome físico (vidas salvadas, estudiantes retenidos, etc.), se calcula <b>CEA</b> (J-PAL). Llenar es opcional — la robustez no depende de esto.
+    </p>
+    <div id="econ-cards"></div>
 
     <div class="actions">
       <button class="btn-ghost" onclick="goToStep(4)">← Alternativas</button>
@@ -1341,9 +1352,12 @@ footer.foot {
       </p>
     </div>
 
-    <div class="placeholder-box">
-      <b>En construcción · C.6</b>
-      Selector de alternativa recomendada + justificación textual + exports llegan en la siguiente iteración.
+    <div id="dec-list"></div>
+
+    <div class="field" style="margin-top:1.4rem">
+      <label class="field-label" for="dec-justif">Justificación de la recomendación <span class="req">*</span></label>
+      <textarea id="dec-justif" placeholder="Ej.: la alternativa elegida combina el mejor score esperado con un peor caso aceptable (≥3) en el escenario disruptivo. La opción siguiente en ranking gana en el optimista pero se hunde en el pesimista por restricción fiscal. Aceptamos sacrificar 0.3 de score esperado a cambio de robustez frente al escenario fiscal."></textarea>
+      <div class="field-hint">Tres a cinco frases. Explica por qué esta y no la siguiente en el ranking, qué supuestos críticos se aceptan, y qué condiciones llevarían a reconsiderar.</div>
     </div>
 
     <div class="actions">
@@ -1361,12 +1375,7 @@ footer.foot {
       <span class="meta" id="res-meta">—</span>
     </div>
 
-    <div id="res-content">
-      <div class="placeholder-box">
-        <b>En construcción · C.6</b>
-        Hero con recomendación + KPIs + tabla compacta + barra IA "Narrativa" + 3 exports (memo .md, matriz .csv, PDF CONPES light) + envío a problema-publico llegan en la siguiente iteración.
-      </div>
-    </div>
+    <div id="res-content"></div>
 
     <div class="ia-bar" style="margin-top:1.5rem">
       <div class="ia-icon">✦</div>
@@ -1722,14 +1731,8 @@ function renderAll() {
 // renderOpciones     · implementado en C.2 (más abajo, sección dedicada)
 // renderMatriz       · implementado en C.3 (más abajo, sección dedicada)
 // renderAlternativas · implementado en C.4 (más abajo, sección dedicada)
-function renderRobustez()     { /* C.5 */ }
-function renderDecision()     { /* C.6 */ }
-
-function renderResults() {
-  // Placeholder hasta C.6
-  const el = document.getElementById('res-meta');
-  if (el) el.textContent = `${STATE.variables.length} variables · ${STATE.alternativas.length} alternativas`;
-}
+// renderRobustez     · implementado en C.5 (más abajo, sección dedicada)
+// renderDecision · renderResults · exports · envío a pp · implementados en C.6 (más abajo)
 
 // ═════════════════════════════════════════════════════════════════════════
 // MECÁNICA 1 · VARIABLES DE DECISIÓN (C.1)
@@ -2774,19 +2777,285 @@ function iaRenderValidarCoherencia(data) {
   out.innerHTML = html;
 }
 
-// Exports (C.6) y envío a pp (C.10) — stubs por ahora
-function downloadMemoMD() {
-  showToast('Export .md llega en C.6');
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 5 · ROBUSTEZ EN ESCENARIOS + LENTE ECONÓMICA (C.5)
+// ═════════════════════════════════════════════════════════════════════════
+// Robust Decision Making (Lempert/Walker · RAND 2003) + MVPF (Hendren ·
+// NBER 2020) + CEA (J-PAL).
+const SCEN_DEFAULTS = [
+  { id:'baseline',  nombre:'Baseline',   descripcion:'Tendencia base. Sin shocks externos ni cambios estructurales relevantes. Las variables exógenas se comportan como en los últimos 5 años.', prob:40 },
+  { id:'optimista', nombre:'Optimista',  descripcion:'Contexto favorable: crecimiento económico sostenido, cooperación territorial, ejecución sin trabas. La política encuentra terreno abonado.', prob:25 },
+  { id:'pesimista', nombre:'Pesimista',  descripcion:'Vientos en contra: restricción fiscal, oposición política, ejecución lenta. La política funciona en el peor escenario factible.', prob:25 },
+  { id:'disruptivo',nombre:'Disruptivo', descripcion:'Choque externo: crisis sanitaria, cambio de gobierno, recesión severa, conflicto armado. Las reglas del juego cambian a mitad de implementación.', prob:10 }
+];
+
+function _ensureScenarios() {
+  if (Array.isArray(STATE.escenarios) && STATE.escenarios.length > 0) return;
+  STATE.escenarios = SCEN_DEFAULTS.map(s => ({ ...s }));
+  saveState();
 }
-function downloadMatrizCSV() {
-  showToast('Export .csv llega en C.6');
+
+function _ratingFor(altId, scenId) {
+  if (!STATE.ratings || !STATE.ratings[altId]) return 0;
+  return Number(STATE.ratings[altId][scenId]) || 0;
 }
-function downloadConpesPDF() {
-  showToast('Export CONPES PDF llega en C.6');
+function setRating(altId, scenId, val) {
+  if (!STATE.ratings || typeof STATE.ratings !== 'object') STATE.ratings = {};
+  if (!STATE.ratings[altId] || typeof STATE.ratings[altId] !== 'object') STATE.ratings[altId] = {};
+  const r = parseInt(val, 10);
+  if (r < 1 || r > 5 || !Number.isFinite(r)) {
+    delete STATE.ratings[altId][scenId];
+  } else if (STATE.ratings[altId][scenId] === r) {
+    // Click on same rating → deselect (allows clearing)
+    delete STATE.ratings[altId][scenId];
+  } else {
+    STATE.ratings[altId][scenId] = r;
+  }
+  saveState();
+  renderRobustez();
 }
-function enviarAProblemaPublico() {
-  showToast('Envío a problema-publico llega en C.6 / C.10');
+
+function _calcScoresAlt(altId) {
+  const escs = STATE.escenarios || [];
+  let probSum = 0;
+  let weighted = 0;
+  let nRated = 0;
+  let worst = Infinity;
+  let best  = -Infinity;
+  escs.forEach(s => {
+    const r = _ratingFor(altId, s.id);
+    if (r >= 1 && r <= 5) {
+      const p = Number(s.prob) || 0;
+      probSum += p;
+      weighted += p * r;
+      nRated++;
+      worst = Math.min(worst, r);
+      best  = Math.max(best, r);
+    }
+  });
+  if (nRated === 0) return { expected:null, worst:null, best:null, bonus:0, final:null, complete:false, nRated:0 };
+  // Normalizar por probSum para que el score esté en escala 1-5 aunque las probs no sumen 100
+  const expected = probSum > 0 ? (weighted / probSum) : 0;
+  const bonus = (worst >= 3) ? 0.5 : 0;
+  const complete = (nRated === escs.length);
+  return { expected, worst, best, bonus, final: expected + bonus, complete, nRated };
 }
+
+function _calcEconAlt(alt) {
+  const e = alt.econ || {};
+  const c = parseFloat(String(e.costo_total || '').replace(/[^0-9.\-]/g,'')) || 0;
+  const b = parseFloat(String(e.beneficio_total || '').replace(/[^0-9.\-]/g,'')) || 0;
+  const o = parseFloat(String(e.outcome_total || '').replace(/[^0-9.\-]/g,'')) || 0;
+  const u = String(e.unidad_outcome || '').trim();
+  const mvpf = (c > 0 && b > 0) ? (b / c) : null;
+  const cea  = (c > 0 && o > 0) ? (c / o) : null;
+  return { c, b, o, u, mvpf, cea };
+}
+
+function renderRobustez() {
+  _ensureScenarios();
+  _ensureBaseline();
+  // Render 4 scen-cards
+  const sgrid = document.getElementById('scen-grid');
+  if (sgrid) {
+    const escs = STATE.escenarios || [];
+    sgrid.innerHTML = escs.map((s, i) => `<div class="scen-card ${escapeAttr(s.id)}">
+      <div class="sc-head">
+        <span class="sc-name" contenteditable="true" spellcheck="false"
+              onblur="renameScenario(${i}, this.innerText)"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${escapeHtml(s.nombre)}</span>
+        <div class="sc-prob-wrap">
+          <input type="number" class="sc-prob" min="0" max="100" step="1" value="${Number(s.prob) || 0}"
+                 oninput="updateScenarioProb(${i}, this.value)"/>
+          <span class="sc-prob-pct">%</span>
+        </div>
+      </div>
+      <textarea oninput="updateScenarioDesc(${i}, this.value)" placeholder="Describe el escenario en 1-2 frases…">${escapeHtml(s.descripcion || '')}</textarea>
+    </div>`).join('');
+  }
+  // Probsum
+  const probsumEl = document.getElementById('scen-probsum');
+  const escs = STATE.escenarios || [];
+  const sum = escs.reduce((s, e) => s + (Number(e.prob) || 0), 0);
+  if (probsumEl) {
+    let cls = 'scen-probsum';
+    if (sum === 100) cls += ' ok';
+    else if (Math.abs(sum - 100) > 5) cls += ' warn';
+    probsumEl.className = cls;
+    probsumEl.innerHTML = `<span>Suma de probabilidades: <b>${sum}%</b></span>` +
+      (sum === 100 ? '<span>✓ Suma exacta a 100.</span>' :
+       sum > 100 ? `<span>Ajusta para sumar 100% (sobran ${sum - 100} pp).</span>` :
+       sum < 100 ? `<span>Faltan ${100 - sum} pp para sumar 100%. El cálculo normaliza automáticamente.</span>` : '');
+  }
+
+  // Matriz de robustez (rob-table)
+  const wrap = document.getElementById('rob-table-wrap');
+  const alts = STATE.alternativas || [];
+  if (alts.length === 0) {
+    if (wrap) wrap.innerHTML = '<div class="placeholder-box"><b>Sin alternativas</b>Vuelve al paso 4 para agregar al menos una alternativa antes de calificarlas por escenario.</div>';
+  } else if (wrap) {
+    // Compute scores
+    const rowsData = alts.map(alt => ({ alt, scores: _calcScoresAlt(alt.id), econ: _calcEconAlt(alt) }));
+    const completed = rowsData.filter(r => r.scores.complete);
+    const winner = completed.length ? completed.reduce((best, cur) => cur.scores.final > (best?.scores.final ?? -Infinity) ? cur : best, null) : null;
+    let html = '<table class="rob-table"><thead><tr>';
+    html += '<th class="alt-col">Alternativa</th>';
+    escs.forEach(s => { html += `<th>${escapeHtml(s.nombre)}<br/><span style="font-family:var(--mono);font-size:9px;color:var(--ink-3);font-weight:400">${Number(s.prob) || 0}%</span></th>`; });
+    html += '<th>Esperado<br/><span style="font-family:var(--mono);font-size:9px;color:var(--ink-3);font-weight:400">1-5</span></th>';
+    html += '<th>Peor caso</th>';
+    html += '<th>Bonus<br/><span style="font-family:var(--mono);font-size:9px;color:var(--ink-3);font-weight:400">peor ≥ 3</span></th>';
+    html += '<th>Final</th>';
+    html += '</tr></thead><tbody>';
+    rowsData.forEach(({ alt, scores }) => {
+      const isWinner = winner && winner.alt.id === alt.id;
+      html += `<tr class="${isWinner ? 'winner' : ''}">`;
+      html += `<td class="cell-name alt-col">${escapeHtml(alt.nombre)}${alt.baseline ? ' <span style="font-family:var(--mono);font-size:9.5px;color:var(--ink-3);letter-spacing:.06em">· baseline</span>' : ''}</td>`;
+      escs.forEach(s => {
+        const r = _ratingFor(alt.id, s.id);
+        html += '<td><div class="rob-cell">';
+        for (let n = 1; n <= 5; n++) {
+          html += `<button class="rob-rate${r === n ? ' sel' : ''}" type="button" onclick="setRating('${alt.id}','${s.id}',${n})" title="${n}/5">${n}</button>`;
+        }
+        html += '</div></td>';
+      });
+      const exp = scores.expected == null ? '—' : scores.expected.toFixed(2);
+      const wst = scores.worst   == null ? '—' : scores.worst;
+      const bns = scores.bonus ? '+0.5' : '0';
+      const fin = scores.final  == null ? '—' : `<b>${scores.final.toFixed(2)}</b>`;
+      html += `<td class="cell-num score-col">${exp}</td>`;
+      html += `<td class="cell-num score-col">${wst}</td>`;
+      html += `<td class="cell-num score-col" style="color:${scores.bonus ? 'var(--green)' : 'var(--ink-3)'}">${bns}</td>`;
+      html += `<td class="cell-num score-col">${fin}${!scores.complete && scores.nRated > 0 ? '<br/><span style="font-family:var(--italic);font-style:italic;color:var(--ink-3);font-size:.8rem">incompleto</span>' : ''}</td>`;
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+  }
+
+  // Lente económica · cards por alternativa
+  const econWrap = document.getElementById('econ-cards');
+  if (econWrap) {
+    if (alts.length === 0) {
+      econWrap.innerHTML = '';
+    } else {
+      econWrap.innerHTML = alts.map(alt => {
+        const e = alt.econ || {};
+        const calc = _calcEconAlt(alt);
+        let resultsHtml = '';
+        if (calc.mvpf !== null || calc.cea !== null) {
+          resultsHtml = '<div class="ec-results">';
+          if (calc.mvpf !== null) {
+            resultsHtml += `<span><b>MVPF</b> = ${calc.mvpf.toFixed(2)} <span style="color:var(--ink-3);font-family:var(--mono);font-size:10.5px;margin-left:.2rem">(beneficio/costo)</span></span>`;
+            if (calc.mvpf > 1) resultsHtml += '<span class="pareto">PARETO-SUPERIOR</span>';
+          }
+          if (calc.cea !== null) {
+            resultsHtml += `<span><b>CEA</b> = $${calc.cea.toLocaleString('es-CO', {maximumFractionDigits:2})} <span style="color:var(--ink-3);font-family:var(--mono);font-size:10.5px;margin-left:.2rem">por ${escapeHtml(calc.u || 'unidad de outcome')}</span></span>`;
+          }
+          resultsHtml += '</div>';
+        }
+        return `<div class="econ-card" data-alt-id="${escapeAttr(alt.id)}">
+          <div class="ec-head">
+            <span class="ec-name">${escapeHtml(alt.nombre)}</span>
+            <span class="ec-tag">${alt.baseline ? 'BASELINE' : 'MVPF · CEA'}</span>
+          </div>
+          <div class="ec-fields">
+            <div class="ar-field">
+              <label>Costo total (COP)</label>
+              <input type="text" placeholder="Ej.: 320000000000" value="${escapeAttr(e.costo_total || '')}"
+                     oninput="updateEcon('${alt.id}','costo_total', this.value)"/>
+            </div>
+            <div class="ar-field">
+              <label>Beneficio total (COP)</label>
+              <input type="text" placeholder="Ej.: 480000000000" value="${escapeAttr(e.beneficio_total || '')}"
+                     oninput="updateEcon('${alt.id}','beneficio_total', this.value)"/>
+            </div>
+            <div class="ar-field">
+              <label>Unidad outcome</label>
+              <input type="text" placeholder="Ej.: estudiantes retenidos" value="${escapeAttr(e.unidad_outcome || '')}"
+                     oninput="updateEcon('${alt.id}','unidad_outcome', this.value)"/>
+            </div>
+            <div class="ar-field">
+              <label>Outcome total</label>
+              <input type="text" placeholder="Ej.: 4200" value="${escapeAttr(e.outcome_total || '')}"
+                     oninput="updateEcon('${alt.id}','outcome_total', this.value)"/>
+            </div>
+          </div>
+          ${resultsHtml}
+        </div>`;
+      }).join('');
+    }
+  }
+
+  // Stage meta
+  const metaEl = document.getElementById('rob-meta');
+  if (metaEl) {
+    const nAlts = alts.length;
+    const completed = alts.filter(a => _calcScoresAlt(a.id).complete).length;
+    metaEl.textContent = `${nAlts} alternativas · ${completed} con rating completo · suma probs ${sum}%`;
+  }
+}
+
+function updateScenarioProb(i, val) {
+  if (!STATE.escenarios || !STATE.escenarios[i]) return;
+  const n = parseInt(val, 10);
+  STATE.escenarios[i].prob = (Number.isFinite(n) && n >= 0 && n <= 100) ? n : 0;
+  saveState();
+  // Re-render solo la suma y la tabla (cambia el % en headers)
+  renderRobustez();
+}
+function updateScenarioDesc(i, val) {
+  if (!STATE.escenarios || !STATE.escenarios[i]) return;
+  STATE.escenarios[i].descripcion = val;
+  saveState();
+}
+function renameScenario(i, txt) {
+  if (!STATE.escenarios || !STATE.escenarios[i]) return;
+  const v = (txt || '').trim();
+  STATE.escenarios[i].nombre = v || SCEN_DEFAULTS[i].nombre || 'Escenario ' + (i + 1);
+  saveState();
+  renderRobustez();
+}
+function resetEscenarios() {
+  if (!confirm('¿Restablecer los 4 escenarios a sus valores por defecto? Los ratings se conservan pero las descripciones y probabilidades se sobreescriben.')) return;
+  STATE.escenarios = SCEN_DEFAULTS.map(s => ({ ...s }));
+  saveState();
+  renderRobustez();
+  showToast('Escenarios restablecidos.');
+}
+function updateEcon(altId, key, val) {
+  const alt = (STATE.alternativas || []).find(a => a.id === altId);
+  if (!alt) return;
+  if (!alt.econ || typeof alt.econ !== 'object') alt.econ = { costo_total:'', beneficio_total:'', unidad_outcome:'', outcome_total:'' };
+  alt.econ[key] = val;
+  saveState();
+  // Re-render solo el bloque ec-results de esta card; lo más simple es re-render robustez
+  // pero eso destruye el focus del input. Hacemos refresh inline del bloque de resultados:
+  const card = document.querySelector(`.econ-card[data-alt-id="${altId}"]`);
+  if (card) {
+    const calc = _calcEconAlt(alt);
+    let html = '';
+    if (calc.mvpf !== null || calc.cea !== null) {
+      html = '<div class="ec-results">';
+      if (calc.mvpf !== null) {
+        html += `<span><b>MVPF</b> = ${calc.mvpf.toFixed(2)} <span style="color:var(--ink-3);font-family:var(--mono);font-size:10.5px;margin-left:.2rem">(beneficio/costo)</span></span>`;
+        if (calc.mvpf > 1) html += '<span class="pareto">PARETO-SUPERIOR</span>';
+      }
+      if (calc.cea !== null) {
+        html += `<span><b>CEA</b> = $${calc.cea.toLocaleString('es-CO', {maximumFractionDigits:2})} <span style="color:var(--ink-3);font-family:var(--mono);font-size:10.5px;margin-left:.2rem">por ${escapeHtml(calc.u || 'unidad de outcome')}</span></span>`;
+      }
+      html += '</div>';
+    }
+    const existing = card.querySelector('.ec-results');
+    if (existing) {
+      if (html) existing.outerHTML = html;
+      else existing.remove();
+    } else if (html) {
+      card.insertAdjacentHTML('beforeend', html);
+    }
+  }
+}
+
+// Exports y envío a pp · implementados en C.6 (más abajo, sección dedicada)
 
 // ═════════════════════════════════════════════════════════════════════════
 // THEME · auto día/noche según hora local + persistencia
@@ -3194,14 +3463,683 @@ function iaShowGate(elId, plan, desc) {
   out.innerHTML = `<div class="ia-result-eyebrow">Copiloto · plan ${plan} requerido</div><p>${escapeHtml(desc)}</p><p>Tu plan actual: <b>${escapeHtml(AUTH.user?.plan || 'free')}</b>.</p><p><a href="pricing.html" style="color:var(--accent);font-weight:600">Ver planes →</a></p>`;
 }
 
+// iaNarrativa · implementada en C.6 (sección dedicada más abajo)
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 6 · DECISIÓN FINAL + RESULTS + EXPORTS + ENVÍO A PP (C.6)
+// ═════════════════════════════════════════════════════════════════════════
+function renderDecision() {
+  const wrap = document.getElementById('dec-list');
+  if (!wrap) return;
+  const alts = STATE.alternativas || [];
+  if (alts.length === 0) {
+    wrap.innerHTML = '<div class="placeholder-box"><b>Sin alternativas</b>Vuelve al paso 4 para agregar alternativas antes de tomar una decisión.</div>';
+  } else {
+    // Calcular scores y ordenar (winner-first)
+    const rows = alts.map(a => ({ alt: a, scores: _calcScoresAlt(a.id), econ: _calcEconAlt(a) }));
+    rows.sort((a, b) => {
+      const sa = a.scores.final == null ? -1 : a.scores.final;
+      const sb = b.scores.final == null ? -1 : b.scores.final;
+      return sb - sa;
+    });
+    const decId = STATE.decision?.altId_recomendada || '';
+    wrap.innerHTML = rows.map((row, idx) => {
+      const { alt, scores, econ } = row;
+      const isSel = decId === alt.id;
+      const econLabel = econ.mvpf != null
+        ? `MVPF ${econ.mvpf.toFixed(2)}${econ.mvpf > 1 ? ' ✓ Pareto' : ''}`
+        : (econ.cea != null ? `CEA $${econ.cea.toLocaleString('es-CO', {maximumFractionDigits:0})}/${escapeHtml(econ.u || 'unidad')}` : '—');
+      return `<div class="alt-card${isSel ? '' : ''}" style="${isSel ? 'border-color:var(--accent);background:var(--accent-soft)' : ''};cursor:none" onclick="setDecisionAlt('${alt.id}')">
+        <div class="alt-head">
+          <span class="alt-name" style="display:flex;align-items:center;gap:.6rem">
+            <span style="width:18px;height:18px;border-radius:50%;border:2px solid ${isSel ? 'var(--accent)' : 'var(--rule-strong)'};display:inline-block;position:relative;flex-shrink:0">
+              ${isSel ? '<span style="position:absolute;inset:3px;background:var(--accent);border-radius:50%"></span>' : ''}
+            </span>
+            ${idx === 0 && scores.final != null ? '<span style="color:var(--accent);font-weight:700">★</span> ' : ''}${escapeHtml(alt.nombre)}
+          </span>
+          <span class="alt-tag">${alt.baseline ? 'Baseline' : 'Rank ' + (idx + 1)}</span>
+        </div>
+        <div class="alt-row" style="margin-top:.45rem">
+          <div class="ar-field"><label>Score final</label><span style="font-family:var(--mono);font-weight:700;color:${scores.final == null ? 'var(--ink-3)' : 'var(--accent)'}">${scores.final == null ? '—' : scores.final.toFixed(2)}</span></div>
+          <div class="ar-field"><label>Peor caso</label><span style="font-family:var(--mono);color:var(--ink-2)">${scores.worst == null ? '—' : scores.worst + '/5'}</span></div>
+          <div class="ar-field"><label>Lente económica</label><span style="font-family:var(--mono);font-size:.82rem;color:var(--ink-2)">${econLabel}</span></div>
+        </div>
+        ${alt.desc ? `<div style="margin-top:.5rem;font-family:var(--italic);font-style:italic;font-size:.88rem;color:var(--ink-2);line-height:1.5">${escapeHtml(alt.desc)}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+  // Justificación textarea
+  const ta = document.getElementById('dec-justif');
+  if (ta) {
+    if (ta.value !== (STATE.decision?.justificacion || '')) ta.value = STATE.decision?.justificacion || '';
+    if (!renderDecision._bound) {
+      renderDecision._bound = true;
+      ta.addEventListener('input', () => {
+        if (!STATE.decision) STATE.decision = { altId_recomendada:'', justificacion:'' };
+        STATE.decision.justificacion = ta.value;
+        saveState();
+      });
+    }
+  }
+  // Meta
+  const meta = document.getElementById('dec-meta');
+  if (meta) {
+    const decAlt = (STATE.alternativas || []).find(a => a.id === STATE.decision?.altId_recomendada);
+    meta.textContent = decAlt ? `Recomendada: ${decAlt.nombre}` : 'sin selección';
+  }
+}
+function setDecisionAlt(altId) {
+  if (!STATE.decision) STATE.decision = { altId_recomendada:'', justificacion:'' };
+  // Toggle: si ya está seleccionada, deseleccionar
+  STATE.decision.altId_recomendada = (STATE.decision.altId_recomendada === altId) ? '' : altId;
+  saveState();
+  renderDecision();
+}
+
+function _altRankings() {
+  // Devuelve [{alt, scores, econ, rank}] ordenado por score final desc
+  const alts = STATE.alternativas || [];
+  const rows = alts.map(a => ({ alt:a, scores:_calcScoresAlt(a.id), econ:_calcEconAlt(a) }));
+  rows.sort((a, b) => {
+    const sa = a.scores.final == null ? -1 : a.scores.final;
+    const sb = b.scores.final == null ? -1 : b.scores.final;
+    return sb - sa;
+  });
+  rows.forEach((r, i) => { r.rank = i + 1; });
+  return rows;
+}
+
+function renderResults() {
+  const cont = document.getElementById('res-content');
+  if (!cont) return;
+  const vars = STATE.variables || [];
+  const alts = STATE.alternativas || [];
+  const rows = _altRankings();
+  const decAlt = (STATE.decision?.altId_recomendada)
+    ? alts.find(a => a.id === STATE.decision.altId_recomendada)
+    : (rows[0] ? rows[0].alt : null);
+  const decRow = decAlt ? rows.find(r => r.alt.id === decAlt.id) : null;
+  const econDecLabel = decRow && decRow.econ.mvpf != null
+    ? ` · MVPF ${decRow.econ.mvpf.toFixed(2)}`
+    : '';
+
+  // Hero
+  let html = '';
+  if (decAlt) {
+    html += `<div class="res-hero">
+      <div class="rh-eyebrow">Alternativa recomendada${decRow ? ' · rank ' + decRow.rank : ''}${econDecLabel}</div>
+      <h3>${escapeHtml(decAlt.nombre)}</h3>
+      ${decAlt.desc ? `<p>${escapeHtml(decAlt.desc)}</p>` : '<p><em>Sin descripción · edítala en el paso 4.</em></p>'}
+    </div>`;
+  } else {
+    html += `<div class="placeholder-box"><b>Sin alternativas</b>Vuelve a la matriz para ensamblar combinaciones y luego selecciona una recomendación.</div>`;
+  }
+
+  // KPIs
+  const nOpt = vars.reduce((s, v) => s + _optsArr(v.id).length, 0);
+  const nAlt = alts.filter(a => !a.baseline).length;
+  const nIncompat = (STATE.incompat || []).length;
+  const scoreDec = decRow && decRow.scores.final != null ? decRow.scores.final.toFixed(2) : '—';
+  html += `<div class="res-grid">
+    <div class="res-kpi"><div class="rk-num">${vars.length}</div><div class="rk-label">Variables</div></div>
+    <div class="res-kpi"><div class="rk-num">${nOpt}</div><div class="rk-label">Opciones (${nIncompat} incompat.)</div></div>
+    <div class="res-kpi"><div class="rk-num">${nAlt}</div><div class="rk-label">Alternativas + baseline</div></div>
+    <div class="res-kpi"><div class="rk-num">${scoreDec}</div><div class="rk-label">Score recomendada</div></div>
+  </div>`;
+
+  // Tabla compacta de ranking
+  if (rows.length > 0) {
+    html += '<div class="res-table-wrap"><table class="res-table"><thead><tr><th>Alternativa</th><th>Esperado</th><th>Peor</th><th>Final</th><th>Lente económica</th></tr></thead><tbody>';
+    rows.forEach(r => {
+      const isWinner = decAlt && r.alt.id === decAlt.id;
+      const econLbl = r.econ.mvpf != null
+        ? `MVPF ${r.econ.mvpf.toFixed(2)}${r.econ.mvpf > 1 ? ' ✓' : ''}`
+        : (r.econ.cea != null ? `CEA ${r.econ.cea.toLocaleString('es-CO', {maximumFractionDigits:0})}/${escapeHtml(r.econ.u || 'unid.')}` : '—');
+      const finalBar = r.scores.final != null ? `${Math.min(100, (r.scores.final / 5.5) * 100).toFixed(0)}%` : '0%';
+      html += `<tr class="${isWinner ? 'winner' : ''}">
+        <td class="cell-name">${escapeHtml(r.alt.nombre)}${r.alt.baseline ? ' <span style="font-family:var(--mono);font-size:9.5px;color:var(--ink-3);letter-spacing:.06em">· baseline</span>' : ''}</td>
+        <td class="cell-num">${r.scores.expected == null ? '—' : r.scores.expected.toFixed(2)}</td>
+        <td class="cell-num">${r.scores.worst == null ? '—' : r.scores.worst + '/5'}</td>
+        <td class="cell-num cell-bar" style="--bar:${finalBar}"><b>${r.scores.final == null ? '—' : r.scores.final.toFixed(2)}</b></td>
+        <td class="cell-num" style="font-family:var(--mono);font-size:.85rem">${econLbl}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
+
+  // Justificación si existe
+  if (STATE.decision?.justificacion) {
+    html += `<div style="margin-top:1.4rem;padding:1.1rem 1.3rem;background:var(--paper-2);border-left:3px solid var(--accent)">
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem">Justificación de la decisión</div>
+      <p style="font-family:var(--sans);font-size:.96rem;line-height:1.6;color:var(--ink);white-space:pre-wrap">${escapeHtml(STATE.decision.justificacion)}</p>
+    </div>`;
+  }
+
+  cont.innerHTML = html;
+
+  // Meta
+  const meta = document.getElementById('res-meta');
+  if (meta) meta.textContent = `${vars.length} variables · ${alts.length} alternativas · score recomendada ${scoreDec}`;
+}
+
+// ── EXPORTS · MD / CSV / PDF ─────────────────────────────────────────────
+function _download(filename, content, mime) {
+  const blob = new Blob([content], { type: mime || 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function _slugForFile() {
+  const enun = (STATE.contexto.enunciado_problema || '').trim();
+  if (enun) return enun.toLowerCase().replace(/[áéíóúñ]/g, c => ({á:'a',é:'e',í:'i',ó:'o',ú:'u',ñ:'n'}[c] || c)).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g,'').slice(0, 40) || 'alternativas';
+  return 'alternativas';
+}
+function _formatCombo(alt) {
+  const vars = STATE.variables || [];
+  if (alt.baseline) return 'statu quo';
+  const parts = vars.filter(v => alt.combo && alt.combo[v.id] != null).map(v => `${v.nombre}: ${_optsArr(v.id)[alt.combo[v.id]] || '?'}`);
+  return parts.length ? parts.join(' · ') : '(combinación vacía)';
+}
+function downloadMemoMD() {
+  const vars = STATE.variables || [];
+  const alts = STATE.alternativas || [];
+  const escs = STATE.escenarios || [];
+  const rows = _altRankings();
+  const decAlt = (STATE.decision?.altId_recomendada)
+    ? alts.find(a => a.id === STATE.decision.altId_recomendada)
+    : (rows[0] ? rows[0].alt : null);
+  const today = new Date().toLocaleDateString('es-CO', { year:'numeric', month:'long', day:'numeric' });
+
+  let md = `# Análisis de alternativas\n\n`;
+  md += `**Fecha:** ${today}\n\n`;
+  if (STATE.contexto.enunciado_problema) md += `## Contexto · enunciado del problema\n\n${STATE.contexto.enunciado_problema}\n\n`;
+
+  md += `## 1. Variables de decisión (${vars.length})\n\n`;
+  vars.forEach((v, i) => {
+    md += `${i + 1}. **${v.nombre}** _(${_varTipoLabel(v.tipo || 'otra')})_\n`;
+    _optsArr(v.id).forEach(o => { md += `   - ${o}\n`; });
+    md += '\n';
+  });
+
+  const product = vars.reduce((p, v) => p * Math.max(_optsArr(v.id).length, 1), 1);
+  md += `## 2. Matriz morfológica (Zwicky)\n\n`;
+  md += `- Combinaciones brutas: **${product.toLocaleString('es-CO')}**\n`;
+  md += `- Pares incompatibles marcados: **${(STATE.incompat || []).length}**\n`;
+  const restantes = _calcRestantesPostIncompat();
+  if (restantes != null) md += `- Combinaciones restantes: **${restantes.toLocaleString('es-CO')}**\n\n`;
+  if ((STATE.incompat || []).length) {
+    md += `### Pares incompatibles\n\n`;
+    (STATE.incompat || []).forEach(pair => {
+      const a = _parseToken(pair[0]); const b = _parseToken(pair[1]);
+      const vA = vars.find(x => x.id === a.varId); const vB = vars.find(x => x.id === b.varId);
+      const oA = vA ? _optsArr(vA.id)[a.optIdx] : '?'; const oB = vB ? _optsArr(vB.id)[b.optIdx] : '?';
+      md += `- _${vA?.nombre || '?'}: ${oA}_ ⟷ _${vB?.nombre || '?'}: ${oB}_\n`;
+    });
+    md += '\n';
+  }
+
+  md += `## 3. Alternativas ensambladas (${alts.length})\n\n`;
+  alts.forEach((a, i) => {
+    md += `### ${i + 1}. ${a.nombre}${a.baseline ? ' _(baseline · statu quo)_' : ''}\n\n`;
+    md += `**Combinación:** ${_formatCombo(a)}\n\n`;
+    if (a.desc) md += `**Descripción:** ${a.desc}\n\n`;
+    if (a.supuestos) md += `**Supuestos críticos:** ${a.supuestos}\n\n`;
+    const meta = [];
+    if (a.costo) meta.push(`Costo: ${a.costo}`);
+    if (a.plazo) meta.push(`Plazo: ${a.plazo}`);
+    if (a.riesgo) meta.push(`Riesgo dominante: ${a.riesgo}`);
+    if (meta.length) md += `${meta.join(' · ')}\n\n`;
+  });
+
+  md += `## 4. Robustez en escenarios\n\n`;
+  md += `| Escenario | Prob | Descripción |\n|---|---|---|\n`;
+  escs.forEach(s => { md += `| ${s.nombre} | ${s.prob}% | ${(s.descripcion || '').replace(/\|/g, '\\|').replace(/\n/g, ' ')} |\n`; });
+  md += '\n';
+
+  md += `### Ratings y scores\n\n`;
+  md += `| Alternativa |`;
+  escs.forEach(s => { md += ` ${s.nombre} |`; });
+  md += ` Esperado | Peor | Bonus | Final |\n|---|`;
+  escs.forEach(() => { md += '---|'; });
+  md += `---|---|---|---|\n`;
+  rows.forEach(r => {
+    md += `| ${r.alt.nombre}${r.alt.baseline ? ' _(base)_' : ''} |`;
+    escs.forEach(s => { const v = _ratingFor(r.alt.id, s.id); md += ` ${v || '—'} |`; });
+    md += ` ${r.scores.expected == null ? '—' : r.scores.expected.toFixed(2)} | ${r.scores.worst == null ? '—' : r.scores.worst} | ${r.scores.bonus ? '+0.5' : '0'} | **${r.scores.final == null ? '—' : r.scores.final.toFixed(2)}** |\n`;
+  });
+  md += '\n';
+
+  // Lente económica si alguna alternativa tiene datos
+  const econRows = rows.filter(r => r.econ.mvpf != null || r.econ.cea != null);
+  if (econRows.length) {
+    md += `### Lente económica\n\n`;
+    md += `| Alternativa | Costo | Beneficio | MVPF | Outcome | CEA |\n|---|---|---|---|---|---|\n`;
+    econRows.forEach(r => {
+      const e = r.econ;
+      md += `| ${r.alt.nombre} | ${e.c || '—'} | ${e.b || '—'} | ${e.mvpf != null ? e.mvpf.toFixed(2) + (e.mvpf > 1 ? ' (Pareto)' : '') : '—'} | ${e.o || '—'} ${e.u ? `(${e.u})` : ''} | ${e.cea != null ? '$' + e.cea.toLocaleString('es-CO', {maximumFractionDigits:0}) : '—'} |\n`;
+    });
+    md += '\n';
+  }
+
+  md += `## 5. Recomendación\n\n`;
+  if (decAlt) {
+    md += `**Alternativa recomendada:** ${decAlt.nombre}\n\n`;
+    if (STATE.decision?.justificacion) md += `${STATE.decision.justificacion}\n\n`;
+    else md += `_Sin justificación textual. Edita el paso 6 para agregarla._\n\n`;
+  } else {
+    md += `_Aún no se seleccionó alternativa recomendada en el paso 6._\n\n`;
+  }
+
+  md += `---\n\n_Generado con ricardoruiz.co · Lab de Políticas Públicas y Prospectiva._\n\n_Análisis morfológico de Zwicky (Caltech, 1969) + Robust Decision Making de Lempert &amp; Walker (RAND, 2003) + MVPF de Hendren &amp; Sprung-Keyser (NBER, 2020) + Cost-Effectiveness Analysis (J-PAL). Anclaje regulatorio: SINERGIA · DNP._\n`;
+
+  _download(`alternativas-${_slugForFile()}-${new Date().toISOString().slice(0,10)}.md`, md, 'text/markdown;charset=utf-8');
+  showToast('Memo .md descargado.');
+}
+
+function downloadMatrizCSV() {
+  const vars = STATE.variables || [];
+  const alts = STATE.alternativas || [];
+  const escs = STATE.escenarios || [];
+  const rows = _altRankings();
+  function q(s) {
+    const str = String(s == null ? '' : s);
+    if (/[",\n]/.test(str)) return '"' + str.replace(/"/g, '""') + '"';
+    return str;
+  }
+  const header = ['Rank','Alternativa','Baseline','Combinación','Costo','Plazo','Riesgo'];
+  escs.forEach(s => header.push(`Rating ${s.nombre} (${s.prob}%)`));
+  header.push('Score esperado','Peor caso','Bonus robustez','Score final');
+  header.push('Costo total (COP)','Beneficio total (COP)','MVPF','Pareto-superior','Outcome total','Unidad outcome','CEA (COP/unidad)');
+  let csv = header.map(q).join(',') + '\n';
+  rows.forEach(r => {
+    const row = [
+      r.rank, r.alt.nombre, r.alt.baseline ? 'sí' : 'no',
+      _formatCombo(r.alt), r.alt.costo || '', r.alt.plazo || '', r.alt.riesgo || ''
+    ];
+    escs.forEach(s => { const v = _ratingFor(r.alt.id, s.id); row.push(v || ''); });
+    row.push(
+      r.scores.expected == null ? '' : r.scores.expected.toFixed(3),
+      r.scores.worst    == null ? '' : r.scores.worst,
+      r.scores.bonus ? '0.5' : '0',
+      r.scores.final    == null ? '' : r.scores.final.toFixed(3),
+      r.alt.econ?.costo_total || '',
+      r.alt.econ?.beneficio_total || '',
+      r.econ.mvpf == null ? '' : r.econ.mvpf.toFixed(3),
+      r.econ.mvpf != null && r.econ.mvpf > 1 ? 'sí' : 'no',
+      r.alt.econ?.outcome_total || '',
+      r.alt.econ?.unidad_outcome || '',
+      r.econ.cea == null ? '' : r.econ.cea.toFixed(2)
+    );
+    csv += row.map(q).join(',') + '\n';
+  });
+  _download(`alternativas-matriz-${_slugForFile()}-${new Date().toISOString().slice(0,10)}.csv`, csv, 'text/csv;charset=utf-8');
+  showToast('Matriz .csv descargada.');
+}
+
+// Carga jsPDF on-demand
+async function _ensureJsPDF() {
+  if (window.jspdf && window.jspdf.jsPDF) return window.jspdf.jsPDF;
+  await new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('No se pudo cargar jsPDF.'));
+    document.head.appendChild(s);
+  });
+  if (!window.jspdf || !window.jspdf.jsPDF) throw new Error('jsPDF no disponible.');
+  return window.jspdf.jsPDF;
+}
+async function downloadConpesPDF() {
+  let jsPDF;
+  try {
+    showToast('Cargando generador PDF…');
+    jsPDF = await _ensureJsPDF();
+  } catch (e) {
+    showToast('No se pudo cargar el generador PDF (revisa tu conexión).');
+    return;
+  }
+  const doc = new jsPDF({ unit:'mm', format:'a4' });
+  const PW = 210, PH = 297, M = 18;
+  let y = M;
+
+  // Colores estilo CONPES (dark salmón sobre blanco, sin temas para PDF)
+  const ACC = [137, 30, 22];     // oxblood
+  const INK = [26, 22, 16];
+  const INK2 = [90, 84, 72];
+  const RULE = [200, 195, 185];
+
+  function addPageIfNeeded(needed) {
+    if (y + needed > PH - M) { doc.addPage(); y = M; }
+  }
+  function setFont(weight, size) {
+    doc.setFont('helvetica', weight); doc.setFontSize(size);
+  }
+  function drawTitle(t) {
+    setFont('bold', 18); doc.setTextColor(...ACC); doc.text(t, M, y); y += 8;
+    doc.setDrawColor(...ACC); doc.setLineWidth(0.6); doc.line(M, y, PW - M, y); y += 6;
+    doc.setTextColor(...INK);
+  }
+  function drawH2(t) {
+    addPageIfNeeded(12);
+    setFont('bold', 12); doc.setTextColor(...ACC); doc.text(t, M, y); y += 6;
+    doc.setTextColor(...INK);
+  }
+  function drawPara(t, opts) {
+    if (!t) return;
+    setFont('normal', opts?.size || 10);
+    doc.setTextColor(...(opts?.color || INK));
+    const lines = doc.splitTextToSize(String(t), PW - 2 * M);
+    lines.forEach(line => {
+      addPageIfNeeded(5);
+      doc.text(line, M, y); y += 4.5;
+    });
+    y += 1;
+  }
+  function drawBullet(t) {
+    setFont('normal', 10); doc.setTextColor(...INK);
+    const txt = '• ' + String(t);
+    const lines = doc.splitTextToSize(txt, PW - 2 * M - 6);
+    lines.forEach((line, i) => {
+      addPageIfNeeded(5);
+      doc.text(line, M + (i === 0 ? 0 : 4), y); y += 4.5;
+    });
+  }
+  function drawKV(k, v) {
+    setFont('bold', 10); doc.setTextColor(...INK);
+    addPageIfNeeded(5);
+    const klabel = k + ': ';
+    doc.text(klabel, M, y);
+    const klabelWidth = doc.getTextWidth(klabel);
+    setFont('normal', 10); doc.setTextColor(...INK2);
+    const lines = doc.splitTextToSize(String(v || '—'), PW - 2 * M - klabelWidth);
+    if (lines.length === 1) { doc.text(lines[0], M + klabelWidth, y); y += 5; }
+    else {
+      doc.text(lines[0], M + klabelWidth, y); y += 4.5;
+      for (let i = 1; i < lines.length; i++) { addPageIfNeeded(5); doc.text(lines[i], M, y); y += 4.5; }
+      y += 1;
+    }
+  }
+  function drawTableHeader(cols, widths) {
+    setFont('bold', 9); doc.setTextColor(...ACC); doc.setFillColor(245, 240, 230);
+    addPageIfNeeded(8);
+    let x = M;
+    doc.setDrawColor(...RULE); doc.setLineWidth(0.2);
+    cols.forEach((c, i) => {
+      doc.rect(x, y - 4, widths[i], 6, 'FD');
+      doc.text(String(c), x + 1.5, y);
+      x += widths[i];
+    });
+    y += 4;
+    doc.setTextColor(...INK);
+  }
+  function drawTableRow(vals, widths, opts) {
+    setFont(opts?.bold ? 'bold' : 'normal', 9);
+    doc.setTextColor(...(opts?.highlight ? ACC : INK));
+    if (opts?.highlight) doc.setFillColor(252, 240, 233);
+    addPageIfNeeded(8);
+    let x = M; let maxLines = 1;
+    const cellLines = vals.map((v, i) => doc.splitTextToSize(String(v == null ? '' : v), widths[i] - 3));
+    cellLines.forEach(arr => { if (arr.length > maxLines) maxLines = arr.length; });
+    const rowH = Math.max(6, maxLines * 4 + 2);
+    addPageIfNeeded(rowH);
+    cellLines.forEach((arr, i) => {
+      doc.setDrawColor(...RULE);
+      doc.rect(x, y - 4, widths[i], rowH, opts?.highlight ? 'FD' : 'D');
+      arr.forEach((line, li) => {
+        doc.text(line, x + 1.5, y + li * 4);
+      });
+      x += widths[i];
+    });
+    y += rowH - 2;
+  }
+
+  // Header
+  drawTitle('Ficha CONPES light · alternativas de política');
+  setFont('normal', 9); doc.setTextColor(...INK2);
+  const today = new Date().toLocaleDateString('es-CO', { year:'numeric', month:'long', day:'numeric' });
+  doc.text(today + '  ·  ricardoruiz.co · Lab de Políticas Públicas y Prospectiva', M, y); y += 7;
+  doc.setTextColor(...INK);
+
+  // 1. Problema
+  drawH2('1. Problema público');
+  drawPara(STATE.contexto.enunciado_problema || '— sin enunciado registrado —');
+
+  // 2. Variables y opciones (resumen)
+  drawH2('2. Variables de decisión y opciones consideradas');
+  const vars = STATE.variables || [];
+  if (vars.length === 0) drawPara('— sin variables definidas —', { color: INK2 });
+  else vars.forEach(v => {
+    setFont('bold', 10); doc.setTextColor(...INK);
+    addPageIfNeeded(5);
+    doc.text('• ' + v.nombre + ' (' + _varTipoLabel(v.tipo || 'otra') + ')', M, y); y += 5;
+    setFont('normal', 9); doc.setTextColor(...INK2);
+    const opts = _optsArr(v.id);
+    if (opts.length === 0) { addPageIfNeeded(5); doc.text('   — sin opciones —', M, y); y += 5; }
+    else opts.forEach(o => {
+      const ls = doc.splitTextToSize('   – ' + o, PW - 2 * M);
+      ls.forEach(l => { addPageIfNeeded(5); doc.text(l, M, y); y += 4.5; });
+    });
+    y += 1;
+  });
+
+  // 3. Alternativas
+  addPageIfNeeded(20);
+  drawH2('3. Alternativas consideradas');
+  const alts = STATE.alternativas || [];
+  alts.forEach((a, i) => {
+    setFont('bold', 11); doc.setTextColor(...ACC);
+    addPageIfNeeded(6);
+    doc.text(`${i + 1}. ${a.nombre}${a.baseline ? '  (baseline)' : ''}`, M, y); y += 5;
+    doc.setTextColor(...INK);
+    drawKV('Combinación', _formatCombo(a));
+    if (a.desc) drawKV('Descripción', a.desc);
+    if (a.supuestos) drawKV('Supuestos críticos', a.supuestos);
+    const meta = [];
+    if (a.costo) meta.push(`Costo: ${a.costo}`);
+    if (a.plazo) meta.push(`Plazo: ${a.plazo}`);
+    if (a.riesgo) meta.push(`Riesgo: ${a.riesgo}`);
+    if (meta.length) drawPara(meta.join('  ·  '), { color: INK2 });
+    y += 2;
+  });
+
+  // 4. Robustez
+  addPageIfNeeded(40);
+  drawH2('4. Análisis de robustez');
+  const escs = STATE.escenarios || [];
+  drawPara(`Cuatro escenarios pre-definidos con probabilidad subjetiva. Score esperado = Σ (prob × rating). Bonus +0.5 si el peor caso ≥ 3.`, { color: INK2 });
+  // Tabla resumen
+  const rows = _altRankings();
+  const escNames = escs.map(s => `${s.nombre.slice(0,4)} ${s.prob}%`);
+  const widths = [50, ...escs.map(() => 16), 14, 14, 14];
+  addPageIfNeeded(8);
+  drawTableHeader(['Alternativa', ...escNames, 'Esp.', 'Peor', 'Final'], widths);
+  rows.forEach(r => {
+    const cells = [r.alt.nombre + (r.alt.baseline ? ' (base)' : '')];
+    escs.forEach(s => { const v = _ratingFor(r.alt.id, s.id); cells.push(v ? String(v) : '—'); });
+    cells.push(
+      r.scores.expected == null ? '—' : r.scores.expected.toFixed(2),
+      r.scores.worst    == null ? '—' : String(r.scores.worst),
+      r.scores.final    == null ? '—' : r.scores.final.toFixed(2)
+    );
+    const isWinner = STATE.decision?.altId_recomendada
+      ? r.alt.id === STATE.decision.altId_recomendada
+      : (r.rank === 1 && r.scores.final != null);
+    drawTableRow(cells, widths, { highlight: isWinner, bold: isWinner });
+  });
+  y += 2;
+
+  // Lente económica si aplica
+  const econRows = rows.filter(r => r.econ.mvpf != null || r.econ.cea != null);
+  if (econRows.length) {
+    addPageIfNeeded(20);
+    drawH2('5. Lente económica · MVPF y CEA');
+    drawPara('MVPF (Marginal Value of Public Funds, Hendren & Sprung-Keyser 2020): beneficio/costo. MVPF > 1 implica política Pareto-superior. CEA (J-PAL): costo por unidad de outcome.', { color: INK2 });
+    const ew = [60, 26, 26, 26, 26, 26];
+    drawTableHeader(['Alternativa','Costo','Beneficio','MVPF','Outcome','CEA'], ew);
+    econRows.forEach(r => {
+      const cells = [
+        r.alt.nombre,
+        r.alt.econ?.costo_total || '—',
+        r.alt.econ?.beneficio_total || '—',
+        r.econ.mvpf == null ? '—' : r.econ.mvpf.toFixed(2) + (r.econ.mvpf > 1 ? ' ✓' : ''),
+        (r.alt.econ?.outcome_total || '—') + (r.alt.econ?.unidad_outcome ? ` ${r.alt.econ.unidad_outcome}`.slice(0,18) : ''),
+        r.econ.cea == null ? '—' : r.econ.cea.toLocaleString('es-CO', {maximumFractionDigits:0})
+      ];
+      drawTableRow(cells, ew, { highlight: r.econ.mvpf != null && r.econ.mvpf > 1 });
+    });
+    y += 2;
+  }
+
+  // 6. Recomendación
+  addPageIfNeeded(20);
+  drawH2(econRows.length ? '6. Recomendación' : '5. Recomendación');
+  const decAlt = (STATE.decision?.altId_recomendada)
+    ? alts.find(a => a.id === STATE.decision.altId_recomendada)
+    : (rows[0] ? rows[0].alt : null);
+  if (decAlt) {
+    setFont('bold', 11); doc.setTextColor(...ACC);
+    addPageIfNeeded(6);
+    doc.text(decAlt.nombre, M, y); y += 5;
+    doc.setTextColor(...INK);
+    if (STATE.decision?.justificacion) drawPara(STATE.decision.justificacion);
+    else drawPara('— sin justificación textual aún —', { color: INK2 });
+  } else {
+    drawPara('— aún no se seleccionó alternativa recomendada —', { color: INK2 });
+  }
+
+  // Footer metodológico (página final)
+  addPageIfNeeded(30);
+  y = PH - M - 22;
+  doc.setDrawColor(...RULE); doc.setLineWidth(0.3); doc.line(M, y, PW - M, y); y += 5;
+  setFont('italic', 8); doc.setTextColor(...INK2);
+  const footer = 'Método: análisis morfológico de Zwicky (Caltech, 1969) + Robust Decision Making de Lempert & Walker (RAND, 2003) + General Morphological Analysis de Ritchey (Swedish Morphological Society) + Decision Analysis de Howard (Stanford, 1968) + Value-Focused Thinking de Keeney (USC, 1992). Lente económica: MVPF de Hendren & Sprung-Keyser (NBER, 2020) y CEA de J-PAL. Anclaje regulatorio: SINERGIA · DNP (formato CONPES light, no es CONPES oficial).';
+  const flines = doc.splitTextToSize(footer, PW - 2 * M);
+  flines.forEach(l => { doc.text(l, M, y); y += 3.5; });
+  setFont('normal', 8); doc.setTextColor(...INK2);
+  y += 2; doc.text('Generado con ricardoruiz.co · Lab de Políticas Públicas y Prospectiva  ·  ' + today, M, y);
+
+  const filename = `alternativas-CONPES-${_slugForFile()}-${new Date().toISOString().slice(0,10)}.pdf`;
+  doc.save(filename);
+  showToast('PDF CONPES light generado.');
+}
+
+// ── Envío a Problema Público (C.10 lo cierra del lado de pp) ─────────────
+function enviarAProblemaPublico() {
+  const alts = STATE.alternativas || [];
+  if (alts.length === 0) { showToast('No hay alternativas para enviar.'); return; }
+  // Construir payload compatible con STATE.alternativas de problema-publico
+  // shape: [{ nombre, desc, supuestos, costo, plazo, baseline }]
+  const payload = {
+    source: 'alternativas.html',
+    timestamp: new Date().toISOString(),
+    contexto: STATE.contexto.enunciado_problema || '',
+    alternativas: alts.map(a => ({
+      nombre: a.nombre,
+      desc: a.desc || '',
+      supuestos: a.supuestos || '',
+      costo: a.costo || '',
+      plazo: a.plazo || '',
+      baseline: !!a.baseline
+    })),
+    decision: {
+      altId_recomendada: STATE.decision?.altId_recomendada || '',
+      justificacion: STATE.decision?.justificacion || ''
+    }
+  };
+  try {
+    localStorage.setItem('alt-import-to-pp', JSON.stringify(payload));
+    if (!confirm(`Se enviaron ${alts.length} alternativas a Problema Público. ¿Abrir el módulo ahora? (Se conservan tu sesión actual de alternativas.)`)) {
+      showToast('Alternativas listas en cola para Problema Público.');
+      return;
+    }
+    window.location.href = 'problema-publico.html?import=alt';
+  } catch (e) {
+    showToast('No se pudo enviar (storage lleno o privado).');
+  }
+}
+
+// ── IA · narrativa-alternativas (Premium+) ───────────────────────────────
 async function iaNarrativa() {
-  // Stub Premium+ · implementación completa en C.6
   if (!AUTH.isLogged) { openModal('modal-login'); return; }
   if (!_userHasTier(2)) {
     iaShowGate('ia-narr-result', 'Premium', 'La narrativa interpretativa con IA está disponible en plan Premium o superior.');
     return;
   }
-  showToast('Narrativa IA llega en C.6');
+  const alts = STATE.alternativas || [];
+  if (alts.length < 2) { showToast('Necesitas al menos una alternativa (no baseline) calificada antes de generar la narrativa.'); return; }
+  const decAlt = (STATE.decision?.altId_recomendada)
+    ? alts.find(a => a.id === STATE.decision.altId_recomendada)
+    : null;
+  if (!decAlt) {
+    showToast('Selecciona una alternativa recomendada en el paso 6 antes de generar la narrativa.');
+    return;
+  }
+  const btn = document.getElementById('ia-narr-btn');
+  const out = document.getElementById('ia-narr-result');
+  btn.disabled = true; btn.textContent = 'Redactando…';
+  out.style.display = 'block';
+  out.innerHTML = '<div class="ia-result-eyebrow">Copiloto · narrativa de alternativas</div><div class="ia-loading"><span class="ia-loading-dot"></span> Redactando lectura interpretativa de tu ranking. ~15-25 segundos.</div>';
+  // Payload: contexto + variables + alternativas con su combo legible + ranking + decisión
+  const vars = STATE.variables || [];
+  const rows = _altRankings();
+  const altsForIA = rows.map(r => ({
+    id: r.alt.id,
+    nombre: r.alt.nombre,
+    baseline: !!r.alt.baseline,
+    rank: r.rank,
+    desc: r.alt.desc || '',
+    combo: Object.fromEntries(vars.filter(v => r.alt.combo && r.alt.combo[v.id] != null).map(v => [v.nombre, _optsArr(v.id)[r.alt.combo[v.id]]])),
+    score_esperado: r.scores.expected == null ? null : Number(r.scores.expected.toFixed(2)),
+    peor_caso: r.scores.worst,
+    bonus: r.scores.bonus,
+    score_final: r.scores.final == null ? null : Number(r.scores.final.toFixed(2)),
+    mvpf: r.econ.mvpf == null ? null : Number(r.econ.mvpf.toFixed(2)),
+    cea: r.econ.cea == null ? null : Number(r.econ.cea.toFixed(2)),
+    pareto: r.econ.mvpf != null && r.econ.mvpf > 1
+  }));
+  const r = await apiCall('/alt/copiloto', { method:'POST', body:{ action:'narrativa-alternativas', payload:{
+    contexto: STATE.contexto,
+    variables: vars.map(v => ({ nombre:v.nombre, tipo:v.tipo })),
+    escenarios: (STATE.escenarios || []).map(s => ({ nombre:s.nombre, prob:s.prob, descripcion:s.descripcion })),
+    alternativas: altsForIA,
+    decision: {
+      altId_recomendada: STATE.decision?.altId_recomendada || '',
+      justificacion: STATE.decision?.justificacion || ''
+    }
+  } } });
+  btn.disabled = false; btn.textContent = 'Generar narrativa';
+  if (!r.ok) {
+    out.innerHTML = `<div class="ia-result-eyebrow">Copiloto · error</div><p>${escapeHtml(r.data?.error || 'No se pudo conectar.')}</p>`;
+    return;
+  }
+  iaRenderNarrativa(r.data);
+}
+function iaRenderNarrativa(data) {
+  const out = document.getElementById('ia-narr-result');
+  const cachedTag = data.cached ? '<span class="ia-cached">caché</span>' : '';
+  let html = `<div class="ia-result-eyebrow">Copiloto · narrativa de alternativas${cachedTag}</div>`;
+  if (data.lectura) html += `<h3>Lectura del ranking</h3><p>${escapeHtml(data.lectura).replace(/\n\n+/g, '</p><p>')}</p>`;
+  if (Array.isArray(data.fortalezas) && data.fortalezas.length) {
+    html += '<h3>Fortalezas de la alternativa recomendada</h3><ul>';
+    data.fortalezas.forEach(s => { html += `<li>${escapeHtml(s)}</li>`; });
+    html += '</ul>';
+  }
+  if (data.por_que_no_la_siguiente) {
+    html += `<h3>Por qué esta y no la siguiente en ranking</h3><p>${escapeHtml(data.por_que_no_la_siguiente)}</p>`;
+  }
+  if (Array.isArray(data.supuestos_criticos) && data.supuestos_criticos.length) {
+    html += '<h3>Supuestos críticos que conviene monitorear</h3><ul>';
+    data.supuestos_criticos.forEach(s => { html += `<li>${escapeHtml(s)}</li>`; });
+    html += '</ul>';
+  }
+  if (Array.isArray(data.condiciones_reconsiderar) && data.condiciones_reconsiderar.length) {
+    html += '<h3>Condiciones para reconsiderar</h3><ul>';
+    data.condiciones_reconsiderar.forEach(s => { html += `<li>${escapeHtml(s)}</li>`; });
+    html += '</ul>';
+  }
+  out.innerHTML = html;
 }
 
 // ═════════════════════════════════════════════════════════════════════════
