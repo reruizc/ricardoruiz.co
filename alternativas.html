@@ -1,0 +1,3228 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Alternativas de Política · Ricardo.Ruiz</title>
+<meta name="description" content="Construye alternativas de política pública con el análisis morfológico de Zwicky y robust decision making (Lempert · RAND). Variables de decisión, opciones, matriz morfológica, escenarios y selección. Lab de Políticas Públicas y Prospectiva." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper:#1a1610; --paper-2:#221d15; --paper-3:#2a241b;
+  --ink:#f4f3ef; --ink-2:#b8b1a0; --ink-3:#807a6c;
+  --rule:#f4f3ef1c; --rule-strong:#f4f3ef38;
+  --accent:#d96a50; --accent-2:#e08266;
+  --accent-soft:#d96a5018; --accent-tint:#d96a5036;
+  --gold:#d6a83a; --on-accent:#14110a;
+  --green:#6fa07a; --amber:#d6a83a; --danger:#d96a50;
+  --sans:'Familjen Grotesk',system-ui,sans-serif;
+  --italic:'Petrona',Georgia,serif;
+  --mono:'Space Mono',ui-monospace,monospace;
+  --display:'Syne',sans-serif;
+}
+body.day-mode {
+  --paper:#f4f3ef; --paper-2:#ecebe5; --paper-3:#e0ddd2;
+  --ink:#14110a; --ink-2:#5a5448; --ink-3:#948e80;
+  --rule:#14110a1f; --rule-strong:#14110a40;
+  --accent:#8a1e16; --accent-2:#a02a20;
+  --accent-soft:#8a1e161a; --accent-tint:#8a1e1633;
+  --gold:#8a6a1a; --on-accent:#f4f3ef;
+  --green:#2f6b3f; --amber:#8a6a1a; --danger:#b03524;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html { scroll-behavior:smooth; }
+body {
+  background:var(--paper); color:var(--ink);
+  font-family:var(--sans); font-size:17px; line-height:1.55;
+  min-height:100vh; overflow-x:hidden; cursor:none;
+  transition:background .35s, color .35s;
+}
+a { color:inherit; text-decoration:none; }
+button { font:inherit; color:inherit; background:none; border:none; cursor:none; }
+::selection { background:var(--accent); color:var(--on-accent); }
+body.day-mode::before {
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image:radial-gradient(rgba(20,17,10,.035) 1px, transparent 1.4px);
+  background-size:4px 4px; opacity:.9; mix-blend-mode:multiply;
+}
+.cursor { position:fixed; width:12px; height:12px; background:var(--accent); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s, background .2s; transform:translate(-50%,-50%); }
+.cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--accent); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s, opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+
+/* Topbar */
+.topbar {
+  position:sticky; top:0; z-index:60;
+  display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:1.5rem;
+  padding:1rem 1.75rem;
+  background:var(--paper); border-bottom:1px solid var(--rule); backdrop-filter:blur(8px);
+}
+.topbar-left,.topbar-center,.topbar-right { display:flex; align-items:center; gap:1.1rem; }
+.topbar-right { justify-content:flex-end; }
+.btn-back {
+  display:inline-flex; align-items:center; gap:.55rem;
+  font-family:var(--sans); font-size:14px; font-weight:500; letter-spacing:.04em;
+  padding:.5rem .9rem; border:1px solid var(--rule-strong); transition:background .2s, border-color .2s;
+}
+.btn-back:hover { background:var(--paper-2); border-color:var(--ink); }
+.theme-btn {
+  font-family:var(--mono); font-size:12px; font-weight:700; color:var(--ink-2);
+  padding:.45rem .8rem; border:1px solid var(--rule-strong);
+  transition:color .2s, border-color .2s;
+}
+.theme-btn:hover { color:var(--ink); border-color:var(--ink); }
+.logo-link { display:inline-flex; align-items:center; gap:.55rem; opacity:.9; }
+.logo-link:hover { opacity:1; }
+.logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
+.logo-bar { width:5px; background:var(--accent); border-radius:1px 1px 0 0; opacity:.9; }
+.logo-text { font-family:var(--display); font-weight:800; font-size:clamp(1.05rem,2vw,1.4rem); letter-spacing:-.03em; line-height:1; }
+.logo-text span { color:var(--accent); }
+
+.page {
+  position:relative; z-index:1;
+  max-width:980px; width:100%; margin:0 auto;
+  padding:2.4rem 1.75rem 5rem;
+}
+@media (max-width:720px) {
+  .page { padding:1.6rem 1.1rem 3rem; }
+  .topbar { grid-template-columns:1fr auto; padding:.85rem 1rem; }
+  .topbar-center { display:none; }
+  .topbar-right .logo-link { display:none; }
+}
+.crumb {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3); margin-bottom:1.8rem;
+}
+.crumb a { color:var(--ink-3); transition:color .2s; }
+.crumb a:hover { color:var(--accent); }
+.crumb .sep { margin:0 .55rem; opacity:.55; }
+
+/* Welcome */
+.welcome { text-align:center; padding:1.5rem 0 2rem; }
+.eyebrow {
+  font-family:var(--mono); font-size:12px; letter-spacing:.22em;
+  text-transform:uppercase; color:var(--accent); font-weight:700; margin-bottom:1.4rem;
+}
+.welcome-title {
+  font-family:var(--sans); font-weight:700;
+  font-size:clamp(2rem,5vw,3rem); letter-spacing:-.025em; line-height:1.1;
+  max-width:24ch; margin:0 auto 1.4rem;
+}
+.welcome-title em { font-family:var(--italic); font-style:italic; font-weight:400; color:var(--accent); }
+.welcome-sub {
+  font-family:var(--sans); font-size:clamp(1rem,1.5vw,1.18rem); line-height:1.55;
+  color:var(--ink-2); max-width:54ch; margin:0 auto 2rem;
+}
+.welcome-hint {
+  font-family:var(--mono); font-size:12px; letter-spacing:.04em; color:var(--ink-3);
+  max-width:54ch; margin:0 auto 2rem; line-height:1.6;
+}
+
+.accordion-stack {
+  display:flex; flex-direction:column; gap:.5rem;
+  max-width:640px; margin:2.6rem auto 2.4rem; text-align:left;
+}
+.accordion {
+  border:1px solid var(--rule-strong); background:var(--paper-2);
+  transition:background .2s, border-color .2s;
+}
+.accordion[open] { border-color:var(--accent-tint); background:var(--paper-3); }
+.accordion summary {
+  display:flex; align-items:center; justify-content:space-between; gap:1rem;
+  padding:1rem 1.2rem; list-style:none; cursor:none;
+  font-family:var(--sans); font-weight:600; font-size:.98rem;
+  user-select:none;
+}
+.accordion summary::-webkit-details-marker { display:none; }
+.accordion summary::after {
+  content:"+"; font-family:var(--mono); font-size:1.2rem; color:var(--accent);
+  width:18px; height:18px; display:flex; align-items:center; justify-content:center;
+  transition:transform .2s;
+}
+.accordion[open] summary::after { content:"−"; }
+.accordion summary .acc-num {
+  font-family:var(--mono); font-size:11px; color:var(--ink-3);
+  letter-spacing:.12em; margin-right:.9rem; font-weight:400;
+}
+.accordion-body {
+  padding:0 1.2rem 1.2rem;
+  font-family:var(--italic); font-style:italic; font-size:1rem; line-height:1.6; color:var(--ink-2);
+}
+.accordion-body em { color:var(--accent); }
+
+/* Botones */
+.btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+  font-family:var(--sans); font-weight:600; font-size:.98rem;
+  padding:.95rem 1.8rem;
+  background:var(--accent); color:var(--on-accent); border:none;
+  transition:background .2s, transform .1s;
+}
+.btn:hover { background:var(--accent-2); }
+.btn:active { transform:scale(.98); }
+.btn[disabled], .btn.disabled { opacity:.35; pointer-events:none; }
+.btn-ghost {
+  background:transparent; color:var(--ink-2);
+  border:1px solid var(--rule-strong);
+  padding:.85rem 1.4rem;
+}
+.btn-ghost:hover { color:var(--ink); border-color:var(--ink); background:var(--paper-2); }
+.btn-big { font-size:1.05rem; padding:1.15rem 2.4rem; letter-spacing:.02em; }
+
+.is-hidden { display:none !important; }
+
+/* Method link */
+.method-link {
+  display:inline-flex; align-items:center; gap:.4rem;
+  font-family:var(--mono); font-size:12px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--ink-2);
+  padding:.55rem .95rem; border:1px solid var(--rule-strong);
+  transition:color .2s, border-color .2s;
+}
+.method-link:hover { color:var(--accent); border-color:var(--accent); }
+
+/* Section head */
+.section-head {
+  display:flex; align-items:baseline; justify-content:space-between;
+  gap:1rem; margin-bottom:1.2rem; flex-wrap:wrap;
+}
+.section-head h2 {
+  font-family:var(--sans); font-weight:700; font-size:1.55rem; letter-spacing:-.015em;
+}
+.section-head h2 .num {
+  font-family:var(--mono); font-size:.65em; letter-spacing:.12em;
+  color:var(--ink-3); margin-right:.5rem; font-weight:400;
+}
+.section-head .meta {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.08em; color:var(--ink-3);
+}
+.section-desc {
+  font-family:var(--italic); font-style:italic; font-size:1.02rem; line-height:1.55;
+  color:var(--ink-2); max-width:60ch; margin-bottom:1.6rem;
+}
+
+/* Stage intro banner */
+.stage-intro {
+  background:var(--paper-2); border:1px solid var(--rule);
+  border-left:3px solid var(--accent);
+  padding:1.1rem 1.4rem; margin-bottom:1.6rem;
+}
+.stage-intro p {
+  font-family:var(--sans); font-size:.96rem; line-height:1.55; color:var(--ink);
+}
+.stage-intro p b { color:var(--accent); font-weight:600; }
+.stage-intro p em { font-family:var(--italic); font-style:italic; color:var(--ink-2); }
+
+/* Steps row */
+.steps-row {
+  display:flex; gap:.4rem; margin-bottom:2rem;
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.1em;
+  text-transform:uppercase;
+}
+.step-pill {
+  flex:1; padding:.65rem .55rem;
+  text-align:center;
+  background:var(--paper-2); color:var(--ink-3);
+  border:1px solid var(--rule-strong);
+  position:relative;
+}
+.step-pill .step-n { color:var(--accent); font-weight:700; margin-right:.45rem; }
+.step-pill.done { color:var(--ink-2); }
+.step-pill.done::after {
+  content:"✓"; position:absolute; right:.55rem; top:50%; transform:translateY(-50%);
+  color:var(--green); font-size:1rem; font-family:var(--sans);
+}
+.step-pill.active { color:var(--ink); background:var(--accent-soft); border-color:var(--accent); }
+@media (max-width:720px) { .steps-row { display:none; } }
+
+/* Form fields */
+.field { margin-bottom:1.4rem; }
+.field-label {
+  display:block;
+  font-family:var(--mono); font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3); margin-bottom:.5rem;
+}
+.field-label .req { color:var(--accent); }
+.field-hint {
+  font-family:var(--italic); font-style:italic; font-size:.86rem;
+  color:var(--ink-3); margin-top:.4rem; line-height:1.5;
+}
+.field input[type="text"], .field input[type="number"], .field input[type="url"], .field textarea, .field select {
+  width:100%;
+  font-family:var(--sans); font-size:.96rem; line-height:1.5;
+  padding:.7rem .9rem;
+  background:var(--paper-2); color:var(--ink);
+  border:1px solid var(--rule-strong); outline:none;
+  transition:border-color .15s;
+}
+.field input:focus, .field textarea:focus, .field select:focus { border-color:var(--accent); }
+.field textarea { min-height:120px; resize:vertical; line-height:1.55; }
+.field-row {
+  display:grid; grid-template-columns:1fr 1fr; gap:1rem;
+}
+@media (max-width:560px) { .field-row { grid-template-columns:1fr; } }
+
+/* Pill group */
+.pill-group { display:flex; gap:.45rem; flex-wrap:wrap; }
+.pill {
+  font-family:var(--sans); font-weight:500; font-size:.92rem;
+  padding:.55rem 1.1rem;
+  background:var(--paper-2); color:var(--ink-2);
+  border:1px solid var(--rule-strong);
+  transition:border-color .15s, color .15s, background .15s;
+}
+.pill:hover { color:var(--ink); border-color:var(--ink); }
+.pill.sel {
+  background:var(--accent-soft); color:var(--accent);
+  border-color:var(--accent); font-weight:700;
+}
+
+.actions {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:.8rem; margin-top:1.8rem; flex-wrap:wrap;
+}
+.actions .right-group { display:flex; gap:.6rem; flex-wrap:wrap; }
+
+.placeholder-box {
+  padding:2.2rem 1.4rem;
+  background:var(--paper-2); border:1px dashed var(--rule-strong);
+  font-family:var(--italic); font-style:italic; font-size:.94rem;
+  color:var(--ink-3); text-align:center;
+  margin-bottom:1.4rem;
+}
+.placeholder-box b { font-family:var(--mono); font-style:normal; color:var(--accent); font-size:.85rem; letter-spacing:.1em; text-transform:uppercase; display:block; margin-bottom:.5rem; }
+
+/* ─── Variables de decisión (C.1) ────────────────────────────────────────── */
+.var-grid {
+  display:flex; flex-direction:column; gap:.55rem; margin-bottom:1rem;
+}
+.var-row {
+  display:grid; grid-template-columns:1fr auto auto; gap:.55rem;
+  align-items:center;
+  padding:.7rem .85rem;
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+}
+.var-row .var-name {
+  font-family:var(--sans); font-size:.95rem; color:var(--ink); outline:none;
+}
+.var-row select.var-tipo {
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.06em;
+  padding:.35rem .55rem; background:var(--paper); color:var(--accent);
+  border:1px solid var(--accent-tint); outline:none;
+}
+.var-row .var-del {
+  font-family:var(--mono); font-size:1rem; color:var(--ink-3); padding:0 .3rem;
+  transition:color .15s;
+}
+.var-row .var-del:hover { color:var(--danger); }
+
+/* ─── Opciones por variable (C.2) ────────────────────────────────────────── */
+.opt-panel {
+  background:var(--paper-2); border:1px solid var(--rule);
+  border-left:3px solid var(--accent);
+  padding:1.05rem 1.25rem; margin-bottom:.85rem;
+}
+.opt-panel .op-head {
+  display:flex; align-items:baseline; justify-content:space-between; gap:1rem;
+  margin-bottom:.55rem; flex-wrap:wrap;
+}
+.opt-panel .op-name {
+  font-family:var(--sans); font-weight:700; font-size:1.02rem; color:var(--ink);
+}
+.opt-panel .op-tipo {
+  font-family:var(--mono); font-size:10px; letter-spacing:.1em;
+  color:var(--ink-3); text-transform:uppercase;
+}
+.opt-list { display:flex; flex-direction:column; gap:.4rem; margin-bottom:.55rem; }
+.opt-row {
+  display:flex; align-items:center; gap:.5rem;
+  padding:.45rem .65rem;
+  background:var(--paper); border:1px solid var(--rule);
+}
+.opt-row .op-n {
+  font-family:var(--mono); font-size:10px; color:var(--accent); font-weight:700;
+}
+.opt-row span[contenteditable] {
+  flex:1; font-family:var(--sans); font-size:.92rem; color:var(--ink); outline:none;
+}
+.opt-row .op-del {
+  font-family:var(--mono); font-size:.9rem; color:var(--ink-3); padding:0 .2rem;
+}
+.opt-row .op-del:hover { color:var(--danger); }
+.opt-panel .op-add {
+  display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.4rem;
+}
+.opt-panel .op-add input {
+  flex:1; min-width:200px;
+  font-family:var(--sans); font-size:.9rem;
+  padding:.55rem .75rem;
+  background:var(--paper); color:var(--ink);
+  border:1px solid var(--rule-strong); outline:none;
+}
+
+/* ─── Matriz morfológica (C.3) ──────────────────────────────────────────── */
+.morph-wrap {
+  background:var(--paper-2); border:1px solid var(--rule);
+  padding:1rem; margin-bottom:1.2rem;
+  overflow-x:auto;
+}
+.morph-grid {
+  display:grid; gap:.4rem;
+  /* grid-template-columns set inline dinámicamente: 1 col por variable */
+}
+.morph-col-head {
+  font-family:var(--mono); font-size:10px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--accent); font-weight:700;
+  padding:.55rem .65rem; background:var(--paper-3);
+  border:1px solid var(--rule-strong);
+  text-align:center;
+  min-height:54px; display:flex; align-items:center; justify-content:center;
+}
+.morph-cell {
+  padding:.55rem .65rem;
+  background:var(--paper); border:1px solid var(--rule-strong);
+  font-family:var(--sans); font-size:.85rem; line-height:1.35;
+  cursor:none; transition:border-color .15s, background .15s, color .15s;
+  min-height:54px; display:flex; align-items:center; justify-content:center;
+  text-align:center; position:relative;
+}
+.morph-cell:hover { border-color:var(--accent); }
+.morph-cell.sel {
+  background:var(--accent-soft); border-color:var(--accent);
+  font-weight:600; color:var(--accent);
+}
+.morph-cell.sel::after {
+  content:"●"; position:absolute; top:.25rem; right:.4rem;
+  color:var(--accent); font-size:.65rem;
+}
+.morph-cell.incompat {
+  background:rgba(217,106,80,0.10); color:var(--ink-3);
+  text-decoration:line-through; opacity:.65;
+}
+.morph-cell.empty {
+  background:transparent; border:1px dashed var(--rule);
+  color:var(--ink-3); font-family:var(--italic); font-style:italic;
+}
+.morph-summary {
+  display:flex; align-items:center; gap:.85rem; flex-wrap:wrap;
+  padding:.7rem 1rem; background:var(--paper-3); border:1px solid var(--rule);
+  font-family:var(--mono); font-size:11.5px; color:var(--ink-2);
+}
+.morph-summary b { color:var(--accent); font-weight:700; }
+.morph-modes {
+  display:flex; gap:.4rem; margin-bottom:.85rem;
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.06em;
+  text-transform:uppercase;
+}
+.morph-modes .mm {
+  padding:.4rem .8rem;
+  background:var(--paper-2); color:var(--ink-3);
+  border:1px solid var(--rule-strong);
+}
+.morph-modes .mm.sel {
+  background:var(--accent-soft); color:var(--accent); border-color:var(--accent); font-weight:700;
+}
+
+/* ─── Alternativas ensambladas (C.4) ────────────────────────────────────── */
+.alt-card {
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+  border-left:3px solid var(--accent);
+  padding:1.1rem 1.3rem; margin-bottom:.85rem;
+}
+.alt-card.baseline {
+  border-left-color:var(--ink-3);
+  background:var(--paper-3);
+}
+.alt-card .alt-head {
+  display:flex; align-items:baseline; justify-content:space-between; gap:1rem;
+  margin-bottom:.45rem; flex-wrap:wrap;
+}
+.alt-card .alt-name {
+  font-family:var(--sans); font-weight:700; font-size:1.08rem; color:var(--ink);
+  outline:none;
+}
+.alt-card.baseline .alt-name { color:var(--ink-2); }
+.alt-card .alt-tag {
+  font-family:var(--mono); font-size:10px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--ink-3); padding:.2rem .55rem;
+  background:var(--paper-3); border:1px solid var(--rule);
+}
+.alt-card.baseline .alt-tag { color:var(--ink-2); background:var(--paper); }
+.alt-card .alt-combo {
+  font-family:var(--mono); font-size:11px; letter-spacing:.04em;
+  color:var(--ink-3); margin-bottom:.55rem; line-height:1.45;
+}
+.alt-card .alt-combo b { color:var(--accent); }
+.alt-card textarea {
+  width:100%; resize:vertical;
+  font-family:var(--sans); font-size:.92rem; line-height:1.5;
+  padding:.55rem .75rem; min-height:60px;
+  background:var(--paper); color:var(--ink);
+  border:1px solid var(--rule); outline:none;
+  transition:border-color .15s;
+}
+.alt-card textarea:focus { border-color:var(--accent); }
+.alt-card .alt-row {
+  display:grid; grid-template-columns:1fr 1fr 1fr; gap:.6rem .9rem;
+  margin-top:.6rem;
+}
+@media (max-width:640px) { .alt-card .alt-row { grid-template-columns:1fr; } }
+.alt-card .alt-row .ar-field {
+  display:flex; flex-direction:column; gap:.2rem;
+}
+.alt-card .alt-row label {
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--accent); font-weight:700;
+}
+.alt-card .alt-row input {
+  font-family:var(--sans); font-size:.88rem;
+  padding:.4rem .55rem;
+  background:var(--paper); color:var(--ink);
+  border:1px solid var(--rule); outline:none;
+}
+.alt-card .alt-row input:focus { border-color:var(--accent); }
+.alt-card .alt-actions {
+  display:flex; gap:.5rem; margin-top:.7rem; align-items:center; flex-wrap:wrap;
+}
+.alt-card .alt-del {
+  font-family:var(--mono); font-size:11px; letter-spacing:.06em;
+  padding:.35rem .7rem; background:transparent; color:var(--ink-3);
+  border:1px solid var(--rule-strong);
+  transition:border-color .15s, color .15s;
+}
+.alt-card .alt-del:hover { border-color:var(--danger); color:var(--danger); }
+
+/* ─── Escenarios + robustez (C.5) ───────────────────────────────────────── */
+.scen-grid {
+  display:grid; grid-template-columns:repeat(2,1fr); gap:.7rem;
+  margin-bottom:1.2rem;
+}
+@media (max-width:640px) { .scen-grid { grid-template-columns:1fr; } }
+.scen-card {
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+  border-left:3px solid var(--accent);
+  padding:.95rem 1.1rem;
+}
+.scen-card.baseline { border-left-color:var(--ink-2); }
+.scen-card.optimista { border-left-color:var(--green); }
+.scen-card.pesimista { border-left-color:var(--amber); }
+.scen-card.disruptivo { border-left-color:var(--danger); }
+.scen-card .sc-head {
+  display:flex; align-items:baseline; justify-content:space-between; gap:.6rem;
+  margin-bottom:.4rem;
+}
+.scen-card .sc-name {
+  font-family:var(--sans); font-weight:700; font-size:.98rem; color:var(--ink);
+}
+.scen-card .sc-prob-wrap {
+  display:flex; align-items:center; gap:.35rem;
+}
+.scen-card .sc-prob {
+  font-family:var(--mono); font-size:.85rem;
+  width:55px; text-align:right;
+  padding:.3rem .4rem; background:var(--paper);
+  border:1px solid var(--rule); color:var(--ink); outline:none;
+}
+.scen-card .sc-prob-pct {
+  font-family:var(--mono); font-size:10.5px; color:var(--ink-3);
+}
+.scen-card textarea {
+  width:100%; resize:vertical; min-height:54px;
+  font-family:var(--sans); font-size:.88rem; line-height:1.5;
+  padding:.5rem .65rem;
+  background:var(--paper); color:var(--ink-2);
+  border:1px solid var(--rule); outline:none;
+}
+.scen-card textarea:focus { border-color:var(--accent); color:var(--ink); }
+.scen-probsum {
+  padding:.55rem .85rem;
+  background:var(--paper-3); border:1px solid var(--rule);
+  font-family:var(--mono); font-size:11.5px; color:var(--ink-2);
+  margin-bottom:1.1rem;
+  display:flex; align-items:center; gap:.85rem; flex-wrap:wrap;
+}
+.scen-probsum.ok { border-color:rgba(111,160,122,0.35); color:var(--green); }
+.scen-probsum.warn { border-color:rgba(214,168,58,0.4); color:var(--amber); }
+.scen-probsum b { font-weight:700; }
+
+/* Matriz de robustez: alternativas (filas) x escenarios (cols) */
+.rob-table-wrap { overflow-x:auto; margin-bottom:1rem; }
+.rob-table {
+  width:100%; border-collapse:collapse; min-width:640px;
+}
+.rob-table th, .rob-table td {
+  border:1px solid var(--rule);
+  padding:.5rem .55rem;
+  font-family:var(--sans); font-size:.85rem;
+  vertical-align:middle;
+  background:var(--paper-2);
+}
+.rob-table th {
+  background:var(--paper-3);
+  font-family:var(--mono); font-size:10px; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--ink-3); font-weight:700;
+  text-align:center;
+}
+.rob-table th.alt-col { text-align:left; width:30%; min-width:160px; }
+.rob-table td.alt-col {
+  font-family:var(--sans); font-weight:600; color:var(--ink); text-align:left;
+}
+.rob-table td.score-col {
+  font-family:var(--mono); font-weight:700; text-align:center;
+  background:var(--paper-3);
+}
+.rob-cell {
+  display:flex; gap:.25rem; justify-content:center; align-items:center;
+}
+.rob-rate {
+  width:24px; height:24px; padding:0;
+  font-family:var(--mono); font-size:11px; font-weight:700;
+  background:var(--paper); color:var(--ink-3);
+  border:1px solid var(--rule-strong);
+  transition:background .15s, color .15s, border-color .15s;
+}
+.rob-rate:hover { border-color:var(--accent); color:var(--ink); }
+.rob-rate.sel {
+  background:var(--accent); color:var(--on-accent); border-color:var(--accent); font-weight:700;
+}
+
+/* Lente económica opcional */
+.econ-card {
+  background:var(--paper-3); border:1px solid var(--rule);
+  border-left:3px solid var(--gold);
+  padding:.95rem 1.2rem; margin-bottom:.85rem;
+}
+.econ-card .ec-head {
+  display:flex; align-items:baseline; justify-content:space-between; gap:.8rem;
+  margin-bottom:.4rem; flex-wrap:wrap;
+}
+.econ-card .ec-name {
+  font-family:var(--sans); font-weight:700; font-size:.96rem; color:var(--ink);
+}
+.econ-card .ec-tag {
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--gold);
+}
+.econ-card .ec-fields {
+  display:grid; grid-template-columns:1fr 1fr 1fr; gap:.5rem .8rem;
+  margin-bottom:.55rem;
+}
+@media (max-width:640px) { .econ-card .ec-fields { grid-template-columns:1fr 1fr; } }
+.econ-card .ec-fields .ar-field { display:flex; flex-direction:column; gap:.2rem; }
+.econ-card .ec-fields label {
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-3); font-weight:700;
+}
+.econ-card .ec-fields input {
+  font-family:var(--mono); font-size:.88rem;
+  padding:.4rem .55rem;
+  background:var(--paper); color:var(--ink);
+  border:1px solid var(--rule); outline:none;
+}
+.econ-card .ec-fields input:focus { border-color:var(--gold); }
+.econ-card .ec-results {
+  display:flex; gap:1rem; flex-wrap:wrap;
+  font-family:var(--mono); font-size:11.5px; color:var(--ink-2);
+  padding-top:.55rem; border-top:1px dashed var(--rule);
+}
+.econ-card .ec-results b { color:var(--gold); font-weight:700; }
+.econ-card .ec-results .pareto {
+  padding:.18rem .55rem; background:rgba(111,160,122,0.18);
+  color:var(--green); border:1px solid rgba(111,160,122,0.4);
+  font-family:var(--mono); font-size:10.5px; font-weight:700;
+  letter-spacing:.06em; text-transform:uppercase;
+}
+
+/* ─── Results (C.6) ─────────────────────────────────────────────────────── */
+.res-hero {
+  background:linear-gradient(135deg, var(--accent-soft), var(--paper-2));
+  border:1px solid var(--accent-tint); border-left:3px solid var(--accent);
+  padding:1.5rem 1.7rem; margin-bottom:1.4rem;
+}
+.res-hero .rh-eyebrow {
+  font-family:var(--mono); font-size:11px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--accent); font-weight:700; margin-bottom:.55rem;
+}
+.res-hero h3 {
+  font-family:var(--sans); font-weight:700; font-size:1.5rem;
+  color:var(--ink); letter-spacing:-.015em; margin-bottom:.6rem;
+}
+.res-hero p {
+  font-family:var(--italic); font-style:italic; font-size:1rem; line-height:1.55;
+  color:var(--ink-2);
+}
+.res-grid {
+  display:grid; grid-template-columns:repeat(4, 1fr); gap:.65rem;
+  margin-bottom:1.3rem;
+}
+@media (max-width:720px) { .res-grid { grid-template-columns:repeat(2, 1fr); } }
+@media (max-width:480px) { .res-grid { grid-template-columns:1fr; } }
+.res-kpi {
+  padding:.95rem 1rem;
+  background:var(--paper-2); border:1px solid var(--rule);
+}
+.res-kpi .rk-num {
+  font-family:var(--sans); font-weight:700; font-size:1.65rem; color:var(--accent);
+  line-height:1.1; letter-spacing:-.015em;
+}
+.res-kpi .rk-label {
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--ink-3); margin-top:.25rem;
+}
+.res-table-wrap { overflow-x:auto; margin-bottom:1rem; }
+.res-table { width:100%; border-collapse:collapse; min-width:480px; }
+.res-table th, .res-table td {
+  border:1px solid var(--rule);
+  padding:.55rem .65rem;
+  font-family:var(--sans); font-size:.88rem;
+  background:var(--paper-2); vertical-align:middle;
+}
+.res-table th {
+  background:var(--paper-3);
+  font-family:var(--mono); font-size:10px; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--ink-3); font-weight:700;
+  text-align:center;
+}
+.res-table th:first-child { text-align:left; }
+.res-table td.cell-name { font-weight:600; color:var(--ink); }
+.res-table tr.winner td.cell-name { color:var(--accent); }
+.res-table tr.winner td.cell-name::before { content:"★ "; color:var(--accent); }
+.res-table td.cell-num { font-family:var(--mono); text-align:center; }
+.res-table td.cell-bar {
+  font-family:var(--mono); font-size:11px; color:var(--ink-3);
+  background:linear-gradient(to right, var(--accent-soft) var(--bar, 0%), transparent var(--bar, 0%)) var(--paper-2);
+  letter-spacing:.04em;
+}
+
+/* Modal */
+.modal-back {
+  position:fixed; inset:0; background:rgba(10,8,4,0.7);
+  display:none; align-items:center; justify-content:center;
+  z-index:8500; padding:1rem; backdrop-filter:blur(4px);
+}
+.modal-back.open { display:flex; }
+.modal {
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+  padding:2rem 2.2rem; max-width:600px; width:100%; position:relative;
+  max-height:90vh; overflow-y:auto;
+}
+.modal-close {
+  position:absolute; top:.9rem; right:1.1rem;
+  font-family:var(--mono); font-size:1.2rem; color:var(--ink-3); transition:color .2s;
+}
+.modal-close:hover { color:var(--danger); }
+.modal h2 {
+  font-family:var(--sans); font-weight:700; font-size:1.35rem;
+  letter-spacing:-.01em; margin-bottom:.7rem; max-width:32ch;
+}
+.modal p {
+  font-family:var(--sans); font-size:.96rem; line-height:1.55; color:var(--ink-2); margin-bottom:1rem;
+}
+.modal p em { font-family:var(--italic); font-style:italic; }
+.modal p b { color:var(--ink); }
+
+/* Toast */
+.toast {
+  position:fixed; bottom:1.5rem; right:1.5rem;
+  background:var(--ink); color:var(--paper);
+  padding:.85rem 1.2rem; font-family:var(--sans); font-size:.9rem;
+  letter-spacing:.02em; z-index:9000;
+  opacity:0; transform:translateY(15px); pointer-events:none;
+  transition:opacity .25s, transform .25s;
+}
+.toast.show { opacity:1; transform:translateY(0); }
+
+.methodology-note {
+  max-width:64ch; margin-top:1.6rem;
+  font-family:var(--italic); font-style:italic; font-size:.9rem; line-height:1.6; color:var(--ink-3);
+}
+.methodology-note a { color:var(--accent); font-style:normal; }
+
+footer.foot {
+  max-width:980px; margin:0 auto; padding:2rem 1.75rem 1.5rem;
+  border-top:1px solid var(--rule);
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.06em; color:var(--ink-3);
+  display:flex; justify-content:space-between; flex-wrap:wrap; gap:1rem;
+}
+
+/* FAB Recursos */
+.lab-fab {
+  position:fixed; bottom:1.5rem; left:1.5rem;
+  z-index:8000;
+  display:inline-flex; align-items:center; gap:.45rem;
+  padding:.65rem 1rem;
+  background:var(--paper-2); color:var(--ink);
+  border:1px solid var(--accent-tint);
+  font-family:var(--mono); font-size:11.5px; font-weight:700;
+  letter-spacing:.1em; text-transform:uppercase;
+  cursor:none;
+  transition:border-color .15s, background .15s, color .15s;
+  box-shadow:0 4px 12px rgba(0,0,0,0.25);
+}
+.lab-fab:hover { border-color:var(--accent); color:var(--accent); }
+.lab-fab .lab-fab-icon { color:var(--accent); font-size:1rem; }
+.lab-fab.is-hidden { display:none !important; }
+@media (max-width:640px) {
+  .lab-fab { padding:.5rem .8rem; font-size:10.5px; bottom:1rem; left:1rem; }
+}
+
+.lab-recursos-modal .modal { max-width:720px; }
+.lab-recursos-modal h2 { margin-bottom:1rem; }
+.lab-recursos-modal .lr-intro {
+  font-family:var(--italic); font-style:italic; font-weight:400;
+  font-size:.92rem; line-height:1.55; color:var(--ink-2);
+  margin-bottom:1.4rem; max-width:56ch;
+}
+.lab-recursos-modal .lr-intro a { color:var(--accent); font-style:normal; }
+.lab-recursos-modal .lr-empty {
+  font-family:var(--italic); font-style:italic; color:var(--ink-3);
+  text-align:center; padding:1.5rem 0;
+}
+.lr-cat { margin-bottom:1.4rem; }
+.lr-cat:last-child { margin-bottom:0; }
+.lr-cat-name {
+  font-family:var(--mono); font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--accent); font-weight:700;
+  margin-bottom:.7rem;
+  padding-bottom:.35rem; border-bottom:1px solid var(--rule);
+}
+.lr-items { display:grid; grid-template-columns:1fr; gap:.5rem; }
+.lr-item {
+  display:block;
+  padding:.75rem .9rem;
+  background:var(--paper); border:1px solid var(--rule);
+  transition:border-color .15s, background .15s;
+}
+.lr-item:hover { border-color:var(--accent); background:var(--paper-2); }
+.lr-item-name {
+  font-family:var(--sans); font-weight:600; font-size:.92rem;
+  color:var(--ink); letter-spacing:-.005em;
+  margin-bottom:.2rem;
+  display:flex; align-items:baseline; gap:.4rem;
+}
+.lr-item-name::after {
+  content:"↗"; color:var(--accent); font-family:var(--mono); font-size:.85rem;
+  margin-left:auto; flex-shrink:0; opacity:.55;
+}
+.lr-item:hover .lr-item-name::after { opacity:1; }
+.lr-item-desc {
+  font-family:var(--italic); font-style:italic; font-weight:400;
+  font-size:.82rem; line-height:1.5; color:var(--ink-2);
+}
+
+/* IA bars + resultado del copiloto */
+.ia-bar {
+  display:flex; align-items:center; gap:1.1rem; flex-wrap:wrap;
+  padding:1.1rem 1.3rem;
+  background:linear-gradient(135deg, var(--accent-soft), var(--paper-2));
+  border:1px solid var(--accent-tint); border-left:3px solid var(--accent);
+}
+.ia-bar .ia-icon { font-family:var(--sans); font-size:1.4rem; color:var(--accent); flex-shrink:0; }
+.ia-bar .ia-body { flex:1; min-width:240px; }
+.ia-bar .ia-title { font-family:var(--sans); font-weight:700; font-size:1rem; color:var(--ink); margin-bottom:.25rem; }
+.ia-bar .ia-sub { font-family:var(--italic); font-style:italic; font-weight:400; font-size:.9rem; line-height:1.5; color:var(--ink-2); }
+.ia-bar .btn { padding:.75rem 1.4rem; font-size:.92rem; }
+.ia-bar .btn[disabled] { opacity:.55; cursor:not-allowed; }
+
+.ia-result {
+  background:var(--paper-2); border:1px solid var(--rule);
+  padding:1.4rem 1.6rem; margin-top:.9rem;
+  animation:fadeInUp .35s ease both;
+}
+@keyframes fadeInUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+.ia-result .ia-result-eyebrow {
+  font-family:var(--mono); font-size:11px; letter-spacing:.18em;
+  text-transform:uppercase; color:var(--accent); margin-bottom:.55rem;
+}
+.ia-result .ia-result-eyebrow .ia-cached {
+  margin-left:.55rem; padding:.15rem .45rem; background:var(--paper-3); color:var(--ink-3);
+  font-size:9.5px; letter-spacing:.12em;
+}
+.ia-result h3 { font-family:var(--sans); font-weight:700; font-size:1.15rem; color:var(--ink); margin:1rem 0 .55rem; letter-spacing:-.01em; }
+.ia-result h3:first-of-type { margin-top:.4rem; }
+.ia-result p { font-family:var(--sans); font-weight:400; font-size:.98rem; line-height:1.6; color:var(--ink); margin-bottom:.85rem; }
+.ia-result p em { font-family:var(--italic); font-style:italic; color:var(--ink-2); }
+.ia-result ul { list-style:none; margin:.4rem 0 0; padding:0; }
+.ia-result ul li {
+  position:relative; padding:.55rem 0 .55rem 1.6rem;
+  font-family:var(--sans); font-size:.96rem; line-height:1.55; color:var(--ink);
+  border-bottom:1px solid var(--rule);
+}
+.ia-result ul li:last-child { border-bottom:none; }
+.ia-result ul li::before { content:"→"; position:absolute; left:0; top:.65rem; color:var(--accent); font-weight:700; }
+
+.ia-loading { display:flex; align-items:center; gap:.8rem; font-family:var(--mono); font-size:12px; color:var(--ink-3); }
+.ia-loading-dot { width:8px; height:8px; background:var(--accent); border-radius:50%; animation:iaPulse 1s ease-in-out infinite; }
+@keyframes iaPulse { 0%,100% { opacity:.3; transform:scale(.9); } 50% { opacity:1; transform:scale(1.2); } }
+
+.ia-suggested { display:flex; flex-direction:column; gap:.45rem; margin-top:.8rem; }
+.ia-sug {
+  display:grid; grid-template-columns:1fr auto; gap:.85rem; align-items:start;
+  padding:.85rem 1rem;
+  background:var(--paper-3); border:1px solid var(--rule);
+}
+.ia-sug-body { min-width:0; }
+.ia-sug-name { font-family:var(--sans); font-weight:600; font-size:.98rem; color:var(--ink); margin-bottom:.2rem; }
+.ia-sug-desc { font-family:var(--italic); font-style:italic; font-size:.87rem; line-height:1.5; color:var(--ink-2); margin-bottom:.3rem; }
+.ia-sug-meta { font-family:var(--mono); font-size:11px; color:var(--ink-3); letter-spacing:.04em; }
+.ia-sug-meta b { color:var(--accent); }
+.ia-sug-add {
+  font-family:var(--mono); font-size:11px; padding:.45rem .8rem;
+  background:transparent; color:var(--ink-2); border:1px solid var(--rule-strong);
+  transition:border-color .15s, color .15s;
+}
+.ia-sug-add:hover { border-color:var(--accent); color:var(--accent); }
+.ia-sug-add.added { color:var(--green); border-color:rgba(111,160,122,0.5); }
+
+.ia-issues { display:flex; flex-direction:column; gap:.55rem; margin-top:.9rem; }
+.ia-issue {
+  display:grid; grid-template-columns:130px 1fr; gap:1rem; align-items:start;
+  padding:.8rem .95rem; background:var(--paper-3); border:1px solid var(--rule);
+}
+.ia-issue-tag {
+  font-family:var(--mono); font-size:10px; font-weight:700;
+  letter-spacing:.14em; text-transform:uppercase;
+  padding:.25rem .5rem; text-align:center;
+  background:var(--accent-soft); color:var(--accent); border:1px solid var(--accent-tint);
+}
+.ia-issue-body { min-width:0; }
+.ia-issue-msg { font-family:var(--sans); font-size:.92rem; line-height:1.5; color:var(--ink); margin-bottom:.4rem; }
+.ia-issue-sug { font-family:var(--italic); font-style:italic; font-size:.88rem; color:var(--ink-2); }
+.ia-issue-sug b { font-family:var(--sans); font-style:normal; color:var(--accent); font-weight:600; }
+
+/* Mis análisis */
+.proj-row {
+  display:grid; grid-template-columns:1fr auto auto; gap:1rem; align-items:center;
+  padding:.8rem 1rem; background:var(--paper-3); border:1px solid var(--rule);
+}
+.proj-row .pr-name { font-family:var(--sans); font-weight:600; font-size:.95rem; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.proj-row .pr-meta { font-family:var(--mono); font-size:11px; color:var(--ink-3); letter-spacing:.04em; margin-top:.15rem; }
+.proj-row .pr-role {
+  font-family:var(--mono); font-size:10.5px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+  padding:.2rem .55rem; background:var(--paper); color:var(--ink-3); border:1px solid var(--rule-strong);
+}
+.proj-row .pr-role.owner { background:var(--accent); color:var(--on-accent); border-color:var(--accent); }
+.proj-row .pr-actions { display:flex; gap:.4rem; }
+.proj-row .pr-actions button {
+  font-family:var(--mono); font-size:11px; letter-spacing:.04em;
+  padding:.35rem .7rem; background:transparent; color:var(--ink-2); border:1px solid var(--rule-strong);
+  transition:border-color .2s, color .2s;
+}
+.proj-row .pr-actions button:hover { border-color:var(--accent); color:var(--accent); }
+.proj-row .pr-actions button.danger:hover { border-color:var(--danger); color:var(--danger); }
+
+/* Cloud bar */
+.cloud-bar {
+  display:flex; align-items:center; gap:1rem; flex-wrap:wrap;
+  padding:.85rem 1.1rem;
+  background:var(--accent-soft); border-left:3px solid var(--accent);
+  font-family:var(--mono); font-size:12px; color:var(--ink-2);
+}
+.cloud-bar .cb-icon { font-family:var(--sans); font-weight:700; color:var(--accent); }
+.cloud-bar .cb-spacer { flex:1; }
+.cloud-bar .cb-status { font-style:italic; color:var(--ink-3); font-family:var(--italic); font-size:12.5px; }
+.cloud-bar .cb-status.saving { color:var(--amber); }
+.cloud-bar .cb-status.saved { color:var(--green); }
+.cloud-bar .cb-status.error { color:var(--danger); }
+.cloud-bar .cb-editor { font-size:11px; color:var(--ink-3); padding-left:.8rem; border-left:1px solid var(--rule); }
+.cloud-bar.anon { background:rgba(214,168,58,0.10); border-left-color:var(--amber); }
+.cloud-bar.anon .cb-icon { color:var(--amber); }
+.cloud-bar .btn-mini {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.06em;
+  padding:.4rem .8rem; border:1px solid var(--rule-strong);
+  background:transparent; color:var(--ink-2);
+  transition:border-color .2s, color .2s;
+}
+.cloud-bar .btn-mini:hover { border-color:var(--accent); color:var(--accent); }
+
+/* Cross-link amarillo */
+.cross-link {
+  display:flex; align-items:center; gap:1.1rem; flex-wrap:wrap;
+  padding:1.1rem 1.3rem;
+  background:rgba(214,168,58,0.10); border:1px solid var(--rule);
+  border-left:3px solid var(--gold);
+  font-family:var(--mono); font-size:12px; color:var(--ink-2);
+}
+.cross-link .cl-arrow { font-family:var(--sans); font-size:1.4rem; color:var(--gold); flex-shrink:0; }
+.cross-link .cl-body { flex:1; min-width:240px; }
+.cross-link .cl-title { font-family:var(--sans); font-weight:700; font-size:1rem; color:var(--ink); margin-bottom:.25rem; }
+.cross-link .cl-desc { font-family:var(--italic); font-style:italic; font-weight:400; font-size:.9rem; line-height:1.5; color:var(--ink-2); }
+.cross-link .cl-desc em { color:var(--accent); }
+.cross-link .btn { background:var(--gold); }
+</style>
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<nav class="topbar">
+  <div class="topbar-left">
+    <a href="analisis-estructural.html" class="btn-back"><span>←</span> Volver al lab</a>
+    <div id="nav-user-block" class="is-hidden" style="display:flex;align-items:center;gap:.7rem;margin-left:.5rem">
+      <span id="nav-user-email" style="font-family:var(--mono);font-size:12px;color:var(--ink-3);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+      <a href="pricing.html" id="nav-user-plan" style="font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--accent);padding:.25rem .55rem;border:1px solid var(--accent);background:var(--accent-soft)">FREE</a>
+      <button onclick="logoutUser()" style="font-family:var(--mono);font-size:11px;color:var(--ink-3);background:none;border:none;padding:0">salir ↗</button>
+    </div>
+    <div id="nav-auth-anon" style="display:flex;gap:.7rem;margin-left:.5rem">
+      <a href="login.html" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)">Iniciar sesión</a>
+      <a href="register.html" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);padding:.3rem .65rem">Registrarse</a>
+    </div>
+  </div>
+  <div class="topbar-center">
+    <span class="eyebrow" style="margin:0;font-size:11px">Lab · Alternativas de Política</span>
+  </div>
+  <div class="topbar-right">
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
+    <a href="index.html" class="logo-link">
+      <div class="logo-bars">
+        <div class="logo-bar" style="height:20px"></div>
+        <div class="logo-bar" style="height:15px"></div>
+        <div class="logo-bar" style="height:9px"></div>
+        <div class="logo-bar" style="height:4px"></div>
+      </div>
+      <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+    </a>
+  </div>
+</nav>
+
+<main class="page">
+  <div class="crumb">
+    <a href="index.html">Inicio</a> <span class="sep">/</span>
+    <a href="analisis-estructural.html">Lab de Políticas Públicas y Prospectiva</a> <span class="sep">/</span>
+    <span>Alternativas de Política</span>
+  </div>
+
+  <!-- MIS ANÁLISIS (visible solo cuando AUTH.isLogged) -->
+  <section class="is-hidden" id="my-projects" style="background:var(--paper-2);border:1px solid var(--rule);padding:1.6rem 1.6rem 1.4rem;margin-bottom:2rem">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.2rem;flex-wrap:wrap">
+      <div>
+        <h3 style="font-family:var(--sans);font-weight:700;font-size:1.15rem;letter-spacing:-.01em">Tus análisis de Alternativas en la nube</h3>
+        <div id="my-projects-meta" style="font-family:var(--mono);font-size:11.5px;color:var(--ink-3);letter-spacing:.05em">—</div>
+      </div>
+      <button class="btn-ghost" onclick="newProject()">+ Nuevo análisis</button>
+    </div>
+    <div id="my-projects-list" style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:1rem"></div>
+  </section>
+
+  <!-- WELCOME -->
+  <section id="stage-welcome">
+    <div class="welcome">
+      <div class="eyebrow">Módulo · Diseño de alternativas de política pública</div>
+      <h1 class="welcome-title">Construye tus alternativas <em>con método</em></h1>
+      <p class="welcome-sub">
+        Las alternativas no se enumeran, se construyen. Cuando comparas
+        tres opciones evidentes, te perdiste las cuarenta y siete que no
+        consideraste. El análisis morfológico de Zwicky te obliga a
+        recorrer el espacio completo de combinaciones; la lente de
+        Robust Decision Making (Lempert · RAND) te dice cuáles aguantan
+        cuando el futuro deja de portarse bien.
+      </p>
+      <p class="welcome-hint">
+        Seis decisiones: variables de decisión · opciones por variable ·
+        matriz morfológica · alternativas ensambladas · robustez en
+        cuatro escenarios · selección final. Toma entre 2 y 6 horas
+        según la profundidad y el tamaño del equipo.
+      </p>
+      <button class="method-link" onclick="openModal('modal-method')">¿En qué se basa? →</button>
+
+      <div class="accordion-stack">
+        <details class="accordion">
+          <summary><span><span class="acc-num">01</span>Qué hace exactamente</span></summary>
+          <div class="accordion-body">
+            Te guía por las seis decisiones que separan una propuesta
+            <em>defendible</em> del clásico "tres alternativas y la
+            recomendada": (1) identificas las <em>variables de decisión</em>
+            — los parámetros sobre los que se construye la política
+            (cobertura, financiamiento, instrumento, condicionalidad,
+            timing, gobernanza); (2) defines <em>tres a cinco opciones</em>
+            por variable; (3) levantas la <em>matriz morfológica</em> de
+            Zwicky para visualizar todo el espacio posible, marcando las
+            combinaciones incompatibles; (4) ensamblas <em>alternativas
+            concretas</em> con costo, plazo y supuestos; (5) las pruebas
+            contra <em>cuatro escenarios</em> (baseline, optimista,
+            pesimista, disruptivo) ponderados por probabilidad subjetiva;
+            (6) opcionalmente añades una <em>lente económica</em> con
+            MVPF (Hendren) y CEA (J-PAL) cuando hay datos de costo y
+            beneficio. La alternativa recomendada es la que combina
+            mayor score esperado y peor caso aceptable.
+          </div>
+        </details>
+        <details class="accordion">
+          <summary><span><span class="acc-num">02</span>Qué te entrega</span></summary>
+          <div class="accordion-body">
+            Tres entregables encadenados: un <em>memo de alternativas</em>
+            en Markdown (variables, matriz, alternativas, ratings por
+            escenario, recomendación); una <em>matriz de robustez</em>
+            en CSV (alternativas × escenarios + scores económicos si
+            llenaste la lente); y una <em>ficha estilo CONPES light</em>
+            en PDF descargable. Adicional: un botón <em>"Enviar a
+            Problema Público"</em> que sobreescribe el paso de
+            alternativas del módulo de Bardach con tus alternativas
+            ensambladas, manteniendo la trazabilidad de la decisión.
+          </div>
+        </details>
+        <details class="accordion">
+          <summary><span><span class="acc-num">03</span>Para qué te sirve</span></summary>
+          <div class="accordion-body">
+            Para evitar el <em>error del consultor apurado</em>: meter
+            tres alternativas — usualmente <i>statu quo</i>, una
+            moderada y una radical — y recomendar la moderada. Una
+            política de cobertura nacional tiene mínimo cuatro variables
+            de decisión con cuatro opciones cada una: <em>256
+            combinaciones posibles</em>. Sin método, el ojo humano sólo
+            considera tres. Y para <em>defender la decisión</em>: cuando
+            quien decide pregunta "¿por qué no esta otra combinación?",
+            poder responder <i>"la consideramos y la descartamos por X
+            en el escenario disruptivo"</i> en vez de "no se nos había
+            ocurrido".
+          </div>
+        </details>
+      </div>
+
+      <div style="display:flex;gap:.7rem;justify-content:center;flex-wrap:wrap">
+        <a class="btn-ghost" href="analisis-estructural.html">← Volver al lab</a>
+        <button class="btn btn-big" onclick="startFlow()">Empecemos →</button>
+      </div>
+
+      <p style="margin-top:2.5rem;font-family:var(--italic);font-style:italic;color:var(--ink-3);font-size:.92rem;max-width:60ch;margin-left:auto;margin-right:auto;line-height:1.55">
+        ¿Aún no tienes el problema enmarcado? Empieza por
+        <a href="problema-publico.html" style="color:var(--accent);font-style:normal;font-weight:600">problema público →</a>
+        y vuelve aquí cuando tengas el enunciado claro. ¿Necesitas
+        entender el sistema antes de proponer cambios? Salta a
+        <a href="analisis-estructural.html" style="color:var(--accent);font-style:normal;font-weight:600">análisis estructural →</a>.
+        Los cuatro módulos del lab se encadenan.
+      </p>
+    </div>
+  </section>
+
+  <!-- STEPS NAV (visible solo en las 6 mecánicas, no en welcome ni results) -->
+  <div id="steps-nav" class="is-hidden">
+    <div class="steps-row" id="steps-row"></div>
+    <div class="cloud-bar" id="cloud-bar-flow" style="margin-bottom:1.6rem">
+      <span class="cb-icon">●</span>
+      <span id="cb-text-flow">Trabajando local</span>
+      <span class="cb-spacer"></span>
+      <span class="cb-status" id="cb-status-flow"></span>
+      <span class="cb-editor" id="cb-editor-flow"></span>
+      <button class="btn-mini" id="cb-save-flow" onclick="cloudSave()">Guardar en la nube</button>
+    </div>
+  </div>
+
+  <!-- MECÁNICA 1 · VARIABLES DE DECISIÓN -->
+  <section id="stage-variables" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 01</span>Variables de decisión</h2>
+      <span class="meta" id="var-meta">—</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        <b>Una variable de decisión es un parámetro sobre el que se
+        construye la política.</b> No es un objetivo ni un indicador.
+        Cobertura (universal vs focalizada), financiamiento (impuesto vs
+        crédito), gobernanza (centralizada vs municipalizada),
+        instrumento (subsidio vs servicio vs regulación), condicionalidad
+        (libre vs ligada), timing (gradual vs choque). Entre 3 y 8
+        variables — menos te deja sin espacio de diseño, más vuelve la
+        matriz inmanejable. <em>Para una política seria, suelen ser 5 o 6.</em>
+      </p>
+    </div>
+
+    <div class="field" style="margin-bottom:1.2rem">
+      <label class="field-label" for="ctx-enunciado">Enunciado del problema (opcional, contexto)</label>
+      <textarea id="ctx-enunciado" placeholder="Ej.: la deserción escolar en 9-11 en Ciudad Bolívar es del 12% anual y reduce el cierre de brecha de logro educativo."></textarea>
+      <div class="field-hint">Aterrizar el problema te ayuda a no confundir variables con objetivos. Si vienes de problema-publico, este campo se autorellena.</div>
+    </div>
+
+    <div class="field" style="margin-bottom:1.2rem">
+      <label class="field-label">Plantillas por dominio · arranque rápido</label>
+      <div class="pill-group" id="var-templates"></div>
+      <div class="field-hint">Cada plantilla precarga 5-6 variables típicas del dominio. Las puedes editar, borrar o complementar.</div>
+    </div>
+
+    <div class="var-grid" id="var-grid"></div>
+
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem">
+      <button class="btn-ghost" onclick="addVariable()">+ Agregar variable</button>
+      <button class="btn-ghost" onclick="resetVariables()">Limpiar todo</button>
+    </div>
+
+    <div class="ia-bar" style="margin-top:1.2rem">
+      <div class="ia-icon">✦</div>
+      <div class="ia-body">
+        <div class="ia-title">Sugerir variables con IA</div>
+        <div class="ia-sub">El copiloto propone 5-7 variables típicas para tu enunciado del problema, con tipo y justificación corta. Plan Pro o superior.</div>
+      </div>
+      <button class="btn" id="ia-var-btn" onclick="iaSugerirVariables()">Sugerir variables</button>
+    </div>
+    <div class="ia-result" id="ia-var-result" style="display:none"></div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="backToWelcome()">← Volver al inicio</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToStep(2)">Opciones por variable →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MECÁNICA 2 · OPCIONES POR VARIABLE -->
+  <section id="stage-opciones" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 02</span>Opciones por variable</h2>
+      <span class="meta" id="opt-meta">—</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        <b>Tres a cinco opciones por variable.</b> Menos de tres no es
+        análisis morfológico, es una elección obligada. Más de cinco
+        infla la matriz a costa de discriminación. Cada opción debe
+        ser <em>distinguible operativamente</em>: si dos opciones se
+        ejecutan igual, son la misma. Para variables binarias (sí/no)
+        está bien tener dos.
+      </p>
+    </div>
+
+    <div id="opt-panels"></div>
+
+    <div class="ia-bar" style="margin-top:1.2rem">
+      <div class="ia-icon">✦</div>
+      <div class="ia-body">
+        <div class="ia-title">Sugerir opciones con IA</div>
+        <div class="ia-sub">El copiloto propone 3-5 opciones para la variable elegida, consistentes con el contexto del problema. Plan Pro o superior.</div>
+        <div style="margin-top:.55rem;display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+          <label style="font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)">Variable:</label>
+          <select id="ia-opt-var" style="font-family:var(--sans);font-size:.92rem;padding:.45rem .7rem;background:var(--paper-3);color:var(--ink);border:1px solid var(--rule-strong);outline:none;min-width:200px"></select>
+        </div>
+      </div>
+      <button class="btn" id="ia-opt-btn" onclick="iaSugerirOpciones()">Sugerir opciones</button>
+    </div>
+    <div class="ia-result" id="ia-opt-result" style="display:none"></div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goToStep(1)">← Variables</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToStep(3)">Matriz morfológica →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MECÁNICA 3 · MATRIZ MORFOLÓGICA (ZWICKY) -->
+  <section id="stage-matriz" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 03</span>Matriz morfológica</h2>
+      <span class="meta" id="morph-meta">—</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        <b>Zwicky (Caltech, 1969):</b> cada columna es una variable,
+        cada celda en la columna es una opción. Una alternativa es una
+        selección de una opción por columna. Con 5 variables × 4
+        opciones tienes 1.024 combinaciones — la mayoría inviables, lo
+        que importa es <em>marcar las incompatibles</em> (Ritchey ·
+        cross-consistency assessment) antes de ensamblar. Una buena
+        matriz reduce el espacio al ~10% manejable.
+      </p>
+    </div>
+
+    <div class="morph-modes" id="morph-modes"></div>
+    <div class="morph-mode-hint" id="morph-mode-hint" style="font-family:var(--italic);font-style:italic;font-size:.92rem;line-height:1.5;color:var(--ink-2);margin-bottom:.85rem"></div>
+
+    <div class="morph-wrap" id="morph-wrap">
+      <div class="morph-grid" id="morph-grid"></div>
+    </div>
+
+    <div class="morph-summary" id="morph-summary"></div>
+
+    <div id="morph-explorar-actions" class="is-hidden" style="margin-top:1rem;display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">
+      <button class="btn" id="morph-save-alt" onclick="guardarComoAlternativa()">Guardar como alternativa →</button>
+      <button class="btn-ghost" onclick="limpiarExploracion()">Limpiar selección</button>
+      <span id="morph-explorar-status" style="font-family:var(--mono);font-size:11.5px;color:var(--ink-3)"></span>
+    </div>
+
+    <div id="morph-incompat-list" style="margin-top:1.4rem"></div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goToStep(2)">← Opciones</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToStep(4)">Alternativas ensambladas →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MECÁNICA 4 · ALTERNATIVAS ENSAMBLADAS -->
+  <section id="stage-alternativas" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 04</span>Alternativas ensambladas</h2>
+      <span class="meta" id="alt-meta">—</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        <b>De la matriz a alternativas concretas.</b> Una alternativa
+        es una combinación específica de opciones — una por variable —
+        más un nombre legible, una descripción, supuestos críticos,
+        costo aproximado y plazo. La primera card es <em>statu quo</em>
+        (no hacer nada explícito); es el baseline contra el que se
+        compara todo, no se elimina pero se puede renombrar.
+      </p>
+    </div>
+
+    <div id="alt-cards"></div>
+
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem">
+      <button class="btn-ghost" onclick="addAlternativaManual()">+ Agregar alternativa manual</button>
+      <button class="btn-ghost" onclick="goToStep(3)">← Volver a la matriz</button>
+    </div>
+
+    <div class="ia-bar" style="margin-top:1.2rem">
+      <div class="ia-icon">✦</div>
+      <div class="ia-body">
+        <div class="ia-title">Validar coherencia con IA</div>
+        <div class="ia-sub">El copiloto revisa cada alternativa ensamblada y detecta combinaciones internamente contradictorias (ej.: cobertura universal + financiamiento por tarifa al usuario). Plan Premium o superior.</div>
+      </div>
+      <button class="btn" id="ia-coh-btn" onclick="iaValidarCoherencia()">Validar coherencia</button>
+    </div>
+    <div class="ia-result" id="ia-coh-result" style="display:none"></div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goToStep(3)">← Matriz</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToStep(5)">Robustez →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MECÁNICA 5 · ROBUSTEZ EN ESCENARIOS -->
+  <section id="stage-robustez" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 05</span>Robustez en escenarios</h2>
+      <span class="meta" id="rob-meta">—</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        <b>Lempert &amp; Walker (RAND, 2003) · Robust Decision Making.</b>
+        Cuatro escenarios pre-definidos (baseline · optimista ·
+        pesimista · disruptivo) con probabilidad subjetiva editable.
+        Calificas cada alternativa 1-5 en cada escenario. Score
+        esperado = <em>Σ probabilidad × rating</em>. Bonus de robustez:
+        +0.5 si el peor caso de la alternativa es ≥ 3. <em>La lente
+        económica</em> (MVPF de Hendren · CEA de J-PAL) es opcional:
+        si llenas costo y beneficio, se calcula MVPF (β/c) y CEA
+        (c/outcome) cliente-side.
+      </p>
+    </div>
+
+    <div class="placeholder-box">
+      <b>En construcción · C.5</b>
+      4 escenarios editables + matriz de rating + lente económica MVPF/CEA opcional llegan en la siguiente iteración.
+    </div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goToStep(4)">← Alternativas</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToStep(6)">Decisión →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MECÁNICA 6 · DECISIÓN FINAL -->
+  <section id="stage-decision" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 06</span>Decisión final</h2>
+      <span class="meta" id="dec-meta">—</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        <b>La decisión es del humano, no del modelo.</b> El módulo te
+        muestra el ranking por score esperado + robustez + score
+        económico (si lo tienes), pero la alternativa recomendada se
+        elige a mano con justificación textual. Documentar el "por qué
+        esta y no la siguiente" es lo que vuelve la decisión auditable
+        — y lo que distingue una recomendación seria del clásico
+        "porque la financiera dijo que sí".
+      </p>
+    </div>
+
+    <div class="placeholder-box">
+      <b>En construcción · C.6</b>
+      Selector de alternativa recomendada + justificación textual + exports llegan en la siguiente iteración.
+    </div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goToStep(5)">← Robustez</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToResults()">Ver resultados y exportar →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section id="stage-results" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 07</span>Análisis de alternativas listo</h2>
+      <span class="meta" id="res-meta">—</span>
+    </div>
+
+    <div id="res-content">
+      <div class="placeholder-box">
+        <b>En construcción · C.6</b>
+        Hero con recomendación + KPIs + tabla compacta + barra IA "Narrativa" + 3 exports (memo .md, matriz .csv, PDF CONPES light) + envío a problema-publico llegan en la siguiente iteración.
+      </div>
+    </div>
+
+    <div class="ia-bar" style="margin-top:1.5rem">
+      <div class="ia-icon">✦</div>
+      <div class="ia-body">
+        <div class="ia-title">Generar narrativa de alternativas</div>
+        <div class="ia-sub">El copiloto interpreta el ranking final, explica por qué la alternativa recomendada vence a las cercanas y dónde sobreviven supuestos críticos. Plan Premium o superior.</div>
+      </div>
+      <button class="btn" id="ia-narr-btn" onclick="iaNarrativa()">Generar narrativa</button>
+    </div>
+    <div class="ia-result" id="ia-narr-result" style="display:none"></div>
+
+    <div class="cloud-bar" id="cloud-bar-results" style="margin-top:1.5rem">
+      <span class="cb-icon">●</span>
+      <span id="cb-text-results">Trabajando local</span>
+      <span class="cb-spacer"></span>
+      <span class="cb-status" id="cb-status-results"></span>
+      <span class="cb-editor" id="cb-editor-results"></span>
+      <button class="btn-mini" id="cb-save-results" onclick="cloudSave()">Guardar en la nube</button>
+      <button class="btn-mini is-hidden" id="cb-invite-results" onclick="openInviteModal()">Invitar colaborador</button>
+    </div>
+
+    <div style="display:flex;gap:.65rem;flex-wrap:wrap;margin-top:1.5rem">
+      <button class="btn" onclick="downloadMemoMD()">↓ Memo de alternativas (.md)</button>
+      <button class="btn-ghost" onclick="downloadMatrizCSV()">↓ Matriz robustez (.csv)</button>
+      <button class="btn-ghost" onclick="downloadConpesPDF()">↓ Ficha CONPES light (.pdf)</button>
+      <button class="btn-ghost" onclick="goToStep(6)">← Editar decisión</button>
+    </div>
+
+    <div style="margin-top:1.5rem">
+      <button class="btn-ghost" onclick="enviarAProblemaPublico()" style="border-color:var(--gold);color:var(--gold)">Enviar alternativas → Problema Público</button>
+    </div>
+
+    <div style="margin-top:2rem;display:grid;gap:.8rem">
+      <div class="cross-link">
+        <div class="cl-arrow">←</div>
+        <div class="cl-body">
+          <div class="cl-title">¿La política a evaluar tiene un problema bien definido detrás?</div>
+          <div class="cl-desc">Si todavía no enmarcaste el problema, el módulo de <em>problema público</em> te lleva por: enunciado · evidencia · alternativas (versión rápida) · criterios · comparación.</div>
+        </div>
+        <a href="problema-publico.html" class="btn">Problema público →</a>
+      </div>
+
+      <div class="cross-link">
+        <div class="cl-arrow">←</div>
+        <div class="cl-body">
+          <div class="cl-title">¿Y los actores que van a aprobar o vetar tu alternativa?</div>
+          <div class="cl-desc">Una alternativa técnicamente impecable puede ser rechazada por razones políticas. Mactor mapea <em>quién decide, quién apoya, quién bloquea</em>, sus posiciones y dónde tendrás que negociar.</div>
+        </div>
+        <a href="mactor.html" class="btn">Análisis de actores →</a>
+      </div>
+
+      <div class="cross-link">
+        <div class="cl-arrow">←</div>
+        <div class="cl-body">
+          <div class="cl-title">¿Cómo vas a saber si la alternativa elegida funcionó?</div>
+          <div class="cl-desc">El módulo de <em>evaluación</em> diseña la pregunta evaluativa, la teoría de cambio, los indicadores SMART y el método (RCT, DiD, RD, etc.). Cierra el ciclo del diseño con el M&amp;E.</div>
+        </div>
+        <a href="evaluacion.html" class="btn">Evaluación →</a>
+      </div>
+    </div>
+
+    <p class="methodology-note">
+      Esta herramienta condensa el análisis morfológico de
+      <b>Fritz Zwicky</b> (Caltech, 1969) y la <em>General Morphological
+      Analysis</em> de <b>Tom Ritchey</b> (Swedish Morphological Society,
+      2011), combinados con el <em>Robust Decision Making</em> de
+      <b>Robert Lempert &amp; Warren Walker</b> (RAND, 2003), el clásico
+      <em>Decision Analysis</em> de <b>Ronald A. Howard</b> (Stanford,
+      1968) y el <em>Value-Focused Thinking</em> de <b>Ralph L. Keeney</b>
+      (USC, 1992). Lente económica opcional con <b>MVPF</b> de
+      Hendren &amp; Sprung-Keyser (NBER, 2020) y <b>CEA</b> de
+      <b>J-PAL</b>. Anclaje regulatorio colombiano con <b>SINERGIA · DNP</b>.
+    </p>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>ricardoruiz.co · 2026</span>
+  <span>Composición: Familjen · Petrona · Mono</span>
+</footer>
+
+<!-- Modal metodología -->
+<div class="modal-back" id="modal-method">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-method')">×</button>
+    <h2>¿En qué se basa?</h2>
+    <p>
+      <b>Seis decisiones, no seis pasos.</b> Diseñar alternativas
+      defendibles requiere alinear seis cosas: las variables sobre las
+      que se decide, las opciones razonables por variable, el espacio
+      morfológico completo, el subset ensamblado, el comportamiento
+      frente a escenarios adversos, y la decisión final con justificación.
+    </p>
+    <p>
+      <b>Espacio antes que enumeración.</b> El error más común al
+      construir alternativas es enumerar tres opciones evidentes (statu
+      quo, moderada, radical) sin haber recorrido el espacio de
+      combinaciones. Zwicky (1969) propuso descomponer el problema en
+      variables independientes y opciones discretas por variable —
+      cualquier alternativa es una selección. Con 5 variables × 4
+      opciones, tienes 1.024 combinaciones; la mayoría inviable, pero
+      el ejercicio te muestra <em>qué</em> es inviable y <em>por qué</em>.
+    </p>
+    <p>
+      <b>Robustez antes que valor esperado.</b> Lempert &amp; Walker
+      (RAND, 2003) mostraron que la alternativa con mejor desempeño
+      esperado puede ser catastrófica en escenarios pesimistas. Robust
+      Decision Making cambia la pregunta: en vez de <em>"¿cuál maximiza
+      el valor esperado?"</em>, pregunta <em>"¿cuál es la peor que
+      puedo elegir y aceptar?"</em>. La alternativa robusta sacrifica
+      algo de upside a cambio de blindarse contra downside.
+    </p>
+    <p>
+      <b>Decisión y juicio.</b> Ronald Howard (Stanford, 1968) y Ralph
+      Keeney (USC, 1992) insistieron en separar las preferencias del
+      decisor (qué valora) de las creencias sobre el mundo (qué cree
+      que pasará). Este módulo deja esa separación explícita: las
+      opciones describen el mundo posible, los ratings por escenario
+      capturan las creencias y la decisión final captura el juicio
+      sobre las preferencias.
+    </p>
+    <p>
+      <b>Tu privacidad.</b> El cálculo es 100% local en tu navegador. No
+      enviamos nada a ningún servidor. Si más adelante quieres guardar
+      en la nube o invitar a tu equipo, será opt-in con cuenta.
+    </p>
+    <p style="border-top:1px solid var(--rule);padding-top:1rem;margin-top:1.4rem">
+      <b>Origen del método.</b><br/>
+      Fritz Zwicky, <em>Discovery, Invention, Research through the
+      Morphological Approach</em> (Macmillan, 1969).<br/>
+      Tom Ritchey, <em>Wicked Problems · Social Messes: Decision Support
+      Modelling with Morphological Analysis</em> (Springer, 2011).<br/>
+      Robert J. Lempert, Steven W. Popper &amp; Steven C. Bankes,
+      <em>Shaping the Next One Hundred Years: New Methods for
+      Quantitative, Long-Term Policy Analysis</em> (RAND, 2003).<br/>
+      Ronald A. Howard, <em>The Foundations of Decision Analysis</em>
+      (IEEE Trans. Systems Science and Cybernetics, 1968).<br/>
+      Ralph L. Keeney, <em>Value-Focused Thinking: A Path to Creative
+      Decisionmaking</em> (Harvard, 1992).<br/>
+      Nathaniel Hendren &amp; Ben Sprung-Keyser, <em>A Unified Welfare
+      Analysis of Government Policies</em> (Quarterly Journal of
+      Economics, 2020). Base pública: <a href="https://policyimpacts.org/" target="_blank" rel="noopener" style="color:var(--accent)">policyimpacts.org</a>.<br/>
+      Anclaje colombiano: <b>SINERGIA · DNP</b> — <em>Guía Metodológica
+      para Seguimiento y Evaluación de Políticas Públicas</em> y el
+      formato CONPES como entregable.
+    </p>
+    <p style="border-top:1px solid var(--rule);padding-top:1rem;margin-top:1.4rem">
+      <b>¿Quieres profundizar?</b><br/>
+      <a href="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/alt/metodologia-paso-a-paso.pdf" target="_blank" rel="noopener" style="color:var(--accent)">↓ Guía paso a paso (PDF)</a> ·
+      manual para usar la herramienta en equipo.<br/>
+      <a href="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/alt/respaldo-academico.pdf" target="_blank" rel="noopener" style="color:var(--accent)">↓ Respaldo metodológico (PDF)</a> ·
+      marco teórico, fórmulas y bibliografía con 25+ referencias.
+    </p>
+  </div>
+</div>
+
+<!-- FAB Recursos -->
+<button class="lab-fab" id="lab-fab" onclick="openRecursosModal()">
+  <span class="lab-fab-icon">↗</span>
+  <span>Recursos</span>
+</button>
+
+<!-- Modal Recursos -->
+<div class="modal-back lab-recursos-modal" id="modal-recursos">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-recursos')">×</button>
+    <h2>Recursos &amp; Datos del lab</h2>
+    <p class="lr-intro">
+      Fuentes oficiales y guías metodológicas más relevantes para
+      <b id="lr-modulo-name">el módulo de Alternativas</b>. El catálogo completo
+      (con todas las categorías) está al pie del
+      <a href="analisis-estructural.html" style="font-weight:600">hub del lab →</a>
+    </p>
+    <div id="modal-recursos-grid"></div>
+  </div>
+</div>
+
+<!-- Modal login -->
+<div class="modal-back" id="modal-login">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-login')">×</button>
+    <h2>Para guardar y compartir necesitas una cuenta</h2>
+    <p>Tu trabajo se guarda localmente en este navegador. Para guardarlo en la nube, compartirlo con tu equipo o acceder desde otro dispositivo, inicia sesión o crea una cuenta gratuita.</p>
+    <div style="display:flex;gap:.55rem;margin-top:1.4rem;flex-wrap:wrap">
+      <a href="login.html" class="btn">Iniciar sesión</a>
+      <a href="register.html" class="btn-ghost">Crear cuenta gratis</a>
+    </div>
+  </div>
+</div>
+
+<!-- Modal invitación -->
+<div class="modal-back" id="modal-invite">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-invite')">×</button>
+    <h2>Invitar a un colaborador</h2>
+    <p>Solo los colaboradores invitados pueden ver y editar este análisis de alternativas. Les llegará un correo con un enlace para aceptar.</p>
+    <label style="display:block;font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:1rem 0 .4rem">Correo del colaborador</label>
+    <input type="email" id="invite-email" placeholder="colega@entidad.gov.co" style="width:100%;padding:.7rem .85rem;font-family:var(--sans);font-size:.95rem;background:var(--paper-3);color:var(--ink);border:1px solid var(--rule-strong);outline:none"/>
+    <div style="display:flex;gap:.55rem;margin-top:1.4rem;flex-wrap:wrap">
+      <button class="btn" onclick="submitInvite()">Enviar invitación</button>
+      <button class="btn-ghost" onclick="closeModal('modal-invite')">Cancelar</button>
+    </div>
+    <label style="display:block;font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:1.5rem 0 .4rem">Personas con acceso</label>
+    <ul id="collab-list" style="list-style:none"></ul>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="lab-recursos.js"></script>
+<script>
+'use strict';
+
+// ═════════════════════════════════════════════════════════════════════════
+// STATE inicial · expandido en cada C.x
+// ═════════════════════════════════════════════════════════════════════════
+const LS_KEY = 'alt-current-v1';
+
+// Shape:
+//   contexto:    { enunciado_problema, dep_cod, mun_cod, sector, importedFromPP }
+//   variables:   [{ id, nombre, tipo }]  // tipo ∈ COBERTURA/FINANCIAMIENTO/...
+//   opciones:    { [varId]: ['opt 1', 'opt 2', ...] }
+//   incompat:    [['varId:optIdx', 'varId:optIdx'], ...]  // pares marcados incompatibles
+//   alternativas:[{ id, nombre, desc, supuestos, costo, plazo, combo, baseline, econ:{costo_total,beneficio_total,unidad_outcome,outcome_total} }]
+//   escenarios:  [{ id, nombre, descripcion, probabilidad }]  // 4 default
+//   ratings:     { [altId]: { [scenId]: 1..5 } }
+//   decision:    { altId_recomendada, justificacion }
+const STATE = {
+  step: 1,
+  contexto:     { enunciado_problema:'', dep_cod:'', mun_cod:'', sector:'', importedFromPP:false },
+  variables:    [],
+  opciones:     {},
+  incompat:     [],
+  alternativas: [],
+  escenarios:   [],
+  ratings:      {},
+  decision:     { altId_recomendada:'', justificacion:'' }
+};
+
+function saveState() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); } catch {}
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return false;
+    const p = JSON.parse(raw);
+    if (!p || typeof p !== 'object') return false;
+    if (p.contexto    && typeof p.contexto === 'object')  Object.assign(STATE.contexto, p.contexto);
+    if (Array.isArray(p.variables))                       STATE.variables = p.variables;
+    if (p.opciones    && typeof p.opciones === 'object')  STATE.opciones = p.opciones;
+    if (Array.isArray(p.incompat))                        STATE.incompat = p.incompat;
+    if (Array.isArray(p.alternativas))                    STATE.alternativas = p.alternativas;
+    if (Array.isArray(p.escenarios))                      STATE.escenarios = p.escenarios;
+    if (p.ratings     && typeof p.ratings === 'object')   STATE.ratings = p.ratings;
+    if (p.decision    && typeof p.decision === 'object')  Object.assign(STATE.decision, p.decision);
+    if (typeof p.step === 'number') STATE.step = p.step;
+    return true;
+  } catch { return false; }
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ═════════════════════════════════════════════════════════════════════════
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function escapeAttr(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+}
+function pad2(n) { return String(n).padStart(2,'0'); }
+function newId(prefix) { return prefix + '-' + Math.random().toString(36).slice(2, 9); }
+
+let _toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ═════════════════════════════════════════════════════════════════════════
+// NAVEGACIÓN ENTRE STAGES
+// ═════════════════════════════════════════════════════════════════════════
+const STAGES = ['stage-welcome','stage-variables','stage-opciones','stage-matriz','stage-alternativas','stage-robustez','stage-decision','stage-results'];
+const STEP_LABELS = [
+  { n:1, key:'variables',    label:'Variables' },
+  { n:2, key:'opciones',     label:'Opciones' },
+  { n:3, key:'matriz',       label:'Matriz' },
+  { n:4, key:'alternativas', label:'Alternativas' },
+  { n:5, key:'robustez',     label:'Robustez' },
+  { n:6, key:'decision',     label:'Decisión' }
+];
+
+function showStage(id) {
+  STAGES.forEach(s => {
+    const el = document.getElementById(s);
+    if (el) el.classList.toggle('is-hidden', s !== id);
+  });
+  const noSteps = new Set(['stage-welcome','stage-results']);
+  document.getElementById('steps-nav').classList.toggle('is-hidden', noSteps.has(id));
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function renderStepsNav() {
+  const row = document.getElementById('steps-row');
+  if (!row) return;
+  row.innerHTML = STEP_LABELS.map(s => {
+    const cls = s.n === STATE.step ? 'active' : (s.n < STATE.step ? 'done' : '');
+    return `<button class="step-pill ${cls}" type="button" onclick="goToStep(${s.n})">
+      <span class="step-n">${pad2(s.n)}</span>${escapeHtml(s.label)}
+    </button>`;
+  }).join('');
+}
+
+function startFlow() {
+  STATE.step = 1;
+  saveState();
+  renderAll();
+  showStage('stage-variables');
+}
+function backToWelcome() { showStage('stage-welcome'); }
+
+function goToStep(n) {
+  STATE.step = n;
+  saveState();
+  renderStepsNav();
+  const stageIds = ['stage-variables','stage-opciones','stage-matriz','stage-alternativas','stage-robustez','stage-decision'];
+  showStage(stageIds[n - 1] || 'stage-variables');
+}
+function goToResults() {
+  renderResults();
+  showStage('stage-results');
+}
+
+function renderAll() {
+  renderStepsNav();
+  renderVariables();
+  renderOpciones();
+  renderMatriz();
+  renderAlternativas();
+  renderRobustez();
+  renderDecision();
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// STUBS · cada render se completa en su sub-sprint (C.1-C.6)
+// ═════════════════════════════════════════════════════════════════════════
+// renderVariables    · implementado en C.1 (más abajo, sección dedicada)
+// renderOpciones     · implementado en C.2 (más abajo, sección dedicada)
+// renderMatriz       · implementado en C.3 (más abajo, sección dedicada)
+// renderAlternativas · implementado en C.4 (más abajo, sección dedicada)
+function renderRobustez()     { /* C.5 */ }
+function renderDecision()     { /* C.6 */ }
+
+function renderResults() {
+  // Placeholder hasta C.6
+  const el = document.getElementById('res-meta');
+  if (el) el.textContent = `${STATE.variables.length} variables · ${STATE.alternativas.length} alternativas`;
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 1 · VARIABLES DE DECISIÓN (C.1)
+// ═════════════════════════════════════════════════════════════════════════
+// Tipología de variables canónicas del policy design (Howlett · Salamon ·
+// Bardach). El campo `tipo` es metadata orientativa; no constriñe la
+// edición libre del nombre.
+const VAR_TIPOS = [
+  { id:'cobertura',      label:'Cobertura',         hint:'Universal vs focalizada vs categorizada' },
+  { id:'financiamiento', label:'Financiamiento',    hint:'Impuesto, crédito, regalías, mixto' },
+  { id:'instrumento',    label:'Instrumento',       hint:'Subsidio, servicio, regulación, información, incentivo' },
+  { id:'gobernanza',     label:'Gobernanza',        hint:'Centralizada, municipalizada, cogestionada' },
+  { id:'condicionalidad',label:'Condicionalidad',   hint:'Libre, condicionada, contractual' },
+  { id:'timing',         label:'Timing',            hint:'Gradual, choque, fases, escalonado' },
+  { id:'poblacion',      label:'Población objetivo',hint:'Edad, vulnerabilidad, territorio, sector' },
+  { id:'ambito',         label:'Ámbito',            hint:'Nacional, departamental, municipal, barrio' },
+  { id:'modalidad',      label:'Modalidad',         hint:'Presencial, digital, mixta' },
+  { id:'sostenibilidad', label:'Sostenibilidad',    hint:'Presupuestal, autofinanciada, PPP, hipotecada' },
+  { id:'otra',           label:'Otra',              hint:'Variable específica del dominio' }
+];
+const VAR_MIN = 3;
+const VAR_MAX = 8;
+
+// Plantillas seed por dominio (precargan ~5-6 variables canónicas).
+const VAR_TEMPLATES = [
+  { id:'cobertura-social', label:'Cobertura social', vars:[
+    { nombre:'Cobertura',            tipo:'cobertura' },
+    { nombre:'Población objetivo',   tipo:'poblacion' },
+    { nombre:'Instrumento principal',tipo:'instrumento' },
+    { nombre:'Condicionalidad',      tipo:'condicionalidad' },
+    { nombre:'Financiamiento',       tipo:'financiamiento' },
+    { nombre:'Gobernanza',           tipo:'gobernanza' }
+  ]},
+  { id:'reforma-fiscal', label:'Reforma fiscal', vars:[
+    { nombre:'Base gravable',        tipo:'instrumento' },
+    { nombre:'Tasa',                 tipo:'instrumento' },
+    { nombre:'Exenciones',           tipo:'cobertura' },
+    { nombre:'Ámbito territorial',   tipo:'ambito' },
+    { nombre:'Timing',               tipo:'timing' },
+    { nombre:'Uso de recursos',      tipo:'sostenibilidad' }
+  ]},
+  { id:'servicio-publico', label:'Servicio público', vars:[
+    { nombre:'Modalidad de prestación',tipo:'modalidad' },
+    { nombre:'Financiamiento al usuario',tipo:'financiamiento' },
+    { nombre:'Cobertura',            tipo:'cobertura' },
+    { nombre:'Estándar de calidad',  tipo:'instrumento' },
+    { nombre:'Gobernanza',           tipo:'gobernanza' },
+    { nombre:'Sostenibilidad fiscal',tipo:'sostenibilidad' }
+  ]},
+  { id:'regulacion', label:'Regulación / norma', vars:[
+    { nombre:'Estructura del incentivo',tipo:'instrumento' },
+    { nombre:'Nivel de cumplimiento exigible',tipo:'condicionalidad' },
+    { nombre:'Mecanismo de control', tipo:'gobernanza' },
+    { nombre:'Ámbito',               tipo:'ambito' },
+    { nombre:'Régimen sancionatorio',tipo:'instrumento' },
+    { nombre:'Vigencia',             tipo:'timing' }
+  ]},
+  { id:'seguridad', label:'Seguridad / convivencia', vars:[
+    { nombre:'Foco',                 tipo:'instrumento' },
+    { nombre:'Actor implementador',  tipo:'gobernanza' },
+    { nombre:'Cobertura territorial',tipo:'ambito' },
+    { nombre:'Población objetivo',   tipo:'poblacion' },
+    { nombre:'Componente tecnológico',tipo:'modalidad' },
+    { nombre:'Articulación nivel',   tipo:'gobernanza' }
+  ]},
+  { id:'blanco', label:'En blanco', vars:[] }
+];
+
+function _varTipoLabel(id) {
+  const t = VAR_TIPOS.find(x => x.id === id);
+  return t ? t.label : id;
+}
+
+function renderVariables() {
+  // Render templates pills
+  const tplEl = document.getElementById('var-templates');
+  if (tplEl) {
+    tplEl.innerHTML = VAR_TEMPLATES.map(t =>
+      `<button class="pill" type="button" onclick="seedVariablesTemplate('${t.id}')" title="${escapeAttr('Cargar ' + t.label.toLowerCase() + ' (reemplaza variables actuales)')}">${escapeHtml(t.label)}</button>`
+    ).join('');
+  }
+  // Bind enunciado del problema (sólo una vez)
+  const ctxEl = document.getElementById('ctx-enunciado');
+  if (ctxEl) {
+    if (ctxEl.value !== (STATE.contexto.enunciado_problema || '')) ctxEl.value = STATE.contexto.enunciado_problema || '';
+    if (!renderVariables._boundCtx) {
+      renderVariables._boundCtx = true;
+      ctxEl.addEventListener('input', () => {
+        STATE.contexto.enunciado_problema = ctxEl.value;
+        saveState();
+      });
+    }
+  }
+  // Render variables
+  const grid = document.getElementById('var-grid');
+  if (!grid) return;
+  if (!Array.isArray(STATE.variables)) STATE.variables = [];
+  const vars = STATE.variables;
+  if (vars.length === 0) {
+    grid.innerHTML = '<div style="font-family:var(--italic);font-style:italic;color:var(--ink-3);text-align:center;padding:1.2rem;background:var(--paper-2);border:1px dashed var(--rule-strong)">Aún no agregaste variables. Usa una plantilla, agrégalas manualmente o pídele al copiloto que las sugiera.</div>';
+  } else {
+    grid.innerHTML = vars.map((v, i) => {
+      const tipoOpts = VAR_TIPOS.map(t =>
+        `<option value="${t.id}"${v.tipo === t.id ? ' selected' : ''} title="${escapeAttr(t.hint)}">${escapeHtml(t.label)}</option>`
+      ).join('');
+      return `<div class="var-row" data-idx="${i}">
+        <span class="var-name" contenteditable="true" spellcheck="false"
+              onblur="renameVariable(${i}, this.innerText)"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${escapeHtml(v.nombre)}</span>
+        <select class="var-tipo" onchange="updateVariableTipo(${i}, this.value)">${tipoOpts}</select>
+        <button class="var-del" onclick="delVariable(${i})" title="Eliminar variable">×</button>
+      </div>`;
+    }).join('');
+  }
+  // Meta
+  const meta = document.getElementById('var-meta');
+  if (meta) {
+    let warn = '';
+    if (vars.length > 0 && vars.length < VAR_MIN) warn = ' · mínimo ' + VAR_MIN;
+    if (vars.length > VAR_MAX) warn = ' · excede máximo ' + VAR_MAX;
+    meta.textContent = `${vars.length}/${VAR_MAX} variables${warn}`;
+  }
+}
+
+function addVariable(nombre, tipo) {
+  if (!Array.isArray(STATE.variables)) STATE.variables = [];
+  if (STATE.variables.length >= VAR_MAX) { showToast(`Máximo ${VAR_MAX} variables.`); return; }
+  const v = {
+    id: newId('var'),
+    nombre: (nombre || 'Nueva variable').trim() || 'Nueva variable',
+    tipo: tipo || 'otra'
+  };
+  STATE.variables.push(v);
+  // Inicializar slot de opciones vacío para esa variable
+  if (!STATE.opciones || typeof STATE.opciones !== 'object') STATE.opciones = {};
+  if (!Array.isArray(STATE.opciones[v.id])) STATE.opciones[v.id] = [];
+  saveState();
+  renderVariables();
+}
+function delVariable(i) {
+  const v = STATE.variables[i];
+  if (!v) return;
+  STATE.variables.splice(i, 1);
+  // Limpieza encadenada: opciones, incompatibilidades, alternativas que usen esa variable
+  if (STATE.opciones && STATE.opciones[v.id]) delete STATE.opciones[v.id];
+  STATE.incompat = (STATE.incompat || []).filter(pair =>
+    !pair.some(token => String(token).split(':')[0] === v.id)
+  );
+  STATE.alternativas = (STATE.alternativas || []).map(alt => {
+    if (alt.combo && typeof alt.combo === 'object') {
+      const next = Object.assign({}, alt.combo);
+      delete next[v.id];
+      return Object.assign({}, alt, { combo: next });
+    }
+    return alt;
+  });
+  saveState();
+  renderAll();
+}
+function renameVariable(i, txt) {
+  const v = (txt || '').trim();
+  if (!STATE.variables[i]) return;
+  if (!v) { delVariable(i); return; }
+  STATE.variables[i].nombre = v;
+  saveState();
+}
+function updateVariableTipo(i, tipo) {
+  if (!STATE.variables[i]) return;
+  if (!VAR_TIPOS.find(t => t.id === tipo)) return;
+  STATE.variables[i].tipo = tipo;
+  saveState();
+}
+function seedVariablesTemplate(tplId) {
+  const tpl = VAR_TEMPLATES.find(t => t.id === tplId);
+  if (!tpl) return;
+  const hasContent = (STATE.variables || []).length > 0
+    || Object.keys(STATE.opciones || {}).length > 0
+    || (STATE.alternativas || []).length > 0;
+  if (hasContent && !confirm('Esto reemplaza variables, opciones, incompatibilidades y alternativas actuales. ¿Continuar?')) return;
+  STATE.variables = tpl.vars.map(v => ({ id: newId('var'), nombre: v.nombre, tipo: v.tipo }));
+  // Reset cascada
+  STATE.opciones = {};
+  STATE.variables.forEach(v => { STATE.opciones[v.id] = []; });
+  STATE.incompat = [];
+  STATE.alternativas = [];
+  STATE.ratings = {};
+  saveState();
+  renderAll();
+  showToast(tpl.vars.length ? `Plantilla "${tpl.label}" cargada (${tpl.vars.length} variables).` : 'Variables limpiadas.');
+}
+function resetVariables() {
+  if (!(STATE.variables || []).length) { showToast('Ya está vacío.'); return; }
+  if (!confirm('¿Limpiar todas las variables? También se pierden opciones, incompatibilidades y alternativas.')) return;
+  STATE.variables = [];
+  STATE.opciones = {};
+  STATE.incompat = [];
+  STATE.alternativas = [];
+  STATE.ratings = {};
+  saveState();
+  renderAll();
+  showToast('Variables limpiadas.');
+}
+
+// ── IA · sugerir-variables (Pro+) ────────────────────────────────────────
+async function iaSugerirVariables() {
+  if (!AUTH.isLogged) { openModal('modal-login'); return; }
+  if (!_userHasTier(1)) {
+    iaShowGate('ia-var-result', 'Pro', 'La sugerencia de variables con IA está disponible en plan Pro o superior.');
+    return;
+  }
+  if (!String(STATE.contexto.enunciado_problema || '').trim()) {
+    showToast('Escribe primero el enunciado del problema (campo arriba).');
+    return;
+  }
+  const btn = document.getElementById('ia-var-btn');
+  const out = document.getElementById('ia-var-result');
+  btn.disabled = true; btn.textContent = 'Consultando…';
+  out.style.display = 'block';
+  out.innerHTML = '<div class="ia-result-eyebrow">Copiloto · sugiriendo variables</div><div class="ia-loading"><span class="ia-loading-dot"></span> Identificando 5-7 variables de decisión típicas. ~10 segundos.</div>';
+  const r = await apiCall('/alt/copiloto', { method:'POST', body:{ action:'sugerir-variables', payload:{
+    contexto: STATE.contexto,
+    variables_actuales: STATE.variables.map(v => v.nombre)
+  } } });
+  btn.disabled = false; btn.textContent = 'Sugerir variables';
+  if (!r.ok) {
+    out.innerHTML = `<div class="ia-result-eyebrow">Copiloto · error</div><p>${escapeHtml(r.data?.error || 'No se pudo conectar.')}</p>`;
+    return;
+  }
+  iaRenderSugerirVariables(r.data);
+}
+function iaRenderSugerirVariables(data) {
+  const out = document.getElementById('ia-var-result');
+  const cachedTag = data.cached ? '<span class="ia-cached">caché</span>' : '';
+  let html = `<div class="ia-result-eyebrow">Copiloto · variables sugeridas${cachedTag}</div>`;
+  if (data.nota) html += `<p><em>${escapeHtml(data.nota)}</em></p>`;
+  html += '<div class="ia-suggested">';
+  (data.variables || []).forEach((v, idx) => {
+    const tipoLbl = _varTipoLabel(v.tipo || 'otra');
+    html += `<div class="ia-sug">
+      <div class="ia-sug-body">
+        <div class="ia-sug-name">${escapeHtml(v.nombre || '—')}</div>
+        ${v.justificacion ? `<div class="ia-sug-desc">${escapeHtml(v.justificacion)}</div>` : ''}
+        <div class="ia-sug-meta">Tipo: <b>${escapeHtml(tipoLbl)}</b></div>
+      </div>
+      <button class="ia-sug-add" data-idx="${idx}" onclick="iaAddVariable(${idx})">+ Agregar</button>
+    </div>`;
+  });
+  html += '</div>';
+  out.innerHTML = html;
+  window._iaVarSuggestions = data.variables || [];
+}
+function iaAddVariable(idx) {
+  const v = (window._iaVarSuggestions || [])[idx];
+  if (!v) return;
+  if (STATE.variables.length >= VAR_MAX) { showToast(`Máximo ${VAR_MAX} variables.`); return; }
+  const tipoValido = VAR_TIPOS.find(t => t.id === v.tipo) ? v.tipo : 'otra';
+  addVariable(v.nombre, tipoValido);
+  const btn = document.querySelector(`#ia-var-result .ia-sug-add[data-idx="${idx}"]`);
+  if (btn) { btn.textContent = '✓ Agregado'; btn.classList.add('added'); btn.disabled = true; }
+  showToast('Variable agregada.');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 2 · OPCIONES POR VARIABLE (C.2)
+// ═════════════════════════════════════════════════════════════════════════
+const OPT_MIN = 2;
+const OPT_MAX = 5;
+
+function _optsArr(varId) {
+  if (!STATE.opciones || typeof STATE.opciones !== 'object') STATE.opciones = {};
+  if (!Array.isArray(STATE.opciones[varId])) STATE.opciones[varId] = [];
+  return STATE.opciones[varId];
+}
+
+function renderOpciones() {
+  const wrap = document.getElementById('opt-panels');
+  if (!wrap) return;
+  const vars = Array.isArray(STATE.variables) ? STATE.variables : [];
+  if (vars.length === 0) {
+    wrap.innerHTML = '<div class="placeholder-box"><b>Falta paso anterior</b>Agrega primero al menos una variable de decisión en el paso 1.</div>';
+  } else {
+    wrap.innerHTML = vars.map((v, vi) => {
+      const opts = _optsArr(v.id);
+      const tipoLbl = _varTipoLabel(v.tipo || 'otra');
+      let optHtml = '';
+      if (opts.length === 0) {
+        optHtml = '<div style="font-family:var(--italic);font-style:italic;color:var(--ink-3);font-size:.88rem;padding:.5rem 0">Aún no agregaste opciones para esta variable.</div>';
+      } else {
+        optHtml = '<div class="opt-list">' + opts.map((o, oi) => `
+          <div class="opt-row">
+            <span class="op-n">${pad2(oi + 1)}</span>
+            <span contenteditable="true" spellcheck="false"
+                  onblur="renameOpcion('${v.id}', ${oi}, this.innerText)"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${escapeHtml(o)}</span>
+            <button class="op-del" onclick="delOpcion('${v.id}', ${oi})" title="Eliminar opción">×</button>
+          </div>`).join('') + '</div>';
+      }
+      const canAdd = opts.length < OPT_MAX;
+      const optMeta = `${opts.length}/${OPT_MAX} opciones${opts.length < OPT_MIN ? ' · mínimo ' + OPT_MIN : ''}`;
+      return `<div class="opt-panel" data-var-id="${escapeAttr(v.id)}">
+        <div class="op-head">
+          <span class="op-name">${escapeHtml(v.nombre)}</span>
+          <span class="op-tipo">${escapeHtml(tipoLbl)} · ${escapeHtml(optMeta)}</span>
+        </div>
+        ${optHtml}
+        ${canAdd ? `<div class="op-add">
+          <input type="text" id="op-add-input-${escapeAttr(v.id)}" placeholder="Nueva opción para '${escapeAttr(v.nombre)}'…"
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();addOpcionFromInput('${v.id}');}"/>
+          <button class="btn-ghost" onclick="addOpcionFromInput('${v.id}')">+ Agregar</button>
+        </div>` : `<div style="font-family:var(--mono);font-size:11px;color:var(--ink-3);padding:.4rem 0">Máximo ${OPT_MAX} opciones alcanzado.</div>`}
+      </div>`;
+    }).join('');
+  }
+  // Dropdown de IA
+  const sel = document.getElementById('ia-opt-var');
+  if (sel) {
+    if (vars.length === 0) {
+      sel.innerHTML = '<option value="">— sin variables —</option>';
+      sel.disabled = true;
+    } else {
+      sel.innerHTML = vars.map(v => `<option value="${escapeAttr(v.id)}">${escapeHtml(v.nombre)} (${_optsArr(v.id).length} opc.)</option>`).join('');
+      sel.disabled = false;
+    }
+  }
+  // Stage meta
+  const meta = document.getElementById('opt-meta');
+  if (meta) {
+    const total = vars.reduce((s, v) => s + _optsArr(v.id).length, 0);
+    const combos = vars.length ? vars.reduce((p, v) => p * Math.max(_optsArr(v.id).length, 1), 1) : 0;
+    meta.textContent = vars.length
+      ? `${total} opciones · ${combos.toLocaleString('es-CO')} combinaciones posibles`
+      : '—';
+  }
+}
+
+function addOpcionFromInput(varId) {
+  const inp = document.getElementById('op-add-input-' + varId);
+  if (!inp) return;
+  const v = (inp.value || '').trim();
+  if (!v) return;
+  addOpcion(varId, v);
+  inp.value = '';
+  // Foco al siguiente input para escritura continua
+  setTimeout(() => {
+    const next = document.getElementById('op-add-input-' + varId);
+    if (next) next.focus();
+  }, 50);
+}
+function addOpcion(varId, text) {
+  const arr = _optsArr(varId);
+  if (arr.length >= OPT_MAX) { showToast(`Máximo ${OPT_MAX} opciones por variable.`); return; }
+  arr.push(String(text || '').trim() || 'Nueva opción');
+  // Limpieza encadenada: si esta variable estaba en una incompat con índice fuera del nuevo rango, no aplica (estamos agregando)
+  saveState();
+  renderOpciones();
+  // Refrescar matriz/alternativas si están renderizadas
+  renderMatriz();
+}
+function delOpcion(varId, i) {
+  const arr = _optsArr(varId);
+  if (!arr[i] && arr[i] !== '') return;
+  arr.splice(i, 1);
+  // Limpieza encadenada de incompatibilidades que referenciaban esa opción
+  // y desplazamiento de índices superiores en el mismo varId
+  STATE.incompat = (STATE.incompat || []).map(pair => {
+    return pair.map(token => {
+      const [vid, oidStr] = String(token).split(':');
+      if (vid !== varId) return token;
+      const oid = parseInt(oidStr, 10);
+      if (oid === i) return null;          // referencia exacta a la opción borrada
+      if (oid > i)  return `${vid}:${oid - 1}`; // desplaza índices superiores
+      return token;
+    });
+  }).filter(pair => pair.length === 2 && pair[0] != null && pair[1] != null);
+  // Alternativas que apuntan a esta opción en combo → desreferenciar
+  STATE.alternativas = (STATE.alternativas || []).map(alt => {
+    if (!alt.combo || alt.combo[varId] == null) return alt;
+    const next = Object.assign({}, alt.combo);
+    if (next[varId] === i) { delete next[varId]; }
+    else if (next[varId] > i) { next[varId] = next[varId] - 1; }
+    return Object.assign({}, alt, { combo: next });
+  });
+  saveState();
+  renderOpciones();
+  renderMatriz();
+  renderAlternativas();
+}
+function renameOpcion(varId, i, txt) {
+  const arr = _optsArr(varId);
+  const v = (txt || '').trim();
+  if (!v) { delOpcion(varId, i); return; }
+  arr[i] = v;
+  saveState();
+  // No re-render completo — el contenteditable ya muestra el cambio
+  renderMatriz();
+}
+
+// ── IA · sugerir-opciones (Pro+) ─────────────────────────────────────────
+async function iaSugerirOpciones() {
+  if (!AUTH.isLogged) { openModal('modal-login'); return; }
+  if (!_userHasTier(1)) {
+    iaShowGate('ia-opt-result', 'Pro', 'La sugerencia de opciones con IA está disponible en plan Pro o superior.');
+    return;
+  }
+  const sel = document.getElementById('ia-opt-var');
+  const varId = sel && sel.value;
+  if (!varId) { showToast('Elige una variable primero.'); return; }
+  const v = STATE.variables.find(x => x.id === varId);
+  if (!v) { showToast('Variable no encontrada.'); return; }
+  const opts = _optsArr(varId);
+  if (opts.length >= OPT_MAX) { showToast(`Esta variable ya tiene ${OPT_MAX} opciones (máximo).`); return; }
+  const btn = document.getElementById('ia-opt-btn');
+  const out = document.getElementById('ia-opt-result');
+  btn.disabled = true; btn.textContent = 'Consultando…';
+  out.style.display = 'block';
+  out.innerHTML = `<div class="ia-result-eyebrow">Copiloto · sugiriendo opciones para "${escapeHtml(v.nombre)}"</div><div class="ia-loading"><span class="ia-loading-dot"></span> Identificando 3-5 opciones distinguibles. ~10 segundos.</div>`;
+  const r = await apiCall('/alt/copiloto', { method:'POST', body:{ action:'sugerir-opciones', payload:{
+    contexto: STATE.contexto,
+    variable: { id:v.id, nombre:v.nombre, tipo:v.tipo },
+    opciones_actuales: opts
+  } } });
+  btn.disabled = false; btn.textContent = 'Sugerir opciones';
+  if (!r.ok) {
+    out.innerHTML = `<div class="ia-result-eyebrow">Copiloto · error</div><p>${escapeHtml(r.data?.error || 'No se pudo conectar.')}</p>`;
+    return;
+  }
+  iaRenderSugerirOpciones(r.data, varId);
+}
+function iaRenderSugerirOpciones(data, varId) {
+  const out = document.getElementById('ia-opt-result');
+  const cachedTag = data.cached ? '<span class="ia-cached">caché</span>' : '';
+  const v = STATE.variables.find(x => x.id === varId);
+  let html = `<div class="ia-result-eyebrow">Copiloto · opciones sugeridas para "${escapeHtml(v ? v.nombre : '?')}"${cachedTag}</div>`;
+  if (data.nota) html += `<p><em>${escapeHtml(data.nota)}</em></p>`;
+  html += '<div class="ia-suggested">';
+  (data.opciones || []).forEach((o, idx) => {
+    html += `<div class="ia-sug">
+      <div class="ia-sug-body">
+        <div class="ia-sug-name">${escapeHtml(o.nombre || o.texto || o || '—')}</div>
+        ${o.justificacion ? `<div class="ia-sug-desc">${escapeHtml(o.justificacion)}</div>` : ''}
+      </div>
+      <button class="ia-sug-add" data-idx="${idx}" onclick="iaAddOpcion('${varId}', ${idx})">+ Agregar</button>
+    </div>`;
+  });
+  html += '</div>';
+  out.innerHTML = html;
+  window._iaOptSuggestions = { varId, items: data.opciones || [] };
+}
+function iaAddOpcion(varId, idx) {
+  const sug = window._iaOptSuggestions;
+  if (!sug || sug.varId !== varId) return;
+  const o = sug.items[idx];
+  if (!o) return;
+  const text = String(o.nombre || o.texto || o || '').trim();
+  if (!text) return;
+  if (_optsArr(varId).length >= OPT_MAX) { showToast(`Máximo ${OPT_MAX} opciones.`); return; }
+  addOpcion(varId, text);
+  const btn = document.querySelector(`#ia-opt-result .ia-sug-add[data-idx="${idx}"]`);
+  if (btn) { btn.textContent = '✓ Agregado'; btn.classList.add('added'); btn.disabled = true; }
+  showToast('Opción agregada.');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 3 · MATRIZ MORFOLÓGICA · ZWICKY (C.3)
+// ═════════════════════════════════════════════════════════════════════════
+// _morphMode ∈ 'incompat' | 'explorar'  (UI ephemeral, no persistido)
+// _morphFirst: token 'varId:optIdx' del primer click en modo incompat
+// _morphExplor: { varId → optIdx } selección en modo explorar
+let _morphMode  = 'incompat';
+let _morphFirst = null;
+let _morphExplor = {};
+const MORPH_BRUTEFORCE_LIMIT = 5000;
+
+function _incompatKey(varId, optIdx) { return `${varId}:${optIdx}`; }
+function _parseToken(t) {
+  const [vid, oid] = String(t).split(':');
+  return { varId: vid, optIdx: parseInt(oid, 10) };
+}
+function _pairsEqual(p1, p2) {
+  return (p1[0] === p2[0] && p1[1] === p2[1]) || (p1[0] === p2[1] && p1[1] === p2[0]);
+}
+function _isIncompat(tokenA, tokenB) {
+  return (STATE.incompat || []).some(p => _pairsEqual(p, [tokenA, tokenB]));
+}
+
+function setMorphMode(mode) {
+  _morphMode = mode;
+  _morphFirst = null;
+  // Mantenemos _morphExplor entre cambios de modo para no perder trabajo
+  renderMatriz();
+}
+function limpiarExploracion() {
+  _morphExplor = {};
+  renderMatriz();
+}
+
+function onMorphCellClick(varId, optIdx) {
+  const token = _incompatKey(varId, optIdx);
+  if (_morphMode === 'incompat') {
+    if (!_morphFirst) {
+      _morphFirst = token;
+      renderMatriz();
+      return;
+    }
+    if (_morphFirst === token) {
+      _morphFirst = null;
+      renderMatriz();
+      return;
+    }
+    const firstVar = _parseToken(_morphFirst).varId;
+    if (firstVar === varId) {
+      // Misma variable → no permitido (las opciones de la misma variable ya se excluyen entre sí)
+      _morphFirst = token;
+      renderMatriz();
+      return;
+    }
+    // Toggle pareja
+    if (_isIncompat(_morphFirst, token)) {
+      STATE.incompat = (STATE.incompat || []).filter(p => !_pairsEqual(p, [_morphFirst, token]));
+      showToast('Incompatibilidad eliminada.');
+    } else {
+      if (!Array.isArray(STATE.incompat)) STATE.incompat = [];
+      STATE.incompat.push([_morphFirst, token]);
+      showToast('Par marcado como incompatible.');
+    }
+    _morphFirst = null;
+    saveState();
+    renderMatriz();
+  } else {
+    // Modo explorar: toggle por columna (sólo una opción por variable)
+    if (_morphExplor[varId] === optIdx) {
+      delete _morphExplor[varId];
+    } else {
+      _morphExplor[varId] = optIdx;
+    }
+    renderMatriz();
+  }
+}
+
+function _explorationHasConflict() {
+  const tokens = Object.entries(_morphExplor).map(([vid, oid]) => _incompatKey(vid, oid));
+  for (let i = 0; i < tokens.length; i++) {
+    for (let j = i + 1; j < tokens.length; j++) {
+      if (_isIncompat(tokens[i], tokens[j])) return [tokens[i], tokens[j]];
+    }
+  }
+  return null;
+}
+function _explorationIsComplete() {
+  const vars = STATE.variables || [];
+  return vars.length > 0 && vars.every(v => _morphExplor[v.id] != null);
+}
+
+function _calcRestantesPostIncompat() {
+  const vars = STATE.variables || [];
+  if (vars.length === 0) return 0;
+  const optCounts = vars.map(v => _optsArr(v.id).length);
+  if (optCounts.some(c => c === 0)) return 0;
+  const product = optCounts.reduce((p, c) => p * c, 1);
+  if (product > MORPH_BRUTEFORCE_LIMIT) return null; // demasiado grande para enumerar
+  let count = 0;
+  const combo = new Array(vars.length).fill(0);
+  function recurse(idx) {
+    if (idx >= vars.length) {
+      // Validar incompats
+      const tokens = vars.map((v, i) => _incompatKey(v.id, combo[i]));
+      for (let i = 0; i < tokens.length; i++) {
+        for (let j = i + 1; j < tokens.length; j++) {
+          if (_isIncompat(tokens[i], tokens[j])) return;
+        }
+      }
+      count++;
+      return;
+    }
+    const opts = _optsArr(vars[idx].id);
+    for (let i = 0; i < opts.length; i++) {
+      combo[idx] = i;
+      recurse(idx + 1);
+    }
+  }
+  recurse(0);
+  return count;
+}
+
+function renderMatriz() {
+  const wrap = document.getElementById('morph-wrap');
+  if (!wrap) return;
+  const vars = STATE.variables || [];
+  // Modes UI
+  const modesEl = document.getElementById('morph-modes');
+  if (modesEl) {
+    modesEl.innerHTML = `
+      <button class="mm${_morphMode === 'incompat' ? ' sel' : ''}" type="button" onclick="setMorphMode('incompat')">Marcar incompatibilidades</button>
+      <button class="mm${_morphMode === 'explorar' ? ' sel' : ''}" type="button" onclick="setMorphMode('explorar')">Explorar combinación</button>
+    `;
+  }
+  const hintEl = document.getElementById('morph-mode-hint');
+  if (hintEl) {
+    if (_morphMode === 'incompat') {
+      hintEl.innerHTML = 'Haz clic en una opción y luego en otra <em>de variable distinta</em> para marcar el par como incompatible (no puede coexistir en una alternativa). Vuelve a clickear el mismo par para deshacer.';
+    } else {
+      hintEl.innerHTML = 'Selecciona una opción por columna para visualizar una combinación específica. Cuando esté completa y sin conflictos, guárdala como <em>alternativa ensamblada</em>.';
+    }
+  }
+  // Empty state
+  const minOpts = vars.length ? vars.reduce((m, v) => Math.min(m, _optsArr(v.id).length), Infinity) : 0;
+  if (vars.length === 0 || minOpts === 0) {
+    wrap.innerHTML = '<div class="placeholder-box"><b>Falta paso anterior</b>' + (vars.length === 0
+      ? 'Agrega variables (paso 1) y opciones por variable (paso 2) antes de levantar la matriz.'
+      : 'Hay variables sin opciones. Agrega al menos una opción a cada variable en el paso 2.') + '</div>';
+    document.getElementById('morph-summary').innerHTML = '';
+    document.getElementById('morph-incompat-list').innerHTML = '';
+    document.getElementById('morph-explorar-actions').classList.add('is-hidden');
+    const metaEl = document.getElementById('morph-meta');
+    if (metaEl) metaEl.textContent = '—';
+    return;
+  }
+  // Build grid
+  const maxRows = Math.max.apply(null, vars.map(v => _optsArr(v.id).length));
+  const colCount = vars.length;
+  const cellsHtml = [];
+  vars.forEach(v => {
+    const optCount = _optsArr(v.id).length;
+    cellsHtml.push(`<div class="morph-col-head">${escapeHtml(v.nombre)} <span style="opacity:.6;margin-left:.3rem;font-size:9px">(${optCount})</span></div>`);
+  });
+  for (let r = 0; r < maxRows; r++) {
+    vars.forEach(v => {
+      const opts = _optsArr(v.id);
+      if (r >= opts.length) {
+        cellsHtml.push('<div class="morph-cell empty">—</div>');
+        return;
+      }
+      const token = _incompatKey(v.id, r);
+      let cls = 'morph-cell';
+      let extra = '';
+      if (_morphMode === 'incompat') {
+        if (_morphFirst === token) cls += ' sel';
+        const inSome = (STATE.incompat || []).some(p => p[0] === token || p[1] === token);
+        if (inSome) extra = '<span title="Esta opción tiene pares incompatibles marcados" style="position:absolute;top:.25rem;left:.4rem;color:var(--danger);font-size:.7rem">⚠</span>';
+      } else {
+        if (_morphExplor[v.id] === r) {
+          cls += ' sel';
+          // Detectar conflicto con otra selección
+          for (const [vid2, oid2] of Object.entries(_morphExplor)) {
+            if (vid2 === v.id) continue;
+            if (_isIncompat(token, _incompatKey(vid2, oid2))) { cls += ' incompat'; break; }
+          }
+        }
+      }
+      cellsHtml.push(`<div class="${cls}" onclick="onMorphCellClick('${v.id}', ${r})">${extra}${escapeHtml(opts[r])}</div>`);
+    });
+  }
+  const grid = document.getElementById('morph-grid');
+  grid.style.gridTemplateColumns = `repeat(${colCount}, minmax(120px, 1fr))`;
+  grid.innerHTML = cellsHtml.join('');
+  // Summary
+  const product = vars.reduce((p, v) => p * _optsArr(v.id).length, 1);
+  const nIncompat = (STATE.incompat || []).length;
+  const restantes = _calcRestantesPostIncompat();
+  const restStr = restantes == null ? '— (demasiadas para enumerar)' : restantes.toLocaleString('es-CO');
+  const sumEl = document.getElementById('morph-summary');
+  sumEl.innerHTML = `
+    <span>Combinaciones brutas: <b>${product.toLocaleString('es-CO')}</b></span>
+    <span>Pares incompatibles: <b>${nIncompat}</b></span>
+    <span>Restantes posibles: <b>${restStr}</b></span>
+    <span>Alternativas guardadas: <b>${(STATE.alternativas || []).length}</b></span>
+  `;
+  // Stage meta
+  const metaEl = document.getElementById('morph-meta');
+  if (metaEl) metaEl.textContent = `${product.toLocaleString('es-CO')} combinaciones · ${nIncompat} incompat. · ${restStr} restantes`;
+  // Incompat list
+  renderMorphIncompatList();
+  // Explorar actions
+  const actions = document.getElementById('morph-explorar-actions');
+  const status  = document.getElementById('morph-explorar-status');
+  const saveBtn = document.getElementById('morph-save-alt');
+  if (_morphMode === 'explorar') {
+    actions.classList.remove('is-hidden');
+    const complete = _explorationIsComplete();
+    const conflict = _explorationHasConflict();
+    saveBtn.disabled = !complete || !!conflict;
+    if (!complete) {
+      const missing = vars.filter(v => _morphExplor[v.id] == null).map(v => v.nombre);
+      status.textContent = `Falta seleccionar: ${missing.join(', ')}`;
+      status.style.color = 'var(--ink-3)';
+    } else if (conflict) {
+      const a = _parseToken(conflict[0]);
+      const b = _parseToken(conflict[1]);
+      const vA = vars.find(v => v.id === a.varId);
+      const vB = vars.find(v => v.id === b.varId);
+      status.textContent = `Conflicto: "${vA ? vA.nombre : '?'}: ${_optsArr(a.varId)[a.optIdx] || '?'}" y "${vB ? vB.nombre : '?'}: ${_optsArr(b.varId)[b.optIdx] || '?'}" están marcados como incompatibles.`;
+      status.style.color = 'var(--danger)';
+    } else {
+      status.textContent = '✓ Combinación válida — lista para guardar.';
+      status.style.color = 'var(--green)';
+    }
+  } else {
+    actions.classList.add('is-hidden');
+  }
+}
+
+function renderMorphIncompatList() {
+  const el = document.getElementById('morph-incompat-list');
+  if (!el) return;
+  const inc = STATE.incompat || [];
+  if (inc.length === 0) { el.innerHTML = ''; return; }
+  const vars = STATE.variables || [];
+  function tokenLabel(t) {
+    const { varId, optIdx } = _parseToken(t);
+    const v = vars.find(x => x.id === varId);
+    const opts = _optsArr(varId);
+    return `<b>${escapeHtml(v ? v.nombre : '?')}</b>: ${escapeHtml(opts[optIdx] || '?')}`;
+  }
+  el.innerHTML = `
+    <h4 style="font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:.6rem">Pares incompatibles marcados (${inc.length})</h4>
+    <div style="display:flex;flex-direction:column;gap:.35rem">
+      ${inc.map((pair, idx) => `<div style="display:flex;align-items:center;gap:.7rem;padding:.5rem .75rem;background:var(--paper-3);border:1px solid var(--rule);font-family:var(--sans);font-size:.88rem">
+        <span style="flex:1">${tokenLabel(pair[0])} <span style="color:var(--danger);font-weight:700;margin:0 .35rem">⟷</span> ${tokenLabel(pair[1])}</span>
+        <button onclick="delIncompat(${idx})" style="font-family:var(--mono);font-size:.85rem;color:var(--ink-3);padding:0 .35rem" title="Eliminar incompatibilidad">×</button>
+      </div>`).join('')}
+    </div>
+  `;
+}
+function delIncompat(idx) {
+  if (!Array.isArray(STATE.incompat)) return;
+  STATE.incompat.splice(idx, 1);
+  saveState();
+  renderMatriz();
+}
+
+// Guardar exploración como alternativa (entra al paso 4 para terminarla)
+const ALT_MAX = 6;
+function guardarComoAlternativa() {
+  const vars = STATE.variables || [];
+  if (!_explorationIsComplete()) { showToast('Selecciona una opción por variable antes de guardar.'); return; }
+  const conflict = _explorationHasConflict();
+  if (conflict) { showToast('La combinación tiene un par incompatible. Cámbialo antes de guardar.'); return; }
+  if (!Array.isArray(STATE.alternativas)) STATE.alternativas = [];
+  if (STATE.alternativas.length >= ALT_MAX) { showToast(`Máximo ${ALT_MAX} alternativas.`); return; }
+  // Combo objeto { varId → optIdx }
+  const combo = {};
+  vars.forEach(v => { combo[v.id] = _morphExplor[v.id]; });
+  // Verificar duplicado
+  const dup = STATE.alternativas.find(alt => alt.combo && vars.every(v => alt.combo[v.id] === combo[v.id]));
+  if (dup) { showToast(`Esa combinación ya existe: "${dup.nombre}"`); return; }
+  // Nombre auto: primeras 2 opciones concatenadas
+  const partes = vars.slice(0, 2).map(v => _optsArr(v.id)[combo[v.id]]);
+  const nombreAuto = partes.join(' · ') + (vars.length > 2 ? '…' : '');
+  STATE.alternativas.push({
+    id: newId('alt'),
+    nombre: nombreAuto,
+    desc: '',
+    supuestos: '',
+    costo: '',
+    plazo: '',
+    combo,
+    baseline: false,
+    econ: { costo_total:'', beneficio_total:'', unidad_outcome:'', outcome_total:'' }
+  });
+  _morphExplor = {};
+  saveState();
+  renderMatriz();
+  showToast(`Alternativa guardada: "${nombreAuto}". Edítala en el paso 4.`);
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 4 · ALTERNATIVAS ENSAMBLADAS (C.4)
+// ═════════════════════════════════════════════════════════════════════════
+// _altEditingCombo: id de la alternativa cuya combinación se está editando
+let _altEditingCombo = null;
+
+function _ensureBaseline() {
+  if (!Array.isArray(STATE.alternativas)) STATE.alternativas = [];
+  const hasBaseline = STATE.alternativas.some(alt => alt.baseline);
+  if (hasBaseline) return;
+  STATE.alternativas.unshift({
+    id: newId('alt'),
+    nombre: 'Statu quo',
+    desc: 'No hacer nada / mantener la política actual. Baseline contra el que se comparan las demás alternativas.',
+    supuestos: '',
+    costo: '',
+    plazo: '',
+    combo: {},
+    baseline: true,
+    econ: { costo_total:'', beneficio_total:'', unidad_outcome:'', outcome_total:'' }
+  });
+  saveState();
+}
+
+function _comboLabel(alt) {
+  if (!alt || !alt.combo) return '<em style="color:var(--ink-3)">— sin combinación —</em>';
+  const vars = STATE.variables || [];
+  if (alt.baseline) return '<em style="color:var(--ink-3)">— statu quo · no aplica combinación —</em>';
+  const parts = [];
+  vars.forEach(v => {
+    if (alt.combo[v.id] == null) return;
+    const opts = _optsArr(v.id);
+    if (alt.combo[v.id] >= opts.length) return;
+    parts.push(`<b>${escapeHtml(v.nombre)}</b>: ${escapeHtml(opts[alt.combo[v.id]] || '?')}`);
+  });
+  if (parts.length === 0) return '<em style="color:var(--ink-3)">— combinación vacía · usa "Editar combinación" para llenarla —</em>';
+  return parts.join(' · ');
+}
+
+function _altIncompatPairsIn(alt) {
+  if (!alt || !alt.combo) return [];
+  const vars = STATE.variables || [];
+  const tokens = vars.filter(v => alt.combo[v.id] != null).map(v => _incompatKey(v.id, alt.combo[v.id]));
+  const pairs = [];
+  for (let i = 0; i < tokens.length; i++) {
+    for (let j = i + 1; j < tokens.length; j++) {
+      if (_isIncompat(tokens[i], tokens[j])) pairs.push([tokens[i], tokens[j]]);
+    }
+  }
+  return pairs;
+}
+
+function renderAlternativas() {
+  const wrap = document.getElementById('alt-cards');
+  if (!wrap) return;
+  _ensureBaseline();
+  const alts = STATE.alternativas || [];
+  const vars = STATE.variables || [];
+  if (alts.length === 0) {
+    wrap.innerHTML = '<div class="placeholder-box"><b>Sin alternativas</b>Vuelve a la matriz para ensamblar combinaciones, o agrega una alternativa manual.</div>';
+  } else {
+    wrap.innerHTML = alts.map((alt, ai) => {
+      const incompatPairs = _altIncompatPairsIn(alt);
+      const isEditing = _altEditingCombo === alt.id;
+      let editComboBlock = '';
+      if (isEditing) {
+        // Vista de edición de combinación con selects
+        editComboBlock = `<div style="margin:.55rem 0 .35rem;padding:.75rem .85rem;background:var(--paper-3);border:1px solid var(--accent-tint)">
+          <div style="font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem">Editar combinación</div>
+          ${vars.length === 0 ? '<div style="font-family:var(--italic);font-style:italic;color:var(--ink-3);font-size:.88rem">No hay variables definidas. Vuelve al paso 1.</div>' : `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.5rem;margin-bottom:.55rem">
+            ${vars.map(v => {
+              const opts = _optsArr(v.id);
+              const curr = alt.combo && alt.combo[v.id] != null ? alt.combo[v.id] : '';
+              const optsHtml = opts.map((o, i) => `<option value="${i}"${curr === i ? ' selected' : ''}>${escapeHtml(o)}</option>`).join('');
+              return `<div style="display:flex;flex-direction:column;gap:.2rem">
+                <label style="font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)">${escapeHtml(v.nombre)}</label>
+                <select onchange="setAltComboValue('${alt.id}','${v.id}', this.value)" style="font-family:var(--sans);font-size:.88rem;padding:.4rem .5rem;background:var(--paper);color:var(--ink);border:1px solid var(--rule-strong);outline:none">
+                  <option value="">— sin elegir —</option>
+                  ${optsHtml}
+                </select>
+              </div>`;
+            }).join('')}
+          </div>`}
+          <button class="btn-ghost" style="font-size:.85rem;padding:.45rem .9rem" onclick="cerrarEdicionCombo()">Cerrar edición</button>
+        </div>`;
+      }
+      const incompatWarn = (incompatPairs.length > 0 && !alt.baseline)
+        ? `<div style="margin-top:.45rem;padding:.5rem .75rem;background:rgba(217,106,80,0.12);border:1px solid var(--accent-tint);font-family:var(--sans);font-size:.85rem;color:var(--danger)">
+            ⚠ Esta alternativa tiene <b>${incompatPairs.length}</b> par(es) marcado(s) como incompatible(s) en el paso 3. Revisa la combinación.
+           </div>`
+        : '';
+      return `<div class="alt-card${alt.baseline ? ' baseline' : ''}" data-alt-id="${escapeAttr(alt.id)}">
+        <div class="alt-head">
+          <span class="alt-name" contenteditable="true" spellcheck="false"
+                onblur="renameAlternativa('${alt.id}', this.innerText)"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${escapeHtml(alt.nombre)}</span>
+          <span class="alt-tag">${alt.baseline ? 'Baseline' : 'Alternativa ' + ai}</span>
+        </div>
+        <div class="alt-combo">${_comboLabel(alt)} ${alt.baseline ? '' : `<button onclick="editarCombo('${alt.id}')" style="font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--accent);background:none;border:1px solid var(--accent-tint);padding:.2rem .5rem;margin-left:.55rem">${isEditing ? 'Cerrar' : 'Editar combinación'}</button>`}</div>
+        ${editComboBlock}
+        ${incompatWarn}
+
+        <label style="display:block;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:.55rem 0 .25rem">Descripción</label>
+        <textarea placeholder="¿Qué hace esta alternativa? Cómo se ejecuta operativamente."
+                  oninput="updateAlt('${alt.id}','desc', this.value)">${escapeHtml(alt.desc || '')}</textarea>
+
+        <label style="display:block;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:.55rem 0 .25rem">Supuestos críticos</label>
+        <textarea placeholder="¿Qué tiene que ser cierto para que esta alternativa funcione? Ej.: cobertura de internet ≥ 80%, autoridad territorial cooperante."
+                  oninput="updateAlt('${alt.id}','supuestos', this.value)">${escapeHtml(alt.supuestos || '')}</textarea>
+
+        <div class="alt-row">
+          <div class="ar-field">
+            <label>Costo aproximado</label>
+            <input type="text" value="${escapeAttr(alt.costo || '')}" placeholder="Ej.: 320 mil M COP/año"
+                   oninput="updateAlt('${alt.id}','costo', this.value)"/>
+          </div>
+          <div class="ar-field">
+            <label>Plazo</label>
+            <input type="text" value="${escapeAttr(alt.plazo || '')}" placeholder="Ej.: 18 meses · cuatro fases"
+                   oninput="updateAlt('${alt.id}','plazo', this.value)"/>
+          </div>
+          <div class="ar-field">
+            <label>Riesgo dominante</label>
+            <input type="text" value="${escapeAttr(alt.riesgo || '')}" placeholder="Ej.: ejecución descentralizada"
+                   oninput="updateAlt('${alt.id}','riesgo', this.value)"/>
+          </div>
+        </div>
+
+        <div class="alt-actions">
+          ${alt.baseline
+            ? '<span style="font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.04em">El baseline no se elimina, solo se renombra.</span>'
+            : `<button class="alt-del" onclick="delAlternativa('${alt.id}')" title="Eliminar alternativa">× Eliminar</button>`}
+        </div>
+      </div>`;
+    }).join('');
+  }
+  // Meta
+  const meta = document.getElementById('alt-meta');
+  if (meta) {
+    const total = alts.length;
+    const noBaseline = alts.filter(a => !a.baseline).length;
+    meta.textContent = `${total}/${ALT_MAX + 1} cards · ${noBaseline} alternativas + baseline`;
+  }
+}
+
+function renameAlternativa(altId, txt) {
+  const alt = (STATE.alternativas || []).find(a => a.id === altId);
+  if (!alt) return;
+  const v = (txt || '').trim();
+  if (!v) { alt.nombre = alt.baseline ? 'Statu quo' : 'Alternativa sin nombre'; }
+  else { alt.nombre = v; }
+  saveState();
+}
+function updateAlt(altId, key, val) {
+  const alt = (STATE.alternativas || []).find(a => a.id === altId);
+  if (!alt) return;
+  alt[key] = val;
+  saveState();
+}
+function delAlternativa(altId) {
+  const alt = (STATE.alternativas || []).find(a => a.id === altId);
+  if (!alt) return;
+  if (alt.baseline) { showToast('El baseline no se elimina; renómbralo si quieres.'); return; }
+  if (!confirm(`¿Eliminar "${alt.nombre}"? Los ratings de esta alternativa también se pierden.`)) return;
+  STATE.alternativas = STATE.alternativas.filter(a => a.id !== altId);
+  if (STATE.ratings && STATE.ratings[altId]) delete STATE.ratings[altId];
+  if (STATE.decision && STATE.decision.altId_recomendada === altId) STATE.decision.altId_recomendada = '';
+  saveState();
+  renderAlternativas();
+  renderRobustez();
+}
+function addAlternativaManual() {
+  if (!Array.isArray(STATE.alternativas)) STATE.alternativas = [];
+  if (STATE.alternativas.filter(a => !a.baseline).length >= ALT_MAX) { showToast(`Máximo ${ALT_MAX} alternativas (sin contar baseline).`); return; }
+  const vars = STATE.variables || [];
+  const combo = {};
+  vars.forEach(v => { combo[v.id] = 0; }); // pre-rellena con primera opción de cada var
+  STATE.alternativas.push({
+    id: newId('alt'),
+    nombre: `Alternativa ${STATE.alternativas.filter(a => !a.baseline).length + 1}`,
+    desc: '',
+    supuestos: '',
+    costo: '',
+    plazo: '',
+    combo,
+    baseline: false,
+    econ: { costo_total:'', beneficio_total:'', unidad_outcome:'', outcome_total:'' }
+  });
+  saveState();
+  _altEditingCombo = STATE.alternativas[STATE.alternativas.length - 1].id; // auto-expandir edición de combo
+  renderAlternativas();
+  showToast('Alternativa creada. Ajusta la combinación y completa los campos.');
+}
+function editarCombo(altId) {
+  _altEditingCombo = (_altEditingCombo === altId) ? null : altId;
+  renderAlternativas();
+}
+function cerrarEdicionCombo() {
+  _altEditingCombo = null;
+  renderAlternativas();
+}
+function setAltComboValue(altId, varId, valStr) {
+  const alt = (STATE.alternativas || []).find(a => a.id === altId);
+  if (!alt) return;
+  if (!alt.combo || typeof alt.combo !== 'object') alt.combo = {};
+  if (valStr === '' || valStr == null) {
+    delete alt.combo[varId];
+  } else {
+    const n = parseInt(valStr, 10);
+    if (!Number.isFinite(n) || n < 0) return;
+    alt.combo[varId] = n;
+  }
+  saveState();
+  // Re-render para refrescar el display del combo + warning de incompat
+  renderAlternativas();
+}
+
+// ── IA · validar-coherencia (Premium+) ───────────────────────────────────
+async function iaValidarCoherencia() {
+  if (!AUTH.isLogged) { openModal('modal-login'); return; }
+  if (!_userHasTier(2)) {
+    iaShowGate('ia-coh-result', 'Premium', 'La validación de coherencia con IA está disponible en plan Premium o superior.');
+    return;
+  }
+  const alts = (STATE.alternativas || []).filter(a => !a.baseline);
+  if (alts.length === 0) { showToast('Agrega al menos una alternativa (no baseline) antes de validar.'); return; }
+  const btn = document.getElementById('ia-coh-btn');
+  const out = document.getElementById('ia-coh-result');
+  btn.disabled = true; btn.textContent = 'Validando…';
+  out.style.display = 'block';
+  out.innerHTML = '<div class="ia-result-eyebrow">Copiloto · validando coherencia</div><div class="ia-loading"><span class="ia-loading-dot"></span> Revisando combinaciones internamente consistentes. ~12 segundos.</div>';
+  // Construir payload con etiquetas legibles (no IDs sueltos)
+  const vars = STATE.variables || [];
+  const altsForIA = alts.map(a => ({
+    id: a.id,
+    nombre: a.nombre,
+    desc: a.desc || '',
+    combo: Object.fromEntries(vars
+      .filter(v => a.combo && a.combo[v.id] != null)
+      .map(v => [v.nombre, _optsArr(v.id)[a.combo[v.id]]])
+    )
+  }));
+  const r = await apiCall('/alt/copiloto', { method:'POST', body:{ action:'validar-coherencia', payload:{
+    contexto: STATE.contexto,
+    variables: vars.map(v => ({ nombre:v.nombre, tipo:v.tipo, opciones:_optsArr(v.id) })),
+    alternativas: altsForIA
+  } } });
+  btn.disabled = false; btn.textContent = 'Validar coherencia';
+  if (!r.ok) {
+    out.innerHTML = `<div class="ia-result-eyebrow">Copiloto · error</div><p>${escapeHtml(r.data?.error || 'No se pudo conectar.')}</p>`;
+    return;
+  }
+  iaRenderValidarCoherencia(r.data);
+}
+function iaRenderValidarCoherencia(data) {
+  const out = document.getElementById('ia-coh-result');
+  const cachedTag = data.cached ? '<span class="ia-cached">caché</span>' : '';
+  let html = `<div class="ia-result-eyebrow">Copiloto · validación de coherencia${cachedTag}</div>`;
+  if (data.resumen) html += `<p>${escapeHtml(data.resumen)}</p>`;
+  const issues = data.issues || [];
+  if (issues.length === 0) {
+    html += `<p><em>El copiloto no detectó incoherencias relevantes. Avanza a robustez.</em></p>`;
+  } else {
+    html += '<h3>Incoherencias detectadas</h3><div class="ia-issues">';
+    issues.forEach(it => {
+      const altName = it.alternativa || '—';
+      html += `<div class="ia-issue">
+        <div class="ia-issue-tag">${escapeHtml(altName)}</div>
+        <div class="ia-issue-body">
+          <div class="ia-issue-msg">${escapeHtml(it.mensaje || it.msg || '')}</div>
+          ${it.sugerencia ? `<div class="ia-issue-sug"><b>Sugerencia:</b> ${escapeHtml(it.sugerencia)}</div>` : ''}
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+  }
+  out.innerHTML = html;
+}
+
+// Exports (C.6) y envío a pp (C.10) — stubs por ahora
+function downloadMemoMD() {
+  showToast('Export .md llega en C.6');
+}
+function downloadMatrizCSV() {
+  showToast('Export .csv llega en C.6');
+}
+function downloadConpesPDF() {
+  showToast('Export CONPES PDF llega en C.6');
+}
+function enviarAProblemaPublico() {
+  showToast('Envío a problema-publico llega en C.6 / C.10');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// THEME · auto día/noche según hora local + persistencia
+// ═════════════════════════════════════════════════════════════════════════
+function toggleTheme() {
+  const isDay = document.body.classList.toggle('day-mode');
+  localStorage.setItem('rr-theme', isDay ? 'day' : 'night');
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = isDay ? '☾ Modo noche' : '☀ Modo día';
+}
+(function applyInitialTheme() {
+  const pref = localStorage.getItem('rr-theme');
+  let isDay;
+  if (pref === 'day') isDay = true;
+  else if (pref === 'night') isDay = false;
+  else {
+    const h = new Date().getHours();
+    isDay = h >= 6 && h < 19;
+  }
+  if (isDay) document.body.classList.add('day-mode');
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = isDay ? '☾ Modo noche' : '☀ Modo día';
+})();
+
+// ═════════════════════════════════════════════════════════════════════════
+// CURSOR custom
+// ═════════════════════════════════════════════════════════════════════════
+(function initCursor() {
+  const c = document.getElementById('cursor');
+  const r = document.getElementById('cursorRing');
+  document.addEventListener('mousemove', e => {
+    c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px';
+    r.style.left = e.clientX + 'px'; r.style.top = e.clientY + 'px';
+  });
+  document.addEventListener('mouseover', e => {
+    if (e.target.closest && e.target.closest('a,button,input,textarea,summary,.accordion,.pill,.step-pill,.morph-cell,.var-row,.opt-row,.alt-card,.scen-card,.rob-rate')) {
+      c.style.transform = 'translate(-50%,-50%) scale(0.5)'; c.style.background = 'transparent'; c.style.border = '2px solid var(--accent)';
+      r.style.transform = 'translate(-50%,-50%) scale(1.5)'; r.style.opacity = '0.7';
+    } else {
+      c.style.transform = 'translate(-50%,-50%) scale(1)'; c.style.background = 'var(--accent)'; c.style.border = 'none';
+      r.style.transform = 'translate(-50%,-50%) scale(1)'; r.style.opacity = '0.4';
+    }
+  });
+})();
+
+// ═════════════════════════════════════════════════════════════════════════
+// MODAL RECURSOS · catálogo compartido, filtrado por 'alternativas'
+// ═════════════════════════════════════════════════════════════════════════
+const LAB_CURRENT_MODULE = 'alternativas';
+const LAB_MOD_LABELS = {
+  problema:     'el módulo de Problema Público',
+  estructural:  'el módulo de Análisis Estructural',
+  mactor:       'el módulo de Análisis de Actores',
+  evaluacion:   'el módulo de Evaluación de Política',
+  alternativas: 'el módulo de Alternativas de Política'
+};
+function openRecursosModal() {
+  const lab = window.LAB_RECURSOS;
+  const grid = document.getElementById('modal-recursos-grid');
+  const nameEl = document.getElementById('lr-modulo-name');
+  if (nameEl) nameEl.textContent = LAB_MOD_LABELS[LAB_CURRENT_MODULE] || 'este módulo';
+  if (!lab || !grid) { openModal('modal-recursos'); return; }
+  const items = lab.items.filter(it => !it.modulos || it.modulos.length === 0 || it.modulos.includes(LAB_CURRENT_MODULE));
+  if (!items.length) {
+    grid.innerHTML = '<div class="lr-empty">El catálogo no tiene recursos destacados para este módulo. Mira el catálogo completo en el hub.</div>';
+    openModal('modal-recursos');
+    return;
+  }
+  const sortedCats = lab.categorias.slice().sort((a, b) => (a.orden || 99) - (b.orden || 99));
+  grid.innerHTML = sortedCats.map(c => {
+    const sub = items.filter(it => it.categoria === c.id);
+    if (!sub.length) return '';
+    return `<div class="lr-cat">
+      <div class="lr-cat-name">${escapeHtml(c.nombre)}</div>
+      <div class="lr-items">
+        ${sub.map(it => `<a class="lr-item" href="${escapeAttr(it.url)}" target="_blank" rel="noopener noreferrer">
+          <div class="lr-item-name"><span>${escapeHtml(it.nombre)}</span></div>
+          <div class="lr-item-desc">${escapeHtml(it.desc)}</div>
+        </a>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+  openModal('modal-recursos');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// AUTH + CLOUD · patrón de evaluacion.html con endpoints /alt/*
+// ═════════════════════════════════════════════════════════════════════════
+const AUTH_URL = 'https://rr-auth.reruizc.workers.dev';
+const POLL_INTERVAL_MS = 10000;
+const AUTH = { token:null, user:null, isLogged:false };
+const CLOUD = { projId:null, lastSavedAt:null, lastEditor:null, collaborators:[], owner:null, _pollTimer:null, _saving:false };
+
+function _authToken() { return localStorage.getItem('rr-token'); }
+function _authStoreUser(u) { if (u) localStorage.setItem('rr-user', JSON.stringify(u)); }
+function _authReadStored() { try { return JSON.parse(localStorage.getItem('rr-user') || 'null'); } catch { return null; } }
+
+async function loadUserFromAPI() {
+  const token = _authToken();
+  if (!token) { AUTH.isLogged=false; AUTH.user=null; AUTH.token=null; return null; }
+  AUTH.token = token;
+  try {
+    const r = await fetch(AUTH_URL + '/auth/me', { headers:{ 'Authorization':'Bearer ' + token } });
+    const data = await r.json();
+    if (!r.ok || !data.ok) {
+      localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user');
+      AUTH.isLogged=false; AUTH.user=null; AUTH.token=null; return null;
+    }
+    AUTH.user = data.user; AUTH.isLogged = true;
+    _authStoreUser(data.user);
+    return data.user;
+  } catch {
+    const cached = _authReadStored();
+    if (cached && token) { AUTH.user=cached; AUTH.isLogged=true; return cached; }
+    return null;
+  }
+}
+
+function renderAuthChip() {
+  const anon = document.getElementById('nav-auth-anon');
+  const userBlock = document.getElementById('nav-user-block');
+  if (AUTH.isLogged && AUTH.user) {
+    anon.classList.add('is-hidden');
+    userBlock.classList.remove('is-hidden');
+    document.getElementById('nav-user-email').textContent = AUTH.user.email;
+    document.getElementById('nav-user-plan').textContent = (AUTH.user.plan || 'free').toUpperCase();
+  } else {
+    anon.classList.remove('is-hidden');
+    userBlock.classList.add('is-hidden');
+  }
+}
+
+function logoutUser() {
+  if (!confirm('¿Cerrar sesión? Tu análisis local se conserva.')) return;
+  localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user');
+  AUTH.token=null; AUTH.user=null; AUTH.isLogged=false;
+  CLOUD.projId=null; CLOUD.lastSavedAt=null; CLOUD.lastEditor=null; CLOUD.collaborators=[]; CLOUD.owner=null;
+  stopPolling();
+  renderAuthChip(); renderCloudBars();
+  document.getElementById('my-projects').classList.add('is-hidden');
+  showToast('Sesión cerrada.');
+}
+
+async function apiCall(path, opts={}) {
+  const token = _authToken();
+  const headers = Object.assign({}, opts.headers || {});
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  if (opts.body && typeof opts.body !== 'string') {
+    headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(opts.body);
+  }
+  const r = await fetch(AUTH_URL + path, Object.assign({}, opts, { headers }));
+  const data = await r.json().catch(() => ({ ok:false, error:'Respuesta no JSON' }));
+  return { status:r.status, ok:r.ok && data.ok !== false, data };
+}
+
+function setCbStatus(kind, msg) {
+  ['flow','results'].forEach(s => {
+    const el = document.getElementById('cb-status-' + s);
+    if (!el) return;
+    el.className = 'cb-status ' + (kind || '');
+    el.textContent = msg || '';
+  });
+}
+function renderCloudBars() {
+  const inCloud = !!CLOUD.projId;
+  ['flow','results'].forEach(s => {
+    const bar = document.getElementById('cloud-bar-' + s);
+    const txt = document.getElementById('cb-text-' + s);
+    const editorEl = document.getElementById('cb-editor-' + s);
+    const saveBtn = document.getElementById('cb-save-' + s);
+    if (!bar) return;
+    if (inCloud) {
+      bar.classList.remove('anon');
+      txt.textContent = 'Sincronizado · análisis ' + CLOUD.projId.slice(0,6);
+      saveBtn.textContent = 'Guardar cambios';
+      if (CLOUD.lastEditor && CLOUD.lastEditor !== (AUTH.user?.email)) editorEl.textContent = 'última edición: ' + CLOUD.lastEditor;
+      else editorEl.textContent = '';
+    } else if (AUTH.isLogged) {
+      bar.classList.remove('anon');
+      txt.textContent = 'Trabajando local — aún no guardado en la nube';
+      saveBtn.textContent = 'Guardar en la nube';
+      editorEl.textContent = '';
+    } else {
+      bar.classList.add('anon');
+      txt.textContent = 'Trabajando local · inicia sesión para guardar y compartir';
+      saveBtn.textContent = 'Iniciar sesión';
+      editorEl.textContent = '';
+    }
+  });
+  const inviteBtn = document.getElementById('cb-invite-results');
+  if (inviteBtn) {
+    const canInvite = !!CLOUD.projId && AUTH.isLogged && CLOUD.owner === AUTH.user?.email;
+    inviteBtn.classList.toggle('is-hidden', !canInvite);
+  }
+}
+
+async function cloudSave() {
+  if (!AUTH.isLogged) { openModal('modal-login'); return; }
+  // Nombre derivado del enunciado del problema (si vino de pp) o de la primera alternativa
+  const nombre = (STATE.contexto.enunciado_problema || '').trim().slice(0,60)
+    || (STATE.alternativas[0]?.nombre || '').trim().slice(0,60)
+    || 'Alternativas sin nombre';
+  if (CLOUD._saving) return;
+  CLOUD._saving = true;
+  setCbStatus('saving', 'Guardando…');
+  const body = {
+    projId: CLOUD.projId || undefined,
+    meta: { nombre },
+    contexto:     STATE.contexto,
+    variables:    STATE.variables,
+    opciones:     STATE.opciones,
+    incompat:     STATE.incompat,
+    alternativas: STATE.alternativas,
+    escenarios:   STATE.escenarios,
+    ratings:      STATE.ratings,
+    decision:     STATE.decision
+  };
+  const r = await apiCall('/alt/save', { method:'POST', body });
+  CLOUD._saving = false;
+  if (!r.ok) {
+    setCbStatus('error', r.data.error || 'Error al guardar');
+    showToast(r.data.error || 'No se pudo guardar.');
+    return;
+  }
+  CLOUD.projId = r.data.projId;
+  CLOUD.lastSavedAt = r.data.updatedAt;
+  CLOUD.lastEditor = r.data.lastEditor;
+  if (!CLOUD.owner) CLOUD.owner = AUTH.user.email;
+  const t = new Date(r.data.updatedAt);
+  setCbStatus('saved', 'Guardado · ' + t.toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit' }));
+  renderCloudBars();
+  startPolling();
+  refreshProjectsList();
+}
+
+async function cloudLoad(projId) {
+  const r = await apiCall('/alt/load?projId=' + encodeURIComponent(projId));
+  if (!r.ok) { showToast(r.data.error || 'No se pudo cargar'); return false; }
+  const p = r.data.project;
+  if (p.contexto    && typeof p.contexto === 'object') Object.assign(STATE.contexto, p.contexto);
+  if (Array.isArray(p.variables))                      STATE.variables = p.variables;
+  if (p.opciones    && typeof p.opciones === 'object') STATE.opciones = p.opciones;
+  if (Array.isArray(p.incompat))                       STATE.incompat = p.incompat;
+  if (Array.isArray(p.alternativas))                   STATE.alternativas = p.alternativas;
+  if (Array.isArray(p.escenarios))                     STATE.escenarios = p.escenarios;
+  if (p.ratings     && typeof p.ratings === 'object')  STATE.ratings = p.ratings;
+  if (p.decision    && typeof p.decision === 'object') Object.assign(STATE.decision, p.decision);
+  CLOUD.projId = projId;
+  CLOUD.lastSavedAt = p.updatedAt;
+  CLOUD.lastEditor = p.lastEditor;
+  CLOUD.owner = p.owner;
+  CLOUD.collaborators = p.collaborators || [];
+  STATE.step = 1;
+  saveState();
+  renderAll();
+  renderCloudBars();
+  goToStep(1);
+  startPolling();
+  showToast('Análisis cargado desde la nube.');
+  return true;
+}
+
+async function refreshProjectsList() {
+  if (!AUTH.isLogged) { document.getElementById('my-projects').classList.add('is-hidden'); return; }
+  const r = await apiCall('/alt/list');
+  if (!r.ok) { document.getElementById('my-projects').classList.add('is-hidden'); return; }
+  renderProjectsList(r.data.projects, r.data.count, r.data.plan, r.data.ownedLimit);
+}
+function renderProjectsList(projects, count, plan, limit) {
+  const card = document.getElementById('my-projects');
+  card.classList.remove('is-hidden');
+  const owned = projects.filter(p => p.role === 'owner').length;
+  document.getElementById('my-projects-meta').textContent =
+    `${count} análisis · ${owned}/${limit} propios · plan ${plan}`;
+  const list = document.getElementById('my-projects-list');
+  if (projects.length === 0) {
+    list.innerHTML = '<div style="font-family:var(--italic);font-style:italic;color:var(--ink-3);text-align:center;padding:1rem">No tienes análisis guardados. Empieza uno y guárdalo desde la barra de la nube.</div>';
+    return;
+  }
+  list.innerHTML = projects.map(p => {
+    const date = p.updatedAt ? new Date(p.updatedAt).toLocaleString('es-CO', { dateStyle:'short', timeStyle:'short' }) : '—';
+    const isOwner = p.role === 'owner';
+    return `<div class="proj-row">
+      <div>
+        <div class="pr-name">${escapeHtml(p.nombre)}</div>
+        <div class="pr-meta">${p.var_count||0} variables · ${p.alt_count||0} alternativas · ${date} · ${escapeHtml(p.owner)}</div>
+      </div>
+      <span class="pr-role ${isOwner ? 'owner' : ''}">${isOwner ? 'Propio' : 'Invitado'}</span>
+      <div class="pr-actions">
+        <button onclick="cloudLoad('${p.projId}')">Abrir →</button>
+        ${isOwner ? `<button class="danger" onclick="cloudDelete('${p.projId}','${escapeHtml(p.nombre).replace(/'/g,'')}')">Borrar</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+async function cloudDelete(projId, name) {
+  if (!confirm(`¿Borrar "${name}"? Esta acción no se puede deshacer.`)) return;
+  const r = await apiCall('/alt/delete?projId=' + encodeURIComponent(projId), { method:'DELETE' });
+  if (!r.ok) { showToast(r.data.error || 'No se pudo borrar'); return; }
+  showToast('Análisis borrado.');
+  if (CLOUD.projId === projId) {
+    CLOUD.projId=null; CLOUD.lastSavedAt=null; CLOUD.lastEditor=null; CLOUD.owner=null; CLOUD.collaborators=[];
+    stopPolling(); renderCloudBars();
+  }
+  refreshProjectsList();
+}
+function newProject() {
+  CLOUD.projId=null; CLOUD.lastSavedAt=null; CLOUD.lastEditor=null; CLOUD.owner=null; CLOUD.collaborators=[];
+  stopPolling();
+  STATE.step = 1;
+  STATE.contexto     = { enunciado_problema:'', dep_cod:'', mun_cod:'', sector:'', importedFromPP:false };
+  STATE.variables    = [];
+  STATE.opciones     = {};
+  STATE.incompat     = [];
+  STATE.alternativas = [];
+  STATE.escenarios   = [];
+  STATE.ratings      = {};
+  STATE.decision     = { altId_recomendada:'', justificacion:'' };
+  saveState();
+  renderAll();
+  renderCloudBars();
+  showStage('stage-welcome');
+}
+
+function openInviteModal() {
+  if (!CLOUD.projId) { showToast('Primero guarda el análisis en la nube.'); return; }
+  if (CLOUD.owner !== AUTH.user?.email) { showToast('Solo el dueño puede invitar.'); return; }
+  document.getElementById('invite-email').value = '';
+  renderCollabList();
+  openModal('modal-invite');
+  setTimeout(() => document.getElementById('invite-email').focus(), 100);
+}
+function renderCollabList() {
+  const list = document.getElementById('collab-list');
+  const items = [`<li style="display:flex;justify-content:space-between;padding:.5rem 0;border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-2)"><span>${escapeHtml(CLOUD.owner)}</span><span style="font-size:10px;padding:.15rem .45rem;background:var(--accent);color:var(--on-accent);font-family:var(--sans);font-weight:700;letter-spacing:.1em;text-transform:uppercase">Dueño</span></li>`];
+  for (const c of CLOUD.collaborators) items.push(`<li style="display:flex;justify-content:space-between;padding:.5rem 0;border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-2)"><span>${escapeHtml(c)}</span><span style="font-size:10px;padding:.15rem .45rem;background:var(--paper-3);color:var(--ink-3);font-family:var(--sans);font-weight:700;letter-spacing:.1em;text-transform:uppercase">Colaborador</span></li>`);
+  list.innerHTML = items.join('');
+}
+async function submitInvite() {
+  const email = document.getElementById('invite-email').value.trim().toLowerCase();
+  if (!email) { showToast('Escribe un correo.'); return; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { showToast('Correo inválido.'); return; }
+  const r = await apiCall('/alt/invite', { method:'POST', body:{ projId:CLOUD.projId, email } });
+  if (!r.ok) { showToast(r.data.error || 'No se pudo invitar'); return; }
+  showToast('Invitación enviada a ' + email + '.');
+  closeModal('modal-invite');
+}
+
+async function handleInviteOnLoad() {
+  const url = new URL(window.location.href);
+  const token = url.searchParams.get('invite');
+  if (!token) return;
+  if (!AUTH.isLogged) {
+    showToast('Inicia sesión para aceptar la invitación.');
+    setTimeout(() => { window.location.href = 'login.html?next=' + encodeURIComponent(window.location.pathname + window.location.search); }, 1800);
+    return;
+  }
+  const r = await apiCall('/alt/accept?token=' + encodeURIComponent(token));
+  if (!r.ok) { showToast(r.data.error || 'No se pudo aceptar la invitación'); return; }
+  showToast('Te uniste al análisis.');
+  url.searchParams.delete('invite');
+  window.history.replaceState({}, '', url.toString());
+  await cloudLoad(r.data.projId);
+  refreshProjectsList();
+}
+
+function startPolling() {
+  stopPolling();
+  if (!CLOUD.projId) return;
+  CLOUD._pollTimer = setInterval(async () => {
+    if (CLOUD._saving || document.hidden) return;
+    const r = await apiCall('/alt/load?projId=' + encodeURIComponent(CLOUD.projId) + '&since=' + encodeURIComponent(CLOUD.lastSavedAt || ''));
+    if (!r.ok || r.data.unchanged || !r.data.project) return;
+    const p = r.data.project;
+    if (p.lastEditor && p.lastEditor !== AUTH.user?.email) {
+      if (p.contexto)     Object.assign(STATE.contexto, p.contexto);
+      if (Array.isArray(p.variables))    STATE.variables = p.variables;
+      if (p.opciones)     STATE.opciones = p.opciones;
+      if (Array.isArray(p.incompat))     STATE.incompat = p.incompat;
+      if (Array.isArray(p.alternativas)) STATE.alternativas = p.alternativas;
+      if (Array.isArray(p.escenarios))   STATE.escenarios = p.escenarios;
+      if (p.ratings)      STATE.ratings = p.ratings;
+      if (p.decision)     Object.assign(STATE.decision, p.decision);
+      CLOUD.lastSavedAt = p.updatedAt; CLOUD.lastEditor = p.lastEditor;
+      CLOUD.collaborators = p.collaborators || CLOUD.collaborators;
+      saveState();
+      renderAll();
+      renderCloudBars();
+      showToast('Cambios de ' + p.lastEditor);
+    }
+  }, POLL_INTERVAL_MS);
+}
+function stopPolling() { if (CLOUD._pollTimer) { clearInterval(CLOUD._pollTimer); CLOUD._pollTimer = null; } }
+
+// ═════════════════════════════════════════════════════════════════════════
+// COPILOTO IA · 4 acciones (sugerir-variables · sugerir-opciones · validar-coherencia · narrativa-alternativas)
+// Stubs por ahora — handlers completos en C.1-C.6
+// ═════════════════════════════════════════════════════════════════════════
+function _planTier(plan) { return ({free:0,pro:1,premium:2,full:3}[plan||'free']) ?? 0; }
+function _userHasTier(min) { return AUTH.isLogged && _planTier(AUTH.user?.plan) >= min; }
+function iaShowGate(elId, plan, desc) {
+  const out = document.getElementById(elId);
+  out.style.display = 'block';
+  out.innerHTML = `<div class="ia-result-eyebrow">Copiloto · plan ${plan} requerido</div><p>${escapeHtml(desc)}</p><p>Tu plan actual: <b>${escapeHtml(AUTH.user?.plan || 'free')}</b>.</p><p><a href="pricing.html" style="color:var(--accent);font-weight:600">Ver planes →</a></p>`;
+}
+
+async function iaNarrativa() {
+  // Stub Premium+ · implementación completa en C.6
+  if (!AUTH.isLogged) { openModal('modal-login'); return; }
+  if (!_userHasTier(2)) {
+    iaShowGate('ia-narr-result', 'Premium', 'La narrativa interpretativa con IA está disponible en plan Premium o superior.');
+    return;
+  }
+  showToast('Narrativa IA llega en C.6');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// INIT
+// ═════════════════════════════════════════════════════════════════════════
+(async function init() {
+  const restored = loadState();
+  renderAll();
+  const hasContent = (STATE.variables.length || STATE.alternativas.length || STATE.contexto.enunciado_problema);
+  if (restored && STATE.step >= 1 && hasContent) {
+    goToStep(STATE.step || 1);
+    showToast('Restauramos tu sesión anterior.');
+  } else {
+    showStage('stage-welcome');
+  }
+  // Auth + cloud
+  await loadUserFromAPI();
+  renderAuthChip();
+  renderCloudBars();
+  if (AUTH.isLogged) { refreshProjectsList(); handleInviteOnLoad(); }
+})();
+</script>
+</body>
+</html>
