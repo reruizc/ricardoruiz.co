@@ -13,8 +13,9 @@
 - `mactor.html` — **Lab** · módulo análisis de actores y conflictos (MID + MAO, copiloto IA). LISTO.
 - `problema-publico.html` — **Lab** · módulo problema público (Eightfold Path de Bardach condensado a 5 mecánicas + capa metodológica profunda con wizard de síntoma, árbol del problema CEPAL/Ortegón, test Rittel-Webber y selector de marco analítico). Cloud-save + 3 acciones IA + Issue Paper export. LISTO (Sprint A).
 - `evaluacion.html` — **Lab** · módulo evaluación de política (OCDE-DAC + Mayne + CEPAL/ILPES + Pre-Analysis Plans). 6 mecánicas: pregunta evaluativa · teoría de cambio · indicadores SMART · selector de método (RCT/DiD/RD/SC/PSM/cualitativo/mixto/VfM) · criterios OCDE-DAC · plan operativo. Cloud-save + 3 acciones IA + plan .md + matriz .csv. LISTO (Sprint B).
-- `alternativas.html` — **Lab** · módulo Alternativas de Política (Zwicky 1969 + Lempert/Walker RDM 2003 + Ritchey + Howard + Keeney + MVPF Hendren 2020 + CEA J-PAL). 6 mecánicas: variables de decisión · opciones por variable · matriz morfológica · alternativas ensambladas · robustez en 4 escenarios + lente económica · decisión final. Cloud-save + 4 acciones IA + memo .md + matriz .csv + ficha CONPES light .pdf + envío bidireccional a problema-publico. LISTO (Sprint C).
-- `lab-recursos.js` — catálogo compartido de 30 recursos en 5 categorías; cargado por los 5 módulos del lab.
+- `alternativas.html` — **Lab** · módulo Alternativas de Política (Zwicky 1969 + Lempert/Walker RDM 2003 + Ritchey + Howard + Keeney + MVPF Hendren 2020 + CEA J-PAL). 6 mecánicas: variables de decisión · opciones por variable · matriz morfológica · alternativas ensambladas · robustez en 4 escenarios + lente económica · decisión final. Cloud-save + 4 acciones IA + memo .md + matriz .csv + ficha CONPES light .pdf + envío bidireccional a problema-publico + envío a AIN. LISTO (Sprint C).
+- `ain.html` — **Lab** · módulo Análisis de Impacto Normativo (DNP/Función Pública Decreto 1081/2015 + 1273/2020 + RIA OCDE 2012/2022 + Sunstein Simpler 2013 + Hahn-Tetlock 2008 + Stigler 1971 + Mashaw 2018). 6 mecánicas: problema regulatorio (tipo de falla) · objetivos normativos medibles · opciones regulatorias (6 familias) · matriz de impactos (5 categorías) · consulta pública + 5 riesgos regulatorios · implementación + monitoreo + cláusula de revisión. Cloud-save + 3 acciones IA + memo .md + matriz .csv + memo CONPES regulatorio .pdf + auto-import desde pp/alt + envío a evaluacion. LISTO (Sprint D).
+- `lab-recursos.js` — catálogo compartido de 32 recursos en 5 categorías; cargado por los 6 módulos del lab.
 - `pricing.html` — planes (Básico / Pro 39.900 COP · Premium 99.900 COP · Personalizado)
 - `lang.js` — i18n (co/us/cn); `CLAUDE.md` vive en la raíz del repo
 
@@ -1830,10 +1831,10 @@ inteligencia editorial, NO publicación de sondeo).
   con prompts largos. Si lo amplías, mide la latencia después (límite
   blando 30 s por API Gateway).
 
-## Lab de Políticas Públicas y Prospectiva (Sprints A + B + C · LISTO)
+## Lab de Políticas Públicas y Prospectiva (Sprints A + B + C + D · LISTO)
 
 **El hub vive en `analisis-estructural.html`** (mismo archivo, rebrandeado).
-Los 5 módulos del lab están operativos:
+Los 6 módulos del lab están operativos:
 
 | # | Módulo | Archivo | Estado |
 |---|---|---|---|
@@ -1842,12 +1843,13 @@ Los 5 módulos del lab están operativos:
 | 3 | Análisis de actores | `mactor.html` | ✓ vivo |
 | 4 | Evaluación de política | `evaluacion.html` | ✓ vivo (Sprint B) |
 | 5 | Alternativas de política | `alternativas.html` | ✓ vivo (Sprint C) |
+| 6 | Análisis de Impacto Normativo | `ain.html` | ✓ vivo (Sprint D) |
 
 Sólo `analisis-estructural.html` figura en el listado de proyectos de
 `index.html` (como "Análisis Estructural de Sistemas"). Desde su hub se
-llega a los otros 4 módulos. El hub-grid se renderiza en 3 cols × 2 rows
-en desktop (3+2) para acomodar las 5 cards limpiamente. Cada módulo
-tiene cross-links amarillos a los otros 2-3 en su stage-results.
+llega a los otros 5 módulos. El hub-grid se renderiza en 3 cols × 2 rows
+en desktop (3+3) para acomodar las 6 cards limpiamente. Cada módulo
+tiene cross-links amarillos a los otros 2-4 en su stage-results.
 
 ### Hub del lab (`stage-hub` en analisis-estructural.html)
 
@@ -2273,6 +2275,128 @@ s3://elecciones-2026/ricardoruiz.co/bases de datos/alt/
   respaldo-academico.pdf       (19.7 KB · marco + fórmulas + 29 referencias)
 ```
 Pipeline en `tools/build-alt-docs/{build_metodologia.py, build_respaldo.py}`.
+
+### `ain.html` (Análisis de Impacto Normativo · Sprint D)
+
+Sexto módulo del lab. Opera sobre el estándar **Regulatory Impact
+Assessment (RIA)** de la OCDE (2012, revisión 2022), operacionalizado
+en Colombia por **DNP y Función Pública** vía **Decreto 1081/2015**
+(proyectos normativos) y **Decreto 1273/2020** (consulta pública).
+Marco teórico: Sunstein (*Simpler* 2013), Hahn-Tetlock (JEP 2008),
+Stigler (1971 captura del regulador), Mashaw (*Reasoned Administration*
+2018), Pigou, Coase, Akerlof.
+
+**6 mecánicas operativas + welcome + results:**
+
+1. **`stage-problema`** — caracteriza el problema regulatorio.
+   Enunciado + tipo de falla (6 familias canónicas: mercado,
+   externalidad, asimetría info, coordinación, equidad distributiva,
+   monopolio natural) + afectados (chips, max 12) + evidencia inicial.
+   Banner "Importar desde Problema Público" lee localStorage
+   `pp-current-v1` y precarga.
+2. **`stage-objetivos`** — 1-5 objetivos con 4 campos cada uno:
+   enunciado, indicador, meta, plazo. Validación de "completo" cuando
+   los 4 están llenos.
+3. **`stage-opciones`** — 7 tipos canónicos (statu-quo baseline,
+   regular directo, autorregulación, co-regulación, sandbox,
+   instr-mercado, otra) según Sunstein. Cada card con tipo + descripción
+   operativa + supuestos. Banner "Importar desde Alternativas" lee
+   `alt-current-v1` o `alt-import-to-ain`. IA "sugerir-opciones-
+   regulatorias" (Pro+). Max 6 + baseline.
+4. **`stage-impactos`** — matriz opciones × 5 categorías (costos
+   directos, costos indirectos, beneficios, captura, carga admin) con
+   escala B/M/A/MA. Score agregado = beneficios − promedio(costos+
+   captura+carga). Winner highlighted.
+5. **`stage-consulta`** — plan de consulta (audiencias chips + 7
+   instrumentos multi-select + cronograma) + matriz de 5 riesgos
+   regulatorios (captura, asimetría, carga excesiva, fragmentación,
+   obsolescencia · Hahn-Tetlock 2008 + Stigler 1971) con pills
+   bajo/medio/alto. IA "detectar-riesgos-regulatorios" (Premium+) con
+   niveles + justificaciones + mitigaciones + botón "Adoptar".
+6. **`stage-implementacion`** — 5 campos textarea: cronograma de
+   implementación, responsables, presupuesto, indicadores de monitoreo,
+   cláusula de revisión (24-36m con criterio cuantitativo).
+
+**`stage-results`** — hero con opción recomendada + 4 KPIs + tabla
+compacta con scores + selector de recomendación con justificación
+textual obligatoria. IA "narrativa-ain" (Premium+) genera informe
+estilo DNP con: justificación del problema, justificación de la
+recomendación, objeciones anticipadas en consulta, mitigaciones de
+riesgo, condiciones de revisión.
+
+**Cálculos clave:**
+- `_calcImpScore(optId)` → `{ score, complete, beneficios, costos_promedio }`.
+  Mapeo cualitativo bajo=1/medio=2/alto=3/muy-alto=4. Score =
+  beneficios − promedio(4 categorías invertidas).
+- `_optRankings()` → ordena opciones por score desc.
+
+**STATE shape:**
+```js
+STATE = {
+  step: 1,
+  contexto:     { enunciado_problema, dep_cod, mun_cod, sector,
+                  instrumento_norm, importedFromPP, importedFromAlt },
+  problema_reg: { enunciado, tipo_falla, afectados[], evidencia_inicial },
+  objetivos:    [{ id, enunciado, indicador, meta, plazo }],
+  opciones:     [{ id, nombre, tipo, desc, supuestos, baseline,
+                   importedFromAlt }],
+  impactos:     { [optId]: { costos_directos, costos_indirectos,
+                             beneficios, captura, carga_admin } },
+  consulta:     { plan, audiencias[], instrumentos[], cronograma },
+  riesgo_reg:   { captura, asimetria, carga_excesiva, fragmentacion,
+                  obsolescencia },
+  implementacion: { cronograma, responsables, presupuesto,
+                    indicadores_monitoreo, clausula_revision },
+  recomendacion: { opcionId_recomendada, justificacion }
+}
+```
+Persistido en `localStorage['ain-current-v1']`. `loadState()` defensivo.
+
+**Copiloto IA (Sprint D.8):** 3 acciones con cache hash24 TTL 7d:
+- `sugerir-opciones-regulatorias` (Pro+) · 4-6 opciones cubriendo al
+  menos 4 familias regulatorias canónicas con descripción + justificación.
+- `detectar-riesgos-regulatorios` (Premium+) · estima los 5 riesgos
+  como bajo/medio/alto con justificación por dimensión + mitigaciones.
+- `narrativa-ain` (Premium+) · redacta informe estilo DNP con 5
+  secciones: justificación problema, justificación recomendación,
+  objeciones anticipadas, mitigaciones de riesgo, condiciones de
+  revisión.
+
+**Exports (Sprint D.7):**
+- `downloadMemoMD` — markdown en 7 secciones con footer metodológico.
+- `downloadMatrizCSV` — CSV opciones × impactos + scores.
+- `downloadConpesPDF` — jsPDF on-demand. Memo CONPES regulatorio con
+  problema + objetivos + opciones + matriz impactos + análisis de
+  riesgo + consulta + implementación + recomendación. Disclaimer
+  "borrador estilo CONPES; no es CONPES oficial".
+- `enviarAEvaluacion` — escribe `localStorage['ain-import-to-ev']` con
+  opción recomendada + objetivos + indicadores monitoreo + justificación.
+  Redirige a `evaluacion.html?import=ain`. Pickup en
+  `evaluacion.html` con `handleAINImportOnLoad()` precarga pregunta
+  evaluativa (causal · ex-post) + sub-preguntas desde objetivos AIN +
+  marco lógico inicial.
+
+**PDFs AIN en S3** (Sprint D.10):
+```
+s3://elecciones-2026/ricardoruiz.co/bases de datos/ain/
+  metodologia-paso-a-paso.pdf  (15.1 KB · 10 secciones + ejemplo regulatorio
+                                  · pólizas de salud prepagada)
+  respaldo-academico.pdf       (15.5 KB · marco + fórmulas + 26 referencias
+                                  · Pigou, Coase, Stigler, Akerlof, Sunstein,
+                                  Hahn-Tetlock, Mashaw, OCDE-RIA, Decretos)
+```
+Pipeline en `tools/build-ain-docs/{build_metodologia.py, build_respaldo.py}`.
+Reportlab, sin más deps. Para regenerar:
+```bash
+python3 tools/build-ain-docs/build_metodologia.py
+python3 tools/build-ain-docs/build_respaldo.py
+aws s3 cp "Bases de datos/ain/metodologia-paso-a-paso.pdf" \
+  "s3://elecciones-2026/ricardoruiz.co/bases de datos/ain/metodologia-paso-a-paso.pdf" \
+  --content-type "application/pdf" --cache-control "public, max-age=300"
+aws s3 cp "Bases de datos/ain/respaldo-academico.pdf" \
+  "s3://elecciones-2026/ricardoruiz.co/bases de datos/ain/respaldo-academico.pdf" \
+  --content-type "application/pdf" --cache-control "public, max-age=300"
+```
 Reportlab, sin más deps. Para regenerar:
 ```bash
 python3 tools/build-alt-docs/build_metodologia.py
@@ -2310,8 +2434,8 @@ actualiza en un solo archivo y los 5 puntos lo recogen.
 
 ### Worker rr-auth — endpoints del lab
 
-Total **35 endpoints** (7 micmac + 7 mactor + 7 pp + 7 ev + 7 alt),
-agrupados en 5 módulos paralelos con el mismo patrón CRUD + invite +
+Total **42 endpoints** (7 micmac + 7 mactor + 7 pp + 7 ev + 7 alt + 7 ain),
+agrupados en 6 módulos paralelos con el mismo patrón CRUD + invite +
 copiloto.
 
 **MicMac (`/micmac/*`):**
@@ -2358,6 +2482,20 @@ copiloto.
 - `GET    /alt/accept?token=` — acepta invitación.
 - `POST   /alt/copiloto` — 4 acciones IA (Sprint C.7).
 
+**AIN (`/ain/*`)** — Sprint D.8:
+- `GET    /ain/list` — lista análisis (owner + collab).
+- `POST   /ain/save` — crea o actualiza. Validación dura: tipo_falla
+  whitelisted, ≤5 objetivos, ≤7 opciones (6 + baseline), tipo de opción
+  whitelisted, niveles de impacto whitelisted, ≤12 afectados, ≤10
+  audiencias, instrumentos whitelisted, dimensiones de riesgo
+  whitelisted, niveles riesgo whitelisted, ids hex.
+- `GET    /ain/load?projId=&since=` — carga con polling.
+- `DELETE /ain/delete?projId=` — solo owner.
+- `POST   /ain/invite` — correo Resend con link 14d, copy "Análisis
+  de Impacto Normativo".
+- `GET    /ain/accept?token=` — acepta invitación.
+- `POST   /ain/copiloto` — 3 acciones IA (Sprint D.8).
+
 **Acciones IA por módulo (action en body):**
 | Módulo | Acción | Plan |
 |---|---|---|
@@ -2379,6 +2517,9 @@ copiloto.
 | alt    | `sugerir-opciones` | Pro+ |
 | alt    | `validar-coherencia` | Premium+ |
 | alt    | `narrativa-alternativas` | Premium+ |
+| ain    | `sugerir-opciones-regulatorias` | Pro+ |
+| ain    | `detectar-riesgos-regulatorios` | Premium+ |
+| ain    | `narrativa-ain` | Premium+ |
 
 **Storage KV (`RR_STORE`):**
 ```
@@ -2391,6 +2532,7 @@ mactor:* (mismo layout con prefijo mactor)
 pp:*     (mismo layout con prefijo pp)
 ev:*     (mismo layout con prefijo ev)
 alt:*    (mismo layout con prefijo alt)
+ain:*    (mismo layout con prefijo ain)
 ```
 
 **DeepSeek:** API key `DEEPSEEK_API_KEY` como secret del worker
@@ -2398,9 +2540,9 @@ alt:*    (mismo layout con prefijo alt)
 `deepseek-v4-flash`. AbortSignal 28s. Cache hash24 con
 `PROMPT_VERSION='v1'` (bumpear al cambiar prompts para invalidar cache).
 
-**Plan gate (común a los 5 módulos):**
+**Plan gate (común a los 6 módulos):**
 ```js
-MICMAC_MAX_PROJ = MACTOR_MAX_PROJ = PP_MAX_PROJ = EV_MAX_PROJ = ALT_MAX_PROJ = { free:1, pro:5, premium:25, full:50 }
+MICMAC_MAX_PROJ = MACTOR_MAX_PROJ = PP_MAX_PROJ = EV_MAX_PROJ = ALT_MAX_PROJ = AIN_MAX_PROJ = { free:1, pro:5, premium:25, full:50 }
 PP_MAX_ALTERNATIVAS = 5
 PP_MAX_CRITERIOS    = 8
 PP_MAX_EVIDENCIA    = 60
@@ -2414,6 +2556,10 @@ ALT_MAX_OPCIONES_POR_VAR = 5
 ALT_MAX_ALTERNATIVAS     = 7   // 6 + baseline
 ALT_MAX_INCOMPAT         = 60
 ALT_MAX_ESCENARIOS       = 4
+AIN_MAX_OBJETIVOS        = 5
+AIN_MAX_OPCIONES         = 7   // 6 + baseline statu-quo
+AIN_MAX_AFECTADOS        = 12
+AIN_MAX_AUDIENCIAS       = 10
 ```
 
 **Deploy del worker:**
@@ -2438,10 +2584,7 @@ token + plan. `_callDeepSeek(env, systemPrompt, userMsg, opts)`. `_hash24(str)`.
 
 ### Backlog del lab
 
-**Sprint próximo (D):**
-- **Sprint D** — módulo **AIA** (Análisis de Impacto Adicional);
-  pendiente de scope. Probablemente impacto regulatorio (RIA · OCDE)
-  y/o impacto ambiental/social ex-ante.
+**Sprint D · AIN** ✓ LISTO (ver sección dedicada arriba).
 
 **Iteraciones del módulo Evaluación (B v2) — literatura 2020-2026 ya en `Bases de datos/evaluacion-politicas/investigacion-literatura-2020-2026.txt`:**
 - TWFE warning + selector de método causal moderno: DID escalonado
@@ -2454,16 +2597,16 @@ token + plan. `_callDeepSeek(env, systemPrompt, userMsg, opts)`. `_hash24(str)`.
 - Cargar el documento de literatura para enriquecer prompts del copiloto
   sin reescribir las 6 mecánicas.
 
-**Reservados para después de los 5 módulos:**
+**Reservados para después de los 6 módulos:**
 - **Sprint E** — datos municipales (~1.100 muns × 5 indicadores)
   precargados desde DANE / Policía / MEN microdatos. Beneficia a los
-  5 módulos cuando estén.
+  6 módulos cuando estén.
 - **Sprint F** — escenarios prospectivos: vista "what-if" sobre MicMac,
-  Mactor, problema-publico y alternativas. Los 4 escenarios de
+  Mactor, problema-publico, alternativas y AIN. Los 4 escenarios de
   Alternativas (C.5) son un primer paso editable.
-- **Sprint G** — informe combinado de los 5 módulos exportado como PDF
+- **Sprint G** — informe combinado de los 6 módulos exportado como PDF
   dinámico (un solo entregable con problema + variables del sistema +
-  actores + alternativas + plan de evaluación).
+  actores + alternativas + AIN + plan de evaluación).
 
 **Mejoras de módulos vivos:**
 - **Mactor MIDI** (opcional) — matriz pivotada de influencias

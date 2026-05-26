@@ -2,9 +2,10 @@
 // Lab de Políticas Públicas y Prospectiva · Catálogo de Recursos & Datos
 // ═════════════════════════════════════════════════════════════════════════
 // Recursos externos curados, agrupados por categoría y etiquetados por
-// módulo del lab donde son más relevantes. Cargado por los 5 módulos
-// (analisis-estructural, mactor, problema-publico, evaluacion, alternativas)
-// vía <script src="lab-recursos.js"></script> al final del body.
+// módulo del lab donde son más relevantes. Cargado por los 6 módulos
+// (analisis-estructural, mactor, problema-publico, evaluacion,
+// alternativas, ain) vía <script src="lab-recursos.js"></script> al
+// final del body.
 //
 // Convenciones:
 //   - SOLO recursos oficiales o instituciones reconocidas (no blogs).
@@ -32,14 +33,14 @@ window.LAB_RECURSOS = {
       nombre: 'CONPES · Documentos de política',
       url: 'https://colaboracion.dnp.gov.co/CDT/Conpes/',
       desc: 'Repositorio completo de documentos CONPES (Consejo Nacional de Política Económica y Social). El instrumento por excelencia de política pública nacional en Colombia.',
-      modulos: ['problema', 'estructural', 'evaluacion', 'alternativas']
+      modulos: ['problema', 'estructural', 'evaluacion', 'alternativas', 'ain']
     },
     {
       id: 'sisconpes', categoria: 'co-pp',
       nombre: 'SISCONPES · Sistema de Seguimiento',
       url: 'https://sisconpes.dnp.gov.co/SisCONPESWeb/',
       desc: 'Tablero de seguimiento del avance de las acciones CONPES vigentes. Útil para entender qué políticas están activas y en qué fase.',
-      modulos: ['problema', 'evaluacion', 'alternativas']
+      modulos: ['problema', 'evaluacion', 'alternativas', 'ain']
     },
     {
       id: 'sinergia', categoria: 'co-pp',
@@ -53,14 +54,14 @@ window.LAB_RECURSOS = {
       nombre: 'DNP · Departamento Nacional de Planeación',
       url: 'https://www.dnp.gov.co/',
       desc: 'Sitio central del DNP: marco fiscal, guías metodológicas, KPT (Kit del Plan Territorial), instrumentos de planeación territorial.',
-      modulos: ['problema', 'estructural', 'evaluacion']
+      modulos: ['problema', 'estructural', 'evaluacion', 'ain']
     },
     {
       id: 'dnp-kpt', categoria: 'co-pp',
       nombre: 'DNP · Kit del Plan Territorial (KPT)',
       url: 'https://kpt.dnp.gov.co/',
       desc: 'Caja de herramientas oficial para alcaldías y gobernaciones que construyen su Plan de Desarrollo Territorial. Incluye diagnósticos y formatos.',
-      modulos: ['problema', 'estructural', 'alternativas']
+      modulos: ['problema', 'estructural', 'alternativas', 'ain']
     },
     {
       id: 'kp-dnp', categoria: 'co-pp',
@@ -192,14 +193,14 @@ window.LAB_RECURSOS = {
       nombre: 'Behavioural Insights Team',
       url: 'https://www.bi.team/',
       desc: 'Instituto pionero en aplicar economía conductual al diseño de política pública. Publicaciones libres con casos reales.',
-      modulos: ['problema', 'evaluacion', 'alternativas']
+      modulos: ['problema', 'evaluacion', 'alternativas', 'ain']
     },
     {
       id: 'cepal-ilpes', categoria: 'diseno',
       nombre: 'CEPAL · ILPES (Planificación)',
       url: 'https://www.cepal.org/es/ilpes',
       desc: 'Instituto Latinoamericano y del Caribe de Planificación. Manuales de marco lógico, prospectiva, planificación estratégica.',
-      modulos: ['problema', 'estructural', 'evaluacion', 'alternativas']
+      modulos: ['problema', 'estructural', 'evaluacion', 'alternativas', 'ain']
     },
 
     // ─── Prospectiva y método ──────────────────────────────────────────────
@@ -244,6 +245,20 @@ window.LAB_RECURSOS = {
       url: 'https://www.povertyactionlab.org/page/cost-effectiveness-and-welfare-analysis',
       desc: 'Recursos de J-PAL sobre análisis de costo-efectividad: guías, plantillas, base comparativa de evaluaciones de impacto. Útil cuando los beneficios no son monetizables.',
       modulos: ['alternativas', 'evaluacion']
+    },
+    {
+      id: 'ocde-ria', categoria: 'evaluacion',
+      nombre: 'OCDE · Regulatory Impact Assessment',
+      url: 'https://www.oecd.org/regreform/regulatory-impact-analysis.htm',
+      desc: 'Página oficial de la OCDE sobre Regulatory Impact Assessment (RIA): manuales, casos comparativos por país, índice global de Regulatory Policy and Governance. Marco internacional del AIN.',
+      modulos: ['ain', 'evaluacion']
+    },
+    {
+      id: 'funcion-publica-ain', categoria: 'co-pp',
+      nombre: 'Función Pública · AIN Colombia',
+      url: 'https://www.funcionpublica.gov.co/web/eva/gestor-normativo',
+      desc: 'Gestor Normativo y portal SUCOP de Función Pública. Decreto 1081/2015 + Decreto 1273/2020 sobre proyectos normativos y consulta pública. Guía oficial colombiana del Análisis de Impacto Normativo.',
+      modulos: ['ain', 'problema']
     }
   ]
 };

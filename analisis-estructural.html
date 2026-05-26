@@ -1731,7 +1731,7 @@ footer.foot a:hover { color: var(--accent); }
     </div>
 
     <div class="hub-hero">
-      <div class="eyebrow">Laboratorio de Políticas · 5 módulos integrados</div>
+      <div class="eyebrow">Laboratorio de Políticas · 6 módulos integrados</div>
       <h1>Política pública que <em>aguanta en comité</em></h1>
       <p>
         Cinco herramientas conectadas para equipos técnicos y consultoras
@@ -1817,6 +1817,22 @@ footer.foot a:hover { color: var(--accent); }
         </div>
         <div class="mod-cta">Abrir módulo →</div>
       </button>
+
+      <button class="mod-card" data-mod="ain" type="button" onclick="onHubCardClick('ain')">
+        <span class="mod-badge-reco">Recomendado para ti</span>
+        <div class="mod-icon">
+          <svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M14 4v4h4"/><path d="M8 13h8M8 17h5"/><circle cx="18" cy="17" r="1.5" fill="currentColor" stroke="none"/></svg>
+        </div>
+        <div class="mod-name">Análisis de Impacto Normativo</div>
+        <div class="mod-tag">DNP · Función Pública · RIA OCDE</div>
+        <div class="mod-desc">
+          Sustenta el proyecto normativo con AIN: problema regulatorio,
+          objetivos medibles, opciones (statu quo · directo · sandbox ·
+          autorregulación · instrumento de mercado), matriz de impactos,
+          5 riesgos regulatorios y memo CONPES PDF.
+        </div>
+        <div class="mod-cta">Abrir módulo →</div>
+      </button>
     </div>
 
     <div class="hub-bottom-cta">
@@ -1827,13 +1843,14 @@ footer.foot a:hover { color: var(--accent); }
       <button class="btn" onclick="openHubWizard()">Ayúdame a escoger →</button>
     </div>
 
-    <p style="margin:2.6rem auto 0;text-align:center;font-family:var(--italic);font-style:italic;color:var(--ink-3);font-size:.92rem;max-width:60ch;line-height:1.55">
-      Los cinco módulos se pueden encadenar — el resultado de uno
+    <p style="margin:2.6rem auto 0;text-align:center;font-family:var(--italic);font-style:italic;color:var(--ink-3);font-size:.92rem;max-width:64ch;line-height:1.55">
+      Los seis módulos se pueden encadenar — el resultado de uno
       alimenta al siguiente. Una ruta natural: <em>problema público</em>
       para enmarcar → <em>alternativas</em> para profundizar las
       opciones con análisis morfológico → <em>análisis estructural</em>
       para entender el sistema → <em>actores</em> para mapear el juego
-      político → <em>evaluación</em> para diseñar cómo se va a medir.
+      político → <em>AIN</em> si vas a expedir norma nueva →
+      <em>evaluación</em> para diseñar cómo se va a medir.
     </p>
 
     <!-- ──────────────── RECURSOS & DATOS (catálogo completo) ──────────────── -->
@@ -3642,7 +3659,8 @@ const HUB_MODULES = {
   estructural: { name: 'Análisis estructural',   href: null,                    soon: false, card: 'estructural' },
   mactor:      { name: 'Análisis de actores',    href: 'mactor.html',           soon: false, card: 'mactor'      },
   evaluacion:  { name: 'Evaluación de política', href: 'evaluacion.html',       soon: false, card: 'evaluacion'  },
-  alternativas:{ name: 'Alternativas de política',href:'alternativas.html',     soon: false, card: 'alternativas'}
+  alternativas:{ name: 'Alternativas de política',href:'alternativas.html',     soon: false, card: 'alternativas'},
+  ain:         { name: 'Análisis de Impacto Normativo', href:'ain.html',        soon: false, card: 'ain'         }
 };
 
 const HUB_QS = [
@@ -3781,7 +3799,7 @@ function hubWizBack(targetStep) { setHubWizStep(targetStep); }
 // donde el ganador esté en estado 'soon' y necesitemos un fallback
 // navegable).
 function computeHubRecommendation() {
-  const score = { problema: 0, estructural: 0, mactor: 0, evaluacion: 0, alternativas: 0 };
+  const score = { problema: 0, estructural: 0, mactor: 0, evaluacion: 0, alternativas: 0, ain: 0 };
   for (const c of HUB_QS) {
     const aId = HUB_STATE.answers[c.id];
     if (!aId) continue;
@@ -3789,16 +3807,18 @@ function computeHubRecommendation() {
     if (!opt) continue;
     for (const k of Object.keys(score)) score[k] += (opt.s[k] || 0);
   }
-  // Cuando problema gana con q1=enmarcar Y (q2=durante o q5=memo), agregamos
-  // un nudge hacia alternativas: el usuario está en diseño de opciones con
-  // necesidad de defenderlas. Alternativas es la versión profunda de ese paso.
-  const a1 = HUB_STATE.answers.q1, a2 = HUB_STATE.answers.q2, a5 = HUB_STATE.answers.q5;
+  // Nudge hacia alternativas: q1=enmarcar Y (q2=durante o q5=memo) suma
+  // puntos a alternativas (versión profunda del paso de opciones de pp).
+  const a1 = HUB_STATE.answers.q1, a2 = HUB_STATE.answers.q2, a3 = HUB_STATE.answers.q3, a5 = HUB_STATE.answers.q5;
   if (a1 === 'enmarcar' && (a2 === 'durante' || a5 === 'memo')) score.alternativas += 2;
   if (a2 === 'durante' && a5 === 'memo') score.alternativas += 1;
-  // Tiebreak: estructural > mactor > problema > alternativas > evaluacion.
-  // Alternativas va después de problema para no robarle el primer plano cuando
-  // ambos empatan, salvo que el nudge específico lo lleve por delante.
-  const order = ['estructural', 'mactor', 'problema', 'alternativas', 'evaluacion'];
+  // Nudge hacia AIN: el usuario tiene un proyecto NORMATIVO específico —
+  // típicamente cuando q1=enmarcar Y el entregable es decreto/norma. No
+  // tenemos opción específica en q5 para regulación, así que nudge suave:
+  // si q1=enmarcar Y q2=pre Y q5=memo, hay buena chance de que sea AIN.
+  if (a1 === 'enmarcar' && a2 === 'pre' && a5 === 'memo') score.ain += 1;
+  // Tiebreak: estructural > mactor > problema > alternativas > ain > evaluacion.
+  const order = ['estructural', 'mactor', 'problema', 'alternativas', 'ain', 'evaluacion'];
   const ranked = order.slice().sort((a, b) => score[b] - score[a]);
   const winner = ranked[0];
   const fallback = ranked.find(k => k !== winner && !HUB_MODULES[k].soon) || null;
@@ -3908,10 +3928,12 @@ function escapeAttr(s) {
 // ── Modal Recursos · filtrado por módulo (FAB en estructural/mactor/pp) ──
 const LAB_CURRENT_MODULE = 'estructural';
 const LAB_MOD_LABELS = {
-  problema:    'el módulo de Problema Público',
-  estructural: 'el módulo de Análisis Estructural',
-  mactor:      'el módulo de Análisis de Actores',
-  evaluacion:  'el módulo de Evaluación'
+  problema:     'el módulo de Problema Público',
+  estructural:  'el módulo de Análisis Estructural',
+  mactor:       'el módulo de Análisis de Actores',
+  evaluacion:   'el módulo de Evaluación',
+  alternativas: 'el módulo de Alternativas de Política',
+  ain:          'el módulo de Análisis de Impacto Normativo'
 };
 function openRecursosModal() {
   const lab = window.LAB_RECURSOS;

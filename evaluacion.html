@@ -2950,6 +2950,70 @@ function iaRenderNarrativaPlan(data) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════
+// ── Import desde AIN (D.11 · ain.html → evaluacion.html) ────────────────
+// ain.html escribe localStorage['ain-import-to-ev'] con shape:
+//   { source, timestamp, contexto, opcion_recomendada:{nombre,tipo,desc,supuestos},
+//     objetivos:[{enunciado,indicador,meta,plazo}], indicadores_monitoreo,
+//     justificacion }
+// y redirige a evaluacion.html?import=ain.
+function handleAINImportOnLoad() {
+  try {
+    const url = new URL(window.location.href);
+    const flag = url.searchParams.get('import');
+    const raw = localStorage.getItem('ain-import-to-ev');
+    if (!raw) return;
+    let payload;
+    try { payload = JSON.parse(raw); } catch { localStorage.removeItem('ain-import-to-ev'); return; }
+    if (!payload || !payload.opcion_recomendada) {
+      localStorage.removeItem('ain-import-to-ev');
+      return;
+    }
+    const stamp = Date.parse(payload.timestamp || '') || 0;
+    const recent = (Date.now() - stamp) < 5 * 60 * 1000;
+    if (flag !== 'ain' && !recent) return;
+    const opt = payload.opcion_recomendada;
+    const msg = `Llegó una opción regulatoria recomendada desde AIN: "${opt.nombre}". ` +
+      `¿Importarla como pregunta evaluativa (orientada a evaluar el efecto de la regulación) y precargar la teoría de cambio?`;
+    if (!confirm(msg)) {
+      localStorage.removeItem('ain-import-to-ev');
+      if (flag === 'ain') { url.searchParams.delete('import'); window.history.replaceState({}, '', url.toString()); }
+      return;
+    }
+    applyAINImport(payload);
+    localStorage.removeItem('ain-import-to-ev');
+    if (flag === 'ain') { url.searchParams.delete('import'); window.history.replaceState({}, '', url.toString()); }
+  } catch (e) {
+    console.error('handleAINImportOnLoad failed:', e.message);
+  }
+}
+function applyAINImport(payload) {
+  const opt = payload.opcion_recomendada;
+  const enunciado = `¿En qué medida la opción regulatoria "${opt.nombre}" logra los objetivos normativos planteados y reduce el problema regulatorio identificado?`;
+  if (!STATE.pregunta) STATE.pregunta = { tipo:'', alcance:'', enunciado:'', subpreguntas:[] };
+  STATE.pregunta.tipo = 'causal';     // por defecto causal — evaluar efecto regulatorio
+  STATE.pregunta.alcance = 'ex-post'; // ex-post típico para evaluar regulación
+  STATE.pregunta.enunciado = enunciado.slice(0, 1200);
+  // Sub-preguntas desde objetivos AIN
+  if (Array.isArray(payload.objetivos) && payload.objetivos.length) {
+    STATE.pregunta.subpreguntas = payload.objetivos.slice(0, 5).map(o =>
+      `¿${o.enunciado || 'logra el objetivo'} (meta: ${o.meta || '—'} en ${o.plazo || '—'})?`
+    ).map(s => s.slice(0, 240));
+  }
+  // Precargar marco lógico: opción regulatoria como actividad principal
+  if (!STATE.teoria) STATE.teoria = { insumos:[], actividades:[], productos:[], resultados:[], impacto:[], supuestos:[] };
+  STATE.teoria.actividades = [`Aplicar opción regulatoria: ${opt.nombre}`.slice(0, 200)];
+  if (opt.desc) STATE.teoria.actividades.push(opt.desc.slice(0, 200));
+  // Indicadores de monitoreo del AIN entran como supuestos transversales
+  if (payload.indicadores_monitoreo) {
+    STATE.teoria.supuestos = [`Indicadores de monitoreo del AIN: ${payload.indicadores_monitoreo}`.slice(0, 400)];
+  }
+  // Justificación del AIN entra como meta del state (campo informativo)
+  saveState();
+  renderAll();
+  goToStep(1);
+  showToast(`Importado desde AIN. Revisa la pregunta evaluativa, teoría y agrega indicadores SMART.`);
+}
+
 // INIT
 // ═════════════════════════════════════════════════════════════════════════
 (async function init() {
@@ -2966,6 +3030,8 @@ function iaRenderNarrativaPlan(data) {
   renderAuthChip();
   renderCloudBars();
   if (AUTH.isLogged) { refreshProjectsList(); handleInviteOnLoad(); }
+  // Pickup de AIN (si lo hay)
+  handleAINImportOnLoad();
 })();
 </script>
 </body>

@@ -1412,8 +1412,9 @@ footer.foot {
       <button class="btn-ghost" onclick="goToStep(6)">← Editar decisión</button>
     </div>
 
-    <div style="margin-top:1.5rem">
+    <div style="margin-top:1.5rem;display:flex;gap:.55rem;flex-wrap:wrap">
       <button class="btn-ghost" onclick="enviarAProblemaPublico()" style="border-color:var(--gold);color:var(--gold)">Enviar alternativas → Problema Público</button>
+      <button class="btn-ghost" onclick="enviarAAIN()" style="border-color:var(--gold);color:var(--gold)">Enviar como opciones regulatorias → AIN</button>
     </div>
 
     <div style="margin-top:2rem;display:grid;gap:.8rem">
@@ -4034,6 +4035,33 @@ async function downloadConpesPDF() {
   const filename = `alternativas-CONPES-${_slugForFile()}-${new Date().toISOString().slice(0,10)}.pdf`;
   doc.save(filename);
   showToast('PDF CONPES light generado.');
+}
+
+// ── Envío a AIN (D.11) ───────────────────────────────────────────────────
+function enviarAAIN() {
+  const alts = STATE.alternativas || [];
+  if (alts.length === 0) { showToast('No hay alternativas para enviar.'); return; }
+  const payload = {
+    source: 'alternativas.html',
+    timestamp: new Date().toISOString(),
+    contexto: STATE.contexto.enunciado_problema || '',
+    alternativas: alts.map(a => ({
+      nombre: a.nombre,
+      desc: a.desc || '',
+      supuestos: a.supuestos || '',
+      baseline: !!a.baseline
+    }))
+  };
+  try {
+    localStorage.setItem('alt-import-to-ain', JSON.stringify(payload));
+    if (!confirm(`Se enviaron ${alts.length} alternativas a AIN. ¿Abrir el módulo AIN ahora? Las alternativas no-baseline se importarán como opciones regulatorias en el paso 3.`)) {
+      showToast('Alternativas listas en cola para AIN.');
+      return;
+    }
+    window.location.href = 'ain.html?import=alt';
+  } catch (e) {
+    showToast('No se pudo enviar (storage lleno).');
+  }
 }
 
 // ── Envío a Problema Público (C.10 lo cierra del lado de pp) ─────────────
