@@ -774,6 +774,19 @@ footer.foot {
 .proj-disclosure summary:hover { background:var(--paper-3); }
 .proj-disclosure .proj-caret { display:inline-block; transition:transform .15s; }
 .proj-disclosure[open] .proj-caret { transform:rotate(90deg); }
+
+/* Tabs económicos (B v2.4) */
+.eco-tab {
+  padding:.5rem 1rem;
+  background:var(--paper-2); color:var(--ink-3);
+  border:1px solid var(--rule-strong);
+  cursor:none; font-weight:700;
+  transition:background .15s, color .15s, border-color .15s;
+}
+.eco-tab:hover { color:var(--ink); border-color:var(--ink); }
+.eco-tab.sel { background:var(--accent-soft); color:var(--accent); border-color:var(--accent); }
+.eco-panel { padding-top:.4rem; }
+.eco-panel.is-hidden { display:none !important; }
 </style>
 </head>
 <body>
@@ -937,11 +950,16 @@ footer.foot {
       <p>
         <b>La pregunta evaluativa determina todo lo demás.</b> Una
         evaluación que intenta contestar <em>"¿el programa funcionó?"</em>
-        sin distinguir <i>tipo de pregunta</i> ni <i>alcance temporal</i>
-        termina midiendo lo más fácil, no lo más importante. Cinco tipos
-        canónicos · cuatro alcances temporales · una pregunta principal
-        bien acotada.
+        sin distinguir <i>tipo de pregunta</i>, <i>alcance temporal</i>
+        ni <i>tipo de evaluación según Sinergia DNP</i> termina midiendo
+        lo más fácil, no lo más importante.
       </p>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Tipo de evaluación · tipología Sinergia DNP</label>
+      <div class="pill-group" id="preg-sinergia-pills"></div>
+      <div class="field-hint" id="preg-sinergia-hint">La tipología oficial colombiana de evaluaciones. Determina el alcance y el formato del entregable final.</div>
     </div>
 
     <div class="field">
@@ -1110,11 +1128,13 @@ footer.foot {
       </p>
     </div>
 
+    <div id="met-twfe-warning" class="is-hidden" style="margin-bottom:1rem"></div>
+
     <div id="met-grid" style="display:grid;grid-template-columns:1fr;gap:.9rem"></div>
 
     <div class="field" style="margin-top:1.4rem">
       <label class="field-label" for="met-justificacion">Justificación de la elección (opcional)</label>
-      <textarea id="met-justificacion" placeholder="Ej.: escogemos diff-in-diff porque tenemos datos panel pre/post para colegios tratados y no tratados; un RCT puro es inviable por restricciones éticas y operativas."></textarea>
+      <textarea id="met-justificacion" placeholder="Ej.: escogemos DID escalonado de Callaway-Sant'Anna porque tenemos panel municipal con tratamiento que entró por fases (2020 cohorte A, 2022 cohorte B, 2024 cohorte C). El estimador ATT(g,t) evita los sesgos TWFE."></textarea>
       <div class="field-hint">Por qué este método es viable y por qué descartas los demás. Útil para defender el plan ante el comité.</div>
     </div>
 
@@ -1155,10 +1175,113 @@ footer.foot {
     </div>
   </section>
 
-  <!-- MECÁNICA 6 · PLAN -->
+  <!-- MECÁNICA 6 · ANÁLISIS ECONÓMICO (B v2.4) -->
+  <section id="stage-economico" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 06</span>Análisis económico</h2>
+      <span class="meta" id="eco-meta">opcional · 3 calculadoras</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        <b>Tres calculadoras conviven, no compiten.</b> Cuando la
+        pregunta es de valor o gestión, conviene tener al menos una de
+        ellas. <em>CBA Green Book</em> (HM Treasury 2022) para VPN
+        social con tasa de descuento y weights distribucionales.
+        <em>MVPF</em> (Hendren &amp; Sprung-Keyser, NBER 2020) cuando
+        quieres comparar políticas heterogéneas en un solo número —
+        MVPF &gt; 1 es Pareto-superior. <em>CEA</em> (J-PAL) cuando los
+        beneficios no son monetizables. <em>Este paso es opcional:</em>
+        llena las calculadoras que apliquen.
+      </p>
+    </div>
+
+    <div class="eco-tabs" style="display:flex;gap:.4rem;margin-bottom:1.1rem;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase">
+      <button class="eco-tab sel" data-tab="cba"  onclick="setEcoTab('cba')">CBA · Green Book</button>
+      <button class="eco-tab"     data-tab="mvpf" onclick="setEcoTab('mvpf')">MVPF · Hendren</button>
+      <button class="eco-tab"     data-tab="cea"  onclick="setEcoTab('cea')">CEA · J-PAL</button>
+    </div>
+
+    <div id="eco-cba-panel" class="eco-panel">
+      <p style="font-family:var(--italic);font-style:italic;font-size:.92rem;color:var(--ink-2);margin-bottom:.85rem">
+        <b>Cost-Benefit Analysis (CBA).</b> Calcula el Valor Presente Neto social de la política. Tasa de descuento social: DNP usa 9%; Green Book HM Treasury 2022 propone 3% ajustada por bienestar. Weights distribucionales opcionales (Green Book 2022).
+      </p>
+      <div class="alt-row">
+        <div class="ar-field">
+          <label>Costos totales (COP, anuales)</label>
+          <input type="text" id="eco-cba-costos" placeholder="Ej.: 50000000000"/>
+        </div>
+        <div class="ar-field">
+          <label>Beneficios totales (COP, anuales)</label>
+          <input type="text" id="eco-cba-beneficios" placeholder="Ej.: 75000000000"/>
+        </div>
+      </div>
+      <div class="alt-row" style="margin-top:.6rem">
+        <div class="ar-field">
+          <label>Tasa social de descuento (%)</label>
+          <input type="text" id="eco-cba-tasa" placeholder="9 (DNP) · 3 (Green Book ajustado)"/>
+        </div>
+        <div class="ar-field">
+          <label>Horizonte (años)</label>
+          <input type="text" id="eco-cba-horizonte" placeholder="10"/>
+        </div>
+      </div>
+      <div class="field" style="margin-top:.85rem">
+        <label class="field-label" for="eco-cba-weights">Weights distribucionales (notas opcionales · Green Book 2022)</label>
+        <input type="text" id="eco-cba-weights" placeholder="Ej.: weight 1.5x para quintil 1 (bajo) según ingreso del beneficiario"/>
+      </div>
+      <div id="eco-cba-result" style="margin-top:1rem;padding:.95rem 1.15rem;background:var(--paper-3);border-left:3px solid var(--accent);font-family:var(--mono);font-size:13px;color:var(--ink)">—</div>
+    </div>
+
+    <div id="eco-mvpf-panel" class="eco-panel is-hidden">
+      <p style="font-family:var(--italic);font-style:italic;font-size:.92rem;color:var(--ink-2);margin-bottom:.85rem">
+        <b>Marginal Value of Public Funds (MVPF).</b> Beneficios para receptores ÷ costo neto al gobierno (incluyendo efectos fiscales futuros). <b>MVPF &gt; 1</b> = política Pareto-superior. Permite comparar políticas heterogéneas (educativo vs subsidio vs crédito tributario). Base pública: <a href="https://policyimpacts.org/" target="_blank" rel="noopener" style="color:var(--accent)">policyimpacts.org</a>.
+      </p>
+      <div class="alt-row">
+        <div class="ar-field">
+          <label>Beneficios para receptores (COP)</label>
+          <input type="text" id="eco-mvpf-beneficios" placeholder="Ej.: 80000000000"/>
+        </div>
+        <div class="ar-field">
+          <label>Costo neto gobierno (COP, incluye efectos fiscales)</label>
+          <input type="text" id="eco-mvpf-costo" placeholder="Ej.: 60000000000"/>
+        </div>
+      </div>
+      <div id="eco-mvpf-result" style="margin-top:1rem;padding:.95rem 1.15rem;background:var(--paper-3);border-left:3px solid var(--accent);font-family:var(--mono);font-size:13px;color:var(--ink)">—</div>
+    </div>
+
+    <div id="eco-cea-panel" class="eco-panel is-hidden">
+      <p style="font-family:var(--italic);font-style:italic;font-size:.92rem;color:var(--ink-2);margin-bottom:.85rem">
+        <b>Cost-Effectiveness Analysis (CEA).</b> Costo ÷ unidad de outcome. Accesible cuando los beneficios sociales no son monetizables (vidas salvadas, años de escolaridad adicionales, vacunados). J-PAL mantiene base comparativa por sector.
+      </p>
+      <div class="alt-row">
+        <div class="ar-field">
+          <label>Costo total (COP)</label>
+          <input type="text" id="eco-cea-costo" placeholder="Ej.: 40000000000"/>
+        </div>
+        <div class="ar-field">
+          <label>Unidad de outcome</label>
+          <input type="text" id="eco-cea-unidad" placeholder="Ej.: estudiantes retenidos"/>
+        </div>
+        <div class="ar-field">
+          <label>Outcome total esperado</label>
+          <input type="text" id="eco-cea-outcome" placeholder="Ej.: 8500"/>
+        </div>
+      </div>
+      <div id="eco-cea-result" style="margin-top:1rem;padding:.95rem 1.15rem;background:var(--paper-3);border-left:3px solid var(--accent);font-family:var(--mono);font-size:13px;color:var(--ink)">—</div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goToStep(5)">← Criterios DAC</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToStep(7)">Plan operativo →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MECÁNICA 7 · PLAN -->
   <section id="stage-plan" class="is-hidden">
     <div class="section-head">
-      <h2><span class="num">— 06</span>Plan de evaluación</h2>
+      <h2><span class="num">— 07</span>Plan de evaluación</h2>
     </div>
     <div class="stage-intro">
       <p>
@@ -1168,7 +1291,7 @@ footer.foot {
         a hacer, cómo y con qué criterios de éxito, para que después no
         puedas <em>p-hackear</em> tu propia evaluación. Completa los
         cuatro campos finales — todo lo demás ya quedó capturado en los
-        pasos 1-5.
+        pasos 1-6.
       </p>
     </div>
 
@@ -1197,7 +1320,7 @@ footer.foot {
     </div>
 
     <div class="actions">
-      <button class="btn-ghost" onclick="goToStep(5)">← Criterios DAC</button>
+      <button class="btn-ghost" onclick="goToStep(6)">← Análisis económico</button>
       <div class="right-group">
         <button class="btn" onclick="goToResults()">Ver plan final →</button>
       </div>
@@ -1207,7 +1330,7 @@ footer.foot {
   <!-- RESULTS -->
   <section id="stage-results" class="is-hidden">
     <div class="section-head">
-      <h2><span class="num">— 07</span>Plan de evaluación listo</h2>
+      <h2><span class="num">— 08</span>Plan de evaluación listo</h2>
       <span class="meta" id="res-meta">—</span>
     </div>
 
@@ -1235,6 +1358,7 @@ footer.foot {
 
     <div style="display:flex;gap:.65rem;flex-wrap:wrap;margin-top:1.5rem">
       <button class="btn" onclick="downloadPlanMD()">↓ Descargar plan (.md)</button>
+      <button class="btn-ghost" onclick="downloadPAPMD()" title="Pre-Analysis Plan compatible con AEA RCT Registry / OSF">↓ Pre-Analysis Plan (.md)</button>
       <button class="btn-ghost" onclick="downloadMatrizCSV()">↓ Matriz indicadores (.csv)</button>
       <button class="btn-ghost" onclick="goToStep(6)">← Editar plan</button>
     </div>
@@ -1260,15 +1384,20 @@ footer.foot {
     </div>
 
     <p class="methodology-note">
-      Esta herramienta condensa los marcos canónicos de evaluación de política pública
-      en seis mecánicas operativas. Las raíces metodológicas: criterios <b>OCDE-DAC</b>
-      (versión 2019/2021), Pre-Analysis Plans del <b>AEA RCT Registry</b>, theory-based
-      evaluation de John Mayne y Ray Pawson, marco lógico de <b>CEPAL/ILPES</b>
-      (Ortegón, Pacheco &amp; Prieto, 2005), value-for-money del <b>HM Treasury Green
-      Book</b> (2022), y los protocolos de <b>Sinergia DNP</b> e <b>Ivàlua</b> (Cataluña).
-      Próximas versiones incorporarán métodos causales modernos (causal forests,
-      double ML, staggered diff-in-diff, synthetic control aumentado) según literatura
-      2020+ reciente.
+      Esta herramienta condensa los marcos canónicos de evaluación de política
+      pública en ocho mecánicas operativas. Las raíces metodológicas: criterios
+      <b>OCDE-DAC</b> (versión 2019/2021), Pre-Analysis Plans del <b>AEA RCT
+      Registry</b>, theory-based evaluation de <b>John Mayne</b> (retrospectiva
+      CJPE 2024) y Ray Pawson, marco lógico de <b>CEPAL/ILPES</b> (Ortegón,
+      Pacheco &amp; Prieto, 2005), value-for-money del <b>HM Treasury Green
+      Book</b> (2022), MVPF de <b>Hendren &amp; Sprung-Keyser</b> (NBER 2020),
+      Cost-Effectiveness del <b>J-PAL</b>, y los protocolos de <b>Sinergia
+      DNP</b> e <b>Ivàlua</b> (Cataluña). Selector de método actualizado a la
+      frontera 2020-2026: <b>DID escalonado</b> (Callaway-Sant'Anna 2021),
+      <b>synthetic control aumentado</b> (Ben-Michael 2021), <b>Double ML</b>
+      (Chernozhukov 2018), <b>causal forests</b> (Wager-Athey 2018) y <b>RDD
+      moderno</b> (Cattaneo-Keele-Titiunik 2023). Warning automático del
+      sesgo TWFE (Goodman-Bacon 2021) cuando el tratamiento es escalonado.
     </p>
   </section>
 </main>
@@ -1311,21 +1440,58 @@ footer.foot {
       en la nube o invitar a tu equipo, será opt-in con cuenta.
     </p>
     <p style="border-top:1px solid var(--rule);padding-top:1rem;margin-top:1.4rem">
+      <b>Actualización 2020-2026.</b> Esta versión del módulo incorpora
+      la literatura econométrica reciente para evitar los sesgos
+      clásicos que invalidan evaluaciones operativas en Colombia.
+    </p>
+    <ul style="margin:0 0 1rem 1.2rem;padding:0;line-height:1.65;font-size:.93rem;color:var(--ink-2)">
+      <li><b>DID escalonado</b> (Callaway &amp; Sant'Anna 2021; Sun &amp;
+      Abraham 2021; Borusyak-Jaravel-Spiess 2024) — el ATT(g,t) por
+      cohorte reemplaza al TWFE clásico cuando los municipios entran
+      al programa en momentos distintos. Sin esto, los signos pueden
+      invertirse (Goodman-Bacon 2021).</li>
+      <li><b>Synthetic control aumentado</b> (Ben-Michael-Feller-Rothstein
+      2021) — ridge regression para corregir el sesgo de pre-ajuste
+      imperfecto. Estado del arte para 1 unidad tratada con N pequeño.</li>
+      <li><b>RDD moderno</b> (Cattaneo-Keele-Titiunik 2023) — bandwidth
+      óptimo MSE + bandas robustas; estándar actual en Sisbén, becas
+      y umbrales programáticos.</li>
+      <li><b>Double ML</b> (Chernozhukov 2018) y <b>causal forests</b>
+      (Wager-Athey 2018) — para datos observacionales con muchas
+      covariables y para descubrir efectos heterogéneos.</li>
+      <li><b>Análisis de contribución</b> (Mayne 2024 · WB IEG 2023) —
+      narrativa auditable cuando ningún cuasi-experimento es factible.</li>
+      <li><b>Lente económica triple</b> — CBA (Green Book 2022),
+      <b>MVPF</b> (Hendren-Sprung-Keyser 2020) y <b>CEA</b> (J-PAL) en
+      el mismo módulo (paso 6) para comparabilidad inter-programa.</li>
+      <li><b>Pre-Analysis Plan</b> exportable estilo AEA RCT Registry y
+      OSF, con corrección por hipótesis múltiples pre-registrada
+      (Anderson 2008 · List-Shaikh-Xu 2019).</li>
+      <li><b>Tipología Sinergia DNP</b> incorporada al paso 1 para
+      alinear con el lenguaje del sistema colombiano de evaluación.</li>
+    </ul>
+    <p style="border-top:1px solid var(--rule);padding-top:1rem;margin-top:1.4rem">
       <b>Origen del método.</b><br/>
       OCDE/CAD, <em>Criterios de evaluación: definiciones y principios</em>
       (París, 1991; actualizado 2019/2021).<br/>
-      John Mayne, <em>Contribution Analysis</em> (2008+).<br/>
+      John Mayne, <em>Contribution Analysis</em> (2008+; retrospectiva
+      CJPE 2024).<br/>
       Ray Pawson &amp; Nick Tilley, <em>Realistic Evaluation</em> (1997).<br/>
       HM Treasury, <em>The Green Book</em> (Londres, actualización 2022).<br/>
+      Hendren &amp; Sprung-Keyser, <em>A Unified Welfare Analysis of
+      Government Policies</em> (NBER 2020).<br/>
       Edgar Ortegón, Juan Francisco Pacheco &amp; Adriana Prieto,
-      <em>Metodología del marco lógico</em> (CEPAL/ILPES, 2005).
+      <em>Metodología del marco lógico</em> (CEPAL/ILPES, 2005).<br/>
+      <b>SINERGIA · DNP</b> — Sistema Nacional de Evaluación de Gestión
+      y Resultados (tipología de evaluaciones).
     </p>
     <p style="border-top:1px solid var(--rule);padding-top:1rem;margin-top:1.4rem">
       <b>¿Quieres profundizar?</b><br/>
-      <a href="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/ev/metodologia-paso-a-paso.pdf" target="_blank" rel="noopener" style="color:var(--accent)">↓ Guía paso a paso (PDF, ~13 KB)</a> ·
-      manual para usar la herramienta en equipo.<br/>
-      <a href="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/ev/respaldo-academico.pdf" target="_blank" rel="noopener" style="color:var(--accent)">↓ Respaldo metodológico (PDF, ~17 KB)</a> ·
-      marco teórico, fórmulas y bibliografía con 30+ referencias.
+      <a href="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/ev/metodologia-paso-a-paso.pdf" target="_blank" rel="noopener" style="color:var(--accent)">↓ Guía paso a paso (PDF)</a> ·
+      manual operativo para usar el módulo en equipo.<br/>
+      <a href="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/ev/respaldo-academico.pdf" target="_blank" rel="noopener" style="color:var(--accent)">↓ Respaldo metodológico (PDF)</a> ·
+      marco teórico, fórmulas y bibliografía con 40+ referencias
+      (2020-2026 incluido).
     </p>
   </div>
 </div>
@@ -1394,12 +1560,15 @@ const LS_KEY = 'ev-current-v1';
 
 const STATE = {
   step: 1,
-  pregunta: { tipo:'', alcance:'', enunciado:'', subpreguntas:[] },     // B.1
-  teoria:    { insumos:[], actividades:[], productos:[], resultados:[], impacto:[], supuestos:[] }, // B.2
-  indicadores: [],                                                       // B.3 [{ nivel, nombre, def, formula, fuente, base, meta, frecuencia }]
-  metodo:    { id:'', justificacion:'' },                                // B.4
-  dac:       { relevance:'', coherence:'', effectiveness:'', efficiency:'', impact:'', sustainability:'' }, // B.5
-  plan:      { cronograma:'', equipo:'', presupuesto:'', uso:'' }        // B.6
+  // B.1 + B v2.3: tipo_sinergia (tipología DNP). B v2.4: economico (3 calculadoras).
+  // B v2.2: metodo.tratamiento_escalonado para TWFE diagnostic.
+  pregunta: { tipo:'', alcance:'', enunciado:'', subpreguntas:[], tipo_sinergia:'' },
+  teoria:    { insumos:[], actividades:[], productos:[], resultados:[], impacto:[], supuestos:[] },
+  indicadores: [],
+  metodo:    { id:'', justificacion:'', tratamiento_escalonado:'' },
+  dac:       { relevance:'', coherence:'', effectiveness:'', efficiency:'', impact:'', sustainability:'' },
+  economico: { activo:false, cba:{ costos_total:'', beneficios_total:'', tasa_descuento:'9', horizonte_anios:'10', weights_distrib:'' }, mvpf:{ beneficios_receptores:'', costo_neto_gob:'' }, cea:{ costo_total:'', outcome_unidad:'', outcome_total:'' } },
+  plan:      { cronograma:'', equipo:'', presupuesto:'', uso:'' }
 };
 
 function saveState() {
@@ -1416,6 +1585,12 @@ function loadState() {
     if (Array.isArray(p.indicadores))                     STATE.indicadores = p.indicadores;
     if (p.metodo      && typeof p.metodo   === 'object')  Object.assign(STATE.metodo, p.metodo);
     if (p.dac         && typeof p.dac      === 'object')  Object.assign(STATE.dac, p.dac);
+    if (p.economico   && typeof p.economico=== 'object') {
+      if (p.economico.cba  && typeof p.economico.cba  === 'object') Object.assign(STATE.economico.cba, p.economico.cba);
+      if (p.economico.mvpf && typeof p.economico.mvpf === 'object') Object.assign(STATE.economico.mvpf, p.economico.mvpf);
+      if (p.economico.cea  && typeof p.economico.cea  === 'object') Object.assign(STATE.economico.cea, p.economico.cea);
+      if (typeof p.economico.activo === 'boolean') STATE.economico.activo = p.economico.activo;
+    }
     if (p.plan        && typeof p.plan     === 'object')  Object.assign(STATE.plan, p.plan);
     if (typeof p.step === 'number') STATE.step = p.step;
     return true;
@@ -1447,14 +1622,15 @@ function closeModal(id) { document.getElementById(id).classList.remove('open'); 
 // ═════════════════════════════════════════════════════════════════════════
 // NAVEGACIÓN ENTRE STAGES
 // ═════════════════════════════════════════════════════════════════════════
-const STAGES = ['stage-welcome','stage-pregunta','stage-teoria','stage-indicadores','stage-metodo','stage-dac','stage-plan','stage-results'];
+const STAGES = ['stage-welcome','stage-pregunta','stage-teoria','stage-indicadores','stage-metodo','stage-dac','stage-economico','stage-plan','stage-results'];
 const STEP_LABELS = [
   { n:1, key:'pregunta',    label:'Pregunta' },
   { n:2, key:'teoria',      label:'Teoría de cambio' },
   { n:3, key:'indicadores', label:'Indicadores' },
   { n:4, key:'metodo',      label:'Método' },
   { n:5, key:'dac',         label:'DAC' },
-  { n:6, key:'plan',        label:'Plan' }
+  { n:6, key:'economico',   label:'Económico' },
+  { n:7, key:'plan',        label:'Plan' }
 ];
 
 function showStage(id) {
@@ -1491,7 +1667,7 @@ function goToStep(n) {
   STATE.step = n;
   saveState();
   renderStepsNav();
-  const stageIds = ['stage-pregunta','stage-teoria','stage-indicadores','stage-metodo','stage-dac','stage-plan'];
+  const stageIds = ['stage-pregunta','stage-teoria','stage-indicadores','stage-metodo','stage-dac','stage-economico','stage-plan'];
   showStage(stageIds[n - 1] || 'stage-pregunta');
 }
 function goToResults() {
@@ -1506,6 +1682,7 @@ function renderAll() {
   renderIndicadores();
   renderMetodos();
   renderDAC();
+  renderEconomico();
   renderPlan();
 }
 
@@ -1529,8 +1706,25 @@ const PREG_ALCANCES = [
   { id:'ex-post',     label:'Ex-post',          hint:'Después de implementar. Mide resultados e impacto contra línea base.' },
   { id:'meta',        label:'Meta-evaluación',  hint:'Evaluar evaluaciones previas. Síntesis sistemática, lecciones acumuladas.' }
 ];
+// B v2.3 · Tipología oficial Sinergia DNP (Guía Metodológica + Agenda de
+// Evaluaciones 2024). Cubre el ciclo completo desde diseño hasta impacto.
+const PREG_SINERGIA = [
+  { id:'ejecutiva',    label:'Ejecutiva',        hint:'Diagnóstico rápido de capacidad institucional y avance. Indicada cuando se requiere insumo para ajuste gerencial.' },
+  { id:'operaciones',  label:'Operaciones',      hint:'Cómo se está implementando la política: fidelidad, calidad, cobertura, eficiencia operativa. Sub-tipo de evaluación de proceso.' },
+  { id:'resultados',   label:'Resultados',       hint:'Mide cumplimiento de productos y resultados de corto/medio plazo contra la cadena de valor.' },
+  { id:'impacto',      label:'Impacto',          hint:'Atribución causal del efecto último sobre el problema. Requiere diseño cuasi-experimental serio (paso 4).' },
+  { id:'institucional',label:'Institucional',    hint:'Evalúa capacidad estatal, gobernanza, articulación interinstitucional. Útil para reformas administrativas.' },
+  { id:'mbe',          label:'Mapas de evidencia',hint:'Síntesis sistemática de evaluaciones existentes (Evidence Gap Maps, metodología 3ie adaptada por DNP).' }
+];
 
 function renderPregunta() {
+  // Pills Sinergia (B v2.3)
+  const sinEl = document.getElementById('preg-sinergia-pills');
+  if (sinEl) {
+    sinEl.innerHTML = PREG_SINERGIA.map(s =>
+      `<button class="pill${STATE.pregunta.tipo_sinergia === s.id ? ' sel' : ''}" type="button" onclick="setPregSinergia('${s.id}')" title="${escapeAttr(s.hint)}">${escapeHtml(s.label)}</button>`
+    ).join('');
+  }
   // Pills tipo
   const tipoEl = document.getElementById('preg-tipo-pills');
   if (tipoEl) {
@@ -1546,6 +1740,9 @@ function renderPregunta() {
     ).join('');
   }
   // Hints dinámicos
+  const sinHint = document.getElementById('preg-sinergia-hint');
+  const sinObj = PREG_SINERGIA.find(s => s.id === STATE.pregunta.tipo_sinergia);
+  if (sinHint && sinObj) sinHint.innerHTML = '<em>' + escapeHtml(sinObj.hint) + '</em>';
   const tipoHint = document.getElementById('preg-tipo-hint');
   const tipoObj = PREG_TIPOS.find(t => t.id === STATE.pregunta.tipo);
   if (tipoHint && tipoObj) tipoHint.innerHTML = '<em>' + escapeHtml(tipoObj.hint) + '</em>';
@@ -1569,6 +1766,11 @@ function setPregTipo(id) {
 }
 function setPregAlcance(id) {
   STATE.pregunta.alcance = id;
+  saveState(); renderPregunta();
+}
+function setPregSinergia(id) {
+  // Toggle: si ya estaba seleccionada, deselecciona
+  STATE.pregunta.tipo_sinergia = (STATE.pregunta.tipo_sinergia === id) ? '' : id;
   saveState(); renderPregunta();
 }
 function renderSubPreguntas() {
@@ -1853,62 +2055,119 @@ function seedIndicadores() {
 // ═════════════════════════════════════════════════════════════════════════
 // MECÁNICA 4 · SELECTOR DE MÉTODO EVALUATIVO
 // ═════════════════════════════════════════════════════════════════════════
-// 8 métodos pre-cargados. tipoSugeridoPara mapea a STATE.pregunta.tipo.
-// NOTA: cuando llegue la literatura externa (B.4 v2), se agregan aquí
-// métodos modernos: causal forests (Athey/Wager 2019), double ML
-// (Chernozhukov 2018), synthetic control augmented (Ben-Michael 2021),
-// staggered diff-in-diff (Callaway-Sant'Anna 2021).
+// 14 métodos pre-cargados. tipoSugeridoPara mapea a STATE.pregunta.tipo.
+// Actualizado en B v2 con la familia 2020-2026: DID escalonado
+// (Callaway-Sant'Anna 2021, de Chaisemartin-D'Haultfœuille 2022),
+// Synthetic Control aumentado (Ben-Michael 2021), Double ML
+// (Chernozhukov 2018), Causal Forests (Athey-Wager 2018), RDD moderno
+// (Cattaneo-Keele-Titiunik 2023), Análisis de Contribución (Mayne 2024
+// retrospectiva + WB IEG guidance). Los métodos clásicos se conservan
+// con etiqueta explícita de su limitación.
 const METODOS = [
   {
     id:'rct',
     tipoSugeridoPara:['causal'],
     nombre:'Ensayo controlado aleatorizado (RCT)',
-    autores:'Banerjee, Duflo &amp; Kremer (2003+ · JPAL)',
+    autores:'Banerjee, Duflo &amp; Kremer (2003+ · J-PAL)',
     datos:'Asignación aleatoria del tratamiento; medición pre y post; muestra suficiente para potencia estadística.',
     fortaleza:'Estándar de oro de causalidad. Si está bien implementado, descarta sesgos por selección.',
     limitacion:'Costoso, lento, exige cooperación operativa. A veces no es ético ni viable (no se puede sortear un derecho).'
   },
   {
-    id:'did',
+    id:'did-staggered',
     tipoSugeridoPara:['causal'],
-    nombre:'Diferencias en diferencias (Diff-in-Diff)',
-    autores:'Card &amp; Krueger (1994); Callaway-Sant\'Anna (2021)',
-    datos:'Panel pre/post de unidades tratadas y no tratadas (≥ 2 períodos). Asume tendencias paralelas.',
-    fortaleza:'Aprovecha datos administrativos ya recolectados. Bueno cuando hay cohortes de entrada escalonadas.',
-    limitacion:'El supuesto de tendencias paralelas es difícil de validar. Vulnerable a shocks coincidentes.'
+    nombre:'DID escalonado (ATT por grupo-tiempo)',
+    autores:'Callaway &amp; Sant\'Anna (2021); Sun &amp; Abraham (2021); Borusyak-Jaravel-Spiess (2024)',
+    datos:'Panel de unidades con tratamiento que entra en momentos distintos (rollout por fases). El estimador ATT(g,t) compara cohortes de inicio con controles no-aún-tratados.',
+    fortaleza:'Soluciona el problema del TWFE (Goodman-Bacon 2021): evita pesos negativos y signos invertidos. Es el estándar actual cuando hay variación en momentos de tratamiento.',
+    limitacion:'Más complejo computacionalmente. Requiere paquetes <code>did</code> (R) o <code>csdid</code> (Stata). No hace sentido si todas las unidades se tratan al mismo tiempo (usar DID clásico de 2 períodos).'
   },
   {
-    id:'rd',
+    id:'did',
     tipoSugeridoPara:['causal'],
-    nombre:'Regresión discontinua (RD)',
-    autores:'Thistlethwaite &amp; Campbell (1960); Imbens-Lemieux (2008)',
-    datos:'Umbral nítido que asigna al programa (ej.: puntaje SISBEN, edad, percentil). Densidad alta cerca del corte.',
-    fortaleza:'Identificación causal local muy creíble alrededor del umbral. Excelente para programas con focalización por puntaje.',
-    limitacion:'Resultado válido solo cerca del umbral, no generalizable. Necesita mucha densidad de observaciones.'
+    nombre:'DID clásico (2 períodos · Card-Krueger)',
+    autores:'Card &amp; Krueger (1994)',
+    datos:'Panel pre/post de unidades tratadas y no tratadas con tratamiento que entra al mismo tiempo. Asume tendencias paralelas.',
+    fortaleza:'Simple, defendible y bien entendido. Buena opción cuando todas las unidades entran al tratamiento simultáneamente.',
+    limitacion:'⚠ Si el tratamiento es escalonado (varias unidades entrando en momentos distintos), TWFE produce sesgos serios (Goodman-Bacon 2021). En ese caso usa DID escalonado.'
+  },
+  {
+    id:'sc-augmented',
+    tipoSugeridoPara:['causal'],
+    nombre:'Synthetic Control aumentado',
+    autores:'Ben-Michael, Feller &amp; Rothstein (2021); Abadie (2021 survey JEL)',
+    datos:'Una unidad tratada (ciudad, depto, país) + panel largo de unidades candidatas a donantes. El aumento con ridge regression desesga el pre-ajuste.',
+    fortaleza:'Versión moderna del control sintético que corrige el sesgo de imperfect pre-treatment fit. Estado del arte para evaluación de política a nivel municipal/departamental con N pequeño de tratados.',
+    limitacion:'Sensible a la calidad del pool de donantes. Inferencia formal sigue siendo limitada — bandas tipo bootstrap.'
   },
   {
     id:'sc',
     tipoSugeridoPara:['causal'],
-    nombre:'Control sintético',
+    nombre:'Control sintético clásico',
     autores:'Abadie, Diamond &amp; Hainmueller (2010)',
-    datos:'Una sola unidad tratada (ciudad, región, país) + panel largo de unidades no tratadas como donantes.',
-    fortaleza:'Diseñado para evaluaciones de política aplicada a una sola unidad geográfica. Visualmente potente.',
-    limitacion:'Sensible a la selección del pool de donantes. Inferencia estadística limitada.'
+    datos:'Una sola unidad tratada + panel largo de no tratadas. Pre-ajuste exacto por pesos no-negativos que suman 1.',
+    fortaleza:'Diseñado para evaluaciones de una sola unidad geográfica. Visualmente potente.',
+    limitacion:'Si el pre-ajuste no es exacto, sesgo. Mejor usar la versión aumentada (Ben-Michael 2021) en su lugar.'
+  },
+  {
+    id:'rdd-moderno',
+    tipoSugeridoPara:['causal'],
+    nombre:'RDD moderno (estimación local-linear robusta)',
+    autores:'Cattaneo, Keele &amp; Titiunik (2023); Calonico-Cattaneo-Titiunik (2014)',
+    datos:'Variable de asignación continua con umbral nítido (Sisbén, becas con cutoff, edad, percentil). Densidad alta cerca del corte.',
+    fortaleza:'Guía moderna unificada: bandwidth óptimo, bandas robustas, test McCrary, diseños primos (kink, bunching, before-after). Implementado en paquete <code>rdrobust</code>.',
+    limitacion:'Resultado válido solo cerca del umbral (Local Average Treatment Effect). Necesita mucha densidad de observaciones.'
+  },
+  {
+    id:'rd',
+    tipoSugeridoPara:['causal'],
+    nombre:'RD clásico',
+    autores:'Thistlethwaite &amp; Campbell (1960); Imbens &amp; Lemieux (2008)',
+    datos:'Umbral nítido de asignación. Estimador polinomial local con bandwidth ad-hoc.',
+    fortaleza:'Estimador tradicional, fácil de explicar.',
+    limitacion:'Sensible a la elección de bandwidth y orden polinomial. Cattaneo 2023 lo reemplazó con bandas robustas en el estado del arte.'
+  },
+  {
+    id:'dml',
+    tipoSugeridoPara:['causal'],
+    nombre:'Double Machine Learning (DML)',
+    autores:'Chernozhukov et al. (2018, Econometrics Journal)',
+    datos:'Datos observacionales con muchas covariables (típicamente ≥20 controles). Cross-fitting + regularización.',
+    fortaleza:'Usa ML para modelar funciones nuisance (propensity, outcome) sin sacrificar inferencia válida del parámetro causal. Estado del arte para observacionales con dimensionalidad alta.',
+    limitacion:'Requiere paquetes especializados (<code>DoubleML</code> en R/Python · <code>EconML</code> de Microsoft). Riesgo de overfitting si cross-fitting mal hecho.'
+  },
+  {
+    id:'causal-forest',
+    tipoSugeridoPara:['causal'],
+    nombre:'Causal Forests / efectos heterogéneos',
+    autores:'Wager &amp; Athey (2018); Athey-Tibshirani-Wager (2019)',
+    datos:'RCT o cuasi-experimento + covariables individuales ricas para descubrir CATE (Conditional Average Treatment Effects).',
+    fortaleza:'Estima efectos heterogéneos no paramétricamente. Responde a "¿qué subgrupos se benefician más?". Implementado en paquete <code>grf</code>.',
+    limitacion:'Necesita N grande (idealmente ≥ 5.000). Difícil de comunicar a tomador no técnico — requiere visualización de partial dependence.'
   },
   {
     id:'matching',
     tipoSugeridoPara:['causal'],
     nombre:'Matching / Propensity Score (PSM)',
     autores:'Rosenbaum &amp; Rubin (1983)',
-    datos:'Datos observacionales con muchas covariables observables. Tratados y no tratados con buen solapamiento.',
-    fortaleza:'Aplicable cuando no hubo aleatorización y no hay umbral natural. Intuitivo de explicar.',
-    limitacion:'Solo controla sesgos observables. Variables omitidas siguen sesgando.'
+    datos:'Datos observacionales con covariables observables. Tratados y no tratados con buen solapamiento (overlap).',
+    fortaleza:'Aplicable cuando no hubo aleatorización ni umbral natural. Intuitivo de explicar.',
+    limitacion:'Solo controla sesgos observables. Si hay variables omitidas relevantes, sigue sesgado. Para >20 controles, DML domina.'
+  },
+  {
+    id:'contribucion',
+    tipoSugeridoPara:['valor','proceso','gestion'],
+    nombre:'Análisis de Contribución',
+    autores:'Mayne (retrospectiva CJPE 2024); WB IEG Quality Guidance (2023)',
+    datos:'Theory of Change explícita + identificación de riesgos críticos a cada flecha causal + recolección de evidencia mixta (quant + qual) por cada riesgo.',
+    fortaleza:'Indicado cuando RCT/cuasi-experimental no es factible: reformas institucionales, programas multicomponente, wicked problems. Produce una "narrativa de contribución" auditable.',
+    limitacion:'No reemplaza atribución causal contrafactual cuando esta sí es factible. Requiere disciplina metodológica para evitar narrativa post-hoc.'
   },
   {
     id:'qual',
     tipoSugeridoPara:['valor','proceso'],
     nombre:'Cualitativo (entrevistas + casos)',
-    autores:'Patton (2015 · 4ª ed.); Yin (2018)',
+    autores:'Patton (2022 · 5ª ed.); Yin (2018)',
     datos:'Entrevistas semi-estructuradas, grupos focales, observación participante. Muestra teórica (no estadística).',
     fortaleza:'Captura mecanismos, percepciones y contexto que ningún número refleja. Esencial para preguntas de valor y proceso.',
     limitacion:'No generaliza estadísticamente. Vulnerable a sesgo del investigador si no hay triangulación.'
@@ -1917,7 +2176,7 @@ const METODOS = [
     id:'mixto',
     tipoSugeridoPara:['descripcion','causal','valor','proceso','gestion'],
     nombre:'Mixto (QUANT + QUAL)',
-    autores:'Creswell &amp; Plano Clark (2017)',
+    autores:'Creswell &amp; Plano Clark (2017); Bamberger et al. (2010)',
     datos:'Combina recolección cuantitativa y cualitativa, secuencial o paralela. Triangula resultados.',
     fortaleza:'Compensa debilidades de cada enfoque. Casi siempre el más defendible ante comité diverso.',
     limitacion:'Más caro y demandante en tiempo de equipo. Requiere perfil multidisciplinario.'
@@ -1925,19 +2184,22 @@ const METODOS = [
   {
     id:'vfm',
     tipoSugeridoPara:['valor','gestion'],
-    nombre:'Value-for-Money / Costo-beneficio',
-    autores:'HM Treasury Green Book (2022); BID (HEROIC)',
-    datos:'Costos totales (presupuestados + ejecutados) + beneficios monetizados o ponderados por equidad.',
-    fortaleza:'Lenguaje directo para tomadores de decisión presupuestal. Comparable entre alternativas.',
-    limitacion:'Monetizar beneficios sociales (vidas, equidad) es controvertido y carga supuestos fuertes.'
+    nombre:'Value-for-Money / Costo-beneficio social',
+    autores:'HM Treasury Green Book (2022, weights distribucionales); Hendren-Sprung-Keyser MVPF (NBER 2020)',
+    datos:'Costos totales + beneficios monetizados o ponderados por equidad + tasa social de descuento (DNP 9%/ Green Book 3% ajustada).',
+    fortaleza:'Lenguaje directo para tomadores de decisión presupuestal. MVPF (Hendren) permite comparar políticas heterogéneas en un solo número. El módulo trae 3 calculadoras: CBA, MVPF, CEA (paso 6).',
+    limitacion:'Monetizar beneficios sociales (vidas, equidad) es controvertido. El Green Book 2022 incorporó weights distribucionales para mitigar.'
   }
 ];
 
 function _metodoSugerido() {
   const tipo = STATE.pregunta && STATE.pregunta.tipo;
   if (!tipo) return null;
-  // Para causal, sugerimos diff-in-diff como default (más viable que RCT en mayoría de casos colombianos).
-  if (tipo === 'causal')  return 'did';
+  // B v2: si causal y tratamiento escalonado, sugerimos DID escalonado
+  // (Callaway-Sant'Anna 2021) sobre DID clásico para evitar el sesgo TWFE.
+  if (tipo === 'causal') {
+    return STATE.metodo?.tratamiento_escalonado ? 'did-staggered' : 'did-staggered';
+  }
   if (tipo === 'valor')   return 'vfm';
   if (tipo === 'proceso') return 'qual';
   if (tipo === 'gestion') return 'vfm';
@@ -1957,13 +2219,16 @@ function renderMetodos() {
   }
   // Mostrar solo los métodos sugeridos para el tipo elegido + los neutrales (mixto siempre, vfm si gestión/valor).
   // Para no esconder opciones, mostramos TODOS pero marcamos el sugerido con badge.
+  // Algunos métodos modernos llevan un badge extra "estado del arte".
+  const ESTADO_ARTE = new Set(['did-staggered','sc-augmented','dml','causal-forest','rdd-moderno','contribucion']);
   grid.innerHTML = METODOS.map(m => {
     const isReco = sugerido === m.id;
     const isSel  = seleccionado === m.id;
+    const isModern = ESTADO_ARTE.has(m.id);
     return `<button class="met-card ${isSel ? 'sel' : ''}" type="button" onclick="setMetodo('${m.id}')">
       <div class="mc-radio"></div>
       <div class="mc-body">
-        <div class="mc-name">${escapeHtml(m.nombre)}</div>
+        <div class="mc-name">${escapeHtml(m.nombre)}${isModern ? ' <span style="font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--green);padding:.1rem .4rem;background:rgba(111,160,122,0.15);border:1px solid rgba(111,160,122,0.4);margin-left:.4rem">2020+</span>' : ''}</div>
         <div class="mc-meta">${m.autores}</div>
         <div class="mc-detail">
           <div><b>Datos requeridos</b>${escapeHtml(m.datos)}</div>
@@ -1981,10 +2246,60 @@ function renderMetodos() {
     renderMetodos._bound = true;
     if (ju) ju.addEventListener('input', () => { STATE.metodo.justificacion = ju.value; saveState(); });
   }
+  // TWFE warning (B v2.2): si selecciona DID clásico, pregunta sobre el tratamiento
+  renderTWFEWarning();
   if (meta) {
     const m = METODOS.find(x => x.id === seleccionado);
     meta.textContent = m ? `Método: ${m.nombre.split('(')[0].trim()}` : 'Aún no eliges método';
   }
+}
+
+// ─── TWFE Warning (B v2.2) ────────────────────────────────────────────────
+// Cuando el usuario selecciona DID clásico, le preguntamos si el tratamiento
+// es escalonado (entra en momentos distintos). Si SÍ, recomendamos el
+// estimador moderno de Callaway-Sant'Anna para evitar el sesgo TWFE
+// (Goodman-Bacon 2021, de Chaisemartin-D'Haultfœuille 2022).
+function renderTWFEWarning() {
+  const wrap = document.getElementById('met-twfe-warning');
+  if (!wrap) return;
+  if (STATE.metodo.id !== 'did') { wrap.classList.add('is-hidden'); wrap.innerHTML = ''; return; }
+  wrap.classList.remove('is-hidden');
+  const escalonado = STATE.metodo.tratamiento_escalonado;
+  if (!escalonado) {
+    // Sin respuesta aún — pedimos diagnóstico
+    wrap.innerHTML = `<div style="padding:.95rem 1.15rem;background:rgba(214,168,58,0.10);border:1px solid var(--rule);border-left:3px solid var(--gold);font-family:var(--sans);font-size:.94rem;color:var(--ink)">
+      <div style="font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:.45rem">Diagnóstico TWFE</div>
+      <div style="margin-bottom:.6rem">Antes de continuar con DID clásico, una pregunta crítica: <b>¿el tratamiento entra en momentos distintos para distintas unidades?</b> (típico cuando un programa se rolea por fases en municipios o regiones).</div>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <button class="btn-ghost" style="padding:.4rem .85rem;font-size:.88rem" onclick="setTWFEDiagnostic('si')">Sí · entra escalonado</button>
+        <button class="btn-ghost" style="padding:.4rem .85rem;font-size:.88rem" onclick="setTWFEDiagnostic('no')">No · todas las unidades al mismo tiempo</button>
+      </div>
+    </div>`;
+    return;
+  }
+  if (escalonado === 'si') {
+    // Warning crítico + sugerencia de cambio
+    wrap.innerHTML = `<div style="padding:1rem 1.2rem;background:rgba(217,106,80,0.12);border:1px solid var(--rule-strong);border-left:3px solid var(--danger);font-family:var(--sans);font-size:.94rem;color:var(--ink)">
+      <div style="font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--danger);font-weight:700;margin-bottom:.45rem">⚠ Sesgo TWFE detectado</div>
+      <div style="margin-bottom:.6rem">Con tratamiento escalonado, el estimador TWFE clásico (Card-Krueger) puede asignar pesos negativos a algunas comparaciones y producir <em>signos invertidos del efecto real</em> (Goodman-Bacon 2021, de Chaisemartin-D'Haultfœuille 2022). Este sesgo invalidó retrospectivamente cientos de evaluaciones publicadas en revistas top.</div>
+      <div style="margin-bottom:.7rem"><b>Recomendación:</b> usa el estimador escalonado de Callaway-Sant'Anna (ATT por grupo-tiempo) en su lugar. Implementado en paquetes <code>did</code> (R) y <code>csdid</code> (Stata).</div>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <button class="btn" style="padding:.5rem 1rem;font-size:.88rem" onclick="setMetodo('did-staggered')">Cambiar a DID escalonado →</button>
+        <button class="btn-ghost" style="padding:.5rem 1rem;font-size:.88rem" onclick="setTWFEDiagnostic('')">Reconsultar diagnóstico</button>
+      </div>
+    </div>`;
+  } else if (escalonado === 'no') {
+    // Confirmación de que DID clásico es OK
+    wrap.innerHTML = `<div style="padding:.85rem 1.15rem;background:rgba(111,160,122,0.10);border:1px solid var(--rule);border-left:3px solid var(--green);font-family:var(--sans);font-size:.92rem;color:var(--ink)">
+      <div style="font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--green);font-weight:700;margin-bottom:.35rem">DID clásico apropiado</div>
+      <div>Con tratamiento simultáneo (todas las unidades entran al mismo tiempo), el DID 2-períodos es el estimador correcto. Igualmente valida el supuesto de tendencias paralelas en el periodo pre-tratamiento. <button onclick="setTWFEDiagnostic('')" style="background:none;border:none;color:var(--accent);text-decoration:underline;cursor:none;font-family:inherit;font-size:.88em;padding:0">cambiar respuesta</button></div>
+    </div>`;
+  }
+}
+function setTWFEDiagnostic(value) {
+  STATE.metodo.tratamiento_escalonado = value || '';
+  saveState();
+  renderMetodos();
 }
 function setMetodo(id) {
   STATE.metodo.id = id;
@@ -2106,7 +2421,147 @@ function toggleDACNA(key) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════
-// MECÁNICA 6 · PLAN (campos finales)
+// MECÁNICA 6 · ANÁLISIS ECONÓMICO (B v2.4)
+// ═════════════════════════════════════════════════════════════════════════
+// Tres calculadoras: CBA Green Book (HM Treasury 2022) + MVPF (Hendren
+// & Sprung-Keyser, NBER 2020) + CEA (J-PAL). Conviven; el usuario llena
+// las que apliquen. Cálculo cliente-side.
+
+const ECO_TABS = ['cba','mvpf','cea'];
+let _ecoActiveTab = 'cba';
+
+function _ecoNum(s) {
+  const n = parseFloat(String(s || '').replace(/[^0-9.\-]/g, ''));
+  return Number.isFinite(n) ? n : null;
+}
+function _fmtCOP(n) {
+  if (!Number.isFinite(n)) return '—';
+  return '$' + n.toLocaleString('es-CO', { maximumFractionDigits: 0 });
+}
+function _calcCBA(cba) {
+  // VPN social simplificado: anual constante, descontado por r durante h años.
+  // VPN = Σ (b - c) / (1+r)^t , t = 1..h
+  const c = _ecoNum(cba.costos_total);
+  const b = _ecoNum(cba.beneficios_total);
+  const r = (_ecoNum(cba.tasa_descuento) || 9) / 100;
+  const h = Math.max(1, Math.min(50, Math.round(_ecoNum(cba.horizonte_anios) || 10)));
+  if (c === null || b === null) return { vpn:null, h, r, ratio:null };
+  let vpn = 0;
+  const flujo = b - c;
+  for (let t = 1; t <= h; t++) vpn += flujo / Math.pow(1 + r, t);
+  const ratio = c > 0 ? b / c : null;
+  return { vpn, h, r, ratio };
+}
+function _calcMVPF(mvpf) {
+  const b = _ecoNum(mvpf.beneficios_receptores);
+  const c = _ecoNum(mvpf.costo_neto_gob);
+  if (b === null || c === null || c <= 0) return { ratio:null, pareto:false };
+  const ratio = b / c;
+  return { ratio, pareto: ratio > 1 };
+}
+function _calcCEA(cea) {
+  const c = _ecoNum(cea.costo_total);
+  const o = _ecoNum(cea.outcome_total);
+  if (c === null || o === null || o <= 0) return { cea:null, unidad: cea.outcome_unidad || 'unidad' };
+  return { cea: c / o, unidad: cea.outcome_unidad || 'unidad' };
+}
+
+function setEcoTab(tab) {
+  _ecoActiveTab = tab;
+  document.querySelectorAll('.eco-tab').forEach(b => b.classList.toggle('sel', b.dataset.tab === tab));
+  ECO_TABS.forEach(t => {
+    const el = document.getElementById('eco-' + t + '-panel');
+    if (el) el.classList.toggle('is-hidden', t !== tab);
+  });
+}
+
+function renderEconomico() {
+  const eco = STATE.economico || (STATE.economico = { cba:{}, mvpf:{}, cea:{} });
+  // Bind inputs (only once)
+  const bindings = [
+    ['eco-cba-costos',     ['cba','costos_total']],
+    ['eco-cba-beneficios', ['cba','beneficios_total']],
+    ['eco-cba-tasa',       ['cba','tasa_descuento']],
+    ['eco-cba-horizonte',  ['cba','horizonte_anios']],
+    ['eco-cba-weights',    ['cba','weights_distrib']],
+    ['eco-mvpf-beneficios',['mvpf','beneficios_receptores']],
+    ['eco-mvpf-costo',     ['mvpf','costo_neto_gob']],
+    ['eco-cea-costo',      ['cea','costo_total']],
+    ['eco-cea-unidad',     ['cea','outcome_unidad']],
+    ['eco-cea-outcome',    ['cea','outcome_total']]
+  ];
+  bindings.forEach(([id, path]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const [section, key] = path;
+    const current = (eco[section] && eco[section][key]) || '';
+    if (el.value !== current) el.value = current;
+    if (!el._ecoBound) {
+      el._ecoBound = true;
+      el.addEventListener('input', () => {
+        if (!eco[section]) eco[section] = {};
+        eco[section][key] = el.value;
+        saveState();
+        refreshEcoResults();
+      });
+    }
+  });
+  refreshEcoResults();
+}
+
+function refreshEcoResults() {
+  const eco = STATE.economico || {};
+  // CBA
+  const cba = _calcCBA(eco.cba || {});
+  const cbaEl = document.getElementById('eco-cba-result');
+  if (cbaEl) {
+    if (cba.vpn === null) {
+      cbaEl.innerHTML = '<em style="color:var(--ink-3)">Llena costos y beneficios para calcular el VPN social.</em>';
+    } else {
+      const sign = cba.vpn >= 0 ? '+' : '';
+      const ratioStr = cba.ratio !== null ? ` · ratio B/C anual = ${cba.ratio.toFixed(2)}` : '';
+      const veredicto = cba.vpn >= 0
+        ? `<span style="color:var(--green);font-weight:700">✓ VPN positivo</span> · la política produce más valor del que cuesta`
+        : `<span style="color:var(--danger);font-weight:700">✗ VPN negativo</span> · costos superan beneficios al horizonte dado`;
+      cbaEl.innerHTML = `<b>VPN social (${cba.h} años · tasa ${(cba.r*100).toFixed(1)}%):</b> ${sign}${_fmtCOP(cba.vpn)}${ratioStr}<br/><span style="font-size:11.5px;color:var(--ink-2)">${veredicto}</span>`;
+    }
+  }
+  // MVPF
+  const mvpf = _calcMVPF(eco.mvpf || {});
+  const mvpfEl = document.getElementById('eco-mvpf-result');
+  if (mvpfEl) {
+    if (mvpf.ratio === null) {
+      mvpfEl.innerHTML = '<em style="color:var(--ink-3)">Llena beneficios y costo neto al gobierno para calcular el MVPF.</em>';
+    } else {
+      const flag = mvpf.pareto
+        ? `<span style="color:var(--green);font-weight:700">✓ Pareto-superior</span> · MVPF &gt; 1 implica que mejora el bienestar agregado`
+        : `<span style="color:var(--amber);font-weight:700">MVPF &lt; 1</span> · cada peso público produce menos de un peso de beneficio social`;
+      mvpfEl.innerHTML = `<b>MVPF:</b> ${mvpf.ratio.toFixed(2)}<br/><span style="font-size:11.5px;color:var(--ink-2)">${flag}</span>`;
+    }
+  }
+  // CEA
+  const cea = _calcCEA(eco.cea || {});
+  const ceaEl = document.getElementById('eco-cea-result');
+  if (ceaEl) {
+    if (cea.cea === null) {
+      ceaEl.innerHTML = '<em style="color:var(--ink-3)">Llena costo y outcome total para calcular costo-efectividad.</em>';
+    } else {
+      ceaEl.innerHTML = `<b>CEA:</b> ${_fmtCOP(cea.cea)} por ${escapeHtml(cea.unidad)}<br/><span style="font-size:11.5px;color:var(--ink-2)">Costo unitario marginal. Compara con benchmarks J-PAL del sector.</span>`;
+    }
+  }
+  // Stage meta
+  const meta = document.getElementById('eco-meta');
+  if (meta) {
+    const filled = [];
+    if (cba.vpn !== null)  filled.push('CBA');
+    if (mvpf.ratio !== null) filled.push('MVPF');
+    if (cea.cea !== null)  filled.push('CEA');
+    meta.textContent = filled.length ? `${filled.length}/3 calculadoras llenas · ${filled.join(', ')}` : 'opcional · 3 calculadoras';
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 7 · PLAN (campos finales)
 // ═════════════════════════════════════════════════════════════════════════
 function renderPlan() {
   const fields = [
@@ -2364,6 +2819,371 @@ function downloadMatrizCSV() {
   const date = new Date().toISOString().slice(0, 10);
   _download(`matriz-indicadores-${date}.csv`, csv, 'text/csv;charset=utf-8');
   showToast('Matriz de indicadores descargada.');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// PAP · Pre-Analysis Plan generator (B v2.5)
+// Formato compatible con AEA RCT Registry (socialscienceregistry.org) y OSF
+// Preprints. Estructura: Research question · Hypotheses · Outcomes ·
+// Specification (con MHT correction) · Heterogeneity · Power · Limitations
+// · References. Pensado para registro pre-implementación.
+// ═════════════════════════════════════════════════════════════════════════
+
+// Recomendación de corrección por hipótesis múltiples según número de
+// outcomes primarios. Devuelve { metodo, justificacion }.
+function _mhtCorreccion(nOutcomes) {
+  if (nOutcomes <= 1) {
+    return {
+      metodo: 'No requerida (un solo outcome primario)',
+      justificacion: 'Con un único outcome primario no hay riesgo de inflación familywise. Si se reportan outcomes exploratorios, marcar explícitamente como secundarios.'
+    };
+  }
+  if (nOutcomes <= 3) {
+    return {
+      metodo: 'Bonferroni (familywise α / k)',
+      justificacion: 'Control conservador del FWER (Family-Wise Error Rate) cuando k ≤ 3. Simple de comunicar a comité.'
+    };
+  }
+  if (nOutcomes <= 8) {
+    return {
+      metodo: 'Holm (1979) o Romano-Wolf (2005) por bootstrap',
+      justificacion: 'Holm domina a Bonferroni para k ≥ 4. Romano-Wolf considera correlaciones entre outcomes (más potente). Implementación: paquete <code>multcomp</code> (R) o <code>boottest</code> (Stata).'
+    };
+  }
+  return {
+    metodo: 'Benjamini-Hochberg (FDR ≤ 0.10)',
+    justificacion: 'Con k ≥ 9 outcomes primarios, control del FDR (False Discovery Rate) es más razonable que FWER. Estándar en J-PAL y AEA Registry para evaluaciones con muchos outcomes.'
+  };
+}
+
+// Familia de método → texto para sección "Estimation Method"
+function _papEspecificacion(metodoId) {
+  const M = {
+    'rct':            'Estimador OLS sobre asignación aleatoria: Y_i = β·T_i + X_i·γ + ε_i. Errores estándar robustos a heteroscedasticidad (HC2) o cluster-robust al nivel de aleatorización.',
+    'did-staggered':  'ATT(g,t) por cohorte de inicio (Callaway-Sant\'Anna 2021). Agregación por exposure-weighted average de ATT(g,t). Bandas de confianza por bootstrap multiplicador. Paquete <code>did</code> (R) o <code>csdid</code> (Stata).',
+    'did':            'Difference-in-Differences clásico de 2 períodos: Y_it = α_i + λ_t + β·(Tratado_i × Post_t) + ε_it. Errores cluster-robust al nivel de la unidad. ⚠ Si el rollout es escalonado, migrar a <code>did-staggered</code>.',
+    'sc-augmented':   'Synthetic Control aumentado (Ben-Michael 2021): pesos de Abadie + corrección ridge para desesgar el pre-ajuste. Inferencia por placebos in-space (Abadie 2010) + p-values exactos.',
+    'sc':             'Synthetic Control clásico (Abadie-Diamond-Hainmueller 2010): pesos no-negativos que suman 1, minimizando MSPE pre-tratamiento. Inferencia por placebos in-space + in-time.',
+    'rdd-moderno':    'RDD local-linear con bandwidth óptimo MSE (Calonico-Cattaneo-Titiunik 2014) + bandas robustas. Test de manipulación (McCrary). Paquete <code>rdrobust</code>.',
+    'rd':             'Regression Discontinuity: estimador polinomial local. Bandwidth elegido por IK (Imbens-Kalyanaraman). Sensibilidad a polinomios de orden 1 y 2 reportada como robustness.',
+    'dml':            'Double Machine Learning (Chernozhukov 2018). Cross-fitting 5-fold. Nuisance functions: Lasso para propensity y outcome (alternativa: Random Forest). Paquete <code>DoubleML</code> (R/Python).',
+    'causal-forest':  'Causal Forest (Wager-Athey 2018). N ≥ 5.000. Honest splitting + cross-fitting. Reporta ATE + CATE por subgrupos via partial dependence. Paquete <code>grf</code> (R).',
+    'matching':       'Propensity Score Matching (Rosenbaum-Rubin 1983) o Inverse Probability Weighting. Diagnóstico de overlap obligatorio. Pruebas de balance pre/post-match. Solo controla observables.',
+    'contribucion':   'Análisis de Contribución (Mayne 2024). Theory of Change explícita + identificación de riesgos por flecha causal + recolección mixta por riesgo. Narrativa de contribución auditable. No reemplaza estimación contrafactual cuando esta es factible.',
+    'qual':           'Cualitativo (Patton 2022, Yin 2018): muestra teórica, codificación abierta-axial-selectiva, triangulación con ≥ 2 fuentes por hallazgo. Memos analíticos archivados con timestamp.',
+    'mixto':          'Diseño mixto convergente (Creswell-Plano Clark 2017): brazo cuantitativo + brazo cualitativo en paralelo, integración por matriz de joint display. Reporta convergencias, complementariedades y discrepancias.',
+    'vfm':            'Análisis económico (CBA, MVPF y/o CEA, paso 6 del módulo). Tasa social de descuento 9% (DNP) o 3.5% (Green Book). MVPF (Hendren-Sprung-Keyser 2020) para comparabilidad inter-programa. Análisis de sensibilidad sobre supuestos clave.'
+  };
+  return M[metodoId] || 'Especificación econométrica pendiente de definir. Documentar antes de recolectar datos finales.';
+}
+
+function downloadPAPMD() {
+  const date = new Date().toISOString().slice(0, 10);
+  const m = _metodoFull();
+  const inds = STATE.indicadores || [];
+  const primarios   = inds.filter(i => i.nivel === 'impacto' || i.nivel === 'resultados');
+  const secundarios = inds.filter(i => i.nivel === 'productos' || i.nivel === 'actividades' || i.nivel === 'insumos');
+  const subPreg = STATE.pregunta.subpreguntas || [];
+  const sup = STATE.teoria.supuestos || [];
+  const sinObj = (typeof PREG_SINERGIA !== 'undefined') ? PREG_SINERGIA.find(s => s.id === STATE.pregunta.tipo_sinergia) : null;
+  const mht = _mhtCorreccion(primarios.length);
+  const eco = STATE.economico || { activo:false };
+
+  let md = `# Pre-Analysis Plan\n\n`;
+  md += `**Title:** ${STATE.pregunta.enunciado || '_(research question pending)_'}\n\n`;
+  md += `**Pre-registration date:** ${date}\n\n`;
+  md += `**Author / PI:** _(complete before registration)_\n\n`;
+  md += `**Status:** On going · Pre-analysis plan only.\n\n`;
+  md += `*This PAP follows the AEA RCT Registry / OSF Preprints structure. ` +
+        `Pre-registration date is the timestamp of this document. ` +
+        `Methodology anchors: Pre-Analysis Plans (AEA RCT Registry · BITSS · ` +
+        `Olken 2015 JEP), Multiple Hypothesis Testing (List-Shaikh-Xu 2019 ` +
+        `Exp Econ), OCDE-DAC evaluation criteria (2019/2021), theory-based ` +
+        `evaluation (Mayne · Pawson), CEPAL/ILPES logical framework ` +
+        `(Ortegón, Pacheco &amp; Prieto 2005), and HM Treasury Green Book ` +
+        `(2022) for cost-benefit analysis.*\n\n`;
+  md += `---\n\n`;
+
+  // ─── 1. Research question + classification
+  md += `## 1. Research question\n\n`;
+  md += `**Primary question:**\n\n`;
+  md += `> ${STATE.pregunta.enunciado || '_(pending)_'}\n\n`;
+  md += `**Question type (Sinergia DNP typology):** ${sinObj ? sinObj.label : '_(not specified)_'}\n\n`;
+  if (sinObj) md += `> ${sinObj.hint}\n\n`;
+  md += `**Evaluation type:** ${_tipoPregLabel()}  ·  **Temporal scope:** ${_alcanceLabel()}\n\n`;
+  if (subPreg.length) {
+    md += `**Sub-questions:**\n\n`;
+    subPreg.forEach((s, i) => md += `${i+1}. ${s}\n`);
+    md += '\n';
+  }
+
+  // ─── 2. Hypotheses
+  md += `## 2. Hypotheses\n\n`;
+  md += `### Primary hypothesis (H1)\n\n`;
+  if (primarios.length > 0) {
+    md += `The intervention increases / changes the primary outcome(s) by a magnitude `;
+    md += `at least equal to the operational target.\n\n`;
+    primarios.forEach((p, i) => {
+      md += `- **H1.${i+1}:** ${p.nombre || '_(unnamed)_'}`;
+      if (p.meta) md += ` reaches target **${p.meta}**`;
+      if (p.base) md += ` (baseline: ${p.base})`;
+      md += `.\n`;
+    });
+    md += '\n';
+  } else {
+    md += `_(primary hypothesis pending — define at least one outcome at the_ ` +
+          `_'Resultados' or 'Impacto' level)_\n\n`;
+  }
+  md += `### Secondary / mechanism hypotheses\n\n`;
+  if (secundarios.length > 0) {
+    secundarios.forEach((p, i) => {
+      md += `- **H2.${i+1}:** ${p.nombre || '_(unnamed)_'} (${IND_NIVEL_LABEL[p.nivel] || p.nivel})`;
+      if (p.meta) md += ` reaches target **${p.meta}**`;
+      md += `.\n`;
+    });
+    md += '\n';
+  } else {
+    md += `_(no secondary outcomes registered)_\n\n`;
+  }
+  md += `### Null hypothesis (H0)\n\n`;
+  md += `No effect of the intervention on the primary outcome(s) beyond ` +
+        `what would be expected under random variation.\n\n`;
+
+  // ─── 3. Outcomes
+  md += `## 3. Outcomes\n\n`;
+  md += `### Primary outcomes\n\n`;
+  if (primarios.length > 0) {
+    md += `| # | Indicator | Operational definition | Formula | Source | Baseline | Target | Frequency |\n`;
+    md += `|---|---|---|---|---|---|---|---|\n`;
+    primarios.forEach((p, i) => {
+      const cells = [
+        i+1,
+        p.nombre || '—',
+        p.def || '—',
+        p.formula || '—',
+        p.fuente || '—',
+        p.base || '—',
+        p.meta || '—',
+        p.frecuencia || '—'
+      ].map(v => String(v).replace(/\|/g, '\\|').replace(/\n/g, ' '));
+      md += `| ${cells.join(' | ')} |\n`;
+    });
+    md += '\n';
+  } else {
+    md += `_(no primary outcomes registered)_\n\n`;
+  }
+  md += `### Secondary outcomes\n\n`;
+  if (secundarios.length > 0) {
+    md += `| # | Indicator | Level | Operational definition | Source | Frequency |\n`;
+    md += `|---|---|---|---|---|---|\n`;
+    secundarios.forEach((p, i) => {
+      const cells = [
+        i+1,
+        p.nombre || '—',
+        IND_NIVEL_LABEL[p.nivel] || p.nivel || '—',
+        p.def || '—',
+        p.fuente || '—',
+        p.frecuencia || '—'
+      ].map(v => String(v).replace(/\|/g, '\\|').replace(/\n/g, ' '));
+      md += `| ${cells.join(' | ')} |\n`;
+    });
+    md += '\n';
+  } else {
+    md += `_(no secondary outcomes registered)_\n\n`;
+  }
+  md += `### Exploratory / heterogeneity outcomes\n\n`;
+  md += `_(Pre-specify any exploratory outcomes here. Anything not_ ` +
+        `_pre-registered must be reported as exploratory and not as confirmatory.)_\n\n`;
+
+  // ─── 4. Theory of change (CEPAL logical framework)
+  md += `## 4. Theory of change\n\n`;
+  md += `*CEPAL/ILPES logical framework (Ortegón, Pacheco &amp; Prieto 2005). ` +
+        `Causal chain from inputs to long-term impact, with key assumptions ` +
+        `at each level.*\n\n`;
+  const tcNiveles = [
+    ['Inputs (Insumos)',           'insumos'],
+    ['Activities (Actividades)',   'actividades'],
+    ['Outputs (Productos)',        'productos'],
+    ['Outcomes (Resultados)',      'resultados'],
+    ['Impact (Impacto)',           'impacto']
+  ];
+  tcNiveles.forEach(([label, key]) => {
+    const arr = _tcArr(key);
+    md += `### ${label}\n\n`;
+    if (arr.length === 0) md += `_(no nodes registered)_\n\n`;
+    else { arr.forEach(v => md += `- ${v}\n`); md += '\n'; }
+  });
+  if (sup.length > 0) {
+    md += `### Critical assumptions\n\n`;
+    sup.forEach((s, i) => md += `${i+1}. ${s}\n`);
+    md += '\n';
+  }
+
+  // ─── 5. Identification & estimation
+  md += `## 5. Identification &amp; estimation strategy\n\n`;
+  if (m) {
+    md += `**Method:** ${m.nombre}\n\n`;
+    md += `**Reference(s):** ${m.autores.replace(/&amp;/g, '&')}\n\n`;
+    md += `**Required data:** ${m.datos}\n\n`;
+    md += `**Identification assumption:** ${m.fortaleza}\n\n`;
+    md += `**Known limitation:** ${m.limitacion}\n\n`;
+    md += `**Econometric specification:**\n\n`;
+    md += `> ${_papEspecificacion(m.id).replace(/&amp;/g, '&')}\n\n`;
+    if (STATE.metodo.tratamiento_escalonado === 'si') {
+      md += `> ⚠ **Treatment timing:** units enter the treatment at different ` +
+            `times (staggered rollout). Use Callaway-Sant'Anna ATT(g,t) ` +
+            `estimator to avoid Goodman-Bacon (2021) bias from negative ` +
+            `weights and contaminated comparisons.\n\n`;
+    } else if (STATE.metodo.tratamiento_escalonado === 'no') {
+      md += `> Treatment timing: all units enter simultaneously — TWFE ` +
+            `2×2 DiD is unbiased under parallel trends.\n\n`;
+    }
+    if (STATE.metodo.justificacion) {
+      md += `**Method justification:**\n\n> ${STATE.metodo.justificacion}\n\n`;
+    }
+  } else {
+    md += `_(method not selected — define before data collection)_\n\n`;
+  }
+
+  // ─── 6. Multiple Hypothesis Testing correction
+  md += `## 6. Multiple hypothesis testing (MHT) correction\n\n`;
+  md += `*Pre-registered correction strategy to control type-I error inflation ` +
+        `across primary outcomes (Anderson 2008 JASA · List-Shaikh-Xu 2019 ` +
+        `Exp Econ).*\n\n`;
+  md += `**Primary outcomes registered:** ${primarios.length}\n\n`;
+  md += `**Correction method:** ${mht.metodo}\n\n`;
+  md += `**Rationale:** ${mht.justificacion.replace(/<\/?code>/g, '`')}\n\n`;
+  md += `**Significance level:** α = 0.05 (two-sided) after correction. ` +
+        `Confidence intervals report uncorrected and corrected versions.\n\n`;
+
+  // ─── 7. Pre-specified heterogeneity
+  md += `## 7. Pre-specified heterogeneity\n\n`;
+  md += `*Subgroups defined ex-ante to limit specification searching. ` +
+        `Any subgroup analysis not listed here will be reported as_ ` +
+        `*exploratory.*\n\n`;
+  md += `Suggested dimensions for the Colombian context — pre-specify only ` +
+        `those theoretically motivated by the theory of change:\n\n`;
+  md += `- **Sex / gender** (M / F / other).\n`;
+  md += `- **Age cohort** (e.g., 18-25, 26-40, 41-60, 60+).\n`;
+  md += `- **Territory** (urban / rural · departments / regions).\n`;
+  md += `- **Baseline value of outcome** (above / below median).\n`;
+  md += `- **Ethnicity** (indigenous / Afro / other), where relevant.\n`;
+  md += `- **Programmatic exposure intensity** (dose-response).\n\n`;
+
+  // ─── 8. Power
+  md += `## 8. Power calculation\n\n`;
+  md += `**Target:** Detect a minimum effect size (MDE) of ___ standard ` +
+        `deviations with statistical power ≥ 0.80 at α = 0.05 (after MHT ` +
+        `correction).\n\n`;
+  md += `**Inputs to fill before registration:**\n`;
+  md += `- Expected take-up / compliance rate (%).\n`;
+  md += `- Intra-cluster correlation (ICC) if clustered.\n`;
+  md += `- Anticipated attrition rate (%).\n`;
+  md += `- Number of clusters / units in treatment and control.\n`;
+  md += `- Baseline standard deviation of primary outcome.\n\n`;
+  md += `**Tools:** <code>pwr</code> (R), <code>power</code> (Stata), or ` +
+        `<code>PowerUp!</code> (Dong-Maynard 2013 for cluster designs).\n\n`;
+
+  // ─── 9. Data collection & timeline
+  md += `## 9. Data collection &amp; timeline\n\n`;
+  md += `**Timeline:**\n\n${STATE.plan.cronograma || '_(pending)_'}\n\n`;
+  md += `**Team:**\n\n${STATE.plan.equipo || '_(pending)_'}\n\n`;
+  md += `**Budget:**\n\n${STATE.plan.presupuesto || '_(pending)_'}\n\n`;
+  md += `**Use of findings:**\n\n${STATE.plan.uso || '_(pending)_'}\n\n`;
+
+  // ─── 10. Economic analysis (if active)
+  if (eco.activo) {
+    md += `## 10. Economic analysis (pre-specified)\n\n`;
+    md += `*Cost-benefit decision rules registered ex-ante to avoid ` +
+          `post-hoc justification of findings (HM Treasury Green Book 2022).*\n\n`;
+    const cba = _calcCBA(eco.cba || {});
+    const mvpf = _calcMVPF(eco.mvpf || {});
+    const cea  = _calcCEA(eco.cea || {});
+    md += `**Cost-Benefit Analysis (CBA):** NPV with discount rate ` +
+          `${(cba.r * 100).toFixed(1)}% over ${cba.h} years. `;
+    if (cba.vpn !== null) {
+      md += `Pre-implementation NPV estimate: ${_fmtCOP(cba.vpn)}. `;
+      md += `B/C ratio: ${cba.ratio ? cba.ratio.toFixed(2) : '—'}.\n\n`;
+    } else { md += `_(values pending)_\n\n`; }
+    md += `**MVPF (Hendren-Sprung-Keyser 2020):** `;
+    if (mvpf.ratio !== null) {
+      md += `${mvpf.ratio.toFixed(2)}. `;
+      md += mvpf.pareto ? '> 1 → Pareto-superior.\n\n' : '≤ 1 → no Pareto-superior.\n\n';
+    } else { md += `_(values pending)_\n\n`; }
+    md += `**Cost-Effectiveness (CEA):** `;
+    if (cea.cea !== null) {
+      md += `Cost per ${cea.unidad}: ${_fmtCOP(cea.cea)}.\n\n`;
+    } else { md += `_(values pending)_\n\n`; }
+    md += `**Sensitivity analysis:** report results under discount rates ` +
+          `3.5% (Green Book), 9% (DNP), and 12% (private sector benchmark). ` +
+          `Report tornado diagram of top 5 sensitive parameters.\n\n`;
+  }
+
+  // ─── 11. DAC criteria (qualitative pre-commitment)
+  md += `## ${eco.activo ? '11' : '10'}. OECD-DAC criteria (qualitative)\n\n`;
+  md += `*Pre-committed positioning on the six 2019/2021 DAC criteria. ` +
+        `If "Not applicable" was selected, justification is registered_ ` +
+        `_ex-ante to avoid post-hoc dismissal.*\n\n`;
+  DAC_CRITERIOS.forEach((c, i) => {
+    const v = _dacGet(c.key);
+    md += `### ${i+1}. ${c.es} _(${c.en})_\n\n`;
+    if (v && v.trim()) md += v + '\n\n';
+    else md += `_(no pre-commitment registered)_\n\n`;
+  });
+
+  // ─── 12. Limitations & deviations protocol
+  md += `## ${eco.activo ? '12' : '11'}. Limitations &amp; deviations protocol\n\n`;
+  md += `**Known limitations of the design:**\n\n`;
+  if (m && m.limitacion) md += `- ${m.limitacion.replace(/<\/?code>/g, '`')}\n`;
+  md += `- External validity beyond the studied context is not guaranteed.\n`;
+  md += `- _(add any context-specific threats: attrition, spillovers, anticipation, etc.)_\n\n`;
+  md += `**Deviations protocol:** any deviation from this PAP must be ` +
+        `documented in a public addendum with timestamp, before unblinding ` +
+        `the analysis. If the deviation is required after seeing outcomes, ` +
+        `it is reported as exploratory (Olken 2015 JEP).\n\n`;
+
+  // ─── 13. References
+  md += `## ${eco.activo ? '13' : '12'}. References &amp; methodology anchors\n\n`;
+  md += `**Pre-Analysis Plans:**\n`;
+  md += `- AEA RCT Registry — socialscienceregistry.org\n`;
+  md += `- OSF Preprints / Registries — osf.io/registries\n`;
+  md += `- BITSS Manual of Best Practices — bitss.org\n`;
+  md += `- Olken (2015) "Promises and Perils of Pre-Analysis Plans", *JEP*.\n\n`;
+  md += `**Multiple Hypothesis Testing:**\n`;
+  md += `- Anderson (2008) "Multiple Inference and Gender Differences", *JASA*.\n`;
+  md += `- List, Shaikh &amp; Xu (2019) "Multiple Hypothesis Testing in Experimental Economics", *Exp Econ*.\n`;
+  md += `- Romano &amp; Wolf (2005) "Stepwise Multiple Testing as Formalized Data Snooping", *Econometrica*.\n\n`;
+  md += `**Identification:**\n`;
+  if (m) md += `- ${m.autores.replace(/&amp;/g, '&')}\n`;
+  md += `- Callaway &amp; Sant'Anna (2021) "Difference-in-Differences with multiple time periods", *J. of Econometrics*.\n`;
+  md += `- Goodman-Bacon (2021) "Difference-in-Differences with variation in treatment timing", *J. of Econometrics*.\n`;
+  md += `- Cattaneo, Keele &amp; Titiunik (2023) "A Practical Introduction to Regression Discontinuity Designs", Cambridge Elements.\n`;
+  md += `- Chernozhukov et al. (2018) "Double/debiased machine learning", *Econometrics Journal*.\n\n`;
+  md += `**Evaluation criteria &amp; theory:**\n`;
+  md += `- OECD/DAC (2019/2021) Better Criteria for Better Evaluation.\n`;
+  md += `- Mayne (2024) "Contribution Analysis: A retrospective", *CJPE*.\n`;
+  md += `- Pawson &amp; Tilley (1997) *Realistic Evaluation*, Sage.\n`;
+  md += `- Ortegón, Pacheco &amp; Prieto (2005) *Metodología del marco lógico*, CEPAL/ILPES.\n`;
+  if (eco.activo) {
+    md += `\n**Economic analysis:**\n`;
+    md += `- HM Treasury (2022) *The Green Book*, UK Government.\n`;
+    md += `- Hendren &amp; Sprung-Keyser (2020) "A Unified Welfare Analysis of Government Policies", NBER WP.\n`;
+    md += `- J-PAL (varios) Cost-Effectiveness Analysis methodology.\n`;
+  }
+  md += `\n**Colombian institutional anchors:**\n`;
+  md += `- DNP — Sinergia. Sistema Nacional de Evaluación de Gestión y Resultados.\n`;
+  md += `- DNP (2014) Guía metodológica para el seguimiento y evaluación de políticas públicas.\n`;
+  md += `- Ivàlua (Cataluña) — protocolos de evaluación.\n\n`;
+
+  md += `---\n\n`;
+  md += `*Generated with the Evaluation module of the Lab de Políticas ` +
+        `Públicas y Prospectiva (ricardoruiz.co). This PAP can be uploaded ` +
+        `as a registration document to AEA RCT Registry, OSF, or any ` +
+        `equivalent pre-registration platform. Once registered, do not ` +
+        `modify the original; document deviations in dated addenda.*\n`;
+
+  _download(`pre-analysis-plan-${date}.md`, md, 'text/markdown;charset=utf-8');
+  showToast('Pre-Analysis Plan descargado.');
 }
 
 // ═════════════════════════════════════════════════════════════════════════

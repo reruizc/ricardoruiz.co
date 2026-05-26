@@ -12,7 +12,7 @@
 - `analisis-estructural.html` — **Lab de Políticas Públicas y Prospectiva** · hub del lab + módulo análisis estructural (MicMac · DEMATEL · ISM modernizado, fuzzy, valencias firmadas, copiloto IA). LISTO, ver sección dedicada.
 - `mactor.html` — **Lab** · módulo análisis de actores y conflictos (MID + MAO, copiloto IA). LISTO.
 - `problema-publico.html` — **Lab** · módulo problema público (Eightfold Path de Bardach condensado a 5 mecánicas + capa metodológica profunda con wizard de síntoma, árbol del problema CEPAL/Ortegón, test Rittel-Webber y selector de marco analítico). Cloud-save + 3 acciones IA + Issue Paper export. LISTO (Sprint A).
-- `evaluacion.html` — **Lab** · módulo evaluación de política (OCDE-DAC + Mayne + CEPAL/ILPES + Pre-Analysis Plans). 6 mecánicas: pregunta evaluativa · teoría de cambio · indicadores SMART · selector de método (RCT/DiD/RD/SC/PSM/cualitativo/mixto/VfM) · criterios OCDE-DAC · plan operativo. Cloud-save + 3 acciones IA + plan .md + matriz .csv. LISTO (Sprint B).
+- `evaluacion.html` — **Lab** · módulo evaluación de política (OCDE-DAC + Mayne + CEPAL/ILPES + Pre-Analysis Plans + literatura 2020-2026). **8 mecánicas**: pregunta evaluativa (tipo + alcance + tipología Sinergia DNP) · teoría de cambio · indicadores SMART · selector de método (14 métodos · frontera 2020-2026) · criterios OCDE-DAC · análisis económico (CBA · MVPF · CEA) · plan operativo · resultados. Detección automática de tratamiento escalonado con warning TWFE (Goodman-Bacon 2021) redirigiendo a DID escalonado (Callaway-Sant'Anna 2021). Cloud-save + 3 acciones IA + plan .md + **Pre-Analysis Plan .md** (AEA RCT Registry / OSF compatible, 13 secciones con MHT correction pre-registrada) + matriz .csv. LISTO (Sprint B + B v2).
 - `alternativas.html` — **Lab** · módulo Alternativas de Política (Zwicky 1969 + Lempert/Walker RDM 2003 + Ritchey + Howard + Keeney + MVPF Hendren 2020 + CEA J-PAL). 6 mecánicas: variables de decisión · opciones por variable · matriz morfológica · alternativas ensambladas · robustez en 4 escenarios + lente económica · decisión final. Cloud-save + 4 acciones IA + memo .md + matriz .csv + ficha CONPES light .pdf + envío bidireccional a problema-publico + envío a AIN. LISTO (Sprint C).
 - `ain.html` — **Lab** · módulo Análisis de Impacto Normativo (DNP/Función Pública Decreto 1081/2015 + 1273/2020 + RIA OCDE 2012/2022 + Sunstein Simpler 2013 + Hahn-Tetlock 2008 + Stigler 1971 + Mashaw 2018). 6 mecánicas: problema regulatorio (tipo de falla) · objetivos normativos medibles · opciones regulatorias (6 familias) · matriz de impactos (5 categorías) · consulta pública + 5 riesgos regulatorios · implementación + monitoreo + cláusula de revisión. Cloud-save + 3 acciones IA + memo .md + matriz .csv + memo CONPES regulatorio .pdf + auto-import desde pp/alt + envío a evaluacion. LISTO (Sprint D).
 - `lab-recursos.js` — catálogo compartido de 32 recursos en 5 categorías; cargado por los 6 módulos del lab.
@@ -1841,7 +1841,7 @@ Los 6 módulos del lab están operativos:
 | 1 | Problema público | `problema-publico.html` | ✓ vivo (Sprint A) |
 | 2 | Análisis estructural | `analisis-estructural.html` (mismo HTML que el hub) | ✓ vivo |
 | 3 | Análisis de actores | `mactor.html` | ✓ vivo |
-| 4 | Evaluación de política | `evaluacion.html` | ✓ vivo (Sprint B) |
+| 4 | Evaluación de política | `evaluacion.html` | ✓ vivo (Sprint B + B v2 · literatura 2020-2026) |
 | 5 | Alternativas de política | `alternativas.html` | ✓ vivo (Sprint C) |
 | 6 | Análisis de Impacto Normativo | `ain.html` | ✓ vivo (Sprint D) |
 
@@ -2094,19 +2094,25 @@ aws s3 cp "Bases de datos/pp/respaldo-academico.pdf" \
   --content-type "application/pdf" --cache-control "public, max-age=300"
 ```
 
-### `evaluacion.html` (evaluación de política · Sprint B)
+### `evaluacion.html` (evaluación de política · Sprint B + B v2)
 
-Cuarto módulo del lab. Diseña la evaluación de una política pública con
-seis decisiones canónicas, anclado en OCDE-DAC + theory-based evaluation
-(Mayne · Pawson) + marco lógico CEPAL/ILPES + Pre-Analysis Plans
-(AEA RCT Registry).
+Cuarto módulo del lab. Diseña la evaluación de una política pública
+con **ocho decisiones canónicas**, anclado en OCDE-DAC + theory-based
+evaluation (Mayne · Pawson) + marco lógico CEPAL/ILPES + Pre-Analysis
+Plans (AEA RCT Registry). **B v2 incorpora literatura econométrica
+2020-2026** (Callaway-Sant'Anna · Cattaneo · Ben-Michael · Wager-Athey
+· Chernozhukov · Mayne 2024 · Hendren) + tipología Sinergia DNP +
+3 calculadoras económicas (CBA · MVPF · CEA) + Pre-Analysis Plan
+exportable.
 
-**6 mecánicas operativas + welcome + results:**
+**8 mecánicas operativas + welcome + results:**
 
 1. **`stage-pregunta`** — selector de tipo de pregunta (descripción ·
    atribución causal · valor · proceso · gestión) + alcance temporal
-   (ex-ante · concurrente · ex-post · meta-evaluación). Enunciado libre
-   + hasta 5 sub-preguntas.
+   (ex-ante · concurrente · ex-post · meta-evaluación) + **tipología
+   Sinergia DNP** (ejecutiva · operaciones · resultados · impacto ·
+   institucional · mapas de evidencia). Enunciado libre + hasta 5
+   sub-preguntas.
 2. **`stage-teoria`** — editor visual del marco lógico CEPAL con 5
    columnas (insumos → actividades → productos → resultados → impacto),
    nodos editables inline (máx 4 por nivel) + supuestos transversales
@@ -2115,19 +2121,37 @@ seis decisiones canónicas, anclado en OCDE-DAC + theory-based evaluation
    · definición operativa · fórmula · fuente · línea base · meta ·
    frecuencia · chip SMART (validación 0-5) · eliminar. Hasta 30
    indicadores. Seed de 4 indicadores típicos.
-4. **`stage-metodo`** — 8 métodos pre-cargados: RCT (Banerjee-Duflo-
-   Kremer) · DiD (Card-Krueger, Callaway-Sant'Anna 2021) · RD
-   (Thistlethwaite-Campbell) · synthetic control (Abadie 2010) · matching
-   (Rosenbaum-Rubin 1983) · cualitativo (Patton-Yin) · mixto
-   (Creswell-Plano Clark) · value-for-money (HM Treasury 2022). Cada
-   uno con autor faro, datos requeridos, fortaleza y limitación. Badge
-   "Sugerido" auto según tipo de pregunta: causal→DiD, valor→VfM,
-   proceso→cualitativo, gestión→VfM, descripción→mixto.
+4. **`stage-metodo`** — **14 métodos pre-cargados** (frontera 2020-2026):
+   RCT (Banerjee-Duflo-Kremer) · **DID escalonado ★** (Callaway-Sant'Anna
+   2021 · Sun-Abraham 2021 · Borusyak-Jaravel-Spiess 2024) · DID clásico
+   (Card-Krueger 1994) · **Synthetic Control aumentado ★** (Ben-Michael
+   2021) · SC clásico (Abadie 2010) · **RDD moderno ★** (Cattaneo-Keele-
+   Titiunik 2023) · RD clásico · **Double ML ★** (Chernozhukov 2018) ·
+   **Causal Forests ★** (Wager-Athey 2018) · Matching (Rosenbaum-Rubin) ·
+   **Análisis de Contribución ★** (Mayne 2024 · WB IEG 2023) ·
+   cualitativo (Patton 2022 · Yin 2018) · mixto (Creswell-Plano Clark
+   2017) · VfM + MVPF (HM Treasury 2022 + Hendren-Sprung-Keyser 2020).
+   Badge "Sugerido" según tipo. **Toggle "tratamiento escalonado"**: si
+   selecciona DID clásico con rollout escalonado → warning automático
+   sobre sesgo TWFE (Goodman-Bacon 2021) + sugerencia de migrar a DID
+   escalonado.
 5. **`stage-dac`** — 6 cards con criterios OCDE-DAC (versión 2019):
    relevance, coherence, effectiveness, efficiency, impact,
    sustainability. Por cada uno: definición + textarea auto-evaluación
    + botón "Marcar como NO APLICA…" con prompt de justificación.
-6. **`stage-plan`** — 4 campos operativos: cronograma · equipo
+6. **`stage-economico`** (B v2.4 · opcional) — toggle activo/inactivo +
+   3 calculadoras conviventes:
+   - **CBA · Cost-Benefit** (Green Book HM Treasury 2022): VPN = Σ(B−C)/(1+r)^t
+     con tasa de descuento configurable (DNP 9% · GB 3.5%) y horizonte 1-50
+     años. Reporta VPN + ratio B/C.
+   - **MVPF** (Hendren-Sprung-Keyser NBER 2020): WTP_receptores / costo
+     neto al gobierno. &gt; 1 → política Pareto-superior. Comparable
+     inter-programa.
+   - **CEA** (J-PAL): costo total / outcome total en unidad natural.
+     Útil cuando monetizar el beneficio es controversial.
+   Cálculo cliente-side con `_calcCBA`, `_calcMVPF`, `_calcCEA`. Los
+   tres resultados entran al plan .md y al PAP exportable.
+7. **`stage-plan`** — 4 campos operativos: cronograma · equipo
    evaluador (con dedicaciones) · presupuesto estimado · plan de uso
    de resultados.
 
@@ -2138,18 +2162,30 @@ amarillos (Mactor + problema-publico).
 **Exports:**
 - `downloadPlanMD` — plan estructurado en 6 secciones compatible
   con formato Sinergia/DNP.
+- **`downloadPAPMD`** (B v2.5) — **Pre-Analysis Plan en 13 secciones**
+  compatible con AEA RCT Registry / OSF: research question +
+  hipótesis primarias/secundarias + outcomes (primarios/secundarios/
+  exploratorios) + ToC + especificación econométrica explícita +
+  **MHT correction pre-registrada** (Bonferroni k≤3 · Holm/Romano-Wolf
+  k≤8 · Benjamini-Hochberg FDR k≥9, según Anderson 2008 JASA ·
+  List-Shaikh-Xu 2019 Exp Econ) + heterogeneidad pre-especificada +
+  power calculation placeholder + análisis económico (si activo) +
+  OCDE-DAC + limitations + **protocolo de desviaciones** + bibliografía.
 - `downloadMatrizCSV` — matriz de indicadores con SMART score + missing.
 
-**STATE shape:**
+**STATE shape (B v2):**
 ```js
 STATE = {
   step: 1,
-  pregunta:    { tipo, alcance, enunciado, subpreguntas[] },
-  teoria:      { insumos[], actividades[], productos[], resultados[], impacto[], supuestos[] },
+  pregunta: { tipo, alcance, enunciado, subpreguntas[], tipo_sinergia },
+  teoria:    { insumos[], actividades[], productos[], resultados[], impacto[], supuestos[] },
   indicadores: [{ nivel, nombre, def, formula, fuente, base, meta, frecuencia }],
-  metodo:      { id, justificacion },
-  dac:         { relevance, coherence, effectiveness, efficiency, impact, sustainability },
-  plan:        { cronograma, equipo, presupuesto, uso }
+  metodo:    { id, justificacion, tratamiento_escalonado },  // 'si'|'no'|''
+  dac:       { relevance, coherence, effectiveness, efficiency, impact, sustainability },
+  economico: { activo, cba:{costos_total, beneficios_total, tasa_descuento, horizonte_anios, weights_distrib},
+               mvpf:{beneficios_receptores, costo_neto_gob},
+               cea:{costo_total, outcome_unidad, outcome_total} },
+  plan:      { cronograma, equipo, presupuesto, uso }
 }
 ```
 Persistido en `localStorage['ev-current-v1']`. `loadState()` defensivo.
@@ -2164,13 +2200,30 @@ Persistido en `localStorage['ev-current-v1']`. `loadState()` defensivo.
   lógica + fortalezas + riesgos del método + puntos a cerrar antes
   de comité.
 
-**PDFs Evaluación en S3** (Sprint B.10):
+**PDFs Evaluación en S3** (Sprint B.10 + B v2.6):
 ```
 s3://elecciones-2026/ricardoruiz.co/bases de datos/ev/
-  metodologia-paso-a-paso.pdf  (13 KB · 9 secciones operativas)
-  respaldo-academico.pdf       (17 KB · marco + fórmulas + 30+ refs)
+  metodologia-paso-a-paso.pdf  (19.2 KB · 11 secciones · v2.0)
+  respaldo-academico.pdf       (26.9 KB · marco + fórmulas + 48 refs · v2.0)
 ```
 Pipeline en `tools/build-ev-docs/{build_metodologia.py, build_respaldo.py}`.
+Para regenerar:
+```bash
+python3 tools/build-ev-docs/build_metodologia.py
+python3 tools/build-ev-docs/build_respaldo.py
+aws s3 cp "Bases de datos/ev/metodologia-paso-a-paso.pdf" \
+  "s3://elecciones-2026/ricardoruiz.co/bases de datos/ev/metodologia-paso-a-paso.pdf" \
+  --content-type "application/pdf" --cache-control "public, max-age=300"
+aws s3 cp "Bases de datos/ev/respaldo-academico.pdf" \
+  "s3://elecciones-2026/ricardoruiz.co/bases de datos/ev/respaldo-academico.pdf" \
+  --content-type "application/pdf" --cache-control "public, max-age=300"
+```
+
+**Validación del worker (B v2.7):** El worker rr-auth valida en `/ev/save`:
+- 14 method ids whitelisted en `EV_METODOS_ID`.
+- `tratamiento_escalonado` ∈ {'si','no',''}.
+- `tipo_sinergia` ∈ {6 tipos DNP, ''}.
+- Bloque `economico` persiste como strings (frontend valida numéricamente).
 
 ### `alternativas.html` (Alternativas de política · Sprint C)
 
@@ -2586,16 +2639,23 @@ token + plan. `_callDeepSeek(env, systemPrompt, userMsg, opts)`. `_hash24(str)`.
 
 **Sprint D · AIN** ✓ LISTO (ver sección dedicada arriba).
 
-**Iteraciones del módulo Evaluación (B v2) — literatura 2020-2026 ya en `Bases de datos/evaluacion-politicas/investigacion-literatura-2020-2026.txt`:**
-- TWFE warning + selector de método causal moderno: DID escalonado
-  (Callaway-Sant'Anna 2021), synthetic control aumentado (Ben-Michael
-  2021), DML (Chernozhukov 2018), causal forests (Athey-Wager 2018).
-- 3 calculadoras económicas convivientes: CBA Green Book + MVPF Hendren
-  + CEA J-PAL (la lente económica de Alternativas C.5 es un primer paso).
-- Tipología Sinergia DNP como primer selector del wizard.
-- Pre-Analysis Plan generator listo para subir a AEA Registry / OSF.
+**Sprint B v2 · Evaluación con literatura 2020-2026** ✓ LISTO (ver sección
+`evaluacion.html` arriba). Cerró:
+- ✓ B v2.1 — 14 métodos (6 estado del arte ★ añadidos: DID escalonado,
+  SC aumentado, RDD moderno, DML, causal forests, contribución).
+- ✓ B v2.2 — TWFE warning automático cuando tratamiento escalonado.
+- ✓ B v2.3 — Tipología Sinergia DNP en paso 1.
+- ✓ B v2.4 — 3 calculadoras económicas (CBA · MVPF · CEA).
+- ✓ B v2.5 — Pre-Analysis Plan exportable estilo AEA RCT Registry / OSF.
+- ✓ B v2.6 — Modal "¿En qué se basa?" + PDFs v2.0 actualizados.
+- ✓ B v2.7 — Worker validation + CLAUDE.md + deploy.
+
+Investigación fuente: `Bases de datos/evaluacion-politicas/investigacion-literatura-2020-2026.txt`.
+Posibles iteraciones futuras (no urgentes):
 - Cargar el documento de literatura para enriquecer prompts del copiloto
-  sin reescribir las 6 mecánicas.
+  IA sin reescribir las 8 mecánicas.
+- Power calculator integrado (no solo placeholder): inputs ICC/atrición/N
+  + cálculo de MDE bajo distintos diseños.
 
 **Reservados para después de los 6 módulos:**
 - **Sprint E** — datos municipales (~1.100 muns × 5 indicadores)
