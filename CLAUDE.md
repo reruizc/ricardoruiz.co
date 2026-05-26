@@ -12,7 +12,8 @@
 - `analisis-estructural.html` — **Lab de Políticas Públicas y Prospectiva** · hub del lab + módulo análisis estructural (MicMac · DEMATEL · ISM modernizado, fuzzy, valencias firmadas, copiloto IA). LISTO, ver sección dedicada.
 - `mactor.html` — **Lab** · módulo análisis de actores y conflictos (MID + MAO, copiloto IA). LISTO.
 - `problema-publico.html` — **Lab** · módulo problema público (Eightfold Path de Bardach condensado a 5 mecánicas + capa metodológica profunda con wizard de síntoma, árbol del problema CEPAL/Ortegón, test Rittel-Webber y selector de marco analítico). Cloud-save + 3 acciones IA + Issue Paper export. LISTO (Sprint A).
-- `lab-recursos.js` — catálogo compartido de 27 recursos en 5 categorías; cargado por los 3 módulos del lab.
+- `evaluacion.html` — **Lab** · módulo evaluación de política (OCDE-DAC + Mayne + CEPAL/ILPES + Pre-Analysis Plans). 6 mecánicas: pregunta evaluativa · teoría de cambio · indicadores SMART · selector de método (RCT/DiD/RD/SC/PSM/cualitativo/mixto/VfM) · criterios OCDE-DAC · plan operativo. Cloud-save + 3 acciones IA + plan .md + matriz .csv. LISTO (Sprint B).
+- `lab-recursos.js` — catálogo compartido de 27 recursos en 5 categorías; cargado por los 4 módulos del lab.
 - `pricing.html` — planes (Básico / Pro 39.900 COP · Premium 99.900 COP · Personalizado)
 - `lang.js` — i18n (co/us/cn); `CLAUDE.md` vive en la raíz del repo
 
@@ -1828,17 +1829,17 @@ inteligencia editorial, NO publicación de sondeo).
   con prompts largos. Si lo amplías, mide la latencia después (límite
   blando 30 s por API Gateway).
 
-## Lab de Políticas Públicas y Prospectiva (Sprint A · LISTO)
+## Lab de Políticas Públicas y Prospectiva (Sprints A + B · LISTO)
 
 **El hub vive en `analisis-estructural.html`** (mismo archivo, rebrandeado).
-4 módulos del lab:
+Los 4 módulos del lab están operativos:
 
 | # | Módulo | Archivo | Estado |
 |---|---|---|---|
-| 1 | Problema público | `problema-publico.html` | ✓ vivo |
+| 1 | Problema público | `problema-publico.html` | ✓ vivo (Sprint A) |
 | 2 | Análisis estructural | `analisis-estructural.html` (mismo HTML que el hub) | ✓ vivo |
 | 3 | Análisis de actores | `mactor.html` | ✓ vivo |
-| 4 | Evaluación de política | — | Próximamente |
+| 4 | Evaluación de política | `evaluacion.html` | ✓ vivo (Sprint B) |
 
 Sólo `analisis-estructural.html` figura en el listado de proyectos de
 `index.html` (como "Análisis Estructural de Sistemas"). Desde su hub se
@@ -2088,6 +2089,84 @@ aws s3 cp "Bases de datos/pp/respaldo-academico.pdf" \
   --content-type "application/pdf" --cache-control "public, max-age=300"
 ```
 
+### `evaluacion.html` (evaluación de política · Sprint B)
+
+Cuarto módulo del lab. Diseña la evaluación de una política pública con
+seis decisiones canónicas, anclado en OCDE-DAC + theory-based evaluation
+(Mayne · Pawson) + marco lógico CEPAL/ILPES + Pre-Analysis Plans
+(AEA RCT Registry).
+
+**6 mecánicas operativas + welcome + results:**
+
+1. **`stage-pregunta`** — selector de tipo de pregunta (descripción ·
+   atribución causal · valor · proceso · gestión) + alcance temporal
+   (ex-ante · concurrente · ex-post · meta-evaluación). Enunciado libre
+   + hasta 5 sub-preguntas.
+2. **`stage-teoria`** — editor visual del marco lógico CEPAL con 5
+   columnas (insumos → actividades → productos → resultados → impacto),
+   nodos editables inline (máx 4 por nivel) + supuestos transversales
+   (máx 6). Plantilla seed de educación.
+3. **`stage-indicadores`** — tabla SMART con 10 columnas: nivel · nombre
+   · definición operativa · fórmula · fuente · línea base · meta ·
+   frecuencia · chip SMART (validación 0-5) · eliminar. Hasta 30
+   indicadores. Seed de 4 indicadores típicos.
+4. **`stage-metodo`** — 8 métodos pre-cargados: RCT (Banerjee-Duflo-
+   Kremer) · DiD (Card-Krueger, Callaway-Sant'Anna 2021) · RD
+   (Thistlethwaite-Campbell) · synthetic control (Abadie 2010) · matching
+   (Rosenbaum-Rubin 1983) · cualitativo (Patton-Yin) · mixto
+   (Creswell-Plano Clark) · value-for-money (HM Treasury 2022). Cada
+   uno con autor faro, datos requeridos, fortaleza y limitación. Badge
+   "Sugerido" auto según tipo de pregunta: causal→DiD, valor→VfM,
+   proceso→cualitativo, gestión→VfM, descripción→mixto.
+5. **`stage-dac`** — 6 cards con criterios OCDE-DAC (versión 2019):
+   relevance, coherence, effectiveness, efficiency, impact,
+   sustainability. Por cada uno: definición + textarea auto-evaluación
+   + botón "Marcar como NO APLICA…" con prompt de justificación.
+6. **`stage-plan`** — 4 campos operativos: cronograma · equipo
+   evaluador (con dedicaciones) · presupuesto estimado · plan de uso
+   de resultados.
+
+**`stage-results`** — resumen con tarjeta de método elegido + 4 KPI
+cards (teoría/indicadores/DAC/plan) + cierre operativo + 2 cross-links
+amarillos (Mactor + problema-publico).
+
+**Exports:**
+- `downloadPlanMD` — plan estructurado en 6 secciones compatible
+  con formato Sinergia/DNP.
+- `downloadMatrizCSV` — matriz de indicadores con SMART score + missing.
+
+**STATE shape:**
+```js
+STATE = {
+  step: 1,
+  pregunta:    { tipo, alcance, enunciado, subpreguntas[] },
+  teoria:      { insumos[], actividades[], productos[], resultados[], impacto[], supuestos[] },
+  indicadores: [{ nivel, nombre, def, formula, fuente, base, meta, frecuencia }],
+  metodo:      { id, justificacion },
+  dac:         { relevance, coherence, effectiveness, efficiency, impact, sustainability },
+  plan:        { cronograma, equipo, presupuesto, uso }
+}
+```
+Persistido en `localStorage['ev-current-v1']`. `loadState()` defensivo.
+
+**Copiloto IA (Sprint B.8):** 3 acciones con cache hash24 TTL 7d:
+- `sugerir-indicadores` (Pro+) · 4-6 indicadores SMART desde teoría
+  y pregunta; botón "+ Agregar" inyecta al state.
+- `validar-teoria` (Premium+) · detecta saltos lógicos, supuestos
+  implícitos, niveles desbalanceados, impactos vagos + sugiere
+  supuestos faltantes.
+- `narrativa-plan` (Premium+) · lectura interpretativa del plan:
+  lógica + fortalezas + riesgos del método + puntos a cerrar antes
+  de comité.
+
+**PDFs Evaluación en S3** (Sprint B.10):
+```
+s3://elecciones-2026/ricardoruiz.co/bases de datos/ev/
+  metodologia-paso-a-paso.pdf  (13 KB · 9 secciones operativas)
+  respaldo-academico.pdf       (17 KB · marco + fórmulas + 30+ refs)
+```
+Pipeline en `tools/build-ev-docs/{build_metodologia.py, build_respaldo.py}`.
+
 ### Recursos & Datos · catálogo compartido `lab-recursos.js` (Sprint A.1)
 
 Catálogo curado de 27 recursos en 5 categorías (Colombia política
@@ -2110,8 +2189,8 @@ actualiza en un solo archivo y los 4 puntos lo recogen.
 
 ### Worker rr-auth — endpoints del lab
 
-Total **21 endpoints** (7 micmac + 7 mactor + 7 pp), agrupados en
-3 módulos paralelos con el mismo patrón CRUD + invite + copiloto.
+Total **28 endpoints** (7 micmac + 7 mactor + 7 pp + 7 ev), agrupados en
+4 módulos paralelos con el mismo patrón CRUD + invite + copiloto.
 
 **MicMac (`/micmac/*`):**
 - `GET    /micmac/list` — lista proyectos (owner + collab).
@@ -2126,14 +2205,23 @@ Total **21 endpoints** (7 micmac + 7 mactor + 7 pp), agrupados en
 
 **Problema Público (`/pp/*`)** — Sprint A.3 y A.4:
 - `GET    /pp/list` — lista análisis (owner + collab).
-- `POST   /pp/save` — crea o actualiza. Validación dura:
-  `definicion.enunciado` no vacío, ≤5 alternativas, 2-8 criterios,
-  ≤60 fuentes evidencia, scores 1-5.
+- `POST   /pp/save` — crea o actualiza. Validación dura.
 - `GET    /pp/load?projId=&since=` — carga con polling.
 - `DELETE /pp/delete?projId=` — solo owner.
-- `POST   /pp/invite` — correo Resend con link 14d, copy "Problema Público".
+- `POST   /pp/invite` — correo Resend con link 14d.
 - `GET    /pp/accept?token=` — acepta invitación.
 - `POST   /pp/copiloto` — 3 acciones IA (Sprint A.4).
+
+**Evaluación (`/ev/*`)** — Sprint B.7 y B.8:
+- `GET    /ev/list` — lista análisis (owner + collab).
+- `POST   /ev/save` — crea o actualiza. Validación dura:
+  `pregunta.enunciado` no vacío, ≤30 indicadores, niveles/tipos/
+  alcances/métodos whitelisted.
+- `GET    /ev/load?projId=&since=` — carga con polling.
+- `DELETE /ev/delete?projId=` — solo owner.
+- `POST   /ev/invite` — correo Resend con link 14d, copy "Evaluación".
+- `GET    /ev/accept?token=` — acepta invitación.
+- `POST   /ev/copiloto` — 3 acciones IA (Sprint B.8).
 
 **Acciones IA por módulo (action en body):**
 | Módulo | Acción | Plan |
@@ -2149,6 +2237,9 @@ Total **21 endpoints** (7 micmac + 7 mactor + 7 pp), agrupados en
 | pp     | `sugerir-alternativas` | Pro+ |
 | pp     | `validar-criterios` | Premium+ |
 | pp     | `narrativa-memo` | Premium+ |
+| ev     | `sugerir-indicadores` | Pro+ |
+| ev     | `validar-teoria` | Premium+ |
+| ev     | `narrativa-plan` | Premium+ |
 
 **Storage KV (`RR_STORE`):**
 ```
@@ -2159,6 +2250,7 @@ micmac:invite:<token>        invitación TTL 14d
 micmac:copiloto:<hash24>     respuestas IA TTL 7d
 mactor:* (mismo layout con prefijo mactor)
 pp:*     (mismo layout con prefijo pp)
+ev:*     (mismo layout con prefijo ev)
 ```
 
 **DeepSeek:** API key `DEEPSEEK_API_KEY` como secret del worker
@@ -2166,13 +2258,17 @@ pp:*     (mismo layout con prefijo pp)
 `deepseek-v4-flash`. AbortSignal 28s. Cache hash24 con
 `PROMPT_VERSION='v1'` (bumpear al cambiar prompts para invalidar cache).
 
-**Plan gate (común a los 3 módulos):**
+**Plan gate (común a los 4 módulos):**
 ```js
-MICMAC_MAX_PROJ = MACTOR_MAX_PROJ = PP_MAX_PROJ = { free:1, pro:5, premium:25, full:50 }
+MICMAC_MAX_PROJ = MACTOR_MAX_PROJ = PP_MAX_PROJ = EV_MAX_PROJ = { free:1, pro:5, premium:25, full:50 }
 PP_MAX_ALTERNATIVAS = 5
 PP_MAX_CRITERIOS    = 8
 PP_MAX_EVIDENCIA    = 60
 PP_MAX_AFECTADOS    = 30
+EV_MAX_INDICADORES  = 30
+EV_MAX_SUBPREGUNTAS = 5
+EV_MAX_SUPUESTOS    = 6
+EV_MAX_NODOS_NIVEL  = 4
 ```
 
 **Deploy del worker:**
@@ -2197,16 +2293,18 @@ token + plan. `_callDeepSeek(env, systemPrompt, userMsg, opts)`. `_hash24(str)`.
 
 ### Backlog del lab
 
-**Sprints próximos del lab (B / C / D)** — módulos nuevos que faltan:
-- **Sprint B** — módulo de **Evaluación de política** (4ª caja del
-  hub, hoy con badge "Próximamente"). Diseñar pregunta evaluativa,
-  teoría de cambio, indicadores SMART y método (RCT · diff-in-diff ·
-  regression discontinuity · cualitativo · value-for-money). Marco:
-  OCDE-DAC + SINERGIA + Ivàlua.
+**Sprints próximos del lab (C / D)** — módulos nuevos que faltan:
 - **Sprint C** — módulo **Alternativas** (pendiente; complementa
   problema-publico con generación más sistemática de opciones).
 - **Sprint D** — módulo **AIA** (Análisis de Impacto Adicional);
   pendiente de scope.
+
+**Iteraciones del módulo Evaluación (B v2):**
+- Métodos causales modernos: causal forests (Athey-Wager 2019), double
+  ML (Chernozhukov 2018), staggered DiD (Callaway-Sant'Anna 2021),
+  synthetic control aumentado (Ben-Michael 2021).
+- Cargar literatura externa que mejore B.4 (selector de método) sin
+  reescribir el resto del módulo.
 
 **Reservados para después de los 4 módulos:**
 - **Sprint E** (antes "Sprint 7") — datos municipales (~1.100 muns ×
