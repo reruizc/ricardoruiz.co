@@ -1261,14 +1261,19 @@ footer.foot {
         <b>Matriz opciones × cinco categorías de impacto:</b> costos
         directos al regulado, costos indirectos de cumplimiento,
         beneficios esperados, riesgo de captura del regulador, carga
-        administrativa. Escala cualitativa (bajo · medio · alto ·
-        muy-alto). Score agregado por opción.
+        administrativa al Estado. Escala cualitativa (bajo · medio ·
+        alto · muy-alto). Score agregado = <em>beneficios − promedio
+        de costos y riesgos</em>.
       </p>
     </div>
 
-    <div class="placeholder-box">
-      <b>En construcción · D.4</b>
-      Matriz interactiva opciones × 5 categorías + score agregado. Llega en la siguiente iteración.
+    <div class="rob-table-wrap" id="imp-table-wrap"></div>
+
+    <div style="margin-top:1rem;font-family:var(--italic);font-style:italic;font-size:.9rem;color:var(--ink-3);max-width:64ch;line-height:1.55">
+      El score agregado es una guía cualitativa, no un cálculo costo-beneficio
+      monetizado. Para un análisis económico riguroso (CBA social Green Book +
+      MVPF + CEA), úsalo en complemento del módulo
+      <a href="alternativas.html#robustez" style="color:var(--accent)">Alternativas → lente económica</a>.
     </div>
 
     <div class="actions">
@@ -1296,10 +1301,48 @@ footer.foot {
       </p>
     </div>
 
-    <div class="placeholder-box">
-      <b>En construcción · D.5</b>
-      Plan de consulta (audiencias + instrumentos + cronograma) + matriz de 5 riesgos regulatorios + IA "detectar-riesgos-regulatorios" (Premium+).
+    <h3 style="font-family:var(--sans);font-weight:700;font-size:1.05rem;margin:1.2rem 0 .75rem;color:var(--ink)">Plan de consulta pública</h3>
+
+    <div class="field">
+      <label class="field-label">Audiencias clave (chips · máx 10)</label>
+      <div id="con-audi-list" style="display:flex;flex-direction:column;gap:.4rem;margin-bottom:.6rem"></div>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <input type="text" id="con-audi-input" placeholder="Ej.: ANDI, Fasecolda, defensorías del consumidor, EPS, CRC…" style="flex:1;min-width:240px;font-family:var(--sans);font-size:.94rem;padding:.6rem .85rem;background:var(--paper-2);color:var(--ink);border:1px solid var(--rule-strong);outline:none" onkeydown="if(event.key==='Enter'){event.preventDefault();addAudiencia();}"/>
+        <button class="btn-ghost" onclick="addAudiencia()">+ Agregar</button>
+      </div>
+      <div class="field-hint">Stakeholders a consultar antes de expedir. Cubre tanto al regulado como al beneficiario y a la sociedad civil.</div>
     </div>
+
+    <div class="field">
+      <label class="field-label">Instrumentos de consulta</label>
+      <div class="pill-group" id="con-instr-pills"></div>
+      <div class="field-hint">Selecciona los mecanismos que usarás. Multi-selección: el AIN serio combina al menos dos.</div>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="con-cronograma">Cronograma de consulta</label>
+      <textarea id="con-cronograma" placeholder="Ej.: Semana 1-2: foro técnico con gremio. Semana 3-4: publicación en MinSalud para comentarios. Semana 5-6: mesa con consumidores. Semana 7: respuesta a comentarios y radicación."></textarea>
+      <div class="field-hint">Tiempos por instrumento y secuencia. El Decreto 1273 exige mínimo 15 días para comentarios web.</div>
+    </div>
+
+    <div class="field" style="margin-top:.5rem">
+      <label class="field-label" for="con-plan">Notas sobre el plan</label>
+      <textarea id="con-plan" placeholder="Notas adicionales del plan de consulta: presupuesto, responsables, contingencias."></textarea>
+    </div>
+
+    <h3 style="font-family:var(--sans);font-weight:700;font-size:1.05rem;margin:1.8rem 0 .75rem;color:var(--ink)">Análisis de riesgo regulatorio</h3>
+
+    <div id="riesgo-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:.7rem;margin-bottom:1.2rem"></div>
+
+    <div class="ia-bar" style="margin-top:1.2rem">
+      <div class="ia-icon">✦</div>
+      <div class="ia-body">
+        <div class="ia-title">Detectar riesgos regulatorios con IA</div>
+        <div class="ia-sub">El copiloto analiza problema + opciones + tipo de falla + audiencias del plan de consulta y estima los 5 riesgos regulatorios (Hahn-Tetlock 2008 · Stigler 1971). Plan Premium o superior.</div>
+      </div>
+      <button class="btn" id="ia-riesgo-btn" onclick="iaDetectarRiesgos()">Detectar riesgos</button>
+    </div>
+    <div class="ia-result" id="ia-riesgo-result" style="display:none"></div>
 
     <div class="actions">
       <button class="btn-ghost" onclick="goToStep(4)">← Impactos</button>
@@ -1325,9 +1368,34 @@ footer.foot {
       </p>
     </div>
 
-    <div class="placeholder-box">
-      <b>En construcción · D.6</b>
-      Cronograma + responsables + presupuesto + indicadores + cláusula de revisión. Llega en la siguiente iteración.
+    <div class="field">
+      <label class="field-label" for="impl-cronograma">Cronograma de implementación <span class="req">*</span></label>
+      <textarea id="impl-cronograma" placeholder="Ej.: Mes 0: publicación del decreto. Mes 1-3: socialización y capacitación. Mes 4-6: transitorio para ajustes. Mes 7: vigencia plena. Mes 12: primer reporte de cumplimiento. Mes 24-36: revisión."></textarea>
+      <div class="field-hint">Hitos clave desde publicación hasta vigencia plena. Incluye períodos de transición si aplican.</div>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="impl-responsables">Responsables institucionales <span class="req">*</span></label>
+      <textarea id="impl-responsables" placeholder="Ej.: Superintendencia Financiera (supervisión). MinSalud (rector de política). Función Pública (registro normativo). Auditor del cumplimiento: Contraloría."></textarea>
+      <div class="field-hint">Quién implementa, quién supervisa, quién audita. Si una entidad debe contratar capacidad extra, indícalo.</div>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="impl-presupuesto">Presupuesto estimado</label>
+      <textarea id="impl-presupuesto" placeholder="Ej.: 4.500 millones COP año 1 (sistemas + 8 inspectores nuevos en Supersalud). 1.800 millones COP años subsiguientes (operación recurrente). Fuente: presupuesto general Supersalud + tasa de inspección a pólizas."></textarea>
+      <div class="field-hint">Costo público de implementar. Diferencia inversión inicial vs. operación recurrente. Indica fuente de financiación.</div>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="impl-indicadores">Indicadores de monitoreo</label>
+      <textarea id="impl-indicadores" placeholder="Ej.: (1) % de pólizas con cláusulas estandarizadas — meta 100% mes 24. (2) Quejas en Defensoría del Consumidor — meta -50% año 2. (3) Dispersión de precios para procedimientos equivalentes — meta < 20%."></textarea>
+      <div class="field-hint">Tres a cinco indicadores con meta y plazo. Estos son los que se reportarán en la revisión.</div>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="impl-revision">Cláusula de revisión <span class="req">*</span></label>
+      <textarea id="impl-revision" placeholder="Ej.: La presente norma será revisada a los 30 meses de su entrada en vigencia. La revisión cotejará los indicadores de monitoreo contra las metas establecidas. Si el cumplimiento agregado es inferior al 60%, la norma se ajusta o se deroga."></textarea>
+      <div class="field-hint">Fecha explícita de revisión (24-36 meses típico) + criterio cuantitativo para decidir mantener/ajustar/derogar. Sin este campo, la norma queda en piloto automático.</div>
     </div>
 
     <div class="actions">
@@ -1741,9 +1809,9 @@ function renderAll() {
 // renderProblema  · implementado en D.1 (sección dedicada más abajo)
 // renderObjetivos · implementado en D.2 (sección dedicada más abajo)
 // renderOpciones  · implementado en D.3 (sección dedicada más abajo)
-function renderImpactos()       { /* D.4 */ }
-function renderConsulta()       { /* D.5 */ }
-function renderImplementacion() { /* D.6 */ }
+// renderImpactos  · implementado en D.4 (sección dedicada más abajo)
+// renderConsulta       · implementado en D.5 (sección dedicada más abajo)
+// renderImplementacion · implementado en D.6 (sección dedicada más abajo)
 
 function renderResults() {
   const el = document.getElementById('res-meta');
@@ -2283,6 +2351,338 @@ function iaAddOpcionReg(idx) {
   const btn = document.querySelector(`#ia-opt-result .ia-sug-add[data-idx="${idx}"]`);
   if (btn) { btn.textContent = '✓ Agregado'; btn.classList.add('added'); btn.disabled = true; }
   showToast('Opción agregada.');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 4 · MATRIZ DE IMPACTOS (D.4)
+// ═════════════════════════════════════════════════════════════════════════
+// 5 categorías de impacto · escala cualitativa bajo/medio/alto/muy-alto
+const IMP_CATEGORIAS = [
+  { id:'costos_directos',   label:'Costos directos',   hint:'Costos asumidos por el regulado al cumplir la norma. Invertido: bajo = bueno.', invertido: true },
+  { id:'costos_indirectos', label:'Costos indirectos', hint:'Costos de cumplimiento, asesoría legal, ajuste de procesos. Invertido: bajo = bueno.', invertido: true },
+  { id:'beneficios',        label:'Beneficios',        hint:'Beneficios esperados para los afectados y la sociedad. Directo: alto = bueno.', invertido: false },
+  { id:'captura',           label:'Riesgo de captura', hint:'Probabilidad de que el regulador termine sirviendo al regulado (Stigler 1971). Invertido: bajo = bueno.', invertido: true },
+  { id:'carga_admin',       label:'Carga administrativa', hint:'Carga al Estado por implementar y supervisar. Invertido: bajo = bueno.', invertido: true }
+];
+const IMP_NIVELES = [
+  { id:'bajo',      label:'B', title:'Bajo',      pts: 1 },
+  { id:'medio',     label:'M', title:'Medio',     pts: 2 },
+  { id:'alto',      label:'A', title:'Alto',      pts: 3 },
+  { id:'muy-alto',  label:'MA',title:'Muy alto',  pts: 4 }
+];
+
+function _impPts(nivel) {
+  const n = IMP_NIVELES.find(x => x.id === nivel);
+  return n ? n.pts : 0;
+}
+
+function _calcImpScore(optId) {
+  if (!STATE.impactos || !STATE.impactos[optId]) return { score:null, complete:false, beneficios:null, costos_promedio:null };
+  const imp = STATE.impactos[optId];
+  let beneficios = null;
+  const negativos = [];
+  let allFilled = true;
+  IMP_CATEGORIAS.forEach(cat => {
+    const v = imp[cat.id];
+    if (!v) { allFilled = false; return; }
+    const pts = _impPts(v);
+    if (cat.id === 'beneficios') beneficios = pts;
+    else negativos.push(pts);
+  });
+  if (!allFilled) return { score:null, complete:false, beneficios, costos_promedio: negativos.length ? negativos.reduce((s,x)=>s+x,0)/negativos.length : null };
+  const negProm = negativos.reduce((s, x) => s + x, 0) / Math.max(negativos.length, 1);
+  const score = (beneficios || 0) - negProm;
+  return { score, complete:true, beneficios, costos_promedio: negProm };
+}
+
+function setImpacto(optId, catId, nivel) {
+  if (!STATE.impactos || typeof STATE.impactos !== 'object') STATE.impactos = {};
+  if (!STATE.impactos[optId]) STATE.impactos[optId] = {};
+  // Toggle: si ya estaba con ese valor, deselecciona
+  if (STATE.impactos[optId][catId] === nivel) {
+    delete STATE.impactos[optId][catId];
+  } else {
+    STATE.impactos[optId][catId] = nivel;
+  }
+  saveState();
+  renderImpactos();
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 5 · CONSULTA PÚBLICA + RIESGO REGULATORIO (D.5)
+// ═════════════════════════════════════════════════════════════════════════
+const CON_AUDI_MAX = 10;
+const CON_INSTRUMENTOS = [
+  { id:'foro-publico',     label:'Foro público' },
+  { id:'consulta-web',     label:'Consulta web (Decreto 1273)' },
+  { id:'mesa-tecnica',     label:'Mesa técnica con gremio' },
+  { id:'audiencia-publica',label:'Audiencia pública' },
+  { id:'audiencia-congreso',label:'Audiencia en Congreso' },
+  { id:'panel-expertos',   label:'Panel de expertos' },
+  { id:'encuesta-usuarios',label:'Encuesta a usuarios' }
+];
+const RIESGO_DIMENSIONES = [
+  { id:'captura',         label:'Captura del regulador',     hint:'El regulado termina influyendo en la regulación (Stigler 1971). Más probable si la regulación afecta a un sector concentrado y poderoso.' },
+  { id:'asimetria',       label:'Asimetría de información',  hint:'El supervisor no tiene la info técnica que el regulado sí. Riesgo de regular en la oscuridad.' },
+  { id:'carga_excesiva',  label:'Carga excesiva al regulado',hint:'Costo de cumplimiento supera el beneficio social esperado. Asfixia al sector formal y empuja a informalidad.' },
+  { id:'fragmentacion',   label:'Fragmentación normativa',   hint:'La norma nueva contradice o se solapa con normas vigentes. Multiplica costos legales y crea confusión.' },
+  { id:'obsolescencia',   label:'Obsolescencia tecnológica', hint:'Por su rigidez, la norma queda obsoleta frente a cambios tecnológicos rápidos del sector regulado.' }
+];
+const RIESGO_NIVELES = [
+  { id:'bajo',  label:'Bajo',  color:'var(--green)' },
+  { id:'medio', label:'Medio', color:'var(--amber)' },
+  { id:'alto',  label:'Alto',  color:'var(--danger)' }
+];
+
+function renderConsulta() {
+  // Audiencias chips
+  renderAudiencias();
+  // Instrumentos pills
+  const pillsEl = document.getElementById('con-instr-pills');
+  if (pillsEl) {
+    const sel = STATE.consulta.instrumentos || [];
+    pillsEl.innerHTML = CON_INSTRUMENTOS.map(i =>
+      `<button class="pill${sel.includes(i.id) ? ' sel' : ''}" type="button" onclick="toggleInstrumento('${i.id}')">${escapeHtml(i.label)}</button>`
+    ).join('');
+  }
+  // Cronograma + notas binds
+  const cronEl = document.getElementById('con-cronograma');
+  const planEl = document.getElementById('con-plan');
+  if (cronEl && cronEl.value !== (STATE.consulta.cronograma || '')) cronEl.value = STATE.consulta.cronograma || '';
+  if (planEl && planEl.value !== (STATE.consulta.plan || '')) planEl.value = STATE.consulta.plan || '';
+  if (!renderConsulta._bound) {
+    renderConsulta._bound = true;
+    if (cronEl) cronEl.addEventListener('input', () => { STATE.consulta.cronograma = cronEl.value; saveState(); refreshConsMeta(); });
+    if (planEl) planEl.addEventListener('input', () => { STATE.consulta.plan = planEl.value; saveState(); });
+  }
+  // Riesgos
+  renderRiesgosGrid();
+  // Stage meta
+  refreshConsMeta();
+}
+
+function refreshConsMeta() {
+  const el = document.getElementById('con-meta');
+  if (!el) return;
+  const nAud = (STATE.consulta.audiencias || []).length;
+  const nInstr = (STATE.consulta.instrumentos || []).length;
+  const riesgosFilled = RIESGO_DIMENSIONES.filter(r => STATE.riesgo_reg[r.id]).length;
+  el.textContent = `${nAud} audiencias · ${nInstr} instrumentos · ${riesgosFilled}/5 riesgos calificados`;
+}
+
+function renderAudiencias() {
+  const list = document.getElementById('con-audi-list');
+  if (!list) return;
+  if (!Array.isArray(STATE.consulta.audiencias)) STATE.consulta.audiencias = [];
+  const arr = STATE.consulta.audiencias;
+  if (arr.length === 0) {
+    list.innerHTML = '<div style="font-family:var(--italic);font-style:italic;color:var(--ink-3);font-size:.88rem">Aún no agregaste audiencias para la consulta.</div>';
+    return;
+  }
+  list.innerHTML = arr.map((s, i) => `
+    <div style="display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;background:var(--paper-2);border:1px solid var(--rule-strong)">
+      <span style="font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:700">${pad2(i+1)}</span>
+      <span contenteditable="true" spellcheck="false" style="flex:1;font-family:var(--sans);font-size:.92rem;outline:none"
+            onblur="renameAudiencia(${i}, this.innerText)"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${escapeHtml(s)}</span>
+      <button onclick="delAudiencia(${i})" style="font-family:var(--mono);font-size:.95rem;color:var(--ink-3);padding:0 .25rem" title="Eliminar">×</button>
+    </div>`).join('');
+}
+function addAudiencia() {
+  const inp = document.getElementById('con-audi-input');
+  const v = (inp.value || '').trim();
+  if (!v) return;
+  if (!Array.isArray(STATE.consulta.audiencias)) STATE.consulta.audiencias = [];
+  if (STATE.consulta.audiencias.length >= CON_AUDI_MAX) { showToast(`Máximo ${CON_AUDI_MAX} audiencias.`); return; }
+  STATE.consulta.audiencias.push(v);
+  inp.value = '';
+  saveState();
+  renderAudiencias();
+  refreshConsMeta();
+}
+function delAudiencia(i) {
+  STATE.consulta.audiencias.splice(i, 1);
+  saveState();
+  renderAudiencias();
+  refreshConsMeta();
+}
+function renameAudiencia(i, txt) {
+  const v = (txt || '').trim();
+  if (!v) { delAudiencia(i); return; }
+  STATE.consulta.audiencias[i] = v;
+  saveState();
+}
+function toggleInstrumento(id) {
+  if (!Array.isArray(STATE.consulta.instrumentos)) STATE.consulta.instrumentos = [];
+  const idx = STATE.consulta.instrumentos.indexOf(id);
+  if (idx === -1) STATE.consulta.instrumentos.push(id);
+  else STATE.consulta.instrumentos.splice(idx, 1);
+  saveState();
+  renderConsulta();
+}
+
+function renderRiesgosGrid() {
+  const grid = document.getElementById('riesgo-grid');
+  if (!grid) return;
+  grid.innerHTML = RIESGO_DIMENSIONES.map(r => {
+    const sel = STATE.riesgo_reg[r.id] || '';
+    const pillsHtml = RIESGO_NIVELES.map(n =>
+      `<button class="pill${sel === n.id ? ' sel' : ''}" type="button" onclick="setRiesgo('${r.id}','${n.id}')" style="${sel === n.id ? `border-color:${n.color};color:${n.color};background:${n.color}1a;` : ''}">${escapeHtml(n.label)}</button>`
+    ).join('');
+    return `<div class="alt-card" style="padding:.85rem 1.1rem">
+      <div style="font-family:var(--sans);font-weight:700;font-size:.96rem;color:var(--ink);margin-bottom:.3rem">${escapeHtml(r.label)}</div>
+      <div style="font-family:var(--italic);font-style:italic;font-size:.85rem;line-height:1.45;color:var(--ink-2);margin-bottom:.55rem">${escapeHtml(r.hint)}</div>
+      <div class="pill-group" style="gap:.35rem">${pillsHtml}</div>
+    </div>`;
+  }).join('');
+}
+function setRiesgo(dim, nivel) {
+  if (STATE.riesgo_reg[dim] === nivel) STATE.riesgo_reg[dim] = '';
+  else STATE.riesgo_reg[dim] = nivel;
+  saveState();
+  renderRiesgosGrid();
+  refreshConsMeta();
+}
+
+// IA · detectar-riesgos-regulatorios (Premium+) — endpoint en D.8
+async function iaDetectarRiesgos() {
+  if (!AUTH.isLogged) { openModal('modal-login'); return; }
+  if (!_userHasTier(2)) {
+    iaShowGate('ia-riesgo-result', 'Premium', 'La detección de riesgos regulatorios con IA está disponible en plan Premium o superior.');
+    return;
+  }
+  const opcionesActivas = (STATE.opciones || []).filter(o => !o.baseline);
+  if (opcionesActivas.length === 0) { showToast('Agrega al menos una opción regulatoria (paso 3) antes de detectar riesgos.'); return; }
+  const btn = document.getElementById('ia-riesgo-btn');
+  const out = document.getElementById('ia-riesgo-result');
+  btn.disabled = true; btn.textContent = 'Analizando…';
+  out.style.display = 'block';
+  out.innerHTML = '<div class="ia-result-eyebrow">Copiloto · detectando riesgos regulatorios</div><div class="ia-loading"><span class="ia-loading-dot"></span> Evaluando captura, asimetría, carga, fragmentación y obsolescencia. ~15 segundos.</div>';
+  const r = await apiCall('/ain/copiloto', { method:'POST', body:{ action:'detectar-riesgos-regulatorios', payload:{
+    problema_reg: STATE.problema_reg,
+    opciones: opcionesActivas.map(o => ({ nombre: o.nombre, tipo: o.tipo, desc: o.desc })),
+    audiencias: STATE.consulta.audiencias || []
+  } } });
+  btn.disabled = false; btn.textContent = 'Detectar riesgos';
+  if (!r.ok) {
+    out.innerHTML = `<div class="ia-result-eyebrow">Copiloto · error</div><p>${escapeHtml(r.data?.error || 'No se pudo conectar.')}</p>`;
+    return;
+  }
+  iaRenderDetectarRiesgos(r.data);
+}
+function iaRenderDetectarRiesgos(data) {
+  const out = document.getElementById('ia-riesgo-result');
+  const cachedTag = data.cached ? '<span class="ia-cached">caché</span>' : '';
+  let html = `<div class="ia-result-eyebrow">Copiloto · riesgos regulatorios estimados${cachedTag}</div>`;
+  if (data.resumen) html += `<p>${escapeHtml(data.resumen)}</p>`;
+  const niveles = data.niveles || {};
+  if (Object.keys(niveles).length) {
+    html += '<h3>Estimación por dimensión</h3><div class="ia-suggested">';
+    RIESGO_DIMENSIONES.forEach(r => {
+      const nivel = niveles[r.id];
+      const just = (data.justificaciones || {})[r.id];
+      if (!nivel) return;
+      const nv = RIESGO_NIVELES.find(x => x.id === nivel);
+      html += `<div class="ia-sug">
+        <div class="ia-sug-body">
+          <div class="ia-sug-name">${escapeHtml(r.label)} · <span style="color:${nv ? nv.color : 'var(--ink-2)'}">${escapeHtml(nv ? nv.label : nivel)}</span></div>
+          ${just ? `<div class="ia-sug-desc">${escapeHtml(just)}</div>` : ''}
+        </div>
+        <button class="ia-sug-add" onclick="setRiesgo('${r.id}','${nivel}')">Adoptar</button>
+      </div>`;
+    });
+    html += '</div>';
+  }
+  if (Array.isArray(data.mitigaciones) && data.mitigaciones.length) {
+    html += '<h3>Mitigaciones sugeridas</h3><ul>';
+    data.mitigaciones.forEach(m => { html += `<li>${escapeHtml(m)}</li>`; });
+    html += '</ul>';
+  }
+  out.innerHTML = html;
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 6 · IMPLEMENTACIÓN + MONITOREO (D.6)
+// ═════════════════════════════════════════════════════════════════════════
+const IMPL_CAMPOS = [
+  { id:'cronograma',             elId:'impl-cronograma' },
+  { id:'responsables',           elId:'impl-responsables' },
+  { id:'presupuesto',            elId:'impl-presupuesto' },
+  { id:'indicadores_monitoreo',  elId:'impl-indicadores' },
+  { id:'clausula_revision',      elId:'impl-revision' }
+];
+
+function renderImplementacion() {
+  // Bind de los 5 campos (sólo una vez)
+  IMPL_CAMPOS.forEach(c => {
+    const el = document.getElementById(c.elId);
+    if (!el) return;
+    const cur = STATE.implementacion[c.id] || '';
+    if (el.value !== cur) el.value = cur;
+    if (!el._aninBound) {
+      el._aninBound = true;
+      el.addEventListener('input', () => {
+        STATE.implementacion[c.id] = el.value;
+        saveState();
+        refreshImplMeta();
+      });
+    }
+  });
+  refreshImplMeta();
+}
+function refreshImplMeta() {
+  const el = document.getElementById('impl-meta');
+  if (!el) return;
+  const total = IMPL_CAMPOS.length;
+  const filled = IMPL_CAMPOS.filter(c => String(STATE.implementacion[c.id] || '').trim()).length;
+  el.textContent = `${filled}/${total} campos completados`;
+}
+
+function renderImpactos() {
+  _ensureStatuQuo();
+  const wrap = document.getElementById('imp-table-wrap');
+  if (!wrap) return;
+  const opciones = STATE.opciones || [];
+  if (opciones.length === 0) {
+    wrap.innerHTML = '<div class="placeholder-box"><b>Sin opciones</b>Vuelve al paso 3 para agregar opciones regulatorias antes de calificar impactos.</div>';
+    const metaEl = document.getElementById('imp-meta');
+    if (metaEl) metaEl.textContent = '—';
+    return;
+  }
+  // Calcular scores
+  const rowsData = opciones.map(o => ({ opt: o, score: _calcImpScore(o.id) }));
+  const completed = rowsData.filter(r => r.score.complete);
+  const winner = completed.length ? completed.reduce((best, cur) => cur.score.score > (best?.score.score ?? -Infinity) ? cur : best, null) : null;
+  // Header
+  let html = '<table class="rob-table"><thead><tr><th class="alt-col">Opción</th>';
+  IMP_CATEGORIAS.forEach(c => { html += `<th title="${escapeAttr(c.hint)}">${escapeHtml(c.label)}<br/><span style="font-family:var(--mono);font-size:9px;color:var(--ink-3);font-weight:400">${c.invertido ? 'bajo = mejor' : 'alto = mejor'}</span></th>`; });
+  html += '<th>Score<br/><span style="font-family:var(--mono);font-size:9px;color:var(--ink-3);font-weight:400">b − c̄</span></th>';
+  html += '</tr></thead><tbody>';
+  rowsData.forEach(({ opt, score }) => {
+    const isWinner = winner && winner.opt.id === opt.id;
+    html += `<tr class="${isWinner ? 'winner' : ''}">`;
+    html += `<td class="cell-name alt-col">${escapeHtml(opt.nombre)}${opt.baseline ? ' <span style="font-family:var(--mono);font-size:9.5px;color:var(--ink-3);letter-spacing:.06em">· baseline</span>' : ''}</td>`;
+    IMP_CATEGORIAS.forEach(c => {
+      const current = STATE.impactos?.[opt.id]?.[c.id] || '';
+      html += '<td><div class="rob-cell">';
+      IMP_NIVELES.forEach(n => {
+        html += `<button class="rob-rate${current === n.id ? ' sel' : ''}" type="button" onclick="setImpacto('${opt.id}','${c.id}','${n.id}')" title="${escapeAttr(n.title)}">${n.label}</button>`;
+      });
+      html += '</div></td>';
+    });
+    const scoreStr = score.score == null ? '—' : (score.score > 0 ? '+' : '') + score.score.toFixed(2);
+    html += `<td class="cell-num score-col"><b>${scoreStr}</b>${!score.complete && Object.keys(STATE.impactos?.[opt.id] || {}).length > 0 ? '<br/><span style="font-family:var(--italic);font-style:italic;color:var(--ink-3);font-size:.78rem">incompleto</span>' : ''}</td>`;
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+  // Stage meta
+  const metaEl = document.getElementById('imp-meta');
+  if (metaEl) {
+    const total = opciones.length;
+    const done = completed.length;
+    metaEl.textContent = `${total} opciones · ${done} con matriz completa${winner ? ' · winner: ' + winner.opt.nombre.slice(0,30) : ''}`;
+  }
 }
 
 function importarDesdePP() {
