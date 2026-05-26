@@ -1813,25 +1813,7 @@ function renderAll() {
 // renderConsulta       · implementado en D.5 (sección dedicada más abajo)
 // renderImplementacion · implementado en D.6 (sección dedicada más abajo)
 
-function renderResults() {
-  const el = document.getElementById('res-meta');
-  if (el) el.textContent = `${(STATE.opciones||[]).length} opciones · ${(STATE.objetivos||[]).length} objetivos`;
-}
-
-// Exports + IA placeholders · se completan en D.7
-function downloadMemoMD()     { showToast('Export .md llega en D.7'); }
-function downloadMatrizCSV()  { showToast('Export .csv llega en D.7'); }
-function downloadConpesPDF()  { showToast('Memo CONPES PDF llega en D.7'); }
-function enviarAEvaluacion()  { showToast('Envío a evaluación llega en D.7'); }
-
-async function iaNarrativa() {
-  if (!AUTH.isLogged) { openModal('modal-login'); return; }
-  if (!_userHasTier(2)) {
-    iaShowGate('ia-narr-result', 'Premium', 'La narrativa interpretativa con IA está disponible en plan Premium o superior.');
-    return;
-  }
-  showToast('Narrativa IA llega en D.7');
-}
+// renderResults + exports + iaNarrativa implementados en D.7 (más abajo, sección dedicada)
 
 // ═════════════════════════════════════════════════════════════════════════
 // MECÁNICA 1 · PROBLEMA REGULATORIO (D.1)
@@ -3132,6 +3114,575 @@ function iaShowGate(elId, plan, desc) {
   const out = document.getElementById(elId);
   out.style.display = 'block';
   out.innerHTML = `<div class="ia-result-eyebrow">Copiloto · plan ${plan} requerido</div><p>${escapeHtml(desc)}</p><p>Tu plan actual: <b>${escapeHtml(AUTH.user?.plan || 'free')}</b>.</p><p><a href="pricing.html" style="color:var(--accent);font-weight:600">Ver planes →</a></p>`;
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 7 · RESULTS + EXPORTS + IA NARRATIVA (D.7)
+// ═════════════════════════════════════════════════════════════════════════
+function _optRankings() {
+  const opciones = STATE.opciones || [];
+  const rows = opciones.map(o => ({ opt:o, score:_calcImpScore(o.id) }));
+  rows.sort((a, b) => {
+    const sa = a.score.score == null ? -999 : a.score.score;
+    const sb = b.score.score == null ? -999 : b.score.score;
+    return sb - sa;
+  });
+  rows.forEach((r, i) => { r.rank = i + 1; });
+  return rows;
+}
+
+function renderResults() {
+  const cont = document.getElementById('res-content');
+  if (!cont) return;
+  const opciones = STATE.opciones || [];
+  const objetivos = STATE.objetivos || [];
+  const rows = _optRankings();
+  const recAlt = (STATE.recomendacion?.opcionId_recomendada)
+    ? opciones.find(o => o.id === STATE.recomendacion.opcionId_recomendada)
+    : (rows[0] ? rows[0].opt : null);
+  const recRow = recAlt ? rows.find(r => r.opt.id === recAlt.id) : null;
+
+  let html = '';
+  // Hero
+  if (recAlt) {
+    html += `<div class="res-hero">
+      <div class="rh-eyebrow">Opción regulatoria recomendada${recRow ? ' · rank ' + recRow.rank : ''}${recAlt.tipo ? ' · ' + escapeHtml(_optTipoLabel(recAlt.tipo)) : ''}</div>
+      <h3>${escapeHtml(recAlt.nombre)}</h3>
+      ${recAlt.desc ? `<p>${escapeHtml(recAlt.desc)}</p>` : '<p><em>Sin descripción · edítala en el paso 3.</em></p>'}
+    </div>`;
+  } else {
+    html += `<div class="placeholder-box"><b>Sin opciones</b>Vuelve al paso 3 para agregar opciones regulatorias.</div>`;
+  }
+
+  // KPIs
+  const nOpt = opciones.length;
+  const nObj = objetivos.length;
+  const objComp = objetivos.filter(o => String(o.enunciado||'').trim() && String(o.indicador||'').trim() && String(o.meta||'').trim() && String(o.plazo||'').trim()).length;
+  const matrizComp = rows.filter(r => r.score.complete).length;
+  const riesgosFilled = RIESGO_DIMENSIONES.filter(r => STATE.riesgo_reg[r.id]).length;
+  const implFilled = IMPL_CAMPOS.filter(c => String(STATE.implementacion[c.id] || '').trim()).length;
+  html += `<div class="res-grid">
+    <div class="res-kpi"><div class="rk-num">${objComp}/${nObj}</div><div class="rk-label">Objetivos SMART</div></div>
+    <div class="res-kpi"><div class="rk-num">${matrizComp}/${nOpt}</div><div class="rk-label">Matriz impactos</div></div>
+    <div class="res-kpi"><div class="rk-num">${riesgosFilled}/5</div><div class="rk-label">Riesgos evaluados</div></div>
+    <div class="res-kpi"><div class="rk-num">${implFilled}/5</div><div class="rk-label">Plan implementación</div></div>
+  </div>`;
+
+  // Tabla compacta de ranking
+  if (rows.length > 0) {
+    html += '<div class="res-table-wrap"><table class="res-table"><thead><tr><th>Opción</th><th>Tipo</th><th>Score impactos</th><th>Beneficios</th><th>Costos prom.</th></tr></thead><tbody>';
+    rows.forEach(r => {
+      const isWinner = recAlt && r.opt.id === recAlt.id;
+      const scoreStr = r.score.score == null ? '—' : (r.score.score > 0 ? '+' : '') + r.score.score.toFixed(2);
+      const bStr = r.score.beneficios == null ? '—' : r.score.beneficios.toFixed(0);
+      const cStr = r.score.costos_promedio == null ? '—' : r.score.costos_promedio.toFixed(2);
+      html += `<tr class="${isWinner ? 'winner' : ''}">
+        <td class="cell-name">${escapeHtml(r.opt.nombre)}${r.opt.baseline ? ' <span style="font-family:var(--mono);font-size:9.5px;color:var(--ink-3);letter-spacing:.06em">· baseline</span>' : ''}</td>
+        <td class="cell-num">${escapeHtml(_optTipoLabel(r.opt.tipo))}</td>
+        <td class="cell-num"><b>${scoreStr}</b>${!r.score.complete && Object.keys(STATE.impactos?.[r.opt.id] || {}).length > 0 ? '<br/><span style="font-family:var(--italic);font-style:italic;color:var(--ink-3);font-size:.78rem">incompleto</span>' : ''}</td>
+        <td class="cell-num">${bStr}</td>
+        <td class="cell-num">${cStr}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
+
+  // Selector de opción recomendada
+  html += `<div class="field" style="margin-top:1.4rem">
+    <label class="field-label">Marca la opción recomendada</label>
+    <div class="pill-group" id="rec-pills" style="gap:.4rem"></div>
+  </div>
+  <div class="field">
+    <label class="field-label" for="rec-justif">Justificación de la decisión <span class="req">*</span></label>
+    <textarea id="rec-justif" placeholder="Ej.: Se recomienda la opción de co-regulación porque combina el mejor score de impactos con un riesgo de captura medio que es mitigable mediante la conformación de un panel técnico con representación equilibrada del sector usuario. La opción de regulación directa tiene mejor beneficio esperado pero alto riesgo de captura y carga administrativa muy alta. La revisión a los 30 meses permitirá ajustar el régimen si los indicadores no se alcanzan.">${escapeHtml(STATE.recomendacion?.justificacion || '')}</textarea>
+    <div class="field-hint">Tres a cinco frases. Explica por qué esta y no la siguiente en ranking, qué supuestos asumes y qué condiciones llevarían a reconsiderar.</div>
+  </div>`;
+
+  cont.innerHTML = html;
+
+  // Render pills de recomendación + bind del textarea
+  const recPills = document.getElementById('rec-pills');
+  if (recPills) {
+    recPills.innerHTML = opciones.filter(o => !o.baseline).map(o => {
+      const sel = STATE.recomendacion?.opcionId_recomendada === o.id;
+      return `<button class="pill${sel ? ' sel' : ''}" type="button" onclick="setRecomendacion('${o.id}')">${escapeHtml(o.nombre.slice(0, 50))}${o.nombre.length > 50 ? '…' : ''}</button>`;
+    }).join('') || '<span style="font-family:var(--italic);font-style:italic;color:var(--ink-3);font-size:.9rem">No hay opciones no-baseline para recomendar.</span>';
+  }
+  const justEl = document.getElementById('rec-justif');
+  if (justEl && !justEl._aninBound) {
+    justEl._aninBound = true;
+    justEl.addEventListener('input', () => {
+      if (!STATE.recomendacion) STATE.recomendacion = { opcionId_recomendada:'', justificacion:'' };
+      STATE.recomendacion.justificacion = justEl.value;
+      saveState();
+    });
+  }
+  // Meta
+  const meta = document.getElementById('res-meta');
+  if (meta) meta.textContent = `${nOpt} opciones · recomendada: ${recAlt ? recAlt.nombre.slice(0,30) : 'pendiente'}`;
+}
+function setRecomendacion(optId) {
+  if (!STATE.recomendacion) STATE.recomendacion = { opcionId_recomendada:'', justificacion:'' };
+  STATE.recomendacion.opcionId_recomendada = (STATE.recomendacion.opcionId_recomendada === optId) ? '' : optId;
+  saveState();
+  renderResults();
+}
+
+// ── EXPORTS · MD / CSV / PDF ─────────────────────────────────────────────
+function _download(filename, content, mime) {
+  const blob = new Blob([content], { type: mime || 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function _slugForFile() {
+  const enun = (STATE.problema_reg?.enunciado || STATE.contexto?.enunciado_problema || '').trim();
+  if (!enun) return 'ain';
+  return enun.toLowerCase().replace(/[áéíóúñ]/g, c => ({á:'a',é:'e',í:'i',ó:'o',ú:'u',ñ:'n'}[c] || c)).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g,'').slice(0, 40) || 'ain';
+}
+function _impLabel(id) {
+  const n = IMP_NIVELES.find(x => x.id === id);
+  return n ? n.title : id;
+}
+function _riesgoLabel(id) {
+  const n = RIESGO_NIVELES.find(x => x.id === id);
+  return n ? n.label : id;
+}
+
+function downloadMemoMD() {
+  const opciones = STATE.opciones || [];
+  const objetivos = STATE.objetivos || [];
+  const rows = _optRankings();
+  const recAlt = (STATE.recomendacion?.opcionId_recomendada)
+    ? opciones.find(o => o.id === STATE.recomendacion.opcionId_recomendada)
+    : (rows[0] ? rows[0].opt : null);
+  const today = new Date().toLocaleDateString('es-CO', { year:'numeric', month:'long', day:'numeric' });
+
+  let md = `# Análisis de Impacto Normativo (AIN)\n\n**Fecha:** ${today}\n\n`;
+
+  md += `## 1. Problema regulatorio\n\n`;
+  if (STATE.problema_reg.enunciado) md += `**Enunciado:** ${STATE.problema_reg.enunciado}\n\n`;
+  if (STATE.problema_reg.tipo_falla) md += `**Tipo de falla:** ${_tipoLabel(STATE.problema_reg.tipo_falla)}\n\n`;
+  if ((STATE.problema_reg.afectados || []).length) {
+    md += `**Afectados / sujetos regulados:**\n\n`;
+    STATE.problema_reg.afectados.forEach(a => { md += `- ${a}\n`; });
+    md += '\n';
+  }
+  if (STATE.problema_reg.evidencia_inicial) md += `**Evidencia inicial:** ${STATE.problema_reg.evidencia_inicial}\n\n`;
+
+  md += `## 2. Objetivos normativos (${objetivos.length})\n\n`;
+  objetivos.forEach((o, i) => {
+    md += `### ${i + 1}. ${o.enunciado || '(sin enunciado)'}\n\n`;
+    if (o.indicador) md += `- **Indicador:** ${o.indicador}\n`;
+    if (o.meta) md += `- **Meta:** ${o.meta}\n`;
+    if (o.plazo) md += `- **Plazo:** ${o.plazo}\n`;
+    md += '\n';
+  });
+
+  md += `## 3. Opciones regulatorias consideradas (${opciones.length})\n\n`;
+  opciones.forEach((o, i) => {
+    md += `### ${i + 1}. ${o.nombre}${o.baseline ? ' _(baseline)_' : ''}\n\n`;
+    md += `**Tipo regulatorio:** ${_optTipoLabel(o.tipo)}\n\n`;
+    if (o.desc) md += `**Descripción operativa:** ${o.desc}\n\n`;
+    if (o.supuestos) md += `**Supuestos críticos:** ${o.supuestos}\n\n`;
+  });
+
+  md += `## 4. Matriz de impactos\n\n`;
+  md += `Escala cualitativa B/M/A/MA. Score = beneficios − promedio(costos directos, costos indirectos, captura, carga administrativa).\n\n`;
+  md += `| Opción | Costos dir. | Costos ind. | Beneficios | Captura | Carga adm. | Score |\n|---|---|---|---|---|---|---|\n`;
+  rows.forEach(r => {
+    const imp = STATE.impactos[r.opt.id] || {};
+    md += `| ${r.opt.nombre}${r.opt.baseline ? ' _(base)_' : ''} | ${_impLabel(imp.costos_directos || '—')} | ${_impLabel(imp.costos_indirectos || '—')} | ${_impLabel(imp.beneficios || '—')} | ${_impLabel(imp.captura || '—')} | ${_impLabel(imp.carga_admin || '—')} | **${r.score.score == null ? '—' : (r.score.score > 0 ? '+' : '') + r.score.score.toFixed(2)}** |\n`;
+  });
+  md += '\n';
+
+  md += `## 5. Consulta pública + análisis de riesgo regulatorio\n\n`;
+  if ((STATE.consulta.audiencias || []).length) {
+    md += `### Audiencias a consultar\n\n`;
+    STATE.consulta.audiencias.forEach(a => { md += `- ${a}\n`; });
+    md += '\n';
+  }
+  if ((STATE.consulta.instrumentos || []).length) {
+    md += `**Instrumentos de consulta:** ${STATE.consulta.instrumentos.map(id => (CON_INSTRUMENTOS.find(x=>x.id===id)?.label || id)).join(' · ')}\n\n`;
+  }
+  if (STATE.consulta.cronograma) md += `**Cronograma:** ${STATE.consulta.cronograma}\n\n`;
+  if (STATE.consulta.plan) md += `**Notas:** ${STATE.consulta.plan}\n\n`;
+  md += `### Riesgo regulatorio (Hahn-Tetlock 2008 · Stigler 1971)\n\n`;
+  md += `| Dimensión | Nivel |\n|---|---|\n`;
+  RIESGO_DIMENSIONES.forEach(r => {
+    const v = STATE.riesgo_reg[r.id];
+    md += `| ${r.label} | ${v ? _riesgoLabel(v) : '—'} |\n`;
+  });
+  md += '\n';
+
+  md += `## 6. Implementación + monitoreo\n\n`;
+  IMPL_CAMPOS.forEach(c => {
+    const val = STATE.implementacion[c.id];
+    if (!val || !val.trim()) return;
+    const label = c.id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    md += `### ${label}\n\n${val}\n\n`;
+  });
+
+  md += `## 7. Recomendación\n\n`;
+  if (recAlt) {
+    md += `**Opción recomendada:** ${recAlt.nombre} _(${_optTipoLabel(recAlt.tipo)})_\n\n`;
+    if (STATE.recomendacion?.justificacion) md += `${STATE.recomendacion.justificacion}\n\n`;
+    else md += `_Sin justificación textual. Edita el paso final para agregarla._\n\n`;
+  } else {
+    md += `_Aún no se seleccionó opción recomendada._\n\n`;
+  }
+
+  md += `---\n\n_Generado con ricardoruiz.co · Laboratorio de Políticas · módulo Análisis de Impacto Normativo._\n\n_Marco metodológico: RIA OCDE (2012, revisión 2022) · DNP/Función Pública AIN (Decreto 1081/2015 + Decreto 1273/2020) · Sunstein (Simpler 2013) · Hahn-Tetlock (JEP 2008) · Stigler (1971) · Mashaw (2018)._\n`;
+
+  _download(`ain-${_slugForFile()}-${new Date().toISOString().slice(0,10)}.md`, md, 'text/markdown;charset=utf-8');
+  showToast('Memo AIN descargado.');
+}
+
+function downloadMatrizCSV() {
+  const opciones = STATE.opciones || [];
+  const rows = _optRankings();
+  function q(s) {
+    const str = String(s == null ? '' : s);
+    if (/[",\n]/.test(str)) return '"' + str.replace(/"/g, '""') + '"';
+    return str;
+  }
+  const header = ['Rank','Opción','Tipo regulatorio','Baseline','Costos directos','Costos indirectos','Beneficios','Riesgo de captura','Carga administrativa','Score agregado'];
+  let csv = header.map(q).join(',') + '\n';
+  rows.forEach(r => {
+    const imp = STATE.impactos[r.opt.id] || {};
+    csv += [
+      r.rank,
+      r.opt.nombre,
+      _optTipoLabel(r.opt.tipo),
+      r.opt.baseline ? 'sí' : 'no',
+      _impLabel(imp.costos_directos || ''),
+      _impLabel(imp.costos_indirectos || ''),
+      _impLabel(imp.beneficios || ''),
+      _impLabel(imp.captura || ''),
+      _impLabel(imp.carga_admin || ''),
+      r.score.score == null ? '' : r.score.score.toFixed(3)
+    ].map(q).join(',') + '\n';
+  });
+  _download(`ain-impactos-${_slugForFile()}-${new Date().toISOString().slice(0,10)}.csv`, csv, 'text/csv;charset=utf-8');
+  showToast('Matriz CSV descargada.');
+}
+
+async function _ensureJsPDF() {
+  if (window.jspdf && window.jspdf.jsPDF) return window.jspdf.jsPDF;
+  await new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('No se pudo cargar jsPDF.'));
+    document.head.appendChild(s);
+  });
+  if (!window.jspdf || !window.jspdf.jsPDF) throw new Error('jsPDF no disponible.');
+  return window.jspdf.jsPDF;
+}
+async function downloadConpesPDF() {
+  let jsPDF;
+  try { showToast('Cargando generador PDF…'); jsPDF = await _ensureJsPDF(); }
+  catch { showToast('No se pudo cargar el generador PDF.'); return; }
+  const doc = new jsPDF({ unit:'mm', format:'a4' });
+  const PW = 210, PH = 297, M = 18;
+  let y = M;
+  const ACC = [137, 30, 22];
+  const INK = [26, 22, 16];
+  const INK2 = [90, 84, 72];
+  const RULE = [200, 195, 185];
+
+  function addPageIfNeeded(needed) { if (y + needed > PH - M) { doc.addPage(); y = M; } }
+  function setFont(weight, size) { doc.setFont('helvetica', weight); doc.setFontSize(size); }
+  function drawTitle(t) {
+    setFont('bold', 18); doc.setTextColor(...ACC); doc.text(t, M, y); y += 8;
+    doc.setDrawColor(...ACC); doc.setLineWidth(0.6); doc.line(M, y, PW - M, y); y += 6;
+    doc.setTextColor(...INK);
+  }
+  function drawH2(t) {
+    addPageIfNeeded(12);
+    setFont('bold', 12); doc.setTextColor(...ACC); doc.text(t, M, y); y += 6;
+    doc.setTextColor(...INK);
+  }
+  function drawPara(t, opts) {
+    if (!t) return;
+    setFont('normal', opts?.size || 10);
+    doc.setTextColor(...(opts?.color || INK));
+    const lines = doc.splitTextToSize(String(t), PW - 2 * M);
+    lines.forEach(line => { addPageIfNeeded(5); doc.text(line, M, y); y += 4.5; });
+    y += 1;
+  }
+  function drawKV(k, v) {
+    setFont('bold', 10); doc.setTextColor(...INK);
+    addPageIfNeeded(5);
+    const klabel = k + ': '; doc.text(klabel, M, y);
+    const klabelWidth = doc.getTextWidth(klabel);
+    setFont('normal', 10); doc.setTextColor(...INK2);
+    const lines = doc.splitTextToSize(String(v || '—'), PW - 2 * M - klabelWidth);
+    if (lines.length === 1) { doc.text(lines[0], M + klabelWidth, y); y += 5; }
+    else {
+      doc.text(lines[0], M + klabelWidth, y); y += 4.5;
+      for (let i = 1; i < lines.length; i++) { addPageIfNeeded(5); doc.text(lines[i], M, y); y += 4.5; }
+      y += 1;
+    }
+  }
+  function drawTableHeader(cols, widths) {
+    setFont('bold', 9); doc.setTextColor(...ACC); doc.setFillColor(245, 240, 230);
+    addPageIfNeeded(8);
+    let x = M; doc.setDrawColor(...RULE); doc.setLineWidth(0.2);
+    cols.forEach((c, i) => { doc.rect(x, y - 4, widths[i], 6, 'FD'); doc.text(String(c), x + 1.5, y); x += widths[i]; });
+    y += 4; doc.setTextColor(...INK);
+  }
+  function drawTableRow(vals, widths, opts) {
+    setFont(opts?.bold ? 'bold' : 'normal', 9);
+    doc.setTextColor(...(opts?.highlight ? ACC : INK));
+    if (opts?.highlight) doc.setFillColor(252, 240, 233);
+    let x = M; let maxLines = 1;
+    const cellLines = vals.map((v, i) => doc.splitTextToSize(String(v == null ? '' : v), widths[i] - 3));
+    cellLines.forEach(arr => { if (arr.length > maxLines) maxLines = arr.length; });
+    const rowH = Math.max(6, maxLines * 4 + 2);
+    addPageIfNeeded(rowH);
+    cellLines.forEach((arr, i) => {
+      doc.setDrawColor(...RULE);
+      doc.rect(x, y - 4, widths[i], rowH, opts?.highlight ? 'FD' : 'D');
+      arr.forEach((line, li) => doc.text(line, x + 1.5, y + li * 4));
+      x += widths[i];
+    });
+    y += rowH - 2;
+  }
+
+  // Header
+  drawTitle('Memo CONPES regulatorio · Análisis de Impacto Normativo (AIN)');
+  setFont('normal', 9); doc.setTextColor(...INK2);
+  const today = new Date().toLocaleDateString('es-CO', { year:'numeric', month:'long', day:'numeric' });
+  doc.text(today + '  ·  ricardoruiz.co · Laboratorio de Políticas', M, y); y += 7;
+  doc.setTextColor(...INK);
+
+  // 1. Problema
+  drawH2('1. Problema regulatorio');
+  drawPara(STATE.problema_reg.enunciado || '— sin enunciado registrado —');
+  if (STATE.problema_reg.tipo_falla) drawKV('Tipo de falla', _tipoLabel(STATE.problema_reg.tipo_falla));
+  if ((STATE.problema_reg.afectados || []).length) drawKV('Afectados', STATE.problema_reg.afectados.join(' · '));
+  if (STATE.problema_reg.evidencia_inicial) drawKV('Evidencia inicial', STATE.problema_reg.evidencia_inicial);
+
+  // 2. Objetivos
+  const objetivos = STATE.objetivos || [];
+  if (objetivos.length) {
+    drawH2(`2. Objetivos normativos (${objetivos.length})`);
+    objetivos.forEach((o, i) => {
+      setFont('bold', 10); doc.setTextColor(...INK);
+      addPageIfNeeded(5); doc.text(`${i + 1}. ${o.enunciado || '(sin enunciado)'}`, M, y); y += 5;
+      const meta = [];
+      if (o.indicador) meta.push(`Indicador: ${o.indicador}`);
+      if (o.meta) meta.push(`Meta: ${o.meta}`);
+      if (o.plazo) meta.push(`Plazo: ${o.plazo}`);
+      if (meta.length) drawPara(meta.join('  ·  '), { color: INK2, size: 9 });
+    });
+  }
+
+  // 3. Opciones
+  const opciones = STATE.opciones || [];
+  if (opciones.length) {
+    drawH2('3. Opciones regulatorias consideradas');
+    opciones.forEach((o, i) => {
+      setFont('bold', 11); doc.setTextColor(...ACC);
+      addPageIfNeeded(6);
+      doc.text(`${i + 1}. ${o.nombre}${o.baseline ? '  (baseline)' : ''}  ·  ${_optTipoLabel(o.tipo)}`, M, y); y += 5;
+      doc.setTextColor(...INK);
+      if (o.desc) drawKV('Descripción', o.desc);
+      if (o.supuestos) drawKV('Supuestos críticos', o.supuestos);
+      y += 1;
+    });
+  }
+
+  // 4. Matriz de impactos
+  const rows = _optRankings();
+  drawH2('4. Matriz de impactos');
+  drawPara('Escala B/M/A/MA · Score = beneficios − promedio(costos+captura+carga). Mayor = mejor.', { color: INK2, size: 9 });
+  const widths = [56, 18, 18, 18, 18, 18, 18];
+  drawTableHeader(['Opción','Costos dir.','Costos ind.','Beneficios','Captura','Carga adm.','Score'], widths);
+  rows.forEach(r => {
+    const isWinner = STATE.recomendacion?.opcionId_recomendada
+      ? r.opt.id === STATE.recomendacion.opcionId_recomendada
+      : (r.rank === 1 && r.score.complete);
+    const imp = STATE.impactos[r.opt.id] || {};
+    const cells = [
+      r.opt.nombre + (r.opt.baseline ? ' (base)' : ''),
+      imp.costos_directos ? _impLabel(imp.costos_directos).slice(0,8) : '—',
+      imp.costos_indirectos ? _impLabel(imp.costos_indirectos).slice(0,8) : '—',
+      imp.beneficios ? _impLabel(imp.beneficios).slice(0,8) : '—',
+      imp.captura ? _impLabel(imp.captura).slice(0,8) : '—',
+      imp.carga_admin ? _impLabel(imp.carga_admin).slice(0,8) : '—',
+      r.score.score == null ? '—' : (r.score.score > 0 ? '+' : '') + r.score.score.toFixed(2)
+    ];
+    drawTableRow(cells, widths, { highlight: isWinner });
+  });
+  y += 2;
+
+  // 5. Riesgo regulatorio
+  const riesgosUsados = RIESGO_DIMENSIONES.filter(r => STATE.riesgo_reg[r.id]);
+  if (riesgosUsados.length) {
+    addPageIfNeeded(20);
+    drawH2('5. Análisis de riesgo regulatorio');
+    drawPara('Cinco dimensiones según Hahn-Tetlock (2008) y Stigler (1971).', { color: INK2, size: 9 });
+    const rw = [80, 30];
+    drawTableHeader(['Dimensión','Nivel'], rw);
+    riesgosUsados.forEach(r => {
+      const nivel = STATE.riesgo_reg[r.id];
+      drawTableRow([r.label, _riesgoLabel(nivel)], rw);
+    });
+    y += 2;
+  }
+
+  // 6. Consulta + Implementación
+  const audCount = (STATE.consulta.audiencias || []).length;
+  const instCount = (STATE.consulta.instrumentos || []).length;
+  if (audCount || instCount || STATE.consulta.cronograma) {
+    addPageIfNeeded(15);
+    drawH2(riesgosUsados.length ? '6. Plan de consulta pública' : '5. Plan de consulta pública');
+    if (audCount) drawKV('Audiencias', (STATE.consulta.audiencias || []).join(' · '));
+    if (instCount) drawKV('Instrumentos', (STATE.consulta.instrumentos || []).map(id => (CON_INSTRUMENTOS.find(x=>x.id===id)?.label || id)).join(' · '));
+    if (STATE.consulta.cronograma) drawKV('Cronograma', STATE.consulta.cronograma);
+  }
+
+  const implHasContent = IMPL_CAMPOS.some(c => String(STATE.implementacion[c.id] || '').trim());
+  if (implHasContent) {
+    addPageIfNeeded(15);
+    drawH2('Implementación y monitoreo');
+    IMPL_CAMPOS.forEach(c => {
+      const v = STATE.implementacion[c.id];
+      if (!v || !String(v).trim()) return;
+      const label = c.id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      drawKV(label, v);
+    });
+  }
+
+  // Recomendación
+  addPageIfNeeded(20);
+  drawH2('Recomendación');
+  const recAlt = (STATE.recomendacion?.opcionId_recomendada)
+    ? opciones.find(o => o.id === STATE.recomendacion.opcionId_recomendada)
+    : (rows[0] ? rows[0].opt : null);
+  if (recAlt) {
+    setFont('bold', 11); doc.setTextColor(...ACC);
+    addPageIfNeeded(6); doc.text(recAlt.nombre + '  ·  ' + _optTipoLabel(recAlt.tipo), M, y); y += 5;
+    doc.setTextColor(...INK);
+    if (STATE.recomendacion?.justificacion) drawPara(STATE.recomendacion.justificacion);
+    else drawPara('— sin justificación textual aún —', { color: INK2 });
+  } else {
+    drawPara('— aún no se seleccionó opción recomendada —', { color: INK2 });
+  }
+
+  // Footer
+  addPageIfNeeded(30);
+  y = PH - M - 22;
+  doc.setDrawColor(...RULE); doc.setLineWidth(0.3); doc.line(M, y, PW - M, y); y += 5;
+  setFont('italic', 8); doc.setTextColor(...INK2);
+  const footer = 'Marco metodológico: Análisis de Impacto Normativo del DNP y Función Pública (Decreto 1081/2015 y Decreto 1273/2020), basado en RIA de la OCDE (2012, revisión 2022). Referencias: Sunstein (Simpler, 2013), Hahn & Tetlock (JEP, 2008), Stigler (1971), Mashaw (2018), Pigou (1920), Coase (1960), Akerlof (1970). Este es un borrador estilo CONPES; no es CONPES oficial — esa formulación requiere proceso interinstitucional DNP.';
+  const flines = doc.splitTextToSize(footer, PW - 2 * M);
+  flines.forEach(l => { doc.text(l, M, y); y += 3.5; });
+  setFont('normal', 8); doc.setTextColor(...INK2);
+  y += 2; doc.text('Generado con ricardoruiz.co · Laboratorio de Políticas  ·  ' + today, M, y);
+
+  const filename = `ain-CONPES-regulatorio-${_slugForFile()}-${new Date().toISOString().slice(0,10)}.pdf`;
+  doc.save(filename);
+  showToast('Memo CONPES PDF generado.');
+}
+
+// Envío a evaluación (D.11 cierra el lado de evaluacion.html)
+function enviarAEvaluacion() {
+  const recAlt = (STATE.recomendacion?.opcionId_recomendada)
+    ? STATE.opciones.find(o => o.id === STATE.recomendacion.opcionId_recomendada)
+    : null;
+  if (!recAlt) { showToast('Selecciona una opción recomendada antes de enviar a Evaluación.'); return; }
+  const payload = {
+    source: 'ain.html',
+    timestamp: new Date().toISOString(),
+    contexto: STATE.problema_reg.enunciado || STATE.contexto.enunciado_problema || '',
+    opcion_recomendada: {
+      nombre: recAlt.nombre,
+      tipo: recAlt.tipo,
+      desc: recAlt.desc || '',
+      supuestos: recAlt.supuestos || ''
+    },
+    objetivos: STATE.objetivos,
+    indicadores_monitoreo: STATE.implementacion.indicadores_monitoreo || '',
+    justificacion: STATE.recomendacion?.justificacion || ''
+  };
+  try {
+    localStorage.setItem('ain-import-to-ev', JSON.stringify(payload));
+    if (!confirm(`Se preparó el envío de la opción recomendada y sus objetivos a Evaluación. ¿Abrir el módulo de Evaluación ahora?`)) {
+      showToast('AIN listo en cola para Evaluación.');
+      return;
+    }
+    window.location.href = 'evaluacion.html?import=ain';
+  } catch (e) {
+    showToast('No se pudo enviar: ' + e.message);
+  }
+}
+
+// IA · narrativa-ain (Premium+)
+async function iaNarrativa() {
+  if (!AUTH.isLogged) { openModal('modal-login'); return; }
+  if (!_userHasTier(2)) {
+    iaShowGate('ia-narr-result', 'Premium', 'La narrativa interpretativa con IA está disponible en plan Premium o superior.');
+    return;
+  }
+  const opciones = (STATE.opciones || []).filter(o => !o.baseline);
+  if (opciones.length === 0) { showToast('Agrega al menos una opción regulatoria antes de generar la narrativa.'); return; }
+  const recAlt = (STATE.recomendacion?.opcionId_recomendada)
+    ? STATE.opciones.find(o => o.id === STATE.recomendacion.opcionId_recomendada)
+    : null;
+  if (!recAlt) { showToast('Selecciona una opción recomendada antes de generar la narrativa.'); return; }
+  const btn = document.getElementById('ia-narr-btn');
+  const out = document.getElementById('ia-narr-result');
+  btn.disabled = true; btn.textContent = 'Redactando…';
+  out.style.display = 'block';
+  out.innerHTML = '<div class="ia-result-eyebrow">Copiloto · redactando informe AIN estilo DNP</div><div class="ia-loading"><span class="ia-loading-dot"></span> Sintetizando problema + opción + impactos + riesgos + plan. ~20-30 segundos.</div>';
+  const rows = _optRankings();
+  const opcionesForIA = rows.map(r => ({
+    nombre: r.opt.nombre,
+    tipo: _optTipoLabel(r.opt.tipo),
+    baseline: !!r.opt.baseline,
+    rank: r.rank,
+    score: r.score.score == null ? null : Number(r.score.score.toFixed(2)),
+    impactos: STATE.impactos[r.opt.id] || {}
+  }));
+  const r = await apiCall('/ain/copiloto', { method:'POST', body:{ action:'narrativa-ain', payload:{
+    problema_reg: STATE.problema_reg,
+    objetivos: STATE.objetivos,
+    opciones: opcionesForIA,
+    riesgo_reg: STATE.riesgo_reg,
+    consulta: STATE.consulta,
+    implementacion: STATE.implementacion,
+    recomendacion: STATE.recomendacion
+  } } });
+  btn.disabled = false; btn.textContent = 'Generar narrativa';
+  if (!r.ok) {
+    out.innerHTML = `<div class="ia-result-eyebrow">Copiloto · error</div><p>${escapeHtml(r.data?.error || 'No se pudo conectar.')}</p>`;
+    return;
+  }
+  iaRenderNarrativaAIN(r.data);
+}
+function iaRenderNarrativaAIN(data) {
+  const out = document.getElementById('ia-narr-result');
+  const cachedTag = data.cached ? '<span class="ia-cached">caché</span>' : '';
+  let html = `<div class="ia-result-eyebrow">Copiloto · informe AIN estilo DNP${cachedTag}</div>`;
+  if (data.justificacion_problema) html += `<h3>Justificación del problema regulatorio</h3><p>${escapeHtml(data.justificacion_problema).replace(/\n\n+/g, '</p><p>')}</p>`;
+  if (data.justificacion_recomendacion) html += `<h3>Por qué la opción recomendada</h3><p>${escapeHtml(data.justificacion_recomendacion).replace(/\n\n+/g, '</p><p>')}</p>`;
+  if (Array.isArray(data.objeciones_anticipadas) && data.objeciones_anticipadas.length) {
+    html += '<h3>Objeciones anticipadas en consulta pública</h3><ul>';
+    data.objeciones_anticipadas.forEach(s => { html += `<li>${escapeHtml(s)}</li>`; });
+    html += '</ul>';
+  }
+  if (Array.isArray(data.mitigaciones_riesgo) && data.mitigaciones_riesgo.length) {
+    html += '<h3>Mitigaciones de riesgo regulatorio</h3><ul>';
+    data.mitigaciones_riesgo.forEach(s => { html += `<li>${escapeHtml(s)}</li>`; });
+    html += '</ul>';
+  }
+  if (data.condiciones_revision) html += `<h3>Cuándo reconsiderar la regulación</h3><p>${escapeHtml(data.condiciones_revision)}</p>`;
+  out.innerHTML = html;
 }
 
 // ═════════════════════════════════════════════════════════════════════════
