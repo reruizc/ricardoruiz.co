@@ -1092,6 +1092,22 @@ footer.foot {
       <button class="btn-ghost" onclick="seedIndicadores()">Cargar 4 indicadores típicos (educación)</button>
     </div>
 
+    <!-- Sprint E.7 · línea base territorial automática -->
+    <div style="margin-bottom:1.4rem;padding:1.1rem 1.2rem;background:var(--paper-2);border:1px solid var(--rule);border-left:3px solid var(--accent)">
+      <div style="font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:.3rem">Sprint E · línea base territorial</div>
+      <div style="font-family:var(--sans);font-weight:700;font-size:1rem;color:var(--ink);margin-bottom:.25rem">¿Tu política se evalúa en un municipio específico?</div>
+      <div style="font-family:var(--italic);font-style:italic;font-size:.88rem;line-height:1.5;color:var(--ink-2);margin-bottom:.85rem">Selecciona territorio y, al crear un indicador cuyo nombre matchee con datos Fase A (homicidios, hurtos, VIF, cobertura escolar…), aparecerá un botón ✦ para autocompletar línea base + fuente + serie histórica.</div>
+      <div style="display:flex;gap:.55rem;flex-wrap:wrap;align-items:center">
+        <select id="ev-terr-dep" class="ind-select" style="min-width:180px" onchange="evTerrPobMuns(this.value)">
+          <option value="">— departamento —</option>
+        </select>
+        <select id="ev-terr-mun" class="ind-select" style="min-width:200px" onchange="evTerrSet(this.value)">
+          <option value="">— municipio (opcional) —</option>
+        </select>
+        <span id="ev-terr-status" style="font-family:var(--mono);font-size:11px;color:var(--ink-3)"></span>
+      </div>
+    </div>
+
     <div class="ia-bar" style="margin-top:1.2rem">
       <div class="ia-icon">✦</div>
       <div class="ia-body">
@@ -1559,6 +1575,7 @@ footer.foot {
 <div class="toast" id="toast"></div>
 
 <script src="lab-recursos.js"></script>
+<script src="lab-indicadores.js"></script>
 <script>
 'use strict';
 
@@ -1678,6 +1695,8 @@ function goToStep(n) {
   renderStepsNav();
   const stageIds = ['stage-pregunta','stage-teoria','stage-indicadores','stage-metodo','stage-dac','stage-economico','stage-plan'];
   showStage(stageIds[n - 1] || 'stage-pregunta');
+  // Sprint E.7: cuando entra a indicadores, poblar selector territorial
+  if (n === 3) setTimeout(() => { if (typeof evTerrPobDeptos === 'function') evTerrPobDeptos(); }, 50);
 }
 function goToResults() {
   renderResults();
@@ -1988,6 +2007,8 @@ function renderIndicadores() {
   if (inds.length === 0) {
     tb.innerHTML = '<tr><td colspan="10" style="text-align:center;font-family:var(--italic);font-style:italic;color:var(--ink-3);padding:1.2rem">Aún no agregaste indicadores. Usa «+ Agregar indicador» o el botón de seed.</td></tr>';
   } else {
+    // Sprint E.7 — detectar si hay territorio activo para mostrar chip ✦
+    const hasTerr = !!(STATE.contexto && STATE.contexto.mun_cod);
     tb.innerHTML = inds.map((ind, i) => {
       const nivelOpts = IND_NIVELES.map(n =>
         `<option value="${n}"${ind.nivel === n ? ' selected' : ''}>${IND_NIVEL_LABEL[n]}</option>`
@@ -1995,9 +2016,17 @@ function renderIndicadores() {
       const freqOpts = IND_FRECUENCIAS.map(f =>
         `<option value="${f}"${ind.frecuencia === f ? ' selected' : ''}>${f}</option>`
       ).join('');
+      // Chip de autocompletar territorial: aparece sólo si hay match keyword + hay mun
+      let autofillChip = '';
+      if (hasTerr && window.LabIndicadores) {
+        const matchId = window.LabIndicadores.matchIndicadorByKeyword(ind.nombre || '');
+        if (matchId) {
+          autofillChip = `<button type="button" onclick="evIndAutoFill(${i})" title="Autocompletar línea base con datos oficiales de ${escapeAttr(STATE.contexto.mun_nombre)}" style="margin-top:.25rem;padding:.2rem .5rem;background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-tint);font-family:var(--mono);font-size:10px;cursor:none;font-weight:700">✦ Autocompletar (${escapeHtml(STATE.contexto.mun_nombre)})</button>`;
+        }
+      }
       return `<tr>
         <td class="col-nivel"><select onchange="updateInd(${i}, 'nivel', this.value)">${nivelOpts}</select></td>
-        <td><input type="text" value="${escapeAttr(ind.nombre)}" placeholder="Ej.: tasa de deserción 9-11" oninput="updateInd(${i}, 'nombre', this.value)"/></td>
+        <td><input type="text" value="${escapeAttr(ind.nombre)}" placeholder="Ej.: tasa de deserción 9-11" oninput="updateInd(${i}, 'nombre', this.value)"/>${autofillChip}</td>
         <td><textarea oninput="updateInd(${i}, 'def', this.value)" placeholder="Qué cuenta y qué no cuenta">${escapeHtml(ind.def)}</textarea></td>
         <td><input type="text" value="${escapeAttr(ind.formula)}" placeholder="Ej.: (desertores / matriculados) × 100" oninput="updateInd(${i}, 'formula', this.value)"/></td>
         <td><input type="text" value="${escapeAttr(ind.fuente)}" placeholder="SIMAT, DANE, encuesta propia…" oninput="updateInd(${i}, 'fuente', this.value)"/></td>
@@ -2022,6 +2051,100 @@ function addIndicador() {
   STATE.indicadores.push(_newIndicador());
   saveState(); renderIndicadores();
 }
+
+// Sprint E.7 · selector territorial + autocompletar línea base con datos Fase A
+function evTerrPobDeptos() {
+  const sel = document.getElementById('ev-terr-dep');
+  if (!sel || sel.options.length > 1) return;
+  if (!window.LabIndicadores) return;
+  window.LabIndicadores.load().then(() => {
+    const deptos = window.LabIndicadores.getDeptosCatalog();
+    sel.insertAdjacentHTML('beforeend',
+      deptos.map(d => `<option value="${d.cod}">${d.nombre.replace(/[<>&]/g,'')}</option>`).join(''));
+    // Restaurar selección si STATE.contexto la tiene
+    if (STATE.contexto && STATE.contexto.dep_cod) {
+      sel.value = STATE.contexto.dep_cod;
+      evTerrPobMuns(STATE.contexto.dep_cod);
+      const munSel = document.getElementById('ev-terr-mun');
+      if (munSel && STATE.contexto.mun_cod) munSel.value = STATE.contexto.mun_cod;
+      _evTerrUpdateStatus();
+    }
+  }).catch(() => {});
+}
+function evTerrPobMuns(depCod) {
+  const sel = document.getElementById('ev-terr-mun');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— municipio (opcional) —</option>';
+  if (!depCod || !window.LabIndicadores || !window.LabIndicadores.isLoaded()) return;
+  const muns = window.LabIndicadores.getMunsByDepto(depCod);
+  sel.insertAdjacentHTML('beforeend',
+    muns.map(m => `<option value="${m.divipola}">${m.nombre.replace(/[<>&]/g,'')}</option>`).join(''));
+}
+function evTerrSet(divipola) {
+  if (!STATE.contexto) STATE.contexto = {};
+  if (!divipola) {
+    STATE.contexto.mun_cod = null;
+    STATE.contexto.mun_nombre = null;
+    _evTerrUpdateStatus();
+    saveState();
+    return;
+  }
+  if (!window.LabIndicadores) return;
+  window.LabIndicadores.load().then(() => {
+    const mun = window.LabIndicadores.getMun(divipola);
+    if (!mun) return;
+    STATE.contexto.dep_cod = mun.cod_depto;
+    STATE.contexto.mun_cod = divipola;
+    STATE.contexto.mun_nombre = mun.nombre;
+    saveState();
+    _evTerrUpdateStatus();
+    renderIndicadores();  // refresca chips de autocompletar
+  });
+}
+function _evTerrUpdateStatus() {
+  const st = document.getElementById('ev-terr-status');
+  if (!st) return;
+  const mun = STATE.contexto?.mun_nombre;
+  if (mun) {
+    st.innerHTML = `✓ <b>${mun}</b> · autocompletar activo`;
+    st.style.color = 'var(--accent)';
+  } else {
+    st.textContent = '';
+  }
+}
+
+// Cuando el nombre del indicador matchea keyword + hay territorio → autocompletar
+function evIndAutoFill(idx) {
+  if (!STATE.indicadores[idx] || !STATE.contexto?.mun_cod || !window.LabIndicadores) return;
+  window.LabIndicadores.load().then(() => {
+    const ind = STATE.indicadores[idx];
+    const indId = window.LabIndicadores.matchIndicadorByKeyword(ind.nombre);
+    if (!indId) { showToast('No hay match con un indicador Fase A.'); return; }
+    const serie = window.LabIndicadores.getSerie(STATE.contexto.mun_cod, indId);
+    if (!serie || !serie.values) { showToast('Sin datos para este municipio.'); return; }
+    const indMeta = serie.indicador;
+    const years = Object.keys(serie.values).map(y => parseInt(y, 10)).sort();
+    const earliestY = years[0], latestY = years[years.length - 1];
+    const earliestV = serie.values[String(earliestY)];
+    const latestV = serie.values[String(latestY)];
+    // Llenar campos vacíos solamente (no sobreescribir trabajo del user)
+    if (!ind.base || !ind.base.trim()) {
+      ind.base = `${earliestY}: ${window.LabIndicadores.formatValue(earliestV, indId)}`;
+    }
+    if (!ind.fuente || !ind.fuente.trim()) {
+      ind.fuente = indMeta.fuente + ' · ' + STATE.contexto.mun_nombre;
+    }
+    if (!ind.def || !ind.def.trim()) {
+      ind.def = indMeta.nombre + ' (panel ' + earliestY + '-' + latestY + ')';
+    }
+    if (!ind.formula || !ind.formula.trim()) {
+      ind.formula = 'Conteo oficial reportado por ' + indMeta.fuente.split('·')[0].trim();
+    }
+    saveState();
+    renderIndicadores();
+    showToast(`✓ Línea base y fuente autocompletadas para ${STATE.contexto.mun_nombre} (${indMeta.nombre}).`);
+  });
+}
 function delIndicador(i) {
   STATE.indicadores.splice(i, 1);
   saveState(); renderIndicadores();
@@ -2036,6 +2159,13 @@ function updateInd(i, key, val) {
   if (tr) {
     const cell = tr.querySelector('.col-smart');
     if (cell) cell.innerHTML = _smartChip(STATE.indicadores[i]);
+  }
+  // Sprint E.7: si cambia 'nombre', repintar la fila completa para refrescar
+  // el chip ✦ Autocompletar territorial.
+  if (key === 'nombre' && STATE.contexto && STATE.contexto.mun_cod) {
+    // Debounce simple para no romper el typing fluido
+    clearTimeout(updateInd._t);
+    updateInd._t = setTimeout(() => renderIndicadores(), 350);
   }
   const meta = document.getElementById('ind-meta');
   if (meta) {

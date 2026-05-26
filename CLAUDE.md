@@ -17,6 +17,7 @@
 - `ain.html` — **Lab** · módulo Análisis de Impacto Normativo (DNP/Función Pública Decreto 1081/2015 + 1273/2020 + RIA OCDE 2012/2022 + Sunstein Simpler 2013 + Hahn-Tetlock 2008 + Stigler 1971 + Mashaw 2018). 6 mecánicas: problema regulatorio (tipo de falla) · objetivos normativos medibles · opciones regulatorias (6 familias) · matriz de impactos (5 categorías) · consulta pública + 5 riesgos regulatorios · implementación + monitoreo + cláusula de revisión. Cloud-save + 3 acciones IA + memo .md + matriz .csv + memo CONPES regulatorio .pdf + auto-import desde pp/alt + envío a evaluacion. LISTO (Sprint D).
 - `lab-recursos.js` — catálogo compartido de 32 recursos en 5 categorías; cargado por los 6 módulos del lab.
 - `lab-informe.js` — **Sprint G** · helpers + generador PDF/MD del informe combinado del lab. Lee los 6 localStorage keys y produce un memo CONPES integrado. Cargado solo desde el hub.
+- `lab-indicadores.js` — **Sprint E (Fase A)** · helper de indicadores municipales oficiales con panel temporal 2018-2024. 8 indicadores × 1.108 municipios desde datos.gov.co (Policía Nacional + MEN). API lookupMun/getSerie/searchMun/matchIndicadorByKeyword. Cargado por analisis-estructural, problema-publico, ain y evaluacion.
 - `pricing.html` — planes (Básico / Pro 39.900 COP · Premium 99.900 COP · Personalizado)
 - `lang.js` — i18n (co/us/cn); `CLAUDE.md` vive en la raíz del repo
 
@@ -2574,6 +2575,120 @@ ahí.
   antes de comité, exportar `.md` y editarlo en su editor preferido
   es la ruta recomendada.
 
+### Sprint E · indicadores municipales oficiales (`lab-indicadores.js`)
+
+Pipeline de datos territoriales precargados desde fuentes oficiales para
+los 4 módulos analíticos del lab (analisis-estructural, problema-publico,
+ain, evaluacion). **Fase A LISTA** (8 indicadores · 1.108 muns · panel
+2018-2024). Fase B pendiente (descargas manuales desde TerriData / DANE
+EEVV / MinSalud).
+
+**Pipeline · `tools/build-indicadores-mun/build.py`** (Python stdlib pura):
+- 6 datasets Socrata de datos.gov.co (resource IDs constantes):
+  - `m8fd-ahd9` — HOMICIDIO (MinDefensa · DIVIPOLA)
+  - `4rxi-8m8d` — HURTO PERSONAS (MinDefensa)
+  - `csb4-y6v2` — HURTO VEHÍCULOS (MinDefensa)
+  - `gepp-dxcs` — VIOLENCIA INTRAFAMILIAR (MinDefensa)
+  - `bz43-8ahq` — DELITOS SEXUALES (MinDefensa)
+  - `sras-4t5p` — MEN_ESTADISTICAS_POR_ETC (cobertura neta · deserción ·
+    matrícula 5-16, **a nivel Entidad Territorial Certificada**)
+- Query agregada Socrata: `$select=cod_muni,date_extract_y(fecha_hecho) as anio,sum(cantidad) as total &$where=date_extract_y(fecha_hecho)>=2018 AND <=2024 &$group=cod_muni,anio &$limit=50000`.
+- Mapeo ETC→DIVIPOLA: 97 ETCs (32 deptales + 65 muns certificados). Para
+  muns no certificados aplica el valor del ETC departamental con marca
+  `_meta: "ETC departamental (aprox)"`.
+- Aliases manuales en `ETC_ALIASES` para los 4 casos donde el nombre del
+  MEN no matchea con el DIVIPOLA (Cartagena, San Andrés, Bogotá D.C.,
+  La Estrella).
+- Cache local en `Bases de datos/indicadores-mun/raw/` (JSONs intermedios).
+  Re-correr con `--no-cache` para refresh completo.
+- Output: `Bases de datos/indicadores-mun/indicadores-mun.json` (~980 KB
+  plano, ~150 KB gzip).
+
+Para regenerar:
+```bash
+python3 tools/build-indicadores-mun/build.py
+aws s3 cp "Bases de datos/indicadores-mun/indicadores-mun.json" \
+  "s3://elecciones-2026/ricardoruiz.co/bases de datos/indicadores-mun/indicadores-mun.json" \
+  --content-type "application/json" --cache-control "public, max-age=600"
+```
+Bumpear `CACHE_BUSTER` en `lab-indicadores.js` al refrescar.
+
+**Shape del JSON:**
+```jsonc
+{
+  "v": "20260526", "sprint": "E.2", "fase": "A", "periodo": [2018, 2024],
+  "indicadores": [
+    { "id":"homicidios", "nombre":"Homicidios (víctimas)", "unidad":"víctimas/año",
+      "categoria":"seguridad", "fuente":"Policía Nacional · Ministerio de Defensa",
+      "fuente_url":"https://www.datos.gov.co/d/m8fd-ahd9",
+      "nota":"...", "panel":[2018,...,2024] },
+    ...8 indicadores...
+  ],
+  "muns": {
+    "05001": {
+      "nombre":"Medellin", "depto":"Antioquia", "cod_depto":"05",
+      "datos": {
+        "homicidios": {"2018":625,"2019":576,..."2024":309},
+        "hurto_personas": {...},
+        "cobertura_neta": {"2018":96.88,..."2024":93.58},
+        "_meta": { "cobertura_neta":"ETC departamental (aprox)" }  // si proxy
+      }
+    },
+    ...1.108 muns...
+  }
+}
+```
+
+**`lab-indicadores.js` (helper, ~270 líneas):**
+
+API en `window.LabIndicadores`:
+- `load()` → Promise · carga lazy del JSON (cache en memoria por sesión).
+- `getCatalog()` → 8 indicadores con metadatos.
+- `getMun(divipola)` → `{ nombre, depto, cod_depto, datos }`.
+- `getMunsByDepto(codDepto)` → lista de muns del depto, ordenada A→Z.
+- `getValue(divipola, indicadorId, year)` → `{ value, year, isProxy, source, proxyNote }`.
+- `getLatestValue(divipola, indicadorId)` → último año disponible.
+- `getSerie(divipola, indicadorId)` → `{ values:{year:v,...}, isProxy, proxyNote, indicador }`.
+- `searchMun(query, codDepto?)` → top 30 muns que matchean por nombre.
+- `getDeptosCatalog()` → 33 deptos ordenados A→Z.
+- `matchIndicadorByKeyword(text)` → id del indicador si el texto contiene
+  un keyword conocido (homicidio, hurto, deserción, cobertura, etc.).
+- `formatValue(value, indicadorId)` → string formateado (% / conteo / COP).
+
+**Cobertura por módulo (Sprint E.4-E.7):**
+
+| Módulo | Integración | Aporte |
+|---|---|---|
+| `analisis-estructural.html` (E.4) | Selector territorio depto + mun cascada; `showIndicator` muestra panel municipal con **sparkline SVG inline** + serie 2018-2024 cuando `municipal_id` matchea | 3 indicadores nuevos en INDICATORS (deserción, hurto vehículos, delitos sexuales); 5 indicadores existentes ganan datos municipales |
+| `problema-publico.html` (E.5) | Selector territorio en `stage-evidencia` + botón "↓ Cargar evidencia oficial" precarga 5 filas con datos reales del último año disponible | Saca al usuario de la búsqueda manual de cifras DANE |
+| `ain.html` (E.6) | Selector territorio en `stage-problema` con grid de 6 indicadores territoriales (último año + fuente + proxy badge). Setea `STATE.contexto.mun_cod` para el copiloto y los exports CONPES | Dimensiona el problema regulatorio con cifras auditables |
+| `evaluacion.html` (E.7) | Selector territorio en `stage-indicadores`. Chip `✦ Autocompletar` al lado del input nombre del indicador, sólo si hay match keyword + mun. Pre-rellena base, fuente, def y fórmula | Acelera la captura SMART evitando copy-paste de DANE |
+
+**Cómo se ve para el usuario:**
+
+1. En cualquiera de los 4 módulos elige *Antioquia* en el primer select.
+2. Se puebla el segundo select con los 125 muns de Antioquia.
+3. Elige *Medellín* (DIVIPOLA 05001).
+4. El módulo muestra:
+   - En estructural: si nombra una variable "Inseguridad", el chip DATO
+     ahora abre un panel con valor nacional + depto + **municipio
+     (sparkline 2018→2024)**.
+   - En problema-publico: botón "Cargar evidencia oficial" agrega 5 filas
+     a la tabla con `Homicidios · Medellín: 309 víctimas (2024)` y
+     similares, con link al dataset.
+   - En AIN: grid con 6 mini-cards mostrando "Homicidios · 309 ·
+     [fuente↗]" etc., y se guarda `mun_cod` en el contexto.
+   - En evaluación: al escribir "cobertura escolar" en un indicador,
+     aparece chip ✦ Autocompletar (Medellín) que rellena base+fuente+def.
+
+**Fase B (pendiente · descarga manual):** IPM 2018 + NBI 2018 + agua
+potable + internet hogares + mortalidad infantil/materna + embarazo
+adolescente + vacunación PAI. Fuentes: TerriData (XLS por dimensión),
+DANE microdatos EEVV (CSVs anuales), MinSalud SISPRO (bodega web).
+Cuando estén descargados a `Bases de datos/indicadores-mun/raw/`, el
+pipeline los procesa con extensiones a `SECURITY_DATASETS` + nuevos
+parsers para CSVs en disco.
+
 ### Worker rr-auth — endpoints del lab
 
 Total **42 endpoints** (7 micmac + 7 mactor + 7 pp + 7 ev + 7 alt + 7 ain),
@@ -2750,10 +2865,16 @@ Posibles iteraciones futuras (no urgentes):
 informe combinado" más abajo. Cierre natural del lab: un solo PDF/MD
 que une el trabajo del usuario en los 6 módulos.
 
+**Sprint E · Datos municipales Fase A** ✓ LISTO. Ver sección "Sprint E ·
+indicadores municipales oficiales" más abajo. 8 indicadores con panel
+2018-2024 sobre 1.108 municipios desde datos.gov.co. Integrado en
+analisis-estructural, problema-publico, ain y evaluacion.
+
 **Reservados para próximas iteraciones:**
-- **Sprint E** — datos municipales (~1.100 muns × 5 indicadores)
-  precargados desde DANE / Policía / MEN microdatos. Beneficia a los
-  6 módulos.
+- **Sprint E Fase B** — descarga manual de TerriData / DANE EEVV /
+  MinSalud para añadir IPM, NBI, agua, internet, mortalidad infantil/
+  materna, embarazo adolescente y vacunación PAI. Requiere descarga
+  manual (SPAs sin API limpia). El pipeline ya lo soporta con extensiones.
 - **Sprint F** — escenarios prospectivos: vista "what-if" sobre MicMac,
   Mactor, problema-publico, alternativas y AIN. Los 4 escenarios de
   Alternativas (C.5) son un primer paso editable.

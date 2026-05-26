@@ -2292,7 +2292,10 @@ footer.foot a:hover { color: var(--accent); }
           <option value="">— sin definir —</option>
           <option value="nacional">Colombia (nacional)</option>
         </select>
-        <span class="terri-help">Si lo eliges, te mostramos cifras públicas de referencia sobre las variables sugeridas que coinciden con indicadores oficiales.</span>
+        <select id="terri-mun-select" class="terri-select is-hidden" onchange="setTerritorioMun(this.value)">
+          <option value="">— municipio (opcional) —</option>
+        </select>
+        <span class="terri-help">Te mostramos cifras públicas oficiales — Colombia, departamento o municipio según lo que elijas. Sprint E habilitó <b>1.108 municipios × 8 indicadores con serie 2018-2024</b>.</span>
       </div>
 
       <div class="vars-grid" id="vars-grid"></div>
@@ -2841,6 +2844,7 @@ footer.foot a:hover { color: var(--accent); }
 
 <script src="lab-recursos.js"></script>
 <script src="lab-informe.js"></script>
+<script src="lab-indicadores.js"></script>
 <script>
 'use strict';
 
@@ -2874,22 +2878,27 @@ const INDICATORS = [
     nota:'Complemento de la informalidad: ocupados que sí cotizan.' },
   { id:'homicidios',    nombre:'Tasa de homicidios',               keywords:['homicidio','homicidios','tasa de homicidio'],
     valor_nal:25.7, unidad:'por 100 mil hab.', anio:2024, fuente:'Policía Nacional · DIJIN',
-    nota:'Casos por año por cada 100.000 habitantes. Colombia tuvo ~13.300 homicidios en 2024.' },
+    nota:'Casos por año por cada 100.000 habitantes. Colombia tuvo ~13.300 homicidios en 2024.',
+    municipal_id:'homicidios' },
   { id:'hurto-personas', nombre:'Hurto a personas',                keywords:['hurto a personas','hurto personas','robo a personas'],
     valor_nal:760, unidad:'por 100 mil hab.', anio:2024, fuente:'Policía Nacional · DIJIN',
-    nota:'Denuncias formales por año. El subregistro real es estimado en 50-70%.' },
+    nota:'Denuncias formales por año. El subregistro real es estimado en 50-70%.',
+    municipal_id:'hurto_personas' },
   { id:'violencia-intrafamiliar', nombre:'Violencia intrafamiliar', keywords:['violencia intrafamiliar','vif','violencia familiar'],
     valor_nal:215, unidad:'por 100 mil hab.', anio:2024, fuente:'Medicina Legal · INMLCF',
-    nota:'Casos atendidos por Medicina Legal. Tres cuartas partes con víctima mujer.' },
+    nota:'Casos atendidos por Medicina Legal. Tres cuartas partes con víctima mujer.',
+    municipal_id:'violencia_intrafamiliar' },
   { id:'cobertura-salud', nombre:'Cobertura de aseguramiento en salud', keywords:['cobertura salud','aseguramiento salud','cobertura aseguramiento'],
     valor_nal:99.6, unidad:'% población', anio:2024, fuente:'MinSalud · BDUA',
     nota:'Afiliación a régimen contributivo + subsidiado. No mide calidad ni acceso real.' },
   { id:'cobertura-primaria', nombre:'Cobertura educativa básica primaria', keywords:['cobertura primaria','cobertura basica primaria','primaria'],
     valor_nal:98.5, unidad:'% neta', anio:2023, fuente:'MEN · SIMAT',
-    nota:'Niños 6-10 años matriculados en primaria sobre población de esa edad.' },
+    nota:'Niños 6-10 años matriculados en primaria sobre población de esa edad.',
+    municipal_id:'cobertura_neta' /* aprox: el ETC reporta cobertura agregada 5-16 */ },
   { id:'cobertura-media', nombre:'Cobertura educativa media',     keywords:['cobertura media','educacion media','cobertura secundaria media'],
     valor_nal:48.2, unidad:'% neta', anio:2023, fuente:'MEN · SIMAT',
-    nota:'Jóvenes 15-16 años matriculados en grados 10-11. El indicador con mayor brecha urbano-rural.' },
+    nota:'Jóvenes 15-16 años matriculados en grados 10-11. El indicador con mayor brecha urbano-rural.',
+    municipal_id:'cobertura_neta' /* aprox: el ETC reporta cobertura agregada 5-16 */ },
   { id:'cobertura-terciaria', nombre:'Cobertura en educación superior', keywords:['cobertura terciaria','educacion superior','cobertura superior','universidad'],
     valor_nal:54.6, unidad:'% bruta', anio:2023, fuente:'MEN · SNIES',
     nota:'Matriculados en pregrado o posgrado sobre población 17-21 años (incluye estudiantes fuera del rango etario).' },
@@ -2901,7 +2910,20 @@ const INDICATORS = [
     nota:'Hogares conectados a acueducto. Rural cae a ~70%, hay brechas regionales fuertes.' },
   { id:'embarazo-adolescente', nombre:'Embarazo adolescente',      keywords:['embarazo adolescente','embarazo en adolescentes','fecundidad adolescente'],
     valor_nal:13.5, unidad:'% mujeres 15-19', anio:2023, fuente:'DANE · estadísticas vitales',
-    nota:'Adolescentes 15-19 que ya son madres o están embarazadas (ENDS).' }
+    nota:'Adolescentes 15-19 que ya son madres o están embarazadas (ENDS).' },
+  // Sprint E.4 — indicadores nuevos con cobertura municipal completa
+  { id:'desercion-escolar', nombre:'Deserción escolar intra-anual', keywords:['desercion','desercion escolar','abandono escolar'],
+    valor_nal:3.9, unidad:'%', anio:2023, fuente:'MEN · SIMAT',
+    nota:'Estudiantes que abandonaron el sistema escolar durante el año académico.',
+    municipal_id:'desercion' },
+  { id:'hurto-vehiculos', nombre:'Hurto de vehículos',              keywords:['hurto de vehiculo','hurto vehiculos','robo vehiculo','robo de auto','hurto auto'],
+    valor_nal:140, unidad:'por 100 mil hab.', anio:2024, fuente:'Policía Nacional · DIJIN',
+    nota:'Hurto de motocicletas + automotores agregado por DIJIN.',
+    municipal_id:'hurto_vehiculos' },
+  { id:'delitos-sexuales',  nombre:'Delitos sexuales',              keywords:['delitos sexuales','violencia sexual','abuso sexual','agresion sexual'],
+    valor_nal:60, unidad:'por 100 mil hab.', anio:2024, fuente:'Policía Nacional · DIJIN',
+    nota:'Delitos del Título IV del Código Penal (artículos 205-219). Subregistro real estimado >50%.',
+    municipal_id:'delitos_sexuales' }
 ];
 
 function _normName(s) {
@@ -4221,8 +4243,40 @@ function _populateTerritorioSelect() {
     sel.insertAdjacentHTML('beforeend', optsHtml);
   }
   const t = STATE.meta?.territorio;
-  if (t) sel.value = t.tipo === 'nacional' ? 'nacional' : (t.tipo === 'depto' ? 'depto:' + t.codigo : '');
+  if (t) {
+    if (t.tipo === 'nacional') sel.value = 'nacional';
+    else if (t.tipo === 'depto') sel.value = 'depto:' + t.codigo;
+    else if (t.tipo === 'mun')   sel.value = 'depto:' + (t.depto_cod || t.codigo.slice(0, 2));
+    else sel.value = '';
+  }
   else sel.value = '';
+  _populateTerritorioMunSelect();
+}
+
+function _populateTerritorioMunSelect() {
+  const munSel = document.getElementById('terri-mun-select');
+  if (!munSel) return;
+  const t = STATE.meta?.territorio;
+  // El select municipal solo se muestra cuando hay depto seleccionado
+  const depCod = (t && (t.tipo === 'depto' ? t.codigo : (t.tipo === 'mun' ? (t.depto_cod || t.codigo.slice(0, 2)) : null)));
+  if (!depCod) {
+    munSel.classList.add('is-hidden');
+    munSel.innerHTML = '<option value="">— municipio (opcional) —</option>';
+    return;
+  }
+  // Llenar con muns de ese depto (lazy: requiere LabIndicadores cargado)
+  if (window.LabIndicadores && window.LabIndicadores.isLoaded()) {
+    const muns = window.LabIndicadores.getMunsByDepto(depCod);
+    munSel.innerHTML = '<option value="">— municipio (opcional) —</option>' +
+      muns.map(m => `<option value="mun:${m.divipola}">${escapeHtmlSafe(m.nombre)}</option>`).join('');
+    if (t && t.tipo === 'mun') munSel.value = 'mun:' + t.codigo;
+    munSel.classList.remove('is-hidden');
+  } else if (window.LabIndicadores) {
+    // Cargar y reintentar
+    munSel.innerHTML = '<option value="">cargando municipios…</option>';
+    munSel.classList.remove('is-hidden');
+    window.LabIndicadores.load().then(() => _populateTerritorioMunSelect()).catch(() => {});
+  }
 }
 
 function setTerritorio(val) {
@@ -4234,8 +4288,40 @@ function setTerritorio(val) {
     STATE.meta.territorio = d ? { tipo:'depto', codigo:d.cod, nombre:d.n } : null;
     // Precargar el JSON departamental en background
     loadIndicadoresDepto();
+    // Sprint E — precargar lab-indicadores para poder poblar el selector mun
+    if (window.LabIndicadores) window.LabIndicadores.load().catch(() => {});
   }
   saveState();
+  _populateTerritorioMunSelect();
+}
+
+// Sprint E.4 — selector municipal cascada
+function setTerritorioMun(val) {
+  if (!val || !val.startsWith('mun:')) {
+    // Si limpian municipio, queda en nivel depto
+    const t = STATE.meta?.territorio;
+    if (t && t.tipo === 'mun') {
+      const dep = t.depto_cod || t.codigo.slice(0, 2);
+      const d = DEPTOS_CO.find(x => x.cod === dep);
+      STATE.meta.territorio = d ? { tipo:'depto', codigo:d.cod, nombre:d.n } : null;
+    }
+    saveState();
+    return;
+  }
+  const divipola = val.slice(4);
+  if (window.LabIndicadores) {
+    const mun = window.LabIndicadores.getMun(divipola);
+    if (mun) {
+      STATE.meta.territorio = {
+        tipo: 'mun',
+        codigo: divipola,
+        nombre: mun.nombre + ', ' + mun.depto,
+        depto_cod: mun.cod_depto,
+        depto_nombre: mun.depto
+      };
+      saveState();
+    }
+  }
 }
 
 // ── Carga lazy del JSON de indicadores departamentales ───────────────────
@@ -4269,7 +4355,7 @@ async function showIndicator(indId, varIdx) {
 
   // Construir el slot territorial primero como loading si aún no tenemos los datos.
   let territorioLinea = '';
-  if (terri && terri.tipo === 'depto') {
+  if (terri && (terri.tipo === 'depto' || terri.tipo === 'mun')) {
     territorioLinea = `<div class="ind-value-block" id="ind-terri-slot">
       <div class="ind-value-label">Tu territorio · ${escapeHtml(terri.nombre)}</div>
       <div class="ind-value" style="color:var(--ink-3)">…</div>
@@ -4323,6 +4409,50 @@ async function showIndicator(indId, varIdx) {
         <div style="font-family:var(--mono);font-size:10px;color:var(--ink-3);margin-top:.3rem">Este indicador aún no está cargado a nivel departamental. Llegará en versión siguiente.</div>
       `;
     }
+  }
+  // Sprint E.4 · slot municipal con serie temporal cuando hay match Fase A
+  if (terri && terri.tipo === 'mun' && ind.municipal_id && window.LabIndicadores) {
+    try { await window.LabIndicadores.load(); } catch {}
+    const slot = document.getElementById('ind-terri-slot');
+    if (!slot) return;
+    const serie = window.LabIndicadores.getSerie(terri.codigo, ind.municipal_id);
+    if (serie && serie.values && Object.keys(serie.values).length > 0) {
+      const yrs = Object.keys(serie.values).map(y => parseInt(y, 10)).sort((a,b) => b-a);
+      const latestY = yrs[0], latestV = serie.values[String(latestY)];
+      const earliestY = yrs[yrs.length - 1], earliestV = serie.values[String(earliestY)];
+      const fmt = (v) => window.LabIndicadores.formatValue(v, ind.municipal_id);
+      const indFaseA = serie.indicador;
+      // Sparkline mini SVG con la serie
+      const w = 110, h = 28;
+      const vals = yrs.slice().reverse().map(y => serie.values[String(y)]);
+      const minV = Math.min(...vals), maxV = Math.max(...vals);
+      const rng = maxV - minV || 1;
+      const pts = vals.map((v, i) => {
+        const x = (i / (vals.length - 1 || 1)) * (w - 4) + 2;
+        const y = h - 2 - ((v - minV) / rng) * (h - 6);
+        return x.toFixed(1) + ',' + y.toFixed(1);
+      }).join(' ');
+      const sparkline = vals.length > 1 ?
+        `<svg width="${w}" height="${h}" style="display:block;margin-top:.4rem;background:var(--paper-3);border:1px solid var(--rule)">
+          <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
+          <circle cx="${pts.split(' ').pop().split(',')[0]}" cy="${pts.split(' ').pop().split(',')[1]}" r="2" fill="var(--accent)"/>
+        </svg>` : '';
+      const proxyNote = serie.isProxy ? `<div style="font-family:var(--mono);font-size:9.5px;color:var(--gold);margin-top:.2rem">⚠ ${escapeHtml(serie.proxyNote)}</div>` : '';
+      slot.innerHTML = `
+        <div class="ind-value-label">Tu municipio · ${escapeHtml(terri.nombre)}</div>
+        <div class="ind-value">${escapeHtml(fmt(latestV))}<span class="ind-unit">${escapeHtml(indFaseA?.unidad || ind.unidad)}</span></div>
+        <div style="font-family:var(--mono);font-size:10.5px;color:var(--ink-3);margin-top:.2rem">${latestY} · serie ${earliestY}→${latestY}: ${escapeHtml(fmt(earliestV))} → ${escapeHtml(fmt(latestV))}</div>
+        ${sparkline}
+        ${proxyNote}
+      `;
+    } else {
+      slot.innerHTML = `
+        <div class="ind-value-label">Tu municipio · ${escapeHtml(terri.nombre)}</div>
+        <div class="ind-value" style="color:var(--ink-3);font-size:1rem;font-weight:400;font-family:var(--italic);font-style:italic">sin dato Fase A</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--ink-3);margin-top:.3rem">Este indicador no está en la primera cosecha municipal. Fase B agregará IPM, NBI, salud y otros.</div>
+      `;
+    }
+    return;
   }
 }
 function hideIndicator() {

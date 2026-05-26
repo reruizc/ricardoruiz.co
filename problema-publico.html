@@ -1305,6 +1305,22 @@ footer.foot {
       <button class="btn-ghost" onclick="seedEvidencia()">Cargar 3 fuentes típicas de referencia</button>
     </div>
 
+    <!-- Sprint E.5 · cargar evidencia oficial municipal -->
+    <div style="margin-top:1.4rem;padding:1.1rem 1.2rem;background:var(--paper-2);border:1px solid var(--rule);border-left:3px solid var(--accent)">
+      <div style="font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:.4rem">Sprint E · evidencia oficial municipal</div>
+      <div style="font-family:var(--sans);font-weight:700;font-size:1rem;color:var(--ink);margin-bottom:.3rem">Cargar cifras oficiales para tu territorio</div>
+      <div style="font-family:var(--italic);font-style:italic;font-size:.9rem;line-height:1.5;color:var(--ink-2);margin-bottom:.85rem">Si tu problema es local, podemos precargar 4-5 fuentes oficiales con cifras del último año disponible. Datos: Policía Nacional (seguridad) + MEN (educación). Tú las editas y completas con lo que aplique.</div>
+      <div style="display:flex;gap:.55rem;flex-wrap:wrap;align-items:center">
+        <select id="pp-evid-dep" class="evid-input" style="min-width:180px" onchange="ppEvidPobMuns(this.value)">
+          <option value="">— departamento —</option>
+        </select>
+        <select id="pp-evid-mun" class="evid-input" style="min-width:180px">
+          <option value="">— municipio —</option>
+        </select>
+        <button class="btn" onclick="ppLoadEvidenciaTerritorial()">↓ Cargar evidencia oficial</button>
+      </div>
+    </div>
+
     <div class="actions">
       <button class="btn-ghost" onclick="goToStep(1)">← Editar problema</button>
       <div class="right-group">
@@ -1637,6 +1653,7 @@ footer.foot {
 <div class="toast" id="toast"></div>
 
 <script src="lab-recursos.js"></script>
+<script src="lab-indicadores.js"></script>
 
 <script>
 'use strict';
@@ -2151,6 +2168,71 @@ function seedEvidencia() {
   seed.forEach(s => STATE.evidencia.push(s));
   saveState(); renderEvidencia();
   showToast('3 fuentes típicas cargadas. Edita los datos según tu caso.');
+}
+
+// Sprint E.5 · evidencia oficial territorial (lab-indicadores.js)
+function ppEvidPobDeptos() {
+  const sel = document.getElementById('pp-evid-dep');
+  if (!sel || sel.options.length > 1) return;  // ya poblado
+  if (!window.LabIndicadores) return;
+  window.LabIndicadores.load().then(() => {
+    const deptos = window.LabIndicadores.getDeptosCatalog();
+    sel.insertAdjacentHTML('beforeend',
+      deptos.map(d => `<option value="${d.cod}">${escapeHtml(d.nombre)}</option>`).join(''));
+  }).catch(() => {});
+}
+function ppEvidPobMuns(depCod) {
+  const sel = document.getElementById('pp-evid-mun');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— municipio —</option>';
+  if (!depCod || !window.LabIndicadores || !window.LabIndicadores.isLoaded()) return;
+  const muns = window.LabIndicadores.getMunsByDepto(depCod);
+  sel.insertAdjacentHTML('beforeend',
+    muns.map(m => `<option value="${m.divipola}">${escapeHtml(m.nombre)}</option>`).join(''));
+}
+function ppLoadEvidenciaTerritorial() {
+  const munSel = document.getElementById('pp-evid-mun');
+  const divipola = munSel ? munSel.value : '';
+  if (!divipola) { showToast('Selecciona municipio primero.'); return; }
+  if (!window.LabIndicadores) { showToast('Datos no disponibles.'); return; }
+  window.LabIndicadores.load().then(() => {
+    const mun = window.LabIndicadores.getMun(divipola);
+    if (!mun) { showToast('Municipio no encontrado.'); return; }
+    // Catálogo de indicadores prioritarios + sus datos del último año
+    const PRIORIDAD = ['homicidios','violencia_intrafamiliar','hurto_personas','cobertura_neta','desercion'];
+    let added = 0;
+    PRIORIDAD.forEach(indId => {
+      const latest = window.LabIndicadores.getLatestValue(divipola, indId);
+      if (!latest || latest.value == null) return;
+      const indMeta = window.LabIndicadores.getCatalog().find(i => i.id === indId);
+      if (!indMeta) return;
+      const valStr = window.LabIndicadores.formatValue(latest.value, indId);
+      STATE.evidencia.push({
+        fuente: indMeta.fuente,
+        anyo: String(latest.year),
+        dato: `${indMeta.nombre} · ${mun.nombre}: ${valStr}${indMeta.unidad === '%' ? '' : ' ' + indMeta.unidad}` + (latest.isProxy ? ' (aprox)' : ''),
+        link: indMeta.fuente_url,
+        nota: indMeta.nota + (latest.isProxy ? ' Nota: ' + latest.proxyNote : '')
+      });
+      added++;
+    });
+    if (added === 0) { showToast('No se encontraron datos para este municipio.'); return; }
+    saveState(); renderEvidencia();
+    showToast(`✓ ${added} fuentes oficiales cargadas para ${mun.nombre}.`);
+  }).catch(e => {
+    showToast('Error cargando indicadores.');
+    console.error(e);
+  });
+}
+// Auto-poblar el dep-select cuando entra a stage-evidencia
+const _origGoToStep = window.goToStep;
+if (typeof goToStep === 'function') {
+  // Wrap goToStep: cuando el step sea 2 (evidencia), poblar deptos
+  const _orig = goToStep;
+  window.goToStep = function(n) {
+    _orig(n);
+    if (n === 2) setTimeout(ppEvidPobDeptos, 50);
+  };
 }
 
 // ═════════════════════════════════════════════════════════════════════════

@@ -1166,6 +1166,22 @@ footer.foot {
       <div class="field-hint">Cifras, estudios y precedentes que sustentan el problema. La consulta pública pregunta primero por esta evidencia.</div>
     </div>
 
+    <!-- Sprint E.6 · cifras territoriales -->
+    <div class="field" style="margin-top:.4rem;padding:1.1rem 1.2rem;background:var(--paper-2);border:1px solid var(--rule);border-left:3px solid var(--accent)">
+      <div style="font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:.3rem">Sprint E · cifras territoriales oficiales</div>
+      <div style="font-family:var(--sans);font-weight:700;font-size:1rem;color:var(--ink);margin-bottom:.25rem">¿La regulación es local o territorial?</div>
+      <div style="font-family:var(--italic);font-style:italic;font-size:.88rem;line-height:1.5;color:var(--ink-2);margin-bottom:.85rem">Si tu norma afecta un municipio específico, podemos mostrar cifras oficiales de los últimos 7 años (Policía Nacional + MEN). Útil para dimensionar el problema regulatorio y citar evidencia en la consulta pública.</div>
+      <div style="display:flex;gap:.55rem;flex-wrap:wrap;align-items:center">
+        <select id="ain-terr-dep" style="font-family:var(--sans);font-size:.94rem;padding:.55rem .85rem;background:var(--paper);color:var(--ink);border:1px solid var(--rule-strong);min-width:180px" onchange="ainTerrPobMuns(this.value)">
+          <option value="">— departamento —</option>
+        </select>
+        <select id="ain-terr-mun" style="font-family:var(--sans);font-size:.94rem;padding:.55rem .85rem;background:var(--paper);color:var(--ink);border:1px solid var(--rule-strong);min-width:200px" onchange="ainTerrShowCifras(this.value)">
+          <option value="">— municipio —</option>
+        </select>
+      </div>
+      <div id="ain-terr-cifras" style="margin-top:1rem"></div>
+    </div>
+
     <div class="actions">
       <button class="btn-ghost" onclick="backToWelcome()">← Volver al inicio</button>
       <div class="right-group">
@@ -1666,6 +1682,7 @@ footer.foot {
 <div class="toast" id="toast"></div>
 
 <script src="lab-recursos.js"></script>
+<script src="lab-indicadores.js"></script>
 <script>
 'use strict';
 
@@ -1864,6 +1881,8 @@ function renderProblema() {
 
   // Afectados
   renderAfectados();
+  // Sprint E.6 · territorio
+  ainTerrPobDeptos();
 
   // Banner de import desde pp
   refreshProblemImportBanner();
@@ -1888,6 +1907,77 @@ function refreshProblemMeta() {
 function _tipoLabel(id) {
   const t = PROB_TIPOS_FALLA.find(x => x.id === id);
   return t ? t.label : id;
+}
+
+// Sprint E.6 · cifras territoriales en stage-problema (AIN)
+function ainTerrPobDeptos() {
+  const sel = document.getElementById('ain-terr-dep');
+  if (!sel || sel.options.length > 1) return;
+  if (!window.LabIndicadores) return;
+  window.LabIndicadores.load().then(() => {
+    const deptos = window.LabIndicadores.getDeptosCatalog();
+    sel.insertAdjacentHTML('beforeend',
+      deptos.map(d => `<option value="${d.cod}">${escapeHtml(d.nombre)}</option>`).join(''));
+  }).catch(() => {});
+}
+function ainTerrPobMuns(depCod) {
+  const sel = document.getElementById('ain-terr-mun');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— municipio —</option>';
+  document.getElementById('ain-terr-cifras').innerHTML = '';
+  if (!depCod || !window.LabIndicadores || !window.LabIndicadores.isLoaded()) return;
+  const muns = window.LabIndicadores.getMunsByDepto(depCod);
+  sel.insertAdjacentHTML('beforeend',
+    muns.map(m => `<option value="${m.divipola}">${escapeHtml(m.nombre)}</option>`).join(''));
+}
+function ainTerrShowCifras(divipola) {
+  const out = document.getElementById('ain-terr-cifras');
+  if (!out) return;
+  if (!divipola || !window.LabIndicadores) { out.innerHTML = ''; return; }
+  window.LabIndicadores.load().then(() => {
+    const mun = window.LabIndicadores.getMun(divipola);
+    if (!mun) { out.innerHTML = ''; return; }
+    // Sembrar el cod_mun en el state para que el copiloto y exports lo usen
+    if (!STATE.contexto) STATE.contexto = {};
+    STATE.contexto.dep_cod = mun.cod_depto;
+    STATE.contexto.mun_cod = divipola;
+    STATE.contexto.mun_nombre = mun.nombre;
+    saveState();
+
+    const PRIORIDAD = ['homicidios','violencia_intrafamiliar','hurto_personas','delitos_sexuales','cobertura_neta','desercion'];
+    const rows = [];
+    PRIORIDAD.forEach(indId => {
+      const latest = window.LabIndicadores.getLatestValue(divipola, indId);
+      if (!latest) return;
+      const indMeta = window.LabIndicadores.getCatalog().find(i => i.id === indId);
+      if (!indMeta) return;
+      const valStr = window.LabIndicadores.formatValue(latest.value, indId);
+      rows.push({
+        nombre: indMeta.nombre,
+        valor: valStr + (indMeta.unidad === '%' ? '' : ' ' + indMeta.unidad),
+        year: latest.year,
+        proxy: latest.isProxy,
+        fuente: indMeta.fuente_url
+      });
+    });
+    if (rows.length === 0) {
+      out.innerHTML = '<div style="font-family:var(--italic);font-style:italic;color:var(--ink-3);font-size:.88rem">Sin datos cargados para este municipio en la Fase A.</div>';
+      return;
+    }
+    out.innerHTML = `
+      <div style="font-family:var(--mono);font-size:10.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.14em;margin-bottom:.5rem">${escapeHtml(mun.nombre)}, ${escapeHtml(mun.depto)} · cifras último año</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:.5rem">
+        ${rows.map(r => `
+          <div style="padding:.65rem .8rem;background:var(--paper);border:1px solid var(--rule)">
+            <div style="font-family:var(--mono);font-size:10px;color:var(--ink-3);letter-spacing:.08em">${escapeHtml(r.nombre)}${r.proxy ? ' · aprox' : ''}</div>
+            <div style="font-family:var(--sans);font-weight:700;font-size:1.1rem;color:var(--ink);margin-top:.2rem">${escapeHtml(r.valor)}</div>
+            <div style="font-family:var(--mono);font-size:9.5px;color:var(--ink-3);margin-top:.15rem">${r.year} · <a href="${escapeAttr(r.fuente)}" target="_blank" rel="noopener" style="color:var(--accent)">fuente ↗</a></div>
+          </div>
+        `).join('')}
+      </div>
+      <div style="font-family:var(--italic);font-style:italic;font-size:.82rem;color:var(--ink-3);margin-top:.7rem">Estas cifras quedan asociadas a tu análisis y se incluyen en el memo CONPES regulatorio.</div>
+    `;
+  }).catch(e => console.error(e));
 }
 
 function setTipoFalla(id) {
