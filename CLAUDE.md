@@ -13,7 +13,8 @@
 - `mactor.html` — **Lab** · módulo análisis de actores y conflictos (MID + MAO, copiloto IA). LISTO.
 - `problema-publico.html` — **Lab** · módulo problema público (Eightfold Path de Bardach condensado a 5 mecánicas + capa metodológica profunda con wizard de síntoma, árbol del problema CEPAL/Ortegón, test Rittel-Webber y selector de marco analítico). Cloud-save + 3 acciones IA + Issue Paper export. LISTO (Sprint A).
 - `evaluacion.html` — **Lab** · módulo evaluación de política (OCDE-DAC + Mayne + CEPAL/ILPES + Pre-Analysis Plans). 6 mecánicas: pregunta evaluativa · teoría de cambio · indicadores SMART · selector de método (RCT/DiD/RD/SC/PSM/cualitativo/mixto/VfM) · criterios OCDE-DAC · plan operativo. Cloud-save + 3 acciones IA + plan .md + matriz .csv. LISTO (Sprint B).
-- `lab-recursos.js` — catálogo compartido de 27 recursos en 5 categorías; cargado por los 4 módulos del lab.
+- `alternativas.html` — **Lab** · módulo Alternativas de Política (Zwicky 1969 + Lempert/Walker RDM 2003 + Ritchey + Howard + Keeney + MVPF Hendren 2020 + CEA J-PAL). 6 mecánicas: variables de decisión · opciones por variable · matriz morfológica · alternativas ensambladas · robustez en 4 escenarios + lente económica · decisión final. Cloud-save + 4 acciones IA + memo .md + matriz .csv + ficha CONPES light .pdf + envío bidireccional a problema-publico. LISTO (Sprint C).
+- `lab-recursos.js` — catálogo compartido de 30 recursos en 5 categorías; cargado por los 5 módulos del lab.
 - `pricing.html` — planes (Básico / Pro 39.900 COP · Premium 99.900 COP · Personalizado)
 - `lang.js` — i18n (co/us/cn); `CLAUDE.md` vive en la raíz del repo
 
@@ -1829,10 +1830,10 @@ inteligencia editorial, NO publicación de sondeo).
   con prompts largos. Si lo amplías, mide la latencia después (límite
   blando 30 s por API Gateway).
 
-## Lab de Políticas Públicas y Prospectiva (Sprints A + B · LISTO)
+## Lab de Políticas Públicas y Prospectiva (Sprints A + B + C · LISTO)
 
 **El hub vive en `analisis-estructural.html`** (mismo archivo, rebrandeado).
-Los 4 módulos del lab están operativos:
+Los 5 módulos del lab están operativos:
 
 | # | Módulo | Archivo | Estado |
 |---|---|---|---|
@@ -1840,11 +1841,13 @@ Los 4 módulos del lab están operativos:
 | 2 | Análisis estructural | `analisis-estructural.html` (mismo HTML que el hub) | ✓ vivo |
 | 3 | Análisis de actores | `mactor.html` | ✓ vivo |
 | 4 | Evaluación de política | `evaluacion.html` | ✓ vivo (Sprint B) |
+| 5 | Alternativas de política | `alternativas.html` | ✓ vivo (Sprint C) |
 
 Sólo `analisis-estructural.html` figura en el listado de proyectos de
 `index.html` (como "Análisis Estructural de Sistemas"). Desde su hub se
-llega a los otros 3 módulos. Cada módulo tiene cross-links amarillos a
-los otros 2 en su stage-results.
+llega a los otros 4 módulos. El hub-grid se renderiza en 3 cols × 2 rows
+en desktop (3+2) para acomodar las 5 cards limpiamente. Cada módulo
+tiene cross-links amarillos a los otros 2-3 en su stage-results.
 
 ### Hub del lab (`stage-hub` en analisis-estructural.html)
 
@@ -2167,30 +2170,149 @@ s3://elecciones-2026/ricardoruiz.co/bases de datos/ev/
 ```
 Pipeline en `tools/build-ev-docs/{build_metodologia.py, build_respaldo.py}`.
 
+### `alternativas.html` (Alternativas de política · Sprint C)
+
+Quinto módulo del lab. Es la **versión profunda del paso 3 de
+problema-publico** (Bardach): donde pp pide enumerar 3-5 opciones,
+este módulo te obliga a recorrer el espacio completo de combinaciones
+con análisis morfológico, descartar las inviables, y probar las
+restantes contra 4 escenarios antes de recomendar una.
+
+Anclado en cinco escuelas: **Zwicky** (Caltech 1969, análisis morfológico),
+**Ritchey** (Swedish Morphological Society 2011, cross-consistency
+assessment), **Lempert &amp; Walker** (RAND 2003, Robust Decision Making),
+**Howard** (Stanford 1968, Decision Analysis), **Keeney** (USC 1992,
+Value-Focused Thinking). Lente económica opcional con **MVPF** de
+Hendren &amp; Sprung-Keyser (NBER 2020) y **CEA** de J-PAL. Anclaje
+regulatorio: **SINERGIA · DNP** + formato CONPES light.
+
+**6 mecánicas operativas + welcome + decisión + results:**
+
+1. **`stage-variables`** — editor de chips con 11 tipos (cobertura,
+   financiamiento, instrumento, gobernanza, condicionalidad, timing,
+   población, ámbito, modalidad, sostenibilidad, otra) + 6 plantillas
+   seed por dominio (cobertura-social, reforma-fiscal, servicio-publico,
+   regulacion, seguridad, blanco). Mín 3 / máx 8. IA "sugerir-variables"
+   (Pro+) propone 5-7 variables desde el enunciado del problema.
+2. **`stage-opciones`** — paneles por variable con 3-5 opciones
+   editables inline. Mín 2 / máx 5 por variable. Stage meta muestra el
+   producto de combinaciones posibles. IA "sugerir-opciones" (Pro+)
+   opera variable por variable.
+3. **`stage-matriz`** — matriz Zwicky visual con 2 modos: <em>marcar
+   incompatibilidades</em> (clic en una opción, clic en otra de variable
+   distinta → par marcado, clic doble deshace) y <em>explorar combinación</em>
+   (selecciona una opción por columna, conteo de combinaciones brutas +
+   restantes via brute-force hasta 5.000). Botón "Guardar como
+   alternativa" cuando la selección está completa y sin conflictos.
+4. **`stage-alternativas`** — cards con baseline "Statu quo" auto-insertado
+   (no eliminable, sólo renombrable). Cada card: nombre + combinación +
+   descripción + supuestos críticos + costo + plazo + riesgo dominante.
+   Editor inline de combinación con selects por variable. Warning rojo
+   si la combinación contiene pares incompatibles marcados. Max 6 +
+   baseline. IA "validar-coherencia" (Premium+) detecta combinaciones
+   operativamente contradictorias.
+5. **`stage-robustez`** — 4 escenarios pre-definidos editables (baseline
+   40% · optimista 25% · pesimista 25% · disruptivo 10%) con
+   probabilidad subjetiva editable. Matriz alternativas × escenarios
+   con rating 1-5 por celda. Score esperado = Σ(prob × rating) / Σprob.
+   Bonus +0.5 si peor caso ≥ 3. Lente económica opcional por alternativa:
+   costo total, beneficio total, unidad outcome, outcome total → MVPF
+   (β/c) y CEA (c/outcome) cliente-side. Badge "PARETO-SUPERIOR" si
+   MVPF &gt; 1.
+6. **`stage-decision`** — cards ordenadas por score final desc con
+   radio de selección. Textarea de justificación obligatoria.
+   `stage-results` con hero + 4 KPIs + tabla compacta + IA
+   "narrativa-alternativas" (Premium+) + 3 exports + botón "Enviar a
+   Problema Público".
+
+**Cálculos clave (cliente, sin libs externas):**
+- `_calcRestantesPostIncompat()` — enumera combinaciones válidas
+  brute-force hasta 5.000; arriba muestra "—".
+- `_calcScoresAlt(altId)` — devuelve `{ expected, worst, best, bonus,
+  final, complete }`. Normaliza por probSum.
+- `_calcEconAlt(alt)` — devuelve `{ c, b, o, u, mvpf, cea }`.
+
+**STATE shape:**
+```js
+STATE = {
+  step: 1,
+  contexto:     { enunciado_problema, dep_cod, mun_cod, sector, importedFromPP },
+  variables:    [{ id, nombre, tipo }],           // 3-8
+  opciones:     { [varId]: ['opt 1', 'opt 2', ...] }, // 2-5 por var
+  incompat:     [['varId:optIdx', 'varId:optIdx'], ...],
+  alternativas: [{ id, nombre, desc, supuestos, costo, plazo, riesgo,
+                   combo:{[varId]:optIdx}, baseline,
+                   econ:{ costo_total, beneficio_total, unidad_outcome,
+                          outcome_total } }],
+  escenarios:   [{ id, nombre, descripcion, prob }],
+  ratings:      { [altId]: { [scenId]: 1..5 } },
+  decision:     { altId_recomendada, justificacion }
+}
+```
+Persistido en `localStorage['alt-current-v1']`. `loadState()` defensivo.
+
+**Copiloto IA (Sprint C.7):** 4 acciones con cache hash24 TTL 7d:
+- `sugerir-variables`      (Pro+)    · paso 1, 5-7 variables típicas
+- `sugerir-opciones`       (Pro+)    · paso 2, 3-5 opciones por variable
+- `validar-coherencia`     (Premium+)· paso 4, detecta combos contradictorios
+- `narrativa-alternativas` (Premium+)· paso 7, lectura interpretativa del ranking
+
+**Exports (Sprint C.6):**
+- `downloadMemoMD` — markdown estructurado en 5 secciones + footer metodológico.
+- `downloadMatrizCSV` — CSV alternativas × escenarios + scores + lente económica.
+- `downloadConpesPDF` — PDF jsPDF (CDN on-demand) formato CONPES light.
+- `enviarAProblemaPublico` — escribe `localStorage['alt-import-to-pp']`
+  con shape compatible con `STATE.alternativas` de pp + redirige a
+  `problema-publico.html?import=alt`. pp tiene `handleAltImportOnLoad()`
+  que prompts confirm y reemplaza el state.
+
+**PDFs Alternativas en S3** (Sprint C.9):
+```
+s3://elecciones-2026/ricardoruiz.co/bases de datos/alt/
+  metodologia-paso-a-paso.pdf  (16.8 KB · 10 secciones operativas + ejemplo completo)
+  respaldo-academico.pdf       (19.7 KB · marco + fórmulas + 29 referencias)
+```
+Pipeline en `tools/build-alt-docs/{build_metodologia.py, build_respaldo.py}`.
+Reportlab, sin más deps. Para regenerar:
+```bash
+python3 tools/build-alt-docs/build_metodologia.py
+python3 tools/build-alt-docs/build_respaldo.py
+aws s3 cp "Bases de datos/alt/metodologia-paso-a-paso.pdf" \
+  "s3://elecciones-2026/ricardoruiz.co/bases de datos/alt/metodologia-paso-a-paso.pdf" \
+  --content-type "application/pdf" --cache-control "public, max-age=300"
+aws s3 cp "Bases de datos/alt/respaldo-academico.pdf" \
+  "s3://elecciones-2026/ricardoruiz.co/bases de datos/alt/respaldo-academico.pdf" \
+  --content-type "application/pdf" --cache-control "public, max-age=300"
+```
+
 ### Recursos & Datos · catálogo compartido `lab-recursos.js` (Sprint A.1)
 
-Catálogo curado de 27 recursos en 5 categorías (Colombia política
+Catálogo curado de 30 recursos en 5 categorías (Colombia política
 pública · Colombia datos abiertos · Evaluación · Diseño/participación ·
 Prospectiva). Cada item etiquetado con qué módulos del lab destaca.
 
 **Distribución por módulo:**
-- problema: 19 recursos · evaluación: 13 · estructural: 12 · mactor: 5
+- problema: 19 recursos · evaluación: 15 · estructural: 13 · mactor: 5
+- alternativas: 13 (CONPES, SISCONPES, DNP-KPT, KP-DNP, CEPAL-ILPES,
+  UK-OPM, service-design, BI-team, LIPSOR, RAND-RDM, Policy Impacts,
+  J-PAL CEA, Future Today)
 
 **Dos puntos de carga:**
 1. **Hub** (`stage-hub` de analisis-estructural.html) muestra TODO el
    catálogo en `<details>` colapsable al pie.
-2. **FAB "Recursos"** en los 3 módulos (`.lab-fab` bottom-left,
+2. **FAB "Recursos"** en los 4 módulos sub (`.lab-fab` bottom-left,
    z-index 8000) abre `modal-recursos` filtrado por
-   `LAB_CURRENT_MODULE` ∈ {'estructural','mactor','problema'}.
+   `LAB_CURRENT_MODULE` ∈ {'estructural','mactor','problema','evaluacion','alternativas'}.
 
-Cargado vía `<script src="lab-recursos.js">` en los 3 HTMLs.
+Cargado vía `<script src="lab-recursos.js">` en los 5 HTMLs.
 Mantener URLs estables (dominios oficiales). Si un link rompe, se
-actualiza en un solo archivo y los 4 puntos lo recogen.
+actualiza en un solo archivo y los 5 puntos lo recogen.
 
 ### Worker rr-auth — endpoints del lab
 
-Total **28 endpoints** (7 micmac + 7 mactor + 7 pp + 7 ev), agrupados en
-4 módulos paralelos con el mismo patrón CRUD + invite + copiloto.
+Total **35 endpoints** (7 micmac + 7 mactor + 7 pp + 7 ev + 7 alt),
+agrupados en 5 módulos paralelos con el mismo patrón CRUD + invite +
+copiloto.
 
 **MicMac (`/micmac/*`):**
 - `GET    /micmac/list` — lista proyectos (owner + collab).
@@ -2223,6 +2345,19 @@ Total **28 endpoints** (7 micmac + 7 mactor + 7 pp + 7 ev), agrupados en
 - `GET    /ev/accept?token=` — acepta invitación.
 - `POST   /ev/copiloto` — 3 acciones IA (Sprint B.8).
 
+**Alternativas (`/alt/*`)** — Sprint C.7:
+- `GET    /alt/list` — lista análisis (owner + collab).
+- `POST   /alt/save` — crea o actualiza. Validación dura: ≤8 variables,
+  ≤5 opciones por variable, ≤7 alternativas (6 + baseline), ≤60 incompats,
+  ≤4 escenarios, ratings 1-5, scenIds whitelisted, tipos de variable
+  whitelisted, ids hex.
+- `GET    /alt/load?projId=&since=` — carga con polling.
+- `DELETE /alt/delete?projId=` — solo owner.
+- `POST   /alt/invite` — correo Resend con link 14d, copy "Alternativas
+  de Política".
+- `GET    /alt/accept?token=` — acepta invitación.
+- `POST   /alt/copiloto` — 4 acciones IA (Sprint C.7).
+
 **Acciones IA por módulo (action en body):**
 | Módulo | Acción | Plan |
 |---|---|---|
@@ -2240,6 +2375,10 @@ Total **28 endpoints** (7 micmac + 7 mactor + 7 pp + 7 ev), agrupados en
 | ev     | `sugerir-indicadores` | Pro+ |
 | ev     | `validar-teoria` | Premium+ |
 | ev     | `narrativa-plan` | Premium+ |
+| alt    | `sugerir-variables` | Pro+ |
+| alt    | `sugerir-opciones` | Pro+ |
+| alt    | `validar-coherencia` | Premium+ |
+| alt    | `narrativa-alternativas` | Premium+ |
 
 **Storage KV (`RR_STORE`):**
 ```
@@ -2251,6 +2390,7 @@ micmac:copiloto:<hash24>     respuestas IA TTL 7d
 mactor:* (mismo layout con prefijo mactor)
 pp:*     (mismo layout con prefijo pp)
 ev:*     (mismo layout con prefijo ev)
+alt:*    (mismo layout con prefijo alt)
 ```
 
 **DeepSeek:** API key `DEEPSEEK_API_KEY` como secret del worker
@@ -2258,9 +2398,9 @@ ev:*     (mismo layout con prefijo ev)
 `deepseek-v4-flash`. AbortSignal 28s. Cache hash24 con
 `PROMPT_VERSION='v1'` (bumpear al cambiar prompts para invalidar cache).
 
-**Plan gate (común a los 4 módulos):**
+**Plan gate (común a los 5 módulos):**
 ```js
-MICMAC_MAX_PROJ = MACTOR_MAX_PROJ = PP_MAX_PROJ = EV_MAX_PROJ = { free:1, pro:5, premium:25, full:50 }
+MICMAC_MAX_PROJ = MACTOR_MAX_PROJ = PP_MAX_PROJ = EV_MAX_PROJ = ALT_MAX_PROJ = { free:1, pro:5, premium:25, full:50 }
 PP_MAX_ALTERNATIVAS = 5
 PP_MAX_CRITERIOS    = 8
 PP_MAX_EVIDENCIA    = 60
@@ -2269,6 +2409,11 @@ EV_MAX_INDICADORES  = 30
 EV_MAX_SUBPREGUNTAS = 5
 EV_MAX_SUPUESTOS    = 6
 EV_MAX_NODOS_NIVEL  = 4
+ALT_MAX_VARIABLES        = 8
+ALT_MAX_OPCIONES_POR_VAR = 5
+ALT_MAX_ALTERNATIVAS     = 7   // 6 + baseline
+ALT_MAX_INCOMPAT         = 60
+ALT_MAX_ESCENARIOS       = 4
 ```
 
 **Deploy del worker:**
@@ -2293,41 +2438,52 @@ token + plan. `_callDeepSeek(env, systemPrompt, userMsg, opts)`. `_hash24(str)`.
 
 ### Backlog del lab
 
-**Sprints próximos del lab (C / D)** — módulos nuevos que faltan:
-- **Sprint C** — módulo **Alternativas** (pendiente; complementa
-  problema-publico con generación más sistemática de opciones).
+**Sprint próximo (D):**
 - **Sprint D** — módulo **AIA** (Análisis de Impacto Adicional);
-  pendiente de scope.
+  pendiente de scope. Probablemente impacto regulatorio (RIA · OCDE)
+  y/o impacto ambiental/social ex-ante.
 
-**Iteraciones del módulo Evaluación (B v2):**
-- Métodos causales modernos: causal forests (Athey-Wager 2019), double
-  ML (Chernozhukov 2018), staggered DiD (Callaway-Sant'Anna 2021),
-  synthetic control aumentado (Ben-Michael 2021).
-- Cargar literatura externa que mejore B.4 (selector de método) sin
-  reescribir el resto del módulo.
+**Iteraciones del módulo Evaluación (B v2) — literatura 2020-2026 ya en `Bases de datos/evaluacion-politicas/investigacion-literatura-2020-2026.txt`:**
+- TWFE warning + selector de método causal moderno: DID escalonado
+  (Callaway-Sant'Anna 2021), synthetic control aumentado (Ben-Michael
+  2021), DML (Chernozhukov 2018), causal forests (Athey-Wager 2018).
+- 3 calculadoras económicas convivientes: CBA Green Book + MVPF Hendren
+  + CEA J-PAL (la lente económica de Alternativas C.5 es un primer paso).
+- Tipología Sinergia DNP como primer selector del wizard.
+- Pre-Analysis Plan generator listo para subir a AEA Registry / OSF.
+- Cargar el documento de literatura para enriquecer prompts del copiloto
+  sin reescribir las 6 mecánicas.
 
-**Reservados para después de los 4 módulos:**
-- **Sprint E** (antes "Sprint 7") — datos municipales (~1.100 muns ×
-  5 indicadores) precargados desde DANE / Policía / MEN microdatos.
-  Beneficia a los 4 módulos cuando estén.
-- **Sprint F** (antes "Sprint 8") — escenarios prospectivos: vista
-  "what-if" sobre MicMac, Mactor y problema-publico.
-- **Sprint G** (antes "Sprint 9") — informe combinado de los 4
-  módulos exportado como PDF dinámico.
+**Reservados para después de los 5 módulos:**
+- **Sprint E** — datos municipales (~1.100 muns × 5 indicadores)
+  precargados desde DANE / Policía / MEN microdatos. Beneficia a los
+  5 módulos cuando estén.
+- **Sprint F** — escenarios prospectivos: vista "what-if" sobre MicMac,
+  Mactor, problema-publico y alternativas. Los 4 escenarios de
+  Alternativas (C.5) son un primer paso editable.
+- **Sprint G** — informe combinado de los 5 módulos exportado como PDF
+  dinámico (un solo entregable con problema + variables del sistema +
+  actores + alternativas + plan de evaluación).
 
 **Mejoras de módulos vivos:**
 - **Mactor MIDI** (opcional) — matriz pivotada de influencias
   indirectas entre actores (multiplica MID consigo misma).
 - **Problema-Público v2** — sub-vista de árbol de objetivos (espejo
   del árbol del problema, lado positivo) y exportación PowerPoint.
+- **Alternativas v2** — integración QCA (Ragin) para identificar
+  configuraciones suficientes/necesarias en alternativas multi-caso.
+  Reusa la infraestructura de matriz incompat de Sprint C.
+- **Alternativas v2** — análisis de sensibilidad sobre ratings y
+  probabilidades de escenarios (Monte Carlo cliente-side).
 
 ### Reglas de oro para Lab de Políticas Públicas y Prospectiva
 
 - **Cita siempre las raíces metodológicas** en textos públicos:
   Godet/Mojica/LIPSOR/Externado para prospectiva; Bardach/Patashnik/
-  Ortegón/Torres-Melo para análisis de políticas; OCDE-DAC/SINERGIA/
-  Ivàlua para evaluación. Es lo que da legitimidad académica frente
-  a un consultor experto.
+  Ortegón/Torres-Melo para análisis de políticas; Zwicky/Ritchey/
+  Lempert/Howard/Keeney para alternativas; OCDE-DAC/SINERGIA/Ivàlua
+  para evaluación; Hendren/J-PAL para lente económica. Es lo que da
+  legitimidad académica frente a un consultor experto.
 - **El copiloto IA sugiere; el humano decide.** Siempre repetir esa
   línea en disclaimers, evitar UI que parezca "decisión automática del
   modelo".
@@ -2344,7 +2500,11 @@ token + plan. `_callDeepSeek(env, systemPrompt, userMsg, opts)`. `_hash24(str)`.
   explica por qué tiene sentido el encadenamiento.
 - **Sesiones previas deben seguir funcionando.** `loadState()` es
   defensivo: si faltan campos del state nuevo, los inicializa con
-  defaults sin romper. Aplica a los 3 módulos.
+  defaults sin romper. Aplica a los 5 módulos.
+- **Hub a 5 cards.** Cuando agregues un sexto módulo, considera dejar
+  el actual de 3 cols × 2 rows (5 cards = 3+2) o subir a 3+3 = 6 cards.
+  Más de 6 satura — meterlo como sub-módulo de uno existente (como
+  Alternativas es sub-módulo de Problema Público).
 
 ## Convenciones de commit
 ```

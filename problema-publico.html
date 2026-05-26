@@ -1321,6 +1321,15 @@ footer.foot {
       </p>
     </div>
 
+    <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;padding:.95rem 1.2rem;margin-bottom:1.1rem;background:rgba(214,168,58,0.10);border:1px solid var(--rule);border-left:3px solid var(--gold);font-family:var(--mono);font-size:11.5px;color:var(--ink-2)">
+      <span style="font-family:var(--sans);font-size:1.3rem;color:var(--gold);flex-shrink:0">→</span>
+      <div style="flex:1;min-width:240px">
+        <div style="font-family:var(--sans);font-weight:700;font-size:.96rem;color:var(--ink);margin-bottom:.2rem">¿Necesitas un análisis más profundo de alternativas?</div>
+        <div style="font-family:var(--italic);font-style:italic;font-weight:400;font-size:.88rem;line-height:1.5;color:var(--ink-2)">El módulo de <em style="color:var(--accent)">Alternativas</em> te lleva por análisis morfológico (Zwicky), matriz de combinaciones, robustez frente a 4 escenarios y lente económica MVPF/CEA. Cuando termines puedes enviar las alternativas de vuelta aquí.</div>
+      </div>
+      <a href="alternativas.html" class="btn-ghost" style="border-color:var(--gold);color:var(--gold);text-decoration:none;flex-shrink:0">Abrir Alternativas →</a>
+    </div>
+
     <div class="alt-grid" id="alt-grid"></div>
 
     <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.5rem">
@@ -3198,6 +3207,80 @@ function iaRenderNarrativaMemo(data) {
   out.innerHTML = html;
 }
 
+// ── Import de alternativas desde alternativas.html (Sprint C.10) ──────────
+// alternativas.html escribe localStorage['alt-import-to-pp'] con shape:
+//   { source, timestamp, contexto, alternativas:[{nombre,desc,supuestos,
+//     costo,plazo,baseline}], decision:{altId_recomendada,justificacion} }
+// y redirige a problema-publico.html?import=alt.
+function handleAltImportOnLoad() {
+  try {
+    const url = new URL(window.location.href);
+    const flag = url.searchParams.get('import');
+    const raw = localStorage.getItem('alt-import-to-pp');
+    if (!raw) return;
+    let payload;
+    try { payload = JSON.parse(raw); } catch { localStorage.removeItem('alt-import-to-pp'); return; }
+    if (!payload || !Array.isArray(payload.alternativas) || payload.alternativas.length === 0) {
+      localStorage.removeItem('alt-import-to-pp');
+      return;
+    }
+    // Si NO viene el flag ?import=alt y el payload es viejo (>5 min), ignorar
+    // para evitar pickups accidentales al volver a pp.
+    const stamp = Date.parse(payload.timestamp || '') || 0;
+    const recent = (Date.now() - stamp) < 5 * 60 * 1000;
+    if (flag !== 'alt' && !recent) return;
+    const n = payload.alternativas.length;
+    const hasCurrent = (STATE.alternativas || []).length > 0;
+    const msg = `Llegaron ${n} alternativas desde el módulo de Alternativas` +
+      (payload.decision?.altId_recomendada ? ` (con recomendación marcada)` : '') +
+      (hasCurrent ? `.\n\n¿Reemplazar tus ${STATE.alternativas.length} alternativas actuales en este módulo?` : '.\n\n¿Cargarlas en el paso 3?');
+    if (!confirm(msg)) {
+      // Limpiar la cola para no preguntar de nuevo en el próximo load
+      localStorage.removeItem('alt-import-to-pp');
+      if (flag === 'alt') {
+        url.searchParams.delete('import');
+        window.history.replaceState({}, '', url.toString());
+      }
+      return;
+    }
+    applyAltImport(payload);
+    // Limpieza
+    localStorage.removeItem('alt-import-to-pp');
+    if (flag === 'alt') {
+      url.searchParams.delete('import');
+      window.history.replaceState({}, '', url.toString());
+    }
+  } catch (e) {
+    console.error('handleAltImportOnLoad failed:', e.message);
+  }
+}
+function applyAltImport(payload) {
+  // Sobreescribe STATE.alternativas con el shape compatible
+  STATE.alternativas = payload.alternativas.map(a => ({
+    nombre:    String(a.nombre || '').slice(0, 200) || 'Alternativa importada',
+    desc:      String(a.desc || '').slice(0, 1200),
+    supuestos: String(a.supuestos || '').slice(0, 1200),
+    costo:     String(a.costo || '').slice(0, 200),
+    plazo:     String(a.plazo || '').slice(0, 200),
+    baseline:  !!a.baseline
+  })).slice(0, 7);
+  // Asegurar que el primer card sea baseline; si no, prependlear uno
+  if (!STATE.alternativas.some(a => a.baseline)) {
+    STATE.alternativas.unshift({ nombre:'No hacer nada', desc:'Statu quo · no intervenir.', supuestos:'', costo:'', plazo:'', baseline:true });
+  }
+  // Si vino contexto y el enunciado del problema actual está vacío, lo aceptamos
+  if (payload.contexto && typeof payload.contexto === 'string' && payload.contexto.trim() && !(STATE.definicion?.enunciado || '').trim()) {
+    if (!STATE.definicion) STATE.definicion = {};
+    STATE.definicion.enunciado = payload.contexto.trim().slice(0, 800);
+  }
+  // Saltar ratings/scores existentes — el shape de scores depende de alt.id que aquí no se preserva
+  STATE.scores = {};
+  saveState();
+  renderAll();
+  goToStep(3);
+  showToast(`${STATE.alternativas.length} alternativas importadas. Revísalas y avanza a criterios.`);
+}
+
 // Init
 (async function init() {
   const restored = loadState();
@@ -3215,6 +3298,8 @@ function iaRenderNarrativaMemo(data) {
   renderAuthChip();
   renderCloudBars();
   if (AUTH.isLogged) { refreshProjectsList(); handleInviteOnLoad(); }
+  // Pickup de alternativas desde alternativas.html (si las hay)
+  handleAltImportOnLoad();
 })();
 
 // ── Modal Recursos · catálogo del lab filtrado por módulo ────────────────

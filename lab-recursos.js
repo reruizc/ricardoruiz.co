@@ -2,17 +2,17 @@
 // Lab de Políticas Públicas y Prospectiva · Catálogo de Recursos & Datos
 // ═════════════════════════════════════════════════════════════════════════
 // Recursos externos curados, agrupados por categoría y etiquetados por
-// módulo del lab donde son más relevantes. Cargado por los 3 módulos
-// (analisis-estructural, mactor, problema-publico) vía
-// <script src="lab-recursos.js"></script> al final del body.
+// módulo del lab donde son más relevantes. Cargado por los 5 módulos
+// (analisis-estructural, mactor, problema-publico, evaluacion, alternativas)
+// vía <script src="lab-recursos.js"></script> al final del body.
 //
 // Convenciones:
 //   - SOLO recursos oficiales o instituciones reconocidas (no blogs).
 //   - URLs ESTABLES — sólo dominios institucionales o sitios académicos
 //     consolidados. Si un link se rompe, hay que actualizarlo aquí y
-//     ya queda corregido para los 4 puntos de carga.
+//     ya queda corregido para los 5 puntos de carga.
 //   - 'modulos' marca dónde se destaca el recurso. Vacío = todos.
-//   - Para añadir un módulo nuevo (ej. 'evaluacion'), simplemente
+//   - Para añadir un módulo nuevo (ej. 'alternativas'), simplemente
 //     agrégalo al array correspondiente; el frontend lo recoge sin
 //     tocar lógica.
 // ═════════════════════════════════════════════════════════════════════════
@@ -32,14 +32,14 @@ window.LAB_RECURSOS = {
       nombre: 'CONPES · Documentos de política',
       url: 'https://colaboracion.dnp.gov.co/CDT/Conpes/',
       desc: 'Repositorio completo de documentos CONPES (Consejo Nacional de Política Económica y Social). El instrumento por excelencia de política pública nacional en Colombia.',
-      modulos: ['problema', 'estructural', 'evaluacion']
+      modulos: ['problema', 'estructural', 'evaluacion', 'alternativas']
     },
     {
       id: 'sisconpes', categoria: 'co-pp',
       nombre: 'SISCONPES · Sistema de Seguimiento',
       url: 'https://sisconpes.dnp.gov.co/SisCONPESWeb/',
       desc: 'Tablero de seguimiento del avance de las acciones CONPES vigentes. Útil para entender qué políticas están activas y en qué fase.',
-      modulos: ['problema', 'evaluacion']
+      modulos: ['problema', 'evaluacion', 'alternativas']
     },
     {
       id: 'sinergia', categoria: 'co-pp',
@@ -60,14 +60,14 @@ window.LAB_RECURSOS = {
       nombre: 'DNP · Kit del Plan Territorial (KPT)',
       url: 'https://kpt.dnp.gov.co/',
       desc: 'Caja de herramientas oficial para alcaldías y gobernaciones que construyen su Plan de Desarrollo Territorial. Incluye diagnósticos y formatos.',
-      modulos: ['problema', 'estructural']
+      modulos: ['problema', 'estructural', 'alternativas']
     },
     {
       id: 'kp-dnp', categoria: 'co-pp',
       nombre: 'DNP · Banco de Programas y Proyectos',
       url: 'https://proyectostipo.dnp.gov.co/',
       desc: 'Proyectos tipo del DNP: alternativas estandarizadas de intervención por sector. Útil para construir alternativas concretas y costos referenciales.',
-      modulos: ['problema']
+      modulos: ['problema', 'alternativas']
     },
 
     // ─── Colombia · Datos abiertos ─────────────────────────────────────────
@@ -178,28 +178,28 @@ window.LAB_RECURSOS = {
       nombre: 'UK · Open Policy Making toolkit',
       url: 'https://www.gov.uk/guidance/open-policy-making-toolkit',
       desc: 'Toolkit del gobierno británico para diseño abierto de política. Métodos de diagnóstico participativo y prototipado.',
-      modulos: ['problema', 'mactor']
+      modulos: ['problema', 'mactor', 'alternativas']
     },
     {
       id: 'service-design', categoria: 'diseno',
       nombre: 'Service Design Tools',
       url: 'https://servicedesigntools.org/',
       desc: 'Caja de herramientas de diseño de servicios públicos: mapas de viaje del usuario, blueprints, journey mapping.',
-      modulos: ['problema']
+      modulos: ['problema', 'alternativas']
     },
     {
       id: 'bi-team', categoria: 'diseno',
       nombre: 'Behavioural Insights Team',
       url: 'https://www.bi.team/',
       desc: 'Instituto pionero en aplicar economía conductual al diseño de política pública. Publicaciones libres con casos reales.',
-      modulos: ['problema', 'evaluacion']
+      modulos: ['problema', 'evaluacion', 'alternativas']
     },
     {
       id: 'cepal-ilpes', categoria: 'diseno',
       nombre: 'CEPAL · ILPES (Planificación)',
       url: 'https://www.cepal.org/es/ilpes',
       desc: 'Instituto Latinoamericano y del Caribe de Planificación. Manuales de marco lógico, prospectiva, planificación estratégica.',
-      modulos: ['problema', 'estructural', 'evaluacion']
+      modulos: ['problema', 'estructural', 'evaluacion', 'alternativas']
     },
 
     // ─── Prospectiva y método ──────────────────────────────────────────────
@@ -207,8 +207,8 @@ window.LAB_RECURSOS = {
       id: 'lipsor', categoria: 'prospectiva',
       nombre: 'LIPSOR · Laboratoire d\'Investigation en Prospective',
       url: 'http://en.laprospective.fr/',
-      desc: 'Laboratorio fundado por Michel Godet (CNAM, París). Software libre (MicMac, Mactor, MorPhol, MultiPol) + publicaciones sobre prospectiva estratégica.',
-      modulos: ['estructural', 'mactor']
+      desc: 'Laboratorio fundado por Michel Godet (CNAM, París). Software libre (MicMac, Mactor, MorPhol, MultiPol) + publicaciones sobre prospectiva estratégica. MorPhol implementa el análisis morfológico de Zwicky.',
+      modulos: ['estructural', 'mactor', 'alternativas']
     },
     {
       id: 'externado-cipe', categoria: 'prospectiva',
@@ -222,7 +222,28 @@ window.LAB_RECURSOS = {
       nombre: 'Future Today Institute · Foresight Toolkit',
       url: 'https://futuretodayinstitute.com/',
       desc: 'Caja de herramientas contemporánea de prospectiva (escenarios, señales débiles, futuros alternativos). Reportes anuales de tendencias.',
-      modulos: ['estructural']
+      modulos: ['estructural', 'alternativas']
+    },
+    {
+      id: 'rand-rdm', categoria: 'prospectiva',
+      nombre: 'RAND · Robust Decision Making',
+      url: 'https://www.rand.org/methods/rdm.html',
+      desc: 'Página oficial de Robust Decision Making (Lempert · Walker · Bankes 2003). Marco para decidir bajo incertidumbre profunda mediante escenarios y rangos en lugar de pronósticos puntuales.',
+      modulos: ['alternativas', 'estructural']
+    },
+    {
+      id: 'policyimpacts-mvpf', categoria: 'evaluacion',
+      nombre: 'Policy Impacts · Base pública MVPF',
+      url: 'https://policyimpacts.org/',
+      desc: 'Base abierta del Harvard Opportunity Insights con MVPF (Marginal Value of Public Funds, Hendren & Sprung-Keyser NBER 2020) calculados para cientos de políticas en EEUU. Referencia metodológica.',
+      modulos: ['alternativas', 'evaluacion']
+    },
+    {
+      id: 'jpal-cea', categoria: 'evaluacion',
+      nombre: 'J-PAL · Cost-Effectiveness Analysis',
+      url: 'https://www.povertyactionlab.org/page/cost-effectiveness-and-welfare-analysis',
+      desc: 'Recursos de J-PAL sobre análisis de costo-efectividad: guías, plantillas, base comparativa de evaluaciones de impacto. Útil cuando los beneficios no son monetizables.',
+      modulos: ['alternativas', 'evaluacion']
     }
   ]
 };
