@@ -3,9 +3,9 @@
 agenda-medios-recomienda · lambda_handler.py
 
 Capa de recomendación táctica del módulo 07. Para cada combinación de
-arquetipo operativo × ventana, llama a DeepSeek con el paquete actual
-de noticias (top 20 con tema/sentimiento ya enriquecidos por la
-Lambda agenda-medios-enrich) y le pide:
+arquetipo psicopolítico × ventana, llama a DeepSeek con el paquete
+actual de noticias (top 20 con tema/sentimiento ya enriquecidos por
+la Lambda agenda-medios-enrich) y le pide:
   - lectura del momento desde el lente del arquetipo
   - 3-5 acciones concretas
   - 2-3 riesgos a evitar
@@ -13,8 +13,8 @@ Lambda agenda-medios-enrich) y le pide:
 
 Trigger: EventBridge cada 6 horas.
 
-Total llamadas: 4 arquetipos × 3 ventanas = 12 calls/run × 4 runs/día
-              = ~1.440 calls/mes ≈ $2/mes en DeepSeek.
+Total llamadas: 5 arquetipos × 3 ventanas = 15 calls/run × 4 runs/día
+              = ~1.800 calls/mes ≈ $2.5/mes en DeepSeek.
 
 Output (todas en agregados/):
   recomendaciones-{arquetipo_slug}-{ventana}.json   (12 archivos)
@@ -57,21 +57,21 @@ def _s3_client():
 
 # ---- Prompt construction ----
 SYSTEM_PROMPT = """Eres un estratega político especializado en Medellín, Colombia. Te paso:
-1. Un ARQUETIPO operativo (un perfil de movilizador electoral con sus características).
+1. Un ARQUETIPO PSICOPOLÍTICO 2027 (perfil emocional del votante con su deseo político, sesgos, canales, tipo de decisión y temas a los que es más sensible).
 2. Un PAQUETE DE NOTICIAS recientes (con tema y sentimiento ya clasificados).
 
 Devuelves recomendaciones tácticas en JSON estricto con esta estructura exacta:
 {
-  "lectura": "1 párrafo (max 80 palabras) sobre qué está pasando ahora desde el lente de este arquetipo. Específico al paquete de noticias, no genérico.",
-  "acciones": ["acción 1 concreta", "acción 2 concreta", "acción 3 concreta"],
-  "riesgos": ["riesgo 1", "riesgo 2"],
-  "mensaje_sugerido": "1-2 frases listas para usar como mensaje en su canal típico"
+  "lectura": "1 párrafo (max 80 palabras) sobre qué está pasando ahora desde el lente emocional de este arquetipo. Cómo está procesando estas noticias, qué le activa, qué le desmoviliza. Específico al paquete, no genérico.",
+  "acciones": ["acción 1 concreta de comunicación o campo", "acción 2", "acción 3"],
+  "riesgos": ["riesgo de fuga hacia otro arquetipo o riesgo narrativo concreto", "riesgo 2"],
+  "mensaje_sugerido": "1-2 frases listas para usar en el canal típico del arquetipo, en su tono recomendado"
 }
 
 REGLAS:
-1. CONCRETO Y ACCIONABLE: nada de consejos genéricos tipo "comparte tu opinión". Específico al momento ("hoy hablan de X, tu mejor jugada es Y").
-2. COHERENTE CON EL ARQUETIPO: usa sus canales específicos (no le pidas a un Confirmador Silencioso que haga TikTok), su intensidad y su radio de influencia.
-3. SI HAY NARRATIVA ADVERSARIA o riesgos virales, indícalo en "riesgos".
+1. CONCRETO Y ACCIONABLE: nada de consejos genéricos. Específico al momento ("hoy hablan de X, tu mejor jugada es Y").
+2. COHERENTE CON EL ARQUETIPO: usa sus canales típicos, su tipo de decisión (racional-pragmática vs crítica-reactiva vs identitaria, etc.), su sensibilidad temática y su tono recomendado. Respeta el riesgo de fuga: si el paquete activa lo que lo desmoviliza, advertilo.
+3. SI HAY NARRATIVA ADVERSARIA o riesgo de migración a otro arquetipo, indícalo en "riesgos".
 4. TONO PROFESIONAL, NO PARTIDISTA. Habla como consultor estratégico, no como militante.
 5. NO menciones a Carvalho ni a un candidato específico. Habla de "tu candidato" o el contexto general.
 
@@ -79,11 +79,8 @@ Responde SOLO el JSON, sin texto adicional ni markdown."""
 
 
 def call_deepseek(arquetipo, titulares, ventana):
-    """Llama DeepSeek con el contexto de un arquetipo + paquete de noticias."""
+    """Llama DeepSeek con el contexto de un arquetipo psicopolítico + paquete de noticias."""
     arq = arquetipo
-    canales = arq.get("canales", "—")
-    descripcion = arq.get("descripcion", "")
-    sesgo = arq.get("sesgo_dominante", "—")
 
     notes_lines = []
     for i, t in enumerate(titulares[:TOP_NOTICIAS_INPUT], 1):
@@ -94,13 +91,24 @@ def call_deepseek(arquetipo, titulares, ventana):
         notes_lines.append(f"{i}. [{sent}] {titulo} — tema: {tema} — actores: {actores}")
     paquete = "\n".join(notes_lines) if notes_lines else "(sin noticias en esta ventana)"
 
-    user_msg = f"""ARQUETIPO: {arq['nombre']}
+    # Top 3 temas más sensibles del arquetipo (de la matriz de sensibilidad)
+    sens = arq.get("sensibilidad_agenda", {}) or {}
+    top_sens = sorted(sens.items(), key=lambda kv: kv[1], reverse=True)[:3]
+    top_sens_str = ", ".join(f"{k} ({v}/5)" for k, v in top_sens) if top_sens else "—"
+
+    user_msg = f"""ARQUETIPO PSICOPOLÍTICO 2027: {arq['nombre']}
 Tagline: {arq.get('tagline','—')}
-Intensidad: {arq.get('intensidad','—')}
-Radio de influencia: {arq.get('radio','—')}
-Canales típicos: {canales}
-Sesgo dominante: {sesgo}
-Descripción: {descripcion}
+Emoción dominante: {arq.get('emocion_dominante','—')}
+Deseo político: {arq.get('deseo_politico','—')}
+Tipo de decisión: {arq.get('tipo_decision','—')}
+Qué lo activa: {arq.get('que_lo_activa','—')}
+Qué lo desmoviliza: {arq.get('que_lo_desmoviliza','—')}
+Riesgo de fuga: {arq.get('riesgo_fuga','—')}
+Canales típicos: {arq.get('canales','—')}
+Sesgos comunicativos: {arq.get('sesgos_comunicativos','—')}
+Tono recomendado: {arq.get('tono_recomendado','—')}
+Temas más sensibles (top 3): {top_sens_str}
+Descripción: {arq.get('descripcion','')}
 
 PAQUETE DE NOTICIAS — últimas {ventana}, top {len(titulares)}:
 {paquete}
