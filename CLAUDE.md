@@ -18,6 +18,7 @@
 - `lab-recursos.js` — catálogo compartido de 32 recursos en 5 categorías; cargado por los 6 módulos del lab.
 - `lab-informe.js` — **Sprint G** · helpers + generador PDF/MD del informe combinado del lab. Lee los 6 localStorage keys y produce un memo CONPES integrado. Cargado solo desde el hub.
 - `lab-indicadores.js` — **Sprint E (Fase A)** · helper de indicadores municipales oficiales con panel temporal 2018-2024. 8 indicadores × 1.108 municipios desde datos.gov.co (Policía Nacional + MEN). API lookupMun/getSerie/searchMun/matchIndicadorByKeyword. Cargado por analisis-estructural, problema-publico, ain y evaluacion.
+- `prospect-escenarios.html` — **Sprint F** · séptimo módulo del lab. Escenarios prospectivos por método de los ejes de incertidumbre (Schwartz · GBN), prospectiva estratégica francesa (Godet · Mojica · LIPSOR) y Robust Decision Making (Lempert · RAND). 4 mecánicas: incertidumbres críticas (auto-suggest desde MicMac) · narrativa de 4 cuadrantes · cross-impact con variables/actores/alternativas (Gordon 1968) · decisiones no-regret + señales tempranas. 3 exports (memo .md + matriz .csv + ficha .pdf jsPDF). Sin cloud-save en v1 (solo localStorage). LISTO.
 - `pricing.html` — planes (Básico / Pro 39.900 COP · Premium 99.900 COP · Personalizado)
 - `lang.js` — i18n (co/us/cn); `CLAUDE.md` vive en la raíz del repo
 
@@ -1846,6 +1847,7 @@ Los 6 módulos del lab están operativos:
 | 4 | Evaluación de política | `evaluacion.html` | ✓ vivo (Sprint B + B v2 · literatura 2020-2026) |
 | 5 | Alternativas de política | `alternativas.html` | ✓ vivo (Sprint C) |
 | 6 | Análisis de Impacto Normativo | `ain.html` | ✓ vivo (Sprint D) |
+| 7 | Escenarios prospectivos | `prospect-escenarios.html` | ✓ vivo (Sprint F) |
 
 Sólo `analisis-estructural.html` figura en el listado de proyectos de
 `index.html` (como "Análisis Estructural de Sistemas"). Desde su hub se
@@ -2681,13 +2683,205 @@ API en `window.LabIndicadores`:
    - En evaluación: al escribir "cobertura escolar" en un indicador,
      aparece chip ✦ Autocompletar (Medellín) que rellena base+fuente+def.
 
-**Fase B (pendiente · descarga manual):** IPM 2018 + NBI 2018 + agua
-potable + internet hogares + mortalidad infantil/materna + embarazo
-adolescente + vacunación PAI. Fuentes: TerriData (XLS por dimensión),
-DANE microdatos EEVV (CSVs anuales), MinSalud SISPRO (bodega web).
-Cuando estén descargados a `Bases de datos/indicadores-mun/raw/`, el
-pipeline los procesa con extensiones a `SECURITY_DATASETS` + nuevos
-parsers para CSVs en disco.
+**Fase B · descarga manual pendiente (checklist operativo):**
+
+Esta sección queda para consulta futura cuando se decida cerrar Fase B.
+La razón de la fase manual: TerriData, DANE EEVV microdatos y MinSalud
+SISPRO son SPAs detrás de login o filtros JavaScript que WebFetch no
+puede traer limpios. Toca click manual una vez.
+
+**Indicadores faltantes (~8 indicadores agrupados por fuente):**
+
+| # | Indicador | Fuente | Cosecha | Dónde bajarlo | Formato |
+|---|---|---|---|---|---|
+| F1 | IPM 2018 (Pobreza multidimensional) | DANE Censo 2018 | Único | `terridata.dnp.gov.co/#/descargas` → ficha "IPM" | XLS por dimensión |
+| F2 | NBI 2018 (Necesidades básicas insatisfechas) | DANE Censo 2018 | Único | TerriData → ficha "NBI" | XLS |
+| F3 | Población DIVIPOLA proyectada | DANE proyecciones | 2018-2024 anual | TerriData → ficha "Demografía" | XLS |
+| F4 | Acceso a agua potable | DANE Censo 2018 / SUI | 2018 + actualizaciones | TerriData → "Servicios públicos" | XLS |
+| F5 | Internet hogares | DANE ENCV / MinTIC | 2023 | TerriData → "Conectividad" (solo cabecera urbana en muchos casos) | XLS |
+| F6 | Mortalidad infantil (<1 año) | DANE EEVV no fetales | 2018-2022 anual | `microdatos.dane.gov.co/index.php/catalog/EEVV-2022` | CSV ~250 MB/año |
+| F7 | Mortalidad materna | DANE EEVV | 2018-2022 anual | Mismo path EEVV | Mismo CSV (filtrar por causa CIE-10) |
+| F8 | Embarazo adolescente (10-19) | DANE EEVV nacimientos | 2018-2022 anual | `microdatos.dane.gov.co/index.php/catalog/EEVV-NAC-2022` | CSV ~150 MB/año |
+| F9 | Vacunación DPT3 (cobertura PAI) | MinSalud SISPRO | 2018-2023 anual | `bodega.sispro.gov.co` (login con cualquier correo) → cubo "PAI - Coberturas" → exportar | XLSX por depto/mun |
+
+**Ruta esperada de los archivos descargados:**
+
+```
+Bases de datos/indicadores-mun/raw/
+  terridata/
+    ipm-2018-por-mun.xlsx        ← TerriData ficha IPM (todos los muns)
+    nbi-2018-por-mun.xlsx        ← idem NBI
+    poblacion-2018-2024.xlsx     ← idem proyecciones anuales
+    agua-2018-por-mun.xlsx       ← idem servicios públicos
+    internet-2023-por-mun.xlsx   ← idem conectividad
+  dane-eevv/
+    EEVV-Defunciones-2018.csv    ← microdatos defunciones no fetales
+    EEVV-Defunciones-2019.csv
+    ...
+    EEVV-Defunciones-2022.csv
+    EEVV-Nacimientos-2018.csv    ← microdatos nacimientos (para embarazo adolescente)
+    ...
+    EEVV-Nacimientos-2022.csv
+  minsalud/
+    pai-cobertura-2018-2023.xlsx ← bodega SISPRO export
+```
+
+**Cómo extender el pipeline `tools/build-indicadores-mun/build.py`:**
+
+1. Crear una nueva función por fuente:
+   - `_fetch_terridata_xlsx(path, col_divipola, col_valor)` — usa openpyxl
+     (única dep extra), lee `Bases de datos/indicadores-mun/raw/terridata/`
+     y devuelve `{ divipola: valor }` o `{ divipola: { año: valor } }`.
+   - `_fetch_eevv_csv(path, año, filtro)` — lee CSVs DANE en streaming
+     (puede ser pesado, usar pandas o stdlib `csv.DictReader`). Cruza
+     `COD_MUNI_OCU` o `COD_MUNI_RES` (decidir cuál → según indicador, la
+     convención DANE es "lugar de ocurrencia") y agrupa por mun.
+   - `_fetch_pai_xlsx(path, col_mun, col_cobertura)` — lee bodega SISPRO.
+
+2. Agregar los nuevos indicadores a `indicadores_meta`:
+   ```python
+   { "id":"ipm", "nombre":"Pobreza multidimensional (IPM)", "unidad":"%",
+     "categoria":"pobreza", "fuente":"DANE Censo 2018", ... }
+   ```
+
+3. Ensamblar el merge con datos Fase A en el bloque final.
+
+4. Bumpear `CACHE_BUSTER` en `lab-indicadores.js` (`v=YYYYMMDD`).
+
+5. Re-correr → re-subir a S3 → spot-check de Medellín / Bogotá / un mun
+   pequeño contra la ficha oficial TerriData.
+
+**Keywords nuevas para `matchIndicadorByKeyword` en `lab-indicadores.js`:**
+
+```js
+'ipm': 'ipm', 'pobreza multidim': 'ipm', 'multidimensional': 'ipm',
+'nbi': 'nbi', 'necesidades basicas': 'nbi',
+'agua potable': 'agua', 'acueducto': 'agua',
+'internet': 'internet', 'conectividad': 'internet',
+'mortalidad infantil': 'mortalidad_infantil',
+'mortalidad materna': 'mortalidad_materna',
+'embarazo adolescente': 'embarazo_adolescente', 'fecundidad adolescente': 'embarazo_adolescente',
+'vacunacion': 'vacunacion_dpt', 'cobertura pai': 'vacunacion_dpt', 'dpt3': 'vacunacion_dpt'
+```
+
+**Notas operativas críticas:**
+
+- **TerriData no expone API REST estable.** Los XLS descargados manualmente
+  son la única vía. Algunos archivos vienen con encabezados en español
+  con caracteres especiales — abrir en Excel + guardar como CSV UTF-8
+  antes de procesar.
+- **DANE EEVV son pesados** (~150-300 MB por año). Pre-filtrar con
+  `csv.DictReader` por columnas estrictas; no cargar todo a memoria.
+- **MinSalud SISPRO requiere registro gratuito** (cualquier correo).
+  El cubo "PAI - Coberturas" se exporta a XLSX directo desde el dashboard
+  con filtros depto/mun/año.
+- **DIVIPOLA en EEVV**: la columna `COD_MUNI_OCU` (lugar de ocurrencia)
+  vs `COD_MUNI_RES` (lugar de residencia). Para mortalidad usamos
+  ocurrencia; para nacimientos usamos residencia de la madre. Documentado
+  en el manual EEVV-2022 del DANE.
+- **Bumpear `CACHE_BUSTER` en `lab-indicadores.js`** SIEMPRE que se
+  regenere el JSON, sino los navegadores cachean la versión vieja por
+  10 minutos.
+
+**Tiempo estimado Fase B completa:** ~6-8 horas (3h descarga manual de
+las 9 fuentes, 2-3h escribir parsers Python, 1-2h validar y subir).
+
+### Sprint F · escenarios prospectivos (3 frentes simultáneos)
+
+Tres frentes complementarios en un solo sprint, cierre prospectivista del lab:
+
+**(A) Módulo nuevo `prospect-escenarios.html`** — séptimo módulo del lab.
+2.407 líneas. Marco metodológico combinado:
+
+- **Método de los ejes de incertidumbre** (Schwartz · Global Business
+  Network 1991): 2 incertidumbres críticas → 4 cuadrantes narrados.
+- **Prospectiva estratégica francesa** (Godet · LIPSOR · CNAM, adaptada
+  por Mojica en Externado): incertidumbres derivadas del análisis
+  estructural (variables motrices del MicMac).
+- **Cross-impact analysis** (Gordon & Hayward 1968, RAND): matriz
+  elementos × escenarios con valencias -2..+2.
+- **Robust Decision Making** (Lempert & Walker 2003, RAND): decisiones
+  no-regret = válidas en ≥3 de 4 escenarios. Plan de contingencia para
+  escenarios donde falla. Señales tempranas para vigilancia estratégica.
+
+4 mecánicas + welcome + results:
+1. `stage-incertidumbres` — define 2 ejes con polo neg/pos. Botón
+   "✦ Importar de MicMac" lee `localStorage['micmac-current-v2']`,
+   calcula motricidad `Σ|M[i,j]|` por fila y sugiere las 2 top.
+2. `stage-escenarios` — matriz 2x2 visual con NE/NO/SO/SE editables
+   (nombre + narrativa + probabilidad). Sum-check de probabilidad ≈ 100%.
+3. `stage-cross-impact` — auto-import desde MicMac (variables), Mactor
+   (actores), Alt (alternativas) con checkboxes. Matriz con celdas
+   cyclando 0→+1→+2→-1→-2.
+4. `stage-estrategia` — lista de alternativas con badge ✓ NO-REGRET si
+   ≥3 escenarios tienen impacto ≥+1. Textareas de contingencia +
+   señales tempranas.
+5. `stage-results` — resumen + 3 exports (memo .md, matriz .csv, ficha
+   .pdf jsPDF on-demand).
+
+STATE en `localStorage['prospect-current-v1']`. Sin cloud-save ni IA
+copiloto en v1 (solo localStorage). Cuando se quiera multi-user, agregar
+endpoints `/prospect/*` al worker rr-auth (no implementado en F).
+
+**(B) Capa what-if en módulos vivos** — paneles "¿Qué pasa si...?" al
+final del stage-results de los módulos analíticos:
+
+- `analisis-estructural.html` (+151 líneas): slider -3..+3 (mapeado a
+  ±30% motricidad de la variable). Re-corre `_computeMicMacOn` sobre
+  una copia de la matriz, recalcula cuadrantes por mediana y diff'ea
+  contra el original. Reporta variables que cambian de cuadrante o
+  suben/bajan ≥2 posiciones en motricidad. La matriz guardada no se
+  toca.
+- `mactor.html` (+152 líneas): slider -50%..+50% sobre la fila MID del
+  actor seleccionado. Recalcula Ri = I/(I+D) para todos los actores y
+  saldos por objetivo. Reporta top 2 ΔRi (uno arriba, uno abajo) y
+  objetivos que cambian de signo (de positivo a negativo o viceversa).
+  MID/MAO originales sin tocar.
+
+**(C) Monte Carlo en `alternativas.html`** (+227 líneas) — análisis
+estocástico bajo incertidumbre en ratings y probabilidades. Botón "Correr
+simulaciones" al final del stage-robustez. Configuración:
+
+- Número de sims: 500 / 1000 / 5000.
+- Perturbación rating: ±0.5 / ±1 / ±1.5 (escala 1-5 truncada).
+- Perturbación probabilidad: ±5 / ±10 / ±20 puntos porcentuales
+  (renormalizada a suma 100% post-perturbación).
+
+Loop en batches de 100 sims con `requestIdleCallback` cuando N≥2000
+(fallback `setTimeout` para no bloquear UI). Por sim aplica la fórmula
+`Σ(prob × rating) / Σprob + bonus(worst≥3)` con `_calcScoresAlt` reusado.
+Acumula winCount por alternativa + samples ordenados.
+
+Resultado: tabla con P(#1) % + barra visual + score medio + p10-p90.
+Interpretación auto: P(#1) > 60% = robusta · 30-60% = moderada · < 30% =
+contingente. Sin libs externas.
+
+**Hub 7 cards** — actualizado de 3+3 a 3+4 (o 4+3 según breakpoint).
+Card prospect agregada al final con tag "Schwartz · Godet · Mojica ·
+Lempert".
+
+**Cross-links** — desde stage-results de problema-publico, evaluacion,
+ain agregamos un cross-link gold hacia prospect ANTES del cross-link
+oxblood al informe combinado. Cada link tiene su pretexto contextual
+("¿La regulación es robusta en distintos futuros?", "¿La política
+mantiene sentido si el contexto cambia?", etc.).
+
+**PDFs en S3** (Sprint F.D.3):
+```
+s3://elecciones-2026/ricardoruiz.co/bases de datos/prospect/
+  metodologia-paso-a-paso.pdf  (10.2 KB · 7 secciones operativas)
+  respaldo-academico.pdf       (13.1 KB · 20 referencias clásicas)
+```
+Pipeline en `tools/build-prospect-docs/{build_metodologia.py, build_respaldo.py}`.
+Reportlab puro. Re-correr y `aws s3 cp` al actualizar.
+
+**lab-recursos.js** — sumados 3 recursos nuevos al catálogo:
+- Schwartz · The Art of the Long View (GBN)
+- Cross-Impact Analysis · Gordon & Hayward 1968
+- Mojica · Concepto y aplicación de la prospectiva estratégica
+
+Y tag `prospect` agregado a los recursos existentes que aplican: LIPSOR,
+Externado-CIPE, Future Today Institute, RAND-RDM.
 
 ### Worker rr-auth — endpoints del lab
 
@@ -2870,14 +3064,25 @@ indicadores municipales oficiales" más abajo. 8 indicadores con panel
 2018-2024 sobre 1.108 municipios desde datos.gov.co. Integrado en
 analisis-estructural, problema-publico, ain y evaluacion.
 
+**Sprint F · Escenarios prospectivos** ✓ LISTO. Ver sección "Sprint F ·
+escenarios prospectivos" más abajo. Tres frentes simultáneos:
+- (A) Nuevo módulo `prospect-escenarios.html` (7º del lab · 2.407 líneas)
+  con método de los ejes de incertidumbre (Schwartz · GBN), prospectiva
+  estratégica francesa (Godet · Mojica), cross-impact (Gordon 1968) y
+  RDM (Lempert).
+- (B) Capa what-if en estructural (slider motricidad) + mactor (slider Ri).
+- (C) Monte Carlo en alternativas (500/1000/5000 sims con perturbación
+  configurable + P(#1) por alternativa).
+
 **Reservados para próximas iteraciones:**
 - **Sprint E Fase B** — descarga manual de TerriData / DANE EEVV /
   MinSalud para añadir IPM, NBI, agua, internet, mortalidad infantil/
   materna, embarazo adolescente y vacunación PAI. Requiere descarga
   manual (SPAs sin API limpia). El pipeline ya lo soporta con extensiones.
-- **Sprint F** — escenarios prospectivos: vista "what-if" sobre MicMac,
-  Mactor, problema-publico, alternativas y AIN. Los 4 escenarios de
-  Alternativas (C.5) son un primer paso editable.
+- **Sprint F v2** — Worker rr-auth con endpoints `/prospect/*` (CRUD +
+  invite + copiloto IA), por ahora solo localStorage. Y agregar prospect
+  al informe combinado del lab (Sprint G) — el lab-informe.js todavía no
+  lee el state prospect.
 
 **Mejoras de módulos vivos:**
 - **Mactor MIDI** (opcional) — matriz pivotada de influencias

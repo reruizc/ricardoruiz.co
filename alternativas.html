@@ -1334,6 +1334,51 @@ footer.foot {
     </p>
     <div id="econ-cards"></div>
 
+    <!-- Sprint F · Monte Carlo (análisis estocástico de robustez) -->
+    <details id="mc-block" style="margin-top:1.6rem;background:var(--paper-2);border:1px solid var(--rule);padding:0">
+      <summary style="cursor:pointer;padding:1rem 1.3rem;font-family:var(--sans);font-weight:700;font-size:1rem;color:var(--ink);display:flex;align-items:center;justify-content:space-between;list-style:none">
+        <span>✦ Análisis estocástico · Monte Carlo</span>
+        <span style="font-family:var(--mono);color:var(--accent);font-size:1.2rem">+</span>
+      </summary>
+      <div style="padding:0 1.3rem 1.3rem">
+        <p style="font-family:var(--sans);font-size:.95rem;color:var(--ink-2);margin:0 0 1rem;max-width:64ch">
+          Las calificaciones 1-5 y las probabilidades de escenarios son <em>juicios subjetivos</em>. Monte Carlo perturba ambos miles de veces y mide qué tan robusta es la alternativa #1: si gana en &gt; 60% de los mundos posibles, la decisión es sólida; si gana en &lt; 30%, es contingente.
+        </p>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr) auto;gap:.8rem;align-items:end;margin-bottom:1rem">
+          <div>
+            <label style="font-family:var(--mono);font-size:.78rem;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.3rem">N simulaciones</label>
+            <select id="mc-nsim" style="width:100%;background:var(--paper);color:var(--ink);border:1px solid var(--rule);padding:.5rem .7rem;font-family:var(--sans);font-size:.95rem">
+              <option value="500">500</option>
+              <option value="1000" selected>1.000</option>
+              <option value="5000">5.000</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-family:var(--mono);font-size:.78rem;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.3rem">Perturbación rating</label>
+            <select id="mc-pr" style="width:100%;background:var(--paper);color:var(--ink);border:1px solid var(--rule);padding:.5rem .7rem;font-family:var(--sans);font-size:.95rem">
+              <option value="0.5">±0.5</option>
+              <option value="1" selected>±1</option>
+              <option value="1.5">±1.5</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-family:var(--mono);font-size:.78rem;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.3rem">Perturbación prob</label>
+            <select id="mc-pp" style="width:100%;background:var(--paper);color:var(--ink);border:1px solid var(--rule);padding:.5rem .7rem;font-family:var(--sans);font-size:.95rem">
+              <option value="5">±5 pp</option>
+              <option value="10" selected>±10 pp</option>
+              <option value="20">±20 pp</option>
+            </select>
+          </div>
+          <button class="btn" id="mc-run-btn" onclick="mcRun()">Correr simulaciones</button>
+        </div>
+        <div id="mc-progress" style="display:none;margin-bottom:.8rem">
+          <div style="font-family:var(--mono);font-size:.78rem;color:var(--ink-3);margin-bottom:.3rem"><span id="mc-progress-txt">Corriendo…</span></div>
+          <div style="height:6px;background:var(--rule);position:relative;overflow:hidden"><div id="mc-progress-bar" style="height:100%;background:var(--accent);width:0%;transition:width .2s"></div></div>
+        </div>
+        <div id="mc-result" style="display:none;background:var(--paper);border:1px solid var(--rule);padding:1rem 1.2rem;font-family:var(--sans);font-size:.95rem"></div>
+      </div>
+    </details>
+
     <div class="actions">
       <button class="btn-ghost" onclick="goToStep(4)">← Alternativas</button>
       <div class="right-group">
@@ -3129,7 +3174,8 @@ const LAB_MOD_LABELS = {
   mactor:       'el módulo de Análisis de Actores',
   evaluacion:   'el módulo de Evaluación de Política',
   alternativas: 'el módulo de Alternativas de Política',
-  ain:          'el módulo de Análisis de Impacto Normativo'
+  ain:          'el módulo de Análisis de Impacto Normativo',
+  prospect:     'el módulo de Escenarios Prospectivos'
 };
 function openRecursosModal() {
   const lab = window.LAB_RECURSOS;
@@ -4189,6 +4235,188 @@ function iaRenderNarrativa(data) {
     html += '</ul>';
   }
   out.innerHTML = html;
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// SPRINT F · MONTE CARLO (análisis estocástico de robustez)
+// ═════════════════════════════════════════════════════════════════════════
+
+let _mcLastResult = null;
+
+function _mcRand(amp) { return (Math.random() * 2 - 1) * amp; }
+function _mcClamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+// Score con probs + ratings perturbados, para una alternativa.
+// probsObj: { [scenId]: prob }, ratingsObj: { [scenId]: rating }
+function _mcCalcScoreAlt(probsObj, ratingsObj) {
+  let probSum = 0, weighted = 0, worst = Infinity;
+  let nRated = 0;
+  for (const sid in probsObj) {
+    const r = ratingsObj[sid];
+    if (r >= 1 && r <= 5) {
+      const p = probsObj[sid];
+      probSum += p;
+      weighted += p * r;
+      worst = Math.min(worst, r);
+      nRated++;
+    }
+  }
+  if (nRated === 0) return null;
+  const expected = probSum > 0 ? (weighted / probSum) : 0;
+  const bonus = (worst >= 3) ? 0.5 : 0;
+  return expected + bonus;
+}
+
+function mcRun() {
+  const alts = (STATE.alternativas || []).filter(a => a && a.id);
+  const escs = (STATE.escenarios || []);
+  if (alts.length < 2) { _mcRenderError('Necesitas al menos 2 alternativas para comparar.'); return; }
+  if (escs.length < 1) { _mcRenderError('Necesitas al menos 1 escenario.'); return; }
+  // Validar ratings completos
+  const incomplete = alts.filter(a => !escs.every(s => {
+    const r = (STATE.ratings && STATE.ratings[a.id]) ? STATE.ratings[a.id][s.id] : null;
+    return r >= 1 && r <= 5;
+  }));
+  if (incomplete.length > 0) {
+    _mcRenderError(`Falta calificar ${incomplete.length} alternativa(s) en algún escenario. Completa la matriz antes de correr Monte Carlo.`);
+    return;
+  }
+  const nSim = parseInt(document.getElementById('mc-nsim').value, 10) || 1000;
+  const pertRating = parseFloat(document.getElementById('mc-pr').value) || 1;
+  const pertProb = parseFloat(document.getElementById('mc-pp').value) || 10;
+  const btn = document.getElementById('mc-run-btn');
+  btn.disabled = true;
+  btn.textContent = 'Corriendo…';
+  document.getElementById('mc-progress').style.display = 'block';
+  document.getElementById('mc-result').style.display = 'none';
+
+  const winCount = {};
+  const scoreSamples = {};
+  alts.forEach(a => { winCount[a.id] = 0; scoreSamples[a.id] = []; });
+
+  // Snapshot inicial de probs y ratings
+  const baseProbs = {}; const baseRatings = {};
+  escs.forEach(s => { baseProbs[s.id] = Number(s.prob) || 0; });
+  alts.forEach(a => {
+    baseRatings[a.id] = {};
+    escs.forEach(s => { baseRatings[a.id][s.id] = Number(STATE.ratings[a.id][s.id]) || 0; });
+  });
+
+  let simDone = 0;
+  const BATCH = 100;
+
+  function runBatch() {
+    const end = Math.min(nSim, simDone + BATCH);
+    for (; simDone < end; simDone++) {
+      // Perturbar probs y renormalizar a 100
+      const newProbs = {};
+      let pSum = 0;
+      escs.forEach(s => {
+        const p = _mcClamp(baseProbs[s.id] + _mcRand(pertProb), 0, 100);
+        newProbs[s.id] = p;
+        pSum += p;
+      });
+      if (pSum > 0) {
+        escs.forEach(s => { newProbs[s.id] = (newProbs[s.id] / pSum) * 100; });
+      }
+      // Perturbar ratings y calcular score por alt
+      let bestId = null; let bestScore = -Infinity;
+      const scoresThis = {};
+      alts.forEach(a => {
+        const newRatings = {};
+        escs.forEach(s => {
+          const r = _mcClamp(baseRatings[a.id][s.id] + _mcRand(pertRating), 1, 5);
+          newRatings[s.id] = r;
+        });
+        const sc = _mcCalcScoreAlt(newProbs, newRatings);
+        scoresThis[a.id] = sc;
+        if (sc != null && sc > bestScore) { bestScore = sc; bestId = a.id; }
+      });
+      if (bestId != null) winCount[bestId]++;
+      alts.forEach(a => { if (scoresThis[a.id] != null) scoreSamples[a.id].push(scoresThis[a.id]); });
+    }
+    const pct = Math.round((simDone / nSim) * 100);
+    document.getElementById('mc-progress-bar').style.width = pct + '%';
+    document.getElementById('mc-progress-txt').textContent = `Corriendo… ${simDone.toLocaleString('es-CO')} / ${nSim.toLocaleString('es-CO')}`;
+    if (simDone < nSim) {
+      const next = (typeof requestIdleCallback === 'function' && nSim >= 2000)
+        ? () => requestIdleCallback(runBatch, { timeout: 50 })
+        : () => setTimeout(runBatch, 0);
+      next();
+    } else {
+      _mcFinish({ alts, escs, nSim, pertRating, pertProb, winCount, scoreSamples });
+    }
+  }
+  setTimeout(runBatch, 0);
+}
+
+function _mcFinish(ctx) {
+  const { alts, nSim, pertRating, pertProb, winCount, scoreSamples } = ctx;
+  document.getElementById('mc-progress').style.display = 'none';
+  const btn = document.getElementById('mc-run-btn');
+  btn.disabled = false;
+  btn.textContent = 'Correr simulaciones';
+  // Estadísticas por alternativa
+  const rows = alts.map(a => {
+    const samples = scoreSamples[a.id].slice().sort((x, y) => x - y);
+    const n = samples.length;
+    if (n === 0) return { alt: a, p1: 0, mean: null, p10: null, p90: null };
+    const mean = samples.reduce((s, v) => s + v, 0) / n;
+    const p10 = samples[Math.floor(0.10 * (n - 1))];
+    const p90 = samples[Math.floor(0.90 * (n - 1))];
+    const p1 = (winCount[a.id] / nSim) * 100;
+    return { alt: a, p1, mean, p10, p90 };
+  }).sort((a, b) => b.p1 - a.p1);
+  _mcLastResult = { rows, nSim, pertRating, pertProb };
+  // Render tabla + barras
+  const box = document.getElementById('mc-result');
+  const maxP1 = Math.max(1, ...rows.map(r => r.p1));
+  const interp = rows[0].p1 > 60
+    ? `<b>Decisión robusta:</b> «${escapeHtml(rows[0].alt.nombre)}» gana en ${rows[0].p1.toFixed(1)}% de los mundos simulados.`
+    : rows[0].p1 < 30
+      ? `<b>Decisión contingente:</b> ninguna alternativa domina (top gana sólo ${rows[0].p1.toFixed(1)}%). Es muy sensible a tus juicios — vale revisar ratings o probabilidades antes de cerrar.`
+      : `<b>Decisión moderadamente robusta:</b> «${escapeHtml(rows[0].alt.nombre)}» lidera con ${rows[0].p1.toFixed(1)}%, pero hay competencia real con las siguientes.`;
+  const tbody = rows.map(r => `
+    <tr>
+      <td style="padding:.4rem .6rem;border-bottom:1px solid var(--rule);font-family:var(--sans);font-weight:600">${escapeHtml(r.alt.nombre || '—')}</td>
+      <td style="padding:.4rem .6rem;border-bottom:1px solid var(--rule);font-family:var(--mono);text-align:right">${r.p1.toFixed(1)}%</td>
+      <td style="padding:.4rem .6rem;border-bottom:1px solid var(--rule)">
+        <div style="position:relative;height:8px;background:var(--rule);overflow:hidden">
+          <div style="height:100%;background:var(--accent);width:${(r.p1 / maxP1 * 100).toFixed(1)}%"></div>
+        </div>
+      </td>
+      <td style="padding:.4rem .6rem;border-bottom:1px solid var(--rule);font-family:var(--mono);text-align:right">${r.mean != null ? r.mean.toFixed(2) : '—'}</td>
+      <td style="padding:.4rem .6rem;border-bottom:1px solid var(--rule);font-family:var(--mono);text-align:right;color:var(--ink-3)">${r.p10 != null && r.p90 != null ? r.p10.toFixed(2) + '–' + r.p90.toFixed(2) : '—'}</td>
+    </tr>`).join('');
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div style="font-family:var(--mono);font-size:.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.6rem">Monte Carlo · ${nSim.toLocaleString('es-CO')} simulaciones · rating ±${pertRating} · prob ±${pertProb}pp</div>
+    <div style="margin-bottom:.9rem">${interp}</div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:.92rem">
+        <thead>
+          <tr style="font-family:var(--mono);font-size:.74rem;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em">
+            <th style="padding:.4rem .6rem;text-align:left;border-bottom:1px solid var(--rule-strong)">Alternativa</th>
+            <th style="padding:.4rem .6rem;text-align:right;border-bottom:1px solid var(--rule-strong)">P(#1)</th>
+            <th style="padding:.4rem .6rem;text-align:left;border-bottom:1px solid var(--rule-strong);width:30%">Distribución</th>
+            <th style="padding:.4rem .6rem;text-align:right;border-bottom:1px solid var(--rule-strong)">Score medio</th>
+            <th style="padding:.4rem .6rem;text-align:right;border-bottom:1px solid var(--rule-strong)">p10–p90</th>
+          </tr>
+        </thead>
+        <tbody>${tbody}</tbody>
+      </table>
+    </div>
+    <div style="font-family:var(--sans);font-size:.82rem;color:var(--ink-3);margin-top:.9rem;border-top:1px solid var(--rule);padding-top:.6rem">
+      <b>Lectura:</b> P(#1) = probabilidad de que la alternativa quede en primer lugar cuando se perturban los ratings y las probabilidades subjetivas. &gt; 60% → robusta; 30-60% → moderada; &lt; 30% → contingente. Tus ratings y probabilidades originales no se modifican.
+    </div>
+  `;
+}
+
+function _mcRenderError(msg) {
+  const box = document.getElementById('mc-result');
+  if (!box) return;
+  box.style.display = 'block';
+  box.innerHTML = `<div style="color:var(--accent)">${escapeHtml(msg)}</div>`;
 }
 
 // ═════════════════════════════════════════════════════════════════════════

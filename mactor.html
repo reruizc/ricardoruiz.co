@@ -1143,6 +1143,32 @@ footer.foot {
       (matriz pivotada MIDI), pesos por poder ponderado y copiloto IA
       para sugerir actores y validar la lista de objetivos.
     </p>
+
+    <!-- Sprint F · What-if: variar influencia de un actor -->
+    <details id="whatif-block" style="margin-top:1.5rem;background:var(--paper-2);border:1px solid var(--rule);padding:0">
+      <summary style="cursor:pointer;padding:1rem 1.3rem;font-family:var(--sans);font-weight:700;font-size:1rem;color:var(--ink);display:flex;align-items:center;justify-content:space-between;list-style:none">
+        <span>✦ What-if · Variar influencia de un actor</span>
+        <span style="font-family:var(--mono);color:var(--accent);font-size:1.2rem">+</span>
+      </summary>
+      <div style="padding:0 1.3rem 1.3rem">
+        <p style="font-family:var(--sans);font-size:.95rem;color:var(--ink-2);margin:0 0 1rem">
+          Simula cómo se mueve el mapa de poder si un actor gana o pierde fuerza. Multiplica su fila de la MID por el porcentaje elegido y recalcula Ri y saldos netos — sin tocar tus calificaciones.
+        </p>
+        <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:.8rem;align-items:end;margin-bottom:1rem">
+          <div>
+            <label style="font-family:var(--mono);font-size:.78rem;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.3rem">Actor</label>
+            <select id="whatif-actor" style="width:100%;background:var(--paper);color:var(--ink);border:1px solid var(--rule);padding:.5rem .7rem;font-family:var(--sans);font-size:.95rem"></select>
+          </div>
+          <div>
+            <label style="font-family:var(--mono);font-size:.78rem;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.3rem">Variar influencia <span id="whatif-delta-lbl" style="color:var(--accent)">+0%</span></label>
+            <input id="whatif-delta" type="range" min="-50" max="50" step="5" value="0" style="width:100%;accent-color:var(--accent)" />
+            <div style="font-family:var(--mono);font-size:.7rem;color:var(--ink-3);display:flex;justify-content:space-between;margin-top:.2rem"><span>−50%</span><span>0</span><span>+50%</span></div>
+          </div>
+          <button class="btn" onclick="whatifMactor()">Aplicar</button>
+        </div>
+        <div id="whatif-result" style="display:none;background:var(--paper);border:1px solid var(--rule);padding:1rem 1.2rem;font-family:var(--sans);font-size:.95rem"></div>
+      </div>
+    </details>
   </section>
 </main>
 
@@ -2671,6 +2697,132 @@ function iaRenderNarrativa(data) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════
+// SPRINT F · WHAT-IF (variación de influencia de un actor sobre Ri y saldos)
+// ═════════════════════════════════════════════════════════════════════════
+
+let _whatifMactorState = { actorIdx: 0, delta: 0 };
+
+function _whatifActorName(i) {
+  const a = STATE.actores[i];
+  if (a == null) return 'A' + (i + 1);
+  return typeof a === 'string' ? a : (a.nombre || a.label || ('A' + (i + 1)));
+}
+function _whatifObjetivoName(k) {
+  const o = STATE.objetivos[k];
+  if (o == null) return 'O' + (k + 1);
+  return typeof o === 'string' ? o : (o.nombre || o.label || ('O' + (k + 1)));
+}
+function whatifMactorPopulate() {
+  const sel = document.getElementById('whatif-actor');
+  if (!sel) return;
+  const cur = sel.value;
+  const opts = STATE.actores.map((_, i) => `<option value="${i}">${escapeHtml(_whatifActorName(i))}</option>`).join('');
+  sel.innerHTML = opts || '<option value="">— sin actores —</option>';
+  if (cur && Number(cur) < STATE.actores.length) sel.value = cur;
+  const sl = document.getElementById('whatif-delta');
+  const lbl = document.getElementById('whatif-delta-lbl');
+  if (sl && lbl && !sl._wf) {
+    sl._wf = true;
+    sl.addEventListener('input', () => {
+      const d = Number(sl.value) || 0;
+      lbl.textContent = (d > 0 ? '+' : '') + d + '%';
+    });
+  }
+}
+
+function whatifMactor() {
+  if (STATE.actores.length < 2) {
+    whatifMactorRender({ error: 'Necesitas al menos 2 actores y la matriz MID capturada.' });
+    return;
+  }
+  const sel = document.getElementById('whatif-actor');
+  const sl = document.getElementById('whatif-delta');
+  const actorIdx = Math.max(0, Math.min(STATE.actores.length - 1, Number(sel.value) || 0));
+  const delta = Math.max(-50, Math.min(50, Number(sl.value) || 0));
+  _whatifMactorState = { actorIdx, delta };
+  // Base: corre cálculo Mactor original
+  const base = computeMactor();
+  if (!base) { whatifMactorRender({ error: 'No se pudo calcular Mactor (faltan datos).' }); return; }
+  const nA = STATE.actores.length;
+  const nO = STATE.objetivos.length;
+  // Matriz MID alterada (multiplicar fila del actor por (1 + delta/100))
+  const MID = midNumeric();
+  const factor = 1 + (delta / 100);
+  for (let j = 0; j < nA; j++) MID[actorIdx][j] = MID[actorIdx][j] * factor;
+  // Re-calcular Ii, Di, Ri con MID alterada
+  const Ii2 = rowSums(MID);
+  const Di2 = colSums(MID);
+  const Ri2 = Ii2.map((ii, i) => {
+    const dd = Di2[i];
+    if (ii + dd === 0) return 0;
+    return ii / (ii + dd);
+  });
+  // Re-calcular saldo neto por objetivo con MAO original × Ri2
+  const MAO = maoNumeric();
+  const saldoNeto2 = new Array(nO).fill(0);
+  for (let k = 0; k < nO; k++) {
+    for (let i = 0; i < nA; i++) saldoNeto2[k] += MAO[i][k] * Ri2[i];
+  }
+  // Diffs: top actor que más subió/bajó en Ri + objetivos que cambian de signo
+  const diffsR = [];
+  for (let i = 0; i < nA; i++) diffsR.push({ i, dR: Ri2[i] - base.Ri[i], Ri2: Ri2[i], RiBase: base.Ri[i] });
+  const subio = diffsR.slice().sort((a, b) => b.dR - a.dR)[0];
+  const bajo = diffsR.slice().sort((a, b) => a.dR - b.dR)[0];
+  const cambioSigno = [];
+  for (let k = 0; k < nO; k++) {
+    const a = base.saldoNeto[k], b = saldoNeto2[k];
+    if (Math.sign(a) !== Math.sign(b) && (Math.abs(a) > 0.05 || Math.abs(b) > 0.05)) {
+      cambioSigno.push({ k, base: a, nuevo: b, nombre: _whatifObjetivoName(k) });
+    }
+  }
+  whatifMactorRender({ actorIdx, delta, factor, subio, bajo, cambioSigno });
+}
+
+function whatifMactorRender(res) {
+  const box = document.getElementById('whatif-result');
+  if (!box) return;
+  if (res.error) {
+    box.style.display = 'block';
+    box.innerHTML = `<div style="color:var(--accent)">${escapeHtml(res.error)}</div>`;
+    return;
+  }
+  const nomA = _whatifActorName(res.actorIdx);
+  const tag = `WHAT-IF · «${escapeHtml(nomA)}» ${res.delta >= 0 ? '+' : ''}${res.delta}% de influencia`;
+  const fmtR = v => (Math.round(v * 1000) / 1000).toFixed(3);
+  const nomSubio = _whatifActorName(res.subio.i);
+  const nomBajo = _whatifActorName(res.bajo.i);
+  let saldoBlock = '';
+  if (res.cambioSigno.length === 0) {
+    saldoBlock = `<div style="color:var(--ink-3);font-style:italic;margin-top:.6rem">Ningún objetivo cambia de saldo positivo a negativo (ni viceversa). El balance de fuerzas sobre los objetivos se mantiene.</div>`;
+  } else {
+    const items = res.cambioSigno.map(c =>
+      `<li style="margin:.3rem 0"><b>${escapeHtml(c.nombre)}</b> · saldo ${c.base.toFixed(2)} → <span style="color:${c.nuevo >= 0 ? '#4ade80' : '#f87171'}">${c.nuevo.toFixed(2)}</span></li>`
+    ).join('');
+    saldoBlock = `
+      <div style="font-family:var(--mono);font-size:.78rem;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;margin-top:.8rem;margin-bottom:.3rem">Objetivos que cambian de signo</div>
+      <ul style="margin:.2rem 0 0;padding-left:1.2rem;list-style:disc">${items}</ul>`;
+  }
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div style="font-family:var(--mono);font-size:.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.6rem">${tag}</div>
+    <div style="font-family:var(--mono);font-size:.78rem;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem">Movimiento en poder relativo Ri</div>
+    <ul style="margin:.2rem 0 0;padding-left:1.2rem;list-style:disc">
+      <li style="margin:.3rem 0"><b>${escapeHtml(nomSubio)}</b> · ${fmtR(res.subio.RiBase)} → <span style="color:#4ade80">${fmtR(res.subio.Ri2)}</span> (Δ ${res.subio.dR >= 0 ? '+' : ''}${fmtR(res.subio.dR)})</li>
+      <li style="margin:.3rem 0"><b>${escapeHtml(nomBajo)}</b> · ${fmtR(res.bajo.RiBase)} → <span style="color:#f87171">${fmtR(res.bajo.Ri2)}</span> (Δ ${res.bajo.dR >= 0 ? '+' : ''}${fmtR(res.bajo.dR)})</li>
+    </ul>
+    ${saldoBlock}
+    <div style="font-family:var(--sans);font-size:.82rem;color:var(--ink-3);margin-top:.8rem;border-top:1px solid var(--rule);padding-top:.6rem">
+      Cálculo: fila MID de «${escapeHtml(nomA)}» × ${res.factor.toFixed(2)}, se recalcula Ri = I / (I+D) y saldo neto Σ MAO[i,k]·Ri[i]. Tu MID original no se modifica.
+    </div>
+  `;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const det = document.getElementById('whatif-block');
+  if (det) det.addEventListener('toggle', () => { if (det.open) whatifMactorPopulate(); });
+});
+
+// ═════════════════════════════════════════════════════════════════════════
 // INIT
 // ═════════════════════════════════════════════════════════════════════════
 (async function init() {
@@ -2691,7 +2843,8 @@ const LAB_MOD_LABELS = {
   mactor:       'el módulo de Análisis de Actores',
   evaluacion:   'el módulo de Evaluación de Política',
   alternativas: 'el módulo de Alternativas de Política',
-  ain:          'el módulo de Análisis de Impacto Normativo'
+  ain:          'el módulo de Análisis de Impacto Normativo',
+  prospect:     'el módulo de Escenarios Prospectivos'
 };
 function _labEscHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));

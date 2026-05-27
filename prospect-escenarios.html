@@ -1,0 +1,2407 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Escenarios Prospectivos · Ricardo.Ruiz</title>
+<meta name="description" content="Construye escenarios prospectivos con el método de Schwartz / Global Business Network: dos incertidumbres críticas, cuatro futuros plausibles, cross-impact y decisiones no-regret (Lempert · RAND). Lab de Políticas Públicas y Prospectiva." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper:#1a1610; --paper-2:#221d15; --paper-3:#2a241b;
+  --ink:#f4f3ef; --ink-2:#b8b1a0; --ink-3:#807a6c;
+  --rule:#f4f3ef1c; --rule-strong:#f4f3ef38;
+  --accent:#d96a50; --accent-2:#e08266;
+  --accent-soft:#d96a5018; --accent-tint:#d96a5036;
+  --gold:#d6a83a; --on-accent:#14110a;
+  --green:#6fa07a; --amber:#d6a83a; --danger:#d96a50;
+  --sans:'Familjen Grotesk',system-ui,sans-serif;
+  --italic:'Petrona',Georgia,serif;
+  --mono:'Space Mono',ui-monospace,monospace;
+  --display:'Syne',sans-serif;
+}
+body.day-mode {
+  --paper:#f4f3ef; --paper-2:#ecebe5; --paper-3:#e0ddd2;
+  --ink:#14110a; --ink-2:#5a5448; --ink-3:#948e80;
+  --rule:#14110a1f; --rule-strong:#14110a40;
+  --accent:#8a1e16; --accent-2:#a02a20;
+  --accent-soft:#8a1e161a; --accent-tint:#8a1e1633;
+  --gold:#8a6a1a; --on-accent:#f4f3ef;
+  --green:#2f6b3f; --amber:#8a6a1a; --danger:#b03524;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html { scroll-behavior:smooth; }
+body {
+  background:var(--paper); color:var(--ink);
+  font-family:var(--sans); font-size:17px; line-height:1.55;
+  min-height:100vh; overflow-x:hidden; cursor:none;
+  transition:background .35s, color .35s;
+}
+a { color:inherit; text-decoration:none; }
+button { font:inherit; color:inherit; background:none; border:none; cursor:none; }
+::selection { background:var(--accent); color:var(--on-accent); }
+body.day-mode::before {
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image:radial-gradient(rgba(20,17,10,.035) 1px, transparent 1.4px);
+  background-size:4px 4px; opacity:.9; mix-blend-mode:multiply;
+}
+.cursor { position:fixed; width:12px; height:12px; background:var(--accent); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s, background .2s; transform:translate(-50%,-50%); }
+.cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--accent); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s, opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+
+/* Topbar */
+.topbar {
+  position:sticky; top:0; z-index:60;
+  display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:1.5rem;
+  padding:1rem 1.75rem;
+  background:var(--paper); border-bottom:1px solid var(--rule); backdrop-filter:blur(8px);
+}
+.topbar-left,.topbar-center,.topbar-right { display:flex; align-items:center; gap:1.1rem; }
+.topbar-right { justify-content:flex-end; }
+.btn-back {
+  display:inline-flex; align-items:center; gap:.55rem;
+  font-family:var(--sans); font-size:14px; font-weight:500; letter-spacing:.04em;
+  padding:.5rem .9rem; border:1px solid var(--rule-strong); transition:background .2s, border-color .2s;
+}
+.btn-back:hover { background:var(--paper-2); border-color:var(--ink); }
+.theme-btn {
+  font-family:var(--mono); font-size:12px; font-weight:700; color:var(--ink-2);
+  padding:.45rem .8rem; border:1px solid var(--rule-strong);
+  transition:color .2s, border-color .2s;
+}
+.theme-btn:hover { color:var(--ink); border-color:var(--ink); }
+.logo-link { display:inline-flex; align-items:center; gap:.55rem; opacity:.9; }
+.logo-link:hover { opacity:1; }
+.logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
+.logo-bar { width:5px; background:var(--accent); border-radius:1px 1px 0 0; opacity:.9; }
+.logo-text { font-family:var(--display); font-weight:800; font-size:clamp(1.05rem,2vw,1.4rem); letter-spacing:-.03em; line-height:1; }
+.logo-text span { color:var(--accent); }
+
+.page {
+  position:relative; z-index:1;
+  max-width:980px; width:100%; margin:0 auto;
+  padding:2.4rem 1.75rem 5rem;
+}
+@media (max-width:720px) {
+  .page { padding:1.6rem 1.1rem 3rem; }
+  .topbar { grid-template-columns:1fr auto; padding:.85rem 1rem; }
+  .topbar-center { display:none; }
+  .topbar-right .logo-link { display:none; }
+}
+.crumb {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3); margin-bottom:1.8rem;
+}
+.crumb a { color:var(--ink-3); transition:color .2s; }
+.crumb a:hover { color:var(--accent); }
+.crumb .sep { margin:0 .55rem; opacity:.55; }
+
+/* Welcome */
+.welcome { text-align:center; padding:1.5rem 0 2rem; }
+.eyebrow {
+  font-family:var(--mono); font-size:12px; letter-spacing:.22em;
+  text-transform:uppercase; color:var(--accent); font-weight:700; margin-bottom:1.4rem;
+}
+.welcome-title {
+  font-family:var(--sans); font-weight:700;
+  font-size:clamp(2rem,5vw,3rem); letter-spacing:-.025em; line-height:1.1;
+  max-width:24ch; margin:0 auto 1.4rem;
+}
+.welcome-title em { font-family:var(--italic); font-style:italic; font-weight:400; color:var(--accent); }
+.welcome-sub {
+  font-family:var(--sans); font-size:clamp(1rem,1.5vw,1.18rem); line-height:1.55;
+  color:var(--ink-2); max-width:54ch; margin:0 auto 2rem;
+}
+.welcome-sub em { font-family:var(--italic); font-style:italic; color:var(--accent); }
+.welcome-hint {
+  font-family:var(--mono); font-size:12px; letter-spacing:.04em; color:var(--ink-3);
+  max-width:54ch; margin:0 auto 2rem; line-height:1.6;
+}
+
+.accordion-stack {
+  display:flex; flex-direction:column; gap:.5rem;
+  max-width:640px; margin:2.6rem auto 2.4rem; text-align:left;
+}
+.accordion {
+  border:1px solid var(--rule-strong); background:var(--paper-2);
+  transition:background .2s, border-color .2s;
+}
+.accordion[open] { border-color:var(--accent-tint); background:var(--paper-3); }
+.accordion summary {
+  display:flex; align-items:center; justify-content:space-between; gap:1rem;
+  padding:1rem 1.2rem; list-style:none; cursor:none;
+  font-family:var(--sans); font-weight:600; font-size:.98rem;
+  user-select:none;
+}
+.accordion summary::-webkit-details-marker { display:none; }
+.accordion summary::after {
+  content:"+"; font-family:var(--mono); font-size:1.2rem; color:var(--accent);
+  width:18px; height:18px; display:flex; align-items:center; justify-content:center;
+  transition:transform .2s;
+}
+.accordion[open] summary::after { content:"−"; }
+.accordion summary .acc-num {
+  font-family:var(--mono); font-size:11px; color:var(--ink-3);
+  letter-spacing:.12em; margin-right:.9rem; font-weight:400;
+}
+.accordion-body {
+  padding:0 1.2rem 1.2rem;
+  font-family:var(--italic); font-style:italic; font-size:1rem; line-height:1.6; color:var(--ink-2);
+}
+.accordion-body em { color:var(--accent); }
+
+/* Botones */
+.btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+  font-family:var(--sans); font-weight:600; font-size:.98rem;
+  padding:.95rem 1.8rem;
+  background:var(--accent); color:var(--on-accent); border:none;
+  transition:background .2s, transform .1s;
+}
+.btn:hover { background:var(--accent-2); }
+.btn:active { transform:scale(.98); }
+.btn[disabled], .btn.disabled { opacity:.35; pointer-events:none; }
+.btn-ghost {
+  background:transparent; color:var(--ink-2);
+  border:1px solid var(--rule-strong);
+  padding:.85rem 1.4rem;
+}
+.btn-ghost:hover { color:var(--ink); border-color:var(--ink); background:var(--paper-2); }
+.btn-big { font-size:1.05rem; padding:1.15rem 2.4rem; letter-spacing:.02em; }
+
+.is-hidden { display:none !important; }
+
+/* Method link */
+.method-link {
+  display:inline-flex; align-items:center; gap:.4rem;
+  font-family:var(--mono); font-size:12px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--ink-2);
+  padding:.55rem .95rem; border:1px solid var(--rule-strong);
+  transition:color .2s, border-color .2s;
+}
+.method-link:hover { color:var(--accent); border-color:var(--accent); }
+
+/* Section head */
+.section-head {
+  display:flex; align-items:baseline; justify-content:space-between;
+  gap:1rem; margin-bottom:1.2rem; flex-wrap:wrap;
+}
+.section-head h2 {
+  font-family:var(--sans); font-weight:700; font-size:1.55rem; letter-spacing:-.015em;
+}
+.section-head h2 .num {
+  font-family:var(--mono); font-size:.65em; letter-spacing:.12em;
+  color:var(--ink-3); margin-right:.5rem; font-weight:400;
+}
+.section-head .meta {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.08em; color:var(--ink-3);
+}
+.section-desc {
+  font-family:var(--italic); font-style:italic; font-size:1.02rem; line-height:1.55;
+  color:var(--ink-2); max-width:60ch; margin-bottom:1.6rem;
+}
+
+/* Stage intro banner */
+.stage-intro {
+  background:var(--paper-2); border:1px solid var(--rule);
+  border-left:3px solid var(--accent);
+  padding:1.1rem 1.4rem; margin-bottom:1.6rem;
+}
+.stage-intro p {
+  font-family:var(--sans); font-size:.96rem; line-height:1.55; color:var(--ink);
+}
+.stage-intro p b { color:var(--accent); font-weight:600; }
+.stage-intro p em { font-family:var(--italic); font-style:italic; color:var(--ink-2); }
+
+/* Steps row */
+.steps-row {
+  display:flex; gap:.4rem; margin-bottom:2rem;
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.1em;
+  text-transform:uppercase;
+}
+.step-pill {
+  flex:1; padding:.65rem .55rem;
+  text-align:center;
+  background:var(--paper-2); color:var(--ink-3);
+  border:1px solid var(--rule-strong);
+  position:relative;
+}
+.step-pill .step-n { color:var(--accent); font-weight:700; margin-right:.45rem; }
+.step-pill.done { color:var(--ink-2); }
+.step-pill.done::after {
+  content:"✓"; position:absolute; right:.55rem; top:50%; transform:translateY(-50%);
+  color:var(--green); font-size:1rem; font-family:var(--sans);
+}
+.step-pill.active { color:var(--ink); background:var(--accent-soft); border-color:var(--accent); }
+@media (max-width:720px) { .steps-row { display:none; } }
+
+/* Form fields */
+.field { margin-bottom:1.4rem; }
+.field-label {
+  display:block;
+  font-family:var(--mono); font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3); margin-bottom:.5rem;
+}
+.field-label .req { color:var(--accent); }
+.field-hint {
+  font-family:var(--italic); font-style:italic; font-size:.86rem;
+  color:var(--ink-3); margin-top:.4rem; line-height:1.5;
+}
+.field input[type="text"], .field input[type="number"], .field input[type="url"], .field textarea, .field select {
+  width:100%;
+  font-family:var(--sans); font-size:.96rem; line-height:1.5;
+  padding:.7rem .9rem;
+  background:var(--paper-2); color:var(--ink);
+  border:1px solid var(--rule-strong); outline:none;
+  transition:border-color .15s;
+}
+.field input:focus, .field textarea:focus, .field select:focus { border-color:var(--accent); }
+.field textarea { min-height:120px; resize:vertical; line-height:1.55; }
+.field-row {
+  display:grid; grid-template-columns:1fr 1fr; gap:1rem;
+}
+@media (max-width:560px) { .field-row { grid-template-columns:1fr; } }
+
+.actions {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:.8rem; margin-top:1.8rem; flex-wrap:wrap;
+}
+.actions .right-group { display:flex; gap:.6rem; flex-wrap:wrap; }
+
+/* Import banner (MicMac, Mactor, Alt) */
+.import-banner {
+  display:flex; align-items:center; gap:1rem; flex-wrap:wrap;
+  padding:.85rem 1.1rem; margin-bottom:1.4rem;
+  background:rgba(214,168,58,0.10);
+  border:1px solid var(--rule);
+  border-left:3px solid var(--gold);
+  font-family:var(--mono); font-size:11.5px; color:var(--ink-2);
+}
+.import-banner .ib-icon { color:var(--gold); font-family:var(--sans); font-size:1.3rem; }
+.import-banner .ib-body { flex:1; min-width:240px; line-height:1.45; }
+.import-banner .ib-body b { color:var(--ink); font-family:var(--sans); font-size:.95rem; font-weight:700; display:block; margin-bottom:.15rem; }
+.import-banner .ib-body em { font-family:var(--italic); font-style:italic; color:var(--ink-2); }
+.import-banner .btn-mini {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.06em;
+  padding:.4rem .85rem; background:var(--gold); color:var(--on-accent);
+  border:1px solid var(--gold); font-weight:700;
+}
+.import-banner .btn-mini:hover { filter:brightness(1.05); }
+
+/* ─── Stage 1 · Incertidumbres ─────────────────────────────────────────── */
+.eje-grid {
+  display:grid; grid-template-columns:1fr 1fr; gap:1.1rem; margin-bottom:1rem;
+}
+@media (max-width:720px) { .eje-grid { grid-template-columns:1fr; } }
+.eje-card {
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+  border-left:3px solid var(--accent);
+  padding:1.1rem 1.2rem;
+}
+.eje-card .eje-label {
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--accent); font-weight:700; margin-bottom:.55rem;
+}
+.eje-card .eje-axis-name {
+  font-family:var(--sans); font-weight:700; font-size:1.05rem;
+  color:var(--ink); margin-bottom:.65rem;
+  padding:.45rem .65rem; background:var(--paper); border:1px solid var(--rule);
+}
+.eje-card .eje-axis-name[contenteditable] { outline:none; }
+.eje-card .eje-axis-name[contenteditable]:focus { border-color:var(--accent); background:var(--paper-3); }
+.eje-card .eje-polos { display:flex; flex-direction:column; gap:.5rem; margin-top:.3rem; }
+.eje-card .polo {
+  display:flex; gap:.55rem; align-items:center;
+  padding:.55rem .75rem; background:var(--paper);
+  border:1px solid var(--rule);
+}
+.eje-card .polo .polo-tag {
+  font-family:var(--mono); font-size:10px; font-weight:700;
+  letter-spacing:.1em; text-transform:uppercase;
+  flex-shrink:0; width:40px;
+}
+.eje-card .polo.neg .polo-tag { color:var(--danger); }
+.eje-card .polo.pos .polo-tag { color:var(--green); }
+.eje-card .polo span[contenteditable] {
+  flex:1; font-family:var(--sans); font-size:.92rem; color:var(--ink); outline:none;
+}
+.eje-card .eje-source {
+  font-family:var(--italic); font-style:italic; font-size:.82rem;
+  color:var(--ink-3); margin-top:.5rem;
+}
+.eje-card .eje-source em { color:var(--accent); }
+
+/* ─── Stage 2 · 4 escenarios ──────────────────────────────────────────── */
+.escenarios-axes-hint {
+  font-family:var(--mono); font-size:11px; letter-spacing:.08em;
+  color:var(--ink-3); margin-bottom:.8rem; line-height:1.55;
+}
+.escenarios-axes-hint b { color:var(--accent); }
+
+.matriz-2x2 {
+  display:grid; grid-template-columns:60px 1fr 1fr; gap:.5rem;
+  margin-bottom:1.4rem;
+  align-items:stretch;
+}
+.matriz-2x2 .axis-label-y-top, .matriz-2x2 .axis-label-y-bot {
+  font-family:var(--mono); font-size:10px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-3); text-align:right;
+  padding:.55rem .4rem; display:flex; align-items:center; justify-content:flex-end;
+}
+.matriz-2x2 .axis-label-y-top b, .matriz-2x2 .axis-label-y-bot b { color:var(--green); font-weight:700; }
+.matriz-2x2 .axis-label-y-bot b.neg { color:var(--danger); }
+.matriz-2x2 .axis-label-x {
+  grid-column: 2 / span 2;
+  display:grid; grid-template-columns:1fr 1fr; gap:.5rem;
+}
+.matriz-2x2 .axis-label-x .x-label {
+  font-family:var(--mono); font-size:10px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-3); text-align:center;
+  padding:.4rem; line-height:1.4;
+}
+.matriz-2x2 .axis-label-x .x-label b { display:block; margin-top:.15rem; }
+.matriz-2x2 .axis-label-x .x-label.neg b { color:var(--danger); }
+.matriz-2x2 .axis-label-x .x-label.pos b { color:var(--green); }
+
+.scen-quad {
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+  padding:.95rem 1rem; display:flex; flex-direction:column; gap:.4rem;
+  min-height:200px;
+}
+.scen-quad.NE { border-left:3px solid var(--green); }
+.scen-quad.NO { border-left:3px solid var(--gold); }
+.scen-quad.SO { border-left:3px solid var(--danger); }
+.scen-quad.SE { border-left:3px solid var(--accent); }
+
+.scen-quad .sq-head {
+  display:flex; align-items:baseline; justify-content:space-between;
+  gap:.55rem; flex-wrap:wrap;
+}
+.scen-quad .sq-tag {
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3); font-weight:700;
+}
+.scen-quad .sq-prob-wrap { display:flex; align-items:center; gap:.3rem; }
+.scen-quad .sq-prob {
+  font-family:var(--mono); font-size:.85rem;
+  width:46px; text-align:right;
+  padding:.25rem .35rem; background:var(--paper);
+  border:1px solid var(--rule); color:var(--ink); outline:none;
+}
+.scen-quad .sq-prob-pct {
+  font-family:var(--mono); font-size:10.5px; color:var(--ink-3);
+}
+.scen-quad .sq-name {
+  font-family:var(--sans); font-weight:700; font-size:1.02rem; color:var(--ink);
+  padding:.4rem .55rem; background:var(--paper); border:1px solid var(--rule);
+  outline:none;
+}
+.scen-quad .sq-name[contenteditable]:focus { border-color:var(--accent); }
+.scen-quad textarea {
+  width:100%; resize:vertical; min-height:80px; flex:1;
+  font-family:var(--sans); font-size:.9rem; line-height:1.5;
+  padding:.5rem .65rem;
+  background:var(--paper); color:var(--ink-2);
+  border:1px solid var(--rule); outline:none;
+}
+.scen-quad textarea:focus { border-color:var(--accent); color:var(--ink); }
+
+.scen-probsum {
+  padding:.55rem .85rem;
+  background:var(--paper-3); border:1px solid var(--rule);
+  font-family:var(--mono); font-size:11.5px; color:var(--ink-2);
+  margin-bottom:1.1rem;
+  display:flex; align-items:center; gap:.85rem; flex-wrap:wrap;
+}
+.scen-probsum.ok { border-color:rgba(111,160,122,0.35); color:var(--green); }
+.scen-probsum.warn { border-color:rgba(214,168,58,0.4); color:var(--amber); }
+.scen-probsum b { font-weight:700; }
+
+@media (max-width:720px) {
+  .matriz-2x2 { grid-template-columns:1fr; }
+  .matriz-2x2 .axis-label-y-top, .matriz-2x2 .axis-label-y-bot { display:none; }
+  .matriz-2x2 .axis-label-x { grid-column: 1; grid-template-columns:1fr; }
+}
+
+/* ─── Stage 3 · Cross-impact ──────────────────────────────────────────── */
+.import-section {
+  background:var(--paper-2); border:1px solid var(--rule);
+  padding:1rem 1.15rem; margin-bottom:1rem;
+}
+.import-section .is-head {
+  display:flex; align-items:baseline; justify-content:space-between;
+  gap:.8rem; margin-bottom:.6rem; flex-wrap:wrap;
+}
+.import-section .is-title {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--accent); font-weight:700;
+}
+.import-section .is-meta {
+  font-family:var(--mono); font-size:10.5px; color:var(--ink-3);
+}
+.import-list { display:flex; flex-direction:column; gap:.35rem; }
+.import-row {
+  display:flex; align-items:center; gap:.6rem;
+  padding:.45rem .7rem; background:var(--paper);
+  border:1px solid var(--rule); transition:border-color .15s;
+  cursor:none;
+}
+.import-row:hover { border-color:var(--accent-tint); }
+.import-row input[type=checkbox] {
+  width:16px; height:16px; cursor:none; accent-color:var(--accent);
+}
+.import-row .ir-name {
+  flex:1; font-family:var(--sans); font-size:.9rem; color:var(--ink);
+}
+.import-row.added { background:var(--accent-soft); border-color:var(--accent-tint); }
+.import-row .ir-add-manual {
+  width:100%;
+  font-family:var(--sans); font-size:.9rem;
+  padding:.45rem .65rem;
+  background:var(--paper); color:var(--ink);
+  border:1px solid var(--rule-strong); outline:none;
+}
+
+.crossimp-wrap { overflow-x:auto; margin-bottom:1.2rem; }
+.crossimp-table {
+  width:100%; border-collapse:collapse; min-width:560px;
+}
+.crossimp-table th, .crossimp-table td {
+  border:1px solid var(--rule);
+  padding:.55rem .65rem;
+  font-family:var(--sans); font-size:.88rem;
+  vertical-align:middle;
+  background:var(--paper-2);
+}
+.crossimp-table th {
+  background:var(--paper-3);
+  font-family:var(--mono); font-size:10px; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--ink-3); font-weight:700;
+  text-align:center;
+}
+.crossimp-table th.el-col { text-align:left; width:35%; min-width:160px; }
+.crossimp-table td.el-col {
+  font-family:var(--sans); font-weight:600; color:var(--ink); text-align:left;
+}
+.crossimp-table td.el-col .el-meta {
+  display:block; font-family:var(--mono); font-size:9.5px;
+  letter-spacing:.06em; color:var(--ink-3); text-transform:uppercase; margin-top:.15rem;
+}
+.ci-cell {
+  width:38px; height:32px; padding:0;
+  font-family:var(--mono); font-size:12px; font-weight:700;
+  background:var(--paper); color:var(--ink-3);
+  border:1px solid var(--rule-strong);
+  transition:background .15s, color .15s, border-color .15s;
+  margin:0 auto; display:flex; align-items:center; justify-content:center;
+}
+.ci-cell:hover { border-color:var(--accent); color:var(--ink); }
+.ci-cell.v-pos2 { background:var(--green); color:var(--on-accent); border-color:var(--green); }
+.ci-cell.v-pos1 { background:rgba(111,160,122,0.35); color:var(--green); border-color:var(--green); }
+.ci-cell.v-zero { background:var(--paper); color:var(--ink-3); }
+.ci-cell.v-neg1 { background:rgba(217,106,80,0.20); color:var(--danger); border-color:var(--danger); }
+.ci-cell.v-neg2 { background:var(--danger); color:var(--on-accent); border-color:var(--danger); }
+
+.ci-legend {
+  display:flex; gap:.6rem; flex-wrap:wrap; align-items:center;
+  font-family:var(--mono); font-size:11px; color:var(--ink-3);
+  margin-bottom:.8rem;
+}
+.ci-legend .ci-chip {
+  display:inline-flex; align-items:center; gap:.3rem;
+  padding:.2rem .55rem; background:var(--paper-2); border:1px solid var(--rule);
+}
+.ci-legend .ci-chip b { font-weight:700; }
+
+/* ─── Stage 4 · Estrategia / no-regret ────────────────────────────────── */
+.noregret-list { display:flex; flex-direction:column; gap:.55rem; margin-bottom:1.2rem; }
+.nr-row {
+  display:grid; grid-template-columns:1fr auto; gap:1rem; align-items:center;
+  padding:.85rem 1.1rem;
+  background:var(--paper-2); border:1px solid var(--rule);
+  border-left:3px solid var(--ink-3);
+}
+.nr-row.is-noregret { border-left-color:var(--green); background:rgba(111,160,122,0.06); }
+.nr-row .nr-body { min-width:0; }
+.nr-row .nr-name {
+  font-family:var(--sans); font-weight:600; font-size:.98rem; color:var(--ink);
+  margin-bottom:.2rem;
+}
+.nr-row .nr-meta {
+  font-family:var(--mono); font-size:10.5px; color:var(--ink-3); letter-spacing:.04em;
+}
+.nr-row .nr-detail {
+  font-family:var(--mono); font-size:10.5px; color:var(--ink-2); letter-spacing:.04em;
+  margin-top:.25rem;
+}
+.nr-row .nr-detail b { color:var(--accent); }
+.nr-badge {
+  font-family:var(--mono); font-size:10px; font-weight:700;
+  letter-spacing:.14em; text-transform:uppercase;
+  padding:.25rem .55rem; background:var(--green); color:var(--on-accent);
+  border:1px solid var(--green);
+}
+.nr-badge.dim {
+  background:transparent; color:var(--ink-3); border-color:var(--rule-strong);
+}
+
+/* ─── Results ─────────────────────────────────────────────────────────── */
+.res-hero {
+  background:linear-gradient(135deg, var(--accent-soft), var(--paper-2));
+  border:1px solid var(--accent-tint); border-left:3px solid var(--accent);
+  padding:1.5rem 1.7rem; margin-bottom:1.4rem;
+}
+.res-hero .rh-eyebrow {
+  font-family:var(--mono); font-size:11px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--accent); font-weight:700; margin-bottom:.55rem;
+}
+.res-hero h3 {
+  font-family:var(--sans); font-weight:700; font-size:1.5rem;
+  color:var(--ink); letter-spacing:-.015em; margin-bottom:.6rem;
+}
+.res-hero p {
+  font-family:var(--italic); font-style:italic; font-size:1rem; line-height:1.55;
+  color:var(--ink-2);
+}
+.res-grid {
+  display:grid; grid-template-columns:repeat(4, 1fr); gap:.65rem;
+  margin-bottom:1.3rem;
+}
+@media (max-width:720px) { .res-grid { grid-template-columns:repeat(2, 1fr); } }
+@media (max-width:480px) { .res-grid { grid-template-columns:1fr; } }
+.res-kpi {
+  padding:.95rem 1rem;
+  background:var(--paper-2); border:1px solid var(--rule);
+}
+.res-kpi .rk-num {
+  font-family:var(--sans); font-weight:700; font-size:1.65rem; color:var(--accent);
+  line-height:1.1; letter-spacing:-.015em;
+}
+.res-kpi .rk-label {
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--ink-3); margin-top:.25rem;
+}
+.res-block {
+  background:var(--paper-2); border:1px solid var(--rule);
+  padding:1.1rem 1.3rem; margin-bottom:1rem;
+}
+.res-block h4 {
+  font-family:var(--mono); font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--accent); font-weight:700;
+  margin-bottom:.6rem;
+}
+.res-block p { font-family:var(--sans); font-size:.94rem; line-height:1.55; color:var(--ink); margin-bottom:.4rem; }
+.res-block p em { font-family:var(--italic); font-style:italic; color:var(--ink-2); }
+.res-block ul { list-style:none; margin-top:.4rem; padding:0; }
+.res-block ul li {
+  position:relative; padding:.4rem 0 .4rem 1.4rem;
+  font-family:var(--sans); font-size:.92rem; line-height:1.5; color:var(--ink);
+  border-bottom:1px solid var(--rule);
+}
+.res-block ul li:last-child { border-bottom:none; }
+.res-block ul li::before { content:"→"; position:absolute; left:0; top:.45rem; color:var(--accent); font-weight:700; }
+
+/* Modal */
+.modal-back {
+  position:fixed; inset:0; background:rgba(10,8,4,0.7);
+  display:none; align-items:center; justify-content:center;
+  z-index:8500; padding:1rem; backdrop-filter:blur(4px);
+}
+.modal-back.open { display:flex; }
+.modal {
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+  padding:2rem 2.2rem; max-width:600px; width:100%; position:relative;
+  max-height:90vh; overflow-y:auto;
+}
+.modal-close {
+  position:absolute; top:.9rem; right:1.1rem;
+  font-family:var(--mono); font-size:1.2rem; color:var(--ink-3); transition:color .2s;
+}
+.modal-close:hover { color:var(--danger); }
+.modal h2 {
+  font-family:var(--sans); font-weight:700; font-size:1.35rem;
+  letter-spacing:-.01em; margin-bottom:.7rem; max-width:32ch;
+}
+.modal p {
+  font-family:var(--sans); font-size:.96rem; line-height:1.55; color:var(--ink-2); margin-bottom:1rem;
+}
+.modal p em { font-family:var(--italic); font-style:italic; }
+.modal p b { color:var(--ink); }
+
+/* Toast */
+.toast {
+  position:fixed; bottom:1.5rem; right:1.5rem;
+  background:var(--ink); color:var(--paper);
+  padding:.85rem 1.2rem; font-family:var(--sans); font-size:.9rem;
+  letter-spacing:.02em; z-index:9000;
+  opacity:0; transform:translateY(15px); pointer-events:none;
+  transition:opacity .25s, transform .25s;
+}
+.toast.show { opacity:1; transform:translateY(0); }
+
+.methodology-note {
+  max-width:64ch; margin-top:1.6rem;
+  font-family:var(--italic); font-style:italic; font-size:.9rem; line-height:1.6; color:var(--ink-3);
+}
+.methodology-note a { color:var(--accent); font-style:normal; }
+
+footer.foot {
+  max-width:980px; margin:0 auto; padding:2rem 1.75rem 1.5rem;
+  border-top:1px solid var(--rule);
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.06em; color:var(--ink-3);
+  display:flex; justify-content:space-between; flex-wrap:wrap; gap:1rem;
+}
+
+/* FAB Recursos */
+.lab-fab {
+  position:fixed; bottom:1.5rem; left:1.5rem;
+  z-index:8000;
+  display:inline-flex; align-items:center; gap:.45rem;
+  padding:.65rem 1rem;
+  background:var(--paper-2); color:var(--ink);
+  border:1px solid var(--accent-tint);
+  font-family:var(--mono); font-size:11.5px; font-weight:700;
+  letter-spacing:.1em; text-transform:uppercase;
+  cursor:none;
+  transition:border-color .15s, background .15s, color .15s;
+  box-shadow:0 4px 12px rgba(0,0,0,0.25);
+}
+.lab-fab:hover { border-color:var(--accent); color:var(--accent); }
+.lab-fab .lab-fab-icon { color:var(--accent); font-size:1rem; }
+.lab-fab.is-hidden { display:none !important; }
+@media (max-width:640px) {
+  .lab-fab { padding:.5rem .8rem; font-size:10.5px; bottom:1rem; left:1rem; }
+}
+
+.lab-recursos-modal .modal { max-width:720px; }
+.lab-recursos-modal h2 { margin-bottom:1rem; }
+.lab-recursos-modal .lr-intro {
+  font-family:var(--italic); font-style:italic; font-weight:400;
+  font-size:.92rem; line-height:1.55; color:var(--ink-2);
+  margin-bottom:1.4rem; max-width:56ch;
+}
+.lab-recursos-modal .lr-intro a { color:var(--accent); font-style:normal; }
+.lab-recursos-modal .lr-empty {
+  font-family:var(--italic); font-style:italic; color:var(--ink-3);
+  text-align:center; padding:1.5rem 0;
+}
+.lr-cat { margin-bottom:1.4rem; }
+.lr-cat:last-child { margin-bottom:0; }
+.lr-cat-name {
+  font-family:var(--mono); font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--accent); font-weight:700;
+  margin-bottom:.7rem;
+  padding-bottom:.35rem; border-bottom:1px solid var(--rule);
+}
+.lr-items { display:grid; grid-template-columns:1fr; gap:.5rem; }
+.lr-item {
+  display:block;
+  padding:.75rem .9rem;
+  background:var(--paper); border:1px solid var(--rule);
+  transition:border-color .15s, background .15s;
+}
+.lr-item:hover { border-color:var(--accent); background:var(--paper-2); }
+.lr-item-name {
+  font-family:var(--sans); font-weight:600; font-size:.92rem;
+  color:var(--ink); letter-spacing:-.005em;
+  margin-bottom:.2rem;
+  display:flex; align-items:baseline; gap:.4rem;
+}
+.lr-item-name::after {
+  content:"↗"; color:var(--accent); font-family:var(--mono); font-size:.85rem;
+  margin-left:auto; flex-shrink:0; opacity:.55;
+}
+.lr-item:hover .lr-item-name::after { opacity:1; }
+.lr-item-desc {
+  font-family:var(--italic); font-style:italic; font-weight:400;
+  font-size:.82rem; line-height:1.5; color:var(--ink-2);
+}
+
+/* Cross-link amarillo */
+.cross-link {
+  display:flex; align-items:center; gap:1.1rem; flex-wrap:wrap;
+  padding:1.1rem 1.3rem;
+  background:rgba(214,168,58,0.10); border:1px solid var(--rule);
+  border-left:3px solid var(--gold);
+  font-family:var(--mono); font-size:12px; color:var(--ink-2);
+}
+.cross-link .cl-arrow { font-family:var(--sans); font-size:1.4rem; color:var(--gold); flex-shrink:0; }
+.cross-link .cl-body { flex:1; min-width:240px; }
+.cross-link .cl-title { font-family:var(--sans); font-weight:700; font-size:1rem; color:var(--ink); margin-bottom:.25rem; }
+.cross-link .cl-desc { font-family:var(--italic); font-style:italic; font-weight:400; font-size:.9rem; line-height:1.5; color:var(--ink-2); }
+.cross-link .cl-desc em { color:var(--accent); }
+.cross-link .btn { background:var(--gold); }
+</style>
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<nav class="topbar">
+  <div class="topbar-left">
+    <a href="analisis-estructural.html" class="btn-back"><span>←</span> Volver al lab</a>
+  </div>
+  <div class="topbar-center">
+    <span class="eyebrow" style="margin:0;font-size:11px">Lab · Escenarios Prospectivos</span>
+  </div>
+  <div class="topbar-right">
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
+    <a href="index.html" class="logo-link">
+      <div class="logo-bars">
+        <div class="logo-bar" style="height:20px"></div>
+        <div class="logo-bar" style="height:15px"></div>
+        <div class="logo-bar" style="height:9px"></div>
+        <div class="logo-bar" style="height:4px"></div>
+      </div>
+      <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+    </a>
+  </div>
+</nav>
+
+<main class="page">
+  <div class="crumb">
+    <a href="index.html">Inicio</a> <span class="sep">/</span>
+    <a href="analisis-estructural.html">Laboratorio de Políticas</a> <span class="sep">/</span>
+    <span>Escenarios Prospectivos</span>
+  </div>
+
+  <!-- WELCOME -->
+  <section id="stage-welcome">
+    <div class="welcome">
+      <div class="eyebrow">Módulo · Escenarios prospectivos para política pública</div>
+      <h1 class="welcome-title">Imagina los futuros <em>antes de decidir</em></h1>
+      <p class="welcome-sub">
+        Los futuros no se predicen, se construyen. La prospectiva estratégica
+        francesa (Godet · Mojica · LIPSOR) y el método de los ejes de
+        incertidumbre (Schwartz, Global Business Network) te dan herramientas
+        para imaginar 4 futuros plausibles, narrarlos con suficiente detalle
+        para que sean creíbles, y probar tus decisiones contra cada uno.
+        Robust Decision Making (Lempert · RAND) cierra el círculo: la decisión
+        robusta no es la que gana en el escenario más probable, es la que
+        <em>no falla en ningún escenario</em>.
+      </p>
+      <p class="welcome-hint">
+        Cuatro decisiones: identificar dos incertidumbres críticas · narrar
+        los cuatro escenarios resultantes · cruzar variables, actores y
+        alternativas contra cada escenario · elegir decisiones no-regret.
+        Toma entre 1 y 3 horas si ya hiciste estructural, actores y alternativas.
+      </p>
+      <button class="method-link" onclick="openModal('modal-method')">¿En qué se basa? →</button>
+
+      <div class="accordion-stack">
+        <details class="accordion">
+          <summary><span><span class="acc-num">01</span>Qué hace exactamente</span></summary>
+          <div class="accordion-body">
+            Te guía por las cuatro decisiones del método de escenarios de la
+            Global Business Network (Schwartz, <em>The Art of the Long View</em>,
+            1991): (1) identificas <em>dos incertidumbres críticas</em> —
+            variables que combinan alto impacto y alta incertidumbre, y que
+            son el eje vertical y horizontal de la matriz; (2) describes los
+            <em>cuatro futuros plausibles</em> que resultan de cruzar los polos
+            de cada incertidumbre, con narrativa y probabilidad subjetiva;
+            (3) levantas la <em>matriz de cross-impact</em> (Gordon, 1968)
+            cruzando los elementos del análisis estructural, actores y
+            alternativas contra cada escenario; (4) identificas las
+            <em>decisiones robustas no-regret</em> que sobreviven en al menos
+            tres de los cuatro futuros — el legado de Lempert &amp; Walker
+            en RAND (2003) sobre Robust Decision Making.
+          </div>
+        </details>
+        <details class="accordion">
+          <summary><span><span class="acc-num">02</span>Qué te entrega</span></summary>
+          <div class="accordion-body">
+            Tres entregables encadenados: un <em>memo de escenarios</em> en
+            Markdown (incertidumbres, narrativas, cross-impact, decisiones
+            no-regret, señales tempranas, plan de contingencia); una
+            <em>matriz cross-impact</em> en CSV (elementos × escenarios con
+            valores -2..+2); y una <em>ficha prospectiva</em> en PDF tipo
+            CONPES light descargable. El módulo lee tu trabajo previo en
+            MicMac, Mactor y Alternativas — no rehace lo que ya hiciste,
+            lo proyecta hacia futuros.
+          </div>
+        </details>
+        <details class="accordion">
+          <summary><span><span class="acc-num">03</span>Para qué te sirve</span></summary>
+          <div class="accordion-body">
+            Para evitar el <em>error del consultor con bola de cristal</em>:
+            apostarle todo al escenario más probable. Una política diseñada
+            para el futuro esperado puede ser desastrosa si el futuro se
+            tuerce; una política <em>robusta</em> sacrifica algo de upside a
+            cambio de funcionar en varios futuros. Y para <em>defender la
+            decisión cuando el mundo cambia</em>: si llega el escenario
+            disruptivo, poder responder "lo consideramos en el ejercicio
+            prospectivo y la alternativa elegida sigue siendo razonable" es
+            la diferencia entre quedar mal y demostrar método.
+          </div>
+        </details>
+      </div>
+
+      <div style="display:flex;gap:.7rem;justify-content:center;flex-wrap:wrap">
+        <a class="btn-ghost" href="analisis-estructural.html">← Volver al lab</a>
+        <button class="btn btn-big" onclick="startFlow()">Empecemos →</button>
+      </div>
+
+      <p style="margin-top:2.5rem;font-family:var(--italic);font-style:italic;color:var(--ink-3);font-size:.92rem;max-width:60ch;margin-left:auto;margin-right:auto;line-height:1.55">
+        ¿Aún no entendiste el sistema que produce el problema? Empieza por
+        <a href="analisis-estructural.html" style="color:var(--accent);font-style:normal;font-weight:600">análisis estructural →</a>
+        para identificar las variables motrices. ¿Ya tienes alternativas
+        ensambladas? Este módulo las probará contra los cuatro futuros con la
+        matriz cross-impact.
+      </p>
+    </div>
+  </section>
+
+  <!-- STEPS NAV (visible solo en las 4 mecánicas, no en welcome ni results) -->
+  <div id="steps-nav" class="is-hidden">
+    <div class="steps-row" id="steps-row"></div>
+  </div>
+
+  <!-- MECÁNICA 1 · INCERTIDUMBRES -->
+  <section id="stage-incertidumbres" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 01</span>Incertidumbres críticas</h2>
+      <span class="meta" id="eje-meta">—</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        <b>Dos incertidumbres, no más, no menos.</b> El método de Schwartz
+        (GBN) parte de la observación de que ningún humano puede sostener
+        en la cabeza más de cuatro futuros distintos. Con dos
+        incertidumbres ortogonales obtienes exactamente cuatro escenarios
+        — el número correcto. Cada incertidumbre debe combinar <em>alto
+        impacto</em> sobre el problema y <em>alta incertidumbre</em>
+        intrínseca: si sabes lo que va a pasar, no es eje, es tendencia.
+      </p>
+    </div>
+
+    <div class="field" style="margin-bottom:1.4rem">
+      <label class="field-label" for="ctx-enunciado">Enunciado del problema (opcional, contexto)</label>
+      <textarea id="ctx-enunciado" placeholder="Ej.: la transición energética en Colombia hacia 2035, dada la dependencia fiscal de hidrocarburos."></textarea>
+      <div class="field-hint">Aterrizar el problema te ayuda a elegir incertidumbres que importen. Si vienes de problema-publico, este campo se autorellena.</div>
+    </div>
+
+    <!-- Banner importar desde MicMac -->
+    <div class="import-banner is-hidden" id="micmac-import-banner">
+      <div class="ib-icon">✦</div>
+      <div class="ib-body">
+        <b>Importar desde Análisis Estructural</b>
+        <em>Detectamos que tienes una matriz MicMac en este navegador. Podemos sugerir las 2 variables más motrices como ejes de incertidumbre.</em>
+      </div>
+      <button class="btn-mini" onclick="importarDeMicmac()">Importar 2 variables motrices →</button>
+    </div>
+
+    <div class="eje-grid">
+      <div class="eje-card" id="eje-x-card">
+        <div class="eje-label">Eje horizontal · Incertidumbre 1</div>
+        <div class="eje-axis-name" contenteditable="true" spellcheck="false"
+             onblur="updateEjeName('x', this.innerText)"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+             id="eje-x-name"></div>
+        <div class="eje-polos">
+          <div class="polo neg">
+            <span class="polo-tag">Polo −</span>
+            <span contenteditable="true" spellcheck="false"
+                  onblur="updateEjePolo('x','neg', this.innerText)"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+                  id="eje-x-pneg"></span>
+          </div>
+          <div class="polo pos">
+            <span class="polo-tag">Polo +</span>
+            <span contenteditable="true" spellcheck="false"
+                  onblur="updateEjePolo('x','pos', this.innerText)"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+                  id="eje-x-ppos"></span>
+          </div>
+        </div>
+        <div class="eje-source" id="eje-x-source"></div>
+      </div>
+
+      <div class="eje-card" id="eje-y-card">
+        <div class="eje-label">Eje vertical · Incertidumbre 2</div>
+        <div class="eje-axis-name" contenteditable="true" spellcheck="false"
+             onblur="updateEjeName('y', this.innerText)"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+             id="eje-y-name"></div>
+        <div class="eje-polos">
+          <div class="polo neg">
+            <span class="polo-tag">Polo −</span>
+            <span contenteditable="true" spellcheck="false"
+                  onblur="updateEjePolo('y','neg', this.innerText)"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+                  id="eje-y-pneg"></span>
+          </div>
+          <div class="polo pos">
+            <span class="polo-tag">Polo +</span>
+            <span contenteditable="true" spellcheck="false"
+                  onblur="updateEjePolo('y','pos', this.innerText)"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+                  id="eje-y-ppos"></span>
+          </div>
+        </div>
+        <div class="eje-source" id="eje-y-source"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem">
+      <button class="btn-ghost" onclick="resetEjes()">Limpiar ejes</button>
+      <button class="btn-ghost" onclick="seedEjesEjemplo()">Cargar ejemplo (transición energética)</button>
+    </div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="backToWelcome()">← Volver al inicio</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToStep(2)">Cuatro escenarios →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MECÁNICA 2 · 4 ESCENARIOS -->
+  <section id="stage-escenarios" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 02</span>Cuatro escenarios plausibles</h2>
+      <span class="meta" id="scen-meta">—</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        <b>Una narrativa por cuadrante, no un titular.</b> Cada escenario es
+        una historia de 3 a 5 frases sobre cómo se ve el mundo si los polos
+        de ambas incertidumbres se materializan en esa combinación. Buen
+        nombre: evocador y memorable (Schwartz recomendaba títulos tipo
+        película). La probabilidad subjetiva es opcional pero útil: <em>no
+        exigimos sumar 100%</em> (warning si te alejas mucho).
+      </p>
+    </div>
+
+    <div class="escenarios-axes-hint" id="scen-axes-hint"></div>
+
+    <div class="matriz-2x2" id="matriz-2x2"></div>
+
+    <div class="scen-probsum" id="scen-probsum"></div>
+
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem">
+      <button class="btn-ghost" onclick="resetEscenariosNarrativa()">Limpiar narrativas</button>
+      <button class="btn-ghost" onclick="seedEscenariosEjemplo()">Cargar ejemplo (4 narrativas)</button>
+    </div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goToStep(1)">← Incertidumbres</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToStep(3)">Cross-impact →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MECÁNICA 3 · CROSS-IMPACT -->
+  <section id="stage-cross-impact" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 03</span>Cross-impact</h2>
+      <span class="meta" id="ci-meta">—</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        <b>Gordon (RAND, 1968) · cross-impact analysis.</b> Cada elemento
+        que importa (variables del sistema, actores clave, alternativas
+        ensambladas) se enfrenta a cada escenario con un valor de
+        <em>-2 a +2</em>: cuánto debilita o cuánto fortalece. La columna
+        que cuenta es la del escenario, no el promedio. Una alternativa
+        que en el escenario disruptivo cae a -2 está confesando que
+        depende de supuestos que ese futuro rompe.
+      </p>
+    </div>
+
+    <h3 style="font-family:var(--sans);font-weight:700;font-size:1.05rem;margin:1.2rem 0 .75rem;color:var(--ink)">Elementos a cruzar</h3>
+    <p style="font-family:var(--italic);font-style:italic;font-size:.92rem;line-height:1.5;color:var(--ink-2);margin-bottom:.95rem;max-width:64ch">
+      Marca los elementos que quieres incluir en la matriz. Importamos
+      desde tu trabajo previo en MicMac, Mactor y Alternativas (si están
+      en este navegador). También puedes agregar elementos manualmente.
+    </p>
+
+    <div id="import-sections"></div>
+
+    <div class="import-section">
+      <div class="is-head">
+        <span class="is-title">Agregar elemento manualmente</span>
+      </div>
+      <div style="display:flex;gap:.55rem;flex-wrap:wrap">
+        <input type="text" id="manual-el-name" class="ir-add-manual" placeholder="Ej.: 'Restricción fiscal estructural'" style="flex:1;min-width:200px"/>
+        <select id="manual-el-tipo" style="font-family:var(--sans);font-size:.9rem;padding:.45rem .65rem;background:var(--paper);color:var(--ink);border:1px solid var(--rule-strong);outline:none">
+          <option value="variable">Variable</option>
+          <option value="actor">Actor</option>
+          <option value="alternativa">Alternativa</option>
+          <option value="otro">Otro</option>
+        </select>
+        <button class="btn-ghost" onclick="addElementoManual()" style="padding:.45rem 1.1rem;font-size:.9rem">+ Agregar</button>
+      </div>
+    </div>
+
+    <h3 style="font-family:var(--sans);font-weight:700;font-size:1.05rem;margin:1.5rem 0 .55rem;color:var(--ink)">Matriz cross-impact</h3>
+    <div class="ci-legend">
+      <span class="ci-chip"><b style="color:var(--danger)">-2</b> Debilita fuerte</span>
+      <span class="ci-chip"><b style="color:var(--danger)">-1</b> Debilita</span>
+      <span class="ci-chip"><b style="color:var(--ink-3)">0</b> Neutral</span>
+      <span class="ci-chip"><b style="color:var(--green)">+1</b> Fortalece</span>
+      <span class="ci-chip"><b style="color:var(--green)">+2</b> Fortalece fuerte</span>
+    </div>
+    <p style="font-family:var(--italic);font-style:italic;font-size:.88rem;line-height:1.5;color:var(--ink-3);margin-bottom:.85rem">Click en una celda para cyclar 0 → +1 → +2 → -1 → -2 → 0.</p>
+    <div class="crossimp-wrap" id="crossimp-wrap">
+      <div id="crossimp-table"></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goToStep(2)">← Escenarios</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToStep(4)">Estrategia →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MECÁNICA 4 · ESTRATEGIA / NO-REGRET -->
+  <section id="stage-estrategia" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 04</span>Decisiones robustas no-regret</h2>
+      <span class="meta" id="nr-meta">—</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        <b>Lempert &amp; Walker (RAND, 2003) · Robust Decision Making.</b>
+        Una decisión <em>no-regret</em> es una alternativa que en al menos
+        tres de los cuatro escenarios marca <em>+1 o más</em> en
+        cross-impact. Sacrifica algo de upside en el escenario más
+        probable a cambio de blindarse contra el resto. Esto no elimina
+        la necesidad de elegir; te indica qué alternativas son robustas
+        y cuáles son apuestas a un solo futuro.
+      </p>
+    </div>
+
+    <h3 style="font-family:var(--sans);font-weight:700;font-size:1.05rem;margin:1.2rem 0 .75rem;color:var(--ink)">Alternativas frente a los escenarios</h3>
+    <div class="noregret-list" id="noregret-list"></div>
+
+    <div class="field" style="margin-top:1.5rem">
+      <label class="field-label" for="estr-contingencia">Plan de contingencia <span class="req">*</span></label>
+      <textarea id="estr-contingencia" placeholder="Ej.: si la alternativa elegida falla en el escenario disruptivo (caída de precios del petróleo + retroceso climático), activamos plan B: acelerar transición a renovables vía subasta competitiva, sin esperar reforma fiscal. La cláusula de revisión a 18 meses incluye este disparador."></textarea>
+      <div class="field-hint">Si la alternativa elegida no es no-regret, ¿cómo te preparas para el escenario donde falla? Tres a cinco frases con disparadores concretos.</div>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="estr-senales">Señales tempranas <span class="req">*</span></label>
+      <textarea id="estr-senales" placeholder="Ej.: 1) precio Brent &lt; US$60 sostenido por 6 meses → señal de escenario pesimista; 2) marco regulatorio acelera transición renovable más allá del PIPS 2024 → señal de escenario optimista; 3) deterioro de la regla fiscal (FFIE &gt; 5% PIB) → señal de escenario disruptivo. Revisar trimestralmente."></textarea>
+      <div class="field-hint">¿Qué indicadores o eventos observables te dirán que un escenario se está materializando antes que los demás? Lista 3-5 señales con umbrales cuantitativos cuando sea posible.</div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goToStep(3)">← Cross-impact</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToResults()">Ver resultados y exportar →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section id="stage-results" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 05</span>Análisis prospectivo listo</h2>
+      <span class="meta" id="res-meta">—</span>
+    </div>
+
+    <div id="res-content"></div>
+
+    <div style="display:flex;gap:.65rem;flex-wrap:wrap;margin-top:1.5rem">
+      <button class="btn" onclick="downloadMemoMD()">↓ Memo de escenarios (.md)</button>
+      <button class="btn-ghost" onclick="downloadMatrizCSV()">↓ Cross-impact (.csv)</button>
+      <button class="btn-ghost" onclick="downloadFichaPDF()">↓ Ficha prospectiva (.pdf)</button>
+      <button class="btn-ghost" onclick="goToStep(4)">← Editar estrategia</button>
+    </div>
+
+    <div style="margin-top:2rem;display:grid;gap:.8rem">
+      <div class="cross-link">
+        <div class="cl-arrow">←</div>
+        <div class="cl-body">
+          <div class="cl-title">¿Necesitas las variables motrices del sistema?</div>
+          <div class="cl-desc">Las incertidumbres críticas suelen salir del módulo de <em>análisis estructural</em>: las variables con mayor motricidad y mayor incertidumbre son candidatas naturales a ejes de escenarios.</div>
+        </div>
+        <a href="analisis-estructural.html" class="btn">Análisis estructural →</a>
+      </div>
+
+      <div class="cross-link">
+        <div class="cl-arrow">←</div>
+        <div class="cl-body">
+          <div class="cl-title">¿Y las alternativas a someter a los escenarios?</div>
+          <div class="cl-desc">El módulo de <em>alternativas</em> construye con análisis morfológico el espacio de opciones; este módulo las prueba contra futuros plausibles.</div>
+        </div>
+        <a href="alternativas.html" class="btn">Alternativas de Política →</a>
+      </div>
+
+      <div class="cross-link">
+        <div class="cl-arrow">←</div>
+        <div class="cl-body">
+          <div class="cl-title">¿Y los actores que pueden empujar o frenar un escenario?</div>
+          <div class="cl-desc">Mactor te dice <em>quién decide, quién apoya, quién bloquea</em>. Aquí puedes incluir esos actores en el cross-impact para ver cómo se mueven en cada futuro.</div>
+        </div>
+        <a href="mactor.html" class="btn">Análisis de actores →</a>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:1.1rem;flex-wrap:wrap;padding:1.1rem 1.3rem;background:var(--paper-2);border:1px solid var(--rule);border-left:3px solid var(--accent);margin-top:.6rem">
+        <div style="font-family:var(--sans);font-size:1.4rem;color:var(--accent);flex-shrink:0">∑</div>
+        <div style="flex:1;min-width:240px">
+          <div style="font-family:var(--sans);font-weight:700;font-size:1rem;color:var(--ink);margin-bottom:.25rem">¿Necesitas un memo completo con todo el ciclo?</div>
+          <div style="font-family:var(--italic);font-style:italic;font-weight:400;font-size:.9rem;line-height:1.5;color:var(--ink-2)">El <b>informe combinado del lab</b> une lo que hayas avanzado en los módulos en un PDF estilo CONPES. Genera memo .pdf o .md desde la sección «Mi informe del lab» del hub.</div>
+        </div>
+        <a href="analisis-estructural.html#informe" class="btn" style="background:var(--accent);color:var(--paper)">Informe combinado →</a>
+      </div>
+    </div>
+
+    <p class="methodology-note">
+      Esta herramienta condensa el <b>método de escenarios</b> de
+      <b>Peter Schwartz</b> y <em>Global Business Network</em>
+      (<em>The Art of the Long View</em>, Doubleday, 1991), la
+      <em>prospectiva estratégica francesa</em> de <b>Michel Godet</b>
+      (LIPSOR, CNAM) y <b>Francisco Mojica</b> (Universidad Externado de
+      Colombia), el <em>Robust Decision Making</em> de <b>Robert Lempert
+      &amp; Warren Walker</b> (RAND, 2003) y el <em>cross-impact analysis</em>
+      de <b>Theodore Gordon</b> (RAND, 1968).
+    </p>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>ricardoruiz.co · 2026</span>
+  <span>Composición: Familjen · Petrona · Mono</span>
+</footer>
+
+<!-- Modal metodología -->
+<div class="modal-back" id="modal-method">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-method')">×</button>
+    <h2>¿En qué se basa?</h2>
+    <p>
+      <b>Cuatro decisiones, no cuatro pasos.</b> Diseñar escenarios
+      prospectivos defendibles requiere alinear cuatro cosas: las
+      incertidumbres críticas que definen el espacio de futuros, las
+      narrativas que vuelven cada escenario creíble, el cross-impact que
+      cruza el análisis previo contra cada futuro, y la identificación
+      de decisiones no-regret.
+    </p>
+    <p>
+      <b>Dos ejes, cuatro futuros.</b> Peter Schwartz, en Royal
+      Dutch/Shell y luego en Global Business Network (<em>The Art of
+      the Long View</em>, 1991), formalizó lo que ya hacían los
+      planificadores estratégicos de Shell: cuando enfrentas un
+      problema complejo, identifica las <em>dos variables que combinan
+      alto impacto y alta incertidumbre</em>, y construye cuatro
+      escenarios cruzando sus polos. La virtud del número cuatro es
+      cognitiva: es lo máximo que un equipo puede sostener en la cabeza
+      simultáneamente.
+    </p>
+    <p>
+      <b>Prospectiva estructural.</b> Michel Godet (LIPSOR) y Francisco
+      Mojica (Externado) sistematizaron la <em>prospectiva
+      estratégica</em> francesa: el futuro no se predice, se construye
+      con métodos formales (MicMac para variables, Mactor para actores,
+      Smic-Prob-Expert para escenarios). Este módulo se conecta
+      explícitamente con MicMac y Mactor: las incertidumbres salen del
+      sistema, no de la imaginación libre.
+    </p>
+    <p>
+      <b>Robustez antes que predicción.</b> Lempert &amp; Walker (RAND,
+      2003) cambiaron la pregunta: en vez de <em>"¿cuál es el escenario
+      más probable?"</em>, pregunta <em>"¿qué decisión funciona en al
+      menos tres de cuatro escenarios?"</em>. Esa es la decisión
+      no-regret. Y Theodore Gordon, también en RAND (1968), propuso el
+      <em>cross-impact analysis</em>: una matriz que cruza elementos
+      contra escenarios para ver qué se fortalece y qué se debilita en
+      cada futuro.
+    </p>
+    <p>
+      <b>Tu privacidad.</b> El cálculo es 100% local en tu navegador. No
+      enviamos nada a ningún servidor.
+    </p>
+    <p style="border-top:1px solid var(--rule);padding-top:1rem;margin-top:1.4rem">
+      <b>Origen del método.</b><br/>
+      Peter Schwartz, <em>The Art of the Long View: Planning for the
+      Future in an Uncertain World</em> (Doubleday, 1991).<br/>
+      Pierre Wack, <em>Scenarios: Uncharted Waters Ahead</em> (Harvard
+      Business Review, 1985).<br/>
+      Michel Godet, <em>Manuel de prospective stratégique</em> (Dunod,
+      varias ediciones) · LIPSOR · CNAM.<br/>
+      Francisco Mojica, <em>La construcción del futuro</em> (Universidad
+      Externado, 2005).<br/>
+      Robert J. Lempert, Steven W. Popper &amp; Steven C. Bankes,
+      <em>Shaping the Next One Hundred Years: New Methods for
+      Quantitative, Long-Term Policy Analysis</em> (RAND, 2003).<br/>
+      Theodore J. Gordon &amp; H. Hayward, <em>Initial Experiments with
+      the Cross-Impact Matrix Method of Forecasting</em> (Futures, 1968).
+    </p>
+  </div>
+</div>
+
+<!-- FAB Recursos -->
+<button class="lab-fab" id="lab-fab" onclick="openRecursosModal()">
+  <span class="lab-fab-icon">↗</span>
+  <span>Recursos</span>
+</button>
+
+<!-- Modal Recursos -->
+<div class="modal-back lab-recursos-modal" id="modal-recursos">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-recursos')">×</button>
+    <h2>Recursos &amp; Datos del lab</h2>
+    <p class="lr-intro">
+      Fuentes oficiales y guías metodológicas más relevantes para
+      <b id="lr-modulo-name">el módulo de Escenarios Prospectivos</b>. El catálogo completo
+      (con todas las categorías) está al pie del
+      <a href="analisis-estructural.html" style="font-weight:600">hub del lab →</a>
+    </p>
+    <div id="modal-recursos-grid"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="lab-recursos.js"></script>
+<script>
+'use strict';
+
+// ═════════════════════════════════════════════════════════════════════════
+// STATE · escenarios prospectivos · v1 (sin cloud-save)
+// ═════════════════════════════════════════════════════════════════════════
+const LS_KEY = 'prospect-current-v1';
+
+const STATE = {
+  step: 1,
+  contexto: { enunciado_problema:'', importedFromPP:false },
+  ejes: {
+    x: { nombre:'', polo_neg:'', polo_pos:'', importedFrom:'' },
+    y: { nombre:'', polo_neg:'', polo_pos:'', importedFrom:'' }
+  },
+  escenarios: {
+    NE: { nombre:'', narrativa:'', prob:25 },
+    NO: { nombre:'', narrativa:'', prob:25 },
+    SO: { nombre:'', narrativa:'', prob:25 },
+    SE: { nombre:'', narrativa:'', prob:25 }
+  },
+  elementos: [],  // [{ id, tipo, nombre, source }]
+  impactos: {},   // { [elementId]: { NE:-2..+2, NO, SO, SE } }
+  estrategia: { contingencia:'', senales_tempranas:'' }
+};
+
+function saveState() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); } catch (e) {}
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return false;
+    const p = JSON.parse(raw);
+    if (!p || typeof p !== 'object') return false;
+    if (p.contexto    && typeof p.contexto === 'object')  Object.assign(STATE.contexto, p.contexto);
+    if (p.ejes        && typeof p.ejes === 'object') {
+      if (p.ejes.x && typeof p.ejes.x === 'object') Object.assign(STATE.ejes.x, p.ejes.x);
+      if (p.ejes.y && typeof p.ejes.y === 'object') Object.assign(STATE.ejes.y, p.ejes.y);
+    }
+    if (p.escenarios  && typeof p.escenarios === 'object') {
+      ['NE','NO','SO','SE'].forEach(k => {
+        if (p.escenarios[k] && typeof p.escenarios[k] === 'object') {
+          Object.assign(STATE.escenarios[k], p.escenarios[k]);
+        }
+      });
+    }
+    if (Array.isArray(p.elementos))                         STATE.elementos = p.elementos;
+    if (p.impactos    && typeof p.impactos === 'object')    STATE.impactos = p.impactos;
+    if (p.estrategia  && typeof p.estrategia === 'object')  Object.assign(STATE.estrategia, p.estrategia);
+    if (typeof p.step === 'number') STATE.step = p.step;
+    return true;
+  } catch (e) { return false; }
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ═════════════════════════════════════════════════════════════════════════
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function escapeAttr(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+}
+function pad2(n) { return String(n).padStart(2,'0'); }
+function newId(prefix) { return prefix + '-' + Math.random().toString(36).slice(2, 9); }
+
+let _toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ═════════════════════════════════════════════════════════════════════════
+// NAVEGACIÓN ENTRE STAGES
+// ═════════════════════════════════════════════════════════════════════════
+const STAGES = ['stage-welcome','stage-incertidumbres','stage-escenarios','stage-cross-impact','stage-estrategia','stage-results'];
+const STEP_LABELS = [
+  { n:1, key:'incertidumbres', label:'Incertidumbres' },
+  { n:2, key:'escenarios',     label:'Escenarios' },
+  { n:3, key:'cross-impact',   label:'Cross-impact' },
+  { n:4, key:'estrategia',     label:'Estrategia' }
+];
+
+function showStage(id) {
+  STAGES.forEach(s => {
+    const el = document.getElementById(s);
+    if (el) el.classList.toggle('is-hidden', s !== id);
+  });
+  const noSteps = new Set(['stage-welcome','stage-results']);
+  document.getElementById('steps-nav').classList.toggle('is-hidden', noSteps.has(id));
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function renderStepsNav() {
+  const row = document.getElementById('steps-row');
+  if (!row) return;
+  row.innerHTML = STEP_LABELS.map(s => {
+    const cls = s.n === STATE.step ? 'active' : (s.n < STATE.step ? 'done' : '');
+    return `<button class="step-pill ${cls}" type="button" onclick="goToStep(${s.n})">
+      <span class="step-n">${pad2(s.n)}</span>${escapeHtml(s.label)}
+    </button>`;
+  }).join('');
+}
+
+function startFlow() {
+  STATE.step = 1;
+  saveState();
+  renderAll();
+  showStage('stage-incertidumbres');
+}
+function backToWelcome() { showStage('stage-welcome'); }
+
+function goToStep(n) {
+  STATE.step = n;
+  saveState();
+  renderStepsNav();
+  const stageIds = ['stage-incertidumbres','stage-escenarios','stage-cross-impact','stage-estrategia'];
+  showStage(stageIds[n - 1] || 'stage-incertidumbres');
+}
+function goToResults() {
+  renderResults();
+  showStage('stage-results');
+}
+
+function renderAll() {
+  renderStepsNav();
+  renderEjes();
+  renderEscenarios();
+  renderImportSections();
+  renderCrossImpactTable();
+  renderEstrategia();
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 1 · INCERTIDUMBRES
+// ═════════════════════════════════════════════════════════════════════════
+function renderEjes() {
+  // Enunciado del problema
+  const ctxEl = document.getElementById('ctx-enunciado');
+  if (ctxEl) {
+    if (ctxEl.value !== (STATE.contexto.enunciado_problema || '')) ctxEl.value = STATE.contexto.enunciado_problema || '';
+    if (!renderEjes._boundCtx) {
+      renderEjes._boundCtx = true;
+      ctxEl.addEventListener('input', () => {
+        STATE.contexto.enunciado_problema = ctxEl.value;
+        saveState();
+      });
+    }
+  }
+  // Render campos de los ejes
+  ['x','y'].forEach(axis => {
+    const e = STATE.ejes[axis];
+    const nameEl = document.getElementById('eje-' + axis + '-name');
+    const pnegEl = document.getElementById('eje-' + axis + '-pneg');
+    const pposEl = document.getElementById('eje-' + axis + '-ppos');
+    const srcEl  = document.getElementById('eje-' + axis + '-source');
+    if (nameEl && nameEl.innerText !== (e.nombre || '')) nameEl.innerText = e.nombre || '';
+    if (pnegEl && pnegEl.innerText !== (e.polo_neg || '')) pnegEl.innerText = e.polo_neg || '';
+    if (pposEl && pposEl.innerText !== (e.polo_pos || '')) pposEl.innerText = e.polo_pos || '';
+    if (srcEl) {
+      srcEl.innerHTML = e.importedFrom
+        ? `Sugerido desde <em>${escapeHtml(e.importedFrom)}</em>`
+        : '';
+    }
+  });
+  // Banner importar MicMac
+  const banner = document.getElementById('micmac-import-banner');
+  if (banner) {
+    const hasMicmac = !!readMicmacMotrices();
+    const hasContent = !!(STATE.ejes.x.nombre || STATE.ejes.y.nombre);
+    banner.classList.toggle('is-hidden', !hasMicmac || hasContent);
+  }
+  // Meta
+  const meta = document.getElementById('eje-meta');
+  if (meta) {
+    const xOk = !!(STATE.ejes.x.nombre && STATE.ejes.x.polo_neg && STATE.ejes.x.polo_pos);
+    const yOk = !!(STATE.ejes.y.nombre && STATE.ejes.y.polo_neg && STATE.ejes.y.polo_pos);
+    const n = (xOk ? 1 : 0) + (yOk ? 1 : 0);
+    meta.textContent = `${n}/2 ejes completos`;
+  }
+}
+
+function updateEjeName(axis, txt) {
+  if (!STATE.ejes[axis]) return;
+  STATE.ejes[axis].nombre = (txt || '').trim();
+  saveState();
+  renderEjes();
+}
+function updateEjePolo(axis, polo, txt) {
+  if (!STATE.ejes[axis]) return;
+  STATE.ejes[axis]['polo_' + polo] = (txt || '').trim();
+  saveState();
+  renderEjes();
+}
+function resetEjes() {
+  if (!confirm('¿Limpiar ambos ejes? Mantiene escenarios y cross-impact.')) return;
+  STATE.ejes = {
+    x: { nombre:'', polo_neg:'', polo_pos:'', importedFrom:'' },
+    y: { nombre:'', polo_neg:'', polo_pos:'', importedFrom:'' }
+  };
+  saveState();
+  renderEjes();
+}
+function seedEjesEjemplo() {
+  STATE.ejes.x = { nombre:'Velocidad de transición energética', polo_neg:'Lenta y fragmentada', polo_pos:'Rápida e integrada', importedFrom:'' };
+  STATE.ejes.y = { nombre:'Estabilidad fiscal', polo_neg:'Deterioro estructural', polo_pos:'Sostenibilidad asegurada', importedFrom:'' };
+  saveState();
+  renderEjes();
+  showToast('Ejemplo cargado: transición energética.');
+}
+
+// ── Importar desde MicMac ────────────────────────────────────────────────
+// MicMac vive en localStorage['micmac-current-v2'] con shape ~{ variables:[{nombre}], matrix:{i-j: valor|{valor}} }
+function readMicmacMotrices() {
+  try {
+    const raw = localStorage.getItem('micmac-current-v2');
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    if (!p || !Array.isArray(p.variables) || p.variables.length === 0) return null;
+    const vars = p.variables;
+    const matrix = (p.matrix && typeof p.matrix === 'object') ? p.matrix : {};
+    // Calcular motricidad = suma fila |M[i,j]|, ignorando diagonal
+    const motri = vars.map((v, i) => {
+      let s = 0;
+      for (let j = 0; j < vars.length; j++) {
+        if (i === j) continue;
+        const cell = matrix[i + '-' + j];
+        let val = 0;
+        if (typeof cell === 'number') val = cell;
+        else if (cell && typeof cell === 'object' && typeof cell.valor === 'number') val = cell.valor;
+        s += Math.abs(val);
+      }
+      return { idx:i, nombre:v.nombre || ('Variable ' + (i+1)), motri:s };
+    });
+    motri.sort((a, b) => b.motri - a.motri);
+    // Solo devolver si hay al menos 2 con motricidad > 0
+    if (motri.length < 2 || motri[1].motri === 0) return null;
+    return [motri[0], motri[1]];
+  } catch (e) { return null; }
+}
+
+function importarDeMicmac() {
+  const top2 = readMicmacMotrices();
+  if (!top2) {
+    showToast('No encontramos matriz MicMac calificada en este navegador.');
+    return;
+  }
+  if ((STATE.ejes.x.nombre || STATE.ejes.y.nombre) &&
+      !confirm('Esto reemplaza los nombres de los ejes con las 2 variables más motrices de MicMac. ¿Continuar?')) return;
+  STATE.ejes.x = {
+    nombre: top2[0].nombre,
+    polo_neg: '(define un polo negativo)',
+    polo_pos: '(define un polo positivo)',
+    importedFrom: 'Análisis Estructural · MicMac (motricidad ' + top2[0].motri + ')'
+  };
+  STATE.ejes.y = {
+    nombre: top2[1].nombre,
+    polo_neg: '(define un polo negativo)',
+    polo_pos: '(define un polo positivo)',
+    importedFrom: 'Análisis Estructural · MicMac (motricidad ' + top2[1].motri + ')'
+  };
+  saveState();
+  renderEjes();
+  showToast('Ejes importados desde MicMac. Define los polos.');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 2 · 4 ESCENARIOS
+// ═════════════════════════════════════════════════════════════════════════
+const QUAD_INFO = {
+  NE: { tag:'NE · Cuadrante I', meta:'X+ · Y+', defaultName:'Mundo virtuoso' },
+  NO: { tag:'NO · Cuadrante II', meta:'X− · Y+', defaultName:'Disonancia' },
+  SO: { tag:'SO · Cuadrante III', meta:'X− · Y−', defaultName:'Mundo adverso' },
+  SE: { tag:'SE · Cuadrante IV', meta:'X+ · Y−', defaultName:'Crecimiento inestable' }
+};
+
+function renderEscenarios() {
+  // Hint con ejes
+  const hint = document.getElementById('scen-axes-hint');
+  if (hint) {
+    const xN = STATE.ejes.x.nombre || '(eje X sin definir)';
+    const yN = STATE.ejes.y.nombre || '(eje Y sin definir)';
+    const xPos = STATE.ejes.x.polo_pos || '+';
+    const xNeg = STATE.ejes.x.polo_neg || '−';
+    const yPos = STATE.ejes.y.polo_pos || '+';
+    const yNeg = STATE.ejes.y.polo_neg || '−';
+    hint.innerHTML = `Eje horizontal: <b>${escapeHtml(xN)}</b> (de <em>${escapeHtml(xNeg)}</em> a <em>${escapeHtml(xPos)}</em>) · Eje vertical: <b>${escapeHtml(yN)}</b> (de <em>${escapeHtml(yNeg)}</em> a <em>${escapeHtml(yPos)}</em>).`;
+  }
+  // Matriz 2x2
+  const wrap = document.getElementById('matriz-2x2');
+  if (wrap) {
+    const yPos = STATE.ejes.y.polo_pos || 'Y+';
+    const yNeg = STATE.ejes.y.polo_neg || 'Y−';
+    const xPos = STATE.ejes.x.polo_pos || 'X+';
+    const xNeg = STATE.ejes.x.polo_neg || 'X−';
+    const cells = ['NO','NE','SO','SE'];
+    // Layout: 3 columnas. Col 1 = etiqueta Y. Cols 2-3 = NO/NE arriba, SO/SE abajo. Última fila = etiquetas X.
+    let html = '';
+    // Row 1: label Y top + NO + NE
+    html += `<div class="axis-label-y-top">Y · <b>${escapeHtml(yPos)}</b></div>`;
+    html += renderQuadCell('NO');
+    html += renderQuadCell('NE');
+    // Row 2: label Y bot + SO + SE
+    html += `<div class="axis-label-y-bot">Y · <b class="neg">${escapeHtml(yNeg)}</b></div>`;
+    html += renderQuadCell('SO');
+    html += renderQuadCell('SE');
+    // Row 3: spacer + X label spread
+    html += `<div></div>`;
+    html += `<div class="axis-label-x">
+      <div class="x-label neg">X · <b>${escapeHtml(xNeg)}</b></div>
+      <div class="x-label pos">X · <b>${escapeHtml(xPos)}</b></div>
+    </div>`;
+    wrap.innerHTML = html;
+  }
+  // Prob sum
+  const sum = ['NE','NO','SO','SE'].reduce((acc, k) => acc + (Number(STATE.escenarios[k].prob) || 0), 0);
+  const psum = document.getElementById('scen-probsum');
+  if (psum) {
+    const diff = Math.abs(sum - 100);
+    const cls = diff <= 5 ? 'ok' : (diff <= 15 ? 'warn' : 'warn');
+    psum.className = 'scen-probsum ' + cls;
+    psum.innerHTML = `Suma de probabilidades: <b>${sum}%</b> · ` +
+      (diff <= 5 ? 'OK — cerca de 100%.'
+       : diff <= 15 ? 'Aceptable, pero conviene ajustar a ~100%.'
+       : 'Lejos de 100%: revisa la coherencia de tus probabilidades subjetivas.');
+  }
+  // Meta
+  const meta = document.getElementById('scen-meta');
+  if (meta) {
+    const n = ['NE','NO','SO','SE'].filter(k => STATE.escenarios[k].nombre && STATE.escenarios[k].narrativa).length;
+    meta.textContent = `${n}/4 escenarios narrados · suma ${sum}%`;
+  }
+}
+function renderQuadCell(k) {
+  const s = STATE.escenarios[k];
+  const info = QUAD_INFO[k];
+  return `<div class="scen-quad ${k}">
+    <div class="sq-head">
+      <span class="sq-tag">${escapeHtml(info.tag)} · ${escapeHtml(info.meta)}</span>
+      <span class="sq-prob-wrap">
+        <input type="number" min="0" max="100" step="1" class="sq-prob"
+               value="${Number(s.prob) || 0}"
+               oninput="updateScenProb('${k}', this.value)" aria-label="Probabilidad"/>
+        <span class="sq-prob-pct">%</span>
+      </span>
+    </div>
+    <div class="sq-name" contenteditable="true" spellcheck="false"
+         onblur="updateScenName('${k}', this.innerText)"
+         onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+         data-placeholder="${escapeAttr(info.defaultName)}">${escapeHtml(s.nombre || '')}</div>
+    <textarea placeholder="Narrativa del escenario (3-5 frases). Cómo se ve el mundo si ambos polos se materializan en esta combinación."
+              oninput="updateScenNarrativa('${k}', this.value)">${escapeHtml(s.narrativa || '')}</textarea>
+  </div>`;
+}
+function updateScenName(k, txt) {
+  if (!STATE.escenarios[k]) return;
+  STATE.escenarios[k].nombre = (txt || '').trim();
+  saveState();
+  renderEscenarios();
+}
+function updateScenNarrativa(k, txt) {
+  if (!STATE.escenarios[k]) return;
+  STATE.escenarios[k].narrativa = String(txt || '');
+  saveState();
+}
+function updateScenProb(k, val) {
+  if (!STATE.escenarios[k]) return;
+  let n = Number(val);
+  if (!isFinite(n) || n < 0) n = 0;
+  if (n > 100) n = 100;
+  STATE.escenarios[k].prob = n;
+  saveState();
+  renderEscenarios();
+}
+function resetEscenariosNarrativa() {
+  if (!confirm('¿Limpiar narrativas y nombres de los 4 escenarios? Mantiene probabilidades.')) return;
+  ['NE','NO','SO','SE'].forEach(k => {
+    STATE.escenarios[k].nombre = '';
+    STATE.escenarios[k].narrativa = '';
+  });
+  saveState();
+  renderEscenarios();
+}
+function seedEscenariosEjemplo() {
+  STATE.escenarios.NE = { nombre:'Salto verde sostenido', narrativa:'Transición rápida e integrada acompañada por sostenibilidad fiscal. Renovables superan 50% de la matriz hacia 2032; regla fiscal se cumple. Bajan los riesgos macro y se libera espacio para inversión social.', prob:25 };
+  STATE.escenarios.NO = { nombre:'Caja llena, pies cortos', narrativa:'La caja fiscal aguanta pero la transición se atasca: bloqueos políticos retrasan reformas energéticas. Bajo riesgo macro pero estancamiento industrial; presión creciente para subsidios cruzados.', prob:25 };
+  STATE.escenarios.SO = { nombre:'Tormenta perfecta', narrativa:'Transición lenta y deterioro fiscal simultáneos. Caída sostenida de precios del petróleo, presión sobre el peso, ajuste fiscal procíclico. Brecha social se ensancha; protestas y polarización.', prob:25 };
+  STATE.escenarios.SE = { nombre:'Sprint sin red', narrativa:'Transición acelerada pero fiscal-mente arriesgada: subsidios mal calibrados y caída de renta petrolera. Renovables crecen pero el gobierno se queda sin caja para acompañar el ajuste social.', prob:25 };
+  saveState();
+  renderEscenarios();
+  showToast('Ejemplo cargado: 4 narrativas tipo transición energética.');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 3 · CROSS-IMPACT
+// ═════════════════════════════════════════════════════════════════════════
+// Importadores desde otros módulos
+function readMicmacVariables() {
+  try {
+    const raw = localStorage.getItem('micmac-current-v2');
+    if (!raw) return [];
+    const p = JSON.parse(raw);
+    if (!p || !Array.isArray(p.variables)) return [];
+    return p.variables.map((v, i) => ({
+      id: 'var-' + i,
+      tipo: 'variable',
+      nombre: v.nombre || ('Variable ' + (i + 1)),
+      source: 'micmac'
+    })).filter(x => x.nombre && x.nombre.trim() !== '');
+  } catch (e) { return []; }
+}
+function readMactorActores() {
+  try {
+    const raw = localStorage.getItem('mactor-current-v1');
+    if (!raw) return [];
+    const p = JSON.parse(raw);
+    if (!p || !Array.isArray(p.actores)) return [];
+    return p.actores.map((a, i) => ({
+      id: 'actor-' + i,
+      tipo: 'actor',
+      nombre: a.nombre || ('Actor ' + (i + 1)),
+      source: 'mactor'
+    })).filter(x => x.nombre && x.nombre.trim() !== '');
+  } catch (e) { return []; }
+}
+function readAltAlternativas() {
+  try {
+    const raw = localStorage.getItem('alt-current-v1');
+    if (!raw) return [];
+    const p = JSON.parse(raw);
+    if (!p || !Array.isArray(p.alternativas)) return [];
+    return p.alternativas.map((a) => ({
+      id: 'alt-' + (a.id || Math.random().toString(36).slice(2,9)),
+      tipo: 'alternativa',
+      nombre: a.nombre || 'Alternativa sin nombre',
+      source: 'alt',
+      baseline: !!a.baseline
+    })).filter(x => x.nombre && x.nombre.trim() !== '');
+  } catch (e) { return []; }
+}
+
+function _elementIncluded(id) {
+  return (STATE.elementos || []).some(e => e.id === id);
+}
+
+function renderImportSections() {
+  const wrap = document.getElementById('import-sections');
+  if (!wrap) return;
+  const sections = [
+    { id:'micmac',  title:'Variables (Análisis Estructural · MicMac)', items: readMicmacVariables() },
+    { id:'mactor',  title:'Actores (Análisis de Actores · Mactor)',    items: readMactorActores() },
+    { id:'alt',     title:'Alternativas (Alternativas de Política)',   items: readAltAlternativas() }
+  ];
+  let html = '';
+  sections.forEach(sec => {
+    if (sec.items.length === 0) {
+      html += `<div class="import-section">
+        <div class="is-head">
+          <span class="is-title">${escapeHtml(sec.title)}</span>
+          <span class="is-meta">— no detectado</span>
+        </div>
+        <div style="font-family:var(--italic);font-style:italic;font-size:.88rem;color:var(--ink-3)">No hay datos guardados en este navegador. Si trabajaste en el módulo, vuelve a él y guarda.</div>
+      </div>`;
+      return;
+    }
+    html += `<div class="import-section">
+      <div class="is-head">
+        <span class="is-title">${escapeHtml(sec.title)}</span>
+        <span class="is-meta">${sec.items.length} disponible${sec.items.length === 1 ? '' : 's'}</span>
+      </div>
+      <div class="import-list">
+        ${sec.items.map(it => {
+          const included = _elementIncluded(it.id);
+          return `<label class="import-row${included ? ' added' : ''}">
+            <input type="checkbox" ${included ? 'checked' : ''} onchange="toggleElemento('${it.id}', this.checked, ${escapeAttr(JSON.stringify(it))})"/>
+            <span class="ir-name">${escapeHtml(it.nombre)}${it.baseline ? ' <em style="color:var(--ink-3);font-size:.85em">(baseline)</em>' : ''}</span>
+          </label>`;
+        }).join('')}
+      </div>
+    </div>`;
+  });
+  wrap.innerHTML = html;
+}
+
+function toggleElemento(id, checked, itJson) {
+  const it = (typeof itJson === 'string') ? JSON.parse(itJson) : itJson;
+  if (!Array.isArray(STATE.elementos)) STATE.elementos = [];
+  if (checked) {
+    if (!STATE.elementos.some(e => e.id === id)) {
+      STATE.elementos.push({ id, tipo: it.tipo, nombre: it.nombre, source: it.source });
+      if (!STATE.impactos[id]) STATE.impactos[id] = { NE:0, NO:0, SO:0, SE:0 };
+    }
+  } else {
+    STATE.elementos = STATE.elementos.filter(e => e.id !== id);
+    if (STATE.impactos[id]) delete STATE.impactos[id];
+  }
+  saveState();
+  renderImportSections();
+  renderCrossImpactTable();
+  renderCIMeta();
+}
+
+function addElementoManual() {
+  const inp = document.getElementById('manual-el-name');
+  const sel = document.getElementById('manual-el-tipo');
+  if (!inp) return;
+  const name = (inp.value || '').trim();
+  if (!name) { showToast('Escribe un nombre.'); return; }
+  if (!Array.isArray(STATE.elementos)) STATE.elementos = [];
+  if (STATE.elementos.length >= 30) { showToast('Máximo 30 elementos.'); return; }
+  const id = newId('man');
+  STATE.elementos.push({ id, tipo: sel ? sel.value : 'otro', nombre: name, source: 'manual' });
+  STATE.impactos[id] = { NE:0, NO:0, SO:0, SE:0 };
+  inp.value = '';
+  saveState();
+  renderCrossImpactTable();
+  renderCIMeta();
+}
+function removeElemento(id) {
+  STATE.elementos = (STATE.elementos || []).filter(e => e.id !== id);
+  if (STATE.impactos[id]) delete STATE.impactos[id];
+  saveState();
+  renderImportSections();
+  renderCrossImpactTable();
+  renderCIMeta();
+}
+
+function renderCrossImpactTable() {
+  const wrap = document.getElementById('crossimp-table');
+  if (!wrap) return;
+  const els = STATE.elementos || [];
+  const qs = ['NE','NO','SO','SE'];
+  const qLabels = qs.map(k => {
+    const s = STATE.escenarios[k];
+    return s.nombre ? s.nombre : QUAD_INFO[k].tag;
+  });
+  if (els.length === 0) {
+    wrap.innerHTML = '<div style="padding:1.2rem 1rem;background:var(--paper-2);border:1px dashed var(--rule-strong);font-family:var(--italic);font-style:italic;color:var(--ink-3);text-align:center">Aún no agregaste elementos. Marca los checkboxes de arriba o agrega uno manualmente.</div>';
+    return;
+  }
+  let html = `<table class="crossimp-table"><thead><tr>
+    <th class="el-col">Elemento</th>
+    ${qLabels.map(l => `<th>${escapeHtml(l.slice(0, 18))}</th>`).join('')}
+    <th style="width:30px"></th>
+  </tr></thead><tbody>`;
+  els.forEach(el => {
+    if (!STATE.impactos[el.id]) STATE.impactos[el.id] = { NE:0, NO:0, SO:0, SE:0 };
+    const tipoLbl = ({ variable:'Variable', actor:'Actor', alternativa:'Alternativa', otro:'Otro' })[el.tipo] || el.tipo;
+    html += `<tr>
+      <td class="el-col">${escapeHtml(el.nombre)}<span class="el-meta">${escapeHtml(tipoLbl)}${el.source && el.source !== 'manual' ? ' · ' + escapeHtml(el.source) : ''}</span></td>
+      ${qs.map(k => {
+        const v = Number(STATE.impactos[el.id][k] || 0);
+        const cls = v === 2 ? 'v-pos2' : v === 1 ? 'v-pos1' : v === -1 ? 'v-neg1' : v === -2 ? 'v-neg2' : 'v-zero';
+        const lbl = v === 0 ? '0' : (v > 0 ? '+' + v : String(v));
+        return `<td style="text-align:center"><button class="ci-cell ${cls}" type="button" onclick="cycleImpacto('${el.id}','${k}')" title="Click para cyclar">${lbl}</button></td>`;
+      }).join('')}
+      <td style="text-align:center"><button onclick="removeElemento('${el.id}')" title="Quitar" style="font-family:var(--mono);font-size:1rem;color:var(--ink-3);padding:0 .35rem">×</button></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+const CICYCLE = [0, 1, 2, -1, -2];
+function cycleImpacto(elId, k) {
+  if (!STATE.impactos[elId]) STATE.impactos[elId] = { NE:0, NO:0, SO:0, SE:0 };
+  const cur = Number(STATE.impactos[elId][k] || 0);
+  const i = CICYCLE.indexOf(cur);
+  const next = CICYCLE[(i + 1) % CICYCLE.length];
+  STATE.impactos[elId][k] = next;
+  saveState();
+  renderCrossImpactTable();
+  renderCIMeta();
+}
+
+function renderCIMeta() {
+  const meta = document.getElementById('ci-meta');
+  if (!meta) return;
+  const els = STATE.elementos || [];
+  const totalCells = els.length * 4;
+  let filled = 0;
+  els.forEach(el => {
+    const row = STATE.impactos[el.id] || {};
+    ['NE','NO','SO','SE'].forEach(k => { if (Number(row[k] || 0) !== 0) filled++; });
+  });
+  meta.textContent = `${els.length} elementos · ${filled}/${totalCells} celdas calificadas`;
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 4 · ESTRATEGIA / NO-REGRET
+// ═════════════════════════════════════════════════════════════════════════
+function _calcNoRegret(elId) {
+  // Robusta no-regret si en >=3 de los 4 escenarios tiene valor >= +1
+  const row = STATE.impactos[elId] || {};
+  const counts = ['NE','NO','SO','SE'].filter(k => Number(row[k] || 0) >= 1).length;
+  return counts >= 3;
+}
+function _detailScenariosForElement(elId) {
+  const row = STATE.impactos[elId] || {};
+  return ['NE','NO','SO','SE'].map(k => {
+    const v = Number(row[k] || 0);
+    return { k, v, scenName: (STATE.escenarios[k].nombre || QUAD_INFO[k].tag) };
+  });
+}
+
+function renderEstrategia() {
+  const list = document.getElementById('noregret-list');
+  if (!list) return;
+  const alts = (STATE.elementos || []).filter(e => e.tipo === 'alternativa');
+  if (alts.length === 0) {
+    list.innerHTML = '<div style="padding:1.2rem 1rem;background:var(--paper-2);border:1px dashed var(--rule-strong);font-family:var(--italic);font-style:italic;color:var(--ink-3);text-align:center">No hay alternativas en el cross-impact. Vuelve al paso anterior, marca alternativas desde el módulo de Alternativas (o agrégalas manualmente como tipo «Alternativa»).</div>';
+  } else {
+    list.innerHTML = alts.map(a => {
+      const robust = _calcNoRegret(a.id);
+      const det = _detailScenariosForElement(a.id);
+      const positivos = det.filter(d => d.v >= 1).length;
+      const detTxt = det.map(d => `<b>${d.v > 0 ? '+' + d.v : d.v}</b> ${escapeHtml(d.scenName.slice(0, 16))}`).join(' · ');
+      return `<div class="nr-row${robust ? ' is-noregret' : ''}">
+        <div class="nr-body">
+          <div class="nr-name">${escapeHtml(a.nombre)}</div>
+          <div class="nr-meta">${positivos}/4 escenarios con impacto ≥ +1</div>
+          <div class="nr-detail">${detTxt}</div>
+        </div>
+        <div class="${robust ? 'nr-badge' : 'nr-badge dim'}">${robust ? '✓ No-regret' : 'No robusta'}</div>
+      </div>`;
+    }).join('');
+  }
+  // Bind contingencia / señales
+  const cEl = document.getElementById('estr-contingencia');
+  const sEl = document.getElementById('estr-senales');
+  if (cEl) {
+    if (cEl.value !== (STATE.estrategia.contingencia || '')) cEl.value = STATE.estrategia.contingencia || '';
+    if (!renderEstrategia._boundC) {
+      renderEstrategia._boundC = true;
+      cEl.addEventListener('input', () => { STATE.estrategia.contingencia = cEl.value; saveState(); });
+    }
+  }
+  if (sEl) {
+    if (sEl.value !== (STATE.estrategia.senales_tempranas || '')) sEl.value = STATE.estrategia.senales_tempranas || '';
+    if (!renderEstrategia._boundS) {
+      renderEstrategia._boundS = true;
+      sEl.addEventListener('input', () => { STATE.estrategia.senales_tempranas = sEl.value; saveState(); });
+    }
+  }
+  const meta = document.getElementById('nr-meta');
+  if (meta) {
+    const robustCount = alts.filter(a => _calcNoRegret(a.id)).length;
+    meta.textContent = alts.length === 0 ? '— sin alternativas' : `${robustCount}/${alts.length} alternativas no-regret`;
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// RESULTS
+// ═════════════════════════════════════════════════════════════════════════
+function renderResults() {
+  const wrap = document.getElementById('res-content');
+  if (!wrap) return;
+  const ejesOk = !!(STATE.ejes.x.nombre && STATE.ejes.y.nombre);
+  const escNarrados = ['NE','NO','SO','SE'].filter(k => STATE.escenarios[k].nombre && STATE.escenarios[k].narrativa).length;
+  const els = STATE.elementos || [];
+  const alts = els.filter(e => e.tipo === 'alternativa');
+  const robustCount = alts.filter(a => _calcNoRegret(a.id)).length;
+  const probSum = ['NE','NO','SO','SE'].reduce((s, k) => s + Number(STATE.escenarios[k].prob || 0), 0);
+
+  let html = `<div class="res-hero">
+    <div class="rh-eyebrow">Resumen prospectivo</div>
+    <h3>${ejesOk ? escapeHtml(STATE.ejes.x.nombre) + ' × ' + escapeHtml(STATE.ejes.y.nombre) : 'Análisis prospectivo'}</h3>
+    <p>${STATE.contexto.enunciado_problema ? escapeHtml(STATE.contexto.enunciado_problema) : 'Análisis de escenarios sin enunciado del problema registrado. Edita el paso 1 para agregarlo.'}</p>
+  </div>`;
+
+  html += `<div class="res-grid">
+    <div class="res-kpi"><div class="rk-num">${ejesOk ? '2' : '0'}</div><div class="rk-label">Ejes definidos</div></div>
+    <div class="res-kpi"><div class="rk-num">${escNarrados}</div><div class="rk-label">Escenarios narrados</div></div>
+    <div class="res-kpi"><div class="rk-num">${els.length}</div><div class="rk-label">Elementos cruzados</div></div>
+    <div class="res-kpi"><div class="rk-num">${robustCount}</div><div class="rk-label">Alts. no-regret</div></div>
+  </div>`;
+
+  // Bloque ejes
+  if (ejesOk) {
+    html += `<div class="res-block">
+      <h4>Incertidumbres críticas</h4>
+      <p><b style="color:var(--accent)">${escapeHtml(STATE.ejes.x.nombre)}</b> (horizontal): ${escapeHtml(STATE.ejes.x.polo_neg || '−')} ↔ ${escapeHtml(STATE.ejes.x.polo_pos || '+')}</p>
+      <p><b style="color:var(--accent)">${escapeHtml(STATE.ejes.y.nombre)}</b> (vertical): ${escapeHtml(STATE.ejes.y.polo_neg || '−')} ↔ ${escapeHtml(STATE.ejes.y.polo_pos || '+')}</p>
+    </div>`;
+  }
+
+  // Bloque 4 escenarios
+  html += `<div class="res-block">
+    <h4>Cuatro escenarios plausibles</h4>
+    ${['NE','NO','SO','SE'].map(k => {
+      const s = STATE.escenarios[k];
+      const name = s.nombre || QUAD_INFO[k].defaultName;
+      return `<p><b style="color:var(--accent)">${escapeHtml(name)}</b> <em style="color:var(--ink-3)">(${QUAD_INFO[k].tag} · ${s.prob}%)</em><br/>${s.narrativa ? escapeHtml(s.narrativa) : '<em>sin narrativa</em>'}</p>`;
+    }).join('')}
+  </div>`;
+  if (Math.abs(probSum - 100) > 15) {
+    html += `<div class="res-block" style="border-left:3px solid var(--amber)">
+      <h4 style="color:var(--amber)">Probabilidades subjetivas</h4>
+      <p><em>La suma actual (${probSum}%) está lejos de 100%. No bloquea el ejercicio pero conviene calibrarla antes de presentar resultados.</em></p>
+    </div>`;
+  }
+
+  // Bloque cross-impact
+  if (els.length > 0) {
+    const winners = alts.filter(a => _calcNoRegret(a.id));
+    html += `<div class="res-block">
+      <h4>Cross-impact · resumen</h4>
+      <p>${els.length} elementos cruzados (${alts.length} alternativas, ${els.filter(e => e.tipo === 'variable').length} variables, ${els.filter(e => e.tipo === 'actor').length} actores).</p>
+      ${winners.length ? '<p><b style="color:var(--green)">Alternativas no-regret (robustas en ≥3 escenarios):</b></p><ul>' + winners.map(w => '<li>' + escapeHtml(w.nombre) + '</li>').join('') + '</ul>' :
+        (alts.length ? '<p><em>Ninguna alternativa actual califica como no-regret. Considera replantear las alternativas o aceptar el riesgo de apostar a un futuro.</em></p>' : '')}
+    </div>`;
+  }
+
+  // Bloque estrategia
+  if (STATE.estrategia.contingencia || STATE.estrategia.senales_tempranas) {
+    html += `<div class="res-block">
+      <h4>Plan de contingencia y señales tempranas</h4>
+      ${STATE.estrategia.contingencia ? '<p><b>Contingencia:</b> ' + escapeHtml(STATE.estrategia.contingencia) + '</p>' : ''}
+      ${STATE.estrategia.senales_tempranas ? '<p><b>Señales tempranas:</b> ' + escapeHtml(STATE.estrategia.senales_tempranas) + '</p>' : ''}
+    </div>`;
+  }
+
+  wrap.innerHTML = html;
+
+  const meta = document.getElementById('res-meta');
+  if (meta) {
+    meta.textContent = `${escNarrados}/4 escenarios · ${els.length} elementos · ${robustCount} no-regret`;
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// EXPORTS · MD · CSV · PDF
+// ═════════════════════════════════════════════════════════════════════════
+function _download(filename, content, mime) {
+  const blob = new Blob([content], { type: mime || 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function _slugForFile() {
+  const enun = (STATE.contexto.enunciado_problema || '').trim();
+  if (enun) return enun.toLowerCase().replace(/[áéíóúñ]/g, c => ({á:'a',é:'e',í:'i',ó:'o',ú:'u',ñ:'n'}[c] || c)).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g,'').slice(0, 40) || 'escenarios';
+  return 'escenarios';
+}
+
+function downloadMemoMD() {
+  const today = new Date().toLocaleDateString('es-CO', { year:'numeric', month:'long', day:'numeric' });
+  let md = `# Análisis prospectivo · escenarios\n\n`;
+  md += `**Fecha:** ${today}\n\n`;
+  if (STATE.contexto.enunciado_problema) md += `## Contexto · enunciado del problema\n\n${STATE.contexto.enunciado_problema}\n\n`;
+
+  md += `## 1. Incertidumbres críticas\n\n`;
+  md += `**Eje horizontal:** ${STATE.ejes.x.nombre || '—'}\n`;
+  md += `- Polo −: ${STATE.ejes.x.polo_neg || '—'}\n`;
+  md += `- Polo +: ${STATE.ejes.x.polo_pos || '—'}\n`;
+  if (STATE.ejes.x.importedFrom) md += `- _Importado de: ${STATE.ejes.x.importedFrom}_\n`;
+  md += '\n';
+  md += `**Eje vertical:** ${STATE.ejes.y.nombre || '—'}\n`;
+  md += `- Polo −: ${STATE.ejes.y.polo_neg || '—'}\n`;
+  md += `- Polo +: ${STATE.ejes.y.polo_pos || '—'}\n`;
+  if (STATE.ejes.y.importedFrom) md += `- _Importado de: ${STATE.ejes.y.importedFrom}_\n`;
+  md += '\n';
+
+  md += `## 2. Cuatro escenarios plausibles\n\n`;
+  ['NE','NO','SO','SE'].forEach(k => {
+    const s = STATE.escenarios[k];
+    const info = QUAD_INFO[k];
+    md += `### ${info.tag} · ${info.meta} — ${s.nombre || info.defaultName} _(${s.prob}%)_\n\n`;
+    md += `${s.narrativa || '_sin narrativa_'}\n\n`;
+  });
+  const probSum = ['NE','NO','SO','SE'].reduce((s, k) => s + Number(STATE.escenarios[k].prob || 0), 0);
+  md += `_Suma de probabilidades subjetivas: ${probSum}%_\n\n`;
+
+  const els = STATE.elementos || [];
+  if (els.length) {
+    md += `## 3. Cross-impact\n\n`;
+    md += `| Elemento | Tipo | NE | NO | SO | SE |\n|---|---|---|---|---|---|\n`;
+    els.forEach(el => {
+      const r = STATE.impactos[el.id] || {};
+      const f = v => { const n = Number(v || 0); return n === 0 ? '0' : (n > 0 ? '+' + n : String(n)); };
+      md += `| ${el.nombre.replace(/\|/g, '\\|')} | ${el.tipo} | ${f(r.NE)} | ${f(r.NO)} | ${f(r.SO)} | ${f(r.SE)} |\n`;
+    });
+    md += '\n';
+  }
+
+  const alts = els.filter(e => e.tipo === 'alternativa');
+  if (alts.length) {
+    md += `## 4. Decisiones robustas no-regret\n\n`;
+    md += `_Una alternativa es **no-regret** si en al menos 3 de 4 escenarios marca +1 o más (Lempert & Walker, RAND, 2003)._\n\n`;
+    alts.forEach(a => {
+      const robust = _calcNoRegret(a.id);
+      const det = _detailScenariosForElement(a.id);
+      const detTxt = det.map(d => `${d.scenName}: ${d.v > 0 ? '+' + d.v : d.v}`).join(' · ');
+      md += `- **${a.nombre}**: ${robust ? '✓ no-regret' : 'no robusta'} · ${detTxt}\n`;
+    });
+    md += '\n';
+  }
+
+  if (STATE.estrategia.contingencia || STATE.estrategia.senales_tempranas) {
+    md += `## 5. Plan de contingencia y señales tempranas\n\n`;
+    if (STATE.estrategia.contingencia) md += `**Contingencia:** ${STATE.estrategia.contingencia}\n\n`;
+    if (STATE.estrategia.senales_tempranas) md += `**Señales tempranas:** ${STATE.estrategia.senales_tempranas}\n\n`;
+  }
+
+  md += `---\n\n_Generado con ricardoruiz.co · Lab de Políticas Públicas y Prospectiva._\n\n_Método de escenarios de Schwartz · Global Business Network (1991) + prospectiva estratégica francesa (Godet · Mojica · LIPSOR) + Robust Decision Making de Lempert & Walker (RAND, 2003) + cross-impact analysis de Gordon (RAND, 1968)._\n`;
+
+  _download(`escenarios-${_slugForFile()}-${new Date().toISOString().slice(0,10)}.md`, md, 'text/markdown;charset=utf-8');
+  showToast('Memo .md descargado.');
+}
+
+function downloadMatrizCSV() {
+  const els = STATE.elementos || [];
+  if (els.length === 0) { showToast('No hay elementos para exportar.'); return; }
+  function q(s) {
+    const str = String(s == null ? '' : s);
+    if (/[",\n]/.test(str)) return '"' + str.replace(/"/g, '""') + '"';
+    return str;
+  }
+  const scenNames = ['NE','NO','SO','SE'].map(k => (STATE.escenarios[k].nombre || QUAD_INFO[k].tag) + ' (' + STATE.escenarios[k].prob + '%)');
+  const header = ['Elemento','Tipo','Origen', ...scenNames, 'No-regret (alts)'];
+  let csv = header.map(q).join(',') + '\n';
+  els.forEach(el => {
+    const r = STATE.impactos[el.id] || {};
+    const v = k => { const n = Number(r[k] || 0); return n === 0 ? '0' : (n > 0 ? '+' + n : String(n)); };
+    const nr = el.tipo === 'alternativa' ? (_calcNoRegret(el.id) ? 'sí' : 'no') : '';
+    csv += [el.nombre, el.tipo, el.source || 'manual', v('NE'), v('NO'), v('SO'), v('SE'), nr].map(q).join(',') + '\n';
+  });
+  _download(`escenarios-cross-impact-${_slugForFile()}-${new Date().toISOString().slice(0,10)}.csv`, csv, 'text/csv;charset=utf-8');
+  showToast('Cross-impact .csv descargado.');
+}
+
+// Carga jsPDF on-demand
+async function _ensureJsPDF() {
+  if (window.jspdf && window.jspdf.jsPDF) return window.jspdf.jsPDF;
+  await new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('No se pudo cargar jsPDF.'));
+    document.head.appendChild(s);
+  });
+  if (!window.jspdf || !window.jspdf.jsPDF) throw new Error('jsPDF no disponible.');
+  return window.jspdf.jsPDF;
+}
+
+async function downloadFichaPDF() {
+  let jsPDF;
+  try {
+    showToast('Cargando generador PDF…');
+    jsPDF = await _ensureJsPDF();
+  } catch (e) {
+    showToast('No se pudo cargar el generador PDF (revisa tu conexión).');
+    return;
+  }
+  const doc = new jsPDF({ unit:'mm', format:'a4' });
+  const PW = 210, PH = 297, M = 18;
+  let y = M;
+
+  const ACC = [137, 30, 22];
+  const INK = [26, 22, 16];
+  const INK2 = [90, 84, 72];
+  const RULE = [200, 195, 185];
+
+  function addPageIfNeeded(needed) {
+    if (y + needed > PH - M) { doc.addPage(); y = M; }
+  }
+  function setFont(weight, size) {
+    doc.setFont('helvetica', weight); doc.setFontSize(size);
+  }
+  function drawTitle(t) {
+    setFont('bold', 18); doc.setTextColor.apply(doc, ACC); doc.text(t, M, y); y += 8;
+    doc.setDrawColor.apply(doc, ACC); doc.setLineWidth(0.6); doc.line(M, y, PW - M, y); y += 6;
+    doc.setTextColor.apply(doc, INK);
+  }
+  function drawH2(t) {
+    addPageIfNeeded(12);
+    setFont('bold', 12); doc.setTextColor.apply(doc, ACC); doc.text(t, M, y); y += 6;
+    doc.setTextColor.apply(doc, INK);
+  }
+  function drawPara(t, opts) {
+    if (!t) return;
+    setFont('normal', (opts && opts.size) || 10);
+    doc.setTextColor.apply(doc, (opts && opts.color) || INK);
+    const lines = doc.splitTextToSize(String(t), PW - 2 * M);
+    lines.forEach(line => {
+      addPageIfNeeded(5);
+      doc.text(line, M, y); y += 4.5;
+    });
+    y += 1;
+  }
+  function drawKV(k, v) {
+    setFont('bold', 10); doc.setTextColor.apply(doc, INK);
+    addPageIfNeeded(5);
+    const klabel = k + ': ';
+    doc.text(klabel, M, y);
+    const klabelWidth = doc.getTextWidth(klabel);
+    setFont('normal', 10); doc.setTextColor.apply(doc, INK2);
+    const lines = doc.splitTextToSize(String(v || '—'), PW - 2 * M - klabelWidth);
+    if (lines.length === 1) { doc.text(lines[0], M + klabelWidth, y); y += 5; }
+    else {
+      doc.text(lines[0], M + klabelWidth, y); y += 4.5;
+      for (let i = 1; i < lines.length; i++) { addPageIfNeeded(5); doc.text(lines[i], M, y); y += 4.5; }
+      y += 1;
+    }
+  }
+  function drawTableHeader(cols, widths) {
+    setFont('bold', 9); doc.setTextColor.apply(doc, ACC); doc.setFillColor(245, 240, 230);
+    addPageIfNeeded(8);
+    let x = M;
+    doc.setDrawColor.apply(doc, RULE); doc.setLineWidth(0.2);
+    cols.forEach((c, i) => {
+      doc.rect(x, y - 4, widths[i], 6, 'FD');
+      doc.text(String(c), x + 1.5, y);
+      x += widths[i];
+    });
+    y += 4;
+    doc.setTextColor.apply(doc, INK);
+  }
+  function drawTableRow(vals, widths, opts) {
+    setFont((opts && opts.bold) ? 'bold' : 'normal', 9);
+    doc.setTextColor.apply(doc, (opts && opts.highlight) ? ACC : INK);
+    if (opts && opts.highlight) doc.setFillColor(252, 240, 233);
+    addPageIfNeeded(8);
+    let x = M; let maxLines = 1;
+    const cellLines = vals.map((v, i) => doc.splitTextToSize(String(v == null ? '' : v), widths[i] - 3));
+    cellLines.forEach(arr => { if (arr.length > maxLines) maxLines = arr.length; });
+    const rowH = Math.max(6, maxLines * 4 + 2);
+    addPageIfNeeded(rowH);
+    cellLines.forEach((arr, i) => {
+      doc.setDrawColor.apply(doc, RULE);
+      doc.rect(x, y - 4, widths[i], rowH, (opts && opts.highlight) ? 'FD' : 'D');
+      arr.forEach((line, li) => {
+        doc.text(line, x + 1.5, y + li * 4);
+      });
+      x += widths[i];
+    });
+    y += rowH - 2;
+  }
+
+  // Header
+  drawTitle('Ficha prospectiva · escenarios');
+  setFont('normal', 9); doc.setTextColor.apply(doc, INK2);
+  const today = new Date().toLocaleDateString('es-CO', { year:'numeric', month:'long', day:'numeric' });
+  doc.text(today + '  ·  ricardoruiz.co · Lab de Políticas Públicas y Prospectiva', M, y); y += 7;
+  doc.setTextColor.apply(doc, INK);
+
+  // 1. Contexto
+  drawH2('1. Contexto');
+  drawPara(STATE.contexto.enunciado_problema || '— sin enunciado registrado —');
+
+  // 2. Incertidumbres
+  drawH2('2. Incertidumbres críticas');
+  drawKV('Eje horizontal', STATE.ejes.x.nombre || '—');
+  drawKV('Polo −', STATE.ejes.x.polo_neg || '—');
+  drawKV('Polo +', STATE.ejes.x.polo_pos || '—');
+  y += 1;
+  drawKV('Eje vertical', STATE.ejes.y.nombre || '—');
+  drawKV('Polo −', STATE.ejes.y.polo_neg || '—');
+  drawKV('Polo +', STATE.ejes.y.polo_pos || '—');
+
+  // 3. Escenarios
+  addPageIfNeeded(20);
+  drawH2('3. Cuatro escenarios plausibles');
+  ['NE','NO','SO','SE'].forEach(k => {
+    const s = STATE.escenarios[k];
+    const info = QUAD_INFO[k];
+    setFont('bold', 11); doc.setTextColor.apply(doc, ACC);
+    addPageIfNeeded(7);
+    doc.text(`${info.tag}: ${s.nombre || info.defaultName} (${s.prob}%)`, M, y); y += 5;
+    doc.setTextColor.apply(doc, INK);
+    drawPara(s.narrativa || '— sin narrativa —', { color: INK2 });
+  });
+
+  // 4. Cross-impact
+  const els = STATE.elementos || [];
+  if (els.length > 0) {
+    addPageIfNeeded(30);
+    drawH2('4. Cross-impact');
+    drawPara('Elementos contra escenarios, valor -2 a +2. Theodore Gordon (RAND, 1968).', { color: INK2 });
+    const widths = [70, 22, 22, 22, 22, 16];
+    drawTableHeader(['Elemento','NE','NO','SO','SE','NR'], widths);
+    const f = v => { const n = Number(v || 0); return n === 0 ? '0' : (n > 0 ? '+' + n : String(n)); };
+    els.forEach(el => {
+      const r = STATE.impactos[el.id] || {};
+      const nr = el.tipo === 'alternativa' ? (_calcNoRegret(el.id) ? '✓' : '—') : '';
+      drawTableRow([el.nombre, f(r.NE), f(r.NO), f(r.SO), f(r.SE), nr], widths, { highlight: el.tipo === 'alternativa' && _calcNoRegret(el.id) });
+    });
+    y += 2;
+  }
+
+  // 5. Estrategia
+  if (STATE.estrategia.contingencia || STATE.estrategia.senales_tempranas) {
+    addPageIfNeeded(30);
+    drawH2('5. Plan de contingencia y señales tempranas');
+    if (STATE.estrategia.contingencia) {
+      setFont('bold', 10); doc.setTextColor.apply(doc, INK);
+      addPageIfNeeded(5); doc.text('Contingencia', M, y); y += 5;
+      drawPara(STATE.estrategia.contingencia);
+    }
+    if (STATE.estrategia.senales_tempranas) {
+      setFont('bold', 10); doc.setTextColor.apply(doc, INK);
+      addPageIfNeeded(5); doc.text('Señales tempranas', M, y); y += 5;
+      drawPara(STATE.estrategia.senales_tempranas);
+    }
+  }
+
+  // Footer metodológico
+  addPageIfNeeded(30);
+  y = PH - M - 22;
+  doc.setDrawColor.apply(doc, RULE); doc.setLineWidth(0.3); doc.line(M, y, PW - M, y); y += 5;
+  setFont('italic', 8); doc.setTextColor.apply(doc, INK2);
+  const footer = 'Método: escenarios de Schwartz · Global Business Network (The Art of the Long View, 1991) + prospectiva estratégica francesa (Godet · Mojica · LIPSOR · Externado) + Robust Decision Making de Lempert & Walker (RAND, 2003) + cross-impact analysis de Gordon (RAND, 1968). Borrador prospectivo; no es CONPES oficial.';
+  const flines = doc.splitTextToSize(footer, PW - 2 * M);
+  flines.forEach(l => { doc.text(l, M, y); y += 3.5; });
+  setFont('normal', 8); doc.setTextColor.apply(doc, INK2);
+  y += 2; doc.text('Generado con ricardoruiz.co · Lab de Políticas Públicas y Prospectiva  ·  ' + today, M, y);
+
+  const filename = `escenarios-prospectiva-${_slugForFile()}-${new Date().toISOString().slice(0,10)}.pdf`;
+  doc.save(filename);
+  showToast('Ficha prospectiva PDF generada.');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// THEME · auto día/noche según hora local + persistencia
+// ═════════════════════════════════════════════════════════════════════════
+function toggleTheme() {
+  const isDay = document.body.classList.toggle('day-mode');
+  localStorage.setItem('rr-theme', isDay ? 'day' : 'night');
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = isDay ? '☾ Modo noche' : '☀ Modo día';
+}
+(function applyInitialTheme() {
+  const pref = localStorage.getItem('rr-theme');
+  let isDay;
+  if (pref === 'day') isDay = true;
+  else if (pref === 'night') isDay = false;
+  else {
+    const h = new Date().getHours();
+    isDay = h >= 6 && h < 19;
+  }
+  if (isDay) document.body.classList.add('day-mode');
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = isDay ? '☾ Modo noche' : '☀ Modo día';
+})();
+
+// ═════════════════════════════════════════════════════════════════════════
+// CURSOR custom
+// ═════════════════════════════════════════════════════════════════════════
+(function initCursor() {
+  const c = document.getElementById('cursor');
+  const r = document.getElementById('cursorRing');
+  if (!c || !r) return;
+  document.addEventListener('mousemove', e => {
+    c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px';
+    r.style.left = e.clientX + 'px'; r.style.top = e.clientY + 'px';
+  });
+  document.addEventListener('mouseover', e => {
+    if (e.target.closest && e.target.closest('a,button,input,textarea,summary,.accordion,.pill,.step-pill,.eje-card,.scen-quad,.ci-cell,.import-row,.nr-row,[contenteditable]')) {
+      c.style.transform = 'translate(-50%,-50%) scale(0.5)'; c.style.background = 'transparent'; c.style.border = '2px solid var(--accent)';
+      r.style.transform = 'translate(-50%,-50%) scale(1.5)'; r.style.opacity = '0.7';
+    } else {
+      c.style.transform = 'translate(-50%,-50%) scale(1)'; c.style.background = 'var(--accent)'; c.style.border = 'none';
+      r.style.transform = 'translate(-50%,-50%) scale(1)'; r.style.opacity = '0.4';
+    }
+  });
+})();
+
+// ═════════════════════════════════════════════════════════════════════════
+// MODAL RECURSOS · catálogo compartido, filtrado por 'prospect'
+// ═════════════════════════════════════════════════════════════════════════
+const LAB_CURRENT_MODULE = 'prospect';
+const LAB_MOD_LABELS = {
+  problema:     'el módulo de Problema Público',
+  estructural:  'el módulo de Análisis Estructural',
+  mactor:       'el módulo de Análisis de Actores',
+  evaluacion:   'el módulo de Evaluación de Política',
+  alternativas: 'el módulo de Alternativas de Política',
+  ain:          'el módulo de Análisis de Impacto Normativo',
+  prospect:     'el módulo de Escenarios Prospectivos'
+};
+function openRecursosModal() {
+  const lab = window.LAB_RECURSOS;
+  const grid = document.getElementById('modal-recursos-grid');
+  const nameEl = document.getElementById('lr-modulo-name');
+  if (nameEl) nameEl.textContent = LAB_MOD_LABELS[LAB_CURRENT_MODULE] || 'este módulo';
+  if (!lab || !grid) { openModal('modal-recursos'); return; }
+  // Si el catálogo no tiene tag 'prospect' aún, mostramos todos los marcados con 'prospectiva' como categoría
+  let items = lab.items.filter(it => !it.modulos || it.modulos.length === 0 || it.modulos.includes(LAB_CURRENT_MODULE));
+  if (items.length === 0) {
+    // Fallback: items de categoría prospectiva
+    items = lab.items.filter(it => it.categoria === 'prospectiva');
+  }
+  if (!items.length) {
+    grid.innerHTML = '<div class="lr-empty">El catálogo no tiene recursos destacados para este módulo. Mira el catálogo completo en el hub.</div>';
+    openModal('modal-recursos');
+    return;
+  }
+  const sortedCats = lab.categorias.slice().sort((a, b) => (a.orden || 99) - (b.orden || 99));
+  grid.innerHTML = sortedCats.map(c => {
+    const sub = items.filter(it => it.categoria === c.id);
+    if (!sub.length) return '';
+    return `<div class="lr-cat">
+      <div class="lr-cat-name">${escapeHtml(c.nombre)}</div>
+      <div class="lr-items">
+        ${sub.map(it => `<a class="lr-item" href="${escapeAttr(it.url)}" target="_blank" rel="noopener noreferrer">
+          <div class="lr-item-name"><span>${escapeHtml(it.nombre)}</span></div>
+          <div class="lr-item-desc">${escapeHtml(it.desc)}</div>
+        </a>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+  openModal('modal-recursos');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// INIT
+// ═════════════════════════════════════════════════════════════════════════
+(function init() {
+  const restored = loadState();
+  renderAll();
+  renderCIMeta();
+  const hasContent = (STATE.ejes.x.nombre || STATE.ejes.y.nombre ||
+                     STATE.contexto.enunciado_problema ||
+                     ['NE','NO','SO','SE'].some(k => STATE.escenarios[k].nombre || STATE.escenarios[k].narrativa));
+  if (restored && STATE.step >= 1 && hasContent) {
+    if (STATE.step >= 1 && STATE.step <= 4) {
+      goToStep(STATE.step);
+      showToast('Restauramos tu sesión anterior.');
+    } else {
+      showStage('stage-welcome');
+    }
+  } else {
+    showStage('stage-welcome');
+  }
+})();
+</script>
+</body>
+</html>

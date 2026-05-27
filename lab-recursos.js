@@ -209,28 +209,49 @@ window.LAB_RECURSOS = {
       nombre: 'LIPSOR · Laboratoire d\'Investigation en Prospective',
       url: 'http://en.laprospective.fr/',
       desc: 'Laboratorio fundado por Michel Godet (CNAM, París). Software libre (MicMac, Mactor, MorPhol, MultiPol) + publicaciones sobre prospectiva estratégica. MorPhol implementa el análisis morfológico de Zwicky.',
-      modulos: ['estructural', 'mactor', 'alternativas']
+      modulos: ['estructural', 'mactor', 'alternativas', 'prospect']
     },
     {
       id: 'externado-cipe', categoria: 'prospectiva',
       nombre: 'Externado · Centro de Pensamiento Estratégico Internacional',
       url: 'https://www.uexternado.edu.co/centros-de-pensamiento/',
-      desc: 'Referente colombiano en prospectiva estratégica. Tradición de Francisco José Mojica (formado con Godet en la Sorbona).',
-      modulos: ['estructural', 'mactor']
+      desc: 'Referente colombiano en prospectiva estratégica. Tradición de Francisco José Mojica (formado con Godet en la Sorbona). Publicaciones de referencia para política pública colombiana.',
+      modulos: ['estructural', 'mactor', 'prospect']
     },
     {
       id: 'foresight-cards', categoria: 'prospectiva',
       nombre: 'Future Today Institute · Foresight Toolkit',
       url: 'https://futuretodayinstitute.com/',
       desc: 'Caja de herramientas contemporánea de prospectiva (escenarios, señales débiles, futuros alternativos). Reportes anuales de tendencias.',
-      modulos: ['estructural', 'alternativas']
+      modulos: ['estructural', 'alternativas', 'prospect']
     },
     {
       id: 'rand-rdm', categoria: 'prospectiva',
       nombre: 'RAND · Robust Decision Making',
       url: 'https://www.rand.org/methods/rdm.html',
-      desc: 'Página oficial de Robust Decision Making (Lempert · Walker · Bankes 2003). Marco para decidir bajo incertidumbre profunda mediante escenarios y rangos en lugar de pronósticos puntuales.',
-      modulos: ['alternativas', 'estructural']
+      desc: 'Página oficial de Robust Decision Making (Lempert · Walker · Bankes 2003). Marco para decidir bajo incertidumbre profunda mediante escenarios y rangos en lugar de pronósticos puntuales. Esencial para identificar decisiones no-regret.',
+      modulos: ['alternativas', 'estructural', 'prospect']
+    },
+    {
+      id: 'schwartz-gbn', categoria: 'prospectiva',
+      nombre: 'Schwartz · The Art of the Long View (GBN)',
+      url: 'https://en.wikipedia.org/wiki/Peter_Schwartz_(futurist)',
+      desc: 'Peter Schwartz · Global Business Network (1991). Método de los ejes de incertidumbre: 2 incertidumbres críticas → 4 escenarios narrados. Estándar corporativo y de planificación pública desde Shell hasta CIA.',
+      modulos: ['prospect']
+    },
+    {
+      id: 'gordon-cross-impact', categoria: 'prospectiva',
+      nombre: 'Cross-Impact Analysis · Gordon & Hayward 1968',
+      url: 'https://www.millennium-project.org/projects/cross-impact-analysis/',
+      desc: 'Cross-Impact Analysis original (Theodore Gordon, RAND 1968). Mide cómo la ocurrencia de un evento altera la probabilidad de otros. Base metodológica del cross-impact por escenarios usado en Sprint F.',
+      modulos: ['prospect', 'mactor']
+    },
+    {
+      id: 'mojica-prospectiva', categoria: 'prospectiva',
+      nombre: 'Mojica · Concepto y aplicación de la prospectiva estratégica',
+      url: 'https://revistas.uexternado.edu.co/index.php/sotavento/article/view/1601',
+      desc: 'Francisco José Mojica (Externado · Sorbona). Adaptación latinoamericana del método Godet, aplicado a Colombia. Lectura obligada para entender por qué los CONPES de prospectiva en Colombia siguen esta tradición.',
+      modulos: ['prospect', 'estructural', 'mactor']
     },
     {
       id: 'policyimpacts-mvpf', categoria: 'evaluacion',
