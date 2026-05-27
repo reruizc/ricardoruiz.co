@@ -2,17 +2,18 @@
  * lab-informe.js — Sprint G del Lab de Políticas Públicas y Prospectiva.
  *
  * Genera un informe combinado (PDF + Markdown) a partir del trabajo del
- * usuario en los 6 módulos del lab. Lee los 6 localStorage keys:
+ * usuario en los 7 módulos del lab. Lee los 7 localStorage keys:
  *
- *   pp-current-v1      problema-publico.html
- *   micmac-current-v2  analisis-estructural.html
- *   mactor-current-v1  mactor.html
- *   ev-current-v1      evaluacion.html
- *   alt-current-v1     alternativas.html
- *   ain-current-v1     ain.html
+ *   pp-current-v1        problema-publico.html
+ *   micmac-current-v2    analisis-estructural.html
+ *   mactor-current-v1    mactor.html
+ *   ev-current-v1        evaluacion.html
+ *   alt-current-v1       alternativas.html
+ *   ain-current-v1       ain.html
+ *   prospect-current-v1  prospect-escenarios.html (Sprint F)
  *
  * Expone tres funciones públicas en window.LabInforme:
- *   getLabState()                  → { pp:{exists,data,resumen}, ... }
+ *   getLabState()                  → { pp:{exists,data,resumen}, ..., prospect:{...} }
  *   buildLabPDF(state, jsPDF)      → Promise (descarga PDF)
  *   buildLabMarkdown(state)        → string markdown
  *
@@ -476,6 +477,71 @@
     };
   }
 
+  // PROSPECT — etiquetas de cuadrante + helper de no-regret
+  const PROSPECT_CUADS = ['NE','NO','SO','SE'];
+
+  function _resumenProspect(s) {
+    if (!s) return { isEmpty:true };
+    const ejes = s.ejes || {};
+    const ejeX = ejes.x || {};
+    const ejeY = ejes.y || {};
+    const escenarios = s.escenarios || {};
+    const elementos = _arrSafe(s.elementos);
+    const impactos = s.impactos || {};
+    const estrategia = s.estrategia || {};
+    const tieneEjes = _nonEmpty(ejeX.nombre) && _nonEmpty(ejeY.nombre);
+    const tieneEscenariosCualquier = PROSPECT_CUADS.some(k => {
+      const e = escenarios[k];
+      return e && (_nonEmpty(e.nombre) || _nonEmpty(e.narrativa));
+    });
+    if (!tieneEjes && !tieneEscenariosCualquier && elementos.length === 0 &&
+        !_nonEmpty(estrategia.contingencia) && !_nonEmpty(estrategia.senales_tempranas)) {
+      return { isEmpty:true };
+    }
+    // Narrativas por cuadrante
+    const escenariosResumen = PROSPECT_CUADS.map(k => {
+      const e = escenarios[k] || {};
+      return {
+        cuadrante: k,
+        nombre: String(e.nombre || '').trim(),
+        narrativa: String(e.narrativa || '').trim(),
+        prob: Number.isFinite(Number(e.prob)) ? Number(e.prob) : null
+      };
+    });
+    // No-regret: alternativas con valor ≥+1 en ≥3 escenarios
+    const noRegret = [];
+    elementos.forEach(el => {
+      if (!el || el.tipo !== 'alternativa') return;
+      const imp = impactos[el.id] || {};
+      const positivos = PROSPECT_CUADS.filter(k => {
+        const v = Number(imp[k]);
+        return Number.isFinite(v) && v >= 1;
+      });
+      if (positivos.length >= 3) {
+        noRegret.push({
+          nombre: el.nombre || '—',
+          alcance: positivos.join('/'),
+          n: positivos.length
+        });
+      }
+    });
+    return {
+      isEmpty: false,
+      titulo: 'Escenarios prospectivos',
+      ejes: {
+        x: { nombre: ejeX.nombre || '', polo_neg: ejeX.polo_neg || '', polo_pos: ejeX.polo_pos || '' },
+        y: { nombre: ejeY.nombre || '', polo_neg: ejeY.polo_neg || '', polo_pos: ejeY.polo_pos || '' }
+      },
+      escenarios: escenariosResumen,
+      nElementos: elementos.length,
+      noRegret,
+      estrategia: {
+        contingencia: String(estrategia.contingencia || '').trim(),
+        senales_tempranas: String(estrategia.senales_tempranas || '').trim()
+      }
+    };
+  }
+
   // ═══════════════════════════════════════════════════════════════════════
   // API pública · getLabState
   // ═══════════════════════════════════════════════════════════════════════
@@ -486,20 +552,24 @@
     const ev        = _readLS('ev-current-v1');
     const alt       = _readLS('alt-current-v1');
     const ain       = _readLS('ain-current-v1');
+    const prospect  = _readLS('prospect-current-v1');
     return {
-      pp:         { exists: !!pp,     data: pp,     resumen: _resumenPP(pp) },
-      micmac:     { exists: !!micmac, data: micmac, resumen: _resumenMicmac(micmac) },
-      mactor:     { exists: !!mactor, data: mactor, resumen: _resumenMactor(mactor) },
-      ev:         { exists: !!ev,     data: ev,     resumen: _resumenEv(ev) },
-      alt:        { exists: !!alt,    data: alt,    resumen: _resumenAlt(alt) },
-      ain:        { exists: !!ain,    data: ain,    resumen: _resumenAin(ain) }
+      pp:         { exists: !!pp,       data: pp,       resumen: _resumenPP(pp) },
+      micmac:     { exists: !!micmac,   data: micmac,   resumen: _resumenMicmac(micmac) },
+      mactor:     { exists: !!mactor,   data: mactor,   resumen: _resumenMactor(mactor) },
+      ev:         { exists: !!ev,       data: ev,       resumen: _resumenEv(ev) },
+      alt:        { exists: !!alt,      data: alt,      resumen: _resumenAlt(alt) },
+      ain:        { exists: !!ain,      data: ain,      resumen: _resumenAin(ain) },
+      prospect:   { exists: !!prospect, data: prospect, resumen: _resumenProspect(prospect) }
     };
   }
 
   function countActiveModules(state) {
     let n = 0;
     if (!state) return 0;
-    ['pp','micmac','mactor','ev','alt','ain'].forEach(k => { if (!state[k].resumen.isEmpty) n++; });
+    ['pp','micmac','mactor','ev','alt','ain','prospect'].forEach(k => {
+      if (state[k] && !state[k].resumen.isEmpty) n++;
+    });
     return n;
   }
 
@@ -536,6 +606,14 @@
     if (!ev.isEmpty) {
       partes.push(`El plan de evaluación usa ${ev.metodo || 'método sin definir'} ` +
         `con ${ev.nIndicadores} indicador${ev.nIndicadores === 1 ? '' : 'es'}.`);
+    }
+    const pr = state.prospect && state.prospect.resumen;
+    if (pr && !pr.isEmpty) {
+      if (pr.noRegret && pr.noRegret.length > 0) {
+        partes.push(`Los escenarios prospectivos identifican ${pr.noRegret.length} alternativa${pr.noRegret.length === 1 ? '' : 's'} no-regret válida${pr.noRegret.length === 1 ? '' : 's'} en al menos 3 de los 4 futuros plausibles.`);
+      } else if (pr.ejes && pr.ejes.x.nombre && pr.ejes.y.nombre) {
+        partes.push(`Los escenarios prospectivos cruzan las incertidumbres «${_trim(pr.ejes.x.nombre, 60)}» y «${_trim(pr.ejes.y.nombre, 60)}» en 4 futuros plausibles.`);
+      }
     }
     if (partes.length === 0) {
       return 'Este informe está vacío — comience por definir el problema en el módulo de Problema Público.';
@@ -697,8 +775,43 @@
       }
     }
 
-    // Próximos pasos
-    md += `## 7. Próximos pasos operativos\n\n`;
+    // 8. Escenarios prospectivos
+    const pr = state.prospect ? state.prospect.resumen : { isEmpty:true };
+    md += `## 8. Escenarios prospectivos\n\n`;
+    if (pr.isEmpty) {
+      md += `_(El módulo de Escenarios Prospectivos no tiene contenido — abrir ` +
+            '`prospect-escenarios.html` para construir 4 futuros plausibles y probar alternativas contra cada uno.)_\n\n';
+    } else {
+      if (pr.ejes.x.nombre) md += `**Eje X:** ${pr.ejes.x.nombre} · de "${pr.ejes.x.polo_neg || '—'}" a "${pr.ejes.x.polo_pos || '—'}"\n\n`;
+      if (pr.ejes.y.nombre) md += `**Eje Y:** ${pr.ejes.y.nombre} · de "${pr.ejes.y.polo_neg || '—'}" a "${pr.ejes.y.polo_pos || '—'}"\n\n`;
+      const tieneAlgunaNarrativa = pr.escenarios.some(e => _nonEmpty(e.nombre) || _nonEmpty(e.narrativa));
+      if (tieneAlgunaNarrativa) {
+        md += `**Escenarios narrados:**\n\n`;
+        md += `| Cuadrante | Nombre | Probabilidad | Narrativa |\n`;
+        md += `|---|---|---|---|\n`;
+        pr.escenarios.forEach(e => {
+          const prob = e.prob != null ? `${e.prob}%` : '—';
+          const nombre = e.nombre || '—';
+          const narr = _trim(e.narrativa || '—', 180).replace(/\|/g, '\\|').replace(/\n/g, ' ');
+          md += `| ${e.cuadrante} | ${nombre} | ${prob} | ${narr} |\n`;
+        });
+        md += `\n`;
+      }
+      if (pr.noRegret && pr.noRegret.length > 0) {
+        md += `**Decisiones no-regret detectadas (válidas en ≥3 escenarios):**\n\n`;
+        pr.noRegret.forEach(nr => {
+          md += `- ${nr.nombre} _(escenarios ${nr.alcance})_\n`;
+        });
+        md += `\n`;
+      } else if (pr.nElementos > 0) {
+        md += `_Aún no se identifican alternativas no-regret — completar la matriz cross-impact para que el análisis sea robusto._\n\n`;
+      }
+      if (pr.estrategia.contingencia) md += `**Plan de contingencia:** ${pr.estrategia.contingencia}\n\n`;
+      if (pr.estrategia.senales_tempranas) md += `**Señales tempranas a monitorear:** ${pr.estrategia.senales_tempranas}\n\n`;
+    }
+
+    // 9. Próximos pasos
+    md += `## 9. Próximos pasos operativos\n\n`;
     const pasos = [];
     if (!pp.isEmpty && pp.evidencia.length < 3) pasos.push('Levantar evidencia adicional (mínimo 3 fuentes) para sostener el diagnóstico.');
     if (!ma.isEmpty && ma.objetivos.length && ma.objetivos[0].saldo < 0) pasos.push(`El saldo del objetivo principal es negativo (${ma.objetivos[0].nombre}) — diseñar estrategia de negociación con dominantes opositores.`);
@@ -706,18 +819,24 @@
     if (!ev.isEmpty && ev.nIndicadores < 4) pasos.push('Completar indicadores SMART mínimos (≥ 4) para la evaluación.');
     if (!ev.isEmpty && !ev.eco) pasos.push('Activar el módulo económico (CBA · MVPF · CEA) para defender la asignación presupuestal.');
     if (state.pp.exists && !state.ev.exists) pasos.push('Planificar la evaluación del problema definido — abrir `evaluacion.html` para diseñar el Pre-Analysis Plan.');
+    if (state.prospect && state.prospect.exists && pr && !pr.isEmpty && (!pr.ejes.x.nombre || !pr.ejes.y.nombre)) {
+      pasos.push('Identificar las 2 incertidumbres críticas en el módulo de Escenarios Prospectivos.');
+    }
+    if (state.prospect && state.prospect.exists && pr && !pr.isEmpty && pr.noRegret.length === 0 && pr.nElementos > 0) {
+      pasos.push('Cruzar tus alternativas con los 4 escenarios para identificar decisiones robustas (no-regret).');
+    }
     if (pasos.length === 0) pasos.push('Validar el informe con los actores dominantes identificados y refinar antes de comité.');
     pasos.forEach((p, i) => md += `${i+1}. ${p}\n`);
     md += `\n---\n\n`;
     md += `*Generado con el Lab de Políticas Públicas y Prospectiva (ricardoruiz.co). ` +
           `Las raíces metodológicas combinadas en este informe: Eightfold Path ` +
           `(Bardach 2020), prospectiva francesa (Godet · Mojica · LIPSOR), ` +
-          `Robust Decision Making (Lempert-Walker RAND 2003), análisis morfológico ` +
-          `(Zwicky 1969 · Ritchey 2011), OCDE RIA (2012/2022), MVPF ` +
-          `(Hendren-Sprung-Keyser NBER 2020), OCDE-DAC (2019/2021) y ` +
-          `Pre-Analysis Plans (AEA RCT Registry · Olken 2015 JEP). Este es un ` +
-          `**borrador automatizado**; debe ser revisado, editado y validado ` +
-          `antes de presentarse ante comité técnico.*\n`;
+          `escenarios GBN (Schwartz 1991), Robust Decision Making (Lempert-Walker ` +
+          `RAND 2003), análisis morfológico (Zwicky 1969 · Ritchey 2011), OCDE RIA ` +
+          `(2012/2022), MVPF (Hendren-Sprung-Keyser NBER 2020), OCDE-DAC ` +
+          `(2019/2021) y Pre-Analysis Plans (AEA RCT Registry · Olken 2015 JEP). ` +
+          `Este es un **borrador automatizado**; debe ser revisado, editado y ` +
+          `validado antes de presentarse ante comité técnico.*\n`;
 
     return md;
   }
@@ -853,13 +972,14 @@
       mactor:'Mapa de actores (Mactor · Godet)',
       alt:'Alternativas de política (Zwicky · RDM)',
       ain:'Análisis de Impacto Normativo (OCDE RIA · DNP)',
-      ev:'Plan de evaluación (OCDE-DAC · PAP)'
+      ev:'Plan de evaluación (OCDE-DAC · PAP)',
+      prospect:'Escenarios prospectivos (Schwartz · Godet · Lempert)'
     };
     setFont('bold', 11); doc.setTextColor(...ACC); pageBreak(8);
     doc.text('Módulos integrados en este informe', M, y); y += 6;
     Object.keys(moduleLabels).forEach(k => {
       pageBreak(5);
-      const isActive = !state[k].resumen.isEmpty;
+      const isActive = state[k] && !state[k].resumen.isEmpty;
       doc.setTextColor(...(isActive ? INK : INK2));
       setFont('normal', 10);
       doc.text(isActive ? '✓' : '○', M, y);
@@ -983,8 +1103,37 @@
       if (ev.plan.presupuesto) drawKV('Presupuesto', ev.plan.presupuesto);
     }
 
-    // ─── 7. Próximos pasos
-    drawH2('7. Próximos pasos operativos');
+    // ─── 8. Escenarios prospectivos
+    const pr = state.prospect ? state.prospect.resumen : { isEmpty:true };
+    drawH2('8. Escenarios prospectivos');
+    if (pr.isEmpty) {
+      drawCalloutBox('No hay análisis prospectivo. Abrir prospect-escenarios.html para construir 4 futuros plausibles (método de ejes de incertidumbre · Schwartz GBN) y probar alternativas contra cada uno (Robust Decision Making · Lempert RAND).', SOFT);
+    } else {
+      if (pr.ejes.x.nombre) drawKV('Eje X', `${pr.ejes.x.nombre} (de "${pr.ejes.x.polo_neg || '—'}" a "${pr.ejes.x.polo_pos || '—'}")`);
+      if (pr.ejes.y.nombre) drawKV('Eje Y', `${pr.ejes.y.nombre} (de "${pr.ejes.y.polo_neg || '—'}" a "${pr.ejes.y.polo_pos || '—'}")`);
+      const tieneAlgunaNarrativa = pr.escenarios.some(e => _nonEmpty(e.nombre) || _nonEmpty(e.narrativa));
+      if (tieneAlgunaNarrativa) {
+        setFont('bold', 10); doc.text('Cuatro escenarios narrados', M, y); y += 5;
+        const rows = pr.escenarios.map(e => [
+          e.cuadrante,
+          e.nombre || '—',
+          e.prob != null ? `${e.prob}%` : '—',
+          _trim(e.narrativa || '—', 120)
+        ]);
+        drawTable(['Cuad.','Nombre','Prob.','Narrativa'], rows, [14, 42, 16, 102]);
+      }
+      if (pr.noRegret && pr.noRegret.length > 0) {
+        setFont('bold', 10); doc.text('Decisiones no-regret (válidas en ≥3 escenarios)', M, y); y += 5;
+        drawList(pr.noRegret.map(nr => `${nr.nombre} — escenarios ${nr.alcance}`));
+      } else if (pr.nElementos > 0) {
+        drawPara('Aún no se identifican alternativas no-regret — completar la matriz cross-impact para que el análisis sea robusto.', { color: INK2 });
+      }
+      if (pr.estrategia.contingencia) drawKV('Plan de contingencia', pr.estrategia.contingencia);
+      if (pr.estrategia.senales_tempranas) drawKV('Señales tempranas', pr.estrategia.senales_tempranas);
+    }
+
+    // ─── 9. Próximos pasos
+    drawH2('9. Próximos pasos operativos');
     const pasos = [];
     if (!pp.isEmpty && pp.evidencia.length < 3) pasos.push('Levantar evidencia adicional (mínimo 3 fuentes) para sostener el diagnóstico.');
     if (!ma.isEmpty && ma.objetivos.length && ma.objetivos[0].saldo < 0) pasos.push(`El saldo del objetivo principal es negativo (${ma.objetivos[0].nombre}) — diseñar estrategia de negociación con dominantes opositores.`);
@@ -992,6 +1141,12 @@
     if (!ev.isEmpty && ev.nIndicadores < 4) pasos.push('Completar indicadores SMART mínimos (≥ 4) para la evaluación.');
     if (!ev.isEmpty && !ev.eco) pasos.push('Activar el módulo económico (CBA · MVPF · CEA) para defender la asignación presupuestal.');
     if (state.pp.exists && !state.ev.exists) pasos.push('Planificar la evaluación del problema definido — abrir evaluacion.html para diseñar el Pre-Analysis Plan.');
+    if (state.prospect && state.prospect.exists && !pr.isEmpty && (!pr.ejes.x.nombre || !pr.ejes.y.nombre)) {
+      pasos.push('Identificar las 2 incertidumbres críticas en el módulo de Escenarios Prospectivos.');
+    }
+    if (state.prospect && state.prospect.exists && !pr.isEmpty && pr.noRegret.length === 0 && pr.nElementos > 0) {
+      pasos.push('Cruzar tus alternativas con los 4 escenarios para identificar decisiones robustas (no-regret).');
+    }
     if (pasos.length === 0) pasos.push('Validar el informe con los actores dominantes identificados y refinar antes de comité.');
     drawList(pasos);
 
@@ -1001,13 +1156,13 @@
     setFont('italic', 8.5); doc.setTextColor(...INK2);
     const footer = 'Raíces metodológicas combinadas en este informe: Eightfold ' +
       'Path (Bardach 2020), prospectiva francesa (Godet · Mojica · LIPSOR), ' +
-      'Robust Decision Making (Lempert-Walker RAND 2003), análisis morfológico ' +
-      '(Zwicky 1969 · Ritchey 2011), OCDE RIA (2012/2022), MVPF ' +
-      '(Hendren-Sprung-Keyser NBER 2020), OCDE-DAC (2019/2021), Pre-Analysis ' +
-      'Plans (AEA RCT Registry · Olken 2015 JEP) y la frontera causal moderna ' +
-      '2020-2026 (Callaway-Sant\'Anna · Cattaneo · Ben-Michael · Wager-Athey · ' +
-      'Chernozhukov · Mayne). Este es un BORRADOR AUTOMATIZADO — debe ser ' +
-      'revisado, editado y validado antes de comité técnico. ricardoruiz.co';
+      'escenarios GBN (Schwartz 1991), Robust Decision Making (Lempert-Walker ' +
+      'RAND 2003), análisis morfológico (Zwicky 1969 · Ritchey 2011), OCDE RIA ' +
+      '(2012/2022), MVPF (Hendren-Sprung-Keyser NBER 2020), OCDE-DAC (2019/2021), ' +
+      'Pre-Analysis Plans (AEA RCT Registry · Olken 2015 JEP) y la frontera ' +
+      'causal moderna 2020-2026 (Callaway-Sant\'Anna · Cattaneo · Ben-Michael · ' +
+      'Wager-Athey · Chernozhukov · Mayne). Este es un BORRADOR AUTOMATIZADO — ' +
+      'debe ser revisado, editado y validado antes de comité técnico. ricardoruiz.co';
     const flines = doc.splitTextToSize(footer, PW - 2 * M);
     flines.forEach(l => { pageBreak(4.2); doc.text(l, M, y); y += 4.2; });
 
@@ -1031,7 +1186,8 @@
       mactor: { titulo:'Mapa de actores', icono:'3', archivo:'mactor.html' },
       alt: { titulo:'Alternativas de política', icono:'4', archivo:'alternativas.html' },
       ain: { titulo:'Análisis de Impacto Normativo', icono:'5', archivo:'ain.html' },
-      ev: { titulo:'Plan de evaluación', icono:'6', archivo:'evaluacion.html' }
+      ev: { titulo:'Plan de evaluación', icono:'6', archivo:'evaluacion.html' },
+      prospect: { titulo:'Escenarios prospectivos', icono:'7', archivo:'prospect-escenarios.html' }
     }
   };
 

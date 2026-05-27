@@ -18,7 +18,7 @@
 - `lab-recursos.js` — catálogo compartido de 32 recursos en 5 categorías; cargado por los 6 módulos del lab.
 - `lab-informe.js` — **Sprint G** · helpers + generador PDF/MD del informe combinado del lab. Lee los 6 localStorage keys y produce un memo CONPES integrado. Cargado solo desde el hub.
 - `lab-indicadores.js` — **Sprint E (Fase A)** · helper de indicadores municipales oficiales con panel temporal 2018-2024. 8 indicadores × 1.108 municipios desde datos.gov.co (Policía Nacional + MEN). API lookupMun/getSerie/searchMun/matchIndicadorByKeyword. Cargado por analisis-estructural, problema-publico, ain y evaluacion.
-- `prospect-escenarios.html` — **Sprint F** · séptimo módulo del lab. Escenarios prospectivos por método de los ejes de incertidumbre (Schwartz · GBN), prospectiva estratégica francesa (Godet · Mojica · LIPSOR) y Robust Decision Making (Lempert · RAND). 4 mecánicas: incertidumbres críticas (auto-suggest desde MicMac) · narrativa de 4 cuadrantes · cross-impact con variables/actores/alternativas (Gordon 1968) · decisiones no-regret + señales tempranas. 3 exports (memo .md + matriz .csv + ficha .pdf jsPDF). Sin cloud-save en v1 (solo localStorage). LISTO.
+- `prospect-escenarios.html` — **Sprint F + F v2** · séptimo módulo del lab. Escenarios prospectivos por método de los ejes de incertidumbre (Schwartz · GBN), prospectiva estratégica francesa (Godet · Mojica · LIPSOR) y Robust Decision Making (Lempert · RAND). 4 mecánicas: incertidumbres críticas (auto-suggest desde MicMac) · narrativa de 4 cuadrantes · cross-impact con variables/actores/alternativas (Gordon 1968) · decisiones no-regret + señales tempranas. Cloud-save + 2 acciones IA copiloto (sugerir-ejes Pro · narrar-escenarios Premium) + 3 exports (memo .md + matriz .csv + ficha .pdf jsPDF). Integrado al informe combinado del lab (sección 8). LISTO (Sprint F + F v2).
 - `pricing.html` — planes (Básico / Pro 39.900 COP · Premium 99.900 COP · Personalizado)
 - `lang.js` — i18n (co/us/cn); `CLAUDE.md` vive en la raíz del repo
 
@@ -2885,7 +2885,7 @@ Externado-CIPE, Future Today Institute, RAND-RDM.
 
 ### Worker rr-auth — endpoints del lab
 
-Total **42 endpoints** (7 micmac + 7 mactor + 7 pp + 7 ev + 7 alt + 7 ain),
+Total **49 endpoints** (7 micmac + 7 mactor + 7 pp + 7 ev + 7 alt + 7 ain + 7 prospect),
 agrupados en 6 módulos paralelos con el mismo patrón CRUD + invite +
 copiloto.
 
@@ -2947,6 +2947,21 @@ copiloto.
 - `GET    /ain/accept?token=` — acepta invitación.
 - `POST   /ain/copiloto` — 3 acciones IA (Sprint D.8).
 
+**Prospect (`/prospect/*`)** — Sprint F v2:
+- `GET    /prospect/list` — lista análisis prospectivos (owner + collab).
+- `POST   /prospect/save` — crea o actualiza. Validación dura: ejes con
+  polos neg/pos, 4 escenarios {NE,NO,SO,SE} con prob 0-100,
+  ≤30 elementos importados con tipo whitelisted
+  ({variable,actor,alternativa}) y source whitelisted
+  ({micmac,mactor,alt,manual}), impactos como int -2..+2 por
+  cuadrante, ids hex.
+- `GET    /prospect/load?projId=&since=` — carga con polling.
+- `DELETE /prospect/delete?projId=` — solo owner.
+- `POST   /prospect/invite` — correo Resend con link 14d, copy
+  "Escenarios Prospectivos".
+- `GET    /prospect/accept?token=` — acepta invitación.
+- `POST   /prospect/copiloto` — 2 acciones IA (Sprint F v2.3).
+
 **Acciones IA por módulo (action en body):**
 | Módulo | Acción | Plan |
 |---|---|---|
@@ -2971,6 +2986,8 @@ copiloto.
 | ain    | `sugerir-opciones-regulatorias` | Pro+ |
 | ain    | `detectar-riesgos-regulatorios` | Premium+ |
 | ain    | `narrativa-ain` | Premium+ |
+| prospect | `sugerir-ejes` | Pro+ |
+| prospect | `narrar-escenarios` | Premium+ |
 
 **Storage KV (`RR_STORE`):**
 ```
@@ -2984,6 +3001,7 @@ pp:*     (mismo layout con prefijo pp)
 ev:*     (mismo layout con prefijo ev)
 alt:*    (mismo layout con prefijo alt)
 ain:*    (mismo layout con prefijo ain)
+prospect:* (mismo layout con prefijo prospect)
 ```
 
 **DeepSeek:** API key `DEEPSEEK_API_KEY` como secret del worker
@@ -2991,9 +3009,9 @@ ain:*    (mismo layout con prefijo ain)
 `deepseek-v4-flash`. AbortSignal 28s. Cache hash24 con
 `PROMPT_VERSION='v1'` (bumpear al cambiar prompts para invalidar cache).
 
-**Plan gate (común a los 6 módulos):**
+**Plan gate (común a los 7 módulos):**
 ```js
-MICMAC_MAX_PROJ = MACTOR_MAX_PROJ = PP_MAX_PROJ = EV_MAX_PROJ = ALT_MAX_PROJ = AIN_MAX_PROJ = { free:1, pro:5, premium:25, full:50 }
+MICMAC_MAX_PROJ = MACTOR_MAX_PROJ = PP_MAX_PROJ = EV_MAX_PROJ = ALT_MAX_PROJ = AIN_MAX_PROJ = PROSPECT_MAX_PROJ = { free:1, pro:5, premium:25, full:50 }
 PP_MAX_ALTERNATIVAS = 5
 PP_MAX_CRITERIOS    = 8
 PP_MAX_EVIDENCIA    = 60
@@ -3011,6 +3029,7 @@ AIN_MAX_OBJETIVOS        = 5
 AIN_MAX_OPCIONES         = 7   // 6 + baseline statu-quo
 AIN_MAX_AFECTADOS        = 12
 AIN_MAX_AUDIENCIAS       = 10
+PROSPECT_MAX_ELEMENTOS   = 30  // cross-impact: vars + actores + alts
 ```
 
 **Deploy del worker:**
@@ -3023,6 +3042,80 @@ de deployar en producción.
 
 **Helpers compartidos:** `sessionGuard(request, env)` valida Bearer
 token + plan. `_callDeepSeek(env, systemPrompt, userMsg, opts)`. `_hash24(str)`.
+
+### Sprint F v2 · cloud-save + IA copiloto para prospect (cierre del 7º módulo)
+
+Cierra el séptimo módulo del lab a paridad de los otros seis: cloud-save
+multi-user, invitaciones por correo y dos acciones IA copiloto.
+
+**Worker rr-auth** (+440 líneas en `/Users/ricardoruiz/rr-auth/src/index.js`):
+- 7 endpoints `/prospect/*` espejo del patrón `/alt/*` y `/ain/*`:
+  list, save, load, delete, invite, accept, copiloto.
+- Validación dura en `/prospect/save`:
+  - Ejes con `nombre`, `polo_neg`, `polo_pos` (cada uno ≤240 chars).
+  - 4 escenarios `{NE,NO,SO,SE}` con `nombre`, `narrativa`, `prob`
+    (clamped 0-100).
+  - ≤30 elementos con tipo whitelisted (`variable`/`actor`/`alternativa`)
+    + source whitelisted (`micmac`/`mactor`/`alt`/`manual`) +
+    id alfanumérico 2-80 chars.
+  - Impactos por elemento × cuadrante: integer en [-2, +2] (clamped).
+  - Estrategia con `contingencia` + `senales_tempranas` (≤4000 chars).
+- 2 acciones IA copiloto:
+  - `sugerir-ejes` (Pro+) · DeepSeek V4 Flash, max 1500 tokens, temp
+    0.4. Recibe `{contexto, variables_micmac}` con las 12 top motrices
+    si vienen del análisis estructural previo. Devuelve 2 ejes con
+    polos descriptivos + rationale.
+  - `narrar-escenarios` (Premium+) · DeepSeek V4 Flash, max 3000 tokens,
+    temp 0.55. Recibe `{ejes, contexto}` con los 2 ejes confirmados.
+    Devuelve 4 narrativas plausibles con nombre evocador + probabilidad
+    subjetiva. Renormaliza probs a sumar 100 si el modelo se equivoca.
+  - Cache hash24 TTL 7d.
+
+**Frontend `prospect-escenarios.html`** (+~600 líneas):
+- Bloque AUTH/CLOUD copiado del patrón de `ain.html`: `loadUserFromAPI`,
+  `renderAuthChip`, `apiCall`, `cloudSave`, `cloudLoad`, `cloudDelete`,
+  `newProject`, `openInviteModal`, `submitInvite`, `acceptInviteFlow`.
+- UI cloud-bar en `stage-results` (y opcionalmente en `cloud-bar-flow`
+  durante las 4 mecánicas).
+- Sección `#my-projects` arriba con `<details>` para abrir análisis
+  guardados.
+- Auto-cloud-save con debounce de 2s: `saveState()` dispara
+  `cloudSave()` si `AUTH.isLogged && CLOUD.projId`.
+- Polling cada 10s mientras la pestaña está activa para sincronizar
+  ediciones de colaboradores.
+- 2 ia-bars:
+  - En `stage-incertidumbres`: "Sugerir incertidumbres con IA"
+    (`iaSugerirEjes()`). Si hay `localStorage['micmac-current-v2']`,
+    calcula motricidad de cada variable y pasa top 8 como contexto.
+  - En `stage-escenarios`: "Narrar los 4 escenarios con IA"
+    (`iaNarrarEscenarios()`). Requiere 2 ejes con polos definidos.
+  - Ambas con botón "+ Adoptar" que aplica el resultado al STATE.
+
+**`lab-informe.js`** (+~150 líneas):
+- `getLabState()` agrega `prospect: { exists, data, resumen }`.
+- Nuevo helper `_resumenProspect(s)` que extrae:
+  - ejes con polos
+  - 4 escenarios narrados con probabilidad
+  - nElementos (de cross-impact)
+  - **noRegret[]**: alternativas con impacto ≥+1 en ≥3 escenarios
+    (cálculo Lempert · RDM)
+  - estrategia (contingencia + señales tempranas)
+- `countActiveModules()` ahora cuenta hasta 7.
+- `buildResumenEjecutivo()` agrega línea sobre escenarios prospectivos
+  si tienen contenido.
+- **Sección 8 nueva** en el MD y PDF del informe combinado: ejes +
+  tabla 4×4 de escenarios + alternativas no-regret + contingencia +
+  señales tempranas.
+- "Próximos pasos" considera prospect: si tiene ejes sin escenarios →
+  recomienda narrar los 4 cuadrantes; si tiene cross-impact sin
+  no-regret → recomienda completar la matriz para identificar
+  decisiones robustas.
+
+**Deploy de v2:**
+```bash
+cd /Users/ricardoruiz/rr-auth && npx wrangler deploy
+```
+Ya desplegado en producción.
 
 ### Cómo agregar una acción IA nueva
 
@@ -3074,15 +3167,17 @@ escenarios prospectivos" más abajo. Tres frentes simultáneos:
 - (C) Monte Carlo en alternativas (500/1000/5000 sims con perturbación
   configurable + P(#1) por alternativa).
 
+**Sprint F v2 · Cloud-save + IA para prospect** ✓ LISTO. Ver sección
+"Sprint F v2 · cloud-save + IA copiloto para prospect" más abajo. El
+worker ahora tiene 49 endpoints (los 7 de prospect agregados). El
+informe combinado de Sprint G integra el séptimo módulo en una nueva
+sección 8.
+
 **Reservados para próximas iteraciones:**
 - **Sprint E Fase B** — descarga manual de TerriData / DANE EEVV /
   MinSalud para añadir IPM, NBI, agua, internet, mortalidad infantil/
   materna, embarazo adolescente y vacunación PAI. Requiere descarga
   manual (SPAs sin API limpia). El pipeline ya lo soporta con extensiones.
-- **Sprint F v2** — Worker rr-auth con endpoints `/prospect/*` (CRUD +
-  invite + copiloto IA), por ahora solo localStorage. Y agregar prospect
-  al informe combinado del lab (Sprint G) — el lab-informe.js todavía no
-  lee el state prospect.
 
 **Mejoras de módulos vivos:**
 - **Mactor MIDI** (opcional) — matriz pivotada de influencias
