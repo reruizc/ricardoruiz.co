@@ -7,7 +7,7 @@
 - `endoso-2026.html` — comparación mesa a mesa senado vs cámara
 - `previa-1v.html` — simulador de intención presidencial 1ª vuelta
 - `oportunidad.html` — **módulo B2B** voto blando afín por candidato (LISTO, ver sección dedicada)
-- `veleta.html` — municipios sensibles al cambio (score multidimensional)
+- `veleta.html` — **módulo B2B LISTO** · municipios sensibles al cambio con score por candidato (Cepeda · Abelardo · Paloma). Drill nacional→depto→mun→ciudades-UPL/comunas→barrios. Excel con categoría + proy + censo + Premium PDF top 50. Ver sección dedicada.
 - `test-presidencial-2026.html` — **test de arquetipo emocional + lectura LLM** (LISTO v1, ver sección dedicada)
 - `analisis-estructural.html` — **Lab de Políticas Públicas y Prospectiva** · hub del lab + módulo análisis estructural (MicMac · DEMATEL · ISM modernizado, fuzzy, valencias firmadas, copiloto IA) + **sección "Mi informe del lab" (Sprint G)** que une los 6 módulos en un memo combinado (PDF + Markdown). LISTO, ver sección dedicada.
 - `mactor.html` — **Lab** · módulo análisis de actores y conflictos (MID + MAO, copiloto IA). LISTO.
@@ -30,88 +30,127 @@
   campo `contribuciones`). Cada punto del eje X es una semana ISO; cada línea
   un candidato. Debería respetar el toggle día/noche y la paleta del proyecto.
 
-## Módulo Veleta — `veleta.html` (por construir, prioridad ALTA, ventana hasta 1ª vuelta)
+## Módulo Veleta — `veleta.html` (LISTO · B2B)
 
-Producto B2B para equipos de campaña: mapa de **municipios veleta** (sensibles al
-cambio electoral) con score multidimensional. Es el bottom-of-funnel comercial
-del ciclo electoral 2026 — diferenciador frente a herramientas genéricas de
-visualización porque combina histórico + competitividad + peso en una sola métrica
-defendible.
+Producto B2B para equipos de campaña: mapa de **municipios sensibles al cambio
+electoral** con score por candidato. Bottom-of-funnel comercial del ciclo
+2026 — diferenciador frente a herramientas genéricas porque combina histórico
+electoral + ponderador propio + cruce con techo captable por bloque ideológico
+en una sola métrica defendible por candidato.
 
-**Definición del Score Veleta (0–100)** — promedio ponderado:
-- **Swing histórico (40%)**: `|Δ pct_Petro_2022 − pct_Petro_2018|`, normalizado al
-  percentil 95 nacional. Bonus +15 pts si el ganador del municipio cambió entre
-  ciclos (`top1_2018 ≠ top1_2022`). Petro candidato en ambas presidenciales =
-  proxy directo del eje izquierda↔resto.
-- **Competitividad (40%)**: margen `top1 − top2` en presidencial 2022 sobre
-  votos válidos. Lineal invertido: margen 0 pp → 100, margen ≥25 pp → 0.
-- **Peso electoral (20%)**: `log(censo_municipal)` normalizado min/max nacional.
-  Filtra ruido de municipios pequeños sin sacrificar cobertura.
+### Score por modo (los 3 modos están implementados)
 
-`Score = 0.4·swing + 0.4·comp + 0.2·peso`. Municipios con score ≥ umbral (default
-70, slider 50–90) se renderizan con **patrón rayado SVG** (`<pattern>` global +
-`fillColor: 'url(#vel-stripes)'` — Leaflet pasa el fill textualmente al path,
-funciona porque la referencia se resuelve por id en el DOM). Resto del mapa:
-gradiente lineal gris frío → ámbar → rojo según score.
+Score 0–100 por percentil dentro de la cohorte (deptos entre sí, muns
+nacionales entre sí, comunas de la ciudad entre sí). El score base se
+construye distinto por modo:
 
-**Datos de entrada** (todos en S3):
+**Modo Cepeda** — objetivo: ganar 1ª vuelta con >50%
 ```
-historicos/pres-2018-v1/por-mun.json   { "depCod-munCod": { candidatos:{1:{nombre,pct},...}, votos_validos } }
-historicos/pres-2022-v1/por-mun.json   misma estructura
-puestos-censos-agg.json                { porMun: { "depCod-munCod": int }, nacional: int }
-mapas-2026/DEPARTAMENTOS2.json         GeoJSON deptos
-mapas-2026/MUNICIPIOSX.json            GeoJSON municipios nacional (9 MB)
+proyCepeda = izq22 × (CepedaNac2026 / izqNac22)
+techoCaptable = max(izq10,izq14,izq18,izq22) × scaleIzq + (centro18 / 3)
+gap = max(0, 50 − proyCepeda)
+captable = max(0, techoCaptable − proyCepeda)  (capped a 10pp)
+score = (0.6 · proximidad + 0.4 · plausibilidad) × 100
+Si proyCepeda ≥ 50 → score = 35 (ya ganado en 1V, baja prioridad)
 ```
 
-**Estructura UX**:
-1. Header + breadcrumb (mismo nav que `previa-1v.html`).
-2. Sección intro con 3 cards explicando los componentes del score (transparencia
-   metodológica = clave para venta B2B).
-3. Toggle nivel territorial (departamental por defecto / municipal). Slider de
-   umbral del rayado.
-4. Shell 2 columnas: mapa Leaflet + panel lateral con leyenda, detalle de
-   municipio en hover, top-30 ranking clickeable, CTA de venta ("¿Equipo de
-   campaña? Reporte territorial 3M COP").
-5. Drill-down por click en depto → muestra solo municipios de ese depto.
-
-**Componentes reutilizables de `previa-1v.html`**:
-- Nav, breadcrumb, header, day-mode (toggleTheme).
-- Helpers `pad()`, hover-chip flotante, estructura `.shell`/`.map-wrap`/`.panel`.
-- Patrón Leaflet: SVG renderer (NO canvas — el rayado necesita SVG).
-- `colorWithIntensity()` no aplica aquí (cambia paleta a gradiente score-driven).
-
-**Color tokens nuevos** (variantes a las globales):
-```css
---vel-low:#2d3340;  --vel-mid:#f59e0b;  --vel-high:#f87171;
-/* Stops del gradiente: 0→#2d3340, 40→#463c3c, 60→#b46e32, 75→#f59e0b, 100→#f87171 */
-/* Acento del módulo (en lugar de --blue): --orange (#fb923c) */
+**Modo Abelardo / Paloma** — objetivo: 2do dentro del bloque derecha
+```
+derTotal22 = d22 + cd22  // bloque derecha completo en 2022
+candProy = derTotal22 × (derPondNac2026 / derNac22) × shareCandNac × HOME_TURF[mode][depCod]
+HOME_TURF Abelardo: Costa Atlántica (03, 05, 12, 13, 21, 28, 48) ×1.20 · Antioquia (01) ×1.10
+HOME_TURF Paloma:   Cauca (11) ×1.30 · Valle (31) ×1.15 · Antioquia (01) ×1.10 · Boyacá/Cundinamarca ×1.05
+techoDer = max(d10+cd10, d14+cd14, d18+cd18, d22+cd22) × scaleDer
+captable = max(0, techoDer × shareCand × boost − candProy)
+score = (0.7 · proximidad + 0.3 · plausibilidad) × 100
+Si proyCand ≥ 50 → score = 35
 ```
 
-**Patrón de rayado SVG** (insertar en `<body>` antes del nav, una sola vez):
-```html
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <defs>
-    <pattern id="vel-stripes" patternUnits="userSpaceOnUse" width="6" height="6"
-             patternTransform="rotate(45)">
-      <rect width="6" height="6" fill="#f87171"/>
-      <line x1="0" y1="0" x2="0" y2="6" stroke="#fff" stroke-width="2.2" stroke-opacity=".45"/>
-    </pattern>
-    <!-- duplicar como #vel-stripes-day con fill #dc2626 + stroke-opacity .7 para day-mode -->
-  </defs>
-</svg>
+### Drill territorial (4 niveles + ciudades)
+
+1. **Nacional · 33 deptos** (default).
+2. **Depto → muns** (~1.100 muns del país).
+3. **Ciudad → UPL/comuna** (14 ciudades: Bogotá UPL · Medellín, Cali,
+   Barranquilla, Manizales, Pereira, Ibagué, Montería, Bucaramanga, Cúcuta,
+   Neiva, Popayán, Sincelejo, Villavicencio).
+4. **Ciudad → barrio** (solo Bogotá UPL → 1.001 barrios catastrales, y
+   Medellín comuna → ~165 barrios urbanos · ambos Premium).
+
+### Plan gate (modelo B2B)
+
+| Feature | Anónimo | Free | Pro | Premium |
+|---|---|---|---|---|
+| Cambio de candidato | 1 switch (Cepeda+1) | ✓ | ✓ | ✓ |
+| Drill nacional → depto → mun + hover detalle | ✓ | ✓ | ✓ | ✓ |
+| Drill mun → 14 ciudades a UPL/comuna | ✗ modal | ✗ modal | ✓ | ✓ |
+| Toggle Local / Nacional (cohorte de comparación) | ✗ | ✗ | ✓ | ✓ |
+| Drill ciudad → barrios (Bogotá catastral + Medellín) | ✗ | ✗ | ✗ modal | ✓ |
+| Descarga Excel (lista completa scope visible) | ✗ | ✗ | 3/mes | 10/mes |
+| **Descarga PDF top 50 + metodología** (V.2) | ✗ | ✗ | ✗ modal | 10/mes |
+
+Cuota Excel + PDF compartida con `oportunidad.html` (mismo contador
+mensual server-side en `rr-auth /dl/status` + `/dl/consume` con KV
+`RR_DL`).
+
+### Descargas (Sprint V)
+
+**Excel** — 2 hojas:
+
+- *Metodología*: explicación del score por modo + tabla de **categorías**
+  (V.1) + cómo descargar agregado por UPL/comuna (V.3).
+- *Datos*: header con `candidato, modo, scope, nivel, rank, nombre, depto,
+  mun_elec, upl_o_comuna, barrio, loc_codigo, loc_nombre, proy_pct,
+  categoria, score, censo, fecha_export`. Para barrios Bogotá:
+  `loc_codigo` + `loc_nombre` permiten reconstruir agregados por localidad
+  (los barrios catastrales no traen UPL pre-asignada).
+
+**Categoría por candidato (helper `_categoriaFor`, V.1):**
+
+| Candidato | Tier | Threshold |
+|---|---|---|
+| Cepeda | Ya proyecta >50% (asegura 1V) | `proy ≥ 50` |
+| Cepeda | A menos de 5 pp del 50% (esfuerzo más rentable) | `45 ≤ proy < 50` |
+| Cepeda | Entre 5 y 15 pp del 50% (campaña fuerte) | `35 ≤ proy < 45` |
+| Cepeda | A más de 15 pp del 50% (bastión opositor) | `proy < 35` |
+| Abelardo/Paloma | Base sólida | `proy ≥ 25` |
+| Abelardo/Paloma | Base media | `15 ≤ proy < 25` |
+| Abelardo/Paloma | Base débil | `proy < 15` |
+
+Los thresholds son idénticos a los que muestra el panel lateral de la UI.
+
+**PDF Premium top 50** (V.2) — `_buildAndDownloadVeletaPDF` con jsPDF 2.5.1
+on-demand desde jsdelivr. Página 1: tabla top 50 con #, territorio, depto,
+score, proy_pct, categoría (top 10 highlighted en accent oxblood/orange).
+Página 2: metodología completa por modo + cómo descargar UPL agregada +
+fuentes. Footer con disclaimer "borrador automático".
+
+**Title dinámico de los botones de descarga** (V.3) — `renderDlCounter`
+actualiza el title de `#dl-btn` y `#dl-btn-pdf` con el scope actual y
+hints contextuales: "Para descargar UPL/comuna: click en mun capital
+(Bogotá → 16-001)" cuando el cliente está en vista nacional/depto.
+
+### Datos de entrada (S3)
+```
+bases+de+datos/output_ponderador/proyeccion-por-mun.json
+bases+de+datos/output_ponderador/proyeccion-por-barrio-bogota.json
+bases+de+datos/output_ponderador/proyeccion-por-barrio-medellin.json
+ricardoruiz.co/oportunidad-2026/ciudades/*.json        (proyección por UPL/comuna)
+mapas-2026/DEPARTAMENTOS2.json                          GeoJSON deptos
+mapas-2026/Departamentos-mps/{cod}.json                 GeoJSON muns por depto
+mapas-2026/Ciudades-COM-LOC/{CITY}X.json                GeoJSON comunas/UPL
+mapas-2026/BOG-BARRIOS-CATASTRALES.json                 1.001 barrios Bogotá
+mapas-2026/MEDELLIN-BARRIOS.json                         ~165 barrios Medellín
 ```
 
-**Notas de cálculo**:
-- En agregado por depto: promedio de score ponderado por censo. Conteo
-  independiente de "veleta count" (`recs.filter(r => r.score >= threshold).length`)
-  para que el slider del umbral repinte sin recomputar scores.
-- Header del mapa: número de municipios veleta + % del censo nacional que
-  representan ("censo en juego"). Es el número que un jefe de campaña quiere ver.
+### Riesgo metodológico documentado en footer
 
-**Riesgo metodológico**: la elección de Petro como ancla del swing carga el
-score hacia volatilidad en el eje izquierda. Es defendible (eje principal de la
-contienda 2026) pero documentar en el footer y en el reporte de venta — un
-consultor experto lo va a preguntar.
+- **HOME_TURF heurístico**: sin polling per-mun que separe Abelardo de
+  Paloma, el boost regional es una heurística declarada (Costa+Antioquia
+  para Abelardo, Cauca+Valle+Antioquia para Paloma). Documentado en el
+  footer y en la hoja Metodología del Excel.
+- **Ancla izquierda 2022**: la proyección de Cepeda usa el bloque izquierda
+  agregado 2022 (Petro) como ancla. Defendible (eje principal de la
+  contienda 2026) pero un consultor experto lo va a preguntar.
 
 ## Módulo Oportunidad — `oportunidad.html` (LISTO · B2B)
 

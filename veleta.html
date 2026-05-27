@@ -521,6 +521,7 @@
     <div class="toggle-group dl-group">
       <span class="dl-counter" id="dl-counter" title="Descargas usadas este mes (compartido con Oportunidad)">…</span>
       <button class="toggle-btn dl-btn" id="dl-btn" onclick="onDownloadVeletaXLSX()" title="Descarga la lista completa del scope actual">Descargar Excel</button>
+      <button class="toggle-btn dl-btn" id="dl-btn-pdf" onclick="onDownloadVeletaPDF()" title="Top 50 + categoría + metodología en PDF · Premium">PDF top 50</button>
     </div>
   </section>
 
@@ -620,6 +621,8 @@
     'mde-barrios':               'premium',  // drill a barrios de Medellín
     'descarga-xlsx':             'pro',      // Pro 3/mes, Premium 10/mes (compartido con Oportunidad)
     'descarga-xlsx-quota':       'pro',      // alias para el modal de "quota agotada"
+    'descarga-pdf':              'premium',  // PDF top 50 + metodología — Premium only
+    'descarga-pdf-quota':        'premium',  // alias para el modal de "quota agotada" del PDF
   };
 
   // Copy del modal por feature
@@ -633,6 +636,8 @@
     'mde-barrios':               { title:'Medellín · barrios', desc:'El mapa por los barrios oficiales de Medellín, con herencia kNN de los barrios sin medición, está disponible en Premium.' },
     'descarga-xlsx':             { title:'Descargar resultados (Excel)', desc:'La descarga en Excel se habilita desde Pro (3/mes) y Premium (10/mes). El contador es mensual y compartido con el módulo Oportunidad.' },
     'descarga-xlsx-quota':       { title:'Llegaste al límite del mes', desc:'Tu cuota mensual de descargas (compartida entre Veleta y Oportunidad) ya se agotó. Se reinicia el día 1 del próximo mes. Si necesitas más, pasa a Premium para 10/mes.' },
+    'descarga-pdf':              { title:'Descargar reporte (PDF)', desc:'El PDF reporta el top 50 municipios del scope actual con score, proyección de votación, categoría y censo electoral, más una página de metodología. Disponible en Premium (10/mes, compartido con la cuota de Excel).' },
+    'descarga-pdf-quota':        { title:'Llegaste al límite del mes', desc:'Tu cuota mensual de descargas (compartida entre Veleta Excel/PDF y Oportunidad) ya se agotó. Se reinicia el día 1 del próximo mes.' },
   };
 
   const PLAN_PRICE = {
@@ -1041,7 +1046,10 @@
        captable = max(0, techoCaptable - proyCepeda), capped a 10pp
        Score: proximidad al 50% (0.6) + plausibilidad del captable (0.4)
        Si proy ≥ 50% → 35 (ya ganado en 1V)
-     Modos Abelardo / Paloma: pendientes (Fase 2C).
+     Modos Abelardo / Paloma: implementados con proyección sobre bloque
+     derecha 2022 escalado al ponderador 2026 + share intra-bloque + boost
+     regional manual (HOME_TURF). Score = (0.7 · proximidad al techo del
+     bloque + 0.3 · plausibilidad de captable) × 100.
   */
   function scoreMunForMode(mun, mode){
     const cand = CANDIDATES.find(c => c.id === mode);
@@ -2688,12 +2696,30 @@
     const used  = _dlState.used;
     cnt.classList.remove('exhausted','locked');
     let countLabel = '';
+    let scopeForTitle = null;
     try {
       const scope = collectVeletaScopeItems();
       if (scope && scope.count){
         countLabel = `${scope.count} ${scope.unitPlural}`;
+        scopeForTitle = scope;
       }
     } catch(_){}
+    // Sprint V.3 · title dinámico de los botones con el scope actual + guía
+    // de cómo cambiar de nivel territorial (la pregunta más común del cliente).
+    const pdfBtn = document.getElementById('dl-btn-pdf');
+    if (scopeForTitle){
+      const lvl = scopeForTitle.level;
+      const hint = (lvl === 'dep')
+        ? '\nPara descargar municipios: click en un depto. Para UPL/comuna de una ciudad: depto → mun capital (Bogotá → 16-001, Medellín → 01-001).'
+        : (lvl === 'mun')
+        ? '\nPara descargar UPL/comuna: click en una ciudad capital (Bogotá → 16-001, Medellín → 01-001).'
+        : (lvl === 'subloc')
+        ? '\nVas a descargar las UPL/comunas del scope actual. Para barrios: click en una UPL/comuna específica (Premium).'
+        : '\nVas a descargar el detalle por barrio. Para volver a UPL/comuna: click en "Cerrar barrios" arriba del mapa.';
+      const baseTitle = `Scope actual: ${scopeForTitle.scope} (${scopeForTitle.count} ${scopeForTitle.unitPlural}).`;
+      if (btn)    btn.title    = baseTitle + hint;
+      if (pdfBtn) pdfBtn.title = `Top 50 + categoría + metodología en PDF (Premium). ${baseTitle}${hint}`;
+    }
     if (quota === 0){
       cnt.textContent = countLabel ? `${countLabel} · Pro/Premium` : 'Pro/Premium';
       cnt.classList.add('locked');
@@ -2712,6 +2738,29 @@
   function _dlErrorModalFor(reason){
     if (reason === 'quota') openBlockedModal('descarga-xlsx-quota');
     else                    openBlockedModal('descarga-xlsx');
+  }
+
+  /* Helper · clasifica un row en una categoría legible según el candidato
+     y su proyección de votación. Replica EXACTAMENTE los thresholds que
+     usa la UI en el panel lateral (función collectVeletaScopeItems-style
+     accordion del candidato), para que cliente vea en el Excel las mismas
+     etiquetas que ve en pantalla. */
+  function _categoriaFor(r, candId){
+    const p = (r && r.proy != null) ? Number(r.proy) : null;
+    if (p == null || !Number.isFinite(p)) return '';
+    if (candId === 'cepeda'){
+      if (p >= 50) return 'Ya proyecta >50% (asegura 1V)';
+      const gap = 50 - p;
+      if (gap <= 5)  return 'A menos de 5 pp del 50% (esfuerzo más rentable)';
+      if (gap <= 15) return 'Entre 5 y 15 pp del 50% (alcanzable con campaña fuerte)';
+      return 'A más de 15 pp del 50% (bastión opositor, baja prioridad)';
+    }
+    if (candId === 'abelardo' || candId === 'paloma'){
+      if (p >= 25) return 'Base sólida (proy ≥ 25%)';
+      if (p >= 15) return 'Base media (proy entre 15% y 25%)';
+      return 'Base débil (proy < 15%)';
+    }
+    return '';
   }
 
   /* Construye el .xlsx con 2 hojas (Metodología + Datos). Columnas
@@ -2758,13 +2807,56 @@
       ['(deptos entre sí, muns nacionales entre sí, comunas de la ciudad entre sí).'],
       ['No es directamente comparable entre niveles distintos.'],
       [''],
+      ['CATEGORÍA (columna nueva)'],
+      [''],
+      ['La columna "categoria" agrupa cada territorio según su proyección de'],
+      ['votación. Replica exactamente las categorías que aparecen en el panel'],
+      ['lateral de la herramienta web.'],
+      [''],
+      ['• Cepeda:'],
+      ['    "Ya proyecta >50% (asegura 1V)"  · proy >= 50%'],
+      ['    "A menos de 5 pp del 50%"        · 45% <= proy < 50%'],
+      ['    "Entre 5 y 15 pp del 50%"        · 35% <= proy < 45%'],
+      ['    "A más de 15 pp del 50%"         · proy < 35%'],
+      [''],
+      ['• Abelardo / Paloma:'],
+      ['    "Base sólida (proy >= 25%)"'],
+      ['    "Base media (15% <= proy < 25%)"'],
+      ['    "Base débil (proy < 15%)"'],
+      [''],
+      ['CÓMO DESCARGAR AGREGADO POR UPL / COMUNA / LOCALIDAD'],
+      [''],
+      ['Para descargar el agregado de Bogotá por UPL (33), Medellín por'],
+      ['comuna (16) o cualquier ciudad por su nivel sub-municipal:'],
+      ['    1. Desde la vista nacional, haz click en el departamento.'],
+      ['    2. Click en el municipio capital (Bogotá → 16-001, Medellín → 01-001).'],
+      ['    3. El mapa cambia automáticamente a la vista UPL/comuna.'],
+      ['    4. Haz click en "Descargar Excel" — la hoja "Datos" listará los'],
+      ['       33 UPL de Bogotá (o las 16 comunas de Medellín) con su score,'],
+      ['       proyección y categoría.'],
+      [''],
+      ['Si descargas a nivel BARRIO (1.001 barrios catastrales de Bogotá o'],
+      ['~165 barrios de Medellín), las columnas "loc_codigo" y "loc_nombre"'],
+      ['indican la LOCALIDAD a la que pertenece cada barrio — útil para'],
+      ['reconstruir agregados por localidad en Excel/Power BI. Nota: los'],
+      ['barrios catastrales NO traen UPL pre-asignada en el JSON oficial;'],
+      ['para agregar por UPL hay que usar el flujo agregado anterior.'],
+      [''],
       ['COLUMNAS'],
       [''],
-      ['rank     : posición de mayor a menor score dentro del scope.'],
-      ['nombre   : nombre del territorio (depto, municipio, comuna/UPL, barrio).'],
-      ['depto    : departamento Registraduría que contiene el territorio.'],
-      ['mun_elec : código electoral municipal Registraduría (cuando aplica).'],
-      ['score    : 0–100, dos decimales.'],
+      ['rank        : posición de mayor a menor score dentro del scope.'],
+      ['nombre      : nombre del territorio (depto, municipio, comuna/UPL, barrio).'],
+      ['depto       : departamento Registraduría que contiene el territorio.'],
+      ['mun_elec    : código electoral municipal Registraduría (cuando aplica).'],
+      ['upl_o_comuna: nombre del nivel sub-municipal (UPL en Bogotá, comuna en'],
+      ['              ciudades; LOCALIDAD para barrios catastrales de Bogotá).'],
+      ['barrio      : nombre del barrio catastral/oficial (solo si scope = barrio).'],
+      ['loc_codigo  : código localidad (2 chars) — solo barrios Bogotá.'],
+      ['loc_nombre  : nombre localidad — solo barrios Bogotá.'],
+      ['proy_pct    : voto proyectado del candidato en este territorio (%).'],
+      ['categoria   : tier de prioridad según proy_pct (ver arriba).'],
+      ['score       : 0–100, dos decimales (rank percentilizado).'],
+      ['censo       : censo electoral del territorio (cuando disponible).'],
       [''],
       ['Documentación completa: https://ricardoruiz.co/veleta.html'],
       ['Detalle metodológico: https://ricardoruiz.co/previa-1v.html'],
@@ -2779,7 +2871,9 @@
     const header = [
       'candidato','modo','scope','nivel','rank','nombre',
       'depto','mun_elec','upl_o_comuna','barrio',
-      'score',
+      'loc_codigo','loc_nombre',
+      'proy_pct','categoria',
+      'score','censo',
       'fecha_export',
     ];
     const num2 = (n) => (n == null || isNaN(n)) ? null : Number(Number(n).toFixed(2));
@@ -2794,6 +2888,8 @@
       let munCod = '';
       let uplComuna = '';
       let barrio = '';
+      let locCod = '';
+      let locNom = '';
       if (lvl === 'dep'){
         nombre = (STATE.depByElectoral[r.depCod] || {}).nombre || r.depCod;
         depto  = nombre;
@@ -2807,12 +2903,16 @@
       } else if (lvl === 'barrio'){
         barrio = r.nombre || r.cod || '';
         nombre = barrio;
-        uplComuna = r.loc_nombre || '';
+        uplComuna = r.loc_nombre || '';  // para barrios Bogotá esto es la LOCALIDAD
+        locCod    = r.loc_codigo || '';
+        locNom    = r.loc_nombre || '';
       }
       return [
         candName, modeShort, scope.scope, lvl, i + 1, nombre,
         depto, munCod, uplComuna, barrio,
-        num2(r.score),
+        locCod, locNom,
+        num2(r.proy), _categoriaFor(r, candId),
+        num2(r.score), (r.censo == null ? null : Number(r.censo)),
         fecha,
       ];
     });
@@ -2820,7 +2920,9 @@
     wsData['!cols'] = [
       { wch: 22 }, { wch: 26 }, { wch: 30 }, { wch: 10 }, { wch: 6 }, { wch: 32 },
       { wch: 22 }, { wch: 10 }, { wch: 26 }, { wch: 26 },
-      { wch: 8 },
+      { wch: 10 }, { wch: 22 },
+      { wch: 9 }, { wch: 44 },
+      { wch: 8 }, { wch: 10 },
       { wch: 12 },
     ];
     XLSX.utils.book_append_sheet(wb, wsData, 'Datos');
@@ -2856,6 +2958,210 @@
     }
   }
   window.onDownloadVeletaXLSX = onDownloadVeletaXLSX;
+
+  /* ───────── PDF · top 50 + metodología (Premium) ───────── */
+  const JSPDF_CDN = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+  async function _loadJsPDF(){
+    if (window.jspdf && window.jspdf.jsPDF) return window.jspdf.jsPDF;
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = JSPDF_CDN; s.onload = resolve;
+      s.onerror = () => reject(new Error('No se pudo cargar jsPDF'));
+      document.head.appendChild(s);
+    });
+    if (!window.jspdf || !window.jspdf.jsPDF) throw new Error('jsPDF no disponible');
+    return window.jspdf.jsPDF;
+  }
+
+  async function _buildAndDownloadVeletaPDF(scope){
+    const cand    = currentCand();
+    const candId  = cand ? cand.id : 'cand';
+    const candName= cand ? cand.nombre : '—';
+    const modeShort = candId === 'cepeda' ? 'Modo Cepeda · 1V'
+                    : candId === 'abelardo' ? 'Modo Abelardo · 2do en derecha'
+                    : candId === 'paloma'   ? 'Modo Paloma · 2do en derecha'
+                    : 'Modo';
+    const fecha = new Date().toLocaleDateString('es-CO', { year:'numeric', month:'long', day:'numeric' });
+    const fechaSlug = new Date().toISOString().slice(0,10);
+    const items = scope.items.slice(0, 50);  // top 50
+
+    const jsPDF = await _loadJsPDF();
+    const doc = new jsPDF({ unit:'mm', format:'a4' });
+    const PW = 210, PH = 297, M = 16;
+    let y = M;
+    const ACC  = [251, 146, 60];   // --orange (#fb923c)
+    const INK  = [26, 22, 16];
+    const INK2 = [90, 84, 72];
+    const RULE = [200, 195, 185];
+    const SOFT = [255, 244, 232];
+    function setFont(w, s){ doc.setFont('helvetica', w); doc.setFontSize(s); }
+    function pageBreak(needed){
+      if (y + needed > PH - M - 10){
+        _drawFooter();
+        doc.addPage();
+        y = M;
+        _drawHeaderBar();
+      }
+    }
+    function _drawHeaderBar(){
+      setFont('normal', 8); doc.setTextColor(...INK2);
+      doc.text('Veleta · Municipios sensibles · ricardoruiz.co', M, M - 6);
+      doc.setDrawColor(...RULE); doc.setLineWidth(0.2);
+      doc.line(M, M - 4, PW - M, M - 4);
+      doc.setTextColor(...INK);
+    }
+    function _drawFooter(){
+      const yy = PH - 8;
+      setFont('italic', 8); doc.setTextColor(...INK2);
+      doc.text('Borrador automático · revisar antes de uso operativo · ricardoruiz.co', M, yy);
+      doc.text(String(doc.internal.getCurrentPageInfo().pageNumber), PW - M, yy, { align:'right' });
+      doc.setTextColor(...INK);
+    }
+    // ─── Portada / header
+    _drawHeaderBar();
+    setFont('bold', 20); doc.setTextColor(...ACC);
+    doc.text('Reporte Veleta · Top 50', M, y + 4); y += 9;
+    doc.setDrawColor(...ACC); doc.setLineWidth(0.7); doc.line(M, y, PW - M, y); y += 6;
+    setFont('bold', 13); doc.setTextColor(...INK);
+    doc.text(`${candName}`, M, y); y += 6;
+    setFont('normal', 10); doc.setTextColor(...INK2);
+    doc.text(`${modeShort}`, M, y); y += 5;
+    doc.text(`Scope: ${scope.scope}  ·  ${scope.count} ${scope.unitPlural} en total  ·  ${items.length} en el top`, M, y); y += 5;
+    doc.text(`Fecha: ${fecha}`, M, y); y += 8;
+    doc.setTextColor(...INK);
+
+    // ─── Tabla top 50
+    setFont('bold', 11); doc.setTextColor(...ACC);
+    doc.text('Top 50 territorios por score', M, y); y += 5;
+    doc.setTextColor(...INK);
+    const headers = ['#', 'Territorio', 'Depto', 'Score', 'Proy.', 'Categoría'];
+    // Anchos por columna en mm (suman ~178 mm de los 178 disponibles después de márgenes)
+    const widths  = [8, 56, 32, 14, 14, 54];
+    function drawTableHeader(){
+      setFont('bold', 9); doc.setFillColor(...SOFT); doc.setTextColor(...ACC);
+      doc.setDrawColor(...RULE); doc.setLineWidth(0.2);
+      let x = M;
+      headers.forEach((h, i) => {
+        doc.rect(x, y - 4, widths[i], 6.5, 'FD');
+        doc.text(h, x + 1.5, y);
+        x += widths[i];
+      });
+      y += 4.5; doc.setTextColor(...INK);
+    }
+    function drawRow(vals, hl){
+      setFont('normal', 8.5);
+      const cellLines = vals.map((v, i) => doc.splitTextToSize(String(v == null ? '' : v), widths[i] - 2));
+      const maxLines = cellLines.reduce((a, c) => Math.max(a, c.length), 1);
+      const rowH = Math.max(5.5, maxLines * 3.7 + 1.5);
+      pageBreak(rowH + 2);
+      if (hl){ doc.setFillColor(255, 240, 224); doc.setTextColor(...ACC); }
+      else  { doc.setFillColor(255, 255, 255); doc.setTextColor(...INK); }
+      let x = M;
+      cellLines.forEach((arr, i) => {
+        doc.rect(x, y - 4, widths[i], rowH, hl ? 'FD' : 'D');
+        arr.forEach((line, li) => doc.text(line, x + 1.5, y + li * 3.7));
+        x += widths[i];
+      });
+      y += rowH - 1.5;
+    }
+    drawTableHeader();
+    const depNameOf = (r) => {
+      const cod = r.depCod || '';
+      return (STATE.depByElectoral[cod] || {}).nombre || cod || '';
+    };
+    items.forEach((r, i) => {
+      let nombre = r.nombre || r.__cityName || r.name || '';
+      if (scope.level === 'dep'){
+        nombre = (STATE.depByElectoral[r.depCod] || {}).nombre || r.depCod;
+      } else if (scope.level === 'mun'){
+        const meta = STATE._munNameByKey && STATE._munNameByKey[r.key];
+        nombre = (meta && meta.name) || r.nombre || r.key || '';
+      }
+      const depto = depNameOf(r);
+      const score = (r.score == null || isNaN(r.score)) ? '—' : Number(r.score).toFixed(1);
+      const proy  = (r.proy  == null || isNaN(r.proy))  ? '—' : Number(r.proy).toFixed(1) + '%';
+      const cat   = _categoriaFor(r, candId);
+      // Highlight top 10
+      drawRow([i + 1, nombre, depto, score, proy, cat], i < 10);
+    });
+
+    // ─── Metodología
+    pageBreak(15);
+    doc.addPage(); y = M; _drawHeaderBar();
+    setFont('bold', 14); doc.setTextColor(...ACC);
+    doc.text('Cómo se construye el score', M, y); y += 7;
+    doc.setTextColor(...INK);
+    function drawPara(t){
+      setFont('normal', 9.5); doc.setTextColor(...INK);
+      const lines = doc.splitTextToSize(String(t), PW - 2*M);
+      lines.forEach(l => { pageBreak(4.5); doc.text(l, M, y); y += 4.3; });
+      y += 1.5;
+    }
+    function drawH3(t){
+      pageBreak(8); setFont('bold', 10.5); doc.setTextColor(...ACC);
+      doc.text(t, M, y); y += 5; doc.setTextColor(...INK);
+    }
+    drawPara('Veleta cruza la evolución del voto por bloque ideológico (izquierda, centro, derecha) entre 2010-2022 con el ponderador propio 2026, para identificar dónde el esfuerzo de campaña tiene mayor leverage por candidato.');
+
+    drawH3('Modo Cepeda · ganar 1ª vuelta con >50%');
+    drawPara('score = (0.6 · proximidad + 0.4 · plausibilidad) × 100. Proximidad: qué tan cerca está el voto Cepeda proyectado del 50%. Plausibilidad: qué tan creíble es cubrir la brecha sumando un tercio del voto centro 2018 (Fajardo). Si la proyección ya supera 50%, el mun cae a baja prioridad (ya ganado en 1V).');
+
+    drawH3('Modo Abelardo / Paloma · 2do lugar dentro del bloque derecha');
+    drawPara('Proyección a partir del bloque derecha 2022 (Fico + Rodolfo) escalado al peso 2026 del candidato, con un boost regional manual (home turf) que diferencia los dos mapas: Costa Atlántica + Antioquia para Abelardo; Cauca + Valle + Antioquia para Paloma. Sin polling per-mun que separe a los dos candidatos, el boost es una heurística declarada.');
+
+    drawH3('Categorías de prioridad (columna "Categoría")');
+    if (candId === 'cepeda'){
+      drawPara('• Ya proyecta >50%: el municipio ya asegura 1V para Cepeda. No requiere campaña intensa.');
+      drawPara('• A menos de 5 pp del 50%: el esfuerzo de campaña con mayor retorno marginal. Foco principal.');
+      drawPara('• Entre 5 y 15 pp del 50%: alcanzable con campaña fuerte y bien dirigida.');
+      drawPara('• A más de 15 pp del 50%: bastión opositor, baja prioridad para 1V.');
+    } else if (candId === 'abelardo' || candId === 'paloma'){
+      drawPara('• Base sólida (proy ≥ 25%): el candidato ya tiene presencia fuerte. Consolidar y defender.');
+      drawPara('• Base media (15-25%): zona de disputa con el otro candidato del bloque derecha.');
+      drawPara('• Base débil (<15%): bajo retorno marginal salvo que haya un evento muy específico.');
+    }
+
+    drawH3('Cómo descargar agregado por UPL / comuna');
+    drawPara('Desde la vista nacional: click en el depto del territorio que te interesa → click en el municipio capital (Bogotá → 16-001, Medellín → 01-001). El mapa cambia automáticamente a la vista UPL/comuna y la descarga lista esa granularidad.');
+
+    drawH3('Fuentes');
+    drawPara('Registraduría Nacional · GCS 2010/2014/2018/2022 1ª vuelta. Ponderador propio (encuestas calibradas vs consultas 8-mar 2026). Censo Divipole.');
+    drawPara('Documentación completa: https://ricardoruiz.co/veleta.html');
+
+    _drawFooter();
+    const safeScope = (scope.scope || 'veleta').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0, 50);
+    doc.save(`veleta_${candId}_${safeScope}_${fechaSlug}.pdf`);
+  }
+
+  async function onDownloadVeletaPDF(){
+    if (!requireFeature('descarga-pdf')) return;
+    const scope = collectVeletaScopeItems();
+    if (!scope || !scope.items || !scope.items.length){
+      alert('No hay datos para descargar todavía. Espera a que terminen de cargar los scores.');
+      return;
+    }
+    const btn = document.getElementById('dl-btn-pdf');
+    const prev = btn ? btn.textContent : '';
+    if (btn){ btn.disabled = true; btn.textContent = 'Generando…'; }
+    try {
+      const consumed = await dlConsume();
+      if (!consumed.ok){
+        // El PDF consume del MISMO contador que el Excel.
+        if (consumed.reason === 'quota') openBlockedModal('descarga-pdf-quota');
+        else                              openBlockedModal('descarga-pdf');
+        renderDlCounter();
+        return;
+      }
+      await _buildAndDownloadVeletaPDF(scope);
+      renderDlCounter();
+    } catch (e){
+      console.error('[Veleta PDF] error', e);
+      alert('No se pudo generar el PDF. Intenta de nuevo.');
+    } finally {
+      if (btn){ btn.disabled = false; btn.textContent = prev || 'PDF top 50'; }
+    }
+  }
+  window.onDownloadVeletaPDF = onDownloadVeletaPDF;
 
   /* ───────── Init ───────── */
   (async function init(){
