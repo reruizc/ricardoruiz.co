@@ -156,6 +156,23 @@
     /* Loading state */
     .loading-overlay { display:flex; align-items:center; justify-content:center; padding: 4rem 1rem; font-family:'DM Mono',monospace; font-size:.75rem; letter-spacing:.12em; color:var(--text3); text-transform:uppercase; }
 
+    /* Panel de recomendaciones */
+    .recom-card { margin-top: 1.5rem; }
+    .recom-card .col-body { padding: 1.25rem 1.5rem; }
+    .recom-general { font-family:'Fraunces',serif; font-weight:400; font-size:1.02rem; line-height:1.6; color:var(--text); padding:.7rem .9rem; background:var(--purple-dim); border-left:3px solid var(--purple); margin-bottom: 1.5rem; }
+    .recom-escenario { font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.1em; color:var(--purple); text-transform:uppercase; margin-bottom:.5rem; }
+    .recom-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+    .recom-arq { padding: 1rem 1.1rem; border:1px solid var(--border); background: var(--surface2); border-top: 3px solid; }
+    .recom-arq h4 { font-family:'Syne',sans-serif; font-weight:700; font-size:.92rem; margin-bottom:.5rem; line-height:1.2; }
+    .recom-arq p { font-family:'Fraunces',serif; font-weight:300; font-size:.88rem; line-height:1.5; color:var(--text); margin-bottom: .75rem; }
+    .recom-arq .recom-acc-title { font-family:'DM Mono',monospace; font-size:.58rem; letter-spacing:.15em; text-transform:uppercase; color:var(--text3); margin-bottom:.3rem; }
+    .recom-arq ul { list-style:none; padding:0; margin-bottom:.7rem; }
+    .recom-arq ul li { font-family:'Fraunces',serif; font-size:.82rem; line-height:1.45; padding-left:1rem; position:relative; color:var(--text2); margin-bottom:.35rem; }
+    .recom-arq ul li::before { content:'→'; position:absolute; left:0; color:inherit; font-weight:600; }
+    .recom-arq .recom-riesgo { font-family:'Fraunces',serif; font-style:italic; font-weight:300; font-size:.78rem; color: var(--danger); padding:.4rem 0 0; border-top: 1px dashed var(--border); }
+    .recom-err { font-family:'DM Mono',monospace; font-size:.72rem; color:var(--danger); padding: 1rem 0; }
+    .recom-meta { margin-top: 1rem; font-family:'DM Mono',monospace; font-size:.62rem; color:var(--text3); letter-spacing:.05em; }
+
     /* Tooltip Leaflet override */
     .leaflet-tooltip {
       font-family: 'Fraunces', serif; font-weight: 400; font-size: .85rem;
@@ -239,7 +256,19 @@
         </div>
       </div>
       <button class="reset-btn" id="reset-sliders">↻ Reset sliders</button>
+      <button class="reset-btn" id="recomendar-btn" style="border-color:var(--purple);color:var(--purple)">✦ Recomendar estrategia</button>
     </div>
+
+    <!-- Panel de recomendaciones DeepSeek -->
+    <section class="recom-card col-card" id="recom-card" hidden>
+      <div class="col-header">
+        <div class="col-title">Recomendaciones de campaña bajo este escenario</div>
+        <div class="col-sub" id="recom-sub">DeepSeek V4 Flash · cache S3 7d</div>
+      </div>
+      <div class="col-body" id="recom-body">
+        <div class="loading-overlay">Pensando estrategia…</div>
+      </div>
+    </section>
 
     <div class="layout">
       <div class="col-card sliders-col">
@@ -332,6 +361,12 @@
         el.addEventListener('mouseleave', () => { cursor.style.transform='translate(-50%,-50%) scale(1)'; cursor.style.background='var(--purple)'; cursor.style.border='none'; ring.style.opacity='.4'; });
       });
     }
+
+    // ─── ENDPOINT DEEPSEEK (Sprint 2) ─────────────────────────────────
+    // Reemplazar con el URL real del API Gateway una vez deployada la Lambda
+    // `proyecto-dc-escenarios-estrategia` (ver tools/.../DEPLOY.md).
+    // Si queda en string vacío, el botón muestra fallback.
+    const STRATEGY_ENDPOINT = '';
 
     // ─── DATA SOURCES ─────────────────────────────────────────────────
     const S3_BASE = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co';
@@ -436,6 +471,141 @@
         document.querySelectorAll('.slider-input').forEach(el => { el.value = 0; el.dispatchEvent(new Event('input')); });
         if (typeof drawMap === 'function') drawMap();
       });
+      const recom = document.getElementById('recomendar-btn');
+      recom.addEventListener('click', pedirEstrategia);
+    }
+
+    // ─── DEEPSEEK · RECOMENDAR ESTRATEGIA ─────────────────────────────
+    function _payloadEstrategia(){
+      const sliders = Object.assign({}, STATE.sliders);
+      const sel = STATE.selected;
+      let baseFam = null, proyFam = null, scores = null, terr = null, afProm = null;
+      if (sel){
+        if (sel.kind === 'barrio'){
+          const res = getBarrioByDap(sel.key);
+          if (res){
+            const b = res.b;
+            baseFam = b.arquetipo && b.arquetipo['2023'];
+            proyFam = baseFam ? computeArquetipoProyectadoBarrio(b, sel.key) : null;
+            const af = STATE.data.afinidad && STATE.data.afinidad.barrios && STATE.data.afinidad.barrios[sel.key];
+            afProm = af ? af.afinidad_slider : null;
+            scores = baseFam ? computeScores(baseFam, sliders, afProm) : null;
+            terr = b.barrio + (b.comuna ? ` (${b.comuna})` : '');
+          }
+        } else {
+          const com = STATE.data.porComuna[sel.key];
+          if (com){
+            baseFam = com['2023'] && com['2023'].dominante;
+            proyFam = baseFam ? computeArquetipoProyectadoComuna(sel.key) : null;
+            let afT=0, afC=0;
+            for (const [dap, b] of Object.entries(STATE.data.porBarrio)){
+              if ((b.comuna||'').toLowerCase() !== (sel.key||'').toLowerCase()) continue;
+              const e = STATE.data.afinidad && STATE.data.afinidad.barrios && STATE.data.afinidad.barrios[dap];
+              if (e){ afT += e.afinidad_slider; afC++; }
+            }
+            afProm = afC > 0 ? afT / afC : null;
+            scores = baseFam ? computeScores(baseFam, sliders, afProm) : null;
+            terr = sel.key + ' (comuna)';
+          }
+        }
+      }
+      // Migraciones top: barrios que cambian bajo el escenario
+      const migs = [];
+      if (escenarioActivo()){
+        for (const [dap, b] of Object.entries(STATE.data.porBarrio)){
+          const base = b.arquetipo && b.arquetipo['2023'];
+          if (!base) continue;
+          const proy = computeArquetipoProyectadoBarrio(b, dap);
+          if (proy && proy !== base){
+            migs.push({ lugar: b.barrio + ' (' + b.comuna + ')', de: base, a: proy });
+          }
+          if (migs.length >= 60) break;
+        }
+      }
+      // Si no hay territorio seleccionado, usar lectura global: arquetipo dominante en mapa
+      if (!baseFam){
+        // Contar arquetipo más frecuente entre comunas
+        const counts = {};
+        for (const c of Object.values(STATE.data.porComuna)){
+          const f = c['2023'] && c['2023'].dominante;
+          if (f) counts[f] = (counts[f]||0) + 1;
+        }
+        baseFam = Object.entries(counts).sort((a,b) => b[1]-a[1])[0]?.[0];
+        if (baseFam) proyFam = computeArquetipoProyectadoComuna(Object.keys(STATE.data.porComuna)[0]) || baseFam;
+      }
+      return {
+        level: STATE.level,
+        territorio: terr,
+        sliders,
+        arquetipo_base: baseFam,
+        arquetipo_proyectado: proyFam,
+        scores,
+        migraciones_top: migs.slice(0, 8),
+        afinidad_carvalho_promedio: afProm,
+      };
+    }
+
+    async function pedirEstrategia(){
+      const card = document.getElementById('recom-card');
+      const body = document.getElementById('recom-body');
+      const sub = document.getElementById('recom-sub');
+      card.hidden = false;
+      body.innerHTML = '<div class="loading-overlay">Pensando estrategia… 10–15s</div>';
+      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      if (!STRATEGY_ENDPOINT){
+        body.innerHTML = `<div class="recom-err">⚠ Endpoint DeepSeek aún no configurado. Editá la constante <code>STRATEGY_ENDPOINT</code> en escenarios-2027.html con el URL del API Gateway una vez deployada la Lambda <code>proyecto-dc-escenarios-estrategia</code> (ver tools/proyecto-dc-escenarios-estrategia/DEPLOY.md).</div>`;
+        return;
+      }
+
+      const payload = _payloadEstrategia();
+      try {
+        const r = await fetch(STRATEGY_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          mode: 'cors',
+        });
+        if (!r.ok){
+          const txt = await r.text();
+          body.innerHTML = `<div class="recom-err">⚠ Error ${r.status}: ${txt.slice(0, 200)}</div>`;
+          return;
+        }
+        const data = await r.json();
+        renderEstrategia(data, payload);
+        sub.textContent = `${DEEPSEEK_FOOTER(data)}`;
+      } catch (e){
+        body.innerHTML = `<div class="recom-err">⚠ No pude llamar a DeepSeek: ${e.message}</div>`;
+      }
+    }
+
+    function DEEPSEEK_FOOTER(data){
+      const dt = data.generado_en ? new Date(data.generado_en).toLocaleString('es-CO', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—';
+      return `${data.modelo || 'DeepSeek V4'} · ${data.cache_hit ? 'cache hit' : 'fresco'} · ${dt}`;
+    }
+
+    function renderEstrategia(data, payload){
+      const body = document.getElementById('recom-body');
+      const recs = data.recomendaciones || {};
+      const order = ['proteccion','castigo','continuidad','supervivencia','pertenencia'];
+      const cards = order.map(famId => {
+        const r = recs[famId] || {};
+        const c = colorArq(famId);
+        const acc = Array.isArray(r.acciones) ? r.acciones : [];
+        return `
+          <div class="recom-arq" style="border-top-color:${c}">
+            <h4 style="color:${c}">${arqLabel(famId, 'evol')}</h4>
+            <p>${r.lectura || '<em>Sin lectura específica para este arquetipo.</em>'}</p>
+            ${acc.length ? `<div class="recom-acc-title">Acciones</div><ul style="color:${c}">${acc.map(a => `<li>${a}</li>`).join('')}</ul>` : ''}
+            ${r.riesgo ? `<div class="recom-riesgo">⚠ ${r.riesgo}</div>` : ''}
+          </div>`;
+      }).join('');
+      body.innerHTML = `
+        ${data.escenario_resumido ? `<div class="recom-escenario">${data.escenario_resumido}</div>` : ''}
+        ${data.lectura_general ? `<div class="recom-general">${data.lectura_general}</div>` : ''}
+        <div class="recom-grid">${cards}</div>
+        <div class="recom-meta">Generado bajo escenario con ${Object.values(payload.sliders).filter(v => v !== 0).length} palancas activas${payload.territorio ? ' · territorio: ' + payload.territorio : ' · lectura global'}.</div>
+      `;
     }
 
     function renderSliders(){
