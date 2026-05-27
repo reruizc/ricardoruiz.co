@@ -1890,26 +1890,54 @@ inteligencia editorial, NO publicación de sondeo).
   con prompts largos. Si lo amplías, mide la latencia después (límite
   blando 30 s por API Gateway).
 
-## Lab de Políticas Públicas y Prospectiva (Sprints A + B + C + D · LISTO)
+## Lab de Políticas Públicas y Prospectiva (Sprints A · B · B v2 · C · D · E Fase A · F · F v2 · G · LISTO)
 
 **El hub vive en `analisis-estructural.html`** (mismo archivo, rebrandeado).
-Los 6 módulos del lab están operativos:
+**Los 7 módulos del lab están operativos** con cloud-save, copiloto IA
+DeepSeek y informe combinado:
 
-| # | Módulo | Archivo | Estado |
-|---|---|---|---|
-| 1 | Problema público | `problema-publico.html` | ✓ vivo (Sprint A) |
-| 2 | Análisis estructural | `analisis-estructural.html` (mismo HTML que el hub) | ✓ vivo |
-| 3 | Análisis de actores | `mactor.html` | ✓ vivo |
-| 4 | Evaluación de política | `evaluacion.html` | ✓ vivo (Sprint B + B v2 · literatura 2020-2026) |
-| 5 | Alternativas de política | `alternativas.html` | ✓ vivo (Sprint C) |
-| 6 | Análisis de Impacto Normativo | `ain.html` | ✓ vivo (Sprint D) |
-| 7 | Escenarios prospectivos | `prospect-escenarios.html` | ✓ vivo (Sprint F) |
+| # | Módulo | Archivo | Sprints | What-if / extras |
+|---|---|---|---|---|
+| 1 | Problema público | `problema-publico.html` | A · 3 IA · cloud · Excel + PDF | — |
+| 2 | Análisis estructural | `analisis-estructural.html` (también es el hub) | A · 5 IA · cloud · panel municipal con sparkline 2018-2024 | **slider what-if motricidad** (Sprint F.B.1) |
+| 3 | Análisis de actores | `mactor.html` | A · 3 IA · cloud · 4 plantillas seed | **slider what-if Ri** (Sprint F.B.2) |
+| 4 | Evaluación de política | `evaluacion.html` | B + **B v2** (literatura 2020-2026 · 14 métodos · TWFE warning · Sinergia DNP · 3 calculadoras económicas CBA/MVPF/CEA · Pre-Analysis Plan AEA RCT exportable) · 3 IA · cloud | — |
+| 5 | Alternativas de política | `alternativas.html` | C · 4 IA · cloud · Excel + CSV + CONPES PDF · envío bidireccional a pp · envío a AIN | **Monte Carlo estocástico 500-5000 sims** (Sprint F.C.1) |
+| 6 | Análisis de Impacto Normativo | `ain.html` | D · 3 IA · cloud · memo CONPES regulatorio · auto-import pp/alt · envío a evaluación | — |
+| 7 | Escenarios prospectivos | `prospect-escenarios.html` | F (módulo nuevo · 4 mecánicas · 3 exports) + **F v2** (cloud + 2 IA copiloto + integración informe combinado) | — |
+
+**Cierre del lab** (no es un módulo más, son herramientas transversales):
+- **Sprint G — Informe combinado** en `lab-informe.js` (~720 líneas): lee
+  los 7 localStorage keys del usuario y genera un PDF/MD único con 9
+  secciones que une diagnóstico + sistema + actores + alternativas + AIN
+  + evaluación + escenarios prospectivos + próximos pasos. Punto de
+  entrada en `stage-hub` de `analisis-estructural.html` ("Mi informe
+  del lab" con anchor `#informe`). Cliente-side jsPDF on-demand.
+- **Sprint E Fase A — Indicadores municipales** en `lab-indicadores.js`
+  (~270 líneas) + JSON ~980 KB en S3: 8 indicadores oficiales (Policía
+  Nacional + MEN) × 1.108 municipios × panel temporal 2018-2024.
+  Integrado en `analisis-estructural` (sparkline SVG), `problema-publico`
+  (botón "Cargar evidencia oficial"), `ain` (grid de cifras
+  territoriales) y `evaluacion` (chip ✦ Autocompletar línea base).
+
+**Worker rr-auth** (`/Users/ricardoruiz/rr-auth/src/index.js`): 49
+endpoints, 7 por prefijo × 7 módulos del lab (micmac · mactor · pp ·
+ev · alt · ain · prospect) + 21 acciones IA copiloto distribuidas.
 
 Sólo `analisis-estructural.html` figura en el listado de proyectos de
 `index.html` (como "Análisis Estructural de Sistemas"). Desde su hub se
-llega a los otros 5 módulos. El hub-grid se renderiza en 3 cols × 2 rows
-en desktop (3+3) para acomodar las 6 cards limpiamente. Cada módulo
-tiene cross-links amarillos a los otros 2-4 en su stage-results.
+llega a los otros 6 módulos. El hub-grid renderiza 7 cards (4+3 en
+desktop). Cada módulo tiene cross-links amarillos al informe combinado
+del lab (∑) y a los módulos adyacentes en el ciclo.
+
+**Pendiente único del Lab (Sprint E Fase B):** descarga manual de
+TerriData / DANE EEVV / MinSalud para añadir 8 indicadores más al
+JSON municipal: IPM 2018, NBI 2018, población DIVIPOLA, agua potable,
+internet hogares, mortalidad infantil, mortalidad materna, embarazo
+adolescente, vacunación PAI. **Checklist operativo detallado en la
+sección "Sprint E Fase B · descarga manual pendiente"** más abajo. ~6-8h
+de trabajo combinado (3h descarga manual, 2-3h escribir parsers Python,
+1-2h validar y subir a S3).
 
 ### Hub del lab (`stage-hub` en analisis-estructural.html)
 
@@ -3184,6 +3212,31 @@ Ya desplegado en producción.
 
 ### Backlog del lab
 
+> **📌 HANDOFF PARA PRÓXIMA CONVERSACIÓN · Estado al 2026-05-27:**
+>
+> El Lab está **LISTO** (10 sprints cerrados: A · B · B v2 · C · D ·
+> E Fase A · F · F v2 · G · varias V de Veleta y C de Cámara). 7
+> módulos operativos con cloud-save, copiloto IA DeepSeek (21
+> acciones), informe combinado y 8 indicadores municipales con panel
+> 2018-2024.
+>
+> **ÚNICO PENDIENTE explícito del Lab: Sprint E Fase B** — agregar 8
+> indicadores municipales más (IPM, NBI, agua, internet, mortalidad
+> infantil/materna, embarazo adolescente, vacunación PAI). Requiere
+> ~3h de descarga MANUAL (TerriData/DANE EEVV/MinSalud no exponen API
+> limpia · WebFetch falla en sus SPAs) y luego ~3-5h de parser Python.
+> El checklist completo está en la sección **"Sprint E Fase B ·
+> descarga manual pendiente"** más abajo (busca `## Sprint E Fase B`
+> o `terridata.dnp.gov.co/#/descargas`). Cubre las 9 fuentes con
+> URLs, formato esperado, rutas locales, cómo extender
+> `build-indicadores-mun/build.py` y keywords nuevas para
+> `matchIndicadorByKeyword` en `lab-indicadores.js`.
+>
+> Otros pendientes del proyecto (NO del Lab) están más arriba en este
+> archivo: `previa-1v.html` (gráfico temporal), Test Presidencial
+> (memes + xlsx_to_json.py + contacto El País Cali), Proyecto DC
+> (módulos 08-09).
+
 **Sprint D · AIN** ✓ LISTO (ver sección dedicada arriba).
 
 **Sprint B v2 · Evaluación con literatura 2020-2026** ✓ LISTO (ver sección
@@ -3229,22 +3282,38 @@ worker ahora tiene 49 endpoints (los 7 de prospect agregados). El
 informe combinado de Sprint G integra el séptimo módulo en una nueva
 sección 8.
 
-**Reservados para próximas iteraciones:**
-- **Sprint E Fase B** — descarga manual de TerriData / DANE EEVV /
-  MinSalud para añadir IPM, NBI, agua, internet, mortalidad infantil/
-  materna, embarazo adolescente y vacunación PAI. Requiere descarga
-  manual (SPAs sin API limpia). El pipeline ya lo soporta con extensiones.
+**🟡 ÚNICO pendiente explícito del Lab — Sprint E Fase B:**
 
-**Mejoras de módulos vivos:**
-- **Mactor MIDI** (opcional) — matriz pivotada de influencias
-  indirectas entre actores (multiplica MID consigo misma).
+Agregar 8 indicadores municipales más al JSON `indicadores-mun.json`
+(IPM 2018, NBI 2018, población DIVIPOLA, agua potable, internet hogares,
+mortalidad infantil/materna, embarazo adolescente, vacunación PAI).
+
+Requiere **descarga manual** porque TerriData (DNP), DANE EEVV
+microdatos y MinSalud SISPRO son SPAs detrás de filtros JavaScript que
+WebFetch no puede leer; toca click manual una vez. Checklist operativo
+completo con URLs, formato y rutas locales en la sección **"Sprint E
+Fase B · descarga manual pendiente (checklist operativo)"** más arriba
+(busca `## Sprint E Fase B` en este archivo, ~línea 2742).
+
+Estimación: 3h descarga manual + 2-3h escribir parsers `_fetch_terridata_xlsx`,
+`_fetch_eevv_csv`, `_fetch_pai_xlsx` en `tools/build-indicadores-mun/build.py`
++ 1-2h validar contra fichas oficiales y subir a S3. Total ~6-8h.
+
+Cuando se haga, **bumpear `CACHE_BUSTER` en `lab-indicadores.js`** (formato
+`v=YYYYMMDD`) para invalidar el cache de 10 min en navegadores.
+
+**Mejoras opcionales de módulos vivos (no pendientes activos):**
+- **Mactor MIDI** — matriz pivotada de influencias indirectas entre
+  actores (multiplica MID consigo misma).
 - **Problema-Público v2** — sub-vista de árbol de objetivos (espejo
   del árbol del problema, lado positivo) y exportación PowerPoint.
 - **Alternativas v2** — integración QCA (Ragin) para identificar
   configuraciones suficientes/necesarias en alternativas multi-caso.
   Reusa la infraestructura de matriz incompat de Sprint C.
-- **Alternativas v2** — análisis de sensibilidad sobre ratings y
-  probabilidades de escenarios (Monte Carlo cliente-side).
+- **Evaluación v3** — power calculator integrado (inputs ICC/atrición/N
+  + cálculo de MDE bajo distintos diseños). Hoy es placeholder en el PAP.
+- **Lab Sprint H (futuro)** — multi-lenguaje del Lab (inglés/portugués),
+  útil si el producto se quiere vender en consultorías regionales.
 
 ### Reglas de oro para Lab de Políticas Públicas y Prospectiva
 
