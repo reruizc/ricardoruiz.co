@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Escenarios 2027 · Proyecto DC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=DM+Mono:wght@300;400&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    :root {
+      --bg: #f4f3ef; --bg2: #eeedea;
+      --surface: #ffffff; --surface2: #f0efe9;
+      --border: rgba(0,0,0,0.07); --border2: rgba(0,0,0,0.12);
+      --text: #0a0a0a; --text2: #555; --text3: #999;
+      --purple: #7c3aed; --purple-dim: rgba(124,58,237,0.10);
+      --warn: #f0c040; --warn-dim: rgba(240,192,64,0.12);
+      --danger: #e63946;
+      --arq-proteccion:    #2563eb;
+      --arq-continuidad:   #16a34a;
+      --arq-supervivencia: #b45309;
+      --arq-castigo:       #dc2626;
+      --arq-pertenencia:   #a21caf;
+      --arq-sin-dato:      #d1d5db;
+    }
+    [data-theme="dark"] {
+      --bg: #060810; --bg2: #0a0c14;
+      --surface: #0f1018; --surface2: #13151f;
+      --border: rgba(255,255,255,0.06); --border2: rgba(255,255,255,0.12);
+      --text: #f4f3ef; --text2: #888; --text3: #444;
+      --purple: #a78bfa; --purple-dim: rgba(167,139,250,0.14);
+      --danger: #ff6b7a;
+      --arq-proteccion:    #60a5fa;
+      --arq-continuidad:   #4ade80;
+      --arq-supervivencia: #f59e0b;
+      --arq-castigo:       #f87171;
+      --arq-pertenencia:   #e879f9;
+      --arq-sin-dato:      #374151;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'Fraunces', serif;
+      min-height: 100vh; cursor: none; overflow-x: hidden;
+      transition: background .4s, color .4s;
+    }
+
+    /* Gate */
+    .gate { position: fixed; inset: 0; z-index: 5000; background: var(--bg); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 1rem; }
+    .gate-text { font-family:'DM Mono',monospace; font-size:.82rem; letter-spacing:.12em; text-transform:uppercase; color:var(--text2); }
+    .gate-bar { width:120px; height:1px; background:var(--border); position:relative; overflow:hidden; }
+    .gate-bar::after { content:''; position:absolute; inset:0; background:var(--purple); animation:gate-slide 1.4s ease-in-out infinite; }
+    @keyframes gate-slide { 0%{transform:translateX(-100%);} 50%{transform:translateX(0);} 100%{transform:translateX(100%);} }
+
+    /* Cursor */
+    .cursor { position:fixed; width:12px; height:12px; background:var(--purple); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s ease,background .2s; transform:translate(-50%,-50%); }
+    .cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--purple); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s ease,opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+
+    /* Nav */
+    nav.top { position: fixed; top:0; left:0; right:0; z-index:100; display: flex; align-items:center; justify-content:space-between; padding: .9rem 2.5rem; background: var(--bg); border-bottom: 1px solid var(--border); backdrop-filter: blur(12px); }
+    .nav-left { display:flex; align-items:center; gap:1rem; }
+    .nav-right { display:flex; align-items:center; gap:1.2rem; }
+    .e-btn-back { font-family:'Syne',sans-serif; font-size:.78rem; letter-spacing:.08em; text-transform:uppercase; color:var(--text2); text-decoration:none; border:1.5px solid var(--border); padding:.3rem .8rem; transition:color .2s,border-color .2s; }
+    .e-btn-back:hover { color:var(--text); border-color:var(--text2); }
+    .private-badge { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.18em; text-transform:uppercase; color: var(--purple); background: var(--purple-dim); padding:.32rem .7rem; border:1px solid var(--purple-dim); }
+    .logo-link { display:flex; align-items:center; gap:.55rem; text-decoration:none; opacity:.85; }
+    .logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
+    .logo-bar { width:5px; background:var(--purple); border-radius:1px 1px 0 0; }
+    .logo-text { font-family:'Syne',sans-serif; font-weight:800; font-size:1.3rem; letter-spacing:-.03em; color:var(--text); }
+    .logo-text span { color:var(--purple); }
+
+    /* Main wrap */
+    main.wrap { max-width: 1500px; margin: 0 auto; padding: 6rem 2rem 3rem; }
+
+    /* Hero */
+    .hero { padding: 1rem 0 2rem; }
+    .hero-label { font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.2em; text-transform:uppercase; color:var(--purple); margin-bottom:.9rem; display:flex; align-items:center; gap:.6rem; }
+    .hero-label::before { content:''; display:block; width:24px; height:1px; background:var(--purple); }
+    .hero-title { font-family:'Syne',sans-serif; font-weight:800; font-size: clamp(1.6rem, 3.6vw, 2.6rem); letter-spacing:-.025em; line-height:1; max-width: 22ch; }
+    .hero-title em { font-style:italic; font-family:'Fraunces',serif; font-weight:300; color:var(--purple); }
+    .hero-sub { font-family:'Fraunces',serif; font-weight:300; font-size:1.05rem; color:var(--text2); margin-top: .8rem; max-width: 70ch; line-height: 1.55; }
+
+    /* Top bar: toggles + reset */
+    .topbar { display:flex; gap:1rem; flex-wrap:wrap; align-items:center; padding: 1rem 1.25rem; background:var(--surface); border:1px solid var(--border); margin-bottom: 1.5rem; }
+    .ctrl-group { display:flex; flex-direction:column; gap:.35rem; }
+    .ctrl-label { font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.18em; text-transform:uppercase; color:var(--text3); }
+    .pill-group { display:flex; gap:0; }
+    .pill { font-family:'Syne',sans-serif; font-weight:500; font-size:.82rem; letter-spacing:.04em; padding:.55rem 1.05rem; background:var(--surface); border:1px solid var(--border); cursor:none; color:var(--text2); transition: all .15s; }
+    .pill + .pill { margin-left: -1px; }
+    .pill:hover { color: var(--text); }
+    .pill.active { background:var(--purple); color:#fff; border-color:var(--purple); position:relative; z-index:1; }
+    .reset-btn { margin-left:auto; font-family:'Syne',sans-serif; font-weight:500; font-size:.78rem; letter-spacing:.04em; padding:.55rem 1.05rem; background:var(--surface); border:1px solid var(--border); color:var(--text2); cursor:none; transition: all .15s; }
+    .reset-btn:hover { color:var(--purple); border-color:var(--purple); }
+
+    /* Layout 3 columnas: sliders | mapa | ficha */
+    .layout { display:grid; grid-template-columns: 300px 1fr 360px; gap:1rem; }
+    @media (max-width: 1200px) { .layout { grid-template-columns: 280px 1fr; } .layout .ficha-col { grid-column: 1 / -1; } }
+    @media (max-width: 900px)  { .layout { grid-template-columns: 1fr; } }
+
+    .col-card { background:var(--surface); border:1px solid var(--border); }
+    .col-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); }
+    .col-title { font-family:'Syne',sans-serif; font-weight:800; font-size:1.05rem; letter-spacing:-.01em; }
+    .col-sub { font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.1em; color:var(--text3); text-transform:uppercase; margin-top:.25rem; }
+
+    /* Sliders col */
+    .sliders-col .col-body { padding: 1rem 1.25rem; max-height: 70vh; overflow-y: auto; }
+    .slider-row { padding: .6rem 0; border-bottom: 1px solid var(--border); }
+    .slider-row:last-child { border-bottom: none; }
+    .slider-name { display:flex; justify-content:space-between; align-items:baseline; font-family:'Syne',sans-serif; font-weight:500; font-size:.85rem; margin-bottom: .35rem; }
+    .slider-val { font-family:'DM Mono',monospace; font-size:.75rem; color: var(--purple); font-weight: 700; }
+    .slider-input { width:100%; height:24px; -webkit-appearance:none; background:transparent; cursor:none; }
+    .slider-input::-webkit-slider-runnable-track { height:4px; background: linear-gradient(to right, var(--danger) 0%, var(--border2) 50%, var(--arq-continuidad) 100%); border-radius:2px; }
+    .slider-input::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; background:var(--purple); border:2px solid var(--bg); margin-top:-5px; border-radius:50%; cursor:none; }
+    .slider-input::-moz-range-track { height:4px; background: linear-gradient(to right, var(--danger) 0%, var(--border2) 50%, var(--arq-continuidad) 100%); border-radius:2px; }
+    .slider-input::-moz-range-thumb { width:14px; height:14px; background:var(--purple); border:2px solid var(--bg); border-radius:50%; cursor:none; }
+    .slider-hint { font-family:'Fraunces',serif; font-style: italic; font-weight:300; font-size:.72rem; color:var(--text3); margin-top: .2rem; }
+
+    /* Mapa col */
+    .map-col #map { width: 100%; height: 72vh; background: var(--bg2); }
+    .map-legend { padding: .7rem 1.25rem; border-top: 1px solid var(--border); font-family:'DM Mono',monospace; font-size:.65rem; color:var(--text2); display:flex; flex-wrap:wrap; gap:.8rem; align-items: center; }
+    .legend-item { display:inline-flex; align-items:center; gap:.4rem; }
+    .legend-swatch { width:12px; height:12px; border:1px solid rgba(255,255,255,0.15); }
+
+    /* Ficha col */
+    .ficha-col .col-body { padding: 1rem 1.25rem; min-height: 60vh; }
+    .ficha-empty { font-family:'Fraunces',serif; font-style:italic; color:var(--text3); padding: 3rem 0; text-align:center; font-size:.92rem; }
+    .fb-title { font-family:'Syne',sans-serif; font-weight:800; font-size:1.3rem; letter-spacing:-.01em; margin-top:.2rem; }
+    .fb-comuna { font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.1em; color:var(--text3); text-transform:uppercase; margin-bottom: 1rem; }
+    .fb-row { display:flex; justify-content:space-between; align-items:flex-start; gap:.7rem; padding:.55rem 0; border-bottom: 1px solid var(--border); }
+    .fb-row:last-of-type { border-bottom: none; }
+    .fb-lbl { font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.12em; text-transform:uppercase; color:var(--text3); flex:0 0 auto; padding-top:.2rem; }
+    .fb-val { font-family:'Fraunces',serif; font-size:.92rem; color:var(--text); text-align:right; }
+    .fb-pill { display:inline-block; padding:.25rem .6rem; font-family:'Syne',sans-serif; font-weight:500; font-size:.78rem; letter-spacing:.02em; line-height:1.2; max-width:200px; white-space:normal; }
+    .fb-emo { font-family:'Fraunces',serif; font-style:italic; font-weight:300; font-size:.82rem; color:var(--text2); margin: -.2rem 0 .4rem; padding-left: 0; }
+    .fb-migracion { margin: .8rem 0; padding: .7rem .85rem; background:var(--warn-dim); border-left:3px solid var(--warn); font-family:'Fraunces',serif; font-size:.88rem; color:var(--text); }
+    .fb-mini { font-family:'DM Mono',monospace; font-size:.65rem; color:var(--text3); margin-top:.3rem; letter-spacing:.04em; }
+    .fb-section-title { font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.15em; text-transform:uppercase; color:var(--text3); margin: 1.2rem 0 .55rem; }
+    .fb-scores { display:flex; flex-direction:column; gap:.4rem; }
+    .fb-score-row { display:grid; grid-template-columns: 110px 1fr 45px; align-items:center; gap:.5rem; }
+    .fb-score-name { font-family:'Syne',sans-serif; font-weight:500; font-size:.72rem; letter-spacing:.02em; }
+    .fb-score-track { height:9px; background:var(--bg2); border-radius:2px; overflow:hidden; }
+    .fb-score-fill { height:100%; transition: width .25s; }
+    .fb-score-val { font-family:'DM Mono',monospace; font-size:.68rem; color:var(--text2); text-align:right; }
+    .fb-act { display:flex; flex-wrap:wrap; gap:.3rem; }
+    .fb-act-pill { font-family:'DM Mono',monospace; font-size:.64rem; letter-spacing:.04em; padding:.25rem .55rem; background:var(--purple-dim); color:var(--text); border:1px solid var(--purple-dim); }
+    .fb-act-pill strong { color:var(--purple); }
+    .fb-banner-her { padding: .6rem .8rem; background:var(--warn-dim); border-left:3px solid var(--warn); font-family:'DM Mono',monospace; font-size:.65rem; color:var(--text2); line-height:1.5; letter-spacing:.04em; margin-bottom: .8rem; }
+    .fb-banner-her strong { color:#fbbf24; font-weight:700; }
+    .fb-empty-mini { font-family:'Fraunces',serif; font-style:italic; color:var(--text3); font-size:.78rem; padding: .6rem 0; }
+
+    /* Loading state */
+    .loading-overlay { display:flex; align-items:center; justify-content:center; padding: 4rem 1rem; font-family:'DM Mono',monospace; font-size:.75rem; letter-spacing:.12em; color:var(--text3); text-transform:uppercase; }
+
+    /* Tooltip Leaflet override */
+    .leaflet-tooltip {
+      font-family: 'Fraunces', serif; font-weight: 400; font-size: .85rem;
+      background: rgba(6,8,16,0.97) !important;
+      border: 1px solid var(--purple) !important;
+      color: #f4f3ef !important;
+      padding: .45rem .65rem !important;
+      width: 240px !important; white-space: normal !important;
+      overflow-wrap: break-word !important;
+      border-radius: 0 !important;
+    }
+    .leaflet-tooltip:before { display: none !important; }
+    .leaflet-control-zoom a {
+      background-color: var(--surface) !important;
+      color: var(--text) !important;
+      border-color: var(--border) !important;
+    }
+
+    /* Banner amarillo de disclaimer */
+    .disclaimer { padding: .8rem 1.1rem; background: var(--warn-dim); border:1px solid var(--warn); margin-bottom: 1.4rem; font-family:'Fraunces',serif; font-weight:300; font-size:.85rem; line-height:1.45; color: var(--text2); }
+    .disclaimer strong { color: var(--text); }
+
+    /* Footer */
+    footer.foot { margin-top: 3rem; padding: 1.5rem 0; border-top: 1px solid var(--border); font-family:'DM Mono',monospace; font-size:.7rem; color: var(--text3); display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <!-- Gate -->
+  <div class="gate" id="gate">
+    <div class="gate-bar"></div>
+    <div class="gate-text">Verificando acceso</div>
+  </div>
+
+  <!-- Nav -->
+  <nav class="top" hidden id="topNav">
+    <div class="nav-left">
+      <a href="../proyecto-dc.html" class="e-btn-back">← Proyecto DC</a>
+      <span class="private-badge">Privado</span>
+    </div>
+    <div class="nav-right">
+      <a href="../index.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div>
+          <div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div>
+          <div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+  </nav>
+
+  <main class="wrap" hidden id="main">
+    <section class="hero">
+      <div class="hero-label">Módulo 08 · Simulador what-if 2027</div>
+      <h1 class="hero-title">¿Cómo se mueve el arquetipo de cada barrio frente a <em>distintos escenarios</em>?</h1>
+      <p class="hero-sub">Ajustá las 11 palancas del contexto político-electoral 2027 y observá cómo el arquetipo dominante de cada comuna o barrio reacciona ante seguridad, economía, mediático, electoral nacional, gestión local y la huella del equipo Carvalho. El mapa arranca en gris: cualquier ajuste de slider repinta el territorio según el nuevo arquetipo proyectado. Click en una comuna o barrio para ver su ficha completa.</p>
+    </section>
+
+    <div class="disclaimer">
+      <strong>Lectura prospectiva, no predicción.</strong> El motor combina el arquetipo base 2023 (módulo 05), la matriz psicopolítica de sensibilidad por tema, la huella electoral histórica Medellín 2014-2023 y el voto del equipo Carvalho (Concejo 2019 + Cámara 2026). El resultado es un mapa de hipótesis sobre cómo cada territorio puede migrar bajo distintos escenarios — no reemplaza encuestas ni trabajo de campo.
+    </div>
+
+    <!-- Top bar: nivel + reset -->
+    <div class="topbar">
+      <div class="ctrl-group">
+        <div class="ctrl-label">Nivel del mapa</div>
+        <div class="pill-group" id="level-pills">
+          <button class="pill active" data-level="comuna">Comuna</button>
+          <button class="pill" data-level="barrio">Barrio</button>
+        </div>
+      </div>
+      <div class="ctrl-group">
+        <div class="ctrl-label">Estado</div>
+        <div class="pill-group" id="state-pills">
+          <button class="pill active" data-state="proyectado">Proyectado 2027</button>
+          <button class="pill" data-state="base">Base 2023</button>
+        </div>
+      </div>
+      <button class="reset-btn" id="reset-sliders">↻ Reset sliders</button>
+    </div>
+
+    <div class="layout">
+      <div class="col-card sliders-col">
+        <div class="col-header">
+          <div class="col-title">Palancas del escenario</div>
+          <div class="col-sub">11 variables · −5 a +5</div>
+        </div>
+        <div class="col-body" id="sliders-body">
+          <div class="loading-overlay">Cargando palancas…</div>
+        </div>
+      </div>
+
+      <div class="col-card map-col">
+        <div class="col-header">
+          <div class="col-title" id="map-title">Mapa Medellín · sin escenario activo</div>
+          <div class="col-sub" id="map-sub">Mové cualquier palanca para pintar el arquetipo proyectado</div>
+        </div>
+        <div id="map"></div>
+        <div class="map-legend" id="map-legend">
+          <span style="color:var(--text3)">Cargando…</span>
+        </div>
+      </div>
+
+      <div class="col-card ficha-col">
+        <div class="col-header">
+          <div class="col-title">Ficha territorial</div>
+          <div class="col-sub" id="ficha-sub">Sin selección</div>
+        </div>
+        <div class="col-body" id="ficha-body">
+          <div class="ficha-empty">Hacé click en una comuna o un barrio para ver su arquetipo base, su proyección bajo el escenario actual y sus señales electorales del equipo.</div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="foot">
+      <div>Módulo 08 · Escenarios 2027 · simulador what-if</div>
+      <div>Fuentes: matriz psicopolítica Nury 2027 · módulo 05 · histórico 2014-2023 · huella Carvalho-Quintero</div>
+    </footer>
+  </main>
+
+  <script>
+    // ─── EMAIL GATE ───────────────────────────────────────────────────
+    const ALLOWED = ['reruizc@gmail.com', 'nuevagemela@gmail.com'];
+    const token = localStorage.getItem('rr-token');
+    const userRaw = localStorage.getItem('rr-user');
+    const user = userRaw ? JSON.parse(userRaw) : null;
+    function emailAllowed(em){ return em && ALLOWED.includes(String(em).toLowerCase().trim()); }
+    function denyToLogin(){ localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); window.location.replace('../login.html'); }
+    function denyToDashboard(){ window.location.replace('../dashboard.html'); }
+
+    if (!token || !user) {
+      denyToLogin();
+    } else if (!emailAllowed(user.email)) {
+      denyToDashboard();
+    } else {
+      (async () => {
+        try {
+          const res = await fetch('https://rr-auth.reruizc.workers.dev/auth/me', { headers: { 'Authorization': `Bearer ${token}` } });
+          if (res.status === 401) return denyToLogin();
+          const data = await res.json();
+          if (!data.ok || !emailAllowed(data.user && data.user.email)) return denyToDashboard();
+          localStorage.setItem('rr-user', JSON.stringify(Object.assign({}, user, data.user)));
+          revealPage();
+        } catch (e) { revealPage(); }
+      })();
+    }
+
+    function revealPage() {
+      const gate = document.getElementById('gate');
+      if (gate) gate.remove();
+      document.getElementById('topNav').hidden = false;
+      document.getElementById('main').hidden = false;
+      init();
+    }
+
+    // ─── THEME ────────────────────────────────────────────────────────
+    function getAutoTheme(){ const h = new Date().getHours(); return (h >= 7 && h < 19) ? 'light' : 'dark'; }
+    const theme = localStorage.getItem('rr-theme') || getAutoTheme();
+    document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : '');
+
+    // ─── CURSOR ───────────────────────────────────────────────────────
+    const cursor = document.getElementById('cursor');
+    const ring = document.getElementById('cursorRing');
+    let mx=0, my=0, rx=0, ry=0;
+    document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; cursor.style.left=mx+'px'; cursor.style.top=my+'px'; });
+    (function ar(){ rx += (mx-rx)*.12; ry += (my-ry)*.12; ring.style.left=rx+'px'; ring.style.top=ry+'px'; requestAnimationFrame(ar); })();
+    function attachCursorHovers(){
+      document.querySelectorAll('a, button, .pill, .slider-input, .leaflet-interactive').forEach(el => {
+        el.addEventListener('mouseenter', () => { cursor.style.transform='translate(-50%,-50%) scale(1.5)'; cursor.style.background='transparent'; cursor.style.border='2px solid var(--purple)'; ring.style.opacity='0'; });
+        el.addEventListener('mouseleave', () => { cursor.style.transform='translate(-50%,-50%) scale(1)'; cursor.style.background='var(--purple)'; cursor.style.border='none'; ring.style.opacity='.4'; });
+      });
+    }
+
+    // ─── DATA SOURCES ─────────────────────────────────────────────────
+    const S3_BASE = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co';
+    const URL = {
+      arquetipos:  `${S3_BASE}/bases+de+datos/Proyecto+DC/arquetipos/arquetipos.json`,
+      porBarrio:   `${S3_BASE}/bases+de+datos/Proyecto+DC/arquetipos/por-barrio.json`,
+      porComuna:   `${S3_BASE}/bases+de+datos/Proyecto+DC/arquetipos/por-comuna.json`,
+      barriosGeo:  `${S3_BASE}/bases+de+datos/MEDELLIN_BARRIOS_OFICIAL.json`,
+      comunasGeo:  `${S3_BASE}/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`,
+      afinidad:    `${S3_BASE}/bases+de+datos/Proyecto+DC/afinidad-carvalho-quintero/afinidad-carvalho-quintero.json`,
+    };
+
+    // ─── STATE ────────────────────────────────────────────────────────
+    const STATE = {
+      level: 'comuna',             // 'comuna' | 'barrio'
+      mapMode: 'proyectado',       // 'proyectado' | 'base'
+      sliders: {},                 // 11 variables -5..+5
+      selected: null,              // codigo barrio o nombre comuna
+      data: null,                  // { arquetipos, porBarrio, porComuna, afinidad }
+      geo: { barrios:null, comunas:null },
+      inferidos: {},               // barrios sin datos directos heredados del vecino más cercano
+    };
+
+    // ─── 11 PALANCAS DEL ESCENARIO 2027 ──────────────────────────────
+    // Cada palanca es bipolar (-5 a +5). El signo negativo significa
+    // deterioro/contracción; el positivo, mejora/expansión. Cada slider
+    // tiene un mapeo a la matriz de sensibilidad por arquetipo (hoja
+    // 05_Sensibilidad_Agenda) o un tratamiento especial (electoral,
+    // afinidad, riesgo de cambio).
+    //
+    // El motor determinista (Sprint 1E) usa estos campos:
+    //   id    - clave del slider
+    //   label - texto visible
+    //   hint  - subtexto explicativo
+    //   tema  - clave en sensibilidad_agenda del arquetipo (o 'special_*')
+    //   sign  - +1: positivo refuerza arquetipos sensibles · -1: lo contrario
+    const SLIDER_DEFS = [
+      { id: 'seguridad',          label: 'Seguridad percibida',           hint: '−5 deterioro · +5 mejora visible',                tema: 'seguridad',           sign: +1 },
+      { id: 'electoral',          label: 'Presidente nacional 2026',      hint: '−5 izquierda fuerte · +5 derecha fuerte',         tema: 'special_electoral',   sign: +1 },
+      { id: 'costo_vida',         label: 'Costo de vida',                 hint: '−5 más caro · +5 alivio',                         tema: 'empleo',              sign: +1 },
+      { id: 'empleo',             label: 'Empleo e ingresos',             hint: '−5 desempleo · +5 mejora',                        tema: 'empleo',              sign: +1 },
+      { id: 'afinidad_carvalho',  label: 'Visibilidad equipo Carvalho',   hint: '−5 invisible · +5 alta presencia',                tema: 'special_afinidad',    sign: +1 },
+      { id: 'riesgo_cambio',      label: 'Volatilidad del barrio',        hint: '−5 estabilidad · +5 alta volatilidad emocional',  tema: 'special_riesgo',      sign: +1 },
+      { id: 'mediatico',          label: 'Saliencia mediática local',     hint: '−5 silencio · +5 conversación intensa',           tema: 'cultura_identidad',   sign: +1 },
+      { id: 'obras',              label: 'Obras y mantenimiento',         hint: '−5 atraso · +5 ejecución visible',                tema: 'servicios_publicos',  sign: +1 },
+      { id: 'favorabilidad',      label: 'Favorabilidad alcalde actual',  hint: '−5 muy baja · +5 muy alta',                       tema: 'special_favorabilidad', sign: +1 },
+      { id: 'movilidad',          label: 'Movilidad cotidiana',           hint: '−5 trancones/fallas · +5 fluidez',                tema: 'movilidad',           sign: +1 },
+      { id: 'ambiente',           label: 'Calidad ambiental',             hint: '−5 contaminación · +5 mejora',                    tema: 'salud_educacion',     sign: +1 },
+    ];
+    // Inicializar STATE.sliders
+    SLIDER_DEFS.forEach(s => { STATE.sliders[s.id] = 0; });
+
+    // ─── CARGA ────────────────────────────────────────────────────────
+    async function loadAll(){
+      const [arqJ, barJ, comJ, barGeo, comGeo, afinJ] = await Promise.all([
+        fetch(URL.arquetipos).then(r=>r.json()),
+        fetch(URL.porBarrio).then(r=>r.json()),
+        fetch(URL.porComuna).then(r=>r.json()),
+        fetch(URL.barriosGeo).then(r=>r.json()),
+        fetch(URL.comunasGeo).then(r=>r.json()),
+        fetch(URL.afinidad).then(r=>r.json()).catch(() => null),
+      ]);
+      STATE.data = { arquetipos: arqJ, porBarrio: barJ, porComuna: comJ, afinidad: afinJ };
+      STATE.geo = { barrios: barGeo, comunas: comGeo };
+    }
+
+    // ─── INIT ─────────────────────────────────────────────────────────
+    async function init(){
+      try {
+        await loadAll();
+        buildHerencia();      // hereda arquetipo base del vecino más cercano para barrios sin datos
+        wirePills();
+        renderSliders();      // Sprint 1D
+        initMap();            // Sprint 1C
+        drawMap();
+        renderLegend();
+        attachCursorHovers();
+      } catch (e) {
+        console.error(e);
+        document.getElementById('map-sub').textContent = 'Error cargando datos: ' + e.message;
+      }
+    }
+
+    function wirePills(){
+      document.querySelectorAll('#level-pills .pill').forEach(p => {
+        p.addEventListener('click', () => {
+          STATE.level = p.dataset.level;
+          document.querySelectorAll('#level-pills .pill').forEach(x => x.classList.toggle('active', x === p));
+          if (typeof drawMap === 'function') drawMap();
+        });
+      });
+      document.querySelectorAll('#state-pills .pill').forEach(p => {
+        p.addEventListener('click', () => {
+          STATE.mapMode = p.dataset.state;
+          document.querySelectorAll('#state-pills .pill').forEach(x => x.classList.toggle('active', x === p));
+          if (typeof drawMap === 'function') drawMap();
+        });
+      });
+      const reset = document.getElementById('reset-sliders');
+      reset.addEventListener('click', () => {
+        SLIDER_DEFS.forEach(s => { STATE.sliders[s.id] = 0; });
+        document.querySelectorAll('.slider-input').forEach(el => { el.value = 0; el.dispatchEvent(new Event('input')); });
+        if (typeof drawMap === 'function') drawMap();
+      });
+    }
+
+    function renderSliders(){
+      const body = document.getElementById('sliders-body');
+      body.innerHTML = SLIDER_DEFS.map(s => `
+        <div class="slider-row">
+          <div class="slider-name">
+            <span>${s.label}</span>
+            <span class="slider-val" id="val-${s.id}">${STATE.sliders[s.id] > 0 ? '+' : ''}${STATE.sliders[s.id]}</span>
+          </div>
+          <input class="slider-input" type="range" min="-5" max="5" step="1" value="${STATE.sliders[s.id]}" data-id="${s.id}" />
+          <div class="slider-hint">${s.hint}</div>
+        </div>
+      `).join('');
+      body.querySelectorAll('.slider-input').forEach(input => {
+        input.addEventListener('input', e => {
+          const id = e.target.dataset.id;
+          const v = Number(e.target.value);
+          STATE.sliders[id] = v;
+          const valEl = document.getElementById('val-' + id);
+          if (valEl) valEl.textContent = (v > 0 ? '+' : '') + v;
+          // Debounce redraw (80ms)
+          if (renderSliders._t) clearTimeout(renderSliders._t);
+          renderSliders._t = setTimeout(() => {
+            drawMap();
+            if (STATE.selected) renderFicha();
+          }, 80);
+        });
+      });
+    }
+
+    // ─── HERENCIA POR VECINO MÁS CERCANO ─────────────────────────────
+    // Mismo patrón del módulo 05: los barrios del GeoJSON sin datos directos
+    // heredan el arquetipo base del barrio CON datos cuyo centroide está
+    // más cerca. Sesgo ×1.3 a comunas distintas para preferir vecinos
+    // intra-comuna cuando hay candidatos equidistantes.
+    function _centroidOf(geom){
+      if (!geom) return null;
+      const r = geom.type === 'Polygon' ? geom.coordinates[0]
+              : geom.type === 'MultiPolygon' ? geom.coordinates[0][0] : null;
+      if (!r || !r.length) return null;
+      let sx = 0, sy = 0;
+      for (const c of r){ sx += c[0]; sy += c[1]; }
+      return [sx/r.length, sy/r.length];
+    }
+    function buildHerencia(){
+      const geo = STATE.geo.barrios;
+      const por = STATE.data.porBarrio;
+      if (!geo || !geo.features) return;
+      const featCentroids = geo.features.map(f => _centroidOf(f.geometry));
+      const conDatos = [];
+      geo.features.forEach((f, i) => {
+        const dap = f.properties && f.properties.CODIGO;
+        if (dap && por[dap]) conDatos.push({ dap, idx: i, centroid: featCentroids[i], comuna: (f.properties.COMUNA||'').toLowerCase() });
+      });
+      const BIAS = 1.3;
+      geo.features.forEach((f, i) => {
+        const props = f.properties || {};
+        const dap = props.CODIGO;
+        if (!dap || por[dap]) return;
+        const ci = featCentroids[i];
+        if (!ci) return;
+        const myCom = (props.COMUNA||'').toLowerCase();
+        let bestD2eff = Infinity, bestRef = null;
+        for (const ref of conDatos){
+          if (!ref.centroid) continue;
+          const dx = ref.centroid[0] - ci[0];
+          const dy = ref.centroid[1] - ci[1];
+          const d2 = dx*dx + dy*dy;
+          const same = myCom && ref.comuna && myCom === ref.comuna;
+          const d2eff = same ? d2 : d2 * BIAS * BIAS;
+          if (d2eff < bestD2eff){ bestD2eff = d2eff; bestRef = ref; }
+        }
+        if (bestRef){
+          const fuente = por[bestRef.dap];
+          STATE.inferidos[dap] = Object.assign({}, fuente, {
+            dap, barrio: props.NOMBRE || dap, comuna: props.COMUNA || fuente.comuna,
+            _heredado: true,
+            _heredado_de: { dap: fuente.dap, barrio: fuente.barrio, comuna: fuente.comuna },
+          });
+        }
+      });
+    }
+    function getBarrioByDap(dap){
+      if (!dap) return null;
+      const d = STATE.data.porBarrio[dap];
+      if (d) return { b: d, inferido: false };
+      const i = STATE.inferidos[dap];
+      if (i) return { b: i, inferido: true };
+      return null;
+    }
+
+    // ─── COLORES POR ARQUETIPO ───────────────────────────────────────
+    function cssVar(name){
+      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+    function colorArq(famId){
+      const key = famId ? '--arq-' + famId : '--arq-sin-dato';
+      return cssVar(key) || '#9ca3af';
+    }
+    function arqLabel(famId, version){
+      const a = STATE.data.arquetipos.arquetipos[famId];
+      if (!a) return '—';
+      const v = a[version] || a.evol || a.base;
+      return (v && (v.label_corto || v.nombre)) || famId;
+    }
+
+    // ─── ESCENARIO ACTIVO? ───────────────────────────────────────────
+    // Devuelve true si algún slider está fuera de 0
+    function escenarioActivo(){
+      return Object.values(STATE.sliders).some(v => Number(v) !== 0);
+    }
+
+    // ─── MATRIZ DE SENSIBILIDAD POR ARQUETIPO ────────────────────────
+    // Tomada de la hoja 05_Sensibilidad_Agenda del paquete Actualizacion-2027.
+    // Escala 1-5: cuán sensible es el arquetipo a cada tema.
+    const SENS = {
+      proteccion:    { seguridad:5, corrupcion:3, empleo:4, servicios_publicos:4, movilidad:4, salud_educacion:3, participacion_jal:2, cultura_identidad:2 },
+      castigo:       { seguridad:4, corrupcion:5, empleo:4, servicios_publicos:3, movilidad:3, salud_educacion:3, participacion_jal:4, cultura_identidad:3 },
+      continuidad:   { seguridad:3, corrupcion:2, empleo:3, servicios_publicos:5, movilidad:4, salud_educacion:4, participacion_jal:5, cultura_identidad:3 },
+      supervivencia: { seguridad:3, corrupcion:2, empleo:5, servicios_publicos:5, movilidad:4, salud_educacion:4, participacion_jal:2, cultura_identidad:2 },
+      pertenencia:   { seguridad:4, corrupcion:3, empleo:3, servicios_publicos:4, movilidad:3, salud_educacion:3, participacion_jal:5, cultura_identidad:5 },
+    };
+
+    // ─── MOTOR DETERMINISTA ──────────────────────────────────────────
+    // Calcula scores para los 5 arquetipos dada la base 2023 y los
+    // sliders activos. El argmax indica el arquetipo proyectado 2027.
+    //
+    // Lógica:
+    //   1) Base bias: el arquetipo 2023 arranca con +3.0.
+    //   2) Sliders temáticos: cada slider con valor v ∈ [-5,+5] empuja
+    //      en sentido inverso a la mejora (deterioro activa al arquetipo
+    //      sensible al tema). Magnitud = -v × (sens/5) × 0.6.
+    //   3) Slider electoral (presidente nacional): negativo (izquierda)
+    //      refuerza castigo+proteccion; positivo (derecha) refuerza
+    //      continuidad+pertenencia. Patrón histórico Medellín 2014-2023.
+    //   4) Slider afinidad Carvalho: multiplica con afinidad_slider del
+    //      barrio (huella Carvalho+Quintero). Refuerza castigo+continuidad+pertenencia.
+    //   5) Slider riesgo: alta volatilidad debilita el base bias.
+    //   6) Slider favorabilidad alcalde: positivo → continuidad+proteccion;
+    //      negativo → castigo.
+    function computeScores(baseFam, sliders, afinSlider){
+      const scores = { proteccion: 0, castigo: 0, continuidad: 0, supervivencia: 0, pertenencia: 0 };
+      // 1) Base bias
+      if (baseFam && scores[baseFam] !== undefined) scores[baseFam] += 3.0;
+
+      // 2) Sliders temáticos (mapeados a SENS)
+      for (const def of SLIDER_DEFS){
+        if (def.tema.startsWith('special_')) continue;
+        const v = Number(sliders[def.id] || 0);
+        if (!v) continue;
+        const tema = def.tema;
+        for (const A of Object.keys(scores)){
+          const sens = SENS[A][tema] || 0;
+          // -v: deterioro activa al sensible; mejora lo desmoviliza
+          scores[A] += (-v) * (sens / 5) * 0.6;
+        }
+      }
+
+      // 3) Electoral nacional
+      const e = Number(sliders.electoral || 0);
+      if (e < 0){
+        scores.castigo    += Math.abs(e) * 0.5;
+        scores.proteccion += Math.abs(e) * 0.4;
+      } else if (e > 0){
+        scores.continuidad += e * 0.4;
+        scores.pertenencia += e * 0.3;
+      }
+
+      // 4) Afinidad equipo Carvalho
+      const af = Number(sliders.afinidad_carvalho || 0);
+      if (af !== 0 && afinSlider !== null && afinSlider !== undefined){
+        const efecto = af * (afinSlider / 5) * 0.5;  // |efecto| ≤ 0.5
+        if (efecto > 0){
+          scores.castigo     += efecto * 0.4;
+          scores.continuidad += efecto * 0.3;
+          scores.pertenencia += efecto * 0.3;
+        } else {
+          const a = -efecto;
+          scores.proteccion   += a * 0.4;
+          scores.supervivencia += a * 0.3;
+        }
+      }
+
+      // 5) Riesgo de cambio (volatilidad)
+      const r = Number(sliders.riesgo_cambio || 0);
+      if (r !== 0 && baseFam) scores[baseFam] -= r * 0.4;
+
+      // 6) Favorabilidad alcalde
+      const f = Number(sliders.favorabilidad || 0);
+      if (f > 0){
+        scores.continuidad += f * 0.4;
+        scores.proteccion  += f * 0.3;
+      } else if (f < 0){
+        scores.castigo += Math.abs(f) * 0.5;
+      }
+
+      return scores;
+    }
+
+    function argmaxFam(scores){
+      let best = null, bestScore = -Infinity;
+      for (const f of Object.keys(scores)){
+        if (scores[f] > bestScore){ bestScore = scores[f]; best = f; }
+      }
+      return best;
+    }
+
+    function computeArquetipoProyectadoBarrio(b, dap){
+      const baseFam = b.arquetipo && b.arquetipo['2023'];
+      if (!baseFam) return null;
+      const afEntry = STATE.data.afinidad && STATE.data.afinidad.barrios && STATE.data.afinidad.barrios[dap];
+      const afinSlider = afEntry ? afEntry.afinidad_slider : null;
+      const scores = computeScores(baseFam, STATE.sliders, afinSlider);
+      return argmaxFam(scores);
+    }
+
+    function computeArquetipoProyectadoComuna(name){
+      const com = STATE.data.porComuna[name];
+      if (!com) return null;
+      const baseFam = com['2023'] && com['2023'].dominante;
+      if (!baseFam) return null;
+      // Afinidad promedio de los barrios de esa comuna
+      let afTotal = 0, afCount = 0;
+      for (const [dap, b] of Object.entries(STATE.data.porBarrio)){
+        if (((b.comuna||'')).toLowerCase() !== ((name||'')).toLowerCase()) continue;
+        const e = STATE.data.afinidad && STATE.data.afinidad.barrios && STATE.data.afinidad.barrios[dap];
+        if (e){ afTotal += e.afinidad_slider; afCount++; }
+      }
+      const afinSlider = afCount > 0 ? afTotal / afCount : null;
+      const scores = computeScores(baseFam, STATE.sliders, afinSlider);
+      return argmaxFam(scores);
+    }
+
+    // ─── MAPA LEAFLET ────────────────────────────────────────────────
+    let map = null;
+    let mapLayer = null;
+
+    function initMap(){
+      map = L.map('map', {
+        zoomControl: true, attributionControl: false,
+        renderer: L.svg(),
+        minZoom: 10, maxZoom: 16,
+      });
+    }
+
+    function drawMap(){
+      if (mapLayer){ map.removeLayer(mapLayer); mapLayer = null; }
+      const isCom = STATE.level === 'comuna';
+      const geo = isCom ? STATE.geo.comunas : STATE.geo.barrios;
+      if (!geo) return;
+
+      const activo = escenarioActivo();
+      const mode = STATE.mapMode; // 'proyectado' | 'base'
+
+      const grisColor = cssVar('--arq-sin-dato') || '#9ca3af';
+      mapLayer = L.geoJSON(geo, {
+        style: (feat) => {
+          // Si no hay escenario activo Y modo === proyectado: gris uniforme
+          if (!activo && mode === 'proyectado') {
+            return { fillColor: grisColor, fillOpacity: 0.55, color: 'rgba(255,255,255,0.3)', weight: 1 };
+          }
+          const fam = resolveFam(feat, isCom, mode);
+          if (!fam) return { fillColor: grisColor, fillOpacity: 0.25, color: 'rgba(255,255,255,0.2)', weight: 1 };
+          return { fillColor: colorArq(fam.id), fillOpacity: fam.inferido ? 0.5 : 0.78, color: 'rgba(255,255,255,0.4)', weight: 1, dashArray: fam.inferido ? '2,3' : null };
+        },
+        onEachFeature: (feat, layer) => {
+          const isCom2 = isCom;
+          const name = (feat.properties && (feat.properties.NOMBRE || feat.properties.CODIGO)) || '—';
+          layer.on({
+            mouseover: (e) => {
+              layer.setStyle({ weight: 2, color: '#fff', fillOpacity: 0.92 });
+              const fam = resolveFam(feat, isCom2, mode);
+              const escAct = mode === 'proyectado' && escenarioActivo();
+              const famColor = fam ? colorArq(fam.id) : '#9ca3af';
+              const tip = `
+                <div>
+                  <div style="font-family:Syne,sans-serif;font-weight:700;color:#a78bfa;font-size:.85rem;line-height:1.3">${String(name).toUpperCase()}</div>
+                  ${fam ? `<div style="font-family:DM Mono,monospace;font-size:.65rem;color:#9ca3af;letter-spacing:.08em;margin-top:.2rem">${escAct ? 'PROYECTADO 2027' : 'BASE 2023'}</div>
+                  <div style="margin-top:.3rem;color:${famColor};font-weight:700">${arqLabel(fam.id, escAct ? 'evol' : 'base')}</div>` : '<div style="color:#9ca3af;font-style:italic;margin-top:.2rem">Sin datos</div>'}
+                  ${fam && fam.inferido ? '<div style="color:#fbbf24;font-size:.7rem;font-style:italic;margin-top:.2rem">⚠ Heredado del vecino</div>' : ''}
+                  <div style="font-family:Fraunces,serif;font-size:.7rem;font-style:italic;color:#9ca3af;margin-top:.4rem">Click para ficha completa</div>
+                </div>`;
+              layer.bindTooltip(tip, { sticky: true, opacity: 1 }).openTooltip(e.latlng);
+            },
+            mouseout: () => { layer.setStyle(mapLayer.options.style(feat)); layer.closeTooltip(); },
+            click: () => onFeatureClick(feat, isCom2),
+          });
+        }
+      }).addTo(map);
+
+      try { map.fitBounds(mapLayer.getBounds(), { padding:[10,10] }); } catch(_) {}
+      updateMapHeader();
+    }
+
+    // Resuelve familia del arquetipo (id + inferido) según feature + modo
+    // mode === 'base'  → arquetipo 2023 directo del módulo 05
+    // mode === 'proyectado' → arquetipo proyectado bajo sliders activos (Sprint 1E)
+    function resolveFam(feat, isComuna, mode){
+      const props = feat.properties || {};
+      if (isComuna){
+        const com = STATE.data.porComuna[props.NOMBRE];
+        if (!com) return null;
+        if (mode === 'proyectado' && escenarioActivo() && typeof computeArquetipoProyectadoComuna === 'function'){
+          const id = computeArquetipoProyectadoComuna(props.NOMBRE);
+          return { id, inferido: false };
+        }
+        const slot = com['2023'];
+        return slot && slot.dominante ? { id: slot.dominante, inferido: false } : null;
+      }
+      // barrio
+      const res = getBarrioByDap(props.CODIGO);
+      if (!res) return null;
+      if (mode === 'proyectado' && escenarioActivo() && typeof computeArquetipoProyectadoBarrio === 'function'){
+        const id = computeArquetipoProyectadoBarrio(res.b, props.CODIGO);
+        return { id, inferido: res.inferido };
+      }
+      const baseFam = res.b.arquetipo && res.b.arquetipo['2023'];
+      return baseFam ? { id: baseFam, inferido: res.inferido } : null;
+    }
+
+    function updateMapHeader(){
+      const activo = escenarioActivo();
+      const isCom = STATE.level === 'comuna';
+      const tipo = isCom ? 'comuna' : 'barrio';
+      const titleEl = document.getElementById('map-title');
+      const subEl = document.getElementById('map-sub');
+      if (!activo && STATE.mapMode === 'proyectado'){
+        titleEl.textContent = `Mapa Medellín · sin escenario activo`;
+        subEl.textContent = 'Mové cualquier palanca para pintar el arquetipo proyectado por ' + tipo;
+      } else if (STATE.mapMode === 'base'){
+        titleEl.textContent = `Arquetipo base 2023 · por ${tipo}`;
+        subEl.textContent = 'Referencia: lectura del módulo 05 (cartografía emocional 2015-2023)';
+      } else {
+        titleEl.textContent = `Arquetipo proyectado 2027 · por ${tipo}`;
+        const n = Object.values(STATE.sliders).filter(v => Number(v) !== 0).length;
+        subEl.textContent = `Escenario activo · ${n} palanca${n===1?'':'s'} movida${n===1?'':'s'}`;
+      }
+    }
+
+    function onFeatureClick(feat, isComuna){
+      const props = feat.properties || {};
+      const key = isComuna ? props.NOMBRE : props.CODIGO;
+      STATE.selected = { kind: isComuna ? 'comuna' : 'barrio', key, props };
+      renderFicha();
+    }
+
+    // ─── PANEL FICHA ─────────────────────────────────────────────────
+    function renderFicha(){
+      const sel = STATE.selected;
+      const body = document.getElementById('ficha-body');
+      const sub  = document.getElementById('ficha-sub');
+      if (!sel){
+        body.innerHTML = '<div class="ficha-empty">Hacé click en una comuna o un barrio para ver su arquetipo base, su proyección bajo el escenario actual y sus señales electorales del equipo.</div>';
+        sub.textContent = 'Sin selección';
+        return;
+      }
+      if (sel.kind === 'comuna') return renderFichaComuna(sel);
+      return renderFichaBarrio(sel);
+    }
+
+    function _arqBlock(label, famId, mode){
+      if (!famId){
+        return `<div class="fb-row"><div class="fb-lbl">${label}</div><div class="fb-val" style="color:var(--text3);font-style:italic">Sin dato</div></div>`;
+      }
+      const arq = STATE.data.arquetipos.arquetipos[famId];
+      const v = (arq && arq[mode]) || (arq && arq.base) || {};
+      const name = v.label_corto || v.nombre || famId;
+      const emocion = v.emocion || '';
+      return `
+        <div class="fb-row">
+          <div class="fb-lbl">${label}</div>
+          <div class="fb-val">
+            <span class="fb-pill" style="background:${colorArq(famId)};color:#fff">${name}</span>
+          </div>
+        </div>
+        ${emocion ? `<div class="fb-emo">${emocion}</div>` : ''}`;
+    }
+
+    function _scoresBars(scores){
+      const order = ['proteccion','castigo','continuidad','supervivencia','pertenencia'];
+      const max = Math.max(0.1, ...Object.values(scores));
+      const min = Math.min(0, ...Object.values(scores));
+      const range = max - min || 1;
+      return `
+        <div class="fb-scores">
+          ${order.map(f => {
+            const v = scores[f] || 0;
+            const pct = Math.max(0, (v - min) / range) * 100;
+            return `
+              <div class="fb-score-row">
+                <span class="fb-score-name" style="color:${colorArq(f)}">${arqLabel(f, 'evol')}</span>
+                <div class="fb-score-track"><div class="fb-score-fill" style="width:${pct.toFixed(1)}%;background:${colorArq(f)}"></div></div>
+                <span class="fb-score-val">${v >= 0 ? '+' : ''}${v.toFixed(1)}</span>
+              </div>`;
+          }).join('')}
+        </div>`;
+    }
+
+    function _slidersActivosTexto(){
+      const lst = SLIDER_DEFS.filter(s => Number(STATE.sliders[s.id]) !== 0);
+      if (!lst.length) return '<div class="fb-empty-mini">Sin escenario activo. Mové sliders para ver la proyección.</div>';
+      return `<div class="fb-act">${lst.map(s => {
+        const v = STATE.sliders[s.id];
+        return `<span class="fb-act-pill">${s.label}: <strong>${v > 0 ? '+' : ''}${v}</strong></span>`;
+      }).join('')}</div>`;
+    }
+
+    function renderFichaBarrio(sel){
+      const dap = sel.key;
+      const res = getBarrioByDap(dap);
+      const sub = document.getElementById('ficha-sub');
+      const body = document.getElementById('ficha-body');
+      if (!res){
+        body.innerHTML = '<div class="ficha-empty">Sin datos para este barrio.</div>';
+        sub.textContent = sel.props.NOMBRE || dap;
+        return;
+      }
+      const b = res.b;
+      const baseFam = b.arquetipo && b.arquetipo['2023'];
+      const proyFam = escenarioActivo() ? computeArquetipoProyectadoBarrio(b, dap) : baseFam;
+      const cambio = proyFam && baseFam && proyFam !== baseFam;
+      const heredadoBanner = res.inferido && b._heredado_de
+        ? `<div class="fb-banner-her">⚠ Datos heredados del barrio más cercano con puesto: <strong>${b._heredado_de.barrio}</strong> (${b._heredado_de.comuna})</div>`
+        : '';
+      const afEntry = STATE.data.afinidad && STATE.data.afinidad.barrios && STATE.data.afinidad.barrios[dap];
+      const afLine = afEntry
+        ? `<div class="fb-row"><div class="fb-lbl">Huella equipo Carvalho</div><div class="fb-val"><span class="fb-pill" style="background:${colorArq('castigo')};color:#fff">${afEntry.afinidad_slider >= 0 ? '+' : ''}${afEntry.afinidad_slider.toFixed(1)}</span></div></div>
+           <div class="fb-mini">Carvalho 2019 Concejo: ${afEntry.pct_carvalho_2019.toFixed(2)}% · Quintero 2026 Cámara: ${afEntry.pct_quintero_2026.toFixed(2)}%</div>`
+        : '<div class="fb-row"><div class="fb-lbl">Huella equipo Carvalho</div><div class="fb-val" style="color:var(--text3);font-style:italic">Sin puesto físico en este barrio</div></div>';
+
+      sub.textContent = `${b.barrio} · ${b.comuna}${res.inferido ? ' · (heredado)' : ''}`;
+
+      const scores = baseFam ? computeScores(baseFam, STATE.sliders, afEntry ? afEntry.afinidad_slider : null) : null;
+
+      body.innerHTML = `
+        ${heredadoBanner}
+        <div class="fb-title">${b.barrio}</div>
+        <div class="fb-comuna">DAP ${dap} · ${b.comuna}</div>
+        ${_arqBlock('Arquetipo base 2023', baseFam, 'base')}
+        ${escenarioActivo() ? _arqBlock('Arquetipo proyectado 2027', proyFam, 'evol') : ''}
+        ${cambio ? `<div class="fb-migracion">⚡ Migración: <strong>${arqLabel(baseFam,'base')}</strong> → <strong style="color:${colorArq(proyFam)}">${arqLabel(proyFam,'evol')}</strong></div>` : ''}
+        ${afLine}
+        <div class="fb-section-title">Scores ${escenarioActivo() ? 'bajo el escenario actual' : '(base · sin escenario)'}</div>
+        ${scores ? _scoresBars(scores) : '<div class="fb-empty-mini">Sin datos base.</div>'}
+        <div class="fb-section-title">Palancas activas</div>
+        ${_slidersActivosTexto()}
+      `;
+    }
+
+    function renderFichaComuna(sel){
+      const name = sel.key;
+      const com = STATE.data.porComuna[name];
+      const sub = document.getElementById('ficha-sub');
+      const body = document.getElementById('ficha-body');
+      if (!com){
+        body.innerHTML = '<div class="ficha-empty">Sin datos para esta comuna.</div>';
+        sub.textContent = name;
+        return;
+      }
+      const baseFam = com['2023'] && com['2023'].dominante;
+      const proyFam = escenarioActivo() ? computeArquetipoProyectadoComuna(name) : baseFam;
+      const cambio = proyFam && baseFam && proyFam !== baseFam;
+
+      // Promedio de afinidad de los barrios de la comuna
+      let afTotal = 0, afCount = 0;
+      for (const [dap, b] of Object.entries(STATE.data.porBarrio)){
+        if (((b.comuna||'')).toLowerCase() !== ((name||'')).toLowerCase()) continue;
+        const e = STATE.data.afinidad && STATE.data.afinidad.barrios && STATE.data.afinidad.barrios[dap];
+        if (e){ afTotal += e.afinidad_slider; afCount++; }
+      }
+      const afProm = afCount > 0 ? afTotal / afCount : null;
+
+      sub.textContent = `${name} · comuna`;
+      const scores = baseFam ? computeScores(baseFam, STATE.sliders, afProm) : null;
+
+      const slot = com['2023'] || {};
+      const barriosTotales = slot.barrios_total || 0;
+      const votosTotales = slot.votos_total || 0;
+
+      body.innerHTML = `
+        <div class="fb-title">${name}</div>
+        <div class="fb-comuna">${barriosTotales} barrios · ${votosTotales.toLocaleString('es-CO')} votos 2023</div>
+        ${_arqBlock('Arquetipo dominante 2023', baseFam, 'base')}
+        ${escenarioActivo() ? _arqBlock('Arquetipo proyectado 2027', proyFam, 'evol') : ''}
+        ${cambio ? `<div class="fb-migracion">⚡ Migración: <strong>${arqLabel(baseFam,'base')}</strong> → <strong style="color:${colorArq(proyFam)}">${arqLabel(proyFam,'evol')}</strong></div>` : ''}
+        <div class="fb-row"><div class="fb-lbl">Huella Carvalho · promedio comuna</div><div class="fb-val">${afProm !== null ? `<span class="fb-pill" style="background:${colorArq('castigo')};color:#fff">${afProm >= 0 ? '+' : ''}${afProm.toFixed(2)}</span>` : '<span style="color:var(--text3);font-style:italic">Sin datos</span>'}</div></div>
+        <div class="fb-section-title">Scores ${escenarioActivo() ? 'bajo el escenario actual' : '(base · sin escenario)'}</div>
+        ${scores ? _scoresBars(scores) : '<div class="fb-empty-mini">Sin datos base.</div>'}
+        <div class="fb-section-title">Palancas activas</div>
+        ${_slidersActivosTexto()}
+      `;
+    }
+
+    function renderLegend(){
+      const arqs = STATE.data.arquetipos.familias || [];
+      const labels = STATE.data.arquetipos.arquetipos || {};
+      const swatch = (id) => `<span class="legend-swatch" style="background:${colorArq(id)}"></span>`;
+      const items = arqs.map(id => {
+        const evol = labels[id] && labels[id].evol;
+        const name = evol ? evol.label_corto || evol.nombre : id;
+        return `<span class="legend-item">${swatch(id)}${name}</span>`;
+      }).join('');
+      document.getElementById('map-legend').innerHTML =
+        items +
+        `<span class="legend-item"><span class="legend-swatch" style="background:${colorArq(null)}"></span>Sin escenario activo / sin dato</span>` +
+        `<span class="legend-item"><span class="legend-swatch" style="background:repeating-linear-gradient(45deg, var(--purple) 0 3px, transparent 3px 6px)"></span>Heredado del vecino (rayado)</span>`;
+    }
+  </script>
+</body>
+</html>
