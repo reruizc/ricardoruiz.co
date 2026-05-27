@@ -124,6 +124,18 @@
 
     .detail-body { padding: 1.5rem; min-height: 620px; max-height: 780px; overflow-y: auto; }
     .detail-empty { color: var(--text3); font-family:'Fraunces',serif; font-style: italic; padding: 4rem 1rem; text-align: center; }
+    .inherited-banner {
+      background: rgba(251, 191, 36, 0.10);
+      border-left: 3px solid #fbbf24;
+      padding: .65rem .8rem;
+      margin: .8rem 0 1rem;
+      font-family:'DM Mono', monospace;
+      font-size: .7rem;
+      line-height: 1.45;
+      color: var(--text2);
+      letter-spacing: .02em;
+    }
+    .inherited-banner strong { color: #fbbf24; font-weight: 700; letter-spacing: .04em; }
     .detail-bar-name { font-family:'Syne',sans-serif; font-weight: 800; font-size: 1.5rem; letter-spacing: -.02em; margin-bottom: .25rem; }
     .detail-comuna { font-family:'DM Mono',monospace; font-size: .65rem; letter-spacing: .1em; text-transform: uppercase; color: var(--purple); margin-bottom: .25rem; }
     .detail-dap { font-family:'DM Mono',monospace; font-size: .6rem; letter-spacing: .12em; color: var(--text3); margin-bottom: 1.1rem; }
@@ -536,6 +548,90 @@
       ]);
       STATE.data = { arquetipos: arqJ, porBarrio: barJ, porComuna: comJ, proyeccion: proJ, correlaciones: corJ, transiciones: traJ, metodologia: metJ };
       STATE.geo  = { barrios: barGeo, comunas: comGeo };
+      buildHerencia();
+    }
+
+    // ─── HERENCIA POR BARRIO MÁS CERCANO ──────────────────────────────
+    // El paquete cubre 152 barrios DAP, pero el GeoJSON oficial trae más
+    // de 300 features (otros barrios catastrales, áreas de expansión, SN).
+    // Para los que no tienen datos directos, heredamos el arquetipo y la
+    // ficha del barrio CON datos cuyo centroide esté más cerca. La ficha
+    // indica claramente que es herencia y de qué barrio viene.
+    function _centroidOf(geom){
+      if (!geom) return null;
+      const ring = geom.type === 'Polygon' ? geom.coordinates[0]
+                 : geom.type === 'MultiPolygon' ? geom.coordinates[0][0]
+                 : null;
+      if (!ring || !ring.length) return null;
+      let sx = 0, sy = 0;
+      for (const c of ring){ sx += c[0]; sy += c[1]; }
+      return [sx / ring.length, sy / ring.length];
+    }
+    function buildHerencia(){
+      const inferidos = {};
+      const geo = STATE.geo.barrios;
+      const por = STATE.data.porBarrio;
+      if (!geo || !geo.features) return;
+      // 1. Construir lista de features CON datos directos (índice por DAP)
+      const conDatos = [];   // { dap, comuna, centroid }
+      const featCentroids = geo.features.map(f => _centroidOf(f.geometry));
+      geo.features.forEach((f, i) => {
+        const dap = f.properties && f.properties.CODIGO;
+        if (dap && por[dap]){
+          conDatos.push({
+            dap, idx: i, centroid: featCentroids[i],
+            comuna: (f.properties.COMUNA || '').toLowerCase(),
+          });
+        }
+      });
+      // 2. Para cada feature SIN datos, encontrar el más cercano con datos.
+      //    Penalizamos vecinos de OTRA comuna con un sesgo 1.3× para que el
+      //    nearest-neighbor prefiera vecinos del mismo entorno cuando hay
+      //    candidatos casi-equidistantes (caso típico: barrio céntrico que
+      //    pega con otra comuna por 100-200 m).
+      const COMUNA_BIAS = 1.3;
+      geo.features.forEach((f, i) => {
+        const props = f.properties || {};
+        const dap = props.CODIGO;
+        if (!dap || por[dap]) return;        // ya tiene datos directos
+        const ci = featCentroids[i];
+        if (!ci) return;
+        const myComuna = (props.COMUNA || '').toLowerCase();
+        let bestD2eff = Infinity, bestRef = null;
+        for (const ref of conDatos){
+          if (!ref.centroid) continue;
+          const dx = ref.centroid[0] - ci[0];
+          const dy = ref.centroid[1] - ci[1];
+          const d2 = dx*dx + dy*dy;
+          const sameComuna = myComuna && ref.comuna && myComuna === ref.comuna;
+          const d2eff = sameComuna ? d2 : d2 * (COMUNA_BIAS * COMUNA_BIAS);
+          if (d2eff < bestD2eff){ bestD2eff = d2eff; bestRef = ref; }
+        }
+        if (!bestRef) return;
+        const fuente = por[bestRef.dap];
+        // Heredar la ficha completa, pero sobrescribir identidad del barrio
+        inferidos[dap] = Object.assign({}, fuente, {
+          dap,
+          barrio: props.NOMBRE || dap,
+          comuna: props.COMUNA || fuente.comuna,
+          _heredado: true,
+          _heredado_de: {
+            dap: fuente.dap,
+            barrio: fuente.barrio,
+            comuna: fuente.comuna,
+          },
+        });
+      });
+      STATE.inferidos = inferidos;
+    }
+    // Lookup unificado: devuelve { b, inferido } o null
+    function getBarrioByDap(dap){
+      if (!dap) return null;
+      const direct = STATE.data.porBarrio[dap];
+      if (direct) return { b: direct, inferido: false };
+      const inf = STATE.inferidos && STATE.inferidos[dap];
+      if (inf) return { b: inf, inferido: true };
+      return null;
     }
 
     // ─── KPI SUMMARY ──────────────────────────────────────────────────
@@ -646,25 +742,35 @@
 
       mapLayer = L.geoJSON(filteredGeo, {
         style: (feat) => {
-          const fam = lookupFamForFeature(feat, yr, isComunaView);
-          if (!fam) return { fillColor:'#9ca3af', fillOpacity:0.18, color:'rgba(0,0,0,0.18)', weight:1 };
-          return { fillColor: colorFamHex(fam), fillOpacity: 0.78, color:'rgba(255,255,255,0.45)', weight:1 };
+          const res = lookupFamForFeature(feat, yr, isComunaView);
+          if (!res || !res.fam) return { fillColor:'#9ca3af', fillOpacity:0.18, color:'rgba(0,0,0,0.18)', weight:1 };
+          if (res.inferido){
+            // Mismo color del vecino pero con menos opacidad y dash para que
+            // se entienda que es heredado (sin puesto físico de votación).
+            return { fillColor: colorFamHex(res.fam), fillOpacity: 0.45, color:'rgba(255,255,255,0.3)', weight:1, dashArray:'2,3' };
+          }
+          return { fillColor: colorFamHex(res.fam), fillOpacity: 0.78, color:'rgba(255,255,255,0.45)', weight:1 };
         },
         onEachFeature: (feat, layer) => {
-          const fam = lookupFamForFeature(feat, yr, isComunaView);
+          const res = lookupFamForFeature(feat, yr, isComunaView);
+          const fam = res && res.fam;
           const name = isComunaView ? (feat.properties.NOMBRE || feat.properties.CODIGO) : (feat.properties.NOMBRE || feat.properties.CODIGO);
           const code = feat.properties.CODIGO;
           const comuna = feat.properties.COMUNA;
           const tipo = lookupExtra(feat, yr, isComunaView);
+          const inferidoNote = res && res.inferido
+            ? `<br/><span style="color:#fbbf24;font-size:.7rem;font-style:italic">⚠ Sin puesto · heredado de ${(res.fuente && res.fuente.barrio) || '—'}</span>`
+            : '';
           layer.on({
             mouseover: (e) => {
-              layer.setStyle({ weight:2, color:'#fff', fillOpacity:0.95 });
+              layer.setStyle({ weight:2, color:'#fff', fillOpacity: res && res.inferido ? 0.7 : 0.95 });
               const tip = `
                 <div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.82rem;line-height:1.45">
                   <span style="color:#a78bfa;font-weight:700">${String(name).toUpperCase()}</span><br/>
                   ${comuna && !isComunaView ? `<span style="color:#999;font-size:.7rem">${comuna}</span><br/>` : ''}
                   ${fam ? `<span style="color:${colorFamHex(fam)};font-weight:700">${famNombre(fam, yr)}</span><br/>` : '<span style="color:#999">Sin datos para este año</span>'}
                   ${tipo ? `<span style="color:#fff;font-size:.75rem">${tipo}</span>` : ''}
+                  ${inferidoNote}
                 </div>`;
               layer.bindTooltip(tip, { sticky: true, opacity: 1 }).openTooltip(e.latlng);
             },
@@ -686,13 +792,17 @@
         const com = STATE.data.porComuna[feat.properties.NOMBRE];
         if (!com) return null;
         const slot = com[yr];
-        return slot ? slot.dominante : null;
+        return slot ? { fam: slot.dominante, inferido: false } : null;
       }
       const dap = feat.properties.CODIGO;
-      const b = STATE.data.porBarrio[dap];
-      if (!b) return null;
-      if (yr === '2027') return b.proyeccion_2027 && b.proyeccion_2027.arquetipo_proy;
-      return b.arquetipo[yr];
+      const res = getBarrioByDap(dap);
+      if (!res) return null;
+      const b = res.b;
+      const fam = (yr === '2027')
+        ? (b.proyeccion_2027 && b.proyeccion_2027.arquetipo_proy)
+        : b.arquetipo[yr];
+      if (!fam) return null;
+      return { fam, inferido: res.inferido, fuente: res.inferido ? b._heredado_de : null };
     }
     function lookupExtra(feat, yr, isComunaView){
       if (isComunaView){
@@ -703,11 +813,12 @@
         return `${fmt(slot.votos_total)} votos · ${slot.barrios_total} barrios`;
       }
       const dap = feat.properties.CODIGO;
-      const b = STATE.data.porBarrio[dap];
-      if (!b) return null;
-      const v = b.votos[yr];
-      if (yr === '2027') return `${fmt(v)} votos proyectados`;
-      return v ? `${fmt(v)} votos válidos` : null;
+      const res = getBarrioByDap(dap);
+      if (!res) return null;
+      const v = res.b.votos[yr];
+      if (yr === '2027') return res.inferido ? `~${fmt(v)} votos proyectados (estim. vecino)` : `${fmt(v)} votos proyectados`;
+      if (!v) return null;
+      return res.inferido ? `~${fmt(v)} votos (estim. vecino)` : `${fmt(v)} votos válidos`;
     }
     function updateMapHeader(){
       const isCom = STATE.level === 'comuna';
@@ -715,7 +826,13 @@
       let sub;
       if (isCom) sub = '21 comunas + corregimientos · click para detalle';
       else if (STATE.mapView === 'comuna') sub = `Vista de comuna · ${STATE.mapComuna}`;
-      else sub = '152 barrios analizados · click para detalle';
+      else {
+        const nDirect = Object.keys(STATE.data.porBarrio || {}).length;
+        const nInf = Object.keys(STATE.inferidos || {}).length;
+        sub = nInf
+          ? `${nDirect} barrios con datos · ${nInf} heredados del vecino más cercano · click para detalle`
+          : `${nDirect} barrios analizados · click para detalle`;
+      }
       document.getElementById('map-title').textContent = `Arquetipo dominante ${yr} · ${isCom ? 'comuna' : 'barrio'}`;
       document.getElementById('map-sub').textContent = sub;
     }
@@ -726,16 +843,20 @@
         const nombre = yr === '2027' ? d.arquetipos[famId].evol.nombre : d.arquetipos[famId].base.nombre;
         return `<div class="legend-item"><span class="legend-swatch" style="background:${colorFamHex(famId)}"></span>${nombre}</div>`;
       }).join('');
+      const nInf = Object.keys(STATE.inferidos || {}).length;
       document.getElementById('map-legend').innerHTML = items
+        + (nInf
+            ? `<div class="legend-item"><span class="legend-swatch" style="background:repeating-linear-gradient(45deg,#a78bfa 0 3px,transparent 3px 6px);border:1px dashed #a78bfa"></span>Heredado del vecino (rayado)</div>`
+            : '')
         + `<div class="legend-item"><span class="legend-swatch" style="background:#9ca3af;opacity:.4"></span>Sin dato</div>`;
     }
 
     // ─── DETAIL PANEL ─────────────────────────────────────────────────
     function selectBarrio(dap){
       STATE.selected = dap;
-      const b = STATE.data.porBarrio[dap];
-      if (!b) { renderDetailEmpty(); return; }
-      renderBarrioDetail(b);
+      const res = getBarrioByDap(dap);
+      if (!res) { renderDetailEmpty(); return; }
+      renderBarrioDetail(res.b, res.inferido);
     }
     function selectComuna(name){
       STATE.selected = name;
@@ -754,8 +875,13 @@
     function renderDetailEmpty(){
       document.getElementById('detail').innerHTML = '<div class="detail-empty">Hacé click en un barrio para abrir la ficha.</div>';
     }
-    function renderBarrioDetail(b){
+    function renderBarrioDetail(b, inferido){
       const yr = STATE.year;
+      const heredadoBanner = inferido && b._heredado_de
+        ? `<div class="inherited-banner" title="Este barrio no tiene puesto de votación propio. Los datos provienen del barrio más cercano con puesto.">
+             <strong>⚠ Datos heredados</strong> · Este barrio no tiene puesto de votación propio. Toda la ficha (arquetipo, scores, ganadores, contexto, proyección) se hereda de <strong>${b._heredado_de.barrio}</strong> (DAP ${b._heredado_de.dap} · ${b._heredado_de.comuna}), el barrio con datos más cercano por centroide.
+           </div>`
+        : '';
       let fam, escudo, escudoName;
       if (yr === '2027'){
         fam = b.proyeccion_2027 && b.proyeccion_2027.arquetipo_proy;
@@ -794,7 +920,8 @@
       document.getElementById('detail').innerHTML = `
         <div class="detail-comuna">${b.comuna}</div>
         <div class="detail-bar-name">${b.barrio}</div>
-        <div class="detail-dap">DAP ${b.dap} · ${fmt(votos)} votos ${yr === '2027' ? 'proyectados' : 'válidos'}</div>
+        <div class="detail-dap">DAP ${b.dap} · ${inferido ? '~' : ''}${fmt(votos)} votos ${yr === '2027' ? 'proyectados' : 'válidos'}${inferido ? ' · estimación heredada' : ''}</div>
+        ${heredadoBanner}
 
         <div class="escudo-row">
           ${escudoHtml}

@@ -186,6 +186,11 @@
       line-height: 1.05; letter-spacing: -.02em;
       margin-bottom: .35rem;
     }
+    /* Card del ganador: nombre con peso medio y 20% más pequeño que el resto */
+    .sum-card.winner .sum-value-big {
+      font-weight: 500;
+      font-size: clamp(1.12rem, 2.08vw, 1.68rem);
+    }
     .sum-meta {
       font-family:'DM Mono',monospace; font-size: .72rem;
       color: var(--text2); letter-spacing: .04em;
@@ -212,6 +217,11 @@
     .card-title {
       font-family:'Syne',sans-serif; font-weight: 800;
       font-size: 1.05rem; letter-spacing: -.01em;
+    }
+    /* Título del top candidatos un poco más liviano y compacto */
+    .table-card .card-title {
+      font-weight: 500;
+      font-size: .9rem;
     }
     .card-sub {
       font-family:'DM Mono',monospace; font-size: .62rem;
@@ -618,7 +628,9 @@
       'PARTIDO ALIANZA POR COLOMBIA (VERDE)': '#4CAF50',
       'PACTO HISTORICO': '#6B2D8B',
       'PACTO HISTORICO COLOMBIA PUEDE': '#6B2D8B',
+      'UP-PACTO HISTORICO COLOMBIA PUEDE': '#6B2D8B',
       'POLO DEMOCRATICO ALTERNATIVO': '#A52A2A',
+      'PARTIDO POLO DEMOCRATICO ALTERNATIVO': '#A52A2A',
       'MIRA': '#1A3FC4',
       'PARTIDO MIRA': '#1A3FC4',
       'INDEPENDIENTES': '#7c3aed',
@@ -629,10 +641,37 @@
       'COMUNES': '#007755',
       'CREEMOS': '#00A1DE',
       'CREEMOS COLOMBIA': '#00A1DE',
+      'PARTIDO POLITICO CREEMOS': '#00A1DE',
       'FUERZA DE LA PAZ': '#9333ea',
       'DIGNIDAD Y COMPROMISO': '#5e3a90',
+      'PARTIDO POLITICO DIGNIDAD & COMPROMISO': '#5e3a90',
       'SALVACION NACIONAL': '#00AEEF',
       'MOVIMIENTO SALVACION NACIONAL': '#00AEEF',
+      'MOVIMIENTO  SALVACION NACIONAL': '#00AEEF',
+      // Partidos / movimientos JAL · Concejo · Alcaldía Medellín 2015-2023
+      'NUEVA FUERZA DEMOCRATICA': '#7a4b9b',
+      'AGRUPACION POLITICA EN MARCHA': '#d97706',
+      'PARTIDO COLOMBIA RENACIENTE': '#15803d',
+      'PARTIDO COLOMBIA JUSTA LIBRES': '#2c5282',
+      'GRAN ALIANZA POR MEDELLIN': '#0f766e',
+      'JUNTOS': '#0891b2',
+      'JUNTOS POR MEDELLIN': '#0891b2',
+      'TODOS JUNTOS': '#0e7490',
+      'SEGUIMOS CONTANDO CON VOS': '#a16207',
+      'MEDELLIN AVANZA': '#155e75',
+      'MEDELLIN NOS UNE': '#0c4a6e',
+      'POR MEDELLIN': '#1e6091',
+      'PROPONEMOS POR MEDELLIN': '#1d4ed8',
+      'MOVIMIENTO CUIDEMOS MEDELLIN': '#0369a1',
+      'MOVIMIENTO POLITICO FUERZA CIUDADANA': '#be185d',
+      'PARTIDO ECOLOGISTA COLOMBIANO': '#65a30d',
+      'DE FRENTE MOVIMIENTO LILIANISTA': '#b91c1c',
+      'MOVIMIENTO ALIANZA DEMOCRATICA AMPLIA': '#7e22ce',
+      'SUMAMOS': '#475569',
+      'PARTIDO ADA': '#84B59F',
+      '"PARTIDO DE REIVINDICACION ETNICA ""PRE"""': '#65a30d',
+      '"MOVIMIENTO ALTERNATIVO INDIGENA Y SOCIAL ""MAIS"""': '#84B59F',
+      '"PARTIDO ALIANZA VERDE - PART. ALIANZA SOCIAL INDEPENDIENTE ""ASI"""': '#4CAF50',
     };
     function getColor(partido){
       const n = String(partido || '').toUpperCase().trim();
@@ -651,12 +690,36 @@
       if (/MIRA\b/i.test(n)) return '#1A3FC4';
       if (/POLO/i.test(n)) return '#A52A2A';
       if (/COMUNES/i.test(n)) return '#007755';
-      // hash determinista
+      // Partidos / movimientos comunes en Medellín que no entran exactos arriba
+      if (/DIGNIDAD/i.test(n)) return '#5e3a90';
+      if (/NUEVA FUERZA/i.test(n)) return '#7a4b9b';
+      if (/EN MARCHA/i.test(n)) return '#d97706';
+      if (/COLOMBIA RENACIENTE/i.test(n)) return '#15803d';
+      if (/JUSTA LIBRES/i.test(n)) return '#2c5282';
+      if (/MAIS|REIVINDICACION ETNICA/i.test(n)) return '#84B59F';
+      if (/JUNTOS/i.test(n)) return '#0891b2';
+      if (/CUIDEMOS MEDELLIN/i.test(n)) return '#0369a1';
+      if (/NOS UNE/i.test(n)) return '#0c4a6e';
+      if (/POR MEDELLIN/i.test(n)) return '#1e6091';
+      if (/MEDELLIN AVANZA/i.test(n)) return '#155e75';
+      if (/FUERZA CIUDADANA/i.test(n)) return '#be185d';
+      if (/ECOLOGISTA/i.test(n)) return '#65a30d';
+      if (/LILIANISTA/i.test(n)) return '#b91c1c';
+      if (/SUMAMOS/i.test(n)) return '#475569';
+      // hash determinista (colores diferenciados por saturación + luminancia)
       let h = 0; for (let i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) >>> 0;
-      const hue = h % 360; return `hsl(${hue}, 55%, 50%)`;
+      const hue = h % 360;
+      const sat = 45 + (h >> 8) % 30;
+      const lig = 38 + (h >> 12) % 22;
+      return `hsl(${hue}, ${sat}%, ${lig}%)`;
     }
 
     function fmt(n){ return new Intl.NumberFormat('es-CO').format(n || 0); }
+    function fmtPct(n){
+      const v = typeof n === 'number' ? n : parseFloat(n);
+      if (!isFinite(v)) return '—';
+      return v.toFixed(2);
+    }
 
     // ─── STATE ────────────────────────────────────────────────────────
     const state = { year: '2023', corp: 'alcaldia', view: 'comuna' };
@@ -753,7 +816,7 @@
         <div class="sum-card winner">
           <div class="sum-label">${lbl}</div>
           <div class="sum-value-big">${c1.nombre}</div>
-          <div class="sum-meta">${c1.partido || 'Sin partido'} · ${fmt(c1.votos)} votos · <span style="color:var(--purple);font-weight:600">${c1.pct}%</span></div>
+          <div class="sum-meta">${c1.partido || 'Sin partido'} · ${fmt(c1.votos)} votos · <span style="color:var(--purple);font-weight:600">${fmtPct(c1.pct)}%</span></div>
         </div>
       ` : `<div class="sum-card"><div class="sum-label">Ganador</div><div class="sum-value-big">—</div></div>`;
 
@@ -764,7 +827,7 @@
         <div class="sum-card">
           <div class="sum-label">Margen sobre 2°</div>
           <div class="sum-pct">${margin === '—' ? '—' : margin + ' pp'}</div>
-          ${c2 ? `<div class="sum-meta">2° ${c2.nombre.split(' ').slice(0,2).join(' ')} · ${c2.pct}%</div>` : ''}
+          ${c2 ? `<div class="sum-meta">2° ${c2.nombre.split(' ').slice(0,2).join(' ')} · ${fmtPct(c2.pct)}%</div>` : ''}
         </div>
         <div class="sum-card">
           <div class="sum-label">Votos válidos</div>
@@ -791,7 +854,7 @@
             <div class="partido">${c.partido || '—'}</div>
           </td>
           <td class="votos">${fmt(c.votos)}</td>
-          <td class="pct">${c.pct}%</td>
+          <td class="pct">${fmtPct(c.pct)}%</td>
         </tr>
       `).join('');
       const titles = {
@@ -852,7 +915,7 @@
                   ${w ? `
                     <span style="color:${getColor(w.partido)};font-weight:700">${w.nombre}</span><br/>
                     ${w.partido || '—'}<br/>
-                    <span style="color:#fff">${fmt(w.votos)} votos · ${w.pct}%</span><br/>
+                    <span style="color:#fff">${fmt(w.votos)} votos · ${fmtPct(w.pct)}%</span><br/>
                     <span style="color:#999;font-size:.7rem">Total comuna: ${fmt(total)} válidos</span>
                   ` : 'Sin datos'}
                 </div>`;
@@ -886,7 +949,12 @@
           const byDirect = {};
           const byAgg = {};
           for (const [k, b] of Object.entries(porBarrio)){
-            const item = { ...b, _key: k };
+            const item = {
+              ...b,
+              _key: k,
+              winner: b.candidatos && b.candidatos[0] ? b.candidatos[0] : null,
+              total: b.votos_validos,
+            };
             const code = b.codigo || (/^\d{3,4}$/.test(k) ? k : null);
             if (code) byCode[code] = item;
             byDirect[normBarrio(b.nombre)] = item;
@@ -999,7 +1067,7 @@
                       ${w ? `
                         <span style="color:${color};font-weight:700">${w.nombre}</span><br/>
                         ${w.partido || '—'}<br/>
-                        <span style="color:#fff">${fmt(w.votos)} votos · ${w.pct}%</span><br/>
+                        <span style="color:#fff">${fmt(w.votos)} votos · ${fmtPct(w.pct)}%</span><br/>
                         <span style="color:#999;font-size:.7rem">${r.inferido ? 'Total vecino' : 'Total barrio'}: ${fmt(b.total)} válidos</span>
                         ${inferidoNote}
                       ` : '<span style="color:#999;font-size:.75rem">Sin datos electorales</span>'}
@@ -1035,7 +1103,7 @@
                 ${w ? `
                   <span style="color:${color};font-weight:700">${w.nombre}</span><br/>
                   ${w.partido || '—'}<br/>
-                  <span style="color:#fff">${fmt(w.votos)} votos · ${w.pct}%</span><br/>
+                  <span style="color:#fff">${fmt(w.votos)} votos · ${fmtPct(w.pct)}%</span><br/>
                   <span style="color:#999;font-size:.7rem">Total barrio: ${fmt(b.total)} válidos</span>
                 ` : 'Sin datos'}
               </div>`;
@@ -1084,7 +1152,7 @@
                 ${w ? `
                   <span style="color:${color};font-weight:700">${w.nombre}</span><br/>
                   ${w.partido || '—'}<br/>
-                  <span style="color:#fff">${fmt(w.votos)} votos · ${w.pct}%</span><br/>
+                  <span style="color:#fff">${fmt(w.votos)} votos · ${fmtPct(w.pct)}%</span><br/>
                   <span style="color:#999;font-size:.7rem">Total puesto: ${fmt(p.total)} válidos</span>
                 ` : '<span style="color:#999;font-size:.75rem">Sin datos electorales</span>'}
               </div>`;
@@ -1157,7 +1225,7 @@
               ${w.nombre}
             </td>
             <td class="v">${fmt(w.votos)}</td>
-            <td class="p">${w.pct}%</td>
+            <td class="p">${fmtPct(w.pct)}%</td>
             <td class="v">${fmt(d.votos_validos)}</td>
           </tr>
         `;
