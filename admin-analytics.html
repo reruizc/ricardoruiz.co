@@ -605,8 +605,29 @@
       document.getElementById('active-paying-body').style.padding = '0';
     }
 
+    // Rutas privadas o de administración que no deben inflar el ranking público.
+    // El pixel ya respeta noindex, pero filtramos también acá para:
+    //  · limpiar el histórico que pueda haber quedado en KV antes del meta noindex
+    //  · cubrir cualquier ruta privada que olvidemos marcar en el futuro
+    const PRIVATE_PATH_PREFIXES = ['/proyecto-dc', '/observatorio-mujer', '/admin-analytics', '/admin-pronosticos'];
+    function isPrivatePath(p){
+      const s = String(p || '').toLowerCase();
+      const norm = s.startsWith('/') ? s : '/' + s;
+      return PRIVATE_PATH_PREFIXES.some(pref => norm === pref || norm.startsWith(pref + '/') || norm.startsWith(pref + '.'));
+    }
+
     function renderTopList(containerId, dict, opts = {}){
-      const entries = Object.entries(dict || {})
+      let src = dict || {};
+      let hiddenPrivate = 0;
+      if (opts.dropPrivate){
+        const out = {};
+        for (const [k, v] of Object.entries(src)){
+          if (isPrivatePath(k)){ hiddenPrivate += v; continue; }
+          out[k] = v;
+        }
+        src = out;
+      }
+      const entries = Object.entries(src)
         .filter(([k, v]) => k !== '_otros' && v > 0)
         .sort((a, b) => b[1] - a[1])
         .slice(0, opts.limit || 10);
@@ -621,7 +642,10 @@
           <span class="v">${fmtNum(v)}<br><span style="color:var(--text3);font-size:.65rem">${fmtPct(v, total)}</span></span>
         </div>
       `).join('') || '<div style="padding:1.5rem;color:var(--text3);font-family:DM Mono,monospace;font-size:.75rem">Sin datos aún en esta ventana</div>';
-      document.getElementById(containerId).innerHTML = html;
+      const privateNote = hiddenPrivate > 0
+        ? `<div style="padding:.75rem 1rem;border-top:1px dashed var(--border);color:var(--text3);font-family:DM Mono,monospace;font-size:.7rem;letter-spacing:.06em">${fmtNum(hiddenPrivate)} pageviews en rutas privadas (Proyecto DC · Observatorio Mujer · admin) excluidas del ranking</div>`
+        : '';
+      document.getElementById(containerId).innerHTML = html + privateNote;
     }
 
     // ISO 3166 alpha-2 → bandera + nombre (subset común). Fallback al código.
@@ -651,7 +675,7 @@
       renderTimeSeries('su-chart', analytics.days, 'signups', 'green');
       renderPlanDonut();
       renderActivePaying();
-      renderTopList('top-paths', analytics.totals.byPath, { formatLabel: p => p });
+      renderTopList('top-paths', analytics.totals.byPath, { formatLabel: p => p, dropPrivate: true });
       renderTopList('top-countries', analytics.totals.byCountry, { formatLabel: c => COUNTRY[c] || c });
       renderTopList('top-refs', analytics.totals.byRef, { formatLabel: r => r === 'direct' ? 'Directo / app' : r === 'interno' ? 'Interno (otra página del sitio)' : r });
       document.getElementById('last-updated').textContent = new Date().toLocaleString('es-CO', { hour12: false });

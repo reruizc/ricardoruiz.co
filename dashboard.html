@@ -396,8 +396,20 @@ body.day-mode::before {
   letter-spacing: -.04em;
 }
 
-/* ───────── PROYECTO DC (privado) ───────── */
-.private-wrap { margin-top: 1rem; display: flex; flex-direction: column; gap: 1rem; }
+/* ───────── HERRAMIENTAS PRIVADAS ───────── */
+.private-wrap { margin-top: 1rem; display: flex; flex-direction: column; gap: 2.25rem; }
+.private-group { display: flex; flex-direction: column; gap: .9rem; }
+.private-group-head {
+  display: flex; align-items: center; gap: .85rem;
+  font-family: var(--mono); font-size: 11.5px; font-weight: 700;
+  letter-spacing: .22em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+.private-group-head::before {
+  content: ""; display: inline-block; width: 28px; height: 1.5px;
+  background: var(--ink-3);
+}
+.private-group-items { display: flex; flex-direction: column; gap: 1rem; }
 .private {
   position: relative;
   background:
@@ -413,7 +425,7 @@ body.day-mode::before {
   overflow: hidden;
 }
 .private::before {
-  content: "Acceso restringido · Proyecto DC";
+  content: attr(data-stamp);
   position: absolute; top: 0; right: 0;
   font-family: var(--mono); font-size: 11.5px; font-weight: 700;
   letter-spacing: .2em; text-transform: uppercase;
@@ -1103,9 +1115,15 @@ const ALL_TOOLS = [
   { id:'descargas',    name:'Centro de Descargas', desc:'Archivos Excel por departamento, circunscripción y corporación hasta nivel de puesto de votación.',     href:'descargas.html',           tag:'Bases · Excel' },
 ];
 
+const PRIVATE_GROUPS = {
+  encargos: { label: 'Encargos de cliente',     stamp: 'Acceso restringido · cliente' },
+  admin:    { label: 'Administración del sitio', stamp: 'Acceso administrador' },
+};
+
 const PRIVATE_TOOLS = [
   {
     id: 'proyecto-dc',
+    group: 'encargos',
     name: 'Proyecto DC',
     expediente: 'RR-DC-2027',
     eyebrow: 'Acceso reservado',
@@ -1118,6 +1136,7 @@ const PRIVATE_TOOLS = [
   },
   {
     id: 'observatorio-mujer',
+    group: 'encargos',
     name: 'Observatorio Mujer',
     expediente: 'RR-OBS-MUJER',
     eyebrow: 'Encargo · Mujeres por la Democracia',
@@ -1130,6 +1149,7 @@ const PRIVATE_TOOLS = [
   },
   {
     id: 'admin-analytics',
+    group: 'admin',
     name: 'Analítica del sitio',
     expediente: 'RR-ADMIN-001',
     eyebrow: 'Operación · sólo administrador',
@@ -1142,6 +1162,7 @@ const PRIVATE_TOOLS = [
   },
   {
     id: 'admin-pronosticos',
+    group: 'admin',
     name: 'Pronósticos 1ª Vuelta',
     expediente: 'RR-ADMIN-002',
     eyebrow: 'Concurso · sólo administrador',
@@ -1456,27 +1477,44 @@ function render() {
       </a>`;
   }).join('');
 
-  /* PRIVATE — capa de acceso restringido */
+  /* PRIVATE — capa de acceso restringido (agrupado: encargos · admin) */
   const wrap = document.getElementById('private-wrap');
   const userEmail = (user.email || '').toLowerCase().trim();
   const visiblePrivate = PRIVATE_TOOLS.filter(p => (p.allowedEmails || []).map(x => x.toLowerCase()).includes(userEmail));
-  wrap.innerHTML = visiblePrivate.map(p => `
-    <div class="private">
-      <div class="private-stamp">
-        <div><span class="k">Expediente</span> ${p.expediente}</div>
-        <div><span class="k">Titular</span> ${firstName}</div>
-        <div><span class="k">Acceso</span> Por invitación</div>
-      </div>
-      <div class="private-body">
-        <div class="private-eyebrow">${p.eyebrow}</div>
-        <h3>${p.titleHTML}</h3>
-        <p class="private-dek">${p.desc}</p>
-      </div>
-      <div class="private-cta">
-        <a href="${p.href}" class="btn">${p.cta}</a>
-        <span class="note">${p.note}</span>
-      </div>
-    </div>`).join('');
+  const groupOrder = ['encargos', 'admin'];
+  const byGroup = {};
+  visiblePrivate.forEach(p => {
+    const g = p.group || 'encargos';
+    (byGroup[g] = byGroup[g] || []).push(p);
+  });
+  wrap.innerHTML = groupOrder
+    .filter(gid => byGroup[gid] && byGroup[gid].length)
+    .map(gid => {
+      const g = PRIVATE_GROUPS[gid];
+      const items = byGroup[gid].map(p => `
+        <div class="private" data-stamp="${g.stamp}">
+          <div class="private-stamp">
+            <div><span class="k">Expediente</span> ${p.expediente}</div>
+            <div><span class="k">Titular</span> ${firstName}</div>
+            <div><span class="k">Acceso</span> Por invitación</div>
+          </div>
+          <div class="private-body">
+            <div class="private-eyebrow">${p.eyebrow}</div>
+            <h3>${p.titleHTML}</h3>
+            <p class="private-dek">${p.desc}</p>
+          </div>
+          <div class="private-cta">
+            <a href="${p.href}" class="btn">${p.cta}</a>
+            <span class="note">${p.note}</span>
+          </div>
+        </div>`).join('');
+      return `
+        <div class="private-group">
+          <div class="private-group-head">${g.label}</div>
+          <div class="private-group-items">${items}</div>
+        </div>`;
+    })
+    .join('');
 
   /* DOWNLOADS (col 1) */
   document.getElementById('dl-kicker').textContent = t.dlKicker;
