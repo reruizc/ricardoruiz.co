@@ -664,14 +664,32 @@
       return cache[key];
     }
     let _toastTimer=null;
-    function showLoadingToast(){
+    function showLoadingToast(msg){
       let el=document.getElementById('_loading-toast');
       if(!el){el=document.createElement('div');el.id='_loading-toast';
         el.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,71,255,.92);color:#fff;font-family:\'Syne\',sans-serif;font-size:1.23rem;padding:.85rem 2.1rem;border-radius:3px;z-index:9999;pointer-events:none;transition:opacity .3s;white-space:nowrap;letter-spacing:.02em';
-        el.textContent='Un momento, cargando\u2026';document.body.appendChild(el);}
+        document.body.appendChild(el);}
+      el.textContent = msg || 'Un momento, cargando\u2026';
       el.style.opacity='1';
       clearTimeout(_toastTimer);
       _toastTimer=setTimeout(()=>{el.style.opacity='0';},3000);
+    }
+    // Ciudades grandes: dep:mun donde las mesas toman m\u00e1s tiempo en cargar
+    // (puestos.json + mesas.json llegan a 100-600 MB en estos casos).
+    // C\u00e1mara usa electoral_id: 01:001 Medell\u00edn, 03:001 Barranquilla, 05:001 Bol\u00edvar,
+    // 16:001 Bogot\u00e1, 31:001 Cali. Se incluyen tambi\u00e9n c\u00f3digos DANE por compatibilidad.
+    const BIG_CITIES = new Set([
+      '16:001', // Bogot\u00e1 D.C.
+      '01:001', // Medell\u00edn (electoral_id Antioquia=01)
+      '05:001', // Bol\u00edvar capital \u00b7 Cartagena en algunos cortes
+      '31:001', // Cali (electoral_id Valle=31)
+      '08:001', // Barranquilla (DANE)
+      '03:001', // Barranquilla (electoral_id Atl\u00e1ntico=03)
+    ]);
+    function isBigCity(depCod, munCod){
+      if(!depCod||!munCod) return false;
+      const key = `${String(depCod).padStart(2,'0')}:${String(munCod).padStart(3,'0')}`;
+      return BIG_CITIES.has(key);
     }
 
     // ─── STATE ────────────────────────────────────────────────
@@ -1168,7 +1186,7 @@
     // ─── SWITCH MUNICIPIO ─────────────────────────────────────
     async function switchMun(munCod){
       curMun = munCod; resetSelFrom('zon'); curComData = null;
-      showLoadingToast();
+      showLoadingToast(isBigCity(curDep, munCod) ? 'En unos segundos cargarán las comunas/localidades' : undefined);
       // En RG: actualizar mapa + hemiciclo (WHAT IF si hay mun filtrado)
       if(_rgMode){
         _ensureRGActive(); // bumpea _rgIIFEToken, invalidando IIFE stale
@@ -1252,7 +1270,7 @@
         return;
       }
       if(zonCod!=='TODOS'){
-        showLoadingToast();
+        showLoadingToast(isBigCity(curDep, curMun) ? 'En unos segundos cargarán los puestos y mesas' : undefined);
         try {
           curComData = await getComJSON(curDep, curMun, zonCod);
           const pues = [...(curComData.puestos||[])].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'))

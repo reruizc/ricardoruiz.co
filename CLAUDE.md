@@ -3,7 +3,7 @@
 ## Archivos principales
 - `electoral.html` — hub de navegación (senado, cámara, consultas)
 - `senado-2026.html` — escrutinio senado, todos los toggles y visualizaciones
-- `camara-2026.html` — (en construcción) espejo de senado para cámara
+- `camara-2026.html` — **LISTO** · escrutinio Cámara 2026 espejo de senado. 4 circunscripciones (Territorial · Indígena · Afro · Resultados Generales con WHAT IF), drill territorial Dep → Mun → Zona → Puesto → Mesa, hemiciclo SVG de 165 curules, mapa Leaflet, listas cerradas por depto, race-fix `_rgIIFEToken`, BIG_CITIES toast custom (C.1).
 - `endoso-2026.html` — comparación mesa a mesa senado vs cámara
 - `previa-1v.html` — simulador de intención presidencial 1ª vuelta
 - `oportunidad.html` — **módulo B2B** voto blando afín por candidato (LISTO, ver sección dedicada)
@@ -848,6 +848,23 @@ Bogotá D.C.) y no tiene sentido quedarse en la vista de "muns del depto".
 `_buildWinnerNamesDep(dep, curMap)` → nombres de ganadores para tooltips
 del hemiciclo. `_buildWinnerNamesNacional()` combina territorial + indígenas
 + afro para la vista nacional (165 curules = 161+2+2).
+
+### BIG_CITIES toast custom (C.1 · sprint cámara cierre)
+Cuando el usuario hace drill a las ciudades grandes, los archivos del mun
+(com-{mun}-{com}.json hasta ~3 MB) tardan en cargar. `showLoadingToast(msg)`
+acepta mensaje custom. `isBigCity(depCod, munCod)` chequea contra
+`BIG_CITIES = {16:001 Bogotá, 01:001 Medellín, 05:001 Bolívar/Cartagena,
+31:001 Cali, 08:001/03:001 Barranquilla}` (mezcla códigos DANE + electoral_id
+porque la cámara usa estos últimos pero hay variantes).
+
+Hooks vivos:
+- `switchMun`: `showLoadingToast(isBigCity(curDep, munCod) ? 'En unos segundos cargarán las comunas/localidades' : undefined)`.
+- `switchZon`: `showLoadingToast(isBigCity(curDep, curMun) ? 'En unos segundos cargarán los puestos y mesas' : undefined)`.
+
+> Nota: cámara NO rota el contenido 90° en móvil portrait como senado.
+> El `<select>` nativo funciona OK en móvil sin overlay custom. Si en el
+> futuro se decide rotar la cámara para móvil, copiar el patrón
+> `_sel-overlay`/`_sel-panel` de senado (líneas ~2327-2378).
 
 ## Donut chart — participación + género
 ### Donut principal `#donut-senado`
