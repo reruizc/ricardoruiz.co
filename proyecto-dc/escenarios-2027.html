@@ -105,6 +105,8 @@
     .col-card { background:var(--surface); border:1px solid var(--border); }
     .col-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); }
     .col-title { font-family:'Syne',sans-serif; font-weight:800; font-size:1.05rem; letter-spacing:-.01em; }
+    /* Título del panel de sliders un poco más liviano */
+    .sliders-col .col-title { font-weight:500; }
     .col-sub { font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.1em; color:var(--text3); text-transform:uppercase; margin-top:.25rem; }
 
     /* Sliders col */
@@ -404,9 +406,15 @@
     //   tema  - clave en sensibilidad_agenda del arquetipo (o 'special_*')
     //   sign  - +1: positivo refuerza arquetipos sensibles · -1: lo contrario
     const SLIDER_DEFS = [
+      // Para sliders "normales" (sign +1): el valor NEGATIVO indica deterioro
+      // del tema, y eso activa al arquetipo sensible al tema. El positivo
+      // indica mejora y lo desmoviliza.
+      // Para sliders "invertidos" (sign -1): la dirección está al revés, el
+      // valor POSITIVO indica el problema y activa al sensible. Caso típico:
+      // costo de vida sube → activa supervivencia.
       { id: 'seguridad',          label: 'Seguridad percibida',           hint: '−5 deterioro · +5 mejora visible',                tema: 'seguridad',           sign: +1 },
       { id: 'electoral',          label: 'Presidente nacional 2026',      hint: '−5 izquierda fuerte · +5 derecha fuerte',         tema: 'special_electoral',   sign: +1 },
-      { id: 'costo_vida',         label: 'Costo de vida',                 hint: '−5 más caro · +5 alivio',                         tema: 'empleo',              sign: +1 },
+      { id: 'costo_vida',         label: 'Costo de vida',                 hint: '−5 baja · +5 sube (más caro)',                    tema: 'empleo',              sign: -1 },
       { id: 'empleo',             label: 'Empleo e ingresos',             hint: '−5 desempleo · +5 mejora',                        tema: 'empleo',              sign: +1 },
       { id: 'afinidad_carvalho',  label: 'Visibilidad equipo Carvalho',   hint: '−5 invisible · +5 alta presencia',                tema: 'special_afinidad',    sign: +1 },
       { id: 'riesgo_cambio',      label: 'Volatilidad del barrio',        hint: '−5 estabilidad · +5 alta volatilidad emocional',  tema: 'special_riesgo',      sign: +1 },
@@ -706,6 +714,43 @@
       const key = famId ? '--arq-' + famId : '--arq-sin-dato';
       return cssVar(key) || '#9ca3af';
     }
+
+    // SVG <pattern> de franjas diagonales 50/50 con dos colores de
+    // arquetipo. Se inyecta lazily en el <defs> del SVG de Leaflet la
+    // primera vez que un par lo necesita. Devuelve el id para usar como
+    // `fillColor: 'url(#<id>)'`.
+    function ensureMixPattern(id1, id2){
+      // Ordenar para que (A,B) y (B,A) compartan pattern
+      const [a, b] = [id1, id2].sort();
+      const patId = `pat-mix-${a}-${b}`;
+      const svg = document.querySelector('#map .leaflet-overlay-pane svg');
+      if (!svg) return patId;
+      let defs = svg.querySelector('defs');
+      if (!defs){
+        defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+        svg.insertBefore(defs, svg.firstChild);
+      }
+      if (defs.querySelector('#' + patId)) return patId;
+      const NS = 'http://www.w3.org/2000/svg';
+      const pat = document.createElementNS(NS, 'pattern');
+      pat.setAttribute('id', patId);
+      pat.setAttribute('patternUnits', 'userSpaceOnUse');
+      pat.setAttribute('width', '10');
+      pat.setAttribute('height', '10');
+      pat.setAttribute('patternTransform', 'rotate(45)');
+      const r1 = document.createElementNS(NS, 'rect');
+      r1.setAttribute('x', '0'); r1.setAttribute('y', '0');
+      r1.setAttribute('width', '5'); r1.setAttribute('height', '10');
+      r1.setAttribute('fill', colorArq(a));
+      const r2 = document.createElementNS(NS, 'rect');
+      r2.setAttribute('x', '5'); r2.setAttribute('y', '0');
+      r2.setAttribute('width', '5'); r2.setAttribute('height', '10');
+      r2.setAttribute('fill', colorArq(b));
+      pat.appendChild(r1);
+      pat.appendChild(r2);
+      defs.appendChild(pat);
+      return patId;
+    }
     function arqLabel(famId, version){
       const a = STATE.data.arquetipos.arquetipos[famId];
       if (!a) return '—';
@@ -749,58 +794,64 @@
     //      negativo → castigo.
     function computeScores(baseFam, sliders, afinSlider){
       const scores = { proteccion: 0, castigo: 0, continuidad: 0, supervivencia: 0, pertenencia: 0 };
-      // 1) Base bias
-      if (baseFam && scores[baseFam] !== undefined) scores[baseFam] += 3.0;
+      // 1) Base bias — bajo a 1.5 para que las palancas tengan más peso real.
+      //    Antes era 3.0 y la migración casi nunca ocurría.
+      if (baseFam && scores[baseFam] !== undefined) scores[baseFam] += 1.5;
 
-      // 2) Sliders temáticos (mapeados a SENS)
+      // 2) Sliders temáticos (mapeados a SENS). Factor 1.2 (antes 0.6) +
+      //    direccionalidad por def.sign:
+      //      sign +1 → deterioro (slider negativo) activa al sensible.
+      //      sign -1 → aumento del problema (slider positivo) activa al sensible.
+      //                Caso típico: costo de vida sube (+5) → activa supervivencia.
       for (const def of SLIDER_DEFS){
         if (def.tema.startsWith('special_')) continue;
         const v = Number(sliders[def.id] || 0);
         if (!v) continue;
         const tema = def.tema;
+        const dir = (def.sign === -1) ? +1 : -1;
         for (const A of Object.keys(scores)){
           const sens = SENS[A][tema] || 0;
-          // -v: deterioro activa al sensible; mejora lo desmoviliza
-          scores[A] += (-v) * (sens / 5) * 0.6;
+          scores[A] += dir * v * (sens / 5) * 1.2;
         }
       }
 
       // 3) Electoral nacional
       const e = Number(sliders.electoral || 0);
       if (e < 0){
-        scores.castigo    += Math.abs(e) * 0.5;
-        scores.proteccion += Math.abs(e) * 0.4;
+        scores.castigo    += Math.abs(e) * 0.9;
+        scores.proteccion += Math.abs(e) * 0.7;
       } else if (e > 0){
-        scores.continuidad += e * 0.4;
-        scores.pertenencia += e * 0.3;
+        scores.continuidad += e * 0.7;
+        scores.pertenencia += e * 0.5;
       }
 
       // 4) Afinidad equipo Carvalho
       const af = Number(sliders.afinidad_carvalho || 0);
       if (af !== 0 && afinSlider !== null && afinSlider !== undefined){
-        const efecto = af * (afinSlider / 5) * 0.5;  // |efecto| ≤ 0.5
+        const efecto = af * (afinSlider / 5) * 0.9;
         if (efecto > 0){
-          scores.castigo     += efecto * 0.4;
-          scores.continuidad += efecto * 0.3;
-          scores.pertenencia += efecto * 0.3;
+          scores.castigo     += efecto * 0.5;
+          scores.continuidad += efecto * 0.4;
+          scores.pertenencia += efecto * 0.4;
         } else {
           const a = -efecto;
-          scores.proteccion   += a * 0.4;
-          scores.supervivencia += a * 0.3;
+          scores.proteccion   += a * 0.5;
+          scores.supervivencia += a * 0.4;
         }
       }
 
       // 5) Riesgo de cambio (volatilidad)
+      // +5 alta volatilidad debilita el base bias hasta ANULARLO.
       const r = Number(sliders.riesgo_cambio || 0);
-      if (r !== 0 && baseFam) scores[baseFam] -= r * 0.4;
+      if (r !== 0 && baseFam) scores[baseFam] -= r * 0.3;
 
       // 6) Favorabilidad alcalde
       const f = Number(sliders.favorabilidad || 0);
       if (f > 0){
-        scores.continuidad += f * 0.4;
-        scores.proteccion  += f * 0.3;
+        scores.continuidad += f * 0.7;
+        scores.proteccion  += f * 0.5;
       } else if (f < 0){
-        scores.castigo += Math.abs(f) * 0.5;
+        scores.castigo += Math.abs(f) * 0.9;
       }
 
       return scores;
@@ -814,6 +865,24 @@
       return best;
     }
 
+    // Devuelve { id, mixed } donde mixed = { id1, id2 } si los dos primeros
+    // arquetipos están a menos de RATIO_MIX de distancia relativa entre ellos
+    // (empate efectivo → pintar franjas). Si no hay empate, mixed = null.
+    const MIX_THRESHOLD = 0.20;  // 20% de diferencia relativa
+    function argmaxFamWithMix(scores){
+      const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+      const first = sorted[0];
+      const second = sorted[1];
+      if (!first) return { id: null, mixed: null };
+      // Si first es negativo o muy chico → no hay mix
+      if (first[1] <= 0.01 || !second) return { id: first[0], mixed: null };
+      const diff = (first[1] - second[1]) / Math.max(0.01, first[1]);
+      if (diff < MIX_THRESHOLD && second[1] > 0){
+        return { id: first[0], mixed: { id1: first[0], id2: second[0] } };
+      }
+      return { id: first[0], mixed: null };
+    }
+
     function computeArquetipoProyectadoBarrio(b, dap){
       const baseFam = b.arquetipo && b.arquetipo['2023'];
       if (!baseFam) return null;
@@ -822,13 +891,20 @@
       const scores = computeScores(baseFam, STATE.sliders, afinSlider);
       return argmaxFam(scores);
     }
+    function computeArquetipoMixBarrio(b, dap){
+      const baseFam = b.arquetipo && b.arquetipo['2023'];
+      if (!baseFam) return { id: null, mixed: null };
+      const afEntry = STATE.data.afinidad && STATE.data.afinidad.barrios && STATE.data.afinidad.barrios[dap];
+      const afinSlider = afEntry ? afEntry.afinidad_slider : null;
+      const scores = computeScores(baseFam, STATE.sliders, afinSlider);
+      return argmaxFamWithMix(scores);
+    }
 
     function computeArquetipoProyectadoComuna(name){
       const com = STATE.data.porComuna[name];
       if (!com) return null;
       const baseFam = com['2023'] && com['2023'].dominante;
       if (!baseFam) return null;
-      // Afinidad promedio de los barrios de esa comuna
       let afTotal = 0, afCount = 0;
       for (const [dap, b] of Object.entries(STATE.data.porBarrio)){
         if (((b.comuna||'')).toLowerCase() !== ((name||'')).toLowerCase()) continue;
@@ -838,6 +914,21 @@
       const afinSlider = afCount > 0 ? afTotal / afCount : null;
       const scores = computeScores(baseFam, STATE.sliders, afinSlider);
       return argmaxFam(scores);
+    }
+    function computeArquetipoMixComuna(name){
+      const com = STATE.data.porComuna[name];
+      if (!com) return { id: null, mixed: null };
+      const baseFam = com['2023'] && com['2023'].dominante;
+      if (!baseFam) return { id: null, mixed: null };
+      let afTotal = 0, afCount = 0;
+      for (const [dap, b] of Object.entries(STATE.data.porBarrio)){
+        if (((b.comuna||'')).toLowerCase() !== ((name||'')).toLowerCase()) continue;
+        const e = STATE.data.afinidad && STATE.data.afinidad.barrios && STATE.data.afinidad.barrios[dap];
+        if (e){ afTotal += e.afinidad_slider; afCount++; }
+      }
+      const afinSlider = afCount > 0 ? afTotal / afCount : null;
+      const scores = computeScores(baseFam, STATE.sliders, afinSlider);
+      return argmaxFamWithMix(scores);
     }
 
     // ─── MAPA LEAFLET ────────────────────────────────────────────────
@@ -870,6 +961,11 @@
           }
           const fam = resolveFam(feat, isCom, mode);
           if (!fam) return { fillColor: grisColor, fillOpacity: 0.25, color: 'rgba(255,255,255,0.2)', weight: 1 };
+          // Si hay empate efectivo entre dos arquetipos → franjas
+          if (fam.mixed){
+            const patId = ensureMixPattern(fam.mixed.id1, fam.mixed.id2);
+            return { fillColor: `url(#${patId})`, fillOpacity: fam.inferido ? 0.7 : 0.92, color: 'rgba(255,255,255,0.4)', weight: 1, dashArray: fam.inferido ? '2,3' : null };
+          }
           return { fillColor: colorArq(fam.id), fillOpacity: fam.inferido ? 0.5 : 0.78, color: 'rgba(255,255,255,0.4)', weight: 1, dashArray: fam.inferido ? '2,3' : null };
         },
         onEachFeature: (feat, layer) => {
@@ -897,21 +993,31 @@
         }
       }).addTo(map);
 
-      try { map.fitBounds(mapLayer.getBounds(), { padding:[10,10] }); } catch(_) {}
+      // Solo encuadrar el mapa la primera vez o cuando se cambia el nivel
+      // (comuna ↔ barrio cambian los polígonos y conviene re-encuadrar una
+      // sola vez). Cualquier otro redraw — sliders, toggles, etc. — deja
+      // el mapa quieto en la posición/zoom que tenga.
+      const fitKey = `${isCom ? 'com' : 'bar'}`;
+      if (drawMap._lastFitKey !== fitKey){
+        try { map.fitBounds(mapLayer.getBounds(), { padding:[10,10] }); } catch(_) {}
+        drawMap._lastFitKey = fitKey;
+      }
       updateMapHeader();
     }
 
-    // Resuelve familia del arquetipo (id + inferido) según feature + modo
-    // mode === 'base'  → arquetipo 2023 directo del módulo 05
-    // mode === 'proyectado' → arquetipo proyectado bajo sliders activos (Sprint 1E)
+    // Resuelve familia del arquetipo (id + inferido + mixed opcional) según
+    // feature + modo. Cuando hay escenario activo y el segundo arquetipo
+    // está a menos de 20% del primero, devolvemos `mixed:{id1,id2}` para
+    // que el render dibuje franjas en lugar de color sólido.
     function resolveFam(feat, isComuna, mode){
       const props = feat.properties || {};
       if (isComuna){
         const com = STATE.data.porComuna[props.NOMBRE];
         if (!com) return null;
-        if (mode === 'proyectado' && escenarioActivo() && typeof computeArquetipoProyectadoComuna === 'function'){
-          const id = computeArquetipoProyectadoComuna(props.NOMBRE);
-          return { id, inferido: false };
+        if (mode === 'proyectado' && escenarioActivo() && typeof computeArquetipoMixComuna === 'function'){
+          const mix = computeArquetipoMixComuna(props.NOMBRE);
+          if (!mix.id) return null;
+          return { id: mix.id, inferido: false, mixed: mix.mixed };
         }
         const slot = com['2023'];
         return slot && slot.dominante ? { id: slot.dominante, inferido: false } : null;
@@ -919,9 +1025,10 @@
       // barrio
       const res = getBarrioByDap(props.CODIGO);
       if (!res) return null;
-      if (mode === 'proyectado' && escenarioActivo() && typeof computeArquetipoProyectadoBarrio === 'function'){
-        const id = computeArquetipoProyectadoBarrio(res.b, props.CODIGO);
-        return { id, inferido: res.inferido };
+      if (mode === 'proyectado' && escenarioActivo() && typeof computeArquetipoMixBarrio === 'function'){
+        const mix = computeArquetipoMixBarrio(res.b, props.CODIGO);
+        if (!mix.id) return null;
+        return { id: mix.id, inferido: res.inferido, mixed: mix.mixed };
       }
       const baseFam = res.b.arquetipo && res.b.arquetipo['2023'];
       return baseFam ? { id: baseFam, inferido: res.inferido } : null;
