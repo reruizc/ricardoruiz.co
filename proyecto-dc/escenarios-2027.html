@@ -149,6 +149,14 @@
     .fb-score-fill { height:100%; transition: width .25s; }
     .fb-score-val { font-family:'DM Mono',monospace; font-size:.7rem; font-weight:700; color:var(--text); text-align:right; line-height:1.1; }
     .fb-total-row { font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.06em; color:var(--text3); text-transform:uppercase; padding-top:.4rem; border-top: 1px dashed var(--border); margin-top:.2rem; }
+
+    /* Stream graph histórico por arquetipo */
+    .fb-stream-svg { display:block; width:100%; height:auto; color: var(--text2); margin: .2rem 0 .4rem; }
+    .fb-stream-svg path { transition: opacity .15s; }
+    .fb-stream-svg path:hover { opacity: 1; stroke: rgba(255,255,255,0.4); stroke-width: 0.5; }
+    .fb-stream-legend { display:flex; flex-wrap:wrap; gap:.4rem .9rem; font-family:'DM Mono',monospace; font-size:.6rem; color:var(--text2); letter-spacing:.04em; margin-bottom:.3rem; }
+    .fb-stream-leg { display:inline-flex; align-items:center; gap:.3rem; }
+    .fb-stream-sw { width:10px; height:10px; display:inline-block; border:1px solid rgba(255,255,255,0.12); }
     .fb-act { display:flex; flex-wrap:wrap; gap:.3rem; }
     .fb-act-pill { font-family:'DM Mono',monospace; font-size:.64rem; letter-spacing:.04em; padding:.25rem .55rem; background:var(--purple-dim); color:var(--text); border:1px solid var(--purple-dim); }
     .fb-act-pill strong { color:var(--purple); }
@@ -1227,6 +1235,110 @@
         </div>`;
     }
 
+    // ─── STREAM GRAPH HISTÓRICO POR ARQUETIPO ────────────────────────
+    // Acumula votos por año + arquetipo para un barrio o una comuna.
+    // Para BARRIO: cada año tiene votos asignados 100% al arquetipo de ese año.
+    //   En 2027 se reparten según votos_por_arquetipo del xlsx.
+    // Para COMUNA: suma los barrios → distribución apilada en cada año.
+    const STREAM_YEARS = ['2015','2019','2023','2027'];
+    const STREAM_ARQS  = ['proteccion','castigo','continuidad','supervivencia','pertenencia'];
+
+    function _distribBarrio(b, dap){
+      const out = { '2015': {}, '2019': {}, '2023': {}, '2027': {} };
+      for (const y of ['2015','2019','2023']){
+        const arq = b.arquetipo && b.arquetipo[y];
+        const v = (b.votos && b.votos[y]) || 0;
+        if (arq && v > 0) out[y][arq] = v;
+      }
+      const v27 = getVot2027Barrio(dap);
+      if (v27 && v27.votos_por_arquetipo){
+        for (const a of STREAM_ARQS) out['2027'][a] = v27.votos_por_arquetipo[a] || 0;
+      }
+      return out;
+    }
+    function _distribComuna(name){
+      const out = { '2015': {}, '2019': {}, '2023': {}, '2027': {} };
+      const nameLc = (name || '').toLowerCase();
+      for (const [dap, b] of Object.entries(STATE.data.porBarrio)){
+        if ((b.comuna || '').toLowerCase() !== nameLc) continue;
+        for (const y of ['2015','2019','2023']){
+          const arq = b.arquetipo && b.arquetipo[y];
+          const v = (b.votos && b.votos[y]) || 0;
+          if (!arq || v <= 0) continue;
+          out[y][arq] = (out[y][arq] || 0) + v;
+        }
+        const v27 = getVot2027Barrio(dap);
+        if (v27 && v27.votos_por_arquetipo){
+          for (const a of STREAM_ARQS) out['2027'][a] = (out['2027'][a] || 0) + (v27.votos_por_arquetipo[a] || 0);
+        }
+      }
+      return out;
+    }
+
+    // SVG stream graph 4 años × 5 arquetipos. Bandas apiladas con bordes
+    // curvos (Bezier). Total del año en el eje X bajo cada columna.
+    function _streamGraph(distrib){
+      const W = 340, H = 180, padL = 20, padR = 20, padT = 8, padB = 36;
+      const innerW = W - padL - padR;
+      const innerH = H - padT - padB;
+      const cols = STREAM_YEARS.map((_, i) => padL + (innerW / (STREAM_YEARS.length - 1)) * i);
+      const totales = STREAM_YEARS.map(y => STREAM_ARQS.reduce((s,a) => s + (distrib[y][a] || 0), 0));
+      const maxTotal = Math.max(1, ...totales);
+      const scale = innerH / maxTotal;
+      const fmt = n => Number(Math.round(n||0)).toLocaleString('es-CO');
+
+      // yStart/yEnd por arquetipo por año (apilado)
+      const bands = STREAM_ARQS.map(arq => cols.map((x, i) => {
+        let yStart = 0;
+        for (const a of STREAM_ARQS){
+          if (a === arq) break;
+          yStart += (distrib[STREAM_YEARS[i]][a] || 0);
+        }
+        const v = distrib[STREAM_YEARS[i]][arq] || 0;
+        return { x, yTop: padT + yStart * scale, yBot: padT + (yStart + v) * scale, v };
+      }));
+
+      function pathBand(pts){
+        // Construye polígono curvo: borde superior izq→der, borde inferior der→izq
+        if (!pts.length) return '';
+        let p = `M ${pts[0].x.toFixed(1)} ${pts[0].yTop.toFixed(1)}`;
+        for (let i = 1; i < pts.length; i++){
+          const a = pts[i-1], b = pts[i];
+          const mx = (a.x + b.x) / 2;
+          p += ` C ${mx.toFixed(1)} ${a.yTop.toFixed(1)}, ${mx.toFixed(1)} ${b.yTop.toFixed(1)}, ${b.x.toFixed(1)} ${b.yTop.toFixed(1)}`;
+        }
+        p += ` L ${pts[pts.length-1].x.toFixed(1)} ${pts[pts.length-1].yBot.toFixed(1)}`;
+        for (let i = pts.length - 2; i >= 0; i--){
+          const a = pts[i+1], b = pts[i];
+          const mx = (a.x + b.x) / 2;
+          p += ` C ${mx.toFixed(1)} ${a.yBot.toFixed(1)}, ${mx.toFixed(1)} ${b.yBot.toFixed(1)}, ${b.x.toFixed(1)} ${b.yBot.toFixed(1)}`;
+        }
+        p += ' Z';
+        return p;
+      }
+
+      // Tooltip simple: title del SVG por banda con nombre del arquetipo y serie
+      return `
+        <svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet" class="fb-stream-svg">
+          ${bands.map((pts, i) => {
+            const arq = STREAM_ARQS[i];
+            const serie = STREAM_YEARS.map((y, j) => `${y}: ${fmt(pts[j].v)}`).join(' · ');
+            return `<path d="${pathBand(pts)}" fill="${colorArq(arq)}" opacity="0.92"><title>${arqLabel(arq, 'evol')}\n${serie}</title></path>`;
+          }).join('')}
+          ${STREAM_YEARS.map((y, i) => `
+            <text x="${cols[i].toFixed(0)}" y="${(H - 22).toFixed(0)}" text-anchor="middle" font-family="DM Mono, monospace" font-size="10" fill="currentColor" opacity="0.7">${y}</text>
+            <text x="${cols[i].toFixed(0)}" y="${(H - 8).toFixed(0)}" text-anchor="middle" font-family="DM Mono, monospace" font-size="9" fill="currentColor" opacity="0.45">${fmt(totales[i])}</text>
+          `).join('')}
+        </svg>`;
+    }
+
+    // Leyenda compacta del stream
+    function _streamLegend(){
+      return `<div class="fb-stream-legend">
+        ${STREAM_ARQS.map(a => `<span class="fb-stream-leg"><span class="fb-stream-sw" style="background:${colorArq(a)}"></span>${arqLabel(a, 'evol').replace(/ .*$/, '')}</span>`).join('')}
+      </div>`;
+    }
+
     function _slidersActivosTexto(){
       const lst = SLIDER_DEFS.filter(s => Number(STATE.sliders[s.id]) !== 0);
       if (!lst.length) return '<div class="fb-empty-mini">Sin escenario activo. Mové sliders para ver la proyección.</div>';
@@ -1280,6 +1392,9 @@
         ${afLine}
         <div class="fb-section-title">Votos esperados 2027 por arquetipo ${escenarioActivo() ? '(escenario activo)' : '(ajustado Nury)'}</div>
         ${votos ? _votosBars(votos) : '<div class="fb-empty-mini">Sin votos esperados para este barrio.</div>'}
+        <div class="fb-section-title">Trayectoria histórica de votos por arquetipo</div>
+        ${_streamGraph(_distribBarrio(b, dap))}
+        ${_streamLegend()}
         <div class="fb-section-title">Palancas activas</div>
         ${_slidersActivosTexto()}
       `;
@@ -1326,6 +1441,9 @@
         <div class="fb-row"><div class="fb-lbl">Huella Carvalho · promedio comuna</div><div class="fb-val">${afProm !== null ? `<span class="fb-pill" style="background:${colorArq('castigo')};color:#fff">${afProm >= 0 ? '+' : ''}${afProm.toFixed(2)}</span>` : '<span style="color:var(--text3);font-style:italic">Sin datos</span>'}</div></div>
         <div class="fb-section-title">Votos esperados 2027 por arquetipo ${escenarioActivo() ? '(escenario activo)' : '(ajustado Nury)'}</div>
         ${votos ? _votosBars(votos) : '<div class="fb-empty-mini">Sin votos esperados para esta comuna.</div>'}
+        <div class="fb-section-title">Trayectoria histórica de votos por arquetipo</div>
+        ${_streamGraph(_distribComuna(name))}
+        ${_streamLegend()}
         <div class="fb-section-title">Palancas activas</div>
         ${_slidersActivosTexto()}
       `;
