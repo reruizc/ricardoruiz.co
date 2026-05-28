@@ -12,8 +12,8 @@
  */
 
 (function() {
-  const LANG_MAP  = { co: 'co', us: 'us', mx: 'co', cn: 'cn' };
-  const LABEL_MAP = { co: 'Colombia', us: 'United States / UK', mx: 'México', cn: '中国 / China' };
+  const LANG_MAP  = { co: 'co', us: 'us', mx: 'co', br: 'br', cn: 'cn' };
+  const LABEL_MAP = { co: 'Colombia', us: 'United States / UK', mx: 'México', br: 'Brasil', cn: '中国 / China' };
 
   function getSavedLang() {
     return localStorage.getItem('rr-lang') || 'co';
