@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concejo · 2023 · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <style>
+    :root{--white:#f4f3ef;--blue:#0047FF;--green:#4ade80;--card-border:rgba(255,255,255,0.1);--border:rgba(255,255,255,0.08);--bar-bg:rgba(255,255,255,0.1);--td-hover:rgba(255,255,255,0.04)}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{background:#060810;color:var(--white);font-family:'Syne',sans-serif;cursor:none;min-height:100vh;overflow-x:hidden}
+    .cursor{position:fixed;width:10px;height:10px;background:var(--blue);border-radius:50%;pointer-events:none;z-index:999999;transform:translate(-50%,-50%);transition:transform .15s,background .2s}
+    .cursor-ring{position:fixed;width:32px;height:32px;border:1.5px solid var(--blue);border-radius:50%;pointer-events:none;z-index:999998;transform:translate(-50%,-50%);opacity:.4}
+    .bg-layer{position:fixed;inset:0;z-index:0;background:url('foto-fondo.webp') center right/cover no-repeat}
+    .bg-overlay{position:fixed;inset:0;z-index:1;background:linear-gradient(to right,rgba(4,6,16,.97) 0%,rgba(4,6,16,.94) 55%,rgba(4,6,16,.72) 72%,rgba(4,6,16,.35) 88%,rgba(4,6,16,.10) 100%)}
+    .shell{position:relative;z-index:2;min-height:100vh;display:flex;flex-direction:column}
+    .electoral-nav{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(4,6,16,.6);backdrop-filter:blur(8px);flex-shrink:0}
+    .e-btn-back{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--green);text-decoration:none;border:1.5px solid rgba(74,222,128,.4);padding:.3rem .8rem;transition:color .2s,border-color .2s,background .2s;flex-shrink:0}
+    .e-btn-back:hover{color:#060810;background:var(--green);border-color:var(--green)}
+    .logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.8;transition:opacity .2s}
+    .logo-link:hover{opacity:1}
+    .logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px}
+    .logo-bar{width:5px;background:var(--blue);border-radius:1px 1px 0 0;opacity:.85}
+    .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.1rem,2vw,1.8rem);letter-spacing:-.03em;color:var(--white)}
+    .logo-text span{color:var(--blue)}
+    @media(max-width:900px){.electoral-nav{display:none}}
+    .top-bar{display:flex;align-items:flex-start;justify-content:space-between;padding:1.1rem 2.5rem 0;flex-shrink:0}
+    .page-title{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.5rem,2.8vw,2.5rem);letter-spacing:-.04em;line-height:1.05;color:var(--white);text-shadow:0 2px 24px rgba(0,71,255,.4)}
+    .page-title span{color:var(--blue)}
+    .breadcrumb{padding:.6rem 2.5rem 0;font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3);border-bottom:1px solid var(--border);padding-bottom:.7rem;flex-shrink:0}
+    .breadcrumb a{color:rgba(0,71,255,.7);text-decoration:none}
+    .breadcrumb a:hover{color:var(--blue)}
+    .meta-bar{display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap;padding:.5rem 2.5rem;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.08em;color:rgba(255,255,255,.35);flex-shrink:0}
+    .meta-item b{color:rgba(74,222,128,.85);font-weight:700}
+    .source-badge{margin-left:auto;font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:.3rem .8rem}
+    .source-badge b{color:var(--blue)}
+    .content-area{flex:1;padding:1.8rem 2.5rem 1.5rem}
+    .loader-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;min-height:300px}
+    .loader-ring{width:40px;height:40px;border:2px solid rgba(0,71,255,.2);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .loader-label{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3)}
+    .sub-selector{display:flex;gap:.75rem;margin-bottom:1.5rem;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--border);padding-bottom:1rem}
+    .sub-label{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-right:.25rem}
+    .dep-select{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.06em;text-transform:uppercase;background:rgba(255,255,255,.05);border:1.5px solid var(--card-border);color:var(--white);padding:.45rem 2rem .45rem .8rem;cursor:pointer;outline:none;transition:border-color .2s;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23aaa' stroke-width='1.5' stroke-linecap='round' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .75rem center}
+    .dep-select:hover,.dep-select:focus{border-color:var(--blue)}
+    .dep-select option{background:#0e1220;color:var(--white)}
+    .search-input{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.06em;background:rgba(255,255,255,.05);border:1.5px solid var(--card-border);color:var(--white);padding:.45rem .8rem;outline:none;width:200px;transition:border-color .2s}
+    .search-input:focus{border-color:var(--blue)}
+    .search-input::placeholder{color:rgba(255,255,255,.25)}
+    .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
+    .kpi-card{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1.1rem 1.3rem;backdrop-filter:blur(4px)}
+    .kpi-label{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:.4rem}
+    .kpi-val{font-family:'Syne',sans-serif;font-weight:800;font-size:1.7rem;letter-spacing:-.04em;line-height:1;color:var(--blue)}
+    .kpi-val.wh{color:var(--white)}.kpi-val.gr{color:var(--green)}.kpi-val.sm{font-size:.95rem;line-height:1.3}
+    .kpi-delta{font-family:'DM Mono',monospace;font-size:.6rem;color:rgba(255,255,255,.28);margin-top:.3rem}
+    .scope-toggle{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap}
+    .scope-btn{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;padding:.28rem .9rem;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;transition:all .15s}
+    .scope-btn:hover{border-color:rgba(0,71,255,.4);color:rgba(180,210,255,.8)}
+    .scope-btn.active{background:rgba(0,71,255,.15);border-color:rgba(0,71,255,.45);color:rgba(180,210,255,.9)}
+    body.day-mode .scope-btn{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.15);color:rgba(0,0,0,.4)}
+    body.day-mode .scope-btn.active{background:rgba(0,71,255,.1);border-color:rgba(0,71,255,.4);color:var(--blue)}
+    .results-grid{display:grid;grid-template-columns:1fr 300px;gap:1.2rem}
+    .card{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1.3rem;overflow:hidden;backdrop-filter:blur(4px)}
+    .card-label{font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:1rem}
+    .level-badge{font-family:'DM Mono',monospace;font-size:.55rem;letter-spacing:.15em;text-transform:uppercase;padding:.2rem .55rem;border:1px solid}
+    .level-badge.dep{color:rgba(167,139,250,.7);border-color:rgba(167,139,250,.25);background:rgba(167,139,250,.06)}
+    .level-badge.mun{color:rgba(0,71,255,.8);border-color:rgba(0,71,255,.3);background:rgba(0,71,255,.06)}
+    .level-badge.pues{color:rgba(74,222,128,.7);border-color:rgba(74,222,128,.25);background:rgba(74,222,128,.06)}
+    .level-badge.nac{color:rgba(255,200,100,.8);border-color:rgba(255,200,100,.3);background:rgba(255,200,100,.06)}
+    .results-table{width:100%;border-collapse:collapse}
+    .results-table th{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.25);text-align:left;padding:.5rem .6rem;border-bottom:1px solid var(--border);white-space:nowrap}
+    .results-table th.r{text-align:right}
+    .results-table td{padding:.65rem .6rem;border-bottom:1px solid rgba(255,255,255,.05);font-family:'DM Mono',monospace;font-size:.74rem;color:rgba(255,255,255,.75);vertical-align:middle}
+    .results-table td.r{text-align:right}
+    .results-table tr:hover td{background:var(--td-hover)}
+    .bar-wrap{width:72px;height:4px;background:var(--bar-bg);border-radius:2px;overflow:hidden;display:inline-block;vertical-align:middle}
+    .bar-fill{height:100%;background:var(--blue);border-radius:2px;transition:width 1s ease}
+    .pct-val{font-family:'Syne',sans-serif;font-weight:700;font-size:.8rem;color:var(--white);display:inline-block;width:46px;text-align:right;margin-left:6px}
+    .cbadge{display:inline-flex;align-items:center;justify-content:center;background:rgba(0,71,255,.15);color:#fff;font-family:'Avenir Next',Avenir,sans-serif;font-weight:500;font-size:.95rem;min-width:28px;height:24px;padding:0 6px;border:1px solid rgba(0,71,255,.3)}
+    .cbadge.sub{background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border-color:rgba(255,255,255,.08)}
+    .drill-btn{background:none;border:none;color:var(--blue);font-family:'DM Mono',monospace;font-size:.74rem;cursor:pointer;text-align:left;padding:0;display:inline-flex;align-items:center;gap:.4rem;transition:color .15s}
+    .drill-btn:hover{color:#7ab3ff}
+    .expand-btn{background:none;border:none;cursor:pointer;font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.06em;color:rgba(0,71,255,.9);display:flex;align-items:center;gap:.4rem;padding:.25rem 0;transition:color .15s;font-weight:500}
+    .expand-btn:hover{color:var(--blue);text-decoration:underline}
+    .cands-inner{background:rgba(0,0,0,.2);border-top:1px solid var(--border);border-bottom:2px solid rgba(0,71,255,.2);padding:.5rem 1rem .75rem 2.5rem;display:none}
+    .cands-inner.open{display:block}
+    .cands-table{width:100%;border-collapse:collapse;font-size:.94rem}
+    .cands-table thead th{font-size:.94rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.25);padding:.4rem .5rem;border-bottom:1px solid var(--border);font-weight:400}
+    .cands-table tbody tr{border-bottom:1px solid rgba(255,255,255,.05)}
+    .cands-table tbody tr:last-child{border-bottom:none}
+    .cands-table tbody td{padding:.35rem .5rem;vertical-align:middle;font-size:.88rem}
+    .cands-table tbody td:nth-child(3){font-size:1.05rem;font-weight:300}
+    .cands-table tbody td.r{font-size:.85rem!important}
+    .leaflet-container{background:#060810 !important}
+    .leaflet-tile-pane{display:none}
+    .leaflet-control-attribution{background:rgba(6,8,16,.75) !important;color:rgba(255,255,255,.2) !important;font-size:.4rem !important}
+    .leaflet-control-attribution a{color:rgba(0,71,255,.5) !important}
+    .leaflet-control-zoom a{background:rgba(13,15,28,.9) !important;color:var(--white) !important;border-color:rgba(255,255,255,.15) !important}
+    .leaflet-control-zoom a:hover{background:rgba(0,71,255,.3) !important}
+    .donut-wrap{display:flex;flex-direction:column;align-items:center;gap:1rem}
+    .donut-cw{position:relative;width:150px;height:150px}
+    .donut-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+    .donut-pct{font-family:Avenir,sans-serif;font-weight:800;font-size:1.5rem;letter-spacing:-.04em;color:var(--white);line-height:1}
+    .donut-sub{font-family:Avenir,sans-serif;font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-top:2px}
+    body.day-mode .donut-sub{color:rgba(0,0,0,.45)}
+    #con-map .leaflet-interactive{cursor:pointer !important}
+    .donut-legend{width:100%;display:flex;flex-direction:column;gap:.55rem}
+    .li{display:flex;align-items:center;gap:.6rem;font-family:Avenir,sans-serif;font-weight:400;font-size:.75rem;color:rgba(255,255,255,.5)}
+    .ld{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+    .lv{margin-left:auto;color:var(--white);font-weight:400;font-family:Avenir,sans-serif}
+    .umbral-bar{margin-top:1rem;padding-top:.8rem;border-top:1px solid var(--border)}
+    .umbral-label{font-family:'Syne',sans-serif;font-weight:400;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:.4rem}
+    .umbral-val{font-family:'DM Mono',monospace;font-size:.72rem;color:var(--blue)}
+    .leaflet-tooltip{font-family:Avenir,sans-serif!important;font-weight:400!important;font-size:.85rem!important;background:rgba(6,8,16,0.97)!important;border:1px solid rgba(0,71,255,0.4)!important;color:#f4f3ef!important;box-shadow:none!important;padding:.45rem .65rem!important;border-radius:0!important;width:220px!important;white-space:normal!important;line-height:1.45!important;overflow-wrap:break-word!important;word-break:normal!important}
+    .leaflet-tooltip:before{display:none!important}
+    .full-footer{flex-shrink:0;width:100%;border-top:1px solid var(--border);padding:.5rem 2.5rem;display:flex;align-items:center;justify-content:space-between}
+    .footer-brand{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.09em;color:rgba(255,255,255,.2)}
+    .footer-brand a{color:rgba(255,255,255,.25);text-decoration:none}
+    .hidden{display:none!important}
+    .theme-btn{display:flex;align-items:center;gap:.4rem;font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);padding:.3rem .75rem;cursor:pointer;transition:all .2s;flex-shrink:0}
+    .theme-btn:hover{background:rgba(255,255,255,.15);color:var(--white)}
+    body.day-mode .theme-btn{background:rgba(0,71,255,.08);border-color:rgba(0,71,255,.25);color:var(--blue)}
+    body.day-mode{--white:#1a1a2e;--card-border:rgba(0,0,0,.12);--border:rgba(0,0,0,.08);--bar-bg:rgba(0,0,0,.1);--td-hover:rgba(0,71,255,.04);background:#e6ded3;color:#1a1a2e}
+    body.day-mode .bg-layer{opacity:.04}
+    body.day-mode .bg-overlay{background:linear-gradient(to right,rgba(240,235,228,.99) 0%,rgba(240,235,228,.97) 55%,rgba(240,235,228,.85) 72%,rgba(240,235,228,.6) 88%,rgba(240,235,228,.25) 100%)}
+    body.day-mode .shell{color:#0d1120}
+    body.day-mode .electoral-nav{background:rgba(240,235,228,.92);border-bottom-color:rgba(0,0,0,.1)}
+    body.day-mode .logo-text{color:#0d1120}
+    body.day-mode .page-title{color:#0d1120;text-shadow:none}
+    body.day-mode .page-title span{color:var(--blue)}
+    body.day-mode .breadcrumb{color:rgba(0,0,0,.45);border-bottom-color:rgba(0,0,0,.1)}
+    body.day-mode .meta-bar{color:rgba(0,0,0,.55);border-bottom-color:rgba(0,0,0,.1)}
+    body.day-mode .meta-item b{color:#0a7a3e}
+    body.day-mode .source-badge{color:rgba(0,0,0,.4);background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.1)}
+    body.day-mode .content-area{background:transparent}
+    body.day-mode .kpi-card{background:#f7f8fc;border:1px solid rgba(0,0,0,.09)}
+    body.day-mode .kpi-label{color:rgba(0,0,0,.5)}
+    body.day-mode .kpi-delta{color:rgba(0,0,0,.4)}
+    body.day-mode .sub-selector{border-bottom-color:rgba(0,0,0,.1)}
+    body.day-mode .search-input{background:#fff;border-color:rgba(0,0,0,.2);color:#0d1120}
+    body.day-mode .search-input::placeholder{color:rgba(0,0,0,.3)}
+    body.day-mode .results-table th{color:rgba(0,0,0,.4);border-bottom-color:rgba(0,0,0,.1)}
+    body.day-mode .results-table td{color:rgba(0,0,0,.8);border-bottom-color:rgba(0,0,0,.06)}
+    body.day-mode .results-table tr:hover td{background:rgba(0,71,255,.04)}
+    body.day-mode .full-footer{border-top-color:rgba(0,0,0,.1)}
+    body.day-mode .footer-brand{color:rgba(0,0,0,.35)}
+    body.day-mode .card{background:#f0f2f8;border-color:rgba(0,0,0,.1)}
+    body.day-mode .dep-select{background:#fff;border-color:rgba(0,0,0,.2);color:#1a1a2e}
+    body.day-mode .dep-select option{background:#fff;color:#1a1a2e}
+    body.day-mode .cands-inner{background:rgba(0,0,0,.03);border-top-color:rgba(0,0,0,.08);border-bottom-color:rgba(0,71,255,.2)}
+    body.day-mode .cands-table thead th{color:rgba(0,0,0,.4);border-bottom-color:rgba(0,0,0,.1)}
+    body.day-mode .cands-table tbody tr{border-bottom-color:rgba(0,0,0,.06)}
+    body.day-mode .bar-wrap{background:rgba(0,0,0,.1)}
+    body.day-mode .cbadge{background:rgba(0,71,255,.1);color:var(--blue);border-color:rgba(0,71,255,.25)}
+    body.day-mode .cbadge.sub{background:rgba(0,0,0,.05);color:rgba(0,0,0,.35);border-color:rgba(0,0,0,.1)}
+    body.day-mode .level-badge.dep{color:rgba(120,80,200,.9);border-color:rgba(120,80,200,.35);background:rgba(120,80,200,.08)}
+    body.day-mode .level-badge.mun{color:rgba(0,71,255,.9);border-color:rgba(0,71,255,.35);background:rgba(0,71,255,.08)}
+    body.day-mode .level-badge.pues{color:#0a7a3e;border-color:rgba(10,122,62,.35);background:rgba(10,122,62,.08)}
+    body.day-mode .level-badge.nac{color:#a06400;border-color:rgba(200,140,0,.4);background:rgba(255,200,100,.12)}
+    body.day-mode .results-table td{color:rgba(0,0,0,.75)!important}
+    body.day-mode .donut-wrap{background:rgba(0,0,0,.03);border-color:rgba(0,0,0,.08)}
+    body.day-mode .card-label{color:rgba(0,0,0,.4)}
+    body.day-mode .umbral-bar{background:rgba(0,0,0,.07)}
+    body.day-mode .umbral-label{color:rgba(0,0,0,.5)}
+    body.day-mode .expand-btn{color:rgba(0,71,255,.8)}
+    body.day-mode .sub-label{color:rgba(0,0,0,.45)}
+    body.day-mode .li{color:rgba(0,0,0,.6)}
+    body.day-mode .lv{color:rgba(0,0,0,.85)}
+    .cand-elected{color:#39ff7a}
+    body.day-mode .cand-elected{color:var(--blue)!important}
+    .whatif-banner{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:#0047FF;margin-bottom:.9rem;padding:.55rem .75rem;background:rgba(0,71,255,.07);border:1px solid rgba(0,71,255,.25);line-height:1.6}
+    .whatif-banner b{color:var(--white);font-weight:700}
+    body.day-mode .whatif-banner b{color:#1a1a2e}
+    .closed-note{font-family:'DM Mono',monospace;font-size:.6rem;color:rgba(255,255,255,.3);text-align:center;letter-spacing:.05em;padding:.5rem .5rem .35rem}
+    body.day-mode .closed-note{color:rgba(0,0,0,.45)}
+    @media(max-width:1100px){.results-grid{grid-template-columns:1fr}}
+    @media(max-width:900px){body{cursor:auto}.cursor,.cursor-ring{display:none}.top-bar,.breadcrumb,.meta-bar,.content-area,.full-footer{padding-left:1.2rem;padding-right:1.2rem}.bg-overlay{background:rgba(4,6,16,.93)}.kpi-row{grid-template-columns:1fr 1fr;gap:.75rem}.hemiciclo-row{grid-template-columns:1fr !important}}
+    @media(max-width:600px){.kpi-row{grid-template-columns:1fr}.sub-selector{flex-direction:column;align-items:flex-start}.search-input{width:100%}}
+  </style>
+</head>
+<body>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+  <div class="bg-layer"></div>
+  <div class="bg-overlay"></div>
+
+  <div class="shell">
+    <nav class="electoral-nav">
+      <div style="display:flex;align-items:center;gap:1rem">
+        <a href="electoral.html" class="e-btn-back" onclick="navTo(event,'electoral.html')">← Volver</a>
+      </div>
+      <div style="display:flex;align-items:center;gap:1.2rem">
+        <a href="electoral.html" class="logo-link" onclick="navTo(event,'electoral.html')">
+          <div class="logo-bars">
+            <div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div>
+            <div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div>
+          </div>
+          <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+        </a>
+      </div>
+    </nav>
+    <div class="top-bar">
+      <div class="page-title">Concejos<br/><span>Municipales · 2023</span></div>
+    </div>
+    <div class="breadcrumb">
+      <a href="electoral.html" onclick="navTo(event,'electoral.html')">Resultados Electorales</a>
+      &nbsp;/&nbsp; 2023 &nbsp;/&nbsp; Concejos Municipales y Distritales
+    </div>
+    <div class="meta-bar">
+      <span class="meta-item">Elección: <b>29 de octubre de 2023</b></span>
+      <span class="meta-item">Concejo activo: <b id="meta-mun">Bogotá D.C.</b></span>
+      <span class="meta-item">Curules: <b id="meta-curules">45</b></span>
+      <span class="meta-item">Votos válidos: <b id="meta-votval">—</b></span>
+      <div class="source-badge">Fuente: <b>Registraduría · GCS 2023 territoriales</b></div>
+      <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
+    </div>
+
+    <div class="content-area">
+      <div id="load-state" class="loader-wrap">
+        <div class="loader-ring"></div>
+        <div class="loader-label">Cargando escrutinio…</div>
+      </div>
+      <div id="main-content" class="hidden">
+        <div class="sub-selector">
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <span class="sub-label">Departamento:</span>
+            <select class="dep-select" id="dep-select" onchange="onDepChange(this.value)">
+              <option value="">— Elige depto —</option>
+            </select>
+          </div>
+          <div id="mun-filter-container" style="display:none;align-items:center;gap:.5rem">
+            <span class="sub-label">Municipio:</span>
+            <select class="dep-select" id="mun-select" onchange="onMunChange(this.value)">
+              <option value="">— Elige mun —</option>
+            </select>
+          </div>
+          <div id="zona-filter-container" style="display:none;align-items:center;gap:.5rem">
+            <span class="sub-label" id="zona-label">Comuna:</span>
+            <select class="dep-select" id="zona-select" onchange="onZonaChange(this.value)">
+              <option value="">Todas</option>
+            </select>
+          </div>
+          <div id="pue-filter-container" style="display:none;align-items:center;gap:.5rem">
+            <span class="sub-label">Puesto:</span>
+            <select class="dep-select" id="pue-select" onchange="onPueChange(this.value)">
+              <option value="">Todos</option>
+            </select>
+          </div>
+          <div id="mesa-filter-container" style="display:none;align-items:center;gap:.5rem">
+            <span class="sub-label">Mesa:</span>
+            <select class="dep-select" id="mesa-select" onchange="onMesaChange(this.value)">
+              <option value="">Todas</option>
+            </select>
+          </div>
+          <span class="sub-label" style="margin-left:1rem">Buscar candidato:</span>
+          <input id="con-search" type="search" class="search-input" placeholder="Nombre o apellido…"
+            oninput="buscarCandidato(this.value)" />
+        </div>
+
+        <div id="con-search-results" style="display:none;margin-bottom:1.5rem"></div>
+
+        <div class="kpi-row" id="kpi-row"></div>
+
+        <div class="scope-toggle">
+          <button class="scope-btn active" id="scope-btn-mun" onclick="onScopeChange('MUN')">Concejo activo</button>
+          <button class="scope-btn" id="scope-btn-nacional" onclick="onScopeChange('NACIONAL')">Resumen nacional · todos los muns</button>
+        </div>
+
+        <div id="hemiciclo-row" class="hemiciclo-row" style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.5rem">
+          <div class="card">
+            <div class="card-label" id="hemiciclo-label">Hemiciclo · 45 curules · Bogotá D.C.</div>
+            <div id="hemiciclo-whatif" class="whatif-banner" style="display:none">
+              WHAT IF?! — ¿Qué pasaría si solo <b id="whatif-lugar">—</b> eligiera el Concejo?
+            </div>
+            <svg id="hemiciclo-svg" viewBox="0 0 600 330" style="width:100%;height:auto;display:block"></svg>
+            <div id="hemiciclo-legend" style="display:flex;flex-direction:column;gap:.4rem;margin-top:.85rem;padding-top:.85rem;border-top:1px solid rgba(255,255,255,0.07)"></div>
+          </div>
+          <div class="card" style="padding:1.3rem 1.3rem .75rem">
+            <div class="card-label" style="margin-bottom:.75rem">Mapa · Partido puntero por concejo municipal</div>
+            <div style="position:relative">
+              <div id="con-map" style="width:100%;height:400px;background:#060810"></div>
+              <button id="con-map-back" type="button" style="display:none;position:absolute;top:.55rem;right:.55rem;z-index:500;background:rgba(0,71,255,.92);color:#fff;border:none;padding:.4rem .7rem;font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;border-radius:2px">← Volver</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="results-grid">
+          <div class="card">
+            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.8rem;flex-wrap:wrap">
+              <div class="card-label" style="margin-bottom:0" id="lbl-tabla">Partidos · Bogotá D.C. · 45 curules · D'Hondt</div>
+              <span class="level-badge mun" id="drill-badge">Concejo</span>
+            </div>
+            <table class="results-table">
+              <thead id="drill-thead"></thead>
+              <tbody id="tbody-con"></tbody>
+            </table>
+          </div>
+          <div class="card">
+            <div class="card-label">Distribución de votos</div>
+            <div class="donut-wrap">
+              <div class="donut-cw">
+                <canvas id="donut-con"></canvas>
+                <div class="donut-center">
+                  <div class="donut-pct" id="pct-con">—</div>
+                  <div class="donut-sub" id="sub-con">válidos</div>
+                </div>
+              </div>
+              <div class="donut-legend" id="leg-con"></div>
+            </div>
+            <div class="umbral-bar">
+              <div class="umbral-label">Cifra repartidora</div>
+              <div class="umbral-val" id="cifra-rep">—</div>
+              <div class="umbral-label" style="margin-top:.5rem">Umbral (50% cifra)</div>
+              <div class="umbral-val" id="umbral-val">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="full-footer">
+    <span class="footer-brand">ricardoruiz.co · Elecciones Colombia 2023</span>
+    <span class="footer-brand"><a href="https://registraduria.gov.co" target="_blank">Fuente: Registraduría Nacional</a></span>
+  </div>
+
+  <script>
+    // ═══════════════════════════════════════════════════════════════
+    // Concejos 2023 · escrutinio + drill + what-if D'Hondt
+    // ═══════════════════════════════════════════════════════════════
+    const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/concejo-2023/output';
+    const MAPAS_S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026';
+    const fmt = n => Number(n).toLocaleString('es-CO');
+    const pctFmt = (n, t) => t ? ((n / t) * 100).toFixed(2) : '0.00';
+    const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
+
+    // Colores conocidos de partidos
+    const CP = {
+      'PACTO HISTORICO':'#6B2D8B', 'PARTIDO CENTRO DEMOCRATICO':'#0088BB',
+      'PARTIDO LIBERAL COLOMBIANO':'#C8102E', 'PARTIDO CONSERVADOR COLOMBIANO':'#003580',
+      'PARTIDO CAMBIO RADICAL':'#E91E8C', 'PARTIDO DE LA UNION POR LA GENTE':'#F7941D',
+      'PARTIDO ALIANZA VERDE':'#4CAF50', 'NUEVO LIBERALISMO EN MARCHA':'#E53935',
+      'PARTIDO POLITICO CREEMOS':'#5C6BC0', 'PARTIDO MIRA':'#1A3FC4',
+      'PARTIDO COLOMBIA RENACIENTE':'#FF9800', 'PARTIDO COMUNES':'#007755',
+      'COLOMBIA JUSTA LIBRES':'#9C27B0',
+    };
+    function getColor(n){
+      const k = norm(n);
+      if(CP[k]) return CP[k];
+      if(/PACTO HIST/.test(k)) return '#6B2D8B';
+      if(/CENTRO DEMOCRA/.test(k)) return '#0088BB';
+      if(/LIBERAL/.test(k) && !/NUEVO/.test(k)) return '#C8102E';
+      if(/CONSERVADOR/.test(k)) return '#003580';
+      if(/CAMBIO RADICAL/.test(k)) return '#E91E8C';
+      if(/UNION POR LA GENTE|\bDE LA U\b/.test(k)) return '#F7941D';
+      if(/ALIANZA VERDE|VERDE/.test(k)) return '#4CAF50';
+      if(/NUEVO LIBERALISMO/.test(k)) return '#E53935';
+      if(/CREEMOS/.test(k)) return '#5C6BC0';
+      if(/\bMIRA\b/.test(k)) return '#1A3FC4';
+      if(/RENACIENTE/.test(k)) return '#FF9800';
+      if(/COMUNES/.test(k)) return '#007755';
+      if(/COLOMBIA JUSTA/.test(k)) return '#9C27B0';
+      if(/MAIS/.test(k)) return '#8BC34A';
+      let h = 0;
+      for(const ch of k) h = (h * 31 + ch.charCodeAt(0)) & 0x7fffffff;
+      const hue = h % 360;
+      return `hsl(${hue},48%,46%)`;
+    }
+
+    // ─── Estado global ─────────────────────────────────────────
+    const STATE = {
+      scope: 'MUN',
+      depCod: '16',      // electoral_id Registraduría (Bogotá D.C.)
+      munCod: '001',
+      zonaCod: '',
+      puestoCod: '',     // "zz-pp"
+      mesaCod: '',       // "zz-pp-mesa"
+      munData: null,
+      puestosData: null,
+      mesasData: null,
+      nacionalResumen: null,
+      porMun: null,
+      porDepto: null,
+      deptoMunCache: {},
+    };
+
+    const _jsonCache = {};
+    async function fetchJSON(url){
+      if(_jsonCache[url]) return _jsonCache[url];
+      const r = await fetch(url);
+      if(!r.ok) throw new Error(`No se pudo cargar ${url} (${r.status})`);
+      _jsonCache[url] = await r.json();
+      return _jsonCache[url];
+    }
+    const getResumen   = () => fetchJSON(`${S3}/nacional/resumen.json`);
+    const getPorDepto  = () => fetchJSON(`${S3}/nacional/por-depto.json`);
+    const getPorMun    = () => fetchJSON(`${S3}/nacional/por-mun.json`);
+    const getDeptoMuns = (depCod) => fetchJSON(`${S3}/departamentos/${depCod}/municipios.json`);
+    const getPuestos   = (depCod, munCod) => fetchJSON(`${S3}/departamentos/${depCod}/${munCod}/puestos.json`);
+    const getMesas     = (depCod, munCod) => fetchJSON(`${S3}/departamentos/${depCod}/${munCod}/mesas.json`);
+
+    // ─── D'Hondt cliente ───────────────────────────────────────
+    function dhondt(partidoVotos, seats){
+      const items = Object.entries(partidoVotos)
+        .filter(([,v]) => v > 0)
+        .map(([p, v]) => ({ partido: p, votos: v, curules: 0 }));
+      if(!items.length || seats <= 0) return {};
+      for(let s = 0; s < seats; s++){
+        let best = -1, bestQ = -1;
+        for(let i = 0; i < items.length; i++){
+          const q = items[i].votos / (items[i].curules + 1);
+          if(q > bestQ){ bestQ = q; best = i; }
+        }
+        items[best].curules++;
+      }
+      const out = {};
+      for(const it of items) out[it.partido] = it.curules;
+      return out;
+    }
+    function cifraRepartidora(partidoVotos, seats){
+      const items = Object.entries(partidoVotos).filter(([,v]) => v > 0)
+        .map(([p, v]) => ({ p, v, c: 0 }));
+      if(!items.length || seats <= 0) return 0;
+      let lastQ = 0;
+      for(let s = 0; s < seats; s++){
+        let best = -1, bestQ = -1;
+        for(let i = 0; i < items.length; i++){
+          const q = items[i].v / (items[i].c + 1);
+          if(q > bestQ){ bestQ = q; best = i; }
+        }
+        items[best].c++;
+        lastQ = bestQ;
+      }
+      return lastQ;
+    }
+
+    function zonaLabel(md){
+      const dep = String(STATE.depCod), mun = String(STATE.munCod);
+      if(dep === '16' && mun === '001') return 'Localidad';
+      if(dep === '01' && mun === '001') return 'Comuna';
+      return 'Zona';
+    }
+
+    // ─── Helpers WHAT IF ───────────────────────────────────────
+    function buildWhatIfScope(){
+      const md = STATE.munData;
+      if(!md) return null;
+      const seats = md.curules;
+      if(!STATE.zonaCod && !STATE.puestoCod && !STATE.mesaCod){
+        return {
+          partidoVotos: Object.fromEntries(md.partidos.map(p => [p.partido, p.votos_total])),
+          votos_validos: md.votos_validos, especiales: md.especiales || {},
+          seats, ambito: md.nombre, filtered: false,
+        };
+      }
+      let rows = null, lugar = '';
+      if(STATE.mesaCod){
+        const [zz, pp, mesa] = STATE.mesaCod.split('-');
+        rows = (STATE.mesasData || []).filter(m => m.zz === zz && m.pp === pp && m.mesa === mesa);
+        lugar = `Mesa ${mesa} (puesto ${zz}-${pp})`;
+      } else if(STATE.puestoCod){
+        const [zz, pp] = STATE.puestoCod.split('-');
+        rows = (STATE.puestosData || []).filter(m => m.zz === zz && m.pp === pp);
+        lugar = `Puesto ${zz}-${pp}`;
+      } else if(STATE.zonaCod){
+        rows = (STATE.puestosData || []).filter(m => m.zz === STATE.zonaCod);
+        lugar = `${zonaLabel(md)} ${STATE.zonaCod}`;
+      }
+      if(!rows || !rows.length) return null;
+      const partidoVotos = {};
+      const especiales = {};
+      let vv = 0;
+      for(const r of rows){
+        vv += r.votos_validos;
+        if(r.especiales) for(const [k,v] of Object.entries(r.especiales))
+          especiales[k] = (especiales[k] || 0) + v;
+        if(r.partidos_top) for(const p of r.partidos_top){
+          partidoVotos[p.partido] = (partidoVotos[p.partido] || 0) + p.votos;
+        }
+      }
+      return { partidoVotos, votos_validos: vv, especiales, seats, ambito: lugar, filtered: true };
+    }
+
+    // ─── Theme ─────────────────────────────────────────────────
+    function applyTheme(theme){
+      document.body.classList.toggle('day-mode', theme === 'day');
+      const btn = document.getElementById('theme-btn');
+      if(btn) btn.textContent = theme === 'day' ? '☾ Modo noche' : '☀ Modo día';
+      try{ localStorage.setItem('rr-theme', theme); }catch(e){}
+      renderHemiciclo();
+      renderDonut();
+    }
+    function toggleTheme(){
+      const cur = document.body.classList.contains('day-mode') ? 'day' : 'night';
+      applyTheme(cur === 'day' ? 'night' : 'day');
+    }
+    (function initTheme(){
+      let stored = null;
+      try{ stored = localStorage.getItem('rr-theme'); }catch(e){}
+      if(stored === 'day' || stored === 'night'){
+        document.body.classList.toggle('day-mode', stored === 'day');
+      } else {
+        const h = new Date().getHours();
+        if(h >= 6 && h < 19) document.body.classList.add('day-mode');
+      }
+      const btn = document.getElementById('theme-btn');
+      if(btn) btn.textContent = document.body.classList.contains('day-mode') ? '☾ Modo noche' : '☀ Modo día';
+    })();
+
+    // ─── Cursor ────────────────────────────────────────────────
+    (function initCursor(){
+      const c = document.getElementById('cursor'), r = document.getElementById('cursorRing');
+      if(!c) return;
+      document.addEventListener('mousemove', e => {
+        c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px';
+        r.style.left = e.clientX + 'px'; r.style.top = e.clientY + 'px';
+      });
+      document.addEventListener('mouseover', e => {
+        if(e.target.closest('a,button,select,input,.leaflet-interactive')){
+          c.style.transform = 'translate(-50%,-50%) scale(2)';
+          c.style.background = 'transparent';
+          c.style.border = '1.5px solid var(--blue)';
+          r.style.opacity = '0';
+        }
+      });
+      document.addEventListener('mouseout', e => {
+        if(e.target.closest('a,button,select,input,.leaflet-interactive')){
+          c.style.transform = 'translate(-50%,-50%) scale(1)';
+          c.style.background = 'var(--blue)';
+          c.style.border = 'none';
+          r.style.opacity = '.4';
+        }
+      });
+    })();
+    function navTo(e, href){ e.preventDefault(); window.location.href = href; }
+
+    // ─── KPIs ─────────────────────────────────────────────────
+    function renderKPI(){
+      const root = document.getElementById('kpi-row');
+      if(STATE.scope === 'NACIONAL'){
+        const r = STATE.nacionalResumen;
+        if(!r){ root.innerHTML = ''; return; }
+        root.innerHTML = `
+          <div class="kpi-card"><div class="kpi-label">Muns con datos</div><div class="kpi-val wh">${fmt(r.total_muns)}</div><div class="kpi-delta">Concejos elegidos en 2023</div></div>
+          <div class="kpi-card"><div class="kpi-label">Curules nacionales</div><div class="kpi-val">${fmt(r.total_curules)}</div><div class="kpi-delta">Suma de todos los concejos</div></div>
+          <div class="kpi-card"><div class="kpi-label">Votos válidos</div><div class="kpi-val gr">${fmt(r.votos_validos)}</div><div class="kpi-delta">Sin blancos ni nulos</div></div>
+          <div class="kpi-card"><div class="kpi-label">Partidos competidores</div><div class="kpi-val wh">${fmt(r.partidos.length)}</div><div class="kpi-delta">Con al menos 1 voto</div></div>`;
+        return;
+      }
+      const md = STATE.munData;
+      const wi = buildWhatIfScope();
+      if(!md){ root.innerHTML = ''; return; }
+      const vv = wi ? wi.votos_validos : md.votos_validos;
+      const censo = md.censo || 0;
+      const participacion = censo > 0 ? ((md.votos_totales / censo) * 100).toFixed(2) : '—';
+      root.innerHTML = `
+        <div class="kpi-card"><div class="kpi-label">Curules a repartir</div><div class="kpi-val">${fmt(md.curules)}</div><div class="kpi-delta">${md.nombre}</div></div>
+        <div class="kpi-card"><div class="kpi-label">${wi && wi.filtered ? 'Votos · territorio' : 'Votos válidos · mun'}</div><div class="kpi-val gr">${fmt(vv)}</div><div class="kpi-delta">${wi && wi.filtered ? wi.ambito : 'En el municipio'}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Censo electoral</div><div class="kpi-val wh">${fmt(censo)}</div><div class="kpi-delta">Participación: ${participacion}%</div></div>
+        <div class="kpi-card"><div class="kpi-label">Partidos</div><div class="kpi-val wh">${fmt(md.partidos.length)}</div><div class="kpi-delta">${md.partidos.filter(p=>p.curules>0).length} con curul</div></div>`;
+    }
+
+    // ─── Tabla ─────────────────────────────────────────────────
+    function renderTable(){
+      const tbody = document.getElementById('tbody-con');
+      const thead = document.getElementById('drill-thead');
+      const lbl = document.getElementById('lbl-tabla');
+      const badge = document.getElementById('drill-badge');
+
+      if(STATE.scope === 'NACIONAL'){
+        const r = STATE.nacionalResumen;
+        if(!r){ tbody.innerHTML = ''; return; }
+        lbl.textContent = `Partidos · Nacional · ${fmt(r.total_curules)} curules`;
+        badge.className = 'level-badge nac';
+        badge.textContent = 'Nacional';
+        thead.innerHTML = `<tr>
+          <th style="width:2.5rem">#</th>
+          <th>Partido</th>
+          <th class="r">Curules</th>
+          <th class="r">Votos</th>
+          <th class="r">% nacional</th>
+        </tr>`;
+        const rows = r.partidos.slice(0, 25).map((p, i) => {
+          const col = getColor(p.partido);
+          return `<tr>
+            <td>${i+1}</td>
+            <td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${col};margin-right:.5rem;vertical-align:middle"></span>${p.partido}</td>
+            <td class="r"><span class="cbadge">${fmt(p.curules)}</span></td>
+            <td class="r">${fmt(p.votos)}</td>
+            <td class="r">${(p.pct || 0).toFixed(2)}%</td>
+          </tr>`;
+        }).join('');
+        tbody.innerHTML = rows;
+        return;
+      }
+
+      const md = STATE.munData;
+      if(!md){ tbody.innerHTML = ''; return; }
+      const wi = buildWhatIfScope();
+      let partidos;
+      const isWhatIf = wi && wi.filtered;
+      if(isWhatIf){
+        const cur = dhondt(wi.partidoVotos, md.curules);
+        const orig = new Map(md.partidos.map(p => [p.partido, p]));
+        partidos = Object.entries(wi.partidoVotos).map(([p, v]) => ({
+          partido: p, votos_total: v, curules: cur[p] || 0,
+          pct: wi.votos_validos > 0 ? (v / wi.votos_validos * 100) : 0,
+          tipo_lista: (orig.get(p) || {}).tipo_lista || 'abierta',
+          candidatos: (orig.get(p) || {}).candidatos || [],
+          electos: (orig.get(p) || {}).electos || [],
+          orden_cerrada: (orig.get(p) || {}).orden_cerrada || false,
+        })).sort((a, b) => b.curules - a.curules || b.votos_total - a.votos_total);
+      } else {
+        partidos = md.partidos;
+      }
+
+      lbl.textContent = `Partidos · ${md.nombre} · ${fmt(md.curules)} curules · D'Hondt`;
+      badge.className = 'level-badge mun';
+      badge.textContent = 'Concejo';
+      thead.innerHTML = `<tr>
+        <th></th>
+        <th style="width:2.5rem">#</th>
+        <th>Partido</th>
+        <th class="r">Curules</th>
+        <th class="r">Votos</th>
+        <th class="r">% mun</th>
+        <th class="r">Lista</th>
+      </tr>`;
+      const banner = document.getElementById('hemiciclo-whatif');
+      const lugarSpan = document.getElementById('whatif-lugar');
+      if(isWhatIf){ banner.style.display = 'block'; lugarSpan.textContent = wi.ambito; }
+      else { banner.style.display = 'none'; }
+
+      const rows = partidos.map((p, i) => {
+        const col = getColor(p.partido);
+        const expandable = (p.candidatos && p.candidatos.length > 0) || (p.tipo_lista === 'cerrada' && p.curules > 0);
+        const expandBtn = expandable
+          ? `<button class="expand-btn" onclick="toggleCands(${i})"><span id="expand-icon-${i}">▸</span></button>`
+          : '';
+        return `<tr>
+            <td style="width:1.5rem">${expandBtn}</td>
+            <td>${i+1}</td>
+            <td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${col};margin-right:.5rem;vertical-align:middle"></span>${p.partido}</td>
+            <td class="r"><span class="cbadge ${p.curules===0?'sub':''}">${p.curules}</span></td>
+            <td class="r">${fmt(p.votos_total)}</td>
+            <td class="r">${(p.pct || 0).toFixed(2)}%</td>
+            <td class="r" style="font-size:.6rem;color:rgba(255,255,255,.5)">${p.tipo_lista === 'abierta' ? 'abierta' : 'cerrada'}</td>
+          </tr>
+          ${expandable ? renderElectosRow(p, i) : ''}`;
+      }).join('');
+      tbody.innerHTML = rows;
+    }
+
+    function renderElectosRow(p, i){
+      const electos = p.electos || [];
+      let inner;
+      if(p.tipo_lista === 'cerrada'){
+        const sub = electos.length ? electos.map((e, k) => `
+          <tr>
+            <td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;width:2.5rem">${String(k+1).padStart(3,'0')}</td>
+            <td style="color:rgba(255,255,255,.25);width:2rem">${String(e.cod || k+1).padStart(2,'0')}</td>
+            <td class="cand-elected">${(e.nombre || '—').toUpperCase()}<span style="font-size:.6rem;margin-left:.4rem">✦</span></td>
+            <td class="r" style="color:rgba(255,255,255,.3)">—</td>
+            <td class="r" style="color:rgba(255,255,255,.4)">orden inscripción</td>
+          </tr>`).join('') : `<tr><td colspan="5" class="closed-note">Lista cerrada — el orden de los electos sigue el formulario E-6 del CNE (no consta en el escrutinio).</td></tr>`;
+        inner = `<table class="cands-table"><thead><tr><th>#</th><th>Cód</th><th>Candidato</th><th class="r">Votos</th><th class="r">Estado</th></tr></thead><tbody>${sub}</tbody></table>`;
+      } else {
+        const electosCods = new Set(electos.map(e => String(e.cod)));
+        const cands = p.candidatos || [];
+        const top = cands.slice(0, 20);
+        const sub = top.map((c, k) => {
+          const isElect = electosCods.has(String(c.cod));
+          return `<tr>
+            <td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;width:2.5rem">${String(k+1).padStart(3,'0')}</td>
+            <td style="color:rgba(255,255,255,.25);width:2rem">${String(c.cod || '').padStart(2,'0')}</td>
+            <td class="${isElect ? 'cand-elected' : ''}">${(c.nombre || '—').toUpperCase()}${isElect ? '<span style="font-size:.6rem;margin-left:.4rem">✦</span>' : ''}</td>
+            <td class="r">${fmt(c.votos || 0)}</td>
+            <td class="r" style="color:rgba(255,255,255,.4)">${isElect ? 'Electo' : ''}</td>
+          </tr>`;
+        }).join('');
+        inner = `<table class="cands-table"><thead><tr><th>#</th><th>Cód</th><th>Candidato</th><th class="r">Voto preferente</th><th class="r">Estado</th></tr></thead><tbody>${sub}</tbody></table>`;
+      }
+      return `<tr><td colspan="7" style="padding:0"><div class="cands-inner" id="cands-inner-${i}">${inner}</div></td></tr>`;
+    }
+
+    function toggleCands(i){
+      const inner = document.getElementById(`cands-inner-${i}`);
+      const icon = document.getElementById(`expand-icon-${i}`);
+      const open = inner.classList.toggle('open');
+      if(icon) icon.textContent = open ? '▾' : '▸';
+    }
+
+    // ─── Donut ─────────────────────────────────────────────────
+    let donutChart = null;
+    function renderDonut(){
+      const ctx = document.getElementById('donut-con');
+      const pctEl = document.getElementById('pct-con');
+      const subEl = document.getElementById('sub-con');
+      const leg = document.getElementById('leg-con');
+      const cifraEl = document.getElementById('cifra-rep');
+      const umEl = document.getElementById('umbral-val');
+
+      if(STATE.scope === 'NACIONAL'){
+        const r = STATE.nacionalResumen;
+        if(!r){ return; }
+        const top = r.partidos.slice(0, 6);
+        const otros = r.partidos.slice(6).reduce((s,p) => s + p.votos, 0);
+        const labels = top.map(p => p.partido.substr(0, 30));
+        const data = top.map(p => p.votos);
+        const colors = top.map(p => getColor(p.partido));
+        if(otros > 0){ labels.push('Otros'); data.push(otros); colors.push('rgba(255,255,255,.18)'); }
+        pctEl.textContent = '100%'; subEl.textContent = 'válidos';
+        cifraEl.textContent = '—'; umEl.textContent = '—';
+        drawChart(ctx, labels, data, colors);
+        leg.innerHTML = top.slice(0,5).map((p,i) => `
+          <div class="li"><span class="ld" style="background:${colors[i]}"></span>${p.partido.substr(0,28)}<span class="lv">${fmt(p.votos)}</span></div>`).join('');
+        return;
+      }
+
+      const md = STATE.munData;
+      if(!md){ return; }
+      const wi = buildWhatIfScope();
+      const scopeVotos = wi ? wi.votos_validos : md.votos_validos;
+      const partidoVotos = wi ? wi.partidoVotos : Object.fromEntries(md.partidos.map(p => [p.partido, p.votos_total]));
+      const especiales = wi ? wi.especiales : (md.especiales || {});
+      let centerPct, centerSub;
+      if(!wi || !wi.filtered){
+        if(md.censo && md.votos_totales){
+          centerPct = ((md.votos_totales / md.censo) * 100).toFixed(1) + '%';
+          centerSub = 'participación';
+        } else { centerPct = '100%'; centerSub = 'válidos'; }
+      } else {
+        centerPct = '100%'; centerSub = wi.ambito.length < 18 ? wi.ambito : 'territorio';
+      }
+      pctEl.textContent = centerPct; subEl.textContent = centerSub;
+      const arr = Object.entries(partidoVotos).filter(([,v]) => v > 0).sort((a,b) => b[1] - a[1]);
+      const top = arr.slice(0, 6);
+      const otros = arr.slice(6).reduce((s,[,v]) => s + v, 0);
+      const blanco = especiales.blanco || 0;
+      const nulos = especiales.nulos || 0;
+      const labels = top.map(([p]) => p.substr(0, 28));
+      const data = top.map(([,v]) => v);
+      const colors = top.map(([p]) => getColor(p));
+      if(otros > 0){ labels.push('Otros'); data.push(otros); colors.push('rgba(255,255,255,.18)'); }
+      if(blanco > 0){ labels.push('Blanco'); data.push(blanco); colors.push('rgba(180,180,180,.4)'); }
+      if(nulos > 0){ labels.push('Nulos'); data.push(nulos); colors.push('rgba(220,80,80,.4)'); }
+      drawChart(ctx, labels, data, colors);
+      leg.innerHTML = top.slice(0,5).map(([p,v], i) => `
+        <div class="li"><span class="ld" style="background:${colors[i]}"></span>${p.substr(0,26)}<span class="lv">${pctFmt(v, scopeVotos)}%</span></div>`).join('');
+
+      const cifra = cifraRepartidora(partidoVotos, md.curules);
+      cifraEl.textContent = fmt(Math.round(cifra));
+      umEl.textContent = fmt(Math.round(cifra * 0.5));
+    }
+
+    function drawChart(ctx, labels, data, colors){
+      if(!ctx) return;
+      if(donutChart){ donutChart.destroy(); donutChart = null; }
+      const dayMode = document.body.classList.contains('day-mode');
+      donutChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 1, borderColor: dayMode ? '#fff' : '#060810' }] },
+        options: {
+          cutout: '72%', responsive: true, maintainAspectRatio: true, aspectRatio: 1,
+          plugins: { legend: { display: false }, tooltip: { callbacks: {
+            label: c => `${c.label}: ${fmt(c.parsed)}`
+          } } },
+          animation: { duration: 400 }
+        }
+      });
+    }
+
+    // ─── Hemiciclo SVG dinámico ───────────────────────────────
+    function hemicicloSeats(N){
+      // 4 anillos con proporción cumulativa. Para N=45 → 7/11/13/14. Para N=21 → 3/5/6/7.
+      // Para N=100 → 16/24/30/30.
+      const ringsRatio = [0.16, 0.24, 0.30, 0.30];
+      const rings = [];
+      let acc = 0;
+      for(let i = 0; i < ringsRatio.length; i++){
+        let n;
+        if(i < ringsRatio.length - 1) n = Math.round(N * ringsRatio[i]);
+        else n = N - acc;
+        rings.push(Math.max(0, n));
+        acc += n;
+      }
+      // Ajustar último anillo a N exacto
+      const sum = rings.reduce((s,n) => s+n, 0);
+      if(sum !== N) rings[rings.length-1] += (N - sum);
+      // Coords del arco superior
+      const seats = [];
+      const cx = 300, cy = 295;
+      const radii = [80, 123, 168, 213];
+      for(let i = 0; i < rings.length; i++){
+        const n = rings[i];
+        if(n <= 0) continue;
+        const r = radii[i];
+        for(let k = 0; k < n; k++){
+          const t = n === 1 ? 0.5 : k / (n - 1);
+          const angle = Math.PI - t * Math.PI;
+          const x = cx + r * Math.cos(angle);
+          const y = cy - r * Math.sin(angle);
+          seats.push({ x, y, angle, ring: i });
+        }
+      }
+      seats.sort((a, b) => a.x - b.x || a.ring - b.ring);
+      return seats;
+    }
+
+    function renderHemiciclo(){
+      const svg = document.getElementById('hemiciclo-svg');
+      const lbl = document.getElementById('hemiciclo-label');
+      const legend = document.getElementById('hemiciclo-legend');
+      if(!svg) return;
+      if(STATE.scope === 'NACIONAL'){
+        svg.innerHTML = '<text x="300" y="170" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="DM Mono" font-size="14">Hemiciclo del concejo activo · cambia a vista municipal</text>';
+        lbl.textContent = `Ranking nacional · ${fmt(STATE.nacionalResumen?.total_curules || 0)} curules totales`;
+        legend.innerHTML = '';
+        return;
+      }
+      const md = STATE.munData;
+      if(!md){ svg.innerHTML = ''; return; }
+      const wi = buildWhatIfScope();
+      let partidoCurules;
+      if(wi && wi.filtered){
+        partidoCurules = dhondt(wi.partidoVotos, md.curules);
+      } else {
+        partidoCurules = Object.fromEntries(md.partidos.map(p => [p.partido, p.curules]));
+      }
+      const total = md.curules;
+      lbl.textContent = `Hemiciclo · ${total} curules · ${md.nombre}`;
+
+      const seats = hemicicloSeats(total);
+      const partidos = Object.entries(partidoCurules)
+        .filter(([,c]) => c > 0)
+        .sort((a,b) => b[1] - a[1]);
+      const seatAssign = [];
+      for(const [p, c] of partidos){ for(let k = 0; k < c; k++) seatAssign.push(p); }
+      while(seatAssign.length < seats.length) seatAssign.push('(VACANTE)');
+
+      const radius = total <= 25 ? 12 : total <= 45 ? 10 : 8;
+      let inner = '';
+      seats.forEach((s, i) => {
+        const part = seatAssign[i] || '(VACANTE)';
+        const col = part === '(VACANTE)' ? 'rgba(255,255,255,0.1)' : getColor(part);
+        inner += `<circle cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="${radius}" fill="${col}" stroke="rgba(0,0,0,0.18)" stroke-width="0.6" data-partido="${part.replace(/"/g, '&quot;')}" onmouseover="hemiTooltip(event, this)" onmouseout="hemiTooltipHide()" />`;
+      });
+      svg.innerHTML = inner;
+
+      legend.innerHTML = partidos.slice(0, 8).map(([p, c]) => {
+        const col = getColor(p);
+        const pctC = ((c / total) * 100).toFixed(1);
+        return `<div class="li"><span class="ld" style="background:${col}"></span>${p.substr(0,42)}<span class="lv">${c} · ${pctC}%</span></div>`;
+      }).join('');
+    }
+
+    function hemiTooltip(ev, el){
+      const partido = el.getAttribute('data-partido');
+      let tt = document.getElementById('hemi-tooltip');
+      if(!tt){
+        tt = document.createElement('div');
+        tt.id = 'hemi-tooltip';
+        tt.style.cssText = 'position:fixed;background:rgba(6,8,16,0.97);border:1px solid rgba(0,71,255,0.4);color:#f4f3ef;font-family:Avenir,sans-serif;font-size:.85rem;padding:.4rem .65rem;pointer-events:none;z-index:9999;white-space:nowrap';
+        document.body.appendChild(tt);
+      }
+      tt.textContent = partido;
+      tt.style.left = (ev.clientX + 12) + 'px';
+      tt.style.top = (ev.clientY - 28) + 'px';
+      tt.style.display = 'block';
+    }
+    function hemiTooltipHide(){
+      const tt = document.getElementById('hemi-tooltip');
+      if(tt) tt.style.display = 'none';
+    }
+
+    // ─── Selectores ───────────────────────────────────────────
+    function populateDeptos(){
+      const sel = document.getElementById('dep-select');
+      const deps = STATE.porDepto || [];
+      const sorted = [...deps].sort((a, b) => norm(a.nombre).localeCompare(norm(b.nombre), 'es'));
+      sel.innerHTML = '<option value="">— Elige depto —</option>' +
+        sorted.map(d => `<option value="${d.dep}" ${d.dep === STATE.depCod ? 'selected' : ''}>${d.nombre}</option>`).join('');
+    }
+
+    async function populateMuns(depCod){
+      const sel = document.getElementById('mun-select');
+      const cont = document.getElementById('mun-filter-container');
+      if(!depCod){ cont.style.display = 'none'; sel.innerHTML = '<option value="">— Elige mun —</option>'; return; }
+      const muns = await getDeptoMuns(depCod);
+      STATE.deptoMunCache[depCod] = muns;
+      const sorted = [...muns].sort((a, b) => norm(a.nombre).localeCompare(norm(b.nombre), 'es'));
+      sel.innerHTML = '<option value="">— Elige mun —</option>' +
+        sorted.map(m => `<option value="${m.mun}" ${m.mun === STATE.munCod ? 'selected' : ''}>${m.nombre} · ${fmt(m.curules)} curules</option>`).join('');
+      cont.style.display = 'flex';
+    }
+
+    function populateZonas(){
+      const sel = document.getElementById('zona-select');
+      const cont = document.getElementById('zona-filter-container');
+      const lbl = document.getElementById('zona-label');
+      if(!STATE.puestosData || !STATE.puestosData.length){ cont.style.display = 'none'; return; }
+      lbl.textContent = zonaLabel(STATE.munData) + ':';
+      const zonas = [...new Set(STATE.puestosData.map(p => p.zz))].sort();
+      const labelL = zonaLabel(STATE.munData).toLowerCase();
+      const plural = labelL.endsWith('a') ? labelL + 's' : labelL.endsWith('e') ? labelL + 's' : (labelL === 'localidad' ? 'localidades' : labelL + 's');
+      sel.innerHTML = `<option value="">Todas las ${plural}</option>` +
+        zonas.map(z => `<option value="${z}">${zonaLabel(STATE.munData)} ${z}</option>`).join('');
+      cont.style.display = 'flex';
+    }
+
+    function populatePuestos(zonaCod){
+      const sel = document.getElementById('pue-select');
+      const cont = document.getElementById('pue-filter-container');
+      if(!zonaCod || !STATE.puestosData){ cont.style.display = 'none'; sel.value = ''; STATE.puestoCod = ''; return; }
+      const pps = STATE.puestosData.filter(p => p.zz === zonaCod);
+      const uniq = [...new Set(pps.map(p => p.pp))].sort();
+      sel.innerHTML = `<option value="">Todos los puestos</option>` +
+        uniq.map(pp => `<option value="${zonaCod}-${pp}">Puesto ${pp}</option>`).join('');
+      cont.style.display = 'flex';
+    }
+
+    function populateMesas(puestoCod){
+      const sel = document.getElementById('mesa-select');
+      const cont = document.getElementById('mesa-filter-container');
+      if(!puestoCod || !STATE.mesasData){ cont.style.display = 'none'; sel.value = ''; STATE.mesaCod = ''; return; }
+      const [zz, pp] = puestoCod.split('-');
+      const mesas = STATE.mesasData.filter(m => m.zz === zz && m.pp === pp);
+      const uniq = [...new Set(mesas.map(m => m.mesa))].sort();
+      sel.innerHTML = `<option value="">Todas las mesas</option>` +
+        uniq.map(mesa => `<option value="${zz}-${pp}-${mesa}">Mesa ${mesa}</option>`).join('');
+      cont.style.display = 'flex';
+    }
+
+    async function onDepChange(cod){
+      STATE.depCod = cod;
+      STATE.munCod = '';
+      STATE.zonaCod = STATE.puestoCod = STATE.mesaCod = '';
+      STATE.munData = STATE.puestosData = STATE.mesasData = null;
+      hideContainers(['zona-filter-container', 'pue-filter-container', 'mesa-filter-container']);
+      if(!cod){ document.getElementById('mun-filter-container').style.display = 'none'; renderAll(); return; }
+      await populateMuns(cod);
+      renderAll();
+    }
+
+    async function onMunChange(cod){
+      STATE.munCod = cod;
+      STATE.zonaCod = STATE.puestoCod = STATE.mesaCod = '';
+      STATE.munData = STATE.puestosData = STATE.mesasData = null;
+      hideContainers(['zona-filter-container', 'pue-filter-container', 'mesa-filter-container']);
+      if(!cod){ renderAll(); return; }
+      await loadConcejo(STATE.depCod, cod);
+      renderAll();
+    }
+
+    function onZonaChange(cod){
+      STATE.zonaCod = cod;
+      STATE.puestoCod = STATE.mesaCod = '';
+      hideContainers(['pue-filter-container', 'mesa-filter-container']);
+      if(cod) populatePuestos(cod);
+      renderAll();
+    }
+
+    async function onPueChange(cod){
+      STATE.puestoCod = cod;
+      STATE.mesaCod = '';
+      hideContainers(['mesa-filter-container']);
+      if(cod){
+        if(!STATE.mesasData){
+          try{ STATE.mesasData = await getMesas(STATE.depCod, STATE.munCod); }catch(e){ STATE.mesasData = null; }
+        }
+        populateMesas(cod);
+      }
+      renderAll();
+    }
+
+    function onMesaChange(cod){
+      STATE.mesaCod = cod;
+      renderAll();
+    }
+
+    function hideContainers(ids){ ids.forEach(id => { const el = document.getElementById(id); if(el) el.style.display = 'none'; }); }
+
+    function onScopeChange(sc){
+      STATE.scope = sc;
+      document.getElementById('scope-btn-mun').classList.toggle('active', sc === 'MUN');
+      document.getElementById('scope-btn-nacional').classList.toggle('active', sc === 'NACIONAL');
+      renderAll();
+    }
+
+    async function loadConcejo(depCod, munCod){
+      const muns = STATE.deptoMunCache[depCod] || await getDeptoMuns(depCod);
+      STATE.deptoMunCache[depCod] = muns;
+      const md = muns.find(m => m.mun === munCod);
+      if(!md) return;
+      STATE.munData = md;
+      try{ STATE.puestosData = await getPuestos(depCod, munCod); }catch(e){ STATE.puestosData = null; }
+      populateZonas();
+      document.getElementById('meta-mun').textContent = md.nombre;
+      document.getElementById('meta-curules').textContent = fmt(md.curules);
+      document.getElementById('meta-votval').textContent = fmt(md.votos_validos);
+    }
+
+    function renderAll(){
+      renderKPI();
+      renderTable();
+      renderDonut();
+      renderHemiciclo();
+    }
+
+    // ─── Mapa Leaflet ──────────────────────────────────────────
+    let conMap = null;
+    let conNacLayer = null, conDepLayer = null;
+    let _deptoGeoRaw = null;
+    const DEPTO_GEOJSON = `${MAPAS_S3}/DEPARTAMENTOS2.json`;
+    const DEPTOS_MPS_URL = `${MAPAS_S3}/Departamentos-mps/`;
+
+    async function initMap(){
+      if(conMap) return;
+      conMap = L.map('con-map', {
+        zoomControl: true, attributionControl: true, scrollWheelZoom: false,
+        dragging: true, doubleClickZoom: true, minZoom: 4, maxZoom: 11,
+      }).setView([4.6, -74.1], 5);
+      await buildNacionalLayer();
+    }
+
+    async function buildNacionalLayer(){
+      if(!_deptoGeoRaw){ _deptoGeoRaw = await fetchJSON(DEPTO_GEOJSON); }
+      const depWin = {};
+      (STATE.porDepto || []).forEach(d => {
+        if(d.partidos && d.partidos.length) depWin[d.dep] = d.partidos[0];
+      });
+      const _normC = c => String(Number(c));
+      const code = props => {
+        if(props.electoral_id != null) return _normC(props.electoral_id);
+        const nm = norm(props.name || props.NOMBRE || props.nombre || '');
+        const found = (STATE.porDepto || []).find(d => norm(d.nombre) === nm);
+        return found ? found.dep : null;
+      };
+      const style = feat => {
+        const c = code(feat.properties);
+        const w = c ? depWin[c] : null;
+        return {
+          fillColor: w ? getColor(w.partido) : '#444',
+          fillOpacity: w ? 0.78 : 0.35,
+          color: 'rgba(255,255,255,0.4)', weight: 0.8,
+        };
+      };
+      const onEach = (feat, layer) => {
+        const c = code(feat.properties);
+        const depObj = (STATE.porDepto || []).find(d => d.dep === c);
+        const w = c ? depWin[c] : null;
+        if(w && depObj){
+          layer.bindTooltip(`<div style="font-weight:700;color:#fff;margin-bottom:.3rem">${depObj.nombre}</div><div>Líder: <b style="color:${getColor(w.partido)}">${w.partido.substr(0,40)}</b></div><div>${fmt(w.curules)} curules totales en el depto</div>`, { sticky: true });
+        } else {
+          layer.bindTooltip(feat.properties.name || feat.properties.NOMBRE || 'Depto', { sticky: true });
+        }
+        layer.on('click', () => { if(c){ drillIntoDepto(c, true); } });
+      };
+      if(conNacLayer) conMap.removeLayer(conNacLayer);
+      conNacLayer = L.geoJSON(_deptoGeoRaw, { style, onEachFeature: onEach }).addTo(conMap);
+      conMap.fitBounds(conNacLayer.getBounds(), { padding: [8, 8] });
+    }
+
+    async function drillIntoDepto(depCod, applyToState){
+      try{
+        if(conNacLayer){ conMap.removeLayer(conNacLayer); conNacLayer = null; }
+        const padded = String(depCod).padStart(2, '0');
+        const geo = await fetchJSON(`${DEPTOS_MPS_URL}${padded}.json`);
+        const muns = STATE.deptoMunCache[depCod] || await getDeptoMuns(depCod);
+        STATE.deptoMunCache[depCod] = muns;
+        const code = props => {
+          if(props.mun_elec != null) return String(props.mun_elec).padStart(3, '0');
+          if(props.electoral_id != null) return String(props.electoral_id).padStart(3, '0');
+          return null;
+        };
+        const munWin = {};
+        muns.forEach(m => {
+          if(m.partidos && m.partidos.length) munWin[m.mun] = m.partidos[0];
+        });
+        const style = feat => {
+          const c = code(feat.properties);
+          const w = c ? munWin[c] : null;
+          return {
+            fillColor: w ? getColor(w.partido) : '#444',
+            fillOpacity: w ? 0.78 : 0.35,
+            color: 'rgba(255,255,255,0.4)', weight: 0.8,
+          };
+        };
+        const onEach = (feat, layer) => {
+          const c = code(feat.properties);
+          const munObj = muns.find(m => m.mun === c);
+          const w = c ? munWin[c] : null;
+          if(munObj && w){
+            layer.bindTooltip(`<div style="font-weight:700;color:#fff;margin-bottom:.3rem">${munObj.nombre}</div><div>Líder: <b style="color:${getColor(w.partido)}">${w.partido.substr(0,40)}</b></div><div>${fmt(w.curules)} de ${fmt(munObj.curules)} curules</div>`, { sticky: true });
+          } else {
+            layer.bindTooltip(feat.properties.NOMBRE || feat.properties.mpio_cnmbr || 'Mun', { sticky: true });
+          }
+          layer.on('click', () => {
+            if(c){
+              const sel = document.getElementById('mun-select');
+              if(applyToState){
+                STATE.depCod = depCod;
+                document.getElementById('dep-select').value = depCod;
+              }
+              sel.value = c;
+              onMunChange(c);
+            }
+          });
+        };
+        if(conDepLayer) conMap.removeLayer(conDepLayer);
+        conDepLayer = L.geoJSON(geo, { style, onEachFeature: onEach }).addTo(conMap);
+        conMap.fitBounds(conDepLayer.getBounds(), { padding: [12, 12] });
+        document.getElementById('con-map-back').style.display = 'block';
+        document.getElementById('con-map-back').onclick = mapBackToNacional;
+        if(applyToState){
+          STATE.depCod = depCod;
+          document.getElementById('dep-select').value = depCod;
+          await populateMuns(depCod);
+        }
+      }catch(e){ console.warn('[drillIntoDepto]', e); }
+    }
+    async function mapBackToNacional(){
+      if(conDepLayer){ conMap.removeLayer(conDepLayer); conDepLayer = null; }
+      document.getElementById('con-map-back').style.display = 'none';
+      await buildNacionalLayer();
+    }
+
+    // ─── Buscador ─────────────────────────────────────────────
+    function buscarCandidato(q){
+      const root = document.getElementById('con-search-results');
+      if(!q || q.length < 3){ root.style.display = 'none'; root.innerHTML = ''; return; }
+      const md = STATE.munData;
+      if(!md){ return; }
+      const Q = norm(q);
+      const hits = [];
+      for(const p of md.partidos){
+        for(const c of (p.candidatos || [])){
+          if(norm(c.nombre).includes(Q)){
+            hits.push({ ...c, partido: p.partido, tipo_lista: p.tipo_lista });
+            if(hits.length > 50) break;
+          }
+        }
+        if(hits.length > 50) break;
+      }
+      if(!hits.length){
+        root.innerHTML = `<div style="font-family:'DM Mono',monospace;font-size:.65rem;color:rgba(255,255,255,.4);padding:.5rem 0">Sin resultados en ${md.nombre}</div>`;
+        root.style.display = 'block';
+        return;
+      }
+      hits.sort((a,b) => (b.votos || 0) - (a.votos || 0));
+      root.innerHTML = '<div style="font-family:\'DM Mono\',monospace;font-size:.6rem;letter-spacing:.1em;color:rgba(255,255,255,.4);margin-bottom:.5rem;text-transform:uppercase">' +
+        hits.length + ' resultado(s) en ' + md.nombre + '</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:.5rem">' +
+        hits.slice(0,20).map(h => `<div style="background:rgba(0,71,255,.04);border:1px solid rgba(0,71,255,.15);padding:.6rem .8rem">
+          <div style="font-family:'Syne',sans-serif;font-weight:400;color:var(--white);font-size:.92rem">${h.nombre}</div>
+          <div style="font-family:'DM Mono',monospace;font-size:.6rem;color:rgba(0,71,255,.7);margin-top:.2rem">${h.partido.substr(0,40)}</div>
+          <div style="font-family:'DM Mono',monospace;font-size:.62rem;color:rgba(255,255,255,.5);margin-top:.3rem">${fmt(h.votos || 0)} votos preferentes · ${h.tipo_lista}</div>
+        </div>`).join('') + '</div>';
+      root.style.display = 'block';
+    }
+
+    // ─── Init ─────────────────────────────────────────────────
+    async function init(){
+      try{
+        const [resumen, deptos, porMun] = await Promise.all([getResumen(), getPorDepto(), getPorMun()]);
+        STATE.nacionalResumen = resumen;
+        STATE.porDepto = deptos;
+        STATE.porMun = porMun;
+        populateDeptos();
+        await populateMuns(STATE.depCod);
+        await loadConcejo(STATE.depCod, STATE.munCod);
+        document.getElementById('load-state').style.display = 'none';
+        document.getElementById('main-content').classList.remove('hidden');
+        renderAll();
+        setTimeout(() => { initMap(); }, 60);
+      }catch(e){
+        console.error(e);
+        document.getElementById('load-state').innerHTML =
+          `<div style="font-family:'DM Mono',monospace;font-size:.8rem;color:#ff8888;text-align:center;max-width:520px">
+            Error al cargar los datos.<br/>${e.message || e}
+          </div>`;
+      }
+    }
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
