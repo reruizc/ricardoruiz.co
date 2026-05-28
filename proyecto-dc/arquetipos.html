@@ -487,6 +487,10 @@
       metodologia:    `${ARQ_BASE}/metodologia.json`,
       barriosGeo:     `${S3_BASE}/bases+de+datos/MEDELLIN_BARRIOS_OFICIAL.json`,
       comunasGeo:     `${S3_BASE}/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`,
+      // Versión ajustada 2027 (entrega Nury 2026-05-28). 48 de 152 barrios
+      // tienen ajuste distinto al proyectado tendencial. Lee
+      // arquetipo_ajustado_2027 para el render del año 2027 y la trayectoria.
+      votacion27:     `${S3_BASE}/bases+de+datos/Proyecto+DC/votacion-arquetipo-2027/votacion-2027.json?v=20260528`,
     };
 
     // ─── ESTADO ───────────────────────────────────────────────────────
@@ -535,7 +539,7 @@
 
     // ─── CARGA ────────────────────────────────────────────────────────
     async function loadAll(){
-      const [arqJ, barJ, comJ, proJ, corJ, traJ, metJ, barGeo, comGeo] = await Promise.all([
+      const [arqJ, barJ, comJ, proJ, corJ, traJ, metJ, barGeo, comGeo, votJ] = await Promise.all([
         fetch(URL.arquetipos).then(r=>r.json()),
         fetch(URL.porBarrio).then(r=>r.json()),
         fetch(URL.porComuna).then(r=>r.json()),
@@ -545,9 +549,34 @@
         fetch(URL.metodologia).then(r=>r.json()),
         fetch(URL.barriosGeo).then(r=>r.json()),
         fetch(URL.comunasGeo).then(r=>r.json()),
+        fetch(URL.votacion27).then(r=>r.json()).catch(() => null),
       ]);
-      STATE.data = { arquetipos: arqJ, porBarrio: barJ, porComuna: comJ, proyeccion: proJ, correlaciones: corJ, transiciones: traJ, metodologia: metJ };
+      STATE.data = { arquetipos: arqJ, porBarrio: barJ, porComuna: comJ, proyeccion: proJ, correlaciones: corJ, transiciones: traJ, metodologia: metJ, votacion27: votJ };
       STATE.geo  = { barrios: barGeo, comunas: comGeo };
+      // Inyectar arquetipo_ajustado_2027 (versión definitiva Nury) en cada
+      // barrio del paquete porBarrio. Esto reemplaza al proyectado tendencial
+      // SOLO para el render (no toca el JSON original en S3). En 48 de 152
+      // barrios la versión ajustada es distinta.
+      if (votJ && votJ.barrios){
+        for (const dap of Object.keys(STATE.data.porBarrio)){
+          const v = votJ.barrios[dap];
+          if (!v) continue;
+          const b = STATE.data.porBarrio[dap];
+          b.proyeccion_2027 = b.proyeccion_2027 || {};
+          if (v.arquetipo_ajustado_2027){
+            b.proyeccion_2027.arquetipo_proy_original = b.proyeccion_2027.arquetipo_proy;
+            b.proyeccion_2027.arquetipo_proy = v.arquetipo_ajustado_2027;
+          }
+          if (v.arquetipo_alterno_2027){
+            b.proyeccion_2027.arquetipo_alt = v.arquetipo_alterno_2027;
+          }
+          // Refrescar la trayectoria: el último paso debe ser el ajustado
+          if (Array.isArray(b.trayectoria) && b.trayectoria.length >= 3 && v.arquetipo_ajustado_2027){
+            // trayectoria viene como [2015, 2019, 2023]; el render del 2027 se
+            // calcula con b.proyeccion_2027.arquetipo_proy que ya quedó arriba.
+          }
+        }
+      }
       buildHerencia();
     }
 

@@ -142,12 +142,13 @@
     .fb-migracion { margin: .8rem 0; padding: .7rem .85rem; background:var(--warn-dim); border-left:3px solid var(--warn); font-family:'Fraunces',serif; font-size:.88rem; color:var(--text); }
     .fb-mini { font-family:'DM Mono',monospace; font-size:.65rem; color:var(--text3); margin-top:.3rem; letter-spacing:.04em; }
     .fb-section-title { font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.15em; text-transform:uppercase; color:var(--text3); margin: 1.2rem 0 .55rem; }
-    .fb-scores { display:flex; flex-direction:column; gap:.4rem; }
-    .fb-score-row { display:grid; grid-template-columns: 110px 1fr 45px; align-items:center; gap:.5rem; }
-    .fb-score-name { font-family:'Syne',sans-serif; font-weight:500; font-size:.72rem; letter-spacing:.02em; }
-    .fb-score-track { height:9px; background:var(--bg2); border-radius:2px; overflow:hidden; }
+    .fb-scores { display:flex; flex-direction:column; gap:.45rem; }
+    .fb-score-row { display:grid; grid-template-columns: 120px 1fr 70px; align-items:center; gap:.55rem; }
+    .fb-score-name { font-family:'Syne',sans-serif; font-weight:500; font-size:.72rem; letter-spacing:.02em; line-height:1.15; }
+    .fb-score-track { height:10px; background:var(--bg2); border-radius:2px; overflow:hidden; }
     .fb-score-fill { height:100%; transition: width .25s; }
-    .fb-score-val { font-family:'DM Mono',monospace; font-size:.68rem; color:var(--text2); text-align:right; }
+    .fb-score-val { font-family:'DM Mono',monospace; font-size:.7rem; font-weight:700; color:var(--text); text-align:right; line-height:1.1; }
+    .fb-total-row { font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.06em; color:var(--text3); text-transform:uppercase; padding-top:.4rem; border-top: 1px dashed var(--border); margin-top:.2rem; }
     .fb-act { display:flex; flex-wrap:wrap; gap:.3rem; }
     .fb-act-pill { font-family:'DM Mono',monospace; font-size:.64rem; letter-spacing:.04em; padding:.25rem .55rem; background:var(--purple-dim); color:var(--text); border:1px solid var(--purple-dim); }
     .fb-act-pill strong { color:var(--purple); }
@@ -379,6 +380,9 @@
       barriosGeo:  `${S3_BASE}/bases+de+datos/MEDELLIN_BARRIOS_OFICIAL.json`,
       comunasGeo:  `${S3_BASE}/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`,
       afinidad:    `${S3_BASE}/bases+de+datos/Proyecto+DC/afinidad-carvalho-quintero/afinidad-carvalho-quintero.json`,
+      // Votación esperada por arquetipo 2027 — fuente definitiva de Nury con
+      // arquetipo_ajustado_2027 + votos esperados por arquetipo y barrio.
+      votacion27:  `${S3_BASE}/bases+de+datos/Proyecto+DC/votacion-arquetipo-2027/votacion-2027.json?v=20260528`,
     };
 
     // ─── STATE ────────────────────────────────────────────────────────
@@ -429,15 +433,16 @@
 
     // ─── CARGA ────────────────────────────────────────────────────────
     async function loadAll(){
-      const [arqJ, barJ, comJ, barGeo, comGeo, afinJ] = await Promise.all([
+      const [arqJ, barJ, comJ, barGeo, comGeo, afinJ, votJ] = await Promise.all([
         fetch(URL.arquetipos).then(r=>r.json()),
         fetch(URL.porBarrio).then(r=>r.json()),
         fetch(URL.porComuna).then(r=>r.json()),
         fetch(URL.barriosGeo).then(r=>r.json()),
         fetch(URL.comunasGeo).then(r=>r.json()),
         fetch(URL.afinidad).then(r=>r.json()).catch(() => null),
+        fetch(URL.votacion27).then(r=>r.json()).catch(() => null),
       ]);
-      STATE.data = { arquetipos: arqJ, porBarrio: barJ, porComuna: comJ, afinidad: afinJ };
+      STATE.data = { arquetipos: arqJ, porBarrio: barJ, porComuna: comJ, afinidad: afinJ, votacion27: votJ };
       STATE.geo = { barrios: barGeo, comunas: comGeo };
     }
 
@@ -883,6 +888,81 @@
       return { id: first[0], mixed: null };
     }
 
+    // ─── HELPERS PARA VOTACIÓN 2027 ──────────────────────────────────
+    function getVot2027Barrio(dap){
+      return (STATE.data.votacion27 && STATE.data.votacion27.barrios && STATE.data.votacion27.barrios[dap]) || null;
+    }
+    function getVot2027Comuna(name){
+      return (STATE.data.votacion27 && STATE.data.votacion27.comunas && STATE.data.votacion27.comunas[name]) || null;
+    }
+    // Arquetipo proyectado 2027 SIN escenario activo → leer del xlsx
+    // (arquetipo_ajustado_2027 de Nury, versión definitiva).
+    function arqAjustadoBarrio(dap){
+      const v = getVot2027Barrio(dap);
+      return (v && v.arquetipo_ajustado_2027) || null;
+    }
+    function arqAjustadoComuna(name){
+      const v = getVot2027Comuna(name);
+      return (v && v.arquetipo_dominante_2027) || null;
+    }
+
+    // Convierte scores a probabilidades [0,1] que suman 1.
+    // Usa softmax con temperatura suave para que los scores se traduzcan
+    // a una distribución que respeta el orden pero no es extrema.
+    function scoresToProbs(scores){
+      const keys = Object.keys(scores);
+      const TEMP = 1.5;  // mayor = distribución más plana
+      const max = Math.max(...keys.map(k => scores[k]));
+      const exps = keys.map(k => Math.exp((scores[k] - max) / TEMP));
+      const sum = exps.reduce((a,b) => a+b, 0) || 1;
+      const out = {};
+      keys.forEach((k, i) => { out[k] = exps[i] / sum; });
+      return out;
+    }
+
+    // Votos esperados por arquetipo bajo el escenario actual.
+    // - Sin escenario activo: devuelve los del xlsx tal cual.
+    // - Con escenario: redistribuye TOTAL_VOTOS_2027 según probabilidades del motor.
+    function votosPorArqBarrio(dap){
+      const v = getVot2027Barrio(dap);
+      if (!v) return null;
+      const baseTotal = v.votos_2027 || 0;
+      if (!escenarioActivo()) return Object.assign({}, v.votos_por_arquetipo || {});
+      const res = getBarrioByDap(dap);
+      const b = res ? res.b : null;
+      const baseFam = (b && b.arquetipo && b.arquetipo['2023']) || v.arquetipo_2023;
+      if (!baseFam) return Object.assign({}, v.votos_por_arquetipo || {});
+      const afEntry = STATE.data.afinidad && STATE.data.afinidad.barrios && STATE.data.afinidad.barrios[dap];
+      const afinSlider = afEntry ? afEntry.afinidad_slider : null;
+      const scores = computeScores(baseFam, STATE.sliders, afinSlider);
+      const probs = scoresToProbs(scores);
+      const out = {};
+      for (const k of Object.keys(probs)) out[k] = Math.round(probs[k] * baseTotal);
+      return out;
+    }
+    function votosPorArqComuna(name){
+      const v = getVot2027Comuna(name);
+      if (!v) return null;
+      const baseTotal = v.votos_2027 || 0;
+      if (!escenarioActivo()) return Object.assign({}, v.votos_por_arquetipo || {});
+      const com = STATE.data.porComuna[name];
+      const baseFam = (com && com['2023'] && com['2023'].dominante) || null;
+      if (!baseFam) return Object.assign({}, v.votos_por_arquetipo || {});
+      // afinidad promedio del scoring
+      let afT=0, afC=0;
+      for (const [dap, b] of Object.entries(STATE.data.porBarrio)){
+        if (((b.comuna||'')).toLowerCase() !== ((name||'')).toLowerCase()) continue;
+        const e = STATE.data.afinidad && STATE.data.afinidad.barrios && STATE.data.afinidad.barrios[dap];
+        if (e){ afT += e.afinidad_slider; afC++; }
+      }
+      const afinSlider = afC > 0 ? afT/afC : null;
+      const scores = computeScores(baseFam, STATE.sliders, afinSlider);
+      const probs = scoresToProbs(scores);
+      const out = {};
+      for (const k of Object.keys(probs)) out[k] = Math.round(probs[k] * baseTotal);
+      return out;
+    }
+
     function computeArquetipoProyectadoBarrio(b, dap){
       const baseFam = b.arquetipo && b.arquetipo['2023'];
       if (!baseFam) return null;
@@ -1013,11 +1093,23 @@
       const props = feat.properties || {};
       if (isComuna){
         const com = STATE.data.porComuna[props.NOMBRE];
-        if (!com) return null;
+        if (!com) {
+          // Comunas/corregimientos sin datos en por-comuna del módulo 05.
+          // Probar arquetipo dominante del xlsx 2027 (agregado por comuna).
+          const ajust = arqAjustadoComuna(props.NOMBRE);
+          if (ajust && mode === 'proyectado') return { id: ajust, inferido: false };
+          return null;
+        }
         if (mode === 'proyectado' && escenarioActivo() && typeof computeArquetipoMixComuna === 'function'){
           const mix = computeArquetipoMixComuna(props.NOMBRE);
           if (!mix.id) return null;
           return { id: mix.id, inferido: false, mixed: mix.mixed };
+        }
+        // SIN escenario activo y modo proyectado: usar dominante del xlsx
+        // (Nury) en lugar del arquetipo dominante tendencial del módulo 05.
+        if (mode === 'proyectado'){
+          const ajust = arqAjustadoComuna(props.NOMBRE);
+          if (ajust) return { id: ajust, inferido: false };
         }
         const slot = com['2023'];
         return slot && slot.dominante ? { id: slot.dominante, inferido: false } : null;
@@ -1029,6 +1121,11 @@
         const mix = computeArquetipoMixBarrio(res.b, props.CODIGO);
         if (!mix.id) return null;
         return { id: mix.id, inferido: res.inferido, mixed: mix.mixed };
+      }
+      // SIN escenario activo + modo proyectado: usar ajustado del xlsx.
+      if (mode === 'proyectado'){
+        const ajust = arqAjustadoBarrio(props.CODIGO);
+        if (ajust) return { id: ajust, inferido: res.inferido };
       }
       const baseFam = res.b.arquetipo && res.b.arquetipo['2023'];
       return baseFam ? { id: baseFam, inferido: res.inferido } : null;
@@ -1092,23 +1189,30 @@
         ${emocion ? `<div class="fb-emo">${emocion}</div>` : ''}`;
     }
 
-    function _scoresBars(scores){
+    // Barras horizontales con votos esperados por arquetipo.
+    // Cada barra muestra: nombre del arquetipo, barra proporcional al
+    // arquetipo MÁS votado, número de votos y porcentaje del total.
+    // Sin escenario: votos del xlsx (proyección oficial Nury).
+    // Con escenario activo: votos redistribuidos según el motor.
+    function _votosBars(votos){
       const order = ['proteccion','castigo','continuidad','supervivencia','pertenencia'];
-      const max = Math.max(0.1, ...Object.values(scores));
-      const min = Math.min(0, ...Object.values(scores));
-      const range = max - min || 1;
+      const max = Math.max(1, ...order.map(f => votos[f] || 0));
+      const total = order.reduce((s, f) => s + (votos[f] || 0), 0);
+      const fmt = n => Number(n || 0).toLocaleString('es-CO');
       return `
         <div class="fb-scores">
           ${order.map(f => {
-            const v = scores[f] || 0;
-            const pct = Math.max(0, (v - min) / range) * 100;
+            const v = votos[f] || 0;
+            const pct = (v / max) * 100;
+            const share = total > 0 ? (v / total) * 100 : 0;
             return `
               <div class="fb-score-row">
                 <span class="fb-score-name" style="color:${colorArq(f)}">${arqLabel(f, 'evol')}</span>
                 <div class="fb-score-track"><div class="fb-score-fill" style="width:${pct.toFixed(1)}%;background:${colorArq(f)}"></div></div>
-                <span class="fb-score-val">${v >= 0 ? '+' : ''}${v.toFixed(1)}</span>
+                <span class="fb-score-val">${fmt(v)}<br><span style="color:var(--text3);font-size:.6rem">${share.toFixed(1)}%</span></span>
               </div>`;
           }).join('')}
+          <div class="fb-total-row">Total ${fmt(Math.round(total))} votos esperados 2027</div>
         </div>`;
     }
 
@@ -1133,7 +1237,12 @@
       }
       const b = res.b;
       const baseFam = b.arquetipo && b.arquetipo['2023'];
-      const proyFam = escenarioActivo() ? computeArquetipoProyectadoBarrio(b, dap) : baseFam;
+      // Proyección 2027 base: viene del xlsx ajustado de Nury.
+      // Si hay escenario activo, el motor decide.
+      const baseProyFam = arqAjustadoBarrio(dap);
+      const proyFam = escenarioActivo()
+        ? computeArquetipoProyectadoBarrio(b, dap)
+        : baseProyFam || baseFam;
       const cambio = proyFam && baseFam && proyFam !== baseFam;
       const heredadoBanner = res.inferido && b._heredado_de
         ? `<div class="fb-banner-her">⚠ Datos heredados del barrio más cercano con puesto: <strong>${b._heredado_de.barrio}</strong> (${b._heredado_de.comuna})</div>`
@@ -1146,18 +1255,20 @@
 
       sub.textContent = `${b.barrio} · ${b.comuna}${res.inferido ? ' · (heredado)' : ''}`;
 
-      const scores = baseFam ? computeScores(baseFam, STATE.sliders, afEntry ? afEntry.afinidad_slider : null) : null;
+      const votos = votosPorArqBarrio(dap);
+      const vot27 = getVot2027Barrio(dap);
+      const baseVotos = vot27 && vot27.votos_base_2023;
 
       body.innerHTML = `
         ${heredadoBanner}
         <div class="fb-title">${b.barrio}</div>
-        <div class="fb-comuna">DAP ${dap} · ${b.comuna}</div>
+        <div class="fb-comuna">DAP ${dap} · ${b.comuna}${baseVotos ? ' · ' + baseVotos.toLocaleString('es-CO') + ' votos base 2023' : ''}</div>
         ${_arqBlock('Arquetipo base 2023', baseFam, 'base')}
-        ${escenarioActivo() ? _arqBlock('Arquetipo proyectado 2027', proyFam, 'evol') : ''}
+        ${_arqBlock(escenarioActivo() ? 'Arquetipo proyectado 2027 (bajo escenario)' : 'Arquetipo ajustado 2027 (Nury)', proyFam, 'evol')}
         ${cambio ? `<div class="fb-migracion">⚡ Migración: <strong>${arqLabel(baseFam,'base')}</strong> → <strong style="color:${colorArq(proyFam)}">${arqLabel(proyFam,'evol')}</strong></div>` : ''}
         ${afLine}
-        <div class="fb-section-title">Scores ${escenarioActivo() ? 'bajo el escenario actual' : '(base · sin escenario)'}</div>
-        ${scores ? _scoresBars(scores) : '<div class="fb-empty-mini">Sin datos base.</div>'}
+        <div class="fb-section-title">Votos esperados 2027 por arquetipo ${escenarioActivo() ? '(escenario activo)' : '(ajustado Nury)'}</div>
+        ${votos ? _votosBars(votos) : '<div class="fb-empty-mini">Sin votos esperados para este barrio.</div>'}
         <div class="fb-section-title">Palancas activas</div>
         ${_slidersActivosTexto()}
       `;
@@ -1166,15 +1277,19 @@
     function renderFichaComuna(sel){
       const name = sel.key;
       const com = STATE.data.porComuna[name];
+      const vot27 = getVot2027Comuna(name);
       const sub = document.getElementById('ficha-sub');
       const body = document.getElementById('ficha-body');
-      if (!com){
+      if (!com && !vot27){
         body.innerHTML = '<div class="ficha-empty">Sin datos para esta comuna.</div>';
         sub.textContent = name;
         return;
       }
-      const baseFam = com['2023'] && com['2023'].dominante;
-      const proyFam = escenarioActivo() ? computeArquetipoProyectadoComuna(name) : baseFam;
+      const baseFam = com && com['2023'] && com['2023'].dominante;
+      const baseProyFam = arqAjustadoComuna(name);
+      const proyFam = escenarioActivo()
+        ? computeArquetipoProyectadoComuna(name)
+        : (baseProyFam || baseFam);
       const cambio = proyFam && baseFam && proyFam !== baseFam;
 
       // Promedio de afinidad de los barrios de la comuna
@@ -1187,21 +1302,19 @@
       const afProm = afCount > 0 ? afTotal / afCount : null;
 
       sub.textContent = `${name} · comuna`;
-      const scores = baseFam ? computeScores(baseFam, STATE.sliders, afProm) : null;
-
-      const slot = com['2023'] || {};
-      const barriosTotales = slot.barrios_total || 0;
-      const votosTotales = slot.votos_total || 0;
+      const votos = votosPorArqComuna(name);
+      const barriosTotales = (vot27 && vot27.n_barrios) || (com && com['2023'] && com['2023'].barrios_total) || 0;
+      const votos2023 = (vot27 && vot27.votos_base_2023) || (com && com['2023'] && com['2023'].votos_total) || 0;
 
       body.innerHTML = `
         <div class="fb-title">${name}</div>
-        <div class="fb-comuna">${barriosTotales} barrios · ${votosTotales.toLocaleString('es-CO')} votos 2023</div>
+        <div class="fb-comuna">${barriosTotales} barrios · ${votos2023.toLocaleString('es-CO')} votos base 2023</div>
         ${_arqBlock('Arquetipo dominante 2023', baseFam, 'base')}
-        ${escenarioActivo() ? _arqBlock('Arquetipo proyectado 2027', proyFam, 'evol') : ''}
+        ${_arqBlock(escenarioActivo() ? 'Arquetipo proyectado 2027 (bajo escenario)' : 'Arquetipo ajustado 2027 (Nury)', proyFam, 'evol')}
         ${cambio ? `<div class="fb-migracion">⚡ Migración: <strong>${arqLabel(baseFam,'base')}</strong> → <strong style="color:${colorArq(proyFam)}">${arqLabel(proyFam,'evol')}</strong></div>` : ''}
         <div class="fb-row"><div class="fb-lbl">Huella Carvalho · promedio comuna</div><div class="fb-val">${afProm !== null ? `<span class="fb-pill" style="background:${colorArq('castigo')};color:#fff">${afProm >= 0 ? '+' : ''}${afProm.toFixed(2)}</span>` : '<span style="color:var(--text3);font-style:italic">Sin datos</span>'}</div></div>
-        <div class="fb-section-title">Scores ${escenarioActivo() ? 'bajo el escenario actual' : '(base · sin escenario)'}</div>
-        ${scores ? _scoresBars(scores) : '<div class="fb-empty-mini">Sin datos base.</div>'}
+        <div class="fb-section-title">Votos esperados 2027 por arquetipo ${escenarioActivo() ? '(escenario activo)' : '(ajustado Nury)'}</div>
+        ${votos ? _votosBars(votos) : '<div class="fb-empty-mini">Sin votos esperados para esta comuna.</div>'}
         <div class="fb-section-title">Palancas activas</div>
         ${_slidersActivosTexto()}
       `;
