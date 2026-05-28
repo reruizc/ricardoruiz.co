@@ -268,8 +268,9 @@
         <div class="kpi-row" id="kpi-row"></div>
 
         <div class="scope-toggle">
-          <button class="scope-btn active" id="scope-btn-mun" onclick="onScopeChange('MUN')">Concejo activo</button>
-          <button class="scope-btn" id="scope-btn-nacional" onclick="onScopeChange('NACIONAL')">Resumen nacional · todos los muns</button>
+          <button class="scope-btn active" id="scope-btn-info" onclick="onScopeChange('INFO')">Información general</button>
+          <button class="scope-btn" id="scope-btn-whatif" onclick="onScopeChange('WHATIF')">¿Qué pasaría si…? · WHAT IF</button>
+          <button class="scope-btn" id="scope-btn-nacional" onclick="onScopeChange('NACIONAL')">Ranking nacional · todos los muns</button>
         </div>
 
         <div id="hemiciclo-row" class="hemiciclo-row" style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.5rem">
@@ -375,7 +376,7 @@
 
     // ─── Estado global ─────────────────────────────────────────
     const STATE = {
-      scope: 'MUN',
+      scope: 'INFO',     // INFO | WHATIF | NACIONAL
       depCod: '16',      // electoral_id Registraduría (Bogotá D.C.)
       munCod: '001',
       zonaCod: '',
@@ -447,18 +448,32 @@
       return 'Zona';
     }
 
-    // ─── Helpers WHAT IF ───────────────────────────────────────
+    // ─── Helpers para datos del territorio ─────────────────────
+    // Suma votos por partido + especiales en las filas pasadas (puestos o mesas)
+    function _sumRows(rows){
+      const partidoVotos = {};
+      const especiales = {};
+      let vv = 0;
+      for(const r of rows){
+        vv += (r.votos_validos || 0);
+        if(r.especiales) for(const [k,v] of Object.entries(r.especiales))
+          especiales[k] = (especiales[k] || 0) + v;
+        if(r.partidos_top) for(const p of r.partidos_top){
+          partidoVotos[p.partido] = (partidoVotos[p.partido] || 0) + p.votos;
+        }
+      }
+      return { partidoVotos, especiales, votos_validos: vv };
+    }
+
+    // Devuelve los datos a renderizar según scope + filtros territoriales
+    //   INFO + sin filtro       → datos del mun (D'Hondt real ya calculado)
+    //   INFO + zona/pue/mesa    → datos del territorio (votos raw, SIN recalcular D'Hondt — preserva curules del mun completo)
+    //   WHATIF + sin filtro     → mismos datos del mun, banner explicativo "WHAT IF — pondé un territorio"
+    //   WHATIF + filtro         → recalcula D'Hondt con votos del territorio
     function buildWhatIfScope(){
       const md = STATE.munData;
       if(!md) return null;
       const seats = md.curules;
-      if(!STATE.zonaCod && !STATE.puestoCod && !STATE.mesaCod){
-        return {
-          partidoVotos: Object.fromEntries(md.partidos.map(p => [p.partido, p.votos_total])),
-          votos_validos: md.votos_validos, especiales: md.especiales || {},
-          seats, ambito: md.nombre, filtered: false,
-        };
-      }
       let rows = null, lugar = '';
       if(STATE.mesaCod){
         const [zz, pp, mesa] = STATE.mesaCod.split('-');
@@ -472,19 +487,33 @@
         rows = (STATE.puestosData || []).filter(m => m.zz === STATE.zonaCod);
         lugar = `${zonaLabel(md)} ${STATE.zonaCod}`;
       }
-      if(!rows || !rows.length) return null;
-      const partidoVotos = {};
-      const especiales = {};
-      let vv = 0;
-      for(const r of rows){
-        vv += r.votos_validos;
-        if(r.especiales) for(const [k,v] of Object.entries(r.especiales))
-          especiales[k] = (especiales[k] || 0) + v;
-        if(r.partidos_top) for(const p of r.partidos_top){
-          partidoVotos[p.partido] = (partidoVotos[p.partido] || 0) + p.votos;
-        }
+      const hasFilter = !!(STATE.zonaCod || STATE.puestoCod || STATE.mesaCod);
+      const filterValid = hasFilter && rows && rows.length;
+      if(!hasFilter){
+        return {
+          partidoVotos: Object.fromEntries(md.partidos.map(p => [p.partido, p.votos_total])),
+          votos_validos: md.votos_validos, especiales: md.especiales || {},
+          seats, ambito: md.nombre, filtered: false, recalc: false,
+        };
       }
-      return { partidoVotos, votos_validos: vv, especiales, seats, ambito: lugar, filtered: true };
+      if(!filterValid){
+        // Filtro pero sin datos del territorio: devolvemos el mun para no romper
+        return {
+          partidoVotos: Object.fromEntries(md.partidos.map(p => [p.partido, p.votos_total])),
+          votos_validos: md.votos_validos, especiales: md.especiales || {},
+          seats, ambito: lugar || md.nombre, filtered: false, recalc: false,
+        };
+      }
+      const sum = _sumRows(rows);
+      const isWhatIf = STATE.scope === 'WHATIF';
+      return {
+        partidoVotos: sum.partidoVotos,
+        votos_validos: sum.votos_validos,
+        especiales: sum.especiales,
+        seats, ambito: lugar,
+        filtered: true,        // sí hay filtro territorial activo (afecta datos)
+        recalc: isWhatIf,      // sólo recalculamos D'Hondt en WHATIF
+      };
     }
 
     // ─── Theme ─────────────────────────────────────────────────
@@ -559,11 +588,18 @@
       const vv = wi ? wi.votos_validos : md.votos_validos;
       const censo = md.censo || 0;
       const participacion = censo > 0 ? ((md.votos_totales / censo) * 100).toFixed(2) : '—';
+      const territorioActivo = wi && wi.filtered;
+      const isWhatIf = STATE.scope === 'WHATIF';
+      // En INFO con filtro territorial mostramos las cifras del territorio pero NO
+      // recalculamos curules. En WHATIF + filtro mostramos curules recalculados.
+      const partidosVivos = isWhatIf && territorioActivo
+        ? Object.values(dhondt(wi.partidoVotos, md.curules)).filter(c => c > 0).length
+        : md.partidos.filter(p => p.curules > 0).length;
       root.innerHTML = `
         <div class="kpi-card"><div class="kpi-label">Curules a repartir</div><div class="kpi-val">${fmt(md.curules)}</div><div class="kpi-delta">${md.nombre}</div></div>
-        <div class="kpi-card"><div class="kpi-label">${wi && wi.filtered ? 'Votos · territorio' : 'Votos válidos · mun'}</div><div class="kpi-val gr">${fmt(vv)}</div><div class="kpi-delta">${wi && wi.filtered ? wi.ambito : 'En el municipio'}</div></div>
+        <div class="kpi-card"><div class="kpi-label">${territorioActivo ? 'Votos · territorio' : 'Votos válidos · mun'}</div><div class="kpi-val gr">${fmt(vv)}</div><div class="kpi-delta">${territorioActivo ? wi.ambito : 'En el municipio'}</div></div>
         <div class="kpi-card"><div class="kpi-label">Censo electoral</div><div class="kpi-val wh">${fmt(censo)}</div><div class="kpi-delta">Participación: ${participacion}%</div></div>
-        <div class="kpi-card"><div class="kpi-label">Partidos</div><div class="kpi-val wh">${fmt(md.partidos.length)}</div><div class="kpi-delta">${md.partidos.filter(p=>p.curules>0).length} con curul</div></div>`;
+        <div class="kpi-card"><div class="kpi-label">Partidos${isWhatIf && territorioActivo ? ' · what-if' : ''}</div><div class="kpi-val wh">${fmt(md.partidos.length)}</div><div class="kpi-delta">${partidosVivos} con curul</div></div>`;
     }
 
     // ─── Tabla ─────────────────────────────────────────────────
@@ -572,7 +608,7 @@
       const thead = document.getElementById('drill-thead');
       const lbl = document.getElementById('lbl-tabla');
       const badge = document.getElementById('drill-badge');
-
+      // Ocultar / mostrar filas según scope (NACIONAL no usa hemiciclo del mun)
       if(STATE.scope === 'NACIONAL'){
         const r = STATE.nacionalResumen;
         if(!r){ tbody.innerHTML = ''; return; }
@@ -603,9 +639,11 @@
       const md = STATE.munData;
       if(!md){ tbody.innerHTML = ''; return; }
       const wi = buildWhatIfScope();
+      const territorioActivo = wi && wi.filtered;
+      const isWhatIf = STATE.scope === 'WHATIF';
       let partidos;
-      const isWhatIf = wi && wi.filtered;
-      if(isWhatIf){
+      if(isWhatIf && territorioActivo){
+        // WHATIF + filtro: recalcula D'Hondt con votos del territorio
         const cur = dhondt(wi.partidoVotos, md.curules);
         const orig = new Map(md.partidos.map(p => [p.partido, p]));
         partidos = Object.entries(wi.partidoVotos).map(([p, v]) => ({
@@ -616,13 +654,31 @@
           electos: (orig.get(p) || {}).electos || [],
           orden_cerrada: (orig.get(p) || {}).orden_cerrada || false,
         })).sort((a, b) => b.curules - a.curules || b.votos_total - a.votos_total);
+      } else if(!isWhatIf && territorioActivo){
+        // INFO + filtro: muestra votos por partido del territorio (sin recalcular curules)
+        // Pinta los curules originales del mun para preservar el contexto del concejo.
+        const orig = new Map(md.partidos.map(p => [p.partido, p]));
+        partidos = Object.entries(wi.partidoVotos).map(([p, v]) => ({
+          partido: p, votos_total: v, curules: (orig.get(p) || {}).curules || 0,
+          pct: wi.votos_validos > 0 ? (v / wi.votos_validos * 100) : 0,
+          tipo_lista: (orig.get(p) || {}).tipo_lista || 'abierta',
+          candidatos: (orig.get(p) || {}).candidatos || [],
+          electos: (orig.get(p) || {}).electos || [],
+          orden_cerrada: (orig.get(p) || {}).orden_cerrada || false,
+        })).sort((a, b) => b.votos_total - a.votos_total);
       } else {
+        // INFO o WHATIF sin filtro → datos del mun completo (D'Hondt real)
         partidos = md.partidos;
       }
 
-      lbl.textContent = `Partidos · ${md.nombre} · ${fmt(md.curules)} curules · D'Hondt`;
-      badge.className = 'level-badge mun';
-      badge.textContent = 'Concejo';
+      const lblExtra = territorioActivo
+        ? (isWhatIf
+            ? ` · WHAT IF en ${wi.ambito} · D'Hondt recalculado`
+            : ` · ${wi.ambito} · votos del territorio`)
+        : ` · ${fmt(md.curules)} curules · D'Hondt`;
+      lbl.textContent = `Partidos · ${md.nombre}${lblExtra}`;
+      badge.className = 'level-badge ' + (isWhatIf ? 'pues' : 'mun');
+      badge.textContent = isWhatIf ? 'What If' : 'Concejo';
       thead.innerHTML = `<tr>
         <th></th>
         <th style="width:2.5rem">#</th>
@@ -634,7 +690,7 @@
       </tr>`;
       const banner = document.getElementById('hemiciclo-whatif');
       const lugarSpan = document.getElementById('whatif-lugar');
-      if(isWhatIf){ banner.style.display = 'block'; lugarSpan.textContent = wi.ambito; }
+      if(isWhatIf && territorioActivo){ banner.style.display = 'block'; lugarSpan.textContent = wi.ambito; }
       else { banner.style.display = 'none'; }
 
       const rows = partidos.map((p, i) => {
@@ -726,11 +782,12 @@
       const md = STATE.munData;
       if(!md){ return; }
       const wi = buildWhatIfScope();
-      const scopeVotos = wi ? wi.votos_validos : md.votos_validos;
-      const partidoVotos = wi ? wi.partidoVotos : Object.fromEntries(md.partidos.map(p => [p.partido, p.votos_total]));
-      const especiales = wi ? wi.especiales : (md.especiales || {});
+      const territorioActivo = wi && wi.filtered;
+      const scopeVotos = territorioActivo ? wi.votos_validos : md.votos_validos;
+      const partidoVotos = territorioActivo ? wi.partidoVotos : Object.fromEntries(md.partidos.map(p => [p.partido, p.votos_total]));
+      const especiales = territorioActivo ? wi.especiales : (md.especiales || {});
       let centerPct, centerSub;
-      if(!wi || !wi.filtered){
+      if(!territorioActivo){
         if(md.censo && md.votos_totales){
           centerPct = ((md.votos_totales / md.censo) * 100).toFixed(1) + '%';
           centerSub = 'participación';
@@ -827,14 +884,19 @@
       const md = STATE.munData;
       if(!md){ svg.innerHTML = ''; return; }
       const wi = buildWhatIfScope();
+      const isWhatIf = STATE.scope === 'WHATIF';
+      const territorioActivo = wi && wi.filtered;
       let partidoCurules;
-      if(wi && wi.filtered){
+      if(isWhatIf && territorioActivo){
+        // Recalcular D'Hondt con votos del territorio
         partidoCurules = dhondt(wi.partidoVotos, md.curules);
       } else {
+        // INFO sin filtro o con filtro: el hemiciclo muestra el concejo real del mun
         partidoCurules = Object.fromEntries(md.partidos.map(p => [p.partido, p.curules]));
       }
       const total = md.curules;
-      lbl.textContent = `Hemiciclo · ${total} curules · ${md.nombre}`;
+      const hemiSuf = (isWhatIf && territorioActivo) ? ` · WHAT IF: ${wi.ambito}` : '';
+      lbl.textContent = `Hemiciclo · ${total} curules · ${md.nombre}${hemiSuf}`;
 
       const seats = hemicicloSeats(total);
       const partidos = Object.entries(partidoCurules)
@@ -956,6 +1018,8 @@
       if(!cod){ renderAll(); return; }
       await loadConcejo(STATE.depCod, cod);
       renderAll();
+      // Drilear el mapa: si es ciudad grande mostramos comunas/localidades
+      if(conMap){ drillIntoMun(); }
     }
 
     function onZonaChange(cod){
@@ -988,7 +1052,8 @@
 
     function onScopeChange(sc){
       STATE.scope = sc;
-      document.getElementById('scope-btn-mun').classList.toggle('active', sc === 'MUN');
+      document.getElementById('scope-btn-info').classList.toggle('active', sc === 'INFO');
+      document.getElementById('scope-btn-whatif').classList.toggle('active', sc === 'WHATIF');
       document.getElementById('scope-btn-nacional').classList.toggle('active', sc === 'NACIONAL');
       renderAll();
     }
@@ -1015,10 +1080,86 @@
 
     // ─── Mapa Leaflet ──────────────────────────────────────────
     let conMap = null;
-    let conNacLayer = null, conDepLayer = null;
+    let conNacLayer = null, conDepLayer = null, conCityLayer = null;
     let _deptoGeoRaw = null;
+    let _cityGeoCache = {};
     const DEPTO_GEOJSON = `${MAPAS_S3}/DEPARTAMENTOS2.json`;
     const DEPTOS_MPS_URL = `${MAPAS_S3}/Departamentos-mps/`;
+    const BOGOTA_LOC_URL  = `${MAPAS_S3}/Ciudades-COM-LOC/BOG-LOCALIDADX.json`;
+    const MEDELLIN_COM_URL = `${MAPAS_S3}/Ciudades-COM-LOC/MEDELLINX.json`;
+    const CALI_COM_URL = `${MAPAS_S3}/Ciudades-COM-LOC/CALIX.json`;
+    const BARRANQUILLA_COM_URL = `${MAPAS_S3}/Ciudades-COM-LOC/BARRANQUILLAX.json`;
+    const IBAGUE_COM_URL = `${MAPAS_S3}/Ciudades-COM-LOC/IBAGUEX.json`;
+    const MANIZALES_COM_URL = `${MAPAS_S3}/Ciudades-COM-LOC/MANIZALESX.json`;
+    const PEREIRA_COM_URL = `${MAPAS_S3}/Ciudades-COM-LOC/PEREIRAX.json`;
+    const _to2 = v => (v != null && v !== '') ? String(parseInt(v, 10) || 0).padStart(2, '0') : '';
+    const CITY_MAPS = {
+      bogota:       { key:'bogota',       url:BOGOTA_LOC_URL,      rotate:true,
+                      code:p=>_to2(p.LocCodigo),                  name:p=>p.LocNombre||p.nombre||'Localidad' },
+      medellin:     { key:'medellin',     url:MEDELLIN_COM_URL,    rotate:false,
+                      code:p=>_to2(p.CODIGO),                     name:p=>p.NOMBRE||p.IDENTIFICACION||'Comuna' },
+      cali:         { key:'cali',         url:CALI_COM_URL,        rotate:false,
+                      code:p=>_to2(p.comuna),                     name:p=>p.nombre||`Comuna ${p.comuna}` },
+      barranquilla: { key:'barranquilla', url:BARRANQUILLA_COM_URL,rotate:false,
+                      code:p=>_to2(p.id),                         name:p=>p.nombre||'Localidad' },
+      ibague:       { key:'ibague',       url:IBAGUE_COM_URL,      rotate:false,
+                      code:p=>{const m=String(p.COMUNAS||'').match(/(\d+)/); return m?_to2(m[1]):'';},
+                      name:p=>p.COMUNAS||'Comuna' },
+      manizales:    { key:'manizales',    url:MANIZALES_COM_URL,   rotate:false,
+                      code:p=>_to2(p.ID_COMUNA),                  name:p=>p.NOMBRES_CO||'Comuna' },
+      pereira:      { key:'pereira',      url:PEREIRA_COM_URL,     rotate:false,
+                      code:_=>'',
+                      name:p=>p.Comuna||'Comuna' },
+    };
+    function rotateGeoJSON90Left(geoData){
+      const cx=-74.08, cy=4.65;
+      const rc=([lon,lat])=>[cx-(lat-cy), cy+(lon-cx)];
+      const rg=geom=>{
+        if(!geom) return geom;
+        if(geom.type==='Polygon') return {...geom, coordinates: geom.coordinates.map(r=>r.map(rc))};
+        if(geom.type==='MultiPolygon') return {...geom, coordinates: geom.coordinates.map(p=>p.map(r=>r.map(rc)))};
+        return geom;
+      };
+      return {...geoData, features: geoData.features.map(f=>({...f, geometry: rg(f.geometry)}))};
+    }
+    function detectCity(depCod, munCod, munName){
+      // Bogotá se detecta por depCod=16 (su único mun es 001).
+      if(String(depCod).padStart(2,'0') === '16') return CITY_MAPS.bogota;
+      if(!munName) return null;
+      const n = norm(munName);
+      if(/MEDELL/.test(n)) return CITY_MAPS.medellin;
+      if(/^CALI$|SANTIAGO DE CALI/.test(n)) return CITY_MAPS.cali;
+      if(/BARRANQUILLA/.test(n)) return CITY_MAPS.barranquilla;
+      if(/IBAGU/.test(n)) return CITY_MAPS.ibague;
+      if(/MANIZALES/.test(n)) return CITY_MAPS.manizales;
+      if(/PEREIRA/.test(n)) return CITY_MAPS.pereira;
+      return null;
+    }
+
+    // Calcula el partido líder por zona (zz) desde los puestos del mun
+    function buildLocComWinner(){
+      const pp = STATE.puestosData;
+      if(!pp || !pp.length) return {};
+      const byZona = {};
+      for(const r of pp){
+        if(!r.partidos_top) continue;
+        const z = _to2(r.zz);
+        if(!byZona[z]) byZona[z] = { partidos: {}, votos: 0 };
+        byZona[z].votos += (r.votos_validos || 0);
+        for(const p of r.partidos_top){
+          byZona[z].partidos[p.partido] = (byZona[z].partidos[p.partido] || 0) + p.votos;
+        }
+      }
+      const out = {};
+      const byName = {};
+      for(const [z, data] of Object.entries(byZona)){
+        const arr = Object.entries(data.partidos).sort((a,b) => b[1] - a[1]);
+        if(!arr.length) continue;
+        out[z] = { partido: arr[0][0], votos: arr[0][1], total: data.votos, zz: z };
+      }
+      out.__byName = byName;
+      return out;
+    }
 
     async function initMap(){
       if(conMap) return;
@@ -1027,6 +1168,10 @@
         dragging: true, doubleClickZoom: true, minZoom: 4, maxZoom: 11,
       }).setView([4.6, -74.1], 5);
       await buildNacionalLayer();
+      // Si arrancamos con un mun activo y es ciudad grande, drilear directo
+      if(STATE.munCod && STATE.munData){
+        await drillIntoMun();
+      }
     }
 
     async function buildNacionalLayer(){
@@ -1127,8 +1272,79 @@
     }
     async function mapBackToNacional(){
       if(conDepLayer){ conMap.removeLayer(conDepLayer); conDepLayer = null; }
+      if(conCityLayer){ conMap.removeLayer(conCityLayer); conCityLayer = null; }
       document.getElementById('con-map-back').style.display = 'none';
       await buildNacionalLayer();
+    }
+
+    // Drill al nivel mun cuando es ciudad grande (Bogotá / Medellín / Cali / etc.)
+    async function drillIntoMun(){
+      if(!conMap) return;
+      const md = STATE.munData;
+      if(!md){ return; }
+      const cfg = detectCity(STATE.depCod, STATE.munCod, md.nombre);
+      // Si no es ciudad con drilldown, limpia y centra en el depto
+      if(!cfg){
+        if(conCityLayer){ conMap.removeLayer(conCityLayer); conCityLayer = null; }
+        return;
+      }
+      // Limpiar capas previas
+      if(conNacLayer){ conMap.removeLayer(conNacLayer); conNacLayer = null; }
+      if(conDepLayer){ conMap.removeLayer(conDepLayer); conDepLayer = null; }
+      if(conCityLayer){ conMap.removeLayer(conCityLayer); conCityLayer = null; }
+      try{
+        // Cache de GeoJSON por ciudad
+        let geo = _cityGeoCache[cfg.key];
+        if(!geo){
+          geo = await fetchJSON(cfg.url);
+          if(cfg.rotate) geo = rotateGeoJSON90Left(geo);
+          _cityGeoCache[cfg.key] = geo;
+        }
+        const winners = buildLocComWinner();
+        const style = feat => {
+          const z = cfg.code(feat.properties);
+          const w = z ? winners[z] : null;
+          return {
+            fillColor: w ? getColor(w.partido) : '#444',
+            fillOpacity: w ? 0.78 : 0.35,
+            color: 'rgba(255,255,255,0.45)', weight: 0.9,
+          };
+        };
+        const onEach = (feat, layer) => {
+          const z = cfg.code(feat.properties);
+          const w = z ? winners[z] : null;
+          const nm = cfg.name(feat.properties);
+          if(w){
+            const pctLocal = w.total ? ((w.votos / w.total) * 100).toFixed(1) : '—';
+            layer.bindTooltip(`<div style="font-weight:700;color:#fff;margin-bottom:.3rem">${nm}</div><div>Líder: <b style="color:${getColor(w.partido)}">${w.partido.substr(0,40)}</b></div><div>${fmt(w.votos)} votos · ${pctLocal}% local</div>`, { sticky: true });
+          } else {
+            layer.bindTooltip(nm, { sticky: true });
+          }
+          layer.on('click', () => {
+            if(z){
+              const sel = document.getElementById('zona-select');
+              if(sel){
+                sel.value = z;
+                sel.dispatchEvent(new Event('change', { bubbles: true }));
+              }
+            }
+          });
+        };
+        conCityLayer = L.geoJSON(geo, { style, onEachFeature: onEach }).addTo(conMap);
+        conMap.fitBounds(conCityLayer.getBounds(), { padding: [12, 12] });
+        document.getElementById('con-map-back').style.display = 'block';
+        document.getElementById('con-map-back').onclick = mapBackToDepOrNac;
+      }catch(e){ console.warn('[drillIntoMun]', e); }
+    }
+
+    async function mapBackToDepOrNac(){
+      if(conCityLayer){ conMap.removeLayer(conCityLayer); conCityLayer = null; }
+      if(STATE.depCod){
+        await drillIntoDepto(STATE.depCod, false);
+      } else {
+        document.getElementById('con-map-back').style.display = 'none';
+        await buildNacionalLayer();
+      }
     }
 
     // ─── Buscador ─────────────────────────────────────────────
