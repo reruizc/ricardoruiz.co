@@ -238,7 +238,15 @@
           <span class="toggle-label">Visualizar:</span>
           <button class="toggle-btn active" data-view="candidato" onclick="setView('candidato')">Por candidato</button>
           <button class="toggle-btn" data-view="partido" onclick="setView('partido')">Por partido</button>
-          <button class="toggle-btn soon" data-view="bloque" onclick="showSoon()">Por bloque <span class="soon-tag">PRÓXIMAMENTE</span></button>
+          <button class="toggle-btn" data-view="bloque" onclick="setView('bloque')">Por bloque ideológico</button>
+        </div>
+        <div id="bloque-disclaimer" style="display:none;font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.06em;color:rgba(255,255,255,.42);background:rgba(0,71,255,.06);border-left:2px solid var(--blue);padding:.55rem .8rem;margin-bottom:1rem;line-height:1.5">
+          <b style="color:var(--blue)">Clasificación heurística.</b>
+          Bloque asignado por filiación nacional del partido y por curaduría
+          manual del ganador en las 31 capitales y alcaldías de alto perfil
+          que corrieron por coalición o MSC. Coaliciones locales sin filiación
+          clara quedan en "sin clasificar" (gris). No es una clasificación
+          académica ni un juicio político; es un mapa de lectura rápida.
         </div>
 
         <div class="sub-selector">
@@ -248,6 +256,12 @@
           </select>
           <select id="mun-select" class="dep-select" onchange="onMunChange(this.value)" disabled>
             <option value="">Todos los muns</option>
+          </select>
+          <select id="zon-select" class="dep-select" onchange="onZonChange(this.value)" disabled>
+            <option value="">Todas las zonas</option>
+          </select>
+          <select id="pue-select" class="dep-select" onchange="onPueChange(this.value)" disabled>
+            <option value="">Todos los puestos</option>
           </select>
           <button class="clear-btn" id="clear-btn" onclick="clearFilters()" style="display:none">× Limpiar</button>
         </div>
@@ -433,12 +447,141 @@
     if (!c || !c.nombre) return NO_PARTY;
     return hashColor(c.nombre);
   }
-  // Color del mapa según vista activa: candidato (por nombre) | partido (sigla) | bloque (próx)
+
+  // ─── Bloques ideológicos (heurística defendible) ─────
+  // Mapeo partido_normalizado → bloque, basado en filiación nacional 2022-2026.
+  // Para los ~80 alcaldes que corrieron por coaliciones/MSC se aplica un override
+  // por nombre del ganador (CAND_BLOQUE_OVERRIDE). Lo que no calce se marca
+  // como "sc" (sin clasificar) y se pinta gris. Disclaimer en el footer.
+  const BLOQUE_LABEL = {
+    izq: 'Izquierda',
+    ci:  'Centro-izquierda',
+    c:   'Centro',
+    cd:  'Centro-derecha',
+    d:   'Derecha',
+    sc:  'Sin clasificar',
+  };
+  const BLOQUE_COLOR = {
+    izq: '#dc2626',
+    ci:  '#f97316',
+    c:   '#fbbf24',
+    cd:  '#2563eb',
+    d:   '#003D7A',
+    sc:  '#64748b',
+  };
+  const BLOQUE_ORDER = ['izq','ci','c','cd','d','sc'];
+
+  const PARTIDO_BLOQUE = {
+    // izquierda
+    'PACTO HISTORICO': 'izq',
+    'PACTO HISTORICO BOGOTA': 'izq',
+    'PACTO HISTORICO COLOMBIA PUEDE': 'izq',
+    'COLOMBIA HUMANA-PACTO HISTORICO': 'izq',
+    'MOVIMIENTO POLITICO COLOMBIA HUMANA': 'izq',
+    'PARTIDO POLO DEMOCRATICO ALTERNATIVO': 'izq',
+    'UNION PATRIOTICA': 'izq',
+    'PARTIDO COMUNES': 'izq',
+    'PARTIDO POLITICO LA FUERZA DE LA PAZ': 'izq',
+    'MOVIMIENTO POLITICO FUERZA CIUDADANA': 'izq',
+    'MOVIMIENTO ALIANZA DEMOCRATICA AMPLIA': 'izq',
+    // centro-izquierda
+    'PARTIDO ALIANZA VERDE': 'ci',
+    'PARTIDO NUEVO LIBERALISMO': 'ci',
+    'PARTIDO VERDE OXIGENO': 'ci',
+    'AGRUPACION POLITICA EN MARCHA': 'ci',
+    'PARTIDO COLOMBIA RENACIENTE': 'ci',
+    'PARTIDO POLITICO ESPERANZA DEMOCRATICA': 'ci',
+    'PARTIDO POLITICO DIGNIDAD & COMPROMISO': 'ci',
+    // centro
+    'PARTIDO LIBERAL COLOMBIANO': 'c',
+    'PARTIDO DE LA UNION POR LA GENTE - PARTIDO DE LA U': 'c',
+    'PARTIDO DE LA U': 'c',
+    'PARTIDO DEMOCRATA COLOMBIANO': 'c',
+    'PARTIDO POLITICO GENTE EN MOVIMIENTO': 'c',
+    'PARTIDO ECOLOGISTA COLOMBIANO': 'c',
+    // centro-derecha
+    'PARTIDO CAMBIO RADICAL': 'cd',
+    'PARTIDO CONSERVADOR COLOMBIANO': 'cd',
+    'PARTIDO LIGA GOBERNANTES ANTICORRUPCION - LIGA': 'cd',
+    'MOVIMIENTO SALVACION NACIONAL': 'cd',
+    'MOVIMIENTO  SALVACION NACIONAL': 'cd',
+    // derecha
+    'PARTIDO CENTRO DEMOCRATICO': 'd',
+    'PARTIDO POLITICO CREEMOS': 'd',
+    'NUEVA FUERZA DEMOCRATICA': 'd',
+    // étnicos/indígenas: por convención sc (no encaja en eje izq-der nacional)
+    'MOVIMIENTO ALTERNATIVO INDIGENA Y SOCIAL "MAIS"': 'sc',
+    'MOVIMIENTO AUTORIDADES INDIGENAS DE COLOMBIA "AICO"': 'sc',
+    'PARTIDO ALIANZA SOCIAL INDEPENDIENTE "ASI"': 'sc',
+  };
+
+  // Overrides por NOMBRE NORMALIZADO del ganador (sustring match).
+  // Curado a mano para las 31 capitales + alcaldías de alto perfil que
+  // corrieron por coalición/MSC y cuya sigla no refleja su bloque real.
+  const CAND_BLOQUE_OVERRIDE = [
+    // izquierda
+    ['KRASNOV', 'izq'],                     // Tunja
+    // centro-izquierda
+    ['CARLOS FERNANDO GALAN', 'ci'],        // Bogotá (Nuevo Liberalismo)
+    ['ALVARO ALEJANDRO EDER', 'ci'],        // Cali (Revivamos Cali)
+    ['JOHANA XIMENA ARANDA', 'ci'],         // Ibagué (Ibagué Para Todos · apoyo Pacto)
+    ['MARLON MONSALVE', 'ci'],              // Florencia (Nuevo Liberalismo + En Marcha)
+    ['RAFAEL ANDRES BOLANOS', 'ci'],        // Quibdó (Alianza Verde)
+    ['JAIME ARIEL RODRIGUEZ', 'ci'],        // Puerto Carreño (Alianza Verde)
+    ['WILLY ALEJANDRO RODRIGUEZ', 'ci'],    // San José Guaviare (Nuevo Liberalismo)
+    ['ELQUIN JADRIAN UNI', 'ci'],           // Leticia (Colombia Renaciente)
+    ['MARCO ALIRIO PORRAS', 'ci'],          // Mitú (ASI indígena)
+    // centro
+    ['JUAN CARLOS MUNOZ BRAVO', 'c'],       // Popayán
+    ['NICOLAS MARTIN TORO', 'c'],           // Pasto (Alianza Ciudadana)
+    ['HUGO FERNANDO KERGUELEN', 'c'],       // Montería (Una Sola Montería)
+    ['JAMES PADILLA', 'c'],                 // Armenia (Armenia Con Más Oportunidades)
+    ['GERMAN CASAGUA', 'c'],                // Neiva (Acciones por Neiva)
+    ['MARCO TULIO RUIZ', 'c'],              // Yopal (Cambio Radical · perfil técnico c)
+    ['CARLOS HUGO PIEDRAHITA', 'c'],        // Mocoa (Alianza Ciudadana por Mocoa)
+    ['ARTURO ALEXANDER SANCHEZ', 'c'],      // Inírida (Una Nueva Historia)
+    ['ERNESTO MIGUEL OROZCO', 'c'],         // Valledupar (Arreglemos Esto)
+    ['GENARO DAVID REDONDO', 'c'],          // Riohacha (Genaro)
+    // centro-derecha
+    ['DUMEK JOSE TURBAY', 'cd'],            // Cartagena (Unidos para Avanzar · Conservadores)
+    ['JORGE ENRIQUE ACEVEDO', 'cd'],        // Cúcuta (Todos por Cúcuta)
+    ['ALEXANDER BAQUERO', 'cd'],            // Villavicencio (Recuperemos Villavo)
+    ['MAURICIO SALAZAR', 'cd'],             // Pereira (Primero Pereira)
+    ['JORGE EDUARDO ROJAS', 'cd'],          // Manizales (Rojas)
+    ['YAHIR FERNANDO ACUNA', 'cd'],         // Sincelejo (de la U + Acuña)
+    ['CARLOS ALBERTO PINEDO', 'cd'],        // Santa Marta (Santa Marta Sí Puede)
+    // derecha
+    ['FEDERICO ANDRES GUTIERREZ', 'd'],     // Medellín (Creemos)
+    ['JAIME ANDRES BELTRAN', 'd'],          // Bucaramanga (Defendamos · evangélico)
+    ['JUAN ALFREDO QUENZA', 'd'],           // Arauca (Nueva Fuerza Democrática)
+  ];
+
+  function bloqueForCandidato(g){
+    if (!g) return 'sc';
+    const name = norm(g.nombre || '');
+    for (const [pat, bl] of CAND_BLOQUE_OVERRIDE){
+      if (name.includes(pat)) return bl;
+    }
+    const part = (g.partido || '').toString().trim();
+    return PARTIDO_BLOQUE[part] || 'sc';
+  }
+  function colorForBloque(g){
+    return BLOQUE_COLOR[bloqueForCandidato(g)] || BLOQUE_COLOR.sc;
+  }
+
+  // Color del mapa según vista activa
   function colorForFeature(rec){
     if (!rec) return 'rgba(120,120,120,.18)';
     const g = rec.ganador || rec;
     if (currentView === 'partido') return colorForPartido(g.partido || rec.partido);
+    if (currentView === 'bloque')  return colorForBloque(g);
     return colorForCandidato(g);
+  }
+  // Color genérico para una fila de candidato según vista
+  function colorForRow(g){
+    if (currentView === 'partido') return colorForPartido(g.partido);
+    if (currentView === 'bloque')  return colorForBloque(g);
+    return hashColor(g.nombre);
   }
 
   // ─── Helpers ──────────────────────────────────────────
@@ -463,9 +606,9 @@
   };
 
   // ─── Estado global ────────────────────────────────────
-  let resumen, deptos, munsAll, deptoCache = {};
+  let resumen, deptos, munsAll, deptoCache = {}, puestosCache = {};
   let currentView = 'candidato';
-  let currentDep = '', currentMun = '';
+  let currentDep = '', currentMun = '', currentZon = '', currentPue = '';
   let alcMap = null, currentLayer = null, depGeoRaw = null;
   let donutChart = null;
   let depByName = {};   // {NOMBRE_NORM: depCod}
@@ -521,13 +664,20 @@
     deptoCache[dep] = res;
     return res;
   }
+  async function ensurePuestosLoaded(dep){
+    if (puestosCache[dep]) return puestosCache[dep];
+    const res = await fetch(`${BASE}/departamentos/${dep}/puestos.json`).then(r => r.json());
+    puestosCache[dep] = res;
+    return res;
+  }
 
   // ─── Selects en cascada ──────────────────────────────
   async function onDepChange(dep){
     currentDep = dep;
-    currentMun = '';
+    currentMun = ''; currentZon = ''; currentPue = '';
     const munSel = document.getElementById('mun-select');
     munSel.innerHTML = '<option value="">Todos los muns</option>';
+    resetZonPueSelects();
     if (!dep){ munSel.disabled = true; document.getElementById('clear-btn').style.display = 'none'; renderAll(); return; }
     const muns = await ensureDepLoaded(dep);
     const sorted = [...muns].sort((a,b) => a.nombre.localeCompare(b.nombre, 'es'));
@@ -543,14 +693,60 @@
   }
   async function onMunChange(mun){
     currentMun = mun;
+    currentZon = ''; currentPue = '';
+    resetZonPueSelects();
     document.getElementById('clear-btn').style.display = (currentDep || currentMun) ? '' : 'none';
+    if (mun && currentDep){
+      // Poblar zonas disponibles para este mun
+      try {
+        const puestos = await ensurePuestosLoaded(currentDep);
+        const zonas = [...new Set(puestos.filter(p => p.mun === mun).map(p => p.zz))].sort();
+        const zonSel = document.getElementById('zon-select');
+        for (const z of zonas){
+          const o = document.createElement('option');
+          o.value = z; o.textContent = 'Zona ' + z;
+          zonSel.appendChild(o);
+        }
+        zonSel.disabled = zonas.length === 0;
+      } catch(e){ console.warn('No puestos.json para dep', currentDep, e); }
+    }
     renderAll();
   }
+  async function onZonChange(zon){
+    currentZon = zon;
+    currentPue = '';
+    const pueSel = document.getElementById('pue-select');
+    pueSel.innerHTML = '<option value="">Todos los puestos</option>';
+    pueSel.disabled = true;
+    if (zon && currentDep && currentMun){
+      const puestos = await ensurePuestosLoaded(currentDep);
+      const pps = puestos.filter(p => p.mun === currentMun && p.zz === zon)
+                         .map(p => p.pp).sort();
+      for (const pp of pps){
+        const o = document.createElement('option');
+        o.value = pp; o.textContent = 'Puesto ' + pp;
+        pueSel.appendChild(o);
+      }
+      pueSel.disabled = pps.length === 0;
+    }
+    renderAll();
+  }
+  async function onPueChange(pue){
+    currentPue = pue;
+    renderAll();
+  }
+  function resetZonPueSelects(){
+    const zonSel = document.getElementById('zon-select');
+    const pueSel = document.getElementById('pue-select');
+    zonSel.innerHTML = '<option value="">Todas las zonas</option>'; zonSel.disabled = true;
+    pueSel.innerHTML = '<option value="">Todos los puestos</option>'; pueSel.disabled = true;
+  }
   function clearFilters(){
-    currentDep = ''; currentMun = '';
+    currentDep = ''; currentMun = ''; currentZon = ''; currentPue = '';
     document.getElementById('dep-select').value = '';
     document.getElementById('mun-select').innerHTML = '<option value="">Todos los muns</option>';
     document.getElementById('mun-select').disabled = true;
+    resetZonPueSelects();
     document.getElementById('clear-btn').style.display = 'none';
     renderAll();
   }
@@ -558,6 +754,7 @@
   function setView(v){
     currentView = v;
     document.querySelectorAll('.toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+    document.getElementById('bloque-disclaimer').style.display = (v === 'bloque') ? '' : 'none';
     renderAll();
   }
   function showSoon(){ document.getElementById('soon-modal').classList.add('show'); }
@@ -565,7 +762,19 @@
 
   // ─── Render unificado ────────────────────────────────
   async function renderAll(){
-    if (currentMun && currentDep){
+    if (currentPue && currentZon && currentMun && currentDep){
+      const puestos = await ensurePuestosLoaded(currentDep);
+      const p = puestos.find(x => x.mun === currentMun && x.zz === currentZon && x.pp === currentPue);
+      const muns = await ensureDepLoaded(currentDep);
+      const m = muns.find(x => x.mun === currentMun);
+      renderPuestoView(p, m);
+    } else if (currentZon && currentMun && currentDep){
+      const puestos = await ensurePuestosLoaded(currentDep);
+      const ppsZona = puestos.filter(x => x.mun === currentMun && x.zz === currentZon);
+      const muns = await ensureDepLoaded(currentDep);
+      const m = muns.find(x => x.mun === currentMun);
+      renderZonaView(ppsZona, m);
+    } else if (currentMun && currentDep){
       const muns = await ensureDepLoaded(currentDep);
       const m = muns.find(x => x.mun === currentMun);
       const munMeta = munsAll.find(x => x.dep === currentDep && x.mun === currentMun);
@@ -603,6 +812,9 @@
       // Tabla de partidos: # alcaldías + capitales + censo + votos
       const sorted = [...resumen.partidos].sort((a,b) => b.muns_ganados - a.muns_ganados || b.votos - a.votos).filter(p => p.muns_ganados > 0).slice(0, 40);
       html = '<div class="card-label">Partidos · por alcaldías ganadas</div>' + renderPartyRankingTable(sorted);
+    } else if (currentView === 'bloque'){
+      const agg = aggBloque(munsAll);
+      html = '<div class="card-label">Bloques · alcaldías ganadas</div>' + renderBloqueRankingTable(agg);
     }
     document.getElementById('ranking-area').innerHTML = html;
   }
@@ -627,8 +839,145 @@
     } else if (currentView === 'partido'){
       const ps = (d.partidos || []).sort((a,b) => b.muns - a.muns || b.votos_totales - a.votos_totales);
       html = `<div class="card-label">${d.nombre} · partidos</div>` + renderPartyRankingTable(ps.map(p => ({ partido: p.partido, votos: p.votos_totales, pct: 0, muns_ganados: p.muns, capitales_ganadas: 0, censo_gobernado: p.censo })));
+    } else if (currentView === 'bloque'){
+      const munsDep = munsAll.filter(m => m.dep === dep);
+      const agg = aggBloque(munsDep);
+      html = `<div class="card-label">${d.nombre} · bloques</div>` + renderBloqueRankingTable(agg);
     }
     document.getElementById('ranking-area').innerHTML = html;
+  }
+
+  // ─── Vista ZONA ────────
+  function renderZonaView(pps, mMeta){
+    if (!pps || !pps.length) return renderMunView(mMeta);
+    const sumVV  = pps.reduce((s,p) => s + (p.votos_validos || 0), 0);
+    const sumVT  = pps.reduce((s,p) => s + (p.votos_totales  || 0), 0);
+    const deptoName = (deptos.find(d => d.dep === currentDep) || {}).nombre || '';
+    setKPI(1, 'Puestos', fmtN(pps.length), '');
+    setKPI(2, 'Votos válidos', fmtN(sumVV), '');
+    setKPI(3, 'Votos totales', fmtN(sumVT), '');
+    // Ganador agregado de la zona
+    const win = winnerFromPuestos(pps);
+    setKPI(4, 'Ganador', win ? win.nombre.split(' ').slice(0,2).join(' ') : '—', win ? fmtPct(win.pct) : '');
+    document.getElementById('kpi4-v').classList.remove('gr'); document.getElementById('kpi4-v').classList.add('wh');
+    document.getElementById('kpi4-v').style.fontSize = '1.05rem'; document.getElementById('kpi4-v').style.lineHeight = '1.3';
+    setMeta('29 Oct 2023', `${mMeta ? mMeta.nombre : ''} · Zona ${currentZon}`, '', fmtN(sumVV));
+    setMapLabel(`${mMeta ? mMeta.nombre : ''} · Zona ${currentZon} · ${viewLabel()}`);
+    drawDonut({ votos_totales: sumVT, votos_validos: sumVV, censo: 0, especiales: {} });
+
+    // Ranking: puestos de la zona ordenados por núm. puesto
+    let html = `<div class="mun-detail">
+      <div class="mun-detail-title">${mMeta ? mMeta.nombre : ''} · Zona ${currentZon}</div>
+      <div class="mun-detail-sub">${deptoName} · ${pps.length} puestos</div>
+      <table class="ranking-table"><thead><tr><th>Puesto</th><th>Ganador</th><th class="r">Votos</th><th class="r">%</th></tr></thead><tbody>`;
+    const sorted = [...pps].sort((a,b) => a.pp.localeCompare(b.pp));
+    for (const p of sorted){
+      const g = (p.top && p.top[0]) || null;
+      const col = g ? colorForRow(g) : 'transparent';
+      const onClick = `goToPuesto('${p.zz}','${p.pp}')`;
+      html += `<tr style="cursor:pointer" onclick="${onClick}">
+        <td><div class="row-name"><span class="swatch" style="background:${col}"></span>Puesto ${p.pp}</div>
+          <div class="row-sub">${fmtN(p.votos_validos)} válidos</div></td>
+        <td>${g ? `<div class="cand-name" style="font-size:.72rem">${g.nombre.split(' ').slice(0,3).join(' ')}</div>
+          <div class="cand-party" style="font-size:.56rem">${(g.partido || '—').slice(0,28)}</div>` : '—'}</td>
+        <td class="r"><span class="num">${g ? fmtN(g.votos) : '—'}</span></td>
+        <td class="r"><span class="pct">${g ? fmtPct(g.pct) : '—'}</span></td>
+      </tr>`;
+    }
+    html += '</tbody></table></div>';
+    document.getElementById('ranking-area').innerHTML = html;
+  }
+
+  // ─── Vista PUESTO (drill final) ────────
+  function renderPuestoView(p, mMeta){
+    if (!p) return renderMunView(mMeta);
+    const deptoName = (deptos.find(d => d.dep === currentDep) || {}).nombre || '';
+    setKPI(1, 'Votos válidos', fmtN(p.votos_validos), '');
+    setKPI(2, 'Votos totales', fmtN(p.votos_totales), '');
+    setKPI(3, 'Candidatos', fmtN((p.top || []).length), '');
+    const g = (p.top || [])[0];
+    setKPI(4, 'Ganador', g ? g.nombre.split(' ').slice(0,2).join(' ') : '—', g ? fmtPct(g.pct) : '');
+    document.getElementById('kpi4-v').classList.remove('gr'); document.getElementById('kpi4-v').classList.add('wh');
+    document.getElementById('kpi4-v').style.fontSize = '1.05rem'; document.getElementById('kpi4-v').style.lineHeight = '1.3';
+    setMeta('29 Oct 2023', `${mMeta ? mMeta.nombre : ''} · Zona ${p.zz} · Puesto ${p.pp}`, '', fmtN(p.votos_validos));
+    setMapLabel(`${mMeta ? mMeta.nombre : ''} · Zona ${p.zz} · Puesto ${p.pp}`);
+    drawDonut({ votos_totales: p.votos_totales, votos_validos: p.votos_validos, censo: 0, especiales: p.especiales || {} });
+
+    let html = `<div class="mun-detail">
+      <div class="mun-detail-title">Puesto ${p.pp} · Zona ${p.zz}</div>
+      <div class="mun-detail-sub">${deptoName} · ${mMeta ? mMeta.nombre : ''}</div>`;
+    const cands = (p.top || []).slice(0, 10);
+    for (let i = 0; i < cands.length; i++){
+      const c = cands[i];
+      const col = colorForRow(c);
+      html += `<div class="cand-row">
+        <div class="cand-rank">${i+1}</div>
+        <div>
+          <div class="cand-name"><span class="swatch" style="background:${col}"></span>${c.nombre}</div>
+          <div class="cand-party">${c.partido || '—'}</div>
+        </div>
+        <div>
+          <div class="cand-pct">${fmtPct(c.pct)}</div>
+          <div class="cand-votos">${fmtN(c.votos)}</div>
+        </div>
+      </div>`;
+    }
+    html += '</div>';
+    document.getElementById('ranking-area').innerHTML = html;
+  }
+  function winnerFromPuestos(pps){
+    // Suma de votos por (nombre, partido) cross-puestos → top
+    const agg = new Map();
+    let totalV = 0;
+    for (const p of pps){
+      for (const c of (p.top || [])){
+        const k = c.nombre + '||' + (c.partido || '');
+        const cur = agg.get(k) || { nombre: c.nombre, partido: c.partido, votos: 0 };
+        cur.votos += c.votos || 0;
+        agg.set(k, cur);
+        totalV += c.votos || 0;
+      }
+    }
+    if (!agg.size) return null;
+    const arr = [...agg.values()].sort((a,b) => b.votos - a.votos);
+    const top = arr[0];
+    return { ...top, pct: totalV ? (top.votos / totalV * 100) : 0 };
+  }
+
+  function goToPuesto(zz, pp){
+    document.getElementById('zon-select').value = zz;
+    onZonChange(zz).then(() => {
+      document.getElementById('pue-select').value = pp;
+      onPueChange(pp);
+    });
+  }
+
+  // ─── Agregación por bloque (para rankings) ────────
+  function aggBloque(muns){
+    const agg = {};
+    for (const b of BLOQUE_ORDER) agg[b] = { bloque: b, muns: 0, censo: 0, capitales: 0 };
+    for (const m of muns){
+      const b = bloqueForCandidato(m.ganador);
+      agg[b].muns += 1;
+      agg[b].censo += (m.censo || 0);
+      if (m.es_capital) agg[b].capitales += 1;
+    }
+    return BLOQUE_ORDER.map(b => agg[b]).filter(x => x.muns > 0)
+      .sort((a,b) => b.muns - a.muns);
+  }
+  function renderBloqueRankingTable(rows){
+    let h = '<table class="ranking-table"><thead><tr><th>Bloque</th><th class="r">Muns</th><th class="r">Censo gob.</th></tr></thead><tbody>';
+    for (const r of rows){
+      const col = BLOQUE_COLOR[r.bloque];
+      h += `<tr>
+        <td><div class="row-name"><span class="swatch" style="background:${col}"></span>${BLOQUE_LABEL[r.bloque]}</div>
+          ${r.capitales ? `<div class="row-sub">${r.capitales} capital${r.capitales > 1 ? 'es' : ''}</div>` : ''}</td>
+        <td class="r"><span class="num">${fmtN(r.muns)}</span></td>
+        <td class="r"><span class="num">${fmtN(r.censo)}</span></td>
+      </tr>`;
+    }
+    h += '</tbody></table>';
+    return h;
   }
 
   // ─── Vista MUN (drill final) ────────
@@ -653,7 +1002,7 @@
     const cands = mFull.candidatos.slice(0, 10);
     for (let i = 0; i < cands.length; i++){
       const c = cands[i];
-      const col = currentView === 'partido' ? colorForPartido(c.partido) : hashColor(c.nombre);
+      const col = colorForRow(c);
       html += `<div class="cand-row">
         <div class="cand-rank">${i+1}</div>
         <div>
@@ -669,14 +1018,18 @@
     html += '</div>';
     document.getElementById('ranking-area').innerHTML = html;
   }
-  function viewLabel(){ return currentView === 'partido' ? 'por partido ganador' : 'por candidato ganador'; }
+  function viewLabel(){
+    if (currentView === 'partido') return 'por partido ganador';
+    if (currentView === 'bloque')  return 'por bloque ideológico';
+    return 'por candidato ganador';
+  }
 
   // ─── Tablas de ranking ────────
   function renderCandRankingTable(rows){
     let h = '<table class="ranking-table"><thead><tr><th>Municipio</th><th class="r">Votos</th><th class="r">%</th></tr></thead><tbody>';
     for (const r of rows){
       const g = r.ganador;
-      const col = currentView === 'partido' ? colorForPartido(g.partido) : hashColor(g.nombre);
+      const col = colorForRow(g);
       const muncss = (r.es_capital ? ' ★' : '');
       const onClick = `goToMun('${r.dep}','${r.mun}')`;
       h += `<tr style="cursor:pointer" onclick="${onClick}">
@@ -810,10 +1163,11 @@
     if (!alcMap) return;
     clearLayer();
     if (currentMun && currentDep){
-      // Vista mun: capa del depto pero zoom al mun
+      // Vista mun (o zona/puesto): capa del depto con zoom al mun
       await renderDepLayer(currentDep, currentMun);
       document.getElementById('map-back-btn').classList.add('show');
-      document.getElementById('map-back-btn').textContent = '← Departamento';
+      document.getElementById('map-back-btn').textContent =
+        currentPue ? '← Zona' : (currentZon ? '← Municipio' : '← Departamento');
     } else if (currentDep){
       await renderDepLayer(currentDep);
       document.getElementById('map-back-btn').classList.add('show');
@@ -838,11 +1192,21 @@
     currentLayer = L.geoJSON(depGeoRaw, {
       style: f => {
         const d = _depFromFeature(f);
-        const dominant = d && d.partidos && d.partidos[0] ? d.partidos[0].partido : null;
-        return {
-          fillColor: dominant ? colorForPartido(dominant) : 'rgba(120,120,120,.2)',
-          fillOpacity: 0.78, color: themeStroke(), weight: 0.6,
-        };
+        let fill = 'rgba(120,120,120,.2)';
+        if (d){
+          if (currentView === 'bloque'){
+            // Color del bloque del candidato más votado del depto
+            const top = d.top_candidatos && d.top_candidatos[0];
+            if (top) fill = colorForBloque(top);
+          } else if (currentView === 'partido'){
+            const dominant = d.partidos && d.partidos[0] ? d.partidos[0].partido : null;
+            if (dominant) fill = colorForPartido(dominant);
+          } else {
+            const top = d.top_candidatos && d.top_candidatos[0];
+            if (top) fill = hashColor(top.nombre);
+          }
+        }
+        return { fillColor: fill, fillOpacity: 0.78, color: themeStroke(), weight: 0.6 };
       },
       onEachFeature: (f, lyr) => {
         const d = _depFromFeature(f);
@@ -887,6 +1251,8 @@
   function renderHoverDetailMun(m){
     const top = m.candidatos && m.candidatos[0];
     const part = m.votos_totales && m.censo ? (m.votos_totales / m.censo * 100) : null;
+    const bl = top ? bloqueForCandidato(top) : null;
+    const blChip = bl ? `<span style="display:inline-block;font-family:'DM Mono',monospace;font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;background:${BLOQUE_COLOR[bl]};color:#fff;padding:.18rem .45rem;margin-top:.4rem">${BLOQUE_LABEL[bl]}</span>` : '';
     const html = `<div class="tt-title">${m.nombre}${m.es_capital ? ' ★' : ''}</div>
       <div class="tt-row"><span>Censo</span><b>${fmtN(m.censo)}</b></div>
       <div class="tt-row"><span>Válidos</span><b>${fmtN(m.votos_validos)}</b></div>
@@ -895,6 +1261,7 @@
         <div class="tt-row"><span>Ganador</span><b></b></div>
         <div class="tt-cand">${top.nombre}</div>
         <div class="tt-party">${top.partido || '—'}</div>
+        ${blChip}
         <div class="tt-pct">${fmtPct(top.pct)}</div>
         <div class="tt-votos">${fmtN(top.votos)} votos</div>` : ''}`;
     document.getElementById('hover-card-label').textContent = 'Municipio';
@@ -920,7 +1287,7 @@
         const m = matchMun(f.properties, byMun, byMunName);
         const g = m ? m.candidatos[0] : null;
         return {
-          fillColor: g ? (currentView === 'partido' ? colorForPartido(g.partido) : hashColor(g.nombre)) : 'rgba(120,120,120,.18)',
+          fillColor: g ? colorForRow(g) : 'rgba(120,120,120,.18)',
           fillOpacity: 0.78, color: themeStroke(), weight: 0.5,
         };
       },
@@ -981,8 +1348,24 @@
     return null;
   }
   function mapBack(){
-    if (currentMun){ currentMun = ''; document.getElementById('mun-select').value = ''; renderAll(); }
-    else if (currentDep){ clearFilters(); }
+    if (currentPue){
+      currentPue = '';
+      const ps = document.getElementById('pue-select'); ps.value = '';
+      renderAll();
+    } else if (currentZon){
+      currentZon = '';
+      const zs = document.getElementById('zon-select'); zs.value = '';
+      const ps = document.getElementById('pue-select');
+      ps.innerHTML = '<option value="">Todos los puestos</option>'; ps.disabled = true;
+      renderAll();
+    } else if (currentMun){
+      currentMun = '';
+      document.getElementById('mun-select').value = '';
+      resetZonPueSelects();
+      renderAll();
+    } else if (currentDep){
+      clearFilters();
+    }
   }
 
   // ─── Boot ─────────────────────
