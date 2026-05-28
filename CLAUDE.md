@@ -19,6 +19,7 @@
 - `lab-informe.js` — **Sprint G** · helpers + generador PDF/MD del informe combinado del lab. Lee los 6 localStorage keys y produce un memo CONPES integrado. Cargado solo desde el hub.
 - `lab-indicadores.js` — **Sprint E (Fase A)** · helper de indicadores municipales oficiales con panel temporal 2018-2024. 8 indicadores × 1.108 municipios desde datos.gov.co (Policía Nacional + MEN). API lookupMun/getSerie/searchMun/matchIndicadorByKeyword. Cargado por analisis-estructural, problema-publico, ain y evaluacion.
 - `prospect-escenarios.html` — **Sprint F + F v2** · séptimo módulo del lab. Escenarios prospectivos por método de los ejes de incertidumbre (Schwartz · GBN), prospectiva estratégica francesa (Godet · Mojica · LIPSOR) y Robust Decision Making (Lempert · RAND). 4 mecánicas: incertidumbres críticas (auto-suggest desde MicMac) · narrativa de 4 cuadrantes · cross-impact con variables/actores/alternativas (Gordon 1968) · decisiones no-regret + señales tempranas. Cloud-save + 2 acciones IA copiloto (sugerir-ejes Pro · narrar-escenarios Premium) + 3 exports (memo .md + matriz .csv + ficha .pdf jsPDF). Integrado al informe combinado del lab (sección 8). LISTO (Sprint F + F v2).
+- `comunicar.html` — **Sprint H · v1** · **octavo módulo del lab**. Plan de comunicación de la política pública. 8 mecánicas: contexto + alcance · audiencias (mín 2 / máx 6) · mensaje clave (primario ≤15 palabras + 3 secundarios + valores) · narrativa pública Ganz (Story of Self/Us/Now) · framing Lakoff + Shenker-Osorio (valor central, palabras propias vs adversario) · matriz audiencia × canal con heurística BIT EAST · vocería principal + multiplicadores · cronograma 4 fases + medición OCDE 9-dim. STATE en `localStorage['comunicar-current-v1']`. 3 exports: plan .md, matriz .csv (audiencia×canal + KPIs), guía de mensajes .md para vocería. Auto-import desde PP/Ev/Alt/AIN. Marco metodológico: OCDE Public Communication Report 2021 · CLAD Carta Iberoamericana de Gobierno Abierto 2016 · MIPG · Función Pública (Decreto 1499/2017, Manual v6 dic 2024) · Ley 1712 de 2014 · Ganz · Lakoff 2024 · Anat Shenker-Osorio · BIT EAST 2024 · Stone · Omar Rincón. **Cloud-save y copiloto IA quedan pendientes para v2** (mismo patrón que prospect v1: solo localStorage). LISTO (Sprint H v1).
 - `pricing.html` — planes (Básico / Pro 39.900 COP · Premium 99.900 COP · Personalizado)
 - `lang.js` — i18n (co/us/cn); `CLAUDE.md` vive en la raíz del repo
 
@@ -3210,15 +3211,221 @@ Ya desplegado en producción.
 4. Frontend: nueva función `iaNueva()` en analisis-estructural.html
    con loading state, plan gate y render del resultado.
 
+### Sprint H · Comunicar la política (octavo módulo del lab)
+
+Octavo módulo. Plan operativo de comunicación pública para una política
+diseñada/evaluada/implementada/en crisis. **v1 sin worker** (igual que
+prospect v1): solo localStorage, cloud-save y copiloto IA quedan para
+v2 cuando se aprueben los endpoints `/comunicar/*` en `rr-auth`.
+
+Vive en `comunicar.html` (~119 KB · 2.050 líneas, chasis y look idéntico
+a `ain.html` y `prospect-escenarios.html`).
+
+**Marco metodológico convergente (5 escuelas):**
+- **OCDE · Public Communication Report 2021** (`Reaching Out and
+  Reaching In`). De ahí salen las **9 dimensiones de medición**
+  (alcance · engagement · atención · comprensión · satisfacción · apoyo
+  · cambio actitudinal · intención · comportamiento). Ver también
+  *Accessible and Inclusive Public Communication* (OCDE WP 54, 2022).
+- **CLAD Carta Iberoamericana de Gobierno Abierto 2016** (firmada en
+  Bogotá). Marco regional común a 22 países iberoamericanos.
+- **Colombia · Función Pública · MIPG Dimensión 5** "Información y
+  Comunicación" (Decreto 1499/2017 + Manual Operativo v6 dic 2024).
+  Y **Ley 1712 de 2014** (transparencia + lenguaje claro).
+- **Marshall Ganz** (Harvard Kennedy School) · Public Narrative
+  *Self/Us/Now*. La narrativa es traducción de valores en acción
+  colectiva.
+- **George Lakoff** (UC Berkeley) · *Don't Think of an Elephant!* ed.
+  2024 (framing). **Anat Shenker-Osorio** · ASO Communications · *Words
+  To Win By* (priming experiments + dial surveys). **BIT EAST framework**
+  (UK Behavioural Insights Team, 2014 rev. 2024): Easy · Attractive ·
+  Social · Timely. **Deborah Stone** · *Policy Paradox* (Counting ·
+  Causation · Comparison). **Omar Rincón** (UniAndes · CESPA) ·
+  narrativas mediáticas en Colombia.
+
+**8 mecánicas operativas + welcome + results:**
+
+1. **`stage-contexto`** — Nombre de la política · fase del ciclo
+   (`diseno`/`evaluacion`/`implementacion`/`crisis`) · enunciado breve ·
+   objetivo comunicacional (informar/persuadir/movilizar/dar cuenta/
+   defender/co-crear) · horizonte (1m/3m/6m/12m/multi) · territorio.
+   Banner "Importar desde PP/Ev/Alt/AIN" lee los `localStorage`
+   correspondientes y precarga el `enunciado`.
+2. **`stage-audiencias`** — Mín 2 / máx 6. Cada una con `nombre · perfil
+   · prioridad (alta/media/baja) · conocimiento previo · tono`. Botón
+   "Cargar audiencias típicas" siembra 6 audiencias sector público
+   (ciudadanía afectada · medios · concejo/asamblea · sociedad civil ·
+   academia · equipo interno).
+3. **`stage-mensaje`** — Primario ≤15 palabras (counter en vivo) +
+   3 secundarios (BBC Editorial Guidelines / Frank Luntz / ASO) +
+   promesa concreta + evidencia principal + 2-5 valores invocados
+   desde un dropdown de 15 valores universales.
+4. **`stage-narrativa`** — 3 textareas Ganz: Story of Self · Story of
+   Us · Story of Now. Hint en cada una con plantilla.
+5. **`stage-framing`** — Valor central · metáfora dominante · chips de
+   palabras propias (≤16) · chips de palabras del adversario (≤16, NO
+   repetir, regla Lakoff 1) · cómo romper el encuadre adversario.
+6. **`stage-canales`** — 14 canales pre-cargados en el catálogo
+   (medios trad · redes Meta · X · TikTok · YouTube · WhatsApp · web
+   oficial · email · territorial · eventos · sociedad civil · influencers
+   · gremios · academia). Pills para seleccionar (mín 3, máx 10). Luego
+   matriz audiencia × canal con celdas que ciclan 0→1→2→3 (apoyo/
+   principal/saturación). Textarea notas EAST por canal principal.
+7. **`stage-voceria`** — Vocero principal (nombre + rol + justificación)
+   + hasta 8 multiplicadores con tipo (académico/gremial/territorial/
+   medios/sociedad civil/celebridad/político aliado) + audiencia que
+   cubre + riesgos de vocería + plan B.
+8. **`stage-cronograma`** — 4 fases (pre-lanzamiento · lanzamiento ·
+   mantenimiento · evaluación) + grid de 9 KPIs (uno por dimensión
+   OCDE: alcance/engagement/atención/comprensión/satisfacción/apoyo/
+   actitudinal/intención/comportamiento) con nombre/meta/fuente
+   editables + plan de monitoreo + triggers de ajuste.
+
+**STATE shape:**
+```js
+STATE = {
+  step: 1,
+  contexto: { politica, fase, enunciado, objetivo, horizonte,
+              dep_cod, dep_nombre, mun_cod, mun_nombre,
+              importedFromPP, importedFromEv, importedFromAin, importedFromAlt },
+  audiencias: [{ nombre, perfil, prioridad, tono, conocimiento }],
+  mensaje: { primario, secundarios:[...], promesa, evidencia, valores:[...] },
+  narrativa: { self, us, now },
+  framing: { valor, metafora, encuadre_evitar,
+             palabras_propias:[...], palabras_adversario:[...] },
+  canales: { seleccionados:[...], matriz:{[aId]:{[cId]:0-3}}, notas_east },
+  voceria: { vocero:{nombre,rol,justifica},
+             multiplicadores:[{nombre,tipo,audiencia}], riesgos },
+  cronograma: { fase_pre, fase_lanzamiento, fase_mantenimiento, fase_evaluacion },
+  medicion:   { kpis:{[dimId]:{nombre,meta,fuente}}, plan_monitoreo, triggers_ajuste }
+}
+```
+Persistido en `localStorage['comunicar-current-v1']`. `loadState()`
+defensivo (merge contra defaults, sesiones previas siguen funcionando).
+
+**Exports (3 entregables):**
+- `downloadPlanMD()` — plan estructurado en 9 secciones (contexto ·
+  audiencias · mensaje · narrativa · framing · canales · vocería ·
+  cronograma · medición OCDE 9-dim) con footer metodológico.
+- `downloadMatrizCSV()` — CSV con 2 bloques: matriz audiencia × canal
+  + tabla KPIs OCDE 9-dim (dimensión, kpi, meta, fuente).
+- `downloadGuiaMensajesMD()` — guía operativa para el vocero y prensa
+  con mensaje primario destacado, 3 secundarios, narrativa Ganz en 90s,
+  lenguaje (decimos · NO repetimos · valor central · metáfora) y plan
+  de respuesta al frame adversario.
+
+**Hub integrado** (`analisis-estructural.html`):
+- Card #8 agregada al `hub-grid` (tag "OCDE 2021 · CLAD · MIPG · Ganz ·
+  Lakoff · EAST").
+- `HUB_MODULES.comunicar = { name:'Comunicar la política', href:'comunicar.html' }`.
+- Eyebrow del hub pasa de "7 módulos integrados" → "8".
+- Closing paragraph del hub explica el encadenamiento completo de los
+  8 módulos.
+
+**Cross-links amarillos hacia comunicar desde:**
+- `problema-publico.html` · stage-results · "¿Y cómo se va a contar
+  esta política al público?"
+- `mactor.html` · stage-results · "¿Cómo le hablamos a cada uno de
+  estos actores?"
+- `evaluacion.html` · stage-results · "¿Cómo se comunican los
+  resultados de esta evaluación?"
+- `alternativas.html` · stage-results · "¿Cómo defiendes en público
+  la alternativa elegida?"
+- `ain.html` · stage-results · "¿Cómo le explicas la norma a quienes
+  regulas?" (cita Ley 1712 transparencia + lenguaje claro)
+- `prospect-escenarios.html` · stage-results · "¿Cómo cuentas estos
+  escenarios al equipo, los aliados y la ciudadanía?"
+- `analisis-estructural.html` · stage-results · "¿Cómo le explicas el
+  mapa del sistema a quien decide?"
+
+Además todos los módulos que ya tenían cross-link al informe combinado
+actualizaron el texto de "6 módulos" / "7 módulos" → "8 módulos
+(problema · sistema · actores · alternativas · AIN · evaluación ·
+escenarios · comunicar)".
+
+**Integración a `lab-informe.js` (sección 9 nueva):**
+- Helper `_resumenComunicar(s)` que extrae política, fase, objetivo,
+  nAud, audPrioAlta, mensaje primario, secundarios, narrativa Ganz
+  (con flag `completa: ganzListos === 3`), framing, canales activos,
+  vocería y nKpis OCDE.
+- `getLabState()` agrega `comunicar: {exists, data, resumen}` leyendo
+  `localStorage['comunicar-current-v1']`.
+- `countActiveModules()` ahora cuenta hasta 8 (`pp`, `micmac`, `mactor`,
+  `ev`, `alt`, `ain`, `prospect`, `comunicar`).
+- `buildResumenEjecutivo()` agrega una línea sobre el plan de
+  comunicación cuando tiene contenido.
+- **Sección 9 nueva** en el MD y PDF del informe combinado:
+  `## 9. Plan de comunicación de la política` con política/fase,
+  audiencias prioritarias, mensaje primario, secundarios, promesa,
+  evidencia, valores, narrativa Ganz, framing (valor + propias +
+  adversario), canales activos, vocería y medición OCDE 9-dim.
+- **Sección 10 "Próximos pasos operativos"** (antes era la 9). Sugerencias
+  derivadas: completar audiencias si <2 · completar Ganz si listos<3 ·
+  definir vocero si vacío · diseñar el plan si pp.exists pero
+  comunicar.isEmpty.
+- Footer metodológico extendido con las 5 escuelas de comunicación.
+
+**Catálogo `lab-recursos.js`:**
+- +12 recursos nuevos con tag `comunicar`: OCDE Public Communication
+  Report 2021 · OCDE Accessible and Inclusive 2022 · CLAD Carta
+  Iberoamericana 2016 · MIPG Política de Comunicación · Ley 1712 ·
+  Ganz Public Narrative MLD-355 · Leading Change Network · Lakoff
+  *Don't Think of an Elephant!* 2024 · ASO *Words To Win By* · BIT
+  EAST 2024 · Omar Rincón (Academia.edu UniAndes) · Stone *Policy
+  Paradox* · Narrative Arts (Public Narrative en español).
+- Tag `comunicar` añadido también a recursos preexistentes pertinentes
+  (Función Pública AIN).
+
+**`renderInformeSection` en `analisis-estructural.html`:**
+- Counter pasa de "X / 6 módulos" → "X / 8 módulos".
+- Array `order` ahora incluye los 8 módulos en orden lógico (PP →
+  MicMac → Mactor → Alt → AIN → Ev → Prospect → Comunicar). Antes
+  estaba bug-fix oculto: prospect tampoco estaba en el grid del
+  informe combinado del hub, quedó arreglado en este sprint.
+- `_informeSnippet` ahora maneja `prospect` (noRegret, ejes) y
+  `comunicar` (nAud + primario, o política + fase).
+
+**Pendiente para v2 (cuando se autorice deploy del worker):**
+- 7 endpoints `/comunicar/*` en `rr-auth` (list, save, load, delete,
+  invite, accept, copiloto) espejo del patrón `/prospect/*` o `/ain/*`.
+- Validación dura en `/comunicar/save`: ≤6 audiencias, mensaje primario
+  ≤300 chars, ≤16 palabras propias/adversario, ≤10 canales activos,
+  matriz audiencia×canal con valores ∈ {0,1,2,3}, ≤8 multiplicadores,
+  tipos de multiplicador whitelisted, 9 KPIs OCDE.
+- 3 acciones IA copiloto recomendadas:
+  - `sugerir-audiencias` (Pro+) · DeepSeek V4 Flash · 4-6 audiencias
+    típicas adaptadas al contexto (Pacto Histórico vs CD cambian los
+    segmentos relevantes).
+  - `validar-mensaje` (Premium+) · chequea el mensaje primario con
+    heurística ASO (valor antes que política · 15 palabras máx · verbo
+    de acción · beneficio claro).
+  - `narrativa-ganz` (Premium+) · sugiere borrador de Story of Self/Us/Now
+    a partir del enunciado, valores y framing.
+- UI del cloud-bar ya existe (en `cloud-bar-flow`), está marcada como
+  *anon* (amarilla) con texto "Trabajando local · cloud-save y
+  copiloto IA llegan en v2" y un botón "↓ Backup .json" para exportar
+  el state completo. Replicar `loadUserFromAPI`/`renderAuthChip`/
+  `cloudSave`/`cloudLoad`/`openInviteModal` del patrón de `ain.html`
+  cuando se prenda v2.
+
+**PDFs metodología pendientes (v2):**
+- `Bases de datos/comunicar/metodologia-paso-a-paso.pdf` (~16 KB ·
+  9 secciones operativas · pipeline en `tools/build-comunicar-docs/`).
+- `Bases de datos/comunicar/respaldo-academico.pdf` (~16 KB · marco +
+  ~30 referencias).
+- Subir a S3 `bases de datos/comunicar/*`.
+
 ### Backlog del lab
 
-> **📌 HANDOFF PARA PRÓXIMA CONVERSACIÓN · Estado al 2026-05-27:**
+> **📌 HANDOFF PARA PRÓXIMA CONVERSACIÓN · Estado al 2026-05-28:**
 >
-> El Lab está **LISTO** (10 sprints cerrados: A · B · B v2 · C · D ·
-> E Fase A · F · F v2 · G · varias V de Veleta y C de Cámara). 7
-> módulos operativos con cloud-save, copiloto IA DeepSeek (21
-> acciones), informe combinado y 8 indicadores municipales con panel
-> 2018-2024.
+> El Lab está **LISTO con 8 módulos** (11 sprints cerrados: A · B ·
+> B v2 · C · D · E Fase A · F · F v2 · G · H v1 · varias V de Veleta
+> y C de Cámara). 7 módulos operativos con cloud-save + copiloto IA
+> DeepSeek (21 acciones) + informe combinado (sección 9 nueva con
+> comunicar) + 8 indicadores municipales con panel 2018-2024.
+> Octavo módulo **comunicar** entregado v1 solo localStorage (sin
+> worker, sin copiloto).
 >
 > **ÚNICO PENDIENTE explícito del Lab: Sprint E Fase B** — agregar 8
 > indicadores municipales más (IPM, NBI, agua, internet, mortalidad

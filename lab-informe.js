@@ -542,6 +542,77 @@
     };
   }
 
+  // COMUNICAR — resumen del plan de comunicación pública
+  function _resumenComunicar(s) {
+    if (!s) return { isEmpty:true };
+    const c = s.contexto || {};
+    const m = s.mensaje || {};
+    const n = s.narrativa || {};
+    const fr = s.framing || {};
+    const v = s.voceria || {};
+    const cr = s.cronograma || {};
+    const me = s.medicion || {};
+    const audiencias = _arrSafe(s.audiencias);
+    const tienePol = _nonEmpty(c.politica);
+    const tieneMsg = _nonEmpty(m.primario);
+    if (!tienePol && !tieneMsg && !audiencias.length &&
+        !_nonEmpty(n.self) && !_nonEmpty(n.us) && !_nonEmpty(n.now) &&
+        !_nonEmpty(fr.valor) && !_nonEmpty(v.vocero && v.vocero.nombre)) {
+      return { isEmpty:true };
+    }
+    const FASE_LBL = { diseno:'Diseño', evaluacion:'Evaluación', implementacion:'Implementación', crisis:'Crisis' };
+    const audPrioAlta = audiencias.filter(a => a && a.prioridad === 'alta').length;
+    const audResumen = audiencias.map(a => ({
+      nombre: String(a.nombre || '—').trim(),
+      prioridad: a.prioridad || '—',
+      tono: a.tono || '—',
+      conocimiento: a.conocimiento || '—'
+    }));
+    const secundarios = _arrSafe(m.secundarios).filter(s => _nonEmpty(s));
+    const ganzListos = ['self','us','now'].filter(k => _nonEmpty(n[k])).length;
+    const canales = _arrSafe(s.canales && s.canales.seleccionados);
+    const kpis = (me.kpis || {});
+    const nKpis = Object.keys(kpis).filter(k => _nonEmpty(kpis[k] && kpis[k].nombre)).length;
+    const multiplicadores = _arrSafe(v.multiplicadores);
+    return {
+      isEmpty: false,
+      titulo: 'Comunicar la política',
+      politica: c.politica || '',
+      fase: FASE_LBL[c.fase] || '',
+      objetivo: c.objetivo || '',
+      horizonte: c.horizonte || '',
+      enunciado: c.enunciado || '',
+      nAud: audiencias.length,
+      audPrioAlta,
+      audiencias: audResumen,
+      primario: m.primario || '',
+      secundarios,
+      promesa: m.promesa || '',
+      evidencia: m.evidencia || '',
+      valores: _arrSafe(m.valores),
+      narrativa: { self: n.self || '', us: n.us || '', now: n.now || '', completa: ganzListos === 3, listos: ganzListos },
+      framing: {
+        valor: fr.valor || '',
+        metafora: fr.metafora || '',
+        propias: _arrSafe(fr.palabras_propias),
+        adversario: _arrSafe(fr.palabras_adversario),
+        encuadre_evitar: fr.encuadre_evitar || ''
+      },
+      canales: { seleccionados: canales, n: canales.length, notas_east: (s.canales && s.canales.notas_east) || '' },
+      voceria: {
+        vocero: (v.vocero && v.vocero.nombre) || '',
+        rol:    (v.vocero && v.vocero.rol)    || '',
+        nMultiplicadores: multiplicadores.length,
+        riesgos: v.riesgos || ''
+      },
+      cronograma: {
+        pre: cr.fase_pre || '', lanz: cr.fase_lanzamiento || '',
+        mant: cr.fase_mantenimiento || '', eval: cr.fase_evaluacion || ''
+      },
+      medicion: { nKpis, planMonitoreo: me.plan_monitoreo || '', triggers: me.triggers_ajuste || '' }
+    };
+  }
+
   // ═══════════════════════════════════════════════════════════════════════
   // API pública · getLabState
   // ═══════════════════════════════════════════════════════════════════════
@@ -553,21 +624,23 @@
     const alt       = _readLS('alt-current-v1');
     const ain       = _readLS('ain-current-v1');
     const prospect  = _readLS('prospect-current-v1');
+    const comunicar = _readLS('comunicar-current-v1');
     return {
-      pp:         { exists: !!pp,       data: pp,       resumen: _resumenPP(pp) },
-      micmac:     { exists: !!micmac,   data: micmac,   resumen: _resumenMicmac(micmac) },
-      mactor:     { exists: !!mactor,   data: mactor,   resumen: _resumenMactor(mactor) },
-      ev:         { exists: !!ev,       data: ev,       resumen: _resumenEv(ev) },
-      alt:        { exists: !!alt,      data: alt,      resumen: _resumenAlt(alt) },
-      ain:        { exists: !!ain,      data: ain,      resumen: _resumenAin(ain) },
-      prospect:   { exists: !!prospect, data: prospect, resumen: _resumenProspect(prospect) }
+      pp:         { exists: !!pp,        data: pp,        resumen: _resumenPP(pp) },
+      micmac:     { exists: !!micmac,    data: micmac,    resumen: _resumenMicmac(micmac) },
+      mactor:     { exists: !!mactor,    data: mactor,    resumen: _resumenMactor(mactor) },
+      ev:         { exists: !!ev,        data: ev,        resumen: _resumenEv(ev) },
+      alt:        { exists: !!alt,       data: alt,       resumen: _resumenAlt(alt) },
+      ain:        { exists: !!ain,       data: ain,       resumen: _resumenAin(ain) },
+      prospect:   { exists: !!prospect,  data: prospect,  resumen: _resumenProspect(prospect) },
+      comunicar:  { exists: !!comunicar, data: comunicar, resumen: _resumenComunicar(comunicar) }
     };
   }
 
   function countActiveModules(state) {
     let n = 0;
     if (!state) return 0;
-    ['pp','micmac','mactor','ev','alt','ain','prospect'].forEach(k => {
+    ['pp','micmac','mactor','ev','alt','ain','prospect','comunicar'].forEach(k => {
       if (state[k] && !state[k].resumen.isEmpty) n++;
     });
     return n;
@@ -613,6 +686,14 @@
         partes.push(`Los escenarios prospectivos identifican ${pr.noRegret.length} alternativa${pr.noRegret.length === 1 ? '' : 's'} no-regret válida${pr.noRegret.length === 1 ? '' : 's'} en al menos 3 de los 4 futuros plausibles.`);
       } else if (pr.ejes && pr.ejes.x.nombre && pr.ejes.y.nombre) {
         partes.push(`Los escenarios prospectivos cruzan las incertidumbres «${_trim(pr.ejes.x.nombre, 60)}» y «${_trim(pr.ejes.y.nombre, 60)}» en 4 futuros plausibles.`);
+      }
+    }
+    const co = state.comunicar && state.comunicar.resumen;
+    if (co && !co.isEmpty) {
+      if (co.primario) {
+        partes.push(`El plan de comunicación organiza ${co.nAud || 0} audiencia${co.nAud === 1 ? '' : 's'} alrededor del mensaje primario «${_trim(co.primario, 100)}».`);
+      } else if (co.politica) {
+        partes.push(`El plan de comunicación enmarca «${_trim(co.politica, 80)}» en fase ${(co.fase || 'sin definir').toLowerCase()}.`);
       }
     }
     if (partes.length === 0) {
@@ -810,8 +891,54 @@
       if (pr.estrategia.senales_tempranas) md += `**Señales tempranas a monitorear:** ${pr.estrategia.senales_tempranas}\n\n`;
     }
 
-    // 9. Próximos pasos
-    md += `## 9. Próximos pasos operativos\n\n`;
+    // 9. Comunicar la política
+    const co = state.comunicar ? state.comunicar.resumen : { isEmpty:true };
+    md += `## 9. Plan de comunicación de la política\n\n`;
+    if (co.isEmpty) {
+      md += `_(El módulo Comunicar la política no tiene contenido — abrir ` +
+            '`comunicar.html` para construir el plan de comunicación pública con audiencias, mensaje clave, narrativa Ganz, framing Lakoff, matriz de canales BIT EAST, vocería, cronograma y medición OCDE 9-dim.)_\n\n';
+    } else {
+      if (co.politica) md += `**Política:** ${co.politica}${co.fase ? ' · fase ' + co.fase : ''}\n\n`;
+      if (co.objetivo) md += `**Objetivo comunicacional:** ${co.objetivo}${co.horizonte ? ' · horizonte ' + co.horizonte : ''}\n\n`;
+      if (co.nAud > 0) {
+        md += `**Audiencias (${co.nAud}, ${co.audPrioAlta} de prioridad alta):**\n\n`;
+        co.audiencias.forEach((a, i) => {
+          md += `${i+1}. **${a.nombre}** — prioridad ${a.prioridad} · tono ${a.tono} · conocimiento previo ${a.conocimiento}\n`;
+        });
+        md += `\n`;
+      }
+      if (co.primario) md += `**Mensaje primario:** « ${co.primario} »\n\n`;
+      if (co.secundarios && co.secundarios.length) {
+        md += `**Mensajes secundarios:**\n\n`;
+        co.secundarios.forEach((s, i) => md += `${i+1}. ${s}\n`);
+        md += `\n`;
+      }
+      if (co.promesa) md += `**Promesa concreta:** ${co.promesa}\n\n`;
+      if (co.evidencia) md += `**Cifra fuerte / evidencia:** ${co.evidencia}\n\n`;
+      if (co.valores && co.valores.length) md += `**Valores invocados:** ${co.valores.join(' · ')}\n\n`;
+      if (co.narrativa.listos > 0) {
+        md += `**Narrativa pública (Ganz):**\n\n`;
+        if (co.narrativa.self) md += `- *Story of Self* — ${_trim(co.narrativa.self, 240)}\n`;
+        if (co.narrativa.us)   md += `- *Story of Us* — ${_trim(co.narrativa.us, 240)}\n`;
+        if (co.narrativa.now)  md += `- *Story of Now* — ${_trim(co.narrativa.now, 240)}\n`;
+        md += `\n`;
+      }
+      if (co.framing.valor || co.framing.propias.length) {
+        md += `**Framing (Lakoff · Shenker-Osorio):**\n\n`;
+        if (co.framing.valor) md += `- Valor central: ${co.framing.valor}${co.framing.metafora ? ' · metáfora: ' + co.framing.metafora : ''}\n`;
+        if (co.framing.propias.length)    md += `- Palabras propias: ${co.framing.propias.join(' · ')}\n`;
+        if (co.framing.adversario.length) md += `- Palabras a evitar (del adversario): ${co.framing.adversario.join(' · ')}\n`;
+        md += `\n`;
+      }
+      if (co.canales.n > 0) {
+        md += `**Canales activos (${co.canales.n}):** ${co.canales.seleccionados.join(' · ')}\n\n`;
+      }
+      if (co.voceria.vocero) md += `**Vocero principal:** ${co.voceria.vocero}${co.voceria.rol ? ' (' + co.voceria.rol + ')' : ''} · ${co.voceria.nMultiplicadores} multiplicador${co.voceria.nMultiplicadores === 1 ? '' : 'es'}\n\n`;
+      if (co.medicion.nKpis > 0) md += `**Medición:** ${co.medicion.nKpis}/9 dimensiones OCDE con KPI definido.\n\n`;
+    }
+
+    // 10. Próximos pasos
+    md += `## 10. Próximos pasos operativos\n\n`;
     const pasos = [];
     if (!pp.isEmpty && pp.evidencia.length < 3) pasos.push('Levantar evidencia adicional (mínimo 3 fuentes) para sostener el diagnóstico.');
     if (!ma.isEmpty && ma.objetivos.length && ma.objetivos[0].saldo < 0) pasos.push(`El saldo del objetivo principal es negativo (${ma.objetivos[0].nombre}) — diseñar estrategia de negociación con dominantes opositores.`);
@@ -825,6 +952,18 @@
     if (state.prospect && state.prospect.exists && pr && !pr.isEmpty && pr.noRegret.length === 0 && pr.nElementos > 0) {
       pasos.push('Cruzar tus alternativas con los 4 escenarios para identificar decisiones robustas (no-regret).');
     }
+    if (state.pp.exists && co && co.isEmpty) {
+      pasos.push('Diseñar el plan de comunicación pública — abrir `comunicar.html` para construir mensaje, narrativa, framing, canales y vocería.');
+    }
+    if (co && !co.isEmpty && co.nAud < 2) {
+      pasos.push('Completar la segmentación de audiencias del plan de comunicación (mínimo 2, recomendado 4-6).');
+    }
+    if (co && !co.isEmpty && co.narrativa.listos < 3) {
+      pasos.push(`Completar la narrativa pública Ganz: faltan ${3 - co.narrativa.listos} de Self/Us/Now para que el vocero principal pueda sostenerla.`);
+    }
+    if (co && !co.isEmpty && !co.voceria.vocero) {
+      pasos.push('Definir vocero principal y al menos 2 multiplicadores en el plan de comunicación.');
+    }
     if (pasos.length === 0) pasos.push('Validar el informe con los actores dominantes identificados y refinar antes de comité.');
     pasos.forEach((p, i) => md += `${i+1}. ${p}\n`);
     md += `\n---\n\n`;
@@ -834,9 +973,15 @@
           `escenarios GBN (Schwartz 1991), Robust Decision Making (Lempert-Walker ` +
           `RAND 2003), análisis morfológico (Zwicky 1969 · Ritchey 2011), OCDE RIA ` +
           `(2012/2022), MVPF (Hendren-Sprung-Keyser NBER 2020), OCDE-DAC ` +
-          `(2019/2021) y Pre-Analysis Plans (AEA RCT Registry · Olken 2015 JEP). ` +
-          `Este es un **borrador automatizado**; debe ser revisado, editado y ` +
-          `validado antes de presentarse ante comité técnico.*\n`;
+          `(2019/2021), Pre-Analysis Plans (AEA RCT Registry · Olken 2015 JEP), ` +
+          `OCDE Public Communication (2021), CLAD Carta Iberoamericana de Gobierno ` +
+          `Abierto (2016), MIPG · Función Pública Colombia (Decreto 1499/2017 · ` +
+          `Manual Operativo v6 dic 2024), Ley 1712 de 2014 (transparencia + ` +
+          `lenguaje claro), Marshall Ganz · Public Narrative (Harvard Kennedy ` +
+          `School), George Lakoff · *Don't Think of an Elephant!* (2024), Anat ` +
+          `Shenker-Osorio · ASO Communications, y BIT EAST framework (2014 · ` +
+          `rev. 2024). Este es un **borrador automatizado**; debe ser revisado, ` +
+          `editado y validado antes de presentarse ante comité técnico.*\n`;
 
     return md;
   }
@@ -1132,8 +1277,42 @@
       if (pr.estrategia.senales_tempranas) drawKV('Señales tempranas', pr.estrategia.senales_tempranas);
     }
 
-    // ─── 9. Próximos pasos
-    drawH2('9. Próximos pasos operativos');
+    // ─── 9. Plan de comunicación
+    const co = state.comunicar ? state.comunicar.resumen : { isEmpty:true };
+    drawH2('9. Plan de comunicación de la política');
+    if (co.isEmpty) {
+      drawCalloutBox('No hay plan de comunicación. Abrir comunicar.html para construir el plan público (audiencias · mensaje · narrativa Ganz · framing Lakoff · matriz BIT EAST · vocería · medición OCDE 9-dim).', SOFT);
+    } else {
+      if (co.politica) drawKV('Política', `${co.politica}${co.fase ? '  ·  fase ' + co.fase : ''}`);
+      if (co.objetivo) drawKV('Objetivo comunicacional', `${co.objetivo}${co.horizonte ? '  ·  horizonte ' + co.horizonte : ''}`);
+      drawKV('Audiencias', `${co.nAud} segmentadas · ${co.audPrioAlta} de prioridad alta`);
+      if (co.primario) drawKV('Mensaje primario', '« ' + co.primario + ' »');
+      if (co.secundarios && co.secundarios.length) {
+        setFont('bold', 10); doc.text('Mensajes secundarios', M, y); y += 5;
+        drawList(co.secundarios.map(s => _trim(s, 200)));
+      }
+      if (co.promesa)    drawKV('Promesa concreta', co.promesa);
+      if (co.evidencia)  drawKV('Cifra fuerte', co.evidencia);
+      if (co.valores && co.valores.length) drawKV('Valores invocados', co.valores.join(' · '));
+      if (co.narrativa.listos > 0) {
+        setFont('bold', 10); doc.text('Narrativa pública (Ganz · Self/Us/Now)', M, y); y += 5;
+        if (co.narrativa.self) drawKV('  Self', _trim(co.narrativa.self, 220));
+        if (co.narrativa.us)   drawKV('  Us',   _trim(co.narrativa.us, 220));
+        if (co.narrativa.now)  drawKV('  Now',  _trim(co.narrativa.now, 220));
+      }
+      if (co.framing.valor || co.framing.propias.length) {
+        setFont('bold', 10); doc.text('Framing (Lakoff · Shenker-Osorio)', M, y); y += 5;
+        if (co.framing.valor)             drawKV('  Valor central', `${co.framing.valor}${co.framing.metafora ? '  ·  metáfora: ' + co.framing.metafora : ''}`);
+        if (co.framing.propias.length)    drawKV('  Palabras propias', co.framing.propias.join(' · '));
+        if (co.framing.adversario.length) drawKV('  No repetir', co.framing.adversario.join(' · '));
+      }
+      if (co.canales.n > 0)   drawKV('Canales activos', `${co.canales.n} en matriz audiencia × canal (BIT EAST)`);
+      if (co.voceria.vocero)  drawKV('Vocería', `${co.voceria.vocero}${co.voceria.rol ? ' (' + co.voceria.rol + ')' : ''} · ${co.voceria.nMultiplicadores} multiplicador${co.voceria.nMultiplicadores === 1 ? '' : 'es'}`);
+      drawKV('Medición OCDE 9-dim', `${co.medicion.nKpis} / 9 dimensiones con KPI definido`);
+    }
+
+    // ─── 10. Próximos pasos
+    drawH2('10. Próximos pasos operativos');
     const pasos = [];
     if (!pp.isEmpty && pp.evidencia.length < 3) pasos.push('Levantar evidencia adicional (mínimo 3 fuentes) para sostener el diagnóstico.');
     if (!ma.isEmpty && ma.objetivos.length && ma.objetivos[0].saldo < 0) pasos.push(`El saldo del objetivo principal es negativo (${ma.objetivos[0].nombre}) — diseñar estrategia de negociación con dominantes opositores.`);
@@ -1146,6 +1325,18 @@
     }
     if (state.prospect && state.prospect.exists && !pr.isEmpty && pr.noRegret.length === 0 && pr.nElementos > 0) {
       pasos.push('Cruzar tus alternativas con los 4 escenarios para identificar decisiones robustas (no-regret).');
+    }
+    if (state.pp.exists && co && co.isEmpty) {
+      pasos.push('Diseñar el plan de comunicación pública en comunicar.html (audiencias · mensaje · narrativa Ganz · framing Lakoff · canales · vocería · medición OCDE 9-dim).');
+    }
+    if (co && !co.isEmpty && co.nAud < 2) {
+      pasos.push('Completar la segmentación de audiencias del plan de comunicación (mínimo 2, recomendado 4-6).');
+    }
+    if (co && !co.isEmpty && co.narrativa.listos < 3) {
+      pasos.push(`Completar la narrativa pública Ganz: faltan ${3 - co.narrativa.listos} de Self/Us/Now para que el vocero principal pueda sostenerla.`);
+    }
+    if (co && !co.isEmpty && !co.voceria.vocero) {
+      pasos.push('Definir vocero principal y al menos 2 multiplicadores en el plan de comunicación.');
     }
     if (pasos.length === 0) pasos.push('Validar el informe con los actores dominantes identificados y refinar antes de comité.');
     drawList(pasos);
@@ -1161,8 +1352,13 @@
       '(2012/2022), MVPF (Hendren-Sprung-Keyser NBER 2020), OCDE-DAC (2019/2021), ' +
       'Pre-Analysis Plans (AEA RCT Registry · Olken 2015 JEP) y la frontera ' +
       'causal moderna 2020-2026 (Callaway-Sant\'Anna · Cattaneo · Ben-Michael · ' +
-      'Wager-Athey · Chernozhukov · Mayne). Este es un BORRADOR AUTOMATIZADO — ' +
-      'debe ser revisado, editado y validado antes de comité técnico. ricardoruiz.co';
+      'Wager-Athey · Chernozhukov · Mayne); para el plan de comunicación: ' +
+      'OCDE Public Communication (2021), CLAD Carta Iberoamericana de Gobierno ' +
+      'Abierto (2016), MIPG · Función Pública Colombia (Decreto 1499/2017), ' +
+      'Ley 1712 de 2014, Marshall Ganz · Public Narrative, George Lakoff ' +
+      '(2024), Anat Shenker-Osorio · ASO, y BIT EAST framework (2024). Este ' +
+      'es un BORRADOR AUTOMATIZADO — debe ser revisado, editado y validado ' +
+      'antes de comité técnico. ricardoruiz.co';
     const flines = doc.splitTextToSize(footer, PW - 2 * M);
     flines.forEach(l => { pageBreak(4.2); doc.text(l, M, y); y += 4.2; });
 

@@ -279,7 +279,100 @@ window.LAB_RECURSOS = {
       nombre: 'Función Pública · AIN Colombia',
       url: 'https://www.funcionpublica.gov.co/web/eva/gestor-normativo',
       desc: 'Gestor Normativo y portal SUCOP de Función Pública. Decreto 1081/2015 + Decreto 1273/2020 sobre proyectos normativos y consulta pública. Guía oficial colombiana del Análisis de Impacto Normativo.',
-      modulos: ['ain', 'problema']
+      modulos: ['ain', 'problema', 'comunicar']
+    },
+
+    // ─── Comunicar la política · marcos institucionales y académicos ──────
+    {
+      id: 'ocde-public-comm', categoria: 'evaluacion',
+      nombre: 'OCDE · Public Communication Report 2021',
+      url: 'https://www.oecd.org/en/publications/oecd-report-on-public-communication_22f8031c-en.html',
+      desc: 'Reporte central de la OCDE sobre comunicación pública como función de gobernanza. Marco de 9 dimensiones de medición (alcance · engagement · atención · comprensión · satisfacción · apoyo · actitudinal · intención · comportamiento). Base de 46 países encuestados.',
+      modulos: ['comunicar', 'evaluacion']
+    },
+    {
+      id: 'ocde-accesible', categoria: 'evaluacion',
+      nombre: 'OCDE · Accessible and Inclusive Public Communication (2022)',
+      url: 'https://www.oecd.org/content/dam/oecd/en/publications/reports/2022/09/accessible-and-inclusive-public-communication_60c0dc6e/222b62d9-en.pdf',
+      desc: 'Working Paper No. 54 de la OCDE sobre cómo hacer la comunicación pública accesible, inclusiva y comprensible. Heurísticas operativas para lenguaje claro, formatos accesibles y traducción a poblaciones diversas.',
+      modulos: ['comunicar']
+    },
+    {
+      id: 'clad-gobierno-abierto', categoria: 'co-pp',
+      nombre: 'CLAD · Carta Iberoamericana de Gobierno Abierto (2016)',
+      url: 'https://clad.org/wp-content/uploads/2020/07/Carta-Iberoamericana-de-Gobierno-Abierto-07-2016.pdf',
+      desc: 'Marco regional iberoamericano (firmado en Bogotá 2016) que obliga al Estado a comunicar para transparencia, participación y rendición de cuentas. Marco común a 22 países iberoamericanos.',
+      modulos: ['comunicar', 'problema', 'ain']
+    },
+    {
+      id: 'mipg-comunicacion', categoria: 'co-pp',
+      nombre: 'Función Pública · MIPG Dim. 5 — Política de Comunicación Pública',
+      url: 'https://www1.funcionpublica.gov.co/documents/34645357/34703510/Politica_operacion_comunicacion.pdf/39805591-8e01-4ae1-84dc-a21e593e4e4d',
+      desc: 'Política oficial de operación del Modelo Integrado de Planeación y Gestión (Dimensión 5 · Información y Comunicación). Decreto 1499/2017. Manual Operativo v6 diciembre 2024. Marco institucional colombiano de comunicación pública.',
+      modulos: ['comunicar']
+    },
+    {
+      id: 'ley-1712', categoria: 'co-pp',
+      nombre: 'Colombia · Ley 1712 de 2014 (Transparencia y Lenguaje Claro)',
+      url: 'https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=56882',
+      desc: 'Ley de transparencia y acceso a la información pública. Obliga al uso de lenguaje claro y formatos comprensibles. Base legal mínima para cualquier pieza institucional en Colombia.',
+      modulos: ['comunicar', 'problema', 'ain', 'evaluacion']
+    },
+    {
+      id: 'ganz-narrative', categoria: 'diseno',
+      nombre: 'Marshall Ganz · Public Narrative (Self/Us/Now)',
+      url: 'https://marshallganz.scholars.harvard.edu/public-narrative-self-us-now-mld-355',
+      desc: 'Curso MLD-355 de Marshall Ganz (Harvard Kennedy School) sobre narrativa pública. Story of Self, Story of Us, Story of Now: cómo traducir valores en acción colectiva. Worksheet operativo + casos.',
+      modulos: ['comunicar', 'mactor']
+    },
+    {
+      id: 'leading-change', categoria: 'diseno',
+      nombre: 'Leading Change Network · Resource Center',
+      url: 'https://leadingchangenetwork.org/resource_center/',
+      desc: 'Repositorio del Leading Change Network con guías, plantillas y videos sobre Public Narrative, organizing y liderazgo cívico. Versiones traducidas al español y casos de campañas iberoamericanas.',
+      modulos: ['comunicar', 'mactor']
+    },
+    {
+      id: 'lakoff-elephant', categoria: 'diseno',
+      nombre: 'George Lakoff · Don\'t Think of an Elephant! (ed. 2024)',
+      url: 'https://george-lakoff.com/about/the-all-new-dont-think-of-an-elephant_george-lakoff/',
+      desc: 'Edición 2024 del clásico de framing político de Lakoff (UC Berkeley). Cómo construir el frame propio, evitar el del adversario y comunicar valores antes que datos. Referencia obligatoria para cualquier plan de comunicación.',
+      modulos: ['comunicar']
+    },
+    {
+      id: 'aso-words', categoria: 'diseno',
+      nombre: 'Anat Shenker-Osorio · Words To Win By',
+      url: 'https://wordstowinby-pod.com/',
+      desc: 'Podcast y research de ASO Communications con testing empírico de mensajes ganadores. Episodios sobre campañas en Brasil (Lula), Irlanda (aborto) y EEUU. Metodología de priming experiments + dial surveys.',
+      modulos: ['comunicar']
+    },
+    {
+      id: 'bit-east', categoria: 'evaluacion',
+      nombre: 'Behavioural Insights Team UK · EAST framework (rev. 2024)',
+      url: 'https://www.bi.team/publications/east-four-simple-ways-to-apply-behavioural-insights/',
+      desc: 'Easy · Attractive · Social · Timely — heurística operativa del Behavioural Insights Team UK para evaluar cualquier pieza de comunicación pública. Versión actualizada 2024 con una década de RCT acumulados.',
+      modulos: ['comunicar', 'evaluacion']
+    },
+    {
+      id: 'omar-rincon', categoria: 'diseno',
+      nombre: 'Omar Rincón · Narrativas mediáticas en Colombia',
+      url: 'https://uniandes.academia.edu/omarRINCON',
+      desc: 'Trabajos académicos de Omar Rincón (UniAndes · CESPA) sobre cómo se cuentan las políticas en El Tiempo, Semana, Caracol y RCN. Útil para entender el frame mediático colombiano antes de diseñar la vocería.',
+      modulos: ['comunicar', 'mactor']
+    },
+    {
+      id: 'stone-paradox', categoria: 'diseno',
+      nombre: 'Deborah Stone · Policy Paradox',
+      url: 'https://wwnorton.com/books/policy-paradox/',
+      desc: 'Libro fundacional de Stone (Brandeis) sobre el lado narrativo del análisis de política: contar el problema es una decisión política. Counting · Causation · Comparison como categorías de la retórica pública.',
+      modulos: ['comunicar', 'problema']
+    },
+    {
+      id: 'narrative-arts', categoria: 'diseno',
+      nombre: 'Narrative Arts · guías de Public Narrative en español',
+      url: 'https://narrativearts.org/article/public-narrative-rappaport-family-foundation/',
+      desc: 'Recursos prácticos y videos en español sobre Public Narrative (Ganz). Útil para entrenar al vocero principal y a la red de multiplicadores en cómo contar Story of Self/Us/Now en 90 segundos.',
+      modulos: ['comunicar']
     }
   ]
 };
