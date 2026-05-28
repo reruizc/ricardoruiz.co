@@ -366,10 +366,10 @@
     }
 
     // ─── ENDPOINT DEEPSEEK (Sprint 2) ─────────────────────────────────
-    // Reemplazar con el URL real del API Gateway una vez deployada la Lambda
-    // `proyecto-dc-escenarios-estrategia` (ver tools/.../DEPLOY.md).
-    // Si queda en string vacío, el botón muestra fallback.
-    const STRATEGY_ENDPOINT = '';
+    // URL del API Gateway HTTP API que invoca la Lambda
+    // proyecto-dc-escenarios-estrategia (DeepSeek V4 Flash · cache S3 7d).
+    // Para rotar/actualizar: ver tools/proyecto-dc-escenarios-estrategia/DEPLOY.md.
+    const STRATEGY_ENDPOINT = 'https://e7r3m2ra54.execute-api.us-east-1.amazonaws.com/estrategia';
 
     // ─── DATA SOURCES ─────────────────────────────────────────────────
     const S3_BASE = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co';
@@ -1020,6 +1020,10 @@
         zoomControl: true, attributionControl: false,
         renderer: L.svg(),
         minZoom: 10, maxZoom: 16,
+        // Permitir zoom fraccionario para los +0.07 que sumamos tras fitBounds
+        // Snap fino (0.01) para que el +5% extra que aplicamos después de
+        // fitBounds no se redondee hacia abajo.
+        zoomSnap: 0.01, zoomDelta: 0.5,
       });
     }
 
@@ -1079,7 +1083,14 @@
       // el mapa quieto en la posición/zoom que tenga.
       const fitKey = `${isCom ? 'com' : 'bar'}`;
       if (drawMap._lastFitKey !== fitKey){
-        try { map.fitBounds(mapLayer.getBounds(), { padding:[10,10] }); } catch(_) {}
+        try {
+          const bounds = mapLayer.getBounds();
+          // +5% de zoom respecto al fitBounds estándar: log2(1.05) ≈ 0.07.
+          // Calculamos el zoom desde los bounds (no desde el zoom actual)
+          // para no acumular el delta entre cambios de nivel.
+          const z = map.getBoundsZoom(bounds, false, L.point(10, 10));
+          map.setView(bounds.getCenter(), z + 0.07, { animate: false });
+        } catch(_) {}
         drawMap._lastFitKey = fitKey;
       }
       updateMapHeader();
