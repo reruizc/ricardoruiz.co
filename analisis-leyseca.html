@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ley seca al viernes en Bogotá · análisis con datos de la Policía · ricardoruiz.co</title>
+  <meta name="description" content="Análisis con datos DIJIN — Policía Nacional sobre 4 elecciones presidenciales (2010-2022). El viernes pre-electoral en Bogotá ha sido históricamente un viernes normal: -6,7% en lesiones personales frente al baseline." />
+  <meta property="og:title" content="Ley seca al viernes en Bogotá — ¿qué dicen los datos históricos?" />
+  <meta property="og:description" content="Cruce DIJIN · Policía Nacional sobre los 4 fines de semana presidenciales 2010-2022. El viernes en Bogotá no tiene pico de violencia. Y 2026 es la primera vez que la ciudad adelanta el cierre al viernes." />
+  <meta property="og:type" content="article" />
+  <meta property="og:image" content="analisis-leyseca/grafica-fds-bogota.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=Arima:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#060810; --surface:rgba(255,255,255,.04); --border:rgba(255,255,255,.08);
+      --white:#f4f3ef; --blue:#0047FF; --green:#4ade80; --orange:#fb923c;
+      --red:#f87171; --amber:#f59e0b; --muted:rgba(255,255,255,.55);
+    }
+    body{background:var(--bg);color:var(--white);font-family:Avenir,sans-serif;min-height:100vh;line-height:1.55}
+    a{color:var(--blue);text-decoration:none} a:hover{text-decoration:underline}
+
+    .nav{padding:.9rem 2rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:rgba(4,6,16,.6);backdrop-filter:blur(8px)}
+    .e-btn-back{font-family:Avenir,sans-serif;font-weight:500;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--green);text-decoration:none;border:1.5px solid rgba(74,222,128,.4);padding:.3rem .8rem;transition:all .2s}
+    .e-btn-back:hover{color:#060810;background:var(--green);text-decoration:none}
+    .logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.85}
+    .logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px}
+    .logo-bar{width:5px;background:var(--blue);border-radius:1px 1px 0 0;opacity:.85}
+    .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:1.2rem;letter-spacing:-.03em;color:var(--white)}
+    .logo-text span{color:var(--blue)}
+
+    .container{max-width:960px;margin:0 auto;padding:2.5rem 2rem 4rem}
+
+    .kicker{font-family:'Syne',sans-serif;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:var(--orange);margin-bottom:.7rem;font-weight:500}
+    h1{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.8rem,4vw,3rem);letter-spacing:-.025em;line-height:1.05;margin-bottom:.7rem}
+    h1 span{color:var(--blue)}
+    .subhead{font-family:'Arima',sans-serif;font-weight:400;font-size:clamp(1rem,1.6vw,1.18rem);color:var(--muted);line-height:1.5;max-width:760px;margin-bottom:2rem}
+    .byline{font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.1em;color:rgba(255,255,255,.4);margin-bottom:3rem;padding-bottom:1.2rem;border-bottom:1px solid var(--border)}
+
+    .lead{font-family:Avenir,sans-serif;font-size:1.05rem;line-height:1.65;margin-bottom:2rem;color:rgba(255,255,255,.85)}
+    .lead b{color:var(--orange);font-weight:600}
+
+    .hero-stat{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin:2.5rem 0;padding:1.6rem;background:linear-gradient(135deg,rgba(0,71,255,.08),rgba(251,146,60,.04));border:1px solid rgba(0,71,255,.2)}
+    @media(max-width:700px){.hero-stat{grid-template-columns:1fr}}
+    .hero-card{padding:.6rem .2rem}
+    .hero-card .lbl{font-family:'Syne',sans-serif;font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:.3rem;font-weight:500}
+    .hero-card .val{font-family:'Syne',sans-serif;font-size:2.1rem;font-weight:800;line-height:1;letter-spacing:-.02em}
+    .hero-card .val.blue{color:var(--blue)}
+    .hero-card .val.orange{color:var(--orange)}
+    .hero-card .val.muted{color:#94a3b8}
+    .hero-card .meta{font-family:Avenir,sans-serif;font-size:.78rem;color:rgba(255,255,255,.5);margin-top:.4rem;line-height:1.4}
+
+    h2{font-family:'Syne',sans-serif;font-weight:700;font-size:1.4rem;letter-spacing:-.015em;margin:2.5rem 0 1rem;color:var(--white)}
+    h2::before{content:'';display:inline-block;width:6px;height:1.2rem;background:var(--blue);margin-right:.6rem;vertical-align:-3px}
+    h3{font-family:'Syne',sans-serif;font-weight:500;font-size:1.05rem;letter-spacing:-.01em;margin:1.6rem 0 .6rem;color:var(--white)}
+
+    p{margin-bottom:1rem;color:rgba(255,255,255,.82)}
+    p b{color:var(--white);font-weight:600}
+    p i{color:var(--orange);font-style:normal;font-weight:600}
+
+    .fig{margin:2rem 0 2.5rem;border:1px solid var(--border);background:rgba(255,255,255,.02)}
+    .fig img{display:block;width:100%;height:auto}
+    .fig .cap{padding:.85rem 1.1rem;font-family:Avenir,sans-serif;font-size:.82rem;color:rgba(255,255,255,.65);line-height:1.5;border-top:1px solid var(--border)}
+    .fig .cap b{color:var(--white)}
+
+    .table-wrap{overflow-x:auto;margin:1.2rem 0 2rem;border:1px solid var(--border)}
+    table{width:100%;border-collapse:collapse;min-width:560px}
+    th,td{padding:.65rem .85rem;text-align:right;font-family:Avenir,sans-serif;font-size:.92rem;border-bottom:1px solid rgba(255,255,255,.05)}
+    th:first-child,td:first-child{text-align:left}
+    th{font-family:'Syne',sans-serif;font-size:.7rem;letter-spacing:.13em;text-transform:uppercase;color:rgba(255,255,255,.55);font-weight:500;background:rgba(0,71,255,.06);border-bottom-color:rgba(0,71,255,.25)}
+    tbody tr{transition:background .12s}
+    tbody tr:hover{background:rgba(0,71,255,.05)}
+    td.num{font-variant-numeric:tabular-nums;font-weight:500}
+    td.delta{font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
+    td.delta.bad{color:var(--orange)}
+    td.delta.ok{color:#94a3b8}
+    td.delta.big{color:var(--blue)}
+    td.terr{font-weight:500;color:var(--white)}
+    td.terr small{display:block;font-size:.7rem;color:rgba(255,255,255,.45);font-weight:400;letter-spacing:.04em;margin-top:.1rem}
+    tbody tr.row-tot{background:rgba(251,146,60,.08);border-top:2px solid rgba(251,146,60,.3)}
+    tbody tr.row-tot td{font-weight:700}
+
+    .three-reads{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;margin:1.5rem 0 2rem}
+    .read{padding:1rem 1.2rem;background:rgba(255,255,255,.03);border-left:2px solid var(--blue)}
+    .read .num{font-family:'Syne',sans-serif;font-size:.78rem;letter-spacing:.1em;color:var(--orange);font-weight:700;margin-bottom:.35rem}
+    .read p{font-size:.88rem;color:rgba(255,255,255,.78);margin:0;line-height:1.55}
+
+    .quote{border-left:2px solid var(--orange);padding:.5rem 1rem;margin:1rem 0 1.5rem;font-family:'Arima',sans-serif;font-style:italic;color:rgba(255,255,255,.85);font-size:.98rem;line-height:1.55}
+    .quote cite{display:block;font-family:Avenir,sans-serif;font-style:normal;font-size:.78rem;color:rgba(255,255,255,.5);margin-top:.5rem;letter-spacing:.04em}
+
+    .method{margin-top:2.5rem;padding:1.2rem;background:rgba(255,255,255,.025);border:1px solid var(--border);font-family:Avenir,sans-serif;font-size:.88rem;color:rgba(255,255,255,.72);line-height:1.6}
+    .method b{color:var(--white)}
+    .method code{font-family:'DM Mono',monospace;font-size:.82rem;background:rgba(255,255,255,.06);padding:.08rem .35rem;color:var(--white)}
+    .method p{color:rgba(255,255,255,.72)}
+    .method p:last-child{margin-bottom:0}
+
+    .cta{margin-top:2.5rem;padding:1.4rem;background:linear-gradient(135deg,rgba(251,146,60,.12),rgba(251,146,60,.04));border:1px solid rgba(251,146,60,.4)}
+    .cta-title{font-family:'Syne',sans-serif;font-weight:700;font-size:1.05rem;color:var(--orange);margin-bottom:.5rem}
+    .cta-body{font-size:.92rem;color:rgba(255,255,255,.85);margin-bottom:.8rem;line-height:1.6}
+    .cta-btn{display:inline-block;background:var(--orange);color:#060810;font-family:Avenir,sans-serif;font-weight:600;font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;padding:.55rem 1.1rem;text-decoration:none;border:1px solid var(--orange);transition:all .15s;margin-right:.5rem}
+    .cta-btn:hover{background:transparent;color:var(--orange);text-decoration:none}
+    .cta-btn.alt{background:transparent;color:var(--white);border-color:rgba(255,255,255,.2)}
+    .cta-btn.alt:hover{border-color:var(--orange);color:var(--orange)}
+
+    .foot{margin-top:3rem;padding-top:1.5rem;border-top:1px solid var(--border);font-family:Avenir,sans-serif;font-size:.78rem;color:rgba(255,255,255,.45);text-align:center;line-height:1.55}
+    .foot a{color:var(--blue)}
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a href="noticias.html" class="e-btn-back">← Noticias</a>
+    <a href="index.html" class="logo-link">
+      <div class="logo-bars">
+        <div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div>
+        <div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div>
+      </div>
+      <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+    </a>
+  </nav>
+
+  <main class="container">
+    <div class="kicker">Análisis · 29 de mayo de 2026</div>
+    <h1>Ley seca al viernes en Bogotá: lo que dicen los datos de la <span>Policía</span></h1>
+    <p class="subhead">El Decreto Distrital 191 del 28 de mayo de 2026 adelantó la ley seca al viernes 6:00 pm. Es la primera vez que Bogotá lo hace. Acá lo que muestran los registros DIJIN de los 4 fines de semana presidenciales 2010-2022.</p>
+    <div class="byline">Ricardo Ruiz · ricardoruiz.co · Datos: DIJIN — Policía Nacional · Grupo de Información de Criminalidad</div>
+
+    <p class="lead">Amanecimos con la noticia de que la Alcaldía Mayor de Bogotá expidió el <b>Decreto Distrital 191 del 28 de mayo de 2026</b>, que prohíbe el expendio y consumo de bebidas embriagantes en sitios públicos o abiertos al público en todo el territorio distrital <b>desde el viernes 29 de mayo a las 6:00 pm hasta el lunes 1 de junio al mediodía</b>, dos días antes de la primera vuelta presidencial. Ni la Alcaldía, ni Asobares, ni la concejala Heidy Sánchez (Unión Patriótica), ni la senadora Angélica Lozano (Alianza Verde) presentaron datos de seguridad para sustentar su posición. Todas las orillas tienen equipos técnicos detrás. Resulta llamativo que la decisión y el debate hayan pasado por encima de la pregunta básica: <b>¿el viernes pre-electoral en Bogotá ha sido históricamente más violento que un viernes normal?</b></p>
+
+    <h2>El antecedente: nunca antes empezó un viernes</h2>
+
+    <p>Verificamos los decretos presidenciales anteriores. En 2018 (gobierno Duque, Alcaldía Peñalosa) aplicó el estándar nacional desde el sábado 26 de mayo 6:00 pm. En 2022 primera vuelta (Decreto Nacional 830 de 2022, Alcaldía Claudia López) también desde el sábado 28 de mayo 6:00 pm. En 2022 segunda vuelta la Alcaldía López expidió el Decreto Distrital 244 con el mismo horario sabatino. <b>Esta es la primera elección presidencial en la que Bogotá adelanta el cierre al viernes.</b> La administración Galán argumenta prudencia preventiva ("conservar la seguridad, el orden público y la protección de los derechos y libertades públicas"); las voces críticas argumentan impacto al sector nocturno.</p>
+
+    <div class="hero-stat">
+      <div class="hero-card">
+        <div class="lbl">Decreto 191/2026 · Bogotá</div>
+        <div class="val orange">Viernes 6 pm</div>
+        <div class="meta">Cierre adelantado · primera vez en una presidencial</div>
+      </div>
+      <div class="hero-card">
+        <div class="lbl">Estándar 2018 · 2022-1V · 2022-2V</div>
+        <div class="val muted">Sábado 6 pm</div>
+        <div class="meta">Estándar nacional aplicado en las 3 últimas presidenciales</div>
+      </div>
+      <div class="hero-card">
+        <div class="lbl">Viernes pre-electoral · Bogotá · lesiones</div>
+        <div class="val blue">−6,7 %</div>
+        <div class="meta">Σ 4 elecciones vs baseline mismo día semana</div>
+      </div>
+    </div>
+
+    <h2>El dato central: el viernes pre-electoral no tiene pico</h2>
+
+    <p>Cruzamos los registros oficiales de la DIJIN — Policía Nacional para los cuatro ciclos presidenciales del período (2010, 2014, 2018, 2022) en dos delitos con desagregación diaria: <b>homicidio intencional</b> y <b>lesiones personales</b>. Año completo, nacional y filtrado a Bogotá D.C. Para cada uno de los cuatro días del fin de semana electoral (viernes previo, sábado, domingo de votación y lunes) calculamos un <i>baseline</i> con el promedio del mismo día de semana del resto del año (n ≈ 51 puntos por baseline), que absorbe estacionalidad semanal. Sumamos las cuatro elecciones para reducir el ruido año a año.</p>
+
+    <p>El resultado, en <b>lesiones personales en Bogotá</b> agregadas en los cuatro ciclos:</p>
+
+    <div class="fig">
+      <img src="analisis-leyseca/grafica-fds-bogota-dark.png" alt="Gráfica: fin de semana electoral en Bogotá · 4 presidenciales · observado vs baseline" />
+      <div class="cap"><b>Suma de 4 elecciones presidenciales (2010 + 2014 + 2018 + 2022).</b> El viernes pre-electoral, único día sin ley seca histórica, cae solo 6,7 % frente al baseline — dentro del ruido estadístico. El descenso grande es el domingo (−46 %), día de votación y con ley seca activa.</div>
+    </div>
+
+    <p>En homicidios el N por día en Bogotá es muy bajo (entre 0 y 4 casos por día), así que los porcentajes son estadísticamente débiles y los reportamos como control. A nivel nacional el patrón se replica: viernes pre-electoral cae apenas 4,4 % en lesiones, mientras el domingo cae 38,9 %.</p>
+
+    <h2>El viernes electoral, año por año</h2>
+
+    <p>La caída agregada de 6,7 % cabe dentro de la dispersión natural de un viernes promedio en Bogotá. La desviación estándar de un viernes promedio en lesiones está entre 11 y 13 lesiones, y los deltas observados son del orden de 2 a 3 lesiones por viernes. Visualmente: las barras observadas se quedan dentro del intervalo ±1σ del baseline en cada uno de los 4 años.</p>
+
+    <div class="fig">
+      <img src="analisis-leyseca/grafica-viernes-anios-dark.png" alt="Gráfica: viernes pre-electoral en Bogotá en cada una de las 4 elecciones presidenciales 2010-2022" />
+      <div class="cap"><b>Viernes pre-electoral en cada elección 2010-2022.</b> En 2018 incluso hay más lesiones que el baseline (+7,5 %), por encima del promedio. La barra de error en negro muestra ±1 desviación estándar del baseline — los observados caen dentro de ese intervalo en los 4 años.</div>
+    </div>
+
+    <h2>Lo que sí cae (y por qué no se le puede atribuir solo a la ley seca)</h2>
+
+    <p>El descenso del domingo es grande: −46 % en lesiones Bogotá. Pero ese descenso <b>no es atribuible solo al cierre de licores</b>. El domingo de elecciones combina varios factores que actúan a la vez:</p>
+
+    <div class="three-reads">
+      <div class="read">
+        <div class="num">01</div>
+        <p>Ley seca: bares y licoreras cerrados, alcohol restringido en hogares.</p>
+      </div>
+      <div class="read">
+        <div class="num">02</div>
+        <p>Evento electoral: ciudadanía en casa votando, transporte limitado, despliegue policial reforzado en puestos, fuerza pública en máxima alerta.</p>
+      </div>
+      <div class="read">
+        <div class="num">03</div>
+        <p>Cierre voluntario del comercio nocturno y movilidad reducida en zonas habituales de rumba.</p>
+      </div>
+    </div>
+
+    <p>El sábado y el lunes electorales también tienen ley seca, pero <b>no son días de votación</b>: caen solo −11 % y −15 % en lesiones Bogotá. La diferencia entre esos −11 a −15 puntos y los −46 puntos del domingo es justamente la contribución del "evento elecciones" sobre el ya combinado efecto de la ley seca. Eso sugiere que la mayor parte del descenso del domingo viene del día electoral en sí — no del cierre del expendio de licor.</p>
+
+    <h2>Lo que dijeron los actores políticos (todos sin cifras)</h2>
+
+    <p>La concejala <b>Heidy Sánchez Barreto</b> (Unión Patriótica) calificó la medida de "desproporcionada e inconsulta" y recordó:</p>
+
+    <div class="quote">
+      Tradicionalmente esta medida se aplicaba desde el sábado en la noche. Ahora, al extenderla desde el viernes, se afecta uno de los días más importantes para bares, restaurantes, discotecas, pequeños comercios, trabajadores informales, artistas, DJs, meseros, conductores y miles de personas que dependen de la economía de la rumba para sostener sus ingresos.
+      <cite>Heidy Sánchez Barreto · concejala de Bogotá · 28 de mayo de 2026</cite>
+    </div>
+
+    <p>La senadora <b>Angélica Lozano</b> (Alianza Verde) recordó que "la ley seca nunca ha incluido el viernes" y defendió a los trabajadores de la vida nocturna. <b>Asobares</b>, por la voz de Camilo Ospina, calificó la medida como un "freno de mano" para el comercio formal. <b>Bares Unidos</b> convocó marcha al mediodía del 29 de mayo en la Plaza de Bolívar. Ninguno de estos pronunciamientos presentó una sola cifra de delito sobre el viernes pre-electoral histórico. El argumento de la oposición fue exclusivamente gremial y de "tradición". La administración Galán y el secretario de gobierno Gustavo Quintero defendieron la medida en clave preventiva, también sin desglose estadístico que la respalde sobre el histórico.</p>
+
+    <h2>Tabla detallada · lesiones personales en Bogotá</h2>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Año</th>
+            <th>Viernes</th>
+            <th>Baseline V</th>
+            <th>Δ V</th>
+            <th>Domingo</th>
+            <th>Baseline D</th>
+            <th>Δ D</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="terr">2010 <small>elección 30-may</small></td>
+            <td class="num">17</td><td class="num">23,6</td><td class="delta big">−27,8 %</td>
+            <td class="num">29</td><td class="num">44,7</td><td class="delta big">−35,1 %</td>
+          </tr>
+          <tr>
+            <td class="terr">2014 <small>elección 25-may</small></td>
+            <td class="num">25</td><td class="num">29,2</td><td class="delta ok">−14,4 %</td>
+            <td class="num">21</td><td class="num">54,3</td><td class="delta big">−61,3 %</td>
+          </tr>
+          <tr>
+            <td class="terr">2018 <small>elección 27-may</small></td>
+            <td class="num">67</td><td class="num">62,3</td><td class="delta bad">+7,5 %</td>
+            <td class="num">59</td><td class="num">103,2</td><td class="delta big">−42,8 %</td>
+          </tr>
+          <tr>
+            <td class="terr">2022 <small>elección 29-may</small></td>
+            <td class="num">49</td><td class="num">54,4</td><td class="delta ok">−9,8 %</td>
+            <td class="num">49</td><td class="num">91,9</td><td class="delta big">−46,7 %</td>
+          </tr>
+          <tr class="row-tot">
+            <td class="terr">Σ 4 elecciones</td>
+            <td class="num">158</td><td class="num">169,4</td><td class="delta ok">−6,7 %</td>
+            <td class="num">158</td><td class="num">294,0</td><td class="delta big">−46,3 %</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>Por qué el viernes es el único día con contrafactual válido</h2>
+
+    <p>Este análisis está enmarcado en la lógica que esta plataforma viene desplegando en su <a href="evaluacion.html">módulo de evaluación de política pública</a> del Lab de PP. Para juzgar una medida hace falta un <b>contrafactual</b>: lo que habría pasado en ausencia de la intervención. En este caso:</p>
+
+    <p>Para el <b>sábado, domingo y lunes</b> electorales no existe contrafactual limpio. La ley seca ha aplicado en <i>todas</i> las elecciones presidenciales del país en el período. Cualquier comparación con un sábado o domingo no electoral mezcla dos cosas inseparables: el efecto del cierre de licores y el efecto del evento electoral. No se puede atribuir una de las dos por separado.</p>
+
+    <p>Para el <b>viernes</b>, en cambio, sí hay contrafactual. Los cuatro viernes pre-electorales 2010-2022 en Bogotá <i>no tuvieron ley seca</i>. Son la línea base limpia con la que juzgar el viernes 2026 — único año en que sí la tendrá. Y la línea base no muestra un viernes pre-electoral peligroso: en cuatro ocasiones se ha comportado como un viernes normal. <b>Si la decisión es preventiva por temor a un viernes atípico esta vez, vale la pena que se declare así</b> — no como una medida con respaldo en el histórico, porque el histórico no la respalda.</p>
+
+    <h2>Limitaciones honestas del análisis</h2>
+
+    <div class="three-reads">
+      <div class="read">
+        <div class="num">01</div>
+        <p>Homicidios en Bogotá tienen N muy bajo por día (0–4). El % se vuelve ruido. Usamos lesiones personales como métrica primaria porque tiene N estable (decenas por día).</p>
+      </div>
+      <div class="read">
+        <div class="num">02</div>
+        <p>El baseline es del mismo año (n≈51 por dow). No corrige por tendencia anual ni por estacionalidad mensual fina. Sí absorbe estacionalidad semanal.</p>
+      </div>
+      <div class="read">
+        <div class="num">03</div>
+        <p>No medimos el viernes 2026 — todavía no existe. Medimos los 4 viernes previos como referencia. La evaluación post-evento debe rehacerse con los datos del 29 de mayo de 2026 cuando estén disponibles.</p>
+      </div>
+    </div>
+
+    <h2>Metodología en una página</h2>
+
+    <div class="method">
+      <p><b>Fuente:</b> Ministerio de Defensa Nacional · Policía Nacional · Dirección de Investigación Criminal e Interpol (DIJIN) · Grupo de Información de Criminalidad. Archivos oficiales <code>Homicidio Intencional 2010/2014/2018/2022.xlsx</code> y <code>lesiones_personales_2010/2014/2018/2022.xlsx</code>, año completo.</p>
+      <p><b>Cobertura:</b> nacional (~13.500 homicidios/año, ~80.000 a 138.000 lesiones/año) y subset de Bogotá D.C. identificado por el campo MUNICIPIO normalizado.</p>
+      <p><b>Baseline:</b> para cada (delito, scope, día de semana) se calcula el promedio del mismo día de semana del año excluyendo los 4 días del fin de semana electoral (n≈51 por baseline). Se reporta media y desviación estándar muestral.</p>
+      <p><b>Métrica:</b> <code>Δ % = (observado − baseline) / baseline × 100</code>. Una caída entre −5 % y +5 % se considera dentro del ruido estadístico habitual, dado que la desviación estándar relativa de un día promedio Bogotá es del orden de ±20 %.</p>
+      <p><b>Agregado multi-año:</b> suma directa de observados y baselines (no promedio de porcentajes), lo que da más peso a años con mayor N y reduce el ruido aleatorio anual.</p>
+      <p><b>Lo que no medimos:</b> riñas o casos de violencia que no terminaron en lesiones reportadas, otros delitos de oportunidad (hurtos, accidentes de tránsito por alcohol). Estos podrían comportarse distinto, aunque su patrón histórico tampoco está documentado en el debate público actual.</p>
+      <p><b>Código del análisis:</b> Python sin dependencias externas más allá de <code>openpyxl</code> y <code>matplotlib</code>. Reproducible end-to-end desde los XLSX originales hasta el JSON intermedio y las gráficas.</p>
+    </div>
+
+    <div class="cta">
+      <div class="cta-title">¿Trabajas en una alcaldía, gremio, medio o equipo de campaña?</div>
+      <div class="cta-body">Este tipo de análisis cuasi-experimental con controles temporales hace parte del <a href="evaluacion.html" style="color:var(--orange);border-bottom:1px solid var(--orange)">Lab de Políticas Públicas y Prospectiva</a> de ricardoruiz.co: 8 módulos integrados para diseñar, evaluar y comunicar política pública con método (problema, sistema, actores, alternativas, AIN, evaluación, escenarios, comunicación). Disponible para uso institucional con cloud-save y copiloto IA.</div>
+      <a href="evaluacion.html" class="cta-btn">Abrir Lab de PP</a>
+      <a href="noticias.html" class="cta-btn alt">Volver a Noticias</a>
+    </div>
+
+    <div class="foot">
+      © Ricardo Ruiz · <a href="index.html">ricardoruiz.co</a> · Datos DIJIN — Policía Nacional · Análisis publicado el 29 de mayo de 2026 a propósito del Decreto Distrital 191 de la Alcaldía Mayor de Bogotá.
+    </div>
+  </main>
+</body>
+</html>
