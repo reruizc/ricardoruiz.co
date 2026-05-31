@@ -17,6 +17,7 @@ import csv
 import subprocess
 import sys
 import time
+from collections import defaultdict
 from pathlib import Path
 from openpyxl import Workbook
 
@@ -69,6 +70,92 @@ def load_geo_lookup():
             }
     print(f"  → {len(lookup):,} puestos georreferenciados", flush=True)
     return lookup
+
+
+def enrich_por_puesto(gcs_in: Path, xlsx_out: Path, lookup: dict):
+    """Agregado por puesto (sumando NUM_VOT por COD_DDE,COD_MME,COD_ZZ,COD_PP,
+    COD_PAR,COD_CAN, etc.) + cruce con nombres. Elimina DES_MS porque pierde
+    sentido al agregar."""
+    misses = 0
+    hits = 0
+    with gcs_in.open("r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.reader(f, delimiter=";")
+        headers = next(reader)
+        try:
+            idx_dde = headers.index("COD_DDE")
+            idx_mme = headers.index("COD_MME")
+            idx_zz  = headers.index("COD_ZZ")
+            idx_pp  = headers.index("COD_PP")
+            idx_vot = headers.index("NUM_VOT")
+            idx_ms  = headers.index("DES_MS") if "DES_MS" in headers else None
+        except ValueError as e:
+            raise SystemExit(f"Falta columna en {gcs_in.name}: {e}")
+
+        # Llaves del groupby: todas las columnas EXCEPTO DES_MS y NUM_VOT.
+        key_idx = [i for i, h in enumerate(headers) if i != idx_vot and i != idx_ms]
+        key_cols = [headers[i] for i in key_idx]
+        # Posición de cod_dde/mme/zz/pp dentro del tuple de key (para lookup)
+        try:
+            k_dde = key_cols.index("COD_DDE")
+            k_mme = key_cols.index("COD_MME")
+            k_zz  = key_cols.index("COD_ZZ")
+            k_pp  = key_cols.index("COD_PP")
+        except ValueError as e:
+            raise SystemExit(f"Falta columna geo en key: {e}")
+
+        agg = defaultdict(int)
+        for row in reader:
+            try:
+                raw_v = row[idx_vot].strip()
+                vot = int(raw_v) if raw_v else 0
+            except (ValueError, IndexError):
+                vot = 0
+            try:
+                key = tuple(row[i] for i in key_idx)
+            except IndexError:
+                continue
+            agg[key] += vot
+
+    new_cols = ["DES_DDE", "DES_MME", "DES_PP", "COD_COMUNA", "DES_COMUNA"]
+    out_header = key_cols + ["NUM_VOT"] + new_cols
+
+    wb = Workbook(write_only=True)
+    ws = wb.create_sheet("Datos")
+    ws.append(out_header)
+    sheet_idx = 1
+    rows_in_sheet = 1
+
+    for key, votos in agg.items():
+        try:
+            dde = key[k_dde].strip().zfill(2)
+            mme = key[k_mme].strip().zfill(3)
+            zz  = key[k_zz].strip().zfill(2)
+            pp  = key[k_pp].strip().zfill(2)
+            info = lookup.get((dde, mme, zz, pp))
+        except IndexError:
+            info = None
+        if info:
+            hits += 1
+            enriched = list(key) + [votos, info["depto"], info["municipio"], info["puesto"], info["cod_comuna"], info["comuna"]]
+        else:
+            misses += 1
+            enriched = list(key) + [votos, "", "", "", "", ""]
+        if rows_in_sheet >= SHEET_ROWS:
+            sheet_idx += 1
+            ws = wb.create_sheet(f"Datos {sheet_idx}")
+            ws.append(out_header)
+            rows_in_sheet = 1
+        ws.append(enriched)
+        rows_in_sheet += 1
+
+    wb.save(xlsx_out)
+    return {
+        "puestos_filas": len(agg),
+        "hits": hits, "misses": misses,
+        "match_pct": round(hits / (hits + misses) * 100, 2) if (hits + misses) else 0,
+        "mb": round(xlsx_out.stat().st_size / (1024 * 1024), 2),
+        "sheets": sheet_idx,
+    }
 
 
 def enrich(gcs_in: Path, xlsx_out: Path, lookup: dict):
@@ -140,19 +227,21 @@ def s3_upload(local_path: Path, cat: str, año: int):
 
 def main():
     only = [a for a in sys.argv[1:] if not a.startswith("--")]
-    upload  = "--no-upload" not in sys.argv
+    upload   = "--no-upload" not in sys.argv
+    por_puesto = "--puesto" in sys.argv
 
     archivos = DEFAULTS
     if only:
         archivos = [(n, c, a) for (n, c, a) in DEFAULTS if n in only]
-        # Permite archivos que no sean defaults también
         for n in only:
             if not any(x[0] == n for x in archivos):
-                # Inferir cat/año por nombre
                 cat, año = ("custom", 0)
                 archivos.append((n, cat, año))
 
     lookup = load_geo_lookup()
+    suffix = "_PUESTO_CON_NOMBRES.xlsx" if por_puesto else "_CON_NOMBRES.xlsx"
+    mode = "POR PUESTO + NOMBRES" if por_puesto else "POR MESA + NOMBRES"
+    print(f"Modo: {mode}", flush=True)
 
     for idx, (csv_name, cat, año) in enumerate(archivos, 1):
         csv_in = GCS_DIR / csv_name
@@ -161,13 +250,18 @@ def main():
             continue
         out_dir = OUT / cat / str(año)
         out_dir.mkdir(parents=True, exist_ok=True)
-        out_name = csv_name.replace(".csv", "_CON_NOMBRES.xlsx")
+        out_name = csv_name.replace(".csv", suffix)
         xlsx_out = out_dir / out_name
         print(f"[{idx}/{len(archivos)}] {csv_name} → {out_name}", flush=True)
         t0 = time.time()
-        stats = enrich(csv_in, xlsx_out, lookup)
-        stats["sec"] = round(time.time() - t0, 1)
-        print(f"   OK · {stats['hits']:,} hits / {stats['misses']:,} misses ({stats['match_pct']}% match) · {stats['mb']} MB · {stats['sheets']} hojas · {stats['sec']}s", flush=True)
+        if por_puesto:
+            stats = enrich_por_puesto(csv_in, xlsx_out, lookup)
+            stats["sec"] = round(time.time() - t0, 1)
+            print(f"   OK · {stats['puestos_filas']:,} filas (puestos×candidatos) · {stats['hits']:,} hits / {stats['misses']:,} misses ({stats['match_pct']}% match) · {stats['mb']} MB · {stats['sheets']} hojas · {stats['sec']}s", flush=True)
+        else:
+            stats = enrich(csv_in, xlsx_out, lookup)
+            stats["sec"] = round(time.time() - t0, 1)
+            print(f"   OK · {stats['hits']:,} hits / {stats['misses']:,} misses ({stats['match_pct']}% match) · {stats['mb']} MB · {stats['sheets']} hojas · {stats['sec']}s", flush=True)
         if upload:
             url = s3_upload(xlsx_out, cat, año)
             if url:
