@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex,nofollow" />
+<title>Presidencia · Preconteo 1V 2026 · Ricardo Ruiz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --white:#f4f3ef; --blue:#0047FF; --green:#4ade80; --red:#ff5a5a; --amber:#f0a500;
+    --card-border:rgba(255,255,255,.1); --border:rgba(255,255,255,.08);
+    --bar-bg:rgba(255,255,255,.1); --td-color:rgba(255,255,255,.75);
+    --td-hover:rgba(255,255,255,.04);
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  body{background:#060810;color:var(--white);font-family:'Syne',sans-serif;cursor:none;min-height:100vh;overflow-x:hidden;}
+  a{color:inherit;}
+  .cursor{position:fixed;width:10px;height:10px;background:var(--blue);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);transition:transform .15s,background .2s;}
+  .cursor-ring{position:fixed;width:32px;height:32px;border:1.5px solid var(--blue);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);opacity:.4;}
+  .bg-layer{position:fixed;inset:0;z-index:0;background:url('foto-fondo.webp') center right/cover no-repeat;}
+  .bg-overlay{position:fixed;inset:0;z-index:1;background:linear-gradient(to right,rgba(4,6,16,.97) 0%,rgba(4,6,16,.94) 55%,rgba(4,6,16,.72) 72%,rgba(4,6,16,.35) 88%,rgba(4,6,16,.10) 100%);}
+  .shell{position:relative;z-index:2;min-height:100vh;display:flex;flex-direction:column;}
+
+  .nav{display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid var(--border);background:rgba(4,6,16,.6);backdrop-filter:blur(8px);}
+  .nav-left{display:flex;align-items:center;gap:1rem;}
+  .e-btn-back{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--green);text-decoration:none;border:1.5px solid rgba(74,222,128,.4);padding:.3rem .8rem;transition:.2s;}
+  .e-btn-back:hover{color:#060810;background:var(--green);border-color:var(--green);}
+  .logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.85;}
+  .logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px;}
+  .logo-bar{width:5px;background:var(--blue);border-radius:1px 1px 0 0;opacity:.85;}
+  .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:1.25rem;letter-spacing:-.03em;color:var(--white);}
+  .logo-text span{color:var(--blue);}
+  .theme-btn{display:flex;align-items:center;gap:.4rem;font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);padding:.3rem .75rem;cursor:none;transition:.2s;}
+  .theme-btn:hover{background:rgba(255,255,255,.15);color:var(--white);}
+
+  .top-bar{padding:1.1rem 2.5rem 0;}
+  .page-title{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.5rem,2.8vw,2.5rem);letter-spacing:-.04em;line-height:1.05;color:var(--white);text-shadow:0 2px 24px rgba(0,71,255,.4);}
+  .page-title span{color:var(--blue);}
+  .breadcrumb{padding:.6rem 2.5rem .7rem;font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3);border-bottom:1px solid var(--border);}
+  .breadcrumb a{color:rgba(0,71,255,.7);text-decoration:none;}
+
+  .meta-bar{display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap;padding:.5rem 2.5rem;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.08em;color:rgba(255,255,255,.35);}
+  .meta-bar b{color:rgba(74,222,128,.85);font-weight:700;}
+  .live-dot{width:7px;height:7px;background:var(--blue);border-radius:50%;display:inline-block;flex-shrink:0;animation:pulse 1.5s ease infinite;margin-right:.4rem;}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.3)}}
+
+  .content{flex:1;padding:1.5rem 2.5rem 1.5rem;}
+
+  .cfg{border:1px solid var(--card-border);background:rgba(255,255,255,.04);margin-bottom:1.5rem;}
+  .cfg>summary{cursor:none;list-style:none;padding:.8rem 1.1rem;font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.6);display:flex;align-items:center;gap:.5rem;}
+  .cfg>summary::-webkit-details-marker{display:none;}
+  .cfg>summary b{color:var(--blue);}
+  .cfg-body{padding:0 1.1rem 1rem;display:flex;flex-direction:column;gap:.6rem;}
+  .row{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;}
+  .row label{font-family:'DM Mono',monospace;font-size:.66rem;letter-spacing:.06em;color:rgba(255,255,255,.45);min-width:6.5rem;}
+  .cfg input,.cfg select{background:rgba(255,255,255,.05);color:var(--white);border:1.5px solid var(--card-border);padding:.42rem .55rem;font-family:'DM Mono',monospace;font-size:.72rem;outline:none;flex:1;min-width:9rem;}
+  .cfg input:focus,.cfg select:focus{border-color:var(--blue);}
+  .cfg input::placeholder{color:rgba(255,255,255,.25);}
+  .cfg select option{background:#0e1220;color:var(--white);}
+  .btn{font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;background:rgba(255,255,255,.06);color:var(--white);border:1.5px solid var(--card-border);padding:.45rem 1rem;cursor:none;white-space:nowrap;transition:.15s;}
+  .btn:hover{border-color:var(--blue);}
+  .btn.primary{background:var(--blue);border-color:var(--blue);}
+  .btn.primary:hover{background:#0035cc;}
+  .btn.on{background:var(--green);border-color:var(--green);color:#06210f;}
+  #status{font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.04em;padding:.5rem .1rem;min-height:1.2rem;color:rgba(255,255,255,.55);white-space:pre-wrap;}
+  #status.err{color:var(--red);}
+  #status.ok{color:var(--green);}
+  #status.load{color:rgba(255,255,255,.55);}
+  details.raw{margin-top:.4rem;border:1px solid var(--border);}
+  details.raw>summary{cursor:none;padding:.45rem .7rem;font-family:'DM Mono',monospace;font-size:.66rem;color:rgba(255,255,255,.4);list-style:none;}
+  details.raw>summary::-webkit-details-marker{display:none;}
+  details.raw pre{margin:0;padding:.7rem;overflow:auto;max-height:340px;font-size:.68rem;background:#07070b;border-top:1px solid var(--border);white-space:pre;color:#b8d0ff;font-family:'DM Mono',monospace;}
+
+  .verdict{border:1px solid var(--card-border);background:rgba(0,71,255,.06);padding:1.3rem 1.5rem;margin-bottom:1.5rem;backdrop-filter:blur(4px);}
+  .verdict-tag{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:.6rem;}
+  .verdict-main{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.2rem,2.4vw,1.9rem);letter-spacing:-.03em;line-height:1.15;}
+  .verdict-main .hl{color:var(--blue);}
+  .verdict-main .win{color:var(--green);}
+  .verdict-sub{font-family:'DM Mono',monospace;font-size:.72rem;color:rgba(255,255,255,.5);margin-top:.55rem;line-height:1.6;}
+  .verdict-faces{display:flex;gap:1.4rem;margin-top:1rem;flex-wrap:wrap;}
+  .vface{display:flex;align-items:center;gap:.6rem;}
+  .vface .lbl{font-family:'DM Mono',monospace;font-size:.6rem;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.08em;}
+  .vface .nm{font-family:'Syne',sans-serif;font-weight:700;font-size:.95rem;}
+  .vface .pc{font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:var(--white);}
+  .thr-wrap{margin-top:1rem;position:relative;height:30px;background:var(--bar-bg);overflow:hidden;}
+  .thr-fill{height:100%;background:linear-gradient(90deg,rgba(0,71,255,.55),var(--blue));transition:width 1s ease;display:flex;align-items:center;}
+  .thr-fill.win{background:linear-gradient(90deg,rgba(74,222,128,.5),var(--green));}
+  .thr-50{position:absolute;top:-4px;bottom:-4px;left:50%;width:2px;background:#fff;opacity:.7;}
+  .thr-50 span{position:absolute;top:-1.2rem;left:50%;transform:translateX(-50%);font-family:'DM Mono',monospace;font-size:.56rem;color:rgba(255,255,255,.55);white-space:nowrap;}
+  .thr-lbl{font-family:'Syne',sans-serif;font-weight:800;font-size:.85rem;color:#fff;padding-left:.6rem;text-shadow:0 1px 4px rgba(0,0,0,.5);}
+
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem;}
+  .kpi-card{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1.1rem 1.3rem;backdrop-filter:blur(4px);}
+  .kpi-label{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:.4rem;}
+  .kpi-val{font-family:'Syne',sans-serif;font-weight:800;font-size:1.7rem;letter-spacing:-.04em;line-height:1;color:var(--blue);}
+  .kpi-val.dark{color:var(--white);}
+  .kpi-val.green{color:var(--green);}
+  .kpi-val.sm{font-size:1rem;color:var(--white);line-height:1.3;}
+  .kpi-delta{font-family:'DM Mono',monospace;font-size:.6rem;color:rgba(255,255,255,.28);margin-top:.3rem;}
+
+  .card{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1.3rem;overflow:hidden;backdrop-filter:blur(4px);margin-bottom:1.5rem;}
+  .card-label{font-family:'DM Mono',monospace;font-size:.74rem;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:1rem;}
+  .grid{display:grid;grid-template-columns:1fr 300px;gap:1.2rem;}
+  .grid>.card{margin-bottom:0;}
+
+  table.res{width:100%;border-collapse:collapse;}
+  table.res th{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.25);text-align:left;padding:.5rem .6rem;border-bottom:1px solid var(--border);}
+  table.res th.r{text-align:right;}
+  table.res td{padding:.7rem .6rem;border-bottom:1px solid rgba(255,255,255,.05);font-family:'DM Mono',monospace;font-size:.84rem;color:var(--td-color);vertical-align:middle;}
+  table.res td.r{text-align:right;}
+  table.res tr:hover td{background:var(--td-hover);}
+  table.res tr.win td{color:var(--white);}
+  .cand-name{font-family:'Syne',sans-serif;font-weight:700;font-size:1.05rem;display:flex;align-items:center;gap:.6rem;}
+  .cand-ph{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;font-family:'Syne',sans-serif;font-weight:800;font-size:.78rem;color:#fff;position:relative;}
+  .cand-ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  .cand-ph.sm{width:26px;height:26px;font-size:.62rem;}
+  .cand-ph.lg{width:44px;height:44px;font-size:.95rem;}
+  .tag2v{font-family:'DM Mono',monospace;font-size:.56rem;letter-spacing:.06em;text-transform:uppercase;color:var(--green);border:1px solid rgba(74,222,128,.4);padding:.1rem .4rem;margin-left:.5rem;}
+  .bar-wrap{width:90px;height:5px;background:var(--bar-bg);overflow:hidden;display:inline-block;vertical-align:middle;}
+  .bar-fill{height:100%;background:var(--blue);transition:width 1s ease;}
+  .pct-val{font-family:'Syne',sans-serif;font-weight:700;font-size:.86rem;color:var(--white);display:inline-block;width:48px;text-align:right;margin-left:8px;}
+
+  .donut-wrap{display:flex;flex-direction:column;align-items:center;gap:1rem;}
+  .donut-cw{position:relative;width:150px;height:150px;}
+  .donut-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;}
+  .donut-pct{font-family:'Syne',sans-serif;font-weight:800;font-size:1.5rem;letter-spacing:-.04em;color:var(--white);line-height:1;}
+  .donut-sub{font-family:'DM Mono',monospace;font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-top:2px;}
+  .donut-legend{width:100%;display:flex;flex-direction:column;gap:.5rem;}
+  .li{display:flex;align-items:center;gap:.6rem;font-family:'DM Mono',monospace;font-size:.78rem;color:rgba(255,255,255,.5);}
+  .ld{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+  .lv{margin-left:auto;color:var(--white);font-weight:700;font-family:'Syne',sans-serif;}
+
+  .def-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.2rem;}
+  .def-stat{background:rgba(255,255,255,.03);border:1px solid var(--border);padding:.8rem .9rem;}
+  .def-k{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:.35rem;}
+  .def-v{font-family:'Syne',sans-serif;font-weight:800;font-size:1.7rem;letter-spacing:-.03em;line-height:1;color:var(--amber);}
+  .def-v.sm{font-size:.95rem;line-height:1.25;color:var(--white);display:flex;align-items:center;gap:.4rem;}
+  .def-v.g{color:var(--green);} .def-v.b{color:var(--blue);} .def-v.r{color:var(--red);}
+  .def-d{font-family:'DM Mono',monospace;font-size:.58rem;color:rgba(255,255,255,.3);margin-top:.3rem;line-height:1.4;}
+  .def-charts{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1rem;}
+  .mini-lbl{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:.5rem;}
+  .def-ctrl{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:.9rem;}
+  .def-ctrl label{font-family:'DM Mono',monospace;font-size:.66rem;color:rgba(255,255,255,.5);display:flex;align-items:center;gap:.4rem;}
+  .def-ctrl input{background:rgba(255,255,255,.05);color:var(--white);border:1.5px solid var(--card-border);padding:.35rem .45rem;font-family:'DM Mono',monospace;font-size:.72rem;outline:none;width:5rem;}
+  .mini-note{font-family:'DM Mono',monospace;font-size:.62rem;color:rgba(255,255,255,.3);}
+  .demo-flag{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:#06210f;background:var(--amber);padding:.15rem .5rem;}
+  table.mini{width:100%;border-collapse:collapse;font-family:'DM Mono',monospace;font-size:.7rem;}
+  table.mini th{text-align:right;color:rgba(255,255,255,.3);padding:.3rem .5rem;border-bottom:1px solid var(--border);font-weight:400;text-transform:uppercase;letter-spacing:.06em;font-size:.58rem;}
+  table.mini th:first-child,table.mini td:first-child{text-align:left;}
+  table.mini td{text-align:right;padding:.3rem .5rem;border-bottom:1px solid rgba(255,255,255,.05);color:rgba(255,255,255,.7);}
+
+  .footer{flex-shrink:0;border-top:1px solid var(--border);padding:.6rem 2.5rem;display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:.62rem;color:rgba(255,255,255,.25);}
+  .footer a{color:rgba(255,255,255,.3);text-decoration:none;}
+
+  body.day-mode{--white:#1a1a2e;--card-border:rgba(0,0,0,.12);--border:rgba(0,0,0,.08);--bar-bg:rgba(0,0,0,.1);--td-hover:rgba(0,71,255,.04);background:#e6ded3;color:#1a1a2e;}
+  body.day-mode .bg-layer{opacity:.04;}
+  body.day-mode .bg-overlay{background:linear-gradient(to right,rgba(240,235,228,.99) 0%,rgba(240,235,228,.97) 55%,rgba(240,235,228,.85) 72%,rgba(240,235,228,.6) 88%,rgba(240,235,228,.25) 100%);}
+  body.day-mode .nav{background:rgba(240,235,228,.92);}
+  body.day-mode .logo-text{color:#0d1120;}
+  body.day-mode .theme-btn{background:rgba(0,71,255,.08);border-color:rgba(0,71,255,.25);color:var(--blue);}
+  body.day-mode .page-title{color:#0d1120;text-shadow:none;}
+  body.day-mode .meta-bar b{color:#0a7a3e;}
+  body.day-mode .card,body.day-mode .kpi-card,body.day-mode .cfg,body.day-mode .verdict,body.day-mode .def-stat{background:#f0f2f8;}
+  body.day-mode .cfg input,body.day-mode .cfg select,body.day-mode .def-ctrl input{background:#fff;border-color:rgba(0,0,0,.2);color:#1a1a2e;}
+  body.day-mode .cfg select option{background:#fff;color:#1a1a2e;}
+  body.day-mode table.res td{color:rgba(0,0,0,.8);}
+  body.day-mode table.mini td{color:rgba(0,0,0,.75);}
+  body.day-mode .donut-pct,body.day-mode .lv,body.day-mode .pct-val,body.day-mode .cand-name,body.day-mode .vface .pc{color:#0d1120;}
+  body.day-mode .li{color:rgba(0,0,0,.6);}
+
+  @media(max-width:900px){
+    body{cursor:auto;} .cursor,.cursor-ring{display:none;}
+    .nav,.top-bar,.breadcrumb,.meta-bar,.content,.footer{padding-left:1.2rem;padding-right:1.2rem;}
+    .bg-overlay{background:rgba(4,6,16,.93);}
+    .kpi-row,.def-grid{grid-template-columns:1fr 1fr;gap:.75rem;}
+    .grid,.def-charts{grid-template-columns:1fr;}
+    .row label{min-width:auto;}
+  }
+  @media(max-width:600px){.kpi-row,.def-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+<div class="bg-layer"></div>
+<div class="bg-overlay"></div>
+
+<div class="shell">
+  <nav class="nav">
+    <div class="nav-left">
+      <a href="electoral.html" class="e-btn-back">← Volver</a>
+      <a href="electoral.html" class="logo-link">
+        <span class="logo-bars"><span class="logo-bar" style="height:20px"></span><span class="logo-bar" style="height:15px"></span><span class="logo-bar" style="height:9px"></span><span class="logo-bar" style="height:4px"></span></span>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
+  </nav>
+
+  <div class="top-bar">
+    <div class="page-title">Presidencia · <span>Preconteo 1ª vuelta</span></div>
+  </div>
+  <div class="breadcrumb"><a href="electoral.html">Resultados Electorales</a> &nbsp;/&nbsp; Presidencia de la República · Preconteo 31 may 2026</div>
+
+  <div class="meta-bar">
+    <span><span class="live-dot"></span>Actualización: <b id="lastUpdate">—</b></span>
+    <span>Mesas: <b id="mesasLabel">— / —</b></span>
+    <span>Potencial: <b id="potLabel">—</b></span>
+    <span>Fuente: <b id="fuenteLabel">—</b></span>
+  </div>
+
+  <div class="content">
+
+    <!-- PANEL DE FUENTE -->
+    <details class="cfg" id="cfg" open>
+      <summary>⚙ Fuente de datos · <b>preconteo en vivo</b> · click para plegar</summary>
+      <div class="cfg-body">
+        <div class="row">
+          <label for="src-mode">Modo</label>
+          <select id="src-mode">
+            <option value="worker">Worker propio (recomendado)</option>
+            <option value="direct">URL directa Registraduría + proxy CORS</option>
+          </select>
+          <label for="dep-select" style="min-width:4rem">Ámbito</label>
+          <select id="dep-select"></select>
+        </div>
+        <div class="row" data-mode="worker">
+          <label for="worker-base">Worker base</label>
+          <input id="worker-base" value="https://registraduria-proxy.reruizc.workers.dev" />
+          <span style="font-family:'DM Mono',monospace;font-size:.62rem;color:rgba(255,255,255,.3)">→ /presidente · /presidente/{cod}</span>
+        </div>
+        <div class="row" data-mode="direct" style="display:none">
+          <label for="reg-base">Registraduría</label>
+          <input id="reg-base" value="https://resultados.registraduria.gov.co" />
+          <label for="corp" style="min-width:3rem">Corp</label>
+          <input id="corp" value="PR" style="max-width:5rem;flex:0 0 5rem" />
+        </div>
+        <div class="row" data-mode="direct" style="display:none">
+          <label for="full-url">URL exacta</label>
+          <input id="full-url" placeholder="Opcional: pega la URL exacta de DevTools→Network (ignora Registraduría+Corp)" />
+          <select id="proxy" style="max-width:13rem;flex:0 0 13rem">
+            <option value="corsproxy">proxy: corsproxy.io</option>
+            <option value="allorigins">proxy: allorigins.win</option>
+            <option value="directo">proxy: ninguno</option>
+          </select>
+        </div>
+        <div class="row">
+          <button class="btn primary" id="btn-load">Cargar ahora</button>
+          <button class="btn" id="btn-auto">Auto-refresh: off</button>
+          <span style="font-family:'DM Mono',monospace;font-size:.62rem;color:rgba(255,255,255,.3)">Endpoint supuesto: <code>ACT/PR/00.json</code> (confirmar al abrir el conteo)</span>
+        </div>
+        <div id="status">Listo. El host de la Registraduría suele abrir al cierre de mesas (4:00 p.m.). Pulsa «Cargar ahora» para sondear, o activa Auto-refresh. Sin datos en vivo puedes probar el modelo con «Simular boletines».</div>
+        <details class="raw" id="raw-wrap" style="display:none">
+          <summary>Ver JSON crudo recibido (para mapear campos si la forma difiere)</summary>
+          <pre id="raw"></pre>
+        </details>
+      </div>
+    </details>
+
+    <!-- VEREDICTO 2ª VUELTA -->
+    <div class="verdict" id="verdict">
+      <div class="verdict-tag">¿Se define en primera vuelta?</div>
+      <div class="verdict-main" id="verdict-main">Esperando datos del preconteo…</div>
+      <div class="verdict-sub" id="verdict-sub">Un candidato gana en 1ª vuelta si supera el 50% de los votos válidos (candidatos + voto en blanco). Si nadie lo logra, los dos primeros van a 2ª vuelta el <b>21 de junio de 2026</b>.</div>
+      <div class="verdict-faces" id="verdict-faces"></div>
+      <div class="thr-wrap" id="thr-wrap" style="display:none">
+        <div class="thr-fill" id="thr-fill" style="width:0%"><span class="thr-lbl" id="thr-lbl"></span></div>
+        <div class="thr-50"><span>50% · mayoría</span></div>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-row" id="kpis"></div>
+
+    <!-- DEFINICIÓN DE LA 2ª VUELTA POR BOLETÍN -->
+    <div class="card" id="def-card">
+      <div class="card-label">Definición de la segunda vuelta · seguimiento por boletín <span id="def-demo" style="display:none"><span class="demo-flag">datos simulados</span></span></div>
+      <div class="def-grid">
+        <div class="def-stat"><div class="def-k">P(segunda vuelta)</div><div class="def-v" id="def-p2v">—</div><div class="def-d" id="def-p2v-d">probabilidad de que nadie pase el 50%</div></div>
+        <div class="def-stat"><div class="def-k">P(par #1 vs #2 firme)</div><div class="def-v" id="def-plock">—</div><div class="def-d" id="def-plock-d">que el 2º no sea alcanzado por el 3º</div></div>
+        <div class="def-stat"><div class="def-k">Estado matemático</div><div class="def-v sm" id="def-det">—</div><div class="def-d" id="def-det-d"></div></div>
+        <div class="def-stat"><div class="def-k">Quedó definido en</div><div class="def-v sm" id="def-moment">—</div><div class="def-d" id="def-moment-d">% mesas escrutadas</div></div>
+      </div>
+      <div class="def-charts">
+        <div><div class="mini-lbl">Probabilidad de 2ª vuelta vs. % escrutado</div><canvas id="chart-prob" height="160"></canvas></div>
+        <div><div class="mini-lbl">% de cada candidato vs. % escrutado</div><canvas id="chart-shares" height="160"></canvas></div>
+      </div>
+      <div class="def-ctrl">
+        <label>σ del modelo <input id="sigma" type="number" min="0.01" max="0.15" step="0.005" value="0.035" /></label>
+        <button class="btn" id="btn-recompute">Recalcular</button>
+        <button class="btn" id="btn-reset-bol">Borrar boletines</button>
+        <button class="btn" id="btn-demo">▶ Simular boletines (demo)</button>
+        <span class="mini-note" id="bol-count"></span>
+      </div>
+      <div class="def-d" style="margin-top:.6rem">Heurística: la incertidumbre del resultado final se modela como σ·√(fracción de mesas sin escrutar). No corrige el sesgo de orden de reporte (zonas que transmiten primero). Ajusta σ según qué tan heterogéneo esperes el voto restante.</div>
+      <details class="raw" style="margin-top:.6rem"><summary id="bol-table-sum">Ver tabla de boletines</summary><div id="bol-table" style="padding:.6rem;overflow:auto"></div></details>
+    </div>
+
+    <!-- COMPARACIÓN VS 2022 -->
+    <div class="card" id="cmp-card">
+      <div class="card-label">Comparación con 2022 (1ª vuelta) · <span id="cmp-scope">Nacional</span></div>
+      <div id="cmp-body"><div class="mini-note">Carga un boletín (o usa el demo) para comparar contra 2022.</div></div>
+      <details class="raw" id="cmp-mun-wrap" style="margin-top:.8rem;display:none">
+        <summary id="cmp-mun-sum">Municipios del departamento vs. 2022</summary>
+        <div id="cmp-mun" style="padding:.6rem;overflow:auto"></div>
+      </details>
+    </div>
+
+    <!-- TABLA + DONUT -->
+    <div class="grid">
+      <div class="card">
+        <div class="card-label" id="tbl-label">Candidatos · orden por votación</div>
+        <table class="res">
+          <thead><tr><th>#</th><th>Candidato/a</th><th>Partido / Coalición</th><th class="r">Votos</th><th class="r" style="min-width:150px">% válidos</th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="card-label">Participación</div>
+        <div class="donut-wrap">
+          <div class="donut-cw">
+            <canvas id="donut"></canvas>
+            <div class="donut-center"><div class="donut-pct" id="donut-pct">—</div><div class="donut-sub">votaron</div></div>
+          </div>
+          <div class="donut-legend" id="donut-leg"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <span>ricardoruiz.co · Preconteo Presidencial 1V 2026 · uso interno</span>
+    <span><a href="https://resultados.registraduria.gov.co" target="_blank" rel="noopener">Fuente: Registraduría Nacional</a></span>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════
+// Preconteo Presidencial · 1ª vuelta 2026
+//
+// Datos en vivo: worker `registraduria-proxy` →
+//   https://resultados.registraduria.gov.co/json/ACT/PR/{DEP}.json (CORS).
+//   Forma esperada (igual a senado): camaras[].partotabla[].act + totales.act.
+//   Falta agregar la ruta /presidente al worker (tools/registraduria-proxy-presidente-route.md).
+//
+// Dos modelos analíticos sobre la serie de boletines:
+//   1. ¿En qué boletín se define la 2ª vuelta? (determinista + probabilístico)
+//   2. Comparación vs 2022 (S3 historicos/pres-2022-v1: nacional, depto, municipio).
+// ════════════════════════════════════════════════════════════════════
+
+const WORKER_DEFAULT = 'https://registraduria-proxy.reruizc.workers.dev';
+const REG_DEFAULT    = 'https://resultados.registraduria.gov.co';
+const RECARGA_MS     = 3 * 60 * 1000;
+const POTENCIAL_DEF  = 41834371;
+let   MESAS_TOTAL    = 0;
+const BOL_KEY        = 'pres-boletines-v1';
+const HIST22_BASE    = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/historicos/pres-2022-v1';
+const PHOTO_BASE     = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/Fotos-presidenciales/';
+
+const $ = id => document.getElementById(id);
+const fmt = n => (n||0).toLocaleString('es-CO');
+const norm = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+
+const DANE_DEP = {
+  '60':'Amazonas','01':'Antioquia','40':'Arauca','56':'San Andrés','88':'Exterior',
+  '03':'Atlántico','16':'Bogotá D.C.','06':'Bolívar','07':'Boyacá','09':'Caldas',
+  '44':'Caquetá','46':'Casanare','11':'Cauca','12':'Cesar','17':'Chocó','13':'Córdoba',
+  '15':'Cundinamarca','50':'Guainía','54':'Guaviare','19':'Huila','48':'La Guajira',
+  '21':'Magdalena','52':'Meta','23':'Nariño','25':'Norte de Santander','64':'Putumayo',
+  '24':'Quindío','27':'Risaralda','26':'Santander','28':'Sucre','29':'Tolima',
+  '31':'Valle del Cauca','68':'Vaupés','72':'Vichada',
+};
+
+// Fotos presidenciales (Fotos-presidenciales/, públicas en S3)
+const CAND_PHOTOS = [
+  { m:['cepeda'],               f:'cepeda.jpg' },
+  { m:['valencia','paloma'],    f:'valencia.jpg' },
+  { m:['espriella','abelardo'], f:'espriella.jpg' },
+  { m:['fajardo'],              f:'fajardo.jpg' },
+  { m:['lopez','claudia'],      f:'lopez.jpg' },
+  { m:['barreras','roy'],       f:'barreras.jpg' },
+];
+function candPhoto(nombre){
+  const n = norm(nombre);
+  for (const e of CAND_PHOTOS) if (e.m.some(k => n.includes(k))) return PHOTO_BASE + e.f;
+  return null;
+}
+function initials(nombre){ const w=(nombre||'').trim().split(/\s+/); return ((w[0]||'')[0]||'') + ((w[1]||'')[0]||''); }
+function faceHTML(nombre, color, klass){
+  const ph = candPhoto(nombre);
+  return `<span class="cand-ph ${klass||''}" style="background:${color}">${ph?`<img src="${ph}" alt="" onerror="this.style.display='none'">`:''}<i>${initials(nombre).toUpperCase()}</i></span>`;
+}
+
+const CAND_COLOR = {
+  'cepeda':'#51458F','espriella':'#000062','abelardo':'#000062',
+  'paloma':'#1866DF','valencia':'#1866DF','claudia':'#d9db24','lopez':'#d9db24',
+  'fajardo':'#EEAA22','roy':'#3d8b3d','barreras':'#3d8b3d',
+  'pacto':'#6B2D8B','centro democr':'#0088BB','liberal':'#C8102E','conservador':'#003580',
+  'cambio radical':'#E91E8C','verde':'#4CAF50','blanco':'#666',
+};
+const PALETTE = ['#0047FF','#e0457b','#16a34a','#f0a500','#8b5cf6','#06b6d4','#ef4444','#84cc16','#ec4899','#14b8a6','#f97316','#22d3ee'];
+function candColor(nombre, partido, idx){
+  const n = norm(nombre + ' ' + (partido||''));
+  for (const k in CAND_COLOR) if (n.includes(k)) return CAND_COLOR[k];
+  return PALETTE[(idx||0) % PALETTE.length];
+}
+
+let STATE = { dep:'00', data:null, autoTimer:null, boletines:[], demo:false };
+
+// ════════════════════════ FETCH ════════════════════════
+function buildTarget(dep){
+  if ($('src-mode').value === 'worker'){
+    const base = ($('worker-base').value.trim() || WORKER_DEFAULT).replace(/\/+$/,'');
+    return base + '/presidente' + (dep && dep !== '00' ? '/' + dep : '');
+  }
+  const full = $('full-url').value.trim();
+  if (full) return (dep && dep !== '00') ? full.replace(/\/0*0\.json/i, '/' + dep + '.json') : full;
+  const rb   = ($('reg-base').value.trim() || REG_DEFAULT).replace(/\/+$/,'');
+  const corp = ($('corp').value.trim() || 'PR').toUpperCase();
+  return rb + '/json/ACT/' + corp + '/' + (dep || '00') + '.json';
+}
+function wrapProxy(target){
+  if ($('src-mode').value === 'worker') return target;
+  const p = $('proxy').value;
+  if (p === 'corsproxy')  return 'https://corsproxy.io/?url=' + encodeURIComponent(target);
+  if (p === 'allorigins') return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(target);
+  return target;
+}
+async function fetchData(dep){
+  const target = buildTarget(dep);
+  const url    = wrapProxy(target);
+  const sep    = url.includes('?') ? '&' : '?';
+  const res    = await fetch(url + sep + 't=' + Date.now(), { cache:'no-store', headers:{ 'Accept':'application/json' } });
+  if (!res.ok){ const e = new Error('HTTP ' + res.status); e.status = res.status; e.target = target; try { e.body = await res.text(); } catch (_) {} throw e; }
+  const txt = await res.text();
+  try { return JSON.parse(txt); } catch (_){ const e = new Error('no-json'); e.body = txt.slice(0,300); throw e; }
+}
+
+// ════════════════════ PARSEO ════════════════════
+function toNum(v){
+  if (typeof v === 'number') return v;
+  if (v == null) return null;
+  const n = parseFloat(String(v).replace(/[^\d.,-]/g,'').replace(/\.(?=\d{3}\b)/g,'').replace(',','.'));
+  return isNaN(n) ? null : n;
+}
+function findTable(root){
+  let best = null;
+  (function walk(o){
+    if (Array.isArray(o)){
+      if (o.length && o[0] && typeof o[0] === 'object' && !Array.isArray(o[0])) if (!best || o.length > best.length) best = o;
+      o.forEach(walk);
+    } else if (o && typeof o === 'object') Object.values(o).forEach(walk);
+  })(root);
+  if (!best) return null;
+  const cols = [];
+  best.forEach(r => Object.keys(r).forEach(k => { if (!cols.includes(k) && (r[k] === null || typeof r[k] !== 'object')) cols.push(k); }));
+  return { rows: best, cols };
+}
+function extraerTotales(ds){
+  const t = (ds && ds.totales && ds.totales.act) || (ds && ds.camaras && ds.camaras[0] && ds.camaras[0].totales && ds.camaras[0].totales.act) || {};
+  const g = k => parseInt(t[k]) || 0;
+  const votant = g('votant'), votblan = g('votblan') || g('votbla');
+  return { mesesc:g('mesesc'), mesatota:g('mesatota')||g('mesins')||g('mesinsta')||0, votant, votblan,
+    votval:g('votval'), votnul:g('votnul'), votnma:g('votnma')||Math.max(0,votant-g('votval')-g('votnul')-votblan), centota:g('centota') };
+}
+function extraerCandidatos(ds){
+  const bloque = ds && ds.camaras && (ds.camaras.find(c => (c.partotabla||[]).length) || ds.camaras[0]);
+  if (bloque && bloque.partotabla && bloque.partotabla.length){
+    const cands = bloque.partotabla.map(p => {
+      const a = p.act || p;
+      const cantos = (a.cantotabla || []).filter(c => !/solo por la lista/i.test(c.nomcan || ''));
+      const top = cantos.slice().sort((x,y) => (parseInt(y.vot)||0) - (parseInt(x.vot)||0))[0];
+      const nombre = top ? (`${top.nomcan||''} ${top.apecan||''}`.trim() || a.nompar) : a.nompar;
+      const partido = a.nompar || (top ? `Partido ${a.codpar}` : '');
+      const votos = parseInt(a.vot) || (top ? parseInt(top.vot)||0 : 0);
+      return { nombre: nombre || partido || ('Cand ' + a.codpar), partido: partido || '', votos, codpar: String(a.codpar || '') };
+    }).filter(c => c.nombre);
+    if (cands.length) return { cands: cands.sort((a,b) => b.votos - a.votos), fuente:'reg' };
+  }
+  const found = findTable(ds);
+  if (found && found.rows.length){
+    const voteCol = found.cols.find(c => /(^|_)vot|votos|votes|cantidad|sufrag|total/i.test(c));
+    const nameCol = found.cols.find(c => /nomcan|nombre|cand|nompar|partido|name/i.test(c)) || found.cols[0];
+    const cands = found.rows.map((r,i) => ({ nombre:String(r[nameCol] ?? ('Fila '+(i+1))), partido:'', votos:toNum(r[voteCol])||0, codpar:'' })).filter(c => c.nombre);
+    if (cands.length) return { cands: cands.sort((a,b) => b.votos - a.votos), fuente:'auto', meta:{ voteCol, nameCol } };
+  }
+  return { cands: [], fuente:'none' };
+}
+
+// ════════════════════ RENDER PRINCIPAL ════════════════════
+let donutI = null;
+function renderDonut(tot, validos){
+  const pot = tot.centota || POTENCIAL_DEF;
+  const novot = Math.max(0, pot - tot.votant);
+  if (donutI) donutI.destroy();
+  donutI = new Chart($('donut').getContext('2d'), {
+    type:'doughnut',
+    data:{ labels:['Válidos','Nulos','No marcados','No votaron'],
+      datasets:[{ data:[validos, tot.votnul, tot.votnma, novot], backgroundColor:['#0047FF','#cc2233','#f0a500','#1e2030'], borderWidth:0, hoverOffset:6 }] },
+    options:{ responsive:true, maintainAspectRatio:true, cutout:'72%', plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:c => `${c.label}: ${fmt(c.raw)}` } } } }
+  });
+  $('donut-pct').textContent = pot ? ((tot.votant / pot) * 100).toFixed(1) + '%' : '—';
+  $('donut-leg').innerHTML = [
+    ['#0047FF','Votos válidos', validos],['#cc2233','Nulos', tot.votnul],
+    ['#f0a500','No marcados', tot.votnma],['#1e2030','No votaron', novot],
+  ].map(([c,l,v]) => `<div class="li"><div class="ld" style="background:${c}${c==='#1e2030'?';border:1px solid #333':''}"></div>${l}<span class="lv">${fmt(v)}</span></div>`).join('');
+}
+
+function render(){
+  const data = STATE.data; if (!data) return;
+  const cands = data.cands, tot = data.tot;
+  const sumaCand  = cands.reduce((s,c) => s + c.votos, 0);
+  const validos   = tot.votval > 0 ? Math.max(tot.votval, sumaCand) : sumaCand;
+  const baseMayoria = sumaCand + (tot.votblan || 0);
+  const lider = cands[0], segundo = cands[1];
+  const share1 = baseMayoria > 0 && lider ? lider.votos / baseMayoria : 0;
+  const share2 = baseMayoria > 0 && segundo ? segundo.votos / baseMayoria : 0;
+  const gana1v = share1 > 0.5, margen = (share1 - share2) * 100;
+
+  const vMain = $('verdict-main'), vSub = $('verdict-sub'), vFaces = $('verdict-faces');
+  const thrWrap = $('thr-wrap'), thrFill = $('thr-fill'), thrLbl = $('thr-lbl');
+  if (!cands.length){ vMain.textContent = 'Esperando datos del preconteo…'; thrWrap.style.display='none'; vFaces.innerHTML=''; }
+  else {
+    if (gana1v){
+      vMain.innerHTML = `<span class="win">${lider.nombre}</span> ganaría en <span class="win">primera vuelta</span>`;
+      vSub.innerHTML = `Supera el 50% con <b>${(share1*100).toFixed(2)}%</b> de votos válidos · margen sobre ${segundo?segundo.nombre:'el 2º'}: <b>${margen.toFixed(1)} pp</b>. <span style="opacity:.6">Preconteo — no oficial.</span>`;
+      thrFill.className = 'thr-fill win';
+    } else {
+      vMain.innerHTML = segundo ? `Habría <span class="hl">segunda vuelta</span> · <span class="hl">${lider.nombre}</span> vs <span class="hl">${segundo.nombre}</span>` : `<span class="hl">${lider.nombre}</span> lidera`;
+      vSub.innerHTML = `Nadie supera el 50%. Líder <b>${(share1*100).toFixed(2)}%</b>${segundo?` · 2º <b>${(share2*100).toFixed(2)}%</b> · margen <b>${margen.toFixed(1)} pp</b>`:''}. Balotaje el <b>21 de junio de 2026</b>. <span style="opacity:.6">Preconteo — no oficial.</span>`;
+      thrFill.className = 'thr-fill';
+    }
+    thrWrap.style.display = '';
+    thrFill.style.width = Math.min(100, share1*100).toFixed(1) + '%';
+    thrLbl.textContent = (share1*100).toFixed(1) + '%';
+    vFaces.innerHTML = [lider, segundo].filter(Boolean).map((c,i) => {
+      const col = candColor(c.nombre, c.partido, i);
+      const sh = i===0?share1:share2;
+      return `<div class="vface">${faceHTML(c.nombre, col, 'lg')}<div><div class="lbl">${i===0?'1º':'2º'}</div><div class="nm">${c.nombre}</div></div><div class="pc">${(sh*100).toFixed(1)}%</div></div>`;
+    }).join('');
+  }
+
+  const pctEscr = MESAS_TOTAL ? (tot.mesesc / MESAS_TOTAL * 100) : 0;
+  const pctPart = (tot.centota || POTENCIAL_DEF) ? (tot.votant / (tot.centota || POTENCIAL_DEF) * 100) : 0;
+  $('kpis').innerHTML = [
+    { l:'Mesas informadas', v:fmt(tot.mesesc), c:'', d: MESAS_TOTAL ? `${pctEscr.toFixed(1)}% de ${fmt(MESAS_TOTAL)}` : 'esperando total' },
+    { l:'Votantes', v:fmt(tot.votant), c:'dark', d:`${pctPart.toFixed(2)}% del potencial` },
+    { l:'Votos válidos', v:fmt(validos), c:'green', d:`incl. ${fmt(tot.votblan)} en blanco` },
+    { l:'Líder', v: lider ? lider.nombre.split(' ')[0] : '—', c:'sm', d: lider ? `${(share1*100).toFixed(1)}% válidos` : '' },
+  ].map(k => `<div class="kpi-card"><div class="kpi-label">${k.l}</div><div class="kpi-val ${k.c}">${k.v}</div><div class="kpi-delta">${k.d}</div></div>`).join('');
+
+  const maxV = Math.max(1, ...cands.map(c => c.votos));
+  $('tbody').innerHTML = cands.map((c,i) => {
+    const pct = validos ? (c.votos / validos * 100) : 0;
+    const bw  = (c.votos / maxV * 100).toFixed(1);
+    const col = candColor(c.nombre, c.partido, i);
+    const a2v = (!gana1v && i < 2) ? '<span class="tag2v">→ 2ª vuelta</span>' : '';
+    return `<tr class="${i===0?'win':''}">
+      <td style="color:rgba(255,255,255,.25);font-size:.72rem">${String(i+1).padStart(2,'0')}</td>
+      <td><span class="cand-name">${faceHTML(c.nombre, col)}${c.nombre}${a2v}</span></td>
+      <td style="font-family:'Syne',sans-serif;color:rgba(255,255,255,.5)">${c.partido || '—'}</td>
+      <td class="r" style="font-family:'Syne',sans-serif;font-size:.95rem">${fmt(c.votos)}</td>
+      <td class="r"><span class="bar-wrap"><span class="bar-fill" style="width:0%;background:${col}" data-w="${bw}%"></span></span><span class="pct-val">${pct.toFixed(2)}%</span></td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="5" style="text-align:center;padding:2rem;color:rgba(255,255,255,.3)">Sin datos todavía. Carga el preconteo desde el panel de arriba.</td></tr>`;
+  setTimeout(() => $('tbody').querySelectorAll('.bar-fill').forEach(b => { if (b.dataset.w) b.style.width = b.dataset.w; }), 60);
+
+  renderDonut(tot, validos);
+  $('tbl-label').textContent = `Candidatos · ${STATE.dep==='00'?'Nacional':DANE_DEP[STATE.dep]||STATE.dep} · ${data.fuente==='auto'?'forma auto-detectada':data.fuente==='demo'?'simulación':'orden por votación'}`;
+}
+
+// ════════════════════ MODELO 1 · DEFINICIÓN 2ª VUELTA ════════════════════
+function loadBoletines(){ try { STATE.boletines = JSON.parse(localStorage.getItem(BOL_KEY) || '[]'); } catch(_){ STATE.boletines = []; } }
+function saveBoletines(){ try { localStorage.setItem(BOL_KEY, JSON.stringify(STATE.boletines.slice(-400))); } catch(_){} }
+function resetBoletines(silent){ STATE.boletines = []; STATE.demo = false; saveBoletines(); if(!silent){ renderDefinicion(); } }
+
+function captureBoletin(tot, cands){
+  if (STATE.dep !== '00' || !cands.length) return;
+  const last = STATE.boletines[STATE.boletines.length-1];
+  if (last && last.demo) resetBoletines(true);                 // limpia demo al llegar dato real
+  const last2 = STATE.boletines[STATE.boletines.length-1];
+  if (last2 && tot.mesesc <= last2.mesesc) return;             // sin avance de mesas
+  STATE.boletines.push({
+    ts: new Date().toISOString(), mesesc: tot.mesesc,
+    pctEscr: MESAS_TOTAL ? (tot.mesesc / MESAS_TOTAL * 100) : 0,
+    blanco: tot.votblan || 0, cands: cands.map(c => ({ n:c.nombre, v:c.votos })),
+  });
+  saveBoletines();
+}
+
+function erf(x){ const t=1/(1+0.3275911*Math.abs(x)); const y=1-(((((1.061405429*t-1.453152027)*t+1.421413741)*t-0.284496736)*t+0.254829592)*t)*Math.exp(-x*x); return x>=0?y:-y; }
+function ncdf(z){ return 0.5*(1+erf(z/Math.SQRT2)); }
+
+function boletinMetrics(b, sigma){
+  const cs = b.cands.slice().sort((a,b2)=>b2.v-a.v);
+  const base = cs.reduce((s,c)=>s+c.v,0) + (b.blanco||0);
+  const sh = i => (base>0 && cs[i]) ? cs[i].v/base : 0;
+  const s1=sh(0), s2=sh(1), s3=cs[2]?sh(2):null;
+  const X = Math.min(0.999, Math.max(0.001, b.pctEscr/100));
+  const sd = Math.max(1e-6, sigma * Math.sqrt(1 - X));
+  const p2v = Math.min(1, Math.max(0, ncdf((0.5 - s1)/sd)));
+  const plock = s3==null ? 1 : Math.min(1, Math.max(0, ncdf((s2 - s3)/(sd*Math.SQRT2))));
+  const maxF1 = s1*X + (1-X), minF1 = s1*X;
+  const min2 = s2*X, max3 = s3==null ? 0 : s3*X + (1-X);
+  const det2da = maxF1 < 0.5, det1ra = minF1 > 0.5, detLock = s3==null ? true : (min2 > max3);
+  return { x:b.pctEscr, ts:b.ts, base, s1, s2, s3, p2v, plock, det2da, det1ra, detLock, cs };
+}
+
+function computeDefinicion(sigma){
+  const rows = STATE.boletines.map(b => boletinMetrics(b, sigma));
+  const cur = rows[rows.length-1] || null;
+  let defProb = null, defDet = null;
+  for (const r of rows){
+    if (!defProb && (r.p2v >= 0.99 || r.p2v <= 0.01)) defProb = { x:r.x, ts:r.ts, val:r.p2v };
+    if (!defDet  && (r.det2da || r.det1ra)) defDet = { x:r.x, ts:r.ts, tipo: r.det2da?'segunda':'primera' };
+  }
+  return { rows, cur, defProb, defDet };
+}
+
+let chartProb=null, chartShares=null;
+function renderDefinicion(){
+  const sigma = parseFloat($('sigma').value) || 0.035;
+  const { rows, cur, defProb, defDet } = computeDefinicion(sigma);
+  $('bol-count').textContent = STATE.boletines.length ? `${STATE.boletines.length} boletín(es) capturado(s)` : 'sin boletines · usa «Simular» o espera datos en vivo';
+  $('def-demo').style.display = STATE.demo ? '' : 'none';
+
+  if (!cur){
+    ['def-p2v','def-plock','def-det','def-moment'].forEach(id => $(id).textContent='—');
+    $('def-det-d').textContent=''; $('def-moment-d').textContent='% mesas escrutadas';
+    if(chartProb){chartProb.destroy();chartProb=null;} if(chartShares){chartShares.destroy();chartShares=null;}
+    $('bol-table').innerHTML='';
+    return;
+  }
+
+  $('def-p2v').textContent = (cur.p2v*100).toFixed(1) + '%';
+  $('def-p2v').className = 'def-v ' + (cur.p2v>0.85?'g':cur.p2v<0.15?'b':'');
+  $('def-p2v-d').textContent = cur.p2v>0.5 ? 'probable segunda vuelta' : 'probable definición en 1ª';
+  $('def-plock').textContent = (cur.plock*100).toFixed(1) + '%';
+  $('def-plock-d').textContent = cur.s3==null ? 'sólo dos en contienda' : 'que el 2º no sea alcanzado por el 3º';
+
+  let detTxt='En disputa', detCls='', detD='aún puede cambiar matemáticamente';
+  if (cur.det1ra){ detTxt='Gana en 1ª (seguro)'; detCls='g'; detD='matemáticamente imposible evitar el 50%'; }
+  else if (cur.det2da){ detTxt='2ª vuelta (segura)'; detCls='b'; detD='el líder ya no puede llegar al 50%'; }
+  $('def-det').textContent = detTxt; $('def-det').className='def-v sm '+detCls; $('def-det-d').textContent = detD;
+
+  if (defDet){ $('def-moment').textContent = defDet.x.toFixed(1)+'%'; $('def-moment').className='def-v sm '+(defDet.tipo==='segunda'?'b':'g'); $('def-moment-d').textContent = `definición matemática (${defDet.tipo==='segunda'?'2ª vuelta':'1ª vuelta'})`; }
+  else if (defProb){ $('def-moment').textContent = defProb.x.toFixed(1)+'%'; $('def-moment').className='def-v sm'; $('def-moment-d').textContent = 'definición probabilística (≥99%)'; }
+  else { $('def-moment').textContent='—'; $('def-moment').className='def-v sm'; $('def-moment-d').textContent='aún sin definirse'; }
+
+  const labels = rows.map(r => r.x.toFixed(0));
+  if (chartProb) chartProb.destroy();
+  chartProb = new Chart($('chart-prob').getContext('2d'), {
+    type:'line',
+    data:{ labels, datasets:[
+      { label:'P(2ª vuelta)', data:rows.map(r=>+(r.p2v*100).toFixed(1)), borderColor:'#0047FF', backgroundColor:'rgba(0,71,255,.12)', fill:true, tension:.25, pointRadius:2 },
+      { label:'P(par firme)', data:rows.map(r=>+(r.plock*100).toFixed(1)), borderColor:'#4ade80', backgroundColor:'transparent', tension:.25, pointRadius:1, borderDash:[4,3] },
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+      scales:{ x:{ title:{display:true,text:'% escrutado'}, grid:{color:'rgba(255,255,255,.06)'} }, y:{ min:0, max:100, grid:{color:'rgba(255,255,255,.06)'}, ticks:{callback:v=>v+'%'} } },
+      plugins:{ legend:{ labels:{ boxWidth:10, font:{size:10} } } } }
+  });
+
+  const topNames = cur.cs.slice(0,5).map(c=>c.n);
+  const sharesData = {}; topNames.forEach(nm => sharesData[nm] = []);
+  rows.forEach((r,ri) => {
+    const blanco = STATE.boletines[ri] ? (STATE.boletines[ri].blanco||0) : 0;
+    const base = r.cs.reduce((s,c)=>s+c.v,0) + blanco;
+    topNames.forEach(nm => { const c = r.cs.find(x=>x.n===nm); sharesData[nm].push(c && base ? +(c.v/base*100).toFixed(2) : null); });
+  });
+  const mayoria = { label:'50% (mayoría)', data:labels.map(()=>50), borderColor:'rgba(255,255,255,.35)', borderDash:[6,4], pointRadius:0, fill:false };
+  if (chartShares) chartShares.destroy();
+  chartShares = new Chart($('chart-shares').getContext('2d'), {
+    type:'line',
+    data:{ labels, datasets: topNames.map((nm,idx) => ({ label:nm.split(' ').slice(0,2).join(' '), data:sharesData[nm], borderColor:candColor(nm,'',idx), backgroundColor:'transparent', tension:.25, pointRadius:1, spanGaps:true })).concat([mayoria]) },
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+      scales:{ x:{ title:{display:true,text:'% escrutado'}, grid:{color:'rgba(255,255,255,.06)'} }, y:{ grid:{color:'rgba(255,255,255,.06)'}, ticks:{callback:v=>v+'%'} } },
+      plugins:{ legend:{ labels:{ boxWidth:10, font:{size:10} } } } }
+  });
+
+  $('bol-table').innerHTML = `<table class="mini"><thead><tr><th>%escr</th><th>hora</th><th>#1</th><th>%</th><th>#2</th><th>%</th><th>P(2V)</th><th>estado</th></tr></thead><tbody>${
+    rows.map(r=>`<tr><td>${r.x.toFixed(1)}%</td><td>${new Date(r.ts).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}</td><td>${(r.cs[0]?r.cs[0].n.split(' ')[0]:'—')}</td><td>${(r.s1*100).toFixed(1)}%</td><td>${(r.cs[1]?r.cs[1].n.split(' ')[0]:'—')}</td><td>${(r.s2*100).toFixed(1)}%</td><td>${(r.p2v*100).toFixed(0)}%</td><td>${r.det1ra?'1ª✓':r.det2da?'2V✓':'…'}</td></tr>`).join('')
+  }</tbody></table>`;
+}
+
+// ════════════════════ MODELO 2 · COMPARACIÓN VS 2022 ════════════════════
+let HIST22 = { resumen:null, depto:null, mun:null, loading:null };
+async function ensure2022(){
+  if (HIST22.resumen && HIST22.depto) return true;
+  if (HIST22.loading) return HIST22.loading;
+  HIST22.loading = (async () => {
+    try {
+      const [r, d] = await Promise.all([
+        fetch(HIST22_BASE + '/resumen.json').then(x=>x.json()),
+        fetch(HIST22_BASE + '/por-depto.json').then(x=>x.json()),
+      ]);
+      HIST22.resumen = r.nacional || r; HIST22.depto = d; return true;
+    } catch(e){ return false; }
+  })();
+  return HIST22.loading;
+}
+async function ensure2022Mun(){
+  if (HIST22.mun) return HIST22.mun;
+  try { HIST22.mun = await fetch(HIST22_BASE + '/por-mun.json').then(x=>x.json()); } catch(_){ HIST22.mun = {}; }
+  return HIST22.mun;
+}
+function parse2022Block(blk){
+  if (!blk || !blk.candidatos) return null;
+  const arr = Object.values(blk.candidatos).map(c => ({ nombre:c.nombre, votos:c.votos, pct:c.pct }));
+  arr.sort((a,b)=>b.votos-a.votos);
+  const find = re => arr.find(c => re.test(norm(c.nombre)));
+  return { leader:arr[0], arr, validos:blk.votos_validos, petro:find(/petro/), fico:find(/gutierrez/) };
+}
+function curLeftPct(){
+  const d = STATE.data; if (!d) return null;
+  const base = d.cands.reduce((s,c)=>s+c.votos,0) + (d.tot.votblan||0);
+  const cep = d.cands.find(c => /cepeda/.test(norm(c.nombre)));
+  return cep && base ? { nombre:cep.nombre, pct: cep.votos/base*100 } : null;
+}
+function curLeader(){ const d=STATE.data; if(!d||!d.cands.length) return null; const base=d.cands.reduce((s,c)=>s+c.votos,0)+(d.tot.votblan||0); return { nombre:d.cands[0].nombre, pct: base?d.cands[0].votos/base*100:0 }; }
+
+async function renderCompare(){
+  const ok = await ensure2022();
+  const body = $('cmp-body'), scope = STATE.dep;
+  $('cmp-scope').textContent = scope==='00' ? 'Nacional' : (DANE_DEP[scope]||scope);
+  if (!ok){ body.innerHTML = '<div class="mini-note" style="color:var(--red)">No se pudo cargar la base 2022 desde S3.</div>'; return; }
+  if (!STATE.data || !STATE.data.cands.length){ body.innerHTML = '<div class="mini-note">Carga un boletín (o usa el demo) para comparar contra 2022.</div>'; return; }
+
+  const blk2022 = scope==='00' ? HIST22.resumen : (HIST22.depto[scope] || HIST22.depto[String(parseInt(scope,10))]);
+  const p22 = parse2022Block(blk2022);
+  if (!p22){ body.innerHTML = '<div class="mini-note">No hay datos 2022 para este ámbito.</div>'; return; }
+
+  const w22 = p22.leader, petro22 = p22.petro;
+  const lNow = curLeader(), cepNow = curLeftPct();
+  let swingHTML = `<div class="def-stat"><div class="def-k">Giro izquierda</div><div class="def-v sm">—</div><div class="def-d">requiere Cepeda en el boletín</div></div>`;
+  if (cepNow && petro22){
+    const swing = cepNow.pct - petro22.pct;
+    swingHTML = `<div class="def-stat"><div class="def-k">Giro izquierda (Cepeda − Petro)</div><div class="def-v sm ${swing>=0?'g':'r'}">${swing>=0?'+':''}${swing.toFixed(1)} pp</div><div class="def-d">Cepeda ${cepNow.pct.toFixed(1)}% hoy vs Petro ${petro22.pct.toFixed(1)}% 2022</div></div>`;
+  }
+  body.innerHTML = `<div class="def-grid" style="margin-bottom:0">
+    <div class="def-stat"><div class="def-k">Ganador 2022 (1ª)</div><div class="def-v sm">${faceHTML(w22.nombre,candColor(w22.nombre,'',0),'sm')} ${w22.nombre.split(' ').slice(0,2).join(' ')}</div><div class="def-d">${w22.pct.toFixed(1)}% de válidos</div></div>
+    <div class="def-stat"><div class="def-k">Líder ahora</div><div class="def-v sm">${lNow?faceHTML(lNow.nombre,candColor(lNow.nombre,'',0),'sm')+' '+lNow.nombre.split(' ').slice(0,2).join(' '):'—'}</div><div class="def-d">${lNow?lNow.pct.toFixed(1)+'% válidos+blanco':''}</div></div>
+    ${swingHTML}
+    <div class="def-stat"><div class="def-k">Válidos 2022</div><div class="def-v sm">${fmt(p22.validos)}</div><div class="def-d">referencia de magnitud</div></div>
+  </div>`;
+
+  const munWrap = $('cmp-mun-wrap');
+  if (scope !== '00'){
+    munWrap.style.display = '';
+    $('cmp-mun-sum').textContent = `Municipios de ${DANE_DEP[scope]||scope} · 2022 (1ª vuelta)`;
+    const muns = await ensure2022Mun();
+    const dep2 = scope.padStart(2,'0');
+    const rws = Object.entries(muns).filter(([k])=>k.startsWith(dep2+'-')).map(([k,v])=>{ const p=parse2022Block(v); return { k, w:p&&p.leader, petro:p&&p.petro, validos:v.votos_validos }; }).filter(r=>r.w);
+    rws.sort((a,b)=> (b.petro?b.petro.pct:0) - (a.petro?a.petro.pct:0));
+    $('cmp-mun').innerHTML = rws.length ? `<div class="mini-note" style="margin-bottom:.4rem">Base 2022 por municipio (orden: % izquierda/Petro). El % actual por municipio se superpone si el boletín trae desglose municipal.</div>
+      <table class="mini"><thead><tr><th>Mun (cód)</th><th>Ganador 2022</th><th>%</th><th>Petro 2022 %</th><th>Válidos</th></tr></thead><tbody>${
+        rws.slice(0,200).map(r=>`<tr><td>${r.k}</td><td>${r.w.nombre.split(' ').slice(0,2).join(' ')}</td><td>${r.w.pct.toFixed(1)}%</td><td>${r.petro?r.petro.pct.toFixed(1)+'%':'—'}</td><td>${fmt(r.validos)}</td></tr>`).join('')
+      }</tbody></table>` : '<div class="mini-note">Sin municipios 2022 para este departamento.</div>';
+  } else { munWrap.style.display = 'none'; }
+}
+
+// ════════════════════ LOAD ════════════════════
+function setStatus(msg, cls){ const s = $('status'); s.className = cls || ''; s.textContent = msg; }
+
+async function load(){
+  setStatus('Consultando ' + buildTarget(STATE.dep) + ' …', 'load');
+  try {
+    const ds = await fetchData(STATE.dep);
+    $('raw').textContent = JSON.stringify(ds, null, 2).slice(0, 40000);
+    $('raw-wrap').style.display = '';
+    const { cands, fuente } = extraerCandidatos(ds);
+    const tot = extraerTotales(ds);
+    if (tot.mesatota) MESAS_TOTAL = tot.mesatota;
+    STATE.data = { cands, tot, fuente };
+    render();
+    captureBoletin(tot, cands);
+    renderDefinicion();
+    renderCompare();
+
+    const now = new Date();
+    $('lastUpdate').textContent = now.toLocaleDateString('es-CO') + ' · ' + now.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+    $('mesasLabel').textContent = fmt(tot.mesesc) + ' / ' + (MESAS_TOTAL ? fmt(MESAS_TOTAL) : '—');
+    $('potLabel').textContent   = fmt(tot.centota || POTENCIAL_DEF);
+    $('fuenteLabel').textContent = 'Registraduría' + (fuente==='auto' ? ' (auto)' : '');
+
+    if (!cands.length) setStatus('JSON recibido pero no detecté candidatos. Revisa el JSON crudo abajo para mapear los campos (la forma presidencial puede diferir).', 'err');
+    else { setStatus(`OK · ${cands.length} candidatos · ${fmt(tot.mesesc)} mesas · ${now.toLocaleTimeString('es-CO')}`, 'ok'); if (!load._collapsed){ $('cfg').open = false; load._collapsed = true; } }
+  } catch (e){
+    if (e.status === 404 && /Ruta no encontrada/i.test(e.body || '')) setStatus('El worker aún no tiene la ruta /presidente. Agrégala (presidente → PR) y vuelve a desplegar — ver tools/registraduria-proxy-presidente-route.md. Mientras tanto puedes usar el modo «URL directa».', 'err');
+    else if (e.status === 403) setStatus('403 · La Registraduría tiene bloqueado el host de resultados (aún no abre el conteo o el endpoint presidencial no está habilitado). Reintenta más tarde esta noche.', 'err');
+    else if (e.message === 'no-json') setStatus('La respuesta no es JSON (landing/WAF/HTML). Primeros caracteres:\n' + (e.body || ''), 'err');
+    else setStatus('Error: ' + (e.message || e) + (e.target ? '\n(' + e.target + ')' : ''), 'err');
+  }
+}
+
+function toggleAuto(){
+  const b = $('btn-auto');
+  if (STATE.autoTimer){ clearInterval(STATE.autoTimer); STATE.autoTimer = null; b.classList.remove('on'); b.textContent = 'Auto-refresh: off'; }
+  else { STATE.autoTimer = setInterval(load, RECARGA_MS); b.classList.add('on'); b.textContent = 'Auto-refresh: 3 min'; load(); }
+}
+
+// ════════════════════ DEMO (probar el modelo sin datos en vivo) ════════════════════
+function runDemo(){
+  resetBoletines(true);
+  const finals = [['IVÁN CEPEDA',42.5],['PALOMA VALENCIA',26.5],['ABELARDO DE LA ESPRIELLA',18.0],['SERGIO FAJARDO',7.5],['CLAUDIA LÓPEZ',3.5],['ROY BARRERAS',2.0]];
+  const blancoFinalPct = 2.0;
+  const steps = [3,8,15,24,35,48,60,72,83,91,97,100];
+  MESAS_TOTAL = 126818;
+  steps.forEach((pe,i) => {
+    const noise = 1 - pe/100;
+    const cands = finals.map(([n,fp]) => {
+      const bias = /cepeda/i.test(n) ? 7*noise : /paloma/i.test(n) ? -1.5*noise : 0;
+      const pct = Math.max(0.2, fp + bias + Math.sin(i*1.7+fp)*1.4*noise);
+      return { n, pct };
+    });
+    const totalPct = cands.reduce((s,c)=>s+c.pct,0) + blancoFinalPct;
+    const baseVotes = 19000000 * (pe/100);
+    const cv = cands.map(c => ({ n:c.n, v:Math.round(baseVotes*c.pct/totalPct) }));
+    const blanco = Math.round(baseVotes*blancoFinalPct/totalPct);
+    STATE.boletines.push({ ts:new Date(Date.now()-(steps.length-i)*180000).toISOString(), mesesc:Math.round(126818*pe/100), pctEscr:pe, blanco, cands:cv, demo:true });
+  });
+  saveBoletines(); STATE.demo = true;
+  const last = STATE.boletines[STATE.boletines.length-1];
+  const sumV = last.cands.reduce((s,c)=>s+c.v,0);
+  STATE.data = {
+    cands: last.cands.map(c => ({ nombre:c.n, partido:'', votos:c.v, codpar:'' })).sort((a,b)=>b.votos-a.votos),
+    tot: { mesesc:last.mesesc, mesatota:126818, votant:sumV+last.blanco+330000, votval:sumV+last.blanco, votnul:200000, votnma:130000, votblan:last.blanco, centota:39002000 },
+    fuente:'demo',
+  };
+  render(); renderDefinicion(); renderCompare();
+  setStatus('Demo cargado: 12 boletines simulados (nadie pasa el 50% → 2ª vuelta). Borra los boletines antes del conteo real.', 'ok');
+}
+
+// ════════════════════ INIT ════════════════════
+function syncModeRows(){ const m = $('src-mode').value; document.querySelectorAll('[data-mode]').forEach(el => { el.style.display = (el.dataset.mode === m) ? '' : 'none'; }); }
+
+(function init(){
+  Chart.defaults.color = 'rgba(255,255,255,.4)';
+  Chart.defaults.font.family = "'DM Mono',monospace";
+
+  const sel = $('dep-select');
+  [['00','Nacional (todos)'], ...Object.entries(DANE_DEP).sort((a,b)=>a[1].localeCompare(b[1],'es'))].forEach(([cod,nom]) => { const o=document.createElement('option'); o.value=cod; o.textContent=nom; sel.appendChild(o); });
+
+  $('src-mode').onchange = syncModeRows;
+  sel.onchange = () => { STATE.dep = sel.value; load(); };
+  $('btn-load').onclick = load;
+  $('btn-auto').onclick = toggleAuto;
+  $('btn-recompute').onclick = renderDefinicion;
+  $('sigma').onchange = renderDefinicion;
+  $('btn-reset-bol').onclick = () => resetBoletines(false);
+  $('btn-demo').onclick = runDemo;
+  $('full-url').addEventListener('keydown', e => { if (e.key === 'Enter') load(); });
+  syncModeRows();
+
+  loadBoletines();
+  if (STATE.boletines.length){ STATE.demo = STATE.boletines.some(b=>b.demo); renderDefinicion(); }
+
+  const cur = $('cursor'), ring = $('cursorRing');
+  let mx=0,my=0,rx=0,ry=0;
+  document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; cur.style.left=mx+'px'; cur.style.top=my+'px'; });
+  (function anim(){ rx+=(mx-rx)*.12; ry+=(my-ry)*.12; ring.style.left=rx+'px'; ring.style.top=ry+'px'; requestAnimationFrame(anim); })();
+  document.addEventListener('mouseover', e => { if (e.target.closest('a,button,select,input,summary')){ cur.style.transform='translate(-50%,-50%) scale(2.5)'; cur.style.background='transparent'; cur.style.border='1.5px solid var(--blue)'; ring.style.opacity='0'; } });
+  document.addEventListener('mouseout', e => { if (e.target.closest('a,button,select,input,summary')){ cur.style.transform='translate(-50%,-50%) scale(1)'; cur.style.background='var(--blue)'; cur.style.border='none'; ring.style.opacity='.4'; } });
+})();
+</script>
+<script src="theme.js"></script>
+</body>
+</html>
