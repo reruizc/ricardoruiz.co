@@ -19,7 +19,7 @@
 - `lab-informe.js` — **Sprint G** · helpers + generador PDF/MD del informe combinado del lab. Lee los 6 localStorage keys y produce un memo CONPES integrado. Cargado solo desde el hub.
 - `lab-indicadores.js` — **Sprint E (Fase A)** · helper de indicadores municipales oficiales con panel temporal 2018-2024. 8 indicadores × 1.108 municipios desde datos.gov.co (Policía Nacional + MEN). API lookupMun/getSerie/searchMun/matchIndicadorByKeyword. Cargado por analisis-estructural, problema-publico, ain y evaluacion.
 - `prospect-escenarios.html` — **Sprint F + F v2** · séptimo módulo del lab. Escenarios prospectivos por método de los ejes de incertidumbre (Schwartz · GBN), prospectiva estratégica francesa (Godet · Mojica · LIPSOR) y Robust Decision Making (Lempert · RAND). 4 mecánicas: incertidumbres críticas (auto-suggest desde MicMac) · narrativa de 4 cuadrantes · cross-impact con variables/actores/alternativas (Gordon 1968) · decisiones no-regret + señales tempranas. Cloud-save + 2 acciones IA copiloto (sugerir-ejes Pro · narrar-escenarios Premium) + 3 exports (memo .md + matriz .csv + ficha .pdf jsPDF). Integrado al informe combinado del lab (sección 8). LISTO (Sprint F + F v2).
-- `comunicar.html` — **Sprint H · v1** · **octavo módulo del lab**. Plan de comunicación de la política pública. 8 mecánicas: contexto + alcance · audiencias (mín 2 / máx 6) · mensaje clave (primario ≤15 palabras + 3 secundarios + valores) · narrativa pública Ganz (Story of Self/Us/Now) · framing Lakoff + Shenker-Osorio (valor central, palabras propias vs adversario) · matriz audiencia × canal con heurística BIT EAST · vocería principal + multiplicadores · cronograma 4 fases + medición OCDE 9-dim. STATE en `localStorage['comunicar-current-v1']`. 3 exports: plan .md, matriz .csv (audiencia×canal + KPIs), guía de mensajes .md para vocería. Auto-import desde PP/Ev/Alt/AIN. Marco metodológico: OCDE Public Communication Report 2021 · CLAD Carta Iberoamericana de Gobierno Abierto 2016 · MIPG · Función Pública (Decreto 1499/2017, Manual v6 dic 2024) · Ley 1712 de 2014 · Ganz · Lakoff 2024 · Anat Shenker-Osorio · BIT EAST 2024 · Stone · Omar Rincón. **Cloud-save y copiloto IA quedan pendientes para v2** (mismo patrón que prospect v1: solo localStorage). LISTO (Sprint H v1).
+- `comunicar.html` — **Sprint H · v1** · **octavo módulo del lab**. Plan de comunicación de la política pública. 8 mecánicas: contexto + alcance · audiencias (mín 2 / máx 6) · mensaje clave (primario ≤15 palabras + 3 secundarios + valores) · narrativa pública Ganz (Story of Self/Us/Now) · framing Lakoff + Shenker-Osorio (valor central, palabras propias vs adversario) · matriz audiencia × canal con heurística BIT EAST · vocería principal + multiplicadores · cronograma 4 fases + medición OCDE 9-dim. STATE en `localStorage['comunicar-current-v1']`. 3 exports: plan .md, matriz .csv (audiencia×canal + KPIs), guía de mensajes .md para vocería. Auto-import desde PP/Ev/Alt/AIN. Marco metodológico: OCDE Public Communication Report 2021 · CLAD Carta Iberoamericana de Gobierno Abierto 2016 · MIPG · Función Pública (Decreto 1499/2017, Manual v6 dic 2024) · Ley 1712 de 2014 · Ganz · Lakoff 2024 · Anat Shenker-Osorio · BIT EAST 2024 · Stone · Omar Rincón. **Cloud-save + colaboración + 3 acciones IA copiloto** (sugerir-audiencias Pro+ · validar-mensaje Premium+ · narrativa-ganz Premium+) operativos vía worker `/comunicar/*`. PDFs de metodología en S3. LISTO (Sprint H v1 + **v2**).
 - `pricing.html` — planes (Básico / Pro 39.900 COP · Premium 99.900 COP · Personalizado)
 - `lang.js` — i18n (co/us/cn); `CLAUDE.md` vive en la raíz del repo
 
@@ -2979,7 +2979,7 @@ Externado-CIPE, Future Today Institute, RAND-RDM.
 
 ### Worker rr-auth — endpoints del lab
 
-Total **49 endpoints** (7 micmac + 7 mactor + 7 pp + 7 ev + 7 alt + 7 ain + 7 prospect),
+Total **56 endpoints** (7 micmac + 7 mactor + 7 pp + 7 ev + 7 alt + 7 ain + 7 prospect + 7 comunicar),
 agrupados en 6 módulos paralelos con el mismo patrón CRUD + invite +
 copiloto.
 
@@ -3082,6 +3082,9 @@ copiloto.
 | ain    | `narrativa-ain` | Premium+ |
 | prospect | `sugerir-ejes` | Pro+ |
 | prospect | `narrar-escenarios` | Premium+ |
+| comunicar | `sugerir-audiencias` | Pro+ |
+| comunicar | `validar-mensaje` | Premium+ |
+| comunicar | `narrativa-ganz` | Premium+ |
 
 **Storage KV (`RR_STORE`):**
 ```
@@ -3096,6 +3099,7 @@ ev:*     (mismo layout con prefijo ev)
 alt:*    (mismo layout con prefijo alt)
 ain:*    (mismo layout con prefijo ain)
 prospect:* (mismo layout con prefijo prospect)
+comunicar:* (mismo layout con prefijo comunicar)
 ```
 
 **DeepSeek:** API key `DEEPSEEK_API_KEY` como secret del worker
@@ -3124,6 +3128,11 @@ AIN_MAX_OPCIONES         = 7   // 6 + baseline statu-quo
 AIN_MAX_AFECTADOS        = 12
 AIN_MAX_AUDIENCIAS       = 10
 PROSPECT_MAX_ELEMENTOS   = 30  // cross-impact: vars + actores + alts
+COMUNICAR_MAX_PROJ       = { free:1, pro:5, premium:25, full:50 }
+COMUNICAR_MAX_AUD        = 6
+COMUNICAR_MAX_MULT       = 8
+COMUNICAR_MAX_PALABRAS   = 16   // palabras propias / adversario (framing)
+// canales whitelisted (14) · matriz audiencia×canal 0-3 · 9 KPIs OCDE · fase/objetivo/prioridad/tipo-multiplicador whitelisted
 ```
 
 **Deploy del worker:**
@@ -3394,28 +3403,31 @@ escenarios · comunicar)".
 - `_informeSnippet` ahora maneja `prospect` (noRegret, ejes) y
   `comunicar` (nAud + primario, o política + fase).
 
-**Pendiente para v2 (cuando se autorice deploy del worker):**
-- 7 endpoints `/comunicar/*` en `rr-auth` (list, save, load, delete,
-  invite, accept, copiloto) espejo del patrón `/prospect/*` o `/ain/*`.
+**v2 · cloud-save + IA copiloto** ✓ LISTO (2026-05-31):
+- **7 endpoints `/comunicar/*`** en `rr-auth` (list, save, load, delete,
+  invite, accept, copiloto) espejo del patrón `/prospect/*`. KV prefijo
+  `comunicar:*`. Total del worker: **56 endpoints**.
 - Validación dura en `/comunicar/save`: ≤6 audiencias, mensaje primario
-  ≤300 chars, ≤16 palabras propias/adversario, ≤10 canales activos,
-  matriz audiencia×canal con valores ∈ {0,1,2,3}, ≤8 multiplicadores,
-  tipos de multiplicador whitelisted, 9 KPIs OCDE.
-- 3 acciones IA copiloto recomendadas:
-  - `sugerir-audiencias` (Pro+) · DeepSeek V4 Flash · 4-6 audiencias
-    típicas adaptadas al contexto (Pacto Histórico vs CD cambian los
-    segmentos relevantes).
-  - `validar-mensaje` (Premium+) · chequea el mensaje primario con
-    heurística ASO (valor antes que política · 15 palabras máx · verbo
-    de acción · beneficio claro).
-  - `narrativa-ganz` (Premium+) · sugiere borrador de Story of Self/Us/Now
-    a partir del enunciado, valores y framing.
-- UI del cloud-bar ya existe (en `cloud-bar-flow`), está marcada como
-  *anon* (amarilla) con texto "Trabajando local · cloud-save y
-  copiloto IA llegan en v2" y un botón "↓ Backup .json" para exportar
-  el state completo. Replicar `loadUserFromAPI`/`renderAuthChip`/
-  `cloudSave`/`cloudLoad`/`openInviteModal` del patrón de `ain.html`
-  cuando se prenda v2.
+  ≤300 chars, ≤16 palabras propias/adversario, canales whitelisted (14),
+  matriz audiencia×canal con valores ∈ {0,1,2,3} (≤12 filas), ≤8
+  multiplicadores con tipo whitelisted, 9 KPIs OCDE, fase/objetivo/
+  prioridad whitelisted.
+- 3 acciones IA copiloto (DeepSeek V4 Flash · cache hash24 TTL 7d):
+  - `sugerir-audiencias` (Pro+) · 4-6 audiencias típicas adaptadas al
+    contexto y la fase. Botón "+ Agregar" inyecta al STATE (≤6).
+  - `validar-mensaje` (Premium+) · heurística ASO/Lakoff (valor antes
+    que política · ≤15 palabras · verbo de acción · beneficio · no
+    repetir al adversario). Devuelve veredicto + issues + mensaje_mejorado
+    con botón "Usar esta propuesta".
+  - `narrativa-ganz` (Premium+) · borrador de Story of Self/Us/Now desde
+    enunciado + valores + framing. Botón "Usar este borrador" rellena los
+    3 campos.
+- Frontend `comunicar.html`: bloque AUTH/CLOUD portado de `ain.html`
+  (auth chip en nav, cloud-bars flow+results, `#my-projects`,
+  modal-login, modal-invite, polling 10s, auto-save con debounce 2s vía
+  `saveState`→`cloudAutoSave`, guard `_applyingRemote` para evitar
+  ping-pong entre colaboradores). JS validado con `new Function` (0
+  errores). Worker validado con `wrangler deploy --dry-run` (bundle OK).
 
 **PDFs metodología (v2)** ✓ LISTOS (2026-05-31):
 - `Bases de datos/comunicar/metodologia-paso-a-paso.pdf` (12.1 KB · 10
@@ -3554,7 +3566,7 @@ escenarios prospectivos" más abajo. Tres frentes simultáneos:
 
 **Sprint F v2 · Cloud-save + IA para prospect** ✓ LISTO. Ver sección
 "Sprint F v2 · cloud-save + IA copiloto para prospect" más abajo. El
-worker ahora tiene 49 endpoints (los 7 de prospect agregados). El
+worker ahora tiene 56 endpoints (los 7 de prospect + 7 de comunicar). El
 informe combinado de Sprint G integra el séptimo módulo en una nueva
 sección 8.
 
