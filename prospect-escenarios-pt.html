@@ -1,0 +1,3219 @@
+<!DOCTYPE html>
+<html lang="pt-BR" id="htmlRoot">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cenários Prospectivos · Ricardo.Ruiz</title>
+<meta name="description" content="Construye cenários prospectivos com o método de Schwartz / Global Business Network: dois incertezas críticas, quatro futuros plausíveis, cross-impact e decisões no-regret (Lempert · RAND). Lab de Políticas Públicas e Prospectiva." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper:#1a1610; --paper-2:#221d15; --paper-3:#2a241b;
+  --ink:#f4f3ef; --ink-2:#b8b1a0; --ink-3:#807a6c;
+  --rule:#f4f3ef1c; --rule-strong:#f4f3ef38;
+  --accent:#d96a50; --accent-2:#e08266;
+  --accent-soft:#d96a5018; --accent-tint:#d96a5036;
+  --gold:#d6a83a; --on-accent:#14110a;
+  --green:#6fa07a; --amber:#d6a83a; --danger:#d96a50;
+  --sans:'Familjen Grotesk',system-ui,sans-serif;
+  --italic:'Petrona',Georgia,serif;
+  --mono:'Space Mono',ui-monospace,monospace;
+  --display:'Syne',sans-serif;
+}
+body.day-mode {
+  --paper:#f4f3ef; --paper-2:#ecebe5; --paper-3:#e0ddd2;
+  --ink:#14110a; --ink-2:#5a5448; --ink-3:#948e80;
+  --rule:#14110a1f; --rule-strong:#14110a40;
+  --accent:#8a1e16; --accent-2:#a02a20;
+  --accent-soft:#8a1e161a; --accent-tint:#8a1e1633;
+  --gold:#8a6a1a; --on-accent:#f4f3ef;
+  --green:#2f6b3f; --amber:#8a6a1a; --danger:#b03524;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html { scroll-behavior:smooth; }
+body {
+  background:var(--paper); color:var(--ink);
+  font-family:var(--sans); font-size:17px; line-height:1.55;
+  min-height:100vh; overflow-x:hidden; cursor:none;
+  transition:background .35s, color .35s;
+}
+a { color:inherit; text-decoration:none; }
+button { font:inherit; color:inherit; background:none; border:none; cursor:none; }
+::selection { background:var(--accent); color:var(--on-accent); }
+body.day-mode::before {
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image:radial-gradient(rgba(20,17,10,.035) 1px, transparent 1.4px);
+  background-size:4px 4px; opacity:.9; mix-blend-mode:multiply;
+}
+.cursor { position:fixed; width:12px; height:12px; background:var(--accent); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s, background .2s; transform:translate(-50%,-50%); }
+.cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--accent); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s, opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+
+/* Topbar */
+.topbar {
+  position:sticky; top:0; z-index:60;
+  display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:1.5rem;
+  padding:1rem 1.75rem;
+  background:var(--paper); border-bottom:1px solid var(--rule); backdrop-filter:blur(8px);
+}
+.topbar-left,.topbar-center,.topbar-right { display:flex; align-items:center; gap:1.1rem; }
+.topbar-right { justify-content:flex-end; }
+.btn-back {
+  display:inline-flex; align-items:center; gap:.55rem;
+  font-family:var(--sans); font-size:14px; font-weight:500; letter-spacing:.04em;
+  padding:.5rem .9rem; border:1px solid var(--rule-strong); transition:background .2s, border-color .2s;
+}
+.btn-back:hover { background:var(--paper-2); border-color:var(--ink); }
+.theme-btn {
+  font-family:var(--mono); font-size:12px; font-weight:700; color:var(--ink-2);
+  padding:.45rem .8rem; border:1px solid var(--rule-strong);
+  transition:color .2s, border-color .2s;
+}
+.theme-btn:hover { color:var(--ink); border-color:var(--ink); }
+.logo-link { display:inline-flex; align-items:center; gap:.55rem; opacity:.9; }
+.logo-link:hover { opacity:1; }
+.logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
+.logo-bar { width:5px; background:var(--accent); border-radius:1px 1px 0 0; opacity:.9; }
+.logo-text { font-family:var(--display); font-weight:800; font-size:clamp(1.05rem,2vw,1.4rem); letter-spacing:-.03em; line-height:1; }
+.logo-text span { color:var(--accent); }
+
+.page {
+  position:relative; z-index:1;
+  max-width:980px; width:100%; margin:0 auto;
+  padding:2.4rem 1.75rem 5rem;
+}
+@media (max-width:720px) {
+  .page { padding:1.6rem 1.1rem 3rem; }
+  .topbar { grid-template-columns:1fr auto; padding:.85rem 1rem; }
+  .topbar-center { display:none; }
+  .topbar-right .logo-link { display:none; }
+}
+.crumb {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3); margin-bottom:1.8rem;
+}
+.crumb a { color:var(--ink-3); transition:color .2s; }
+.crumb a:hover { color:var(--accent); }
+.crumb .sep { margin:0 .55rem; opacity:.55; }
+
+/* Welcome */
+.welcome { text-align:center; padding:1.5rem 0 2rem; }
+.eyebrow {
+  font-family:var(--mono); font-size:12px; letter-spacing:.22em;
+  text-transform:uppercase; color:var(--accent); font-weight:700; margin-bottom:1.4rem;
+}
+.welcome-title {
+  font-family:var(--sans); font-weight:700;
+  font-size:clamp(2rem,5vw,3rem); letter-spacing:-.025em; line-height:1.1;
+  max-width:24ch; margin:0 auto 1.4rem;
+}
+.welcome-title em { font-family:var(--italic); font-style:italic; font-weight:400; color:var(--accent); }
+.welcome-sub {
+  font-family:var(--sans); font-size:clamp(1rem,1.5vw,1.18rem); line-height:1.55;
+  color:var(--ink-2); max-width:54ch; margin:0 auto 2rem;
+}
+.welcome-sub em { font-family:var(--italic); font-style:italic; color:var(--accent); }
+.welcome-hint {
+  font-family:var(--mono); font-size:12px; letter-spacing:.04em; color:var(--ink-3);
+  max-width:54ch; margin:0 auto 2rem; line-height:1.6;
+}
+
+.accordion-stack {
+  display:flex; flex-direction:column; gap:.5rem;
+  max-width:640px; margin:2.6rem auto 2.4rem; text-align:left;
+}
+.accordion {
+  border:1px solid var(--rule-strong); background:var(--paper-2);
+  transition:background .2s, border-color .2s;
+}
+.accordion[open] { border-color:var(--accent-tint); background:var(--paper-3); }
+.accordion summary {
+  display:flex; align-items:center; justify-content:space-between; gap:1rem;
+  padding:1rem 1.2rem; list-style:none; cursor:none;
+  font-family:var(--sans); font-weight:600; font-size:.98rem;
+  user-select:none;
+}
+.accordion summary::-webkit-details-marker { display:none; }
+.accordion summary::after {
+  content:"+"; font-family:var(--mono); font-size:1.2rem; color:var(--accent);
+  width:18px; height:18px; display:flex; align-items:center; justify-content:center;
+  transition:transform .2s;
+}
+.accordion[open] summary::after { content:"−"; }
+.accordion summary .acc-num {
+  font-family:var(--mono); font-size:11px; color:var(--ink-3);
+  letter-spacing:.12em; margin-right:.9rem; font-weight:400;
+}
+.accordion-body {
+  padding:0 1.2rem 1.2rem;
+  font-family:var(--italic); font-style:italic; font-size:1rem; line-height:1.6; color:var(--ink-2);
+}
+.accordion-body em { color:var(--accent); }
+
+/* Botones */
+.btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+  font-family:var(--sans); font-weight:600; font-size:.98rem;
+  padding:.95rem 1.8rem;
+  background:var(--accent); color:var(--on-accent); border:none;
+  transition:background .2s, transform .1s;
+}
+.btn:hover { background:var(--accent-2); }
+.btn:active { transform:scale(.98); }
+.btn[disabled], .btn.disabled { opacity:.35; pointer-events:none; }
+.btn-ghost {
+  background:transparent; color:var(--ink-2);
+  border:1px solid var(--rule-strong);
+  padding:.85rem 1.4rem;
+}
+.btn-ghost:hover { color:var(--ink); border-color:var(--ink); background:var(--paper-2); }
+.btn-big { font-size:1.05rem; padding:1.15rem 2.4rem; letter-spacing:.02em; }
+
+.is-hidden { display:none !important; }
+
+/* Method link */
+.method-link {
+  display:inline-flex; align-items:center; gap:.4rem;
+  font-family:var(--mono); font-size:12px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--ink-2);
+  padding:.55rem .95rem; border:1px solid var(--rule-strong);
+  transition:color .2s, border-color .2s;
+}
+.method-link:hover { color:var(--accent); border-color:var(--accent); }
+
+/* Section head */
+.section-head {
+  display:flex; align-items:baseline; justify-content:space-between;
+  gap:1rem; margin-bottom:1.2rem; flex-wrap:wrap;
+}
+.section-head h2 {
+  font-family:var(--sans); font-weight:700; font-size:1.55rem; letter-spacing:-.015em;
+}
+.section-head h2 .num {
+  font-family:var(--mono); font-size:.65em; letter-spacing:.12em;
+  color:var(--ink-3); margin-right:.5rem; font-weight:400;
+}
+.section-head .meta {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.08em; color:var(--ink-3);
+}
+.section-desc {
+  font-family:var(--italic); font-style:italic; font-size:1.02rem; line-height:1.55;
+  color:var(--ink-2); max-width:60ch; margin-bottom:1.6rem;
+}
+
+/* Stage intro banner */
+.stage-intro {
+  background:var(--paper-2); border:1px solid var(--rule);
+  border-left:3px solid var(--accent);
+  padding:1.1rem 1.4rem; margin-bottom:1.6rem;
+}
+.stage-intro p {
+  font-family:var(--sans); font-size:.96rem; line-height:1.55; color:var(--ink);
+}
+.stage-intro p b { color:var(--accent); font-weight:600; }
+.stage-intro p em { font-family:var(--italic); font-style:italic; color:var(--ink-2); }
+
+/* Steps row */
+.steps-row {
+  display:flex; gap:.4rem; margin-bottom:2rem;
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.1em;
+  text-transform:uppercase;
+}
+.step-pill {
+  flex:1; padding:.65rem .55rem;
+  text-align:center;
+  background:var(--paper-2); color:var(--ink-3);
+  border:1px solid var(--rule-strong);
+  position:relative;
+}
+.step-pill .step-n { color:var(--accent); font-weight:700; margin-right:.45rem; }
+.step-pill.done { color:var(--ink-2); }
+.step-pill.done::after {
+  content:"✓"; position:absolute; right:.55rem; top:50%; transform:translateY(-50%);
+  color:var(--green); font-size:1rem; font-family:var(--sans);
+}
+.step-pill.active { color:var(--ink); background:var(--accent-soft); border-color:var(--accent); }
+@media (max-width:720px) { .steps-row { display:none; } }
+
+/* Form fields */
+.field { margin-bottom:1.4rem; }
+.field-label {
+  display:block;
+  font-family:var(--mono); font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3); margin-bottom:.5rem;
+}
+.field-label .req { color:var(--accent); }
+.field-hint {
+  font-family:var(--italic); font-style:italic; font-size:.86rem;
+  color:var(--ink-3); margin-top:.4rem; line-height:1.5;
+}
+.field input[type="text"], .field input[type="number"], .field input[type="url"], .field textarea, .field select {
+  width:100%;
+  font-family:var(--sans); font-size:.96rem; line-height:1.5;
+  padding:.7rem .9rem;
+  background:var(--paper-2); color:var(--ink);
+  border:1px solid var(--rule-strong); outline:none;
+  transition:border-color .15s;
+}
+.field input:focus, .field textarea:focus, .field select:focus { border-color:var(--accent); }
+.field textarea { min-height:120px; resize:vertical; line-height:1.55; }
+.field-row {
+  display:grid; grid-template-columns:1fr 1fr; gap:1rem;
+}
+@media (max-width:560px) { .field-row { grid-template-columns:1fr; } }
+
+.actions {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:.8rem; margin-top:1.8rem; flex-wrap:wrap;
+}
+.actions .right-group { display:flex; gap:.6rem; flex-wrap:wrap; }
+
+/* Import banner (MicMac, Mactor, Alt) */
+.import-banner {
+  display:flex; align-items:center; gap:1rem; flex-wrap:wrap;
+  padding:.85rem 1.1rem; margin-bottom:1.4rem;
+  background:rgba(214,168,58,0.10);
+  border:1px solid var(--rule);
+  border-left:3px solid var(--gold);
+  font-family:var(--mono); font-size:11.5px; color:var(--ink-2);
+}
+.import-banner .ib-icon { color:var(--gold); font-family:var(--sans); font-size:1.3rem; }
+.import-banner .ib-body { flex:1; min-width:240px; line-height:1.45; }
+.import-banner .ib-body b { color:var(--ink); font-family:var(--sans); font-size:.95rem; font-weight:700; display:block; margin-bottom:.15rem; }
+.import-banner .ib-body em { font-family:var(--italic); font-style:italic; color:var(--ink-2); }
+.import-banner .btn-mini {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.06em;
+  padding:.4rem .85rem; background:var(--gold); color:var(--on-accent);
+  border:1px solid var(--gold); font-weight:700;
+}
+.import-banner .btn-mini:hover { filter:brightness(1.05); }
+
+/* ─── Stage 1 · Incertidumbres ─────────────────────────────────────────── */
+.eje-grid {
+  display:grid; grid-template-columns:1fr 1fr; gap:1.1rem; margin-bottom:1rem;
+}
+@media (max-width:720px) { .eje-grid { grid-template-columns:1fr; } }
+.eje-card {
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+  border-left:3px solid var(--accent);
+  padding:1.1rem 1.2rem;
+}
+.eje-card .eje-label {
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--accent); font-weight:700; margin-bottom:.55rem;
+}
+.eje-card .eje-axis-name {
+  font-family:var(--sans); font-weight:700; font-size:1.05rem;
+  color:var(--ink); margin-bottom:.65rem;
+  padding:.45rem .65rem; background:var(--paper); border:1px solid var(--rule);
+}
+.eje-card .eje-axis-name[contenteditable] { outline:none; }
+.eje-card .eje-axis-name[contenteditable]:focus { border-color:var(--accent); background:var(--paper-3); }
+.eje-card .eje-polos { display:flex; flex-direction:column; gap:.5rem; margin-top:.3rem; }
+.eje-card .polo {
+  display:flex; gap:.55rem; align-items:center;
+  padding:.55rem .75rem; background:var(--paper);
+  border:1px solid var(--rule);
+}
+.eje-card .polo .polo-tag {
+  font-family:var(--mono); font-size:10px; font-weight:700;
+  letter-spacing:.1em; text-transform:uppercase;
+  flex-shrink:0; width:40px;
+}
+.eje-card .polo.neg .polo-tag { color:var(--danger); }
+.eje-card .polo.pos .polo-tag { color:var(--green); }
+.eje-card .polo span[contenteditable] {
+  flex:1; font-family:var(--sans); font-size:.92rem; color:var(--ink); outline:none;
+}
+.eje-card .eje-source {
+  font-family:var(--italic); font-style:italic; font-size:.82rem;
+  color:var(--ink-3); margin-top:.5rem;
+}
+.eje-card .eje-source em { color:var(--accent); }
+
+/* ─── Stage 2 · 4 escenarios ──────────────────────────────────────────── */
+.escenarios-axes-hint {
+  font-family:var(--mono); font-size:11px; letter-spacing:.08em;
+  color:var(--ink-3); margin-bottom:.8rem; line-height:1.55;
+}
+.escenarios-axes-hint b { color:var(--accent); }
+
+.matriz-2x2 {
+  display:grid; grid-template-columns:60px 1fr 1fr; gap:.5rem;
+  margin-bottom:1.4rem;
+  align-items:stretch;
+}
+.matriz-2x2 .axis-label-y-top, .matriz-2x2 .axis-label-y-bot {
+  font-family:var(--mono); font-size:10px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-3); text-align:right;
+  padding:.55rem .4rem; display:flex; align-items:center; justify-content:flex-end;
+}
+.matriz-2x2 .axis-label-y-top b, .matriz-2x2 .axis-label-y-bot b { color:var(--green); font-weight:700; }
+.matriz-2x2 .axis-label-y-bot b.neg { color:var(--danger); }
+.matriz-2x2 .axis-label-x {
+  grid-column: 2 / span 2;
+  display:grid; grid-template-columns:1fr 1fr; gap:.5rem;
+}
+.matriz-2x2 .axis-label-x .x-label {
+  font-family:var(--mono); font-size:10px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-3); text-align:center;
+  padding:.4rem; line-height:1.4;
+}
+.matriz-2x2 .axis-label-x .x-label b { display:block; margin-top:.15rem; }
+.matriz-2x2 .axis-label-x .x-label.neg b { color:var(--danger); }
+.matriz-2x2 .axis-label-x .x-label.pos b { color:var(--green); }
+
+.scen-quad {
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+  padding:.95rem 1rem; display:flex; flex-direction:column; gap:.4rem;
+  min-height:200px;
+}
+.scen-quad.NE { border-left:3px solid var(--green); }
+.scen-quad.NO { border-left:3px solid var(--gold); }
+.scen-quad.SO { border-left:3px solid var(--danger); }
+.scen-quad.SE { border-left:3px solid var(--accent); }
+
+.scen-quad .sq-head {
+  display:flex; align-items:baseline; justify-content:space-between;
+  gap:.55rem; flex-wrap:wrap;
+}
+.scen-quad .sq-tag {
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3); font-weight:700;
+}
+.scen-quad .sq-prob-wrap { display:flex; align-items:center; gap:.3rem; }
+.scen-quad .sq-prob {
+  font-family:var(--mono); font-size:.85rem;
+  width:46px; text-align:right;
+  padding:.25rem .35rem; background:var(--paper);
+  border:1px solid var(--rule); color:var(--ink); outline:none;
+}
+.scen-quad .sq-prob-pct {
+  font-family:var(--mono); font-size:10.5px; color:var(--ink-3);
+}
+.scen-quad .sq-name {
+  font-family:var(--sans); font-weight:700; font-size:1.02rem; color:var(--ink);
+  padding:.4rem .55rem; background:var(--paper); border:1px solid var(--rule);
+  outline:none;
+}
+.scen-quad .sq-name[contenteditable]:focus { border-color:var(--accent); }
+.scen-quad textarea {
+  width:100%; resize:vertical; min-height:80px; flex:1;
+  font-family:var(--sans); font-size:.9rem; line-height:1.5;
+  padding:.5rem .65rem;
+  background:var(--paper); color:var(--ink-2);
+  border:1px solid var(--rule); outline:none;
+}
+.scen-quad textarea:focus { border-color:var(--accent); color:var(--ink); }
+
+.scen-probsum {
+  padding:.55rem .85rem;
+  background:var(--paper-3); border:1px solid var(--rule);
+  font-family:var(--mono); font-size:11.5px; color:var(--ink-2);
+  margin-bottom:1.1rem;
+  display:flex; align-items:center; gap:.85rem; flex-wrap:wrap;
+}
+.scen-probsum.ok { border-color:rgba(111,160,122,0.35); color:var(--green); }
+.scen-probsum.warn { border-color:rgba(214,168,58,0.4); color:var(--amber); }
+.scen-probsum b { font-weight:700; }
+
+@media (max-width:720px) {
+  .matriz-2x2 { grid-template-columns:1fr; }
+  .matriz-2x2 .axis-label-y-top, .matriz-2x2 .axis-label-y-bot { display:none; }
+  .matriz-2x2 .axis-label-x { grid-column: 1; grid-template-columns:1fr; }
+}
+
+/* ─── Stage 3 · Cross-impact ──────────────────────────────────────────── */
+.import-section {
+  background:var(--paper-2); border:1px solid var(--rule);
+  padding:1rem 1.15rem; margin-bottom:1rem;
+}
+.import-section .is-head {
+  display:flex; align-items:baseline; justify-content:space-between;
+  gap:.8rem; margin-bottom:.6rem; flex-wrap:wrap;
+}
+.import-section .is-title {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--accent); font-weight:700;
+}
+.import-section .is-meta {
+  font-family:var(--mono); font-size:10.5px; color:var(--ink-3);
+}
+.import-list { display:flex; flex-direction:column; gap:.35rem; }
+.import-row {
+  display:flex; align-items:center; gap:.6rem;
+  padding:.45rem .7rem; background:var(--paper);
+  border:1px solid var(--rule); transition:border-color .15s;
+  cursor:none;
+}
+.import-row:hover { border-color:var(--accent-tint); }
+.import-row input[type=checkbox] {
+  width:16px; height:16px; cursor:none; accent-color:var(--accent);
+}
+.import-row .ir-name {
+  flex:1; font-family:var(--sans); font-size:.9rem; color:var(--ink);
+}
+.import-row.added { background:var(--accent-soft); border-color:var(--accent-tint); }
+.import-row .ir-add-manual {
+  width:100%;
+  font-family:var(--sans); font-size:.9rem;
+  padding:.45rem .65rem;
+  background:var(--paper); color:var(--ink);
+  border:1px solid var(--rule-strong); outline:none;
+}
+
+.crossimp-wrap { overflow-x:auto; margin-bottom:1.2rem; }
+.crossimp-table {
+  width:100%; border-collapse:collapse; min-width:560px;
+}
+.crossimp-table th, .crossimp-table td {
+  border:1px solid var(--rule);
+  padding:.55rem .65rem;
+  font-family:var(--sans); font-size:.88rem;
+  vertical-align:middle;
+  background:var(--paper-2);
+}
+.crossimp-table th {
+  background:var(--paper-3);
+  font-family:var(--mono); font-size:10px; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--ink-3); font-weight:700;
+  text-align:center;
+}
+.crossimp-table th.el-col { text-align:left; width:35%; min-width:160px; }
+.crossimp-table td.el-col {
+  font-family:var(--sans); font-weight:600; color:var(--ink); text-align:left;
+}
+.crossimp-table td.el-col .el-meta {
+  display:block; font-family:var(--mono); font-size:9.5px;
+  letter-spacing:.06em; color:var(--ink-3); text-transform:uppercase; margin-top:.15rem;
+}
+.ci-cell {
+  width:38px; height:32px; padding:0;
+  font-family:var(--mono); font-size:12px; font-weight:700;
+  background:var(--paper); color:var(--ink-3);
+  border:1px solid var(--rule-strong);
+  transition:background .15s, color .15s, border-color .15s;
+  margin:0 auto; display:flex; align-items:center; justify-content:center;
+}
+.ci-cell:hover { border-color:var(--accent); color:var(--ink); }
+.ci-cell.v-pos2 { background:var(--green); color:var(--on-accent); border-color:var(--green); }
+.ci-cell.v-pos1 { background:rgba(111,160,122,0.35); color:var(--green); border-color:var(--green); }
+.ci-cell.v-zero { background:var(--paper); color:var(--ink-3); }
+.ci-cell.v-neg1 { background:rgba(217,106,80,0.20); color:var(--danger); border-color:var(--danger); }
+.ci-cell.v-neg2 { background:var(--danger); color:var(--on-accent); border-color:var(--danger); }
+
+.ci-legend {
+  display:flex; gap:.6rem; flex-wrap:wrap; align-items:center;
+  font-family:var(--mono); font-size:11px; color:var(--ink-3);
+  margin-bottom:.8rem;
+}
+.ci-legend .ci-chip {
+  display:inline-flex; align-items:center; gap:.3rem;
+  padding:.2rem .55rem; background:var(--paper-2); border:1px solid var(--rule);
+}
+.ci-legend .ci-chip b { font-weight:700; }
+
+/* ─── Stage 4 · Estrategia / no-regret ────────────────────────────────── */
+.noregret-list { display:flex; flex-direction:column; gap:.55rem; margin-bottom:1.2rem; }
+.nr-row {
+  display:grid; grid-template-columns:1fr auto; gap:1rem; align-items:center;
+  padding:.85rem 1.1rem;
+  background:var(--paper-2); border:1px solid var(--rule);
+  border-left:3px solid var(--ink-3);
+}
+.nr-row.is-noregret { border-left-color:var(--green); background:rgba(111,160,122,0.06); }
+.nr-row .nr-body { min-width:0; }
+.nr-row .nr-name {
+  font-family:var(--sans); font-weight:600; font-size:.98rem; color:var(--ink);
+  margin-bottom:.2rem;
+}
+.nr-row .nr-meta {
+  font-family:var(--mono); font-size:10.5px; color:var(--ink-3); letter-spacing:.04em;
+}
+.nr-row .nr-detail {
+  font-family:var(--mono); font-size:10.5px; color:var(--ink-2); letter-spacing:.04em;
+  margin-top:.25rem;
+}
+.nr-row .nr-detail b { color:var(--accent); }
+.nr-badge {
+  font-family:var(--mono); font-size:10px; font-weight:700;
+  letter-spacing:.14em; text-transform:uppercase;
+  padding:.25rem .55rem; background:var(--green); color:var(--on-accent);
+  border:1px solid var(--green);
+}
+.nr-badge.dim {
+  background:transparent; color:var(--ink-3); border-color:var(--rule-strong);
+}
+
+/* ─── Results ─────────────────────────────────────────────────────────── */
+.res-hero {
+  background:linear-gradient(135deg, var(--accent-soft), var(--paper-2));
+  border:1px solid var(--accent-tint); border-left:3px solid var(--accent);
+  padding:1.5rem 1.7rem; margin-bottom:1.4rem;
+}
+.res-hero .rh-eyebrow {
+  font-family:var(--mono); font-size:11px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--accent); font-weight:700; margin-bottom:.55rem;
+}
+.res-hero h3 {
+  font-family:var(--sans); font-weight:700; font-size:1.5rem;
+  color:var(--ink); letter-spacing:-.015em; margin-bottom:.6rem;
+}
+.res-hero p {
+  font-family:var(--italic); font-style:italic; font-size:1rem; line-height:1.55;
+  color:var(--ink-2);
+}
+.res-grid {
+  display:grid; grid-template-columns:repeat(4, 1fr); gap:.65rem;
+  margin-bottom:1.3rem;
+}
+@media (max-width:720px) { .res-grid { grid-template-columns:repeat(2, 1fr); } }
+@media (max-width:480px) { .res-grid { grid-template-columns:1fr; } }
+.res-kpi {
+  padding:.95rem 1rem;
+  background:var(--paper-2); border:1px solid var(--rule);
+}
+.res-kpi .rk-num {
+  font-family:var(--sans); font-weight:700; font-size:1.65rem; color:var(--accent);
+  line-height:1.1; letter-spacing:-.015em;
+}
+.res-kpi .rk-label {
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--ink-3); margin-top:.25rem;
+}
+.res-block {
+  background:var(--paper-2); border:1px solid var(--rule);
+  padding:1.1rem 1.3rem; margin-bottom:1rem;
+}
+.res-block h4 {
+  font-family:var(--mono); font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--accent); font-weight:700;
+  margin-bottom:.6rem;
+}
+.res-block p { font-family:var(--sans); font-size:.94rem; line-height:1.55; color:var(--ink); margin-bottom:.4rem; }
+.res-block p em { font-family:var(--italic); font-style:italic; color:var(--ink-2); }
+.res-block ul { list-style:none; margin-top:.4rem; padding:0; }
+.res-block ul li {
+  position:relative; padding:.4rem 0 .4rem 1.4rem;
+  font-family:var(--sans); font-size:.92rem; line-height:1.5; color:var(--ink);
+  border-bottom:1px solid var(--rule);
+}
+.res-block ul li:last-child { border-bottom:none; }
+.res-block ul li::before { content:"→"; position:absolute; left:0; top:.45rem; color:var(--accent); font-weight:700; }
+
+/* Modal */
+.modal-back {
+  position:fixed; inset:0; background:rgba(10,8,4,0.7);
+  display:none; align-items:center; justify-content:center;
+  z-index:8500; padding:1rem; backdrop-filter:blur(4px);
+}
+.modal-back.open { display:flex; }
+.modal {
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+  padding:2rem 2.2rem; max-width:600px; width:100%; position:relative;
+  max-height:90vh; overflow-y:auto;
+}
+.modal-close {
+  position:absolute; top:.9rem; right:1.1rem;
+  font-family:var(--mono); font-size:1.2rem; color:var(--ink-3); transition:color .2s;
+}
+.modal-close:hover { color:var(--danger); }
+.modal h2 {
+  font-family:var(--sans); font-weight:700; font-size:1.35rem;
+  letter-spacing:-.01em; margin-bottom:.7rem; max-width:32ch;
+}
+.modal p {
+  font-family:var(--sans); font-size:.96rem; line-height:1.55; color:var(--ink-2); margin-bottom:1rem;
+}
+.modal p em { font-family:var(--italic); font-style:italic; }
+.modal p b { color:var(--ink); }
+
+/* Toast */
+.toast {
+  position:fixed; bottom:1.5rem; right:1.5rem;
+  background:var(--ink); color:var(--paper);
+  padding:.85rem 1.2rem; font-family:var(--sans); font-size:.9rem;
+  letter-spacing:.02em; z-index:9000;
+  opacity:0; transform:translateY(15px); pointer-events:none;
+  transition:opacity .25s, transform .25s;
+}
+.toast.show { opacity:1; transform:translateY(0); }
+
+.methodology-note {
+  max-width:64ch; margin-top:1.6rem;
+  font-family:var(--italic); font-style:italic; font-size:.9rem; line-height:1.6; color:var(--ink-3);
+}
+.methodology-note a { color:var(--accent); font-style:normal; }
+
+footer.foot {
+  max-width:980px; margin:0 auto; padding:2rem 1.75rem 1.5rem;
+  border-top:1px solid var(--rule);
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.06em; color:var(--ink-3);
+  display:flex; justify-content:space-between; flex-wrap:wrap; gap:1rem;
+}
+
+/* FAB Recursos */
+.lab-fab {
+  position:fixed; bottom:1.5rem; left:1.5rem;
+  z-index:8000;
+  display:inline-flex; align-items:center; gap:.45rem;
+  padding:.65rem 1rem;
+  background:var(--paper-2); color:var(--ink);
+  border:1px solid var(--accent-tint);
+  font-family:var(--mono); font-size:11.5px; font-weight:700;
+  letter-spacing:.1em; text-transform:uppercase;
+  cursor:none;
+  transition:border-color .15s, background .15s, color .15s;
+  box-shadow:0 4px 12px rgba(0,0,0,0.25);
+}
+.lab-fab:hover { border-color:var(--accent); color:var(--accent); }
+.lab-fab .lab-fab-icon { color:var(--accent); font-size:1rem; }
+.lab-fab.is-hidden { display:none !important; }
+@media (max-width:640px) {
+  .lab-fab { padding:.5rem .8rem; font-size:10.5px; bottom:1rem; left:1rem; }
+}
+
+.lab-recursos-modal .modal { max-width:720px; }
+.lab-recursos-modal h2 { margin-bottom:1rem; }
+.lab-recursos-modal .lr-intro {
+  font-family:var(--italic); font-style:italic; font-weight:400;
+  font-size:.92rem; line-height:1.55; color:var(--ink-2);
+  margin-bottom:1.4rem; max-width:56ch;
+}
+.lab-recursos-modal .lr-intro a { color:var(--accent); font-style:normal; }
+.lab-recursos-modal .lr-empty {
+  font-family:var(--italic); font-style:italic; color:var(--ink-3);
+  text-align:center; padding:1.5rem 0;
+}
+.lr-cat { margin-bottom:1.4rem; }
+.lr-cat:last-child { margin-bottom:0; }
+.lr-cat-name {
+  font-family:var(--mono); font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--accent); font-weight:700;
+  margin-bottom:.7rem;
+  padding-bottom:.35rem; border-bottom:1px solid var(--rule);
+}
+.lr-items { display:grid; grid-template-columns:1fr; gap:.5rem; }
+.lr-item {
+  display:block;
+  padding:.75rem .9rem;
+  background:var(--paper); border:1px solid var(--rule);
+  transition:border-color .15s, background .15s;
+}
+.lr-item:hover { border-color:var(--accent); background:var(--paper-2); }
+.lr-item-name {
+  font-family:var(--sans); font-weight:600; font-size:.92rem;
+  color:var(--ink); letter-spacing:-.005em;
+  margin-bottom:.2rem;
+  display:flex; align-items:baseline; gap:.4rem;
+}
+.lr-item-name::after {
+  content:"↗"; color:var(--accent); font-family:var(--mono); font-size:.85rem;
+  margin-left:auto; flex-shrink:0; opacity:.55;
+}
+.lr-item:hover .lr-item-name::after { opacity:1; }
+.lr-item-desc {
+  font-family:var(--italic); font-style:italic; font-weight:400;
+  font-size:.82rem; line-height:1.5; color:var(--ink-2);
+}
+
+/* Cross-link amarillo */
+.cross-link {
+  display:flex; align-items:center; gap:1.1rem; flex-wrap:wrap;
+  padding:1.1rem 1.3rem;
+  background:rgba(214,168,58,0.10); border:1px solid var(--rule);
+  border-left:3px solid var(--gold);
+  font-family:var(--mono); font-size:12px; color:var(--ink-2);
+}
+.cross-link .cl-arrow { font-family:var(--sans); font-size:1.4rem; color:var(--gold); flex-shrink:0; }
+.cross-link .cl-body { flex:1; min-width:240px; }
+.cross-link .cl-title { font-family:var(--sans); font-weight:700; font-size:1rem; color:var(--ink); margin-bottom:.25rem; }
+.cross-link .cl-desc { font-family:var(--italic); font-style:italic; font-weight:400; font-size:.9rem; line-height:1.5; color:var(--ink-2); }
+.cross-link .cl-desc em { color:var(--accent); }
+.cross-link .btn { background:var(--gold); }
+
+/* IA bars + resultado del copiloto */
+.ia-bar {
+  display:flex; align-items:center; gap:1.1rem; flex-wrap:wrap;
+  padding:1.1rem 1.3rem;
+  background:linear-gradient(135deg, var(--accent-soft), var(--paper-2));
+  border:1px solid var(--accent-tint); border-left:3px solid var(--accent);
+}
+.ia-bar .ia-icon { font-family:var(--sans); font-size:1.4rem; color:var(--accent); flex-shrink:0; }
+.ia-bar .ia-body { flex:1; min-width:240px; }
+.ia-bar .ia-title { font-family:var(--sans); font-weight:700; font-size:1rem; color:var(--ink); margin-bottom:.25rem; }
+.ia-bar .ia-sub { font-family:var(--italic); font-style:italic; font-weight:400; font-size:.9rem; line-height:1.5; color:var(--ink-2); }
+.ia-bar .btn { padding:.75rem 1.4rem; font-size:.92rem; }
+.ia-bar .btn[disabled] { opacity:.55; cursor:not-allowed; }
+
+.ia-result {
+  background:var(--paper-2); border:1px solid var(--rule);
+  padding:1.4rem 1.6rem; margin-top:.9rem;
+  animation:fadeInUp .35s ease both;
+}
+@keyframes fadeInUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+.ia-result .ia-result-eyebrow {
+  font-family:var(--mono); font-size:11px; letter-spacing:.18em;
+  text-transform:uppercase; color:var(--accent); margin-bottom:.55rem;
+}
+.ia-result .ia-result-eyebrow .ia-cached {
+  margin-left:.55rem; padding:.15rem .45rem; background:var(--paper-3); color:var(--ink-3);
+  font-size:9.5px; letter-spacing:.12em;
+}
+.ia-result h3 { font-family:var(--sans); font-weight:700; font-size:1.15rem; color:var(--ink); margin:1rem 0 .55rem; letter-spacing:-.01em; }
+.ia-result h3:first-of-type { margin-top:.4rem; }
+.ia-result p { font-family:var(--sans); font-weight:400; font-size:.98rem; line-height:1.6; color:var(--ink); margin-bottom:.85rem; }
+.ia-result p em { font-family:var(--italic); font-style:italic; color:var(--ink-2); }
+.ia-result ul { list-style:none; margin:.4rem 0 0; padding:0; }
+.ia-result ul li {
+  position:relative; padding:.55rem 0 .55rem 1.6rem;
+  font-family:var(--sans); font-size:.96rem; line-height:1.55; color:var(--ink);
+  border-bottom:1px solid var(--rule);
+}
+.ia-result ul li:last-child { border-bottom:none; }
+.ia-result ul li::before { content:"→"; position:absolute; left:0; top:.65rem; color:var(--accent); font-weight:700; }
+.ia-loading { display:flex; align-items:center; gap:.8rem; font-family:var(--mono); font-size:12px; color:var(--ink-3); }
+.ia-loading-dot { width:8px; height:8px; background:var(--accent); border-radius:50%; animation:iaPulse 1s ease-in-out infinite; }
+@keyframes iaPulse { 0%,100% { opacity:.3; transform:scale(.9); } 50% { opacity:1; transform:scale(1.2); } }
+.ia-suggested { display:flex; flex-direction:column; gap:.45rem; margin-top:.8rem; }
+.ia-sug {
+  display:grid; grid-template-columns:1fr auto; gap:.85rem; align-items:start;
+  padding:.85rem 1rem;
+  background:var(--paper-3); border:1px solid var(--rule);
+}
+.ia-sug-body { min-width:0; }
+.ia-sug-name { font-family:var(--sans); font-weight:600; font-size:.98rem; color:var(--ink); margin-bottom:.2rem; }
+.ia-sug-desc { font-family:var(--italic); font-style:italic; font-size:.87rem; line-height:1.5; color:var(--ink-2); margin-bottom:.3rem; }
+.ia-sug-meta { font-family:var(--mono); font-size:11px; color:var(--ink-3); letter-spacing:.04em; }
+.ia-sug-meta b { color:var(--accent); }
+.ia-sug-add {
+  font-family:var(--mono); font-size:11px; padding:.45rem .8rem;
+  background:transparent; color:var(--ink-2); border:1px solid var(--rule-strong);
+  transition:border-color .15s, color .15s;
+}
+.ia-sug-add:hover { border-color:var(--accent); color:var(--accent); }
+.ia-sug-add.added { color:var(--green); border-color:rgba(111,160,122,0.5); }
+
+/* Mis análisis */
+.proj-row {
+  display:grid; grid-template-columns:1fr auto auto; gap:1rem; align-items:center;
+  padding:.8rem 1rem; background:var(--paper-3); border:1px solid var(--rule);
+}
+.proj-row .pr-name { font-family:var(--sans); font-weight:600; font-size:.95rem; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.proj-row .pr-meta { font-family:var(--mono); font-size:11px; color:var(--ink-3); letter-spacing:.04em; margin-top:.15rem; }
+.proj-row .pr-role {
+  font-family:var(--mono); font-size:10.5px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+  padding:.2rem .55rem; background:var(--paper); color:var(--ink-3); border:1px solid var(--rule-strong);
+}
+.proj-row .pr-role.owner { background:var(--accent); color:var(--on-accent); border-color:var(--accent); }
+.proj-row .pr-actions { display:flex; gap:.4rem; }
+.proj-row .pr-actions button {
+  font-family:var(--mono); font-size:11px; letter-spacing:.04em;
+  padding:.35rem .7rem; background:transparent; color:var(--ink-2); border:1px solid var(--rule-strong);
+  transition:border-color .2s, color .2s;
+}
+.proj-row .pr-actions button:hover { border-color:var(--accent); color:var(--accent); }
+.proj-row .pr-actions button.danger:hover { border-color:var(--danger); color:var(--danger); }
+
+/* Cloud bar */
+.cloud-bar {
+  display:flex; align-items:center; gap:1rem; flex-wrap:wrap;
+  padding:.85rem 1.1rem;
+  background:var(--accent-soft); border-left:3px solid var(--accent);
+  font-family:var(--mono); font-size:12px; color:var(--ink-2);
+}
+.cloud-bar .cb-icon { font-family:var(--sans); font-weight:700; color:var(--accent); }
+.cloud-bar .cb-spacer { flex:1; }
+.cloud-bar .cb-status { font-style:italic; color:var(--ink-3); font-family:var(--italic); font-size:12.5px; }
+.cloud-bar .cb-status.saving { color:var(--amber); }
+.cloud-bar .cb-status.saved { color:var(--green); }
+.cloud-bar .cb-status.error { color:var(--danger); }
+.cloud-bar .cb-editor { font-size:11px; color:var(--ink-3); padding-left:.8rem; border-left:1px solid var(--rule); }
+.cloud-bar.anon { background:rgba(214,168,58,0.10); border-left-color:var(--amber); }
+.cloud-bar.anon .cb-icon { color:var(--amber); }
+.cloud-bar .btn-mini {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.06em;
+  padding:.4rem .8rem; border:1px solid var(--rule-strong);
+  background:transparent; color:var(--ink-2);
+  transition:border-color .2s, color .2s;
+}
+.cloud-bar .btn-mini:hover { border-color:var(--accent); color:var(--accent); }
+
+/* Disclosure compacto de proyectos en la nube */
+.proj-disclosure summary::-webkit-details-marker { display:none; }
+.proj-disclosure summary::marker { content:''; }
+.proj-disclosure summary:hover { background:var(--paper-3); }
+.proj-disclosure .proj-caret { display:inline-block; transition:transform .15s; }
+.proj-disclosure[open] .proj-caret { transform:rotate(90deg); }
+
+/* Modal back/modal genérico para login/invite */
+.modal-back {
+  position:fixed; inset:0; background:rgba(0,0,0,0.6);
+  display:none; align-items:center; justify-content:center;
+  z-index:9000; padding:1.2rem;
+}
+.modal-back.open { display:flex; }
+.modal-back .modal {
+  background:var(--paper-2); border:1px solid var(--rule);
+  padding:2rem 2.2rem; max-width:540px; width:100%;
+  max-height:85vh; overflow-y:auto; position:relative;
+}
+.modal-back .modal h2 { font-family:var(--sans); font-weight:800; font-size:1.5rem; color:var(--ink); margin-bottom:.85rem; letter-spacing:-.02em; }
+.modal-back .modal p { font-family:var(--sans); font-size:.95rem; line-height:1.55; color:var(--ink-2); margin-bottom:.65rem; }
+.modal-back .modal-close {
+  position:absolute; top:.85rem; right:1rem;
+  font-family:var(--sans); font-size:1.6rem; line-height:1;
+  background:none; border:none; color:var(--ink-3); cursor:pointer;
+}
+.modal-back .modal-close:hover { color:var(--accent); }
+</style>
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<nav class="topbar">
+  <div class="topbar-left">
+    <a href="analisis-estrutural.html" class="btn-back"><span>←</span> Voltar ao lab</a>
+    <div id="nav-user-block" class="is-hidden" style="display:flex;align-items:center;gap:.7rem;margin-left:.5rem">
+      <a href="dashboard.html" id="nav-user-name" style="font-family:var(--sans);font-size:13px;font-weight:600;color:var(--ink);text-decoration:none;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .2s" title="Ir ao dashboard"></a>
+      <a href="pricing.html" id="nav-user-plano" style="font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--accent);padding:.25rem .55rem;border:1px solid var(--accent);background:var(--accent-soft)">FREE</a>
+      <button onclick="logoutUser()" style="font-family:var(--mono);font-size:11px;color:var(--ink-3);background:none;border:none;padding:0">sair ↗</button>
+    </div>
+    <div id="nav-auth-anon" style="display:flex;gap:.7rem;margin-left:.5rem">
+      <a href="login.html" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)">Entrar</a>
+      <a href="register.html" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);padding:.3rem .65rem">Cadastrar</a>
+    </div>
+  </div>
+  <div class="topbar-center">
+    <span class="eyebrow" style="margin:0;font-size:11px">Lab · Cenários Prospectivos</span>
+  </div>
+  <div class="topbar-right">
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo dia</button>
+    <a href="index.html" class="logo-link">
+      <div class="logo-bars">
+        <div class="logo-bar" style="height:20px"></div>
+        <div class="logo-bar" style="height:15px"></div>
+        <div class="logo-bar" style="height:9px"></div>
+        <div class="logo-bar" style="height:4px"></div>
+      </div>
+      <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+    </a>
+  </div>
+</nav>
+
+<main class="page">
+  <div class="crumb">
+    <a href="index.html">Início</a> <span class="sep">/</span>
+    <a href="analisis-estrutural.html">Laboratório de Políticas</a> <span class="sep">/</span>
+    <span>Cenários Prospectivos</span>
+  </div>
+
+  <!-- MIS ANÁLISIS (visible apenas quando AUTH.isLogged) -->
+  <section class="is-hidden" id="my-projects" style="margin-bottom:1.4rem">
+    <details class="proj-disclosure" style="background:var(--paper-2);border:1px solid var(--rule)">
+      <summary style="display:flex;align-items:center;justify-content:space-between;gap:.8rem;padding:.7rem 1.1rem;list-style:none;cursor:none;flex-wrap:wrap;transition:background .15s">
+        <span style="display:flex;align-items:baseline;gap:.85rem;flex-wrap:wrap">
+          <span style="font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700"><span class="proj-caret">▸</span> Cargar ou abrir análise prospectivo</span>
+          <span id="my-projects-meta" style="font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.04em">—</span>
+        </span>
+        <button class="btn-ghost" style="padding:.4rem .85rem;font-size:.85rem" onclick="event.preventDefault();event.stopPropagation();newProject()">+ Novo</button>
+      </summary>
+      <div id="my-projects-list" style="display:flex;flex-direction:column;gap:.45rem;padding:.5rem 1.1rem 1.1rem"></div>
+    </details>
+  </section>
+
+  <!-- WELCOME -->
+  <section id="stage-welcome">
+    <div class="welcome">
+      <div class="eyebrow">Módulo · Cenários prospectivos para política pública</div>
+      <h1 class="welcome-title">Imagina os futuros <em>antes de decidir</em></h1>
+      <p class="welcome-sub">
+        Os futuros não se predicen, se construyen. A prospectiva estratégica
+        francesa (Godet · Mojica · LIPSOR) e o método dos ejes de
+        incerteza (Schwartz, Global Business Network) te dan ferramentas
+        para imaginar 4 futuros plausíveis, narrarlos com suficiente detalle
+        para que sean creíbles, e testar seus decisões contra cada uno.
+        Robust Decision Making (Lempert · RAND) cierra o círculo: a decisão
+        robusta não é a que ganha no cenário mais probable, é a que
+        <em>não falla em ningún cenário</em>.
+      </p>
+      <p class="welcome-hint">
+        Quatro decisões: identificar dois incertezas críticas · narrar
+        os quatro cenários resultantes · cruzar variáveis, atores e
+        alternativas contra cada cenário · escolher decisões no-regret.
+        Toma entre 1 e 3 horas se já hiciste estrutural, atores e alternativas.
+      </p>
+      <button class="method-link" onclick="openModal('modal-method')">Em que se baseia? →</button>
+
+      <div class="accordion-stack">
+        <details class="accordion">
+          <summary><span><span class="acc-num">01</span>O que faz exactamente</span></summary>
+          <div class="accordion-body">
+            Te guía pelas quatro decisões do método de cenários da
+            Global Business Network (Schwartz, <em>The Art of the Long View</em>,
+            1991): (1) identificas <em>dois incertezas críticas</em> —
+            variáveis que combinan alto impacto e alta incerteza, e que
+            são o eje vertical e horizontal da matriz; (2) describes os
+            <em>quatro futuros plausíveis</em> que resultan de cruzar os polos
+            de cada incerteza, com narrativa e probabilidad subjetiva;
+            (3) levantas a <em>matriz de cross-impact</em> (Gordon, 1968)
+            cruzando os elementos do análise estrutural, atores e
+            alternativas contra cada cenário; (4) identificas as
+            <em>decisões robustas no-regret</em> que sobreviven em ao menos
+            três dos quatro futuros — o legado de Lempert &amp; Walker
+            em RAND (2003) sobre Robust Decision Making.
+          </div>
+        </details>
+        <details class="accordion">
+          <summary><span><span class="acc-num">02</span>O que te entrega</span></summary>
+          <div class="accordion-body">
+            Três entregáveis encadenados: um <em>memo de cenários</em> em
+            Markdown (incertezas, narrativas, cross-impact, decisões
+            no-regret, señales tempranas, plano de contingencia); uma
+            <em>matriz cross-impact</em> em CSV (elementos × cenários com
+            valores -2..+2); e uma <em>ficha prospectiva</em> em PDF tipo
+            CONPES light descargable. O módulo lee seu trabalho previo em
+            MicMac, Mactor e Alternativas — não rehace o que já hiciste,
+            lo proyecta para futuros.
+          </div>
+        </details>
+        <details class="accordion">
+          <summary><span><span class="acc-num">03</span>Para que te sirve</span></summary>
+          <div class="accordion-body">
+            Para evitar o <em>error do consultor com bola de cristal</em>:
+            apostarle todo ao cenário mais probable. Uma política desenhada
+            para o futuro esperado pode ser desastrosa se o futuro se
+            tuerce; uma política <em>robusta</em> sacrifica algo de upside a
+            mudança de funcionar em varios futuros. E para <em>defender a
+            decisão quando o mundo muda</em>: se llega o cenário
+            disruptivo, poder responder "lo consideramos no exercício
+            prospectivo e a alternativa escolhida sigue siendo razonable" é
+            a diferencia entre ficar mal e demostrar método.
+          </div>
+        </details>
+      </div>
+
+      <div style="display:flex;gap:.7rem;justify-content:center;flex-wrap:wrap">
+        <a class="btn-ghost" href="analisis-estrutural.html">← Voltar ao lab</a>
+        <button class="btn btn-big" onclick="startFlow()">Vamos começar →</button>
+      </div>
+
+      <p style="margin-top:2.5rem;font-family:var(--italic);font-style:italic;color:var(--ink-3);font-size:.92rem;max-width:60ch;margin-left:auto;margin-right:auto;line-height:1.55">
+        Ainda não entendiste o sistema que produz o problema? Empieza por
+        <a href="analisis-estrutural.html" style="color:var(--accent);font-style:normal;font-weight:600">análise estrutural →</a>
+        para identificar as variáveis motoras. Ea vocêenes alternativas
+        ensambladas? Este módulo as testará contra os quatro futuros com a
+        matriz cross-impact.
+      </p>
+    </div>
+  </section>
+
+  <!-- STEPS NAV (visible apenas nas 4 mecánicas, não em welcome ni results) -->
+  <div id="steps-nav" class="is-hidden">
+    <div class="steps-row" id="steps-row"></div>
+    <div class="cloud-bar" id="cloud-bar-flow" style="margin-bottom:1.6rem">
+      <span class="cb-icon">●</span>
+      <span id="cb-text-flow">Trabajando local</span>
+      <span class="cb-spacer"></span>
+      <span class="cb-status" id="cb-status-flow"></span>
+      <span class="cb-editor" id="cb-editor-flow"></span>
+      <button class="btn-mini" id="cb-save-flow" onclick="cloudSave()">Salvar na nuvem</button>
+    </div>
+  </div>
+
+  <!-- MECÁNICA 1 · INCERTIDUMBRES -->
+  <section id="stage-incertezas" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 01</span>Incertidumbres críticas</h2>
+      <span class="meta" id="eje-meta">—</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        <b>Dois incertezas, não mais, não menos.</b> O método de Schwartz
+        (GBN) parte da observación de que ningún humanão pode sostener
+        na cabeza mais de quatro futuros diferentes. Com dois
+        incertezas ortogonales obtienes exactamente quatro cenários
+        — o número correcto. Cada incerteza debe combinar <em>alto
+        impacto</em> sobre o problema e <em>alta incerteza</em>
+        intrínseca: se sabe o que vai passar, não é eje, é tendencia.
+      </p>
+    </div>
+
+    <div class="field" style="margin-bottom:1.4rem">
+      <label class="field-label" for="ctx-enunciado">Enunciado do problema (opcional, contexto)</label>
+      <textarea id="ctx-enunciado" placeholder="Ej.: a transición energética em Colombia para 2035, dada a dependencia fiscal de hidrocarburos."></textarea>
+      <div class="field-hint">Aterrizar o problema te ajuda a escolher incertezas que importen. Se vem de problema-publico, este campo se autorellena.</div>
+    </div>
+
+    <!-- Banner importar desde MicMac -->
+    <div class="import-banner is-hidden" id="micmac-import-banner">
+      <div class="ib-icon">✦</div>
+      <div class="ib-body">
+        <b>Importar desde Análise Estrutural</b>
+        <em>Detectamos que tem uma matriz MicMac neste navegador. Podemos sugerir as 2 variáveis mais motoras como ejes de incerteza.</em>
+      </div>
+      <button class="btn-mini" onclick="importarDeMicmac()">Importar 2 variáveis motoras →</button>
+    </div>
+
+    <div class="eje-grid">
+      <div class="eje-card" id="eje-x-card">
+        <div class="eje-label">Eje horizontal · Incerteza 1</div>
+        <div class="eje-axis-name" contenteditable="true" spellcheck="false"
+             onblur="updateEjeName('x', this.innerText)"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+             id="eje-x-name"></div>
+        <div class="eje-polos">
+          <div class="polo neg">
+            <span class="polo-tag">Polo −</span>
+            <span contenteditable="true" spellcheck="false"
+                  onblur="updateEjePolo('x','neg', this.innerText)"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+                  id="eje-x-pneg"></span>
+          </div>
+          <div class="polo pos">
+            <span class="polo-tag">Polo +</span>
+            <span contenteditable="true" spellcheck="false"
+                  onblur="updateEjePolo('x','pos', this.innerText)"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+                  id="eje-x-ppos"></span>
+          </div>
+        </div>
+        <div class="eje-source" id="eje-x-source"></div>
+      </div>
+
+      <div class="eje-card" id="eje-e-card">
+        <div class="eje-label">Eje vertical · Incerteza 2</div>
+        <div class="eje-axis-name" contenteditable="true" spellcheck="false"
+             onblur="updateEjeName('e', this.innerText)"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+             id="eje-e-name"></div>
+        <div class="eje-polos">
+          <div class="polo neg">
+            <span class="polo-tag">Polo −</span>
+            <span contenteditable="true" spellcheck="false"
+                  onblur="updateEjePolo('e','neg', this.innerText)"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+                  id="eje-e-pneg"></span>
+          </div>
+          <div class="polo pos">
+            <span class="polo-tag">Polo +</span>
+            <span contenteditable="true" spellcheck="false"
+                  onblur="updateEjePolo('e','pos', this.innerText)"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+                  id="eje-e-ppos"></span>
+          </div>
+        </div>
+        <div class="eje-source" id="eje-e-source"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem">
+      <button class="btn-ghost" onclick="resetEjes()">Limpiar ejes</button>
+      <button class="btn-ghost" onclick="seedEjesEjemplo()">Cargar exemplo (transición energética)</button>
+    </div>
+
+    <div class="ia-bar" style="margin-top:1.4rem">
+      <div class="ia-icon">✦</div>
+      <div class="ia-body">
+        <div class="ia-title">Sugerir incertezas com IA</div>
+        <div class="ia-sub">O copiloto propone 2 incertezas críticas a partir do contexto do problema e, se tem análise estrutural previo, as variáveis motoras do MicMac. Plan Pro ou superior.</div>
+      </div>
+      <button class="btn" id="ia-ejes-btn" onclick="iaSugerirEjes()">Sugerir ejes</button>
+    </div>
+    <div class="ia-result" id="ia-ejes-result" style="display:none"></div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="backToWelcome()">← Voltar ao inicio</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToStep(2)">Quatro cenários →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MECÁNICA 2 · 4 ESCENARIOS -->
+  <section id="stage-cenários" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 02</span>Quatro cenários plausíveis</h2>
+      <span class="meta" id="scen-meta">—</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        <b>Uma narrativa por quadrante, não um titular.</b> Cada cenário é
+        uma historia de 3 a 5 frases sobre como se ve o mundo se os polos
+        de ambas incertezas se materializan nessa combinação. Buen
+        nome: evocador e memorable (Schwartz recomendaba títulos tipo
+        película). A probabilidad subjetiva é opcional mas útil: <em>não
+        exigimos sumar 100%</em> (warning se te alejas muito).
+      </p>
+    </div>
+
+    <div class="cenários-axes-hint" id="scen-axes-hint"></div>
+
+    <div class="matriz-2x2" id="matriz-2x2"></div>
+
+    <div class="scen-probsum" id="scen-probsum"></div>
+
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem">
+      <button class="btn-ghost" onclick="resetEscenariosNarrativa()">Limpiar narrativas</button>
+      <button class="btn-ghost" onclick="seedEscenariosEjemplo()">Cargar exemplo (4 narrativas)</button>
+    </div>
+
+    <div class="ia-bar" style="margin-top:1.4rem">
+      <div class="ia-icon">✦</div>
+      <div class="ia-body">
+        <div class="ia-title">Narrar os 4 cenários com IA</div>
+        <div class="ia-sub">O copiloto redige narrativas plausíveis para os 4 quadrantes com um nome evocador e probabilidad subjetiva inicial. Plan Premium ou superior.</div>
+      </div>
+      <button class="btn" id="ia-narrar-btn" onclick="iaNarrarEscenarios()">Narrar cenários</button>
+    </div>
+    <div class="ia-result" id="ia-narrar-result" style="display:none"></div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goToStep(1)">← Incertidumbres</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToStep(3)">Cross-impact →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MECÁNICA 3 · CROSS-IMPACT -->
+  <section id="stage-cross-impact" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 03</span>Cross-impact</h2>
+      <span class="meta" id="ci-meta">—</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        <b>Gordon (RAND, 1968) · cross-impact analysis.</b> Cada elemento
+        que importa (variáveis do sistema, atores clave, alternativas
+        ensambladas) se enfrenta a cada cenário com um valor de
+        <em>-2 a +2</em>: quanto debilita ou quanto fortalece. A coluna
+        que conta é a do cenário, não o promedio. Uma alternativa
+        que no cenário disruptivo cae a -2 está confesando que
+        depende de supuestos que esse futuro rompe.
+      </p>
+    </div>
+
+    <h3 style="font-family:var(--sans);font-weight:700;font-size:1.05rem;margin:1.2rem 0 .75rem;color:var(--ink)">Elementos a cruzar</h3>
+    <p style="font-family:var(--italic);font-style:italic;font-size:.92rem;line-height:1.5;color:var(--ink-2);margin-bottom:.95rem;max-width:64ch">
+      Marca os elementos que quer incluir na matriz. Importamos
+      desde seu trabalho previo em MicMac, Mactor e Alternativas (se estão
+      neste navegador). Também puedes adicionar elementos manualmente.
+    </p>
+
+    <div id="import-sections"></div>
+
+    <div class="import-section">
+      <div class="is-head">
+        <span class="is-title">Adicionar elemento manualmente</span>
+      </div>
+      <div style="display:flex;gap:.55rem;flex-wrap:wrap">
+        <input type="text" id="manual-o-name" class="ir-add-manual" placeholder="Ej.: 'Restricción fiscal estrutural'" style="flex:1;min-width:200px"/>
+        <select id="manual-o-tipo" style="font-family:var(--sans);font-size:.9rem;padding:.45rem .65rem;background:var(--paper);color:var(--ink);border:1px solid var(--rule-strong);outline:none">
+          <option value="variável">Variável</option>
+          <option value="ator">Ator</option>
+          <option value="alternativa">Alternativa</option>
+          <option value="outro">Outro</option>
+        </select>
+        <button class="btn-ghost" onclick="addElementoManual()" style="padding:.45rem 1.1rem;font-size:.9rem">+ Adicionar</button>
+      </div>
+    </div>
+
+    <h3 style="font-family:var(--sans);font-weight:700;font-size:1.05rem;margin:1.5rem 0 .55rem;color:var(--ink)">Matriz cross-impact</h3>
+    <div class="ci-legend">
+      <span class="ci-chip"><b style="color:var(--danger)">-2</b> Debilita forte</span>
+      <span class="ci-chip"><b style="color:var(--danger)">-1</b> Debilita</span>
+      <span class="ci-chip"><b style="color:var(--ink-3)">0</b> Neutral</span>
+      <span class="ci-chip"><b style="color:var(--green)">+1</b> Fortalece</span>
+      <span class="ci-chip"><b style="color:var(--green)">+2</b> Fortalece forte</span>
+    </div>
+    <p style="font-family:var(--italic);font-style:italic;font-size:.88rem;line-height:1.5;color:var(--ink-3);margin-bottom:.85rem">Click numa célula para cyclar 0 → +1 → +2 → -1 → -2 → 0.</p>
+    <div class="crossimp-wrap" id="crossimp-wrap">
+      <div id="crossimp-table"></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goToStep(2)">← Cenários</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToStep(4)">Estratégia →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MECÁNICA 4 · ESTRATEGIA / NO-REGRET -->
+  <section id="stage-estratégia" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 04</span>Decisiones robustas no-regret</h2>
+      <span class="meta" id="nr-meta">—</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        <b>Lempert &amp; Walker (RAND, 2003) · Robust Decision Making.</b>
+        Uma decisão <em>no-regret</em> é uma alternativa que em ao menos
+        três dos quatro cenários marca <em>+1 ou mais</em> em
+        cross-impact. Sacrifica algo de upside no cenário mais
+        probable a mudança de blindarse contra o resto. Isto não elimina
+        a necessidade de escolher; te indica que alternativas são robustas
+        e quais são apuestas a um apenas futuro.
+      </p>
+    </div>
+
+    <h3 style="font-family:var(--sans);font-weight:700;font-size:1.05rem;margin:1.2rem 0 .75rem;color:var(--ink)">Alternativas frente aos cenários</h3>
+    <div class="noregret-list" id="noregret-list"></div>
+
+    <div class="field" style="margin-top:1.5rem">
+      <label class="field-label" for="estr-contingencia">Plan de contingencia <span class="req">*</span></label>
+      <textarea id="estr-contingencia" placeholder="Ej.: se a alternativa escolhida falla no cenário disruptivo (caída de precios do petróleo + retroceso climático), activamos plano B: acelerar transición a renovables vía subasta competitiva, sem esperar reforma fiscal. A cláusula de revisión a 18 meses incluye este disparador."></textarea>
+      <div class="field-hint">Se a alternativa escolhida não é no-regret, como te preparas para o cenário onde falla? Três a cinco frases com disparadores concretos.</div>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="estr-senales">Señales tempranas <span class="req">*</span></label>
+      <textarea id="estr-senales" placeholder="Ej.: 1) precio Brent &lt; US$60 sostenido por 6 meses → señal de cenário pesimista; 2) marco regulatorio acelera transición renovable mais allá do PIPS 2024 → señal de cenário optimista; 3) deterioro da regla fiscal (FFIE &gt; 5% PIB) → señal de cenário disruptivo. Revisar trimestralmente."></textarea>
+      <div class="field-hint">O que indicadores ou eventos observables te dirán que um cenário se está materializando antes que os demais? Lista 3-5 señales com umbrales cuantitativos quando sea posible.</div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goToStep(3)">← Cross-impact</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToResults()">Ver resultados e exportar →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section id="stage-results" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 05</span>Análise prospectivo listo</h2>
+      <span class="meta" id="res-meta">—</span>
+    </div>
+
+    <div id="res-content"></div>
+
+    <div class="cloud-bar" id="cloud-bar-results" style="margin-top:1.5rem">
+      <span class="cb-icon">●</span>
+      <span id="cb-text-results">Trabajando local</span>
+      <span class="cb-spacer"></span>
+      <span class="cb-status" id="cb-status-results"></span>
+      <span class="cb-editor" id="cb-editor-results"></span>
+      <button class="btn-mini" id="cb-save-results" onclick="cloudSave()">Salvar na nuvem</button>
+      <button class="btn-mini is-hidden" id="cb-invite-results" onclick="openInviteModal()">Invitar colaborador</button>
+    </div>
+
+    <div style="display:flex;gap:.65rem;flex-wrap:wrap;margin-top:1.5rem">
+      <button class="btn" onclick="downloadMemoMD()">↓ Memo de cenários (.md)</button>
+      <button class="btn-ghost" onclick="downloadMatrizCSV()">↓ Cross-impact (.csv)</button>
+      <button class="btn-ghost" onclick="downloadFichaPDF()">↓ Ficha prospectiva (.pdf)</button>
+      <button class="btn-ghost" onclick="goToStep(4)">← Editar estratégia</button>
+    </div>
+
+    <div style="margin-top:2rem;display:grid;gap:.8rem">
+      <div class="cross-link">
+        <div class="cl-arrow">←</div>
+        <div class="cl-body">
+          <div class="cl-title">Necesitas as variáveis motoras do sistema?</div>
+          <div class="cl-desc">As incertezas críticas suelen sair do módulo de <em>análise estrutural</em>: as variáveis com maior motricidad e maior incerteza são candidatas naturales a ejes de cenários.</div>
+        </div>
+        <a href="analisis-estrutural.html" class="btn">Análise estrutural →</a>
+      </div>
+
+      <div class="cross-link">
+        <div class="cl-arrow">←</div>
+        <div class="cl-body">
+          <div class="cl-title">E as alternativas a someter aos cenários?</div>
+          <div class="cl-desc">O módulo de <em>alternativas</em> construye com análise morfológico o espacio de opções; este módulo as prueba contra futuros plausíveis.</div>
+        </div>
+        <a href="alternativas-pt.html" class="btn">Alternativas de Política →</a>
+      </div>
+
+      <div class="cross-link">
+        <div class="cl-arrow">←</div>
+        <div class="cl-body">
+          <div class="cl-title">E os atores que podem empujar ou frenar um cenário?</div>
+          <div class="cl-desc">Mactor te diz <em>quem decide, quem apoia, quem bloquea</em>. Aquí puedes incluir esses atores no cross-impact para ver como se movem em cada futuro.</div>
+        </div>
+        <a href="mactor-pt.html" class="btn">Análise de atores →</a>
+      </div>
+
+      <div class="cross-link">
+        <div class="cl-arrow">→</div>
+        <div class="cl-body">
+          <div class="cl-title">Como contas estes cenários ao equipe, os aliados e a ciudadanía?</div>
+          <div class="cl-desc">O módulo <em>Comunicar a política</em> construye a narrativa pública (Ganz: Story of Now com a urgencia que sale dos cenários), o framing do valor central e os canais para defender as decisões no-regret frente a diferentes audiências.</div>
+        </div>
+        <a href="comunicar-pt.html" class="btn">Comunicar →</a>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:1.1rem;flex-wrap:wrap;padding:1.1rem 1.3rem;background:var(--paper-2);border:1px solid var(--rule);border-left:3px solid var(--accent);margin-top:.6rem">
+        <div style="font-family:var(--sans);font-size:1.4rem;color:var(--accent);flex-shrink:0">∑</div>
+        <div style="flex:1;min-width:240px">
+          <div style="font-family:var(--sans);font-weight:700;font-size:1rem;color:var(--ink);margin-bottom:.25rem">Necesitas um memo completo com todo o ciclo?</div>
+          <div style="font-family:var(--italic);font-style:italic;font-weight:400;font-size:.9rem;line-height:1.5;color:var(--ink-2)">O <b>relatório combinado do lab</b> une o que hayas avançado nos 8 módulos num PDF estilo CONPES. Genera memo .pdf ou .md desde a sección «Meu relatório do lab» do hub.</div>
+        </div>
+        <a href="analisis-estrutural.html#informe" class="btn" style="background:var(--accent);color:var(--paper)">Relatório combinado →</a>
+      </div>
+    </div>
+
+    <p class="methodology-note">
+      Esta ferramenta condensa o <b>método de cenários</b> de
+      <b>Peter Schwartz</b> e <em>Global Business Network</em>
+      (<em>The Art of the Long View</em>, Doubleday, 1991), a
+      <em>prospectiva estratégica francesa</em> de <b>Michel Godet</b>
+      (LIPSOR, CNAM) e <b>Francisco Mojica</b> (Universidad Externado de
+      Colombia), o <em>Robust Decision Making</em> de <b>Robert Lempert
+      &amp; Warren Walker</b> (RAND, 2003) e o <em>cross-impact analysis</em>
+      de <b>Theodore Gordon</b> (RAND, 1968).
+    </p>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>ricardoruiz.co · 2026</span>
+  <span>Composição: Familjen · Petrona · Mono</span>
+</footer>
+
+<!-- Modal metodologia -->
+<div class="modal-back" id="modal-method">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-method')">×</button>
+    <h2>Em que se baseia?</h2>
+    <p>
+      <b>Quatro decisões, não quatro passos.</b> Diseñar cenários
+      prospectivos defendibles requiere alinear quatro cosas: as
+      incertezas críticas que definen o espacio de futuros, as
+      narrativas que vuelven cada cenário creíble, o cross-impact que
+      cruza o análise previo contra cada futuro, e a identificación
+      de decisões no-regret.
+    </p>
+    <p>
+      <b>Dois ejes, quatro futuros.</b> Peter Schwartz, em Royal
+      Dutch/Shell e depois em Global Business Network (<em>The Art of
+      the Long View</em>, 1991), formalizó o que já hacían os
+      planificadores estratégicos de Shell: quando enfrentas um
+      problema complexo, identifica as <em>dois variáveis que combinan
+      alto impacto e alta incerteza</em>, e construye quatro
+      cenários cruzando sus polos. A virtud do número quatro é
+      cognitiva: é lo máximo que um equipe pode sostener na cabeza
+      simultáneamente.
+    </p>
+    <p>
+      <b>Prospectiva estrutural.</b> Michel Godet (LIPSOR) e Francisco
+      Mojica (Externado) sistematizaron a <em>prospectiva
+      estratégica</em> francesa: o futuro não se predice, se construye
+      com métodos formales (MicMac para variáveis, Mactor para atores,
+      Smic-Prob-Expert para cenários). Este módulo se conecta
+      explícitamente com MicMac e Mactor: as incertezas salen do
+      sistema, não da imaginación libre.
+    </p>
+    <p>
+      <b>Robustez antes que predicción.</b> Lempert &amp; Walker (RAND,
+      2003) cambiaron a pergunta: em vez de <em>"qual é o cenário
+      mais probable?"</em>, pergunta <em>"o que decisão funciona em ao
+      menos três de quatro cenários?"</em>. Essa é a decisão
+      no-regret. E Theodore Gordon, também em RAND (1968), propuso o
+      <em>cross-impact analysis</em>: uma matriz que cruza elementos
+      contra cenários para ver o que se fortalece e o que se debilita em
+      cada futuro.
+    </p>
+    <p>
+      <b>Seu privacidad.</b> O cálculo é 100% local em seu navegador. Não
+      enviamos nada a ningún servidor.
+    </p>
+    <p style="border-top:1px solid var(--rule);padding-top:1rem;margin-top:1.4rem">
+      <b>Origen do método.</b><br/>
+      Peter Schwartz, <em>The Art of the Long View: Planning for the
+      Future in an Uncertain World</em> (Doubleday, 1991).<br/>
+      Pierre Wack, <em>Scenarios: Uncharted Waters Ahead</em> (Harvard
+      Business Review, 1985).<br/>
+      Michel Godet, <em>Manuel de prospective stratégique</em> (Dunod,
+      varias ediciones) · LIPSOR · CNAM.<br/>
+      Francisco Mojica, <em>A construcción do futuro</em> (Universidad
+      Externado, 2005).<br/>
+      Robert J. Lempert, Steven W. Popper &amp; Steven C. Bankes,
+      <em>Shaping the Next One Hundred Years: New Methods for
+      Quantitative, Long-Term Policy Analysis</em> (RAND, 2003).<br/>
+      Theodore J. Gordon &amp; H. Hayward, <em>Initial Experiments with
+      the Cross-Impact Matrix Method of Forecasting</em> (Futures, 1968).
+    </p>
+  </div>
+</div>
+
+<!-- FAB Recursos -->
+<button class="lab-fab" id="lab-fab" onclick="openRecursosModal()">
+  <span class="lab-fab-icon">↗</span>
+  <span>Recursos</span>
+</button>
+
+<!-- Modal Recursos -->
+<div class="modal-back lab-recursos-modal" id="modal-recursos">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-recursos')">×</button>
+    <h2>Recursos &amp; Dados do lab</h2>
+    <p class="lr-intro">
+      Fuentes oficiales e guías metodológicas mais relevantes para
+      <b id="lr-modulo-name">o módulo de Cenários Prospectivos</b>. O catálogo completo
+      (com todas as categorías) está ao pie do
+      <a href="analisis-estrutural.html" style="font-weight:600">hub do lab →</a>
+    </p>
+    <div id="modal-recursos-grid"></div>
+  </div>
+</div>
+
+<!-- Modal login -->
+<div class="modal-back" id="modal-login">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-login')">×</button>
+    <h2>Para salvar e compartilhar precisa uma conta</h2>
+    <p>Seu trabalho se salva localmente neste navegador. Para salvá-lo na nuvem, compartilhá-lo com seu equipe ou acessar de outro dispositivo, inicia sessão ou cria uma conta gratuita.</p>
+    <div style="display:flex;gap:.55rem;margin-top:1.4rem;flex-wrap:wrap">
+      <a href="login.html" class="btn">Entrar</a>
+      <a href="register.html" class="btn-ghost">Crear conta gratis</a>
+    </div>
+  </div>
+</div>
+
+<!-- Modal invitación -->
+<div class="modal-back" id="modal-invite">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-invite')">×</button>
+    <h2>Invitar a um colaborador</h2>
+    <p>Apenas os colaboradores convidados podem ver e editar este análise prospectivo. Les llegará um e-mail com um link para aceptar.</p>
+    <label style="display:block;font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:1rem 0 .4rem">E-mail do colaborador</label>
+    <input type="email" id="invite-email" placeholder="colega@entidad.gov.co" style="width:100%;padding:.7rem .85rem;font-family:var(--sans);font-size:.95rem;background:var(--paper-3);color:var(--ink);border:1px solid var(--rule-strong);outline:none"/>
+    <div style="display:flex;gap:.55rem;margin-top:1.4rem;flex-wrap:wrap">
+      <button class="btn" onclick="submitInvite()">Enviar invitación</button>
+      <button class="btn-ghost" onclick="closeModal('modal-invite')">Cancelar</button>
+    </div>
+    <label style="display:block;font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:1.5rem 0 .4rem">Personas com acesso</label>
+    <ul id="collab-list" style="list-style:none;padding:0"></ul>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="lab-recursos.js"></script>
+<script>
+'use strict';
+
+// ═════════════════════════════════════════════════════════════════════════
+// STATE · escenarios prospectivos · v1 (sin cloud-save)
+// ═════════════════════════════════════════════════════════════════════════
+const LS_KEY = 'prospect-current-v1';
+
+const STATE = {
+  step: 1,
+  contexto: { enunciado_problema:'', importedFromPP:false },
+  ejes: {
+    x: { nombre:'', polo_neg:'', polo_pos:'', importedFrom:'' },
+    y: { nombre:'', polo_neg:'', polo_pos:'', importedFrom:'' }
+  },
+  escenarios: {
+    NE: { nombre:'', narrativa:'', prob:25 },
+    NO: { nombre:'', narrativa:'', prob:25 },
+    SO: { nombre:'', narrativa:'', prob:25 },
+    SE: { nombre:'', narrativa:'', prob:25 }
+  },
+  elementos: [],  // [{ id, tipo, nombre, source }]
+  impactos: {},   // { [elementId]: { NE:-2..+2, NO, SO, SE } }
+  estrategia: { contingencia:'', senales_tempranas:'' }
+};
+
+function saveState() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); } catch (e) {}
+  // Auto cloud-save con debounce 2s (sólo si hay sesión + proyecto)
+  if (typeof AUTH !== 'undefined' && AUTH.isLogged && typeof CLOUD !== 'undefined' && CLOUD.projId) {
+    clearTimeout(saveState._cloudTimer);
+    saveState._cloudTimer = setTimeout(() => { try { cloudSave(); } catch (e) {} }, 2000);
+  }
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return false;
+    const p = JSON.parse(raw);
+    if (!p || typeof p !== 'object') return false;
+    if (p.contexto    && typeof p.contexto === 'object')  Object.assign(STATE.contexto, p.contexto);
+    if (p.ejes        && typeof p.ejes === 'object') {
+      if (p.ejes.x && typeof p.ejes.x === 'object') Object.assign(STATE.ejes.x, p.ejes.x);
+      if (p.ejes.y && typeof p.ejes.y === 'object') Object.assign(STATE.ejes.y, p.ejes.y);
+    }
+    if (p.escenarios  && typeof p.escenarios === 'object') {
+      ['NE','NO','SO','SE'].forEach(k => {
+        if (p.escenarios[k] && typeof p.escenarios[k] === 'object') {
+          Object.assign(STATE.escenarios[k], p.escenarios[k]);
+        }
+      });
+    }
+    if (Array.isArray(p.elementos))                         STATE.elementos = p.elementos;
+    if (p.impactos    && typeof p.impactos === 'object')    STATE.impactos = p.impactos;
+    if (p.estrategia  && typeof p.estrategia === 'object')  Object.assign(STATE.estrategia, p.estrategia);
+    if (typeof p.step === 'number') STATE.step = p.step;
+    return true;
+  } catch (e) { return false; }
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ═════════════════════════════════════════════════════════════════════════
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function escapeAttr(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+}
+function pad2(n) { return String(n).padStart(2,'0'); }
+function newId(prefix) { return prefix + '-' + Math.random().toString(36).slice(2, 9); }
+
+let _toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ═════════════════════════════════════════════════════════════════════════
+// NAVEGACIÓN ENTRE STAGES
+// ═════════════════════════════════════════════════════════════════════════
+const STAGES = ['stage-welcome','stage-incertidumbres','stage-escenarios','stage-cross-impact','stage-estrategia','stage-results'];
+const STEP_LABELS = [
+  { n:1, key:'incertidumbres', label:'Incertidumbres' },
+  { n:2, key:'escenarios',     label:'Escenarios' },
+  { n:3, key:'cross-impact',   label:'Cross-impact' },
+  { n:4, key:'estrategia',     label:'Estrategia' }
+];
+
+function showStage(id) {
+  STAGES.forEach(s => {
+    const el = document.getElementById(s);
+    if (el) el.classList.toggle('is-hidden', s !== id);
+  });
+  const noSteps = new Set(['stage-welcome','stage-results']);
+  document.getElementById('steps-nav').classList.toggle('is-hidden', noSteps.has(id));
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function renderStepsNav() {
+  const row = document.getElementById('steps-row');
+  if (!row) return;
+  row.innerHTML = STEP_LABELS.map(s => {
+    const cls = s.n === STATE.step ? 'active' : (s.n < STATE.step ? 'done' : '');
+    return `<button class="step-pill ${cls}" type="button" onclick="goToStep(${s.n})">
+      <span class="step-n">${pad2(s.n)}</span>${escapeHtml(s.label)}
+    </button>`;
+  }).join('');
+}
+
+function startFlow() {
+  STATE.step = 1;
+  saveState();
+  renderAll();
+  showStage('stage-incertidumbres');
+}
+function backToWelcome() { showStage('stage-welcome'); }
+
+function goToStep(n) {
+  STATE.step = n;
+  saveState();
+  renderStepsNav();
+  const stageIds = ['stage-incertidumbres','stage-escenarios','stage-cross-impact','stage-estrategia'];
+  showStage(stageIds[n - 1] || 'stage-incertidumbres');
+}
+function goToResults() {
+  renderResults();
+  showStage('stage-results');
+}
+
+function renderAll() {
+  renderStepsNav();
+  renderEjes();
+  renderEscenarios();
+  renderImportSections();
+  renderCrossImpactTable();
+  renderEstrategia();
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 1 · INCERTIDUMBRES
+// ═════════════════════════════════════════════════════════════════════════
+function renderEjes() {
+  // Enunciado del problema
+  const ctxEl = document.getElementById('ctx-enunciado');
+  if (ctxEl) {
+    if (ctxEl.value !== (STATE.contexto.enunciado_problema || '')) ctxEl.value = STATE.contexto.enunciado_problema || '';
+    if (!renderEjes._boundCtx) {
+      renderEjes._boundCtx = true;
+      ctxEl.addEventListener('input', () => {
+        STATE.contexto.enunciado_problema = ctxEl.value;
+        saveState();
+      });
+    }
+  }
+  // Render campos de los ejes
+  ['x','y'].forEach(axis => {
+    const e = STATE.ejes[axis];
+    const nameEl = document.getElementById('eje-' + axis + '-name');
+    const pnegEl = document.getElementById('eje-' + axis + '-pneg');
+    const pposEl = document.getElementById('eje-' + axis + '-ppos');
+    const srcEl  = document.getElementById('eje-' + axis + '-source');
+    if (nameEl && nameEl.innerText !== (e.nombre || '')) nameEl.innerText = e.nombre || '';
+    if (pnegEl && pnegEl.innerText !== (e.polo_neg || '')) pnegEl.innerText = e.polo_neg || '';
+    if (pposEl && pposEl.innerText !== (e.polo_pos || '')) pposEl.innerText = e.polo_pos || '';
+    if (srcEl) {
+      srcEl.innerHTML = e.importedFrom
+        ? `Sugerido desde <em>${escapeHtml(e.importedFrom)}</em>`
+        : '';
+    }
+  });
+  // Banner importar MicMac
+  const banner = document.getElementById('micmac-import-banner');
+  if (banner) {
+    const hasMicmac = !!readMicmacMotrices();
+    const hasContent = !!(STATE.ejes.x.nombre || STATE.ejes.y.nombre);
+    banner.classList.toggle('is-hidden', !hasMicmac || hasContent);
+  }
+  // Meta
+  const meta = document.getElementById('eje-meta');
+  if (meta) {
+    const xOk = !!(STATE.ejes.x.nombre && STATE.ejes.x.polo_neg && STATE.ejes.x.polo_pos);
+    const yOk = !!(STATE.ejes.y.nombre && STATE.ejes.y.polo_neg && STATE.ejes.y.polo_pos);
+    const n = (xOk ? 1 : 0) + (yOk ? 1 : 0);
+    meta.textContent = `${n}/2 ejes completos`;
+  }
+}
+
+function updateEjeName(axis, txt) {
+  if (!STATE.ejes[axis]) return;
+  STATE.ejes[axis].nombre = (txt || '').trim();
+  saveState();
+  renderEjes();
+}
+function updateEjePolo(axis, polo, txt) {
+  if (!STATE.ejes[axis]) return;
+  STATE.ejes[axis]['polo_' + polo] = (txt || '').trim();
+  saveState();
+  renderEjes();
+}
+function resetEjes() {
+  if (!confirm('Limpiar ambos ejes? Mantiene cenários e cross-impact.')) return;
+  STATE.ejes = {
+    x: { nombre:'', polo_neg:'', polo_pos:'', importedFrom:'' },
+    y: { nombre:'', polo_neg:'', polo_pos:'', importedFrom:'' }
+  };
+  saveState();
+  renderEjes();
+}
+function seedEjesEjemplo() {
+  STATE.ejes.x = { nombre:'Velocidad de transición energética', polo_neg:'Lenta e fragmentada', polo_pos:'Rápida e integrada', importedFrom:'' };
+  STATE.ejes.y = { nombre:'Estabilidad fiscal', polo_neg:'Deterioro estrutural', polo_pos:'Sostenibilidad asegurada', importedFrom:'' };
+  saveState();
+  renderEjes();
+  showToast('Exemplo cargado: transición energética.');
+}
+
+// ── Importar desde MicMac ────────────────────────────────────────────────
+// MicMac vive en localStorage['micmac-current-v2'] con shape ~{ variables:[{nombre}], matrix:{i-j: valor|{valor}} }
+function readMicmacMotrices() {
+  try {
+    const raw = localStorage.getItem('micmac-current-v2');
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    if (!p || !Array.isArray(p.variables) || p.variables.length === 0) return null;
+    const vars = p.variables;
+    const matrix = (p.matrix && typeof p.matrix === 'object') ? p.matrix : {};
+    // Calcular motricidad = suma fila |M[i,j]|, ignorando diagonal
+    const motri = vars.map((v, i) => {
+      let s = 0;
+      for (let j = 0; j < vars.length; j++) {
+        if (i === j) continue;
+        const cell = matrix[i + '-' + j];
+        let val = 0;
+        if (typeof cell === 'number') val = cell;
+        else if (cell && typeof cell === 'object' && typeof cell.valor === 'number') val = cell.valor;
+        s += Math.abs(val);
+      }
+      return { idx:i, nombre:v.nombre || ('Variável ' + (i+1)), motri:s };
+    });
+    motri.sort((a, b) => b.motri - a.motri);
+    // Solo devolver si hay al menos 2 con motricidad > 0
+    if (motri.length < 2 || motri[1].motri === 0) return null;
+    return [motri[0], motri[1]];
+  } catch (e) { return null; }
+}
+
+function importarDeMicmac() {
+  const top2 = readMicmacMotrices();
+  if (!top2) {
+    showToast('Não encontramos matriz MicMac classificada neste navegador.');
+    return;
+  }
+  if ((STATE.ejes.x.nombre || STATE.ejes.y.nombre) &&
+      !confirm('Isto reemplaza os nomes dos ejes com as 2 variáveis mais motoras de MicMac. Continuar?')) return;
+  STATE.ejes.x = {
+    nombre: top2[0].nombre,
+    polo_neg: '(define um polo negativo)',
+    polo_pos: '(define um polo positivo)',
+    importedFrom: 'Análise Estrutural · MicMac (motricidad ' + top2[0].motri + ')'
+  };
+  STATE.ejes.y = {
+    nombre: top2[1].nombre,
+    polo_neg: '(define um polo negativo)',
+    polo_pos: '(define um polo positivo)',
+    importedFrom: 'Análise Estrutural · MicMac (motricidad ' + top2[1].motri + ')'
+  };
+  saveState();
+  renderEjes();
+  showToast('Ejes importados desde MicMac. Define os polos.');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 2 · 4 ESCENARIOS
+// ═════════════════════════════════════════════════════════════════════════
+const QUAD_INFO = {
+  NE: { tag:'NE · Cuadrante I', meta:'X+ · E+', defaultName:'Mundo virtuoso' },
+  NO: { tag:'NO · Cuadrante II', meta:'X− · E+', defaultName:'Disonancia' },
+  SO: { tag:'SO · Cuadrante III', meta:'X− · E−', defaultName:'Mundo adverso' },
+  SE: { tag:'SE · Cuadrante IV', meta:'X+ · E−', defaultName:'Crecimiento inestable' }
+};
+
+function renderEscenarios() {
+  // Hint con ejes
+  const hint = document.getElementById('scen-axes-hint');
+  if (hint) {
+    const xN = STATE.ejes.x.nombre || '(eje X sem definir)';
+    const yN = STATE.ejes.y.nombre || '(eje E sem definir)';
+    const xPos = STATE.ejes.x.polo_pos || '+';
+    const xNeg = STATE.ejes.x.polo_neg || '−';
+    const yPos = STATE.ejes.y.polo_pos || '+';
+    const yNeg = STATE.ejes.y.polo_neg || '−';
+    hint.innerHTML = `Eje horizontal: <b>${escapeHtml(xN)}</b> (de <em>${escapeHtml(xNeg)}</em> a <em>${escapeHtml(xPos)}</em>) · Eje vertical: <b>${escapeHtml(yN)}</b> (de <em>${escapeHtml(yNeg)}</em> a <em>${escapeHtml(yPos)}</em>).`;
+  }
+  // Matriz 2x2
+  const wrap = document.getElementById('matriz-2x2');
+  if (wrap) {
+    const yPos = STATE.ejes.y.polo_pos || 'Y+';
+    const yNeg = STATE.ejes.y.polo_neg || 'Y−';
+    const xPos = STATE.ejes.x.polo_pos || 'X+';
+    const xNeg = STATE.ejes.x.polo_neg || 'X−';
+    const cells = ['NO','NE','SO','SE'];
+    // Layout: 3 columnas. Col 1 = etiqueta Y. Cols 2-3 = NO/NE arriba, SO/SE abajo. Última fila = etiquetas X.
+    let html = '';
+    // Row 1: label Y top + NO + NE
+    html += `<div class="axis-label-e-top">E · <b>${escapeHtml(yPos)}</b></div>`;
+    html += renderQuadCell('NO');
+    html += renderQuadCell('NE');
+    // Row 2: label Y bot + SO + SE
+    html += `<div class="axis-label-e-bot">E · <b class="neg">${escapeHtml(yNeg)}</b></div>`;
+    html += renderQuadCell('SO');
+    html += renderQuadCell('SE');
+    // Row 3: spacer + X label spread
+    html += `<div></div>`;
+    html += `<div class="axis-label-x">
+      <div class="x-label neg">X · <b>${escapeHtml(xNeg)}</b></div>
+      <div class="x-label pos">X · <b>${escapeHtml(xPos)}</b></div>
+    </div>`;
+    wrap.innerHTML = html;
+  }
+  // Prob sum
+  const sum = ['NE','NO','SO','SE'].reduce((acc, k) => acc + (Number(STATE.escenarios[k].prob) || 0), 0);
+  const psum = document.getElementById('scen-probsum');
+  if (psum) {
+    const diff = Math.abs(sum - 100);
+    const cls = diff <= 5 ? 'ok' : (diff <= 15 ? 'warn' : 'warn');
+    psum.className = 'scen-probsum ' + cls;
+    psum.innerHTML = `Suma de probabilidades: <b>${sum}%</b> · ` +
+      (diff <= 5 ? 'OK — cerca de 100%.'
+       : diff <= 15 ? 'Aceptable, mas convém ajustar a ~100%.'
+       : 'Lejos de 100%: revisa a coherencia de seus probabilidades subjetivas.');
+  }
+  // Meta
+  const meta = document.getElementById('scen-meta');
+  if (meta) {
+    const n = ['NE','NO','SO','SE'].filter(k => STATE.escenarios[k].nombre && STATE.escenarios[k].narrativa).length;
+    meta.textContent = `${n}/4 cenários narrados · suma ${sum}%`;
+  }
+}
+function renderQuadCell(k) {
+  const s = STATE.escenarios[k];
+  const info = QUAD_INFO[k];
+  return `<div class="scen-quad ${k}">
+    <div class="sq-head">
+      <span class="sq-tag">${escapeHtml(info.tag)} · ${escapeHtml(info.meta)}</span>
+      <span class="sq-prob-wrap">
+        <input type="number" min="0" max="100" step="1" class="sq-prob"
+               value="${Number(s.prob) || 0}"
+               oninput="updateScenProb('${k}', this.value)" aria-label="Probabilidad"/>
+        <span class="sq-prob-pct">%</span>
+      </span>
+    </div>
+    <div class="sq-name" contenteditable="true" spellcheck="false"
+         onblur="updateScenName('${k}', this.innerText)"
+         onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+         data-placeholder="${escapeAttr(info.defaultName)}">${escapeHtml(s.nombre || '')}</div>
+    <textarea placeholder="Narrativa do cenário (3-5 frases). Como se ve o mundo se ambos polos se materializan nesta combinação."
+              oninput="updateScenNarrativa('${k}', this.value)">${escapeHtml(s.narrativa || '')}</textarea>
+  </div>`;
+}
+function updateScenName(k, txt) {
+  if (!STATE.escenarios[k]) return;
+  STATE.escenarios[k].nombre = (txt || '').trim();
+  saveState();
+  renderEscenarios();
+}
+function updateScenNarrativa(k, txt) {
+  if (!STATE.escenarios[k]) return;
+  STATE.escenarios[k].narrativa = String(txt || '');
+  saveState();
+}
+function updateScenProb(k, val) {
+  if (!STATE.escenarios[k]) return;
+  let n = Number(val);
+  if (!isFinite(n) || n < 0) n = 0;
+  if (n > 100) n = 100;
+  STATE.escenarios[k].prob = n;
+  saveState();
+  renderEscenarios();
+}
+function resetEscenariosNarrativa() {
+  if (!confirm('Limpiar narrativas e nomes dos 4 cenários? Mantiene probabilidades.')) return;
+  ['NE','NO','SO','SE'].forEach(k => {
+    STATE.escenarios[k].nombre = '';
+    STATE.escenarios[k].narrativa = '';
+  });
+  saveState();
+  renderEscenarios();
+}
+function seedEscenariosEjemplo() {
+  STATE.escenarios.NE = { nombre:'Salto verde sostenido', narrativa:'Transición rápida e integrada acompañada por sostenibilidad fiscal. Renovables superan 50% da matriz para 2032; regla fiscal se cumple. Bajan os riscos macro e se libera espacio para inversión social.', prob:25 };
+  STATE.escenarios.NO = { nombre:'Caja preenche, pies cortos', narrativa:'A caja fiscal aguenta mas a transición se atasca: bloqueos políticos retrasan reformas energéticas. Bajo risco macro mas estancamiento industrial; presión creciente para subsidios cruzados.', prob:25 };
+  STATE.escenarios.SO = { nombre:'Tormenta perfecta', narrativa:'Transición lenta e deterioro fiscal simultáneos. Caída sostenida de precios do petróleo, presión sobre o peso, ajuste fiscal procíclico. Brecha social se ensancha; protestas e polarización.', prob:25 };
+  STATE.escenarios.SE = { nombre:'Sprint sem red', narrativa:'Transición acelerada mas fiscal-mente arriesgada: subsidios mal calibrados e caída de renta petrolera. Renovables crecen mas o gobiernão se fica sem caja para acompañar o ajuste social.', prob:25 };
+  saveState();
+  renderEscenarios();
+  showToast('Exemplo cargado: 4 narrativas tipo transición energética.');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 3 · CROSS-IMPACT
+// ═════════════════════════════════════════════════════════════════════════
+// Importadores desde otros módulos
+function readMicmacVariables() {
+  try {
+    const raw = localStorage.getItem('micmac-current-v2');
+    if (!raw) return [];
+    const p = JSON.parse(raw);
+    if (!p || !Array.isArray(p.variables)) return [];
+    return p.variables.map((v, i) => ({
+      id: 'var-' + i,
+      tipo: 'variable',
+      nombre: v.nombre || ('Variável ' + (i + 1)),
+      source: 'micmac'
+    })).filter(x => x.nombre && x.nombre.trim() !== '');
+  } catch (e) { return []; }
+}
+function readMactorActores() {
+  try {
+    const raw = localStorage.getItem('mactor-current-v1');
+    if (!raw) return [];
+    const p = JSON.parse(raw);
+    if (!p || !Array.isArray(p.actores)) return [];
+    return p.actores.map((a, i) => ({
+      id: 'actor-' + i,
+      tipo: 'actor',
+      nombre: a.nombre || ('Ator ' + (i + 1)),
+      source: 'mactor'
+    })).filter(x => x.nombre && x.nombre.trim() !== '');
+  } catch (e) { return []; }
+}
+function readAltAlternativas() {
+  try {
+    const raw = localStorage.getItem('alt-current-v1');
+    if (!raw) return [];
+    const p = JSON.parse(raw);
+    if (!p || !Array.isArray(p.alternativas)) return [];
+    return p.alternativas.map((a) => ({
+      id: 'alt-' + (a.id || Math.random().toString(36).slice(2,9)),
+      tipo: 'alternativa',
+      nombre: a.nombre || 'Alternativa sem nome',
+      source: 'alt',
+      baseline: !!a.baseline
+    })).filter(x => x.nombre && x.nombre.trim() !== '');
+  } catch (e) { return []; }
+}
+
+function _elementIncluded(id) {
+  return (STATE.elementos || []).some(e => e.id === id);
+}
+
+function renderImportSections() {
+  const wrap = document.getElementById('import-sections');
+  if (!wrap) return;
+  const sections = [
+    { id:'micmac',  title:'Variáveis (Análise Estrutural · MicMac)', items: readMicmacVariables() },
+    { id:'mactor',  title:'Atores (Análise de Atores · Mactor)',    items: readMactorActores() },
+    { id:'alt',     title:'Alternativas (Alternativas de Política)',   items: readAltAlternativas() }
+  ];
+  let html = '';
+  sections.forEach(sec => {
+    if (sec.items.length === 0) {
+      html += `<div class="import-section">
+        <div class="is-head">
+          <span class="is-title">${escapeHtml(sec.title)}</span>
+          <span class="is-meta">— não detectado</span>
+        </div>
+        <div style="font-family:var(--italic);font-style:italic;font-size:.88rem;color:var(--ink-3)">Não há datos guardados neste navegador. Se trabajaste no módulo, vuelve a él e salva.</div>
+      </div>`;
+      return;
+    }
+    html += `<div class="import-section">
+      <div class="is-head">
+        <span class="is-title">${escapeHtml(sec.title)}</span>
+        <span class="is-meta">${sec.items.length} disponible${sec.items.length === 1 ? '' : 's'}</span>
+      </div>
+      <div class="import-list">
+        ${sec.items.map(it => {
+          const included = _elementIncluded(it.id);
+          return `<label class="import-row${included ? ' added' : ''}">
+            <input type="checkbox" ${included ? 'checked' : ''} onchange="toggleElemento('${it.id}', this.checked, ${escapeAttr(JSON.stringify(it))})"/>
+            <span class="ir-name">${escapeHtml(it.nombre)}${it.baseline ? ' <em style="color:var(--ink-3);font-size:.85em">(baseline)</em>' : ''}</span>
+          </label>`;
+        }).join('')}
+      </div>
+    </div>`;
+  });
+  wrap.innerHTML = html;
+}
+
+function toggleElemento(id, checked, itJson) {
+  const it = (typeof itJson === 'string') ? JSON.parse(itJson) : itJson;
+  if (!Array.isArray(STATE.elementos)) STATE.elementos = [];
+  if (checked) {
+    if (!STATE.elementos.some(e => e.id === id)) {
+      STATE.elementos.push({ id, tipo: it.tipo, nombre: it.nombre, source: it.source });
+      if (!STATE.impactos[id]) STATE.impactos[id] = { NE:0, NO:0, SO:0, SE:0 };
+    }
+  } else {
+    STATE.elementos = STATE.elementos.filter(e => e.id !== id);
+    if (STATE.impactos[id]) delete STATE.impactos[id];
+  }
+  saveState();
+  renderImportSections();
+  renderCrossImpactTable();
+  renderCIMeta();
+}
+
+function addElementoManual() {
+  const inp = document.getElementById('manual-el-name');
+  const sel = document.getElementById('manual-el-tipo');
+  if (!inp) return;
+  const name = (inp.value || '').trim();
+  if (!name) { showToast('Escribe um nome.'); return; }
+  if (!Array.isArray(STATE.elementos)) STATE.elementos = [];
+  if (STATE.elementos.length >= 30) { showToast('Máximo 30 elementos.'); return; }
+  const id = newId('man');
+  STATE.elementos.push({ id, tipo: sel ? sel.value : 'otro', nombre: name, source: 'manual' });
+  STATE.impactos[id] = { NE:0, NO:0, SO:0, SE:0 };
+  inp.value = '';
+  saveState();
+  renderCrossImpactTable();
+  renderCIMeta();
+}
+function removeElemento(id) {
+  STATE.elementos = (STATE.elementos || []).filter(e => e.id !== id);
+  if (STATE.impactos[id]) delete STATE.impactos[id];
+  saveState();
+  renderImportSections();
+  renderCrossImpactTable();
+  renderCIMeta();
+}
+
+function renderCrossImpactTable() {
+  const wrap = document.getElementById('crossimp-table');
+  if (!wrap) return;
+  const els = STATE.elementos || [];
+  const qs = ['NE','NO','SO','SE'];
+  const qLabels = qs.map(k => {
+    const s = STATE.escenarios[k];
+    return s.nombre ? s.nombre : QUAD_INFO[k].tag;
+  });
+  if (els.length === 0) {
+    wrap.innerHTML = '<div style="padding:1.2rem 1rem;background:var(--paper-2);border:1px dashed var(--rule-strong);font-family:var(--italic);font-style:italic;color:var(--ink-3);text-align:center">Ainda não agregaste elementos. Marca os checkboxes de arriba ou adiciona uno manualmente.</div>';
+    return;
+  }
+  let html = `<table class="crossimp-table"><thead><tr>
+    <th class="el-col">Elemento</th>
+    ${qLabels.map(l => `<th>${escapeHtml(l.slice(0, 18))}</th>`).join('')}
+    <th style="width:30px"></th>
+  </tr></thead><tbody>`;
+  els.forEach(el => {
+    if (!STATE.impactos[el.id]) STATE.impactos[el.id] = { NE:0, NO:0, SO:0, SE:0 };
+    const tipoLbl = ({ variable:'Variable', actor:'Actor', alternativa:'Alternativa', otro:'Otro' })[el.tipo] || el.tipo;
+    html += `<tr>
+      <td class="el-col">${escapeHtml(el.nombre)}<span class="el-meta">${escapeHtml(tipoLbl)}${el.source && el.source !== 'manual' ? ' · ' + escapeHtml(el.source) : ''}</span></td>
+      ${qs.map(k => {
+        const v = Number(STATE.impactos[el.id][k] || 0);
+        const cls = v === 2 ? 'v-pos2' : v === 1 ? 'v-pos1' : v === -1 ? 'v-neg1' : v === -2 ? 'v-neg2' : 'v-zero';
+        const lbl = v === 0 ? '0' : (v > 0 ? '+' + v : String(v));
+        return `<td style="text-align:center"><button class="ci-cell ${cls}" type="button" onclick="cycleImpacto('${el.id}','${k}')" title="Click para cyclar">${lbl}</button></td>`;
+      }).join('')}
+      <td style="text-align:center"><button onclick="removeElemento('${el.id}')" title="Quitar" style="font-family:var(--mono);font-size:1rem;color:var(--ink-3);padding:0 .35rem">×</button></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+const CICYCLE = [0, 1, 2, -1, -2];
+function cycleImpacto(elId, k) {
+  if (!STATE.impactos[elId]) STATE.impactos[elId] = { NE:0, NO:0, SO:0, SE:0 };
+  const cur = Number(STATE.impactos[elId][k] || 0);
+  const i = CICYCLE.indexOf(cur);
+  const next = CICYCLE[(i + 1) % CICYCLE.length];
+  STATE.impactos[elId][k] = next;
+  saveState();
+  renderCrossImpactTable();
+  renderCIMeta();
+}
+
+function renderCIMeta() {
+  const meta = document.getElementById('ci-meta');
+  if (!meta) return;
+  const els = STATE.elementos || [];
+  const totalCells = els.length * 4;
+  let filled = 0;
+  els.forEach(el => {
+    const row = STATE.impactos[el.id] || {};
+    ['NE','NO','SO','SE'].forEach(k => { if (Number(row[k] || 0) !== 0) filled++; });
+  });
+  meta.textContent = `${els.length} elementos · ${filled}/${totalCells} células classificadas`;
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 4 · ESTRATEGIA / NO-REGRET
+// ═════════════════════════════════════════════════════════════════════════
+function _calcNoRegret(elId) {
+  // Robusta no-regret si en >=3 de los 4 escenarios tiene valor >= +1
+  const row = STATE.impactos[elId] || {};
+  const counts = ['NE','NO','SO','SE'].filter(k => Number(row[k] || 0) >= 1).length;
+  return counts >= 3;
+}
+function _detailScenariosForElement(elId) {
+  const row = STATE.impactos[elId] || {};
+  return ['NE','NO','SO','SE'].map(k => {
+    const v = Number(row[k] || 0);
+    return { k, v, scenName: (STATE.escenarios[k].nombre || QUAD_INFO[k].tag) };
+  });
+}
+
+function renderEstrategia() {
+  const list = document.getElementById('noregret-list');
+  if (!list) return;
+  const alts = (STATE.elementos || []).filter(e => e.tipo === 'alternativa');
+  if (alts.length === 0) {
+    list.innerHTML = '<div style="padding:1.2rem 1rem;background:var(--paper-2);border:1px dashed var(--rule-strong);font-family:var(--italic);font-style:italic;color:var(--ink-3);text-align:center">Não há alternativas no cross-impact. Vuelve ao passo anterior, marca alternativas desde o módulo de Alternativas (ou agrégalas manualmente como tipo «Alternativa»).</div>';
+  } else {
+    list.innerHTML = alts.map(a => {
+      const robust = _calcNoRegret(a.id);
+      const det = _detailScenariosForElement(a.id);
+      const positivos = det.filter(d => d.v >= 1).length;
+      const detTxt = det.map(d => `<b>${d.v > 0 ? '+' + d.v : d.v}</b> ${escapeHtml(d.scenName.slice(0, 16))}`).join(' · ');
+      return `<div class="nr-row${robust ? ' is-noregret' : ''}">
+        <div class="nr-body">
+          <div class="nr-name">${escapeHtml(a.nombre)}</div>
+          <div class="nr-meta">${positivos}/4 cenários com impacto ≥ +1</div>
+          <div class="nr-detail">${detTxt}</div>
+        </div>
+        <div class="${robust ? 'nr-badge' : 'nr-badge dim'}">${robust ? '✓ Não-regret' : 'Não robusta'}</div>
+      </div>`;
+    }).join('');
+  }
+  // Bind contingencia / señales
+  const cEl = document.getElementById('estr-contingencia');
+  const sEl = document.getElementById('estr-senales');
+  if (cEl) {
+    if (cEl.value !== (STATE.estrategia.contingencia || '')) cEl.value = STATE.estrategia.contingencia || '';
+    if (!renderEstrategia._boundC) {
+      renderEstrategia._boundC = true;
+      cEl.addEventListener('input', () => { STATE.estrategia.contingencia = cEl.value; saveState(); });
+    }
+  }
+  if (sEl) {
+    if (sEl.value !== (STATE.estrategia.senales_tempranas || '')) sEl.value = STATE.estrategia.senales_tempranas || '';
+    if (!renderEstrategia._boundS) {
+      renderEstrategia._boundS = true;
+      sEl.addEventListener('input', () => { STATE.estrategia.senales_tempranas = sEl.value; saveState(); });
+    }
+  }
+  const meta = document.getElementById('nr-meta');
+  if (meta) {
+    const robustCount = alts.filter(a => _calcNoRegret(a.id)).length;
+    meta.textContent = alts.length === 0 ? '— sem alternativas' : `${robustCount}/${alts.length} alternativas no-regret`;
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// RESULTS
+// ═════════════════════════════════════════════════════════════════════════
+function renderResults() {
+  const wrap = document.getElementById('res-content');
+  if (!wrap) return;
+  const ejesOk = !!(STATE.ejes.x.nombre && STATE.ejes.y.nombre);
+  const escNarrados = ['NE','NO','SO','SE'].filter(k => STATE.escenarios[k].nombre && STATE.escenarios[k].narrativa).length;
+  const els = STATE.elementos || [];
+  const alts = els.filter(e => e.tipo === 'alternativa');
+  const robustCount = alts.filter(a => _calcNoRegret(a.id)).length;
+  const probSum = ['NE','NO','SO','SE'].reduce((s, k) => s + Number(STATE.escenarios[k].prob || 0), 0);
+
+  let html = `<div class="res-hero">
+    <div class="rh-eyebrow">Resumen prospectivo</div>
+    <h3>${ejesOk ? escapeHtml(STATE.ejes.x.nombre) + ' × ' + escapeHtml(STATE.ejes.y.nombre) : 'Análise prospectivo'}</h3>
+    <p>${STATE.contexto.enunciado_problema ? escapeHtml(STATE.contexto.enunciado_problema) : 'Análise de cenários sem enunciado do problema registrado. Edita o passo 1 para agregarlo.'}</p>
+  </div>`;
+
+  html += `<div class="res-grid">
+    <div class="res-kpi"><div class="rk-num">${ejesOk ? '2' : '0'}</div><div class="rk-label">Ejes definidos</div></div>
+    <div class="res-kpi"><div class="rk-num">${escNarrados}</div><div class="rk-label">Cenários narrados</div></div>
+    <div class="res-kpi"><div class="rk-num">${els.length}</div><div class="rk-label">Elementos cruzados</div></div>
+    <div class="res-kpi"><div class="rk-num">${robustCount}</div><div class="rk-label">Alts. no-regret</div></div>
+  </div>`;
+
+  // Bloque ejes
+  if (ejesOk) {
+    html += `<div class="res-block">
+      <h4>Incertidumbres críticas</h4>
+      <p><b style="color:var(--accent)">${escapeHtml(STATE.ejes.x.nombre)}</b> (horizontal): ${escapeHtml(STATE.ejes.x.polo_neg || '−')} ↔ ${escapeHtml(STATE.ejes.x.polo_pos || '+')}</p>
+      <p><b style="color:var(--accent)">${escapeHtml(STATE.ejes.y.nombre)}</b> (vertical): ${escapeHtml(STATE.ejes.y.polo_neg || '−')} ↔ ${escapeHtml(STATE.ejes.y.polo_pos || '+')}</p>
+    </div>`;
+  }
+
+  // Bloque 4 escenarios
+  html += `<div class="res-block">
+    <h4>Cuatro escenarios plausibles</h4>
+    ${['NE','NO','SO','SE'].map(k => {
+      const s = STATE.escenarios[k];
+      const name = s.nombre || QUAD_INFO[k].defaultName;
+      return `<p><b style="color:var(--accent)">${escapeHtml(name)}</b> <em style="color:var(--ink-3)">(${QUAD_INFO[k].tag} · ${s.prob}%)</em><br/>${s.narrativa ? escapeHtml(s.narrativa) : '<em>sem narrativa</em>'}</p>`;
+    }).join('')}
+  </div>`;
+  if (Math.abs(probSum - 100) > 15) {
+    html += `<div class="res-block" style="border-left:3px solid var(--amber)">
+      <h4 style="color:var(--amber)">Probabilidades subjetivas</h4>
+      <p><em>A suma actual (${probSum}%) está lejos de 100%. Não bloquea o exercício mas convém calibrarla antes de presentar resultados.</em></p>
+    </div>`;
+  }
+
+  // Bloque cross-impact
+  if (els.length > 0) {
+    const winners = alts.filter(a => _calcNoRegret(a.id));
+    html += `<div class="res-block">
+      <h4>Cross-impact · resumen</h4>
+      <p>${els.length} elementos cruzados (${alts.length} alternativas, ${els.filter(e => e.tipo === 'variable').length} variáveis, ${els.filter(e => e.tipo === 'actor').length} atores).</p>
+      ${winners.length ? '<p><b style="color:var(--green)">Alternativas no-regret (robustas em ≥3 cenários):</b></p><ul>' + winners.map(w => '<li>' + escapeHtml(w.nombre) + '</li>').join('') + '</ul>' :
+        (alts.length ? '<p><em>Ninguna alternativa actual classifica como no-regret. Considera replantear as alternativas ou aceptar o risco de apostar a um futuro.</em></p>' : '')}
+    </div>`;
+  }
+
+  // Bloque estrategia
+  if (STATE.estrategia.contingencia || STATE.estrategia.senales_tempranas) {
+    html += `<div class="res-block">
+      <h4>Plan de contingencia e señales tempranas</h4>
+      ${STATE.estrategia.contingencia ? '<p><b>Contingencia:</b> ' + escapeHtml(STATE.estrategia.contingencia) + '</p>' : ''}
+      ${STATE.estrategia.senales_tempranas ? '<p><b>Señales tempranas:</b> ' + escapeHtml(STATE.estrategia.senales_tempranas) + '</p>' : ''}
+    </div>`;
+  }
+
+  wrap.innerHTML = html;
+
+  const meta = document.getElementById('res-meta');
+  if (meta) {
+    meta.textContent = `${escNarrados}/4 cenários · ${els.length} elementos · ${robustCount} no-regret`;
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// EXPORTS · MD · CSV · PDF
+// ═════════════════════════════════════════════════════════════════════════
+function _download(filename, content, mime) {
+  const blob = new Blob([content], { type: mime || 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function _slugForFile() {
+  const enun = (STATE.contexto.enunciado_problema || '').trim();
+  if (enun) return enun.toLowerCase().replace(/[áéíóúñ]/g, c => ({á:'a',é:'e',í:'i',ó:'o',ú:'u',ñ:'n'}[c] || c)).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g,'').slice(0, 40) || 'escenarios';
+  return 'escenarios';
+}
+
+function downloadMemoMD() {
+  const today = new Date().toLocaleDateString('es-CO', { year:'numeric', month:'long', day:'numeric' });
+  let md = `# Análise prospectivo · cenários\n\n`;
+  md += `**Fecha:** ${today}\n\n`;
+  if (STATE.contexto.enunciado_problema) md += `## Contexto · enunciado do problema\n\n${STATE.contexto.enunciado_problema}\n\n`;
+
+  md += `## 1. Incertidumbres críticas\n\n`;
+  md += `**Eje horizontal:** ${STATE.ejes.x.nombre || '—'}\n`;
+  md += `- Polo −: ${STATE.ejes.x.polo_neg || '—'}\n`;
+  md += `- Polo +: ${STATE.ejes.x.polo_pos || '—'}\n`;
+  if (STATE.ejes.x.importedFrom) md += `- _Importado de: ${STATE.ejes.x.importedFrom}_\n`;
+  md += '\n';
+  md += `**Eje vertical:** ${STATE.ejes.y.nombre || '—'}\n`;
+  md += `- Polo −: ${STATE.ejes.y.polo_neg || '—'}\n`;
+  md += `- Polo +: ${STATE.ejes.y.polo_pos || '—'}\n`;
+  if (STATE.ejes.y.importedFrom) md += `- _Importado de: ${STATE.ejes.y.importedFrom}_\n`;
+  md += '\n';
+
+  md += `## 2. Quatro cenários plausíveis\n\n`;
+  ['NE','NO','SO','SE'].forEach(k => {
+    const s = STATE.escenarios[k];
+    const info = QUAD_INFO[k];
+    md += `### ${info.tag} · ${info.meta} — ${s.nombre || info.defaultName} _(${s.prob}%)_\n\n`;
+    md += `${s.narrativa || '_sin narrativa_'}\n\n`;
+  });
+  const probSum = ['NE','NO','SO','SE'].reduce((s, k) => s + Number(STATE.escenarios[k].prob || 0), 0);
+  md += `_Suma de probabilidades subjetivas: ${probSum}%_\n\n`;
+
+  const els = STATE.elementos || [];
+  if (els.length) {
+    md += `## 3. Cross-impact\n\n`;
+    md += `| Elemento | Tipo | NE | NO | SO | SE |\n|---|---|---|---|---|---|\n`;
+    els.forEach(el => {
+      const r = STATE.impactos[el.id] || {};
+      const f = v => { const n = Number(v || 0); return n === 0 ? '0' : (n > 0 ? '+' + n : String(n)); };
+      md += `| ${el.nombre.replace(/\|/g, '\\|')} | ${el.tipo} | ${f(r.NE)} | ${f(r.NO)} | ${f(r.SO)} | ${f(r.SE)} |\n`;
+    });
+    md += '\n';
+  }
+
+  const alts = els.filter(e => e.tipo === 'alternativa');
+  if (alts.length) {
+    md += `## 4. Decisiones robustas no-regret\n\n`;
+    md += `_Una alternativa é **no-regret** se em ao menos 3 de 4 cenários marca +1 ou mais (Lempert & Walker, RAND, 2003)._\n\n`;
+    alts.forEach(a => {
+      const robust = _calcNoRegret(a.id);
+      const det = _detailScenariosForElement(a.id);
+      const detTxt = det.map(d => `${d.scenName}: ${d.v > 0 ? '+' + d.v : d.v}`).join(' · ');
+      md += `- **${a.nombre}**: ${robust ? '✓ no-regret' : 'não robusta'} · ${detTxt}\n`;
+    });
+    md += '\n';
+  }
+
+  if (STATE.estrategia.contingencia || STATE.estrategia.senales_tempranas) {
+    md += `## 5. Plan de contingencia e señales tempranas\n\n`;
+    if (STATE.estrategia.contingencia) md += `**Contingencia:** ${STATE.estrategia.contingencia}\n\n`;
+    if (STATE.estrategia.senales_tempranas) md += `**Señales tempranas:** ${STATE.estrategia.senales_tempranas}\n\n`;
+  }
+
+  md += `---\n\n_Generado com ricardoruiz.co · Lab de Políticas Públicas e Prospectiva._\n\n_Método de cenários de Schwartz · Global Business Network (1991) + prospectiva estratégica francesa (Godet · Mojica · LIPSOR) + Robust Decision Making de Lempert & Walker (RAND, 2003) + cross-impact analysis de Gordon (RAND, 1968)._\n`;
+
+  _download(`cenários-${_slugForFile()}-${new Date().toISOString().slice(0,10)}.md`, md, 'text/markdown;charset=utf-8');
+  showToast('Memo .md descargado.');
+}
+
+function downloadMatrizCSV() {
+  const els = STATE.elementos || [];
+  if (els.length === 0) { showToast('Não há elementos para exportar.'); return; }
+  function q(s) {
+    const str = String(s == null ? '' : s);
+    if (/[",\n]/.test(str)) return '"' + str.replace(/"/g, '""') + '"';
+    return str;
+  }
+  const scenNames = ['NE','NO','SO','SE'].map(k => (STATE.escenarios[k].nombre || QUAD_INFO[k].tag) + ' (' + STATE.escenarios[k].prob + '%)');
+  const header = ['Elemento','Tipo','Origen', ...scenNames, 'Não-regret (alts)'];
+  let csv = header.map(q).join(',') + '\n';
+  els.forEach(el => {
+    const r = STATE.impactos[el.id] || {};
+    const v = k => { const n = Number(r[k] || 0); return n === 0 ? '0' : (n > 0 ? '+' + n : String(n)); };
+    const nr = el.tipo === 'alternativa' ? (_calcNoRegret(el.id) ? 'sí' : 'no') : '';
+    csv += [el.nombre, el.tipo, el.source || 'manual', v('NE'), v('NO'), v('SO'), v('SE'), nr].map(q).join(',') + '\n';
+  });
+  _download(`cenários-cross-impact-${_slugForFile()}-${new Date().toISOString().slice(0,10)}.csv`, csv, 'text/csv;charset=utf-8');
+  showToast('Cross-impact .csv descargado.');
+}
+
+// Carga jsPDF on-demand
+async function _ensureJsPDF() {
+  if (window.jspdf && window.jspdf.jsPDF) return window.jspdf.jsPDF;
+  await new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Não se pudo cargar jsPDF.'));
+    document.head.appendChild(s);
+  });
+  if (!window.jspdf || !window.jspdf.jsPDF) throw new Error('jsPDF não disponível.');
+  return window.jspdf.jsPDF;
+}
+
+async function downloadFichaPDF() {
+  let jsPDF;
+  try {
+    showToast('Cargando generador PDF…');
+    jsPDF = await _ensureJsPDF();
+  } catch (e) {
+    showToast('Não se pudo cargar o generador PDF (revisa seu conexión).');
+    return;
+  }
+  const doc = new jsPDF({ unit:'mm', format:'a4' });
+  const PW = 210, PH = 297, M = 18;
+  let y = M;
+
+  const ACC = [137, 30, 22];
+  const INK = [26, 22, 16];
+  const INK2 = [90, 84, 72];
+  const RULE = [200, 195, 185];
+
+  function addPageIfNeeded(needed) {
+    if (y + needed > PH - M) { doc.addPage(); y = M; }
+  }
+  function setFont(weight, size) {
+    doc.setFont('helvetica', weight); doc.setFontSize(size);
+  }
+  function drawTitle(t) {
+    setFont('bold', 18); doc.setTextColor.apply(doc, ACC); doc.text(t, M, y); y += 8;
+    doc.setDrawColor.apply(doc, ACC); doc.setLineWidth(0.6); doc.line(M, y, PW - M, y); y += 6;
+    doc.setTextColor.apply(doc, INK);
+  }
+  function drawH2(t) {
+    addPageIfNeeded(12);
+    setFont('bold', 12); doc.setTextColor.apply(doc, ACC); doc.text(t, M, y); y += 6;
+    doc.setTextColor.apply(doc, INK);
+  }
+  function drawPara(t, opts) {
+    if (!t) return;
+    setFont('normal', (opts && opts.size) || 10);
+    doc.setTextColor.apply(doc, (opts && opts.color) || INK);
+    const lines = doc.splitTextToSize(String(t), PW - 2 * M);
+    lines.forEach(line => {
+      addPageIfNeeded(5);
+      doc.text(line, M, y); y += 4.5;
+    });
+    y += 1;
+  }
+  function drawKV(k, v) {
+    setFont('bold', 10); doc.setTextColor.apply(doc, INK);
+    addPageIfNeeded(5);
+    const klabel = k + ': ';
+    doc.text(klabel, M, y);
+    const klabelWidth = doc.getTextWidth(klabel);
+    setFont('normal', 10); doc.setTextColor.apply(doc, INK2);
+    const lines = doc.splitTextToSize(String(v || '—'), PW - 2 * M - klabelWidth);
+    if (lines.length === 1) { doc.text(lines[0], M + klabelWidth, y); y += 5; }
+    else {
+      doc.text(lines[0], M + klabelWidth, y); y += 4.5;
+      for (let i = 1; i < lines.length; i++) { addPageIfNeeded(5); doc.text(lines[i], M, y); y += 4.5; }
+      y += 1;
+    }
+  }
+  function drawTableHeader(cols, widths) {
+    setFont('bold', 9); doc.setTextColor.apply(doc, ACC); doc.setFillColor(245, 240, 230);
+    addPageIfNeeded(8);
+    let x = M;
+    doc.setDrawColor.apply(doc, RULE); doc.setLineWidth(0.2);
+    cols.forEach((c, i) => {
+      doc.rect(x, y - 4, widths[i], 6, 'FD');
+      doc.text(String(c), x + 1.5, y);
+      x += widths[i];
+    });
+    y += 4;
+    doc.setTextColor.apply(doc, INK);
+  }
+  function drawTableRow(vals, widths, opts) {
+    setFont((opts && opts.bold) ? 'bold' : 'normal', 9);
+    doc.setTextColor.apply(doc, (opts && opts.highlight) ? ACC : INK);
+    if (opts && opts.highlight) doc.setFillColor(252, 240, 233);
+    addPageIfNeeded(8);
+    let x = M; let maxLines = 1;
+    const cellLines = vals.map((v, i) => doc.splitTextToSize(String(v == null ? '' : v), widths[i] - 3));
+    cellLines.forEach(arr => { if (arr.length > maxLines) maxLines = arr.length; });
+    const rowH = Math.max(6, maxLines * 4 + 2);
+    addPageIfNeeded(rowH);
+    cellLines.forEach((arr, i) => {
+      doc.setDrawColor.apply(doc, RULE);
+      doc.rect(x, y - 4, widths[i], rowH, (opts && opts.highlight) ? 'FD' : 'D');
+      arr.forEach((line, li) => {
+        doc.text(line, x + 1.5, y + li * 4);
+      });
+      x += widths[i];
+    });
+    y += rowH - 2;
+  }
+
+  // Header
+  drawTitle('Ficha prospectiva · cenários');
+  setFont('normal', 9); doc.setTextColor.apply(doc, INK2);
+  const today = new Date().toLocaleDateString('es-CO', { year:'numeric', month:'long', day:'numeric' });
+  doc.text(today + '  ·  ricardoruiz.co · Lab de Políticas Públicas e Prospectiva', M, y); y += 7;
+  doc.setTextColor.apply(doc, INK);
+
+  // 1. Contexto
+  drawH2('1. Contexto');
+  drawPara(STATE.contexto.enunciado_problema || '— sem enunciado registrado —');
+
+  // 2. Incertidumbres
+  drawH2('2. Incertidumbres críticas');
+  drawKV('Eje horizontal', STATE.ejes.x.nombre || '—');
+  drawKV('Polo −', STATE.ejes.x.polo_neg || '—');
+  drawKV('Polo +', STATE.ejes.x.polo_pos || '—');
+  y += 1;
+  drawKV('Eje vertical', STATE.ejes.y.nombre || '—');
+  drawKV('Polo −', STATE.ejes.y.polo_neg || '—');
+  drawKV('Polo +', STATE.ejes.y.polo_pos || '—');
+
+  // 3. Escenarios
+  addPageIfNeeded(20);
+  drawH2('3. Quatro cenários plausíveis');
+  ['NE','NO','SO','SE'].forEach(k => {
+    const s = STATE.escenarios[k];
+    const info = QUAD_INFO[k];
+    setFont('bold', 11); doc.setTextColor.apply(doc, ACC);
+    addPageIfNeeded(7);
+    doc.text(`${info.tag}: ${s.nombre || info.defaultName} (${s.prob}%)`, M, y); y += 5;
+    doc.setTextColor.apply(doc, INK);
+    drawPara(s.narrativa || '— sem narrativa —', { color: INK2 });
+  });
+
+  // 4. Cross-impact
+  const els = STATE.elementos || [];
+  if (els.length > 0) {
+    addPageIfNeeded(30);
+    drawH2('4. Cross-impact');
+    drawPara('Elementos contra cenários, valor -2 a +2. Theodore Gordon (RAND, 1968).', { color: INK2 });
+    const widths = [70, 22, 22, 22, 22, 16];
+    drawTableHeader(['Elemento','NE','NO','SO','SE','NR'], widths);
+    const f = v => { const n = Number(v || 0); return n === 0 ? '0' : (n > 0 ? '+' + n : String(n)); };
+    els.forEach(el => {
+      const r = STATE.impactos[el.id] || {};
+      const nr = el.tipo === 'alternativa' ? (_calcNoRegret(el.id) ? '✓' : '—') : '';
+      drawTableRow([el.nombre, f(r.NE), f(r.NO), f(r.SO), f(r.SE), nr], widths, { highlight: el.tipo === 'alternativa' && _calcNoRegret(el.id) });
+    });
+    y += 2;
+  }
+
+  // 5. Estrategia
+  if (STATE.estrategia.contingencia || STATE.estrategia.senales_tempranas) {
+    addPageIfNeeded(30);
+    drawH2('5. Plan de contingencia e señales tempranas');
+    if (STATE.estrategia.contingencia) {
+      setFont('bold', 10); doc.setTextColor.apply(doc, INK);
+      addPageIfNeeded(5); doc.text('Contingencia', M, y); y += 5;
+      drawPara(STATE.estrategia.contingencia);
+    }
+    if (STATE.estrategia.senales_tempranas) {
+      setFont('bold', 10); doc.setTextColor.apply(doc, INK);
+      addPageIfNeeded(5); doc.text('Señales tempranas', M, y); y += 5;
+      drawPara(STATE.estrategia.senales_tempranas);
+    }
+  }
+
+  // Footer metodológico
+  addPageIfNeeded(30);
+  y = PH - M - 22;
+  doc.setDrawColor.apply(doc, RULE); doc.setLineWidth(0.3); doc.line(M, y, PW - M, y); y += 5;
+  setFont('italic', 8); doc.setTextColor.apply(doc, INK2);
+  const footer = 'Método: cenários de Schwartz · Global Business Network (The Art of the Long View, 1991) + prospectiva estratégica francesa (Godet · Mojica · LIPSOR · Externado) + Robust Decision Making de Lempert & Walker (RAND, 2003) + cross-impact analysis de Gordon (RAND, 1968). Rascunho prospectivo; não é CONPES oficial.';
+  const flines = doc.splitTextToSize(footer, PW - 2 * M);
+  flines.forEach(l => { doc.text(l, M, y); y += 3.5; });
+  setFont('normal', 8); doc.setTextColor.apply(doc, INK2);
+  y += 2; doc.text('Generado com ricardoruiz.co · Lab de Políticas Públicas e Prospectiva  ·  ' + today, M, y);
+
+  const filename = `cenários-prospectiva-${_slugForFile()}-${new Date().toISOString().slice(0,10)}.pdf`;
+  doc.save(filename);
+  showToast('Ficha prospectiva PDF generada.');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// THEME · auto día/noche según hora local + persistencia
+// ═════════════════════════════════════════════════════════════════════════
+function toggleTheme() {
+  const isDay = document.body.classList.toggle('day-mode');
+  localStorage.setItem('rr-theme', isDay ? 'day' : 'night');
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = isDay ? '☾ Modo noite' : '☀ Modo dia';
+}
+(function applyInitialTheme() {
+  const pref = localStorage.getItem('rr-theme');
+  let isDay;
+  if (pref === 'day') isDay = true;
+  else if (pref === 'night') isDay = false;
+  else {
+    const h = new Date().getHours();
+    isDay = h >= 6 && h < 19;
+  }
+  if (isDay) document.body.classList.add('day-mode');
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = isDay ? '☾ Modo noite' : '☀ Modo dia';
+})();
+
+// ═════════════════════════════════════════════════════════════════════════
+// CURSOR custom
+// ═════════════════════════════════════════════════════════════════════════
+(function initCursor() {
+  const c = document.getElementById('cursor');
+  const r = document.getElementById('cursorRing');
+  if (!c || !r) return;
+  document.addEventListener('mousemove', e => {
+    c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px';
+    r.style.left = e.clientX + 'px'; r.style.top = e.clientY + 'px';
+  });
+  document.addEventListener('mouseover', e => {
+    if (e.target.closest && e.target.closest('a,button,input,textarea,summary,.accordion,.pill,.step-pill,.eje-card,.scen-quad,.ci-cell,.import-row,.nr-row,[contenteditable]')) {
+      c.style.transform = 'translate(-50%,-50%) scale(0.5)'; c.style.background = 'transparent'; c.style.border = '2px solid var(--accent)';
+      r.style.transform = 'translate(-50%,-50%) scale(1.5)'; r.style.opacity = '0.7';
+    } else {
+      c.style.transform = 'translate(-50%,-50%) scale(1)'; c.style.background = 'var(--accent)'; c.style.border = 'none';
+      r.style.transform = 'translate(-50%,-50%) scale(1)'; r.style.opacity = '0.4';
+    }
+  });
+})();
+
+// ═════════════════════════════════════════════════════════════════════════
+// MODAL RECURSOS · catálogo compartido, filtrado por 'prospect'
+// ═════════════════════════════════════════════════════════════════════════
+const LAB_CURRENT_MODULE = 'prospect';
+const LAB_MOD_LABELS = {
+  problema:     'o módulo de Problema Público',
+  estructural:  'o módulo de Análise Estrutural',
+  mactor:       'o módulo de Análise de Atores',
+  evaluacion:   'o módulo de Avaliação de Política',
+  alternativas: 'o módulo de Alternativas de Política',
+  ain:          'o módulo de Análise de Impacto Normativo',
+  prospect:     'o módulo de Cenários Prospectivos'
+};
+function openRecursosModal() {
+  const lab = window.LAB_RECURSOS;
+  const grid = document.getElementById('modal-recursos-grid');
+  const nameEl = document.getElementById('lr-modulo-name');
+  if (nameEl) nameEl.textContent = LAB_MOD_LABELS[LAB_CURRENT_MODULE] || 'este módulo';
+  if (!lab || !grid) { openModal('modal-recursos'); return; }
+  // Si el catálogo no tiene tag 'prospect' aún, mostramos todos los marcados con 'prospectiva' como categoría
+  let items = lab.items.filter(it => !it.modulos || it.modulos.length === 0 || it.modulos.includes(LAB_CURRENT_MODULE));
+  if (items.length === 0) {
+    // Fallback: items de categoría prospectiva
+    items = lab.items.filter(it => it.categoria === 'prospectiva');
+  }
+  if (!items.length) {
+    grid.innerHTML = '<div class="lr-empty">O catálogo não tem recursos destacados para este módulo. Mira o catálogo completo no hub.</div>';
+    openModal('modal-recursos');
+    return;
+  }
+  const sortedCats = lab.categorias.slice().sort((a, b) => (a.orden || 99) - (b.orden || 99));
+  grid.innerHTML = sortedCats.map(c => {
+    const sub = items.filter(it => it.categoria === c.id);
+    if (!sub.length) return '';
+    return `<div class="lr-cat">
+      <div class="lr-cat-name">${escapeHtml(c.nombre)}</div>
+      <div class="lr-items">
+        ${sub.map(it => `<a class="lr-item" href="${escapeAttr(it.url)}" target="_blank" rel="noopener noreferrer">
+          <div class="lr-item-name"><span>${escapeHtml(it.nombre)}</span></div>
+          <div class="lr-item-desc">${escapeHtml(it.desc)}</div>
+        </a>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+  openModal('modal-recursos');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// AUTH + CLOUD · patrón de ain-pt.html con endpoints /prospect/*
+// ═════════════════════════════════════════════════════════════════════════
+const AUTH_URL = 'https://rr-auth.reruizc.workers.dev';
+const POLL_INTERVAL_MS = 10000;
+const AUTH = { token:null, user:null, isLogged:false };
+const CLOUD = { projId:null, lastSavedAt:null, lastEditor:null, collaborators:[], owner:null, _pollTimer:null, _saving:false };
+
+function _authToken() { return localStorage.getItem('rr-token'); }
+function _authStoreUser(u) { if (u) localStorage.setItem('rr-user', JSON.stringify(u)); }
+function _authReadStored() { try { return JSON.parse(localStorage.getItem('rr-user') || 'null'); } catch { return null; } }
+
+async function loadUserFromAPI() {
+  const token = _authToken();
+  if (!token) { AUTH.isLogged=false; AUTH.user=null; AUTH.token=null; return null; }
+  AUTH.token = token;
+  try {
+    const r = await fetch(AUTH_URL + '/auth/me', { headers:{ 'Authorization':'Bearer ' + token } });
+    const data = await r.json();
+    if (!r.ok || !data.ok) {
+      localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user');
+      AUTH.isLogged=false; AUTH.user=null; AUTH.token=null; return null;
+    }
+    AUTH.user = data.user; AUTH.isLogged = true;
+    _authStoreUser(data.user);
+    return data.user;
+  } catch {
+    const cached = _authReadStored();
+    if (cached && token) { AUTH.user=cached; AUTH.isLogged=true; return cached; }
+    return null;
+  }
+}
+
+function renderAuthChip() {
+  const anon = document.getElementById('nav-auth-anon');
+  const userBlock = document.getElementById('nav-user-block');
+  if (!anon || !userBlock) return;
+  if (AUTH.isLogged && AUTH.user) {
+    anon.classList.add('is-hidden');
+    userBlock.classList.remove('is-hidden');
+    const _u = AUTH.user;
+    const _first = ((_u.name || '').trim().split(/\s+/)[0]) || ((_u.email || '').split('@')[0]) || 'mi conta';
+    document.getElementById('nav-user-name').textContent = _first;
+    document.getElementById('nav-user-name').title = 'Ir ao dashboard · ' + (_u.email || '');
+    document.getElementById('nav-user-plan').textContent = (AUTH.user.plan || 'free').toUpperCase();
+  } else {
+    anon.classList.remove('is-hidden');
+    userBlock.classList.add('is-hidden');
+  }
+}
+
+function logoutUser() {
+  if (!confirm('Fechar sessão? Seu análise local se conserva.')) return;
+  localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user');
+  AUTH.token=null; AUTH.user=null; AUTH.isLogged=false;
+  CLOUD.projId=null; CLOUD.lastSavedAt=null; CLOUD.lastEditor=null; CLOUD.collaborators=[]; CLOUD.owner=null;
+  stopPolling();
+  renderAuthChip(); renderCloudBars();
+  const my = document.getElementById('my-projects');
+  if (my) my.classList.add('is-hidden');
+  showToast('Sessão cerrada.');
+}
+
+async function apiCall(path, opts={}) {
+  const token = _authToken();
+  const headers = Object.assign({}, opts.headers || {});
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  if (opts.body && typeof opts.body !== 'string') {
+    headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(opts.body);
+  }
+  const r = await fetch(AUTH_URL + path, Object.assign({}, opts, { headers }));
+  const data = await r.json().catch(() => ({ ok:false, error:'Resposta não JSON' }));
+  return { status:r.status, ok:r.ok && data.ok !== false, data };
+}
+
+function setCbStatus(kind, msg) {
+  ['flow','results'].forEach(s => {
+    const el = document.getElementById('cb-status-' + s);
+    if (!el) return;
+    el.className = 'cb-status ' + (kind || '');
+    el.textContent = msg || '';
+  });
+}
+function renderCloudBars() {
+  const inCloud = !!CLOUD.projId;
+  ['flow','results'].forEach(s => {
+    const bar = document.getElementById('cloud-bar-' + s);
+    const txt = document.getElementById('cb-text-' + s);
+    const editorEl = document.getElementById('cb-editor-' + s);
+    const saveBtn = document.getElementById('cb-save-' + s);
+    if (!bar) return;
+    if (inCloud) {
+      bar.classList.remove('anon');
+      txt.textContent = 'Sincronizado · análise ' + CLOUD.projId.slice(0,6);
+      saveBtn.textContent = 'Salvar mudanças';
+      if (CLOUD.lastEditor && CLOUD.lastEditor !== (AUTH.user?.email)) editorEl.textContent = 'última edición: ' + CLOUD.lastEditor;
+      else editorEl.textContent = '';
+    } else if (AUTH.isLogged) {
+      bar.classList.remove('anon');
+      txt.textContent = 'Trabajando local — ainda não salvo na nuvem';
+      saveBtn.textContent = 'Salvar na nuvem';
+      editorEl.textContent = '';
+    } else {
+      bar.classList.add('anon');
+      txt.textContent = 'Trabajando local · inicia sessão para salvar e compartilhar';
+      saveBtn.textContent = 'Entrar';
+      editorEl.textContent = '';
+    }
+  });
+  const inviteBtn = document.getElementById('cb-invite-results');
+  if (inviteBtn) {
+    const canInvite = !!CLOUD.projId && AUTH.isLogged && CLOUD.owner === AUTH.user?.email;
+    inviteBtn.classList.toggle('is-hidden', !canInvite);
+  }
+}
+
+async function cloudSave() {
+  if (!AUTH.isLogged) { openModal('modal-login'); return; }
+  // Nombre derivado del enunciado del problema (si vino de pp) o del primer eje
+  const nombre = (STATE.contexto?.enunciado_problema || '').trim().slice(0,60)
+    || (STATE.ejes?.x?.nombre || '').trim().slice(0,60)
+    || (STATE.ejes?.y?.nombre || '').trim().slice(0,60)
+    || 'Cenários sem nome';
+  if (CLOUD._saving) return;
+  CLOUD._saving = true;
+  setCbStatus('saving', 'Guardando…');
+  const body = {
+    projId: CLOUD.projId || undefined,
+    meta: { nombre },
+    contexto:   STATE.contexto,
+    ejes:       STATE.ejes,
+    escenarios: STATE.escenarios,
+    elementos:  STATE.elementos,
+    impactos:   STATE.impactos,
+    estrategia: STATE.estrategia
+  };
+  const r = await apiCall('/prospect/save', { method:'POST', body });
+  CLOUD._saving = false;
+  if (!r.ok) {
+    setCbStatus('error', r.data.error || 'Error ao salvar');
+    showToast(r.data.error || 'Não se pudo salvar.');
+    return;
+  }
+  CLOUD.projId = r.data.projId;
+  CLOUD.lastSavedAt = r.data.updatedAt;
+  CLOUD.lastEditor = r.data.lastEditor;
+  if (!CLOUD.owner) CLOUD.owner = AUTH.user.email;
+  const t = new Date(r.data.updatedAt);
+  setCbStatus('saved', 'Guardado · ' + t.toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit' }));
+  renderCloudBars();
+  startPolling();
+  refreshProjectsList();
+}
+
+async function cloudLoad(projId) {
+  const r = await apiCall('/prospect/load?projId=' + encodeURIComponent(projId));
+  if (!r.ok) { showToast(r.data.error || 'Não se pudo cargar'); return false; }
+  const p = r.data.project;
+  if (p.contexto   && typeof p.contexto === 'object')   Object.assign(STATE.contexto, p.contexto);
+  if (p.ejes       && typeof p.ejes === 'object') {
+    if (p.ejes.x && typeof p.ejes.x === 'object') Object.assign(STATE.ejes.x, p.ejes.x);
+    if (p.ejes.y && typeof p.ejes.y === 'object') Object.assign(STATE.ejes.y, p.ejes.y);
+  }
+  if (p.escenarios && typeof p.escenarios === 'object') {
+    ['NE','NO','SO','SE'].forEach(k => {
+      if (p.escenarios[k] && typeof p.escenarios[k] === 'object') {
+        Object.assign(STATE.escenarios[k], p.escenarios[k]);
+      }
+    });
+  }
+  if (Array.isArray(p.elementos))                       STATE.elementos = p.elementos;
+  if (p.impactos   && typeof p.impactos === 'object')   STATE.impactos = p.impactos;
+  if (p.estrategia && typeof p.estrategia === 'object') Object.assign(STATE.estrategia, p.estrategia);
+  CLOUD.projId = projId;
+  CLOUD.lastSavedAt = p.updatedAt;
+  CLOUD.lastEditor = p.lastEditor;
+  CLOUD.owner = p.owner;
+  CLOUD.collaborators = p.collaborators || [];
+  STATE.step = 1;
+  // Guardar sin retriggear cloud-save
+  try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); } catch (e) {}
+  renderAll();
+  renderCloudBars();
+  goToStep(1);
+  startPolling();
+  showToast('Análise cargado desde a nuvem.');
+  return true;
+}
+
+async function refreshProjectsList() {
+  if (!AUTH.isLogged) { const el = document.getElementById('my-projects'); if (el) el.classList.add('is-hidden'); return; }
+  const r = await apiCall('/prospect/list');
+  if (!r.ok) { const el = document.getElementById('my-projects'); if (el) el.classList.add('is-hidden'); return; }
+  renderProjectsList(r.data.projects, r.data.count, r.data.plan, r.data.ownedLimit);
+}
+function renderProjectsList(projects, count, plan, limit) {
+  const card = document.getElementById('my-projects');
+  if (!card) return;
+  card.classList.remove('is-hidden');
+  const owned = projects.filter(p => p.role === 'owner').length;
+  document.getElementById('my-projects-meta').textContent =
+    `${count} análise · ${owned}/${limit} propios · plano ${plan}`;
+  const list = document.getElementById('my-projects-list');
+  if (projects.length === 0) {
+    list.innerHTML = '<div style="font-family:var(--italic);font-style:italic;color:var(--ink-3);text-align:center;padding:1rem">Não tem análise guardados. Empieza uno e guárdalo desde a barra da nuvem.</div>';
+    return;
+  }
+  list.innerHTML = projects.map(p => {
+    const date = p.updatedAt ? new Date(p.updatedAt).toLocaleString('es-CO', { dateStyle:'short', timeStyle:'short' }) : '—';
+    const isOwner = p.role === 'owner';
+    const ejesTxt = p.has_ejes ? 'ejes definidos' : 'sem ejes';
+    return `<div class="proj-row">
+      <div>
+        <div class="pr-name">${escapeHtml(p.nombre)}</div>
+        <div class="pr-meta">${p.elem_count||0} elementos · ${ejesTxt} · ${date} · ${escapeHtml(p.owner)}</div>
+      </div>
+      <span class="pr-role ${isOwner ? 'owner' : ''}">${isOwner ? 'Propio' : 'Invitado'}</span>
+      <div class="pr-actions">
+        <button onclick="cloudLoad('${p.projId}')">Abrir →</button>
+        ${isOwner ? `<button class="danger" onclick="cloudDelete('${p.projId}','${escapeHtml(p.nombre).replace(/'/g,'')}')">Borrar</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+async function cloudDelete(projId, name) {
+  if (!confirm(`Borrar "${name}"? Esta ação não pode ser desfeita.`)) return;
+  const r = await apiCall('/prospect/delete?projId=' + encodeURIComponent(projId), { method:'DELETE' });
+  if (!r.ok) { showToast(r.data.error || 'Não se pudo borrar'); return; }
+  showToast('Análise borrado.');
+  if (CLOUD.projId === projId) {
+    CLOUD.projId=null; CLOUD.lastSavedAt=null; CLOUD.lastEditor=null; CLOUD.owner=null; CLOUD.collaborators=[];
+    stopPolling(); renderCloudBars();
+  }
+  refreshProjectsList();
+}
+function newProject() {
+  CLOUD.projId=null; CLOUD.lastSavedAt=null; CLOUD.lastEditor=null; CLOUD.owner=null; CLOUD.collaborators=[];
+  stopPolling();
+  STATE.step = 1;
+  STATE.contexto   = { enunciado_problema:'', importedFromPP:false };
+  STATE.ejes       = {
+    x: { nombre:'', polo_neg:'', polo_pos:'', importedFrom:'' },
+    y: { nombre:'', polo_neg:'', polo_pos:'', importedFrom:'' }
+  };
+  STATE.escenarios = {
+    NE: { nombre:'', narrativa:'', prob:25 },
+    NO: { nombre:'', narrativa:'', prob:25 },
+    SO: { nombre:'', narrativa:'', prob:25 },
+    SE: { nombre:'', narrativa:'', prob:25 }
+  };
+  STATE.elementos  = [];
+  STATE.impactos   = {};
+  STATE.estrategia = { contingencia:'', senales_tempranas:'' };
+  try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); } catch (e) {}
+  renderAll();
+  renderCloudBars();
+  showStage('stage-welcome');
+}
+
+function openInviteModal() {
+  if (!CLOUD.projId) { showToast('Primero salva o análise na nuvem.'); return; }
+  if (CLOUD.owner !== AUTH.user?.email) { showToast('Apenas o dueño pode convidar.'); return; }
+  document.getElementById('invite-email').value = '';
+  renderCollabList();
+  openModal('modal-invite');
+  setTimeout(() => document.getElementById('invite-email').focus(), 100);
+}
+function closeInviteModal() { closeModal('modal-invite'); }
+function renderCollabList() {
+  const list = document.getElementById('collab-list');
+  if (!list) return;
+  const items = [`<li style="display:flex;justify-content:space-between;padding:.5rem 0;border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-2)"><span>${escapeHtml(CLOUD.owner || '')}</span><span style="font-size:10px;padding:.15rem .45rem;background:var(--accent);color:var(--on-accent);font-family:var(--sans);font-weight:700;letter-spacing:.1em;text-transform:uppercase">Dueño</span></li>`];
+  for (const c of CLOUD.collaborators) items.push(`<li style="display:flex;justify-content:space-between;padding:.5rem 0;border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-2)"><span>${escapeHtml(c)}</span><span style="font-size:10px;padding:.15rem .45rem;background:var(--paper-3);color:var(--ink-3);font-family:var(--sans);font-weight:700;letter-spacing:.1em;text-transform:uppercase">Colaborador</span></li>`);
+  list.innerHTML = items.join('');
+}
+function removeCollaborator() {
+  // Placeholder por compatibilidad — el patrón no remueve colabs vía UI todavía
+}
+async function submitInvite() {
+  const email = document.getElementById('invite-email').value.trim().toLowerCase();
+  if (!email) { showToast('Escribe um e-mail.'); return; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { showToast('E-mail inválido.'); return; }
+  const r = await apiCall('/prospect/invite', { method:'POST', body:{ projId:CLOUD.projId, email } });
+  if (!r.ok) { showToast(r.data.error || 'Não se pudo convidar'); return; }
+  showToast('Invitación enviada a ' + email + '.');
+  closeModal('modal-invite');
+}
+
+async function acceptInviteFlow(token) {
+  if (!token) {
+    const url = new URL(window.location.href);
+    token = url.searchParams.get('invite');
+  }
+  if (!token) return;
+  if (!AUTH.isLogged) {
+    showToast('Inicia sessão para aceptar a invitación.');
+    setTimeout(() => { window.location.href = 'login.html?next=' + encodeURIComponent(window.location.pathname + window.location.search); }, 1800);
+    return;
+  }
+  const r = await apiCall('/prospect/accept?token=' + encodeURIComponent(token));
+  if (!r.ok) { showToast(r.data.error || 'Não se pudo aceptar a invitación'); return; }
+  showToast('Te uniste ao análise.');
+  const url = new URL(window.location.href);
+  url.searchParams.delete('invite');
+  window.history.replaceState({}, '', url.toString());
+  await cloudLoad(r.data.projId);
+  refreshProjectsList();
+}
+
+function startPolling() {
+  stopPolling();
+  if (!CLOUD.projId) return;
+  CLOUD._pollTimer = setInterval(async () => {
+    if (CLOUD._saving || document.hidden) return;
+    const r = await apiCall('/prospect/load?projId=' + encodeURIComponent(CLOUD.projId) + '&since=' + encodeURIComponent(CLOUD.lastSavedAt || ''));
+    if (!r.ok || r.data.unchanged || !r.data.project) return;
+    const p = r.data.project;
+    if (p.lastEditor && p.lastEditor !== AUTH.user?.email) {
+      if (p.contexto)   Object.assign(STATE.contexto, p.contexto);
+      if (p.ejes) {
+        if (p.ejes.x) Object.assign(STATE.ejes.x, p.ejes.x);
+        if (p.ejes.y) Object.assign(STATE.ejes.y, p.ejes.y);
+      }
+      if (p.escenarios) {
+        ['NE','NO','SO','SE'].forEach(k => {
+          if (p.escenarios[k]) Object.assign(STATE.escenarios[k], p.escenarios[k]);
+        });
+      }
+      if (Array.isArray(p.elementos)) STATE.elementos = p.elementos;
+      if (p.impactos)                 STATE.impactos = p.impactos;
+      if (p.estrategia)               Object.assign(STATE.estrategia, p.estrategia);
+      CLOUD.lastSavedAt = p.updatedAt; CLOUD.lastEditor = p.lastEditor;
+      CLOUD.collaborators = p.collaborators || CLOUD.collaborators;
+      try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); } catch (e) {}
+      renderAll();
+      renderCloudBars();
+      showToast('Mudanças de ' + p.lastEditor);
+    }
+  }, POLL_INTERVAL_MS);
+}
+function stopPolling() { if (CLOUD._pollTimer) { clearInterval(CLOUD._pollTimer); CLOUD._pollTimer = null; } }
+
+// ═════════════════════════════════════════════════════════════════════════
+// COPILOTO IA · sugerir-ejes (Pro+) + narrar-escenarios (Premium+)
+// ═════════════════════════════════════════════════════════════════════════
+function _planTier(plan) { return ({free:0,pro:1,premium:2,full:3}[plan||'free']) ?? 0; }
+function _userHasTier(min) { return AUTH.isLogged && _planTier(AUTH.user?.plan) >= min; }
+function iaShowGate(elId, plan, desc) {
+  const out = document.getElementById(elId);
+  if (!out) return;
+  out.style.display = 'block';
+  out.innerHTML = `<div class="ia-result-eyebrow">Copiloto · plano ${plan} requerido</div><p>${escapeHtml(desc)}</p><p>Seu plano actual: <b>${escapeHtml(AUTH.user?.plan || 'free')}</b>.</p><p><a href="pricing.html" style="color:var(--accent);font-weight:600">Ver planos →</a></p>`;
+}
+
+// Lee MicMac local y devuelve top 8 variables motrices con su motricidad
+function _readMicmacTopMotrices(n) {
+  n = n || 8;
+  try {
+    const raw = localStorage.getItem('micmac-current-v2');
+    if (!raw) return [];
+    const p = JSON.parse(raw);
+    if (!p || !Array.isArray(p.variables) || p.variables.length === 0) return [];
+    const matrix = p.matrix || {};
+    const vars = p.variables.filter(v => v && (v.nombre || v.name));
+    if (vars.length < 2) return [];
+    const motri = vars.map((v, i) => {
+      let s = 0;
+      for (let j = 0; j < vars.length; j++) {
+        if (i === j) continue;
+        const cell = matrix[i + '-' + j];
+        let val = 0;
+        if (typeof cell === 'number') val = cell;
+        else if (cell && typeof cell === 'object' && typeof cell.valor === 'number') val = cell.valor;
+        s += Math.abs(val);
+      }
+      return { idx:i, nombre:(v.nombre || v.name || ('Variável ' + (i+1))), motri:s };
+    });
+    motri.sort((a, b) => b.motri - a.motri);
+    return motri.filter(m => m.motri > 0).slice(0, n);
+  } catch (e) { return []; }
+}
+
+async function iaSugerirEjes() {
+  if (!AUTH.isLogged) { openModal('modal-login'); return; }
+  if (!_userHasTier(1)) {
+    iaShowGate('ia-ejes-result', 'Pro', 'A sugestão de incertezas com IA está disponível em plano Pro ou superior.');
+    return;
+  }
+  const ctx = String(STATE.contexto?.enunciado_problema || '').trim();
+  const variablesMicmac = _readMicmacTopMotrices(8);
+  if (!ctx && variablesMicmac.length === 0) {
+    showToast('Define o enunciado do problema ou trae variáveis do MicMac antes de pedir sugestões.');
+    return;
+  }
+  const btn = document.getElementById('ia-ejes-btn');
+  const out = document.getElementById('ia-ejes-result');
+  btn.disabled = true; btn.textContent = 'Consultando…';
+  out.style.display = 'block';
+  out.innerHTML = '<div class="ia-result-eyebrow">Copiloto · sugiriendo incertezas críticas</div><div class="ia-loading"><span class="ia-loading-dot"></span> Identificando 2 ejes com alto impacto e alta incerteza. ~10-15 segundos.</div>';
+  const r = await apiCall('/prospect/copiloto', { method:'POST', body:{ action:'sugerir-ejes', payload:{
+    contexto: STATE.contexto || {},
+    variables_micmac: variablesMicmac
+  } } });
+  btn.disabled = false; btn.textContent = 'Sugerir ejes';
+  if (!r.ok) {
+    out.innerHTML = `<div class="ia-result-eyebrow">Copiloto · error</div><p>${escapeHtml(r.data?.error || 'Não se pudo conectar.')}</p>`;
+    return;
+  }
+  iaRenderSugerirEjes(r.data);
+}
+function iaRenderSugerirEjes(data) {
+  const out = document.getElementById('ia-ejes-result');
+  const cachedTag = data.cached ? '<span class="ia-cached">caché</span>' : '';
+  let html = `<div class="ia-result-eyebrow">Copiloto · incertezas sugeridas${cachedTag}</div>`;
+  if (data.nota) html += `<p><em>${escapeHtml(data.nota)}</em></p>`;
+  html += '<div class="ia-suggested">';
+  (data.ejes || []).forEach((eje, idx) => {
+    html += `<div class="ia-sug">
+      <div class="ia-sug-body">
+        <div class="ia-sug-name">${escapeHtml(eje.nombre || '—')}</div>
+        ${eje.justificacion ? `<div class="ia-sug-desc">${escapeHtml(eje.justificacion)}</div>` : ''}
+        <div class="ia-sug-meta">Polo − <b>${escapeHtml(eje.polo_neg || '—')}</b>  ·  Polo + <b>${escapeHtml(eje.polo_pos || '—')}</b></div>
+      </div>
+      <button class="ia-sug-add" data-idx="${idx}" onclick="iaAdoptarEje(${idx})">+ Adoptar</button>
+    </div>`;
+  });
+  html += '</div>';
+  if ((data.ejes || []).length >= 2) {
+    html += `<div style="display:flex;gap:.55rem;margin-top:1rem;flex-wrap:wrap"><button class="btn-ghost" onclick="iaAdoptarAmbosEjes()">↡ Adoptar ambos como ejes X/E</button></div>`;
+  }
+  out.innerHTML = html;
+  window._iaEjesSuggestions = data.ejes || [];
+}
+function iaAdoptarEje(idx) {
+  const e = (window._iaEjesSuggestions || [])[idx];
+  if (!e) return;
+  // Coloca en el primer eje vacío; si ambos están llenos, sobreescribe X
+  let axis = 'x';
+  if (STATE.ejes.x.nombre && !STATE.ejes.y.nombre) axis = 'y';
+  else if (STATE.ejes.x.nombre && STATE.ejes.y.nombre) {
+    if (!confirm('Ambos ejes já estão definidos. Sobreescribir o eje X?')) return;
+    axis = 'x';
+  }
+  STATE.ejes[axis] = {
+    nombre: String(e.nombre || '').slice(0, 200),
+    polo_neg: String(e.polo_neg || '').slice(0, 200),
+    polo_pos: String(e.polo_pos || '').slice(0, 200),
+    importedFrom: 'Copiloto IA'
+  };
+  saveState();
+  renderEjes();
+  const btn = document.querySelector(`#ia-ejes-result .ia-sug-add[data-idx="${idx}"]`);
+  if (btn) { btn.textContent = '✓ Adoptado'; btn.classList.add('added'); btn.disabled = true; }
+  showToast('Eje ' + axis.toUpperCase() + ' adoptado.');
+}
+function iaAdoptarAmbosEjes() {
+  const lista = (window._iaEjesSuggestions || []).slice(0, 2);
+  if (lista.length < 2) return;
+  if ((STATE.ejes.x.nombre || STATE.ejes.y.nombre) &&
+      !confirm('Isto reemplaza os ejes X e E com as 2 incertezas sugeridas. Continuar?')) return;
+  STATE.ejes.x = {
+    nombre: String(lista[0].nombre || '').slice(0, 200),
+    polo_neg: String(lista[0].polo_neg || '').slice(0, 200),
+    polo_pos: String(lista[0].polo_pos || '').slice(0, 200),
+    importedFrom: 'Copiloto IA'
+  };
+  STATE.ejes.y = {
+    nombre: String(lista[1].nombre || '').slice(0, 200),
+    polo_neg: String(lista[1].polo_neg || '').slice(0, 200),
+    polo_pos: String(lista[1].polo_pos || '').slice(0, 200),
+    importedFrom: 'Copiloto IA'
+  };
+  saveState();
+  renderEjes();
+  showToast('Ejes X e E adoptados desde IA.');
+}
+
+async function iaNarrarEscenarios() {
+  if (!AUTH.isLogged) { openModal('modal-login'); return; }
+  if (!_userHasTier(2)) {
+    iaShowGate('ia-narrar-result', 'Premium', 'A narrativa de cenários com IA está disponível em plano Premium ou superior.');
+    return;
+  }
+  if (!STATE.ejes.x.nombre || !STATE.ejes.y.nombre ||
+      !STATE.ejes.x.polo_neg || !STATE.ejes.x.polo_pos ||
+      !STATE.ejes.y.polo_neg || !STATE.ejes.y.polo_pos) {
+    showToast('Define primeiro os 2 ejes com nome e os 2 polos cada uno.');
+    return;
+  }
+  const btn = document.getElementById('ia-narrar-btn');
+  const out = document.getElementById('ia-narrar-result');
+  btn.disabled = true; btn.textContent = 'Redactando…';
+  out.style.display = 'block';
+  out.innerHTML = '<div class="ia-result-eyebrow">Copiloto · redigendo narrativas de 4 cenários</div><div class="ia-loading"><span class="ia-loading-dot"></span> Construyendo nomes evocadores + 3-5 frases por quadrante. ~15-25 segundos.</div>';
+  const r = await apiCall('/prospect/copiloto', { method:'POST', body:{ action:'narrar-escenarios', payload:{
+    ejes: STATE.ejes,
+    contexto: STATE.contexto || {}
+  } } });
+  btn.disabled = false; btn.textContent = 'Narrar cenários';
+  if (!r.ok) {
+    out.innerHTML = `<div class="ia-result-eyebrow">Copiloto · error</div><p>${escapeHtml(r.data?.error || 'Não se pudo conectar.')}</p>`;
+    return;
+  }
+  iaRenderNarrarEscenarios(r.data);
+}
+function iaRenderNarrarEscenarios(data) {
+  const out = document.getElementById('ia-narrar-result');
+  const cachedTag = data.cached ? '<span class="ia-cached">caché</span>' : '';
+  let html = `<div class="ia-result-eyebrow">Copiloto · 4 cenários narrados${cachedTag}</div>`;
+  const escenarios = data.escenarios || {};
+  ['NE','NO','SO','SE'].forEach(k => {
+    const e = escenarios[k];
+    if (!e) return;
+    html += `<div class="ia-sug" style="margin-bottom:.45rem">
+      <div class="ia-sug-body">
+        <div class="ia-sug-meta" style="margin-bottom:.2rem"><b>${escapeHtml(k)}</b> · prob. ${escapeHtml(String(e.prob != null ? e.prob : '—'))}%</div>
+        <div class="ia-sug-name">${escapeHtml(e.nombre || '—')}</div>
+        ${e.narrativa ? `<div class="ia-sug-desc">${escapeHtml(e.narrativa)}</div>` : ''}
+      </div>
+      <button class="ia-sug-add" data-quad="${k}" onclick="iaAdoptarEscenario('${k}')">+ Adoptar</button>
+    </div>`;
+  });
+  html += `<div style="display:flex;gap:.55rem;margin-top:1rem;flex-wrap:wrap"><button class="btn-ghost" onclick="iaAdoptarTodosEscenarios()">↡ Adoptar os 4</button></div>`;
+  out.innerHTML = html;
+  window._iaEscenSuggestions = escenarios;
+}
+function iaAdoptarEscenario(quad) {
+  const e = (window._iaEscenSuggestions || {})[quad];
+  if (!e) return;
+  STATE.escenarios[quad] = {
+    nombre: String(e.nombre || '').slice(0, 200),
+    narrativa: String(e.narrativa || '').slice(0, 2000),
+    prob: Number.isFinite(Number(e.prob)) ? Math.max(0, Math.min(100, Number(e.prob))) : 25
+  };
+  saveState();
+  renderEscenarios();
+  const btn = document.querySelector(`#ia-narrar-result .ia-sug-add[data-quad="${quad}"]`);
+  if (btn) { btn.textContent = '✓ Adoptado'; btn.classList.add('added'); btn.disabled = true; }
+  showToast('Cuadrante ' + quad + ' adoptado.');
+}
+function iaAdoptarTodosEscenarios() {
+  const all = window._iaEscenSuggestions || {};
+  if (!all || Object.keys(all).length < 4) return;
+  if (['NE','NO','SO','SE'].some(k => (STATE.escenarios[k].nombre || STATE.escenarios[k].narrativa))) {
+    if (!confirm('Isto reemplaza as narrativas existentes nos 4 quadrantes. Continuar?')) return;
+  }
+  ['NE','NO','SO','SE'].forEach(k => {
+    const e = all[k];
+    if (!e) return;
+    STATE.escenarios[k] = {
+      nombre: String(e.nombre || '').slice(0, 200),
+      narrativa: String(e.narrativa || '').slice(0, 2000),
+      prob: Number.isFinite(Number(e.prob)) ? Math.max(0, Math.min(100, Number(e.prob))) : 25
+    };
+  });
+  saveState();
+  renderEscenarios();
+  showToast('Os 4 cenários adoptados desde IA.');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// INIT
+// ═════════════════════════════════════════════════════════════════════════
+(async function init() {
+  const restored = loadState();
+  renderAll();
+  renderCIMeta();
+  const hasContent = (STATE.ejes.x.nombre || STATE.ejes.y.nombre ||
+                     STATE.contexto.enunciado_problema ||
+                     ['NE','NO','SO','SE'].some(k => STATE.escenarios[k].nombre || STATE.escenarios[k].narrativa));
+  if (restored && STATE.step >= 1 && hasContent) {
+    if (STATE.step >= 1 && STATE.step <= 4) {
+      goToStep(STATE.step);
+      showToast('Restauramos seu sessão anterior.');
+    } else {
+      showStage('stage-welcome');
+    }
+  } else {
+    showStage('stage-welcome');
+  }
+  // Auth + cloud
+  try {
+    await loadUserFromAPI();
+    renderAuthChip();
+    renderCloudBars();
+    if (AUTH.isLogged) refreshProjectsList();
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('invite')) acceptInviteFlow(urlParams.get('invite'));
+  } catch (e) {
+    // No bloquear si falla el contacto con el worker
+  }
+})();
+</script>
+</body>
+</html>

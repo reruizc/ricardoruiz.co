@@ -1120,12 +1120,15 @@ Investigación Medellín". Todas llevan `<meta name="robots" content="noindex,no
 
 ### Archivos
 ```
-proyecto-dc.html                          hub: 9 tarjetas de módulos + secciones descriptivas
+proyecto-dc.html                          hub: 8 tarjetas de módulos + secciones descriptivas
 proyecto-dc/voto-historico.html           módulo 01
 proyecto-dc/seguridad.html                módulo 02
 proyecto-dc/comportamiento-electoral.html módulo 03
 proyecto-dc/pobreza-ipm.html              módulo 04
+proyecto-dc/arquetipos.html               módulo 05
 proyecto-dc/gobierno-criminal.html        módulo 06
+proyecto-dc/agenda.html                   módulo 07
+proyecto-dc/escenarios-2027.html          módulo 08 (simulador what-if 2027)
 ```
 
 ### Convención visual de páginas privadas (chasis a copiar)
@@ -1234,8 +1237,14 @@ y similares por módulo.
 | 05 | Arquetipos territoriales | paquete socia 2015-2027 (S3) | ✓ |
 | 06 | Gobierno criminal | paquete socia 2023-2026 (embebido) | ✓ |
 | 07 | Saliencia/agenda pública | 10 medios RSS + agregador (S3) | ✓ v1 (medios) |
-| 08 | Fricción ciudadana / PQRSD | — | pendiente datos |
-| 09 | Simulador what-if | — | pendiente |
+| 08 | Simulador what-if 2027 (`escenarios-2027.html`) | arquetipo base módulo 05 + matriz psicopolítica Nury 2027 + huella Carvalho-Quintero (S3/embebido) | ✓ · 16 comunas + 5 corregimientos · 332 barrios |
+
+> **Nota (2026-05-31):** el módulo 08 es ahora el **Simulador what-if 2027**
+> (`escenarios-2027.html`), no PQRSD. El viejo "módulo 09 · proyección 1V
+> Medellín" fue borrado (commit `ec4cba6`). La idea de **Fricción ciudadana /
+> PQRSD** ya NO es una card numerada del hub — queda como fuente de datos
+> pendiente (ver "Datos pendientes / faltantes"), no como módulo. El hub tiene
+> 8 módulos (01–08).
 
 ### Datos pendientes / faltantes
 - Censos electorales históricos por año (potencial 2015/2019/2023) → calcular abstención real
@@ -3408,12 +3417,72 @@ escenarios · comunicar)".
   `cloudSave`/`cloudLoad`/`openInviteModal` del patrón de `ain.html`
   cuando se prenda v2.
 
-**PDFs metodología pendientes (v2):**
-- `Bases de datos/comunicar/metodologia-paso-a-paso.pdf` (~16 KB ·
-  9 secciones operativas · pipeline en `tools/build-comunicar-docs/`).
-- `Bases de datos/comunicar/respaldo-academico.pdf` (~16 KB · marco +
-  ~30 referencias).
-- Subir a S3 `bases de datos/comunicar/*`.
+**PDFs metodología (v2)** ✓ LISTOS (2026-05-31):
+- `Bases de datos/comunicar/metodologia-paso-a-paso.pdf` (12.1 KB · 10
+  secciones: intro + las 8 mecánicas + exportables · tabla OCDE 9-dim +
+  heurística EAST + narrativa Ganz).
+- `Bases de datos/comunicar/respaldo-academico.pdf` (9.4 KB · marco de las
+  5 escuelas + 31 referencias canónicas).
+- Pipeline en `tools/build-comunicar-docs/{build_metodologia.py, build_respaldo.py}`
+  (reportlab, misma plantilla que prospect/ain). Regenerar:
+  ```bash
+  python3 tools/build-comunicar-docs/build_metodologia.py
+  python3 tools/build-comunicar-docs/build_respaldo.py
+  ```
+- **Pendiente: subir a S3** `bases de datos/comunicar/*` (con espacio literal
+  en la key, `--content-type application/pdf --cache-control "public, max-age=300"`).
+  La bucket policy ya cubre `bases de datos/*`.
+
+### Versión portuguesa del Lab (Brasil) · `tools/build-pt-lab/translate.py`
+
+Para la salida a Brasil, el Lab se traduce a PT-BR con un traductor por
+diccionario (sin deps, stdlib pura). **No es traducción neuronal**: es
+substitución ordenada de frases + palabras con word-boundary. Genera los 8
+módulos desde sus fuentes ES.
+
+**Mapa de archivos (`MODULES` en el script):**
+```
+analisis-estructural.html → analisis-estrutural.html   (entry; index.html ya lo enlaza para 'br')
+mactor.html               → mactor-pt.html
+problema-publico.html     → problema-publico-pt.html
+evaluacion.html           → evaluacion-pt.html
+alternativas.html         → alternativas-pt.html
+ain.html                  → ain-pt.html
+prospect-escenarios.html  → prospect-escenarios-pt.html
+comunicar.html            → comunicar-pt.html
+```
+
+**Cómo corre el motor (en orden):** protege `<style>`/`<script>`/atributos
+URL (`href`/`src`/`action`) → traduce HTML visible (PHRASES → WORDS →
+restaura PHRASES → `contract()`) → restaura atributos reescribiendo
+cross-links ES→PT → traduce string-literals **y template literals
+backtick** dentro de `<script>` (preservando `${...}`) → quita `¿`/`¡`.
+`contract()` recombina `em+art`/`de+art`/`a+art`/`por+art` en las
+contracciones del portugués (no, na, do, da, ao, à, pelo…).
+
+**Regenerar:**
+```bash
+python3 tools/build-pt-lab/translate.py            # los 8 módulos
+python3 tools/build-pt-lab/translate.py mactor.html # uno solo (ES o PT name)
+```
+
+**Garantías validadas tras cada corrida:** integridad estructural (conteos
+de `` ` ``, `${`, `{`, `}` idénticos a la fuente ES → el JS/CSS no se rompe),
+0 cross-links ES restantes (toda navegación queda PT-interna), 0 `¿`/`¡`.
+
+**Calidad (importante para el partner brasileño):** el chasis compartido
+(nav, cloud-bar, auth, footer, wizard, recursos) y el vocabulario de política
+pública común quedan en buen PT-BR. **Queda un long-tail** de español
+residual y de gramática que el diccionario no cubre: concordancia de género
+(«o equipe» → debería «a equipe»), clíticos («as podrás abordar»), y frases
+variantes que no calzan con una PHRASE exacta (p.ej. «Les llegará un
+correo»). El módulo más pulido es `analisis-estrutural.html` (el diccionario
+está afinado para él). Para subir calidad: agregar PHRASES/WORDS por módulo,
+o hacer una pasada humana/LLM sobre la copia que ve primero el partner
+(welcome + hero + wizard). Los 8 archivos PT viven en el repo pero **no se
+despliegan** hasta hacer push; `lab-recursos.js`/`lab-informe.js`/
+`lab-indicadores.js` siguen en español (pendiente si se quiere el modal de
+recursos y el informe combinado en PT).
 
 ### Backlog del lab
 
@@ -3551,6 +3620,192 @@ Cuando se haga, **bumpear `CACHE_BUSTER` en `lab-indicadores.js`** (formato
   el actual de 3 cols × 2 rows (5 cards = 3+2) o subir a 3+3 = 6 cards.
   Más de 6 satura — meterlo como sub-módulo de uno existente (como
   Alternativas es sub-módulo de Problema Público).
+
+## Roadmap post-2V · Chats conversacionales (LLM + function calling)
+
+Dos productos planeados para julio 2026 (post-2V) que comparten
+infraestructura técnica pero atienden universos distintos.
+
+### Contexto competitivo
+Wonk (`getwonk.co`, lanzado mayo 2026) hace BI conversacional sobre
+datos abiertos COL (DANE, MinHacienda, Registraduría) con interfaz de
+chat en español. Equipo de 6 personas (Bogotá), fundadores Bernardo
+Romero-Torres (econometría aplicada) + Samuel David Echeverry. Su
+tablero electoral histórico (presi+cámara+senado+locales) probablemente
+llega hasta municipio. NO baja a puesto/mesa ni tiene voto blando afín,
+ponderador propio o drill barrial.
+
+Decisión estratégica: nuestro chat NO compite head-to-head con BI
+horizontal. Compite verticalmente sobre datos electorales granulares
+que sólo nosotros tenemos curados (foso = años de pipelines sobre los
+CSV GCS de la Registraduría + cruces zona electoral → comuna política +
+PUESTOS_GEOREF + listas cerradas).
+
+### Chat #1 — Electoral conversacional
+
+Producto B2C/B2B. Pregunta natural → respuesta con datos exactos +
+visualización ligera + cita de fuente. Cero alucinación numérica vía
+function calling estricto.
+
+**Arquitectura mínima:**
+```
+Lambda chat-electoral
+├─ Sonnet 4.6 (B2B serio) o DeepSeek V4 Flash (B2C masivo)
+├─ ~25 tools de lookup sobre JSONs S3 ya curados
+│   ├─ votos_candidato_territorio(cand, dep|mun|com|barrio, año)
+│   ├─ resultado_municipio(mun, año, corporacion)
+│   ├─ partido_lista(partido, dep, año)
+│   ├─ ponderador_actual(candidato)
+│   ├─ huella_territorial(barrio_slug, candidato)
+│   ├─ comparar_elecciones(territorio, años[])
+│   ├─ ganador_mesa(mesa_id, año)
+│   ├─ topN_municipios(corte, año, partido)
+│   ├─ indicador_municipal(mun, indicador, año)
+│   ├─ arquetipo_barrio(barrio_dap, año)
+│   ├─ buscar_territorio(texto_libre) → divipola
+│   └─ coverage_check(territorio, eleccion, año, granularidad)
+│        → { disponible: ✓ | parcial | ✗,
+│            latencia: instantáneo | 24-72h }
+├─ Cache S3 hash24 TTL 7d para preguntas repetitivas
+└─ Output: { texto, datos_crudos, sugerencia_visualizacion }
+```
+
+**Reglas duras del system prompt:**
+1. Cero datos numéricos sin tool call (regex de validación en
+   post-proceso elimina cifras sin respaldo).
+2. Siempre citar fuente + año.
+3. Si `coverage_check` retorna ✗, decir honestamente "no procesado, lo
+   proceso en 24-72h con plan Pro/Premium" — nunca inventar.
+
+**Unit economics:**
+- Sonnet 4.6 con cache: ~$0.013-0.02 USD/pregunta.
+- DeepSeek V4 Flash: ~$0.0002 USD/pregunta.
+- Pro $39.900 con 150 preguntas/mes → margen 80%+.
+- Premium $99.900 con 800 preguntas/mes → margen 85%+.
+
+**Cobertura · pre-procesamiento antes del lanzamiento:**
+
+Bloque A — antes de primera semana julio 2026 (compromiso del usuario):
+- Territoriales 2019 y 2023 a 5 niveles (alcalde+concejo+JAL) para
+  32 capitales × 3 años × 3 corporaciones (~288 corridas, ~1-2 días).
+  Generalizar `tools/build-medellin-historicos.js` parametrizando
+  (COD_DDE, COD_MME).
+- Presidenciales 2018 a puesto+mesa.
+- Generalizar `tools/build-historicos.js` para que también escriba
+  `por-puesto.json` y `por-mesa.json` (hoy sólo hasta `por-mun`).
+
+Bloque B — opcional pre-julio si hay tiempo:
+- Congreso 2014/2018/2022 a mesa (formato ya conocido del 2026).
+- Presidenciales 2010 y 2014 a puesto+mesa.
+
+Cobertura proyectada post-Bloque A:
+- 100% Presi 2018-2026 a mesa.
+- 100% Senado/Cámara 2026 a mesa (ya está).
+- 100% Territoriales 2019/2023 a mesa para 32 capitales.
+- Bogotá y Medellín a barrio (ya está).
+- Cola on-demand 24-72h para muns no-capitales y elecciones pre-2018.
+
+### Chat #2 — Asistente metodológico del Lab de PP
+
+Producto transversal a los 8 módulos del Lab (no es módulo nuevo).
+Capa de guía que reduce abandono y aumenta activación. NO canibaliza
+el chat electoral — universos completamente distintos (datos vs
+metodología).
+
+**Arquitectura:** misma Lambda template + mismo patrón de cache + mismo
+gate de plan en `rr-auth`. Cambia el system prompt y el catálogo de
+tools.
+
+```
+Lambda lab-asistente
+├─ DeepSeek V4 Flash (90% de preguntas) + Sonnet 4.6 para
+│   diagnósticos profundos del state (Premium)
+├─ Tools:
+│   ├─ leer_state(modulo)            → lee localStorage del módulo
+│   ├─ diagnosticar_progreso(modulo) → qué está completo / qué falta
+│   ├─ explicar_concepto(termino)    → definición + cita académica
+│   │                                   desde lab-recursos.js
+│   ├─ sugerir_siguiente_modulo()    → según state cross-módulo
+│   └─ revisar_calidad(modulo)       → red flags metodológicos
+│        (matriz muy pequeña, indicadores sin línea base,
+│         alternativas sin baseline "statu-quo", etc.)
+└─ UI: FAB ✦ Asistente del Lab en cada módulo, acento oxblood/salmón
+       del Lab (no el azul/morado de los chats principales)
+```
+
+**System prompt:** "Eres el asistente metodológico del Lab de PP de
+ricardoruiz.co. Conoces los 8 módulos, sus marcos teóricos y su orden.
+Tu trabajo es guiar al usuario, NO hacer el trabajo por él."
+
+**Casos típicos que resuelve:**
+- *"¿Qué es un problema wicked?"* → definición + cita Rittel-Webber 1973.
+- *"¿Cuándo uso DEMATEL vs MicMac?"* → diferencia conceptual + sugerencia
+  según contexto.
+- *"Mi MicMac tiene 4 variables, ¿es suficiente?"* → diagnóstico real:
+  poco para detectar bucles, recomienda agregar 2-3 más por dominio.
+- *"Ya definí el problema, ¿qué sigue?"* → lee state del PP, sugiere
+  abrir alternativas con Zwicky o levantar evidencia adicional.
+
+**Por qué importa:** hoy mucha gente abre el Lab, no entiende qué llenar
+y se va. El asistente lleva al usuario al `stage-results` y al informe
+combinado. Eso es activación de usuario, que es lo que después convierte
+a pago.
+
+### Packaging conjunto · cómo evitar canibalización
+
+El chat (electoral o Lab) es **exploración / insight rápido**. Los
+reportes (Excel/PDF/mapas embebibles) son **entregable formal de
+trabajo**. Son jobs-to-be-done distintos.
+
+| Feature | Free anon | Free email | Pro $39.900 | Premium $99.900 |
+|---|---|---|---|---|
+| Chat electoral preguntas/mes | 5/día | 30 | 150 | 800 |
+| Asistente Lab preguntas/mes | — | 5 | 30 | 150 |
+| Tablero electoral | dep/mun | dep/mun | + comuna/puesto | + mesa/barrio |
+| Veleta / Oportunidad | demo | demo | acceso completo | + barrios catastrales |
+| Excel descarga | ✗ | ✗ | 3/mes | 10/mes |
+| PDF Top 50 con metodología | ✗ | ✗ | ✗ | 10/mes |
+| Mapas embebibles | ✗ | ✗ | ✗ | ✓ |
+| Dashboard custom guardado | ✗ | ✗ | ✗ | ✓ |
+| `revisar_calidad` del Lab (Sonnet) | ✗ | ✗ | ✗ | ✓ |
+| Cola priorizada (no-cobertura) | — | 72h | 72h | 24h |
+| API B2B | ✗ | ✗ | ✗ | 100 calls/día |
+
+**Regla de oro:** el chat da el dato hablado. El entregable formal
+(PDF metodológico, Excel base, mapa HD embebible, dashboard custom)
+es Premium. Cada respuesta del chat puede mostrar **preview bloqueado**
+de versión HD/PDF con CTA upsell a Premium.
+
+### Cronograma sugerido
+
+- Mayo-Junio 2026: foco 100% en 2V (pipeline mesa-a-mesa post-1V,
+  endoso simulator, Veleta/Oportunidad 2V, concurso de pronóstico 2V).
+- Junio 2026 en paralelo: pre-procesamiento Bloque A (territoriales
+  2019/2023 a 32 capitales + presi 2018 a mesa + generalizar
+  `build-historicos.js`). En seco, diseño del catálogo de tools de
+  ambos chats.
+- Primera semana julio 2026 (post-2V): build Lambda chat-electoral +
+  UI `pregunta.html`.
+- Segunda semana julio: build Lambda lab-asistente (reusa infra).
+- Tercera semana julio: integración con `rr-auth` (cuotas + plan gate)
+  + landing comercial.
+- Lanzamiento: agosto 2026. Coincide con arranque de ciclo electoral
+  2027 (Medellín + Bogotá + locales).
+
+### Riesgos a mitigar
+- **Alucinación numérica** → function calling estricto + post-proceso
+  con regex que valida que toda cifra venga de tool result.
+- **Cobertura faltante en preguntas reales** → `coverage_check` como
+  tool obligatoria + cola on-demand convertida en feature comercial
+  ("procesamiento priorizado en 24h con Premium").
+- **Canibalización de Premium** → packaging por job-to-be-done + cuotas
+  estrictas en Pro + previews bloqueados que convierten cada respuesta
+  del chat en upsell.
+- **Costos LLM out of control** → cache S3 hash24 por pregunta
+  canonicalizada (la mayoría se repiten) + rate limit por plan.
+- **El chat aprende qué pre-procesar** → loguear cada pregunta no
+  respondida con conteo de veces que la piden. Es heatmap de demanda
+  para priorizar el siguiente lote de pre-procesamiento.
 
 ## Convenciones de commit
 ```

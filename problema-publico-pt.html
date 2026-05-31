@@ -1,0 +1,3472 @@
+<!DOCTYPE html>
+<html lang="pt-BR" id="htmlRoot">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Problema Público · Ricardo.Ruiz</title>
+<meta name="description" content="Diseña uma política pública com método: define o problema, recoge evidencia, construye alternativas, fija criterios e compara. Inspirado no Eightfold Path de Eugene Bardach e o marco de Ortegón." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper:#1a1610; --paper-2:#221d15; --paper-3:#2a241b;
+  --ink:#f4f3ef; --ink-2:#b8b1a0; --ink-3:#807a6c;
+  --rule:#f4f3ef1c; --rule-strong:#f4f3ef38;
+  --accent:#d96a50; --accent-2:#e08266;
+  --accent-soft:#d96a5018; --accent-tint:#d96a5036;
+  --gold:#d6a83a; --on-accent:#14110a;
+  --green:#6fa07a; --amber:#d6a83a; --danger:#d96a50;
+  --sans:'Familjen Grotesk',system-ui,sans-serif;
+  --italic:'Petrona',Georgia,serif;
+  --mono:'Space Mono',ui-monospace,monospace;
+  --display:'Syne',sans-serif;
+}
+body.day-mode {
+  --paper:#f4f3ef; --paper-2:#ecebe5; --paper-3:#e0ddd2;
+  --ink:#14110a; --ink-2:#5a5448; --ink-3:#948e80;
+  --rule:#14110a1f; --rule-strong:#14110a40;
+  --accent:#8a1e16; --accent-2:#a02a20;
+  --accent-soft:#8a1e161a; --accent-tint:#8a1e1633;
+  --gold:#8a6a1a; --on-accent:#f4f3ef;
+  --green:#2f6b3f; --amber:#8a6a1a; --danger:#b03524;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html { scroll-behavior:smooth; }
+body {
+  background:var(--paper); color:var(--ink);
+  font-family:var(--sans); font-size:17px; line-height:1.55;
+  min-height:100vh; overflow-x:hidden; cursor:none;
+  transition:background .35s, color .35s;
+}
+a { color:inherit; text-decoration:none; }
+button { font:inherit; color:inherit; background:none; border:none; cursor:none; }
+::selection { background:var(--accent); color:var(--on-accent); }
+body.day-mode::before {
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image:radial-gradient(rgba(20,17,10,.035) 1px, transparent 1.4px);
+  background-size:4px 4px; opacity:.9; mix-blend-mode:multiply;
+}
+.cursor { position:fixed; width:12px; height:12px; background:var(--accent); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s, background .2s; transform:translate(-50%,-50%); }
+.cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--accent); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s, opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+
+/* Topbar */
+.topbar {
+  position:sticky; top:0; z-index:60;
+  display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:1.5rem;
+  padding:1rem 1.75rem;
+  background:var(--paper); border-bottom:1px solid var(--rule); backdrop-filter:blur(8px);
+}
+.topbar-left,.topbar-center,.topbar-right { display:flex; align-items:center; gap:1.1rem; }
+.topbar-right { justify-content:flex-end; }
+.btn-back {
+  display:inline-flex; align-items:center; gap:.55rem;
+  font-family:var(--sans); font-size:14px; font-weight:500; letter-spacing:.04em;
+  padding:.5rem .9rem; border:1px solid var(--rule-strong); transition:background .2s, border-color .2s;
+}
+.btn-back:hover { background:var(--paper-2); border-color:var(--ink); }
+.theme-btn {
+  font-family:var(--mono); font-size:12px; font-weight:700; color:var(--ink-2);
+  padding:.45rem .8rem; border:1px solid var(--rule-strong);
+  transition:color .2s, border-color .2s;
+}
+.theme-btn:hover { color:var(--ink); border-color:var(--ink); }
+.logo-link { display:inline-flex; align-items:center; gap:.55rem; opacity:.9; }
+.logo-link:hover { opacity:1; }
+.logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
+.logo-bar { width:5px; background:var(--accent); border-radius:1px 1px 0 0; opacity:.9; }
+.logo-text { font-family:var(--display); font-weight:800; font-size:clamp(1.05rem,2vw,1.4rem); letter-spacing:-.03em; line-height:1; }
+.logo-text span { color:var(--accent); }
+
+.page {
+  position:relative; z-index:1;
+  max-width:980px; width:100%; margin:0 auto;
+  padding:2.4rem 1.75rem 5rem;
+}
+@media (max-width:720px) {
+  .page { padding:1.6rem 1.1rem 3rem; }
+  .topbar { grid-template-columns:1fr auto; padding:.85rem 1rem; }
+  .topbar-center { display:none; }
+  .topbar-right .logo-link { display:none; }
+}
+.crumb {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3); margin-bottom:1.8rem;
+}
+.crumb a { color:var(--ink-3); transition:color .2s; }
+.crumb a:hover { color:var(--accent); }
+.crumb .sep { margin:0 .55rem; opacity:.55; }
+
+/* Welcome */
+.welcome { text-align:center; padding:1.5rem 0 2rem; }
+.eyebrow {
+  font-family:var(--mono); font-size:12px; letter-spacing:.22em;
+  text-transform:uppercase; color:var(--accent); font-weight:700; margin-bottom:1.4rem;
+}
+.welcome-title {
+  font-family:var(--sans); font-weight:700;
+  font-size:clamp(2rem,5vw,3rem); letter-spacing:-.025em; line-height:1.1;
+  max-width:24ch; margin:0 auto 1.4rem;
+}
+.welcome-title em { font-family:var(--italic); font-style:italic; font-weight:400; color:var(--accent); }
+.welcome-sub {
+  font-family:var(--sans); font-size:clamp(1rem,1.5vw,1.18rem); line-height:1.55;
+  color:var(--ink-2); max-width:54ch; margin:0 auto 2rem;
+}
+.welcome-hint {
+  font-family:var(--mono); font-size:12px; letter-spacing:.04em; color:var(--ink-3);
+  max-width:54ch; margin:0 auto 2rem; line-height:1.6;
+}
+
+.accordion-stack {
+  display:flex; flex-direction:column; gap:.5rem;
+  max-width:640px; margin:2.6rem auto 2.4rem; text-align:left;
+}
+.accordion {
+  border:1px solid var(--rule-strong); background:var(--paper-2);
+  transition:background .2s, border-color .2s;
+}
+.accordion[open] { border-color:var(--accent-tint); background:var(--paper-3); }
+.accordion summary {
+  display:flex; align-items:center; justify-content:space-between; gap:1rem;
+  padding:1rem 1.2rem; list-style:none; cursor:none;
+  font-family:var(--sans); font-weight:600; font-size:.98rem;
+  user-select:none;
+}
+.accordion summary::-webkit-details-marker { display:none; }
+.accordion summary::after {
+  content:"+"; font-family:var(--mono); font-size:1.2rem; color:var(--accent);
+  width:18px; height:18px; display:flex; align-items:center; justify-content:center;
+  transition:transform .2s;
+}
+.accordion[open] summary::after { content:"−"; }
+.accordion summary .acc-num {
+  font-family:var(--mono); font-size:11px; color:var(--ink-3);
+  letter-spacing:.12em; margin-right:.9rem; font-weight:400;
+}
+.accordion-body {
+  padding:0 1.2rem 1.2rem;
+  font-family:var(--italic); font-style:italic; font-size:1rem; line-height:1.6; color:var(--ink-2);
+}
+.accordion-body em { color:var(--accent); }
+
+/* Botones */
+.btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+  font-family:var(--sans); font-weight:600; font-size:.98rem;
+  padding:.95rem 1.8rem;
+  background:var(--accent); color:var(--on-accent); border:none;
+  transition:background .2s, transform .1s;
+}
+.btn:hover { background:var(--accent-2); }
+.btn:active { transform:scale(.98); }
+.btn[disabled], .btn.disabled { opacity:.35; pointer-events:none; }
+.btn-ghost {
+  background:transparent; color:var(--ink-2);
+  border:1px solid var(--rule-strong);
+  padding:.85rem 1.4rem;
+}
+.btn-ghost:hover { color:var(--ink); border-color:var(--ink); background:var(--paper-2); }
+.btn-big { font-size:1.05rem; padding:1.15rem 2.4rem; letter-spacing:.02em; }
+
+.is-hidden { display:none !important; }
+
+/* Method link */
+.method-link {
+  display:inline-flex; align-items:center; gap:.4rem;
+  font-family:var(--mono); font-size:12px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--ink-2);
+  padding:.55rem .95rem; border:1px solid var(--rule-strong);
+  transition:color .2s, border-color .2s;
+}
+.method-link:hover { color:var(--accent); border-color:var(--accent); }
+
+/* Section head */
+.section-head {
+  display:flex; align-items:baseline; justify-content:space-between;
+  gap:1rem; margin-bottom:1.2rem; flex-wrap:wrap;
+}
+.section-head h2 {
+  font-family:var(--sans); font-weight:700; font-size:1.55rem; letter-spacing:-.015em;
+}
+.section-head h2 .num {
+  font-family:var(--mono); font-size:.65em; letter-spacing:.12em;
+  color:var(--ink-3); margin-right:.5rem; font-weight:400;
+}
+.section-head .meta {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.08em; color:var(--ink-3);
+}
+.section-desc {
+  font-family:var(--italic); font-style:italic; font-size:1.02rem; line-height:1.55;
+  color:var(--ink-2); max-width:60ch; margin-bottom:1.6rem;
+}
+
+/* Stage intro banner */
+.stage-intro {
+  background:var(--paper-2); border:1px solid var(--rule);
+  border-left:3px solid var(--accent);
+  padding:1.1rem 1.4rem; margin-bottom:1.6rem;
+}
+.stage-intro p {
+  font-family:var(--sans); font-size:.96rem; line-height:1.55; color:var(--ink);
+}
+.stage-intro p b { color:var(--accent); font-weight:600; }
+.stage-intro p em { font-family:var(--italic); font-style:italic; color:var(--ink-2); }
+
+/* Progress bar (steps) */
+.steps-row {
+  display:flex; gap:.4rem; margin-bottom:2rem;
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.1em;
+  text-transform:uppercase;
+}
+.step-pill {
+  flex:1; padding:.65rem .55rem;
+  text-align:center;
+  background:var(--paper-2); color:var(--ink-3);
+  border:1px solid var(--rule-strong);
+  position:relative;
+}
+.step-pill .step-n { color:var(--accent); font-weight:700; margin-right:.45rem; }
+.step-pill.done { color:var(--ink-2); border-color:var(--rule-strong); }
+.step-pill.done::after {
+  content:"✓"; position:absolute; right:.55rem; top:50%; transform:translateY(-50%);
+  color:var(--green); font-size:1rem; font-family:var(--sans);
+}
+.step-pill.active {
+  color:var(--ink); background:var(--accent-soft);
+  border-color:var(--accent);
+}
+@media (max-width:720px) {
+  .steps-row { display:none; }
+}
+
+/* Form fields */
+.field { margin-bottom:1.4rem; }
+.field-label {
+  display:block;
+  font-family:var(--mono); font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3); margin-bottom:.5rem;
+}
+.field-label .req { color:var(--accent); }
+.field-hint {
+  font-family:var(--italic); font-style:italic; font-size:.86rem;
+  color:var(--ink-3); margin-top:.4rem; line-height:1.5;
+}
+.field input[type="text"], .field input[type="number"], .field input[type="url"], .field textarea, .field select {
+  width:100%;
+  font-family:var(--sans); font-size:.96rem; line-height:1.5;
+  padding:.7rem .9rem;
+  background:var(--paper-2); color:var(--ink);
+  border:1px solid var(--rule-strong); outline:none;
+  transition:border-color .15s;
+}
+.field input:focus, .field textarea:focus, .field select:focus { border-color:var(--accent); }
+.field textarea { min-height:120px; resize:vertical; line-height:1.55; }
+.field-row {
+  display:grid; grid-template-columns:1fr 1fr; gap:1rem;
+}
+@media (max-width:560px) { .field-row { grid-template-columns:1fr; } }
+
+/* Radio group estilo pill */
+.pill-group {
+  display:flex; gap:.45rem; flex-wrap:wrap;
+}
+.pill {
+  font-family:var(--sans); font-weight:500; font-size:.92rem;
+  padding:.55rem 1.1rem;
+  background:var(--paper-2); color:var(--ink-2);
+  border:1px solid var(--rule-strong);
+  transition:border-color .15s, color .15s, background .15s;
+}
+.pill:hover { color:var(--ink); border-color:var(--ink); }
+.pill.sel {
+  background:var(--accent-soft); color:var(--accent);
+  border-color:var(--accent); font-weight:700;
+}
+
+/* Árbol del problema (CEPAL / Ortegón) */
+.def-mode-toggle {
+  display:flex; gap:.4rem; margin-bottom:1.4rem;
+  font-family:var(--mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+}
+.def-mode-toggle button {
+  padding:.45rem 1rem;
+  background:var(--paper-2); color:var(--ink-2);
+  border:1px solid var(--rule-strong);
+  transition:border-color .15s, color .15s, background .15s;
+}
+.def-mode-toggle button:hover { color:var(--ink); border-color:var(--ink); }
+.def-mode-toggle button.active { background:var(--accent-soft); color:var(--accent); border-color:var(--accent); font-weight:700; }
+
+.arbol-wrap {
+  display:flex; flex-direction:column; align-items:center; gap:.6rem;
+  padding:1.4rem 1rem;
+  background:var(--paper-2); border:1px solid var(--rule);
+}
+.arbol-label {
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink-3);
+}
+.arbol-row {
+  display:flex; gap:.7rem; flex-wrap:wrap; justify-content:center; align-items:stretch;
+}
+.arbol-trunk { width:2px; height:30px; background:var(--accent-tint); }
+.arbol-node {
+  position:relative;
+  display:flex; flex-direction:column;
+  padding:.7rem .85rem;
+  background:var(--paper-3); border:1px solid var(--rule-strong);
+  min-width:170px; max-width:240px;
+  font-family:var(--sans); font-size:.88rem; line-height:1.45; color:var(--ink);
+}
+.arbol-node[contenteditable]:focus { outline:1px solid var(--accent); outline-offset:2px; }
+.arbol-node-del {
+  position:absolute; top:.25rem; right:.4rem;
+  font-family:var(--mono); font-size:.85rem; color:var(--ink-3);
+  padding:.05rem .3rem; transition:color .15s;
+}
+.arbol-node-del:hover { color:var(--danger); }
+.arbol-node-add {
+  padding:.7rem .85rem;
+  background:transparent; color:var(--ink-3);
+  border:1px dashed var(--rule-strong);
+  font-family:var(--mono); font-size:11px; letter-spacing:.06em;
+  min-width:170px;
+  transition:border-color .15s, color .15s;
+}
+.arbol-node-add:hover { border-color:var(--accent); color:var(--accent); }
+.arbol-central {
+  padding:1rem 1.3rem;
+  background:var(--accent-soft); border:2px solid var(--accent);
+  font-family:var(--sans); font-weight:700; font-size:.98rem; line-height:1.5;
+  color:var(--ink); max-width:520px; text-align:center;
+  min-height:60px; display:flex; align-items:center; justify-content:center;
+}
+.arbol-central em { font-family:var(--italic); font-style:italic; color:var(--ink-3); font-weight:400; }
+
+/* Rittel-Webber · preguntas SÍ/NO */
+.rittel-q {
+  display:grid; grid-template-columns:30px 1fr auto; gap:1rem;
+  align-items:center;
+  padding:.75rem 1rem;
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+}
+.rittel-q .rq-n { font-family:var(--mono); font-size:11px; color:var(--accent); letter-spacing:.05em; font-weight:700; }
+.rittel-q .rq-text { font-family:var(--sans); font-size:.94rem; line-height:1.45; color:var(--ink); }
+.rittel-q .rq-answers { display:flex; gap:.4rem; }
+.rittel-q .rq-btn {
+  font-family:var(--mono); font-size:11px; letter-spacing:.06em; font-weight:700;
+  padding:.4rem .9rem;
+  background:transparent; color:var(--ink-2);
+  border:1px solid var(--rule-strong);
+  transition:border-color .15s, background .15s, color .15s;
+}
+.rittel-q .rq-btn:hover { border-color:var(--accent); color:var(--accent); }
+.rittel-q .rq-btn.sel-si { background:var(--accent); color:var(--on-accent); border-color:var(--accent); }
+.rittel-q .rq-btn.sel-no { background:var(--paper-3); color:var(--ink); border-color:var(--rule-strong); }
+@media (max-width:560px) {
+  .rittel-q { grid-template-columns:1fr; gap:.45rem; }
+  .rittel-q .rq-n { font-size:10px; }
+  .rittel-q .rq-answers { justify-content:flex-end; }
+}
+
+/* Marco analítico · cards */
+.marco-card {
+  display:grid; grid-template-columns:auto 1fr auto; gap:1.1rem;
+  align-items:center;
+  padding:1.1rem 1.3rem;
+  background:var(--paper-2); border:1.5px solid var(--rule-strong);
+  cursor:none; transition:border-color .15s, background .15s;
+  position:relative;
+}
+.marco-card:hover { border-color:var(--accent); background:var(--paper-3); }
+.marco-card.sel { border-color:var(--accent); background:var(--accent-soft); }
+.marco-card.sel::before {
+  content:""; position:absolute; top:-1px; left:-1px; bottom:-1px;
+  width:3px; background:var(--accent);
+}
+.marco-card .mc-radio {
+  width:18px; height:18px; border-radius:50%;
+  border:2px solid var(--rule-strong);
+  position:relative; flex-shrink:0;
+}
+.marco-card.sel .mc-radio { border-color:var(--accent); }
+.marco-card.sel .mc-radio::after {
+  content:""; position:absolute; top:3px; left:3px; right:3px; bottom:3px;
+  background:var(--accent); border-radius:50%;
+}
+.marco-card .mc-body { min-width:0; }
+.marco-card .mc-name { font-family:var(--sans); font-weight:700; font-size:1.02rem; color:var(--ink); margin-bottom:.2rem; letter-spacing:-.01em; }
+.marco-card .mc-meta { font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; color:var(--ink-3); margin-bottom:.4rem; }
+.marco-card .mc-meta b { color:var(--accent); }
+.marco-card .mc-desc { font-family:var(--italic); font-style:italic; font-size:.9rem; line-height:1.55; color:var(--ink-2); }
+.marco-card .mc-badge-reco {
+  font-family:var(--mono); font-size:10px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+  padding:.25rem .55rem;
+  background:var(--accent); color:var(--on-accent);
+  flex-shrink:0;
+}
+
+/* Chips de afectados */
+.chip-grid {
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));
+  gap:.5rem; margin-bottom:1rem;
+}
+.chip {
+  display:flex; align-items:center; gap:.55rem;
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+  padding:.55rem .75rem; font-family:var(--sans); font-size:.92rem; min-width:0;
+}
+.chip-name {
+  flex:1; outline:none; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.chip-name:focus { outline:1px solid var(--accent); outline-offset:2px; }
+.chip-del {
+  font-family:var(--mono); font-size:.95rem; color:var(--ink-3);
+  padding:0 .25rem; transition:color .2s;
+}
+.chip-del:hover { color:var(--danger); }
+.chip-add-row { display:flex; gap:.55rem; margin-top:.8rem; flex-wrap:wrap; }
+.chip-add-input {
+  flex:1; min-width:200px;
+  font-family:var(--sans); font-size:.94rem;
+  padding:.65rem .9rem;
+  background:var(--paper-2); color:var(--ink);
+  border:1px solid var(--rule-strong); outline:none;
+}
+.chip-add-input:focus { border-color:var(--accent); }
+
+/* Tabla de evidencia */
+.evid-table { width:100%; border-collapse:collapse; margin-bottom:.8rem; }
+.evid-table th, .evid-table td {
+  border:1px solid var(--rule);
+  padding:.55rem .65rem;
+  font-family:var(--sans); font-size:.9rem;
+  text-align:left; vertical-align:top;
+  background:var(--paper-2);
+}
+.evid-table th {
+  background:var(--paper-3);
+  font-family:var(--mono); font-size:11px; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--ink-3); font-weight:700;
+}
+.evid-table td input, .evid-table td textarea {
+  width:100%; padding:.3rem .45rem;
+  font-family:var(--sans); font-size:.88rem; line-height:1.4;
+  background:transparent; color:var(--ink);
+  border:1px solid transparent; outline:none;
+  transition:border-color .15s, background .15s;
+}
+.evid-table td input:focus, .evid-table td textarea:focus { border-color:var(--accent); background:var(--paper); }
+.evid-table td textarea { min-height:42px; resize:vertical; }
+.evid-table .col-anyo { width:80px; }
+.evid-table .col-dato { width:130px; }
+.evid-table .col-link { width:160px; }
+.evid-table .col-del { width:36px; text-align:center; }
+.evid-del-btn {
+  font-family:var(--mono); font-size:.95rem; color:var(--ink-3);
+  padding:0 .25rem;
+}
+.evid-del-btn:hover { color:var(--danger); }
+@media (max-width:720px) {
+  .evid-table, .evid-table thead, .evid-table tbody, .evid-table th, .evid-table tr { display:block; }
+  .evid-table thead { display:none; }
+  .evid-table tr { margin-bottom:.8rem; border:1px solid var(--rule); padding:.4rem; }
+  .evid-table td { border:none; padding:.3rem .45rem; }
+  .evid-table .col-anyo, .evid-table .col-dato, .evid-table .col-link, .evid-table .col-del { width:auto; }
+}
+
+/* Cards de alternativas */
+.alt-grid {
+  display:grid; grid-template-columns:1fr; gap:1rem; margin-bottom:1rem;
+}
+@media (min-width:760px) { .alt-grid { grid-template-columns:1fr 1fr; } }
+.alt-card {
+  padding:1.1rem 1.2rem;
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+  position:relative;
+}
+.alt-card.is-baseline { border-left:3px solid var(--gold); }
+.alt-card .alt-code {
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--accent); font-weight:700;
+  margin-bottom:.5rem;
+}
+.alt-card .alt-code .baseline-tag {
+  background:var(--gold); color:var(--on-accent); padding:.1rem .4rem; margin-left:.5rem;
+  font-size:9.5px;
+}
+.alt-card .alt-name-input {
+  width:100%;
+  font-family:var(--sans); font-weight:700; font-size:1.05rem;
+  padding:.4rem .5rem; margin-bottom:.6rem;
+  background:transparent; color:var(--ink);
+  border:1px solid transparent; outline:none;
+}
+.alt-card .alt-name-input:focus { border-color:var(--accent); background:var(--paper); }
+.alt-card .alt-field { margin-bottom:.55rem; }
+.alt-card .alt-field-label {
+  font-family:var(--mono); font-size:10px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--ink-3); margin-bottom:.2rem; display:block;
+}
+.alt-card textarea, .alt-card input {
+  width:100%; padding:.4rem .5rem;
+  font-family:var(--sans); font-size:.88rem; line-height:1.45;
+  background:var(--paper); color:var(--ink);
+  border:1px solid var(--rule); outline:none;
+  transition:border-color .15s;
+}
+.alt-card textarea:focus, .alt-card input:focus { border-color:var(--accent); }
+.alt-card textarea { min-height:54px; resize:vertical; }
+.alt-card .alt-del-btn {
+  position:absolute; top:.6rem; right:.8rem;
+  font-family:var(--mono); font-size:.95rem; color:var(--ink-3);
+  padding:.15rem .35rem; transition:color .15s;
+}
+.alt-card .alt-del-btn:hover { color:var(--danger); }
+.alt-meta {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.05em; color:var(--ink-3);
+}
+.alt-meta b { color:var(--accent); }
+
+/* Criterios */
+.crit-list {
+  display:flex; flex-direction:column; gap:.6rem; margin-bottom:1rem;
+}
+.crit-row {
+  display:grid; grid-template-columns:1fr 100px 1fr 36px; gap:.7rem;
+  align-items:center;
+  padding:.7rem .9rem;
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+}
+@media (max-width:680px) {
+  .crit-row { grid-template-columns:1fr 80px 36px; }
+  .crit-row .crit-bar { grid-column:1 / -1; }
+}
+.crit-row .crit-name-input {
+  font-family:var(--sans); font-weight:600; font-size:.96rem;
+  padding:.35rem .45rem;
+  background:transparent; color:var(--ink);
+  border:1px solid transparent; outline:none;
+}
+.crit-row .crit-name-input:focus { border-color:var(--accent); background:var(--paper); }
+.crit-row .crit-peso-input {
+  font-family:var(--mono); font-size:.92rem;
+  padding:.4rem .5rem;
+  background:var(--paper); color:var(--ink);
+  border:1px solid var(--rule); outline:none;
+  text-align:right;
+}
+.crit-row .crit-peso-input:focus { border-color:var(--accent); }
+.crit-bar {
+  height:8px; background:var(--paper-3); position:relative; overflow:hidden;
+}
+.crit-bar-fill {
+  position:absolute; left:0; top:0; bottom:0;
+  background:var(--accent);
+  transition:width .25s;
+}
+.crit-del-btn {
+  font-family:var(--mono); font-size:.95rem; color:var(--ink-3);
+  padding:0 .25rem; transition:color .15s;
+}
+.crit-del-btn:hover { color:var(--danger); }
+.crit-sum {
+  font-family:var(--mono); font-size:12px; letter-spacing:.04em;
+  color:var(--ink-3); margin-top:.6rem;
+}
+.crit-sum b { color:var(--accent); font-weight:700; }
+.crit-sum.warn b { color:var(--amber); }
+
+/* Matriz de comparación */
+.cmp-wrap { overflow-x:auto; margin-bottom:1rem; background:var(--paper-2); padding:.8rem; border:1px solid var(--rule); }
+.cmp-table { border-collapse:collapse; font-family:var(--mono); font-size:.8rem; min-width:520px; }
+.cmp-table th, .cmp-table td {
+  border:1px solid var(--rule); padding:.4rem .55rem;
+  text-align:center; vertical-align:middle; min-width:62px;
+}
+.cmp-table th {
+  background:var(--paper-3); color:var(--ink);
+  font-family:var(--sans); font-weight:600; font-size:.85rem;
+}
+.cmp-table th.row-h {
+  text-align:left; max-width:200px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis;
+}
+.cmp-table th.col-h .col-h-inner {
+  display:flex; flex-direction:column; align-items:center; gap:.15rem;
+}
+.cmp-table th.col-h .col-h-peso {
+  font-family:var(--mono); font-size:10px; color:var(--accent); letter-spacing:.04em;
+}
+.cmp-table td.cmp-cell {
+  background:var(--paper); cursor:none; user-select:none;
+  transition:background .15s, color .15s;
+  position:relative;
+}
+.cmp-table td.cmp-cell:hover { background:var(--accent-soft); }
+.cmp-table td.cmp-cell.v-1 { background:rgba(180,180,180,0.08); color:var(--ink-3); }
+.cmp-table td.cmp-cell.v-2 { color:var(--ink); }
+.cmp-table td.cmp-cell.v-3 { background:var(--accent-soft); color:var(--accent); font-weight:700; }
+.cmp-table td.cmp-cell.v-4 { background:var(--accent-tint); color:var(--accent); font-weight:700; }
+.cmp-table td.cmp-cell.v-5 { background:var(--accent); color:var(--on-accent); font-weight:700; }
+.cmp-table td.cmp-score {
+  background:var(--paper-3); color:var(--accent);
+  font-weight:700; font-family:var(--mono);
+}
+
+/* Ranking de alternativas */
+.rank-bars { display:flex; flex-direction:column; gap:.6rem; }
+.rank-bar-row {
+  display:grid; grid-template-columns:30px 1fr 70px; gap:.7rem;
+  align-items:center;
+  padding:.55rem .8rem;
+  background:var(--paper-2); border:1px solid var(--rule);
+}
+.rank-bar-row.winner {
+  border-color:var(--accent); background:var(--accent-soft);
+}
+.rank-bar-row .rk-pos {
+  font-family:var(--mono); font-size:13px; font-weight:700;
+  color:var(--accent); text-align:center;
+}
+.rank-bar-row .rk-info { min-width:0; }
+.rank-bar-row .rk-name {
+  font-family:var(--sans); font-weight:600; font-size:.96rem;
+  color:var(--ink); margin-bottom:.25rem;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.rank-bar-row .rk-bar {
+  height:5px; background:var(--paper-3); position:relative; overflow:hidden;
+}
+.rank-bar-row .rk-bar-fill {
+  position:absolute; left:0; top:0; bottom:0;
+  background:var(--accent);
+}
+.rank-bar-row .rk-score {
+  font-family:var(--mono); font-size:13px; color:var(--accent); text-align:right;
+  font-weight:700;
+}
+
+/* Tabla compacta de resultados */
+.res-table { width:100%; border-collapse:collapse; margin-top:1.2rem; }
+.res-table th, .res-table td {
+  border:1px solid var(--rule); padding:.5rem .65rem;
+  font-family:var(--sans); font-size:.88rem;
+  text-align:left;
+}
+.res-table th { background:var(--paper-3); font-family:var(--mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); font-weight:700; }
+.res-table td.num { font-family:var(--mono); text-align:right; color:var(--accent); font-weight:700; }
+.res-table tr.winner td { background:var(--accent-soft); }
+
+.export-row { display:flex; gap:.65rem; flex-wrap:wrap; margin-top:1.5rem; }
+
+.actions {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:.8rem; margin-top:1.8rem; flex-wrap:wrap;
+}
+.actions .right-group { display:flex; gap:.6rem; flex-wrap:wrap; }
+
+/* Modal */
+.modal-back {
+  position:fixed; inset:0; background:rgba(10,8,4,0.7);
+  display:none; align-items:center; justify-content:center;
+  z-index:8500; padding:1rem; backdrop-filter:blur(4px);
+}
+.modal-back.open { display:flex; }
+.modal {
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+  padding:2rem 2.2rem; max-width:600px; width:100%; position:relative;
+  max-height:90vh; overflow-y:auto;
+}
+.modal-close {
+  position:absolute; top:.9rem; right:1.1rem;
+  font-family:var(--mono); font-size:1.2rem; color:var(--ink-3); transition:color .2s;
+}
+.modal-close:hover { color:var(--danger); }
+.modal h2 {
+  font-family:var(--sans); font-weight:700; font-size:1.35rem;
+  letter-spacing:-.01em; margin-bottom:.7rem; max-width:32ch;
+}
+.modal p {
+  font-family:var(--sans); font-size:.96rem; line-height:1.55; color:var(--ink-2); margin-bottom:1rem;
+}
+.modal p em { font-family:var(--italic); font-style:italic; }
+.modal p b { color:var(--ink); }
+
+/* Toast */
+.toast {
+  position:fixed; bottom:1.5rem; right:1.5rem;
+  background:var(--ink); color:var(--paper);
+  padding:.85rem 1.2rem; font-family:var(--sans); font-size:.9rem;
+  letter-spacing:.02em; z-index:9000;
+  opacity:0; transform:translateY(15px); pointer-events:none;
+  transition:opacity .25s, transform .25s;
+}
+.toast.show { opacity:1; transform:translateY(0); }
+
+.methodology-note {
+  max-width:64ch; margin-top:1.6rem;
+  font-family:var(--italic); font-style:italic; font-size:.9rem; line-height:1.6; color:var(--ink-3);
+}
+.methodology-note a { color:var(--accent); font-style:normal; }
+
+/* IA bars + resultado del copiloto (espejo de mactor) */
+.ia-bar {
+  display:flex; align-items:center; gap:1.1rem; flex-wrap:wrap;
+  padding:1.1rem 1.3rem;
+  background:linear-gradient(135deg, var(--accent-soft), var(--paper-2));
+  border:1px solid var(--accent-tint); border-left:3px solid var(--accent);
+}
+.ia-bar .ia-icon { font-family:var(--sans); font-size:1.4rem; color:var(--accent); flex-shrink:0; }
+.ia-bar .ia-body { flex:1; min-width:240px; }
+.ia-bar .ia-title { font-family:var(--sans); font-weight:700; font-size:1rem; color:var(--ink); margin-bottom:.25rem; }
+.ia-bar .ia-sub { font-family:var(--italic); font-style:italic; font-weight:400; font-size:.9rem; line-height:1.5; color:var(--ink-2); }
+.ia-bar .btn { padding:.75rem 1.4rem; font-size:.92rem; }
+.ia-bar .btn[disabled] { opacity:.55; cursor:not-allowed; }
+
+.ia-result {
+  background:var(--paper-2); border:1px solid var(--rule);
+  padding:1.4rem 1.6rem; margin-top:.9rem;
+  animation:fadeInUp .35s ease both;
+}
+@keyframes fadeInUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+.ia-result .ia-result-eyebrow {
+  font-family:var(--mono); font-size:11px; letter-spacing:.18em;
+  text-transform:uppercase; color:var(--accent); margin-bottom:.55rem;
+}
+.ia-result .ia-result-eyebrow .ia-cached {
+  margin-left:.55rem; padding:.15rem .45rem; background:var(--paper-3); color:var(--ink-3);
+  font-size:9.5px; letter-spacing:.12em;
+}
+.ia-result h3 { font-family:var(--sans); font-weight:700; font-size:1.15rem; color:var(--ink); margin:1rem 0 .55rem; letter-spacing:-.01em; }
+.ia-result h3:first-of-type { margin-top:.4rem; }
+.ia-result p { font-family:var(--sans); font-weight:400; font-size:.98rem; line-height:1.6; color:var(--ink); margin-bottom:.85rem; }
+.ia-result p em { font-family:var(--italic); font-style:italic; color:var(--ink-2); }
+.ia-result ul { list-style:none; margin:.4rem 0 0; padding:0; }
+.ia-result ul li {
+  position:relative; padding:.55rem 0 .55rem 1.6rem;
+  font-family:var(--sans); font-size:.96rem; line-height:1.55; color:var(--ink);
+  border-bottom:1px solid var(--rule);
+}
+.ia-result ul li:last-child { border-bottom:none; }
+.ia-result ul li::before { content:"→"; position:absolute; left:0; top:.65rem; color:var(--accent); font-weight:700; }
+
+.ia-loading { display:flex; align-items:center; gap:.8rem; font-family:var(--mono); font-size:12px; color:var(--ink-3); }
+.ia-loading-dot { width:8px; height:8px; background:var(--accent); border-radius:50%; animation:iaPulse 1s ease-in-out infinite; }
+@keyframes iaPulse { 0%,100% { opacity:.3; transform:scale(.9); } 50% { opacity:1; transform:scale(1.2); } }
+
+.ia-suggested { display:flex; flex-direction:column; gap:.45rem; margin-top:.8rem; }
+.ia-sug {
+  display:grid; grid-template-columns:1fr auto; gap:.85rem; align-items:start;
+  padding:.85rem 1rem;
+  background:var(--paper-3); border:1px solid var(--rule);
+}
+.ia-sug-body { min-width:0; }
+.ia-sug-name { font-family:var(--sans); font-weight:600; font-size:.98rem; color:var(--ink); margin-bottom:.2rem; }
+.ia-sug-desc { font-family:var(--italic); font-style:italic; font-size:.87rem; line-height:1.5; color:var(--ink-2); margin-bottom:.3rem; }
+.ia-sug-meta { font-family:var(--mono); font-size:11px; color:var(--ink-3); letter-spacing:.04em; }
+.ia-sug-meta b { color:var(--accent); }
+.ia-sug-add {
+  font-family:var(--mono); font-size:11px; padding:.45rem .8rem;
+  background:transparent; color:var(--ink-2); border:1px solid var(--rule-strong);
+  transition:border-color .15s, color .15s;
+}
+.ia-sug-add:hover { border-color:var(--accent); color:var(--accent); }
+.ia-sug-add.added { color:var(--green); border-color:rgba(111,160,122,0.5); }
+
+.ia-issues { display:flex; flex-direction:column; gap:.55rem; margin-top:.9rem; }
+.ia-issue {
+  display:grid; grid-template-columns:120px 1fr; gap:1rem; align-items:start;
+  padding:.8rem .95rem; background:var(--paper-3); border:1px solid var(--rule);
+}
+.ia-issue-tag {
+  font-family:var(--mono); font-size:10px; font-weight:700;
+  letter-spacing:.14em; text-transform:uppercase;
+  padding:.25rem .5rem; text-align:center;
+  background:var(--accent-soft); color:var(--accent); border:1px solid var(--accent-tint);
+}
+.ia-issue-body { min-width:0; }
+.ia-issue-msg { font-family:var(--sans); font-size:.92rem; line-height:1.5; color:var(--ink); margin-bottom:.4rem; }
+.ia-issue-sug { font-family:var(--italic); font-style:italic; font-size:.88rem; color:var(--ink-2); }
+.ia-issue-sug b { font-family:var(--sans); font-style:normal; color:var(--accent); font-weight:600; }
+
+/* Mis proyectos (lista de proyectos del usuario logueado) */
+.proj-row {
+  display:grid; grid-template-columns:1fr auto auto; gap:1rem; align-items:center;
+  padding:.8rem 1rem; background:var(--paper-3); border:1px solid var(--rule);
+}
+.proj-row .pr-name { font-family:var(--sans); font-weight:600; font-size:.95rem; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.proj-row .pr-meta { font-family:var(--mono); font-size:11px; color:var(--ink-3); letter-spacing:.04em; margin-top:.15rem; }
+.proj-row .pr-role {
+  font-family:var(--mono); font-size:10.5px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+  padding:.2rem .55rem; background:var(--paper); color:var(--ink-3); border:1px solid var(--rule-strong);
+}
+.proj-row .pr-role.owner { background:var(--accent); color:var(--on-accent); border-color:var(--accent); }
+.proj-row .pr-actions { display:flex; gap:.4rem; }
+.proj-row .pr-actions button {
+  font-family:var(--mono); font-size:11px; letter-spacing:.04em;
+  padding:.35rem .7rem; background:transparent; color:var(--ink-2); border:1px solid var(--rule-strong);
+  transition:border-color .2s, color .2s;
+}
+.proj-row .pr-actions button:hover { border-color:var(--accent); color:var(--accent); }
+.proj-row .pr-actions button.danger:hover { border-color:var(--danger); color:var(--danger); }
+
+/* Cloud bar (estado de sincronización) */
+.cloud-bar {
+  display:flex; align-items:center; gap:1rem; flex-wrap:wrap;
+  padding:.85rem 1.1rem;
+  background:var(--accent-soft); border-left:3px solid var(--accent);
+  font-family:var(--mono); font-size:12px; color:var(--ink-2);
+}
+.cloud-bar .cb-icon { font-family:var(--sans); font-weight:700; color:var(--accent); }
+.cloud-bar .cb-spacer { flex:1; }
+.cloud-bar .cb-status { font-style:italic; color:var(--ink-3); font-family:var(--italic); font-size:12.5px; }
+.cloud-bar .cb-status.saving { color:var(--amber); }
+.cloud-bar .cb-status.saved { color:var(--green); }
+.cloud-bar .cb-status.error { color:var(--danger); }
+.cloud-bar .cb-editor { font-size:11px; color:var(--ink-3); padding-left:.8rem; border-left:1px solid var(--rule); }
+.cloud-bar.anon { background:rgba(214,168,58,0.10); border-left-color:var(--amber); }
+.cloud-bar.anon .cb-icon { color:var(--amber); }
+.cloud-bar .btn-mini {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.06em;
+  padding:.4rem .8rem; border:1px solid var(--rule-strong);
+  background:transparent; color:var(--ink-2);
+  transition:border-color .2s, color .2s;
+}
+.cloud-bar .btn-mini:hover { border-color:var(--accent); color:var(--accent); }
+
+footer.foot {
+  max-width:980px; margin:0 auto; padding:2rem 1.75rem 1.5rem;
+  border-top:1px solid var(--rule);
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.06em; color:var(--ink-3);
+  display:flex; justify-content:space-between; flex-wrap:wrap; gap:1rem;
+}
+
+/* FAB Recursos · botón flotante del lab */
+.lab-fab {
+  position:fixed; bottom:1.5rem; left:1.5rem;
+  z-index:8000;
+  display:inline-flex; align-items:center; gap:.45rem;
+  padding:.65rem 1rem;
+  background:var(--paper-2); color:var(--ink);
+  border:1px solid var(--accent-tint);
+  font-family:var(--mono); font-size:11.5px; font-weight:700;
+  letter-spacing:.1em; text-transform:uppercase;
+  cursor:none;
+  transition:border-color .15s, background .15s, color .15s;
+  box-shadow:0 4px 12px rgba(0,0,0,0.25);
+}
+.lab-fab:hover { border-color:var(--accent); color:var(--accent); }
+.lab-fab .lab-fab-icon { color:var(--accent); font-size:1rem; }
+.lab-fab.is-hidden { display:none !important; }
+@media (max-width:640px) {
+  .lab-fab { padding:.5rem .8rem; font-size:10.5px; bottom:1rem; left:1rem; }
+}
+
+/* Modal Recursos */
+.lab-recursos-modal .modal { max-width:720px; }
+.lab-recursos-modal h2 { margin-bottom:1rem; }
+.lab-recursos-modal .lr-intro {
+  font-family:var(--italic); font-style:italic; font-weight:400;
+  font-size:.92rem; line-height:1.55; color:var(--ink-2);
+  margin-bottom:1.4rem; max-width:56ch;
+}
+.lab-recursos-modal .lr-intro a { color:var(--accent); font-style:normal; }
+.lab-recursos-modal .lr-empty {
+  font-family:var(--italic); font-style:italic; color:var(--ink-3);
+  text-align:center; padding:1.5rem 0;
+}
+.lr-cat { margin-bottom:1.4rem; }
+.lr-cat:last-child { margin-bottom:0; }
+.lr-cat-name {
+  font-family:var(--mono); font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--accent); font-weight:700;
+  margin-bottom:.7rem;
+  padding-bottom:.35rem; border-bottom:1px solid var(--rule);
+}
+.lr-items { display:grid; grid-template-columns:1fr; gap:.5rem; }
+.lr-item {
+  display:block;
+  padding:.75rem .9rem;
+  background:var(--paper); border:1px solid var(--rule);
+  transition:border-color .15s, background .15s;
+}
+.lr-item:hover { border-color:var(--accent); background:var(--paper-2); }
+.lr-item-name {
+  font-family:var(--sans); font-weight:600; font-size:.92rem;
+  color:var(--ink); letter-spacing:-.005em;
+  margin-bottom:.2rem;
+  display:flex; align-items:baseline; gap:.4rem;
+}
+.lr-item-name::after {
+  content:"↗"; color:var(--accent); font-family:var(--mono); font-size:.85rem;
+  margin-left:auto; flex-shrink:0; opacity:.55;
+}
+.lr-item:hover .lr-item-name::after { opacity:1; }
+.lr-item-desc {
+  font-family:var(--italic); font-style:italic; font-weight:400;
+  font-size:.82rem; line-height:1.5; color:var(--ink-2);
+}
+/* Disclosure compacto de proyectos en la nube (D.2) */
+.proj-disclosure summary::-webkit-details-marker { display:none; }
+.proj-disclosure summary::marker { content:''; }
+.proj-disclosure summary:hover { background:var(--paper-3); }
+.proj-disclosure .proj-caret { display:inline-block; transition:transform .15s; }
+.proj-disclosure[open] .proj-caret { transform:rotate(90deg); }
+</style>
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<nav class="topbar">
+  <div class="topbar-left">
+    <a href="analisis-estrutural.html" class="btn-back"><span>←</span> Voltar ao lab</a>
+    <div id="nav-user-block" class="is-hidden" style="display:flex;align-items:center;gap:.7rem;margin-left:.5rem">
+      <a href="dashboard.html" id="nav-user-name" style="font-family:var(--sans);font-size:13px;font-weight:600;color:var(--ink);text-decoration:none;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .2s" title="Ir ao dashboard"></a>
+      <a href="pricing.html" id="nav-user-plano" style="font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--accent);padding:.25rem .55rem;border:1px solid var(--accent);background:var(--accent-soft)">FREE</a>
+      <button onclick="logoutUser()" style="font-family:var(--mono);font-size:11px;color:var(--ink-3);background:none;border:none;padding:0">sair ↗</button>
+    </div>
+    <div id="nav-auth-anon" style="display:flex;gap:.7rem;margin-left:.5rem">
+      <a href="login.html" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)">Entrar</a>
+      <a href="register.html" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);padding:.3rem .65rem">Cadastrar</a>
+    </div>
+  </div>
+  <div class="topbar-center">
+    <span class="eyebrow" style="margin:0;font-size:11px">Lab · Problema Público</span>
+  </div>
+  <div class="topbar-right">
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo dia</button>
+    <a href="index.html" class="logo-link">
+      <div class="logo-bars">
+        <div class="logo-bar" style="height:20px"></div>
+        <div class="logo-bar" style="height:15px"></div>
+        <div class="logo-bar" style="height:9px"></div>
+        <div class="logo-bar" style="height:4px"></div>
+      </div>
+      <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+    </a>
+  </div>
+</nav>
+
+<main class="page">
+  <div class="crumb">
+    <a href="index.html">Início</a> <span class="sep">/</span>
+    <a href="analisis-estrutural.html">Laboratório de Políticas</a> <span class="sep">/</span>
+    <span>Problema Público</span>
+  </div>
+
+  <!-- MIS PROYECTOS (visible apenas quando AUTH.isLogged) -->
+  <section class="is-hidden" id="my-projects" style="margin-bottom:1.4rem">
+    <details class="proj-disclosure" style="background:var(--paper-2);border:1px solid var(--rule)">
+      <summary style="display:flex;align-items:center;justify-content:space-between;gap:.8rem;padding:.7rem 1.1rem;list-style:none;cursor:none;flex-wrap:wrap;transition:background .15s">
+        <span style="display:flex;align-items:baseline;gap:.85rem;flex-wrap:wrap">
+          <span style="font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700"><span class="proj-caret">▸</span> Carregar ou abrir projeto</span>
+          <span id="my-projects-meta" style="font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.04em">—</span>
+        </span>
+        <button class="btn-ghost" style="padding:.4rem .85rem;font-size:.85rem" onclick="event.preventDefault();event.stopPropagation();newProject()">+ Novo</button>
+      </summary>
+      <div id="my-projects-list" style="display:flex;flex-direction:column;gap:.45rem;padding:.5rem 1.1rem 1.1rem"></div>
+    </details>
+  </section>
+
+  <!-- WELCOME -->
+  <section id="stage-welcome">
+    <div class="welcome">
+      <div class="eyebrow">Módulo · Definición e desenho de problema público</div>
+      <h1 class="welcome-title">Diseña seu política <em>com método</em></h1>
+      <p class="welcome-sub">
+        Uma política pública não empieza com uma solución — empieza com um
+        problema bem planteado. Este módulo te acompaña pelas cinco
+        decisões que seu análise tem que tomar antes de que valga a
+        pena defender uma alternativa frente a um comitê.
+      </p>
+      <p class="welcome-hint">
+        Definir o problema · acopiar evidencia · construir alternativas ·
+        fijar criterios · comparar e decidir. Toma entre 30 minutos e dois
+        horas segundo a profundidad e o tamaño do equipe.
+      </p>
+      <button class="method-link" onclick="openModal('modal-method')">Em que se baseia? →</button>
+
+      <div class="accordion-stack">
+        <details class="accordion">
+          <summary><span><span class="acc-num">01</span>O que faz exactamente</span></summary>
+          <div class="accordion-body">
+            Te guía pelas cinco mecánicas do <em>Eightfold Path</em> de
+            Bardach condensadas e adaptadas à práctica colombiana:
+            (1) definir o problema com precisión, (2) acopiar a evidencia
+            que lo sustenta, (3) construir ao menos três alternativas
+            reales — incluyendo sempre «não fazer nada» como baseline —,
+            (4) fijar criterios explícitos para comparar antes de mirar
+            os resultados, e (5) puntuar cada alternativa em cada
+            criterio para produzir um ranking ponderado.
+          </div>
+        </details>
+        <details class="accordion">
+          <summary><span><span class="acc-num">02</span>O que te entrega</span></summary>
+          <div class="accordion-body">
+            Um <em>memo de política</em> estructurado e descargable em
+            Markdown com o problema, a evidencia, as alternativas com
+            sus supuestos e costos, a lista de criterios com sus pesos,
+            e a matriz de comparación com a alternativa recomendada.
+            Mais uma matriz de comparación em CSV para levar a Excel ou a
+            um comitê técnico.
+          </div>
+        </details>
+        <details class="accordion">
+          <summary><span><span class="acc-num">03</span>Para que te sirve</span></summary>
+          <div class="accordion-body">
+            Para <em>blindar seu propuesta contra o sesgo de
+            confirmación</em>: ao fijar os criterios <b>antes</b> de
+            mirar os resultados, te obligas a defender a melhor opção e
+            não a que já tenías em mente. Também sirve para alinear a um
+            equipe: fazer este exercício juntos obliga a colocar o
+            problema, os supuestos e os criterios sobre a mesa antes
+            de discutir soluciones.
+          </div>
+        </details>
+      </div>
+
+      <div style="display:flex;gap:.7rem;justify-content:center;flex-wrap:wrap">
+        <a class="btn-ghost" href="analisis-estrutural.html">← Voltar ao lab</a>
+        <button class="btn btn-big" onclick="startFlow()">Vamos começar →</button>
+      </div>
+
+      <p style="margin-top:2.5rem;font-family:var(--italic);font-style:italic;color:var(--ink-3);font-size:.92rem;max-width:60ch;margin-left:auto;margin-right:auto;line-height:1.55">
+        Ea vocêenes claras as variáveis e quer entender <em>como se
+        influenciam entre si</em>? Salta a
+        <a href="analisis-estrutural.html" style="color:var(--accent);font-style:normal;font-weight:600">análise estrutural →</a>.
+        Seu pergunta é mais <em>quem apoia e quem bloquea</em>? Salta a
+        <a href="mactor-pt.html" style="color:var(--accent);font-style:normal;font-weight:600">análise de atores →</a>.
+        Vas a <em>medir o efecto</em> da política?
+        <a href="evaluacion-pt.html" style="color:var(--accent);font-style:normal;font-weight:600">avaliação →</a>.
+        Os quatro são módulos complementares do mismo lab.
+      </p>
+    </div>
+  </section>
+
+  <!-- STAGE 0 · WIZARD DE SÍNTOMA (opcional, antes da mecánica 1) -->
+  <section id="stage-sintoma" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 00</span>Do síntoma ao problema</h2>
+      <span class="meta">Passo preliminar · opcional</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        <b>O síntoma não é o problema.</b> "Há muita inseguridad" é um
+        síntoma; "os homicídios juveniles na zona X subieron 30 % em
+        24 meses concentrados em bairros E e Z" é um problema enunciable.
+        <em>Quatro perguntas para fazer esse salto.</em>
+      </p>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="sint-sintoma">O que síntoma está observando?</label>
+      <textarea id="sint-sintoma" placeholder="Ej.: deserción escolar alta nos grados 9 a 11"></textarea>
+      <div class="field-hint">Em uma frase. É o que um ciudadano qualquer notaría.</div>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="sint-quienes">Quiénes lo padecen específicamente?</label>
+      <input type="text" id="sint-quienes" placeholder="Ej.: estudiantes de colegios públicos em Ciudad Bolívar e San Cristóbal"/>
+      <div class="field-hint">Sé concreto: grupo demográfico + lugar. Isto descarta o "todos em general" e obliga a focalizar.</div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label class="field-label" for="sint-quando">Desde quando e como está cambiando?</label>
+        <input type="text" id="sint-quando" placeholder="Ej.: desde 2023, +4 pp em 3 años"/>
+        <div class="field-hint">Trayectoria temporal. Sem isto não sabrás se a política está funcionando.</div>
+      </div>
+      <div class="field">
+        <label class="field-label" for="sint-evidencia">O que fuente ou cifra inicial lo respalda?</label>
+        <input type="text" id="sint-evidencia" placeholder="Ej.: ECV 2024 DANE — 12.3 % deserción"/>
+        <div class="field-hint">Uma sola fuente clave por agora; as demais se acopian no passo 2.</div>
+      </div>
+    </div>
+
+    <div id="sint-draft" class="is-hidden" style="background:var(--accent-soft);border:1px solid var(--accent-tint);border-left:3px solid var(--accent);padding:1.2rem 1.4rem;margin-top:1.4rem">
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:.45rem">Rascunho do enunciado generado</div>
+      <div id="sint-draft-text" style="font-family:var(--sans);font-size:1.02rem;line-height:1.55;color:var(--ink);margin-bottom:.7rem"></div>
+      <div style="font-family:var(--italic);font-style:italic;font-size:.88rem;color:var(--ink-2);line-height:1.5">Lo poderá editar libremente no seguinte passo. Este rascunho apenas te ajuda a arrancar.</div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="backToWelcome()">← Voltar ao inicio</button>
+      <div class="right-group">
+        <button class="btn-ghost" onclick="skipSintoma()">Já tengo o problema claro →</button>
+        <button class="btn" id="sint-next-btn" onclick="acceptSintomaDraft()">Aceitar e continuar →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEPS NAV (shared across all 5 mechanics) -->
+  <div id="steps-nav" class="is-hidden">
+    <div class="steps-row" id="steps-row"></div>
+    <div class="cloud-bar" id="cloud-bar-flow" style="margin-bottom:1.6rem">
+      <span class="cb-icon">●</span>
+      <span id="cb-text-flow">Trabajando local</span>
+      <span class="cb-spacer"></span>
+      <span class="cb-status" id="cb-status-flow"></span>
+      <span class="cb-editor" id="cb-editor-flow"></span>
+      <button class="btn-mini" id="cb-save-flow" onclick="cloudSave()">Salvar na nuvem</button>
+    </div>
+  </div>
+
+  <!-- STAGE 1: DEFINICIÓN -->
+  <section id="stage-definicion" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 01</span>Define o problema</h2>
+    </div>
+    <div class="stage-intro">
+      <p>
+        <b>O error mais común</b> é saltarse este passo. Se não podes
+        escribir o problema numa frase concreta, não poderá defender
+        ninguna alternativa depois. <em>Magnitud, urgencia e afectados
+        não são retórica — são os três ejes que harán que seu propuesta
+        compita por orçamento.</em>
+      </p>
+    </div>
+
+    <div class="def-mode-toggle">
+      <button type="button" id="def-mode-form-btn"  class="active" onclick="setDefinicionMode('form')">Formulario</button>
+      <button type="button" id="def-mode-arbol-btn"            onclick="setDefinicionMode('arbol')">Árbol do problema</button>
+    </div>
+
+    <!-- Árbol do problema (CEPAL · Ortegón) -->
+    <div id="def-arbol" class="is-hidden">
+      <div class="arbol-wrap">
+        <div class="arbol-label">Causas raíz</div>
+        <div class="arbol-row" id="arbol-causas"></div>
+        <div class="arbol-trunk"></div>
+        <div class="arbol-label">Problema central</div>
+        <div class="arbol-central" id="arbol-central"></div>
+        <div class="arbol-trunk"></div>
+        <div class="arbol-label">Efectos</div>
+        <div class="arbol-row" id="arbol-efectos"></div>
+      </div>
+      <p style="margin-top:.9rem;font-family:var(--italic);font-style:italic;font-size:.88rem;color:var(--ink-3);line-height:1.5;text-align:center">
+        Método clásico CEPAL · Ortegón. <em>As causas raíz são candidatas naturales a variáveis em
+        <a href="analisis-estrutural.html" style="color:var(--accent);font-style:normal;font-weight:600">análise estrutural</a> depois.</em>
+      </p>
+    </div>
+
+    <!-- Formulario clásico -->
+    <div id="def-form">
+    <div class="field">
+      <label class="field-label" for="def-enunciado">Enunciado do problema <span class="req">*</span></label>
+      <textarea id="def-enunciado" placeholder="Ej.: A tasa de deserción escolar nos grados 9-11 do Distrito subió 4 pp nos últimos 3 años, concentrada em localidades de maior pobreza, e supera a meta do PDT 2024-2027."></textarea>
+      <div class="field-hint">Uma sola frase. Incluye <em>o que passa</em>, <em>onde</em>, <em>quanto</em> e <em>desde quando</em>. Evita verbos vagos como «mejorar» ou «fortalecer».</div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label class="field-label" for="def-magnitud">Magnitud actual</label>
+        <input type="text" id="def-magnitud" placeholder="Ej.: 12.3 % deserción · 18.000 estudiantes" />
+        <div class="field-hint">Cifra concreta + unidad. Sem isto, não poderá medir se a política funciona.</div>
+      </div>
+      <div class="field">
+        <label class="field-label">Urgencia</label>
+        <div class="pill-group" id="def-urgencia">
+          <button class="pill" type="button" data-val="alta">Alta · explosiva</button>
+          <button class="pill" type="button" data-val="média">Média · sostenida</button>
+          <button class="pill" type="button" data-val="baja">Baja · crónica</button>
+        </div>
+        <div class="field-hint">O problema empeora rápido (alta), se mantiene constante (média), ou lleva años igual (baja)?</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Población afectada</label>
+      <div class="chip-grid" id="def-afectados-grid"></div>
+      <div class="chip-add-row">
+        <input type="text" class="chip-add-input" id="def-afectados-input" placeholder="Ej.: jóvenes 14-17 años de Ciudad Bolívar" onkeydown="if(event.key==='Enter')addAfectado()"/>
+        <button class="btn-ghost" onclick="addAfectado()">+ Adicionar grupo</button>
+      </div>
+      <div class="field-hint">Grupos específicos. Sé concreto: «familias de estrato 1-2 do rural disperso de Cauca» diz muito mais que «población vulnerable».</div>
+    </div>
+    </div><!-- /def-form -->
+
+    <div style="margin-top:1.4rem;padding:1rem 1.2rem;background:var(--paper-2);border:1px dashed var(--rule-strong);font-family:var(--italic);font-style:italic;font-size:.93rem;line-height:1.5;color:var(--ink-2)">
+      Quieres entender quão <em>complexo</em> é este problema e o que
+      marco analítico le convém? Aplica o test de Rittel-Webber antes
+      de seguir.
+      <button class="btn-ghost" onclick="goToDiagnostico()" style="margin-left:.8rem;padding:.45rem .9rem;font-size:.85rem">Profundizar diagnóstico →</button>
+    </div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="backToWelcome()">← Voltar ao inicio</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToStep(2)">Acopiar evidencia →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE EXTRA · TEST RITTEL-WEBBER (opcional) -->
+  <section id="stage-rittel" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 01·b</span>Test Rittel-Webber</h2>
+      <span class="meta">Diagnóstico de complejidad</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        Horst Rittel e Melvin Webber (1973) definieron <b>10 propiedades</b>
+        que distinguen um <em>wicked problem</em> de uno bem estructurado.
+        Isto importa: um problema <b>tame</b> se resuelve com análise
+        racional clásico; uno <b>wicked</b> exige desenho participativo e
+        processo iterativo. <em>Responde sim ou não según seu intuición — não
+        há respostas correctas, há seu leitura do caso.</em>
+      </p>
+    </div>
+
+    <div id="rittel-questions" style="display:flex;flex-direction:column;gap:.7rem"></div>
+
+    <div id="rittel-score" class="is-hidden" style="margin-top:1.6rem;padding:1.3rem 1.5rem;background:var(--paper-2);border:1px solid var(--rule);border-left:3px solid var(--accent)">
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:.55rem">Resultado do diagnóstico</div>
+      <div id="rittel-score-text" style="font-family:var(--sans);font-size:1.05rem;line-height:1.55;color:var(--ink);margin-bottom:.8rem"></div>
+      <div style="height:10px;background:var(--paper-3);position:relative;overflow:hidden;margin-bottom:.5rem">
+        <div id="rittel-score-bar" style="position:absolute;left:0;top:0;bottom:0;width:0;background:var(--accent);transition:width .4s"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--ink-3)">
+        <span>0 · Tame</span><span>3-5 · Complejo</span><span>6-8 · Wicked</span><span>9-10 · Meta-wicked</span>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goToStep(1)">← Voltar a definir</button>
+      <div class="right-group">
+        <button class="btn-ghost" onclick="goToStep(2)">Saltar marco →</button>
+        <button class="btn" id="rittel-next-btn" onclick="goToMarco()" disabled>Ver marco recomendado →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE EXTRA · SELECTOR DE MARCO ANALÍTICO -->
+  <section id="stage-marco" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 01·c</span>Marco analítico</h2>
+      <span class="meta" id="marco-meta">—</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        Segundo a <b>complejidad diagnosticada</b>, há um marco analítico
+        que convém mais ao caso. <em>Puedes mudar a selección; lo
+        importante é que a decisão sea consciente.</em> O marco
+        escolhido se incluye no memo final como anclaje teórico.
+      </p>
+    </div>
+
+    <div id="marco-grid" style="display:grid;grid-template-columns:1fr;gap:.9rem"></div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goToStep(1)">← Voltar a definir</button>
+      <div class="right-group">
+        <button class="btn-ghost" onclick="goToRittel()">← Voltar ao test</button>
+        <button class="btn" onclick="goToStep(2)">Continuar a evidencia →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE 2: EVIDENCIA -->
+  <section id="stage-evidencia" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 02</span>Acopiar evidencia</h2>
+      <span class="meta" id="evid-meta">—</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        <b>Toda afirmación precisa uma fuente.</b> Aquí coleccionas as
+        cifras e referencias que sostienen seu problema e, depois, seus
+        alternativas. <em>Uma evidencia fraca é uma alternativa
+        fraca.</em>
+      </p>
+    </div>
+
+    <div style="overflow-x:auto">
+      <table class="evid-table" id="evid-table">
+        <thead>
+          <tr>
+            <th>Fuente</th>
+            <th class="col-anyo">Año</th>
+            <th class="col-dato">Dato / cifra</th>
+            <th class="col-link">Link / referencia</th>
+            <th>Nota</th>
+            <th class="col-do"></th>
+          </tr>
+        </thead>
+        <tbody id="evid-tbody"></tbody>
+      </table>
+    </div>
+
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.5rem">
+      <button class="btn-ghost" onclick="addEvidencia()">+ Adicionar fila</button>
+      <button class="btn-ghost" onclick="seedEvidencia()">Cargar 3 fuentes típicas de referencia</button>
+    </div>
+
+    <!-- Sprint E.5 · cargar evidencia oficial municipal -->
+    <div style="margin-top:1.4rem;padding:1.1rem 1.2rem;background:var(--paper-2);border:1px solid var(--rule);border-left:3px solid var(--accent)">
+      <div style="font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:.4rem">Sprint E · evidencia oficial municipal</div>
+      <div style="font-family:var(--sans);font-weight:700;font-size:1rem;color:var(--ink);margin-bottom:.3rem">Cargar cifras oficiales para seu territorio</div>
+      <div style="font-family:var(--italic);font-style:italic;font-size:.9rem;line-height:1.5;color:var(--ink-2);margin-bottom:.85rem">Se seu problema é local, podemos precargar 4-5 fuentes oficiales com cifras do último año disponível. Datos: Policía Nacional (segurança) + MEN (educação). Você as editas e completas com o que aplique.</div>
+      <div style="display:flex;gap:.55rem;flex-wrap:wrap;align-items:center">
+        <select id="pp-evid-dep" class="evid-input" style="min-width:180px" onchange="ppEvidPobMuns(this.value)">
+          <option value="">— departamento —</option>
+        </select>
+        <select id="pp-evid-mun" class="evid-input" style="min-width:180px">
+          <option value="">— município —</option>
+        </select>
+        <button class="btn" onclick="ppLoadEvidenciaTerritorial()">↓ Cargar evidencia oficial</button>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goToStep(1)">← Editar problema</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToStep(3)">Construir alternativas →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE 3: ALTERNATIVAS -->
+  <section id="stage-alternativas" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 03</span>Construye ao menos 3 alternativas</h2>
+      <span class="meta" id="alt-meta">—</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        Uma alternativa é uma <b>opção real de política</b> — não um
+        objetivo. Incluye sempre <b>«não fazer nada»</b> como baseline:
+        sem él, não podes argumentar que valga a pena moverse. Entre 3 e
+        5 alternativas é o rango útil; menos não compara, mais se vuelve
+        difícil de defender.
+      </p>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;padding:.95rem 1.2rem;margin-bottom:1.1rem;background:rgba(214,168,58,0.10);border:1px solid var(--rule);border-left:3px solid var(--gold);font-family:var(--mono);font-size:11.5px;color:var(--ink-2)">
+      <span style="font-family:var(--sans);font-size:1.3rem;color:var(--gold);flex-shrink:0">→</span>
+      <div style="flex:1;min-width:240px">
+        <div style="font-family:var(--sans);font-weight:700;font-size:.96rem;color:var(--ink);margin-bottom:.2rem">Necesitas um análise mais profundo de alternativas?</div>
+        <div style="font-family:var(--italic);font-style:italic;font-weight:400;font-size:.88rem;line-height:1.5;color:var(--ink-2)">O módulo de <em style="color:var(--accent)">Alternativas</em> te lleva por análise morfológico (Zwicky), matriz de combinações, robustez frente a 4 cenários e lente económica MVPF/CEA. Quando termines puedes enviar as alternativas de vuelta aqui.</div>
+      </div>
+      <a href="alternativas-pt.html" class="btn-ghost" style="border-color:var(--gold);color:var(--gold);text-decoration:none;flex-shrink:0">Abrir Alternativas →</a>
+    </div>
+
+    <div class="alt-grid" id="alt-grid"></div>
+
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.5rem">
+      <button class="btn-ghost" id="alt-add-btn" onclick="addAlternativa()">+ Adicionar alternativa</button>
+    </div>
+
+    <div class="ia-bar" style="margin-top:1.2rem">
+      <div class="ia-icon">✦</div>
+      <div class="ia-body">
+        <div class="ia-title">Sugerir alternativas com IA</div>
+        <div class="ia-sub">O copiloto IA propone 3-5 intervenções de política concretas a partir de seu enunciado do problema. Plan Pro ou superior.</div>
+      </div>
+      <button class="btn" id="ia-alt-btn" onclick="iaSugerirAlternativas()">Sugerir alternativas</button>
+    </div>
+    <div class="ia-result" id="ia-alt-result" style="display:none"></div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goToStep(2)">← Editar evidencia</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToStep(4)">Establecer criterios →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE 4: CRITERIOS -->
+  <section id="stage-criterios" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 04</span>Establece os criterios</h2>
+      <span class="meta" id="crit-meta">—</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        Os criterios deben ficar <b>explícitos antes de comparar</b> —
+        este é o blindaje contra o sesgo de confirmación. Se os
+        defines depois de ver os resultados, vai inventarlos para
+        favorecer seu intuición. <em>Os pesos relativos os puedes
+        ajustar; os criterios mismos deben ser sólidos.</em>
+      </p>
+    </div>
+
+    <div class="crit-list" id="crit-list"></div>
+
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.5rem">
+      <button class="btn-ghost" onclick="addCriterio()">+ Adicionar criterio</button>
+      <button class="btn-ghost" onclick="resetCriterios()">Restaurar 5 criterios por defecto</button>
+    </div>
+
+    <div class="crit-sum" id="crit-sum">—</div>
+
+    <div class="ia-bar" style="margin-top:1.2rem">
+      <div class="ia-icon">✦</div>
+      <div class="ia-body">
+        <div class="ia-title">Revisar criterios com IA</div>
+        <div class="ia-sub">O copiloto detecta sobreposições entre criterios, ambiguidades, pesos sospechosos e criterios típicos que estén faltando. Plan Premium ou superior.</div>
+      </div>
+      <button class="btn" id="ia-crit-btn" onclick="iaValidarCriterios()">Revisar criterios</button>
+    </div>
+    <div class="ia-result" id="ia-crit-result" style="display:none"></div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goToStep(3)">← Editar alternativas</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToStep(5)">Comparar e decidir →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE 5: COMPARACIÓN -->
+  <section id="stage-comparacion" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 05</span>Compara e decide</h2>
+      <span class="meta" id="cmp-meta">—</span>
+    </div>
+    <div class="stage-intro">
+      <p>
+        Para cada par (alternativa, criterio), classifica de <b>1 a 5</b>
+        como se desempeña a alternativa nesse criterio (1 = muito sob · 5
+        = muito alto). O score final se calcula como
+        <b>Σ (valor × peso normalizado)</b> por alternativa. <em>Cada clic
+        numa célula sube o valor: 1 → 2 → 3 → 4 → 5 → vuelve a 1.</em>
+      </p>
+    </div>
+
+    <div class="cmp-wrap">
+      <table class="cmp-table" id="cmp-table"></table>
+    </div>
+
+    <h3 style="font-family:var(--sans);font-weight:700;font-size:1.1rem;margin:1.6rem 0 .8rem;letter-spacing:-.01em">Ranking de alternativas</h3>
+    <div class="rank-bars" id="rank-bars"></div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="goToStep(4)">← Editar criterios</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToResults()">Ver memo final →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE 6: RESULTS / MEMO -->
+  <section id="stage-results" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 06</span>Memo de política</h2>
+      <span class="meta" id="res-meta">—</span>
+    </div>
+
+    <div id="res-content"></div>
+
+    <div class="ia-bar" style="margin-top:1.5rem">
+      <div class="ia-icon">✦</div>
+      <div class="ia-body">
+        <div class="ia-title">Generar leitura interpretativa com IA</div>
+        <div class="ia-sub">O copiloto toma seu problema, criterios, alternativas e scores e redige uma leitura accionable: lógica do ranking, supuestos a cuestionar, riscos políticos probables e seguinte passo. Plan Premium ou superior.</div>
+      </div>
+      <button class="btn" id="ia-narr-btn" onclick="iaNarrativaMemo()">Generar leitura</button>
+    </div>
+    <div class="ia-result" id="ia-narr-result" style="display:none"></div>
+
+    <div class="cloud-bar" id="cloud-bar-results" style="margin-top:1.5rem">
+      <span class="cb-icon">●</span>
+      <span id="cb-text-results">Trabajando local</span>
+      <span class="cb-spacer"></span>
+      <span class="cb-status" id="cb-status-results"></span>
+      <span class="cb-editor" id="cb-editor-results"></span>
+      <button class="btn-mini" id="cb-save-results" onclick="cloudSave()">Salvar na nuvem</button>
+      <button class="btn-mini is-hidden" id="cb-invite-results" onclick="openInviteModal()">Invitar colaborador</button>
+    </div>
+
+    <div class="export-row">
+      <button class="btn" onclick="downloadMemo()">↓ Baixar memo (.md)</button>
+      <button class="btn-ghost" onclick="downloadIssuePaper()">↓ Issue Paper Bardach (.md)</button>
+      <button class="btn-ghost" onclick="downloadCSV()">↓ Matriz (.csv)</button>
+      <button class="btn-ghost" onclick="goToStep(5)">← Editar comparación</button>
+    </div>
+
+    <div style="margin-top:2rem;display:grid;gap:.8rem">
+      <div style="display:flex;align-items:center;gap:1.1rem;flex-wrap:wrap;padding:1.1rem 1.3rem;background:rgba(214,168,58,0.10);border:1px solid var(--rule);border-left:3px solid var(--gold)">
+        <div style="font-family:var(--sans);font-size:1.4rem;color:var(--gold);flex-shrink:0">→</div>
+        <div style="flex:1;min-width:240px">
+          <div style="font-family:var(--sans);font-weight:700;font-size:1rem;color:var(--ink);margin-bottom:.25rem">As variáveis que muevneste problema</div>
+          <div style="font-family:var(--italic);font-style:italic;font-weight:400;font-size:.9rem;line-height:1.5;color:var(--ink-2)">Se seu alternativa ganadora vocêene supuestos fortes sobre como se influenciam as peças do sistema, vale a pena mapearlos com MicMac · DEMATEL · ISM antes de defender o memo. Te diz <em>quais</em> alavancas tirar primeiro.</div>
+        </div>
+        <a href="analisis-estrutural.html" class="btn" style="background:var(--gold)">Análise estrutural →</a>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:1.1rem;flex-wrap:wrap;padding:1.1rem 1.3rem;background:rgba(214,168,58,0.10);border:1px solid var(--rule);border-left:3px solid var(--gold)">
+        <div style="font-family:var(--sans);font-size:1.4rem;color:var(--gold);flex-shrink:0">→</div>
+        <div style="flex:1;min-width:240px">
+          <div style="font-family:var(--sans);font-weight:700;font-size:1rem;color:var(--ink);margin-bottom:.25rem">Os atores que podem bloquear ou impulsar esta política</div>
+          <div style="font-family:var(--italic);font-style:italic;font-weight:400;font-size:.9rem;line-height:1.5;color:var(--ink-2)">Seu alternativa recomendada precisa passar por uma mesa política. Mactor mapea <em>quem</em> tem poder real sobre ella, sus alianzas posibles e os conflictos a arbitrar antes de que exploten.</div>
+        </div>
+        <a href="mactor-pt.html" class="btn" style="background:var(--gold)">Análise de atores →</a>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:1.1rem;flex-wrap:wrap;padding:1.1rem 1.3rem;background:rgba(214,168,58,0.10);border:1px solid var(--rule);border-left:3px solid var(--gold)">
+        <div style="font-family:var(--sans);font-size:1.4rem;color:var(--gold);flex-shrink:0">→</div>
+        <div style="flex:1;min-width:240px">
+          <div style="font-family:var(--sans);font-weight:700;font-size:1rem;color:var(--ink);margin-bottom:.25rem">Como vai saber se esta alternativa funciona?</div>
+          <div style="font-family:var(--italic);font-style:italic;font-weight:400;font-size:.9rem;line-height:1.5;color:var(--ink-2)">O módulo de avaliação de política desenha a pergunta evaluativa, a teoria de mudança, os indicadores SMART e o método (RCT, DiD, value-for-money…) para seu alternativa ganadora. É o passo seguinte natural antes de implementar.</div>
+        </div>
+        <a href="evaluacion-pt.html" class="btn" style="background:var(--gold)">Avaliação →</a>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:1.1rem;flex-wrap:wrap;padding:1.1rem 1.3rem;background:rgba(214,168,58,0.10);border:1px solid var(--rule);border-left:3px solid var(--gold);margin-top:.6rem">
+        <div style="font-family:var(--sans);font-size:1.4rem;color:var(--gold);flex-shrink:0">→</div>
+        <div style="flex:1;min-width:240px">
+          <div style="font-family:var(--sans);font-weight:700;font-size:1rem;color:var(--ink);margin-bottom:.25rem">E se o contexto muda drásticamente?</div>
+          <div style="font-family:var(--italic);font-style:italic;font-weight:400;font-size:.9rem;line-height:1.5;color:var(--ink-2)">O módulo de <em>cenários prospectivos</em> te ajuda a anticipar 4 futuros plausíveis (Schwartz · Godet · Mojica) e a identificar qual de seus alternativas é robusta (no-regret) em todos. Útil quando a incerteza é estrutural.</div>
+        </div>
+        <a href="prospect-escenarios-pt.html" class="btn" style="background:var(--gold)">Cenários prospectivos →</a>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:1.1rem;flex-wrap:wrap;padding:1.1rem 1.3rem;background:rgba(214,168,58,0.10);border:1px solid var(--rule);border-left:3px solid var(--gold);margin-top:.6rem">
+        <div style="font-family:var(--sans);font-size:1.4rem;color:var(--gold);flex-shrink:0">→</div>
+        <div style="flex:1;min-width:240px">
+          <div style="font-family:var(--sans);font-weight:700;font-size:1rem;color:var(--ink);margin-bottom:.25rem">E como se vai contar esta política ao público?</div>
+          <div style="font-family:var(--italic);font-style:italic;font-weight:400;font-size:.9rem;line-height:1.5;color:var(--ink-2)">O módulo <em>Comunicar a política</em> arma o plano operativo: audiências, mensagem primario, narrativa Ganz, framing Lakoff, matriz de canais BIT EAST, vocería e medición OCDE 9-dim. Importa o enunciado do problema e construye o plano encima.</div>
+        </div>
+        <a href="comunicar-pt.html" class="btn" style="background:var(--gold)">Comunicar →</a>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:1.1rem;flex-wrap:wrap;padding:1.1rem 1.3rem;background:var(--paper-2);border:1px solid var(--rule);border-left:3px solid var(--accent);margin-top:.6rem">
+        <div style="font-family:var(--sans);font-size:1.4rem;color:var(--accent);flex-shrink:0">∑</div>
+        <div style="flex:1;min-width:240px">
+          <div style="font-family:var(--sans);font-weight:700;font-size:1rem;color:var(--ink);margin-bottom:.25rem">Necesitas um memo completo com todo o ciclo?</div>
+          <div style="font-family:var(--italic);font-style:italic;font-weight:400;font-size:.9rem;line-height:1.5;color:var(--ink-2)">O <b>relatório combinado do lab</b> une o que hayas avançado nos 8 módulos (problema · sistema · atores · alternativas · AIN · avaliação · cenários · comunicar) num PDF estilo CONPES. Genera memo .pdf ou .md desde a sección «Meu relatório do lab» do hub.</div>
+        </div>
+        <a href="analisis-estrutural.html#informe" class="btn" style="background:var(--accent);color:var(--paper)">Relatório combinado →</a>
+      </div>
+    </div>
+
+    <p class="methodology-note">
+      Esta ferramenta condensa os oito passos do <b>Eightfold Path</b> de
+      Eugene Bardach (<em>A Practical Guide for Policy Analysis</em>, 4ª
+      edición com Eric M. Patashnik, 2016) em cinco mecánicas operativas.
+      O énfasis em evidencia explícita e criterios anteriores à
+      comparación vem do marco de Edgar Ortegón
+      (<em>Manual de prospectiva e decisão estratégica</em>, ILPES/CEPAL,
+      2007) e da tradición colombiana de Jaime Torres-Melo e Jairo
+      Santander (<em>Introducción às políticas públicas</em>, IEMP, 2013).
+      Próximas versiones incorporarán copiloto IA para sugerir alternativas
+      e validar o conjunto de criterios, modelos seed por sector e
+      respaldo PDF descargable.
+    </p>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>ricardoruiz.co · 2026</span>
+  <span>Composição: Familjen · Petrona · Mono</span>
+</footer>
+
+<!-- Modal metodologia -->
+<div class="modal-back" id="modal-method">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-method')">×</button>
+    <h2>Em que se baseia?</h2>
+    <p>
+      <b>Cinco mecánicas, não oito passos.</b> Eugene Bardach popularizó o
+      <em>Eightfold Path</em> (define o problema · acopia evidencia ·
+      construye alternativas · selecciona criterios · proyecta resultados ·
+      confronta trade-offs · decide · conta seu historia). Este módulo
+      condensa esses oito passos em cinco mecánicas operativas: as três
+      do medio (proyecta · confronta · decide) ficam integradas na
+      matriz de comparación com score ponderado.
+    </p>
+    <p>
+      <b>Criterios antes que resultados.</b> O orden importa: se fijas
+      os criterios <em>depois</em> de ver as alternativas, vai a
+      ajustarlos para favorecer seu intuición. Este sesgo de confirmación
+      é a falla mais común em análise de política e a razón pela
+      que o método separa estrictamente a mecánica 4 (criterios) da
+      5 (comparación).
+    </p>
+    <p>
+      <b>Pesos normalizados.</b> Não exigimos que os pesos sumen
+      exactamente 100. Internamente se normalizan ao calcular o score:
+      <code>score = Σ valor_ij × (peso_j / Σ pesos)</code>. Así puedes
+      ajustar a importancia relativa sem pelearte com a aritmética.
+    </p>
+    <p>
+      <b>Seu privacidad.</b> O cálculo é 100% local em seu navegador. Não
+      enviamos nada a ningún servidor. Se mais adelante quer salvar
+      na nuvem ou convidar a seu equipe, será opt-in com conta.
+    </p>
+    <p style="border-top:1px solid var(--rule);padding-top:1rem;margin-top:1.4rem">
+      <b>Origen do método.</b><br/>
+      Eugene Bardach &amp; Eric M. Patashnik, <em>A Practical Guide for
+      Policy Analysis</em> (CQ Press, 4ª ed. 2016).<br/>
+      Edgar Ortegón, <em>Manual de prospectiva e decisão estratégica</em>
+      (ILPES/CEPAL, 2007).<br/>
+      Jaime Torres-Melo &amp; Jairo Santander, <em>Introducción às
+      políticas públicas</em> (IEMP, 2013).
+    </p>
+    <p style="border-top:1px solid var(--rule);padding-top:1rem;margin-top:1.4rem">
+      <b>Quieres profundizar?</b><br/>
+      <a href="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/pp/metodologia-paso-a-paso.pdf" target="_blank" rel="noopener" style="color:var(--accent)">↓ Guía passo a passo (PDF, ~16 KB)</a> ·
+      manual operativo para usar o módulo em equipe.<br/>
+      <a href="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/pp/respaldo-academico.pdf" target="_blank" rel="noopener" style="color:var(--accent)">↓ Respaldo académico (PDF, ~15 KB)</a> ·
+      fórmulas, autores e bibliografía.
+    </p>
+  </div>
+</div>
+
+<!-- Modal login -->
+<div class="modal-back" id="modal-login">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-login')">×</button>
+    <h2>Para salvar e compartilhar precisa uma conta</h2>
+    <p>Seu trabalho se salva localmente neste navegador. Para salvá-lo na nuvem, compartilhá-lo com seu equipe ou acessar de outro dispositivo, inicia sessão ou cria uma conta gratuita.</p>
+    <div style="display:flex;gap:.55rem;margin-top:1.4rem;flex-wrap:wrap">
+      <a href="login.html" class="btn">Entrar</a>
+      <a href="register.html" class="btn-ghost">Crear conta gratis</a>
+    </div>
+  </div>
+</div>
+
+<!-- Modal invitación -->
+<div class="modal-back" id="modal-invite">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-invite')">×</button>
+    <h2>Invitar a um colaborador</h2>
+    <p>Apenas os colaboradores convidados podem ver e editar este análise. Les llegará um e-mail com um link para aceptar.</p>
+    <label style="display:block;font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:1rem 0 .4rem">E-mail do colaborador</label>
+    <input type="email" id="invite-email" placeholder="colega@entidad.gov.co" style="width:100%;padding:.7rem .85rem;font-family:var(--sans);font-size:.95rem;background:var(--paper-3);color:var(--ink);border:1px solid var(--rule-strong);outline:none"/>
+    <div style="display:flex;gap:.55rem;margin-top:1.4rem;flex-wrap:wrap">
+      <button class="btn" onclick="submitInvite()">Enviar invitación</button>
+      <button class="btn-ghost" onclick="closeModal('modal-invite')">Cancelar</button>
+    </div>
+    <label style="display:block;font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:1.5rem 0 .4rem">Personas com acesso</label>
+    <ul id="collab-list" style="list-style:none"></ul>
+  </div>
+</div>
+
+<!-- FAB Recursos · botón flotante do lab -->
+<button class="lab-fab" id="lab-fab" onclick="openRecursosModal()">
+  <span class="lab-fab-icon">↗</span>
+  <span>Recursos</span>
+</button>
+
+<!-- Modal compartido do catálogo de Recursos do lab -->
+<div class="modal-back lab-recursos-modal" id="modal-recursos">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-recursos')">×</button>
+    <h2>Recursos &amp; Dados do lab</h2>
+    <p class="lr-intro">
+      Fuentes oficiales e guías metodológicas mais relevantes para
+      <b id="lr-modulo-name">este módulo</b>. O catálogo completo (com
+      todas as categorías) está ao pie do
+      <a href="analisis-estrutural.html" style="font-weight:600">hub do lab →</a>
+    </p>
+    <div id="modal-recursos-grid"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="lab-recursos.js"></script>
+<script src="lab-indicadores.js"></script>
+
+<script>
+'use strict';
+
+// ═════════════════════════════════════════════════════════════════════════
+// STATE
+// ═════════════════════════════════════════════════════════════════════════
+const LS_KEY = 'pp-current-v1';
+
+const DEFAULT_CRITERIOS = [
+  { nombre: 'Eficiencia',           peso: 20 },
+  { nombre: 'Equidad',              peso: 20 },
+  { nombre: 'Factibilidad política',peso: 20 },
+  { nombre: 'Costo',                peso: 20 },
+  { nombre: 'Sostenibilidad',       peso: 20 }
+];
+
+const STATE = {
+  step: 1,
+  sintoma: { sintoma:'', quienes:'', cuando:'', evidencia:'' },
+  diagnostico: { rittel: new Array(10).fill(null), marco: null },
+  definicion: {
+    enunciado:'', magnitud:'', urgencia:'media',
+    afectados: [],
+    evidenciaInicial: '',
+    causas: [], efectos: []  // árbol del problema (CEPAL/Ortegón)
+  },
+  evidencia: [],  // [{ fuente, anyo, dato, link, nota }]
+  alternativas: [], // [{ nombre, desc, supuestos, costo, plazo, baseline }]
+  criterios: DEFAULT_CRITERIOS.map(c => ({ ...c })),
+  scores: {}  // { 'altIdx-critIdx': 1..5 }
+};
+
+function saveState() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); } catch {}
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return false;
+    const p = JSON.parse(raw);
+    if (!p || typeof p !== 'object') return false;
+    if (p.sintoma && typeof p.sintoma === 'object') Object.assign(STATE.sintoma, p.sintoma);
+    if (p.diagnostico && typeof p.diagnostico === 'object') {
+      if (Array.isArray(p.diagnostico.rittel) && p.diagnostico.rittel.length === 10) STATE.diagnostico.rittel = p.diagnostico.rittel;
+      if (typeof p.diagnostico.marco === 'string') STATE.diagnostico.marco = p.diagnostico.marco;
+    }
+    Object.assign(STATE.definicion, p.definicion || {});
+    if (Array.isArray(p.evidencia)) STATE.evidencia = p.evidencia;
+    if (Array.isArray(p.alternativas)) STATE.alternativas = p.alternativas;
+    if (Array.isArray(p.criterios) && p.criterios.length) STATE.criterios = p.criterios;
+    if (p.scores && typeof p.scores === 'object') STATE.scores = p.scores;
+    if (typeof p.step === 'number') STATE.step = p.step;
+    return true;
+  } catch { return false; }
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ═════════════════════════════════════════════════════════════════════════
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function pad2(n) { return String(n).padStart(2,'0'); }
+
+let _toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ═════════════════════════════════════════════════════════════════════════
+// NAVEGACIÓN ENTRE STAGES
+// ═════════════════════════════════════════════════════════════════════════
+const STAGES = ['stage-welcome','stage-sintoma','stage-definicion','stage-rittel','stage-marco','stage-evidencia','stage-alternativas','stage-criterios','stage-comparacion','stage-results'];
+const STEP_LABELS = [
+  { n:1, key:'definicion',  label:'Definir' },
+  { n:2, key:'evidencia',   label:'Evidencia' },
+  { n:3, key:'alternativas',label:'Alternativas' },
+  { n:4, key:'criterios',   label:'Criterios' },
+  { n:5, key:'comparacion', label:'Comparar' }
+];
+
+function showStage(id) {
+  STAGES.forEach(s => {
+    const el = document.getElementById(s);
+    if (el) el.classList.toggle('is-hidden', s !== id);
+  });
+  // Mostrar steps-nav solo en las 5 mecánicas (no en welcome, síntoma,
+  // los sub-stages de diagnóstico ni results).
+  const noSteps = new Set(['stage-welcome','stage-sintoma','stage-rittel','stage-marco','stage-results']);
+  document.getElementById('steps-nav').classList.toggle('is-hidden', noSteps.has(id));
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function renderStepsNav() {
+  const row = document.getElementById('steps-row');
+  if (!row) return;
+  row.innerHTML = STEP_LABELS.map(s => {
+    const cls = s.n === STATE.step ? 'active' : (s.n < STATE.step ? 'done' : '');
+    return `<button class="step-pill ${cls}" type="button" onclick="goToStep(${s.n})">
+      <span class="step-n">${pad2(s.n)}</span>${s.label}
+    </button>`;
+  }).join('');
+}
+
+function startFlow() {
+  STATE.step = 1;
+  saveState();
+  renderAll();
+  renderSintoma();
+  showStage('stage-sintoma');
+}
+function backToWelcome() { showStage('stage-welcome'); }
+
+// ── A.7.1 · Wizard de síntoma ────────────────────────────────────────────
+function renderSintoma() {
+  const ids = ['sint-sintoma','sint-quienes','sint-cuando','sint-evidencia'];
+  const keys = ['sintoma','quienes','cuando','evidencia'];
+  ids.forEach((id, i) => {
+    const el = document.getElementById(id);
+    if (el && el.value !== STATE.sintoma[keys[i]]) el.value = STATE.sintoma[keys[i]] || '';
+  });
+  // Bindings live (idempotentes)
+  if (!renderSintoma._bound) {
+    renderSintoma._bound = true;
+    ids.forEach((id, i) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('input', () => {
+        STATE.sintoma[keys[i]] = el.value;
+        saveState();
+        renderSintomaDraft();
+      });
+    });
+  }
+  renderSintomaDraft();
+}
+function _buildSintomaDraft() {
+  const s = STATE.sintoma;
+  const partes = [];
+  if (s.sintoma)   partes.push(s.sintoma.trim().replace(/\.$/, ''));
+  if (s.quienes)   partes.push('afecta a ' + s.quienes.trim().replace(/\.$/, ''));
+  if (s.cuando)    partes.push(s.cuando.trim().replace(/\.$/, ''));
+  if (s.evidencia) partes.push('segundo ' + s.evidencia.trim().replace(/\.$/, ''));
+  if (!partes.length) return '';
+  return partes.join(', ') + '.';
+}
+function renderSintomaDraft() {
+  const draft = _buildSintomaDraft();
+  const box = document.getElementById('sint-draft');
+  const txt = document.getElementById('sint-draft-text');
+  if (!box || !txt) return;
+  if (draft) {
+    txt.textContent = draft;
+    box.classList.remove('is-hidden');
+  } else {
+    box.classList.add('is-hidden');
+  }
+}
+function acceptSintomaDraft() {
+  const draft = _buildSintomaDraft();
+  if (draft && !STATE.definicion.enunciado.trim()) {
+    STATE.definicion.enunciado = draft;
+  }
+  // Si el usuario llenó "quienes" en el síntoma y aún no agregó afectados, lo pre-popula.
+  if (STATE.sintoma.quienes && STATE.definicion.afectados.length === 0) {
+    STATE.definicion.afectados = [STATE.sintoma.quienes.trim()];
+  }
+  saveState();
+  goToStep(1);
+}
+function skipSintoma() {
+  goToStep(1);
+}
+
+// ── A.7.4 · Árbol del problema (CEPAL · Ortegón) ─────────────────────────
+let _defMode = 'form';  // 'form' | 'arbol'
+function setDefinicionMode(mode) {
+  _defMode = mode;
+  document.getElementById('def-mode-form-btn').classList.toggle('active', mode === 'form');
+  document.getElementById('def-mode-arbol-btn').classList.toggle('active', mode === 'arbol');
+  document.getElementById('def-form').classList.toggle('is-hidden', mode !== 'form');
+  document.getElementById('def-arbol').classList.toggle('is-hidden', mode !== 'arbol');
+  if (mode === 'arbol') renderArbol();
+}
+
+function renderArbol() {
+  // Causas
+  const cont1 = document.getElementById('arbol-causas');
+  const causas = STATE.definicion.causas || [];
+  let html1 = causas.map((v, i) =>
+    `<div class="arbol-node" contenteditable="true" spellcheck="false"
+          onblur="renameCausa(${i}, this.innerText)"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${escapeHtml(v)}<button class="arbol-node-del" onclick="event.stopPropagation();delCausa(${i})" contenteditable="false">×</button></div>`
+  ).join('');
+  if (causas.length < 5) html1 += `<button class="arbol-node-add" onclick="addCausa()">+ Adicionar causa</button>`;
+  cont1.innerHTML = html1;
+
+  // Problema central
+  const central = document.getElementById('arbol-central');
+  central.innerHTML = STATE.definicion.enunciado
+    ? escapeHtml(STATE.definicion.enunciado)
+    : '<em>Sem enunciado · escríbelo no formulario</em>';
+
+  // Efectos
+  const cont2 = document.getElementById('arbol-efectos');
+  const efectos = STATE.definicion.efectos || [];
+  let html2 = efectos.map((v, i) =>
+    `<div class="arbol-node" contenteditable="true" spellcheck="false"
+          onblur="renameEfecto(${i}, this.innerText)"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${escapeHtml(v)}<button class="arbol-node-del" onclick="event.stopPropagation();delEfecto(${i})" contenteditable="false">×</button></div>`
+  ).join('');
+  if (efectos.length < 5) html2 += `<button class="arbol-node-add" onclick="addEfecto()">+ Adicionar efecto</button>`;
+  cont2.innerHTML = html2;
+}
+
+function addCausa() {
+  if ((STATE.definicion.causas || []).length >= 5) return;
+  STATE.definicion.causas.push('Causa raíz');
+  saveState(); renderArbol();
+}
+function delCausa(i) { STATE.definicion.causas.splice(i,1); saveState(); renderArbol(); }
+function renameCausa(i, txt) {
+  const v = (txt || '').trim();
+  if (!v) { delCausa(i); return; }
+  STATE.definicion.causas[i] = v;
+  saveState();
+}
+function addEfecto() {
+  if ((STATE.definicion.efectos || []).length >= 5) return;
+  STATE.definicion.efectos.push('Efecto');
+  saveState(); renderArbol();
+}
+function delEfecto(i) { STATE.definicion.efectos.splice(i,1); saveState(); renderArbol(); }
+function renameEfecto(i, txt) {
+  const v = (txt || '').trim();
+  if (!v) { delEfecto(i); return; }
+  STATE.definicion.efectos[i] = v;
+  saveState();
+}
+
+// ── A.7.2 · Test Rittel-Webber (10 propiedades, 1973) ────────────────────
+const RITTEL_QS = [
+  'Não existe uma formulación definitiva do problema (cada leitura abre outra dimensión).',
+  'Não há um criterio claro para saber quando o análise terminó (uno sempre poderia seguir).',
+  'As soluciones não são verdaderas ou falsas, são mejores ou peores segundo quien as juzgue.',
+  'Não há forma de testar a solución de uma sola vez (os efectos toman años em mostrarse).',
+  'Cada intervenção muda o sistema (não podes ensayar e volver atrás como se nada hubiera pasado).',
+  'Não há uma lista finita de alternativas; o menú depende da creatividad do equipe.',
+  'Este problema é esencialmente único (não há um caso idéntico do cual copiar a receta).',
+  'Este problema é síntoma ou consecuencia de outro problema mais profundo.',
+  'Como expliques as causas determina que soluciones consideres válidas (a explicación não é neutral).',
+  'Quien desenha a política carga responsabilidad moral pelos efectos — não pode "ensayar e aprender".'
+];
+
+function goToDiagnostico() { goToRittel(); }
+function goToRittel() {
+  renderRittel();
+  showStage('stage-rittel');
+}
+
+function renderRittel() {
+  const cont = document.getElementById('rittel-questions');
+  if (!cont) return;
+  cont.innerHTML = RITTEL_QS.map((q, i) => {
+    const r = STATE.diagnostico.rittel[i];
+    const selSi = r === 'si' ? 'sel-si' : '';
+    const selNo = r === 'no' ? 'sel-no' : '';
+    return `<div class="rittel-q">
+      <div class="rq-n">${pad2(i+1)}</div>
+      <div class="rq-text">${escapeHtml(q)}</div>
+      <div class="rq-answers">
+        <button class="rq-btn ${selSi}" onclick="setRittel(${i}, 'se')">SÍ</button>
+        <button class="rq-btn ${selNo}" onclick="setRittel(${i}, 'não')">NO</button>
+      </div>
+    </div>`;
+  }).join('');
+  renderRittelScore();
+}
+
+function setRittel(i, val) {
+  STATE.diagnostico.rittel[i] = val;
+  saveState();
+  renderRittel();
+}
+
+function rittelScore() {
+  return STATE.diagnostico.rittel.filter(r => r === 'si').length;
+}
+function rittelCompleto() {
+  return STATE.diagnostico.rittel.every(r => r === 'si' || r === 'no');
+}
+function rittelTipo(score) {
+  if (score <= 2) return { id:'tame',          label:'Tame · bem estructurado', marco:'racional-simple' };
+  if (score <= 5) return { id:'complejo',      label:'Complejo · varias capas',   marco:'multicriterio-adaptativo' };
+  if (score <= 8) return { id:'wicked',        label:'Wicked · mal estructurado', marco:'participativo' };
+  return { id:'meta-wicked', label:'Meta-wicked · sistémico', marco:'gobernanza-colaborativa' };
+}
+
+function renderRittelScore() {
+  const box  = document.getElementById('rittel-score');
+  const text = document.getElementById('rittel-score-text');
+  const bar  = document.getElementById('rittel-score-bar');
+  const btn  = document.getElementById('rittel-next-btn');
+  if (!box) return;
+  if (!rittelCompleto()) {
+    box.classList.add('is-hidden');
+    if (btn) btn.disabled = true;
+    return;
+  }
+  const score = rittelScore();
+  const tipo = rittelTipo(score);
+  box.classList.remove('is-hidden');
+  text.innerHTML = `Seu problema clasifica como <b style="color:var(--accent)">${escapeHtml(tipo.label)}</b> · respondiste <b style="color:var(--accent)">${score}/10</b> propiedades como propias de um wicked problem.`;
+  bar.style.width = (score * 10) + '%';
+  if (btn) btn.disabled = false;
+}
+
+// ── A.7.3 · Selector de marco analítico ──────────────────────────────────
+const MARCOS = [
+  { id:'racional-simple',           tipoSugeridoPara:'tame',          nombre:'Análise racional · multi-criterio simples',
+    autores:'Bardach (8-fold path) · CEPAL', desc:'A matriz alternativas × criterios que ea vocêene este módulo basta. Define os criterios, classifica, compara e elige. Funciona porque o problema está bem estructurado, as alternativas são finitas e os criterios consensuables.' },
+  { id:'multicriterio-adaptativo',  tipoSugeridoPara:'complejo',      nombre:'Multi-criterio + cenários adaptativos',
+    autores:'Walker & Marchau · Lempert',     desc:'À matriz se le adiciona exploración de cenários (o que passa se X cae 30 %?, se o contexto muda?) e revisión periódica da decisão. A política se desenha para ser robusta ante varios futuros, não óptima para uno apenas.' },
+  { id:'participativo',             tipoSugeridoPara:'wicked',         nombre:'Diseño participativo + co-creación',
+    autores:'Roberts · Head & Alford',        desc:'O método se vuelve tão importante como o conteúdo. Talleres iterativos com afectados, especialistas e opositores. A qualidade se mide pela legitimidad do processo, não apenas pelo score ponderado. Documenta os desacuerdos.' },
+  { id:'gobernanza-colaborativa',   tipoSugeridoPara:'meta-wicked',    nombre:'Governança colaborativa de red',
+    autores:'Ansell & Gash · Provan',          desc:'Ningún ator apenas pode resolverlo. Se desenha a red de organizações que vai tomar decisões distribuidas, sus reglas de juego, sus mecanismos de coordinación e sus indicadores compartidos. O producto NO é uma política, é uma arquitectura de gobernanza.' }
+];
+
+function goToMarco() {
+  renderMarcos();
+  showStage('stage-marco');
+}
+
+function renderMarcos() {
+  const grid = document.getElementById('marco-grid');
+  const meta = document.getElementById('marco-meta');
+  if (!grid) return;
+  const score = rittelScore();
+  const tipo = rittelCompleto() ? rittelTipo(score) : null;
+  const sugerido = tipo ? tipo.marco : null;
+  const seleccionado = STATE.diagnostico.marco || sugerido;
+  if (meta) meta.textContent = tipo
+    ? `Diagnóstico: ${tipo.label} · ${score}/10`
+    : 'Sem diagnóstico previo · escolhe segundo seu criterio';
+  grid.innerHTML = MARCOS.map(m => {
+    const isReco = sugerido === m.id;
+    const isSel  = seleccionado === m.id;
+    return `<button class="marco-card ${isSel ? 'sel' : ''}" type="button" onclick="setMarco('${m.id}')">
+      <div class="mc-radio"></div>
+      <div class="mc-body">
+        <div class="mc-name">${escapeHtml(m.nombre)}</div>
+        <div class="mc-meta">${escapeHtml(m.autores)}</div>
+        <div class="mc-desc">${escapeHtml(m.desc)}</div>
+      </div>
+      ${isReco ? '<span class="mc-badge-reco">Sugerido</span>' : '<span></span>'}
+    </button>`;
+  }).join('');
+  // Persiste el sugerido como default si nada está elegido aún
+  if (!STATE.diagnostico.marco && sugerido) {
+    STATE.diagnostico.marco = sugerido;
+    saveState();
+  }
+}
+
+function setMarco(id) {
+  STATE.diagnostico.marco = id;
+  saveState();
+  renderMarcos();
+}
+function marcoNombre() {
+  const m = MARCOS.find(m => m.id === STATE.diagnostico.marco);
+  return m ? m.nombre : null;
+}
+
+function goToStep(n) {
+  // Asegura tener mínimos antes de saltar adelante: 3 alternativas + criterios cargados.
+  if (n >= 3 && STATE.alternativas.length === 0) ensureBaseAlternativas();
+  if (n >= 4 && STATE.criterios.length === 0) STATE.criterios = DEFAULT_CRITERIOS.map(c => ({ ...c }));
+  STATE.step = n;
+  saveState();
+  renderStepsNav();
+  if      (n === 1) { renderDefinicion();  showStage('stage-definicion'); }
+  else if (n === 2) { renderEvidencia();   showStage('stage-evidencia'); }
+  else if (n === 3) { renderAlternativas();showStage('stage-alternativas'); }
+  else if (n === 4) { renderCriterios();   showStage('stage-criterios'); }
+  else if (n === 5) { renderComparacion(); showStage('stage-comparacion'); }
+}
+function goToResults() {
+  renderResults();
+  showStage('stage-results');
+}
+
+function renderAll() {
+  renderStepsNav();
+  renderDefinicion();
+  renderEvidencia();
+  renderAlternativas();
+  renderCriterios();
+  renderComparacion();
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 1 · DEFINICIÓN
+// ═════════════════════════════════════════════════════════════════════════
+function renderDefinicion() {
+  const en = document.getElementById('def-enunciado');
+  const ma = document.getElementById('def-magnitud');
+  if (en) en.value = STATE.definicion.enunciado || '';
+  if (ma) ma.value = STATE.definicion.magnitud || '';
+  // Urgencia pills
+  document.querySelectorAll('#def-urgencia .pill').forEach(p => {
+    p.classList.toggle('sel', p.dataset.val === (STATE.definicion.urgencia || 'media'));
+  });
+  renderAfectados();
+}
+function renderAfectados() {
+  const grid = document.getElementById('def-afectados-grid');
+  if (!grid) return;
+  const items = STATE.definicion.afectados || [];
+  if (items.length === 0) {
+    grid.innerHTML = '<div style="grid-column:1/-1;font-family:var(--italic);font-style:italic;color:var(--ink-3);font-size:.92rem">Ainda não agregaste grupos afectados.</div>';
+    return;
+  }
+  grid.innerHTML = items.map((v, i) => `
+    <div class="chip">
+      <span class="chip-name" contenteditable="true" spellcheck="false"
+            onblur="renameAfectado(${i}, this.innerText)"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${escapeHtml(v)}</span>
+      <button class="chip-del" onclick="delAfectado(${i})" title="Eliminar">×</button>
+    </div>`).join('');
+}
+function addAfectado() {
+  const inp = document.getElementById('def-afectados-input');
+  const v = (inp.value || '').trim();
+  if (!v) return;
+  STATE.definicion.afectados.push(v);
+  inp.value = '';
+  saveState(); renderAfectados();
+}
+function delAfectado(i) { STATE.definicion.afectados.splice(i,1); saveState(); renderAfectados(); }
+function renameAfectado(i, name) {
+  const v = (name || '').trim();
+  if (!v) { delAfectado(i); return; }
+  STATE.definicion.afectados[i] = v;
+  saveState();
+}
+
+// Bindings live para inputs de definición
+function bindDefinicionInputs() {
+  const en = document.getElementById('def-enunciado');
+  const ma = document.getElementById('def-magnitud');
+  if (en) en.addEventListener('input', () => { STATE.definicion.enunciado = en.value; saveState(); });
+  if (ma) ma.addEventListener('input', () => { STATE.definicion.magnitud  = ma.value; saveState(); });
+  document.querySelectorAll('#def-urgencia .pill').forEach(p => {
+    p.addEventListener('click', () => {
+      STATE.definicion.urgencia = p.dataset.val;
+      document.querySelectorAll('#def-urgencia .pill').forEach(x => x.classList.toggle('sel', x === p));
+      saveState();
+    });
+  });
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 2 · EVIDENCIA
+// ═════════════════════════════════════════════════════════════════════════
+function renderEvidencia() {
+  const tb = document.getElementById('evid-tbody');
+  if (!tb) return;
+  const meta = document.getElementById('evid-meta');
+  if (meta) meta.textContent = (STATE.evidencia.length || 0) + ' fuentes';
+  if (STATE.evidencia.length === 0) {
+    tb.innerHTML = '<tr><td colspan="6" style="text-align:center;font-family:var(--italic);font-style:italic;color:var(--ink-3);padding:1.2rem">Ainda não agregaste fuentes. Usa «+ Adicionar fila» ou «Cargar 3 fuentes típicas».</td></tr>';
+    return;
+  }
+  tb.innerHTML = STATE.evidencia.map((e, i) => `
+    <tr>
+      <td><input type="text" value="${escapeHtml(e.fuente)}" placeholder="DANE · MEN · DNP…" oninput="updateEvid(${i},'fuente',this.value)"/></td>
+      <td class="col-anyo"><input type="text" value="${escapeHtml(e.anyo)}" placeholder="2024" oninput="updateEvid(${i},'anyo',this.value)"/></td>
+      <td class="col-dato"><input type="text" value="${escapeHtml(e.dato)}" placeholder="12.3 %" oninput="updateEvid(${i},'dato',this.value)"/></td>
+      <td class="col-link"><input type="url" value="${escapeHtml(e.link)}" placeholder="https://…" oninput="updateEvid(${i},'link',this.value)"/></td>
+      <td><textarea oninput="updateEvid(${i},'nota',this.value)" placeholder="Contexto u observación">${escapeHtml(e.nota)}</textarea></td>
+      <td class="col-do"><button class="evid-do-btn" onclick="delEvidencia(${i})" title="Excluir">×</button></td>
+    </tr>`).join('');
+}
+function addEvidencia() {
+  STATE.evidencia.push({ fuente:'', anyo:'', dato:'', link:'', nota:'' });
+  saveState(); renderEvidencia();
+}
+function delEvidencia(i) { STATE.evidencia.splice(i,1); saveState(); renderEvidencia(); }
+function updateEvid(i, key, val) {
+  if (!STATE.evidencia[i]) return;
+  STATE.evidencia[i][key] = val;
+  saveState();
+  const meta = document.getElementById('evid-meta');
+  if (meta) meta.textContent = (STATE.evidencia.length || 0) + ' fuentes';
+}
+function seedEvidencia() {
+  // 3 fuentes típicas de referencia genéricas. El usuario las edita.
+  const seed = [
+    { fuente:'DANE — Encuesta de qualidade de vida',  anyo:'2024', dato:'', link:'https://www.dane.gov.co/', nota:'Fuente nacional oficial.' },
+    { fuente:'DNP — TerriData',                     anyo:'2024', dato:'', link:'https://terridata.dnp.gov.co/', nota:'Indicadores territoriales.' },
+    { fuente:'Datos Abiertos — datos.gov.co',       anyo:'2024', dato:'', link:'https://www.datos.gov.co/', nota:'Datasets sectoriales abiertos.' }
+  ];
+  seed.forEach(s => STATE.evidencia.push(s));
+  saveState(); renderEvidencia();
+  showToast('3 fuentes típicas cargadas. Edita os datos segundo seu caso.');
+}
+
+// Sprint E.5 · evidencia oficial territorial (lab-indicadores.js)
+function ppEvidPobDeptos() {
+  const sel = document.getElementById('pp-evid-dep');
+  if (!sel || sel.options.length > 1) return;  // ya poblado
+  if (!window.LabIndicadores) return;
+  window.LabIndicadores.load().then(() => {
+    const deptos = window.LabIndicadores.getDeptosCatalog();
+    sel.insertAdjacentHTML('beforeend',
+      deptos.map(d => `<option value="${d.cod}">${escapeHtml(d.nombre)}</option>`).join(''));
+  }).catch(() => {});
+}
+function ppEvidPobMuns(depCod) {
+  const sel = document.getElementById('pp-evid-mun');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— município —</option>';
+  if (!depCod || !window.LabIndicadores || !window.LabIndicadores.isLoaded()) return;
+  const muns = window.LabIndicadores.getMunsByDepto(depCod);
+  sel.insertAdjacentHTML('beforeend',
+    muns.map(m => `<option value="${m.divipola}">${escapeHtml(m.nombre)}</option>`).join(''));
+}
+function ppLoadEvidenciaTerritorial() {
+  const munSel = document.getElementById('pp-evid-mun');
+  const divipola = munSel ? munSel.value : '';
+  if (!divipola) { showToast('Selecciona município primeiro.'); return; }
+  if (!window.LabIndicadores) { showToast('Datos não disponíveis.'); return; }
+  window.LabIndicadores.load().then(() => {
+    const mun = window.LabIndicadores.getMun(divipola);
+    if (!mun) { showToast('Município não encontrado.'); return; }
+    // Catálogo de indicadores prioritarios + sus datos del último año
+    const PRIORIDAD = ['homicidios','violencia_intrafamiliar','hurto_personas','cobertura_neta','desercion'];
+    let added = 0;
+    PRIORIDAD.forEach(indId => {
+      const latest = window.LabIndicadores.getLatestValue(divipola, indId);
+      if (!latest || latest.value == null) return;
+      const indMeta = window.LabIndicadores.getCatalog().find(i => i.id === indId);
+      if (!indMeta) return;
+      const valStr = window.LabIndicadores.formatValue(latest.value, indId);
+      STATE.evidencia.push({
+        fuente: indMeta.fuente,
+        anyo: String(latest.year),
+        dato: `${indMeta.nombre} · ${mun.nombre}: ${valStr}${indMeta.unidad === '%' ? '' : ' ' + indMeta.unidad}` + (latest.isProxy ? ' (aprox)' : ''),
+        link: indMeta.fuente_url,
+        nota: indMeta.nota + (latest.isProxy ? ' Nota: ' + latest.proxyNote : '')
+      });
+      added++;
+    });
+    if (added === 0) { showToast('Não se encontraron datos para este município.'); return; }
+    saveState(); renderEvidencia();
+    showToast(`✓ ${added} fuentes oficiales cargadas para ${mun.nombre}.`);
+  }).catch(e => {
+    showToast('Error cargando indicadores.');
+    console.error(e);
+  });
+}
+// Auto-poblar el dep-select cuando entra a stage-evidencia
+const _origGoToStep = window.goToStep;
+if (typeof goToStep === 'function') {
+  // Wrap goToStep: cuando el step sea 2 (evidencia), poblar deptos
+  const _orig = goToStep;
+  window.goToStep = function(n) {
+    _orig(n);
+    if (n === 2) setTimeout(ppEvidPobDeptos, 50);
+  };
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 3 · ALTERNATIVAS
+// ═════════════════════════════════════════════════════════════════════════
+function ensureBaseAlternativas() {
+  if (STATE.alternativas.length > 0) return;
+  STATE.alternativas = [
+    { nombre:'Não fazer nada (baseline)', desc:'Mantener a situación actual sem nova intervenção.', supuestos:'O problema sigue su trayectoria sem mudanças estruturais.', costo:'$0', plazo:'—', baseline:true },
+    { nombre:'Alternativa A',  desc:'',  supuestos:'',  costo:'',  plazo:'', baseline:false },
+    { nombre:'Alternativa B',  desc:'',  supuestos:'',  costo:'',  plazo:'', baseline:false }
+  ];
+  saveState();
+}
+function renderAlternativas() {
+  const grid = document.getElementById('alt-grid');
+  if (!grid) return;
+  if (STATE.alternativas.length === 0) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;font-family:var(--italic);font-style:italic;color:var(--ink-3);padding:1.2rem">Ainda não há alternativas. Apenas avances ao passo 3 cargaremos 3 vacías + o baseline.</div>';
+    return;
+  }
+  grid.innerHTML = STATE.alternativas.map((a, i) => `
+    <div class="alt-card ${a.baseline ? 'is-baseline' : ''}">
+      ${i > 0 ? `<button class="alt-del-btn" onclick="delAlternativa(${i})" title="Eliminar">×</button>` : ''}
+      <div class="alt-code">
+        ${pad2(i + 1)} · Alternativa
+        ${a.baseline ? '<span class="baseline-tag">baseline</span>' : ''}
+      </div>
+      <input type="text" class="alt-name-input" value="${escapeHtml(a.nombre)}" placeholder="Nome corto" oninput="updateAlt(${i},'nombre',this.value)"/>
+      <div class="alt-field">
+        <label class="alt-field-label">Descripción</label>
+        <textarea oninput="updateAlt(${i},'desc',this.value)" placeholder="Em que consiste a intervenção?">${escapeHtml(a.desc)}</textarea>
+      </div>
+      <div class="alt-field">
+        <label class="alt-field-label">Supuestos clave</label>
+        <textarea oninput="updateAlt(${i},'supuestos',this.value)" placeholder="De que depende que funcione?">${escapeHtml(a.supuestos)}</textarea>
+      </div>
+      <div class="alt-field" style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem">
+        <div>
+          <label class="alt-field-label">Costo estimado</label>
+          <input type="text" value="${escapeHtml(a.costo)}" placeholder="Ej.: $1.500 mill / año" oninput="updateAlt(${i},'costo',this.value)"/>
+        </div>
+        <div>
+          <label class="alt-field-label">Plazo</label>
+          <input type="text" value="${escapeHtml(a.plazo)}" placeholder="Ej.: 18 meses" oninput="updateAlt(${i},'plazo',this.value)"/>
+        </div>
+      </div>
+    </div>`).join('');
+  const meta = document.getElementById('alt-meta');
+  if (meta) meta.textContent = STATE.alternativas.length + ' alternativas';
+  const addBtn = document.getElementById('alt-add-btn');
+  if (addBtn) addBtn.classList.toggle('disabled', STATE.alternativas.length >= 5);
+}
+function addAlternativa() {
+  if (STATE.alternativas.length >= 5) { showToast('Máximo 5 alternativas. Se precisa mais, agrupa similares.'); return; }
+  STATE.alternativas.push({ nombre:'Nova alternativa', desc:'', supuestos:'', costo:'', plazo:'', baseline:false });
+  saveState(); renderAlternativas();
+}
+function delAlternativa(i) {
+  if (i === 0 && STATE.alternativas[i].baseline) {
+    showToast('Não puedes eliminar o baseline. Renómbralo se quer redefinirlo.');
+    return;
+  }
+  STATE.alternativas.splice(i, 1);
+  // Reindexa scores: borrar los del idx y desplazar los siguientes.
+  const newScores = {};
+  for (const k of Object.keys(STATE.scores)) {
+    const [ai, ci] = k.split('-').map(Number);
+    if (ai === i) continue;
+    const newAi = ai > i ? ai - 1 : ai;
+    newScores[`${newAi}-${ci}`] = STATE.scores[k];
+  }
+  STATE.scores = newScores;
+  saveState(); renderAlternativas();
+}
+function updateAlt(i, key, val) {
+  if (!STATE.alternativas[i]) return;
+  STATE.alternativas[i][key] = val;
+  saveState();
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 4 · CRITERIOS
+// ═════════════════════════════════════════════════════════════════════════
+function renderCriterios() {
+  const list = document.getElementById('crit-list');
+  if (!list) return;
+  if (STATE.criterios.length === 0) {
+    STATE.criterios = DEFAULT_CRITERIOS.map(c => ({ ...c }));
+    saveState();
+  }
+  const sumPesos = STATE.criterios.reduce((s, c) => s + (Number(c.peso) || 0), 0) || 1;
+  list.innerHTML = STATE.criterios.map((c, i) => {
+    const pct = ((c.peso / sumPesos) * 100).toFixed(0);
+    return `<div class="crit-row">
+      <input type="text" class="crit-name-input" value="${escapeHtml(c.nombre)}" oninput="updateCrit(${i},'nome',this.value)"/>
+      <input type="number" class="crit-peso-input" min="0" max="100" step="1" value="${c.peso}" oninput="updateCritPeso(${i}, this.value)"/>
+      <div class="crit-bar"><div class="crit-bar-fill" style="width:${pct}%"></div></div>
+      <button class="crit-do-btn" onclick="delCriterio(${i})" title="Excluir">×</button>
+    </div>`;
+  }).join('');
+  const meta = document.getElementById('crit-meta');
+  if (meta) meta.textContent = STATE.criterios.length + ' criterios';
+  const sumEl = document.getElementById('crit-sum');
+  if (sumEl) {
+    const raw = STATE.criterios.reduce((s, c) => s + (Number(c.peso) || 0), 0);
+    if (Math.round(raw) === 100) {
+      sumEl.innerHTML = `Suma de pesos: <b>${raw}</b> · ✓ suman 100`;
+      sumEl.classList.remove('warn');
+    } else {
+      sumEl.innerHTML = `Suma de pesos: <b>${raw}</b> · se normalizará ao calcular (não é obligatorio que sume 100).`;
+      sumEl.classList.add('warn');
+    }
+  }
+}
+function updateCrit(i, key, val) {
+  if (!STATE.criterios[i]) return;
+  STATE.criterios[i][key] = val;
+  saveState();
+}
+function updateCritPeso(i, val) {
+  if (!STATE.criterios[i]) return;
+  const n = Math.max(0, Math.min(100, Number(val) || 0));
+  STATE.criterios[i].peso = n;
+  saveState(); renderCriterios();
+}
+function addCriterio() {
+  if (STATE.criterios.length >= 8) { showToast('Máximo 8 criterios. Mais se vuelve difícil de defender.'); return; }
+  STATE.criterios.push({ nombre:'Novo criterio', peso: 10 });
+  saveState(); renderCriterios();
+}
+function delCriterio(i) {
+  if (STATE.criterios.length <= 2) { showToast('Mínimo 2 criterios.'); return; }
+  STATE.criterios.splice(i, 1);
+  // Reindexar scores en su segunda coordenada (criterio)
+  const newScores = {};
+  for (const k of Object.keys(STATE.scores)) {
+    const [ai, ci] = k.split('-').map(Number);
+    if (ci === i) continue;
+    const newCi = ci > i ? ci - 1 : ci;
+    newScores[`${ai}-${newCi}`] = STATE.scores[k];
+  }
+  STATE.scores = newScores;
+  saveState(); renderCriterios();
+}
+function resetCriterios() {
+  if (!confirm('Restaurar os 5 criterios por defecto? Seus pesos personalizados se perdem.')) return;
+  STATE.criterios = DEFAULT_CRITERIOS.map(c => ({ ...c }));
+  STATE.scores = {};
+  saveState(); renderCriterios();
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MECÁNICA 5 · COMPARACIÓN
+// ═════════════════════════════════════════════════════════════════════════
+function getScore(ai, ci) { return STATE.scores[`${ai}-${ci}`] || 0; }
+function setScore(ai, ci, v) {
+  if (v === 0 || v == null) delete STATE.scores[`${ai}-${ci}`];
+  else STATE.scores[`${ai}-${ci}`] = v;
+  saveState();
+}
+function cycleScore(ai, ci) {
+  const cur = getScore(ai, ci);
+  const next = cur >= 5 ? 1 : (cur + 1);
+  setScore(ai, ci, next);
+  renderComparacion();
+}
+
+// Calcula el score ponderado de una alternativa (suma normalizada).
+// Si una celda no tiene valor, cuenta como 0 — no se rellena
+// implícitamente para no inflar artificialmente.
+function computeAltScore(ai) {
+  const sumPesos = STATE.criterios.reduce((s, c) => s + (Number(c.peso) || 0), 0) || 1;
+  let total = 0;
+  STATE.criterios.forEach((c, ci) => {
+    const v = getScore(ai, ci);
+    const wn = (Number(c.peso) || 0) / sumPesos;
+    total += v * wn;
+  });
+  return total;  // rango aprox 0..5
+}
+
+function renderComparacion() {
+  // Asegura tener al menos 3 alternativas y criterios.
+  if (STATE.alternativas.length === 0) ensureBaseAlternativas();
+  if (STATE.criterios.length === 0) STATE.criterios = DEFAULT_CRITERIOS.map(c => ({ ...c }));
+
+  const tbl = document.getElementById('cmp-table');
+  if (!tbl) return;
+  const sumPesos = STATE.criterios.reduce((s, c) => s + (Number(c.peso) || 0), 0) || 1;
+  let html = '<thead><tr><th class="row-h">Alternativa \\ Criterio</th>';
+  STATE.criterios.forEach(c => {
+    const pct = ((c.peso / sumPesos) * 100).toFixed(0);
+    html += `<th class="col-h"><div class="col-h-inner">${escapeHtml(c.nombre)}<span class="col-h-peso">${pct}%</span></div></th>`;
+  });
+  html += '<th>Score</th></tr></thead><tbody>';
+  STATE.alternativas.forEach((a, ai) => {
+    html += `<tr><th class="row-h">${escapeHtml(a.nombre)}${a.baseline ? ' <span style="font-size:9.5px;color:var(--gold);letter-spacing:.1em">★</span>' : ''}</th>`;
+    STATE.criterios.forEach((c, ci) => {
+      const v = getScore(ai, ci);
+      const cls = v ? `cmp-cell v-${v}` : 'cmp-cell v-0';
+      html += `<td class="${cls}" onclick="cycleScore(${ai},${ci})">${v || '—'}</td>`;
+    });
+    const sc = computeAltScore(ai);
+    html += `<td class="cmp-score">${sc.toFixed(2)}</td></tr>`;
+  });
+  html += '</tbody>';
+  tbl.innerHTML = html;
+
+  const meta = document.getElementById('cmp-meta');
+  if (meta) {
+    const filled = Object.keys(STATE.scores).length;
+    const total = STATE.alternativas.length * STATE.criterios.length;
+    meta.textContent = `${filled} / ${total} células`;
+  }
+  renderRankBars();
+}
+
+function renderRankBars() {
+  const container = document.getElementById('rank-bars');
+  if (!container) return;
+  const items = STATE.alternativas.map((a, i) => ({ name: a.nombre || `Alternativa ${i+1}`, score: computeAltScore(i), baseline: a.baseline }))
+                                   .sort((a, b) => b.score - a.score);
+  const maxSc = Math.max(...items.map(it => it.score), 0.001);
+  container.innerHTML = items.map((it, pos) => {
+    const pct = (it.score / maxSc * 100).toFixed(0);
+    const cls = pos === 0 && it.score > 0 ? 'rank-bar-row winner' : 'rank-bar-row';
+    return `<div class="${cls}">
+      <div class="rk-pos">${pad2(pos + 1)}</div>
+      <div class="rk-info">
+        <div class="rk-name">${escapeHtml(it.name)}${it.baseline ? ' <span style="color:var(--gold);font-size:.85em">★ baseline</span>' : ''}</div>
+        <div class="rk-bar"><div class="rk-bar-fill" style="width:${pct}%"></div></div>
+      </div>
+      <div class="rk-score">${it.score.toFixed(2)}</div>
+    </div>`;
+  }).join('');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// RESULTS · MEMO
+// ═════════════════════════════════════════════════════════════════════════
+function renderResults() {
+  const cont = document.getElementById('res-content');
+  if (!cont) return;
+  const meta = document.getElementById('res-meta');
+  if (meta) meta.textContent = (new Date()).toLocaleDateString('es-CO', { year:'numeric', month:'short', day:'numeric' });
+
+  const items = STATE.alternativas.map((a, i) => ({
+    idx: i, name: a.nombre || `Alternativa ${i+1}`, score: computeAltScore(i), baseline: a.baseline
+  })).sort((x, y) => y.score - x.score);
+  const winner = items[0];
+
+  const sumPesos = STATE.criterios.reduce((s, c) => s + (Number(c.peso) || 0), 0) || 1;
+  const critHeader = STATE.criterios.map(c => {
+    const pct = ((c.peso / sumPesos) * 100).toFixed(0);
+    return `<th>${escapeHtml(c.nombre)} <span style="color:var(--accent);font-family:var(--mono);font-size:10px">${pct}%</span></th>`;
+  }).join('');
+
+  const tableRows = STATE.alternativas.map((a, ai) => {
+    const cells = STATE.criterios.map((c, ci) => {
+      const v = getScore(ai, ci);
+      return `<td class="num">${v || '—'}</td>`;
+    }).join('');
+    const sc = computeAltScore(ai);
+    const winnerCls = (winner && winner.idx === ai) ? 'winner' : '';
+    return `<tr class="${winnerCls}"><td>${escapeHtml(a.nombre)}${a.baseline ? ' <span style="color:var(--gold)">★</span>' : ''}</td>${cells}<td class="num">${sc.toFixed(2)}</td></tr>`;
+  }).join('');
+
+  cont.innerHTML = `
+    <div style="background:var(--paper-2);padding:1.6rem 1.8rem;border:1px solid var(--rule);margin-bottom:1.2rem">
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3);margin-bottom:.5rem">Enunciado do problema</div>
+      <div style="font-family:var(--sans);font-size:1.05rem;line-height:1.55;color:var(--ink)">${escapeHtml(STATE.definicion.enunciado) || '<em style="font-family:var(--italic);color:var(--ink-3)">(sem definir)</em>'}</div>
+      <div style="display:flex;gap:1.8rem;margin-top:.8rem;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;color:var(--ink-3)">
+        <span>Magnitud: <b style="color:var(--accent)">${escapeHtml(STATE.definicion.magnitud) || '—'}</b></span>
+        <span>Urgencia: <b style="color:var(--accent)">${escapeHtml(STATE.definicion.urgencia || '—')}</b></span>
+        <span>Afectados: <b style="color:var(--accent)">${STATE.definicion.afectados.length}</b> grupos</span>
+        <span>Evidencia: <b style="color:var(--accent)">${STATE.evidencia.length}</b> fuentes</span>
+      </div>
+    </div>
+
+    <h3 style="font-family:var(--sans);font-weight:700;font-size:1.1rem;margin:.4rem 0 .6rem">Recomendación</h3>
+    <div style="background:var(--accent-soft);border:1px solid var(--accent-tint);border-left:3px solid var(--accent);padding:1.2rem 1.4rem">
+      <div style="font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:.4rem">Alternativa com maior score ponderado</div>
+      <div style="font-family:var(--sans);font-weight:700;font-size:1.25rem;color:var(--ink);margin-bottom:.3rem">${winner ? escapeHtml(winner.name) : '—'}</div>
+      <div style="font-family:var(--mono);font-size:13px;color:var(--ink-2)">Score: <b style="color:var(--accent)">${winner ? winner.score.toFixed(2) : '0'}</b> / 5.00</div>
+    </div>
+
+    <h3 style="font-family:var(--sans);font-weight:700;font-size:1.1rem;margin:1.4rem 0 .6rem">Matriz de comparación</h3>
+    <div style="overflow-x:auto">
+      <table class="res-table">
+        <thead><tr><th>Alternativa</th>${critHeader}<th>Score</th></tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// DESCARGAS
+// ═════════════════════════════════════════════════════════════════════════
+function _download(filename, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
+}
+
+function downloadMemo() {
+  const date = new Date().toISOString().slice(0, 10);
+  const sumPesos = STATE.criterios.reduce((s, c) => s + (Number(c.peso) || 0), 0) || 1;
+  const items = STATE.alternativas.map((a, i) => ({
+    idx: i, name: a.nombre || `Alternativa ${i+1}`, score: computeAltScore(i)
+  })).sort((x, y) => y.score - x.score);
+
+  let md = `# Memo de política pública\n\n`;
+  md += `**Fecha:** ${date}\n\n`;
+  md += `## 1. Problema\n\n${STATE.definicion.enunciado || '_(sem definir)_'}\n\n`;
+  md += `- **Magnitud:** ${STATE.definicion.magnitud || '—'}\n`;
+  md += `- **Urgencia:** ${STATE.definicion.urgencia || '—'}\n`;
+  md += `- **Afectados:**\n`;
+  if (STATE.definicion.afectados.length === 0) md += `  - _(sem definir)_\n`;
+  else STATE.definicion.afectados.forEach(a => md += `  - ${a}\n`);
+
+  md += `\n## 2. Evidencia\n\n`;
+  if (STATE.evidencia.length === 0) md += `_(sem fuentes registradas)_\n\n`;
+  else {
+    md += `| Fuente | Año | Dato | Link | Nota |\n|---|---|---|---|---|\n`;
+    STATE.evidencia.forEach(e => {
+      const link = e.link ? `[link](${e.link})` : '—';
+      md += `| ${(e.fuente||'—').replace(/\|/g,'\\|')} | ${e.anyo||'—'} | ${(e.dato||'—').replace(/\|/g,'\\|')} | ${link} | ${(e.nota||'').replace(/\|/g,'\\|')} |\n`;
+    });
+    md += '\n';
+  }
+
+  md += `## 3. Alternativas\n\n`;
+  STATE.alternativas.forEach((a, i) => {
+    md += `### ${i+1}. ${a.nombre}${a.baseline ? ' _(baseline)_' : ''}\n\n`;
+    if (a.desc)      md += `**Descripción:** ${a.desc}\n\n`;
+    if (a.supuestos) md += `**Supuestos:** ${a.supuestos}\n\n`;
+    if (a.costo || a.plazo) md += `**Costo:** ${a.costo || '—'} · **Plazo:** ${a.plazo || '—'}\n\n`;
+  });
+
+  md += `## 4. Criterios de comparación\n\n`;
+  md += `| Criterio | Peso (raw) | Peso normalizado |\n|---|---|---|\n`;
+  STATE.criterios.forEach(c => {
+    const pct = ((c.peso / sumPesos) * 100).toFixed(1);
+    md += `| ${c.nombre} | ${c.peso} | ${pct}% |\n`;
+  });
+
+  md += `\n## 5. Matriz de comparación\n\n`;
+  md += `| Alternativa | ${STATE.criterios.map(c => c.nombre).join(' | ')} | **Score** |\n`;
+  md += `|---|${STATE.criterios.map(() => '---').join('|')}|---|\n`;
+  STATE.alternativas.forEach((a, ai) => {
+    const cells = STATE.criterios.map((_, ci) => getScore(ai, ci) || '—').join(' | ');
+    md += `| ${a.nombre} | ${cells} | **${computeAltScore(ai).toFixed(2)}** |\n`;
+  });
+
+  md += `\n## 6. Recomendación\n\n`;
+  if (items.length && items[0].score > 0) {
+    md += `A alternativa com maior score ponderado é **${items[0].name}** (${items[0].score.toFixed(2)} / 5.00).\n\n`;
+    if (items.length > 1) md += `Como referencia, le sigue **${items[1].name}** com ${items[1].score.toFixed(2)}.\n\n`;
+  } else {
+    md += `_(sem scores asignados — completa a matriz de comparación antes de leer a recomendação)_\n\n`;
+  }
+
+  md += `---\n\n_Generado com o módulo de problema público do Lab de Políticas Públicas e Prospectiva de ricardoruiz.co. Método basado no Eightfold Path de Eugene Bardach, com referentes de Ortegón (ILPES/CEPAL) e Torres-Melo & Santander (IEMP)._\n`;
+
+  _download(`memo-politica-${date}.md`, md, 'text/markdown;charset=utf-8');
+  showToast('Memo descargado.');
+}
+
+// ── A.7.5 · Issue Paper formato Bardach/Dunn ─────────────────────────────
+function downloadIssuePaper() {
+  const date = new Date().toISOString().slice(0, 10);
+  const sumPesos = STATE.criterios.reduce((s, c) => s + (Number(c.peso) || 0), 0) || 1;
+  const items = STATE.alternativas.map((a, i) => ({
+    idx: i, name: a.nombre || `Alternativa ${i+1}`, score: computeAltScore(i), baseline: a.baseline,
+    desc: a.desc || '', supuestos: a.supuestos || '', costo: a.costo || '', plazo: a.plazo || ''
+  })).sort((x, y) => y.score - x.score);
+
+  const score = rittelCompleto() ? rittelScore() : null;
+  const tipo = score != null ? rittelTipo(score) : null;
+  const marcoSel = MARCOS.find(m => m.id === STATE.diagnostico.marco);
+
+  let md = `# Issue Paper · Análise de política pública\n\n`;
+  md += `*Formato basado em Bardach (Eightfold Path) e Dunn (Public Policy Analysis).*\n\n`;
+  md += `**Fecha:** ${date}\n\n`;
+  md += `---\n\n`;
+
+  md += `## 1. Contexto histórico e síntoma observado\n\n`;
+  if (STATE.sintoma.sintoma || STATE.sintoma.quienes || STATE.sintoma.cuando || STATE.sintoma.evidencia) {
+    if (STATE.sintoma.sintoma)   md += `- **Síntoma:** ${STATE.sintoma.sintoma}\n`;
+    if (STATE.sintoma.quienes)   md += `- **Quiénes lo padecen:** ${STATE.sintoma.quienes}\n`;
+    if (STATE.sintoma.cuando)    md += `- **Trayectoria:** ${STATE.sintoma.cuando}\n`;
+    if (STATE.sintoma.evidencia) md += `- **Fuente inicial:** ${STATE.sintoma.evidencia}\n`;
+    md += '\n';
+  } else {
+    md += `_(O analista não documentó o síntoma observado por separado do problema enunciado.)_\n\n`;
+  }
+
+  md += `## 2. Afirmación do problema\n\n`;
+  md += `${STATE.definicion.enunciado || '_(sem definir)_'}\n\n`;
+  md += `- **Magnitud:** ${STATE.definicion.magnitud || '—'}\n`;
+  md += `- **Urgencia:** ${STATE.definicion.urgencia || '—'}\n\n`;
+
+  // Árbol del problema (si lo armó)
+  const causas = (STATE.definicion.causas || []).filter(Boolean);
+  const efectos = (STATE.definicion.efectos || []).filter(Boolean);
+  if (causas.length || efectos.length) {
+    md += `### Árbol do problema (CEPAL · Ortegón)\n\n`;
+    if (causas.length) {
+      md += `**Causas raíz:**\n`;
+      causas.forEach(c => md += `- ${c}\n`);
+      md += '\n';
+    }
+    if (efectos.length) {
+      md += `**Efectos observados:**\n`;
+      efectos.forEach(e => md += `- ${e}\n`);
+      md += '\n';
+    }
+  }
+
+  // Diagnóstico de complejidad
+  if (tipo) {
+    md += `### Diagnóstico de complejidad (Rittel-Webber 1973)\n\n`;
+    md += `- Clasificación: **${tipo.label}** (${score}/10 propiedades de wicked problem).\n`;
+    if (marcoSel) {
+      md += `- Marco analítico aplicado: **${marcoSel.nombre}** _(${marcoSel.autores})_.\n`;
+      md += `  ${marcoSel.desc}\n`;
+    }
+    md += '\n';
+  }
+
+  md += `## 3. Partes interesadas\n\n`;
+  if (STATE.definicion.afectados.length) {
+    md += `**Afectados directos:**\n`;
+    STATE.definicion.afectados.forEach(a => md += `- ${a}\n`);
+    md += '\n';
+  } else {
+    md += `_(sem afectados detallados — recomendable mapear atores no módulo Mactor)_\n\n`;
+  }
+
+  md += `## 4. Alternativas evaluadas\n\n`;
+  if (items.length === 0) {
+    md += `_(sem alternativas registradas)_\n\n`;
+  } else {
+    items.forEach((a, pos) => {
+      md += `### ${pos+1}. ${a.name}${a.baseline ? ' _(baseline · não fazer nada)_' : ''}\n\n`;
+      if (a.desc)      md += `**Descripción:** ${a.desc}\n\n`;
+      if (a.supuestos) md += `**Supuestos clave:** ${a.supuestos}\n\n`;
+      if (a.costo || a.plazo) md += `**Costo:** ${a.costo || '—'} · **Plazo:** ${a.plazo || '—'}\n\n`;
+      md += `**Score ponderado:** ${a.score.toFixed(2)} / 5.00\n\n`;
+    });
+  }
+
+  md += `## 5. Criterios de avaliação\n\n`;
+  md += `| Criterio | Peso (raw) | Peso normalizado |\n|---|---|---|\n`;
+  STATE.criterios.forEach(c => {
+    const pct = ((c.peso / sumPesos) * 100).toFixed(1);
+    md += `| ${c.nombre} | ${c.peso} | ${pct}% |\n`;
+  });
+  md += '\n';
+
+  md += `## 6. Recomendación\n\n`;
+  if (items.length && items[0].score > 0) {
+    md += `Sobre a base do análise multi-criterio, se recomenda **${items[0].name}** ` +
+          `(score ${items[0].score.toFixed(2)} / 5.00). ` +
+          `Se o comitê prefiere uma alternativa de respaldo, a seguinte no ranking é ` +
+          `**${items[1] ? items[1].name : '—'}**` +
+          `${items[1] ? ` con score ${items[1].score.toFixed(2)}` : ''}.\n\n`;
+    if (items[0].baseline) {
+      md += `> ⚠️ O **baseline (não fazer nada) salió primeiro**. Isto significa que ninguna ` +
+            `alternativa supera, no modelo actual, o costo-beneficio da inacción. ` +
+            `Revisa supuestos, criterios ou adiciona alternativas antes de cerrar o análise.\n\n`;
+    }
+  } else {
+    md += `_(sem scores suficientes na matriz para emitir uma recomendação)_\n\n`;
+  }
+
+  md += `## 7. Plan de implementación (alternativa recomendada)\n\n`;
+  if (items.length && !items[0].baseline) {
+    md += `- **Próximos 30 días:** sustentar técnicamente a alternativa ante o equipe e ` +
+          `validar supuestos clave com a evidencia recogida.\n`;
+    md += `- **Próximos 90 días:** identificar atores com poder de bloqueo ou impulso ` +
+          `(complementar com o módulo Mactor do lab) e construir coalición de apoio.\n`;
+    md += `- **Próximos 6 meses:** desenhar mecanismo de avaliação intermédia com indicadores ` +
+          `de processo, resultado e impacto (próximo módulo do lab).\n\n`;
+  } else {
+    md += `_(plano condicionado a redefinir o análise ou aceptar o baseline)_\n\n`;
+  }
+
+  md += `## 8. Referencias e evidencia\n\n`;
+  if (STATE.evidencia.length === 0) {
+    md += `_(sem fuentes registradas)_\n\n`;
+  } else {
+    STATE.evidencia.forEach((e, i) => {
+      const cite = [e.fuente, e.anyo].filter(Boolean).join(', ');
+      const link = e.link ? ` — [link](${e.link})` : '';
+      const dato = e.dato ? ` · ${e.dato}` : '';
+      const nota = e.nota ? ` *(${e.nota})*` : '';
+      md += `${i+1}. ${cite || '—'}${dato}${link}${nota}\n`;
+    });
+    md += '\n';
+  }
+
+  md += `---\n\n`;
+  md += `*Generado com o módulo de Problema Público do Lab de Políticas Públicas e ` +
+        `Prospectiva (ricardoruiz.co). Método basado em Eugene Bardach & Eric M. Patashnik, ` +
+        `"A Practical Guide for Policy Analysis" (CQ Press, 4ª ed. 2016) e William N. Dunn, ` +
+        `"Public Policy Analysis" (Routledge, 6ª ed. 2017), com referente colombiano de ` +
+        `Edgar Ortegón (ILPES/CEPAL, 2007) e Jaime Torres-Melo & Jairo Santander (IEMP, 2013).*\n`;
+
+  _download(`issue-paper-${date}.md`, md, 'text/markdown;charset=utf-8');
+  showToast('Issue Paper descargado.');
+}
+
+function downloadCSV() {
+  const headers = ['Alternativa', ...STATE.criterios.map(c => `${c.nombre} (peso ${c.peso})`), 'Score'];
+  const rows = STATE.alternativas.map((a, ai) => {
+    const cells = STATE.criterios.map((_, ci) => getScore(ai, ci) || '');
+    return [a.nombre, ...cells, computeAltScore(ai).toFixed(2)];
+  });
+  const esc = v => {
+    const s = String(v == null ? '' : v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const csv = [headers, ...rows].map(r => r.map(esc).join(',')).join('\n');
+  const date = new Date().toISOString().slice(0, 10);
+  _download(`matriz-comparacion-${date}.csv`, csv, 'text/csv;charset=utf-8');
+  showToast('Matriz CSV descargada.');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// THEME + CURSOR + INIT
+// ═════════════════════════════════════════════════════════════════════════
+function toggleTheme() {
+  const isDay = document.body.classList.toggle('day-mode');
+  localStorage.setItem('rr-theme', isDay ? 'day' : 'night');
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = isDay ? '☾ Modo noite' : '☀ Modo dia';
+}
+// Auto día/noche (norma del sitio).
+(function applyInitialTheme() {
+  const pref = localStorage.getItem('rr-theme');
+  let isDay;
+  if (pref === 'day') isDay = true;
+  else if (pref === 'night') isDay = false;
+  else {
+    const h = new Date().getHours();
+    isDay = h >= 6 && h < 19;
+  }
+  if (isDay) document.body.classList.add('day-mode');
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = isDay ? '☾ Modo noite' : '☀ Modo dia';
+})();
+
+(function initCursor() {
+  const c = document.getElementById('cursor');
+  const r = document.getElementById('cursorRing');
+  document.addEventListener('mousemove', e => {
+    c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px';
+    r.style.left = e.clientX + 'px'; r.style.top = e.clientY + 'px';
+  });
+  document.addEventListener('mouseover', e => {
+    if (e.target.closest && e.target.closest('a,button,td.cmp-cell,.chip,input,textarea,summary,.accordion,.pill,.step-pill')) {
+      c.style.transform = 'translate(-50%,-50%) scale(0.5)'; c.style.background = 'transparent'; c.style.border = '2px solid var(--accent)';
+      r.style.transform = 'translate(-50%,-50%) scale(1.5)'; r.style.opacity = '0.7';
+    } else {
+      c.style.transform = 'translate(-50%,-50%) scale(1)'; c.style.background = 'var(--accent)'; c.style.border = 'none';
+      r.style.transform = 'translate(-50%,-50%) scale(1)'; r.style.opacity = '0.4';
+    }
+  });
+})();
+
+// ═════════════════════════════════════════════════════════════════════════
+// AUTH + CLOUD (espejo del patrón de mactor-pt.html con endpoints /pp/*)
+// ═════════════════════════════════════════════════════════════════════════
+const AUTH_URL = 'https://rr-auth.reruizc.workers.dev';
+const POLL_INTERVAL_MS = 10000;
+const AUTH = { token:null, user:null, isLogged:false };
+const CLOUD = { projId:null, lastSavedAt:null, lastEditor:null, collaborators:[], owner:null, _pollTimer:null, _saving:false };
+
+function _authToken() { return localStorage.getItem('rr-token'); }
+function _authStoreUser(u) { if (u) localStorage.setItem('rr-user', JSON.stringify(u)); }
+function _authReadStored() { try { return JSON.parse(localStorage.getItem('rr-user') || 'null'); } catch { return null; } }
+
+async function loadUserFromAPI() {
+  const token = _authToken();
+  if (!token) { AUTH.isLogged=false; AUTH.user=null; AUTH.token=null; return null; }
+  AUTH.token = token;
+  try {
+    const r = await fetch(AUTH_URL + '/auth/me', { headers:{ 'Authorization':'Bearer ' + token } });
+    const data = await r.json();
+    if (!r.ok || !data.ok) {
+      localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user');
+      AUTH.isLogged=false; AUTH.user=null; AUTH.token=null; return null;
+    }
+    AUTH.user = data.user; AUTH.isLogged = true;
+    _authStoreUser(data.user);
+    return data.user;
+  } catch {
+    const cached = _authReadStored();
+    if (cached && token) { AUTH.user=cached; AUTH.isLogged=true; return cached; }
+    return null;
+  }
+}
+
+function renderAuthChip() {
+  const anon = document.getElementById('nav-auth-anon');
+  const userBlock = document.getElementById('nav-user-block');
+  if (AUTH.isLogged && AUTH.user) {
+    anon.classList.add('is-hidden');
+    userBlock.classList.remove('is-hidden');
+    const _u = AUTH.user;
+    const _first = ((_u.name || '').trim().split(/\s+/)[0]) || ((_u.email || '').split('@')[0]) || 'mi conta';
+    document.getElementById('nav-user-name').textContent = _first;
+    document.getElementById('nav-user-name').title = 'Ir ao dashboard · ' + (_u.email || '');
+    document.getElementById('nav-user-plan').textContent = (AUTH.user.plan || 'free').toUpperCase();
+  } else {
+    anon.classList.remove('is-hidden');
+    userBlock.classList.add('is-hidden');
+  }
+}
+
+function logoutUser() {
+  if (!confirm('Fechar sessão? Seu análise local se conserva.')) return;
+  localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user');
+  AUTH.token=null; AUTH.user=null; AUTH.isLogged=false;
+  CLOUD.projId=null; CLOUD.lastSavedAt=null; CLOUD.lastEditor=null; CLOUD.collaborators=[]; CLOUD.owner=null;
+  stopPolling();
+  renderAuthChip(); renderCloudBars();
+  document.getElementById('my-projects').classList.add('is-hidden');
+  showToast('Sessão cerrada.');
+}
+
+async function apiCall(path, opts={}) {
+  const token = _authToken();
+  const headers = Object.assign({}, opts.headers || {});
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  if (opts.body && typeof opts.body !== 'string') {
+    headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(opts.body);
+  }
+  const r = await fetch(AUTH_URL + path, Object.assign({}, opts, { headers }));
+  const data = await r.json().catch(() => ({ ok:false, error:'Resposta não JSON' }));
+  return { status:r.status, ok:r.ok && data.ok !== false, data };
+}
+
+function setCbStatus(kind, msg) {
+  ['flow','results'].forEach(s => {
+    const el = document.getElementById('cb-status-' + s);
+    if (!el) return;
+    el.className = 'cb-status ' + (kind || '');
+    el.textContent = msg || '';
+  });
+}
+function renderCloudBars() {
+  const inCloud = !!CLOUD.projId;
+  ['flow','results'].forEach(s => {
+    const bar = document.getElementById('cloud-bar-' + s);
+    const txt = document.getElementById('cb-text-' + s);
+    const editorEl = document.getElementById('cb-editor-' + s);
+    const saveBtn = document.getElementById('cb-save-' + s);
+    if (!bar) return;
+    if (inCloud) {
+      bar.classList.remove('anon');
+      txt.textContent = 'Sincronizado · análise ' + CLOUD.projId.slice(0,6);
+      saveBtn.textContent = 'Salvar mudanças';
+      if (CLOUD.lastEditor && CLOUD.lastEditor !== (AUTH.user?.email)) editorEl.textContent = 'última edición: ' + CLOUD.lastEditor;
+      else editorEl.textContent = '';
+    } else if (AUTH.isLogged) {
+      bar.classList.remove('anon');
+      txt.textContent = 'Trabajando local — ainda não salvo na nuvem';
+      saveBtn.textContent = 'Salvar na nuvem';
+      editorEl.textContent = '';
+    } else {
+      bar.classList.add('anon');
+      txt.textContent = 'Trabajando local · inicia sessão para salvar e compartilhar';
+      saveBtn.textContent = 'Entrar';
+      editorEl.textContent = '';
+    }
+  });
+  const inviteBtn = document.getElementById('cb-invite-results');
+  if (inviteBtn) {
+    const canInvite = !!CLOUD.projId && AUTH.isLogged && CLOUD.owner === AUTH.user?.email;
+    inviteBtn.classList.toggle('is-hidden', !canInvite);
+  }
+}
+
+async function cloudSave() {
+  if (!AUTH.isLogged) { openModal('modal-login'); return; }
+  if (!STATE.definicion.enunciado || !STATE.definicion.enunciado.trim()) {
+    showToast('Define o enunciado do problema antes de salvar.');
+    return;
+  }
+  if (CLOUD._saving) return;
+  CLOUD._saving = true;
+  setCbStatus('saving', 'Guardando…');
+  const body = {
+    projId: CLOUD.projId || undefined,
+    meta: { nombre: STATE.definicion.enunciado.slice(0, 60) },
+    definicion:   STATE.definicion,
+    evidencia:    STATE.evidencia,
+    alternativas: STATE.alternativas,
+    criterios:    STATE.criterios,
+    scores:       STATE.scores
+  };
+  const r = await apiCall('/pp/save', { method:'POST', body });
+  CLOUD._saving = false;
+  if (!r.ok) {
+    setCbStatus('error', r.data.error || 'Error ao salvar');
+    showToast(r.data.error || 'Não se pudo salvar.');
+    return;
+  }
+  CLOUD.projId = r.data.projId;
+  CLOUD.lastSavedAt = r.data.updatedAt;
+  CLOUD.lastEditor = r.data.lastEditor;
+  if (!CLOUD.owner) CLOUD.owner = AUTH.user.email;
+  const t = new Date(r.data.updatedAt);
+  setCbStatus('saved', 'Guardado · ' + t.toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit' }));
+  renderCloudBars();
+  startPolling();
+  refreshProjectsList();
+}
+
+async function cloudLoad(projId) {
+  const r = await apiCall('/pp/load?projId=' + encodeURIComponent(projId));
+  if (!r.ok) { showToast(r.data.error || 'Não se pudo cargar'); return false; }
+  const p = r.data.project;
+  // Reemplaza state local con el remoto.
+  if (p.definicion)   Object.assign(STATE.definicion, p.definicion);
+  if (Array.isArray(p.evidencia))    STATE.evidencia    = p.evidencia;
+  if (Array.isArray(p.alternativas)) STATE.alternativas = p.alternativas;
+  if (Array.isArray(p.criterios))    STATE.criterios    = p.criterios;
+  if (p.scores && typeof p.scores === 'object') STATE.scores = p.scores;
+  CLOUD.projId = projId;
+  CLOUD.lastSavedAt = p.updatedAt;
+  CLOUD.lastEditor = p.lastEditor;
+  CLOUD.owner = p.owner;
+  CLOUD.collaborators = p.collaborators || [];
+  STATE.step = 1;
+  saveState();
+  renderAll();
+  renderCloudBars();
+  showStage('stage-definicion');
+  goToStep(1);
+  startPolling();
+  showToast('Análise cargado desde a nuvem.');
+  return true;
+}
+
+async function refreshProjectsList() {
+  if (!AUTH.isLogged) { document.getElementById('my-projects').classList.add('is-hidden'); return; }
+  const r = await apiCall('/pp/list');
+  if (!r.ok) { document.getElementById('my-projects').classList.add('is-hidden'); return; }
+  renderProjectsList(r.data.projects, r.data.count, r.data.plan, r.data.ownedLimit);
+}
+function renderProjectsList(projects, count, plan, limit) {
+  const card = document.getElementById('my-projects');
+  card.classList.remove('is-hidden');
+  const owned = projects.filter(p => p.role === 'owner').length;
+  document.getElementById('my-projects-meta').textContent =
+    `${count} análise · ${owned}/${limit} propios · plano ${plan}`;
+  const list = document.getElementById('my-projects-list');
+  if (projects.length === 0) {
+    list.innerHTML = '<div style="font-family:var(--italic);font-style:italic;color:var(--ink-3);text-align:center;padding:1rem">Não tem análise guardados. Empieza uno e guárdalo desde a barra azul.</div>';
+    return;
+  }
+  list.innerHTML = projects.map(p => {
+    const date = p.updatedAt ? new Date(p.updatedAt).toLocaleString('es-CO', { dateStyle:'short', timeStyle:'short' }) : '—';
+    const isOwner = p.role === 'owner';
+    return `<div class="proj-row">
+      <div>
+        <div class="pr-name">${escapeHtml(p.nombre)}</div>
+        <div class="pr-meta">${p.alt_count} alternativas · ${p.crit_count} criterios · ${p.evid_count} fuentes · ${date} · ${escapeHtml(p.owner)}</div>
+      </div>
+      <span class="pr-role ${isOwner ? 'owner' : ''}">${isOwner ? 'Propio' : 'Invitado'}</span>
+      <div class="pr-actions">
+        <button onclick="cloudLoad('${p.projId}')">Abrir →</button>
+        ${isOwner ? `<button class="danger" onclick="cloudDelete('${p.projId}','${escapeHtml(p.nombre).replace(/'/g,'')}')">Borrar</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+async function cloudDelete(projId, name) {
+  if (!confirm(`Borrar "${name}"? Esta ação não pode ser desfeita.`)) return;
+  const r = await apiCall('/pp/delete?projId=' + encodeURIComponent(projId), { method:'DELETE' });
+  if (!r.ok) { showToast(r.data.error || 'Não se pudo borrar'); return; }
+  showToast('Análise borrado.');
+  if (CLOUD.projId === projId) {
+    CLOUD.projId=null; CLOUD.lastSavedAt=null; CLOUD.lastEditor=null; CLOUD.owner=null; CLOUD.collaborators=[];
+    stopPolling(); renderCloudBars();
+  }
+  refreshProjectsList();
+}
+function newProject() {
+  CLOUD.projId=null; CLOUD.lastSavedAt=null; CLOUD.lastEditor=null; CLOUD.owner=null; CLOUD.collaborators=[];
+  stopPolling();
+  STATE.definicion = { enunciado:'', magnitud:'', urgencia:'media', afectados: [], evidenciaInicial: '' };
+  STATE.evidencia = [];
+  STATE.alternativas = [];
+  STATE.criterios = DEFAULT_CRITERIOS.map(c => ({ ...c }));
+  STATE.scores = {};
+  STATE.step = 1;
+  saveState();
+  renderAll();
+  renderCloudBars();
+  showStage('stage-welcome');
+}
+
+function openInviteModal() {
+  if (!CLOUD.projId) { showToast('Primero salva o análise na nuvem.'); return; }
+  if (CLOUD.owner !== AUTH.user?.email) { showToast('Apenas o dueño pode convidar.'); return; }
+  document.getElementById('invite-email').value = '';
+  renderCollabList();
+  openModal('modal-invite');
+  setTimeout(() => document.getElementById('invite-email').focus(), 100);
+}
+function renderCollabList() {
+  const list = document.getElementById('collab-list');
+  const items = [`<li style="display:flex;justify-content:space-between;padding:.5rem 0;border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-2)"><span>${escapeHtml(CLOUD.owner)}</span><span style="font-size:10px;padding:.15rem .45rem;background:var(--accent);color:var(--on-accent);font-family:var(--sans);font-weight:700;letter-spacing:.1em;text-transform:uppercase">Dueño</span></li>`];
+  for (const c of CLOUD.collaborators) items.push(`<li style="display:flex;justify-content:space-between;padding:.5rem 0;border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-2)"><span>${escapeHtml(c)}</span><span style="font-size:10px;padding:.15rem .45rem;background:var(--paper-3);color:var(--ink-3);font-family:var(--sans);font-weight:700;letter-spacing:.1em;text-transform:uppercase">Colaborador</span></li>`);
+  list.innerHTML = items.join('');
+}
+async function submitInvite() {
+  const email = document.getElementById('invite-email').value.trim().toLowerCase();
+  if (!email) { showToast('Escribe um e-mail.'); return; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { showToast('E-mail inválido.'); return; }
+  const r = await apiCall('/pp/invite', { method:'POST', body:{ projId:CLOUD.projId, email } });
+  if (!r.ok) { showToast(r.data.error || 'Não se pudo convidar'); return; }
+  showToast('Invitación enviada a ' + email + '.');
+  closeModal('modal-invite');
+}
+
+async function handleInviteOnLoad() {
+  const url = new URL(window.location.href);
+  const token = url.searchParams.get('invite');
+  if (!token) return;
+  if (!AUTH.isLogged) {
+    showToast('Inicia sessão para aceptar a invitación.');
+    setTimeout(() => { window.location.href = 'login.html?next=' + encodeURIComponent(window.location.pathname + window.location.search); }, 1800);
+    return;
+  }
+  const r = await apiCall('/pp/accept?token=' + encodeURIComponent(token));
+  if (!r.ok) { showToast(r.data.error || 'Não se pudo aceptar a invitación'); return; }
+  showToast('Te uniste ao análise.');
+  url.searchParams.delete('invite');
+  window.history.replaceState({}, '', url.toString());
+  await cloudLoad(r.data.projId);
+  refreshProjectsList();
+}
+
+function startPolling() {
+  stopPolling();
+  if (!CLOUD.projId) return;
+  CLOUD._pollTimer = setInterval(async () => {
+    if (CLOUD._saving || document.hidden) return;
+    const r = await apiCall('/pp/load?projId=' + encodeURIComponent(CLOUD.projId) + '&since=' + encodeURIComponent(CLOUD.lastSavedAt || ''));
+    if (!r.ok || r.data.unchanged || !r.data.project) return;
+    const p = r.data.project;
+    if (p.lastEditor && p.lastEditor !== AUTH.user?.email) {
+      if (p.definicion)   Object.assign(STATE.definicion, p.definicion);
+      if (Array.isArray(p.evidencia))    STATE.evidencia    = p.evidencia;
+      if (Array.isArray(p.alternativas)) STATE.alternativas = p.alternativas;
+      if (Array.isArray(p.criterios))    STATE.criterios    = p.criterios;
+      if (p.scores && typeof p.scores === 'object') STATE.scores = p.scores;
+      CLOUD.lastSavedAt = p.updatedAt; CLOUD.lastEditor = p.lastEditor;
+      CLOUD.collaborators = p.collaborators || CLOUD.collaborators;
+      saveState();
+      renderAll();
+      renderCloudBars();
+      showToast('Mudanças de ' + p.lastEditor);
+    }
+  }, POLL_INTERVAL_MS);
+}
+function stopPolling() { if (CLOUD._pollTimer) { clearInterval(CLOUD._pollTimer); CLOUD._pollTimer = null; } }
+
+// ═════════════════════════════════════════════════════════════════════════
+// COPILOTO IA (3 acciones: sugerir-alternativas · validar-criterios · narrativa-memo)
+// ═════════════════════════════════════════════════════════════════════════
+function _planTier(plan) { return ({free:0,pro:1,premium:2,full:3}[plan||'free']) ?? 0; }
+function _userHasTier(min) { return AUTH.isLogged && _planTier(AUTH.user?.plan) >= min; }
+function iaShowGate(elId, plan, desc) {
+  const out = document.getElementById(elId);
+  out.style.display = 'block';
+  out.innerHTML = `<div class="ia-result-eyebrow">Copiloto · plano ${plan} requerido</div><p>${escapeHtml(desc)}</p><p>Seu plano actual: <b>${escapeHtml(AUTH.user?.plan || 'free')}</b>.</p><p><a href="pricing.html" style="color:var(--accent);font-weight:600">Ver planos →</a></p>`;
+}
+
+// ── Acción 1 · sugerir-alternativas (Pro+) ───────────────────────────────
+async function iaSugerirAlternativas() {
+  if (!AUTH.isLogged) { openModal('modal-login'); return; }
+  if (!_userHasTier(1)) {
+    iaShowGate('ia-alt-result', 'Pro', 'A sugestão de alternativas com IA está disponível em plano Pro ou superior.');
+    return;
+  }
+  if (!STATE.definicion.enunciado || !STATE.definicion.enunciado.trim()) {
+    showToast('Define primeiro o enunciado do problema (passo 1).');
+    return;
+  }
+  const btn = document.getElementById('ia-alt-btn');
+  const out = document.getElementById('ia-alt-result');
+  btn.disabled = true; btn.textContent = 'Consultando…';
+  out.style.display = 'block';
+  out.innerHTML = '<div class="ia-result-eyebrow">Copiloto · sugiriendo alternativas</div><div class="ia-loading"><span class="ia-loading-dot"></span> Generando 3-5 opções segundo seu problema. ~10 segundos.</div>';
+  const r = await apiCall('/pp/copiloto', { method:'POST', body:{ action:'sugerir-alternativas', payload:{ definicion: STATE.definicion, alternativas: STATE.alternativas } } });
+  btn.disabled = false; btn.textContent = 'Sugerir alternativas';
+  if (!r.ok) {
+    out.innerHTML = `<div class="ia-result-eyebrow">Copiloto · error</div><p>${escapeHtml(r.data?.error || 'Não se pudo conectar.')}</p>`;
+    return;
+  }
+  iaRenderSugerirAlternativas(r.data);
+}
+function iaRenderSugerirAlternativas(data) {
+  const out = document.getElementById('ia-alt-result');
+  const cachedTag = data.cached ? '<span class="ia-cached">caché</span>' : '';
+  let html = `<div class="ia-result-eyebrow">Copiloto · alternativas sugeridas${cachedTag}</div>`;
+  if (data.nota) html += `<p><em>${escapeHtml(data.nota)}</em></p>`;
+  html += '<div class="ia-suggested">';
+  (data.alternativas || []).forEach((alt, idx) => {
+    const meta = [];
+    if (alt.costo) meta.push(`Costo: <b>${escapeHtml(alt.costo)}</b>`);
+    if (alt.plazo) meta.push(`Plazo: <b>${escapeHtml(alt.plazo)}</b>`);
+    html += `<div class="ia-sug">
+      <div class="ia-sug-body">
+        <div class="ia-sug-name">${escapeHtml(alt.nombre || '—')}</div>
+        ${alt.desc ? `<div class="ia-sug-desc">${escapeHtml(alt.desc)}</div>` : ''}
+        ${alt.supuestos ? `<div class="ia-sug-desc" style="color:var(--ink-3)"><b style="color:var(--accent)">Supuestos:</b> ${escapeHtml(alt.supuestos)}</div>` : ''}
+        ${meta.length ? `<div class="ia-sug-meta">${meta.join(' · ')}</div>` : ''}
+      </div>
+      <button class="ia-sug-add" data-idx="${idx}" onclick="iaAddAlternativa(${idx})">+ Agregar</button>
+    </div>`;
+  });
+  html += '</div>';
+  out.innerHTML = html;
+  // Guarda las sugerencias en una propiedad temporal para iaAddAlternativa
+  window._iaAltSuggestions = data.alternativas || [];
+}
+function iaAddAlternativa(idx) {
+  const alt = (window._iaAltSuggestions || [])[idx];
+  if (!alt) return;
+  if (STATE.alternativas.length >= 5) { showToast('Máximo 5 alternativas. Borra alguna primeiro.'); return; }
+  STATE.alternativas.push({
+    nombre: alt.nombre || 'Sem nome',
+    desc: alt.desc || '',
+    supuestos: alt.supuestos || '',
+    costo: alt.costo || '',
+    plazo: alt.plazo || '',
+    baseline: false
+  });
+  saveState(); renderAlternativas();
+  // Marca el botón como agregado
+  const btn = document.querySelector(`#ia-alt-result .ia-sug-add[data-idx="${idx}"]`);
+  if (btn) { btn.textContent = '✓ Agregada'; btn.classList.add('added'); btn.disabled = true; }
+  showToast('Alternativa agregada.');
+}
+
+// ── Acción 2 · validar-criterios (Premium+) ──────────────────────────────
+async function iaValidarCriterios() {
+  if (!AUTH.isLogged) { openModal('modal-login'); return; }
+  if (!_userHasTier(2)) {
+    iaShowGate('ia-crit-result', 'Premium', 'A revisión de criterios com IA está disponível em plano Premium ou superior.');
+    return;
+  }
+  if (!STATE.criterios || STATE.criterios.length === 0) {
+    showToast('Não há criterios para revisar.');
+    return;
+  }
+  const btn = document.getElementById('ia-crit-btn');
+  const out = document.getElementById('ia-crit-result');
+  btn.disabled = true; btn.textContent = 'Revisando…';
+  out.style.display = 'block';
+  out.innerHTML = '<div class="ia-result-eyebrow">Copiloto · revisando criterios</div><div class="ia-loading"><span class="ia-loading-dot"></span> Detectando sobreposições, ambiguidades e ausencias. ~8 segundos.</div>';
+  const r = await apiCall('/pp/copiloto', { method:'POST', body:{ action:'validar-criterios', payload:{ definicion: STATE.definicion, criterios: STATE.criterios } } });
+  btn.disabled = false; btn.textContent = 'Revisar criterios';
+  if (!r.ok) {
+    out.innerHTML = `<div class="ia-result-eyebrow">Copiloto · error</div><p>${escapeHtml(r.data?.error || 'Não se pudo conectar.')}</p>`;
+    return;
+  }
+  iaRenderValidarCriterios(r.data);
+}
+function iaRenderValidarCriterios(data) {
+  const out = document.getElementById('ia-crit-result');
+  const cachedTag = data.cached ? '<span class="ia-cached">caché</span>' : '';
+  let html = `<div class="ia-result-eyebrow">Copiloto · revisión de criterios${cachedTag}</div>`;
+  if (data.summary) html += `<p>${escapeHtml(data.summary)}</p>`;
+  if ((data.issues || []).length === 0 && (data.faltantes || []).length === 0) {
+    html += `<p><em>O copiloto não detectó problemas relevantes em seu lista de criterios. Sigue ao passo de comparación.</em></p>`;
+  } else {
+    if ((data.issues || []).length) {
+      html += '<h3>Problemas detectados</h3><div class="ia-issues">';
+      (data.issues || []).forEach(it => {
+        const refIdxs = Array.isArray(it.criterios) ? it.criterios : (it.criterio != null ? [it.criterio] : []);
+        const refNames = refIdxs
+          .map(i => STATE.criterios[i - 1]?.nombre || `C${i}`)
+          .filter(Boolean).join(' · ');
+        html += `<div class="ia-issue">
+          <div class="ia-issue-tag">${escapeHtml(it.tipo || '—')}</div>
+          <div class="ia-issue-body">
+            ${refNames ? `<div class="ia-issue-msg"><b style="color:var(--accent)">${escapeHtml(refNames)}</b></div>` : ''}
+            <div class="ia-issue-msg">${escapeHtml(it.msg || '')}</div>
+            ${it.sugerencia ? `<div class="ia-issue-sug"><b>Sugerencia:</b> ${escapeHtml(it.sugerencia)}</div>` : ''}
+          </div>
+        </div>`;
+      });
+      html += '</div>';
+    }
+    if ((data.faltantes || []).length) {
+      html += '<h3>Criterios que poderiam faltar</h3><div class="ia-suggested">';
+      (data.faltantes || []).forEach((f, idx) => {
+        html += `<div class="ia-sug">
+          <div class="ia-sug-body">
+            <div class="ia-sug-name">${escapeHtml(f.nombre || '—')}</div>
+            ${f.razon ? `<div class="ia-sug-desc">${escapeHtml(f.razon)}</div>` : ''}
+          </div>
+          <button class="ia-sug-add" data-idx="${idx}" onclick="iaAddCriterio(${idx})">+ Agregar</button>
+        </div>`;
+      });
+      html += '</div>';
+      window._iaCritSuggestions = data.faltantes || [];
+    }
+  }
+  out.innerHTML = html;
+}
+function iaAddCriterio(idx) {
+  const f = (window._iaCritSuggestions || [])[idx];
+  if (!f || !f.nombre) return;
+  if (STATE.criterios.length >= 8) { showToast('Máximo 8 criterios.'); return; }
+  STATE.criterios.push({ nombre: f.nombre, peso: 10 });
+  saveState(); renderCriterios();
+  const btn = document.querySelector(`#ia-crit-result .ia-sug-add[data-idx="${idx}"]`);
+  if (btn) { btn.textContent = '✓ Agregado'; btn.classList.add('added'); btn.disabled = true; }
+  showToast('Criterio agregado.');
+}
+
+// ── Acción 3 · narrativa-memo (Premium+) ─────────────────────────────────
+async function iaNarrativaMemo() {
+  if (!AUTH.isLogged) { openModal('modal-login'); return; }
+  if (!_userHasTier(2)) {
+    iaShowGate('ia-narr-result', 'Premium', 'A leitura interpretativa com IA está disponível em plano Premium ou superior.');
+    return;
+  }
+  if (!STATE.definicion.enunciado) { showToast('Falta definir o problema.'); return; }
+  if (!STATE.alternativas.length || !Object.keys(STATE.scores).length) {
+    showToast('Completa ao menos algunas células da matriz de comparación antes de pedir a leitura.');
+    return;
+  }
+  const btn = document.getElementById('ia-narr-btn');
+  const out = document.getElementById('ia-narr-result');
+  btn.disabled = true; btn.textContent = 'Redactando…';
+  out.style.display = 'block';
+  out.innerHTML = '<div class="ia-result-eyebrow">Copiloto · redigendo leitura</div><div class="ia-loading"><span class="ia-loading-dot"></span> Interpretando o ranking, supuestos e riscos políticos. ~15-25 segundos.</div>';
+  const r = await apiCall('/pp/copiloto', { method:'POST', body:{ action:'narrativa-memo', payload:{ definicion: STATE.definicion, criterios: STATE.criterios, alternativas: STATE.alternativas, scores: STATE.scores } } });
+  btn.disabled = false; btn.textContent = 'Generar leitura';
+  if (!r.ok) {
+    out.innerHTML = `<div class="ia-result-eyebrow">Copiloto · error</div><p>${escapeHtml(r.data?.error || 'Não se pudo conectar.')}</p>`;
+    return;
+  }
+  iaRenderNarrativaMemo(r.data);
+}
+function iaRenderNarrativaMemo(data) {
+  const out = document.getElementById('ia-narr-result');
+  const cachedTag = data.cached ? '<span class="ia-cached">caché</span>' : '';
+  let html = `<div class="ia-result-eyebrow">Copiloto · leitura interpretativa${cachedTag}</div>`;
+  if (data.lectura) html += `<h3>Leitura</h3><p>${escapeHtml(data.lectura).replace(/\n\n/g, '</p><p>')}</p>`;
+  if (Array.isArray(data.supuestos_a_cuestionar) && data.supuestos_a_cuestionar.length) {
+    html += '<h3>Supuestos a cuestionar em comitê</h3><ul>';
+    data.supuestos_a_cuestionar.forEach(s => html += `<li>${escapeHtml(s)}</li>`);
+    html += '</ul>';
+  }
+  if (data.riesgos_politicos) html += `<h3>Riscos políticos</h3><p>${escapeHtml(data.riesgos_politicos)}</p>`;
+  if (data.siguiente_paso) html += `<h3>Próximo passo</h3><p>${escapeHtml(data.siguiente_paso)}</p>`;
+  out.innerHTML = html;
+}
+
+// ── Import de alternativas desde alternativas-pt.html (Sprint C.10) ──────────
+// alternativas-pt.html escribe localStorage['alt-import-to-pp'] con shape:
+//   { source, timestamp, contexto, alternativas:[{nombre,desc,supuestos,
+//     costo,plazo,baseline}], decision:{altId_recomendada,justificacion} }
+// y redirige a problema-publico-pt.html?import=alt.
+function handleAltImportOnLoad() {
+  try {
+    const url = new URL(window.location.href);
+    const flag = url.searchParams.get('import');
+    const raw = localStorage.getItem('alt-import-to-pp');
+    if (!raw) return;
+    let payload;
+    try { payload = JSON.parse(raw); } catch { localStorage.removeItem('alt-import-to-pp'); return; }
+    if (!payload || !Array.isArray(payload.alternativas) || payload.alternativas.length === 0) {
+      localStorage.removeItem('alt-import-to-pp');
+      return;
+    }
+    // Si NO viene el flag ?import=alt y el payload es viejo (>5 min), ignorar
+    // para evitar pickups accidentales al volver a pp.
+    const stamp = Date.parse(payload.timestamp || '') || 0;
+    const recent = (Date.now() - stamp) < 5 * 60 * 1000;
+    if (flag !== 'alt' && !recent) return;
+    const n = payload.alternativas.length;
+    const hasCurrent = (STATE.alternativas || []).length > 0;
+    const msg = `Llegaron ${n} alternativas desde o módulo de Alternativas` +
+      (payload.decision?.altId_recomendada ? ` (com recomendação marcada)` : '') +
+      (hasCurrent ? `.\n\nReemplazar seus ${STATE.alternativas.length} alternativas actuales neste módulo?` : '.\n\nCargarlas no passo 3?');
+    if (!confirm(msg)) {
+      // Limpiar la cola para no preguntar de nuevo en el próximo load
+      localStorage.removeItem('alt-import-to-pp');
+      if (flag === 'alt') {
+        url.searchParams.delete('import');
+        window.history.replaceState({}, '', url.toString());
+      }
+      return;
+    }
+    applyAltImport(payload);
+    // Limpieza
+    localStorage.removeItem('alt-import-to-pp');
+    if (flag === 'alt') {
+      url.searchParams.delete('import');
+      window.history.replaceState({}, '', url.toString());
+    }
+  } catch (e) {
+    console.error('handleAltImportOnLoad failed:', e.message);
+  }
+}
+function applyAltImport(payload) {
+  // Sobreescribe STATE.alternativas con el shape compatible
+  STATE.alternativas = payload.alternativas.map(a => ({
+    nombre:    String(a.nombre || '').slice(0, 200) || 'Alternativa importada',
+    desc:      String(a.desc || '').slice(0, 1200),
+    supuestos: String(a.supuestos || '').slice(0, 1200),
+    costo:     String(a.costo || '').slice(0, 200),
+    plazo:     String(a.plazo || '').slice(0, 200),
+    baseline:  !!a.baseline
+  })).slice(0, 7);
+  // Asegurar que el primer card sea baseline; si no, prependlear uno
+  if (!STATE.alternativas.some(a => a.baseline)) {
+    STATE.alternativas.unshift({ nombre:'Não fazer nada', desc:'Statu quo · não intervenir.', supuestos:'', costo:'', plazo:'', baseline:true });
+  }
+  // Si vino contexto y el enunciado del problema actual está vacío, lo aceptamos
+  if (payload.contexto && typeof payload.contexto === 'string' && payload.contexto.trim() && !(STATE.definicion?.enunciado || '').trim()) {
+    if (!STATE.definicion) STATE.definicion = {};
+    STATE.definicion.enunciado = payload.contexto.trim().slice(0, 800);
+  }
+  // Saltar ratings/scores existentes — el shape de scores depende de alt.id que aquí no se preserva
+  STATE.scores = {};
+  saveState();
+  renderAll();
+  goToStep(3);
+  showToast(`${STATE.alternativas.length} alternativas importadas. Revísalas e avanza a criterios.`);
+}
+
+// Init
+(async function init() {
+  const restored = loadState();
+  renderAll();
+  bindDefinicionInputs();
+  if (restored && STATE.step >= 1 && STATE.definicion.enunciado) {
+    // Si había trabajo previo, aterriza en la mecánica donde se quedó.
+    goToStep(STATE.step || 1);
+    showToast('Restauramos seu sessão anterior.');
+  } else {
+    showStage('stage-welcome');
+  }
+  // Auth + cloud
+  await loadUserFromAPI();
+  renderAuthChip();
+  renderCloudBars();
+  if (AUTH.isLogged) { refreshProjectsList(); handleInviteOnLoad(); }
+  // Pickup de alternativas desde alternativas-pt.html (si las hay)
+  handleAltImportOnLoad();
+})();
+
+// ── Modal Recursos · catálogo del lab filtrado por módulo ────────────────
+const LAB_CURRENT_MODULE = 'problema';
+const LAB_MOD_LABELS = {
+  problema:     'o módulo de Problema Público',
+  estructural:  'o módulo de Análise Estrutural',
+  mactor:       'o módulo de Análise de Atores',
+  evaluacion:   'o módulo de Avaliação de Política',
+  alternativas: 'o módulo de Alternativas de Política',
+  ain:          'o módulo de Análise de Impacto Normativo',
+  prospect:     'o módulo de Cenários Prospectivos'
+};
+function _labEscHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function _labEscAttr(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+}
+function openRecursosModal() {
+  const lab = window.LAB_RECURSOS;
+  const grid = document.getElementById('modal-recursos-grid');
+  const nameEl = document.getElementById('lr-modulo-name');
+  if (nameEl) nameEl.textContent = LAB_MOD_LABELS[LAB_CURRENT_MODULE] || 'este módulo';
+  if (!lab || !grid) { openModal('modal-recursos'); return; }
+  const items = lab.items.filter(it => !it.modulos || it.modulos.length === 0 || it.modulos.includes(LAB_CURRENT_MODULE));
+  if (!items.length) {
+    grid.innerHTML = '<div class="lr-empty">O catálogo não tem recursos destacados para este módulo. Mira o catálogo completo no hub.</div>';
+    openModal('modal-recursos');
+    return;
+  }
+  const sortedCats = lab.categorias.slice().sort((a, b) => (a.orden || 99) - (b.orden || 99));
+  grid.innerHTML = sortedCats.map(c => {
+    const sub = items.filter(it => it.categoria === c.id);
+    if (!sub.length) return '';
+    return `<div class="lr-cat">
+      <div class="lr-cat-name">${_labEscHtml(c.nombre)}</div>
+      <div class="lr-items">
+        ${sub.map(it => `<a class="lr-item" href="${_labEscAttr(it.url)}" target="_blank" rel="noopener noreferrer">
+          <div class="lr-item-name"><span>${_labEscHtml(it.nombre)}</span></div>
+          <div class="lr-item-desc">${_labEscHtml(it.desc)}</div>
+        </a>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+  openModal('modal-recursos');
+}
+</script>
+</body>
+</html>

@@ -16,8 +16,22 @@ Estrategia:
 import re
 from pathlib import Path
 
-SRC = Path(__file__).resolve().parents[2] / "analisis-estructural.html"
-DST = Path(__file__).resolve().parents[2] / "analisis-estrutural.html"
+ROOT = Path(__file__).resolve().parents[2]
+
+# Mapa ES → PT de los 8 módulos del Lab. Se usa para (a) elegir el nombre de
+# salida y (b) reescribir los cross-links entre módulos. La entrada
+# analisis-estrutural.html conserva su nombre porque index.html ya la enlaza
+# para los visitantes de Brasil; los demás usan sufijo -pt.
+MODULES = {
+    "analisis-estructural.html": "analisis-estrutural.html",
+    "mactor.html":               "mactor-pt.html",
+    "problema-publico.html":     "problema-publico-pt.html",
+    "evaluacion.html":           "evaluacion-pt.html",
+    "alternativas.html":         "alternativas-pt.html",
+    "ain.html":                  "ain-pt.html",
+    "prospect-escenarios.html":  "prospect-escenarios-pt.html",
+    "comunicar.html":            "comunicar-pt.html",
+}
 
 # ─── PHRASES (≥8 chars, substring replace, orden manual) ──────────────────
 PHRASES = [
@@ -377,14 +391,8 @@ PHRASES = [
     ("simple", "simples"),
     ("Simple", "Simples"),
     ("fórmulas", "fórmulas"),
-    ("esos", "esses"),
-    ("esas", "essas"),
-    ("Esos", "Esses"),
-    ("Esas", "Essas"),
-    ("ese", "esse"),
-    ("Ese", "Esse"),
-    ("esa", "essa"),
-    ("Esa", "Essa"),
+    # ese/esa/esos/esas → movidos a WORDS (word-bounded): como substring
+    # corrompían palabras ("pesado"→"pessado", "presente"→"pressente").
     ("redacta", "redige"),
     ("redactar", "redigir"),
     ("redactamos", "redigimos"),
@@ -513,9 +521,9 @@ PHRASES = [
     ("descargarlos", "baixá-los"),
     ("compartirla", "compartilhá-la"),
     ("compartirlo", "compartilhá-lo"),
-    ("Va a", "Vai a"),
-    ("va a", "vai a"),
-    ("vamos a", "vamos a"),
+    ("Va a ", "Vai "),
+    (" va a ", " vai "),
+    (" vamos a ", " vamos "),
 
     # Pequeñas estructurales
     ("o que tão bem", "quão bem"),
@@ -523,14 +531,8 @@ PHRASES = [
     ("uma sobre la otra", "uma sobre a outra"),
     ("uma sobre a otra", "uma sobre a outra"),
     ("la otra", "a outra"),
-    ("otra", "outra"),
-    ("otras", "outras"),
-    ("otro", "outro"),
-    ("otros", "outros"),
-    ("Otra", "Outra"),
-    ("Otras", "Outras"),
-    ("Otro", "Outro"),
-    ("Otros", "Outros"),
+    # otra/otras/otro/otros → movidos a WORDS (word-bounded): como substring
+    # corrompían "nosotros"→"nosoutros", "vosotros", etc.
     ("dices", "diz"),
     ("decimos", "dizemos"),
     ("Estamos", "Estamos"),
@@ -614,6 +616,62 @@ PHRASES = [
     ("Agregar", "Adicionar"),
     ("Resultados", "Resultados"),
     ("Inicio", "Início"),
+
+    # ─── Lote PT v2 · términos técnicos protegidos (no traducir) ─────────────
+    ("no-regret", "no-regret"), ("no-regrets", "no-regrets"),
+    ("NO-REGRET", "NO-REGRET"), ("what-if", "what-if"),
+    ("What-if", "What-if"), ("trade-off", "trade-off"),
+    ("trade-offs", "trade-offs"),
+
+    # ─── Lote PT v2 · negaciones (corren antes que las WORDS) ────────────────
+    # Más largas primero para que ganen la coincidencia.
+    ("no se puede", "não se pode"), ("No se puede", "Não se pode"),
+    ("no se pueden", "não se podem"),
+    ("no tienes", "não tem"), ("no tiene", "não tem"), ("no tienen", "não têm"),
+    ("no quieres", "não quer"), ("no necesitas", "não precisa"),
+    ("no sabes", "não sabe"), ("no sabe", "não sabe"),
+    ("no pueden", "não podem"), ("no puede", "não pode"),
+    ("no hay", "não há"), ("No hay", "Não há"),
+    ("no son", "não são"), ("No son", "Não são"),
+    ("no es", "não é"), ("No es", "Não é"),
+    ("no las", "não as"), ("no los", "não os"),
+    ("no lo", "não o"), ("no la", "não a"),
+    ("no se", "não se"), ("No se", "Não se"),
+    ("aún no", "ainda não"), ("Aún no", "Ainda não"),
+    ("todavía no", "ainda não"), ("Todavía no", "Ainda não"),
+    ("ya no", "já não"), ("Ya no", "Já não"),
+
+    # ─── Lote PT v2 · qué/cuál con preposición (orden de palabras) ───────────
+    ("en qué", "em que"), ("En qué", "Em que"),
+    ("de qué", "de que"), ("De qué", "De que"),
+    ("a qué", "a que"), ("A qué", "A que"),
+    ("sobre qué", "sobre o que"), ("Sobre qué", "Sobre o que"),
+    ("lo que", "o que"), ("Lo que", "O que"),
+    ("qué tanto", "quanto"), ("Qué tanto", "Quanto"),
+    ("qué tan", "quão"), ("Qué tan", "Quão"),
+    ("qué tipo", "que tipo"), ("Qué tipo", "Que tipo"),
+    ("para qué", "para que"), ("Para qué", "Para que"),
+    ("por qué", "por que"), ("Por qué", "Por que"),
+
+    # ─── Lote PT v2 · "va/vas/van a + inf" → "vai/vão + inf" ──────────────────
+    (" vas a ", " vai "), (" van a ", " vão "), (" voy a ", " vou "),
+
+    # ─── Lote PT v2 · giros frecuentes ───────────────────────────────────────
+    ("Te recomendamos", "Recomendamos"), ("te recomendamos", "recomendamos"),
+    ("Ten en cuenta", "Tenha em conta"), ("ten en cuenta", "tenha em conta"),
+    ("a la vez", "ao mesmo tempo"),
+
+    # ─── Lote PT v2 · en/de + demostrativo → contracción portuguesa ──────────
+    ("en estos", "nestes"), ("En estos", "Nestes"),
+    ("en estas", "nestas"), ("En estas", "Nestas"),
+    ("en este", "neste"), ("En este", "Neste"),
+    ("en esta", "nesta"), ("En esta", "Nesta"),
+    ("en esos", "nesses"), ("en esas", "nessas"),
+    ("en ese", "nesse"), ("en esa", "nessa"),
+    ("de estos", "destes"), ("de estas", "destas"),
+    ("de este", "deste"), ("de esta", "desta"),
+    ("de esos", "desses"), ("de esas", "dessas"),
+    ("de ese", "desse"), ("de esa", "dessa"),
 ]
 
 # ─── WORDS (palabras sueltas, word-boundary regex) ────────────────────────
@@ -1270,6 +1328,108 @@ WORDS = [
     (r"\bejemplo\b", "exemplo"),
     (r"\bejemplos\b", "exemplos"),
     (r"\bEjemplo\b", "Exemplo"),
+
+    # ─── Lote PT v2 · words adicionales (corren tras las PHRASES) ────────────
+    (r"\bno\b", "não"), (r"\bNo\b", "Não"),
+    (r"\bCuál\b", "Qual"), (r"\bcuál\b", "qual"),
+    (r"\bCuáles\b", "Quais"), (r"\bcuáles\b", "quais"),
+    (r"\bestás\b", "está"), (r"\bEstás\b", "Está"),
+    (r"\bestoy\b", "estou"), (r"\bEstoy\b", "Estou"),
+    (r"\besté\b", "esteja"), (r"\bestés\b", "esteja"),
+    (r"\beres\b", "é"), (r"\bEres\b", "É"),
+    (r"\bsoy\b", "sou"), (r"\bSoy\b", "Sou"),
+    (r"\bhoy\b", "hoje"), (r"\bHoy\b", "Hoje"),
+    (r"\btrabajar\b", "trabalhar"), (r"\btrabaja\b", "trabalha"),
+    (r"\btrabajan\b", "trabalham"), (r"\btrabajamos\b", "trabalhamos"),
+    (r"\bevaluar\b", "avaliar"), (r"\bevalúa\b", "avalia"),
+    (r"\bevalúan\b", "avaliam"), (r"\bevaluará\b", "avaliará"),
+    (r"\bevaluamos\b", "avaliamos"), (r"\bevaluado\b", "avaliado"),
+    (r"\bejercicio\b", "exercício"), (r"\bEjercicio\b", "Exercício"),
+    (r"\borganización\b", "organização"), (r"\bOrganización\b", "Organização"),
+    (r"\borganizaciones\b", "organizações"),
+    (r"\bdominio\b", "domínio"), (r"\bDominio\b", "Domínio"), (r"\bdominios\b", "domínios"),
+    (r"\bpalanca\b", "alavanca"), (r"\bpalancas\b", "alavancas"),
+    (r"\bPalanca\b", "Alavanca"), (r"\bPalancas\b", "Alavancas"),
+    (r"\bpasa\b", "passa"), (r"\bpasan\b", "passam"), (r"\bpasar\b", "passar"),
+    (r"\bpase\b", "passe"), (r"\bpasó\b", "passou"),
+    (r"\bcambia\b", "muda"), (r"\bcambian\b", "mudam"), (r"\bcambiar\b", "mudar"),
+    (r"\bcambió\b", "mudou"), (r"\bcambie\b", "mude"),
+    (r"\benmarcado\b", "enquadrado"), (r"\benmarcada\b", "enquadrada"),
+    (r"\benmarca\b", "enquadra"),
+    (r"\bdeshacer\b", "desfazer"),
+    (r"\bapoyo\b", "apoio"), (r"\bApoyo\b", "Apoio"),
+    (r"\bapoya\b", "apoia"), (r"\bapoyan\b", "apoiam"), (r"\bapoyar\b", "apoiar"),
+    (r"\bmensaje\b", "mensagem"), (r"\bmensajes\b", "mensagens"),
+    (r"\bMensaje\b", "Mensagem"), (r"\bMensajes\b", "Mensagens"),
+    (r"\baudiencia\b", "audiência"), (r"\baudiencias\b", "audiências"),
+    (r"\bAudiencia\b", "Audiência"), (r"\bAudiencias\b", "Audiências"),
+    (r"\bcanales\b", "canais"), (r"\bCanales\b", "Canais"),
+    (r"\bcelda\b", "célula"), (r"\bceldas\b", "células"),
+    (r"\bcuadrante\b", "quadrante"), (r"\bcuadrantes\b", "quadrantes"),
+    (r"\bumbral\b", "limiar"), (r"\bUmbral\b", "Limiar"),
+    (r"\bcolumna\b", "coluna"), (r"\bcolumnas\b", "colunas"),
+    (r"\bflecha\b", "seta"), (r"\bflechas\b", "setas"),
+    (r"\bpantalla\b", "tela"), (r"\bPantalla\b", "Tela"),
+    (r"\bborrador\b", "rascunho"), (r"\bBorrador\b", "Rascunho"),
+    (r"\bencuadre\b", "enquadramento"), (r"\bEncuadre\b", "Enquadramento"),
+    (r"\bvocero\b", "porta-voz"), (r"\bvoceros\b", "porta-vozes"),
+    (r"\bsiguiente\b", "seguinte"), (r"\bSiguiente\b", "Seguinte"),
+    (r"\bpendiente\b", "pendente"), (r"\bPendiente\b", "Pendente"),
+    (r"\bpendientes\b", "pendentes"), (r"\bPendientes\b", "Pendentes"),
+    (r"\btrabajas\b", "trabalha"),
+    (r"\brecomienda\b", "recomenda"), (r"\brecomiendan\b", "recomendam"),
+    (r"\brecomendará\b", "recomendará"),
+
+    # demostrativos ese/esa (word-bounded; antes eran substring y corrompían palabras)
+    (r"\bese\b", "esse"), (r"\bEse\b", "Esse"),
+    (r"\besa\b", "essa"), (r"\bEsa\b", "Essa"),
+    (r"\besos\b", "esses"), (r"\bEsos\b", "Esses"),
+    (r"\besas\b", "essas"), (r"\bEsas\b", "Essas"),
+    # otra/otro (word-bounded; antes substring corrompía nosotros/vosotros)
+    (r"\botra\b", "outra"), (r"\bOtra\b", "Outra"),
+    (r"\botras\b", "outras"), (r"\bOtras\b", "Outras"),
+    (r"\botro\b", "outro"), (r"\bOtro\b", "Outro"),
+    (r"\botros\b", "outros"), (r"\bOtros\b", "Outros"),
+    (r"\bnosotras\b", "nós"), (r"\bvosotras\b", "vocês"),
+
+    # vocabulario frecuente que quedaba en español
+    (r"\bplantilla\b", "modelo"), (r"\bplantillas\b", "modelos"),
+    (r"\blenguaje\b", "linguagem"), (r"\bLenguaje\b", "Linguagem"),
+    (r"\badecuado\b", "adequado"), (r"\badecuada\b", "adequada"),
+    (r"\bAdecuado\b", "Adequado"), (r"\bAdecuada\b", "Adequada"),
+    (r"\badecuados\b", "adequados"), (r"\badecuadas\b", "adequadas"),
+    (r"\bdonde\b", "onde"), (r"\bDonde\b", "Onde"),
+    (r"\bproduce\b", "produz"), (r"\bproducen\b", "produzem"),
+    (r"\bproducir\b", "produzir"), (r"\bprodujo\b", "produziu"),
+    (r"\bcombinación\b", "combinação"), (r"\bCombinación\b", "Combinação"),
+    (r"\bcombinaciones\b", "combinações"), (r"\bCombinaciones\b", "Combinações"),
+    (r"\bcuán\b", "quão"), (r"\bCuán\b", "Quão"),
+    (r"\bEscoge\b", "Escolha"),
+    (r"\bpodrás\b", "poderá"), (r"\bpodrá\b", "poderá"), (r"\bpodrán\b", "poderão"),
+    (r"\bpodremos\b", "poderemos"), (r"\bpodría\b", "poderia"), (r"\bpodrían\b", "poderiam"),
+    (r"\bquizás\b", "talvez"), (r"\bQuizás\b", "Talvez"),
+    (r"\btú\b", "você"), (r"\bTú\b", "Você"),
+    (r"\btrabajo\b", "trabalho"), (r"\bTrabajo\b", "Trabalho"),
+    (r"\bnube\b", "nuvem"), (r"\bNube\b", "Nuvem"),
+    (r"\bcuenta\b", "conta"), (r"\bCuenta\b", "Conta"), (r"\bcuentas\b", "contas"),
+    (r"\binvitados\b", "convidados"), (r"\binvitado\b", "convidado"),
+    (r"\binvitada\b", "convidada"), (r"\binvitadas\b", "convidadas"),
+    (r"\binvitar\b", "convidar"), (r"\binvita\b", "convida"),
+    (r"\bcorreo\b", "e-mail"), (r"\bCorreo\b", "E-mail"), (r"\bcorreos\b", "e-mails"),
+    (r"\benlace\b", "link"), (r"\bEnlace\b", "Link"), (r"\benlaces\b", "links"),
+    (r"\bposición\b", "posição"), (r"\bPosición\b", "Posição"),
+    (r"\bposiciones\b", "posições"), (r"\bPosiciones\b", "Posições"),
+    (r"\bhipótesis\b", "hipótese"), (r"\bHipótesis\b", "Hipótese"),
+    (r"\bexperto\b", "especialista"), (r"\bexpertos\b", "especialistas"),
+    (r"\bExperto\b", "Especialista"), (r"\bexperta\b", "especialista"),
+    (r"\bLectura\b", "Leitura"),
+    (r"\bcomposición\b", "composição"), (r"\bComposición\b", "Composição"),
+    (r"\bguardarlo\b", "salvá-lo"), (r"\bguardarla\b", "salvá-la"),
+    (r"\bguardarlos\b", "salvá-los"), (r"\bguardarlas\b", "salvá-las"),
+    (r"\bagrega\b", "adiciona"), (r"\bagregar\b", "adicionar"),
+    (r"\bagregue\b", "adicione"), (r"\bagregas\b", "adiciona"),
+    (r"\bsegún\b", "segundo"), (r"\bSegún\b", "Segundo"),
+    (r"\bademás\b", "além disso"),
 ]
 
 _PHRASE_BUFFER = []  # contiene los segmentos traducidos por PHRASES
@@ -1289,6 +1449,34 @@ def restore_phrases(text):
     def _sub(m):
         return _PHRASE_BUFFER[int(m.group(1))]
     return re.sub(r"\x03(\d+)\x04", _sub, text)
+
+# ─── Contracciones PT (em+art, de+art, a+art, por+art) ────────────────────
+# El traductor produce "em o / de a / a la→a a" tras la pasada de palabras;
+# aquí se recombinan en las contracciones correctas del portugués.
+_CONTRACTIONS = [
+    (r"\bem os\b", "nos"), (r"\bEm os\b", "Nos"),
+    (r"\bem as\b", "nas"), (r"\bEm as\b", "Nas"),
+    (r"\bem o\b", "no"),   (r"\bEm o\b", "No"),
+    (r"\bem a\b", "na"),   (r"\bEm a\b", "Na"),
+    (r"\bem um\b", "num"), (r"\bem uma\b", "numa"),
+    (r"\bde os\b", "dos"), (r"\bDe os\b", "Dos"),
+    (r"\bde as\b", "das"), (r"\bDe as\b", "Das"),
+    (r"\bde o\b", "do"),   (r"\bDe o\b", "Do"),
+    (r"\bde a\b", "da"),   (r"\bDe a\b", "Da"),
+    (r"\ba os\b", "aos"),  (r"\bA os\b", "Aos"),
+    (r"\ba as\b", "às"),   (r"\bA as\b", "Às"),
+    (r"\ba o\b", "ao"),    (r"\bA o\b", "Ao"),
+    (r"\ba a\b", "à"),     (r"\bA a\b", "À"),
+    (r"\bpor os\b", "pelos"), (r"\bpor as\b", "pelas"),
+    (r"\bpor o\b", "pelo"),   (r"\bPor o\b", "Pelo"),
+    (r"\bpor a\b", "pela"),   (r"\bPor a\b", "Pela"),
+]
+_CONTRACTIONS_C = [(re.compile(p), r) for p, r in _CONTRACTIONS]
+
+def contract(text):
+    for rx, rep in _CONTRACTIONS_C:
+        text = rx.sub(rep, text)
+    return text
 
 # ─── Single-pass word translation (evita cadenas tipo el → o → ou) ────────
 # Construimos un mapa palabra-completa → reemplazo y un regex que matchea
@@ -1316,8 +1504,36 @@ _WORD_RE = re.compile(
 def apply_words(text):
     return _WORD_RE.sub(lambda m: _WORD_MAP[m.group(1)], text)
 
+def _translate_text_run(s):
+    new = apply_phrases(s)
+    new = apply_words(new)
+    new = restore_phrases(new)
+    new = contract(new)
+    return new
+
+def _translate_template(m):
+    """Traduce el texto literal de un template literal `...`, dejando intactas
+    las interpolaciones ${...}. Si la interpolación tiene llaves anidadas, no
+    arriesga y devuelve el literal sin tocar."""
+    inner = m.group(1)
+    interps = []
+    def _ip(mm):
+        interps.append(mm.group(0))
+        return f"\x02{len(interps)-1}\x02"
+    tmp = re.sub(r"\$\{[^{}]*\}", _ip, inner)
+    if "${" in tmp or "}" in tmp:          # interpolación con llaves anidadas
+        return m.group(0)
+    if not re.search(r"[A-Za-zÁÉÍÓÚáéíóúñÑ]", tmp):
+        return m.group(0)
+    new = _translate_text_run(tmp)
+    new = re.sub(r"\x02(\d+)\x02", lambda mm: interps[int(mm.group(1))], new)
+    return "`" + new + "`"
+
 def _translate_script(script_text):
-    """Translate string-literals inside JS that look like UI text."""
+    """Translate string-literals + template literals inside JS that look like UI."""
+    # 1) Template literals (backticks) — texto literal, preservando ${...}.
+    script_text = re.sub(r"`([^`]*)`", _translate_template, script_text, flags=re.DOTALL)
+    # 2) String literals '...' "..."
     def _replace_str(m):
         quote = m.group(1)
         content = m.group(2)
@@ -1328,10 +1544,7 @@ def _translate_script(script_text):
         # Skip if no spaces AND no Spanish-specific chars (probably ID/path)
         if " " not in content and not re.search(r"[áéíóúñÑ¿¡]", content):
             return m.group(0)
-        new = apply_phrases(content)
-        new = apply_words(new)
-        new = restore_phrases(new)
-        return quote + new + quote
+        return quote + _translate_text_run(content) + quote
     out = re.sub(
         r"(['\"])((?:\\.|(?!\1).)*)\1",
         _replace_str,
@@ -1339,42 +1552,69 @@ def _translate_script(script_text):
     )
     return out
 
-def main():
-    src = SRC.read_text(encoding="utf-8")
+def rewrite_crosslinks(text):
+    """Reescribe enlaces ES→PT entre módulos del Lab, preservando #anchor/?query."""
+    for es, pt in MODULES.items():
+        text = re.sub(r"(?<![\w./-])" + re.escape(es) + r"(?![\w])", pt, text)
+    return text
 
-    src = src.replace('<html lang="es" id="htmlRoot">',
-                      '<html lang="pt-BR" id="htmlRoot">')
+def translate_file(src_path, dst_path):
+    _PHRASE_BUFFER.clear()
+    src = src_path.read_text(encoding="utf-8")
 
-    # Protect <style>
+    # lang attr (cualquier variante de <html ... lang="es" ...>)
+    src = re.sub(r'(<html[^>]*\blang=")es(")', r'\1pt-BR\2', src)
+
+    # Proteger <style>, <script> y atributos URL (href/src/action).
     styles = []
-    def _style_repl(m):
-        styles.append(m.group(0))
-        return f"\x00STYLE{len(styles)-1}\x00"
-    src = re.sub(r"<style[^>]*>.*?</style>", _style_repl, src, flags=re.DOTALL)
-
-    # Protect <script>
+    src = re.sub(r"<style[^>]*>.*?</style>",
+                 lambda m: (styles.append(m.group(0)) or f"\x00STYLE{len(styles)-1}\x00"),
+                 src, flags=re.DOTALL)
     scripts = []
-    def _script_repl(m):
-        scripts.append(m.group(0))
-        return f"\x00SCRIPT{len(scripts)-1}\x00"
-    src = re.sub(r"<script[^>]*>.*?</script>", _script_repl, src, flags=re.DOTALL)
+    src = re.sub(r"<script[^>]*>.*?</script>",
+                 lambda m: (scripts.append(m.group(0)) or f"\x00SCRIPT{len(scripts)-1}\x00"),
+                 src, flags=re.DOTALL)
+    attrs = []
+    src = re.sub(r'\b(?:href|src|action)\s*=\s*(["\']).*?\1',
+                 lambda m: (attrs.append(m.group(0)) or f"\x00ATTR{len(attrs)-1}\x00"),
+                 src, flags=re.DOTALL)
 
-    # Translate visible HTML — phrases first (con sentinelas), luego words
+    # Traducir HTML visible: frases → palabras → restaurar frases → contraer.
     src = apply_phrases(src)
     src = apply_words(src)
     src = restore_phrases(src)
+    src = contract(src)
 
-    # Restore <style> as-is
+    # Restaurar atributos URL (sin traducir, con cross-links ES→PT reescritos).
+    for i, a in enumerate(attrs):
+        src = src.replace(f"\x00ATTR{i}\x00", rewrite_crosslinks(a))
+    # Restaurar <style> intacto.
     for i, st in enumerate(styles):
         src = src.replace(f"\x00STYLE{i}\x00", st)
-
-    # Translate <script> string-literals carefully
+    # Restaurar <script>: traducir string-literals + reescribir cross-links.
     for i, sc in enumerate(scripts):
-        src = src.replace(f"\x00SCRIPT{i}\x00", _translate_script(sc))
+        src = src.replace(f"\x00SCRIPT{i}\x00", rewrite_crosslinks(_translate_script(sc)))
 
-    DST.write_text(src, encoding="utf-8")
-    print(f"OK · escrito {DST.name}")
-    print(f"   tamaño: {len(src):,} chars")
+    # Quitar signos de apertura del español (no existen en portugués).
+    src = src.replace("¿", "").replace("¡", "")
+
+    dst_path.write_text(src, encoding="utf-8")
+    return len(src)
+
+def main():
+    import sys
+    only = sys.argv[1] if len(sys.argv) > 1 else None
+    for es, pt in MODULES.items():
+        if only and only not in (es, pt):
+            continue
+        src_path = ROOT / es
+        if not src_path.exists():
+            print(f"⚠  falta {es} — salto")
+            continue
+        n = translate_file(src_path, ROOT / pt)
+        out = (ROOT / pt).read_text(encoding="utf-8")
+        resid = out.count("¿") + out.count("¡")
+        print(f"OK · {es:28s} → {pt:30s} {n:>9,} chars · ¿¡ residual: {resid}")
 
 if __name__ == "__main__":
     main()

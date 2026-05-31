@@ -1,0 +1,2894 @@
+<!DOCTYPE html>
+<html lang="pt-BR" id="htmlRoot">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Análise de Atores e Conflictos · Ricardo.Ruiz</title>
+<meta name="description" content="Mapa de atores, alianzas e conflictos sobre objetivos de política pública. Inspirado no método Mactor (Godet) e adaptado para Colombia." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --paper:#1a1610; --paper-2:#221d15; --paper-3:#2a241b;
+  --ink:#f4f3ef; --ink-2:#b8b1a0; --ink-3:#807a6c;
+  --rule:#f4f3ef1c; --rule-strong:#f4f3ef38;
+  --accent:#d96a50; --accent-2:#e08266;
+  --accent-soft:#d96a5018; --accent-tint:#d96a5036;
+  --gold:#d6a83a; --on-accent:#14110a;
+  --green:#6fa07a; --amber:#d6a83a; --danger:#d96a50;
+  --sans:'Familjen Grotesk',system-ui,sans-serif;
+  --italic:'Petrona',Georgia,serif;
+  --mono:'Space Mono',ui-monospace,monospace;
+  --display:'Syne',sans-serif;
+}
+body.day-mode {
+  --paper:#f4f3ef; --paper-2:#ecebe5; --paper-3:#e0ddd2;
+  --ink:#14110a; --ink-2:#5a5448; --ink-3:#948e80;
+  --rule:#14110a1f; --rule-strong:#14110a40;
+  --accent:#8a1e16; --accent-2:#a02a20;
+  --accent-soft:#8a1e161a; --accent-tint:#8a1e1633;
+  --gold:#8a6a1a; --on-accent:#f4f3ef;
+  --green:#2f6b3f; --amber:#8a6a1a; --danger:#b03524;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html { scroll-behavior:smooth; }
+body {
+  background:var(--paper); color:var(--ink);
+  font-family:var(--sans); font-size:17px; line-height:1.55;
+  min-height:100vh; overflow-x:hidden; cursor:none;
+  transition:background .35s, color .35s;
+}
+a { color:inherit; text-decoration:none; }
+button { font:inherit; color:inherit; background:none; border:none; cursor:none; }
+::selection { background:var(--accent); color:var(--on-accent); }
+body.day-mode::before {
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image:radial-gradient(rgba(20,17,10,.035) 1px, transparent 1.4px);
+  background-size:4px 4px; opacity:.9; mix-blend-mode:multiply;
+}
+.cursor { position:fixed; width:12px; height:12px; background:var(--accent); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s, background .2s; transform:translate(-50%,-50%); }
+.cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--accent); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s, opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+
+/* Topbar */
+.topbar {
+  position:sticky; top:0; z-index:60;
+  display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:1.5rem;
+  padding:1rem 1.75rem;
+  background:var(--paper); border-bottom:1px solid var(--rule); backdrop-filter:blur(8px);
+}
+.topbar-left,.topbar-center,.topbar-right { display:flex; align-items:center; gap:1.1rem; }
+.topbar-right { justify-content:flex-end; }
+.btn-back {
+  display:inline-flex; align-items:center; gap:.55rem;
+  font-family:var(--sans); font-size:14px; font-weight:500; letter-spacing:.04em;
+  padding:.5rem .9rem; border:1px solid var(--rule-strong); transition:background .2s, border-color .2s;
+}
+.btn-back:hover { background:var(--paper-2); border-color:var(--ink); }
+.theme-btn {
+  font-family:var(--mono); font-size:12px; font-weight:700; color:var(--ink-2);
+  padding:.45rem .8rem; border:1px solid var(--rule-strong);
+  transition:color .2s, border-color .2s;
+}
+.theme-btn:hover { color:var(--ink); border-color:var(--ink); }
+.logo-link { display:inline-flex; align-items:center; gap:.55rem; opacity:.9; }
+.logo-link:hover { opacity:1; }
+.logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
+.logo-bar { width:5px; background:var(--accent); border-radius:1px 1px 0 0; opacity:.9; }
+.logo-text { font-family:var(--display); font-weight:800; font-size:clamp(1.05rem,2vw,1.4rem); letter-spacing:-.03em; line-height:1; }
+.logo-text span { color:var(--accent); }
+
+.page {
+  position:relative; z-index:1;
+  max-width:980px; width:100%; margin:0 auto;
+  padding:2.4rem 1.75rem 5rem;
+}
+@media (max-width:720px) {
+  .page { padding:1.6rem 1.1rem 3rem; }
+  .topbar { grid-template-columns:1fr auto; padding:.85rem 1rem; }
+  .topbar-center { display:none; }
+  .topbar-right .logo-link { display:none; }
+}
+.crumb {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3); margin-bottom:1.8rem;
+}
+.crumb a { color:var(--ink-3); transition:color .2s; }
+.crumb a:hover { color:var(--accent); }
+.crumb .sep { margin:0 .55rem; opacity:.55; }
+
+/* Welcome */
+.welcome { text-align:center; padding:1.5rem 0 2rem; }
+.eyebrow {
+  font-family:var(--mono); font-size:12px; letter-spacing:.22em;
+  text-transform:uppercase; color:var(--accent); font-weight:700; margin-bottom:1.4rem;
+}
+.welcome-title {
+  font-family:var(--sans); font-weight:700;
+  font-size:clamp(2rem,5vw,3rem); letter-spacing:-.025em; line-height:1.1;
+  max-width:24ch; margin:0 auto 1.4rem;
+}
+.welcome-title em { font-family:var(--italic); font-style:italic; font-weight:400; color:var(--accent); }
+.welcome-sub {
+  font-family:var(--sans); font-size:clamp(1rem,1.5vw,1.18rem); line-height:1.55;
+  color:var(--ink-2); max-width:54ch; margin:0 auto 2rem;
+}
+.welcome-hint {
+  font-family:var(--mono); font-size:12px; letter-spacing:.04em; color:var(--ink-3);
+  max-width:54ch; margin:0 auto 2rem; line-height:1.6;
+}
+
+.accordion-stack {
+  display:flex; flex-direction:column; gap:.5rem;
+  max-width:640px; margin:2.6rem auto 2.4rem; text-align:left;
+}
+.accordion {
+  border:1px solid var(--rule-strong); background:var(--paper-2);
+  transition:background .2s, border-color .2s;
+}
+.accordion[open] { border-color:var(--accent-tint); background:var(--paper-3); }
+.accordion summary {
+  display:flex; align-items:center; justify-content:space-between; gap:1rem;
+  padding:1rem 1.2rem; list-style:none; cursor:none;
+  font-family:var(--sans); font-weight:600; font-size:.98rem;
+  user-select:none;
+}
+.accordion summary::-webkit-details-marker { display:none; }
+.accordion summary::after {
+  content:"+"; font-family:var(--mono); font-size:1.2rem; color:var(--accent);
+  width:18px; height:18px; display:flex; align-items:center; justify-content:center;
+  transition:transform .2s;
+}
+.accordion[open] summary::after { content:"−"; }
+.accordion summary .acc-num {
+  font-family:var(--mono); font-size:11px; color:var(--ink-3);
+  letter-spacing:.12em; margin-right:.9rem; font-weight:400;
+}
+.accordion-body {
+  padding:0 1.2rem 1.2rem;
+  font-family:var(--italic); font-style:italic; font-size:1rem; line-height:1.6; color:var(--ink-2);
+}
+.accordion-body em { color:var(--accent); }
+
+/* Botones */
+.btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+  font-family:var(--sans); font-weight:600; font-size:.98rem;
+  padding:.95rem 1.8rem;
+  background:var(--accent); color:var(--on-accent); border:none;
+  transition:background .2s, transform .1s;
+}
+.btn:hover { background:var(--accent-2); }
+.btn:active { transform:scale(.98); }
+.btn[disabled] { opacity:.35; pointer-events:none; }
+.btn-ghost {
+  background:transparent; color:var(--ink-2);
+  border:1px solid var(--rule-strong);
+  padding:.85rem 1.4rem;
+}
+.btn-ghost:hover { color:var(--ink); border-color:var(--ink); background:var(--paper-2); }
+.btn-big { font-size:1.05rem; padding:1.15rem 2.4rem; letter-spacing:.02em; }
+
+/* Stages */
+.is-hidden { display:none !important; }
+
+/* Cloud + IA bars */
+.cloud-bar {
+  display:flex; align-items:center; gap:1rem; flex-wrap:wrap;
+  padding:.85rem 1.1rem;
+  background:var(--accent-soft); border-left:3px solid var(--accent);
+  font-family:var(--mono); font-size:12px; color:var(--ink-2);
+}
+.cloud-bar .cb-icon { font-family:var(--sans); font-weight:700; color:var(--accent); }
+.cloud-bar .cb-spacer { flex:1; }
+.cloud-bar .cb-status { font-style:italic; color:var(--ink-3); font-family:var(--italic); font-size:12.5px; }
+.cloud-bar .cb-status.saving { color:var(--amber); }
+.cloud-bar .cb-status.saved { color:var(--green); }
+.cloud-bar .cb-status.error { color:var(--danger); }
+.cloud-bar .cb-editor { font-size:11px; color:var(--ink-3); padding-left:.8rem; border-left:1px solid var(--rule); }
+.cloud-bar.anon { background:rgba(214,168,58,0.10); border-left-color:var(--amber); }
+.cloud-bar.anon .cb-icon { color:var(--amber); }
+.cloud-bar .btn-mini {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.06em;
+  padding:.4rem .8rem; border:1px solid var(--rule-strong);
+  background:transparent; color:var(--ink-2);
+  transition:border-color .2s, color .2s;
+}
+.cloud-bar .btn-mini:hover { border-color:var(--accent); color:var(--accent); }
+
+.ia-bar {
+  display:flex; align-items:center; gap:1.1rem; flex-wrap:wrap;
+  padding:1.1rem 1.3rem;
+  background:linear-gradient(135deg, var(--accent-soft), var(--paper-2));
+  border:1px solid var(--accent-tint); border-left:3px solid var(--accent);
+}
+.ia-bar .ia-icon { font-family:var(--sans); font-size:1.4rem; color:var(--accent); flex-shrink:0; }
+.ia-bar .ia-body { flex:1; min-width:240px; }
+.ia-bar .ia-title { font-family:var(--sans); font-weight:700; font-size:1rem; color:var(--ink); margin-bottom:.25rem; }
+.ia-bar .ia-sub { font-family:var(--italic); font-style:italic; font-weight:400; font-size:.9rem; line-height:1.5; color:var(--ink-2); }
+.ia-bar .btn { padding:.75rem 1.4rem; font-size:.92rem; }
+.ia-bar .btn[disabled] { opacity:.55; cursor:not-allowed; }
+
+.ia-result {
+  background:var(--paper-2); border:1px solid var(--rule);
+  padding:1.4rem 1.6rem; margin:0;
+  animation:fadeInUp .35s ease both;
+}
+.ia-result .ia-result-eyebrow {
+  font-family:var(--mono); font-size:11px; letter-spacing:.18em;
+  text-transform:uppercase; color:var(--accent); margin-bottom:.55rem;
+}
+.ia-result .ia-result-eyebrow .ia-cached {
+  margin-left:.55rem; padding:.15rem .45rem; background:var(--paper-3); color:var(--ink-3);
+  font-size:9.5px; letter-spacing:.12em;
+}
+.ia-result h3 { font-family:var(--sans); font-weight:700; font-size:1.15rem; color:var(--ink); margin:1rem 0 .55rem; letter-spacing:-.01em; }
+.ia-result h3:first-of-type { margin-top:.4rem; }
+.ia-result p { font-family:var(--sans); font-weight:400; font-size:.98rem; line-height:1.6; color:var(--ink); margin-bottom:.85rem; }
+.ia-result p em { font-family:var(--italic); font-style:italic; color:var(--ink-2); }
+.ia-result ul { list-style:none; margin:.4rem 0 0; padding:0; }
+.ia-result ul li {
+  position:relative; padding:.55rem 0 .55rem 1.6rem;
+  font-family:var(--sans); font-size:.96rem; line-height:1.55; color:var(--ink);
+  border-bottom:1px solid var(--rule);
+}
+.ia-result ul li:last-child { border-bottom:none; }
+.ia-result ul li::before { content:"→"; position:absolute; left:0; top:.65rem; color:var(--accent); font-weight:700; }
+
+.ia-loading { display:flex; align-items:center; gap:.8rem; font-family:var(--mono); font-size:12px; color:var(--ink-3); }
+.ia-loading-dot { width:8px; height:8px; background:var(--accent); border-radius:50%; animation:iaPulse 1s ease-in-out infinite; }
+@keyframes iaPulse { 0%,100% { opacity:.3; transform:scale(.9); } 50% { opacity:1; transform:scale(1.2); } }
+
+.ia-suggested {
+  display:flex; flex-direction:column; gap:.45rem; margin-top:.8rem;
+}
+.ia-sug {
+  display:grid; grid-template-columns:auto 1fr auto; gap:.85rem; align-items:start;
+  padding:.7rem .9rem;
+  background:var(--paper-3); border:1px solid var(--rule);
+}
+.ia-sug-fam {
+  font-family:var(--mono); font-size:9.5px; font-weight:700; letter-spacing:.1em;
+  padding:.2rem .45rem; text-align:center; color:var(--accent); border:1px solid var(--accent-tint); background:var(--accent-soft);
+}
+.ia-sug-body { min-width:0; }
+.ia-sug-name { font-family:var(--sans); font-weight:600; font-size:.95rem; color:var(--ink); margin-bottom:.2rem; }
+.ia-sug-razon { font-family:var(--italic); font-style:italic; font-size:.85rem; line-height:1.5; color:var(--ink-2); }
+.ia-sug-add {
+  font-family:var(--mono); font-size:11px; padding:.4rem .7rem;
+  background:transparent; color:var(--ink-2); border:1px solid var(--rule-strong);
+  transition:border-color .15s, color .15s;
+}
+.ia-sug-add:hover { border-color:var(--accent); color:var(--accent); }
+.ia-sug-add.added { color:var(--green); border-color:rgba(111,160,122,0.5); }
+
+.ia-issues { display:flex; flex-direction:column; gap:.55rem; margin-top:.9rem; }
+.ia-issue {
+  display:grid; grid-template-columns:90px 1fr; gap:1rem; align-items:start;
+  padding:.8rem .95rem; background:var(--paper-3); border:1px solid var(--rule);
+}
+.ia-issue-tag {
+  font-family:var(--mono); font-size:10px; font-weight:700;
+  letter-spacing:.14em; text-transform:uppercase;
+  padding:.25rem .5rem; text-align:center;
+  background:var(--accent-soft); color:var(--accent); border:1px solid var(--accent-tint);
+}
+.ia-issue-body { min-width:0; }
+.ia-issue-actor { font-family:var(--mono); font-size:11px; color:var(--ink-3); letter-spacing:.04em; margin-bottom:.3rem; }
+.ia-issue-actor b { color:var(--accent); font-weight:600; }
+.ia-issue-msg { font-family:var(--sans); font-size:.92rem; line-height:1.5; color:var(--ink); margin-bottom:.4rem; }
+.ia-issue-sug { font-family:var(--italic); font-style:italic; font-size:.88rem; color:var(--ink-2); }
+.ia-issue-sug b { font-family:var(--sans); font-style:normal; color:var(--accent); font-weight:600; }
+
+/* Project row */
+.proj-row {
+  display:grid; grid-template-columns:1fr auto auto; gap:1rem; align-items:center;
+  padding:.8rem 1rem; background:var(--paper-3); border:1px solid var(--rule);
+}
+.proj-row .pr-name { font-family:var(--sans); font-weight:600; font-size:.95rem; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.proj-row .pr-meta { font-family:var(--mono); font-size:11px; color:var(--ink-3); letter-spacing:.04em; margin-top:.15rem; }
+.proj-row .pr-role {
+  font-family:var(--mono); font-size:10.5px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+  padding:.2rem .55rem; background:var(--paper); color:var(--ink-3); border:1px solid var(--rule-strong);
+}
+.proj-row .pr-role.owner { background:var(--accent); color:var(--on-accent); border-color:var(--accent); }
+.proj-row .pr-actions { display:flex; gap:.4rem; }
+.proj-row .pr-actions button {
+  font-family:var(--mono); font-size:11px; letter-spacing:.04em;
+  padding:.35rem .7rem; background:transparent; color:var(--ink-2); border:1px solid var(--rule-strong);
+  transition:border-color .2s, color .2s;
+}
+.proj-row .pr-actions button:hover { border-color:var(--accent); color:var(--accent); }
+.proj-row .pr-actions button.danger:hover { border-color:var(--danger); color:var(--danger); }
+
+/* Section head */
+.section-head {
+  display:flex; align-items:baseline; justify-content:space-between;
+  gap:1rem; margin-bottom:1.2rem; flex-wrap:wrap;
+}
+.section-head h2 {
+  font-family:var(--sans); font-weight:700; font-size:1.55rem; letter-spacing:-.015em;
+}
+.section-head h2 .num {
+  font-family:var(--mono); font-size:.65em; letter-spacing:.12em;
+  color:var(--ink-3); margin-right:.5rem; font-weight:400;
+}
+.section-head .meta {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.08em; color:var(--ink-3);
+}
+.section-desc {
+  font-family:var(--italic); font-style:italic; font-size:1.02rem; line-height:1.55;
+  color:var(--ink-2); max-width:56ch; margin-bottom:1.6rem;
+}
+
+/* Chips de actores/objetivos */
+.entity-grid {
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));
+  gap:.5rem; margin-bottom:1rem;
+}
+.entity-chip {
+  display:flex; align-items:center; gap:.55rem;
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+  padding:.55rem .75rem; font-family:var(--sans); font-size:.92rem; min-width:0;
+}
+.entity-chip-code {
+  font-family:var(--mono); font-size:11px; color:var(--accent);
+  letter-spacing:.04em; flex-shrink:0;
+}
+.entity-chip-name {
+  flex:1; outline:none; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.entity-chip-name:focus { outline:1px solid var(--accent); outline-offset:2px; }
+.entity-chip-del {
+  font-family:var(--mono); font-size:.95rem; color:var(--ink-3);
+  padding:0 .25rem; transition:color .2s;
+}
+.entity-chip-del:hover { color:var(--danger); }
+.entity-add-row { display:flex; gap:.55rem; margin-top:.8rem; flex-wrap:wrap; }
+.entity-add-input {
+  flex:1; min-width:200px;
+  font-family:var(--sans); font-size:.94rem;
+  padding:.65rem .9rem;
+  background:var(--paper-2); color:var(--ink);
+  border:1px solid var(--rule-strong); outline:none;
+}
+.entity-add-input:focus { border-color:var(--accent); }
+.entity-meta {
+  display:flex; gap:1.6rem; margin-top:1rem; flex-wrap:wrap;
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.04em; color:var(--ink-3);
+}
+.entity-meta b { color:var(--accent); font-weight:700; }
+
+.actions {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:.8rem; margin-top:1.8rem; flex-wrap:wrap;
+}
+.actions .right-group { display:flex; gap:.6rem; }
+
+/* Stage intro */
+.stage-intro {
+  background:var(--paper-2); border:1px solid var(--rule);
+  border-left:3px solid var(--accent);
+  padding:1.6rem 1.8rem; margin-bottom:1.6rem;
+}
+.stage-intro-p {
+  font-family:var(--sans); font-size:1rem; line-height:1.6; color:var(--ink); margin-bottom:1rem;
+}
+.stage-intro-p:last-of-type { margin-bottom:0; }
+.stage-intro-p em { font-family:var(--italic); font-style:italic; color:var(--ink-2); }
+.stage-intro-p b { color:var(--accent); font-weight:600; }
+
+/* Captura · escala MID (0-4) y MAO (-4..+4) */
+.scale-legend {
+  display:flex; flex-wrap:wrap; gap:1.2rem;
+  font-family:var(--mono); font-size:11.5px; color:var(--ink-3);
+  margin-bottom:1rem; letter-spacing:.04em;
+}
+.scale-legend b { color:var(--accent); font-weight:700; margin-right:.25rem; }
+.scale-legend .neg b { color:var(--green); }
+
+.matrix-wrap {
+  overflow-x:auto; margin-bottom:1rem;
+  background:var(--paper-2); padding:.9rem; border:1px solid var(--rule);
+}
+table.matrix {
+  border-collapse:collapse;
+  font-family:var(--mono); font-size:.78rem;
+}
+table.matrix th, table.matrix td {
+  border:1px solid var(--rule);
+  min-width:40px; height:36px;
+  text-align:center; vertical-align:middle; padding:0;
+}
+table.matrix th.row-h, table.matrix th.col-h {
+  font-family:var(--sans); font-weight:500; font-size:.8rem;
+  background:var(--paper-3); color:var(--ink);
+  padding:.3rem .55rem; max-width:220px;
+  text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+table.matrix th.col-h { text-align:center; min-width:44px; max-width:64px; }
+table.matrix th.col-h .col-h-inner {
+  writing-mode:vertical-rl; transform:rotate(180deg);
+  font-size:.7rem; letter-spacing:.04em;
+  max-height:130px; overflow:hidden; text-overflow:ellipsis; padding:.35rem 0;
+}
+table.matrix th.corner {
+  background:var(--paper-3); font-family:var(--mono); font-size:10.5px; color:var(--ink-3);
+  letter-spacing:.12em; text-align:center; vertical-align:bottom; padding-bottom:.5rem;
+}
+table.matrix td.cell { cursor:none; user-select:none; transition:background .15s; color:var(--ink); }
+table.matrix td.cell:hover { background:var(--accent-soft); }
+table.matrix td.cell.diag { background:var(--paper-3); color:var(--ink-3); cursor:not-allowed; }
+table.matrix td.cell.v-0 { color:var(--ink-3); }
+table.matrix td.cell.v-1 { background:var(--accent-soft); }
+table.matrix td.cell.v-2 { background:var(--accent-tint); color:var(--accent); font-weight:700; }
+table.matrix td.cell.v-3 { background:var(--accent); color:var(--on-accent); font-weight:700; }
+table.matrix td.cell.v-4 {
+  background:var(--accent); color:var(--on-accent); font-weight:700;
+  box-shadow:inset 0 0 0 2px var(--accent-2);
+}
+table.matrix td.cell.v-n1 { background:rgba(111,160,122,0.13); color:var(--green); font-weight:600; }
+table.matrix td.cell.v-n2 { background:rgba(111,160,122,0.28); color:var(--green); font-weight:700; }
+table.matrix td.cell.v-n3 { background:var(--green); color:var(--on-accent); font-weight:700; }
+table.matrix td.cell.v-n4 {
+  background:var(--green); color:var(--on-accent); font-weight:700;
+  box-shadow:inset 0 0 0 2px var(--green);
+}
+table.matrix td.cell:focus { outline:2px solid var(--accent); outline-offset:-2px; z-index:2; }
+
+.matrix-hint {
+  font-family:var(--italic); font-style:italic; font-weight:400;
+  font-size:.92rem; line-height:1.5; color:var(--ink-2);
+  background:var(--paper-2); border:1px dashed var(--rule-strong);
+  padding:.85rem 1.05rem; margin-bottom:1.1rem;
+}
+.matrix-hint b { font-family:var(--sans); font-style:normal; color:var(--accent); font-weight:600; }
+
+/* Resultados */
+.view-tabs {
+  display:grid; grid-template-columns:1fr 1fr 1fr; gap:.4rem; margin-bottom:1.5rem;
+}
+@media (max-width:720px) { .view-tabs { grid-template-columns:1fr; } }
+.view-tab {
+  display:grid; grid-template-columns:auto 1fr; grid-template-rows:auto auto;
+  gap:.15rem .9rem; align-items:baseline;
+  padding:.85rem 1.1rem;
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+  text-align:left; cursor:none; transition:border-color .2s, background .2s; position:relative;
+}
+.view-tab:hover { border-color:var(--accent); background:var(--paper-3); }
+.view-tab.active { border-color:var(--accent); background:var(--accent-soft); }
+.view-tab.active::before {
+  content:""; position:absolute; top:-1px; left:-1px; bottom:-1px; width:3px; background:var(--accent);
+}
+.view-tab .vt-num {
+  grid-row:1/span 2; font-family:var(--mono); font-size:11px; font-weight:700;
+  letter-spacing:.12em; color:var(--accent);
+  padding:.3rem .55rem; border:1px solid var(--accent-tint);
+  background:var(--paper); align-self:start;
+}
+.view-tab .vt-label { font-family:var(--sans); font-weight:700; font-size:1.02rem; letter-spacing:-.01em; color:var(--ink); }
+.view-tab .vt-hint { font-family:var(--italic); font-style:italic; font-weight:400; font-size:.78rem; line-height:1.4; color:var(--ink-3); }
+
+.view-pane { display:none; }
+.view-pane.active { display:block; animation:fadeInUp .25s ease both; }
+@keyframes fadeInUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+.results-grid {
+  display:grid; grid-template-columns:1.4fr 1fr; gap:1.5rem; margin-top:.5rem;
+}
+@media (max-width:900px) { .results-grid { grid-template-columns:1fr; } }
+.chart-wrap {
+  position:relative; background:var(--paper-2); border:1px solid var(--rule);
+  padding:1.2rem; min-height:480px;
+}
+.chart-quadrant-label {
+  position:absolute; font-family:var(--mono); font-size:10.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-3); pointer-events:none;
+}
+.chart-quadrant-label.q1 { top:1.2rem; left:1.2rem; }
+.chart-quadrant-label.q2 { top:1.2rem; right:1.2rem; color:var(--accent); }
+.chart-quadrant-label.q3 { bottom:2.7rem; left:1.2rem; }
+.chart-quadrant-label.q4 { bottom:2.7rem; right:1.2rem; }
+.ranking-card { background:var(--paper-2); border:1px solid var(--rule); padding:1rem 1.2rem; }
+.rank-group { margin-bottom:1rem; }
+.rank-group:last-child { margin-bottom:0; }
+.rank-title {
+  font-family:var(--sans); font-weight:700; font-size:.9rem;
+  letter-spacing:-.005em; margin-bottom:.45rem;
+  padding-bottom:.35rem; border-bottom:1px solid var(--rule);
+}
+.rank-list { list-style:none; font-family:var(--sans); font-size:.9rem; line-height:1.5; }
+.rank-list li {
+  display:flex; justify-content:space-between; align-items:baseline;
+  padding:.2rem 0; gap:.55rem;
+}
+.rank-list li .rk-code { font-family:var(--mono); font-size:10.5px; color:var(--ink-3); letter-spacing:.04em; flex-shrink:0; }
+.rank-list li .rk-name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink); }
+.rank-list li .rk-score { font-family:var(--mono); font-size:11px; color:var(--accent); flex-shrink:0; min-width:60px; text-align:right; }
+
+.empty-msg { font-family:var(--italic); font-style:italic; color:var(--ink-3); text-align:center; padding:1.5rem 0; }
+
+.export-row { display:flex; gap:.65rem; flex-wrap:wrap; margin-top:1.5rem; }
+
+.methodology-note {
+  max-width:64ch; margin-top:1.4rem;
+  font-family:var(--italic); font-style:italic; font-size:.9rem; line-height:1.6; color:var(--ink-3);
+}
+.methodology-note a { color:var(--accent); font-style:normal; }
+
+/* Modal */
+.modal-back {
+  position:fixed; inset:0; background:rgba(10,8,4,0.7);
+  display:none; align-items:center; justify-content:center;
+  z-index:8500; padding:1rem; backdrop-filter:blur(4px);
+}
+.modal-back.open { display:flex; }
+.modal {
+  background:var(--paper-2); border:1px solid var(--rule-strong);
+  padding:2rem 2.2rem; max-width:540px; width:100%; position:relative;
+  max-height:90vh; overflow-y:auto;
+}
+.modal-close {
+  position:absolute; top:.9rem; right:1.1rem;
+  font-family:var(--mono); font-size:1.2rem; color:var(--ink-3); transition:color .2s;
+}
+.modal-close:hover { color:var(--danger); }
+.modal h2 {
+  font-family:var(--sans); font-weight:700; font-size:1.35rem;
+  letter-spacing:-.01em; margin-bottom:.7rem; max-width:28ch;
+}
+.modal p {
+  font-family:var(--sans); font-size:.98rem; line-height:1.55; color:var(--ink-2); margin-bottom:1rem;
+}
+.modal p em { font-family:var(--italic); font-style:italic; }
+.modal p b { color:var(--ink); }
+
+/* Toast */
+.toast {
+  position:fixed; bottom:1.5rem; right:1.5rem;
+  background:var(--ink); color:var(--paper);
+  padding:.85rem 1.2rem; font-family:var(--sans); font-size:.9rem;
+  letter-spacing:.02em; z-index:9000;
+  opacity:0; transform:translateY(15px); pointer-events:none;
+  transition:opacity .25s, transform .25s;
+}
+.toast.show { opacity:1; transform:translateY(0); }
+
+/* Method link button */
+.method-link {
+  display:inline-flex; align-items:center; gap:.4rem;
+  font-family:var(--mono); font-size:12px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--ink-2);
+  padding:.55rem .95rem; border:1px solid var(--rule-strong);
+  transition:color .2s, border-color .2s;
+}
+.method-link:hover { color:var(--accent); border-color:var(--accent); }
+
+footer.foot {
+  max-width:980px; margin:0 auto; padding:2rem 1.75rem 1.5rem;
+  border-top:1px solid var(--rule);
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.06em; color:var(--ink-3);
+  display:flex; justify-content:space-between; flex-wrap:wrap; gap:1rem;
+}
+
+/* Plantilla sugerida en wizard */
+.tpl-suggest {
+  border:1px solid var(--accent-tint); background:var(--accent-soft);
+  padding:1.6rem 1.6rem 1.8rem; margin-top:1.5rem;
+}
+.tpl-suggest-eyebrow {
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.18em;
+  text-transform:uppercase; color:var(--accent); font-weight:700; margin-bottom:.7rem;
+}
+.tpl-suggest-name {
+  font-family:var(--sans); font-weight:700; font-size:1.4rem;
+  letter-spacing:-.015em; margin-bottom:.6rem;
+}
+.tpl-suggest-desc {
+  font-family:var(--italic); font-style:italic; font-weight:400;
+  font-size:1rem; line-height:1.55; color:var(--ink-2); margin-bottom:.8rem;
+}
+.tpl-suggest-meta {
+  font-family:var(--mono); font-size:11.5px; color:var(--ink-3); letter-spacing:.08em;
+}
+.tpl-suggest-meta b { color:var(--ink); font-weight:700; }
+
+/* FAB Recursos · botón flotante del lab */
+.lab-fab {
+  position:fixed; bottom:1.5rem; left:1.5rem;
+  z-index:8000;
+  display:inline-flex; align-items:center; gap:.45rem;
+  padding:.65rem 1rem;
+  background:var(--paper-2); color:var(--ink);
+  border:1px solid var(--accent-tint);
+  font-family:var(--mono); font-size:11.5px; font-weight:700;
+  letter-spacing:.1em; text-transform:uppercase;
+  cursor:none;
+  transition:border-color .15s, background .15s, color .15s;
+  box-shadow:0 4px 12px rgba(0,0,0,0.25);
+}
+.lab-fab:hover { border-color:var(--accent); color:var(--accent); }
+.lab-fab .lab-fab-icon { color:var(--accent); font-size:1rem; }
+.lab-fab.is-hidden { display:none !important; }
+@media (max-width:640px) {
+  .lab-fab { padding:.5rem .8rem; font-size:10.5px; bottom:1rem; left:1rem; }
+}
+
+/* Modal Recursos */
+.lab-recursos-modal .modal { max-width:720px; }
+.lab-recursos-modal h2 { margin-bottom:1rem; }
+.lab-recursos-modal .lr-intro {
+  font-family:var(--italic); font-style:italic; font-weight:400;
+  font-size:.92rem; line-height:1.55; color:var(--ink-2);
+  margin-bottom:1.4rem; max-width:56ch;
+}
+.lab-recursos-modal .lr-intro a { color:var(--accent); font-style:normal; }
+.lab-recursos-modal .lr-empty {
+  font-family:var(--italic); font-style:italic; color:var(--ink-3);
+  text-align:center; padding:1.5rem 0;
+}
+.lr-cat { margin-bottom:1.4rem; }
+.lr-cat:last-child { margin-bottom:0; }
+.lr-cat-name {
+  font-family:var(--mono); font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--accent); font-weight:700;
+  margin-bottom:.7rem;
+  padding-bottom:.35rem; border-bottom:1px solid var(--rule);
+}
+.lr-items { display:grid; grid-template-columns:1fr; gap:.5rem; }
+.lr-item {
+  display:block;
+  padding:.75rem .9rem;
+  background:var(--paper); border:1px solid var(--rule);
+  transition:border-color .15s, background .15s;
+}
+.lr-item:hover { border-color:var(--accent); background:var(--paper-2); }
+.lr-item-name {
+  font-family:var(--sans); font-weight:600; font-size:.92rem;
+  color:var(--ink); letter-spacing:-.005em;
+  margin-bottom:.2rem;
+  display:flex; align-items:baseline; gap:.4rem;
+}
+.lr-item-name::after {
+  content:"↗"; color:var(--accent); font-family:var(--mono); font-size:.85rem;
+  margin-left:auto; flex-shrink:0; opacity:.55;
+}
+.lr-item:hover .lr-item-name::after { opacity:1; }
+.lr-item-desc {
+  font-family:var(--italic); font-style:italic; font-weight:400;
+  font-size:.82rem; line-height:1.5; color:var(--ink-2);
+}
+/* Disclosure compacto de proyectos en la nube (D.2) */
+.proj-disclosure summary::-webkit-details-marker { display:none; }
+.proj-disclosure summary::marker { content:''; }
+.proj-disclosure summary:hover { background:var(--paper-3); }
+.proj-disclosure .proj-caret { display:inline-block; transition:transform .15s; }
+.proj-disclosure[open] .proj-caret { transform:rotate(90deg); }
+</style>
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<nav class="topbar">
+  <div class="topbar-left">
+    <a href="index.html#proyectos" class="btn-back"><span>←</span> Voltar</a>
+    <div id="nav-user-block" class="is-hidden" style="display:flex;align-items:center;gap:.7rem;margin-left:.5rem">
+      <a href="dashboard.html" id="nav-user-name" style="font-family:var(--sans);font-size:13px;font-weight:600;color:var(--ink);text-decoration:none;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .2s" title="Ir ao dashboard"></a>
+      <a href="pricing.html" id="nav-user-plano" style="font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--accent);padding:.25rem .55rem;border:1px solid var(--accent);background:var(--accent-soft)">FREE</a>
+      <button onclick="logoutUser()" style="font-family:var(--mono);font-size:11px;color:var(--ink-3);background:none;border:none;padding:0">sair ↗</button>
+    </div>
+    <div id="nav-auth-anon" style="display:flex;gap:.7rem;margin-left:.5rem">
+      <a href="login.html" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)">Entrar</a>
+      <a href="register.html" style="font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);padding:.3rem .65rem">Cadastrar</a>
+    </div>
+  </div>
+  <div class="topbar-center">
+    <span class="eyebrow" style="margin:0;font-size:11px">Análise de Atores</span>
+  </div>
+  <div class="topbar-right">
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo dia</button>
+    <a href="index.html" class="logo-link">
+      <div class="logo-bars">
+        <div class="logo-bar" style="height:20px"></div>
+        <div class="logo-bar" style="height:15px"></div>
+        <div class="logo-bar" style="height:9px"></div>
+        <div class="logo-bar" style="height:4px"></div>
+      </div>
+      <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+    </a>
+  </div>
+</nav>
+
+<main class="page">
+  <div class="crumb">
+    <a href="index.html">Início</a> <span class="sep">/</span>
+    <a href="analisis-estrutural.html">Laboratório de Políticas</a> <span class="sep">/</span>
+    <span>Análise de Atores</span>
+  </div>
+
+  <!-- MIS PROYECTOS (logged only) -->
+  <section class="is-hidden" id="my-projects" style="margin-bottom:1.4rem">
+    <details class="proj-disclosure" style="background:var(--paper-2);border:1px solid var(--rule)">
+      <summary style="display:flex;align-items:center;justify-content:space-between;gap:.8rem;padding:.7rem 1.1rem;list-style:none;cursor:none;flex-wrap:wrap;transition:background .15s">
+        <span style="display:flex;align-items:baseline;gap:.85rem;flex-wrap:wrap">
+          <span style="font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700"><span class="proj-caret">▸</span> Carregar ou abrir projeto</span>
+          <span id="my-projects-meta" style="font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.04em">—</span>
+        </span>
+        <button class="btn-ghost" style="padding:.4rem .85rem;font-size:.85rem" onclick="event.preventDefault();event.stopPropagation();newProject()">+ Novo</button>
+      </summary>
+      <div id="my-projects-list" style="display:flex;flex-direction:column;gap:.45rem;padding:.5rem 1.1rem 1.1rem"></div>
+    </details>
+  </section>
+
+  <!-- WELCOME -->
+  <section id="stage-welcome">
+    <div class="welcome">
+      <div class="eyebrow">Mapa de alianzas e conflictos de política pública</div>
+      <h1 class="welcome-title">Quem apoia, quem <em>bloquea</em>, quem decide</h1>
+      <p class="welcome-sub">
+        Uma política pública não falla por mal desenho técnico — falla porque
+        não entendió a vocêempo o juego de atores que a rodea. Esta
+        ferramenta te ajuda a mapear os atores, ver sobre o que objetivos
+        estão alineados ou em conflicto, e entender quem tem o poder
+        real de bloquear ou impulsar.
+      </p>
+      <p class="welcome-hint">
+        Defines os atores (gremios, ministerios, sindicatos, comunidades,
+        ONG), os objetivos em disputa, e classifica como cada ator se
+        posiciona sobre cada objetivo. A ferramenta calcula o poder
+        relativo de cada uno, as alianzas posibles e os conflictos
+        latentes. Toma entre 30 minutos e dois horas segundo a profundidad.
+      </p>
+      <button class="method-link" onclick="openModal('modal-method')">Como calculamos? →</button>
+
+      <div class="accordion-stack">
+        <details class="accordion">
+          <summary><span><span class="acc-num">01</span>O que faz exactamente</span></summary>
+          <div class="accordion-body">
+            Toma aos <em>atores</em> que importan para uma decisão
+            (instituciones, gremios, sindicatos, comunidades, partidos) e
+            os <em>objetivos</em> em disputa (projetos, reformas, leyes,
+            decisões). Calificas dois cosas: quanto influencia cada ator
+            sobre cada uno dos demais (0 a 4), e quão a favor ou em
+            contra está cada ator sobre cada objetivo (−4 a +4). Com
+            essas classificaciones a ferramenta calcula o poder relativo
+            de cada ator, sus alianzas posibles, sus conflictos
+            latentes e o grado de movilización de cada objetivo.
+          </div>
+        </details>
+        <details class="accordion">
+          <summary><span><span class="acc-num">02</span>O que te entrega</span></summary>
+          <div class="accordion-body">
+            Um mapa com dois lentes: <em>Influencia × Dependencia</em>
+            (o que ator manda e qual é manejado por outros?) e
+            <em>Convergencia × Divergencia</em> (o que pares de atores
+            comparten objetivos e quais estão claramente em oposición?).
+            Além disso um ranking de atores por poder e um ranking de
+            objetivos por nivel de movilización (quão disputado está).
+          </div>
+        </details>
+        <details class="accordion">
+          <summary><span><span class="acc-num">03</span>Para que te sirve</span></summary>
+          <div class="accordion-body">
+            Para desenhar uma <em>estratégia de incidencia</em>: com quem
+            sentarse primeiro, o que argumentos usar para cada ator, onde
+            estão os conflictos que há que arbitrar antes de que
+            exploten. É o complemento natural do análise estrutural
+            de variáveis: esse te diz o que mover, este te diz quiénes
+            são os que podem moverlo ou frenarlo.
+          </div>
+        </details>
+      </div>
+      <button class="btn btn-big" onclick="startWizard()">Começar →</button>
+
+      <p style="margin-top:2.5rem;font-family:var(--italic);font-style:italic;color:var(--ink-3);font-size:.92rem;max-width:54ch;margin-left:auto;margin-right:auto;line-height:1.55">
+        O <em>problema mismo</em> que disputan estes atores não étá acordado? Empieza por
+        <a href="problema-publico-pt.html" style="color:var(--accent);font-style:normal;font-weight:600">problema público →</a>.
+        Quieres entender o que <em>variáveis movem o sistema</em>? Salta a
+        <a href="analisis-estrutural.html" style="color:var(--accent);font-style:normal;font-weight:600">análise estrutural →</a>.
+        Vas a <em>medir o efecto</em> de uma política sobre estes atores?
+        <a href="evaluacion-pt.html" style="color:var(--accent);font-style:normal;font-weight:600">avaliação →</a>.
+      </p>
+    </div>
+  </section>
+
+  <!-- WIZARD (mínimo, 1 pergunta + modelo sugerida) -->
+  <section id="stage-wizard" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 01</span>Cuéntanos sobre o que vai trabalhar</h2>
+    </div>
+    <p class="section-desc">
+      Uma pergunta para sugerirte uma modelo. Puedes cambiarla ou empezar
+      em blanco no seguinte passo.
+    </p>
+
+    <div class="wizard-step">
+      <p style="font-family:var(--sans);font-weight:600;font-size:1.05rem;margin-bottom:.9rem">Que tipo de processo vai analizar?</p>
+      <div class="opts-list" id="wp-q1-opts" style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem"></div>
+    </div>
+
+    <div id="tpl-suggest-box" style="margin-top:1.2rem"></div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="backToWelcome()">← Voltar ao inicio</button>
+      <div class="right-group">
+        <button class="btn-ghost" onclick="startBlank()">Começar em blanco</button>
+        <button class="btn" id="wp-q1-next" disabled onclick="startProject()">Começar análise →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE: ACTORES -->
+  <section id="stage-atores" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 02</span>Atores do sistema</h2>
+      <span class="meta" id="atores-meta">—</span>
+    </div>
+    <div class="stage-intro" id="atores-intro">
+      <p class="stage-intro-p">
+        Os atores são os individuos, organizações ou grupos que
+        têm <em>intereses</em> sobre o processo que está analizando
+        — e por lo tanto têm incentivos para apoyarlo ou frenarlo.
+      </p>
+      <p class="stage-intro-p">
+        <b>Reglas prácticas:</b> que sean nomes específicos (não
+        &laquo;sociedad civil&raquo; mas sim &laquo;ANDI&raquo;, &laquo;Fedegan&raquo;, &laquo;CUT&raquo;,
+        &laquo;Min. Hacienda&raquo;). Entre 6 e 15 atores: por debajo de 5 o
+        análise perde resolución, por encima de 20 a matriz se vuelve
+        impractica. Incluye <b>atores em conflicto</b> e <b>árbitros</b>:
+        se todos estão do mismo lado, o análise não te dirá nada novo.
+      </p>
+      <div class="actions" style="margin-top:1.4rem">
+        <button class="btn-ghost" onclick="backToWizard()">← Cambiar modelo</button>
+        <div class="right-group">
+          <button class="btn" onclick="actoresShowEditor()">Editar atores →</button>
+        </div>
+      </div>
+    </div>
+    <div id="atores-editor" class="is-hidden">
+      <p class="section-desc">Edita, adiciona ou remove atores segundo seu caso.</p>
+
+      <div class="ia-bar" id="ia-atores-bar" style="margin-bottom:1.2rem">
+        <div class="ia-icon">✦</div>
+        <div class="ia-body">
+          <div class="ia-title">Sugerir atores com IA</div>
+          <div class="ia-sub">O copiloto IA propone atores típicos para seu tema no contexto colombiano (gobierno, gremios, sindicatos, sociedad civil, terceros). Plan Pro ou superior.</div>
+        </div>
+        <button class="btn" id="ia-atores-btn" onclick="iaSugerirActores()">Sugerir atores</button>
+      </div>
+      <div class="ia-result" id="ia-atores-result" style="display:none"></div>
+
+      <div class="entity-grid" id="atores-grid"></div>
+      <div class="entity-add-row">
+        <input type="text" class="entity-add-input" id="atores-add-input" placeholder="Nome do novo ator…" onkeydown="if(event.key==='Enter')addActor()"/>
+        <button class="btn-ghost" onclick="addActor()">+ Adicionar ator</button>
+      </div>
+      <div class="entity-meta">
+        <span>Atores: <b id="atores-count">0</b></span>
+      </div>
+      <div class="actions">
+        <button class="btn-ghost" onclick="backToActoresIntro()">← Voltar à introducción</button>
+        <div class="right-group">
+          <button class="btn" onclick="goToObjetivos()">Continuar a objetivos →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE: OBJETIVOS -->
+  <section id="stage-objetivos" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 03</span>Objetivos em disputa</h2>
+    </div>
+    <p class="section-desc">
+      Os objetivos são as decisões, projetos ou reformas concretas
+      sobre as que os atores se posicionan. Idealmente entre 5 e 15:
+      lo suficientemente específicos para que um ator possa estar
+      claramente a favor ou em contra de cada uno.
+    </p>
+    <div class="entity-grid" id="objetivos-grid"></div>
+    <div class="entity-add-row">
+      <input type="text" class="entity-add-input" id="objetivos-add-input" placeholder="Objetivo específico…" onkeydown="if(event.key==='Enter')addObjetivo()"/>
+      <button class="btn-ghost" onclick="addObjetivo()">+ Adicionar objetivo</button>
+    </div>
+    <div class="entity-meta">
+      <span>Objetivos: <b id="objetivos-count">0</b></span>
+    </div>
+    <div class="actions">
+      <button class="btn-ghost" onclick="backToActores()">← Editar atores</button>
+      <div class="right-group">
+        <button class="btn" onclick="goToMID()">Continuar a matriz de influencias →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE: MID (ator × ator) -->
+  <section id="stage-mid" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 04</span>Matriz de influencias entre atores</h2>
+      <span class="meta"><b id="mid-filled">0</b>/<b id="mid-total">0</b> células</span>
+    </div>
+    <p class="section-desc">
+      Para cada par (A, B), classifica quanto influencia A sobre B numa
+      escala de 0 a 4. A escala captura a profundidad do impacto: se
+      A pode afectar a B a nivel de processos cotidianos, projetos
+      estratégicos, su misión institucional, ou até su existencia
+      misma.
+    </p>
+    <div class="scale-legend">
+      <span><b>0</b> nula</span>
+      <span><b>1</b> sobre processos operativos</span>
+      <span><b>2</b> sobre projetos</span>
+      <span><b>3</b> sobre su misión</span>
+      <span><b>4</b> sobre su existencia</span>
+    </div>
+    <p class="matrix-hint">
+      <b>Tip:</b> cada clic numa célula <em>sube</em> o valor (0 → 1 → 2 → 3 → 4 → vuelve a 0).
+      As setas do teclado navegan entre células. A diagonal está
+      bloqueada (um ator não se influencia a si mesmo).
+    </p>
+    <div class="matrix-wrap" id="mid-wrap"></div>
+    <div class="actions">
+      <button class="btn-ghost" onclick="backToObjetivos()">← Editar objetivos</button>
+      <div class="right-group">
+        <button class="btn-ghost" onclick="resetMID()">Limpiar matriz</button>
+        <button class="btn" onclick="goToMAO()">Continuar a posições →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE: MAO (ator × objetivo) -->
+  <section id="stage-mao" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 05</span>Posição de cada ator sobre cada objetivo</h2>
+      <span class="meta"><b id="mao-filled">0</b>/<b id="mao-total">0</b> células</span>
+    </div>
+    <p class="section-desc">
+      Para cada ator (filas) e cada objetivo (colunas), classifica o que
+      tão a favor (+) ou em contra (−) está o ator desse objetivo, em
+      uma escala que também captura intensidad: se o objetivo afecta
+      aos processos do ator, a sus projetos, a su misión, ou a su
+      existencia.
+    </p>
+    <div class="scale-legend">
+      <span><b>+4 / −4</b> existencia</span>
+      <span><b>+3 / −3</b> misión</span>
+      <span><b>+2 / −2</b> projetos</span>
+      <span><b>+1 / −1</b> processos</span>
+      <span><b>0</b> nula</span>
+    </div>
+    <p class="matrix-hint">
+      <b>Tip:</b> cada clic cicla o valor: 0 → +1 → +2 → +3 → +4 → −1 → −2 → −3 → −4 → 0.
+      As posições positivas (apoio, salmón) e negativas (oposición, verde) se distinguen por color.
+    </p>
+    <div class="cloud-bar" id="cloud-bar-mao" style="margin-bottom:1.2rem">
+      <span class="cb-icon">●</span>
+      <span id="cb-text-mao">Trabajando local</span>
+      <span class="cb-spacer"></span>
+      <span class="cb-status" id="cb-status-mao"></span>
+      <span class="cb-editor" id="cb-editor-mao"></span>
+      <button class="btn-mini" id="cb-save-mao" onclick="cloudSave()">Salvar na nuvem</button>
+    </div>
+
+    <div class="matrix-wrap" id="mao-wrap"></div>
+
+    <div class="ia-bar" id="ia-mao-bar" style="margin-top:1.2rem">
+      <div class="ia-icon">✦</div>
+      <div class="ia-body">
+        <div class="ia-title">Revisar posições com IA</div>
+        <div class="ia-sub">O copiloto detecta posições improbables: atores neutrales em todo, asimetrías sospechosas, contradicciones com a misión institucional típica. Plan Premium ou superior.</div>
+      </div>
+      <button class="btn" id="ia-mao-btn" onclick="iaValidarMAO()">Revisar posições</button>
+    </div>
+    <div class="ia-result" id="ia-mao-result" style="display:none"></div>
+
+    <div class="actions">
+      <button class="btn-ghost" onclick="backToMID()">← Editar influencias</button>
+      <div class="right-group">
+        <button class="btn-ghost" onclick="resetMAO()">Limpiar matriz</button>
+        <button class="btn" onclick="goToResults()">Ver resultados →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE: RESULTS -->
+  <section id="stage-results" class="is-hidden">
+    <div class="section-head">
+      <h2><span class="num">— 06</span>Mapa de atores</h2>
+      <span class="meta" id="results-counter">—</span>
+    </div>
+    <div class="view-tabs">
+      <button class="view-tab active" data-view="influ" onclick="setView('influ')">
+        <span class="vt-num">A</span><span class="vt-label">Influencia</span>
+        <span class="vt-hint">quem manda · quem é manejado</span>
+      </button>
+      <button class="view-tab" data-view="alianzas" onclick="setView('alianzas')">
+        <span class="vt-num">B</span><span class="vt-label">Alianzas</span>
+        <span class="vt-hint">convergencia · divergencia entre atores</span>
+      </button>
+      <button class="view-tab" data-view="objetivos" onclick="setView('objetivos')">
+        <span class="vt-num">C</span><span class="vt-label">Objetivos</span>
+        <span class="vt-hint">movilización · saldo neto por objetivo</span>
+      </button>
+    </div>
+
+    <div class="view-pane active" id="view-influ">
+      <p class="section-desc">
+        Cada ator segundo su <b>influencia total</b> (eje E, quanto manda
+        sobre os demais) e su <b>dependencia total</b> (eje X, quanto os
+        demais mandan sobre él). Os <b>dominantes</b> (muita influencia,
+        pouca dependencia) têm o poder estratégico. Os <b>dominados</b>
+        são os que o sistema empuja. Os <b>autónomos</b> estão ao margen.
+      </p>
+      <div class="results-grid">
+        <div class="chart-wrap">
+          <span class="chart-quadrant-label q1">Dominantes</span>
+          <span class="chart-quadrant-label q2">De link</span>
+          <span class="chart-quadrant-label q3">Autónomos</span>
+          <span class="chart-quadrant-label q4">Dominados</span>
+          <canvas id="chart-influ"></canvas>
+        </div>
+        <div class="ranking-card" id="rank-influ"></div>
+      </div>
+    </div>
+
+    <div class="view-pane" id="view-alianzas">
+      <p class="section-desc">
+        Para cada par de atores, sumamos os objetivos nos que estão
+        do <em>mismo lado</em> (convergencia) e os que estão em
+        <em>oposición</em> (divergencia). Eje E: convergencia total com o
+        resto do sistema. Eje X: divergencia total. Os atores com alta
+        convergencia e baja divergencia são <b>candidatos a coalición</b>;
+        os de alta divergencia são os focos de conflicto a arbitrar.
+      </p>
+      <div class="results-grid">
+        <div class="chart-wrap">
+          <span class="chart-quadrant-label q1">Coaliciones</span>
+          <span class="chart-quadrant-label q2">Conflictivos</span>
+          <span class="chart-quadrant-label q3">Marginales</span>
+          <span class="chart-quadrant-label q4">Opositores</span>
+          <canvas id="chart-alianzas"></canvas>
+        </div>
+        <div class="ranking-card" id="rank-alianzas"></div>
+      </div>
+    </div>
+
+    <div class="view-pane" id="view-objetivos">
+      <p class="section-desc">
+        Para cada objetivo: <b>movilización</b> (suma de |posições|, o que
+        tão disputado está) e <b>saldo neto</b> (suma de posições
+        ponderadas por poder do ator, signo positivo = apoio neto,
+        negativo = oposición neta). Os objetivos com alta movilización
+        e saldo cercano a cero são os <em>conflictos sem resolver</em>;
+        os de alto saldo positivo são os que têm camino libre.
+      </p>
+      <div class="ranking-card" id="rank-objetivos"></div>
+    </div>
+
+    <div class="cloud-bar" id="cloud-bar-results" style="margin-top:1.5rem">
+      <span class="cb-icon">●</span>
+      <span id="cb-text-results">Trabajando local</span>
+      <span class="cb-spacer"></span>
+      <span class="cb-status" id="cb-status-results"></span>
+      <span class="cb-editor" id="cb-editor-results"></span>
+      <button class="btn-mini" id="cb-save-results" onclick="cloudSave()">Salvar na nuvem</button>
+      <button class="btn-mini is-hidden" id="cb-invite-results" onclick="openInviteModal()">Invitar colaborador</button>
+    </div>
+
+    <div class="ia-bar" id="ia-narr-bar" style="margin-top:1.5rem">
+      <div class="ia-icon">✦</div>
+      <div class="ia-body">
+        <div class="ia-title">Generar leitura interpretativa com IA</div>
+        <div class="ia-sub">O copiloto toma seus atores, posições e alianzas detectadas e redige panorama, claves, alianzas, conflictos e três recomendações de incidencia. Plan Premium ou superior.</div>
+      </div>
+      <button class="btn" id="ia-narr-btn" onclick="iaNarrativa()">Generar leitura</button>
+    </div>
+    <div class="ia-result" id="ia-narr-result" style="display:none"></div>
+
+    <div class="export-row">
+      <button class="btn" onclick="exportJSON()">Baixar análise (.json)</button>
+      <button class="btn-ghost" onclick="backToMAO()">← Editar posições</button>
+    </div>
+
+    <div style="margin-top:2rem;display:grid;gap:.8rem">
+      <div style="display:flex;align-items:center;gap:1.1rem;flex-wrap:wrap;padding:1.1rem 1.3rem;background:rgba(214,168,58,0.10);border:1px solid var(--rule);border-left:3px solid var(--gold);font-family:var(--mono);font-size:12px;color:var(--ink-2)">
+        <div style="font-family:var(--sans);font-size:1.4rem;color:var(--gold);flex-shrink:0">←</div>
+        <div style="flex:1;min-width:240px">
+          <div style="font-family:var(--sans);font-weight:700;font-size:1rem;color:var(--ink);margin-bottom:.25rem">O problema que disputan está bem enquadrado?</div>
+          <div style="font-family:var(--italic);font-style:italic;font-weight:400;font-size:.9rem;line-height:1.5;color:var(--ink-2)">Se os atores estão em conflicto mas o problema mismo não étá acordado, o análise se vuelve ruido. Problema público te ajuda a fijar enunciado, criterios e alternativas <em>antes</em> da mesa política.</div>
+        </div>
+        <a href="problema-publico-pt.html" class="btn" style="background:var(--gold)">Problema público →</a>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:1.1rem;flex-wrap:wrap;padding:1.1rem 1.3rem;background:rgba(214,168,58,0.10);border:1px solid var(--rule);border-left:3px solid var(--gold);font-family:var(--mono);font-size:12px;color:var(--ink-2)">
+        <div style="font-family:var(--sans);font-size:1.4rem;color:var(--gold);flex-shrink:0">←</div>
+        <div style="flex:1;min-width:240px">
+          <div style="font-family:var(--sans);font-weight:700;font-size:1rem;color:var(--ink);margin-bottom:.25rem">E o que variáveis movem a estes atores?</div>
+          <div style="font-family:var(--italic);font-style:italic;font-weight:400;font-size:.9rem;line-height:1.5;color:var(--ink-2)">Mactor te mostra <em>quem</em> manda. O análise estrutural te mostra <em>o que</em> há que mover. São dois lentes complementares do mismo sistema.</div>
+        </div>
+        <a href="analisis-estrutural.html" class="btn" style="background:var(--gold)">Análise estrutural →</a>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:1.1rem;flex-wrap:wrap;padding:1.1rem 1.3rem;background:rgba(214,168,58,0.10);border:1px solid var(--rule);border-left:3px solid var(--gold);font-family:var(--mono);font-size:12px;color:var(--ink-2)">
+        <div style="font-family:var(--sans);font-size:1.4rem;color:var(--gold);flex-shrink:0">←</div>
+        <div style="flex:1;min-width:240px">
+          <div style="font-family:var(--sans);font-weight:700;font-size:1rem;color:var(--ink);margin-bottom:.25rem">Como le vai testar a estes atores que a política funciona?</div>
+          <div style="font-family:var(--italic);font-style:italic;font-weight:400;font-size:.9rem;line-height:1.5;color:var(--ink-2)">O módulo de avaliação de política te ajuda a desenhar o plano de avaliação: pergunta evaluativa, indicadores SMART, método e criterios DAC. Listo para defender ante os atores que mapeaste arriba.</div>
+        </div>
+        <a href="evaluacion-pt.html" class="btn" style="background:var(--gold)">Avaliação →</a>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:1.1rem;flex-wrap:wrap;padding:1.1rem 1.3rem;background:rgba(214,168,58,0.10);border:1px solid var(--rule);border-left:3px solid var(--gold);margin-top:.6rem">
+        <div style="font-family:var(--sans);font-size:1.4rem;color:var(--gold);flex-shrink:0">→</div>
+        <div style="flex:1;min-width:240px">
+          <div style="font-family:var(--sans);font-weight:700;font-size:1rem;color:var(--ink);margin-bottom:.25rem">Como le falamos a cada uno destes atores?</div>
+          <div style="font-family:var(--italic);font-style:italic;font-weight:400;font-size:.9rem;line-height:1.5;color:var(--ink-2)">O módulo <em>Comunicar a política</em> segmenta audiências e construye mensagem, narrativa Ganz, framing Lakoff e matriz de canais por audiência — incluidos os atores dominantes e opositores que identificaste neste Mactor.</div>
+        </div>
+        <a href="comunicar-pt.html" class="btn" style="background:var(--gold)">Comunicar →</a>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:1.1rem;flex-wrap:wrap;padding:1.1rem 1.3rem;background:var(--paper-2);border:1px solid var(--rule);border-left:3px solid var(--accent);margin-top:.6rem">
+        <div style="font-family:var(--sans);font-size:1.4rem;color:var(--accent);flex-shrink:0">∑</div>
+        <div style="flex:1;min-width:240px">
+          <div style="font-family:var(--sans);font-weight:700;font-size:1rem;color:var(--ink);margin-bottom:.25rem">Necesitas um memo completo com todo o ciclo?</div>
+          <div style="font-family:var(--italic);font-style:italic;font-weight:400;font-size:.9rem;line-height:1.5;color:var(--ink-2)">O <b>relatório combinado do lab</b> une o que hayas avançado nos 8 módulos (problema · sistema · atores · alternativas · AIN · avaliação · cenários · comunicar) num PDF estilo CONPES. Genera memo .pdf ou .md desde a sección «Meu relatório do lab» do hub.</div>
+        </div>
+        <a href="analisis-estrutural.html#informe" class="btn" style="background:var(--accent);color:var(--paper)">Relatório combinado →</a>
+      </div>
+    </div>
+
+    <p class="methodology-note">
+      Esta ferramenta é uma versión simplificada do método <b>Mactor</b>
+      (Matrix of Alliances and Conflicts: Tactics, Objectives,
+      Recommendations) propuesto por Michel Godet, LIPSOR, 1991, como
+      complemento natural do análise estrutural MICMAC. Enquanto MICMAC
+      diagnostica as variáveis que movem o sistema, Mactor analiza
+      aos atores que têm poder sobre essas variáveis.
+      Próximas versiones incorporarán cálculo de influencias indirectas
+      (matriz pivotada MIDI), pesos por poder ponderado e copiloto IA
+      para sugerir atores e validar a lista de objetivos.
+    </p>
+
+    <!-- Sprint F · What-if: variar influencia de um ator -->
+    <details id="whatif-block" style="margin-top:1.5rem;background:var(--paper-2);border:1px solid var(--rule);padding:0">
+      <summary style="cursor:pointer;padding:1rem 1.3rem;font-family:var(--sans);font-weight:700;font-size:1rem;color:var(--ink);display:flex;align-items:center;justify-content:space-between;list-style:none">
+        <span>✦ What-if · Variar influencia de um ator</span>
+        <span style="font-family:var(--mono);color:var(--accent);font-size:1.2rem">+</span>
+      </summary>
+      <div style="padding:0 1.3rem 1.3rem">
+        <p style="font-family:var(--sans);font-size:.95rem;color:var(--ink-2);margin:0 0 1rem">
+          Simula como se move o mapa de poder se um ator ganha ou perde fuerza. Multiplica su fila da MID pelo porcentaje escolhido e recalcula Ri e saldos netos — sem tocar seus classificaciones.
+        </p>
+        <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:.8rem;align-items:end;margin-bottom:1rem">
+          <div>
+            <label style="font-family:var(--mono);font-size:.78rem;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.3rem">Ator</label>
+            <select id="whatif-ator" style="width:100%;background:var(--paper);color:var(--ink);border:1px solid var(--rule);padding:.5rem .7rem;font-family:var(--sans);font-size:.95rem"></select>
+          </div>
+          <div>
+            <label style="font-family:var(--mono);font-size:.78rem;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.3rem">Variar influencia <span id="whatif-delta-lbl" style="color:var(--accent)">+0%</span></label>
+            <input id="whatif-delta" type="range" min="-50" max="50" step="5" value="0" style="width:100%;accent-color:var(--accent)" />
+            <div style="font-family:var(--mono);font-size:.7rem;color:var(--ink-3);display:flex;justify-content:space-between;margin-top:.2rem"><span>−50%</span><span>0</span><span>+50%</span></div>
+          </div>
+          <button class="btn" onclick="whatifMactor()">Aplicar</button>
+        </div>
+        <div id="whatif-result" style="display:none;background:var(--paper);border:1px solid var(--rule);padding:1rem 1.2rem;font-family:var(--sans);font-size:.95rem"></div>
+      </div>
+    </details>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>ricardoruiz.co · 2026</span>
+  <span>Composição: Familjen · Petrona · Mono</span>
+</footer>
+
+<!-- Modal metodologia -->
+<div class="modal-back" id="modal-method">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-method')">×</button>
+    <h2>Como lo calculamos</h2>
+    <p>
+      <b>Em palabras simples:</b> está descrevendo o juego político de uma
+      decisão. Por um lado, quem manda sobre quem (matriz <em>MID</em>:
+      ator × ator). Por outro, como se posiciona cada ator sobre cada
+      objetivo de seu lista (matriz <em>MAO</em>: ator × objetivo).
+    </p>
+    <p>
+      <b>Três lentes sobre o mismo juego.</b>
+    </p>
+    <p>
+      <b>Influencia e Dependencia.</b> A suma de cada fila de MID te da a
+      <em>influencia total</em> de cada ator (quanto manda). A suma de
+      cada coluna, su <em>dependencia</em> (quanto le mandan). O ratio
+      Influencia/Dependencia é o <b>poder relativo</b> Ri do ator — e
+      é o que se usa para ponderar sus posições sobre objetivos.
+    </p>
+    <p>
+      <b>Convergencia e Divergencia.</b> Para cada par de atores, miramos
+      sus posições em MAO. Se num objetivo ambos estão do mismo lado
+      (os dois a favor ou os dois em contra), suma à convergencia. Se
+      estão em lados opuestos, suma à divergencia. A intensidad do
+      acuerdo ou desacuerdo se conta pelo <em>mínimo</em> de sus
+      posições (um ator com +4 e outro com +1 cuentan como +1 de
+      convergencia).
+    </p>
+    <p>
+      <b>Movilización por objetivo.</b> Para cada objetivo, sumamos as
+      posições absolutas de todos os atores (ponderadas por su poder
+      Ri). Um objetivo com alta movilización é uno que muita gente quer
+      mover — para arriba ou para abajo. O saldo neto (sem valor absoluto)
+      diz para onde ganha o empate de fuerzas.
+    </p>
+    <p>
+      <b>Origen.</b> O método vem de Michel Godet em LIPSOR (París, 1991)
+      como contraparte do análise estrutural MICMAC. Em Colombia o
+      referente é Francisco José Mojica (Externado), formado com Godet
+      na Sorbona. Esta implementación é uma versión simplificada
+      do original — adequada para diagnóstico estratégico rápido, mas
+      não reemplaza um Mactor completo com software LIPSOR.
+    </p>
+    <p>
+      <b>Seu privacidad.</b> O cálculo é 100% local em seu navegador. Se salva na nuvem,
+      apenas viajan os nomes de atores, objetivos e as dois matrices — nunca enviamos
+      os resultados a terceros.
+    </p>
+    <p style="border-top:1px solid var(--rule);padding-top:1rem;margin-top:1.4rem">
+      <b>Quieres profundizar?</b><br/>
+      <a href="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/mactor/metodologia-paso-a-paso.pdf" target="_blank" rel="noopener" style="color:var(--accent)">↓ Guía passo a passo (PDF, ~11 KB)</a> ·
+      manual para usar a ferramenta em equipe.<br/>
+      <a href="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/mactor/respaldo-academico.pdf" target="_blank" rel="noopener" style="color:var(--accent)">↓ Respaldo metodológico (PDF, ~10 KB)</a> ·
+      fórmulas, autores e bibliografía.
+    </p>
+  </div>
+</div>
+
+<!-- Modal login -->
+<div class="modal-back" id="modal-login">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-login')">×</button>
+    <h2>Para salvar e usar IA precisa uma conta</h2>
+    <p>Seu trabalho se salva localmente. Para compartilhar com seu equipe, usar o copiloto IA ou acessar de outro dispositivo, inicia sessão ou cria uma conta gratuita.</p>
+    <div style="display:flex;gap:.55rem;margin-top:1.4rem;flex-wrap:wrap">
+      <a href="login.html" class="btn">Entrar</a>
+      <a href="register.html" class="btn-ghost">Crear conta gratis</a>
+    </div>
+  </div>
+</div>
+
+<!-- Modal invitación -->
+<div class="modal-back" id="modal-invite">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-invite')">×</button>
+    <h2>Invitar a um colaborador</h2>
+    <p>Apenas os colaboradores convidados podem ver e editar este projeto. Les llegará um e-mail com um link para aceptar.</p>
+    <label style="display:block;font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:1rem 0 .4rem">E-mail do colaborador</label>
+    <input type="email" id="invite-email" placeholder="colega@entidad.gov.co" style="width:100%;padding:.7rem .85rem;font-family:var(--sans);font-size:.95rem;background:var(--paper-3);color:var(--ink);border:1px solid var(--rule-strong);outline:none"/>
+    <div style="display:flex;gap:.55rem;margin-top:1.4rem;flex-wrap:wrap">
+      <button class="btn" onclick="submitInvite()">Enviar invitación</button>
+      <button class="btn-ghost" onclick="closeModal('modal-invite')">Cancelar</button>
+    </div>
+    <label style="display:block;font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:1.5rem 0 .4rem">Personas com acesso</label>
+    <ul id="collab-list" style="list-style:none"></ul>
+  </div>
+</div>
+
+<!-- FAB Recursos · botón flotante do lab -->
+<button class="lab-fab" id="lab-fab" onclick="openRecursosModal()">
+  <span class="lab-fab-icon">↗</span>
+  <span>Recursos</span>
+</button>
+
+<!-- Modal compartido do catálogo de Recursos do lab -->
+<div class="modal-back lab-recursos-modal" id="modal-recursos">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-recursos')">×</button>
+    <h2>Recursos &amp; Dados do lab</h2>
+    <p class="lr-intro">
+      Fuentes oficiales e guías metodológicas mais relevantes para
+      <b id="lr-modulo-name">este módulo</b>. O catálogo completo (com
+      todas as categorías) está ao pie do
+      <a href="analisis-estrutural.html" style="font-weight:600">hub do lab →</a>
+    </p>
+    <div id="modal-recursos-grid"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="lab-recursos.js"></script>
+
+<script>
+'use strict';
+
+// ═════════════════════════════════════════════════════════════════════════
+// PLANTILLAS — 4 plantillas seed (procesos típicos)
+// ═════════════════════════════════════════════════════════════════════════
+const TEMPLATES = {
+  'reforma-tributaria': {
+    nombre: 'Reforma tributaria nacional',
+    descripcion: 'Mapa típico de atores e objetivos quando se discute uma reforma fiscal no Congreso colombiano.',
+    perfil: 'Equipos de incidencia política, oficinas de planejamento nacional, consultorías estratégicas.',
+    actores: [
+      'MinHacienda','Presidencia','Bancada de gobierno','Bancada de oposición',
+      'ANDI','Fedegan','Asobancaria','Confecámaras',
+      'CUT','CGT','DIAN','Banco da República'
+    ],
+    objetivos: [
+      'Aumentar tarifa renta empresas grandes',
+      'Reduzir IVA em canasta básica',
+      'Impuesto a dividendos',
+      'Impuesto a patrimonio',
+      'Sobretasa ao sector financiero',
+      'Recortar exenciones tributarias',
+      'Impuesto ao carbono efectivo',
+      'Régimen tributario simplificado para pymes'
+    ]
+  },
+  'reforma-pensional': {
+    nombre: 'Reforma pensional',
+    descripcion: 'Atores e objetivos típicos quando se discute o sistema pensional colombiano (Régimen de Prima Média vs RAIS, edad de jubilación, pilar solidario).',
+    perfil: 'Equipos de política social, fondos privados, sindicatos, oficinas de planejamento.',
+    actores: [
+      'MinTrabajo','MinHacienda','Presidencia',
+      'Colpensiones','Fondos privados (AFP)','Banco da República',
+      'CUT','CGT','Asobancaria','Bancada gobierno','Bancada oposición','Corte Constitucional'
+    ],
+    objetivos: [
+      'Aumentar pilar solidario para mayores em pobreza',
+      'Subir o limiar de cotización ao RPM',
+      'Aumentar edad de jubilación',
+      'Excluir régimen de excepción (Ecopetrol, Fuerzas Armadas)',
+      'Aumentar semanas mínimas de cotización',
+      'Cobertura universal com pilar não contributivo',
+      'Sostenibilidad fiscal do sistema'
+    ]
+  },
+  'paz-territorial': {
+    nombre: 'Implementación de paz territorial',
+    descripcion: 'Atores do Acuerdo de Paz 2016 + 2026, sobre objetivos de implementación numa región específica.',
+    perfil: 'Oficinas de paz, ONG, cooperación internacional, gobiernos locales.',
+    actores: [
+      'Gobierno nacional','JEP','Comisión da Verdad','Unidad de Víctimas',
+      'Fuerza Pública','Partidos políticos de oposición','FARC reincorporación',
+      'Disidencias','ELN','Iglesia católica','ONU','Cooperación internacional',
+      'Comunidades étnicas','Empresarios agroindustriales'
+    ],
+    objetivos: [
+      'Reforma rural integral · acesso a vocêerras',
+      'Sustitución de cultivos ilícitos',
+      'Reincorporación económica de excombatientes',
+      'Verdad, justicia e reparación a víctimas',
+      'Garantías de segurança para líderes sociales',
+      'Aplicación efectiva do enfoque étnico e de género',
+      'Inversión em infraestructura rural'
+    ]
+  },
+  'politica-mde': {
+    nombre: 'Prefeitura de ciudad capital',
+    descripcion: 'Modelo genérica de atores e objetivos típicos numa prefeitura de ciudad capital colombiana (Bogotá, Medellín, Cali).',
+    perfil: 'Equipos de gobiernão ocal, consultorías de campaña, oficinas de planejamento municipal.',
+    actores: [
+      'Alcalde/Alcaldesa','Concejo Municipal','Personería','Contraloría',
+      'Sindicatos sector público','ANDI seccional','Cámara de Comercio',
+      'Universidades','Iglesias','ONG locales','Medios locales',
+      'Comunidades barriales','Gobernación','Gobierno nacional'
+    ],
+    objetivos: [
+      'Aumentar inversión em segurança ciudadana',
+      'Reforma à mobilidade / transporte público',
+      'Inversión em vivienda social',
+      'Recuperación de espacio público',
+      'Política de cultura e deporte',
+      'Programas para jóvenes em risco',
+      'Transparencia e lucha contra a corrupción'
+    ]
+  }
+};
+
+const Q1_OPTIONS = [
+  { id:'reforma-tributaria', label:'Reforma tributaria ou fiscal' },
+  { id:'reforma-pensional',  label:'Reforma pensional ou de segurança social' },
+  { id:'paz-territorial',    label:'Implementación de paz territorial' },
+  { id:'politica-mde',       label:'Gestión de prefeitura ou gobernación' }
+];
+
+// ═════════════════════════════════════════════════════════════════════════
+// STATE
+// ═════════════════════════════════════════════════════════════════════════
+const LS_KEY = 'mactor-current-v1';
+const STATE = {
+  wizard:{ tpl:null },
+  meta:{ tplId:null, nombre:'', createdAt:null, updatedAt:null },
+  actores:[],
+  objetivos:[],
+  mid:[],   // matriz [actores][actores] valores '0'..'4' o '' o '-' (diagonal)
+  mao:[]    // matriz [actores][objetivos] valores '-4'..'+4' o '' o '0'
+};
+function saveState() {
+  STATE.meta.updatedAt = new Date().toISOString();
+  try { localStorage.setItem(LS_KEY, JSON.stringify(STATE)); } catch {}
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return false;
+    const obj = JSON.parse(raw);
+    Object.assign(STATE.wizard, obj.wizard||{});
+    Object.assign(STATE.meta, obj.meta||{});
+    STATE.actores = obj.actores||[];
+    STATE.objetivos = obj.objetivos||[];
+    STATE.mid = obj.mid||[];
+    STATE.mao = obj.mao||[];
+    return true;
+  } catch { return false; }
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MATRIX HELPERS
+// ═════════════════════════════════════════════════════════════════════════
+function newMID(n) {
+  const m = [];
+  for (let i=0; i<n; i++) {
+    const row = new Array(n).fill('');
+    row[i] = '-';
+    m.push(row);
+  }
+  return m;
+}
+function newMAO(nA, nO) {
+  const m = [];
+  for (let i=0; i<nA; i++) m.push(new Array(nO).fill(''));
+  return m;
+}
+function resizeMID(newN) {
+  const oldN = STATE.mid.length;
+  if (newN === oldN) return;
+  if (newN > oldN) {
+    for (let i=0; i<oldN; i++) while (STATE.mid[i].length < newN) STATE.mid[i].push('');
+    for (let i=oldN; i<newN; i++) {
+      const row = new Array(newN).fill('');
+      row[i] = '-';
+      STATE.mid.push(row);
+    }
+  } else {
+    STATE.mid = STATE.mid.slice(0,newN).map(r => r.slice(0,newN));
+  }
+  for (let i=0; i<newN; i++) STATE.mid[i][i] = '-';
+}
+function resizeMAO() {
+  const nA = STATE.actores.length, nO = STATE.objetivos.length;
+  // Ajustar filas
+  while (STATE.mao.length < nA) STATE.mao.push(new Array(nO).fill(''));
+  STATE.mao = STATE.mao.slice(0, nA);
+  // Ajustar columnas
+  for (let i=0; i<nA; i++) {
+    while (STATE.mao[i].length < nO) STATE.mao[i].push('');
+    STATE.mao[i] = STATE.mao[i].slice(0, nO);
+  }
+}
+function valToNum(v) {
+  if (v==='' || v==='-' || v==null) return 0;
+  const n = parseInt(v,10);
+  return isNaN(n) ? 0 : n;
+}
+function rowSums(M) { return M.map(r => r.reduce((s,x)=>s+x,0)); }
+function colSums(M) {
+  const n = M.length, c = new Array(M[0]?.length||0).fill(0);
+  for (let i=0;i<n;i++) for (let j=0;j<M[i].length;j++) c[j]+=M[i][j];
+  return c;
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// CÁLCULOS MACTOR
+// ═════════════════════════════════════════════════════════════════════════
+function midNumeric() {
+  const n = STATE.actores.length;
+  const M = [];
+  for (let i=0;i<n;i++) {
+    const row = new Array(n);
+    for (let j=0;j<n;j++) row[j] = (i===j) ? 0 : valToNum(STATE.mid[i][j]);
+    M.push(row);
+  }
+  return M;
+}
+function maoNumeric() {
+  const nA = STATE.actores.length, nO = STATE.objetivos.length;
+  const M = [];
+  for (let i=0;i<nA;i++) {
+    const row = new Array(nO);
+    for (let j=0;j<nO;j++) row[j] = valToNum(STATE.mao[i][j]);
+    M.push(row);
+  }
+  return M;
+}
+
+function computeMactor() {
+  const nA = STATE.actores.length;
+  const nO = STATE.objetivos.length;
+  if (nA < 2 || nO < 1) return null;
+
+  const MID = midNumeric();
+  const MAO = maoNumeric();
+
+  // Influencia directa Ii = sum_j MID[i,j]
+  // Dependencia directa Di = sum_j MID[j,i]
+  const Ii = rowSums(MID);
+  const Di = colSums(MID);
+
+  // Poder relativo Ri = Ii / (Ii + Di) normalizado. Si Di=0 y Ii>0, Ri=1.
+  const Ri = Ii.map((ii, i) => {
+    const dd = Di[i];
+    if (ii + dd === 0) return 0;
+    return ii / (ii + dd);
+  });
+
+  // Normalizar Influencia y Dependencia a 0-100 para el plot
+  const maxI = Math.max(1, ...Ii);
+  const maxD = Math.max(1, ...Di);
+  const IiN = Ii.map(v => (v/maxI)*100);
+  const DiN = Di.map(v => (v/maxD)*100);
+
+  // Clasificación por cuadrantes Influencia × Dependencia (mediana)
+  const sortedI = [...IiN].sort((a,b)=>a-b);
+  const sortedD = [...DiN].sort((a,b)=>a-b);
+  const medI = sortedI[Math.floor(nA/2)];
+  const medD = sortedD[Math.floor(nA/2)];
+  const cuadIDep = IiN.map((iv, i) => {
+    const dv = DiN[i];
+    if (iv >= medI && dv < medD) return 'dominante';
+    if (iv >= medI && dv >= medD) return 'enlace';
+    if (iv < medI && dv < medD) return 'autonomo';
+    return 'dominado';
+  });
+
+  // Convergencia y Divergencia entre pares de actores
+  // Conv[i,j] = sum_k min(|MAO[i,k]|, |MAO[j,k]|) si signo(MAO[i,k])=signo(MAO[j,k])
+  // Div[i,j]  = sum_k min(|MAO[i,k]|, |MAO[j,k]|) si signos opuestos
+  const Conv = Array.from({length:nA}, () => new Array(nA).fill(0));
+  const Div  = Array.from({length:nA}, () => new Array(nA).fill(0));
+  for (let i=0;i<nA;i++) for (let j=i+1;j<nA;j++) {
+    let c = 0, d = 0;
+    for (let k=0;k<nO;k++) {
+      const a = MAO[i][k], b = MAO[j][k];
+      if (a===0 || b===0) continue;
+      const inten = Math.min(Math.abs(a), Math.abs(b));
+      if (Math.sign(a) === Math.sign(b)) c += inten;
+      else d += inten;
+    }
+    Conv[i][j] = Conv[j][i] = c;
+    Div[i][j]  = Div[j][i]  = d;
+  }
+  // Convergencia/Divergencia totales por actor
+  const ConvI = rowSums(Conv);
+  const DivI  = rowSums(Div);
+  const maxC = Math.max(1, ...ConvI);
+  const maxDV = Math.max(1, ...DivI);
+  const ConvN = ConvI.map(v => (v/maxC)*100);
+  const DivN  = DivI.map(v => (v/maxDV)*100);
+
+  // Cuadrantes Convergencia × Divergencia
+  const sortedC = [...ConvN].sort((a,b)=>a-b);
+  const sortedDv = [...DivN].sort((a,b)=>a-b);
+  const medC = sortedC[Math.floor(nA/2)];
+  const medDv = sortedDv[Math.floor(nA/2)];
+  const cuadCD = ConvN.map((cv, i) => {
+    const dv = DivN[i];
+    if (cv >= medC && dv < medDv) return 'coalicion';
+    if (cv >= medC && dv >= medDv) return 'conflictivo';
+    if (cv < medC && dv < medDv) return 'marginal';
+    return 'opositor';
+  });
+
+  // Por objetivo: movilización (sum |MAO[*,k]|) y saldo neto ponderado por Ri
+  const movilizacion = new Array(nO).fill(0);
+  const saldoNeto = new Array(nO).fill(0);
+  for (let k=0;k<nO;k++) {
+    let mov = 0, saldo = 0;
+    for (let i=0;i<nA;i++) {
+      mov += Math.abs(MAO[i][k]);
+      saldo += MAO[i][k] * Ri[i];
+    }
+    movilizacion[k] = mov;
+    saldoNeto[k] = saldo;
+  }
+
+  return {
+    nA, nO,
+    Ii, Di, Ri, IiN, DiN, medI, medD, cuadIDep,
+    Conv, Div, ConvI, DivI, ConvN, DivN, medC, medDv, cuadCD,
+    movilizacion, saldoNeto
+  };
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// RENDER · WIZARD
+// ═════════════════════════════════════════════════════════════════════════
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderWizard() {
+  const cont = document.getElementById('wp-q1-opts');
+  cont.innerHTML = Q1_OPTIONS.map(o => {
+    const sel = STATE.wizard.tpl === o.id;
+    return `<button class="entity-chip" style="padding:1rem 1.1rem;text-align:left;${sel?'border-color:var(--accent);background:var(--accent-soft)':''}" data-id="${o.id}">
+      <span class="entity-chip-name" style="font-family:var(--sans);font-size:1rem;font-weight:600;color:var(--ink)">${o.label}</span>
+    </button>`;
+  }).join('');
+  cont.querySelectorAll('button').forEach(b => b.addEventListener('click', () => pickTpl(b.dataset.id)));
+  renderTplSuggest();
+}
+function pickTpl(id) {
+  STATE.wizard.tpl = id;
+  saveState();
+  renderWizard();
+}
+function renderTplSuggest() {
+  const box = document.getElementById('tpl-suggest-box');
+  const id = STATE.wizard.tpl;
+  if (!id) { box.innerHTML = ''; document.getElementById('wp-q1-next').disabled = true; return; }
+  const tpl = TEMPLATES[id];
+  box.innerHTML = `
+    <div class="tpl-suggest">
+      <div class="tpl-suggest-eyebrow">Modelo sugerida</div>
+      <div class="tpl-suggest-name">${escapeHtml(tpl.nombre)}</div>
+      <div class="tpl-suggest-desc">${escapeHtml(tpl.descripcion)}</div>
+      <div class="tpl-suggest-meta">
+        <b>${tpl.actores.length}</b> atores · <b>${tpl.objetivos.length}</b> objetivos · <em>${escapeHtml(tpl.perfil)}</em>
+      </div>
+    </div>`;
+  document.getElementById('wp-q1-next').disabled = false;
+}
+
+function startProject() {
+  const tplId = STATE.wizard.tpl;
+  if (!tplId) return;
+  const tpl = TEMPLATES[tplId];
+  STATE.meta.tplId = tplId;
+  STATE.meta.nombre = tpl.nombre;
+  STATE.meta.createdAt = STATE.meta.createdAt || new Date().toISOString();
+  STATE.actores = tpl.actores.slice();
+  STATE.objetivos = tpl.objetivos.slice();
+  STATE.mid = newMID(STATE.actores.length);
+  STATE.mao = newMAO(STATE.actores.length, STATE.objetivos.length);
+  saveState();
+  document.getElementById('actores-intro').classList.remove('is-hidden');
+  document.getElementById('actores-editor').classList.add('is-hidden');
+  renderActores();
+  showStage('stage-actores');
+}
+function startBlank() {
+  STATE.meta.tplId = null;
+  STATE.meta.nombre = 'Análise personalizado';
+  STATE.actores = ['Ator 1','Ator 2','Ator 3','Ator 4'];
+  STATE.objetivos = ['Objetivo 1','Objetivo 2','Objetivo 3'];
+  STATE.mid = newMID(STATE.actores.length);
+  STATE.mao = newMAO(STATE.actores.length, STATE.objetivos.length);
+  saveState();
+  document.getElementById('actores-intro').classList.remove('is-hidden');
+  document.getElementById('actores-editor').classList.add('is-hidden');
+  renderActores();
+  showStage('stage-actores');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// ACTORES
+// ═════════════════════════════════════════════════════════════════════════
+function renderActores() {
+  const grid = document.getElementById('actores-grid');
+  grid.innerHTML = STATE.actores.map((a, i) =>
+    `<div class="entity-chip">
+      <span class="entity-chip-code">A${String(i+1).padStart(2,'0')}</span>
+      <span class="entity-chip-name" contenteditable="true" spellcheck="false"
+            onblur="renameActor(${i}, this.innerText)"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${escapeHtml(a)}</span>
+      <button class="entity-chip-del" onclick="delActor(${i})" title="Eliminar">×</button>
+    </div>`).join('');
+  document.getElementById('actores-count').textContent = STATE.actores.length;
+  document.getElementById('actores-meta').textContent = STATE.meta.nombre || '—';
+}
+function addActor() {
+  const inp = document.getElementById('actores-add-input');
+  const name = inp.value.trim();
+  if (!name) { inp.focus(); return; }
+  STATE.actores.push(name);
+  resizeMID(STATE.actores.length);
+  resizeMAO();
+  inp.value = '';
+  saveState();
+  renderActores();
+  inp.focus();
+}
+function delActor(i) {
+  if (STATE.actores.length <= 2) { showToast('Necesitas ao menos 2 atores.'); return; }
+  STATE.actores.splice(i,1);
+  STATE.mid.splice(i,1);
+  STATE.mid.forEach(r => r.splice(i,1));
+  for (let k=0; k<STATE.mid.length; k++) STATE.mid[k][k] = '-';
+  STATE.mao.splice(i,1);
+  saveState();
+  renderActores();
+}
+function renameActor(i, newName) {
+  const n = (newName||'').trim();
+  if (!n) { showToast('O nome não pode estar vacío.'); renderActores(); return; }
+  STATE.actores[i] = n;
+  saveState();
+}
+function actoresShowEditor() {
+  document.getElementById('actores-intro').classList.add('is-hidden');
+  document.getElementById('actores-editor').classList.remove('is-hidden');
+  renderActores();
+}
+function backToActoresIntro() {
+  document.getElementById('actores-editor').classList.add('is-hidden');
+  document.getElementById('actores-intro').classList.remove('is-hidden');
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// OBJETIVOS
+// ═════════════════════════════════════════════════════════════════════════
+function renderObjetivos() {
+  const grid = document.getElementById('objetivos-grid');
+  grid.innerHTML = STATE.objetivos.map((o, i) =>
+    `<div class="entity-chip">
+      <span class="entity-chip-code">O${String(i+1).padStart(2,'0')}</span>
+      <span class="entity-chip-name" contenteditable="true" spellcheck="false"
+            onblur="renameObjetivo(${i}, this.innerText)"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">${escapeHtml(o)}</span>
+      <button class="entity-chip-del" onclick="delObjetivo(${i})" title="Eliminar">×</button>
+    </div>`).join('');
+  document.getElementById('objetivos-count').textContent = STATE.objetivos.length;
+}
+function addObjetivo() {
+  const inp = document.getElementById('objetivos-add-input');
+  const name = inp.value.trim();
+  if (!name) { inp.focus(); return; }
+  STATE.objetivos.push(name);
+  resizeMAO();
+  inp.value = '';
+  saveState();
+  renderObjetivos();
+  inp.focus();
+}
+function delObjetivo(i) {
+  if (STATE.objetivos.length <= 1) { showToast('Necesitas ao menos 1 objetivo.'); return; }
+  STATE.objetivos.splice(i,1);
+  STATE.mao.forEach(r => r.splice(i,1));
+  saveState();
+  renderObjetivos();
+}
+function renameObjetivo(i, newName) {
+  const n = (newName||'').trim();
+  if (!n) { showToast('O nome não pode estar vacío.'); renderObjetivos(); return; }
+  STATE.objetivos[i] = n;
+  saveState();
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MATRIZ MID (actor × actor, 0-4)
+// ═════════════════════════════════════════════════════════════════════════
+function renderMID() {
+  const wrap = document.getElementById('mid-wrap');
+  const n = STATE.actores.length;
+  if (n < 2) { wrap.innerHTML = '<p class="empty-msg">Necesitas ao menos 2 atores.</p>'; return; }
+  let html = '<table class="matrix"><thead><tr>';
+  html += '<th class="corner">influencia sobre →</th>';
+  for (let j=0;j<n;j++) {
+    html += `<th class="col-h" title="${escapeHtml(STATE.actores[j])}"><div class="col-h-inner">A${String(j+1).padStart(2,'0')} · ${escapeHtml(STATE.actores[j])}</div></th>`;
+  }
+  html += '</tr></thead><tbody>';
+  for (let i=0;i<n;i++) {
+    html += `<tr><th class="row-h" title="${escapeHtml(STATE.actores[i])}">A${String(i+1).padStart(2,'0')} · ${escapeHtml(STATE.actores[i])}</th>`;
+    for (let j=0;j<n;j++) {
+      const v = STATE.mid[i][j];
+      if (i===j) html += '<td class="cell diag">·</td>';
+      else {
+        const cls = v === '' ? '' : `v-${v}`;
+        html += `<td class="cell ${cls}" data-i="${i}" data-j="${j}" tabindex="0" onclick="cycleMID(${i},${j})" onkeydown="cellKeyMID(event,${i},${j})">${v === '' ? '' : v}</td>`;
+      }
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+  updateMIDCounter();
+}
+function cycleMID(i,j) {
+  const cur = STATE.mid[i][j];
+  const order = ['','1','2','3','4','0'];
+  const idx = order.indexOf(cur === undefined ? '' : cur);
+  STATE.mid[i][j] = order[(idx+1) % order.length];
+  saveState();
+  renderMID();
+}
+function cellKeyMID(ev, i, j) {
+  const k = ev.key;
+  if (['0','1','2','3','4'].includes(k)) { STATE.mid[i][j]=k; saveState(); renderMID(); ev.preventDefault(); }
+  else if (k === 'Backspace' || k === 'Delete') { STATE.mid[i][j]=''; saveState(); renderMID(); ev.preventDefault(); }
+  else if (k === 'ArrowRight'||k==='Tab') { const n=document.querySelector(`td.cell[data-i="${i}"][data-j="${j+1}"]`); if(n){n.focus();ev.preventDefault();} }
+  else if (k === 'ArrowLeft') { const n=document.querySelector(`td.cell[data-i="${i}"][data-j="${j-1}"]`); if(n){n.focus();ev.preventDefault();} }
+  else if (k === 'ArrowDown') { const n=document.querySelector(`td.cell[data-i="${i+1}"][data-j="${j}"]`); if(n){n.focus();ev.preventDefault();} }
+  else if (k === 'ArrowUp') { const n=document.querySelector(`td.cell[data-i="${i-1}"][data-j="${j}"]`); if(n){n.focus();ev.preventDefault();} }
+}
+function updateMIDCounter() {
+  let filled = 0, total = 0;
+  const n = STATE.actores.length;
+  for (let i=0;i<n;i++) for (let j=0;j<n;j++) {
+    if (i===j) continue; total++;
+    if (STATE.mid[i] && STATE.mid[i][j]!=='' && STATE.mid[i][j]!=='-') filled++;
+  }
+  document.getElementById('mid-filled').textContent = filled;
+  document.getElementById('mid-total').textContent = total;
+}
+function resetMID() {
+  if (!confirm('Limpiar a matriz de influencias?')) return;
+  STATE.mid = newMID(STATE.actores.length);
+  saveState();
+  renderMID();
+  showToast('Matriz de influencias limpiada.');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// MATRIZ MAO (actor × objetivo, -4..+4)
+// ═════════════════════════════════════════════════════════════════════════
+function renderMAO() {
+  const wrap = document.getElementById('mao-wrap');
+  const nA = STATE.actores.length, nO = STATE.objetivos.length;
+  if (nA < 2 || nO < 1) { wrap.innerHTML = '<p class="empty-msg">Necesitas atores e objetivos.</p>'; return; }
+  let html = '<table class="matrix"><thead><tr>';
+  html += '<th class="corner">posição sobre →</th>';
+  for (let j=0;j<nO;j++) {
+    html += `<th class="col-h" title="${escapeHtml(STATE.objetivos[j])}"><div class="col-h-inner">Ou${String(j+1).padStart(2,'0')} · ${escapeHtml(STATE.objetivos[j])}</div></th>`;
+  }
+  html += '</tr></thead><tbody>';
+  for (let i=0;i<nA;i++) {
+    html += `<tr><th class="row-h" title="${escapeHtml(STATE.actores[i])}">A${String(i+1).padStart(2,'0')} · ${escapeHtml(STATE.actores[i])}</th>`;
+    for (let j=0;j<nO;j++) {
+      const v = STATE.mao[i][j];
+      let cls = '', disp = '';
+      if (v === '') { cls = ''; disp = ''; }
+      else if (v === '0') { cls = 'v-0'; disp = '0'; }
+      else if (v === '-1') { cls = 'v-n1'; disp = '−1'; }
+      else if (v === '-2') { cls = 'v-n2'; disp = '−2'; }
+      else if (v === '-3') { cls = 'v-n3'; disp = '−3'; }
+      else if (v === '-4') { cls = 'v-n4'; disp = '−4'; }
+      else if (['1','2','3','4'].includes(v)) { cls = 'v-' + v; disp = '+' + v; }
+      else { cls = ''; disp = v; }
+      html += `<td class="cell ${cls}" data-i="${i}" data-j="${j}" tabindex="0" onclick="cycleMAO(${i},${j})" onkeydown="cellKeyMAO(event,${i},${j})">${disp}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+  updateMAOCounter();
+}
+function cycleMAO(i,j) {
+  const cur = STATE.mao[i][j];
+  const order = ['','1','2','3','4','-1','-2','-3','-4','0'];
+  const idx = order.indexOf(cur === undefined ? '' : cur);
+  STATE.mao[i][j] = order[(idx+1) % order.length];
+  saveState();
+  renderMAO();
+}
+function cellKeyMAO(ev, i, j) {
+  const k = ev.key;
+  if (['0','1','2','3','4'].includes(k)) { STATE.mao[i][j]=k; saveState(); renderMAO(); ev.preventDefault(); }
+  else if (k === '-' || k === '_') {
+    const cur = STATE.mao[i][j];
+    if (cur && cur !== '' && cur !== '0') {
+      const n = valToNum(cur);
+      STATE.mao[i][j] = String(-n);
+      saveState();
+      renderMAO();
+    }
+    ev.preventDefault();
+  }
+  else if (k === 'Backspace' || k === 'Delete') { STATE.mao[i][j]=''; saveState(); renderMAO(); ev.preventDefault(); }
+  else if (k === 'ArrowRight'||k==='Tab') { const n=document.querySelector(`td.cell[data-i="${i}"][data-j="${j+1}"]`); if(n){n.focus();ev.preventDefault();} }
+  else if (k === 'ArrowLeft') { const n=document.querySelector(`td.cell[data-i="${i}"][data-j="${j-1}"]`); if(n){n.focus();ev.preventDefault();} }
+  else if (k === 'ArrowDown') { const n=document.querySelector(`td.cell[data-i="${i+1}"][data-j="${j}"]`); if(n){n.focus();ev.preventDefault();} }
+  else if (k === 'ArrowUp') { const n=document.querySelector(`td.cell[data-i="${i-1}"][data-j="${j}"]`); if(n){n.focus();ev.preventDefault();} }
+}
+function updateMAOCounter() {
+  let filled = 0, total = 0;
+  const nA = STATE.actores.length, nO = STATE.objetivos.length;
+  for (let i=0;i<nA;i++) for (let j=0;j<nO;j++) {
+    total++;
+    if (STATE.mao[i] && STATE.mao[i][j]!=='' && STATE.mao[i][j]!=='-') filled++;
+  }
+  document.getElementById('mao-filled').textContent = filled;
+  document.getElementById('mao-total').textContent = total;
+}
+function resetMAO() {
+  if (!confirm('Limpiar a matriz de posições?')) return;
+  STATE.mao = newMAO(STATE.actores.length, STATE.objetivos.length);
+  saveState();
+  renderMAO();
+  showToast('Matriz de posições limpiada.');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// RESULTADOS
+// ═════════════════════════════════════════════════════════════════════════
+let _chartInflu = null, _chartAlianzas = null;
+let _currentView = 'influ';
+
+function setView(view) {
+  _currentView = view;
+  document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
+  document.querySelectorAll('.view-pane').forEach(p => p.classList.toggle('active', p.id === 'view-' + view));
+  if (view === 'influ') renderInflu();
+  else if (view === 'alianzas') renderAlianzas();
+  else if (view === 'objetivos') renderObjResults();
+}
+
+function renderInflu() {
+  const res = computeMactor();
+  const rankEl = document.getElementById('rank-influ');
+  if (!res) { rankEl.innerHTML = '<p class="empty-msg">Sem datos suficientes.</p>'; return; }
+  const accent = getComputedStyle(document.body).getPropertyValue('--accent').trim();
+  const green = getComputedStyle(document.body).getPropertyValue('--green').trim();
+  const amber = getComputedStyle(document.body).getPropertyValue('--amber').trim();
+  const ink3 = getComputedStyle(document.body).getPropertyValue('--ink-3').trim();
+  const ink = getComputedStyle(document.body).getPropertyValue('--ink').trim();
+  const ruleStrong = getComputedStyle(document.body).getPropertyValue('--rule-strong').trim();
+  const colorOf = c => ({dominante:green, enlace:accent, autonomo:ink3, dominado:amber}[c]);
+
+  const data = STATE.actores.map((a, i) => ({
+    x: res.DiN[i], y: res.IiN[i],
+    label: 'A' + String(i+1).padStart(2,'0'),
+    name: a, cuadrante: res.cuadIDep[i]
+  }));
+
+  const ctx = document.getElementById('chart-influ').getContext('2d');
+  if (_chartInflu) _chartInflu.destroy();
+  _chartInflu = new Chart(ctx, {
+    type:'scatter',
+    data:{ datasets:[{ label:'Actores', data, backgroundColor: data.map(d=>colorOf(d.cuadrante)), borderColor: data.map(d=>colorOf(d.cuadrante)), pointRadius:8, pointHoverRadius:12, pointBorderWidth:2 }] },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      scales:{
+        x:{ title:{display:true, text:'Dependencia (0–100)', font:{family:'Space Mono', size:11}, color:ink3}, min:0, max:100, grid:{color:ruleStrong}, ticks:{font:{family:'Space Mono', size:10}, color:ink3} },
+        y:{ title:{display:true, text:'Influencia (0–100)', font:{family:'Space Mono', size:11}, color:ink3}, min:0, max:100, grid:{color:ruleStrong}, ticks:{font:{family:'Space Mono', size:10}, color:ink3} }
+      },
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'rgba(20,17,10,0.95)',
+          titleFont:{family:'Familjen Grotesk', size:12, weight:'700'},
+          bodyFont:{family:'Space Mono', size:11}, padding:10,
+          callbacks:{
+            title:items => items[0].raw.name,
+            label:c => [c.raw.label + ' · ' + c.raw.cuadrante.toUpperCase(), 'Influencia: ' + c.raw.y.toFixed(1), 'Dependencia: ' + c.raw.x.toFixed(1)]
+          }
+        }
+      }
+    },
+    plugins:[{
+      id:'quadrantLines',
+      afterDraw(chart) {
+        const { ctx, chartArea, scales } = chart;
+        const xMid = scales.x.getPixelForValue(res.medD);
+        const yMid = scales.y.getPixelForValue(res.medI);
+        ctx.save(); ctx.strokeStyle = accent; ctx.globalAlpha = .35;
+        ctx.setLineDash([4,4]); ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(chartArea.left, yMid); ctx.lineTo(chartArea.right, yMid);
+        ctx.moveTo(xMid, chartArea.top); ctx.lineTo(xMid, chartArea.bottom);
+        ctx.stroke(); ctx.restore();
+      }
+    }, {
+      id:'pointLabels',
+      afterDatasetsDraw(chart) {
+        const { ctx } = chart;
+        const ds = chart.getDatasetMeta(0);
+        ctx.save(); ctx.font = '600 9px "Space Mono", monospace'; ctx.fillStyle = ink;
+        ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ds.data.forEach((pt, i) => ctx.fillText(data[i].label, pt.x + 9, pt.y));
+        ctx.restore();
+      }
+    }]
+  });
+
+  // Ranking por poder relativo Ri
+  const ranked = STATE.actores.map((a, i) => ({ name:a, code:'A'+String(i+1).padStart(2,'0'), Ri:res.Ri[i], Ii:res.Ii[i], Di:res.Di[i], cuad:res.cuadIDep[i] }))
+    .sort((a,b) => b.Ri - a.Ri);
+  rankEl.innerHTML = `<div class="rank-group">
+    <div class="rank-title">Poder relativo Ri (Influencia / total)</div>
+    <ul class="rank-list">
+      ${ranked.map(r => `<li>
+        <span class="rk-code">${r.code}</span>
+        <span class="rk-name" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</span>
+        <span class="rk-score">${(r.Ri*100).toFixed(0)}%</span>
+      </li>`).join('')}
+    </ul>
+  </div>`;
+}
+
+function renderAlianzas() {
+  const res = computeMactor();
+  const rankEl = document.getElementById('rank-alianzas');
+  if (!res) { rankEl.innerHTML = '<p class="empty-msg">Sem datos suficientes.</p>'; return; }
+  const accent = getComputedStyle(document.body).getPropertyValue('--accent').trim();
+  const green = getComputedStyle(document.body).getPropertyValue('--green').trim();
+  const amber = getComputedStyle(document.body).getPropertyValue('--amber').trim();
+  const ink3 = getComputedStyle(document.body).getPropertyValue('--ink-3').trim();
+  const ink = getComputedStyle(document.body).getPropertyValue('--ink').trim();
+  const ruleStrong = getComputedStyle(document.body).getPropertyValue('--rule-strong').trim();
+  const colorOf = c => ({coalicion:green, conflictivo:accent, marginal:ink3, opositor:amber}[c]);
+
+  const data = STATE.actores.map((a, i) => ({
+    x: res.DivN[i], y: res.ConvN[i],
+    label: 'A' + String(i+1).padStart(2,'0'),
+    name: a, cuadrante: res.cuadCD[i]
+  }));
+
+  const ctx = document.getElementById('chart-alianzas').getContext('2d');
+  if (_chartAlianzas) _chartAlianzas.destroy();
+  _chartAlianzas = new Chart(ctx, {
+    type:'scatter',
+    data:{ datasets:[{ label:'Actores', data, backgroundColor: data.map(d=>colorOf(d.cuadrante)), borderColor: data.map(d=>colorOf(d.cuadrante)), pointRadius:8, pointHoverRadius:12, pointBorderWidth:2 }] },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      scales:{
+        x:{ title:{display:true, text:'Divergencia (0–100)', font:{family:'Space Mono', size:11}, color:ink3}, min:0, max:100, grid:{color:ruleStrong}, ticks:{font:{family:'Space Mono', size:10}, color:ink3} },
+        y:{ title:{display:true, text:'Convergencia (0–100)', font:{family:'Space Mono', size:11}, color:ink3}, min:0, max:100, grid:{color:ruleStrong}, ticks:{font:{family:'Space Mono', size:10}, color:ink3} }
+      },
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'rgba(20,17,10,0.95)',
+          titleFont:{family:'Familjen Grotesk', size:12, weight:'700'},
+          bodyFont:{family:'Space Mono', size:11}, padding:10,
+          callbacks:{
+            title:items => items[0].raw.name,
+            label:c => [c.raw.label + ' · ' + c.raw.cuadrante.toUpperCase(), 'Convergencia: ' + c.raw.y.toFixed(1), 'Divergencia: ' + c.raw.x.toFixed(1)]
+          }
+        }
+      }
+    },
+    plugins:[{
+      id:'quadrantLines',
+      afterDraw(chart) {
+        const { ctx, chartArea, scales } = chart;
+        const xMid = scales.x.getPixelForValue(res.medDv);
+        const yMid = scales.y.getPixelForValue(res.medC);
+        ctx.save(); ctx.strokeStyle = accent; ctx.globalAlpha = .35;
+        ctx.setLineDash([4,4]); ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(chartArea.left, yMid); ctx.lineTo(chartArea.right, yMid);
+        ctx.moveTo(xMid, chartArea.top); ctx.lineTo(xMid, chartArea.bottom);
+        ctx.stroke(); ctx.restore();
+      }
+    }, {
+      id:'pointLabels',
+      afterDatasetsDraw(chart) {
+        const { ctx } = chart;
+        const ds = chart.getDatasetMeta(0);
+        ctx.save(); ctx.font = '600 9px "Space Mono", monospace'; ctx.fillStyle = ink;
+        ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ds.data.forEach((pt, i) => ctx.fillText(data[i].label, pt.x + 9, pt.y));
+        ctx.restore();
+      }
+    }]
+  });
+
+  // Ranking: top 5 pares con mayor convergencia y top 5 con mayor divergencia
+  const pairsConv = [], pairsDiv = [];
+  for (let i=0;i<STATE.actores.length;i++) for (let j=i+1;j<STATE.actores.length;j++) {
+    if (res.Conv[i][j] > 0) pairsConv.push({ i, j, val:res.Conv[i][j] });
+    if (res.Div[i][j] > 0)  pairsDiv.push({ i, j, val:res.Div[i][j] });
+  }
+  pairsConv.sort((a,b) => b.val - a.val);
+  pairsDiv.sort((a,b) => b.val - a.val);
+  const cName = i => 'A' + String(i+1).padStart(2,'0') + ' ' + STATE.actores[i];
+
+  rankEl.innerHTML = `
+    <div class="rank-group">
+      <div class="rank-title" style="color:${green}">Top alianzas (convergencia ↑)</div>
+      <ul class="rank-list">
+        ${pairsConv.slice(0,6).map(p => `<li>
+          <span class="rk-name" title="${escapeHtml(cName(p.i))} ↔ ${escapeHtml(cName(p.j))}">${escapeHtml('A'+String(p.i+1).padStart(2,'0'))} ↔ ${escapeHtml('A'+String(p.j+1).padStart(2,'0'))}</span>
+          <span class="rk-score">${p.val}</span>
+        </li>`).join('') || '<li><span class="rk-name" style="font-style:italic;color:var(--ink-3)">sem alianzas detectadas</span></li>'}
+      </ul>
+    </div>
+    <div class="rank-group">
+      <div class="rank-title" style="color:${accent}">Top conflictos (divergencia ↑)</div>
+      <ul class="rank-list">
+        ${pairsDiv.slice(0,6).map(p => `<li>
+          <span class="rk-name" title="${escapeHtml(cName(p.i))} ⇄ ${escapeHtml(cName(p.j))}">${escapeHtml('A'+String(p.i+1).padStart(2,'0'))} ⇄ ${escapeHtml('A'+String(p.j+1).padStart(2,'0'))}</span>
+          <span class="rk-score">${p.val}</span>
+        </li>`).join('') || '<li><span class="rk-name" style="font-style:italic;color:var(--ink-3)">sem conflictos detectados</span></li>'}
+      </ul>
+    </div>`;
+}
+
+function renderObjResults() {
+  const res = computeMactor();
+  const rankEl = document.getElementById('rank-objetivos');
+  if (!res) { rankEl.innerHTML = '<p class="empty-msg">Sem datos suficientes.</p>'; return; }
+  const ranked = STATE.objetivos.map((o, k) => ({
+    name:o, code:'O'+String(k+1).padStart(2,'0'),
+    mov:res.movilizacion[k], saldo:res.saldoNeto[k]
+  })).sort((a,b) => b.mov - a.mov);
+  const accent = getComputedStyle(document.body).getPropertyValue('--accent').trim();
+  const green = getComputedStyle(document.body).getPropertyValue('--green').trim();
+  rankEl.innerHTML = `
+    <div class="rank-group">
+      <div class="rank-title">Objetivos por movilización (top → menor)</div>
+      <ul class="rank-list">
+        ${ranked.map(r => {
+          const saldoColor = r.saldo > 0 ? green : (r.saldo < 0 ? accent : 'var(--ink-3)');
+          const saldoStr = (r.saldo > 0 ? '+' : '') + r.saldo.toFixed(1);
+          return `<li>
+            <span class="rk-code">${r.code}</span>
+            <span class="rk-name" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</span>
+            <span class="rk-score">M${r.mov} <span style="color:${saldoColor}">${saldoStr}</span></span>
+          </li>`;
+        }).join('')}
+      </ul>
+    </div>
+    <p style="font-family:var(--italic);font-style:italic;font-size:.85rem;color:var(--ink-3);margin-top:1rem">
+      <b style="font-family:var(--sans);font-style:normal;color:var(--accent)">M</b> es la movilización total (suma de |posiciones|).
+      El número en color es el <em>saldo neto ponderado por poder Ri de cada actor</em>: positivo (verde) significa apoyo neto al objetivo, negativo (salmón) oposición neta, y cerca de cero significa empate de fuerzas — esos son los conflictos sin resolver.
+    </p>`;
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// NAVEGACIÓN
+// ═════════════════════════════════════════════════════════════════════════
+function showStage(id) {
+  ['stage-welcome','stage-wizard','stage-actores','stage-objetivos','stage-mid','stage-mao','stage-results'].forEach(s => {
+    document.getElementById(s).classList.toggle('is-hidden', s !== id);
+  });
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+function startWizard() { renderWizard(); showStage('stage-wizard'); }
+function backToWelcome() { showStage('stage-welcome'); }
+function backToWizard() { renderWizard(); showStage('stage-wizard'); }
+function backToActores() {
+  document.getElementById('actores-intro').classList.add('is-hidden');
+  document.getElementById('actores-editor').classList.remove('is-hidden');
+  renderActores();
+  showStage('stage-actores');
+}
+function backToObjetivos() { renderObjetivos(); showStage('stage-objetivos'); }
+function backToMID() { renderMID(); showStage('stage-mid'); }
+function backToMAO() { renderMAO(); showStage('stage-mao'); }
+function goToObjetivos() {
+  if (STATE.actores.length < 2) { showToast('Necesitas ao menos 2 atores.'); return; }
+  renderObjetivos();
+  showStage('stage-objetivos');
+}
+function goToMID() {
+  if (STATE.objetivos.length < 1) { showToast('Necesitas ao menos 1 objetivo.'); return; }
+  renderMID();
+  showStage('stage-mid');
+}
+function goToMAO() {
+  if (STATE.actores.length < 2 || STATE.objetivos.length < 1) { showToast('Necesitas atores e objetivos.'); return; }
+  resizeMAO();
+  renderMAO();
+  showStage('stage-mao');
+}
+function goToResults() {
+  const counter = document.getElementById('results-counter');
+  if (counter) counter.textContent = `${STATE.actores.length} atores · ${STATE.objetivos.length} objetivos`;
+  showStage('stage-results');
+  setView(_currentView);
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// EXPORT
+// ═════════════════════════════════════════════════════════════════════════
+function exportJSON() {
+  const res = computeMactor();
+  const out = {
+    meta:STATE.meta, wizard:STATE.wizard,
+    actores:STATE.actores, objetivos:STATE.objetivos,
+    mid:STATE.mid, mao:STATE.mao,
+    resultados:res ? {
+      influencia:STATE.actores.map((a,i)=>({actor:a, I:res.Ii[i], D:res.Di[i], Ri:res.Ri[i], cuadrante:res.cuadIDep[i]})),
+      alianzas:STATE.actores.map((a,i)=>({actor:a, convergencia:res.ConvI[i], divergencia:res.DivI[i], cuadrante:res.cuadCD[i]})),
+      objetivos:STATE.objetivos.map((o,k)=>({objetivo:o, movilizacion:res.movilizacion[k], saldo_neto:res.saldoNeto[k]}))
+    } : null,
+    exportedAt:new Date().toISOString()
+  };
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `analisis-atores-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Archivo descargado.');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// UTILITIES (modal, toast, theme, cursor)
+// ═════════════════════════════════════════════════════════════════════════
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+let _toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+function toggleTheme() {
+  const isDay = document.body.classList.toggle('day-mode');
+  localStorage.setItem('rr-theme', isDay ? 'day' : 'night');
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = isDay ? '☾ Modo noite' : '☀ Modo dia';
+}
+// Auto día/noche (norma del sitio): si el usuario no ha tocado el toggle,
+// activa modo día entre las 6h y las 19h locales. Si ya hay preferencia
+// guardada, la respeta.
+(function applyInitialTheme() {
+  const pref = localStorage.getItem('rr-theme');
+  let isDay;
+  if (pref === 'day') isDay = true;
+  else if (pref === 'night') isDay = false;
+  else {
+    const h = new Date().getHours();
+    isDay = h >= 6 && h < 19;
+  }
+  if (isDay) document.body.classList.add('day-mode');
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = isDay ? '☾ Modo noite' : '☀ Modo dia';
+})();
+
+(function initCursor() {
+  const c = document.getElementById('cursor');
+  const r = document.getElementById('cursorRing');
+  document.addEventListener('mousemove', e => {
+    c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px';
+    r.style.left = e.clientX + 'px'; r.style.top = e.clientY + 'px';
+  });
+  document.addEventListener('mouseover', e => {
+    if (e.target.closest && e.target.closest('a,button,td.cell,.entity-chip,input,summary,.accordion')) {
+      c.style.transform = 'translate(-50%,-50%) scale(0.5)'; c.style.background = 'transparent'; c.style.border = '2px solid var(--accent)';
+      r.style.transform = 'translate(-50%,-50%) scale(1.5)'; r.style.opacity = '0.7';
+    } else {
+      c.style.transform = 'translate(-50%,-50%) scale(1)'; c.style.background = 'var(--accent)'; c.style.border = 'none';
+      r.style.transform = 'translate(-50%,-50%) scale(1)'; r.style.opacity = '0.4';
+    }
+  });
+})();
+
+// ═════════════════════════════════════════════════════════════════════════
+// AUTH + CLOUD + COPILOTO IA
+// ═════════════════════════════════════════════════════════════════════════
+const AUTH_URL = 'https://rr-auth.reruizc.workers.dev';
+const POLL_INTERVAL_MS = 10000;
+const AUTH = { token:null, user:null, isLogged:false };
+const CLOUD = { projId:null, lastSavedAt:null, lastEditor:null, collaborators:[], owner:null, _pollTimer:null, _saving:false };
+
+function _authToken() { return localStorage.getItem('rr-token'); }
+function _authStoreUser(u) { if (u) localStorage.setItem('rr-user', JSON.stringify(u)); }
+function _authReadStored() { try { return JSON.parse(localStorage.getItem('rr-user') || 'null'); } catch { return null; } }
+
+async function loadUserFromAPI() {
+  const token = _authToken();
+  if (!token) { AUTH.isLogged=false; AUTH.user=null; AUTH.token=null; return null; }
+  AUTH.token = token;
+  try {
+    const r = await fetch(AUTH_URL + '/auth/me', { headers:{ 'Authorization':'Bearer ' + token } });
+    const data = await r.json();
+    if (!r.ok || !data.ok) {
+      localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user');
+      AUTH.isLogged=false; AUTH.user=null; AUTH.token=null; return null;
+    }
+    AUTH.user = data.user; AUTH.isLogged = true;
+    _authStoreUser(data.user);
+    return data.user;
+  } catch {
+    const cached = _authReadStored();
+    if (cached && token) { AUTH.user=cached; AUTH.isLogged=true; return cached; }
+    return null;
+  }
+}
+
+function renderAuthChip() {
+  const anon = document.getElementById('nav-auth-anon');
+  const userBlock = document.getElementById('nav-user-block');
+  if (AUTH.isLogged && AUTH.user) {
+    anon.classList.add('is-hidden');
+    userBlock.classList.remove('is-hidden');
+    const _u = AUTH.user;
+    const _first = ((_u.name || '').trim().split(/\s+/)[0]) || ((_u.email || '').split('@')[0]) || 'mi conta';
+    document.getElementById('nav-user-name').textContent = _first;
+    document.getElementById('nav-user-name').title = 'Ir ao dashboard · ' + (_u.email || '');
+    document.getElementById('nav-user-plan').textContent = (AUTH.user.plan || 'free').toUpperCase();
+  } else {
+    anon.classList.remove('is-hidden');
+    userBlock.classList.add('is-hidden');
+  }
+}
+
+function logoutUser() {
+  if (!confirm('Fechar sessão? Seu análise local se conserva.')) return;
+  localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user');
+  AUTH.token=null; AUTH.user=null; AUTH.isLogged=false;
+  CLOUD.projId=null; CLOUD.lastSavedAt=null; CLOUD.lastEditor=null; CLOUD.collaborators=[]; CLOUD.owner=null;
+  stopPolling();
+  renderAuthChip(); renderCloudBars();
+  document.getElementById('my-projects').classList.add('is-hidden');
+  showToast('Sessão cerrada.');
+}
+
+async function apiCall(path, opts={}) {
+  const token = _authToken();
+  const headers = Object.assign({}, opts.headers || {});
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  if (opts.body && typeof opts.body !== 'string') {
+    headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(opts.body);
+  }
+  const r = await fetch(AUTH_URL + path, Object.assign({}, opts, { headers }));
+  const data = await r.json().catch(() => ({ ok:false, error:'Resposta não JSON' }));
+  return { status:r.status, ok:r.ok && data.ok !== false, data };
+}
+
+function setCbStatus(kind, msg) {
+  ['mao','results'].forEach(s => {
+    const el = document.getElementById('cb-status-' + s);
+    if (!el) return;
+    el.className = 'cb-status ' + (kind || '');
+    el.textContent = msg || '';
+  });
+}
+function renderCloudBars() {
+  const inCloud = !!CLOUD.projId;
+  ['mao','results'].forEach(s => {
+    const bar = document.getElementById('cloud-bar-' + s);
+    const txt = document.getElementById('cb-text-' + s);
+    const editorEl = document.getElementById('cb-editor-' + s);
+    const saveBtn = document.getElementById('cb-save-' + s);
+    if (!bar) return;
+    if (inCloud) {
+      bar.classList.remove('anon');
+      txt.textContent = 'Sincronizado · projeto ' + CLOUD.projId.slice(0,6);
+      saveBtn.textContent = 'Salvar mudanças';
+      if (CLOUD.lastEditor && CLOUD.lastEditor !== (AUTH.user?.email)) editorEl.textContent = 'última edición: ' + CLOUD.lastEditor;
+      else editorEl.textContent = '';
+    } else if (AUTH.isLogged) {
+      bar.classList.remove('anon');
+      txt.textContent = 'Trabajando local — ainda não salvo na nuvem';
+      saveBtn.textContent = 'Salvar na nuvem';
+      editorEl.textContent = '';
+    } else {
+      bar.classList.add('anon');
+      txt.textContent = 'Trabajando local · inicia sessão para salvar e compartilhar';
+      saveBtn.textContent = 'Entrar';
+      editorEl.textContent = '';
+    }
+  });
+  const inviteBtn = document.getElementById('cb-invite-results');
+  if (inviteBtn) {
+    const canInvite = !!CLOUD.projId && AUTH.isLogged && CLOUD.owner === AUTH.user?.email;
+    inviteBtn.classList.toggle('is-hidden', !canInvite);
+  }
+}
+
+async function cloudSave() {
+  if (!AUTH.isLogged) { openModal('modal-login'); return; }
+  if (STATE.actores.length < 1) { showToast('Define ao menos 1 ator.'); return; }
+  if (CLOUD._saving) return;
+  CLOUD._saving = true;
+  setCbStatus('saving', 'Guardando…');
+  const body = {
+    projId: CLOUD.projId || undefined, meta: STATE.meta,
+    actores: STATE.actores, objetivos: STATE.objetivos,
+    mid: STATE.mid, mao: STATE.mao
+  };
+  const r = await apiCall('/mactor/save', { method:'POST', body });
+  CLOUD._saving = false;
+  if (!r.ok) {
+    setCbStatus('error', r.data.error || 'Error ao salvar');
+    showToast(r.data.error || 'Não se pudo salvar.');
+    return;
+  }
+  CLOUD.projId = r.data.projId;
+  CLOUD.lastSavedAt = r.data.updatedAt;
+  CLOUD.lastEditor = r.data.lastEditor;
+  if (!CLOUD.owner) CLOUD.owner = AUTH.user.email;
+  const t = new Date(r.data.updatedAt);
+  setCbStatus('saved', 'Guardado · ' + t.toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit' }));
+  renderCloudBars();
+  startPolling();
+  refreshProjectsList();
+}
+
+async function cloudLoad(projId) {
+  const r = await apiCall('/mactor/load?projId=' + encodeURIComponent(projId));
+  if (!r.ok) { showToast(r.data.error || 'Não se pudo cargar'); return false; }
+  const p = r.data.project;
+  STATE.meta = p.meta || {};
+  STATE.actores = p.actores || [];
+  STATE.objetivos = p.objetivos || [];
+  STATE.mid = p.mid || newMID(STATE.actores.length);
+  STATE.mao = p.mao || newMAO(STATE.actores.length, STATE.objetivos.length);
+  CLOUD.projId = projId;
+  CLOUD.lastSavedAt = p.updatedAt;
+  CLOUD.lastEditor = p.lastEditor;
+  CLOUD.owner = p.owner;
+  CLOUD.collaborators = p.collaborators || [];
+  saveState();
+  renderCloudBars();
+  document.getElementById('actores-intro').classList.add('is-hidden');
+  document.getElementById('actores-editor').classList.remove('is-hidden');
+  renderActores();
+  showStage('stage-actores');
+  startPolling();
+  showToast('Projeto cargado.');
+  return true;
+}
+
+async function refreshProjectsList() {
+  if (!AUTH.isLogged) { document.getElementById('my-projects').classList.add('is-hidden'); return; }
+  const r = await apiCall('/mactor/list');
+  if (!r.ok) { document.getElementById('my-projects').classList.add('is-hidden'); return; }
+  renderProjectsList(r.data.projects, r.data.count, r.data.plan, r.data.ownedLimit);
+}
+function renderProjectsList(projects, count, plan, limit) {
+  const card = document.getElementById('my-projects');
+  card.classList.remove('is-hidden');
+  const owned = projects.filter(p => p.role === 'owner').length;
+  document.getElementById('my-projects-meta').textContent =
+    `${count} projeto${count === 1 ? '' : 's'} · ${owned}/${limit} propios · plano ${plan}`;
+  const list = document.getElementById('my-projects-list');
+  if (projects.length === 0) {
+    list.innerHTML = '<div style="font-family:var(--italic);font-style:italic;color:var(--ink-3);text-align:center;padding:1rem">Não tem projetos guardados. Empieza uno desde o wizard.</div>';
+    return;
+  }
+  list.innerHTML = projects.map(p => {
+    const date = p.updatedAt ? new Date(p.updatedAt).toLocaleString('es-CO', { dateStyle:'short', timeStyle:'short' }) : '—';
+    const isOwner = p.role === 'owner';
+    return `<div class="proj-row">
+      <div>
+        <div class="pr-name">${escapeHtml(p.nombre)}</div>
+        <div class="pr-meta">${p.actores_count} actores · ${p.objetivos_count} objetivos · ${date} · ${escapeHtml(p.owner)}</div>
+      </div>
+      <span class="pr-role ${isOwner ? 'owner' : ''}">${isOwner ? 'Propio' : 'Invitado'}</span>
+      <div class="pr-actions">
+        <button onclick="cloudLoad('${p.projId}')">Abrir →</button>
+        ${isOwner ? `<button class="danger" onclick="cloudDelete('${p.projId}','${escapeHtml(p.nombre).replace(/'/g,'')}')">Borrar</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+async function cloudDelete(projId, name) {
+  if (!confirm(`Borrar "${name}"? Esta ação não pode ser desfeita.`)) return;
+  const r = await apiCall('/mactor/delete?projId=' + encodeURIComponent(projId), { method:'DELETE' });
+  if (!r.ok) { showToast(r.data.error || 'Não se pudo borrar'); return; }
+  showToast('Projeto borrado.');
+  if (CLOUD.projId === projId) {
+    CLOUD.projId=null; CLOUD.lastSavedAt=null; CLOUD.lastEditor=null; CLOUD.owner=null; CLOUD.collaborators=[];
+    stopPolling(); renderCloudBars();
+  }
+  refreshProjectsList();
+}
+function newProject() {
+  CLOUD.projId=null; CLOUD.lastSavedAt=null; CLOUD.lastEditor=null; CLOUD.owner=null; CLOUD.collaborators=[];
+  stopPolling();
+  STATE.wizard={ tpl:null }; STATE.meta={ tplId:null, nombre:'', createdAt:null, updatedAt:null };
+  STATE.actores=[]; STATE.objetivos=[]; STATE.mid=[]; STATE.mao=[];
+  saveState();
+  renderWizard();
+  renderCloudBars();
+  showStage('stage-wizard');
+}
+
+function openInviteModal() {
+  if (!CLOUD.projId) { showToast('Primero salva o projeto na nuvem.'); return; }
+  if (CLOUD.owner !== AUTH.user?.email) { showToast('Apenas o dueño pode convidar.'); return; }
+  document.getElementById('invite-email').value = '';
+  renderCollabList();
+  openModal('modal-invite');
+  setTimeout(() => document.getElementById('invite-email').focus(), 100);
+}
+function renderCollabList() {
+  const list = document.getElementById('collab-list');
+  const items = [`<li style="display:flex;justify-content:space-between;padding:.5rem 0;border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-2)"><span>${escapeHtml(CLOUD.owner)}</span><span style="font-size:10px;padding:.15rem .45rem;background:var(--accent);color:var(--on-accent);font-family:var(--sans);font-weight:700;letter-spacing:.1em;text-transform:uppercase">Dueño</span></li>`];
+  for (const c of CLOUD.collaborators) items.push(`<li style="display:flex;justify-content:space-between;padding:.5rem 0;border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-2)"><span>${escapeHtml(c)}</span><span style="font-size:10px;padding:.15rem .45rem;background:var(--paper-3);color:var(--ink-3);font-family:var(--sans);font-weight:700;letter-spacing:.1em;text-transform:uppercase">Colaborador</span></li>`);
+  list.innerHTML = items.join('');
+}
+async function submitInvite() {
+  const email = document.getElementById('invite-email').value.trim().toLowerCase();
+  if (!email) { showToast('Escribe um e-mail.'); return; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { showToast('E-mail inválido.'); return; }
+  const r = await apiCall('/mactor/invite', { method:'POST', body:{ projId:CLOUD.projId, email } });
+  if (!r.ok) { showToast(r.data.error || 'Não se pudo convidar'); return; }
+  showToast('Invitación enviada a ' + email + '.');
+  closeModal('modal-invite');
+}
+
+async function handleInviteOnLoad() {
+  const url = new URL(window.location.href);
+  const token = url.searchParams.get('invite');
+  if (!token) return;
+  if (!AUTH.isLogged) {
+    showToast('Inicia sessão para aceptar a invitación.');
+    setTimeout(() => { window.location.href = 'login.html?next=' + encodeURIComponent(window.location.pathname + window.location.search); }, 1800);
+    return;
+  }
+  const r = await apiCall('/mactor/accept?token=' + encodeURIComponent(token));
+  if (!r.ok) { showToast(r.data.error || 'Não se pudo aceptar a invitación'); return; }
+  showToast('Te uniste ao projeto.');
+  url.searchParams.delete('invite');
+  window.history.replaceState({}, '', url.toString());
+  await cloudLoad(r.data.projId);
+  refreshProjectsList();
+}
+
+function startPolling() {
+  stopPolling();
+  if (!CLOUD.projId) return;
+  CLOUD._pollTimer = setInterval(async () => {
+    if (CLOUD._saving || document.hidden) return;
+    const r = await apiCall('/mactor/load?projId=' + encodeURIComponent(CLOUD.projId) + '&since=' + encodeURIComponent(CLOUD.lastSavedAt || ''));
+    if (!r.ok || r.data.unchanged || !r.data.project) return;
+    const p = r.data.project;
+    if (p.lastEditor && p.lastEditor !== AUTH.user?.email) {
+      STATE.actores = p.actores || []; STATE.objetivos = p.objetivos || [];
+      STATE.mid = p.mid || STATE.mid; STATE.mao = p.mao || STATE.mao;
+      STATE.meta = p.meta || STATE.meta;
+      CLOUD.lastSavedAt = p.updatedAt; CLOUD.lastEditor = p.lastEditor;
+      CLOUD.collaborators = p.collaborators || CLOUD.collaborators;
+      saveState();
+      if (!document.getElementById('stage-actores').classList.contains('is-hidden')) renderActores();
+      if (!document.getElementById('stage-objetivos').classList.contains('is-hidden')) renderObjetivos();
+      if (!document.getElementById('stage-mid').classList.contains('is-hidden')) renderMID();
+      if (!document.getElementById('stage-mao').classList.contains('is-hidden')) renderMAO();
+      if (!document.getElementById('stage-results').classList.contains('is-hidden')) setView(_currentView);
+      renderCloudBars();
+      showToast('Mudanças de ' + p.lastEditor);
+    }
+  }, POLL_INTERVAL_MS);
+}
+function stopPolling() { if (CLOUD._pollTimer) { clearInterval(CLOUD._pollTimer); CLOUD._pollTimer = null; } }
+
+// ── Copiloto IA ──────────────────────────────────────────────────────────
+function _planTier(plan) { return ({free:0,pro:1,premium:2,full:3}[plan||'free'])??0; }
+function _userHasTier(min) { return AUTH.isLogged && _planTier(AUTH.user?.plan) >= min; }
+function iaShowGate(elId, plan, desc) {
+  const out = document.getElementById(elId);
+  out.style.display = 'block';
+  out.innerHTML = `<div class="ia-result-eyebrow">Copiloto · plano ${plan} requerido</div><p>${escapeHtml(desc)}</p><p>Seu plano actual: <b>${escapeHtml(AUTH.user?.plan || 'free')}</b>.</p><p><a href="pricing.html" style="color:var(--accent);font-weight:600">Ver planos →</a></p>`;
+}
+
+async function iaSugerirActores() {
+  if (!AUTH.isLogged) { openModal('modal-login'); return; }
+  if (!_userHasTier(1)) { iaShowGate('ia-actores-result', 'Pro', 'A sugestão de atores com IA está disponível em plano Pro ou superior.'); return; }
+  const tema = STATE.meta?.nombre || prompt('Describe brevemente o tema do análise (ej: "Reforma tributaria nacional 2026")') || '';
+  if (!tema.trim()) return;
+  const btn = document.getElementById('ia-actores-btn');
+  const out = document.getElementById('ia-actores-result');
+  btn.disabled = true; btn.textContent = 'Consultando…';
+  out.style.display = 'block';
+  out.innerHTML = '<div class="ia-result-eyebrow">Copiloto · sugiriendo atores</div><div class="ia-loading"><span class="ia-loading-dot"></span> O consultor IA está armando a lista. Toma 5-10 segundos.</div>';
+  const r = await apiCall('/mactor/copiloto', { method:'POST', body:{ action:'sugerir-actores', payload:{ tema, contexto: STATE.meta?.tplId || '' } } });
+  btn.disabled = false; btn.textContent = 'Sugerir atores';
+  if (!r.ok) {
+    out.innerHTML = `<div class="ia-result-eyebrow">Copiloto · error</div><p>${escapeHtml(r.data?.error || 'Não se pudo conectar.')}</p>`;
+    return;
+  }
+  iaRenderSugerirActores(r.data);
+}
+function iaRenderSugerirActores(data) {
+  const out = document.getElementById('ia-actores-result');
+  const cachedTag = data.cached ? '<span class="ia-cached">caché</span>' : '';
+  const items = Array.isArray(data.actores) ? data.actores : [];
+  let html = `<div class="ia-result-eyebrow">Copiloto · atores sugeridos ${cachedTag}</div>`;
+  if (data.nota) html += `<p>${escapeHtml(data.nota)}</p>`;
+  if (items.length === 0) html += '<p style="font-family:var(--italic);font-style:italic;color:var(--ink-3)">O copiloto não devolvió sugestões.</p>';
+  else {
+    html += '<div class="ia-suggested">';
+    items.forEach((it, idx) => {
+      html += `<div class="ia-sug">
+        <span class="ia-sug-fam">${escapeHtml(it.familia || 'otro').slice(0,12)}</span>
+        <div class="ia-sug-body">
+          <div class="ia-sug-name">${escapeHtml(it.nombre || '')}</div>
+          <div class="ia-sug-razon">${escapeHtml(it.razon || '')}</div>
+        </div>
+        <button class="ia-sug-add" data-idx="${idx}" onclick="iaAddSuggestedActor(${idx}, this)">+ Adicionar</button>
+      </div>`;
+    });
+    html += '</div>';
+  }
+  out.innerHTML = html;
+  // Almacenar para acceso desde onclick
+  out._suggested = items;
+}
+function iaAddSuggestedActor(idx, btn) {
+  const out = document.getElementById('ia-actores-result');
+  const items = out._suggested || [];
+  const it = items[idx];
+  if (!it || !it.nombre) return;
+  // Evitar duplicar
+  if (STATE.actores.includes(it.nombre)) {
+    showToast('Já está em seu lista.');
+    return;
+  }
+  STATE.actores.push(it.nombre);
+  resizeMID(STATE.actores.length);
+  resizeMAO();
+  saveState();
+  renderActores();
+  btn.textContent = '✓ Agregado';
+  btn.classList.add('added');
+  btn.disabled = true;
+}
+
+async function iaValidarMAO() {
+  if (!AUTH.isLogged) { openModal('modal-login'); return; }
+  if (!_userHasTier(2)) { iaShowGate('ia-mao-result', 'Premium', 'A revisión de posições com IA está disponível em plano Premium ou superior.'); return; }
+  if (STATE.actores.length < 2 || STATE.objetivos.length < 1) { showToast('Necesitas atores e objetivos.'); return; }
+  const btn = document.getElementById('ia-mao-btn');
+  const out = document.getElementById('ia-mao-result');
+  btn.disabled = true; btn.textContent = 'Revisando…';
+  out.style.display = 'block';
+  out.innerHTML = '<div class="ia-result-eyebrow">Copiloto · revisando posições</div><div class="ia-loading"><span class="ia-loading-dot"></span> O consultor IA está revisando consistencia. Toma 5-10 segundos.</div>';
+  const r = await apiCall('/mactor/copiloto', { method:'POST', body:{ action:'validar-mao', payload:{ actores:STATE.actores, objetivos:STATE.objetivos, mao:STATE.mao } } });
+  btn.disabled = false; btn.textContent = 'Voltar a revisar';
+  if (!r.ok) { out.innerHTML = `<div class="ia-result-eyebrow">Copiloto · error</div><p>${escapeHtml(r.data?.error || 'Não se pudo conectar.')}</p>`; return; }
+  iaRenderValidarMAO(r.data);
+}
+function iaRenderValidarMAO(data) {
+  const out = document.getElementById('ia-mao-result');
+  const cachedTag = data.cached ? '<span class="ia-cached">caché</span>' : '';
+  const issues = Array.isArray(data.issues) ? data.issues : [];
+  let html = `<div class="ia-result-eyebrow">Copiloto · revisión de posições ${cachedTag}</div>`;
+  html += `<p>${escapeHtml(data.summary || '')}</p>`;
+  if (issues.length === 0) html += '<p style="color:var(--green);font-weight:600">✓ O copiloto não detectó inconsistencias.</p>';
+  else {
+    html += '<div class="ia-issues">';
+    for (const ii of issues) {
+      const actor = (ii.actor_idx != null && STATE.actores[ii.actor_idx]) ? `A${String(ii.actor_idx+1).padStart(2,'0')} · ${escapeHtml(STATE.actores[ii.actor_idx])}` : '';
+      const obj = (ii.objetivo_idx != null && STATE.objetivos[ii.objetivo_idx]) ? ` sobre Ou${String(ii.objetivo_idx+1).padStart(2,'0')} · ${escapeHtml(STATE.objetivos[ii.objetivo_idx])}` : '';
+      html += `<div class="ia-issue">
+        <span class="ia-issue-tag">${escapeHtml((ii.tipo||'').replace(/-/g,' '))}</span>
+        <div class="ia-issue-body">
+          <div class="ia-issue-actor"><b>${actor}</b>${obj}</div>
+          <div class="ia-issue-msg">${escapeHtml(ii.msg || '')}</div>
+          ${ii.sugerencia ? `<div class="ia-issue-sug">Sugerencia: <b>${escapeHtml(ii.sugerencia)}</b></div>` : ''}
+        </div>
+      </div>`;
+    }
+    html += '</div>';
+    html += '<p style="font-family:var(--italic);font-style:italic;color:var(--ink-3);font-size:.88rem;margin-top:1rem">O copiloto sugere; você decides. Uma posição que o modelo flagea pode ser uma hipótese real do especialista.</p>';
+  }
+  out.innerHTML = html;
+}
+
+async function iaNarrativa() {
+  if (!AUTH.isLogged) { openModal('modal-login'); return; }
+  if (!_userHasTier(2)) { iaShowGate('ia-narr-result', 'Premium', 'A leitura interpretativa com IA está disponível em plano Premium ou superior.'); return; }
+  const res = computeMactor();
+  if (!res) { showToast('Necesitas o análise completo.'); return; }
+  const btn = document.getElementById('ia-narr-btn');
+  const out = document.getElementById('ia-narr-result');
+  btn.disabled = true; btn.textContent = 'Generando…';
+  out.style.display = 'block';
+  out.innerHTML = '<div class="ia-result-eyebrow">Copiloto · redigendo leitura</div><div class="ia-loading"><span class="ia-loading-dot"></span> O consultor IA está leyendo o sistema. Toma 15-25 segundos.</div>';
+  const r = await apiCall('/mactor/copiloto', { method:'POST', body:{ action:'narrativa', payload:{ actores:STATE.actores, objetivos:STATE.objetivos, mid:STATE.mid, mao:STATE.mao, contexto:STATE.meta?.nombre || '' } } });
+  btn.disabled = false; btn.textContent = 'Voltar a generar';
+  if (!r.ok) { out.innerHTML = `<div class="ia-result-eyebrow">Copiloto · error</div><p>${escapeHtml(r.data?.error || 'Não se pudo conectar.')}</p>`; return; }
+  iaRenderNarrativa(r.data);
+}
+function iaRenderNarrativa(data) {
+  const out = document.getElementById('ia-narr-result');
+  const cachedTag = data.cached ? '<span class="ia-cached">caché</span>' : '';
+  const recs = Array.isArray(data.recomendaciones) ? data.recomendaciones : [];
+  let html = `<div class="ia-result-eyebrow">Copiloto · leitura interpretativa ${cachedTag}</div>`;
+  if (data.panorama)        html += `<h3>Panorama</h3><p>${escapeHtml(data.panorama).replace(/\n/g,'<br/>')}</p>`;
+  if (data.claves)          html += `<h3>Atores clave</h3><p>${escapeHtml(data.claves).replace(/\n/g,'<br/>')}</p>`;
+  if (data.alianzas)        html += `<h3>Alianzas posibles</h3><p>${escapeHtml(data.alianzas).replace(/\n/g,'<br/>')}</p>`;
+  if (data.conflictos)      html += `<h3>Conflictos a arbitrar</h3><p>${escapeHtml(data.conflictos).replace(/\n/g,'<br/>')}</p>`;
+  if (data.objetivos_clave) html += `<h3>Objetivos disputados</h3><p>${escapeHtml(data.objetivos_clave).replace(/\n/g,'<br/>')}</p>`;
+  if (recs.length) {
+    html += '<h3>Recomendaciones de incidencia</h3><ul>';
+    for (const r of recs) html += `<li>${escapeHtml(r)}</li>`;
+    html += '</ul>';
+  }
+  html += '<p style="font-family:var(--italic);font-style:italic;color:var(--ink-3);font-size:.85rem;margin-top:1.2rem">Leitura generada por DeepSeek V4. Valida com seu equipe antes de levar a comitê.</p>';
+  out.innerHTML = html;
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+// SPRINT F · WHAT-IF (variación de influencia de un actor sobre Ri y saldos)
+// ═════════════════════════════════════════════════════════════════════════
+
+let _whatifMactorState = { actorIdx: 0, delta: 0 };
+
+function _whatifActorName(i) {
+  const a = STATE.actores[i];
+  if (a == null) return 'A' + (i + 1);
+  return typeof a === 'string' ? a : (a.nombre || a.label || ('A' + (i + 1)));
+}
+function _whatifObjetivoName(k) {
+  const o = STATE.objetivos[k];
+  if (o == null) return 'O' + (k + 1);
+  return typeof o === 'string' ? o : (o.nombre || o.label || ('O' + (k + 1)));
+}
+function whatifMactorPopulate() {
+  const sel = document.getElementById('whatif-actor');
+  if (!sel) return;
+  const cur = sel.value;
+  const opts = STATE.actores.map((_, i) => `<option value="${i}">${escapeHtml(_whatifActorName(i))}</option>`).join('');
+  sel.innerHTML = opts || '<option value="">— sem atores —</option>';
+  if (cur && Number(cur) < STATE.actores.length) sel.value = cur;
+  const sl = document.getElementById('whatif-delta');
+  const lbl = document.getElementById('whatif-delta-lbl');
+  if (sl && lbl && !sl._wf) {
+    sl._wf = true;
+    sl.addEventListener('input', () => {
+      const d = Number(sl.value) || 0;
+      lbl.textContent = (d > 0 ? '+' : '') + d + '%';
+    });
+  }
+}
+
+function whatifMactor() {
+  if (STATE.actores.length < 2) {
+    whatifMactorRender({ error: 'Necesitas ao menos 2 atores e a matriz MID capturada.' });
+    return;
+  }
+  const sel = document.getElementById('whatif-actor');
+  const sl = document.getElementById('whatif-delta');
+  const actorIdx = Math.max(0, Math.min(STATE.actores.length - 1, Number(sel.value) || 0));
+  const delta = Math.max(-50, Math.min(50, Number(sl.value) || 0));
+  _whatifMactorState = { actorIdx, delta };
+  // Base: corre cálculo Mactor original
+  const base = computeMactor();
+  if (!base) { whatifMactorRender({ error: 'Não se pudo calcular Mactor (faltan datos).' }); return; }
+  const nA = STATE.actores.length;
+  const nO = STATE.objetivos.length;
+  // Matriz MID alterada (multiplicar fila del actor por (1 + delta/100))
+  const MID = midNumeric();
+  const factor = 1 + (delta / 100);
+  for (let j = 0; j < nA; j++) MID[actorIdx][j] = MID[actorIdx][j] * factor;
+  // Re-calcular Ii, Di, Ri con MID alterada
+  const Ii2 = rowSums(MID);
+  const Di2 = colSums(MID);
+  const Ri2 = Ii2.map((ii, i) => {
+    const dd = Di2[i];
+    if (ii + dd === 0) return 0;
+    return ii / (ii + dd);
+  });
+  // Re-calcular saldo neto por objetivo con MAO original × Ri2
+  const MAO = maoNumeric();
+  const saldoNeto2 = new Array(nO).fill(0);
+  for (let k = 0; k < nO; k++) {
+    for (let i = 0; i < nA; i++) saldoNeto2[k] += MAO[i][k] * Ri2[i];
+  }
+  // Diffs: top actor que más subió/bajó en Ri + objetivos que cambian de signo
+  const diffsR = [];
+  for (let i = 0; i < nA; i++) diffsR.push({ i, dR: Ri2[i] - base.Ri[i], Ri2: Ri2[i], RiBase: base.Ri[i] });
+  const subio = diffsR.slice().sort((a, b) => b.dR - a.dR)[0];
+  const bajo = diffsR.slice().sort((a, b) => a.dR - b.dR)[0];
+  const cambioSigno = [];
+  for (let k = 0; k < nO; k++) {
+    const a = base.saldoNeto[k], b = saldoNeto2[k];
+    if (Math.sign(a) !== Math.sign(b) && (Math.abs(a) > 0.05 || Math.abs(b) > 0.05)) {
+      cambioSigno.push({ k, base: a, nuevo: b, nombre: _whatifObjetivoName(k) });
+    }
+  }
+  whatifMactorRender({ actorIdx, delta, factor, subio, bajo, cambioSigno });
+}
+
+function whatifMactorRender(res) {
+  const box = document.getElementById('whatif-result');
+  if (!box) return;
+  if (res.error) {
+    box.style.display = 'block';
+    box.innerHTML = `<div style="color:var(--accent)">${escapeHtml(res.error)}</div>`;
+    return;
+  }
+  const nomA = _whatifActorName(res.actorIdx);
+  const tag = `WHAT-IF · «${escapeHtml(nomA)}» ${res.delta >= 0 ? '+' : ''}${res.delta}% de influencia`;
+  const fmtR = v => (Math.round(v * 1000) / 1000).toFixed(3);
+  const nomSubio = _whatifActorName(res.subio.i);
+  const nomBajo = _whatifActorName(res.bajo.i);
+  let saldoBlock = '';
+  if (res.cambioSigno.length === 0) {
+    saldoBlock = `<div style="color:var(--ink-3);font-style:italic;margin-top:.6rem">Ningún objetivo muda de saldo positivo a negativo (ni viceversa). O balance de fuerzas sobre os objetivos se mantiene.</div>`;
+  } else {
+    const items = res.cambioSigno.map(c =>
+      `<li style="margin:.3rem 0"><b>${escapeHtml(c.nombre)}</b> · saldo ${c.base.toFixed(2)} → <span style="color:${c.novo >= 0 ? '#4ade80' : '#f87171'}">${c.nuevo.toFixed(2)}</span></li>`
+    ).join('');
+    saldoBlock = `
+      <div style="font-family:var(--mono);font-size:.78rem;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;margin-top:.8rem;margin-bottom:.3rem">Objetivos que mudam de signo</div>
+      <ul style="margin:.2rem 0 0;padding-left:1.2rem;list-style:disc">${items}</ul>`;
+  }
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div style="font-family:var(--mono);font-size:.78rem;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.6rem">${tag}</div>
+    <div style="font-family:var(--mono);font-size:.78rem;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem">Movimiento em poder relativo Ri</div>
+    <ul style="margin:.2rem 0 0;padding-left:1.2rem;list-style:disc">
+      <li style="margin:.3rem 0"><b>${escapeHtml(nomSubio)}</b> · ${fmtR(res.subio.RiBase)} → <span style="color:#4ade80">${fmtR(res.subio.Ri2)}</span> (Δ ${res.subio.dR >= 0 ? '+' : ''}${fmtR(res.subio.dR)})</li>
+      <li style="margin:.3rem 0"><b>${escapeHtml(nomBajo)}</b> · ${fmtR(res.bajo.RiBase)} → <span style="color:#f87171">${fmtR(res.bajo.Ri2)}</span> (Δ ${res.bajo.dR >= 0 ? '+' : ''}${fmtR(res.bajo.dR)})</li>
+    </ul>
+    ${saldoBlock}
+    <div style="font-family:var(--sans);font-size:.82rem;color:var(--ink-3);margin-top:.8rem;border-top:1px solid var(--rule);padding-top:.6rem">
+      Cálculo: fila MID de «${escapeHtml(nomA)}» × ${res.factor.toFixed(2)}, se recalcula Ri = I / (I+D) e saldo neto Σ MAO[i,k]·Ri[i]. Seu MID original não se modifica.
+    </div>
+  `;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const det = document.getElementById('whatif-block');
+  if (det) det.addEventListener('toggle', () => { if (det.open) whatifMactorPopulate(); });
+});
+
+// ═════════════════════════════════════════════════════════════════════════
+// INIT
+// ═════════════════════════════════════════════════════════════════════════
+(async function init() {
+  const restored = loadState();
+  renderWizard();
+  await loadUserFromAPI();
+  renderAuthChip();
+  renderCloudBars();
+  if (AUTH.isLogged) { refreshProjectsList(); handleInviteOnLoad(); }
+  if (restored && STATE.actores.length >= 2) showToast('Restauramos seu análise anterior.');
+})();
+
+// ── Modal Recursos · catálogo del lab filtrado por módulo ────────────────
+const LAB_CURRENT_MODULE = 'mactor';
+const LAB_MOD_LABELS = {
+  problema:     'o módulo de Problema Público',
+  estructural:  'o módulo de Análise Estrutural',
+  mactor:       'o módulo de Análise de Atores',
+  evaluacion:   'o módulo de Avaliação de Política',
+  alternativas: 'o módulo de Alternativas de Política',
+  ain:          'o módulo de Análise de Impacto Normativo',
+  prospect:     'o módulo de Cenários Prospectivos'
+};
+function _labEscHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function _labEscAttr(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+}
+function openRecursosModal() {
+  const lab = window.LAB_RECURSOS;
+  const grid = document.getElementById('modal-recursos-grid');
+  const nameEl = document.getElementById('lr-modulo-name');
+  if (nameEl) nameEl.textContent = LAB_MOD_LABELS[LAB_CURRENT_MODULE] || 'este módulo';
+  if (!lab || !grid) { openModal('modal-recursos'); return; }
+  const items = lab.items.filter(it => !it.modulos || it.modulos.length === 0 || it.modulos.includes(LAB_CURRENT_MODULE));
+  if (!items.length) {
+    grid.innerHTML = '<div class="lr-empty">O catálogo não tem recursos destacados para este módulo. Mira o catálogo completo no hub.</div>';
+    openModal('modal-recursos');
+    return;
+  }
+  const sortedCats = lab.categorias.slice().sort((a, b) => (a.orden || 99) - (b.orden || 99));
+  grid.innerHTML = sortedCats.map(c => {
+    const sub = items.filter(it => it.categoria === c.id);
+    if (!sub.length) return '';
+    return `<div class="lr-cat">
+      <div class="lr-cat-name">${_labEscHtml(c.nombre)}</div>
+      <div class="lr-items">
+        ${sub.map(it => `<a class="lr-item" href="${_labEscAttr(it.url)}" target="_blank" rel="noopener noreferrer">
+          <div class="lr-item-name"><span>${_labEscHtml(it.nombre)}</span></div>
+          <div class="lr-item-desc">${_labEscHtml(it.desc)}</div>
+        </a>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+  openModal('modal-recursos');
+}
+</script>
+</body>
+</html>
