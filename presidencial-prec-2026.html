@@ -89,6 +89,11 @@
   .cfg input::placeholder{color:var(--ink-3);}
   .cfg select option{background:var(--paper-2);color:var(--ink);}
   .hint{font-family:var(--mono);font-size:11px;color:var(--ink-3);}
+  .ambito-bar{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;}
+  .ambito-bar label{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);}
+  .ambito-bar select{background:var(--paper-2);color:var(--ink);border:1px solid var(--rule-strong);border-radius:999px;padding:.42rem 1rem;font-family:var(--mono);font-size:12.5px;outline:none;cursor:none;}
+  .ambito-bar select:focus{border-color:var(--accent);}
+  .ambito-bar select option{background:var(--paper-2);color:var(--ink);}
   .btn{font-family:var(--mono);font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink);border:1px solid var(--rule-strong);border-radius:999px;padding:.5rem 1.05rem;cursor:none;white-space:nowrap;transition:.15s;}
   .btn:hover{border-color:var(--ink);}
   .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);}
@@ -256,50 +261,11 @@
 
   <main class="content">
 
-    <details class="cfg" id="cfg" open>
-      <summary>⚙ Fuente de datos · <b>preconteo en vivo</b> · click para plegar</summary>
-      <div class="cfg-body">
-        <div class="row">
-          <label for="src-mode">Modo</label>
-          <select id="src-mode">
-            <option value="worker">Worker propio (recomendado)</option>
-            <option value="direct">URL directa Registraduría + proxy CORS</option>
-          </select>
-          <label for="dep-select" style="min-width:4rem">Ámbito</label>
-          <select id="dep-select"></select>
-        </div>
-        <div class="row" data-mode="worker">
-          <label for="worker-base">Worker base</label>
-          <input id="worker-base" value="https://registraduria-proxy.reruizc.workers.dev" />
-          <span class="hint">→ /presidente · /presidente/{cod}</span>
-        </div>
-        <div class="row" data-mode="direct" style="display:none">
-          <label for="reg-base">Registraduría</label>
-          <input id="reg-base" value="https://resultados.registraduria.gov.co" />
-          <label for="corp" style="min-width:3rem">Corp</label>
-          <input id="corp" value="PR" style="max-width:5rem;flex:0 0 5rem" />
-        </div>
-        <div class="row" data-mode="direct" style="display:none">
-          <label for="full-url">URL exacta</label>
-          <input id="full-url" placeholder="Opcional: pega la URL exacta de DevTools→Network" />
-          <select id="proxy" style="max-width:13rem;flex:0 0 13rem">
-            <option value="corsproxy">proxy: corsproxy.io</option>
-            <option value="allorigins">proxy: allorigins.win</option>
-            <option value="directo">proxy: ninguno</option>
-          </select>
-        </div>
-        <div class="row">
-          <button class="btn primary" id="btn-load">Cargar ahora</button>
-          <button class="btn" id="btn-auto">Auto-refresh: off</button>
-          <span class="hint">Endpoint supuesto: <code>ACT/PR/00.json</code> (confirmar al abrir el conteo)</span>
-        </div>
-        <div id="status">Listo. El host de la Registraduría suele abrir al cierre de mesas (4:00 p.m.). Pulsa «Cargar ahora», activa Auto-refresh, o prueba el modelo con «Simular boletines».</div>
-        <details class="raw" id="raw-wrap" style="display:none">
-          <summary>Ver JSON crudo recibido (para mapear campos si la forma difiere)</summary>
-          <pre id="raw"></pre>
-        </details>
-      </div>
-    </details>
+    <div class="ambito-bar">
+      <label for="dep-select">Ámbito</label>
+      <select id="dep-select"></select>
+      <span class="hint">o haz click en un departamento del mapa · se actualiza solo cada 3 min</span>
+    </div>
 
     <div class="verdict" id="verdict">
       <div class="verdict-tag">¿Se define en primera vuelta?</div>
@@ -490,26 +456,12 @@ let STATE = { dep:'00', data:null, autoTimer:null, boletines:[], demo:false, dep
 
 // ════════════════════════ FETCH ════════════════════════
 function buildTarget(dep){
-  if ($('src-mode').value === 'worker'){
-    const base = ($('worker-base').value.trim() || WORKER_DEFAULT).replace(/\/+$/,'');
-    return base + '/presidente' + (dep && dep !== '00' ? '/' + dep : '');
-  }
-  const full = $('full-url').value.trim();
-  if (full) return (dep && dep !== '00') ? full.replace(/\/0*0\.json/i, '/' + dep + '.json') : full;
-  const rb   = ($('reg-base').value.trim() || REG_DEFAULT).replace(/\/+$/,'');
-  const corp = ($('corp').value.trim() || 'PR').toUpperCase();
-  return rb + '/json/ACT/' + corp + '/' + (dep || '00') + '.json';
-}
-function wrapProxy(target){
-  if ($('src-mode').value === 'worker') return target;
-  const p = $('proxy').value;
-  if (p === 'corsproxy')  return 'https://corsproxy.io/?url=' + encodeURIComponent(target);
-  if (p === 'allorigins') return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(target);
-  return target;
+  const base = WORKER_DEFAULT.replace(/\/+$/,'');
+  return base + '/presidente' + (dep && dep !== '00' ? '/' + dep : '');
 }
 async function fetchData(dep){
   const target = buildTarget(dep);
-  const url    = wrapProxy(target);
+  const url    = target;
   const sep    = url.includes('?') ? '&' : '?';
   const res    = await fetch(url + sep + 't=' + Date.now(), { cache:'no-store', headers:{ 'Accept':'application/json' } });
   if (!res.ok){ const e = new Error('HTTP ' + res.status); e.status = res.status; e.target = target; try { e.body = await res.text(); } catch (_) {} throw e; }
@@ -936,14 +888,12 @@ async function renderCompare(){
 }
 
 // ════════════════════ LOAD ════════════════════
-function setStatus(msg, cls){ const s = $('status'); s.className = cls || ''; s.textContent = msg; }
+function setStatus(msg, cls){ const s = $('status'); if (!s) return; s.className = cls || ''; s.textContent = msg; }
 
 async function load(){
   setStatus('Consultando ' + buildTarget(STATE.dep) + ' …', 'load');
   try {
     const ds = await fetchData(STATE.dep);
-    $('raw').textContent = JSON.stringify(ds, null, 2).slice(0, 40000);
-    $('raw-wrap').style.display = '';
     const { cands, fuente } = extraerCandidatos(ds);
     const tot = extraerTotales(ds);
     if (tot.mesatota) MESAS_TOTAL = tot.mesatota;
@@ -962,7 +912,7 @@ async function load(){
     $('fuenteLabel').textContent = 'Registraduría' + (fuente==='auto' ? ' (auto)' : '');
 
     if (!cands.length) setStatus('JSON recibido pero no detecté candidatos. Revisa el JSON crudo abajo para mapear los campos (la forma presidencial puede diferir).', 'err');
-    else { setStatus(`OK · ${cands.length} candidatos · ${fmt(tot.mesesc)} mesas · ${now.toLocaleTimeString('es-CO')}`, 'ok'); if (!load._collapsed){ $('cfg').open = false; load._collapsed = true; } }
+    else setStatus(`OK · ${cands.length} candidatos · ${fmt(tot.mesesc)} mesas · ${now.toLocaleTimeString('es-CO')}`, 'ok');
   } catch (e){
     if (e.status === 404 && /Ruta no encontrada/i.test(e.body || '')) setStatus('El worker aún no tiene la ruta /presidente. Agrégala (presidente → PR) y vuelve a desplegar — ver tools/registraduria-proxy-presidente-route.md. Mientras tanto puedes usar el modo «URL directa».', 'err');
     else if (e.status === 403) setStatus('403 · La Registraduría tiene bloqueado el host de resultados (aún no abre el conteo o el endpoint presidencial no está habilitado). Reintenta más tarde esta noche.', 'err');
@@ -973,8 +923,8 @@ async function load(){
 
 function toggleAuto(){
   const b = $('btn-auto');
-  if (STATE.autoTimer){ clearInterval(STATE.autoTimer); STATE.autoTimer = null; b.classList.remove('on'); b.textContent = 'Auto-refresh: off'; }
-  else { STATE.autoTimer = setInterval(load, RECARGA_MS); b.classList.add('on'); b.textContent = 'Auto-refresh: 3 min'; load(); }
+  if (STATE.autoTimer){ clearInterval(STATE.autoTimer); STATE.autoTimer = null; if(b){ b.classList.remove('on'); b.textContent = 'Auto-refresh: off'; } }
+  else { STATE.autoTimer = setInterval(load, RECARGA_MS); if(b){ b.classList.add('on'); b.textContent = 'Auto-refresh: 3 min'; } load(); }
 }
 
 // ════════════════════ DEMO (probar el modelo sin datos en vivo) ════════════════════
@@ -1013,8 +963,6 @@ function runDemo(){
 }
 
 // ════════════════════ INIT ════════════════════
-function syncModeRows(){ const m = $('src-mode').value; document.querySelectorAll('[data-mode]').forEach(el => { el.style.display = (el.dataset.mode === m) ? '' : 'none'; }); }
-
 (function init(){
   Chart.defaults.color = cssVar('--ink-2');
   Chart.defaults.font.family = "'Arima', sans-serif";
@@ -1022,17 +970,12 @@ function syncModeRows(){ const m = $('src-mode').value; document.querySelectorAl
   const sel = $('dep-select');
   [['00','Nacional (todos)'], ...Object.entries(DANE_DEP).sort((a,b)=>a[1].localeCompare(b[1],'es'))].forEach(([cod,nom]) => { const o=document.createElement('option'); o.value=cod; o.textContent=nom; sel.appendChild(o); });
 
-  $('src-mode').onchange = syncModeRows;
   sel.onchange = () => { STATE.dep = sel.value; load(); };
-  $('btn-load').onclick = load;
-  $('btn-auto').onclick = toggleAuto;
   $('btn-recompute').onclick = renderDefinicion;
   $('sigma').onchange = renderDefinicion;
   $('btn-reset-bol').onclick = () => resetBoletines(false);
   $('btn-demo').onclick = runDemo;
   $('btn-sweep').onclick = sweepDepartments;
-  $('full-url').addEventListener('keydown', e => { if (e.key === 'Enter') load(); });
-  syncModeRows();
   initMap();
   // repintar al cambiar día/noche (tokens + charts + mapa)
   window.__onThemeChange = () => { try { Chart.defaults.color = cssVar('--ink-2'); renderMap(); if (STATE.data){ renderDefinicion(); if (CHART_MODE==='evo') renderEvoChart(); } } catch(_){} };
