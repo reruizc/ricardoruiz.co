@@ -609,6 +609,7 @@ async function selectCandidate(nombre, codpar){
     const fresh = Object.keys(STATE.depCand||{}).length && (Date.now()-STATE.depCandTs) < 120000;
     if (!fresh){ const h=$('map-hint'); if(h) h.textContent='cargando mapa del candidato…'; await ensureDepCand(); }
     renderMap();                               // re-colorea con la matriz completa
+    if (STATE.dep === '00') renderCompare();   // refresca tabla Cepeda 2026 vs Petro 2022 (ya hay caché)
   } else { render(); }
 }
 
@@ -625,7 +626,7 @@ async function ensureDepCand(force){
       const base = cands.reduce((s,c)=>s+c.votos,0);
       if (cands.length && base > 0){
         const byCodpar = {}; cands.forEach(c => { if (c.codpar) byCodpar[String(c.codpar)] = { nombre:c.nombre, votos:c.votos }; });
-        STATE.depCand[cod] = { base, byCodpar };
+        STATE.depCand[cod] = { base, blanco: tot.votblan||0, byCodpar };
         STATE.depWinners[cod] = { nombre:cands[0].nombre, color:candColor(cands[0].nombre,cands[0].partido,0), pct:cands[0].votos/(base+(tot.votblan||0))*100 };
       }
     } catch(_){} } }
@@ -704,7 +705,7 @@ function renderEvoChart(){
 }
 
 // ════════════════════ MAPA COLOMBIA ════════════════════
-let leafMap=null, geoLayer=null, GEO=null, sweeping=false;
+let leafMap=null, geoLayer=null, GEO=null, sweeping=false, _mapStyle=null;
 const GEO_URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/DEPARTAMENTOS2.json';
 const NAME2CODE=(()=>{ const m={}; for(const cod in DANE_DEP) m[norm(DANE_DEP[cod])]=cod;
   Object.assign(m,{'bogota':'16','bogota dc':'16','distrito capital de bogota':'16','valle del cauca':'31','valle':'31','norte de santander':'25','san andres y providencia':'56','san andres':'56'}); return m; })();
@@ -756,11 +757,12 @@ function renderMap(){
     if (mc){ const sh=shareMap[cod]||0; return { fillColor:candHex, fillOpacity: sh>0 ? 0.15+0.8*(sh/maxShare) : 0.05, color:rule, weight:1 }; }
     const w=STATE.depWinners[cod]; return { fillColor:w?w.color:paper3, fillOpacity:w?.85:.4, color:rule, weight:1 };
   };
+  _mapStyle = styleFn;   // ref viva al estilo del modo actual (los handlers de hover la leen)
   if (!geoLayer){
     geoLayer=L.geoJSON(GEO,{ style:styleFn, onEachFeature:(f,l)=>{
       const cod=geoCode(f.properties);
-      l.on('mouseover',()=>l.setStyle({fillOpacity:1}));
-      l.on('mouseout',()=>l.setStyle(styleFn(f)));
+      l.on('mouseover',()=>l.setStyle(Object.assign({}, _mapStyle(f), {fillOpacity:1})));
+      l.on('mouseout',()=>l.setStyle(_mapStyle(f)));
       l.on('click',()=>{ if(cod){ const s=$('dep-select'); if(s) s.value=cod; STATE.dep=cod; load(); } });
     }}).addTo(leafMap);
     try{ leafMap.fitBounds(geoLayer.getBounds(),{padding:[6,6],animate:false}); }catch(_){}
@@ -948,7 +950,39 @@ async function renderCompare(){
       <table class="mini"><thead><tr><th>Mun (cód)</th><th>Ganador 2022</th><th>%</th><th>Petro 2022 %</th><th>Válidos</th></tr></thead><tbody>${
         rws.slice(0,200).map(r=>`<tr><td>${r.k}</td><td>${r.w.nombre.split(' ').slice(0,2).join(' ')}</td><td>${r.w.pct.toFixed(1)}%</td><td>${r.petro?r.petro.pct.toFixed(1)+'%':'—'}</td><td>${fmt(r.validos)}</td></tr>`).join('')
       }</tbody></table>` : '<div class="mini-note">Sin municipios 2022 para este departamento.</div>';
-  } else { munWrap.style.display = 'none'; }
+  } else {
+    // Nacional → comparativo Cepeda 2026 vs Petro 2022 por departamento
+    munWrap.style.display = '';
+    $('cmp-mun-sum').textContent = 'Cepeda 2026 vs Petro 2022 · por departamento';
+    renderCepedaVsPetroDepto();
+  }
+}
+
+// Tabla: voto de Cepeda 2026 vs Petro 2022 (1ª vuelta) por departamento.
+// Cepeda 2026 sale del caché depto×candidato (codpar 7); requiere el barrido.
+function renderCepedaVsPetroDepto(){
+  const box = $('cmp-mun'); if (!box) return;
+  if (!Object.keys(STATE.depCand||{}).length){
+    box.innerHTML = '<div class="mini-note" style="margin-bottom:.5rem">Necesito el desglose por departamento (se carga al elegir un candidato en el gráfico, o aquí).</div><button class="btn" id="btn-load-cmp-dep">↓ Cargar comparativo por departamento</button>';
+    const b = $('btn-load-cmp-dep'); if (b) b.onclick = async () => { b.textContent = 'Cargando…'; await ensureDepCand(); renderCepedaVsPetroDepto(); };
+    return;
+  }
+  if (!HIST22.depto){ box.innerHTML = '<div class="mini-note">Cargando base 2022…</div>'; return; }
+  const rows = [];
+  for (const cod in DANE_DEP){
+    const e = STATE.depCand[cod];
+    const c = e && e.byCodpar['7'];
+    const cep = (e && c) ? c.votos / ((e.base + (e.blanco||0)) || 1) * 100 : null;
+    const blk = HIST22.depto[cod] || HIST22.depto[String(parseInt(cod,10))];
+    const p22 = parse2022Block(blk); const pet = (p22 && p22.petro) ? p22.petro.pct : null;
+    if (cep == null && pet == null) continue;
+    rows.push({ nombre: DANE_DEP[cod], cep, pet, swing: (cep!=null && pet!=null) ? cep-pet : null });
+  }
+  rows.sort((a,b) => (b.swing==null?-999:b.swing) - (a.swing==null?-999:a.swing));
+  box.innerHTML = `<div class="mini-note" style="margin-bottom:.4rem">Voto de <b>Cepeda 2026</b> (% válidos+blanco) frente al de <b>Petro 2022</b> (1ª vuelta) en cada departamento. Δ = puntos que sube (+) o baja (−) la izquierda.</div>
+    <table class="mini"><thead><tr><th>Departamento</th><th>Cepeda 2026</th><th>Petro 2022</th><th>Δ izq</th></tr></thead><tbody>${
+      rows.map(r => `<tr><td>${r.nombre}</td><td>${r.cep!=null?r.cep.toFixed(1)+'%':'—'}</td><td>${r.pet!=null?r.pet.toFixed(1)+'%':'—'}</td><td style="color:${r.swing==null?'var(--ink-3)':(r.swing>=0?'var(--ok)':'var(--danger)')};font-weight:600">${r.swing!=null?((r.swing>=0?'+':'')+r.swing.toFixed(1)+' pp'):'—'}</td></tr>`).join('')
+    }</tbody></table>`;
 }
 
 // ════════════════════ LOAD ════════════════════
