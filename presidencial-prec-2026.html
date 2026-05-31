@@ -247,6 +247,7 @@
   <div class="head"><div class="page-title">Presidencia · <span class="em">preconteo 1ª vuelta</span></div></div>
   <div class="breadcrumb"><a href="electoral.html">Resultados Electorales</a> &nbsp;/&nbsp; Presidencia de la República · 31 may 2026</div>
   <div class="meta-bar">
+    <span>Boletín: <b id="boletinLabel">—</b></span>
     <span>Actualización: <b id="lastUpdate">—</b></span>
     <span>Mesas: <b id="mesasLabel">— / —</b></span>
     <span>Potencial: <b id="potLabel">—</b></span>
@@ -374,10 +375,6 @@
         <div class="def-stat"><div class="def-k">P(par #1 vs #2 firme)</div><div class="def-v" id="def-plock">—</div><div class="def-d" id="def-plock-d">que el 2º no sea alcanzado por el 3º</div></div>
         <div class="def-stat"><div class="def-k">Estado matemático</div><div class="def-v sm" id="def-det">—</div><div class="def-d" id="def-det-d"></div></div>
         <div class="def-stat"><div class="def-k">Quedó definido en</div><div class="def-v sm" id="def-moment">—</div><div class="def-d" id="def-moment-d">% mesas escrutadas</div></div>
-      </div>
-      <div class="def-charts">
-        <div><div class="mini-lbl">Probabilidad de 2ª vuelta vs. % escrutado</div><canvas id="chart-prob" height="160"></canvas></div>
-        <div><div class="mini-lbl">% de cada candidato vs. % escrutado</div><canvas id="chart-shares" height="160"></canvas></div>
       </div>
       <div class="def-ctrl">
         <label>σ del modelo <input id="sigma" type="number" min="0.01" max="0.15" step="0.005" value="0.035" /></label>
@@ -718,6 +715,22 @@ const NAME2CODE=(()=>{ const m={}; for(const cod in DANE_DEP) m[norm(DANE_DEP[co
   Object.assign(m,{'bogota':'16','bogota dc':'16','distrito capital de bogota':'16','valle del cauca':'31','valle':'31','norte de santander':'25','san andres y providencia':'56','san andres':'56'}); return m; })();
 function geoCode(p){ return NAME2CODE[norm(p.name||p.NOMBRE_DPT||p.dpt||'')]||null; }
 
+// Colorea el mapa por departamento desde camaras[0].mapagan (ganador por dpto, en el JSON nacional).
+// Solo entran los departamentos que ya reportaron mesas (mesesc>0).
+function parseMapaGan(ds){
+  const mg = ds && ds.camaras && ds.camaras[0] && ds.camaras[0].mapagan;
+  if (!Array.isArray(mg)) return;
+  const w = {};
+  mg.forEach(e => {
+    const cod = String(e.amb||'').padStart(2,'0');
+    const ct = e.cantotabla || {};
+    const nombre = `${ct.nomcan||''} ${ct.apecan||''}`.trim();
+    const pct = parseFloat(String(e.pvot||'0').replace('%','').replace(',','.')) || 0;
+    if ((parseInt(e.mesesc)||0) > 0 && nombre) w[cod] = { nombre, color: candColor(nombre,'',0), pct };
+  });
+  STATE.depWinners = w;
+}
+
 async function initMap(){
   if (leafMap || typeof L==='undefined') return;
   try{
@@ -838,35 +851,8 @@ function renderDefinicion(){
   else if (defProb){ $('def-moment').textContent = defProb.x.toFixed(1)+'%'; $('def-moment').className='def-v sm'; $('def-moment-d').textContent = 'definición probabilística (≥99%)'; }
   else { $('def-moment').textContent='—'; $('def-moment').className='def-v sm'; $('def-moment-d').textContent='aún sin definirse'; }
 
-  const labels = rows.map(r => r.x.toFixed(0));
-  if (chartProb) chartProb.destroy();
-  chartProb = new Chart($('chart-prob').getContext('2d'), {
-    type:'line',
-    data:{ labels, datasets:[
-      { label:'P(2ª vuelta)', data:rows.map(r=>+(r.p2v*100).toFixed(1)), borderColor:'#0047FF', backgroundColor:'rgba(0,71,255,.12)', fill:true, tension:.25, pointRadius:2 },
-      { label:'P(par firme)', data:rows.map(r=>+(r.plock*100).toFixed(1)), borderColor:'#4ade80', backgroundColor:'transparent', tension:.25, pointRadius:1, borderDash:[4,3] },
-    ]},
-    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
-      scales:{ x:{ title:{display:true,text:'% escrutado'}, grid:{color:'rgba(255,255,255,.06)'} }, y:{ min:0, max:100, grid:{color:'rgba(255,255,255,.06)'}, ticks:{callback:v=>v+'%'} } },
-      plugins:{ legend:{ labels:{ boxWidth:10, font:{size:10} } } } }
-  });
-
-  const topNames = cur.cs.slice(0,5).map(c=>c.n);
-  const sharesData = {}; topNames.forEach(nm => sharesData[nm] = []);
-  rows.forEach((r,ri) => {
-    const blanco = STATE.boletines[ri] ? (STATE.boletines[ri].blanco||0) : 0;
-    const base = r.cs.reduce((s,c)=>s+c.v,0) + blanco;
-    topNames.forEach(nm => { const c = r.cs.find(x=>x.n===nm); sharesData[nm].push(c && base ? +(c.v/base*100).toFixed(2) : null); });
-  });
-  const mayoria = { label:'50% (mayoría)', data:labels.map(()=>50), borderColor:'rgba(255,255,255,.35)', borderDash:[6,4], pointRadius:0, fill:false };
-  if (chartShares) chartShares.destroy();
-  chartShares = new Chart($('chart-shares').getContext('2d'), {
-    type:'line',
-    data:{ labels, datasets: topNames.map((nm,idx) => ({ label:nm.split(' ').slice(0,2).join(' '), data:sharesData[nm], borderColor:candColor(nm,'',idx), backgroundColor:'transparent', tension:.25, pointRadius:1, spanGaps:true })).concat([mayoria]) },
-    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
-      scales:{ x:{ title:{display:true,text:'% escrutado'}, grid:{color:'rgba(255,255,255,.06)'} }, y:{ grid:{color:'rgba(255,255,255,.06)'}, ticks:{callback:v=>v+'%'} } },
-      plugins:{ legend:{ labels:{ boxWidth:10, font:{size:10} } } } }
-  });
+  // Charts del def-card removidos (se congelaban al re-renderizar con auto-refresh).
+  // Quedan las cards + la tabla de boletines.
 
   $('bol-table').innerHTML = `<table class="mini"><thead><tr><th>%escr</th><th>hora</th><th>#1</th><th>%</th><th>#2</th><th>%</th><th>P(2V)</th><th>estado</th></tr></thead><tbody>${
     rows.map(r=>`<tr><td>${r.x.toFixed(1)}%</td><td>${new Date(r.ts).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}</td><td>${(r.cs[0]?r.cs[0].n.split(' ')[0]:'—')}</td><td>${(r.s1*100).toFixed(1)}%</td><td>${(r.cs[1]?r.cs[1].n.split(' ')[0]:'—')}</td><td>${(r.s2*100).toFixed(1)}%</td><td>${(r.p2v*100).toFixed(0)}%</td><td>${r.det1ra?'1ª✓':r.det2da?'2V✓':'…'}</td></tr>`).join('')
@@ -962,12 +948,14 @@ async function load(){
     const tot = extraerTotales(ds);
     if (tot.mesatota) MESAS_TOTAL = tot.mesatota;
     STATE.data = { cands, tot, fuente };
+    if (STATE.dep === '00') parseMapaGan(ds);   // colorea el mapa por departamento desde el JSON nacional
     render();
     captureBoletin(tot, cands);
     renderDefinicion();
     renderCompare();
 
     const now = new Date();
+    $('boletinLabel').textContent = (ds && ds.numact != null) ? '#' + ds.numact : '—';
     $('lastUpdate').textContent = now.toLocaleDateString('es-CO') + ' · ' + now.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
     $('mesasLabel').textContent = fmt(tot.mesesc) + ' / ' + (MESAS_TOTAL ? fmt(MESAS_TOTAL) : '—');
     $('potLabel').textContent   = fmt(tot.centota || POTENCIAL_DEF);
@@ -1051,6 +1039,7 @@ function syncModeRows(){ const m = $('src-mode').value; document.querySelectorAl
 
   loadBoletines();
   if (STATE.boletines.length){ STATE.demo = STATE.boletines.some(b=>b.demo); renderDefinicion(); }
+  toggleAuto();   // auto-refresh ON por defecto: primera carga inmediata + cada 3 min
 
   const cur = $('cursor'), ring = $('cursorRing');
   let mx=0,my=0,rx=0,ry=0;
