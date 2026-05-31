@@ -16,7 +16,7 @@
   :root{
     --paper:#1a1610; --paper-2:#221d15; --paper-3:#2a241b;
     --ink:#f4f3ef; --ink-2:#b8b1a0; --ink-3:#807a6c;
-    --accent:#d96a50; --accent-soft:#d96a5018; --accent-tint:#d96a5036; --on-accent:#14110a;
+    --accent:#d96a50; --accent-soft:#d96a5018; --accent-tint:#d96a5036; --on-accent:#14110a; --cafe:#b5895c;
     --rule:#f4f3ef1c; --rule-strong:#f4f3ef38;
     --ok:#7bb661; --warn:#d9a441; --danger:#b03524;
     --sans:'Familjen Grotesk',system-ui,sans-serif; --italic:'Petrona',Georgia,serif; --mono:'Arima',ui-rounded,sans-serif;
@@ -24,7 +24,7 @@
   body.day-mode{
     --paper:#f4f3ef; --paper-2:#ecebe5; --paper-3:#e0ddd2;
     --ink:#14110a; --ink-2:#5a5448; --ink-3:#948e80;
-    --accent:#8a1e16; --accent-soft:#8a1e161a; --accent-tint:#8a1e1633; --on-accent:#f4f3ef;
+    --accent:#8a1e16; --accent-soft:#8a1e161a; --accent-tint:#8a1e1633; --on-accent:#f4f3ef; --cafe:#6f4a2a;
     --rule:#14110a1f; --rule-strong:#14110a40;
   }
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -56,10 +56,10 @@
   .theme-btn{display:inline-flex;align-items:center;gap:.45rem;font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);padding:.45rem .85rem;border:1px solid var(--rule-strong);border-radius:999px;transition:.2s;}
   .theme-btn:hover{color:var(--ink);border-color:var(--ink);}
   .logo-link{display:flex;align-items:center;gap:.55rem;}
-  .logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px;}
-  .logo-bar{width:5px;background:var(--accent);border-radius:1px 1px 0 0;opacity:.9;}
-  .logo-text{font-family:var(--sans);font-weight:700;font-size:1.2rem;letter-spacing:-.02em;color:var(--ink);}
-  .logo-text span{color:var(--accent);}
+  .logo-bars{display:flex;align-items:flex-end;gap:3px;height:18px;}
+  .logo-bar{width:5px;background:var(--cafe);border-radius:1px 1px 0 0;opacity:.9;}
+  .logo-text{font-family:var(--sans);font-weight:800;font-size:clamp(1.1rem,2vw,1.4rem);letter-spacing:-.03em;color:var(--ink);line-height:1;}
+  .logo-text span{color:var(--cafe);}
 
   /* HEAD + META */
   .head{padding:1.2rem 1.75rem .3rem;}
@@ -225,7 +225,7 @@
     <div class="tb-center"><span class="live-dot"></span>Preconteo en vivo</div>
     <div class="tb-right">
       <a href="electoral.html" class="logo-link">
-        <span class="logo-bars"><span class="logo-bar" style="height:20px"></span><span class="logo-bar" style="height:15px"></span><span class="logo-bar" style="height:9px"></span><span class="logo-bar" style="height:4px"></span></span>
+        <span class="logo-bars"><span class="logo-bar" style="height:18px"></span><span class="logo-bar" style="height:14px"></span><span class="logo-bar" style="height:9px"></span><span class="logo-bar" style="height:5px"></span></span>
         <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
       </a>
     </div>
@@ -660,26 +660,33 @@ function geoCode(p){ return NAME2CODE[norm(p.name||p.NOMBRE_DPT||p.dpt||'')]||nu
 async function initMap(){
   if (leafMap || typeof L==='undefined') return;
   try{
-    leafMap=L.map('map',{zoomControl:true,attributionControl:false,scrollWheelZoom:false});
+    leafMap=L.map('map',{zoomControl:true,attributionControl:false,scrollWheelZoom:false,zoomAnimation:false,fadeAnimation:false});
     leafMap.setView([4.6,-73.5],5);
     const r=await fetch(GEO_URL); GEO=await r.json();
     renderMap();
   }catch(e){ /* el mapa es opcional */ }
 }
+// Construye la capa UNA sola vez; en llamadas siguientes sólo re-colorea
+// (setStyle) y actualiza tooltips. fitBounds corre una única vez y sin
+// animación, para que recolorear no vuelva a hacer zoom ("drill down").
 function renderMap(){
   if (!leafMap || !GEO) return;
   STATE.depWinners=STATE.depWinners||{};
-  if (geoLayer) leafMap.removeLayer(geoLayer);
   const paper3=cssVar('--paper-3'), rule=cssVar('--rule-strong');
-  geoLayer=L.geoJSON(GEO,{
-    style:f=>{ const w=STATE.depWinners[geoCode(f.properties)]; return { fillColor:w?w.color:paper3, fillOpacity:w?.85:.4, color:rule, weight:1 }; },
-    onEachFeature:(f,l)=>{ const cod=geoCode(f.properties), w=STATE.depWinners[cod], nom=f.properties.name||cod||'—';
-      l.bindTooltip(`<b>${nom}</b><br>${w?w.nombre.split(' ').slice(0,2).join(' ')+' · '+w.pct.toFixed(1)+'%':'sin reporte'}`,{className:'map-tt',sticky:true});
-      l.on('mouseover',()=>l.setStyle({fillOpacity:1})); l.on('mouseout',()=>l.setStyle({fillOpacity:w?.85:.4}));
-      l.on('click',()=>{ if(cod){ const s=$('dep-select'); if(s){ s.value=cod; } STATE.dep=cod; load(); } });
-    }
-  }).addTo(leafMap);
-  try{ leafMap.fitBounds(geoLayer.getBounds(),{padding:[6,6]}); }catch(_){}
+  const styleFn=f=>{ const w=STATE.depWinners[geoCode(f.properties)]; return { fillColor:w?w.color:paper3, fillOpacity:w?.85:.4, color:rule, weight:1 }; };
+  if (!geoLayer){
+    geoLayer=L.geoJSON(GEO,{ style:styleFn, onEachFeature:(f,l)=>{
+      const cod=geoCode(f.properties);
+      l.on('mouseover',()=>l.setStyle({fillOpacity:1}));
+      l.on('mouseout',()=>l.setStyle(styleFn(f)));
+      l.on('click',()=>{ if(cod){ const s=$('dep-select'); if(s) s.value=cod; STATE.dep=cod; load(); } });
+    }}).addTo(leafMap);
+    try{ leafMap.fitBounds(geoLayer.getBounds(),{padding:[6,6],animate:false}); }catch(_){}
+  } else { geoLayer.setStyle(styleFn); }
+  geoLayer.eachLayer(l=>{ const f=l.feature, cod=geoCode(f.properties), w=STATE.depWinners[cod], nom=(f.properties&&f.properties.name)||cod||'—';
+    const html=`<b>${nom}</b><br>${w?w.nombre.split(' ').slice(0,2).join(' ')+' · '+w.pct.toFixed(1)+'%':'sin reporte'}`;
+    if (l.getTooltip()) l.setTooltipContent(html); else l.bindTooltip(html,{className:'map-tt',sticky:false});
+  });
   const n=Object.keys(STATE.depWinners).length;
   const ms=$('map-status'); if(ms) ms.textContent=`${n} departamento${n===1?'':'s'} reportado${n===1?'':'s'}`;
 }
