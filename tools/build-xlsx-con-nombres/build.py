@@ -38,8 +38,15 @@ DEFAULTS = [
 SHEET_ROWS = 1_000_000
 
 
+NO_DISP = "No disponible"
+
+
 def load_geo_lookup():
-    """Lee PUESTOS_GEOREF.csv y devuelve dict (dde,mme,zz,pp) → info."""
+    """Lee PUESTOS_GEOREF.csv y devuelve dict (dde,mme,zz,pp) → info.
+
+    Para campos vacíos en el CSV (comuna/barrio que no fueron registrados),
+    devuelve "No disponible" en lugar de string vacío.
+    """
     print(f"Cargando {GEOREF.name}…", flush=True)
     lookup = {}
     with GEOREF.open("r", encoding="utf-8-sig", newline="") as f:
@@ -61,12 +68,20 @@ def load_geo_lookup():
             # El NOMBRE COMUNA viene con prefix del CÓDIGO ("01COMUNA 1 POPULAR" → "COMUNA 1 POPULAR")
             if cod_comuna and nom_comuna.startswith(cod_comuna):
                 nom_comuna = nom_comuna[len(cod_comuna):].strip()
+            # Barrio principal + barrio.1 (a veces vienen distintos). Si el principal está
+            # vacío, usar el alternativo. Si ambos están vacíos → NO_DISP.
+            barrio_main = (row.get("BARRIO") or "").strip()
+            barrio_alt  = (row.get("barrio.1") or "").strip()
+            barrio = barrio_main or barrio_alt
+
+            def _or_na(s): return s if s else NO_DISP
             lookup[(dde, mme, zz, pp)] = {
-                "depto":      (row.get("DEPARTAMENTO") or "").strip(),
-                "municipio":  (row.get("MUNICIPIO") or "").strip(),
-                "puesto":     (row.get("NOMBRE PUESTO") or "").strip(),
-                "cod_comuna": cod_comuna,
-                "comuna":     nom_comuna,
+                "depto":      _or_na((row.get("DEPARTAMENTO") or "").strip()),
+                "municipio":  _or_na((row.get("MUNICIPIO") or "").strip()),
+                "puesto":     _or_na((row.get("NOMBRE PUESTO") or "").strip()),
+                "cod_comuna": _or_na(cod_comuna),
+                "comuna":     _or_na(nom_comuna),
+                "barrio":     _or_na(barrio),
             }
     print(f"  → {len(lookup):,} puestos georreferenciados", flush=True)
     return lookup
@@ -116,7 +131,7 @@ def enrich_por_puesto(gcs_in: Path, xlsx_out: Path, lookup: dict):
                 continue
             agg[key] += vot
 
-    new_cols = ["DES_DDE", "DES_MME", "DES_PP", "COD_COMUNA", "DES_COMUNA"]
+    new_cols = ["DES_DDE", "DES_MME", "DES_PP", "COD_COMUNA", "DES_COMUNA", "DES_BARRIO"]
     out_header = key_cols + ["NUM_VOT"] + new_cols
 
     wb = Workbook(write_only=True)
@@ -136,10 +151,18 @@ def enrich_por_puesto(gcs_in: Path, xlsx_out: Path, lookup: dict):
             info = None
         if info:
             hits += 1
-            enriched = list(key) + [votos, info["depto"], info["municipio"], info["puesto"], info["cod_comuna"], info["comuna"]]
+            enriched = list(key) + [
+                votos,
+                info["depto"], info["municipio"], info["puesto"],
+                info["cod_comuna"], info["comuna"], info["barrio"],
+            ]
         else:
             misses += 1
-            enriched = list(key) + [votos, "", "", "", "", ""]
+            enriched = list(key) + [
+                votos,
+                NO_DISP, NO_DISP, NO_DISP,
+                NO_DISP, NO_DISP, NO_DISP,
+            ]
         if rows_in_sheet >= SHEET_ROWS:
             sheet_idx += 1
             ws = wb.create_sheet(f"Datos {sheet_idx}")
@@ -159,7 +182,7 @@ def enrich_por_puesto(gcs_in: Path, xlsx_out: Path, lookup: dict):
 
 
 def enrich(gcs_in: Path, xlsx_out: Path, lookup: dict):
-    new_cols = ["DES_DDE", "DES_MME", "DES_PP", "COD_COMUNA", "DES_COMUNA"]
+    new_cols = ["DES_DDE", "DES_MME", "DES_PP", "COD_COMUNA", "DES_COMUNA", "DES_BARRIO"]
     misses = 0
     hits = 0
     with gcs_in.open("r", encoding="utf-8-sig", newline="") as f:
@@ -190,10 +213,13 @@ def enrich(gcs_in: Path, xlsx_out: Path, lookup: dict):
                 info = None
             if info:
                 hits += 1
-                enriched = row + [info["depto"], info["municipio"], info["puesto"], info["cod_comuna"], info["comuna"]]
+                enriched = row + [
+                    info["depto"], info["municipio"], info["puesto"],
+                    info["cod_comuna"], info["comuna"], info["barrio"],
+                ]
             else:
                 misses += 1
-                enriched = row + ["", "", "", "", ""]
+                enriched = row + [NO_DISP, NO_DISP, NO_DISP, NO_DISP, NO_DISP, NO_DISP]
             if rows_in_sheet >= SHEET_ROWS:
                 sheet_idx += 1
                 ws = wb.create_sheet(f"Datos {sheet_idx}")
