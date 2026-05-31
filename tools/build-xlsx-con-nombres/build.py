@@ -38,7 +38,13 @@ S3_BASE = "s3://elecciones-2026/ricardoruiz.co/DESCARGAS/raw"
 
 # (gcs_name, categoria_s3, año)
 DEFAULTS = [
+    ("GCS_2010PRES1V.csv", "presidencial-1v", 2010),
+    ("GCS_2014PRES1V.csv", "presidencial-1v", 2014),
+    ("GCS_2018PRES1V.csv", "presidencial-1v", 2018),
     ("GCS_2022PRES1V.csv", "presidencial-1v", 2022),
+    ("GCS_2010PRES2V.csv", "presidencial-2v", 2010),
+    ("GCS_2014PRES2V.csv", "presidencial-2v", 2014),
+    ("GCS_2018PRES2V.csv", "presidencial-2v", 2018),
     ("GCS_2022PRES2V.csv", "presidencial-2v", 2022),
 ]
 
@@ -135,27 +141,48 @@ def load_geo_lookup():
     return lookup, depto_by_cod, mun_by_cod
 
 
+def _puesto_label(dde, zz):
+    """Etiqueta descriptiva para puestos sin nombre exacto en el censo,
+    derivada del tipo de zona (opción B). Mejor que un 'No disponible' crudo.
+       dde=88           → Consulado (exterior)
+       zz=99            → Puesto rural / corregimiento
+       zz=90            → Puesto censo (tipo CORFERIAS)
+       zz=98            → Puesto especial (cárceles)
+       resto            → Puesto sin registro en censo
+    """
+    if dde == "88":
+        return "Consulado (exterior)"
+    if zz == "99":
+        return "Puesto rural / corregimiento"
+    if zz == "90":
+        return "Puesto censo"
+    if zz == "98":
+        return "Puesto especial (cárceles)"
+    return "Puesto sin registro en censo"
+
+
 def resolve_names(dde, mme, zz, pp, lookup_full, depto_by_cod, mun_by_cod):
     """Resuelve los 5 campos de nombre con cascada:
        1. match exacto del puesto → todos los valores del lookup_full
        2. para depto/municipio sin match exacto: fallback a los mapeos por
           código (siempre disponible para los 33 deptos y municipios
           que aparecen al menos una vez en georef).
-       3. cualquier campo que quede vacío → NO_DISP.
+       3. puesto sin nombre → etiqueta descriptiva por tipo de zona (opción B).
+       4. comuna/barrio sin dato → NO_DISP.
     """
     info = lookup_full.get((dde, mme, zz, pp))
     if info:
         depto     = info["depto"]     or depto_by_cod.get(dde, "") or NO_DISP
         municipio = info["municipio"] or mun_by_cod.get((dde, mme), "") or NO_DISP
-        puesto    = info["puesto"]    or NO_DISP
+        puesto    = info["puesto"]    or _puesto_label(dde, zz)
         comuna    = info["comuna"]    or NO_DISP
         barrio    = info["barrio"]    or NO_DISP
         return depto, municipio, puesto, comuna, barrio, True
 
-    # Sin match exacto: rellenar lo que se pueda por código
+    # Sin match exacto: rellenar lo que se pueda por código, puesto = etiqueta por zona
     depto     = depto_by_cod.get(dde, "") or NO_DISP
     municipio = mun_by_cod.get((dde, mme), "") or NO_DISP
-    return depto, municipio, NO_DISP, NO_DISP, NO_DISP, False
+    return depto, municipio, _puesto_label(dde, zz), NO_DISP, NO_DISP, False
 
 
 def enrich_por_puesto(gcs_in: Path, xlsx_out: Path, lookup_data):
