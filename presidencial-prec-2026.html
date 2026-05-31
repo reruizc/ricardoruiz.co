@@ -189,7 +189,9 @@
   .vbar .vname{font-family:var(--sans);font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .vbar .vtrack{height:5px;border-radius:999px;background:var(--paper-3);overflow:hidden;margin-top:3px;}
   .vbar .vfill{height:100%;border-radius:999px;transition:width 1s;}
-  .vbar .vpct{font-family:var(--sans);font-weight:700;font-size:13px;width:46px;text-align:right;flex-shrink:0;}
+  .vbar .vend{display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;min-width:54px;}
+  .vbar .vpct{font-family:var(--sans);font-weight:700;font-size:13px;text-align:right;line-height:1.1;}
+  .vbar .vraw{font-family:var(--mono);font-size:10px;color:var(--ink-3);text-align:right;line-height:1.2;margin-top:1px;}
   .vbar .vtag{font-family:var(--mono);font-size:9px;letter-spacing:.04em;text-transform:uppercase;color:var(--ok);border:1px solid var(--ok);border-radius:6px;padding:.05rem .3rem;margin-left:.35rem;}
   #chart-evo-wrap{flex:1;min-height:240px;display:none;}
   .cand-ph{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;overflow:hidden;position:relative;font-family:var(--sans);font-weight:700;font-size:11px;color:#fff;flex-shrink:0;vertical-align:middle;}
@@ -264,7 +266,7 @@
     <div class="ambito-bar">
       <label for="dep-select">Ámbito</label>
       <select id="dep-select"></select>
-      <span class="hint">o haz click en un departamento del mapa · se actualiza solo cada 3 min</span>
+      <span class="hint">o haz click en un departamento del mapa · se actualiza solo cada 90 s</span>
     </div>
 
     <div class="verdict" id="verdict">
@@ -317,7 +319,7 @@
       </div>
 
       <div class="h3col">
-        <div class="h3head"><span class="h3title">Mapa · líder por departamento</span><span class="h3hint">click = abrir departamento</span></div>
+        <div class="h3head"><span class="h3title" id="map-title">Mapa · líder por departamento</span><span class="h3hint" id="map-hint">click = abrir departamento</span></div>
         <div class="map-box"><div id="map"></div></div>
         <div class="map-foot"><span id="map-status">0 departamentos reportados</span><button class="btn" id="btn-sweep" style="padding:.3rem .7rem;font-size:10px">Colorear todos</button></div>
       </div>
@@ -386,7 +388,7 @@
 
 const WORKER_DEFAULT = 'https://registraduria-proxy.reruizc.workers.dev';
 const REG_DEFAULT    = 'https://resultados.registraduria.gov.co';
-const RECARGA_MS     = 3 * 60 * 1000;
+const RECARGA_MS     = 90 * 1000;
 const POTENCIAL_DEF  = 41834371;
 let   MESAS_TOTAL    = 0;
 const BOL_KEY        = 'pres-boletines-v1';
@@ -400,7 +402,7 @@ const norm = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowe
 
 const DANE_DEP = {
   '60':'Amazonas','01':'Antioquia','40':'Arauca','56':'San Andrés','88':'Exterior',
-  '03':'Atlántico','16':'Bogotá D.C.','06':'Bolívar','07':'Boyacá','09':'Caldas',
+  '03':'Atlántico','16':'Bogotá D.C.','05':'Bolívar','07':'Boyacá','09':'Caldas',
   '44':'Caquetá','46':'Casanare','11':'Cauca','12':'Cesar','17':'Chocó','13':'Córdoba',
   '15':'Cundinamarca','50':'Guainía','54':'Guaviare','19':'Huila','48':'La Guajira',
   '21':'Magdalena','52':'Meta','23':'Nariño','25':'Norte de Santander','64':'Putumayo',
@@ -452,7 +454,7 @@ function candColor(nombre, partido, idx){
   return PALETTE[(idx||0) % PALETTE.length];
 }
 
-let STATE = { dep:'00', data:null, autoTimer:null, boletines:[], demo:false, depWinners:{} };
+let STATE = { dep:'00', data:null, autoTimer:null, boletines:[], demo:false, depWinners:{}, depCand:{}, depCandTs:0, mapCand:null };
 
 // ════════════════════════ FETCH ════════════════════════
 function buildTarget(dep){
@@ -590,14 +592,55 @@ function renderVoteBars(cands, validos, gana1v){
     const bw=(c.votos/maxV*100).toFixed(1);
     const col=candColor(c.nombre,c.partido,i);
     const a2v=(!gana1v && i<2)?'<span class="vtag">2V</span>':'';
-    const sel=SELECTED && norm(SELECTED)===norm(c.nombre)?' sel':'';
-    return `<div class="vbar${sel}" data-nombre="${(c.nombre||'').replace(/"/g,'')}">${barAvatar(c.nombre,col)}<div class="vmid"><div class="vname">${c.nombre}${a2v}</div><div class="vtrack"><div class="vfill" style="width:0;background:${col}" data-w="${bw}%"></div></div></div><div class="vpct">${pct.toFixed(1)}%</div></div>`;
+    const sel=(SELECTED && norm(SELECTED)===norm(c.nombre)) || (STATE.mapCand && String(STATE.mapCand)===String(c.codpar)) ?' sel':'';
+    return `<div class="vbar${sel}" data-nombre="${(c.nombre||'').replace(/"/g,'')}" data-codpar="${c.codpar||''}">${barAvatar(c.nombre,col)}<div class="vmid"><div class="vname">${c.nombre}${a2v}</div><div class="vtrack"><div class="vfill" style="width:0;background:${col}" data-w="${bw}%"></div></div></div><div class="vend"><div class="vpct">${pct.toFixed(1)}%</div><div class="vraw">${fmt(c.votos)}</div></div></div>`;
   }).join('');
-  box.querySelectorAll('.vbar').forEach(el=>{ el.onclick=()=>selectCandidate(el.dataset.nombre); });
+  box.querySelectorAll('.vbar').forEach(el=>{ el.onclick=()=>selectCandidate(el.dataset.nombre, el.dataset.codpar); });
   setTimeout(()=>box.querySelectorAll('.vfill').forEach(b=>{ if(b.dataset.w) b.style.width=b.dataset.w; }),50);
 }
 
-function selectCandidate(nombre){ SELECTED=nombre; render(); }
+async function selectCandidate(nombre, codpar){
+  SELECTED = nombre;
+  // Click en un candidato → mapa propio del candidato. Re-click del mismo → vuelve a líderes.
+  if (codpar != null && codpar !== ''){
+    if (String(STATE.mapCand) === String(codpar)){ STATE.mapCand = null; render(); return; }
+    STATE.mapCand = String(codpar);
+    render();                                  // foto + barras al instante
+    const fresh = Object.keys(STATE.depCand||{}).length && (Date.now()-STATE.depCandTs) < 120000;
+    if (!fresh){ const h=$('map-hint'); if(h) h.textContent='cargando mapa del candidato…'; await ensureDepCand(); }
+    renderMap();                               // re-colorea con la matriz completa
+  } else { render(); }
+}
+
+// Barrido de los 33 deptos → matriz depto × candidato (por codpar). Cacheada 2 min.
+let _depCandLoading = null;
+async function ensureDepCand(force){
+  if (_depCandLoading) return _depCandLoading;
+  if (!force && Object.keys(STATE.depCand||{}).length && (Date.now()-STATE.depCandTs) < 120000) return;
+  _depCandLoading = (async () => {
+    const codes = Object.keys(DANE_DEP).filter(c => c !== '88'); let i = 0;
+    STATE.depCand = STATE.depCand || {};
+    async function w(){ while (i < codes.length){ const cod = codes[i++]; try {
+      const ds = await fetchData(cod); const { cands } = extraerCandidatos(ds); const tot = extraerTotales(ds);
+      const base = cands.reduce((s,c)=>s+c.votos,0);
+      if (cands.length && base > 0){
+        const byCodpar = {}; cands.forEach(c => { if (c.codpar) byCodpar[String(c.codpar)] = { nombre:c.nombre, votos:c.votos }; });
+        STATE.depCand[cod] = { base, byCodpar };
+        STATE.depWinners[cod] = { nombre:cands[0].nombre, color:candColor(cands[0].nombre,cands[0].partido,0), pct:cands[0].votos/(base+(tot.votblan||0))*100 };
+      }
+    } catch(_){} } }
+    await Promise.all([w(),w(),w()]);
+    STATE.depCandTs = Date.now();
+  })();
+  try { await _depCandLoading; } finally { _depCandLoading = null; }
+}
+// % del candidato (codpar) en cada depto, sobre votos de candidatos del depto.
+function _candShareMap(codpar){
+  const out = {};
+  for (const cod in (STATE.depCand||{})){ const e = STATE.depCand[cod]; const c = e.byCodpar[String(codpar)];
+    out[cod] = (c && e.base) ? c.votos/e.base : 0; }
+  return out;
+}
 
 // Cotas duras (deterministas) que muestra la caja "Cómo sabemos que ya no tiene reversa".
 function renderMetodo(){
@@ -699,7 +742,20 @@ function renderMap(){
   if (!leafMap || !GEO) return;
   STATE.depWinners=STATE.depWinners||{};
   const paper3=cssVar('--paper-3'), rule=cssVar('--rule-strong');
-  const styleFn=f=>{ const w=STATE.depWinners[geoCode(f.properties)]; return { fillColor:w?w.color:paper3, fillOpacity:w?.85:.4, color:rule, weight:1 }; };
+
+  // Modo candidato: pinta cada depto con el color del candidato, intensidad por su %.
+  const mc = STATE.mapCand;
+  let shareMap=null, maxShare=0, candHex='#888', candNombre='';
+  if (mc){
+    shareMap = _candShareMap(mc);
+    maxShare = Math.max(0.0001, ...Object.values(shareMap));
+    const cn = (STATE.data&&STATE.data.cands) ? STATE.data.cands.find(c=>String(c.codpar)===String(mc)) : null;
+    candNombre = cn ? cn.nombre : ''; candHex = cn ? candColor(cn.nombre,cn.partido,0) : '#888';
+  }
+  const styleFn=f=>{ const cod=geoCode(f.properties);
+    if (mc){ const sh=shareMap[cod]||0; return { fillColor:candHex, fillOpacity: sh>0 ? 0.15+0.8*(sh/maxShare) : 0.05, color:rule, weight:1 }; }
+    const w=STATE.depWinners[cod]; return { fillColor:w?w.color:paper3, fillOpacity:w?.85:.4, color:rule, weight:1 };
+  };
   if (!geoLayer){
     geoLayer=L.geoJSON(GEO,{ style:styleFn, onEachFeature:(f,l)=>{
       const cod=geoCode(f.properties);
@@ -709,19 +765,27 @@ function renderMap(){
     }}).addTo(leafMap);
     try{ leafMap.fitBounds(geoLayer.getBounds(),{padding:[6,6],animate:false}); }catch(_){}
   } else { geoLayer.setStyle(styleFn); }
-  geoLayer.eachLayer(l=>{ const f=l.feature, cod=geoCode(f.properties), w=STATE.depWinners[cod], nom=(f.properties&&f.properties.name)||cod||'—';
-    const html=`<b>${nom}</b><br>${w?w.nombre.split(' ').slice(0,2).join(' ')+' · '+w.pct.toFixed(1)+'%':'sin reporte'}`;
+  geoLayer.eachLayer(l=>{ const f=l.feature, cod=geoCode(f.properties), nom=(f.properties&&f.properties.name)||cod||'—';
+    let html;
+    if (mc){ const sh=shareMap[cod]||0, e=STATE.depCand[cod], c=e&&e.byCodpar[String(mc)];
+      html=`<b>${nom}</b><br>${candNombre.split(' ').slice(0,2).join(' ')} · ${(sh*100).toFixed(1)}%${c?' · '+fmt(c.votos)+' votos':' · sin reporte'}`;
+    } else { const w=STATE.depWinners[cod];
+      html=`<b>${nom}</b><br>${w?w.nombre.split(' ').slice(0,2).join(' ')+' · '+w.pct.toFixed(1)+'%':'sin reporte'}`;
+    }
     if (l.getTooltip()) l.setTooltipContent(html); else l.bindTooltip(html,{className:'map-tt',sticky:false});
   });
+  // Título + hint + contador según modo
+  const mt=$('map-title'), mh=$('map-hint');
+  if (mc){ if(mt) mt.textContent='Mapa · '+(candNombre.split(' ').slice(0,2).join(' ')||'candidato'); if(mh) mh.textContent='toca de nuevo el candidato para ver líderes'; }
+  else { if(mt) mt.textContent='Mapa · líder por departamento'; if(mh) mh.textContent='click = abrir departamento'; }
   const n=Object.keys(STATE.depWinners).length;
-  const ms=$('map-status'); if(ms) ms.textContent=`${n} departamento${n===1?'':'s'} reportado${n===1?'':'s'}`;
+  const ms=$('map-status'); if(ms) ms.textContent = mc ? `mapa de ${candNombre.split(' ')[0]||'candidato'}` : `${n} departamento${n===1?'':'s'} reportado${n===1?'':'s'}`;
 }
 async function sweepDepartments(){
   if (sweeping) return; sweeping=true;
   const btn=$('btn-sweep'), old=btn?btn.textContent:''; if(btn) btn.textContent='Cargando…';
-  const codes=Object.keys(DANE_DEP).filter(c=>c!=='88'); let i=0;
-  async function w(){ while(i<codes.length){ const cod=codes[i++]; try{ const ds=await fetchData(cod); const {cands}=extraerCandidatos(ds); const tot=extraerTotales(ds); const sc=cands.reduce((s,c)=>s+c.votos,0)+(tot.votblan||0); if(cands.length&&sc>0){ STATE.depWinners[cod]={nombre:cands[0].nombre,color:candColor(cands[0].nombre,cands[0].partido,0),pct:cands[0].votos/sc*100}; renderMap(); } }catch(_){} } }
-  await Promise.all([w(),w(),w()]);
+  await ensureDepCand(true);     // barrido completo → depWinners + matriz depto×candidato
+  renderMap();
   sweeping=false; if(btn) btn.textContent=old;
 }
 
@@ -924,7 +988,7 @@ async function load(){
 function toggleAuto(){
   const b = $('btn-auto');
   if (STATE.autoTimer){ clearInterval(STATE.autoTimer); STATE.autoTimer = null; if(b){ b.classList.remove('on'); b.textContent = 'Auto-refresh: off'; } }
-  else { STATE.autoTimer = setInterval(load, RECARGA_MS); if(b){ b.classList.add('on'); b.textContent = 'Auto-refresh: 3 min'; } load(); }
+  else { STATE.autoTimer = setInterval(load, RECARGA_MS); if(b){ b.classList.add('on'); b.textContent = 'Auto-refresh: 90 s'; } load(); }
 }
 
 // ════════════════════ DEMO (probar el modelo sin datos en vivo) ════════════════════
