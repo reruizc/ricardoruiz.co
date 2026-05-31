@@ -465,10 +465,20 @@ function faceHTML(nombre, color, klass){
   return `<span class="cand-ph ${klass||''}" style="background:${color}">${ph?`<img src="${ph}" alt="" onerror="this.style.display='none'">`:''}<i>${initials(nombre).toUpperCase()}</i></span>`;
 }
 
+// Coalición por codpar de la Registraduría (corp PR). Completar las que falten.
+const PARTIDO_PRES = {
+  '7':'Pacto Histórico',     // Iván Cepeda
+  '2':'Centro Democrático',  // Paloma Valencia
+  // 11 Claudia López · 10 Abelardo De la Espriella · 3 Sergio Fajardo · 6 Roy Barreras
+  // 12 Luis G. Murillo · 13 Carlos Caicedo · 8 R. Botero · 4 Miguel Uribe Londoño
+  // 9 Sondra Macollins · 5 Gustavo Matamoros · 14 Óscar Lizcano
+};
 const CAND_COLOR = {
   'cepeda':'#51458F','espriella':'#000062','abelardo':'#000062',
   'paloma':'#1866DF','valencia':'#1866DF','claudia':'#d9db24','lopez':'#d9db24',
   'fajardo':'#EEAA22','roy':'#3d8b3d','barreras':'#3d8b3d',
+  'murillo':'#16a34a','caicedo':'#d6336c','botero':'#b8860b','lizcano':'#5b8def',
+  'londoño':'#1d4ed8','matamoros':'#9c6f42','macollins':'#0ea5a3',
   'pacto':'#6B2D8B','centro democr':'#0088BB','liberal':'#C8102E','conservador':'#003580',
   'cambio radical':'#E91E8C','verde':'#4CAF50','blanco':'#666',
 };
@@ -534,7 +544,7 @@ function extraerTotales(ds){
   const t = (ds && ds.totales && ds.totales.act) || (ds && ds.camaras && ds.camaras[0] && ds.camaras[0].totales && ds.camaras[0].totales.act) || {};
   const g = k => parseInt(t[k]) || 0;
   const votant = g('votant'), votblan = g('votblan') || g('votbla');
-  return { mesesc:g('mesesc'), mesatota:g('mesatota')||g('mesins')||g('mesinsta')||0, votant, votblan,
+  return { mesesc:g('mesesc'), mesatota:g('metota')||g('mesatota')||g('mesins')||g('mesinsta')||0, votant, votblan,
     votval:g('votval'), votnul:g('votnul'), votnma:g('votnma')||Math.max(0,votant-g('votval')-g('votnul')-votblan), centota:g('centota') };
 }
 function extraerCandidatos(ds){
@@ -545,7 +555,7 @@ function extraerCandidatos(ds){
       const cantos = (a.cantotabla || []).filter(c => !/solo por la lista/i.test(c.nomcan || ''));
       const top = cantos.slice().sort((x,y) => (parseInt(y.vot)||0) - (parseInt(x.vot)||0))[0];
       const nombre = top ? (`${top.nomcan||''} ${top.apecan||''}`.trim() || a.nompar) : a.nompar;
-      const partido = a.nompar || (top ? `Partido ${a.codpar}` : '');
+      const partido = a.nompar || PARTIDO_PRES[String(a.codpar)] || '';
       const votos = parseInt(a.vot) || (top ? parseInt(top.vot)||0 : 0);
       return { nombre: nombre || partido || ('Cand ' + a.codpar), partido: partido || '', votos, codpar: String(a.codpar || '') };
     }).filter(c => c.nombre);
