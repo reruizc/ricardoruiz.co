@@ -321,7 +321,7 @@
       <div class="h3col">
         <div class="h3head"><span class="h3title" id="map-title">Mapa · líder por departamento</span><span class="h3hint" id="map-hint">click = abrir departamento</span></div>
         <div class="map-box"><div id="map"></div></div>
-        <div class="map-foot"><span id="map-status">0 departamentos reportados</span><button class="btn" id="btn-sweep" style="padding:.3rem .7rem;font-size:10px">Colorear todos</button></div>
+        <div class="map-foot"><span id="map-status">0 departamentos reportados</span><span style="display:flex;align-items:center;gap:.5rem"><span class="toggle" id="map-level"><button id="tg-lvl-dep" class="active" onclick="setMapLevel('dep')">Deptos</button><button id="tg-lvl-mun" onclick="setMapLevel('mun')">Municipios</button></span><button class="btn" id="btn-sweep" style="padding:.3rem .7rem;font-size:10px">Colorear todos</button></span></div>
       </div>
 
       <div class="h3col">
@@ -454,7 +454,7 @@ function candColor(nombre, partido, idx){
   return PALETTE[(idx||0) % PALETTE.length];
 }
 
-let STATE = { dep:'00', data:null, autoTimer:null, boletines:[], demo:false, depWinners:{}, depCand:{}, depCandTs:0, mapCand:null };
+let STATE = { dep:'00', data:null, autoTimer:null, boletines:[], demo:false, depWinners:{}, depCand:{}, depCandTs:0, mapCand:null, mapLevel:'dep', munWinners:{} };
 
 // ════════════════════════ FETCH ════════════════════════
 function buildTarget(dep){
@@ -706,7 +706,9 @@ function renderEvoChart(){
 
 // ════════════════════ MAPA COLOMBIA ════════════════════
 let leafMap=null, geoLayer=null, GEO=null, sweeping=false, _mapStyle=null;
+let munLayer=null, _munStyle=null, _munLayerDep=null; const munGeoCache={};
 const GEO_URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/DEPARTAMENTOS2.json';
+const MPS_URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Departamentos-mps/';
 const NAME2CODE=(()=>{ const m={}; for(const cod in DANE_DEP) m[norm(DANE_DEP[cod])]=cod;
   Object.assign(m,{'bogota':'16','bogota dc':'16','distrito capital de bogota':'16','valle del cauca':'31','valle':'31','norte de santander':'25','san andres y providencia':'56','san andres':'56'}); return m; })();
 function geoCode(p){ return NAME2CODE[norm(p.name||p.NOMBRE_DPT||p.dpt||'')]||null; }
@@ -727,6 +729,28 @@ function parseMapaGan(ds){
   STATE.depWinners = w;
 }
 
+// Ganador por municipio desde camaras[0].mapagan del JSON del DEPARTAMENTO.
+// amb = dep(2)+mun(3), ej '01004'. Match con GeoJSON: dep_electoral + mun_elec.
+function parseMunMapaGan(ds){
+  const mg = ds && ds.camaras && ds.camaras[0] && ds.camaras[0].mapagan;
+  if (!Array.isArray(mg)){ STATE.munWinners = {}; return; }
+  const w = {};
+  mg.forEach(e => {
+    const amb = String(e.amb||'');
+    const ct = e.cantotabla || {};
+    const nombre = `${ct.nomcan||''} ${ct.apecan||''}`.trim();
+    const pct = parseFloat(String(e.pvot||'0').replace('%','').replace(',','.')) || 0;
+    if ((parseInt(e.mesesc)||0) > 0 && nombre) w[amb] = { nombre, color: candColor(nombre,'',0), pct, mesesc:parseInt(e.mesesc)||0, mun:e.nombre||amb };
+  });
+  STATE.munWinners = w;
+}
+async function ensureMunGeo(dep){
+  if (munGeoCache[dep]) return munGeoCache[dep];
+  try { const r = await fetch(MPS_URL + dep + '.json'); munGeoCache[dep] = await r.json(); }
+  catch(_){ munGeoCache[dep] = null; }
+  return munGeoCache[dep];
+}
+
 async function initMap(){
   if (leafMap || typeof L==='undefined') return;
   try{
@@ -741,6 +765,9 @@ async function initMap(){
 // animación, para que recolorear no vuelva a hacer zoom ("drill down").
 function renderMap(){
   if (!leafMap || !GEO) return;
+  if (STATE.mapLevel === 'mun' && STATE.dep !== '00'){ renderMunMap(); return; }
+  if (munLayer && leafMap.hasLayer(munLayer)) leafMap.removeLayer(munLayer);   // veníamos de municipios
+  if (geoLayer && !leafMap.hasLayer(geoLayer)){ geoLayer.addTo(leafMap); try{ leafMap.fitBounds(geoLayer.getBounds(),{padding:[6,6],animate:false}); }catch(_){} }
   STATE.depWinners=STATE.depWinners||{};
   const paper3=cssVar('--paper-3'), rule=cssVar('--rule-strong');
 
@@ -780,9 +807,52 @@ function renderMap(){
   const mt=$('map-title'), mh=$('map-hint');
   if (mc){ if(mt) mt.textContent='Mapa · '+(candNombre.split(' ').slice(0,2).join(' ')||'candidato'); if(mh) mh.textContent='toca de nuevo el candidato para ver líderes'; }
   else { if(mt) mt.textContent='Mapa · líder por departamento'; if(mh) mh.textContent='click = abrir departamento'; }
+  if (STATE.mapLevel==='mun' && mh) mh.textContent='elige un departamento para ver municipios';
   const n=Object.keys(STATE.depWinners).length;
   const ms=$('map-status'); if(ms) ms.textContent = mc ? `mapa de ${candNombre.split(' ')[0]||'candidato'}` : `${n} departamento${n===1?'':'s'} reportado${n===1?'':'s'}`;
+  _syncMapLevelBtns();
 }
+
+// Mapa de municipios del departamento activo, coloreados por ganador (STATE.munWinners).
+async function renderMunMap(){
+  if (!leafMap) return;
+  const dep = STATE.dep; if (dep==='00'){ STATE.mapLevel='dep'; renderMap(); return; }
+  const geo = await ensureMunGeo(dep);
+  const mt=$('map-title'), mh=$('map-hint'), ms=$('map-status');
+  if (!geo){ if(ms) ms.textContent='no hay mapa municipal para este depto'; return; }
+  if (geoLayer && leafMap.hasLayer(geoLayer)) leafMap.removeLayer(geoLayer);   // oculta capa de deptos
+  const paper3=cssVar('--paper-3'), rule=cssVar('--rule-strong');
+  const codeOf = p => (p.dep_electoral||'') + (p.mun_elec||'');
+  const styleFn = f => { const w=STATE.munWinners[codeOf(f.properties)]; return { fillColor:w?w.color:paper3, fillOpacity:w?.85:.35, color:rule, weight:.8 }; };
+  const ttHTML = f => { const p=f.properties, w=STATE.munWinners[codeOf(p)], nom=p.mpio_cnmbr||p.mun_elec||'—';
+    return `<b>${nom}</b><br>${w?w.nombre.split(' ').slice(0,2).join(' ')+' · '+w.pct.toFixed(1)+'%':'sin reporte'}`; };
+  _munStyle = styleFn;
+  if (munLayer && _munLayerDep === dep){   // mismo depto (auto-refresh): solo recolorea, sin re-zoom
+    munLayer.setStyle(styleFn);
+    munLayer.eachLayer(l=>{ const h=ttHTML(l.feature); if(l.getTooltip()) l.setTooltipContent(h); else l.bindTooltip(h,{className:'map-tt',sticky:false}); });
+  } else {
+    if (munLayer){ leafMap.removeLayer(munLayer); munLayer=null; }   // depto distinto: recrea (geometría nueva)
+    munLayer = L.geoJSON(geo, { style:styleFn, onEachFeature:(f,l)=>{
+      l.on('mouseover',()=>l.setStyle(Object.assign({}, _munStyle(f), {fillOpacity:1})));
+      l.on('mouseout',()=>l.setStyle(_munStyle(f)));
+      l.bindTooltip(ttHTML(f),{className:'map-tt',sticky:false});
+    }}).addTo(leafMap);
+    _munLayerDep = dep;
+    try{ leafMap.fitBounds(munLayer.getBounds(),{padding:[6,6],animate:false}); }catch(_){}
+  }
+  const rep=Object.keys(STATE.munWinners).length, tot=geo.features.length;
+  if(mt) mt.textContent='Mapa · municipios de '+(DANE_DEP[dep]||dep);
+  if(mh) mh.textContent='ganador por municipio';
+  if(ms) ms.textContent=`${rep} de ${tot} municipios reportados`;
+  _syncMapLevelBtns();
+}
+function _syncMapLevelBtns(){
+  const d=$('tg-lvl-dep'), m=$('tg-lvl-mun');
+  if(d) d.classList.toggle('active', STATE.mapLevel==='dep');
+  if(m) m.classList.toggle('active', STATE.mapLevel==='mun');
+}
+function setMapLevel(level){ STATE.mapLevel = level; _syncMapLevelBtns(); renderMap(); }
+
 async function sweepDepartments(){
   if (sweeping) return; sweeping=true;
   const btn=$('btn-sweep'), old=btn?btn.textContent:''; if(btn) btn.textContent='Cargando…';
@@ -997,6 +1067,7 @@ async function load(){
     if (tot.mesatota) MESAS_TOTAL = tot.mesatota;
     STATE.data = { cands, tot, fuente };
     if (STATE.dep === '00') parseMapaGan(ds);   // colorea el mapa por departamento desde el JSON nacional
+    else parseMunMapaGan(ds);                   // ganador por municipio (para el toggle Municipios)
     render();
     captureBoletin(tot, cands);
     renderDefinicion();
