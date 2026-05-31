@@ -1012,19 +1012,19 @@
           { año:2022, mb:54, archivo:'presidencial-2v/2022/GCS_2022PRES2V.csv', xlsx:true, puesto:true },
         ]},
       { id:'congreso', nombre:'Congreso de la República',
-        desc:'Senado y Cámara por mesa, todas las circunscripciones (nacional, territorial, indígenas, afro). CSV mesa completo. El XLSX mesa llega como ZIP por departamento en próxima entrega. La versión agregada por puesto está disponible en CSV (el XLSX equivalente tiene 1-2 hojas pesadas y se ofrece bajo solicitud comercial).',
+        desc:'Senado y Cámara por mesa, todas las circunscripciones (nacional, territorial, indígenas, afro). CSV mesa completo. El XLSX mesa viene como ZIP con un Excel por departamento (33 archivos adentro). La versión agregada por puesto está disponible en CSV.',
         años:[
-          { año:2014, mb:802,  archivo:'congreso/2014/GCS_2014CON.csv', xlsx:false, puesto:true, puestoXlsx:false },
-          { año:2018, mb:1200, archivo:'congreso/2018/GCS_2018CON.csv', xlsx:false, puesto:true, puestoXlsx:false },
-          { año:2022, mb:1200, archivo:'congreso/2022/GCS_2022CON.csv', xlsx:false, puesto:true, puestoXlsx:false },
+          { año:2014, mb:802,  archivo:'congreso/2014/GCS_2014CON.csv', xlsx:false, xlsxZip:true, puesto:true, puestoXlsx:false },
+          { año:2018, mb:1200, archivo:'congreso/2018/GCS_2018CON.csv', xlsx:false, xlsxZip:true, puesto:true, puestoXlsx:false },
+          { año:2022, mb:1200, archivo:'congreso/2022/GCS_2022CON.csv', xlsx:false, xlsxZip:true, puesto:true, puestoXlsx:false },
         ]},
       { id:'territoriales', nombre:'Territoriales · Autoridades locales',
-        desc:'Resultados por mesa del paquete de autoridades locales que se elige cada cuatro años: Gobernación, Asamblea Departamental, Alcaldía, Concejos municipales y Concejo Distrital de Bogotá. Cada archivo TER de un año cubre todas estas corporaciones. CSV mesa completo. El XLSX mesa llega como ZIP por departamento en próxima entrega. La versión agregada por puesto está disponible en CSV (XLSX bajo solicitud comercial).',
+        desc:'Resultados por mesa del paquete de autoridades locales que se elige cada cuatro años: Gobernación, Asamblea Departamental, Alcaldía, Concejos municipales y Concejo Distrital de Bogotá. Cada archivo TER de un año cubre todas estas corporaciones. CSV mesa completo. El XLSX mesa viene como ZIP con un Excel por departamento (33 archivos adentro). La versión agregada por puesto está disponible en CSV.',
         años:[
-          { año:2011, mb:2900, archivo:'territoriales/2011/GCS_2011TER.csv', xlsx:false, puesto:true, puestoXlsx:false },
-          { año:2015, mb:1600, archivo:'territoriales/2015/GCS_2015TER.csv', xlsx:false, puesto:true, puestoXlsx:false },
-          { año:2019, mb:1700, archivo:'territoriales/2019/GCS_2019TER.csv', xlsx:false, puesto:true, puestoXlsx:false },
-          { año:2023, mb:1800, archivo:'territoriales/2023/GCS_2023TER.csv', xlsx:false, puesto:true, puestoXlsx:false },
+          { año:2011, mb:2900, archivo:'territoriales/2011/GCS_2011TER.csv', xlsx:false, xlsxZip:true, puesto:true, puestoXlsx:false },
+          { año:2015, mb:1600, archivo:'territoriales/2015/GCS_2015TER.csv', xlsx:false, xlsxZip:true, puesto:true, puestoXlsx:false },
+          { año:2019, mb:1700, archivo:'territoriales/2019/GCS_2019TER.csv', xlsx:false, xlsxZip:true, puesto:true, puestoXlsx:false },
+          { año:2023, mb:1800, archivo:'territoriales/2023/GCS_2023TER.csv', xlsx:false, xlsxZip:true, puesto:true, puestoXlsx:false },
         ]},
       { id:'jal', nombre:'Juntas Administradoras Locales (JAL)',
         desc:'Edilatos de las JAL: ediles de las localidades de Bogotá y de las JAL municipales en ciudades con esta figura. No confundir con Concejos municipales (esos van en el paquete Territoriales).',
@@ -1069,6 +1069,9 @@
     // Plan del usuario (se sobre-escribe en el IIFE de auth abajo)
     window._userPlan  = 'anon';
     window._isPremium = false;
+    window._isAdmin   = false;
+    // Whitelist de emails admin. Equivalentes al gate de admin-* pages.
+    const ADMIN_EMAILS = ['reruizc@gmail.com'];
 
     // ─── CUOTA PREMIUM · 1 descarga por cuenta, ÚNICA (no renovable) ──────────
     // Premium incluye 1 archivo histórico de muestra de por vida. Para acceder
@@ -1090,15 +1093,27 @@
       catch(e) { return []; }
     }
     function rawCanDownload() {
+      if (window._isAdmin) return true;  // admins sin límites
       return window._isPremium && getRawDownloadsLifetime().length < PREMIUM_RAW_QUOTA_TOTAL;
     }
     function recordRawDownload(catId, año, file) {
+      if (window._isAdmin) return;  // admins no consumen cuota
       const arr = getRawDownloadsLifetime();
       arr.push({ catId, año, file, ts: new Date().toISOString() });
       localStorage.setItem(_rawAccountKey(), JSON.stringify(arr));
     }
 
     function getCrudoBanner() {
+      // ── ADMIN ── (bypass total)
+      if (window._isAdmin) {
+        return `
+          <div class="crudo-banner premium">
+            <div class="crudo-banner-title">Acceso administrador · descargas sin límite</div>
+            <div class="crudo-banner-body">
+              Estás autenticado como <b>administrador</b> (${(JSON.parse(localStorage.getItem('rr-user')||'null')?.email)||''}). Puedes descargar cualquier archivo del catálogo histórico, en cualquier granularidad y formato, sin consumo de cuota ni tope. Las descargas no se contabilizan localmente.
+            </div>
+          </div>`;
+      }
       // ── PREMIUM ──
       if (window._isPremium) {
         const used     = getRawDownloadsLifetime().length;
@@ -1172,7 +1187,7 @@
                   ${a.extra ? `<span class="cat-year-extra">${a.extra}</span>` : ``}
                 </div>
                 <span class="cat-year-meta">${fmtMB(a.mb)} · ${[
-                  a.xlsx ? 'Mesa CSV+XLSX' : 'Mesa CSV',
+                  a.xlsx ? 'Mesa CSV+XLSX' : (a.xlsxZip ? 'Mesa CSV+ZIP' : 'Mesa CSV'),
                   a.puesto ? (a.puestoXlsx === false ? 'Puesto CSV' : 'Puesto CSV+XLSX') : ''
                 ].filter(Boolean).join(' · ')}</span>
               </div>
@@ -1198,8 +1213,8 @@
     // ─── DESCARGA DIRECTA · S3 ────────────────────────────────────────────────
     const S3_RAW = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/DESCARGAS/raw/';
 
-    // Resuelve URL/archivo según granularidad (mesa|puesto) y formato (csv|xlsx).
-    // Devuelve null si la combinación no existe (ej. mesa-xlsx para Congreso).
+    // Resuelve URL/archivo según granularidad (mesa|puesto) y formato (csv|xlsx|xlsx-zip).
+    // Devuelve null si la combinación no existe.
     function _resolveTarget(catId, año, extra, granularidad='mesa', formato='csv') {
       const cat = CRUDOS.find(c => c.id === catId);
       if (!cat) return null;
@@ -1207,14 +1222,17 @@
       const a = cat.años.find(x => x.año===año && (!extra || x.extra===extra));
       if (!a) return null;
 
-      const wantMesa   = (granularidad === 'mesa');
-      const wantPuesto = (granularidad === 'puesto');
-      const wantXlsx   = (formato === 'xlsx');
-      const wantCsv    = (formato === 'csv');
+      const wantMesa     = (granularidad === 'mesa');
+      const wantPuesto   = (granularidad === 'puesto');
+      const wantXlsx     = (formato === 'xlsx');
+      const wantXlsxZip  = (formato === 'xlsx-zip');
+      const wantCsv      = (formato === 'csv');
 
       // Validar disponibilidad
-      if (wantMesa   && wantXlsx && !a.xlsx)             return null;
-      if (wantPuesto && !a.puesto)                       return null;
+      if (wantMesa   && wantXlsx    && !a.xlsx)             return null;
+      if (wantMesa   && wantXlsxZip && !a.xlsxZip)          return null;
+      if (wantPuesto && !a.puesto)                          return null;
+      if (wantPuesto && wantXlsxZip)                        return null;  // puesto no tiene zip
       // Puesto XLSX puede estar desactivado explícitamente (Congreso/Territoriales)
       if (wantPuesto && wantXlsx && a.puestoXlsx === false) return null;
 
@@ -1228,29 +1246,40 @@
       if (wantXlsx) {
         path = path.replace(/\.csv$/, '.xlsx');
         file = file.replace(/\.csv$/, '.xlsx');
+      } else if (wantXlsxZip) {
+        path = path.replace(/\.csv$/, '_BY_DEPTO.zip');
+        file = file.replace(/\.csv$/, '_BY_DEPTO.zip');
       }
       return {
         url: S3_RAW + path,
         file,
         mb: a.mb,                          // peso del CSV mesa, de referencia
-        formato: wantXlsx ? 'xlsx' : 'csv',
+        formato: wantXlsxZip ? 'xlsx-zip' : (wantXlsx ? 'xlsx' : 'csv'),
         granularidad: wantPuesto ? 'puesto' : 'mesa',
-        hasMesaXlsx: a.xlsx === true,
-        hasPuesto:   a.puesto === true,
+        hasMesaXlsx:    a.xlsx === true,
+        hasMesaXlsxZip: a.xlsxZip === true,
+        hasPuesto:      a.puesto === true,
       };
     }
 
     // Helper: arma todas las opciones de descarga disponibles para un archivo.
     function _availableTargets(catId, año, extra) {
       const out = [];
-      const mesaCsv   = _resolveTarget(catId, año, extra, 'mesa',   'csv');
-      const mesaXlsx  = _resolveTarget(catId, año, extra, 'mesa',   'xlsx');
-      const puestoCsv = _resolveTarget(catId, año, extra, 'puesto', 'csv');
-      const puestoXlsx= _resolveTarget(catId, año, extra, 'puesto', 'xlsx');
-      if (mesaCsv)    out.push({ key:'mesa-csv',    label:'Mesa · CSV',    sub:'Granularidad máxima por mesa',          target:mesaCsv });
-      if (mesaXlsx)   out.push({ key:'mesa-xlsx',   label:'Mesa · XLSX',   sub:'Mismo detalle, formato Excel',          target:mesaXlsx });
-      if (puestoCsv)  out.push({ key:'puesto-csv',  label:'Puesto · CSV',  sub:'Agregado por puesto (~85% menos filas)',target:puestoCsv });
-      if (puestoXlsx) out.push({ key:'puesto-xlsx', label:'Puesto · XLSX', sub:'Agregado por puesto en Excel',          target:puestoXlsx, isPrimary:true });
+      const mesaCsv     = _resolveTarget(catId, año, extra, 'mesa',   'csv');
+      const mesaXlsx    = _resolveTarget(catId, año, extra, 'mesa',   'xlsx');
+      const mesaXlsxZip = _resolveTarget(catId, año, extra, 'mesa',   'xlsx-zip');
+      const puestoCsv   = _resolveTarget(catId, año, extra, 'puesto', 'csv');
+      const puestoXlsx  = _resolveTarget(catId, año, extra, 'puesto', 'xlsx');
+      if (mesaCsv)      out.push({ key:'mesa-csv',     label:'Mesa · CSV',     sub:'Granularidad máxima por mesa',           target:mesaCsv });
+      if (mesaXlsx)     out.push({ key:'mesa-xlsx',    label:'Mesa · XLSX',    sub:'Mismo detalle, formato Excel',           target:mesaXlsx });
+      if (mesaXlsxZip)  out.push({ key:'mesa-xlsx-zip',label:'Mesa · XLSX ZIP',sub:'ZIP con 1 Excel por departamento',       target:mesaXlsxZip });
+      if (puestoCsv)    out.push({ key:'puesto-csv',   label:'Puesto · CSV',   sub:'Agregado por puesto (~85% menos filas)', target:puestoCsv });
+      if (puestoXlsx)   out.push({ key:'puesto-xlsx',  label:'Puesto · XLSX',  sub:'Agregado por puesto en Excel',           target:puestoXlsx, isPrimary:true });
+      // Si no hay puesto-xlsx (Congreso/Territoriales), el mesa-xlsx-zip pasa a ser el primario.
+      if (!puestoXlsx && mesaXlsxZip) {
+        const t = out.find(o => o.key === 'mesa-xlsx-zip');
+        if (t) t.isPrimary = true;
+      }
       return out;
     }
 
@@ -1281,8 +1310,12 @@
 
       const ref = opciones[0].target;   // referencia (mesa csv)
       const scope = `${cat.nombre} · ${año}${extra?` · ${extra}`:''}`;
+      const tagEl = document.getElementById('confirm-tag');
+      if (tagEl) tagEl.textContent = window._isAdmin ? 'Descarga · Acceso administrador' : 'Confirmar descarga · Premium';
       title.textContent = `Descargar: ${scope}`;
-      sub.innerHTML = `Esta acción <b>usa tu descarga histórica de muestra</b> (cuota Premium · 1 archivo por cuenta, <b>no renovable</b>). Elige granularidad y formato — solo se cobra como una descarga. Cuando confirmes, los demás archivos quedarán reservados al <b>Plan Datos</b>.`;
+      sub.innerHTML = window._isAdmin
+        ? `Estás autenticado como <b>administrador</b>. Esta descarga no consume cuota.`
+        : `Esta acción <b>usa tu descarga histórica de muestra</b> (cuota Premium · 1 archivo por cuenta, <b>no renovable</b>). Elige granularidad y formato — solo se cobra como una descarga. Cuando confirmes, los demás archivos quedarán reservados al <b>Plan Datos</b>.`;
       meta.innerHTML = `
         <span>${ref.file.replace(/\.csv$/,'')} · referencia ${fmtMB(ref.mb)} CSV mesa</span>
         <span>Fuente: Registraduría Nacional (formato GCS · normalizado)</span>
@@ -1408,6 +1441,10 @@
       // Plan global para gate de crudos
       window._userPlan  = (token && user && user.plan) ? user.plan.toLowerCase() : 'anon';
       window._isPremium = ['premium','full'].includes(window._userPlan);
+      // Admins (whitelist por email): sin límites de descarga + acceso a todos los tiers.
+      window._isAdmin   = !!(token && user && user.email && ADMIN_EMAILS.includes(user.email.toLowerCase()));
+      // Admins se tratan como Premium para el resto del gate.
+      if (window._isAdmin) window._isPremium = true;
 
       // Render nav auth bar
       if (authEl) {
@@ -1481,7 +1518,7 @@
   <!-- CONFIRM DOWNLOAD MODAL (Premium · 1/mes no acumulable) -->
   <div id="confirm-overlay" class="conf-overlay hidden" onclick="if(event.target===this)closeConfirmModal()">
     <div class="conf-modal">
-      <span class="conf-tag">Confirmar descarga · Premium</span>
+      <span class="conf-tag" id="confirm-tag">Confirmar descarga · Premium</span>
       <div class="conf-title" id="confirm-title">Descargar archivo</div>
       <div class="conf-sub" id="confirm-sub"></div>
       <div class="conf-meta" id="confirm-meta"></div>
