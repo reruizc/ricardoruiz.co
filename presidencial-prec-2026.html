@@ -501,6 +501,14 @@ async function fetchData(dep){
   const txt = await res.text();
   try { return JSON.parse(txt); } catch (_){ const e = new Error('no-json'); e.body = txt.slice(0,300); throw e; }
 }
+// fetch con reintentos para los barridos (evita que un fallo puntual deje un depto/municipio sin color).
+async function fetchDataRetry(dep, tries){
+  tries = tries || 3;
+  for (let t = 0; t < tries; t++){
+    try { return await fetchData(dep); }
+    catch (e){ if (t === tries-1) throw e; await new Promise(r => setTimeout(r, 350*(t+1))); }
+  }
+}
 
 // ════════════════════ PARSEO ════════════════════
 function toNum(v){
@@ -663,7 +671,7 @@ async function ensureDepCand(force){
     const codes = Object.keys(DANE_DEP).filter(c => c !== '88'); let i = 0;
     STATE.depCand = STATE.depCand || {};
     async function w(){ while (i < codes.length){ const cod = codes[i++]; try {
-      const ds = await fetchData(cod); const { cands } = extraerCandidatos(ds); const tot = extraerTotales(ds);
+      const ds = await fetchDataRetry(cod); const { cands } = extraerCandidatos(ds); const tot = extraerTotales(ds);
       const base = cands.reduce((s,c)=>s+c.votos,0);
       if (cands.length && base > 0){
         const byCodpar = {}; cands.forEach(c => { if (c.codpar) byCodpar[String(c.codpar)] = { nombre:c.nombre, votos:c.votos }; });
@@ -695,7 +703,7 @@ async function ensureMunCand(dep, force){
     const ambs = geo.features.map(f => (f.properties.dep_electoral||'') + (f.properties.mun_elec||'')).filter(a => a.length===5);
     const acc = {}; let i = 0;
     async function w(){ while (i < ambs.length){ const amb = ambs[i++]; try {
-      const ds = await fetchData(amb); const { cands } = extraerCandidatos(ds); const tot = extraerTotales(ds);
+      const ds = await fetchDataRetry(amb); const { cands } = extraerCandidatos(ds); const tot = extraerTotales(ds);
       const base = cands.reduce((s,c)=>s+c.votos,0);
       if (cands.length && base > 0){
         const byCodpar = {}; cands.forEach(c => { if (c.codpar) byCodpar[String(c.codpar)] = { nombre:c.nombre, votos:c.votos }; });
