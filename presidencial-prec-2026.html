@@ -1105,13 +1105,15 @@ function curLeader(){ const d=STATE.data; if(!d||!d.cands.length) return null; c
 async function renderCompare(){
   const ok = await ensure2022();
   const body = $('cmp-body'), scope = STATE.dep;
-  $('cmp-scope').textContent = scope==='00' ? 'Nacional' : (DANE_DEP[scope]||scope);
-  if (!ok){ body.innerHTML = '<div class="mini-note" style="color:var(--red)">No se pudo cargar la base 2022 desde S3.</div>'; return; }
+  $('cmp-scope').textContent = scopeLabel();
+  if (!ok){ body.innerHTML = '<div class="mini-note" style="color:var(--danger)">No se pudo cargar la base 2022 desde S3.</div>'; return; }
   if (!STATE.data || !STATE.data.cands.length){ body.innerHTML = '<div class="mini-note">Carga un boletín (o usa el demo) para comparar contra 2022.</div>'; return; }
 
-  const blk2022 = scope==='00' ? HIST22.resumen : (HIST22.depto[scope] || HIST22.depto[String(parseInt(scope,10))]);
+  let blk2022;
+  if (STATE.mun){ await ensure2022Mun(); blk2022 = HIST22.mun && HIST22.mun[STATE.mun.slice(0,2)+'-'+STATE.mun.slice(2)]; }   // ficha del municipio
+  else blk2022 = scope==='00' ? HIST22.resumen : (HIST22.depto[scope] || HIST22.depto[String(parseInt(scope,10))]);
   const p22 = parse2022Block(blk2022);
-  if (!p22){ body.innerHTML = '<div class="mini-note">No hay datos 2022 para este ámbito.</div>'; return; }
+  if (!p22){ body.innerHTML = '<div class="mini-note">No hay datos 2022 para este ' + (STATE.mun?'municipio':'ámbito') + '.</div>'; return; }
 
   const w22 = p22.leader, petro22 = p22.petro;
   const lNow = curLeader(), cepNow = curLeftPct();
@@ -1122,13 +1124,15 @@ async function renderCompare(){
   }
   body.innerHTML = `<div class="def-grid" style="margin-bottom:0">
     <div class="def-stat"><div class="def-k">Ganador 2022 (1ª)</div><div class="def-v sm">${faceHTML(w22.nombre,candColor(w22.nombre,'',0),'sm')} ${w22.nombre.split(' ').slice(0,2).join(' ')}</div><div class="def-d">${w22.pct.toFixed(1)}% de válidos</div></div>
-    <div class="def-stat"><div class="def-k">Líder ahora</div><div class="def-v sm">${lNow?faceHTML(lNow.nombre,candColor(lNow.nombre,'',0),'sm')+' '+lNow.nombre.split(' ').slice(0,2).join(' '):'—'}</div><div class="def-d">${lNow?lNow.pct.toFixed(1)+'% válidos+blanco':''}</div></div>
+    <div class="def-stat"><div class="def-k">${STATE.mun?'Gana 2026':'Líder ahora'}</div><div class="def-v sm">${lNow?faceHTML(lNow.nombre,candColor(lNow.nombre,'',0),'sm')+' '+lNow.nombre.split(' ').slice(0,2).join(' '):'—'}</div><div class="def-d">${lNow?lNow.pct.toFixed(1)+'% válidos+blanco':''}</div></div>
     ${swingHTML}
     <div class="def-stat"><div class="def-k">Válidos 2022</div><div class="def-v sm">${fmt(p22.validos)}</div><div class="def-d">referencia de magnitud</div></div>
   </div>`;
 
   const munWrap = $('cmp-mun-wrap');
-  if (scope !== '00'){
+  if (STATE.mun){
+    munWrap.style.display = 'none';   // dentro de un municipio no hay sub-nivel que comparar
+  } else if (scope !== '00'){
     munWrap.style.display = '';
     $('cmp-mun-sum').textContent = `Municipios de ${DANE_DEP[scope]||scope} · 2022 (1ª vuelta)`;
     const muns = await ensure2022Mun();
