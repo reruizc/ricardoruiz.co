@@ -356,7 +356,7 @@
     </div>
 
     <div class="card" id="cmp-card">
-      <div class="card-label">Comparación con 2022 (1ª vuelta) · <span id="cmp-scope">Nacional</span></div>
+      <div class="card-label">Comparación con 2022 (1ª vuelta) · <span id="cmp-scope">Nacional</span><button class="btn" id="btn-swing" onclick="toggleSwing()" style="margin-left:auto;padding:.35rem .8rem;font-size:11px">Ver cambio en el mapa</button></div>
       <div id="cmp-body"><div class="mini-note">Carga un boletín (o usa el demo) para comparar contra 2022.</div></div>
       <details class="raw" id="cmp-mun-wrap" style="margin-top:.8rem;display:none">
         <summary id="cmp-mun-sum">Municipios del departamento vs. 2022</summary>
@@ -454,7 +454,7 @@ function candColor(nombre, partido, idx){
   return PALETTE[(idx||0) % PALETTE.length];
 }
 
-let STATE = { dep:'00', mun:null, data:null, autoTimer:null, boletines:[], demo:false, depWinners:{}, depCand:{}, depCandTs:0, mapCand:null, mapLevel:'dep', munWinners:{} };
+let STATE = { dep:'00', mun:null, data:null, autoTimer:null, boletines:[], demo:false, depWinners:{}, depCand:{}, depCandTs:0, mapCand:null, mapLevel:'dep', munWinners:{}, munCand:{}, munCandTs:{}, mapSwing:false };
 
 // Nombre del municipio (amb 5díg) desde el ganador o el GeoJSON del depto.
 function munNameFor(amb){
@@ -613,17 +613,26 @@ function renderVoteBars(cands, validos, gana1v){
 
 async function selectCandidate(nombre, codpar){
   SELECTED = nombre;
-  if (STATE.mapLevel === 'mun'){ render(); return; }   // en municipios el mapa muestra ganadores, no el choropleth del candidato
-  // Click en un candidato → mapa propio del candidato. Re-click del mismo → vuelve a líderes.
-  if (codpar != null && codpar !== ''){
-    if (String(STATE.mapCand) === String(codpar)){ STATE.mapCand = null; render(); return; }
-    STATE.mapCand = String(codpar);
-    render();                                  // foto + barras al instante
-    const fresh = Object.keys(STATE.depCand||{}).length && (Date.now()-STATE.depCandTs) < 120000;
-    if (!fresh){ const h=$('map-hint'); if(h) h.textContent='cargando mapa del candidato…'; await ensureDepCand(); }
-    renderMap();                               // re-colorea con la matriz completa
-    if (STATE.dep === '00') renderCompare();   // refresca tabla Cepeda 2026 vs Petro 2022 (ya hay caché)
-  } else { render(); }
+  if (codpar == null || codpar === ''){ render(); return; }
+
+  // Nivel municipios (con depto): choropleth del candidato por municipio.
+  if (STATE.mapLevel === 'mun' && STATE.dep !== '00'){
+    STATE.mapSwing = false;
+    STATE.mapCand = (String(STATE.mapCand) === String(codpar)) ? null : String(codpar);
+    _syncSwingBtn(); render();
+    if (STATE.mapCand){ const h=$('map-hint'); if(h) h.textContent='cargando mapa del candidato (municipios)…'; await ensureMunCand(STATE.dep); renderMunMap(); }
+    return;
+  }
+
+  // Nivel departamentos: choropleth del candidato por depto. Re-click del mismo → vuelve a líderes.
+  STATE.mapSwing = false; _syncSwingBtn();
+  if (String(STATE.mapCand) === String(codpar)){ STATE.mapCand = null; render(); return; }
+  STATE.mapCand = String(codpar);
+  render();                                  // foto + barras al instante
+  const fresh = Object.keys(STATE.depCand||{}).length && (Date.now()-STATE.depCandTs) < 120000;
+  if (!fresh){ const h=$('map-hint'); if(h) h.textContent='cargando mapa del candidato…'; await ensureDepCand(); }
+  renderMap();                               // re-colorea con la matriz completa
+  if (STATE.dep === '00') renderCompare();   // refresca tabla Cepeda 2026 vs Petro 2022 (ya hay caché)
 }
 
 // Barrido de los 33 deptos → matriz depto × candidato (por codpar). Cacheada 2 min.
@@ -654,6 +663,42 @@ function _candShareMap(codpar){
   for (const cod in (STATE.depCand||{})){ const e = STATE.depCand[cod]; const c = e.byCodpar[String(codpar)];
     out[cod] = (c && e.base) ? c.votos/e.base : 0; }
   return out;
+}
+
+// Barrido de los municipios de un depto → matriz municipio × candidato (por codpar).
+// Cacheado por depto, 2 min. Usa los amb del GeoJSON del depto.
+let _munCandLoading = {};
+async function ensureMunCand(dep, force){
+  if (_munCandLoading[dep]) return _munCandLoading[dep];
+  if (!force && STATE.munCand[dep] && (Date.now()-(STATE.munCandTs[dep]||0)) < 120000) return;
+  _munCandLoading[dep] = (async () => {
+    const geo = await ensureMunGeo(dep); if (!geo) return;
+    const ambs = geo.features.map(f => (f.properties.dep_electoral||'') + (f.properties.mun_elec||'')).filter(a => a.length===5);
+    const acc = {}; let i = 0;
+    async function w(){ while (i < ambs.length){ const amb = ambs[i++]; try {
+      const ds = await fetchData(amb); const { cands } = extraerCandidatos(ds); const tot = extraerTotales(ds);
+      const base = cands.reduce((s,c)=>s+c.votos,0);
+      if (cands.length && base > 0){
+        const byCodpar = {}; cands.forEach(c => { if (c.codpar) byCodpar[String(c.codpar)] = { nombre:c.nombre, votos:c.votos }; });
+        acc[amb] = { base, blanco: tot.votblan||0, byCodpar };
+      }
+    } catch(_){} } }
+    await Promise.all([w(),w(),w(),w()]);   // 4 en paralelo
+    STATE.munCand[dep] = acc; STATE.munCandTs[dep] = Date.now();
+  })();
+  try { await _munCandLoading[dep]; } finally { _munCandLoading[dep] = null; }
+}
+// % del candidato (codpar) por municipio del depto.
+function _munCandShareMap(dep, codpar){
+  const out = {}, mc = STATE.munCand[dep] || {};
+  for (const amb in mc){ const e = mc[amb], c = e.byCodpar[String(codpar)]; out[amb] = (c && e.base) ? c.votos/e.base : 0; }
+  return out;
+}
+// Petro 2022 (%) por municipio del depto, desde el histórico por-mun (clave 'dd-mmm').
+function _petro22MunPct(amb){
+  if (!HIST22.mun) return null;
+  const blk = HIST22.mun[amb.slice(0,2) + '-' + amb.slice(2)];
+  const p = parse2022Block(blk); return (p && p.petro) ? p.petro.pct : null;
 }
 
 // Cotas duras (deterministas) que muestra la caja "Cómo sabemos que ya no tiene reversa".
@@ -782,18 +827,26 @@ function renderMap(){
   if (munLayer && leafMap.hasLayer(munLayer)) leafMap.removeLayer(munLayer);   // veníamos de municipios
   if (geoLayer && !leafMap.hasLayer(geoLayer)){ geoLayer.addTo(leafMap); try{ leafMap.fitBounds(geoLayer.getBounds(),{padding:[6,6],animate:false}); }catch(_){} }
   STATE.depWinners=STATE.depWinners||{};
-  const paper3=cssVar('--paper-3'), rule=cssVar('--rule-strong');
+  const paper3=cssVar('--paper-3'), rule=cssVar('--rule-strong'), okHex=cssVar('--ok'), dangerHex=cssVar('--danger');
 
-  // Modo candidato: pinta cada depto con el color del candidato, intensidad por su %.
-  const mc = STATE.mapCand;
-  let shareMap=null, maxShare=0, candHex='#888', candNombre='';
-  if (mc){
+  // Modo de pintado: cambio (Cepeda↔Petro) > candidato > líder.
+  const swing = STATE.mapSwing;
+  const mc = (!swing) ? STATE.mapCand : null;
+  let shareMap=null, maxShare=0, candHex='#888', candNombre='', swingMap=null;
+  if (swing){
+    const cepShare = _candShareMap('7'); swingMap = {};
+    for (const cod in DANE_DEP){ const cep=(STATE.depCand[cod]&&cepShare[cod]!=null?cepShare[cod]*100:null);
+      const blk=HIST22.depto&&(HIST22.depto[cod]||HIST22.depto[String(parseInt(cod,10))]); const p=parse2022Block(blk); const pet=(p&&p.petro)?p.petro.pct:null;
+      swingMap[cod] = (cep!=null && pet!=null) ? { cep, pet, d:cep-pet } : null; }
+  } else if (mc){
     shareMap = _candShareMap(mc);
     maxShare = Math.max(0.0001, ...Object.values(shareMap));
     const cn = (STATE.data&&STATE.data.cands) ? STATE.data.cands.find(c=>String(c.codpar)===String(mc)) : null;
     candNombre = cn ? cn.nombre : ''; candHex = cn ? candColor(cn.nombre,cn.partido,0) : '#888';
   }
   const styleFn=f=>{ const cod=geoCode(f.properties);
+    if (swing){ const sw=swingMap[cod]; if(!sw) return { fillColor:paper3, fillOpacity:.22, color:rule, weight:1 };
+      const op=0.2+0.7*Math.min(1,Math.abs(sw.d)/15); return { fillColor: sw.d>=0?okHex:dangerHex, fillOpacity:op, color:rule, weight:1 }; }
     if (mc){ const sh=shareMap[cod]||0; return { fillColor:candHex, fillOpacity: sh>0 ? 0.15+0.8*(sh/maxShare) : 0.05, color:rule, weight:1 }; }
     const w=STATE.depWinners[cod]; return { fillColor:w?w.color:paper3, fillOpacity:w?.85:.4, color:rule, weight:1 };
   };
@@ -803,13 +856,15 @@ function renderMap(){
       const cod=geoCode(f.properties);
       l.on('mouseover',()=>l.setStyle(Object.assign({}, _mapStyle(f), {fillOpacity:1})));
       l.on('mouseout',()=>l.setStyle(_mapStyle(f)));
-      l.on('click',()=>{ if(cod){ const s=$('dep-select'); if(s) s.value=cod; STATE.dep=cod; STATE.mun=null; load(); } });
+      l.on('click',()=>{ if(cod){ const s=$('dep-select'); if(s) s.value=cod; STATE.dep=cod; STATE.mun=null; STATE.mapSwing=false; STATE.mapCand=null; _syncSwingBtn(); load(); } });
     }}).addTo(leafMap);
     try{ leafMap.fitBounds(geoLayer.getBounds(),{padding:[6,6],animate:false}); }catch(_){}
   } else { geoLayer.setStyle(styleFn); }
   geoLayer.eachLayer(l=>{ const f=l.feature, cod=geoCode(f.properties), nom=(f.properties&&f.properties.name)||cod||'—';
     let html;
-    if (mc){ const sh=shareMap[cod]||0, e=STATE.depCand[cod], c=e&&e.byCodpar[String(mc)];
+    if (swing){ const sw=swingMap[cod];
+      html=`<b>${nom}</b><br>${sw?`Cepeda 26 ${sw.cep.toFixed(1)}% · Petro 22 ${sw.pet.toFixed(1)}% · <b>Δ ${(sw.d>=0?'+':'')+sw.d.toFixed(1)} pp</b>`:'sin dato comparable'}`;
+    } else if (mc){ const sh=shareMap[cod]||0, e=STATE.depCand[cod], c=e&&e.byCodpar[String(mc)];
       html=`<b>${nom}</b><br>${candNombre.split(' ').slice(0,2).join(' ')} · ${(sh*100).toFixed(1)}%${c?' · '+fmt(c.votos)+' votos':' · sin reporte'}`;
     } else { const w=STATE.depWinners[cod];
       html=`<b>${nom}</b><br>${w?w.nombre.split(' ').slice(0,2).join(' ')+' · '+w.pct.toFixed(1)+'%':'sin reporte'}`;
@@ -818,11 +873,12 @@ function renderMap(){
   });
   // Título + hint + contador según modo
   const mt=$('map-title'), mh=$('map-hint');
-  if (mc){ if(mt) mt.textContent='Mapa · '+(candNombre.split(' ').slice(0,2).join(' ')||'candidato'); if(mh) mh.textContent='toca de nuevo el candidato para ver líderes'; }
+  if (swing){ if(mt) mt.textContent='Mapa · cambio izquierda (Cepeda 26 − Petro 22)'; if(mh) mh.textContent='verde = sube · rojo = baja'; }
+  else if (mc){ if(mt) mt.textContent='Mapa · '+(candNombre.split(' ').slice(0,2).join(' ')||'candidato'); if(mh) mh.textContent='toca de nuevo el candidato para ver líderes'; }
   else { if(mt) mt.textContent='Mapa · líder por departamento'; if(mh) mh.textContent='click = abrir departamento'; }
-  if (STATE.mapLevel==='mun' && mh) mh.textContent='elige un departamento para ver municipios';
+  if (STATE.mapLevel==='mun' && !swing && !mc && mh) mh.textContent='elige un departamento para ver municipios';
   const n=Object.keys(STATE.depWinners).length;
-  const ms=$('map-status'); if(ms) ms.textContent = mc ? `mapa de ${candNombre.split(' ')[0]||'candidato'}` : `${n} departamento${n===1?'':'s'} reportado${n===1?'':'s'}`;
+  const ms=$('map-status'); if(ms) ms.textContent = swing ? 'cambio Cepeda 26 vs Petro 22' : (mc ? `mapa de ${candNombre.split(' ')[0]||'candidato'}` : `${n} departamento${n===1?'':'s'} reportado${n===1?'':'s'}`);
   _syncMapLevelBtns();
 }
 
@@ -834,15 +890,41 @@ async function renderMunMap(){
   const mt=$('map-title'), mh=$('map-hint'), ms=$('map-status');
   if (!geo){ if(ms) ms.textContent='no hay mapa municipal para este depto'; return; }
   if (geoLayer && leafMap.hasLayer(geoLayer)) leafMap.removeLayer(geoLayer);   // oculta capa de deptos
-  const paper3=cssVar('--paper-3'), rule=cssVar('--rule-strong');
+  const paper3=cssVar('--paper-3'), rule=cssVar('--rule-strong'), accent=cssVar('--accent');
+  const okHex=cssVar('--ok'), dangerHex=cssVar('--danger');
   const codeOf = p => (p.dep_electoral||'') + (p.mun_elec||'');
-  const accent = cssVar('--accent');
-  const styleFn = f => { const code=codeOf(f.properties), w=STATE.munWinners[code], on=STATE.mun===code;
+
+  // Modo de pintado: cambio (Cepeda↔Petro) > candidato > ganador.
+  const swing = STATE.mapSwing;
+  const mc = (!swing) ? STATE.mapCand : null;
+  let candHex='#888', candNom='', shareMap=null, maxShare=0, swingMap=null;
+  if (swing){
+    const cepShare = _munCandShareMap(dep, '7'); swingMap = {};
+    geo.features.forEach(f => { const amb=codeOf(f.properties), cep=(cepShare[amb]!=null?cepShare[amb]*100:null), pet=_petro22MunPct(amb);
+      swingMap[amb] = (cep!=null && pet!=null) ? { cep, pet, d:cep-pet } : null; });
+  } else if (mc){
+    shareMap = _munCandShareMap(dep, mc); maxShare = Math.max(0.0001, ...Object.values(shareMap));
+    const cn = (STATE.data&&STATE.data.cands) ? STATE.data.cands.find(c=>String(c.codpar)===String(mc)) : null;
+    candNom = cn ? cn.nombre : ''; candHex = candColor(candNom,'',0);
+  }
+  const styleFn = f => { const code=codeOf(f.properties), on=STATE.mun===code;
+    if (swing){ const sw=swingMap[code];
+      if (!sw) return { fillColor:paper3, fillOpacity:.22, color:on?accent:rule, weight:on?3:.8 };
+      const op = 0.2 + 0.7*Math.min(1, Math.abs(sw.d)/15);
+      return { fillColor: sw.d>=0?okHex:dangerHex, fillOpacity:on?1:op, color:on?accent:rule, weight:on?3:.8 }; }
+    if (mc){ const sh=shareMap[code]||0;
+      return { fillColor:candHex, fillOpacity:on?1:(sh>0?0.15+0.8*(sh/maxShare):0.05), color:on?accent:rule, weight:on?3:.8 }; }
+    const w=STATE.munWinners[code];
     return { fillColor:w?w.color:paper3, fillOpacity:on?1:(w?.85:.35), color:on?accent:rule, weight:on?3:.8 }; };
-  const ttHTML = f => { const p=f.properties, w=STATE.munWinners[codeOf(p)], nom=p.mpio_cnmbr||p.mun_elec||'—';
+  const ttHTML = f => { const p=f.properties, code=codeOf(p), nom=p.mpio_cnmbr||p.mun_elec||'—';
+    if (swing){ const sw=swingMap[code];
+      return `<b>${nom}</b><br>${sw?`Cepeda 26 ${sw.cep.toFixed(1)}% · Petro 22 ${sw.pet.toFixed(1)}% · <b>Δ ${(sw.d>=0?'+':'')+sw.d.toFixed(1)} pp</b>`:'sin dato comparable'}`; }
+    if (mc){ const sh=(shareMap[code]||0)*100, e=STATE.munCand[dep]&&STATE.munCand[dep][code], c=e&&e.byCodpar[String(mc)];
+      return `<b>${nom}</b><br>${candNom.split(' ').slice(0,2).join(' ')} · ${sh.toFixed(1)}%${c?' · '+fmt(c.votos)+' votos':' · sin reporte'}`; }
+    const w=STATE.munWinners[code];
     return `<b>${nom}</b><br>${w?w.nombre.split(' ').slice(0,2).join(' ')+' · '+w.pct.toFixed(1)+'%':'sin reporte'} · <i>click = ver votos</i>`; };
   _munStyle = styleFn;
-  if (munLayer && _munLayerDep === dep){   // mismo depto (auto-refresh / drill): solo recolorea, sin re-zoom
+  if (munLayer && _munLayerDep === dep){   // mismo depto (auto-refresh / drill / cambio de modo): solo recolorea, sin re-zoom
     munLayer.setStyle(styleFn);
     munLayer.eachLayer(l=>{ const h=ttHTML(l.feature); if(l.getTooltip()) l.setTooltipContent(h); else l.bindTooltip(h,{className:'map-tt',sticky:false}); });
   } else {
@@ -857,8 +939,9 @@ async function renderMunMap(){
     try{ leafMap.fitBounds(munLayer.getBounds(),{padding:[6,6],animate:false}); }catch(_){}
   }
   const rep=Object.keys(STATE.munWinners).length, tot=geo.features.length;
-  if(mt) mt.textContent = STATE.mun ? ('Mapa · '+(munNameFor(STATE.mun)||'municipio')) : ('Mapa · municipios de '+(DANE_DEP[dep]||dep));
-  if(mh) mh.textContent = STATE.mun ? 'toca de nuevo el municipio para ver el depto' : 'click en un municipio = ver sus votos';
+  if (swing){ if(mt) mt.textContent='Mapa · cambio izquierda · '+(DANE_DEP[dep]||dep); if(mh) mh.textContent='verde = Cepeda 26 sube vs Petro 22 · rojo = baja'; }
+  else if (mc){ if(mt) mt.textContent='Mapa · '+(candNom.split(' ').slice(0,2).join(' ')||'candidato')+' · '+(DANE_DEP[dep]||dep); if(mh) mh.textContent='% del candidato por municipio'; }
+  else { if(mt) mt.textContent = STATE.mun ? ('Mapa · '+(munNameFor(STATE.mun)||'municipio')) : ('Mapa · municipios de '+(DANE_DEP[dep]||dep)); if(mh) mh.textContent = STATE.mun ? 'toca de nuevo el municipio para ver el depto' : 'click en un municipio = ver sus votos'; }
   if(ms) ms.textContent=`${rep} de ${tot} municipios reportados`;
   _syncMapLevelBtns();
 }
@@ -868,8 +951,24 @@ function _syncMapLevelBtns(){
   if(m) m.classList.toggle('active', STATE.mapLevel==='mun');
 }
 function setMapLevel(level){
-  STATE.mapLevel = level; _syncMapLevelBtns();
+  STATE.mapLevel = level; STATE.mapSwing=false; STATE.mapCand=null;   // cambiar de nivel resetea el modo de pintado
+  _syncMapLevelBtns(); _syncSwingBtn();
   if (level==='dep' && STATE.mun){ STATE.mun=null; load(); return; }   // volver a Deptos sale del municipio
+  renderMap();
+}
+function _syncSwingBtn(){ const b=$('btn-swing'); if(b){ b.classList.toggle('on', !!STATE.mapSwing); b.textContent = STATE.mapSwing ? '✓ Cambio en el mapa' : 'Ver cambio en el mapa'; } }
+// Mapa de cambio izquierda: Cepeda 2026 − Petro 2022 (por depto o por municipio según nivel).
+async function toggleSwing(){
+  STATE.mapSwing = !STATE.mapSwing;
+  if (STATE.mapSwing) STATE.mapCand = null;   // el modo cambio anula el de candidato
+  _syncSwingBtn();
+  if (STATE.mapSwing){
+    const h=$('map-hint'); if(h) h.textContent='cargando mapa de cambio…';
+    await ensure2022();
+    if (STATE.mapLevel==='mun' && STATE.dep!=='00'){ await ensure2022Mun(); await ensureMunCand(STATE.dep); }
+    else await ensureDepCand();
+    const mb=document.querySelector('.map-box'); if(mb) mb.scrollIntoView({block:'center',behavior:'smooth'});
+  }
   renderMap();
 }
 
@@ -1162,7 +1261,7 @@ function runDemo(){
   const sel = $('dep-select');
   [['00','Nacional (todos)'], ...Object.entries(DANE_DEP).sort((a,b)=>a[1].localeCompare(b[1],'es'))].forEach(([cod,nom]) => { const o=document.createElement('option'); o.value=cod; o.textContent=nom; sel.appendChild(o); });
 
-  sel.onchange = () => { STATE.dep = sel.value; STATE.mun = null; load(); };
+  sel.onchange = () => { STATE.dep = sel.value; STATE.mun = null; STATE.mapSwing = false; STATE.mapCand = null; _syncSwingBtn(); load(); };
   $('btn-recompute').onclick = renderDefinicion;
   $('sigma').onchange = renderDefinicion;
   $('btn-reset-bol').onclick = () => resetBoletines(false);
