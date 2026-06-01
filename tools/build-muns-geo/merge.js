@@ -19,6 +19,12 @@ const OUT = path.join(__dirname, '..', '..', 'Bases de datos', 'output_swing', '
 const round = (n) => Math.round(n * 1e4) / 1e4;   // 4 decimales (~11 m) — reduce tamaño sin romper polígonos
 function thinCoords(c){ return (typeof c[0] === 'number') ? [round(c[0]), round(c[1])] : c.map(thinCoords); }
 
+// Corregimientos sin mun_elec en el GeoJSON → código electoral (amb) por nombre.
+// OJO: NO usar mun_electoral como fallback; es otro sistema de códigos (no el amb).
+const _norm = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+const MUN_FIX = { '60':{ 'puerto alegria':'030', 'puerto santander':'021' }, '50':{ 'la guadalupe':'078' } };
+function munElecOf(cod, p){ const fx = (MUN_FIX[cod] || {})[_norm(p.mpio_cnmbr)]; return fx || p.mun_elec || ''; }
+
 async function getJSON(url, tries = 3){
   for (let t = 0; t < tries; t++){
     try { const r = await fetch(url, { headers:{ 'User-Agent':'node' } }); if (!r.ok) throw new Error('HTTP '+r.status); return await r.json(); }
@@ -34,7 +40,7 @@ async function getJSON(url, tries = 3){
       for (const f of (g.features||[])){
         const p = f.properties || {};
         feats.push({ type:'Feature',
-          properties: { d: p.dep_electoral || cod, m: p.mun_elec || p.mun_electoral || '', n: p.mpio_cnmbr || '' },
+          properties: { d: p.dep_electoral || cod, m: munElecOf(p.dep_electoral || cod, p), n: p.mpio_cnmbr || '' },
           geometry: f.geometry ? { type:f.geometry.type, coordinates: thinCoords(f.geometry.coordinates) } : null });
       }
       console.log('  ', cod, (g.features||[]).length, 'muns');

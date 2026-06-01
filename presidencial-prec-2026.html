@@ -430,6 +430,14 @@ const PHOTO_VER      = '20260531a';   // bump al re-subir fotos a Fotos-presiden
 const $ = id => document.getElementById(id);
 const fmt = n => (n||0).toLocaleString('es-CO');
 const norm = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+// Algunos pol\u00edgonos del GeoJSON (corregimientos de Amazonas/Guain\u00eda) vienen sin mun_elec;
+// se resuelve el c\u00f3digo electoral por nombre para que casen con el amb (60030, 60021, 50078).
+const MUN_FIX = { '60':{ 'puerto alegria':'030', 'puerto santander':'021' }, '50':{ 'la guadalupe':'078' } };
+function munCodeFix(dep, munElec, name){
+  const fx = (MUN_FIX[dep] || {})[norm(name)];   // el override manda (el GeoJSON trae un código equivocado)
+  if (fx) return dep + fx;
+  return dep + (munElec || '');
+}
 
 const DANE_DEP = {
   '60':'Amazonas','01':'Antioquia','40':'Arauca','56':'San Andrés','88':'Exterior',
@@ -952,7 +960,7 @@ async function renderMunMap(){
   if (nacMunLayer && leafMap.hasLayer(nacMunLayer)) leafMap.removeLayer(nacMunLayer);
   const paper3=cssVar('--paper-3'), rule=cssVar('--rule-strong'), accent=cssVar('--accent');
   const okHex=cssVar('--ok'), dangerHex=cssVar('--danger');
-  const codeOf = p => (p.dep_electoral||'') + (p.mun_elec||'');
+  const codeOf = p => munCodeFix(p.dep_electoral||'', p.mun_elec, p.mpio_cnmbr);
 
   // Modo de pintado: cambio (Cepeda↔Petro) > candidato > ganador.
   const swing = STATE.mapSwing;
@@ -1017,7 +1025,7 @@ async function renderNacMunMap(){
   if (!geo){ if(ms) ms.textContent='no se pudo cargar el mapa municipal'; return; }
   const winByAmb = {}; if (SWING_DATA) (SWING_DATA.muns||[]).forEach(r => { if (r.win) winByAmb[r.amb] = r; });
   const paper3=cssVar('--paper-3'), rule=cssVar('--rule-strong');
-  const codeOf = p => (p.d||'')+(p.m||'');
+  const codeOf = p => munCodeFix(p.d||'', p.m, p.n);
   const styleFn = f => { const r = winByAmb[codeOf(f.properties)];
     return { fillColor: r ? candColor(r.win.n,'',0) : paper3, fillOpacity: r ? .85 : .25, color:rule, weight:.4 }; };
   const ttHTML = f => { const r = winByAmb[codeOf(f.properties)], nm = f.properties.n || '—';
@@ -1092,8 +1100,8 @@ async function renderCmpMap(){
   initCmpMap(); _syncCmpLevelBtns(); if (!cmpMap || !SWING_DATA) return;
   const dep = STATE.dep;
   let key, geo, codeOf;
-  if (dep !== '00'){ key = 'mun:'+dep; geo = await ensureMunGeo(dep); codeOf = f => (f.properties.dep_electoral||'')+(f.properties.mun_elec||''); }
-  else if (STATE.cmpLevel === 'mun'){ key = 'nacmun'; geo = await ensureNacMunGeo(); codeOf = f => (f.properties.d||'')+(f.properties.m||''); }
+  if (dep !== '00'){ key = 'mun:'+dep; geo = await ensureMunGeo(dep); codeOf = f => munCodeFix(f.properties.dep_electoral||'', f.properties.mun_elec, f.properties.mpio_cnmbr); }
+  else if (STATE.cmpLevel === 'mun'){ key = 'nacmun'; geo = await ensureNacMunGeo(); codeOf = f => munCodeFix(f.properties.d||'', f.properties.m, f.properties.n); }
   else { key = 'dep'; geo = GEO; codeOf = f => geoCode(f.properties); }
   if (!geo) return;
   const lookup = {};
