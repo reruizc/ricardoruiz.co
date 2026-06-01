@@ -99,6 +99,8 @@
   .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);}
   .btn.primary:hover{filter:brightness(1.06);}
   .btn.on{background:var(--ok);border-color:var(--ok);color:#0c1a08;}
+  .btn.btn-dl{background:#9fd98a;border-color:#7bb661;color:#143a0c;font-weight:600;}
+  .btn.btn-dl:hover{background:#b6e6a4;border-color:#5fa34a;}
   #status{font-family:var(--mono);font-size:12px;padding:.45rem .1rem;min-height:1.2rem;color:var(--ink-2);white-space:pre-wrap;}
   #status.err{color:var(--danger);}#status.ok{color:var(--ok);}
   body.day-mode #status.err{color:#9a2a1e;}
@@ -269,14 +271,6 @@
 
   <main class="content">
 
-    <div class="ambito-bar">
-      <label for="dep-select">Ámbito</label>
-      <select id="dep-select"></select>
-      <button class="btn" id="btn-back-scope" onclick="goBack()" style="display:none">← Volver</button>
-      <span class="hint">o haz click en un departamento del mapa · se actualiza solo cada 90 s</span>
-      <button class="btn" id="btn-xls-result" onclick="downloadResultsXLS(this)" style="margin-left:auto">↓ Resultados (Excel)</button>
-    </div>
-
     <div class="verdict" id="verdict">
       <div class="verdict-tag">¿Se define en primera vuelta?</div>
       <div class="verdict-main" id="verdict-main">Esperando datos del preconteo…</div>
@@ -307,6 +301,14 @@
     </div>
 
     <div class="kpi-row" id="kpis"></div>
+
+    <div class="ambito-bar">
+      <label for="dep-select">Ámbito</label>
+      <select id="dep-select"></select>
+      <button class="btn" id="btn-back-scope" onclick="goBack()" style="display:none">← Volver</button>
+      <span class="hint">o haz click en un departamento del mapa · se actualiza solo cada 90 s</span>
+      <button class="btn btn-dl" id="btn-xls-result" onclick="downloadResultsXLS(this)" style="margin-left:auto">↓ Resultados (Excel)</button>
+    </div>
 
     <section class="hero3">
       <div class="h3col">
@@ -364,7 +366,7 @@
     </div>
 
     <div class="card" id="cmp-card">
-      <div class="card-label">Comparación con 2022 (1ª vuelta) · <span id="cmp-scope">Nacional</span><button class="btn" id="btn-xls-swing" onclick="downloadSwingXLS(this)" style="margin-left:auto;padding:.35rem .8rem;font-size:11px">↓ Cepeda vs Petro (Excel)</button></div>
+      <div class="card-label">Comparación con 2022 (1ª vuelta) · <span id="cmp-scope">Nacional</span><button class="btn btn-dl" id="btn-xls-swing" onclick="downloadSwingXLS(this)" style="margin-left:auto;padding:.35rem .8rem;font-size:11px">↓ Cepeda vs Petro (Excel)</button></div>
       <div id="cmp-body"><div class="mini-note">Carga un boletín (o usa el demo) para comparar contra 2022.</div></div>
       <div id="cmp-map-wrap" style="margin-top:1rem">
         <div style="display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;margin-bottom:.5rem">
@@ -1339,11 +1341,36 @@ function renderCepedaVsPetroDepto(){
 // ── Top municipios por giro de la izquierda (Cepeda 2026 vs Petro 2022) ──
 // Lee un JSON precomputado (tools/build-swing-municipal/build.js · barrido nacional
 // de ~1.100 municipios hecho UNA vez, no desde el navegador). Es un corte, no live.
-// ── Descargas Excel (SheetJS on-demand) ──
+// ── Descargas Excel (xlsx-js-style on-demand · permite estilo de celdas) ──
 let RESULT_DATA = null;
 function loadXLSX(){ return new Promise((res,rej)=>{ if(window.XLSX) return res(window.XLSX);
-  const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+  const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js';
   s.onload=()=>res(window.XLSX); s.onerror=()=>rej(new Error('no se pudo cargar la librería Excel')); document.head.appendChild(s); }); }
+
+const _XLS_BD = (()=>{ const c={style:'thin',color:{rgb:'D9D2C7'}}; return {top:c,bottom:c,left:c,right:c}; })();
+// Hoja con formato de tabla: encabezado verde, filas alternadas, bordes, autofiltro y anchos.
+function _xlsTable(XLSX, head, rows, widths){
+  const aoa = [head, ...rows], nrow = aoa.length, ncol = head.length;
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const hdr = { font:{bold:true,color:{rgb:'FFFFFF'},sz:11}, fill:{fgColor:{rgb:'2E6B1F'}}, alignment:{horizontal:'center',vertical:'center',wrapText:true}, border:_XLS_BD };
+  const band = { fill:{fgColor:{rgb:'EEF5E9'}}, border:_XLS_BD };
+  const plain = { border:_XLS_BD };
+  for (let r=0;r<nrow;r++) for (let c=0;c<ncol;c++){ const ref = XLSX.utils.encode_cell({r,c}); let cell = ws[ref]; if(!cell){ cell={t:'s',v:''}; ws[ref]=cell; }
+    if (r===0) cell.s = hdr;
+    else { cell.s = (r%2===0) ? band : plain; if (typeof cell.v === 'number') cell.z = Number.isInteger(cell.v) ? '#,##0' : '0.0'; } }
+  ws['!cols'] = widths.map(w=>({wch:w}));
+  ws['!autofilter'] = { ref: XLSX.utils.encode_range({s:{r:0,c:0},e:{r:nrow-1,c:ncol-1}}) };
+  ws['!freeze'] = { xSplit:0, ySplit:1, topLeftCell:'A2', activePane:'bottomLeft', state:'frozen' };
+  return ws;
+}
+// Hoja de instrucciones (texto). Título en grande; líneas terminadas en ':' en negrita.
+function _xlsInfo(XLSX, titulo, lineas){
+  const ws = XLSX.utils.aoa_to_sheet([[titulo]].concat(lineas.map(l=>[l])));
+  ws['!cols'] = [{wch:115}];
+  if (ws['A1']) ws['A1'].s = { font:{bold:true,sz:15,color:{rgb:'2E6B1F'}} };
+  lineas.forEach((l,i)=>{ const ref='A'+(i+2); if (ws[ref] && /:\s*$/.test(l)) ws[ref].s = { font:{bold:true,sz:11} }; });
+  return ws;
+}
 
 // Excel 1 · resultados por candidato + blanco/nulos/no marcados, por depto y municipio.
 async function downloadResultsXLS(btn){
@@ -1351,21 +1378,33 @@ async function downloadResultsXLS(btn){
   try {
     const XLSX = await loadXLSX();
     if (!RESULT_DATA){ const r = await fetch(RESULTADOS_URL + '?t=' + Date.now(), { cache:'no-store' }); if(!r.ok) throw new Error('sin datos'); RESULT_DATA = await r.json(); }
-    const cands = RESULT_DATA.cands || [];
+    const cands = RESULT_DATA.cands || [], bol = RESULT_DATA.boletin || '';
     const tail = ['Voto en blanco','Nulos','No marcados','Válidos','Votantes'];
-    const sheet = (rows, codeLbl, nameLbl, hasDep) => {
-      const head = [codeLbl, nameLbl].concat(hasDep?['Departamento']:[]).concat(cands.map(c=>c.n), tail);
-      const data = rows.map(r => {
-        const base = hasDep ? [r.amb, r.mun, r.dep] : [r.cod, r.dep];
-        return base.concat(cands.map(c => (r.votos && r.votos[c.codpar]!=null) ? r.votos[c.codpar] : 0), [r.blanco, r.nulos, r.nma, r.validos, r.votantes]);
-      });
-      return XLSX.utils.aoa_to_sheet([head, ...data]);
-    };
+    const candW = cands.map(()=>15), tailW = [14,11,13,13,13];
+    const buildRows = (arr, hasDep) => arr.map(r => { const base = hasDep ? [r.amb, r.mun, r.dep] : [r.cod, r.dep];
+      return base.concat(cands.map(c => (r.votos && r.votos[c.codpar]!=null) ? r.votos[c.codpar] : 0), [r.blanco, r.nulos, r.nma, r.validos, r.votantes]); });
+    const depHead = ['Código','Departamento'].concat(cands.map(c=>c.n), tail);
+    const munHead = ['Código','Municipio','Departamento'].concat(cands.map(c=>c.n), tail);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, sheet(RESULT_DATA.deps||[], 'Código', 'Departamento', false), 'Departamentos');
+    XLSX.utils.book_append_sheet(wb, _xlsInfo(XLSX, 'Resultados presidenciales · 1ª vuelta 2026', [
+      'Preconteo de la Registraduría — cifras NO oficiales. Generado por ricardoruiz.co.',
+      'Corte: boletín #' + bol + '.', '',
+      'CONTENIDO:',
+      '• Hoja "Departamentos": votos por candidato en cada uno de los 33 departamentos.',
+      '• Hoja "Municipios": votos por candidato en cada municipio (1.122).', '',
+      'COLUMNAS:',
+      '• Una columna por cada candidato (número de votos).',
+      '• Voto en blanco · Nulos · No marcados.',
+      '• Válidos: votos válidos (candidatos + voto en blanco).',
+      '• Votantes: total de sufragantes.', '',
+      'NOTAS:',
+      '• Es preconteo; el escrutinio oficial puede variar.',
+      '• Usa los filtros (flechas del encabezado) para ordenar o buscar.',
+    ]), 'Instrucciones');
+    XLSX.utils.book_append_sheet(wb, _xlsTable(XLSX, depHead, buildRows(RESULT_DATA.deps||[], false), [10,18].concat(candW, tailW)), 'Departamentos');
     const muns = (RESULT_DATA.muns||[]).slice().sort((a,b)=> (a.dep||'').localeCompare(b.dep||'','es') || (a.mun||'').localeCompare(b.mun||'','es'));
-    XLSX.utils.book_append_sheet(wb, sheet(muns, 'Código', 'Municipio', true), 'Municipios');
-    XLSX.writeFile(wb, `resultados-presidencial-1v_bol${RESULT_DATA.boletin||''}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, _xlsTable(XLSX, munHead, buildRows(muns, true), [10,24,18].concat(candW, tailW)), 'Municipios');
+    XLSX.writeFile(wb, `resultados-presidencial-1v_bol${bol}.xlsx`);
   } catch(e){ alert('No se pudo generar el Excel: ' + (e.message||e)); }
   finally { if (btn) btn.textContent = old; }
 }
@@ -1375,16 +1414,28 @@ async function downloadSwingXLS(btn){
   if (!SWING_DATA){ alert('Aún no cargó el comparativo.'); return; }
   const old = btn && btn.textContent; if (btn) btn.textContent = 'Generando…';
   try {
-    const XLSX = await loadXLSX();
+    const XLSX = await loadXLSX(); const bol = SWING_DATA.boletin || '';
     const dHead = ['Código','Departamento','Cepeda 2026 %','Petro 2022 %','Δ izquierda (pp)','Ganador 2026','% ganador'];
     const dRows = (SWING_DATA.deps||[]).map(d => [d.cod, d.dep, d.cep26, d.petro22, d.swing, d.win?d.win.n:'', d.win?d.win.pct:'']);
     const mHead = ['Código','Municipio','Departamento','Cepeda 2026 %','Petro 2022 %','Δ izquierda (pp)','Válidos 2026','Ganador 2026','% ganador'];
     const mRows = (SWING_DATA.muns||[]).slice().sort((a,b)=> (a.dep||'').localeCompare(b.dep||'','es') || (a.mun||'').localeCompare(b.mun||'','es'))
       .map(m => [m.amb, m.mun, m.dep, m.cep26, m.petro22, m.swing, m.val26, m.win?m.win.n:'', m.win?m.win.pct:'']);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([dHead, ...dRows]), 'Departamentos');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([mHead, ...mRows]), 'Municipios');
-    XLSX.writeFile(wb, `cepeda26-vs-petro22_bol${SWING_DATA.boletin||''}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, _xlsInfo(XLSX, 'Cambio de la izquierda · Cepeda 2026 vs Petro 2022', [
+      'Preconteo Registraduría (2026) frente al resultado oficial 2022 — referencia analítica.',
+      'Corte: boletín #' + bol + '. Generado por ricardoruiz.co.', '',
+      'COLUMNAS:',
+      '• Cepeda 2026 %: voto de Iván Cepeda en 1ª vuelta 2026 (% sobre válidos + blanco).',
+      '• Petro 2022 %: voto de Gustavo Petro en 1ª vuelta 2022 (% sobre válidos).',
+      '• Δ izquierda (pp): Cepeda 2026 − Petro 2022, en puntos porcentuales.',
+      '• Ganador 2026 / % ganador: candidato más votado del ámbito en 2026.', '',
+      'NOTAS:',
+      '• Δ positivo = la izquierda creció vs 2022; negativo = bajó.',
+      '• Usa los filtros del encabezado para ordenar por Δ y ver dónde más se movió.',
+    ]), 'Instrucciones');
+    XLSX.utils.book_append_sheet(wb, _xlsTable(XLSX, dHead, dRows, [10,18,15,14,16,26,12]), 'Departamentos');
+    XLSX.utils.book_append_sheet(wb, _xlsTable(XLSX, mHead, mRows, [10,24,18,15,14,16,13,26,12]), 'Municipios');
+    XLSX.writeFile(wb, `cepeda26-vs-petro22_bol${bol}.xlsx`);
   } catch(e){ alert('No se pudo generar el Excel: ' + (e.message||e)); }
   finally { if (btn) btn.textContent = old; }
 }
