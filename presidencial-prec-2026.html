@@ -211,6 +211,8 @@
   .def-charts{display:grid;grid-template-columns:1fr 1fr;gap:1.1rem;margin-bottom:.9rem;}
   .swing-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.3rem;}
   @media(max-width:820px){.swing-grid{grid-template-columns:1fr;}}
+  .cmp-map-box{position:relative;height:380px;border:1px solid var(--rule);border-radius:12px;overflow:hidden;background:var(--paper-3);}
+  #cmp-map{position:absolute;inset:0;}
   .mini-lbl{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin-bottom:.5rem;}
   .def-ctrl{display:flex;gap:.65rem;align-items:center;flex-wrap:wrap;border-top:1px solid var(--rule);padding-top:.85rem;}
   .def-ctrl label{font-family:var(--mono);font-size:12px;color:var(--ink-2);display:flex;align-items:center;gap:.4rem;}
@@ -361,8 +363,12 @@
     </div>
 
     <div class="card" id="cmp-card">
-      <div class="card-label">Comparación con 2022 (1ª vuelta) · <span id="cmp-scope">Nacional</span><button class="btn" id="btn-swing" onclick="toggleSwing()" style="margin-left:auto;padding:.35rem .8rem;font-size:11px">Ver cambio en el mapa</button></div>
+      <div class="card-label">Comparación con 2022 (1ª vuelta) · <span id="cmp-scope">Nacional</span></div>
       <div id="cmp-body"><div class="mini-note">Carga un boletín (o usa el demo) para comparar contra 2022.</div></div>
+      <div id="cmp-map-wrap" style="margin-top:1rem">
+        <div class="mini-lbl" id="cmp-map-title">Mapa del cambio de la izquierda · <span style="color:var(--ok)">verde</span> = Cepeda 26 sube vs Petro 22 · <span style="color:var(--danger)">rojo</span> = baja</div>
+        <div class="cmp-map-box"><div id="cmp-map"></div></div>
+      </div>
       <details class="raw" id="cmp-mun-wrap" style="margin-top:.8rem;display:none">
         <summary id="cmp-mun-sum">Municipios del departamento vs. 2022</summary>
         <div id="cmp-mun" style="padding:.6rem;overflow:auto"></div>
@@ -620,6 +626,7 @@ function render(){
   if (STATE.dep!=='00' && !STATE.mun && lider){ STATE.depWinners[STATE.dep] = { nombre:lider.nombre, color:candColor(lider.nombre,lider.partido,0), pct:share1*100 }; }
   _syncBackBtn();
   renderMap();
+  renderCmpMap();
 }
 
 function renderVoteBars(cands, validos, gana1v){
@@ -791,7 +798,7 @@ function renderEvoChart(){
 
 // ════════════════════ MAPA COLOMBIA ════════════════════
 let leafMap=null, geoLayer=null, GEO=null, sweeping=false, _mapStyle=null;
-let munLayer=null, _munStyle=null, _munLayerDep=null; const munGeoCache={};
+let munLayer=null, _munStyle=null, _munLayerDep=null, nacMunLayer=null; const munGeoCache={};
 const GEO_URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/DEPARTAMENTOS2.json';
 const MPS_URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Departamentos-mps/';
 const NAME2CODE=(()=>{ const m={}; for(const cod in DANE_DEP) m[norm(DANE_DEP[cod])]=cod;
@@ -866,7 +873,9 @@ function refitNational(){
 }
 function renderMap(){
   if (!leafMap || !GEO) return;
+  if (STATE.mapLevel === 'mun' && STATE.dep === '00'){ renderNacMunMap(); return; }   // todos los municipios del país
   if (STATE.mapLevel === 'mun' && STATE.dep !== '00'){ renderMunMap(); return; }
+  if (nacMunLayer && leafMap.hasLayer(nacMunLayer)) leafMap.removeLayer(nacMunLayer);
   if (munLayer && leafMap.hasLayer(munLayer)) leafMap.removeLayer(munLayer);   // veníamos de municipios
   if (geoLayer && !leafMap.hasLayer(geoLayer)){ geoLayer.addTo(leafMap); try{ leafMap.fitBounds(_nationalBounds(),{padding:[2,2],animate:false}); }catch(_){} }
   STATE.depWinners=STATE.depWinners||{};
@@ -933,6 +942,7 @@ async function renderMunMap(){
   const mt=$('map-title'), mh=$('map-hint'), ms=$('map-status');
   if (!geo){ if(ms) ms.textContent='no hay mapa municipal para este depto'; return; }
   if (geoLayer && leafMap.hasLayer(geoLayer)) leafMap.removeLayer(geoLayer);   // oculta capa de deptos
+  if (nacMunLayer && leafMap.hasLayer(nacMunLayer)) leafMap.removeLayer(nacMunLayer);
   const paper3=cssVar('--paper-3'), rule=cssVar('--rule-strong'), accent=cssVar('--accent');
   const okHex=cssVar('--ok'), dangerHex=cssVar('--danger');
   const codeOf = p => (p.dep_electoral||'') + (p.mun_elec||'');
@@ -988,6 +998,36 @@ async function renderMunMap(){
   if(ms) ms.textContent=`${rep} de ${tot} municipios reportados`;
   _syncMapLevelBtns();
 }
+// Mapa nacional de TODOS los municipios, coloreados por ganador (corte del ranking).
+async function renderNacMunMap(){
+  if (!leafMap) return;
+  const mt=$('map-title'), mh=$('map-hint'), ms=$('map-status');
+  if (mt) mt.textContent = 'Mapa · todos los municipios';
+  if (ms) ms.textContent = 'cargando municipios…';
+  if (geoLayer && leafMap.hasLayer(geoLayer)) leafMap.removeLayer(geoLayer);
+  if (munLayer && leafMap.hasLayer(munLayer)) leafMap.removeLayer(munLayer);
+  const geo = await ensureNacMunGeo();
+  if (!geo){ if(ms) ms.textContent='no se pudo cargar el mapa municipal'; return; }
+  const winByAmb = {}; if (SWING_DATA) (SWING_DATA.muns||[]).forEach(r => { if (r.win) winByAmb[r.amb] = r; });
+  const paper3=cssVar('--paper-3'), rule=cssVar('--rule-strong');
+  const codeOf = p => (p.d||'')+(p.m||'');
+  const styleFn = f => { const r = winByAmb[codeOf(f.properties)];
+    return { fillColor: r ? candColor(r.win.n,'',0) : paper3, fillOpacity: r ? .85 : .25, color:rule, weight:.4 }; };
+  const ttHTML = f => { const r = winByAmb[codeOf(f.properties)], nm = f.properties.n || '—';
+    return `<b>${nm}</b><br>${r ? r.win.n.split(' ').slice(0,2).join(' ')+' · '+r.win.pct.toFixed(1)+'%' : 'sin dato'} · <i>click = ver votos</i>`; };
+  if (nacMunLayer){ leafMap.removeLayer(nacMunLayer); nacMunLayer=null; }
+  nacMunLayer = L.geoJSON(geo,{ style:styleFn, onEachFeature:(f,l)=>{
+    l.on('mouseover',()=>l.setStyle({fillOpacity:1}));
+    l.on('mouseout',()=>l.setStyle(styleFn(f)));
+    l.on('click',()=>{ const amb=codeOf(f.properties); if(amb.length===5){ const s=$('dep-select'); if(s) s.value=amb.slice(0,2); STATE.dep=amb.slice(0,2); STATE.mun=amb; STATE.mapCand=null; STATE.mapSwing=false; _syncSwingBtn(); load(); } });
+    l.bindTooltip(ttHTML(f),{className:'map-tt',sticky:false});
+  } }).addTo(leafMap);
+  try{ leafMap.invalidateSize(false); leafMap.fitBounds(nacMunLayer.getBounds(),{padding:[2,2],animate:false}); }catch(_){}
+  const n = Object.keys(winByAmb).length;
+  if (ms) ms.textContent = n ? (n+' municipios · ganador') : 'sin datos de ganador';
+  if (mh) mh.textContent = 'ganador por municipio (corte del ranking) · click = ver votos';
+  _syncMapLevelBtns();
+}
 function _syncMapLevelBtns(){
   const d=$('tg-lvl-dep'), m=$('tg-lvl-mun');
   if(d) d.classList.toggle('active', STATE.mapLevel==='dep');
@@ -998,6 +1038,7 @@ function setMapLevel(level){
   _syncMapLevelBtns(); _syncSwingBtn();
   if (level==='dep' && STATE.mun){ STATE.mun=null; load(); return; }   // volver a Deptos sale del municipio
   renderMap();
+  renderCmpMap();   // el mapa del comparativo espeja el nivel del mapa principal
 }
 function _syncSwingBtn(){ const b=$('btn-swing'); if(b){ b.classList.toggle('on', !!STATE.mapSwing); b.textContent = STATE.mapSwing ? '✓ Cambio en el mapa' : 'Ver cambio en el mapa'; } }
 // Mapa de cambio izquierda: Cepeda 2026 − Petro 2022 (por depto o por municipio según nivel).
@@ -1013,6 +1054,52 @@ async function toggleSwing(){
     const mb=document.querySelector('.map-box'); if(mb) mb.scrollIntoView({block:'center',behavior:'smooth'});
   }
   renderMap();
+}
+
+// ── Mapa propio del comparativo (Cepeda 26 vs Petro 22) ──
+// Espeja la geografía del mapa principal (nacional→deptos · depto→sus municipios ·
+// nacional+Municipios→todos los municipios) pero coloreada por el swing. Lee el
+// JSON precomputado swing-municipal (deps[] + muns[]).
+const NAC_MUN_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/MUNICIPIOS-NACIONAL.json';
+let _nacMunGeo = null, _nacMunGeoP = null;
+async function ensureNacMunGeo(){
+  if (_nacMunGeo) return _nacMunGeo;
+  if (_nacMunGeoP) return _nacMunGeoP;
+  _nacMunGeoP = (async () => { try { const r = await fetch(NAC_MUN_URL); _nacMunGeo = await r.json(); } catch(_){ _nacMunGeo = null; } return _nacMunGeo; })();
+  return _nacMunGeoP;
+}
+let cmpMap = null, cmpLayer = null, _cmpKey = null;
+function initCmpMap(){
+  if (cmpMap || typeof L === 'undefined') return;
+  if (!$('cmp-map')) return;
+  try { cmpMap = L.map('cmp-map',{ zoomControl:false, attributionControl:false, scrollWheelZoom:false, dragging:false, doubleClickZoom:false, zoomAnimation:false, fadeAnimation:false, zoomSnap:0 }); cmpMap.setView([4.6,-73.5],5); } catch(_){}
+}
+async function renderCmpMap(){
+  initCmpMap(); if (!cmpMap || !SWING_DATA) return;
+  const dep = STATE.dep;
+  let key, geo, codeOf;
+  if (dep !== '00'){ key = 'mun:'+dep; geo = await ensureMunGeo(dep); codeOf = f => (f.properties.dep_electoral||'')+(f.properties.mun_elec||''); }
+  else if (STATE.mapLevel === 'mun'){ key = 'nacmun'; geo = await ensureNacMunGeo(); codeOf = f => (f.properties.d||'')+(f.properties.m||''); }
+  else { key = 'dep'; geo = GEO; codeOf = f => geoCode(f.properties); }
+  if (!geo) return;
+  const lookup = {};
+  if (key === 'dep') (SWING_DATA.deps||[]).forEach(d => lookup[d.cod] = d);
+  else (SWING_DATA.muns||[]).forEach(r => lookup[r.amb] = r);
+  const t = $('cmp-map-title');
+  if (t) t.innerHTML = 'Cambio de la izquierda · '+(key==='dep'?'por departamento':(key==='nacmun'?'todos los municipios':('municipios de '+(DANE_DEP[dep]||dep))))+' · <span style="color:var(--ok)">verde</span> sube · <span style="color:var(--danger)">rojo</span> baja';
+  if (key === _cmpKey){ try{ cmpMap.invalidateSize(false); }catch(_){} return; }   // misma geografía ya pintada (swing estático)
+  _cmpKey = key;
+  const okHex = cssVar('--ok'), dangerHex = cssVar('--danger'), paper3 = cssVar('--paper-3'), rule = cssVar('--rule-strong');
+  const W = key === 'dep' ? 1 : .6;
+  const styleFn = f => { const r = lookup[codeOf(f)];
+    if (!r || r.swing == null) return { fillColor:paper3, fillOpacity:.22, color:rule, weight:W };
+    return { fillColor: r.swing>=0?okHex:dangerHex, fillOpacity: 0.2+0.7*Math.min(1,Math.abs(r.swing)/15), color:rule, weight:W }; };
+  const ttHTML = f => { const r = lookup[codeOf(f)], nm = f.properties.name || f.properties.n || f.properties.mpio_cnmbr || '—';
+    return `<b>${nm}</b><br>${r ? `Cepeda 26 ${r.cep26}% · Petro 22 ${r.petro22}% · <b>Δ ${(r.swing>=0?'+':'')+r.swing} pp</b>` : 'sin dato comparable'}`; };
+  if (cmpLayer){ try{ cmpMap.removeLayer(cmpLayer); }catch(_){} cmpLayer = null; }
+  cmpLayer = L.geoJSON(geo,{ style:styleFn, onEachFeature:(f,l)=>{ l.bindTooltip(ttHTML(f),{className:'map-tt',sticky:false}); } }).addTo(cmpMap);
+  try{ cmpMap.invalidateSize(false); cmpMap.fitBounds(cmpLayer.getBounds(),{padding:[4,4],animate:false}); }catch(_){}
+  setTimeout(()=>{ try{ cmpMap.invalidateSize(false); cmpMap.fitBounds(cmpLayer.getBounds(),{padding:[4,4],animate:false}); }catch(_){} }, 400);
 }
 
 // Botón "Volver": municipio → departamento → nacional.
@@ -1246,6 +1333,7 @@ async function loadSwingTop(){
   try { const r = await fetch(SWING_URL + '?t=' + Date.now(), { cache:'no-store' }); if(!r.ok) throw 0; SWING_DATA = await r.json(); }
   catch(e){ box.innerHTML = '<div class="mini-note">Aún no hay ranking nacional publicado.</div>'; return; }
   renderSwingTop();
+  renderCmpMap();   // el mapa del comparativo también usa SWING_DATA
 }
 function setSwingMin(min){ SWING_MIN = min; document.querySelectorAll('#swing-size-tg button').forEach(b=>b.classList.toggle('active', +b.dataset.min===min)); renderSwingTop(); }
 function _swingTable(rows, titulo){
