@@ -89,10 +89,10 @@ async function pool(items, fn){
   const deps = Object.keys(DANE_DEP);
   let boletin = null;
   const munList = [];
+  try { const nac = await getJSON(`${WORKER}/presidente`); if (nac.numact != null) boletin = nac.numact; } catch(_){}   // boletín NACIONAL (no el contador por depto)
   await pool(deps, async (dep) => {
     try {
       const ds = await getJSON(`${WORKER}/presidente/${dep}`);
-      if (boletin == null && ds.numact != null) boletin = ds.numact;
       const mg = ds.camaras && ds.camaras[0] && ds.camaras[0].mapagan;
       if (Array.isArray(mg)) for (const e of mg){ const amb = String(e.amb||''); if (amb.length===5) munList.push({ amb, mun: e.nombre || amb, dep: DANE_DEP[dep] }); }
     } catch(e){ console.log('   dep', dep, 'fail:', e.message); }
