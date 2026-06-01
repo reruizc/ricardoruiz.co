@@ -889,7 +889,7 @@ function renderMap(){
       const cod=geoCode(f.properties);
       l.on('mouseover',()=>l.setStyle(Object.assign({}, _mapStyle(f), {fillOpacity:1})));
       l.on('mouseout',()=>l.setStyle(_mapStyle(f)));
-      l.on('click',()=>{ if(cod){ const s=$('dep-select'); if(s) s.value=cod; STATE.dep=cod; STATE.mun=null; STATE.mapSwing=false; STATE.mapCand=null; _syncSwingBtn(); load(); } });
+      l.on('click',()=>{ if(cod){ const s=$('dep-select'); if(s) s.value=cod; STATE.dep=cod; STATE.mun=null; STATE.mapLevel='mun'; STATE.mapSwing=false; STATE.mapCand=null; _syncSwingBtn(); _syncMapLevelBtns(); load(); } });   // click depto → drill al mapa municipal
     }}).addTo(leafMap);
     try{ leafMap.fitBounds(_nationalBounds(),{padding:[2,2],animate:false}); }catch(_){}
   } else { geoLayer.setStyle(styleFn); }
@@ -1007,10 +1007,10 @@ async function toggleSwing(){
 
 // Botón "Volver": municipio → departamento → nacional.
 function goBack(){
-  if (STATE.mun){ STATE.mun = null; load(); }
-  else if (STATE.dep !== '00'){
+  if (STATE.mun){ STATE.mun = null; load(); }                          // municipio → mapa municipal del depto
+  else if (STATE.dep !== '00'){                                        // mapa municipal del depto → nacional
     const s = $('dep-select'); if (s) s.value = '00';
-    STATE.dep = '00'; STATE.mun = null; STATE.mapSwing = false; STATE.mapCand = null; _syncSwingBtn(); load();
+    STATE.dep = '00'; STATE.mun = null; STATE.mapLevel = 'dep'; STATE.mapSwing = false; STATE.mapCand = null; _syncSwingBtn(); _syncMapLevelBtns(); load();
   }
 }
 function _syncBackBtn(){
@@ -1339,7 +1339,7 @@ function runDemo(){
   const sel = $('dep-select');
   [['00','Nacional (todos)'], ...Object.entries(DANE_DEP).sort((a,b)=>a[1].localeCompare(b[1],'es'))].forEach(([cod,nom]) => { const o=document.createElement('option'); o.value=cod; o.textContent=nom; sel.appendChild(o); });
 
-  sel.onchange = () => { STATE.dep = sel.value; STATE.mun = null; STATE.mapSwing = false; STATE.mapCand = null; _syncSwingBtn(); load(); };
+  sel.onchange = () => { STATE.dep = sel.value; STATE.mun = null; STATE.mapLevel = (sel.value==='00') ? 'dep' : 'mun'; STATE.mapSwing = false; STATE.mapCand = null; _syncSwingBtn(); _syncMapLevelBtns(); load(); };
   $('btn-recompute').onclick = renderDefinicion;
   $('sigma').onchange = renderDefinicion;
   $('btn-reset-bol').onclick = () => resetBoletines(false);
