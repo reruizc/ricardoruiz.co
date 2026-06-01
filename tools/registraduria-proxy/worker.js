@@ -1,7 +1,10 @@
 // registraduria-proxy — proxea (con CORS) los JSON de resultados de la
 // Registraduría: https://resultados.registraduria.gov.co/json/ACT/{CORP}/{DEP}.json
 //
-// Rutas:  /senado · /camara · /consultas · /presidente   (+ /{cod} por depto, ej /presidente/05)
+// Rutas:  /senado · /camara · /consultas · /presidente
+//   + /{cod}        por depto      (ej /presidente/05)
+//   + /{cod5}       por municipio  (ej /presidente/05001  → dep 05 + mun 001)
+//   + /{dep}/{mun}  por municipio  (ej /presidente/05/001)
 // CORP:   SE        CA         CN           PR
 //
 // CLAVE (verificado 2026-05-31): el WAF de la Registraduría exige un
@@ -25,9 +28,8 @@ export default {
     if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
 
     const { pathname } = new URL(req.url);
-    const seg  = pathname.replace(/^\/+|\/+$/g, '').split('/'); // ['presidente','05']
+    const seg  = pathname.replace(/^\/+|\/+$/g, '').split('/'); // ['presidente','05'] o ['presidente','05','001']
     const corp = CORP[seg[0]];
-    const dep  = /^\d{1,2}$/.test(seg[1] || '') ? seg[1].padStart(2, '0') : '00';
 
     if (!corp) {
       const rutas = [];
@@ -35,7 +37,15 @@ export default {
       return json({ error: 'Ruta no encontrada', path: pathname, rutas }, 404);
     }
 
-    const url = `${BASE}/${corp}/${dep}.json`;
+    // Ámbito: nacional '00' · depto (2 díg) · municipio (5 díg = dep+mun).
+    // Acepta /presidente/05, /presidente/05001 y /presidente/05/001.
+    const a = seg[1] || '', b = seg[2] || '';
+    let amb = '00';
+    if (/^\d{5}$/.test(a))                                amb = a;                                // municipio 5 díg
+    else if (/^\d{1,2}$/.test(a) && /^\d{1,3}$/.test(b)) amb = a.padStart(2, '0') + b.padStart(3, '0'); // dep + mun
+    else if (/^\d{1,2}$/.test(a))                        amb = a.padStart(2, '0');               // depto
+
+    const url = `${BASE}/${corp}/${amb}.json`;
     let up;
     try {
       up = await fetch(url, {

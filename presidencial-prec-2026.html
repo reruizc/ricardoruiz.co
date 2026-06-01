@@ -454,7 +454,20 @@ function candColor(nombre, partido, idx){
   return PALETTE[(idx||0) % PALETTE.length];
 }
 
-let STATE = { dep:'00', data:null, autoTimer:null, boletines:[], demo:false, depWinners:{}, depCand:{}, depCandTs:0, mapCand:null, mapLevel:'dep', munWinners:{} };
+let STATE = { dep:'00', mun:null, data:null, autoTimer:null, boletines:[], demo:false, depWinners:{}, depCand:{}, depCandTs:0, mapCand:null, mapLevel:'dep', munWinners:{} };
+
+// Nombre del municipio (amb 5díg) desde el ganador o el GeoJSON del depto.
+function munNameFor(amb){
+  if (STATE.munWinners[amb] && STATE.munWinners[amb].mun) return STATE.munWinners[amb].mun;
+  const geo = munGeoCache[STATE.dep];
+  if (geo){ const f = geo.features.find(ft => ((ft.properties.dep_electoral||'')+(ft.properties.mun_elec||''))===amb); if (f) return f.properties.mpio_cnmbr; }
+  return amb;
+}
+// Etiqueta del ámbito activo (municipio · depto · Nacional).
+function scopeLabel(){
+  if (STATE.mun) return (munNameFor(STATE.mun)||STATE.mun) + ' · ' + (DANE_DEP[STATE.dep]||'');
+  return STATE.dep==='00' ? 'Nacional' : (DANE_DEP[STATE.dep]||STATE.dep);
+}
 
 // ════════════════════════ FETCH ════════════════════════
 function buildTarget(dep){
@@ -571,15 +584,14 @@ function render(){
     {l:'Líder',v:lider?lider.nombre.split(' ')[0]:'—',c:'sm',d:lider?`${(share1*100).toFixed(1)}% válidos`:''},
   ].map(k=>`<div class="kpi-card"><div class="kpi-label">${k.l}</div><div class="kpi-val ${k.c}">${k.v}</div><div class="kpi-delta">${k.d}</div></div>`).join('');
 
-  const scopeName = STATE.dep==='00'?'Nacional':(DANE_DEP[STATE.dep]||STATE.dep);
-  $('chart-title').textContent = `Resultado · ${scopeName}`;
+  $('chart-title').textContent = `Resultado · ${scopeLabel()}`;
   if (!SELECTED && lider) SELECTED = lider.nombre;
   renderVoteBars(cands, validos, gana1v);
   renderMetodo();
   if (CHART_MODE==='evo') renderEvoChart();
   updatePhotoCol();
 
-  if (STATE.dep!=='00' && lider){ STATE.depWinners[STATE.dep] = { nombre:lider.nombre, color:candColor(lider.nombre,lider.partido,0), pct:share1*100 }; }
+  if (STATE.dep!=='00' && !STATE.mun && lider){ STATE.depWinners[STATE.dep] = { nombre:lider.nombre, color:candColor(lider.nombre,lider.partido,0), pct:share1*100 }; }
   renderMap();
 }
 
@@ -601,6 +613,7 @@ function renderVoteBars(cands, validos, gana1v){
 
 async function selectCandidate(nombre, codpar){
   SELECTED = nombre;
+  if (STATE.mapLevel === 'mun'){ render(); return; }   // en municipios el mapa muestra ganadores, no el choropleth del candidato
   // Click en un candidato → mapa propio del candidato. Re-click del mismo → vuelve a líderes.
   if (codpar != null && codpar !== ''){
     if (String(STATE.mapCand) === String(codpar)){ STATE.mapCand = null; render(); return; }
@@ -790,7 +803,7 @@ function renderMap(){
       const cod=geoCode(f.properties);
       l.on('mouseover',()=>l.setStyle(Object.assign({}, _mapStyle(f), {fillOpacity:1})));
       l.on('mouseout',()=>l.setStyle(_mapStyle(f)));
-      l.on('click',()=>{ if(cod){ const s=$('dep-select'); if(s) s.value=cod; STATE.dep=cod; load(); } });
+      l.on('click',()=>{ if(cod){ const s=$('dep-select'); if(s) s.value=cod; STATE.dep=cod; STATE.mun=null; load(); } });
     }}).addTo(leafMap);
     try{ leafMap.fitBounds(geoLayer.getBounds(),{padding:[6,6],animate:false}); }catch(_){}
   } else { geoLayer.setStyle(styleFn); }
@@ -823,11 +836,13 @@ async function renderMunMap(){
   if (geoLayer && leafMap.hasLayer(geoLayer)) leafMap.removeLayer(geoLayer);   // oculta capa de deptos
   const paper3=cssVar('--paper-3'), rule=cssVar('--rule-strong');
   const codeOf = p => (p.dep_electoral||'') + (p.mun_elec||'');
-  const styleFn = f => { const w=STATE.munWinners[codeOf(f.properties)]; return { fillColor:w?w.color:paper3, fillOpacity:w?.85:.35, color:rule, weight:.8 }; };
+  const accent = cssVar('--accent');
+  const styleFn = f => { const code=codeOf(f.properties), w=STATE.munWinners[code], on=STATE.mun===code;
+    return { fillColor:w?w.color:paper3, fillOpacity:on?1:(w?.85:.35), color:on?accent:rule, weight:on?3:.8 }; };
   const ttHTML = f => { const p=f.properties, w=STATE.munWinners[codeOf(p)], nom=p.mpio_cnmbr||p.mun_elec||'—';
-    return `<b>${nom}</b><br>${w?w.nombre.split(' ').slice(0,2).join(' ')+' · '+w.pct.toFixed(1)+'%':'sin reporte'}`; };
+    return `<b>${nom}</b><br>${w?w.nombre.split(' ').slice(0,2).join(' ')+' · '+w.pct.toFixed(1)+'%':'sin reporte'} · <i>click = ver votos</i>`; };
   _munStyle = styleFn;
-  if (munLayer && _munLayerDep === dep){   // mismo depto (auto-refresh): solo recolorea, sin re-zoom
+  if (munLayer && _munLayerDep === dep){   // mismo depto (auto-refresh / drill): solo recolorea, sin re-zoom
     munLayer.setStyle(styleFn);
     munLayer.eachLayer(l=>{ const h=ttHTML(l.feature); if(l.getTooltip()) l.setTooltipContent(h); else l.bindTooltip(h,{className:'map-tt',sticky:false}); });
   } else {
@@ -835,14 +850,15 @@ async function renderMunMap(){
     munLayer = L.geoJSON(geo, { style:styleFn, onEachFeature:(f,l)=>{
       l.on('mouseover',()=>l.setStyle(Object.assign({}, _munStyle(f), {fillOpacity:1})));
       l.on('mouseout',()=>l.setStyle(_munStyle(f)));
+      l.on('click',()=>{ const code=codeOf(f.properties); STATE.mun = (STATE.mun===code) ? null : code; load(); });   // drill a municipio (toggle)
       l.bindTooltip(ttHTML(f),{className:'map-tt',sticky:false});
     }}).addTo(leafMap);
     _munLayerDep = dep;
     try{ leafMap.fitBounds(munLayer.getBounds(),{padding:[6,6],animate:false}); }catch(_){}
   }
   const rep=Object.keys(STATE.munWinners).length, tot=geo.features.length;
-  if(mt) mt.textContent='Mapa · municipios de '+(DANE_DEP[dep]||dep);
-  if(mh) mh.textContent='ganador por municipio';
+  if(mt) mt.textContent = STATE.mun ? ('Mapa · '+(munNameFor(STATE.mun)||'municipio')) : ('Mapa · municipios de '+(DANE_DEP[dep]||dep));
+  if(mh) mh.textContent = STATE.mun ? 'toca de nuevo el municipio para ver el depto' : 'click en un municipio = ver sus votos';
   if(ms) ms.textContent=`${rep} de ${tot} municipios reportados`;
   _syncMapLevelBtns();
 }
@@ -851,7 +867,11 @@ function _syncMapLevelBtns(){
   if(d) d.classList.toggle('active', STATE.mapLevel==='dep');
   if(m) m.classList.toggle('active', STATE.mapLevel==='mun');
 }
-function setMapLevel(level){ STATE.mapLevel = level; _syncMapLevelBtns(); renderMap(); }
+function setMapLevel(level){
+  STATE.mapLevel = level; _syncMapLevelBtns();
+  if (level==='dep' && STATE.mun){ STATE.mun=null; load(); return; }   // volver a Deptos sale del municipio
+  renderMap();
+}
 
 async function sweepDepartments(){
   if (sweeping) return; sweeping=true;
@@ -1059,15 +1079,18 @@ function renderCepedaVsPetroDepto(){
 function setStatus(msg, cls){ const s = $('status'); if (!s) return; s.className = cls || ''; s.textContent = msg; }
 
 async function load(){
-  setStatus('Consultando ' + buildTarget(STATE.dep) + ' …', 'load');
+  const scope = STATE.mun || STATE.dep;   // municipio (5díg) tiene prioridad sobre depto
+  setStatus('Consultando ' + buildTarget(scope) + ' …', 'load');
   try {
-    const ds = await fetchData(STATE.dep);
+    const ds = await fetchData(scope);
     const { cands, fuente } = extraerCandidatos(ds);
     const tot = extraerTotales(ds);
     if (tot.mesatota) MESAS_TOTAL = tot.mesatota;
     STATE.data = { cands, tot, fuente };
-    if (STATE.dep === '00') parseMapaGan(ds);   // colorea el mapa por departamento desde el JSON nacional
-    else parseMunMapaGan(ds);                   // ganador por municipio (para el toggle Municipios)
+    if (!STATE.mun){                            // solo recalcula ganadores del mapa cuando NO hay drill a municipio
+      if (STATE.dep === '00') parseMapaGan(ds); //   nacional → ganador por departamento
+      else parseMunMapaGan(ds);                 //   depto → ganador por municipio (toggle Municipios)
+    }
     render();
     captureBoletin(tot, cands);
     renderDefinicion();
@@ -1139,7 +1162,7 @@ function runDemo(){
   const sel = $('dep-select');
   [['00','Nacional (todos)'], ...Object.entries(DANE_DEP).sort((a,b)=>a[1].localeCompare(b[1],'es'))].forEach(([cod,nom]) => { const o=document.createElement('option'); o.value=cod; o.textContent=nom; sel.appendChild(o); });
 
-  sel.onchange = () => { STATE.dep = sel.value; load(); };
+  sel.onchange = () => { STATE.dep = sel.value; STATE.mun = null; load(); };
   $('btn-recompute').onclick = renderDefinicion;
   $('sigma').onchange = renderDefinicion;
   $('btn-reset-bol').onclick = () => resetBoletines(false);
