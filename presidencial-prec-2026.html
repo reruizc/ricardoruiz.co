@@ -366,7 +366,10 @@
       <div class="card-label">Comparación con 2022 (1ª vuelta) · <span id="cmp-scope">Nacional</span></div>
       <div id="cmp-body"><div class="mini-note">Carga un boletín (o usa el demo) para comparar contra 2022.</div></div>
       <div id="cmp-map-wrap" style="margin-top:1rem">
-        <div class="mini-lbl" id="cmp-map-title">Mapa del cambio de la izquierda · <span style="color:var(--ok)">verde</span> = Cepeda 26 sube vs Petro 22 · <span style="color:var(--danger)">rojo</span> = baja</div>
+        <div style="display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;margin-bottom:.5rem">
+          <div class="mini-lbl" id="cmp-map-title" style="margin-bottom:0">Mapa del cambio de la izquierda · <span style="color:var(--ok)">verde</span> = Cepeda 26 sube vs Petro 22 · <span style="color:var(--danger)">rojo</span> = baja</div>
+          <span class="toggle" id="cmp-level-tg" style="margin-left:auto"><button id="tg-cmp-dep" class="active" onclick="setCmpLevel('dep')">Deptos</button><button id="tg-cmp-mun" onclick="setCmpLevel('mun')">Municipios</button></span>
+        </div>
         <div class="cmp-map-box"><div id="cmp-map"></div></div>
       </div>
       <details class="raw" id="cmp-mun-wrap" style="margin-top:.8rem;display:none">
@@ -478,7 +481,7 @@ function candColor(nombre, partido, idx){
   return PALETTE[(idx||0) % PALETTE.length];
 }
 
-let STATE = { dep:'00', mun:null, data:null, autoTimer:null, boletines:[], demo:false, depWinners:{}, depCand:{}, depCandTs:0, mapCand:null, mapLevel:'dep', munWinners:{}, munCand:{}, munCandTs:{}, mapSwing:false };
+let STATE = { dep:'00', mun:null, data:null, autoTimer:null, boletines:[], demo:false, depWinners:{}, depCand:{}, depCandTs:0, mapCand:null, mapLevel:'dep', munWinners:{}, munCand:{}, munCandTs:{}, mapSwing:false, cmpLevel:'dep' };
 
 // Nombre del municipio (amb 5díg) desde el ganador o el GeoJSON del depto.
 function munNameFor(amb){
@@ -1074,12 +1077,19 @@ function initCmpMap(){
   if (!$('cmp-map')) return;
   try { cmpMap = L.map('cmp-map',{ zoomControl:false, attributionControl:false, scrollWheelZoom:false, dragging:false, doubleClickZoom:false, zoomAnimation:false, fadeAnimation:false, zoomSnap:0 }); cmpMap.setView([4.6,-73.5],5); } catch(_){}
 }
+function _syncCmpLevelBtns(){
+  const d=$('tg-cmp-dep'), m=$('tg-cmp-mun'), tg=$('cmp-level-tg');
+  if(d) d.classList.toggle('active', STATE.cmpLevel==='dep');
+  if(m) m.classList.toggle('active', STATE.cmpLevel==='mun');
+  if(tg) tg.style.display = (STATE.dep==='00') ? '' : 'none';   // a nivel depto siempre se ven sus municipios
+}
+function setCmpLevel(level){ STATE.cmpLevel = level; _syncCmpLevelBtns(); renderCmpMap(); }
 async function renderCmpMap(){
-  initCmpMap(); if (!cmpMap || !SWING_DATA) return;
+  initCmpMap(); _syncCmpLevelBtns(); if (!cmpMap || !SWING_DATA) return;
   const dep = STATE.dep;
   let key, geo, codeOf;
   if (dep !== '00'){ key = 'mun:'+dep; geo = await ensureMunGeo(dep); codeOf = f => (f.properties.dep_electoral||'')+(f.properties.mun_elec||''); }
-  else if (STATE.mapLevel === 'mun'){ key = 'nacmun'; geo = await ensureNacMunGeo(); codeOf = f => (f.properties.d||'')+(f.properties.m||''); }
+  else if (STATE.cmpLevel === 'mun'){ key = 'nacmun'; geo = await ensureNacMunGeo(); codeOf = f => (f.properties.d||'')+(f.properties.m||''); }
   else { key = 'dep'; geo = GEO; codeOf = f => geoCode(f.properties); }
   if (!geo) return;
   const lookup = {};
