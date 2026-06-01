@@ -174,6 +174,8 @@
   .map-tt{background:var(--paper)!important;border:1px solid var(--rule-strong)!important;color:var(--ink)!important;border-radius:8px!important;font-family:var(--mono)!important;font-size:11px!important;box-shadow:0 4px 18px rgba(0,0,0,.35)!important;}
   .map-tt b{font-family:var(--sans);}
   .map-foot{padding:.5rem .9rem;border-top:1px solid var(--rule);font-family:var(--mono);font-size:10.5px;color:var(--ink-3);display:flex;justify-content:space-between;align-items:center;gap:.5rem;}
+  .map-back-btn{position:absolute;top:.55rem;right:.55rem;z-index:500;font-family:var(--mono);font-size:11px;letter-spacing:.03em;color:var(--ink);background:var(--paper);border:1px solid var(--accent);border-radius:999px;padding:.42rem .85rem;cursor:none;box-shadow:0 2px 10px rgba(0,0,0,.3);transition:background .15s,color .15s;}
+  .map-back-btn:hover{background:var(--accent);color:var(--on-accent);}
 
   /* col gráfico */
   .chart-body{flex:1;display:flex;flex-direction:column;padding:.9rem 1rem;gap:.55rem;}
@@ -323,7 +325,7 @@
 
       <div class="h3col">
         <div class="h3head"><span class="h3title" id="map-title">Mapa · líder por departamento</span><span class="h3hint" id="map-hint">click = abrir departamento</span></div>
-        <div class="map-box"><div id="map"></div></div>
+        <div class="map-box"><div id="map"></div><button class="map-back-btn" id="map-back" onclick="goBack()" style="display:none">← Volver</button></div>
         <div class="map-foot"><span id="map-status">0 departamentos reportados</span><span style="display:flex;align-items:center;gap:.5rem"><span class="toggle" id="map-level"><button id="tg-lvl-dep" class="active" onclick="setMapLevel('dep')">Deptos</button><button id="tg-lvl-mun" onclick="setMapLevel('mun')">Municipios</button></span><button class="btn" id="btn-sweep" style="padding:.3rem .7rem;font-size:10px">Colorear todos</button></span></div>
       </div>
 
@@ -1014,10 +1016,11 @@ function goBack(){
   }
 }
 function _syncBackBtn(){
-  const b = $('btn-back-scope'); if (!b) return;
-  if (STATE.mun){ b.style.display = ''; b.textContent = '← Volver al departamento'; }
-  else if (STATE.dep !== '00'){ b.style.display = ''; b.textContent = '← Volver a Nacional'; }
-  else b.style.display = 'none';
+  let txt = null;
+  if (STATE.mun) txt = '← Volver al departamento';
+  else if (STATE.dep !== '00') txt = '← Volver a Nacional';
+  ['btn-back-scope','map-back'].forEach(id => { const b = $(id); if (!b) return;
+    b.style.display = txt ? '' : 'none'; if (txt) b.textContent = (id==='map-back') ? '← Volver' : txt; });
 }
 
 async function sweepDepartments(){
