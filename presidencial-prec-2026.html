@@ -268,6 +268,7 @@
     <div class="ambito-bar">
       <label for="dep-select">Ámbito</label>
       <select id="dep-select"></select>
+      <button class="btn" id="btn-back-scope" onclick="goBack()" style="display:none">← Volver</button>
       <span class="hint">o haz click en un departamento del mapa · se actualiza solo cada 90 s</span>
     </div>
 
@@ -607,6 +608,7 @@ function render(){
   updatePhotoCol();
 
   if (STATE.dep!=='00' && !STATE.mun && lider){ STATE.depWinners[STATE.dep] = { nombre:lider.nombre, color:candColor(lider.nombre,lider.partido,0), pct:share1*100 }; }
+  _syncBackBtn();
   renderMap();
 }
 
@@ -1003,6 +1005,21 @@ async function toggleSwing(){
   renderMap();
 }
 
+// Botón "Volver": municipio → departamento → nacional.
+function goBack(){
+  if (STATE.mun){ STATE.mun = null; load(); }
+  else if (STATE.dep !== '00'){
+    const s = $('dep-select'); if (s) s.value = '00';
+    STATE.dep = '00'; STATE.mun = null; STATE.mapSwing = false; STATE.mapCand = null; _syncSwingBtn(); load();
+  }
+}
+function _syncBackBtn(){
+  const b = $('btn-back-scope'); if (!b) return;
+  if (STATE.mun){ b.style.display = ''; b.textContent = '← Volver al departamento'; }
+  else if (STATE.dep !== '00'){ b.style.display = ''; b.textContent = '← Volver a Nacional'; }
+  else b.style.display = 'none';
+}
+
 async function sweepDepartments(){
   if (sweeping) return; sweeping=true;
   const btn=$('btn-sweep'), old=btn?btn.textContent:''; if(btn) btn.textContent='Cargando…';
@@ -1255,19 +1272,6 @@ async function load(){
     captureBoletin(tot, cands);
     renderDefinicion();
     renderCompare();
-
-    // Landing: de entrada, mapa del candidato GANADOR (su color por depto). Muestra
-    // líderes al instante y, cuando el barrido termina, pasa al choropleth del ganador
-    // — solo si el usuario no ha tocado nada todavía.
-    if (!STATE._landingDone && STATE.dep === '00' && !STATE.mun && cands.length){
-      STATE._landingDone = true;
-      const win = cands[0];
-      ensureDepCand().then(() => {
-        if (STATE.dep === '00' && !STATE.mun && !STATE.mapSwing && STATE.mapCand == null && win.codpar){
-          SELECTED = win.nombre; STATE.mapCand = String(win.codpar); render();
-        }
-      });
-    }
 
     const now = new Date();
     $('boletinLabel').textContent = (ds && ds.numact != null) ? '#' + ds.numact : '—';
