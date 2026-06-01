@@ -7,7 +7,7 @@
 <title>Presidencia · Preconteo 1V 2026 · Ricardo Ruiz</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Arima:wght@400;500;600;700&family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,400;1,500;1,600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Arima:wght@400;500;600;700&family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,400;1,500;1,600&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -58,7 +58,7 @@
   .logo-link{display:flex;align-items:center;gap:.55rem;}
   .logo-bars{display:flex;align-items:flex-end;gap:3px;height:18px;}
   .logo-bar{width:5px;background:var(--cafe);border-radius:1px 1px 0 0;opacity:.9;}
-  .logo-text{font-family:var(--sans);font-weight:800;font-size:clamp(1.1rem,2vw,1.4rem);letter-spacing:-.03em;color:var(--ink);line-height:1;}
+  .logo-text{font-family:'Syne',var(--sans);font-weight:800;font-size:clamp(1.1rem,2vw,1.4rem);letter-spacing:-.02em;color:var(--ink);line-height:1;}
   .logo-text span{color:var(--cafe);}
 
   /* HEAD + META */
@@ -827,20 +827,36 @@ async function ensureMunGeo(dep){
 async function initMap(){
   if (leafMap || typeof L==='undefined') return;
   try{
-    leafMap=L.map('map',{zoomControl:true,attributionControl:false,scrollWheelZoom:false,zoomAnimation:false,fadeAnimation:false});
+    leafMap=L.map('map',{zoomControl:true,attributionControl:false,scrollWheelZoom:false,zoomAnimation:false,fadeAnimation:false,zoomSnap:0,zoomDelta:0.5});
     leafMap.setView([4.6,-73.5],5);
     const r=await fetch(GEO_URL); GEO=await r.json();
+    leafMap.invalidateSize(false);   // tamaño real del contenedor antes del primer fitBounds
     renderMap();
+    setTimeout(refitNational, 500);  // re-encuadre cuando el layout ya está asentado
   }catch(e){ /* el mapa es opcional */ }
 }
 // Construye la capa UNA sola vez; en llamadas siguientes sólo re-colorea
 // (setStyle) y actualiza tooltips. fitBounds corre una única vez y sin
 // animación, para que recolorear no vuelva a hacer zoom ("drill down").
+// Encuadre del mapa nacional excluyendo San Andrés (isla a ~700 km que achica el continente).
+function _nationalBounds(){
+  if (!geoLayer) return null;
+  let b = null;
+  geoLayer.eachLayer(l => { const nm = norm((l.feature.properties && l.feature.properties.name) || '');
+    if (!nm.includes('san andres') && !nm.includes('providencia')){ const lb = l.getBounds(); if (lb && lb.isValid()) b = b ? b.extend(lb) : L.latLngBounds(lb.getSouthWest(), lb.getNorthEast()); } });
+  return (b && b.isValid()) ? b : (geoLayer ? geoLayer.getBounds() : null);
+}
+// Re-encuadra el mapa nacional (tras asentarse el layout o en resize) para que llene el contenedor.
+function refitNational(){
+  if (leafMap && geoLayer && STATE.mapLevel === 'dep' && !STATE.mun){
+    try { leafMap.invalidateSize(false); leafMap.fitBounds(_nationalBounds(), { padding:[2,2], animate:false }); } catch(_){}
+  }
+}
 function renderMap(){
   if (!leafMap || !GEO) return;
   if (STATE.mapLevel === 'mun' && STATE.dep !== '00'){ renderMunMap(); return; }
   if (munLayer && leafMap.hasLayer(munLayer)) leafMap.removeLayer(munLayer);   // veníamos de municipios
-  if (geoLayer && !leafMap.hasLayer(geoLayer)){ geoLayer.addTo(leafMap); try{ leafMap.fitBounds(geoLayer.getBounds(),{padding:[6,6],animate:false}); }catch(_){} }
+  if (geoLayer && !leafMap.hasLayer(geoLayer)){ geoLayer.addTo(leafMap); try{ leafMap.fitBounds(_nationalBounds(),{padding:[2,2],animate:false}); }catch(_){} }
   STATE.depWinners=STATE.depWinners||{};
   const paper3=cssVar('--paper-3'), rule=cssVar('--rule-strong'), okHex=cssVar('--ok'), dangerHex=cssVar('--danger');
 
@@ -873,7 +889,7 @@ function renderMap(){
       l.on('mouseout',()=>l.setStyle(_mapStyle(f)));
       l.on('click',()=>{ if(cod){ const s=$('dep-select'); if(s) s.value=cod; STATE.dep=cod; STATE.mun=null; STATE.mapSwing=false; STATE.mapCand=null; _syncSwingBtn(); load(); } });
     }}).addTo(leafMap);
-    try{ leafMap.fitBounds(geoLayer.getBounds(),{padding:[6,6],animate:false}); }catch(_){}
+    try{ leafMap.fitBounds(_nationalBounds(),{padding:[2,2],animate:false}); }catch(_){}
   } else { geoLayer.setStyle(styleFn); }
   geoLayer.eachLayer(l=>{ const f=l.feature, cod=geoCode(f.properties), nom=(f.properties&&f.properties.name)||cod||'—';
     let html;
@@ -1240,6 +1256,19 @@ async function load(){
     renderDefinicion();
     renderCompare();
 
+    // Landing: de entrada, mapa del candidato GANADOR (su color por depto). Muestra
+    // líderes al instante y, cuando el barrido termina, pasa al choropleth del ganador
+    // — solo si el usuario no ha tocado nada todavía.
+    if (!STATE._landingDone && STATE.dep === '00' && !STATE.mun && cands.length){
+      STATE._landingDone = true;
+      const win = cands[0];
+      ensureDepCand().then(() => {
+        if (STATE.dep === '00' && !STATE.mun && !STATE.mapSwing && STATE.mapCand == null && win.codpar){
+          SELECTED = win.nombre; STATE.mapCand = String(win.codpar); render();
+        }
+      });
+    }
+
     const now = new Date();
     $('boletinLabel').textContent = (ds && ds.numact != null) ? '#' + ds.numact : '—';
     $('lastUpdate').textContent = now.toLocaleDateString('es-CO') + ' · ' + now.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
@@ -1319,6 +1348,7 @@ function runDemo(){
   loadBoletines();
   if (STATE.boletines.length){ STATE.demo = STATE.boletines.some(b=>b.demo); renderDefinicion(); }
   loadSwingTop();   // ranking nacional de giro (JSON precomputado)
+  let _rzT; window.addEventListener('resize', () => { clearTimeout(_rzT); _rzT = setTimeout(refitNational, 250); });
   toggleAuto();   // auto-refresh ON por defecto: primera carga inmediata + cada 90 s
 
   const cur = $('cursor'), ring = $('cursorRing');
