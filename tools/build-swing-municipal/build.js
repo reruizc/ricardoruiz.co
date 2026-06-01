@@ -27,6 +27,7 @@ const HIST22_DEPTO = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardo
 const CEPEDA_CODPAR = '7';
 const CONCURRENCY = 8;
 const OUT = path.join(__dirname, '..', '..', 'Bases de datos', 'output_swing', 'swing-municipal.json');
+const OUT_RES = path.join(__dirname, '..', '..', 'Bases de datos', 'output_swing', 'resultados-municipal.json');
 
 const DANE_DEP = {
   '60':'Amazonas','01':'Antioquia','40':'Arauca','56':'San Andrés','03':'Atlántico',
@@ -83,6 +84,22 @@ function statsFrom(ds){
     win: winA ? { n: winnerName(winA), pct: winV/base*100 } : null };
 }
 
+// Resultados completos de un ámbito: votos por codpar + blanco/nulos/no marcados/válidos/votantes.
+function fullResults(ds){
+  const cam = (ds.camaras || []).find(c => c && (c.partotabla||[]).length);
+  const votos = {};
+  if (cam) for (const p of cam.partotabla){ const a = p.act || p; votos[String(a.codpar)] = parseInt(a.vot) || 0; }
+  const t = (ds.totales && ds.totales.act) || {};
+  return { votos, blanco: parseInt(t.votblan||t.votbla)||0, nulos: parseInt(t.votnul)||0,
+    nma: parseInt(t.votnma)||0, validos: parseInt(t.votval)||0, votantes: parseInt(t.votant)||0 };
+}
+// Lista global de candidatos {codpar, nombre} desde un partotabla.
+function candList(ds){
+  const cam = (ds.camaras || []).find(c => c && (c.partotabla||[]).length);
+  if (!cam) return [];
+  return cam.partotabla.map(p => { const a = p.act || p; return { codpar:String(a.codpar), n: winnerName(a) }; });
+}
+
 async function pool(items, fn){
   const out = []; let i = 0;
   async function w(){ while (i < items.length){ const idx = i++; out[idx] = await fn(items[idx], idx); } }
@@ -97,13 +114,14 @@ async function pool(items, fn){
 
   console.log('2) municipios + stats por departamento 2026…');
   const deps = Object.keys(DANE_DEP);
-  let boletin = null;
-  const munList = [], depStats = {};
-  try { const nac = await getJSON(`${WORKER}/presidente`); if (nac.numact != null) boletin = nac.numact; } catch(_){}   // boletín NACIONAL (no el contador por depto)
+  let boletin = null, candsGlobal = [];
+  const munList = [], depStats = {}, depFull = {};
+  try { const nac = await getJSON(`${WORKER}/presidente`); if (nac.numact != null) boletin = nac.numact; candsGlobal = candList(nac); } catch(_){}   // boletín + lista de candidatos NACIONAL
   await pool(deps, async (dep) => {
     try {
       const ds = await getJSON(`${WORKER}/presidente/${dep}`);
       depStats[dep] = statsFrom(ds);   // Cepeda 2026 + ganador del depto
+      depFull[dep] = fullResults(ds);  // todos los candidatos + blanco/nulos/no marcados
       const mg = ds.camaras && ds.camaras[0] && ds.camaras[0].mapagan;
       if (Array.isArray(mg)) for (const e of mg){ const amb = String(e.amb||''); if (amb.length===5) munList.push({ amb, mun: e.nombre || amb, dep: DANE_DEP[dep] }); }
     } catch(e){ console.log('   dep', dep, 'fail:', e.message); }
@@ -126,6 +144,7 @@ async function pool(items, fn){
       const ds = await getJSON(`${WORKER}/presidente/${m.amb}`);
       const c = statsFrom(ds);
       if (c){ m.cep26 = c.cep26; m.val26 = c.val26; m.mesesc = c.mesesc; m.win = c.win; ok++; }
+      m.full = fullResults(ds);   // todos los candidatos + blanco/nulos/no marcados
     } catch(_){}
     if (++done % 100 === 0) console.log(`   ${done}/${munList.length} (ok ${ok})`);
   });
@@ -144,6 +163,14 @@ async function pool(items, fn){
   const out = { v: new Date().toISOString(), boletin, total: rows.length, muns: rows, deps: depsOut };
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, JSON.stringify(out));
+
+  // resultados completos (todos los candidatos + blanco/nulos/no marcados) por depto y municipio
+  const resDeps = deps.filter(d => depFull[d]).map(d => ({ cod:d, dep:DANE_DEP[d], ...depFull[d] }));
+  const resMuns = munList.filter(m => m.full).map(m => ({ amb:m.amb, mun:m.mun, dep:m.dep, ...m.full }));
+  const outRes = { v: new Date().toISOString(), boletin, cands: candsGlobal, deps: resDeps, muns: resMuns };
+  fs.writeFileSync(OUT_RES, JSON.stringify(outRes));
+  console.log(`✓ resultados completos: ${resDeps.length} deptos + ${resMuns.length} muns → ${OUT_RES}`);
+
   console.log(`\n✓ ${rows.length} municipios con swing → ${OUT}`);
   console.log('  Top +5:', rows.slice(0,5).map(r=>`${r.mun}(${r.dep}) +${r.swing}`).join(' · '));
   console.log('  Top −5:', rows.slice(-5).reverse().map(r=>`${r.mun}(${r.dep}) ${r.swing}`).join(' · '));
