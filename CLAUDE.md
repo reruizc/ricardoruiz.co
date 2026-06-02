@@ -608,6 +608,210 @@ Las 3 consultas presidenciales 2026 (claves):
 Consulta Pacto Histórico 2025: ganó **Iván Cepeda** (consulta única, `GCS_2025CONSU.csv`).
 Todos los JSON tienen `por_circunscripcion: { NACIONAL: {...}, INDIGENAS: {...} }`.
 
+## Preconteo 1V 2026 por mesa — `PRECONTEO_REGIS_*.csv`
+
+Archivos crudos del preconteo de la Registraduría (noche del 31-may-2026), a
+nivel de **mesa**. Viven en `Bases de datos/nuevos archivos 1v 2026/`. Se
+usarán bastante mientras llega el escrutinio definitivo. **Tienen dos trampas
+graves: nombres de columna barajados y un swap de header entre snapshots.**
+
+### Cuál usar
+- **`PRECONTEO_REGIS_1780270247.csv`** → **el bueno** (snapshot casi final,
+  121.863 mesas, hasta 23:30). Sus totales cuadran con el oficial.
+- `PRECONTEO_REGIS_1780265633.csv` → snapshot parcial anterior (97.339 mesas,
+  hasta 22:12). **NO usar** salvo como histórico de la noche.
+- ⚠️ **El orden de columnas difiere entre los dos**: en 5633 el header es
+  `...,raul,abelardo,...` y en 0247 es `...,abelardo,raul,...` (las etiquetas
+  `abelardo`↔`raul` están intercambiadas entre archivos). No se puede reusar el
+  mismo mapeo para ambos. El mapeo de abajo es **solo para 0247**.
+
+### Columnas barajadas → candidato real (verificado por match exacto de totales)
+Las etiquetas del header NO corresponden al candidato. Mapeo para **0247**:
+```python
+NAME_0247 = {
+  'ivan':'Iván Cepeda', 'abelardo':'Abelardo De La Espriella',
+  'gustavo':'Paloma Valencia', 'paloma':'Sergio Fajardo',
+  'claudia':'Santiago Botero', 'raul':'Mauricio Lizcano',
+  'oscar':'Miguel Uribe', 'miguel':'Sondra Macollins',
+  'sondra':'Roy Barreras', 'sergio':'Gilberto Murillo',
+  'roy':'Carlos Caicedo', 'carlos':'Gustavo Matamoros',
+  'luis':'Claudia López',   # ⚠️ SIEMPRE 0 en el preconteo por mesa
+}
+# Solo la columna 'abelardo' coincide con su dato real; las otras 12 están barajadas.
+# Totales de control (0247): Cepeda 9.680.095 · Abelardo 10.346.010 ·
+# Paloma 1.637.665 · Fajardo 1.007.627 · Botero 206.024 · Lizcano 53.828.
+```
+
+### Claudia López NO está en el preconteo por mesa
+Su columna (`luis`) llega en **0 en las 121.863 mesas**. Sus ~225.287 votos
+reales (≈1%) **solo existen agregados a municipio** en `Base nombres corregidos
+primera vuelta 2026.csv` (ver abajo). Cualquier análisis barrio/puesto/mesa con
+este archivo dejará a Claudia en cero — hay que inyectarla aparte desde
+municipio.
+
+### Copia con nombres corregidos (ya generada)
+`Bases de datos/nuevos archivos 1v 2026/PRECONTEO_1V_2026_MESA_nombres_corregidos.csv`
+— copia de 0247 con los 13 nombres reales en el header, mismo formato (códigos
+quoted con ceros a la izquierda, BOM utf-8 para Excel). Claudia sigue en 0.
+
+### `Base nombres corregidos primera vuelta 2026.csv`
+Agregación **a municipio** (cols `Candidato, cod_departamento, cod_municipio,
+Llave mun, Suma de Votos`), ya con nombres propios. Misma cifra por candidato
+que las columnas de 0247 **+ Claudia López 225.287** traída de otra fuente.
+Total 23.657.546 (incluye blanco 406.805). Es la fuente de Claudia a municipio
+(la usa `build_excel2.py` del análisis Pacto).
+
+### Cobertura vs censo electoral 2026 (al corte 0247)
+Censo: **41.287.084 potencial · 13.746 puestos · 125.259 mesas**
+(`censos-puesto-2026.json` campo `nacional`+`porPuesto`; mesas en
+`COMUNAS_DATA.csv`, delimitado por `;`).
+- Potencial cubierto: **99,9%** (faltan 59.821).
+- Puestos con reporte: 13.707 / 13.746 → **39 puestos sin abrir** (0,3%).
+- Mesas: 121.863 reportadas → **~3.396 mesas pendientes** (2,7%, bajo potencial).
+- Participación nacional: **58,0%** (23.950.441 votantes).
+- Blanco 406.805 · nulos 245.324 · no marcados 47.571.
+- El preconteo trae **~698 puestos de más** que no están en el censo doméstico:
+  son **exterior/consulados + cárceles + puesto censo** (14.405 puestos en el
+  preconteo vs 13.746 del censo de COMUNAS_DATA, que es solo territorio nacional).
+
+### Esquema del CSV (23 columnas)
+`cod_departamento, cod_municipio, zona, puesto, num_mesa,` + 13 candidatos +
+`votos_blanco, votos_nulos, votos_no_marcados, total_votos_urna,
+fecha_actualizacion`. Códigos quoted (preservan ceros), votos sin comillas.
+Clave de mesa = `(cod_departamento, cod_municipio, zona, puesto, num_mesa)`;
+clave de puesto para cruzar con censo = `f"{dep}-{mun}-{zona}-{puesto}"`
+(coincide con las keys de `censos-puesto-2026.json`).
+
+> Distinto del `COL2CAND` de `tools/pacto-1v-2026/build_base_2026.py`: ese mapea
+> a slugs cortos (`cepeda`, `paloma`…) para el pipeline; el de aquí usa nombres
+> completos. Ambos describen el MISMO barajado de 0247.
+
+### Mapa Bogotá por localidad — `presidencial-prec-2026.html`
+
+El preconteo presidencial (`presidencial-prec-2026.html`) es un tracker en
+vivo del feed de la Registraduría (worker `registraduria-proxy`): mapa nacional
+→ click depto → municipios (vía `mapagan`). **Bogotá es un solo municipio
+(16-001)**, así que al abrir el depto NO hay municipios que mostrar. Para eso se
+agregó un mapa por **localidad** (20, no UPL):
+
+- En Bogotá la columna `zona` del preconteo == **localidad** (01..20) y coincide
+  1:1 con `LocCodigo` de `BOG-LOCALIDADX.json`. 90/98 (puesto-censo Corferias +
+  cárceles) NO son localidades → van a un bucket `especiales`, fuera del mapa.
+- El feed en vivo **no desagrega por localidad** (`/presidente/16001` trae
+  `mapagan` vacío), así que el coloreado sale de un **JSON estático del
+  preconteo final** (no live): `tools/build-bog-localidades-prec/build.py` lee
+  `PRECONTEO_1V_2026_MESA_nombres_corregidos.csv` y emite
+  `Bases de datos/output_prec_1v/bogota-localidades.json` (~9 KB). Cada
+  localidad: votos por slug de candidato (`cepeda`, `espriella`, `valencia`…
+  mismos keys que `candColor()`), `base` (válidos+blanco), `winner`,
+  `winner_pct`, mesas.
+- S3 (público, mismo prefijo del resto de la página):
+  `congreso-2026/output/prec-1v/bogota-localidades.json`. Regenerar:
+  ```bash
+  python3 tools/build-bog-localidades-prec/build.py
+  aws s3 cp "Bases de datos/output_prec_1v/bogota-localidades.json" \
+    "s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/prec-1v/bogota-localidades.json" \
+    --content-type "application/json" --cache-control "public, max-age=300"
+  ```
+- Frontend: `renderMunMap()` intercepta `STATE.dep==='16'` → `renderBogLocMap()`.
+  Reusa los 2 modos de pintado (líder / candidato `mapCand` por codpar→slug vía
+  `_candSlugFor`). Geo rotado 90° izq (`_rotBogGeo`, convención Bogotá del
+  proyecto). El swing vs Petro 22 NO está por localidad (hint lo aclara).
+  `_clearBogLoc()` limpia la capa al volver a nacional o cambiar de depto.
+  Re-pinta in-place (sin re-zoom) en el refresh de 90s y al cambiar de modo.
+- Resultado (ganador por localidad, snapshot final): **Cepeda** gana las 10 del
+  sur/centro (Usme, Bosa, Ciudad Bolívar, San Cristóbal, Rafael Uribe, Santa Fe,
+  Tunjuelito, Kennedy, Candelaria, Sumapaz); **Abelardo** las 10 del norte/occ
+  (Usaquén, Chapinero, Suba, Engativá, Fontibón, Teusaquillo, Barrios Unidos,
+  Puente Aranda, Antonio Nariño, Los Mártires). Ciudad: Cepeda 42.7%.
+
+## Entregable Pacto Histórico — informe 1V 2026 (`tools/pacto-1v-2026/`)
+
+Análisis para cliente del Pacto: **un solo Word con capítulos + resumen
+ejecutivo + Excel de soporte**. Diagnóstico de 1ª vuelta 2026 por bloque
+(Petro 2V-1V · Cepeda vs Petro · Centro/Oviedo · Derecha · Bogotá por estrato ·
+mapa de la 2ª vuelta · abstención). Salidas en
+`Bases de datos/output_pacto_1v_2026/` (gitignored).
+
+### Pipeline (orden de corrida)
+```
+build_base_2026.py   preconteo 0247 → master_2026_puesto.json (14.220 puestos, georef)
+build_base_2022.py   GCS 2022 1V+2V → master_2022_puesto.json
+engine.py / engine2.py  → blocks_all.json (depto + ciudad·comuna) + blocks_full.json
+                        (municipio + ciudad·barrio + muni_abst) + dif_2022.json
+                        (bogota_loc) + estrato_bogota.json (join puestos↔manzana SDP)
+build_maps.py        11 mapas m_*.png (coropletas + Bogotá rotada + UPL)
+build_charts.py      5 gráficos g_*.png (líneas/barras/dumbbell)
+build_report.py      → Analisis_Nacional_Electoral_Pacto_1V_2026.docx (incrusta Inter)
+build_excel2.py      → Soporte_Analisis_Pacto_1V_2026.xlsx (13 hojas)
+build_oviedo_docs.py bloque Oviedo (Excel + correlaciones)
+```
+Verificación visual: `soffice --headless --convert-to pdf` y leer el PDF.
+
+### Motor de mapas (`build_maps.py`) — geopandas + matplotlib
+- GeoJSON oficiales (los MISMOS de senado/cámara), cacheados en
+  `output_pacto_1v_2026/geo/`. Se bajan de S3
+  (`.../congreso-2026/output/mapas-2026/`): `DEPARTAMENTOS2.json` (33 deptos,
+  prop `name`), `Departamentos-mps/{cod}.json` (municipios, props
+  `dep_electoral`+`mun_elec` → clave `01001`), `Ciudades-COM-LOC/BOG-LOCALIDADX.json`
+  y `BOG-UPL.json` (33 UPL, prop `CODIGO_UPL`). Bajar con `aws s3 cp` (el loop
+  curl tuvo hipos; aws es robusto).
+- Match depto: por nombre normalizado + alias `Distrito Capital de Bogotá→Bogotá`,
+  `San Andrés y Providencia→San Andrés`. Vista nacional recortada al continente
+  (`xlim -79.3..-66.8`, `ylim -4.4..13.7`); barra de color al costado IZQUIERDO
+  (sobre el Pacífico, vacío) para no taparse con los llanos.
+- **Bogotá se rota 90° a la izquierda (CCW)** — convención de cómo se ve la
+  ciudad. Helper `rotate_gdf(g, 90)` (mismo giro que `rotateGeoJSON90Left` de
+  cámara/senado: `x'=cx-(lat-cy), y'=cy+(lon-cx)`). Aplica al mapa de estrato
+  (manzana, gpkg proyectado) y al de Cepeda por UPL.
+- **Cepeda por UPL**: spatial-join `sjoin_nearest` de los 1.038 puestos
+  georreferenciados contra `BOG-UPL.json`, agrega `cepeda/base` por UPL. Encuadre
+  a los puestos (urbano) para que las UPL rurales del sur no aplasten el mapa.
+- **Estrato Bogotá** (manzana): `manzana_estrato_bog.gpkg` (44.260 manzanas,
+  SDP/IDECA). Colores estrato 1→6 (rojo→azul, espejo del voto Cepeda↓/Abelardo↑).
+
+### Tipografía Inter incrustada en el Word
+**El informe Word usa Inter (no Helvetica) e incrusta la fuente** para que el
+cliente la vea idéntica en Windows/Office aunque no la tenga. El "saltarín" que
+veíamos era Helvetica Neue ausente en el cliente → sustitución glifo por glifo
+(tildes/ñ/guiones de otra fuente). Inter es la "Helvetica de hoy", gratis y de
+uso comercial.
+- TTF en `tools/pacto-1v-2026/fonts/Inter-{Regular,Bold,Italic}.ttf` (subset
+  latín, ~230 glifos). Instaladas en `~/Library/Fonts/` para que LibreOffice y
+  matplotlib las rendericen.
+- `build_report.py`: fuente en estilo Normal + **docDefaults** (clave para que
+  las celdas de tabla también hereden Inter). Tras `d.save()`, `embed_inter()`
+  incrusta los 3 TTF con la **obfuscación OOXML estándar** (XOR de los primeros
+  32 bytes con el GUID invertido) + `fontTable.xml` (`w:embedRegular/Bold/Italic`
+  + `w:fontKey`) + `fontTable.xml.rels` + `Default Extension="odttf"` en
+  Content-Types + `<w:embedTrueTypeFonts/>` en settings (va entre `zoom` y
+  `proofState`). Verificación: de-obfuscar el `.odttf` y confirmar magic
+  `00010000` (TTF válido) ⇒ Word lo leerá.
+- `build_maps.py` y `build_charts.py` registran Inter en matplotlib
+  (`font_manager.addfont` + `rcParams['font.family']='Inter'`) para que mapas y
+  gráficos vayan en la misma fuente.
+
+**⚠️ El subset latín de Inter NO trae flechas ni estrellas** (`→ ← ↔ ★ ✦`,
+U+2190-2194 salvo ↑↓, U+2605). En texto del Word o de los gráficos producen
+cajas (tofu). Usar `—` / `a` / `vs` / `–` en su lugar (ya aplicado: "2022 a
+2026", "Oviedo–Paloma"). Si en el futuro se necesita el set completo, instanciar
+Inter variable de Google Fonts a estáticas 400/700 con `fontTools.varLib.instancer`
+y reembeber.
+
+**⚠️⚠️ Inter es SOLO para el informe Word + sus mapas/gráficos. Las imágenes de
+redes / Instagram (`rrss/instagram/carousel.html`, `rrss/twitter/*`) CONSERVAN
+Helvetica + Arima y su formato propio** — se ven muy bien así y NO se tocan.
+No portar Inter ni este pipeline a las piezas de redes.
+
+### Bloque Oviedo (capítulo del Centro)
+Refuta la hipótesis del cliente (Paloma-1V = voto de Oviedo). Cruce mesa a mesa:
+del voto de Oviedo (1,26M, 2º Gran Consulta) **solo ~8% fue a Paloma**; ~67% a
+Cepeda, ~20% a Fajardo, ~5% a Abelardo (87% izquierda+centro). Correlaciones por
+puesto lo respaldan (Oviedo↔Fajardo +0,60, ↔Cepeda +0,32, ↔Abelardo −0,41,
+↔Paloma −0,12; en Bogotá ↔Paloma −0,57). Claim con **cota dura de King** (techo
+teórico ~64%) + nota honesta de lo que la inferencia ecológica no fija. Gráfico
+`g_oviedo_destino.png`.
+
 ## Tipografía
 | Uso | Familia | Peso |
 |-----|---------|------|

@@ -814,6 +814,7 @@ function renderEvoChart(){
 // ════════════════════ MAPA COLOMBIA ════════════════════
 let leafMap=null, geoLayer=null, GEO=null, sweeping=false, _mapStyle=null;
 let munLayer=null, _munStyle=null, _munLayerDep=null, nacMunLayer=null; const munGeoCache={};
+let bogLocLayer=null, _bogLocGeo=null, _bogLocData=null, _bogLocLoading=null, _bogLocStyle=null;   // Bogotá por localidad (preconteo)
 const GEO_URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/DEPARTAMENTOS2.json';
 const MPS_URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Departamentos-mps/';
 const NAME2CODE=(()=>{ const m={}; for(const cod in DANE_DEP) m[norm(DANE_DEP[cod])]=cod;
@@ -892,6 +893,7 @@ function renderMap(){
   if (STATE.mapLevel === 'mun' && STATE.dep !== '00'){ renderMunMap(); return; }
   if (nacMunLayer && leafMap.hasLayer(nacMunLayer)) leafMap.removeLayer(nacMunLayer);
   if (munLayer && leafMap.hasLayer(munLayer)) leafMap.removeLayer(munLayer);   // veníamos de municipios
+  _clearBogLoc();   // veníamos de Bogotá-localidades
   if (geoLayer && !leafMap.hasLayer(geoLayer)){ geoLayer.addTo(leafMap); try{ leafMap.fitBounds(_nationalBounds(),{padding:[2,2],animate:false}); }catch(_){} }
   STATE.depWinners=STATE.depWinners||{};
   const paper3=cssVar('--paper-3'), rule=cssVar('--rule-strong'), okHex=cssVar('--ok'), dangerHex=cssVar('--danger');
@@ -952,7 +954,9 @@ function renderMap(){
 // Mapa de municipios del departamento activo, coloreados por ganador (STATE.munWinners).
 async function renderMunMap(){
   if (!leafMap) return;
+  if (STATE.dep === '16'){ return renderBogLocMap(); }   // Bogotá → mapa por localidad (no hay muns)
   const dep = STATE.dep; if (dep==='00'){ STATE.mapLevel='dep'; renderMap(); return; }
+  _clearBogLoc();   // veníamos de Bogotá-localidades
   const geo = await ensureMunGeo(dep);
   const mt=$('map-title'), mh=$('map-hint'), ms=$('map-status');
   if (!geo){ if(ms) ms.textContent='no hay mapa municipal para este depto'; return; }
@@ -1021,6 +1025,7 @@ async function renderNacMunMap(){
   if (ms) ms.textContent = 'cargando municipios…';
   if (geoLayer && leafMap.hasLayer(geoLayer)) leafMap.removeLayer(geoLayer);
   if (munLayer && leafMap.hasLayer(munLayer)) leafMap.removeLayer(munLayer);
+  _clearBogLoc();
   const geo = await ensureNacMunGeo();
   if (!geo){ if(ms) ms.textContent='no se pudo cargar el mapa municipal'; return; }
   const winByAmb = {}; if (SWING_DATA) (SWING_DATA.muns||[]).forEach(r => { if (r.win) winByAmb[r.amb] = r; });
@@ -1041,6 +1046,104 @@ async function renderNacMunMap(){
   const n = Object.keys(winByAmb).length;
   if (ms) ms.textContent = n ? (n+' municipios · ganador') : 'sin datos de ganador';
   if (mh) mh.textContent = 'ganador por municipio (corte del ranking) · click = ver votos';
+  _syncMapLevelBtns();
+}
+
+// ════════════ BOGOTÁ · MAPA POR LOCALIDAD (preconteo 1V) ════════════
+// Bogotá es 1 solo municipio (16-001): al abrir el depto mostramos las 20
+// localidades. El feed en vivo no desagrega por localidad, así que el
+// coloreado sale de un JSON estático del preconteo final (zona == localidad,
+// 01..20 = LocCodigo de BOG-LOCALIDADX.json). 90/98 (Corferias/cárceles) no
+// son localidades y quedan fuera del mapa.
+const BOG_LOC_GEO_URL  = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json';
+const BOG_LOC_DATA_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/prec-1v/bogota-localidades.json';
+// Rotación 90° a la izquierda (convención del proyecto para Bogotá).
+function _rotBogGeo(geoData){
+  const cx=-74.08, cy=4.65, rc=([lon,lat])=>[cx-(lat-cy), cy+(lon-cx)];
+  const rg=g=>{ if(g.type==='Polygon') return {...g,coordinates:g.coordinates.map(r=>r.map(rc))};
+    if(g.type==='MultiPolygon') return {...g,coordinates:g.coordinates.map(p=>p.map(r=>r.map(rc)))}; return g; };
+  return {...geoData, features: geoData.features.map(f=>({...f, geometry: rg(f.geometry)}))};
+}
+async function ensureBogLoc(){
+  if (_bogLocGeo && _bogLocData) return true;
+  if (_bogLocLoading) return _bogLocLoading;
+  _bogLocLoading = (async () => {
+    try {
+      const [g,d] = await Promise.all([ fetch(BOG_LOC_GEO_URL).then(r=>r.json()), fetch(BOG_LOC_DATA_URL).then(r=>r.json()) ]);
+      _bogLocGeo = _rotBogGeo(g); _bogLocData = d; return true;
+    } catch(_){ return false; }
+  })();
+  try { return await _bogLocLoading; } finally { _bogLocLoading = null; }
+}
+// Slug (apellido) para casar el candidato del feed en vivo con el JSON estático.
+function _candSlugFor(nombre){
+  const n = norm(nombre);
+  const M = [['cepeda','cepeda'],['espriella','espriella'],['abelardo','espriella'],['valencia','valencia'],['paloma','valencia'],
+    ['fajardo','fajardo'],['lopez','lopez'],['claudia','lopez'],['barreras','barreras'],['roy','barreras'],
+    ['murillo','murillo'],['caicedo','caicedo'],['botero','botero'],['lizcano','lizcano'],
+    ['londoño','uribe'],['londono','uribe'],['uribe','uribe'],['macollins','macollins'],['matamoros','matamoros']];
+  for (const [k,s] of M) if (n.includes(k)) return s;
+  return null;
+}
+function _clearBogLoc(){ if (bogLocLayer && leafMap && leafMap.hasLayer(bogLocLayer)){ leafMap.removeLayer(bogLocLayer); } bogLocLayer=null; }
+async function renderBogLocMap(){
+  if (!leafMap) return;
+  const mt=$('map-title'), mh=$('map-hint'), ms=$('map-status');
+  if (mh) mh.textContent = 'cargando localidades de Bogotá…';
+  const ok = await ensureBogLoc();
+  if (!ok || !_bogLocData || STATE.dep !== '16'){ if(ms) ms.textContent='no se pudo cargar el preconteo por localidad'; return; }
+  // Oculta capas nacionales/municipales.
+  if (geoLayer && leafMap.hasLayer(geoLayer)) leafMap.removeLayer(geoLayer);
+  if (munLayer && leafMap.hasLayer(munLayer)){ leafMap.removeLayer(munLayer); munLayer=null; _munLayerDep=null; }
+  if (nacMunLayer && leafMap.hasLayer(nacMunLayer)) leafMap.removeLayer(nacMunLayer);
+
+  const paper3=cssVar('--paper-3'), rule=cssVar('--rule-strong');
+  const locs = _bogLocData.localidades || {};
+  const codeOf = p => String(p.LocCodigo||'').padStart(2,'0');
+
+  // Modo candidato: mapCand (codpar del feed) → slug → votos del JSON.
+  const mc = (!STATE.mapSwing) ? STATE.mapCand : null;
+  let candSlug=null, candNom='', candHex='#888', maxShare=0;
+  if (mc){
+    const cn = (STATE.data&&STATE.data.cands) ? STATE.data.cands.find(c=>String(c.codpar)===String(mc)) : null;
+    candNom = cn ? cn.nombre : '';
+    candSlug = _candSlugFor(candNom);
+    candHex = candColor(candNom,'',0);
+    if (candSlug) for (const cod in locs){ const L=locs[cod], sh=L.base?(L.votos[candSlug]||0)/L.base:0; if(sh>maxShare) maxShare=sh; }
+    maxShare = Math.max(0.0001, maxShare);
+  }
+  _bogLocStyle = f => { const cod=codeOf(f.properties), L=locs[cod];
+    if (!L) return { fillColor:paper3, fillOpacity:.25, color:rule, weight:1 };
+    if (mc && candSlug){ const sh=L.base?(L.votos[candSlug]||0)/L.base:0;
+      return { fillColor:candHex, fillOpacity: sh>0 ? 0.15+0.8*(sh/maxShare) : 0.06, color:rule, weight:1 }; }
+    return { fillColor: candColor(L.winner,'',0), fillOpacity:.85, color:rule, weight:1 };
+  };
+  const styleFn = _bogLocStyle;
+  const ttHTML = f => { const cod=codeOf(f.properties), L=locs[cod], nm=f.properties.LocNombre||cod;
+    if (!L) return `<b>${nm}</b><br>sin dato`;
+    if (mc && candSlug){ const v=L.votos[candSlug]||0, sh=L.base?v/L.base*100:0;
+      return `<b>${nm}</b><br>${(candNom.split(' ').slice(0,2).join(' '))} · ${sh.toFixed(1)}% · ${fmt(v)} votos`; }
+    return `<b>${nm}</b><br>1º ${L.winner.split(' ').slice(0,2).join(' ')} · ${(L.winner_pct||0).toFixed(1)}% · ${fmt(L.mesas)} mesas`;
+  };
+
+  if (bogLocLayer && leafMap.hasLayer(bogLocLayer)){   // ya pintado (refresh 90s / cambio de modo): re-colorea sin re-zoom
+    bogLocLayer.setStyle(styleFn);
+    bogLocLayer.eachLayer(l=>{ const h=ttHTML(l.feature); if(l.getTooltip()) l.setTooltipContent(h); else l.bindTooltip(h,{className:'map-tt',sticky:false}); });
+  } else {
+    _clearBogLoc();
+    bogLocLayer = L.geoJSON(_bogLocGeo, { style:styleFn, onEachFeature:(f,l)=>{
+      l.on('mouseover',()=>l.setStyle(Object.assign({}, _bogLocStyle(f), {fillOpacity:1, weight:2, color:'#fff'})));
+      l.on('mouseout',()=>l.setStyle(_bogLocStyle(f)));
+      l.bindTooltip(ttHTML(f),{className:'map-tt',sticky:false});
+    }}).addTo(leafMap);
+    try{ leafMap.invalidateSize(false); leafMap.fitBounds(bogLocLayer.getBounds(),{padding:[8,8],animate:false}); }catch(_){}
+  }
+
+  if (mt) mt.textContent = mc ? ('Mapa · '+(candNom.split(' ').slice(0,2).join(' ')||'candidato')+' · Bogotá por localidad')
+                              : 'Mapa · líder por localidad · Bogotá';
+  if (mh) mh.textContent = STATE.mapSwing ? 'el cambio vs 2022 no está disponible por localidad'
+                          : (mc ? '% del candidato por localidad · preconteo final' : 'preconteo final · 20 localidades');
+  if (ms) ms.textContent = `${Object.keys(locs).length} localidades · preconteo final`;
   _syncMapLevelBtns();
 }
 function _syncMapLevelBtns(){
