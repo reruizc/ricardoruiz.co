@@ -98,7 +98,7 @@ function rot(g){const cx=-74.08,cy=4.65;const rc=([lo,la])=>[cx-(la-cy),cy+(lo-c
  return{...g,features:g.features.map(f=>({...f,geometry:rg(f.geometry)}))};}
 function shade(hex,t){const c=parseInt(hex.slice(1),16);let r=c>>16,g=(c>>8)&255,b=c&255;r=Math.round(r+(255-r)*(1-t)*.0+(0-r)*0);return hex;}
 function fillFor(win,pct){const r=win==='Abelardo'?['#9db4f5','#5b82ef','#3a5bd0','#1f2a8c']:(win==='Cepeda'?['#f2a59d','#e2685c','#cf4135','#9c1e15']:['#fb923c','#fb923c','#fb923c','#fb923c']);return r[pct<40?0:pct<50?1:pct<60?2:3];}
-const map=L.map('map',{center:[4.66,-74.05],zoom:11,scrollWheelZoom:true,zoomControl:true,attributionControl:false});
+const map=L.map('map',{center:[4.66,-74.05],zoom:11,zoomSnap:0,attributionControl:false,zoomControl:false,scrollWheelZoom:false,doubleClickZoom:false,boxZoom:false,dragging:false,touchZoom:false,keyboard:false});
 fetch(GEO_URL).then(r=>r.json()).then(geo=>{
  geo=rot(geo);
  const layer=L.geoJSON(geo,{style:f=>{const code=f.properties.codigo;const v=BARRIOS[code];
@@ -117,6 +117,7 @@ fetch(GEO_URL).then(r=>r.json()).then(geo=>{
    l.on('mouseover',()=>l.setStyle({weight:2,color:'#fff'}));l.on('mouseout',()=>l.setStyle({weight:.5,color:'rgba(255,255,255,.18)'}));}
  }).addTo(map);
  map.fitBounds(layer.getBounds(),{padding:[10,10]});
+ map.setZoom(map.getZoom()+Math.log2(1.05)); // +5% de zoom
 }).catch(e=>{document.getElementById('map').innerHTML='<div style="padding:2rem;color:#fb923c;font-family:Avenir">No se pudo cargar la cartografía: '+e.message+'</div>';});
 // tops
 const arr=Object.values(BARRIOS).filter(v=>v.urna>200);
