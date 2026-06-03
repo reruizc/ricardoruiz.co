@@ -20,13 +20,13 @@ Fuente: preconteo Registraduría 1V × cartografía catastral; comparación con 
 → Hipotecho (Kennedy): 55 % → 32 %
 → Galerías (Teusaquillo): 67 % → 46 %
 
-**7/** No son casos sueltos: **137 barrios pasaron de ganar Petro (2022) a ganar Abelardo (2026)**. La franja media —Fontibón, Engativá, Puente Aranda, Barrios Unidos— fue el verdadero campo de batalla, y se rompió hacia la derecha.
+**7/** No son casos sueltos: **136 barrios pasaron de ganar Petro (2022) a ganar Abelardo (2026)**. La franja media —Fontibón, Engativá, Puente Aranda, Barrios Unidos— fue el verdadero campo de batalla, y se rompió hacia la derecha.
 
 **8/** Pero el piso de la izquierda aguantó. En el sur profundo Cepeda igualó o superó a Petro: Desarrollo Brazuelos (Petro 68 → Cepeda 70), La Gloria, Argelia. E incluso creció donde era débil, como El Campín (+8 pp).
 
 **9/** El mapa de Bogotá 2026 es, en el fondo, un **mapa de ingreso**: norte rico → Abelardo, sur popular → Cepeda, las cuadras de élite → Paloma. Y el centro de la ciudad, que define la elección, se corrió a la derecha.
 
-**10/** Todo el mapa interactivo —557 barrios, pasa el cursor y ves cada resultado— y la metodología (preconteo por mesa × cartografía catastral):
+**10/** Todo el mapa interactivo —625 barrios, pasa el cursor y ves cada resultado— y la metodología (preconteo por mesa × cartografía catastral):
 👉 ricardoruiz.co/bogota-1v-barrios.html
 
 ---
