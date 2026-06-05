@@ -1148,6 +1148,19 @@ const PRIVATE_TOOLS = [
     allowedEmails: ['reruizc@gmail.com', 'nuevagemela@gmail.com'],
   },
   {
+    id: 'narrativas-lab',
+    group: 'encargos',
+    name: 'Narrativas Lab',
+    expediente: 'RR-NARR-BOG',
+    eyebrow: 'Borrador · agencia de comunicación',
+    titleHTML: 'Narrativas <em>Lab</em>',
+    desc: 'Laboratorio para construir narrativas, testearlas contra audiencias reales cruzadas con arquetipos, emociones y contexto socioeconómico de Bogotá, y afinarlas antes de hacerlas públicas. Borrador para presentación a financiador · datos simulados.',
+    href: 'narrativas-lab.html',
+    cta: 'Abrir borrador ↗',
+    note: 'Privado · borrador · datos simulados',
+    allowedEmails: ['reruizc@gmail.com', 'frp1978@gmail.com', 'nuevagemela@gmail.com'],
+  },
+  {
     id: 'admin-analytics',
     group: 'admin',
     name: 'Analítica del sitio',
@@ -1385,7 +1398,8 @@ function formatTime() {
 }
 function formatNewsDate(iso) {
   if (!iso) return { d:'—', m:'—', y:'' };
-  const d = new Date(iso);
+  /* 'YYYY-MM-DD' se parsea como UTC y desfasa el día en TZ negativas → fijar mediodía local */
+  const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso + 'T12:00:00' : iso);
   if (isNaN(d.getTime())) return { d:iso, m:'', y:'' };
   const lang = getLang();
   if (lang === 'us') {
@@ -1563,7 +1577,7 @@ function render() {
     newsList.innerHTML = NEWS.map(n => {
       const fd = formatNewsDate(n.date);
       const tagClass = n.plan === 'pro' ? 'pro' : (n.plan === 'premium' ? 'premium' : 'free');
-      const tagLabel = n.plan === 'pro' ? PLANS.pro.label : (n.plan === 'premium' ? PLANS.premium.label : PLANS.free.label);
+      const tagLabel = n.tag ? n.tag : (n.plan === 'pro' ? PLANS.pro.label : (n.plan === 'premium' ? PLANS.premium.label : PLANS.free.label));
       return `
         <div class="news-item">
           <div class="news-date">${fd.d}<br>${fd.m}<span class="y">${fd.y}</span></div>
@@ -1630,17 +1644,49 @@ function render() {
   if (cancelConfirmEl) cancelConfirmEl.textContent = t.cancelConfirm;
 }
 
-/* ─── NEWS LOADER ─── */
+/* ─── NEWS LOADER ───────────────────────────────────────────────
+   Lee directo de noticias.html (la superficie real de publicación) para
+   que el dashboard SIEMPRE muestre la última noticia que sale. Cae a
+   noticias.json solo si no se puede leer/parsear el HTML. */
+const NEWS_MONTHS = { ene:0, feb:1, mar:2, abr:3, may:4, jun:5, jul:6, ago:7, sep:8, oct:9, nov:10, dic:11 };
+function parseNewsDate(txt) {
+  const m = String(txt || '').match(/(\d{1,2})\s+([A-Za-zÁÉÍÓÚáéíóúñ]{3,})\.?\s+(\d{4})/);
+  if (!m) return '';
+  const mo = NEWS_MONTHS[m[2].slice(0, 3).toLowerCase()];
+  if (mo == null) return '';
+  return `${m[3]}-${String(mo + 1).padStart(2, '0')}-${String(+m[1]).padStart(2, '0')}`;
+}
 async function loadNews() {
+  let items = [];
   try {
-    const res = await fetch('noticias.json', { cache: 'no-store' });
-    if (!res.ok) return;
-    const data = await res.json();
-    const items = Array.isArray(data) ? data : (data.items || []);
-    items.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
-    NEWS = items.slice(0, 5);
-    render();
+    const res = await fetch('noticias.html', { cache: 'no-store' });
+    if (res.ok) {
+      const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+      items = [...doc.querySelectorAll('article.article')].map(a => {
+        const title = (a.querySelector('.article-title')?.textContent || '').trim();
+        const p = a.querySelector('.article-body p');
+        let desc = (p?.textContent || '').replace(/\s+/g, ' ').trim();
+        if (desc.length > 240) desc = desc.slice(0, 237).trim() + '…';
+        return {
+          date: parseNewsDate(a.querySelector('.article-date')?.textContent),
+          title,
+          desc,
+          tag: (a.querySelector('.article-tag')?.textContent || '').trim(),
+          plan: 'free',
+        };
+      }).filter(x => x.title);
+    }
   } catch {}
+  if (!items.length) {
+    /* fallback: JSON estático */
+    try {
+      const res = await fetch('noticias.json', { cache: 'no-store' });
+      if (res.ok) { const data = await res.json(); items = Array.isArray(data) ? data : (data.items || []); }
+    } catch {}
+  }
+  items.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+  NEWS = items.slice(0, 5);
+  render();
 }
 
 /* ─── CANCEL PLAN ─── */
