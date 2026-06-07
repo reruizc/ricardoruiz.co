@@ -998,10 +998,11 @@
         desc:'Resultados por mesa de la primera vuelta presidencial. Cobertura nacional + consulados. Columnas estándar GCS (depto, mun, zona, puesto, mesa, candidato, partido, votos).',
         destacado:true,
         años:[
-          { año:2010, mb:96,  archivo:'presidencial-1v/2010/GCS_2010PRES1V.csv', xlsx:true, puesto:true },
-          { año:2014, mb:93,  archivo:'presidencial-1v/2014/GCS_2014PRES1V.csv', xlsx:true, puesto:true },
-          { año:2018, mb:107, archivo:'presidencial-1v/2018/GCS_2018PRES1V.csv', xlsx:true, puesto:true },
-          { año:2022, mb:101, archivo:'presidencial-1v/2022/GCS_2022PRES1V.csv', xlsx:true, puesto:true },
+          // pres-1V: el XLSX amigable (nombres + estilo) es el de PUESTO. Mesa queda solo CSV (crudo, avanzados).
+          { año:2010, mb:96,  archivo:'presidencial-1v/2010/GCS_2010PRES1V.csv', xlsx:false, puesto:true },
+          { año:2014, mb:93,  archivo:'presidencial-1v/2014/GCS_2014PRES1V.csv', xlsx:false, puesto:true },
+          { año:2018, mb:107, archivo:'presidencial-1v/2018/GCS_2018PRES1V.csv', xlsx:false, puesto:true },
+          { año:2022, mb:101, archivo:'presidencial-1v/2022/GCS_2022PRES1V.csv', xlsx:false, puesto:true },
         ]},
       { id:'pres2v', nombre:'Presidencial · Segunda vuelta',
         desc:'Resultados por mesa de la segunda vuelta presidencial. Solo años con balotaje.',
@@ -1070,8 +1071,12 @@
     window._userPlan  = 'anon';
     window._isPremium = false;
     window._isAdmin   = false;
+    window._isFullAccess = false;
     // Whitelist de emails admin. Equivalentes al gate de admin-* pages.
     const ADMIN_EMAILS = ['reruizc@gmail.com'];
+    // Acceso total (colaboradores de confianza, sin ser admin del sitio):
+    // bypass del gate de plan y de la cuota de crudos. Descargas ilimitadas.
+    const FULL_ACCESS_EMAILS = ['nuevagemela@gmail.com'];   // Nury Gómez
 
     // ─── CUOTA PREMIUM · 1 descarga por cuenta, ÚNICA (no renovable) ──────────
     // Premium incluye 1 archivo histórico de muestra de por vida. Para acceder
@@ -1093,11 +1098,11 @@
       catch(e) { return []; }
     }
     function rawCanDownload() {
-      if (window._isAdmin) return true;  // admins sin límites
+      if (window._isFullAccess) return true;  // admins + acceso total: sin límites
       return window._isPremium && getRawDownloadsLifetime().length < PREMIUM_RAW_QUOTA_TOTAL;
     }
     function recordRawDownload(catId, año, file) {
-      if (window._isAdmin) return;  // admins no consumen cuota
+      if (window._isFullAccess) return;  // admins + acceso total no consumen cuota
       const arr = getRawDownloadsLifetime();
       arr.push({ catId, año, file, ts: new Date().toISOString() });
       localStorage.setItem(_rawAccountKey(), JSON.stringify(arr));
@@ -1111,6 +1116,16 @@
             <div class="crudo-banner-title">Acceso administrador · descargas sin límite</div>
             <div class="crudo-banner-body">
               Estás autenticado como <b>administrador</b> (${(JSON.parse(localStorage.getItem('rr-user')||'null')?.email)||''}). Puedes descargar cualquier archivo del catálogo histórico, en cualquier granularidad y formato, sin consumo de cuota ni tope. Las descargas no se contabilizan localmente.
+            </div>
+          </div>`;
+      }
+      // ── ACCESO TOTAL (colaborador de confianza, no admin) ──
+      if (window._isFullAccess) {
+        return `
+          <div class="crudo-banner premium">
+            <div class="crudo-banner-title">Acceso total · descargas sin límite</div>
+            <div class="crudo-banner-body">
+              Tienes <b>acceso total</b> al catálogo histórico de crudos. Puedes descargar cualquier archivo, en cualquier granularidad (mesa o puesto) y formato (CSV o XLSX), <b>sin tope ni consumo de cuota</b>.
             </div>
           </div>`;
       }
@@ -1311,10 +1326,10 @@
       const ref = opciones[0].target;   // referencia (mesa csv)
       const scope = `${cat.nombre} · ${año}${extra?` · ${extra}`:''}`;
       const tagEl = document.getElementById('confirm-tag');
-      if (tagEl) tagEl.textContent = window._isAdmin ? 'Descarga · Acceso administrador' : 'Confirmar descarga · Premium';
+      if (tagEl) tagEl.textContent = window._isFullAccess ? 'Descarga · Acceso total' : 'Confirmar descarga · Premium';
       title.textContent = `Descargar: ${scope}`;
-      sub.innerHTML = window._isAdmin
-        ? `Estás autenticado como <b>administrador</b>. Esta descarga no consume cuota.`
+      sub.innerHTML = window._isFullAccess
+        ? `Tienes <b>acceso total</b> al catálogo. Esta descarga no consume cuota.`
         : `Esta acción <b>usa tu descarga histórica de muestra</b> (cuota Premium · 1 archivo por cuenta, <b>no renovable</b>). Elige granularidad y formato — solo se cobra como una descarga. Cuando confirmes, los demás archivos quedarán reservados al <b>Plan Datos</b>.`;
       meta.innerHTML = `
         <span>${ref.file.replace(/\.csv$/,'')} · referencia ${fmtMB(ref.mb)} CSV mesa</span>
@@ -1441,10 +1456,13 @@
       // Plan global para gate de crudos
       window._userPlan  = (token && user && user.plan) ? user.plan.toLowerCase() : 'anon';
       window._isPremium = ['premium','full'].includes(window._userPlan);
+      const _email = (token && user && user.email) ? user.email.toLowerCase() : '';
       // Admins (whitelist por email): sin límites de descarga + acceso a todos los tiers.
-      window._isAdmin   = !!(token && user && user.email && ADMIN_EMAILS.includes(user.email.toLowerCase()));
-      // Admins se tratan como Premium para el resto del gate.
-      if (window._isAdmin) window._isPremium = true;
+      window._isAdmin   = !!(_email && ADMIN_EMAILS.includes(_email));
+      // Acceso total: admins + colaboradores whitelisted. Bypass de plan y cuota.
+      window._isFullAccess = window._isAdmin || (!!_email && FULL_ACCESS_EMAILS.includes(_email));
+      // Acceso total se trata como Premium para el resto del gate.
+      if (window._isFullAccess) window._isPremium = true;
 
       // Render nav auth bar
       if (authEl) {
@@ -1461,8 +1479,8 @@
         }
       }
 
-      // Pro/Premium gate
-      const isPaid = token && user && user.plan && ['pro','premium','full'].includes(user.plan.toLowerCase());
+      // Pro/Premium gate (acceso total lo bypassa por completo)
+      const isPaid = window._isFullAccess || (token && user && user.plan && ['pro','premium','full'].includes(user.plan.toLowerCase()));
       if (!isPaid) {
         // Disable all download buttons
         document.querySelectorAll('.dl-btn, .dept-dl-btn').forEach(btn => {
