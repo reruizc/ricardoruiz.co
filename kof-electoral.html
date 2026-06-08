@@ -378,11 +378,6 @@
   .btn.ghost{background:rgba(0,0,0,.5); color:#fff; box-shadow:0 5px 0 rgba(0,0,0,.6)}
   .btn-row{display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-top:14px}
 
-  /* ============== FIGHT placeholder ============== */
-  #scr-fight{align-items:center; justify-content:center; text-align:center; padding:6%}
-  .fight-round{font-family:'Anton'; font-size:clamp(16px,3.4vw,40px); color:var(--gold); letter-spacing:2px; -webkit-text-stroke:1px #000; text-shadow:0 4px 0 #000}
-  .fight-match{font-family:'Anton'; font-size:clamp(20px,4.6vw,56px); color:#fff; -webkit-text-stroke:2px #000; text-shadow:0 5px 0 #000; margin:10px 0; line-height:1.05}
-  .fight-soon{font-size:clamp(8px,1.5vw,13px); color:#cbe0ff; letter-spacing:2px; margin-top:10px; line-height:2}
 
   /* FIGHT flash */
   #flash{
@@ -396,6 +391,26 @@
     animation:fightzoom .5s ease;
   }
   @keyframes fightzoom{0%{transform:scale(.2) rotate(-8deg); opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+
+  /* ===== Pantalla de pelea (motor) ===== */
+  #scr-fight{position:relative; overflow:hidden; background:#000}
+  #fcanvas{position:absolute; inset:0; width:100%; height:100%; display:block}
+  #fight-hud{position:absolute; top:0; left:0; right:0; z-index:20; display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:10px 14px 0; pointer-events:none}
+  .fbar-wrap{flex:1 1 0; min-width:0}
+  .fbar-wrap.right{display:flex; flex-direction:column; align-items:flex-end}
+  .fbar-name{font-family:'Press Start 2P'; font-size:clamp(7px,1.3vw,12px); color:#fff; letter-spacing:1px; text-shadow:0 2px 0 #000; margin-bottom:5px}
+  .fbar{height:clamp(11px,2vw,18px); width:64%; background:rgba(0,0,0,.55); border:2px solid #000; box-shadow:0 0 0 2px rgba(255,255,255,.3), 0 3px 0 rgba(0,0,0,.5); position:relative; overflow:hidden; transform:skewX(-12deg)}
+  .fbar-wrap.right .fbar{margin-left:auto}
+  .fbar-fill{position:absolute; top:0; bottom:0; left:0; width:100%; background:linear-gradient(#fff3a0,#ffd23e 45%,#ff8a1e); transition:width .14s linear}
+  .fbar-wrap.right .fbar-fill{left:auto; right:0}
+  .ftimer{flex:0 0 auto; font-family:'Anton'; font-size:clamp(24px,5vw,54px); color:#fff; -webkit-text-stroke:2px #000; text-shadow:0 3px 0 #000; line-height:1; padding-top:2px}
+  .ftimer.low{color:#ff3b2e}
+  #fight-center-msg{position:absolute; inset:0; z-index:25; display:flex; align-items:center; justify-content:center; pointer-events:none; font-family:'Anton'; font-size:clamp(40px,12vw,150px); color:var(--gold); -webkit-text-stroke:4px #000; text-shadow:0 0 30px rgba(0,0,0,.85); opacity:0}
+  #fight-center-msg.show{opacity:1; animation:fmsg .45s ease}
+  @keyframes fmsg{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+  #fight-hint{position:absolute; left:0; right:0; bottom:6px; z-index:20; text-align:center; font-size:clamp(6px,1.05vw,10px); color:#e9e3d3; letter-spacing:1px; text-shadow:0 2px 0 #000; opacity:.85; pointer-events:none}
+  #fight-end{position:absolute; inset:0; z-index:30; display:none; flex-direction:column; align-items:center; justify-content:center; gap:14px; background:rgba(4,6,14,.72)}
+  .fight-result{font-family:'Anton'; font-size:clamp(26px,7vw,72px); color:#fff; -webkit-text-stroke:2px #000; text-shadow:0 5px 0 #000}
 
   .credit-note{
     position:absolute; bottom:2px; left:0; right:0; z-index:40; text-align:center;
@@ -507,17 +522,28 @@
     </section>
 
     <!-- ============ FIGHT placeholder ============ -->
-    <section id="scr-fight" class="screen bg-versus">
-      <div class="fight-round">PRIMER COMBATE · ROUND 1</div>
-      <div class="fight-match" id="fight-match">— VS —</div>
-      <div class="fight-soon" id="fight-soon">
-        🥊 EL COMBATE LLEGA PRONTO 🥊<br>
-        (motor de pelea en construcción)
+    <section id="scr-fight" class="screen">
+      <canvas id="fcanvas"></canvas>
+      <div id="fight-hud">
+        <div class="fbar-wrap left">
+          <div class="fbar-name" id="fname-l">JUGADOR</div>
+          <div class="fbar"><i class="fbar-fill" id="fhp-l"></i></div>
+        </div>
+        <div class="ftimer" id="ftimer">60</div>
+        <div class="fbar-wrap right">
+          <div class="fbar-name" id="fname-r">RIVAL</div>
+          <div class="fbar"><i class="fbar-fill" id="fhp-r"></i></div>
+        </div>
       </div>
-      <div class="btn-row">
-        <button class="btn" id="btn-rerival">OTRO RIVAL</button>
-        <button class="btn ghost" id="btn-rechar">CAMBIAR CANDIDATO</button>
-        <button class="btn ghost" id="btn-restart">VOLVER AL INICIO</button>
+      <div id="fight-center-msg"></div>
+      <div id="fight-hint">← → mover · ↑ saltar · A puño · S patada · ↓ cubrir</div>
+      <div id="fight-end">
+        <div class="fight-result" id="fight-result">K.O.</div>
+        <div class="btn-row">
+          <button class="btn" id="fb-rematch">REVANCHA</button>
+          <button class="btn ghost" id="fb-char">CAMBIAR CANDIDATO</button>
+          <button class="btn ghost" id="fb-title">INICIO</button>
+        </div>
       </div>
     </section>
 
@@ -574,6 +600,11 @@
   const RICARDO = { id:'ricardo', name:'RICARDO RUIZ', short:'RICARDO', ini:'RR',
     color:'#0047FF', accent:'#86c5ff',
     line:'Los datos pueden decir muchas cosas, pero la decisión es del votante. Mira cómo se juega y luego escoge tu candidato.' };
+
+  /* PROTOTIPO del motor de pelea: fuerza rival = Ricardo y escenario = Medellín,
+     porque por ahora solo hay poses de pelea de abelardo y ricardo.
+     Cuando haya poses de todos, poner PROTO.on=false para rival/escenario al azar. */
+  const PROTO = { on:true, stageId:'medellin' };
 
   const $  = s => document.querySelector(s);
   const rnd = n => Math.floor(Math.random()*n);
@@ -646,6 +677,7 @@
     document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
     $('#scr-'+id).classList.add('active');
     clearInterval(selTimer); clearInterval(rollIv); clearInterval(qflipIv); clearInterval(stageRollIv);
+    if(fRAF && id!=='fight'){ cancelAnimationFrame(fRAF); fRAF=null; }
     if(id==='title'){ enterTitle(); }
     if(id==='howto'){ playMusic('howto'); enterHowto(); }
     if(id==='select'){ playMusic('select'); enterSelect(); }
@@ -743,7 +775,7 @@
     return pool[rnd(pool.length)];
   }
   function enterVersus(){
-    state.opp = pickOpponent();
+    state.opp = PROTO.on ? RICARDO : pickOpponent();
     $('#versus-vs').classList.remove('show');
     $('#versus-roll').style.display='flex';
     $('#versus-hud').textContent='EL DESTINO ELIGE A TU RIVAL…';
@@ -800,7 +832,7 @@
     stageSettled=false;
     clearInterval(stageRollIv);
     $('#stage-hint').textContent='ESCENARIO AL AZAR…';
-    const finalIdx=rnd(STAGES.length);
+    const finalIdx = PROTO.on ? Math.max(0, STAGES.findIndex(s=>s.id===PROTO.stageId)) : rnd(STAGES.length);
     let ticks=0; const maxTicks=20;            // ~2s a 100ms
     stageRollIv=setInterval(()=>{
       paintStage(rnd(STAGES.length), true);
@@ -825,19 +857,218 @@
     const fl=$('#flash'); fl.classList.add('on'); sfx.gong();
     setTimeout(()=>{ fl.classList.remove('on'); go('fight'); }, 850);
   }
+  /* ============ MOTOR DE PELEA (prototipo) ============ */
+  const F = {
+    W:1024, H:768, groundY:0.90, spriteH:0.60,
+    round:60, walk:3.6, jumpV:17, grav:0.95,
+    reach:104, punchDmg:6, kickDmg:10, blockMul:0.22,
+    punchCD:340, kickCD:560, atkWindow:160, knock:30, hitStun:280
+  };
+  let fcanvas=null, fctx=null, fRAF=null, fLast=0;
+  let fPhase='intro', fTimer=F.round, fTimerAcc=0, fResult='', fIntroT=0;
+  let fP=null, fO=null, fStageImg=null, fSparks=[], fShake=0;
+  const fKeys={left:false,right:false,jump:false,block:false};
+
+  function fGroundPx(){ return F.H*F.groundY; }
+  function fSpriteH(){ return F.H*F.spriteH; }
+  function fSpriteW(){ const im=fP&&fP.img; const a=(im&&im.naturalHeight)?(im.naturalWidth/im.naturalHeight):0.667; return fSpriteH()*a; }
+
+  function fLoadSprite(fd){
+    const im=new Image();
+    im.onerror=function(){ im.onerror=null; im.src='kof-electoral/candidatos/'+fd.id+'.png'; };
+    im.src='kof-electoral/candidatos/fight/'+fd.id+'.png';
+    return im;
+  }
+  function mkF(fd, side){
+    return { fd, side, x: side==='L'?F.W*0.30:F.W*0.70, y:0, vy:0, onGround:true,
+      hp:100, maxHp:100, facing: side==='L'?1:-1,
+      atk:null, atkUntil:0, atkHit:false, cdUntil:0, stun:0, lean:0, blocking:false,
+      img:fLoadSprite(fd) };
+  }
+
   function enterFight(){
-    const s=STAGES[state.stageIdx||0];
-    $('#fight-match').innerHTML = state.me.short + '<br>VS<br>' + state.opp.short;
-    $('#fight-soon').innerHTML = 'EN ' + s.city + ' · ' + s.place + '<br>🥊 EL COMBATE LLEGA PRONTO · (motor de pelea en construcción)';
+    fP = mkF(state.me, 'L');
+    fO = mkF(state.opp, 'R');
+    fStageImg = new Image();
+    fStageImg.src = 'kof-electoral/stages/'+((STAGES[state.stageIdx]||STAGES[0]).id)+'.png';
+    fSparks=[]; fShake=0;
+    fTimer=F.round; fTimerAcc=0; fResult=''; fIntroT=0;
+    fKeys.left=fKeys.right=fKeys.block=fKeys.jump=false;
+    fcanvas=$('#fcanvas'); fcanvas.width=F.W; fcanvas.height=F.H; fctx=fcanvas.getContext('2d');
+    $('#fname-l').textContent=state.me.short; $('#fname-r').textContent=state.opp.short;
+    $('#fhp-l').style.width='100%'; $('#fhp-r').style.width='100%';
+    $('#ftimer').textContent=F.round; $('#ftimer').classList.remove('low');
+    $('#fight-end').style.display='none';
+    fPhase='intro'; showFMsg('ROUND 1');
+    fLast=performance.now();
+    if(fRAF) cancelAnimationFrame(fRAF);
+    fRAF=requestAnimationFrame(fLoop);
+  }
+
+  function showFMsg(t){ const m=$('#fight-center-msg'); m.textContent=t; m.classList.remove('show'); void m.offsetWidth; m.classList.add('show'); }
+  function hideFMsg(){ $('#fight-center-msg').classList.remove('show'); }
+
+  function fLoop(now){
+    const dt=Math.min(48, now-fLast); fLast=now;
+    fUpdate(dt, now); fDraw(now);
+    fRAF=requestAnimationFrame(fLoop);
+  }
+
+  function fUpdate(dt, now){
+    if(fPhase==='intro'){
+      fIntroT+=dt;
+      if(fIntroT>1100){ fPhase='fight'; showFMsg('¡PELEEN!'); setTimeout(hideFMsg,650); }
+      return;
+    }
+    if(fPhase!=='fight'){ updateSparks(dt); return; }
+
+    fTimerAcc+=dt;
+    if(fTimerAcc>=1000){ fTimerAcc-=1000; fTimer--; $('#ftimer').textContent=Math.max(0,fTimer);
+      if(fTimer<=10) $('#ftimer').classList.add('low');
+      if(fTimer<=0){ endFight('time'); return; } }
+
+    fP.facing=(fO.x>=fP.x)?1:-1;
+    fO.facing=(fP.x>=fO.x)?1:-1;
+
+    stepFighter(fP, playerIntent(), dt, now);
+    stepFighter(fO, aiIntent(now), dt, now);
+
+    // separación simple
+    const minGap=fSpriteW()*0.46, d=fO.x-fP.x;
+    if(Math.abs(d)<minGap){ const push=(minGap-Math.abs(d))/2, sgn=d>=0?1:-1; fP.x-=sgn*push; fO.x+=sgn*push; }
+
+    resolveAttack(fP, fO, now);
+    resolveAttack(fO, fP, now);
+
+    updateSparks(dt);
+    if(fShake>0) fShake=Math.max(0, fShake-dt*0.04);
+
+    if(fP.hp<=0 || fO.hp<=0) endFight('ko');
+  }
+
+  function playerIntent(){
+    let moveX=0; if(fKeys.left) moveX-=1; if(fKeys.right) moveX+=1;
+    const it={moveX, jump:fKeys.jump, block:fKeys.block}; fKeys.jump=false; return it;
+  }
+  function playerAttack(type){ if(cur==='fight'&&fPhase==='fight') tryAttack(fP, type, performance.now()); }
+
+  function aiIntent(now){
+    const o=fO,p=fP; if(o.stun>0) return {moveX:0,jump:false,block:false};
+    const dist=Math.abs(p.x-o.x), dir=(p.x>o.x)?1:-1;
+    const range=fSpriteW()*0.42+F.reach;
+    let moveX=0, jump=false, block=false;
+    if(p.atk && dist<range+40 && Math.random()<0.06){ block=true; }
+    else if(dist>range){ moveX=dir; }
+    else {
+      if(now>=o.cdUntil && !o.atk && Math.random()<0.05) tryAttack(o, Math.random()<0.5?'punch':'kick', now);
+      else if(Math.random()<0.012) moveX=-dir;
+    }
+    if(Math.random()<0.004 && o.onGround) jump=true;
+    return {moveX, jump, block};
+  }
+
+  function tryAttack(ftr, type, now){
+    if(ftr.stun>0 || ftr.atk || now<ftr.cdUntil || !ftr.onGround) return;
+    ftr.atk=type; ftr.atkUntil=now+F.atkWindow; ftr.atkHit=false;
+    ftr.cdUntil=now+(type==='punch'?F.punchCD:F.kickCD); ftr.lean=1;
+  }
+
+  function stepFighter(ftr, it, dt, now){
+    const f=dt/16.7;
+    if(ftr.stun>0) ftr.stun-=dt;
+    ftr.blocking = !!it.block && ftr.onGround && ftr.stun<=0 && !ftr.atk;
+    if(ftr.stun<=0 && !ftr.atk && !ftr.blocking) ftr.x += (it.moveX||0)*F.walk*f;
+    if(it.jump && ftr.onGround && ftr.stun<=0 && !ftr.atk){ ftr.vy=-F.jumpV; ftr.onGround=false; }
+    if(!ftr.onGround){ ftr.vy+=F.grav*f; ftr.y+=ftr.vy*f; if(ftr.y>=0){ ftr.y=0; ftr.vy=0; ftr.onGround=true; } }
+    if(ftr.atk && now>ftr.atkUntil) ftr.atk=null;
+    if(ftr.lean>0) ftr.lean=Math.max(0, ftr.lean-dt*0.006);
+    const halfW=fSpriteW()/2;
+    ftr.x=Math.max(halfW+10, Math.min(F.W-halfW-10, ftr.x));
+  }
+
+  function resolveAttack(att, def, now){
+    if(!att.atk || att.atkHit) return;
+    if(now < att.atkUntil - F.atkWindow*0.55) return;   // sólo en la parte activa del golpe
+    const dx=(def.x-att.x)*att.facing, w=fSpriteW(), vert=Math.abs(def.y-att.y);
+    if(!(dx>0 && dx < w*0.45+F.reach && vert<F.H*0.22)) return;
+    att.atkHit=true;
+    const dmg = att.atk==='punch'?F.punchDmg:F.kickDmg;
+    const facingFoe = (def.facing === -att.facing);
+    const cx=(att.x+def.x)/2, cy=fGroundPx()-fSpriteH()*0.52;
+    if(def.blocking && facingFoe){
+      def.hp-=dmg*F.blockMul; def.x+=att.facing*8; spark(cx,cy,'#9fd0ff');
+    } else {
+      def.hp-=dmg; def.x+=att.facing*F.knock; def.stun=F.hitStun; def.atk=null; fShake=11; spark(cx,cy,'#ffd75e');
+    }
+    if(def.hp<0) def.hp=0;
+    $('#fhp-l').style.width=Math.max(0,fP.hp)+'%';
+    $('#fhp-r').style.width=Math.max(0,fO.hp)+'%';
+    sfx.tick();
+  }
+
+  function endFight(reason){
+    if(fPhase==='over') return; fPhase='over';
+    let winner;
+    if(reason==='ko') winner = fP.hp<=0 ? (fO.hp<=0?null:fO) : fP;
+    else winner = (fP.hp===fO.hp)?null:(fP.hp>fO.hp?fP:fO);
+    fResult = winner ? ('¡'+winner.fd.short+' GANA!') : 'EMPATE';
+    showFMsg(reason==='ko'?'K.O.':'TIME UP'); sfx.gong();
+    setTimeout(()=>{ $('#fight-result').textContent=fResult; $('#fight-end').style.display='flex'; }, 1000);
+  }
+
+  function spark(x,y,color){ for(let i=0;i<9;i++) fSparks.push({x,y,vx:(Math.random()*2-1)*4.5,vy:Math.random()*-3.5-1,t:1,c:color}); }
+  function updateSparks(dt){ for(const s of fSparks){ s.x+=s.vx; s.y+=s.vy; s.vy+=0.3; s.t-=dt*0.004; } fSparks=fSparks.filter(s=>s.t>0); }
+  function drawSparks(c){ for(const s of fSparks){ c.save(); c.globalAlpha=Math.max(0,s.t); c.fillStyle=s.c; c.fillRect(s.x-3,s.y-3,6,6); c.restore(); } }
+
+  function drawCover(c,img,W,H){
+    if(!img || !img.complete || !img.naturalWidth){ c.fillStyle='#10182e'; c.fillRect(0,0,W,H); return; }
+    const ir=img.naturalWidth/img.naturalHeight, cr=W/H; let dw,dh;
+    if(ir>cr){ dh=H; dw=H*ir; } else { dw=W; dh=W/ir; }
+    c.drawImage(img,(W-dw)/2,(H-dh)/2,dw,dh);
+  }
+  function drawShadow(c,ftr){ const gy=fGroundPx(), w=fSpriteW(); c.save(); c.globalAlpha=.32; c.fillStyle='#000'; c.beginPath(); c.ellipse(ftr.x, gy-6, w*0.28, 15, 0, 0, Math.PI*2); c.fill(); c.restore(); }
+  function drawFighter(c,ftr,now){
+    const h=fSpriteH(), w=fSpriteW(), gy=fGroundPx();
+    const lean = ftr.atk ? (ftr.facing*20*ftr.lean) : (ftr.stun>0 ? -ftr.facing*9 : 0);
+    const sc = ftr.atk?1.03:1, dh=h*sc, dw=w*sc, cx=ftr.x+lean, top=gy-dh+ftr.y;
+    c.save();
+    if(ftr.facing===-1){ c.translate(cx,0); c.scale(-1,1); c.translate(-cx,0); }
+    if(!ftr.img || !ftr.img.complete || !ftr.img.naturalWidth){ c.fillStyle=ftr.fd.color; c.fillRect(cx-dw/2, top, dw, dh); }
+    else c.drawImage(ftr.img, cx-dw/2, top, dw, dh);
+    c.restore();
+  }
+  function fDraw(now){
+    const c=fctx; if(!c) return;
+    const sx=fShake>0?(Math.random()*2-1)*fShake:0, sy=fShake>0?(Math.random()*2-1)*fShake:0;
+    c.save(); c.clearRect(0,0,F.W,F.H); c.translate(sx,sy);
+    drawCover(c, fStageImg, F.W, F.H);
+    c.fillStyle='rgba(0,0,12,0.12)'; c.fillRect(0,0,F.W,F.H);
+    drawShadow(c,fP); drawShadow(c,fO);
+    // dibujar el de más atrás primero (mayor x al fondo da igual; orden simple)
+    drawFighter(c,fO,now); drawFighter(c,fP,now);
+    drawSparks(c);
+    c.restore();
+  }
+
+  function fightKeyDown(e){
+    const k=e.key;
+    if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(k)) e.preventDefault();
+    if(fPhase!=='fight') return;
+    if(k==='ArrowLeft') fKeys.left=true;
+    else if(k==='ArrowRight') fKeys.right=true;
+    else if(k==='ArrowDown') fKeys.block=true;
+    else if(k==='ArrowUp'){ if(!e.repeat) fKeys.jump=true; }
+    else if(k==='a'||k==='A'){ if(!e.repeat) playerAttack('punch'); }
+    else if(k==='s'||k==='S'){ if(!e.repeat) playerAttack('kick'); }
   }
 
   /* ============ EVENTOS ============ */
   $('#scr-title').addEventListener('click', ()=>{ titleAdvance(); });
   $('#scr-howto').addEventListener('click', ()=>{ go('select'); });
   $('#btn-fight').addEventListener('click', startFight);
-  $('#btn-rerival').addEventListener('click', ()=>{ sfx.select(); go('versus'); });
-  $('#btn-rechar').addEventListener('click', ()=>{ go('select'); });
-  $('#btn-restart').addEventListener('click', ()=>{ go('title'); });
+  $('#fb-rematch').addEventListener('click', ()=>{ enterFight(); });
+  $('#fb-char').addEventListener('click', ()=>{ go('select'); });
+  $('#fb-title').addEventListener('click', ()=>{ go('title'); });
 
   document.addEventListener('keydown', (e)=>{
     const k=e.key;
@@ -855,10 +1086,21 @@
       return;
     }
     if(cur==='fight'){
-      if(k==='Enter'||k===' '){ go('versus'); }
-      else if(k==='Escape'){ go('select'); }
+      if(fPhase==='over'){
+        if(k==='Enter'||k===' '){ e.preventDefault(); enterFight(); }
+        else if(k==='Escape'){ go('select'); }
+        return;
+      }
+      fightKeyDown(e);
       return;
     }
+  });
+  document.addEventListener('keyup', (e)=>{
+    if(cur!=='fight') return;
+    const k=e.key;
+    if(k==='ArrowLeft') fKeys.left=false;
+    else if(k==='ArrowRight') fKeys.right=false;
+    else if(k==='ArrowDown') fKeys.block=false;
   });
 
   // Intento de autoplay del intro (los navegadores suelen bloquearlo hasta el primer gesto;
