@@ -1238,13 +1238,24 @@
   // Poses de golpe (der/izq). Si no existen, naturalWidth=0 y se usa la pose base.
   function fLoadPunch(fd, dir){ const im=new Image(); im.src='kof-electoral/candidatos/fight/punos/'+fd.id+'-'+dir+'.png'; return im; }
   function fLoadKick(fd, dir){ const im=new Image(); im.src='kof-electoral/candidatos/fight/patada/'+fd.id+'-'+dir+'.png'; return im; }
+  // golpe recibido: puede venir como <id>-der/-izq (orientado) o <id> (único). Lo que falte queda en 0.
+  function fLoadHit(fd, suf){ const im=new Image(); im.src='kof-electoral/candidatos/fight/golpe-recibido/'+fd.id+suf+'.png'; return im; }
+  function ready(im){ return im && im.complete && im.naturalWidth; }
   function mkF(fd, side, boss){
     const hp = boss?120:100;
     return { fd, side, boss:!!boss, x: side==='L'?F.W*0.30:F.W*0.70, y:0, vy:0, onGround:true,
       hp, maxHp:hp, hpShown:hp, facing: side==='L'?1:-1,
       atk:null, atkUntil:0, atkHit:false, cdUntil:0, stun:0, lean:0, blocking:false,
       combo:0, lastHit:0, flashUntil:0, img:fLoadSprite(fd),
-      punchR:fLoadPunch(fd,'der'), punchL:fLoadPunch(fd,'izq'), kickR:fLoadKick(fd,'der'), kickL:fLoadKick(fd,'izq') };
+      punchR:fLoadPunch(fd,'der'), punchL:fLoadPunch(fd,'izq'), kickR:fLoadKick(fd,'der'), kickL:fLoadKick(fd,'izq'),
+      hitR:fLoadHit(fd,'-der'), hitL:fLoadHit(fd,'-izq'), hit0:fLoadHit(fd,'') };
+  }
+  // pose de golpe recibido según orientación (con fallback al único)
+  function hitImgFor(ftr){
+    const dir = ftr.facing>=0 ? ftr.hitR : ftr.hitL;
+    if(ready(dir)) return {img:dir, flip:false};
+    if(ready(ftr.hit0)) return {img:ftr.hit0, flip:(ftr.facing!==(ftr.fd.srcFace||1))};
+    return null;
   }
   function setBars(){ if(fP) $('#fhp-l').style.width=Math.max(0,fP.hp/fP.maxHp*100)+'%'; if(fO) $('#fhp-r').style.width=Math.max(0,fO.hp/fO.maxHp*100)+'%'; }
   // capa roja de daño: baja con retraso hasta la vida real
@@ -1506,14 +1517,17 @@
   function drawFighter(c,ftr,now){
     const srcFace = ftr.fd.srcFace || 1;   // orientación natural del PNG base (1=mira derecha, -1=izquierda)
     let img = ftr.img, flip = (ftr.facing!==srcFace), usingFrame=false;
-    if(ftr.atk==='punch' || ftr.atk==='kick'){
+    if(ftr.stun>0){                                   // recibiendo golpe
+      const h2=hitImgFor(ftr);
+      if(h2){ img=h2.img; flip=h2.flip; usingFrame=true; }
+    } else if(ftr.atk==='punch' || ftr.atk==='kick'){
       const set = ftr.atk==='punch' ? (ftr.facing>=0?ftr.punchR:ftr.punchL) : (ftr.facing>=0?ftr.kickR:ftr.kickL);
-      if(set && set.complete && set.naturalWidth){ img=set; flip=false; usingFrame=true; }  // der/izq ya orientados
+      if(ready(set)){ img=set; flip=false; usingFrame=true; }  // der/izq ya orientados
     }
     const h=fSpriteH(), gy=fGroundPx();
     const aspect = (img && img.naturalHeight) ? img.naturalWidth/img.naturalHeight : 0.667;
     const w = h*aspect;
-    const lean = ftr.stun>0 ? -ftr.facing*9 : (ftr.atk && !usingFrame ? ftr.facing*20*ftr.lean : 0);
+    const lean = (ftr.stun>0 && !usingFrame) ? -ftr.facing*9 : (ftr.atk && !usingFrame ? ftr.facing*20*ftr.lean : 0);
     const sc = (ftr.atk && !usingFrame)?1.03:1, dh=h*sc, dw=w*sc, cx=ftr.x+lean, top=gy-dh+ftr.y;
     const flashing = ftr.flashUntil && now < ftr.flashUntil && (Math.floor(now/45)%2===0);
     c.save();
