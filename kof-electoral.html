@@ -591,7 +591,7 @@
         <div class="win-info">
           <div class="win-title" id="win-title">¡GANA!</div>
           <div class="win-phrase" id="win-phrase">—</div>
-          <div class="win-score">
+          <div class="win-score" id="win-score">
             <div class="ws-row"><span>VITALIDAD</span><b id="ws-vit">0</b></div>
             <div class="ws-row"><span>TIEMPO</span><b id="ws-time">0</b></div>
             <div class="ws-row" id="ws-perfect-row"><span>PERFECT</span><b id="ws-perfect">0</b></div>
@@ -665,7 +665,8 @@
     { id:'bogota',       city:'BOGOTÁ',       place:'PLAZA DE BOLÍVAR' },
     { id:'medellin',     city:'MEDELLÍN',     place:'EL POBLADO' },
     { id:'cali',         city:'CALI',         place:'JAIME VARELA' },
-    { id:'barranquilla', city:'BARRANQUILLA', place:'MALECÓN DEL RÍO' }
+    { id:'barranquilla', city:'BARRANQUILLA', place:'MALECÓN DEL RÍO' },
+    { id:'cartagena',    city:'CARTAGENA',    place:'CASTILLO DE SAN FELIPE' }
   ];
 
   /* ============ ANFITRIÓN + JEFE FINAL ============ */
@@ -688,17 +689,78 @@
   }
   function unlock(id){ const set=getUnlocked(); set.add(id); try{ localStorage.setItem(UNLOCK_KEY, JSON.stringify([...set])); }catch(e){} }
 
-  /* ---- Frases de victoria (ganador → vencido) ---- */
-  const VICTORY_LINES = {
-    cepeda:  { _def:'Cada golpe queda en el expediente. Caso cerrado.', uribe:'Te lo dije: todo a su debido proceso.', abelardo:'Las demandas no te salvaron esta vez.' },
-    petro:   { _def:'¡El cambio no se detiene, hermano!', uribe:'El cambio le ganó al pasado.', abelardo:'El pueblo pega más duro que la toga.' },
-    santos:  { _def:'Hasta los puños se negocian. Fin del conflicto.', uribe:'De la guerra a la paz… y al nocaut.', petro:'La estabilidad también sabe pelear.' },
-    abelardo:{ _def:'El Tigre no deja sobrevivientes en el ring.', cepeda:'Sin pruebas no hay caso, pero sí zarpazo.', petro:'El Tigre no le teme a ningún discurso.' },
-    uribe:   { _def:'Mano firme, corazón grande. A trabajar.', petro:'Colombia no es para experimentos.', cepeda:'Mano firme contra el que la quiera tumbar.' },
-    paloma:  { _def:'Con firmeza y argumentos se gana. Siguiente.', petro:'Más Estado de derecho, menos tarima.', cepeda:'El expediente lo cierro yo, con un derechazo.' },
-    ricardo: { _def:'Los datos no fallan, y yo tampoco. Soy el jefe final.' }
+  /* ---- Discursos de victoria: el candidato elegido (ganador) sobre el vencido.
+         Tono de rivalidad respetuosa "nos vemos en la segunda vuelta". ---- */
+  const SPEECHES = {
+    cepeda: {
+      petro:'Gustavo, compañero de causa, pero esta vez la izquierda la lidero yo. Nos vemos en segunda vuelta.',
+      santos:'Santos, tú hiciste la paz; yo la voy a profundizar. Con respeto, sigo.',
+      abelardo:'Abelardo, te respeto como rival, pero el expediente del cambio lo firmo yo.',
+      uribe:'Álvaro, orillas distintas, mismo país. Que decidan las urnas en segunda vuelta.',
+      paloma:'Paloma, gran debatiente, pero hoy pesan más los argumentos del pueblo.',
+      ricardo:'Ricardo, los datos son tuyos, pero el veredicto es del votante. ¡Campeón!',
+      _def:'Con respeto, sigo yo a la segunda vuelta.'
+    },
+    petro: {
+      cepeda:'Iván, hermano de lucha, hoy me toca a mí llevar la bandera. ¡Seguimos!',
+      santos:'Santos, gracias por la paz; el cambio la lleva al siguiente nivel.',
+      abelardo:'Abelardo, respeto tu garra, pero el pueblo ya decidió. A segunda vuelta.',
+      uribe:'Álvaro, dos visiones de Colombia; que el pueblo elija. Con respeto.',
+      paloma:'Paloma, firme rival, pero el cambio no se detiene.',
+      ricardo:'Ricardo, ni tus números frenan al pueblo. ¡Campeón!',
+      _def:'El cambio sigue. ¡A segunda vuelta!'
+    },
+    santos: {
+      cepeda:'Iván, defiendes la paz que firmamos; te respeto, pero el centro lo sostengo yo.',
+      petro:'Gustavo, se gobierna con mesura. Nos vemos en segunda vuelta, con respeto.',
+      abelardo:'Abelardo, energía no te falta; pero el país pide acuerdos.',
+      uribe:'Álvaro, viejos contrincantes; esta vez deciden los datos y los votos.',
+      paloma:'Paloma, brillante, pero la reconciliación necesita puentes.',
+      ricardo:'Ricardo, hasta los datos firman la paz. ¡Campeón!',
+      _def:'Con acuerdos se gana. A segunda vuelta.'
+    },
+    abelardo: {
+      cepeda:'Cepeda, te respeto como adversario, pero el orden lo pongo yo. A segunda vuelta.',
+      petro:'Petro, gran rival, pero el país pide firmeza. Seguimos.',
+      santos:'Santos, Nobel y todo, pero el ring es otra cosa. Con respeto, avanzo.',
+      uribe:'Álvaro, maestro de la derecha; hoy te respeto y te supero. A segunda vuelta.',
+      paloma:'Paloma, te respeto muchísimo; misma orilla, pero a la segunda voy yo.',
+      ricardo:'Ricardo, los datos no asustan al Tigre. ¡Campeón!',
+      _def:'El Tigre avanza. A segunda vuelta.'
+    },
+    uribe: {
+      cepeda:'Iván, otra visión, pero respeto tu coherencia. Que decidan las urnas.',
+      petro:'Gustavo, dos Colombias; con mano firme y corazón grande, sigo yo.',
+      santos:'Juan Manuel, fuimos aliados; hoy te respeto y te gano. A segunda vuelta.',
+      abelardo:'Abelardo, misma orilla y mucha energía; pero manda la experiencia.',
+      paloma:'Paloma, gran cuadro del partido; te respeto, y sigo yo a la segunda.',
+      ricardo:'Ricardo, trabajar, trabajar y trabajar… también le gana a los datos. ¡Campeón!',
+      _def:'Mano firme a la segunda vuelta.'
+    },
+    paloma: {
+      cepeda:'Cepeda, te respeto, pero con argumentos firmes voy yo a la segunda.',
+      petro:'Gustavo, gran rival; más Estado de derecho, menos tarima. Sigo.',
+      santos:'Santos, respeto tu legado; pero el país pide nuevas voces.',
+      abelardo:'Abelardo, misma orilla; te respeto mucho y vamos a la segunda vuelta.',
+      uribe:'Álvaro, mi maestro político; con todo respeto, esta vez sigo yo.',
+      ricardo:'Ricardo, con firmeza hasta los datos se ordenan. ¡Campeona!',
+      _def:'Con firmeza, a la segunda vuelta.'
+    },
+    ricardo:{ _def:'Los datos no fallan, y yo tampoco.' }
   };
-  function victoryLine(winId, loseId){ const w=VICTORY_LINES[winId]||{}; return w[loseId] || w._def || '¡Victoria!'; }
+  function victoryLine(winId, loseId){ const w=SPEECHES[winId]||{}; return w[loseId] || w._def || '¡A segunda vuelta!'; }
+
+  /* ---- Si el JEFE FINAL (Ricardo) te gana: critica a tu candidato con un dato real ---- */
+  const RICARDO_WIN = {
+    cepeda:'Iván, el Pacto Histórico fue la lista más votada al Senado en 2022; pero una lista no es una presidencia. Los datos mandan.',
+    petro:'Gustavo, alcalde de Bogotá y presidente; pero tu aprobación ha oscilado fuerte. Una segunda vuelta es otra encuesta.',
+    santos:'Juan Manuel, Nobel de Paz 2016… ese mismo año el plebiscito por el «No» ganó por estrecho margen. Los datos no olvidan.',
+    abelardo:'Abelardo, abogado y figura mediática, pero tu historial electoral arranca en cero. Los números no improvisan.',
+    uribe:'Álvaro, presidente dos veces (2002-2010); pero la reelección que lo permitió ya no existe. Los datos cambiaron.',
+    paloma:'Paloma, senadora desde 2014 y proponente de dividir el país en regiones autónomas; un dato que no todos comparten.',
+    _def:'Los datos no fallan, y yo tampoco. Inténtalo de nuevo.'
+  };
+  function ricardoCritique(id){ return RICARDO_WIN[id] || RICARDO_WIN._def; }
 
   /* ---- Clips one-shot (no son la música de pantalla) ---- */
   const CLIPS = {
@@ -713,10 +775,10 @@
   const $  = s => document.querySelector(s);
   const rnd = n => Math.floor(Math.random()*n);
 
-  const state = { me:null, opp:null, curIdx:0, stageIdx:0, stage:null, ladder:[], matchIdx:0, score:0, streak:0, lastRound:null };
+  const state = { me:null, opp:null, curIdx:0, stageIdx:0, stage:null, stageOrder:[], ladder:[], matchIdx:0, score:0, streak:0, lastRound:null };
   let cur = 'title';
   let selTimer = null, selTime = 26, rollIv = null, qflipIv = null, stageRollIv = null, stageSettled = false;
-  let contIv = null, winAnimIv = null, fWinnerProceed = null;
+  let contIv = null, winAnimIv = null, fWinnerProceed = null, fBossWin = false;
   let SEL_ROSTER = [];
 
   /* ============ SONIDO (WebAudio sintetizado) ============ */
@@ -891,6 +953,7 @@
     // Escalera: los otros candidatos al azar + Ricardo como JEFE FINAL al cierre.
     const others = (me===RICARDO) ? shuffle(FIGHTERS.slice()) : shuffle(FIGHTERS.filter(f=>f.id!==me.id));
     state.ladder = (me===RICARDO) ? others : others.concat([RICARDO]);
+    state.stageOrder = shuffle(STAGES);    // escenarios sin repetir en la escalera
     state.matchIdx = 0; state.score = 0; state.streak = 0;   // nueva partida
     sfx.select();
     go('versus');
@@ -962,18 +1025,22 @@
     $('#stage-hint').textContent  = rolling ? 'ESCENARIO AL AZAR…' : 'ricardoruiz.co';
   }
   // En los 5 combates de ciudad el escenario NO se elige: rota ~2s y aterriza al azar.
+  function cityStageFor(idx){
+    const order = (state.stageOrder && state.stageOrder.length) ? state.stageOrder : STAGES;
+    return order[idx % order.length] || STAGES[rnd(STAGES.length)];
+  }
   function rollStage(){
     stageSettled=false;
     clearInterval(stageRollIv);
     $('#stage-hint').textContent='ESCENARIO AL AZAR…';
-    const finalIdx = rnd(STAGES.length);
-    let ticks=0; const maxTicks=20;            // ~2s a 100ms
+    const target = cityStageFor(state.matchIdx);   // sin repetir en la escalera
+    let ticks=0; const maxTicks=20;                // ~2s a 100ms
     stageRollIv=setInterval(()=>{
       showStageObj(STAGES[rnd(STAGES.length)], true);
       sfx.tick(); ticks++;
       if(ticks>=maxTicks){
         clearInterval(stageRollIv); stageRollIv=null;
-        showStageObj(STAGES[finalIdx], false);
+        showStageObj(target, false);
         stageSettled=true; sfx.reveal();
       }
     },100);
@@ -982,7 +1049,7 @@
     if(stageSettled) return;
     clearInterval(stageRollIv); stageRollIv=null;
     if(state.opp===RICARDO) showStageObj(FINAL_STAGE, false);
-    else showStageObj(STAGES[rnd(STAGES.length)], false);
+    else showStageObj(cityStageFor(state.matchIdx), false);
     stageSettled=true;
   }
 
@@ -1014,12 +1081,14 @@
     im.src='kof-electoral/candidatos/fight/'+fd.id+'.png';
     return im;
   }
+  // Poses de puño (der/izq). Si no existen, naturalWidth=0 y se usa la pose base.
+  function fLoadPunch(fd, dir){ const im=new Image(); im.src='kof-electoral/candidatos/fight/punos/'+fd.id+'-'+dir+'.png'; return im; }
   function mkF(fd, side, boss){
     const hp = boss?120:100;
     return { fd, side, boss:!!boss, x: side==='L'?F.W*0.30:F.W*0.70, y:0, vy:0, onGround:true,
       hp, maxHp:hp, facing: side==='L'?1:-1,
       atk:null, atkUntil:0, atkHit:false, cdUntil:0, stun:0, lean:0, blocking:false,
-      combo:0, lastHit:0, img:fLoadSprite(fd) };
+      combo:0, lastHit:0, img:fLoadSprite(fd), punchR:fLoadPunch(fd,'der'), punchL:fLoadPunch(fd,'izq') };
   }
   function setBars(){ if(fP) $('#fhp-l').style.width=Math.max(0,fP.hp/fP.maxHp*100)+'%'; if(fO) $('#fhp-r').style.width=Math.max(0,fO.hp/fO.maxHp*100)+'%'; }
 
@@ -1185,7 +1254,8 @@
     showFMsg(reason==='ko'?'K.O.':'TIME UP'); sfx.gong();
     setTimeout(()=>{
       if(cur!=='fight') return;
-      if(won){ computeRoundScore(); go('winner'); }
+      if(won){ fBossWin=false; computeRoundScore(); go('winner'); }
+      else if(state.opp===RICARDO){ state.streak=0; fBossWin=true; go('winner'); }  // perdiste ante el jefe → Ricardo gana y te critica
       else { state.streak=0; go('continue'); }
     }, 1200);
   }
@@ -1194,6 +1264,8 @@
   function fmt(n){ return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
   function enterWinner(){
     stopClip();
+    if(fBossWin){ enterBossWin(); return; }
+    $('#win-score').style.display='';
     const me=state.me, opp=state.opp, isFinalWin=(opp===RICARDO);
     unlock(opp.id);   // desbloquea al vencido para el selector
     const a=$('#win-art'); a.style.setProperty('--c',me.color); a.style.setProperty('--a',me.accent);
@@ -1208,6 +1280,21 @@
     animScore(r);
     $('#win-next').textContent = isFinalWin ? 'JUGAR DE NUEVO ▸' : 'SIGUIENTE RIVAL ▸';
     fWinnerProceed = isFinalWin ? ()=>go('select') : advanceLadder;
+  }
+  // Derrota ante el JEFE FINAL: Ricardo gana y critica a tu candidato con un dato real.
+  function enterBossWin(){
+    const me=state.me;
+    const a=$('#win-art'); a.style.setProperty('--c',RICARDO.color); a.style.setProperty('--a',RICARDO.accent);
+    a.innerHTML = '<div class="fallback"><span class="ini">RR</span></div>'
+      + '<img src="kof-electoral/candidatos/ricardo.png" alt="RICARDO RUIZ" onerror="this.style.display=\'none\'">';
+    $('#win-title').textContent = 'RICARDO GANA';
+    $('#win-phrase').textContent = '«'+ ricardoCritique(me.id) +'»';
+    $('#win-hud').textContent = 'EL JEFE FINAL TE DERROTÓ';
+    $('#win-score').style.display='none';
+    $('#win-next').textContent = 'CONTINUAR ▸';
+    fWinnerProceed = ()=>go('continue');
+    const aud=playClip('winner', false);
+    if(aud) aud.onended=()=>{ if(cur==='winner') go('continue'); };
   }
   function animScore(r){
     clearInterval(winAnimIv);
@@ -1246,14 +1333,21 @@
   }
   function drawShadow(c,ftr){ const gy=fGroundPx(), w=fwOf(ftr); c.save(); c.globalAlpha=.32; c.fillStyle='#000'; c.beginPath(); c.ellipse(ftr.x, gy-6, w*0.28, 15, 0, 0, Math.PI*2); c.fill(); c.restore(); }
   function drawFighter(c,ftr,now){
-    const h=fSpriteH(), w=fwOf(ftr), gy=fGroundPx();
-    const lean = ftr.atk ? (ftr.facing*20*ftr.lean) : (ftr.stun>0 ? -ftr.facing*9 : 0);
-    const sc = ftr.atk?1.03:1, dh=h*sc, dw=w*sc, cx=ftr.x+lean, top=gy-dh+ftr.y;
-    const srcFace = ftr.fd.srcFace || 1;   // orientación natural del PNG (1=mira derecha, -1=izquierda)
+    const srcFace = ftr.fd.srcFace || 1;   // orientación natural del PNG base (1=mira derecha, -1=izquierda)
+    let img = ftr.img, flip = (ftr.facing!==srcFace), usingPunch=false;
+    if(ftr.atk==='punch'){
+      const pim = (ftr.facing>=0) ? ftr.punchR : ftr.punchL;   // der=golpe a la derecha, izq=a la izquierda (ya orientados)
+      if(pim && pim.complete && pim.naturalWidth){ img=pim; flip=false; usingPunch=true; }
+    }
+    const h=fSpriteH(), gy=fGroundPx();
+    const aspect = (img && img.naturalHeight) ? img.naturalWidth/img.naturalHeight : 0.667;
+    const w = h*aspect;
+    const lean = ftr.stun>0 ? -ftr.facing*9 : (ftr.atk && !usingPunch ? ftr.facing*20*ftr.lean : 0);
+    const sc = (ftr.atk && !usingPunch)?1.03:1, dh=h*sc, dw=w*sc, cx=ftr.x+lean, top=gy-dh+ftr.y;
     c.save();
-    if(ftr.facing!==srcFace){ c.translate(cx,0); c.scale(-1,1); c.translate(-cx,0); }
-    if(!ftr.img || !ftr.img.complete || !ftr.img.naturalWidth){ c.fillStyle=ftr.fd.color; c.fillRect(cx-dw/2, top, dw, dh); }
-    else c.drawImage(ftr.img, cx-dw/2, top, dw, dh);
+    if(flip){ c.translate(cx,0); c.scale(-1,1); c.translate(-cx,0); }
+    if(!img || !img.complete || !img.naturalWidth){ c.fillStyle=ftr.fd.color; c.fillRect(cx-dw/2, top, dw, dh); }
+    else c.drawImage(img, cx-dw/2, top, dw, dh);
     c.restore();
   }
   function fDraw(now){
