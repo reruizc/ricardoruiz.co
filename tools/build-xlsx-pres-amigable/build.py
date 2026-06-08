@@ -59,6 +59,10 @@ DEFAULTS = [
     ("GCS_2014PRES1V.csv", "presidencial-1v", 2014),
     ("GCS_2018PRES1V.csv", "presidencial-1v", 2018),
     ("GCS_2022PRES1V.csv", "presidencial-1v", 2022),
+    ("GCS_2010PRES2V.csv", "presidencial-2v", 2010),
+    ("GCS_2014PRES2V.csv", "presidencial-2v", 2014),
+    ("GCS_2018PRES2V.csv", "presidencial-2v", 2018),
+    ("GCS_2022PRES2V.csv", "presidencial-2v", 2022),
 ]
 
 HEADER_PUESTO = [
