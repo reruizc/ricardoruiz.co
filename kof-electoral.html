@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="robots" content="noindex,nofollow">
-<title>The King of Fighters '26 · Edición Electoral</title>
+<title>Segunda Vuelta Colombia '26 · Combate Electoral</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -60,7 +60,7 @@
   .screen.active{display:flex; animation:fadein .25s ease}
   @keyframes fadein{from{opacity:0}to{opacity:1}}
 
-  /* fondo polvo marrón rojizo (estilo título KOF98) */
+  /* fondo polvo marrón rojizo (estilo arcade Neo-Geo) */
   .bg-dust{
     background:
       radial-gradient(circle at 50% 38%, var(--red-hi) 0%, var(--red) 46%, var(--red-dark) 100%);
@@ -902,7 +902,7 @@
   const state = { me:null, opp:null, curIdx:0, stageIdx:0, stage:null, stageOrder:[], ladder:[], matchIdx:0, score:0, streak:0, lastRound:null };
   let cur = 'title';
   let selTimer = null, selTime = 26, rollIv = null, qflipIv = null, stageRollIv = null, stageSettled = false;
-  let contIv = null, winAnimIv = null, fWinnerProceed = null, fBossWin = false;
+  let contIv = null, winAnimIv = null, fWinnerProceed = null, fBossWin = false, howtoIv = null;
   let SEL_ROSTER = [];
 
   /* ============ SONIDO (WebAudio sintetizado) ============ */
@@ -929,9 +929,9 @@
   };
   /* ---- Música de fondo (mp3 por pantalla, en orden de creación) ---- */
   const TRACKS = {
-    intro:  'kof-electoral/music/KOF98%20Cipher%20OST.mp3',                 // 1 · intro
-    howto:  'kof-electoral/music/KOF98%20OK%3F%20OST.mp3',                  // 2 · instrucciones
-    select: 'kof-electoral/music/KOF98%20THE%20KING%20OF%20FIGHTERS%20OST.mp3' // 3 · selección
+    intro:  'kof-electoral/music/intro.mp3',          // 1 · intro
+    howto:  'kof-electoral/music/instrucciones.mp3',  // 2 · instrucciones
+    select: 'kof-electoral/music/seleccion.mp3'       // 3 · selección
   };
   let curMusic=null, curMusicName=null, musicReady=false;
   function playMusic(name){
@@ -968,7 +968,7 @@
     cur=id;
     document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
     $('#scr-'+id).classList.add('active');
-    clearInterval(selTimer); clearInterval(rollIv); clearInterval(qflipIv); clearInterval(stageRollIv); clearInterval(contIv); clearInterval(winAnimIv);
+    clearInterval(selTimer); clearInterval(rollIv); clearInterval(qflipIv); clearInterval(stageRollIv); clearInterval(contIv); clearInterval(winAnimIv); clearInterval(howtoIv);
     if(fRAF && id!=='fight'){ cancelAnimationFrame(fRAF); fRAF=null; }
     if(['title','howto','select','versus'].includes(id)) stopClip();
     if(id==='title'){ enterTitle(); }
@@ -1002,11 +1002,14 @@
 
   /* ---- INSTRUCCIONES (personaje al azar) ---- */
   function enterHowto(){
-    $('#howto-art').innerHTML = '<div class="adv-badge">ANFITRIÓN</div>'
-      + '<div class="fallback" style="--c:'+RICARDO.color+';--a:'+RICARDO.accent+'"></div>'
-      + '<img src="kof-electoral/candidatos/fight/ricardo.png" alt="RICARDO RUIZ" style="object-fit:cover;object-position:center top" onerror="this.style.display=\'none\'">';
+    const poses=['kof-electoral/candidatos/fight/punos/ricardo-der.png','kof-electoral/candidatos/fight/patada/ricardo-der.png'];
+    $('#howto-art').innerHTML = '<div class="fallback" style="--c:'+RICARDO.color+';--a:'+RICARDO.accent+'"></div>'
+      + '<img id="howto-ric" src="'+poses[0]+'" alt="RICARDO RUIZ" style="object-fit:contain;object-position:center" onerror="this.style.display=\'none\'">';
     $('#howto-name').textContent = RICARDO.name;
     $('#howto-line').textContent = RICARDO.line;
+    let i=0; const im=$('#howto-ric');
+    clearInterval(howtoIv);
+    howtoIv=setInterval(()=>{ i=(i+1)%poses.length; if(im) im.src=poses[i]; }, 1000);   // alterna puño/patada
   }
 
   /* ---- SELECCIÓN ---- */
