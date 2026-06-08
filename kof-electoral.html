@@ -565,7 +565,7 @@
   // Imágenes esperadas (las pones tú): kof-electoral/<id>.png  (retrato vertical ~600x800)
   const FIGHTERS = [
     { id:'cepeda',  name:'IVÁN CEPEDA',   short:'CEPEDA',   ini:'IC',
-      partido:'Pacto Histórico', epi:'EL INVESTIGADOR', color:'#8E44AD', accent:'#C39BD3',
+      partido:'Pacto Histórico', epi:'EL INVESTIGADOR', color:'#8E44AD', accent:'#C39BD3', srcFace:-1,
       special:'EXPEDIENTE ABIERTO', stats:{F:3,V:3,T:5,D:4,R:4},
       line:'Bienvenido al combate. Aquí cada golpe queda en el expediente: estudia a tu rival antes de atacar.' },
     { id:'petro',   name:'GUSTAVO PETRO', short:'PETRO',    ini:'GP',
@@ -876,8 +876,8 @@
   }
   /* ============ MOTOR DE PELEA (prototipo) ============ */
   const F = {
-    W:1024, H:768, groundY:0.90, spriteH:0.60,
-    round:60, walk:3.6, jumpV:17, grav:0.95,
+    W:1024, H:768, groundY:0.90, spriteH:0.42,   // sprites 30% más pequeños
+    round:60, walk:3.6, jumpV:20, grav:0.95,      // saltan un poco más
     reach:104, punchDmg:6, kickDmg:10, blockMul:0.22,
     punchCD:340, kickCD:560, atkWindow:160, knock:30, hitStun:280
   };
@@ -1072,8 +1072,9 @@
     const h=fSpriteH(), w=fwOf(ftr), gy=fGroundPx();
     const lean = ftr.atk ? (ftr.facing*20*ftr.lean) : (ftr.stun>0 ? -ftr.facing*9 : 0);
     const sc = ftr.atk?1.03:1, dh=h*sc, dw=w*sc, cx=ftr.x+lean, top=gy-dh+ftr.y;
+    const srcFace = ftr.fd.srcFace || 1;   // orientación natural del PNG (1=mira derecha, -1=izquierda)
     c.save();
-    if(ftr.facing===-1){ c.translate(cx,0); c.scale(-1,1); c.translate(-cx,0); }
+    if(ftr.facing!==srcFace){ c.translate(cx,0); c.scale(-1,1); c.translate(-cx,0); }
     if(!ftr.img || !ftr.img.complete || !ftr.img.naturalWidth){ c.fillStyle=ftr.fd.color; c.fillRect(cx-dw/2, top, dw, dh); }
     else c.drawImage(ftr.img, cx-dw/2, top, dw, dh);
     c.restore();
