@@ -766,7 +766,9 @@
     { id:'medellin',     city:'MEDELLÍN',     place:'EL POBLADO' },
     { id:'cali',         city:'CALI',         place:'JAIME VARELA' },
     { id:'barranquilla', city:'BARRANQUILLA', place:'MALECÓN DEL RÍO' },
-    { id:'cartagena',    city:'CARTAGENA',    place:'CASTILLO DE SAN FELIPE' }
+    { id:'cartagena',    city:'CARTAGENA',    place:'CASTILLO DE SAN FELIPE' },
+    { id:'macarena',     city:'LA MACARENA',  place:'CAÑO CRISTALES' },
+    { id:'narino',       city:'NARIÑO',       place:'SANTUARIO DE LAS LAJAS' }
   ];
 
   /* ============ ANFITRIÓN + JEFE FINAL ============ */
@@ -779,6 +781,11 @@
   // Escenario del JEFE FINAL (Ricardo). No entra en la ruleta de ciudades.
   const FINAL_STAGE = { id:'final-boss-stage', city:'BOGOTÁ', place:'C.C. GALERÍAS' };
   function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
+  // Orden FIJO de la escalera para los dos finalistas reales (aunque parezca azar). El resto va al azar.
+  const FIXED_LADDER = {
+    cepeda:   ['paloma','uribe','santos','petro','abelardo'],
+    abelardo: ['petro','santos','paloma','uribe','cepeda']
+  };
 
   /* ---- Desbloqueos (progresión, persistido) ---- */
   const UNLOCK_KEY='kof-unlocked';
@@ -998,11 +1005,12 @@
     $('#sel-grid').innerHTML = SEL_ROSTER.map((f,i)=>{
       const locked = !un.has(f.id);
       return '<button class="cell'+(locked?' locked':'')+'" data-i="'+i+'" style="--c:'+f.color+';--a:'+f.accent+'">'
-        + '<div class="fallback"><span class="ini">'+(locked?'?':f.ini)+'</span></div>'
+        + '<div class="fallback">'+(locked?'<span class="ini">?</span>':'')+'</div>'   // sin iniciales detrás (la foto es transparente)
         + '<img src="kof-electoral/candidatos/'+f.id+'.png" alt="'+f.name+'" onerror="this.style.display=\'none\'">'
         + '<span class="p1"></span>'
         + (locked?'<span class="lock">🔒</span>':'')
-        + '</button>';   // sin nombre: cada candidato tiene su foto
+        + '<span class="tag">'+(locked?'???':f.short)+'</span>'
+        + '</button>';
     }).join('');
     $('#sel-grid').querySelectorAll('.cell').forEach(c=>{
       const i = +c.dataset.i, locked = c.classList.contains('locked');
@@ -1068,8 +1076,11 @@
     if(!me || !getUnlocked().has(me.id)) return;   // no confirmar bloqueados
     clearInterval(selTimer);
     state.me = me;
-    // Escalera: los otros candidatos al azar + Ricardo como JEFE FINAL al cierre.
-    const others = (me===RICARDO) ? shuffle(FIGHTERS.slice()) : shuffle(FIGHTERS.filter(f=>f.id!==me.id));
+    // Escalera: orden fijo para Cepeda/Abelardo; el resto al azar. Ricardo cierra como JEFE FINAL.
+    let others;
+    if(me===RICARDO) others = shuffle(FIGHTERS.slice());
+    else if(FIXED_LADDER[me.id]) others = FIXED_LADDER[me.id].map(id=>FIGHTERS.find(f=>f.id===id)).filter(Boolean);
+    else others = shuffle(FIGHTERS.filter(f=>f.id!==me.id));
     state.ladder = (me===RICARDO) ? others : others.concat([RICARDO]);
     state.stageOrder = shuffle(STAGES);    // escenarios sin repetir en la escalera
     state.matchIdx = 0; state.score = 0; state.streak = 0;   // nueva partida
