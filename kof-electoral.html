@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="robots" content="noindex,nofollow">
+<title>The King of Fighters '26 · Edición Electoral</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --red-dark:#1c0605; --red:#3a0d0a; --red-hi:#5a1410;
+    --gold:#ffd75e; --gold-deep:#c8881a;
+    --blue:#2f7ddb; --blue-lt:#86c5ff;
+    --ink:#0a0a14; --paper:#f4f3ef;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    background:#000;
+    font-family:'Press Start 2P',monospace;
+    color:var(--paper);
+    overflow:hidden;
+    -webkit-font-smoothing:none;
+    image-rendering:pixelated;
+    user-select:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  /* ===== Cabina / pantalla ===== */
+  #cab{
+    position:fixed; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    background:#000;
+  }
+  #screen{
+    position:relative;
+    width:min(100vw, calc(100vh * 4 / 3));
+    height:min(100vh, calc(100vw * 3 / 4));
+    aspect-ratio:4/3;
+    overflow:hidden;
+    background:var(--red);
+    box-shadow:0 0 60px rgba(0,0,0,.9), inset 0 0 120px rgba(0,0,0,.55);
+  }
+  /* grano + scanlines + viñeta */
+  #screen::before{
+    content:""; position:absolute; inset:0; z-index:60; pointer-events:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+    opacity:.07; mix-blend-mode:overlay;
+  }
+  #screen::after{
+    content:""; position:absolute; inset:0; z-index:61; pointer-events:none;
+    background:
+      repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,.18) 2px 3px),
+      radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,.55) 100%);
+  }
+
+  .screen{position:absolute; inset:0; display:none; flex-direction:column; z-index:10}
+  .screen.active{display:flex; animation:fadein .25s ease}
+  @keyframes fadein{from{opacity:0}to{opacity:1}}
+
+  /* fondo polvo marrón rojizo (estilo título KOF98) */
+  .bg-dust{
+    background:
+      radial-gradient(circle at 50% 38%, var(--red-hi) 0%, var(--red) 46%, var(--red-dark) 100%);
+  }
+  /* fondo azul-rojo selección */
+  .bg-arena{
+    background:
+      linear-gradient(120deg, #14203f 0%, #1b2c52 38%, #4a1414 62%, #6a1a14 100%);
+  }
+  .bg-versus{
+    background:
+      radial-gradient(circle at 50% 45%, #2a3f7a 0%, #16234a 55%, #0a0f24 100%);
+  }
+
+  /* ===== HUD inferior arcade ===== */
+  .hud{
+    position:absolute; left:0; right:0; bottom:0; z-index:40;
+    display:flex; justify-content:space-between; align-items:center;
+    padding:8px 14px;
+    font-size:clamp(7px,1.1vw,11px);
+    color:#d8d2c2; letter-spacing:1px;
+    text-shadow:0 2px 0 #000;
+  }
+  .hud .lvl{color:var(--gold)}
+  .hud .time{color:#ff6b4a}
+  .blink{animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  .blink-s{animation:blink .6s steps(1) infinite}
+
+  .topbrand{
+    position:absolute; top:10px; left:0; right:0; z-index:40; text-align:center;
+    font-size:clamp(6px,1vw,9px); letter-spacing:3px; color:#e9c47a; opacity:.85;
+    text-shadow:0 2px 0 #000;
+  }
+
+  /* ===== Botón sonido ===== */
+  #snd{
+    position:absolute; top:8px; right:10px; z-index:80;
+    background:rgba(0,0,0,.5); border:2px solid rgba(255,255,255,.25);
+    color:#fff; font-family:'Press Start 2P'; font-size:11px;
+    padding:6px 8px; cursor:pointer;
+  }
+  #snd:hover{border-color:var(--gold)}
+
+  /* ============== TÍTULO ============== */
+  #scr-title{align-items:center; justify-content:center; text-align:center}
+  .logo{ transform:translateY(-4%); padding:0 4%}
+  .logo-top{
+    font-family:'Anton'; font-size:clamp(20px,5.2vw,58px); letter-spacing:2px;
+    color:#efe9da; -webkit-text-stroke:1.5px var(--ink);
+    text-shadow:0 4px 0 #000, 0 0 18px rgba(255,180,90,.25);
+    transform:skewX(-7deg); line-height:.9;
+  }
+  .logo-mid{
+    display:flex; align-items:flex-end; justify-content:center; gap:.06em;
+    transform:skewX(-7deg); margin-top:-.04em;
+  }
+  .fighters{
+    font-family:'Anton'; font-size:clamp(56px,15.5vw,176px); line-height:.82;
+    letter-spacing:1px;
+    background:linear-gradient(#ffffff 0%, #dfe9f5 40%, #9fb8d6 72%, #5d7aa8 100%);
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+    -webkit-text-stroke:3px var(--ink);
+    filter:drop-shadow(0 7px 0 #000) drop-shadow(0 0 22px rgba(120,170,255,.35));
+  }
+  .year{
+    font-family:'Anton'; font-size:clamp(58px,16.5vw,188px); line-height:.78;
+    background:linear-gradient(#fff3c0 0%, var(--gold) 38%, var(--gold-deep) 78%, #7a4d09 100%);
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+    -webkit-text-stroke:3px var(--ink);
+    filter:drop-shadow(0 7px 0 #000) drop-shadow(0 0 22px rgba(255,200,80,.4));
+  }
+  .logo-sub{
+    margin:.6em auto 0; max-width:94%; font-size:clamp(7px,1.5vw,15px); letter-spacing:.14em;
+    line-height:1.7; color:var(--blue-lt); text-shadow:0 3px 0 #000, 0 0 12px rgba(80,150,255,.5);
+    transform:skewX(-7deg);
+  }
+  .logo-sub b{color:#fff}
+  .insert{
+    position:absolute; bottom:20%; left:0; right:0;
+    font-size:clamp(11px,2.6vw,26px); letter-spacing:.18em; color:var(--gold);
+    text-shadow:0 3px 0 #000, 0 0 14px rgba(255,210,90,.55);
+  }
+  .tap-hint{
+    position:absolute; bottom:8%; left:0; right:0;
+    font-size:clamp(6px,1.1vw,10px); color:#cbb88c; letter-spacing:2px; opacity:.8;
+  }
+
+  /* ============== INSTRUCCIONES ============== */
+  #scr-howto{padding:5% 5% 9%}
+  .howto-wrap{display:flex; gap:4%; height:100%; align-items:center}
+  .howto-char{
+    position:relative; flex:0 0 38%; height:84%;
+    border:3px solid rgba(0,0,0,.5); background:#0c0c16;
+    box-shadow:0 0 0 3px rgba(255,255,255,.06), 0 10px 30px rgba(0,0,0,.6);
+    overflow:hidden;
+  }
+  /* placeholder de arte centrado para instrucciones y ruleta */
+  .howto-char .fallback, .roll-art .fallback{
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:10px;
+    background:radial-gradient(circle at 50% 30%, var(--a) -30%, var(--c) 60%, #000 130%);
+  }
+  .howto-char .ini{font-family:'Anton'; font-size:clamp(40px,8vw,92px); color:#fff; -webkit-text-stroke:3px rgba(0,0,0,.5)}
+  .howto-char .cname{font-size:clamp(7px,1.3vw,12px); letter-spacing:2px; color:#fff}
+  .roll-art .ini{font-family:'Anton'; font-size:clamp(34px,7vw,80px); color:#fff; -webkit-text-stroke:3px rgba(0,0,0,.5)}
+  .roll-art .cname{font-size:clamp(6px,1.2vw,11px); letter-spacing:2px; color:#fff}
+  .howto-char img, .roll-art img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:top center}
+  .adv-badge{
+    position:absolute; top:8px; left:8px; z-index:5;
+    background:linear-gradient(#ff8a3c,#c43c12); color:#fff;
+    font-size:clamp(9px,1.6vw,15px); padding:7px 12px; letter-spacing:2px;
+    border:2px solid #000; box-shadow:0 3px 0 #000; transform:skewX(-6deg);
+  }
+  .howto-panel{flex:1; display:flex; flex-direction:column; gap:14px; min-width:0}
+  .howto-name{
+    font-family:'Anton'; font-size:clamp(16px,3.4vw,38px); letter-spacing:1px;
+    color:var(--gold); -webkit-text-stroke:1.5px #000; text-shadow:0 4px 0 #000;
+    transform:skewX(-6deg);
+  }
+  .howto-line{
+    background:rgba(8,10,22,.85); border:2px solid var(--blue);
+    border-radius:8px; padding:14px 16px;
+    font-size:clamp(8px,1.45vw,13px); line-height:1.9; color:#eef3ff;
+    text-shadow:0 2px 0 #000;
+  }
+  .ctrl-title{font-size:clamp(8px,1.4vw,12px); color:#ffd98a; letter-spacing:2px; margin-top:2px}
+  .ctrl-list{display:flex; flex-direction:column; gap:9px}
+  .ctrl{
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    font-size:clamp(7px,1.25vw,11px); color:#e8e8e8; letter-spacing:1px;
+    border-bottom:1px dashed rgba(255,255,255,.14); padding-bottom:7px;
+  }
+  .ctrl .keys{color:var(--gold); white-space:nowrap}
+  .howto-go{margin-top:auto; color:#cbe0ff; font-size:clamp(7px,1.2vw,11px); letter-spacing:2px}
+
+  /* ============== SELECCIÓN ============== */
+  #scr-select{padding:4.5% 4% 8.5%}
+  .sel-head{
+    text-align:center; font-size:clamp(9px,1.9vw,16px); color:#fff;
+    letter-spacing:3px; text-shadow:0 3px 0 #000; margin-bottom:2.5%;
+  }
+  .sel-head b{color:var(--gold)}
+  .sel-body{display:flex; gap:3.5%; flex:1; min-height:0}
+  .sel-preview{
+    flex:0 0 33%; display:flex; flex-direction:column; gap:10px; min-width:0;
+  }
+  .sel-grid{
+    flex:1; display:grid; grid-template-columns:repeat(2,1fr); gap:14px;
+    align-content:center;
+  }
+  @media(min-width:760px){ .sel-grid{grid-template-columns:repeat(3,1fr)} }
+
+  .cell{
+    position:relative; aspect-ratio:1/1; cursor:pointer; overflow:hidden;
+    border:3px solid rgba(0,0,0,.55); background:#111;
+    box-shadow:0 4px 0 rgba(0,0,0,.5);
+    transition:transform .08s;
+  }
+  .cell .fallback{
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:6px;
+    background:radial-gradient(circle at 50% 32%, var(--a) -40%, var(--c) 55%, #000 130%);
+  }
+  .cell .ini{font-family:'Anton'; font-size:clamp(20px,4vw,46px); color:#fff; -webkit-text-stroke:2px rgba(0,0,0,.55); text-shadow:0 3px 0 rgba(0,0,0,.5)}
+  .cell .cname{display:none} /* la etiqueta inferior .tag ya rotula la celda */
+  .cell img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:top center}
+  .cell .tag{
+    position:absolute; left:0; right:0; bottom:0; z-index:3;
+    background:linear-gradient(transparent, rgba(0,0,0,.85));
+    color:#fff; font-size:clamp(5px,1vw,9px); letter-spacing:1px;
+    padding:10px 4px 4px; text-align:center;
+  }
+  .cell.cur{ z-index:4; transform:translateY(-3px) }
+  .cell.cur::after{
+    content:""; position:absolute; inset:-3px; z-index:5; pointer-events:none;
+    border:4px solid var(--gold);
+    box-shadow:0 0 0 2px #000, 0 0 16px rgba(255,210,80,.8);
+    animation:curpulse .5s steps(2) infinite;
+  }
+  @keyframes curpulse{50%{border-color:#fff}}
+  .cell.cur .p1{
+    content:"1P"; position:absolute; top:-12px; left:-2px; z-index:6;
+    background:var(--blue); color:#fff; font-size:9px; padding:3px 5px;
+    border:2px solid #000;
+  }
+
+  /* preview lateral */
+  .pv-art{
+    position:relative; flex:1; min-height:0; overflow:hidden;
+    border:3px solid rgba(0,0,0,.55);
+    box-shadow:0 0 0 3px rgba(255,255,255,.06);
+  }
+  .pv-art .fallback{
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:10px;
+    background:radial-gradient(circle at 50% 30%, var(--a) -30%, var(--c) 58%, #000 130%);
+  }
+  .pv-art .ini{font-family:'Anton'; font-size:clamp(40px,9vw,96px); color:#fff; -webkit-text-stroke:3px rgba(0,0,0,.5)}
+  .pv-art .cname{font-size:clamp(7px,1.3vw,12px); letter-spacing:2px; color:#fff}
+  .pv-art img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:top center}
+  .pv-adv{
+    position:absolute; top:8px; right:8px; z-index:5;
+    background:linear-gradient(#ff8a3c,#c43c12); color:#fff;
+    font-size:10px; padding:5px 9px; letter-spacing:1px; border:2px solid #000; transform:skewX(-6deg);
+  }
+  .pv-info{ display:flex; flex-direction:column; gap:7px }
+  .pv-name{
+    font-family:'Anton'; font-size:clamp(13px,2.4vw,26px); letter-spacing:1px;
+    color:#fff; -webkit-text-stroke:1px #000; text-shadow:0 3px 0 #000;
+  }
+  .pv-epi{font-size:clamp(7px,1.15vw,11px); color:var(--gold); letter-spacing:2px}
+  .pv-part{font-size:clamp(6px,1vw,9px); color:#bcd2ff; letter-spacing:1px}
+  .stats{display:flex; flex-direction:column; gap:5px; margin-top:3px}
+  .stat{display:flex; align-items:center; gap:8px; font-size:clamp(6px,1vw,9px); color:#ddd}
+  .stat .lbl{flex:0 0 4.2em; color:#9fb6d6}
+  .segs{display:flex; gap:3px}
+  .seg{width:clamp(8px,1.6vw,16px); height:8px; background:rgba(255,255,255,.13); border:1px solid rgba(0,0,0,.5)}
+  .seg.on{background:linear-gradient(var(--gold),var(--gold-deep))}
+  .pv-special{
+    margin-top:3px; font-size:clamp(6px,1vw,9px); color:#ffb; letter-spacing:1px;
+    border-top:1px dashed rgba(255,255,255,.2); padding-top:7px;
+  }
+  .pv-special b{color:#ff7b54}
+
+  /* ============== VERSUS ============== */
+  #scr-versus{align-items:center; justify-content:center; padding:4%}
+  .v-stage{width:100%; height:100%; display:flex; align-items:center; justify-content:center}
+
+  /* ruleta */
+  #versus-roll{display:flex; flex-direction:column; align-items:center; gap:3.2%; width:100%}
+  .v-firstbattle{
+    font-family:'Anton'; font-size:clamp(14px,3vw,32px); letter-spacing:2px;
+    color:var(--blue-lt); -webkit-text-stroke:1px #000; text-shadow:0 4px 0 #000;
+    transform:skewX(-6deg);
+  }
+  .v-banner{
+    background:linear-gradient(#3f74c9,#244a8e);
+    border:3px solid rgba(255,255,255,.25); border-radius:16px;
+    box-shadow:0 8px 0 rgba(0,0,0,.5), inset 0 2px 12px rgba(255,255,255,.18);
+    padding:14px 34px; text-align:center;
+  }
+  .v-banner span{
+    font-family:'Anton'; font-size:clamp(18px,4.4vw,52px); line-height:1;
+    color:var(--gold); -webkit-text-stroke:2px #000; text-shadow:0 4px 0 #000;
+    letter-spacing:1px;
+  }
+  .roll-area{display:flex; flex-direction:column; align-items:center; gap:12px}
+  .roll-art{
+    position:relative; width:clamp(120px,26vw,240px); aspect-ratio:3/4; overflow:hidden;
+    border:4px solid rgba(0,0,0,.6); box-shadow:0 0 0 3px var(--gold), 0 0 26px rgba(255,210,80,.5);
+  }
+  .roll-art.reveal{animation:revealpop .5s ease}
+  @keyframes revealpop{0%{transform:scale(.7)}60%{transform:scale(1.08)}100%{transform:scale(1)}}
+  .roll-name{font-family:'Anton'; font-size:clamp(14px,3vw,34px); color:#fff; letter-spacing:1px; -webkit-text-stroke:1px #000; text-shadow:0 3px 0 #000; min-height:1.1em}
+  .qgrid{display:grid; grid-template-columns:repeat(6,1fr); gap:8px; width:min(70%,520px)}
+  .qtile{
+    aspect-ratio:1/1; display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(#2c55a0,#16306a); border:2px solid rgba(0,0,0,.5);
+    font-family:'Anton'; font-size:clamp(14px,3vw,30px); color:var(--gold);
+    box-shadow:inset 0 2px 8px rgba(255,255,255,.12);
+  }
+  .qtile.flip{animation:qflip .3s steps(2) infinite}
+  @keyframes qflip{50%{color:#fff; transform:scaleX(.6)}}
+
+  /* VS final + selección de escenario */
+  #versus-vs{display:none; width:100%; height:100%; flex-direction:column}
+  #versus-vs.show{display:flex}
+  .vs-top{ text-align:center; font-family:'Anton'; font-size:clamp(12px,2.6vw,28px); letter-spacing:2px; color:var(--blue-lt); -webkit-text-stroke:1px #000; text-shadow:0 3px 0 #000; padding:6px 0; transform:skewX(-6deg)}
+  .vs-arena{ flex:1; display:flex; align-items:stretch; gap:0; min-height:0 }
+  .vs-fighter{
+    flex:0 0 26%; position:relative; overflow:hidden;
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-end; padding-bottom:10px;
+    border:2px solid rgba(0,0,0,.5);
+  }
+  #vs-left{clip-path:polygon(0 0,100% 0,84% 100%,0 100%)}
+  #vs-right{clip-path:polygon(16% 0,100% 0,100% 100%,0 100%)}
+  .vs-fighter .art{position:absolute; inset:0}
+  .vs-fighter .art .fallback{
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+    background:radial-gradient(circle at 50% 30%, var(--a) -30%, var(--c) 60%, #000 130%);
+  }
+  .vs-fighter .art .ini{font-family:'Anton'; font-size:clamp(30px,6vw,80px); color:#fff; -webkit-text-stroke:3px rgba(0,0,0,.5)}
+  .vs-fighter .art .cname{display:none}
+  .vs-fighter .art img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:top center}
+  .vs-meta{position:relative; z-index:4; text-align:center; text-shadow:0 3px 0 #000; padding:0 4px}
+  .vs-meta .nm{font-family:'Anton'; font-size:clamp(11px,2vw,24px); color:#fff; -webkit-text-stroke:1px #000; letter-spacing:1px; line-height:1}
+  .vs-meta .ep{font-size:clamp(5px,1vw,10px); color:var(--gold); letter-spacing:1px; margin-top:3px}
+  .vs-center{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px; padding:0 1.5%; min-width:0 }
+  .vs-battlein{ font-family:'Anton'; font-size:clamp(12px,2.4vw,26px); color:var(--gold); -webkit-text-stroke:1px #000; text-shadow:0 3px 0 #000; letter-spacing:2px }
+  .stage-frame{
+    position:relative; width:96%; aspect-ratio:16/10; overflow:hidden;
+    border:3px solid #cfd6e6; box-shadow:0 0 0 2px #000, 0 8px 22px rgba(0,0,0,.6); background:#0a0f1e;
+  }
+  .stage-frame img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
+  .stage-frame .ph{
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+    background:linear-gradient(135deg,#1c2c52,#3a1414); color:#9fb6d6;
+    font-size:clamp(6px,1.1vw,10px); letter-spacing:2px; text-align:center; line-height:1.6;
+  }
+  .stage-frame .ph b{font-family:'Anton'; font-size:clamp(14px,2.6vw,28px); color:#fff; letter-spacing:1px}
+  .stage-city{ font-family:'Anton'; font-size:clamp(16px,3.4vw,40px); color:var(--gold); -webkit-text-stroke:1px #000; text-shadow:0 3px 0 #000; letter-spacing:1px; line-height:1 }
+  .stage-place{ font-size:clamp(7px,1.3vw,13px); color:var(--blue-lt); letter-spacing:2px }
+  .stage-hint{ font-size:clamp(5px,.95vw,9px); color:#cbb88c; letter-spacing:1px; opacity:.85 }
+  .stage-chips{ display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:2px }
+  .chip{
+    font-family:'Press Start 2P'; font-size:clamp(5px,.95vw,9px); letter-spacing:.5px;
+    background:rgba(0,0,0,.45); color:#dfe6f5; border:2px solid rgba(255,255,255,.18);
+    padding:6px 8px; cursor:pointer;
+  }
+  .chip.sel{ border-color:var(--gold); color:#fff; background:rgba(255,210,90,.15); box-shadow:0 0 8px rgba(255,210,80,.4) }
+  .vs-cta{text-align:center; padding:10px}
+
+  .btn{
+    font-family:'Press Start 2P'; font-size:clamp(8px,1.5vw,13px);
+    background:linear-gradient(#ffb44a,#d6691a); color:#1a0c02;
+    border:3px solid #000; padding:13px 22px; cursor:pointer; letter-spacing:1px;
+    box-shadow:0 5px 0 #000; transition:transform .06s;
+  }
+  .btn:hover{filter:brightness(1.08)}
+  .btn:active{transform:translateY(3px); box-shadow:0 2px 0 #000}
+  .btn.ghost{background:rgba(0,0,0,.5); color:#fff; box-shadow:0 5px 0 rgba(0,0,0,.6)}
+  .btn-row{display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-top:14px}
+
+  /* ============== FIGHT placeholder ============== */
+  #scr-fight{align-items:center; justify-content:center; text-align:center; padding:6%}
+  .fight-round{font-family:'Anton'; font-size:clamp(16px,3.4vw,40px); color:var(--gold); letter-spacing:2px; -webkit-text-stroke:1px #000; text-shadow:0 4px 0 #000}
+  .fight-match{font-family:'Anton'; font-size:clamp(20px,4.6vw,56px); color:#fff; -webkit-text-stroke:2px #000; text-shadow:0 5px 0 #000; margin:10px 0; line-height:1.05}
+  .fight-soon{font-size:clamp(8px,1.5vw,13px); color:#cbe0ff; letter-spacing:2px; margin-top:10px; line-height:2}
+
+  /* FIGHT flash */
+  #flash{
+    position:absolute; inset:0; z-index:90; display:none;
+    align-items:center; justify-content:center; background:rgba(0,0,0,.82);
+  }
+  #flash.on{display:flex}
+  #flash span{
+    font-family:'Anton'; font-size:clamp(40px,14vw,170px); color:#ff3b2e;
+    -webkit-text-stroke:5px #000; text-shadow:0 0 40px rgba(255,60,40,1);
+    animation:fightzoom .5s ease;
+  }
+  @keyframes fightzoom{0%{transform:scale(.2) rotate(-8deg); opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+
+  .credit-note{
+    position:absolute; bottom:2px; left:0; right:0; z-index:40; text-align:center;
+    font-size:6px; color:#8a7a5a; letter-spacing:1px; line-height:1.4;
+  }
+  #scr-title .hud{bottom:18px}
+</style>
+</head>
+<body>
+<div id="cab">
+  <div id="screen">
+    <button id="snd" title="Sonido">🔊</button>
+
+    <!-- ============ TÍTULO ============ -->
+    <section id="scr-title" class="screen active bg-dust">
+      <div class="topbrand">RICARDO.RUIZ PRESENTA</div>
+      <div class="logo">
+        <div class="logo-top">SEGUNDA VUELTA</div>
+        <div class="logo-mid">
+          <span class="fighters">COLOMBIA</span>
+          <span class="year">'26</span>
+        </div>
+        <div class="logo-sub">EL CAMBIO POR LA VIDA <b>O</b> FIRMES POR LA PATRIA</div>
+      </div>
+      <div class="insert blink" id="insert-msg">INSERTE VOTO</div>
+      <div class="tap-hint" id="tap-hint">PULSA CUALQUIER TECLA · O TOCA LA PANTALLA</div>
+      <div class="hud">
+        <span>CRÉDITOS <b>00</b></span>
+        <span>2ª VUELTA · 2026</span>
+      </div>
+      <div class="credit-note">RICARDO RUIZ 2026</div>
+    </section>
+
+    <!-- ============ INSTRUCCIONES ============ -->
+    <section id="scr-howto" class="screen bg-arena">
+      <div class="howto-wrap">
+        <div class="howto-char" id="howto-art"></div>
+        <div class="howto-panel">
+          <div class="howto-name" id="howto-name">—</div>
+          <div class="howto-line" id="howto-line">—</div>
+          <div class="ctrl-title">CÓMO SE JUEGA · MODO AVANZADO</div>
+          <div class="ctrl-list">
+            <div class="ctrl"><span>ESCAPE DE EMERGENCIA</span><span class="keys">[◄] A+B</span></div>
+            <div class="ctrl"><span>CARGAR ENCUESTAS (MEDIDOR)</span><span class="keys">MANTÉN C</span></div>
+            <div class="ctrl"><span>MOVIMIENTO ESPECIAL</span><span class="keys">↓ ↘ → + A</span></div>
+            <div class="ctrl"><span>ACTIVAR MODO CAMPAÑA (MAX)</span><span class="keys">A+B+C</span></div>
+          </div>
+          <div class="howto-go blink-s">PULSA CUALQUIER TECLA PARA ELEGIR PELEADOR ▸</div>
+        </div>
+      </div>
+      <div class="hud">
+        <span class="lvl">NIVEL- 4</span>
+        <span>AVANZADO</span>
+        <span>CRÉDITOS <b>00</b></span>
+      </div>
+    </section>
+
+    <!-- ============ SELECCIÓN ============ -->
+    <section id="scr-select" class="screen bg-arena">
+      <div class="sel-head">ELIGE A TU <b>CANDIDATO</b> · K.O.F. '26</div>
+      <div class="sel-body">
+        <div class="sel-preview" id="sel-preview"></div>
+        <div class="sel-grid" id="sel-grid"></div>
+      </div>
+      <div class="hud">
+        <span class="lvl">NIVEL- 4</span>
+        <span>← → ELIGE · ENTER CONFIRMA</span>
+        <span class="time">TIME <b id="sel-time">26</b></span>
+      </div>
+    </section>
+
+    <!-- ============ VERSUS ============ -->
+    <section id="scr-versus" class="screen bg-versus">
+      <div class="v-stage">
+        <!-- ruleta -->
+        <div id="versus-roll">
+          <div class="v-firstbattle">PRIMER COMBATE</div>
+          <div class="v-banner"><span>EL SIGUIENTE<br>RIVAL</span></div>
+          <div class="roll-area">
+            <div class="roll-art" id="roll-art"></div>
+            <div class="roll-name" id="roll-name">???</div>
+          </div>
+          <div class="qgrid" id="qgrid"></div>
+        </div>
+        <!-- VS + selección de escenario -->
+        <div id="versus-vs">
+          <div class="vs-top">PRIMER COMBATE</div>
+          <div class="vs-arena">
+            <div class="vs-fighter" id="vs-left"></div>
+            <div class="vs-center">
+              <div class="vs-battlein">COMBATE EN</div>
+              <div class="stage-frame" id="stage-frame"></div>
+              <div class="stage-city" id="stage-city">BOGOTÁ</div>
+              <div class="stage-place" id="stage-place">PLAZA DE BOLÍVAR</div>
+              <div class="stage-hint">ESCOGE EL ESCENARIO · ← →</div>
+              <div class="stage-chips" id="stage-chips"></div>
+            </div>
+            <div class="vs-fighter" id="vs-right"></div>
+          </div>
+          <div class="vs-cta">
+            <button class="btn" id="btn-fight">¡PELEAR!  ▸</button>
+          </div>
+        </div>
+      </div>
+      <div class="hud">
+        <span class="lvl">NIVEL- 4</span>
+        <span id="versus-hud">EL DESTINO ELIGE A TU RIVAL…</span>
+        <span>CRÉDITOS <b>00</b></span>
+      </div>
+    </section>
+
+    <!-- ============ FIGHT placeholder ============ -->
+    <section id="scr-fight" class="screen bg-versus">
+      <div class="fight-round">PRIMER COMBATE · ROUND 1</div>
+      <div class="fight-match" id="fight-match">— VS —</div>
+      <div class="fight-soon" id="fight-soon">
+        🥊 EL COMBATE LLEGA PRONTO 🥊<br>
+        (motor de pelea en construcción)
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="btn-rerival">OTRO RIVAL</button>
+        <button class="btn ghost" id="btn-rechar">CAMBIAR CANDIDATO</button>
+        <button class="btn ghost" id="btn-restart">VOLVER AL INICIO</button>
+      </div>
+    </section>
+
+    <!-- FLASH FIGHT! -->
+    <div id="flash"><span>¡FIGHT!</span></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============ DATOS DE PELEADORES ============ */
+  // Imágenes esperadas (las pones tú): kof-electoral/<id>.png  (retrato vertical ~600x800)
+  const FIGHTERS = [
+    { id:'cepeda',  name:'IVÁN CEPEDA',   short:'CEPEDA',   ini:'IC',
+      partido:'Pacto Histórico', epi:'EL INVESTIGADOR', color:'#8E44AD', accent:'#C39BD3',
+      special:'EXPEDIENTE ABIERTO', stats:{F:3,V:3,T:5,D:4,R:4},
+      line:'Bienvenido al combate. Aquí cada golpe queda en el expediente: estudia a tu rival antes de atacar.' },
+    { id:'petro',   name:'GUSTAVO PETRO', short:'PETRO',    ini:'GP',
+      partido:'Pacto Histórico', epi:'EL HURACÁN DEL CAMBIO', color:'#E74C3C', accent:'#F1948A',
+      special:'OLA DEL CAMBIO', stats:{F:5,V:4,T:3,D:2,R:5},
+      line:'¡Esto es el cambio, hermano! Carga el medidor con la fuerza del pueblo y suéltalo todo de una.' },
+    { id:'santos',  name:'JUAN M. SANTOS', short:'SANTOS',  ini:'JS',
+      partido:'De la U · Paz', epi:'EL NOBEL DE PAZ', color:'#00A8B5', accent:'#76D7E0',
+      special:'PALOMA DE LA PAZ', stats:{F:3,V:3,T:5,D:4,R:3},
+      line:'Caballero, hasta en la pelea hay reglas. Domina la técnica y, si puedes, negocia la victoria.' },
+    { id:'abelardo',name:'ABELARDO E.',   short:'ABELARDO', ini:'AE',
+      partido:'Defensores de la Patria', epi:'EL TIGRE', color:'#16161F', accent:'#D4AF37',
+      special:'ZARPAZO DEL TIGRE', stats:{F:5,V:2,T:3,D:5,R:4},
+      line:'Esto no es para tibios. El Tigre no perdona: bloquea, espera y da el zarpazo.' },
+    { id:'uribe',   name:'ÁLVARO URIBE',  short:'URIBE',    ini:'AU',
+      partido:'Centro Democrático', epi:'MANO FIRME', color:'#1B4F8C', accent:'#7FB3D5',
+      special:'SEGURIDAD DEMOCRÁTICA', stats:{F:4,V:3,T:4,D:5,R:4},
+      line:'Mano firme, corazón grande. Mantén la guardia arriba y no le sueltes el cuello al adversario.' },
+    { id:'paloma',  name:'PALOMA VALENCIA', short:'PALOMA', ini:'PV',
+      partido:'Centro Democrático', epi:'LA PALOMA DE ACERO', color:'#2F7DE0', accent:'#9FC4F0',
+      special:'VUELO DE ACERO', stats:{F:3,V:4,T:5,D:3,R:4},
+      line:'Aquí se viene con argumentos y firmeza. Lee a tu rival, mide los tiempos y no aflojes.' }
+  ];
+  const STAT_LABELS = { F:'FUERZA', V:'VELOC', T:'TÉCNICA', D:'DEFENSA', R:'AGUANTE' };
+
+  /* ============ ESCENARIOS DE COMBATE ============ */
+  // Imágenes esperadas (las pones tú): kof-electoral/stages/<id>.jpg
+  const STAGES = [
+    { id:'bogota',       city:'BOGOTÁ',       place:'PLAZA DE BOLÍVAR' },
+    { id:'medellin',     city:'MEDELLÍN',     place:'EL POBLADO' },
+    { id:'cali',         city:'CALI',         place:'JAIME VARELA' },
+    { id:'barranquilla', city:'BARRANQUILLA', place:'MALECÓN DEL RÍO' }
+  ];
+
+  const $  = s => document.querySelector(s);
+  const rnd = n => Math.floor(Math.random()*n);
+
+  const state = { me:null, opp:null, curIdx:0, stageIdx:0 };
+  let cur = 'title';
+  let selTimer = null, selTime = 26, rollIv = null, qflipIv = null;
+
+  /* ============ SONIDO (WebAudio sintetizado) ============ */
+  let actx=null, muted=false;
+  function audio(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ actx=null; } } return actx; }
+  function tone(freq, dur, type, vol){
+    if(muted) return; const a=audio(); if(!a) return;
+    const o=a.createOscillator(), g=a.createGain();
+    o.type=type||'square'; o.frequency.value=freq;
+    g.gain.value=(vol||0.06);
+    o.connect(g); g.connect(a.destination);
+    const t=a.currentTime; o.start(t);
+    g.gain.setValueAtTime(g.gain.value,t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+(dur||0.08));
+    o.stop(t+(dur||0.08)+0.02);
+  }
+  const sfx = {
+    coin(){ tone(660,.08,'square',.08); setTimeout(()=>tone(990,.12,'square',.08),90); setTimeout(()=>tone(1320,.16,'square',.07),200); },
+    move(){ tone(420,.05,'square',.05); },
+    select(){ tone(880,.09,'square',.08); setTimeout(()=>tone(1175,.14,'square',.07),80); },
+    tick(){ tone(300+rnd(500),.03,'square',.04); },
+    reveal(){ tone(523,.1,'sawtooth',.07); setTimeout(()=>tone(784,.18,'sawtooth',.07),100); },
+    gong(){ tone(140,.5,'sawtooth',.12); setTimeout(()=>tone(90,.6,'sawtooth',.1),60); }
+  };
+  /* ---- Música de fondo (mp3 por pantalla, en orden de creación) ---- */
+  const TRACKS = {
+    intro:  'kof-electoral/music/KOF98%20Cipher%20OST.mp3',                 // 1 · intro
+    howto:  'kof-electoral/music/KOF98%20OK%3F%20OST.mp3',                  // 2 · instrucciones
+    select: 'kof-electoral/music/KOF98%20THE%20KING%20OF%20FIGHTERS%20OST.mp3' // 3 · selección
+  };
+  let curMusic=null, curMusicName=null, musicReady=false;
+  function playMusic(name){
+    if(name && curMusicName===name && curMusic && !curMusic.paused) return;
+    if(curMusic){ try{curMusic.pause();}catch(e){} curMusic=null; }
+    curMusicName = name || null;
+    if(!name || muted) return;
+    const a=new Audio(TRACKS[name]); a.loop=true; a.volume=0.55;
+    curMusic=a; a.play().catch(()=>{});
+  }
+
+  $('#snd').addEventListener('click', (e)=>{ e.stopPropagation();
+    muted=!muted; $('#snd').textContent=muted?'🔇':'🔊';
+    if(muted){ if(curMusic){ try{curMusic.pause();}catch(e){} } }
+    else { audio(); const n=curMusicName; curMusicName=null; if(n){ playMusic(n); } else { sfx.move(); } }
+  });
+
+  /* ============ HELPERS DE ARTE ============ */
+  function artHTML(f){
+    return '<div class="art" style="--c:'+f.color+';--a:'+f.accent+'">'
+      + '<div class="fallback"><span class="ini">'+f.ini+'</span><span class="cname">'+f.short+'</span></div>'
+      + '<img src="kof-electoral/candidatos/'+f.id+'.png" alt="'+f.name+'" onerror="this.style.display=\'none\'">'
+      + '</div>';
+  }
+  // versión "suelta" (sin wrapper .art) para contenedores que ya posicionan
+  function artInner(f){
+    return '<div class="fallback" style="--c:'+f.color+';--a:'+f.accent+'"><span class="ini">'+f.ini+'</span><span class="cname">'+f.short+'</span></div>'
+      + '<img src="kof-electoral/candidatos/'+f.id+'.png" alt="'+f.name+'" onerror="this.style.display=\'none\'">';
+  }
+  function segs(n){ let s=''; for(let k=1;k<=5;k++){ s+='<i class="seg'+(k<=n?' on':'')+'"></i>'; } return s; }
+
+  /* ============ NAVEGACIÓN ============ */
+  function go(id){
+    cur=id;
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    $('#scr-'+id).classList.add('active');
+    clearInterval(selTimer); clearInterval(rollIv); clearInterval(qflipIv);
+    if(id==='title'){ enterTitle(); }
+    if(id==='howto'){ playMusic('howto'); enterHowto(); }
+    if(id==='select'){ playMusic('select'); enterSelect(); }
+    if(id==='versus'){ playMusic(null); enterVersus(); }   // sin música (por ahora)
+    if(id==='fight'){ enterFight(); }
+  }
+
+  /* ---- TÍTULO ---- */
+  function enterTitle(){
+    const ins=$('#insert-msg'), hint=$('#tap-hint');
+    ins.textContent='INSERTE VOTO'; ins.classList.add('blink');
+    hint.textContent='PULSA CUALQUIER TECLA · O TOCA LA PANTALLA';
+    if(musicReady){ playMusic('intro'); }   // al volver al inicio, suena el intro
+  }
+  // Primer gesto: desbloquea audio + arranca el intro (sin avanzar). Segundo gesto: entra.
+  function titleAdvance(){
+    if(!musicReady){
+      musicReady=true; audio(); playMusic('intro');
+      const ins=$('#insert-msg'), hint=$('#tap-hint');
+      ins.textContent='✓ VOTO REGISTRADO'; ins.classList.remove('blink');
+      hint.textContent='PULSA PARA EMPEZAR ▸'; hint.classList.add('blink-s');
+      return;
+    }
+    sfx.select();
+    go('howto');
+  }
+
+  /* ---- INSTRUCCIONES (personaje al azar) ---- */
+  function enterHowto(){
+    const f = FIGHTERS[rnd(FIGHTERS.length)];
+    $('#howto-art').innerHTML = '<div class="adv-badge">AVANZADO</div>' + artInner(f);
+    $('#howto-name').textContent = f.name;
+    $('#howto-line').textContent = '«'+f.line+'»';
+  }
+
+  /* ---- SELECCIÓN ---- */
+  function buildGrid(){
+    $('#sel-grid').innerHTML = FIGHTERS.map((f,i)=>
+      '<button class="cell" data-i="'+i+'" style="--c:'+f.color+';--a:'+f.accent+'">'
+      + '<div class="fallback"><span class="ini">'+f.ini+'</span><span class="cname">'+f.short+'</span></div>'
+      + '<img src="kof-electoral/candidatos/'+f.id+'.png" alt="'+f.name+'" onerror="this.style.display=\'none\'">'
+      + '<span class="p1"></span>'
+      + '<span class="tag">'+f.short+'</span>'
+      + '</button>'
+    ).join('');
+    $('#sel-grid').querySelectorAll('.cell').forEach(c=>{
+      const i = +c.dataset.i;
+      c.addEventListener('mouseenter', ()=>{ if(state.curIdx!==i){ state.curIdx=i; paintCursor(); sfx.move(); } });
+      c.addEventListener('click', ()=>{ state.curIdx=i; paintCursor(); confirmPick(); });
+    });
+  }
+  function paintCursor(){
+    $('#sel-grid').querySelectorAll('.cell').forEach((c,i)=>c.classList.toggle('cur', i===state.curIdx));
+    const f = FIGHTERS[state.curIdx];
+    $('#sel-preview').innerHTML =
+      '<div class="pv-art" style="--c:'+f.color+';--a:'+f.accent+'">'
+        + '<div class="pv-adv">AVANZADO</div>'
+        + '<div class="fallback"><span class="ini">'+f.ini+'</span><span class="cname">'+f.short+'</span></div>'
+        + '<img src="kof-electoral/candidatos/'+f.id+'.png" alt="'+f.name+'" onerror="this.style.display=\'none\'">'
+      + '</div>'
+      + '<div class="pv-info">'
+        + '<div class="pv-name">'+f.name+'</div>'
+        + '<div class="pv-epi">«'+f.epi+'»</div>'
+        + '<div class="pv-part">'+f.partido+'</div>'
+        + '<div class="stats">'
+          + Object.keys(f.stats).map(k=>'<div class="stat"><span class="lbl">'+STAT_LABELS[k]+'</span><span class="segs">'+segs(f.stats[k])+'</span></div>').join('')
+        + '</div>'
+        + '<div class="pv-special">ESPECIAL · <b>'+f.special+'</b></div>'
+      + '</div>';
+  }
+  function enterSelect(){
+    state.curIdx = state.curIdx || 0;
+    buildGrid(); paintCursor();
+    selTime = 26; $('#sel-time').textContent = selTime;
+    selTimer = setInterval(()=>{
+      selTime--; if(selTime<0) selTime=0;
+      $('#sel-time').textContent = String(selTime).padStart(2,'0');
+      if(selTime<=0){ clearInterval(selTimer); confirmPick(); }
+    },1000);
+  }
+  function moveCursor(d){
+    const n=FIGHTERS.length;
+    state.curIdx=(state.curIdx+d+n)%n;
+    paintCursor(); sfx.move();
+  }
+  function confirmPick(){
+    clearInterval(selTimer);
+    state.me = FIGHTERS[state.curIdx];
+    sfx.select();
+    go('versus');
+  }
+
+  /* ---- VERSUS (ruleta del rival al azar) ---- */
+  function pickOpponent(){
+    const pool = FIGHTERS.filter(f=>f.id!==state.me.id);
+    return pool[rnd(pool.length)];
+  }
+  function enterVersus(){
+    state.opp = pickOpponent();
+    $('#versus-vs').classList.remove('show');
+    $('#versus-roll').style.display='flex';
+    $('#versus-hud').textContent='EL DESTINO ELIGE A TU RIVAL…';
+    $('#roll-name').textContent='???';
+    $('#roll-art').classList.remove('reveal');
+    // grid decorativo de ???
+    $('#qgrid').innerHTML = Array.from({length:12}).map(()=>'<div class="qtile flip">?</div>').join('');
+    qflipIv = setInterval(()=>{
+      $('#qgrid').querySelectorAll('.qtile').forEach(t=>{ if(rnd(2)) t.classList.toggle('flip'); });
+    },140);
+    // ruleta del retrato
+    let ticks=0; const maxTicks=22;
+    rollIv = setInterval(()=>{
+      const r = FIGHTERS[rnd(FIGHTERS.length)];
+      $('#roll-art').innerHTML = artInner(r);
+      sfx.tick(); ticks++;
+      if(ticks>=maxTicks){
+        clearInterval(rollIv); clearInterval(qflipIv);
+        $('#qgrid').querySelectorAll('.qtile').forEach(t=>t.classList.remove('flip'));
+        $('#roll-art').innerHTML = artInner(state.opp);
+        $('#roll-art').classList.add('reveal');
+        $('#roll-name').textContent = state.opp.name;
+        $('#versus-hud').textContent = '¡'+state.opp.short+' TE RETA!';
+        sfx.reveal();
+        setTimeout(showVS, 1200);
+      }
+    },95);
+  }
+  function showVS(){
+    if(cur!=='versus') return;
+    $('#versus-roll').style.display='none';
+    const L=state.me, R=state.opp;
+    $('#vs-left').style.setProperty('--c',L.color); $('#vs-left').style.setProperty('--a',L.accent);
+    $('#vs-right').style.setProperty('--c',R.color); $('#vs-right').style.setProperty('--a',R.accent);
+    $('#vs-left').innerHTML  = artHTML(L) + '<div class="vs-meta"><div class="nm">'+L.short+'</div><div class="ep">TÚ</div></div>';
+    $('#vs-right').innerHTML = artHTML(R) + '<div class="vs-meta"><div class="nm">'+R.short+'</div><div class="ep">RIVAL</div></div>';
+    renderStage(state.stageIdx||0);
+    $('#versus-vs').classList.add('show');
+    $('#versus-hud').textContent = L.short+'  VS  '+R.short;
+    sfx.gong();
+  }
+  function renderStage(i){
+    state.stageIdx=i;
+    const s=STAGES[i];
+    $('#stage-frame').innerHTML =
+      '<div class="ph">ESCENARIO<br><b>'+s.city+'</b><br>'+s.place+'</div>'
+      + '<img src="kof-electoral/stages/'+s.id+'.jpg" alt="'+s.city+'" onerror="this.style.display=\'none\'">';
+    $('#stage-city').textContent  = s.city;
+    $('#stage-place').textContent = s.place;
+    $('#stage-chips').innerHTML = STAGES.map((st,k)=>'<button class="chip'+(k===i?' sel':'')+'" data-k="'+k+'">'+st.city+'</button>').join('');
+    $('#stage-chips').querySelectorAll('.chip').forEach(c=>{
+      c.addEventListener('click', (e)=>{ e.stopPropagation(); renderStage(+c.dataset.k); sfx.move(); });
+    });
+  }
+
+  /* ---- FIGHT placeholder ---- */
+  function startFight(){
+    const fl=$('#flash'); fl.classList.add('on'); sfx.gong();
+    setTimeout(()=>{ fl.classList.remove('on'); go('fight'); }, 850);
+  }
+  function enterFight(){
+    const s=STAGES[state.stageIdx||0];
+    $('#fight-match').innerHTML = state.me.short + '<br>VS<br>' + state.opp.short;
+    $('#fight-soon').innerHTML = 'EN ' + s.city + ' · ' + s.place + '<br>🥊 EL COMBATE LLEGA PRONTO · (motor de pelea en construcción)';
+  }
+
+  /* ============ EVENTOS ============ */
+  $('#scr-title').addEventListener('click', ()=>{ titleAdvance(); });
+  $('#scr-howto').addEventListener('click', ()=>{ go('select'); });
+  $('#btn-fight').addEventListener('click', startFight);
+  $('#btn-rerival').addEventListener('click', ()=>{ sfx.select(); go('versus'); });
+  $('#btn-rechar').addEventListener('click', ()=>{ go('select'); });
+  $('#btn-restart').addEventListener('click', ()=>{ go('title'); });
+
+  document.addEventListener('keydown', (e)=>{
+    const k=e.key;
+    if(cur==='title'){ titleAdvance(); return; }
+    if(cur==='howto'){ go('select'); return; }
+    if(cur==='select'){
+      if(k==='ArrowLeft'||k==='ArrowUp'){ e.preventDefault(); moveCursor(-1); }
+      else if(k==='ArrowRight'||k==='ArrowDown'){ e.preventDefault(); moveCursor(1); }
+      else if(k==='Enter'||k===' '){ e.preventDefault(); confirmPick(); }
+      return;
+    }
+    if(cur==='versus'){
+      if(!$('#versus-vs').classList.contains('show')) return;
+      if(k==='ArrowLeft'||k==='ArrowUp'){ e.preventDefault(); renderStage((state.stageIdx-1+STAGES.length)%STAGES.length); sfx.move(); }
+      else if(k==='ArrowRight'||k==='ArrowDown'){ e.preventDefault(); renderStage((state.stageIdx+1)%STAGES.length); sfx.move(); }
+      else if(k==='Enter'||k===' '){ e.preventDefault(); startFight(); }
+      return;
+    }
+    if(cur==='fight'){
+      if(k==='Enter'||k===' '){ go('versus'); }
+      else if(k==='Escape'){ go('select'); }
+      return;
+    }
+  });
+
+  // Intento de autoplay del intro (los navegadores suelen bloquearlo hasta el primer gesto;
+  // si se bloquea, el intro arranca con el primer toque en el título).
+  (function(){
+    const a=new Audio(TRACKS.intro); a.loop=true; a.volume=0.55;
+    a.play().then(()=>{ curMusic=a; curMusicName='intro'; musicReady=true; }).catch(()=>{});
+  })();
+
+  // arranque
+  go('title');
+})();
+</script>
+</body>
+</html>
