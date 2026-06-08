@@ -1235,14 +1235,16 @@
     im.src='kof-electoral/candidatos/fight/'+fd.id+'.png';
     return im;
   }
-  // Poses de puño (der/izq). Si no existen, naturalWidth=0 y se usa la pose base.
+  // Poses de golpe (der/izq). Si no existen, naturalWidth=0 y se usa la pose base.
   function fLoadPunch(fd, dir){ const im=new Image(); im.src='kof-electoral/candidatos/fight/punos/'+fd.id+'-'+dir+'.png'; return im; }
+  function fLoadKick(fd, dir){ const im=new Image(); im.src='kof-electoral/candidatos/fight/patada/'+fd.id+'-'+dir+'.png'; return im; }
   function mkF(fd, side, boss){
     const hp = boss?120:100;
     return { fd, side, boss:!!boss, x: side==='L'?F.W*0.30:F.W*0.70, y:0, vy:0, onGround:true,
       hp, maxHp:hp, hpShown:hp, facing: side==='L'?1:-1,
       atk:null, atkUntil:0, atkHit:false, cdUntil:0, stun:0, lean:0, blocking:false,
-      combo:0, lastHit:0, flashUntil:0, img:fLoadSprite(fd), punchR:fLoadPunch(fd,'der'), punchL:fLoadPunch(fd,'izq') };
+      combo:0, lastHit:0, flashUntil:0, img:fLoadSprite(fd),
+      punchR:fLoadPunch(fd,'der'), punchL:fLoadPunch(fd,'izq'), kickR:fLoadKick(fd,'der'), kickL:fLoadKick(fd,'izq') };
   }
   function setBars(){ if(fP) $('#fhp-l').style.width=Math.max(0,fP.hp/fP.maxHp*100)+'%'; if(fO) $('#fhp-r').style.width=Math.max(0,fO.hp/fO.maxHp*100)+'%'; }
   // capa roja de daño: baja con retraso hasta la vida real
@@ -1503,16 +1505,16 @@
   function drawShadow(c,ftr){ const gy=fGroundPx(), w=fwOf(ftr); c.save(); c.globalAlpha=.32; c.fillStyle='#000'; c.beginPath(); c.ellipse(ftr.x, gy-6, w*0.28, 15, 0, 0, Math.PI*2); c.fill(); c.restore(); }
   function drawFighter(c,ftr,now){
     const srcFace = ftr.fd.srcFace || 1;   // orientación natural del PNG base (1=mira derecha, -1=izquierda)
-    let img = ftr.img, flip = (ftr.facing!==srcFace), usingPunch=false;
-    if(ftr.atk==='punch'){
-      const pim = (ftr.facing>=0) ? ftr.punchR : ftr.punchL;   // der=golpe a la derecha, izq=a la izquierda (ya orientados)
-      if(pim && pim.complete && pim.naturalWidth){ img=pim; flip=false; usingPunch=true; }
+    let img = ftr.img, flip = (ftr.facing!==srcFace), usingFrame=false;
+    if(ftr.atk==='punch' || ftr.atk==='kick'){
+      const set = ftr.atk==='punch' ? (ftr.facing>=0?ftr.punchR:ftr.punchL) : (ftr.facing>=0?ftr.kickR:ftr.kickL);
+      if(set && set.complete && set.naturalWidth){ img=set; flip=false; usingFrame=true; }  // der/izq ya orientados
     }
     const h=fSpriteH(), gy=fGroundPx();
     const aspect = (img && img.naturalHeight) ? img.naturalWidth/img.naturalHeight : 0.667;
     const w = h*aspect;
-    const lean = ftr.stun>0 ? -ftr.facing*9 : (ftr.atk && !usingPunch ? ftr.facing*20*ftr.lean : 0);
-    const sc = (ftr.atk && !usingPunch)?1.03:1, dh=h*sc, dw=w*sc, cx=ftr.x+lean, top=gy-dh+ftr.y;
+    const lean = ftr.stun>0 ? -ftr.facing*9 : (ftr.atk && !usingFrame ? ftr.facing*20*ftr.lean : 0);
+    const sc = (ftr.atk && !usingFrame)?1.03:1, dh=h*sc, dw=w*sc, cx=ftr.x+lean, top=gy-dh+ftr.y;
     const flashing = ftr.flashUntil && now < ftr.flashUntil && (Math.floor(now/45)%2===0);
     c.save();
     if(flip){ c.translate(cx,0); c.scale(-1,1); c.translate(-cx,0); }
