@@ -352,7 +352,7 @@
   .vs-center{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px; padding:0 1.5%; min-width:0 }
   .vs-battlein{ font-family:'Anton'; font-size:clamp(12px,2.4vw,26px); color:var(--gold); -webkit-text-stroke:1px #000; text-shadow:0 3px 0 #000; letter-spacing:2px }
   .stage-frame{
-    position:relative; width:96%; aspect-ratio:16/10; overflow:hidden;
+    position:relative; width:96%; aspect-ratio:16/9; overflow:hidden;
     border:3px solid #cfd6e6; box-shadow:0 0 0 2px #000, 0 8px 22px rgba(0,0,0,.6); background:#0a0f1e;
   }
   .stage-frame img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
@@ -364,14 +364,7 @@
   .stage-frame .ph b{font-family:'Anton'; font-size:clamp(14px,2.6vw,28px); color:#fff; letter-spacing:1px}
   .stage-city{ font-family:'Anton'; font-size:clamp(16px,3.4vw,40px); color:var(--gold); -webkit-text-stroke:1px #000; text-shadow:0 3px 0 #000; letter-spacing:1px; line-height:1 }
   .stage-place{ font-size:clamp(7px,1.3vw,13px); color:var(--blue-lt); letter-spacing:2px }
-  .stage-hint{ font-size:clamp(5px,.95vw,9px); color:#cbb88c; letter-spacing:1px; opacity:.85 }
-  .stage-chips{ display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:2px }
-  .chip{
-    font-family:'Press Start 2P'; font-size:clamp(5px,.95vw,9px); letter-spacing:.5px;
-    background:rgba(0,0,0,.45); color:#dfe6f5; border:2px solid rgba(255,255,255,.18);
-    padding:6px 8px; cursor:pointer;
-  }
-  .chip.sel{ border-color:var(--gold); color:#fff; background:rgba(255,210,90,.15); box-shadow:0 0 8px rgba(255,210,80,.4) }
+  .stage-hint{ font-size:clamp(6px,1.1vw,11px); color:#ffd98a; letter-spacing:1px; opacity:.9 }
   .vs-cta{text-align:center; padding:10px}
 
   .btn{
@@ -462,7 +455,7 @@
 
     <!-- ============ SELECCIÓN ============ -->
     <section id="scr-select" class="screen bg-arena">
-      <div class="sel-head">ELIGE A TU <b>CANDIDATO</b> · K.O.F. '26</div>
+      <div class="sel-head">ELIGE A TU <b>CANDIDATO</b> · 2NDA VUELTA '26</div>
       <div class="sel-body">
         <div class="sel-preview" id="sel-preview"></div>
         <div class="sel-grid" id="sel-grid"></div>
@@ -495,10 +488,9 @@
             <div class="vs-center">
               <div class="vs-battlein">COMBATE EN</div>
               <div class="stage-frame" id="stage-frame"></div>
-              <div class="stage-city" id="stage-city">BOGOTÁ</div>
-              <div class="stage-place" id="stage-place">PLAZA DE BOLÍVAR</div>
-              <div class="stage-hint">ESCOGE EL ESCENARIO · ← →</div>
-              <div class="stage-chips" id="stage-chips"></div>
+              <div class="stage-city" id="stage-city">—</div>
+              <div class="stage-place" id="stage-place"></div>
+              <div class="stage-hint" id="stage-hint">ESCENARIO AL AZAR…</div>
             </div>
             <div class="vs-fighter" id="vs-right"></div>
           </div>
@@ -569,7 +561,7 @@
   const STAT_LABELS = { F:'FUERZA', V:'VELOC', T:'TÉCNICA', D:'DEFENSA', R:'AGUANTE' };
 
   /* ============ ESCENARIOS DE COMBATE ============ */
-  // Imágenes esperadas (las pones tú): kof-electoral/stages/<id>.jpg
+  // Imágenes esperadas (las pones tú): kof-electoral/stages/<id>.png · se elige al azar
   const STAGES = [
     { id:'bogota',       city:'BOGOTÁ',       place:'PLAZA DE BOLÍVAR' },
     { id:'medellin',     city:'MEDELLÍN',     place:'EL POBLADO' },
@@ -577,12 +569,18 @@
     { id:'barranquilla', city:'BARRANQUILLA', place:'MALECÓN DEL RÍO' }
   ];
 
+  /* ============ ANFITRIÓN (explica el juego · futuro "final boss") ============ */
+  // Ricardo NO está en la selección de candidatos. Imagen: kof-electoral/candidatos/ricardo.png
+  const RICARDO = { id:'ricardo', name:'RICARDO RUIZ', short:'RICARDO', ini:'RR',
+    color:'#0047FF', accent:'#86c5ff',
+    line:'Los datos pueden decir muchas cosas, pero la decisión es del votante. Mira cómo se juega y luego escoge tu candidato.' };
+
   const $  = s => document.querySelector(s);
   const rnd = n => Math.floor(Math.random()*n);
 
   const state = { me:null, opp:null, curIdx:0, stageIdx:0 };
   let cur = 'title';
-  let selTimer = null, selTime = 26, rollIv = null, qflipIv = null;
+  let selTimer = null, selTime = 26, rollIv = null, qflipIv = null, stageRollIv = null, stageSettled = false;
 
   /* ============ SONIDO (WebAudio sintetizado) ============ */
   let actx=null, muted=false;
@@ -647,7 +645,7 @@
     cur=id;
     document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
     $('#scr-'+id).classList.add('active');
-    clearInterval(selTimer); clearInterval(rollIv); clearInterval(qflipIv);
+    clearInterval(selTimer); clearInterval(rollIv); clearInterval(qflipIv); clearInterval(stageRollIv);
     if(id==='title'){ enterTitle(); }
     if(id==='howto'){ playMusic('howto'); enterHowto(); }
     if(id==='select'){ playMusic('select'); enterSelect(); }
@@ -677,10 +675,9 @@
 
   /* ---- INSTRUCCIONES (personaje al azar) ---- */
   function enterHowto(){
-    const f = FIGHTERS[rnd(FIGHTERS.length)];
-    $('#howto-art').innerHTML = '<div class="adv-badge">AVANZADO</div>' + artInner(f);
-    $('#howto-name').textContent = f.name;
-    $('#howto-line').textContent = '«'+f.line+'»';
+    $('#howto-art').innerHTML = '<div class="adv-badge">ANFITRIÓN</div>' + artInner(RICARDO);
+    $('#howto-name').textContent = RICARDO.name;
+    $('#howto-line').textContent = RICARDO.line;
   }
 
   /* ---- SELECCIÓN ---- */
@@ -783,27 +780,48 @@
     $('#vs-right').style.setProperty('--c',R.color); $('#vs-right').style.setProperty('--a',R.accent);
     $('#vs-left').innerHTML  = artHTML(L) + '<div class="vs-meta"><div class="nm">'+L.short+'</div><div class="ep">TÚ</div></div>';
     $('#vs-right').innerHTML = artHTML(R) + '<div class="vs-meta"><div class="nm">'+R.short+'</div><div class="ep">RIVAL</div></div>';
-    renderStage(state.stageIdx||0);
     $('#versus-vs').classList.add('show');
     $('#versus-hud').textContent = L.short+'  VS  '+R.short;
     sfx.gong();
+    rollStage();
   }
-  function renderStage(i){
+  function paintStage(i, rolling){
     state.stageIdx=i;
     const s=STAGES[i];
     $('#stage-frame').innerHTML =
       '<div class="ph">ESCENARIO<br><b>'+s.city+'</b><br>'+s.place+'</div>'
-      + '<img src="kof-electoral/stages/'+s.id+'.jpg" alt="'+s.city+'" onerror="this.style.display=\'none\'">';
+      + '<img src="kof-electoral/stages/'+s.id+'.png" alt="'+s.city+'" onerror="this.style.display=\'none\'">';
     $('#stage-city').textContent  = s.city;
     $('#stage-place').textContent = s.place;
-    $('#stage-chips').innerHTML = STAGES.map((st,k)=>'<button class="chip'+(k===i?' sel':'')+'" data-k="'+k+'">'+st.city+'</button>').join('');
-    $('#stage-chips').querySelectorAll('.chip').forEach(c=>{
-      c.addEventListener('click', (e)=>{ e.stopPropagation(); renderStage(+c.dataset.k); sfx.move(); });
-    });
+    $('#stage-hint').textContent  = rolling ? 'ESCENARIO AL AZAR…' : ('COMBATE EN ' + s.city);
+  }
+  // El escenario NO se elige: rota ~2s y aterriza al azar.
+  function rollStage(){
+    stageSettled=false;
+    clearInterval(stageRollIv);
+    $('#stage-hint').textContent='ESCENARIO AL AZAR…';
+    const finalIdx=rnd(STAGES.length);
+    let ticks=0; const maxTicks=20;            // ~2s a 100ms
+    stageRollIv=setInterval(()=>{
+      paintStage(rnd(STAGES.length), true);
+      sfx.tick(); ticks++;
+      if(ticks>=maxTicks){
+        clearInterval(stageRollIv); stageRollIv=null;
+        paintStage(finalIdx, false);
+        stageSettled=true; sfx.reveal();
+      }
+    },100);
+  }
+  function finalizeStage(){
+    if(stageSettled) return;
+    clearInterval(stageRollIv); stageRollIv=null;
+    paintStage(rnd(STAGES.length), false);
+    stageSettled=true;
   }
 
   /* ---- FIGHT placeholder ---- */
   function startFight(){
+    finalizeStage();
     const fl=$('#flash'); fl.classList.add('on'); sfx.gong();
     setTimeout(()=>{ fl.classList.remove('on'); go('fight'); }, 850);
   }
@@ -833,9 +851,7 @@
     }
     if(cur==='versus'){
       if(!$('#versus-vs').classList.contains('show')) return;
-      if(k==='ArrowLeft'||k==='ArrowUp'){ e.preventDefault(); renderStage((state.stageIdx-1+STAGES.length)%STAGES.length); sfx.move(); }
-      else if(k==='ArrowRight'||k==='ArrowDown'){ e.preventDefault(); renderStage((state.stageIdx+1)%STAGES.length); sfx.move(); }
-      else if(k==='Enter'||k===' '){ e.preventDefault(); startFight(); }
+      if(k==='Enter'||k===' '){ e.preventDefault(); startFight(); }
       return;
     }
     if(cur==='fight'){
