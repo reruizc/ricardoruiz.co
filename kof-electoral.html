@@ -411,6 +411,7 @@
   #fight-hint{position:absolute; left:0; right:0; bottom:6px; z-index:20; text-align:center; font-size:clamp(6px,1.05vw,10px); color:#e9e3d3; letter-spacing:1px; text-shadow:0 2px 0 #000; opacity:.85; pointer-events:none}
   #fight-end{position:absolute; inset:0; z-index:30; display:none; flex-direction:column; align-items:center; justify-content:center; gap:14px; background:rgba(4,6,14,.72)}
   .fight-result{font-family:'Anton'; font-size:clamp(26px,7vw,72px); color:#fff; -webkit-text-stroke:2px #000; text-shadow:0 5px 0 #000}
+  .fight-sub{font-family:'Press Start 2P'; font-size:clamp(7px,1.4vw,12px); color:var(--gold); letter-spacing:1px; text-shadow:0 2px 0 #000; margin-top:-2px; text-align:center}
 
   .credit-note{
     position:absolute; bottom:2px; left:0; right:0; z-index:40; text-align:center;
@@ -487,7 +488,7 @@
       <div class="v-stage">
         <!-- ruleta -->
         <div id="versus-roll">
-          <div class="v-firstbattle">PRIMER COMBATE</div>
+          <div class="v-firstbattle" id="roll-battle-label">PRIMER COMBATE</div>
           <div class="v-banner"><span>EL SIGUIENTE<br>RIVAL</span></div>
           <div class="roll-area">
             <div class="roll-art" id="roll-art"></div>
@@ -497,7 +498,7 @@
         </div>
         <!-- VS + selección de escenario -->
         <div id="versus-vs">
-          <div class="vs-top">PRIMER COMBATE</div>
+          <div class="vs-top" id="vs-battle-label">PRIMER COMBATE</div>
           <div class="vs-arena">
             <div class="vs-fighter" id="vs-left"></div>
             <div class="vs-center">
@@ -539,6 +540,7 @@
       <div id="fight-hint">← → mover · ↑ saltar · A puño · S patada · ↓ cubrir</div>
       <div id="fight-end">
         <div class="fight-result" id="fight-result">K.O.</div>
+        <div class="fight-sub" id="fight-sub"></div>
         <div class="btn-row">
           <button class="btn" id="fb-rematch">REVANCHA</button>
           <button class="btn ghost" id="fb-char">CAMBIAR CANDIDATO</button>
@@ -601,15 +603,14 @@
     color:'#0047FF', accent:'#86c5ff',
     line:'Los datos pueden decir muchas cosas, pero la decisión es del votante. Mira cómo se juega y luego escoge tu candidato.' };
 
-  /* PROTOTIPO del motor de pelea: fuerza rival = Ricardo y escenario = Medellín,
-     porque por ahora solo hay poses de pelea de abelardo y ricardo.
-     Cuando haya poses de todos, poner PROTO.on=false para rival/escenario al azar. */
-  const PROTO = { on:true, stageId:'medellin' };
+  // Escenario del JEFE FINAL (Ricardo). No entra en la ruleta de ciudades.
+  const FINAL_STAGE = { id:'final-boss-stage', city:'BOGOTÁ', place:'C.C. GALERÍAS' };
+  function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
 
   const $  = s => document.querySelector(s);
   const rnd = n => Math.floor(Math.random()*n);
 
-  const state = { me:null, opp:null, curIdx:0, stageIdx:0 };
+  const state = { me:null, opp:null, curIdx:0, stageIdx:0, stage:null, ladder:[], matchIdx:0 };
   let cur = 'title';
   let selTimer = null, selTime = 26, rollIv = null, qflipIv = null, stageRollIv = null, stageSettled = false;
 
@@ -765,20 +766,24 @@
   function confirmPick(){
     clearInterval(selTimer);
     state.me = FIGHTERS[state.curIdx];
+    // Escalera: los otros 5 candidatos al azar + Ricardo como JEFE FINAL al cierre.
+    state.ladder = shuffle(FIGHTERS.filter(f=>f.id!==state.me.id)).concat([RICARDO]);
+    state.matchIdx = 0;
     sfx.select();
     go('versus');
   }
 
   /* ---- VERSUS (ruleta del rival al azar) ---- */
-  function pickOpponent(){
-    const pool = FIGHTERS.filter(f=>f.id!==state.me.id);
-    return pool[rnd(pool.length)];
-  }
+  const BATTLE_LABELS = ['PRIMER COMBATE','SEGUNDO COMBATE','TERCER COMBATE','CUARTO COMBATE','QUINTO COMBATE'];
   function enterVersus(){
-    state.opp = PROTO.on ? RICARDO : pickOpponent();
+    state.opp = state.ladder[state.matchIdx] || RICARDO;
+    const isFinal = (state.opp===RICARDO);
+    const hdr = isFinal ? 'COMBATE FINAL' : (BATTLE_LABELS[state.matchIdx] || 'COMBATE');
+    const l1=$('#roll-battle-label'); if(l1) l1.textContent=hdr;
+    const l2=$('#vs-battle-label'); if(l2) l2.textContent=hdr;
     $('#versus-vs').classList.remove('show');
     $('#versus-roll').style.display='flex';
-    $('#versus-hud').textContent='EL DESTINO ELIGE A TU RIVAL…';
+    $('#versus-hud').textContent = isFinal ? 'EL JEFE FINAL TE ESPERA…' : 'EL DESTINO ELIGE A TU RIVAL…';
     $('#roll-name').textContent='???';
     $('#roll-art').classList.remove('reveal');
     // grid decorativo de ???
@@ -815,11 +820,17 @@
     $('#versus-vs').classList.add('show');
     $('#versus-hud').textContent = L.short+'  VS  '+R.short;
     sfx.gong();
-    rollStage();
+    if(state.opp===RICARDO){
+      clearInterval(stageRollIv);
+      showStageObj(FINAL_STAGE, false);
+      stageSettled=true;
+      $('#stage-hint').textContent = 'JEFE FINAL · ' + FINAL_STAGE.place;
+    } else {
+      rollStage();
+    }
   }
-  function paintStage(i, rolling){
-    state.stageIdx=i;
-    const s=STAGES[i];
+  function showStageObj(s, rolling){
+    state.stage=s;
     $('#stage-frame').innerHTML =
       '<div class="ph">ESCENARIO<br><b>'+s.city+'</b><br>'+s.place+'</div>'
       + '<img src="kof-electoral/stages/'+s.id+'.png" alt="'+s.city+'" onerror="this.style.display=\'none\'">';
@@ -827,19 +838,19 @@
     $('#stage-place').textContent = s.place;
     $('#stage-hint').textContent  = rolling ? 'ESCENARIO AL AZAR…' : ('COMBATE EN ' + s.city);
   }
-  // El escenario NO se elige: rota ~2s y aterriza al azar.
+  // En los 5 combates de ciudad el escenario NO se elige: rota ~2s y aterriza al azar.
   function rollStage(){
     stageSettled=false;
     clearInterval(stageRollIv);
     $('#stage-hint').textContent='ESCENARIO AL AZAR…';
-    const finalIdx = PROTO.on ? Math.max(0, STAGES.findIndex(s=>s.id===PROTO.stageId)) : rnd(STAGES.length);
+    const finalIdx = rnd(STAGES.length);
     let ticks=0; const maxTicks=20;            // ~2s a 100ms
     stageRollIv=setInterval(()=>{
-      paintStage(rnd(STAGES.length), true);
+      showStageObj(STAGES[rnd(STAGES.length)], true);
       sfx.tick(); ticks++;
       if(ticks>=maxTicks){
         clearInterval(stageRollIv); stageRollIv=null;
-        paintStage(finalIdx, false);
+        showStageObj(STAGES[finalIdx], false);
         stageSettled=true; sfx.reveal();
       }
     },100);
@@ -847,7 +858,8 @@
   function finalizeStage(){
     if(stageSettled) return;
     clearInterval(stageRollIv); stageRollIv=null;
-    paintStage(rnd(STAGES.length), false);
+    if(state.opp===RICARDO) showStageObj(FINAL_STAGE, false);
+    else showStageObj(STAGES[rnd(STAGES.length)], false);
     stageSettled=true;
   }
 
@@ -871,7 +883,7 @@
 
   function fGroundPx(){ return F.H*F.groundY; }
   function fSpriteH(){ return F.H*F.spriteH; }
-  function fSpriteW(){ const im=fP&&fP.img; const a=(im&&im.naturalHeight)?(im.naturalWidth/im.naturalHeight):0.667; return fSpriteH()*a; }
+  function fwOf(ftr){ const im=ftr&&ftr.img; const a=(im&&im.naturalHeight)?(im.naturalWidth/im.naturalHeight):0.667; return fSpriteH()*a; }
 
   function fLoadSprite(fd){
     const im=new Image();
@@ -879,27 +891,31 @@
     im.src='kof-electoral/candidatos/fight/'+fd.id+'.png';
     return im;
   }
-  function mkF(fd, side){
-    return { fd, side, x: side==='L'?F.W*0.30:F.W*0.70, y:0, vy:0, onGround:true,
-      hp:100, maxHp:100, facing: side==='L'?1:-1,
+  function mkF(fd, side, boss){
+    const hp = boss?120:100;
+    return { fd, side, boss:!!boss, x: side==='L'?F.W*0.30:F.W*0.70, y:0, vy:0, onGround:true,
+      hp, maxHp:hp, facing: side==='L'?1:-1,
       atk:null, atkUntil:0, atkHit:false, cdUntil:0, stun:0, lean:0, blocking:false,
       img:fLoadSprite(fd) };
   }
+  function setBars(){ if(fP) $('#fhp-l').style.width=Math.max(0,fP.hp/fP.maxHp*100)+'%'; if(fO) $('#fhp-r').style.width=Math.max(0,fO.hp/fO.maxHp*100)+'%'; }
 
   function enterFight(){
-    fP = mkF(state.me, 'L');
-    fO = mkF(state.opp, 'R');
+    const isFinal=(state.opp===RICARDO);
+    fP = mkF(state.me, 'L', false);
+    fO = mkF(state.opp, 'R', isFinal);
+    const s = state.stage || STAGES[0];
     fStageImg = new Image();
-    fStageImg.src = 'kof-electoral/stages/'+((STAGES[state.stageIdx]||STAGES[0]).id)+'.png';
+    fStageImg.src = 'kof-electoral/stages/'+s.id+'.png';
     fSparks=[]; fShake=0;
     fTimer=F.round; fTimerAcc=0; fResult=''; fIntroT=0;
     fKeys.left=fKeys.right=fKeys.block=fKeys.jump=false;
     fcanvas=$('#fcanvas'); fcanvas.width=F.W; fcanvas.height=F.H; fctx=fcanvas.getContext('2d');
     $('#fname-l').textContent=state.me.short; $('#fname-r').textContent=state.opp.short;
-    $('#fhp-l').style.width='100%'; $('#fhp-r').style.width='100%';
+    setBars();
     $('#ftimer').textContent=F.round; $('#ftimer').classList.remove('low');
     $('#fight-end').style.display='none';
-    fPhase='intro'; showFMsg('ROUND 1');
+    fPhase='intro'; showFMsg(isFinal?'JEFE FINAL':'ROUND 1');
     fLast=performance.now();
     if(fRAF) cancelAnimationFrame(fRAF);
     fRAF=requestAnimationFrame(fLoop);
@@ -934,7 +950,7 @@
     stepFighter(fO, aiIntent(now), dt, now);
 
     // separación simple
-    const minGap=fSpriteW()*0.46, d=fO.x-fP.x;
+    const minGap=(fwOf(fP)+fwOf(fO))*0.23, d=fO.x-fP.x;
     if(Math.abs(d)<minGap){ const push=(minGap-Math.abs(d))/2, sgn=d>=0?1:-1; fP.x-=sgn*push; fO.x+=sgn*push; }
 
     resolveAttack(fP, fO, now);
@@ -955,7 +971,7 @@
   function aiIntent(now){
     const o=fO,p=fP; if(o.stun>0) return {moveX:0,jump:false,block:false};
     const dist=Math.abs(p.x-o.x), dir=(p.x>o.x)?1:-1;
-    const range=fSpriteW()*0.42+F.reach;
+    const range=fwOf(o)*0.42+F.reach;
     let moveX=0, jump=false, block=false;
     if(p.atk && dist<range+40 && Math.random()<0.06){ block=true; }
     else if(dist>range){ moveX=dir; }
@@ -982,14 +998,14 @@
     if(!ftr.onGround){ ftr.vy+=F.grav*f; ftr.y+=ftr.vy*f; if(ftr.y>=0){ ftr.y=0; ftr.vy=0; ftr.onGround=true; } }
     if(ftr.atk && now>ftr.atkUntil) ftr.atk=null;
     if(ftr.lean>0) ftr.lean=Math.max(0, ftr.lean-dt*0.006);
-    const halfW=fSpriteW()/2;
+    const halfW=fwOf(ftr)/2;
     ftr.x=Math.max(halfW+10, Math.min(F.W-halfW-10, ftr.x));
   }
 
   function resolveAttack(att, def, now){
     if(!att.atk || att.atkHit) return;
     if(now < att.atkUntil - F.atkWindow*0.55) return;   // sólo en la parte activa del golpe
-    const dx=(def.x-att.x)*att.facing, w=fSpriteW(), vert=Math.abs(def.y-att.y);
+    const dx=(def.x-att.x)*att.facing, w=fwOf(att), vert=Math.abs(def.y-att.y);
     if(!(dx>0 && dx < w*0.45+F.reach && vert<F.H*0.22)) return;
     att.atkHit=true;
     const dmg = att.atk==='punch'?F.punchDmg:F.kickDmg;
@@ -1001,19 +1017,39 @@
       def.hp-=dmg; def.x+=att.facing*F.knock; def.stun=F.hitStun; def.atk=null; fShake=11; spark(cx,cy,'#ffd75e');
     }
     if(def.hp<0) def.hp=0;
-    $('#fhp-l').style.width=Math.max(0,fP.hp)+'%';
-    $('#fhp-r').style.width=Math.max(0,fO.hp)+'%';
+    setBars();
     sfx.tick();
   }
 
+  let fPrimaryFn=null;
+  function advanceLadder(){ state.matchIdx++; go('versus'); }
   function endFight(reason){
     if(fPhase==='over') return; fPhase='over';
     let winner;
     if(reason==='ko') winner = fP.hp<=0 ? (fO.hp<=0?null:fO) : fP;
     else winner = (fP.hp===fO.hp)?null:(fP.hp>fO.hp?fP:fO);
-    fResult = winner ? ('¡'+winner.fd.short+' GANA!') : 'EMPATE';
+    const won=(winner===fP), isFinal=(state.opp===RICARDO);
     showFMsg(reason==='ko'?'K.O.':'TIME UP'); sfx.gong();
-    setTimeout(()=>{ $('#fight-result').textContent=fResult; $('#fight-end').style.display='flex'; }, 1000);
+    let title, sub, primaryTxt;
+    if(won && isFinal){
+      title='¡CAMPEÓN!'; sub=state.me.short+' gana la Segunda Vuelta';
+      primaryTxt='JUGAR DE NUEVO'; fPrimaryFn=()=>go('select');
+    } else if(won){
+      const next=state.ladder[state.matchIdx+1];
+      const remaining=state.ladder.length-1-state.matchIdx;
+      title='¡'+state.me.short+' GANA!';
+      sub=(next===RICARDO)?'Te espera el JEFE FINAL':('Quedan '+remaining+' rivales');
+      primaryTxt='SIGUIENTE ▸'; fPrimaryFn=advanceLadder;
+    } else {
+      title=winner?('¡'+winner.fd.short+' GANA!'):'EMPATE';
+      sub='Inténtalo de nuevo'; primaryTxt='REVANCHA'; fPrimaryFn=()=>enterFight();
+    }
+    setTimeout(()=>{
+      $('#fight-result').textContent=title;
+      $('#fight-sub').textContent=sub;
+      $('#fb-rematch').textContent=primaryTxt;
+      $('#fight-end').style.display='flex';
+    }, 1000);
   }
 
   function spark(x,y,color){ for(let i=0;i<9;i++) fSparks.push({x,y,vx:(Math.random()*2-1)*4.5,vy:Math.random()*-3.5-1,t:1,c:color}); }
@@ -1026,9 +1062,9 @@
     if(ir>cr){ dh=H; dw=H*ir; } else { dw=W; dh=W/ir; }
     c.drawImage(img,(W-dw)/2,(H-dh)/2,dw,dh);
   }
-  function drawShadow(c,ftr){ const gy=fGroundPx(), w=fSpriteW(); c.save(); c.globalAlpha=.32; c.fillStyle='#000'; c.beginPath(); c.ellipse(ftr.x, gy-6, w*0.28, 15, 0, 0, Math.PI*2); c.fill(); c.restore(); }
+  function drawShadow(c,ftr){ const gy=fGroundPx(), w=fwOf(ftr); c.save(); c.globalAlpha=.32; c.fillStyle='#000'; c.beginPath(); c.ellipse(ftr.x, gy-6, w*0.28, 15, 0, 0, Math.PI*2); c.fill(); c.restore(); }
   function drawFighter(c,ftr,now){
-    const h=fSpriteH(), w=fSpriteW(), gy=fGroundPx();
+    const h=fSpriteH(), w=fwOf(ftr), gy=fGroundPx();
     const lean = ftr.atk ? (ftr.facing*20*ftr.lean) : (ftr.stun>0 ? -ftr.facing*9 : 0);
     const sc = ftr.atk?1.03:1, dh=h*sc, dw=w*sc, cx=ftr.x+lean, top=gy-dh+ftr.y;
     c.save();
@@ -1066,7 +1102,7 @@
   $('#scr-title').addEventListener('click', ()=>{ titleAdvance(); });
   $('#scr-howto').addEventListener('click', ()=>{ go('select'); });
   $('#btn-fight').addEventListener('click', startFight);
-  $('#fb-rematch').addEventListener('click', ()=>{ enterFight(); });
+  $('#fb-rematch').addEventListener('click', ()=>{ if(fPrimaryFn) fPrimaryFn(); });
   $('#fb-char').addEventListener('click', ()=>{ go('select'); });
   $('#fb-title').addEventListener('click', ()=>{ go('title'); });
 
@@ -1087,7 +1123,7 @@
     }
     if(cur==='fight'){
       if(fPhase==='over'){
-        if(k==='Enter'||k===' '){ e.preventDefault(); enterFight(); }
+        if(k==='Enter'||k===' '){ e.preventDefault(); if(fPrimaryFn) fPrimaryFn(); }
         else if(k==='Escape'){ go('select'); }
         return;
       }
