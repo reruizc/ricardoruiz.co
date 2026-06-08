@@ -513,6 +513,17 @@
   .cont-count{font-family:'Anton'; font-size:clamp(50px,13vw,150px); color:#ff3b2e; -webkit-text-stroke:3px #000; text-shadow:0 0 26px rgba(255,60,40,.7), 0 6px 0 #000; line-height:.9; animation:blink 1s steps(1) infinite}
   .cont-sub{font-size:clamp(7px,1.4vw,12px); color:var(--gold); letter-spacing:1px; text-shadow:0 2px 0 #000}
 
+  /* ----- CRÉDITOS ----- */
+  #scr-credits{align-items:center; justify-content:center; text-align:center; cursor:pointer}
+  .cred-card{display:flex; flex-direction:column; align-items:center; gap:9px; max-width:92%; animation:fadein .5s ease}
+  .cred-champ{font-family:'Anton'; font-size:clamp(22px,6vw,58px); color:var(--gold); -webkit-text-stroke:2px #000; text-shadow:0 4px 0 #000, 0 0 22px rgba(255,210,80,.5); transform:skewX(-6deg)}
+  .cred-line{font-size:clamp(7px,1.4vw,12px); color:var(--blue-lt); letter-spacing:2px}
+  .cred-roll{display:flex; flex-direction:column; gap:6px; margin:4px 0}
+  .cred-roll p{font-size:clamp(6px,1.25vw,11px); color:#e9e3d3; letter-spacing:1px; line-height:1.5; margin:0}
+  .cred-roll b{color:#fff}
+  .cred-roll .cred-big{font-family:'Anton'; font-size:clamp(11px,2.4vw,20px); color:#9dff5a; letter-spacing:1px; margin:4px 0; -webkit-text-stroke:1px #000}
+  #cred-back{margin-top:4px}
+
   /* ----- Revelación del JEFE FINAL ----- */
   #versus-final{display:none; width:100%; height:100%; flex-direction:column; align-items:center; justify-content:center; gap:3%;
     background:radial-gradient(circle at 50% 42%, rgba(24,12,46,.55), rgba(0,0,4,.93) 78%); animation:vfFade .55s ease}
@@ -730,6 +741,26 @@
       <div class="hud"><span class="lvl">NIVEL- 4</span><span>INSERTE VOTO PARA SEGUIR</span><span>CRÉDITOS <b>00</b></span></div>
     </section>
 
+    <!-- ============ CRÉDITOS (al vencer al jefe final) ============ -->
+    <section id="scr-credits" class="screen bg-dust">
+      <div class="cred-card">
+        <div class="cred-champ" id="cred-champ">¡CAMPEÓN!</div>
+        <div class="cred-line" id="cred-line">Campeón de la Segunda Vuelta · Colombia '26</div>
+        <div class="cred-roll">
+          <p>SEGUNDA VUELTA · COMBATE ELECTORAL</p>
+          <p>Idea, código y dirección<br><b>RICARDO RUIZ</b></p>
+          <p>Arte de candidatos y escenarios<br><b>IA + Ricardo Ruiz</b></p>
+          <p>Escenarios<br><b>de la Plaza de Bolívar a Caño Cristales</b></p>
+          <p>Jefe final<br><b>el analista de datos</b></p>
+          <p>Parodia política sin ánimo de lucro · 2026</p>
+          <p class="cred-big">El voto es tuyo.<br>Nos vemos en las urnas.</p>
+          <p>Gracias por jugar · <b>ricardoruiz.co</b></p>
+        </div>
+        <button class="btn" id="cred-back">VOLVER AL INICIO ▸</button>
+      </div>
+      <div class="hud"><span class="lvl">NIVEL- 4</span><span>FIN</span><span>RICARDO RUIZ 2026</span></div>
+    </section>
+
     <!-- FLASH FIGHT! -->
     <div id="flash"><span>¡FIGHT!</span></div>
   </div>
@@ -740,7 +771,7 @@
   "use strict";
 
   /* ============ DATOS DE PELEADORES ============ */
-  // Imágenes esperadas (las pones tú): kof-electoral/<id>.png  (retrato vertical ~600x800)
+  // Imágenes esperadas (las pones tú): combate-electoral/<id>.png  (retrato vertical ~600x800)
   const FIGHTERS = [
     { id:'cepeda',  name:'IVÁN CEPEDA',   short:'CEPEDA',   ini:'IC',
       partido:'Pacto Histórico', epi:'EL INVESTIGADOR', color:'#8E44AD', accent:'#C39BD3', srcFace:-1,
@@ -770,7 +801,7 @@
   const STAT_LABELS = { F:'FUERZA', V:'VELOC', T:'TÉCNICA', D:'DEFENSA', R:'AGUANTE' };
 
   /* ============ ESCENARIOS DE COMBATE ============ */
-  // Imágenes esperadas (las pones tú): kof-electoral/stages/<id>.png · se elige al azar
+  // Imágenes esperadas (las pones tú): combate-electoral/stages/<id>.png · se elige al azar
   const STAGES = [
     { id:'bogota',       city:'BOGOTÁ',       place:'PLAZA DE BOLÍVAR' },
     { id:'medellin',     city:'MEDELLÍN',     place:'EL POBLADO' },
@@ -798,7 +829,7 @@
   };
 
   /* ---- Desbloqueos (progresión, persistido) ---- */
-  const UNLOCK_KEY='kof-unlocked';
+  const UNLOCK_KEY='combate-unlocked';
   function getUnlocked(){
     let s; try{ s=JSON.parse(localStorage.getItem(UNLOCK_KEY)); }catch(e){}
     if(!Array.isArray(s)) s=[];
@@ -888,9 +919,9 @@
 
   /* ---- Clips one-shot (no son la música de pantalla) ---- */
   const CLIPS = {
-    winner:   'kof-electoral/music/winner.mp3',
-    continue: 'kof-electoral/music/continue.mp3',
-    boss:     'kof-electoral/music/jefe%20final.mp3'
+    winner:   'combate-electoral/music/winner.mp3',
+    continue: 'combate-electoral/music/continue.mp3',
+    boss:     'combate-electoral/music/jefe%20final.mp3'
   };
   let curClip=null;
   function playClip(name, loop){ stopClip(); if(muted) return null; const a=new Audio(CLIPS[name]); a.loop=!!loop; a.volume=0.6; curClip=a; a.play().catch(()=>{}); return a; }
@@ -929,9 +960,9 @@
   };
   /* ---- Música de fondo (mp3 por pantalla, en orden de creación) ---- */
   const TRACKS = {
-    intro:  'kof-electoral/music/intro.mp3',          // 1 · intro
-    howto:  'kof-electoral/music/instrucciones.mp3',  // 2 · instrucciones
-    select: 'kof-electoral/music/seleccion.mp3'       // 3 · selección
+    intro:  'combate-electoral/music/intro.mp3',          // 1 · intro
+    howto:  'combate-electoral/music/instrucciones.mp3',  // 2 · instrucciones
+    select: 'combate-electoral/music/seleccion.mp3'       // 3 · selección
   };
   let curMusic=null, curMusicName=null, musicReady=false;
   function playMusic(name){
@@ -953,13 +984,13 @@
   function artHTML(f){
     return '<div class="art" style="--c:'+f.color+';--a:'+f.accent+'">'
       + '<div class="fallback"><span class="ini">'+f.ini+'</span><span class="cname">'+f.short+'</span></div>'
-      + '<img src="kof-electoral/candidatos/'+f.id+'.png" alt="'+f.name+'" onerror="this.style.display=\'none\'">'
+      + '<img src="combate-electoral/candidatos/'+f.id+'.png" alt="'+f.name+'" onerror="this.style.display=\'none\'">'
       + '</div>';
   }
   // versión "suelta" (sin wrapper .art) para contenedores que ya posicionan
   function artInner(f){
     return '<div class="fallback" style="--c:'+f.color+';--a:'+f.accent+'"><span class="ini">'+f.ini+'</span><span class="cname">'+f.short+'</span></div>'
-      + '<img src="kof-electoral/candidatos/'+f.id+'.png" alt="'+f.name+'" onerror="this.style.display=\'none\'">';
+      + '<img src="combate-electoral/candidatos/'+f.id+'.png" alt="'+f.name+'" onerror="this.style.display=\'none\'">';
   }
   function segs(n){ let s=''; for(let k=1;k<=5;k++){ s+='<i class="seg'+(k<=n?' on':'')+'"></i>'; } return s; }
 
@@ -978,6 +1009,7 @@
     if(id==='fight'){ playMusic(null); enterFight(); }
     if(id==='winner'){ playMusic(null); enterWinner(); }
     if(id==='continue'){ playMusic(null); enterContinue(); }
+    if(id==='credits'){ playMusic(null); enterCredits(); }
   }
 
   /* ---- TÍTULO ---- */
@@ -1002,7 +1034,7 @@
 
   /* ---- INSTRUCCIONES (personaje al azar) ---- */
   function enterHowto(){
-    const poses=['kof-electoral/candidatos/fight/punos/ricardo-der.png','kof-electoral/candidatos/fight/patada/ricardo-der.png'];
+    const poses=['combate-electoral/candidatos/fight/punos/ricardo-der.png','combate-electoral/candidatos/fight/patada/ricardo-der.png'];
     $('#howto-art').innerHTML = '<div class="fallback" style="--c:'+RICARDO.color+';--a:'+RICARDO.accent+'"></div>'
       + '<img id="howto-ric" src="'+poses[0]+'" alt="RICARDO RUIZ" style="object-fit:contain;object-position:center" onerror="this.style.display=\'none\'">';
     $('#howto-name').textContent = RICARDO.name;
@@ -1019,7 +1051,7 @@
       const locked = !un.has(f.id);
       return '<button class="cell'+(locked?' locked':'')+'" data-i="'+i+'" style="--c:'+f.color+';--a:'+f.accent+'">'
         + '<div class="fallback">'+(locked?'<span class="ini">?</span>':'')+'</div>'   // sin iniciales detrás (la foto es transparente)
-        + '<img src="kof-electoral/candidatos/'+f.id+'.png" alt="'+f.name+'" onerror="this.style.display=\'none\'">'
+        + '<img src="combate-electoral/candidatos/'+f.id+'.png" alt="'+f.name+'" onerror="this.style.display=\'none\'">'
         + '<span class="p1"></span>'
         + (locked?'<span class="lock">🔒</span>':'')
         + '<span class="tag">'+(locked?'???':f.short)+'</span>'
@@ -1038,7 +1070,7 @@
       '<div class="pv-art" style="--c:'+f.color+';--a:'+f.accent+'">'
         + '<div class="pv-adv">AVANZADO</div>'
         + '<div class="fallback"><span class="ini">'+f.ini+'</span><span class="cname">'+f.short+'</span></div>'
-        + '<img src="kof-electoral/candidatos/'+f.id+'.png" alt="'+f.name+'" onerror="this.style.display=\'none\'">'
+        + '<img src="combate-electoral/candidatos/'+f.id+'.png" alt="'+f.name+'" onerror="this.style.display=\'none\'">'
       + '</div>'
       + '<div class="pv-info">'
         + '<div class="pv-name">'+f.name+'</div>'
@@ -1143,11 +1175,11 @@
     $('#versus-roll').style.display='none';
     const ff=$('#versus-final'); ff.style.display='flex';
     $('#versus-hud').textContent='EL JEFE FINAL TE ESPERA…';
-    $('#vf-sil').innerHTML='<img src="kof-electoral/candidatos/'+state.me.id+'.png" alt="">';
-    $('#vf-stage').innerHTML='<img src="kof-electoral/stages/'+FINAL_STAGE.id+'.png" alt="">'
+    $('#vf-sil').innerHTML='<img src="combate-electoral/candidatos/'+state.me.id+'.png" alt="">';
+    $('#vf-stage').innerHTML='<img src="combate-electoral/stages/'+FINAL_STAGE.id+'.png" alt="">'
       + '<div class="vf-place">'+FINAL_STAGE.city+' · '+FINAL_STAGE.place+'</div>';
     const beaten = state.ladder.slice(0, state.matchIdx);
-    $('#vf-defeated').innerHTML = beaten.map(f=>'<div class="vf-face" style="background-image:url(\'kof-electoral/candidatos/'+f.id+'.png\')"></div>').join('');
+    $('#vf-defeated').innerHTML = beaten.map(f=>'<div class="vf-face" style="background-image:url(\'combate-electoral/candidatos/'+f.id+'.png\')"></div>').join('');
     sfx.gong();
     setTimeout(()=>{ if(cur==='versus' && state.opp===RICARDO){ $('#versus-final').style.display='none'; showVS(); } }, 3000);
   }
@@ -1176,7 +1208,7 @@
     state.stage=s;
     $('#stage-frame').innerHTML =
       '<div class="ph">ESCENARIO<br><b>'+s.city+'</b><br>'+s.place+'</div>'
-      + '<img src="kof-electoral/stages/'+s.id+'.png" alt="'+s.city+'" onerror="this.style.display=\'none\'">';
+      + '<img src="combate-electoral/stages/'+s.id+'.png" alt="'+s.city+'" onerror="this.style.display=\'none\'">';
     $('#stage-city').textContent  = s.city;
     $('#stage-place').textContent = s.place;
     $('#stage-hint').textContent  = rolling ? 'ESCENARIO AL AZAR…' : 'ricardoruiz.co';
@@ -1234,15 +1266,15 @@
 
   function fLoadSprite(fd){
     const im=new Image();
-    im.onerror=function(){ im.onerror=null; im.src='kof-electoral/candidatos/'+fd.id+'.png'; };
-    im.src='kof-electoral/candidatos/fight/'+fd.id+'.png';
+    im.onerror=function(){ im.onerror=null; im.src='combate-electoral/candidatos/'+fd.id+'.png'; };
+    im.src='combate-electoral/candidatos/fight/'+fd.id+'.png';
     return im;
   }
   // Poses de golpe (der/izq). Si no existen, naturalWidth=0 y se usa la pose base.
-  function fLoadPunch(fd, dir){ const im=new Image(); im.src='kof-electoral/candidatos/fight/punos/'+fd.id+'-'+dir+'.png'; return im; }
-  function fLoadKick(fd, dir){ const im=new Image(); im.src='kof-electoral/candidatos/fight/patada/'+fd.id+'-'+dir+'.png'; return im; }
+  function fLoadPunch(fd, dir){ const im=new Image(); im.src='combate-electoral/candidatos/fight/punos/'+fd.id+'-'+dir+'.png'; return im; }
+  function fLoadKick(fd, dir){ const im=new Image(); im.src='combate-electoral/candidatos/fight/patada/'+fd.id+'-'+dir+'.png'; return im; }
   // golpe recibido: puede venir como <id>-der/-izq (orientado) o <id> (único). Lo que falte queda en 0.
-  function fLoadHit(fd, suf){ const im=new Image(); im.src='kof-electoral/candidatos/fight/golpe-recibido/'+fd.id+suf+'.png'; return im; }
+  function fLoadHit(fd, suf){ const im=new Image(); im.src='combate-electoral/candidatos/fight/golpe-recibido/'+fd.id+suf+'.png'; return im; }
   function ready(im){ return im && im.complete && im.naturalWidth; }
   function mkF(fd, side, boss){
     const hp = boss?120:100;
@@ -1273,14 +1305,14 @@
     fO = mkF(state.opp, 'R', isFinal);
     const s = state.stage || STAGES[0];
     fStageImg = new Image();
-    fStageImg.src = 'kof-electoral/stages/'+s.id+'.png';
+    fStageImg.src = 'combate-electoral/stages/'+s.id+'.png';
     fSparks=[]; fShake=0; fMaxCombo=0; fPlayerHurt=false; fCamX=0;
     fTimer=F.round; fTimerAcc=0; fResult=''; fIntroT=0;
     fKeys.left=fKeys.right=fKeys.block=fKeys.jump=false;
     fcanvas=$('#fcanvas'); fcanvas.width=F.W; fcanvas.height=F.H; fctx=fcanvas.getContext('2d');
     $('#fname-l').textContent=state.me.short; $('#fname-r').textContent=state.opp.short;
-    $('#fface-l').style.backgroundImage='url("kof-electoral/candidatos/'+state.me.id+'.png")';
-    $('#fface-r').style.backgroundImage='url("kof-electoral/candidatos/'+state.opp.id+'.png")';
+    $('#fface-l').style.backgroundImage='url("combate-electoral/candidatos/'+state.me.id+'.png")';
+    $('#fface-r').style.backgroundImage='url("combate-electoral/candidatos/'+state.opp.id+'.png")';
     $('#fscore-l').textContent=fmt(state.score||0); $('#fscore-r').textContent='';
     $('#ftrail-l').style.width='100%'; $('#ftrail-r').style.width='100%';
     setBars(); clearCombo();
@@ -1451,7 +1483,7 @@
     unlock(opp.id);   // desbloquea al vencido para el selector
     const a=$('#win-art'); a.style.setProperty('--c',me.color); a.style.setProperty('--a',me.accent);
     a.innerHTML = '<div class="fallback"><span class="ini">'+me.ini+'</span></div>'
-      + '<img src="kof-electoral/candidatos/'+me.id+'.png" alt="'+me.name+'" onerror="this.style.display=\'none\'">';
+      + '<img src="combate-electoral/candidatos/'+me.id+'.png" alt="'+me.name+'" onerror="this.style.display=\'none\'">';
     $('#win-title').textContent = isFinalWin ? ('¡'+me.short+' CAMPEÓN!') : ('¡'+me.short+' GANA!');
     $('#win-phrase').textContent = '«'+ victoryLine(me.id, opp.id) +'»';
     $('#win-hud').textContent = isFinalWin ? '¡CAMPEÓN DE LA 2ª VUELTA!' : 'VICTORIA';
@@ -1459,8 +1491,13 @@
     $('#ws-perfect-row').classList.toggle('on', r.perfect>0);
     playClip('winner', false);
     animScore(r);
-    $('#win-next').textContent = isFinalWin ? 'JUGAR DE NUEVO ▸' : 'SIGUIENTE RIVAL ▸';
-    fWinnerProceed = isFinalWin ? ()=>go('select') : advanceLadder;
+    $('#win-next').textContent = isFinalWin ? 'VER CRÉDITOS ▸' : 'SIGUIENTE RIVAL ▸';
+    fWinnerProceed = isFinalWin ? ()=>go('credits') : advanceLadder;
+  }
+  function enterCredits(){
+    stopClip();
+    $('#cred-champ').textContent = '¡'+state.me.short+' CAMPEÓN!';
+    $('#cred-line').textContent = state.me.short+' gana la Segunda Vuelta · Colombia \'26';
   }
   // Derrota ante el JEFE FINAL: Ricardo gana y critica a tu candidato con un dato real.
   function enterBossWin(){
@@ -1468,7 +1505,7 @@
     const me=state.me;
     const a=$('#win-art'); a.style.setProperty('--c',RICARDO.color); a.style.setProperty('--a',RICARDO.accent);
     a.innerHTML = '<div class="fallback"><span class="ini">RR</span></div>'
-      + '<img src="kof-electoral/candidatos/ricardo.png" alt="RICARDO RUIZ" onerror="this.style.display=\'none\'">';
+      + '<img src="combate-electoral/candidatos/ricardo.png" alt="RICARDO RUIZ" onerror="this.style.display=\'none\'">';
     $('#win-title').textContent = 'RICARDO GANA';
     $('#win-phrase').textContent = '«'+ ricardoCritique(me.id) +'»';
     $('#win-hud').textContent = 'EL JEFE FINAL TE DERROTÓ';
@@ -1575,6 +1612,8 @@
   $('#scr-winner').addEventListener('click', ()=>{ if(fWinnerProceed) fWinnerProceed(); });   // móvil: tocar en cualquier parte
   $('#cont-yes').addEventListener('click', ()=>{ clearInterval(contIv); stopClip(); go('fight'); });
   $('#cont-no').addEventListener('click', ()=>{ clearInterval(contIv); stopClip(); go('title'); });
+  $('#cred-back').addEventListener('click', (e)=>{ e.stopPropagation(); go('title'); });
+  $('#scr-credits').addEventListener('click', ()=>{ go('title'); });   // móvil: tocar en cualquier parte
 
   document.addEventListener('keydown', (e)=>{
     const k=e.key;
@@ -1598,6 +1637,7 @@
       else if(k==='Escape'){ clearInterval(contIv); stopClip(); go('title'); }
       return;
     }
+    if(cur==='credits'){ if(k==='Enter'||k===' '||k==='Escape'){ e.preventDefault(); go('title'); } return; }
   });
   document.addEventListener('keyup', (e)=>{
     if(cur!=='fight') return;
