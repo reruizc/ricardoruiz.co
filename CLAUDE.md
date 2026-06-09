@@ -1532,6 +1532,13 @@ title → howto → select → versus → fight → (winner | continue) → [cre
 - **Hint de rotación** (`#rotate-hint`): overlay full-screen "GIRA TU TELÉFONO" que
   aparece solo en **móvil + vertical** (`@media (orientation:portrait){ body.touch … }`);
   al girar a landscape desaparece. Empuja a jugar en horizontal.
+- **Viewport visible (`svh`) + pantalla completa**: el cabinet usa `100svh` (con
+  fallback `vh`) en `#cab`/`#screen` → mide el alto **VISIBLE** descontando la barra del
+  navegador móvil, así los **controles de abajo no se cortan** en iPhone. Además
+  `goFullscreen()` pide `requestFullscreen()` al primer toque (solo `body.touch`):
+  Android/iPad entran a pantalla completa; iPhone Safari no lo permite por API (ahí el
+  `svh` ya resuelve). Metas `apple-mobile-web-app-capable` + `viewport-fit=cover` para
+  "Agregar a inicio" sin barra.
 - **Layout responsive (cabinet-relative)** para que nada se desborde en cabinet chico:
   logo `.fighters`/`.year` con `min(vw,vh)` (antes `vw` puro se salía en landscape);
   título `.tap-hint`/`.insert` con `bottom:max(%,px)` (no pisan el `.hud`); botón
