@@ -1523,7 +1523,12 @@ title → howto → select → versus → fight → (winner | continue) → [cre
 - **HUD**: barras **anchas** con **capa roja de daño** (baja con retraso hasta la
   vida real), **timer grande** al centro, **foto pequeña** (1P izquierda, **2P al
   extremo derecho**), **nombre debajo de la barra** y **score del 1P**. Móvil:
-  `body.touch` muestra **#fight-touch** (d-pad ◀▲▼▶ + botones A/S).
+  `body.touch` muestra **#fight-touch** (d-pad ◀▲▼▶ + botones A/S). Las teclas se
+  dimensionan **relativas al cabinet** (`clamp(px, min(vh,vw), px)`, no `vw` puro, que
+  en landscape se inflaba) y en touch el **piso sube a `0.80`** (`fGroundPx`) para que
+  los peleadores queden por encima de las teclas. El cabinet es **4:3** fijo
+  (`#screen: min(100vw,100vh·4/3)`); pensado para **landscape** (en portrait queda chico
+  y centrado con franjas negras).
 - **Cámara** (`drawCover` + `fCamX`): el fondo panorámico **panea** según el punto
   medio entre peleadores; el paneo es **proporcional al sobre-ancho** de cada
   imagen (anchos como Cali/Barranquilla/Galerías se mueven más). Sin huecos.
