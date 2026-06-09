@@ -430,7 +430,7 @@
   #fcanvas{position:absolute; inset:0; width:100%; height:100%; display:block}
   #fight-hud{position:absolute; top:0; left:0; right:0; z-index:20; display:flex; align-items:flex-start; justify-content:space-between; gap:10px; padding:10px 12px 0; pointer-events:none}
   .fside{flex:1 1 0; min-width:0; display:flex; align-items:flex-start; gap:8px}
-  .fside.right{flex-direction:row-reverse}
+  .fside.right{flex-direction:row}   /* foto del 2P a la derecha del todo */
   .fface{flex:0 0 auto; width:clamp(46px,7.6vw,84px); height:clamp(46px,7.6vw,84px); border:2px solid #000; box-shadow:0 0 0 2px rgba(255,255,255,.35); background:#222 center top/cover no-repeat}
   .fmeter{flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:5px}
   .fside.right .fmeter{align-items:flex-end}
@@ -1069,7 +1069,7 @@
     $('#sel-preview').innerHTML =
       '<div class="pv-art" style="--c:'+f.color+';--a:'+f.accent+'">'
         + '<div class="pv-adv">AVANZADO</div>'
-        + '<div class="fallback"><span class="ini">'+f.ini+'</span><span class="cname">'+f.short+'</span></div>'
+        + '<div class="fallback"></div>'   // sin iniciales detrás (la foto es transparente)
         + '<img src="combate-electoral/candidatos/'+f.id+'.png" alt="'+f.name+'" onerror="this.style.display=\'none\'">'
       + '</div>'
       + '<div class="pv-info">'
@@ -1253,11 +1253,11 @@
     W:1024, H:768, groundY:0.90, spriteH:0.42,   // sprites 30% más pequeños
     round:60, walk:3.6, jumpV:20, grav:0.95,      // saltan un poco más
     reach:104, punchDmg:6, kickDmg:10,
-    punchCD:340, kickCD:560, atkWindow:160, knock:30, hitStun:280, comboWin:1100
+    punchCD:340, kickCD:560, atkWindow:160, knock:30, hitStun:280, comboWin:1100, koDur:2600
   };
   let fcanvas=null, fctx=null, fRAF=null, fLast=0;
   let fPhase='intro', fTimer=F.round, fTimerAcc=0, fResult='', fIntroT=0;
-  let fP=null, fO=null, fStageImg=null, fSparks=[], fShake=0, fMaxCombo=0, fPlayerHurt=false, fCamX=0;
+  let fP=null, fO=null, fStageImg=null, fSparks=[], fShake=0, fMaxCombo=0, fPlayerHurt=false, fCamX=0, fMatchWon=false, fKoUntil=0;
   const fKeys={left:false,right:false,jump:false,block:false};
 
   function fGroundPx(){ return F.H*F.groundY; }
@@ -1281,7 +1281,7 @@
     return { fd, side, boss:!!boss, x: side==='L'?F.W*0.30:F.W*0.70, y:0, vy:0, onGround:true,
       hp, maxHp:hp, hpShown:hp, facing: side==='L'?1:-1,
       atk:null, atkUntil:0, atkHit:false, cdUntil:0, stun:0, lean:0, blocking:false,
-      combo:0, lastHit:0, flashUntil:0, img:fLoadSprite(fd),
+      combo:0, lastHit:0, flashUntil:0, ko:false, koStart:0, img:fLoadSprite(fd),
       punchR:fLoadPunch(fd,'der'), punchL:fLoadPunch(fd,'izq'), kickR:fLoadKick(fd,'der'), kickL:fLoadKick(fd,'izq'),
       hitR:fLoadHit(fd,'-der'), hitL:fLoadHit(fd,'-izq'), hit0:fLoadHit(fd,'') };
   }
@@ -1342,6 +1342,12 @@
     if(fPhase==='intro'){
       fIntroT+=dt;
       if(fIntroT>1100){ fPhase='fight'; showFMsg('¡PELEEN!'); setTimeout(hideFMsg,650); }
+      return;
+    }
+    if(fPhase==='ko'){
+      updateSparks(dt);
+      if(fShake>0) fShake=Math.max(0, fShake-dt*0.04);
+      if(now>=fKoUntil){ fPhase='over'; if(cur==='fight') finishMatch(); }
       return;
     }
     if(fPhase!=='fight'){ updateSparks(dt); return; }
@@ -1456,19 +1462,29 @@
     state.lastRound = { vitality, timeBonus, perfect:perfectB, straight, comboB, total, maxCombo:fMaxCombo, streak:state.streak };
   }
   function endFight(reason){
-    if(fPhase==='over') return; fPhase='over';
+    if(fPhase==='over' || fPhase==='ko') return;
     clearCombo();
     let winner;
     if(reason==='ko') winner = fP.hp<=0 ? (fO.hp<=0?null:fO) : fP;
     else winner = (fP.hp===fO.hp)?null:(fP.hp>fO.hp?fP:fO);
-    const won=(winner===fP);
+    fMatchWon = (winner===fP);
+    if(fP) fP.atk=null; if(fO) fO.atk=null;
+    if(reason==='ko' && winner){
+      // el perdedor se desploma lentamente (~2.6s) y al final se abre el resultado
+      const loser = (winner===fP) ? fO : fP;
+      loser.ko=true; loser.koStart=performance.now(); loser.stun=0;
+      fPhase='ko'; fKoUntil=performance.now()+F.koDur; fShake=12;
+      showFMsg('K.O.'); sfx.gong();
+      return;
+    }
+    fPhase='over';
     showFMsg(reason==='ko'?'K.O.':'TIME UP'); sfx.gong();
-    setTimeout(()=>{
-      if(cur!=='fight') return;
-      if(won){ fBossWin=false; computeRoundScore(); go('winner'); }
-      else if(state.opp===RICARDO){ state.streak=0; fBossWin=true; go('winner'); }  // perdiste ante el jefe → Ricardo gana y te critica
-      else { state.streak=0; go('continue'); }
-    }, 1200);
+    setTimeout(()=>{ if(cur==='fight') finishMatch(); }, 1200);
+  }
+  function finishMatch(){
+    if(fMatchWon){ fBossWin=false; computeRoundScore(); go('winner'); }
+    else if(state.opp===RICARDO){ state.streak=0; fBossWin=true; go('winner'); }  // perdiste ante el jefe → Ricardo gana y te critica
+    else { state.streak=0; go('continue'); }
   }
 
   /* ---- PANTALLA DE VICTORIA (winner.mp3 + conteo de puntos) ---- */
@@ -1566,7 +1582,7 @@
   function drawFighter(c,ftr,now){
     const srcFace = ftr.fd.srcFace || 1;   // orientación natural del PNG base (1=mira derecha, -1=izquierda)
     let img = ftr.img, flip = (ftr.facing!==srcFace), usingFrame=false;
-    if(ftr.stun>0){                                   // recibiendo golpe
+    if(ftr.stun>0 || ftr.ko){                         // recibiendo golpe / cayendo
       const h2=hitImgFor(ftr);
       if(h2){ img=h2.img; flip=h2.flip; usingFrame=true; }
     } else if(ftr.atk==='punch' || ftr.atk==='kick'){
@@ -1576,9 +1592,22 @@
     const h=fSpriteH(), gy=fGroundPx();
     const aspect = (img && img.naturalHeight) ? img.naturalWidth/img.naturalHeight : 0.667;
     const w = h*aspect;
+    const flashing = ftr.flashUntil && now < ftr.flashUntil && (Math.floor(now/45)%2===0);
+    if(ftr.ko){   // ===== caída de K.O. (rota y baja, ~2.6s) =====
+      const k=Math.min(1,(now-ftr.koStart)/F.koDur), e=1-(1-k)*(1-k);
+      const ang=(-ftr.facing)*(85*Math.PI/180)*e, kdw=w, kdh=h, drop=kdh*0.42*e;
+      c.save();
+      c.translate(ftr.x, gy-kdh*0.5+drop);
+      c.rotate(ang);
+      if(flip) c.scale(-1,1);
+      if(flashing){ try{ c.filter='brightness(0) invert(1)'; }catch(e){} }
+      if(ready(img)) c.drawImage(img, -kdw/2, -kdh/2, kdw, kdh);
+      else { c.fillStyle=ftr.fd.color; c.fillRect(-kdw/2,-kdh/2,kdw,kdh); }
+      c.restore();
+      return;
+    }
     const lean = (ftr.stun>0 && !usingFrame) ? -ftr.facing*9 : (ftr.atk && !usingFrame ? ftr.facing*20*ftr.lean : 0);
     const sc = (ftr.atk && !usingFrame)?1.03:1, dh=h*sc, dw=w*sc, cx=ftr.x+lean, top=gy-dh+ftr.y;
-    const flashing = ftr.flashUntil && now < ftr.flashUntil && (Math.floor(now/45)%2===0);
     c.save();
     if(flip){ c.translate(cx,0); c.scale(-1,1); c.translate(-cx,0); }
     if(!img || !img.complete || !img.naturalWidth){ c.fillStyle = flashing?'#fff':ftr.fd.color; c.fillRect(cx-dw/2, top, dw, dh); }
