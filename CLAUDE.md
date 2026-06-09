@@ -1530,10 +1530,11 @@ title → howto → select → versus → fight → (winner | continue) → [cre
   (`#screen: min(100vw,100vh·4/3)`); pensado para **landscape** (en portrait queda chico
   y centrado con franjas negras).
 - **Layout VERTICAL en móvil** (`@media (orientation:portrait) and (max-width:820px)`,
-  al final del `<style>` para ganar la cascada): en iPhone se juega **en vertical**
-  (NO se fuerza landscape — el `#rotate-hint` quedó retirado, iOS Safari no da
-  fullscreen real por API). `#screen` rompe el 4:3 y usa `100svh` (todo el alto visible,
-  descontando la barra del navegador). La **pelea va centrada verticalmente**: el canvas
+  al final del `<style>` para ganar la cascada): aplica por ORIENTACIÓN, no por
+  dispositivo → **iPhone y Android idéntico** (verificado en viewport 375×812 y
+  412×915). NO se fuerza landscape (el `#rotate-hint` quedó retirado). `#screen`
+  rompe el 4:3 y usa `100svh` con **fallback `100vh`** (Android/WebView viejos sin
+  `svh` descartarían la regla y caerían al cabinet 4:3 chico). La **pelea va centrada verticalmente**: el canvas
   + sus overlays se envuelven en `.fight-stage` (4:3, sin estirar) y `#scr-fight.active`
   es `flex column; justify-content:center` con `padding` de `env(safe-area-inset-*)` →
   canvas y controles centrados como grupo, **libres del notch (arriba) y del home bar
@@ -1546,7 +1547,9 @@ title → howto → select → versus → fight → (winner | continue) → [cre
 - **`svh` + pantalla completa**: el cabinet usa `100svh` (fallback `vh`) → alto visible.
   `goFullscreen()` pide `requestFullscreen()` al primer toque (solo `body.touch`):
   Android/iPad entran a pantalla completa; iPhone Safari no lo permite por API (ahí el
-  `svh` + layout vertical ya resuelven). Metas `apple-mobile-web-app-capable` +
+  `svh` + layout vertical ya resuelven). El fullscreen **NO toca la orientación** (no
+  hay `orientation.lock`): en Android vertical solo quita la barra del navegador y el
+  layout vertical se mantiene. Metas `apple-mobile-web-app-capable` +
   `viewport-fit=cover` para "Agregar a inicio" sin barra.
 - **Layout responsive (cabinet-relative)** para que nada se desborde en cabinet chico:
   logo `.fighters`/`.year` con `min(vw,vh)` (antes `vw` puro se salía en landscape);
