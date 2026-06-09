@@ -1474,6 +1474,15 @@
   /* ---- PANTALLA DE VICTORIA (winner.mp3 + conteo de puntos) ---- */
   function fmt(n){ return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
   function triggerWinAnim(){ const w=$('#win-wrap'); if(w){ w.classList.remove('go'); void w.offsetWidth; w.classList.add('go'); } }
+  // Título al vencer al JEFE FINAL (personalizado por candidato)
+  function championTitle(f){
+    const n=f.short;
+    if(f.id==='cepeda' || f.id==='abelardo') return '¡'+n+' PRESIDENTE EN 2NDA VUELTA!';
+    if(f.id==='paloma') return '¡PALOMA SERÁ PRESIDENTA EN 2030!';
+    if(f.id==='petro')  return '¡PETRO PRESIDENTE DE NUEVO!';
+    if(f.id==='uribe' || f.id==='santos') return '¡'+n+' PRESIDENTE ETERNO!';
+    return '¡'+n+' CAMPEÓN!';
+  }
   function enterWinner(){
     stopClip();
     if(fBossWin){ enterBossWin(); return; }
@@ -1484,7 +1493,7 @@
     const a=$('#win-art'); a.style.setProperty('--c',me.color); a.style.setProperty('--a',me.accent);
     a.innerHTML = '<div class="fallback"><span class="ini">'+me.ini+'</span></div>'
       + '<img src="combate-electoral/candidatos/'+me.id+'.png" alt="'+me.name+'" onerror="this.style.display=\'none\'">';
-    $('#win-title').textContent = isFinalWin ? ('¡'+me.short+' CAMPEÓN!') : ('¡'+me.short+' GANA!');
+    $('#win-title').textContent = isFinalWin ? championTitle(me) : ('¡'+me.short+' GANA!');
     $('#win-phrase').textContent = '«'+ victoryLine(me.id, opp.id) +'»';
     $('#win-hud').textContent = isFinalWin ? '¡CAMPEÓN DE LA 2ª VUELTA!' : 'VICTORIA';
     const r=state.lastRound||{vitality:0,timeBonus:0,perfect:0,straight:0,comboB:0,total:0,maxCombo:0,streak:1};
@@ -1496,8 +1505,8 @@
   }
   function enterCredits(){
     stopClip();
-    $('#cred-champ').textContent = '¡'+state.me.short+' CAMPEÓN!';
-    $('#cred-line').textContent = state.me.short+' gana la Segunda Vuelta · Colombia \'26';
+    $('#cred-champ').textContent = championTitle(state.me);
+    $('#cred-line').textContent = 'Has vencido al jefe final · Colombia \'26';
   }
   // Derrota ante el JEFE FINAL: Ricardo gana y critica a tu candidato con un dato real.
   function enterBossWin(){
