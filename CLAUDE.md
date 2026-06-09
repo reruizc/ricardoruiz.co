@@ -1529,6 +1529,15 @@ title → howto → select → versus → fight → (winner | continue) → [cre
   los peleadores queden por encima de las teclas. El cabinet es **4:3** fijo
   (`#screen: min(100vw,100vh·4/3)`); pensado para **landscape** (en portrait queda chico
   y centrado con franjas negras).
+- **Hint de rotación** (`#rotate-hint`): overlay full-screen "GIRA TU TELÉFONO" que
+  aparece solo en **móvil + vertical** (`@media (orientation:portrait){ body.touch … }`);
+  al girar a landscape desaparece. Empuja a jugar en horizontal.
+- **Layout responsive (cabinet-relative)** para que nada se desborde en cabinet chico:
+  logo `.fighters`/`.year` con `min(vw,vh)` (antes `vw` puro se salía en landscape);
+  título `.tap-hint`/`.insert` con `bottom:max(%,px)` (no pisan el `.hud`); botón
+  **AL AZAR** más compacto en `@media` (font 7px, sin letter-spacing); instrucciones
+  `@media` compactas + top-align + `#scr-howto .hud` oculto para que no se recorte el
+  texto ni choque el "PULSA TECLA" abajo.
 - **Cámara** (`drawCover` + `fCamX`): el fondo panorámico **panea** según el punto
   medio entre peleadores; el paneo es **proporcional al sobre-ancho** de cada
   imagen (anchos como Cali/Barranquilla/Galerías se mueven más). Sin huecos.
@@ -1596,10 +1605,11 @@ title → howto → select → versus → fight → (winner | continue) → [cre
     **encadenado después** sólo si fue K.O. perfecto del jugador (sin recibir daño).
   - **Winner**: `winner-voice` en capa con `winner.mp3` al aparecer la imagen (también
     en la derrota ante el jefe).
-- **Saludos de apertura** (suenan **A LA VEZ** tras el "¿Listos?", antes de pelear ·
-  `playGreetings`): cada peleador saluda con `"{id}-{rival}.MP3"`; si no existe, cae al
-  genérico `"{id}-all.MP3"` (p.ej. **`santos-all`** — Santos no necesita uno por rival).
-  Suenan los dos lados (`me-opp` + `opp-me`).
+- **Saludos de apertura** (**en secuencia** tras el "¿Listos?", antes de pelear ·
+  `playGreetings`): primero el del **rival** (`opp-me`, si tiene), al terminar el del
+  **candidato propio** (`me-opp`). Cada peleador saluda con `"{id}-{rival}.MP3"`; si no
+  existe, cae al genérico `"{id}-all.MP3"` (p.ej. **`santos-all`** — Santos no necesita
+  uno por rival). NO se solapan (token `greetTok` invalida secuencias viejas).
 - **Voz de victoria del ganador** (`playKoWinner`): al K.O. suena `"{ganador}-winner.MP3"`
   y **la pantalla de winner ESPERA** a que termine (gate `fKoWinReady` + `fKoUntil`).
 - **`mkAudioChain(bases[])`**: prueba una lista de bases en orden, cada una con
