@@ -1529,16 +1529,25 @@ title → howto → select → versus → fight → (winner | continue) → [cre
   los peleadores queden por encima de las teclas. El cabinet es **4:3** fijo
   (`#screen: min(100vw,100vh·4/3)`); pensado para **landscape** (en portrait queda chico
   y centrado con franjas negras).
-- **Hint de rotación** (`#rotate-hint`): overlay full-screen "GIRA TU TELÉFONO" que
-  aparece solo en **móvil + vertical** (`@media (orientation:portrait){ body.touch … }`);
-  al girar a landscape desaparece. Empuja a jugar en horizontal.
-- **Viewport visible (`svh`) + pantalla completa**: el cabinet usa `100svh` (con
-  fallback `vh`) en `#cab`/`#screen` → mide el alto **VISIBLE** descontando la barra del
-  navegador móvil, así los **controles de abajo no se cortan** en iPhone. Además
+- **Layout VERTICAL en móvil** (`@media (orientation:portrait) and (max-width:820px)`,
+  al final del `<style>` para ganar la cascada): en iPhone se juega **en vertical**
+  (NO se fuerza landscape — el `#rotate-hint` quedó retirado, iOS Safari no da
+  fullscreen real por API). `#screen` rompe el 4:3 y usa `100svh` (todo el alto visible,
+  descontando la barra del navegador). La **pelea va centrada verticalmente**: el canvas
+  + sus overlays se envuelven en `.fight-stage` (4:3, sin estirar) y `#scr-fight.active`
+  es `flex column; justify-content:center` con `padding` de `env(safe-area-inset-*)` →
+  canvas y controles centrados como grupo, **libres del notch (arriba) y del home bar
+  (abajo)**. `#fight-touch` pasa a item de flex debajo del canvas (relativo, no
+  absolute). Instrucciones y winner pasan a **columna centrada** (arte arriba, texto
+  abajo). El botón **¡PELEAR!** del versus se sube con `padding-bottom` (no pegado al
+  borde). **Clave:** los overrides de `#scr-fight`/`#fight-touch` deben ir calificados
+  con `.active` (p.ej. `#scr-fight.active{display:flex}`) — un `#scr-fight{display:flex}`
+  pelado (ID) pisa el `.screen{display:none}` y deja la pantalla SIEMPRE visible (bug).
+- **`svh` + pantalla completa**: el cabinet usa `100svh` (fallback `vh`) → alto visible.
   `goFullscreen()` pide `requestFullscreen()` al primer toque (solo `body.touch`):
   Android/iPad entran a pantalla completa; iPhone Safari no lo permite por API (ahí el
-  `svh` ya resuelve). Metas `apple-mobile-web-app-capable` + `viewport-fit=cover` para
-  "Agregar a inicio" sin barra.
+  `svh` + layout vertical ya resuelven). Metas `apple-mobile-web-app-capable` +
+  `viewport-fit=cover` para "Agregar a inicio" sin barra.
 - **Layout responsive (cabinet-relative)** para que nada se desborde en cabinet chico:
   logo `.fighters`/`.year` con `min(vw,vh)` (antes `vw` puro se salía en landscape);
   título `.tap-hint`/`.insert` con `bottom:max(%,px)` (no pisan el `.hud`); botón
