@@ -786,7 +786,7 @@
       special:'PALOMA DE LA PAZ', stats:{F:3,V:3,T:5,D:4,R:3},
       line:'Caballero, hasta en la pelea hay reglas. Domina la técnica y, si puedes, negocia la victoria.' },
     { id:'abelardo',name:'ABELARDO E.',   short:'ABELARDO', ini:'AE',
-      partido:'Defensores de la Patria', epi:'EL TIGRE', color:'#16161F', accent:'#D4AF37',
+      partido:'Defensores de la Patria', epi:'EL TIGRE', color:'#16161F', accent:'#D4AF37', scale:1.05,
       special:'ZARPAZO DEL TIGRE', stats:{F:5,V:2,T:3,D:5,R:4},
       line:'Esto no es para tibios. El Tigre no perdona: bloquea, espera y da el zarpazo.' },
     { id:'uribe',   name:'ÁLVARO URIBE',  short:'URIBE',    ini:'AU',
@@ -927,6 +927,38 @@
   function playClip(name, loop){ stopClip(); if(muted) return null; const a=new Audio(CLIPS[name]); a.loop=!!loop; a.volume=0.6; curClip=a; a.play().catch(()=>{}); return a; }
   function stopClip(){ if(curClip){ try{curClip.pause();}catch(e){} curClip=null; } }
 
+  /* ---- Voces / locuciones (canal propio · se solapan con clips y se pueden encadenar) ---- */
+  const VOICES = {
+    ko:      'combate-electoral/music/ko-voice.MP3',
+    perfect: 'combate-electoral/music/perfect.MP3',
+    winner:  'combate-electoral/music/winner-voice.MP3',
+    round:   'combate-electoral/music/round-voice.MP3',
+    ready:   'combate-electoral/music/ready-voice.MP3'
+  };
+  // número del ROUND → voz ("ONE","TWO",…). Los que aún no existan (three-voice.MP3) se omiten solos al fallar la carga.
+  const NUM_VOICE = ['one','two','three','four','five','six'].map(n=>'combate-electoral/music/'+n+'-voice.MP3');
+  let curVoice=null, voiceSeqTok=0;
+  function stopVoice(){ voiceSeqTok++; if(curVoice){ try{curVoice.pause();}catch(e){} curVoice=null; } }
+  function playVoice(url, vol){ if(muted||!url) return null; const a=new Audio(url); a.volume=(vol==null?0.85:vol); curVoice=a; a.play().catch(()=>{}); return a; }
+  // reproduce urls una tras otra: cada una arranca cuando termina la anterior (y salta las que falten)
+  function playVoiceSeq(urls, vol){
+    if(muted) return;
+    stopVoice();
+    const tok=voiceSeqTok; let i=0;
+    const step=()=>{
+      if(tok!==voiceSeqTok || i>=urls.length) return;       // cancelada o terminada
+      const url=urls[i++]; if(!url){ step(); return; }
+      const a=new Audio(url); a.volume=(vol==null?0.85:vol); curVoice=a;
+      a.onended=()=>{ if(tok===voiceSeqTok) step(); };
+      a.onerror=()=>{ if(tok===voiceSeqTok) step(); };       // archivo faltante → sigue con el próximo
+      a.play().catch(()=>{});
+    };
+    step();
+  }
+  /* ---- SFX de combate (mp3 compartidos · fire-and-forget para que se solapen) ---- */
+  const SFX_FILES = { punch:'combate-electoral/music/puno.MP3', kick:'combate-electoral/music/patada.MP3' };
+  function playSfxFile(name, vol){ if(muted) return; const url=SFX_FILES[name]; if(!url) return; const a=new Audio(url); a.volume=(vol==null?0.7:vol); a.play().catch(()=>{}); }
+
   const $  = s => document.querySelector(s);
   const rnd = n => Math.floor(Math.random()*n);
 
@@ -976,7 +1008,7 @@
 
   $('#snd').addEventListener('click', (e)=>{ e.stopPropagation();
     muted=!muted; $('#snd').textContent=muted?'🔇':'🔊';
-    if(muted){ if(curMusic){ try{curMusic.pause();}catch(e){} } stopClip(); }
+    if(muted){ if(curMusic){ try{curMusic.pause();}catch(e){} } stopClip(); stopVoice(); }
     else { audio(); const n=curMusicName; curMusicName=null; if(n){ playMusic(n); } else { sfx.move(); } }
   });
 
@@ -1262,7 +1294,7 @@
 
   function fGroundPx(){ return F.H*F.groundY; }
   function fSpriteH(){ return F.H*F.spriteH; }
-  function fwOf(ftr){ const im=ftr&&ftr.img; const a=(im&&im.naturalHeight)?(im.naturalWidth/im.naturalHeight):0.667; return fSpriteH()*a; }
+  function fwOf(ftr){ const im=ftr&&ftr.img; const a=(im&&im.naturalHeight)?(im.naturalWidth/im.naturalHeight):0.667; const sc=(ftr&&ftr.fd&&ftr.fd.scale)||1; return fSpriteH()*a*sc; }
 
   function fLoadSprite(fd){
     const im=new Image();
@@ -1317,8 +1349,9 @@
     $('#ftrail-l').style.width='100%'; $('#ftrail-r').style.width='100%';
     setBars(); clearCombo();
     $('#ftimer').textContent=F.round; $('#ftimer').classList.remove('low');
-    fPhase='intro'; showFMsg(isFinal?'JEFE FINAL':'ROUND 1');
-    if(isFinal) playClip('boss', true); else stopClip();   // tema del jefe en loop
+    fPhase='intro'; stopVoice();
+    if(isFinal){ showFMsg('JEFE FINAL'); playClip('boss', true); playVoiceSeq([VOICES.round, VOICES.ready]); }   // jefe: tema propio + "ROUND ¿Listos?" sin número
+    else { showFMsg('ROUND '+(state.matchIdx+1)); stopClip(); playVoiceSeq([VOICES.round, NUM_VOICE[state.matchIdx], VOICES.ready]); }  // "ROUND ONE/TWO/…" → "¿Listos?"
     fLast=performance.now();
     if(fRAF) cancelAnimationFrame(fRAF);
     fRAF=requestAnimationFrame(fLoop);
@@ -1405,6 +1438,7 @@
     if(ftr.stun>0 || ftr.atk || now<ftr.cdUntil || !ftr.onGround) return;
     ftr.atk=type; ftr.atkUntil=now+F.atkWindow; ftr.atkHit=false;
     ftr.cdUntil=now+(type==='punch'?F.punchCD:F.kickCD); ftr.lean=1;
+    playSfxFile(type);   // SFX de puño/patada (jugador e IA)
   }
 
   function stepFighter(ftr, it, dt, now){
@@ -1475,6 +1509,8 @@
       loser.ko=true; loser.koStart=performance.now(); loser.stun=0;
       fPhase='ko'; fKoUntil=performance.now()+F.koDur; fShake=12;
       showFMsg('K.O.'); sfx.gong();
+      const koPerfect = (winner===fP) && !fPlayerHurt && fP.hp>=fP.maxHp;   // K.O. sin recibir daño
+      playVoiceSeq(koPerfect ? [VOICES.ko, VOICES.perfect] : [VOICES.ko]);  // ko-voice con los destellos; perfect después si aplica
       return;
     }
     fPhase='over';
@@ -1514,7 +1550,7 @@
     $('#win-hud').textContent = isFinalWin ? '¡CAMPEÓN DE LA 2ª VUELTA!' : 'VICTORIA';
     const r=state.lastRound||{vitality:0,timeBonus:0,perfect:0,straight:0,comboB:0,total:0,maxCombo:0,streak:1};
     $('#ws-perfect-row').classList.toggle('on', r.perfect>0);
-    playClip('winner', false);
+    playClip('winner', false); playVoice(VOICES.winner, 0.9);   // música winner + locución, en capa
     animScore(r);
     $('#win-next').textContent = isFinalWin ? 'VER CRÉDITOS ▸' : 'SIGUIENTE RIVAL ▸';
     fWinnerProceed = isFinalWin ? ()=>go('credits') : advanceLadder;
@@ -1537,7 +1573,7 @@
     $('#win-score').style.display='none';
     $('#win-next').textContent = 'CONTINUAR ▸';
     fWinnerProceed = ()=>go('continue');
-    const aud=playClip('winner', false);
+    const aud=playClip('winner', false); playVoice(VOICES.winner, 0.9);   // música winner + locución, en capa
     if(aud) aud.onended=()=>{ if(cur==='winner') go('continue'); };
   }
   function animScore(r){
@@ -1589,10 +1625,11 @@
       const set = ftr.atk==='punch' ? (ftr.facing>=0?ftr.punchR:ftr.punchL) : (ftr.facing>=0?ftr.kickR:ftr.kickL);
       if(ready(set)){ img=set; flip=false; usingFrame=true; }  // der/izq ya orientados
     }
-    const h=fSpriteH(), gy=fGroundPx();
+    const h=fSpriteH()*((ftr.fd&&ftr.fd.scale)||1), gy=fGroundPx();
     const aspect = (img && img.naturalHeight) ? img.naturalWidth/img.naturalHeight : 0.667;
     const w = h*aspect;
-    const flashing = ftr.flashUntil && now < ftr.flashUntil && (Math.floor(now/45)%2===0);
+    // durante el K.O. los combatientes NO destellan (el destello va en la pantalla, ver fDraw)
+    const flashing = fPhase!=='ko' && ftr.flashUntil && now < ftr.flashUntil && (Math.floor(now/45)%2===0);
     if(ftr.ko){   // ===== caída de K.O. (rota y baja, ~2.6s) =====
       const k=Math.min(1,(now-ftr.koStart)/F.koDur), e=1-(1-k)*(1-k);
       const ang=(-ftr.facing)*(85*Math.PI/180)*e, kdw=w, kdh=h, drop=kdh*0.42*e;
@@ -1622,6 +1659,13 @@
     c.save(); c.clearRect(0,0,F.W,F.H); c.translate(sx,sy);
     drawCover(c, fStageImg, F.W, F.H, fCamX);
     c.fillStyle='rgba(0,0,12,0.12)'; c.fillRect(0,0,F.W,F.H);
+    if(fPhase==='ko'){   // destellos rojo/blanco en pantalla (los combatientes van encima, sin teñir)
+      const koEl=now-(fKoUntil-F.koDur);
+      const env=Math.min(1,koEl/140)*Math.min(1,Math.max(0,(fKoUntil-now)/420));
+      const a=(0.42+0.30*(Math.sin(now/42)*0.5+0.5))*env;
+      c.fillStyle=(Math.floor(now/70)%2)?'rgba(255,28,40,'+a.toFixed(3)+')':'rgba(255,255,255,'+a.toFixed(3)+')';
+      c.fillRect(-80,-80,F.W+160,F.H+160);
+    }
     drawShadow(c,fP); drawShadow(c,fO);
     // dibujar el de más atrás primero (mayor x al fondo da igual; orden simple)
     drawFighter(c,fO,now); drawFighter(c,fP,now);

@@ -9,6 +9,7 @@
 - `oportunidad.html` — **módulo B2B** voto blando afín por candidato (LISTO, ver sección dedicada)
 - `veleta.html` — **módulo B2B LISTO** · municipios sensibles al cambio con score por candidato (Cepeda · Abelardo · Paloma). Drill nacional→depto→mun→ciudades-UPL/comunas→barrios. Excel con categoría + proy + censo + Premium PDF top 50. Ver sección dedicada.
 - `test-presidencial-2026.html` — **test de arquetipo emocional + lectura LLM** (LISTO v1, ver sección dedicada)
+- `combate-electoral.html` — **juego de pelea tipo KOF'98** (parodia, LISTO v1) · candidatos 2026, escalera + jefe final Ricardo, motor canvas 2D. Reemplazó al kart (eliminado). Assets en `combate-electoral/`. Ver sección dedicada.
 - `analisis-estructural.html` — **Lab de Políticas Públicas y Prospectiva** · hub del lab + módulo análisis estructural (MicMac · DEMATEL · ISM modernizado, fuzzy, valencias firmadas, copiloto IA) + **sección "Mi informe del lab" (Sprint G)** que une los 6 módulos en un memo combinado (PDF + Markdown). LISTO, ver sección dedicada.
 - `mactor.html` — **Lab** · módulo análisis de actores y conflictos (MID + MAO, copiloto IA). LISTO.
 - `problema-publico.html` — **Lab** · módulo problema público (Eightfold Path de Bardach condensado a 5 mecánicas + capa metodológica profunda con wizard de síntoma, árbol del problema CEPAL/Ortegón, test Rittel-Webber y selector de marco analítico). Cloud-save + 3 acciones IA + Issue Paper export. LISTO (Sprint A).
@@ -642,12 +643,17 @@ NAME_0247 = {
 # Paloma 1.637.665 · Fajardo 1.007.627 · Botero 206.024 · Lizcano 53.828.
 ```
 
-### Claudia López NO está en el preconteo por mesa
-Su columna (`luis`) llega en **0 en las 121.863 mesas**. Sus ~225.287 votos
-reales (≈1%) **solo existen agregados a municipio** en `Base nombres corregidos
-primera vuelta 2026.csv` (ver abajo). Cualquier análisis barrio/puesto/mesa con
-este archivo dejará a Claudia en cero — hay que inyectarla aparte desde
-municipio.
+### Claudia López — su columna llega en 0 PERO es recuperable EXACTA por mesa
+Su columna (`luis`) llega en **0 en las 121.863 mesas**. **PERO sus votos NO se
+perdieron: están escondidos en `total_votos_urna`** (el total de cada urna sí los
+contaba). Entonces `Claudia_mesa = total_votos_urna − (suma de las otras 12 columnas
++ blanco + nulos + no_marcados)`. El residual nacional da **225.287 EXACTO, sin un
+solo negativo** = su total oficial. **Es dato real por mesa, no estimación.**
+- Ya generado: `tools/cliente-mesa/build.py` → `PRECONTEO_1V_2026_MESA_con_Claudia.csv`
+  (idéntico pero con Claudia llena) + `Resultados_1V_2026_por_mesa.xlsx` (Excel bonito
+  con nombres). Ver sección "Entregable Pacto Histórico → Entregable aparte".
+- (Histórico: antes creíamos que Claudia "solo existía a municipio" en `Base nombres
+  corregidos primera vuelta 2026.csv`; eso quedó superado por el truco del residual.)
 
 ### Copia con nombres corregidos (ya generada)
 `Bases de datos/nuevos archivos 1v 2026/PRECONTEO_1V_2026_MESA_nombres_corregidos.csv`
@@ -725,13 +731,61 @@ agregó un mapa por **localidad** (20, no UPL):
   (Usaquén, Chapinero, Suba, Engativá, Fontibón, Teusaquillo, Barrios Unidos,
   Puente Aranda, Antonio Nariño, Los Mártires). Ciudad: Cepeda 42.7%.
 
+## Mapas por barrio 1V 2026 — `bogota-1v-barrios.html` + `medellin-1v-barrios.html`
+
+Notas/mapas interactivos (enlazados desde `noticias.html`) que llevan el
+preconteo 1V por mesa al barrio. Mismo motor: cada puesto se asigna por
+**PIP** (lat/lon de `PUESTOS_GEOREF.csv`) al polígono que lo contiene; los
+barrios sin puesto propio se rellenan con la tendencia del **vecino más
+cercano por centroide** (`FILL`, translúcido). El titular cuenta **solo
+barrios con dato directo** (no los rellenados).
+
+- **Bogotá** (`bogota-1v-barrios.html`): 1.001 barrios catastrales (IDECA,
+  `BOG-BARRIOS-CATASTRALES`), geo rotada 90° izq. Cepeda gana 435 barrios /
+  Abelardo 223 (directos). Datos inline `BARRIOS`+`FILL` generados por
+  `tools/trasvase-paloma/build_barrio_pip.py` (PIP base) y
+  **`tools/trasvase-paloma/build_barrio_override.py`** (override "llenar
+  huérfanos por nombre", ver abajo). El override reinyecta `BARRIOS`/`FILL`
+  + el titular in-place; reproduce y **asserta** el baseline (625 · Cepeda
+  412 / Abelardo 213) antes de tocar la página.
+- **Medellín** (`medellin-1v-barrios.html`): 332 barrios oficiales DAP
+  (`MEDELLIN_BARRIOS_OFICIAL.json`, dep 01 mun 001, **sin rotar**). Abelardo
+  arrasa (54,5% ciudad); de 154 barrios directos gana 137, Cepeda 17 (foco
+  rojo en centro/Popular/Manrique/Santo Domingo). Build:
+  **`tools/build-mde-barrios-prec/build.py`** (autocontenido, emite el HTML).
+  GEO_URL = `bases+de+datos/MEDELLIN_BARRIOS_OFICIAL.json` (S3 público).
+
+**Override "llenar huérfanos por nombre"** (decisión del usuario, jun-2026):
+si un puesto se *llama* como un barrio catastral (p.ej. "QUINTA PAREDES A/B")
+pero por PIP cae en un barrio vecino (su georef y su columna `BARRIO` lo
+confirman — Quinta Paredes A→Ciudad Universitaria, B→Ortezal), y el barrio
+homónimo está **huérfano** (0 puestos), se le asigna el puesto por nombre —
+**solo si moverlo no deja huérfana a la fuente** (conteo dinámico, no
+estático: dos puestos que comparten fuente no la vacían). 33 movimientos en
+Bogotá (incluye Quinta Paredes ← QP B). No es blanket name-match: 112 puestos
+tienen nombre = barrio pero solo se mueven los ~33 que llenan huérfanos sin
+robar dato. Mantiene el principio "PIP > nombre" salvo en los huecos.
+
+**Descargas (ambas páginas):** gratis para usuarios **registrados**
+(`plan!=='anonymous'`, antes era Premium-only). Ofrecen el preconteo 1V
+nacional por mesa: `DESCARGAS/Resultados_1V_2026_por_mesa.xlsx` (nombres) +
+`DESCARGAS/PRECONTEO_1V_2026_MESA_con_Claudia.csv` (códigos, Claudia
+recuperada). Anónimo → `register.html`.
+
 ## Entregable Pacto Histórico — informe 1V 2026 (`tools/pacto-1v-2026/`)
 
 Análisis para cliente del Pacto: **un solo Word con capítulos + resumen
-ejecutivo + Excel de soporte**. Diagnóstico de 1ª vuelta 2026 por bloque
-(Petro 2V-1V · Cepeda vs Petro · Centro/Oviedo · Derecha · Bogotá por estrato ·
-mapa de la 2ª vuelta · abstención). Salidas en
+ejecutivo + Excel de soporte**. **Estado actual: LISTO · Word de ~43 páginas
+(8 capítulos + metodología, Inter incrustada · gráfico de brecha `g_brecha_2v` al
+cierre del Cap 2 · Cap 8 = 3 campañas con mapa por barrio numerado de 9 ciudades) ·
+Excel de soporte de 15 hojas + 3 Excel de estrategia.** Salidas en
 `Bases de datos/output_pacto_1v_2026/` (gitignored).
+
+Diagnóstico de 1V 2026 por bloque + **camino a la 2ª vuelta**: Petro 2V-1V ·
+Cepeda vs Petro (con mapas) · Centro/Oviedo (incl. trasvase de Oviedo) · Derecha ·
+Bogotá por estrato · mapa de la 2V (techo) · abstención · **cuántos votos
+necesita Cepeda para ganar (modelo de trasvase + dónde están los ~1,9M, hasta
+comuna/barrio/puesto)**.
 
 ### Pipeline (orden de corrida)
 ```
@@ -740,13 +794,152 @@ build_base_2022.py   GCS 2022 1V+2V → master_2022_puesto.json
 engine.py / engine2.py  → blocks_all.json (depto + ciudad·comuna) + blocks_full.json
                         (municipio + ciudad·barrio + muni_abst) + dif_2022.json
                         (bogota_loc) + estrato_bogota.json (join puestos↔manzana SDP)
-build_maps.py        11 mapas m_*.png (coropletas + Bogotá rotada + UPL)
-build_charts.py      5 gráficos g_*.png (líneas/barras/dumbbell)
-build_report.py      → Analisis_Nacional_Electoral_Pacto_1V_2026.docx (incrusta Inter)
-build_excel2.py      → Soporte_Analisis_Pacto_1V_2026.xlsx (13 hojas)
-build_oviedo_docs.py bloque Oviedo (Excel + correlaciones)
+build_2v.py          modelo de 2ª vuelta → twov_model.json (nacional + trasvase)
+                     + twov_territorial.json (recuperar por municipio + puesto)
+build_voronoi_barrios.py → polígonos de barrio APROXIMADOS (Voronoi de puestos · convex-hull del
+                     casco urbano si no hay geojson de comuna) para ciudades SIN capa pública: Cúcuta +
+                     7 zonas fuertes de abstención (Buenaventura, Pasto, Santa Marta, Palmira, Tumaco,
+                     Sincelejo, Soledad). Correr ANTES de build_maps.
+build_maps.py        ~44 mapas m_*.png · incl. **28 por barrio**: 9 ciudades base × {centro, recuperación}
+                     (Bogotá, Medellín, Cali, Barranquilla, Cartagena, Manizales, Pereira, Bucaramanga,
+                     Cúcuta) + abstención en **11 zonas fuertes** (las 4 grandes + Buenaventura, Soledad,
+                     Pasto, Santa Marta, Palmira, Tumaco, Sincelejo · Quibdó se omite: georef con 4
+                     barrios). Helper genérico barrio_map() con métrica centro/rec/abst, relleno de vecino,
+                     ETIQUETAS NUMÉRICAS (1..N) → barrio_labels.json (lo lee el Word).
+build_charts.py      7 gráficos g_*.png (estrato, ciudades-techo, recuperación, oviedo-localidad,
+                     oviedo-destino, trasvase-2V, **brecha-2V** [waterfall del Cap 2])
+build_estrategias.py → twov_estrategias.json (incl. city9: totales municipio por ciudad) + 3 Excel de
+                     estrategia (Centro · Recuperación · Abstención) · lee twov_model+territorial+master+CSV
+build_excel2.py      → Soporte_Analisis_Pacto_1V_2026.xlsx (15 hojas) · lee twov_territorial
+build_report.py      → Analisis_Nacional_Electoral_Pacto_1V_2026.docx (incrusta Inter) · lee
+                     twov_model + twov_estrategias (Cap 8 = 3 campañas)
+build_oviedo_docs.py bloque Oviedo (Excel + correlaciones · genera oviedo_*.json)
 ```
-Verificación visual: `soffice --headless --convert-to pdf` y leer el PDF.
+**Orden importa:** `build_2v` antes que `build_estrategias`/`build_excel2`/`build_report`;
+`build_estrategias` antes que `build_report` (escribe `twov_estrategias.json` con `city9` que el
+Cap 8 lee); `build_maps`+`build_charts` antes que `build_report` (incrusta PNG + `barrio_labels.json`
+que los párrafos del Cap 8 leen para numerar barrios); `build_voronoi_barrios` antes que `build_maps`
+(genera los geojson aproximados de Cúcuta). Verificación visual: `soffice --headless --convert-to pdf` + leer el PDF.
+**Regenerar todo:**
+```bash
+cd /Users/ricardoruiz/ricardoruiz.co
+python3 tools/pacto-1v-2026/build_2v.py
+python3 tools/pacto-1v-2026/build_voronoi_barrios.py   # geojson aprox (Cúcuta) — solo si faltan en geo/
+python3 tools/pacto-1v-2026/build_maps.py
+python3 tools/pacto-1v-2026/build_charts.py
+python3 tools/pacto-1v-2026/build_estrategias.py
+python3 tools/pacto-1v-2026/build_excel2.py
+python3 tools/pacto-1v-2026/build_report.py
+cd "Bases de datos/output_pacto_1v_2026"
+/Applications/LibreOffice.app/Contents/MacOS/soffice --headless --convert-to pdf --outdir . Analisis_Nacional_Electoral_Pacto_1V_2026.docx
+```
+
+### Tres campañas de 2V (`build_estrategias.py`) — Cap 8 + 3 Excel
+
+El cliente pidió separar el "camino a la 2V" en **3 estrategias de campaña
+distintas** porque la tabla única (que mezclaba "recuperar" y "centro
+disponible") los enredaba. `build_estrategias.py` produce `twov_estrategias.json`
+(que el Cap 8 del Word lee) + 3 Excel independientes, cada uno con hoja "Léeme"
+que explica la métrica y cómo (no) se suma:
+
+- **`Estrategia_1_Centro.xlsx`** · persuasión. Centro transferible =
+  `0,55·Fajardo + 0,65·Claudia` (supuestos del modelo) = **~700.631** nacional.
+  Hojas: por municipio (CSV nombres corregidos como columna vertebral, incluye
+  municipios chicos + fila agregada "Exterior") · Bogotá localidad/barrio ·
+  16 ciudades comuna/barrio. **Claudia solo existe a municipio en el preconteo**
+  (su columna llegó en 0 por mesa); en las hojas submunicipales va como columna
+  **"Claudia (est.)"** = total municipal repartido en proporción a Fajardo
+  (reconcilia exacto por ciudad). Transferible submunicipal = 0,55·Fajardo +
+  0,65·Claudia(est).
+- **`Estrategia_2_Recuperacion.xlsx`** · el techo. `max(0, techo Petro-2V −
+  Cepeda 1V)` = **~2.050.187**. Hojas: municipio · puesto · ciudades
+  comuna/barrio. Es el "universo" de la izquierda demovilizada.
+- **`Estrategia_3_Abstencion.xlsx`** · movilización NETA. `max(0, abstención ×
+  (2·share_Petro2V − 1))` — solo positivo donde la izquierda gana la 2V (zonas
+  fuertes). Σ nacional **~2,63M**; la columna "Suma el objetivo 1,9M" marca con
+  ✓ los **73 municipios** que juntan el `gap` (1.915.513). Hojas: municipio ·
+  Bogotá localidad · ciudades comuna · **ciudades barrio** (dedup por
+  (ciudad,comuna,barrio); como el neto se recorta a 0, al bajar de nivel afloran
+  bolsones fuertes en comunas mixtas → el total por barrio sale algo más alto que
+  por comuna, no re-sumar contra el objetivo nacional). Censo/votantes desde
+  `pot`/`total_votos_urna` por puesto del master 2026.
+
+**Cómo (no) se suman** (clave del entregable, repetido en cada Léeme y en el Cap 8):
+Centro (~0,7M) **se suma** a Movilización (~1,9M) = 2,65M (`need_over_1v`).
+Recuperación y Abstención **NO se suman entre sí**: mismo universo, dos lentes
+(una dimensiona el techo, la otra dice cómo recuperarlo vía participación).
+
+Las 16 ciudades se resuelven por **código electoral** (no DANE): Bucaramanga
+27-001, Manizales 09-001, Cúcuta 25-001, Soledad 03-052, Soacha 15-247, etc.
+Reusa la fusión de barrios por `(ciudad, norm(comuna), norm(barrio))` con
+`_bestname` (mismo fix que `build_excel2.py`, ver gotcha de tildes).
+
+### Mapas por barrio + relleno de vecino (`barrio_map` en build_maps.py)
+
+Helper genérico `barrio_map(city,dep,mun,geofile,namefield,fname,metric,rotate,...,citycode,frame,approx,vq)`:
+agrega los puestos al polígono de barrio por `sjoin_nearest`, calcula la métrica y pinta.
+- **3 métricas**: `'centro'` → `0,55·Fajardo + 0,65·Claudia(est ∝ Fajardo)` (Claudia desde
+  `CLA_MUN`, ámbar `CM_CENTRO`); `'rec'` → `max(0,techo−cepeda)` (verde); `'abst'` → neto
+  `max(0,(censo−votantes)·(2·share−1))` (cobre). centro usa TODOS los puestos; rec/abst filtran `has_sh`.
+- **Etiquetas numéricas**: numera los top-N barrios con DATO DIRECTO (dedup por nombre — un barrio
+  catastral puede venir en varios polígonos), pone círculos 1..N en el mapa, y vuelca el mapeo
+  nº→barrio→valor a `LABELS` → `barrio_labels.json`. El Word (`bcity` en build_report) lo lee y
+  **desarrolla los barrios numerados en el texto** (sin encimar nombres en el mapa). `total` = suma
+  por nombre único (no por polígono, que multicontaría).
+- **Relleno de vecino** (`_fill_neighbors`): barrios sin puesto propio heredan la tendencia del más
+  cercano (no entran a `total` ni a la numeración). Gotcha: tras el fill no quedan NaN →
+  `if len(gnan): gnan.plot(...)` (geopandas revienta en `set_aspect` con subset vacío).
+- `frame='pts'` encuadra al casco urbano (Cartagena, que trae rural/islas). `rotate=True` solo Bogotá.
+  `comuna_field`+`urban_set` filtran corregimientos (Medellín). `approx=True` añade nota de polígono aproximado (Cúcuta).
+- **28 mapas vivos**: 9 ciudades base × {centro, rec} (loop `CITY_BARRIO`) + abstención en **11 zonas
+  fuertes** (loop `CITY_BARRIO` para las 9 — abst se genera para todas — pero solo se EMBEBEN en el Word
+  las de neto>0: Bogotá/Cali/Barranquilla/Cartagena; + loop `ABST_EXTRA` con las 7 Voronoi nuevas).
+- **Las 5 ciudades débiles NO entran a abstención en el Word** (Medellín/Manizales/Pereira/Bucaramanga/
+  Cúcuta): su muni-neto es 0 (share Petro-2V <50% → movilizar le suma a Abelardo). Bucaramanga y Cúcuta
+  dan total 0 (mapa en blanco). Van con una nota en vez de mapa. También NO van en recuperación si
+  muni-recuperar=0 (Bucaramanga).
+
+**Geojson de barrio por ciudad (en `output_pacto_1v_2026/geo/`, bajados a mano — gitignored):**
+- Bogotá `BOG-BARRIOS-CATASTRALES.json` (`nombre`, 1.001) · Medellín `MEDELLIN_BARRIOS_OFICIAL.json`
+  (`NOMBRE`+`COMUNA`, 332) · Cali `CALI-BARRIOS.json` (`barrio`, 339, de datos.cali.gov.co ZIP shapefile
+  EPSG:6249) · Manizales `MANIZALES-BARRIOS.json` (`BARRIOS`, 116) · Barranquilla `BARRANQUILLA-BARRIOS.json`
+  (`NOMBRE`, 189) · Cartagena `CARTAGENA-BARRIOS.json` (`NOMBRE`, 213, `frame='pts'`) · Pereira
+  `PEREIRA-BARRIOS.json` (`NOMBRE`, 486).
+- **Bucaramanga `BUCARAMANGA-BARRIOS.json` (`barrio`, 219 REAL)**: portal propio
+  `geodata.bucaramanga.gov.co/waportal/sharing/rest/content/items/<id>?f=json` → `url` apunta al host
+  interno `vmarcgis01.bucaramanga.gov.co/waserver/rest/services/Hosted/Barrios/FeatureServer` (el proxy
+  público da HTML; el host interno SÍ responde el query geojson).
+- **Cúcuta `CUCUTA-BARRIOS.json` (`barrio`, 424 REAL)** + **Soledad `SOLEDAD-BARRIOS.json` (`barrio`, 239 REAL)**:
+  de los **GeoServer de catastro vía IDEEP** (ver método abajo). Cúcuta `geoservicioside.cucuta.gov.co`
+  capa `cucuta:barrios_poligono`; Soledad `geoservicios.catastrosoledad.gov.co` capa `soledad:barrios_v2`.
+- **Buenaventura `BUENAVENTURA-BARRIOS.json` (`barrio`, 110 REAL)**: capa hosted de ArcGIS Online
+  (`services2.arcgis.com/EsyoEkMlTcucSCqP/.../Buenaventura_barrios/FeatureServer`).
+- **Quibdó `QUIBDO-BARRIOS.json` (`barrio`, 60 REAL)**: capa ArcGIS Online
+  (`services4.arcgis.com/3OgCxmjOXo22H0MY/.../Barrios_Quibdo_1`, campo `N_BARRIO`). **Lección:** el
+  "solo 4 barrios" era del CAMPO DE TEXTO del puesto; `barrio_map` asigna por UBICACIÓN (sjoin punto→polígono),
+  así que los 43 puestos caen en 20 barrios distintos → mapa usable. No descartar una ciudad por el conteo
+  del campo de texto.
+- **Voronoi aprox que QUEDAN (pendientes de capa real):** Pasto, Santa Marta, Palmira, Tumaco, Sincelejo
+  (`build_voronoi_barrios.py`, `approx=True` en ABST_EXTRA). Tumaco/Sincelejo se ven feos (revisar).
+
+**Método IDEEP (catastro municipal · sirve para muchas ciudades con "catastro multipropósito"):**
+El geovisor `https://<host_catastro>/ideep_geovisor/index.html?...&codigo_dane=<dane>` carga su GeoServer
+desde un config en runtime, NO alcanzable por curl. Con la **extensión Claude in Chrome**: navegar al
+geovisor → `read_network_requests` filtrando `geoserver` → de ahí salen el host del GeoServer
+(`geoservicios...`/`geoservicioside...`), el workspace y el `authkey`. Luego, aunque WFS GetCapabilities dé
+**403**, `GetFeature` sobre la capa autorizada SÍ responde:
+`<host>/geoserver/<ws>/ows?service=WFS&version=2.0.0&request=GetFeature&typeNames=<ws>:barrios_poligono&outputFormat=application/json&srsName=EPSG:4326&count=2000&authkey=<key>`.
+Para listar capas usar **WMS** GetCapabilities (sí pasa con el authkey) y buscar `<Name>barrios*</Name>`.
+Usar `/usr/bin/curl` (no el de PATH) para bajar y el `python3` normal (con geopandas) para procesar.
+
+**Cómo se consiguieron Manizales y Barranquilla (método ArcGIS, reusable para otras ciudades):**
+1. `curl "https://www.arcgis.com/sharing/rest/search?q=barrios+<ciudad>&f=json&num=25"` → lista
+   items; quedarse con los `Feature Service` cuyo título sea "Barrios de <ciudad>".
+2. `curl "https://www.arcgis.com/sharing/rest/content/items/<itemId>?f=json"` → campo `url` = el
+   FeatureServer (p.ej. `.../Barrios_de_Barranquilla/FeatureServer`).
+3. `curl "<featureServerUrl>/0/query?where=1%3D1&outFields=*&outSR=4326&f=geojson"` → geojson directo.
+4. `gpd.read_file(...).to_crs('EPSG:4326')[['<nombre>','geometry']].to_file(...,driver='GeoJSON')`.
+   (datos.gov.co/SODA NO sirve: expone geometría null; el export shapefile da 500.)
 
 ### Motor de mapas (`build_maps.py`) — geopandas + matplotlib
 - GeoJSON oficiales (los MISMOS de senado/cámara), cacheados en
@@ -811,6 +1004,97 @@ puesto lo respaldan (Oviedo↔Fajardo +0,60, ↔Cepeda +0,32, ↔Abelardo −0,4
 ↔Paloma −0,12; en Bogotá ↔Paloma −0,57). Claim con **cota dura de King** (techo
 teórico ~64%) + nota honesta de lo que la inferencia ecológica no fija. Gráfico
 `g_oviedo_destino.png`.
+
+### Capítulos del informe (`build_report.py`)
+Portada + índice + **resumen ejecutivo (8 hallazgos)** + 8 capítulos + nota
+metodológica. **Cada capítulo arranca en página nueva** (`cap()` pone
+`paragraph_format.page_break_before=True`; NO hay `add_page_break` manual salvo
+el del cierre del resumen ejecutivo... ojo: se quitó, lo hace el `page_break_before`
+del Cap 1). Helpers: `cap(num,txt)` (título + eyebrow), `h()` (subtítulo 12.5),
+`body()` (10.5, **justificado**), `note()` (9, para metodología/salvedades),
+`bullet()` (10.5 justificado), `tbl()` (header oxblood 8.5), `img(name,w)`
+(centrado, espaciado apretado). `body()` parsea `**negrita**` (NO `*italic*` —
+los asteriscos sueltos salen literales).
+- **Cap 1** Petro 2V-1V · **Cap 2** Cepeda vs Petro (mapa ganador con Abelardo en
+  **azul rey `#1f47cc`** para contrastar con el morado de Cepeda · swing municipal ·
+  Cepeda municipal) · **Cap 3** Centro/Oviedo (bullets + g_oviedo_destino +
+  g_oviedo_bogota_localidad) · **Cap 4** Derecha (m_derecha_dep) · **Cap 5** Bogotá
+  estrato (m_bogota_estrato manzana + m_bogota_upl_cepeda + g_bogota_estrato) ·
+  **Cap 6** mapa de la 2V/techo (m_recuperacion_dep) · **Cap 7** abstención
+  (m_abstencion_mun) · **Cap 8** cuántos votos necesita Cepeda (g_trasvase_2v +
+  tabla cuenta-de-cobro + m_bogota_recuperar + m_{cali,medellin,barranquilla}_recuperar).
+- **Frases del cliente neutralizadas**: nada de "el cliente plantea/pregunta" en
+  el texto final → "Se plantea la posibilidad de", "Conviene darle la vuelta a la
+  pregunta", "La pregunta de fondo". (El cliente NO quiere verse citado.)
+
+### Modelo de 2ª vuelta (`build_2v.py`)
+Aritmética con **supuestos de trasvase EXPLÍCITOS** (movibles, en el dict `T`):
+Paloma 85%→Abelardo, minoritarios derecha 78%→Abe, Fajardo 55% Cep / 30% Abe,
+Claudia 65% / 20%, minoritarios izq 85%→Cep. Totales 1V hardcoded en `V` (verificados).
+- **Piso de Abelardo (derecha consolidada): ~12,33M · Cepeda con todo el centro:
+  ~10,41M · brecha ~1,92M · Cepeda debe sumar ~2,65M (0,73M centro + 1,9M
+  movilización).** Es escenario para dimensionar, NO pronóstico. Lo honesto: la
+  derecha llega favorita porque se consolidó en 1V; remontar es la jugada de Petro
+  2022 (que movió +2,7M de 1V a 2V), pero más difícil esta vez.
+- **Territorial** (`twov_territorial.json`): `recuperar = max(0, techo − cepeda)`
+  donde techo = Petro 2V 2022. Por **municipio** (desde `BF['muni']` petro2v/cep26/base,
+  + "centro disponible" = centro26×base×0,55) y por **puesto** (join masters 2026↔2022
+  por pcode `dep+mun+zona+puesto`, **filtra zona 90/98 y dep 88**). El recuperar nacional
+  (~2,05M por municipio) ≈ la brecha de 1,9M → "los votos ya existieron con Petro 2022".
+
+### Mapas de recuperación + matching por ciudad (`build_maps.py`)
+`bogota_recuperar_map` (localidad, rotado 90°) + `city_recuperar_map(city, geojson,
+codefield, namefield, fname, mode)` para Cali/Medellín/Barranquilla (sin rotar).
+`recuperar` por comuna desde `BA['city_comuna'][city]`. **Cada ciudad casa distinto:**
+- **Medellín/Cali** `mode='num'`: match por número de comuna (`int` del código).
+  Medellín CODIGO 01-16 (corregimientos 50+ quedan grises); Cali comuna 1-22.
+- **Barranquilla** `mode='name'`: su número de localidad NO coincide con el `id` del
+  GeoJSON → match por nombre, con **clave de prefijo alfanumérico de 8 chars**
+  (`re.sub(r'[^A-Z0-9]','',norm(s))[:8]`) que fusiona "Norte Centro Hi"+"Norte Centro
+  Historico" y quita el guion de "Norte - Centro Histórico".
+- Tres trampas resueltas: (1) si TODAS las comunas casan, el subset gris queda vacío y
+  geopandas revienta en `set_aspect('equal')` → guardar `if len(gi): gi.plot(...)`;
+  (2) features sin nombre (polígonos "SN") salían como "Nan" → nular `g[namefield].isna()`;
+  (3) `int(zona/puesto)` falla en exterior (códigos alfanuméricos tipo 'A2') → `if isdigit`.
+
+### Excel de soporte (`build_excel2.py`) — 15 hojas
+Resumen · 1·Petro 2V-1V (depto/muni) · 2·Cepeda vs Petro (depto/muni/Bogotá-loc/crece+abst) ·
+3·Centro · 4·Derecha (depto/muni) · **Ciudades·comuna** + **Ciudades·barrio** (enriquecidas:
+"Votos por recuperar" + "Centro disponible") · Bogotá·estrato · **8·Camino 2V (municipio)** +
+**8·Camino 2V (puesto)** (del `twov_territorial`; puesto trae nombres de depto/municipio).
+- `fin(ws, pcols, zebra)`: bordes + **zebra crema** (`F4F0E7`, filas pares) + miles
+  automáticos (`#,##0` a valores ≥1000) + autofiltro + freeze `A2`. `cf_div` (escala
+  roja→verde en columnas con "(pp)") y `cf_bar` (barras de datos en "recuperar"/"centro
+  disponible"); `cf_auto(ws)` las aplica por nombre de header al final, sobre TODAS las hojas.
+- **Ciudades·comuna/barrio**: recuperar = (petro2v−cep26)×base, centro = centro26×base×0,55.
+  **FUSIONAN duplicados por tilde** (ver gotcha) y filtran ruido (`_noise`: PUESTO CENSO,
+  CONSULADO, CARCEL, EXTERIOR, OTROS, CORR, CIUDAD, SN, NULL).
+
+### Gotchas de datos (CRÍTICOS — perder uno arruina cifras)
+- **`city_comuna` tiene DUPLICADOS por tilde**: "Ciudad Bolívar"+"Ciudad Bolivar",
+  "Mártires"+"Martires" → si no fusionas por nombre normalizado (sumando votos
+  absolutos), una pisa a la otra (Ciudad Bolívar salía 4k en vez de 43k) o aparecen
+  como dos filas. Fusionar SIEMPRE por `norm(nombre)`.
+- **Puestos zona 90 (PUESTO CENSO/Corferias) y 98 (cárceles) + dep 88 (exterior)** son
+  ruido geográfico → filtrarlos en la hoja de puestos y en los mapas/comunas.
+- **Inter (subset latín) NO trae `→ ← ↔ ★ ✦`** → en el Word/gráficos usar `—`/`a`/`vs`/`–`.
+- **Exterior**: códigos de zona/puesto alfanuméricos, sin nombre en PUESTOS_GEOREF.
+
+### Entregable aparte para OTRO cliente — `tools/cliente-mesa/build.py`
+Genera, desde `PRECONTEO_1V_2026_MESA_nombres_corregidos.csv`:
+1. **`PRECONTEO_1V_2026_MESA_con_Claudia.csv`** — idéntico pero con Claudia López
+   **recuperada EXACTA por mesa**. Hallazgo clave: **los votos de Claudia estaban
+   escondidos en `total_votos_urna`** (el total ya los contaba, su columna llegaba en 0)
+   → `Claudia_mesa = total − suma del resto de partes`. El residual nacional da
+   **225.287 exacto, sin negativos** = su total oficial. **NO es estimación, es dato.**
+   (Esto SUPERA la nota vieja de que Claudia "solo existe a nivel municipio".)
+2. **`Resultados_1V_2026_por_mesa.xlsx`** — Excel bonito: hoja *Instrucciones* + hoja
+   *Datos por mesa* como **Table de openpyxl** (`TableStyleInfo`, autofiltro + zebra),
+   freeze `F2`, **sin códigos** → nombres de Departamento/Municipio/Zona-Comuna/Puesto
+   (cruce con `PUESTOS_GEOREF.csv` por `CÓDIGO COMPLETO` de 9 dígitos = dep+mun+zona+puesto;
+   `NOMBRE COMUNA` con "NULL" → vacío → "Zona N"; `NOMBRE PUESTO` para el puesto).
+   Candidatos ordenados por votación nacional. 121.863 filas, ~12 MB. Ambos en
+   `Bases de datos/nuevos archivos 1v 2026/`.
 
 ## Tipografía
 | Uso | Familia | Peso |
@@ -1146,162 +1430,220 @@ añadir modales/overlays:
    Aplicar este reset en cualquier función que cierre un modal u overlay
    donde el elemento bajo el puntero desaparece del DOM.
 
-## Kart Electoral — `kart-presidencial1v.html`
+## Combate Electoral — `combate-electoral.html` (juego de pelea tipo KOF'98 · LISTO v1)
 
-Juego de karts estilo Mario Kart / CTR con los 8 candidatos presidenciales
-2026. Single-file HTML autocontenido (~3000 líneas), sin build step. Linkeado
-desde `index.html` (proyectos, en es/en/zh).
+> **Renombrado:** antes era `kof-electoral.html` / carpeta `kof-electoral/`. Se
+> cambió a `combate-electoral.html` / `combate-electoral/` **por seguridad legal**
+> (fuera todo "KOF" / "King of Fighters" visible: `<title>`, cards del index en
+> es/en/zh/pt — se quitó 格斗之王 —, y los 3 mp3 "KOF98…"). El **Kart Presidencial**
+> (`kart-presidencial1v.html`) se **eliminó del repo** y su enlace en `index.html`
+> se reemplazó por este juego. URL pública: `ricardoruiz.co/combate-electoral.html`.
 
-### Tech base
-- **Mode 7 fake-3D** sobre Canvas 2D. Resolución interna `IW=480, IH=270`,
-  escalada al viewport con `imageSmoothingEnabled=false` (look pixelart).
-- **Texture procedural 4096×4096** (`TRACK_SIZE`, ~64 MB ImageData) que se
-  samplea por inverse-mode-7 cada frame. Bitwise `& TRACK_MASK` (potencia de 2)
-  para wrap rápido. La pista misma ocupa una zona pequeña del centro; la
-  textura grande mantiene las repeticiones lejos en la fog.
-- **Inner loop mode 7** (renderMode7): por cada scanline `y`, distancia
-  `dist = CAM_HEIGHT * FOV / yy`, sample paso `dist/FOV`. Píxeles en
-  `groundImg` (ImageData reusada — alpha pre-rellenada).
-- **Cámara**: chase camera 28 unidades detrás del jugador
-  (`CAM_DIST=28`), altura `CAM_HEIGHT=32`, `FOV=300`, `HORIZON=102`.
+Juego de pelea **tipo The King of Fighters '98** (parodia) con los candidatos
+presidenciales 2026, tema **"SEGUNDA VUELTA COLOMBIA '26"**. Single-file HTML
+autocontenido (~50 KB, sin build), motor de pelea en **canvas 2D**. Enlazado
+desde `index.html` (proyectos, es/en/zh/pt como "Combate Electoral").
 
-### Pista — silueta de Bogotá
-- `RAW_CENTERLINE`: 41 vértices que aproximan la silueta D.C. (Suba bulge NW,
-  Bosa SW, San Cristóbal SE knee, Usaquén tip N, Cerros recta E, notch oeste).
-  Ajustada con `CL_OFFSET_X=1024, CL_OFFSET_Y=924` para centrar en 4096².
-- **Importante**: arranca en el sur ([1080,1880] raw → world [2104,2804])
-  y va sentido **horario**. Si rotás el start a otra parte del lazo, validá
-  que el `totalAngle` de detección de vueltas siga decreciendo (ver más abajo).
-- `posAtParam(t)`: devuelve `{x, y, angle}` interpolando la polilínea por
-  longitud acumulada (`CL_LENS`/`CL_TOTAL`).
-- `buildTrack(c, S)` dibuja: pasto granulado, edificios fantasma fuera del
-  loop, berma ladrillo, asfalto en 3 capas, carril TM rojo tenue, kerbs en
-  curvas, líneas blancas borde, línea de meta a cuadros, banner BOGOTÁ con
-  bandera amarilla/azul/roja, chevrons amarillos pre-meta.
-
-### Detección de vueltas
-- `totalAngle` = ángulo acumulado del jugador alrededor de
-  `(TRACK_CX, TRACK_CY)` = promedio de vértices del centerline.
-- En sentido horario (canvas y-down), `totalAngle` **decrece**. Lap cuando
-  `totalAngle <= -2π`. **Si la pista arranca al norte** (jugador encima del
-  centroide), la dirección se invierte y el lap nunca se cuenta — bug
-  histórico que rompió la versión anterior con start [1024, 350].
-- IA usa `t` lineal (`ai.t += ai.speed`); cada wrap a `>= CL_TOTAL` incrementa
-  `ai.lap`. Inicializan en `lap: 0` y `t = CL_TOTAL - offset` (grilla detrás
-  del jugador) para que la primera cruzada de meta los pase a lap 1 sin
-  regalarles distancia.
-
-### Candidatos
-- Array `CANDIDATES` (8), cada uno con:
-  - `color` (del partido, según `previa-1v.html`): Cepeda `#51458F`,
-    Abelardo `#000062`, Paloma `#1866DF`, Claudia `#d9db24`,
-    Fajardo `#EEAA22`, Murillo `#16a34a`. Botero `#d4af37` y
-    Caicedo `#ff6eb4` son locales (no están en previa).
-  - `features`: `hairStyle` (`curly`/`short`/`shortF`/`long`/`bald`),
-    `hair` (color), `skin` (`SKIN.fair/medium/dark`), `glasses`, `beard`.
-  - `photo`: URL S3 (Cepeda, Abelardo, Paloma) o Wikipedia (Claudia,
-    Fajardo, Murillo) o `null` (Botero, Caicedo — pendientes de subir).
-- `skill` 0.90–1.00 multiplica la velocidad base de la IA (~3.55).
-  Bogotá da home boost ×1.05 (Claudia), Cundinamarca ×1.02 (Botero).
-- **Foto pendiente**: subir a `/Fotos-presidenciales/` en S3 con formato
-  300×300: `CLAUDIA+LOPEZ.jpg`, `SERGIO+FAJARDO.jpg`, `LUIS+GILBERTO+MURILLO.jpg`,
-  `SANTIAGO+BOTERO.jpg`, `CARLOS+CAICEDO.jpg`. Las de Wikipedia pueden
-  fallar por hotlinking; el fallback dibuja iniciales en círculo del color.
-
-### Sprite unificado del kart
-- `drawKartSprite(c, candidate, opts)` dibuja al origen; el caller hace
-  `translate/rotate/scale`. Mismo sprite para jugador (escala `KART_SCALE=1.10`)
-  y para IA (escala calculada por proyección).
-- Colores derivados de `candidate.color` con `darkenHex/lightenHex`:
-  `carBase, carDark, carDarker, carLight, carLighter, carShine, carCabin`.
-- Cabeza vista **desde atrás** (cámara detrás del kart): mayoritariamente
-  silueta de cabello con color del partido en el cuello de camisa. Estilos:
-  `long` (cae a hombros, flequillo), `shortF` (corte corto femenino),
-  `short`, `curly` (bumps irregulares), `bald` (corona + skin top).
-- Llantas delanteras: elipses 6×11 (alargadas) que rotan hasta `0.75 rad`
-  (~43°) con el steering — **importante** para que el giro sea visible.
-  Traseras 10×16 con spin acumulado por velocidad.
-
-### Proyección y rivales
-- `projectWorld(wx, wy)` retorna `{x, y, kartScale, lmScale, dist}`:
-  - `kartScale = (CAM_DIST / rx) * KART_SCALE` — a la distancia del jugador
-    da exactamente el mismo tamaño que el sprite del jugador.
-  - `lmScale = FOV / rx` — escala "intrínseca" para landmarks; multiplicada
-    por `obj.size` (controla qué tan grande es cada landmark).
-- En `renderWorldObjects`: `RIVAL_BOOST = 1.7` multiplica el `kartScale` de
-  los rivales (intermedio entre tamaño igual al jugador y la versión gigante).
-
-### Landmarks — al BORDE de la pista
-- `placeOnEdge(tFrac, lateralOff, type, size, name)` resuelve un landmark
-  a coordenadas world a partir de un t (fracción del lazo) y un offset
-  lateral. `lateralOff > 0` = derecha del sentido de marcha = exterior CW.
-- Asfalto halfwidth = 110, berma ~145, así que offsets ≥165 quedan en pasto.
-- Tipos definidos (cada uno con sprite procedural detallado tipo PS1):
-  `plaza` (Plaza Bolívar con estatua, palomas, farolas),
-  `capitolio` (6 columnas, frontón, bandera ondeando),
-  `candelaria` (7 casas coloniales con tejas),
-  `parque` (cipreses, banca, iglesia con cruz),
-  `campin` (estadio oval con cancha + 4 torres luz),
-  `arena` (Movistar, domo con paneles + entrada),
-  `tm` (TransMilenio articulado, 8 ventanas, faja blanca, logo),
-  `tribune` (4 niveles graduados con público + banner sponsor).
-
-### Render pipeline (por frame)
-1. `renderSky(ictx, dayness, rainK)` — gradiente, sol/luna, estrellas,
-   nubes con parallax (2 capas), Cerros Orientales (Monserrate + Guadalupe).
-2. `renderMode7(dayness, rainK)` — piso vía sample del trackData.
-3. `renderWorldObjects(ictx, dayness)` — proyecta IA + landmarks + tribunas,
-   ordena far-to-near, dibuja.
-4. `renderSmoke(ictx)` — partículas de escape (sólo en movimiento).
-5. `renderPlayerKart(ictx, dayness)` — sprite del jugador encima.
-6. `renderRain(ictx, rainK)` — streaks + tinte azul-gris.
-7. `ctx.drawImage(ic, ...)` — escala el canvas interno al viewport, con
-   shake aleatorio si `speed > 0.7 * MAX_FWD`.
-8. `renderMinimap()` — canvas 130×150 abajo derecha con trazado, posición
-   del jugador (flecha), markers IA y landmarks.
-
-### Día/noche y lluvia (independientes)
-- Día/noche: `getDayness(timeMs)` cicla cada 4 min (`CYCLE_MS=240000`):
-  42% día → 8% sunset → 42% noche → 8% sunrise. `dayness ∈ [0,1]`.
-- Lluvia: estado `rainState` `dry`/`wet`. Próximo aguacero en
-  `nextRainAt = raceTimeMs + 90 a 140 s`. Duración `35–55 s`. Fade in/out
-  de 5 s. `getRainIntensity()` retorna 0..1. Decoupled del día/noche.
-
-### Estados y flujo
-- `state`: `'menu'` → `'select'` → `'countdown'` → `'racing'` → `'finished'`.
-  `'paused'` se intercambia con `'racing'` vía `ESC` o botón `#btn-pause`.
-- `resetRace()` reinicia jugador, IA, lapTimes, smoke, rain.
-- `chooseCandidate(id)` setea `selectedCandidate`, llama `resetRace`,
-  arranca countdown, `initAudio()` (engine sintetizado + beeps).
-
-### Layout HTML
-- `<nav>` con logo Ricardo.Ruiz, selector de país (lang.js compartido),
-  Proyectos / Noticias / Planes / Iniciar sesión / Registrarse — copiado
-  literal de `index.html` para mantener identidad visual.
-- `<main id="game-wrap">` flex-1 contiene el `<canvas#game>`, todos los
-  HUDs (`#hud`, `#hud-track`, `#hud-laps`, `#hud-pos`), el panel
-  `#standings` (top-4 con foto), el `<canvas#minimap>`, y los modales
-  (menu, select, countdown, pause-overlay, finish-overlay).
-- Cursor custom z-index 9999/9998 (no 100000 como en otras páginas — match
-  con index.html).
-
-### Tunables principales (top del script)
+### Estructura de archivos
 ```
-ACCEL=0.058 BRAKE=0.085 REV_ACCEL=0.030 FRICTION=0.985
-MAX_FWD=4.40 MAX_REV=-1.60 TURN_RATE=0.050 TURN_RAMP=1.30
-CAM_HEIGHT=32 CAM_DIST=28 FOV=300 HORIZON=102
-KART_SCALE=1.10 TOTAL_LAPS=3 CYCLE_MS=240000
-TRACK_SIZE=4096 TR_HALF_WIDTH=110
-RIVAL_BOOST=1.7 (en renderWorldObjects)
+combate-electoral.html                       el juego (todo: HTML+CSS+JS inline)
+combate-electoral/
+  LEEME.txt                                  doc de assets de candidatos+música
+  candidatos/<id>.png                        retrato del selector (PNG TRANSPARENTE vertical)
+  candidatos/fight/<id>.png                  pose base de pelea (guardia, transparente)
+  candidatos/fight/punos/<id>-der|izq.png    pose de PUÑO (der=mira derecha, izq=izquierda)
+  candidatos/fight/patada/<id>-der|izq.png   pose de PATADA
+  candidatos/fight/golpe-recibido/<id>-der|izq.png   pose de GOLPE RECIBIDO (o <id>.png único)
+  stages/<id>.png                            escenarios panorámicos (~16:9, sin espacios en el nombre)
+  stages/LEEME.txt
+  music/intro.mp3 · instrucciones.mp3 · seleccion.mp3   música por pantalla (loop)
+  music/winner.mp3 · continue.mp3 · "jefe final.mp3"    clips one-shot
 ```
+`ids`: `cepeda · petro · santos · abelardo · uribe · paloma · ricardo`.
+**El motor carga los frames por nombre; lo que falte cae a la pose base** (no se
+rompe nada). `.DS_Store` ya está en `.gitignore` (raíz del repo).
 
-### Pendientes / próximas iteraciones
-- Subir 5 fotos faltantes a S3 (Claudia, Fajardo, Murillo, Botero, Caicedo).
-- Reemplazar URLs en `CANDIDATES[].photo` cuando estén arriba.
-- Refinar más la silueta de Bogotá si queda corta.
-- Sprites de landmarks como PNG en S3 si la versión procedural no alcanza.
-- Pistas adicionales: una por departamento clave (Cauca, Antioquia,
-  Magdalena, Bolívar, Atlántico, Chocó, Cundinamarca).
+### Candidatos (`FIGHTERS`) + `RICARDO` (anfitrión / jefe final)
+6 seleccionables: **Cepeda · Petro · Santos · Abelardo · Uribe · Paloma**.
+`RICARDO` es el **anfitrión** (instrucciones) y el **JEFE FINAL** (no aparece en la
+selección salvo que lo desbloquees venciéndolo). Cada uno: `id, name, short, ini,
+partido, epi, color, accent, special, stats, line, srcFace`.
+- **`srcFace`** = orientación natural del PNG base (1 = mira a la derecha, -1 = a la
+  izquierda). Solo **Cepeda = -1**; el resto = 1. `drawFighter` voltea con
+  `facing !== srcFace` para que cada uno mire al rival.
+
+### Flujo de pantallas (`go(id)`)
+```
+title → howto → select → versus → fight → (winner | continue) → [credits]
+```
+- **title**: logo "SEGUNDA VUELTA / COLOMBIA '26 / EL CAMBIO POR LA VIDA O FIRMES
+  POR LA PATRIA". "INSERTE VOTO". Por el bloqueo de autoplay, **el 1er toque
+  desbloquea audio + intro y el 2º entra** (si el navegador permite autoplay, un
+  solo toque).
+- **howto (instrucciones)**: muestra a **Ricardo (anfitrión)** con su frase fija;
+  su imagen **alterna puño/patada cada 1 s** (sin badge). Controles reales:
+  **← → mover · ↑ saltar · ↓ cubrir · A puño · S patada** + nota de botones en móvil.
+- **select**: 6 candidatos + Ricardo (si desbloqueado). Botón **🎲 AL AZAR**, **TIME
+  grande** (cuenta 26→0, auto-elige). Bloqueados en gris + 🔒 + "???". **Sin
+  iniciales detrás** de las fotos (son transparentes).
+- **versus**: ruleta **"EL SIGUIENTE RIVAL"**. Para el **jefe final**: pantalla
+  oscura **"COMBATE FINAL"** con **tu silueta (?)**, el **lugar a la derecha**
+  (C.C. Galerías) y **los derrotados en gris**. Hint del escenario = `ricardoruiz.co`.
+- **fight**: motor de pelea (ver abajo).
+- **winner / continue / credits**: ver abajo.
+
+### Desbloqueos y escalera
+- **Desbloqueos** en `localStorage['combate-unlocked']`. Base: **Cepeda + Abelardo**.
+  Cada victoria **desbloquea al vencido** (vencer a Ricardo desbloquea a Ricardo
+  como jugable). `getUnlocked()/unlock(id)`.
+- **Escalera (`confirmPick`)**: orden **FIJO** para los dos finalistas reales y al
+  azar para el resto. `FIXED_LADDER`:
+  - **Cepeda** → Paloma, Uribe, Santos, Petro, Abelardo, **+ Ricardo (jefe)**.
+  - **Abelardo** → Petro, Santos, Paloma, Uribe, Cepeda, **+ Ricardo (jefe)**.
+  - resto → `shuffle`. `state.stageOrder = shuffle(STAGES)` → **escenarios no se
+    repiten** en una escalera.
+
+### Motor de pelea (canvas, objeto `F`)
+- Canvas interno **1024×768**, 4:3. `F` = `{W,H, groundY:0.90, spriteH:0.42,
+  walk:3.6, jumpV:20, grav:0.95, reach:104, punchDmg:6, kickDmg:10, punchCD:340,
+  kickCD:560, atkWindow:160, knock:30, hitStun:280, comboWin:1100, koDur:2600}`.
+  **Escala por peleador**: `fd.scale` (solo **Abelardo `1.05`**, +5%) multiplica la
+  altura en `drawFighter` y ancho/hitbox/sombra/límites en `fwOf`; pies anclados
+  (`top=gy-dh`).
+- **Frames por estado** (`drawFighter`): `stun/ko` → pose de **golpe-recibido**;
+  `atk==='punch'` → **puño** (der/izq según facing); `atk==='kick'` → **patada**;
+  si no, **pose base**. der/izq ya van orientadas (no se voltean); base usa `srcFace`.
+  **Flash blanco** al recibir golpe (`ctx.filter='brightness(0) invert(1)'`).
+- **Física**: salto (`jumpV`), gravedad, separación de cuerpos, límites.
+- **IA** (`aiIntent`): acerca, golpea con cooldown, cubre, retrocede. El jefe (boss)
+  tiene 120 de vida (vs 100) y es algo más agresivo.
+- **Combos** (`N HITS`), **Perfect** (ganar sin recibir daño), **score** =
+  vitalidad + tiempo + perfect + racha + combo (se **acumula por partida**).
+- **HUD**: barras **anchas** con **capa roja de daño** (baja con retraso hasta la
+  vida real), **timer grande** al centro, **foto pequeña** (1P izquierda, **2P al
+  extremo derecho**), **nombre debajo de la barra** y **score del 1P**. Móvil:
+  `body.touch` muestra **#fight-touch** (d-pad ◀▲▼▶ + botones A/S).
+- **Cámara** (`drawCover` + `fCamX`): el fondo panorámico **panea** según el punto
+  medio entre peleadores; el paneo es **proporcional al sobre-ancho** de cada
+  imagen (anchos como Cali/Barranquilla/Galerías se mueven más). Sin huecos.
+- **K.O.** (`endFight` → `fPhase='ko'`): al llegar la vida a 0, el perdedor **se
+  desploma rotando (~85°) y bajando durante ~2.6 s** (`koDur`), con su pose de
+  golpe-recibido + texto **"K.O."**; al terminar → `finishMatch()` abre winner /
+  continue. (Por tiempo agotado: gana quien tenga más vida, sin caída.)
+  **Destello de pantalla**: durante el K.O. `fDraw` pinta un strobe **rojo/blanco
+  fuerte** (~14 Hz, con fade-in/out) ENTRE el fondo y los peleadores → la pantalla
+  destella pero **los combatientes NO se tiñen** (van encima; su flash propio se
+  suprime con `fPhase!=='ko'`).
+- **Controles**: teclado (← → ↑ ↓ A S) + táctiles en móvil.
+
+### Winner / derrota ante el jefe / continue / créditos
+- **Winner** (jugador gana): retrato del selector + **frase del ganador SOBRE el
+  vencido** (`SPEECHES`, ver abajo) + **tally de score** animado (`winner.mp3`,
+  ~6 s) + **animación de entrada** (el cuadro entra por un lado y el texto por el
+  otro). Móvil: **tocar en cualquier parte avanza**. Desbloquea al vencido.
+  - **Campeón** (venciste al jefe final): título **personalizado** (`championTitle`):
+    Cepeda/Abelardo → "¡-N- PRESIDENTE EN 2NDA VUELTA!"; Paloma → "¡PALOMA SERÁ
+    PRESIDENTA EN 2030!"; Petro → "¡PETRO PRESIDENTE DE NUEVO!"; Uribe/Santos →
+    "¡-N- PRESIDENTE ETERNO!". El botón pasa a **VER CRÉDITOS**.
+- **Derrota ante el JEFE FINAL** (`fBossWin`): **Ricardo gana** y **critica a tu
+  candidato con un dato real** (`RICARDO_WIN`); al terminar `winner.mp3` → arranca
+  el **continue**.
+- **Continue**: `continue.mp3` + countdown 10 s. **SÍ = revancha** del mismo rival;
+  **NO/0 = inicio**.
+- **Créditos** (`#scr-credits`): al vencer al jefe final y pasar el winner → roll de
+  créditos (título de campeón + ficha técnica + "El voto es tuyo. Nos vemos en las
+  urnas." + gracias · ricardoruiz.co) → VOLVER AL INICIO (tap en cualquier parte).
+
+### Frases (`SPEECHES`, `RICARDO_WIN`) — ojo legal
+- **Ancladas en rivalidades públicas y documentadas**, en personaje, **neutrales y
+  sin imputar delitos ni inventar citas textuales**: Cepeda↔Uribe (el duelo en los
+  estrados, "de acusador a acusado, absuelto 2025"), Santos (ex-MinDefensa de
+  Uribe y el "No" al Acuerdo 2016), Petro (ex-M-19, alcalde/presidente), Abelardo
+  (admira a Uribe; **es el rival real de 2da vuelta de Cepeda, 43,7% en 1V**),
+  Paloma (uribista, propuso regiones autónomas), Pacto = lista más votada al Senado
+  2022, plebiscito 2016. **Slogans** al final de la frase: Abelardo "¡Firmes por la
+  Patria!", Cepeda "¡Me la juego por la Vida!".
+- Si el usuario aporta **citas textuales reales con fuente**, insertarlas atribuidas.
+- Fuentes usadas (rivalidad Uribe/Cepeda y perfil Abelardo): Wikipedia "Caso Uribe",
+  CNN Español (fallo 2025 / revocatoria oct-2025 / perfil Abelardo 28-may-2026).
+
+### Escenarios (`STAGES`)
+`bogota` (Plaza de Bolívar) · `medellin` (El Poblado) · `cali` (Jaime Varela) ·
+`barranquilla` (Malecón del Río) · `cartagena` (Castillo de San Felipe) ·
+`macarena` (Caño Cristales) · `narino` (Santuario de Las Lajas) · + **`final-boss-stage`**
+(C.C. Galerías, Bogotá — solo el jefe final). En una escalera no se repiten.
+
+### Audio (3 canales + SFX)
+- **Música de pantalla** (`TRACKS`, loop): `intro.mp3` (title), `instrucciones.mp3`
+  (howto), `seleccion.mp3` (select).
+- **Clips one-shot** (`CLIPS`, canal único `curClip` vía `playClip`): `winner.mp3`,
+  `continue.mp3`, `"jefe final.mp3"` (tema del jefe, loop en el boss fight).
+- **Voces / locuciones** (`VOICES`, **canal propio** `curVoice` vía `playVoice` /
+  `playVoiceSeq` / `stopVoice` — se solapan con los clips y **encadenan** una tras otra):
+  - **ROUND** al entrar a cada rival: `playVoiceSeq([round, NUM_VOICE[matchIdx], ready])`
+    → "ROUND ONE/TWO/…" + **"¿Listos?"** (`ready-voice`). En el **jefe final** suena
+    `[round, ready]` **sin número**. `NUM_VOICE` mapea one…six; los que falten se
+    omiten solos (`onerror`). El texto en pantalla también es dinámico (`ROUND N`).
+  - **K.O.**: `ko-voice` en el momento del K.O. (con los destellos); `perfect`
+    **encadenado después** sólo si fue K.O. perfecto del jugador (sin recibir daño).
+  - **Winner**: `winner-voice` en capa con `winner.mp3` al aparecer la imagen (también
+    en la derrota ante el jefe).
+- **SFX de combate** (`SFX_FILES`, **fire-and-forget** vía `playSfxFile` — cada golpe
+  crea su `Audio`, se solapan sin cortarse): `puno.MP3` / `patada.MP3` compartidos,
+  suenan en `tryAttack` al iniciar el golpe (jugador **e IA**).
+- SFX sintetizados extra (WebAudio `sfx.gong/coin/...`). Botón 🔊 mute corta música +
+  clips + voces.
+- **WIP del usuario** (en S3 local, NO referenciados aún · fuera del repo por ahora):
+  `OICE COLLECTION & sound effects.mp3` (base de música que arma el usuario),
+  `puno-paloma.MP3` / `patada-paloma.MP3` (SFX por candidato — si se quieren, wirear
+  un override per-fighter; hoy el golpe es compartido), y en `golpe-recibido/`
+  `petrofin.mp3` · `tigreabelardo.mp3` · `uribe-poereza.mp3` (voces especiales sin
+  enganchar).
+
+### Cómo agregar/cambiar assets (convenciones)
+- Retrato selector: `candidatos/<id>.png` (transparente). Pose base: `fight/<id>.png`.
+- Puño/patada: `fight/punos|patada/<id>-der.png` y `<id>-izq.png` (**der = golpe a
+  la derecha**, ya orientadas — el motor NO las voltea).
+- Golpe recibido: `fight/golpe-recibido/<id>-der|izq.png` (o `<id>.png` único como
+  fallback). Stages: `stages/<id>.png` panorámico (sin espacios en el nombre; si
+  trae espacio, renombrar — pasó con "La Macarena.png" → `macarena.png`).
+- Tras subir imágenes/música: `git add` selectivo + commit + `git push origin HEAD:main`.
+  **Validar el JS embebido con `new Function` antes de cada push** (regla del proyecto).
+
+### Estado de frames por candidato (qué falta DIBUJAR)
+| Candidato | Puño | Patada | Golpe recibido |
+|---|---|---|---|
+| Cepeda · Santos · Uribe · Paloma · Ricardo · Petro | ✅ | ✅ | ✅ |
+| **Abelardo** | ✅ | ✅ | 🟡 solo **`abelardo-der`** (falta `-izq`) |
+→ Petro ya trae golpe-recibido der/izq. **Abelardo** solo tiene `-der`; cuando mira a
+la izquierda (lado rival) cae a la pose base. Falta dibujar `abelardo-izq`.
+
+### Animaciones que aún NO existen (opcionales, backlog)
+- **Salto** con frame propio (hoy usa la pose base en el aire).
+- **Bloqueo** con frame propio (hoy pose base).
+- **Pose de victoria en el ring** antes del winner.
+- Pulido del K.O. (polvo/impacto al tocar el piso, pausa dramática).
+- Caminar (ciclo) y mareo — nicho.
+
+### Pendientes / ideas (handoff)
+1. **`abelardo-izq`** golpe-recibido (solo está `-der`) → entra solo por nombre.
+2. (Opcional) **SFX de golpe por candidato**: ya hay `puno-paloma`/`patada-paloma`;
+   hoy el golpe es compartido (`SFX_FILES`). Wirear override per-fighter si se quiere.
+3. **Música propia/libre**: la base WIP es `OICE COLLECTION & sound effects.mp3`.
+4. (Opcional) animaciones de salto/bloqueo/victoria + pulido de K.O. + frames de
+   **caminar** (carpeta `caminar/`, en progreso · `<id>-der1`/`-der2` para el ciclo).
+5. Ideas grandes: best-of-3 rounds, dificultad creciente, más candidatos/escenarios.
+
+### Verificación / preview (gotchas)
+- `launch.json` levanta `python3 -m http.server 8765`. Abrir
+  `http://localhost:8765/combate-electoral.html`.
+- **El preview headless pausa `requestAnimationFrame` cuando `document.hidden`** →
+  la pelea **no anima oculta** (el timer no baja, la caída no corre). Verificar la
+  lógica por **DOM/eval** o por **screenshot** (que reactiva la visibilidad). Las
+  pantallas DOM (selector/winner/continue/créditos) y los timers (ruletas) sí corren
+  ocultos. El screenshot a veces va **rezagado** (muestra un frame anterior).
+- Mezcla de orientaciones de PNG (algunos 1024×1536, otros cuadrados/panorámicos):
+  el motor calcula el ancho **por imagen** (no asume aspecto fijo).
 
 ## Proyecto DC — capa privada (Daniel Carvalho · Alcaldía Medellín 2027)
 
@@ -1710,7 +2052,8 @@ sf — Sergio Fajardo       (Coalición de Centro)      #EEAA22
 rb — Roy Barreras         (Frente por la Vida)       #3d8b3d
 ```
 Fotos en S3: `bases+de+datos/fotos-candidatos-ctr/{cepeda,abelardo,paloma,claudia,fajardo,roy}.jpg`
-(comparte con `kart-presidencial1v.html`).
+(set propio del test; `kart-presidencial1v.html` fue eliminado del repo y
+`combate-electoral.html` usa sus propios PNG en `combate-electoral/candidatos/`).
 
 ### Flujo del usuario (6 pasos)
 
