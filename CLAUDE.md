@@ -1505,8 +1505,9 @@ title → howto → select → versus → fight → (winner | continue) → [cre
 
 ### Motor de pelea (canvas, objeto `F`)
 - Canvas interno **1024×768**, 4:3. `F` = `{W,H, groundY:0.90, spriteH:0.42,
-  walk:3.6, jumpV:20, grav:0.95, reach:104, punchDmg:6, kickDmg:10, punchCD:340,
+  walk:3.6, jumpV:20, grav:0.95, reach:104, punchDmg:4.2, kickDmg:7, punchCD:340,
   kickCD:560, atkWindow:160, knock:30, hitStun:280, comboWin:1100, koDur:2600}`.
+  (Daño −30% vs original 6/10: las peleas duraban 10-12 s.)
   **Escala por peleador**: `fd.scale` (solo **Abelardo `1.05`**, +5%) multiplica la
   altura en `drawFighter` y ancho/hitbox/sombra/límites en `fwOf`; pies anclados
   (`top=gy-dh`).
@@ -1533,7 +1534,9 @@ title → howto → select → versus → fight → (winner | continue) → [cre
   **Destello de pantalla**: durante el K.O. `fDraw` pinta un strobe **rojo/blanco
   fuerte** (~14 Hz, con fade-in/out) ENTRE el fondo y los peleadores → la pantalla
   destella pero **los combatientes NO se tiñen** (van encima; su flash propio se
-  suprime con `fPhase!=='ko'`).
+  suprime con `fPhase!=='ko'`). El texto **"K.O." va al doble** (`#fight-center-msg.big`,
+  solo ese texto) y sale el aviso **"(NOMBRE) GANA"** (`#ko-win-banner`) del lado del
+  ganador mientras suenan los audios.
 - **Controles**: teclado (← → ↑ ↓ A S) + táctiles en móvil.
 
 ### Winner / derrota ante el jefe / continue / créditos
@@ -1588,17 +1591,26 @@ title → howto → select → versus → fight → (winner | continue) → [cre
     **encadenado después** sólo si fue K.O. perfecto del jugador (sin recibir daño).
   - **Winner**: `winner-voice` en capa con `winner.mp3` al aparecer la imagen (también
     en la derrota ante el jefe).
-- **SFX de combate** (`SFX_FILES`, **fire-and-forget** vía `playSfxFile` — cada golpe
-  crea su `Audio`, se solapan sin cortarse): `puno.MP3` / `patada.MP3` compartidos,
-  suenan en `tryAttack` al iniciar el golpe (jugador **e IA**).
+- **Saludos de apertura** (suenan **A LA VEZ** tras el "¿Listos?", antes de pelear ·
+  `playGreetings`): cada peleador saluda con `"{id}-{rival}.MP3"`; si no existe, cae al
+  genérico `"{id}-all.MP3"` (p.ej. **`santos-all`** — Santos no necesita uno por rival).
+  Suenan los dos lados (`me-opp` + `opp-me`).
+- **Voz de victoria del ganador** (`playKoWinner`): al K.O. suena `"{ganador}-winner.MP3"`
+  y **la pantalla de winner ESPERA** a que termine (gate `fKoWinReady` + `fKoUntil`).
+- **`mkAudioChain(bases[])`**: prueba una lista de bases en orden, cada una con
+  **`.MP3` → `.mp3`** (el host de prod es case-sensitive; el usuario mezcla mayús/minús).
+  Toca la primera que exista; si ninguna, sigue sin colgar.
+- **Gating del arranque** (`fFightStartAt`): la pelea arranca tras
+  ROUND→número→¿Listos?→saludos (callbacks encadenados; topes anti-cuelgue 4–12 s +
+  watchdog en `playVoiceSeq`). Muteado: intro fija de 1.1 s.
+- **SFX de combate** (`SFX_FILES`, **fire-and-forget** vía `playSfxFile`): `puno.MP3` /
+  `patada.MP3` **compartidos**, suenan en `tryAttack` al iniciar el golpe (jugador e IA).
 - SFX sintetizados extra (WebAudio `sfx.gong/coin/...`). Botón 🔊 mute corta música +
-  clips + voces.
-- **WIP del usuario** (en S3 local, NO referenciados aún · fuera del repo por ahora):
-  `OICE COLLECTION & sound effects.mp3` (base de música que arma el usuario),
-  `puno-paloma.MP3` / `patada-paloma.MP3` (SFX por candidato — si se quieren, wirear
-  un override per-fighter; hoy el golpe es compartido), y en `golpe-recibido/`
-  `petrofin.mp3` · `tigreabelardo.mp3` · `uribe-poereza.mp3` (voces especiales sin
-  enganchar).
+  clips + voces + saludos + voz de ganador.
+- **WIP del usuario** (NO referenciados · fuera del repo): `OICE COLLECTION…mp3` (base de
+  música), SFX por candidato `puno/patada-{cepeda,paloma}.MP3` (si se quieren, wirear un
+  override per-fighter; hoy el golpe es compartido), drafts con espacios (`cepeda a
+  paloma.mp3`…), `holasantos.mp3`, `petrofin.mp3`, `recibe-puno.MP3`.
 
 ### Cómo agregar/cambiar assets (convenciones)
 - Retrato selector: `candidatos/<id>.png` (transparente). Pose base: `fight/<id>.png`.
@@ -1613,10 +1625,8 @@ title → howto → select → versus → fight → (winner | continue) → [cre
 ### Estado de frames por candidato (qué falta DIBUJAR)
 | Candidato | Puño | Patada | Golpe recibido |
 |---|---|---|---|
-| Cepeda · Santos · Uribe · Paloma · Ricardo · Petro | ✅ | ✅ | ✅ |
-| **Abelardo** | ✅ | ✅ | 🟡 solo **`abelardo-der`** (falta `-izq`) |
-→ Petro ya trae golpe-recibido der/izq. **Abelardo** solo tiene `-der`; cuando mira a
-la izquierda (lado rival) cae a la pose base. Falta dibujar `abelardo-izq`.
+| Cepeda · Santos · Uribe · Paloma · Ricardo · Petro · Abelardo | ✅ | ✅ | ✅ |
+→ Los 6 + Ricardo tienen puño/patada/golpe-recibido (der/izq) completos.
 
 ### Animaciones que aún NO existen (opcionales, backlog)
 - **Salto** con frame propio (hoy usa la pose base en el aire).

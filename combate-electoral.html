@@ -447,7 +447,12 @@
   .ftimer.low{color:#ff3b2e}
   #fight-center-msg{position:absolute; inset:0; z-index:25; display:flex; align-items:center; justify-content:center; pointer-events:none; font-family:'Anton'; font-size:clamp(40px,12vw,150px); color:var(--gold); -webkit-text-stroke:4px #000; text-shadow:0 0 30px rgba(0,0,0,.85); opacity:0}
   #fight-center-msg.show{opacity:1; animation:fmsg .45s ease}
+  #fight-center-msg.big{font-size:clamp(80px,24vw,300px); -webkit-text-stroke-width:8px}   /* "K.O." al doble */
   @keyframes fmsg{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+  #ko-win-banner{position:absolute; top:40%; z-index:26; pointer-events:none; font-family:'Anton'; font-size:clamp(22px,5vw,60px); color:#fff; -webkit-text-stroke:3px #000; text-shadow:0 0 18px rgba(0,0,0,.9); white-space:nowrap; opacity:0}
+  #ko-win-banner.left{left:5%; right:auto; text-align:left}
+  #ko-win-banner.right{right:5%; left:auto; text-align:right}
+  #ko-win-banner.show{opacity:1; animation:fmsg .45s ease}
   #fight-hint{position:absolute; left:0; right:0; bottom:6px; z-index:20; text-align:center; font-size:clamp(6px,1.05vw,10px); color:#e9e3d3; letter-spacing:1px; text-shadow:0 2px 0 #000; opacity:.85; pointer-events:none}
   /* ----- Controles táctiles (móvil) ----- */
   #fight-touch{position:absolute; left:0; right:0; bottom:0; z-index:40; display:none; align-items:flex-end; justify-content:space-between; padding:8px 12px 12px; gap:10px; pointer-events:none}
@@ -690,6 +695,7 @@
       </div>
       <div id="fight-combo"></div>
       <div id="fight-center-msg"></div>
+      <div id="ko-win-banner"></div>
       <div id="fight-hint">← → mover · ↑ saltar · A puño · S patada · ↓ cubrir</div>
       <div id="fight-touch">
         <div class="ft-pad">
@@ -941,23 +947,66 @@
   function stopVoice(){ voiceSeqTok++; if(curVoice){ try{curVoice.pause();}catch(e){} curVoice=null; } }
   function playVoice(url, vol){ if(muted||!url) return null; const a=new Audio(url); a.volume=(vol==null?0.85:vol); curVoice=a; a.play().catch(()=>{}); return a; }
   // reproduce urls una tras otra: cada una arranca cuando termina la anterior (y salta las que falten)
-  function playVoiceSeq(urls, vol){
-    if(muted) return;
+  function playVoiceSeq(urls, vol, onDone){
     stopVoice();
-    const tok=voiceSeqTok; let i=0;
+    if(muted){ if(onDone) onDone(); return; }               // muteado: salta directo al final
+    const tok=voiceSeqTok; let i=0, wd=null;
     const step=()=>{
-      if(tok!==voiceSeqTok || i>=urls.length) return;       // cancelada o terminada
+      if(wd){ clearTimeout(wd); wd=null; }
+      if(tok!==voiceSeqTok) return;                          // cancelada por otra secuencia
+      if(i>=urls.length){ if(onDone) onDone(); return; }     // terminó la secuencia
       const url=urls[i++]; if(!url){ step(); return; }
       const a=new Audio(url); a.volume=(vol==null?0.85:vol); curVoice=a;
-      a.onended=()=>{ if(tok===voiceSeqTok) step(); };
-      a.onerror=()=>{ if(tok===voiceSeqTok) step(); };       // archivo faltante → sigue con el próximo
+      const next=()=>{ if(tok===voiceSeqTok) step(); };
+      a.onended=next; a.onerror=next;                        // fin / archivo faltante → siguiente
       a.play().catch(()=>{});
+      wd=setTimeout(next, 4000);                             // respaldo: si autoplay bloquea (ni ended ni error), avanza igual
     };
     step();
   }
   /* ---- SFX de combate (mp3 compartidos · fire-and-forget para que se solapen) ---- */
   const SFX_FILES = { punch:'combate-electoral/music/puno.MP3', kick:'combate-electoral/music/patada.MP3' };
   function playSfxFile(name, vol){ if(muted) return; const url=SFX_FILES[name]; if(!url) return; const a=new Audio(url); a.volume=(vol==null?0.7:vol); a.play().catch(()=>{}); }
+
+  /* ---- Audio que prueba una LISTA de bases (en orden), cada una con extensión .MP3 → .mp3 ----
+     Toca la PRIMERA que exista. onEnd se llama 1 sola vez (al terminar, o si ninguna carga). ---- */
+  function mkAudioChain(bases, vol, onEnd){
+    let ended=false; const done=()=>{ if(ended) return; ended=true; if(onEnd) onEnd(); };
+    const a=new Audio(); a.volume=vol; let bi=0, lower=false;
+    a.onended=done;
+    a.onerror=()=>{                              // 404: probar minúscula, luego la siguiente base
+      if(!lower){ lower=true; a.src=bases[bi]+'.mp3'; a.play().catch(()=>{}); return; }
+      lower=false; bi++;
+      if(bi>=bases.length){ done(); return; }    // ninguna existe → terminar (no bloquea)
+      a.src=bases[bi]+'.MP3'; a.play().catch(()=>{});
+    };
+    a.src=bases[0]+'.MP3'; a.play().catch(()=>{});
+    return a;
+  }
+  /* ---- Saludos de apertura · suenan A LA VEZ tras el ready ----
+     Cada peleador saluda con "{id}-{rival}"; si no existe, usa el genérico "{id}-all" (p.ej. santos-all). ---- */
+  let fGreets=[];
+  function stopGreets(){ fGreets.forEach(a=>{ try{a.pause();}catch(e){} }); fGreets=[]; }
+  function greetBases(a, b){ return [ 'combate-electoral/music/'+a+'-'+b, 'combate-electoral/music/'+a+'-all' ]; }
+  function playGreetings(meId, oppId, after){
+    stopGreets();
+    let done=false; const fin=()=>{ if(done) return; done=true; if(after) after(); };
+    if(muted){ fin(); return; }
+    const sides=[ greetBases(meId, oppId), greetBases(oppId, meId) ];   // me→opp y opp→me, simultáneos
+    let pending=sides.length; const one=()=>{ if(--pending<=0) fin(); };
+    sides.forEach(bs=>{ fGreets.push(mkAudioChain(bs, 0.92, one)); });
+    setTimeout(fin, 6000);                      // tope de seguridad
+  }
+  /* ---- Voz de victoria del ganador ("candidato-winner") · al K.O., la pantalla winner ESPERA a que termine ---- */
+  let curKoWin=null;
+  function stopKoWin(){ if(curKoWin){ try{curKoWin.pause();}catch(e){} curKoWin=null; } }
+  function playKoWinner(id, after){
+    stopKoWin();
+    let done=false; const fin=()=>{ if(done) return; done=true; if(after) after(); };
+    if(muted){ fin(); return; }
+    curKoWin=mkAudioChain([ 'combate-electoral/music/'+id+'-winner' ], 0.95, fin);
+    setTimeout(fin, 8000);                       // tope de seguridad
+  }
 
   const $  = s => document.querySelector(s);
   const rnd = n => Math.floor(Math.random()*n);
@@ -1008,7 +1057,7 @@
 
   $('#snd').addEventListener('click', (e)=>{ e.stopPropagation();
     muted=!muted; $('#snd').textContent=muted?'🔇':'🔊';
-    if(muted){ if(curMusic){ try{curMusic.pause();}catch(e){} } stopClip(); stopVoice(); }
+    if(muted){ if(curMusic){ try{curMusic.pause();}catch(e){} } stopClip(); stopVoice(); stopGreets(); stopKoWin(); }
     else { audio(); const n=curMusicName; curMusicName=null; if(n){ playMusic(n); } else { sfx.move(); } }
   });
 
@@ -1284,12 +1333,13 @@
   const F = {
     W:1024, H:768, groundY:0.90, spriteH:0.42,   // sprites 30% más pequeños
     round:60, walk:3.6, jumpV:20, grav:0.95,      // saltan un poco más
-    reach:104, punchDmg:6, kickDmg:10,
+    reach:104, punchDmg:4.2, kickDmg:7,           // -30%: las peleas duraban 10-12s
     punchCD:340, kickCD:560, atkWindow:160, knock:30, hitStun:280, comboWin:1100, koDur:2600
   };
   let fcanvas=null, fctx=null, fRAF=null, fLast=0;
   let fPhase='intro', fTimer=F.round, fTimerAcc=0, fResult='', fIntroT=0;
   let fP=null, fO=null, fStageImg=null, fSparks=[], fShake=0, fMaxCombo=0, fPlayerHurt=false, fCamX=0, fMatchWon=false, fKoUntil=0;
+  let fFightStartAt=0, fKoWinReady=true;   // gating: arranque de pelea (tras saludos) · pantalla winner (tras voz del ganador)
   const fKeys={left:false,right:false,jump:false,block:false};
 
   function fGroundPx(){ return F.H*F.groundY; }
@@ -1339,7 +1389,7 @@
     fStageImg = new Image();
     fStageImg.src = 'combate-electoral/stages/'+s.id+'.png';
     fSparks=[]; fShake=0; fMaxCombo=0; fPlayerHurt=false; fCamX=0;
-    fTimer=F.round; fTimerAcc=0; fResult=''; fIntroT=0;
+    fTimer=F.round; fTimerAcc=0; fResult=''; fIntroT=0; fKoWinReady=true;
     fKeys.left=fKeys.right=fKeys.block=fKeys.jump=false;
     fcanvas=$('#fcanvas'); fcanvas.width=F.W; fcanvas.height=F.H; fctx=fcanvas.getContext('2d');
     $('#fname-l').textContent=state.me.short; $('#fname-r').textContent=state.opp.short;
@@ -1349,9 +1399,19 @@
     $('#ftrail-l').style.width='100%'; $('#ftrail-r').style.width='100%';
     setBars(); clearCombo();
     $('#ftimer').textContent=F.round; $('#ftimer').classList.remove('low');
-    fPhase='intro'; stopVoice();
-    if(isFinal){ showFMsg('JEFE FINAL'); playClip('boss', true); playVoiceSeq([VOICES.round, VOICES.ready]); }   // jefe: tema propio + "ROUND ¿Listos?" sin número
-    else { showFMsg('ROUND '+(state.matchIdx+1)); stopClip(); playVoiceSeq([VOICES.round, NUM_VOICE[state.matchIdx], VOICES.ready]); }  // "ROUND ONE/TWO/…" → "¿Listos?"
+    fPhase='intro'; stopVoice(); stopGreets(); stopKoWin(); { const kwb=$('#ko-win-banner'); if(kwb) kwb.classList.remove('show'); }
+    if(isFinal){ showFMsg('JEFE FINAL'); playClip('boss', true); } else { showFMsg('ROUND '+(state.matchIdx+1)); stopClip(); }
+    const annSeq = isFinal ? [VOICES.round, VOICES.ready] : [VOICES.round, NUM_VOICE[state.matchIdx], VOICES.ready];  // "ROUND ONE/…" → "¿Listos?"
+    if(muted){ fFightStartAt = performance.now()+1100; }   // sin audio: intro corto fijo
+    else {
+      fFightStartAt = performance.now()+12000;             // tope anti-cuelgue (generoso); el after() de los saludos adelanta el arranque
+      playVoiceSeq(annSeq, null, ()=>{                     // al terminar "ROUND … ¿Listos?":
+        if(cur!=='fight' || fPhase!=='intro') return;
+        playGreetings(state.me.id, state.opp.id, ()=>{     // saludos me-opp + opp-me, A LA VEZ
+          if(cur==='fight' && fPhase==='intro') fFightStartAt = performance.now()+250;  // saludos listos → ¡a pelear!
+        });
+      });
+    }
     fLast=performance.now();
     if(fRAF) cancelAnimationFrame(fRAF);
     fRAF=requestAnimationFrame(fLoop);
@@ -1362,7 +1422,7 @@
     if(att.combo>=2){ el.textContent=att.combo+' HITS'; el.style.opacity='1'; el.style.color = (att===fP)?'#ffd75e':'#ff7a5a'; el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
   }
 
-  function showFMsg(t){ const m=$('#fight-center-msg'); m.textContent=t; m.classList.remove('show'); void m.offsetWidth; m.classList.add('show'); }
+  function showFMsg(t){ const m=$('#fight-center-msg'); m.textContent=t; m.classList.toggle('big', t==='K.O.'); m.classList.remove('show'); void m.offsetWidth; m.classList.add('show'); }
   function hideFMsg(){ $('#fight-center-msg').classList.remove('show'); }
 
   function fLoop(now){
@@ -1374,13 +1434,13 @@
   function fUpdate(dt, now){
     if(fPhase==='intro'){
       fIntroT+=dt;
-      if(fIntroT>1100){ fPhase='fight'; showFMsg('¡PELEEN!'); setTimeout(hideFMsg,650); }
+      if(now>=fFightStartAt){ fPhase='fight'; showFMsg('¡PELEEN!'); setTimeout(hideFMsg,650); }  // arranca tras ROUND·¿Listos?·saludos
       return;
     }
     if(fPhase==='ko'){
       updateSparks(dt);
       if(fShake>0) fShake=Math.max(0, fShake-dt*0.04);
-      if(now>=fKoUntil){ fPhase='over'; if(cur==='fight') finishMatch(); }
+      if(now>=fKoUntil && fKoWinReady){ fPhase='over'; if(cur==='fight') finishMatch(); }  // espera la caída Y la voz del ganador
       return;
     }
     if(fPhase!=='fight'){ updateSparks(dt); return; }
@@ -1509,8 +1569,12 @@
       loser.ko=true; loser.koStart=performance.now(); loser.stun=0;
       fPhase='ko'; fKoUntil=performance.now()+F.koDur; fShake=12;
       showFMsg('K.O.'); sfx.gong();
+      const kwb=$('#ko-win-banner');                                       // aviso "(NOMBRE) GANA" al lado del ganador, mientras suenan los audios
+      if(kwb){ kwb.textContent=winner.fd.short+' GANA'; kwb.classList.remove('show','left','right'); kwb.classList.add(winner===fP?'left':'right'); void kwb.offsetWidth; kwb.classList.add('show'); }
       const koPerfect = (winner===fP) && !fPlayerHurt && fP.hp>=fP.maxHp;   // K.O. sin recibir daño
       playVoiceSeq(koPerfect ? [VOICES.ko, VOICES.perfect] : [VOICES.ko]);  // ko-voice con los destellos; perfect después si aplica
+      fKoWinReady=false;                                                    // la pantalla winner espera la voz del ganador
+      playKoWinner(winner.fd.id, ()=>{ fKoWinReady=true; });               // "{ganador}-winner.MP3" antes de la pantalla winner
       return;
     }
     fPhase='over';
