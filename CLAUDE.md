@@ -571,6 +571,93 @@ censo). Confirmado al sumar 2018 contra cifra oficial (match 99.9%).
 
 Depto 88 (Consulados/Exterior) sí está incluido.
 
+**⚠️ Gotcha de llaves (descubierto jun-2026):** en Bogotá la columna
+`Cód. Comuna / Localidad` trae el **NOMBRE de la localidad** ("Usaquén",
+"Suba"…), no el código de zona. Mapear con el dict canónico Usaquén=01 …
+Sumapaz=20, Corferias=90, Cárceles=98 (ya implementado en
+`tools/edad-1v-2026/probe_viabilidad.py::BOG_LOC`). El resto del país sí
+trae la zona electoral numérica y matchea con GCS/preconteo casi 1:1.
+
+## Análisis etario 1V 2026 — `tools/edad-1v-2026/` (LISTO · pipeline corrido 2026-06-09)
+
+Composición etaria del voto por candidato 1V-2026 vs 1V-2022 vía inferencia
+ecológica a nivel **puesto**, con composición de votantes 2026 **proyectada**
+(Edadygenero 2022 × proyecciones DANE dep × raking IPF a votantes reales por
+puesto). **Spec formal completa en `tools/edad-1v-2026/MODELO.md`** (4 pasos:
+perfil 2022 con gates de calidad → proyección demográfica → EI RxC con cotas
+Duncan-Davis + QP símplex + opcional bayesiano → comparativo 2022/2026).
+
+Probe de viabilidad corrido (2026-06-09), todo VIABLE:
+- Cruce edad22∩votos22 = 98,7% de votos · votos26 con perfil directo 88% (+8,7% zona).
+- Backtest del supuesto de proyección 2018→2022: MAE nacional 0,32 pp por banda.
+- DANE↔RNEC crosswalk dep 33/33 por nombre. Factores 22→26: 61+ ×1,135 (la banda que más crece).
+- Demo Goodman reproduce 2022 conocido (Petro joven / Fico 61+) con consistencia nacional exacta.
+- Edadygenero 2022 cubre 87,5% de sufragantes → gate `cov∈[0.70,1.10]` por puesto, fallback zona→mun.
+
+Scripts (todos corridos): `extract_edadygenero.py` (caché mesa P1V18/P1V22/
+P2V22), `aggregate_votes.py` (votos→puesto, validados al voto exacto),
+`probe_viabilidad.py`, `demo_ei.py`, `build_w26.py` (proyección+IPF; semillas
+64% puesto/33% zona), `fit_ei.py` (QP símplex 7 estratos + cotas Duncan-Davis
++ bootstrap mun B=300 + sensibilidad). Outputs en `Bases de datos/
+output_edad_1v/` (`ei-report.txt` = tabla final con IC; `ei-final.csv` long).
+**Resultados clave:** 2026 Cepeda 60% en 18-25 y 7% en 61+; Abelardo monótono
+23%→79% en 61+; Paloma concentrada 46+; Fajardo-26 perfil joven (invierte su
+2022). 2022: Petro 62% jóvenes/3% mayores · Fico 69% en 61+. Electorado de
+Abelardo 38% es 61+; el de Cepeda 49% <36. **Regla de publicación:** valores
+extremos siempre con cota dura al lado; IC no incluye sesgo de agregación;
+el error de proyección ATENÚA (compresión ≤6,5 pp) — los contrastes reales
+serían ≥ los reportados. Gotcha EIV: NO meter el ruido de proyección al
+bootstrap de los IC (atenúa y el IC deja de contener el punto); va aparte
+como sensibilidad. `report_edad.py` = gráficos nacionales (líneas/barras
+light+dark).
+
+**Geo + carrusel de redes (jun-2026):**
+- `build_blocs_depto.py` — margen izq/der + **pista limpia del Pacto
+  (Petro→Cepeda) por depto** → `blocs-depto.csv`. OJO: el margen der−izq tiene
+  **artefacto Rodolfo** (sus ~6M de 2022 clasificados como derecha inflan el
+  margen 2022 en sus bastiones — N.Santander, Sucre, llanos — y al no haber
+  "Rodolfo" en 2026 parece giro a la izquierda). Por eso el chart usa la pista
+  Petro→Cepeda (candidato Pacto, comparable año a año): **Cepeda creció en 27/33
+  deptos, cayó en Bogotá −5,4 y Atlántico −2,7; nacional plano +0,7**.
+  Códigos RNEC verificados contra depname (27=Santander, 25=N.Santander — el
+  dict viejo estaba descuadrado, corregido).
+- `fit_ei_geo.py` — EI por ciudad y depto. A N moderado la EI de 6 candidatos
+  se **acorrala en el borde** (Cepeda 0% en 61+) por **confusión ecológica
+  real** (en grandes ciudades edad↔ingreso van juntos). Fixes: (1) **3 bandas**
+  (18-35/36-60/61+) en vez de 5; (2) **cara a cara Cepeda-vs-Abelardo** (EI
+  binaria, robusta, suma 100); (3) **pooling parcial** (shrinkage `SHRINK=0.02`
+  hacia el prior nacional por estratos vía `fit_qp_reg`). Consistencia
+  implícito/observado <1pp. Salidas `ei-ciudades.csv` + `ei-deptos.csv`.
+- `report_carrusel.py` — **9 slides Twitter-first**: apaisadas 1200×900 (4:3)
+  salvo la 02 (flechas, vertical 1080×1350). Identidad de carruseles previos:
+  **títulos Arima 700** (TTFs estáticas en `tools/edad-1v-2026/fonts/`, bajadas
+  de Google Fonts con UA viejo), kicker Helvetica bold **oxblood #8a1e16**,
+  paper #f1eee4 / ink #1a1510 (paleta de carousel-conflicto.html). Slides:
+  portada · **02 flechas = margen cara-a-cara** (Pacto − mejor derecha, 0 al
+  centro, zonas "va adelante la izq/der" → así Bogotá lee "ganó pero
+  retrocedió", orden alfabético) · mapa shift (texto izq + mapa der, sin
+  solapes) · perfil nacional (etiquetas directas con dodge, sin leyenda) ·
+  herencia (2 paneles lado a lado) · electorado · **ciudades WaPo** (caja 100%
+  con números adentro, fila Nacional saturada, ganador con borde, números <13%
+  por fuera) · 2 mapas jóvenes-vs-mayores · cierre 2×2. Geo de
+  `output_pacto_1v_2026/geo/DEPARTAMENTOS2.json` (match por `name`).
+  `python3 report_carrusel.py all`. blocs-depto.csv trae h2h22/h2h26/h2h_shift
+  (margen vs mejor derecha: izq adelante 19→18 deptos, margen cerrado en 20/33,
+  Bogotá +24,9→+4,0; flips Quindío/Risaralda→der, Vichada→izq).
+- Hilo de 13 trinos + caption IG en `rrss/twitter/hilo-edad-1v.md`. Colores
+  🔴 Cepeda/izq · 🔵 Abelardo/der. **Hallazgo central:** choque de generaciones
+  — Cepeda ~60% en 18-25 / ~7% en 61+; Abelardo 23%→79%. Se hereda de 2022
+  (Cepeda=perfil de Petro, Abelardo=perfil de Fico). Pasa en las 6 ciudades.
+  Entre jóvenes Cepeda gana el país menos Antioquia+Llanos; entre mayores
+  Abelardo gana TODOS los deptos.
+- **Noticia + página de análisis (jun-10):** `edades-1v.html` (tema claro
+  paper #f1eee4 cohesivo con el carrusel — NO el dark de leyseca/trasvase;
+  títulos Arima, kicker ox, hero-stats, 7 figuras, metodología con límites,
+  related links). Imágenes del carrusel copiadas a `analisis-edades/*.png`
+  (patrón carpeta-por-análisis tipo `analisis-leyseca/`). Card NOTICIA 14 en
+  `noticias.html` → link a edades-1v.html. JS inline validado con
+  `new Function`; verificado en preview (14 articles, 7 imgs OK).
+
 ## Data local — históricos pre-2026 (GCS)
 Histórico electoral desde 2010 (Registraduría, formato GCS unificado). **Pesados, no se
 despliegan al navegador**: se procesan y se suben a S3 como JSON agregados.

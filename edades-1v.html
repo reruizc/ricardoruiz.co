@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script defer src="/track.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Colombia votó por edades · 1ª vuelta 2026 · ricardoruiz.co</title>
+  <meta name="description" content="Cepeda ganó ~60% del voto de los 18-25 y Abelardo ~79% de los mayores de 60. Reconstruimos cómo votó cada generación cruzando el preconteo con la edad de los sufragantes por puesto (Registraduría + DANE), con inferencia ecológica e intervalos de confianza." />
+  <meta property="og:title" content="Colombia votó por edades: Cepeda ganó los jóvenes, Abelardo los mayores" />
+  <meta property="og:description" content="La 1ª vuelta 2026 fue un choque de generaciones que se heredó de 2022. Análisis por puesto de votación con inferencia ecológica: perfiles por edad, ciudades, mapas y metodología." />
+  <meta property="og:type" content="article" />
+  <meta property="og:image" content="https://ricardoruiz.co/analisis-edades/01_portada.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=Arima:wght@400;500;700&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet" />
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --paper:#f1eee4; --ink:#1a1510; --ink2:#6b6354; --ink3:#9a9180;
+      --ox:#8a1e16; --rojo:#d1322e; --azul:#1f47cc; --blue:#0047FF;
+      --border:rgba(26,21,16,.12); --surface:rgba(26,21,16,.035);
+    }
+    body{background:var(--paper);color:var(--ink);font-family:Avenir,'Helvetica Neue',sans-serif;min-height:100vh;line-height:1.55}
+    a{color:var(--ox);text-decoration:none} a:hover{text-decoration:underline}
+
+    .nav{padding:.9rem 2rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:rgba(241,238,228,.85);backdrop-filter:blur(8px);position:sticky;top:0;z-index:50}
+    .e-btn-back{font-family:Avenir,sans-serif;font-weight:500;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ox);text-decoration:none;border:1.5px solid rgba(138,30,22,.35);padding:.3rem .8rem;transition:all .2s}
+    .e-btn-back:hover{color:var(--paper);background:var(--ox);text-decoration:none}
+    .logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.9}
+    .logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px}
+    .logo-bar{width:5px;background:var(--blue);border-radius:1px 1px 0 0;opacity:.85}
+    .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:1.2rem;letter-spacing:-.03em;color:var(--ink)}
+    .logo-text span{color:var(--blue)}
+
+    .container{max-width:880px;margin:0 auto;padding:2.8rem 2rem 4rem}
+
+    .kicker{font-family:'Syne',sans-serif;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:var(--ox);margin-bottom:.7rem;font-weight:700}
+    h1{font-family:'Arima',sans-serif;font-weight:700;font-size:clamp(1.9rem,4.4vw,3.1rem);letter-spacing:-.02em;line-height:1.04;margin-bottom:.8rem}
+    h1 em{font-style:normal;color:var(--rojo)}
+    h1 b{font-weight:700;color:var(--azul)}
+    .subhead{font-family:'Arima',sans-serif;font-weight:400;font-size:clamp(1.02rem,1.6vw,1.2rem);color:var(--ink2);line-height:1.5;max-width:780px;margin-bottom:1.6rem}
+    .byline{font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.1em;color:var(--ink3);margin-bottom:2.6rem;padding-bottom:1.2rem;border-bottom:1px solid var(--border)}
+
+    .lead{font-size:1.08rem;line-height:1.68;margin-bottom:1.2rem;color:#3a332a}
+    .lead b{color:var(--ink);font-weight:600}
+
+    .hero-stat{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin:2.2rem 0;padding:1.5rem;background:linear-gradient(135deg,rgba(209,50,46,.06),rgba(31,71,204,.05));border:1px solid var(--border)}
+    @media(max-width:700px){.hero-stat{grid-template-columns:1fr}}
+    .hero-card{padding:.5rem .2rem}
+    .hero-card .lbl{font-family:'Syne',sans-serif;font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin-bottom:.3rem;font-weight:700}
+    .hero-card .val{font-family:'Arima',sans-serif;font-size:2.2rem;font-weight:700;line-height:1;letter-spacing:-.02em}
+    .hero-card .val.rojo{color:var(--rojo)}
+    .hero-card .val.azul{color:var(--azul)}
+    .hero-card .val.ox{color:var(--ox)}
+    .hero-card .meta{font-size:.8rem;color:var(--ink2);margin-top:.45rem;line-height:1.4}
+
+    h2{font-family:'Arima',sans-serif;font-weight:700;font-size:1.55rem;letter-spacing:-.01em;margin:2.8rem 0 1rem;color:var(--ink)}
+    h2::before{content:'';display:inline-block;width:6px;height:1.15rem;background:var(--ox);margin-right:.6rem}
+
+    p{margin-bottom:1rem;color:#3a332a}
+    p b{color:var(--ink);font-weight:600}
+    .rojo-t{color:var(--rojo);font-weight:600}
+    .azul-t{color:var(--azul);font-weight:600}
+
+    figure{margin:1.6rem 0 2rem}
+    figure img{width:100%;height:auto;display:block;border:1px solid var(--border)}
+    figcaption{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.06em;color:var(--ink3);margin-top:.55rem;line-height:1.5}
+
+    .note{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--ox);padding:1.1rem 1.3rem;margin:1.6rem 0;font-size:.93rem;color:#3a332a}
+    .note b{color:var(--ink)}
+
+    ul.metodo{margin:0 0 1rem 1.2rem}
+    ul.metodo li{margin-bottom:.55rem;font-size:.95rem;color:#3a332a}
+    ul.metodo li b{color:var(--ink)}
+
+    .related{margin-top:3rem;padding-top:1.6rem;border-top:1px solid var(--border)}
+    .related .rel-title{font-family:'Syne',sans-serif;font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--ink3);font-weight:700;margin-bottom:1rem}
+    .rel-links{display:flex;flex-wrap:wrap;gap:.8rem}
+    .rel-links a{font-family:'Syne',sans-serif;font-weight:700;font-size:.85rem;letter-spacing:.01em;color:var(--ox);border:1.5px solid rgba(138,30,22,.3);padding:.55rem 1rem;transition:all .2s}
+    .rel-links a:hover{background:var(--ox);color:var(--paper);text-decoration:none}
+
+    footer{border-top:1px solid var(--border);padding:1.6rem 2rem;display:flex;align-items:center;justify-content:space-between}
+    .footer-brand{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
+
+    @media(max-width:700px){
+      .nav{padding:.8rem 1.1rem}
+      .container{padding:2rem 1.1rem 3rem}
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="nav">
+    <a href="noticias.html" class="e-btn-back">← Noticias</a>
+    <a href="index.html" class="logo-link">
+      <div class="logo-bars">
+        <div class="logo-bar" style="height:20px"></div>
+        <div class="logo-bar" style="height:14px"></div>
+        <div class="logo-bar" style="height:9px"></div>
+        <div class="logo-bar" style="height:4px"></div>
+      </div>
+      <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+    </a>
+  </nav>
+
+  <div class="container">
+
+    <div class="kicker">Elecciones · 1ª vuelta · 2026</div>
+    <h1>Colombia votó por edades: <em>Cepeda</em> ganó los jóvenes, <b>Abelardo</b> los mayores</h1>
+    <p class="subhead">El voto es secreto, pero la Registraduría publica cuántas personas votaron por edad en cada puesto. Cruzamos ese dato con los resultados de la primera vuelta y reconstruimos, con inferencia ecológica, cómo votó cada generación — a nivel nacional, por departamento y en las seis ciudades principales.</p>
+    <div class="byline">10 · JUN · 2026 — RICARDO RUIZ · DATOS: REGISTRADURÍA (SUFRAGANTES POR EDAD · PRECONTEO 1V) + PROYECCIONES DANE</div>
+
+    <p class="lead">La primera vuelta del 31 de mayo fue, sobre todo, un <b>choque de generaciones</b>. Iván Cepeda se llevó cerca de <span class="rojo-t">6 de cada 10 votos entre los menores de 25</span> y apenas el 7% entre los mayores de 60. Abelardo De La Espriella hizo el camino exactamente inverso: 23% entre los jóvenes y <span class="azul-t">cerca de 8 de cada 10 votos entre los mayores</span>. De hecho, Cepeda puntea en todas las franjas de edad… menos en la de los mayores de 60, donde Abelardo se dispara — y esa franja, que pesa una quinta parte del electorado y es la que más crece, le dio la delantera nacional.</p>
+
+    <div class="hero-stat">
+      <div class="hero-card">
+        <div class="lbl">Cepeda · 18-25 años</div>
+        <div class="val rojo">~60%</div>
+        <div class="meta">del voto joven (IC 95%: 54–66). Entre mayores de 60: 7%.</div>
+      </div>
+      <div class="hero-card">
+        <div class="lbl">Abelardo · 61+ años</div>
+        <div class="val azul">~79%</div>
+        <div class="meta">del voto mayor (IC 95%: 72–85). Entre los 18-25: 23%.</div>
+      </div>
+      <div class="hero-card">
+        <div class="lbl">El Pacto vs 2022</div>
+        <div class="val ox">27/33</div>
+        <div class="meta">departamentos donde Cepeda igualó o superó la votación de Petro.</div>
+      </div>
+    </div>
+
+    <h2>¿Quién va adelante en cada departamento?</h2>
+    <p>Antes de la edad, el tablero. Medimos la <b>ventaja del candidato del Pacto sobre el candidato de derecha más votado</b> en cada departamento — Petro contra el mejor entre Fico y Rodolfo en 2022; Cepeda contra Abelardo en 2026. La izquierda sigue adelante en <b>18 de 33 departamentos</b> (Caribe, Pacífico, suroccidente), pero frente a una derecha ya unificada su ventaja <b>se encogió en 20 de los 33</b>. El caso más dramático es Bogotá: la izquierda sigue ganando la ciudad, pero su colchón pasó de <b>+25 puntos a apenas +4</b>.</p>
+    <figure>
+      <img src="analisis-edades/02_shift_deptos.png" alt="Gráfico de flechas: ventaja del Pacto sobre el candidato de derecha más votado, por departamento, 2022 vs 2026" loading="lazy" />
+      <figcaption>El punto es 2022; la flecha llega a 2026. Flecha roja = la izquierda ganó terreno; azul = lo perdió. Voto por puesto, Registraduría (escrutinio 2022 · preconteo 2026).</figcaption>
+    </figure>
+
+    <h2>En votos, la izquierda no se hundió — pero cayó donde más pesa</h2>
+    <p>¿Y en votos propios? Ahí el resultado es contraintuitivo: Cepeda <b>igualó o superó la votación de Petro en 27 de 33 departamentos</b> — creció en la Orinoquía, la Amazonía y Santander. Pero cayó justo donde más votos hay: <b>Bogotá (−5,4 puntos) y Atlántico (−2,7)</b>. El saldo: la izquierda quedó casi clavada en su marca nacional (40,5% → 41,2%). Lo que cambió el resultado no fue un derrumbe de la izquierda: fue que la derecha, dividida en 2022 entre Fico y Rodolfo, esta vez votó unida detrás de un solo nombre.</p>
+    <figure>
+      <img src="analisis-edades/03_mapa_shift.png" alt="Mapa de Colombia: cambio del voto del Pacto (Petro 2022 a Cepeda 2026) por departamento" loading="lazy" />
+      <figcaption>Cambio en el voto del Pacto (Petro 2022 → Cepeda 2026), en puntos porcentuales sobre votos válidos.</figcaption>
+    </figure>
+
+    <h2>El choque generacional</h2>
+    <p>Aquí está el corazón del análisis. Estimamos el voto de cada candidato dentro de cada grupo de edad: la línea de Cepeda baja con la edad (60% → 7%) y la de Abelardo sube (23% → 79%), casi en espejo. Paloma Valencia, tercera en la elección, concentra su fuerza después de los 45. Y Fajardo muestra el perfil más curioso: su mejor franja en 2026 fue la más joven — el opuesto exacto de su electorado de 2022.</p>
+    <figure>
+      <img src="analisis-edades/04_perfil_2026.png" alt="Líneas: porcentaje estimado del voto de cada candidato en cada grupo de edad, primera vuelta 2026, con intervalos de confianza" loading="lazy" />
+      <figcaption>% estimado del voto dentro de cada grupo de edad · sombra = intervalo de confianza del 95% (bootstrap por municipios).</figcaption>
+    </figure>
+
+    <h2>La edad se heredó de 2022 — y se hizo más extrema</h2>
+    <p>Este patrón no nació en 2026. Corrimos el mismo modelo sobre la primera vuelta de 2022 (ahí la edad de los votantes es <b>observada</b>, no proyectada) y la conclusión es nítida: <b>cada bloque heredó la edad de su antecesor</b>. Cepeda calcó el perfil joven de Petro — 60% vs 62% entre los 18-25. Abelardo heredó el perfil mayor de Fico y lo <b>amplificó</b>: Fico tuvo 69% de los mayores de 60; Abelardo, 79%. La brecha generacional no es nueva; lo nuevo es que se volvió más profunda.</p>
+    <figure>
+      <img src="analisis-edades/05_herencia.png" alt="Comparación 2022 vs 2026: perfil etario de Petro vs Cepeda y de Fico vs Abelardo" loading="lazy" />
+      <figcaption>Punteado: 1ª vuelta 2022 (Petro, Fico). Línea llena: 2026 (Cepeda, Abelardo). % del voto por grupo de edad.</figcaption>
+    </figure>
+
+    <h2>El retrato de cada electorado</h2>
+    <p>Visto desde el otro lado — ¿de qué edades es el voto de cada candidato? — el contraste es igual de fuerte. El <b>49% de los votos de Cepeda</b> viene de menores de 36 años, y solo el 3% de mayores de 60. El <b>38% de los votos de Abelardo</b> es de mayores de 60. Paloma tiene el electorado más envejecido: 7 de cada 10 de sus votos son de personas de más de 45 años. Y el electorado de Fajardo 2026 es, después del de Cepeda, el más joven: 28% de sus votos son de menores de 26.</p>
+    <figure>
+      <img src="analisis-edades/06_electorado.png" alt="Barras apiladas: composición etaria del electorado de Cepeda, Abelardo, Paloma y Fajardo" loading="lazy" />
+      <figcaption>De cada 100 votos de cada candidato, cuántos puso cada grupo de edad. 1ª vuelta 2026.</figcaption>
+    </figure>
+
+    <h2>Pasa en todas las ciudades</h2>
+    <p>¿Es un fenómeno nacional o de unas regiones? Lo probamos ciudad por ciudad con el duelo directo entre los dos punteros. En <b>Bogotá, Medellín, Cali, Barranquilla, Cartagena y Bucaramanga</b> el voto se voltea de joven a mayor — en todas. Con matices que cuentan su propia historia: en Cartagena y Cali, Cepeda barrió entre los jóvenes (85% y 79% del duelo); en Medellín y Bucaramanga la pelea joven fue pareja — Abelardo incluso puntea entre los jóvenes bumangueses. Pero entre los mayores de 60, en las seis ciudades, ganó Abelardo.</p>
+    <figure>
+      <img src="analisis-edades/07_ciudades_edad.png" alt="Tabla de barras: reparto del voto entre Cepeda y Abelardo por grupo de edad en las seis ciudades principales" loading="lazy" />
+      <figcaption>Duelo Cepeda–Abelardo (la suma de los dos = 100). En las grandes ciudades edad e ingreso van juntos: el voto de Cepeda entre mayores se estima muy bajo — ver metodología.</figcaption>
+    </figure>
+
+    <h2>Dos países según la edad</h2>
+    <p>Llevado al mapa, el hallazgo da para dos países distintos. <b>Si solo votaran los jóvenes (18-35), Cepeda ganaría el duelo en casi todo el país</b> — con las excepciones reveladoras de Antioquia y los Llanos, donde Abelardo aguanta incluso entre los jóvenes. <b>Si solo votaran los mayores de 60, Abelardo ganaría en todos los departamentos</b> — hasta en Nariño, Cauca y Sucre, los bastiones históricos de la izquierda, donde es donde menos mal le va a Cepeda con los mayores, pero no le alcanza.</p>
+    <figure>
+      <img src="analisis-edades/08_mapa_edad.png" alt="Dos mapas de Colombia: ganador del duelo Cepeda-Abelardo entre los jóvenes y entre los mayores, por departamento" loading="lazy" />
+      <figcaption>Quién gana el duelo Cepeda–Abelardo en cada departamento, entre los 18-35 y entre los 61+. En departamentos pequeños el dato es menos preciso.</figcaption>
+    </figure>
+
+    <h2>Cómo lo hicimos (y qué no se puede afirmar)</h2>
+    <p>Esto <b>no es una encuesta ni son datos individuales</b>: el voto sigue siendo secreto. Es <b>inferencia ecológica</b> — el método estándar en la literatura electoral (Goodman 1953; Duncan &amp; Davis 1953; King 1997) para estimar comportamientos de grupo a partir de agregados. La base:</p>
+    <ul class="metodo">
+      <li><b>La edad de los votantes reales.</b> La Registraduría nos entregó cuántas personas votaron por mesa, según edad y sexo, en 2018 y 2022 (no dice por quién — ese dato no existe). Lo agregamos a los ~12.400 puestos de votación del país.</li>
+      <li><b>La proyección a 2026.</b> Ese desglose aún no existe para 2026, así que lo proyectamos: perfil etario 2022 de cada puesto + envejecimiento poblacional del DANE + total real de votantes 2026 de cada puesto (raking IPF). Solo se modela la mezcla interna; los totales son dato. El método, probado proyectando 2018→2022, erró en promedio <b>0,3 puntos por banda</b> a nivel nacional.</li>
+      <li><b>La estimación.</b> Mínimos cuadrados ponderados con restricciones (los porcentajes de cada grupo suman 100 y viven entre 0 y 100), estimados por estratos regionales, con intervalos de confianza por bootstrap de municipios. La consistencia es exacta: el modelo reproduce el resultado nacional al decimal.</li>
+    </ul>
+    <div class="note">
+      <b>Los límites, sin letra chica.</b> (1) La inferencia ecológica estima grupos, no personas; los valores extremos (el 7% de Cepeda entre mayores, el 79% de Abelardo) son los más expuestos al sesgo de agregación y van siempre con su rango. (2) En las grandes ciudades <b>edad e ingreso van de la mano</b>: los mayores se concentran en los barrios más ricos y anti-Cepeda, así que su voto entre mayores urbanos se estima muy bajo y debe leerse como cota inferior. (3) Los grupos de 60+ vienen en una sola banda de la Registraduría. (4) 2026 es preconteo, no escrutinio definitivo. (5) El error de proyección <b>comprime</b> los contrastes: las brechas reales serían iguales o mayores que las reportadas.
+    </div>
+
+    <div class="related">
+      <div class="rel-title">Más análisis de la 1ª vuelta</div>
+      <div class="rel-links">
+        <a href="bogota-1v-barrios.html">Bogotá, barrio por barrio →</a>
+        <a href="medellin-1v-barrios.html">Medellín, barrio por barrio →</a>
+        <a href="trasvase-paloma.html">El derrumbe de Paloma, mesa a mesa →</a>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    <span class="footer-brand">ricardoruiz.co · análisis electoral</span>
+    <span class="footer-brand">Registraduría + DANE · inferencia ecológica por puesto</span>
+  </footer>
+
+</body>
+</html>
