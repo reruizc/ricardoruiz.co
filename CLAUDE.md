@@ -587,6 +587,43 @@ puesto). **Spec formal completa en `tools/edad-1v-2026/MODELO.md`** (4 pasos:
 perfil 2022 con gates de calidad → proyección demográfica → EI RxC con cotas
 Duncan-Davis + QP símplex + opcional bayesiano → comparativo 2022/2026).
 
+### Cómo se saca la edad + alcances puesto vs mesa
+
+- **De dónde sale la edad:** `Edadygenero.xlsx` (RNEC) trae SUFRAGANTES por
+  mesa × edad (10 bandas: 18-20, 21-25 … 56-60, "Mayor a 60"=61+) × sexo para
+  2018/2019/2022/2023. Dice CUÁNTOS votaron por banda en cada mesa, NUNCA por
+  quién. La edad por candidato es SIEMPRE estimación ecológica (cruzar la
+  variación de composición etaria entre puestos con la variación del voto).
+- **2026 aún no existe** → se PROYECTA: perfil etario 2022 del puesto ×
+  envejecimiento DANE por depto (ρ_a=sufragantes/población, aplicada a DANE
+  2026) × raking IPF a los votantes reales del preconteo por puesto. El nivel
+  es dato; solo la mezcla interna es modelo. Cuando la RNEC publique
+  Edadygenero 2026 (rezago ~1-2 años), la proyección desaparece y todo pasa a
+  observado — re-correr `fit_ei.py` sin más.
+- **Por qué PUESTO y no mesa** (el dato crudo SÍ es mesa: 112.012 mesas 2022 ·
+  121.863 preconteo 2026 → ~12,4k puestos con perfil · muestra EI 9.346 con
+  ≥200 votos): las mesas NO persisten entre elecciones — se asignan por orden
+  de cédula y la numeración se rearma con el censo — así que la proyección
+  2022→2026 exige unidad territorial estable. Mesa mediana ~200 votantes vs
+  ~600 del puesto. Usar puesto NO sesga vs mesa: solo ensancha el IC, y ese
+  costo ya está incluido en el ± publicado.
+- **Alcance mesa (upgrade v2, decidido NO por ahora · jun-2026):** el orden de
+  cédula genera sorting etario brutal entre mesas del MISMO puesto (mesas
+  bajas = inscritos viejos; cédulas viejas de mujeres arrancan en 20M → también
+  sorting por sexo). Comparar mesas jóvenes vs viejas del mismo puesto =
+  efectos fijos de puesto → mata la confusión edad↔ingreso (la que acorrala
+  Cepeda-61+ a 0% en ciudades). EI-2022 a mesa se puede correr YA (edad
+  observada, 112k mesas, sirve como validación dura). Para 2026: aprender el
+  patrón rango-de-mesa→perfil con 2022 (validable 2018→2022) + raking (~1 día
+  de trabajo). Vale la pena montarlo antes del análisis de la 2V (21-jun).
+- **Precisión publicable (puesto):** IC95 nacional ±3-6 pp típico (peor ±10 en
+  36-45, donde se cruzan las líneas); ciudades (duelo estratificado) ±3 pp
+  típico, máx ±9 en 61+. Decir "95% de confianza" (no "probabilidad de 95%");
+  analogía válida: "margen de error similar al de una encuesta grande". El IC
+  cubre muestreo; el error de proyección va aparte (atenúa ≤6,5 pp, los
+  contrastes reales serían ≥); el sesgo de agregación no es cuantificable →
+  cotas duras junto a valores extremos.
+
 Probe de viabilidad corrido (2026-06-09), todo VIABLE:
 - Cruce edad22∩votos22 = 98,7% de votos · votos26 con perfil directo 88% (+8,7% zona).
 - Backtest del supuesto de proyección 2018→2022: MAE nacional 0,32 pp por banda.
