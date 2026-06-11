@@ -13,14 +13,24 @@ Salidas:   Bases de datos/ESCRUTINIO-1V/ESCRUTINIO_1V_2026_PUESTO.csv
 Notas:
 - Las filas vienen sparse (solo candidatos con votos en la mesa);
   el agregado rellena con 0.
-- Cobertura del lote actual: 32 deptos. FALTAN Santander (27, archivo
-  consecutivo 1017 ausente) y Exterior/Consulados (88). Documentado en
-  la hoja Instrucciones del Excel.
+- Cobertura: 33 deptos del escrutinio oficial (118.350 mesas, 100% según
+  el consolidado del sitio de escrutinios). Exterior/Consulados (88) NO
+  fue publicado por la RNEC en escrutiniospresidente2026 (la comisión
+  1033 está vacía y el MMV NACIONAL figura publicado=0), así que se
+  integra desde el PRECONTEO por mesa (con Claudia recuperada). La
+  columna `fuente` distingue escrutinio vs preconteo por fila.
+- Murillo y Caicedo (renunciaron antes de 1V) tienen votos en el
+  preconteo del exterior pero NO existen en el escrutinio: se excluyen
+  y se reporta el monto excluido.
+- Nombres de consulados (país + puesto): lookup desde los MMV declarados
+  de Congreso (DEPTOS_DECLARADOS/MMV_XXX_88_*.csv, mismos códigos).
 """
 import csv, glob, os, sys
 from collections import defaultdict
 
 BASE = '/Users/ricardoruiz/ricardoruiz.co/Bases de datos/ESCRUTINIO-1V'
+PRECONTEO = '/Users/ricardoruiz/ricardoruiz.co/Bases de datos/nuevos archivos 1v 2026/PRECONTEO_1V_2026_MESA_con_Claudia.csv'
+DECLARADOS_88 = '/Users/ricardoruiz/ricardoruiz.co/Bases de datos/DEPTOS_DECLARADOS'
 OUT_CSV  = os.path.join(BASE, 'ESCRUTINIO_1V_2026_PUESTO.csv')
 OUT_XLSX = os.path.join(BASE, 'Resultados_Escrutinio_1V_2026_por_puesto.xlsx')
 
@@ -40,6 +50,54 @@ CANDS = [
 ]
 SPECIALS = [('996', 'Votos en blanco'), ('997', 'Votos nulos'), ('998', 'Votos no marcados')]
 ALL_CODES = [c for c, _ in CANDS] + [c for c, _ in SPECIALS]
+
+# Columna del preconteo (header con nombres corregidos) → código CAN.
+# Carlos Caicedo y Gilberto Murillo renunciaron: None = excluir.
+PRECONTEO_MAP = {
+    'Iván Cepeda': '001', 'Claudia López': '002', 'Santiago Botero': '003',
+    'Abelardo De La Espriella': '004', 'Mauricio Lizcano': '005',
+    'Miguel Uribe': '006', 'Sondra Macollins': '007', 'Roy Barreras': '008',
+    'Carlos Caicedo': None, 'Gustavo Matamoros': '010',
+    'Paloma Valencia': '011', 'Sergio Fajardo': '012', 'Gilberto Murillo': None,
+    'votos_blanco': '996', 'votos_nulos': '997', 'votos_no_marcados': '998',
+}
+
+def load_nombres_exterior():
+    """(mun, zona, puesto) → (país, nombre puesto) desde MMV declarados de Congreso."""
+    look = {}
+    for f in glob.glob(os.path.join(DECLARADOS_88, 'MMV_XXX_88_*.csv')):
+        with open(f, encoding='utf-8-sig', newline='') as fh:
+            rd = csv.reader(fh, delimiter=';')
+            next(rd)
+            for row in rd:
+                if len(row) < 8:
+                    continue
+                key = (row[2], row[4], row[5])
+                if key not in look:
+                    look[key] = (row[3], row[6])
+    return look
+
+def agg_exterior_preconteo():
+    """Agrega dep 88 del preconteo por puesto. Devuelve (rows_dict, excluidos)."""
+    votos = defaultdict(lambda: defaultdict(int))
+    mesas = defaultdict(set)
+    excluidos = 0
+    with open(PRECONTEO, encoding='utf-8-sig', newline='') as fh:
+        rd = csv.DictReader(fh)
+        cand_cols = [c for c in rd.fieldnames if c in PRECONTEO_MAP]
+        for row in rd:
+            if row['cod_departamento'] != '88':
+                continue
+            key = (row['cod_municipio'], row['zona'], row['puesto'])
+            mesas[key].add(row['num_mesa'])
+            for col in cand_cols:
+                v = int(row[col] or 0)
+                code = PRECONTEO_MAP[col]
+                if code is None:
+                    excluidos += v
+                else:
+                    votos[key][code] += v
+    return votos, mesas, excluidos
 
 def title_es(s):
     """Title-case suave para nombres en MAYÚSCULAS, respetando conectores."""
@@ -95,7 +153,7 @@ def main():
         sys.exit(1)
 
     header = (['cod_departamento', 'departamento', 'cod_municipio', 'municipio',
-               'zona', 'cod_puesto', 'puesto', 'cod_comuna', 'comuna', 'mesas']
+               'zona', 'cod_puesto', 'puesto', 'cod_comuna', 'comuna', 'mesas', 'fuente']
               + [n for _, n in CANDS]
               + [n for _, n in SPECIALS]
               + ['total_votos'])
@@ -109,8 +167,31 @@ def main():
         total = sum(vals)
         comunom_clean = '' if comunom.strip().upper() in ('NACIONAL', 'NULL', '') else title_es(comunom.strip())
         rows.append([dep, title_es(depnom), mun, title_es(munnom), zona, pue,
-                     puenom.strip(), comucod, comunom_clean, len(mesas[key])]
+                     puenom.strip(), comucod, comunom_clean, len(mesas[key]), 'escrutinio']
                     + vals + [total])
+
+    # ── Exterior (dep 88) desde el preconteo ──
+    ext_votos, ext_mesas, ext_excluidos = agg_exterior_preconteo()
+    nombres_ext = load_nombres_exterior()
+    sin_nombre = 0
+    pais_by_mun = {}
+    for (mun, _z, _p), (munnom, _pn) in nombres_ext.items():
+        pais_by_mun.setdefault(mun, munnom)
+    for key in sorted(ext_votos.keys()):
+        mun, zona, pue = key
+        munnom, puenom = nombres_ext.get(key, ('', ''))
+        if not munnom:
+            # puesto nuevo sin homólogo en Congreso: al menos el país
+            munnom = pais_by_mun.get(mun, '')
+            sin_nombre += 1
+        cv = ext_votos[key]
+        vals = [cv.get(c, 0) for c, _ in CANDS] + [cv.get(c, 0) for c, _ in SPECIALS]
+        total = sum(vals)
+        rows.append(['88', 'Exterior (Consulados)', mun, title_es(munnom), zona, pue,
+                     puenom.strip(), '', '', len(ext_mesas[key]), 'preconteo']
+                    + vals + [total])
+    print(f'Exterior: {len(ext_votos)} puestos · {sum(len(m) for m in ext_mesas.values())} mesas '
+          f'· {sin_nombre} sin nombre · excluidos Murillo/Caicedo: {ext_excluidos} votos')
 
     # ── CSV (BOM utf-8, códigos quoted para preservar ceros) ──
     with open(OUT_CSV, 'w', encoding='utf-8-sig', newline='') as fh:
@@ -121,7 +202,7 @@ def main():
     print(f'CSV → {OUT_CSV} ({len(rows)} filas)')
 
     # totales de control
-    tot_by_cand = [sum(r[10 + i] for r in rows) for i in range(len(CANDS) + len(SPECIALS))]
+    tot_by_cand = [sum(r[11 + i] for r in rows) for i in range(len(CANDS) + len(SPECIALS))]
     for (c, n), t in zip(CANDS + SPECIALS, tot_by_cand):
         print(f'  {n:42s} {t:>12,}')
     print(f'  {"TOTAL":42s} {sum(tot_by_cand):>12,}')
@@ -156,15 +237,20 @@ def main():
         ('uno de los 11 candidatos, votos en blanco, nulos, no marcados y total.', body),
         ('', None),
         ('Cobertura de esta versión', bold),
-        ('32 departamentos del territorio nacional. NO incluye todavía Santander (cód. 27) ni la', body),
-        ('circunscripción Exterior/Consulados (cód. 88): la Registraduría no había publicado esos archivos', body),
-        ('al momento del corte. Los totales nacionales de esta tabla son parciales por esa razón.', body),
+        ('Los 33 departamentos del territorio nacional con el ESCRUTINIO oficial (118.350 mesas, 100% del', body),
+        ('consolidado publicado por la RNEC). La circunscripción Exterior/Consulados (cód. 88) NO fue', body),
+        ('publicada en el sitio de escrutinios: sus filas vienen del PRECONTEO por mesa de la noche electoral', body),
+        ('(dato real por mesa, incluida Claudia López reconstruida del total de urna). La columna "fuente"', body),
+        ('indica de dónde sale cada fila: escrutinio | preconteo.', body),
         ('', None),
         ('Notas de lectura', bold),
         ('· Los códigos territoriales son los de la Registraduría (no DANE) y conservan ceros a la izquierda.', body),
         ('· Zona 90 = puesto censo (ej. Corferias) · zona 98 = cárceles. Son agregados especiales sin', body),
         ('  geografía de barrio; inclúyelos o descártalos según tu análisis.', body),
-        ('· En el escrutinio solo aparecen los 11 candidatos en contienda (las renuncias previas no suman votos).', body),
+        ('· En el escrutinio solo aparecen los 11 candidatos en contienda. En las filas del exterior', body),
+        ('  (preconteo) se excluyeron los votos de Murillo y Caicedo (renunciaron antes de la elección;', body),
+        ('  el escrutinio no los contabiliza). En el exterior la zona/puesto puede ser alfanumérica y los', body),
+        ('  nombres de consulado provienen del divipol de Congreso 2026 (mismos códigos).', body),
         ('· El % de cada candidato se calcula normalmente sobre votos válidos (candidatos + blanco).', body),
         ('', None),
         ('ricardoruiz.co · análisis electoral · datos: Registraduría Nacional', Font(size=10, italic=True, color='666666')),
@@ -189,10 +275,10 @@ def main():
     ws2.add_table(tbl)
     ws2.freeze_panes = 'G2'
 
-    widths = [8, 18, 8, 22, 6, 8, 34, 8, 22, 7] + [14] * (len(CANDS) + len(SPECIALS)) + [12]
+    widths = [8, 18, 8, 22, 6, 8, 34, 8, 22, 7, 11] + [14] * (len(CANDS) + len(SPECIALS)) + [12]
     for i, wd in enumerate(widths, start=1):
         ws2.column_dimensions[get_column_letter(i)].width = wd
-    for col in range(11, n_cols + 1):
+    for col in range(12, n_cols + 1):
         for row in range(2, n_rows + 1):
             ws2.cell(row=row, column=col).number_format = '#,##0'
 
