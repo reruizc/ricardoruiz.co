@@ -448,7 +448,7 @@ def slide_ciudades(n):
 # ============================================================ 08 MAPA EDAD
 def slide_mapa_edad(n):
     df = pd.read_csv(os.path.join(OUT, "ei-deptos.csv"))
-    df = df[df.robust == 1]
+    df = df[df.robust >= 1]    # robust=2: deptos pequeños, muestra ampliada
     yng = dict(zip(df[df.grupo == "18-35"]["geoname"], df[df.grupo == "18-35"]["cepeda"]))
     old = dict(zip(df[df.grupo == "61+"]["geoname"], df[df.grupo == "61+"]["cepeda"]))
 
@@ -470,8 +470,8 @@ def slide_mapa_edad(n):
     fig.text(0.405, 0.058, "gana Cepeda", color=FG, fontsize=12.5, ha="left")
     fig.text(0.535, 0.058, "■", color=BLUE, fontsize=15, ha="left")
     fig.text(0.555, 0.058, "gana Abelardo", color=FG, fontsize=12.5, ha="left")
-    foot(fig, n, extra="Duelo Cepeda–Abelardo por puesto. En deptos pequeños el "
-         "dato es menos preciso.")
+    foot(fig, n, extra="Duelo Cepeda–Abelardo por puesto. En la Amazonía-Orinoquía "
+         "y San Andrés (pocos puestos) el dato es menos preciso.")
     save(fig, "08_mapa_edad.png")
 
 

@@ -101,14 +101,14 @@ def fit_qp(W, Y, T, iters=3000, tol=1e-10):
 
 
 # ----------------------------------------------------------------- datos
-def load_year(year):
+def load_year(year, min_votes=200, seeds=("puesto", "zona")):
     """-> df con pcode, mun, stratum, T, W (shares 5 grupos), Y (shares)."""
     if year == 2022:
         e = pd.read_csv(os.path.join(OUT, "edad-2022-puesto.csv"), dtype={"pcode": str})
         v = pd.read_csv(os.path.join(OUT, "votos-2022-puesto.csv"), dtype={"pcode": str})
         m = e.merge(v, on="pcode")
         m["ratio"] = m["Cantidad de Sufragantes"] / m["total_votos"].clip(lower=1)
-        m = m[m["ratio"].between(0.70, 1.10) & (m["total_votos"] >= 200)].copy()
+        m = m[m["ratio"].between(0.70, 1.10) & (m["total_votos"] >= min_votes)].copy()
         raw = m[BANDS].values.astype(float)
         depname = m["depname"]
         cands = ["petro", "fico", "rodolfo", "fajardo", "blanco"]
@@ -118,9 +118,9 @@ def load_year(year):
         e = pd.read_csv(os.path.join(OUT, "edad-2022-puesto.csv"), dtype={"pcode": str})
         dep2name = (e.assign(dep=e["pcode"].str[:2])
                     .groupby("dep")["depname"].agg(lambda s: s.mode()[0]))
-        m = w[w["seed_level"].isin(["puesto", "zona"])].merge(v, on="pcode",
+        m = w[w["seed_level"].isin(list(seeds))].merge(v, on="pcode",
                                                               suffixes=("", "_v"))
-        m = m[m["total_votos"] >= 200].copy()
+        m = m[m["total_votos"] >= min_votes].copy()
         raw = m[[f"b{b}" for b in range(10)]].values.astype(float)
         depname = m["pcode"].str[:2].map(dep2name)
         cands = ["cepeda", "abelardo", "paloma", "fajardo26", "blanco"]

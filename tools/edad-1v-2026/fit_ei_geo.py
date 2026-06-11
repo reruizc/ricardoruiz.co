@@ -160,21 +160,60 @@ def main():
     pd.DataFrame(rows).to_csv(os.path.join(OUT, "ei-ciudades.csv"), index=False)
 
     # ---------------- departamentos (head-to-head, para mapas) ----------------
+    # Deptos pequeños (Amazonía/Orinoquía/San Andrés): muestra ampliada (piso
+    # de 50 votos, semilla hasta mun), prior RECENTRADO al resultado global
+    # del propio depto (swing uniforme sobre el patrón etario nacional — no se
+    # les puede imponer el prior de otra región) y shrink fuerte. robust=2.
+    meta2, W5x, Y6x, Tx = load_year(2026, min_votes=50,
+                                    seeds=("puesto", "zona", "mun"))
+    meta2 = meta2.reset_index(drop=True)
+    meta2["dep"] = meta2["pcode"].str[:2]
+    Wx = to3(W5x)
+    cepx, abex = Y6x[:, 0], Y6x[:, 1]
+    totx = np.maximum(cepx + abex, 1e-9)
+    Y2x = np.column_stack([cepx / totx, abex / totx])
+    T2x = totx * Tx
+    nat_obs = (Y2[:, 0] * T2).sum() / T2.sum()
+
     drows = []
     print("\nDEPARTAMENTOS (Cepeda % entre los dos punteros · jóvenes / mayores):")
     for dep, (name, geo) in DEP.items():
         mask = (meta["dep"] == dep).values
         npu = mask.sum()
-        if npu < 20:
-            drows.append(dict(dep=dep, dep_name=name, geoname=geo, npuestos=npu, robust=0))
-            continue
-        nb = 120 if npu < 100 else 200
-        Bn, lo, hi, err = fit_h2h(mask, nb)
+        if npu >= 20:
+            nb = 120 if npu < 100 else 200
+            Bn, lo, hi, err = fit_h2h(mask, nb)
+            rb = 1
+        else:
+            mask2 = (meta2["dep"] == dep).values
+            np2 = mask2.sum()
+            if np2 < 4:
+                drows.append(dict(dep=dep, dep_name=name, geoname=geo,
+                                  npuestos=npu, robust=0))
+                continue
+            dep_obs = (Y2x[mask2, 0] * T2x[mask2]).sum() / T2x[mask2].sum()
+            B0d = B0.copy()
+            B0d[0] = np.clip(B0[0] + (dep_obs - nat_obs), 0.02, 0.98)
+            B0d[1] = 1 - B0d[0]
+            lam = 0.10 * T2x[mask2].sum()
+            Bn = fit_qp_reg(Wx[mask2], Y2x[mask2], T2x[mask2], B0d, lam)
+            boots = []
+            for _ in range(80):
+                idx = np.where(mask2)[0]
+                idx = idx[RNG.integers(0, len(idx), len(idx))]
+                boots.append(fit_qp_reg(Wx[idx], Y2x[idx], T2x[idx], B0d,
+                                        0.10 * T2x[idx].sum(), iters=1200))
+            boots = np.stack(boots)
+            lo = np.percentile(boots, 2.5, axis=0)
+            hi = np.percentile(boots, 97.5, axis=0)
+            npu, rb = np2, 2
         for a, g in enumerate(GNAMES):
-            drows.append(dict(dep=dep, dep_name=name, geoname=geo, npuestos=npu, robust=1,
-                              grupo=g, cepeda=Bn[0, a], abelardo=Bn[1, a],
+            drows.append(dict(dep=dep, dep_name=name, geoname=geo, npuestos=npu,
+                              robust=rb, grupo=g, cepeda=Bn[0, a], abelardo=Bn[1, a],
                               cep_lo=lo[0, a], cep_hi=hi[0, a]))
-        print(f"  {name:20} ({npu:3}p) jóvenes {Bn[0,0]*100:3.0f} · mayores {Bn[0,2]*100:3.0f}")
+        tag = "" if rb == 1 else "  [muestra ampliada + prior recentrado]"
+        print(f"  {name:20} ({npu:3}p) jóvenes {Bn[0,0]*100:3.0f} · "
+              f"mayores {Bn[0,2]*100:3.0f}{tag}")
     pd.DataFrame(drows).to_csv(os.path.join(OUT, "ei-deptos.csv"), index=False)
     print("\nei-ciudades.csv + ei-deptos.csv escritos.")
 

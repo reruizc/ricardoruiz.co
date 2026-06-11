@@ -632,6 +632,13 @@ light+dark).
   · Cartagena 13 · B/manga 6 · Medellín <5 (genuinamente al piso).
   Consistencia implícito/observado ≤1.3pp. Salidas `ei-ciudades.csv` +
   `ei-deptos.csv`. Slide 07 muestra `<5`/`>95` bajo ese umbral.
+  **Deptos pequeños** (Guainía·Vaupés·Vichada·Amazonas·San Andrés, <20 puestos
+  en muestra): muestra ampliada (`load_year(min_votes=50, seeds=+mun)`) +
+  **prior recentrado** al resultado global del depto (swing uniforme sobre el
+  patrón etario nacional; NO heredan prior regional ajeno) + shrink 0.10 →
+  `robust=2` en ei-deptos.csv. Vaupés es el mejor registro de Cepeda en 61+
+  (45% del duelo) y aun así pierde la franja → "Abelardo gana 61+ en TODOS"
+  se sostiene en 33/33.
 - `report_carrusel.py` — **9 slides Twitter-first**: apaisadas 1200×900 (4:3)
   salvo la 02 (flechas, vertical 1080×1350). Identidad de carruseles previos:
   **títulos Arima 700** (TTFs estáticas en `tools/edad-1v-2026/fonts/`, bajadas
