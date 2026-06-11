@@ -623,11 +623,15 @@ light+dark).
   dict viejo estaba descuadrado, corregido).
 - `fit_ei_geo.py` — EI por ciudad y depto. A N moderado la EI de 6 candidatos
   se **acorrala en el borde** (Cepeda 0% en 61+) por **confusión ecológica
-  real** (en grandes ciudades edad↔ingreso van juntos). Fixes: (1) **3 bandas**
-  (18-35/36-60/61+) en vez de 5; (2) **cara a cara Cepeda-vs-Abelardo** (EI
-  binaria, robusta, suma 100); (3) **pooling parcial** (shrinkage `SHRINK=0.02`
-  hacia el prior nacional por estratos vía `fit_qp_reg`). Consistencia
-  implícito/observado <1pp. Salidas `ei-ciudades.csv` + `ei-deptos.csv`.
+  real** (en grandes ciudades edad↔ingreso van juntos; validado: con Petro
+  2022 OBSERVADO pasa idéntico — 0% en Bog/Med/Cali/Cart). Fixes: (1) **3
+  bandas** (18-35/36-60/61+); (2) **cara a cara Cepeda-vs-Abelardo** (EI
+  binaria, suma 100); (3) **ciudades ESTRATIFICADAS por localidad/comuna**
+  (Medellín agrupa 2 zonas=1 comuna; shrink 0.03 al prior nacional por
+  estrato vía `fit_qp_reg`) → 61+ del duelo: Bogotá 9 · Cali 14 · B/quilla 23
+  · Cartagena 13 · B/manga 6 · Medellín <5 (genuinamente al piso).
+  Consistencia implícito/observado ≤1.3pp. Salidas `ei-ciudades.csv` +
+  `ei-deptos.csv`. Slide 07 muestra `<5`/`>95` bajo ese umbral.
 - `report_carrusel.py` — **9 slides Twitter-first**: apaisadas 1200×900 (4:3)
   salvo la 02 (flechas, vertical 1080×1350). Identidad de carruseles previos:
   **títulos Arima 700** (TTFs estáticas en `tools/edad-1v-2026/fonts/`, bajadas
@@ -641,7 +645,9 @@ light+dark).
   con números adentro, fila Nacional saturada, ganador con borde, números <13%
   por fuera) · 2 mapas jóvenes-vs-mayores · cierre 2×2. Geo de
   `output_pacto_1v_2026/geo/DEPARTAMENTOS2.json` (match por `name`).
-  `python3 report_carrusel.py all`. blocs-depto.csv trae h2h22/h2h26/h2h_shift
+  `python3 report_carrusel.py all` (Twitter 4:3) · `... all ig` (**Instagram
+  cuadrado 1080×1080** → `carrusel-ig/`, layouts ajustados por flag `IG`).
+  blocs-depto.csv trae h2h22/h2h26/h2h_shift
   (margen vs mejor derecha: izq adelante 19→18 deptos, margen cerrado en 20/33,
   Bogotá +24,9→+4,0; flips Quindío/Risaralda→der, Vichada→izq).
 - Hilo de 13 trinos + caption IG en `rrss/twitter/hilo-edad-1v.md`. Colores
