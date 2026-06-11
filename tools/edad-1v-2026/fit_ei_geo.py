@@ -104,22 +104,59 @@ def main():
         Bn, lo, hi, impl, obs = fit_unit(W[mask], Y2[mask], T2[mask], B0, n_boot=nb)
         return Bn, lo, hi, abs(impl[0] - obs[0]) * 100   # Bn fila0=Cepeda share
 
-    # ---------------- ciudades + nacional (head-to-head) ----------------
+    # ---------------- ciudades + nacional (head-to-head ESTRATIFICADO) ----
+    # Dentro de cada ciudad, estratos por localidad/comuna (zona electoral;
+    # Medellín agrupa 2 zonas = 1 comuna). Rompe la confusión edad-ingreso
+    # que acorrala a Cepeda-61+ en 0% cuando se estima la ciudad pooled
+    # (validado: con Petro 2022 observado pasa idéntico). Agregación por
+    # pesos de votantes por banda, shrink suave 0.03 al prior nacional.
+    meta["zona"] = meta["pcode"].str.split("-").str[2]
+
+    def strat_of(key, zonas):
+        if key == "01-001":   # Medellín: zona electoral -> comuna
+            return zonas.map(lambda z: f"c{(int(z)+1)//2}"
+                             if z.isdigit() and int(z) <= 32 else "corr")
+        return zonas
+
+    def city_strat(key, minp=6, nboot=120):
+        mask = (meta["mun"] == key).values
+        strat = strat_of(key, meta.loc[mask, "zona"])
+        counts = strat.value_counts()
+        strat = strat.where(strat.isin(set(counts[counts >= minp].index)), "resto")
+        groups = [np.where(mask)[0][(strat == s).values] for s in strat.unique()]
+
+        def fit_once(rng=None):
+            Bs, Ms = [], []
+            for idx in groups:
+                if rng is not None:
+                    idx = idx[rng.integers(0, len(idx), len(idx))]
+                lam = 0.03 * T2[idx].sum()
+                B = fit_qp_reg(W[idx], Y2[idx], T2[idx], B0, lam, iters=1500)
+                Bs.append(B); Ms.append((W[idx] * T2[idx, None]).sum(0))
+            M = np.sum(Ms, axis=0)
+            return np.sum([B * (m / M)[None, :] for B, m in zip(Bs, Ms)], axis=0), M
+        Bc, M = fit_once()
+        boots = np.stack([fit_once(RNG)[0] for _ in range(nboot)])
+        lo = np.percentile(boots, 2.5, axis=0)
+        hi = np.percentile(boots, 97.5, axis=0)
+        impl = (Bc @ (M / M.sum()))[0]
+        obs = (Y2[mask][:, 0] * T2[mask]).sum() / T2[mask].sum()
+        return Bc, lo, hi, abs(impl - obs) * 100, len(groups)
+
     rows = []
-    print("\nCIUDADES (Cepeda % entre los dos punteros, por banda · err consist):")
+    print("\nCIUDADES (Cepeda % del duelo, estratificado por localidad/comuna):")
     Bn, lo, hi, err = fit_h2h(np.ones(len(T), bool), 200)
     for a, g in enumerate(GNAMES):
         rows.append(dict(unit="Nacional", grupo=g, cepeda=Bn[0, a], abelardo=Bn[1, a],
                          cep_lo=lo[0, a], cep_hi=hi[0, a]))
     print("  Nacional      " + " · ".join(f"{g} {Bn[0,a]*100:.0f}" for a, g in enumerate(GNAMES)))
     for name, dep, mun in CIUDADES:
-        mask = (meta["mun"] == f"{dep}-{mun}").values
-        Bn, lo, hi, err = fit_h2h(mask, 200)
+        Bn, lo, hi, err, ns = city_strat(f"{dep}-{mun}")
         for a, g in enumerate(GNAMES):
             rows.append(dict(unit=name, grupo=g, cepeda=Bn[0, a], abelardo=Bn[1, a],
                              cep_lo=lo[0, a], cep_hi=hi[0, a]))
         print(f"  {name:13} " + " · ".join(f"{g} {Bn[0,a]*100:.0f}" for a, g in enumerate(GNAMES))
-              + f"   (consist {err:.1f})")
+              + f"   (consist {err:.1f} · {ns} estratos)")
     pd.DataFrame(rows).to_csv(os.path.join(OUT, "ei-ciudades.csv"), index=False)
 
     # ---------------- departamentos (head-to-head, para mapas) ----------------

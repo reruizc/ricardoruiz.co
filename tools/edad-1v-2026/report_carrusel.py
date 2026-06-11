@@ -58,10 +58,11 @@ rcParams["axes.spines.right"] = False
 
 DPI = 100
 SIZES = {"default": (1200, 900), "shift": (1080, 1350)}
+IG = False     # modo Instagram: todo cuadrado 1080x1080 -> carrusel-ig/
 
 
 def new_fig(slide="default"):
-    w, h = SIZES.get(slide, SIZES["default"])
+    w, h = (1080, 1080) if IG else SIZES.get(slide, SIZES["default"])
     fig = plt.figure(figsize=(w / DPI, h / DPI), dpi=DPI)
     fig.patch.set_facecolor(BG)
     return fig
@@ -69,6 +70,8 @@ def new_fig(slide="default"):
 
 def head(fig, kicker, title, sub, tall=False, tsize=34):
     ky, ty, sy = (0.952, 0.922, 0.852) if tall else (0.935, 0.895, 0.80)
+    if IG and tall:
+        sy = 0.832          # en cuadrado el título de 2 líneas baja más
     fig.text(0.06, ky, kicker.upper(), fontsize=15, color=OX, fontweight="bold",
              ha="left")
     fig.text(0.06, ty, title, fontsize=tsize, color=FG, ha="left", va="top",
@@ -90,8 +93,9 @@ def foot(fig, n, extra=None):
 
 
 def save(fig, name):
-    os.makedirs(CDIR, exist_ok=True)
-    p = os.path.join(CDIR, name)
+    d = CDIR + ("-ig" if IG else "")
+    os.makedirs(d, exist_ok=True)
+    p = os.path.join(d, name)
     fig.savefig(p, facecolor=BG)
     plt.close(fig)
     print("  ->", os.path.relpath(p, os.path.join(HERE, "..", "..")))
@@ -102,14 +106,22 @@ def slide_portada(n):
     fig = new_fig()
     fig.text(0.06, 0.91, "ELECCIONES · 1ª VUELTA · 2026", fontsize=16, color=OX,
              fontweight="bold")
-    fig.text(0.06, 0.83, "Colombia votó\npor edades", fontsize=64, color=FG,
-             va="top", linespacing=1.0, **TITLE_F)
-    fig.text(0.06, 0.40, "Quién ganó en cada generación, ciudad por\nciudad. "
-             "Una estimación a partir de 23 millones\nde votos y la edad de "
-             "quienes sufragaron\nen cada puesto del país.",
-             fontsize=19, color=SUB, va="top", linespacing=1.4)
-    # tug-of-war ilustrativo (derecha)
-    ax = fig.add_axes([0.52, 0.13, 0.42, 0.64])
+    if IG:   # cuadrado: título a todo el ancho arriba, barras abajo
+        fig.text(0.06, 0.84, "Colombia votó\npor edades", fontsize=58, color=FG,
+                 va="top", linespacing=1.0, **TITLE_F)
+        fig.text(0.06, 0.60, "Quién ganó en cada generación, ciudad por ciudad. "
+                 "Una estimación\na partir de 23 millones de votos y la edad de "
+                 "quienes sufragaron\nen cada puesto del país.",
+                 fontsize=17, color=SUB, va="top", linespacing=1.4)
+        ax = fig.add_axes([0.10, 0.085, 0.84, 0.40])
+    else:
+        fig.text(0.06, 0.83, "Colombia votó\npor edades", fontsize=64, color=FG,
+                 va="top", linespacing=1.0, **TITLE_F)
+        fig.text(0.06, 0.40, "Quién ganó en cada generación, ciudad por\nciudad. "
+                 "Una estimación a partir de 23 millones\nde votos y la edad de "
+                 "quienes sufragaron\nen cada puesto del país.",
+                 fontsize=19, color=SUB, va="top", linespacing=1.4)
+        ax = fig.add_axes([0.52, 0.13, 0.42, 0.64])
     ax.axis("off"); ax.set_xlim(0, 1); ax.set_ylim(0, 1)
     data = [("18-25", .62), ("26-35", .58), ("36-45", .50), ("46-60", .47), ("61+", .12)]
     for i, (g, cep) in enumerate(data):
@@ -243,8 +255,8 @@ def slide_perfil(n):
     fig = new_fig()
     head(fig, "Quién ganó cada generación",
          "Cepeda barrió entre los jóvenes;\nAbelardo, entre los mayores",
-         "% estimado del voto en cada grupo de edad · 1ª vuelta 2026 · "
-         "la sombra es el intervalo de confianza (95%).", tsize=31)
+         "% estimado del voto en cada grupo de edad · 1ª vuelta 2026.\n"
+         "La sombra es el intervalo de confianza (95%).", tsize=31)
     ax = fig.add_axes([0.085, 0.135, 0.80, 0.56]); ax.set_facecolor(BG)
     x = np.arange(len(GN5))
     series = [("Cepeda", RED), ("Abelardo", BLUE), ("Paloma", PALOMA),
@@ -368,8 +380,8 @@ def slide_ciudades(n):
     fig = new_fig()
     head(fig, "Las ciudades",
          "En todas, el voto se voltea con la edad",
-         "Cómo se repartió cada generación entre los dos punteros · "
-         "izquierda roja = Cepeda · derecha azul = Abelardo.", tsize=31)
+         "Cómo se repartió cada generación entre los dos punteros.\n"
+         "Izquierda roja = Cepeda · derecha azul = Abelardo.", tsize=31)
     lab = {"18-35": "18-35 años", "36-60": "36-60 años", "61+": "61+ años"}
     RED_P, BLUE_P = _mix(RED, BG, 0.78), _mix(BLUE, BG, 0.78)   # tintes pálidos
     ax = fig.add_axes([0.155, 0.115, 0.80, 0.60]); ax.set_facecolor(BG)
@@ -407,22 +419,29 @@ def slide_ciudades(n):
                 else:
                     ax.add_patch(Rectangle((x0 + cw, i - BH / 2), BW - cw, BH,
                                            fill=False, edgecolor=BLUE, lw=2.2, zorder=3))
-            # números ADENTRO de cada lado (si el lado es muy angosto, afuera)
-            cv, av = f"{ce*100:.0f}%", f"{ab*100:.0f}%"
-            if ce >= 0.13:
+            # números ADENTRO de cada lado (si el lado es muy angosto, afuera).
+            # Bajo 5% se reporta "<5": a ese nivel la EI no fija el valor exacto.
+            def fmt(v):
+                if v < 0.05:
+                    return "<5"
+                if v > 0.95:
+                    return ">95"
+                return f"{v*100:.0f}%"
+            cv, av = fmt(ce), fmt(ab)
+            if ce >= 0.17:
                 ax.text(x0 + 0.025, i, cv, ha="left", va="center", fontsize=11.5,
                         color=tc_c, fontweight="bold" if (win_c or nac) else "normal")
             else:
                 ax.text(x0 - 0.012, i, cv, ha="right", va="center", fontsize=10.5,
                         color=OX)
-            if ab >= 0.13:
+            if ab >= 0.17:
                 ax.text(x0 + BW - 0.025, i, av, ha="right", va="center", fontsize=11.5,
                         color=tc_a, fontweight="bold" if ((not win_c) or nac) else "normal")
             else:
                 ax.text(x0 + BW + 0.012, i, av, ha="left", va="center", fontsize=10.5,
                         color="#16235e")
-    foot(fig, n, extra="Duelo Cepeda–Abelardo (suma 100). En las grandes ciudades "
-         "edad e ingreso van juntos: el voto mayor de Cepeda se estima muy bajo.")
+    foot(fig, n, extra="Duelo Cepeda–Abelardo (suma 100) por localidad/comuna · "
+         "el 61+ de Cepeda es el dato menos preciso.")
     save(fig, "07_ciudades_edad.png")
 
 
@@ -491,7 +510,11 @@ SLIDES = {
 }
 
 if __name__ == "__main__":
-    args = sys.argv[1:] or ["all"]
+    args = [a for a in sys.argv[1:]]
+    if "ig" in args:
+        IG = True
+        args.remove("ig")
+    args = args or ["all"]
     todo = list(SLIDES) if args == ["all"] else args
     for k in todo:
         fn, num = SLIDES[k]
