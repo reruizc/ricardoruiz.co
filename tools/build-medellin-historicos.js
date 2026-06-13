@@ -178,6 +178,17 @@ function normName(s){
   return String(s || '').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
+// Deshace el entrecomillado CSV cuando un campo viene como "..."" (comillas
+// dobladas). El split(';') ingenuo deja literales como
+// `"PARTIDO ALIANZA SOCIAL INDEPENDIENTE ""ASI"""`; esto los limpia.
+function unquote(s){
+  let v = String(s == null ? '' : s).trim();
+  if (v.length >= 2 && v[0] === '"' && v[v.length - 1] === '"'){
+    v = v.slice(1, -1).replace(/""/g, '"');
+  }
+  return v;
+}
+
 function parseHeaderLine(line){
   const clean = line.replace(/^\uFEFF/, '');
   const cols = clean.split(';').map(s => s.trim());
@@ -201,16 +212,21 @@ function ensure(map, key){
   return s;
 }
 
-function accum(scope, candCod, candNombre, candPartido, votos){
+function accum(scope, candKey, candCod, candNombre, candPartido, votos){
   const sp = SPECIAL_CODES[candCod];
   if (sp){
     scope.especiales.set(sp, (scope.especiales.get(sp) || 0) + votos);
     return;
   }
-  let c = scope.cands.get(candCod);
+  // OJO: en concejo/JAL el COD_CAN es solo la POSICIÓN en la lista (0 = voto
+  // por la lista, 1, 2, 3…) y se REUSA en todas las listas. Hay que llavear
+  // por COD_PAR|COD_CAN para no fusionar el "#1 de Creemos" con el "#1 del
+  // Centro Democrático". En alcaldía el COD_CAN ya es único, así que la
+  // llave compuesta no cambia nada.
+  let c = scope.cands.get(candKey);
   if (!c){
-    c = { cod: candCod, nombre: candNombre, partido: candPartido, votos: 0 };
-    scope.cands.set(candCod, c);
+    c = { cod: candKey, codcan: candCod, nombre: candNombre, partido: candPartido, votos: 0 };
+    scope.cands.set(candKey, c);
   }
   c.votos += votos;
   if (!c.nombre && candNombre) c.nombre = candNombre;
@@ -246,6 +262,22 @@ function serializeScope(scope, opts = {}){
   for (const [k,v] of scope.especiales) especiales[k] = v;
   const totalEsp = Object.values(especiales).reduce((s,v) => s+v, 0);
 
+  // Agregado por partido (lista). Unidad natural en concejo/JAL: el "ganador"
+  // de un territorio es la LISTA más votada (suma del voto por la lista + sus
+  // candidatos), no el candidato individual top. Solo se emite cuando el
+  // caller lo pide (concejo/JAL) para no inflar alcaldía ni el nivel mesa.
+  let partidos = null;
+  if (opts.withPartidos){
+    const aggP = new Map();
+    for (const c of cands){
+      const p = c.partido || '(SIN PARTIDO)';
+      aggP.set(p, (aggP.get(p) || 0) + c.votos);
+    }
+    partidos = Array.from(aggP, ([partido, votos]) => ({ partido, votos }))
+      .sort((a,b) => b.votos - a.votos)
+      .map(p => ({ ...p, pct: validos > 0 ? +(p.votos / validos * 100).toFixed(3) : 0 }));
+  }
+
   // D'Hondt por partido para concejo
   let curulesPorPartido = null;
   if (opts.curules && opts.curules > 0){
@@ -254,8 +286,8 @@ function serializeScope(scope, opts = {}){
       const p = c.partido || '(SIN PARTIDO)';
       aggPartido.set(p, (aggPartido.get(p) || 0) + c.votos);
     }
-    const partidos = Array.from(aggPartido, ([partido, votos]) => ({ partido, votos }));
-    curulesPorPartido = dhondt(partidos, opts.curules)
+    const partidosDH = Array.from(aggPartido, ([partido, votos]) => ({ partido, votos }));
+    curulesPorPartido = dhondt(partidosDH, opts.curules)
       .filter(p => p.curules > 0)
       .sort((a,b) => b.curules - a.curules || b.votos - a.votos);
   }
@@ -265,6 +297,7 @@ function serializeScope(scope, opts = {}){
     votos_totales: validos + totalEsp,
     especiales,
     candidatos: cands,
+    ...(partidos ? { partidos } : {}),
     ...(curulesPorPartido ? { curules_por_partido: curulesPorPartido } : {}),
   };
 }
@@ -315,22 +348,27 @@ async function processCsv(csvPath, puestos){
     const pp = String(parseInt(parts[idx['COD_PP']] || '0', 10)).padStart(2, '0');
     const ms = String(parts[idx['DES_MS']] || '0').trim();
     const cod   = parts[idx['COD_CAN']];
-    const des   = parts[idx['DES_CAN']] || '';
-    const par   = parts[idx['DES_PAR']] || '';
+    const des   = unquote(parts[idx['DES_CAN']] || '');
+    const par   = unquote(parts[idx['DES_PAR']] || '');
     const votos = parseInt(parts[idx['NUM_VOT']] || '0', 10);
 
     if (!cod || !Number.isFinite(votos) || votos <= 0) continue;
 
     const candNombre  = normName(des);
     const candPartido = normName(par);
+    // Llave única de candidato = COD_PAR|COD_CAN (ver nota en accum). Si el
+    // archivo no trae COD_PAR, caemos al nombre normalizado del partido.
+    const codparRaw = (idx['COD_PAR'] != null) ? parts[idx['COD_PAR']] : null;
+    const codpar = String(codparRaw != null && codparRaw !== '' ? codparRaw : candPartido).trim();
+    const candKey = `${codpar}|${cod}`;
 
     const tgt = data[corName];
     const cp  = mapZZ(zz);
-    accum(tgt.ciudad, cod, candNombre, candPartido, votos);
-    accum(ensure(tgt.comunaPol, cp), cod, candNombre, candPartido, votos);
-    accum(ensure(tgt.zona, zz), cod, candNombre, candPartido, votos);
-    accum(ensure(tgt.puesto, `${zz}-${pp}`), cod, candNombre, candPartido, votos);
-    accum(ensure(tgt.mesa,   `${zz}-${pp}-${ms}`), cod, candNombre, candPartido, votos);
+    accum(tgt.ciudad, candKey, cod, candNombre, candPartido, votos);
+    accum(ensure(tgt.comunaPol, cp), candKey, cod, candNombre, candPartido, votos);
+    accum(ensure(tgt.zona, zz), candKey, cod, candNombre, candPartido, votos);
+    accum(ensure(tgt.puesto, `${zz}-${pp}`), candKey, cod, candNombre, candPartido, votos);
+    accum(ensure(tgt.mesa,   `${zz}-${pp}-${ms}`), candKey, cod, candNombre, candPartido, votos);
 
     // Nivel barrio. Clave: código oficial DAP (preferido) o nombre
     // normalizado (modo legacy). El nombre legible va en barrioMeta.
@@ -338,7 +376,7 @@ async function processCsv(csvPath, puestos){
       const pgeo = puestos.get(`${zz}-${pp}`);
       if (pgeo){
         const bk = pgeo.barrio;  // CODIGO oficial DAP, o barrio normalizado legacy
-        accum(ensure(tgt.barrio, bk), cod, candNombre, candPartido, votos);
+        accum(ensure(tgt.barrio, bk), candKey, cod, candNombre, candPartido, votos);
         let meta = barrioMeta[corName].get(bk);
         if (!meta){
           meta = {
@@ -404,7 +442,11 @@ async function main(){
     // Si la corporación no aparece en este archivo (ej. JAL en GCS_*TER.csv),
     // saltar para no producir directorios vacíos.
     if (d.ciudad.cands.size === 0 && Array.from(d.ciudad.especiales.values()).every(v => v === 0)) continue;
-    const opts = corp === 'concejo' ? { curules: CURULES_CONCEJO } : {};
+    // concejo y JAL son por LISTA → emitir agregado `partidos` para que el
+    // mapa/leyenda/gráfico coloreen por partido ganador, no por candidato.
+    const wantP = (corp === 'concejo' || corp === 'jal');
+    const opts = { ...(corp === 'concejo' ? { curules: CURULES_CONCEJO } : {}), withPartidos: wantP };
+    const scopeOpts = { withPartidos: wantP };
 
     const resumen = {
       corporacion: corp,
@@ -429,15 +471,15 @@ async function main(){
         comuna: meta.comunaPol,
         lat: meta.latSum / meta.wSum,
         lon: meta.lonSum / meta.wSum,
-        ...serializeScope(scope),
+        ...serializeScope(scope, scopeOpts),
       };
     }
 
     const porZona = {};
-    for (const [k, scope] of d.zona) porZona[k] = serializeScope(scope);
+    for (const [k, scope] of d.zona) porZona[k] = serializeScope(scope, scopeOpts);
 
     const porPuesto = {};
-    for (const [k, scope] of d.puesto) porPuesto[k] = serializeScope(scope);
+    for (const [k, scope] of d.puesto) porPuesto[k] = serializeScope(scope, scopeOpts);
 
     const porMesa = {};
     for (const [k, scope] of d.mesa) porMesa[k] = serializeScope(scope);

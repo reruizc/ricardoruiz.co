@@ -845,21 +845,46 @@
       }
     }
 
+    // ─── GANADOR POR CORPORACIÓN ──────────────────────────────────────
+    // Concejo y JAL se eligen por LISTA (representación proporcional): el
+    // "ganador" de un territorio es el PARTIDO/lista más votado (suma del
+    // voto por la lista + todos sus candidatos), NO el candidato individual
+    // top. Alcaldía sí es por candidato. Los datos traen `partidos[]` para
+    // concejo/JAL; si faltara (dato viejo), caemos a `candidatos[]`.
+    function isPartyCorp(){ return state.corp === 'concejo' || state.corp === 'jal'; }
+    function rankedEntries(obj){
+      if (!obj) return [];
+      if (isPartyCorp() && Array.isArray(obj.partidos) && obj.partidos.length){
+        // nombre = partido para que tooltips/coloreo existentes sigan igual
+        return obj.partidos.map(p => ({ nombre: p.partido, partido: p.partido, votos: p.votos, pct: p.pct }));
+      }
+      return obj.candidatos || [];
+    }
+    function winnerOf(obj){ const e = rankedEntries(obj); return e.length ? e[0] : null; }
+
     function renderSummary(r){
-      const c1 = r.candidatos[0] || null;
-      const c2 = r.candidatos[1] || null;
+      const entries = rankedEntries(r);
+      const c1 = entries[0] || null;
+      const c2 = entries[1] || null;
       const total = r.votos_totales || 0;
       const validos = r.votos_validos || 0;
       const especiales = total - validos;
 
-      const labelMap = { alcaldia: 'Ganador · Alcaldía', concejo: '1er en Concejo', jal: '1er en JAL (agregado ciudad)' };
+      const partyMode = isPartyCorp();
+      const labelMap = { alcaldia: 'Ganador · Alcaldía', concejo: 'Lista más votada · Concejo', jal: 'Lista más votada · JAL' };
       const lbl = labelMap[state.corp] || 'Top';
+      const c1meta = c1 ? (partyMode
+        ? `${fmt(c1.votos)} votos · <span style="color:var(--purple);font-weight:600">${fmtPct(c1.pct)}%</span>`
+        : `${c1.partido || 'Sin partido'} · ${fmt(c1.votos)} votos · <span style="color:var(--purple);font-weight:600">${fmtPct(c1.pct)}%</span>`) : '';
+      const c2short = c2 ? (partyMode
+        ? (c2.nombre.length > 24 ? c2.nombre.slice(0,22) + '…' : c2.nombre)
+        : c2.nombre.split(' ').slice(0,2).join(' ')) : '';
 
       const winnerHtml = c1 ? `
         <div class="sum-card winner">
           <div class="sum-label">${lbl}</div>
           <div class="sum-value-big">${c1.nombre}</div>
-          <div class="sum-meta">${c1.partido || 'Sin partido'} · ${fmt(c1.votos)} votos · <span style="color:var(--purple);font-weight:600">${fmtPct(c1.pct)}%</span></div>
+          <div class="sum-meta">${c1meta}</div>
         </div>
       ` : `<div class="sum-card"><div class="sum-label">Ganador</div><div class="sum-value-big">—</div></div>`;
 
@@ -870,12 +895,12 @@
         <div class="sum-card">
           <div class="sum-label">Margen sobre 2°</div>
           <div class="sum-pct">${margin === '—' ? '—' : margin + ' pp'}</div>
-          ${c2 ? `<div class="sum-meta">2° ${c2.nombre.split(' ').slice(0,2).join(' ')} · ${fmtPct(c2.pct)}%</div>` : ''}
+          ${c2 ? `<div class="sum-meta">2° ${c2short} · ${fmtPct(c2.pct)}%</div>` : ''}
         </div>
         <div class="sum-card">
           <div class="sum-label">Votos válidos</div>
           <div class="sum-value-big">${fmt(validos)}</div>
-          <div class="sum-meta">${(r.candidatos||[]).length} candidatos / partidos</div>
+          <div class="sum-meta">${entries.length} ${partyMode ? 'partidos / listas' : 'candidatos'}</div>
         </div>
         <div class="sum-card">
           <div class="sum-label">Especiales</div>
@@ -892,18 +917,14 @@
       const s = state.scope;
       if (s.level === 'comuna' && currentComunas && currentComunas[s.key]){
         const d = currentComunas[s.key];
-        return { cands: d.candidatos || [], nombre: d.nombre || ('Comuna ' + s.key),
-                 total: d.votos_validos || 0, label: 'Comuna' };
+        return { obj: d, nombre: d.nombre || ('Comuna ' + s.key), label: 'Comuna' };
       }
       if (s.level === 'barrio' && currentBarrios && currentBarrios[s.key]){
         const d = currentBarrios[s.key];
-        return { cands: d.candidatos || [], nombre: d.nombre || String(s.key),
-                 total: d.votos_validos || 0, label: 'Barrio' };
+        return { obj: d, nombre: d.nombre || String(s.key), label: 'Barrio' };
       }
       state.scope = { level: 'ciudad', key: null };
-      return { cands: (currentResumen && currentResumen.candidatos) || [],
-               nombre: 'Medellín · toda la ciudad',
-               total: (currentResumen && currentResumen.votos_validos) || 0, label: 'Ciudad' };
+      return { obj: currentResumen, nombre: 'Medellín · toda la ciudad', label: 'Ciudad' };
     }
 
     // Si el ámbito elegido ya no existe en los datos del año/vista actuales,
@@ -918,12 +939,13 @@
       const wrap = document.getElementById('cand-bars');
       if (!wrap) return;
       const rec = _scopeRecord();
-      const list = (rec.cands || []).slice(0, 10);
+      const partyMode = isPartyCorp();
+      const list = rankedEntries(rec.obj).slice(0, 10);
 
       const titles = {
         alcaldia: 'Top candidatos · alcaldía',
-        concejo:  'Top listas · concejo',
-        jal:      'Top ediles · JAL (ciudad)',
+        concejo:  'Top listas (partidos) · concejo',
+        jal:      'Top listas (partidos) · JAL',
       };
       const titleEl = document.getElementById('cand-title');
       if (titleEl) titleEl.textContent = titles[state.corp] || 'Top candidatos';
@@ -943,15 +965,17 @@
       wrap.innerHTML = list.map((c, i) => {
         const color = getColor(c.partido);
         const w = Math.max(2, (c.votos || 0) / maxVotos * 100);
+        const sub = partyMode ? '' : (esc(c.partido) || '—');
+        const title = partyMode ? esc(c.nombre) : `${esc(c.nombre)} · ${esc(c.partido) || '—'}`;
         return `
-          <div class="cand-bar${i === 0 ? ' is-leader' : ''}" title="${esc(c.nombre)} · ${esc(c.partido) || '—'}">
+          <div class="cand-bar${i === 0 ? ' is-leader' : ''}" title="${title}">
             <div class="cand-bar-top">
               <span class="cand-bar-rank">${String(i+1).padStart(2,'0')}</span>
               <span class="cand-bar-name">${esc(c.nombre) || '—'}</span>
               <span class="cand-bar-pct">${fmtPct(c.pct)}%</span>
             </div>
             <div class="cand-bar-track"><div class="cand-bar-fill" data-w="${w.toFixed(2)}" style="background:${color}"></div></div>
-            <div class="cand-bar-meta"><span class="party">${esc(c.partido) || '—'}</span><span class="votos">${fmt(c.votos)} votos</span></div>
+            <div class="cand-bar-meta"><span class="party">${sub}</span><span class="votos">${fmt(c.votos)} votos</span></div>
           </div>`;
       }).join('');
       // Animar el ancho de 0 → objetivo. Forzar reflow y fijar el ancho de
@@ -1002,10 +1026,10 @@
           // En vistas más granulares, la capa de comunas es contorno tenue
           return { fillColor: '#222', fillOpacity: 0.04, color: 'rgba(255,255,255,0.25)', weight: 1, dashArray: '2,3' };
         }
-        if (!data || !data.candidatos || !data.candidatos.length){
+        const winner = winnerOf(data);
+        if (!winner){
           return { fillColor: '#444', fillOpacity: .25, color: 'rgba(255,255,255,0.25)', weight: 1 };
         }
-        const winner = data.candidatos[0];
         return { fillColor: getColor(winner.partido), fillOpacity: 0.78, color: 'rgba(255,255,255,0.35)', weight: 1 };
       }
 
@@ -1020,14 +1044,14 @@
           layer.on({
             mouseover: (e) => {
               layer.setStyle({ weight: 2, color: '#fff', fillOpacity: 0.95 });
-              const w = data && data.candidatos && data.candidatos[0];
+              const w = winnerOf(data);
               const total = data ? data.votos_validos : 0;
               const tt = `
                 <div style="font-family:Avenir,sans-serif;font-weight:400;font-size:.85rem;line-height:1.45">
                   <span style="color:#a78bfa;font-weight:700">${String(nombre).toUpperCase()}</span><br/>
                   ${w ? `
                     <span style="color:${getColor(w.partido)};font-weight:700">${w.nombre}</span><br/>
-                    ${w.partido || '—'}<br/>
+                    ${(w.partido && w.partido !== w.nombre) ? w.partido + '<br/>' : ''}
                     <span style="color:#fff">${fmt(w.votos)} votos · ${fmtPct(w.pct)}%</span><br/>
                     <span style="color:#999;font-size:.7rem">Total comuna: ${fmt(total)} válidos</span>
                   ` : 'Sin datos'}
@@ -1048,7 +1072,7 @@
         const barrios = Object.entries(porBarrio).map(([k, d]) => ({
           key: k, nombre: d.nombre, lat: d.lat, lon: d.lon, comuna: d.comuna,
           total: d.votos_validos,
-          winner: d.candidatos && d.candidatos[0] ? d.candidatos[0] : null,
+          winner: winnerOf(d),
         }));
 
         // Intento usar GeoJSON poligonal (oficial preferido, Voronoi fallback)
@@ -1066,7 +1090,7 @@
             const item = {
               ...b,
               _key: k,
-              winner: b.candidatos && b.candidatos[0] ? b.candidatos[0] : null,
+              winner: winnerOf(b),
               total: b.votos_validos,
             };
             const code = b.codigo || (/^\d{3,4}$/.test(k) ? k : null);
@@ -1180,7 +1204,7 @@
                       <span style="color:#999;font-size:.7rem">Comuna ${(b && b.comuna) || props.COMUNA || '—'}</span><br/>
                       ${w ? `
                         <span style="color:${color};font-weight:700">${w.nombre}</span><br/>
-                        ${w.partido || '—'}<br/>
+                        ${(w.partido && w.partido !== w.nombre) ? w.partido + '<br/>' : ''}
                         <span style="color:#fff">${fmt(w.votos)} votos · ${fmtPct(w.pct)}%</span><br/>
                         <span style="color:#999;font-size:.7rem">${r.inferido ? 'Total vecino' : 'Total barrio'}: ${fmt(b.total)} válidos</span>
                         ${inferidoNote}
@@ -1217,7 +1241,7 @@
                 <span style="color:#999;font-size:.7rem">Comuna ${b.comuna}</span><br/>
                 ${w ? `
                   <span style="color:${color};font-weight:700">${w.nombre}</span><br/>
-                  ${w.partido || '—'}<br/>
+                  ${(w.partido && w.partido !== w.nombre) ? w.partido + '<br/>' : ''}
                   <span style="color:#fff">${fmt(w.votos)} votos · ${fmtPct(w.pct)}%</span><br/>
                   <span style="color:#999;font-size:.7rem">Total barrio: ${fmt(b.total)} válidos</span>
                 ` : 'Sin datos'}
@@ -1238,7 +1262,7 @@
           for (const [key, data] of Object.entries(porPuesto)){
             const m = meta[key];
             if (!m || !Number.isFinite(m.lat) || !Number.isFinite(m.lon)) continue;
-            const winner = data.candidatos && data.candidatos[0];
+            const winner = winnerOf(data);
             items.push({
               key, lat: m.lat, lon: m.lon,
               nombre_puesto: m.nombre_puesto || `Puesto ${key}`,
@@ -1267,7 +1291,7 @@
                 <span style="color:#999;font-size:.7rem">${p.mesas} mesas · ZZ-PP ${p.key}</span><br/>
                 ${w ? `
                   <span style="color:${color};font-weight:700">${w.nombre}</span><br/>
-                  ${w.partido || '—'}<br/>
+                  ${(w.partido && w.partido !== w.nombre) ? w.partido + '<br/>' : ''}
                   <span style="color:#fff">${fmt(w.votos)} votos · ${fmtPct(w.pct)}%</span><br/>
                   <span style="color:#999;font-size:.7rem">Total puesto: ${fmt(p.total)} válidos</span>
                 ` : '<span style="color:#999;font-size:.75rem">Sin datos electorales</span>'}
@@ -1283,7 +1307,7 @@
       const winsByParty = new Map();
       const source = showPuestos ? porPuesto : (showBarrios ? porBarrio : porComuna);
       for (const k of Object.keys(source || {})){
-        const w = source[k].candidatos && source[k].candidatos[0];
+        const w = winnerOf(source[k]);
         if (!w) continue;
         const p = w.partido || 'Sin partido';
         winsByParty.set(p, (winsByParty.get(p) || 0) + 1);
@@ -1317,7 +1341,9 @@
             mapSub.textContent = 'Color por partido ganador · radio proporcional a votos válidos del barrio';
           }
         } else {
-          mapSub.textContent = 'Color por partido del primer puesto';
+          mapSub.textContent = isPartyCorp()
+            ? 'Color por la lista (partido) más votada en la comuna'
+            : 'Color por el candidato ganador en la comuna';
         }
       }
     }
@@ -1328,7 +1354,7 @@
       const order = ['01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','CORR','OTROS'];
       const rows = order.filter(k => porComuna[k]).map(k => {
         const d = porComuna[k];
-        const w = d.candidatos && d.candidatos[0];
+        const w = winnerOf(d);
         const nombre = d.nombre || k;
         if (!w){
           return `<tr onclick="selectComuna('${k}')"><td>${nombre}</td><td>—</td><td class="v">—</td><td class="p">—</td><td class="v">${fmt(d.votos_validos || 0)}</td></tr>`;
