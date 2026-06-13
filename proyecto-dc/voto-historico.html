@@ -288,6 +288,56 @@
       border-radius: 1px;
     }
 
+    /* ── BAR CHART · Top candidatos reactivo (año · comuna · barrio) ── */
+    .scope-reset {
+      font-family:'DM Mono',monospace; font-size:.6rem;
+      letter-spacing:.1em; text-transform:uppercase;
+      color:var(--purple); background:var(--purple-dim);
+      border:1px solid var(--purple); padding:.32rem .6rem;
+      cursor:none; white-space:nowrap;
+      transition:background .15s, color .15s;
+    }
+    .scope-reset:hover { background:var(--purple); color:var(--surface); }
+    .cand-bars { padding:1.1rem 1.25rem .4rem; display:flex; flex-direction:column; gap:.9rem; }
+    .cand-bar { display:block; cursor:default; }
+    .cand-bar.is-leader .cand-bar-name { font-weight:500; }
+    .cand-bar-top { display:flex; align-items:baseline; gap:.5rem; margin-bottom:.32rem; }
+    .cand-bar-rank {
+      font-family:'DM Mono',monospace; font-size:.62rem;
+      color:var(--text3); width:20px; flex-shrink:0;
+    }
+    .cand-bar-name {
+      font-family:'Fraunces',serif; font-weight:400; font-size:.92rem;
+      color:var(--text); flex:1; line-height:1.25;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .cand-bar-pct {
+      font-family:'Avenir',sans-serif; font-weight:600; font-size:.9rem;
+      color:var(--purple); flex-shrink:0; font-variant-numeric:tabular-nums;
+    }
+    .cand-bar-track {
+      height:11px; background:var(--surface2);
+      border:1px solid var(--border); overflow:hidden;
+    }
+    .cand-bar-fill { height:100%; width:0; transition:width .85s cubic-bezier(.2,.7,.2,1); }
+    .cand-bar-meta {
+      display:flex; justify-content:space-between; gap:1rem; margin-top:.28rem;
+      font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.04em;
+      color:var(--text3); text-transform:uppercase;
+    }
+    .cand-bar-meta .party { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .cand-bar-meta .votos { white-space:nowrap; font-variant-numeric:tabular-nums; }
+    .cand-hint {
+      padding:.4rem 1.25rem 1.1rem; font-family:'DM Mono',monospace;
+      font-size:.58rem; letter-spacing:.05em; color:var(--text3); line-height:1.55;
+    }
+    .cand-empty {
+      padding:2.2rem 1.25rem; text-align:center; color:var(--text3);
+      font-family:'Fraunces',serif; font-style:italic; font-size:.95rem;
+    }
+    .comuna-table tbody tr { cursor:none; }
+    .comuna-table tbody tr:hover { background:var(--purple-dim); }
+
     .comuna-section {
       margin-top: 1rem;
       background: var(--surface);
@@ -446,20 +496,12 @@
         <div class="card-header">
           <div>
             <div class="card-title" id="cand-title">Top candidatos</div>
-            <div class="card-sub">Ordenados por votación</div>
+            <div class="card-sub" id="cand-scope">Medellín · toda la ciudad</div>
           </div>
+          <button class="scope-reset" id="scope-reset" hidden onclick="resetScopeAndRender()">← Toda la ciudad</button>
         </div>
-        <table class="cand-table">
-          <thead>
-            <tr>
-              <th class="pos">#</th>
-              <th>Candidato / Partido</th>
-              <th style="text-align:right">Votos</th>
-              <th style="text-align:right">%</th>
-            </tr>
-          </thead>
-          <tbody id="cand-tbody"></tbody>
-        </table>
+        <div class="cand-bars" id="cand-bars"></div>
+        <div class="cand-hint" id="cand-hint">Clic en una comuna o barrio (mapa o tabla) para filtrar el gráfico · cambia el año arriba para ver cómo fluctúa</div>
       </div>
     </section>
 
@@ -722,7 +764,7 @@
     }
 
     // ─── STATE ────────────────────────────────────────────────────────
-    const state = { year: '2023', corp: 'alcaldia', view: 'comuna' };
+    const state = { year: '2023', corp: 'alcaldia', view: 'comuna', scope: { level: 'ciudad', key: null } };
     let map = null;
     let mapLayer = null;        // capa de comunas (GeoJSON)
     let barrioLayer = null;     // capa de barrios (circleMarkers fallback)
@@ -793,7 +835,8 @@
         currentComunas = porComuna;
         currentBarrios = porBarrio || null;
         renderSummary(resumen);
-        renderCandTable(resumen);
+        validateScope();
+        renderCandChart();
         await renderMap(porComuna, currentBarrios, porPuesto);
         renderComunaTable(porComuna);
       } catch (e) {
@@ -842,27 +885,97 @@
       `;
     }
 
-    function renderCandTable(r){
-      const tbody = document.getElementById('cand-tbody');
-      const top = (r.candidatos || []).slice(0, 12);
-      tbody.innerHTML = top.map((c, i) => `
-        <tr>
-          <td class="pos">${String(i+1).padStart(2,'0')}</td>
-          <td>
-            <span class="swatch" style="background:${getColor(c.partido)}"></span>
-            <span class="nombre">${c.nombre}</span>
-            <div class="partido">${c.partido || '—'}</div>
-          </td>
-          <td class="votos">${fmt(c.votos)}</td>
-          <td class="pct">${fmtPct(c.pct)}%</td>
-        </tr>
-      `).join('');
+    // ─── TOP CANDIDATOS · GRÁFICO DE BARRAS REACTIVO ──────────────────
+    // Fluctúa según año (recarga render) + ámbito territorial seleccionado
+    // (ciudad por defecto · comuna o barrio al hacer clic en mapa/tabla).
+    function _scopeRecord(){
+      const s = state.scope;
+      if (s.level === 'comuna' && currentComunas && currentComunas[s.key]){
+        const d = currentComunas[s.key];
+        return { cands: d.candidatos || [], nombre: d.nombre || ('Comuna ' + s.key),
+                 total: d.votos_validos || 0, label: 'Comuna' };
+      }
+      if (s.level === 'barrio' && currentBarrios && currentBarrios[s.key]){
+        const d = currentBarrios[s.key];
+        return { cands: d.candidatos || [], nombre: d.nombre || String(s.key),
+                 total: d.votos_validos || 0, label: 'Barrio' };
+      }
+      state.scope = { level: 'ciudad', key: null };
+      return { cands: (currentResumen && currentResumen.candidatos) || [],
+               nombre: 'Medellín · toda la ciudad',
+               total: (currentResumen && currentResumen.votos_validos) || 0, label: 'Ciudad' };
+    }
+
+    // Si el ámbito elegido ya no existe en los datos del año/vista actuales,
+    // vuelve a ciudad (p.ej. al cambiar de año o salir de la vista barrio).
+    function validateScope(){
+      const s = state.scope;
+      if (s.level === 'comuna' && (!currentComunas || !currentComunas[s.key])) state.scope = { level: 'ciudad', key: null };
+      if (s.level === 'barrio' && (!currentBarrios || !currentBarrios[s.key])) state.scope = { level: 'ciudad', key: null };
+    }
+
+    function renderCandChart(){
+      const wrap = document.getElementById('cand-bars');
+      if (!wrap) return;
+      const rec = _scopeRecord();
+      const list = (rec.cands || []).slice(0, 10);
+
       const titles = {
         alcaldia: 'Top candidatos · alcaldía',
-        concejo:  'Top candidatos / listas · concejo',
-        jal:      'Top ediles agregados ciudad (mezcla 16 JALs)',
+        concejo:  'Top listas · concejo',
+        jal:      'Top ediles · JAL (ciudad)',
       };
-      document.getElementById('cand-title').textContent = titles[state.corp] || 'Top';
+      const titleEl = document.getElementById('cand-title');
+      if (titleEl) titleEl.textContent = titles[state.corp] || 'Top candidatos';
+      const scopeEl = document.getElementById('cand-scope');
+      if (scopeEl) scopeEl.textContent = (state.scope.level === 'ciudad')
+        ? 'Medellín · toda la ciudad'
+        : (rec.label + ' · ' + rec.nombre);
+      const resetBtn = document.getElementById('scope-reset');
+      if (resetBtn) resetBtn.hidden = (state.scope.level === 'ciudad');
+
+      if (!list.length){
+        wrap.innerHTML = '<div class="cand-empty">Sin datos para este territorio</div>';
+        return;
+      }
+      const maxVotos = Math.max.apply(null, list.map(c => c.votos || 0).concat([1]));
+      const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      wrap.innerHTML = list.map((c, i) => {
+        const color = getColor(c.partido);
+        const w = Math.max(2, (c.votos || 0) / maxVotos * 100);
+        return `
+          <div class="cand-bar${i === 0 ? ' is-leader' : ''}" title="${esc(c.nombre)} · ${esc(c.partido) || '—'}">
+            <div class="cand-bar-top">
+              <span class="cand-bar-rank">${String(i+1).padStart(2,'0')}</span>
+              <span class="cand-bar-name">${esc(c.nombre) || '—'}</span>
+              <span class="cand-bar-pct">${fmtPct(c.pct)}%</span>
+            </div>
+            <div class="cand-bar-track"><div class="cand-bar-fill" data-w="${w.toFixed(2)}" style="background:${color}"></div></div>
+            <div class="cand-bar-meta"><span class="party">${esc(c.partido) || '—'}</span><span class="votos">${fmt(c.votos)} votos</span></div>
+          </div>`;
+      }).join('');
+      // Animar el ancho de 0 → objetivo. Forzar reflow y fijar el ancho de
+      // forma síncrona (la transición CSS lo anima cuando la pestaña está
+      // visible); NO depende de requestAnimationFrame, que se pausa con la
+      // pestaña oculta y dejaría las barras en 0 al cargar en segundo plano.
+      const fills = wrap.querySelectorAll('.cand-bar-fill');
+      void wrap.offsetWidth;
+      fills.forEach(el => { el.style.width = el.dataset.w + '%'; });
+    }
+
+    function selectComuna(key){
+      if (!currentComunas || !currentComunas[key]) return;
+      state.scope = { level: 'comuna', key: String(key) };
+      renderCandChart();
+    }
+    function selectBarrio(key){
+      if (key == null || !currentBarrios || !currentBarrios[key]) return;
+      state.scope = { level: 'barrio', key: String(key) };
+      renderCandChart();
+    }
+    function resetScopeAndRender(){
+      state.scope = { level: 'ciudad', key: null };
+      renderCandChart();
     }
 
     async function renderMap(porComuna, porBarrio, porPuesto){
@@ -922,6 +1035,7 @@
               layer.bindTooltip(tt, { sticky: true, opacity: 1 }).openTooltip(e.latlng);
             },
             mouseout: () => { layer.setStyle(styleOf(feat)); layer.closeTooltip(); },
+            click: () => selectComuna(key),
           });
         },
       }).addTo(map);
@@ -1078,6 +1192,7 @@
                   barrioPolyLayer.resetStyle(layer);
                   layer.closeTooltip();
                 },
+                click: () => { const k = b && (b._key || b.key); if (k != null) selectBarrio(k); },
               });
             },
           }).addTo(map);
@@ -1108,6 +1223,7 @@
                 ` : 'Sin datos'}
               </div>`;
             cm.bindTooltip(tt, { sticky: true, opacity: 1 });
+            cm.on('click', () => selectBarrio(b.key));
             cm.addTo(barrioLayer);
           });
           barrioLayer.addTo(map);
@@ -1215,10 +1331,10 @@
         const w = d.candidatos && d.candidatos[0];
         const nombre = d.nombre || k;
         if (!w){
-          return `<tr><td>${nombre}</td><td>—</td><td class="v">—</td><td class="p">—</td><td class="v">${fmt(d.votos_validos || 0)}</td></tr>`;
+          return `<tr onclick="selectComuna('${k}')"><td>${nombre}</td><td>—</td><td class="v">—</td><td class="p">—</td><td class="v">${fmt(d.votos_validos || 0)}</td></tr>`;
         }
         return `
-          <tr>
+          <tr onclick="selectComuna('${k}')">
             <td>${nombre}</td>
             <td class="winner">
               <span class="swatch" style="background:${getColor(w.partido)};display:inline-block;width:8px;height:8px;margin-right:.4rem;vertical-align:middle"></span>
