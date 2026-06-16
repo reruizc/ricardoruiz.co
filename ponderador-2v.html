@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ponderador · Segunda Vuelta 2026 · Ricardo Ruiz</title>
+  <meta name="description" content="Promedio ponderado de las encuestas de segunda vuelta 2026 (Cepeda vs Abelardo) y simulador de trasvase desde el escrutinio de primera vuelta, con proyección por departamento." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=Arima:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#060810; --surface:rgba(255,255,255,.04); --border:rgba(255,255,255,.08);
+      --white:#f4f3ef; --blue:#0047FF; --green:#4ade80;
+      --cep:#e23b50; --abe:#2f5fe0; --gray:#94a3b8;
+    }
+    html{scroll-behavior:smooth}
+    body{background:var(--bg);color:var(--white);font-family:Avenir,'Segoe UI',sans-serif;min-height:100vh;overflow-x:hidden}
+    a{color:var(--blue)}
+    /* ── DAY MODE ─────────────────────────────────────────── */
+    body.day-mode{background:#e6ded3;color:#0d1120}
+    body.day-mode .electoral-nav{background:rgba(230,222,211,.93);border-bottom:1px solid rgba(0,0,0,.1)}
+    body.day-mode .logo-text{color:#0d1120}
+    body.day-mode .breadcrumb{color:rgba(0,0,0,.45);border-bottom-color:rgba(0,0,0,.1)}
+    body.day-mode .breadcrumb a{color:rgba(0,71,255,.8)}
+    body.day-mode .page-header{border-bottom-color:rgba(0,0,0,.1)}
+    body.day-mode .page-sub{color:rgba(0,0,0,.5)}
+    body.day-mode .use-note{background:rgba(0,0,0,.03);border-color:rgba(0,0,0,.08);color:rgba(0,0,0,.7)}
+    body.day-mode .card{background:rgba(0,0,0,.02);border-color:rgba(0,0,0,.1)}
+    body.day-mode .h2h-wrap{background:rgba(0,0,0,.02);border-color:rgba(0,0,0,.1)}
+    body.day-mode .section-title{color:rgba(0,0,0,.6)}
+    body.day-mode .muted{color:rgba(0,0,0,.5)}
+    body.day-mode .tab{color:rgba(0,0,0,.55);background:rgba(0,0,0,.03);border-color:rgba(0,0,0,.12)}
+    body.day-mode .tab:hover{color:#0d1120;border-color:rgba(0,71,255,.4)}
+    body.day-mode .tab.active{color:#fff;background:var(--blue);border-color:var(--blue)}
+    body.day-mode table.polls th{color:rgba(0,0,0,.5);border-bottom-color:rgba(0,0,0,.15)}
+    body.day-mode table.polls td{border-bottom-color:rgba(0,0,0,.07)}
+    body.day-mode table.polls tr.hyp td{color:rgba(0,0,0,.4)}
+    body.day-mode .slider-row{border-bottom-color:rgba(0,0,0,.07)}
+    body.day-mode .slider-lab{color:rgba(0,0,0,.7)}
+    body.day-mode .slider-sub{color:rgba(0,0,0,.42)}
+    body.day-mode input[type=range]{background:rgba(0,0,0,.12)}
+    body.day-mode .btn{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.2);color:rgba(0,0,0,.7)}
+    body.day-mode .btn:hover{background:rgba(0,71,255,.08);border-color:rgba(0,71,255,.5);color:#0d1120}
+    body.day-mode #leaflet-map{background:#dbd2c4!important}
+    body.day-mode .leaflet-container{background:#dbd2c4!important}
+    body.day-mode .map-card{background:rgba(0,0,0,.02);border-color:rgba(0,0,0,.1)}
+    body.day-mode .info-btn{color:rgba(0,0,0,.5);border-color:rgba(0,0,0,.22)}
+    body.day-mode .theme-btn{background:rgba(0,71,255,.08);border-color:rgba(0,71,255,.25);color:var(--blue)}
+    body.day-mode .modal-box{background:#f5f0ea;color:#0d1120;border-color:rgba(0,71,255,.25)}
+    body.day-mode .modal-body{color:rgba(0,0,0,.78)} body.day-mode .modal-body h4{color:var(--blue)}
+    body.day-mode .foot{border-top-color:rgba(0,0,0,.1);color:rgba(0,0,0,.5)}
+    body.day-mode .chip{background:rgba(0,0,0,.04);color:rgba(0,0,0,.6);border-color:rgba(0,0,0,.12)}
+    body.day-mode .ev-grid line{stroke:rgba(0,0,0,.08)}
+    body.day-mode .ev-axis text{fill:rgba(0,0,0,.5)}
+    body.day-mode .leaflet-control-attribution{background:rgba(230,222,211,.9)!important;color:rgba(0,0,0,.4)!important}
+
+    /* ── NAV ──────────────────────────────────────────────── */
+    .electoral-nav{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(4,6,16,.6);backdrop-filter:blur(8px)}
+    .electoral-nav-auth{display:flex;align-items:center;gap:.6rem;font-family:Avenir,sans-serif}
+    .e-btn-back{font-family:Avenir,sans-serif;font-weight:500;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--green);text-decoration:none;border:1.5px solid rgba(74,222,128,.4);padding:.3rem .8rem;transition:.2s}
+    .e-btn-back:hover{color:#060810;background:var(--green);border-color:var(--green)}
+    .e-user-plan{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;color:var(--green);border:1px solid rgba(74,222,128,.35);padding:.2rem .5rem}
+    .e-user-name{font-size:.74rem;color:var(--white);text-decoration:none;opacity:.85}
+    .e-btn-logout,.e-btn-login{font-family:Avenir,sans-serif;font-size:.68rem;letter-spacing:.05em;text-transform:uppercase;background:none;border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.55);padding:.28rem .6rem;cursor:pointer;transition:.2s}
+    .e-btn-logout:hover,.e-btn-login:hover{color:var(--white);border-color:rgba(255,255,255,.4)}
+    .e-btn-register{font-family:Avenir,sans-serif;font-size:.68rem;letter-spacing:.05em;text-transform:uppercase;background:var(--blue);color:#fff;text-decoration:none;padding:.3rem .65rem}
+    .logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.85;transition:opacity .2s}
+    .logo-link:hover{opacity:1}
+    .logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px}
+    .logo-bar{width:5px;background:var(--blue);border-radius:1px 1px 0 0;opacity:.85}
+    .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.1rem,2vw,1.7rem);letter-spacing:-.03em;color:var(--white)}
+    .logo-text span{color:var(--blue)}
+    .theme-btn{display:flex;align-items:center;gap:.4rem;font-family:Avenir,sans-serif;font-weight:500;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);padding:.3rem .75rem;cursor:pointer;transition:.2s;white-space:nowrap}
+    .theme-btn:hover{background:rgba(255,255,255,.15);color:var(--white)}
+
+    .breadcrumb{font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.05em;color:rgba(255,255,255,.4);padding:.7rem 2.5rem;border-bottom:1px solid rgba(255,255,255,.05)}
+    .breadcrumb a{color:rgba(0,71,255,.85);text-decoration:none}
+    .breadcrumb a:hover{text-decoration:underline}
+    .bc-current{color:var(--white)}
+
+    .page-header{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;padding:1.6rem 2.5rem 1.1rem;border-bottom:1px solid rgba(255,255,255,.07);flex-wrap:wrap}
+    .page-title{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.5rem,3.4vw,2.5rem);letter-spacing:-.02em;line-height:1.04}
+    .page-title span{color:var(--cep)}
+    .page-title em{font-style:normal;color:var(--abe)}
+    .page-sub{font-family:Avenir,sans-serif;font-size:.92rem;color:rgba(255,255,255,.5);margin-top:.35rem;max-width:640px}
+
+    .wrap{max-width:1180px;margin:0 auto;padding:0 2.5rem}
+    .use-note{font-family:Avenir,sans-serif;font-size:.86rem;line-height:1.6;color:rgba(255,255,255,.62);background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:1rem 1.2rem;margin:1.3rem 0}
+    .use-note strong{color:var(--white)}
+    .use-note em{color:var(--green);font-style:normal}
+
+    /* ── HEAD TO HEAD ─────────────────────────────────────── */
+    .h2h-wrap{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:1.4rem 1.5rem;margin:1.1rem 0}
+    .h2h-head{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}
+    .section-title{font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:.55rem}
+    .info-btn{font-family:Avenir,sans-serif;font-size:.72rem;width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.55);background:none;cursor:pointer;transition:.2s}
+    .info-btn:hover{color:var(--blue);border-color:var(--blue)}
+    .chip{font-family:'DM Mono',monospace;font-size:.64rem;letter-spacing:.04em;color:rgba(255,255,255,.6);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:.25rem .7rem}
+    .h2h-cards{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem}
+    .cand-card{display:flex;align-items:center;gap:.9rem;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:.9rem 1.1rem}
+    .cand-card.abe{flex-direction:row-reverse;text-align:right}
+    .cand-photo{width:62px;height:62px;border-radius:50%;object-fit:cover;object-position:center top;flex-shrink:0;border:2px solid currentColor;background:#1a1d2e}
+    .cand-card.cep{color:var(--cep)} .cand-card.abe{color:var(--abe)}
+    .cand-name{font-family:'Syne',sans-serif;font-weight:700;font-size:1.02rem;color:var(--white)}
+    .cand-party{font-family:Avenir,sans-serif;font-size:.72rem;color:rgba(255,255,255,.45)}
+    .cand-pct{font-family:'Syne',sans-serif;font-weight:800;font-size:2.1rem;line-height:1;color:currentColor;margin-top:.15rem}
+    .cand-pct small{font-size:.95rem;font-weight:500;opacity:.7}
+    .h2h-bar{height:34px;border-radius:8px;overflow:hidden;display:flex;border:1px solid rgba(255,255,255,.1)}
+    .h2h-seg{height:100%;display:flex;align-items:center;font-family:'DM Mono',monospace;font-size:.72rem;color:#fff;transition:width .5s cubic-bezier(.4,0,.2,1)}
+    .h2h-seg.cep{background:var(--cep);justify-content:flex-start;padding-left:.6rem}
+    .h2h-seg.abe{background:var(--abe);justify-content:flex-end;padding-right:.6rem}
+    .h2h-seg.bl{background:var(--gray);justify-content:center;color:rgba(0,0,0,.55)}
+    .h2h-foot{display:flex;justify-content:space-between;gap:1rem;margin-top:.6rem;font-family:Avenir,sans-serif;font-size:.78rem;color:rgba(255,255,255,.5);flex-wrap:wrap}
+    .toggle-mini{display:inline-flex;border:1px solid rgba(255,255,255,.15);border-radius:7px;overflow:hidden}
+    .toggle-mini button{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.04em;background:none;border:none;color:rgba(255,255,255,.5);padding:.3rem .6rem;cursor:pointer}
+    .toggle-mini button.active{background:var(--blue);color:#fff}
+    body.day-mode .toggle-mini button.active{background:var(--blue);color:#fff}
+
+    /* ── TABS ─────────────────────────────────────────────── */
+    .tabs{display:flex;gap:.5rem;margin:1.4rem 0 .4rem;flex-wrap:wrap}
+    .tab{font-family:Avenir,sans-serif;font-size:.78rem;letter-spacing:.02em;color:rgba(255,255,255,.6);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:.5rem .95rem;cursor:pointer;transition:.2s}
+    .tab:hover{color:var(--white);border-color:rgba(0,71,255,.45)}
+    .tab.active{color:#fff;background:var(--blue);border-color:var(--blue)}
+    .view{display:none}
+    .view.active{display:block}
+
+    .card{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:1.2rem 1.3rem;margin:1rem 0}
+    .muted{color:rgba(255,255,255,.5);font-family:Avenir,sans-serif;font-size:.82rem;line-height:1.5}
+
+    /* ── EVOLUTION CHART ──────────────────────────────────── */
+    #ev-svg{width:100%;height:auto;display:block;font-family:Avenir,sans-serif;overflow:visible}
+    .ev-grid line{stroke:rgba(255,255,255,.07);stroke-width:1}
+    .ev-axis text{fill:rgba(255,255,255,.42);font-size:11px;font-family:'DM Mono',monospace}
+    .ev-line{fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+    .ev-halo{fill:none;stroke-width:6;opacity:.13;stroke-linecap:round}
+    .ev-proj{fill:none;stroke-width:2;stroke-dasharray:4 4;opacity:.6}
+    .ev-end-label{font-family:'Syne',sans-serif;font-weight:700;font-size:12px}
+    .ev-end-pct{font-family:'Syne',sans-serif;font-weight:800;font-size:15px}
+    .ev-vert-line{stroke:rgba(255,255,255,.2);stroke-width:1;stroke-dasharray:3 3}
+    .ev-vert-label{fill:rgba(255,255,255,.45);font-size:10px;font-family:'DM Mono',monospace}
+    .ev-pred-zone{fill:rgba(0,71,255,.05)}
+    .ev-mark-hit{cursor:pointer}
+    .ev-mark-glow{opacity:0;transition:opacity .15s}
+    .ev-mark-hit:hover .ev-mark-glow{opacity:.3}
+    .ev-legend{display:flex;flex-wrap:wrap;gap:.5rem 1.2rem;margin-top:.8rem;font-family:Avenir,sans-serif;font-size:.74rem;color:rgba(255,255,255,.55)}
+    .ev-legend .item{display:flex;align-items:center;gap:.4rem}
+    .ev-legend .dot{width:10px;height:10px;border-radius:50%}
+    #ev-tip{position:fixed;z-index:9000;pointer-events:none;background:rgba(6,8,16,.97);border:1px solid rgba(0,71,255,.4);border-radius:6px;padding:.5rem .7rem;font-family:Avenir,sans-serif;font-size:.74rem;color:#f4f3ef;max-width:240px;display:none;line-height:1.45}
+
+    /* ── POLLS TABLE ──────────────────────────────────────── */
+    table.polls{width:100%;border-collapse:collapse;font-family:Avenir,sans-serif;font-size:.8rem;margin-top:.5rem}
+    table.polls th{text-align:left;font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.45);padding:.5rem .55rem;border-bottom:1px solid rgba(255,255,255,.15)}
+    table.polls td{padding:.5rem .55rem;border-bottom:1px solid rgba(255,255,255,.06);color:rgba(255,255,255,.8)}
+    table.polls td.num{font-family:'DM Mono',monospace;text-align:right}
+    table.polls td.cep{color:var(--cep);font-weight:600}
+    table.polls td.abe{color:var(--abe);font-weight:600}
+    table.polls tr.hyp td{color:rgba(255,255,255,.42)}
+    .tag{font-family:'DM Mono',monospace;font-size:.55rem;letter-spacing:.04em;text-transform:uppercase;padding:.12rem .4rem;border-radius:4px}
+    .tag.real{background:rgba(74,222,128,.15);color:#4ade80}
+    .tag.hyp{background:rgba(148,163,184,.16);color:#94a3b8}
+
+    /* ── SIMULATOR ────────────────────────────────────────── */
+    .sim-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem}
+    .slider-row{padding:.7rem 0;border-bottom:1px solid rgba(255,255,255,.06)}
+    .slider-top{display:flex;justify-content:space-between;align-items:baseline;gap:.6rem;margin-bottom:.35rem}
+    .slider-lab{font-family:Avenir,sans-serif;font-size:.84rem;color:rgba(255,255,255,.85);font-weight:600}
+    .slider-lab .vt{font-family:'DM Mono',monospace;font-size:.66rem;color:rgba(255,255,255,.4);font-weight:400;margin-left:.4rem}
+    .slider-val{font-family:'DM Mono',monospace;font-size:.74rem;white-space:nowrap}
+    .slider-val .c{color:var(--cep)} .slider-val .a{color:var(--abe)}
+    .slider-sub{font-family:Avenir,sans-serif;font-size:.68rem;color:rgba(255,255,255,.4);margin-top:.25rem}
+    input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:4px;background:linear-gradient(90deg,var(--abe),var(--cep));outline:none;margin-top:.15rem;cursor:pointer}
+    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid #060810;box-shadow:0 1px 4px rgba(0,0,0,.5);cursor:pointer}
+    input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid #060810;cursor:pointer}
+    .btn{font-family:Avenir,sans-serif;font-size:.74rem;letter-spacing:.04em;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.75);padding:.45rem .9rem;border-radius:7px;cursor:pointer;transition:.2s}
+    .btn:hover{background:rgba(0,71,255,.15);border-color:rgba(0,71,255,.5);color:var(--white)}
+
+    /* ── MAP ──────────────────────────────────────────────── */
+    .map-card{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:12px;overflow:hidden;margin-top:1rem}
+    #leaflet-map{width:100%;height:540px;background:#060810}
+    .map-bar{display:flex;align-items:center;justify-content:space-between;gap:.8rem;padding:.7rem 1rem;flex-wrap:wrap}
+    .map-legend{display:flex;align-items:center;gap:.5rem;font-family:'DM Mono',monospace;font-size:.62rem;color:rgba(255,255,255,.55)}
+    .leg-grad{width:120px;height:10px;border-radius:3px;background:linear-gradient(90deg,var(--cep),#cbd5e1 50%,var(--abe))}
+    .leaflet-tooltip.rr2v{background:rgba(6,8,16,.97)!important;border:1px solid rgba(0,71,255,.4)!important;color:#f4f3ef!important;font-family:Avenir,sans-serif!important;border-radius:6px!important;padding:.45rem .65rem!important;box-shadow:0 6px 20px rgba(0,0,0,.4)!important}
+    .leaflet-tooltip.rr2v:before{display:none!important}
+
+    /* ── MODAL ────────────────────────────────────────────── */
+    .modal{position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;padding:1.5rem}
+    .modal.open{display:flex}
+    .modal-box{background:#0e1220;border:1px solid rgba(0,71,255,.3);border-radius:14px;max-width:640px;width:100%;max-height:85vh;overflow-y:auto;padding:1.6rem 1.8rem}
+    .modal-title{font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;margin-bottom:.8rem}
+    .modal-body{font-family:Avenir,sans-serif;font-size:.86rem;line-height:1.62;color:rgba(255,255,255,.78)}
+    .modal-body h4{font-family:'Syne',sans-serif;font-weight:700;font-size:.92rem;color:var(--blue);margin:1rem 0 .35rem}
+    .modal-body b{color:var(--white)}
+    .modal-body code{font-family:'DM Mono',monospace;font-size:.8em;background:rgba(255,255,255,.08);padding:.1rem .3rem;border-radius:3px}
+    .modal-close{position:sticky;top:0;float:right;background:none;border:none;color:rgba(255,255,255,.5);font-size:1.4rem;cursor:pointer;line-height:1}
+
+    .foot{font-family:'DM Mono',monospace;font-size:.66rem;line-height:1.7;color:rgba(255,255,255,.4);padding:2rem 2.5rem 3rem;border-top:1px solid rgba(255,255,255,.07);margin-top:2rem}
+    .foot a{color:rgba(0,71,255,.8)}
+
+    @media (max-width:760px){
+      .electoral-nav{padding:.8rem 1.1rem}
+      .breadcrumb,.page-header,.wrap{padding-left:1.1rem;padding-right:1.1rem}
+      .h2h-cards{grid-template-columns:1fr}
+      .cand-card.abe{flex-direction:row;text-align:left}
+      .sim-grid{grid-template-columns:1fr}
+      #leaflet-map{height:420px}
+      .foot{padding-left:1.1rem;padding-right:1.1rem}
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="electoral-nav">
+    <div style="display:flex;align-items:center;gap:1rem">
+      <a href="electoral.html" class="e-btn-back">← Volver</a>
+      <div id="e-nav-auth" class="electoral-nav-auth"></div>
+    </div>
+    <a href="electoral.html" class="logo-link">
+      <div class="logo-bars">
+        <div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div>
+        <div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div>
+      </div>
+      <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+    </a>
+  </nav>
+
+  <div class="breadcrumb">
+    <a href="electoral.html">Electoral</a> &nbsp;/&nbsp; Segunda Vuelta 2026 &nbsp;/&nbsp; <span class="bc-current">Ponderador 2V</span>
+  </div>
+
+  <header class="page-header">
+    <div>
+      <div class="page-title">Ponderador · <span>Cepeda</span> vs <em>Abelardo</em></div>
+      <div class="page-sub">Promedio ponderado de las encuestas de segunda vuelta y simulador de trasvase desde el escrutinio de primera vuelta · elección del 21 de junio de 2026</div>
+    </div>
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
+  </header>
+
+  <div class="wrap">
+
+    <section class="use-note">
+      <strong>¿Cómo usar esta herramienta?</strong>
+      El número de arriba es el <em>promedio ponderado</em> de las encuestas reales de segunda vuelta (junio 2026), pesadas por la precisión histórica de cada firma y por su recencia —el mismo motor del <a href="previa-1v.html">ponderador de primera vuelta</a>.
+      Abajo, el <strong>simulador de trasvase</strong> parte de los resultados reales del escrutinio del 31 de mayo y te deja mover a dónde va el voto de Paloma, Fajardo, Claudia, los menores, el voto en blanco y la abstención: el mapa repinta el ganador por departamento en vivo.
+    </section>
+
+    <!-- HEAD TO HEAD -->
+    <section class="h2h-wrap">
+      <div class="h2h-head">
+        <div class="section-title">
+          Promedio de encuestas · 2ª vuelta
+          <button class="info-btn" onclick="openModal()" title="Metodología">?</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+          <span class="chip" id="pond-chip">5 encuestas de junio</span>
+          <div class="toggle-mini" id="base-toggle">
+            <button class="active" data-base="total" onclick="setBase('total')">Sobre el total</button>
+            <button data-base="valido" onclick="setBase('valido')">Votos válidos</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="h2h-cards">
+        <div class="cand-card cep">
+          <img class="cand-photo" src="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/Fotos-presidenciales/IVAN+CEPEDA.jpg" alt="Iván Cepeda" onerror="this.style.visibility='hidden'">
+          <div>
+            <div class="cand-name">Iván Cepeda</div>
+            <div class="cand-party">Pacto Histórico · fórmula Aída Quilcué</div>
+            <div class="cand-pct"><span id="hh-cep">43.7</span><small>%</small></div>
+          </div>
+        </div>
+        <div class="cand-card abe">
+          <img class="cand-photo" src="https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/Fotos-presidenciales/abelardo.jpg" alt="Abelardo de la Espriella" onerror="this.style.visibility='hidden'">
+          <div>
+            <div class="cand-name">Abelardo de la Espriella</div>
+            <div class="cand-party">Defensores de la Patria · fórmula J. M. Restrepo</div>
+            <div class="cand-pct"><span id="hh-abe">49.2</span><small>%</small></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="h2h-bar" id="hh-bar">
+        <div class="h2h-seg cep" id="seg-cep" style="width:43.7%">43.7%</div>
+        <div class="h2h-seg bl" id="seg-bl" style="width:7.1%"></div>
+        <div class="h2h-seg abe" id="seg-abe" style="width:49.2%">49.2%</div>
+      </div>
+      <div class="h2h-foot">
+        <span id="hh-margin">Abelardo aventaja a Cepeda por <b>5.5 pp</b></span>
+        <span id="hh-bl-note">Voto en blanco / indeciso: <b>7.1%</b></span>
+      </div>
+    </section>
+
+    <!-- TABS -->
+    <nav class="tabs">
+      <button class="tab active" data-view="encuestas" onclick="switchView('encuestas')">Encuestas y evolución</button>
+      <button class="tab" data-view="simulador" onclick="switchView('simulador')">Simulador de trasvase + mapa</button>
+    </nav>
+
+    <!-- VIEW: ENCUESTAS -->
+    <div class="view active" data-view="encuestas">
+      <div class="card">
+        <div class="section-title" style="margin-bottom:.3rem">Evolución de la intención de voto · 2ª vuelta</div>
+        <div class="muted" id="ev-sub">mayo–junio 2026 · puntos = encuestas publicadas · línea = promedio ponderado de las reales de junio</div>
+        <svg id="ev-svg" viewBox="0 0 880 360" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Evolución de la intención de voto de segunda vuelta"></svg>
+        <div class="ev-legend" id="ev-legend"></div>
+      </div>
+
+      <div class="card">
+        <div class="section-title" style="margin-bottom:.6rem">Las encuestas de segunda vuelta</div>
+        <div style="overflow-x:auto">
+        <table class="polls" id="polls-table">
+          <thead><tr>
+            <th>Firma</th><th>Campo</th><th class="num">n</th><th>Modo</th>
+            <th class="num">Cepeda</th><th class="num">Abelardo</th><th class="num">Blanco/ind.</th><th></th>
+          </tr></thead>
+          <tbody id="polls-tbody"></tbody>
+        </table>
+        </div>
+        <div class="muted" style="margin-top:.8rem">
+          Las <span class="tag hyp">hipotética</span> de mayo se midieron <b>antes</b> de la primera vuelta (cuando Cepeda lideraba en intención de 1V) y se muestran solo como contexto: <b>no pesan</b> en el promedio. Invamer anunció que no publicará más encuestas para la segunda vuelta.
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW: SIMULADOR -->
+    <div class="view" data-view="simulador">
+      <div class="card">
+        <div class="section-title" style="margin-bottom:.55rem">Punto de partida · escrutinio 1ª vuelta (31 may 2026)</div>
+        <div class="muted" id="base1v-note"></div>
+      </div>
+
+      <div class="sim-grid">
+        <div class="card" style="margin-top:0">
+          <div class="section-title" style="margin-bottom:.2rem">Trasvase de votos a la 2ª vuelta</div>
+          <div class="muted" style="margin-bottom:.4rem">Desliza hacia <span style="color:var(--cep)">Cepeda</span> o <span style="color:var(--abe)">Abelardo</span>. Defectos = matriz de trasvase observada por Atlas (1V→2V).</div>
+          <div id="sliders"></div>
+          <button class="btn" style="margin-top:.9rem" onclick="resetSliders()">↺ Restablecer al modelo Atlas</button>
+        </div>
+
+        <div class="card" style="margin-top:0">
+          <div class="section-title" style="margin-bottom:.6rem">Proyección 2ª vuelta (votos válidos)</div>
+          <div class="h2h-cards" style="grid-template-columns:1fr 1fr;margin-bottom:.8rem">
+            <div class="cand-card cep" style="padding:.7rem .8rem">
+              <div><div class="cand-name" style="font-size:.92rem">Cepeda</div>
+              <div class="cand-pct" style="font-size:1.8rem"><span id="sim-cep">46</span><small>%</small></div></div>
+            </div>
+            <div class="cand-card abe" style="padding:.7rem .8rem;flex-direction:row;text-align:left">
+              <div><div class="cand-name" style="font-size:.92rem">Abelardo</div>
+              <div class="cand-pct" style="font-size:1.8rem"><span id="sim-abe">54</span><small>%</small></div></div>
+            </div>
+          </div>
+          <div class="h2h-bar"><div class="h2h-seg cep" id="sim-seg-cep" style="width:46%">46%</div><div class="h2h-seg abe" id="sim-seg-abe" style="width:54%">54%</div></div>
+          <div class="h2h-foot"><span id="sim-margin"></span></div>
+          <div class="muted" style="margin-top:.8rem" id="sim-votes"></div>
+        </div>
+      </div>
+
+      <div class="map-card">
+        <div class="map-bar">
+          <div class="section-title">Proyección por departamento</div>
+          <div class="map-legend">
+            <span style="color:var(--cep)">Cepeda</span>
+            <span class="leg-grad"></span>
+            <span style="color:var(--abe)">Abelardo</span>
+            <span style="margin-left:.6rem" id="map-tally"></span>
+          </div>
+        </div>
+        <div id="leaflet-map"></div>
+        <div class="map-bar"><span class="muted" style="font-size:.72rem">El color marca el ganador proyectado en cada departamento aplicando el mismo trasvase nacional a la composición real de 1V de ese territorio. La intensidad refleja el margen. Pasa el cursor para el detalle.</span></div>
+      </div>
+    </div>
+
+    <div id="ev-tip"></div>
+
+    <div class="foot">
+      Ponderador propio · ricardoruiz.co · Encuestas de 2ª vuelta de junio 2026 (CB Global Data, CNC, Guarumo/EcoAnalítica, AtlasIntel/Semana, CELAG) registradas ante el CNE. Punto de partida del simulador: preconteo oficial de 1ª vuelta (snapshot del 31 may, ~99,9% del potencial). El simulador es un ejercicio de escenarios, no un pronóstico. Las cifras de trasvase por defecto provienen de la pregunta de voto 1V→2V de AtlasIntel. <a href="electoral.html">← Volver al hub electoral</a>
+    </div>
+
+  </div><!-- /wrap -->
+
+  <!-- MODAL METODOLOGÍA -->
+  <div class="modal" id="modal" onclick="if(event.target===this)closeModal()">
+    <div class="modal-box">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <div class="modal-title">¿Cómo se calcula?</div>
+      <div class="modal-body">
+        <h4>El promedio ponderado de encuestas</h4>
+        Cada encuesta de segunda vuelta entra al promedio con un peso
+        <code>w = q_firma × q_modo × e^(−λ·días)</code>, igual que el ponderador de primera vuelta.
+        <b>q_firma</b> es la calibración de cada casa contra el único terreno conocido post-Ley 2494 (las consultas del 8 de marzo): AtlasIntel 0.99, CNC 0.94, Guarumo 1.0 (neutro, sin MAE previo), CB Global 0.45 (firma nueva sin historial), CELAG 0.40 (firma extranjera, no registrada en el CNE, históricamente sesgada). <b>λ = 0.1</b> hace que una encuesta pierda relevancia con los días. Solo entran las <b>5 encuestas reales de junio</b> (post-31 may).
+        <h4>El simulador de trasvase</h4>
+        Parte de los votos <b>reales</b> de cada candidato en el escrutinio de 1ª vuelta. A cada bloque eliminado (Paloma, Fajardo, Claudia, menores, voto en blanco) y a la abstención se le aplica una tasa de trasvase a Cepeda y a Abelardo. Los valores por defecto son la <b>matriz de transferencia observada por AtlasIntel</b> (su cruce «voto en 1ª vuelta → intención en 2ª»): de los votantes de Paloma, ~85% van a Abelardo; los de Fajardo se dividen (~58% Cepeda); la abstención que se moviliza se inclina a Abelardo (~66%). La proyección es <code>válidos = proyCepeda / (proyCepeda + proyAbelardo)</code>.
+        <h4>El mapa</h4>
+        Aplica <b>el mismo trasvase nacional</b> a la composición real de 1ª vuelta de cada departamento. No usa encuestas departamentales (no existen para 2ª vuelta), así que es una proyección aritmética: dónde ganaría cada quien si el país entero se comportara como dicen los deslizadores.
+        <h4>Límites honestos</h4>
+        El trasvase asume tasas uniformes en todo el país; en la realidad varían por región. La abstención movilizable se estima sobre el potencial del preconteo (incompleto en ~3% de las mesas). Es una herramienta para <b>explorar escenarios</b>, no un pronóstico cerrado. ¿Ves algo raro? <a href="mailto:reruizc@gmail.com">reruizc@gmail.com</a>.
+      </div>
+    </div>
+  </div>
+
+<script src="theme.js"></script>
+<script src="lang.js"></script>
+<script>
+"use strict";
+/* ════════════════════════════════════════════════════════════════
+   PONDERADOR · SEGUNDA VUELTA 2026 · Cepeda vs Abelardo
+   ════════════════════════════════════════════════════════════════ */
+
+const COL = { cep:'#e23b50', abe:'#2f5fe0', gray:'#94a3b8' };
+
+/* ── ENCUESTAS DE SEGUNDA VUELTA ──────────────────────────────────
+   tipo:'real'  = medidas DESPUÉS de la 1ª vuelta (runoff real). Pesan.
+   tipo:'hip'   = hipotéticas pre-1V (mayo). Solo contexto en el chart. */
+const POLLS = [
+  // ── REALES (post 31-may) ──
+  { firma:'CB Global Data',                  fecha:'2026-06-04', n:1475, modo:'digital',    cep:43.3, abe:49.6, bl:7.1,  q:0.45, tipo:'real' },
+  { firma:'Centro Nacional de Consultoría',  fecha:'2026-06-11', n:2186, modo:'presencial', cep:44.7, abe:48.6, bl:6.7,  q:0.943,tipo:'real' },
+  { firma:'Guarumo / EcoAnalítica',          fecha:'2026-06-11', n:2073, modo:'presencial', cep:45.0, abe:52.6, bl:2.4,  q:1.0,  tipo:'real' },
+  { firma:'AtlasIntel / Semana',             fecha:'2026-06-11', n:2992, modo:'presencial', cep:43.1, abe:50.9, bl:5.9,  q:0.985,tipo:'real' },
+  { firma:'CELAG',                           fecha:'2026-06-13', n:2046, modo:'mixto',      cep:40.8, abe:39.7, bl:19.5, q:0.40, tipo:'real' },
+  // ── HIPOTÉTICAS (mayo, pre-1V) ──
+  { firma:'Guarumo / EcoAnalítica',          fecha:'2026-05-19', n:3787, modo:'presencial', cep:40.0, abe:43.6, bl:16.4, q:1.0,  tipo:'hip' },
+  { firma:'Invamer',                         fecha:'2026-05-20', n:3800, modo:'presencial', cep:52.4, abe:45.3, bl:2.3,  q:0.932,tipo:'hip' },
+  { firma:'AtlasIntel / Semana',             fecha:'2026-05-21', n:2900, modo:'digital',    cep:41.3, abe:50.0, bl:8.7,  q:0.985,tipo:'hip' },
+  { firma:'Centro Nacional de Consultoría',  fecha:'2026-05-22', n:2202, modo:'presencial', cep:40.9, abe:43.6, bl:15.5, q:0.943,tipo:'hip' },
+];
+const Q_MODO = { presencial:0.932, digital:0.985, telefonico:0.549, mixto:0.943, '':1.0 };
+const LAMBDA = 0.1;
+const HOY = Date.UTC(2026,5,15);   // corte
+const ELEC = Date.UTC(2026,5,21);  // 21 junio
+const FIRMA_SHAPE = {
+  'AtlasIntel / Semana':'circle','Invamer':'tri','Centro Nacional de Consultoría':'diamond',
+  'Guarumo / EcoAnalítica':'plus','CELAG':'hex','CB Global Data':'square',
+};
+function dms(s){ const [y,m,d]=s.split('-').map(Number); return Date.UTC(y,m-1,d); }
+POLLS.forEach(p=>{ p._t=dms(p.fecha); });
+
+/* ── RESULTADOS REALES 1ª VUELTA (preconteo final) ────────────── */
+const D1V = {"v":"2026-06-15","fuente":"preconteo 1V 2026 (snapshot 0247, ~99,9% del potencial)","nacional":{"cep":9604259,"abe":10256857,"pal":1622110,"faj":994044,"cla":223085,"otr":351005,"bln":693018,"urna":23744378,"pot":38430102},"deptos":{"Antioquia":{"cep":776046,"abe":1673271,"pal":286247,"faj":217755,"cla":13084,"otr":46164,"bln":96240,"urna":3108807,"pot":5006922},"Magdalena":{"cep":263014,"abe":197533,"pal":18398,"faj":7934,"cla":1229,"otr":7526,"bln":12359,"urna":507993,"pot":1055318},"Boyacá":{"cep":216425,"abe":337768,"pal":57602,"faj":28853,"cla":8175,"otr":9999,"bln":18811,"urna":677633,"pot":1009700},"Valle del Cauca":{"cep":1119914,"abe":710909,"pal":118541,"faj":77283,"cla":12664,"otr":26893,"bln":67033,"urna":2133237,"pot":3695619},"Cundinamarca":{"cep":599852,"abe":723985,"pal":123121,"faj":71743,"cla":26924,"otr":25194,"bln":54391,"urna":1625210,"pot":2167339},"Santander":{"cep":338400,"abe":679229,"pal":76313,"faj":46997,"cla":6396,"otr":21591,"bln":28813,"urna":1197739,"pot":1783605},"Bolívar":{"cep":443226,"abe":312574,"pal":23822,"faj":15690,"cla":2343,"otr":9763,"bln":19602,"urna":827020,"pot":1725593},"Bogotá":{"cep":1676595,"abe":1512633,"pal":366017,"faj":252520,"cla":100788,"otr":40915,"bln":103944,"urna":4053412,"pot":6026103},"Huila":{"cep":176721,"abe":297613,"pal":35802,"faj":14601,"cla":3357,"otr":10578,"bln":17184,"urna":555856,"pot":906061},"Atlántico":{"cep":549193,"abe":432784,"pal":20940,"faj":27808,"cla":2684,"otr":7942,"bln":18796,"urna":1060147,"pot":2034094},"Cauca":{"cep":462003,"abe":130595,"pal":40308,"faj":12033,"cla":3987,"otr":10417,"bln":36025,"urna":695368,"pot":1042867},"Córdoba":{"cep":391880,"abe":268604,"pal":19401,"faj":8325,"cla":1596,"otr":6021,"bln":15744,"urna":711571,"pot":1347208},"Nariño":{"cep":462545,"abe":147220,"pal":30799,"faj":12986,"cla":3857,"otr":7440,"bln":23835,"urna":688682,"pot":1178348},"Norte de Santander":{"cep":128088,"abe":519143,"pal":33319,"faj":28755,"cla":2398,"otr":14777,"bln":15212,"urna":741692,"pot":1329804},"Caldas":{"cep":146202,"abe":218852,"pal":61889,"faj":26703,"cla":4908,"otr":22873,"bln":21380,"urna":502807,"pot":822711},"Cesar":{"cep":224457,"abe":223840,"pal":11898,"faj":8174,"cla":1132,"otr":6250,"bln":12850,"urna":488601,"pot":872930},"Casanare":{"cep":54202,"abe":134114,"pal":14702,"faj":6028,"cla":1076,"otr":4915,"bln":7466,"urna":222503,"pot":313783},"La Guajira":{"cep":140319,"abe":96552,"pal":6204,"faj":2945,"cla":670,"otr":3370,"bln":7075,"urna":257135,"pot":671125},"Risaralda":{"cep":182268,"abe":226277,"pal":44561,"faj":26474,"cla":5041,"otr":10863,"bln":20195,"urna":515679,"pot":850764},"Quindío":{"cep":94337,"abe":142586,"pal":27539,"faj":15663,"cla":2369,"otr":5459,"bln":10995,"urna":298948,"pot":492506},"Putumayo":{"cep":94416,"abe":25087,"pal":4414,"faj":2131,"cla":582,"otr":2734,"bln":5130,"urna":134494,"pot":250395},"Tolima":{"cep":234002,"abe":313114,"pal":70468,"faj":20221,"cla":4848,"otr":13345,"bln":22608,"urna":678606,"pot":1128310},"Sucre":{"cep":226644,"abe":145696,"pal":14294,"faj":4355,"cla":856,"otr":3600,"bln":8860,"urna":404305,"pot":747602},"Chocó":{"cep":109020,"abe":22782,"pal":5640,"faj":1203,"cla":612,"otr":2579,"bln":5292,"urna":147128,"pot":343488},"Meta":{"cep":174242,"abe":280090,"pal":36706,"faj":17768,"cla":3236,"otr":15402,"bln":19511,"urna":546955,"pot":811728},"Guaviare":{"cep":12677,"abe":16060,"pal":2016,"faj":835,"cla":298,"otr":1075,"bln":1990,"urna":34951,"pot":66269},"Vaupés":{"cep":6932,"abe":1379,"pal":344,"faj":147,"cla":69,"otr":166,"bln":217,"urna":9254,"pot":24559},"Guainía":{"cep":6778,"abe":3722,"pal":688,"faj":188,"cla":112,"otr":274,"bln":372,"urna":12134,"pot":33771},"Caquetá":{"cep":66468,"abe":81783,"pal":8226,"faj":4048,"cla":879,"otr":4947,"bln":8642,"urna":174993,"pot":318635},"Arauca":{"cep":34097,"abe":50613,"pal":5889,"faj":2313,"cla":466,"otr":2730,"bln":4621,"urna":100729,"pot":216870},"Vichada":{"cep":9769,"abe":9334,"pal":954,"faj":293,"cla":92,"otr":531,"bln":598,"urna":21571,"pot":54375},"Amazonas":{"cep":13954,"abe":7887,"pal":1596,"faj":494,"cla":218,"otr":599,"bln":809,"urna":25557,"pot":53638},"San Andrés":{"cep":7936,"abe":7793,"pal":826,"faj":535,"cla":70,"otr":171,"bln":786,"urna":18117,"pot":48062}}};
+
+/* ── MODELO DE TRASVASE ──────────────────────────────────────────
+   Cada bloque transfiere a Cepeda una fracción `p` (slider) de su parte
+   transferible (1 − blanco fijo); el resto va a Abelardo. La abstención
+   se moviliza una fracción `m` y de ella `p` va a Cepeda.
+   Defaults = matriz observada por AtlasIntel (cruce 1V→2V).             */
+const SIM_DEF = {
+  fidC: 0.97,   // fidelidad Cepeda (resto → blanco/abstención)
+  fidA: 0.95,   // fidelidad Abelardo
+  pal:  0.033,  // Paloma → Cepeda (Atlas: 2.9 vs 84.5)
+  faj:  0.585,  // Fajardo → Cepeda (43.3 vs 30.7)
+  cla:  0.55,   // Claudia → Cepeda (estimado centro-izquierda)
+  otr:  0.478,  // menores+Botero → Cepeda (39.1 vs 42.7)
+  blo:  0.11,   // blanco/nulo 1V → Cepeda (1 vs 8 de la parte que se mueve)
+  mob:  0.06,   // abstención movilizada (fracción del potencial sin voto)
+  mobp: 0.342,  // de la abstención movilizada → Cepeda (27.4 vs 52.8)
+};
+// fracción que se queda en blanco/casa por bloque (no transferible)
+const BLANCO_FRAC = { pal:0.126, faj:0.260, cla:0.180, otr:0.182, blo:0.802, mob:0.130 };
+let SIM = { ...SIM_DEF };
+
+/* proyección 2V de un scope (objeto con cep,abe,pal,faj,cla,otr,bln,urna,pot) */
+function project(s){
+  const tr = (v, frac, p) => { const t = v*(1-frac); return { c:t*p, a:t*(1-p) }; };
+  let C = s.cep*SIM.fidC, A = s.abe*SIM.fidA;
+  let r;
+  r=tr(s.pal,BLANCO_FRAC.pal,SIM.pal); C+=r.c; A+=r.a;
+  r=tr(s.faj,BLANCO_FRAC.faj,SIM.faj); C+=r.c; A+=r.a;
+  r=tr(s.cla,BLANCO_FRAC.cla,SIM.cla); C+=r.c; A+=r.a;
+  r=tr(s.otr,BLANCO_FRAC.otr,SIM.otr); C+=r.c; A+=r.a;
+  r=tr(s.bln,BLANCO_FRAC.blo,SIM.blo); C+=r.c; A+=r.a;
+  const abst = Math.max(0, s.pot - s.urna) * SIM.mob;
+  r=tr(abst,BLANCO_FRAC.mob,SIM.mobp); C+=r.c; A+=r.a;
+  const tot = C+A;
+  return { C, A, cepPct: tot>0?100*C/tot:50, abePct: tot>0?100*A/tot:50 };
+}
+
+/* ── PONDERADOR (promedio de encuestas reales) ────────────────── */
+function ponderar(){
+  let sw=0, sc=0, sa=0, sb=0, swv=0, scv=0, nreal=0;
+  for (const p of POLLS){
+    if (p.tipo!=='real') continue;
+    nreal++;
+    const days = Math.max(0,(HOY-p._t)/86400000);
+    const w = p.q * (Q_MODO[p.modo]||1) * Math.exp(-LAMBDA*days);
+    sw+=w; sc+=w*p.cep; sa+=w*p.abe; sb+=w*p.bl;
+    const val=p.cep+p.abe; scv+=w*(p.cep/val*100); swv+=w;
+  }
+  return {
+    cep: sc/sw, abe: sa/sw, bl: sb/sw,
+    cepVal: scv/swv, abeVal: 100-scv/swv, n: nreal,
+  };
+}
+const POND = ponderar();
+let BASE_MODE = 'total';
+
+function setBase(mode){
+  BASE_MODE = mode;
+  document.querySelectorAll('#base-toggle button').forEach(b=>b.classList.toggle('active', b.dataset.base===mode));
+  renderH2H();
+}
+function renderH2H(){
+  const c = BASE_MODE==='valido'? POND.cepVal : POND.cep;
+  const a = BASE_MODE==='valido'? POND.abeVal : POND.abe;
+  const bl = BASE_MODE==='valido'? 0 : POND.bl;
+  document.getElementById('hh-cep').textContent = c.toFixed(1);
+  document.getElementById('hh-abe').textContent = a.toFixed(1);
+  document.getElementById('seg-cep').style.width = c+'%';
+  document.getElementById('seg-cep').textContent = c.toFixed(1)+'%';
+  document.getElementById('seg-abe').style.width = a+'%';
+  document.getElementById('seg-abe').textContent = a.toFixed(1)+'%';
+  document.getElementById('seg-bl').style.width = bl+'%';
+  const m = Math.abs(a-c);
+  const lead = a>c ? 'Abelardo aventaja a Cepeda' : 'Cepeda aventaja a Abelardo';
+  document.getElementById('hh-margin').innerHTML = `${lead} por <b>${m.toFixed(1)} pp</b>`;
+  document.getElementById('hh-bl-note').innerHTML = BASE_MODE==='valido'
+    ? 'Reparto solo entre los dos finalistas'
+    : `Voto en blanco / indeciso: <b>${POND.bl.toFixed(1)}%</b>`;
+  document.getElementById('pond-chip').textContent = `${POND.n} encuestas de junio`;
+}
+
+/* ── TABLA DE ENCUESTAS ───────────────────────────────────────── */
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+function fechaCorta(s){ const [y,m,d]=s.split('-').map(Number); return `${d} ${MESES[m-1]}`; }
+function renderPollsTable(){
+  const rows = POLLS.slice().sort((a,b)=>b._t-a._t).map(p=>{
+    const tag = p.tipo==='real' ? '<span class="tag real">2ª vuelta</span>' : '<span class="tag hyp">hipotética</span>';
+    return `<tr class="${p.tipo==='hip'?'hyp':''}">
+      <td>${p.firma}</td><td>${fechaCorta(p.fecha)}</td>
+      <td class="num">${p.n?p.n.toLocaleString('es-CO'):'—'}</td><td>${p.modo}</td>
+      <td class="num cep">${p.cep.toFixed(1)}</td><td class="num abe">${p.abe.toFixed(1)}</td>
+      <td class="num">${p.bl.toFixed(1)}</td><td>${tag}</td></tr>`;
+  }).join('');
+  document.getElementById('polls-tbody').innerHTML = rows;
+}
+
+/* ── CHART DE EVOLUCIÓN ───────────────────────────────────────── */
+function evMarker(sh,x,y,r,fill){
+  if (sh==='tri') return `<path d="M${x} ${y-r} L${x+r} ${y+r} L${x-r} ${y+r}Z" fill="${fill}"/>`;
+  if (sh==='diamond') return `<path d="M${x} ${y-r} L${x+r} ${y} L${x} ${y+r} L${x-r} ${y}Z" fill="${fill}"/>`;
+  if (sh==='square') return `<rect x="${x-r}" y="${y-r}" width="${2*r}" height="${2*r}" fill="${fill}"/>`;
+  if (sh==='plus') return `<path d="M${x-r} ${y} H${x+r} M${x} ${y-r} V${y+r}" stroke="${fill}" stroke-width="2.2"/>`;
+  if (sh==='hex') return `<path d="M${x} ${y-r} L${x+r} ${y-r/2} L${x+r} ${y+r/2} L${x} ${y+r} L${x-r} ${y+r/2} L${x-r} ${y-r/2}Z" fill="${fill}"/>`;
+  return `<circle cx="${x}" cy="${y}" r="${r}" fill="${fill}"/>`;
+}
+// promedio ponderado de las REALES en el momento t (línea suavizada)
+function rollingAt(t, key){
+  let sw=0,sv=0;
+  for (const p of POLLS){
+    if (p.tipo!=='real') continue;
+    const days=(t-p._t)/86400000;
+    if (days<0) continue;
+    const w = p.q*(Q_MODO[p.modo]||1)*Math.exp(-LAMBDA*Math.max(0,days));
+    sw+=w; sv+=w*p[key];
+  }
+  return sw>0? sv/sw : null;
+}
+function renderEvol(){
+  const svg = document.getElementById('ev-svg');
+  if (!svg) return;
+  const day = document.body.classList.contains('day-mode');
+  const W=880,H=360, ML=44,MR=120,MT=24,MB=46, PW=W-ML-MR, PH=H-MT-MB;
+  const T0=Date.UTC(2026,4,1), T1=ELEC;
+  const xOf = t => ML + ((t-T0)/(T1-T0))*PW;
+  const yMin=30, yMax=58;
+  const yOf = v => MT + (1-(v-yMin)/(yMax-yMin))*PH;
+  const parts=[];
+  // grid
+  let g='<g class="ev-grid">';
+  for (let v=30; v<=58; v+=4){ const y=yOf(v); g+=`<line x1="${ML}" y1="${y}" x2="${ML+PW}" y2="${y}"/>`; }
+  g+='</g>'; parts.push(g);
+  let ax='<g class="ev-axis">';
+  for (let v=30; v<=58; v+=4){ const y=yOf(v); ax+=`<text x="${ML-7}" y="${y+4}" text-anchor="end">${v}%</text>`; }
+  for (const mm of [[Date.UTC(2026,4,1),'1 may'],[Date.UTC(2026,4,15),'15 may'],[Date.UTC(2026,5,1),'1 jun'],[Date.UTC(2026,5,15),'15 jun'],[ELEC,'21 jun']]){
+    const x=xOf(mm[0]); ax+=`<text x="${x}" y="${MT+PH+18}" text-anchor="middle">${mm[1]}</text>`;
+  }
+  ax+='</g>'; parts.push(ax);
+  // línea 1ª vuelta + corte
+  const x1v=xOf(Date.UTC(2026,4,31));
+  parts.push(`<line class="ev-vert-line" x1="${x1v}" y1="${MT}" x2="${x1v}" y2="${MT+PH}"/>`,
+             `<text class="ev-vert-label" x="${x1v-4}" y="${MT+10}" text-anchor="end">1ª vuelta</text>`);
+  const xc=xOf(HOY);
+  parts.push(`<rect class="ev-pred-zone" x="${xc}" y="${MT}" width="${ML+PW-xc}" height="${PH}"/>`,
+             `<text class="ev-vert-label" x="${xc+4}" y="${MT+10}">corte hoy</text>`);
+  // líneas ponderadas (solo reales): desde la primera real hasta corte, luego proyección plana a 21 jun
+  const tFirst = Math.min(...POLLS.filter(p=>p.tipo==='real').map(p=>p._t));
+  for (const key of ['abe','cep']){
+    const col = COL[key];
+    let d='', started=false;
+    for (let t=tFirst; t<=HOY; t+=86400000){
+      const v=rollingAt(t,key); if (v==null) continue;
+      const x=xOf(t), y=yOf(Math.max(yMin,Math.min(yMax,v)));
+      d+=(started?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)+' '; started=true;
+    }
+    parts.push(`<path class="ev-halo" stroke="${col}" d="${d}"/>`,`<path class="ev-line" stroke="${col}" d="${d}"/>`);
+    // proyección plana hasta elección
+    const vEnd=rollingAt(HOY,key);
+    if (vEnd!=null){ const y=yOf(Math.max(yMin,Math.min(yMax,vEnd))); parts.push(`<path class="ev-proj" stroke="${col}" d="M${xc} ${y} L${xOf(ELEC)} ${y}"/>`); }
+  }
+  // markers
+  POLLS.forEach((p,pi)=>{
+    const sh=FIRMA_SHAPE[p.firma]||'circle';
+    for (const key of ['cep','abe']){
+      const col=COL[key], x=xOf(p._t), y=yOf(Math.max(yMin,Math.min(yMax,p[key])));
+      const op = p.tipo==='hip'? 0.42 : 1;
+      parts.push(`<g class="ev-mark-hit" data-poll="${pi}" opacity="${op}">`+
+        `<circle class="ev-mark-glow" cx="${x}" cy="${y}" r="10" fill="${col}"/>`+
+        evMarker(sh,x,y,4.5,col)+
+        `<circle cx="${x}" cy="${y}" r="9" fill="${col}" fill-opacity="0" pointer-events="all"/></g>`);
+    }
+  });
+  // etiquetas fin (valor ponderado al corte)
+  const vc=rollingAt(HOY,'cep'), va=rollingAt(HOY,'abe');
+  const xL=xc+8;
+  [['Abelardo',va,COL.abe],['Cepeda',vc,COL.cep]].forEach(l=>{
+    if (l[1]==null) return;
+    let y=yOf(Math.max(yMin,Math.min(yMax,l[1])));
+    parts.push(`<circle cx="${xc}" cy="${y}" r="3" fill="${l[2]}"/>`,
+      `<text class="ev-end-label" x="${xL}" y="${y-2}" fill="${l[2]}">${l[0]}</text>`,
+      `<text class="ev-end-pct" x="${xL}" y="${y+14}" fill="${l[2]}">${l[1].toFixed(1)}%</text>`);
+  });
+  svg.innerHTML = parts.join('');
+  bindEvHover(svg);
+  // leyenda firmas
+  const firmas=[...new Set(POLLS.map(p=>p.firma))];
+  document.getElementById('ev-legend').innerHTML =
+    `<span class="item"><span class="dot" style="background:${COL.cep}"></span>Cepeda</span>`+
+    `<span class="item"><span class="dot" style="background:${COL.abe}"></span>Abelardo</span>`+
+    `<span class="item" style="opacity:.5">○ marcador tenue = hipotética de mayo</span>`;
+}
+function bindEvHover(svg){
+  const tip=document.getElementById('ev-tip');
+  svg.querySelectorAll('.ev-mark-hit').forEach(g=>{
+    g.addEventListener('mousemove', e=>{
+      const p=POLLS[+g.dataset.poll];
+      tip.innerHTML=`<b>${p.firma}</b><br>${fechaCorta(p.fecha)} · n=${p.n?p.n.toLocaleString('es-CO'):'—'} · ${p.modo}<br>`+
+        `<span style="color:${COL.cep}">Cepeda ${p.cep}%</span> · <span style="color:${COL.abe}">Abelardo ${p.abe}%</span>`+
+        (p.tipo==='hip'?'<br><i style="opacity:.6">hipotética pre-1V</i>':'');
+      tip.style.display='block';
+      tip.style.left=Math.min(e.clientX+14, window.innerWidth-250)+'px';
+      tip.style.top=(e.clientY+14)+'px';
+    });
+    g.addEventListener('mouseleave', ()=>{ tip.style.display='none'; });
+  });
+}
+
+/* ── SLIDERS DEL SIMULADOR ────────────────────────────────────── */
+const SLIDERS = [
+  { key:'fidC', lab:'Fidelidad de Cepeda',   sub:'qué % de su voto de 1V retiene', min:80, max:100, scale:100, half:false },
+  { key:'fidA', lab:'Fidelidad de Abelardo', sub:'qué % de su voto de 1V retiene', min:80, max:100, scale:100, half:false },
+  { key:'pal',  lab:'Voto de Paloma Valencia', vt:'1.62M', sub:'centro-derecha que se reagrupa', half:true },
+  { key:'faj',  lab:'Voto de Sergio Fajardo',  vt:'0.99M', sub:'centro disputado', half:true },
+  { key:'cla',  lab:'Voto de Claudia López',   vt:'0.22M', sub:'centro anti-Petro', half:true },
+  { key:'otr',  lab:'Menores + Botero',        vt:'0.35M', sub:'Botero, Lizcano, etc.', half:true },
+  { key:'blo',  lab:'Voto en blanco / nulo 1V', vt:'0.69M', sub:'la mayoría se queda en blanco', half:true },
+  { key:'mob',  lab:'Abstención que se moviliza', sub:'% del potencial sin voto que sale a votar', min:0, max:30, scale:100, half:false },
+  { key:'mobp', lab:'…y de ellos, a Cepeda',   sub:'reparto de los nuevos votantes', half:true },
+];
+function renderSliders(){
+  const html = SLIDERS.map(s=>{
+    if (s.half){
+      const p = Math.round(SIM[s.key]*100);
+      return `<div class="slider-row">
+        <div class="slider-top">
+          <span class="slider-lab">${s.lab}${s.vt?`<span class="vt">${s.vt}</span>`:''}</span>
+          <span class="slider-val"><span class="a">Abe ${100-p}%</span> · <span class="c">Cep ${p}%</span></span>
+        </div>
+        <input type="range" min="0" max="100" value="${p}" oninput="onSlider('${s.key}',this.value,100)">
+        <div class="slider-sub">${s.sub}</div></div>`;
+    } else {
+      const v = Math.round(SIM[s.key]*s.scale);
+      return `<div class="slider-row">
+        <div class="slider-top">
+          <span class="slider-lab">${s.lab}</span>
+          <span class="slider-val">${v}%</span>
+        </div>
+        <input type="range" min="${s.min}" max="${s.max}" value="${v}" oninput="onSlider('${s.key}',this.value,${s.scale})">
+        <div class="slider-sub">${s.sub}</div></div>`;
+    }
+  }).join('');
+  document.getElementById('sliders').innerHTML = html;
+}
+function onSlider(key,val,scale){ SIM[key] = (+val)/scale; renderSliders(); renderSim(); repaintMap(); }
+function resetSliders(){ SIM = { ...SIM_DEF }; renderSliders(); renderSim(); repaintMap(); }
+
+function renderSim(){
+  const r = project(D1V.nacional);
+  document.getElementById('sim-cep').textContent = Math.round(r.cepPct);
+  document.getElementById('sim-abe').textContent = Math.round(r.abePct);
+  document.getElementById('sim-seg-cep').style.width = r.cepPct+'%';
+  document.getElementById('sim-seg-cep').textContent = r.cepPct.toFixed(0)+'%';
+  document.getElementById('sim-seg-abe').style.width = r.abePct+'%';
+  document.getElementById('sim-seg-abe').textContent = r.abePct.toFixed(0)+'%';
+  const m=Math.abs(r.abePct-r.cepPct);
+  const win = r.abePct>r.cepPct?'Abelardo':'Cepeda';
+  document.getElementById('sim-margin').innerHTML = `Ganaría <b style="color:${win==='Abelardo'?COL.abe:COL.cep}">${win}</b> por <b>${m.toFixed(1)} pp</b>`;
+  const fmt = n => (n/1e6).toFixed(2)+' M';
+  document.getElementById('sim-votes').innerHTML =
+    `Cepeda ≈ <b>${fmt(r.C)}</b> · Abelardo ≈ <b>${fmt(r.A)}</b> votos proyectados (escenario actual).`;
+}
+
+function renderBase1V(){
+  const n=D1V.nacional;
+  const val=n.cep+n.abe+n.pal+n.faj+n.cla+n.otr;
+  const pct = v => (100*v/val).toFixed(1);
+  document.getElementById('base1v-note').innerHTML =
+    `<b style="color:${COL.cep}">Cepeda ${pct(n.cep)}%</b> · <b style="color:${COL.abe}">Abelardo ${pct(n.abe)}%</b> · `+
+    `Paloma ${pct(n.pal)}% · Fajardo ${pct(n.faj)}% · Claudia ${pct(n.cla)}% · menores ${pct(n.otr)}% `+
+    `<span class="muted">(sobre votos por candidato). Abelardo ganó la 1ª vuelta; el centro-derecha de Paloma y la abstención son las llaves de la 2ª.</span>`;
+}
+
+/* ── MAPA ─────────────────────────────────────────────────────── */
+const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
+const DEPTOS_URL = `${S3}/mapas-2026/DEPARTAMENTOS2.json`;
+let map=null, deptLayer=null, geoData=null;
+function norm(s){ return (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim(); }
+const DEP_ALIAS = { 'DISTRITO CAPITAL DE BOGOTA':'Bogotá','BOGOTA DC':'Bogotá','BOGOTA D.C.':'Bogotá','BOGOTA':'Bogotá','SAN ANDRES Y PROVIDENCIA':'San Andrés','ARCHIPIELAGO DE SAN ANDRES PROVIDENCIA Y SANTA CATALINA':'San Andrés' };
+const _depKeyByNorm = {};
+Object.keys(D1V.deptos).forEach(k=>{ _depKeyByNorm[norm(k)] = k; });
+function depKeyFor(props){
+  const raw = props.name || props.NOMBRE_DPT || props.dpto || props.DPTO_CNMBR || '';
+  const nn = norm(raw);
+  if (_depKeyByNorm[nn]) return _depKeyByNorm[nn];
+  if (DEP_ALIAS[nn]) return DEP_ALIAS[nn];
+  // intento por prefijo (Norte de Santander, Valle del Cauca…)
+  for (const k of Object.keys(D1V.deptos)){ if (norm(k)===nn) return k; }
+  return null;
+}
+function hexToRgb(h){ h=h.replace('#',''); return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; }
+function mix(hex,t){ // t=0 → blanco-grisáceo, t=1 → color pleno
+  const [r,g,b]=hexToRgb(hex); const W=[226,222,211];
+  const tt=Math.max(0,Math.min(1,t));
+  return `rgb(${Math.round(W[0]+(r-W[0])*tt)},${Math.round(W[1]+(g-W[1])*tt)},${Math.round(W[2]+(b-W[2])*tt)})`;
+}
+function depStyle(props){
+  const k=depKeyFor(props);
+  if (!k) return { fillColor:'#1a1d2e', fillOpacity:.35, color:'rgba(255,255,255,.25)', weight:1 };
+  const r=project(D1V.deptos[k]);
+  const win = r.abePct>=r.cepPct ? COL.abe : COL.cep;
+  const margin = Math.abs(r.abePct-r.cepPct);          // 0..~80
+  const t = Math.min(1, 0.25 + margin/45);
+  return { fillColor: mix(win,t), fillOpacity:.92, color:'rgba(255,255,255,.32)', weight:1 };
+}
+function depTooltip(k){
+  const s=D1V.deptos[k]; const r=project(s);
+  const val=s.cep+s.abe+s.pal+s.faj+s.cla+s.otr;
+  const win=r.abePct>=r.cepPct?'Abelardo':'Cepeda';
+  const wc=r.abePct>=r.cepPct?COL.abe:COL.cep;
+  return `<div style="line-height:1.5"><b>${k}</b><br>`+
+    `Proyección 2V: <b style="color:${wc}">${win} ${Math.max(r.cepPct,r.abePct).toFixed(1)}%</b><br>`+
+    `<span style="color:${COL.cep}">Cepeda ${r.cepPct.toFixed(1)}</span> · <span style="color:${COL.abe}">Abelardo ${r.abePct.toFixed(1)}</span><br>`+
+    `<span style="opacity:.6;font-size:.9em">1V: Cepeda ${(100*s.cep/val).toFixed(0)}% · Abelardo ${(100*s.abe/val).toFixed(0)}% · Paloma ${(100*s.pal/val).toFixed(0)}%</span></div>`;
+}
+async function initMap(){
+  map = L.map('leaflet-map',{ center:[4.5,-73.5], zoom:5, zoomControl:false, attributionControl:true, scrollWheelZoom:false, doubleClickZoom:false, dragging:false, touchZoom:false, keyboard:false, boxZoom:false, tap:false });
+  map.getContainer().style.background = document.body.classList.contains('day-mode')?'#dbd2c4':'#060810';
+  setTimeout(()=>map.invalidateSize(),200);
+  try{
+    const res = await fetch(DEPTOS_URL); geoData = await res.json();
+    deptLayer = L.geoJSON(geoData,{ style:f=>depStyle(f.properties), onEachFeature }).addTo(map);
+    try{ const b=deptLayer.getBounds(); if (b.isValid()) map.fitBounds(b,{padding:[10,10]}); }catch(e){}
+    updateTally();
+  }catch(e){ console.error('[2V] error cargando deptos:',e); }
+}
+function onEachFeature(f, layer){
+  const k=depKeyFor(f.properties);
+  layer.on({
+    mouseover(){ layer.setStyle({weight:2.4,color:'#fff',fillOpacity:.99}); if(k) layer.bindTooltip(depTooltip(k),{sticky:true,className:'rr2v',opacity:1}).openTooltip(); },
+    mouseout(){ if(deptLayer) deptLayer.resetStyle(layer); layer.closeTooltip(); },
+  });
+}
+function repaintMap(){
+  if (!deptLayer) return;
+  deptLayer.setStyle(f=>depStyle(f.properties));
+  updateTally();
+}
+function updateTally(){
+  let cw=0, aw=0;
+  for (const k of Object.keys(D1V.deptos)){ const r=project(D1V.deptos[k]); if (r.abePct>=r.cepPct) aw++; else cw++; }
+  const el=document.getElementById('map-tally');
+  if (el) el.innerHTML = `<span style="color:${COL.cep}">Cepeda ${cw}</span> · <span style="color:${COL.abe}">Abelardo ${aw}</span> deptos`;
+}
+
+/* ── TABS / MODAL ─────────────────────────────────────────────── */
+function switchView(v){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.view===v));
+  document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active', el.dataset.view===v));
+  if (v==='simulador'){
+    if (!map) initMap(); else setTimeout(()=>{ map.invalidateSize(); repaintMap(); },120);
+  }
+}
+function openModal(){ document.getElementById('modal').classList.add('open'); document.body.style.overflow='hidden'; }
+function closeModal(){ document.getElementById('modal').classList.remove('open'); document.body.style.overflow=''; }
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+
+/* re-render chart on theme change */
+window.__onThemeChange = function(){ renderEvol(); if (map) map.getContainer().style.background = document.body.classList.contains('day-mode')?'#dbd2c4':'#060810'; };
+
+/* ── AUTH CHIP (mismo modelo que el resto del sitio) ──────────── */
+function updateNavAuth(){
+  const area=document.getElementById('e-nav-auth'); if(!area) return;
+  const token=localStorage.getItem('rr-token');
+  let user=null; try{ user=JSON.parse(localStorage.getItem('rr-user')||'null'); }catch(e){}
+  if (token && user){
+    const planLabels={ free:'Free', pro:'Pro', premium:'Premium', basic:'Básico', full:'Premium' };
+    const pl=planLabels[user.plan]||user.plan||'Free';
+    const fn=(user.name||'Usuario').split(' ')[0];
+    area.innerHTML=`<span class="e-user-plan">${pl}</span><a href="dashboard.html" class="e-user-name">${fn}</a><button class="e-btn-logout" onclick="eLogOut()">Salir</button>`;
+  } else {
+    area.innerHTML=`<button class="e-btn-login" onclick="location.href='login.html'">Iniciar sesión</button><a href="register.html" class="e-btn-register">Registrarse</a>`;
+  }
+}
+async function eLogOut(){
+  const token=localStorage.getItem('rr-token');
+  if (token){ try{ await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{Authorization:`Bearer ${token}`}});}catch(e){} }
+  localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); updateNavAuth();
+}
+
+/* ── BOOT ─────────────────────────────────────────────────────── */
+function boot(){
+  updateNavAuth();
+  renderH2H();
+  renderPollsTable();
+  renderEvol();
+  renderBase1V();
+  renderSliders();
+  renderSim();
+}
+if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+window.addEventListener('resize', ()=>{ renderEvol(); });
+</script>
+</body>
+</html>
