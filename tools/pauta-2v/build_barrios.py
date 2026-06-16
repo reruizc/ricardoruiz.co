@@ -102,13 +102,20 @@ def find_namefield(gdf, pref):
     return None
 
 def render_png(gdf, col, fname, title, cmap):
-    sub = gdf[gdf[col].notna()]
-    if not len(sub): return
+    notna = gdf[gdf[col].notna()]
+    if not len(notna): return
+    vmin, vmax = float(notna[col].min()), float(notna[col].max())
+    direct = gdf[(gdf[col].notna()) & (gdf["f"]==0)]
+    filled = gdf[(gdf[col].notna()) & (gdf["f"]==1)]
     fig, ax = plt.subplots(figsize=(6.6,6.2), dpi=130)
     fig.patch.set_facecolor(PAPER); ax.set_facecolor(PAPER)
     gdf.plot(ax=ax, color="#e6e0d4", edgecolor="#cdc6b6", linewidth=.25)
-    sub.plot(ax=ax, column=col, cmap=cmap, edgecolor="#00000022", linewidth=.2,
-             legend=True, legend_kwds={"shrink":.5,"pad":.01})
+    if len(filled):  # heredados del vecino: traslúcidos
+        filled.plot(ax=ax, column=col, cmap=cmap, vmin=vmin, vmax=vmax,
+                    edgecolor="#00000018", linewidth=.15, alpha=.45)
+    direct.plot(ax=ax, column=col, cmap=cmap, vmin=vmin, vmax=vmax,
+                edgecolor="#00000022", linewidth=.2, legend=True,
+                legend_kwds={"shrink":.5,"pad":.01})
     minx,miny,maxx,maxy = pts_city.total_bounds
     ax.set_xlim(minx-.005,maxx+.005); ax.set_ylim(miny-.005,maxy+.005)
     ax.set_axis_off(); ax.set_title(title, fontsize=12, fontweight="bold", color=INK, loc="left")
@@ -136,6 +143,18 @@ for slug,name,code,gj,nf,lean,approx,frame in CITIES:
         g.at[bi,"men"]=round(r["H"]/censo,3) if censo>0 else None
     for c in ("rec","young","men","censo"): g[c]=pd.to_numeric(g[c], errors="coerce")
     g["npue"]=pd.to_numeric(g["npue"], errors="coerce").fillna(0).astype(int)
+    # ── heredar del vecino más cercano: barrios sin puesto propio ───────────
+    g["f"]=0
+    have = g[g["npue"]>0]; need = g[g["npue"]==0]
+    if len(have) and len(need):
+        hc = have.copy(); hc["geometry"]=hc.geometry.to_crs(3857).centroid.to_crs(4326)
+        nc = need.copy(); nc["geometry"]=nc.geometry.to_crs(3857).centroid.to_crs(4326)
+        nn = gpd.sjoin_nearest(nc[["geometry"]].to_crs(3857),
+                               hc[["rec","young","men","geometry"]].to_crs(3857), how="left")
+        nn = nn[~nn.index.duplicated(keep="first")]
+        for idx,row in nn.iterrows():
+            for c in ("rec","young","men"): g.at[idx,c]=row[c]
+            g.at[idx,"f"]=1
     pts_city = j  # para encuadre PNG
     # PNG para el Word (no rotamos: orientación geográfica real)
     if slug in WORD_CITIES:
@@ -147,7 +166,7 @@ for slug,name,code,gj,nf,lean,approx,frame in CITIES:
     gw = gw[gw.geometry.notna() & ~gw.geometry.is_empty]
     out_path = os.path.join(OUT,"barrios",f"{slug}.json")
     gw.to_file(out_path, driver="GeoJSON")
-    nb = (g["rec"].notna()).sum()
+    nb = int((g["npue"]>0).sum())   # directos (los heredados llevan f=1)
     sz = round(os.path.getsize(out_path)/1024,1)
     index.append({"slug":slug,"name":name,"lean":lean,"approx":approx,
                   "nbarrios":int(len(g)),"con_dato":int(nb),"kb":sz})
