@@ -201,7 +201,7 @@ meta = {
 # munis compactos para el HTML (solo lo que pinta el mapa/tabla)
 munis_html = [{
     "cod":x["cod"],"dep":x["dep"],"muni":x["muni"],
-    "rec":x["recuperar"],"cen":x["centro"],"net":x["abst_neto"],
+    "rec":x["recuperar"],"cen":x["centro"],"net":x["abst_neto"],"base":x["base"],"techo":x["techo"],
     "censo":x["censo"],"part": round(x["votantes"]/x["censo"],3) if x["censo"] else None,
     "izq":x["share_izq2v"],"young":x["young_share"],"cy":x["cep_young"],
     "men":x["men_share"],"lat":x["lat"],"lon":x["lon"],
