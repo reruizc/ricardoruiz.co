@@ -116,7 +116,7 @@ def render_png(gdf, col, fname, title, cmap):
     direct.plot(ax=ax, column=col, cmap=cmap, vmin=vmin, vmax=vmax,
                 edgecolor="#00000022", linewidth=.2, legend=True,
                 legend_kwds={"shrink":.5,"pad":.01})
-    minx,miny,maxx,maxy = pts_city.total_bounds
+    minx,miny,maxx,maxy = notna.total_bounds
     ax.set_xlim(minx-.005,maxx+.005); ax.set_ylim(miny-.005,maxy+.005)
     ax.set_axis_off(); ax.set_title(title, fontsize=12, fontweight="bold", color=INK, loc="left")
     fig.savefig(os.path.join(OUT,"png",fname), bbox_inches="tight", facecolor=PAPER); plt.close(fig)
@@ -155,7 +155,14 @@ for slug,name,code,gj,nf,lean,approx,frame in CITIES:
         for idx,row in nn.iterrows():
             for c in ("rec","young","men"): g.at[idx,c]=row[c]
             g.at[idx,"f"]=1
-    pts_city = j  # para encuadre PNG
+    # centroide REAL (lat/lon) como propiedad → el "copiar para Meta" del HTML
+    # usa coords verdaderas aunque Bogotá se gire para mostrarse.
+    cent = g.geometry.to_crs(3857).centroid.to_crs(4326)
+    g["clon"] = cent.x.round(5); g["clat"] = cent.y.round(5)
+    # Bogotá se gira 90° a la izquierda (convención del sitio) — solo para DISPLAY
+    if slug == "bogota":
+        g["geometry"] = g.geometry.rotate(90, origin=(-74.08, 4.65))
+    pts_city = j  # (sin uso tras cambiar el encuadre a notna.total_bounds)
     # PNG para el Word (no rotamos: orientación geográfica real)
     if slug in WORD_CITIES:
         render_png(g, "rec", f"m_{slug}_rec_barrio.png", f"{name} · voto recuperable por barrio", "Reds")
