@@ -158,15 +158,15 @@
   <div class="cursor-ring" id="cursorRing"></div>
 
   <nav id="topNav" hidden>
-    <a href="dashboard.html" class="logo-link" aria-label="Ricardo.Ruiz">
-      <span class="logo-bars"><i style="height:18px"></i><i style="height:13px"></i><i style="height:8px"></i><i style="height:4px"></i></span>
-      <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
-    </a>
+    <a class="btn back" href="dashboard.html">← Volver</a>
     <span class="navlabel">Plan de Pauta Digital · 2ª Vuelta</span>
     <span class="priv">Privado</span>
     <span class="sp"></span>
     <button onclick="toggleTheme()" id="themeBtn">◐</button>
-    <a class="btn" href="dashboard.html">Salir</a>
+    <a href="dashboard.html" class="logo-link" aria-label="Ricardo.Ruiz">
+      <span class="logo-bars"><i style="height:18px"></i><i style="height:13px"></i><i style="height:8px"></i><i style="height:4px"></i></span>
+      <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+    </a>
   </nav>
 
   <main id="main" hidden>
@@ -176,7 +176,7 @@
       <h1>Dónde, a quién y con qué pautar en los días que quedan</h1>
       <p class="lead" id="leadTxt"></p>
       <div class="kpis" id="heroKpis"></div>
-      <p class="muted" style="margin-top:1rem">Las cifras salen del preconteo de 1ª vuelta por mesa + el modelo de 2ª vuelta (techo <span data-nm="izq22"></span>&nbsp;2V&nbsp;2022) + el análisis de edad por inferencia ecológica. Es un escenario para dimensionar la pauta, no un pronóstico.</p>
+      <p class="muted" style="margin-top:1rem">Las cifras salen del escrutinio de 1ª vuelta por mesa + el modelo de 2ª vuelta (techo <span data-nm="izq22"></span>&nbsp;2V&nbsp;2022) + el análisis de edad por inferencia ecológica. Es un escenario para dimensionar la pauta, no un pronóstico.</p>
     </section>
 
     <!-- ESTRATEGIA -->
@@ -350,7 +350,7 @@
 
     <footer>
       <div class="draft">Borrador automático · ricardoruiz.co</div>
-      <p style="margin-top:.6rem;color:var(--ink-3)">Fuentes: preconteo 1V 2026 por mesa (Registraduría) · modelo de 2ª vuelta con supuestos de trasvase explícitos (techo = <span data-nm="izq22"></span> 2V 2022) · censo electoral Divipole + georreferenciación de puestos · análisis de composición etaria por inferencia ecológica a nivel puesto (IC95 ±3-6 pp típico). El bloque de movilización es un escenario para dimensionar pauta, no un pronóstico. La inferencia ecológica acota, no fija intención individual.</p>
+      <p style="margin-top:.6rem;color:var(--ink-3)">Fuentes: escrutinio 1V 2026 por mesa (Registraduría) · modelo de 2ª vuelta con supuestos de trasvase explícitos (techo = <span data-nm="izq22"></span> 2V 2022) · censo electoral Divipole + georreferenciación de puestos · análisis de composición etaria por inferencia ecológica a nivel puesto (IC95 ±3-6 pp típico). El bloque de movilización es un escenario para dimensionar pauta, no un pronóstico. La inferencia ecológica acota, no fija intención individual.</p>
     </footer>
   </main>
 
@@ -671,7 +671,7 @@
   function fillNames(){ document.querySelectorAll('[data-nm]').forEach(el=>{ const k=el.getAttribute('data-nm'); if(N[k]) el.textContent=N[k]; }); }
 
   // ─── MAPA DE CALOR POR BARRIO ─────────────────────────────────────────────
-  let bMap,bLayer,bGeo=null,bMetric='rec',bCitySlug=null;
+  let bMap,bLayer,bGeo=null,bMetric='rec',bCitySlug=null,bZoom=0,bBox=null;
   function buildBarrioSel(){
     const sel=document.getElementById('barrioCitySel'); const idx=DATA.barrio_index||[];
     if(!idx.length){ const s=document.getElementById('barrioSection'); if(s) s.style.display='none'; return; }
@@ -680,7 +680,7 @@
   }
   async function loadBarrioCity(){
     const slug=document.getElementById('barrioCitySel').value; bCitySlug=slug;
-    const meta=(DATA.barrio_index||[]).find(c=>c.slug===slug)||{};
+    const meta=(DATA.barrio_index||[]).find(c=>c.slug===slug)||{}; bZoom=meta.zoom||0; bBox=meta.bbox||null;
     document.getElementById('barrioNote').innerHTML=(meta.approx?'<b>Polígonos aproximados.</b> ':'')+(meta.lean==='der'?'Ciudad que tiende a la derecha — sirve para ubicar los pocos bolsones de izquierda. ':'')+`${meta.con_dato||0} barrios con dato directo (de ${meta.nbarrios||0}).`;
     try{ bGeo=await (await fetch(DATA_BASE+'barrios/'+slug+'.json')).json(); }catch(e){ toast('No cargó '+slug); return; }
     if(!bMap){ bMap=L.map('barrioMap',{zoomControl:true,attributionControl:false,scrollWheelZoom:false}).setView([4.6,-74.1],11); }
@@ -700,7 +700,7 @@
         l.on('mouseout',()=>l.setStyle({weight:.3,color:'#00000026'}));
         if(p.rec!=null) l.bindTooltip(`<b>${p.nm}</b><br>${barrioMetricLabel()}: ${barrioFmt(p)}`,{sticky:true}); }
     }).addTo(bMap);
-    try{ bMap.fitBounds(bLayer.getBounds(),{padding:[12,12]}); }catch(e){}
+    try{ if(bBox){ bMap.fitBounds([[bBox[1],bBox[0]],[bBox[3],bBox[2]]],{padding:[8,8]}); } else { bMap.fitBounds(bLayer.getBounds(),{padding:[12,12]}); } }catch(e){}
   }
   function barrioColor(t){ t=Math.max(0,Math.min(1,t));
     const base = bMetric==='rec'?[179,38,29] : bMetric==='young'?[193,108,46] : [47,125,82];

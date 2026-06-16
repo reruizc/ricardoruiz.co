@@ -18,6 +18,8 @@ import csv, json, os
 from collections import defaultdict
 import geopandas as gpd
 import pandas as pd
+import numpy as np
+import warnings; warnings.filterwarnings("ignore", message=".*Geometry is in a geographic CRS.*")
 from shapely.geometry import Point
 import matplotlib
 matplotlib.use("Agg")
@@ -43,21 +45,19 @@ plt.rcParams["font.family"] = "Inter"
 OX = "#8a1e16"; INK = "#1a1510"; PAPER = "#f4f0e7"; GR = "#5a5448"
 
 # slug, nombre, code(dep+mun electoral), geojson, namefield, lean(izq/der/mixto), approx, frame_pts
+# slug, nombre, code, geojson, namefield, lean, approx, frame_pts, zoom% (acerca sin agrandar la caja)
 CITIES = [
-    ("bogota","Bogotá","16001","BOG-BARRIOS-CATASTRALES.json","nombre","izq",False,False),
-    ("cali","Cali","31001","CALI-BARRIOS.json","barrio","izq",False,False),
-    ("cartagena","Cartagena","05001","CARTAGENA-BARRIOS.json","NOMBRE","izq",False,True),
-    ("barranquilla","Barranquilla","03001","BARRANQUILLA-BARRIOS.json","NOMBRE","izq",False,False),
-    ("soledad","Soledad","03052","SOLEDAD-BARRIOS.json","barrio","izq",False,False),
-    ("buenaventura","Buenaventura","31019","BUENAVENTURA-BARRIOS.json","barrio","izq",False,True),
-    ("santamarta","Santa Marta","21001","SANTAMARTA-BARRIOS-REAL.json","barrio","izq",False,True),
-    ("medellin","Medellín","01001","MEDELLIN_BARRIOS_OFICIAL.json","NOMBRE","mixto",False,False),
-    ("quibdo","Quibdó","17001","QUIBDO-BARRIOS.json","barrio","izq",False,True),
-    ("pasto","Pasto","23001","PASTO-BARRIOS.json","barrio","izq",True,True),
-    ("sincelejo","Sincelejo","28001","SINCELEJO-BARRIOS.json","barrio","izq",True,True),
-    ("palmira","Palmira","31079","PALMIRA-BARRIOS.json","barrio","izq",True,True),
-    ("bucaramanga","Bucaramanga","27001","BUCARAMANGA-BARRIOS.json","barrio","der",False,False),
-    ("cucuta","Cúcuta","25001","CUCUTA-BARRIOS.json","barrio","der",False,False),
+    ("bogota","Bogotá","16001","BOG-BARRIOS-CATASTRALES.json","nombre","izq",False,False,0),
+    ("cali","Cali","31001","CALI-BARRIOS.json","barrio","izq",False,False,3),
+    ("cartagena","Cartagena","05001","CARTAGENA-BARRIOS.json","NOMBRE","izq",False,True,5),
+    ("barranquilla","Barranquilla","03001","BARRANQUILLA-BARRIOS.json","NOMBRE","izq",False,False,3),
+    ("soledad","Soledad","03052","SOLEDAD-BARRIOS.json","barrio","izq",False,False,0),
+    ("buenaventura","Buenaventura","31019","BUENAVENTURA-BARRIOS.json","barrio","izq",False,True,0),
+    ("santamarta","Santa Marta","21001","SANTAMARTA-BARRIOS-REAL.json","barrio","izq",False,True,3),
+    ("medellin","Medellín","01001","MEDELLIN_BARRIOS_OFICIAL.json","NOMBRE","mixto",False,False,0),
+    ("quibdo","Quibdó","17001","QUIBDO-BARRIOS.json","barrio","izq",False,True,3),
+    ("bucaramanga","Bucaramanga","27001","BUCARAMANGA-BARRIOS.json","barrio","der",False,False,0),
+    ("cucuta","Cúcuta","25001","CUCUTA-BARRIOS.json","barrio","der",False,False,0),
 ]
 WORD_CITIES = {"bogota","cali","cartagena","barranquilla","buenaventura","medellin"}
 
@@ -101,7 +101,7 @@ def find_namefield(gdf, pref):
         if c != "geometry" and gdf[c].dtype == object: return c
     return None
 
-def render_png(gdf, col, fname, title, cmap):
+def render_png(gdf, col, fname, title, cmap, bbox):
     notna = gdf[gdf[col].notna()]
     if not len(notna): return
     vmin, vmax = float(notna[col].min()), float(notna[col].max())
@@ -116,13 +116,12 @@ def render_png(gdf, col, fname, title, cmap):
     direct.plot(ax=ax, column=col, cmap=cmap, vmin=vmin, vmax=vmax,
                 edgecolor="#00000022", linewidth=.2, legend=True,
                 legend_kwds={"shrink":.5,"pad":.01})
-    minx,miny,maxx,maxy = notna.total_bounds
-    ax.set_xlim(minx-.005,maxx+.005); ax.set_ylim(miny-.005,maxy+.005)
+    ax.set_xlim(bbox[0], bbox[2]); ax.set_ylim(bbox[1], bbox[3])
     ax.set_axis_off(); ax.set_title(title, fontsize=12, fontweight="bold", color=INK, loc="left")
     fig.savefig(os.path.join(OUT,"png",fname), bbox_inches="tight", facecolor=PAPER); plt.close(fig)
 
 index = []
-for slug,name,code,gj,nf,lean,approx,frame in CITIES:
+for slug,name,code,gj,nf,lean,approx,frame,zoom in CITIES:
     path = os.path.join(GEO, gj)
     if not os.path.exists(path): print("  ⚠ falta", gj); continue
     g = gpd.read_file(path).to_crs("EPSG:4326")
@@ -162,12 +161,25 @@ for slug,name,code,gj,nf,lean,approx,frame in CITIES:
     # Bogotá se gira 90° a la izquierda (convención del sitio) — solo para DISPLAY
     if slug == "bogota":
         g["geometry"] = g.geometry.rotate(90, origin=(-74.08, 4.65))
-    pts_city = j  # (sin uso tras cambiar el encuadre a notna.total_bounds)
-    # PNG para el Word (no rotamos: orientación geográfica real)
+    # ── encuadre robusto: caja ponderada por censo del núcleo (excluye islas/rural) ──
+    core = g[g["npue"]>0]; cn = g[g["rec"].notna()]; fb = cn.total_bounds
+    if len(core):
+        cc=core.geometry.centroid; xs=cc.x.values; ys=cc.y.values
+        wt=core["censo"].fillna(1).clip(lower=1).values.astype(float)
+        mxc=np.average(xs,weights=wt); myc=np.average(ys,weights=wt)
+        sx=float(np.sqrt(np.average((xs-mxc)**2,weights=wt))) or 0.02
+        sy=float(np.sqrt(np.average((ys-myc)**2,weights=wt))) or 0.02
+        k=2.6
+        x0=max(mxc-k*sx,fb[0]); x1=min(mxc+k*sx,fb[2]); y0=max(myc-k*sy,fb[1]); y1=min(myc+k*sy,fb[3])
+    else:
+        x0,y0,x1,y1 = fb
+    fz=1-zoom/100.0; cx=(x0+x1)/2; cy=(y0+y1)/2; hx=(x1-x0)/2*fz; hy=(y1-y0)/2*fz
+    frame_bbox=[round(cx-hx-.002,5),round(cy-hy-.002,5),round(cx+hx+.002,5),round(cy+hy+.002,5)]  # w,s,e,n
+    # PNG para el Word
     if slug in WORD_CITIES:
-        render_png(g, "rec", f"m_{slug}_rec_barrio.png", f"{name} · voto recuperable por barrio", "Reds")
-        render_png(g, "young", f"m_{slug}_young_barrio.png", f"{name} · % jóvenes (18-35) por barrio", "Purples")
-        render_png(g, "men", f"m_{slug}_men_barrio.png", f"{name} · % hombres por barrio", "YlGn")
+        render_png(g, "rec", f"m_{slug}_rec_barrio.png", f"{name} · voto recuperable por barrio", "Reds", frame_bbox)
+        render_png(g, "young", f"m_{slug}_young_barrio.png", f"{name} · % jóvenes (18-35) por barrio", "Purples", frame_bbox)
+        render_png(g, "men", f"m_{slug}_men_barrio.png", f"{name} · % hombres por barrio", "YlGn", frame_bbox)
     # GeoJSON simplificado para el HTML
     gw = g.copy(); gw["geometry"] = gw["geometry"].simplify(0.0004, preserve_topology=True)
     gw = gw[gw.geometry.notna() & ~gw.geometry.is_empty]
@@ -175,7 +187,7 @@ for slug,name,code,gj,nf,lean,approx,frame in CITIES:
     gw.to_file(out_path, driver="GeoJSON")
     nb = int((g["npue"]>0).sum())   # directos (los heredados llevan f=1)
     sz = round(os.path.getsize(out_path)/1024,1)
-    index.append({"slug":slug,"name":name,"lean":lean,"approx":approx,
+    index.append({"slug":slug,"name":name,"lean":lean,"approx":approx,"zoom":zoom,"bbox":frame_bbox,
                   "nbarrios":int(len(g)),"con_dato":int(nb),"kb":sz})
     print(f"  · {name:14} {len(g):4} barrios · {nb:4} con dato · {sz:6} KB"
           + ("  [PNG]" if slug in WORD_CITIES else "") + ("  ~aprox" if approx else ""))

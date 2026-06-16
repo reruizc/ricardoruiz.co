@@ -75,7 +75,7 @@ p.paragraph_format.space_before=Pt(60)
 p=d.add_paragraph(); r=p.add_run("Plan de Pauta Digital"); r.font.size=Pt(30); r.bold=True; r.font.color.rgb=INK
 p=d.add_paragraph(); r=p.add_run("Segunda Vuelta Presidencial · 21 de junio de 2026"); r.font.size=Pt(15); r.font.color.rgb=OX
 p.paragraph_format.space_after=Pt(18)
-body("Dónde poner la pauta, a quién hablarle y con qué mensaje en el tramo final, a partir del preconteo de 1ª vuelta por mesa, el modelo de 2ª vuelta y el análisis de composición etaria del voto. Acompaña al Excel de targeting (lista completa de municipios con centroides) y al tablero interactivo privado.")
+body("Dónde poner la pauta, a quién hablarle y con qué mensaje en el tramo final, a partir del escrutinio de 1ª vuelta por mesa, el modelo de 2ª vuelta y el análisis de composición etaria del voto. Acompaña al Excel de targeting (lista completa de municipios con centroides) y al tablero interactivo privado.")
 note("Borrador automático para planeación interna. Es un escenario para dimensionar la pauta, no un pronóstico. Las cifras de movilización suponen el techo de la izquierda en 2ª vuelta (Petro 2V 2022). La inferencia ecológica acota, no fija intención individual.")
 
 # ── RESUMEN ─────────────────────────────────────────────────────────────────
@@ -181,7 +181,7 @@ bullet("**TikTok no acepta pauta pagada** (solo orgánico + creadores). Veda y p
 
 # ── METODOLOGÍA ─────────────────────────────────────────────────────────────
 cap("10","Metodología y fuentes")
-note("Preconteo de 1ª vuelta 2026 por mesa (Registraduría). Modelo de 2ª vuelta con supuestos de trasvase explícitos: Paloma 85% → Abelardo, minoritarios de derecha 78% → Abelardo, Fajardo 55% Cepeda / 30% Abelardo, Claudia 65% / 20%, minoritarios de izquierda 85% → Cepeda. Techo de la izquierda = Petro 2ª vuelta 2022 por municipio. Censo electoral Divipole y georreferenciación de puestos (centroides ponderados por censo). Composición etaria por inferencia ecológica a nivel puesto (IC95 ±3-6 pp típico). Neto de movilización = abstención × (2·share_izquierda_2V − 1), solo donde la izquierda gana la 2ª vuelta. Voto blando de centro = 0,55·Fajardo + 0,65·Claudia. El bloque de movilización es un escenario para dimensionar pauta, no un pronóstico; la inferencia ecológica acota, no fija intención individual.")
+note("Escrutinio de 1ª vuelta 2026 por mesa (Registraduría). Modelo de 2ª vuelta con supuestos de trasvase explícitos: Paloma 85% → Abelardo, minoritarios de derecha 78% → Abelardo, Fajardo 55% Cepeda / 30% Abelardo, Claudia 65% / 20%, minoritarios de izquierda 85% → Cepeda. Techo de la izquierda = Petro 2ª vuelta 2022 por municipio. Censo electoral Divipole y georreferenciación de puestos (centroides ponderados por censo). Composición etaria por inferencia ecológica a nivel puesto (IC95 ±3-6 pp típico). Neto de movilización = abstención × (2·share_izquierda_2V − 1), solo donde la izquierda gana la 2ª vuelta. Voto blando de centro = 0,55·Fajardo + 0,65·Claudia. El bloque de movilización es un escenario para dimensionar pauta, no un pronóstico; la inferencia ecológica acota, no fija intención individual.")
 
 DOCX = os.path.join(OUTD, "Plan_Pauta_Digital_2V.docx")
 d.save(DOCX)
