@@ -72,5 +72,30 @@ def main():
     print(f"escrito {OUT} ({os.path.getsize(OUT)} bytes · {len(out['deptos'])} deptos)")
     print(f"nacional Cepeda {nac['cep']:,} · Abelardo {nac['abe']:,}")
 
+    # ── mun1v.json: 1V por municipio para el toggle Departamentos/Municipios.
+    # Formato compacto: { "DDMMM": [cep,abe,pal,faj,cla,otr,bln,urna,pot] }.
+    # Clave = dep+mun (electoral) → coincide con dep_electoral+mun_elec del GeoJSON.
+    mun = {}
+    for r in d:
+        dep = r['dep']; mn = r['mun']
+        if dep == '88': continue
+        key = dep + mn
+        a = mun.setdefault(key, [0]*9)
+        partes = sum((r.get(c,0) or 0) for c in CANDS)
+        partes += sum((r.get(k,0) or 0) for k in ['votos_blanco','votos_nulos','votos_no_marcados'])
+        tot = r.get('total_votos_urna',0) or 0
+        a[0] += r.get('cepeda',0) or 0
+        a[1] += r.get('abelardo',0) or 0
+        a[2] += r.get('paloma',0) or 0
+        a[3] += r.get('fajardo',0) or 0
+        a[4] += max(0, tot - partes)
+        a[5] += sum((r.get(c,0) or 0) for c in MENORES)
+        a[6] += (r.get('votos_blanco',0) or 0)+(r.get('votos_nulos',0) or 0)+(r.get('votos_no_marcados',0) or 0)
+        a[7] += tot
+        a[8] += r.get('pot',0) or 0
+    munpath = os.path.join(os.path.dirname(OUT), "mun1v.json")
+    json.dump(mun, open(munpath,"w"), separators=(',',':'))
+    print(f"escrito {munpath} ({os.path.getsize(munpath)} bytes · {len(mun)} muns)")
+
 if __name__ == "__main__":
     main()
