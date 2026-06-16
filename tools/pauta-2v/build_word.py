@@ -179,8 +179,27 @@ bullet("**Autorización de anuncios políticos en Meta.** Correr ads electorales
 bullet("**Topes de campaña (CNE) y Cuentas Claras.** El gasto digital cuenta para el tope y se reporta. El plan debe caber en el tope restante; cruzar con el contador/jurídica.")
 bullet("**TikTok no acepta pauta pagada** (solo orgánico + creadores). Veda y propaganda: confirmar las fechas vigentes de propaganda electoral digital con la jurídica antes de programar.")
 
+# ── GLOSARIO ────────────────────────────────────────────────────────────────
+cap("10","Glosario · términos del tablero")
+body("Lo mínimo para leer el tablero y el Excel sin malentendidos. Conviene que el equipo lo tenga claro antes de cargar la pauta.")
+GLOSARIO = [
+ ("Radio en Meta","En el administrador de anuncios de Meta (Facebook/Instagram) se define una zona con un PIN (un punto lat, lon) más un RADIO en kilómetros (mínimo ~1 km, hasta 80). El anuncio se muestra solo a quien esté dentro de ese círculo. Por eso cada municipio, comuna y barrio trae su centroide: se pega como pin, se elige el radio (2-4 km típico) y se satura esa zona sin gastar en el resto de la ciudad."),
+ ("Centroide","El punto central (lat, lon) de un territorio, ponderado por censo. Es lo que se copia para el radio en Meta."),
+ ("Voto recuperable (techo)","El máximo que la izquierda alcanzó en ese territorio (techo de la izquierda en 2ª vuelta 2022) menos lo que sacó el candidato en 1ª vuelta. El universo de votos de izquierda que existieron ahí y hoy no están con él."),
+ ("Neto de movilización","Los votos netos que rinde prender abstención por geografía, contando solo donde la izquierda gana la 2ª vuelta. Movilizar a ciegas donde gana el rival le suma al rival; por eso la pauta de movilización se concentra donde la izquierda va adelante."),
+ ("Centro disponible","Voto de centro (Fajardo + Claudia) que el modelo asume transferible: 0,55 de Fajardo + 0,65 de Claudia. Es la palanca de persuasión, sobre todo urbana."),
+ ("Share izquierda 2V","Tamaño del bloque de izquierda en el territorio (techo 2V dividido por el total de votos). Por encima de 50% la izquierda gana ahí en 2ª vuelta."),
+ ("Participación 1V","Porcentaje del censo que votó en 1ª vuelta. Lo que falta para el 100% es la abstención: el universo a movilizar."),
+ ("Composición por edad / sexo (barrio)","Dónde se concentran los jóvenes (18-35) o los hombres según el censo del puesto. NO es el voto del candidato por edad a nivel barrio (eso sería demasiado impreciso): es la demografía del electorado, que es justo lo que Meta deja segmentar por edad y sexo dentro del radio."),
+ ("Inferencia ecológica","Método para estimar cómo votan distintos grupos (p.ej. por edad) cruzando los resultados agregados de muchos puestos. Acota tendencias con un margen de error; no fija el voto de cada persona."),
+ ("CPM","Costo por mil impresiones: lo que cuesta que el anuncio aparezca 1.000 veces. Sube en 2ª vuelta por la competencia."),
+ ("Frecuencia","Cuántas veces ve el anuncio, en promedio, cada persona alcanzada. Si pasa de 4-5 satura: conviene rotar el creativo o ampliar la zona."),
+ ("Custom audiences","Audiencias propias que se suben a Meta (la base de contactos, con consentimiento Ley 1581) para llegar a personas específicas, no solo a zonas. Sirven para movilizar simpatizantes incluso en territorio adverso."),
+]
+tbl(["Término","Qué significa"], [[t,dsc] for t,dsc in GLOSARIO])
+
 # ── METODOLOGÍA ─────────────────────────────────────────────────────────────
-cap("10","Metodología y fuentes")
+cap("11","Metodología y fuentes")
 note("Escrutinio de 1ª vuelta 2026 por mesa (Registraduría). Modelo de 2ª vuelta con supuestos de trasvase explícitos: Paloma 85% → Abelardo, minoritarios de derecha 78% → Abelardo, Fajardo 55% Cepeda / 30% Abelardo, Claudia 65% / 20%, minoritarios de izquierda 85% → Cepeda. Techo de la izquierda = Petro 2ª vuelta 2022 por municipio. Censo electoral Divipole y georreferenciación de puestos (centroides ponderados por censo). Composición etaria por inferencia ecológica a nivel puesto (IC95 ±3-6 pp típico). Neto de movilización = abstención × (2·share_izquierda_2V − 1), solo donde la izquierda gana la 2ª vuelta. Voto blando de centro = 0,55·Fajardo + 0,65·Claudia. El bloque de movilización es un escenario para dimensionar pauta, no un pronóstico; la inferencia ecológica acota, no fija intención individual.")
 
 DOCX = os.path.join(OUTD, "Plan_Pauta_Digital_2V.docx")
