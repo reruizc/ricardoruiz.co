@@ -129,14 +129,14 @@ for cod in ["16001","31001","03001","05001"]:
 # ── 4b · MAPAS DE CALOR POR BARRIO ──────────────────────────────────────────
 from docx.shared import Inches as _In
 def city_barrio_row(slug, nm):
-    have = [m for m in ("rec","young","men") if os.path.exists(os.path.join(OUTD,"png",f"m_{slug}_{m}_barrio.png"))]
+    labs = {"rec":"Voto recuperable","young":"% jóvenes (18-35)","men":"% hombres","women":"% mujeres"}
+    have = [m for m in ("rec","young","men","women") if os.path.exists(os.path.join(OUTD,"png",f"m_{slug}_{m}_barrio.png"))]
     if not have: return
     h(nm, size=11.5, color=OX, before=12, after=2)
-    labs = {"rec":"Voto recuperable","young":"% jóvenes (18-35)","men":"% hombres"}
-    t = d.add_table(rows=1, cols=len(have))
+    t = d.add_table(rows=2, cols=2)
     for i,m in enumerate(have):
-        cell = t.cell(0,i); p = cell.paragraphs[0]; p.alignment=WD_ALIGN_PARAGRAPH.CENTER
-        run = p.add_run(); run.add_picture(os.path.join(OUTD,"png",f"m_{slug}_{m}_barrio.png"), width=_In(2.05))
+        cell = t.cell(i//2, i%2); p = cell.paragraphs[0]; p.alignment=WD_ALIGN_PARAGRAPH.CENTER
+        run = p.add_run(); run.add_picture(os.path.join(OUTD,"png",f"m_{slug}_{m}_barrio.png"), width=_In(2.4))
         cp = cell.add_paragraph(); cp.alignment=WD_ALIGN_PARAGRAPH.CENTER
         r = cp.add_run(labs[m]); r.italic=True; r.font.size=Pt(7.5); r.font.color.rgb=GR
 

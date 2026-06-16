@@ -156,16 +156,17 @@ def page_break():
     p = d.add_paragraph(); p.add_run().add_break(WD_BREAK.PAGE)
 
 def maps_row(slug):
-    """3 PNGs lado a lado: rec | young | men."""
-    metrics = [("rec","Voto recuperable"),("young","Composición jóvenes (18-35)"),("men","Composición hombres")]
-    t = d.add_table(rows=2, cols=3)
+    """4 PNGs en 2x2: rec | young / men | women."""
+    metrics = [("rec","Voto recuperable"),("young","Composición jóvenes (18-35)"),
+               ("men","Composición hombres"),("women","Composición mujeres")]
+    t = d.add_table(rows=2, cols=2)
     t.alignment = WD_TABLE_ALIGNMENT.CENTER
     for i,(m,lab) in enumerate(metrics):
         path = os.path.join(OUTD,"png",f"m_{slug}_{m}_barrio.png")
         if not os.path.exists(path): continue
-        cell = t.cell(0,i); p = cell.paragraphs[0]; p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        cell = t.cell(i//2, i%2); p = cell.paragraphs[0]; p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         run = p.add_run(); run.add_picture(path, width=Inches(2.65))
-        cp = t.cell(1,i).paragraphs[0]; cp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        cp = cell.add_paragraph(); cp.alignment = WD_ALIGN_PARAGRAPH.CENTER
         r = cp.add_run(lab); r.italic = True; r.font.size = Pt(8); r.font.color.rgb = GR
     d.add_paragraph().paragraph_format.space_after = Pt(8)
 

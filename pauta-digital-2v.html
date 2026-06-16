@@ -158,11 +158,14 @@
     /* zoom por ciudad */
     .czrow{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin:1rem 0 .8rem}
     .cz3{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem}
+    .cz4{display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem}
+    @media(max-width:980px){.cz4{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:560px){.cz4{grid-template-columns:1fr}}
     @media(max-width:880px){.cz3{grid-template-columns:1fr;gap:1rem}}
     .czm{border:1px solid var(--rule);border-radius:10px;overflow:hidden;background:var(--paper-2)}
     .czlab{font-family:var(--mono);font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2);padding:.5rem .7rem;border-bottom:1px solid var(--rule);display:flex;align-items:center;gap:.45rem}
     .czlab .dot{width:8px;height:8px;border-radius:2px;display:inline-block}
-    .czlab .dot.izq{background:var(--izq)} .czlab .dot.gold{background:var(--gold)} .czlab .dot.grn{background:#2f7d4a}
+    .czlab .dot.izq{background:var(--izq)} .czlab .dot.gold{background:var(--gold)} .czlab .dot.grn{background:#2f7d4a} .czlab .dot.rose{background:#c75a96}
     .czmap{height:320px;background:var(--paper-3)}
     @media(max-width:880px){.czmap{height:280px}}
     .gloss{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:8px;overflow:hidden;margin-top:1rem}
@@ -315,6 +318,7 @@
           <button data-bm="rec" class="on">Movilización</button>
           <button data-bm="young">% jóvenes</button>
           <button data-bm="men">% hombres</button>
+          <button data-bm="women">% mujeres</button>
         </div>
       </div>
       <div id="barrioNote" class="muted" style="margin:0 0 .6rem"></div>
@@ -775,10 +779,10 @@
     try{ if(bBox){ bMap.fitBounds([[bBox[1],bBox[0]],[bBox[3],bBox[2]]],{padding:[8,8]}); } else { bMap.fitBounds(bLayer.getBounds(),{padding:[12,12]}); } }catch(e){}
   }
   function barrioColor(t){ t=Math.max(0,Math.min(1,t));
-    const base = bMetric==='rec'?[179,38,29] : bMetric==='young'?[193,108,46] : [47,125,82];
+    const base = bMetric==='rec'?[179,38,29] : bMetric==='young'?[193,108,46] : bMetric==='women'?[199,90,150] : [47,125,82];
     const lo=[235,231,221];
     return `rgb(${(lo[0]+(base[0]-lo[0])*t)|0},${(lo[1]+(base[1]-lo[1])*t)|0},${(lo[2]+(base[2]-lo[2])*t)|0})`; }
-  function barrioMetricLabel(){ return bMetric==='rec'?'Movilización':bMetric==='young'?'% jóvenes':'% hombres'; }
+  function barrioMetricLabel(){ return bMetric==='rec'?'Movilización':bMetric==='young'?'% jóvenes':bMetric==='women'?'% mujeres':'% hombres'; }
   function barrioFmt(p){ const v=p[bMetric]; if(v==null)return '—'; return bMetric==='rec'?fmt(v):(v*100).toFixed(0)+'%'; }
   function showBarrioDetail(p,geom){
     let c=''; if(p.clat!=null&&p.clon!=null) c=`<button class="copybtn" onclick="copyLatLon(${p.clat},${p.clon})">⌖ Copiar centroide ${p.clat}, ${p.clon} (radio Meta)</button>`;
@@ -851,10 +855,11 @@
       <section>
         <h3>Mapa de calor por barrio</h3>
         <p class="muted" style="font-size:.9rem">Las tres capas lado a lado. Pasa el cursor por un barrio para su ficha y copiar el centroide (pin) para el radio en Meta.</p>
-        <div class="cz3" style="margin-top:.6rem">
+        <div class="cz4" style="margin-top:.6rem">
           <div class="czm"><div class="czlab"><span class="dot izq"></span>Voto recuperable</div><div id="cv-map-rec" class="czmap"></div></div>
           <div class="czm"><div class="czlab"><span class="dot gold"></span>% jóvenes (18-35)</div><div id="cv-map-young" class="czmap"></div></div>
           <div class="czm"><div class="czlab"><span class="dot grn"></span>% hombres</div><div id="cv-map-men" class="czmap"></div></div>
+          <div class="czm"><div class="czlab"><span class="dot rose"></span>% mujeres</div><div id="cv-map-women" class="czmap"></div></div>
         </div>
         <div id="cvDetail" class="muted" style="margin-top:.6rem;font-size:.88rem">Pasa el cursor por un barrio…</div>
       </section>
@@ -885,14 +890,14 @@
         <p class="muted" style="font-size:.86rem;margin-top:.5rem">Esta misma vista, con más detalle, está en el anexo PDF "Las 4 ciudades grandes, una a una" (se entrega aparte).</p>
       </section>`;
     fillNames();
-    cvMaps.rec=cvMakeMap('cv-map-rec'); cvMaps.young=cvMakeMap('cv-map-young'); cvMaps.men=cvMakeMap('cv-map-men');
-    cvRenderMap(cvMaps.rec, geo, 'rec', slug); cvRenderMap(cvMaps.young, geo, 'young', slug); cvRenderMap(cvMaps.men, geo, 'men', slug);
+    cvMaps.rec=cvMakeMap('cv-map-rec'); cvMaps.young=cvMakeMap('cv-map-young'); cvMaps.men=cvMakeMap('cv-map-men'); cvMaps.women=cvMakeMap('cv-map-women');
+    cvRenderMap(cvMaps.rec, geo, 'rec', slug); cvRenderMap(cvMaps.young, geo, 'young', slug); cvRenderMap(cvMaps.men, geo, 'men', slug); cvRenderMap(cvMaps.women, geo, 'women', slug);
     drawEdadSvg(document.getElementById('cv-edad'), name);
   }
   function cvMakeMap(id){ return L.map(id,{zoomControl:false,attributionControl:false,scrollWheelZoom:false,dragging:false,touchZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false}).setView([4.6,-74.1],11); }
   function cvRenderMap(map, geo, metric, slug){
     let mn=Infinity,mx=-Infinity; geo.features.forEach(f=>{const v=f.properties[metric]; if(v!=null){mn=Math.min(mn,v);mx=Math.max(mx,v);}});
-    const ramp=metric==='rec'?[179,38,29]:metric==='young'?[140,90,180]:[47,125,82], lo=[235,231,221];
+    const ramp=metric==='rec'?[179,38,29]:metric==='young'?[140,90,180]:metric==='women'?[199,90,150]:[47,125,82], lo=[235,231,221];
     L.geoJSON(geo,{
       style:f=>{const v=f.properties[metric]; if(v==null) return {fillColor:'#b9b2a2',fillOpacity:.16,color:'#0002',weight:.2};
         const t=metric==='rec'?Math.sqrt(v/(mx||1)):(mx>mn?(v-mn)/(mx-mn):.5);

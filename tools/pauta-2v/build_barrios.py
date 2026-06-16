@@ -47,10 +47,10 @@ OX = "#8a1e16"; INK = "#1a1510"; PAPER = "#f4f0e7"; GR = "#5a5448"
 # slug, nombre, code(dep+mun electoral), geojson, namefield, lean(izq/der/mixto), approx, frame_pts
 # slug, nombre, code, geojson, namefield, lean, approx, frame_pts, zoom% (acerca sin agrandar la caja)
 CITIES = [
-    ("bogota","Bogotá","16001","BOG-BARRIOS-CATASTRALES.json","nombre","izq",False,False,0),
+    ("bogota","Bogotá","16001","BOG-BARRIOS-CATASTRALES.json","nombre","izq",False,False,2),
     ("cali","Cali","31001","CALI-BARRIOS.json","barrio","izq",False,False,3),
     ("cartagena","Cartagena","05001","CARTAGENA-BARRIOS.json","NOMBRE","izq",False,True,5),
-    ("barranquilla","Barranquilla","03001","BARRANQUILLA-BARRIOS.json","NOMBRE","izq",False,False,3),
+    ("barranquilla","Barranquilla","03001","BARRANQUILLA-BARRIOS.json","NOMBRE","izq",False,False,5),
     ("soledad","Soledad","03052","SOLEDAD-BARRIOS.json","barrio","izq",False,False,0),
     ("buenaventura","Buenaventura","31019","BUENAVENTURA-BARRIOS.json","barrio","izq",False,True,0),
     ("santamarta","Santa Marta","21001","SANTAMARTA-BARRIOS-REAL.json","barrio","izq",False,True,3),
@@ -142,18 +142,19 @@ for slug,name,code,gj,nf,lean,approx,frame,zoom in CITIES:
         g.at[bi,"men"]=round(r["H"]/censo,3) if censo>0 else None
     for c in ("rec","young","men","censo"): g[c]=pd.to_numeric(g[c], errors="coerce")
     g["npue"]=pd.to_numeric(g["npue"], errors="coerce").fillna(0).astype(int)
-    # ── heredar del vecino más cercano: barrios sin puesto propio ───────────
-    g["f"]=0
-    have = g[g["npue"]>0]; need = g[g["npue"]==0]
-    if len(have) and len(need):
-        hc = have.copy(); hc["geometry"]=hc.geometry.to_crs(3857).centroid.to_crs(4326)
-        nc = need.copy(); nc["geometry"]=nc.geometry.to_crs(3857).centroid.to_crs(4326)
-        nn = gpd.sjoin_nearest(nc[["geometry"]].to_crs(3857),
-                               hc[["rec","young","men","geometry"]].to_crs(3857), how="left")
-        nn = nn[~nn.index.duplicated(keep="first")]
-        for idx,row in nn.iterrows():
-            for c in ("rec","young","men"): g.at[idx,c]=row[c]
-            g.at[idx,"f"]=1
+    # ── heredar del vecino más cercano, POR MÉTRICA ─────────────────────────
+    # ningún barrio queda en blanco/cero en NINGÚN mapa: cada métrica nula
+    # toma el valor del barrio con dato más cercano (por centroide).
+    g["f"]=(g["npue"]==0).astype(int)
+    cg = gpd.GeoDataFrame(geometry=g.geometry.to_crs(3857).centroid, crs="EPSG:3857")
+    cg = cg.join(g[["rec","young","men"]])
+    for col in ("rec","young","men"):
+        have = cg[cg[col].notna()]; need = cg[cg[col].isna()]
+        if len(have) and len(need):
+            nn = gpd.sjoin_nearest(need[["geometry"]], have[[col,"geometry"]], how="left")
+            nn = nn[~nn.index.duplicated(keep="first")]
+            for idx,row in nn.iterrows(): g.at[idx,col]=row[col]
+    g["women"]=pd.to_numeric(1.0 - g["men"], errors="coerce").round(3)
     # centroide REAL (lat/lon) como propiedad → el "copiar para Meta" del HTML
     # usa coords verdaderas aunque Bogotá se gire para mostrarse.
     cent = g.geometry.to_crs(3857).centroid.to_crs(4326)
@@ -180,6 +181,7 @@ for slug,name,code,gj,nf,lean,approx,frame,zoom in CITIES:
         render_png(g, "rec", f"m_{slug}_rec_barrio.png", f"{name} · voto recuperable por barrio", "Reds", frame_bbox)
         render_png(g, "young", f"m_{slug}_young_barrio.png", f"{name} · % jóvenes (18-35) por barrio", "Purples", frame_bbox)
         render_png(g, "men", f"m_{slug}_men_barrio.png", f"{name} · % hombres por barrio", "YlGn", frame_bbox)
+        render_png(g, "women", f"m_{slug}_women_barrio.png", f"{name} · % mujeres por barrio", "RdPu", frame_bbox)
     # GeoJSON simplificado para el HTML
     gw = g.copy(); gw["geometry"] = gw["geometry"].simplify(0.0004, preserve_topology=True)
     gw = gw[gw.geometry.notna() & ~gw.geometry.is_empty]
