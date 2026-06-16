@@ -2118,6 +2118,23 @@ proyecto-dc/agenda.html ◀──── fetch directo a S3 (cache 5min)
 - `raw/medios/yyyy=YYYY/mm=MM/dd=DD/{medio}__{run_id}.jsonl` — privado
 - `agregados/{nube,medios,titulares}-{6h,24h,5d}.json` — **público** vía bucket policy
 
+**Retención e histórico (verificado 2026-06-15):**
+- **`raw/medios/` + `enriched/` se ACUMULAN** con `run_id` (timestamp) en la key →
+  nada las borra, no hay lifecycle policy. Al 2026-06-15: **7.064 archivos en
+  `raw/medios/`, del 30-abr-2026 a hoy, día por día** (particiones Hive `yyyy=/mm=/dd=`).
+  Cada evento trae `titulo`, `resumen`, `fecha_pub`. **Hay que conservar esto** —
+  es el insumo para estudios futuros de saliencia/agenda.
+- **`agregados/` y las `recomendaciones-*` se SOBRESCRIBEN** (key fija): solo
+  sobrevive la última ventana 6h/24h/5d y la última recomendación de cada arquetipo.
+  **No hay histórico de recomendaciones ni de titulares agregados** — la lectura
+  táctica de DeepSeek de una corrida se pierde en la siguiente (cada 6h).
+- **PENDIENTE · ver titulares de fechas pasadas:** hoy NO hay forma de consultarlos
+  (el frontend solo lee los agregados rolling). El dato existe en `raw/`/`enriched/`.
+  Para estudios futuros: (a) script Python que lea `raw/` por fecha/rango → CSV/MD,
+  o (b) vista con calendario en `agenda.html` (requiere agregador que lea fechas
+  arbitrarias), o (c) Athena sobre `raw/` (ya particionado Hive). **NO es entregable
+  para Carvalho** — es para investigación interna. No construido aún.
+
 **Esquema del evento** (jsonl raw):
 ```json
 {
