@@ -35,7 +35,7 @@
     ::selection{background:var(--accent);color:var(--on-accent)}
     a{color:var(--accent);text-decoration:none}
     a:hover{text-decoration:underline}
-    h1,h2,h3{font-family:var(--sans);font-weight:800;letter-spacing:-.01em;line-height:1.1}
+    h1,h2,h3,h4{font-family:var(--sans);font-weight:800;letter-spacing:-.01em;line-height:1.1}
     /* gate */
     .gate{position:fixed;inset:0;z-index:5000;background:var(--paper);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1rem}
     .gate-text{font-family:var(--mono);font-size:.82rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2)}
@@ -143,6 +143,18 @@
     .alert ol{margin:.6rem 0 0 1.1rem;font-size:.93rem;color:var(--ink-2)}
     .alert li{padding:.3rem 0}
     .alert li b{color:var(--ink)}
+    /* switcher de vista nacional/ciudad */
+    .viewsw{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;margin:1.6rem 0 .4rem;padding:.45rem .5rem;border:1px solid var(--rule);border-radius:12px;background:var(--paper-2);position:sticky;top:50px;z-index:80;box-shadow:0 4px 16px -10px rgba(0,0,0,.3)}
+    .viewsw-lbl{font-family:var(--mono);font-size:.64rem;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-3);padding:0 .5rem}
+    .viewsw button{font-family:var(--sans);font-weight:600;font-size:.95rem;padding:.45rem 1rem;border:1px solid transparent;border-radius:8px;background:none;color:var(--ink-2);cursor:none;transition:background .15s,color .15s}
+    .viewsw button:hover{color:var(--ink);background:var(--paper-3)}
+    .viewsw button.on{background:var(--accent);color:var(--on-accent)}
+    /* dossier de ciudad */
+    .cv-back{font-family:var(--mono);font-size:.72rem;color:var(--accent);background:none;border:1px solid var(--accent-tint);padding:.3rem .7rem;border-radius:6px;cursor:none;margin-bottom:.5rem}
+    .cv-tables{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:.4rem}
+    @media(max-width:880px){.cv-tables{grid-template-columns:1fr}}
+    .cv-edadrow{display:grid;grid-template-columns:1fr 1.1fr;gap:1.4rem;align-items:center;margin-top:.4rem}
+    @media(max-width:760px){.cv-edadrow{grid-template-columns:1fr}}
     /* zoom por ciudad */
     .czrow{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin:1rem 0 .8rem}
     .cz3{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem}
@@ -195,27 +207,21 @@
       <p class="muted" style="margin-top:1rem">Las cifras salen del escrutinio de 1ª vuelta por mesa + el modelo de 2ª vuelta (techo <span data-nm="izq22"></span>&nbsp;2V&nbsp;2022) + el análisis de edad por inferencia ecológica. Es un escenario para dimensionar la pauta, no un pronóstico.</p>
     </section>
 
-    <!-- ZOOM POR CIUDAD -->
-    <section id="cityZoomSection" style="padding-top:2rem">
-      <div class="eyebrow">Zoom por ciudad · módulo destacado</div>
-      <h2>Las 4 ciudades grandes, una a una</h2>
-      <p>Bogotá, Barranquilla, Cali y Medellín concentran el grueso del voto urbano. Aquí están sus tres capas (movilización, % jóvenes, % hombres) lado a lado, comparables de un vistazo. Pasa el cursor por un barrio para ver su composición y copiar el centroide. <span class="muted">El <a href="#" onclick="downloadAnexoToast(event)">anexo PDF "Las 4 ciudades grandes, una a una"</a> tiene esta misma vista con estrategia y jugadas concretas por edad × sexo.</span></p>
-      <div class="czrow">
-        <div class="seg" id="czCitySeg">
-          <button data-cz="bogota" class="on">Bogotá</button>
-          <button data-cz="barranquilla">Barranquilla</button>
-          <button data-cz="cali">Cali</button>
-          <button data-cz="medellin">Medellín</button>
-        </div>
-        <div id="czPanorama" class="muted" style="font-size:.88rem"></div>
-      </div>
-      <div class="cz3">
-        <div class="czm"><div class="czlab"><span class="dot izq"></span>Voto recuperable</div><div id="czMapRec" class="czmap"></div></div>
-        <div class="czm"><div class="czlab"><span class="dot gold"></span>% jóvenes (18-35)</div><div id="czMapYoung" class="czmap"></div></div>
-        <div class="czm"><div class="czlab"><span class="dot grn"></span>% hombres</div><div id="czMapMen" class="czmap"></div></div>
-      </div>
-      <div id="czDetail" class="muted" style="margin-top:.7rem;font-size:.88rem">Pasa el cursor por un barrio para ver su ficha.</div>
-    </section>
+    <!-- SWITCHER DE VISTA: Nacional + 4 ciudades dedicadas -->
+    <div class="viewsw" id="viewSwitch">
+      <span class="viewsw-lbl">Ver:</span>
+      <button data-view="nacional" class="on">Nacional</button>
+      <button data-view="bogota">Bogotá</button>
+      <button data-view="cali">Cali</button>
+      <button data-view="medellin">Medellín</button>
+      <button data-view="barranquilla">Barranquilla</button>
+    </div>
+
+    <!-- VISTA POR CIUDAD · dossier dedicado (se arma en JS) -->
+    <div id="cityView" hidden></div>
+
+    <!-- ===== VISTA NACIONAL ===== -->
+    <div id="nationalView">
 
     <!-- ESTRATEGIA -->
     <section>
@@ -406,6 +412,7 @@
         </ol>
       </div>
     </section>
+    </div><!-- /nationalView -->
 
     <footer>
       <div class="draft">Borrador automático · ricardoruiz.co</div>
@@ -450,7 +457,7 @@
   function getAutoTheme(){ const h=new Date().getHours(); return (h>=7&&h<19)?'light':'dark'; }
   let THEME = localStorage.getItem('rr-theme') || getAutoTheme();
   document.documentElement.setAttribute('data-theme', THEME==='dark'?'dark':'');
-  function toggleTheme(){ THEME = (THEME==='dark')?'light':'dark'; localStorage.setItem('rr-theme',THEME); document.documentElement.setAttribute('data-theme',THEME==='dark'?'dark':''); if(window._repaintMap) _repaintMap(); if(typeof bGeo!=='undefined'&&bGeo) renderBarrio(); if(czGeo) ['rec','young','men'].forEach(m=>czRenderOne(czCity,m)); drawEdad(); }
+  function toggleTheme(){ THEME = (THEME==='dark')?'light':'dark'; localStorage.setItem('rr-theme',THEME); document.documentElement.setAttribute('data-theme',THEME==='dark'?'dark':''); if(window._repaintMap) _repaintMap(); if(typeof bGeo!=='undefined'&&bGeo) renderBarrio(); if(curView!=='nacional') renderCityDossier(curView); drawEdad(); }
 
   // ─── CURSOR ─────────────────────────────────────────────────────────────
   const cur=document.getElementById('cursor'), ring=document.getElementById('cursorRing');
@@ -684,9 +691,10 @@
     units.sort((a,b)=>(order.indexOf(a)+99*(order.indexOf(a)<0))-(order.indexOf(b)+99*(order.indexOf(b)<0)));
     sel.innerHTML=units.map(u=>`<option>${u}</option>`).join(''); drawEdad();
   }
-  function drawEdad(){
-    const u=document.getElementById('edadSel').value||'Nacional'; const d=DATA.edad[u]; if(!d)return;
-    const groups=['18-35','36-60','61+']; const svg=document.getElementById('edadSvg');
+  function drawEdad(){ const u=document.getElementById('edadSel').value||'Nacional'; drawEdadSvg(document.getElementById('edadSvg'), u); }
+  function drawEdadSvg(svg, u){
+    const d=DATA.edad[u]; if(!d||!svg)return;
+    const groups=['18-35','36-60','61+'];
     const W=420,H=260,padL=44,padB=34,padT=14,bw=36,gap=22;
     const izq=getComputedStyle(document.documentElement).getPropertyValue('--izq')||'#b3261d';
     const der=getComputedStyle(document.documentElement).getPropertyValue('--der')||'#1f47cc';
@@ -786,64 +794,130 @@
   function geomCentroid(g){ let xs=0,ys=0,n=0; const walk=co=>{ if(typeof co[0]==='number'){ xs+=co[0];ys+=co[1];n++; } else co.forEach(walk); }; walk(g.coordinates); return n?[xs/n,ys/n]:null; }
   document.addEventListener('click',e=>{ const b=e.target.closest('#barrioMetricSeg button'); if(b){ bMetric=b.dataset.bm; [...b.parentNode.children].forEach(x=>x.classList.toggle('on',x===b)); renderBarrio(); } });
 
-  // ─── ZOOM POR CIUDAD (3 mapas sincronizados) ────────────────────────────
-  const CZ_CITIES=['bogota','barranquilla','cali','medellin'];
-  const CZ_NAMES={bogota:'Bogotá',barranquilla:'Barranquilla',cali:'Cali',medellin:'Medellín'};
-  let czCity='bogota', czMaps={}, czLayers={}, czGeo=null;
-  const CZ_GEO_CACHE={};
-  async function czLoadCity(slug){
-    czCity=slug; [...document.querySelectorAll('#czCitySeg button')].forEach(b=>b.classList.toggle('on',b.dataset.cz===slug));
-    if(!CZ_GEO_CACHE[slug]){ try{ CZ_GEO_CACHE[slug]=await (await fetch(DATA_BASE+'barrios/'+slug+'.json')).json(); }catch(e){ toast('No cargó '+slug); return; } }
-    czGeo=CZ_GEO_CACHE[slug];
-    // panorama
-    const m=MUNI[(slug==='bogota'?'16001':slug==='barranquilla'?'03001':slug==='cali'?'31001':'01001')];
-    if(m){ document.getElementById('czPanorama').innerHTML = `<b>${CZ_NAMES[slug]}</b> · recuperar <b style="color:var(--izq)">${fmt(m.rec)}</b> · centro <b style="color:var(--der)">${fmt(m.cen)}</b> · base ${fmt(m.base)} votos`; }
-    ['rec','young','men'].forEach(metric=>czRenderOne(slug, metric));
+  // ─── VISTA POR CIUDAD (dossier dedicado + switcher nacional/ciudad) ──────
+  const CITY_CODE={bogota:'16001',cali:'31001',medellin:'01001',barranquilla:'03001'};
+  const CITY_NAME={bogota:'Bogotá',cali:'Cali',medellin:'Medellín',barranquilla:'Barranquilla'};
+  const CITY_DIV={bogota:'Localidad',barranquilla:'Localidad',cali:'Comuna',medellin:'Comuna'};
+  const CITY_SUB={bogota:'Distrito Capital · el grueso del voto urbano del país',cali:'Capital del Valle · epicentro Pacífico de la izquierda',medellin:'Capital de Antioquia · ciudad clave del rival',barranquilla:'Capital del Atlántico · puerta del Caribe'};
+  const JUGADAS=[
+   ['18-35','Hombres','Movilización fuerte: creadores locales, identidad de barrio, CTA "salí a votar". Pin en barrios jóvenes + radio 2-4 km. TikTok orgánico.'],
+   ['18-35','Mujeres','Movilización con mensaje diferenciado (gestión, derechos, agenda joven). Creativo aparte del de hombres jóvenes.'],
+   ['36-60','Hombres','Persuasión con foco en economía y costos. Video corto en Meta + skippable de YouTube.'],
+   ['36-60','Mujeres','Persuasión moderada: garantías, gestión, contraste con extremos. Cuidar el tono.'],
+   ['61+','Mixto','Contención, no convencer. Mensaje sobrio de continuidad institucional. Bajo gasto.'],
+  ];
+  let curView='nacional', cvMaps={}, cvGeoCache={};
+  function cleanZone(s){ return (s||'').replace(/^\d{2,3}\s*/,'').replace(/LOCALIDAD NO\.?\s*/i,'Localidad ').replace(/LOCALIDAD\s+/i,'Localidad ').trim(); }
+  function _destroyCvMaps(){ Object.values(cvMaps).forEach(mp=>{try{mp.remove()}catch(e){}}); cvMaps={}; }
+
+  function switchView(view){
+    curView=view;
+    [...document.querySelectorAll('#viewSwitch button')].forEach(b=>b.classList.toggle('on',b.dataset.view===view));
+    const cv=document.getElementById('cityView'), nv=document.getElementById('nationalView');
+    if(view==='nacional'){
+      _destroyCvMaps(); cv.hidden=true; cv.innerHTML=''; nv.hidden=false;
+      setTimeout(()=>{ if(map)map.invalidateSize(); if(typeof bMap!=='undefined'&&bMap)bMap.invalidateSize(); },60);
+    } else { nv.hidden=true; cv.hidden=false; renderCityDossier(view); }
+    document.getElementById('viewSwitch').scrollIntoView({behavior:'auto',block:'start'});
   }
-  function czRenderOne(slug, metric){
-    const elId = metric==='rec'?'czMapRec':metric==='young'?'czMapYoung':'czMapMen';
-    if(!czMaps[metric]){
-      czMaps[metric] = L.map(elId,{zoomControl:false,attributionControl:false,scrollWheelZoom:false,dragging:false,touchZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false}).setView([4.6,-74.1],11);
-    }
-    const map=czMaps[metric];
-    if(czLayers[metric]){ map.removeLayer(czLayers[metric]); }
-    let mn=Infinity,mx=-Infinity; czGeo.features.forEach(f=>{ const v=f.properties[metric]; if(v!=null){ mn=Math.min(mn,v); mx=Math.max(mx,v); } });
-    const ramp = metric==='rec'?[179,38,29] : metric==='young'?[140,90,180] : [47,125,82];
-    const lo=[235,231,221];
-    czLayers[metric] = L.geoJSON(czGeo,{
-      style:f=>{ const v=f.properties[metric];
-        if(v==null) return {fillColor:'#b9b2a2',fillOpacity:.16,color:'#0002',weight:.2};
-        const t = metric==='rec' ? Math.sqrt(v/(mx||1)) : (mx>mn?(v-mn)/(mx-mn):.5);
+
+  async function renderCityDossier(slug){
+    const code=CITY_CODE[slug], m=MUNI[code]||{}, name=CITY_NAME[slug];
+    if(!cvGeoCache[slug]){ try{ cvGeoCache[slug]=await (await fetch(DATA_BASE+'barrios/'+slug+'.json')).json(); }catch(e){ document.getElementById('cityView').innerHTML='<section><p style="padding:2rem">No se pudo cargar '+name+'.</p></section>'; return; } }
+    const geo=cvGeoCache[slug];
+    const feats=geo.features.map(f=>f.properties).filter(p=>p.rec!=null && p.f!==1);
+    const topY=[...feats].filter(p=>p.young!=null).sort((a,b)=>b.young-a.young).slice(0,6);
+    const topM=[...feats].filter(p=>p.men!=null).sort((a,b)=>b.men-a.men).slice(0,6);
+    const topW=[...feats].filter(p=>p.men!=null).sort((a,b)=>a.men-b.men).slice(0,6);
+    const comunas=(DATA.comunas[code]||[]).slice(0,7);
+    const part=m.part!=null?(m.part*100).toFixed(1)+'%':'—';
+    const izqpct=(m.base&&m.techo)?(m.techo/m.base*100).toFixed(1)+'%':'—';
+    _destroyCvMaps();
+    const kpis=[['red',fmt(m.rec),'Voto recuperable'],['blue',fmt(m.cen),'Centro disponible'],['',fmt(m.base),'Base electoral'],['',izqpct,'Techo izq. 2V'],['',part,'Participación 1V']];
+    const T=(head,rows)=>`<div class="tbl-wrap"><table class="dt"><thead><tr>${head.map((h,i)=>`<th class="${i===0?'s':''}">${h}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
+    const yR=topY.map(p=>`<tr><td>${p.nm}</td><td>${(p.young*100).toFixed(0)}%</td><td>${fmt(p.rec)}</td></tr>`).join('');
+    const mR=topM.map(p=>`<tr><td>${p.nm}</td><td>${(p.men*100).toFixed(0)}%</td><td>${fmt(p.rec)}</td></tr>`).join('');
+    const wR=topW.map(p=>`<tr><td>${p.nm}</td><td>${(100-p.men*100).toFixed(0)}%</td><td>${fmt(p.rec)}</td></tr>`).join('');
+    const cR=comunas.map(c=>`<tr><td>${cleanZone(c.comuna)}</td><td>${fmt(c.recuperar)}</td><td>${fmt(c.censo)}</td><td>${c.lat?`<a href="#" onclick="copyLatLon(${c.lat},${c.lon});return false">copiar pin</a>`:'—'}</td></tr>`).join('');
+    const jR=JUGADAS.map(j=>`<tr><td>${j[0]}</td><td>${j[1]}</td><td style="text-align:left">${j[2]}</td></tr>`).join('');
+    document.getElementById('cityView').innerHTML=`
+      <section style="border-top:none;padding-top:1.2rem">
+        <button class="cv-back" onclick="switchView('nacional')">← Volver a la vista nacional</button>
+        <div class="eyebrow">Zoom · ${name}</div>
+        <h2>${name}</h2>
+        <p class="muted">${CITY_SUB[slug]}</p>
+        <div class="kpis">${kpis.map(k=>`<div class="kpi ${k[0]}"><div class="v">${k[1]}</div><div class="l">${k[2]}</div></div>`).join('')}</div>
+      </section>
+      <section>
+        <h3>Mapa de calor por barrio</h3>
+        <p class="muted" style="font-size:.9rem">Las tres capas lado a lado. Pasa el cursor por un barrio para su ficha y copiar el centroide (pin) para el radio en Meta.</p>
+        <div class="cz3" style="margin-top:.6rem">
+          <div class="czm"><div class="czlab"><span class="dot izq"></span>Voto recuperable</div><div id="cv-map-rec" class="czmap"></div></div>
+          <div class="czm"><div class="czlab"><span class="dot gold"></span>% jóvenes (18-35)</div><div id="cv-map-young" class="czmap"></div></div>
+          <div class="czm"><div class="czlab"><span class="dot grn"></span>% hombres</div><div id="cv-map-men" class="czmap"></div></div>
+        </div>
+        <div id="cvDetail" class="muted" style="margin-top:.6rem;font-size:.88rem">Pasa el cursor por un barrio…</div>
+      </section>
+      <section>
+        <h3>Edad y género de la ciudad</h3>
+        <div class="cv-edadrow">
+          <div><p style="font-size:.92rem">Composición del voto por edad (inferencia ecológica de ciudad). La movilización va a los jóvenes, donde el voto ya es nuestro; con los mayores, contención.</p>
+            <div class="leg"><span><span class="sw" style="background:var(--izq)"></span><span data-nm="cand"></span></span><span><span class="sw" style="background:var(--der)"></span><span data-nm="rival"></span></span></div></div>
+          <div><svg id="cv-edad" viewBox="0 0 420 260" style="width:100%;height:auto"></svg></div>
+        </div>
+      </section>
+      <section>
+        <h3>${CITY_DIV[slug]}s por voto a recuperar</h3>
+        ${T([CITY_DIV[slug],'Recuperar','Censo','Pin (radio Meta)'], cR)}
+      </section>
+      <section>
+        <h3>Barrios por composición</h3>
+        <div class="cv-tables">
+          <div><h4 style="font-size:.92rem;margin-bottom:.3rem;color:var(--izq)">Más jóvenes · GOTV</h4>${T(['Barrio','%','Recup.'],yR)}</div>
+          <div><h4 style="font-size:.92rem;margin-bottom:.3rem">Más hombres · rinde izq.</h4>${T(['Barrio','%','Recup.'],mR)}</div>
+          <div><h4 style="font-size:.92rem;margin-bottom:.3rem">Más mujeres · cerrar brecha</h4>${T(['Barrio','% muj.','Recup.'],wR)}</div>
+        </div>
+        <p class="muted" style="font-size:.86rem;margin-top:.5rem">En barrios de mayoría femenina conviene un creativo propio para mujeres (la brecha de género es mayor entre jóvenes), no el mismo de los hombres.</p>
+      </section>
+      <section style="border-bottom:none">
+        <h3>Jugadas concretas · edad × sexo</h3>
+        ${T(['Edad','Sexo','Jugada de pauta'], jR)}
+        <p class="muted" style="font-size:.86rem;margin-top:.5rem">Esta misma vista, con más detalle, está en el anexo PDF "Las 4 ciudades grandes, una a una" (se entrega aparte).</p>
+      </section>`;
+    fillNames();
+    cvMaps.rec=cvMakeMap('cv-map-rec'); cvMaps.young=cvMakeMap('cv-map-young'); cvMaps.men=cvMakeMap('cv-map-men');
+    cvRenderMap(cvMaps.rec, geo, 'rec', slug); cvRenderMap(cvMaps.young, geo, 'young', slug); cvRenderMap(cvMaps.men, geo, 'men', slug);
+    drawEdadSvg(document.getElementById('cv-edad'), name);
+  }
+  function cvMakeMap(id){ return L.map(id,{zoomControl:false,attributionControl:false,scrollWheelZoom:false,dragging:false,touchZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false}).setView([4.6,-74.1],11); }
+  function cvRenderMap(map, geo, metric, slug){
+    let mn=Infinity,mx=-Infinity; geo.features.forEach(f=>{const v=f.properties[metric]; if(v!=null){mn=Math.min(mn,v);mx=Math.max(mx,v);}});
+    const ramp=metric==='rec'?[179,38,29]:metric==='young'?[140,90,180]:[47,125,82], lo=[235,231,221];
+    L.geoJSON(geo,{
+      style:f=>{const v=f.properties[metric]; if(v==null) return {fillColor:'#b9b2a2',fillOpacity:.16,color:'#0002',weight:.2};
+        const t=metric==='rec'?Math.sqrt(v/(mx||1)):(mx>mn?(v-mn)/(mx-mn):.5);
         const c=[lo[0]+(ramp[0]-lo[0])*t|0,lo[1]+(ramp[1]-lo[1])*t|0,lo[2]+(ramp[2]-lo[2])*t|0];
-        return {fillColor:`rgb(${c[0]},${c[1]},${c[2]})`,fillOpacity:f.properties.f?.5:.85,color:'#00000022',weight:.2}; },
-      onEachFeature:(f,l)=>{ const p=f.properties;
-        l.on('mouseover',()=>{ l.setStyle({weight:1.4,color:'#000'}); czShowDetail(p,f.geometry); });
-        l.on('mouseout',()=>l.setStyle({weight:.2,color:'#00000022'}));
-        if(p[metric]!=null){
-          const lab = metric==='rec'?fmt(p[metric]) : (p[metric]*100).toFixed(0)+'%';
-          l.bindTooltip(`<b>${p.nm}</b><br>${lab}`,{sticky:true});
-        }
-      }
+        return {fillColor:`rgb(${c[0]},${c[1]},${c[2]})`,fillOpacity:f.properties.f?.5:.85,color:'#00000022',weight:.2};},
+      onEachFeature:(f,l)=>{const p=f.properties;
+        l.on('mouseover',()=>cvShowDetail(p));
+        if(p[metric]!=null){const lab=metric==='rec'?fmt(p[metric]):(p[metric]*100).toFixed(0)+'%'; l.bindTooltip(`<b>${p.nm}</b><br>${lab}`,{sticky:true});}}
     }).addTo(map);
     const meta=(DATA.barrio_index||[]).find(c=>c.slug===slug);
-    try{ if(meta&&meta.bbox){ map.fitBounds([[meta.bbox[1],meta.bbox[0]],[meta.bbox[3],meta.bbox[2]]],{padding:[4,4]}); } else { map.fitBounds(czLayers[metric].getBounds(),{padding:[6,6]}); } }catch(e){}
-    setTimeout(()=>map.invalidateSize(),50);
+    try{ if(meta&&meta.bbox){ map.fitBounds([[meta.bbox[1],meta.bbox[0]],[meta.bbox[3],meta.bbox[2]]],{padding:[4,4]}); } else { map.fitBounds(L.geoJSON(geo).getBounds(),{padding:[6,6]}); } }catch(e){}
+    setTimeout(()=>map.invalidateSize(),70);
   }
-  function czShowDetail(p,g){
-    let copyBtn=''; if(p.clat!=null&&p.clon!=null) copyBtn=` · <a href="#" onclick="copyLatLon(${p.clat},${p.clon});return false">⌖ copiar centroide ${p.clat}, ${p.clon}</a>`;
-    document.getElementById('czDetail').innerHTML = `<b>${p.nm}</b> · recuperar <b>${fmt(p.rec)}</b> · jóvenes <b>${p.young!=null?(p.young*100).toFixed(0)+'%':'—'}</b> · hombres <b>${p.men!=null?(p.men*100).toFixed(0)+'%':'—'}</b>${copyBtn}`;
+  function cvShowDetail(p){
+    let cp=''; if(p.clat!=null) cp=` · <a href="#" onclick="copyLatLon(${p.clat},${p.clon});return false">⌖ copiar centroide</a>`;
+    const el=document.getElementById('cvDetail'); if(el) el.innerHTML=`<b>${p.nm}</b> · recuperar <b>${fmt(p.rec)}</b> · jóvenes <b>${p.young!=null?(p.young*100).toFixed(0)+'%':'—'}</b> · hombres <b>${p.men!=null?(p.men*100).toFixed(0)+'%':'—'}</b>${cp}`;
   }
-  document.addEventListener('click',e=>{
-    const b=e.target.closest('#czCitySeg button'); if(b) czLoadCity(b.dataset.cz);
-  });
-  function downloadAnexoToast(e){ if(e)e.preventDefault(); toast('El anexo PDF se entrega por separado a la campaña.'); }
+  document.addEventListener('click',e=>{ const b=e.target.closest('#viewSwitch button'); if(b) switchView(b.dataset.view); });
 
   // ─── INIT ───────────────────────────────────────────────────────────────
   async function init(){
     try{ DATA = await (await fetch(DATA_BASE+'data.json')).json(); }
     catch(e){ document.getElementById('main').innerHTML='<p style="padding:3rem">No se pudieron cargar los datos del análisis. Reintenta o revisa tu conexión.</p>'; return; }
     N = DATA.names || {}; fillNames();
-    buildLookups(); renderHero(); renderTable(); buildCitySel(); buildEdadSel(); calcBudget(); buildBarrioSel(); initMap(); czLoadCity('bogota');
+    buildLookups(); renderHero(); renderTable(); buildCitySel(); buildEdadSel(); calcBudget(); buildBarrioSel(); initMap();
   }
   </script>
 </body>
