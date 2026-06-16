@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Plan de Pauta Digital · 2ª Vuelta 2026</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    :root{
+      --paper:#f4f3ef; --paper-2:#ecebe5; --paper-3:#e0ddd2;
+      --ink:#14110a; --ink-2:#5a5448; --ink-3:#948e80;
+      --rule:#14110a1f; --rule-strong:#14110a40;
+      --accent:#8a1e16; --accent-soft:#8a1e161a; --accent-tint:#8a1e1633;
+      --gold:#8a6a1a; --on-accent:#f4f3ef; --danger:#b03524;
+      --izq:#b3261d; --der:#1f47cc; --warn:#b8860b; --warn-bg:#f0c0401f;
+      --sans:'Familjen Grotesk',system-ui,sans-serif; --italic:'Petrona',Georgia,serif;
+      --mono:'Space Mono',ui-monospace,monospace; --display:'Syne',sans-serif;
+    }
+    [data-theme="dark"]{
+      --paper:#1a1610; --paper-2:#221d15; --paper-3:#2a241b;
+      --ink:#f4f3ef; --ink-2:#b8b1a0; --ink-3:#807a6c;
+      --rule:#f4f3ef1c; --rule-strong:#f4f3ef38;
+      --accent:#d96a50; --accent-soft:#d96a5018; --accent-tint:#d96a5036;
+      --gold:#d6a83a; --on-accent:#14110a; --danger:#d96a50;
+      --izq:#e0584a; --der:#5a78e6; --warn:#d6a83a; --warn-bg:#d6a83a1f;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55;min-height:100vh;cursor:none;overflow-x:hidden;-webkit-font-smoothing:antialiased;transition:background .4s,color .4s}
+    ::selection{background:var(--accent);color:var(--on-accent)}
+    a{color:var(--accent);text-decoration:none}
+    a:hover{text-decoration:underline}
+    h1,h2,h3{font-family:var(--display);font-weight:800;letter-spacing:-.01em;line-height:1.1}
+    /* gate */
+    .gate{position:fixed;inset:0;z-index:5000;background:var(--paper);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1rem}
+    .gate-text{font-family:var(--mono);font-size:.82rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2)}
+    .gate-bar{width:120px;height:1px;background:var(--rule);position:relative;overflow:hidden}
+    .gate-bar::after{content:'';position:absolute;inset:0;background:var(--accent);animation:gs 1.4s ease-in-out infinite}
+    @keyframes gs{0%{transform:translateX(-100%)}50%{transform:translateX(0)}100%{transform:translateX(100%)}}
+    /* cursor */
+    .cursor{position:fixed;width:11px;height:11px;background:var(--accent);border-radius:50%;pointer-events:none;z-index:9999;transition:transform .15s ease,background .2s;transform:translate(-50%,-50%)}
+    .cursor-ring{position:fixed;width:34px;height:34px;border:1px solid var(--accent);border-radius:50%;pointer-events:none;z-index:9998;opacity:.4;transform:translate(-50%,-50%);transition:transform .18s ease,opacity .2s}
+    @media(hover:none){body{cursor:auto}.cursor,.cursor-ring{display:none}}
+    /* nav */
+    nav{position:sticky;top:0;z-index:900;display:flex;align-items:center;gap:1rem;padding:.7rem 1.4rem;background:color-mix(in srgb,var(--paper) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--rule)}
+    nav .brand{font-family:var(--display);font-weight:800;font-size:.98rem;letter-spacing:-.01em}
+    nav .priv{font-family:var(--mono);font-size:.62rem;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);border:1px solid var(--accent-tint);padding:.16rem .45rem;border-radius:3px}
+    nav .sp{flex:1}
+    nav button,nav a.btn{font-family:var(--mono);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2);background:none;border:1px solid var(--rule);padding:.35rem .6rem;border-radius:4px;cursor:none}
+    nav button:hover,nav a.btn:hover{border-color:var(--accent);color:var(--accent);text-decoration:none}
+    main{max-width:1180px;margin:0 auto;padding:0 1.4rem 6rem;position:relative;z-index:1}
+    section{padding:3.2rem 0;border-bottom:1px solid var(--rule)}
+    .eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:.7rem}
+    .lead{font-family:var(--italic);font-style:italic;font-size:1.3rem;color:var(--ink-2);max-width:60ch;line-height:1.45}
+    h2{font-size:1.9rem;margin-bottom:.5rem}
+    h3{font-size:1.15rem;margin-bottom:.4rem}
+    p{max-width:72ch;color:var(--ink-2)}
+    .muted{color:var(--ink-3);font-size:.9rem}
+    /* hero */
+    .hero{padding-top:3rem}
+    .hero h1{font-size:clamp(2.1rem,5vw,3.4rem);max-width:18ch}
+    .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);margin-top:2rem;border-radius:8px;overflow:hidden}
+    .kpi{background:var(--paper-2);padding:1.1rem 1.2rem}
+    .kpi .v{font-family:var(--display);font-weight:800;font-size:1.6rem;line-height:1}
+    .kpi .l{font-family:var(--mono);font-size:.66rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3);margin-top:.45rem}
+    .kpi.red .v{color:var(--izq)} .kpi.blue .v{color:var(--der)} .kpi.gold .v{color:var(--gold)}
+    /* cards */
+    .cards2{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-top:1.6rem}
+    @media(max-width:760px){.cards2{grid-template-columns:1fr}}
+    .card{background:var(--paper-2);border:1px solid var(--rule);border-radius:10px;padding:1.3rem 1.4rem}
+    .card.mob{border-top:3px solid var(--izq)} .card.per{border-top:3px solid var(--der)}
+    .card h3{font-size:1.25rem}
+    .card .uni{font-family:var(--display);font-weight:800;font-size:1.7rem;margin:.3rem 0}
+    .card.mob .uni{color:var(--izq)} .card.per .uni{color:var(--der)}
+    .card ul{list-style:none;margin-top:.7rem;font-size:.92rem;color:var(--ink-2)}
+    .card li{padding:.28rem 0;border-top:1px solid var(--rule);display:flex;gap:.5rem}
+    .card li b{color:var(--ink);min-width:78px;font-weight:600}
+    /* map */
+    .maptools{display:flex;gap:.5rem;flex-wrap:wrap;margin:1rem 0 .8rem}
+    .seg{display:inline-flex;border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+    .seg button{font-family:var(--mono);font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;padding:.4rem .7rem;background:var(--paper-2);border:none;border-right:1px solid var(--rule);color:var(--ink-2);cursor:none}
+    .seg button:last-child{border-right:none}
+    .seg button.on{background:var(--accent);color:var(--on-accent)}
+    .maprow{display:grid;grid-template-columns:1.6fr 1fr;gap:1rem}
+    @media(max-width:860px){.maprow{grid-template-columns:1fr}}
+    #map,#barrioMap{height:520px;border:1px solid var(--rule);border-radius:10px;background:var(--paper-2)}
+    .leaflet-container{background:var(--paper-2)}
+    #mapback{display:none;font-family:var(--mono);font-size:.72rem;margin-bottom:.5rem;color:var(--accent);background:none;border:1px solid var(--accent-tint);padding:.3rem .6rem;border-radius:4px;cursor:none}
+    .detail{background:var(--paper-2);border:1px solid var(--rule);border-radius:10px;padding:1.2rem;min-height:200px}
+    .detail .dt-muni{font-family:var(--display);font-weight:800;font-size:1.3rem}
+    .detail .dt-dep{font-family:var(--mono);font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3);margin-bottom:.8rem}
+    .dt-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem .9rem;margin-top:.4rem}
+    .dt-grid .m .v{font-family:var(--display);font-weight:700;font-size:1.15rem}
+    .dt-grid .m .l{font-family:var(--mono);font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3)}
+    .copybtn{margin-top:.9rem;font-family:var(--mono);font-size:.72rem;width:100%;padding:.5rem;border:1px solid var(--rule);border-radius:5px;background:var(--paper-3);color:var(--ink);cursor:none}
+    .copybtn:hover{border-color:var(--accent);color:var(--accent)}
+    .leaflet-tooltip{font-family:var(--sans)!important;font-size:.82rem!important;background:rgba(6,8,16,.95)!important;border:1px solid var(--accent-tint)!important;color:#f4f3ef!important;border-radius:4px!important;padding:.4rem .6rem!important}
+    .leaflet-tooltip:before{display:none!important}
+    /* table */
+    .tbl-wrap{overflow-x:auto;border:1px solid var(--rule);border-radius:10px;margin-top:.6rem}
+    table.dt{width:100%;border-collapse:collapse;font-size:.88rem;min-width:680px}
+    table.dt th{font-family:var(--mono);font-size:.64rem;text-transform:uppercase;letter-spacing:.05em;text-align:right;padding:.6rem .7rem;background:var(--paper-3);color:var(--ink-2);position:sticky;top:0;cursor:none;white-space:nowrap}
+    table.dt th:first-child,table.dt td:first-child{text-align:left}
+    table.dt th.s{text-align:left}
+    table.dt td{padding:.5rem .7rem;text-align:right;border-top:1px solid var(--rule);font-variant-numeric:tabular-nums}
+    table.dt tbody tr:hover{background:var(--accent-soft)}
+    .pill{font-family:var(--mono);font-size:.6rem;padding:.1rem .4rem;border-radius:3px;background:var(--accent-soft);color:var(--accent)}
+    input[type=search],input[type=number],select{font-family:var(--sans);font-size:.9rem;padding:.45rem .6rem;border:1px solid var(--rule);border-radius:5px;background:var(--paper-2);color:var(--ink);cursor:none}
+    /* edad chart */
+    .edadrow{display:grid;grid-template-columns:1.1fr 1fr;gap:1.4rem;align-items:center}
+    @media(max-width:760px){.edadrow{grid-template-columns:1fr}}
+    .leg{display:flex;gap:1rem;font-family:var(--mono);font-size:.72rem;margin-top:.6rem}
+    .leg .sw{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:.3rem;vertical-align:-1px}
+    /* budget */
+    .calc{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin:1rem 0}
+    .calc label{font-family:var(--mono);font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);display:block;margin-bottom:.3rem}
+    .calc input,.calc select{width:100%}
+    .calcout{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:8px;overflow:hidden;margin-top:.6rem}
+    .calcout .c{background:var(--paper-2);padding:1rem}
+    .calcout .c .v{font-family:var(--display);font-weight:800;font-size:1.4rem}
+    .calcout .c .l{font-family:var(--mono);font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);margin-top:.4rem}
+    /* platforms */
+    .plat{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-top:1.2rem}
+    .plat .p{background:var(--paper-2);border:1px solid var(--rule);border-radius:10px;padding:1.1rem}
+    .plat .p h3{font-size:1.05rem}
+    .plat .p .role{font-family:var(--mono);font-size:.64rem;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin:.2rem 0 .5rem}
+    .plat .p p{font-size:.85rem}
+    /* alert */
+    .alert{background:var(--warn-bg);border:1px solid var(--warn);border-radius:10px;padding:1.3rem 1.5rem;margin-top:1rem}
+    .alert h3{color:var(--warn)}
+    .alert ol{margin:.6rem 0 0 1.1rem;font-size:.93rem;color:var(--ink-2)}
+    .alert li{padding:.3rem 0}
+    .alert li b{color:var(--ink)}
+    footer{padding:2.5rem 0;color:var(--ink-3);font-size:.8rem;max-width:80ch}
+    .draft{font-family:var(--mono);font-size:.66rem;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-3)}
+    .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:.78rem;padding:.6rem 1rem;border-radius:6px;z-index:9000;opacity:0;transition:opacity .25s;pointer-events:none}
+    .toast.show{opacity:1}
+  </style>
+</head>
+<body>
+  <div class="gate" id="gate">
+    <div class="gate-text">Verificando acceso</div>
+    <div class="gate-bar"></div>
+  </div>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <nav id="topNav" hidden>
+    <span class="brand">Plan de Pauta Digital</span>
+    <span class="priv">Privado · 2ª Vuelta</span>
+    <span class="sp"></span>
+    <button onclick="toggleTheme()" id="themeBtn">◐</button>
+    <a class="btn" href="dashboard.html">Salir</a>
+  </nav>
+
+  <main id="main" hidden>
+    <!-- HERO -->
+    <section class="hero" style="border-top:none">
+      <div class="eyebrow">Documento de trabajo · campaña · uso interno</div>
+      <h1>Dónde, a quién y con qué pautar en los días que quedan</h1>
+      <p class="lead" id="leadTxt"></p>
+      <div class="kpis" id="heroKpis"></div>
+      <p class="muted" style="margin-top:1rem">Las cifras salen del preconteo de 1ª vuelta por mesa + el modelo de 2ª vuelta (techo <span data-nm="izq22"></span>&nbsp;2V&nbsp;2022) + el análisis de edad por inferencia ecológica. Es un escenario para dimensionar la pauta, no un pronóstico.</p>
+    </section>
+
+    <!-- ESTRATEGIA -->
+    <section>
+      <div class="eyebrow">La estrategia en una frase</div>
+      <h2>Dos campañas distintas, no una</h2>
+      <p>A seis días, la pauta no es "convencer indecisos despacio": es <b>movilizar a la izquierda que no votó</b> (la palanca grande) y <b>persuadir al centro</b> (la palanca fina). Se compran y se miden distinto.</p>
+      <div class="cards2">
+        <div class="card mob">
+          <h3>① Movilización · GOTV</h3>
+          <div class="uni" id="uniMob">—</div>
+          <ul>
+            <li><b>A quién</b><span>Simpatizantes de izquierda que se quedaron en casa en 1V.</span></li>
+            <li><b>Dónde</b><span id="mobDonde">—</span></li>
+            <li><b>Regla</b><span>Pauta broad por geo <b>solo donde la izquierda gana la 2V</b>. Prender abstención donde gana <span data-nm="rival"></span> le suma a <span data-nm="rival"></span>.</span></li>
+            <li><b>Mensaje</b><span>Emocional, identidad, "salí a votar". Urgencia y pertenencia.</span></li>
+            <li><b>Canales</b><span>Meta (geo+edad) · TikTok orgánico (jóvenes) · WhatsApp territorial.</span></li>
+          </ul>
+        </div>
+        <div class="card per">
+          <h3>② Persuasión · Centro</h3>
+          <div class="uni" id="uniPer">—</div>
+          <ul>
+            <li><b>A quién</b><span>Votantes de <span data-nm="faj"></span> y <span data-nm="cla"></span>, transferibles.</span></li>
+            <li><b>Dónde</b><span id="perDonde">—</span></li>
+            <li><b>Regla</b><span>Sobre todo urbano. Targeting por ciudad + intereses.</span></li>
+            <li><b>Mensaje</b><span>Moderado, riesgo de los extremos, gestión y garantías.</span></li>
+            <li><b>Canales</b><span>Meta · YouTube (video corto) · prensa digital.</span></li>
+          </ul>
+        </div>
+      </div>
+      <p class="muted" style="margin-top:1rem">Centro (~0,7M) <b>se suma</b> a movilización (~1,9M) = lo que <span data-nm="cand"></span> debe crecer sobre su 1V. Recuperación (techo) y movilización son el mismo universo visto distinto: no se suman entre sí.</p>
+    </section>
+
+    <!-- MAPA -->
+    <section>
+      <div class="eyebrow">El mapa de la compra</div>
+      <h2>Dónde poner la plata</h2>
+      <p>Click en un departamento para abrir sus municipios. Click en un municipio para su ficha con el centroide listo para <b>targeting por radio en Meta</b>.</p>
+      <div class="maptools">
+        <div class="seg" id="metricSeg">
+          <button data-m="net" class="on">Movilización (neto)</button>
+          <button data-m="cen">Persuasión (centro)</button>
+          <button data-m="part">Participación 1V</button>
+        </div>
+      </div>
+      <button id="mapback" onclick="backToNacional()">← Volver al mapa nacional</button>
+      <div class="maprow">
+        <div id="map"></div>
+        <div class="detail" id="detail">
+          <div class="muted">Pasa el mouse o haz click en el mapa para ver la ficha de targeting de cada territorio.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TABLA -->
+    <section>
+      <div class="eyebrow">Lista priorizada</div>
+      <h2>Municipios objetivo</h2>
+      <div class="maptools" style="justify-content:space-between;align-items:center">
+        <div class="seg" id="tblSeg">
+          <button data-t="net" class="on">Movilización</button>
+          <button data-t="cen">Persuasión</button>
+          <button data-t="rec">Recuperación</button>
+        </div>
+        <div style="display:flex;gap:.6rem;align-items:center">
+          <input type="search" id="tblSearch" placeholder="Buscar municipio…" oninput="renderTable()" />
+          <button class="copybtn" style="width:auto;margin:0" onclick="downloadCSV()">↓ CSV de la vista</button>
+        </div>
+      </div>
+      <div class="tbl-wrap"><table class="dt" id="dtable"><thead id="dthead"></thead><tbody id="dtbody"></tbody></table></div>
+      <p class="muted" style="margin-top:.6rem">El Excel entregado trae la lista completa (1.090 municipios) + comunas de ciudades grandes con centroides. Esta tabla muestra el top de la vista activa.</p>
+    </section>
+
+    <!-- HIPERLOCAL -->
+    <section>
+      <div class="eyebrow">Saturación hiperlocal</div>
+      <h2>Comunas y localidades para radio</h2>
+      <p>En las ciudades grandes, un municipio entero es demasiado amplio. Estas comunas concentran voto recuperable: usa el centroide + un radio de 2-4 km en Meta para saturarlas.</p>
+      <div style="margin:.8rem 0"><select id="citySel" onchange="renderHiper()"></select></div>
+      <div class="tbl-wrap"><table class="dt" id="hiper"><thead><tr><th class="s">Comuna / Localidad</th><th>Recuperar</th><th>Censo</th><th>Lat, Lon (radio Meta)</th><th></th></tr></thead><tbody id="hiperbody"></tbody></table></div>
+    </section>
+
+    <!-- MAPA DE CALOR POR BARRIO -->
+    <section id="barrioSection">
+      <div class="eyebrow">Mapa de calor por barrio</div>
+      <h2>Cada ciudad por dentro</h2>
+      <p>Dónde está el voto recuperable y cómo se compone el electorado por <b>edad</b> y <b>sexo</b>, barrio por barrio. Edad y sexo van como <b>composición del censo</b> (dónde se concentran los jóvenes / los hombres), no como voto por demografía — a nivel barrio eso sería inferencia demasiado ruidosa. Y es justo lo que se segmenta en Meta: un radio sobre el barrio, filtrado por edad y sexo. Solo ciudades con polígonos y margen útil.</p>
+      <div class="maptools" style="justify-content:space-between;align-items:center">
+        <select id="barrioCitySel" onchange="loadBarrioCity()"></select>
+        <div class="seg" id="barrioMetricSeg">
+          <button data-bm="rec" class="on">Movilización</button>
+          <button data-bm="young">% jóvenes</button>
+          <button data-bm="men">% hombres</button>
+        </div>
+      </div>
+      <div id="barrioNote" class="muted" style="margin:0 0 .6rem"></div>
+      <div class="maprow">
+        <div id="barrioMap"></div>
+        <div class="detail" id="barrioDetail"><div class="muted">Pasa el mouse por un barrio para ver su composición y copiar su centroide.</div></div>
+      </div>
+    </section>
+
+    <!-- EDAD / GENERO -->
+    <section>
+      <div class="eyebrow">Segmentos · el porqué del mensaje</div>
+      <h2>Edad y género: la palanca fina</h2>
+      <div class="edadrow">
+        <div>
+          <h3 style="margin-bottom:.2rem">Choque de generaciones</h3>
+          <p style="font-size:.92rem"><span data-nm="cand"></span> arrasa entre los jóvenes y casi desaparece entre los mayores; con <span data-nm="rival"></span> es al revés. Pasa en todo el país. Implicación de pauta: <b>la movilización va a jóvenes</b> (donde el voto ya es tuyo, solo falta sacarlo); con los mayores no se gasta en convencer, se contiene.</p>
+          <div style="margin:.7rem 0"><select id="edadSel" onchange="drawEdad()"></select></div>
+          <div class="leg"><span><span class="sw" style="background:var(--izq)"></span><span data-nm="cand"></span></span><span><span class="sw" style="background:var(--der)"></span><span data-nm="rival"></span></span></div>
+        </div>
+        <div><svg id="edadSvg" viewBox="0 0 420 260" style="width:100%;height:auto"></svg></div>
+      </div>
+      <h3 style="margin-top:1.8rem">Brecha de género</h3>
+      <p style="font-size:.92rem">El patrón regional (validado por mesa con efectos fijos): <b>los hombres se inclinan más a la izquierda y las mujeres más a la derecha, y la brecha es mayor entre los jóvenes</b>. No cambia mucho el "dónde" (el censo hombre/mujer es parejo) pero sí el <b>"qué"</b>: en Meta puedes correr creativos separados por género — a los hombres jóvenes, movilización directa; a las mujeres jóvenes, un mensaje distinto que cierre la brecha en vez de asumir el voto.</p>
+    </section>
+
+    <!-- PRESUPUESTO -->
+    <section>
+      <div class="eyebrow">Cuánto y cómo repartir</div>
+      <h2>Calculadora de presupuesto</h2>
+      <p>Mete el presupuesto real y ajusta los supuestos. El reparto entre municipios es proporcional al universo de cada campaña (neto para movilización, centro para persuasión).</p>
+      <div class="calc">
+        <div><label>Presupuesto total (COP)</label><input type="number" id="bTotal" value="20000000" oninput="calcBudget()"></div>
+        <div><label>% a movilización</label><input type="number" id="bMob" value="70" min="0" max="100" oninput="calcBudget()"></div>
+        <div><label>CPM Meta (COP / 1000 impr.)</label><input type="number" id="bCpm" value="12000" oninput="calcBudget()"></div>
+        <div><label>Frecuencia objetivo</label><input type="number" id="bFreq" value="3.5" step="0.1" oninput="calcBudget()"></div>
+      </div>
+      <div class="calcout" id="calcOut"></div>
+      <p class="muted" style="margin-top:.6rem">CPM de referencia para Meta en Colombia ($2-4 USD); sube en 2ª vuelta por la competencia. Alcance ≈ impresiones / frecuencia. Son estimados para planear, no garantías. <span id="calcFoot"></span></p>
+      <div class="tbl-wrap" style="margin-top:1rem"><table class="dt" id="budgetTbl"><thead><tr><th class="s">Municipio</th><th>Campaña</th><th>Presupuesto</th><th>Impresiones</th><th>Alcance aprox.</th></tr></thead><tbody id="budgetBody"></tbody></table></div>
+    </section>
+
+    <!-- PLATAFORMAS -->
+    <section>
+      <div class="eyebrow">Dónde pautar</div>
+      <h2>Plataformas y formatos</h2>
+      <div class="plat">
+        <div class="p"><h3>Meta (FB/IG)</h3><div class="role">Backbone · mov. + persuasión</div><p>Geo por municipio + pin/radio, edad y género. Es donde tu data rinde más. <b>Exige autorización política.</b> Formatos: Reels verticales 9:16, video ≤15s, stories con CTA "registra tu puesto".</p></div>
+        <div class="p"><h3>YouTube / Google</h3><div class="role">Alcance + persuasión</div><p>Depto/ciudad + edad + afinidad. Bumper 6s (no salteable) para recordación + skippable 15-30s para persuasión de centro. Search para defender el nombre.</p></div>
+        <div class="p"><h3>TikTok</h3><div class="role">Jóvenes · solo orgánico</div><p><b>No acepta pauta política pagada.</b> Es la base joven de <span data-nm="cand"></span>: se trabaja con creadores y contenido orgánico, no con anuncios. Disclosure de colaboración pagada.</p></div>
+        <div class="p"><h3>WhatsApp / territorial</h3><div class="role">GOTV puerta a puerta digital</div><p>Difusión a listas propias por municipio + botón clic-a-WhatsApp desde los anuncios de Meta. Consentimiento Ley 1581 para las bases.</p></div>
+        <div class="p"><h3>X (Twitter)</h3><div class="role">Conversación / élite</div><p>Orgánico y amplificación con la cuenta del candidato. X Premium no es herramienta de campaña; para pauta sería X Ads (alcance limitado vs Meta en Colombia).</p></div>
+        <div class="p"><h3>Inteligencia competitiva</h3><div class="role">Gratis · legal</div><p>La <a href="https://www.facebook.com/ads/library" target="_blank" rel="noopener">Meta Ad Library</a> muestra toda la pauta política activa del rival (<span data-nm="rival"></span>): mensajes, rango de gasto, alcance por demografía. El <a href="https://adstransparency.google.com" target="_blank" rel="noopener">Google Ads Transparency Center</a> igual. Revisar a diario.</p></div>
+      </div>
+    </section>
+
+    <!-- MEDICION -->
+    <section>
+      <div class="eyebrow">Cómo saber si funciona</div>
+      <h2>Medición</h2>
+      <p>Instala el <b>Meta Pixel + Conversions API (CAPI)</b> en la landing y marca cada anuncio con <b>UTMs</b> (campaña = mov/centro, contenido = creativo). Mira tres cosas por municipio: <b>costo por resultado</b> (registro de puesto / clic-a-WhatsApp / vista de 75% del video), <b>frecuencia</b> (si pasa de 4-5, satura: rota creativo o amplía geo) y <b>CTR</b>. Reasigna el presupuesto cada 24-48h a lo que más barato convierte. El KPI final no es likes: es <b>votantes movilizados</b>, así que prioriza acciones (registro, compartir, recordatorio) sobre alcance puro.</p>
+    </section>
+
+    <!-- ALERTAS -->
+    <section style="border-bottom:none">
+      <div class="eyebrow" style="color:var(--warn)">Antes de poner un solo peso</div>
+      <h2>Tres alertas que resolver ya</h2>
+      <div class="alert">
+        <h3>⚠ Bloqueantes</h3>
+        <ol>
+          <li><b>Autorización de anuncios políticos en Meta.</b> Para correr ads electorales en Colombia la cuenta debe estar autorizada (verificación de identidad + disclaimer "pagado por"). <b>Tarda días.</b> Si la cuenta no está autorizada, no se podrá lanzar pauta nueva antes del 21. Verificar el estatus <b>hoy</b>.</li>
+          <li><b>Topes de campaña (CNE) y Cuentas Claras.</b> El gasto digital cuenta para el tope y se reporta. El plan tiene que caber en el tope restante; cruzar con el contador/jurídica.</li>
+          <li><b>TikTok no acepta pauta pagada</b> (solo orgánico + creadores). <b>Veda/propaganda:</b> confirmar las fechas vigentes de propaganda electoral digital con la jurídica antes de programar.</li>
+        </ol>
+      </div>
+    </section>
+
+    <footer>
+      <div class="draft">Borrador automático · ricardoruiz.co</div>
+      <p style="margin-top:.6rem;color:var(--ink-3)">Fuentes: preconteo 1V 2026 por mesa (Registraduría) · modelo de 2ª vuelta con supuestos de trasvase explícitos (techo = <span data-nm="izq22"></span> 2V 2022) · censo electoral Divipole + georreferenciación de puestos · análisis de composición etaria por inferencia ecológica a nivel puesto (IC95 ±3-6 pp típico). El bloque de movilización es un escenario para dimensionar pauta, no un pronóstico. La inferencia ecológica acota, no fija intención individual.</p>
+    </footer>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+  // ─── EMAIL GATE ─────────────────────────────────────────────────────────
+  // TODO RICARDO: agregar el correo del CLIENTE (campaña) a esta whitelist.
+  const ALLOWED = ['reruizc@gmail.com', 'CORREO_DEL_CLIENTE@PENDIENTE.com'];
+  const token = localStorage.getItem('rr-token');
+  const userRaw = localStorage.getItem('rr-user');
+  const user = userRaw ? JSON.parse(userRaw) : null;
+  function emailAllowed(em){ return em && ALLOWED.includes(String(em).toLowerCase().trim()); }
+  function denyToLogin(){ localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); window.location.replace('login.html'); }
+  function denyToDashboard(){ window.location.replace('dashboard.html'); }
+  if (!token || !user) { denyToLogin(); }
+  else if (!emailAllowed(user.email)) { denyToDashboard(); }
+  else {
+    (async () => {
+      try {
+        const res = await fetch('https://rr-auth.reruizc.workers.dev/auth/me', { headers:{ 'Authorization':`Bearer ${token}` } });
+        if (res.status === 401) return denyToLogin();
+        const data = await res.json();
+        if (!data.ok || !emailAllowed(data.user && data.user.email)) return denyToDashboard();
+        localStorage.setItem('rr-user', JSON.stringify(Object.assign({}, user, data.user)));
+        revealPage();
+      } catch(e){ revealPage(); }
+    })();
+  }
+  function revealPage(){
+    const g=document.getElementById('gate'); if(g) g.remove();
+    document.getElementById('topNav').hidden=false;
+    document.getElementById('main').hidden=false;
+    init();
+  }
+
+  // ─── THEME ──────────────────────────────────────────────────────────────
+  function getAutoTheme(){ const h=new Date().getHours(); return (h>=7&&h<19)?'light':'dark'; }
+  let THEME = localStorage.getItem('rr-theme') || getAutoTheme();
+  document.documentElement.setAttribute('data-theme', THEME==='dark'?'dark':'');
+  function toggleTheme(){ THEME = (THEME==='dark')?'light':'dark'; localStorage.setItem('rr-theme',THEME); document.documentElement.setAttribute('data-theme',THEME==='dark'?'dark':''); if(window._repaintMap) _repaintMap(); if(typeof bGeo!=='undefined'&&bGeo) renderBarrio(); drawEdad(); }
+
+  // ─── CURSOR ─────────────────────────────────────────────────────────────
+  const cur=document.getElementById('cursor'), ring=document.getElementById('cursorRing');
+  window.addEventListener('mousemove',e=>{ if(!cur)return; cur.style.left=e.clientX+'px'; cur.style.top=e.clientY+'px'; ring.style.left=e.clientX+'px'; ring.style.top=e.clientY+'px'; });
+  document.addEventListener('mouseover',e=>{ const t=e.target; if(t.closest&&t.closest('button,a,input,select,th,.copybtn,.leaflet-interactive')){ cur.style.transform='translate(-50%,-50%) scale(1.6)'; cur.style.background='transparent'; ring.style.opacity='.9'; } else { cur.style.transform='translate(-50%,-50%) scale(1)'; cur.style.background='var(--accent)'; ring.style.opacity='.4'; } });
+
+  function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),1600); }
+
+  // ─── DATA (inline) ──────────────────────────────────────────────────────
+    let DATA = null, N = {};
+  // Datos confidenciales: NO van inline. Se cargan tras el gate desde una ruta S3 no adivinable.
+  const DATA_BASE = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/p2v-df6bfd0f60754c0f69a7/';
+  const S3='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026';
+  const DEPTOS_URL=`${S3}/DEPARTAMENTOS2.json`;
+  const MUNI_URL=cod=>`${S3}/Departamentos-mps/${cod}.json`;
+
+  const fmt=n=>n==null?'—':Math.round(n).toLocaleString('es-CO');
+  const fmtM=n=>n==null?'—':(Math.abs(n)>=1e6?(n/1e6).toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2})+'M':fmt(n));
+  const fmtCop=n=>'$'+Math.round(n).toLocaleString('es-CO');
+  const pct=n=>n==null?'—':(n*100).toFixed(1)+'%';
+  function norm(s){ return (s||'').normalize('NFKD').replace(/[̀-ͯ]/g,'').toUpperCase().trim(); }
+
+  // lookups
+  let MUNI={}, DEP={}, NAME2DEP={};
+  function buildLookups(){
+    DATA.munis.forEach(m=>{ MUNI[m.cod]=m; const d=m.cod.slice(0,2);
+      if(!DEP[d]) DEP[d]={cod:d,name:m.dep,net:0,cen:0,rec:0,censo:0,part_w:0,part_n:0};
+      DEP[d].net+=m.net||0; DEP[d].cen+=m.cen||0; DEP[d].rec+=m.rec||0; DEP[d].censo+=m.censo||0;
+      if(m.part!=null&&m.censo){ DEP[d].part_w+=m.part*m.censo; DEP[d].part_n+=m.censo; }
+      NAME2DEP[norm(m.dep)]=d;
+    });
+    Object.values(DEP).forEach(d=>{ d.part=d.part_n?d.part_w/d.part_n:null; });
+  }
+
+  // ─── HERO ───────────────────────────────────────────────────────────────
+  function renderHero(){
+    const M=DATA.meta;
+    const _t2v=new Date(M.fecha_2v),_now=new Date();
+    const dias=Math.max(0,Math.round((Date.UTC(_t2v.getUTCFullYear(),_t2v.getUTCMonth(),_t2v.getUTCDate())-Date.UTC(_now.getFullYear(),_now.getMonth(),_now.getDate()))/864e5));
+    document.getElementById('leadTxt').innerHTML=`La derecha llegó adelante a la 2ª vuelta porque se consolidó en 1V. Cerrar la brecha es la jugada de movilización de ${N.izq22||'la izquierda'}&nbsp;2022 — más difícil esta vez. Quedan <b>${dias} días</b>.`;
+    const k=[
+      ['red',fmtM(M.need_over_1v),'Votos a sumar sobre 1V'],
+      ['red','~1,9M','Movilización (izq. demovilizada)'],
+      ['blue','~0,7M','Persuasión (centro)'],
+      ['gold',fmtM(M.gap),`Brecha actual con ${N.rival||'el rival'}`],
+      ['',fmtM(M.cepeda_1v),`${N.cand||'Nuestro candidato'} 1V`],
+      ['',fmtM(M.abelardo_1v),`${N.rival||'Rival'} 1V`],
+    ];
+    document.getElementById('heroKpis').innerHTML=k.map(x=>`<div class="kpi ${x[0]}"><div class="v">${x[1]}</div><div class="l">${x[2]}</div></div>`).join('');
+    document.getElementById('uniMob').textContent='≈ '+fmt(M.abst_target)+' votos · '+M.abst_n_muni+' municipios';
+    document.getElementById('uniPer').textContent='≈ '+fmt(M.center_contrib)+' votos transferibles';
+    // dónde
+    const topMob=[...DATA.munis].filter(m=>m.net>0).sort((a,b)=>b.net-a.net).slice(0,6).map(m=>m.muni.replace(' D.C.','')).join(', ');
+    const topPer=[...DATA.munis].filter(m=>m.cen>0).sort((a,b)=>b.cen-a.cen).slice(0,6).map(m=>m.muni.replace(' D.C.','')).join(', ');
+    document.getElementById('mobDonde').innerHTML='Bolsones de izquierda con abstención: <b>'+topMob+'</b>…';
+    document.getElementById('perDonde').innerHTML='Centros urbanos: <b>'+topPer+'</b>…';
+  }
+
+  // ─── COLOR SCALES ───────────────────────────────────────────────────────
+  function lerp(a,b,t){ return a+(b-a)*t; }
+  function scaleColor(t,kind){ // t in 0..1
+    t=Math.max(0,Math.min(1,t));
+    if(kind==='part'){ // diverging low(red)->high(green)
+      const c1=[176,53,36], c2=[63,125,82];
+      return `rgb(${lerp(c1[0],c2[0],t)|0},${lerp(c1[1],c2[1],t)|0},${lerp(c1[2],c2[2],t)|0})`;
+    }
+    const base = kind==='cen'?[31,71,204]:[179,38,29]; // blue / red
+    const lo=[226,220,208];
+    const u=Math.sqrt(t); // realza el extremo bajo (distribución muy sesgada a las capitales)
+    return `rgb(${lerp(lo[0],base[0],u)|0},${lerp(lo[1],base[1],u)|0},${lerp(lo[2],base[2],u)|0})`;
+  }
+
+  // ─── MAP ────────────────────────────────────────────────────────────────
+  let map, depLayer, munLayer, depGeo=null, curMetric='net', curDep=null;
+  const munGeoCache={};
+  function metricVal(obj){ return curMetric==='net'?(obj.net||0):curMetric==='cen'?(obj.cen||0):(obj.part||0); }
+  function metricMaxNac(){ let mx=0; Object.values(DEP).forEach(d=>{ mx=Math.max(mx,curMetric==='part'?(d.part||0):metricVal(d)); }); return mx||1; }
+
+  async function initMap(){
+    map=L.map('map',{zoomControl:true,attributionControl:false,scrollWheelZoom:false}).setView([4.6,-74.1],5);
+    depGeo=await (await fetch(DEPTOS_URL)).json();
+    drawNacional();
+  }
+  function depCodeFromProps(p){
+    const cand=p.electoral_id||p.DPTO||p.cod_depto;
+    if(cand) return String(cand).padStart(2,'0');
+    return NAME2DEP[norm(p.name||p.NOMBRE_DPT||p.DPTO_CNMBR||'')]||null;
+  }
+  function drawNacional(){
+    curDep=null; document.getElementById('mapback').style.display='none';
+    if(munLayer){ map.removeLayer(munLayer); munLayer=null; }
+    if(depLayer) map.removeLayer(depLayer);
+    const mx=metricMaxNac();
+    depLayer=L.geoJSON(depGeo,{
+      style:f=>{ const c=depCodeFromProps(f.properties); const d=c&&DEP[c]; const v=d?(curMetric==='part'?(d.part||0):metricVal(d)):0;
+        return {fillColor:scaleColor(curMetric==='part'?v: v/mx,curMetric),fillOpacity:.9,color:'rgba(20,17,10,.35)',weight:1}; },
+      onEachFeature:(f,l)=>{ const c=depCodeFromProps(f.properties); const d=c&&DEP[c];
+        l.on('mouseover',()=>{ l.setStyle({weight:2,color:'#000'}); if(d) showDetailDep(d); });
+        l.on('mouseout',()=>l.setStyle({weight:.7,color:'#0003'}));
+        l.on('click',()=>{ if(c) openDep(c); });
+        if(d) l.bindTooltip(`<b>${d.name}</b><br>${metricLabel()}: ${curMetric==='part'?pct(d.part):fmt(metricVal(d))}`,{sticky:true});
+      }
+    }).addTo(map);
+    map.setView([4.6,-74.1],5);
+  }
+  async function openDep(cod){
+    curDep=cod; document.getElementById('mapback').style.display='inline-block';
+    let geo=munGeoCache[cod];
+    if(!geo){ try{ geo=await (await fetch(MUNI_URL(cod))).json(); munGeoCache[cod]=geo; }catch(e){ toast('No cargó el mapa del depto'); return; } }
+    if(depLayer) map.removeLayer(depLayer);
+    if(munLayer) map.removeLayer(munLayer);
+    const muns=DATA.munis.filter(m=>m.cod.slice(0,2)===cod);
+    let mx=0; muns.forEach(m=>{ mx=Math.max(mx,curMetric==='part'?(m.part||0):metricVal(m)); }); mx=mx||1;
+    munLayer=L.geoJSON(geo,{
+      style:f=>{ const m=muniFromFeature(f.properties); const v=m?(curMetric==='part'?(m.part||0):metricVal(m)):0;
+        return {fillColor:scaleColor(curMetric==='part'?v:v/mx,curMetric),fillOpacity:.9,color:'rgba(20,17,10,.4)',weight:.8}; },
+      onEachFeature:(f,l)=>{ const m=muniFromFeature(f.properties);
+        l.on('mouseover',()=>{ l.setStyle({weight:2,color:'#000'}); if(m) showDetail(m); });
+        l.on('mouseout',()=>l.setStyle({weight:.6,color:'#0004'}));
+        l.on('click',()=>{ if(m) showDetail(m); });
+        if(m) l.bindTooltip(`<b>${m.muni}</b><br>${metricLabel()}: ${curMetric==='part'?pct(m.part):fmt(metricVal(m))}`,{sticky:true});
+      }
+    }).addTo(map);
+    try{ map.fitBounds(munLayer.getBounds(),{padding:[20,20]}); }catch(e){}
+  }
+  function muniFromFeature(p){
+    const d=p.dep_electoral||p.DEP_ELECT||p.cod_dep, mu=p.mun_elec||p.MUN_ELECT||p.cod_mun;
+    if(d!=null&&mu!=null){ const cod=String(d).padStart(2,'0')+String(mu).padStart(3,'0'); if(MUNI[cod]) return MUNI[cod]; }
+    // fallback por nombre
+    const nm=norm(p.mun_elec_nombre||p.MUNICIPIO||p.NOMBRE||p.mun_nombre||'');
+    if(nm&&curDep){ const hit=DATA.munis.find(m=>m.cod.slice(0,2)===curDep&&norm(m.muni)===nm); if(hit) return hit; }
+    return null;
+  }
+  function backToNacional(){ drawNacional(); document.getElementById('detail').innerHTML='<div class="muted">Pasa el mouse o haz click en el mapa para ver la ficha de targeting de cada territorio.</div>'; }
+  function metricLabel(){ return curMetric==='net'?'Neto movilización':curMetric==='cen'?'Centro disponible':'Participación 1V'; }
+  function _repaintMap(){ if(!map)return; if(curDep) openDep(curDep); else drawNacional(); }
+
+  function showDetailDep(d){
+    document.getElementById('detail').innerHTML=`
+      <div class="dt-muni">${d.name}</div><div class="dt-dep">Departamento · agregado</div>
+      <div class="dt-grid">
+        <div class="m"><div class="v" style="color:var(--izq)">${fmt(d.net)}</div><div class="l">Neto movilización</div></div>
+        <div class="m"><div class="v" style="color:var(--der)">${fmt(d.cen)}</div><div class="l">Centro disponible</div></div>
+        <div class="m"><div class="v">${fmt(d.rec)}</div><div class="l">Recuperar (techo)</div></div>
+        <div class="m"><div class="v">${d.part?pct(d.part):'—'}</div><div class="l">Participación 1V</div></div>
+      </div>
+      <div class="muted" style="margin-top:.7rem">Click para abrir los municipios.</div>`;
+  }
+  function showDetail(m){
+    const seg = m.net>0 ? '<span class="pill">Movilización</span>' : (m.cen>0?'<span class="pill" style="background:#1f47cc22;color:var(--der)">Persuasión</span>':'');
+    document.getElementById('detail').innerHTML=`
+      <div class="dt-muni">${m.muni}</div><div class="dt-dep">${m.dep} ${seg}</div>
+      <div class="dt-grid">
+        <div class="m"><div class="v" style="color:var(--izq)">${fmt(m.net)}</div><div class="l">Neto movilización</div></div>
+        <div class="m"><div class="v" style="color:var(--der)">${fmt(m.cen)}</div><div class="l">Centro disponible</div></div>
+        <div class="m"><div class="v">${fmt(m.rec)}</div><div class="l">Recuperar (techo)</div></div>
+        <div class="m"><div class="v">${m.izq!=null?(m.izq*100).toFixed(1)+'%':'—'}</div><div class="l">Share izq. 2V</div></div>
+        <div class="m"><div class="v">${m.part!=null?pct(m.part):'—'}</div><div class="l">Participación 1V</div></div>
+        <div class="m"><div class="v">${fmt(m.censo)}</div><div class="l">Censo</div></div>
+        <div class="m"><div class="v">${m.cy!=null?(m.cy*100).toFixed(0)+'%':'—'}</div><div class="l">${N.cand||'Izq'} jóvenes (depto)</div></div>
+        <div class="m"><div class="v">${m.young!=null?(m.young*100).toFixed(0)+'%':'—'}</div><div class="l">% jóvenes electorado</div></div>
+      </div>
+      ${m.lat?`<button class="copybtn" onclick="copyLatLon(${m.lat},${m.lon})">⌖ Copiar centroide ${m.lat}, ${m.lon} (radio Meta)</button>`:''}`;
+  }
+  function copyLatLon(la,lo){ navigator.clipboard.writeText(`${la}, ${lo}`).then(()=>toast('Centroide copiado: '+la+', '+lo)); }
+
+  // metric segments
+  document.addEventListener('click',e=>{
+    const b=e.target.closest('#metricSeg button'); if(b){ curMetric=b.dataset.m; [...b.parentNode.children].forEach(x=>x.classList.toggle('on',x===b)); _repaintMap(); }
+    const tb=e.target.closest('#tblSeg button'); if(tb){ TBL=tb.dataset.t; [...tb.parentNode.children].forEach(x=>x.classList.toggle('on',x===tb)); renderTable(); }
+  });
+
+  // ─── TABLE ──────────────────────────────────────────────────────────────
+  let TBL='net';
+  const TCOLS={
+    net:[['muni','Municipio','s'],['dep','Depto','s'],['net','Neto'],['rec','Recuperar'],['censo','Censo'],['part','Part. 1V'],['izq','Izq 2V'],['mw','% ppto']],
+    cen:[['muni','Municipio','s'],['dep','Depto','s'],['cen','Centro'],['censo','Censo'],['izq','Izq 2V'],['pw','% ppto']],
+    rec:[['muni','Municipio','s'],['dep','Depto','s'],['rec','Recuperar'],['censo','Censo'],['izq','Izq 2V']],
+  };
+  function renderTable(){
+    const cols=TCOLS[TBL]; const q=norm(document.getElementById('tblSearch').value);
+    const key=TBL==='cen'?'cen':TBL==='rec'?'rec':'net';
+    let rows=DATA.munis.filter(m=>m[key]>0); if(q) rows=rows.filter(m=>norm(m.muni).includes(q)||norm(m.dep).includes(q));
+    rows.sort((a,b)=>b[key]-a[key]); if(!q) rows=rows.slice(0,60);
+    document.getElementById('dthead').innerHTML='<tr>'+cols.map(c=>`<th class="${c[2]||''}">${c[1]}</th>`).join('')+'</tr>';
+    document.getElementById('dtbody').innerHTML=rows.map(m=>'<tr>'+cols.map(c=>{
+      const v=m[c[0]];
+      if(c[0]==='muni'||c[0]==='dep') return `<td>${v||''}</td>`;
+      if(c[0]==='part'||c[0]==='izq') return `<td>${v!=null?(v*100).toFixed(1)+'%':'—'}</td>`;
+      if(c[0]==='mw'||c[0]==='pw') return `<td>${v!=null?(v*100).toFixed(2)+'%':'—'}</td>`;
+      return `<td>${fmt(v)}</td>`;
+    }).join('')+'</tr>').join('');
+  }
+  function downloadCSV(){
+    const cols=TCOLS[TBL]; const key=TBL==='cen'?'cen':TBL==='rec'?'rec':'net';
+    let rows=DATA.munis.filter(m=>m[key]>0).sort((a,b)=>b[key]-a[key]);
+    const head=cols.map(c=>c[1]).concat(['Lat','Lon']).join(',');
+    const body=rows.map(m=>cols.map(c=>{ const v=m[c[0]]; return typeof v==='string'?'"'+v+'"':(v==null?'':v); }).concat([m.lat||'',m.lon||'']).join(',')).join('\n');
+    const blob=new Blob(['﻿'+head+'\n'+body],{type:'text/csv;charset=utf-8'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`pauta_${TBL}_2v.csv`; a.click();
+  }
+
+  // ─── HIPERLOCAL ─────────────────────────────────────────────────────────
+  function buildCitySel(){
+    const sel=document.getElementById('citySel'); const seen={};
+    const opts=Object.keys(DATA.comunas).map(cod=>({cod,name:DATA.city_names[cod]||cod})).filter(o=>{ if(seen[o.name])return false; seen[o.name]=1; return true; }).sort((a,b)=>a.name.localeCompare(b.name));
+    sel.innerHTML=opts.map(o=>`<option value="${o.cod}">${o.name}</option>`).join('');
+    renderHiper();
+  }
+  function renderHiper(){
+    const cod=document.getElementById('citySel').value; const rows=(DATA.comunas[cod]||[]).slice(0,20);
+    document.getElementById('hiperbody').innerHTML=rows.map(r=>`<tr>
+      <td>${r.comuna}</td><td>${fmt(r.recuperar)}</td><td>${fmt(r.censo)}</td>
+      <td style="font-family:var(--mono);font-size:.78rem">${r.lat?r.lat+', '+r.lon:'—'}</td>
+      <td>${r.lat?`<button class="copybtn" style="width:auto;margin:0;padding:.25rem .5rem" onclick="copyLatLon(${r.lat},${r.lon})">copiar</button>`:''}</td></tr>`).join('');
+  }
+
+  // ─── EDAD CHART ─────────────────────────────────────────────────────────
+  function buildEdadSel(){
+    const sel=document.getElementById('edadSel'); const units=Object.keys(DATA.edad);
+    const order=['Nacional','Bogotá','Medellín','Cali','Barranquilla','Cartagena','Bucaramanga'];
+    units.sort((a,b)=>(order.indexOf(a)+99*(order.indexOf(a)<0))-(order.indexOf(b)+99*(order.indexOf(b)<0)));
+    sel.innerHTML=units.map(u=>`<option>${u}</option>`).join(''); drawEdad();
+  }
+  function drawEdad(){
+    const u=document.getElementById('edadSel').value||'Nacional'; const d=DATA.edad[u]; if(!d)return;
+    const groups=['18-35','36-60','61+']; const svg=document.getElementById('edadSvg');
+    const W=420,H=260,padL=44,padB=34,padT=14,bw=36,gap=22;
+    const izq=getComputedStyle(document.documentElement).getPropertyValue('--izq')||'#b3261d';
+    const der=getComputedStyle(document.documentElement).getPropertyValue('--der')||'#1f47cc';
+    const ink3=getComputedStyle(document.documentElement).getPropertyValue('--ink-3');
+    let s=`<line x1="${padL}" y1="${H-padB}" x2="${W-10}" y2="${H-padB}" stroke="${ink3}" stroke-width=".5"/>`;
+    [0,.25,.5,.75,1].forEach(t=>{ const y=padT+(1-t)*(H-padB-padT); s+=`<line x1="${padL}" y1="${y}" x2="${W-10}" y2="${y}" stroke="${ink3}" stroke-opacity=".25" stroke-width=".5"/><text x="${padL-6}" y="${y+3}" text-anchor="end" font-family="Space Mono" font-size="8" fill="${ink3}">${t*100}%</text>`; });
+    const chartW=W-padL-14; const slot=chartW/groups.length;
+    groups.forEach((g,i)=>{ const gd=d[g]; if(!gd)return; const cx=padL+slot*i+slot/2;
+      const hC=(gd.cepeda)*(H-padB-padT), hA=(gd.abelardo)*(H-padB-padT);
+      s+=`<rect x="${cx-bw-2}" y="${H-padB-hC}" width="${bw}" height="${hC}" fill="${izq}" rx="2"/>`;
+      s+=`<rect x="${cx+2}" y="${H-padB-hA}" width="${bw}" height="${hA}" fill="${der}" rx="2"/>`;
+      s+=`<text x="${cx-bw/2}" y="${H-padB-hC-4}" text-anchor="middle" font-family="Space Mono" font-size="9" fill="${izq}">${(gd.cepeda*100).toFixed(0)}</text>`;
+      s+=`<text x="${cx+bw/2+2}" y="${H-padB-hA-4}" text-anchor="middle" font-family="Space Mono" font-size="9" fill="${der}">${(gd.abelardo*100).toFixed(0)}</text>`;
+      s+=`<text x="${cx}" y="${H-padB+16}" text-anchor="middle" font-family="Familjen Grotesk" font-size="11" fill="var(--ink-2)">${g}</text>`;
+    });
+    svg.innerHTML=s;
+  }
+
+  // ─── BUDGET ─────────────────────────────────────────────────────────────
+  function calcBudget(){
+    const tot=+document.getElementById('bTotal').value||0;
+    const mobPct=Math.max(0,Math.min(100,+document.getElementById('bMob').value||0))/100;
+    const cpm=+document.getElementById('bCpm').value||12000;
+    const freq=+document.getElementById('bFreq').value||3.5;
+    const mobBudget=tot*mobPct, perBudget=tot*(1-mobPct);
+    const impr=tot/cpm*1000, reach=impr/Math.max(1,freq);
+    document.getElementById('calcOut').innerHTML=[
+      ['var(--izq)',fmtCop(mobBudget),'A movilización'],
+      ['var(--der)',fmtCop(perBudget),'A persuasión'],
+      ['',fmt(impr),'Impresiones estimadas'],
+      ['',fmt(reach),'Personas alcanzadas (aprox)'],
+    ].map(x=>`<div class="c"><div class="v" style="color:${x[0]||'var(--ink)'}">${x[1]}</div><div class="l">${x[2]}</div></div>`).join('');
+    // reparto por municipio (top 12 de cada campaña)
+    const mob=DATA.munis.filter(m=>m.net>0); const sNet=mob.reduce((a,m)=>a+m.net,0)||1;
+    const per=DATA.munis.filter(m=>m.cen>0); const sCen=per.reduce((a,m)=>a+m.cen,0)||1;
+    const rowsM=mob.sort((a,b)=>b.net-a.net).slice(0,12).map(m=>({m,camp:'Movilización',cop:mobBudget*m.net/sNet}));
+    const rowsP=per.sort((a,b)=>b.cen-a.cen).slice(0,8).map(m=>({m,camp:'Persuasión',cop:perBudget*m.cen/sCen}));
+    const rows=[...rowsM,...rowsP].sort((a,b)=>b.cop-a.cop);
+    document.getElementById('budgetBody').innerHTML=rows.map(r=>{ const im=r.cop/cpm*1000; return `<tr>
+      <td>${r.m.muni}</td><td style="text-align:left"><span class="pill" style="${r.camp==='Persuasión'?'background:#1f47cc22;color:var(--der)':''}">${r.camp}</span></td>
+      <td>${fmtCop(r.cop)}</td><td>${fmt(im)}</td><td>${fmt(im/Math.max(1,freq))}</td></tr>`; }).join('');
+    document.getElementById('calcFoot').textContent=`Ejemplo: con ${fmtCop(tot)} y CPM ${fmtCop(cpm)} → ~${fmt(impr)} impresiones.`;
+  }
+
+  // ─── NOMBRES (inyectados en runtime; el HTML público queda neutro) ────────
+  function fillNames(){ document.querySelectorAll('[data-nm]').forEach(el=>{ const k=el.getAttribute('data-nm'); if(N[k]) el.textContent=N[k]; }); }
+
+  // ─── MAPA DE CALOR POR BARRIO ─────────────────────────────────────────────
+  let bMap,bLayer,bGeo=null,bMetric='rec',bCitySlug=null;
+  function buildBarrioSel(){
+    const sel=document.getElementById('barrioCitySel'); const idx=DATA.barrio_index||[];
+    if(!idx.length){ const s=document.getElementById('barrioSection'); if(s) s.style.display='none'; return; }
+    sel.innerHTML=idx.map(c=>`<option value="${c.slug}">${c.name}${c.lean==='der'?' (tiende derecha)':(c.approx?' (aprox)':'')}</option>`).join('');
+    loadBarrioCity();
+  }
+  async function loadBarrioCity(){
+    const slug=document.getElementById('barrioCitySel').value; bCitySlug=slug;
+    const meta=(DATA.barrio_index||[]).find(c=>c.slug===slug)||{};
+    document.getElementById('barrioNote').innerHTML=(meta.approx?'<b>Polígonos aproximados.</b> ':'')+(meta.lean==='der'?'Ciudad que tiende a la derecha — sirve para ubicar los pocos bolsones de izquierda. ':'')+`${meta.con_dato||0} barrios con dato directo (de ${meta.nbarrios||0}).`;
+    try{ bGeo=await (await fetch(DATA_BASE+'barrios/'+slug+'.json')).json(); }catch(e){ toast('No cargó '+slug); return; }
+    if(!bMap){ bMap=L.map('barrioMap',{zoomControl:true,attributionControl:false,scrollWheelZoom:false}).setView([4.6,-74.1],11); }
+    renderBarrio();
+  }
+  function barrioScales(){ let mn=Infinity,mx=-Infinity; bGeo.features.forEach(f=>{ const v=f.properties[bMetric]; if(v!=null){ mn=Math.min(mn,v); mx=Math.max(mx,v); } }); return {mn,mx}; }
+  function renderBarrio(){
+    if(!bGeo||!bMap)return; if(bLayer) bMap.removeLayer(bLayer);
+    const {mn,mx}=barrioScales();
+    bLayer=L.geoJSON(bGeo,{
+      style:f=>{ const v=f.properties[bMetric];
+        if(v==null) return {fillColor:'#b9b2a2',fillOpacity:.16,color:'#0002',weight:.25};
+        const t = bMetric==='rec' ? Math.sqrt(v/(mx||1)) : (mx>mn?(v-mn)/(mx-mn):.5);
+        return {fillColor:barrioColor(t),fillOpacity:.85,color:'#00000026',weight:.3}; },
+      onEachFeature:(f,l)=>{ const p=f.properties;
+        l.on('mouseover',()=>{ l.setStyle({weight:1.5,color:'#000'}); showBarrioDetail(p,f.geometry); });
+        l.on('mouseout',()=>l.setStyle({weight:.3,color:'#00000026'}));
+        if(p.rec!=null) l.bindTooltip(`<b>${p.nm}</b><br>${barrioMetricLabel()}: ${barrioFmt(p)}`,{sticky:true}); }
+    }).addTo(bMap);
+    try{ bMap.fitBounds(bLayer.getBounds(),{padding:[12,12]}); }catch(e){}
+  }
+  function barrioColor(t){ t=Math.max(0,Math.min(1,t));
+    const base = bMetric==='rec'?[179,38,29] : bMetric==='young'?[193,108,46] : [47,125,82];
+    const lo=[235,231,221];
+    return `rgb(${(lo[0]+(base[0]-lo[0])*t)|0},${(lo[1]+(base[1]-lo[1])*t)|0},${(lo[2]+(base[2]-lo[2])*t)|0})`; }
+  function barrioMetricLabel(){ return bMetric==='rec'?'Movilización':bMetric==='young'?'% jóvenes':'% hombres'; }
+  function barrioFmt(p){ const v=p[bMetric]; if(v==null)return '—'; return bMetric==='rec'?fmt(v):(v*100).toFixed(0)+'%'; }
+  function showBarrioDetail(p,geom){
+    let c=''; try{ const cc=geomCentroid(geom); if(cc) c=`<button class="copybtn" onclick="copyLatLon(${cc[1].toFixed(5)},${cc[0].toFixed(5)})">⌖ Copiar centroide ${cc[1].toFixed(5)}, ${cc[0].toFixed(5)} (radio Meta)</button>`; }catch(e){}
+    document.getElementById('barrioDetail').innerHTML=`
+      <div class="dt-muni">${p.nm}</div><div class="dt-dep">Barrio</div>
+      <div class="dt-grid">
+        <div class="m"><div class="v" style="color:var(--izq)">${fmt(p.rec)}</div><div class="l">Voto recuperable</div></div>
+        <div class="m"><div class="v" style="color:var(--gold)">${p.young!=null?(p.young*100).toFixed(0)+'%':'—'}</div><div class="l">% jóvenes (18-35)</div></div>
+        <div class="m"><div class="v">${p.men!=null?(p.men*100).toFixed(0)+'%':'—'}</div><div class="l">% hombres</div></div>
+        <div class="m"><div class="v">${fmt(p.censo)}</div><div class="l">Censo</div></div>
+      </div>${c}`;
+  }
+  function geomCentroid(g){ let xs=0,ys=0,n=0; const walk=co=>{ if(typeof co[0]==='number'){ xs+=co[0];ys+=co[1];n++; } else co.forEach(walk); }; walk(g.coordinates); return n?[xs/n,ys/n]:null; }
+  document.addEventListener('click',e=>{ const b=e.target.closest('#barrioMetricSeg button'); if(b){ bMetric=b.dataset.bm; [...b.parentNode.children].forEach(x=>x.classList.toggle('on',x===b)); renderBarrio(); } });
+
+  // ─── INIT ───────────────────────────────────────────────────────────────
+  async function init(){
+    try{ DATA = await (await fetch(DATA_BASE+'data.json')).json(); }
+    catch(e){ document.getElementById('main').innerHTML='<p style="padding:3rem">No se pudieron cargar los datos del análisis. Reintenta o revisa tu conexión.</p>'; return; }
+    N = DATA.names || {}; fillNames();
+    buildLookups(); renderHero(); renderTable(); buildCitySel(); buildEdadSel(); calcBudget(); buildBarrioSel(); initMap();
+  }
+  </script>
+</body>
+</html>
