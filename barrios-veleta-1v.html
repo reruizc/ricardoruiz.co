@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Barrios veleta — primera vuelta 2026, ciudad por ciudad · ricardoruiz.co</title>
+<meta name="description" content="Los barrios 'veleta' (swing) de la primera vuelta 2026: donde Cepeda y Abelardo quedaron a 2-3 puntos. Mapa interactivo barrio a barrio en 11 ciudades, con umbral ajustable.">
+<meta property="og:title" content="Barrios veleta — primera vuelta 2026">
+<meta property="og:description" content="Dónde se peleó voto a voto entre Cepeda y Abelardo: los barrios disputados de 11 ciudades, barrio por barrio.">
+<meta property="og:type" content="article">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=Arima:wght@400;500;700&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#060810;--border:rgba(255,255,255,.08);--white:#f4f3ef;--blue:#0047FF;--green:#4ade80;--gold:#f4c430;--muted:rgba(255,255,255,.55);--abel:#3a5bd0;--cepe:#cf4135}
+body{background:var(--bg);color:var(--white);font-family:Avenir,sans-serif;min-height:100vh;line-height:1.55}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+.nav{padding:.9rem 2rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:rgba(4,6,16,.6)}
+.e-btn-back{font-family:Avenir,sans-serif;font-weight:500;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--green);border:1.5px solid rgba(74,222,128,.4);padding:.3rem .8rem}
+.e-btn-back:hover{color:#060810;background:var(--green);text-decoration:none}
+.logo-link{display:flex;align-items:center;gap:.55rem;opacity:.85}.logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px}
+.logo-bar{width:5px;background:var(--blue)}.logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:1.2rem;letter-spacing:-.03em;color:var(--white)}.logo-text span{color:var(--blue)}
+.container{max-width:1060px;margin:0 auto;padding:2.5rem 2rem 4rem}
+.kicker{font-family:'Syne',sans-serif;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-bottom:.7rem;font-weight:500}
+h1{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.8rem,4vw,2.9rem);letter-spacing:-.025em;line-height:1.05;margin-bottom:.7rem}
+h1 span{color:var(--gold)}
+.subhead{font-family:'Arima',sans-serif;font-size:clamp(1rem,1.6vw,1.18rem);color:var(--muted);line-height:1.5;max-width:840px;margin-bottom:1.4rem}
+.byline{font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.1em;color:rgba(255,255,255,.4);margin-bottom:1.6rem;padding-bottom:1.2rem;border-bottom:1px solid var(--border)}
+.cities{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:1.1rem}
+.citybtn{font-family:'Syne',sans-serif;font-weight:500;font-size:.82rem;color:var(--white);background:rgba(255,255,255,.05);border:1px solid var(--border);padding:.38rem .8rem;cursor:pointer;transition:.15s}
+.citybtn:hover{background:rgba(255,255,255,.1)}
+.citybtn.on{background:var(--gold);color:#1a1505;border-color:var(--gold);font-weight:700}
+.panel{display:flex;flex-wrap:wrap;align-items:center;gap:1.2rem 1.8rem;margin-bottom:.7rem;padding:.9rem 1.1rem;border:1px solid var(--border);background:rgba(255,255,255,.02)}
+.ctrl{display:flex;align-items:center;gap:.7rem;flex:1;min-width:280px}
+.ctrl label{font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.04em;color:var(--muted);white-space:nowrap}
+.ctrl input[type=range]{flex:1;accent-color:var(--gold);min-width:120px}
+.thrval{font-family:'Syne',sans-serif;font-weight:800;font-size:1.05rem;color:var(--gold);min-width:64px;text-align:right}
+.counts{display:flex;gap:1.1rem;font-family:Avenir,sans-serif;font-size:.85rem;flex-wrap:wrap}
+.counts b{font-variant-numeric:tabular-nums;font-size:1.05rem}
+.cnt-v b{color:var(--gold)}.cnt-c b{color:var(--cepe)}.cnt-a b{color:var(--abel)}
+.legend{display:flex;gap:1.3rem;flex-wrap:wrap;font-family:Avenir,sans-serif;font-size:.82rem;color:rgba(255,255,255,.75);margin:.2rem 0 1rem}
+.legend span{display:flex;align-items:center;gap:.4rem}.legend i{width:14px;height:14px;border-radius:3px;display:inline-block}
+#map{width:100%;height:72vh;min-height:520px;border:1px solid var(--border);background:#0a0d18}
+.maptip{font-family:Avenir,sans-serif;font-size:.8rem;color:rgba(255,255,255,.5);margin:.6rem 0 1.8rem;line-height:1.5}
+h2{font-family:'Syne',sans-serif;font-weight:700;font-size:1.3rem;margin:2.2rem 0 .9rem}h2::before{content:'';display:inline-block;width:6px;height:1.1rem;background:var(--gold);margin-right:.6rem;vertical-align:-3px}
+#veleta-list{list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.3rem .9rem}
+#veleta-list li{font-family:Avenir,sans-serif;font-size:.9rem;padding:.34rem .2rem;border-bottom:1px solid rgba(255,255,255,.05);display:flex;justify-content:space-between;gap:.8rem}
+#veleta-list .nm{color:var(--white)}#veleta-list .mg{font-variant-numeric:tabular-nums;font-family:'DM Mono',monospace;font-size:.8rem}
+.mg.c{color:var(--cepe)}.mg.a{color:var(--abel)}
+.empty{color:var(--muted);font-style:italic;font-family:Arima,sans-serif}
+.method{margin-top:2.4rem;padding:1.2rem;background:rgba(255,255,255,.025);border:1px solid var(--border);font-size:.88rem;color:rgba(255,255,255,.72);line-height:1.6}
+.method b{color:var(--white)}.method code{font-family:'DM Mono',monospace;font-size:.82rem;background:rgba(255,255,255,.06);padding:.06rem .3rem}
+.foot{margin-top:3rem;padding-top:1.5rem;border-top:1px solid var(--border);font-size:.78rem;color:rgba(255,255,255,.45);text-align:center;line-height:1.55}.foot a{color:var(--blue)}
+.leaflet-tooltip{font-family:Avenir,sans-serif!important;font-size:.82rem!important;background:rgba(6,8,16,.97)!important;border:1px solid rgba(0,71,255,.4)!important;color:#f4f3ef!important;border-radius:0!important;padding:.45rem .65rem!important;width:236px!important;white-space:normal!important}
+.leaflet-tooltip:before{display:none!important}.leaflet-tooltip b{color:#fff}
+@media(max-width:640px){.container{padding:2rem 1rem 3rem}.panel{gap:.9rem}.ctrl{min-width:100%;flex-wrap:wrap}.ctrl label{white-space:normal}.ctrl input[type=range]{min-width:90px}.thrval{min-width:auto;flex:0 0 auto}}
+</style></head>
+<body>
+<nav class="nav">
+<a href="noticias.html" class="e-btn-back">← Noticias</a>
+<a href="index.html" class="logo-link"><div class="logo-bars"><div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div><div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div></div><span class="logo-text">Ricardo<span>.</span>Ruiz</span></a>
+</nav>
+<main class="container">
+<div class="kicker">Mapa interactivo · primera vuelta 2026</div>
+<h1>Los barrios <span>veleta</span></h1>
+<p class="subhead">Los barrios donde la primera vuelta se peleó voto a voto entre <b style="color:var(--cepe)">Cepeda</b> y <b style="color:var(--abel)">Abelardo</b> — los que en EE.UU. llaman <i>swing</i> o <i>purple precincts</i>. En dorado, los que se definieron por un margen estrecho; en rojo y azul, el resto. Mueve el umbral para ver qué tan disputado quieres que sea un "veleta".</p>
+<div class="byline">Ricardo Ruiz · ricardoruiz.co · Preconteo Registraduría 1ª vuelta por mesa · cruce puesto→barrio (punto-en-polígono)</div>
+
+<div class="cities" id="cities"></div>
+
+<div class="panel">
+  <div class="ctrl">
+    <label>Margen máximo "veleta":</label>
+    <input type="range" id="thr" min="1" max="6" step="0.5" value="3">
+    <span class="thrval" id="thrval">±3 pp</span>
+  </div>
+  <div class="counts">
+    <span class="cnt-v">veleta <b id="c-vel">—</b></span>
+    <span class="cnt-c">Cepeda <b id="c-cep">—</b></span>
+    <span class="cnt-a">Abelardo <b id="c-abe">—</b></span>
+    <span style="color:var(--muted)">de <b id="c-tot">—</b> con dato</span>
+  </div>
+</div>
+<div class="legend">
+  <span><i style="background:var(--gold)"></i>Veleta (margen estrecho)</span>
+  <span>Cepeda<span style="display:inline-flex;gap:2px;margin-left:6px"><i style="background:#f2a59d"></i><i style="background:#e2685c"></i><i style="background:#cf4135"></i><i style="background:#9c1e15"></i></span></span>
+  <span>Abelardo<span style="display:inline-flex;gap:2px;margin-left:6px"><i style="background:#9db4f5"></i><i style="background:#5b82ef"></i><i style="background:#3a5bd0"></i><i style="background:#1f2a8c"></i></span></span>
+  <span style="color:var(--muted)">claro → oscuro = margen mayor</span>
+  <span style="color:var(--muted)">tenue = sin puesto (vecino)</span>
+</div>
+<div id="map"></div>
+<div class="maptip" id="maptip">Pasa el cursor sobre un barrio para ver el detalle. Los barrios sin puesto propio se pintan tenues con la tendencia del vecino más cercano y no cuentan en el marcador.</div>
+
+<h2 id="veleta-title">Barrios veleta</h2>
+<ul id="veleta-list"></ul>
+
+<div class="method">
+<p><b>Datos:</b> preconteo Registraduría 1ª vuelta (31-may-2026) por mesa. <b>Mesa→barrio:</b> cada puesto se asigna por punto-en-polígono (su lat/lon de <code>PUESTOS_GEOREF</code>) al barrio que lo contiene; los votos del puesto se suman a ese barrio. <b>Margen:</b> <code>Cepeda% − Abelardo%</code> sobre votos válidos (todos los candidatos + blanco). Un barrio es "veleta" si ese margen, en valor absoluto, no supera el umbral elegido.</p>
+<p><b>Cartografía:</b> capas oficiales de barrios de cada ciudad (catastro / planeación municipal). Bogotá se muestra rotada 90° (norte a la izquierda), convención del sitio. Los barrios sin puesto propio heredan la tendencia del vecino más cercano (tono tenue) y no entran al conteo. Es preconteo (preliminar); un puesto sirve a votantes de varios barrios, pero se asigna al barrio donde está físicamente.</p>
+</div>
+<div class="foot">© Ricardo Ruiz · <a href="index.html">ricardoruiz.co</a> · Barrios veleta 1ª vuelta 2026 · preconteo Registraduría + cartografía de barrios oficiales.</div>
+</main>
+<script>
+// Datos por ciudad en S3 (prefijo público). Regenera: tools/barrios-disputados-1v/build_data.py + aws s3 cp.
+const DATA_BASE='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/barrios-veleta/';
+const CEP=['#f2a59d','#e2685c','#cf4135','#9c1e15'];
+const ABE=['#9db4f5','#5b82ef','#3a5bd0','#1f2a8c'];
+const GOLD='#f4c430';
+const map=L.map('map',{zoomSnap:.25,attributionControl:false,zoomControl:true,scrollWheelZoom:true});
+let STATE={geo:null,layer:null,city:null,thr:3,cache:{}};
+
+function rot(g){const cx=-74.08,cy=4.65;const rc=([lo,la])=>[cx-(la-cy),cy+(lo-cx)];
+ const rg=ge=>{if(ge.type==='Polygon')return{...ge,coordinates:ge.coordinates.map(r=>r.map(rc))};
+  if(ge.type==='MultiPolygon')return{...ge,coordinates:ge.coordinates.map(p=>p.map(r=>r.map(rc)))};return ge;};
+ return{...g,features:g.features.map(f=>({...f,geometry:rg(f.geometry)}))};}
+
+function margin(p){return p.b>0?(p.c-p.a)/p.b*100:0;}
+function styleFor(p,thr){const m=margin(p),am=Math.abs(m);
+ if(p.f===0&&am<=thr)return{fillColor:GOLD,fillOpacity:.95,color:'rgba(255,255,255,.2)',weight:.5};
+ const ramp=m>=0?CEP:ABE;const i=am<7?0:am<15?1:am<30?2:3;
+ return{fillColor:ramp[i],fillOpacity:p.f?.5:.92,color:'rgba(255,255,255,.16)',weight:.5};}
+
+function tip(p){const m=margin(p);const am=Math.abs(m);const lead=m>=0?'Cepeda':'Abelardo';
+ const cep=p.b?(100*p.c/p.b):0,abe=p.b?(100*p.a/p.b):0;
+ let h=`<b>${p.nb}</b>`;
+ if(p.f){h+=`<br><span style="color:rgba(255,255,255,.55)">Sin puesto propio · tendencia del vecino: <b>${lead}</b></span>`;return h;}
+ const tag=am<=STATE.thr?`<span style="color:${GOLD}">● Veleta · ±${m.toFixed(1)} pp</span>`
+   :`Ganó <b>${lead}</b> · ${am.toFixed(1)} pp`;
+ h+=`<br>${tag}<br><span style="color:var(--cepe);color:#e2685c">Cepeda ${cep.toFixed(1)}%</span> · <span style="color:#5b82ef">Abelardo ${abe.toFixed(1)}%</span>`
+   +`<br><span style="color:rgba(255,255,255,.5)">${p.b.toLocaleString('es')} votos válidos</span>`;
+ return h;}
+
+function recolor(){if(STATE.layer)STATE.layer.eachLayer(l=>l.setStyle(styleFor(l.feature.properties,STATE.thr)));updateCounts();}
+
+function updateCounts(){const thr=STATE.thr;let vel=0,cep=0,abe=0;const seen={};
+ (STATE.geo.features||[]).forEach(f=>{const p=f.properties;if(p.f!==0||p.b<=0||seen[p.nb])return;seen[p.nb]=1;
+  const m=margin(p);if(Math.abs(m)<=thr)vel++;else if(m>0)cep++;else abe++;});
+ document.getElementById('c-vel').textContent=vel;document.getElementById('c-cep').textContent=cep;
+ document.getElementById('c-abe').textContent=abe;document.getElementById('c-tot').textContent=vel+cep+abe;
+ // lista de veleta
+ const items=[];const s2={};
+ (STATE.geo.features||[]).forEach(f=>{const p=f.properties;if(p.f!==0||p.b<=0||s2[p.nb])return;s2[p.nb]=1;
+  const m=margin(p);if(Math.abs(m)<=thr)items.push({nb:p.nb,m});});
+ items.sort((a,b)=>Math.abs(a.m)-Math.abs(b.m));
+ const ul=document.getElementById('veleta-list');
+ document.getElementById('veleta-title').textContent=`Barrios veleta (±${thr} pp) — ${items.length}`;
+ ul.innerHTML=items.length?items.map(it=>{const lead=it.m>=0?'Cepeda':'Abelardo';const cls=it.m>=0?'c':'a';
+  return `<li><span class="nm">${it.nb}</span><span class="mg ${cls}">${lead} +${Math.abs(it.m).toFixed(1)}</span></li>`;}).join('')
+  :'<li class="empty">No hay barrios dentro de este margen en esta ciudad.</li>';}
+
+function loadCity(c){STATE.city=c.slug;
+ document.querySelectorAll('.citybtn').forEach(b=>b.classList.toggle('on',b.dataset.slug===c.slug));
+ const done=geo=>{STATE.geo=c.rotate?rot(geo):geo;
+  if(STATE.layer)map.removeLayer(STATE.layer);
+  STATE.layer=L.geoJSON(STATE.geo,{style:f=>styleFor(f.properties,STATE.thr),
+   onEachFeature:(f,l)=>{l.bindTooltip(tip(f.properties),{sticky:true});
+    l.on('mouseover',()=>l.setStyle({weight:2,color:'#fff'}));
+    l.on('mouseout',()=>l.setStyle(styleFor(f.properties,STATE.thr)));}}).addTo(map);
+  const dir=L.geoJSON({type:'FeatureCollection',features:STATE.geo.features.filter(f=>f.properties.f===0)});
+  try{map.fitBounds(dir.getBounds(),{padding:[12,12]});}catch(e){map.fitBounds(STATE.layer.getBounds(),{padding:[12,12]});}
+  updateCounts();};
+ if(STATE.cache[c.slug])return done(STATE.cache[c.slug]);
+ fetch(encodeURI(DATA_BASE+c.file)).then(r=>r.json()).then(geo=>{STATE.cache[c.slug]=geo;done(geo);})
+  .catch(e=>{document.getElementById('map').innerHTML='<div style="padding:2rem;color:var(--gold);font-family:Avenir">No se pudo cargar '+c.name+': '+e.message+'</div>';});}
+
+document.getElementById('thr').addEventListener('input',e=>{STATE.thr=parseFloat(e.target.value);
+ document.getElementById('thrval').textContent='±'+STATE.thr+' pp';recolor();});
+
+fetch(encodeURI(DATA_BASE+'index.json')).then(r=>r.json()).then(idx=>{
+ const box=document.getElementById('cities');
+ idx.cities.forEach(c=>{const b=document.createElement('button');b.className='citybtn';b.dataset.slug=c.slug;
+  b.textContent=c.name;b.onclick=()=>loadCity(c);box.appendChild(b);});
+ loadCity(idx.cities[0]);
+}).catch(e=>{document.getElementById('map').innerHTML='<div style="padding:2rem;color:var(--gold)">No se pudo cargar el índice: '+e.message+'</div>';});
+</script>
+</body></html>
