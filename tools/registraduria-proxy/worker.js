@@ -1,11 +1,16 @@
 // registraduria-proxy — proxea (con CORS) los JSON de resultados de la
 // Registraduría: https://resultados.registraduria.gov.co/json/ACT/{CORP}/{DEP}.json
 //
-// Rutas:  /senado · /camara · /consultas · /presidente
+// Rutas:  /senado · /camara · /consultas · /presidente · /presidente2v
 //   + /{cod}        por depto      (ej /presidente/05)
 //   + /{cod5}       por municipio  (ej /presidente/05001  → dep 05 + mun 001)
 //   + /{dep}/{mun}  por municipio  (ej /presidente/05/001)
-// CORP:   SE        CA         CN           PR
+// CORP:   SE        CA         CN           PR            PR
+//
+//  • /presidente   → 1ª vuelta (portal viejo):  /json/ACT/PR/{amb}.json
+//  • /presidente2v → 2ª vuelta (portal v2):     /v2/json/ACT/PR/{amb}.json
+//    Verificado 2026-06-21: misma forma de JSON (Cepeda codpar 2 · Abelardo 3),
+//    con prefijo /v2/. Sin CORS en origen → por eso pasa por este worker.
 //
 // CLAVE (verificado 2026-05-31): el WAF de la Registraduría exige un
 // User-Agent de navegador COMPLETO. Un "Mozilla/5.0" mínimo o curl => 403.
@@ -13,8 +18,10 @@
 //
 // Deploy:  cd tools/registraduria-proxy && npx wrangler deploy
 
-const CORP = { senado: 'SE', camara: 'CA', consultas: 'CN', presidente: 'PR' };
+const CORP = { senado: 'SE', camara: 'CA', consultas: 'CN', presidente: 'PR', presidente2v: 'PR' };
 const BASE = 'https://resultados.registraduria.gov.co/json/ACT';
+// Bases por ruta (la 2ª vuelta vive bajo el portal /v2/). El resto usa BASE.
+const BASE_BY_ROUTE = { presidente2v: 'https://resultados.registraduria.gov.co/v2/json/ACT' };
 const UA   = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 const CORS = {
@@ -45,7 +52,8 @@ export default {
     else if (/^\d{1,2}$/.test(a) && /^\d{1,3}$/.test(b)) amb = a.padStart(2, '0') + b.padStart(3, '0'); // dep + mun
     else if (/^\d{1,2}$/.test(a))                        amb = a.padStart(2, '0');               // depto
 
-    const url = `${BASE}/${corp}/${amb}.json`;
+    const base = BASE_BY_ROUTE[seg[0]] || BASE;
+    const url = `${base}/${corp}/${amb}.json`;
     let up;
     try {
       up = await fetch(url, {

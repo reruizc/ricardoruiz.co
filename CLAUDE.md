@@ -868,6 +868,61 @@ agregó un mapa por **localidad** (20, no UPL):
   (Usaquén, Chapinero, Suba, Engativá, Fontibón, Teusaquillo, Barrios Unidos,
   Puente Aranda, Antonio Nariño, Los Mártires). Ciudad: Cepeda 42.7%.
 
+## Segunda vuelta en vivo — `segunda-vuelta-prec-2026.html` (LISTO · 21 jun 2026)
+
+Tracker del balotaje **Cepeda vs Abelardo** centrado en **cuándo el ganador es
+irreversible**, ponderando *dónde* falta voto (no el conteo bruto). Reemplazó el
+placeholder `locked` "Resultados 2V" del cajón Segunda Vuelta en `electoral.html`.
+
+### Feed v2 (portal nuevo de la Registraduría) — CLAVE
+La 1V vivía en `…/json/ACT/PR/{amb}.json`. La **2V vive bajo el portal v2**:
+`https://resultados.registraduria.gov.co/v2/json/ACT/PR/{amb}.json`. Misma forma
+de JSON (totales.act · camaras[0].partotabla · mapagan) PERO **codpars distintos:
+Cepeda = `2`, Abelardo = `3`** (en 1V eran 7 y 10). `tope:"2"`. Sin CORS → worker.
+- Worker `registraduria-proxy` ahora tiene ruta **`/presidente2v`** → base v2
+  (`BASE_BY_ROUTE` en `tools/registraduria-proxy/worker.js`). `/presidente` sigue
+  sirviendo la 1V final. Deploy: `cd tools/registraduria-proxy && npx wrangler deploy`.
+- Descubrimiento del endpoint: el bundle SPA `/v2/assets/index-*.js` (build
+  "PROD 2a VUELTA") usa `path:"/json/ACT/:electionSiglas/:scopeCode"` con prefijo `v2`.
+
+### Modelo geográfico de irreversibilidad (el diferencial)
+**Una sola llamada nacional** (`/presidente2v`) trae todo: el `mapagan` del JSON
+nacional da, por depto, `mesesc`, `votcan` y el ganador → con 2 candidatos se
+reconstruye cep_d y abe_d (perdedor = votcan − ganador). Por depto:
+- `f_d = mesesc_d / metota_d` (mesas escrutadas).
+- Voto 2-cand que falta `R_d = max(0, Vtot_d − votcan_d)`, con `Vtot_d` por
+  extrapolación de mesas (`votcan_d/f_d`) anclada al `censo_d × participación × validFrac`
+  cuando `f_d~0`. **Participación = ancla 1V (0.58) migrando al dato en vivo** (las
+  primeras mesas rurales van menos llenas → extrapolar crudo subestima el faltante).
+- Inclinación de lo que falta `q_d` (share Cepeda) = mezcla del 2V en vivo del depto
+  y su **huella 1V por trasvase** (prior), pesada por `f_d`.
+- Proyección final = Σ(contado + R_d·q_d). **Robusta desde el boletín 1**: en el demo
+  marca Abelardo 47%Cep estable mientras el conteo bruto va Cepeda +58pp→−5pp.
+- **Cota dura** (nunca en falso): ventaja > `inscritos de mesas sin escrutar`
+  (`(metota−mesesc)·censo/metota`, techo absoluto). **Cota geográfica**: σ* = 50% +
+  ventaja/(2·falta) vs expectativa `t̄` del de atrás → "le faltan X pp que superar
+  en todo el país a la vez". **Probabilística**: Φ((p̂−0.5)/(σ·√(falta/total))).
+
+### Anclas estáticas (embebidas inline en el HTML)
+`tools/segunda-vuelta-prec/build_anclas.py` → `anclas-2v.json`: por depto `metota`
+(mesas 2V), `censo`, `cep1v`/`abe1v` y `prior` (share Cepeda 2V esperado por trasvase
+de bloques 1V: cep_bloc = Cepeda + 0.55·Fajardo + 0.65·Claudia + 0.85·{Roy,Caicedo,
+Murillo}; abe_bloc = Abelardo + 0.85·Paloma + 0.78·{M.Uribe,Matamoros,Botero,Macollins}
++ 0.55·Lizcano). prior_nac = 0.4651 (Abelardo favorito, consistente con 1V 10.36M vs
+9.69M). Para regenerar: `python3 tools/segunda-vuelta-prec/build_anclas.py` (66 fetches
+a old+v2; metota/censo del v2). Bastiones prior: Chocó .79 · Vaupés .80 · Cauca .73 ·
+Nariño .73 pro-Cepeda; N.Santander .21 · Casanare .28 · Antioquia .32 pro-Abelardo.
+
+### UI (chasis de `presidencial-prec-2026.html`)
+Veredicto (proyección + tier Definido/Encaminado/Inclinado/En disputa) · barra cara
+a cara del conteo · KPIs · "la cuenta de la remontada" (2 cotas + prob) · mapa
+("voto que falta": color=inclinación, intensidad=cuánto falta · toggle "líder ahora"
+· click depto→municipios) · **tabla "Dónde está el voto que falta y a quién favorece"**
+(por depto: %escr, voto que falta, inclinación, **neto pendiente** por candidato,
+ordenable) · evolución del margen conteo vs proyectado por boletín. Auto-refresh 60s.
+`window.STATE`/`computeModel`/`ANCLAS` expuestos para debug. Demo "▶ Simular noche"
+con sesgo de orden de reporte (bastiones Cepeda primero) demuestra el punto.
+
 ## Mapas por barrio 1V 2026 — `bogota-1v-barrios.html` + `medellin-1v-barrios.html`
 
 Notas/mapas interactivos (enlazados desde `noticias.html`) que llevan el

@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex,nofollow" />
+<title>Presidencia · Preconteo 2ª vuelta 2026 · Ricardo Ruiz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Arima:wght@400;500;600;700&family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,400;1,500;1,600&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --paper:#1a1610; --paper-2:#221d15; --paper-3:#2a241b;
+    --ink:#f4f3ef; --ink-2:#b8b1a0; --ink-3:#807a6c;
+    --accent:#d96a50; --accent-soft:#d96a5018; --accent-tint:#d96a5036; --on-accent:#14110a; --cafe:#b5895c;
+    --rule:#f4f3ef1c; --rule-strong:#f4f3ef38;
+    --ok:#7bb661; --warn:#d9a441; --danger:#b03524;
+    --cep:#8b6fd0; --abe:#3f7fd6;   /* Cepeda púrpura (Pacto) · Abelardo azul */
+    --sans:'Familjen Grotesk',system-ui,sans-serif; --italic:'Petrona',Georgia,serif; --mono:'Arima',ui-rounded,sans-serif;
+  }
+  body.day-mode{
+    --paper:#f4f3ef; --paper-2:#ecebe5; --paper-3:#e0ddd2;
+    --ink:#14110a; --ink-2:#5a5448; --ink-3:#948e80;
+    --accent:#8a1e16; --accent-soft:#8a1e161a; --accent-tint:#8a1e1633; --on-accent:#f4f3ef; --cafe:#6f4a2a;
+    --rule:#14110a1f; --rule-strong:#14110a40;
+    --cep:#5b3fa0; --abe:#16457f;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.5;min-height:100vh;overflow-x:hidden;cursor:none;text-rendering:optimizeLegibility;transition:background .35s,color .35s;}
+  a{color:inherit;text-decoration:none;}
+  button{font:inherit;color:inherit;background:none;border:none;cursor:none;}
+  ::selection{background:var(--accent);color:var(--on-accent);}
+  body.day-mode::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background-image:radial-gradient(rgba(20,17,10,.035) 1px,transparent 1.4px);background-size:4px 4px;mix-blend-mode:multiply;}
+  .cursor{position:fixed;width:12px;height:12px;background:var(--accent);border-radius:50%;pointer-events:none;z-index:9999;transition:transform .15s,background .2s;transform:translate(-50%,-50%);}
+  .cursor-ring{position:fixed;width:36px;height:36px;border:1.5px solid var(--accent);border-radius:50%;pointer-events:none;z-index:9998;transition:transform .35s,opacity .3s;transform:translate(-50%,-50%);opacity:.4;}
+  .em{font-family:var(--italic);font-style:italic;}
+  .mono{font-family:var(--mono);}
+  .shell{position:relative;z-index:1;display:flex;flex-direction:column;min-height:100vh;}
+
+  .topbar{position:sticky;top:0;z-index:60;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:1.2rem;padding:.85rem 1.75rem;background:var(--paper);border-bottom:1px solid var(--rule);backdrop-filter:blur(8px);}
+  .tb-left,.tb-center,.tb-right{display:flex;align-items:center;gap:1rem;}
+  .tb-right{justify-content:flex-end;}
+  .tb-center{justify-content:center;font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);}
+  .live-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);display:inline-block;animation:pulse 1.5s ease infinite;margin-right:.45rem;}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(1.3)}}
+  .btn-back{display:inline-flex;align-items:center;gap:.5rem;font-size:14px;font-weight:500;color:var(--ink);padding:.5rem .9rem;border:1px solid var(--rule-strong);border-radius:999px;transition:.2s;}
+  .btn-back:hover{background:var(--paper-2);border-color:var(--ink);}
+  .btn-back .arr{transition:transform .25s;}.btn-back:hover .arr{transform:translateX(-3px);}
+  .theme-btn{display:inline-flex;align-items:center;gap:.45rem;font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);padding:.45rem .85rem;border:1px solid var(--rule-strong);border-radius:999px;transition:.2s;}
+  .theme-btn:hover{color:var(--ink);border-color:var(--ink);}
+  .logo-link{display:flex;align-items:center;gap:.55rem;}
+  .logo-bars{display:flex;align-items:flex-end;gap:3px;height:18px;}
+  .logo-bar{width:5px;background:var(--cafe);border-radius:1px 1px 0 0;opacity:.9;}
+  .logo-text{font-family:'Syne',var(--sans);font-weight:800;font-size:clamp(1.1rem,2vw,1.4rem);letter-spacing:-.02em;color:var(--ink);line-height:1;}
+  .logo-text span{color:var(--cafe);}
+
+  .head{padding:1.2rem 1.75rem .3rem;}
+  .page-title{font-family:var(--sans);font-weight:700;font-size:clamp(1.5rem,2.7vw,2.3rem);letter-spacing:-.025em;line-height:1.05;}
+  .page-title .em{color:var(--accent);font-weight:500;}
+  .breadcrumb{padding:.55rem 1.75rem .75rem;font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);border-bottom:1px solid var(--rule);}
+  .breadcrumb a{color:var(--accent);}
+  .meta-bar{display:flex;gap:1.4rem;flex-wrap:wrap;align-items:center;padding:.5rem 1.75rem;border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;color:var(--ink-3);}
+  .meta-bar b{color:var(--ink);font-weight:600;}
+  .content{flex:1;padding:1.4rem 1.75rem 1.6rem;display:flex;flex-direction:column;gap:1.3rem;}
+
+  .card{background:var(--paper-2);border:1px solid var(--rule);border-radius:14px;padding:1.2rem 1.3rem;}
+  .card-label{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-bottom:1rem;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;}
+
+  /* VERDICT */
+  .verdict{border-radius:16px;padding:1.4rem 1.5rem;border:1px solid var(--rule-strong);background:var(--paper-2);position:relative;overflow:hidden;}
+  .verdict.tier-def{border-color:var(--ok);background:linear-gradient(180deg,var(--paper-2),#7bb6611a);}
+  .verdict.tier-enc{border-color:var(--warn);}
+  .verdict.tier-dis{border-color:var(--accent);}
+  .verdict-tag{font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);margin-bottom:.55rem;display:flex;align-items:center;gap:.6rem;}
+  .vchip{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;padding:.18rem .55rem;border-radius:999px;font-weight:600;}
+  .vchip.def{background:var(--ok);color:#0c1a08;}
+  .vchip.enc{background:var(--warn);color:#1a1405;}
+  .vchip.dis{background:var(--accent);color:var(--on-accent);}
+  .verdict-main{font-family:var(--sans);font-weight:700;font-size:clamp(1.2rem,2.4vw,1.95rem);letter-spacing:-.02em;line-height:1.12;}
+  .verdict-main .cep{color:var(--cep);}.verdict-main .abe{color:var(--abe);}
+  .verdict-sub{font-family:var(--mono);font-size:12.5px;color:var(--ink-2);margin-top:.6rem;line-height:1.65;}
+  .verdict-sub b{color:var(--ink);}
+  /* barra cara a cara */
+  .h2h{margin-top:1.1rem;}
+  .h2h-bar{position:relative;height:34px;border-radius:8px;overflow:hidden;display:flex;background:var(--paper-3);}
+  .h2h-cep{height:100%;background:var(--cep);display:flex;align-items:center;padding-left:.7rem;transition:width 1s;}
+  .h2h-abe{height:100%;background:var(--abe);display:flex;align-items:center;justify-content:flex-end;padding-right:.7rem;transition:width 1s;margin-left:auto;}
+  .h2h-lbl{font-family:var(--sans);font-weight:700;font-size:13.5px;color:#fff;white-space:nowrap;}
+  .h2h-50{position:absolute;top:-4px;bottom:-4px;left:50%;width:2px;background:var(--ink);opacity:.6;z-index:3;}
+  .h2h-50 span{position:absolute;top:-1.15rem;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:10px;color:var(--ink-3);white-space:nowrap;}
+  .h2h-foot{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--ink-3);margin-top:.4rem;}
+  .h2h-foot .cep{color:var(--cep);}.h2h-foot .abe{color:var(--abe);}
+
+  /* KPIs */
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;}
+  .kpi-card{background:var(--paper-2);border:1px solid var(--rule);border-radius:12px;padding:1rem 1.15rem;}
+  .kpi-label{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-bottom:.4rem;}
+  .kpi-val{font-family:var(--sans);font-weight:700;font-size:1.55rem;letter-spacing:-.03em;line-height:1;color:var(--accent);}
+  .kpi-val.dark{color:var(--ink);}.kpi-val.ok{color:var(--ok);}.kpi-val.cep{color:var(--cep);}.kpi-val.abe{color:var(--abe);}.kpi-val.sm{font-size:1rem;line-height:1.25;color:var(--ink);}
+  .kpi-delta{font-family:var(--mono);font-size:11px;color:var(--ink-3);margin-top:.3rem;}
+
+  /* METODO / remontada */
+  .metodo-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.3rem;}
+  @media(max-width:820px){.metodo-grid{grid-template-columns:1fr;}}
+  .mb-title{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:.5rem;}
+  .metodo-block p{font-size:13.5px;color:var(--ink-2);line-height:1.55;margin-bottom:.6rem;}
+  .metodo-block p b{color:var(--ink);font-weight:600;}
+  .mb-formula{font-family:var(--mono);font-size:12px;color:var(--ink);background:var(--paper-3);border:1px solid var(--rule);border-radius:8px;padding:.55rem .7rem;margin-bottom:.55rem;overflow-x:auto;white-space:nowrap;}
+  .mb-live{font-family:var(--mono);font-size:12.5px;color:var(--ink-2);line-height:1.6;}
+  .mb-live b{color:var(--ink);}.mb-live b.lock{color:var(--ok);}.mb-live b.cep{color:var(--cep);}.mb-live b.abe{color:var(--abe);}
+  .metodo-foot{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);line-height:1.65;border-top:1px solid var(--rule);padding-top:.75rem;margin-top:.4rem;}
+  .metodo-foot b{color:var(--ink-2);}
+
+  /* HERO 2 col (mapa + barras) */
+  .hero{display:grid;grid-template-columns:1.4fr 1fr;gap:1.1rem;align-items:stretch;}
+  @media(max-width:1000px){.hero{grid-template-columns:1fr;}}
+  .h-col{background:var(--paper-2);border:1px solid var(--rule);border-radius:14px;display:flex;flex-direction:column;overflow:hidden;min-height:420px;}
+  .h-head{display:flex;align-items:center;justify-content:space-between;gap:.6rem;padding:.7rem 1rem;border-bottom:1px solid var(--rule);background:var(--paper-3);}
+  .h-title{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);font-weight:600;}
+  .h-hint{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);}
+  .map-box{flex:1;position:relative;background:var(--paper-3);}
+  #map{position:absolute;inset:0;}
+  .leaflet-container{background:var(--paper-3)!important;font-family:var(--mono);}
+  .leaflet-tile-pane{display:none;}
+  .leaflet-control-attribution{display:none;}
+  .leaflet-control-zoom a{background:var(--paper-2)!important;color:var(--ink-2)!important;border-color:var(--rule-strong)!important;}
+  .map-tt{background:var(--paper)!important;border:1px solid var(--rule-strong)!important;color:var(--ink)!important;border-radius:8px!important;font-family:var(--mono)!important;font-size:11px!important;box-shadow:0 4px 18px rgba(0,0,0,.35)!important;}
+  .map-tt b{font-family:var(--sans);}
+  .map-foot{padding:.5rem .9rem;border-top:1px solid var(--rule);font-family:var(--mono);font-size:10.5px;color:var(--ink-3);display:flex;justify-content:space-between;align-items:center;gap:.5rem;}
+  .map-back-btn{position:absolute;top:.55rem;right:.55rem;z-index:500;font-family:var(--mono);font-size:11px;color:var(--ink);background:var(--paper);border:1px solid var(--accent);border-radius:999px;padding:.42rem .85rem;cursor:none;box-shadow:0 2px 10px rgba(0,0,0,.3);}
+  .map-back-btn:hover{background:var(--accent);color:var(--on-accent);}
+  .toggle{display:inline-flex;border:1px solid var(--rule-strong);border-radius:999px;overflow:hidden;}
+  .toggle button{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;padding:.35rem .7rem;color:var(--ink-3);}
+  .toggle button.active{background:var(--accent);color:var(--on-accent);}
+  .legend{display:flex;gap:.8rem;align-items:center;font-family:var(--mono);font-size:10px;color:var(--ink-3);}
+  .legend i{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:.25rem;vertical-align:middle;}
+
+  /* col barras */
+  .bars-body{flex:1;display:flex;flex-direction:column;padding:1rem;gap:1.1rem;}
+  .cand-row{display:flex;align-items:center;gap:.7rem;}
+  .cand-ph{width:46px;height:46px;border-radius:50%;overflow:hidden;position:relative;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:var(--sans);font-weight:700;font-size:14px;color:#fff;}
+  .cand-ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 22%;}
+  .cand-mid{flex:1;min-width:0;}
+  .cand-name{font-family:var(--sans);font-weight:700;font-size:15px;}
+  .cand-track{height:8px;border-radius:999px;background:var(--paper-3);overflow:hidden;margin-top:5px;}
+  .cand-fill{height:100%;border-radius:999px;transition:width 1s;}
+  .cand-end{text-align:right;flex-shrink:0;}
+  .cand-pct{font-family:var(--sans);font-weight:700;font-size:1.25rem;letter-spacing:-.02em;line-height:1;}
+  .cand-raw{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);margin-top:2px;}
+  .bars-split{border-top:1px solid var(--rule);padding-top:.9rem;}
+  .bars-split .mini-lbl{margin-bottom:.55rem;}
+  #chart-evo-wrap{flex:1;min-height:200px;}
+
+  /* tabla "dónde falta" */
+  .mini-lbl{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);}
+  table.falta{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11.5px;}
+  table.falta th{text-align:right;color:var(--ink-3);padding:.4rem .5rem;border-bottom:1px solid var(--rule-strong);font-weight:400;text-transform:uppercase;letter-spacing:.04em;font-size:9.5px;cursor:none;}
+  table.falta th:first-child,table.falta td:first-child{text-align:left;}
+  table.falta th.sortable:hover{color:var(--accent);}
+  table.falta td{text-align:right;padding:.4rem .5rem;border-bottom:1px solid var(--rule);color:var(--ink-2);}
+  table.falta tr:hover td{background:var(--paper-3);}
+  .lean-pill{display:inline-block;font-size:9.5px;padding:.1rem .45rem;border-radius:999px;font-weight:600;}
+  .lean-cep{background:var(--cep);color:#fff;}.lean-abe{background:var(--abe);color:#fff;}.lean-par{background:var(--paper-3);color:var(--ink-2);}
+  .netnum.cep{color:var(--cep);font-weight:600;}.netnum.abe{color:var(--abe);font-weight:600;}
+  .falta-bar{height:5px;border-radius:999px;background:var(--paper-3);overflow:hidden;width:60px;display:inline-block;vertical-align:middle;}
+  .falta-bar i{display:block;height:100%;}
+  .falta-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:.9rem;margin-bottom:1rem;}
+  @media(max-width:640px){.falta-sum{grid-template-columns:1fr;}}
+  .fsum{background:var(--paper-3);border:1px solid var(--rule);border-radius:10px;padding:.75rem .9rem;}
+  .fsum .k{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin-bottom:.3rem;}
+  .fsum .v{font-family:var(--sans);font-weight:700;font-size:1.3rem;line-height:1;}
+
+  .def-ctrl{display:flex;gap:.65rem;align-items:center;flex-wrap:wrap;border-top:1px solid var(--rule);padding-top:.85rem;margin-top:.6rem;}
+  .def-ctrl label{font-family:var(--mono);font-size:12px;color:var(--ink-2);display:flex;align-items:center;gap:.4rem;}
+  .def-ctrl input{background:var(--paper-3);color:var(--ink);border:1px solid var(--rule-strong);border-radius:8px;padding:.35rem .45rem;font-family:var(--mono);font-size:12px;outline:none;width:5rem;}
+  .btn{font-family:var(--mono);font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink);border:1px solid var(--rule-strong);border-radius:999px;padding:.5rem 1.05rem;cursor:none;white-space:nowrap;transition:.15s;}
+  .btn:hover{border-color:var(--ink);}
+  .btn.on{background:var(--ok);border-color:var(--ok);color:#0c1a08;}
+  .mini-note{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);}
+  #status{font-family:var(--mono);font-size:12px;padding:.3rem .1rem;min-height:1.2rem;color:var(--ink-2);white-space:pre-wrap;}
+  #status.err{color:var(--danger);}#status.ok{color:var(--ok);}
+  .demo-flag{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--on-accent);background:var(--warn);border-radius:6px;padding:.12rem .5rem;}
+  details.raw{margin-top:.5rem;border:1px solid var(--rule);border-radius:10px;overflow:hidden;}
+  details.raw>summary{cursor:none;padding:.45rem .75rem;font-family:var(--mono);font-size:11.5px;color:var(--ink-3);list-style:none;}
+  details.raw>summary::-webkit-details-marker{display:none;}
+  details.raw .raw-in{padding:.6rem;overflow:auto;max-height:420px;}
+
+  .footer{flex-shrink:0;border-top:1px solid var(--rule);padding:.7rem 1.75rem;display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--ink-3);}
+  .footer a{color:var(--ink-2);}
+
+  @media(max-width:820px){
+    body{cursor:auto;}.cursor,.cursor-ring{display:none;}
+    .topbar{grid-template-columns:auto 1fr;}.tb-center{display:none;}
+    .head,.breadcrumb,.meta-bar,.content,.footer,.topbar{padding-left:1.1rem;padding-right:1.1rem;}
+    .kpi-row{grid-template-columns:1fr 1fr;}
+  }
+  @media(max-width:560px){.kpi-row{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<div class="shell">
+  <header class="topbar">
+    <div class="tb-left">
+      <a href="electoral.html" class="btn-back"><span class="arr">←</span> Volver</a>
+      <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
+    </div>
+    <div class="tb-center"><span class="live-dot"></span>Segunda vuelta en vivo</div>
+    <div class="tb-right">
+      <a href="electoral.html" class="logo-link">
+        <span class="logo-bars"><span class="logo-bar" style="height:18px"></span><span class="logo-bar" style="height:14px"></span><span class="logo-bar" style="height:9px"></span><span class="logo-bar" style="height:5px"></span></span>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+  </header>
+
+  <div class="head"><div class="page-title">Presidencia · <span class="em">segunda vuelta</span> · ¿cuándo es irreversible?</div></div>
+  <div class="breadcrumb"><a href="electoral.html">Resultados Electorales</a> &nbsp;/&nbsp; Balotaje · 21 jun 2026 · Cepeda vs Abelardo</div>
+  <div class="meta-bar">
+    <span>Boletín: <b id="boletinLabel">—</b></span>
+    <span>Actualización: <b id="lastUpdate">—</b></span>
+    <span>Mesas: <b id="mesasLabel">— / —</b></span>
+    <span>Escrutado: <b id="escrLabel">—</b></span>
+    <span>Fuente: <b id="fuenteLabel">—</b></span>
+  </div>
+
+  <main class="content">
+
+    <!-- VERDICT -->
+    <div class="verdict" id="verdict">
+      <div class="verdict-tag">El veredicto <span class="vchip dis" id="verdict-chip">en disputa</span></div>
+      <div class="verdict-main" id="verdict-main">Esperando el primer boletín…</div>
+      <div class="verdict-sub" id="verdict-sub">La proyección pondera <b>dónde falta voto</b>, no solo el conteo bruto: el voto que falta en Antioquia pesa para Abelardo, el de Cauca o Nariño para Cepeda. Preconteo — no oficial.</div>
+      <div class="h2h" id="h2h" style="display:none">
+        <div class="h2h-bar">
+          <div class="h2h-cep" id="h2h-cep" style="width:50%"><span class="h2h-lbl" id="h2h-cep-lbl"></span></div>
+          <div class="h2h-50"><span>50%</span></div>
+          <div class="h2h-abe" id="h2h-abe" style="width:50%"><span class="h2h-lbl" id="h2h-abe-lbl"></span></div>
+        </div>
+        <div class="h2h-foot"><span class="cep" id="h2h-cep-foot">Cepeda</span><span id="h2h-mid"></span><span class="abe" id="h2h-abe-foot">Abelardo</span></div>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-row" id="kpis"></div>
+
+    <!-- LA CUENTA DE LA REMONTADA -->
+    <div class="card" id="metodo-card">
+      <div class="card-label">¿Por qué ya no tiene reversa? · la cuenta de la remontada <span id="metodo-demo" style="display:none"><span class="demo-flag">datos simulados</span></span></div>
+      <div class="metodo-grid">
+        <div class="metodo-block">
+          <div class="mb-title">1 · Cota dura (garantía matemática)</div>
+          <p>Incluso si <em class="em">todo</em> el voto que falta fuera para quien va abajo, ¿alcanzaría? El que va arriba está blindado cuando su ventaja en votos <b>supera a todo el voto sin escrutar</b>. No usa supuestos: es aritmética. Nunca declara bloqueo en falso.</p>
+          <div class="mb-formula">ventaja en votos &gt; voto 2-candidatos sin escrutar</div>
+          <div class="mb-live" id="metodo-1">—</div>
+        </div>
+        <div class="metodo-block">
+          <div class="mb-title">2 · Cota geográfica (dónde falta el voto)</div>
+          <p>El voto que falta <b>no es neutral</b>. Estimamos cuánto falta en cada departamento y hacia quién se inclina (mezcla de su voto 2V en vivo y su huella 1V). Para empatar, el de atrás debe ganarle al voto restante con cierto <b>%</b>; por geografía se espera que saque otro. La diferencia es lo que tendría que <b>superar su expectativa en todo el país a la vez</b>.</p>
+          <div class="mb-formula">σ* = 50% + ventaja / (2·voto que falta)</div>
+          <div class="mb-live" id="metodo-2">—</div>
+        </div>
+      </div>
+      <p class="metodo-foot">Las dos son <b>cotas</b>. Mientras no se cierran, la probabilidad <b id="metodo-prob">—</b> las anticipa: modela la incertidumbre de la proyección final como <b>σ·√(fracción de voto sin escrutar)</b>. La cota dura manda; la geográfica es la lectura útil; la probabilidad solo adelanta la señal. <b>Cepeda codpar 2 · Abelardo codpar 3</b> en el feed.</p>
+      <div class="def-ctrl">
+        <label>σ del modelo <input id="sigma" type="number" min="0.01" max="0.18" step="0.005" value="0.06" /></label>
+        <button class="btn" id="btn-recompute">Recalcular</button>
+        <button class="btn" id="btn-reset-bol">Borrar boletines</button>
+        <button class="btn" id="btn-demo">▶ Simular noche (demo)</button>
+        <span class="mini-note" id="bol-count"></span>
+      </div>
+    </div>
+
+    <!-- HERO: mapa + barras -->
+    <section class="hero">
+      <div class="h-col">
+        <div class="h-head"><span class="h-title" id="map-title">Dónde falta el voto</span><span class="h-hint" id="map-hint">color = a quién favorece · intensidad = cuánto falta</span></div>
+        <div class="map-box"><div id="map"></div><button class="map-back-btn" id="map-back" onclick="mapBack()" style="display:none">← Nacional</button></div>
+        <div class="map-foot">
+          <span class="legend"><i style="background:var(--cep)"></i>favorece Cepeda <i style="background:var(--abe);margin-left:.5rem"></i>favorece Abelardo</span>
+          <span class="toggle"><button id="tg-falta" class="active" onclick="setMapMode('falta')">Voto que falta</button><button id="tg-lider" onclick="setMapMode('lider')">Líder ahora</button></span>
+        </div>
+      </div>
+      <div class="h-col">
+        <div class="h-head"><span class="h-title">Conteo vs proyección</span><span class="h-hint">barra = conteo actual</span></div>
+        <div class="bars-body">
+          <div id="bars-now"></div>
+          <div class="bars-split">
+            <div class="mini-lbl">Evolución del margen por boletín <span style="color:var(--ink-3)">· conteo (línea) vs proyección (punteada)</span></div>
+            <div id="chart-evo-wrap"><canvas id="chart-evo"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DÓNDE FALTA · TABLA -->
+    <div class="card" id="falta-card">
+      <div class="card-label">Dónde está el voto que falta y a quién favorece <span class="mini-note" style="margin-left:auto" id="falta-sub"></span></div>
+      <div class="falta-sum" id="falta-sum"></div>
+      <div style="overflow:auto" id="falta-table"><div class="mini-note">Esperando datos del preconteo…</div></div>
+      <details class="raw" id="falta-all-wrap" style="display:none"><summary id="falta-all-sum">Ver los 33 departamentos + exterior</summary><div class="raw-in" id="falta-all"></div></details>
+    </div>
+
+    <div id="status"></div>
+
+  </main>
+
+  <footer class="footer">
+    <span>ricardoruiz.co · Preconteo 2ª vuelta presidencial 2026 · uso interno · no oficial</span>
+    <span><a href="https://resultados.registraduria.gov.co/v2/" target="_blank" rel="noopener">Fuente: Registraduría Nacional (v2)</a></span>
+  </footer>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════
+// Preconteo Presidencial · 2ª vuelta 2026 · Cepeda (codpar 2) vs Abelardo (codpar 3)
+//
+// Feed: worker registraduria-proxy → /presidente2v → /v2/json/ACT/PR/{amb}.json (CORS).
+//   Una sola llamada nacional trae TODO lo que el modelo necesita:
+//     · totales.act (mesas, censo, votantes)
+//     · camaras[0].partotabla[] (votos nacionales de los 2 candidatos)
+//     · camaras[0].mapagan[] (por depto: mesesc, votcan, ganador) → reconstruye
+//       cep_d y abe_d de cada departamento (con 2 candidatos: perdedor = votcan − ganador).
+//
+// MODELO GEOGRÁFICO DE IRREVERSIBILIDAD (no medir el voto bruto sino DÓNDE falta):
+//   Por depto d: fracción escrutada f_d = mesesc_d / metota_d.
+//   Voto 2-cand que falta R_d = max(0, Vtot_d − votcan_d), con Vtot_d estimado por
+//     extrapolación de mesas (votcan_d/f_d) anclado al censo×participación cuando f_d~0.
+//   Inclinación del voto que falta q_d (share Cepeda) = mezcla del 2V en vivo del depto
+//     y su huella 1V (prior por trasvase de bloques). Se confía más en el vivo a medida
+//     que sube f_d.   Proyección = Σ (votos contados + R_d·q_d).
+//   Cota dura: ventaja > Σ R_d.  Cota geográfica: σ* vs expectativa t̄.
+// ════════════════════════════════════════════════════════════════════
+
+// ── Anclas estáticas (mesas 2V, censo, huella 1V por trasvase) · tools/segunda-vuelta-prec/ ──
+const ANCLAS = {"v":"2026-06-21","nat":{"metota":122020,"censo":41421973,"cep1v":9688361,"abe1v":10361499,"prior":0.4651},"dep":{"01":{"n":"Antioquia","metota":15801,"censo":5448240,"cep1v":805652,"abe1v":1723406,"prior":0.3197},"03":{"n":"Atlántico","metota":6190,"censo":2129515,"cep1v":549193,"abe1v":432784,"prior":0.5547},"05":{"n":"Bolívar","metota":5355,"censo":1791159,"cep1v":443226,"abe1v":312574,"prior":0.5729},"07":{"n":"Boyacá","metota":3126,"censo":1039293,"cep1v":216425,"abe1v":337768,"prior":0.3773},"09":{"n":"Caldas","metota":2492,"censo":828671,"cep1v":146202,"abe1v":218852,"prior":0.3665},"11":{"n":"Cauca","metota":3427,"censo":1075975,"cep1v":462794,"abe1v":131175,"prior":0.7335},"12":{"n":"Cesar","metota":2754,"censo":929139,"cep1v":224457,"abe1v":223840,"prior":0.4915},"13":{"n":"Córdoba","metota":4180,"censo":1394973,"cep1v":391880,"abe1v":268604,"prior":0.5795},"15":{"n":"Cundinamarca","metota":6916,"censo":2335305,"cep1v":600032,"abe1v":724083,"prior":0.438},"16":{"n":"Bogotá D.C.","metota":17164,"censo":6076599,"cep1v":1706249,"abe1v":1543517,"prior":0.5044},"17":{"n":"Chocó","metota":1252,"censo":361794,"cep1v":109148,"abe1v":22782,"prior":0.7921},"19":{"n":"Huila","metota":2746,"censo":937739,"cep1v":176721,"abe1v":297613,"prior":0.3591},"21":{"n":"Magdalena","metota":3228,"censo":1089418,"cep1v":263014,"abe1v":197533,"prior":0.5556},"23":{"n":"Nariño","metota":3901,"censo":1225565,"cep1v":472845,"abe1v":148120,"prior":0.7291},"24":{"n":"Risaralda","metota":2551,"censo":878829,"cep1v":182268,"abe1v":226277,"prior":0.4254},"25":{"n":"Norte de Santander","metota":4079,"censo":1369050,"cep1v":128091,"abe1v":519161,"prior":0.2077},"26":{"n":"Quindío","metota":1471,"censo":504934,"cep1v":94337,"abe1v":142586,"prior":0.382},"27":{"n":"Santander","metota":5690,"censo":1861932,"cep1v":343998,"abe1v":684563,"prior":0.3291},"28":{"n":"Sucre","metota":2347,"censo":761233,"cep1v":226644,"abe1v":145696,"prior":0.5897},"29":{"n":"Tolima","metota":3526,"censo":1170701,"cep1v":235730,"abe1v":315181,"prior":0.3953},"31":{"n":"Valle del Cauca","metota":11087,"censo":3793190,"cep1v":1119914,"abe1v":710909,"prior":0.5862},"40":{"n":"Arauca","metota":662,"censo":220805,"cep1v":34097,"abe1v":50613,"prior":0.3842},"44":{"n":"Caquetá","metota":983,"censo":327418,"cep1v":66468,"abe1v":81783,"prior":0.4305},"46":{"n":"Casanare","metota":1020,"censo":328773,"cep1v":54202,"abe1v":134114,"prior":0.2806},"48":{"n":"La Guajira","metota":2095,"censo":708846,"cep1v":140544,"abe1v":96625,"prior":0.5791},"50":{"n":"Guainía","metota":117,"censo":36900,"cep1v":6778,"abe1v":3722,"prior":0.6092},"52":{"n":"Meta","metota":2543,"censo":854033,"cep1v":174242,"abe1v":280090,"prior":0.367},"54":{"n":"Guaviare","metota":221,"censo":69304,"cep1v":12677,"abe1v":16060,"prior":0.4199},"56":{"n":"San Andrés","metota":156,"censo":53790,"cep1v":7936,"abe1v":7793,"prior":0.4923},"60":{"n":"Amazonas","metota":176,"censo":57274,"cep1v":13954,"abe1v":7887,"prior":0.6004},"64":{"n":"Putumayo","metota":809,"censo":263450,"cep1v":94416,"abe1v":25087,"prior":0.7576},"68":{"n":"Vaupés","metota":88,"censo":26110,"cep1v":6932,"abe1v":1379,"prior":0.8},"72":{"n":"Vichada","metota":197,"censo":57355,"cep1v":9769,"abe1v":9334,"prior":0.4898},"88":{"n":"Exterior","metota":3670,"censo":1414661,"cep1v":167526,"abe1v":319988,"prior":0.3394}}};
+
+const WORKER   = 'https://registraduria-proxy.reruizc.workers.dev';
+const ROUTE    = '/presidente2v';
+const RECARGA_MS = 60 * 1000;
+const BOL_KEY  = 'pres2v-boletines-v1';
+const CEP = '2', ABE = '3';
+const DEF_TURNOUT = 0.58, DEF_VALIDFRAC = 0.965;
+const PHOTO_BASE = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/Fotos-presidenciales/';
+const PHOTO_VER  = '20260531a';
+const CAND = {
+  '2': { key:'cep', nombre:'Iván Cepeda',        ape:'Cepeda',    partido:'Pacto Histórico',   color:'cep', photo:'cepeda.jpg' },
+  '3': { key:'abe', nombre:'Abelardo De La Espriella', ape:'De La Espriella', partido:'Independiente', color:'abe', photo:'espriella.jpg' },
+};
+
+const $ = id => document.getElementById(id);
+const fmt = n => Math.round(n||0).toLocaleString('es-CO');
+const fmtk = n => { n=Math.round(n||0); return Math.abs(n)>=1000 ? (n/1000).toFixed(n>=100000?0:1)+'k' : ''+n; };
+const clamp = (x,a,b) => Math.max(a, Math.min(b, x));
+const cssVar = n => (getComputedStyle(document.body).getPropertyValue(n)||'').trim() || '#888';
+function erf(x){ const t=1/(1+0.3275911*Math.abs(x)); const y=1-(((((1.061405429*t-1.453152027)*t+1.421413741)*t-0.284496736)*t+0.254829592)*t)*Math.exp(-x*x); return x>=0?y:-y; }
+function ncdf(z){ return 0.5*(1+erf(z/Math.SQRT2)); }
+function photoURL(c){ return PHOTO_BASE + c.photo + '?v=' + PHOTO_VER; }
+
+let STATE = { live:null, boletines:[], demo:false, autoTimer:null, mapMode:'falta', mapDep:null, lastModel:null, faltaSort:'R' };
+
+// ════════════════════ FETCH + PARSE ════════════════════
+async function fetchAmb(amb){
+  const url = WORKER + ROUTE + (amb && amb!=='00' ? '/'+amb : '');
+  const res = await fetch(url + '?t=' + Date.now(), { cache:'no-store', headers:{ 'Accept':'application/json' } });
+  if (!res.ok){ const e=new Error('HTTP '+res.status); e.status=res.status; try{ e.body=await res.text(); }catch(_){} throw e; }
+  return res.json();
+}
+function gi(o,k){ return parseInt(String((o&&o[k])!=null?o[k]:'0').replace(/[.\s]/g,'').replace(',','')) || 0; }
+function extraerTotales(ds){
+  const t = (ds&&ds.totales&&ds.totales.act) || {};
+  return { metota: gi(t,'metota')||gi(t,'mesatota')||gi(t,'mesins'), mesesc: gi(t,'mesesc'),
+    censo: gi(t,'centota'), votant: gi(t,'votant'), votval: gi(t,'votval'),
+    votblan: gi(t,'votblan')||gi(t,'votbla'), votnul: gi(t,'votnul'), votnma: gi(t,'votnma') };
+}
+function extraerNacional(ds){
+  // votos nacionales por codpar desde partotabla[].act
+  const out = { '2':0, '3':0 };
+  try { (ds.camaras||[]).forEach(cam => (cam.partotabla||[]).forEach(p => { const a=p.act||p; const cp=String(a.codpar); if (out[cp]!=null) out[cp]+=gi(a,'vot'); })); } catch(_){}
+  return out;
+}
+function extraerDeptos(ds){
+  // mapagan del JSON nacional → por amb (depto): mesesc, votcan, ganador (codpar+vot).
+  // Con 2 candidatos: ganador = vot, perdedor = votcan − vot.
+  const deps = {};
+  const mg = ds && ds.camaras && ds.camaras[0] && ds.camaras[0].mapagan;
+  if (Array.isArray(mg)) mg.forEach(e => {
+    const cod = String(e.amb||'').padStart(2,'0');
+    if (!ANCLAS.dep[cod]) return;
+    const winCp = String(e.codpar||''), winV = gi(e,'vot'), votcan = gi(e,'votcan');
+    let cep=0, abe=0;
+    if (winCp===CEP){ cep=winV; abe=Math.max(0,votcan-winV); }
+    else if (winCp===ABE){ abe=winV; cep=Math.max(0,votcan-winV); }
+    else { // sin ganador aún (0 mesas): reparte por prior solo para no romper (votcan será 0)
+      cep=0; abe=0;
+    }
+    deps[cod] = { cep, abe, votcan, mesesc: gi(e,'mesesc'), votant: gi(e,'votant'),
+                  winCp, winPct: parseFloat(String(e.pvot||'0').replace('%','').replace(',','.'))||0 };
+  });
+  return deps;
+}
+
+// ════════════════════ MODELO GEOGRÁFICO ════════════════════
+function computeModel(){
+  const L = STATE.live; if (!L) return null;
+  const tot = L.tot;
+  const natMesFrac = ANCLAS.nat.metota ? clamp(tot.mesesc/ANCLAS.nat.metota,0,1) : 0;
+  const censoNat = tot.censo||ANCLAS.nat.censo;
+  // Participación FINAL esperada. Las primeras mesas (rurales chicas) van menos llenas
+  // que las urbanas que reportan tarde → la extrapolación cruda subestima al inicio.
+  // Anclamos en la participación 1V (DEF_TURNOUT) y migramos al dato en vivo al madurar el conteo.
+  const liveTurn = (natMesFrac>0.01 && tot.votant>0 && censoNat>0) ? tot.votant/natMesFrac/censoNat : DEF_TURNOUT;
+  const gT = clamp(natMesFrac/0.30, 0, 1);
+  const turnoutNat = clamp((1-gT)*DEF_TURNOUT + gT*liveTurn, 0.35, 0.82);
+  const natVotcan = (L.nac[CEP]||0)+(L.nac[ABE]||0);
+  const validFrac = (tot.votant>0 && natVotcan>0) ? clamp(natVotcan/tot.votant,0.5,1) : DEF_VALIDFRAC;
+  const SIGMA = clamp(parseFloat($('sigma').value)||0.06, 0.005, 0.30);
+
+  let cCount=0, aCount=0, sumR=0, sumRq=0, projC=0, projA=0;
+  const rows=[];
+  for (const cod in ANCLAS.dep){
+    const an = ANCLAS.dep[cod];
+    const d = L.deps[cod] || { cep:0, abe:0, votcan:0, mesesc:0 };
+    const cep=d.cep, abe=d.abe, votcan=cep+abe;
+    const f = an.metota ? clamp(d.mesesc/an.metota,0,1) : 0;
+    // total 2-cand esperado en el depto
+    const VtotMesa  = f>0.02 ? votcan/f : 0;
+    const VtotCenso = an.censo*turnoutNat*validFrac;
+    const w = clamp(f/0.15, 0, 1);                 // confía en extrapolación de mesas al subir f
+    let Vtot = (f<=0.005) ? VtotCenso : (w*VtotMesa + (1-w)*VtotCenso);
+    Vtot = Math.max(Vtot, votcan);
+    const R = Math.max(0, Vtot - votcan);
+    // inclinación del voto que falta (share Cepeda)
+    const sLive = votcan>0 ? cep/votcan : an.prior;
+    const beta  = clamp(f*3, 0, 1);                // confía en el vivo del depto al subir f (pleno a 33%)
+    const q = beta*sLive + (1-beta)*an.prior;
+    cCount+=cep; aCount+=abe;
+    projC += cep + R*q; projA += abe + R*(1-q);
+    sumR += R; sumRq += R*q;
+    rows.push({ cod, name:an.n, f, mesesc:d.mesesc, metota:an.metota, cep, abe, votcan, R, q,
+                sLive, prior:an.prior, netCep: R*(2*q-1) });
+  }
+  const projTot = projC+projA;
+  const pHat = projTot>0 ? projC/projTot : ANCLAS.nat.prior;     // share final Cepeda
+  const Rtot = sumR, Vtotal = projTot;
+  const sdP  = Math.max(0.0015, SIGMA*Math.sqrt(clamp(Rtot/Math.max(1,Vtotal),0,1)));
+  const pCepWin = ncdf((pHat-0.5)/sdP);
+  const M = Math.abs(cCount-aCount);
+  const leaderNow = cCount>=aCount ? 'cep' : 'abe';
+  const trailNow  = leaderNow==='cep' ? 'abe' : 'cep';
+  const sigmaStar = Rtot>0 ? 0.5 + M/(2*Rtot) : Infinity;        // share de lo que falta que el de atrás necesita p/ empatar
+  const cepRemShare = Rtot>0 ? sumRq/Rtot : ANCLAS.nat.prior;
+  const tBar = trailNow==='cep' ? cepRemShare : (1-cepRemShare); // expectativa del de atrás en lo que falta
+  // Cota DURA: máximo voto que podría faltar = TODOS los inscritos de las mesas sin escrutar
+  // (cada inscrito vota por el de atrás). Sobreestima a propósito → nunca declara en falso.
+  const remReg = Math.max(0, ANCLAS.nat.metota - tot.mesesc) * (censoNat/ANCLAS.nat.metota);
+  const hard = (cCount>0||aCount>0) && M > remReg;
+  const projLeader = projC>=projA ? 'cep' : 'abe';
+  const counted2 = cCount+aCount;
+  return { rows, cCount, aCount, counted2, M, leaderNow, trailNow, projC, projA, pHat, projTot,
+           pCepWin, sdP, Rtot, Vtotal, sigmaStar, tBar, cepRemShare, hard, remReg, projLeader,
+           turnoutNat, validFrac, natMesFrac, tot };
+}
+
+// ════════════════════ RENDER ════════════════════
+function tierOf(m){
+  const pLeader = m.projLeader==='cep' ? m.pCepWin : 1-m.pCepWin;
+  if (m.hard) return { t:'def', lbl:'definido', txt:'irreversible (matemático)' };
+  if (pLeader>=0.995) return { t:'def', lbl:'definido', txt:'prácticamente irreversible' };
+  if (pLeader>=0.90)  return { t:'enc', lbl:'encaminado', txt:'muy probable, no sellado' };
+  if (pLeader>=0.65)  return { t:'enc', lbl:'inclinado', txt:'ventaja, aún reversible' };
+  return { t:'dis', lbl:'en disputa', txt:'abierto' };
+}
+function candName(k){ return k==='cep'?'Cepeda':'Abelardo'; }
+
+function renderAll(){
+  const m = computeModel(); STATE.lastModel = m;
+  renderVerdict(m); renderKpis(m); renderMetodo(m); renderBars(m); renderFalta(m); renderMap();
+}
+
+function renderVerdict(m){
+  const card=$('verdict'), main=$('verdict-main'), sub=$('verdict-sub'), chip=$('verdict-chip'), h2h=$('h2h');
+  card.className='verdict';
+  if (!m || (m.cCount===0 && m.aCount===0 && m.Rtot>0 && !STATE.demo && m.natMesFrac===0)){
+    // sin mesas: mostramos el punto de partida por geografía (prior)
+    if (!m){ main.textContent='Esperando el primer boletín…'; h2h.style.display='none'; return; }
+  }
+  const tier = tierOf(m);
+  card.classList.add('tier-'+tier.t);
+  chip.className='vchip '+tier.t; chip.textContent=tier.lbl;
+  const winK = m.projLeader, loseK = winK==='cep'?'abe':'cep';
+  const winPct = (winK==='cep'? m.pHat : 1-m.pHat)*100;
+  const losePct= 100-winPct;
+  const noData = (m.cCount===0 && m.aCount===0);
+  const winName = `<span class="${winK}">${candName(winK)}</span>`;
+  if (m.hard){
+    main.innerHTML = `${winName} es presidente · <span class="${winK}">irreversible</span>`;
+  } else if (noData){
+    main.innerHTML = `Punto de partida (sin mesas): la geografía 1V proyecta a ${winName} · ${winPct.toFixed(1)}%`;
+  } else {
+    main.innerHTML = `Proyección: ${winName} presidente · ${winPct.toFixed(1)}% – ${losePct.toFixed(1)}%`;
+  }
+  // sub
+  const pLeader = (winK==='cep'? m.pCepWin : 1-m.pCepWin)*100;
+  let leadTxt;
+  if (m.cCount===0 && m.aCount===0) leadTxt = 'Aún sin mesas escrutadas';
+  else { const ln=candName(m.leaderNow); const lpct=(m.leaderNow==='cep'? m.cCount:m.aCount)/Math.max(1,m.counted2)*100;
+         leadTxt = `Va ganando el conteo <b>${ln}</b> (${lpct.toFixed(1)}% de lo escrutado)`; }
+  sub.innerHTML = `${leadTxt} · ${tier.txt}. Probabilidad de que gane ${candName(winK)}: <b>${pLeader.toFixed(1)}%</b>. Falta por escrutar ~<b>${fmt(m.Rtot)}</b> votos (${(m.Rtot/Math.max(1,m.Vtotal)*100).toFixed(0)}% del total esperado). Preconteo — no oficial.`;
+  // barra cara a cara (por CONTEO actual, no proyección)
+  h2h.style.display='';
+  const cP = m.counted2>0 ? m.cCount/m.counted2*100 : m.pHat*100;
+  const aP = 100-cP;
+  $('h2h-cep').style.width=cP.toFixed(1)+'%'; $('h2h-abe').style.width=aP.toFixed(1)+'%';
+  $('h2h-cep-lbl').textContent = cP>=12?'Cepeda '+cP.toFixed(1)+'%':'';
+  $('h2h-abe-lbl').textContent = aP>=12?'Abelardo '+aP.toFixed(1)+'%':'';
+  $('h2h-cep-foot').textContent = `Cepeda ${fmt(m.cCount)}`;
+  $('h2h-abe-foot').textContent = `${fmt(m.aCount)} Abelardo`;
+  $('h2h-mid').textContent = m.counted2>0 ? `conteo · margen ${fmt(m.M)} (${Math.abs(cP-aP).toFixed(1)} pp)` : 'sin conteo';
+}
+
+function renderKpis(m){
+  if (!m){ $('kpis').innerHTML=''; return; }
+  const escr = m.natMesFrac*100;
+  const part = (m.tot.censo||ANCLAS.nat.censo) ? m.tot.votant/(m.tot.censo||ANCLAS.nat.censo)*100 : 0;
+  const projMargin = Math.abs(m.pHat-0.5)*2*100;
+  const winK = m.projLeader;
+  $('kpis').innerHTML = [
+    { l:'Escrutado', v:escr.toFixed(1)+'%', c:'dark', d:`${fmt(m.tot.mesesc)} / ${fmt(ANCLAS.nat.metota)} mesas` },
+    { l:'Participación', v:m.tot.votant?part.toFixed(1)+'%':'—', c:'dark', d:`${fmt(m.tot.votant)} votantes` },
+    { l:'Margen del conteo', v:m.counted2?fmt(m.M):'—', c:m.leaderNow, d:m.counted2?`a favor de ${candName(m.leaderNow)}`:'sin mesas' },
+    { l:'Proyección final', v:projMargin.toFixed(1)+' pp', c:winK, d:`gana ${candName(winK)} (geográfico)` },
+  ].map(k=>`<div class="kpi-card"><div class="kpi-label">${k.l}</div><div class="kpi-val ${k.c}">${k.v}</div><div class="kpi-delta">${k.d}</div></div>`).join('');
+}
+
+function renderMetodo(m){
+  const e1=$('metodo-1'), e2=$('metodo-2'), ep=$('metodo-prob');
+  $('metodo-demo').style.display = STATE.demo ? '' : 'none';
+  if (!m){ e1.textContent='—'; e2.textContent='—'; ep.textContent='—'; return; }
+  const Ln = candName(m.leaderNow), Tn = candName(m.trailNow);
+  // cota 1 — usa el techo de inscritos sin escrutar (máximo absoluto que podría faltar)
+  if (m.counted2===0){ e1.innerHTML='Sin mesas todavía — la cota dura aún no aplica.'; }
+  else if (m.hard){ e1.innerHTML=`Ventaja de <b>${Ln}</b>: <b>${fmt(m.M)}</b> votos · como máximo quedan <b>${fmt(m.remReg)}</b> inscritos sin escrutar → <b class="lock">aunque todos votaran por ${Tn}, no alcanza · ${Ln} es presidente</b>`; }
+  else { e1.innerHTML=`Ventaja de <b>${Ln}</b>: <b>${fmt(m.M)}</b> votos · quedan hasta <b>${fmt(m.remReg)}</b> inscritos sin escrutar → <b>todavía cabe (matemáticamente) la remontada</b>`; }
+  // cota 2 — geográfica
+  if (m.counted2===0){
+    e2.innerHTML = `Por geografía 1V, el voto del país se inclina a <b class="${m.projLeader}">${candName(m.projLeader)}</b> (~${((m.projLeader==='cep'?m.pHat:1-m.pHat)*100).toFixed(1)}%). Empieza el conteo para fijar la cuenta de la remontada.`;
+  } else if (m.sigmaStar>=1){
+    e2.innerHTML = `Ni con el <b>100%</b> de lo que falta ${Tn} empata → coincide con la cota dura.`;
+  } else {
+    const need=(m.sigmaStar*100), exp=(m.tBar*100), gap=(m.sigmaStar-m.tBar)*100;
+    const Tk = m.trailNow;
+    e2.innerHTML = `Para empatar, <b>${Tn}</b> necesita el <b class="${Tk}">${need.toFixed(1)}%</b> del voto que falta. `+
+      `Por geografía se espera que saque <b>${exp.toFixed(1)}%</b>. `+
+      (gap>0 ? `Le faltan <b class="${gap>6?'lock':''}">${gap.toFixed(1)} pp</b> que tendría que superar su expectativa <em class="em">en todo el país a la vez</em>.`
+             : `Va <b class="${Tk}">por encima</b> de lo que necesita → la remontada está en curso.`);
+  }
+  const pLeader=(m.projLeader==='cep'?m.pCepWin:1-m.pCepWin)*100;
+  ep.textContent = `P(gana ${candName(m.projLeader)}) = ${pLeader.toFixed(1)}%`;
+}
+
+function renderBars(m){
+  const box=$('bars-now'); if (!m){ box.innerHTML=''; return; }
+  const data = [
+    { k:'cep', c:CAND['2'], votos:m.cCount, proj:m.pHat },
+    { k:'abe', c:CAND['3'], votos:m.aCount, proj:1-m.pHat },
+  ];
+  const tot = m.counted2||1;
+  box.innerHTML = data.map(d=>{
+    const pct = d.votos/tot*100;
+    const col = d.k==='cep'?cssVar('--cep'):cssVar('--abe');
+    const ph = photoURL(d.c);
+    return `<div class="cand-row">
+      <span class="cand-ph" style="background:${col}"><img src="${ph}" alt="" onerror="this.remove()">${d.c.ape.slice(0,2).toUpperCase()}</span>
+      <div class="cand-mid">
+        <div class="cand-name" style="color:${col}">${d.c.nombre}</div>
+        <div class="cand-track"><div class="cand-fill" style="width:0;background:${col}" data-w="${pct.toFixed(1)}%"></div></div>
+        <div class="cand-raw">${m.counted2?fmt(d.votos)+' votos · proyección final '+(d.proj*100).toFixed(1)+'%':'sin conteo · proyección '+(d.proj*100).toFixed(1)+'%'}</div>
+      </div>
+      <div class="cand-end"><div class="cand-pct" style="color:${col}">${m.counted2?pct.toFixed(1)+'%':'—'}</div></div>
+    </div>`;
+  }).join('');
+  setTimeout(()=>box.querySelectorAll('.cand-fill').forEach(b=>{ if(b.dataset.w) b.style.width=b.dataset.w; }), 50);
+}
+
+// ── tabla "dónde falta" ──
+function leanPill(q){
+  if (q>=0.55) return '<span class="lean-pill lean-cep">→ Cepeda</span>';
+  if (q<=0.45) return '<span class="lean-pill lean-abe">→ Abelardo</span>';
+  return '<span class="lean-pill lean-par">parejo</span>';
+}
+function faltaRowHTML(r){
+  const escr=(r.f*100), col=r.q>=0.5?cssVar('--cep'):cssVar('--abe');
+  const barW=Math.min(100, r.R/STATE._maxR*100)||0;
+  const net=Math.abs(r.netCep), netK=r.netCep>=0?'cep':'abe';
+  return `<tr data-cod="${r.cod}">
+    <td>${r.name}</td>
+    <td>${escr.toFixed(0)}%</td>
+    <td>${fmt(r.R)}<span class="falta-bar" style="margin-left:.4rem"><i style="width:${barW.toFixed(0)}%;background:${col}"></i></span></td>
+    <td>${(r.q*100).toFixed(0)}% ${leanPill(r.q)}</td>
+    <td><span class="netnum ${netK}">${r.netCep>=0?'Cepeda':'Abelardo'} +${fmt(net)}</span></td>
+  </tr>`;
+}
+function renderFalta(m){
+  const box=$('falta-table'), sum=$('falta-sum'), sub=$('falta-sub'); if (!m){ return; }
+  const rows = m.rows.slice();
+  STATE._maxR = Math.max(1, ...rows.map(r=>r.R));
+  // resumen
+  const netCepTot = rows.reduce((s,r)=>s+Math.max(0,r.netCep),0);
+  const netAbeTot = rows.reduce((s,r)=>s+Math.max(0,-r.netCep),0);
+  const faltaWinner = netCepTot>=netAbeTot?'cep':'abe';
+  const netDiff = Math.abs(netCepTot-netAbeTot);
+  sum.innerHTML = [
+    { k:'Voto que falta (est.)', v:fmt(m.Rtot), c:'var(--ink)' },
+    { k:'Neto pendiente Cepeda', v:'+'+fmtk(netCepTot), c:'var(--cep)' },
+    { k:'Neto pendiente Abelardo', v:'+'+fmtk(netAbeTot), c:'var(--abe)' },
+  ].map(s=>`<div class="fsum"><div class="k">${s.k}</div><div class="v" style="color:${s.c}">${s.v}</div></div>`).join('');
+  sub.innerHTML = `el voto que falta favorece neto a <b style="color:var(--${faltaWinner})">${candName(faltaWinner)}</b> por ~${fmt(netDiff)} votos`;
+  // orden
+  const sortFns = {
+    R:  (a,b)=>b.R-a.R,
+    net:(a,b)=>Math.abs(b.netCep)-Math.abs(a.netCep),
+    escr:(a,b)=>a.f-b.f,
+  };
+  rows.sort(sortFns[STATE.faltaSort]||sortFns.R);
+  const head = `<table class="falta"><thead><tr>
+    <th>Departamento</th>
+    <th class="sortable" onclick="setFaltaSort('escr')">% escr ${STATE.faltaSort==='escr'?'▾':''}</th>
+    <th class="sortable" onclick="setFaltaSort('R')">Voto que falta ${STATE.faltaSort==='R'?'▾':''}</th>
+    <th>Inclinación</th>
+    <th class="sortable" onclick="setFaltaSort('net')">Neto pendiente ${STATE.faltaSort==='net'?'▾':''}</th>
+  </tr></thead><tbody>`;
+  box.innerHTML = head + rows.slice(0,12).map(faltaRowHTML).join('') + '</tbody></table>';
+  $('falta-all-wrap').style.display='';
+  $('falta-all-sum').textContent = `Ver los ${rows.length} territorios`;
+  $('falta-all').innerHTML = head + rows.map(faltaRowHTML).join('') + '</tbody></table>';
+  // click fila → centra el depto en el mapa
+  box.querySelectorAll('tr[data-cod]').forEach(tr=>tr.onclick=()=>focusDepOnMap(tr.dataset.cod));
+}
+function setFaltaSort(s){ STATE.faltaSort=s; if (STATE.lastModel) renderFalta(STATE.lastModel); }
+
+// ════════════════════ MAPA ════════════════════
+let leafMap=null, geoLayer=null, GEO=null, munLayer=null; const munGeoCache={};
+const GEO_URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/DEPARTAMENTOS2.json';
+const MPS_URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Departamentos-mps/';
+const norm = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+const NAME2CODE=(()=>{ const m={}; for(const cod in ANCLAS.dep) m[norm(ANCLAS.dep[cod].n)]=cod;
+  Object.assign(m,{'bogota':'16','bogota dc':'16','distrito capital de bogota':'16','valle del cauca':'31','valle':'31','norte de santander':'25','san andres y providencia':'56','san andres':'56'}); return m; })();
+function geoCode(p){ return NAME2CODE[norm(p.name||p.NOMBRE_DPT||p.dpt||'')]||null; }
+
+async function initMap(){
+  if (leafMap || typeof L==='undefined') return;
+  try{
+    leafMap=L.map('map',{zoomControl:true,attributionControl:false,scrollWheelZoom:false,zoomAnimation:false,fadeAnimation:false,zoomSnap:0,zoomDelta:0.5});
+    leafMap.setView([4.6,-73.5],5);
+    const r=await fetch(GEO_URL); GEO=await r.json();
+    leafMap.invalidateSize(false);
+    renderMap();
+    setTimeout(()=>{ try{ leafMap.invalidateSize(false); fitNational(); }catch(_){} }, 450);
+  }catch(e){ /* mapa opcional */ }
+}
+function fitNational(){
+  if (!geoLayer) return;
+  let b=null;
+  geoLayer.eachLayer(l=>{ const nm=norm((l.feature.properties&&l.feature.properties.name)||'');
+    if (!nm.includes('san andres')&&!nm.includes('providencia')){ const lb=l.getBounds(); if(lb&&lb.isValid()) b=b?b.extend(lb):L.latLngBounds(lb.getSouthWest(),lb.getNorthEast()); } });
+  try{ leafMap.fitBounds(b&&b.isValid()?b:geoLayer.getBounds(),{padding:[2,2],animate:false}); }catch(_){}
+}
+function depColor(r){
+  // intensidad por R (voto que falta) en modo falta; por margen en modo líder
+  const cep=cssVar('--cep'), abe=cssVar('--abe'), paper3=cssVar('--paper-3'), rule=cssVar('--rule-strong');
+  if (STATE.mapMode==='lider'){
+    const lead = r && (r.cep+r.abe)>0 ? (r.cep>=r.abe?'cep':'abe') : null;
+    if (!lead) return { fillColor:paper3, fillOpacity:.25, color:rule, weight:1 };
+    const marg = Math.abs(r.cep-r.abe)/Math.max(1,r.cep+r.abe);
+    return { fillColor: lead==='cep'?cep:abe, fillOpacity:0.25+0.7*Math.min(1,marg/0.4), color:rule, weight:1 };
+  }
+  // modo falta: color = inclinación de lo que falta; opacidad = cuánto falta
+  if (!r || r.R<=0) return { fillColor:paper3, fillOpacity:.18, color:rule, weight:1 };
+  const op = 0.12 + 0.8*Math.min(1, r.R/(STATE._maxR||1));
+  return { fillColor: r.q>=0.5?cep:abe, fillOpacity:op, color:rule, weight:1 };
+}
+function rowFor(cod){ const m=STATE.lastModel; if(!m) return null; return m.rows.find(r=>r.cod===cod)||null; }
+function ttHTML(cod){
+  const r=rowFor(cod), an=ANCLAS.dep[cod], nm=an?an.n:cod;
+  if (!r) return `<b>${nm}</b><br>sin dato`;
+  const lead = (r.cep+r.abe)>0 ? (r.cep>=r.abe?'Cepeda':'Abelardo') : '—';
+  const leadPct = (r.cep+r.abe)>0 ? Math.max(r.cep,r.abe)/(r.cep+r.abe)*100 : 0;
+  const net=Math.abs(r.netCep), netN=r.netCep>=0?'Cepeda':'Abelardo';
+  return `<b>${nm}</b><br>${(r.f*100).toFixed(0)}% escrutado`+
+    (r.cep+r.abe>0?` · va ${lead} ${leadPct.toFixed(0)}%`:'')+
+    `<br>falta ~${fmt(r.R)} votos · favorece ${netN} +${fmt(net)}`;
+}
+function renderMap(){
+  if (!leafMap || !GEO) return;
+  if (STATE.mapDep){ renderMunMap(); return; }
+  if (munLayer && leafMap.hasLayer(munLayer)) leafMap.removeLayer(munLayer);
+  const styleFn=f=>depColor(rowFor(geoCode(f.properties)));
+  if (!geoLayer){
+    geoLayer=L.geoJSON(GEO,{ style:styleFn, onEachFeature:(f,l)=>{
+      const cod=geoCode(f.properties);
+      l.on('mouseover',()=>l.setStyle(Object.assign({},styleFn(f),{fillOpacity:1,weight:2})));
+      l.on('mouseout',()=>l.setStyle(styleFn(f)));
+      l.on('click',()=>{ if(cod){ STATE.mapDep=cod; renderMunMap(); } });
+      l.bindTooltip(ttHTML(cod),{className:'map-tt',sticky:false});
+    }}).addTo(leafMap);
+    fitNational();
+  } else {
+    geoLayer.setStyle(styleFn);
+    geoLayer.eachLayer(l=>{ const cod=geoCode(l.feature.properties); const h=ttHTML(cod); if(l.getTooltip()) l.setTooltipContent(h); else l.bindTooltip(h,{className:'map-tt',sticky:false}); });
+  }
+  const mt=$('map-title'), mh=$('map-hint'), mb=$('map-back');
+  if (mb) mb.style.display='none';
+  if (mt) mt.textContent = STATE.mapMode==='lider' ? 'Líder por departamento (conteo)' : 'Dónde falta el voto';
+  if (mh) mh.textContent = STATE.mapMode==='lider' ? 'color = quién va ganando · intensidad = margen' : 'color = a quién favorece lo que falta · intensidad = cuánto falta · click = municipios';
+}
+async function ensureMunGeo(dep){
+  if (munGeoCache[dep]!==undefined) return munGeoCache[dep];
+  try { const r=await fetch(MPS_URL+dep+'.json'); munGeoCache[dep]=await r.json(); } catch(_){ munGeoCache[dep]=null; }
+  return munGeoCache[dep];
+}
+// Drill: municipios del depto coloreados por ganador 2V (mapagan del JSON del depto).
+let _munWin={};
+async function renderMunMap(){
+  const dep=STATE.mapDep; if (!leafMap || !dep) return;
+  const mt=$('map-title'), mh=$('map-hint'), mb=$('map-back');
+  if (mt) mt.textContent='Municipios · '+(ANCLAS.dep[dep]?ANCLAS.dep[dep].n:dep);
+  if (mh) mh.textContent='cargando municipios…';
+  if (mb) mb.style.display='';
+  const geo=await ensureMunGeo(dep);
+  if (geoLayer && leafMap.hasLayer(geoLayer)) leafMap.removeLayer(geoLayer);
+  if (!geo){ if(mh) mh.textContent='no hay mapa municipal'; return; }
+  // jala el depto para el ganador municipal
+  try { const ds=await fetchAmb(dep); _munWin={};
+    const mg=ds&&ds.camaras&&ds.camaras[0]&&ds.camaras[0].mapagan;
+    if (Array.isArray(mg)) mg.forEach(e=>{ const amb=String(e.amb||''); const cp=String(e.codpar||''); const win=gi(e,'vot'),votcan=gi(e,'votcan');
+      _munWin[amb]={ cp, win, votcan, mesesc:gi(e,'mesesc'), pct:parseFloat(String(e.pvot||'0').replace('%','').replace(',','.'))||0 }; });
+  } catch(_){ _munWin={}; }
+  const cepC=cssVar('--cep'), abeC=cssVar('--abe'), paper3=cssVar('--paper-3'), rule=cssVar('--rule-strong');
+  const codeOf=p=>(p.dep_electoral||'')+(p.mun_elec||'');
+  const styleFn=f=>{ const w=_munWin[codeOf(f.properties)];
+    if (!w || w.mesesc===0) return { fillColor:paper3, fillOpacity:.25, color:rule, weight:.7 };
+    const lead=w.cp===CEP?'cep':w.cp===ABE?'abe':null;
+    return { fillColor: lead==='cep'?cepC:lead==='abe'?abeC:paper3, fillOpacity:.85, color:rule, weight:.7 }; };
+  const tt=f=>{ const p=f.properties, w=_munWin[codeOf(p)], nm=p.mpio_cnmbr||p.mun_elec||'—';
+    if (!w||w.mesesc===0) return `<b>${nm}</b><br>sin reporte`;
+    const lead=w.cp===CEP?'Cepeda':w.cp===ABE?'Abelardo':'—';
+    return `<b>${nm}</b><br>va ${lead} · ${w.pct.toFixed(1)}% · ${fmt(w.mesesc)} mesas`; };
+  if (munLayer){ leafMap.removeLayer(munLayer); munLayer=null; }
+  munLayer=L.geoJSON(geo,{ style:styleFn, onEachFeature:(f,l)=>{
+    l.on('mouseover',()=>l.setStyle(Object.assign({},styleFn(f),{fillOpacity:1,weight:2})));
+    l.on('mouseout',()=>l.setStyle(styleFn(f)));
+    l.bindTooltip(tt(f),{className:'map-tt',sticky:false});
+  }}).addTo(leafMap);
+  try{ leafMap.fitBounds(munLayer.getBounds(),{padding:[6,6],animate:false}); }catch(_){}
+  const rep=Object.values(_munWin).filter(w=>w.mesesc>0).length;
+  if (mh) mh.textContent=`${rep} municipios con reporte · click ← Nacional para volver`;
+}
+function mapBack(){ STATE.mapDep=null; if (munLayer && leafMap.hasLayer(munLayer)){ leafMap.removeLayer(munLayer); munLayer=null; } if (geoLayer) geoLayer.addTo(leafMap); renderMap(); fitNational(); }
+function focusDepOnMap(cod){
+  if (!leafMap || !geoLayer || STATE.mapDep) return;
+  geoLayer.eachLayer(l=>{ if (geoCode(l.feature.properties)===cod){ try{ leafMap.fitBounds(l.getBounds(),{padding:[40,40],animate:true,maxZoom:7}); l.openTooltip(); }catch(_){} } });
+}
+function setMapMode(mode){ STATE.mapMode=mode; $('tg-falta').classList.toggle('active',mode==='falta'); $('tg-lider').classList.toggle('active',mode==='lider'); if (!STATE.mapDep) renderMap(); }
+
+// ════════════════════ BOLETINES + EVOLUCIÓN ════════════════════
+function loadBoletines(){ try{ STATE.boletines=JSON.parse(localStorage.getItem(BOL_KEY)||'[]'); }catch(_){ STATE.boletines=[]; } }
+function saveBoletines(){ try{ localStorage.setItem(BOL_KEY, JSON.stringify(STATE.boletines.slice(-500))); }catch(_){} }
+function resetBoletines(){ STATE.boletines=[]; STATE.demo=false; saveBoletines(); renderEvo(); if (STATE.lastModel) renderMetodo(STATE.lastModel); $('bol-count').textContent=''; }
+function captureBoletin(m){
+  if (!m || (m.cCount===0 && m.aCount===0)) return;
+  const last=STATE.boletines[STATE.boletines.length-1];
+  if (last && last.demo) { STATE.boletines=[]; STATE.demo=false; }   // limpia demo al llegar dato real
+  const last2=STATE.boletines[STATE.boletines.length-1];
+  if (last2 && m.tot.mesesc<=last2.mesesc) return;                    // sin avance
+  STATE.boletines.push({ ts:new Date().toISOString(), mesesc:m.tot.mesesc, escr:m.natMesFrac*100,
+    cep:m.cCount, abe:m.aCount, projCep:m.pHat, pCepWin:m.pCepWin, hard:m.hard, demo:false });
+  saveBoletines();
+}
+let evoChart=null;
+function renderEvo(){
+  const rows=STATE.boletines; $('bol-count').textContent = rows.length ? `${rows.length} boletín(es)` + (STATE.demo?' · demo':'') : 'sin boletines';
+  if (!rows.length){ if(evoChart){evoChart.destroy();evoChart=null;} return; }
+  const labels=rows.map(r=>r.escr.toFixed(0));
+  const margCount = rows.map(r=>{ const t=r.cep+r.abe; return t? (r.cep-r.abe)/t*100 : null; }); // + = Cepeda
+  const margProj  = rows.map(r=> (r.projCep-0.5)*2*100 );
+  const ink2=cssVar('--ink-2'), rule=cssVar('--rule'), cep=cssVar('--cep');
+  const zero={label:'empate',data:labels.map(()=>0),borderColor:ink2,borderDash:[5,4],pointRadius:0,borderWidth:1};
+  if (evoChart) evoChart.destroy();
+  evoChart=new Chart($('chart-evo').getContext('2d'),{ type:'line',
+    data:{ labels, datasets:[
+      { label:'Margen conteo (Cepeda−Abelardo)', data:margCount, borderColor:cep, backgroundColor:'transparent', tension:.2, pointRadius:1.5, spanGaps:true },
+      { label:'Margen proyectado', data:margProj, borderColor:cssVar('--abe'), borderDash:[5,3], backgroundColor:'transparent', tension:.2, pointRadius:0 },
+      zero ]},
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+      scales:{ x:{ title:{display:true,text:'% escrutado',color:ink2,font:{size:9}}, grid:{color:rule}, ticks:{color:ink2,font:{size:9}} },
+               y:{ grid:{color:rule}, ticks:{color:ink2,font:{size:9},callback:v=>v+'pp'} } },
+      plugins:{ legend:{labels:{color:ink2,boxWidth:9,font:{size:9}}} } } });
+}
+
+// ════════════════════ LOAD ════════════════════
+function setStatus(msg,cls){ const s=$('status'); if(!s) return; s.className=cls||''; s.textContent=msg; }
+async function load(){
+  setStatus('Consultando '+WORKER+ROUTE+' …','');
+  try{
+    const ds=await fetchAmb('00');
+    const tot=extraerTotales(ds);
+    const nac=extraerNacional(ds);
+    const deps=extraerDeptos(ds);
+    STATE.live={ tot, nac, deps, raw:ds };
+    renderAll();
+    const m=STATE.lastModel; captureBoletin(m); renderEvo();
+    const now=new Date();
+    $('boletinLabel').textContent = (ds&&ds.numact!=null)?'#'+ds.numact:'—';
+    $('lastUpdate').textContent = now.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    $('mesasLabel').textContent = fmt(tot.mesesc)+' / '+fmt(ANCLAS.nat.metota);
+    $('escrLabel').textContent = (ANCLAS.nat.metota?(tot.mesesc/ANCLAS.nat.metota*100).toFixed(1):'0')+'%';
+    $('fuenteLabel').textContent = 'Registraduría v2';
+    if (tot.mesesc===0) setStatus('Feed activo · aún sin mesas escrutadas (numact '+(ds.numact||0)+'). El modelo muestra el punto de partida por geografía 1V.','ok');
+    else setStatus(`OK · ${fmt(tot.mesesc)} mesas (${(tot.mesesc/ANCLAS.nat.metota*100).toFixed(1)}%) · ${now.toLocaleTimeString('es-CO')}`,'ok');
+  } catch(e){
+    if (e.status===404) setStatus('El worker no tiene la ruta /presidente2v (404). Verifica el deploy de registraduria-proxy.','err');
+    else if (e.status===403) setStatus('403 · La Registraduría aún bloquea el endpoint v2 (el conteo no abrió o el WAF). Reintenta.','err');
+    else setStatus('Error: '+(e.message||e),'err');
+  }
+}
+function toggleAuto(on){
+  if (STATE.autoTimer){ clearInterval(STATE.autoTimer); STATE.autoTimer=null; }
+  if (on){ STATE.autoTimer=setInterval(load, RECARGA_MS); load(); }
+}
+
+// ════════════════════ DEMO (simula la noche con sesgo de orden de reporte) ════════════════════
+// Demuestra el punto: los bastiones de Cepeda (Nariño/Cauca/Chocó/Caribe) reportan
+// primero → el conteo bruto lo da arriba, pero el modelo PROYECTA a Abelardo porque
+// Antioquia/Santander/N.Santander (sus bastiones) están casi sin escrutar.
+function runDemo(){
+  resetBoletines();
+  STATE.demo=true;
+  const order = Object.keys(ANCLAS.dep).slice().sort((a,b)=> ANCLAS.dep[b].prior - ANCLAS.dep[a].prior); // pro-Cepeda primero
+  const steps = [4,9,16,26,38,52,66,79,89,96,100];
+  steps.forEach((pe,si)=>{
+    const deps={}; let mesescNat=0, votantNat=0;
+    Object.keys(ANCLAS.dep).forEach((cod)=>{
+      const an=ANCLAS.dep[cod];
+      const rank=order.indexOf(cod)/order.length;        // 0 = reporta primero (pro-Cepeda)
+      // fracción escrutada del depto en este paso: los pro-Cepeda van adelantados
+      let f = clamp((pe/100)*1.7 - rank*0.9, 0, 1);
+      if (si===steps.length-1) f=1;
+      const turn=0.57, valid=0.965;
+      const Vtot = an.censo*turn*valid;
+      const votcan = Math.round(Vtot*f);
+      // split real 2V ≈ prior + ruido suave
+      const truth = clamp(an.prior + Math.sin(cod*13.1)*0.015, 0.02, 0.98);
+      const cep=Math.round(votcan*truth), abe=votcan-cep;
+      deps[cod]={ cep, abe, votcan, mesesc:Math.round(an.metota*f), votant:Math.round(votcan/valid), winCp: cep>=abe?CEP:ABE };
+      mesescNat+=Math.round(an.metota*f); votantNat+=Math.round(votcan/valid);
+    });
+    const nac={ '2':0,'3':0 }; Object.values(deps).forEach(d=>{ nac['2']+=d.cep; nac['3']+=d.abe; });
+    const tot={ metota:ANCLAS.nat.metota, mesesc:mesescNat, censo:ANCLAS.nat.censo, votant:votantNat,
+                votval:nac['2']+nac['3'], votblan:Math.round(votantNat*0.02), votnul:Math.round(votantNat*0.012), votnma:0 };
+    STATE.live={ tot, nac, deps, raw:{numact:si+1} };
+    const m=computeModel(); STATE.lastModel=m;
+    STATE.boletines.push({ ts:new Date(Date.now()-(steps.length-si)*120000).toISOString(), mesesc:tot.mesesc,
+      escr:tot.mesesc/ANCLAS.nat.metota*100, cep:m.cCount, abe:m.aCount, projCep:m.pHat, pCepWin:m.pCepWin, hard:m.hard, demo:true });
+  });
+  saveBoletines();
+  renderAll(); renderEvo();
+  $('boletinLabel').textContent='demo';
+  setStatus('Demo: 11 boletines simulados con sesgo de orden de reporte (bastiones de Cepeda primero). Mira cómo el CONTEO lo da arriba al inicio pero la PROYECCIÓN ya marca a Abelardo. Borra los boletines antes del conteo real.','ok');
+}
+
+// ════════════════════ INIT ════════════════════
+(function init(){
+  Chart.defaults.color = cssVar('--ink-2');
+  Chart.defaults.font.family = "'Arima', sans-serif";
+  window.STATE = STATE; window.computeModel = computeModel; window.ANCLAS = ANCLAS;   // debugging en vivo
+  $('btn-recompute').onclick = ()=>{ if(STATE.live){ renderAll(); } renderEvo(); };
+  $('sigma').onchange = ()=>{ if(STATE.live){ renderAll(); } };
+  $('btn-reset-bol').onclick = resetBoletines;
+  $('btn-demo').onclick = runDemo;
+  initMap();
+  window.__onThemeChange = ()=>{ try{ Chart.defaults.color=cssVar('--ink-2'); if(STATE.live) renderMap(); renderEvo(); }catch(_){} };
+  loadBoletines();
+  if (STATE.boletines.length){ STATE.demo=STATE.boletines.some(b=>b.demo); }
+  // render inicial con el prior (sin datos) para que la página no quede vacía
+  STATE.live = { tot:{ metota:ANCLAS.nat.metota, mesesc:0, censo:ANCLAS.nat.censo, votant:0, votval:0, votblan:0, votnul:0, votnma:0 }, nac:{'2':0,'3':0}, deps:{}, raw:{} };
+  renderAll(); renderEvo();
+  toggleAuto(true);   // auto-refresh ON · primera carga inmediata + cada 60 s
+
+  const cur=$('cursor'), ring=$('cursorRing'); let mx=0,my=0,rx=0,ry=0;
+  document.addEventListener('mousemove',e=>{ mx=e.clientX; my=e.clientY; cur.style.left=mx+'px'; cur.style.top=my+'px'; });
+  (function anim(){ rx+=(mx-rx)*.12; ry+=(my-ry)*.12; ring.style.left=rx+'px'; ring.style.top=ry+'px'; requestAnimationFrame(anim); })();
+  document.addEventListener('mouseover',e=>{ if(e.target.closest('a,button,select,input,summary,tr')){ cur.style.transform='translate(-50%,-50%) scale(2.5)'; cur.style.background='transparent'; cur.style.border='1.5px solid var(--accent)'; ring.style.opacity='0'; } });
+  document.addEventListener('mouseout',e=>{ if(e.target.closest('a,button,select,input,summary,tr')){ cur.style.transform='translate(-50%,-50%) scale(1)'; cur.style.background='var(--accent)'; cur.style.border='none'; ring.style.opacity='.4'; } });
+})();
+</script>
+<script src="theme.js"></script>
+</body>
+</html>
