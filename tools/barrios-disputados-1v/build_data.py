@@ -18,9 +18,22 @@ Trasvase = modelo de ponderador-2v.html (matriz AtlasIntel 1V->2V):
 Mismo motor de cruce que tools/pacto-1v-2026/build_maps.py (sjoin_nearest).
 Salida: Bases de datos/output_barrios_veleta/{slug}.json + index.json
 """
-import json, os, sys
+import json, os, sys, unicodedata
 import geopandas as gpd
 from shapely.geometry import Point, mapping
+
+def _norm(s):
+    return ''.join(c for c in unicodedata.normalize('NFD', str(s).upper()) if unicodedata.category(c) != 'Mn').strip()
+
+# Polígonos no residenciales (parques, clubes) que NO deben colorearse — quedan grises (f=2).
+EXCLUDE = {
+    'bogota': {'COUNTRY CLUB','SIMON BOLIVAR'},  # + cualquier "PARQUE *" (regla abajo)
+}
+def is_excl(slug, nb):
+    n = _norm(nb)
+    if n in EXCLUDE.get(slug, set()): return True
+    if slug == 'bogota' and n.startswith('PARQUE '): return True
+    return False
 
 ROOT = '/Users/ricardoruiz/ricardoruiz.co'
 GEO  = f'{ROOT}/Bases de datos/output_pacto_1v_2026/geo'
@@ -28,7 +41,7 @@ MASTER = f'{ROOT}/Bases de datos/output_pacto_1v_2026/master_2026_puesto.json'
 OUT  = f'{ROOT}/Bases de datos/output_barrios_veleta'
 os.makedirs(OUT, exist_ok=True)
 
-VERSION = '2026-06-20-2v'
+VERSION = '2026-06-20-3v'
 CAND = ['cepeda','abelardo','paloma','fajardo','botero','lizcano','miguel_uribe',
         'macollins','roy','murillo','caicedo','matamoros','claudia']
 OTR  = ['botero','lizcano','miguel_uribe','macollins','roy','murillo','caicedo','matamoros']
@@ -105,36 +118,47 @@ for name, region, slug, code, gj, nf, bbox, rotate in CITIES:
     bar = gpd.read_file(f'{GEO}/{gj}')[[nf,'geometry']].to_crs('EPSG:4326').rename(columns={nf:'NB'})
     bar['NB'] = bar['NB'].fillna('').astype(str).str.strip()
     bar = bar[bar['NB'] != ''].reset_index(drop=True)
+    bar['excl'] = bar['NB'].map(lambda n: is_excl(slug, n))
     pts = city_puestos(dep, mun, bbox)
-    j = gpd.sjoin_nearest(pts, bar[['NB','geometry']], how='left')
-    j = j[~j.index.duplicated(keep='first')]
-    agg = j.groupby('NB')[SUMCOLS].sum().reset_index()
-    agg = agg[agg['base'] > 0]
+    # asignación POR POLÍGONO (no por nombre): cada puesto al polígono no-excluido más cercano
+    tgt = bar[~bar['excl']]
+    j = gpd.sjoin_nearest(pts, tgt[['geometry']], how='left')
+    j = j[~j.index.duplicated(keep='first')].dropna(subset=['index_right'])
+    j['index_right'] = j['index_right'].astype(int)
+    agg = j.groupby('index_right')[SUMCOLS].sum()
     res = {}
-    for _, r in agg.iterrows():
+    for idx, r in agg.iterrows():
+        if r['base'] <= 0: continue
         C, A = project(r['cep'],r['abe'],r['pal'],r['faj'],r['cla'],r['otr'],r['bln'],r['urna'],r['pot'])
-        res[r['NB']] = (int(r['cep']), int(r['abe']), int(r['base']), round(C), round(A))
-
+        res[idx] = (int(r['cep']), int(r['abe']), int(r['base']), round(C), round(A))
+    # representante por nombre = polígono directo con más votos (para contar barrios sin duplicar)
+    byname = {}
+    for idx,(c,a,b,C,A) in res.items(): byname.setdefault(bar.at[idx,'NB'], []).append((b, idx))
+    repset = {max(lst, key=lambda t: t[0])[1] for lst in byname.values()}
+    # huérfanos (no excluidos, sin dato) heredan el polígono directo más cercano
     bar['rep'] = bar.geometry.representative_point()
-    have = bar[bar['NB'].isin(res)]; miss = bar[~bar['NB'].isin(res)]
+    have_idx = list(res.keys())
+    miss = bar[(~bar['excl']) & (~bar.index.isin(res))]
     fill = {}
-    if len(miss) and len(have):
-        hg = gpd.GeoDataFrame({'NB': have['NB'].values}, geometry=have['rep'].values, crs=bar.crs)
+    if len(miss) and have_idx:
+        hg = gpd.GeoDataFrame({'hi': have_idx}, geometry=bar.loc[have_idx,'rep'].values, crs=bar.crs)
         mg = gpd.GeoDataFrame({'_i': list(miss.index)}, geometry=miss['rep'].values, crs=bar.crs)
         jn = gpd.sjoin_nearest(mg, hg, how='left'); jn = jn[~jn['_i'].duplicated(keep='first')]
-        for _, r in jn.iterrows(): fill[r['_i']] = res.get(r['NB'])
+        for _, r in jn.iterrows(): fill[int(r['_i'])] = res[int(r['hi'])]
 
-    feats = []; seen = set(); v1 = v2 = c1 = c2 = a1 = a2 = 0
+    feats = []; v1=v2=c1=c2=a1=a2=0
     for idx, row in bar.iterrows():
         nb = row['NB']
-        if nb in res:        c,a,b,C,A = res[nb]; f = 0
-        elif fill.get(idx):  c,a,b,C,A = fill[idx]; f = 1
+        if row['excl']:
+            feats.append({'type':'Feature','properties':{'nb':nb,'c':0,'a':0,'b':0,'C':0,'A':0,'f':2,'r':0},
+                          'geometry': round_geom(row.geometry.simplify(SIMP, preserve_topology=True))}); continue
+        if idx in res:        c,a,b,C,A = res[idx]; f = 0; rp = 1 if idx in repset else 0
+        elif idx in fill:     c,a,b,C,A = fill[idx]; f = 1; rp = 0
         else: continue
         feats.append({'type':'Feature',
-                      'properties':{'nb':nb,'c':c,'a':a,'b':b,'C':C,'A':A,'f':f},
+                      'properties':{'nb':nb,'c':c,'a':a,'b':b,'C':C,'A':A,'f':f,'r':rp},
                       'geometry': round_geom(row.geometry.simplify(SIMP, preserve_topology=True))})
-        if f == 0 and b > 0 and nb not in seen:
-            seen.add(nb)
+        if f == 0 and rp == 1 and b > 0:   # cuenta barrios por representante (sin duplicar nombres)
             m1 = (c - a) / b * 100
             tot = C + A; m2 = (C - A) / tot * 100 if tot else 0
             if abs(m1) <= 3: v1 += 1
@@ -143,12 +167,13 @@ for name, region, slug, code, gj, nf, bbox, rotate in CITIES:
             if abs(m2) <= 3: v2 += 1
             elif m2 > 0: c2 += 1
             else: a2 += 1
+    ndir = v1 + c1 + a1
     json.dump({'type':'FeatureCollection','features':feats}, open(f'{OUT}/{slug}.json','w'),
               ensure_ascii=False, separators=(',',':'))
     kb = os.path.getsize(f'{OUT}/{slug}.json')//1024
     index.append({'slug':slug,'name':name,'region':region,'rotate':rotate,
-                  'nDirect':len(seen),'file':f'{slug}.json'})
-    print(f'{name:<13} dir {len(seen):>4} · 1V[vel{v1:>3} C{c1:>3} A{a1:>3}] · '
+                  'nDirect':ndir,'file':f'{slug}.json'})
+    print(f'{name:<13} dir {ndir:>4} · 1V[vel{v1:>3} C{c1:>3} A{a1:>3}] · '
           f'2V[vel{v2:>3} C{c2:>3} A{a2:>3}] · {kb} KB')
 
 json.dump({'cities':index,'version':VERSION,'cands':['Cepeda','Abelardo'],

@@ -165,10 +165,11 @@ h1 .vel{color:var(--veleta)}
     <span><i style="background:var(--veleta)"></i>Veleta (margen estrecho)</span>
     <span>Cepeda<span style="display:inline-flex;gap:2px;margin-left:6px"><i style="background:#f2a59d"></i><i style="background:#e2685c"></i><i style="background:#cf4135"></i><i style="background:#9c1e15"></i></span></span>
     <span>Abelardo<span style="display:inline-flex;gap:2px;margin-left:6px"><i style="background:#9db4f5"></i><i style="background:#5b82ef"></i><i style="background:#3a5bd0"></i><i style="background:#1f2a8c"></i></span></span>
-    <span style="color:var(--ink-3)">claro → oscuro = margen mayor · tenue = sin puesto (vecino)</span>
+    <span><i style="background:#8d8676"></i>parque / no residencial</span>
+    <span style="color:var(--ink-3)">claro → oscuro = margen mayor · sin puesto = color del vecino</span>
   </div>
   <div class="mapwrap"><div id="map"></div><aside class="side" id="side"></aside></div>
-  <div class="maptip">El mapa está fijo: el panel de la derecha muestra el detalle del barrio al pasar el cursor (o tocarlo) y la foto general de la ciudad al salir. Los barrios sin puesto propio van tenues (heredan al vecino) y no cuentan en el marcador.</div>
+  <div class="maptip">El mapa está fijo: el panel de la derecha muestra el detalle del barrio al pasar el cursor (o tocarlo) y la foto general de la ciudad al salir. Los barrios sin puesto propio toman el color del vecino más cercano (no cuentan en el marcador); los parques y zonas sin habitantes quedan en gris.</div>
 
   <div class="section-head"><h2 id="veleta-title">Barrios veleta</h2><span class="meta" id="veleta-meta"></span></div>
   <ul id="veleta-list"></ul>
@@ -182,7 +183,7 @@ h1 .vel{color:var(--veleta)}
 </main>
 <script>
 const DATA_BASE='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/barrios-veleta/';
-const CB='2026-06-20-2v';                       // cache-buster; subir con build_data.py + aws s3 cp
+const CB='2026-06-20-3v';                       // cache-buster; subir con build_data.py + aws s3 cp
 const CEP=['#f2a59d','#e2685c','#cf4135','#9c1e15'];
 const ABE=['#9db4f5','#5b82ef','#3a5bd0','#1f2a8c'];
 const GOLD='#f4c430';
@@ -203,10 +204,12 @@ function margin(p){
  if(STATE.view==='1v') return p.b>0?(p.c-p.a)/p.b*100:0;
  const t=p.C+p.A; return t>0?(p.C-p.A)/t*100*(1-BLANK2V):0;
 }
-function styleFor(p){const m=margin(p),am=Math.abs(m);
- if(p.f===0&&am<=STATE.thr)return{fillColor:GOLD,fillOpacity:.95,color:BORDER,weight:.5};
+function styleFor(p){
+ if(p.f===2)return{fillColor:'#8d8676',fillOpacity:.30,color:BORDER,weight:.4};  // parque / no residencial
+ const m=margin(p),am=Math.abs(m);
+ if(am<=STATE.thr)return{fillColor:GOLD,fillOpacity:.95,color:BORDER,weight:.5};  // veleta (directo o heredado)
  const ramp=m>=0?CEP:ABE;const i=am<7?0:am<15?1:am<30?2:3;
- return{fillColor:ramp[i],fillOpacity:p.f?.5:.92,color:BORDER,weight:.5};}
+ return{fillColor:ramp[i],fillOpacity:.92,color:BORDER,weight:.5};}  // heredado = mismo color pleno del vecino
 
 function bar3(cepP,abeP){const rest=Math.max(0,100-cepP-abeP);
  return `<div class="bar"><div class="bc" style="width:${cepP}%"></div><div class="ba" style="width:${abeP}%"></div><div style="width:${rest}%;background:var(--rule-strong)"></div></div>`;}
@@ -214,6 +217,8 @@ const pc=n=>n.toFixed(1);
 
 // panel: detalle del barrio bajo el cursor
 function showBarrio(p){const el=document.getElementById('side');if(!el)return;
+ if(p.f===2){el.innerHTML=`<div class="eyebrow">Zona no residencial</div><div class="sname">${p.nb}</div>
+   <div class="meta">Parque o área sin habitantes — no se colorea ni cuenta.</div>`;return;}
  const cep1=p.b?100*p.c/p.b:0,abe1=p.b?100*p.a/p.b:0;
  const t=p.C+p.A,cep2=t?100*p.C/t*(1-BLANK2V):0,abe2=t?100*p.A/t*(1-BLANK2V):0;
  const m2=cep2-abe2,am2=Math.abs(m2),lead2=m2>=0?'Cepeda':'Abelardo';
@@ -233,8 +238,8 @@ function showBarrio(p){const el=document.getElementById('side');if(!el)return;
 
 // panel por defecto: la foto general de la ciudad
 function showCity(){const el=document.getElementById('side');if(!el||!STATE.geo)return;
- let c=0,a=0,b=0,C=0,A=0,vel=0,cep=0,abe=0;const seen={};
- STATE.geo.features.forEach(f=>{const p=f.properties;if(p.f!==0||p.b<=0||seen[p.nb])return;seen[p.nb]=1;
+ let c=0,a=0,b=0,C=0,A=0,vel=0,cep=0,abe=0;
+ STATE.geo.features.forEach(f=>{const p=f.properties;if(p.f!==0||p.r!==1||p.b<=0)return;
   c+=p.c;a+=p.a;b+=p.b;C+=p.C;A+=p.A;const m=margin(p);
   if(Math.abs(m)<=STATE.thr)vel++;else if(m>0)cep++;else abe++;});
  const cep1=b?100*c/b:0,abe1=b?100*a/b:0,t=C+A,cep2=t?100*C/t*(1-BLANK2V):0,abe2=t?100*A/t*(1-BLANK2V):0;
@@ -249,8 +254,8 @@ function showCity(){const el=document.getElementById('side');if(!el||!STATE.geo)
 
 function recolor(){if(STATE.layer)STATE.layer.eachLayer(l=>l.setStyle(styleFor(l.feature.properties)));}
 
-function updateCounts(){let vel=0,cep=0,abe=0;const seen={},items=[];
- (STATE.geo?.features||[]).forEach(f=>{const p=f.properties;if(p.f!==0||p.b<=0||seen[p.nb])return;seen[p.nb]=1;
+function updateCounts(){let vel=0,cep=0,abe=0;const items=[];
+ (STATE.geo?.features||[]).forEach(f=>{const p=f.properties;if(p.f!==0||p.r!==1||p.b<=0)return;
   const m=margin(p);if(Math.abs(m)<=STATE.thr){vel++;items.push({nb:p.nb,m});}else if(m>0)cep++;else abe++;});
  c('c-vel',vel);c('c-cep',cep);c('c-abe',abe);c('c-tot',vel+cep+abe);
  items.sort((a,b)=>Math.abs(a.m)-Math.abs(b.m));
