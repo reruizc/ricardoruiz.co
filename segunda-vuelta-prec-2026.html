@@ -168,6 +168,15 @@
   .netnum.cep{color:var(--cep);font-weight:600;}.netnum.abe{color:var(--abe);font-weight:600;}
   .falta-bar{height:5px;border-radius:999px;background:var(--paper-3);overflow:hidden;width:60px;display:inline-block;vertical-align:middle;}
   .falta-bar i{display:block;height:100%;}
+  /* señal de sorpresa vs huella 1V */
+  .surp{display:inline-block;font-size:9px;padding:.08rem .42rem;border-radius:999px;font-weight:700;margin-left:.4rem;letter-spacing:.02em;white-space:nowrap;vertical-align:middle;cursor:help;}
+  .surp-flip-cep{background:var(--cep);color:#fff;box-shadow:0 0 0 1.5px var(--paper-2),0 0 0 3px var(--cep);}
+  .surp-flip-abe{background:var(--abe);color:#fff;box-shadow:0 0 0 1.5px var(--paper-2),0 0 0 3px var(--abe);}
+  .surp-move{font-size:9.5px;font-weight:700;margin-left:.4rem;white-space:nowrap;vertical-align:middle;cursor:help;}
+  .surp-move.cep{color:var(--cep);}.surp-move.abe{color:var(--abe);}
+  tr.flip-row td{background:var(--accent-soft);}
+  .surp-legend{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);margin-top:.55rem;line-height:1.6;}
+  .surp-legend b{color:var(--accent);}
   .falta-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:.9rem;margin-bottom:1rem;}
   @media(max-width:640px){.falta-sum{grid-template-columns:1fr;}}
   .fsum{background:var(--paper-3);border:1px solid var(--rule);border-radius:10px;padding:.75rem .9rem;}
@@ -592,12 +601,39 @@ function leanPill(q){
   if (q<=0.45) return '<span class="lean-pill lean-abe">→ Abelardo</span>';
   return '<span class="lean-pill lean-par">parejo</span>';
 }
+// Sorpresa vs huella 1V: compara el voto 2V EN VIVO del depto (sLive) con lo que
+// esperaba el trasvase 1V (prior). Solo cuando hay conteo suficiente para juzgar.
+//   'flip' = se inclina al lado CONTRARIO de lo esperado (lo que pidió Ricardo).
+//   'move' = mismo lado pero se corrió ≥8 pp respecto a lo esperado.
+function surpriseOf(r){
+  if (r.f < 0.10 || r.votcan < 1500) return null;       // poco conteo → aún no se puede decir
+  const dev = r.sLive - r.prior;                         // + = mejor para Cepeda de lo esperado
+  const expSide = r.prior >= 0.5 ? 'cep' : 'abe';
+  const liveSide = r.sLive >= 0.5 ? 'cep' : 'abe';
+  const flip = (expSide !== liveSide) && Math.abs(r.prior-0.5) >= 0.04 && Math.abs(r.sLive-0.5) >= 0.04;
+  if (flip) return { type:'flip', to:liveSide, dev };
+  if (Math.abs(dev*100) >= 8) return { type:'move', to: dev>0?'cep':'abe', dev };
+  return null;
+}
+function surpriseTag(r){
+  const s = surpriseOf(r); if (!s) return '';
+  const expPct=(r.prior*100).toFixed(0), livePct=(r.sLive*100).toFixed(0), devpp=(s.dev*100);
+  const sgn = (devpp>=0?'+':'')+devpp.toFixed(0);
+  if (s.type==='flip'){
+    const title = `Por su huella 1V se esperaba pro-${candName(r.prior>=0.5?'cep':'abe')} (~${expPct}% Cepeda); el conteo 2V va ${livePct}% → se vuelca a ${candName(s.to)} (${sgn} pp vs lo esperado)`;
+    return `<span class="surp surp-flip-${s.to}" title="${title}">⇄ vira a ${candName(s.to)}</span>`;
+  }
+  const arrow = s.dev>0 ? '▲' : '▼';
+  const title = `Huella 1V esperaba ~${expPct}% Cepeda; el conteo 2V va ${livePct}% (${sgn} pp, se corre hacia ${candName(s.to)})`;
+  return `<span class="surp-move ${s.to}" title="${title}">${arrow} ${sgn}pp</span>`;
+}
 function faltaRowHTML(r){
   const escr=(r.f*100), col=r.q>=0.5?cssVar('--cep'):cssVar('--abe');
   const barW=Math.min(100, r.R/STATE._maxR*100)||0;
   const net=Math.abs(r.netCep), netK=r.netCep>=0?'cep':'abe';
-  return `<tr data-cod="${r.cod}">
-    <td>${r.name}</td>
+  const surp=surpriseOf(r), flipCls=(surp&&surp.type==='flip')?' flip-row':'';
+  return `<tr data-cod="${r.cod}" class="${flipCls.trim()}">
+    <td>${r.name}${surpriseTag(r)}</td>
     <td>${escr.toFixed(0)}%</td>
     <td>${fmt(r.R)}<span class="falta-bar" style="margin-left:.4rem"><i style="width:${barW.toFixed(0)}%;background:${col}"></i></span></td>
     <td>${(r.q*100).toFixed(0)}% ${leanPill(r.q)}</td>
@@ -618,7 +654,11 @@ function renderFalta(m){
     { k:'Neto pendiente Cepeda', v:'+'+fmtk(netCepTot), c:'var(--cep)' },
     { k:'Neto pendiente Abelardo', v:'+'+fmtk(netAbeTot), c:'var(--abe)' },
   ].map(s=>`<div class="fsum"><div class="k">${s.k}</div><div class="v" style="color:${s.c}">${s.v}</div></div>`).join('');
-  sub.innerHTML = `el voto que falta favorece neto a <b style="color:var(--${faltaWinner})">${candName(faltaWinner)}</b> por ~${fmt(netDiff)} votos`;
+  const flips = rows.filter(r=>{ const s=surpriseOf(r); return s && s.type==='flip'; });
+  const flipNote = flips.length
+    ? ` · <b style="color:var(--accent)">⇄ ${flips.length===1?'1 depto vira':flips.length+' deptos viran'} vs 1V: ${flips.map(f=>f.name).join(', ')}</b>`
+    : '';
+  sub.innerHTML = `el voto que falta favorece neto a <b style="color:var(--${faltaWinner})">${candName(faltaWinner)}</b> por ~${fmt(netDiff)} votos${flipNote}`;
   // orden
   const sortFns = {
     R:  (a,b)=>b.R-a.R,
@@ -633,7 +673,11 @@ function renderFalta(m){
     <th>Inclinación</th>
     <th class="sortable" onclick="setFaltaSort('net')">Neto pendiente ${STATE.faltaSort==='net'?'▾':''}</th>
   </tr></thead><tbody>`;
-  box.innerHTML = head + rows.slice(0,12).map(faltaRowHTML).join('') + '</tbody></table>';
+  const top = rows.slice(0,12);
+  const extraFlips = flips.filter(r=>!top.includes(r));   // un vuelco en depto chico (poco voto que falta) igual se muestra
+  const visible = top.concat(extraFlips);
+  const legend = `<div class="surp-legend"><b>⇄ vira</b> = el conteo 2V se inclina al lado contrario a lo esperado por su huella de 1ª vuelta · <b>▲/▼ pp</b> = se corre respecto a lo esperado (mismo lado) · fila resaltada = vuelco. Señal solo con ≥10% del depto escrutado.</div>`;
+  box.innerHTML = head + visible.map(faltaRowHTML).join('') + '</tbody></table>' + legend;
   $('falta-all-wrap').style.display='';
   $('falta-all-sum').textContent = `Ver los ${rows.length} territorios`;
   $('falta-all').innerHTML = head + rows.map(faltaRowHTML).join('') + '</tbody></table>';

@@ -920,8 +920,14 @@ a cara del conteo · KPIs · "la cuenta de la remontada" (2 cotas + prob) · map
 · click depto→municipios) · **tabla "Dónde está el voto que falta y a quién favorece"**
 (por depto: %escr, voto que falta, inclinación, **neto pendiente** por candidato,
 ordenable) · evolución del margen conteo vs proyectado por boletín. Auto-refresh 60s.
-`window.STATE`/`computeModel`/`ANCLAS` expuestos para debug. Demo "▶ Simular noche"
-con sesgo de orden de reporte (bastiones Cepeda primero) demuestra el punto.
+`window.STATE`/`computeModel`/`ANCLAS` expuestos para debug. (Los controles de
+operador — recalcular/borrar/demo — se quitaron de la UI; `runDemo`/`resetBoletines`
+quedan latentes en el código.)
+- **Señal de sorpresa vs huella 1V** (`surpriseOf`/`surpriseTag`): en la tabla, cada
+  depto compara su voto 2V EN VIVO (`sLive`) con lo esperado por el trasvase 1V (`prior`).
+  `flip` = se inclina al lado CONTRARIO (badge "⇄ vira a X" + fila resaltada + nombre
+  en el subtítulo, garantizado visible aunque sea depto chico); `move` = mismo lado
+  pero ≥8 pp de corrimiento (▲/▼). Gate de fiabilidad: f_d≥0.10 y votcan≥1500.
 
 ## Mapas por barrio 1V 2026 — `bogota-1v-barrios.html` + `medellin-1v-barrios.html`
 
