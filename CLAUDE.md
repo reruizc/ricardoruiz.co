@@ -918,8 +918,11 @@ Veredicto (proyección + tier Definido/Encaminado/Inclinado/En disputa) · barra
 a cara del conteo · KPIs · "la cuenta de la remontada" (2 cotas + prob) · mapa
 ("voto que falta": color=inclinación, intensidad=cuánto falta · toggle "líder ahora"
 · click depto→municipios) · **tabla "Dónde está el voto que falta y a quién favorece"**
-(por depto: %escr, voto que falta, inclinación, **neto pendiente** por candidato,
-ordenable) · evolución del margen conteo vs proyectado por boletín. Auto-refresh 60s.
+(por depto: **va ganando = margen REAL del depto** [resuelve confusión: "neto pendiente"
+es solo del voto sin escrutar, ≠ resultado del depto], %escr, voto que falta, inclinación
++ neto pendiente "de lo que falta", ordenable) · evolución del margen conteo vs proyectado
+por boletín · **gráfico de la diferencia (Abelardo−Cepeda) en votos por boletín** (sube/baja
+= se amplía/recorta, con stat creció↑/se redujo↓). Auto-refresh 60s.
 `window.STATE`/`computeModel`/`ANCLAS` expuestos para debug. (Los controles de
 operador — recalcular/borrar/demo — se quitaron de la UI; `runDemo`/`resetBoletines`
 quedan latentes en el código.)

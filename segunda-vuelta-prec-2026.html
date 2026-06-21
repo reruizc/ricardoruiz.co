@@ -313,6 +313,13 @@
       <details class="raw" id="falta-all-wrap" style="display:none"><summary id="falta-all-sum">Ver los 33 departamentos + exterior</summary><div class="raw-in" id="falta-all"></div></details>
     </div>
 
+    <div class="card" id="diff-card">
+      <div class="card-label">Cómo evoluciona la diferencia entre los dos · por boletín</div>
+      <div class="mini-note" id="diff-stat" style="margin-bottom:.8rem">Aún sin boletines.</div>
+      <div style="height:300px;position:relative"><canvas id="chart-diff"></canvas></div>
+      <div class="mini-note" style="margin-top:.6rem">Diferencia en votos del conteo (Abelardo − Cepeda). Por encima del cero gana <b style="color:var(--abe)">Abelardo</b>, por debajo <b style="color:var(--cep)">Cepeda</b>. La línea <b style="color:var(--ink-2)">sube</b> cuando se amplía la ventaja de Abelardo y <b style="color:var(--ink-2)">baja</b> cuando Cepeda recorta; cruza el cero si cambia el líder.</div>
+    </div>
+
     <div id="status"></div>
 
   </main>
@@ -632,8 +639,11 @@ function faltaRowHTML(r){
   const barW=Math.min(100, r.R/STATE._maxR*100)||0;
   const net=Math.abs(r.netCep), netK=r.netCep>=0?'cep':'abe';
   const surp=surpriseOf(r), flipCls=(surp&&surp.type==='flip')?' flip-row':'';
+  const counted=r.cep+r.abe, leadK=r.cep>=r.abe?'cep':'abe', leadMrg=Math.abs(r.cep-r.abe);
+  const leadCell = counted>0 ? `<span class="netnum ${leadK}">${leadK==='cep'?'Cepeda':'Abelardo'} +${fmt(leadMrg)}</span>` : '<span style="color:var(--ink-3)">—</span>';
   return `<tr data-cod="${r.cod}" class="${flipCls.trim()}">
     <td>${r.name}${surpriseTag(r)}</td>
+    <td>${leadCell}</td>
     <td>${escr.toFixed(0)}%</td>
     <td>${fmt(r.R)}<span class="falta-bar" style="margin-left:.4rem"><i style="width:${barW.toFixed(0)}%;background:${col}"></i></span></td>
     <td>${(r.q*100).toFixed(0)}% ${leanPill(r.q)}</td>
@@ -664,14 +674,16 @@ function renderFalta(m){
     R:  (a,b)=>b.R-a.R,
     net:(a,b)=>Math.abs(b.netCep)-Math.abs(a.netCep),
     escr:(a,b)=>a.f-b.f,
+    lead:(a,b)=>Math.abs(b.cep-b.abe)-Math.abs(a.cep-a.abe),
   };
   rows.sort(sortFns[STATE.faltaSort]||sortFns.R);
   const head = `<table class="falta"><thead><tr>
     <th>Departamento</th>
+    <th class="sortable" onclick="setFaltaSort('lead')">Va ganando (margen) ${STATE.faltaSort==='lead'?'▾':''}</th>
     <th class="sortable" onclick="setFaltaSort('escr')">% escr ${STATE.faltaSort==='escr'?'▾':''}</th>
     <th class="sortable" onclick="setFaltaSort('R')">Voto que falta ${STATE.faltaSort==='R'?'▾':''}</th>
-    <th>Inclinación</th>
-    <th class="sortable" onclick="setFaltaSort('net')">Neto pendiente ${STATE.faltaSort==='net'?'▾':''}</th>
+    <th>Inclinación<br><span style="font-size:8.5px;opacity:.7">de lo que falta</span></th>
+    <th class="sortable" onclick="setFaltaSort('net')">Neto pendiente<br><span style="font-size:8.5px;opacity:.7">de lo que falta</span> ${STATE.faltaSort==='net'?'▾':''}</th>
   </tr></thead><tbody>`;
   const top = rows.slice(0,12);
   const extraFlips = flips.filter(r=>!top.includes(r));   // un vuelco en depto chico (poco voto que falta) igual se muestra
@@ -826,6 +838,7 @@ function captureBoletin(m){
 }
 let evoChart=null;
 function renderEvo(){
+  renderDiffChart();   // gráfico de la diferencia (al final) · siempre, maneja el caso vacío
   const rows=STATE.boletines; $('bol-count').textContent = rows.length ? `${rows.length} boletín(es)` + (STATE.demo?' · demo':'') : 'sin boletines';
   if (!rows.length){ if(evoChart){evoChart.destroy();evoChart=null;} return; }
   const labels=rows.map(r=>r.escr.toFixed(0));
@@ -843,6 +856,38 @@ function renderEvo(){
       scales:{ x:{ title:{display:true,text:'% escrutado',color:ink2,font:{size:9}}, grid:{color:rule}, ticks:{color:ink2,font:{size:9}} },
                y:{ grid:{color:rule}, ticks:{color:ink2,font:{size:9},callback:v=>v+'pp'} } },
       plugins:{ legend:{labels:{color:ink2,boxWidth:9,font:{size:9}}} } } });
+}
+
+// Gráfico de la DIFERENCIA en votos (Abelardo − Cepeda) por boletín · aumento/disminución.
+let diffChart=null;
+function renderDiffChart(){
+  const rows=STATE.boletines, stat=$('diff-stat'), cv=$('chart-diff'); if (!cv) return;
+  if (!rows.length){ if(diffChart){diffChart.destroy();diffChart=null;} if(stat) stat.textContent='Aún sin boletines.'; return; }
+  const labels=rows.map(r=>r.escr.toFixed(0));
+  const diff=rows.map(r=> r.abe - r.cep);                 // + = Abelardo arriba
+  const ink2=cssVar('--ink-2'), rule=cssVar('--rule'), abeC=cssVar('--abe'), cepC=cssVar('--cep');
+  const cur=diff[diff.length-1], prev=diff.length>1?diff[diff.length-2]:null;
+  const leader=cur>=0?'Abelardo':'Cepeda', lcol=cur>=0?abeC:cepC;
+  let txt=`Diferencia actual: <b style="color:${lcol}">${fmt(Math.abs(cur))}</b> votos a favor de <b style="color:${lcol}">${leader}</b>`;
+  if (prev!==null){
+    if ((cur>=0)!==(prev>=0)) txt+=' · <b style="color:var(--accent)">cambió el líder</b> en este tramo';
+    else { const dAbs=Math.abs(cur)-Math.abs(prev);
+      txt += Math.abs(dAbs)<1 ? ' · estable en el último boletín'
+           : ` · la diferencia <b style="color:${lcol}">${dAbs>0?'creció ↑':'se redujo ↓'} ${fmt(Math.abs(dAbs))}</b> en el último boletín`; }
+  }
+  if (stat) stat.innerHTML=txt;
+  if (diffChart) diffChart.destroy();
+  diffChart=new Chart(cv.getContext('2d'),{ type:'line',
+    data:{ labels, datasets:[
+      { label:'Diferencia (Abelardo − Cepeda)', data:diff, borderWidth:2.6, tension:.2, pointRadius:1.5,
+        borderColor:abeC, backgroundColor:'transparent',
+        segment:{ borderColor: ctx => (ctx.p1.parsed.y>=0 ? abeC : cepC) } },
+      { label:'empate', data:labels.map(()=>0), borderColor:ink2, borderDash:[5,4], pointRadius:0, borderWidth:1 } ]},
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+      scales:{ x:{ title:{display:true,text:'% escrutado',color:ink2,font:{size:9}}, grid:{color:rule}, ticks:{color:ink2,font:{size:9}} },
+               y:{ grid:{color:rule}, ticks:{color:ink2,font:{size:9},callback:v=> (Math.abs(v)>=1000?(v/1000).toFixed(0)+'k':v) } } },
+      plugins:{ legend:{display:false},
+        tooltip:{ filter:it=>it.datasetIndex===0, callbacks:{ label:c=>{ const v=c.parsed.y; return `${fmt(Math.abs(v))} votos a favor de ${v>=0?'Abelardo':'Cepeda'}`; } } } } } });
 }
 
 // ════════════════════ LOAD ════════════════════
