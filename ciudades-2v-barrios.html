@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Las cuatro grandes ciudades, barrio por barrio · segunda vuelta 2026 · ricardoruiz.co</title>
+<meta name="description" content="Bogotá, Medellín, Barranquilla y Cali en la segunda vuelta presidencial 2026, barrio por barrio. Cepeda ganó tres de las cuatro grandes —y hasta amplió—, pero perdió la presidencia afuera. Datos del preconteo por mesa.">
+<meta property="og:title" content="Las cuatro grandes ciudades, barrio por barrio — segunda vuelta 2026">
+<meta property="og:description" content="Cepeda ganó Bogotá, Cali y Barranquilla; Abelardo arrasó Medellín. El mapa por barrio de las 4 grandes, con el cambio entre vueltas.">
+<meta property="og:type" content="article">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=Arima:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#070910;--panel:#0c0f18;--border:rgba(255,255,255,.09);--white:#f4f3ef;--blue:#0047FF;--muted:rgba(255,255,255,.55);--abel:#3d7dff;--cepe:#e2685c;--green:#4ade80;--orange:#fb923c}
+body{background:var(--bg);color:var(--white);font-family:Avenir,sans-serif;min-height:100vh;line-height:1.55}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+.nav{padding:.9rem 2rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:rgba(4,6,16,.6)}
+.e-btn-back{font-family:Avenir,sans-serif;font-weight:500;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--green);border:1.5px solid rgba(74,222,128,.4);padding:.3rem .8rem}
+.e-btn-back:hover{color:#060810;background:var(--green);text-decoration:none}
+.logo-link{display:flex;align-items:center;gap:.55rem;opacity:.85}.logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px}
+.logo-bar{width:5px;background:var(--blue)}.logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:1.2rem;letter-spacing:-.03em;color:var(--white)}.logo-text span{color:var(--blue)}
+.container{max-width:1180px;margin:0 auto;padding:2.3rem 2rem 4rem}
+.kicker{font-family:'Syne',sans-serif;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:var(--orange);margin-bottom:.7rem;font-weight:500}
+h1{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.8rem,4vw,3rem);letter-spacing:-.025em;line-height:1.04;margin-bottom:.7rem}
+h1 span{color:var(--abel)}
+.subhead{font-family:'Arima',sans-serif;font-size:clamp(1rem,1.6vw,1.2rem);color:var(--muted);line-height:1.5;max-width:880px;margin-bottom:1.2rem}
+.byline{font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.1em;color:rgba(255,255,255,.4);margin-bottom:1.6rem;padding-bottom:1.2rem;border-bottom:1px solid var(--border)}
+/* tabs + controls */
+.tabs{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem}
+.tab{font-family:'Syne',sans-serif;font-weight:700;font-size:.95rem;letter-spacing:-.01em;color:var(--muted);background:var(--panel);border:1px solid var(--border);padding:.5rem 1.05rem;cursor:pointer;transition:all .15s}
+.tab:hover{color:var(--white);border-color:rgba(255,255,255,.25)}
+.tab.on{color:#fff;background:rgba(0,71,255,.16);border-color:rgba(0,71,255,.55)}
+.tab small{display:block;font-family:'DM Mono',monospace;font-weight:400;font-size:.62rem;letter-spacing:.04em;color:rgba(255,255,255,.45);margin-top:.12rem}
+.tab.on small{color:rgba(255,255,255,.7)}
+.controls{display:flex;gap:1.4rem;flex-wrap:wrap;align-items:center;margin-bottom:1rem}
+.seg{display:inline-flex;border:1px solid var(--border);background:var(--panel)}
+.seg button{font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:none;border:none;padding:.45rem .85rem;cursor:pointer}
+.seg button.on{background:rgba(255,255,255,.1);color:#fff}
+.seg-label{font-family:'DM Mono',monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-right:.5rem}
+/* layout */
+.grid{display:grid;grid-template-columns:1.7fr 1fr;gap:1.4rem;align-items:start}
+@media(max-width:880px){.grid{grid-template-columns:1fr}}
+#map{width:100%;height:72vh;min-height:520px;border:1px solid var(--border);background:#0a0d18}
+.panel{background:var(--panel);border:1px solid var(--border);padding:1.3rem 1.35rem}
+.panel h3{font-family:'Syne',sans-serif;font-weight:700;font-size:1.15rem;margin-bottom:.15rem}
+.panel .ph-sub{font-family:'DM Mono',monospace;font-size:.66rem;letter-spacing:.06em;color:var(--muted);margin-bottom:1rem}
+.bars{margin:.2rem 0 1rem}
+.bar-row{display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem}
+.bar-row .nm{font-family:'Syne',sans-serif;font-weight:700;font-size:.82rem;width:74px;flex:none}
+.bar-track{flex:1;height:22px;background:rgba(255,255,255,.06);position:relative;overflow:hidden}
+.bar-fill{height:100%;display:flex;align-items:center;justify-content:flex-end;padding-right:.4rem;font-family:Avenir;font-size:.74rem;font-weight:600;color:#fff}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;margin:.3rem 0 1rem}
+.kpi{border:1px solid var(--border);padding:.6rem .7rem}
+.kpi .v{font-family:'Syne',sans-serif;font-weight:800;font-size:1.35rem;line-height:1}
+.kpi .l{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.05em;color:var(--muted);margin-top:.3rem;text-transform:uppercase}
+.takeaway{font-family:'Arima',sans-serif;font-size:.95rem;line-height:1.5;color:rgba(255,255,255,.85);border-left:3px solid var(--abel);padding:.1rem 0 .1rem .8rem;margin-bottom:1.1rem}
+.legend{font-family:Avenir,sans-serif;font-size:.78rem;color:rgba(255,255,255,.7);line-height:1.7}
+.legend .lr{display:flex;align-items:center;gap:.5rem;margin-bottom:.25rem}
+.legend i{width:13px;height:13px;display:inline-block;flex:none}
+.legend .ramp{display:inline-flex;gap:2px}
+.tops{margin-top:1rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.tops h4{font-family:'Syne',sans-serif;font-size:.8rem;margin-bottom:.4rem}
+.tops .ab h4{color:var(--abel)}.tops .ce h4{color:var(--cepe)}
+.tops ol{list-style:none}.tops li{font-family:Avenir;font-size:.78rem;padding:.24rem 0;border-bottom:1px solid rgba(255,255,255,.05);display:flex;justify-content:space-between;gap:.5rem}
+.tops li b{font-variant-numeric:tabular-nums;flex:none}
+.tops li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mapcap{font-family:Avenir,sans-serif;font-size:.78rem;color:rgba(255,255,255,.5);margin:.7rem 0 0;line-height:1.5}
+.method{margin-top:2.4rem;padding:1.2rem;background:rgba(255,255,255,.025);border:1px solid var(--border);font-size:.86rem;color:rgba(255,255,255,.72);line-height:1.6}
+.method b{color:var(--white)}.method code{font-family:'DM Mono',monospace;font-size:.8rem;background:rgba(255,255,255,.06);padding:.06rem .3rem}
+.cta{margin-top:2.2rem;padding:1.4rem;background:linear-gradient(135deg,rgba(0,71,255,.12),rgba(0,71,255,.04));border:1px solid rgba(0,71,255,.4)}
+.cta-title{font-family:'Syne',sans-serif;font-weight:700;font-size:1.05rem;color:var(--abel);margin-bottom:.5rem}.cta-body{font-size:.92rem;color:rgba(255,255,255,.85);margin-bottom:.8rem}
+.cta-btn{display:inline-block;background:var(--blue);color:#fff;font-family:Avenir,sans-serif;font-weight:600;font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;padding:.55rem 1.1rem;border:1px solid var(--blue);margin-right:.5rem;margin-bottom:.4rem}.cta-btn.alt{background:transparent;color:var(--white);border-color:rgba(255,255,255,.2)}
+.foot{margin-top:3rem;padding-top:1.5rem;border-top:1px solid var(--border);font-size:.78rem;color:rgba(255,255,255,.45);text-align:center;line-height:1.55}.foot a{color:var(--blue)}
+.leaflet-tooltip{font-family:Avenir,sans-serif!important;font-size:.82rem!important;background:rgba(6,8,16,.97)!important;border:1px solid rgba(0,71,255,.4)!important;color:#f4f3ef!important;border-radius:0!important;padding:.45rem .65rem!important;width:235px!important;white-space:normal!important}
+.leaflet-tooltip:before{display:none!important}.leaflet-tooltip b{color:#fff}
+.spin{padding:2rem;color:var(--muted);font-family:Avenir;text-align:center}
+</style></head>
+<body>
+<nav class="nav">
+<a href="noticias.html" class="e-btn-back">← Noticias</a>
+<a href="index.html" class="logo-link"><div class="logo-bars"><div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div><div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div></div><span class="logo-text">Ricardo<span>.</span>Ruiz</span></a>
+</nav>
+<main class="container">
+<div class="kicker">Segunda vuelta presidencial 2026 · 21 de junio</div>
+<h1>Las cuatro grandes ciudades, <span>barrio por barrio</span></h1>
+<p class="subhead">Bogotá, Medellín, Barranquilla y Cali llevadas al nivel más fino que existe: el barrio. Cepeda ganó tres de las cuatro —y en ellas hasta amplió su ventaja— pero la presidencia se decidió afuera. Acá está la divisoria de cada ciudad, polígono a polígono, y cómo se movió entre la primera y la segunda vuelta.</p>
+<div class="byline">Ricardo Ruiz · ricardoruiz.co · Preconteo Registraduría 1ª y 2ª vuelta por mesa · cartografía oficial de barrios</div>
+
+<div class="tabs" id="tabs"></div>
+<div class="controls">
+  <div><span class="seg-label">Vuelta</span><span class="seg" id="seg-round"><button data-r="2" class="on">2ª vuelta</button><button data-r="1">1ª vuelta</button></span></div>
+  <div><span class="seg-label">Pintar</span><span class="seg" id="seg-mode"><button data-m="win" class="on">Ganador</button><button data-m="swing">Cambio 1V→2V</button></span></div>
+</div>
+
+<div class="grid">
+  <div>
+    <div id="map"><div class="spin">Cargando cartografía…</div></div>
+    <div class="mapcap" id="mapcap"></div>
+  </div>
+  <aside class="panel" id="panel"><div class="spin">…</div></aside>
+</div>
+
+<div class="method">
+<p><b>Datos:</b> preconteo Registraduría de 1ª vuelta (31-may-2026) y 2ª vuelta (21-jun-2026), por mesa. <b>Mesa→barrio:</b> cada puesto de votación se asigna por su ubicación (lat/lon) al polígono de barrio que lo contiene (punto-en-polígono); los barrios sin puesto propio heredan la tendencia del vecino más cercano y se pintan translúcidos.</p>
+<p><b>Cartografía:</b> barrios oficiales — Bogotá catastral (IDECA, 1.001), Medellín DAP (332), Cali (339) y Barranquilla (189). Bogotá va rotada 90° (convención del proyecto). El <b>“Cambio 1V→2V”</b> es el corrimiento del margen entre vueltas: azul = se movió hacia Abelardo, rojo = hacia Cepeda.</p>
+<p><b>Límite:</b> un puesto sirve a votantes de varios barrios vecinos pero se asigna al barrio donde está físicamente. El mapa muestra dónde votó cada puesto, no el domicilio exacto del votante. Es preconteo (preliminar).</p>
+</div>
+
+<div class="cta">
+<div class="cta-title">El dato electoral hasta el barrio y la mesa</div>
+<div class="cta-body">Este cruce mesa→barrio es el mismo motor de los módulos de ricardoruiz.co. Mira el panorama nacional en <a href="segunda-vuelta-prec-2026.html" style="color:var(--abel)">el tracker de segunda vuelta</a>, o explora la primera vuelta barrio por barrio en <a href="bogota-1v-barrios.html" style="color:var(--abel)">Bogotá</a> y <a href="medellin-1v-barrios.html" style="color:var(--abel)">Medellín</a>.</div>
+<a href="noticias.html" class="cta-btn">Más análisis</a><a href="veleta.html" class="cta-btn alt">Veleta · municipios sensibles</a>
+</div>
+<div class="foot">© Ricardo Ruiz · <a href="index.html">ricardoruiz.co</a> · Mapa publicado en junio de 2026 · preconteo Registraduría 1ª y 2ª vuelta + cartografía oficial de barrios. Preliminar.</div>
+</main>
+<script>
+const DATA_URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/prec-2v/ciudades-barrios-2v.json?v=20260623';
+const ORDER=['bogota','medellin','barranquilla','cali'];
+const ABEL=['#9db4f5','#5b82ef','#3a5bd0','#1f2a8c'];      // Abelardo (azul, claro→oscuro)
+const CEPE=['#f2a59d','#e2685c','#cf4135','#9c1e15'];      // Cepeda (rojo, claro→oscuro)
+const SW_A=['#cdd9f7','#8fa9ee','#4f74e0','#1f2a8c'];      // swing hacia Abelardo
+const SW_C=['#f6c9c2','#ef9a8f','#dd5e4f','#9c1e15'];      // swing hacia Cepeda
+const NEU='#2a2f3e';
+let DATA=null, MAP=null, LAYER=null, GEOC={}, ST={city:'bogota',round:'2',mode:'win'};
+
+function fmt(n){return (n||0).toLocaleString('es-CO');}
+function twoway(c,a){const t=c+a; return t>0?Math.round(1000*Math.max(c,a)/t)/10:0;}
+function winnerName(w){return w==='A'?'Abelardo':'Cepeda';}
+function rotGeo(g){const cx=-74.08,cy=4.65;const rc=([lo,la])=>[cx-(la-cy),cy+(lo-cx)];
+ const rg=ge=>{if(!ge)return ge;if(ge.type==='Polygon')return{...ge,coordinates:ge.coordinates.map(r=>r.map(rc))};
+  if(ge.type==='MultiPolygon')return{...ge,coordinates:ge.coordinates.map(p=>p.map(r=>r.map(rc)))};return ge;};
+ return{...g,features:g.features.map(f=>({...f,geometry:rg(f.geometry)}))};}
+
+function keyOf(meta,f,i){return meta.keyfld==='__idx'?String(i):String(f.properties[meta.keyfld]);}
+
+function colorFor(d){
+ if(ST.mode==='swing'){
+   const s=d.sw||0, a=Math.abs(s); const b=a<2?0:a<5?1:a<10?2:3;
+   if(b===0) return NEU;
+   return s>=0?SW_A[b]:SW_C[b];
+ }
+ const w=d['w'+ST.round], m=Math.abs(d['m'+ST.round]);
+ const b=m<10?0:m<30?1:m<55?2:3;
+ return (w==='A'?ABEL:CEPE)[b];
+}
+
+function styleFor(d){
+ if(!d) return {fillColor:NEU,fillOpacity:.4,color:'rgba(255,255,255,.16)',weight:.5};
+ return {fillColor:colorFor(d),fillOpacity:d.f?.5:.95,color:'rgba(255,255,255,.16)',weight:.5};
+}
+
+function tipFor(d){
+ if(!d) return '<b>Sin dato</b>';
+ const c=d['c'+ST.round], a=d['a'+ST.round], w=d['w'+ST.round];
+ const t=c+a, pc=t>0?Math.round(1000*c/t)/10:0, pa=t>0?Math.round(1000*a/t)/10:0;
+ let h=`<b>${d.n}</b>`;
+ if(d.cm) h+=`<br><span style="color:rgba(255,255,255,.55)">${d.cm}</span>`;
+ h+=`<br>Ganó <b style="color:${w==='A'?'#7da2ff':'#f08a7f'}">${winnerName(w)}</b>`;
+ h+=`<br>Cepeda ${pc}% · Abelardo ${pa}%<br><span style="color:rgba(255,255,255,.5)">${fmt(t)} votos · ${ST.round==='2'?'2ª':'1ª'} vuelta</span>`;
+ const s=d.sw||0; const dir=s>=0?'Abelardo':'Cepeda';
+ if(Math.abs(s)>=1) h+=`<br><span style="color:rgba(255,255,255,.55)">1V→2V: se movió ${Math.abs(s).toFixed(1)} pts hacia ${dir}</span>`;
+ if(d.f) h+=`<br><span style="color:rgba(255,255,255,.45)">sin puesto propio · tendencia del vecino</span>`;
+ return h;
+}
+
+function renderLayer(){
+ const meta=DATA[ST.city].meta, bd=DATA[ST.city].b;
+ let geo=GEOC[ST.city];
+ if(meta.rot) geo=rotGeo(geo);
+ if(LAYER){MAP.removeLayer(LAYER);LAYER=null;}
+ LAYER=L.geoJSON(geo,{
+   style:(f)=>styleFor(bd[keyOf(meta,f,f.__i)]),
+   onEachFeature:(f,l)=>{const d=bd[keyOf(meta,f,f.__i)];
+     l.bindTooltip(tipFor(d),{sticky:true});
+     l.on('mouseover',()=>l.setStyle({weight:2,color:'#fff'}));
+     l.on('mouseout',()=>l.setStyle({weight:.5,color:'rgba(255,255,255,.16)'}));}
+ }).addTo(MAP);
+ MAP.fitBounds(LAYER.getBounds(),{padding:[8,8]});
+}
+
+function loadCity(){
+ const meta=DATA[ST.city].meta;
+ // index features so keyOf can use original order
+ const cap=document.getElementById('mapcap');
+ cap.innerHTML=`<b>${meta.n} barrios con dato directo</b> de ${meta.nfeat}. Los demás se pintan con la tendencia del vecino más cercano (translúcido).`;
+ if(!MAP){
+   document.getElementById('map').innerHTML='';
+   MAP=L.map('map',{zoomSnap:0,attributionControl:false,zoomControl:false,scrollWheelZoom:false,doubleClickZoom:false,boxZoom:false,dragging:false,touchZoom:false,keyboard:false});
+ }
+ if(GEOC[ST.city]){renderLayer();return;}
+ fetch(meta.url).then(r=>r.json()).then(geo=>{
+   geo.features.forEach((f,i)=>{f.__i=i;});
+   GEOC[ST.city]=geo; renderLayer();
+ }).catch(e=>{document.getElementById('map').innerHTML='<div class="spin" style="color:var(--orange)">No se pudo cargar la cartografía: '+e.message+'</div>';});
+}
+
+function renderPanel(){
+ const m=DATA[ST.city].meta, bd=DATA[ST.city].b;
+ const R=ST.round, c=m['cep'+R], a=m['abe'+R], t=c+a;
+ const pc=Math.round(1000*c/t)/10, pa=Math.round(1000*a/t)/10;
+ const cg=m['cep_gana'+R], ag=m['abe_gana'+R];
+ const win = c>a?'Cepeda':'Abelardo';
+ const wpts=Math.abs(pc-pa).toFixed(1);
+ // shift narrative
+ const dm=(Math.abs(m.m2)-Math.abs(m.m1)); // + = el líder amplió
+ const lead = m.m2<0?'Cepeda':'Abelardo';
+ let shift;
+ if(Math.abs(dm)<0.6) shift=`El margen casi no se movió entre vueltas.`;
+ else if(dm>0) shift=`${lead} <b>amplió</b> su ventaja ${dm.toFixed(1)} pts entre la 1ª y la 2ª vuelta.`;
+ else shift=`El líder <b>recortó</b> ${Math.abs(dm).toFixed(1)} pts: la ciudad se cerró un poco entre vueltas.`;
+ // tops by two-way pct in selected round — solo barrios con dato directo
+ const list=Object.values(bd).filter(d=>!d.f && (d['c'+R]+d['a'+R])>800);
+ const pctA=d=>{const tt=d['c'+R]+d['a'+R];return tt>0?d['a'+R]/tt:0;};
+ const topA=[...list].sort((x,y)=>pctA(y)-pctA(x)).slice(0,6);
+ const topC=[...list].sort((x,y)=>pctA(x)-pctA(y)).slice(0,6);
+ const liA=topA.map(d=>`<li><span>${d.n}</span><b>${(pctA(d)*100).toFixed(0)}%</b></li>`).join('');
+ const liC=topC.map(d=>`<li><span>${d.n}</span><b>${((1-pctA(d))*100).toFixed(0)}%</b></li>`).join('');
+ const legend = ST.mode==='swing'
+   ? `<div class="lr"><span class="ramp">${SW_C.slice().reverse().map(h=>`<i style="background:${h}"></i>`).join('')}</span> hacia Cepeda</div>
+      <div class="lr"><span class="ramp">${SW_A.map(h=>`<i style="background:${h}"></i>`).join('')}</span> hacia Abelardo</div>
+      <div class="lr" style="color:rgba(255,255,255,.5)"><i style="background:${NEU}"></i> sin cambio relevante</div>`
+   : `<div class="lr"><span style="color:var(--cepe)">Cepeda</span> <span class="ramp">${CEPE.map(h=>`<i style="background:${h}"></i>`).join('')}</span></div>
+      <div class="lr"><span style="color:var(--abel)">Abelardo</span> <span class="ramp">${ABEL.map(h=>`<i style="background:${h}"></i>`).join('')}</span></div>
+      <div class="lr" style="color:rgba(255,255,255,.5)">claro → oscuro = ventaja más amplia</div>`;
+ document.getElementById('panel').innerHTML=`
+   <h3>${m.name}</h3>
+   <div class="ph-sub">${R==='2'?'2ª vuelta · 21 jun':'1ª vuelta · 31 may'} · ${win} gana la ciudad por ${wpts} pts</div>
+   <div class="bars">
+     <div class="bar-row"><span class="nm" style="color:var(--cepe)">Cepeda</span><div class="bar-track"><div class="bar-fill" style="width:${pc}%;background:#cf4135">${pc}%</div></div></div>
+     <div class="bar-row"><span class="nm" style="color:var(--abel)">Abelardo</span><div class="bar-track"><div class="bar-fill" style="width:${pa}%;background:#3a5bd0">${pa}%</div></div></div>
+   </div>
+   <div class="kpis">
+     <div class="kpi"><div class="v" style="color:var(--cepe)">${cg}</div><div class="l">barrios Cepeda</div></div>
+     <div class="kpi"><div class="v" style="color:var(--abel)">${ag}</div><div class="l">barrios Abelardo</div></div>
+     <div class="kpi"><div class="v">${fmt(c)}</div><div class="l">votos Cepeda</div></div>
+     <div class="kpi"><div class="v">${fmt(a)}</div><div class="l">votos Abelardo</div></div>
+   </div>
+   <div class="takeaway">${shift}</div>
+   <div class="legend">${legend}</div>
+   <div class="tops">
+     <div class="ce"><h4>Más Cepeda</h4><ol>${liC}</ol></div>
+     <div class="ab"><h4>Más Abelardo</h4><ol>${liA}</ol></div>
+   </div>`;
+}
+
+function renderTabs(){
+ const t=document.getElementById('tabs');
+ t.innerHTML=ORDER.map(s=>{const m=DATA[s].meta;const w=m.cep2>m.abe2?'Cepeda':'Abelardo';
+   return `<button class="tab ${s===ST.city?'on':''}" data-c="${s}">${m.name}<small>2V · gana ${w}</small></button>`;}).join('');
+ t.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{ST.city=b.dataset.c;renderTabs();loadCity();renderPanel();});
+}
+
+function init(){
+ fetch(DATA_URL).then(r=>r.json()).then(d=>{
+   DATA=d; renderTabs(); loadCity(); renderPanel();
+   document.querySelectorAll('#seg-round button').forEach(b=>b.onclick=()=>{
+     ST.round=b.dataset.r; document.querySelectorAll('#seg-round button').forEach(x=>x.classList.toggle('on',x===b));
+     if(LAYER&&GEOC[ST.city])renderLayer(); renderPanel();});
+   document.querySelectorAll('#seg-mode button').forEach(b=>b.onclick=()=>{
+     ST.mode=b.dataset.m; document.querySelectorAll('#seg-mode button').forEach(x=>x.classList.toggle('on',x===b));
+     if(LAYER&&GEOC[ST.city])renderLayer(); renderPanel();});
+ }).catch(e=>{document.getElementById('map').innerHTML='<div class="spin" style="color:var(--orange)">No se pudieron cargar los datos: '+e.message+'</div>';});
+}
+init();
+</script>
+</body></html>
