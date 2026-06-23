@@ -7,7 +7,7 @@
   <title>Escenarios 2027 · Proyecto DC</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=DM+Mono:wght@300;400&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=DM+Mono:wght@300;400&family=Fraunces:opsz,wght@9..144,300;9..144,400&family=Arima:wght@400;500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
@@ -124,9 +124,18 @@
 
     /* Mapa col */
     .map-col #map { width: 100%; height: 72vh; background: var(--bg2); }
-    .map-legend { padding: .7rem 1.25rem; border-top: 1px solid var(--border); font-family:'DM Mono',monospace; font-size:.65rem; color:var(--text2); display:flex; flex-wrap:wrap; gap:.8rem; align-items: center; }
+    .map-legend { padding: .7rem 1.25rem; border-top: 1px solid var(--border); font-family:'Arima',sans-serif; font-size:.7rem; color:var(--text2); display:flex; flex-wrap:wrap; gap:.8rem; align-items: center; }
     .legend-item { display:inline-flex; align-items:center; gap:.4rem; }
     .legend-swatch { width:12px; height:12px; border:1px solid rgba(255,255,255,0.15); }
+
+    /* Caja horizontal de la trayectoria histórica (debajo de la leyenda) */
+    .map-traj { padding: .85rem 1.25rem 1rem; border-top: 1px solid var(--border); }
+    .map-traj-head { display:flex; flex-wrap:wrap; align-items:baseline; gap:.55rem; margin-bottom:.45rem; }
+    .map-traj-title { font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.15em; text-transform:uppercase; color:var(--text3); }
+    .map-traj-name { font-family:'Syne',sans-serif; font-weight:700; font-size:.82rem; color:var(--purple); }
+    /* El stream va horizontal: ancho completo y bajito (viewBox ancho que le
+       pasa renderMapTrajectory). max-height es sólo una red de seguridad. */
+    .map-traj .fb-stream-svg { max-height: 260px; }
 
     /* Ficha col */
     .ficha-col .col-body { padding: 1rem 1.25rem; min-height: 60vh; }
@@ -159,7 +168,7 @@
     .fb-stream-wrap { position: relative; }
     .fb-stream-svg { display:block; width:100%; height:auto; color: var(--text2); margin: .2rem 0 .4rem; }
     .fb-stream-svg .fb-stream-hover { cursor: crosshair; }
-    .fb-stream-legend { display:flex; flex-wrap:wrap; gap:.4rem .9rem; font-family:'DM Mono',monospace; font-size:.6rem; color:var(--text2); letter-spacing:.04em; margin-bottom:.3rem; }
+    .fb-stream-legend { display:flex; flex-wrap:wrap; gap:.4rem .9rem; font-family:'Arima',sans-serif; font-size:.68rem; color:var(--text2); letter-spacing:.02em; margin-top:.4rem; }
     .fb-stream-leg { display:inline-flex; align-items:center; gap:.3rem; }
     .fb-stream-sw { width:10px; height:10px; display:inline-block; border:1px solid rgba(255,255,255,0.12); }
 
@@ -169,7 +178,7 @@
       background: rgba(15, 16, 24, 0.97); color: #f4f3ef;
       border: 1px solid var(--purple);
       padding: .55rem .7rem;
-      font-family: 'DM Mono', monospace; font-size: .65rem; line-height: 1.4;
+      font-family: 'Arima', sans-serif; font-size: .72rem; line-height: 1.4;
       max-width: 280px; min-width: 220px;
       z-index: 5; box-shadow: 0 4px 14px rgba(0,0,0,0.35);
     }
@@ -179,8 +188,8 @@
     .fb-tip-row { display: grid; grid-template-columns: 10px 1fr auto 38px; gap: .4rem; align-items: center; }
     .fb-tip-sw { width: 9px; height: 9px; border: 1px solid rgba(255,255,255,0.15); }
     .fb-tip-name { font-family: 'Syne', sans-serif; font-weight: 500; font-size: .68rem; color: #f4f3ef; }
-    .fb-tip-votes { font-family: 'DM Mono', monospace; font-weight: 700; color: #fff; font-size: .68rem; text-align: right; }
-    .fb-tip-pct { font-family: 'DM Mono', monospace; color: #9ca3af; font-size: .6rem; text-align: right; }
+    .fb-tip-votes { font-family: 'Arima', sans-serif; font-weight: 700; color: #fff; font-size: .72rem; text-align: right; }
+    .fb-tip-pct { font-family: 'Arima', sans-serif; color: #9ca3af; font-size: .66rem; text-align: right; }
     .fb-act { display:flex; flex-wrap:wrap; gap:.3rem; }
     .fb-act-pill { font-family:'DM Mono',monospace; font-size:.64rem; letter-spacing:.04em; padding:.25rem .55rem; background:var(--purple-dim); color:var(--text); border:1px solid var(--purple-dim); }
     .fb-act-pill strong { color:var(--purple); }
@@ -325,6 +334,13 @@
         <div class="map-legend" id="map-legend">
           <span style="color:var(--text3)">Cargando…</span>
         </div>
+        <div class="map-traj" id="map-traj" hidden>
+          <div class="map-traj-head">
+            <span class="map-traj-title">Trayectoria histórica de votos por arquetipo</span>
+            <span class="map-traj-name" id="map-traj-name"></span>
+          </div>
+          <div id="map-traj-body"></div>
+        </div>
       </div>
 
       <div class="col-card ficha-col">
@@ -448,12 +464,12 @@
       // Para sliders "invertidos" (sign -1): la dirección está al revés, el
       // valor POSITIVO indica el problema y activa al sensible. Caso típico:
       // costo de vida sube → activa supervivencia.
+      { id: 'riesgo_cambio',      label: 'Volatilidad del barrio',        hint: '−5 estabilidad · +5 alta volatilidad emocional',  tema: 'special_riesgo',      sign: +1 },
       { id: 'seguridad',          label: 'Seguridad percibida',           hint: '−5 deterioro · +5 mejora visible',                tema: 'seguridad',           sign: +1 },
       { id: 'electoral',          label: 'Presidente nacional 2026',      hint: '−5 izquierda fuerte · +5 derecha fuerte',         tema: 'special_electoral',   sign: +1 },
       { id: 'costo_vida',         label: 'Costo de vida',                 hint: '−5 baja · +5 sube (más caro)',                    tema: 'empleo',              sign: -1 },
       { id: 'empleo',             label: 'Empleo e ingresos',             hint: '−5 desempleo · +5 mejora',                        tema: 'empleo',              sign: +1 },
       { id: 'afinidad_carvalho',  label: 'Visibilidad equipo Carvalho',   hint: '−5 invisible · +5 alta presencia',                tema: 'special_afinidad',    sign: +1 },
-      { id: 'riesgo_cambio',      label: 'Volatilidad del barrio',        hint: '−5 estabilidad · +5 alta volatilidad emocional',  tema: 'special_riesgo',      sign: +1 },
       { id: 'mediatico',          label: 'Saliencia mediática local',     hint: '−5 silencio · +5 conversación intensa',           tema: 'cultura_identidad',   sign: +1 },
       { id: 'obras',              label: 'Obras y mantenimiento',         hint: '−5 atraso · +5 ejecución visible',                tema: 'servicios_publicos',  sign: +1 },
       { id: 'favorabilidad',      label: 'Favorabilidad alcalde actual',  hint: '−5 muy baja · +5 muy alta',                       tema: 'special_favorabilidad', sign: +1 },
@@ -1060,13 +1076,17 @@
 
     function initMap(){
       map = L.map('map', {
-        zoomControl: true, attributionControl: false,
+        zoomControl: false, attributionControl: false,
         renderer: L.svg(),
         minZoom: 10, maxZoom: 16,
-        // Permitir zoom fraccionario para los +0.07 que sumamos tras fitBounds
-        // Snap fino (0.01) para que el +5% extra que aplicamos después de
+        // Snap fino (0.01) para que el +3.95% extra que aplicamos después de
         // fitBounds no se redondee hacia abajo.
         zoomSnap: 0.01, zoomDelta: 0.5,
+        // Mapa bloqueado: sin desplazamiento ni zoom del usuario. El encuadre
+        // lo fija drawMap() vía setView (que funciona aunque la interacción
+        // esté desactivada).
+        dragging: false, scrollWheelZoom: false, doubleClickZoom: false,
+        touchZoom: false, boxZoom: false, keyboard: false,
       });
     }
 
@@ -1128,11 +1148,12 @@
       if (drawMap._lastFitKey !== fitKey){
         try {
           const bounds = mapLayer.getBounds();
-          // +5% de zoom respecto al fitBounds estándar: log2(1.05) ≈ 0.07.
-          // Calculamos el zoom desde los bounds (no desde el zoom actual)
-          // para no acumular el delta entre cambios de nivel.
+          // +3.95% de zoom respecto al fitBounds estándar (era +5%, −1%):
+          // log2(1.05 × 0.99) = log2(1.0395) ≈ 0.056. Calculamos el zoom desde
+          // los bounds (no desde el zoom actual) para no acumular el delta
+          // entre cambios de nivel.
           const z = map.getBoundsZoom(bounds, false, L.point(10, 10));
-          map.setView(bounds.getCenter(), z + 0.07, { animate: false });
+          map.setView(bounds.getCenter(), z + 0.056, { animate: false });
         } catch(_) {}
         drawMap._lastFitKey = fitKey;
       }
@@ -1219,11 +1240,38 @@
       if (!sel){
         body.innerHTML = '<div class="ficha-empty">Hacé click en una comuna o un barrio para ver su arquetipo base, su proyección bajo el escenario actual y sus señales electorales del equipo.</div>';
         sub.textContent = 'Sin selección';
+        renderMapTrajectory();
         return;
       }
       if (sel.kind === 'comuna') renderFichaComuna(sel);
       else renderFichaBarrio(sel);
+      renderMapTrajectory();
       _wireStreamTooltips();
+    }
+
+    // Render del stream graph histórico en su caja propia debajo de la leyenda
+    // del mapa. Horizontal (viewBox ancho) y se actualiza con la selección.
+    function renderMapTrajectory(){
+      const box  = document.getElementById('map-traj');
+      const body = document.getElementById('map-traj-body');
+      const nameEl = document.getElementById('map-traj-name');
+      if (!box || !body) return;
+      const sel = STATE.selected;
+      if (!sel){ box.hidden = true; body.innerHTML = ''; if (nameEl) nameEl.textContent = ''; return; }
+
+      let distrib = null, name = '';
+      if (sel.kind === 'comuna'){
+        name = sel.key;
+        distrib = _distribComuna(sel.key);
+      } else {
+        const res = getBarrioByDap(sel.key);
+        if (res){ name = `${res.b.barrio} · ${res.b.comuna}`; distrib = _distribBarrio(res.b, sel.key); }
+      }
+      if (!distrib){ box.hidden = true; body.innerHTML = ''; return; }
+      if (nameEl) nameEl.textContent = name;
+      // viewBox ancho → tira horizontal que llena el ancho del mapa.
+      body.innerHTML = _streamGraph(distrib, { W: 680, H: 190 }) + _streamLegend();
+      box.hidden = false;
     }
 
     function _arqBlock(label, famId, mode){
@@ -1313,8 +1361,9 @@
 
     // SVG stream graph 4 años × 5 arquetipos. Bandas apiladas con bordes
     // curvos (Bezier). Total del año en el eje X bajo cada columna.
-    function _streamGraph(distrib){
-      const W = 340, H = 180, padL = 20, padR = 20, padT = 8, padB = 36;
+    function _streamGraph(distrib, opts){
+      opts = opts || {};
+      const W = opts.W || 340, H = opts.H || 180, padL = 20, padR = 20, padT = 8, padB = 36;
       const innerW = W - padL - padR;
       const innerH = H - padT - padB;
       const cols = STREAM_YEARS.map((_, i) => padL + (innerW / (STREAM_YEARS.length - 1)) * i);
@@ -1507,9 +1556,6 @@
         ${afLine}
         <div class="fb-section-title">Votos esperados 2027 por arquetipo ${escenarioActivo() ? '(escenario activo)' : '(ajustado Nury)'}</div>
         ${votos ? _votosBars(votos) : '<div class="fb-empty-mini">Sin votos esperados para este barrio.</div>'}
-        <div class="fb-section-title">Trayectoria histórica de votos por arquetipo</div>
-        ${_streamGraph(_distribBarrio(b, dap))}
-        ${_streamLegend()}
         <div class="fb-section-title">Palancas activas</div>
         ${_slidersActivosTexto()}
       `;
@@ -1556,9 +1602,6 @@
         <div class="fb-row"><div class="fb-lbl">Huella Carvalho · promedio comuna</div><div class="fb-val">${afProm !== null ? `<span class="fb-pill" style="background:${colorArq('castigo')};color:#fff">${afProm >= 0 ? '+' : ''}${afProm.toFixed(2)}</span>` : '<span style="color:var(--text3);font-style:italic">Sin datos</span>'}</div></div>
         <div class="fb-section-title">Votos esperados 2027 por arquetipo ${escenarioActivo() ? '(escenario activo)' : '(ajustado Nury)'}</div>
         ${votos ? _votosBars(votos) : '<div class="fb-empty-mini">Sin votos esperados para esta comuna.</div>'}
-        <div class="fb-section-title">Trayectoria histórica de votos por arquetipo</div>
-        ${_streamGraph(_distribComuna(name))}
-        ${_streamLegend()}
         <div class="fb-section-title">Palancas activas</div>
         ${_slidersActivosTexto()}
       `;
