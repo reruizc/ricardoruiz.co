@@ -40,9 +40,32 @@ CITIES = [
  dict(slug='pereira', name='Pereira', cod5='24001',
       geo='PEREIRA-BARRIOS.json', fld='NOMBRE', com='COMUNA', key='__idx', rot=False,
       url=f'{S3}/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/PEREIRA-BARRIOS.json'),
+ dict(slug='cartagena', name='Cartagena', cod5='05001',
+      geo='CARTAGENA-BARRIOS.json', fld='NOMBRE', com='LOC', key='__idx', rot=False,
+      url=f'{S3}/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/CARTAGENA-BARRIOS.json'),
+ dict(slug='cucuta', name='Cúcuta', cod5='25001',
+      geo='CUCUTA-BARRIOS.json', fld='barrio', com='comuna', key='__idx', rot=False,
+      url=f'{S3}/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/CUCUTA-BARRIOS.json'),
+ dict(slug='santamarta', name='Santa Marta', cod5='21001',
+      geo='SANTAMARTA-BARRIOS-REAL.json', fld='barrio', com='', key='__idx', rot=False,
+      url=f'{S3}/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/SANTAMARTA-BARRIOS.json'),
+ dict(slug='popayan', name='Popayán', cod5='11001',
+      geo='POPAYAN-BARRIOS.json', fld='BARRIOS', com='Comuna', key='__idx', rot=False,
+      url=f'{S3}/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/POPAYAN-BARRIOS.json'),
+ dict(slug='buenaventura', name='Buenaventura', cod5='31019',
+      geo='BUENAVENTURA-BARRIOS.json', fld='barrio', com='', key='__idx', rot=False,
+      url=f'{S3}/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/BUENAVENTURA-BARRIOS.json'),
+ dict(slug='quibdo', name='Quibdó', cod5='17001',
+      geo='QUIBDO-BARRIOS.json', fld='barrio', com='COMUNA', key='__idx', rot=False,
+      url=f'{S3}/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/QUIBDO-BARRIOS.json'),
 ]
 
 def margin(c, a): return (a - c) / (a + c) if (a + c) > 0 else 0.0
+
+def clean_name(v):
+    if v is None: return ''
+    s = str(v).strip()
+    return '' if s.lower() in ('nan', 'none') else s
 
 def fmt_com(slug, v):
     if v is None: return ''
@@ -70,8 +93,8 @@ for cfg in CITIES:
     g = gpd.GeoDataFrame.from_features(gj['features']).set_crs('EPSG:4326')
     g = g.reset_index(drop=True)
     g['fid'] = range(len(g))
-    g['nm'] = g[cfg['fld']].astype(str)
-    g['cm'] = g[cfg['com']].astype(str) if cfg['com'] in g.columns else ''
+    g['nm'] = g[cfg['fld']].fillna('').astype(str)
+    g['cm'] = g[cfg['com']].fillna('').astype(str) if cfg['com'] in g.columns else ''
 
     pdf = pd.DataFrame(pts, columns=['lon','lat','cep1','abe1','cep2','abe2'])
     P = gpd.GeoDataFrame(pdf, geometry=[Point(xy) for xy in zip(pdf.lon, pdf.lat)], crs='EPSG:4326')
@@ -113,7 +136,7 @@ for cfg in CITIES:
         m1, m2 = margin(c1, a1), margin(c2, a2)
         k = str(i) if keyfld == '__idx' else str(getattr(g.iloc[i], keyfld))
         bd[k] = {
-            'n': r.nm, 'cm': fmt_com(cfg['slug'], r.cm),
+            'n': clean_name(r.nm), 'cm': fmt_com(cfg['slug'], r.cm),
             'c1': int(c1), 'a1': int(a1), 'c2': int(c2), 'a2': int(a2),
             'w1': 'A' if a1 >= c1 else 'C', 'w2': 'A' if a2 >= c2 else 'C',
             'm1': round(100 * m1, 1), 'm2': round(100 * m2, 1),

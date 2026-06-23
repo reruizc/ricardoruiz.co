@@ -26,13 +26,21 @@ h1{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.8rem,4vw,3rem
 h1 span{color:var(--abel)}
 .subhead{font-family:'Arima',sans-serif;font-size:clamp(1rem,1.6vw,1.2rem);color:var(--muted);line-height:1.5;max-width:880px;margin-bottom:1.2rem}
 .byline{font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.1em;color:rgba(255,255,255,.4);margin-bottom:1.6rem;padding-bottom:1.2rem;border-bottom:1px solid var(--border)}
-/* tabs + controls */
-.tabs{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem}
-.tab{font-family:'Syne',sans-serif;font-weight:700;font-size:.95rem;letter-spacing:-.01em;color:var(--muted);background:var(--panel);border:1px solid var(--border);padding:.5rem 1.05rem;cursor:pointer;transition:all .15s}
-.tab:hover{color:var(--white);border-color:rgba(255,255,255,.25)}
-.tab.on{color:#fff;background:rgba(0,71,255,.16);border-color:rgba(0,71,255,.55)}
-.tab small{display:block;font-family:'DM Mono',monospace;font-weight:400;font-size:.62rem;letter-spacing:.04em;color:rgba(255,255,255,.45);margin-top:.12rem}
-.tab.on small{color:rgba(255,255,255,.7)}
+/* selector de ciudad (dropdown) + controls */
+.citysel{position:relative;display:inline-block;margin-bottom:1rem}
+.city-btn{display:inline-flex;align-items:center;gap:.6rem;font-family:'Syne',sans-serif;font-weight:800;font-size:1.15rem;letter-spacing:-.02em;color:#fff;background:var(--panel);border:1px solid rgba(0,71,255,.45);padding:.6rem 1.1rem;cursor:pointer;min-width:300px}
+.city-btn:hover{border-color:rgba(0,71,255,.8)}
+.city-btn .caret{margin-left:auto;color:var(--muted);font-size:.85rem;transition:transform .15s}
+.city-btn.open .caret{transform:rotate(180deg)}
+.city-btn .dot{width:12px;height:12px;flex:none}
+.city-menu{position:absolute;top:calc(100% + 4px);left:0;z-index:1000;background:var(--panel);border:1px solid var(--border);min-width:320px;max-height:64vh;overflow:auto;box-shadow:0 14px 38px rgba(0,0,0,.55)}
+.city-grp{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:.7rem .9rem .3rem;border-top:1px solid var(--border)}
+.city-grp:first-child{border-top:none}
+.city-opt{display:flex;align-items:center;gap:.6rem;padding:.55rem .9rem;cursor:pointer;font-family:'Syne',sans-serif;font-weight:700;font-size:.95rem;color:var(--white)}
+.city-opt:hover{background:rgba(255,255,255,.07)}
+.city-opt.on{background:rgba(0,71,255,.18)}
+.city-opt .dot{width:10px;height:10px;flex:none}
+.city-opt small{font-family:'DM Mono',monospace;font-weight:400;font-size:.64rem;letter-spacing:.03em;color:var(--muted);margin-left:auto}
 .controls{display:flex;gap:1.4rem;flex-wrap:wrap;align-items:center;margin-bottom:1rem}
 .seg{display:inline-flex;border:1px solid var(--border);background:var(--panel)}
 .seg button{font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:none;border:none;padding:.45rem .85rem;cursor:pointer}
@@ -87,7 +95,13 @@ h1 span{color:var(--abel)}
 <p class="subhead">Las ciudades más grandes del país llevadas al nivel más fino que existe: el barrio. En las cuatro mayores —Bogotá, Medellín, Barranquilla y Cali— Cepeda ganó tres y hasta amplió su ventaja, pero la presidencia se decidió afuera. Acá está la divisoria de cada ciudad, polígono a polígono, y cómo se movió entre la primera y la segunda vuelta. Explora también Bucaramanga, Soledad, Manizales y Pereira.</p>
 <div class="byline">Ricardo Ruiz · ricardoruiz.co · Preconteo Registraduría 1ª y 2ª vuelta por mesa · cartografía oficial de barrios</div>
 
-<div class="tabs" id="tabs"></div>
+<div class="citysel">
+  <button class="city-btn" id="city-btn" aria-haspopup="true"><span class="dot" id="city-dot"></span><span id="city-label">Ciudad…</span><span class="caret">▾</span></button>
+  <div class="city-menu" id="city-menu" hidden>
+    <div class="city-grp">Las 4 grandes</div><div id="grp-grandes"></div>
+    <div class="city-grp">Otras ciudades</div><div id="grp-otras"></div>
+  </div>
+</div>
 <div class="controls">
   <div><span class="seg-label">Vuelta</span><span class="seg" id="seg-round"><button data-r="2" class="on">2ª vuelta</button><button data-r="1">1ª vuelta</button></span></div>
   <div><span class="seg-label">Pintar</span><span class="seg" id="seg-mode"><button data-m="win" class="on">Ganador</button><button data-m="swing">Cambio 1V→2V</button></span></div>
@@ -115,8 +129,10 @@ h1 span{color:var(--abel)}
 <div class="foot">© Ricardo Ruiz · <a href="index.html">ricardoruiz.co</a> · Mapa publicado en junio de 2026 · preconteo Registraduría 1ª y 2ª vuelta + cartografía oficial de barrios. Preliminar.</div>
 </main>
 <script>
-const DATA_URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/prec-2v/ciudades-barrios-2v.json?v=20260623b';
-const ORDER=['bogota','medellin','barranquilla','cali','bucaramanga','soledad','manizales','pereira'];
+const DATA_URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/prec-2v/ciudades-barrios-2v.json?v=20260623c';
+const GRANDES=['bogota','medellin','barranquilla','cali'];
+const OTRAS=['cartagena','cucuta','bucaramanga','santamarta','soledad','pereira','manizales','popayan','buenaventura','quibdo'];
+const ORDER=[...GRANDES,...OTRAS];
 const ABEL=['#9db4f5','#5b82ef','#3a5bd0','#1f2a8c'];      // Abelardo (azul, claro→oscuro)
 const CEPE=['#f2a59d','#e2685c','#cf4135','#9c1e15'];      // Cepeda (rojo, claro→oscuro)
 const SW_A=['#cdd9f7','#8fa9ee','#4f74e0','#1f2a8c'];      // swing hacia Abelardo
@@ -244,19 +260,28 @@ function renderPanel(){
    </div>`;
 }
 
-function renderTabs(){
- const t=document.getElementById('tabs');
- t.innerHTML=ORDER.map(s=>{const m=DATA[s].meta;const w=m.cep2>m.abe2?'Cepeda':'Abelardo';
-   return `<button class="tab ${s===ST.city?'on':''}" data-c="${s}">${m.name}<small>2V · gana ${w}</small></button>`;}).join('');
- t.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{ST.city=b.dataset.c;renderTabs();loadCity();renderPanel();});
+function winOf(m){return m['cep'+ST.round]>m['abe'+ST.round]?'Cepeda':'Abelardo';}
+function cityOpt(s){const m=DATA[s].meta;const w=winOf(m);const col=w==='Cepeda'?'var(--cepe)':'var(--abel)';
+ return `<div class="city-opt ${s===ST.city?'on':''}" data-c="${s}"><span class="dot" style="background:${col}"></span>${m.name}<small>gana ${w}</small></div>`;}
+function closeMenu(){const mn=document.getElementById('city-menu');if(mn)mn.hidden=true;document.getElementById('city-btn').classList.remove('open');}
+function renderCitySelect(){
+ document.getElementById('grp-grandes').innerHTML=GRANDES.map(cityOpt).join('');
+ document.getElementById('grp-otras').innerHTML=OTRAS.map(cityOpt).join('');
+ const m=DATA[ST.city].meta;const w=winOf(m);
+ document.getElementById('city-label').textContent=`${m.name} · ${ST.round==='2'?'2V':'1V'} gana ${w}`;
+ document.getElementById('city-dot').style.background=w==='Cepeda'?'var(--cepe)':'var(--abel)';
+ document.querySelectorAll('.city-opt').forEach(o=>o.onclick=()=>{ST.city=o.dataset.c;closeMenu();renderCitySelect();loadCity();renderPanel();});
 }
 
 function init(){
  fetch(DATA_URL).then(r=>r.json()).then(d=>{
-   DATA=d; renderTabs(); loadCity(); renderPanel();
+   DATA=d; renderCitySelect(); loadCity(); renderPanel();
+   const btn=document.getElementById('city-btn'), menu=document.getElementById('city-menu');
+   btn.onclick=(e)=>{e.stopPropagation();menu.hidden=!menu.hidden;btn.classList.toggle('open',!menu.hidden);};
+   document.addEventListener('click',(e)=>{if(!document.querySelector('.citysel').contains(e.target))closeMenu();});
    document.querySelectorAll('#seg-round button').forEach(b=>b.onclick=()=>{
      ST.round=b.dataset.r; document.querySelectorAll('#seg-round button').forEach(x=>x.classList.toggle('on',x===b));
-     if(LAYER&&GEOC[ST.city])renderLayer(); renderPanel();});
+     if(LAYER&&GEOC[ST.city])renderLayer(); renderCitySelect(); renderPanel();});
    document.querySelectorAll('#seg-mode button').forEach(b=>b.onclick=()=>{
      ST.mode=b.dataset.m; document.querySelectorAll('#seg-mode button').forEach(x=>x.classList.toggle('on',x===b));
      if(LAYER&&GEOC[ST.city])renderLayer(); renderPanel();});
