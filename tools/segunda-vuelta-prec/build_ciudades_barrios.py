@@ -28,6 +28,18 @@ CITIES = [
  dict(slug='cali', name='Cali', cod5='31001',
       geo='CALI-BARRIOS.json', fld='barrio', com='comuna', key='__idx', rot=False,
       url=f'{S3}/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/CALI-BARRIOS.json'),
+ dict(slug='bucaramanga', name='Bucaramanga', cod5='27001',
+      geo='BUCARAMANGA-BARRIOS.json', fld='barrio', com='cod_comuna', key='__idx', rot=False,
+      url=f'{S3}/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/BUCARAMANGA-BARRIOS.json'),
+ dict(slug='soledad', name='Soledad', cod5='03052',
+      geo='SOLEDAD-BARRIOS.json', fld='barrio', com='comuna', key='__idx', rot=False,
+      url=f'{S3}/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/SOLEDAD-BARRIOS.json'),
+ dict(slug='manizales', name='Manizales', cod5='09001',
+      geo='MANIZALES-BARRIOS.json', fld='BARRIOS', com='Id_Comuna', key='__idx', rot=False,
+      url=f'{S3}/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/MANIZALES-BARRIOS.json'),
+ dict(slug='pereira', name='Pereira', cod5='24001',
+      geo='PEREIRA-BARRIOS.json', fld='NOMBRE', com='COMUNA', key='__idx', rot=False,
+      url=f'{S3}/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/PEREIRA-BARRIOS.json'),
 ]
 
 def margin(c, a): return (a - c) / (a + c) if (a + c) > 0 else 0.0
@@ -35,11 +47,12 @@ def margin(c, a): return (a - c) / (a + c) if (a + c) > 0 else 0.0
 def fmt_com(slug, v):
     if v is None: return ''
     s = str(v).strip()
-    if slug == 'bogota':      return s.title()
-    if slug == 'cali':
-        try: return f'Comuna {int(s)}'
+    if not s or s.lower() in ('none', 'nan', 'sn'): return ''
+    if slug == 'bogota': return s.title()              # localidad (texto)
+    if s.replace('.', '').isdigit():                    # código de comuna -> "Comuna N"
+        try: return f'Comuna {int(float(s))}'
         except: return s
-    return s
+    return s.title()
 
 M = json.load(open(f'{OUT}/master_unificado_puesto.json'))
 bycity = collections.defaultdict(list)
@@ -64,9 +77,15 @@ for cfg in CITIES:
     P = gpd.GeoDataFrame(pdf, geometry=[Point(xy) for xy in zip(pdf.lon, pdf.lat)], crs='EPSG:4326')
     j = gpd.sjoin(P, g[['fid','geometry']], how='left', predicate='within')
     miss = j['index_right'].isna()
+    dropped = 0
     if miss.any():
-        jn = gpd.sjoin_nearest(P[miss.values], g[['fid','geometry']], how='left')
+        # nearest SOLO si está cerca (~550 m): evita que puestos rurales/cerros fuera
+        # de la cartografía urbana (veredas, La Calera) se peguen a un barrio del borde
+        # y lo contaminen (caso Santa Ana en Usaquén). Los lejanos quedan sin barrio.
+        jn = gpd.sjoin_nearest(P[miss.values], g[['fid','geometry']], how='left', max_distance=0.005)
+        jn = jn[~jn.index.duplicated(keep='first')].reindex(P[miss.values].index)
         j.loc[miss.values, 'fid'] = jn['fid'].values
+        dropped = int(j.loc[miss.values, 'fid'].isna().sum())
     agg = j.groupby('fid')[['cep1','abe1','cep2','abe2']].sum()
     g = g.merge(agg, left_on='fid', right_index=True, how='left')
 
@@ -114,7 +133,7 @@ for cfg in CITIES:
         'cep_gana1': cw1, 'abe_gana1': aw1, 'cep_gana2': cw2, 'abe_gana2': aw2,
     }
     RESULT[cfg['slug']] = {'meta': meta, 'b': bd}
-    print(f"  {cfg['name']:13s} feats {len(g):4d} · directos {meta['n']:4d} · "
+    print(f"  {cfg['name']:13s} feats {len(g):4d} · directos {meta['n']:4d} · drop {dropped:3d} · "
           f"1V Cep {cw1}/Abe {aw1} -> 2V Cep {cw2}/Abe {aw2} · "
           f"margen 1V {meta['m1']:+.1f} -> 2V {meta['m2']:+.1f}")
 

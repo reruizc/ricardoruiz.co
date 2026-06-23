@@ -33,10 +33,10 @@ plt.rcParams['font.family']='Inter'
 LOGO='Bases de datos/output_abelardo_cartagena/logo_ricardoruiz.png'
 
 CITY = {
- 'bogota':       dict(name='Bogotá',       fld='nombre', sub='Cepeda 53,7% · Abelardo 46,3% · 425 barrios vs 195', rot=True),
+ 'bogota':       dict(name='Bogotá',       fld='nombre', sub='Cepeda 53,7% · Abelardo 46,3% · 423 barrios vs 194', rot=True),
  'medellin':     dict(name='Medellín',     fld='NOMBRE', sub='Abelardo 66,3% · Cepeda 33,7% · 134 barrios vs 25', rot=False),
  'barranquilla': dict(name='Barranquilla', fld='NOMBRE', sub='Cepeda 54,8% · Abelardo 45,2% · 67 barrios vs 29', rot=False),
- 'cali':         dict(name='Cali',         fld='barrio', sub='Cepeda 60,6% · Abelardo 39,4% · 122 barrios vs 32', rot=False),
+ 'cali':         dict(name='Cali',         fld='barrio', sub='Cepeda 60,6% · Abelardo 39,4% · 118 barrios vs 32', rot=False),
 }
 
 def canvas():

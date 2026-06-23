@@ -21,7 +21,7 @@ Crucé el preconteo de la 2ª vuelta, barrio por barrio. Esto es lo que muestra 
 
 🔴 **Bogotá: Cepeda 53,7% · Abelardo 46,3%.**
 
-Cepeda ganó 425 barrios; Abelardo, 195. Y no es una ciudad: son dos. El norte se pinta de azul, el sur y el occidente de rojo. La frontera es casi una línea recta.
+Cepeda ganó 423 barrios; Abelardo, 194. Y no es una ciudad: son dos. El norte se pinta de azul, el sur y el occidente de rojo. La frontera es casi una línea recta.
 
 ---
 
@@ -102,7 +102,7 @@ Barranquilla pasó de un **empate técnico** (Cepeda +1,6 en 1V) a **Cepeda +9,6
 
 🔴 **Cali: Cepeda 60,6% · Abelardo 39,4%.**
 
-La más roja de las cuatro. Cepeda ganó 122 barrios; Abelardo, 32. El oriente —Aguablanca— teñido de rojo; el sur de Pance, una isla azul.
+La más roja de las cuatro. Cepeda ganó 118 barrios; Abelardo, 32. El oriente —Aguablanca— teñido de rojo; el sur de Pance, una isla azul.
 
 ---
 
