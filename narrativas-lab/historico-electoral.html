@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Histórico electoral · NarrativasLab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="chassis.css" />
+  <style>
+    .legend-grad{ height:8px; width:160px; border-radius:4px; background:linear-gradient(90deg,#7d130a,#c0392b,#d8796b,#b9b3a6,#7d9bf0,#1f47cc,#0c2a86); }
+    .sidecard{ background:var(--surface); border:1px solid var(--border); border-radius:5px; padding:1rem 1.1rem; margin-bottom:.9rem; }
+    .sidecard h3{ margin:0 0 .5rem; }
+    .kv{ display:flex; justify-content:space-between; gap:.6rem; font-size:.86rem; padding:.18rem 0; }
+    .kv b{ font-weight:600; }
+    .rank-li{ display:flex; justify-content:space-between; gap:.6rem; font-size:.84rem; padding:.2rem 0; border-bottom:1px solid var(--border); }
+  </style>
+</head>
+<body>
+  <div class="cursor"></div><div class="cursor-ring"></div>
+  <div id="gate" class="gate"><div class="gate-text">Verificando acceso</div><div class="gate-bar"></div></div>
+
+  <nav class="top" id="topNav" hidden>
+    <div class="nav-left">
+      <a class="btn-back" href="../narrativas-lab.html">← Hub</a>
+      <span class="logo-product">Narrativas<span>Lab</span></span>
+      <span class="private-badge">Privado</span>
+    </div>
+    <div class="nav-right">
+      <span id="nl-city-slot"></span>
+      <span class="user-chip" id="userChip"></span>
+      <button class="theme-btn theme-icon" id="theme-toggle-btn" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
+    </div>
+  </nav>
+
+  <main class="wrap" id="main" hidden>
+    <div class="warn-banner real"><span>●</span><span><b>Datos reales.</b> Huella electoral Cepeda vs De la Espriella por barrio (preconteo presidencial 2026, 1ª y 2ª vuelta) + historia del territorio. Dos niveles: <b>Comuna/Localidad → barrio</b>.</span></div>
+
+    <div class="eyebrow">Módulo analítico 01 · Histórico electoral</div>
+    <h1 id="title">Histórico electoral</h1>
+    <p class="lead">Cómo votó cada territorio en la elección presidencial 2026, de la comuna al barrio, con la historia electoral de la zona.</p>
+
+    <div class="map-wrap">
+      <div class="map-toolbar">
+        <div class="map-level" id="round-toggle">
+          <button data-r="1">1ª vuelta</button>
+          <button data-r="2" class="on">2ª vuelta</button>
+        </div>
+        <div class="map-level" id="level-toggle">
+          <button data-l="comuna" class="on">Comuna/Localidad</button>
+          <button data-l="barrio">Barrio</button>
+        </div>
+        <button class="map-back" id="map-back" style="display:none">← Volver</button>
+        <span class="map-scope" id="map-scope"></span>
+      </div>
+      <div class="map-grid">
+        <div class="map-box">
+          <div id="map" class="nl-map"></div>
+          <div class="map-legend"><span>Cepeda</span><span class="legend-grad"></span><span>De la Espriella</span><span style="margin-left:auto" class="muted">intensidad = margen · real</span></div>
+        </div>
+        <div class="map-side" id="side"></div>
+      </div>
+    </div>
+
+    <div class="foot" id="foot"></div>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="cities.js"></script>
+  <script src="engine.js"></script>
+  <script src="lab-common.js"></script>
+  <script src="nl-map.js"></script>
+  <script>
+    const HUELLA_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/huella/huella-territorial.json?v=20260518';
+    let _huella=null, _huellaP=null;
+    function loadHuella(){ if(_huella) return Promise.resolve(_huella); if(!_huellaP) _huellaP=fetch(HUELLA_URL).then(r=>r.json()).then(j=>{_huella=j;return j;}).catch(()=>({muns:{}})); return _huellaP; }
+
+    const CEPE=['#e9b4ab','#d8796b','#c0392b','#7d130a'];
+    const ABEL=['#b3c2f0','#7d9bf0','#1f47cc','#0c2a86'];
+    const bkt = m => { m=Math.abs(m); return m<10?0:m<30?1:m<55?2:3; };
+    const colorWin = (w,m) => (w==='A'?ABEL:CEPE)[bkt(m)];
+    const fmt = n => (n||0).toLocaleString('es-CO');
+    const pct = (a,b)=>{ const t=a+b; return t>0?Math.round(1000*a/t)/10:0; };
+
+    const ST = { round:'2', level:'comuna', comuna:null };
+    let MAP=null, CITYINFO=null;
+
+    function tipBarrio(rec){
+      const r=ST.round, c=rec['c'+r], a=rec['a'+r], w=rec['w'+r];
+      let h=`<b>${rec.n}</b>`;
+      if(rec.cm) h+=`<br><span class="muted">${rec.cm}</span>`;
+      h+=`<br>Ganó <b style="color:${w==='A'?'#7da2ff':'#f08a7f'}">${w==='A'?'De la Espriella':'Cepeda'}</b>`;
+      h+=`<br>Cepeda ${pct(c,a)}% · De la Espriella ${pct(a,c)}%`;
+      h+=`<br><span class="muted">${fmt(c+a)} votos · ${r==='2'?'2ª':'1ª'} vuelta</span>`;
+      if(rec.f) h+='<br><span class="muted">sin puesto propio · tendencia del vecino</span>';
+      return h;
+    }
+    function tipComuna(c){
+      const r=ST.round, ce=c['c'+r], ab=c['a'+r], w=c['w'+r];
+      return `<b>${c.cm}</b><br>Ganó <b style="color:${w==='A'?'#7da2ff':'#f08a7f'}">${w==='A'?'De la Espriella':'Cepeda'}</b>`+
+        `<br>Cepeda ${pct(ce,ab)}% · De la Espriella ${pct(ab,ce)}%`+
+        `<br><span class="muted">${fmt(ce+ab)} votos · ${c.n} barrios · clic para ver barrios</span>`;
+    }
+    function styler(rec, ctx){
+      const r=ST.round;
+      if(ctx.level==='comuna' && ctx.comunaRec){ const c=ctx.comunaRec; return { fillColor:colorWin(c['w'+r], c['m'+r]), tooltip:tipComuna(c) }; }
+      return { fillColor:colorWin(rec['w'+r], rec['m'+r]), fillOpacity:rec.f?.5:.9, tooltip:tipBarrio(rec) };
+    }
+
+    function setToolbar(){
+      document.querySelectorAll('#round-toggle button').forEach(b=>b.classList.toggle('on', b.dataset.r===ST.round));
+      document.querySelectorAll('#level-toggle button').forEach(b=>b.classList.toggle('on', b.dataset.l===ST.level));
+      const back=document.getElementById('map-back'); back.style.display = ST.comuna?'inline-block':'none';
+      if(ST.comuna) back.textContent='← '+ST.comuna;
+      const scope=document.getElementById('map-scope');
+      scope.textContent = ST.comuna ? `${CITYINFO.nombre} · ${ST.comuna} · barrios`
+        : (ST.level==='comuna' ? `${CITYINFO.nombre} · por comuna/localidad` : `${CITYINFO.nombre} · todos los barrios`);
+    }
+
+    function renderSide(){
+      const recs = MAP.barrioRecords();
+      const scoped = ST.comuna ? recs.filter(b=>b.cm===ST.comuna) : recs;
+      // totales ciudad/scope
+      const sum = (k)=>scoped.reduce((s,b)=>s+(b[k]||0),0);
+      const c1=sum('c1'),a1=sum('a1'),c2=sum('c2'),a2=sum('a2');
+      const winner2 = c2>=a2?'Cepeda':'De la Espriella';
+      const swing = pct(c1,a1) - pct(c2,a2); // + = Cepeda perdió terreno hacia 2V (ilustrativo)
+      let html = `<div class="sidecard"><h3>${ST.comuna||CITYINFO.nombre}</h3>
+        <div class="kv"><span>1ª vuelta</span><b>Cepeda ${pct(c1,a1)}% · ${pct(a1,c1)}% Abelardo</b></div>
+        <div class="kv"><span>2ª vuelta</span><b>Cepeda ${pct(c2,a2)}% · ${pct(a2,c2)}% Abelardo</b></div>
+        <div class="kv"><span>Ganó (2V)</span><b style="color:${winner2==='Cepeda'?'#c0392b':'#1f47cc'}">${winner2}</b></div>
+        <div class="kv"><span>Votos 2V</span><b>${fmt(c2+a2)}</b></div></div>`;
+      // ranking
+      const r=ST.round;
+      const rows = (ST.level==='comuna' && !ST.comuna)
+        ? MAP.comunaRecords().slice().sort((x,y)=>y.share2-x.share2)
+        : scoped.filter(b=>!b.f).slice().sort((x,y)=>y.share2-x.share2);
+      const top = rows.slice(0,6), bot = rows.slice(-4).reverse();
+      const nameOf = o => o.cm!==undefined && o.n!==undefined && o.keys ? o.cm : (o.n||o.cm);
+      const li = o => `<div class="rank-li"><span>${nameOf(o)}</span><b style="color:#c0392b">${Math.round(o.share2*100)}%</b></div>`;
+      html += `<div class="sidecard"><h3>Más Cepeda</h3>${top.map(li).join('')}</div>`;
+      html += `<div class="sidecard"><h3>Más De la Espriella</h3>${bot.map(o=>`<div class="rank-li"><span>${nameOf(o)}</span><b style="color:#1f47cc">${100-Math.round(o.share2*100)}%</b></div>`).join('')}</div>`;
+      // historia (huella) — async
+      html += `<div class="sidecard" id="hist-card"><h3>Historia del territorio</h3><p class="small muted">Cargando…</p></div>`;
+      document.getElementById('side').innerHTML = html;
+      loadHuella().then(h=>{
+        const m = (h.muns||{})[CITYINFO.huellaMun];
+        const card = document.getElementById('hist-card'); if(!card) return;
+        if(!m){ card.innerHTML='<h3>Historia del territorio</h3><p class="small muted">Sin histórico para este municipio.</p>'; return; }
+        const hh = m.h||{};
+        const blo = {gran:'La Gran Consulta (derecha)', frente:'Frente por la Vida', soluciones:'Consulta de Soluciones'};
+        card.innerHTML = `<h3>Historia del territorio</h3>
+          ${hh.p22?`<div class="kv"><span>Presidente 2022</span><b>${hh.p22.n} (${hh.p22.pct}%)</b></div>`:''}
+          ${hh.c25p?`<div class="kv"><span>Consulta Pacto 2025</span><b>${hh.c25p.n}</b></div>`:''}
+          ${hh.c26?`<div class="kv"><span>Consulta 2026</span><b>${blo[hh.c26]||hh.c26}</b></div>`:''}
+          ${hh.s26?`<div class="kv"><span>Senado 2026</span><b>${hh.s26.n} (${hh.s26.pct}%)</b></div>`:''}
+          <p class="small muted" style="margin-top:.5rem">Censo zona: ${fmt(m.censo)} · fuente huella territorial.</p>`;
+      });
+    }
+
+    function draw(){ MAP.setStyler(styler); MAP.draw(ST.level, ST.comuna); setToolbar(); renderSide(); }
+
+    async function loadCity(){
+      CITYINFO = NLCities.active();
+      document.getElementById('title').textContent = 'Histórico electoral · ' + CITYINFO.nombre;
+      ST.comuna=null;
+      const info = await MAP.loadCity(CITYINFO);
+      // ciudades sin comuna (santamarta/buenaventura): forzar barrio
+      const lvlToggle = document.getElementById('level-toggle');
+      if(!info.hasComuna){ ST.level='barrio'; lvlToggle.style.display='none'; }
+      else { lvlToggle.style.display=''; ST.level = ST.level||'comuna'; }
+      draw();
+    }
+
+    NLCommon.initCursor();
+    NLCommon.bootGate(function(){
+      NLCommon.mountCitySelect('#nl-city-slot');
+      MAP = NLMap('#map');
+      MAP.onDrill(cm => { ST.comuna=cm; ST.level='barrio'; draw(); });
+      document.querySelectorAll('#round-toggle button').forEach(b=>b.onclick=()=>{ ST.round=b.dataset.r; MAP.setStyler(styler); MAP.redraw(); setToolbar(); renderSide(); });
+      document.querySelectorAll('#level-toggle button').forEach(b=>b.onclick=()=>{ ST.level=b.dataset.l; ST.comuna=null; draw(); });
+      document.getElementById('map-back').onclick=()=>{ ST.comuna=null; ST.level='comuna'; draw(); };
+      NLCities.onChange(()=>{ loadCity(); });
+      document.getElementById('foot').innerHTML='NarrativasLab · módulo Histórico electoral · huella presidencial 2026 por barrio (REAL) + historia electoral del territorio · acceso restringido.';
+      loadCity();
+    });
+  </script>
+  <script src="../theme.js"></script>
+</body>
+</html>

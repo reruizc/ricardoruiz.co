@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Construir narrativa · NarrativasLab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="chassis.css" />
+</head>
+<body>
+  <div class="cursor"></div><div class="cursor-ring"></div>
+  <div id="gate" class="gate"><div class="gate-text">Verificando acceso</div><div class="gate-bar"></div></div>
+
+  <nav class="top" id="topNav" hidden>
+    <div class="nav-left">
+      <a class="btn-back" href="../narrativas-lab.html">← Hub</a>
+      <span class="logo-product">Narrativas<span>Lab</span></span>
+      <span class="private-badge">Privado</span>
+    </div>
+    <div class="nav-right">
+      <span id="nl-city-slot"></span>
+      <span class="user-chip" id="userChip"></span>
+      <button class="theme-btn theme-icon" id="theme-toggle-btn" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
+    </div>
+  </nav>
+
+  <main class="wrap" id="main" hidden>
+    <div class="warn-banner"><span>◆</span><span><b>Maqueta.</b> El motor de reacción es una heurística determinista (silicon sampling), no una predicción validada. El mapa colorea persuasión <b>simulada</b> anclada en el <b>sesgo electoral real</b> de cada territorio.</span></div>
+
+    <div class="eyebrow">Módulo narrativo 04 · Construir</div>
+    <h1>El constructor de narrativa</h1>
+    <p class="lead">Escribe el mensaje y define sus atributos. Lo que armes aquí queda guardado y se testea en los módulos de Testear y Escenarios.</p>
+
+    <div class="builder" style="margin-top:1.4rem">
+      <div>
+        <label class="fld">Mensaje primario (≤ 25 palabras)</label>
+        <textarea id="b-texto" maxlength="240"></textarea>
+        <div class="grid g2">
+          <div>
+            <label class="fld">Story of Self / Us / Now (Ganz)</label>
+            <textarea id="b-ganz" placeholder="Yo… / Nosotros… / Ahora…"></textarea>
+          </div>
+          <div>
+            <label class="fld">Valor central + encuadre (Lakoff)</label>
+            <textarea id="b-frame" placeholder="Valor central, metáfora dominante, palabras propias…"></textarea>
+          </div>
+        </div>
+        <label class="fld">Temas que toca</label>
+        <div class="chips" id="b-chips"></div>
+      </div>
+      <div>
+        <div class="card">
+          <label class="fld" style="margin-top:0">Tono</label>
+          <select id="b-tono">
+            <option value="firmeza">Firmeza / orden</option>
+            <option value="esperanza">Esperanza / oportunidad</option>
+            <option value="cercania">Cercanía / empatía</option>
+            <option value="indignacion">Indignación / denuncia</option>
+            <option value="tecnico">Técnico / gestión</option>
+          </select>
+          <label class="fld">Emoción que apela</label>
+          <select id="b-emocion">
+            <option value="seguridad">Seguridad</option>
+            <option value="esperanza">Esperanza</option>
+            <option value="indignacion">Indignación</option>
+            <option value="pertenencia">Pertenencia</option>
+            <option value="firmeza">Confianza / firmeza</option>
+          </select>
+          <label class="fld">Inclinación ideológica del mensaje</label>
+          <div class="slider-row"><input type="range" id="b-ideo" min="-100" max="100" value="-20"><span class="v" id="b-ideo-v"></span></div>
+          <div class="small muted" style="font-size:.7rem">← Izquierda · Centro · Derecha →</div>
+          <label class="fld">Complejidad del lenguaje</label>
+          <div class="slider-row"><input type="range" id="b-complej" min="0" max="100" value="45"><span class="v" id="b-complej-v"></span></div>
+          <label class="fld">Concreción (promesa + evidencia)</label>
+          <div class="slider-row"><input type="range" id="b-concre" min="0" max="100" value="45"><span class="v" id="b-concre-v"></span></div>
+          <div class="btn-row">
+            <button class="btn sm" id="load-a">Ejemplo «Firmeza»</button>
+            <button class="btn sm ghost" id="load-b">Ejemplo «Oportunidad»</button>
+          </div>
+        </div>
+        <div class="btn-row"><button class="btn" id="goto-test">Testear este mensaje →</button></div>
+        <div class="btn-row">
+          <button class="btn sm ghost" id="save-a">Guardar como Variante A</button>
+          <button class="btn sm ghost" id="save-b">Guardar como Variante B</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="map-wrap">
+      <h2>Cómo aterriza por territorio</h2>
+      <p class="small muted">Persuasión <b>simulada</b> del mensaje que estás armando, por comuna/localidad y barrio. El color reacciona en vivo a lo que cambies arriba; el ancla (qué tan de izquierda/derecha es el territorio) es <b>dato electoral real</b>.</p>
+      <div class="map-toolbar">
+        <div class="map-level" id="level-toggle">
+          <button data-l="comuna" class="on">Comuna/Localidad</button>
+          <button data-l="barrio">Barrio</button>
+        </div>
+        <button class="map-back" id="map-back" style="display:none">← Volver</button>
+        <span class="map-scope" id="map-scope"></span>
+      </div>
+      <div class="map-grid">
+        <div class="map-box">
+          <div id="map" class="nl-map"></div>
+          <div class="map-legend"><span>Resistencia</span><span class="lbar" style="background:linear-gradient(90deg,#cf5b46,#d2a236,#3f9d63)"></span><span>Recepción</span><span style="margin-left:auto" class="muted">persuasión simulada</span></div>
+        </div>
+        <div class="map-side" id="side"></div>
+      </div>
+    </div>
+
+    <div class="foot" id="foot"></div>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="cities.js"></script>
+  <script src="engine.js"></script>
+  <script src="lab-common.js"></script>
+  <script src="nl-map.js"></script>
+  <script>
+    let MSG = NLCommon.getMsg(); if(!MSG || !MSG.temas){ MSG = JSON.parse(JSON.stringify(EX_B)); }
+    let MAP=null, CITYINFO=null;
+    const ST = { level:'comuna', comuna:null };
+    const persOf = ideo => simular(personaFromIdeo(ideo), MSG, SCENARIOS[0]).pers;
+
+    function tip(target, v, level){
+      const w = target.w2==='A'?'De la Espriella':'Cepeda';
+      const name = level==='comuna' ? target.cm : target.n;
+      return `<b>${name}</b><br>Persuasión simulada <b>${v}/100</b><br><span class="muted">voto real 2026: ${w} ${Math.round((target.share2||0)*100)}% Cepeda</span>`;
+    }
+    function styler(rec, ctx){
+      const t = ctx.level==='comuna' ? ctx.comunaRec : rec;
+      const v = persOf(t.ideo);
+      return { fillColor: persColor(v), fillOpacity:(ctx.level==='barrio'&&rec.f)?.5:.9, tooltip: tip(t,v,ctx.level) };
+    }
+
+    function setToolbar(){
+      document.querySelectorAll('#level-toggle button').forEach(b=>b.classList.toggle('on', b.dataset.l===ST.level));
+      const back=document.getElementById('map-back'); back.style.display=ST.comuna?'inline-block':'none'; if(ST.comuna) back.textContent='← '+ST.comuna;
+      document.getElementById('map-scope').textContent = ST.comuna?`${CITYINFO.nombre} · ${ST.comuna} · barrios`:(ST.level==='comuna'?`${CITYINFO.nombre} · por comuna/localidad`:`${CITYINFO.nombre} · barrios`);
+    }
+    function renderSide(){
+      const recs = ST.level==='comuna' && !ST.comuna ? MAP.comunaRecords() : MAP.barrioRecords().filter(b=>!b.f && (!ST.comuna||b.cm===ST.comuna));
+      const scored = recs.map(r=>({ r, v:persOf(r.ideo) })).sort((a,b)=>b.v-a.v);
+      const nm = o => o.cm!==undefined && o.keys ? o.cm : (o.n||o.cm);
+      const li = (o)=>`<div class="rank-li" style="display:flex;justify-content:space-between;padding:.2rem 0;border-bottom:1px solid var(--border);font-size:.84rem"><span>${nm(o.r)}</span><b style="color:${persColor(o.v)}">${o.v}</b></div>`;
+      const top=scored.slice(0,6), bot=scored.slice(-5).reverse();
+      const avg = scored.length?Math.round(scored.reduce((s,o)=>s+o.v,0)/scored.length):0;
+      document.getElementById('side').innerHTML =
+        `<div class="card"><h3 style="margin-top:0">Lectura del mapa</h3>
+          <p class="small muted">Persuasión simulada promedio: <b style="color:${persColor(avg)}">${avg}/100</b></p>
+          <div class="small"><b>Mejor recepción</b>${top.map(li).join('')}</div>
+          <div class="small" style="margin-top:.7rem"><b>Más resistencia</b>${bot.map(li).join('')}</div></div>`;
+    }
+
+    let _deb=null;
+    function recolor(){ if(MAP){ MAP.setStyler(styler); MAP.restyle(); renderSide(); } }
+    function recolorDeb(){ clearTimeout(_deb); _deb=setTimeout(recolor, 180); }
+
+    function renderBuilder(){
+      document.getElementById('b-texto').value = MSG.texto||'';
+      document.getElementById('b-ganz').value = MSG.ganz||'';
+      document.getElementById('b-frame').value = MSG.frame||'';
+      document.getElementById('b-tono').value = MSG.tono||'esperanza';
+      document.getElementById('b-emocion').value = MSG.emocion||'esperanza';
+      document.getElementById('b-ideo').value = Math.round((MSG.ideo||0)*100);
+      document.getElementById('b-complej').value = Math.round((MSG.complejidad||0.45)*100);
+      document.getElementById('b-concre').value = Math.round((MSG.concrecion||0.45)*100);
+      syncLabels();
+      const box=document.getElementById('b-chips');
+      box.innerHTML = Object.keys(TEMAS).map(t=>`<button class="chip ${MSG.temas[t]?'on':''}" data-tema="${t}">${TEMAS[t]}</button>`).join('');
+      box.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{ const t=c.dataset.tema; if(MSG.temas[t]) delete MSG.temas[t]; else MSG.temas[t]=0.8; c.classList.toggle('on'); NLCommon.saveMsg(MSG); recolorDeb(); });
+    }
+    function syncLabels(){ const i=+document.getElementById('b-ideo').value; document.getElementById('b-ideo-v').textContent=(i>0?'+':'')+i; document.getElementById('b-complej-v').textContent=document.getElementById('b-complej').value; document.getElementById('b-concre-v').textContent=document.getElementById('b-concre').value; }
+    function pullBuilder(){
+      MSG.texto=document.getElementById('b-texto').value; MSG.ganz=document.getElementById('b-ganz').value; MSG.frame=document.getElementById('b-frame').value;
+      MSG.tono=document.getElementById('b-tono').value; MSG.emocion=document.getElementById('b-emocion').value;
+      MSG.ideo=(+document.getElementById('b-ideo').value)/100; MSG.complejidad=(+document.getElementById('b-complej').value)/100; MSG.concrecion=(+document.getElementById('b-concre').value)/100;
+      NLCommon.saveMsg(MSG);
+    }
+    function flash(id,txt){ const b=document.getElementById(id); const o=b.textContent; b.textContent=txt; setTimeout(()=>b.textContent=o,1300); }
+
+    async function loadCityMap(){
+      CITYINFO = NLCities.active(); ST.comuna=null;
+      const info = await MAP.loadCity(CITYINFO);
+      const lt=document.getElementById('level-toggle');
+      if(!info.hasComuna){ ST.level='barrio'; lt.style.display='none'; } else { lt.style.display=''; ST.level=ST.level||'comuna'; }
+      MAP.setStyler(styler); MAP.draw(ST.level, ST.comuna); setToolbar(); renderSide();
+    }
+
+    NLCommon.initCursor();
+    NLCommon.bootGate(function(){
+      NLCommon.mountCitySelect('#nl-city-slot');
+      MAP = NLMap('#map');
+      MAP.onDrill(cm=>{ ST.comuna=cm; ST.level='barrio'; MAP.draw('barrio',cm); setToolbar(); renderSide(); });
+      renderBuilder();
+      ['b-ideo','b-complej','b-concre'].forEach(id=>document.getElementById(id).oninput=()=>{ syncLabels(); pullBuilder(); recolorDeb(); });
+      const bEl=document.querySelector('.builder'); const onB=()=>{ pullBuilder(); recolorDeb(); }; bEl.addEventListener('input',onB); bEl.addEventListener('change',onB);
+      document.getElementById('load-a').onclick=()=>{ MSG=JSON.parse(JSON.stringify(EX_A)); NLCommon.saveMsg(MSG); renderBuilder(); recolor(); };
+      document.getElementById('load-b').onclick=()=>{ MSG=JSON.parse(JSON.stringify(EX_B)); NLCommon.saveMsg(MSG); renderBuilder(); recolor(); };
+      document.getElementById('save-a').onclick=()=>{ pullBuilder(); NLCommon.saveVar('a',MSG); flash('save-a','Guardada como A ✓'); };
+      document.getElementById('save-b').onclick=()=>{ pullBuilder(); NLCommon.saveVar('b',MSG); flash('save-b','Guardada como B ✓'); };
+      document.getElementById('goto-test').onclick=()=>{ pullBuilder(); location.href='testear.html'; };
+      document.querySelectorAll('#level-toggle button').forEach(b=>b.onclick=()=>{ ST.level=b.dataset.l; ST.comuna=null; MAP.draw(ST.level,null); setToolbar(); renderSide(); });
+      document.getElementById('map-back').onclick=()=>{ ST.comuna=null; ST.level='comuna'; MAP.draw('comuna',null); setToolbar(); renderSide(); };
+      NLCities.onChange(()=>loadCityMap());
+      document.getElementById('foot').innerHTML='NarrativasLab · módulo Construir · motor de reacción simulado · mapa anclado en sesgo electoral real · acceso restringido.';
+      loadCityMap();
+    });
+  </script>
+  <script src="../theme.js"></script>
+</body>
+</html>

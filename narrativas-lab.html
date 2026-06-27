@@ -8,280 +8,36 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="narrativas-lab/chassis.css" />
   <style>
-    /* ── DASHBOARD CHASSIS · noche por defecto · body.day-mode = día ── */
-    :root {
-      /* NIGHT (default) */
-      --paper:#1a1610; --paper-2:#221d15; --paper-3:#2a241b;
-      --ink:#f4f3ef; --ink-2:#b8b1a0; --ink-3:#807a6c;
-      --rule:#f4f3ef1c; --rule-strong:#f4f3ef38;
-      --accent:#d96a50; --accent-soft:#d96a5018; --accent-tint:#d96a5036;
-      --gold:#d6a83a; --gold-soft:#d6a83a22; --on-accent:#14110a;
-      --good:#5aa873; --mid:#d6a83a; --bad:#d96a50; --danger:#d96a50; --warn:#d6a83a;
-      --sans:'Familjen Grotesk',system-ui,sans-serif;
-      --italic:'Petrona',Georgia,serif;
-      --mono:'Space Mono',ui-monospace,monospace;
-      --display:'Syne',sans-serif;
-      /* aliases legacy → tokens del dashboard (no tocar el motor) */
-      --bg:var(--paper); --bg2:var(--paper-2); --surface:var(--paper); --surface2:var(--paper-2);
-      --border:var(--rule); --border2:var(--rule-strong);
-      --text:var(--ink); --text2:var(--ink-2); --text3:var(--ink-3);
-      --purple:var(--accent); --purple-dim:var(--accent-soft);
-      --teal:var(--gold); --teal-dim:var(--gold-soft);
-      --amber:var(--gold); --amber-dim:var(--gold-soft);
-    }
-    body.day-mode {
-      /* DAY — cream/oxblood (identidad de marca) */
-      --paper:#f4f3ef; --paper-2:#ecebe5; --paper-3:#e0ddd2;
-      --ink:#14110a; --ink-2:#5a5448; --ink-3:#948e80;
-      --rule:#14110a1f; --rule-strong:#14110a40;
-      --accent:#8a1e16; --accent-soft:#8a1e161a; --accent-tint:#8a1e1633;
-      --gold:#8a6a1a; --gold-soft:#8a6a1a1f; --on-accent:#f4f3ef;
-      --good:#2f7d4f; --mid:#8a6a1a; --bad:#b03524; --danger:#b03524; --warn:#8a6a1a;
-      /* re-declarar aliases acá: si no, heredan el valor noche resuelto en :root */
-      --bg:var(--paper); --bg2:var(--paper-2); --surface:var(--paper); --surface2:var(--paper-2);
-      --border:var(--rule); --border2:var(--rule-strong);
-      --text:var(--ink); --text2:var(--ink-2); --text3:var(--ink-3);
-      --purple:var(--accent); --purple-dim:var(--accent-soft);
-      --teal:var(--gold); --teal-dim:var(--gold-soft);
-      --amber:var(--gold); --amber-dim:var(--gold-soft);
-    }
-    *,*::before,*::after{ box-sizing:border-box; margin:0; padding:0; }
-    html{ scroll-behavior:smooth; }
-    body{ background:var(--paper); color:var(--ink); font-family:var(--sans); font-size:16.5px; line-height:1.55; min-height:100vh; cursor:none; overflow-x:hidden; font-feature-settings:"ss01","kern","liga"; text-rendering:optimizeLegibility; transition:background .35s ease,color .35s ease; }
-    ::selection{ background:var(--accent); color:var(--on-accent); }
-    /* grano sutil solo en día (igual que dashboard) */
-    body.day-mode::before{ content:""; position:fixed; inset:0; pointer-events:none; z-index:0; background-image:radial-gradient(rgba(20,17,10,.035) 1px, transparent 1.4px); background-size:4px 4px; opacity:.9; mix-blend-mode:multiply; }
-    @media (hover:none){ body{ cursor:auto; } .cursor,.cursor-ring{ display:none!important; } }
-
-    /* GATE */
-    .gate{ position:fixed; inset:0; z-index:5000; background:var(--bg); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:1rem; }
-    .gate-text{ font-family:var(--mono); font-size:.82rem; letter-spacing:.12em; text-transform:uppercase; color:var(--text2); }
-    .gate-bar{ width:120px; height:1px; background:var(--border); position:relative; overflow:hidden; }
-    .gate-bar::after{ content:''; position:absolute; inset:0; background:var(--purple); animation:gate-slide 1.4s ease-in-out infinite; }
-    @keyframes gate-slide{ 0%{transform:translateX(-100%);} 50%{transform:translateX(0);} 100%{transform:translateX(100%);} }
-
-    /* CURSOR */
-    .cursor{ position:fixed; width:12px; height:12px; background:var(--purple); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s ease,background .2s; transform:translate(-50%,-50%); }
-    .cursor-ring{ position:fixed; width:36px; height:36px; border:1.5px solid var(--purple); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s ease,opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
-
-    /* NAV */
-    nav.top{ position:fixed; top:0; left:0; right:0; z-index:100; display:flex; align-items:center; justify-content:space-between; padding:.85rem 2rem; background:color-mix(in srgb,var(--bg) 88%,transparent); border-bottom:1px solid var(--border); backdrop-filter:blur(12px); }
-    .nav-left{ display:flex; align-items:center; gap:1rem; }
-    .nav-right{ display:flex; align-items:center; gap:1rem; }
-    .logo-link{ display:flex; align-items:center; gap:.5rem; text-decoration:none; }
-    .logo-bars{ display:flex; align-items:flex-end; gap:3px; height:20px; }
-    .logo-bar{ width:5px; background:var(--purple); border-radius:1px 1px 0 0; }
-    .logo-text{ font-family:var(--display); font-weight:800; font-size:1.4rem; letter-spacing:-.045em; line-height:1; color:var(--ink); }
-    .logo-text span{ color:var(--accent); }
-    .private-badge{ font-family:var(--mono); font-size:.6rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); background:var(--accent-soft); padding:.34rem .7rem; border:1px solid var(--accent); border-radius:999px; }
-    .theme-btn{ background:none; border:1px solid var(--rule-strong); color:var(--ink-2); font-family:var(--mono); font-size:.66rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; padding:.4rem .85rem; cursor:none; border-radius:999px; white-space:nowrap; transition:background .2s,color .2s,border-color .2s; }
-    .theme-btn:hover{ background:var(--paper-2); color:var(--ink); border-color:var(--ink); }
-    .theme-btn.theme-icon{ font-size:1rem; line-height:1; padding:.35rem .55rem; letter-spacing:0; }
-    .logo-sep{ font-family:var(--display); font-weight:800; font-size:1.2rem; color:var(--ink-3); opacity:.55; }
-    .logo-product{ font-family:var(--display); font-weight:800; font-size:1.4rem; letter-spacing:-.045em; line-height:1; color:var(--ink); }
-    .logo-product span{ color:var(--accent); }
-    .user-chip{ font-family:var(--mono); font-size:.68rem; color:var(--ink-3); }
-
-    /* WARN BANNER */
-    .warn-banner{ margin:5rem auto 0; max-width:1180px; padding:.8rem 1.1rem; background:var(--amber-dim); border:1px solid var(--amber); color:var(--text); font-family:var(--mono); font-size:.74rem; line-height:1.5; letter-spacing:.02em; display:flex; gap:.7rem; align-items:flex-start; }
-    .warn-banner b{ color:var(--amber); }
-
-    main.wrap{ position:relative; z-index:1; max-width:1180px; margin:0 auto; padding:1.5rem 2rem 6rem; }
-
-    /* TABS */
-    .tabs{ display:flex; gap:.4rem; flex-wrap:wrap; margin:1.6rem 0 1.8rem; border-bottom:1px solid var(--border); padding-bottom:.2rem; }
-    .tab{ font-family:var(--sans); font-weight:500; font-size:.82rem; letter-spacing:.01em; color:var(--text2); background:none; border:none; border-bottom:2px solid transparent; padding:.5rem .7rem; cursor:none; transition:color .2s,border-color .2s; }
-    .tab:hover{ color:var(--text); }
-    .tab.active{ color:var(--purple); border-bottom-color:var(--purple); }
-
-    .stage{ display:none; animation:fade .35s ease; }
-    .stage.active{ display:block; }
-    @keyframes fade{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;} }
-
-    h1{ font-family:var(--sans); font-weight:700; font-size:2.1rem; letter-spacing:-.03em; line-height:1.08; margin-bottom:.6rem; }
-    h2{ font-family:var(--sans); font-weight:700; font-size:1.3rem; letter-spacing:-.02em; margin:1.8rem 0 .8rem; }
-    h3{ font-family:var(--sans); font-weight:600; font-size:1rem; margin:1.1rem 0 .5rem; }
-    p{ font-size:1rem; line-height:1.6; color:var(--text); max-width:64ch; }
-    .lead{ font-family:var(--italic); font-style:italic; font-weight:400; font-size:1.22rem; line-height:1.5; color:var(--ink-2); max-width:60ch; }
-    .eyebrow{ font-family:var(--mono); font-size:.7rem; letter-spacing:.18em; text-transform:uppercase; color:var(--purple); margin-bottom:.7rem; }
-    .muted{ color:var(--text2); }
-    .small{ font-size:.85rem; }
-    em{ font-family:var(--italic); font-style:italic; }
-    a.inline{ color:var(--purple); text-decoration:none; border-bottom:1px solid var(--purple-dim); }
-
-    .card{ background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:1.2rem 1.3rem; }
-    .grid{ display:grid; gap:1rem; }
-    .g2{ grid-template-columns:1fr 1fr; }
-    .g3{ grid-template-columns:repeat(3,1fr); }
-    @media(max-width:820px){ .g2,.g3{ grid-template-columns:1fr; } main.wrap{ padding:1.2rem 1.1rem 5rem; } nav.top{ padding:.8rem 1.1rem; } .warn-banner{ margin-top:4.4rem; } }
-
-    /* the loop */
-    .loop{ display:flex; gap:.5rem; flex-wrap:wrap; align-items:stretch; margin:1.4rem 0; }
-    .loop-step{ flex:1; min-width:150px; background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:.9rem 1rem; position:relative; }
-    .loop-step .n{ font-family:var(--mono); font-size:.66rem; color:var(--purple); letter-spacing:.1em; }
-    .loop-step .t{ font-family:var(--sans); font-weight:700; font-size:.98rem; margin:.3rem 0; }
-    .loop-step .d{ font-size:.82rem; color:var(--text2); line-height:1.45; }
-
-    /* PERSONAS */
-    .persona-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr)); gap:1rem; }
-    .persona{ background:var(--surface); border:1px solid var(--border); border-radius:5px; padding:1.1rem 1.2rem; cursor:none; transition:border-color .2s,transform .2s; }
-    .persona:hover{ border-color:var(--purple); transform:translateY(-2px); }
-    .persona.flag{ border-color:var(--purple); box-shadow:0 0 0 1px var(--purple-dim); }
-    .p-head{ display:flex; gap:.8rem; align-items:center; margin-bottom:.7rem; }
-    .p-ava{ width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--sans); font-weight:700; font-size:1.05rem; color:#fff; flex-shrink:0; }
-    .p-name{ font-family:var(--sans); font-weight:700; font-size:1.02rem; line-height:1.1; }
-    .p-sub{ font-family:var(--mono); font-size:.68rem; color:var(--text3); margin-top:.15rem; }
-    .p-tags{ display:flex; gap:.35rem; flex-wrap:wrap; margin:.55rem 0; }
-    .tag{ font-family:var(--mono); font-size:.62rem; letter-spacing:.04em; padding:.2rem .5rem; border-radius:3px; background:var(--surface2); color:var(--text2); border:1px solid var(--border); }
-    .tag.arq{ color:#fff; border:none; }
-    .p-row{ font-size:.84rem; color:var(--text2); line-height:1.5; margin:.3rem 0; }
-    .p-row b{ color:var(--text); font-weight:500; }
-    .p-signal{ font-family:var(--italic); font-size:.9rem; font-style:italic; color:var(--text2); border-left:2px solid var(--gold); padding-left:.6rem; margin-top:.6rem; line-height:1.45; }
-
-    /* BUILDER */
-    .builder{ display:grid; grid-template-columns:1.3fr 1fr; gap:1.2rem; }
-    @media(max-width:820px){ .builder{ grid-template-columns:1fr; } }
-    label.fld{ display:block; font-family:var(--mono); font-size:.66rem; letter-spacing:.1em; text-transform:uppercase; color:var(--text3); margin:.9rem 0 .35rem; }
-    textarea,input[type=text],select{ width:100%; background:var(--surface); border:1px solid var(--border2); border-radius:4px; color:var(--text); font-family:var(--sans); font-size:.98rem; padding:.65rem .75rem; cursor:none; }
-    textarea{ resize:vertical; min-height:64px; line-height:1.45; }
-    input[type=range]{ width:100%; cursor:none; accent-color:var(--purple); }
-    .chips{ display:flex; gap:.4rem; flex-wrap:wrap; margin-top:.3rem; }
-    .chip{ font-family:var(--mono); font-size:.7rem; padding:.32rem .7rem; border-radius:999px; border:1px solid var(--border2); background:var(--surface); color:var(--text2); cursor:none; transition:all .15s; }
-    .chip.on{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
-    .slider-row{ display:flex; align-items:center; gap:.7rem; }
-    .slider-row .v{ font-family:var(--mono); font-size:.72rem; color:var(--purple); min-width:34px; text-align:right; }
-
-    .btn{ font-family:var(--sans); font-weight:600; font-size:.84rem; padding:.6rem 1.15rem; border-radius:999px; border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); cursor:none; transition:opacity .2s,transform .1s; }
-    .btn:hover{ opacity:.9; }
-    .btn:active{ transform:translateY(1px); }
-    .btn.ghost{ background:none; color:var(--accent); }
-    .btn.sm{ font-size:.74rem; padding:.4rem .75rem; }
-    .btn-row{ display:flex; gap:.5rem; flex-wrap:wrap; margin-top:1rem; }
-
-    /* RESULTS / SCORES */
-    .veredicto{ background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--purple); border-radius:4px; padding:1rem 1.2rem; margin-bottom:1.2rem; }
-    .veredicto .big{ font-family:var(--sans); font-weight:700; font-size:1.6rem; }
-    .agg{ display:grid; grid-template-columns:repeat(5,1fr); gap:.7rem; margin:1rem 0 1.6rem; }
-    @media(max-width:680px){ .agg{ grid-template-columns:repeat(2,1fr); } }
-    .metric{ background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:.8rem .9rem; text-align:center; }
-    .metric .lab{ font-family:var(--mono); font-size:.62rem; letter-spacing:.06em; text-transform:uppercase; color:var(--text3); }
-    .metric .num{ font-family:var(--sans); font-weight:700; font-size:1.7rem; line-height:1.2; margin:.2rem 0; }
-    .bar{ height:5px; border-radius:3px; background:var(--surface2); overflow:hidden; margin-top:.35rem; }
-    .bar > i{ display:block; height:100%; width:0; border-radius:3px; transition:width .8s cubic-bezier(.2,.7,.3,1); }
-
-    .react-row{ display:flex; gap:.8rem; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:.7rem .9rem; margin-bottom:.55rem; }
-    .react-row .ava{ width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--sans); font-weight:700; font-size:.82rem; color:#fff; flex-shrink:0; }
-    .react-row .body{ flex:1; min-width:0; }
-    .react-row .nm{ font-family:var(--sans); font-weight:600; font-size:.9rem; }
-    .react-row .rx{ font-family:var(--italic); font-size:.92rem; color:var(--text2); line-height:1.4; font-style:italic; }
-    .react-row .sc{ display:flex; gap:.7rem; flex-shrink:0; }
-    .react-row .sc .s{ text-align:center; }
-    .react-row .sc .s .n{ font-family:var(--sans); font-weight:700; font-size:1.05rem; }
-    .react-row .sc .s .l{ font-family:var(--mono); font-size:.56rem; color:var(--text3); text-transform:uppercase; }
-    @media(max-width:680px){ .react-row .sc{ display:none; } }
-
-    .filter-row{ display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin-bottom:1rem; }
-    .filter-row select{ width:auto; font-size:.82rem; padding:.4rem .6rem; }
-
-    /* A/B */
-    .ab{ display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
-    @media(max-width:680px){ .ab{ grid-template-columns:1fr; } }
-    .ab-col{ background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:1rem 1.1rem; }
-    .ab-col.win{ border-color:var(--good); box-shadow:0 0 0 1px color-mix(in srgb,var(--good) 30%,transparent); }
-    .ab-tag{ font-family:var(--mono); font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; color:var(--text3); }
-    .ab-msg{ font-family:var(--italic); font-size:1.02rem; line-height:1.5; margin:.5rem 0 .8rem; font-style:italic; }
-
-    /* RED TEAM */
-    .attack{ background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--danger); border-radius:4px; padding:.9rem 1.1rem; margin-bottom:.7rem; }
-    .attack .h{ font-family:var(--sans); font-weight:700; font-size:.95rem; color:var(--danger); margin-bottom:.3rem; }
-    .attack .vuln{ font-family:var(--mono); font-size:.68rem; color:var(--text3); margin-top:.4rem; }
-
-    /* SOCIAL */
-    .topic-bar{ display:flex; align-items:center; gap:.7rem; margin-bottom:.5rem; }
-    .topic-bar .nm{ width:160px; font-size:.85rem; flex-shrink:0; }
-    .topic-bar .tk{ flex:1; height:18px; background:var(--surface2); border-radius:3px; overflow:hidden; }
-    .topic-bar .tk > i{ display:block; height:100%; }
-    .topic-bar .sent{ font-family:var(--mono); font-size:.7rem; width:48px; text-align:right; }
-    .emo-wheel{ display:grid; grid-template-columns:repeat(4,1fr); gap:.5rem; }
-    @media(max-width:680px){ .emo-wheel{ grid-template-columns:repeat(2,1fr); } }
-    .emo{ text-align:center; padding:.7rem; border-radius:4px; }
-    .emo .v{ font-family:var(--sans); font-weight:700; font-size:1.3rem; }
-    .emo .l{ font-family:var(--mono); font-size:.62rem; text-transform:uppercase; letter-spacing:.05em; }
-
-    /* SCENARIOS */
-    .scen-pills{ display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1.1rem; }
-    .scen-pill{ font-family:var(--mono); font-size:.72rem; padding:.45rem .85rem; border-radius:999px; border:1px solid var(--border2); background:var(--surface); color:var(--text2); cursor:none; }
-    .scen-pill.on{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
-    table.tbl{ width:100%; border-collapse:collapse; font-size:.86rem; }
-    table.tbl th,table.tbl td{ text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--border); }
-    table.tbl th{ font-family:var(--mono); font-size:.64rem; letter-spacing:.06em; text-transform:uppercase; color:var(--text3); }
-    table.tbl td b{ font-weight:600; }
-
-    .foot{ margin-top:3rem; padding-top:1.4rem; border-top:1px solid var(--border); font-family:var(--mono); font-size:.68rem; color:var(--text3); line-height:1.6; }
-
-    ul.clean{ list-style:none; }
-    ul.clean li{ position:relative; padding-left:1.2rem; margin-bottom:.5rem; font-size:.95rem; line-height:1.55; color:var(--text); }
-    ul.clean li::before{ content:'→'; position:absolute; left:0; color:var(--purple); }
-
-    /* ── MAPA BOGOTÁ (simulado) ── */
-    .bog-map-wrap{ margin-top:1.8rem; }
-    .bog-map-grid{ display:grid; grid-template-columns:1.15fr .85fr; gap:1.3rem; align-items:start; }
-    .bog-map{ position:relative; background:var(--surface); border:1px solid var(--border2); border-radius:6px; padding:1rem 1.1rem 1.1rem; }
-    .bog-svg{ width:100%; height:auto; display:block; max-height:460px; }
-    .bzcell{ transition:fill .55s cubic-bezier(.2,.7,.3,1); cursor:none; }
-    .bzcell:hover{ opacity:.82; }
-    .bzflip{ stroke:var(--ink); stroke-width:.7; }
-    .bzlabel{ font-family:var(--mono); font-size:3.1px; font-weight:700; fill:rgba(20,17,10,.82); pointer-events:none; letter-spacing:-.01em; }
-    .bog-legend{ display:flex; align-items:center; gap:.5rem; font-family:var(--mono); font-size:.62rem; letter-spacing:.04em; color:var(--ink-3); margin-top:.8rem; flex-wrap:wrap; }
-    .bog-legend .bar{ height:8px; width:120px; border-radius:4px; }
-    .bog-side{ font-size:.92rem; }
-    .bog-side h3{ margin-top:0; }
-    .bog-cap{ font-family:var(--italic); font-style:italic; color:var(--text2); margin-top:.75rem; font-size:.98rem; line-height:1.45; }
-    .bog-tip{ position:fixed; z-index:9000; pointer-events:none; background:var(--paper); border:1px solid var(--rule-strong); color:var(--ink); font-family:var(--mono); font-size:.7rem; line-height:1.4; padding:.42rem .58rem; border-radius:4px; max-width:210px; opacity:0; transition:opacity .12s; box-shadow:0 6px 20px rgba(0,0,0,.22); }
-    @media(max-width:820px){ .bog-map-grid{ grid-template-columns:1fr; } }
-
-    /* ── MÓVIL (teléfono) ── */
-    @media(max-width:560px){
-      .nav-left{ flex-direction:column; align-items:flex-start; gap:.02rem; }
-      .logo-sep{ display:none; }
-      .logo-text{ font-size:.98rem; } .logo-product{ font-size:.82rem; }
-      .logo-bars{ height:15px; } .logo-bar{ width:4px; }
-      nav.top{ padding:.7rem 1rem; gap:.6rem; }
-      .logo-text{ font-size:1.12rem; }
-      .private-badge{ display:none; }       /* el banner ⚠ ya dice "Borrador" */
-      .user-chip{ display:none; }
-      .theme-btn{ font-size:.58rem; padding:.38rem .7rem; letter-spacing:.08em; }
-      .warn-banner{ margin-top:3.8rem; font-size:.72rem; padding:.75rem .9rem; }
-      main.wrap{ padding:1.1rem 1rem 5rem; }
-      h1{ font-size:1.72rem; }
-      .lead{ font-size:1.08rem; }
-      .tabs{ gap:.15rem; margin:1.2rem 0 1.4rem; }
-      .tab{ font-size:.78rem; padding:.45rem .55rem; }
-      .filter-row select{ flex:1 1 44%; }
-      .veredicto .big{ font-size:1.32rem; }
-      /* tablas anchas: permitir scroll horizontal en vez de desbordar */
-      table.tbl{ display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; white-space:nowrap; }
-    }
+    .hero{ margin-top:1.2rem; }
+    .hero h1{ font-size:2.4rem; max-width:18ch; }
+    .city-hero{ display:flex; align-items:center; gap:1rem; flex-wrap:wrap; margin:1.4rem 0 .4rem; padding:1rem 1.2rem; background:var(--surface); border:1px solid var(--border2); border-radius:6px; }
+    .city-hero .lbl{ font-family:var(--mono); font-size:.66rem; letter-spacing:.1em; text-transform:uppercase; color:var(--text3); }
+    .city-hero select.city-select{ font-size:1rem; padding:.55rem 2rem .55rem .9rem; }
+    .s-label{ font-family:var(--mono); font-size:.7rem; letter-spacing:.16em; text-transform:uppercase; color:var(--text3); margin:2rem 0 .9rem; padding-bottom:.4rem; border-bottom:1px solid var(--border); }
+    .modulo-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; }
+    @media(max-width:900px){ .modulo-grid{ grid-template-columns:1fr 1fr; } }
+    @media(max-width:620px){ .modulo-grid{ grid-template-columns:1fr; } }
+    .modulo{ display:block; text-decoration:none; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:1.2rem 1.3rem; transition:border-color .2s,transform .2s; }
+    .modulo:hover{ border-color:var(--accent); transform:translateY(-3px); }
+    .modulo-num{ font-family:var(--mono); font-size:.62rem; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); }
+    .modulo-name{ font-family:var(--sans); font-weight:700; font-size:1.18rem; margin:.45rem 0 .4rem; color:var(--ink); }
+    .modulo-desc{ font-size:.88rem; line-height:1.5; color:var(--text2); }
+    .modulo-status{ display:inline-block; margin-top:.8rem; font-family:var(--mono); font-size:.6rem; letter-spacing:.05em; text-transform:uppercase; padding:.28rem .6rem; border-radius:999px; border:1px solid var(--border2); color:var(--text3); }
+    .modulo-status.live{ color:var(--good); border-color:var(--good); background:color-mix(in srgb,var(--good) 12%,transparent); }
+    .modulo-status.sim{ color:var(--gold); border-color:var(--gold); background:var(--gold-soft); }
+    .modulo.disabled{ opacity:.5; pointer-events:none; }
   </style>
 </head>
 <body>
-  <div class="cursor"></div>
-  <div class="cursor-ring"></div>
-
-  <div id="gate" class="gate">
-    <div class="gate-text">Verificando acceso</div>
-    <div class="gate-bar"></div>
-  </div>
+  <div class="cursor"></div><div class="cursor-ring"></div>
+  <div id="gate" class="gate"><div class="gate-text">Verificando acceso</div><div class="gate-bar"></div></div>
 
   <nav class="top" id="topNav" hidden>
     <div class="nav-left">
       <a class="logo-link" href="dashboard.html" aria-label="Ricardo.Ruiz">
-        <span class="logo-bars">
-          <span class="logo-bar" style="height:9px"></span>
-          <span class="logo-bar" style="height:15px"></span>
-          <span class="logo-bar" style="height:20px"></span>
-        </span>
+        <span class="logo-bars"><span class="logo-bar" style="height:9px"></span><span class="logo-bar" style="height:15px"></span><span class="logo-bar" style="height:20px"></span></span>
         <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
       </a>
       <span class="logo-sep" aria-hidden="true">/</span>
@@ -295,940 +51,96 @@
   </nav>
 
   <main class="wrap" id="main" hidden>
+    <div class="warn-banner"><span>⚠</span><span><b>Borrador privado para presentación.</b> <b style="color:var(--good)">Reales</b>: histórico electoral por barrio, criminalidad municipal y saliencia de medios en Medellín. <b style="color:var(--gold)">Simulados</b>: el motor de reacción de audiencia, la escucha social y la saliencia fuera de Medellín. Las personas mostradas son personas-ejemplo. Habeas data: <b>Ley 1581 de 2012</b>.</span></div>
 
-    <div class="warn-banner">
-      <span>⚠</span>
-      <span><b>Borrador / mockup para presentación a financiador.</b> Todos los datos son <b>simulados</b>: no hay encuestas ni paneles reales detrás. Los individuos mostrados — incluido «Simón Bolívar» — son <b>personas-ejemplo</b> construidas para ilustrar el producto, no individuos reales identificados. El motor de reacción es una <b>maqueta determinista</b> que muestra cómo se sentiría el flujo, no una predicción validada.</span>
+    <section class="hero">
+      <div class="eyebrow">Laboratorio de narrativas + inteligencia territorial</div>
+      <h1>Entiende el territorio, construye la narrativa y pruébala antes de salir al público.</h1>
+      <p class="lead">Un entorno para que una agencia lea la huella electoral, mediática y de seguridad de una ciudad, diseñe mensajes y los testee contra audiencias cruzadas con arquetipos y contexto — todo aterrizado a la comuna y el barrio.</p>
+    </section>
+
+    <div class="city-hero">
+      <span class="lbl">Trabajando sobre</span>
+      <span id="city-hero-slot"></span>
+      <span class="small muted" id="city-note"></span>
     </div>
 
-    <div class="tabs" id="tabs">
-      <button class="tab active" data-stage="inicio">Inicio</button>
-      <button class="tab" data-stage="personas">Personas reales</button>
-      <button class="tab" data-stage="construir">Construir narrativa</button>
-      <button class="tab" data-stage="testear">Testear audiencia</button>
-      <button class="tab" data-stage="ab">Comparar A/B</button>
-      <button class="tab" data-stage="redteam">Red team</button>
-      <button class="tab" data-stage="social">Escucha social</button>
-      <button class="tab" data-stage="escenarios">Escenarios</button>
-      <button class="tab" data-stage="metodo">Metodología & validez</button>
-    </div>
+    <div class="s-label">Inteligencia territorial · datos reales</div>
+    <div class="modulo-grid" id="grid-analiticos"></div>
 
-    <!-- ════════ INICIO ════════ -->
-    <section class="stage active" id="stage-inicio">
-      <div class="eyebrow">Laboratorio de narrativas · Bogotá D.C.</div>
-      <h1>Construye la narrativa, pruébala en gente real,<br>ajústala y sácala al público con menos incertidumbre.</h1>
-      <p class="lead">Un entorno para que una agencia de comunicación diseñe mensajes, los testee contra audiencias reales cruzadas con arquetipos, emociones y contexto socioeconómico de Bogotá, mida cómo aterrizan y los afine antes de hacerlos públicos.</p>
+    <div class="s-label">Laboratorio de narrativa · motor simulado</div>
+    <div class="modulo-grid" id="grid-narrativos"></div>
 
-      <div class="loop">
-        <div class="loop-step"><div class="n">01</div><div class="t">Construir</div><div class="d">Mensaje, narrativa (Ganz) y encuadre (Lakoff). Defines tono, valores y a quién le hablas.</div></div>
-        <div class="loop-step"><div class="n">02</div><div class="t">Testear</div><div class="d">El mensaje se confronta con un panel de personas reales por localidad, estrato, arquetipo y estado de ánimo.</div></div>
-        <div class="loop-step"><div class="n">03</div><div class="t">Ajustar</div><div class="d">Comparas variantes A/B, ves el riesgo de rechazo y simulas cómo lo ataca el adversario.</div></div>
-        <div class="loop-step"><div class="n">04</div><div class="t">Publicar</div><div class="d">Sacas la versión robusta a través de escenarios, con la incertidumbre acotada y documentada.</div></div>
-      </div>
+    <div class="s-label">Próximamente</div>
+    <div class="modulo-grid" id="grid-soon"></div>
 
-      <h2>Qué entra como insumo</h2>
-      <div class="grid g3">
-        <div class="card"><h3>Personas reales + arquetipos</h3><p class="small muted">Individuos cruzados con la taxonomía de 5 arquetipos psicopolíticos y su huella territorial en Bogotá.</p></div>
-        <div class="card"><h3>Estado de ánimo y emociones</h3><p class="small muted">Línea base emocional por persona (rueda de emociones) y su valencia actual, sensible al contexto.</p></div>
-        <div class="card"><h3>Contexto socioeconómico y político</h3><p class="small muted">Estrato, ocupación, ingreso, postura ideológica y temas que de verdad le importan a cada quien.</p></div>
-        <div class="card"><h3>Escucha social (Apify)</h3><p class="small muted">Señal viva de conversación por localidad: temas que suben, sentimiento y emoción dominante.</p></div>
-        <div class="card"><h3>Variantes de mensaje</h3><p class="small muted">Tantas versiones del mensaje como quieras, con tono, encuadre y nivel de concreción distintos.</p></div>
-        <div class="card"><h3>Escenarios futuros</h3><p class="small muted">Pruebas si el mensaje aguanta una ola de inseguridad, un escándalo o una mejora económica.</p></div>
-      </div>
-
-      <div class="warn-banner" style="margin-top:1.6rem">
-        <span>◆</span>
-        <span>Bogotá primero: este borrador usa el universo de las 20 localidades. La versión nacional se construye encima del mismo motor, sumando los demás departamentos.</span>
-      </div>
-    </section>
-
-    <!-- ════════ PERSONAS ════════ -->
-    <section class="stage" id="stage-personas">
-      <div class="eyebrow">Insumo 01 · Personas reales</div>
-      <h1>El panel de audiencia</h1>
-      <p class="lead">Cada mensaje se testea contra individuos, no contra promedios. En producción serían personas reales (datos públicos + consentimiento). En este borrador son personas-ejemplo que cubren la diversidad de Bogotá.</p>
-      <div class="persona-grid" id="personaGrid"></div>
-    </section>
-
-    <!-- ════════ CONSTRUIR ════════ -->
-    <section class="stage" id="stage-construir">
-      <div class="eyebrow">Paso 01 · Construir</div>
-      <h1>El constructor de narrativa</h1>
-      <p class="lead">Escribe el mensaje y define sus atributos. Lo que armes aquí es lo que se testea en la pestaña siguiente.</p>
-
-      <div class="builder" style="margin-top:1.4rem">
-        <div>
-          <label class="fld">Mensaje primario (≤ 25 palabras)</label>
-          <textarea id="b-texto" maxlength="240"></textarea>
-
-          <div class="grid g2">
-            <div>
-              <label class="fld">Story of Self / Us / Now (Ganz)</label>
-              <textarea id="b-ganz" placeholder="Yo… / Nosotros… / Ahora…"></textarea>
-            </div>
-            <div>
-              <label class="fld">Valor central + encuadre (Lakoff)</label>
-              <textarea id="b-frame" placeholder="Valor central, metáfora dominante, palabras propias…"></textarea>
-            </div>
-          </div>
-
-          <label class="fld">Temas que toca</label>
-          <div class="chips" id="b-chips"></div>
-        </div>
-
-        <div>
-          <div class="card">
-            <label class="fld" style="margin-top:0">Tono</label>
-            <select id="b-tono">
-              <option value="firmeza">Firmeza / orden</option>
-              <option value="esperanza">Esperanza / oportunidad</option>
-              <option value="cercania">Cercanía / empatía</option>
-              <option value="indignacion">Indignación / denuncia</option>
-              <option value="tecnico">Técnico / gestión</option>
-            </select>
-
-            <label class="fld">Emoción que apela</label>
-            <select id="b-emocion">
-              <option value="seguridad">Seguridad</option>
-              <option value="esperanza">Esperanza</option>
-              <option value="indignacion">Indignación</option>
-              <option value="pertenencia">Pertenencia</option>
-              <option value="firmeza">Confianza / firmeza</option>
-            </select>
-
-            <label class="fld">Inclinación ideológica del mensaje</label>
-            <div class="slider-row"><input type="range" id="b-ideo" min="-100" max="100" value="-20"><span class="v" id="b-ideo-v"></span></div>
-            <div class="small muted" style="font-size:.7rem">← Izquierda · Centro · Derecha →</div>
-
-            <label class="fld">Complejidad del lenguaje</label>
-            <div class="slider-row"><input type="range" id="b-complej" min="0" max="100" value="45"><span class="v" id="b-complej-v"></span></div>
-
-            <label class="fld">Concreción (promesa + evidencia)</label>
-            <div class="slider-row"><input type="range" id="b-concre" min="0" max="100" value="45"><span class="v" id="b-concre-v"></span></div>
-
-            <div class="btn-row">
-              <button class="btn sm" id="load-a">Cargar ejemplo «Firmeza»</button>
-              <button class="btn sm ghost" id="load-b">Cargar ejemplo «Oportunidad»</button>
-            </div>
-          </div>
-          <div class="btn-row">
-            <button class="btn" id="goto-test">Testear este mensaje →</button>
-          </div>
-          <div class="btn-row">
-            <button class="btn sm ghost" id="save-a">Guardar como Variante A</button>
-            <button class="btn sm ghost" id="save-b">Guardar como Variante B</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="bog-map-wrap">
-        <h2>Impacto simulado por UPL de Bogotá</h2>
-        <p class="small muted">Cómo aterriza el mensaje que estás armando en cada UPL. Mové los filtros (tono, ideología, temas, concreción) y el mapa se recolorea en vivo.</p>
-        <div class="bog-map-grid">
-          <div class="bog-map">
-            <svg id="bog-upl-svg" class="bog-svg" viewBox="0 0 100 160" aria-label="Mapa simulado por UPL de Bogotá"></svg>
-            <div class="bog-legend"><span>Resistencia</span><span class="bar" style="background:linear-gradient(90deg,#cf5b46,#d2a236,#3f9d63)"></span><span>Recepción</span><span style="margin-left:auto">persuasión simulada · ilustrativo</span></div>
-          </div>
-          <div class="bog-side" id="bog-upl-side"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ════════ TESTEAR ════════ -->
-    <section class="stage" id="stage-testear">
-      <div class="eyebrow">Paso 02 · Testear</div>
-      <h1>Cómo aterriza en la audiencia</h1>
-      <div class="filter-row">
-        <span class="small muted">Filtrar panel:</span>
-        <select id="f-localidad"><option value="">Todas las localidades</option></select>
-        <select id="f-estrato"><option value="">Todos los estratos</option></select>
-        <select id="f-arq"><option value="">Todos los arquetipos</option></select>
-        <select id="f-scen"></select>
-        <button class="btn sm" id="run-test">Simular reacciones</button>
-      </div>
-
-      <div class="veredicto" id="veredicto"></div>
-      <div class="agg" id="agg"></div>
-      <h3>Reacción individuo por individuo</h3>
-      <div id="reactList"></div>
-    </section>
-
-    <!-- ════════ A/B ════════ -->
-    <section class="stage" id="stage-ab">
-      <div class="eyebrow">Paso 03 · Ajustar</div>
-      <h1>Comparar variantes A/B</h1>
-      <p class="lead">Dos versiones del mensaje, mismo panel. Quién gana, en quién y por qué.</p>
-      <div class="btn-row"><button class="btn sm" id="run-ab">Comparar A vs B</button>
-        <span class="small muted" id="ab-hint" style="align-self:center"></span></div>
-      <div class="ab" id="abBox" style="margin-top:1.2rem"></div>
-      <h3>Desglose por persona</h3>
-      <table class="tbl" id="abTable"></table>
-    </section>
-
-    <!-- ════════ RED TEAM ════════ -->
-    <section class="stage" id="stage-redteam">
-      <div class="eyebrow">Paso 03 · Ajustar · Adversario</div>
-      <h1>Red team: cómo te lo voltean</h1>
-      <p class="lead">Antes de publicar, simulamos cómo el adversario re-encuadra el mensaje (Lakoff) y qué segmentos del panel quedan expuestos a ese ataque.</p>
-      <div id="redBox" style="margin-top:1.2rem"></div>
-    </section>
-
-    <!-- ════════ SOCIAL ════════ -->
-    <section class="stage" id="stage-social">
-      <div class="eyebrow">Insumo 04 · Escucha social (Apify)</div>
-      <h1>Pulso de la conversación · Bogotá</h1>
-      <p class="lead muted small">Maqueta de panel de escucha. En producción se alimenta de scraping vía Apify (X, Instagram, Facebook, comentarios de medios) + clasificación de sentimiento/emoción. Acá los números son ilustrativos.</p>
-
-      <div class="grid g2" style="margin-top:1.4rem">
-        <div class="card">
-          <h3 style="margin-top:0">Temas que suben (últimos 7 días)</h3>
-          <div id="topicBars"></div>
-        </div>
-        <div class="card">
-          <h3 style="margin-top:0">Emoción dominante</h3>
-          <div class="emo-wheel" id="emoWheel"></div>
-          <p class="small muted" style="margin-top:.9rem">Sentimiento neto ciudad: <b id="sentNeto"></b></p>
-        </div>
-      </div>
-
-      <h3>Sentimiento por localidad</h3>
-      <table class="tbl" id="locTable"></table>
-    </section>
-
-    <!-- ════════ ESCENARIOS ════════ -->
-    <section class="stage" id="stage-escenarios">
-      <div class="eyebrow">Paso 04 · Publicar con menos incertidumbre</div>
-      <h1>¿El mensaje aguanta distintos futuros?</h1>
-      <p class="lead">Probamos la persuasión promedio del mensaje actual bajo cuatro escenarios. Un mensaje robusto es el que no se desploma cuando cambia el contexto.</p>
-      <div class="scen-pills" id="scenPills" style="margin-top:1.2rem"></div>
-      <table class="tbl" id="scenTable"></table>
-      <div class="veredicto" id="scenVeredicto" style="margin-top:1.2rem"></div>
-
-      <div class="bog-map-wrap">
-        <h2>Cómo cambian los barrios de Bogotá según el escenario</h2>
-        <p class="small muted">Cada celda es un barrio. El color muestra cuánto sube o baja su receptividad al mensaje actual al pasar de la línea base al escenario elegido arriba.</p>
-        <div class="bog-map-grid">
-          <div class="bog-map">
-            <svg id="bog-barrio-svg" class="bog-svg" viewBox="0 0 100 160" aria-label="Mapa simulado por barrios de Bogotá"></svg>
-            <div class="bog-legend"><span>Empeora</span><span class="bar" style="background:linear-gradient(90deg,#cf5b46,#b9b3a6,#3f9d63)"></span><span>Mejora</span><span style="margin-left:auto">cambio simulado · ilustrativo</span></div>
-            <div class="bog-cap" id="bog-barrio-cap"></div>
-          </div>
-          <div class="bog-side" id="bog-barrio-side"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ════════ METODOLOGÍA ════════ -->
-    <section class="stage" id="stage-metodo">
-      <div class="eyebrow">La letra honesta</div>
-      <h1>Metodología, validez y límites</h1>
-      <p class="lead">Esto es lo que un financiador serio va a preguntar. Mejor tenerlo claro desde el borrador.</p>
-
-      <h2>Qué es real y qué es simulado en este borrador</h2>
-      <div class="grid g2">
-        <div class="card"><h3 style="margin-top:0">Simulado (mockup)</h3><ul class="clean small">
-          <li>Las 6 personas-ejemplo y sus atributos.</li>
-          <li>El motor de reacción (heurística determinista, sin LLM).</li>
-          <li>Los números de escucha social.</li>
-          <li>Cualquier «predicción» de persuasión o rechazo.</li>
-        </ul></div>
-        <div class="card"><h3 style="margin-top:0">Real / reutilizable</h3><ul class="clean small">
-          <li>La taxonomía de 5 arquetipos psicopolíticos (modelo propio).</li>
-          <li>La huella electoral territorial de Bogotá (localidad / barrio).</li>
-          <li>El marco de mensaje: Ganz (narrativa) + Lakoff (encuadre).</li>
-          <li>La infraestructura de pipeline, escucha y reporte.</li>
-        </ul></div>
-      </div>
-
-      <h2>El método detrás del «testeo»</h2>
-      <p>La idea de simular reacciones de audiencia con personas sintéticas se conoce como <em>silicon sampling</em> (Argyle et al., 2023, <em>«Out of One, Many»</em>, Political Analysis). Es útil para <b>explorar hipótesis de mensaje rápido y barato</b>, pero <b>no sustituye una encuesta</b>: su validez depende de calibrarlo contra verdad-terreno real.</p>
-
-      <h3>Ruta a la validez (lo que falta y lo que costaría)</h3>
-      <ul class="clean">
-        <li><b>Calibración:</b> contrastar las salidas del motor contra resultados conocidos (encuestas previas del cliente, comportamiento electoral por localidad). Hoy no tenemos ese ground truth.</li>
-        <li><b>Panel real:</b> un panel pequeño de validación (40–60 personas por segmento) que ancle el modelo sintético. Es el upsell natural sobre este producto.</li>
-        <li><b>Señal viva:</b> conectar Apify con tope de costo y geolocalización inferida (la mayoría de posts en Bogotá no vienen geo-etiquetados).</li>
-        <li><b>Modelo LLM en el motor:</b> reemplazar la heurística por reacciones generadas con LLM ancladas en el perfil de cada persona (con su costo por consulta).</li>
-      </ul>
-
-      <h2>Privacidad y marco legal</h2>
-      <p class="small muted">«Individuos reales» activa la <b>Ley 1581 de 2012</b> (habeas data). En producción hay que decidir entre individuos reales con consentimiento explícito, o segmentos agregados anclados en datos. Este borrador usa solo personas-ejemplo, sin datos personales de nadie.</p>
-
-      <div class="foot" id="foot"></div>
-    </section>
-
+    <div class="foot" id="foot"></div>
   </main>
 
+  <script src="narrativas-lab/cities.js"></script>
+  <script src="narrativas-lab/lab-common.js"></script>
   <script>
-    /* ─── EMAIL GATE ─────────────────────────────────────────── */
-    const ALLOWED = ['reruizc@gmail.com', 'frp1978@gmail.com', 'nuevagemela@gmail.com']; // Nury (socia)
-    const token = localStorage.getItem('rr-token');
-    const userRaw = localStorage.getItem('rr-user');
-    const user = userRaw ? JSON.parse(userRaw) : null;
-    function denyToLogin(){ localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); window.location.replace('login.html'); }
-    function denyToDashboard(){ window.location.replace('dashboard.html'); }
-    function emailAllowed(em){ return em && ALLOWED.includes(String(em).toLowerCase().trim()); }
-    if (!token || !user) {
-      denyToLogin();
-    } else if (!emailAllowed(user.email)) {
-      denyToDashboard();
-    } else {
-      (async () => {
-        try {
-          const res = await fetch('https://rr-auth.reruizc.workers.dev/auth/me', { headers: { 'Authorization': `Bearer ${token}` } });
-          if (res.status === 401) return denyToLogin();
-          const data = await res.json();
-          if (!data.ok || !emailAllowed(data.user && data.user.email)) return denyToDashboard();
-          localStorage.setItem('rr-user', JSON.stringify(Object.assign({}, user, data.user)));
-          revealPage();
-        } catch(e){ revealPage(); }
-      })();
-    }
-    function revealPage(){
-      const gate = document.getElementById('gate'); if (gate) gate.remove();
-      document.getElementById('topNav').hidden = false;
-      document.getElementById('main').hidden = false;
-      const uc = document.getElementById('userChip');
-      if (uc && user) uc.textContent = String(user.email||'').split('@')[0];
-      initApp();
-    }
-
-    /* ─── THEME: lo maneja theme.js (body.day-mode por hora) ───
-       El botón es id="theme-toggle-btn" (no "theme-btn") para que theme.js
-       NO le escriba texto; acá solo cambiamos el ícono sol/luna. */
-    window.__onThemeChange = function(day){
-      const b = document.getElementById('theme-toggle-btn');
-      if (b) b.textContent = day ? '🌙' : '☀';
-    };
-
-    /* ─── CURSOR ─────────────────────────────────────────── */
-    (function(){
-      const cur = document.querySelector('.cursor'), ring = document.querySelector('.cursor-ring');
-      window.addEventListener('mousemove', e => {
-        cur.style.left = ring.style.left = e.clientX + 'px';
-        cur.style.top = ring.style.top = e.clientY + 'px';
-      });
-      document.addEventListener('mouseover', e => {
-        const hov = e.target.closest('button,a,.persona,select,input,textarea,.chip,.scen-pill');
-        cur.style.transform = 'translate(-50%,-50%) scale(' + (hov?1.8:1) + ')';
-        ring.style.opacity = hov ? '.8' : '.4';
-      });
-    })();
-
-    /* ════════════════════════════════════════════════════════
-       DATA  (todo simulado · personas-ejemplo)
-       ════════════════════════════════════════════════════════ */
-    const ARQ = {
-      proteccion:   { nombre:'Protección',   color:'#1e6fb8' },
-      continuidad:  { nombre:'Continuidad',  color:'#2f6b3f' },
-      supervivencia:{ nombre:'Supervivencia',color:'#c9682e' },
-      castigo:      { nombre:'Castigo',      color:'#a02020' },
-      pertenencia:  { nombre:'Pertenencia',  color:'#7a3b8f' }
-    };
-
-    const TEMAS = {
-      seguridad:'Seguridad', orden:'Orden', empleo:'Empleo', costo_vida:'Costo de vida',
-      movilidad:'Movilidad', educacion:'Educación', corrupcion:'Anticorrupción',
-      salud:'Salud', ambiente:'Ambiente', servicios:'Servicios públicos',
-      vivienda:'Vivienda', impuestos:'Impuestos', genero:'Género'
-    };
-
-    // educ = proxy de comprensión · escept = escepticismo · apertura = persuadabilidad
-    // engage = actividad digital · moodVal = valencia de ánimo (-1..1) · ideo (-1 izq .. +1 der)
-    const PERSONAS = [
-      { id:'simon', nombre:'Simón Bolívar', edad:47, localidad:'Kennedy', estrato:2,
-        ocup:'Conductor de plataforma', arq:'supervivencia', ideo:-0.15, educ:0.45,
-        escept:0.6, apertura:0.6, engage:0.5, moodVal:-0.25, emoDom:'Frustración con esperanza',
-        emoAfin:['esperanza','indignacion'], temaTop:'el costo de vida',
-        temas:{ costo_vida:0.95, empleo:0.9, seguridad:0.7, salud:0.6, movilidad:0.65, impuestos:0.7 },
-        socio:'Ingreso variable día a día; sin ahorro; aporta a casa de 4.',
-        senal:'Sube fotos del precio de la gasolina, comparte memes sobre peajes y pregunta por subsidios al gremio.' },
-
-      { id:'carmen', nombre:'Carmen Elisa Rojas', edad:62, localidad:'Usaquén', estrato:5,
-        ocup:'Empresaria pensionada', arq:'proteccion', ideo:0.45, educ:0.8,
-        escept:0.7, apertura:0.35, engage:0.4, moodVal:-0.2, emoDom:'Ansiedad por seguridad',
-        emoAfin:['seguridad','firmeza'], temaTop:'la seguridad',
-        temas:{ seguridad:0.95, orden:0.9, impuestos:0.75, salud:0.6, corrupcion:0.7 },
-        socio:'Patrimonio consolidado; preocupada por seguridad y por impuestos.',
-        senal:'Reenvía cadenas de WhatsApp sobre robos en el conjunto y pide más policía y cámaras.' },
-
-      { id:'daniela', nombre:'Daniela Quintero', edad:26, localidad:'Chapinero', estrato:4,
-        ocup:'Diseñadora freelance', arq:'castigo', ideo:-0.6, educ:0.85,
-        escept:0.55, apertura:0.75, engage:0.9, moodVal:-0.1, emoDom:'Indignación idealista',
-        emoAfin:['indignacion','esperanza'], temaTop:'la corrupción y el ambiente',
-        temas:{ ambiente:0.85, genero:0.8, corrupcion:0.9, movilidad:0.7, empleo:0.6 },
-        socio:'Ingreso por proyectos; sin estabilidad pero con capital cultural alto.',
-        senal:'Muy activa en X e Instagram: comparte hilos de clima y denuncias de corrupción, hace stories de opinión.' },
-
-      { id:'jose', nombre:'José Gregorio Pájaro', edad:54, localidad:'Bosa', estrato:2,
-        ocup:'Tendero', arq:'continuidad', ideo:0.05, educ:0.4,
-        escept:0.65, apertura:0.45, engage:0.35, moodVal:-0.15, emoDom:'Cansancio pragmático',
-        emoAfin:['firmeza','esperanza'], temaTop:'el negocio y la seguridad',
-        temas:{ seguridad:0.85, empleo:0.7, impuestos:0.8, costo_vida:0.8, movilidad:0.5 },
-        socio:'Negocio propio chico; márgenes apretados; teme la extorsión.',
-        senal:'En grupos de comerciantes del barrio; se queja de la extorsión, los impuestos y la inseguridad nocturna.' },
-
-      { id:'luz', nombre:'Luz Marina Cifuentes', edad:38, localidad:'Ciudad Bolívar', estrato:1,
-        ocup:'Líder comunal · madre cabeza de hogar', arq:'pertenencia', ideo:-0.5, educ:0.5,
-        escept:0.6, apertura:0.65, engage:0.7, moodVal:-0.05, emoDom:'Resiliencia desconfiada',
-        emoAfin:['esperanza','pertenencia','indignacion'], temaTop:'los servicios y la educación',
-        temas:{ servicios:0.9, educacion:0.85, seguridad:0.8, vivienda:0.8, salud:0.7 },
-        socio:'Ingreso informal; vive del rebusque y el trabajo comunitario.',
-        senal:'Organiza por Facebook y WhatsApp comunal; pide agua, colegios y rutas de transporte para el barrio.' },
-
-      { id:'andres', nombre:'Andrés Felipe Moreno', edad:33, localidad:'Suba', estrato:3,
-        ocup:'Ingeniero asalariado', arq:'proteccion', ideo:0.25, educ:0.8,
-        escept:0.6, apertura:0.55, engage:0.6, moodVal:-0.1, emoDom:'Escepticismo aspiracional',
-        emoAfin:['firmeza','esperanza'], temaTop:'la movilidad',
-        temas:{ movilidad:0.9, seguridad:0.8, empleo:0.7, impuestos:0.75 },
-        socio:'Clase media; crédito de vivienda; valora resultados medibles.',
-        senal:'Comparte quejas de TransMilenio y trancones; mira propuestas con lupa y pide datos.' }
+    const ANALITICOS = [
+      { num:'01 · línea base electoral', name:'Histórico electoral', href:'narrativas-lab/historico-electoral.html', status:'real',
+        desc:'Cómo votó cada territorio en presidencial 2026 (1ª y 2ª vuelta), de la comuna al barrio, con la historia electoral de la zona.' },
+      { num:'02 · agenda pública', name:'Saliencia mediática', href:'narrativas-lab/saliencia.html', status:'real-saliencia',
+        desc:'Qué publican los medios: nube de palabras, medios más activos y titulares por ventana de 6 h / 24 h / 5 días.' },
+      { num:'03 · seguridad y delitos', name:'Criminalidad', href:'narrativas-lab/criminalidad.html', status:'real',
+        desc:'Homicidios, hurtos, violencia intrafamiliar y delitos sexuales (Policía Nacional), evolución 2018–2024 y ranking del departamento.' }
+    ];
+    const NARRATIVOS = [
+      { num:'04 · construir', name:'Construir narrativa', href:'narrativas-lab/construir.html', status:'sim',
+        desc:'Escribe el mensaje (Ganz + Lakoff), define tono y encuadre, y míralo aterrizar por territorio en un mapa que reacciona en vivo.' },
+      { num:'05 · testear', name:'Testear audiencia', href:'narrativas-lab/testear.html', status:'sim',
+        desc:'Confronta el mensaje contra un panel de personas-ejemplo por arquetipo, estrato y estado de ánimo. Persuasión y riesgo de rechazo.' },
+      { num:'06 · escucha', name:'Escucha social', href:'narrativas-lab/escucha-social.html', status:'sim',
+        desc:'Pulso de la conversación en redes: temas que suben, emoción dominante y sentimiento por zona. Maqueta del panel (Apify).' },
+      { num:'07 · escenarios', name:'Escenarios', href:'narrativas-lab/escenarios.html', status:'sim',
+        desc:'¿El mensaje aguanta una ola de inseguridad, un escándalo o una mejora económica? Robustez y mapa de cómo se mueve cada territorio.' }
+    ];
+    const SOON = [
+      { name:'Arquetipos territoriales', desc:'Cartografía emocional psicopolítica por barrio (hoy real solo en Medellín).' },
+      { name:'Comportamiento electoral', desc:'Riesgo electoral, públicos dominantes y variables explicativas por comuna.' },
+      { name:'Pobreza e IPM', desc:'Indicadores socioeconómicos por territorio (IPM, NBI, servicios).' },
+      { name:'Gobierno criminal', desc:'Matriz de injerencia e injerencia electoral (requiere investigación por ciudad).' },
+      { name:'Comparar A/B', desc:'Dos variantes del mensaje, mismo panel: quién gana, en quién y por qué.' },
+      { name:'Red team', desc:'Cómo el adversario re-encuadra el mensaje (Lakoff) y qué segmentos quedan expuestos.' }
     ];
 
-    // Variantes-ejemplo
-    const EX_A = { texto:'Bogotá necesita orden. Mano firme contra el crimen, cámaras en cada esquina y cero tolerancia con la extorsión.',
-      ganz:'Yo crecí cuidando lo mío. / Nosotros merecemos vivir sin miedo. / Ahora recuperamos la calle.',
-      frame:'Valor central: seguridad. Metáfora: la casa que se protege. Palabras propias: orden, autoridad, respeto.',
-      tono:'firmeza', emocion:'seguridad', ideo:0.4, complejidad:0.30, concrecion:0.6,
-      temas:{ seguridad:1.0, orden:0.9 } };
-    const EX_B = { texto:'Bogotá se cuida cuidando a su gente: empleo digno, transporte que funcione y barrios con oportunidades para los jóvenes.',
-      ganz:'Yo también la he peleado duro. / Nosotros somos una ciudad que no se rinde. / Ahora construimos oportunidades.',
-      frame:'Valor central: oportunidad. Metáfora: la ciudad que cuida. Palabras propias: dignidad, futuro, juntos.',
-      tono:'esperanza', emocion:'esperanza', ideo:-0.2, complejidad:0.45, concrecion:0.45,
-      temas:{ empleo:0.9, costo_vida:0.7, movilidad:0.6, seguridad:0.5, educacion:0.5 } };
-
-    // mensaje en edición (arranca en una mezcla realista = B)
-    let MSG = JSON.parse(JSON.stringify(EX_B));
-    let VAR_A = JSON.parse(JSON.stringify(EX_A));
-    let VAR_B = JSON.parse(JSON.stringify(EX_B));
-
-    // Escenarios: moodShift global + multiplicadores de saliencia por tema + penalización de credibilidad
-    const SCENARIOS = [
-      { id:'base', nombre:'Línea base (hoy)', moodShift:0, credPenalty:0, sal:{} },
-      { id:'inseg', nombre:'Ola de inseguridad', moodShift:-0.15, credPenalty:0, sal:{ seguridad:1.4, orden:1.3 } },
-      { id:'corrup', nombre:'Escándalo de corrupción', moodShift:-0.2, credPenalty:0.15, sal:{ corrupcion:1.6 } },
-      { id:'economia', nombre:'Mejora económica', moodShift:0.2, credPenalty:0, sal:{ empleo:1.3, costo_vida:1.3 } }
-    ];
-
-    const SOCIAL_TOPICS = [
-      { t:'Seguridad / hurtos', vol:92, sent:-0.55 },
-      { t:'Costo de vida', vol:81, sent:-0.40 },
-      { t:'Movilidad / TransMilenio', vol:74, sent:-0.48 },
-      { t:'Corrupción', vol:63, sent:-0.62 },
-      { t:'Empleo / oportunidades', vol:57, sent:-0.18 },
-      { t:'Servicios públicos', vol:44, sent:-0.30 },
-      { t:'Ambiente', vol:31, sent:0.05 }
-    ];
-    const SOCIAL_EMO = [
-      { l:'Indignación', v:34, c:'#a02020' },
-      { l:'Miedo', v:24, c:'#1e6fb8' },
-      { l:'Esperanza', v:19, c:'#2f6b3f' },
-      { l:'Cansancio', v:14, c:'#c9682e' },
-      { l:'Orgullo', v:6, c:'#7a3b8f' },
-      { l:'Otros', v:3, c:'#888' }
-    ];
-    const SOCIAL_LOC = [
-      { loc:'Ciudad Bolívar', sent:-0.42, tema:'Servicios públicos' },
-      { loc:'Kennedy', sent:-0.51, tema:'Costo de vida' },
-      { loc:'Suba', sent:-0.46, tema:'Movilidad' },
-      { loc:'Usaquén', sent:-0.38, tema:'Seguridad' },
-      { loc:'Chapinero', sent:-0.29, tema:'Corrupción' },
-      { loc:'Bosa', sent:-0.49, tema:'Seguridad' }
-    ];
-
-    /* ════════════════════════════════════════════════════════
-       MOTOR DE REACCIÓN (heurística determinista)
-       ════════════════════════════════════════════════════════ */
-    const clamp = (x,a,b)=>Math.max(a,Math.min(b,x));
-
-    function temaOverlap(p, msg, scen){
-      let num=0, den=0;
-      for (const t in msg.temas){
-        const sal = (scen && scen.sal && scen.sal[t]) ? scen.sal[t] : 1;
-        const mi = msg.temas[t] * sal;
-        den += mi; num += mi * (p.temas[t]||0);
-      }
-      return den ? clamp(num/den,0,1) : 0;
+    function badge(cfg, status){
+      if(status==='real') return `<span class="modulo-status live">Real · ${cfg.nombre}</span>`;
+      if(status==='real-saliencia') return cfg.hasSaliencia
+        ? `<span class="modulo-status live">Real · ${cfg.nombre}</span>`
+        : `<span class="modulo-status sim">Maqueta · ${cfg.nombre}</span>`;
+      return `<span class="modulo-status sim">Motor simulado</span>`;
     }
-    const ideoDist = (p,msg)=>Math.abs(p.ideo - msg.ideo)/2;       // 0..1
-    const ideoAlign = (p,msg)=>1 - ideoDist(p,msg);                 // 0..1
-
-    function simular(p, msg, scen){
-      scen = scen || SCENARIOS[0];
-      const align = ideoAlign(p,msg);
-      const overlap = temaOverlap(p,msg,scen);
-      const mood = clamp(p.moodVal + (scen.moodShift||0), -1, 1);
-
-      let comp = 100*(1 - msg.complejidad*(1.15 - 0.45*p.educ)) + msg.concrecion*8 + (mood>0?3:-3);
-      comp = clamp(comp, 6, 99);
-
-      let cred = 100*(0.45*align + 0.35*msg.concrecion + 0.20*(1-p.escept));
-      cred = clamp(cred - (scen.credPenalty||0)*100 - (1-align)*p.escept*30, 5, 98);
-
-      let reso = 100*(0.55*overlap + 0.25*align + 0.20*((mood+1)/2));
-      if (msg.emocion && p.emoAfin.includes(msg.emocion)) reso += 8;
-      // Bono de saliencia del escenario (NO normalizado): si el escenario
-      // hace más saliente un tema que el mensaje toca Y a la persona/barrio
-      // le importa, sube la resonancia. Hace que los escenarios muevan el mapa.
-      if (scen.sal){ let sb = 0; for (const tt in msg.temas){ const s = (scen.sal[tt]||1) - 1; if (s > 0) sb += s * msg.temas[tt] * (p.temas[tt]||0); } reso += sb * 24; }
-      reso = clamp(reso, 4, 99);
-
-      let pers = 100*(0.40*(reso/100) + 0.35*(cred/100) + 0.25*p.apertura) * (0.62 + 0.38*align);
-      pers = clamp(pers, 3, 97);
-
-      let risk = 100*(0.55*ideoDist(p,msg) + 0.25*p.escept + 0.20*p.engage);
-      if (msg.tono==='indignacion' && align<0.45) risk += 12;
-      if (mood<-0.3 && align<0.5) risk += 8;
-      risk = clamp(risk - align*15, 2, 96);
-
-      return { comp:Math.round(comp), cred:Math.round(cred), reso:Math.round(reso),
-               pers:Math.round(pers), risk:Math.round(risk) };
+    function card(m, cfg){
+      return `<a class="modulo" href="${m.href}"><div class="modulo-num">${m.num}</div>
+        <div class="modulo-name">${m.name}</div><div class="modulo-desc">${m.desc}</div>${badge(cfg, m.status)}</a>`;
+    }
+    function soonCard(m){
+      return `<div class="modulo disabled"><div class="modulo-num">próximamente</div>
+        <div class="modulo-name">${m.name}</div><div class="modulo-desc">${m.desc}</div><span class="modulo-status">No disponible</span></div>`;
+    }
+    function renderGrids(){
+      const cfg = NLCities.active();
+      document.getElementById('grid-analiticos').innerHTML = ANALITICOS.map(m=>card(m,cfg)).join('');
+      document.getElementById('grid-narrativos').innerHTML = NARRATIVOS.map(m=>card(m,cfg)).join('');
+      document.getElementById('grid-soon').innerHTML = SOON.map(soonCard).join('');
+      document.getElementById('city-note').textContent = cfg.hasSaliencia
+        ? 'Medellín: la ciudad con cobertura completa (electoral + crimen + medios + arquetipos).'
+        : 'Histórico electoral y criminalidad son reales para esta ciudad; saliencia y arquetipos, aún en maqueta.';
     }
 
-    function _reaccion(p, msg, s){
-      if (s.risk >= 62) return `Lo siente como un mensaje que no es para ${p.nombre.split(' ')[0]}: choca con su mirada y activa rechazo. Riesgo de que lo comparta para criticarlo.`;
-      if (s.pers >= 66) return `Conecta fuerte: lo lee como una respuesta directa a lo que le importa: ${p.temaTop}. Alta probabilidad de que lo amplifique.`;
-      if (s.pers >= 46) return `Lo escucha con interés, pero pide pruebas concretas sobre ${p.temaTop} antes de creerlo del todo.`;
-      return `Indiferencia: el mensaje no toca su prioridad (${p.temaTop}). Pasa de largo sin reaccionar.`;
-    }
-
-    function getFiltered(){
-      const fl = document.getElementById('f-localidad').value;
-      const fe = document.getElementById('f-estrato').value;
-      const fa = document.getElementById('f-arq').value;
-      return PERSONAS.filter(p =>
-        (!fl || p.localidad===fl) &&
-        (!fe || String(p.estrato)===fe) &&
-        (!fa || p.arq===fa));
-    }
-    const scoreColor = (v, invert)=>{ const x = invert ? 100-v : v; return x>=60?'var(--good)':x>=40?'var(--mid)':'var(--bad)'; };
-    const initials = n => n.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
-
-    /* ════════════════════════════════════════════════════════
-       RENDER
-       ════════════════════════════════════════════════════════ */
-    function renderPersonas(){
-      const g = document.getElementById('personaGrid');
-      g.innerHTML = PERSONAS.map(p => {
-        const a = ARQ[p.arq];
-        const ideoLab = p.ideo<-0.25?'Izquierda':p.ideo>0.25?'Derecha':'Centro';
-        return `<div class="persona ${p.id==='simon'?'flag':''}">
-          <div class="p-head">
-            <div class="p-ava" style="background:${a.color}">${initials(p.nombre)}</div>
-            <div><div class="p-name">${p.nombre}</div>
-              <div class="p-sub">${p.edad} años · ${p.localidad} · Estrato ${p.estrato}</div></div>
-          </div>
-          <div class="p-tags">
-            <span class="tag arq" style="background:${a.color}">${a.nombre}</span>
-            <span class="tag">${ideoLab}</span>
-            <span class="tag">${p.ocup}</span>
-          </div>
-          <div class="p-row"><b>Ánimo:</b> ${p.emoDom}</div>
-          <div class="p-row"><b>Le importa:</b> ${p.temaTop}</div>
-          <div class="p-row"><b>Contexto:</b> ${p.socio}</div>
-          <div class="p-signal">Señal social — ${p.senal}</div>
-        </div>`;
-      }).join('');
-    }
-
-    function renderBuilder(){
-      document.getElementById('b-texto').value = MSG.texto;
-      document.getElementById('b-ganz').value = MSG.ganz||'';
-      document.getElementById('b-frame').value = MSG.frame||'';
-      document.getElementById('b-tono').value = MSG.tono;
-      document.getElementById('b-emocion').value = MSG.emocion;
-      document.getElementById('b-ideo').value = Math.round(MSG.ideo*100);
-      document.getElementById('b-complej').value = Math.round(MSG.complejidad*100);
-      document.getElementById('b-concre').value = Math.round(MSG.concrecion*100);
-      syncSliderLabels();
-      const box = document.getElementById('b-chips');
-      box.innerHTML = Object.keys(TEMAS).map(t =>
-        `<button class="chip ${MSG.temas[t]?'on':''}" data-tema="${t}">${TEMAS[t]}</button>`).join('');
-      box.querySelectorAll('.chip').forEach(c => c.onclick = () => {
-        const t = c.dataset.tema;
-        if (MSG.temas[t]) delete MSG.temas[t]; else MSG.temas[t] = 0.8;
-        c.classList.toggle('on');
-        renderBogUPL();
-      });
-    }
-    function syncSliderLabels(){
-      const i = +document.getElementById('b-ideo').value;
-      document.getElementById('b-ideo-v').textContent = (i>0?'+':'')+i;
-      document.getElementById('b-complej-v').textContent = document.getElementById('b-complej').value;
-      document.getElementById('b-concre-v').textContent = document.getElementById('b-concre').value;
-    }
-    function pullBuilder(){
-      MSG.texto = document.getElementById('b-texto').value;
-      MSG.ganz = document.getElementById('b-ganz').value;
-      MSG.frame = document.getElementById('b-frame').value;
-      MSG.tono = document.getElementById('b-tono').value;
-      MSG.emocion = document.getElementById('b-emocion').value;
-      MSG.ideo = (+document.getElementById('b-ideo').value)/100;
-      MSG.complejidad = (+document.getElementById('b-complej').value)/100;
-      MSG.concrecion = (+document.getElementById('b-concre').value)/100;
-    }
-
-    const DIMS = [
-      { k:'comp', l:'Comprensión', inv:false },
-      { k:'cred', l:'Credibilidad', inv:false },
-      { k:'reso', l:'Resonancia', inv:false },
-      { k:'pers', l:'Persuasión', inv:false },
-      { k:'risk', l:'Riesgo rechazo', inv:true }
-    ];
-
-    function renderTest(){
-      pullBuilder();
-      const scen = SCENARIOS.find(s=>s.id===document.getElementById('f-scen').value) || SCENARIOS[0];
-      const panel = getFiltered();
-      if (!panel.length){ document.getElementById('reactList').innerHTML='<p class="muted">Sin personas en el filtro.</p>'; return; }
-      const sims = panel.map(p => ({ p, s: simular(p, MSG, scen) }));
-      const avg = k => Math.round(sims.reduce((a,x)=>a+x.s[k],0)/sims.length);
-
-      // veredicto
-      const persAvg = avg('pers'), riskAvg = avg('risk');
-      let verdict = persAvg>=60 ? 'Mensaje fuerte' : persAvg>=45 ? 'Mensaje aceptable' : 'Mensaje flojo';
-      let vcol = persAvg>=60?'var(--good)':persAvg>=45?'var(--mid)':'var(--bad)';
-      document.getElementById('veredicto').innerHTML =
-        `<div class="small muted">Veredicto sobre ${panel.length} persona(s) · escenario «${scen.nombre}»</div>
-         <div class="big" style="color:${vcol}">${verdict} · ${persAvg}/100 persuasión</div>
-         <div class="small muted">Riesgo de rechazo promedio: <b style="color:${scoreColor(riskAvg,true)}">${riskAvg}/100</b>${riskAvg>=55?' — revisar antes de publicar.':''}</div>`;
-
-      document.getElementById('agg').innerHTML = DIMS.map(d => {
-        const v = avg(d.k); const col = scoreColor(v, d.inv);
-        return `<div class="metric"><div class="lab">${d.l}</div><div class="num" style="color:${col}">${v}</div>
-          <div class="bar"><i style="width:${v}%;background:${col}"></i></div></div>`;
-      }).join('');
-
-      document.getElementById('reactList').innerHTML = sims
-        .sort((a,b)=>b.s.pers-a.s.pers)
-        .map(({p,s}) => {
-        const a = ARQ[p.arq];
-        const mini = [['Per',s.pers,false],['Cre',s.cred,false],['Rie',s.risk,true]];
-        return `<div class="react-row">
-          <div class="ava" style="background:${a.color}">${initials(p.nombre)}</div>
-          <div class="body"><div class="nm">${p.nombre} <span class="small muted" style="font-weight:400">· ${p.localidad} · E${p.estrato}</span></div>
-            <div class="rx">"${_reaccion(p, MSG, s)}"</div></div>
-          <div class="sc">${mini.map(([l,v,iv])=>`<div class="s"><div class="n" style="color:${scoreColor(v,iv)}">${v}</div><div class="l">${l}</div></div>`).join('')}</div>
-        </div>`;
-      }).join('');
-    }
-
-    function renderAB(){
-      pullBuilder();
-      const scen = SCENARIOS[0];
-      document.getElementById('ab-hint').textContent = 'A = la última guardada · B = la última guardada · (usa los botones en Construir)';
-      const simA = PERSONAS.map(p=>({p,s:simular(p,VAR_A,scen)}));
-      const simB = PERSONAS.map(p=>({p,s:simular(p,VAR_B,scen)}));
-      const avg = (arr,k)=>Math.round(arr.reduce((a,x)=>a+x.s[k],0)/arr.length);
-      const pa = avg(simA,'pers'), pb = avg(simB,'pers');
-      const colA = pa>=pb, colB = pb>pa;
-      const colBox = (lbl,msg,arr,win)=>`<div class="ab-col ${win?'win':''}">
-        <div class="ab-tag">Variante ${lbl} ${win?'· gana':''}</div>
-        <div class="ab-msg">"${msg.texto}"</div>
-        ${DIMS.map(d=>{const v=avg(arr,d.k);const c=scoreColor(v,d.inv);return `<div class="topic-bar"><div class="nm small">${d.l}</div><div class="tk"><i style="width:${v}%;background:${c}"></i></div><div class="sent" style="color:${c}">${v}</div></div>`;}).join('')}
-      </div>`;
-      document.getElementById('abBox').innerHTML = colBox('A',VAR_A,simA,colA) + colBox('B',VAR_B,simB,colB);
-
-      // tabla por persona
-      const rows = PERSONAS.map((p,i)=>{
-        const a = simA[i].s.pers, b = simB[i].s.pers;
-        const w = a>b?'A':b>a?'B':'=';
-        return `<tr><td><b>${p.nombre.split(' ')[0]} ${p.nombre.split(' ')[1]||''}</b><br><span class="small muted">${p.localidad} · ${ARQ[p.arq].nombre}</span></td>
-          <td style="color:${scoreColor(a)}">${a}</td><td style="color:${scoreColor(b)}">${b}</td>
-          <td><b style="color:var(--purple)">${w}</b></td>
-          <td class="small muted">${b>a?'Le habla más la oportunidad':a>b?'Le habla más la firmeza':'Empate'}</td></tr>`;
-      }).join('');
-      document.getElementById('abTable').innerHTML =
-        `<tr><th>Persona</th><th>Persuasión A</th><th>Persuasión B</th><th>Gana</th><th>Lectura</th></tr>${rows}`;
-    }
-
-    function renderRed(){
-      pullBuilder();
-      const tono = MSG.tono;
-      // ataques según tono dominante
-      const ATAQUES = {
-        firmeza: [
-          { h:'«Mano dura = más de lo mismo»', d:'Re-encuadran la firmeza como autoritarismo vacío que ya falló. Activan memoria de promesas incumplidas de seguridad.', side:'izquierda' },
-          { h:'«¿Y las causas? Pura tijera, cero oportunidad»', d:'Frame de que solo castiga y no resuelve empleo ni juventud. Atrae a quienes priorizan oportunidad.', side:'izquierda' }
-        ],
-        esperanza: [
-          { h:'«Bonito, pero ¿con qué plata?»', d:'Re-encuadran la oportunidad como promesa hueca sin financiación. Activan escepticismo fiscal.', side:'derecha' },
-          { h:'«Mientras tanto, te roban en la esquina»', d:'Desvían a seguridad: el mensaje suena tibio frente al miedo real. Atrae a votantes de orden.', side:'derecha' }
-        ],
-        cercania:[ { h:'«Populismo de abrazo»', d:'Re-encuadran la empatía como manipulación sentimental sin sustancia.', side:'ambos' } ],
-        indignacion:[ { h:'«Solo sabe pelear, no gobernar»', d:'Re-encuadran la denuncia como rabia destructiva sin propuesta.', side:'ambos' } ],
-        tecnico:[ { h:'«Habla en chino, no conecta»', d:'Re-encuadran el tecnicismo como distancia con la gente del común.', side:'ambos' } ]
-      };
-      const atks = ATAQUES[tono] || ATAQUES.tecnico;
-      // segmentos vulnerables = personas con alto riesgo bajo el mensaje
-      const html = atks.map(a => {
-        const vuln = PERSONAS.filter(p => simular(p,MSG,SCENARIOS[0]).risk>=50)
-          .map(p=>p.nombre.split(' ')[0]+' ('+p.localidad+')');
-        return `<div class="attack"><div class="h">⚔ ${a.h}</div>
-          <div class="small">${a.d}</div>
-          <div class="vuln">Segmentos expuestos: ${vuln.length?vuln.join(' · '):'ninguno crítico en el panel actual'}</div></div>`;
-      }).join('');
-      document.getElementById('redBox').innerHTML = html +
-        `<p class="small muted" style="margin-top:1rem">El red team corre sobre el <b>mensaje actual del constructor</b> (tono: ${tono}). Cambia el tono y vuelve a entrar para ver otros vectores de ataque.</p>`;
-    }
-
-    function renderSocial(){
-      document.getElementById('topicBars').innerHTML = SOCIAL_TOPICS.map(t=>{
-        const c = t.sent<-0.4?'var(--bad)':t.sent<-0.15?'var(--mid)':'var(--good)';
-        return `<div class="topic-bar"><div class="nm">${t.t}</div>
-          <div class="tk"><i style="width:${t.vol}%;background:${c}"></i></div>
-          <div class="sent" style="color:${c}">${t.sent>0?'+':''}${t.sent.toFixed(2)}</div></div>`;
-      }).join('');
-      document.getElementById('emoWheel').innerHTML = SOCIAL_EMO.map(e=>
-        `<div class="emo" style="background:${e.c}1a"><div class="v" style="color:${e.c}">${e.v}%</div><div class="l" style="color:${e.c}">${e.l}</div></div>`).join('');
-      document.getElementById('sentNeto').textContent = '−0.41 (negativo)';
-      document.getElementById('sentNeto').style.color = 'var(--bad)';
-      document.getElementById('locTable').innerHTML =
-        `<tr><th>Localidad</th><th>Sentimiento</th><th>Tema que domina</th></tr>` +
-        SOCIAL_LOC.map(l=>{const c=l.sent<-0.4?'var(--bad)':'var(--mid)';
-          return `<tr><td><b>${l.loc}</b></td><td style="color:${c}">${l.sent.toFixed(2)}</td><td class="small muted">${l.tema}</td></tr>`;}).join('');
-    }
-
-    let curScen = 'base';
-    function renderScen(){
-      pullBuilder();
-      renderBogBarrios();
-      document.getElementById('scenPills').innerHTML = SCENARIOS.map(s=>
-        `<button class="scen-pill ${s.id===curScen?'on':''}" data-s="${s.id}">${s.nombre}</button>`).join('');
-      document.querySelectorAll('#scenPills .scen-pill').forEach(b=>b.onclick=()=>{ curScen=b.dataset.s; renderScen(); });
-
-      const rows = SCENARIOS.map(s=>{
-        const sims = PERSONAS.map(p=>simular(p,MSG,s));
-        const pers = Math.round(sims.reduce((a,x)=>a+x.pers,0)/sims.length);
-        const risk = Math.round(sims.reduce((a,x)=>a+x.risk,0)/sims.length);
-        const here = s.id===curScen;
-        return `<tr style="${here?'background:var(--teal-dim)':''}">
-          <td><b>${s.nombre}</b></td>
-          <td style="color:${scoreColor(pers)}"><b>${pers}</b></td>
-          <td style="color:${scoreColor(risk,true)}">${risk}</td>
-          <td class="small muted">${pers>=58?'Aguanta bien':pers>=45?'Aguanta justo':'Se cae'}</td></tr>`;
-      }).join('');
-      document.getElementById('scenTable').innerHTML =
-        `<tr><th>Escenario</th><th>Persuasión</th><th>Riesgo</th><th>Lectura</th></tr>${rows}`;
-
-      const persVals = SCENARIOS.map(s=>{const sims=PERSONAS.map(p=>simular(p,MSG,s));return sims.reduce((a,x)=>a+x.pers,0)/sims.length;});
-      const min = Math.round(Math.min(...persVals)), max = Math.round(Math.max(...persVals));
-      const spread = max-min;
-      const robusto = spread<=12 ? 'robusto' : spread<=22 ? 'moderadamente sensible' : 'frágil';
-      const rc = spread<=12?'var(--good)':spread<=22?'var(--mid)':'var(--bad)';
-      document.getElementById('scenVeredicto').innerHTML =
-        `<div class="small muted">Robustez del mensaje a través de los 4 escenarios</div>
-         <div class="big" style="color:${rc}">Mensaje ${robusto}</div>
-         <div class="small muted">Persuasión entre <b>${min}</b> y <b>${max}</b> (variación de ${spread} puntos). ${spread>22?'Conviene una versión de respaldo para el peor escenario.':'La narrativa se sostiene aunque cambie el contexto.'}</div>`;
-    }
-
-    /* ════════════════════════════════════════════════════════
-       MAPA ESQUEMÁTICO DE BOGOTÁ (simulado · inline · sin datos externos)
-       Silueta por máscara de celdas; norte arriba, cerros al este.
-       Geografía política aproximada: NE más derecha/estrato alto,
-       SO más popular/izquierda. Cada celda reusa el motor `simular`.
-       ════════════════════════════════════════════════════════ */
-    const BOG_MASK = [
-      "...XXX....",
-      "..XXXXX...",
-      ".XXXXXX...",
-      ".XXXXXXX..",
-      "XXXXXXXX..",
-      "XXXXXXXXX.",
-      "XXXXXXXXX.",
-      "XXXXXXXXX.",
-      "XXXXXXXX..",
-      ".XXXXXXX..",
-      ".XXXXXX...",
-      ".XXXXX....",
-      "..XXXX....",
-      "..XXX.....",
-      "...XX.....",
-      "...X......"
-    ];
-    const BOG_COLS = BOG_MASK[0].length, BOG_ROWS = BOG_MASK.length;
-
-    function _bogUpl(c, r){
-      const x = c/(BOG_COLS-1), y = r/(BOG_ROWS-1);
-      if (y < 0.18) return x < 0.5 ? 'Suba' : 'Usaquén';
-      if (y < 0.34) return x < 0.34 ? 'Engativá' : (x < 0.67 ? 'Barrios Unidos' : 'Chapinero');
-      if (y < 0.50) return x < 0.34 ? 'Fontibón' : (x < 0.67 ? 'Teusaquillo' : 'Santa Fe');
-      if (y < 0.64) return x < 0.40 ? 'Kennedy' : (x < 0.70 ? 'Puente Aranda' : 'San Cristóbal');
-      if (y < 0.80) return x < 0.45 ? 'Bosa' : (x < 0.72 ? 'Rafael Uribe' : 'Usme');
-      return 'Ciudad Bolívar';
-    }
-    function _bogAttrs(c, r){
-      const x = c/(BOG_COLS-1), y = r/(BOG_ROWS-1);
-      const east = x*2-1, north = (1-y)*2-1;
-      const noise = (((c*7 + r*13) % 7) - 3) / 28;       // determinista −0.1..+0.1
-      const ideo = clamp(0.45*east + 0.5*north + noise, -0.85, 0.85);
-      const educ = clamp(0.52 + 0.28*east + 0.22*north, 0.2, 0.95);
-      const der = (ideo + 0.85) / 1.7;                    // 0 izq .. 1 der
-      const temas = {
-        seguridad: 0.6 + 0.3*der, orden: 0.3 + 0.5*der, impuestos: 0.3 + 0.45*der,
-        movilidad: 0.5 + 0.2*Math.abs(east), costo_vida: 0.9 - 0.5*der,
-        empleo: 0.85 - 0.4*der, servicios: 0.85 - 0.55*der, educacion: 0.7 - 0.3*der
-      };
-      const temaTop = Object.keys(temas).reduce((a,b)=> temas[b] > temas[a] ? b : a);
-      const emoAfin = ideo > 0.2 ? ['seguridad','firmeza']
-                    : ideo < -0.2 ? ['esperanza','indignacion','pertenencia']
-                    : ['esperanza','firmeza'];
-      return { ideo, educ, temas, temaTop, emoAfin,
-        moodVal: -0.12 + noise, escept: 0.5 + 0.12*educ,
-        apertura: clamp(0.6 - 0.18*Math.abs(ideo) + noise, 0.3, 0.9), engage: 0.45 + 0.18*educ };
-    }
-    const BOG_CELLS = (() => {
-      const cells = [];
-      for (let r=0; r<BOG_ROWS; r++) for (let c=0; c<BOG_COLS; c++) {
-        if (BOG_MASK[r][c] !== 'X') continue;
-        const upl = _bogUpl(c, r);
-        cells.push(Object.assign({ c, r, idx: cells.length, upl,
-          barrio: upl + ' · sector ' + (c+1) + '·' + (r+1) }, _bogAttrs(c, r)));
-      }
-      return cells;
-    })();
-
-    function _hx(h){ h=h.replace('#',''); return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; }
-    function _mix(a, b, t){ const A=_hx(a), B=_hx(b); return `rgb(${Math.round(A[0]+(B[0]-A[0])*t)},${Math.round(A[1]+(B[1]-A[1])*t)},${Math.round(A[2]+(B[2]-A[2])*t)})`; }
-    const C_BAD='#cf5b46', C_MID='#d2a236', C_GOOD='#3f9d63', C_NEU='#b9b3a6';
-    function persColor(v){ const t=clamp(v/100,0,1); return t<0.5 ? _mix(C_BAD,C_MID,t*2) : _mix(C_MID,C_GOOD,(t-0.5)*2); }
-    function swingColor(d){ const t=clamp(d/16,-1,1); return t>=0 ? _mix(C_NEU,C_GOOD,t) : _mix(C_NEU,C_BAD,-t); }
-    const CS = 10, GAPU = 0.6, GAPB = 0.5;
-
-    function _bogTip(){
-      let tip = document.getElementById('bog-tip');
-      if (!tip){ tip = document.createElement('div'); tip.id='bog-tip'; tip.className='bog-tip'; document.body.appendChild(tip); }
-      return tip;
-    }
-    function _bindBog(svg){
-      if (!svg || svg._bound) return; svg._bound = true;
-      const tip = _bogTip();
-      svg.addEventListener('mousemove', e => {
-        const t = e.target.closest('.bzcell'); if (!t){ tip.style.opacity='0'; return; }
-        const z = BOG_CELLS[+t.dataset.idx]; if (!z) return;
-        let html;
-        if (t.dataset.mode === 'upl'){ const v = simular(z, MSG, SCENARIOS[0]).pers; html = `<b>${z.upl}</b><br>Persuasión ${v}/100`; }
-        else { const sc = SCENARIOS.find(s=>s.id===curScen)||SCENARIOS[0];
-               const d = simular(z, MSG, sc).pers - simular(z, MSG, SCENARIOS[0]).pers;
-               html = `<b>${z.upl}</b><br>${z.barrio}<br>Δ ${d>0?'+':''}${d} vs base`; }
-        tip.innerHTML = html;
-        tip.style.left = (e.clientX+12)+'px'; tip.style.top = (e.clientY+12)+'px'; tip.style.opacity='1';
-      });
-      svg.addEventListener('mouseleave', ()=>{ tip.style.opacity='0'; });
-    }
-
-    function renderBogUPL(){
-      const svg = document.getElementById('bog-upl-svg'); if (!svg) return;
-      pullBuilder();
-      const sum={}, cnt={};
-      BOG_CELLS.forEach(z => { const p = simular(z, MSG, SCENARIOS[0]).pers; sum[z.upl]=(sum[z.upl]||0)+p; cnt[z.upl]=(cnt[z.upl]||0)+1; });
-      const val={}; Object.keys(sum).forEach(u => val[u] = Math.round(sum[u]/cnt[u]));
-      const rects = BOG_CELLS.map(z =>
-        `<rect class="bzcell" data-idx="${z.idx}" data-mode="upl" x="${(z.c*CS+GAPU).toFixed(1)}" y="${(z.r*CS+GAPU).toFixed(1)}" width="${(CS-GAPU*2).toFixed(1)}" height="${(CS-GAPU*2).toFixed(1)}" rx="1.2" fill="${persColor(val[z.upl])}"/>`).join('');
-      const groups={}; BOG_CELLS.forEach(z => (groups[z.upl]=groups[z.upl]||[]).push(z));
-      const labels = Object.keys(groups).map(u => {
-        const zs=groups[u]; const cx=(zs.reduce((a,z)=>a+z.c,0)/zs.length+0.5)*CS; const cy=(zs.reduce((a,z)=>a+z.r,0)/zs.length+0.5)*CS;
-        return `<text x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" class="bzlabel" text-anchor="middle" dominant-baseline="middle">${u}</text>`;
-      }).join('');
-      svg.setAttribute('viewBox', `0 0 ${BOG_COLS*CS} ${BOG_ROWS*CS}`);
-      svg.innerHTML = rects + labels;
-      _bindBog(svg);
-      const ranked = Object.keys(val).sort((a,b)=>val[b]-val[a]);
-      const side = document.getElementById('bog-upl-side');
-      if (side){
-        const top = ranked.slice(0,3), bot = ranked.slice(-3).reverse();
-        const li = u => `<div style="display:flex;justify-content:space-between;gap:.6rem"><span>${u}</span><b style="color:${persColor(val[u])}">${val[u]}</b></div>`;
-        side.innerHTML = `<h3>Lectura del mapa</h3>
-          <p class="small muted">Persuasión simulada del mensaje actual en cada UPL (0–100).</p>
-          <div class="small"><b>Mejor recepción</b>${top.map(li).join('')}</div>
-          <div class="small" style="margin-top:.7rem"><b>Más resistencia</b>${bot.map(li).join('')}</div>`;
-      }
-    }
-
-    function renderBogBarrios(){
-      const svg = document.getElementById('bog-barrio-svg'); if (!svg) return;
-      const sc = SCENARIOS.find(s=>s.id===curScen) || SCENARIOS[0];
-      let mejoran=0, empeoran=0; const deltas=[];
-      const rects = BOG_CELLS.map(z => {
-        const base = simular(z, MSG, SCENARIOS[0]).pers;
-        const now  = simular(z, MSG, sc).pers;
-        const d = now - base; deltas.push({ z, d });
-        if (d >= 3) mejoran++; else if (d <= -3) empeoran++;
-        const flip = (base<50 && now>=50) || (base>=50 && now<50);
-        return `<rect class="bzcell${flip?' bzflip':''}" data-idx="${z.idx}" data-mode="barrio" x="${(z.c*CS+GAPB).toFixed(1)}" y="${(z.r*CS+GAPB).toFixed(1)}" width="${(CS-GAPB*2).toFixed(1)}" height="${(CS-GAPB*2).toFixed(1)}" rx="1" fill="${swingColor(d)}"/>`;
-      }).join('');
-      svg.setAttribute('viewBox', `0 0 ${BOG_COLS*CS} ${BOG_ROWS*CS}`);
-      svg.innerHTML = rects;
-      _bindBog(svg);
-      const cap = document.getElementById('bog-barrio-cap');
-      if (cap) cap.textContent = curScen==='base'
-        ? 'Línea base: punto de partida. Elegí otro escenario arriba para ver cómo se mueven los barrios.'
-        : `Con «${sc.nombre}»: ${mejoran} barrios mejoran su receptividad al mensaje y ${empeoran} la empeoran (vs. línea base).`;
-      const side = document.getElementById('bog-barrio-side');
-      if (side){
-        const up=[...deltas].sort((a,b)=>b.d-a.d).slice(0,3);
-        const dn=[...deltas].sort((a,b)=>a.d-b.d).slice(0,3);
-        const li = o => `<div style="display:flex;justify-content:space-between;gap:.6rem"><span>${o.z.upl}</span><b style="color:${swingColor(o.d)}">${o.d>0?'+':''}${o.d}</b></div>`;
-        side.innerHTML = `<h3>Barrios que más se mueven</h3>
-          <p class="small muted">Cambio en la persuasión simulada al pasar de la línea base a «${sc.nombre}».</p>
-          <div class="small"><b>Suben</b>${up.map(li).join('')}</div>
-          <div class="small" style="margin-top:.7rem"><b>Bajan</b>${dn.map(li).join('')}</div>`;
-      }
-    }
-
-    /* ─── TABS ─────────────────────────────────────────── */
-    function showStage(id){
-      document.querySelectorAll('.stage').forEach(s=>s.classList.remove('active'));
-      document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-      document.getElementById('stage-'+id).classList.add('active');
-      document.querySelector(`.tab[data-stage="${id}"]`).classList.add('active');
-      window.scrollTo({top:0,behavior:'smooth'});
-      if (id==='testear') renderTest();
-      if (id==='ab') renderAB();
-      if (id==='redteam') renderRed();
-      if (id==='social') renderSocial();
-      if (id==='escenarios') renderScen();
-      if (id==='construir'){ renderBuilder(); renderBogUPL(); }
-    }
-
-    /* ─── INIT ─────────────────────────────────────────── */
-    function initApp(){
-      document.querySelectorAll('.tab').forEach(t => t.onclick = () => showStage(t.dataset.stage));
-
-      // filtros del testeo
-      const fl = document.getElementById('f-localidad');
-      [...new Set(PERSONAS.map(p=>p.localidad))].sort().forEach(l=>fl.innerHTML+=`<option>${l}</option>`);
-      const fe = document.getElementById('f-estrato');
-      [...new Set(PERSONAS.map(p=>p.estrato))].sort().forEach(e=>fe.innerHTML+=`<option value="${e}">Estrato ${e}</option>`);
-      const fa = document.getElementById('f-arq');
-      Object.keys(ARQ).forEach(k=>fa.innerHTML+=`<option value="${k}">${ARQ[k].nombre}</option>`);
-      const fs = document.getElementById('f-scen');
-      SCENARIOS.forEach(s=>fs.innerHTML+=`<option value="${s.id}">${s.nombre}</option>`);
-
-      document.getElementById('run-test').onclick = renderTest;
-      document.getElementById('run-ab').onclick = renderAB;
-      ['f-localidad','f-estrato','f-arq','f-scen'].forEach(id=>document.getElementById(id).onchange=renderTest);
-
-      // builder
-      renderBuilder();
-      ['b-ideo','b-complej','b-concre'].forEach(id=>document.getElementById(id).oninput=syncSliderLabels);
-      document.getElementById('load-a').onclick = ()=>{ MSG=JSON.parse(JSON.stringify(EX_A)); renderBuilder(); renderBogUPL(); };
-      document.getElementById('load-b').onclick = ()=>{ MSG=JSON.parse(JSON.stringify(EX_B)); renderBuilder(); renderBogUPL(); };
-      const builderEl = document.querySelector('.builder');
-      if (builderEl){ const onB = ()=>{ pullBuilder(); renderBogUPL(); }; builderEl.addEventListener('input', onB); builderEl.addEventListener('change', onB); }
-      document.getElementById('save-a').onclick = ()=>{ pullBuilder(); VAR_A=JSON.parse(JSON.stringify(MSG)); flash('save-a','Guardada como A ✓'); };
-      document.getElementById('save-b').onclick = ()=>{ pullBuilder(); VAR_B=JSON.parse(JSON.stringify(MSG)); flash('save-b','Guardada como B ✓'); };
-      document.getElementById('goto-test').onclick = ()=>{ pullBuilder(); showStage('testear'); };
-
-      renderPersonas();
+    NLCommon.initCursor();
+    NLCommon.bootGate(function(){
+      NLCommon.mountCitySelect('#city-hero-slot', { onPick: renderGrids });
+      NLCities.onChange(renderGrids);
+      renderGrids();
       document.getElementById('foot').innerHTML =
-        'Narrativas Lab · borrador privado · acceso restringido · datos simulados<br>'+
-        'Marco: Ganz (narrativa pública) · Lakoff (encuadre) · silicon sampling (Argyle 2023) · arquetipos psicopolíticos (modelo propio) · Bogotá D.C.';
-    }
-    function flash(btnId, txt){
-      const b = document.getElementById(btnId); const old = b.textContent;
-      b.textContent = txt; setTimeout(()=>{ b.textContent = old; }, 1400);
-    }
+        'Narrativas Lab · borrador privado · acceso restringido · 14 ciudades con mapa por barrio<br>'+
+        'Marco: Ganz (narrativa) · Lakoff (encuadre) · silicon sampling (Argyle 2023) · arquetipos psicopolíticos (modelo propio) · huella electoral 2026.';
+    });
   </script>
   <script src="theme.js"></script>
 </body>

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Escenarios · NarrativasLab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="chassis.css" />
+</head>
+<body>
+  <div class="cursor"></div><div class="cursor-ring"></div>
+  <div id="gate" class="gate"><div class="gate-text">Verificando acceso</div><div class="gate-bar"></div></div>
+
+  <nav class="top" id="topNav" hidden>
+    <div class="nav-left">
+      <a class="btn-back" href="../narrativas-lab.html">← Hub</a>
+      <span class="logo-product">Narrativas<span>Lab</span></span>
+      <span class="private-badge">Privado</span>
+    </div>
+    <div class="nav-right">
+      <span id="nl-city-slot"></span>
+      <span class="user-chip" id="userChip"></span>
+      <button class="theme-btn theme-icon" id="theme-toggle-btn" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
+    </div>
+  </nav>
+
+  <main class="wrap" id="main" hidden>
+    <div class="warn-banner"><span>◆</span><span><b>Maqueta.</b> Probamos la persuasión <b>simulada</b> del mensaje actual bajo cuatro escenarios. Un mensaje robusto no se desploma cuando cambia el contexto. El mapa muestra cómo se mueve cada territorio (anclado en su voto real).</span></div>
+
+    <div class="eyebrow">Módulo narrativo 07 · Escenarios</div>
+    <h1>¿El mensaje aguanta distintos futuros?</h1>
+    <p class="lead">Sobre el mensaje guardado en <a class="inline" href="construir.html">Construir</a>. Elige un escenario y mira cómo reacciona la ciudad.</p>
+
+    <div class="scen-pills" id="scenPills" style="margin-top:1.2rem"></div>
+    <table class="tbl" id="scenTable"></table>
+    <div class="veredicto" id="scenVeredicto" style="margin-top:1.2rem"></div>
+
+    <div class="map-wrap">
+      <h2>Cómo se mueven los territorios según el escenario</h2>
+      <p class="small muted">Cambio en la receptividad simulada del mensaje al pasar de la línea base al escenario elegido, por comuna/localidad y barrio.</p>
+      <div class="map-toolbar">
+        <div class="map-level" id="level-toggle">
+          <button data-l="comuna" class="on">Comuna/Localidad</button>
+          <button data-l="barrio">Barrio</button>
+        </div>
+        <button class="map-back" id="map-back" style="display:none">← Volver</button>
+        <span class="map-scope" id="map-scope"></span>
+      </div>
+      <div class="map-grid">
+        <div class="map-box">
+          <div id="map" class="nl-map"></div>
+          <div class="map-legend"><span>Empeora</span><span class="lbar" style="background:linear-gradient(90deg,#cf5b46,#b9b3a6,#3f9d63)"></span><span>Mejora</span><span style="margin-left:auto" class="muted" id="map-cap"></span></div>
+        </div>
+        <div class="map-side" id="side"></div>
+      </div>
+    </div>
+
+    <div class="foot" id="foot"></div>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="cities.js"></script>
+  <script src="engine.js"></script>
+  <script src="lab-common.js"></script>
+  <script src="nl-map.js"></script>
+  <script>
+    let MSG = NLCommon.getMsg(); if(!MSG || !MSG.temas){ MSG = JSON.parse(JSON.stringify(EX_B)); }
+    let MAP=null, CITYINFO=null, curScen='base';
+    const ST={ level:'comuna', comuna:null };
+    const persUnder = (ideo,scen)=>simular(personaFromIdeo(ideo), MSG, scen).pers;
+
+    function deltaOf(t){ const base=persUnder(t.ideo,SCENARIOS[0]); const sc=SCENARIOS.find(s=>s.id===curScen)||SCENARIOS[0]; return persUnder(t.ideo,sc)-base; }
+    function styler(rec, ctx){
+      const t=ctx.level==='comuna'?ctx.comunaRec:rec; const d=deltaOf(t);
+      const name=ctx.level==='comuna'?t.cm:t.n;
+      return { fillColor:swingColor(d), fillOpacity:(ctx.level==='barrio'&&rec.f)?.5:.9,
+        tooltip:`<b>${name}</b><br>${curScen==='base'?'Línea base':'Δ '+(d>0?'+':'')+d+' vs base'}<br><span class="muted">voto real: ${Math.round((t.share2||0)*100)}% Cepeda</span>` };
+    }
+
+    function renderScenTable(){
+      document.getElementById('scenPills').innerHTML = SCENARIOS.map(s=>`<button class="scen-pill ${s.id===curScen?'on':''}" data-s="${s.id}">${s.nombre}</button>`).join('');
+      document.querySelectorAll('#scenPills .scen-pill').forEach(b=>b.onclick=()=>{ curScen=b.dataset.s; renderScenTable(); if(MAP){MAP.setStyler(styler);MAP.restyle();renderSide();} updateCap(); });
+      const rows = SCENARIOS.map(s=>{ const sims=PERSONAS.map(p=>simular(p,MSG,s)); const pers=Math.round(sims.reduce((a,x)=>a+x.pers,0)/sims.length); const risk=Math.round(sims.reduce((a,x)=>a+x.risk,0)/sims.length); const here=s.id===curScen;
+        return `<tr style="${here?'background:var(--teal-dim)':''}"><td><b>${s.nombre}</b></td><td style="color:${scoreColor(pers)}"><b>${pers}</b></td><td style="color:${scoreColor(risk,true)}">${risk}</td><td class="small muted">${pers>=58?'Aguanta bien':pers>=45?'Aguanta justo':'Se cae'}</td></tr>`; }).join('');
+      document.getElementById('scenTable').innerHTML = `<tr><th>Escenario</th><th>Persuasión</th><th>Riesgo</th><th>Lectura</th></tr>${rows}`;
+      const pv = SCENARIOS.map(s=>{const sims=PERSONAS.map(p=>simular(p,MSG,s));return sims.reduce((a,x)=>a+x.pers,0)/sims.length;});
+      const min=Math.round(Math.min(...pv)), max=Math.round(Math.max(...pv)), spread=max-min;
+      const robusto=spread<=12?'robusto':spread<=22?'moderadamente sensible':'frágil'; const rc=spread<=12?'var(--good)':spread<=22?'var(--mid)':'var(--bad)';
+      document.getElementById('scenVeredicto').innerHTML = `<div class="small muted">Robustez del mensaje a través de los 4 escenarios</div><div class="big" style="color:${rc}">Mensaje ${robusto}</div><div class="small muted">Persuasión entre <b>${min}</b> y <b>${max}</b> (variación de ${spread} puntos). ${spread>22?'Conviene una versión de respaldo para el peor escenario.':'La narrativa se sostiene aunque cambie el contexto.'}</div>`;
+    }
+    function updateCap(){ const sc=SCENARIOS.find(s=>s.id===curScen)||SCENARIOS[0]; document.getElementById('map-cap').textContent = curScen==='base'?'elige un escenario arriba':`«${sc.nombre}» vs base`; }
+    function setToolbar(){
+      document.querySelectorAll('#level-toggle button').forEach(b=>b.classList.toggle('on',b.dataset.l===ST.level));
+      const back=document.getElementById('map-back'); back.style.display=ST.comuna?'inline-block':'none'; if(ST.comuna)back.textContent='← '+ST.comuna;
+      document.getElementById('map-scope').textContent = ST.comuna?`${CITYINFO.nombre} · ${ST.comuna} · barrios`:(ST.level==='comuna'?`${CITYINFO.nombre} · por comuna/localidad`:`${CITYINFO.nombre} · barrios`);
+    }
+    function renderSide(){
+      const recs = ST.level==='comuna' && !ST.comuna ? MAP.comunaRecords() : MAP.barrioRecords().filter(b=>!b.f && (!ST.comuna||b.cm===ST.comuna));
+      const scored = recs.map(r=>({r,d:deltaOf(r)}));
+      const nm=o=>o.cm!==undefined&&o.keys?o.cm:(o.n||o.cm);
+      const up=[...scored].sort((a,b)=>b.d-a.d).slice(0,5), dn=[...scored].sort((a,b)=>a.d-b.d).slice(0,5);
+      const li=o=>`<div class="rank-li" style="display:flex;justify-content:space-between;padding:.2rem 0;border-bottom:1px solid var(--border);font-size:.84rem"><span>${nm(o.r)}</span><b style="color:${swingColor(o.d)}">${o.d>0?'+':''}${o.d}</b></div>`;
+      document.getElementById('side').innerHTML = `<div class="card"><h3 style="margin-top:0">Territorios que más se mueven</h3>
+        <p class="small muted">Cambio simulado al pasar a «${(SCENARIOS.find(s=>s.id===curScen)||{}).nombre}».</p>
+        <div class="small"><b>Suben</b>${up.map(li).join('')}</div><div class="small" style="margin-top:.7rem"><b>Bajan</b>${dn.map(li).join('')}</div></div>`;
+    }
+    function drawMap(){ MAP.setStyler(styler); MAP.draw(ST.level, ST.comuna); setToolbar(); renderSide(); updateCap(); }
+    async function loadCityMap(){
+      CITYINFO=NLCities.active(); ST.comuna=null;
+      const info=await MAP.loadCity(CITYINFO);
+      const lt=document.getElementById('level-toggle');
+      if(!info.hasComuna){ ST.level='barrio'; lt.style.display='none'; } else { lt.style.display=''; ST.level=ST.level||'comuna'; }
+      drawMap();
+    }
+
+    NLCommon.initCursor();
+    NLCommon.bootGate(function(){
+      NLCommon.mountCitySelect('#nl-city-slot');
+      MAP=NLMap('#map');
+      MAP.onDrill(cm=>{ ST.comuna=cm; ST.level='barrio'; MAP.draw('barrio',cm); setToolbar(); renderSide(); });
+      document.querySelectorAll('#level-toggle button').forEach(b=>b.onclick=()=>{ ST.level=b.dataset.l; ST.comuna=null; MAP.draw(ST.level,null); setToolbar(); renderSide(); });
+      document.getElementById('map-back').onclick=()=>{ ST.comuna=null; ST.level='comuna'; MAP.draw('comuna',null); setToolbar(); renderSide(); };
+      NLCities.onChange(()=>loadCityMap());
+      document.getElementById('foot').innerHTML='NarrativasLab · módulo Escenarios · robustez del mensaje (simulado) · mapa anclado en sesgo electoral real · acceso restringido.';
+      renderScenTable();
+      loadCityMap();
+    });
+  </script>
+  <script src="../theme.js"></script>
+</body>
+</html>

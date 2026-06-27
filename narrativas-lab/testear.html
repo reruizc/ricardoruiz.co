@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Testear audiencia · NarrativasLab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="chassis.css" />
+</head>
+<body>
+  <div class="cursor"></div><div class="cursor-ring"></div>
+  <div id="gate" class="gate"><div class="gate-text">Verificando acceso</div><div class="gate-bar"></div></div>
+
+  <nav class="top" id="topNav" hidden>
+    <div class="nav-left">
+      <a class="btn-back" href="../narrativas-lab.html">← Hub</a>
+      <span class="logo-product">Narrativas<span>Lab</span></span>
+      <span class="private-badge">Privado</span>
+    </div>
+    <div class="nav-right">
+      <span id="nl-city-slot"></span>
+      <span class="user-chip" id="userChip"></span>
+      <button class="theme-btn theme-icon" id="theme-toggle-btn" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
+    </div>
+  </nav>
+
+  <main class="wrap" id="main" hidden>
+    <div class="warn-banner"><span>◆</span><span><b>Maqueta.</b> El panel son <b>personas-ejemplo</b> que cubren la diversidad del electorado; el motor de reacción es una heurística determinista (silicon sampling), no una encuesta. Útil para explorar hipótesis de mensaje, no para predecir.</span></div>
+
+    <div class="eyebrow">Módulo narrativo 05 · Testear</div>
+    <h1>Cómo aterriza en la audiencia</h1>
+    <p class="lead">El mensaje que armaste en <a class="inline" href="construir.html">Construir</a> se confronta contra individuos, no contra promedios.</p>
+
+    <div class="filter-row">
+      <span class="small muted">Filtrar panel:</span>
+      <select id="f-localidad"><option value="">Todas las localidades</option></select>
+      <select id="f-estrato"><option value="">Todos los estratos</option></select>
+      <select id="f-arq"><option value="">Todos los arquetipos</option></select>
+      <select id="f-scen"></select>
+      <button class="btn sm" id="run-test">Simular reacciones</button>
+    </div>
+
+    <div class="veredicto" id="veredicto"></div>
+    <div class="agg" id="agg"></div>
+    <h3>Reacción individuo por individuo</h3>
+    <div id="reactList"></div>
+
+    <div class="foot" id="foot"></div>
+  </main>
+
+  <script src="cities.js"></script>
+  <script src="engine.js"></script>
+  <script src="lab-common.js"></script>
+  <script>
+    let MSG = NLCommon.getMsg(); if(!MSG || !MSG.temas){ MSG = JSON.parse(JSON.stringify(EX_B)); }
+
+    function getFiltered(){
+      const fl=document.getElementById('f-localidad').value, fe=document.getElementById('f-estrato').value, fa=document.getElementById('f-arq').value;
+      return PERSONAS.filter(p => (!fl||p.localidad===fl) && (!fe||String(p.estrato)===fe) && (!fa||p.arq===fa));
+    }
+    function renderTest(){
+      const scen = SCENARIOS.find(s=>s.id===document.getElementById('f-scen').value) || SCENARIOS[0];
+      const panel = getFiltered();
+      if(!panel.length){ document.getElementById('veredicto').innerHTML=''; document.getElementById('agg').innerHTML=''; document.getElementById('reactList').innerHTML='<p class="muted">Sin personas en el filtro.</p>'; return; }
+      const sims = panel.map(p=>({ p, s:simular(p, MSG, scen) }));
+      const avg = k => Math.round(sims.reduce((a,x)=>a+x.s[k],0)/sims.length);
+      const persAvg=avg('pers'), riskAvg=avg('risk');
+      const verdict = persAvg>=60?'Mensaje fuerte':persAvg>=45?'Mensaje aceptable':'Mensaje flojo';
+      const vcol = persAvg>=60?'var(--good)':persAvg>=45?'var(--mid)':'var(--bad)';
+      document.getElementById('veredicto').innerHTML =
+        `<div class="small muted">Veredicto sobre ${panel.length} persona(s) · escenario «${scen.nombre}»</div>
+         <div class="big" style="color:${vcol}">${verdict} · ${persAvg}/100 persuasión</div>
+         <div class="small muted">Riesgo de rechazo promedio: <b style="color:${scoreColor(riskAvg,true)}">${riskAvg}/100</b>${riskAvg>=55?' — revisar antes de publicar.':''}</div>`;
+      document.getElementById('agg').innerHTML = DIMS.map(d=>{ const v=avg(d.k), col=scoreColor(v,d.inv);
+        return `<div class="metric"><div class="lab">${d.l}</div><div class="num" style="color:${col}">${v}</div><div class="bar"><i style="width:${v}%;background:${col}"></i></div></div>`; }).join('');
+      document.getElementById('reactList').innerHTML = sims.sort((a,b)=>b.s.pers-a.s.pers).map(({p,s})=>{
+        const a=ARQ[p.arq]; const mini=[['Per',s.pers,false],['Cre',s.cred,false],['Rie',s.risk,true]];
+        return `<div class="react-row"><div class="ava" style="background:${a.color}">${initials(p.nombre)}</div>
+          <div class="body"><div class="nm">${p.nombre} <span class="small muted" style="font-weight:400">· ${p.localidad} · E${p.estrato}</span></div>
+          <div class="rx">"${_reaccion(p, MSG, s)}"</div></div>
+          <div class="sc">${mini.map(([l,v,iv])=>`<div class="s"><div class="n" style="color:${scoreColor(v,iv)}">${v}</div><div class="l">${l}</div></div>`).join('')}</div></div>`;
+      }).join('');
+    }
+
+    NLCommon.initCursor();
+    NLCommon.bootGate(function(){
+      NLCommon.mountCitySelect('#nl-city-slot');
+      const fl=document.getElementById('f-localidad'); [...new Set(PERSONAS.map(p=>p.localidad))].sort().forEach(l=>fl.innerHTML+=`<option>${l}</option>`);
+      const fe=document.getElementById('f-estrato'); [...new Set(PERSONAS.map(p=>p.estrato))].sort().forEach(e=>fe.innerHTML+=`<option value="${e}">Estrato ${e}</option>`);
+      const fa=document.getElementById('f-arq'); Object.keys(ARQ).forEach(k=>fa.innerHTML+=`<option value="${k}">${ARQ[k].nombre}</option>`);
+      const fs=document.getElementById('f-scen'); SCENARIOS.forEach(s=>fs.innerHTML+=`<option value="${s.id}">${s.nombre}</option>`);
+      ['f-localidad','f-estrato','f-arq','f-scen'].forEach(id=>document.getElementById(id).onchange=renderTest);
+      document.getElementById('run-test').onclick=()=>{ MSG=NLCommon.getMsg(); renderTest(); };
+      document.getElementById('foot').innerHTML='NarrativasLab · módulo Testear · motor simulado (silicon sampling, Argyle 2023) · personas-ejemplo · acceso restringido.';
+      renderTest();
+    });
+  </script>
+  <script src="../theme.js"></script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Saliencia mediática · NarrativasLab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="chassis.css" />
+  <style>
+    .cloud{ display:flex; flex-wrap:wrap; gap:.35rem .8rem; align-items:baseline; line-height:1.5; }
+    .cloud-word{ font-family:var(--sans); font-weight:600; color:var(--accent); cursor:none; transition:opacity .2s; }
+    .cloud-word.dim{ color:var(--ink-2); font-weight:500; }
+    .win-toggle{ display:inline-flex; border:1px solid var(--border2); border-radius:999px; overflow:hidden; }
+    .win-toggle button{ font-family:var(--mono); font-size:.66rem; text-transform:uppercase; padding:.36rem .8rem; background:none; border:none; color:var(--text2); cursor:none; }
+    .win-toggle button.on{ background:var(--accent); color:var(--on-accent); }
+    .titular{ padding:.55rem 0; border-bottom:1px solid var(--border); }
+    .titular a{ color:var(--text); text-decoration:none; font-size:.95rem; }
+    .titular a:hover{ color:var(--accent); }
+    .titular .meta{ font-family:var(--mono); font-size:.62rem; color:var(--text3); margin-top:.15rem; }
+  </style>
+</head>
+<body>
+  <div class="cursor"></div><div class="cursor-ring"></div>
+  <div id="gate" class="gate"><div class="gate-text">Verificando acceso</div><div class="gate-bar"></div></div>
+
+  <nav class="top" id="topNav" hidden>
+    <div class="nav-left">
+      <a class="btn-back" href="../narrativas-lab.html">← Hub</a>
+      <span class="logo-product">Narrativas<span>Lab</span></span>
+      <span class="private-badge">Privado</span>
+    </div>
+    <div class="nav-right">
+      <span id="nl-city-slot"></span>
+      <span class="user-chip" id="userChip"></span>
+      <button class="theme-btn theme-icon" id="theme-toggle-btn" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
+    </div>
+  </nav>
+
+  <main class="wrap" id="main" hidden>
+    <div class="warn-banner" id="banner"><span>◆</span><span id="banner-txt"></span></div>
+
+    <div class="eyebrow">Módulo analítico 02 · Saliencia mediática</div>
+    <h1 id="title">Saliencia mediática</h1>
+    <p class="lead">Qué publican los medios sobre la ciudad: los temas que suben, las palabras que dominan y los titulares de las últimas horas.</p>
+
+    <div id="content"><p class="muted" style="margin-top:1.4rem">Cargando…</p></div>
+
+    <div class="foot" id="foot"></div>
+  </main>
+
+  <script src="cities.js"></script>
+  <script src="engine.js"></script>
+  <script src="lab-common.js"></script>
+  <script>
+    const AGG = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/proyecto-dc/agenda/agregados';
+    let WIN = '24h';
+
+    function renderCloud(palabras){
+      if(!palabras || !palabras.length) return '<div class="muted small">Sin palabras suficientes en esta ventana.</div>';
+      const max=palabras[0].n, min=palabras[palabras.length-1].n, span=Math.max(1,max-min);
+      return '<div class="cloud">'+palabras.slice(0,50).map(p=>{ const t=(p.n-min)/span; const size=(0.9+t*1.7).toFixed(2); const op=(0.6+t*0.4).toFixed(2);
+        return `<span class="cloud-word${t<0.25?' dim':''}" style="font-size:${size}rem;opacity:${op}" title="${p.n} menciones">${p.w}</span>`; }).join('')+'</div>';
+    }
+    function renderMedios(medios){
+      if(!medios || !medios.length) return '';
+      const max=Math.max.apply(null, medios.map(m=>m.n||0))||1;
+      return medios.slice(0,10).map(m=>`<div class="topic-bar"><div class="nm">${m.medio}</div><div class="tk"><i style="width:${Math.round((m.n||0)/max*100)}%;background:var(--accent)"></i></div><div class="sent">${m.n||0}</div></div>`).join('');
+    }
+    function renderTitulares(tits){
+      if(!tits || !tits.length) return '<div class="muted small">Sin titulares en esta ventana.</div>';
+      return tits.slice(0,15).map(t=>{ const f=t.fecha_pub?new Date(t.fecha_pub).toLocaleString('es-CO',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+        return `<div class="titular"><a href="${t.url||'#'}" target="_blank" rel="noopener">${t.titulo||'(sin título)'}</a><div class="meta">${t.medio||''} · ${f}</div></div>`; }).join('');
+    }
+
+    function renderReal(){
+      const cont=document.getElementById('content');
+      cont.innerHTML = `<div class="map-toolbar"><span class="small muted">Ventana:</span>
+        <div class="win-toggle" id="win-toggle"><button data-w="6h">6 h</button><button data-w="24h" class="on">24 h</button><button data-w="5d">5 días</button></div>
+        <span class="map-scope" id="agg-meta"></span></div>
+        <div class="grid g2" style="margin-top:1rem">
+          <div class="card"><h3 style="margin-top:0">Palabras que dominan</h3><div id="cloud"><p class="muted small">Cargando…</p></div></div>
+          <div class="card"><h3 style="margin-top:0">Medios más activos</h3><div id="medios"></div></div>
+        </div>
+        <h2>Titulares recientes</h2><div id="titulares"></div>`;
+      cont.querySelectorAll('#win-toggle button').forEach(b=>b.onclick=()=>{ WIN=b.dataset.w; cont.querySelectorAll('#win-toggle button').forEach(x=>x.classList.toggle('on',x===b)); loadWindow(); });
+      loadWindow();
+    }
+    function loadWindow(){
+      const J = name => fetch(`${AGG}/${name}-${WIN}.json`,{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null);
+      Promise.all([J('nube'),J('medios'),J('titulares')]).then(([nube,medios,tit])=>{
+        document.getElementById('cloud').innerHTML = renderCloud(nube&&nube.palabras);
+        document.getElementById('medios').innerHTML = renderMedios(medios&&medios.medios) || '<div class="muted small">—</div>';
+        document.getElementById('titulares').innerHTML = renderTitulares(tit&&tit.titulares);
+        const m=document.getElementById('agg-meta'); if(m&&nube) m.textContent = `${nube.n_eventos??0} eventos · ${nube.n_medios??0} medios`;
+      });
+    }
+
+    function renderSim(cfg){
+      const cont=document.getElementById('content');
+      cont.innerHTML = `<div class="grid g2" style="margin-top:1rem">
+        <div class="card"><h3 style="margin-top:0">Temas que suben (maqueta)</h3><div id="topicBars"></div></div>
+        <div class="card"><h3 style="margin-top:0">Emoción dominante (maqueta)</h3><div class="emo-wheel" id="emoWheel"></div>
+          <p class="small muted" style="margin-top:.9rem">Sentimiento neto: <b style="color:var(--bad)">−0.41 (negativo)</b></p></div></div>`;
+      document.getElementById('topicBars').innerHTML = SOCIAL_TOPICS.map(t=>{ const c=t.sent<-0.4?'var(--bad)':t.sent<-0.15?'var(--mid)':'var(--good)';
+        return `<div class="topic-bar"><div class="nm">${t.t}</div><div class="tk"><i style="width:${t.vol}%;background:${c}"></i></div><div class="sent" style="color:${c}">${t.sent>0?'+':''}${t.sent.toFixed(2)}</div></div>`; }).join('');
+      document.getElementById('emoWheel').innerHTML = SOCIAL_EMO.map(e=>`<div class="emo" style="background:${e.c}1a"><div class="v" style="color:${e.c}">${e.v}%</div><div class="l" style="color:${e.c}">${e.l}</div></div>`).join('');
+    }
+
+    function render(){
+      const cfg = NLCities.active();
+      document.getElementById('title').textContent = 'Saliencia mediática · ' + cfg.nombre;
+      const banner=document.getElementById('banner'), txt=document.getElementById('banner-txt');
+      if(cfg.hasSaliencia){ banner.className='warn-banner real'; txt.innerHTML='<b>Datos reales.</b> Captura cada 30 min de 10 medios (RSS) · nube semántica + titulares por ventana de 6 h / 24 h / 5 días.'; renderReal(); }
+      else { banner.className='warn-banner'; txt.innerHTML=`<b>Maqueta.</b> No hay aún un feed de medios para ${cfg.nombre}: estos números son ilustrativos. El pipeline de scraping (hoy operativo en Medellín) se replica por ciudad.`; renderSim(cfg); }
+    }
+
+    NLCommon.initCursor();
+    NLCommon.bootGate(function(){
+      NLCommon.mountCitySelect('#nl-city-slot');
+      NLCities.onChange(render);
+      document.getElementById('foot').innerHTML='NarrativasLab · módulo Saliencia mediática · REAL en Medellín (RSS cada 30 min) / maqueta en el resto · acceso restringido.';
+      render();
+    });
+  </script>
+  <script src="../theme.js"></script>
+</body>
+</html>

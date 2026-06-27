@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Escucha social · NarrativasLab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="chassis.css" />
+</head>
+<body>
+  <div class="cursor"></div><div class="cursor-ring"></div>
+  <div id="gate" class="gate"><div class="gate-text">Verificando acceso</div><div class="gate-bar"></div></div>
+
+  <nav class="top" id="topNav" hidden>
+    <div class="nav-left">
+      <a class="btn-back" href="../narrativas-lab.html">← Hub</a>
+      <span class="logo-product">Narrativas<span>Lab</span></span>
+      <span class="private-badge">Privado</span>
+    </div>
+    <div class="nav-right">
+      <span id="nl-city-slot"></span>
+      <span class="user-chip" id="userChip"></span>
+      <button class="theme-btn theme-icon" id="theme-toggle-btn" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
+    </div>
+  </nav>
+
+  <main class="wrap" id="main" hidden>
+    <div class="warn-banner"><span>◆</span><span><b>Maqueta.</b> Panel de escucha de redes. En producción se alimenta de scraping (X, Instagram, Facebook, comentarios de medios) vía Apify + clasificación de sentimiento/emoción. Aquí los números son <b>ilustrativos</b>.</span></div>
+
+    <div class="eyebrow">Módulo narrativo 06 · Escucha social</div>
+    <h1 id="title">Pulso de la conversación</h1>
+    <p class="lead muted small">Distinto de Saliencia (lo que publican los medios): aquí es lo que <b>postea la gente</b>. Maqueta del panel de escucha social.</p>
+
+    <div class="grid g2" style="margin-top:1.4rem">
+      <div class="card"><h3 style="margin-top:0">Temas que suben (últimos 7 días)</h3><div id="topicBars"></div></div>
+      <div class="card"><h3 style="margin-top:0">Emoción dominante</h3><div class="emo-wheel" id="emoWheel"></div>
+        <p class="small muted" style="margin-top:.9rem">Sentimiento neto: <b id="sentNeto"></b></p></div>
+    </div>
+    <h3>Sentimiento por zona</h3>
+    <table class="tbl" id="locTable"></table>
+
+    <div class="foot" id="foot"></div>
+  </main>
+
+  <script src="cities.js"></script>
+  <script src="engine.js"></script>
+  <script src="lab-common.js"></script>
+  <script>
+    function render(){
+      const cfg = NLCities.active();
+      document.getElementById('title').textContent = 'Pulso de la conversación · ' + cfg.nombre;
+      document.getElementById('topicBars').innerHTML = SOCIAL_TOPICS.map(t=>{ const c=t.sent<-0.4?'var(--bad)':t.sent<-0.15?'var(--mid)':'var(--good)';
+        return `<div class="topic-bar"><div class="nm">${t.t}</div><div class="tk"><i style="width:${t.vol}%;background:${c}"></i></div><div class="sent" style="color:${c}">${t.sent>0?'+':''}${t.sent.toFixed(2)}</div></div>`; }).join('');
+      document.getElementById('emoWheel').innerHTML = SOCIAL_EMO.map(e=>`<div class="emo" style="background:${e.c}1a"><div class="v" style="color:${e.c}">${e.v}%</div><div class="l" style="color:${e.c}">${e.l}</div></div>`).join('');
+      const sn=document.getElementById('sentNeto'); sn.textContent='−0.41 (negativo)'; sn.style.color='var(--bad)';
+      document.getElementById('locTable').innerHTML = `<tr><th>Zona</th><th>Sentimiento</th><th>Tema que domina</th></tr>`+
+        SOCIAL_LOC.map(l=>{ const c=l.sent<-0.4?'var(--bad)':'var(--mid)'; return `<tr><td><b>${l.loc}</b></td><td style="color:${c}">${l.sent.toFixed(2)}</td><td class="small muted">${l.tema}</td></tr>`; }).join('');
+    }
+    NLCommon.initCursor();
+    NLCommon.bootGate(function(){
+      NLCommon.mountCitySelect('#nl-city-slot');
+      NLCities.onChange(render);
+      document.getElementById('foot').innerHTML='NarrativasLab · módulo Escucha social · maqueta (en producción: Apify + clasificación de sentimiento) · acceso restringido.';
+      render();
+    });
+  </script>
+  <script src="../theme.js"></script>
+</body>
+</html>
