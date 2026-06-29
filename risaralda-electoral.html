@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex,nofollow" />
+<title>Risaralda · Inteligencia Electoral</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root{
+    --bg:#f1eee4; --panel:#faf8f2; --ink:#1a1510; --ink2:#6b6258; --line:#ddd6c8;
+    --accent:#8a1e16; --alt:#1f7a3d; --alt-dim:rgba(31,122,61,.12); --warn:#c98a1a;
+    --shadow:0 1px 3px rgba(0,0,0,.06);
+  }
+  html[data-theme="dark"]{
+    --bg:#16140f; --panel:#1f1c16; --ink:#f1eee4; --ink2:#a89f92; --line:#332e25;
+    --accent:#d96a50; --alt:#39ff7a; --alt-dim:rgba(57,255,122,.10); --warn:#e0b150;
+    --shadow:0 1px 3px rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:'Syne',sans-serif;min-height:100vh}
+  /* gate */
+  .gate{position:fixed;inset:0;z-index:5000;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1rem}
+  .gate-text{font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink2)}
+  .gate-bar{width:120px;height:2px;background:var(--line);position:relative;overflow:hidden}
+  .gate-bar::after{content:'';position:absolute;inset:0;background:var(--accent);animation:gs 1.4s ease-in-out infinite}
+  @keyframes gs{0%{transform:translateX(-100%)}50%{transform:translateX(0)}100%{transform:translateX(100%)}}
+  /* topbar */
+  .top{display:flex;align-items:center;gap:1rem;padding:.7rem 1.1rem;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:1000}
+  .top .brand{font-weight:800;font-size:1.02rem;letter-spacing:-.01em}
+  .top .brand small{display:block;font-family:'DM Mono',monospace;font-weight:400;font-size:.6rem;letter-spacing:.16em;text-transform:uppercase;color:var(--ink2);margin-top:1px}
+  .badge{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;padding:.2rem .5rem;border:1px solid var(--accent);color:var(--accent);border-radius:3px}
+  .top .sp{flex:1}
+  .ico-btn{cursor:pointer;background:none;border:1px solid var(--line);color:var(--ink);width:32px;height:32px;border-radius:6px;font-size:.9rem;display:flex;align-items:center;justify-content:center}
+  .ico-btn:hover{border-color:var(--accent)}
+  a.back{color:var(--ink2);text-decoration:none;font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.08em}
+  a.back:hover{color:var(--accent)}
+  /* controls */
+  .controls{display:flex;flex-wrap:wrap;gap:.8rem 1.2rem;align-items:center;padding:.8rem 1.1rem;border-bottom:1px solid var(--line);background:var(--panel)}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  .seg button{cursor:pointer;background:none;border:none;color:var(--ink2);font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.04em;padding:.42rem .7rem;border-right:1px solid var(--line)}
+  .seg button:last-child{border-right:none}
+  .seg button.on{background:var(--accent);color:#fff}
+  .ctl-lab{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink2);margin-right:.4rem}
+  .grp{display:flex;align-items:center}
+  /* alt toggle */
+  .alt-toggle{display:inline-flex;align-items:center;gap:.55rem;cursor:pointer;user-select:none;padding:.35rem .65rem;border:1px solid var(--alt);border-radius:20px;background:transparent}
+  .alt-toggle.on{background:var(--alt-dim)}
+  .alt-toggle .sw{width:34px;height:18px;border-radius:10px;background:var(--line);position:relative;transition:.18s}
+  .alt-toggle.on .sw{background:var(--alt)}
+  .alt-toggle .sw::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:.18s}
+  .alt-toggle.on .sw::after{transform:translateX(16px)}
+  .alt-toggle span{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.03em;color:var(--ink)}
+  /* layout */
+  .wrap{display:grid;grid-template-columns:1fr 380px;gap:0;height:calc(100vh - 132px)}
+  #map{width:100%;height:100%;background:var(--bg)}
+  .panel{border-left:1px solid var(--line);background:var(--panel);overflow-y:auto;padding:1rem 1.1rem}
+  .kicker{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink2)}
+  .ptitle{font-weight:800;font-size:1.15rem;margin:.15rem 0 .1rem;letter-spacing:-.01em}
+  .psub{color:var(--ink2);font-size:.82rem;font-family:'Fraunces',serif}
+  .stat-row{display:flex;gap:.6rem;margin:.8rem 0}
+  .stat{flex:1;border:1px solid var(--line);border-radius:8px;padding:.55rem .6rem;background:var(--bg)}
+  .stat .v{font-family:'DM Mono',monospace;font-weight:500;font-size:1.15rem}
+  .stat .v.alt{color:var(--alt)}
+  .stat .l{font-family:'DM Mono',monospace;font-size:.56rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);margin-top:2px}
+  .bar{margin:.55rem 0}
+  .bar .row{display:flex;align-items:center;gap:.5rem;margin:.32rem 0;font-size:.78rem}
+  .bar .nm{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bar .nm.alt{color:var(--alt);font-weight:500}
+  .bar .nm .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--alt);margin-right:5px;vertical-align:middle}
+  .bar .tr{width:90px;height:7px;background:var(--line);border-radius:4px;overflow:hidden}
+  .bar .tr i{display:block;height:100%;background:var(--ink2)}
+  .bar .tr i.alt{background:var(--alt)}
+  .bar .pc{font-family:'DM Mono',monospace;font-size:.72rem;width:46px;text-align:right;color:var(--ink2)}
+  .sec-t{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink2);margin:1rem 0 .35rem;border-top:1px solid var(--line);padding-top:.7rem}
+  .hint{font-size:.74rem;color:var(--ink2);font-family:'Fraunces',serif;line-height:1.45}
+  .legend{position:absolute;left:12px;bottom:18px;z-index:600;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:.55rem .65rem;box-shadow:var(--shadow);max-width:230px}
+  .legend .lt{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);margin-bottom:.4rem}
+  .legend .scale{display:flex;height:10px;border-radius:3px;overflow:hidden;margin-bottom:3px}
+  .legend .scale i{flex:1}
+  .legend .ends{display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:.6rem;color:var(--ink2)}
+  .legend .li{display:flex;align-items:center;gap:.4rem;font-size:.7rem;margin:.18rem 0}
+  .legend .li .sw{width:11px;height:11px;border-radius:2px;flex:none}
+  .backbtn{position:absolute;right:12px;top:12px;z-index:600;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:.4rem .65rem;cursor:pointer;font-family:'DM Mono',monospace;font-size:.66rem;color:var(--ink);box-shadow:var(--shadow)}
+  .backbtn:hover{border-color:var(--accent)}
+  .leaflet-tooltip.rr{font-family:'DM Mono',monospace!important;font-size:.74rem!important;background:rgba(20,18,12,.95)!important;border:1px solid var(--accent)!important;color:#f1eee4!important;border-radius:5px!important;padding:.4rem .55rem!important;box-shadow:none!important}
+  .leaflet-tooltip.rr:before{display:none!important}
+  .foot{padding:.7rem 1.1rem;border-top:1px solid var(--line);background:var(--panel);font-family:'Fraunces',serif;font-size:.72rem;color:var(--ink2);line-height:1.5}
+  .foot b{color:var(--ink);font-weight:400}
+  @media(max-width:860px){ .wrap{grid-template-columns:1fr;height:auto} #map{height:55vh} .panel{border-left:none;border-top:1px solid var(--line)} }
+</style>
+</head>
+<body>
+  <div id="gate" class="gate"><div class="gate-text">Verificando acceso</div><div class="gate-bar"></div></div>
+
+  <div id="topNav" hidden>
+    <div class="top">
+      <a class="back" href="dashboard.html">← Panel</a>
+      <div class="brand">Risaralda · Inteligencia Electoral<small>ricardoruiz.co · privado</small></div>
+      <span class="badge">Privado</span>
+      <div class="sp"></div>
+      <button class="ico-btn" id="themeBtn" title="Día / noche">◐</button>
+    </div>
+    <div class="controls">
+      <div class="grp"><span class="ctl-lab">Elección</span>
+        <div class="seg" id="eleccion-seg">
+          <button data-e="camara" class="on">Cámara 2026</button>
+          <button data-e="2023">Territorial 2023</button>
+          <button data-e="2019">Territorial 2019</button>
+        </div>
+      </div>
+      <div class="grp" id="corp-grp" style="display:none"><span class="ctl-lab">Corporación</span>
+        <div class="seg" id="corp-seg">
+          <button data-c="gobernacion" class="on">Gobernación</button>
+          <button data-c="asamblea">Asamblea</button>
+          <button data-c="alcaldia">Alcaldía</button>
+          <button data-c="concejo">Concejo</button>
+        </div>
+      </div>
+      <div class="alt-toggle on" id="altToggle"><div class="sw"></div><span>Priorizar voto alternativo</span></div>
+    </div>
+  </div>
+
+  <main id="main" hidden>
+    <div class="wrap">
+      <div style="position:relative">
+        <div id="map"></div>
+        <div class="legend" id="legend"></div>
+        <button class="backbtn" id="backMun" style="display:none">← Municipios</button>
+      </div>
+      <aside class="panel" id="panel"></aside>
+    </div>
+    <div class="foot" id="foot"></div>
+  </main>
+
+<script>
+// ─── EMAIL GATE ──────────────────────────────────────────────────────
+const ALLOWED = ['reruizc@gmail.com', 'nuevagemela@gmail.com', 'mariacirof@gmail.com'];
+const _token = localStorage.getItem('rr-token');
+const _userRaw = localStorage.getItem('rr-user');
+const _user = _userRaw ? JSON.parse(_userRaw) : null;
+function emailAllowed(em){ return em && ALLOWED.includes(String(em).toLowerCase().trim()); }
+function denyToLogin(){ localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); location.replace('login.html'); }
+function denyToDash(){ location.replace('dashboard.html'); }
+if (!_token || !_user) denyToLogin();
+else if (!emailAllowed(_user.email)) denyToDash();
+else {
+  (async()=>{
+    try{
+      const res = await fetch('https://rr-auth.reruizc.workers.dev/auth/me',{headers:{Authorization:`Bearer ${_token}`}});
+      if (res.status===401) return denyToLogin();
+      const data = await res.json();
+      if (!data.ok || !emailAllowed(data.user && data.user.email)) return denyToDash();
+      revealPage();
+    }catch(e){ revealPage(); }
+  })();
+}
+function getAutoTheme(){ const h=new Date().getHours(); return (h>=7&&h<19)?'light':'dark'; }
+document.documentElement.setAttribute('data-theme', (localStorage.getItem('rr-theme')||getAutoTheme())==='dark'?'dark':'');
+function revealPage(){
+  document.getElementById('gate').remove();
+  document.getElementById('topNav').hidden=false;
+  document.getElementById('main').hidden=false;
+  init();
+}
+
+// ─── CONFIG / DATA ───────────────────────────────────────────────────
+const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co';
+const DATA_BASE = `${S3}/bases+de+datos/output_risaralda`;
+const MAP_BASE  = `${S3}/congreso-2026/output/mapas-2026`;
+const CB = 'v=20260629';
+
+const ELEC = {
+  camara: { label:'Cámara 2026', main:`${DATA_BASE}/risaralda-camara-2026.json?${CB}`,
+            barrios:`${DATA_BASE}/risaralda-camara-2026-pereira-barrios.json?${CB}`,
+            puestos:`${DATA_BASE}/risaralda-camara-2026-puestos.json?${CB}`, territorial:false },
+  '2023': { label:'Territorial 2023', main:`${DATA_BASE}/risaralda-2023.json?${CB}`,
+            barrios:`${DATA_BASE}/risaralda-2023-pereira-barrios.json?${CB}`,
+            puestos:`${DATA_BASE}/risaralda-2023-puestos.json?${CB}`, territorial:true },
+  '2019': { label:'Territorial 2019', main:`${DATA_BASE}/risaralda-2019.json?${CB}`,
+            barrios:`${DATA_BASE}/risaralda-2019-pereira-barrios.json?${CB}`,
+            puestos:`${DATA_BASE}/risaralda-2019-puestos.json?${CB}`, territorial:true },
+};
+const CORP_LABEL = { gobernacion:'Gobernación', asamblea:'Asamblea', alcaldia:'Alcaldía', concejo:'Concejo' };
+
+const STATE = { eleccion:'camara', corp:'gobernacion', alt:true, mun:null, view:'muns' };
+const CACHE = {};   // url → json
+const GEO = { muns:null, barrios:null };
+
+async function getJSON(url){ if(CACHE[url]) return CACHE[url]; const r=await fetch(url); const j=await r.json(); CACHE[url]=j; return j; }
+
+// ─── COLOR ───────────────────────────────────────────────────────────
+function lerp(a,b,t){ return Math.round(a+(b-a)*t); }
+function altColor(t){ // 0..1 → paper → verde
+  const dark = document.documentElement.getAttribute('data-theme')==='dark';
+  const c0 = dark ? [40,44,38] : [240,238,228];
+  const c1 = dark ? [57,255,122] : [22,110,52];
+  return `rgb(${lerp(c0[0],c1[0],t)},${lerp(c0[1],c1[1],t)},${lerp(c0[2],c1[2],t)})`;
+}
+function normp(s){ return String(s||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/"+/g,'').replace(/\s+/g,' ').trim(); }
+function isAltParty(nombre){
+  const n=normp(nombre);
+  if (n==='PACTO POR RISARALDA') return true;
+  if (n==='POR RISARALDA') return false;
+  if (n.includes('VERDE OXIGENO')||n.includes('ECOLOGISTA')) return false;
+  return ['ALIANZA VERDE','PACTO HISTORICO','COLOMBIA HUMANA','UNION PATRIOTICA',
+    'POLO DEMOCRATICO','ALTERNATIVO INDIGENA Y SOCIAL','MAIS','ALIANZA DEMOCRATICA AMPLIA',
+    'UNIDAD EN MINGA','FRENTE AMPLIO RISARALDA','FUERZA ALTERNATIVA REVOLUCIONARIA','COMUNES']
+    .some(t=>n.includes(t)) && !['LIBERAL COLOMBIANO','CONSERVADOR','CAMBIO RADICAL',
+    'CENTRO DEMOCRATICO','DE LA U','UNION POR LA GENTE','SOCIAL DE UNIDAD','JUSTA LIBRES',
+    'POLITICO MIRA','SALVACION NACIONAL'].some(t=>n.includes(t));
+}
+const PARTY_COLOR = [ // leader-mode palette (no alt)
+  ['LIBERAL','#C8102E'],['CONSERVADOR','#1f5fb0'],['CAMBIO RADICAL','#e0531f'],
+  ['CENTRO DEMOCRATICO','#0a3d91'],['DE LA U','#e8a200'],['UNION POR LA GENTE','#e8a200'],
+  ['MIRA','#7b3fa0'],['SALVACION','#5a7d2a'],['JUSTA LIBRES','#c77'],['NUEVO LIBERALISMO','#9b1c31'],
+];
+function leaderColor(partido, alt){
+  if (alt) return document.documentElement.getAttribute('data-theme')==='dark'?'#39ff7a':'#1f7a3d';
+  const n=normp(partido);
+  for (const [t,c] of PARTY_COLOR){ if(n.includes(t)) return c; }
+  return '#9a9183';
+}
+
+// ─── METRIC EXTRACTION ───────────────────────────────────────────────
+function munScope(main, munInt){
+  if (ELEC[STATE.eleccion].territorial){
+    const c = main.corporaciones[STATE.corp];
+    return c.por_mun ? c.por_mun[munInt] : null;
+  }
+  return main.por_mun[munInt];
+}
+function depScope(main){
+  if (ELEC[STATE.eleccion].territorial){
+    const c = main.corporaciones[STATE.corp];
+    return c.dep || null;   // alcaldia/concejo no tienen dep
+  }
+  return main.dep_resumen;
+}
+
+// ─── MAP ─────────────────────────────────────────────────────────────
+let map, munLayer, barrioLayer;
+function initMap(){
+  map = L.map('map',{zoomControl:true,attributionControl:false,scrollWheelZoom:true});
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',{maxZoom:18,opacity:.55}).addTo(map);
+}
+
+async function renderMuns(){
+  STATE.view='muns'; STATE.mun=null;
+  document.getElementById('backMun').style.display='none';
+  if (barrioLayer){ map.removeLayer(barrioLayer); barrioLayer=null; }
+  if (!GEO.muns) GEO.muns = await getJSON(`${MAP_BASE}/Departamentos-mps/24.json?${CB}`);
+  const main = await getJSON(ELEC[STATE.eleccion].main);
+
+  // domain for alt scale
+  let mx=0;
+  for (const f of GEO.muns.features){ const m=String(parseInt(f.properties.mun_elec,10)); const s=munScope(main,m); if(s) mx=Math.max(mx,s.alt_pct); }
+  mx = Math.max(mx, 1);
+
+  if (munLayer) map.removeLayer(munLayer);
+  munLayer = L.geoJSON(GEO.muns,{
+    style:f=>{ const m=String(parseInt(f.properties.mun_elec,10)); const s=munScope(main,m);
+      let fill='#ccc';
+      if (s){ fill = STATE.alt ? altColor(Math.min(1,s.alt_pct/mx)) : leaderColor(s.lider?s.lider.partido:'', s.lider&&s.lider.alt); }
+      return { color:'#fff', weight:1, fillColor:fill, fillOpacity: s?.86:.3 }; },
+    onEachFeature:(f,layer)=>{
+      const m=String(parseInt(f.properties.mun_elec,10)); const s=munScope(main,m);
+      const nm=f.properties.mpio_cnmbr;
+      let tip=`<b>${nm}</b>`;
+      if (s){ tip+=`<br>Alt: ${s.alt_pct}%`; if(s.lider) tip+=`<br>Líder: ${s.lider.partido} (${s.lider.pct}%)`; }
+      layer.bindTooltip(tip,{className:'rr',sticky:true});
+      layer.on('mouseover',()=>layer.setStyle({weight:2.5,color:'#222'}));
+      layer.on('mouseout',()=>munLayer.resetStyle(layer));
+      layer.on('click',()=>selectMun(m, nm));
+    }
+  }).addTo(map);
+  map.fitBounds(munLayer.getBounds(),{padding:[16,16]});
+  renderLegend(mx);
+  renderDepPanel(main);
+}
+
+async function selectMun(munInt, nombre){
+  STATE.mun=munInt;
+  const main = await getJSON(ELEC[STATE.eleccion].main);
+  renderMunPanel(main, munInt, nombre);
+  if (munLayer) munLayer.eachLayer(l=>{ const m=String(parseInt(l.feature.properties.mun_elec,10)); l.setStyle({weight:m===munInt?3:1,color:m===munInt?'#000':'#fff'}); });
+  // Pereira → barrios
+  if (munInt==='1'){ const btn=document.getElementById('panel').querySelector('#toPereira'); }
+}
+
+async function renderPereiraBarrios(){
+  STATE.view='pereira-barrio';
+  document.getElementById('backMun').style.display='block';
+  if (!GEO.barrios) GEO.barrios = await getJSON(`${DATA_BASE}/PEREIRA-BARRIOS.json?${CB}`);
+  const bdata = await getJSON(ELEC[STATE.eleccion].barrios);
+  const corpKey = ELEC[STATE.eleccion].territorial ? STATE.corp : 'camara';
+  const metric = bdata[corpKey] || {};
+  let mx=0; for (const k in metric) mx=Math.max(mx, metric[k].alt_pct); mx=Math.max(mx,1);
+
+  if (munLayer) map.removeLayer(munLayer);
+  if (barrioLayer) map.removeLayer(barrioLayer);
+  barrioLayer = L.geoJSON(GEO.barrios,{
+    style:(f)=>{ return { color:'#fff', weight:.5, fillColor:'#d8d2c4', fillOpacity:.25 }; },
+    onEachFeature:(f,layer)=>{
+      // barrioId = índice del feature
+      const idx = GEO.barrios.features.indexOf(f);
+      const d = metric[idx];
+      const nm = (f.properties.NOMBRE||'').toUpperCase();
+      if (d){
+        const fill = STATE.alt ? altColor(Math.min(1,d.alt_pct/mx)) : leaderColor(d.lider?d.lider.partido:'', d.lider&&d.lider.alt);
+        layer.setStyle({fillColor:fill, fillOpacity:.85, weight:.6});
+        let tip=`<b>${nm}</b><br>Alt: ${d.alt_pct}%`; if(d.lider) tip+=`<br>Líder: ${d.lider.partido} (${d.lider.pct}%)`;
+        layer.bindTooltip(tip,{className:'rr',sticky:true});
+        layer.on('mouseover',()=>layer.setStyle({weight:2,color:'#222'}));
+        layer.on('mouseout',()=>layer.setStyle({weight:.6,color:'#fff'}));
+      }
+    }
+  }).addTo(map);
+  try{ map.fitBounds(barrioLayer.getBounds(),{padding:[20,20]}); }catch(e){}
+  renderLegend(mx, `Pereira por barrio · ${barrioCount(metric)} con dato`);
+  renderPereiraPanel(metric);
+}
+function barrioCount(metric){ return Object.keys(metric).length; }
+
+// ─── LEGEND ──────────────────────────────────────────────────────────
+function renderLegend(mx, note){
+  const el=document.getElementById('legend');
+  if (STATE.alt){
+    el.innerHTML = `<div class="lt">% voto alternativo</div>
+      <div class="scale"><i style="background:${altColor(0)}"></i><i style="background:${altColor(.25)}"></i><i style="background:${altColor(.5)}"></i><i style="background:${altColor(.75)}"></i><i style="background:${altColor(1)}"></i></div>
+      <div class="ends"><span>0%</span><span>${mx.toFixed(0)}%+</span></div>${note?`<div class="li" style="margin-top:.4rem;color:var(--ink2)">${note}</div>`:''}`;
+  } else {
+    el.innerHTML = `<div class="lt">Partido líder</div>
+      <div class="li"><span class="sw" style="background:${leaderColor('',true)}"></span>Alternativo (Verde/Pacto/izq)</div>
+      <div class="li"><span class="sw" style="background:#C8102E"></span>Liberal</div>
+      <div class="li"><span class="sw" style="background:#1f5fb0"></span>Conservador</div>
+      <div class="li"><span class="sw" style="background:#e0531f"></span>Cambio Radical / U</div>
+      <div class="li"><span class="sw" style="background:#0a3d91"></span>Centro Democrático</div>
+      <div class="li"><span class="sw" style="background:#9a9183"></span>Otro / local</div>${note?`<div class="li" style="color:var(--ink2)">${note}</div>`:''}`;
+  }
+}
+
+// ─── PANELS ──────────────────────────────────────────────────────────
+function barRows(items, getName, getPct, getAlt, max){
+  let h='<div class="bar">';
+  for (const it of items.slice(0,max||10)){
+    const alt=getAlt(it); const pct=getPct(it);
+    h+=`<div class="row"><span class="nm ${alt?'alt':''}">${alt?'<span class="dot"></span>':''}${getName(it)}</span>
+      <span class="tr"><i class="${alt?'alt':''}" style="width:${Math.min(100,pct*2)}%"></i></span>
+      <span class="pc">${pct}%</span></div>`;
+  }
+  return h+'</div>';
+}
+function renderDepPanel(main){
+  const ds = depScope(main);
+  const p=document.getElementById('panel');
+  const elabel = ELEC[STATE.eleccion].label + (ELEC[STATE.eleccion].territorial?` · ${CORP_LABEL[STATE.corp]}`:'');
+  let h=`<div class="kicker">${elabel}</div><div class="ptitle">Risaralda</div>
+    <div class="psub">14 municipios · enfoque voto alternativo</div>`;
+  if (ds){
+    h+=`<div class="stat-row">
+      <div class="stat"><div class="v alt">${ds.alt_pct}%</div><div class="l">Voto alternativo</div></div>
+      <div class="stat"><div class="v">${(ds.validos||0).toLocaleString('es')}</div><div class="l">Votos válidos</div></div></div>`;
+    if (ds.lider) h+=`<div class="hint">Más votado: <b style="color:var(--ink)">${ds.lider.partido||ds.lider.nombre}</b> (${ds.lider.pct}%)</div>`;
+    const items = ds.partidos || ds.candidatos || [];
+    if (items.length){ h+=`<div class="sec-t">Fuerzas en el departamento</div>`+
+      barRows(items, it=>it.partido||it.nombre, it=>it.pct, it=>it.alt, 12); }
+    if (ds.curules){ h+=`<div class="sec-t">Curules (D'Hondt) · alt ${ds.alt_curules||0}/${ds.curules.reduce((s,c)=>s+c.curules,0)}</div>`+
+      ds.curules.map(c=>`<div class="bar"><div class="row"><span class="nm ${c.alt?'alt':''}">${c.alt?'<span class="dot"></span>':''}${c.partido}</span><span class="pc">${c.curules} cur</span></div></div>`).join(''); }
+  } else {
+    h+=`<div class="hint" style="margin-top:1rem">Esta corporación se elige por municipio (no hay total departamental). Haz clic en un municipio para ver su resultado.</div>`;
+  }
+  h+=`<div class="sec-t">Cómo leer el mapa</div><div class="hint">Color = ${STATE.alt?'intensidad del <b>% alternativo</b> (más verde = más voto Verde+Pacto+izquierda)':'<b>partido líder</b> de cada municipio'}. Clic en un municipio para el detalle; en <b>Pereira</b> puedes bajar a barrio.</div>`;
+  p.innerHTML=h;
+}
+function renderMunPanel(main, munInt, nombre){
+  const s = munScope(main, munInt);
+  const p=document.getElementById('panel');
+  let h=`<div class="kicker">${ELEC[STATE.eleccion].label}${ELEC[STATE.eleccion].territorial?' · '+CORP_LABEL[STATE.corp]:''}</div>
+    <div class="ptitle">${nombre}</div>`;
+  if (!s){ p.innerHTML=h+`<div class="hint" style="margin-top:1rem">Sin datos para esta corporación en este municipio.</div>`; return; }
+  h+=`<div class="psub">${(s.validos||0).toLocaleString('es')} votos válidos</div>
+    <div class="stat-row"><div class="stat"><div class="v alt">${s.alt_pct}%</div><div class="l">Voto alternativo</div></div>`;
+  if (s.lider) h+=`<div class="stat"><div class="v" style="font-size:.82rem;line-height:1.25">${(s.lider.partido||s.lider.nombre)}</div><div class="l">Líder ${s.lider.pct}%</div></div>`;
+  h+=`</div>`;
+  const items = s.candidatos || s.partidos || [];
+  if (items.length){ h+=`<div class="sec-t">${s.candidatos?'Candidatos':'Listas'}</div>`+
+    barRows(items, it=>it.nombre||it.partido, it=>it.pct, it=>it.alt, 14); }
+  if (s.curules){ h+=`<div class="sec-t">Curules concejo · alt ${s.alt_curules||0}</div>`+
+    s.curules.map(c=>`<div class="bar"><div class="row"><span class="nm ${c.alt?'alt':''}">${c.alt?'<span class="dot"></span>':''}${c.partido}</span><span class="pc">${c.curules}</span></div></div>`).join(''); }
+  if (munInt==='1'){ h+=`<button class="backbtn" id="toPereira" style="position:static;display:block;margin-top:1rem;width:100%;text-align:center">Ver Pereira por barrio →</button>`; }
+  p.innerHTML=h;
+  if (munInt==='1') document.getElementById('toPereira').onclick=renderPereiraBarrios;
+}
+function renderPereiraPanel(metric){
+  const p=document.getElementById('panel');
+  const arr = Object.entries(metric).map(([id,d])=>({id,...d})).sort((a,b)=>b.alt_pct-a.alt_pct);
+  let h=`<div class="kicker">${ELEC[STATE.eleccion].label}${ELEC[STATE.eleccion].territorial?' · '+CORP_LABEL[STATE.corp]:''}</div>
+    <div class="ptitle">Pereira · barrios</div><div class="psub">${arr.length} barrios con mesa de votación</div>
+    <div class="sec-t">Barrios más alternativos</div>`;
+  for (const b of arr.slice(0,18)){
+    h+=`<div class="bar"><div class="row"><span class="nm ${b.alt_pct>0?'alt':''}">${(GEO.barrios.features[b.id]?.properties?.NOMBRE||b.id)}</span>
+      <span class="tr"><i class="alt" style="width:${Math.min(100,b.alt_pct*1.6)}%"></i></span>
+      <span class="pc">${b.alt_pct}%</span></div></div>`;
+  }
+  h+=`<div class="hint" style="margin-top:.7rem">Cruce puesto→barrio por punto-en-polígono (georreferenciación oficial de la Registraduría). Sólo barrios con puesto de votación propio; el resto queda sin color.</div>`;
+  p.innerHTML=h;
+}
+
+// ─── FOOT ────────────────────────────────────────────────────────────
+function renderFoot(){
+  document.getElementById('foot').innerHTML = `<b>Voto alternativo</b> = Alianza Verde + Pacto Histórico + izquierda histórica (Polo, Colombia Humana, UP, MAIS, ADA/Frente Amplio, Comunes). En territorial las coaliciones mixtas con un partido tradicional (p.ej. "Conservador–Polo") NO se cuentan como alternativas. La coalición local llamada "ALTERNATIVOS" (2023) es un movimiento municipal, no el bloque. Fuente: Registraduría (GCS territorial 2019/2023 · preconteo Cámara 2026). Clasificación revisable.`;
+}
+
+// ─── WIRING ──────────────────────────────────────────────────────────
+function setSeg(segId, attr, val){ document.querySelectorAll(`#${segId} button`).forEach(b=>b.classList.toggle('on', b.getAttribute(attr)===val)); }
+
+function init(){
+  initMap();
+  renderFoot();
+  document.getElementById('themeBtn').onclick=()=>{
+    const dark=document.documentElement.getAttribute('data-theme')==='dark';
+    document.documentElement.setAttribute('data-theme', dark?'':'dark');
+    localStorage.setItem('rr-theme', dark?'light':'dark');
+    refresh();
+  };
+  document.querySelectorAll('#eleccion-seg button').forEach(b=>b.onclick=()=>{
+    STATE.eleccion=b.getAttribute('data-e'); setSeg('eleccion-seg','data-e',STATE.eleccion);
+    document.getElementById('corp-grp').style.display = ELEC[STATE.eleccion].territorial?'flex':'none';
+    refresh();
+  });
+  document.querySelectorAll('#corp-seg button').forEach(b=>b.onclick=()=>{
+    STATE.corp=b.getAttribute('data-c'); setSeg('corp-seg','data-c',STATE.corp); refresh();
+  });
+  document.getElementById('altToggle').onclick=()=>{
+    STATE.alt=!STATE.alt; document.getElementById('altToggle').classList.toggle('on',STATE.alt); refresh();
+  };
+  document.getElementById('backMun').onclick=()=>renderMuns();
+  refresh();
+}
+function refresh(){ if (STATE.view==='pereira-barrio') renderPereiraBarrios(); else renderMuns(); }
+</script>
+</body>
+</html>
