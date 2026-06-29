@@ -932,6 +932,125 @@ quedan latentes en el código.)
   en el subtítulo, garantizado visible aunque sea depto chico); `move` = mismo lado
   pero ≥8 pp de corrimiento (▲/▼). Gate de fiabilidad: f_d≥0.10 y votcan≥1500.
 
+## Análisis post-2V 2026 por mesa/barrio — `tools/segunda-vuelta-prec/` + `Bases de datos/output_2v/`
+
+Pipeline completo de análisis del **resultado** de la 2ª vuelta (no el tracker en
+vivo de arriba, sino el estudio posterior). Construido jun-2026. La pieza reusable
+para CUALQUIER comparativo elección-a-elección es el **master por puesto**.
+
+### Datos de entrada (cómo tenemos la 2V)
+- **`Bases de datos/output_2v/detalle_nacional_presidencia_mesas.xlsx`** — preconteo
+  2V **por mesa** (122.020 mesas × 25 cols). Es el equivalente 2V del
+  `PRECONTEO_1V_2026_MESA`. ⚠️ Las columnas de votos llevan prefijo **`Pre_`** =
+  **PRECONTEO**; las columnas de escrutinio (`recontadaComision`, `excluida`,
+  `Causal`, `EstadoReclamacion`, `votosUrna`, `sufragantesE11SegunE14`…) llegan en
+  **`N/A` al 100%** hasta que las comisiones escrutadoras avancen. O sea: HOY es
+  preconteo con el molde del escrutinio vacío. Snapshot ~99,9% mesas (un pelín
+  anterior al feed final). Solo trae Cepeda y Abelardo por mesa.
+- **Feed en vivo** `/presidente2v` (worker `registraduria-proxy`) para el 2V
+  municipal: Cepeda `codpar 2`, Abelardo `codpar 3` (ver memoria del feed v2).
+- **1V**: `Bases de datos/nuevos archivos 1v 2026/PRECONTEO_1V_2026_MESA_con_Claudia.csv`.
+- **Georef**: `PUESTOS_GEOREF.csv` (puesto→barrio/lat/lon/comuna, clave de 9 díg) +
+  `test-presidencial/divipola.json` (nombre→código, fallback).
+- **Control nacional**: 2V Cepeda **12.708.712** / Abelardo **12.959.542** (margen
+  **250.830 = 0,98 pp**, participación 63,6%). 1V cara a cara Cep 9.680.095 / Abe
+  10.346.010 (Abe +665.915).
+
+### La unidad reusable — `master_unificado_puesto.json`
+**14.220 puestos**, cada uno con: 1V (13 candidatos + blanco + censo `pot` +
+votantes `urna1`) · 2V (`cep2`/`abe2`/`urna2`) · georef (lat/lon/barrio/comuna/
+ciudad) · techo Petro-2V 2022 + `recuperar`. **99,1% del voto nacional**. El puesto
+es la unidad ESTABLE entre elecciones (las mesas se reasignan) → es la base ideal
+para cruzar cualquier par de elecciones. Para añadir otra elección al comparativo,
+agregar sus votos por puesto por `pcode` (dep+mun+zona+puesto, 9 díg).
+
+### Pipeline (orden de corrida)
+```
+fetch_2v_municipios.py   feed /presidente2v → dos_vuelta_municipios.json (2V municipal)
+analisis_2v_vs_1v.py     1V(csv) vs 2V(municipal) → municipios_2v_vs_1v.csv (margen/swing/flips, 1.189 munis)
+build_master_2v.py       une 1V(13 cands)+2V por puesto → master_unificado_puesto.json + agg_municipio.json
+build_trasvases.py       inferencia ecológica por BLOQUE (lsq_linear+bootstrap) → trasvases.json
+build_analisis_2v.py     3 estrategias + participación + atípicos → analisis_2v.json
+build_barrios_2v.py      PIP puesto→barrio · mapas 1V vs 2V (14 ciudades) → barrios_2v.json + mapas/*_{v1,v2}.png
+build_comunas_2v.py      agrega por comuna/localidad → comunas_2v.json
+build_graficos_2v.py     5 gráficos nacionales (limpios) → graficos/
+build_pdf_60.py          documento extenso (56 pág, TOC, encriptado no-copy, watermark) → Analisis_2V_2026_Extendido.pdf
+build_pdf.py             documento corto (3 pág) → Analisis_2V_2026_donde_gano_Abelardo.pdf
+build_linkedin_imgs.py   3 gráficos con marca Ricardo.Ruiz, SIN watermark → rrss/linkedin/
+```
+
+### Gotchas metodológicos (CRÍTICOS para reusar)
+- **El XLSX 2V usa NOMBRES de depto/mun** (no códigos). `build_master_2v` mapea
+  nombre→código con `normm()` (quita tildes + **paréntesis + puntos**: "TIQUISIO
+  (PTO. RICO)" == GEOREF "TIQUISIO PTO. RICO") + fallback `divipola.json`. Bogotá:
+  `cod5_of` lo fuerza a `16001`.
+- **Claudia López llega en 0 por mesa** en el preconteo → traerla a municipio del
+  `Base nombres corregidos primera vuelta 2026.csv` (igual que en pacto-1v-2026).
+- **Trasvases por BLOQUE, no por candidato** (Paloma y minoritarios de derecha votan
+  los mismos territorios → colinealidad ecológica). Se estima por bloque (Derecha ·
+  Centro · Izq menor · Nuevos votantes) y se atribuye la tasa del bloque a cada
+  candidato. Bootstrap 400 munis. R²≈0,99.
+- **Barrios**: encuadre al **casco urbano = `gp[direct].total_bounds`** (NO a los
+  puestos, que traen outliers rurales que estiran el marco y dejan la ciudad
+  diminuta). Relleno de vecino más cercano es SOLO visual (no suma a totales; los
+  totales salen de los puestos directos). 14 ciudades con polígono bueno; Pasto,
+  Tumaco, Palmira, Sincelejo se descartaron por mapa pobre.
+- **Watermark/seguridad**: mapas llevan "DOCUMENTO / CONFIDENCIAL / RICARDORUIZ.CO"
+  diagonal 45° (anti-robo de la pieza suelta). PDF extenso encriptado con `canCopy=0`
+  (no se puede seleccionar texto) + watermark de página. Las imágenes de LinkedIn van
+  **SIN** watermark (son públicas, solo logo + crédito).
+
+### Hallazgos clave (para no recalcular)
+- **Antioquia decide**: +1.052.153 de margen neto = **419% del margen nacional**.
+  Sin Antioquia, Cepeda sería presidente por ~800.000.
+- **Trasvases reales**: Derecha (84% Paloma) → **81% Abelardo** · Centro
+  (Fajardo+Claudia) → **81% Cepeda** · Izq menor → 100% Cepeda · Nuevos votantes →
+  **81% Cepeda** (promedio nacional; en bastiones de Abelardo van a él).
+- **Las 3 estrategias del Pacto cuajaron** (Centro 143% del target · Recuperación
+  100% del techo · Abstención +667K netos) y **aun así perdió**: la participación
+  subió pareja (60,3→66,4%, +2,33M, en 1.121/1.122 munis), sin ventaja diferencial.
+- Veredicto: la elección estaba estructuralmente decidida desde 1V; la geografía
+  pesó más que la campaña.
+
+### Entregables
+- `Analisis_2V_2026_Extendido.pdf` (56 pág · **CONFIDENCIAL**, encriptado) ·
+  `Analisis_2V_2026_donde_gano_Abelardo.pdf` (3 pág).
+- `rrss/linkedin/articulo-abelardo-un-punto.md` + 3 imágenes (`1-tres-estrategias`,
+  `2-antioquia-decide`, `3-trasvases`) — artículo "¿Por qué Abelardo ganó, y solo
+  con un punto?".
+
+### Las 4 grandes ciudades 2V barrio por barrio (`ciudades-2v-barrios.html`) — jun-2026
+
+Deep-dive de **Bogotá · Medellín · Barranquilla · Cali** en 2V por barrio (distinto
+del análisis nacional de arriba). Tesis: Cepeda ganó 3 de las 4 grandes (Bogotá
+53,7% · Cali 60,6% · B/quilla 54,8%) y en las 3 amplió; Abelardo solo Medellín
+(66,3%, achicándose de +39,1 a +32,7). La fractura interna es de **estrato**: barrios
+ricos (La Cabrera, El Poblado, Riomar, Pance) → Abelardo; periferia popular → Cepeda.
+B/quilla dio el mayor giro (empate +1,6 → Cepeda +9,6). Pero la presidencia se ganó
+afuera (Antioquia = 2× el margen nacional).
+- **Datos:** `tools/segunda-vuelta-prec/build_ciudades_barrios.py` lee
+  `master_unificado_puesto.json`, PIP puesto→barrio (4 ciudades) + vecino más cercano,
+  emite `Bases de datos/output_2v/ciudades-barrios-2v.json` (dict por ciudad, `b`
+  keyed por código estable [Medellín `CODIGO`] o índice de feature [resto, match por
+  orden — verificado S3==local]). Margen `(abe−cep)/(abe+cep)`, negativo=Cepeda.
+- **HTML:** standalone dark, identidad 2V (Cepeda rojo `#c0392b`/Abelardo azul
+  `#1f47cc`), Leaflet. Tabs 4 ciudades · toggle 1V/2V · modo Ganador/Cambio(swing) ·
+  panel KPIs + tops + leyenda dinámica · Bogotá rotada 90°. Fetch data JSON + GeoJSON
+  de S3 (URLs en `meta.url`). Bug clave resuelto: NO hacer `innerHTML=''` al cambiar
+  de ciudad (destruye el contenedor Leaflet) — init del mapa una sola vez.
+- **Imágenes** (`tools/segunda-vuelta-prec/build_ciudades_imgs.py` → 14 PNG 1080×1080
+  en `rrss/twitter/ciudades-2v-png/`): portada + por ciudad {mapa, a1 "dos ciudades en
+  una"=leaderboard barrios, a2 "cambio 1V→2V"=barras+flecha} + cierre. Identidad paper
+  `#f1eee4`/Arima/Inter, **SIN watermark** (públicas), logo+crédito. Gotcha respetado:
+  Inter no trae emoji ni `→` (usar bullets `Rectangle`, flechas `annotate`, coma decimal).
+- **S3 subido** (público): `congreso-2026/output/prec-2v/ciudades-barrios-2v.json` +
+  `…/mapas-2026/Ciudades-COM-LOC/{CALI,BARRANQUILLA}-BARRIOS.json` (Bogotá/Medellín ya
+  estaban). Bumpear `?v=YYYYMMDD` del `DATA_URL` en el HTML al regenerar.
+- **Redes:** hilo X `rrss/twitter/hilo-ciudades-2v.md` (14 trinos: portada + mapa+2
+  análisis por ciudad + cierre) · carrusel IG `rrss/instagram/carrusel-ciudades-2v/`
+  (10: portada+mapa+a1 por ciudad+cierre) · LinkedIn `rrss/linkedin/articulo-ciudades-2v.md`.
+  Card NOTICIA 16 en `noticias.html`.
+
 ## Mapas por barrio 1V 2026 — `bogota-1v-barrios.html` + `medellin-1v-barrios.html`
 
 Notas/mapas interactivos (enlazados desde `noticias.html`) que llevan el
@@ -4627,6 +4746,108 @@ de versión HD/PDF con CTA upsell a Premium.
 - **El chat aprende qué pre-procesar** → loguear cada pregunta no
   respondida con conteo de veces que la piden. Es heatmap de demanda
   para priorizar el siguiente lote de pre-procesamiento.
+
+## Análisis "voto fusil" 2V 2026 (LISTO v1 · PENDIENTE columna + fix imágenes)
+
+Frente periodístico que **afina** el debate del "voto fusil" del balotaje Cepeda–Abelardo.
+**Tesis (de Ricardo):** el fusil existe, está probado puntualmente, opera en varios bandos,
+NO fue masivo ni decidió la elección; el dato cuantitativo **ACOTA dónde mirar (no prueba)**,
+el terreno valida. NO comparar con 2018/22 (es contextual); comparar **dentro del ciclo
+(1V→2V)**. Ajuste de framing (jun-2026): donde hay coacción documentada (asesinato de
+líderes, audio exigiendo certificado electoral, "gobernanza criminal" de la Defensoría),
+**la evidencia inclina la balanza hacia el fusil**; el terreno valida denuncias puntuales,
+no decide si el fenómeno existe.
+
+### La métrica propia: la TIJERA — a nivel PUESTO, NO municipio (clave)
+- **Unidad = PUESTO rural (zona 99), georreferenciado** (lat/lon en
+  `master_unificado_puesto.json` / `PUESTOS_GEOREF.csv`). NO municipio — ese es el foso
+  (rural + georref). La agregación a municipio fue **solo** para cruzar con los hechos de
+  Defensoría/prensa (que se reportan a corregimiento/municipio). Mantener esa distinción.
+- **Tijera** = puesto donde el ganador 2V ≥95% Y el rival cae ≥10 votos ABSOLUTOS de 1V a
+  2V (anómalo: la participación subió). Calculada sobre
+  `Bases de datos/output_2v/master_unificado_puesto.json` (14.220 puestos con
+  cep1/abe1/cep2/abe2/urna1/urna2/pot/lat/lon). **976 puestos (7%) con caída del rival;
+  entre ≥95% sube a 42%; 89 tijeras fuertes, TODAS lado Cepeda** (lado Abelardo 3 débiles =
+  sesgo de tamaño de puesto).
+
+### Hallazgos verificados
+- 675 mesas 100% Cepeda (Abelardo 81, 64 exterior). 532 en Cauca/Chocó/Nariño, 521 rural.
+- **Descomposición (PIP capas oficiales ANT) de las 532:** afro 52% / resguardo indígena
+  27% / campesino-coca 22% (étnico 78%); en VOTOS afro 45 / ind 30 / camp 25. → NO es "voto
+  resguardo" (La Silla), es territorio colectivo étnico, sobre todo **AFRO**.
+- **Inversión clave:** las mesas 100% son étnicas (78%); las **TIJERAS son campesinas (72%)**.
+  El voto en bloque étnico es genuino; el desplome del rival (tijera) es campesino-coca bajo EMC-Mordisco.
+- Continuidad 1V→2V: 81% de las mesas 100% ya eran ≥90% Cepeda en 1V (estructural).
+- **Participación = movilización, no abstención** (censo POR PUESTO `pot`, Divipole — no por
+  mesa): nacional 58,8→64,8 (+6); tijeras 69,5→83,0 (+13,6); 10 zonas 55,7→69,6 (+13,9);
+  Tumaco 37,9→57,7 (+19,9). Matiza a la FIP (−4pp promedio).
+- 17 mesas "100%" eran error de digitación E14 (descontadas).
+
+### Las 10 zonas (municipio · m100 · tijeras · frente EMC-Mordisco · triangulación)
+6 FULL (grupo+Defensoría+prensa fechada) + 4 PARCIAL (2 + prensa estructural):
+Tumaco(Nar 112·9, F.Oliver Sinisterra/CN-EB; AT 013-25 gobernanza criminal, minas 11-may,
+líder Awá 14-jun) · Policarpa(Nar 9·6, F.Franco Benavides; masacre La Vega 5-mar + audio
+"certificado electoral" 31-may) · Argelia(Cau 7·6, F.Carlos Patiño; combates El Plateado
+9-12 abr) · Patía(Cau 4·6, F.Carlos Patiño; atentado Panamericana 25-abr) · El Tambo(Cau
+8·5, F.Carlos Patiño) · Mercaderes(Cau 4·3, F.Carlos Patiño; Panamericana 25-abr) — los 6
+FULL. PARCIAL: Bolívar-Cauca(24·18, F.Carlos Patiño+ELN) · Leiva(Nar 6·8, F.Franco
+Benavides) · Cumbitara(Nar 12·3, F.Franco Benavides) · Almaguer(Cau 11·2, F.Carlos Patiño).
+**Frentes EMC línea 'Mordisco' (NO Calarcá):** Carlos Patiño (Cauca sur, 6 zonas), Franco
+Benavides (cordillera Nariño, 3), Oliver Sinisterra/CN-EB (Tumaco, 1).
+
+### Simetría "varios bandos" (Catatumbo, lado Abelardo)
+A nivel MUNICIPIO el voto sigue el linaje del grupo: ELN→Cepeda (El Tarra 82, Teorama 86,
+San Calixto 89, Hacarí 70); derecha (Clan del Golfo/ACSN/Frente 33-EMBF de 'Calarcá')→
+Abelardo (Sardinata 89, Toledo 88, Ábrego 82, Ocaña 71, Tibú 60). Tijera mesa-a-mesa casi
+nula del lado Abelardo (puestos chicos); sin hecho documentado de presión pro-Abelardo en
+sus municipios de arrase (cordillera/Santander, separados del Catatumbo en guerra).
+
+### Archivos
+- `voto-fusil-2026.html` — página/hub (hero + mapa Leaflet 10 zonas con fichas/popups + 4
+  figuras + tabla diferenciación + metodología + fuentes; tema paper). Verificado en navegador.
+- `rrss/twitter/hilo-voto-fusil.md` — 14 trinos (Premium), apunta a ricardoruiz.co/voto-fusil-2026.html.
+  (Se quitó el trino "en qué nos distanciamos"; trino 11 Catatumbo suavizado a "coincidencia, no prueba".)
+- `rrss/twitter/voto-fusil-png/{inversion-territorio, participacion-movilizacion,
+  mapa-tijeras-cauca, mapa-tijeras-narino, simetria-catatumbo, tabla-10-zonas-1,
+  tabla-10-zonas-2, caso-llorente}.png` — 8 imágenes. **El mapa y la tabla quedaron
+  partidos en 2** (antes `mapa-10-sitios.png` y `tabla-10-zonas.png`, eliminados). El mapa
+  ahora es a nivel **PUESTO** georreferenciado (zona 99), dividido Cauca (40 ptos) / Nariño
+  (26 ptos). `caso-llorente.png` = anatomía de una tijera en un puesto concreto (LLORENTE,
+  Tumaco, pcode 231399959: Cepeda 1816→3678, Abelardo 219→101, +1.681 votantes).
+- `rrss/linkedin/articulo-voto-fusil.md` — columna extendida (tuteo neutro), profundiza
+  más allá de las imágenes. LISTA.
+- **`tools/voto-fusil/build_imgs.py`** — regenera las 4 imágenes corregidas (a inversión,
+  b participación, c mapas Cauca/Nariño a nivel puesto, d tabla partida en 2 con el hecho
+  visible). Reconstruido jun-2026 (el script original no quedó en el repo). Lee
+  `tools/voto-fusil/_tijeras.json` (89 tijeras fuertes con lat/lon, regenerable desde
+  `master_unificado_puesto.json`) y la geo municipal de
+  `Bases de datos/output_pacto_1v_2026/geo/mps/{11,23}.json` (Cauca=11, Nariño=23
+  electoral; match por `mun_elec`). 10 zonas en dict `ZONAS`. Tijera fuerte = Cepeda
+  cep2/(cep2+abe2)≥0.95 y abe1−abe2≥10. Correr: `python3 tools/voto-fusil/build_imgs.py`.
+- `Bases de datos/output_2v/voto-fusil-memo-tecnico.md` — memo backbone (todo + fuentes + diferenciación).
+- Datos: `Bases de datos/output_2v/{master_unificado_puesto.json, Mesas_Cepeda_100pct_2V_vs_1V.xlsx,
+  Cepeda_Cauca_Choco_Narino_analisis.xlsx, _cache_resguardos_cn.geojson, _cache_afro_cn.geojson}`.
+  Capas ANT: services9.arcgis.com/pZylgd2zhNey2qXF — `10_12_24_RESGUARDO_INDIGENA_FORMALIZADO`
+  (layer 19) + `10_12_24_COMUNIDAD_NEGRA_TITULADA` (layer 18), DEPARTAMENTO=DANE (Cauca 19,
+  Chocó 27, Nariño 52). MOE: `.claude/riesgo-2025/full.txt` (Tabla 1/2/3/4 GAI por municipio,
+  split EMC Mordisco vs Calarcá en línea ~313).
+- **Identidad imágenes:** matplotlib + Arima (`tools/edad-1v-2026/fonts/Arima-{Bold,SemiBold}.ttf`),
+  paper #f1eee4, ink #1a1510, oxblood #8a1e16, ámbar #cf7d2a, Cepeda rojo #c0392b / Abelardo
+  azul #1f47cc. Redes usan Helvetica/Arima (NO Inter). Censo por PUESTO (no mesa).
+
+### PENDIENTE
+1. ✅ **Columna/artículo (LinkedIn)** — `rrss/linkedin/articulo-voto-fusil.md` (jun-2026).
+2. ✅ **Fix imágenes** — los 4 fixes hechos vía `tools/voto-fusil/build_imgs.py`:
+   (a) inversión: interlineado del subtítulo + leyenda separada del cuadro · (b)
+   participación: `%` separado del nombre + interlineado · (c) mapa a nivel PUESTO,
+   partido Cauca/Nariño · (d) tabla partida en 2 con el hecho visible por zona.
+3. **Validación geográfica km puesto→hecho** (events DB Defensoría/prensa geocodificada a
+   vereda) — pendiente (es el §5 del memo, "en construcción").
+4. **Carrusel IG + enlazar la página en `noticias.html`** — pendiente.
+
+> Nota: las imágenes y el artículo NO se han subido a S3 ni pusheado (esperan luz verde
+> de Ricardo). El og:image de `voto-fusil-2026.html` se repuntó a `inversion-territorio.png`
+> (antes apuntaba al borrado `mapa-10-sitios.png`).
 
 ## Convenciones de commit
 ```
