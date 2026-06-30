@@ -338,9 +338,11 @@ async function main(){
     for (const [k, s] of porPuesto[corp]){
       const [m, zzpp] = k.split('::');
       const ser = serialize(s, { mode:'cand', topN:0 });
+      const g = georef.get(`${m}-${zzpp}`);
       (puestosOut[corp][m] ||= {})[zzpp] = {
         validos:ser.validos, alt_votos:ser.alt_votos, alt_pct:ser.alt_pct,
         lider: ser.lider ? { partido:ser.lider.partido, pct:ser.lider.pct, alt:!!ser.lider.alt } : null,
+        lat: g&&Number.isFinite(g.lat)?+g.lat.toFixed(5):null, lon: g&&Number.isFinite(g.lon)?+g.lon.toFixed(5):null,
       };
     }
   }

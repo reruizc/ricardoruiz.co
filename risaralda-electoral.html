@@ -120,6 +120,17 @@
   .partyrow:hover .nm{color:var(--accent)}
   .partyrow .ar{font-family:'DM Mono',monospace;font-size:.7rem;color:var(--ink2)}
   .crumb{display:inline-flex;align-items:center;gap:.35rem;cursor:pointer;font-family:'Arima',sans-serif;font-weight:600;font-size:.78rem;color:var(--accent);margin:.2rem 0 .4rem}
+  .candrow{cursor:pointer}
+  .candrow:hover .nm{text-decoration:underline}
+  .candrow.sel{outline:2px solid var(--accent);outline-offset:-2px;border-radius:3px}
+  /* banner filtro candidato sobre el mapa */
+  .cand-banner{position:absolute;left:12px;top:12px;z-index:650;display:none;align-items:center;gap:.6rem;background:var(--panel);border:1px solid var(--accent);border-radius:8px;padding:.45rem .65rem;box-shadow:var(--shadow);max-width:calc(100% - 24px)}
+  .cand-banner.show{display:inline-flex}
+  .cand-banner .t{font-family:'Arima',sans-serif;font-size:.82rem;color:var(--ink);line-height:1.2}
+  .cand-banner .t b{color:var(--accent)}
+  .cand-banner .t small{display:block;color:var(--ink2);font-size:.7rem}
+  .cand-banner .x{cursor:pointer;font-family:'DM Mono',monospace;font-size:.72rem;color:var(--ink2);border:1px solid var(--line);border-radius:5px;padding:.2rem .45rem;white-space:nowrap}
+  .cand-banner .x:hover{color:var(--accent);border-color:var(--accent)}
   /* temporal */
   .temporal{display:flex;align-items:flex-end;gap:.7rem;height:96px;padding:.5rem .2rem 0;border:1px solid var(--line);border-radius:8px;background:var(--bg);margin-top:.3rem}
   .tcol{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:4px}
@@ -218,6 +229,7 @@
       <div style="position:relative">
         <div id="map"></div>
         <div class="legend" id="legend"></div>
+        <div class="cand-banner" id="candBanner"><div class="t" id="candBannerT"></div><span class="x" id="candBannerX">✕ Quitar filtro</span></div>
         <button class="backbtn" id="backMun" style="display:none">← Municipios</button>
       </div>
       <aside class="panel" id="panel"></aside>
@@ -269,15 +281,18 @@ const CB = 'v=20260629c';
 
 const ELEC = {
   camara: { label:'Cámara 2026', main:`${DATA_BASE}/risaralda-camara-2026.json?${CB}`,
-            barrios:`${DATA_BASE}/risaralda-camara-2026-pereira-barrios.json?${CB}`, territorial:false },
+            barrios:`${DATA_BASE}/risaralda-camara-2026-pereira-barrios.json?${CB}`,
+            puestos:`${DATA_BASE}/risaralda-camara-2026-puestos.json?${CB}`, territorial:false },
   '2023': { label:'Territorial 2023', main:`${DATA_BASE}/risaralda-2023.json?${CB}`,
-            barrios:`${DATA_BASE}/risaralda-2023-pereira-barrios.json?${CB}`, territorial:true },
+            barrios:`${DATA_BASE}/risaralda-2023-pereira-barrios.json?${CB}`,
+            puestos:`${DATA_BASE}/risaralda-2023-puestos.json?${CB}`, territorial:true },
   '2019': { label:'Territorial 2019', main:`${DATA_BASE}/risaralda-2019.json?${CB}`,
-            barrios:`${DATA_BASE}/risaralda-2019-pereira-barrios.json?${CB}`, territorial:true },
+            barrios:`${DATA_BASE}/risaralda-2019-pereira-barrios.json?${CB}`,
+            puestos:`${DATA_BASE}/risaralda-2019-puestos.json?${CB}`, territorial:true },
 };
 const CORP_LABEL = { gobernacion:'Gobernación', asamblea:'Asamblea', alcaldia:'Alcaldía', concejo:'Concejo' };
 
-const STATE = { eleccion:'camara', corp:'gobernacion', alt:false, mun:null, view:'muns', detailMode:'cand', partyFilter:null, search:'' };
+const STATE = { eleccion:'camara', corp:'gobernacion', alt:false, mun:null, view:'muns', detailMode:'lista', partyFilter:null, search:'', candFilter:null };
 const CUR = { scope:null, titulo:'', sub:'' };   // scope visible para detalle + export
 const CACHE = {};
 const GEO = { muns:null, barrios:null };
@@ -325,7 +340,22 @@ function depScope(main){
 }
 
 // ─── MAP ─────────────────────────────────────────────────────────────
-let map, munLayer, barrioLayer;
+let map, munLayer, barrioLayer, puestoLayer, CURMAIN=null;
+let _candMax=1, _candCol='#9a9183';
+function hex2rgb(h){ h=String(h||'').replace('#',''); if(h.length===3)h=h.split('').map(c=>c+c).join(''); return [parseInt(h.slice(0,2),16)||150,parseInt(h.slice(2,4),16)||150,parseInt(h.slice(4,6),16)||150]; }
+function tintColor(hex,t){ const dark=document.documentElement.getAttribute('data-theme')==='dark'; const bg=dark?[35,32,26]:[241,238,228]; const c=hex2rgb(hex); return `rgb(${lerp(bg[0],c[0],t)},${lerp(bg[1],c[1],t)},${lerp(bg[2],c[2],t)})`; }
+// votos/pct del candidato filtrado en el municipio m
+function candInMun(main, m){
+  const sc = munScope(main, m); if(!sc||!sc.candidatos) return null;
+  const f=STATE.candFilter; const c=sc.candidatos.find(x=>x.nombre===f.nombre && x.partido===f.partido);
+  return c?{votos:c.votos, pct:c.pct}:{votos:0, pct:0};
+}
+function scaleMxAlt(main){ let mx=1; for(const f of (GEO.muns?GEO.muns.features:[])){ const m=String(parseInt(f.properties.mun_elec,10)); const s=munScope(main,m); if(s) mx=Math.max(mx,s.alt_pct); } return mx; }
+function munFill(main, m, mxAlt){
+  if (STATE.candFilter){ const cv=candInMun(main,m); if(!cv) return '#ccc'; return tintColor(_candCol, Math.min(1,(cv.pct||0)/_candMax)); }
+  const s=munScope(main,m); if(!s) return '#ccc';
+  return STATE.alt? altColor(Math.min(1,s.alt_pct/mxAlt)) : leaderColor(s.lider?s.lider.partido:'', s.lider&&s.lider.alt);
+}
 function initMap(){
   // Mapa estático: sin paneo ni zoom de usuario (clic para drill sí funciona).
   map = L.map('map',{zoomControl:false,attributionControl:false,scrollWheelZoom:false,
@@ -346,27 +376,76 @@ async function renderMuns(){
   if (barrioLayer){ map.removeLayer(barrioLayer); barrioLayer=null; }
   if (!GEO.muns) GEO.muns = await getJSON(`${MAP_BASE}/Departamentos-mps/24.json?${CB}`);
   const main = await getJSON(ELEC[STATE.eleccion].main);
-  let mx=0;
-  for (const f of GEO.muns.features){ const m=String(parseInt(f.properties.mun_elec,10)); const s=munScope(main,m); if(s) mx=Math.max(mx,s.alt_pct); }
-  mx=Math.max(mx,1);
+  CURMAIN = main;
+  const mx = scaleMxAlt(main);
   if (munLayer) map.removeLayer(munLayer);
   munLayer = L.geoJSON(GEO.muns,{
     style:f=>{ const m=String(parseInt(f.properties.mun_elec,10)); const s=munScope(main,m);
-      let fill='#ccc'; if(s) fill = STATE.alt?altColor(Math.min(1,s.alt_pct/mx)):leaderColor(s.lider?s.lider.partido:'', s.lider&&s.lider.alt);
-      return {color:'#fff',weight:1,fillColor:fill,fillOpacity:s?.86:.3}; },
+      return {color:'#fff',weight:1,fillColor:munFill(main,m,mx),fillOpacity:s?.86:.3}; },
     onEachFeature:(f,layer)=>{
       const m=String(parseInt(f.properties.mun_elec,10)); const s=munScope(main,m); const nm=titleCase(f.properties.mpio_cnmbr);
-      let tip=`<b>${nm}</b>`;
-      if(s){ tip+=`<br><span class="alt">Alternativo: ${s.alt_pct}%</span>`; if(s.lider) tip+=`<br>Líder: ${titleCase(s.lider.partido||s.lider.nombre)} (${s.lider.pct}%)`; }
-      layer.bindTooltip(tip,{className:'rr',sticky:true});
+      const tipFn=()=>{ let tip=`<b>${nm}</b>`;
+        if (STATE.candFilter){ const cv=candInMun(main,m); tip+=`<br><span class="alt">${titleCase(STATE.candFilter.nombre)}: ${cv?cv.pct:0}%</span> · ${cv?fmt(cv.votos):0} votos`; }
+        else if(s){ tip+=`<br><span class="alt">Alternativo: ${s.alt_pct}%</span>`; if(s.lider) tip+=`<br>Líder: ${titleCase(s.lider.partido||s.lider.nombre)} (${s.lider.pct}%)`; }
+        return tip; };
+      layer.bindTooltip(tipFn,{className:'rr',sticky:true});
       layer.on('mouseover',()=>layer.setStyle({weight:2.5,color:'#222'}));
       layer.on('mouseout',()=>munLayer.resetStyle(layer));
       layer.on('click',()=>selectMun(m,f.properties.mpio_cnmbr));
     }
   }).addTo(map);
   fitZoom(munLayer.getBounds(),[16,16]);
+  await renderPuestos();
   renderLegend(mx);
+  syncCandBanner();
   if (!STATE.mun) renderDepPanel(main);
+}
+
+// ─── PUESTOS DE VOTACIÓN (marcadores) ────────────────────────────────
+async function renderPuestos(){
+  if (puestoLayer){ map.removeLayer(puestoLayer); puestoLayer=null; }
+  if (STATE.candFilter) return;                 // durante filtro de candidato no se pintan
+  let pj; try{ pj = await getJSON(ELEC[STATE.eleccion].puestos); }catch(e){ return; }
+  const block = ELEC[STATE.eleccion].territorial ? (pj[STATE.corp]||{}) : pj;
+  const dark = document.documentElement.getAttribute('data-theme')==='dark';
+  puestoLayer = L.layerGroup();
+  for (const munInt of Object.keys(block)){
+    const muns = block[munInt];
+    for (const zzpp of Object.keys(muns)){
+      const d = muns[zzpp];
+      if (!d || !Number.isFinite(d.lat) || !Number.isFinite(d.lon)) continue;
+      const col = STATE.alt ? altColor(Math.min(1,(d.alt_pct||0)/49)) : leaderColor(d.lider?d.lider.partido:'', d.lider&&d.lider.alt);
+      const mk = L.circleMarker([d.lat,d.lon], { radius:2.6, color:dark?'#0b0b0b':'#ffffff', weight:.6, fillColor:col, fillOpacity:.95 });
+      mk.bindTooltip(()=>{ let t=`<b>Puesto de votación</b><br>${fmt(d.validos)} válidos`; if(d.lider) t+=`<br>Líder: ${titleCase(d.lider.partido)} (${d.lider.pct}%)`; t+=`<br><span class="alt">Alternativo: ${d.alt_pct}%</span>`; return t; },{className:'rr',sticky:true});
+      mk.on('mouseover',()=>mk.setStyle({radius:5,weight:1.4}));
+      mk.on('mouseout',()=>mk.setStyle({radius:2.6,weight:.6}));
+      mk.on('click',()=>selectMun(munInt,(CURMAIN.muns[munInt]||{}).nombre||''));
+      puestoLayer.addLayer(mk);
+    }
+  }
+  puestoLayer.addTo(map);
+}
+
+// ─── FILTRO POR CANDIDATO ────────────────────────────────────────────
+function recolorMuns(){
+  if (!munLayer||!CURMAIN) return;
+  const mx=scaleMxAlt(CURMAIN);
+  munLayer.eachLayer(l=>{ const m=String(parseInt(l.feature.properties.mun_elec,10)); l.setStyle({fillColor:munFill(CURMAIN,m,mx)}); });
+  renderLegend(mx);
+}
+async function setCandFilter(nombre, partido){
+  STATE.candFilter={nombre,partido};
+  const _c = (CUR.scope && CUR.scope.candidatos || []).find(x=>x.nombre===nombre && x.partido===partido);
+  _candCol = leaderColor(partido, _c?_c.alt:false);
+  _candMax = 1;
+  if (GEO.muns) for(const f of GEO.muns.features){ const m=String(parseInt(f.properties.mun_elec,10)); const cv=candInMun(CURMAIN,m); if(cv) _candMax=Math.max(_candMax,cv.pct); }
+  recolorMuns(); await renderPuestos(); syncCandBanner(); renderDetailBody();
+}
+function clearCandFilter(){ STATE.candFilter=null; recolorMuns(); renderPuestos(); syncCandBanner(); renderDetailBody(); }
+function syncCandBanner(){
+  const b=document.getElementById('candBanner');
+  if (STATE.candFilter){ document.getElementById('candBannerT').innerHTML=`Votación de <b>${titleCase(STATE.candFilter.nombre)}</b><small>${titleCase(STATE.candFilter.partido)} · más oscuro = mayor %</small>`; b.classList.add('show'); }
+  else b.classList.remove('show');
 }
 async function selectMun(munInt, nombreRaw){
   STATE.mun=munInt;
@@ -375,7 +454,8 @@ async function selectMun(munInt, nombreRaw){
   await renderMunPanel(main, munInt, titleCase(nombreRaw));
 }
 async function renderPereiraBarrios(){
-  STATE.view='pereira-barrio';
+  STATE.view='pereira-barrio'; STATE.candFilter=null; syncCandBanner();
+  if (puestoLayer){ map.removeLayer(puestoLayer); puestoLayer=null; }
   document.getElementById('backMun').style.display='block';
   if (!GEO.barrios) GEO.barrios = await getJSON(`${DATA_BASE}/PEREIRA-BARRIOS.json?${CB}`);
   const bdata = await getJSON(ELEC[STATE.eleccion].barrios);
@@ -406,6 +486,13 @@ async function renderPereiraBarrios(){
 // ─── LEGEND ──────────────────────────────────────────────────────────
 function renderLegend(mx, note){
   const el=document.getElementById('legend');
+  if (STATE.candFilter){
+    el.innerHTML = `<div class="lt">% de ${titleCase(STATE.candFilter.nombre).split(' ').slice(0,2).join(' ')}</div>
+      <div class="scale"><i style="background:${tintColor(_candCol,0)}"></i><i style="background:${tintColor(_candCol,.25)}"></i><i style="background:${tintColor(_candCol,.5)}"></i><i style="background:${tintColor(_candCol,.75)}"></i><i style="background:${tintColor(_candCol,1)}"></i></div>
+      <div class="ends"><span>0%</span><span>${_candMax.toFixed(0)}%+</span></div>
+      <div class="li" style="margin-top:.4rem;color:var(--ink2)">Puestos ocultos durante el filtro</div>`;
+    return;
+  }
   if (STATE.alt){
     el.innerHTML = `<div class="lt">% voto alternativo</div>
       <div class="scale"><i style="background:${altColor(0)}"></i><i style="background:${altColor(.25)}"></i><i style="background:${altColor(.5)}"></i><i style="background:${altColor(.75)}"></i><i style="background:${altColor(1)}"></i></div>
@@ -476,7 +563,8 @@ function candListHTML(cands){
   let h='<div class="clist">';
   cands.forEach((c,i)=>{
     const col=leaderColor(c.partido,c.alt);
-    h+=`<div class="crow" style="border-left:3px solid ${col};padding-left:.45rem;background:linear-gradient(90deg,${col}1c,transparent 60%)"><span class="rk">${i+1}</span>
+    const sel = STATE.candFilter && STATE.candFilter.nombre===c.nombre && STATE.candFilter.partido===c.partido;
+    h+=`<div class="crow candrow${sel?' sel':''}" title="Ver en el mapa la votación de este candidato" data-cn="${encodeURIComponent(c.nombre)}" data-cp="${encodeURIComponent(c.partido)}" style="border-left:3px solid ${col};padding-left:.45rem;background:linear-gradient(90deg,${col}1c,transparent 60%)"><span class="rk">${i+1}</span>
       <span class="who"><span class="nm ${c.alt?'alt':''}">${titleCase(c.nombre)||'—'}</span>
       <span class="pa">${c.alt?'<span class="dot"></span>':''}${titleCase(c.partido)}</span></span>
       <span class="num"><span class="vt">${fmt(c.votos)}</span><br><span class="pc ${c.alt?'alt':''}">${c.pct}%</span></span></div>`;
@@ -496,7 +584,7 @@ function listRowsHTML(partidos, max){
 // ─── DETALLE: toggle Partidos/Candidatos + búsqueda + drill + export ──
 function detailHostHTML(){
   return `<div class="dhead">
-      <div class="seg sm" id="dmode"><button data-m="cand" class="${STATE.detailMode==='cand'?'on':''}">Candidatos</button><button data-m="lista" class="${STATE.detailMode==='lista'?'on':''}">Partidos</button></div>
+      <div class="seg sm" id="dmode"><button data-m="lista" class="${STATE.detailMode==='lista'?'on':''}">Partidos</button><button data-m="cand" class="${STATE.detailMode==='cand'?'on':''}">Candidatos</button></div>
       <input class="dsearch" id="dsearch" placeholder="Buscar nombre o partido…" value="${(STATE.search||'').replace(/"/g,'&quot;')}">
       <button class="dlbtn" id="dlbtn" title="Descargar tabla en Excel">↓ Excel</button>
     </div><div id="detail-body"></div>`;
@@ -532,6 +620,11 @@ function renderDetailBody(){
   body.innerHTML=h;
   const cb=document.getElementById('crumb-back'); if(cb) cb.onclick=()=>{ STATE.partyFilter=null; renderDetailBody(); };
   document.querySelectorAll('#detail-body .partyrow').forEach(r=>r.onclick=()=>{ STATE.partyFilter=decodeURIComponent(r.getAttribute('data-p')); renderDetailBody(); });
+  document.querySelectorAll('#detail-body .candrow').forEach(r=>r.onclick=()=>{
+    const nm=decodeURIComponent(r.getAttribute('data-cn')), pa=decodeURIComponent(r.getAttribute('data-cp'));
+    if (STATE.candFilter && STATE.candFilter.nombre===nm && STATE.candFilter.partido===pa) clearCandFilter();
+    else setCandFilter(nm, pa);
+  });
 }
 
 // ─── EXPORT XLSX (xlsx-js-style · Arial 13 · filas intercaladas) ──────
@@ -662,11 +755,12 @@ function init(){
   document.querySelectorAll('#eleccion-seg button').forEach(b=>b.onclick=()=>{
     STATE.eleccion=b.getAttribute('data-e'); setSeg('eleccion-seg','data-e',STATE.eleccion);
     document.getElementById('corp-grp').style.display = ELEC[STATE.eleccion].territorial?'flex':'none';
-    STATE.mun=null; refresh();
+    STATE.mun=null; STATE.candFilter=null; refresh();
   });
   document.querySelectorAll('#corp-seg button').forEach(b=>b.onclick=()=>{
-    STATE.corp=b.getAttribute('data-c'); setSeg('corp-seg','data-c',STATE.corp); STATE.mun=null; refresh();
+    STATE.corp=b.getAttribute('data-c'); setSeg('corp-seg','data-c',STATE.corp); STATE.mun=null; STATE.candFilter=null; refresh();
   });
+  document.getElementById('candBannerX').onclick=clearCandFilter;
   document.getElementById('altToggle').onclick=()=>{
     STATE.alt=!STATE.alt; document.getElementById('altToggle').classList.toggle('on',STATE.alt); refresh();
   };

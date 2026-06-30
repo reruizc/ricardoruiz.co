@@ -68,6 +68,16 @@ function loadCensoByMun(){
   for(let i=1;i<lines.length;i++){const p=lines[i].split(';');const code=(p[I_COD]||'').replace(/"/g,'');if(code.length<9)continue;if(code.slice(0,2)!=='24')continue;const mun=String(parseInt(code.slice(2,5),10));byMun[mun]=(byMun[mun]||0)+(parseInt(p[I_MUJ]||'0',10)||0)+(parseInt(p[I_HOM]||'0',10)||0);}
   return byMun;
 }
+// Lat/lon por puesto (dep 24) → `${mun}-${zz}-${pp}`.
+function loadGerefAll(){
+  const lines=fs.readFileSync(GEOREF,'utf8').split(/\r?\n/);
+  const H=lines[0].replace(/^﻿/,'').split(';').map(s=>s.trim());
+  const I=n=>H.indexOf(n);
+  const I_COD=I('CÓDIGO COMPLETO'),I_LAT=I('LATITUD'),I_LON=I('LONGITUD');
+  const map=new Map();
+  for(let i=1;i<lines.length;i++){const p=lines[i].split(';');const code=(p[I_COD]||'').replace(/"/g,'');if(code.length<9)continue;if(code.slice(0,2)!=='24')continue;const mun=String(parseInt(code.slice(2,5),10));const zz=pad2(code.slice(5,7)),pp=pad2(code.slice(7,9));map.set(`${mun}-${zz}-${pp}`,{lat:parseFloat(p[I_LAT]),lon:parseFloat(p[I_LON])});}
+  return map;
+}
 function loadGeorefPereira(feats){
   const lines=fs.readFileSync(GEOREF,'utf8').split(/\r?\n/);
   const H=lines[0].replace(/^﻿/,'').split(';').map(s=>s.trim());
@@ -115,6 +125,7 @@ async function main(){
   const feats = loadPereiraBarrios();
   const georef = loadGeorefPereira(feats);
   const censoByMun = loadCensoByMun();
+  const gerefAll = loadGerefAll();
 
   let d;
   try { const r = await fetch(DEP24_URL); d = await r.json(); }
@@ -162,8 +173,10 @@ async function main(){
         const zz=pad2(pu.zon_cod), pp=pad2(pu.pue_cod_raw||(pu.pue_cod||'').split('-').pop());
         const accP=new Map(); addPartidos(accP,pu.partidos);
         const s=summarize(accP);
+        const ga=gerefAll.get(`${munInt}-${zz}-${pp}`);
         porPuesto[munInt][`${zz}-${pp}`] = { validos:s.validos, alt_votos:s.alt_votos, alt_pct:s.alt_pct,
-          lider: s.lider?{partido:s.lider.partido,pct:s.lider.pct,alt:s.lider.alt}:null };
+          lider: s.lider?{partido:s.lider.partido,pct:s.lider.pct,alt:s.lider.alt}:null,
+          lat: ga&&Number.isFinite(ga.lat)?+ga.lat.toFixed(5):null, lon: ga&&Number.isFinite(ga.lon)?+ga.lon.toFixed(5):null };
         // Pereira barrio
         if (munCod===PEREIRA_MUN){
           const g=georef.get(`${zz}-${pp}`);
