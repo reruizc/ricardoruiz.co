@@ -195,6 +195,7 @@
           <button data-e="camara" class="on">Cámara 2026</button>
           <button data-e="2023">Territorial 2023</button>
           <button data-e="2019">Territorial 2019</button>
+          <button data-e="trasvase">Trasvase ⇄</button>
         </div>
       </div>
       <div class="grp" id="corp-grp" style="display:none"><span class="ctl-lab">Corporación</span>
@@ -203,6 +204,13 @@
           <button data-c="asamblea">Asamblea</button>
           <button data-c="alcaldia">Alcaldía</button>
           <button data-c="concejo">Concejo</button>
+        </div>
+      </div>
+      <div class="grp" id="pair-grp" style="display:none"><span class="ctl-lab">Trasvase</span>
+        <div class="seg" id="pair-seg">
+          <button data-p="gob-alc" class="on">Gobernación → Alcaldía</button>
+          <button data-p="asa-cam">Asamblea → Cámara</button>
+          <button data-p="con-cam">Concejo → Cámara</button>
         </div>
       </div>
       <div class="alt-toggle" id="altToggle"><div class="sw"></div><span>Priorizar voto alternativo</span></div>
@@ -294,7 +302,13 @@ const ELEC = {
 };
 const CORP_LABEL = { gobernacion:'Gobernación', asamblea:'Asamblea', alcaldia:'Alcaldía', concejo:'Concejo' };
 
-const STATE = { eleccion:'camara', corp:'gobernacion', alt:false, mun:null, view:'muns', detailMode:'lista', partyFilter:null, search:'', candFilter:null };
+const STATE = { eleccion:'camara', corp:'gobernacion', alt:false, mun:null, view:'muns', detailMode:'lista', partyFilter:null, search:'', candFilter:null, mode:'normal', pair:'gob-alc' };
+// Pares de trasvase del voto alternativo entre cargos.
+const PAIRS = {
+  'gob-alc': { label:'Gobernación → Alcaldía', src:{e:'2023',corp:'gobernacion',lab:'Gobernación 2023'}, dst:{e:'2023',corp:'alcaldia',lab:'Alcaldía 2023'}, sameDay:true },
+  'asa-cam': { label:'Asamblea → Cámara',      src:{e:'2023',corp:'asamblea',lab:'Asamblea 2023'},      dst:{e:'camara',corp:null,lab:'Cámara 2026'}, sameDay:false },
+  'con-cam': { label:'Concejo → Cámara',       src:{e:'2023',corp:'concejo',lab:'Concejo 2023'},        dst:{e:'camara',corp:null,lab:'Cámara 2026'}, sameDay:false },
+};
 const CUR = { scope:null, titulo:'', sub:'' };   // scope visible para detalle + export
 const CACHE = {};
 const GEO = { muns:null, barrios:null };
@@ -357,6 +371,99 @@ function munFill(main, m, mxAlt){
   if (STATE.candFilter){ const cv=candInMun(main,m); if(!cv) return '#ccc'; return tintColor(_candCol, Math.min(1,(cv.pct||0)/_candMax)); }
   const s=munScope(main,m); if(!s) return '#ccc';
   return STATE.alt? altColor(Math.min(1,s.alt_pct/mxAlt)) : leaderColor(s.lider?s.lider.partido:'', s.lider&&s.lider.alt);
+}
+
+// ─── TRASVASE (flujo del voto alternativo entre cargos) ──────────────
+function refMunScope(main, ref, m){ if(ref.e==='camara') return main.por_mun[m]; const c=main.corporaciones[ref.corp]; return c&&c.por_mun?c.por_mun[m]:null; }
+function refDepAgg(main, ref){ let av=0,v=0; if(GEO.muns) for(const f of GEO.muns.features){ const m=String(parseInt(f.properties.mun_elec,10)); const s=refMunScope(main,ref,m); if(s){av+=s.alt_votos||0;v+=s.validos||0;} } return {alt_votos:av,validos:v,alt_pct:v?+(av/v*100).toFixed(2):0}; }
+function divColor(net, maxAbs){
+  const dark=document.documentElement.getAttribute('data-theme')==='dark';
+  const mid=dark?[55,52,46]:[224,221,210], pos=dark?[57,255,122]:[31,122,61], neg=dark?[217,106,80]:[138,30,22];
+  const t=Math.max(-1,Math.min(1,net/(maxAbs||1)));
+  const to=t>=0?pos:neg, k=Math.abs(t);
+  return `rgb(${lerp(mid[0],to[0],k)},${lerp(mid[1],to[1],k)},${lerp(mid[2],to[2],k)})`;
+}
+// Asociación ecológica a nivel puesto entre dos corporaciones del MISMO año.
+function computeEco(puestosJson, srcCorp, dstCorp){
+  const A=puestosJson[srcCorp]||{}, B=puestosJson[dstCorp]||{}; const xs=[],ys=[];
+  for(const m of Object.keys(A)){ const bm=B[m]||{}; for(const k of Object.keys(A[m])){ const a=A[m][k], b=bm[k]; if(a&&b&&(a.validos||0)>=50&&(b.validos||0)>=50){ xs.push(a.alt_pct); ys.push(b.alt_pct); } } }
+  const n=xs.length; if(n<8) return null;
+  const mx=xs.reduce((s,v)=>s+v,0)/n, my=ys.reduce((s,v)=>s+v,0)/n;
+  let sxy=0,sxx=0,syy=0; for(let i=0;i<n;i++){ const dx=xs[i]-mx, dy=ys[i]-my; sxy+=dx*dy; sxx+=dx*dx; syy+=dy*dy; }
+  if(sxx<=0||syy<=0) return null;
+  return { n, r:+(sxy/Math.sqrt(sxx*syy)).toFixed(2), slope:+(sxy/sxx).toFixed(2) };
+}
+
+async function renderTrasvase(){
+  STATE.view='muns'; STATE.mun=null; STATE.candFilter=null; syncCandBanner();
+  document.getElementById('backMun').style.display='none';
+  if(barrioLayer){map.removeLayer(barrioLayer);barrioLayer=null;}
+  if(puestoLayer){map.removeLayer(puestoLayer);puestoLayer=null;}
+  if(!GEO.muns) GEO.muns=await getJSON(`${MAP_BASE}/Departamentos-mps/24.json?${CB}`);
+  const pair=PAIRS[STATE.pair];
+  const srcMain=await getJSON(ELEC[pair.src.e].main), dstMain=await getJSON(ELEC[pair.dst.e].main);
+  const nets={};
+  for(const f of GEO.muns.features){ const m=String(parseInt(f.properties.mun_elec,10));
+    const ss=refMunScope(srcMain,pair.src,m), ds=refMunScope(dstMain,pair.dst,m);
+    if(ss&&ds){ const net=+(ds.alt_pct-ss.alt_pct).toFixed(2); nets[m]={src:ss.alt_pct,dst:ds.alt_pct,net}; } }
+  // Escala robusta: percentil 85 de |net| (un municipio atípico no aplana el resto).
+  const absS=Object.values(nets).map(n=>Math.abs(n.net)).sort((a,b)=>a-b);
+  const maxAbs = Math.max(3, absS.length?absS[Math.floor((absS.length-1)*0.85)]:1);
+  if(munLayer)map.removeLayer(munLayer);
+  munLayer=L.geoJSON(GEO.muns,{
+    style:f=>{ const m=String(parseInt(f.properties.mun_elec,10)); const n=nets[m]; return {color:'#fff',weight:1,fillColor:n?divColor(n.net,maxAbs):'#ccc',fillOpacity:n?.88:.3}; },
+    onEachFeature:(f,layer)=>{ const m=String(parseInt(f.properties.mun_elec,10)); const nm=titleCase(f.properties.mpio_cnmbr); const n=nets[m];
+      layer.bindTooltip(()=>{ let t=`<b>${nm}</b>`; if(n){ t+=`<br>${pair.src.lab}: ${n.src}%<br>${pair.dst.lab}: ${n.dst}%<br><b class="alt">${n.net>=0?'+':''}${n.net} pp</b> voto alternativo`; } return t; },{className:'rr',sticky:true});
+      layer.on('mouseover',()=>layer.setStyle({weight:2.5,color:'#222'}));
+      layer.on('mouseout',()=>munLayer.resetStyle(layer));
+    }
+  }).addTo(map);
+  fitZoom(munLayer.getBounds(),[16,16]);
+  // leyenda divergente
+  document.getElementById('legend').innerHTML = `<div class="lt">Trasvase del voto alternativo (pp)</div>
+    <div class="scale"><i style="background:${divColor(-maxAbs,maxAbs)}"></i><i style="background:${divColor(-maxAbs/2,maxAbs)}"></i><i style="background:${divColor(0,maxAbs)}"></i><i style="background:${divColor(maxAbs/2,maxAbs)}"></i><i style="background:${divColor(maxAbs,maxAbs)}"></i></div>
+    <div class="ends"><span>−${maxAbs.toFixed(0)} (cae)</span><span>+${maxAbs.toFixed(0)} (crece)</span></div>`;
+  renderTrasvasePanel(pair, srcMain, dstMain, nets);
+}
+function renderTrasvasePanel(pair, srcMain, dstMain, nets){
+  const p=document.getElementById('panel');
+  const sd=refDepAgg(srcMain,pair.src), dd=refDepAgg(dstMain,pair.dst);
+  const net=+(dd.alt_pct-sd.alt_pct).toFixed(2);
+  let h=`<div class="kicker">Trasvase · voto alternativo</div><div class="ptitle">${pair.label}</div>
+    <div class="psub">${pair.sameDay?'Mismo día (2023) · mismos votantes':'2023 → 2026 · comparación entre elecciones'}</div>`;
+  h+=`<div class="temporal" style="height:auto;padding:.7rem .5rem">
+    <div class="tcol"><div class="tv" style="color:var(--ink2)">${sd.alt_pct}%</div><div class="tbar dim" style="height:${Math.max(2,sd.alt_pct/Math.max(sd.alt_pct,dd.alt_pct,1)*54)}px"></div><div class="tl">${pair.src.lab}</div></div>
+    <div class="tcol" style="flex:0 0 26px"><div class="tv" style="font-size:1.1rem">⇄</div></div>
+    <div class="tcol"><div class="tv alt" style="color:var(--alt)">${dd.alt_pct}%</div><div class="tbar" style="height:${Math.max(2,dd.alt_pct/Math.max(sd.alt_pct,dd.alt_pct,1)*54)}px"></div><div class="tl">${pair.dst.lab}</div></div></div>`;
+  h+=`<div class="hint" style="margin-top:.6rem">El voto alternativo del departamento ${net>=0?'<b style="color:var(--alt)">creció</b>':'<b style="color:var(--accent)">cayó</b>'} <b>${net>=0?'+':''}${net} pp</b> de ${pair.src.lab.toLowerCase()} a ${pair.dst.lab.toLowerCase()}.`;
+  if(pair.sameDay){ const mult = sd.alt_votos>0 ? dd.alt_votos/sd.alt_votos : null;
+    if(mult!=null){
+      if(mult>=1.1) h+=` El bloque alternativo obtuvo <b>${mult.toFixed(2)}×</b> los votos a alcaldes (${fmt(dd.alt_votos)}) que a gobernador (${fmt(sd.alt_votos)}): los candidatos locales arrastran más que el único candidato a la gobernación.`;
+      else if(mult<=0.9) h+=` Retención: de ${fmt(sd.alt_votos)} votos a gobernador a ${fmt(dd.alt_votos)} a alcaldes (<b>${Math.round(mult*100)}%</b>).`;
+      else h+=` Votación casi pareja: ${fmt(sd.alt_votos)} a gobernador, ${fmt(dd.alt_votos)} a alcaldes.`;
+    }
+  } else { h+=` Son elecciones distintas (electorados y participación diferentes): es una comparación de fuerza del bloque, no un flujo de los mismos votantes.`; }
+  h+=`</div>`;
+  // asociación ecológica (solo mismo día)
+  if(pair.sameDay){ h+=`<div class="sec-t">Asociación a nivel puesto</div><div id="eco-slot"><div class="hint">Calculando…</div></div>`; }
+  // tabla de municipios por net
+  const rows=Object.entries(nets).map(([m,n])=>({m, nm:titleCase((srcMain.muns[m]&&srcMain.muns[m].nombre)||m), ...n})).sort((a,b)=>b.net-a.net);
+  h+=`<div class="sec-t">Por municipio (Δ pp del voto alternativo)</div><div class="clist">`;
+  for(const r of rows){ const col=divColor(r.net, Math.max(1,...rows.map(x=>Math.abs(x.net))));
+    h+=`<div class="crow" style="border-left:3px solid ${col};padding-left:.45rem"><span class="who"><span class="nm">${r.nm}</span><span class="pa">${pair.src.lab.split(' ')[0]} ${r.src}% → ${pair.dst.lab.split(' ')[0]} ${r.dst}%</span></span>
+      <span class="num"><span class="vt" style="color:${r.net>=0?'var(--alt)':'var(--accent)'}">${r.net>=0?'+':''}${r.net}</span><br><span class="pc">pp</span></span></div>`;
+  }
+  h+=`</div>`;
+  p.innerHTML=h;
+  if(pair.sameDay){ getJSON(ELEC[pair.src.e].puestos).then(pj=>{ const eco=computeEco(pj,pair.src.corp,pair.dst.corp); const sl=document.getElementById('eco-slot'); if(!sl) return;
+    if(!eco){ sl.innerHTML='<div class="hint">Muestra insuficiente.</div>'; return; }
+    let interp;
+    if(eco.r>=0.4) interp=`donde más votó el bloque alternativo a la gobernación, también votó más a la alcaldía (asociación positiva fuerte)`;
+    else if(eco.r>=0.15) interp=`hay una asociación positiva débil entre el voto alternativo a gobernación y a alcaldía`;
+    else if(eco.r>-0.15) interp=`el voto alternativo a gobernación y a alcaldía casi no se relacionan: responden a dinámicas distintas (candidatos locales vs. el único candidato a la gobernación)`;
+    else interp=`el voto alternativo a gobernación y a alcaldía van por caminos distintos (correlación negativa): la fuerza alternativa local no coincide con la del candidato a la gobernación`;
+    sl.innerHTML=`<div class="hint">En los ${eco.n} puestos comparables, ${interp} (correlación <b>r=${eco.r}</b>). Es asociación ecológica entre territorios, no el flujo de votantes individuales (cota de King).</div>`;
+  }); }
 }
 function initMap(){
   // Mapa estático: sin paneo ni zoom de usuario (clic para drill sí funciona).
@@ -798,12 +905,24 @@ function init(){
     localStorage.setItem('rr-theme', dark?'light':'dark'); refresh();
   };
   document.querySelectorAll('#eleccion-seg button').forEach(b=>b.onclick=()=>{
-    STATE.eleccion=b.getAttribute('data-e'); setSeg('eleccion-seg','data-e',STATE.eleccion);
-    document.getElementById('corp-grp').style.display = ELEC[STATE.eleccion].territorial?'flex':'none';
-    STATE.mun=null; STATE.candFilter=null; refresh();
+    const e=b.getAttribute('data-e'); setSeg('eleccion-seg','data-e',e);
+    STATE.mun=null; STATE.candFilter=null; STATE.view='muns';
+    if (e==='trasvase'){ STATE.mode='trasvase';
+      document.getElementById('corp-grp').style.display='none';
+      document.getElementById('pair-grp').style.display='flex';
+      document.getElementById('altToggle').style.display='none';
+    } else { STATE.mode='normal'; STATE.eleccion=e;
+      document.getElementById('pair-grp').style.display='none';
+      document.getElementById('corp-grp').style.display = ELEC[e].territorial?'flex':'none';
+      document.getElementById('altToggle').style.display='inline-flex';
+    }
+    refresh();
   });
   document.querySelectorAll('#corp-seg button').forEach(b=>b.onclick=()=>{
     STATE.corp=b.getAttribute('data-c'); setSeg('corp-seg','data-c',STATE.corp); STATE.mun=null; STATE.candFilter=null; refresh();
+  });
+  document.querySelectorAll('#pair-seg button').forEach(b=>b.onclick=()=>{
+    STATE.pair=b.getAttribute('data-p'); setSeg('pair-seg','data-p',STATE.pair); refresh();
   });
   document.getElementById('candBannerX').onclick=clearCandFilter;
   document.getElementById('altToggle').onclick=()=>{
@@ -814,7 +933,7 @@ function init(){
   document.getElementById('explainClose').onclick=()=>document.getElementById('explainer').classList.remove('open');
   refresh();
 }
-function refresh(){ if (STATE.view==='pereira-barrio') renderPereiraBarrios(); else renderMuns(); }
+function refresh(){ if (STATE.mode==='trasvase') renderTrasvase(); else if (STATE.view==='pereira-barrio') renderPereiraBarrios(); else renderMuns(); }
 </script>
 </body>
 </html>
