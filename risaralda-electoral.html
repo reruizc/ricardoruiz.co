@@ -90,9 +90,10 @@
   .crow:last-child{border-bottom:none}
   .crow .rk{font-family:'DM Mono',monospace;font-size:.68rem;color:var(--ink2);width:18px;text-align:right;flex:none}
   .crow .who{flex:1;min-width:0}
-  .crow .who .nm{font-family:'Arima',sans-serif;font-weight:600;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .crow .who .nm{display:block;font-family:'Arima',sans-serif;font-weight:600;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .crow .who .nm.alt{color:var(--alt)}
-  .crow .who .pa{font-family:'Arima',sans-serif;font-size:.72rem;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .crow .who .pa{display:block;font-family:'Arima',sans-serif;font-size:.72rem;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .crow .num{min-width:50px}
   .crow .who .pa .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--alt);margin-right:4px;vertical-align:middle}
   .crow .num{text-align:right;flex:none}
   .crow .num .vt{font-family:'DM Mono',monospace;font-size:.82rem}
@@ -107,6 +108,18 @@
   .lrow .tr i{display:block;height:100%;background:var(--ink2)}
   .lrow .tr i.alt{background:var(--alt)}
   .lrow .pc{font-family:'DM Mono',monospace;font-size:.72rem;width:44px;text-align:right;color:var(--ink2);flex:none}
+  /* detail head: toggle + search + descarga */
+  .dhead{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:.5rem 0 .2rem}
+  .seg.sm button{font-size:.74rem;padding:.3rem .6rem}
+  .dsearch{flex:1;min-width:120px;font-family:'Arima',sans-serif;font-size:.82rem;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:.34rem .55rem;outline:none}
+  .dsearch:focus{border-color:var(--accent)}
+  .dsearch::placeholder{color:var(--ink2)}
+  .dlbtn{cursor:pointer;font-family:'Arima',sans-serif;font-weight:600;font-size:.78rem;color:var(--alt);background:var(--alt-dim);border:1px solid var(--alt);border-radius:6px;padding:.34rem .6rem;display:inline-flex;align-items:center;gap:.3rem}
+  .dlbtn:hover{filter:brightness(1.08)}
+  .partyrow{cursor:pointer}
+  .partyrow:hover .nm{color:var(--accent)}
+  .partyrow .ar{font-family:'DM Mono',monospace;font-size:.7rem;color:var(--ink2)}
+  .crumb{display:inline-flex;align-items:center;gap:.35rem;cursor:pointer;font-family:'Arima',sans-serif;font-weight:600;font-size:.78rem;color:var(--accent);margin:.2rem 0 .4rem}
   /* temporal */
   .temporal{display:flex;align-items:flex-end;gap:.7rem;height:96px;padding:.5rem .2rem 0;border:1px solid var(--line);border-radius:8px;background:var(--bg);margin-top:.3rem}
   .tcol{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:4px}
@@ -131,7 +144,21 @@
   .leaflet-tooltip.rr:before{display:none!important}
   .foot{padding:.7rem 1.1rem;border-top:1px solid var(--line);background:var(--panel);font-family:'Arima',sans-serif;font-size:.76rem;color:var(--ink2);line-height:1.5}
   .foot b{color:var(--ink);font-weight:600}
-  @media(max-width:860px){ .wrap{grid-template-columns:1fr;height:auto} #map{height:55vh} .panel{border-left:none;border-top:1px solid var(--line)} .logo-text{font-size:.95rem} }
+  @media(max-width:860px){
+    .wrap{grid-template-columns:1fr;height:auto} #map{height:52vh;min-height:340px} .panel{border-left:none;border-top:1px solid var(--line);max-height:none}
+    .top{flex-wrap:wrap;gap:.5rem;padding:.55rem .8rem} .top .sp{flex-basis:100%;height:0;order:5}
+    .logo-link{order:6} .user-chip{order:4} .logo-text{font-size:.95rem}
+    .controls{padding:.6rem .8rem;gap:.55rem .7rem} .controls .grp{flex-wrap:wrap}
+    .seg{flex-wrap:wrap} .seg button{font-size:.78rem;padding:.4rem .6rem}
+    .alt-toggle{order:2} .qbtn{order:3}
+    .explainer{margin:0 .8rem} .explainer.open{margin-top:.55rem}
+    .dhead{gap:.4rem} .dsearch{min-width:90px}
+  }
+  @media(max-width:420px){
+    .badge{display:none} .user-chip{font-size:.78rem;padding:.24rem .5rem}
+    .ptitle{font-size:1.08rem} #map{height:46vh;min-height:300px}
+    .stat .v{font-size:1rem} .crow .who .nm{font-size:.82rem}
+  }
 </style>
 </head>
 <body>
@@ -250,13 +277,15 @@ const ELEC = {
 };
 const CORP_LABEL = { gobernacion:'Gobernación', asamblea:'Asamblea', alcaldia:'Alcaldía', concejo:'Concejo' };
 
-const STATE = { eleccion:'camara', corp:'gobernacion', alt:true, mun:null, view:'muns' };
+const STATE = { eleccion:'camara', corp:'gobernacion', alt:true, mun:null, view:'muns', detailMode:'cand', partyFilter:null, search:'' };
+const CUR = { scope:null, titulo:'', sub:'' };   // scope visible para detalle + export
 const CACHE = {};
 const GEO = { muns:null, barrios:null };
 async function getJSON(url){ if(CACHE[url]) return CACHE[url]; const r=await fetch(url); const j=await r.json(); CACHE[url]=j; return j; }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────
 const fmt = n => Number(n||0).toLocaleString('es-CO');
+const pNom = p => p.partido || p.nombre || '';   // Cámara usa .nombre, territorial .partido
 const SMALL = new Set(['de','la','las','los','del','y','e','o','el','por','para','en','a','con','un','una']);
 function titleCase(s){
   if(!s) return '';
@@ -298,9 +327,18 @@ function depScope(main){
 // ─── MAP ─────────────────────────────────────────────────────────────
 let map, munLayer, barrioLayer;
 function initMap(){
-  map = L.map('map',{zoomControl:true,attributionControl:false,scrollWheelZoom:true});
+  // Mapa estático: sin paneo ni zoom de usuario (clic para drill sí funciona).
+  map = L.map('map',{zoomControl:false,attributionControl:false,scrollWheelZoom:false,
+    dragging:false,doubleClickZoom:false,boxZoom:false,keyboard:false,touchZoom:false,
+    zoomSnap:0,zoomDelta:0});
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',{maxZoom:18,opacity:.55}).addTo(map);
   setTimeout(()=>map.invalidateSize(),120);
+}
+// Encuadra y aplica +2% de zoom (la imagen, no la caja).
+function fitZoom(bounds, pad){
+  map.invalidateSize();
+  map.fitBounds(bounds,{padding:pad});
+  map.setZoom(map.getZoom() + Math.log2(1.02));
 }
 async function renderMuns(){
   STATE.view='muns'; STATE.mun=null;
@@ -326,8 +364,7 @@ async function renderMuns(){
       layer.on('click',()=>selectMun(m,f.properties.mpio_cnmbr));
     }
   }).addTo(map);
-  map.invalidateSize();
-  map.fitBounds(munLayer.getBounds(),{padding:[16,16]});
+  fitZoom(munLayer.getBounds(),[16,16]);
   renderLegend(mx);
   if (!STATE.mun) renderDepPanel(main);
 }
@@ -361,8 +398,7 @@ async function renderPereiraBarrios(){
       }
     }
   }).addTo(map);
-  map.invalidateSize();
-  try{ map.fitBounds(barrioLayer.getBounds(),{padding:[20,20]}); }catch(e){}
+  try{ fitZoom(barrioLayer.getBounds(),[20,20]); }catch(e){}
   renderLegend(mx, `Pereira por barrio · ${Object.keys(metric).length} con dato`);
   renderPereiraPanel(metric);
 }
@@ -436,6 +472,93 @@ function listRowsHTML(partidos, max){
   return h;
 }
 
+// ─── DETALLE: toggle Partidos/Candidatos + búsqueda + drill + export ──
+function detailHostHTML(){
+  return `<div class="dhead">
+      <div class="seg sm" id="dmode"><button data-m="cand" class="${STATE.detailMode==='cand'?'on':''}">Candidatos</button><button data-m="lista" class="${STATE.detailMode==='lista'?'on':''}">Partidos</button></div>
+      <input class="dsearch" id="dsearch" placeholder="Buscar nombre o partido…" value="${(STATE.search||'').replace(/"/g,'&quot;')}">
+      <button class="dlbtn" id="dlbtn" title="Descargar tabla en Excel">↓ Excel</button>
+    </div><div id="detail-body"></div>`;
+}
+function renderDetailHost(){
+  const host=document.getElementById('detail-host'); if(!host) return;
+  host.innerHTML = detailHostHTML();
+  document.querySelectorAll('#dmode button').forEach(b=>b.onclick=()=>{ STATE.detailMode=b.getAttribute('data-m'); STATE.partyFilter=null; document.querySelectorAll('#dmode button').forEach(x=>x.classList.toggle('on',x===b)); renderDetailBody(); });
+  const inp=document.getElementById('dsearch'); inp.oninput=()=>{ STATE.search=inp.value; renderDetailBody(); };
+  document.getElementById('dlbtn').onclick=downloadXLSX;
+  renderDetailBody();
+}
+function renderDetailBody(){
+  const body=document.getElementById('detail-body'); if(!body||!CUR.scope) return;
+  const s=CUR.scope, q=normp(STATE.search); let h='';
+  if (STATE.detailMode==='lista'){
+    if (STATE.partyFilter){
+      const cands=(s.candidatos||[]).filter(c=>c.partido===STATE.partyFilter).filter(c=>!q||normp(c.nombre).includes(q));
+      h+=`<div class="crumb" id="crumb-back">← Todos los partidos</div>
+        <div class="sec-t" style="margin-top:0;border-top:none;padding-top:0">${titleCase(STATE.partyFilter)} · ${cands.length}</div>`;
+      h+= cands.length?candListHTML(cands):'<div class="hint">Lista cerrada (sin candidatos individuales) o sin coincidencias.</div>';
+    } else {
+      const parts=(s.partidos||[]).filter(p=>!q||normp(pNom(p)).includes(q));
+      h+='<div class="clist">'+parts.map(p=>`<div class="crow partyrow" data-p="${encodeURIComponent(pNom(p))}"><span class="rk"></span>
+        <span class="who"><span class="nm ${p.alt?'alt':''}">${p.alt?'<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--alt);margin-right:5px"></span>':''}${titleCase(pNom(p))}</span>
+        <span class="pa">${fmt(p.votos)} votos · ver candidatos</span></span>
+        <span class="num"><span class="vt">${p.pct}%</span><br><span class="ar">›</span></span></div>`).join('')+'</div>';
+    }
+  } else {
+    const cands=(s.candidatos||[]).filter(c=>!q||normp(c.nombre).includes(q)||normp(c.partido).includes(q));
+    h+= cands.length?candListHTML(cands):'<div class="hint">Sin coincidencias.</div>';
+  }
+  body.innerHTML=h;
+  const cb=document.getElementById('crumb-back'); if(cb) cb.onclick=()=>{ STATE.partyFilter=null; renderDetailBody(); };
+  document.querySelectorAll('#detail-body .partyrow').forEach(r=>r.onclick=()=>{ STATE.partyFilter=decodeURIComponent(r.getAttribute('data-p')); renderDetailBody(); });
+}
+
+// ─── EXPORT XLSX (xlsx-js-style · Arial 13 · filas intercaladas) ──────
+const XLSX_CDN='https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js';
+function loadXLSX(){ if(window.XLSX) return Promise.resolve(window.XLSX);
+  return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=XLSX_CDN; s.onload=()=>res(window.XLSX); s.onerror=()=>rej(new Error('xlsx')); document.head.appendChild(s); }); }
+async function downloadXLSX(){
+  const btn=document.getElementById('dlbtn'); if(btn) btn.textContent='…';
+  try{
+    const X=await loadXLSX(); const s=CUR.scope; if(!s){ return; }
+    const A='Arial', SZ=13;
+    const headFill={patternType:'solid',fgColor:{rgb:'8A1E16'}};
+    const altFill={patternType:'solid',fgColor:{rgb:'EAF4EC'}};   // verde muy claro filas alt
+    const z1={patternType:'solid',fgColor:{rgb:'FFFFFF'}}, z2={patternType:'solid',fgColor:{rgb:'F3F0E7'}};
+    const border={style:'thin',color:{rgb:'D9D2C4'}};
+    const bordered={top:border,bottom:border,left:border,right:border};
+    const headStyle={font:{name:A,sz:SZ,bold:true,color:{rgb:'FFFFFF'}},fill:headFill,alignment:{vertical:'center'},border:bordered};
+    const cell=(v,i,isAlt,numeric)=>({v,t:numeric?'n':'s',s:{font:{name:A,sz:SZ,color:{rgb:isAlt?'1F7A3D':'1A1510'},bold:!!isAlt},fill:isAlt?altFill:(i%2?z2:z1),alignment:{vertical:'center',horizontal:numeric?'right':'left'},border:bordered}});
+    function sheet(rows, headers){
+      const data=[headers.map(h=>({v:h,t:'s',s:headStyle}))];
+      rows.forEach((r,i)=>data.push(r.map((c,ci)=>cell(c.v,i,r._alt,c.n))));
+      const ws=X.utils.aoa_to_sheet(data.map(r=>r.map(c=>({v:c.v,t:c.t})))); // base
+      // re-aplicar estilos (aoa_to_sheet no preserva .s desde objetos custom)
+      data.forEach((r,ri)=>r.forEach((c,ci)=>{ const ref=X.utils.encode_cell({r:ri,c:ci}); ws[ref]={v:c.v,t:c.t,s:c.s}; }));
+      return ws;
+    }
+    const wb=X.utils.book_new();
+    // Hoja Candidatos
+    const cRows=(s.candidatos||[]).map(c=>{ const row=[{v:0,n:true},{v:titleCase(c.nombre)},{v:titleCase(c.partido)},{v:c.votos,n:true},{v:c.pct/100,n:true},{v:c.alt?'Sí':'No'}]; row._alt=c.alt; return row; });
+    cRows.forEach((r,i)=>r[0].v=i+1);
+    const wsC=sheet(cRows,['#','Candidato','Partido / Lista','Votos','% válidos','Alternativo']);
+    wsC['!cols']=[{wch:5},{wch:34},{wch:34},{wch:12},{wch:11},{wch:12}];
+    // formato % y miles
+    cRows.forEach((r,i)=>{ const rr=i+1; const pv=wsC[X.utils.encode_cell({r:rr,c:4})]; if(pv) pv.z='0.00%'; const vv=wsC[X.utils.encode_cell({r:rr,c:3})]; if(vv) vv.z='#,##0'; });
+    wsC['!rows']=[{hpt:22}]; X.utils.book_append_sheet(wb,wsC,'Candidatos');
+    // Hoja Partidos
+    const pRows=(s.partidos||[]).map(p=>{ const row=[{v:0,n:true},{v:titleCase(pNom(p))},{v:p.votos,n:true},{v:p.pct/100,n:true},{v:p.alt?'Sí':'No'}]; row._alt=p.alt; return row; });
+    pRows.forEach((r,i)=>r[0].v=i+1);
+    const wsP=sheet(pRows,['#','Partido / Lista','Votos','% válidos','Alternativo']);
+    wsP['!cols']=[{wch:5},{wch:40},{wch:12},{wch:11},{wch:12}];
+    pRows.forEach((r,i)=>{ const rr=i+1; const pv=wsP[X.utils.encode_cell({r:rr,c:3})]; if(pv) pv.z='0.00%'; const vv=wsP[X.utils.encode_cell({r:rr,c:2})]; if(vv) vv.z='#,##0'; });
+    X.utils.book_append_sheet(wb,wsP,'Partidos');
+    const safe=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-zA-Z0-9]+/g,'-').toLowerCase().replace(/^-|-$/g,'');
+    X.writeFile(wb, `risaralda-${safe(CUR.titulo)}-${safe(CUR.sub)}.xlsx`);
+  }catch(e){ alert('No se pudo generar el Excel.'); }
+  finally{ if(btn) btn.textContent='↓ Excel'; }
+}
+
 // ─── PANELS ──────────────────────────────────────────────────────────
 async function renderDepPanel(main){
   const ds = depScope(main);
@@ -452,17 +575,12 @@ async function renderDepPanel(main){
     h+=`<div class="hint" style="margin-top:.8rem">Esta corporación se elige por municipio (no hay total departamental). Haz clic en un municipio.</div>`;
   }
   h+=`<div class="sec-t">Evolución del voto alternativo</div><div id="temporal-slot"><div class="hint">Cargando…</div></div>`;
-  if (ds){
-    if (ds.curules){ h+=`<div class="sec-t">Curules (D'Hondt) · alt ${ds.alt_curules||0}/${ds.curules.reduce((s,c)=>s+c.curules,0)}</div>`+
-      ds.curules.map(c=>`<div class="lrow"><span class="nm ${c.alt?'alt':''}">${c.alt?'<span class="dot"></span>':''}${titleCase(c.partido)}</span><span class="pc">${c.curules} cur</span></div>`).join(''); }
-    if (ds.candidatos && ds.candidatos.length){
-      h+=`<div class="sec-t">${ELEC[STATE.eleccion].territorial && (STATE.corp==='asamblea')?'Candidatos a la Asamblea':'Candidatos'} · ${ds.candidatos.length}</div>`+candListHTML(ds.candidatos);
-    } else if (ds.partidos){
-      h+=`<div class="sec-t">Listas</div>`+listRowsHTML(ds.partidos, 40);
-    }
-  }
+  if (ds && ds.curules){ h+=`<div class="sec-t">Curules (D'Hondt) · alt ${ds.alt_curules||0}/${ds.curules.reduce((s,c)=>s+c.curules,0)}</div>`+
+    ds.curules.map(c=>`<div class="lrow"><span class="nm ${c.alt?'alt':''}">${c.alt?'<span class="dot"></span>':''}${titleCase(c.partido)}</span><span class="pc">${c.curules} cur</span></div>`).join(''); }
+  if (ds){ h+=`<div class="sec-t">Resultados · ${fmt(ds.validos)} válidos</div><div id="detail-host"></div>`; }
   h+=`<div class="sec-t">Cómo leer el mapa</div><div class="hint">Color = ${STATE.alt?'intensidad del <b>% alternativo</b> (más verde = más Verde+Pacto+izquierda)':'<b>partido líder</b> de cada municipio'}. Clic en un municipio para su detalle; en <b>Pereira</b> puedes bajar a barrio.</div>`;
   p.innerHTML=h;
+  if (ds){ CUR.scope=ds; CUR.titulo=ELEC[STATE.eleccion].label; CUR.sub='risaralda'+(ELEC[STATE.eleccion].territorial?'-'+STATE.corp:''); STATE.partyFilter=null; STATE.search=""; renderDetailHost(); }
   temporalData(null).then(rows=>{ const sl=document.getElementById('temporal-slot'); if(sl) sl.innerHTML=temporalHTML(rows); });
 }
 async function renderMunPanel(main, munInt, nombre){
@@ -479,14 +597,10 @@ async function renderMunPanel(main, munInt, nombre){
   if (munInt==='1'){ h+=`<button class="backbtn" id="toPereira" style="position:static;display:block;margin:.7rem 0 0;width:100%;text-align:center">Ver Pereira por barrio →</button>`; }
   if (s.curules){ h+=`<div class="sec-t">Curules concejo · alt ${s.alt_curules||0}/${s.curules.reduce((a,c)=>a+c.curules,0)}</div>`+
     s.curules.map(c=>`<div class="lrow"><span class="nm ${c.alt?'alt':''}">${c.alt?'<span class="dot"></span>':''}${titleCase(c.partido)}</span><span class="pc">${c.curules}</span></div>`).join(''); }
-  if (s.partidos && s.partidos.length>1 && (s.curules || (s.candidatos&&s.candidatos.length>12))){
-    h+=`<div class="sec-t">Listas · ${s.partidos.length}</div>`+listRowsHTML(s.partidos, 40);
-  }
-  if (s.candidatos && s.candidatos.length){
-    h+=`<div class="sec-t">Cada candidatura · ${s.candidatos.length}</div>`+candListHTML(s.candidatos);
-  }
+  h+=`<div class="sec-t">Resultados · ${fmt(s.validos)} válidos</div><div id="detail-host"></div>`;
   p.innerHTML=h;
   if (munInt==='1') document.getElementById('toPereira').onclick=renderPereiraBarrios;
+  CUR.scope=s; CUR.titulo=ELEC[STATE.eleccion].label+(ELEC[STATE.eleccion].territorial?'-'+STATE.corp:''); CUR.sub=nombre; STATE.partyFilter=null; STATE.search=""; renderDetailHost();
   temporalData(munInt).then(rows=>{ const sl=document.getElementById('temporal-slot'); if(sl) sl.innerHTML=temporalHTML(rows); });
 }
 function renderPereiraPanel(metric){
