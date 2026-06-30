@@ -117,8 +117,10 @@ function serialize(scope, { mode='cand', curules=0, topN=0 } = {}){
     altCurules = curulesArr.filter(p=>p.alt).reduce((s,p)=>s+p.curules,0);
   }
 
+  const esp = Object.values(scope.especiales).reduce((a,b)=>a+b,0);
   const out = {
     validos,
+    votantes: validos + esp,            // sufragantes = válidos + blanco/nulos/no_marcados
     alt_votos: altVotos,
     alt_pct: validos>0 ? +(altVotos/validos*100).toFixed(2) : 0,
     especiales: scope.especiales,
@@ -186,8 +188,9 @@ function loadGeoref(pereiraFeats){
   const H = lines[0].replace(/^﻿/,'').split(';').map(s=>s.trim());
   const ix = n=>H.indexOf(n);
   const I_COD=ix('CÓDIGO COMPLETO'), I_LAT=ix('LATITUD'), I_LON=ix('LONGITUD'),
-        I_BAR=ix('BARRIO'), I_COMN=ix('NOMBRE COMUNA');
+        I_BAR=ix('BARRIO'), I_COMN=ix('NOMBRE COMUNA'), I_MUJ=ix('MUJERES'), I_HOM=ix('HOMBRES');
   const map = new Map();   // `${mun}-${zz}-${pp}` → meta
+  const censoByMun = {};   // mun(int) → censo electoral (mujeres+hombres)
   let nPer=0, nBar=0;
   for (let i=1;i<lines.length;i++){
     const ln=lines[i]; if(!ln) continue;
@@ -199,6 +202,8 @@ function loadGeoref(pereiraFeats){
     const zz = pad2(code.slice(5,7)), pp = pad2(code.slice(7,9));
     const lat=parseFloat(p[I_LAT]), lon=parseFloat(p[I_LON]);
     const meta = { lat, lon, comuna:(p[I_COMN]||'').replace(/"/g,'').trim(), barrioCsv:(p[I_BAR]||'').replace(/"/g,'').trim() };
+    const censo = (parseInt(p[I_MUJ]||'0',10)||0) + (parseInt(p[I_HOM]||'0',10)||0);
+    censoByMun[mun] = (censoByMun[mun]||0) + censo;
     // Pereira: PIP a barrio oficial
     if (mun===PEREIRA_MUN && pereiraFeats && Number.isFinite(lat) && Number.isFinite(lon)){
       const b = findBarrio(lat, lon, pereiraFeats);
@@ -212,7 +217,7 @@ function loadGeoref(pereiraFeats){
     const ej=[...map].filter(([k,m])=>m.barrioId).slice(0,8).map(([k])=>k);
     console.log('  DBG keys con barrioId:', ej.join(' '));
   }
-  return map;
+  return { map, censoByMun };
 }
 
 // ─── MAIN ─────────────────────────────────────────────────────────────
@@ -224,7 +229,8 @@ async function main(){
 
   console.log(`▶ Risaralda ${year}`);
   const pereiraFeats = loadPereiraBarrios();
-  const georef = loadGeoref(pereiraFeats);
+  const { map:georef, censoByMun } = loadGeoref(pereiraFeats);
+  const censoDep = Object.values(censoByMun).reduce((a,b)=>a+b,0);
 
   // Estructuras: por corporación
   //  gobernacion/asamblea: dep scope + por_mun scopes
@@ -299,7 +305,8 @@ async function main(){
     year:+year, depcod:String(DEP), dep:DEP_NOMBRE,
     generated:new Date().toISOString().slice(0,10),
     alt_definicion:'Verde + Pacto Histórico + izquierda histórica (Polo, Colombia Humana, UP, MAIS, ADA, Comunes)',
-    muns: Object.fromEntries(Object.entries(MUNS).map(([k,v])=>[k,{nombre:v}])),
+    censo: censoDep,
+    muns: Object.fromEntries(Object.entries(MUNS).map(([k,v])=>[k,{nombre:v, censo:censoByMun[+k]||0}])),
     corporaciones:{},
   };
 

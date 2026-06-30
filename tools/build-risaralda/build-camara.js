@@ -58,6 +58,16 @@ function loadPereiraBarrios(){
 }
 function findBarrio(lat,lon,feats){for(const f of feats)for(const poly of f.polys)if(pointInPolygon(lon,lat,poly))return f;return null;}
 function pad2(v){return String(parseInt(v||'0',10)).padStart(2,'0');}
+// Censo electoral por municipio (dep 24) desde PUESTOS_GEOREF (mujeres+hombres).
+function loadCensoByMun(){
+  const lines=fs.readFileSync(GEOREF,'utf8').split(/\r?\n/);
+  const H=lines[0].replace(/^﻿/,'').split(';').map(s=>s.trim());
+  const I=n=>H.indexOf(n);
+  const I_COD=I('CÓDIGO COMPLETO'),I_MUJ=I('MUJERES'),I_HOM=I('HOMBRES');
+  const byMun={};
+  for(let i=1;i<lines.length;i++){const p=lines[i].split(';');const code=(p[I_COD]||'').replace(/"/g,'');if(code.length<9)continue;if(code.slice(0,2)!=='24')continue;const mun=String(parseInt(code.slice(2,5),10));byMun[mun]=(byMun[mun]||0)+(parseInt(p[I_MUJ]||'0',10)||0)+(parseInt(p[I_HOM]||'0',10)||0);}
+  return byMun;
+}
 function loadGeorefPereira(feats){
   const lines=fs.readFileSync(GEOREF,'utf8').split(/\r?\n/);
   const H=lines[0].replace(/^﻿/,'').split(';').map(s=>s.trim());
@@ -104,6 +114,7 @@ async function main(){
   console.log('▶ Cámara 2026 · Risaralda');
   const feats = loadPereiraBarrios();
   const georef = loadGeorefPereira(feats);
+  const censoByMun = loadCensoByMun();
 
   let d;
   try { const r = await fetch(DEP24_URL); d = await r.json(); }
@@ -120,6 +131,8 @@ async function main(){
   // Depto
   out.dep_resumen = summarize((()=>{const a=new Map(); addPartidos(a,d.partidos); return a;})());
   out.dep_resumen.candidatos = flattenCands(d.candidatos, out.dep_resumen.validos);
+  out.dep_resumen.votantes = d.votant||0;
+  out.censo = Object.values(censoByMun).reduce((a,b)=>a+b,0);
 
   const porPuesto = {};    // mun(int) → 'zz-pp' → metric
   const barrioAcc = {};    // bid → Map partido
@@ -129,11 +142,12 @@ async function main(){
     const munCod = m.cod;                    // '001','008'...
     const munInt = String(parseInt(munCod,10));
     MUNS[munInt] = m.nombre;
-    out.muns[munInt] = { nombre:m.nombre };
+    out.muns[munInt] = { nombre:m.nombre, censo:censoByMun[munInt]||0 };
     // municipio
     const accM=new Map(); addPartidos(accM,m.partidos);
     out.por_mun[munInt] = summarize(accM);
     out.por_mun[munInt].candidatos = flattenCands(m.candidatos, out.por_mun[munInt].validos);
+    out.por_mun[munInt].votantes = m.votant||0;
 
     // comunas → puestos
     porPuesto[munInt] = {};

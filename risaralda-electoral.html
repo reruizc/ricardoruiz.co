@@ -192,7 +192,7 @@
           <button data-c="concejo">Concejo</button>
         </div>
       </div>
-      <div class="alt-toggle on" id="altToggle"><div class="sw"></div><span>Priorizar voto alternativo</span></div>
+      <div class="alt-toggle" id="altToggle"><div class="sw"></div><span>Priorizar voto alternativo</span></div>
       <button class="qbtn" id="explainBtn">¿Qué es el voto alternativo?</button>
     </div>
     <div class="explainer" id="explainer">
@@ -265,7 +265,7 @@ function revealPage(){
 const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co';
 const DATA_BASE = `${S3}/bases+de+datos/output_risaralda`;
 const MAP_BASE  = `${S3}/congreso-2026/output/mapas-2026`;
-const CB = 'v=20260629b';
+const CB = 'v=20260629c';
 
 const ELEC = {
   camara: { label:'Cámara 2026', main:`${DATA_BASE}/risaralda-camara-2026.json?${CB}`,
@@ -277,7 +277,7 @@ const ELEC = {
 };
 const CORP_LABEL = { gobernacion:'Gobernación', asamblea:'Asamblea', alcaldia:'Alcaldía', concejo:'Concejo' };
 
-const STATE = { eleccion:'camara', corp:'gobernacion', alt:true, mun:null, view:'muns', detailMode:'cand', partyFilter:null, search:'' };
+const STATE = { eleccion:'camara', corp:'gobernacion', alt:false, mun:null, view:'muns', detailMode:'cand', partyFilter:null, search:'' };
 const CUR = { scope:null, titulo:'', sub:'' };   // scope visible para detalle + export
 const CACHE = {};
 const GEO = { muns:null, barrios:null };
@@ -451,11 +451,32 @@ function temporalHTML(rows){
   return h+'</div>';
 }
 
+// ─── PARTICIPACIÓN (donut SVG) ───────────────────────────────────────
+function participacionHTML(votantes, censo, nota){
+  if(!censo||!votantes) return '';
+  const part=Math.min(1,votantes/censo), pct=+(part*100).toFixed(1), abst=+((1-part)*100).toFixed(1);
+  const r=42, C=2*Math.PI*r, on=C*part;
+  return `<div style="display:flex;align-items:center;gap:1rem;margin-top:.2rem">
+    <svg width="100" height="100" viewBox="0 0 104 104" style="flex:none">
+      <circle cx="52" cy="52" r="${r}" fill="none" stroke="var(--line)" stroke-width="13"/>
+      <circle cx="52" cy="52" r="${r}" fill="none" stroke="var(--accent)" stroke-width="13" stroke-dasharray="${on.toFixed(1)} ${(C-on).toFixed(1)}" transform="rotate(-90 52 52)"/>
+      <text x="52" y="50" text-anchor="middle" font-family="DM Mono,monospace" font-size="18" font-weight="500" fill="var(--ink)">${pct}%</text>
+      <text x="52" y="65" text-anchor="middle" font-family="DM Mono,monospace" font-size="7" letter-spacing="1.5" fill="var(--ink2)">PARTICIP.</text>
+    </svg>
+    <div style="font-family:'Arima',sans-serif;font-size:.84rem;line-height:1.55">
+      <div><b style="color:var(--accent)">${fmt(votantes)}</b> votantes</div>
+      <div style="color:var(--ink2)">${fmt(censo)} en el censo</div>
+      <div style="color:var(--ink2)">Abstención <b style="color:var(--ink)">${abst}%</b></div>
+      ${nota?`<div style="color:var(--ink2);font-size:.72rem;margin-top:.25rem">${nota}</div>`:''}
+    </div></div>`;
+}
+
 // ─── CANDIDATE / LIST RENDER ─────────────────────────────────────────
 function candListHTML(cands){
   let h='<div class="clist">';
   cands.forEach((c,i)=>{
-    h+=`<div class="crow"><span class="rk">${i+1}</span>
+    const col=leaderColor(c.partido,c.alt);
+    h+=`<div class="crow" style="border-left:3px solid ${col};padding-left:.45rem;background:linear-gradient(90deg,${col}1c,transparent 60%)"><span class="rk">${i+1}</span>
       <span class="who"><span class="nm ${c.alt?'alt':''}">${titleCase(c.nombre)||'—'}</span>
       <span class="pa">${c.alt?'<span class="dot"></span>':''}${titleCase(c.partido)}</span></span>
       <span class="num"><span class="vt">${fmt(c.votos)}</span><br><span class="pc ${c.alt?'alt':''}">${c.pct}%</span></span></div>`;
@@ -499,10 +520,10 @@ function renderDetailBody(){
       h+= cands.length?candListHTML(cands):'<div class="hint">Lista cerrada (sin candidatos individuales) o sin coincidencias.</div>';
     } else {
       const parts=(s.partidos||[]).filter(p=>!q||normp(pNom(p)).includes(q));
-      h+='<div class="clist">'+parts.map(p=>`<div class="crow partyrow" data-p="${encodeURIComponent(pNom(p))}"><span class="rk"></span>
+      h+='<div class="clist">'+parts.map(p=>{ const col=leaderColor(pNom(p),p.alt); return `<div class="crow partyrow" data-p="${encodeURIComponent(pNom(p))}" style="border-left:4px solid ${col};padding-left:.5rem;background:linear-gradient(90deg,${col}30,${col}0a 70%)"><span class="rk"></span>
         <span class="who"><span class="nm ${p.alt?'alt':''}">${p.alt?'<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--alt);margin-right:5px"></span>':''}${titleCase(pNom(p))}</span>
         <span class="pa">${fmt(p.votos)} votos · ver candidatos</span></span>
-        <span class="num"><span class="vt">${p.pct}%</span><br><span class="ar">›</span></span></div>`).join('')+'</div>';
+        <span class="num"><span class="vt">${p.pct}%</span><br><span class="ar">›</span></span></div>`; }).join('')+'</div>';
     }
   } else {
     const cands=(s.candidatos||[]).filter(c=>!q||normp(c.nombre).includes(q)||normp(c.partido).includes(q));
@@ -571,6 +592,7 @@ async function renderDepPanel(main){
       <div class="stat"><div class="v alt">${ds.alt_pct}%</div><div class="l">Voto alternativo</div></div>
       <div class="stat"><div class="v">${fmt(ds.validos)}</div><div class="l">Votos válidos</div></div></div>`;
     if (ds.lider) h+=`<div class="hint">Más votado: <b style="color:var(--ink)">${titleCase(ds.lider.partido||ds.lider.nombre)}</b> (${ds.lider.pct}%)</div>`;
+    if (ds.votantes && main.censo) h+=`<div class="sec-t">Participación</div>`+participacionHTML(ds.votantes, main.censo, ELEC[STATE.eleccion].territorial?'Censo electoral 2026 (referencia)':'');
   } else {
     h+=`<div class="hint" style="margin-top:.8rem">Esta corporación se elige por municipio (no hay total departamental). Haz clic en un municipio.</div>`;
   }
@@ -593,6 +615,8 @@ async function renderMunPanel(main, munInt, nombre){
     <div class="stat-row"><div class="stat"><div class="v alt">${s.alt_pct}%</div><div class="l">Voto alternativo</div></div>`;
   if (s.lider) h+=`<div class="stat"><div class="v" style="font-size:.8rem;line-height:1.25">${titleCase(s.lider.partido||s.lider.nombre)}</div><div class="l">Líder ${s.lider.pct}%</div></div>`;
   h+=`</div>`;
+  const _censoM = main.muns[munInt] && main.muns[munInt].censo;
+  if (s.votantes && _censoM) h+=`<div class="sec-t">Participación</div>`+participacionHTML(s.votantes, _censoM, ELEC[STATE.eleccion].territorial?'Censo electoral 2026 (referencia)':'');
   h+=`<div class="sec-t">Evolución del voto alternativo</div><div id="temporal-slot"><div class="hint">Cargando…</div></div>`;
   if (munInt==='1'){ h+=`<button class="backbtn" id="toPereira" style="position:static;display:block;margin:.7rem 0 0;width:100%;text-align:center">Ver Pereira por barrio →</button>`; }
   if (s.curules){ h+=`<div class="sec-t">Curules concejo · alt ${s.alt_curules||0}/${s.curules.reduce((a,c)=>a+c.curules,0)}</div>`+
