@@ -504,7 +504,25 @@ async function renderPereiraBarrios(){
       fitZoom(L.latLngBounds([q(lats,.04),q(lons,.04)],[q(lats,.96),q(lons,.96)]),[14,14], 0.99);
     } else { fitZoom((dataLayers.length?L.featureGroup(dataLayers):barrioLayer).getBounds(),[14,14], 0.99); }
   }catch(e){ try{ fitZoom(barrioLayer.getBounds(),[20,20]); }catch(_){} }
-  renderLegend(mx, `${Object.keys(metric).length} barrios con puesto · resto por vecino`);
+  // Puestos de votación de Pereira como puntos sobre los barrios.
+  try{
+    const pj = await getJSON(ELEC[STATE.eleccion].puestos);
+    const per = (ELEC[STATE.eleccion].territorial ? (pj[STATE.corp]||{}) : pj)['1'] || {};
+    const dark = document.documentElement.getAttribute('data-theme')==='dark';
+    puestoLayer = L.layerGroup();
+    let np=0;
+    for (const zzpp of Object.keys(per)){
+      const d=per[zzpp]; if(!d||!Number.isFinite(d.lat)||!Number.isFinite(d.lon)) continue;
+      const col = STATE.alt?altColor(Math.min(1,(d.alt_pct||0)/49)):leaderColor(d.lider?d.lider.partido:'', d.lider&&d.lider.alt);
+      const mk = L.circleMarker([d.lat,d.lon], { radius:3.6, color:dark?'#0b0b0b':'#ffffff', weight:1.1, fillColor:col, fillOpacity:1 });
+      mk.bindTooltip(()=>{ let t=`<b>${titleCase(d.nombre)||'Puesto'}</b><br>${fmt(d.validos)} válidos`; if(d.lider) t+=`<br>Líder: ${titleCase(d.lider.partido)} (${d.lider.pct}%)`; t+=`<br><span class="alt">Alternativo: ${d.alt_pct}%</span>`; return t; },{className:'rr',sticky:true});
+      mk.on('mouseover',()=>mk.setStyle({radius:6.5,weight:1.8}));
+      mk.on('mouseout',()=>mk.setStyle({radius:3.6,weight:1.1}));
+      puestoLayer.addLayer(mk); np++;
+    }
+    puestoLayer.addTo(map);
+    renderLegend(mx, `${Object.keys(metric).length} barrios con dato · ${np} puestos (puntos)`);
+  }catch(e){ renderLegend(mx, `${Object.keys(metric).length} barrios con puesto · resto por vecino`); }
   renderPereiraPanel(metric);
 }
 
