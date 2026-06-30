@@ -126,13 +126,15 @@ function serialize(scope, { mode='cand', curules=0, topN=0 } = {}){
   // Líder: por lista en asamblea/concejo, por candidato en alcaldía/gobernación.
   if (mode === 'lista'){
     out.lider = partidos[0] ? { partido:partidos[0].partido, votos:partidos[0].votos, pct:partidos[0].pct, alt:!!partidos[0].alt } : null;
-    out.partidos = topN>0 ? partidos.slice(0,topN) : partidos;
     if (curulesArr){ out.curules = curulesArr; out.alt_curules = altCurules; }
   } else {
     const top = cands[0];
     out.lider = top ? { nombre:top.nombre, partido:top.partido, votos:top.votos, pct:top.pct, alt:!!top.alt } : null;
-    out.candidatos = topN>0 ? cands.slice(0,topN) : cands;
   }
+  // SIEMPRE incluimos listas + candidatos completos (con votos) para el
+  // detalle scrollable "ver cada candidato". Cap defensivo de 400.
+  out.partidos = partidos;
+  out.candidatos = cands.slice(0, 400);
   return out;
 }
 

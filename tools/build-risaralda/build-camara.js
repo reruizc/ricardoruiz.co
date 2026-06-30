@@ -77,6 +77,18 @@ function addPartidos(acc, partidos){
     e.votos += votos;
   }
 }
+// Aplana el dict candidatos {partido:[{nombre,votos}]} → lista ordenada.
+// Las listas cerradas (Pacto) no traen candidatos individuales → sólo
+// aparecen en `partidos`.
+function flattenCands(candDict, validos){
+  const arr=[];
+  for (const [partido, list] of Object.entries(candDict||{})){
+    for (const c of (list||[])){ arr.push({ nombre:c.nombre, partido, votos:c.votos||0, alt:esAltCamara(partido) }); }
+  }
+  arr.sort((a,b)=>b.votos-a.votos);
+  for (const c of arr) c.pct = validos>0 ? +(c.votos/validos*100).toFixed(2):0;
+  return arr.slice(0,400);
+}
 function summarize(acc){
   const arr=[...acc.values()].sort((a,b)=>b.votos-a.votos);
   let val=0,alt=0; for(const p of arr){ val+=p.votos; if(p.alt)alt+=p.votos; }
@@ -107,6 +119,7 @@ async function main(){
 
   // Depto
   out.dep_resumen = summarize((()=>{const a=new Map(); addPartidos(a,d.partidos); return a;})());
+  out.dep_resumen.candidatos = flattenCands(d.candidatos, out.dep_resumen.validos);
 
   const porPuesto = {};    // mun(int) → 'zz-pp' → metric
   const barrioAcc = {};    // bid → Map partido
@@ -120,6 +133,7 @@ async function main(){
     // municipio
     const accM=new Map(); addPartidos(accM,m.partidos);
     out.por_mun[munInt] = summarize(accM);
+    out.por_mun[munInt].candidatos = flattenCands(m.candidatos, out.por_mun[munInt].validos);
 
     // comunas → puestos
     porPuesto[munInt] = {};
