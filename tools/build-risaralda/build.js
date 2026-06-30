@@ -188,7 +188,8 @@ function loadGeoref(pereiraFeats){
   const H = lines[0].replace(/^﻿/,'').split(';').map(s=>s.trim());
   const ix = n=>H.indexOf(n);
   const I_COD=ix('CÓDIGO COMPLETO'), I_LAT=ix('LATITUD'), I_LON=ix('LONGITUD'),
-        I_BAR=ix('BARRIO'), I_COMN=ix('NOMBRE COMUNA'), I_MUJ=ix('MUJERES'), I_HOM=ix('HOMBRES');
+        I_BAR=ix('BARRIO'), I_COMN=ix('NOMBRE COMUNA'), I_MUJ=ix('MUJERES'), I_HOM=ix('HOMBRES'),
+        I_NOMP=ix('NOMBRE PUESTO');
   const map = new Map();   // `${mun}-${zz}-${pp}` → meta
   const censoByMun = {};   // mun(int) → censo electoral (mujeres+hombres)
   let nPer=0, nBar=0;
@@ -201,7 +202,7 @@ function loadGeoref(pereiraFeats){
     const mun = parseInt(code.slice(2,5),10);
     const zz = pad2(code.slice(5,7)), pp = pad2(code.slice(7,9));
     const lat=parseFloat(p[I_LAT]), lon=parseFloat(p[I_LON]);
-    const meta = { lat, lon, comuna:(p[I_COMN]||'').replace(/"/g,'').trim(), barrioCsv:(p[I_BAR]||'').replace(/"/g,'').trim() };
+    const meta = { lat, lon, comuna:(p[I_COMN]||'').replace(/"/g,'').trim(), barrioCsv:(p[I_BAR]||'').replace(/"/g,'').trim(), nombre:(I_NOMP>=0?(p[I_NOMP]||''):'').replace(/"/g,'').trim() };
     const censo = (parseInt(p[I_MUJ]||'0',10)||0) + (parseInt(p[I_HOM]||'0',10)||0);
     censoByMun[mun] = (censoByMun[mun]||0) + censo;
     // Pereira: PIP a barrio oficial
@@ -343,6 +344,7 @@ async function main(){
         validos:ser.validos, alt_votos:ser.alt_votos, alt_pct:ser.alt_pct,
         lider: ser.lider ? { partido:ser.lider.partido, pct:ser.lider.pct, alt:!!ser.lider.alt } : null,
         lat: g&&Number.isFinite(g.lat)?+g.lat.toFixed(5):null, lon: g&&Number.isFinite(g.lon)?+g.lon.toFixed(5):null,
+        nombre: g&&g.nombre ? g.nombre : null,
       };
     }
   }

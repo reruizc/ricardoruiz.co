@@ -73,10 +73,20 @@ function loadGerefAll(){
   const lines=fs.readFileSync(GEOREF,'utf8').split(/\r?\n/);
   const H=lines[0].replace(/^﻿/,'').split(';').map(s=>s.trim());
   const I=n=>H.indexOf(n);
-  const I_COD=I('CÓDIGO COMPLETO'),I_LAT=I('LATITUD'),I_LON=I('LONGITUD');
+  const I_COD=I('CÓDIGO COMPLETO'),I_LAT=I('LATITUD'),I_LON=I('LONGITUD'),I_NOMP=I('NOMBRE PUESTO');
   const map=new Map();
-  for(let i=1;i<lines.length;i++){const p=lines[i].split(';');const code=(p[I_COD]||'').replace(/"/g,'');if(code.length<9)continue;if(code.slice(0,2)!=='24')continue;const mun=String(parseInt(code.slice(2,5),10));const zz=pad2(code.slice(5,7)),pp=pad2(code.slice(7,9));map.set(`${mun}-${zz}-${pp}`,{lat:parseFloat(p[I_LAT]),lon:parseFloat(p[I_LON])});}
+  for(let i=1;i<lines.length;i++){const p=lines[i].split(';');const code=(p[I_COD]||'').replace(/"/g,'');if(code.length<9)continue;if(code.slice(0,2)!=='24')continue;const mun=String(parseInt(code.slice(2,5),10));const zz=pad2(code.slice(5,7)),pp=pad2(code.slice(7,9));map.set(`${mun}-${zz}-${pp}`,{lat:parseFloat(p[I_LAT]),lon:parseFloat(p[I_LON]),nombre:(I_NOMP>=0?(p[I_NOMP]||''):'').replace(/"/g,'').trim()});}
   return map;
+}
+// Cifra repartidora (D'Hondt) sobre listas que superan el umbral.
+// Cámara Risaralda: 4 curules. Umbral = 50% del cuociente (elige >2).
+function curulesCamara(partidos, validos, seats){
+  const cuociente = validos/seats, umbral = cuociente*0.5;
+  let elegibles = partidos.filter(p=>p.votos>=umbral);
+  if (!elegibles.length) elegibles = partidos.slice();
+  const arr = elegibles.map(p=>({partido:p.nombre, votos:p.votos, alt:p.alt, curules:0}));
+  for(let i=0;i<seats;i++){ let bi=-1,bq=-1; for(let j=0;j<arr.length;j++){const q=arr[j].votos/(arr[j].curules+1); if(q>bq){bq=q;bi=j;}} if(bi>=0)arr[bi].curules++; }
+  return arr.filter(p=>p.curules>0).sort((a,b)=>b.curules-a.curules||b.votos-a.votos);
 }
 function loadGeorefPereira(feats){
   const lines=fs.readFileSync(GEOREF,'utf8').split(/\r?\n/);
@@ -144,6 +154,10 @@ async function main(){
   out.dep_resumen.candidatos = flattenCands(d.candidatos, out.dep_resumen.validos);
   out.dep_resumen.votantes = d.votant||0;
   out.censo = Object.values(censoByMun).reduce((a,b)=>a+b,0);
+  // Curules de Cámara (Risaralda elige 4) por cifra repartidora.
+  out.dep_resumen.curules = curulesCamara(out.dep_resumen.partidos, out.dep_resumen.validos, 4);
+  out.dep_resumen.alt_curules = out.dep_resumen.curules.filter(c=>c.alt).reduce((s,c)=>s+c.curules,0);
+  out.dep_resumen.seats = 4;
 
   const porPuesto = {};    // mun(int) → 'zz-pp' → metric
   const barrioAcc = {};    // bid → Map partido
@@ -176,7 +190,8 @@ async function main(){
         const ga=gerefAll.get(`${munInt}-${zz}-${pp}`);
         porPuesto[munInt][`${zz}-${pp}`] = { validos:s.validos, alt_votos:s.alt_votos, alt_pct:s.alt_pct,
           lider: s.lider?{partido:s.lider.partido,pct:s.lider.pct,alt:s.lider.alt}:null,
-          lat: ga&&Number.isFinite(ga.lat)?+ga.lat.toFixed(5):null, lon: ga&&Number.isFinite(ga.lon)?+ga.lon.toFixed(5):null };
+          lat: ga&&Number.isFinite(ga.lat)?+ga.lat.toFixed(5):null, lon: ga&&Number.isFinite(ga.lon)?+ga.lon.toFixed(5):null,
+          nombre: ga&&ga.nombre?ga.nombre:null };
         // Pereira barrio
         if (munCod===PEREIRA_MUN){
           const g=georef.get(`${zz}-${pp}`);

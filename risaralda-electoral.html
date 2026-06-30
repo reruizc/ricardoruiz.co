@@ -71,7 +71,7 @@
   .explainer .chip.no{background:transparent;color:var(--ink2);border:1px solid var(--line)}
   .explainer .x{float:right;cursor:pointer;color:var(--ink2);font-size:1rem;padding:.6rem .8rem}
   /* layout */
-  .wrap{display:grid;grid-template-columns:1fr 392px;gap:0;height:calc(100vh - 132px)}
+  .wrap{display:grid;grid-template-columns:1fr minmax(420px,34%);gap:0;height:calc(100vh - 132px)}
   #map{width:100%;height:100%;background:var(--bg)}
   .panel{border-left:1px solid var(--line);background:var(--panel);overflow-y:auto;padding:1rem 1.1rem}
   .kicker{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink2)}
@@ -119,6 +119,8 @@
   .partyrow{cursor:pointer}
   .partyrow:hover .nm{color:var(--accent)}
   .partyrow .ar{font-family:'DM Mono',monospace;font-size:.7rem;color:var(--ink2)}
+  .curbadge{display:inline-block;font-family:'DM Mono',monospace;font-size:.6rem;font-weight:500;letter-spacing:.04em;background:var(--accent);color:#fff;border-radius:4px;padding:.08rem .35rem;margin-left:.4rem;vertical-align:middle}
+  .curbadge.alt{background:var(--alt)}
   .crumb{display:inline-flex;align-items:center;gap:.35rem;cursor:pointer;font-family:'Arima',sans-serif;font-weight:600;font-size:.78rem;color:var(--accent);margin:.2rem 0 .4rem}
   .candrow{cursor:pointer}
   .candrow:hover .nm{text-decoration:underline}
@@ -277,7 +279,7 @@ function revealPage(){
 const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co';
 const DATA_BASE = `${S3}/bases+de+datos/output_risaralda`;
 const MAP_BASE  = `${S3}/congreso-2026/output/mapas-2026`;
-const CB = 'v=20260629c';
+const CB = 'v=20260629d';
 
 const ELEC = {
   camara: { label:'Cámara 2026', main:`${DATA_BASE}/risaralda-camara-2026.json?${CB}`,
@@ -404,7 +406,6 @@ async function renderMuns(){
 // ─── PUESTOS DE VOTACIÓN (marcadores) ────────────────────────────────
 async function renderPuestos(){
   if (puestoLayer){ map.removeLayer(puestoLayer); puestoLayer=null; }
-  if (STATE.candFilter) return;                 // durante filtro de candidato no se pintan
   let pj; try{ pj = await getJSON(ELEC[STATE.eleccion].puestos); }catch(e){ return; }
   const block = ELEC[STATE.eleccion].territorial ? (pj[STATE.corp]||{}) : pj;
   const dark = document.documentElement.getAttribute('data-theme')==='dark';
@@ -416,7 +417,7 @@ async function renderPuestos(){
       if (!d || !Number.isFinite(d.lat) || !Number.isFinite(d.lon)) continue;
       const col = STATE.alt ? altColor(Math.min(1,(d.alt_pct||0)/49)) : leaderColor(d.lider?d.lider.partido:'', d.lider&&d.lider.alt);
       const mk = L.circleMarker([d.lat,d.lon], { radius:2.6, color:dark?'#0b0b0b':'#ffffff', weight:.6, fillColor:col, fillOpacity:.95 });
-      mk.bindTooltip(()=>{ let t=`<b>Puesto de votación</b><br>${fmt(d.validos)} válidos`; if(d.lider) t+=`<br>Líder: ${titleCase(d.lider.partido)} (${d.lider.pct}%)`; t+=`<br><span class="alt">Alternativo: ${d.alt_pct}%</span>`; return t; },{className:'rr',sticky:true});
+      mk.bindTooltip(()=>{ let t=`<b>${titleCase(d.nombre)||'Puesto de votación'}</b><br>${fmt(d.validos)} válidos`; if(d.lider) t+=`<br>Líder: ${titleCase(d.lider.partido)} (${d.lider.pct}%)`; t+=`<br><span class="alt">Alternativo: ${d.alt_pct}%</span>`; return t; },{className:'rr',sticky:true});
       mk.on('mouseover',()=>mk.setStyle({radius:5,weight:1.4}));
       mk.on('mouseout',()=>mk.setStyle({radius:2.6,weight:.6}));
       mk.on('click',()=>selectMun(munInt,(CURMAIN.muns[munInt]||{}).nombre||''));
@@ -464,6 +465,7 @@ async function renderPereiraBarrios(){
   let mx=0; for(const k in metric) mx=Math.max(mx,metric[k].alt_pct); mx=Math.max(mx,1);
   if (munLayer) map.removeLayer(munLayer);
   if (barrioLayer) map.removeLayer(barrioLayer);
+  const dataLayers=[];
   barrioLayer = L.geoJSON(GEO.barrios,{
     style:()=>({color:'#fff',weight:.5,fillColor:'#d8d2c4',fillOpacity:.22}),
     onEachFeature:(f,layer)=>{
@@ -475,10 +477,20 @@ async function renderPereiraBarrios(){
         layer.bindTooltip(tip,{className:'rr',sticky:true});
         layer.on('mouseover',()=>layer.setStyle({weight:2,color:'#222'}));
         layer.on('mouseout',()=>layer.setStyle({weight:.6,color:'#fff'}));
+        dataLayers.push(layer);
       }
     }
   }).addTo(map);
-  try{ fitZoom(barrioLayer.getBounds(),[20,20]); }catch(e){}
+  // Encuadrar al casco urbano: bbox por percentil 4-96 de los centroides con
+  // dato (descarta corregimientos rurales del norte que achican la ciudad).
+  try{
+    const cents=dataLayers.map(l=>l.getBounds().getCenter());
+    if (cents.length>=6){
+      const lats=cents.map(c=>c.lat).sort((a,b)=>a-b), lons=cents.map(c=>c.lng).sort((a,b)=>a-b);
+      const q=(a,p)=>a[Math.min(a.length-1,Math.max(0,Math.round((a.length-1)*p)))];
+      fitZoom(L.latLngBounds([q(lats,.04),q(lons,.04)],[q(lats,.96),q(lons,.96)]),[14,14]);
+    } else { fitZoom((dataLayers.length?L.featureGroup(dataLayers):barrioLayer).getBounds(),[14,14]); }
+  }catch(e){ try{ fitZoom(barrioLayer.getBounds(),[20,20]); }catch(_){} }
   renderLegend(mx, `Pereira por barrio · ${Object.keys(metric).length} con dato`);
   renderPereiraPanel(metric);
 }
@@ -490,7 +502,7 @@ function renderLegend(mx, note){
     el.innerHTML = `<div class="lt">% de ${titleCase(STATE.candFilter.nombre).split(' ').slice(0,2).join(' ')}</div>
       <div class="scale"><i style="background:${tintColor(_candCol,0)}"></i><i style="background:${tintColor(_candCol,.25)}"></i><i style="background:${tintColor(_candCol,.5)}"></i><i style="background:${tintColor(_candCol,.75)}"></i><i style="background:${tintColor(_candCol,1)}"></i></div>
       <div class="ends"><span>0%</span><span>${_candMax.toFixed(0)}%+</span></div>
-      <div class="li" style="margin-top:.4rem;color:var(--ink2)">Puestos ocultos durante el filtro</div>`;
+      <div class="li" style="margin-top:.4rem;color:var(--ink2)">Municipios = % del candidato · puntos = líder por puesto</div>`;
     return;
   }
   if (STATE.alt){
@@ -607,9 +619,10 @@ function renderDetailBody(){
         <div class="sec-t" style="margin-top:0;border-top:none;padding-top:0">${titleCase(STATE.partyFilter)} · ${cands.length}</div>`;
       h+= cands.length?candListHTML(cands):'<div class="hint">Lista cerrada (sin candidatos individuales) o sin coincidencias.</div>';
     } else {
+      const curMap={}; (s.curules||[]).forEach(c=>{ curMap[c.partido]=c; });
       const parts=(s.partidos||[]).filter(p=>!q||normp(pNom(p)).includes(q));
-      h+='<div class="clist">'+parts.map(p=>{ const col=leaderColor(pNom(p),p.alt); return `<div class="crow partyrow" data-p="${encodeURIComponent(pNom(p))}" style="border-left:4px solid ${col};padding-left:.5rem;background:linear-gradient(90deg,${col}30,${col}0a 70%)"><span class="rk"></span>
-        <span class="who"><span class="nm ${p.alt?'alt':''}">${p.alt?'<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--alt);margin-right:5px"></span>':''}${titleCase(pNom(p))}</span>
+      h+='<div class="clist">'+parts.map(p=>{ const col=leaderColor(pNom(p),p.alt); const cu=curMap[pNom(p)]; const badge=cu?`<span class="curbadge ${p.alt?'alt':''}">${cu.curules} ${cu.curules===1?'curul':'curules'}</span>`:''; return `<div class="crow partyrow" data-p="${encodeURIComponent(pNom(p))}" style="border-left:4px solid ${col};padding-left:.5rem;background:linear-gradient(90deg,${col}30,${col}0a 70%)"><span class="rk"></span>
+        <span class="who"><span class="nm ${p.alt?'alt':''}">${p.alt?'<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--alt);margin-right:5px"></span>':''}${titleCase(pNom(p))}${badge}</span>
         <span class="pa">${fmt(p.votos)} votos · ver candidatos</span></span>
         <span class="num"><span class="vt">${p.pct}%</span><br><span class="ar">›</span></span></div>`; }).join('')+'</div>';
     }
@@ -690,8 +703,9 @@ async function renderDepPanel(main){
     h+=`<div class="hint" style="margin-top:.8rem">Esta corporación se elige por municipio (no hay total departamental). Haz clic en un municipio.</div>`;
   }
   h+=`<div class="sec-t">Evolución del voto alternativo</div><div id="temporal-slot"><div class="hint">Cargando…</div></div>`;
-  if (ds && ds.curules){ h+=`<div class="sec-t">Curules (D'Hondt) · alt ${ds.alt_curules||0}/${ds.curules.reduce((s,c)=>s+c.curules,0)}</div>`+
-    ds.curules.map(c=>`<div class="lrow"><span class="nm ${c.alt?'alt':''}">${c.alt?'<span class="dot"></span>':''}${titleCase(c.partido)}</span><span class="pc">${c.curules} cur</span></div>`).join(''); }
+  if (ds && ds.curules){ const tot=ds.curules.reduce((s,c)=>s+c.curules,0); const ttl=ELEC[STATE.eleccion].territorial?`Curules Asamblea (D'Hondt)`:`Curules Cámara · ${ds.seats||tot} (estimadas)`;
+    h+=`<div class="sec-t">${ttl} · alt ${ds.alt_curules||0}/${tot}</div>`+
+    ds.curules.map(c=>`<div class="lrow"><span class="nm ${c.alt?'alt':''}">${c.alt?'<span class="dot"></span>':''}${titleCase(c.partido)}</span><span class="pc">${c.curules} ${c.curules===1?'curul':'cur'}</span></div>`).join(''); }
   if (ds){ h+=`<div class="sec-t">Resultados · ${fmt(ds.validos)} válidos</div><div id="detail-host"></div>`; }
   h+=`<div class="sec-t">Cómo leer el mapa</div><div class="hint">Color = ${STATE.alt?'intensidad del <b>% alternativo</b> (más verde = más Verde+Pacto+izquierda)':'<b>partido líder</b> de cada municipio'}. Clic en un municipio para su detalle; en <b>Pereira</b> puedes bajar a barrio.</div>`;
   p.innerHTML=h;
