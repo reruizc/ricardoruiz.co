@@ -296,7 +296,7 @@ function revealPage(){
 const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co';
 const DATA_BASE = `${S3}/bases+de+datos/output_risaralda`;
 const MAP_BASE  = `${S3}/congreso-2026/output/mapas-2026`;
-const CB = 'v=20260629d';
+const CB = 'v=20260630';
 
 const ELEC = {
   camara: { label:'Cámara 2026', main:`${DATA_BASE}/risaralda-camara-2026.json?${CB}`,
@@ -311,8 +311,11 @@ const ELEC = {
 };
 const CORP_LABEL = { gobernacion:'Gobernación', asamblea:'Asamblea', alcaldia:'Alcaldía', concejo:'Concejo' };
 const EDAD_URL = `${DATA_BASE}/edad-resultados.json?${CB}`;
+// Listas de Cámara con perfil por edad (las grandes, >13%). Match por nombre normalizado.
+const EDAD_PARTIES = ['PACTO POR RISARALDA','PARTIDO ALIANZA VERDE','PARTIDO LIBERAL COLOMBIANO','PARTIDO DE LA U - CAMBIO RADICAL','CENTRO DEMOCRATICO- MIRA'];
+function edadPartyKey(partido){ const n=normp(partido); return EDAD_PARTIES.find(p=>normp(p)===n)||null; }
 
-const STATE = { eleccion:'camara', corp:'gobernacion', alt:false, mun:null, view:'muns', detailMode:'lista', partyFilter:null, search:'', candFilter:null, mode:'normal', pair:'gob-alc' };
+const STATE = { eleccion:'camara', corp:'gobernacion', alt:false, mun:null, view:'muns', detailMode:'lista', partyFilter:null, search:'', candFilter:null, mode:'normal', pair:'gob-alc', edadParty:null, edadCand:null };
 // Pares de trasvase del voto alternativo entre cargos.
 const PAIRS = {
   'gob-alc': { label:'Gobernación → Alcaldía', src:{e:'2023',corp:'gobernacion',lab:'Gobernación 2023'}, dst:{e:'2023',corp:'alcaldia',lab:'Alcaldía 2023'}, sameDay:true },
@@ -558,9 +561,12 @@ async function setCandFilter(nombre, partido){
   _candCol = leaderColor(partido, _c?_c.alt:false);
   _candMax = 1;
   if (GEO.muns) for(const f of GEO.muns.features){ const m=String(parseInt(f.properties.mun_elec,10)); const cv=candInMun(CURMAIN,m); if(cv) _candMax=Math.max(_candMax,cv.pct); }
-  recolorMuns(); await renderPuestos(); syncCandBanner(); renderDetailBody();
+  // Perfil por edad de la lista del candidato (solo Cámara).
+  STATE.edadCand = (STATE.eleccion==='camara') ? {nombre,partido} : null;
+  STATE.edadParty = (STATE.eleccion==='camara') ? partido : null;
+  recolorMuns(); await renderPuestos(); syncCandBanner(); renderDetailBody(); injectEdad(STATE.mun);
 }
-function clearCandFilter(){ STATE.candFilter=null; recolorMuns(); renderPuestos(); syncCandBanner(); renderDetailBody(); }
+function clearCandFilter(){ STATE.candFilter=null; STATE.edadCand=null; STATE.edadParty=null; recolorMuns(); renderPuestos(); syncCandBanner(); renderDetailBody(); injectEdad(STATE.mun); }
 function syncCandBanner(){
   const b=document.getElementById('candBanner');
   if (STATE.candFilter){ document.getElementById('candBannerT').innerHTML=`Votación de <b>${titleCase(STATE.candFilter.nombre)}</b><small>${titleCase(STATE.candFilter.partido)} · más oscuro = mayor %</small>`; b.classList.add('show'); }
@@ -728,6 +734,26 @@ async function edadFor(munInt){
   const sc=el.scopes[munInt||'DEP']; if(!sc) return {blocked:'scope'};
   return { el, sc, grupos:ed.grupos };
 }
+async function edadPartyFor(munInt, party){
+  let ed; try{ ed=await getJSON(EDAD_URL); }catch(e){ return null; }
+  const el=ed.elecciones.camara; if(!el||!el.partidos) return null;
+  const key=Object.keys(el.partidos).find(k=>normp(k)===normp(party)); if(!key) return null;
+  const sc=el.partidos[key].scopes[munInt||'DEP']; if(!sc) return null;
+  return { sc, grupos:ed.grupos, key };
+}
+function perfilEdadPartyHTML(sc, grupos, party, cand){
+  let h=`<div class="sec-t">Perfil por edad · Lista ${titleCase(party)}</div>`;
+  if (cand) h+=`<div class="hint" style="margin-bottom:.5rem"><b>${titleCase(cand.nombre)}</b> se eligió en esta lista. En Cámara el voto por puesto es <b>por lista</b>, no por candidato: este es el perfil de la <b>lista Alianza Verde</b>. <span class="crumb" id="edad-reset" style="margin:0">✕ ver bloque</span></div>`.replace('Alianza Verde', titleCase(party));
+  for(const gn of grupos){ const g=sc.grupos[gn]; if(!g) continue;
+    const lo=Math.min(100,g.lo), hi=Math.min(100,g.hi);
+    h+=`<div class="agerow" title="IC95 ${g.lo}–${g.hi}%"><span class="lb">${gn}</span>
+      <span class="tk"><span class="fl" style="width:${Math.min(100,g.beta)}%"></span>
+        <span class="ic" style="left:${lo}%;width:${Math.max(1,hi-lo)}%"></span></span>
+      <span class="pc">${g.beta}%</span></div>`;
+  }
+  h+=`<div class="hint" style="margin-top:.45rem">Barra = % de cada franja que votó por la lista. Estimación ecológica (proyección DANE 2022→2026, IC95, cota de King).</div>`;
+  return h;
+}
 function perfilEdadHTML(sc, el, grupos){
   let h=`<div class="sec-t">Perfil por edad · voto alternativo</div>`;
   h+=`<div class="hint" style="margin-bottom:.5rem">${el.proy?'<b style="color:var(--warn)">Proyectado</b> — '+el.nota:'Edad medida por la RNEC para esta elección.'}</div>`;
@@ -743,6 +769,16 @@ function perfilEdadHTML(sc, el, grupos){
   return h;
 }
 function injectEdad(munInt){
+  // Modo lista (al tocar un candidato de Cámara de una lista grande).
+  if (STATE.edadParty && STATE.eleccion==='camara'){
+    edadPartyFor(munInt, STATE.edadParty).then(r=>{
+      const slot=document.getElementById('edad-slot'); if(!slot) return;
+      if(!r){ slot.innerHTML=`<div class="sec-t">Perfil por edad</div><div class="hint">La lista de <b>${STATE.edadCand?titleCase(STATE.edadCand.nombre):'este candidato'}</b> es muy pequeña para un perfil por edad fiable. <span class="crumb" id="edad-reset" style="margin:0">✕ ver bloque</span></div>`; const rb=document.getElementById('edad-reset'); if(rb) rb.onclick=()=>{STATE.edadParty=null;STATE.edadCand=null;injectEdad(munInt);}; return; }
+      slot.innerHTML=perfilEdadPartyHTML(r.sc, r.grupos, r.key, STATE.edadCand);
+      const rb=document.getElementById('edad-reset'); if(rb) rb.onclick=()=>{STATE.edadParty=null;STATE.edadCand=null;injectEdad(munInt);};
+    });
+    return;
+  }
   edadFor(munInt).then(r=>{
     const slot=document.getElementById('edad-slot'); if(!slot) return;
     if(!r){ slot.innerHTML=''; return; }
@@ -952,7 +988,7 @@ function init(){
   };
   document.querySelectorAll('#eleccion-seg button').forEach(b=>b.onclick=()=>{
     const e=b.getAttribute('data-e'); setSeg('eleccion-seg','data-e',e);
-    STATE.mun=null; STATE.candFilter=null; STATE.view='muns';
+    STATE.mun=null; STATE.candFilter=null; STATE.edadParty=null; STATE.edadCand=null; STATE.view='muns';
     if (e==='trasvase'){ STATE.mode='trasvase';
       document.getElementById('corp-grp').style.display='none';
       document.getElementById('pair-grp').style.display='flex';
@@ -965,7 +1001,7 @@ function init(){
     refresh();
   });
   document.querySelectorAll('#corp-seg button').forEach(b=>b.onclick=()=>{
-    STATE.corp=b.getAttribute('data-c'); setSeg('corp-seg','data-c',STATE.corp); STATE.mun=null; STATE.candFilter=null; refresh();
+    STATE.corp=b.getAttribute('data-c'); setSeg('corp-seg','data-c',STATE.corp); STATE.mun=null; STATE.candFilter=null; STATE.edadParty=null; STATE.edadCand=null; refresh();
   });
   document.querySelectorAll('#pair-seg button').forEach(b=>b.onclick=()=>{
     STATE.pair=b.getAttribute('data-p'); setSeg('pair-seg','data-p',STATE.pair); refresh();
