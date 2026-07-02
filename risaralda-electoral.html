@@ -140,6 +140,15 @@
   .tcol .tbar.dim{background:var(--ink2);opacity:.45}
   .tcol .tv{font-family:'DM Mono',monospace;font-size:.72rem;font-weight:500}
   .tcol .tl{font-family:'Arima',sans-serif;font-size:.66rem;color:var(--ink2);text-align:center;line-height:1.15}
+  /* perfil por edad */
+  .agerow{display:flex;align-items:center;gap:.5rem;margin:.42rem 0;font-family:'Arima',sans-serif;font-size:.82rem}
+  .agerow .lb{width:50px;flex:none;color:var(--ink)}
+  .agerow .tk{flex:1;height:16px;background:var(--line);border-radius:4px;position:relative;overflow:hidden}
+  .agerow .fl{position:absolute;left:0;top:0;bottom:0;background:var(--alt);opacity:.85;border-radius:4px 0 0 4px}
+  .agerow .ic{position:absolute;top:50%;height:0;border-top:2px dotted var(--ink);opacity:.55;transform:translateY(-50%)}
+  .agerow .ic::before,.agerow .ic::after{content:'';position:absolute;top:-3px;width:1.5px;height:6px;background:var(--ink);opacity:.7}
+  .agerow .ic::before{left:0}.agerow .ic::after{right:0}
+  .agerow .pc{width:52px;flex:none;text-align:right;font-family:'DM Mono',monospace;font-size:.74rem}
   /* legend / map chrome */
   .legend{position:absolute;left:12px;bottom:18px;z-index:600;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:.55rem .65rem;box-shadow:var(--shadow);max-width:240px}
   .legend .lt{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);margin-bottom:.4rem}
@@ -301,6 +310,7 @@ const ELEC = {
             puestos:`${DATA_BASE}/risaralda-2019-puestos.json?${CB}`, territorial:true },
 };
 const CORP_LABEL = { gobernacion:'Gobernación', asamblea:'Asamblea', alcaldia:'Alcaldía', concejo:'Concejo' };
+const EDAD_URL = `${DATA_BASE}/edad-resultados.json?${CB}`;
 
 const STATE = { eleccion:'camara', corp:'gobernacion', alt:false, mun:null, view:'muns', detailMode:'lista', partyFilter:null, search:'', candFilter:null, mode:'normal', pair:'gob-alc' };
 // Pares de trasvase del voto alternativo entre cargos.
@@ -708,6 +718,40 @@ function participacionHTML(votantes, censo, nota){
     </div></div>`;
 }
 
+// ─── PERFIL POR EDAD (inferencia ecológica bloque) ───────────────────
+function edadKey(){ return (STATE.eleccion==='camara'||STATE.eleccion==='2023'||STATE.eleccion==='2019')?STATE.eleccion:null; }
+async function edadFor(munInt){
+  const key=edadKey(); if(!key) return null;
+  let ed; try{ ed=await getJSON(EDAD_URL); }catch(e){ return null; }
+  const el=ed.elecciones[key]; if(!el) return null;
+  if (ELEC[STATE.eleccion].territorial && STATE.corp!=='gobernacion') return {blocked:'corp'};
+  const sc=el.scopes[munInt||'DEP']; if(!sc) return {blocked:'scope'};
+  return { el, sc, grupos:ed.grupos };
+}
+function perfilEdadHTML(sc, el, grupos){
+  let h=`<div class="sec-t">Perfil por edad · voto alternativo</div>`;
+  h+=`<div class="hint" style="margin-bottom:.5rem">${el.proy?'<b style="color:var(--warn)">Proyectado</b> — '+el.nota:'Edad medida por la RNEC para esta elección.'}</div>`;
+  for(const gn of grupos){ const g=sc.grupos[gn]; if(!g) continue;
+    const lo=Math.min(100,g.lo), hi=Math.min(100,g.hi);
+    h+=`<div class="agerow" title="IC95 ${g.lo}–${g.hi}% · cota dura ${g.dd_lo}–${g.dd_hi}%"><span class="lb">${gn}</span>
+      <span class="tk"><span class="fl" style="width:${Math.min(100,g.beta)}%"></span>
+        <span class="ic" style="left:${lo}%;width:${Math.max(1,hi-lo)}%"></span></span>
+      <span class="pc">${g.beta}%</span></div>`;
+  }
+  const g0=sc.grupos[grupos[0]];
+  h+=`<div class="hint" style="margin-top:.45rem">El <b style="color:var(--alt)">${g0.comp_alt}%</b> del voto alternativo viene de <b>${grupos[0]}</b> años. Barra = % de cada franja que vota alternativo; línea punteada = IC95. Estimación ecológica (cota de King), no conteo por votante.</div>`;
+  return h;
+}
+function injectEdad(munInt){
+  edadFor(munInt).then(r=>{
+    const slot=document.getElementById('edad-slot'); if(!slot) return;
+    if(!r){ slot.innerHTML=''; return; }
+    if(r.blocked==='corp'){ slot.innerHTML=`<div class="sec-t">Perfil por edad</div><div class="hint">Disponible en <b>Gobernación</b> (territorial) y en <b>Cámara 2026</b> — cambia de corporación para verlo.</div>`; return; }
+    if(r.blocked==='scope'){ slot.innerHTML=`<div class="sec-t">Perfil por edad</div><div class="hint">Estimación por edad sólo a nivel Risaralda y en Pereira, Dosquebradas y Santa Rosa (municipios con puestos suficientes para la inferencia).</div>`; return; }
+    slot.innerHTML=perfilEdadHTML(r.sc, r.el, r.grupos);
+  });
+}
+
 // ─── CANDIDATE / LIST RENDER ─────────────────────────────────────────
 function candListHTML(cands){
   let h='<div class="clist">';
@@ -840,7 +884,7 @@ async function renderDepPanel(main){
   } else {
     h+=`<div class="hint" style="margin-top:.8rem">Esta corporación se elige por municipio (no hay total departamental). Haz clic en un municipio.</div>`;
   }
-  h+=`<div class="sec-t">Evolución del voto alternativo</div><div id="temporal-slot"><div class="hint">Cargando…</div></div>`;
+  h+=`<div class="sec-t">Evolución del voto alternativo</div><div id="temporal-slot"><div class="hint">Cargando…</div></div><div id="edad-slot"></div>`;
   if (ds && ds.curules){ const tot=ds.curules.reduce((s,c)=>s+c.curules,0); const ttl=ELEC[STATE.eleccion].territorial?`Curules Asamblea (D'Hondt)`:`Curules Cámara · ${ds.seats||tot} (estimadas)`;
     h+=`<div class="sec-t">${ttl} · alt ${ds.alt_curules||0}/${tot}</div>`+
     ds.curules.map(c=>`<div class="lrow"><span class="nm ${c.alt?'alt':''}">${c.alt?'<span class="dot"></span>':''}${titleCase(c.partido)}</span><span class="pc">${c.curules} ${c.curules===1?'curul':'cur'}</span></div>`).join(''); }
@@ -849,6 +893,7 @@ async function renderDepPanel(main){
   p.innerHTML=h;
   if (ds){ CUR.scope=ds; CUR.titulo=ELEC[STATE.eleccion].label; CUR.sub='risaralda'+(ELEC[STATE.eleccion].territorial?'-'+STATE.corp:''); STATE.partyFilter=null; STATE.search=""; renderDetailHost(); }
   temporalData(null).then(rows=>{ const sl=document.getElementById('temporal-slot'); if(sl) sl.innerHTML=temporalHTML(rows); });
+  injectEdad(null);
 }
 async function renderMunPanel(main, munInt, nombre){
   const s = munScope(main, munInt);
@@ -862,7 +907,7 @@ async function renderMunPanel(main, munInt, nombre){
   h+=`</div>`;
   const _censoM = main.muns[munInt] && main.muns[munInt].censo;
   if (s.votantes && _censoM) h+=`<div class="sec-t">Participación</div>`+participacionHTML(s.votantes, _censoM, ELEC[STATE.eleccion].territorial?'Censo electoral 2026 (referencia)':'');
-  h+=`<div class="sec-t">Evolución del voto alternativo</div><div id="temporal-slot"><div class="hint">Cargando…</div></div>`;
+  h+=`<div class="sec-t">Evolución del voto alternativo</div><div id="temporal-slot"><div class="hint">Cargando…</div></div><div id="edad-slot"></div>`;
   if (munInt==='1'){ h+=`<button class="backbtn" id="toPereira" style="position:static;display:block;margin:.7rem 0 0;width:100%;text-align:center">Ver Pereira por barrio →</button>`; }
   if (s.curules){ h+=`<div class="sec-t">Curules concejo · alt ${s.alt_curules||0}/${s.curules.reduce((a,c)=>a+c.curules,0)}</div>`+
     s.curules.map(c=>`<div class="lrow"><span class="nm ${c.alt?'alt':''}">${c.alt?'<span class="dot"></span>':''}${titleCase(c.partido)}</span><span class="pc">${c.curules}</span></div>`).join(''); }
@@ -871,6 +916,7 @@ async function renderMunPanel(main, munInt, nombre){
   if (munInt==='1') document.getElementById('toPereira').onclick=renderPereiraBarrios;
   CUR.scope=s; CUR.titulo=ELEC[STATE.eleccion].label+(ELEC[STATE.eleccion].territorial?'-'+STATE.corp:''); CUR.sub=nombre; STATE.partyFilter=null; STATE.search=""; renderDetailHost();
   temporalData(munInt).then(rows=>{ const sl=document.getElementById('temporal-slot'); if(sl) sl.innerHTML=temporalHTML(rows); });
+  injectEdad(munInt);
 }
 function renderPereiraPanel(metric){
   const p=document.getElementById('panel');
