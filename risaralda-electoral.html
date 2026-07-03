@@ -311,6 +311,9 @@ const ELEC = {
 };
 const CORP_LABEL = { gobernacion:'Gobernación', asamblea:'Asamblea', alcaldia:'Alcaldía', concejo:'Concejo' };
 const EDAD_URL = `${DATA_BASE}/edad-resultados.json?${CB}`;
+const CANDEDAD_URL = `${DATA_BASE}/candidatos-edad.json?${CB}`;
+// Elección del tool → clave en candidatos-edad.json (solo donde hay dato mesa-FE).
+function candEdadKey(){ if(STATE.eleccion==='camara') return 'camara'; if(ELEC[STATE.eleccion].territorial && STATE.corp==='gobernacion') return 'gob'+STATE.eleccion; return null; }
 // Listas de Cámara con perfil por edad (las grandes, >13%). Match por nombre normalizado.
 const EDAD_PARTIES = ['PACTO POR RISARALDA','PARTIDO ALIANZA VERDE','PARTIDO LIBERAL COLOMBIANO','PARTIDO DE LA U - CAMBIO RADICAL','CENTRO DEMOCRATICO- MIRA'];
 function edadPartyKey(partido){ const n=normp(partido); return EDAD_PARTIES.find(p=>normp(p)===n)||null; }
@@ -561,9 +564,8 @@ async function setCandFilter(nombre, partido){
   _candCol = leaderColor(partido, _c?_c.alt:false);
   _candMax = 1;
   if (GEO.muns) for(const f of GEO.muns.features){ const m=String(parseInt(f.properties.mun_elec,10)); const cv=candInMun(CURMAIN,m); if(cv) _candMax=Math.max(_candMax,cv.pct); }
-  // Perfil por edad de la lista del candidato (solo Cámara).
-  STATE.edadCand = (STATE.eleccion==='camara') ? {nombre,partido} : null;
-  STATE.edadParty = (STATE.eleccion==='camara') ? partido : null;
+  // Perfil por edad propio del candidato (mesa-FE): Cámara y Gobernación.
+  STATE.edadCand = {nombre,partido};
   recolorMuns(); await renderPuestos(); syncCandBanner(); renderDetailBody(); injectEdad(STATE.mun);
 }
 function clearCandFilter(){ STATE.candFilter=null; STATE.edadCand=null; STATE.edadParty=null; recolorMuns(); renderPuestos(); syncCandBanner(); renderDetailBody(); injectEdad(STATE.mun); }
@@ -754,6 +756,33 @@ function perfilEdadPartyHTML(sc, grupos, party, cand){
   h+=`<div class="hint" style="margin-top:.45rem">Barra = % de cada franja que votó por la lista. Estimación ecológica (proyección DANE 2022→2026, IC95, cota de King).</div>`;
   return h;
 }
+const MUN_BIG_NAMES = {'1':'Pereira','25':'Dosquebradas','86':'Santa Rosa'};
+async function edadCandFor(nombre, partido, munInt){
+  const key=candEdadKey(); if(!key) return {blocked:'election'};
+  let d; try{ d=await getJSON(CANDEDAD_URL); }catch(e){ return null; }
+  const el=d.elecciones[key]; if(!el) return {blocked:'election'};
+  const nn=normp(nombre), pp=normp(partido||''); let cand=null;
+  for(const k in el){ const c=el[k]; if(normp(c.nombre)===nn && (key!=='camara' || !partido || normp(c.partido)===pp)){ cand=c; break; } }
+  if(!cand) return {blocked:'notfound'};
+  let scopeKey='DEP', sc=cand.scopes.DEP;
+  if(munInt && MUN_BIG_NAMES[munInt] && cand.scopes[munInt] && !cand.scopes[munInt].insuf){ scopeKey=munInt; sc=cand.scopes[munInt]; }
+  return { cand, sc, scopeKey, grupos:d.grupos };
+}
+function perfilEdadCandHTML(sc, cand, grupos, scopeKey){
+  const scopeName = scopeKey==='DEP'?'Risaralda':(MUN_BIG_NAMES[scopeKey]||scopeKey);
+  let h=`<div class="sec-t">Perfil por edad · ${titleCase(cand.nombre)}</div>`;
+  if(!sc || sc.insuf){ return h+`<div class="hint">Muestra insuficiente para estimar el perfil por edad de <b>${titleCase(cand.nombre)}</b> en ${scopeName}. <span class="crumb" id="edad-reset" style="margin:0">✕ ver bloque</span></div>`; }
+  h+=`<div class="hint" style="margin-bottom:.5rem">${cand.partido?titleCase(cand.partido)+' · ':''}${fmt(cand.votos)} votos · ${scopeName}. <span class="crumb" id="edad-reset" style="margin:0">✕ ver bloque</span></div>`;
+  for(const gn of grupos){ const g=sc.grupos[gn]; if(!g) continue;
+    const has=g.lo!=null; const lo=Math.min(100,has?g.lo:g.beta), hi=Math.min(100,has?g.hi:g.beta);
+    h+=`<div class="agerow" title="${has?'IC95 '+g.lo+'–'+g.hi+'%':''}"><span class="lb">${gn}</span>
+      <span class="tk"><span class="fl" style="width:${Math.min(100,g.beta)}%"></span>
+        ${has?`<span class="ic" style="left:${lo}%;width:${Math.max(1,hi-lo)}%"></span>`:''}</span>
+      <span class="pc">${g.beta}%</span></div>`;
+  }
+  h+=`<div class="hint" style="margin-top:.45rem">% de cada franja que votó por <b>${titleCase(cand.nombre)}</b>. Efectos fijos de puesto (mesa · orden de cédula), IC95.${STATE.eleccion==='camara'?' Edad proyectada de 2022.':''} El IC es bajo el modelo, no incluye error de proyección.</div>`;
+  return h;
+}
 function perfilEdadHTML(sc, el, grupos){
   let h=`<div class="sec-t">Perfil por edad · voto alternativo</div>`;
   h+=`<div class="hint" style="margin-bottom:.5rem">${el.proy?'<b style="color:var(--warn)">Proyectado</b> — '+el.nota:'Edad medida por la RNEC para esta elección.'}</div>`;
@@ -769,13 +798,17 @@ function perfilEdadHTML(sc, el, grupos){
   return h;
 }
 function injectEdad(munInt){
-  // Modo lista (al tocar un candidato de Cámara de una lista grande).
-  if (STATE.edadParty && STATE.eleccion==='camara'){
-    edadPartyFor(munInt, STATE.edadParty).then(r=>{
+  // Modo candidato (al tocar un candidato): su perfil por edad propio (mesa-FE).
+  if (STATE.edadCand){
+    edadCandFor(STATE.edadCand.nombre, STATE.edadCand.partido, munInt).then(r=>{
       const slot=document.getElementById('edad-slot'); if(!slot) return;
-      if(!r){ slot.innerHTML=`<div class="sec-t">Perfil por edad</div><div class="hint">La lista de <b>${STATE.edadCand?titleCase(STATE.edadCand.nombre):'este candidato'}</b> es muy pequeña para un perfil por edad fiable. <span class="crumb" id="edad-reset" style="margin:0">✕ ver bloque</span></div>`; const rb=document.getElementById('edad-reset'); if(rb) rb.onclick=()=>{STATE.edadParty=null;STATE.edadCand=null;injectEdad(munInt);}; return; }
-      slot.innerHTML=perfilEdadPartyHTML(r.sc, r.grupos, r.key, STATE.edadCand);
-      const rb=document.getElementById('edad-reset'); if(rb) rb.onclick=()=>{STATE.edadParty=null;STATE.edadCand=null;injectEdad(munInt);};
+      let html='';
+      if(!r) html='';
+      else if(r.blocked==='election') html=`<div class="sec-t">Perfil por edad</div><div class="hint">El perfil por edad <b>por candidato</b> está disponible en <b>Cámara 2026</b> y <b>Gobernación</b> (territorial). <span class="crumb" id="edad-reset" style="margin:0">✕ ver bloque</span></div>`;
+      else if(r.blocked==='notfound') html=`<div class="sec-t">Perfil por edad</div><div class="hint">Sin estimación por edad para <b>${titleCase(STATE.edadCand.nombre)}</b> (votación muy baja). <span class="crumb" id="edad-reset" style="margin:0">✕ ver bloque</span></div>`;
+      else html=perfilEdadCandHTML(r.sc, r.cand, r.grupos, r.scopeKey);
+      slot.innerHTML=html;
+      const rb=document.getElementById('edad-reset'); if(rb) rb.onclick=()=>{STATE.edadCand=null;STATE.edadParty=null;injectEdad(munInt);};
     });
     return;
   }

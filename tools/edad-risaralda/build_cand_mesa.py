@@ -63,7 +63,8 @@ def fe_candidate(mesas, cod):
         ybar=(y*wt).sum(); fybar=(fy*wt).sum(); fobar=(fo*wt).sum()
         for i in range(len(ms)):
             Y.append(y[i]-ybar); X.append([fy[i]-fybar, fo[i]-fobar]); W.append(w[i]); P.append(pc)
-    if len(Y)<40: return None
+    npu=len(set(P))
+    if len(Y)<40 or npu<12: return {"insuf":True,"n":len(Y),"npuestos":npu}
     Y=np.array(Y);X=np.array(X);W=np.array(W);P=np.array(P)
     def wls(Xa,Ya,Wa):
         sw=np.sqrt(Wa); A=Xa*sw[:,None]; b=Ya*sw
@@ -76,7 +77,7 @@ def fe_candidate(mesas, cod):
         samp=rng.choice(pucods,len(pucods)); ii=np.concatenate([pidx[pc] for pc in samp])
         boots.append(wls(X[ii],Y[ii],W[ii]))
     boots=np.array(boots)
-    return {"b":b, "lo":np.percentile(boots,2.5,axis=0), "hi":np.percentile(boots,97.5,axis=0)}
+    return {"b":b, "lo":np.percentile(boots,2.5,axis=0), "hi":np.percentile(boots,97.5,axis=0), "n":len(Y), "npuestos":npu}
 
 def main():
     age=load_age_mesa(); votes,valid,names=load_gob_mesa()
