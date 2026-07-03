@@ -313,7 +313,12 @@ const CORP_LABEL = { gobernacion:'Gobernación', asamblea:'Asamblea', alcaldia:'
 const EDAD_URL = `${DATA_BASE}/edad-resultados.json?${CB}`;
 const CANDEDAD_URL = `${DATA_BASE}/candidatos-edad.json?${CB}`;
 // Elección del tool → clave en candidatos-edad.json (solo donde hay dato mesa-FE).
-function candEdadKey(){ if(STATE.eleccion==='camara') return 'camara'; if(ELEC[STATE.eleccion].territorial && STATE.corp==='gobernacion') return 'gob'+STATE.eleccion; return null; }
+function candEdadKey(){
+  if(STATE.eleccion==='camara') return 'camara';
+  if(!ELEC[STATE.eleccion].territorial) return null;
+  const m={gobernacion:'gob',asamblea:'asa',alcaldia:'alc',concejo:'con'}[STATE.corp];
+  return m ? m+STATE.eleccion : null;
+}
 // Listas de Cámara con perfil por edad (las grandes, >13%). Match por nombre normalizado.
 const EDAD_PARTIES = ['PACTO POR RISARALDA','PARTIDO ALIANZA VERDE','PARTIDO LIBERAL COLOMBIANO','PARTIDO DE LA U - CAMBIO RADICAL','CENTRO DEMOCRATICO- MIRA'];
 function edadPartyKey(partido){ const n=normp(partido); return EDAD_PARTIES.find(p=>normp(p)===n)||null; }
@@ -761,15 +766,22 @@ async function edadCandFor(nombre, partido, munInt){
   const key=candEdadKey(); if(!key) return {blocked:'election'};
   let d; try{ d=await getJSON(CANDEDAD_URL); }catch(e){ return null; }
   const el=d.elecciones[key]; if(!el) return {blocked:'election'};
+  const municipal=/^(alc|con)/.test(key);
   const nn=normp(nombre), pp=normp(partido||''); let cand=null;
-  for(const k in el){ const c=el[k]; if(normp(c.nombre)===nn && (key!=='camara' || !partido || normp(c.partido)===pp)){ cand=c; break; } }
+  for(const k in el){ const c=el[k];
+    if(normp(c.nombre)!==nn) continue;
+    if(partido && c.partido && normp(c.partido)!==pp) continue;
+    if(municipal && c.mun && String(munInt)!==String(c.mun)) continue;
+    cand=c; break; }
   if(!cand) return {blocked:'notfound'};
-  let scopeKey='DEP', sc=cand.scopes.DEP;
-  if(munInt && MUN_BIG_NAMES[munInt] && cand.scopes[munInt] && !cand.scopes[munInt].insuf){ scopeKey=munInt; sc=cand.scopes[munInt]; }
+  let scopeKey, sc;
+  if(municipal){ scopeKey=cand.mun; sc=cand.scopes[cand.mun]; }
+  else { scopeKey='DEP'; sc=cand.scopes.DEP;
+    if(munInt && MUN_BIG_NAMES[munInt] && cand.scopes[munInt] && !cand.scopes[munInt].insuf){ scopeKey=munInt; sc=cand.scopes[munInt]; } }
   return { cand, sc, scopeKey, grupos:d.grupos };
 }
 function perfilEdadCandHTML(sc, cand, grupos, scopeKey){
-  const scopeName = scopeKey==='DEP'?'Risaralda':(MUN_BIG_NAMES[scopeKey]||scopeKey);
+  const scopeName = scopeKey==='DEP'?'Risaralda':((CURMAIN&&CURMAIN.muns&&CURMAIN.muns[scopeKey]&&titleCase(CURMAIN.muns[scopeKey].nombre))||MUN_BIG_NAMES[scopeKey]||scopeKey);
   let h=`<div class="sec-t">Perfil por edad · ${titleCase(cand.nombre)}</div>`;
   if(!sc || sc.insuf){ return h+`<div class="hint">Muestra insuficiente para estimar el perfil por edad de <b>${titleCase(cand.nombre)}</b> en ${scopeName}. <span class="crumb" id="edad-reset" style="margin:0">✕ ver bloque</span></div>`; }
   h+=`<div class="hint" style="margin-bottom:.5rem">${cand.partido?titleCase(cand.partido)+' · ':''}${fmt(cand.votos)} votos · ${scopeName}. <span class="crumb" id="edad-reset" style="margin:0">✕ ver bloque</span></div>`;
