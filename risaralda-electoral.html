@@ -297,7 +297,7 @@ function revealPage(){
 const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co';
 const DATA_BASE = `${S3}/bases+de+datos/output_risaralda`;
 const MAP_BASE  = `${S3}/congreso-2026/output/mapas-2026`;
-const CB = 'v=20260630b';
+const CB = 'v=20260630c';
 
 const ELEC = {
   camara: { label:'Cámara 2026', main:`${DATA_BASE}/risaralda-camara-2026.json?${CB}`,
@@ -547,7 +547,10 @@ async function renderPuestos(){
       if (!d || !Number.isFinite(d.lat) || !Number.isFinite(d.lon)) continue;
       const col = STATE.alt ? altColor(Math.min(1,(d.alt_pct||0)/49)) : leaderColor(d.lider?d.lider.partido:'', d.lider&&d.lider.alt);
       const mk = L.circleMarker([d.lat,d.lon], { radius:2.6, color:dark?'#0b0b0b':'#ffffff', weight:.6, fillColor:col, fillOpacity:.95 });
-      mk.bindTooltip(()=>{ let t=`<b>${titleCase(d.nombre)||'Puesto de votación'}</b><br>${fmt(d.validos)} válidos`; if(d.lider) t+=`<br>Líder: ${titleCase(d.lider.partido)} (${d.lider.pct}%)`; t+=`<br><span class="alt">Alternativo: ${d.alt_pct}%</span>`; return t; },{className:'rr',sticky:true});
+      const pkey=`${munInt}-${zzpp}`;
+      mk.bindTooltip(()=>{ let t=`<b>${titleCase(d.nombre)||'Puesto de votación'}</b><br>${fmt(d.validos)} válidos`;
+        if(_selCandPV){ const vv=_selCandPV.pv[pkey]||0; t+=`<br><b style="color:#7CFFA8">${titleCase(_selCandPV.nombre)}: ${fmt(vv)} votos</b>`; }
+        if(d.lider) t+=`<br>Líder: ${titleCase(d.lider.partido)} (${d.lider.pct}%)`; t+=`<br><span class="alt">Alternativo: ${d.alt_pct}%</span>`; return t; },{className:'rr',sticky:true});
       mk.on('mouseover',()=>mk.setStyle({radius:5,weight:1.4}));
       mk.on('mouseout',()=>mk.setStyle({radius:2.6,weight:.6}));
       mk.on('click',()=>selectMun(munInt,(CURMAIN.muns[munInt]||{}).nombre||''));
@@ -564,6 +567,7 @@ function recolorMuns(){
   munLayer.eachLayer(l=>{ const m=String(parseInt(l.feature.properties.mun_elec,10)); l.setStyle({fillColor:munFill(CURMAIN,m,mx)}); });
   renderLegend(mx);
 }
+let _selCandPV=null;   // {nombre, pv:{puestoKey:votos}} del candidato filtrado → tooltip de puestos
 async function setCandFilter(nombre, partido){
   STATE.candFilter={nombre,partido};
   const _c = (CUR.scope && CUR.scope.candidatos || []).find(x=>x.nombre===nombre && x.partido===partido);
@@ -572,9 +576,15 @@ async function setCandFilter(nombre, partido){
   if (GEO.muns) for(const f of GEO.muns.features){ const m=String(parseInt(f.properties.mun_elec,10)); const cv=candInMun(CURMAIN,m); if(cv) _candMax=Math.max(_candMax,cv.pct); }
   // Perfil por edad propio del candidato (mesa-FE): Cámara y Gobernación.
   STATE.edadCand = {nombre,partido};
+  // Votos del candidato por puesto (para el tooltip del mapa).
+  _selCandPV=null;
+  try{ const key=candEdadKey(); if(key){ const dd=await getJSON(CANDEDAD_URL); const el=dd.elecciones[key];
+    if(el){ const nn=normp(nombre), pp2=normp(partido||'');
+      for(const kk in el){ const c=el[kk]; if(normp(c.nombre)!==nn) continue; if(partido&&c.partido&&normp(c.partido)!==pp2) continue;
+        if(c.mun && STATE.mun && String(c.mun)!==String(STATE.mun)) continue; _selCandPV={nombre:c.nombre, pv:c.pv||{}}; break; } } } }catch(e){}
   recolorMuns(); await renderPuestos(); syncCandBanner(); renderDetailBody(); injectEdad(STATE.mun);
 }
-function clearCandFilter(){ STATE.candFilter=null; STATE.edadCand=null; STATE.edadParty=null; recolorMuns(); renderPuestos(); syncCandBanner(); renderDetailBody(); injectEdad(STATE.mun); }
+function clearCandFilter(){ STATE.candFilter=null; STATE.edadCand=null; STATE.edadParty=null; _selCandPV=null; recolorMuns(); renderPuestos(); syncCandBanner(); renderDetailBody(); injectEdad(STATE.mun); }
 function syncCandBanner(){
   const b=document.getElementById('candBanner');
   if (STATE.candFilter){ document.getElementById('candBannerT').innerHTML=`Votación de <b>${titleCase(STATE.candFilter.nombre)}</b><small>${titleCase(STATE.candFilter.partido)} · más oscuro = mayor %</small>`; b.classList.add('show'); }
@@ -787,13 +797,14 @@ function perfilEdadCandHTML(sc, cand, grupos, scopeKey){
   if(!sc || sc.insuf){ return h+`<div class="hint">Muestra insuficiente para estimar el perfil por edad de <b>${titleCase(cand.nombre)}</b> en ${scopeName}. <span class="crumb" id="edad-reset" style="margin:0">✕ ver bloque</span></div>`; }
   h+=`<div class="hint" style="margin-bottom:.5rem">${cand.partido?titleCase(cand.partido)+' · ':''}${fmt(cand.votos)} votos · ${scopeName}. <span class="crumb" id="edad-reset" style="margin:0">✕ ver bloque</span></div>`;
   for(const gn of grupos){ const g=sc.grupos[gn]; if(!g) continue;
-    const has=g.lo!=null; const lo=Math.min(100,has?g.lo:g.beta), hi=Math.min(100,has?g.hi:g.beta);
-    h+=`<div class="agerow" title="${has?'IC95 '+g.lo+'–'+g.hi+'%':''}"><span class="lb">${gn}</span>
-      <span class="tk"><span class="fl" style="width:${Math.min(100,g.beta)}%"></span>
-        ${has?`<span class="ic" style="left:${lo}%;width:${Math.max(1,hi-lo)}%"></span>`:''}</span>
-      <span class="pc">${g.beta}%</span></div>`;
+    const comp = g.comp!=null?g.comp:0;
+    const tt = `tasa: ${g.beta}% de esta franja votó por el candidato${g.lo!=null?' (IC95 '+g.lo+'–'+g.hi+'%)':''}`;
+    h+=`<div class="agerow" title="${tt}"><span class="lb">${gn}</span>
+      <span class="tk"><span class="fl" style="width:${Math.min(100,comp)}%"></span></span>
+      <span class="pc">${comp}%</span></div>`;
   }
-  h+=`<div class="hint" style="margin-top:.45rem">% de cada franja que votó por <b>${titleCase(cand.nombre)}</b>. Efectos fijos de puesto (mesa · orden de cédula), IC95.${STATE.eleccion==='camara'?' Edad proyectada de 2022.':''} El IC es bajo el modelo, no incluye error de proyección.</div>`;
+  const elec = sc.electorado;
+  h+=`<div class="hint" style="margin-top:.45rem"><b>Composición de sus votantes</b> (suma 100%): de los votos de <b>${titleCase(cand.nombre)}</b>, cuántos son de cada franja.${elec?` El electorado general es ${elec['18-35']}% / ${elec['36-60']}% / ${elec['61+']}%, así que sesga ${(sc.grupos['18-35'].comp>elec['18-35']+5)?'<b style="color:var(--alt)">joven</b>':(sc.grupos['61+'].comp>elec['61+']+5?'<b style="color:var(--accent)">mayor</b>':'parejo')}.`:''} Efectos fijos de puesto (mesa · orden de cédula).${STATE.eleccion==='camara'?' Edad proyectada de 2022.':''}</div>`;
   return h;
 }
 function perfilEdadHTML(sc, el, grupos){

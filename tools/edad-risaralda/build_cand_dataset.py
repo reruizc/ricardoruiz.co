@@ -69,8 +69,16 @@ def profile(mesas):
     if not r or r.get("insuf"): return {"insuf":True,"n":(r or {}).get("n",len(mesas)),"npuestos":(r or {}).get("npuestos",0)}
     by,bo=r["b"]; r36=S-by*Fy-bo*Fo
     cl=lambda x: round(max(0,min(100,x*100)),1)
-    return {"grupos":{"18-35":{"beta":cl(r36+by),"lo":cl(r36+r["lo"][0]),"hi":cl(r36+r["hi"][0])},
-        "36-60":{"beta":cl(r36)},"61+":{"beta":cl(r36+bo),"lo":cl(r36+r["lo"][1]),"hi":cl(r36+r["hi"][1])}},
+    # Composición del electorado del candidato: de SUS votantes, qué % es de cada
+    # franja (suma 100). comp_g = tasa_g · N_g / Σ, con N_g = electorado del grupo.
+    ry=max(0,r36+by); rm=max(0,r36); ro=max(0,r36+bo); F36=max(0,1-Fy-Fo)
+    vy=ry*Fy; vm=rm*F36; vo=ro*Fo; vs=(vy+vm+vo) or 1
+    comp={"18-35":round(vy/vs*100,1),"36-60":round(vm/vs*100,1),"61+":round(vo/vs*100,1)}
+    return {"grupos":{
+        "18-35":{"beta":cl(r36+by),"lo":cl(r36+r["lo"][0]),"hi":cl(r36+r["hi"][0]),"comp":comp["18-35"]},
+        "36-60":{"beta":cl(r36),"comp":comp["36-60"]},
+        "61+":{"beta":cl(r36+bo),"lo":cl(r36+r["lo"][1]),"hi":cl(r36+r["hi"][1]),"comp":comp["61+"]}},
+        "electorado":{"18-35":round(Fy*100,1),"36-60":round(F36*100,1),"61+":round(Fo*100,1)},
         "n":r["n"],"npuestos":r["npuestos"]}
 
 def mesas_for(k, votes, valid, age, mun=None):
@@ -83,9 +91,15 @@ def mesas_for(k, votes, valid, age, mun=None):
     return out
 
 def run(votes,valid,tot,meta,age,municipal):
+    # votos por puesto por candidato (una sola pasada) → tooltip del mapa
+    pvall=collections.defaultdict(lambda: collections.defaultdict(int))
+    for mk,cv in votes.items():
+        pk=mk.rsplit("-",1)[0]              # mun-zz-pp
+        for key,vv in cv.items(): pvall[key][pk]+=vv
     res={}
     for k in [k for k in tot if tot[k]>=MIN_TOT]:
-        e={"nombre":meta[k]["nombre"],"partido":meta[k]["partido"],"votos":tot[k],"mun":meta[k]["mun"],"scopes":{}}
+        e={"nombre":meta[k]["nombre"],"partido":meta[k]["partido"],"votos":tot[k],"mun":meta[k]["mun"],
+           "pv":dict(pvall[k]),"scopes":{}}
         if municipal:
             mun=meta[k]["mun"]; e["scopes"][mun]=profile(mesas_for(k,votes,valid,age,mun))
         else:
