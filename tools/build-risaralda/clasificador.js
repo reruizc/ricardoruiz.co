@@ -61,6 +61,7 @@ const ALT = [
   'FUERZA ALTERNATIVA REVOLUCIONARIA', // Comunes / FARC
   'PARTIDO COMUNES',
   'UNIDAD DE IZQUIERDA',
+  'ALTERNATIVOS',                   // coalición progresista de Risaralda (Daniel Silva; gob/asamblea/alcaldías/concejos 2019 y 2023). Confirmado por el cliente.
 ];
 
 // Coaliciones locales (>=2000) suelen mezclar miembros. Sólo se clasifican
@@ -70,6 +71,7 @@ const ALT = [
 const ALT_COALICION = [
   'ALIANZA VERDE', 'PACTO HISTORICO', 'POLO DEMOCRATICO',
   'COLOMBIA HUMANA', 'UNION PATRIOTICA', 'ALIANZA DEMOCRATICA AMPLIA',
+  'ALTERNATIVOS',                   // coalición progresista de Risaralda (confirmada por el cliente)
 ];
 
 // codpar: string/num del COD_PAR (para distinguir nacional <2000 vs coalición).
