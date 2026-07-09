@@ -728,6 +728,16 @@
       transition: color .2s;
     }
     .pro-modal-cancel:hover { color: var(--ink); }
+    /* ─── PRODUCTOS POR BARRIO (pago único) ──────────── */
+    .prod-card { display:flex; flex-direction:column; gap:.7rem; }
+    .prod-price { font-family:'Syne',sans-serif; font-weight:800; font-size:1.35rem; color:var(--ink); }
+    .prod-price small { font-family:'DM Mono',monospace; font-weight:400; font-size:.7rem; color:var(--muted); display:block; margin-top:.1rem; }
+    .prod-buy { display:inline-flex; align-items:center; justify-content:center; gap:.45rem;
+      background:var(--accent); color:var(--on-accent); font-family:'Syne',sans-serif; font-weight:700;
+      font-size:.82rem; padding:.7rem 1rem; border-radius:5px; text-decoration:none; border:none; cursor:pointer;
+      transition:background .2s; }
+    .prod-buy:hover { background:var(--ink); color:var(--paper); }
+    .prod-buy.soon { background:transparent; color:var(--muted); border:1px dashed var(--rule-strong); cursor:not-allowed; }
   </style>
 </head>
 <body>
@@ -792,10 +802,20 @@
 
       <div class="notice-box" id="notice-crudos" style="display:none"></div>
 
+      <div class="notice-box" id="notice-barrio" style="display:none">
+        Datasets premium <b>presidenciales 2026 desagregados por BARRIO</b> en las 17 ciudades principales
+        (Bogotá, Medellín, Cali, Barranquilla, Cartagena, Cúcuta, Bucaramanga, Ibagué, Pereira, Villavicencio,
+        Soacha, Santa Marta, Montería, Pasto, Manizales, Soledad, Popayán). Una hoja por ciudad, resultados por
+        barrio y comuna/localidad, más composición por sexo y edad estimada. <b>Pago único por archivo · licencia
+        de uso interno · entrega automática tras el pago.</b> Los datos por sexo y edad son estimaciones
+        metodológicas (ver hoja «Léeme» de cada archivo), no conteos.
+      </div>
+
       <!-- ── TABS ── -->
       <div class="tabs-bar">
         <button class="tab-btn active" onclick="switchTab(event,'generales')">Resultados Declarados · 2026</button>
         <button class="tab-btn" onclick="switchTab(event,'crudos')">Datos crudos · 2010 – 2025</button>
+        <button class="tab-btn" onclick="switchTab(event,'barrio')">Datos por barrio · Premium</button>
       </div>
 
       <!-- ══════════════════════════════════════════ -->
@@ -854,6 +874,20 @@
       <div class="tab-panel" id="tab-crudos">
         <div id="crudos-grid"></div>
       </div><!-- /tab-crudos -->
+
+
+      <!-- ══════════════════════════════════════════ -->
+      <!-- TAB 3: DATOS POR BARRIO · PREMIUM          -->
+      <!-- ══════════════════════════════════════════ -->
+      <div class="tab-panel" id="tab-barrio">
+        <div class="sec-block">
+          <div class="sec-header">
+            <span class="sec-num">$</span>
+            <span class="sec-title">Presidencial 2026 por barrio · 17 ciudades · pago único por archivo</span>
+          </div>
+          <div class="dl-grid" id="grid-barrio"></div>
+        </div>
+      </div><!-- /tab-barrio -->
 
 
     </div><!-- /content-area -->
@@ -956,6 +990,55 @@
         </div>`).join('');
     }
 
+    // ─── PRODUCTOS POR BARRIO (pago único · 850.000 c/u) ──────────────────────
+    // Entrega automática: Wompi -> descarga-entrega.html -> Lambda verifica + firma S3.
+    // ⚠️ Pega aquí las URL de los Links de Pago de Wompi (una por producto, 850.000 COP,
+    //    con URL de redirección = https://ricardoruiz.co/descarga-entrega.html?p=<id>).
+    //    Mientras estén vacías, el botón queda como "Próximamente".
+    const WOMPI_LINKS = {
+      'resultados-1v': '',   // https://checkout.wompi.co/l/XXXXXX
+      'resultados-2v': '',
+      'genero-1v':     '',
+      'genero-2v':     '',
+      'edad-1v':       '',
+      'edad-2v':       '',
+    };
+    const BARRIO_PRODUCTOS = [
+      { id:'resultados-1v', nombre:'Resultados 1ª vuelta · por barrio', mb:'0.32',
+        desc:'Votos de los 13 candidatos por barrio y comuna/localidad, ganador, margen, blanco/nulos, puestos y mesas. Una hoja por ciudad + Resumen.' },
+      { id:'resultados-2v', nombre:'Resultados 2ª vuelta · por barrio', mb:'0.49',
+        desc:'Cepeda vs Abelardo por barrio: votos, %, ganador, margen, comparativo con 2022 y estimación por sexo. Una hoja por ciudad + Resumen.' },
+      { id:'genero-1v', nombre:'Género 1ª vuelta · por barrio', mb:'0.33',
+        desc:'Votos de los 13 candidatos + % de mujeres y hombres del barrio y de cada candidato principal (estimación mesa-EF).' },
+      { id:'genero-2v', nombre:'Género 2ª vuelta · por barrio', mb:'0.32',
+        desc:'Cepeda/Abelardo + % mujeres/hombres del barrio y de cada uno + variación de género respecto a 1ª vuelta.' },
+      { id:'edad-1v', nombre:'Composición etaria 1ª vuelta · por barrio', mb:'0.57',
+        desc:'Votos de los 13 + composición por edad (18-30 / 31-60 / 61+) del barrio y de cada candidato principal.' },
+      { id:'edad-2v', nombre:'Composición etaria 2ª vuelta · por barrio', mb:'0.42',
+        desc:'Cepeda/Abelardo + composición por edad del barrio y de cada uno + cómo cambió el perfil de edad respecto a 1ª vuelta.' },
+    ];
+    function fmtCOP(n) { return n.toLocaleString('es-CO'); }
+    function renderBarrio() {
+      const el = document.getElementById('grid-barrio');
+      if (!el) return;
+      el.innerHTML = BARRIO_PRODUCTOS.map(p => {
+        const link = WOMPI_LINKS[p.id];
+        const btn = link
+          ? `<a class="prod-buy" href="${link}" target="_blank" rel="noopener">Comprar · $${fmtCOP(850000)}</a>`
+          : `<span class="prod-buy soon">Próximamente</span>`;
+        return `
+        <div class="dl-card prod-card">
+          <div class="dl-card-top"><div>
+            <div class="dl-name">${p.nombre}</div>
+            <div class="dl-desc">${p.desc}</div>
+          </div></div>
+          <div class="dl-meta">17 ciudades · Excel (.xlsx) · ${p.mb} MB · licencia de uso interno</div>
+          <div class="prod-price">$${fmtCOP(850000)} <small>COP · pago único · entrega automática</small></div>
+          ${btn}
+        </div>`;
+      }).join('');
+    }
+
     // ─── POPULATE SELECTS ────────────────────────────────────────────────────
     function populateSelect(id, deptos) {
       const sel = document.getElementById(id);
@@ -1001,8 +1084,10 @@
       // Notice contextual
       const nGen = document.getElementById('notice-generales');
       const nCrudos = document.getElementById('notice-crudos');
+      const nBarrio = document.getElementById('notice-barrio');
       if (nGen)    nGen.style.display    = (id === 'generales') ? '' : 'none';
       if (nCrudos) nCrudos.style.display = (id === 'crudos')    ? '' : 'none';
+      if (nBarrio) nBarrio.style.display = (id === 'barrio')    ? '' : 'none';
       // Si entra a "crudos" cerramos el modal Pro (los crudos son B2B, sin gate)
       if (id === 'crudos') closeProModal();
     }
@@ -1551,6 +1636,7 @@
     renderGrid('grid-esc1v', ESC1V, S3_DESCARGAS);
     renderGrid('grid-corp', CORP, S3_DEC);
     renderGrid('grid-circ', CIRC, S3_DEC);
+    renderBarrio();
     populateSelect('sel-dept-gen', DEPTOS_GEN);
     renderCrudos();  // IIFE de auth corre antes (setea _userPlan/_isPremium)
   </script>

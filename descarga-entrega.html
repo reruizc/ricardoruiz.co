@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Tu descarga · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet" />
+  <style>
+    :root { --paper:#14110c; --paper-2:#1d1913; --ink:#f1eee4; --muted:#9a9384;
+            --accent:#d96a50; --green:#4ade80; --rule:rgba(241,238,228,.12); }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:var(--paper); color:var(--ink); font-family:'DM Mono',monospace;
+           min-height:100vh; display:flex; flex-direction:column; align-items:center;
+           justify-content:center; padding:1.5rem; }
+    .card { max-width:560px; width:100%; background:var(--paper-2); border:1px solid var(--rule);
+            border-radius:6px; padding:2.4rem 2.2rem; text-align:center; }
+    .logo { font-family:'Syne',sans-serif; font-weight:800; font-size:.95rem; letter-spacing:.02em;
+            margin-bottom:1.8rem; opacity:.9; }
+    .logo span { color:var(--accent); }
+    .spinner { width:44px; height:44px; border:3px solid var(--rule); border-top-color:var(--accent);
+               border-radius:50%; margin:.5rem auto 1.4rem; animation:spin 1s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .icon { font-size:2.6rem; margin-bottom:1rem; }
+    h1 { font-family:'Fraunces',serif; font-weight:400; font-size:1.6rem; margin-bottom:.7rem; line-height:1.2; }
+    .prod { font-family:'Syne',sans-serif; font-weight:700; color:var(--accent); font-size:1.05rem;
+            margin-bottom:1rem; }
+    p { color:var(--muted); font-size:.9rem; line-height:1.55; margin-bottom:1.3rem; }
+    .btn { display:inline-flex; align-items:center; gap:.5rem; background:var(--accent); color:#14110c;
+           font-family:'Syne',sans-serif; font-weight:700; font-size:.9rem; padding:.85rem 1.5rem;
+           border:none; border-radius:5px; cursor:pointer; text-decoration:none; }
+    .btn:hover { background:var(--ink); }
+    .btn.ghost { background:transparent; color:var(--ink); border:1px solid var(--rule); }
+    .btn.ghost:hover { border-color:var(--ink); background:transparent; }
+    .btns { display:flex; gap:.7rem; justify-content:center; flex-wrap:wrap; }
+    .note { font-size:.72rem; color:var(--muted); margin-top:1.3rem; opacity:.8; }
+    .hidden { display:none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">Ricardo<span>.</span>Ruiz · datos por barrio</div>
+
+    <div id="loading">
+      <div class="spinner"></div>
+      <h1>Confirmando tu pago…</h1>
+      <p>Estamos verificando la transacción con Wompi y preparando tu archivo. Esto toma unos segundos.</p>
+    </div>
+
+    <div id="ok" class="hidden">
+      <div class="icon">✓</div>
+      <h1>¡Listo, tu descarga está lista!</h1>
+      <div class="prod" id="ok-prod"></div>
+      <p>El enlace es de un solo uso y caduca en 10 minutos. Puedes volver a esta página con el mismo
+         correo del pago para descargar de nuevo durante 30 días.</p>
+      <div class="btns">
+        <a class="btn" id="ok-dl" href="#">↓ Descargar Excel</a>
+        <a class="btn ghost" href="descargas.html">Volver a descargas</a>
+      </div>
+      <div class="note">Uso interno con atribución opcional · redistribución comercial bajo acuerdo aparte.</div>
+    </div>
+
+    <div id="err" class="hidden">
+      <div class="icon">⚠️</div>
+      <h1 id="err-title">No pudimos confirmar el pago</h1>
+      <p id="err-msg"></p>
+      <div class="btns">
+        <button class="btn ghost" onclick="verificar()">Reintentar</button>
+        <a class="btn" href="index.html#contacto">Escribir a Ricardo</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = 'https://ciupqm47ki.execute-api.us-east-1.amazonaws.com/entrega';
+
+    const qs = new URLSearchParams(location.search);
+    // Wompi devuelve ?id=<tx>&env=... ; el producto lo fija la URL de redirección del link (?p=...)
+    const PRODUCTO = qs.get('p') || qs.get('producto') || '';
+    const TX = qs.get('id') || qs.get('tx') || qs.get('transaction') || '';
+
+    function show(id) {
+      for (const k of ['loading','ok','err']) document.getElementById(k).classList.toggle('hidden', k !== id);
+    }
+    function fail(title, msg) {
+      document.getElementById('err-title').textContent = title || 'No pudimos confirmar el pago';
+      document.getElementById('err-msg').textContent = msg || 'Intenta de nuevo en un momento.';
+      show('err');
+    }
+
+    async function verificar() {
+      show('loading');
+      if (!PRODUCTO || !TX) { return fail('Faltan datos', 'No llegó la referencia del pago. Si ya pagaste, escríbenos.'); }
+      try {
+        const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'},
+                                     body: JSON.stringify({ producto: PRODUCTO, tx: TX }) });
+        const d = await r.json();
+        if (!d.ok) return fail('No pudimos entregar el archivo', d.error || 'Verifica que el pago haya sido aprobado.');
+        document.getElementById('ok-prod').textContent = d.titulo || '';
+        const a = document.getElementById('ok-dl');
+        a.href = d.url;
+        a.setAttribute('download', d.archivo || '');
+        show('ok');
+        // dispara la descarga automáticamente
+        setTimeout(() => { window.location.href = d.url; }, 600);
+      } catch (e) {
+        fail('Error de conexión', 'No pudimos contactar el servidor. Reintenta en un momento.');
+      }
+    }
+    verificar();
+  </script>
+</body>
+</html>
