@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Validando tu pago · Ricardo Ruiz</title>
+  <meta name="robots" content="noindex,nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <style>
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-medium.woff2') format('woff2'); font-weight:500; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-bold.woff2') format('woff2'); font-weight:600 900; font-style:normal; font-display:swap; }
+
+    :root {
+      --white: #f4f3ef;
+      --blue: #0047FF;
+      --blue-light: #3d6fff;
+      --green: #4ade80;
+      --orange: #f97316;
+      --red: #ff5c5c;
+      --card-border: rgba(255,255,255,0.1);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; }
+    body {
+      background: #060810; color: var(--white);
+      font-family: 'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 1.5rem; text-align: center;
+    }
+    body::before { content:''; position:fixed; inset:0; z-index:-1;
+      background:
+        radial-gradient(1100px 600px at 78% -8%, rgba(0,71,255,0.18), transparent 60%),
+        radial-gradient(900px 500px at 12% 108%, rgba(0,71,255,0.10), transparent 60%),
+        #060810; }
+
+    .logo-link { display:flex; align-items:center; gap:.55rem; text-decoration:none; opacity:.9; margin-bottom:2.2rem; }
+    .logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
+    .logo-bar { width:5px; background:var(--blue); border-radius:1px 1px 0 0; opacity:.85; }
+    .logo-text { font-family:'Syne',sans-serif; font-weight:800; font-size:1.4rem; letter-spacing:-.03em; color:var(--white); line-height:1; }
+    .logo-text span { color:var(--blue); }
+
+    .box { background:rgba(10,10,16,0.8); border:1px solid var(--card-border); backdrop-filter:blur(8px);
+      padding:2.6rem 2.2rem 2.2rem; max-width:460px; width:100%; }
+
+    .spinner { width:46px; height:46px; margin:0 auto 1.4rem; border-radius:50%;
+      border:3px solid rgba(0,71,255,.2); border-top-color:var(--blue); animation:spin 1s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .state-icon { font-size:2.6rem; line-height:1; margin-bottom:1.1rem; display:none; }
+    .state-icon.ok { color:var(--green); }
+    .state-icon.warn { color:var(--orange); }
+    .state-icon.err { color:var(--red); }
+
+    h1 { font-weight:800; font-size:1.45rem; letter-spacing:-.02em; margin-bottom:.6rem; }
+    .sub { font-weight:400; font-size:.9rem; line-height:1.6; color:rgba(255,255,255,.55); margin-bottom:1.4rem; }
+    .sub strong { color:var(--white); font-weight:700; }
+
+    .tx-details { border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.03);
+      padding:.9rem 1.1rem; margin-bottom:1.5rem; display:none; text-align:left; }
+    .tx-row { display:flex; justify-content:space-between; gap:1rem; font-size:.74rem; padding:.25rem 0; }
+    .tx-row .k { color:rgba(255,255,255,.4); letter-spacing:.05em; text-transform:uppercase; font-weight:500; }
+    .tx-row .v { color:rgba(255,255,255,.85); font-weight:500; text-align:right; word-break:break-all; }
+    .tx-row .v.ok { color:var(--green); }
+    .tx-row .v.warn { color:var(--orange); }
+    .tx-row .v.err { color:var(--red); }
+
+    .actions { display:flex; flex-direction:column; gap:.6rem; }
+    .btn { font-weight:700; font-size:.8rem; letter-spacing:.08em; text-transform:uppercase;
+      padding:.75rem 1.2rem; text-decoration:none; cursor:pointer; border:1.5px solid transparent;
+      transition:background .2s,border-color .2s,color .2s; display:none; }
+    .btn-primary { background:var(--blue); color:var(--white); border-color:var(--blue); }
+    .btn-primary:hover { background:#0035cc; border-color:#0035cc; }
+    .btn-ghost { background:none; color:var(--white); border-color:rgba(255,255,255,.28); }
+    .btn-ghost:hover { border-color:var(--white); }
+    .btn-wa { background:#22c55e; color:#04220f; border-color:#22c55e; }
+    .btn-wa:hover { background:#1ba34d; border-color:#1ba34d; }
+
+    .hint { font-size:.7rem; color:rgba(255,255,255,.35); margin-top:1.3rem; line-height:1.6; }
+    .hint a { color:rgba(255,255,255,.55); }
+
+    @media (max-width: 480px) { .box { padding:2rem 1.4rem 1.7rem; } }
+  </style>
+</head>
+<body>
+
+  <a href="index.html" class="logo-link">
+    <div class="logo-bars">
+      <div class="logo-bar" style="height:20px"></div>
+      <div class="logo-bar" style="height:15px"></div>
+      <div class="logo-bar" style="height:9px"></div>
+      <div class="logo-bar" style="height:4px"></div>
+    </div>
+    <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+  </a>
+
+  <div class="box">
+    <div class="spinner" id="spinner"></div>
+    <div class="state-icon ok" id="icon-ok">✓</div>
+    <div class="state-icon warn" id="icon-warn">⏳</div>
+    <div class="state-icon err" id="icon-err">✕</div>
+
+    <h1 id="title">Validando tu pago…</h1>
+    <p class="sub" id="sub">Estamos confirmando la transacción con Wompi y activando tu plan. Esto suele tardar unos segundos, no cierres esta página.</p>
+
+    <div class="tx-details" id="tx-details">
+      <div class="tx-row"><span class="k">Estado</span><span class="v" id="tx-status">—</span></div>
+      <div class="tx-row"><span class="k">Monto</span><span class="v" id="tx-amount">—</span></div>
+      <div class="tx-row"><span class="k">Plan</span><span class="v" id="tx-plan">—</span></div>
+      <div class="tx-row"><span class="k">Referencia</span><span class="v" id="tx-ref" style="font-size:.62rem">—</span></div>
+    </div>
+
+    <div class="actions">
+      <a class="btn btn-primary" id="btn-dashboard" href="dashboard.html">Ir a mi dashboard →</a>
+      <a class="btn btn-ghost" id="btn-retry" href="pricing.html">Volver a planes</a>
+      <a class="btn btn-wa" id="btn-support" href="#" target="_blank" rel="noopener">Escribir a soporte</a>
+    </div>
+
+    <p class="hint" id="hint">Si pagaste y tu plan no se activa en unos minutos, escríbenos por WhatsApp con tu comprobante — lo activamos manualmente.</p>
+  </div>
+
+  <script>
+    // ─── Página de validación post-pago Wompi ─────────────────────────────────
+    // Wompi redirige aquí con ?id=<transaction_id> (y env=test en sandbox).
+    // 1) Consulta el estado de la transacción en la API pública de Wompi.
+    // 2) En paralelo, hace polling a rr-auth /auth/me hasta que el webhook
+    //    active el plan; entonces refresca rr-user en localStorage.
+    // Así el dashboard nunca se abre con el plan viejo en caché.
+
+    const API_AUTH = 'https://rr-auth.reruizc.workers.dev';
+    const qs = new URLSearchParams(location.search);
+    const txId = qs.get('id');
+    const isTest = (qs.get('env') === 'test');
+    const WOMPI_API = isTest ? 'https://sandbox.wompi.co/v1' : 'https://production.wompi.co/v1';
+
+    const pending = JSON.parse(localStorage.getItem('rr-pending-plan') || 'null'); // { planId:'pro_anual', planName, billing }
+    const wantedPlan = pending ? String(pending.planId).split('_')[0] : null;      // 'pro' | 'premium'
+
+    const el = id => document.getElementById(id);
+    function show(...ids){ ids.forEach(i => { const e = el(i); if (e) e.style.display = i.startsWith('btn') ? 'block' : (i==='tx-details' ? 'block' : 'block'); }); }
+    function hide(...ids){ ids.forEach(i => { const e = el(i); if (e) e.style.display = 'none'; }); }
+
+    function waLink(estado) {
+      const ref = pending ? `${pending.planName || pending.planId} (${pending.billing || ''})` : 'mi plan';
+      const msg = `Hola Ricardo, acabo de hacer un pago en Wompi por ${ref} y la página de validación me muestra estado: ${estado}. Transacción: ${txId || 'sin id'}.`;
+      return 'https://wa.me/573243036767?text=' + encodeURIComponent(msg);
+    }
+
+    function fmtCOP(cents) {
+      if (!cents && cents !== 0) return '—';
+      return 'COP $' + (cents/100).toLocaleString('es-CO');
+    }
+
+    function setState(state, tx) {
+      hide('spinner','icon-ok','icon-warn','icon-err','btn-dashboard','btn-retry','btn-support');
+      el('btn-support').href = waLink(state);
+      if (tx) {
+        show('tx-details');
+        const st = el('tx-status');
+        st.textContent = tx.status === 'APPROVED' ? 'Aprobado' : tx.status === 'PENDING' ? 'Pendiente' : tx.status === 'DECLINED' ? 'Rechazado' : (tx.status || '—');
+        st.className = 'v ' + (tx.status === 'APPROVED' ? 'ok' : tx.status === 'PENDING' ? 'warn' : 'err');
+        el('tx-amount').textContent = fmtCOP(tx.amount_in_cents);
+        el('tx-plan').textContent = pending ? `${pending.planName || pending.planId}${pending.billing ? ' · ' + pending.billing : ''}` : '—';
+        el('tx-ref').textContent = tx.reference || txId || '—';
+      } else if (pending) {
+        show('tx-details');
+        el('tx-plan').textContent = `${pending.planName || pending.planId}${pending.billing ? ' · ' + pending.billing : ''}`;
+        if (txId) el('tx-ref').textContent = txId;
+      }
+
+      if (state === 'validando') {
+        show('spinner');
+        el('title').textContent = 'Validando tu pago…';
+        el('sub').innerHTML = 'Estamos confirmando la transacción con Wompi y activando tu plan. Esto suele tardar unos segundos, <strong>no cierres esta página</strong>.';
+      }
+      if (state === 'activando') {
+        show('spinner');
+        el('title').textContent = '¡Pago aprobado! Activando tu plan…';
+        el('sub').innerHTML = 'Wompi confirmó tu pago. Estamos activando tu plan en la cuenta — unos segundos más.';
+      }
+      if (state === 'listo') {
+        show('icon-ok','btn-dashboard');
+        el('title').textContent = '¡Todo listo! Tu plan está activo.';
+        el('sub').innerHTML = 'El pago fue aprobado y tu cuenta ya tiene el plan nuevo. Puedes empezar a usarlo ahora mismo.';
+      }
+      if (state === 'aprobado-sin-cuenta') {
+        show('icon-ok','btn-dashboard','btn-support');
+        el('title').textContent = '¡Pago aprobado!';
+        el('sub').innerHTML = 'Tu pago fue aprobado. Si al entrar al dashboard tu plan aún no aparece activo, dale unos minutos o escríbenos y lo activamos de inmediato.';
+      }
+      if (state === 'pendiente') {
+        show('icon-warn','btn-dashboard','btn-support');
+        el('title').textContent = 'Tu pago está en proceso';
+        el('sub').innerHTML = 'Wompi aún está procesando la transacción (típico con PSE). <strong>Tu plan se activará automáticamente</strong> apenas el banco confirme — puede tardar unos minutos. No necesitas pagar de nuevo.';
+      }
+      if (state === 'rechazado') {
+        show('icon-err','btn-retry','btn-support');
+        el('title').textContent = 'El pago no se completó';
+        el('sub').innerHTML = 'La transacción fue rechazada o anulada. No se hizo ningún cobro — puedes intentarlo de nuevo con otro medio de pago.';
+      }
+      if (state === 'demorado') {
+        show('icon-warn','btn-dashboard','btn-support');
+        el('title').textContent = 'Esto está tardando más de lo normal';
+        el('sub').innerHTML = 'Wompi confirmó el pago pero la activación aún no se refleja. Suele resolverse solo en unos minutos. Si no, escríbenos con tu comprobante y lo activamos manualmente <strong>hoy mismo</strong>.';
+      }
+      if (state === 'sin-datos') {
+        show('icon-warn','btn-retry','btn-support');
+        el('title').textContent = 'No encontramos la transacción';
+        el('sub').innerHTML = 'Llegaste a esta página sin datos de un pago. Si acabas de pagar y ves esto, escríbenos con tu comprobante.';
+      }
+    }
+
+    // ── 1) Estado de la transacción en Wompi (API pública, solo lectura) ──────
+    async function fetchTx() {
+      if (!txId) return null;
+      try {
+        const r = await fetch(`${WOMPI_API}/transactions/${encodeURIComponent(txId)}`);
+        if (!r.ok) return null;
+        const j = await r.json();
+        return j && j.data ? j.data : null;
+      } catch { return null; }
+    }
+
+    // ── 2) Polling a /auth/me hasta que el plan cambie ────────────────────────
+    async function fetchMe() {
+      const token = localStorage.getItem('rr-token');
+      if (!token) return null;
+      try {
+        const r = await fetch(`${API_AUTH}/auth/me`, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!r.ok) return null;
+        const j = await r.json();
+        return j && (j.user || j);
+      } catch { return null; }
+    }
+
+    async function main() {
+      setState('validando');
+
+      // Fase A: estado Wompi (reintenta si PENDING, ~1 min)
+      let tx = null;
+      for (let i = 0; i < 15; i++) {
+        tx = await fetchTx();
+        if (!tx) break;                          // sin id o API caída → seguimos con /auth/me
+        if (tx.status === 'APPROVED') break;
+        if (tx.status === 'DECLINED' || tx.status === 'VOIDED' || tx.status === 'ERROR') {
+          setState('rechazado', tx);
+          return;
+        }
+        setState('validando', tx);               // PENDING → espera 4s y reintenta
+        await new Promise(r => setTimeout(r, 4000));
+      }
+
+      if (tx && tx.status === 'PENDING') { setState('pendiente', tx); return; }
+      if (!tx && !txId && !pending) { setState('sin-datos'); return; }
+
+      // Fase B: pago aprobado (o sin tx legible) → esperar activación del plan
+      if (tx && tx.status === 'APPROVED') setState('activando', tx);
+
+      const token = localStorage.getItem('rr-token');
+      if (!token) { setState(tx ? 'aprobado-sin-cuenta' : 'sin-datos', tx); return; }
+
+      for (let i = 0; i < 36; i++) {             // ~3 minutos
+        const user = await fetchMe();
+        if (user && user.plan) {
+          const activated = wantedPlan ? (user.plan === wantedPlan || user.plan === 'full') : (user.plan !== 'free' && user.plan !== 'basic');
+          if (activated) {
+            localStorage.setItem('rr-user', JSON.stringify(user));   // refresca el caché → el dashboard abre con el plan nuevo
+            localStorage.removeItem('rr-pending-plan');
+            localStorage.removeItem('rr-desired-plan');
+            setState('listo', tx);
+            return;
+          }
+        }
+        await new Promise(r => setTimeout(r, 5000));
+      }
+      setState('demorado', tx);
+    }
+
+    // Expuesto para depurar estados: window.__setState('listo')
+    window.__setState = setState;
+    main();
+  </script>
+</body>
+</html>
