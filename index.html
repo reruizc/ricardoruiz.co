@@ -4,1143 +4,382 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title id="pageTitle">Ricardo Ruiz — Consultor en Datos y Decisiones Públicas</title>
+  <meta name="description" content="Convertimos información compleja en decisiones y políticas claras, estratégicas y con impacto real en entidades, empresas y territorios." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&family=Fraunces:opsz,wght@9..144,300;9..144,400&family=Inter:wght@400;600;700&family=Playfair+Display:wght@600;700;800&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
   <style>
+    /* Helvetica Neue embebida (familia completa). El logo va aparte en Syne. */
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-thin.woff2') format('woff2'); font-weight:200; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-light.woff2') format('woff2'); font-weight:300; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-medium.woff2') format('woff2'); font-weight:500; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-bold.woff2') format('woff2'); font-weight:600 900; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-italic.woff2') format('woff2'); font-weight:400; font-style:italic; font-display:swap; }
+
     :root {
-      --black: #0a0a0a;
-      --white: #e6ded3;
+      --white: #f4f3ef;
       --blue: #0047FF;
       --blue-light: #3d6fff;
-      --gray: #888;
-      --gray-light: #e0dfd9;
+      --green: #22c55e;
+      --orange: #f97316;
+      --card-bg: rgba(10,10,16,0.75);
+      --card-border: rgba(255,255,255,0.07);
+      --gap: 6px;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    html { scroll-behavior: smooth; }
-
+    html, body { min-height: 100%; overflow-x: hidden; }
     body {
-      background: var(--white);
-      color: var(--black);
-      font-family: 'Fraunces', serif;
-      overflow-x: hidden;
-      cursor: none;
+      background: #060810; color: var(--white);
+      font-family: 'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;
+      cursor: none; display: flex; flex-direction: column; min-height: 100vh;
     }
 
-    /* CUSTOM CURSOR */
-    .cursor {
-      position: fixed;
-      width: 12px; height: 12px;
-      background: var(--blue);
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 9999;
-      transition: transform 0.15s ease, width 0.2s, height 0.2s, background 0.2s;
-      transform: translate(-50%, -50%);
-    }
-    .cursor-ring {
-      position: fixed;
-      width: 36px; height: 36px;
-      border: 1.5px solid var(--blue);
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 9998;
-      transition: transform 0.35s ease, width 0.3s, height 0.3s, opacity 0.3s;
-      transform: translate(-50%, -50%);
-      opacity: 0.5;
-    }
-    body:hover .cursor { opacity: 1; }
+    /* ── FONDO ── */
+    .bg-layer { position: fixed; inset: 0; z-index: 0;
+      background:
+        radial-gradient(1100px 600px at 78% -8%, rgba(0,71,255,0.18), transparent 60%),
+        radial-gradient(900px 500px at 12% 108%, rgba(0,71,255,0.10), transparent 60%),
+        #060810;
+      pointer-events: none; }
+    .shell { position: relative; z-index: 1; display: flex; flex-direction: column; flex: 1 0 auto; }
 
-    /* NAV */
-    nav {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: .9rem 2.5rem;
-      z-index: 100;
-      mix-blend-mode: normal;
-      background: rgba(230,222,211,0.85);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid rgba(0,0,0,0.07);
-    }
+    /* ── CURSOR ── */
+    .cursor { position: fixed; width: 10px; height: 10px; background: var(--blue); border-radius: 50%;
+      pointer-events: none; z-index: 100000; transform: translate(-50%,-50%); transition: transform .15s, background .2s, border .2s; }
+    .cursor-ring { position: fixed; width: 34px; height: 34px; border: 1px solid rgba(0,71,255,.5); border-radius: 50%;
+      pointer-events: none; z-index: 99999; transform: translate(-50%,-50%); opacity: .5; }
 
-    .nav-logo-wrap {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      text-decoration: none;
-    }
+    /* ── NAV (misma barra de electoral) ── */
+    .electoral-nav{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(4,6,16,.6);backdrop-filter:blur(8px);flex-shrink:0}
+    .e-nav-left{display:flex;align-items:center;gap:1rem;min-width:0}
+    .e-nav-right{display:flex;align-items:center;gap:1.2rem;flex-shrink:0}
+    .electoral-nav-auth{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
+    .e-btn-login{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-decoration:none;background:var(--orange);border:1.5px solid var(--orange);padding:.35rem .8rem;transition:background .2s,border-color .2s;cursor:none;white-space:nowrap}
+    .e-btn-login:hover{background:#ea6d0d;border-color:#ea6d0d}
+    .e-btn-profile{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-decoration:none;background:var(--orange);border:1.5px solid var(--orange);padding:.35rem .8rem;transition:background .2s,border-color .2s;cursor:none;white-space:nowrap}
+    .e-btn-profile:hover{background:#ea6d0d;border-color:#ea6d0d}
+    .e-btn-register{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-decoration:none;background:var(--blue);border:1.5px solid var(--blue);padding:.35rem .8rem;white-space:nowrap}
+    .e-btn-register:hover{background:#0035cc;border-color:#0035cc}
+    .e-user-plan{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.69rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue);background:rgba(0,71,255,.12);padding:.2rem .6rem;text-decoration:none;white-space:nowrap}
+    .e-btn-logout{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.25);background:none;border:none;cursor:none;padding:0;white-space:nowrap}
+    .e-btn-logout:hover{color:rgba(255,255,255,.6)}
+    .e-btn-planes{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:#4ade80;text-decoration:none;border:1.5px solid rgba(74,222,128,.4);padding:.3rem .8rem;transition:color .2s,border-color .2s,background .2s;flex-shrink:0;white-space:nowrap;cursor:none}
+    .e-btn-planes:hover{color:#060810;background:#4ade80;border-color:#4ade80}
+    .country-selector-wrap{position:relative}
+    .country-btn{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-weight:500;font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.45);background:none;border:1px solid rgba(255,255,255,.15);padding:.3rem .65rem;cursor:none;display:flex;align-items:center;transition:border-color .2s,color .2s;white-space:nowrap}
+    .country-btn:hover,.country-btn.open{border-color:rgba(255,255,255,.35);color:rgba(255,255,255,.7)}
+    .country-btn.open #countryChevron{transform:rotate(180deg)}
+    .country-dropdown{position:absolute;top:calc(100% + 8px);right:0;background:#0e1220;border:1px solid rgba(255,255,255,.12);min-width:200px;display:none;flex-direction:column;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+    .country-dropdown.open{display:flex}
+    .country-option{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-weight:500;font-size:.68rem;letter-spacing:.04em;padding:.65rem 1rem;cursor:none;display:flex;align-items:center;gap:.5rem;color:rgba(255,255,255,.5);border-bottom:1px solid rgba(255,255,255,.07);transition:background .15s;user-select:none}
+    .country-option:last-child{border-bottom:none}
+    .country-option:hover{background:rgba(255,255,255,.05);color:rgba(255,255,255,.8)}
+    .country-option.selected{color:var(--blue)}
+    .country-check{font-size:.6rem;width:12px;opacity:0;color:var(--blue)}
+    .country-option.selected .country-check{opacity:1}
+    .logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.85;transition:opacity .2s;flex-shrink:0;cursor:none}
+    .logo-link:hover{opacity:1}
+    .logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px}
+    .logo-bar{width:5px;background:var(--blue);border-radius:1px 1px 0 0;opacity:.85}
+    .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.1rem,2vw,1.8rem);letter-spacing:-.03em;color:var(--white);line-height:1}
+    .logo-text span{color:var(--blue)}
 
-    .nav-logo {
-      font-family: 'Syne', sans-serif;
-      font-weight: 800;
-      font-size: clamp(1.1rem,2vw,1.8rem);
-      letter-spacing: -0.03em;
-      color: var(--black);
-      text-decoration: none;
-      line-height: 1;
-    }
-    .nav-logo span { color: var(--blue); }
+    /* ── HUB (título + pestañas + paneles) ── */
+    .hub { padding: 1.6rem 2.5rem 0; flex: 1 0 auto; display: flex; flex-direction: column; }
+    .hub-eyebrow { font-weight: 500; font-size: .72rem; letter-spacing: .22em; text-transform: uppercase; color: rgba(255,255,255,.42); margin-bottom: .5rem; }
+    .hub-tabs { display: flex; align-items: flex-end; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 1.1rem; }
+    .hub-tab { font-family: 'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif; font-weight: 500; font-size: 1.01rem; letter-spacing: .16em;
+      text-transform: uppercase; color: rgba(255,255,255,0.38); padding: .5rem 1.5rem .65rem; cursor: none;
+      position: relative; border: none; background: none; transition: color .2s; user-select: none; }
+    .hub-tab:first-child { padding-left: 0; }
+    .hub-tab::after { content:''; position:absolute; bottom:-1px; left:0; right:0; height:2.5px; background:var(--blue); transform:scaleX(0); transition:transform .25s ease; }
+    .hub-tab:first-child::after { left:0; right:1.5rem; }
+    .hub-tab:hover { color: rgba(255,255,255,.7); }
+    .hub-tab.active { color: var(--white); font-weight: 700; }
+    .hub-tab.active::after { transform: scaleX(1); }
 
-    .nav-bars {
-      display: flex;
-      align-items: flex-end;
-      gap: 3px;
-      height: 18px;
-    }
-    .nav-bar {
-      width: 5px;
-      background: var(--blue);
-      border-radius: 1px 1px 0 0;
-      opacity: 0.85;
-    }
+    .hub-panels { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding-bottom: 1.6rem; }
+    .panel { display: none; opacity: 0; transform: translateY(10px); transition: opacity .35s ease, transform .35s ease; }
+    .panel.active { opacity: 1; transform: translateY(0); flex: 1 1 auto; min-height: 0; }
 
-    nav ul {
-      list-style: none;
-      display: flex;
-      gap: 2.5rem;
-      align-items: center;
+    /* ── CARD base ── */
+    .card {
+      position: relative; background: var(--card-bg); border: 1px solid var(--card-border);
+      overflow: hidden; cursor: none; transition: border-color .25s, transform .2s;
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+      display: flex; flex-direction: column; justify-content: flex-end; min-height: 150px; text-decoration: none;
     }
-    nav ul li {
-      display: flex;
-      align-items: center;
-    }
-    nav ul a {
-      font-family: 'Syne', sans-serif;
-      font-size: 0.75rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--black);
-      text-decoration: none;
-      transition: color 0.2s;
-    }
-    nav ul a:hover { color: var(--blue); }
+    .card:hover { border-color: rgba(0,71,255,0.6); transform: scale(1.012); z-index: 3; }
+    .card-glow { position:absolute; inset:0; background:linear-gradient(135deg,rgba(0,71,255,0.15) 0%,transparent 60%); opacity:0; transition:opacity .3s; pointer-events:none; }
+    .card:hover .card-glow { opacity: 1; }
+    .card-label { position:relative; z-index:1; padding:.7rem .9rem .85rem; background:linear-gradient(to top,rgba(0,0,0,0.82) 0%,rgba(0,0,0,0.12) 100%); }
+    .card-name { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-weight:700; font-size:clamp(.85rem,1.5vw,1.15rem); letter-spacing:.02em; text-transform:uppercase; color:var(--white); line-height:1.15; transition:color .2s; }
+    .card-sub { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-weight:400; font-size:.78rem; letter-spacing:.01em; color:rgba(255,255,255,.5); margin-top:.28rem; line-height:1.3; }
+    .card:hover .card-name { color: var(--blue-light); }
+    .card-arrow { position:absolute; top:.75rem; right:.85rem; z-index:1; font-size:1rem; color:rgba(255,255,255,.35); transition:color .2s, transform .2s; }
+    .card:hover .card-arrow { color: var(--white); transform: translate(2px,-2px); }
 
-    .nav-user {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-    .nav-user-name {
-      font-family: 'Syne', sans-serif;
-      font-size: 0.72rem;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--black);
-      text-decoration: none;
-      transition: color 0.2s;
-    }
-    .nav-user-name:hover { color: var(--blue); }
-    .nav-user-plan {
-      font-family: 'Syne', sans-serif;
-      font-size: 0.6rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--blue);
-      background: rgba(0,71,255,0.08);
-      padding: 0.2rem 0.6rem;
-      text-decoration: none;
-      transition: background 0.2s;
-    }
-    .nav-user-plan:hover { background: rgba(0,71,255,0.18); }
-    .nav-logout {
-      font-family: 'Syne', sans-serif;
-      font-size: 0.7rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--gray);
-      text-decoration: none;
-      border: 1.5px solid transparent;
-      padding: 0.4rem 0.85rem;
-      cursor: none;
-      background: none;
-      transition: color 0.2s, border-color 0.2s;
-    }
-    .nav-logout:hover { color: var(--black); border-color: var(--gray-light); }
+    /* Accent variants */
+    .card-perfil { background:linear-gradient(150deg, rgba(0,71,255,0.16), rgba(10,10,16,0.8)); }
+    .card-perfil .card-glow { background:linear-gradient(135deg,rgba(0,71,255,0.3) 0%,transparent 70%); }
+    .card-contacto { background:linear-gradient(150deg, rgba(249,115,22,0.16), rgba(10,10,16,0.8)); }
+    .card-contacto:hover { border-color: rgba(249,115,22,0.7); }
+    .card-contacto:hover .card-name { color:#ffb37a; }
+    .card-contacto .card-glow { background:linear-gradient(135deg,rgba(249,115,22,0.22) 0%,transparent 70%); }
+    .card-noticias { background:linear-gradient(150deg, rgba(34,197,94,0.15), rgba(10,10,16,0.8)); }
+    .card-noticias:hover { border-color: rgba(34,197,94,0.7); }
+    .card-noticias:hover .card-name { color:#7ee2a6; }
+    .card-noticias .card-glow { background:linear-gradient(135deg,rgba(34,197,94,0.2) 0%,transparent 70%); }
 
-    .nav-noticias {
-      font-family: 'Syne', sans-serif;
-      font-size: 0.75rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: #0a0a0a;
-      text-decoration: none;
-      background: #4ade80;
-      border: 1.5px solid #4ade80;
-      padding: 0.4rem 0.85rem;
-      transition: background 0.2s, border-color 0.2s, color 0.2s;
-    }
-    .nav-noticias:hover { background: #22c55e; border-color: #22c55e; }
+    /* ── PANEL INICIO ── */
+    .pan-inicio.active { display:grid; grid-template-columns:1.5fr 1fr; grid-auto-rows:minmax(160px,1fr); gap:var(--gap); }
+    .card-hero { grid-column:1; grid-row:1 / span 2; justify-content:center; padding:2.2rem 2.4rem;
+      background:linear-gradient(140deg, rgba(0,71,255,0.28) 0%, rgba(6,10,26,0.9) 62%); border-color:rgba(0,71,255,0.32); cursor:default; }
+    .card-hero:hover { transform:none; border-color:rgba(0,71,255,0.42); }
+    .card-perfil { grid-column:2; grid-row:1; }
+    .card-contacto { grid-column:2; grid-row:2; }
+    .card-noticias { grid-column:1 / -1; grid-row:3; min-height:120px; }
 
-    .nav-planes {
-      font-family: 'Syne', sans-serif;
-      font-size: 0.75rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--black);
-      text-decoration: none;
-      border: 1.5px solid transparent;
-      padding: 0.4rem 0.85rem;
-      transition: color 0.2s, border-color 0.2s;
-    }
-    .nav-planes:hover { color: var(--blue); border-color: var(--blue); }
+    .hero-statement { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-weight:800;
+      font-size:clamp(2rem, 4.2vw, 3.6rem); line-height:1.02; letter-spacing:-.03em; color:var(--white); }
+    .hero-accent { color: var(--blue-light); }
+    #word-verb, #word-noun { display:inline-block; transition:opacity .35s ease, transform .35s ease; }
+    #word-verb.fading, #word-noun.fading { opacity:0; transform:translateY(-8px); }
+    .hero-sub { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-weight:400;
+      font-size:clamp(.9rem,1.2vw,1.05rem); line-height:1.55; color:rgba(255,255,255,.62); margin-top:1.1rem; max-width:44ch; }
+    .hero-cta-row { margin-top:1.5rem; display:flex; gap:.8rem; flex-wrap:wrap; }
+    .hero-cta { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-weight:700; font-size:.8rem;
+      letter-spacing:.08em; text-transform:uppercase; padding:.55rem 1.1rem; cursor:none; text-decoration:none; transition:background .2s,color .2s,border-color .2s; }
+    .hero-cta.primary { background:var(--blue); color:var(--white); border:1.5px solid var(--blue); }
+    .hero-cta.primary:hover { background:#0035cc; border-color:#0035cc; }
+    .hero-cta.ghost { background:none; color:var(--white); border:1.5px solid rgba(255,255,255,.28); }
+    .hero-cta.ghost:hover { border-color:var(--white); }
 
-    /* BOTONES AUTH */
-    .nav-auth {
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-    }
-    .nav-login {
-      font-family: 'Syne', sans-serif;
-      font-size: 0.75rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--black);
-      text-decoration: none;
-      border: 1.5px solid transparent;
-      padding: 0.4rem 0.85rem;
-      transition: color 0.2s, border-color 0.2s;
-    }
-    .nav-login:hover { color: var(--blue); border-color: var(--blue); }
+    /* ── PANEL PROYECTOS ── */
+    .pan-proyectos.active { display:flex; flex-direction:column; }
+    .proj-grid { display:grid; grid-template-columns:repeat(3,1fr); grid-auto-rows:minmax(165px,1fr); gap:var(--gap); flex:1 1 auto; }
+    .proj-card { position:relative; background:var(--card-bg); border:1px solid var(--card-border); overflow:hidden;
+      cursor:none; transition:border-color .25s, transform .2s; backdrop-filter:blur(6px); display:flex; flex-direction:column; justify-content:space-between; padding:1.1rem 1.15rem; text-decoration:none; }
+    .proj-card.clickable:hover { border-color:rgba(0,71,255,0.6); transform:scale(1.012); z-index:3; }
+    .proj-card.clickable:hover .proj-name { color:var(--blue-light); }
+    .proj-year { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-weight:700; font-size:.7rem; letter-spacing:.14em; color:var(--blue-light); }
+    .proj-name { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-weight:700; font-size:1.02rem; letter-spacing:.01em; color:var(--white); line-height:1.2; margin-top:.5rem; transition:color .2s; }
+    .proj-org { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-weight:400; font-size:.74rem; color:rgba(255,255,255,.45); margin-top:.35rem; }
+    .proj-foot { display:flex; align-items:center; justify-content:space-between; margin-top:1rem; }
+    .proj-tag { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-weight:500; font-size:.64rem; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,.5); border:1px solid rgba(255,255,255,.14); padding:.2rem .5rem; }
+    .proj-arrow { font-size:1rem; color:rgba(255,255,255,.4); }
+    .proj-card.soon { opacity:.72; }
+    .proj-card.soon .proj-year { color:#e6cf3a; }
+    .proj-card.soon .proj-arrow { color:rgba(255,255,255,.15); }
 
-    .nav-register {
-      font-family: 'Syne', sans-serif;
-      font-size: 0.75rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--white);
-      text-decoration: none;
-      background: var(--blue);
-      border: 1.5px solid var(--blue);
-      padding: 0.4rem 0.85rem;
-      transition: background 0.2s, border-color 0.2s;
-    }
-    .nav-register:hover { background: var(--black); border-color: var(--black); }
+    /* ── PANEL SERVICIOS ── */
+    .pan-servicios.active { display:flex; flex-direction:column; }
+    .svc-grid { display:grid; grid-template-columns:1fr 1fr; grid-auto-rows:1fr; gap:var(--gap); flex:1 1 auto; }
+    .svc-card { position:relative; background:var(--card-bg); border:1px solid var(--card-border); overflow:hidden;
+      transition:border-color .25s, transform .2s; backdrop-filter:blur(6px); display:flex; flex-direction:column; padding:1.6rem 1.7rem; cursor:none; }
+    .svc-card:hover { border-color:rgba(0,71,255,0.45); }
+    .svc-num { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-weight:700; font-size:.78rem; letter-spacing:.12em; color:var(--blue-light); margin-bottom:.65rem; }
+    .svc-title { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-weight:700; font-size:1.22rem; letter-spacing:-.01em; color:var(--white); line-height:1.15; margin-bottom:.65rem; }
+    .svc-desc { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-weight:400; font-size:.85rem; line-height:1.55; color:rgba(255,255,255,.55); }
 
-    /* BOTÓN APÓYANOS */
-    .nav-apoyo {
-      background: var(--blue) !important;
-      color: var(--white) !important;
-      padding: 0.4rem 1rem !important;
-      border: 1.5px solid var(--blue);
-      transition: background 0.2s, border-color 0.2s !important;
-    }
-    .nav-apoyo:hover {
-      background: var(--black) !important;
-      border-color: var(--black) !important;
-      color: var(--white) !important;
-    }
+    /* ── FOOTER ── */
+    .hub-footer { flex-shrink:0; border-top:1px solid rgba(255,255,255,0.07); padding:.7rem 2.5rem; display:flex; align-items:center; justify-content:flex-end; }
+    .footer-brand { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-weight:500; font-size:.72rem; letter-spacing:.06em; color:rgba(255,255,255,0.28); }
 
-    /* HERO */
-    #hero {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
-      padding: 0 3rem 5rem;
-      position: relative;
-      overflow: hidden;
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      body { cursor:auto; }
+      .cursor,.cursor-ring { display:none; }
+      .hub { padding:1.2rem 1.1rem 0; }
+      .hub-footer { padding:.7rem 1.1rem; }
+      .hub-panels { display:block; }
+      .panel.active { flex:none; }
+      .proj-grid, .svc-grid { height:auto; }
+      .proj-grid { grid-auto-rows:minmax(150px,auto); }
+      .svc-grid { grid-auto-rows:auto; }
+      .pan-inicio.active { grid-template-columns:1fr; grid-auto-rows:auto; }
+      .card, .card-noticias { min-height:130px; }
+      .card-hero { grid-column:auto; grid-row:auto; padding:1.8rem 1.4rem; }
+      .card-perfil,.card-contacto,.card-noticias { grid-column:auto; grid-row:auto; }
+      .proj-grid { grid-template-columns:1fr 1fr; }
+      .svc-grid { grid-template-columns:1fr; }
+      .hub-tab { font-size:.9rem; letter-spacing:.1em; padding:.5rem 1rem .6rem; }
+      /* Nav en móvil: logo centrado línea 1, planes+auth línea 2 (igual que electoral) */
+      .electoral-nav { flex-direction: column; align-items: stretch; padding: .6rem 1.1rem; gap: .5rem; }
+      .e-nav-right { order: 1; width: 100%; position: relative; justify-content: center; gap: .8rem; margin: 0; min-height: 26px; }
+      .e-nav-left { order: 2; width: 100%; justify-content: center; gap: .6rem; flex-wrap: wrap; row-gap: .45rem; }
+      .country-selector-wrap { position: absolute; left: 0; top: 50%; transform: translateY(-50%); }
+      .electoral-nav-auth { gap: .5rem; flex-wrap: wrap; justify-content: center; }
+      .e-btn-planes, .e-btn-login, .e-btn-register, .e-btn-profile, .e-btn-logout { font-size: .68rem; letter-spacing: .06em; }
+      .e-btn-login, .e-btn-register, .e-btn-profile { padding: .3rem .55rem; }
+      .e-btn-planes { padding: .28rem .55rem; }
+      .e-user-plan { font-size: .6rem; padding: .15rem .45rem; }
+      .country-btn { font-size: .54rem; padding: .24rem .46rem; letter-spacing: .05em; }
+      .country-dropdown { right: auto; left: 0; }
+      .logo-text { font-size: clamp(.7rem, 3.3vw, .9rem); }
+      .logo-bars { height: 11px; }
+      .logo-bar { width: 2.5px; }
     }
-
-    .hero-bg-number {
-      position: absolute;
-      top: 50%;
-      right: -2rem;
-      transform: translateY(-50%);
-      font-family: 'Syne', sans-serif;
-      font-weight: 800;
-      font-size: clamp(200px, 30vw, 420px);
-      color: transparent;
-      -webkit-text-stroke: 1px rgba(0,71,255,0.08);
-      line-height: 1;
-      user-select: none;
-      pointer-events: none;
+    @media (max-width: 560px) {
+      .proj-grid { grid-template-columns:1fr; }
+      .hero-statement { font-size: clamp(1.7rem, 8vw, 2.4rem); }
     }
-
-    .hero-tag {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.72rem;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: var(--blue);
-      margin-bottom: 1.5rem;
-      opacity: 0;
-      transform: translateY(20px);
-      animation: fadeUp 0.8s ease forwards 0.3s;
+    @media (max-width: 360px) {
+      .electoral-nav { padding-left: .8rem; padding-right: .8rem; }
+      .country-btn { font-size: .52rem; padding: .22rem .42rem; letter-spacing: .06em; }
+      .logo-text { font-size: 9.5px; }
+      .logo-bars { height: 10px; }
+      .logo-bar { width: 2.5px; }
     }
-
-    .hero-title {
-      font-family: 'Syne', sans-serif;
-      font-weight: 800;
-      font-size: clamp(3rem, 8vw, 8rem);
-      line-height: 0.95;
-      letter-spacing: -0.03em;
-      max-width: 900px;
-      opacity: 0;
-      transform: translateY(30px);
-      animation: fadeUp 0.9s ease forwards 0.5s;
-    }
-
-    .hero-sub {
-      margin-top: 2rem;
-      max-width: 480px;
-      font-family: 'Fraunces', serif;
-      font-weight: 300;
-      font-size: 1.15rem;
-      line-height: 1.6;
-      color: #444;
-      opacity: 0;
-      transform: translateY(20px);
-      animation: fadeUp 0.9s ease forwards 0.7s;
-    }
-
-    .hero-cta {
-      margin-top: 2.5rem;
-      display: flex;
-      gap: 1rem;
-      align-items: center;
-      opacity: 0;
-      transform: translateY(20px);
-      animation: fadeUp 0.9s ease forwards 0.9s;
-    }
-
-    .btn-primary {
-      background: var(--black);
-      color: var(--white);
-      padding: 0.9rem 2rem;
-      font-family: 'DM Mono', monospace;
-      font-size: 0.8rem;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      text-decoration: none;
-      border: 2px solid var(--black);
-      transition: background 0.25s, color 0.25s;
-    }
-    .btn-primary:hover { background: var(--blue); border-color: var(--blue); }
-
-    .btn-secondary {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.8rem;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--black);
-      text-decoration: none;
-      border-bottom: 1.5px solid var(--black);
-      padding-bottom: 2px;
-      transition: color 0.2s, border-color 0.2s;
-    }
-    .btn-secondary:hover { color: var(--blue); border-color: var(--blue); }
-
-    .hero-scroll {
-      position: absolute;
-      bottom: 2.5rem;
-      right: 3rem;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.5rem;
-      opacity: 0;
-      animation: fadeUp 1s ease forwards 1.2s;
-    }
-    .hero-scroll span {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.65rem;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      writing-mode: vertical-rl;
-      color: var(--gray);
-    }
-    .scroll-line {
-      width: 1px;
-      height: 60px;
-      background: linear-gradient(to bottom, var(--blue), transparent);
-      animation: scrollLine 1.5s ease infinite 1.5s;
-    }
-
-    /* SECTIONS SHARED */
-    section { padding: 8rem 3rem; }
-
-    .section-label {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.7rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--blue);
-      margin-bottom: 1rem;
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-    }
-    .section-label::after {
-      content: '';
-      display: block;
-      width: 40px;
-      height: 1px;
-      background: var(--blue);
-    }
-
-    .section-title {
-      font-family: 'Syne', sans-serif;
-      font-weight: 800;
-      font-size: clamp(2.2rem, 5vw, 4.5rem);
-      line-height: 1;
-      letter-spacing: -0.03em;
-      margin-bottom: 3rem;
-    }
-
-    /* SERVICIOS */
-    #servicios {
-      background: var(--black);
-      color: var(--white);
-    }
-    #servicios .section-label { color: var(--blue-light); }
-    #servicios .section-label::after { background: var(--blue-light); }
-
-    .services-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 1px;
-      background: #222;
-      border: 1px solid #222;
-      margin-top: 1rem;
-    }
-
-    .service-card {
-      background: var(--black);
-      padding: 2.5rem 2rem;
-      position: relative;
-      overflow: hidden;
-      transition: background 0.3s;
-    }
-    .service-card:hover { background: #111; }
-    .service-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0;
-      width: 3px;
-      height: 0;
-      background: var(--blue);
-      transition: height 0.4s ease;
-    }
-    .service-card:hover::before { height: 100%; }
-
-    .service-num {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.65rem;
-      letter-spacing: 0.15em;
-      color: var(--blue-light);
-      margin-bottom: 1.5rem;
-    }
-
-    .service-title {
-      font-family: 'Syne', sans-serif;
-      font-weight: 700;
-      font-size: 1.4rem;
-      margin-bottom: 1rem;
-      line-height: 1.15;
-    }
-
-    .service-desc {
-      font-family: 'Fraunces', serif;
-      font-weight: 300;
-      font-size: 0.95rem;
-      line-height: 1.7;
-      color: #aaa;
-    }
-
-    /* PROYECTOS */
-    #proyectos { background: var(--white); }
-
-    .projects-list { display: flex; flex-direction: column; gap: 0; }
-
-    .project-item {
-      display: grid;
-      grid-template-columns: 80px 1fr auto;
-      align-items: center;
-      gap: 2rem;
-      padding: 2rem 0;
-      border-bottom: 1px solid var(--gray-light);
-      cursor: pointer;
-      transition: padding-left 0.3s;
-    }
-    .project-item:first-child { border-top: 1px solid var(--gray-light); }
-    .project-item:hover { padding-left: 1rem; }
-    .project-item:hover .project-arrow { color: var(--blue); transform: translate(4px, -4px); }
-
-    .project-year {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.72rem;
-      color: var(--gray);
-      letter-spacing: 0.05em;
-    }
-
-    .project-name {
-      font-family: 'Syne', sans-serif;
-      font-weight: 700;
-      font-size: clamp(1.2rem, 2.5vw, 2rem);
-      letter-spacing: -0.02em;
-    }
-
-    .project-tag {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.65rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--blue);
-      background: rgba(0,71,255,0.08);
-      padding: 0.3rem 0.7rem;
-    }
-
-    .project-arrow {
-      font-size: 1.2rem;
-      transition: transform 0.25s, color 0.25s;
-      color: var(--gray);
-    }
-
-    /* PORTAL / DASHBOARD */
-    #portal {
-      background: #0a0a0a;
-      color: var(--white);
-    }
-    #portal .section-label { color: var(--blue-light); }
-    #portal .section-label::after { background: var(--blue-light); }
-
-    .dashboard-grid {
-      display: grid;
-      grid-template-columns: repeat(12, 1fr);
-      gap: 1rem;
-      margin-top: 2rem;
-    }
-
-    .dash-card {
-      background: #111;
-      border: 1px solid #1e1e1e;
-      padding: 1.5rem;
-      position: relative;
-      overflow: hidden;
-    }
-    .dash-card.col-4 { grid-column: span 4; }
-    .dash-card.col-8 { grid-column: span 8; }
-    .dash-card.col-6 { grid-column: span 6; }
-    .dash-card.col-12 { grid-column: span 12; }
-
-    .dash-label {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.65rem;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: #555;
-      margin-bottom: 0.75rem;
-    }
-
-    .dash-value {
-      font-family: 'Syne', sans-serif;
-      font-weight: 800;
-      font-size: 2.8rem;
-      letter-spacing: -0.04em;
-      line-height: 1;
-    }
-    .dash-value .unit {
-      font-size: 1rem;
-      font-weight: 400;
-      color: #555;
-      margin-left: 0.25rem;
-    }
-
-    .dash-delta {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.72rem;
-      margin-top: 0.4rem;
-      color: #00d68f;
-    }
-
-    .dash-accent { color: var(--blue); }
-
-    .kpi-bar {
-      margin-top: 1rem;
-      height: 3px;
-      background: #1e1e1e;
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .kpi-bar-fill {
-      height: 100%;
-      background: var(--blue);
-      border-radius: 2px;
-      transition: width 1.5s ease;
-    }
-
-    .chart-wrapper { height: 220px; position: relative; }
-
-    /* CONTACTO */
-    #contacto {
-      background: var(--white);
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6rem;
-      align-items: start;
-    }
-
-    .contact-title {
-      font-family: 'Syne', sans-serif;
-      font-weight: 800;
-      font-size: clamp(2.5rem, 5vw, 5rem);
-      letter-spacing: -0.04em;
-      line-height: 0.95;
-    }
-    .contact-title em {
-      font-style: italic;
-      font-family: 'Fraunces', serif;
-      font-weight: 300;
-      color: var(--blue);
-    }
-
-    .contact-info { margin-top: 2rem; }
-    .contact-info p {
-      font-family: 'Fraunces', serif;
-      font-weight: 300;
-      font-size: 1rem;
-      line-height: 1.7;
-      color: #555;
-      margin-bottom: 1.5rem;
-    }
-    .contact-email {
-      font-family: 'Syne', sans-serif;
-      font-weight: 700;
-      font-size: 1.2rem;
-      color: var(--black);
-      text-decoration: none;
-      border-bottom: 2px solid var(--blue);
-      padding-bottom: 3px;
-      transition: color 0.2s;
-    }
-    .contact-email:hover { color: var(--blue); }
-
-    .wa-wrap {
-      margin-top: 2rem;
-      display: flex; flex-direction: column; gap: .75rem;
-    }
-    .wa-question {
-      font-family: 'Fraunces', serif; font-weight: 300;
-      font-size: .9rem; color: #555; line-height: 1.5;
-    }
-    .wa-btn {
-      display: inline-flex; align-items: center; gap: .6rem;
-      background: #25D366; color: #fff;
-      font-family: 'DM Mono', monospace; font-size: .7rem;
-      letter-spacing: .08em; text-transform: uppercase;
-      text-decoration: none;
-      padding: .65rem 1.25rem; border-radius: 2rem;
-      width: fit-content;
-      transition: background .2s, transform .15s;
-    }
-    .wa-btn:hover { background: #1ebe5d; transform: translateY(-1px); }
-    .wa-btn svg { flex-shrink: 0; }
-
-    .contact-form { padding-top: 1rem; }
-    .form-group { margin-bottom: 1.5rem; }
-    .form-group label {
-      display: block;
-      font-family: 'DM Mono', monospace;
-      font-size: 0.65rem;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: var(--gray);
-      margin-bottom: 0.5rem;
-    }
-    .form-group input,
-    .form-group textarea {
-      width: 100%;
-      background: transparent;
-      border: none;
-      border-bottom: 1.5px solid var(--gray-light);
-      padding: 0.75rem 0;
-      font-family: 'Fraunces', serif;
-      font-size: 1rem;
-      color: var(--black);
-      outline: none;
-      transition: border-color 0.25s;
-      resize: none;
-    }
-    .form-group input:focus,
-    .form-group textarea:focus { border-color: var(--blue); }
-    .form-group textarea { height: 100px; }
-
-    .btn-send {
-      background: var(--blue);
-      color: #fff;
-      border: none;
-      padding: 1rem 2.5rem;
-      font-family: 'DM Mono', monospace;
-      font-size: 0.8rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      cursor: none;
-      transition: background 0.25s;
-    }
-    .btn-send:hover { background: var(--black); }
-
-    /* FOOTER */
-    footer {
-      background: var(--black);
-      color: #444;
-      padding: 2.5rem 3rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-family: 'DM Mono', monospace;
-      font-size: 0.65rem;
-      letter-spacing: 0.1em;
-    }
-    footer a { color: #444; text-decoration: none; transition: color 0.2s; }
-    footer a:hover { color: var(--blue); }
-
-    /* ANIMATIONS */
-    @keyframes fadeUp {
-      to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes scrollLine {
-      0% { transform: scaleY(0); transform-origin: top; }
-      50% { transform: scaleY(1); transform-origin: top; }
-      51% { transform: scaleY(1); transform-origin: bottom; }
-      100% { transform: scaleY(0); transform-origin: bottom; }
-    }
-
-    .reveal {
-      opacity: 0;
-      transform: translateY(40px);
-      transition: opacity 0.8s ease, transform 0.8s ease;
-    }
-    .reveal.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    /* RESPONSIVE */
-    @media (max-width: 768px) {
-      nav { padding: 1.2rem 1.5rem; }
-      #hero { padding: 0 1.5rem 4rem; }
-      section { padding: 5rem 1.5rem; }
-      #contacto { grid-template-columns: 1fr; gap: 3rem; }
-      .dash-card.col-4,
-      .dash-card.col-8,
-      .dash-card.col-6 { grid-column: span 12; }
-      footer { flex-direction: column; gap: 1rem; text-align: center; }
-      body { cursor: auto; }
-      .cursor, .cursor-ring { display: none; }
-
-      /* Hero title en móvil: 4 líneas, fuente más pequeña */
-      .hero-title {
-        font-size: clamp(1.8rem, 10vw, 3rem) !important;
-        line-height: 1.1 !important;
-      }
-      /* Fuerza el verbo a su propia línea */
-      .que-verb-wrap {
-        display: inline-flex;
-        flex-direction: column;
-      }
-
-      /* Hide nav links on mobile, show hamburger */
-      .nav-links { display: none; }
-      .nav-links.open { 
-        display: flex;
-        flex-direction: column;
-        position: fixed;
-        top: 65px; left: 0; right: 0;
-        background: rgba(244,243,239,0.98);
-        backdrop-filter: blur(12px);
-        padding: 1.5rem 1.5rem;
-        gap: 1.2rem;
-        border-bottom: 1px solid rgba(0,0,0,0.07);
-        z-index: 99;
-      }
-      .nav-links.open li { display: flex; flex-direction: column; }
-      .nav-links.open a { font-size: 0.9rem; padding: 0.3rem 0; }
-      .nav-links.open .nav-submenu {
-        position: static;
-        display: flex !important;
-        transform: none;
-        padding-top: 0.5rem;
-        padding-left: 1rem;
-      }
-      .nav-links.open .nav-submenu-inner {
-        box-shadow: none;
-        border: none;
-        background: transparent;
-      }
-      .nav-links.open .nav-sub-item {
-        padding: 0.4rem 0;
-        font-size: 0.75rem;
-        color: var(--gray) !important;
-        border-bottom: none;
-      }
-      .nav-hamburger {
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-        cursor: pointer;
-        padding: 4px;
-      }
-      .nav-hamburger span {
-        display: block;
-        width: 22px;
-        height: 2px;
-        background: var(--black);
-        transition: all 0.3s;
-        border-radius: 2px;
-      }
-      .nav-hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-      .nav-hamburger.open span:nth-child(2) { opacity: 0; }
-      .nav-hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
-
-      /* Apóyanos en móvil: ancho completo */
-      .nav-apoyo {
-        width: fit-content;
-        display: inline-block;
-        margin-top: 0.2rem;
-      }
-      /* Auth en móvil: fila compacta */
-      .nav-auth {
-        flex-direction: row;
-        gap: 0.5rem;
-        margin-top: 0.2rem;
-      }
-      .nav-login, .nav-register {
-        font-size: 0.8rem;
-        padding: 0.45rem 0.85rem;
-      }
-    }
-
-    @media (min-width: 769px) {
-      .nav-hamburger { display: none; }
-      .nav-links { display: flex !important; }
-    }
-
-    /* NAV PROYECTOS SUBMENU */
-    .nav-dropdown-wrap { position: relative; }
-    .nav-dropdown-trigger { display: flex; align-items: center; cursor: none; }
-    .nav-dropdown-wrap:hover .nav-chevron { transform: rotate(180deg); }
-    .nav-submenu {
-      display: none;
-      position: absolute;
-      top: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      padding-top: 14px;
-      background: transparent;
-      min-width: 140px;
-      flex-direction: column;
-      z-index: 200;
-    }
-    .nav-submenu-inner {
-      background: rgba(244,243,239,0.97);
-      border: 1px solid rgba(0,0,0,0.08);
-      backdrop-filter: blur(12px);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.07);
-      display: flex;
-      flex-direction: column;
-    }
-    .nav-dropdown-wrap:hover .nav-submenu { display: flex; }
-    .nav-sub-item {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.72rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--black) !important;
-      text-decoration: none;
-      padding: 0.7rem 1.1rem;
-      border-bottom: 1px solid rgba(0,0,0,0.06);
-      transition: color 0.15s, background 0.15s;
-    }
-    .nav-sub-item:last-child { border-bottom: none; }
-    .nav-sub-item:hover { color: var(--blue) !important; background: rgba(0,71,255,0.04); }
-
-    /* COUNTRY SELECTOR */
-    .country-selector-wrap { position: relative; }
-    .country-btn {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.75rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--black);
-      background: transparent;
-      border: 1.5px solid var(--gray-light);
-      padding: 0.4rem 0.85rem;
-      cursor: none;
-      display: flex;
-      align-items: center;
-      min-width: 190px;
-      justify-content: space-between;
-      transition: border-color 0.2s, color 0.2s;
-    }
-    .country-btn:hover { border-color: var(--blue); color: var(--blue); }
-    .country-btn.open { border-color: var(--blue); color: var(--blue); }
-    .country-btn.open #countryChevron { transform: rotate(180deg); }
-    .country-dropdown {
-      position: absolute;
-      top: calc(100% + 10px);
-      right: 0;
-      background: var(--white);
-      border: 1.5px solid var(--gray-light);
-      min-width: 190px;
-      display: none;
-      flex-direction: column;
-      z-index: 200;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-    }
-    .country-dropdown.open { display: flex; }
-    .country-option {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.72rem;
-      letter-spacing: 0.05em;
-      padding: 0.7rem 1rem;
-      cursor: none;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      color: var(--black);
-      border-bottom: 1px solid var(--gray-light);
-      transition: background 0.15s;
-      user-select: none;
-    }
-    .country-option:last-child { border-bottom: none; }
-    .country-option:hover { background: rgba(0,71,255,0.05); }
-    .country-option.selected { color: var(--blue); }
-    .country-check { font-size: 0.65rem; width: 12px; opacity: 0; color: var(--blue); font-weight: bold; }
-    .country-option.selected .country-check { opacity: 1; }
-
-    #word-contact { display: inline-block; transition: opacity 0.35s ease, transform 0.35s ease; }
-    #word-contact.fading { opacity: 0; transform: translateY(-8px); }
-    #word-verb, #word-noun { display: inline-block; transition: opacity 0.35s ease, transform 0.35s ease; }
-    #word-verb.fading, #word-noun.fading { opacity: 0; transform: translateY(-8px); }
-    #word-noun { color: var(--black); }
   </style>
-  <script defer src="/track.js"></script>
 </head>
 <body>
-
   <div class="cursor" id="cursor"></div>
   <div class="cursor-ring" id="cursorRing"></div>
+  <div class="bg-layer"></div>
 
-  <!-- NAV -->
-  <nav>
-    <ul class="nav-links" id="navLinks">
-      <li class="country-selector-wrap">
-        <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
-          <span id="countryBtnLabel">Colombia</span>
-          <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style="margin-left:6px;transition:transform 0.2s" id="countryChevron"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        </button>
-        <div class="country-dropdown" id="countryDropdown">
-          <div class="country-option selected" data-value="co" onclick="selectCountry(this)">
-            <span class="country-check">✓</span> Colombia
-          </div>
-          <div class="country-option" data-value="us" onclick="selectCountry(this)">
-            <span class="country-check">✓</span> United States / UK
-          </div>
-          <div class="country-option" data-value="mx" onclick="selectCountry(this)">
-            <span class="country-check">✓</span> México
-          </div>
-          <div class="country-option" data-value="br" onclick="selectCountry(this)">
-            <span class="country-check">✓</span> Brasil
-          </div>
-          <div class="country-option" data-value="cn" onclick="selectCountry(this)">
-            <span class="country-check">✓</span> 中国 / China
+  <div class="shell">
+
+    <!-- NAV -->
+    <nav class="electoral-nav">
+      <div class="e-nav-left">
+        <a href="pricing.html" class="e-btn-planes" id="nav-planes">Planes</a>
+        <div class="electoral-nav-auth" id="nav-auth-area"></div>
+      </div>
+      <div class="e-nav-right">
+        <div class="country-selector-wrap">
+          <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
+            <span id="countryBtnLabel">Colombia</span>
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style="margin-left:6px;transition:transform 0.2s" id="countryChevron"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+          <div class="country-dropdown" id="countryDropdown">
+            <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
+            <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
+            <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
+            <div class="country-option" data-value="br" onclick="selectCountry(this)"><span class="country-check">✓</span> Brasil</div>
+            <div class="country-option" data-value="cn" onclick="selectCountry(this)"><span class="country-check">✓</span> 中国 / China</div>
           </div>
         </div>
-      </li>
-      <li><a href="perfil.html" id="nav-perfil">Perfil</a></li>
-      <li><a href="noticias.html" class="nav-noticias" id="nav-noticias">Noticias</a></li>
-      <li><a href="#proyectos" id="nav-proyectos">Proyectos</a></li>
-      <li><a href="pricing.html" class="nav-planes" id="nav-planes">Planes</a></li>
-      <li>
-        <div id="nav-auth-area">
-          <div class="nav-auth">
-            <a href="login.html" class="nav-login" id="nav-login">Iniciar sesión</a>
-            <a href="register.html" class="nav-register" id="nav-register">Registrarse</a>
+        <a href="index.html" class="logo-link">
+          <div class="logo-bars">
+            <div class="logo-bar" style="height:20px"></div>
+            <div class="logo-bar" style="height:15px"></div>
+            <div class="logo-bar" style="height:9px"></div>
+            <div class="logo-bar" style="height:4px"></div>
           </div>
-        </div>
-      </li>
-    </ul>
-    <button class="nav-hamburger" id="hamburger" onclick="toggleMenu()" aria-label="Menu">
-      <span></span><span></span><span></span>
-    </button>
-    <a href="#hero" class="nav-logo-wrap">
-      <div class="nav-bars">
-        <div class="nav-bar" style="height:18px"></div>
-        <div class="nav-bar" style="height:14px"></div>
-        <div class="nav-bar" style="height:9px"></div>
-        <div class="nav-bar" style="height:5px"></div>
+          <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+        </a>
       </div>
-      <span class="nav-logo">Ricardo<span>.</span>Ruiz</span>
-    </a>
-  </nav>
+    </nav>
 
-  <!-- HERO -->
-  <section id="hero">
-    <div class="hero-bg-number">01</div>
-    <p class="hero-tag" id="hero-tag">Consultoría · Análisis · Decisiones Públicas</p>
-    <h1 class="hero-title">
-      <span id="hero-title-word1">Datos</span><br/>
-      <span class="que-verb-wrap"><span id="hero-title-que">que</span> <span id="word-verb" style="color:var(--blue)">mueven</span></span><br/>
-      <span style="white-space:nowrap"><span id="word-noun">políticas</span>.</span>
-    </h1>
-    <p class="hero-sub" id="hero-sub">
-      Convertimos información compleja en decisiones y políticas claras, estratégicas y con impacto real en entidades, empresas y territorios.
-    </p>
-    <div class="hero-cta">
-      <a href="#servicios" class="btn-primary" id="hero-cta-primary">Ver servicios</a>
-      <a href="#proyectos" class="btn-secondary" id="hero-cta-secondary">Proyectos →</a>
-    </div>
-    <div class="hero-scroll">
-      <div class="scroll-line"></div>
-      <span>Scroll</span>
-    </div>
-  </section>
+    <!-- HUB -->
+    <div class="hub">
+      <div class="hub-eyebrow" id="hero-tag">Consultoría · Análisis · Decisiones Públicas</div>
 
-  <section id="servicios">
-    <div class="section-label" id="servicios-label">Nuestros servicios</div>
-    <h2 class="section-title" style="color: var(--white);" id="servicios-title">Servicios</h2>
-    <div class="services-grid reveal">
-      <div class="service-card">
-        <div class="service-num">01 —</div>
-        <h3 class="service-title" id="svc1-title">Análisis de datos públicos</h3>
-        <p class="service-desc" id="svc1-desc">Generamos, buscamos, analizamos y transformamos grandes cantidades de información para identificar patrones precisos al nivel más detallado posible. Llevas el dataset; te devolvemos un diagnóstico accionable con hallazgos jerarquizados por impacto.</p>
+      <div class="hub-tabs">
+        <button class="hub-tab active" data-panel="pan-inicio" id="tab-inicio" onclick="switchHubTab(this)">Inicio</button>
+        <button class="hub-tab" data-panel="pan-proyectos" id="tab-proyectos" onclick="switchHubTab(this)">Proyectos</button>
+        <button class="hub-tab" data-panel="pan-servicios" id="tab-servicios" onclick="switchHubTab(this)">Servicios</button>
       </div>
-      <div class="service-card">
-        <div class="service-num">02 —</div>
-        <h3 class="service-title" id="svc2-title">Visualización e infografías</h3>
-        <p class="service-desc" id="svc2-desc">Convertimos evidencia compleja en mapas, dashboards e infografías que cualquier tomador de decisión entiende en menos de 30 segundos. Sin ruido visual, sin adornos: solo lo que necesitas ver para tomar decisiones.</p>
-      </div>
-      <div class="service-card">
-        <div class="service-num">03 —</div>
-        <h3 class="service-title" id="svc3-title">Asesoría en política pública</h3>
-        <p class="service-desc" id="svc3-desc">Diseñamos, diagnosticamos y evaluamos políticas basadas en evidencia real. El criterio humano — contexto territorial, historia institucional, viabilidad política — es lo que ningún modelo puede reemplazar. Eso es lo que aportamos.</p>
-      </div>
-      <div class="service-card">
-        <div class="service-num">04 —</div>
-        <h3 class="service-title" id="svc4-title">Formación y talleres</h3>
-        <p class="service-desc" id="svc4-desc">Para equipos de gobierno y organizaciones que quieren tomar mejores decisiones con sus propios datos. No enseñamos herramientas: construimos capacidad analítica que genera memoria institucional o empresarial y conocimiento constante.</p>
-      </div>
-    </div>
-  </section>
 
-  <!-- PROYECTOS -->
-  <section id="proyectos">
-    <div class="section-label" id="proyectos-label">Trabajo reciente</div>
-    <h2 class="section-title" id="proyectos-title">Proyectos</h2>
-    <div class="projects-list reveal" id="projects-list">
-      <!-- populated by JS -->
-    </div>
-  </section>
+      <div class="hub-panels">
 
-  <!-- PORTAL INTERACTIVO -->
-  <section id="portal">
-    <div class="section-label" id="portal-label">Portal interactivo</div>
-    <h2 class="section-title" style="color: var(--white);" id="portal-title">Indicadores<br/>en tiempo real</h2>
-    <p id="portal-desc" style="font-family:'Fraunces',serif; font-weight:300; color:#666; max-width:500px; line-height:1.7; margin-bottom:0.5rem; font-size:0.95rem;">
-      Una muestra de cómo transformo datos públicos en tableros que facilitan la toma de decisiones.
-    </p>
-    <div class="dashboard-grid reveal">
-      <div class="dash-card col-4">
-        <div class="dash-label" id="kpi1-label">Tasa de desempleo nacional · DANE mar 2026</div>
-        <div class="dash-value dash-accent" id="kpi1">0<span class="unit" id="kpi1-unit">%</span></div>
-        <div class="dash-delta" id="kpi1-delta">↓ 0.9 pp vs mar 2025</div>
-        <div class="kpi-bar"><div class="kpi-bar-fill" style="width:0%" data-w="48%"></div></div>
-      </div>
-      <div class="dash-card col-4">
-        <div class="dash-label" id="kpi2-label">Tasa de desempleo mujeres · DANE mar 2026</div>
-        <div class="dash-value" id="kpi2">0<span class="unit" id="kpi2-unit">%</span></div>
-        <div class="dash-delta" id="kpi2-delta" style="color:#ff4757;">↓ 1.8 pp vs mar 2025</div>
-        <div class="kpi-bar"><div class="kpi-bar-fill" style="width:0%; background:#ff4757" data-w="61%"></div></div>
-      </div>
-      <div class="dash-card col-4">
-        <div class="dash-label" id="kpi3-label">Brecha de género (Muj − Hom) · mar 2026</div>
-        <div class="dash-value dash-accent" id="kpi3">0<span class="unit" id="kpi3-unit">pp</span></div>
-        <div class="dash-delta" id="kpi3-delta" style="color:#00d68f;">↓ 1.5 pp vs mar 2025</div>
-        <div class="kpi-bar"><div class="kpi-bar-fill" style="width:0%; background:#00d68f" data-w="44%"></div></div>
-      </div>
-      <div class="dash-card col-8">
-        <div class="dash-label" id="chart-line-label">Tasa de desempleo · Nacional, hombres y mujeres · marzo 2021–2026</div>
-        <div class="chart-wrapper"><canvas id="lineChart"></canvas></div>
-      </div>
-      <div class="dash-card col-4">
-        <div class="dash-label" id="chart-donut-label">Brecha de género · 23 ciudades · mar 2026</div>
-        <div class="chart-wrapper"><canvas id="donutChart"></canvas></div>
-      </div>
-      <div class="dash-card col-12">
-        <div class="dash-label" id="chart-bar-label">Tasa de desempleo de mujeres por ciudad · mar 2026 (%)</div>
-        <div class="chart-wrapper" style="height:180px"><canvas id="barChart"></canvas></div>
-      </div>
-    </div>
-  </section>
+        <!-- ══ INICIO ══ -->
+        <div class="panel pan-inicio active" id="pan-inicio">
+          <div class="card card-hero">
+            <h1 class="hero-statement">
+              <span id="hero-title-word1">Datos</span> <span id="hero-title-que">que</span>
+              <span id="word-verb" class="hero-accent">mueven</span>
+              <span id="word-noun">políticas</span>.
+            </h1>
+            <p class="hero-sub" id="hero-sub">Convertimos información compleja en decisiones y políticas claras, estratégicas y con impacto real en entidades, empresas y territorios.</p>
+            <div class="hero-cta-row">
+              <a class="hero-cta primary" id="hero-cta-primary" onclick="switchHubTabById('pan-servicios')">Ver servicios</a>
+              <a class="hero-cta ghost" id="hero-cta-secondary" onclick="switchHubTabById('pan-proyectos')">Proyectos →</a>
+            </div>
+          </div>
 
-  <!-- CONTACTO -->
-  <section id="contacto">
-    <div>
-      <div class="section-label" id="contacto-label">Trabajemos juntos</div>
-      <h2 class="contact-title"><span id="contacto-title-start">Hablemos</span><br/><span id="contacto-title-mid">de tu</span> <em><span id="word-contact">reto</span></em>.</h2>
-      <div class="contact-info">
-        <p id="contacto-desc">Si tienes un proyecto de datos o política pública y quieres convertirlo en impacto real, escríbeme.</p>
-        <a href="/cdn-cgi/l/email-protection#f29a9d9e93b2809b919380969d80879b88dc919d" class="contact-email"><span class="__cf_email__" data-cfemail="b6ded9dad7f6c4dfd5d7c4d2d9c4c3dfcc98d5d9">[email&#160;protected]</span></a>
-        <p id="contacto-location" style="margin-top:1.5rem; font-size:0.85rem;">Bogotá, Colombia · Disponible para proyectos remotos</p>
-        <div class="wa-wrap">
-          <p class="wa-question" id="wa-question">¿Eres persona o empresa y prefieres escribirme directo?</p>
-          <a href="https://wa.me/573243036767?text=Hola%20Ricardo%2C%20me%20gustar%C3%ADa%20hablar%20contigo%20sobre%20un%20proyecto."
-             class="wa-btn" target="_blank" rel="noopener" id="wa-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-            </svg>
-            <span id="wa-btn-text">Chatear por WhatsApp</span>
+          <a class="card card-perfil" href="perfil.html">
+            <div class="card-glow"></div>
+            <span class="card-arrow">↗</span>
+            <div class="card-label">
+              <div class="card-name" id="card-perfil-name">Perfil</div>
+              <div class="card-sub" id="card-perfil-sub">Quién soy y en qué creo</div>
+            </div>
+          </a>
+
+          <a class="card card-contacto" id="card-contacto" href="https://wa.me/573243036767?text=Hola%20Ricardo%2C%20me%20gustar%C3%ADa%20hablar%20contigo%20sobre%20un%20proyecto." target="_blank" rel="noopener">
+            <div class="card-glow"></div>
+            <span class="card-arrow">↗</span>
+            <div class="card-label">
+              <div class="card-name" id="card-contacto-name">Contacto</div>
+              <div class="card-sub" id="card-contacto-sub">Cuéntame tu reto</div>
+            </div>
+          </a>
+
+          <a class="card card-noticias" href="noticias.html">
+            <div class="card-glow"></div>
+            <span class="card-arrow">↗</span>
+            <div class="card-label">
+              <div class="card-name" id="card-noticias-name">Noticias</div>
+              <div class="card-sub" id="card-noticias-sub">Análisis y publicaciones</div>
+            </div>
           </a>
         </div>
+
+        <!-- ══ PROYECTOS ══ -->
+        <div class="panel pan-proyectos" id="pan-proyectos">
+          <div class="proj-grid" id="proyectos-grid"></div>
+        </div>
+
+        <!-- ══ SERVICIOS ══ -->
+        <div class="panel pan-servicios" id="pan-servicios">
+          <div class="svc-grid">
+            <div class="svc-card">
+              <div class="svc-num">01 —</div>
+              <div class="svc-title" id="svc1-title">Análisis de datos públicos</div>
+              <div class="svc-desc" id="svc1-desc"></div>
+            </div>
+            <div class="svc-card">
+              <div class="svc-num">02 —</div>
+              <div class="svc-title" id="svc2-title">Visualización e infografías</div>
+              <div class="svc-desc" id="svc2-desc"></div>
+            </div>
+            <div class="svc-card">
+              <div class="svc-num">03 —</div>
+              <div class="svc-title" id="svc3-title">Asesoría en política pública</div>
+              <div class="svc-desc" id="svc3-desc"></div>
+            </div>
+            <div class="svc-card">
+              <div class="svc-num">04 —</div>
+              <div class="svc-title" id="svc4-title">Formación y talleres</div>
+              <div class="svc-desc" id="svc4-desc"></div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
-    <div class="contact-form reveal">
-      <div class="form-group">
-        <label id="form-name-label">Tu nombre</label>
-        <input type="text" id="form-name-input" placeholder="María García" />
-      </div>
-      <div class="form-group">
-        <label id="form-email-label">Correo electrónico</label>
-        <input type="email" id="form-email-input" placeholder="maria@entidad.gov.co" />
-      </div>
-      <div class="form-group">
-        <label id="form-msg-label">Cuéntame tu proyecto</label>
-        <textarea id="form-msg-input" placeholder="Tenemos un conjunto de datos y queremos..."></textarea>
-      </div>
-      <button class="btn-send" id="form-submit">Enviar mensaje →</button>
-    </div>
-  </section>
 
-  <!-- FOOTER -->
-  <footer>
-    <span>© 2026 Ricardo Ruiz · ricardoruiz.co</span>
-    <span id="footer-role">Consultor en Análisis de Datos y Política Pública</span>
-    <div style="display:flex; gap:1.5rem;">
-      <a href="https://www.linkedin.com/in/ricardoeruiz/" target="_blank" rel="noopener">LinkedIn</a>
-      <a href="https://x.com/RicardoRuiz_" target="_blank" rel="noopener">Twitter/X</a>
-      <a href="https://www.instagram.com/ricardoeruiz_/" target="_blank" rel="noopener">Instagram</a>
-    </div>
-  </footer>
+    <footer class="hub-footer">
+      <span class="footer-brand">ricardoruiz.co · <span id="footer-role">Consultor en Análisis de Datos y Política Pública</span></span>
+    </footer>
+  </div>
 
-  <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
-
-    // ─── i18n CONTENT ────────────────────────────────────────────────────────
+  <script>
+    // ─── i18n ───────────────────────────────────────────────────────────────
     const i18n = {
       co: {
         lang: 'es',
         title: 'Ricardo Ruiz — Consultor en Datos y Decisiones Públicas',
-        nav: { perfil: 'Perfil', noticias: 'Noticias', proyectos: 'Proyectos', planes: 'Planes', login: 'Iniciar sesión', register: 'Registrarse', country: 'Colombia' },
+        nav: { planes: 'Planes', login: 'Iniciar sesión', register: 'Registrarse', country: 'Colombia' },
+        hub: { inicio: 'Inicio', proyectos: 'Proyectos', servicios: 'Servicios' },
         hero: { tag: 'Consultoría · Análisis · Decisiones Públicas', word1: 'Datos', que: 'que', verbs: ['mueven','transforman','resuelven','cambian'], nouns: ['políticas','decisiones','estrategias','planes'], sub: 'Convertimos información compleja en decisiones y políticas claras, estratégicas y con impacto real en entidades, empresas y territorios.', ctaPrimary: 'Ver servicios', ctaSecondary: 'Proyectos →' },
-        servicios: { label: 'Nuestros servicios', title: 'Servicios', s1t: 'Análisis de datos públicos', s1d: 'Generamos, buscamos, analizamos y transformamos grandes cantidades de información para identificar patrones precisos al nivel más detallado posible. Llevas el dataset; te devolvemos un diagnóstico accionable con hallazgos jerarquizados por impacto.', s2t: 'Visualización e infografías', s2d: 'Convertimos evidencia compleja en mapas, dashboards e infografías que cualquier tomador de decisión entiende en menos de 30 segundos. Sin ruido visual, sin adornos: solo lo que necesitas ver para tomar decisiones.', s3t: 'Asesoría en política pública', s3d: 'Diseñamos, diagnosticamos y evaluamos políticas basadas en evidencia real. El criterio humano — contexto territorial, historia institucional, viabilidad política — es lo que ningún modelo puede reemplazar. Eso es lo que aportamos.', s4t: 'Formación y talleres', s4d: 'Para equipos de gobierno y organizaciones que quieren tomar mejores decisiones con sus propios datos. No enseñamos herramientas: construimos capacidad analítica que genera memoria institucional o empresarial y conocimiento constante.' },
+        cards: { perfilName: 'Perfil', perfilSub: 'Quién soy y en qué creo', contactoName: 'Contacto', contactoSub: 'Cuéntame tu reto', noticiasName: 'Noticias', noticiasSub: 'Análisis y publicaciones' },
+        servicios: { s1t: 'Análisis de datos públicos', s1d: 'Generamos, buscamos, analizamos y transformamos grandes cantidades de información para identificar patrones precisos al nivel más detallado posible. Llevas el dataset; te devolvemos un diagnóstico accionable con hallazgos jerarquizados por impacto.', s2t: 'Visualización e infografías', s2d: 'Convertimos evidencia compleja en mapas, dashboards e infografías que cualquier tomador de decisión entiende en menos de 30 segundos. Sin ruido visual, sin adornos: solo lo que necesitas ver para tomar decisiones.', s3t: 'Asesoría en política pública', s3d: 'Diseñamos, diagnosticamos y evaluamos políticas basadas en evidencia real. El criterio humano — contexto territorial, historia institucional, viabilidad política — es lo que ningún modelo puede reemplazar. Eso es lo que aportamos.', s4t: 'Formación y talleres', s4d: 'Para equipos de gobierno y organizaciones que quieren tomar mejores decisiones con sus propios datos. No enseñamos herramientas: construimos capacidad analítica que genera memoria institucional o empresarial y conocimiento constante.' },
         proyectos: {
-          label: 'Trabajo reciente', title: 'Proyectos',
           items: [
             { year: '2026', name: 'Histórico Electoral de Colombia', org: 'Registraduría Nacional del Estado Civil', tag: 'Datos electorales', href: 'electoral.html' },
             { year: '2026', name: 'Análisis Estructural de Sistemas', org: 'ricardoruiz.co · Prospectiva', tag: 'Política pública', href: 'analisis-estructural.html' },
@@ -1149,18 +388,17 @@
             { year: 'PRONTO!', name: 'Análisis del Sector Empresarial Colombiano', org: 'Confecámaras', tag: 'Análisis empresarial', href: '#' }
           ]
         },
-        portal: { label: 'Portal interactivo', title: 'Mercado laboral con<br/>perspectiva de género', desc: 'Cifras del DANE — GEIH Mercado Laboral según Sexo (anexo trimestre móvil ene–mar 2026). Última lectura: marzo 2026. Fuente: Observatorio Mujer · ricardoruiz.co.', kpi1: 'Tasa de desempleo nacional · DANE mar 2026', kpi1unit: '%', kpi1delta: '↓ 0.9 pp vs mar 2025', kpi2: 'Tasa de desempleo mujeres · DANE mar 2026', kpi2unit: '%', kpi2delta: '↓ 1.8 pp vs mar 2025', kpi3: 'Brecha de género (Muj − Hom) · mar 2026', kpi3unit: 'pp', kpi3delta: '↓ 1.5 pp vs mar 2025', lineLabel: 'Tasa de desempleo · Nacional, hombres y mujeres · marzo 2021–2026', donutLabel: 'Brecha de género · 23 ciudades · mar 2026', barLabel: 'Tasa de desempleo de mujeres por ciudad · mar 2026 (%)', lineDatasets: ['Nacional','Hombres','Mujeres'], donutLabels: ['Brecha alta (≥5 pp)','Brecha media (2–5 pp)','Brecha baja (<2 pp)'], barLabel2: 'Tasa de desempleo de mujeres (%)', barCities: ['Quibdó','Cartagena','Medellín','Cúcuta','Barranquilla','Cali','Pereira','Bogotá'] },
-        contacto: { label: 'Trabajemos juntos', titleStart: 'Hablemos', titleMid: 'de tu', words: ['reto','oportunidad','proyecto','idea'], desc: 'Si tienes un proyecto de datos o política pública y quieres convertirlo en impacto real, escríbeme.', location: 'Bogotá, Colombia · Disponible para proyectos remotos', waQuestion: '¿Eres persona o empresa y prefieres escribirme directo?', waBtnText: 'Chatear por WhatsApp', nameLabel: 'Tu nombre', namePh: 'María García', emailLabel: 'Correo electrónico', emailPh: 'maria@entidad.gov.co', msgLabel: 'Cuéntame tu proyecto', msgPh: 'Tenemos un conjunto de datos y queremos...', submit: 'Enviar mensaje →' },
         footer: { role: 'Consultor en Análisis de Datos y Política Pública' }
       },
       us: {
         lang: 'en',
         title: 'Ricardo Ruiz — Data Consultant & Public Policy Advisor',
-        nav: { perfil: 'Profile', noticias: 'News', proyectos: 'Projects', planes: 'Pricing', login: 'Log in', register: 'Sign up', country: 'United States / UK' },
+        nav: { planes: 'Pricing', login: 'Log in', register: 'Sign up', country: 'United States / UK' },
+        hub: { inicio: 'Home', proyectos: 'Projects', servicios: 'Services' },
         hero: { tag: 'Consulting · Analysis · Public Decisions', word1: 'Data', que: 'that', verbs: ['drives','transforms','resolves','shapes'], nouns: ['policy','decisions','strategy','outcomes'], sub: 'We turn complex information into clear, strategic decisions with measurable impact across institutions, organizations, and territories.', ctaPrimary: 'Our services', ctaSecondary: 'Projects →' },
-        servicios: { label: 'What we do', title: 'Services', s1t: 'Data Analysis', s1d: 'We source, clean, model, and interpret large volumes of public and institutional data to surface precise patterns at the most granular level possible. You bring the dataset; we deliver an actionable diagnostic with findings ranked by impact.', s2t: 'Maps, Dashboards & Infographics', s2d: 'We translate complex evidence into maps, dashboards, and infographics that any decision-maker can read in under 30 seconds. No visual noise, no decoration — only what you need to act.', s3t: 'Public Policy Advisory', s3d: 'We design, diagnose, and evaluate evidence-based policies. Territorial context, institutional history, political feasibility — the human judgment no model can replicate. That is exactly what we bring to the table.', s4t: 'Training & Workshops', s4d: "For government teams and organizations that want to make better decisions with their own data. We don't teach tools — we build analytical capacity that generates lasting institutional knowledge." },
+        cards: { perfilName: 'Profile', perfilSub: 'Who I am and what I do', contactoName: 'Contact', contactoSub: 'Tell me your challenge', noticiasName: 'News', noticiasSub: 'Analysis & publications' },
+        servicios: { s1t: 'Data Analysis', s1d: 'We source, clean, model, and interpret large volumes of public and institutional data to surface precise patterns at the most granular level possible. You bring the dataset; we deliver an actionable diagnostic with findings ranked by impact.', s2t: 'Maps, Dashboards & Infographics', s2d: 'We translate complex evidence into maps, dashboards, and infographics that any decision-maker can read in under 30 seconds. No visual noise, no decoration — only what you need to act.', s3t: 'Public Policy Advisory', s3d: 'We design, diagnose, and evaluate evidence-based policies. Territorial context, institutional history, political feasibility — the human judgment no model can replicate. That is exactly what we bring to the table.', s4t: 'Training & Workshops', s4d: "For government teams and organizations that want to make better decisions with their own data. We don't teach tools — we build analytical capacity that generates lasting institutional knowledge." },
         proyectos: {
-          label: 'Recent work', title: 'Projects',
           items: [
             { year: '2026', name: 'Colombia Electoral History', org: 'National Civil Registry', tag: 'Electoral data', href: 'electoral.html' },
             { year: '2026', name: 'Structural Systems Analysis', org: 'ricardoruiz.co · Foresight', tag: 'Public policy', href: 'analisis-estructural.html' },
@@ -1169,18 +407,17 @@
             { year: 'SOON!', name: 'Colombian Business Sector Analysis', org: 'Confecámaras', tag: 'Business analysis', href: '#' }
           ]
         },
-        portal: { label: 'Interactive portal', title: 'Colombian labor market<br/>through a gender lens', desc: "Figures from DANE — GEIH Labor Market by Sex (rolling quarter Jan–Mar 2026). Latest reading: March 2026. Source: Observatorio Mujer · ricardoruiz.co.", kpi1: 'National unemployment rate · DANE Mar 2026', kpi1unit: '%', kpi1delta: '↓ 0.9 pp vs Mar 2025', kpi2: "Women's unemployment rate · DANE Mar 2026", kpi2unit: '%', kpi2delta: '↓ 1.8 pp vs Mar 2025', kpi3: 'Gender gap (Women − Men) · Mar 2026', kpi3unit: 'pp', kpi3delta: '↓ 1.5 pp vs Mar 2025', lineLabel: 'Unemployment rate · National, men & women · March 2021–2026', donutLabel: 'Gender gap · 23 cities · Mar 2026', barLabel: "Women's unemployment by city · Mar 2026 (%)", lineDatasets: ['National','Men','Women'], donutLabels: ['Wide gap (≥5 pp)','Mid gap (2–5 pp)','Narrow gap (<2 pp)'], barLabel2: "Women's unemployment rate (%)", barCities: ['Quibdó','Cartagena','Medellín','Cúcuta','Barranquilla','Cali','Pereira','Bogotá'] },
-        contacto: { label: "Let's work together", titleStart: "Let's talk", titleMid: 'about your', words: ['challenge','opportunity','project','idea'], desc: 'If you have a data or public policy project and want to turn it into real impact, reach out.', location: 'Bogotá, Colombia · Available for remote projects worldwide', waQuestion: 'Are you an individual or company and prefer to reach me directly?', waBtnText: 'Chat on WhatsApp', nameLabel: 'Your name', namePh: 'Jane Smith', emailLabel: 'Email address', emailPh: 'jane@organization.org', msgLabel: 'Tell me about your project', msgPh: 'We have a dataset and want to...', submit: 'Send message →' },
         footer: { role: 'Data Consultant & Public Policy Advisor' }
       },
       cn: {
         lang: 'zh',
         title: 'Ricardo Ruiz — 数据与公共政策顾问',
-        nav: { perfil: '个人资料', noticias: '新闻', proyectos: '项目', planes: '计划', login: '登录', register: '注册', country: '中国 / China' },
+        nav: { planes: '计划', login: '登录', register: '注册', country: '中国 / China' },
+        hub: { inicio: '主页', proyectos: '项目', servicios: '服务' },
         hero: { tag: '咨询 · 分析 · 公共决策', word1: '数据', que: '驱动', verbs: ['政策','决策','变革','影响'], nouns: ['政策','战略','影响','变革'], sub: '我们将复杂信息转化为清晰、战略性的决策，对机构、企业和地区产生真实影响。', ctaPrimary: '查看服务', ctaSecondary: '项目 →' },
-        servicios: { label: '我们的服务', title: '服务', s1t: '公共数据分析', s1d: '我们生成、搜索、分析和转换大量信息，以尽可能详细的层次识别精确模式。您提供数据集；我们返回按影响力排序的可操作诊断。', s2t: '可视化与信息图', s2d: '我们将复杂证据转化为地图、仪表板和信息图，任何决策者都能在30秒内理解。无视觉噪音，无装饰：只有您需要看到的内容。', s3t: '政策与战略咨询', s3d: '我们将数据分析转化为具体建议：优先事项、路线图和可实施的行动计划。我们与您的团队合作，确保每个决策都有证据支持。', s4t: '培训与能力建设', s4d: '我们为团队提供数据分析、可视化和循证决策培训。从基础到高级，根据您机构的具体需求定制。' },
+        cards: { perfilName: '个人资料', perfilSub: '我是谁，我做什么', contactoName: '联系', contactoSub: '告诉我您的挑战', noticiasName: '新闻', noticiasSub: '分析与出版物' },
+        servicios: { s1t: '公共数据分析', s1d: '我们生成、搜索、分析和转换大量信息，以尽可能详细的层次识别精确模式。您提供数据集；我们返回按影响力排序的可操作诊断。', s2t: '可视化与信息图', s2d: '我们将复杂证据转化为地图、仪表板和信息图，任何决策者都能在30秒内理解。无视觉噪音，无装饰：只有您需要看到的内容。', s3t: '政策与战略咨询', s3d: '我们将数据分析转化为具体建议：优先事项、路线图和可实施的行动计划。我们与您的团队合作，确保每个决策都有证据支持。', s4t: '培训与能力建设', s4d: '我们为团队提供数据分析、可视化和循证决策培训。从基础到高级，根据您机构的具体需求定制。' },
         proyectos: {
-          label: '近期工作', title: '项目',
           items: [
             { year: '2026', name: '哥伦比亚选举历史', org: '国家民事登记处', tag: '选举数据', href: 'electoral.html' },
             { year: '2026', name: '系统结构分析', org: 'ricardoruiz.co · 前瞻研究', tag: '公共政策', href: 'analisis-estructural.html' },
@@ -1189,18 +426,17 @@
             { year: '即将推出', name: '哥伦比亚商业部门分析', org: 'Confecámaras', tag: '商业分析', href: '#' }
           ]
         },
-        portal: { label: '交互式门户', title: '哥伦比亚劳动力市场<br/>性别视角', desc: '来源：DANE 综合家庭大调查（GEIH）按性别分类的劳动力市场附件（2026年1-3月滚动季度）。最新数据：2026年3月。来源：女性观察站 · ricardoruiz.co。', kpi1: '全国失业率 · DANE 2026年3月', kpi1unit: '%', kpi1delta: '↓ 较2025年3月下降0.9个百分点', kpi2: '女性失业率 · DANE 2026年3月', kpi2unit: '%', kpi2delta: '↓ 较2025年3月下降1.8个百分点', kpi3: '性别差距（女-男）· 2026年3月', kpi3unit: 'pp', kpi3delta: '↓ 较2025年3月下降1.5个百分点', lineLabel: '失业率 · 全国、男性与女性 · 2021-2026年3月', donutLabel: '性别差距 · 23个城市 · 2026年3月', barLabel: '各城市女性失业率 · 2026年3月 (%)', lineDatasets: ['全国','男性','女性'], donutLabels: ['差距大 (≥5 pp)','差距中等 (2-5 pp)','差距小 (<2 pp)'], barLabel2: '女性失业率 (%)', barCities: ['基布多','卡塔赫纳','麦德林','库库塔','巴兰基亚','卡利','佩雷拉','波哥大'] },
-        contacto: { label: '合作', titleStart: '联系我们', titleMid: '关于您的', words: ['挑战','机遇','项目','想法'], desc: '如果您有数据或公共政策项目，想将其转化为真实影响，请联系我们。', location: '哥伦比亚波哥大 · 可远程服务全球', waQuestion: '您是个人或公司，希望直接联系我？', waBtnText: 'WhatsApp联系', nameLabel: '您的姓名', namePh: '张伟', emailLabel: '电子邮件', emailPh: 'usuario@organizacion.org', msgLabel: '告诉我您的项目', msgPh: '我们有一个数据集，想要...', submit: '发送消息 →' },
         footer: { role: '数据顾问与公共政策分析师' }
       },
       br: {
         lang: 'pt',
         title: 'Ricardo Ruiz — Consultor em Dados e Decisões Públicas',
-        nav: { perfil: 'Perfil', noticias: 'Notícias', proyectos: 'Projetos', planes: 'Planos', login: 'Entrar', register: 'Cadastrar', country: 'Brasil' },
+        nav: { planes: 'Planos', login: 'Entrar', register: 'Cadastrar', country: 'Brasil' },
+        hub: { inicio: 'Início', proyectos: 'Projetos', servicios: 'Serviços' },
         hero: { tag: 'Consultoria · Análise · Decisões Públicas', word1: 'Dados', que: 'que', verbs: ['movem','transformam','resolvem','mudam'], nouns: ['políticas','decisões','estratégias','planos'], sub: 'Convertemos informações complexas em decisões e políticas claras, estratégicas e com impacto real em órgãos públicos, empresas e territórios.', ctaPrimary: 'Ver serviços', ctaSecondary: 'Projetos →' },
-        servicios: { label: 'Nossos serviços', title: 'Serviços', s1t: 'Análise de dados públicos', s1d: 'Geramos, buscamos, analisamos e transformamos grandes volumes de informação para identificar padrões precisos no nível mais detalhado possível. Você traz o dataset; devolvemos um diagnóstico acionável com achados hierarquizados por impacto.', s2t: 'Visualização e infográficos', s2d: 'Convertemos evidências complexas em mapas, painéis e infográficos que qualquer tomador de decisão entende em menos de 30 segundos. Sem ruído visual, sem enfeites: só o que você precisa ver para decidir.', s3t: 'Assessoria em política pública', s3d: 'Projetamos, diagnosticamos e avaliamos políticas baseadas em evidência real. O critério humano — contexto territorial, história institucional, viabilidade política — é o que nenhum modelo pode substituir. É isso que entregamos.', s4t: 'Formação e workshops', s4d: 'Para equipes de governo e organizações que querem tomar melhores decisões com seus próprios dados. Não ensinamos ferramentas: construímos capacidade analítica que gera memória institucional ou empresarial e conhecimento contínuo.' },
+        cards: { perfilName: 'Perfil', perfilSub: 'Quem sou e no que acredito', contactoName: 'Contato', contactoSub: 'Conte seu desafio', noticiasName: 'Notícias', noticiasSub: 'Análises e publicações' },
+        servicios: { s1t: 'Análise de dados públicos', s1d: 'Geramos, buscamos, analisamos e transformamos grandes volumes de informação para identificar padrões precisos no nível mais detalhado possível. Você traz o dataset; devolvemos um diagnóstico acionável com achados hierarquizados por impacto.', s2t: 'Visualização e infográficos', s2d: 'Convertemos evidências complexas em mapas, painéis e infográficos que qualquer tomador de decisão entende em menos de 30 segundos. Sem ruído visual, sem enfeites: só o que você precisa ver para decidir.', s3t: 'Assessoria em política pública', s3d: 'Projetamos, diagnosticamos e avaliamos políticas baseadas em evidência real. O critério humano — contexto territorial, história institucional, viabilidade política — é o que nenhum modelo pode substituir. É isso que entregamos.', s4t: 'Formação e workshops', s4d: 'Para equipes de governo e organizações que querem tomar melhores decisões com seus próprios dados. Não ensinamos ferramentas: construímos capacidade analítica que gera memória institucional ou empresarial e conhecimento contínuo.' },
         proyectos: {
-          label: 'Trabalho recente', title: 'Projetos',
           items: [
             { year: '2026', name: 'Histórico Eleitoral da Colômbia', org: 'Registraduría Nacional del Estado Civil', tag: 'Dados eleitorais', href: 'electoral.html' },
             { year: '2026', name: 'Análise Estrutural de Sistemas', org: 'ricardoruiz.co · Prospectiva', tag: 'Política pública', href: 'analisis-estrutural.html' },
@@ -1209,340 +445,168 @@
             { year: 'EM BREVE!', name: 'Análise do Setor Empresarial Colombiano', org: 'Confecámaras', tag: 'Análise empresarial', href: '#' }
           ]
         },
-        portal: { label: 'Portal interativo', title: 'Mercado de trabalho<br/>com perspectiva de gênero', desc: 'Dados do DANE — GEIH Mercado de Trabalho por Sexo (anexo trimestre móvel jan–mar 2026). Última leitura: março de 2026. Fonte: Observatorio Mujer · ricardoruiz.co.', kpi1: 'Taxa de desemprego nacional · DANE mar 2026', kpi1unit: '%', kpi1delta: '↓ 0,9 pp vs mar 2025', kpi2: 'Taxa de desemprego mulheres · DANE mar 2026', kpi2unit: '%', kpi2delta: '↓ 1,8 pp vs mar 2025', kpi3: 'Brecha de gênero (Mul − Hom) · mar 2026', kpi3unit: 'pp', kpi3delta: '↓ 1,5 pp vs mar 2025', lineLabel: 'Taxa de desemprego · Nacional, homens e mulheres · março 2021–2026', donutLabel: 'Brecha de gênero · 23 cidades · mar 2026', barLabel: 'Taxa de desemprego de mulheres por cidade · mar 2026 (%)', lineDatasets: ['Nacional','Homens','Mulheres'], donutLabels: ['Brecha alta (≥5 pp)','Brecha média (2–5 pp)','Brecha baixa (<2 pp)'], barLabel2: 'Taxa de desemprego de mulheres (%)', barCities: ['Quibdó','Cartagena','Medellín','Cúcuta','Barranquilla','Cali','Pereira','Bogotá'] },
-        contacto: { label: 'Vamos trabalhar juntos', titleStart: 'Vamos falar', titleMid: 'sobre seu', words: ['desafio','oportunidade','projeto','ideia'], desc: 'Se você tem um projeto de dados ou política pública e quer convertê-lo em impacto real, escreva para mim.', location: 'Bogotá, Colômbia · Disponível para projetos remotos', waQuestion: 'Você é pessoa física ou empresa e prefere falar direto?', waBtnText: 'Conversar pelo WhatsApp', nameLabel: 'Seu nome', namePh: 'João Silva', emailLabel: 'E-mail', emailPh: 'joao@organizacao.com.br', msgLabel: 'Conte sobre seu projeto', msgPh: 'Temos um conjunto de dados e queremos...', submit: 'Enviar mensagem →' },
         footer: { role: 'Consultor em Análise de Dados e Política Pública' }
       }
     };
 
-    // ─── LANGUAGE STATE ───────────────────────────────────────────────────────
     let currentLang = localStorage.getItem('rr-lang') || 'co';
-    let wordVerbInterval, wordNounInterval, wordContactInterval;
+    let wordVerbInterval, wordNounInterval;
 
+    const _t = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+
+    // ─── PROYECTOS ──────────────────────────────────────────────────────────
     function renderProjects(items) {
-      const list = document.getElementById('projects-list');
-      list.innerHTML = items.map(p => `
-        <div class="project-item" onclick="if('${p.href}'!=='#') window.location.href='${p.href}'" style="${p.href !== '#' ? 'cursor:pointer' : ''}">
-          <span class="project-year">${p.year}</span>
-          <div>
-            <div class="project-name">${p.name}</div>
-            <div style="margin-top:0.3rem;font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--gray);">${p.org}</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:1rem">
-            <span class="project-tag">${p.tag}</span>
-            <span class="project-arrow">↗</span>
-          </div>
-        </div>`).join('');
-      // re-attach cursor events to new project items
-      list.querySelectorAll('.project-item').forEach(el => {
-        el.addEventListener('mouseenter', () => { cursor.style.transform='translate(-50%,-50%) scale(2.5)'; cursor.style.background='transparent'; cursor.style.border='1.5px solid var(--blue)'; ring.style.opacity='0'; });
-        el.addEventListener('mouseleave', () => { cursor.style.transform='translate(-50%,-50%) scale(1)'; cursor.style.background='var(--blue)'; cursor.style.border='none'; ring.style.opacity='0.5'; });
-      });
+      const grid = document.getElementById('proyectos-grid');
+      if (!grid) return;
+      grid.innerHTML = items.map(p => {
+        const soon = p.href === '#';
+        const tag = soon ? 'proj-card soon' : 'proj-card clickable';
+        const open = soon ? '' : ` onclick="window.location.href='${p.href}'"`;
+        return `<div class="${tag}"${open}>
+          <div><span class="proj-year">${p.year}</span><div class="proj-name">${p.name}</div><div class="proj-org">${p.org}</div></div>
+          <div class="proj-foot"><span class="proj-tag">${p.tag}</span><span class="proj-arrow">${soon ? '' : '↗'}</span></div>
+        </div>`;
+      }).join('');
+      attachHover(grid.querySelectorAll('.proj-card.clickable'));
     }
 
+    // ─── ROTATING WORDS ─────────────────────────────────────────────────────
+    function startRotate(elId, words, interval) {
+      let i = 0;
+      const el = document.getElementById(elId);
+      if (!el) return null;
+      return setInterval(() => {
+        el.classList.add('fading');
+        setTimeout(() => { i = (i + 1) % words.length; el.textContent = words[i]; el.classList.remove('fading'); }, 350);
+      }, interval);
+    }
+
+    // ─── LANGUAGE ───────────────────────────────────────────────────────────
     function setLanguage(lang) {
       if (!i18n[lang]) return;
       currentLang = lang;
       localStorage.setItem('rr-lang', lang);
       const t = i18n[lang];
 
-      // html lang
-      document.getElementById('htmlRoot').lang = t.lang;
-      document.getElementById('pageTitle').textContent = t.title;
+      const root = document.getElementById('htmlRoot'); if (root) root.lang = t.lang;
+      _t('pageTitle', t.title);
 
       // nav
-      const _t = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
-      _t('nav-perfil', t.nav.perfil);
-      _t('nav-noticias', t.nav.noticias);
-      _t('nav-proyectos', t.nav.proyectos);
       _t('nav-planes', t.nav.planes);
-      _t('nav-login', t.nav.login);          // null cuando hay sesión
-      _t('nav-register', t.nav.register);    // null cuando hay sesión
       _t('countryBtnLabel', t.nav.country);
+      document.querySelectorAll('.country-option').forEach(opt => opt.classList.toggle('selected', opt.dataset.value === lang));
 
-      // country dropdown selected state
-      document.querySelectorAll('.country-option').forEach(opt => {
-        opt.classList.toggle('selected', opt.dataset.value === lang);
-      });
+      // eyebrow + tabs
+      _t('hero-tag', t.hero.tag);
+      _t('tab-inicio', t.hub.inicio);
+      _t('tab-proyectos', t.hub.proyectos);
+      _t('tab-servicios', t.hub.servicios);
 
-      // hero
-      document.getElementById('hero-tag').textContent = t.hero.tag;
-      document.getElementById('hero-title-word1').textContent = t.hero.word1;
-      document.getElementById('hero-title-que').textContent = t.hero.que;
-      document.getElementById('hero-sub').textContent = t.hero.sub;
-      document.getElementById('hero-cta-primary').textContent = t.hero.ctaPrimary;
-      document.getElementById('hero-cta-secondary').textContent = t.hero.ctaSecondary;
+      // hero card
+      _t('hero-title-word1', t.hero.word1);
+      _t('hero-title-que', t.hero.que);
+      _t('hero-sub', t.hero.sub);
+      _t('hero-cta-primary', t.hero.ctaPrimary);
+      _t('hero-cta-secondary', t.hero.ctaSecondary);
+
+      // inicio cards
+      _t('card-perfil-name', t.cards.perfilName);
+      _t('card-perfil-sub', t.cards.perfilSub);
+      _t('card-contacto-name', t.cards.contactoName);
+      _t('card-contacto-sub', t.cards.contactoSub);
+      _t('card-noticias-name', t.cards.noticiasName);
+      _t('card-noticias-sub', t.cards.noticiasSub);
 
       // servicios
-      document.getElementById('servicios-label').childNodes[0].textContent = t.servicios.label;
-      document.getElementById('servicios-title').textContent = t.servicios.title;
-      document.getElementById('svc1-title').textContent = t.servicios.s1t;
-      document.getElementById('svc1-desc').textContent = t.servicios.s1d;
-      document.getElementById('svc2-title').textContent = t.servicios.s2t;
-      document.getElementById('svc2-desc').textContent = t.servicios.s2d;
-      document.getElementById('svc3-title').textContent = t.servicios.s3t;
-      document.getElementById('svc3-desc').textContent = t.servicios.s3d;
-      document.getElementById('svc4-title').textContent = t.servicios.s4t;
-      document.getElementById('svc4-desc').textContent = t.servicios.s4d;
+      _t('svc1-title', t.servicios.s1t); _t('svc1-desc', t.servicios.s1d);
+      _t('svc2-title', t.servicios.s2t); _t('svc2-desc', t.servicios.s2d);
+      _t('svc3-title', t.servicios.s3t); _t('svc3-desc', t.servicios.s3d);
+      _t('svc4-title', t.servicios.s4t); _t('svc4-desc', t.servicios.s4d);
 
       // proyectos
-      document.getElementById('proyectos-label').childNodes[0].textContent = t.proyectos.label;
-      document.getElementById('proyectos-title').textContent = t.proyectos.title;
       renderProjects(t.proyectos.items);
 
-      // portal
-      document.getElementById('portal-label').childNodes[0].textContent = t.portal.label;
-      document.getElementById('portal-title').innerHTML = t.portal.title;
-      document.getElementById('portal-desc').textContent = t.portal.desc;
-      document.getElementById('kpi1-label').textContent = t.portal.kpi1;
-      document.getElementById('kpi1-unit').textContent = t.portal.kpi1unit;
-      document.getElementById('kpi1-delta').textContent = t.portal.kpi1delta;
-      document.getElementById('kpi2-label').textContent = t.portal.kpi2;
-      document.getElementById('kpi2-unit').textContent = t.portal.kpi2unit;
-      document.getElementById('kpi2-delta').textContent = t.portal.kpi2delta;
-      document.getElementById('kpi3-label').textContent = t.portal.kpi3;
-      document.getElementById('kpi3-unit').textContent = t.portal.kpi3unit;
-      document.getElementById('kpi3-delta').textContent = t.portal.kpi3delta;
-      document.getElementById('chart-line-label').textContent = t.portal.lineLabel;
-      document.getElementById('chart-donut-label').textContent = t.portal.donutLabel;
-      document.getElementById('chart-bar-label').textContent = t.portal.barLabel;
-
-      // update chart labels
-      if (window.lineChartInst) {
-        window.lineChartInst.data.datasets[0].label = t.portal.lineDatasets[0];
-        window.lineChartInst.data.datasets[1].label = t.portal.lineDatasets[1];
-        window.lineChartInst.data.datasets[2].label = t.portal.lineDatasets[2];
-        window.lineChartInst.update();
-      }
-      if (window.donutChartInst) {
-        window.donutChartInst.data.labels = t.portal.donutLabels;
-        window.donutChartInst.update();
-      }
-      if (window.barChartInst) {
-        window.barChartInst.data.datasets[0].label = t.portal.barLabel2;
-        window.barChartInst.update();
-      }
-
-      // contacto
-      document.getElementById('contacto-label').childNodes[0].textContent = t.contacto.label;
-      document.getElementById('contacto-title-start').textContent = t.contacto.titleStart || (lang === 'us' ? "Let's talk" : lang === 'cn' ? '联系我们' : lang === 'br' ? 'Vamos falar' : 'Hablemos');
-      document.getElementById('contacto-title-mid').textContent = t.contacto.titleMid;
-      document.getElementById('contacto-desc').textContent = t.contacto.desc;
-      document.getElementById('contacto-location').textContent = t.contacto.location;
-      document.getElementById('wa-question').textContent = t.contacto.waQuestion;
-      document.getElementById('wa-btn-text').textContent = t.contacto.waBtnText;
-      document.getElementById('form-name-label').textContent = t.contacto.nameLabel;
-      document.getElementById('form-name-input').placeholder = t.contacto.namePh;
-      document.getElementById('form-email-label').textContent = t.contacto.emailLabel;
-      document.getElementById('form-email-input').placeholder = t.contacto.emailPh;
-      document.getElementById('form-msg-label').textContent = t.contacto.msgLabel;
-      document.getElementById('form-msg-input').placeholder = t.contacto.msgPh;
-      document.getElementById('form-submit').textContent = t.contacto.submit;
-
       // footer
-      document.getElementById('footer-role').textContent = t.footer.role;
+      _t('footer-role', t.footer.role);
 
-      // rotating words — restart with new word lists
-      clearInterval(wordVerbInterval);
-      clearInterval(wordNounInterval);
-      clearInterval(wordContactInterval);
-      document.getElementById('word-verb').textContent = t.hero.verbs[0];
-      document.getElementById('word-noun').textContent = t.hero.nouns[0];
-      document.getElementById('word-contact').textContent = t.contacto.words[0];
-      wordVerbInterval    = startRotate('word-verb',    t.hero.verbs,       2000);
-      wordNounInterval    = startRotate('word-noun',    t.hero.nouns,       3000);
-      wordContactInterval = startRotate('word-contact', t.contacto.words,   3000);
+      // rotating words
+      clearInterval(wordVerbInterval); clearInterval(wordNounInterval);
+      _t('word-verb', t.hero.verbs[0]); _t('word-noun', t.hero.nouns[0]);
+      wordVerbInterval = startRotate('word-verb', t.hero.verbs, 2400);
+      wordNounInterval = startRotate('word-noun', t.hero.nouns, 3200);
     }
 
-    // ─── UTILS ────────────────────────────────────────────────────────────────
-    function toggleMenu() {
-      document.getElementById('navLinks').classList.toggle('open');
-      document.getElementById('hamburger').classList.toggle('open');
+    // ─── TABS ───────────────────────────────────────────────────────────────
+    function switchHubTab(btn) {
+      document.querySelectorAll('.hub-tab').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      const panel = document.getElementById(btn.dataset.panel);
+      if (panel) panel.classList.add('active');
     }
-    function closeMenu() {
-      document.getElementById('navLinks').classList.remove('open');
-      document.getElementById('hamburger').classList.remove('open');
+    function switchHubTabById(panelId) {
+      const btn = document.querySelector(`.hub-tab[data-panel="${panelId}"]`);
+      if (btn) switchHubTab(btn);
     }
-    document.querySelectorAll('#navLinks a').forEach(a => {
-      a.addEventListener('click', closeMenu);
-    });
 
+    // ─── CURSOR ─────────────────────────────────────────────────────────────
     const cursor = document.getElementById('cursor');
     const ring = document.getElementById('cursorRing');
     let mx = 0, my = 0, rx = 0, ry = 0;
-    document.addEventListener('mousemove', e => {
-      mx = e.clientX; my = e.clientY;
-      cursor.style.left = mx + 'px'; cursor.style.top = my + 'px';
-    });
-    function animRing() {
-      rx += (mx - rx) * 0.12; ry += (my - ry) * 0.12;
-      ring.style.left = rx + 'px'; ring.style.top = ry + 'px';
-      requestAnimationFrame(animRing);
-    }
-    animRing();
-    document.querySelectorAll('a, button').forEach(el => {
-      el.addEventListener('mouseenter', () => { cursor.style.transform='translate(-50%,-50%) scale(2.5)'; cursor.style.background='transparent'; cursor.style.border='1.5px solid var(--blue)'; ring.style.opacity='0'; });
-      el.addEventListener('mouseleave', () => { cursor.style.transform='translate(-50%,-50%) scale(1)'; cursor.style.background='var(--blue)'; cursor.style.border='none'; ring.style.opacity='0.5'; });
-    });
-
-    const obs = new IntersectionObserver((entries) => {
-      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } });
-    }, { threshold: 0.1 });
-    document.querySelectorAll('.reveal').forEach(r => obs.observe(r));
-
-    function animCount(el, target, duration = 1500, suffix = '', decimals = 0) {
-      let start = null;
-      const f = Math.pow(10, decimals);
-      const fmt = v => decimals > 0 ? v.toFixed(decimals) : String(Math.floor(v));
-      const step = ts => {
-        if (!start) start = ts;
-        const p = Math.min((ts - start) / duration, 1);
-        el.innerHTML = fmt(Math.floor(p * target * f) / f) + suffix;
-        if (p < 1) requestAnimationFrame(step);
-        else el.innerHTML = fmt(target) + suffix;
-      };
-      requestAnimationFrame(step);
-    }
-
-    const kpiObs = new IntersectionObserver(entries => {
-      entries.forEach(e => {
-        if (e.isIntersecting) {
-          const p = i18n[currentLang].portal;
-          const u1 = '<span class="unit" id="kpi1-unit">' + p.kpi1unit + '</span>';
-          const u2 = '<span class="unit" id="kpi2-unit">' + p.kpi2unit + '</span>';
-          const u3 = '<span class="unit" id="kpi3-unit">' + p.kpi3unit + '</span>';
-          // DANE GEIH · trimestre móvil ene-mar 2026
-          document.getElementById('kpi1').innerHTML = '0.0' + u1;
-          animCount(document.getElementById('kpi1'), 9.6, 1500, u1, 1);
-          document.getElementById('kpi2').innerHTML = '0.0' + u2;
-          animCount(document.getElementById('kpi2'), 12.2, 1700, u2, 1);
-          document.getElementById('kpi3').innerHTML = '0.0' + u3;
-          animCount(document.getElementById('kpi3'), 4.4, 1900, u3, 1);
-          document.querySelectorAll('.kpi-bar-fill').forEach(bar => {
-            setTimeout(() => bar.style.width = bar.dataset.w, 300);
-          });
-          kpiObs.unobserve(e.target);
-        }
+    document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; cursor.style.left = mx + 'px'; cursor.style.top = my + 'px'; });
+    (function animRing(){ rx += (mx - rx) * 0.14; ry += (my - ry) * 0.14; ring.style.left = rx + 'px'; ring.style.top = ry + 'px'; requestAnimationFrame(animRing); })();
+    function attachHover(els) {
+      els.forEach(el => {
+        el.addEventListener('mouseenter', () => { cursor.style.transform='translate(-50%,-50%) scale(2.4)'; cursor.style.background='transparent'; cursor.style.border='1.5px solid var(--blue)'; ring.style.opacity='0'; });
+        el.addEventListener('mouseleave', () => { cursor.style.transform='translate(-50%,-50%) scale(1)'; cursor.style.background='var(--blue)'; cursor.style.border='none'; ring.style.opacity='0.5'; });
       });
-    }, { threshold: 0.15 });
-    kpiObs.observe(document.getElementById('portal'));
-
-    // ─── CHARTS ───────────────────────────────────────────────────────────────
-    Chart.defaults.color = '#555';
-    Chart.defaults.font.family = "'DM Mono', monospace";
-
-    const t0 = i18n[currentLang];
-    // ─── DANE GEIH MLS · trimestre móvil cerrado en marzo de cada año ────────
-    //     Tasa de desempleo Nacional / Hombres / Mujeres
-    window.lineChartInst = new Chart(document.getElementById('lineChart').getContext('2d'), {
-      type: 'line',
-      data: {
-        labels: ['mar 2021','mar 2022','mar 2023','mar 2024','mar 2025','mar 2026'],
-        datasets: [
-          { label: t0.portal.lineDatasets[0], data: [16.0,13.2,11.7,11.9,10.5, 9.6], borderColor:'#0047FF', backgroundColor:'rgba(0,71,255,0.08)', tension:0.4, fill:true, pointRadius:4, pointBackgroundColor:'#0047FF' },
-          { label: t0.portal.lineDatasets[1], data: [13.0,10.4, 9.2, 9.6, 8.0, 7.7], borderColor:'#00d68f', backgroundColor:'rgba(0,214,143,0.05)', tension:0.4, fill:true, pointRadius:4, pointBackgroundColor:'#00d68f' },
-          { label: t0.portal.lineDatasets[2], data: [20.2,17.1,15.1,15.0,13.9,12.2], borderColor:'#ff4757', backgroundColor:'rgba(255,71,87,0.05)', tension:0.4, fill:true, pointRadius:4, pointBackgroundColor:'#ff4757' },
-        ]
-      },
-      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ font:{ size:10 }, color:'#555', boxWidth:10 } }, tooltip:{ callbacks:{ label: (ctx) => ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(1) + '%' } } }, scales:{ x:{ grid:{ color:'#1e1e1e' }, ticks:{ color:'#555', font:{size:10} } }, y:{ grid:{ color:'#1e1e1e' }, ticks:{ color:'#555', font:{size:10}, callback: (v) => v + '%' } } } }
-    });
-
-    // ─── DANE · brecha de género (TD muj − TD hom) por las 23 ciudades ──────
-    //     mar 2026: 5 ciudades con brecha ≥5 pp · 7 con 2-5 pp · 11 con <2 pp
-    window.donutChartInst = new Chart(document.getElementById('donutChart').getContext('2d'), {
-      type: 'doughnut',
-      data: {
-        labels: t0.portal.donutLabels,
-        datasets: [{ data: [5,7,11], backgroundColor:['#ff4757','#f0c040','#00d68f'], borderWidth:0, hoverOffset:8 }]
-      },
-      options: { responsive:true, maintainAspectRatio:false, cutout:'68%', plugins:{ legend:{ position:'right', labels:{ font:{size:9}, color:'#555', boxWidth:10, padding:12 } }, tooltip:{ callbacks:{ label: (ctx) => ctx.label + ': ' + ctx.parsed + ' ciudades' } } } }
-    });
-
-    // ─── DANE · tasa de desempleo de mujeres por ciudad · mar 2026 (%) ───────
-    window.barChartInst = new Chart(document.getElementById('barChart').getContext('2d'), {
-      type: 'bar',
-      data: {
-        labels: t0.portal.barCities,
-        datasets: [{ label: t0.portal.barLabel2, data: [29.4,18.6,13.0,12.9,12.7,11.3,11.1, 9.2], backgroundColor: (ctx) => ctx.dataIndex === 0 ? '#ff4757' : '#0047FF', borderRadius:2 }]
-      },
-      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label: (ctx) => ctx.parsed.y.toFixed(1) + '%' } } }, scales:{ x:{ grid:{ color:'#1e1e1e' }, ticks:{ color:'#555', font:{size:10} } }, y:{ grid:{ color:'#1e1e1e' }, ticks:{ color:'#555', font:{size:10}, callback: (v) => v + '%' } } } }
-    });
-
-    // ─── ROTATING WORDS ───────────────────────────────────────────────────────
-    function startRotate(elId, words, interval) {
-      let i = 0;
-      const el = document.getElementById(elId);
-      return setInterval(() => {
-        el.classList.add('fading');
-        setTimeout(() => {
-          i = (i + 1) % words.length;
-          el.textContent = words[i];
-          el.classList.remove('fading');
-        }, 350);
-      }, interval);
     }
+    attachHover(document.querySelectorAll('a, button, .card, .svc-card'));
 
-    // ─── COUNTRY SELECTOR ────────────────────────────────────────────────────
-    // Las funciones toggleCountryDropdown y selectCountry las provee lang.js
-    // Solo necesitamos exponer __applyLang para que lang.js llame a setLanguage
-    window.__applyLang = function(lang) {
-      currentLang = lang;
-      setLanguage(lang);
-    };
-
-    // ─── SESSION NAV ──────────────────────────────────────────────────────────
+    // ─── SESSION / AUTH ─────────────────────────────────────────────────────
     function updateNavAuth() {
       const token = localStorage.getItem('rr-token');
       const user  = JSON.parse(localStorage.getItem('rr-user') || 'null');
       const area  = document.getElementById('nav-auth-area');
-      const t     = i18n[currentLang] || i18n.co;
-
+      if (!area) return;
       if (token && user) {
         const planLabels = currentLang === 'us'
-          ? { free: 'Free', basic: 'Basic', analysis: 'Analysis', full: 'Full', pro: 'Pro', premium: 'Premium' }
+          ? { free:'Free', basic:'Basic', analysis:'Analysis', full:'Full', pro:'Pro', premium:'Premium' }
           : currentLang === 'cn'
-          ? { free: '免费', basic: '基础版', analysis: '分析版', full: '完整版', pro: 'Pro', premium: 'Premium' }
+          ? { free:'免费', basic:'基础版', analysis:'分析版', full:'完整版', pro:'Pro', premium:'Premium' }
           : currentLang === 'br'
-          ? { free: 'Free', basic: 'Básico', analysis: 'Análise', full: 'Completo', pro: 'Pro', premium: 'Premium' }
-          : { free: 'Free', basic: 'Básico', analysis: 'Análisis', full: 'Completo', pro: 'Pro', premium: 'Premium' };
+          ? { free:'Free', basic:'Básico', analysis:'Análise', full:'Completo', pro:'Pro', premium:'Premium' }
+          : { free:'Free', basic:'Básico', analysis:'Análisis', full:'Completo', pro:'Pro', premium:'Premium' };
+        const perfilLabel = currentLang === 'us' ? 'My profile' : currentLang === 'cn' ? '我的资料' : currentLang === 'br' ? 'Meu perfil' : 'Mi perfil';
         const logoutLabel = currentLang === 'us' ? 'Log out' : currentLang === 'cn' ? '退出' : currentLang === 'br' ? 'Sair' : 'Salir';
+        area.dataset.loggedIn = '1';
         area.innerHTML = `
-          <div class="nav-user">
-            <a href="dashboard.html" class="nav-user-plan">${planLabels[user.plan] || user.plan}</a>
-            <a href="dashboard.html" class="nav-user-name">${user.name.split(' ')[0]}</a>
-            <button class="nav-logout" onclick="logOut()">${logoutLabel}</button>
-          </div>`;
+          <a href="dashboard.html" class="e-user-plan">${planLabels[user.plan] || user.plan}</a>
+          <a href="dashboard.html" class="e-btn-profile">${perfilLabel}</a>
+          <button class="e-btn-logout" onclick="logOut()">${logoutLabel}</button>`;
       } else {
+        delete area.dataset.loggedIn;
+        const t = i18n[currentLang] || i18n.co;
         area.innerHTML = `
-          <div class="nav-auth">
-            <a href="login.html" class="nav-login">${t.nav.login}</a>
-            <a href="register.html" class="nav-register">${t.nav.register}</a>
-          </div>`;
+          <a href="login.html" class="e-btn-login">${t.nav.login}</a>
+          <a href="register.html" class="e-btn-register">${t.nav.register}</a>`;
       }
+      attachHover(area.querySelectorAll('a, button'));
     }
 
     async function logOut() {
       const token = localStorage.getItem('rr-token');
-      if (token) {
-        try {
-          await fetch('https://rr-auth.reruizc.workers.dev/auth/logout', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-          });
-        } catch {}
-      }
-      localStorage.removeItem('rr-token');
-      localStorage.removeItem('rr-user');
+      if (token) { try { await fetch('https://rr-auth.reruizc.workers.dev/auth/logout', { method:'POST', headers:{ 'Authorization':`Bearer ${token}` } }); } catch {} }
+      localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user');
       updateNavAuth();
     }
 
-    // Llama updateNavAuth después de setLanguage
-    const _origSetLanguage = setLanguage;
-    setLanguage = function(lang) { _origSetLanguage(lang); updateNavAuth(); };
+    // lang.js llama a window.__applyLang; refrescamos auth después de traducir
+    window.__applyLang = function(lang) { setLanguage(lang); updateNavAuth(); };
 
     // Init
     setLanguage(currentLang);
-
+    updateNavAuth();
   </script>
   <script src="lang.js?v=20260527"></script>
 </body>
