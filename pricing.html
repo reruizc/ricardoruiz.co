@@ -7,567 +7,266 @@
   <title id="pageTitle">Planes · Ricardo Ruiz</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&family=Fraunces:opsz,wght@9..144,300;9..144,400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
   <style>
+    /* Helvetica Neue embebida (familia completa). El logo va aparte en Syne. */
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-thin.woff2') format('woff2'); font-weight:200; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-light.woff2') format('woff2'); font-weight:300; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-medium.woff2') format('woff2'); font-weight:500; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-bold.woff2') format('woff2'); font-weight:600 900; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-italic.woff2') format('woff2'); font-weight:400; font-style:italic; font-display:swap; }
+
     :root {
-      --black: #0a0a0a;
-      --white: #e6ded3;
+      --white: #f4f3ef;
+      --black: #0e1220;
       --blue: #0047FF;
       --blue-light: #3d6fff;
-      --gray: #888;
-      --gray-light: #e0dfd9;
+      --orange: #f97316;
+      --gray: rgba(255,255,255,.45);
+      --card-bg: rgba(10,10,16,0.75);
+      --card-border: rgba(255,255,255,0.07);
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
     body {
-      background: var(--white);
-      color: var(--black);
-      font-family: 'Fraunces', serif;
-      overflow-x: hidden;
-      cursor: none;
+      background: #060810; color: var(--white);
+      font-family: 'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;
+      overflow-x: hidden; cursor: none;
     }
+    body::before { content:''; position:fixed; inset:0; z-index:-1;
+      background:
+        radial-gradient(1100px 600px at 78% -8%, rgba(0,71,255,0.18), transparent 60%),
+        radial-gradient(900px 500px at 12% 108%, rgba(0,71,255,0.10), transparent 60%),
+        #060810; }
 
-    /* CURSOR */
-    .cursor { position:fixed; width:12px; height:12px; background:var(--blue); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s ease,background .2s; transform:translate(-50%,-50%); }
-    .cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--blue); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s ease,opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+    /* ── CURSOR ── */
+    .cursor { position: fixed; width: 10px; height: 10px; background: var(--blue); border-radius: 50%;
+      pointer-events: none; z-index: 100000; transform: translate(-50%,-50%); transition: transform .15s, background .2s, border .2s; }
+    .cursor-ring { position: fixed; width: 34px; height: 34px; border: 1px solid rgba(0,71,255,.5); border-radius: 50%;
+      pointer-events: none; z-index: 99999; transform: translate(-50%,-50%); opacity: .5; }
 
-    /* NAV */
-    nav {
-      position: fixed; top:0; left:0; right:0;
-      display: flex; justify-content:space-between; align-items:center;
-      padding: 1.5rem 3rem; z-index:100;
-      background: rgba(244,243,239,0.88); backdrop-filter:blur(12px);
-      border-bottom: 1px solid rgba(0,0,0,0.07);
-    }
-    .nav-logo-wrap { display:flex; align-items:center; gap:.75rem; text-decoration:none; }
-    .nav-logo { font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(1.1rem,2vw,1.8rem); letter-spacing:-.03em; color:var(--black); line-height:1; }
-    .nav-logo span { color:var(--blue); }
-    .nav-bars { display:flex; align-items:flex-end; gap:3px; height:18px; }
-    .nav-bar { width:5px; background:var(--blue); border-radius:1px 1px 0 0; opacity:.85; }
-    .nav-back { font-family:'DM Mono',monospace; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--gray); text-decoration:none; transition:color .2s; }
-    .nav-back:hover { color:var(--blue); }
-    .nav-right { display:flex; align-items:center; gap:1rem; }
-    .country-selector-wrap { position:relative; }
-    .country-btn { font-family:'DM Mono',monospace; font-size:.72rem; letter-spacing:.08em; text-transform:uppercase; color:var(--black); background:transparent; border:1.5px solid var(--gray-light); padding:.4rem .85rem; cursor:none; display:flex; align-items:center; transition:border-color .2s,color .2s; }
-    .country-btn:hover,.country-btn.open { border-color:var(--blue); color:var(--blue); }
-    .country-dropdown { position:absolute; top:calc(100% + 10px); right:0; background:var(--white); border:1.5px solid var(--gray-light); min-width:190px; display:none; flex-direction:column; z-index:200; box-shadow:0 8px 24px rgba(0,0,0,.08); }
-    .country-dropdown.open { display:flex; }
-    .country-option { font-family:'DM Mono',monospace; font-size:.72rem; letter-spacing:.05em; padding:.7rem 1rem; cursor:none; display:flex; align-items:center; gap:.5rem; color:var(--black); border-bottom:1px solid var(--gray-light); transition:background .15s; user-select:none; }
-    .country-option:last-child { border-bottom:none; }
-    .country-option:hover { background:rgba(0,71,255,.05); }
-    .country-option.selected { color:var(--blue); }
-    .country-check { font-size:.65rem; width:12px; opacity:0; color:var(--blue); font-weight:bold; }
-    .country-option.selected .country-check { opacity:1; }
+    /* ── NAV (barra electoral) ── */
+    .electoral-nav{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(4,6,16,.6);backdrop-filter:blur(8px)}
+    .e-nav-left{display:flex;align-items:center;gap:1rem;min-width:0}
+    .e-nav-right{display:flex;align-items:center;gap:1.2rem;flex-shrink:0}
+    .electoral-nav-auth{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
+    .e-btn-back{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:#4ade80;text-decoration:none;border:1.5px solid rgba(74,222,128,.4);padding:.35rem .8rem;transition:color .2s,border-color .2s,background .2s;flex-shrink:0;white-space:nowrap;cursor:none}
+    .e-btn-back:hover{color:#060810;background:#4ade80;border-color:#4ade80}
+    .e-btn-login{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-decoration:none;background:var(--orange);border:1.5px solid var(--orange);padding:.35rem .8rem;transition:background .2s,border-color .2s;cursor:none;white-space:nowrap}
+    .e-btn-login:hover{background:#ea6d0d;border-color:#ea6d0d}
+    .e-btn-profile{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-decoration:none;background:var(--orange);border:1.5px solid var(--orange);padding:.35rem .8rem;transition:background .2s,border-color .2s;cursor:none;white-space:nowrap}
+    .e-btn-profile:hover{background:#ea6d0d;border-color:#ea6d0d}
+    .e-btn-register{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-decoration:none;background:var(--blue);border:1.5px solid var(--blue);padding:.35rem .8rem;white-space:nowrap}
+    .e-btn-register:hover{background:#0035cc;border-color:#0035cc}
+    .e-user-plan{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.69rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue-light);background:rgba(0,71,255,.12);padding:.2rem .6rem;text-decoration:none;white-space:nowrap}
+    .e-btn-logout{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.25);background:none;border:none;cursor:none;padding:0;white-space:nowrap}
+    .e-btn-logout:hover{color:rgba(255,255,255,.6)}
+    .country-selector-wrap{position:relative}
+    .country-btn{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-weight:500;font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.45);background:none;border:1px solid rgba(255,255,255,.15);padding:.3rem .65rem;cursor:none;display:flex;align-items:center;transition:border-color .2s,color .2s;white-space:nowrap}
+    .country-btn:hover,.country-btn.open{border-color:rgba(255,255,255,.35);color:rgba(255,255,255,.7)}
+    .country-btn.open #countryChevron{transform:rotate(180deg)}
+    .country-dropdown{position:absolute;top:calc(100% + 8px);right:0;background:#0e1220;border:1px solid rgba(255,255,255,.12);min-width:200px;display:none;flex-direction:column;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+    .country-dropdown.open{display:flex}
+    .country-option{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-weight:500;font-size:.68rem;letter-spacing:.04em;padding:.65rem 1rem;cursor:none;display:flex;align-items:center;gap:.5rem;color:rgba(255,255,255,.5);border-bottom:1px solid rgba(255,255,255,.07);transition:background .15s;user-select:none}
+    .country-option:last-child{border-bottom:none}
+    .country-option:hover{background:rgba(255,255,255,.05);color:rgba(255,255,255,.8)}
+    .country-option.selected{color:var(--blue-light)}
+    .country-check{font-size:.6rem;width:12px;opacity:0;color:var(--blue-light)}
+    .country-option.selected .country-check{opacity:1}
+    .logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.85;transition:opacity .2s;flex-shrink:0;cursor:none}
+    .logo-link:hover{opacity:1}
+    .logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px}
+    .logo-bar{width:5px;background:var(--blue);border-radius:1px 1px 0 0;opacity:.85}
+    .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.1rem,2vw,1.8rem);letter-spacing:-.03em;color:var(--white);line-height:1}
+    .logo-text span{color:var(--blue)}
 
-    /* HERO */
-    .pricing-hero {
-      padding: 10rem 3rem 4rem;
-      text-align: center;
-      position: relative;
-      overflow: hidden;
-    }
-    .pricing-hero-bg {
-      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
-      font-family: 'Syne', sans-serif; font-weight: 800;
-      font-size: clamp(120px, 18vw, 240px);
-      color: transparent; -webkit-text-stroke: 1px rgba(0,71,255,0.05);
-      white-space: nowrap; user-select: none; pointer-events: none;
-      letter-spacing: -0.04em;
-    }
-    .pricing-label {
-      font-family: 'DM Mono', monospace; font-size:.7rem;
-      letter-spacing:.2em; text-transform:uppercase; color:var(--blue);
-      margin-bottom: 1rem; display:flex; align-items:center; justify-content:center; gap:1rem;
-    }
+    /* ── HERO ── */
+    .pricing-hero { position:relative; text-align:center; padding: 3.2rem 2rem 1.6rem; overflow:hidden; }
+    .pricing-hero-bg { position:absolute; top:-1.5rem; left:50%; transform:translateX(-50%);
+      font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-weight:800;
+      font-size:clamp(5rem,16vw,13rem); letter-spacing:-.05em; line-height:1; color:transparent;
+      -webkit-text-stroke:1px rgba(0,71,255,0.16); pointer-events:none; user-select:none; white-space:nowrap; }
+    .pricing-label { position:relative; z-index:1; font-weight:500; font-size:.72rem; letter-spacing:.22em; text-transform:uppercase;
+      color: var(--blue-light); margin-bottom:1rem; display:flex; align-items:center; justify-content:center; gap:1rem; }
     .pricing-label::before, .pricing-label::after { content:''; display:block; width:30px; height:1px; background:var(--blue); }
-    .pricing-title {
-      font-family: 'Syne', sans-serif; font-weight:800;
-      font-size: clamp(2.5rem, 6vw, 5rem);
-      letter-spacing: -.03em; line-height:.95;
-      margin-bottom: 1.5rem; position:relative; z-index:1;
-    }
-    .pricing-title em { font-style:italic; font-family:'Fraunces',serif; font-weight:300; color:var(--blue); }
-    .pricing-sub {
-      font-family: 'Fraunces', serif; font-weight:300;
-      font-size: 1.1rem; color:#555; line-height:1.7;
-      max-width: 480px; margin: 0 auto 2.5rem;
-      position: relative; z-index:1;
-    }
+    .pricing-title { position:relative; z-index:1; font-weight:800;
+      font-size:clamp(2.2rem, 5.5vw, 4.2rem); letter-spacing:-.03em; line-height:1; color:var(--white); margin-bottom:1rem; }
+    .pricing-title em { font-style:normal; color:var(--blue-light); }
+    .pricing-sub { position:relative; z-index:1; font-weight:400;
+      font-size:clamp(.9rem, 1.4vw, 1.05rem); color:rgba(255,255,255,.55); max-width:520px; margin:0 auto 1.6rem; line-height:1.6; }
+    .promo-tag { display:inline-flex; align-items:center; gap:.5rem; background:rgba(249,115,22,0.1); border:1px solid rgba(249,115,22,0.3);
+      border-radius:2rem; padding:.35rem 1rem; margin-bottom:2rem;
+      font-weight:500; font-size:.66rem; letter-spacing:.1em; text-transform:uppercase; color:#ffa057; position:relative; z-index:1; }
+    .promo-tag .promo-dot { width:6px; height:6px; border-radius:50%; background:#f97316; flex-shrink:0; }
 
-    /* TOGGLES */
-    .toggles-wrap {
-      display: flex; align-items:center; justify-content:center;
-      gap: 2rem; margin-bottom: 3.5rem; flex-wrap: wrap;
-      position: relative; z-index:1;
-    }
-    .toggle-group {
-      display: flex; align-items:center; gap:.75rem;
-      font-family: 'DM Mono', monospace; font-size:.65rem;
-      letter-spacing:.12em; text-transform:uppercase; color:#aaa;
-    }
-    .toggle-group span.active { color:var(--black); }
-    .toggle-pill {
-      width: 44px; height: 24px;
-      background: var(--black); border-radius: 12px;
-      position: relative; cursor: none;
-      transition: background .25s;
-      border: none; padding: 0;
-      flex-shrink: 0;
-    }
-    .toggle-pill::after {
-      content: ''; position:absolute;
-      width: 18px; height: 18px; border-radius: 50%;
-      background: var(--white); top:3px; left:3px;
-      transition: transform .25s;
-    }
-    .toggle-pill.on { background: var(--blue); }
-    .toggle-pill.on::after { transform: translateX(20px); }
-    .toggle-save {
-      font-family: 'DM Mono', monospace; font-size:.58rem;
-      letter-spacing:.1em; text-transform:uppercase;
-      color: var(--blue); background: rgba(0,71,255,0.08);
-      padding: .2rem .6rem; opacity:0; transition:opacity .2s;
-    }
+    /* ── TOGGLES ── */
+    .toggles-wrap { position:relative; z-index:1; display:flex; align-items:center; justify-content:center; gap:2.5rem; flex-wrap:wrap; }
+    .toggle-group { display:flex; align-items:center; gap:.7rem;
+      font-weight:500; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.35); }
+    .toggle-group span.active { color:var(--white); font-weight:700; }
+    .toggle-pill { position:relative; width:44px; height:22px; border-radius:22px; background:rgba(255,255,255,.12);
+      border:1px solid rgba(255,255,255,.18); cursor:none; transition:background .25s; flex-shrink:0; }
+    .toggle-pill::after { content:''; position:absolute; top:2px; left:3px; width:15px; height:15px; border-radius:50%;
+      background:var(--white); transition:transform .25s; }
+    .toggle-pill.on { background:var(--blue); border-color:var(--blue); }
+    .toggle-pill.on::after { transform:translateX(21px); }
+    .toggle-save { font-size:.62rem; color:#4ade80; letter-spacing:.08em; opacity:0; transition:opacity .25s; }
     .toggle-save.visible { opacity:1; }
 
-    /* PLANS GRID */
-    .plans-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 1px;
-      background: var(--gray-light);
-      border: 1px solid var(--gray-light);
-      margin: 0 3rem 6rem;
-    }
+    /* ── COMPARISON ── */
+    .comparison-section { max-width:1200px; margin:1.5rem auto 0; padding:0 2rem; }
+    .comparison-head { display:flex; align-items:flex-end; justify-content:space-between; gap:2rem; margin-bottom:1.2rem; flex-wrap:wrap; }
+    .comparison-label { font-weight:500; font-size:.68rem; letter-spacing:.2em; text-transform:uppercase; color:var(--blue-light); margin-bottom:.5rem; }
+    .comparison-title { font-weight:800; font-size:clamp(1.3rem,2.6vw,1.9rem); letter-spacing:-.02em; color:var(--white); }
+    .comparison-sub { font-weight:400; font-size:.85rem; color:rgba(255,255,255,.5); max-width:420px; line-height:1.6; }
+    .comparison-table-wrap { overflow-x:auto; border:1px solid var(--card-border); background:var(--card-bg); backdrop-filter:blur(6px); }
+    .comparison-table { width:100%; border-collapse:collapse; min-width:720px; }
+    .comparison-table th { font-weight:700; font-size:.72rem; letter-spacing:.08em; text-transform:uppercase; color:var(--white);
+      text-align:center; padding:.9rem .8rem; border-bottom:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.03); }
+    .comparison-table th:first-child { text-align:left; }
+    .comparison-table th.plan-col-featured { color:var(--blue-light); }
+    .comparison-table td { padding:.7rem .8rem; border-bottom:1px solid rgba(255,255,255,.05); text-align:center; vertical-align:middle; }
+    .comparison-table tr:last-child td { border-bottom:none; }
+    .comparison-table tr:hover td { background:rgba(0,71,255,.05); }
+    .comparison-feature-cell { text-align:left !important; max-width:340px; }
+    .comparison-feature-title { font-weight:500; font-size:.8rem; color:rgba(255,255,255,.8); line-height:1.4; }
+    .comparison-feature-note { font-weight:400; font-size:.68rem; color:rgba(255,255,255,.38); margin-top:.2rem; line-height:1.4; }
+    .comparison-check { color:#4ade80; font-weight:700; font-size:.9rem; }
+    .comparison-dash { color:rgba(255,255,255,.2); }
+    .comparison-value { font-weight:500; font-size:.74rem; color:var(--blue-light); }
+    .comparison-footnote { font-weight:400; font-size:.78rem; color:rgba(255,255,255,.45); margin-top:1rem; line-height:1.6; max-width:760px; }
 
-    .plan-card {
-      background: var(--white);
-      padding: 2.5rem 2rem;
-      position: relative;
-      transition: background .2s;
-    }
-    .plan-card:hover { background: #fafaf8; }
-    .plan-card.featured {
-      background: var(--black);
-      color: var(--white);
-    }
-    .plan-card.featured:hover { background: #111; }
-
-    /* Featured top bar */
-    .plan-card.featured::before {
-      content: '';
-      position: absolute; top:0; left:0; right:0;
-      height: 3px; background: var(--blue);
-    }
-
-    .plan-badge {
-      font-family: 'DM Mono', monospace; font-size:.58rem;
-      letter-spacing:.18em; text-transform:uppercase;
-      color: var(--blue); margin-bottom: 1.2rem;
-      display: flex; align-items:center; gap:.5rem;
-    }
+    /* ── PLANES ── */
+    .plans-grid { max-width:1200px; margin:2.5rem auto 0; padding:0 2rem;
+      display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; }
+    .plan-card { position:relative; background:var(--card-bg); border:1px solid var(--card-border);
+      padding:1.6rem 1.4rem; display:flex; flex-direction:column; backdrop-filter:blur(6px); transition:border-color .25s, transform .2s; }
+    .plan-card:hover { border-color:rgba(0,71,255,.5); }
+    .plan-card.featured { background:linear-gradient(150deg, rgba(0,71,255,0.2), rgba(6,10,26,0.9) 60%); border-color:rgba(0,71,255,.45); }
+    .plan-card.featured:hover { border-color:rgba(0,71,255,.8); }
+    .plan-badge { display:flex; align-items:center; gap:.5rem; font-weight:500; font-size:.62rem;
+      letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.4); margin-bottom:.9rem; }
     .plan-badge-dot { width:5px; height:5px; border-radius:50%; background:var(--blue); flex-shrink:0; }
-    .plan-featured-tag {
-      font-family: 'DM Mono', monospace; font-size:.55rem;
-      letter-spacing:.15em; text-transform:uppercase;
-      color: var(--white); background: var(--blue);
-      padding: .2rem .65rem; margin-left: auto;
-    }
-
-    .plan-name {
-      font-family: 'Syne', sans-serif; font-weight:800;
-      font-size: 1.6rem; letter-spacing:-.03em; line-height:1;
-      margin-bottom: .75rem;
-    }
-    .plan-desc {
-      font-family: 'Fraunces', serif; font-weight:300;
-      font-size: .9rem; line-height:1.65;
-      color: #777; margin-bottom: 2rem;
-    }
-    .plan-card.featured .plan-desc { color: #666; }
-
-    /* PRICE */
-    .plan-price-wrap { margin-bottom: 2rem; }
-    .plan-price {
-      font-family: 'Syne', sans-serif; font-weight:800;
-      font-size: clamp(2rem, 3.5vw, 3rem);
-      letter-spacing: -.04em; line-height:1;
-      display: flex; align-items:baseline; gap:.3rem;
-    }
-    .plan-price-currency {
-      font-family: 'DM Mono', monospace; font-weight:400;
-      font-size: 1rem; letter-spacing:.04em; color:#aaa;
-    }
-    .plan-card.featured .plan-price-currency { color:#555; }
-    .plan-price-period {
-      font-family: 'DM Mono', monospace; font-size:.75rem;
-      letter-spacing:.08em; text-transform:uppercase;
-      color: #aaa; margin-top:.3rem;
-    }
-    .plan-card.featured .plan-price-period { color:#555; }
-    .plan-price-annual {
-      font-family: 'DM Mono', monospace; font-size:.6rem;
-      letter-spacing:.08em; color:var(--blue);
-      margin-top:.25rem; opacity:0; transition:opacity .2s;
-    }
+    .plan-featured-tag { font-weight:700; font-size:.58rem; letter-spacing:.1em; color:#060810;
+      background:#4ade80; padding:.18rem .5rem; margin-left:auto; }
+    .plan-name { font-weight:800; font-size:1.35rem; letter-spacing:-.02em; color:var(--white); margin-bottom:.5rem; }
+    .plan-desc { font-weight:400; font-size:.78rem; line-height:1.55; color:rgba(255,255,255,.5); margin-bottom:1.4rem; min-height:3.6em; }
+    .plan-price-wrap { margin-bottom:1.4rem; }
+    .plan-price { font-weight:800; font-size:1.9rem; letter-spacing:-.02em; color:var(--white);
+      display:flex; align-items:baseline; gap:.35rem; }
+    .plan-price-currency { font-weight:500; font-size:.66rem; letter-spacing:.1em; color:rgba(255,255,255,.4); }
+    .plan-price-period { font-weight:400; font-size:.7rem; color:rgba(255,255,255,.4); margin-top:.25rem; }
+    .plan-price-annual { font-weight:500; font-size:.64rem; letter-spacing:.05em; color:#4ade80; margin-top:.3rem; opacity:0; transition:opacity .25s; }
     .plan-price-annual.visible { opacity:1; }
-    .plan-free-tag {
-      font-family: 'Syne', sans-serif; font-weight:800;
-      font-size: 2rem; letter-spacing:-.03em;
-    }
+    .plan-free-tag { font-weight:800; font-size:1.6rem; letter-spacing:-.02em; color:var(--white); }
+    .plan-features { list-style:none; margin-bottom:1.6rem; flex:1; }
+    .plan-features li { font-weight:400; font-size:.76rem; line-height:1.5; color:rgba(255,255,255,.62);
+      padding:.34rem 0 .34rem 1.1rem; position:relative; border-bottom:1px solid rgba(255,255,255,.04); }
+    .plan-features li::before { content:'✓'; position:absolute; left:0; color:#4ade80; font-size:.7rem; }
+    .plan-features li.muted { color:rgba(255,255,255,.25); }
+    .plan-features li.muted::before { content:'—'; color:rgba(255,255,255,.15); }
+    .plan-cta { display:block; text-align:center; font-weight:700; font-size:.76rem; letter-spacing:.08em; text-transform:uppercase;
+      padding:.7rem 1rem; text-decoration:none; cursor:none; transition:background .2s,color .2s,border-color .2s; }
+    .plan-cta-outline { background:none; color:var(--white); border:1.5px solid rgba(255,255,255,.28); }
+    .plan-cta-outline:hover { border-color:var(--white); }
+    .plan-cta-solid, .plan-cta-dark { background:var(--blue); color:var(--white); border:1.5px solid var(--blue); }
+    .plan-cta-solid:hover, .plan-cta-dark:hover { background:#0035cc; border-color:#0035cc; }
+    .plan-cta-ghost { background:none; color:rgba(255,255,255,.55); border:1.5px solid rgba(255,255,255,.15); }
+    .plan-cta-ghost:hover { color:var(--white); border-color:rgba(255,255,255,.4); }
+    .compare-note { text-align:center; font-weight:400; font-size:.72rem; letter-spacing:.04em;
+      color:rgba(255,255,255,.35); margin:1.4rem auto 0; padding:0 2rem; }
 
-    /* FEATURES */
-    .plan-features {
-      list-style: none; display:flex; flex-direction:column; gap:.75rem;
-      margin-bottom: 2.5rem;
-    }
-    .plan-features li {
-      font-family: 'DM Mono', monospace; font-size:.8rem;
-      letter-spacing:.04em; color:#444;
-      display: flex; gap:.65rem; align-items:flex-start;
-      line-height: 1.5;
-    }
-    .plan-card.featured .plan-features li { color:#888; }
-    .plan-features li::before {
-      content: '→'; color:var(--blue); flex-shrink:0;
-      font-size:.6rem; margin-top:.1rem;
-    }
-    .plan-features li.muted::before { content: '—'; color:#ccc; }
-    .plan-features li.muted { color:#ccc; }
-    .plan-card.featured .plan-features li.muted { color:#333; }
+    /* ── PLAN DATOS (pago único) ── */
+    .datos-section { max-width:1200px; margin:3.5rem auto 0; padding:0 2rem; }
+    .datos-head { margin-bottom:1.4rem; }
+    .datos-label { font-weight:500; font-size:.68rem; letter-spacing:.2em; text-transform:uppercase; color:var(--blue-light); margin-bottom:.5rem; }
+    .datos-title { font-weight:800; font-size:clamp(1.5rem,3vw,2.2rem); letter-spacing:-.02em; color:var(--white); margin-bottom:.7rem; }
+    .datos-title em { font-style:normal; color:var(--blue-light); }
+    .datos-sub { font-weight:400; font-size:.85rem; color:rgba(255,255,255,.5); max-width:760px; line-height:1.65; }
+    .datos-tiers { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+    .datos-tier { position:relative; background:var(--card-bg); border:1px solid var(--card-border);
+      padding:1.5rem 1.4rem; display:flex; flex-direction:column; backdrop-filter:blur(6px); transition:border-color .25s; }
+    .datos-tier:hover { border-color:rgba(0,71,255,.5); }
+    .datos-tier.featured { background:linear-gradient(150deg, rgba(0,71,255,0.2), rgba(6,10,26,0.9) 60%); border-color:rgba(0,71,255,.45); }
+    .datos-tier-head { display:flex; align-items:center; justify-content:space-between; gap:.5rem;
+      font-weight:500; font-size:.62rem; letter-spacing:.14em; text-transform:uppercase; color:rgba(255,255,255,.4); margin-bottom:.8rem; }
+    .datos-tier-tag { font-weight:700; font-size:.58rem; letter-spacing:.1em; color:#060810; background:#4ade80; padding:.18rem .5rem; }
+    .datos-tier-name { font-weight:800; font-size:1.2rem; letter-spacing:-.02em; color:var(--white); margin-bottom:.5rem; }
+    .datos-tier-desc { font-weight:400; font-size:.76rem; line-height:1.55; color:rgba(255,255,255,.5); margin-bottom:1.2rem; min-height:3.4em; }
+    .datos-tier-price { font-weight:800; font-size:1.65rem; letter-spacing:-.02em; color:var(--white); display:flex; align-items:baseline; gap:.35rem; }
+    .datos-tier-currency { font-weight:500; font-size:.64rem; letter-spacing:.1em; color:rgba(255,255,255,.4); }
+    .datos-tier-once { font-weight:400; font-size:.68rem; color:rgba(255,255,255,.4); margin:.25rem 0 1.2rem; }
+    .datos-tier-features { list-style:none; margin-bottom:1.5rem; flex:1; }
+    .datos-tier-features li { font-weight:400; font-size:.74rem; line-height:1.5; color:rgba(255,255,255,.62);
+      padding:.32rem 0 .32rem 1.1rem; position:relative; border-bottom:1px solid rgba(255,255,255,.04); }
+    .datos-tier-features li::before { content:'✓'; position:absolute; left:0; color:#4ade80; font-size:.7rem; }
+    .datos-tier-cta { display:block; text-align:center; font-weight:700; font-size:.74rem; letter-spacing:.08em; text-transform:uppercase;
+      background:none; color:var(--white); border:1.5px solid rgba(255,255,255,.28); padding:.65rem 1rem; text-decoration:none; cursor:none;
+      transition:background .2s,color .2s,border-color .2s; }
+    .datos-tier-cta:hover { background:var(--blue); border-color:var(--blue); }
+    .datos-tier.featured .datos-tier-cta { background:var(--blue); border-color:var(--blue); }
+    .datos-tier.featured .datos-tier-cta:hover { background:#0035cc; border-color:#0035cc; }
+    .datos-foot { font-weight:400; font-size:.7rem; color:rgba(255,255,255,.35); margin-top:1rem; line-height:1.6; max-width:820px; }
 
-    /* CTA BUTTON */
-    .plan-cta {
-      display: block; width:100%;
-      font-family: 'DM Mono', monospace; font-size:.72rem;
-      letter-spacing:.1em; text-transform:uppercase;
-      padding: .9rem 1.5rem; text-align:center;
-      text-decoration: none; cursor: none;
-      transition: background .2s, color .2s, border-color .2s;
-    }
-    .plan-cta-outline {
-      border: 1.5px solid var(--gray-light);
-      color: var(--black); background: transparent;
-    }
-    .plan-cta-outline:hover { border-color:var(--black); }
-    .plan-cta-solid {
-      background: var(--blue); color:#fff;
-      border: 1.5px solid var(--blue);
-    }
-    .plan-cta-solid:hover { background: #0035cc; border-color:#0035cc; }
-    .plan-cta-dark {
-      background: var(--white); color:var(--black);
-      border: 1.5px solid var(--white);
-    }
-    .plan-cta-dark:hover { background: var(--gray-light); border-color:var(--gray-light); }
-    .plan-cta-ghost {
-      border: 1.5px solid #222;
-      color: #666; background: transparent;
-    }
-    .plan-cta-ghost:hover { border-color:#555; color:var(--white); }
+    /* ── CONTEXT / FAQ ── */
+    .context-section { max-width:1200px; margin:3.5rem auto 0; padding:0 2rem 3rem; }
+    .context-grid { display:grid; grid-template-columns:1fr 1.2fr; gap:3rem; }
+    .context-label { font-weight:500; font-size:.68rem; letter-spacing:.2em; text-transform:uppercase; color:var(--blue-light); margin-bottom:.5rem; }
+    .context-title { font-weight:800; font-size:clamp(1.4rem,2.8vw,2rem); letter-spacing:-.02em; color:var(--white); margin-bottom:.9rem; line-height:1.1; }
+    .context-title em { font-style:normal; color:var(--blue-light); }
+    .context-desc { font-weight:400; font-size:.85rem; color:rgba(255,255,255,.55); line-height:1.7; }
+    .faq-list { display:flex; flex-direction:column; gap:6px; }
+    .faq-item { background:var(--card-bg); border:1px solid var(--card-border); padding:1.1rem 1.3rem; backdrop-filter:blur(6px); transition:border-color .25s; }
+    .faq-item:hover { border-color:rgba(0,71,255,.4); }
+    .faq-q { font-weight:700; font-size:.85rem; color:var(--white); margin-bottom:.4rem; }
+    .faq-a { font-weight:400; font-size:.78rem; color:rgba(255,255,255,.55); line-height:1.6; }
 
-    /* COMPARISON TABLE */
-    .comparison-section {
-      margin: 0 3rem 5rem;
-      border: 1px solid var(--gray-light);
-      background: linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.7) 100%);
-      overflow: hidden;
-    }
-    .comparison-head {
-      display:flex; align-items:end; justify-content:space-between;
-      gap:1.5rem; padding: 1.5rem 1.75rem;
-      border-bottom: 1px solid var(--gray-light);
-      background: rgba(255,255,255,0.55);
-    }
-    .comparison-label {
-      font-family:'DM Mono',monospace; font-size:.62rem;
-      letter-spacing:.18em; text-transform:uppercase; color:var(--blue);
-      margin-bottom:.55rem;
-    }
-    .comparison-title {
-      font-family:'Syne',sans-serif; font-weight:800;
-      font-size: clamp(1.2rem, 2vw, 1.8rem);
-      letter-spacing:-.03em; line-height:1;
-    }
-    .comparison-sub {
-      font-family:'Fraunces',serif; font-weight:300;
-      font-size:.9rem; line-height:1.6; color:#666;
-      max-width: 520px;
-    }
-    .comparison-table-wrap { overflow-x:auto; }
-    .comparison-table {
-      width:100%;
-      border-collapse: collapse;
-      min-width: 900px;
-    }
-    .comparison-table th,
-    .comparison-table td {
-      border-bottom: 1px solid var(--gray-light);
-      padding: .95rem 1rem;
-      text-align:center;
-      vertical-align: middle;
-    }
-    .comparison-table thead th {
-      font-family:'DM Mono',monospace; font-size:.66rem;
-      letter-spacing:.12em; text-transform:uppercase;
-      color:#777; background: rgba(255,255,255,0.55);
-      position: sticky; top: 0; z-index: 1;
-    }
-    .comparison-table thead th:first-child {
-      text-align:left;
-      min-width: 270px;
-    }
-    .comparison-table th.plan-col-featured {
-      background: rgba(0,71,255,.08);
-      color: var(--blue);
-    }
-    .comparison-feature-cell {
-      text-align:left !important;
-    }
-    .comparison-feature-title {
-      font-family:'Syne',sans-serif; font-weight:700;
-      font-size:.92rem; letter-spacing:-.01em; color:var(--black);
-      margin-bottom:.15rem;
-    }
-    .comparison-feature-note {
-      font-family:'Fraunces',serif; font-weight:300;
-      font-size:.82rem; line-height:1.45; color:#777;
-    }
-    .comparison-value {
-      font-family:'DM Mono',monospace; font-size:.8rem;
-      letter-spacing:.06em; color:#444;
-    }
-    .comparison-check {
-      display:inline-flex; align-items:center; justify-content:center;
-      width:26px; height:26px; border-radius:50%;
-      border:1px solid rgba(0,71,255,.18);
-      background: rgba(0,71,255,.08);
-      color:var(--blue); font-family:'Syne',sans-serif; font-weight:800;
-      font-size:.88rem;
-    }
-    .comparison-dash {
-      color:#c1bdb5; font-family:'DM Mono',monospace; font-size:.9rem;
-    }
-    .comparison-footnote {
-      padding: 1rem 1.75rem 1.25rem;
-      font-family:'Fraunces',serif; font-weight:300;
-      font-size:.9rem; line-height:1.65; color:#666;
-      background: rgba(255,255,255,0.45);
-    }
+    /* ── FOOTER ── */
+    footer { border-top:1px solid rgba(255,255,255,.07); padding:.8rem 2.5rem;
+      display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap;
+      font-weight:500; font-size:.7rem; letter-spacing:.06em; color:rgba(255,255,255,.28); }
+    footer a { color:rgba(255,255,255,.35); text-decoration:none; transition:color .2s; cursor:none; }
+    footer a:hover { color:var(--white); }
 
-    /* PLAN DATOS · ONE-SHOT */
-    .datos-section {
-      margin: 0 3rem 5rem;
-      padding: 3rem 3rem 3.5rem;
-      background: linear-gradient(135deg, rgba(0,71,255,0.04) 0%, rgba(0,71,255,0.08) 100%);
-      border: 1px solid rgba(0,71,255,0.18);
-      position: relative;
-      overflow: hidden;
+    /* ── RESPONSIVE ── */
+    @media (max-width: 1080px) {
+      .plans-grid { grid-template-columns:repeat(2,1fr); }
+      .datos-tiers { grid-template-columns:1fr; }
     }
-    .datos-section::before {
-      content: 'PLAN DATOS';
-      position: absolute;
-      top: 50%; right: -1rem; transform: translateY(-50%) rotate(-90deg);
-      transform-origin: center;
-      font-family: 'Syne', sans-serif; font-weight: 800;
-      font-size: clamp(60px, 8vw, 120px);
-      color: transparent; -webkit-text-stroke: 1px rgba(0,71,255,0.07);
-      white-space: nowrap; user-select: none; pointer-events: none;
-      letter-spacing: -.04em;
-    }
-    .datos-head { position: relative; z-index: 1; margin-bottom: 2.5rem; max-width: 700px; }
-    .datos-label {
-      font-family:'DM Mono',monospace; font-size:.62rem;
-      letter-spacing:.18em; text-transform:uppercase; color:var(--blue);
-      margin-bottom:.85rem; display:inline-flex; align-items:center; gap:.6rem;
-    }
-    .datos-label::before { content:''; display:block; width:30px; height:1px; background:var(--blue); }
-    .datos-title {
-      font-family:'Syne',sans-serif; font-weight:800;
-      font-size: clamp(1.8rem, 3.2vw, 2.6rem);
-      letter-spacing:-.03em; line-height:1.02; margin-bottom: 1rem;
-    }
-    .datos-title em { font-style:italic; font-family:'Fraunces',serif; font-weight:300; color:var(--blue); }
-    .datos-sub {
-      font-family:'Fraunces',serif; font-weight:300;
-      font-size: 1rem; line-height:1.65; color:#555;
-      max-width: 620px;
-    }
-    .datos-tiers {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1px;
-      background: rgba(0,71,255,0.18);
-      border: 1px solid rgba(0,71,255,0.18);
-      position: relative; z-index: 1;
-    }
-    .datos-tier {
-      background: var(--white);
-      padding: 2rem 1.85rem 2.2rem;
-      display: flex; flex-direction: column; gap: .85rem;
-      transition: background .2s;
-    }
-    .datos-tier:hover { background: #fafaf8; }
-    .datos-tier.featured {
-      background: var(--black); color: var(--white);
-    }
-    .datos-tier.featured:hover { background: #111; }
-    .datos-tier-head {
-      display: flex; align-items: center; justify-content: space-between;
-      font-family:'DM Mono',monospace; font-size:.6rem;
-      letter-spacing:.18em; text-transform:uppercase; color: var(--blue);
-    }
-    .datos-tier.featured .datos-tier-head { color: var(--blue); }
-    .datos-tier-tag {
-      font-family:'DM Mono',monospace; font-size:.55rem;
-      letter-spacing:.15em; text-transform:uppercase;
-      color:#fff; background:var(--blue); padding:.2rem .65rem;
-    }
-    .datos-tier-name {
-      font-family:'Syne',sans-serif; font-weight:800;
-      font-size: 1.4rem; letter-spacing:-.025em; line-height:1.05;
-    }
-    .datos-tier-desc {
-      font-family:'Fraunces',serif; font-weight:300;
-      font-size:.9rem; line-height:1.6; color:#666;
-    }
-    .datos-tier.featured .datos-tier-desc { color:#bbb; }
-    .datos-tier-price {
-      font-family:'Syne',sans-serif; font-weight:800;
-      font-size: clamp(1.6rem, 2.8vw, 2.3rem);
-      letter-spacing:-.04em; line-height:1; margin-top:.4rem;
-      display:flex; align-items:baseline; gap:.3rem;
-    }
-    .datos-tier-currency {
-      font-family:'DM Mono',monospace; font-weight:400;
-      font-size:.8rem; letter-spacing:.04em; color:#aaa;
-    }
-    .datos-tier.featured .datos-tier-currency { color:#555; }
-    .datos-tier-once {
-      font-family:'DM Mono',monospace; font-size:.62rem;
-      letter-spacing:.12em; text-transform:uppercase;
-      color:#999; margin-top:.25rem;
-    }
-    .datos-tier.featured .datos-tier-once { color:#666; }
-    .datos-tier-features {
-      list-style:none; display:flex; flex-direction:column; gap:.55rem;
-      flex: 1; margin-top:.5rem;
-    }
-    .datos-tier-features li {
-      font-family:'DM Mono',monospace; font-size:.74rem;
-      letter-spacing:.04em; color:#444;
-      display: flex; gap:.55rem; align-items:flex-start; line-height: 1.5;
-    }
-    .datos-tier.featured .datos-tier-features li { color:#999; }
-    .datos-tier-features li::before {
-      content:'→'; color:var(--blue); flex-shrink:0;
-      font-size:.55rem; margin-top:.15rem;
-    }
-    .datos-tier-cta {
-      display: block; width:100%; margin-top: 1rem;
-      font-family:'DM Mono',monospace; font-size:.7rem;
-      letter-spacing:.1em; text-transform:uppercase;
-      padding: .85rem 1.25rem; text-align:center;
-      text-decoration: none; cursor: none;
-      border: 1.5px solid var(--gray-light); color: var(--black); background: transparent;
-      transition: background .2s, color .2s, border-color .2s;
-    }
-    .datos-tier-cta:hover { border-color: var(--black); }
-    .datos-tier.featured .datos-tier-cta {
-      background: var(--white); color: var(--black); border-color: var(--white);
-    }
-    .datos-tier.featured .datos-tier-cta:hover { background: var(--gray-light); border-color: var(--gray-light); }
-    .datos-foot {
-      margin-top: 1.5rem; position: relative; z-index: 1;
-      font-family:'DM Mono',monospace; font-size:.62rem;
-      letter-spacing:.1em; text-transform:uppercase; color:#888;
-    }
-
-    @media (max-width: 1024px) {
-      .datos-section { margin: 0 1.5rem 4rem; padding: 2.5rem 2rem; }
-      .datos-tiers { grid-template-columns: 1fr; }
-    }
-    @media (max-width: 640px) {
-      .datos-section { padding: 2rem 1.5rem; }
-    }
-
-    /* COMPARISON NOTE */
-    .compare-note {
-      text-align: center; margin: 0 3rem 5rem;
-      font-family: 'DM Mono', monospace; font-size:.62rem;
-      letter-spacing:.1em; text-transform:uppercase; color:#bbb;
-    }
-
-    /* FAQ / CONTEXT SECTION */
-    .context-section {
-      background: var(--black); color:var(--white);
-      padding: 6rem 3rem;
-    }
-    .context-grid {
-      display: grid; grid-template-columns: 1fr 1fr; gap:5rem; align-items:start;
-      max-width: 1100px; margin:0 auto;
-    }
-    .context-label {
-      font-family: 'DM Mono', monospace; font-size:.68rem;
-      letter-spacing:.18em; text-transform:uppercase;
-      color:var(--blue); margin-bottom:1rem;
-      display:flex; align-items:center; gap:1rem;
-    }
-    .context-label::after { content:''; display:block; width:30px; height:1px; background:var(--blue); }
-    .context-title {
-      font-family: 'Syne', sans-serif; font-weight:800;
-      font-size: clamp(1.8rem, 3vw, 2.8rem);
-      letter-spacing:-.03em; line-height:.95;
-      margin-bottom: 1.5rem;
-    }
-    .context-title em { font-style:italic; font-family:'Fraunces',serif; font-weight:300; color:var(--blue); }
-    .context-desc {
-      font-family: 'Fraunces', serif; font-weight:300;
-      font-size:1rem; line-height:1.8; color:#666;
-    }
-    .faq-list { display:flex; flex-direction:column; gap:0; }
-    .faq-item {
-      border-bottom: 1px solid #1a1a1a;
-      padding: 1.2rem 0;
-    }
-    .faq-q {
-      font-family: 'DM Mono', monospace; font-size:.68rem;
-      letter-spacing:.08em; text-transform:uppercase;
-      color:var(--white); margin-bottom:.6rem;
-    }
-    .faq-a {
-      font-family: 'Fraunces', serif; font-weight:300;
-      font-size:.9rem; line-height:1.7; color:#555;
-    }
-
-    /* FOOTER */
-    footer {
-      background: var(--black); color:#444;
-      padding: 2.5rem 3rem;
-      display:flex; justify-content:space-between; align-items:center;
-      font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.1em;
-    }
-    footer a { color:#444; text-decoration:none; transition:color .2s; }
-    footer a:hover { color:var(--blue); }
-
-    /* RESPONSIVE */
-    @media (max-width: 1024px) {
-      .plans-grid { grid-template-columns: repeat(2,1fr); margin:0 1.5rem 4rem; }
-      .comparison-section { margin:0 1.5rem 4rem; }
-    }
-    @media (max-width: 640px) {
-      nav { padding:1.2rem 1.5rem; }
-      .pricing-hero { padding:8rem 1.5rem 3rem; }
-      .plans-grid { grid-template-columns:1fr; margin:0 1.5rem 4rem; }
-      .comparison-section { margin:0 1.5rem 3rem; }
-      .comparison-head { padding:1.25rem 1.1rem; }
-      .comparison-footnote { padding:1rem 1.1rem 1.2rem; }
-      .context-grid { grid-template-columns:1fr; gap:3rem; }
-      .context-section { padding:4rem 1.5rem; }
-      footer { flex-direction:column; gap:1rem; text-align:center; }
+    @media (max-width: 900px) {
       body { cursor:auto; }
       .cursor,.cursor-ring { display:none; }
+      .toggle-pill, .plan-cta, .datos-tier-cta, .e-btn-back { cursor:pointer; }
+      .pricing-hero { padding:2.2rem 1.1rem 1.2rem; }
+      .comparison-section, .plans-grid, .datos-section, .context-section, .compare-note { padding-left:1.1rem; padding-right:1.1rem; }
+      .context-grid { grid-template-columns:1fr; gap:1.6rem; }
+      footer { padding:.8rem 1.1rem; flex-direction:column; text-align:center; }
+      /* Nav en móvil: logo centrado línea 1, volver+auth línea 2 */
+      .electoral-nav { flex-direction: column; align-items: stretch; padding: .6rem 1.1rem; gap: .5rem; }
+      .e-nav-right { order: 1; width: 100%; position: relative; justify-content: center; gap: .8rem; margin: 0; min-height: 26px; }
+      .e-nav-left { order: 2; width: 100%; justify-content: center; gap: .6rem; flex-wrap: wrap; row-gap: .45rem; }
+      .country-selector-wrap { position: absolute; left: 0; top: 50%; transform: translateY(-50%); }
+      .electoral-nav-auth { gap: .5rem; flex-wrap: wrap; justify-content: center; }
+      .e-btn-back, .e-btn-login, .e-btn-register, .e-btn-profile, .e-btn-logout { font-size: .68rem; letter-spacing: .06em; }
+      .e-btn-login, .e-btn-register, .e-btn-profile, .e-btn-back { padding: .3rem .55rem; }
+      .e-user-plan { font-size: .6rem; padding: .15rem .45rem; }
+      .country-btn { font-size: .54rem; padding: .24rem .46rem; letter-spacing: .05em; }
+      .country-dropdown { right: auto; left: 0; }
+      .logo-text { font-size: clamp(.7rem, 3.3vw, .9rem); }
+      .logo-bars { height: 11px; }
+      .logo-bar { width: 2.5px; }
+    }
+    @media (max-width: 620px) {
+      .plans-grid { grid-template-columns:1fr; }
+    }
+    @media (max-width: 360px) {
+      .electoral-nav { padding-left: .8rem; padding-right: .8rem; }
+      .country-btn { font-size: .52rem; padding: .22rem .42rem; letter-spacing: .04em; }
+      .logo-text { font-size: 9.5px; }
+      .logo-bars { height: 10px; }
+      .logo-bar { width: 2.5px; }
     }
   </style>
 </head>
@@ -576,18 +275,12 @@
   <div class="cursor" id="cursor"></div>
   <div class="cursor-ring" id="cursorRing"></div>
 
-  <nav>
-    <a href="index.html" class="nav-back" id="nav-back">← Inicio</a>
-    <a href="index.html" class="nav-logo-wrap">
-      <div class="nav-bars">
-        <div class="nav-bar" style="height:18px"></div>
-        <div class="nav-bar" style="height:14px"></div>
-        <div class="nav-bar" style="height:9px"></div>
-        <div class="nav-bar" style="height:5px"></div>
-      </div>
-      <span class="nav-logo">Ricardo<span>.</span>Ruiz</span>
-    </a>
-    <div class="nav-right">
+  <nav class="electoral-nav">
+    <div class="e-nav-left">
+      <a href="index.html" class="e-btn-back" id="nav-back">← Inicio</a>
+      <div class="electoral-nav-auth" id="nav-auth-area"></div>
+    </div>
+    <div class="e-nav-right">
       <div class="country-selector-wrap">
         <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
           <span id="countryBtnLabel">Colombia</span>
@@ -597,9 +290,19 @@
           <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
           <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
           <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
+          <div class="country-option" data-value="br" onclick="selectCountry(this)"><span class="country-check">✓</span> Brasil</div>
           <div class="country-option" data-value="cn" onclick="selectCountry(this)"><span class="country-check">✓</span> 中国 / China</div>
         </div>
       </div>
+      <a href="index.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div>
+          <div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div>
+          <div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
     </div>
   </nav>
 
@@ -609,8 +312,8 @@
     <div class="pricing-label" id="pricing-label">Acceso por suscripción</div>
     <h1 class="pricing-title" id="pricing-title">Elige tu <em>plan</em>.</h1>
     <p class="pricing-sub" id="pricing-sub">Datos públicos procesados, visualizaciones y análisis actualizados mensualmente. Cancela cuando quieras.</p>
-    <div style="display:inline-flex;align-items:center;gap:.5rem;background:rgba(255,100,0,0.08);border:1px solid rgba(255,100,0,0.2);border-radius:2rem;padding:.35rem 1rem;margin-bottom:2rem;font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:#c05000;position:relative;z-index:1;">
-      <span style="width:6px;height:6px;border-radius:50%;background:#c05000;flex-shrink:0;"></span>
+    <div class="promo-tag">
+      <span class="promo-dot"></span>
       <span id="promo-tag-text">Precio de lanzamiento · Tiempo limitado</span>
     </div>
 
@@ -764,7 +467,7 @@
             id: 'custom', name: 'Personalizado', featured: false,
             desc: 'Para campañas, equipos y organizaciones que necesitan análisis a medida, entregables especializados y acompañamiento directo.',
             priceCOP: null, priceUSD: null, free: false, custom: true,
-            cta: 'Escribir a Ricardo →', ctaStyle: 'outline', ctaHref: 'index.html#contacto',
+            cta: 'Escribir a Ricardo →', ctaStyle: 'outline', ctaHref: 'https://wa.me/573243036767?text=Hola%20Ricardo%2C%20me%20gustar%C3%ADa%20hablar%20contigo%20sobre%20un%20proyecto.',
             features: [
               'Análisis y reportes a medida',
               'Acompañamiento directo para equipos',
@@ -929,7 +632,7 @@
             id: 'custom', name: 'Custom', featured: false,
             desc: 'For campaigns, teams and organizations that need tailored analysis, specialized deliverables and direct support.',
             priceCOP: null, priceUSD: null, free: false, custom: true,
-            cta: 'Get in touch →', ctaStyle: 'outline', ctaHref: 'index.html#contacto',
+            cta: 'Get in touch →', ctaStyle: 'outline', ctaHref: 'https://wa.me/573243036767?text=Hola%20Ricardo%2C%20me%20gustar%C3%ADa%20hablar%20contigo%20sobre%20un%20proyecto.',
             features: [
               'Custom analysis and reports',
               'Direct support for teams',
@@ -1094,7 +797,7 @@
             id: 'custom', name: '定制版', featured: false,
             desc: '适合需要定制分析、专项交付和直接支持的竞选团队、组织与机构。',
             priceCOP: null, priceUSD: null, free: false, custom: true,
-            cta: '联系 Ricardo →', ctaStyle: 'outline', ctaHref: 'index.html#contacto',
+            cta: '联系 Ricardo →', ctaStyle: 'outline', ctaHref: 'https://wa.me/573243036767?text=Hola%20Ricardo%2C%20me%20gustar%C3%ADa%20hablar%20contigo%20sobre%20un%20proyecto.',
             features: [
               '定制分析与报告',
               '面向团队的直接支持',
@@ -1186,6 +889,171 @@
             cta: '购买完整库 →', ctaHref: 'descargas.html'
           },
         ]
+      },
+      br: {
+        lang: 'pt', title: 'Planos · Ricardo Ruiz',
+        navBack: '← Início',
+        heroBg: 'DADOS',
+        pricingLabel: 'Acesso por assinatura',
+        pricingTitle: 'Escolha seu <em>plano</em>.',
+        pricingSub: 'Dados públicos processados, visualizações e análises atualizadas mensalmente. Cancele quando quiser.',
+        toggleMonthly: 'Mensal', toggleAnnual: 'Anual', toggleSave: '−20% · Tempo limitado',
+        toggleCOP: 'COP', toggleUSD: 'USD',
+        compareNote: 'Todos os planos incluem acesso imediato · Sem fidelidade · Cancele a qualquer momento',
+        comparisonLabel: 'Comparar planos',
+        comparisonTitle: 'O que cada um inclui',
+        comparisonSub: 'Veja rapidamente o que cada plano desbloqueia e onde começa de fato a análise avançada ou granular.',
+        comparisonFootnote: 'Se você precisa de análises especializadas, acompanhamento estratégico ou entregáveis sob medida para campanhas, equipes ou organizações, o plano Personalizado é a melhor opção.',
+        ctxLabel: 'O que inclui?',
+        ctxTitle: 'Dados públicos,<br/><em>bem feitos</em>.',
+        ctxDesc: 'Todo mês processo e publico bases de dados eleitorais, de segurança e do DANE — especialmente emprego — com cruzamentos próprios que você não encontra em nenhum outro lugar. Não são dados crus: são diagnósticos prontos para tomar decisões.',
+        footerRole: 'Consultor em Análise de Dados e Política Pública',
+        plans: [
+          {
+            id: 'free', name: 'Básico', featured: false,
+            desc: 'Explore grátis as ferramentas abertas: Previa 1V, Veleta, Oportunidade (amostra), Teste de afinidade, CITREP e mais.',
+            priceCOP: 0, priceUSD: 0, free: true,
+            cta: 'Criar conta grátis', ctaStyle: 'outline', ctaHref: 'register.html',
+            features: [
+              'Previa 1V · simulador de intenção presidencial com ponderador próprio',
+              'Veleta · mapa de municípios sensíveis à mudança eleitoral',
+              'Teste de afinidade presidencial 2026 (9 candidatos)',
+              'CITREP 2026 · composição territorial',
+              'Prognóstico 1V · registre sua previsão cidadã',
+              'Oportunidade · 1 troca de candidato e visão departamental',
+              'Resultados de Senado, Câmara e consultas 2026',
+              'Cadastro gratuito para entrar no dashboard',
+            ]
+          },
+          {
+            id: 'pro', name: 'Pro', featured: true,
+            desc: 'Para jornalistas, consultores e analistas que precisam passar da consulta pública à análise aplicada.',
+            priceCOP: 59900, priceCOPMonthly: 79900, priceUSD: 39, free: false,
+            cta: 'Começar com Pro', ctaStyle: 'dark', ctaHref: '#',
+            featuredTag: 'Mais popular',
+            features: [
+              'Tudo do plano Básico',
+              'Mapa de Oportunidade · alterne entre os 6 candidatos do ponderador',
+              'Drilldown a comunas em 8 cidades (Bogotá, Medellín, Cali, Pereira, Ibagué, Barranquilla, Montería, Manizales)',
+              'Bogotá · 33 UPL e 1.000+ bairros cadastrais · Medellín · 147 bairros',
+              'Simulador de transferência intra-bloco entre candidatos afins',
+              'Pesos ajustáveis por fonte histórica (Pres-22, Cong-26, Pres-18, Consultas)',
+              'Medição de endosso entre candidatos ao Congresso',
+              'Comparador de candidatos · desde 15 de abril de 2026',
+              '3 downloads CSV / mês (Top de territórios de oportunidade)',
+            ]
+          },
+          {
+            id: 'premium', name: 'Premium', featured: false,
+            desc: 'Pensado para candidatos, equipes de campanha e analistas que precisam ler o território seção por seção.',
+            priceCOP: 179000, priceCOPMonthly: 219000, priceUSD: 99, free: false,
+            cta: 'Começar com Premium', ctaStyle: 'outline', ctaHref: '#',
+            features: [
+              'Tudo do plano Pro',
+              'Camada Locais de votação · 13.500+ locais com viés próprio por local',
+              'Visão por mesas em todas as cidades, municípios e distritos',
+              'Relatório territorial PDF mensal com recomendações táticas por candidato',
+              '10 downloads CSV e infográficos / mês',
+              '1 arquivo cru histórico de amostra (Central de Downloads)',
+              'Análise granular do desempenho eleitoral',
+            ]
+          },
+          {
+            id: 'custom', name: 'Personalizado', featured: false,
+            desc: 'Para campanhas, equipes e organizações que precisam de análises sob medida, entregáveis especializados e acompanhamento direto.',
+            priceCOP: null, priceUSD: null, free: false, custom: true,
+            cta: 'Escrever para Ricardo →', ctaStyle: 'outline', ctaHref: 'https://wa.me/573243036767?text=Hola%20Ricardo%2C%20me%20gustar%C3%ADa%20hablar%20contigo%20sobre%20un%20proyecto.',
+            features: [
+              'Análises e relatórios sob medida',
+              'Acompanhamento direto para equipes',
+              'Entregáveis especializados conforme a necessidade',
+              'Workshops e formação em dados',
+              'Suporte prioritário',
+              'Escopo definido com você conforme o projeto',
+              'Ideal para trabalho eleitoral ou institucional mais especializado',
+            ]
+          },
+        ],
+        faqs: [
+          { q: 'Quando o conteúdo é atualizado?', a: 'Todo mês subo novas bases de dados processadas e atualizo as visualizações. Os dados eleitorais são atualizados em tempo real durante períodos de eleições.' },
+          { q: 'Posso cancelar a qualquer momento?', a: 'Sim. Não há fidelidade mínima. Você pode cancelar no seu painel e o acesso se mantém até o fim do período pago.' },
+          { q: 'O que são os "cruzamentos de informação"?', a: 'São análises próprias que cruzam dados de diferentes fontes (eleitoral, DANE, segurança) para revelar padrões que não são visíveis olhando cada base separadamente.' },
+          { q: 'O que inclui o plano Personalizado?', a: 'É um acordo direto. Falamos das suas necessidades específicas — análises recorrentes, formação de equipes ou acesso institucional — e definimos o escopo juntos.' },
+        ],
+        comparisonRows: [
+          { feature: 'Previa 1V · simulador presidencial com ponderador próprio', values: { free: true, pro: true, premium: true, custom: true } },
+          { feature: 'Veleta · municípios sensíveis à mudança eleitoral', values: { free: true, pro: true, premium: true, custom: true } },
+          { feature: 'Teste de afinidade e Prognóstico 1V', values: { free: true, pro: true, premium: true, custom: true } },
+          { feature: 'CITREP 2026 · composição territorial', values: { free: true, pro: true, premium: true, custom: true } },
+          { feature: 'Resultados Senado, Câmara e consultas 2026', values: { free: true, pro: true, premium: true, custom: true } },
+          { feature: 'Mapa de Oportunidade · candidatos do ponderador', note: 'Anônimo: 1 troca de amostra. Free: alterna livre entre os 6 candidatos. Pro/Premium: camadas adicionais de análise.', values: { free: 'Visão base', pro: true, premium: true, custom: true } },
+          { feature: 'Drilldown a comunas em 8 cidades', note: 'Bogotá, Medellín, Cali, Pereira, Ibagué, Barranquilla, Montería e Manizales.', values: { free: false, pro: true, premium: true, custom: true } },
+          { feature: 'Bogotá UPL + bairros cadastrais · Medellín bairros', note: '33 UPL e 1.000+ bairros cadastrais em Bogotá; 147 bairros oficiais em Medellín.', values: { free: false, pro: true, premium: true, custom: true } },
+          { feature: 'Simulador de transferência intra-bloco', note: 'Simula quanto seu candidato recebe se absorver parte do voto de candidatos afins.', values: { free: false, pro: true, premium: true, custom: true } },
+          { feature: 'Pesos por fonte histórica', note: 'Ajuste quanto pesa Pres-22, Cong-26, Pres-18 e Consultas ao construir o mapa.', values: { free: false, pro: true, premium: true, custom: true } },
+          { feature: 'Medição de endosso entre candidatos ao Congresso', values: { free: false, pro: true, premium: true, custom: true } },
+          { feature: 'Comparador de candidatos', note: 'Formato próximo a analisis-candidato. Disponível desde 15 de abril de 2026.', values: { free: false, pro: true, premium: true, custom: true } },
+          { feature: 'Camada Locais de votação · 13.500+ locais', note: 'Viés próprio por local, só no Premium.', values: { free: false, pro: false, premium: true, custom: true } },
+          { feature: 'Acesso a mesas', note: 'O nível mais granular fica reservado para Premium e projetos personalizados.', values: { free: false, pro: false, premium: true, custom: true } },
+          { feature: 'Relatório territorial PDF mensal', note: 'Recomendações táticas por candidato.', values: { free: false, pro: false, premium: true, custom: true } },
+          { feature: 'Downloads mensais (CSV / infográficos)', values: { free: '0', pro: '3', premium: '10', custom: 'Sob medida' } },
+          { feature: 'Trabalho especializado', note: 'Para campanhas, equipes e organizações com necessidades particulares.', values: { free: false, pro: false, premium: false, custom: true } },
+        ],
+        datosLabel: 'Catálogo histórico · pagamento único',
+        datosTitle: 'Plano <em>Dados</em>.',
+        datosSub: 'Acesso ao catálogo de dados crus por mesa da Registraduría (2010 – 2025). 25 arquivos normalizados com limpeza já feita, em CSV e XLSX. Você paga uma vez, licença perpétua, sem atribuição obrigatória para uso interno. Para think tanks, veículos de mídia, universidades e consultorias que precisam dos dados como insumo de um projeto fechado.',
+        datosFoot: 'Dados públicos da Registraduría · você paga pela curadoria, normalização, georreferenciamento e dicionário · licença de uso interno com atribuição opcional · redistribuição comercial sob acordo à parte.',
+        datosTiers: [
+          {
+            id: 'individual', name: 'Individual', featured: false,
+            label: 'Dados · 1 arquivo',
+            desc: 'Um arquivo cru à sua escolha, por mesa ou local, CSV e XLSX. Ideal para um projeto pontual ou validação.',
+            priceCOP: 390000, priceUSD: 99,
+            once: 'Pagamento único · licença perpétua',
+            features: [
+              '1 arquivo à sua escolha (qualquer ano, categoria ou granularidade)',
+              'Versões por mesa e por local incluídas',
+              'CSV + XLSX conforme disponibilidade',
+              'Dicionário de colunas em espanhol',
+              'Licença de uso interno · atribuição opcional',
+            ],
+            cta: 'Escolher arquivo →', ctaHref: 'descargas.html'
+          },
+          {
+            id: 'categoria', name: 'Categoria', featured: true,
+            label: 'Dados · 1 categoria',
+            tag: 'Recomendado',
+            desc: 'Todos os anos de uma categoria completa. Por exemplo: as quatro presidenciais de 1º turno 2010 – 2022.',
+            priceCOP: 1490000, priceUSD: 379,
+            once: 'Pagamento único · licença perpétua',
+            features: [
+              'Todos os anos de uma categoria (presidencial, congresso, territorial, consulta, plebiscito ou JAL)',
+              'Até 4 arquivos × 2 granularidades × 2 formatos',
+              'Georreferenciamento dos 13.500 locais incluído',
+              'Dicionário de colunas + notas de limpeza',
+              '1h de suporte por e-mail para integração',
+              'Licença de uso interno · atribuição opcional',
+            ],
+            cta: 'Comprar categoria →', ctaHref: 'descargas.html'
+          },
+          {
+            id: 'catalogo', name: 'Catálogo completo', featured: false,
+            label: 'Dados · catálogo 2010 – 2025',
+            desc: 'Os 25 arquivos do catálogo histórico, em todas as suas variantes. Para grandes veículos, consultorias corporativas e centros de pesquisa.',
+            priceCOP: 4990000, priceUSD: 1249,
+            once: 'Pagamento único · licença perpétua',
+            features: [
+              'Catálogo completo · 25 arquivos × variantes',
+              'Mesa e local · CSV e XLSX',
+              'Georreferenciamento dos 13.500 locais',
+              'Dicionário completo + notas de limpeza',
+              '30 min de onboarding por videochamada',
+              'Atualizações futuras: 30% de desconto em novos datasets (Territoriais 2027, etc.)',
+              'Licença de uso interno · atribuição opcional',
+            ],
+            cta: 'Comprar catálogo →', ctaHref: 'descargas.html'
+          },
+        ]
       }
     };
 
@@ -1193,6 +1061,12 @@
     let currentLang     = localStorage.getItem('rr-lang') || 'co';
     let billingAnnual   = true;
     let currencyUSD     = false;
+
+    // Cadena por idioma (us, co, cn, br)
+    function LSTR(us, co, cn, brr, lang) {
+      const l = lang || currentLang;
+      return l === 'us' ? us : l === 'cn' ? cn : l === 'br' ? brr : co;
+    }
 
     // ─── TOGGLES ─────────────────────────────────────────────────────────────
     function toggleBilling() {
@@ -1222,10 +1096,10 @@
       if (plan.custom) return null;
       if (currencyUSD) {
         const p = billingAnnual ? plan.priceUSD : Math.round(plan.priceUSD / 0.8);
-        return { amount: '$' + p, currency: 'USD', period: billingAnnual ? '/mo · billed annually' : '/month' };
+        return { amount: '$' + p, currency: 'USD', period: billingAnnual ? LSTR('/mo · billed annually','/mes · facturado anualmente','/月 · 按年计费','/mês · faturado anualmente') : LSTR('/month','/mes','/月','/mês') };
       } else {
         const p = billingAnnual ? plan.priceCOP : (plan.priceCOPMonthly || Math.round(plan.priceCOP / 0.8 / 1000) * 1000);
-        return { amount: '$' + p.toLocaleString('es-CO'), currency: 'COP', period: billingAnnual ? '/mes · facturado anualmente' : '/mes' };
+        return { amount: '$' + p.toLocaleString('es-CO'), currency: 'COP', period: billingAnnual ? LSTR('/mo · billed annually','/mes · facturado anualmente','/月 · 按年计费','/mês · faturado anualmente') : LSTR('/month','/mes','/月','/mês') };
       }
     }
 
@@ -1276,13 +1150,13 @@
 
         const priceHTML = plan.free
           ? `<div class="plan-price-wrap">
-               <div class="plan-price"><span class="plan-free-tag">${currentLang === 'us' ? 'Free' : 'Gratis'}</span></div>
-               <div class="plan-price-period">${currentLang === 'us' ? 'forever' : 'siempre'}</div>
+               <div class="plan-price"><span class="plan-free-tag">${LSTR('Free','Gratis','免费','Grátis')}</span></div>
+               <div class="plan-price-period">${LSTR('forever','siempre','永久','para sempre')}</div>
              </div>`
           : plan.custom
           ? `<div class="plan-price-wrap">
-               <div class="plan-price"><span class="plan-free-tag">${currentLang === 'us' ? 'Custom' : 'A medida'}</span></div>
-               <div class="plan-price-period">${currentLang === 'us' ? 'contact us' : 'contáctanos'}</div>
+               <div class="plan-price"><span class="plan-free-tag">${LSTR('Custom','A medida','定制','Sob medida')}</span></div>
+               <div class="plan-price-period">${LSTR('contact us','contáctanos','联系我们','fale conosco')}</div>
              </div>`
           : `<div class="plan-price-wrap">
                <div class="plan-price">
@@ -1291,12 +1165,12 @@
                </div>
                <div class="plan-price-period">${price.period}</div>
                <div class="plan-price-annual ${billingAnnual ? 'visible' : ''}">
-                 ${currentLang === 'us' ? '20% off vs monthly' : '20% de ahorro vs mensual'}
+                 ${LSTR('20% off vs monthly','20% de ahorro vs mensual','比月付节省20%','20% de economia vs mensal')}
                </div>
              </div>`;
 
         const ctaText = isCurrent
-          ? (currentLang === 'us' ? 'Current plan' : 'Plan actual')
+          ? LSTR('Current plan','Plan actual','当前计划','Plano atual')
           : plan.cta;
         const ctaDisabled = isCurrent ? 'style="opacity:.4;pointer-events:none;"' : '';
 
@@ -1418,12 +1292,46 @@
       table.innerHTML = `
         <thead>
           <tr>
-            <th>${currentLang === 'us' ? 'Feature' : currentLang === 'cn' ? '功能' : 'Característica'}</th>
+            <th>${LSTR('Feature','Característica','功能','Recurso')}</th>
             ${headers}
           </tr>
         </thead>
         <tbody>${body}</tbody>
       `;
+    }
+
+    // ─── SESSION NAV ─────────────────────────────────────────────────────────
+    function updateNavAuth() {
+      const token = localStorage.getItem('rr-token');
+      const user  = JSON.parse(localStorage.getItem('rr-user') || 'null');
+      const area  = document.getElementById('nav-auth-area');
+      if (!area) return;
+      if (token && user) {
+        const planLabels = currentLang === 'us'
+          ? { free:'Free', pro:'Pro', premium:'Premium', basic:'Basic', analysis:'Analysis', full:'Full' }
+          : currentLang === 'cn'
+            ? { free:'免费', pro:'Pro', premium:'Premium', basic:'基础版', analysis:'分析版', full:'完整版' }
+            : currentLang === 'br'
+              ? { free:'Free', pro:'Pro', premium:'Premium', basic:'Básico', analysis:'Análise', full:'Completo' }
+              : { free:'Free', pro:'Pro', premium:'Premium', basic:'Básico', analysis:'Análisis', full:'Completo' };
+        area.dataset.loggedIn = '1';
+        area.innerHTML = `
+          <span class="e-user-plan">${planLabels[user.plan] || user.plan}</span>
+          <a href="dashboard.html" class="e-btn-profile">${LSTR('My profile','Mi perfil','我的资料','Meu perfil')}</a>
+          <button class="e-btn-logout" onclick="logOutPage()">${LSTR('Log out','Salir','退出','Sair')}</button>`;
+      } else {
+        delete area.dataset.loggedIn;
+        area.innerHTML = `
+          <a href="login.html" class="e-btn-login">${LSTR('Log in','Iniciar sesión','登录','Entrar')}</a>
+          <a href="register.html" class="e-btn-register">${LSTR('Sign up','Registrarse','注册','Cadastrar')}</a>`;
+      }
+    }
+    async function logOutPage() {
+      const token = localStorage.getItem('rr-token');
+      if (token) { try { await fetch('https://rr-auth.reruizc.workers.dev/auth/logout', { method:'POST', headers:{ 'Authorization':`Bearer ${token}` } }); } catch {} }
+      localStorage.removeItem('rr-token');
+      localStorage.removeItem('rr-user');
+      window.location.reload();
     }
 
     // ─── SET LANGUAGE ─────────────────────────────────────────────────────────
@@ -1450,7 +1358,7 @@
       document.getElementById('ctx-title').innerHTML = t.ctxTitle;
       document.getElementById('ctx-desc').textContent = t.ctxDesc;
       document.getElementById('footer-role').textContent = t.footerRole;
-      document.getElementById('promo-tag-text').textContent = lang === 'us' ? 'Launch pricing · Limited time' : 'Precio de lanzamiento · Tiempo limitado';
+      document.getElementById('promo-tag-text').textContent = LSTR('Launch pricing · Limited time','Precio de lanzamiento · Tiempo limitado','限时 · 发布价','Preço de lançamento · Tempo limitado', lang);
       // Plan Datos · one-shot section labels
       const datosLabelEl = document.getElementById('datos-label');
       const datosTitleEl = document.getElementById('datos-title');
@@ -1464,6 +1372,7 @@
       renderComparison();
       renderFAQ();
       renderDatos();
+      updateNavAuth();
     }
 
     // ─── CURSOR ───────────────────────────────────────────────────────────────
