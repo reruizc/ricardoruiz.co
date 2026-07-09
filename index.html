@@ -88,7 +88,7 @@
 
     /* ── HUB (título + pestañas + paneles) ── */
     .hub { padding: 1.6rem 2.5rem 0; flex: 1 0 auto; display: flex; flex-direction: column; }
-    .hub-eyebrow { font-weight: 500; font-size: .72rem; letter-spacing: .22em; text-transform: uppercase; color: rgba(255,255,255,.42); margin-bottom: .5rem; }
+    .hub-eyebrow { font-weight: 500; font-size: .72rem; letter-spacing: .22em; text-transform: uppercase; color: rgba(255,255,255,.42); margin: .3rem 0 .2rem; }
     .hub-tabs { display: flex; align-items: flex-end; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 1.1rem; }
     .hub-tab { font-family: 'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif; font-weight: 500; font-size: 1.01rem; letter-spacing: .16em;
       text-transform: uppercase; color: rgba(255,255,255,0.38); padding: .5rem 1.5rem .65rem; cursor: none;
@@ -188,6 +188,22 @@
     .hub-footer { flex-shrink:0; border-top:1px solid rgba(255,255,255,0.07); padding:.7rem 2.5rem; display:flex; align-items:center; justify-content:flex-end; }
     .footer-brand { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-weight:500; font-size:.72rem; letter-spacing:.06em; color:rgba(255,255,255,0.28); }
 
+    /* ── MODAL DE CONTACTO ── */
+    .contact-modal-overlay { position:fixed; inset:0; z-index:50000; display:none; align-items:center; justify-content:center; background:rgba(4,6,16,.8); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); }
+    .contact-modal-overlay.open { display:flex; }
+    .contact-modal { position:relative; background:#0e1220; border:1px solid rgba(255,255,255,.12); padding:2.3rem 2rem 2rem; max-width:380px; width:90%; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,.5); }
+    .contact-modal-title { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-weight:800; font-size:1.4rem; letter-spacing:-.02em; color:var(--white); margin-bottom:.35rem; }
+    .contact-modal-sub { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-weight:400; font-size:.85rem; color:rgba(255,255,255,.5); margin-bottom:1.5rem; }
+    .contact-modal-actions { display:flex; flex-direction:column; gap:.65rem; }
+    .cm-btn { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-weight:700; font-size:.82rem; letter-spacing:.06em; text-transform:uppercase; padding:.8rem 1rem; text-decoration:none; cursor:none; display:flex; align-items:center; justify-content:center; gap:.55rem; transition:background .2s, border-color .2s, color .2s; }
+    .cm-email { background:var(--blue); color:var(--white); border:1.5px solid var(--blue); }
+    .cm-email:hover { background:#0035cc; border-color:#0035cc; }
+    .cm-wa { background:#22c55e; color:#04220f; border:1.5px solid #22c55e; }
+    .cm-wa:hover { background:#1ba34d; border-color:#1ba34d; }
+    .contact-modal-close { position:absolute; top:.7rem; right:.85rem; background:none; border:none; color:rgba(255,255,255,.4); font-size:.95rem; cursor:none; transition:color .18s; line-height:1; }
+    .contact-modal-close:hover { color:var(--white); }
+    @media (max-width:900px) { .cm-btn, .contact-modal-close { cursor:pointer; } }
+
     /* ── RESPONSIVE ── */
     @media (max-width: 900px) {
       body { cursor:auto; }
@@ -276,8 +292,6 @@
 
     <!-- HUB -->
     <div class="hub">
-      <div class="hub-eyebrow" id="hero-tag">Consultoría · Análisis · Decisiones Públicas</div>
-
       <div class="hub-tabs">
         <button class="hub-tab active" data-panel="pan-inicio" id="tab-inicio" onclick="switchHubTab(this)">Inicio</button>
         <button class="hub-tab" data-panel="pan-proyectos" id="tab-proyectos" onclick="switchHubTab(this)">Proyectos</button>
@@ -310,7 +324,7 @@
             </div>
           </a>
 
-          <a class="card card-contacto" id="card-contacto" href="https://wa.me/573243036767?text=Hola%20Ricardo%2C%20me%20gustar%C3%ADa%20hablar%20contigo%20sobre%20un%20proyecto." target="_blank" rel="noopener">
+          <a class="card card-contacto" id="card-contacto" href="#contacto" onclick="openContactModal(event)">
             <div class="card-glow"></div>
             <span class="card-arrow">↗</span>
             <div class="card-label">
@@ -361,11 +375,32 @@
         </div>
 
       </div>
+
+      <div class="hub-eyebrow" id="hero-tag">Consultoría · Análisis · Decisiones Públicas</div>
     </div>
 
     <footer class="hub-footer">
       <span class="footer-brand">ricardoruiz.co · <span id="footer-role">Consultor en Análisis de Datos y Política Pública</span></span>
     </footer>
+  </div>
+
+  <!-- MODAL DE CONTACTO -->
+  <div class="contact-modal-overlay" id="contactModal" onclick="closeContactModal(event)">
+    <div class="contact-modal">
+      <button class="contact-modal-close" onclick="closeContactModal()" aria-label="Cerrar">✕</button>
+      <div class="contact-modal-title" id="cm-title">Hablemos</div>
+      <div class="contact-modal-sub" id="cm-sub">¿Cómo prefieres escribirme?</div>
+      <div class="contact-modal-actions">
+        <a class="cm-btn cm-email" id="cm-email" href="mailto:hola@ricardoruiz.co">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 6 10 7L22 6"/></svg>
+          <span id="cm-email-txt">Correo electrónico</span>
+        </a>
+        <a class="cm-btn cm-wa" id="cm-wa" href="https://wa.me/573243036767?text=Hola%20Ricardo%2C%20me%20gustar%C3%ADa%20hablar%20contigo%20sobre%20un%20proyecto." target="_blank" rel="noopener">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          <span id="cm-wa-txt">WhatsApp</span>
+        </a>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -376,8 +411,9 @@
         title: 'Ricardo Ruiz — Consultor en Datos y Decisiones Públicas',
         nav: { planes: 'Planes', login: 'Iniciar sesión', register: 'Registrarse', country: 'Colombia' },
         hub: { inicio: 'Inicio', proyectos: 'Proyectos', servicios: 'Servicios' },
-        hero: { tag: 'Consultoría · Análisis · Decisiones Públicas', word1: 'Datos', que: 'que', verbs: ['mueven','transforman','resuelven','cambian'], nouns: ['políticas','decisiones','estrategias','planes'], sub: 'Convertimos información compleja en decisiones y políticas claras, estratégicas y con impacto real en entidades, empresas y territorios.', ctaPrimary: 'Ver servicios', ctaSecondary: 'Proyectos →' },
+        hero: { tag: 'Consultoría · Análisis · Decisiones Públicas', word1: 'Datos', que: 'que', verbs: ['mueven','transforman','resuelven','cambian'], nouns: ['políticas','decisiones','estrategias','planes','elecciones'], sub: 'Convertimos información compleja en decisiones y políticas claras, estratégicas y con impacto real en entidades, empresas y territorios.', ctaPrimary: 'Ver servicios', ctaSecondary: 'Proyectos →' },
         cards: { perfilName: 'Perfil', perfilSub: 'Quién soy y en qué creo', contactoName: 'Contacto', contactoSub: 'Cuéntame tu reto', noticiasName: 'Noticias', noticiasSub: 'Análisis y publicaciones' },
+        cm: { title: 'Hablemos', sub: '¿Cómo prefieres escribirme?', email: 'Correo electrónico', wa: 'WhatsApp' },
         servicios: { s1t: 'Análisis de datos públicos', s1d: 'Generamos, buscamos, analizamos y transformamos grandes cantidades de información para identificar patrones precisos al nivel más detallado posible. Llevas el dataset; te devolvemos un diagnóstico accionable con hallazgos jerarquizados por impacto.', s2t: 'Visualización e infografías', s2d: 'Convertimos evidencia compleja en mapas, dashboards e infografías que cualquier tomador de decisión entiende en menos de 30 segundos. Sin ruido visual, sin adornos: solo lo que necesitas ver para tomar decisiones.', s3t: 'Asesoría en política pública', s3d: 'Diseñamos, diagnosticamos y evaluamos políticas basadas en evidencia real. El criterio humano — contexto territorial, historia institucional, viabilidad política — es lo que ningún modelo puede reemplazar. Eso es lo que aportamos.', s4t: 'Formación y talleres', s4d: 'Para equipos de gobierno y organizaciones que quieren tomar mejores decisiones con sus propios datos. No enseñamos herramientas: construimos capacidad analítica que genera memoria institucional o empresarial y conocimiento constante.' },
         proyectos: {
           items: [
@@ -395,8 +431,9 @@
         title: 'Ricardo Ruiz — Data Consultant & Public Policy Advisor',
         nav: { planes: 'Pricing', login: 'Log in', register: 'Sign up', country: 'United States / UK' },
         hub: { inicio: 'Home', proyectos: 'Projects', servicios: 'Services' },
-        hero: { tag: 'Consulting · Analysis · Public Decisions', word1: 'Data', que: 'that', verbs: ['drives','transforms','resolves','shapes'], nouns: ['policy','decisions','strategy','outcomes'], sub: 'We turn complex information into clear, strategic decisions with measurable impact across institutions, organizations, and territories.', ctaPrimary: 'Our services', ctaSecondary: 'Projects →' },
+        hero: { tag: 'Consulting · Analysis · Public Decisions', word1: 'Data', que: 'that', verbs: ['drives','transforms','resolves','shapes'], nouns: ['policy','decisions','strategy','outcomes','elections'], sub: 'We turn complex information into clear, strategic decisions with measurable impact across institutions, organizations, and territories.', ctaPrimary: 'Our services', ctaSecondary: 'Projects →' },
         cards: { perfilName: 'Profile', perfilSub: 'Who I am and what I do', contactoName: 'Contact', contactoSub: 'Tell me your challenge', noticiasName: 'News', noticiasSub: 'Analysis & publications' },
+        cm: { title: "Let's talk", sub: 'How would you like to reach me?', email: 'Email', wa: 'WhatsApp' },
         servicios: { s1t: 'Data Analysis', s1d: 'We source, clean, model, and interpret large volumes of public and institutional data to surface precise patterns at the most granular level possible. You bring the dataset; we deliver an actionable diagnostic with findings ranked by impact.', s2t: 'Maps, Dashboards & Infographics', s2d: 'We translate complex evidence into maps, dashboards, and infographics that any decision-maker can read in under 30 seconds. No visual noise, no decoration — only what you need to act.', s3t: 'Public Policy Advisory', s3d: 'We design, diagnose, and evaluate evidence-based policies. Territorial context, institutional history, political feasibility — the human judgment no model can replicate. That is exactly what we bring to the table.', s4t: 'Training & Workshops', s4d: "For government teams and organizations that want to make better decisions with their own data. We don't teach tools — we build analytical capacity that generates lasting institutional knowledge." },
         proyectos: {
           items: [
@@ -414,8 +451,9 @@
         title: 'Ricardo Ruiz — 数据与公共政策顾问',
         nav: { planes: '计划', login: '登录', register: '注册', country: '中国 / China' },
         hub: { inicio: '主页', proyectos: '项目', servicios: '服务' },
-        hero: { tag: '咨询 · 分析 · 公共决策', word1: '数据', que: '驱动', verbs: ['政策','决策','变革','影响'], nouns: ['政策','战略','影响','变革'], sub: '我们将复杂信息转化为清晰、战略性的决策，对机构、企业和地区产生真实影响。', ctaPrimary: '查看服务', ctaSecondary: '项目 →' },
+        hero: { tag: '咨询 · 分析 · 公共决策', word1: '数据', que: '驱动', verbs: ['政策','决策','变革','影响'], nouns: ['政策','战略','影响','变革','选举'], sub: '我们将复杂信息转化为清晰、战略性的决策，对机构、企业和地区产生真实影响。', ctaPrimary: '查看服务', ctaSecondary: '项目 →' },
         cards: { perfilName: '个人资料', perfilSub: '我是谁，我做什么', contactoName: '联系', contactoSub: '告诉我您的挑战', noticiasName: '新闻', noticiasSub: '分析与出版物' },
+        cm: { title: '联系我们', sub: '您希望通过哪种方式联系我？', email: '电子邮件', wa: 'WhatsApp' },
         servicios: { s1t: '公共数据分析', s1d: '我们生成、搜索、分析和转换大量信息，以尽可能详细的层次识别精确模式。您提供数据集；我们返回按影响力排序的可操作诊断。', s2t: '可视化与信息图', s2d: '我们将复杂证据转化为地图、仪表板和信息图，任何决策者都能在30秒内理解。无视觉噪音，无装饰：只有您需要看到的内容。', s3t: '政策与战略咨询', s3d: '我们将数据分析转化为具体建议：优先事项、路线图和可实施的行动计划。我们与您的团队合作，确保每个决策都有证据支持。', s4t: '培训与能力建设', s4d: '我们为团队提供数据分析、可视化和循证决策培训。从基础到高级，根据您机构的具体需求定制。' },
         proyectos: {
           items: [
@@ -433,8 +471,9 @@
         title: 'Ricardo Ruiz — Consultor em Dados e Decisões Públicas',
         nav: { planes: 'Planos', login: 'Entrar', register: 'Cadastrar', country: 'Brasil' },
         hub: { inicio: 'Início', proyectos: 'Projetos', servicios: 'Serviços' },
-        hero: { tag: 'Consultoria · Análise · Decisões Públicas', word1: 'Dados', que: 'que', verbs: ['movem','transformam','resolvem','mudam'], nouns: ['políticas','decisões','estratégias','planos'], sub: 'Convertemos informações complexas em decisões e políticas claras, estratégicas e com impacto real em órgãos públicos, empresas e territórios.', ctaPrimary: 'Ver serviços', ctaSecondary: 'Projetos →' },
+        hero: { tag: 'Consultoria · Análise · Decisões Públicas', word1: 'Dados', que: 'que', verbs: ['movem','transformam','resolvem','mudam'], nouns: ['políticas','decisões','estratégias','planos','eleições'], sub: 'Convertemos informações complexas em decisões e políticas claras, estratégicas e com impacto real em órgãos públicos, empresas e territórios.', ctaPrimary: 'Ver serviços', ctaSecondary: 'Projetos →' },
         cards: { perfilName: 'Perfil', perfilSub: 'Quem sou e no que acredito', contactoName: 'Contato', contactoSub: 'Conte seu desafio', noticiasName: 'Notícias', noticiasSub: 'Análises e publicações' },
+        cm: { title: 'Vamos falar', sub: 'Como prefere falar comigo?', email: 'E-mail', wa: 'WhatsApp' },
         servicios: { s1t: 'Análise de dados públicos', s1d: 'Geramos, buscamos, analisamos e transformamos grandes volumes de informação para identificar padrões precisos no nível mais detalhado possível. Você traz o dataset; devolvemos um diagnóstico acionável com achados hierarquizados por impacto.', s2t: 'Visualização e infográficos', s2d: 'Convertemos evidências complexas em mapas, painéis e infográficos que qualquer tomador de decisão entende em menos de 30 segundos. Sem ruído visual, sem enfeites: só o que você precisa ver para decidir.', s3t: 'Assessoria em política pública', s3d: 'Projetamos, diagnosticamos e avaliamos políticas baseadas em evidência real. O critério humano — contexto territorial, história institucional, viabilidade política — é o que nenhum modelo pode substituir. É isso que entregamos.', s4t: 'Formação e workshops', s4d: 'Para equipes de governo e organizações que querem tomar melhores decisões com seus próprios dados. Não ensinamos ferramentas: construímos capacidade analítica que gera memória institucional ou empresarial e conhecimento contínuo.' },
         proyectos: {
           items: [
@@ -517,6 +556,9 @@
       _t('card-noticias-name', t.cards.noticiasName);
       _t('card-noticias-sub', t.cards.noticiasSub);
 
+      // modal de contacto
+      if (t.cm) { _t('cm-title', t.cm.title); _t('cm-sub', t.cm.sub); _t('cm-email-txt', t.cm.email); _t('cm-wa-txt', t.cm.wa); }
+
       // servicios
       _t('svc1-title', t.servicios.s1t); _t('svc1-desc', t.servicios.s1d);
       _t('svc2-title', t.servicios.s2t); _t('svc2-desc', t.servicios.s2d);
@@ -549,12 +591,26 @@
       if (btn) switchHubTab(btn);
     }
 
+    // ─── MODAL DE CONTACTO ──────────────────────────────────────────────────
+    function openContactModal(e) {
+      if (e) e.preventDefault();
+      document.getElementById('contactModal').classList.add('open');
+    }
+    function closeContactModal(e) {
+      // Cierra solo al hacer click en el fondo o la X (no en el contenido)
+      if (e && e.type === 'click' && e.target.id !== 'contactModal' && !e.target.classList.contains('contact-modal-close')) return;
+      document.getElementById('contactModal').classList.remove('open');
+      resetCursor();
+    }
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeContactModal(); });
+
     // ─── CURSOR ─────────────────────────────────────────────────────────────
     const cursor = document.getElementById('cursor');
     const ring = document.getElementById('cursorRing');
     let mx = 0, my = 0, rx = 0, ry = 0;
     document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; cursor.style.left = mx + 'px'; cursor.style.top = my + 'px'; });
     (function animRing(){ rx += (mx - rx) * 0.14; ry += (my - ry) * 0.14; ring.style.left = rx + 'px'; ring.style.top = ry + 'px'; requestAnimationFrame(animRing); })();
+    function resetCursor() { if(!cursor) return; cursor.style.transform='translate(-50%,-50%) scale(1)'; cursor.style.background='var(--blue)'; cursor.style.border='none'; if(ring) ring.style.opacity='0.5'; }
     function attachHover(els) {
       els.forEach(el => {
         el.addEventListener('mouseenter', () => { cursor.style.transform='translate(-50%,-50%) scale(2.4)'; cursor.style.background='transparent'; cursor.style.border='1.5px solid var(--blue)'; ring.style.opacity='0'; });
