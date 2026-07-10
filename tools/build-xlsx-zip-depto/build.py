@@ -44,6 +44,8 @@ for _d in _div["deptos"]:
     DEP_NOMBRE[_d["cod"].zfill(2)] = _d["nombre"]
     for _m in _d.get("muns", []):
         MUN_NOMBRE[f'{_d["cod"].zfill(2)}-{_m["cod"].zfill(3)}'] = _m["nombre"]
+# divipola.json trae 2 nombres de depto defectuosos; se corrigen aquí.
+DEP_NOMBRE.update({"25": "Norte De Santander", "31": "Valle Del Cauca"})
 
 PUESTO_NOMBRE = {}
 def _load_puesto_nombres():
@@ -89,22 +91,21 @@ ARCHIVOS = [
 
 SHEET_ROWS = 1_000_000
 
-# Mapeo COD_DDE → nombre de depto (códigos Registraduría). Sólo para etiquetar
-# el archivo dentro del ZIP. Cualquier código fuera de este mapeo queda con
-# un fallback "depto_XX".
-DEPTOS = {
-    "01": "ANTIOQUIA",    "03": "ATLANTICO",    "05": "BOLIVAR",
-    "07": "BOYACA",       "09": "CALDAS",       "11": "CAUCA",
-    "12": "CESAR",        "13": "CORDOBA",      "15": "CUNDINAMARCA",
-    "17": "CHOCO",        "18": "HUILA",        "19": "LA_GUAJIRA",
-    "20": "MAGDALENA",    "21": "META",         "22": "NARINO",
-    "23": "NORTE_DE_SANTANDER", "25": "QUINDIO", "26": "RISARALDA",
-    "27": "SANTANDER",    "28": "SUCRE",        "29": "TOLIMA",
-    "30": "VALLE_DEL_CAUCA", "32": "ARAUCA",    "33": "CASANARE",
-    "34": "PUTUMAYO",     "35": "SAN_ANDRES",   "36": "AMAZONAS",
-    "37": "GUAINIA",      "38": "GUAVIARE",     "39": "VAUPES",
-    "40": "VICHADA",      "16": "BOGOTA_DC",    "88": "CONSULADOS",
-}
+# Mapeo COD_DDE → nombre de archivo dentro del ZIP, DERIVADO del mapeo
+# autoritativo (divipola + fixes). El dict hardcodeado anterior estaba
+# DESCUADRADO con los códigos reales de la Registraduría (p.ej. decía
+# 40=VICHADA cuando 40=Arauca) y etiquetó mal los ZIP de Congreso ya
+# publicados — regenerarlos con esta versión.
+def _fname(nombre: str) -> str:
+    import unicodedata
+    s = unicodedata.normalize("NFD", nombre)
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")   # sin tildes/ñ→n
+    s = "".join(c if c.isalnum() else "_" for c in s.upper())
+    while "__" in s:
+        s = s.replace("__", "_")
+    return s.strip("_")
+
+DEPTOS = {cod: _fname(n) for cod, n in DEP_NOMBRE.items()}
 
 
 def s3_upload_and_delete(local_path: Path, cat: str, año: int) -> bool:

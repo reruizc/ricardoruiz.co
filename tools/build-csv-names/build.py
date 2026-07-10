@@ -34,6 +34,10 @@ GEOREF = ROOT / "Bases de datos/PUESTOS_GEOREF.csv"
 DIVIPOL21 = ROOT / "Bases de datos/Divipol 23.09.2021.xlsx"
 
 
+# divipola.json trae 2 nombres de depto defectuosos; se corrigen aquí.
+DEP_FIXES = {"25": "Norte De Santander", "31": "Valle Del Cauca"}
+
+
 def load_maps():
     div = json.loads(DIVIPOLA.read_text(encoding="utf-8"))
     dep_nombre, mun_nombre = {}, {}
@@ -41,6 +45,7 @@ def load_maps():
         dep_nombre[d["cod"].zfill(2)] = d["nombre"]
         for m in d.get("muns", []):
             mun_nombre[f'{d["cod"].zfill(2)}-{m["cod"].zfill(3)}'] = m["nombre"]
+    dep_nombre.update(DEP_FIXES)
 
     puesto_nombre = {}
     # fallback primero (2021), el primario (2026) lo pisa después
