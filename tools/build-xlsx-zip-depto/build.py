@@ -30,9 +30,13 @@ SRC = Path("/Users/ricardoruiz/ricardoruiz.co/Bases de datos/FINAL SUBIDA GCS")
 OUT = Path("/Users/ricardoruiz/ricardoruiz.co/Bases de datos/output_xlsx_zip_depto")
 OUT.mkdir(parents=True, exist_ok=True)
 
-# Nombres oficiales dep/mun (códigos Registraduría) para las columnas
-# DES_DDE / DES_MME que se insertan junto a sus códigos en el XLSX.
+# Nombres oficiales dep/mun/puesto (códigos Registraduría) para las columnas
+# DES_DDE / DES_MME / DES_PP que se insertan junto a sus códigos en el XLSX.
+# Mismas fuentes que tools/build-csv-names/build.py.
 DIVIPOLA = Path("/Users/ricardoruiz/ricardoruiz.co/Bases de datos/test-presidencial/divipola.json")
+GEOREF = Path("/Users/ricardoruiz/ricardoruiz.co/Bases de datos/PUESTOS_GEOREF.csv")
+DIVIPOL21 = Path("/Users/ricardoruiz/ricardoruiz.co/Bases de datos/Divipol 23.09.2021.xlsx")
+
 _div = json.loads(DIVIPOLA.read_text(encoding="utf-8"))
 DEP_NOMBRE = {}
 MUN_NOMBRE = {}
@@ -40,6 +44,35 @@ for _d in _div["deptos"]:
     DEP_NOMBRE[_d["cod"].zfill(2)] = _d["nombre"]
     for _m in _d.get("muns", []):
         MUN_NOMBRE[f'{_d["cod"].zfill(2)}-{_m["cod"].zfill(3)}'] = _m["nombre"]
+
+PUESTO_NOMBRE = {}
+def _load_puesto_nombres():
+    """Divipol 2021 como fallback; el georef 2026 (primario) lo pisa después."""
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(DIVIPOL21, read_only=True)
+        ws = wb.active
+        for i, r in enumerate(ws.iter_rows(values_only=True), 1):
+            if i <= 5:
+                continue
+            try:
+                dd, mm, zz, pp, _dep, _mun, puesto = r[0], r[1], r[2], r[3], r[4], r[5], r[6]
+                if dd is None or puesto is None:
+                    continue
+                k = str(dd).zfill(2) + str(mm).zfill(3) + str(zz).zfill(2) + str(pp).zfill(2)
+                PUESTO_NOMBRE[k] = str(puesto).strip()
+            except Exception:
+                pass
+        wb.close()
+    except Exception as e:
+        print(f"aviso: Divipol 2021 no cargó ({e}); sigo solo con georef 2026", flush=True)
+    with GEOREF.open(encoding="utf-8-sig", newline="") as f:
+        for row in csv.DictReader(f, delimiter=";"):
+            code = (row.get("CÓDIGO COMPLETO") or "").strip()
+            name = (row.get("NOMBRE PUESTO") or "").strip()
+            if code and name:
+                PUESTO_NOMBRE[code.zfill(9)] = name
+_load_puesto_nombres()
 
 S3_BASE = "s3://elecciones-2026/ricardoruiz.co/DESCARGAS/raw"
 
@@ -113,6 +146,11 @@ def process_file(csv_in: Path, zip_out: Path):
                     cod_mme_idx = headers.index("COD_MME")
                 except ValueError:
                     cod_mme_idx = None
+                try:
+                    cod_zz_idx = headers.index("COD_ZZ")
+                    cod_pp_idx = headers.index("COD_PP")
+                except ValueError:
+                    cod_zz_idx = cod_pp_idx = None
                 continue
             try:
                 cod_dde = row[cod_dde_idx].strip()
@@ -128,14 +166,19 @@ def process_file(csv_in: Path, zip_out: Path):
     print(f"        {total_rows:,} filas en {n_deptos} deptos", flush=True)
 
     # PASO 2: generar XLSX por depto
-    # Se insertan DES_DDE (nombre del departamento) tras COD_DDE y DES_MME
-    # (nombre del municipio) tras COD_MME — misma convención DES_* del
+    # Se insertan DES_DDE (depto) tras COD_DDE, DES_MME (municipio) tras
+    # COD_MME y DES_PP (puesto) tras COD_PP — misma convención DES_* del
     # formato oficial (DES_COR, DES_PAR, DES_CAN...).
     ins_names = cod_mme_idx is not None and cod_mme_idx > cod_dde_idx
+    ins_pp = (ins_names and cod_pp_idx is not None and cod_zz_idx is not None
+              and cod_pp_idx > cod_mme_idx)
     if ins_names:
         headers_out = (headers[:cod_dde_idx+1] + ["DES_DDE"]
-                       + headers[cod_dde_idx+1:cod_mme_idx+1] + ["DES_MME"]
-                       + headers[cod_mme_idx+1:])
+                       + headers[cod_dde_idx+1:cod_mme_idx+1] + ["DES_MME"])
+        if ins_pp:
+            headers_out += headers[cod_mme_idx+1:cod_pp_idx+1] + ["DES_PP"] + headers[cod_pp_idx+1:]
+        else:
+            headers_out += headers[cod_mme_idx+1:]
     else:
         headers_out = list(headers)
 
@@ -162,8 +205,14 @@ def process_file(csv_in: Path, zip_out: Path):
                 mun_cod = (row[cod_mme_idx].strip() if cod_mme_idx < len(row) else "").zfill(3)
                 mun_nombre = MUN_NOMBRE.get(f"{cod_dde}-{mun_cod}", "")
                 out = (list(row[:cod_dde_idx+1]) + [dep_nombre]
-                       + list(row[cod_dde_idx+1:cod_mme_idx+1]) + [mun_nombre]
-                       + list(row[cod_mme_idx+1:]))
+                       + list(row[cod_dde_idx+1:cod_mme_idx+1]) + [mun_nombre])
+                if ins_pp:
+                    zz2 = (row[cod_zz_idx].strip() if cod_zz_idx < len(row) else "").zfill(2)
+                    pp2 = (row[cod_pp_idx].strip() if cod_pp_idx < len(row) else "").zfill(2)
+                    pp_nombre = PUESTO_NOMBRE.get(cod_dde + mun_cod + zz2 + pp2, "")
+                    out += list(row[cod_mme_idx+1:cod_pp_idx+1]) + [pp_nombre] + list(row[cod_pp_idx+1:])
+                else:
+                    out += list(row[cod_mme_idx+1:])
             else:
                 out = list(row)
             ws.append(out)
