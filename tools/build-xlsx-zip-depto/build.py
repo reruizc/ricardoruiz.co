@@ -15,6 +15,7 @@ Soporta:
   --upload-and-delete              tras generar el ZIP, subir a S3 y borrar local
 """
 import csv
+import json
 import shutil
 import subprocess
 import sys
@@ -28,6 +29,17 @@ from openpyxl import Workbook
 SRC = Path("/Users/ricardoruiz/ricardoruiz.co/Bases de datos/FINAL SUBIDA GCS")
 OUT = Path("/Users/ricardoruiz/ricardoruiz.co/Bases de datos/output_xlsx_zip_depto")
 OUT.mkdir(parents=True, exist_ok=True)
+
+# Nombres oficiales dep/mun (códigos Registraduría) para las columnas
+# DES_DDE / DES_MME que se insertan junto a sus códigos en el XLSX.
+DIVIPOLA = Path("/Users/ricardoruiz/ricardoruiz.co/Bases de datos/test-presidencial/divipola.json")
+_div = json.loads(DIVIPOLA.read_text(encoding="utf-8"))
+DEP_NOMBRE = {}
+MUN_NOMBRE = {}
+for _d in _div["deptos"]:
+    DEP_NOMBRE[_d["cod"].zfill(2)] = _d["nombre"]
+    for _m in _d.get("muns", []):
+        MUN_NOMBRE[f'{_d["cod"].zfill(2)}-{_m["cod"].zfill(3)}'] = _m["nombre"]
 
 S3_BASE = "s3://elecciones-2026/ricardoruiz.co/DESCARGAS/raw"
 
@@ -87,6 +99,7 @@ def process_file(csv_in: Path, zip_out: Path):
     headers = None
     cod_dde_idx = None
 
+    cod_mme_idx = None
     with csv_in.open("r", encoding="utf-8-sig", newline="") as f:
         reader = csv.reader(f, delimiter=";", quoting=csv.QUOTE_MINIMAL)
         for i, row in enumerate(reader):
@@ -96,6 +109,10 @@ def process_file(csv_in: Path, zip_out: Path):
                     cod_dde_idx = headers.index("COD_DDE")
                 except ValueError:
                     raise SystemExit(f"COD_DDE column missing in {csv_in.name}")
+                try:
+                    cod_mme_idx = headers.index("COD_MME")
+                except ValueError:
+                    cod_mme_idx = None
                 continue
             try:
                 cod_dde = row[cod_dde_idx].strip()
@@ -111,6 +128,17 @@ def process_file(csv_in: Path, zip_out: Path):
     print(f"        {total_rows:,} filas en {n_deptos} deptos", flush=True)
 
     # PASO 2: generar XLSX por depto
+    # Se insertan DES_DDE (nombre del departamento) tras COD_DDE y DES_MME
+    # (nombre del municipio) tras COD_MME — misma convención DES_* del
+    # formato oficial (DES_COR, DES_PAR, DES_CAN...).
+    ins_names = cod_mme_idx is not None and cod_mme_idx > cod_dde_idx
+    if ins_names:
+        headers_out = (headers[:cod_dde_idx+1] + ["DES_DDE"]
+                       + headers[cod_dde_idx+1:cod_mme_idx+1] + ["DES_MME"]
+                       + headers[cod_mme_idx+1:])
+    else:
+        headers_out = list(headers)
+
     tmpdir = zip_out.parent / f"_tmp_{zip_out.stem}"
     tmpdir.mkdir(parents=True, exist_ok=True)
     xlsx_files = []
@@ -118,6 +146,7 @@ def process_file(csv_in: Path, zip_out: Path):
     for cod_dde in sorted(by_depto.keys()):
         rows = by_depto[cod_dde]
         depto_name = DEPTOS.get(cod_dde, f"depto_{cod_dde}")
+        dep_nombre = DEP_NOMBRE.get(cod_dde, depto_name.replace("_", " ").title())
         xlsx_path = tmpdir / f"{cod_dde}_{depto_name}.xlsx"
         wb = Workbook(write_only=True)
         sheet_idx = 0
@@ -127,9 +156,17 @@ def process_file(csv_in: Path, zip_out: Path):
             if ws is None or rows_in_sheet >= SHEET_ROWS:
                 sheet_idx += 1
                 ws = wb.create_sheet(f"Datos {sheet_idx}" if sheet_idx > 1 else "Datos")
-                ws.append(headers)
+                ws.append(headers_out)
                 rows_in_sheet = 1
-            ws.append(list(row))
+            if ins_names:
+                mun_cod = (row[cod_mme_idx].strip() if cod_mme_idx < len(row) else "").zfill(3)
+                mun_nombre = MUN_NOMBRE.get(f"{cod_dde}-{mun_cod}", "")
+                out = (list(row[:cod_dde_idx+1]) + [dep_nombre]
+                       + list(row[cod_dde_idx+1:cod_mme_idx+1]) + [mun_nombre]
+                       + list(row[cod_mme_idx+1:]))
+            else:
+                out = list(row)
+            ws.append(out)
             rows_in_sheet += 1
         wb.save(xlsx_path)
         xlsx_files.append((cod_dde, xlsx_path))
