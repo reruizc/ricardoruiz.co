@@ -61,9 +61,9 @@ h1{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-
 .seg button:hover{color:var(--white)}
 .seg button.on{background:var(--blue);color:var(--white)}
 .seg .grp-label{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-weight:500;font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);align-self:center;padding:0 .4rem 0 .2rem}
-.layout{display:grid;grid-template-columns:1fr 430px;gap:1.2rem;margin:1rem 0 2.4rem}
+.layout{display:grid;grid-template-columns:1fr 430px;gap:1.2rem;margin:1rem 0 2.4rem;align-items:start}
 #map{height:620px;border:1px solid var(--card-border);background:#0b0e18;z-index:1}
-.panel{background:var(--card-bg);border:1px solid var(--card-border);padding:1.1rem;height:620px;overflow-y:auto}
+.panel{background:var(--card-bg);border:1px solid var(--card-border);padding:1.1rem}
 .panel h3{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-weight:700;font-size:1.15rem;letter-spacing:-.02em;margin:.1rem 0 .2rem}
 .panel .sub{font-size:.8rem;color:var(--muted);margin-bottom:.9rem}
 .kpi{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:1rem}
@@ -84,7 +84,7 @@ h1{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-
 .note{font-size:.74rem;color:var(--muted);line-height:1.45;margin-top:1rem;border-top:1px solid var(--line);padding-top:.7rem}
 /* detalle del barrio como overlay sobre el mapa (arriba a la derecha) */
 .map-wrap{position:relative;min-width:0}
-#map-detail{position:absolute;top:10px;right:10px;z-index:1200;max-width:300px;pointer-events:none;
+#map-detail{position:absolute;top:10px;left:10px;z-index:1200;max-width:300px;pointer-events:none;
   background:rgba(6,8,16,.93);border:1px solid rgba(0,71,255,.4);padding:.7rem .8rem;font-size:.8rem;line-height:1.45;color:var(--white)}
 #map-detail .dh{font-weight:700;margin-bottom:.3rem}
 #map-detail .hint{color:var(--muted)}
@@ -167,8 +167,9 @@ h1{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-
     <div class="modewrap seg" id="seg-mode">
       <button data-m="ganador" class="on">Ganador</button>
       <button data-m="margen" data-feat="intensidad">Intensidad</button>
+      <button id="btn-puestos" data-feat="puestos">Puestos</button>
     </div>
-    <button class="dl-btn" id="btn-dl" data-feat="descarga-base">↓ Base por puesto (CSV)</button>
+    <button class="dl-btn" id="btn-dl" data-feat="descarga-base">↓ Base por puesto (Excel)</button>
   </div>
 
   <div class="layout">
@@ -331,6 +332,7 @@ function render(){
     }
   }).addTo(map);
   try{ map.invalidateSize(); }catch(e){}
+  if(typeof renderPuestos==='function') renderPuestos(); // marcadores por encima del choropleth
   renderPanel();
 }
 
@@ -411,12 +413,14 @@ let _userPlan = 'anonymous';
 const FEATURE_PLAN = {
   'historico':     'pro',      // alcaldías 2011 · 2015 · 2019
   'intensidad':    'pro',      // modo intensidad del mapa
-  'descarga-base': 'premium',  // CSV por puesto
+  'puestos':       'premium',  // capa de puestos de votación
+  'descarga-base': 'premium',  // base por puesto (Excel)
 };
 const FEATURE_COPY = {
   'historico':     { title:'Histórico de alcaldías 2011–2019', desc:'La alcaldía 2023 y la presidencial 2026 son gratis. Para recorrer el histórico completo de Tunja (2011, 2015 y 2019, puesto por puesto) necesitas el plan Pro.' },
   'intensidad':    { title:'Modo Intensidad', desc:'Ver no solo quién gana cada barrio sino con cuánta fuerza (margen del ganador) está disponible en el plan Pro.' },
-  'descarga-base': { title:'Descargar la base por puesto (CSV)', desc:'La base completa de Tunja — 26 puestos × 6 elecciones con ganador, partido, votos, censo y mesas — se descarga en el plan Premium.' },
+  'puestos':       { title:'Capa de puestos de votación', desc:'Superponer los 26 puestos de votación sobre el mapa —ubicación y tamaño del censo de cada uno— está disponible en el plan Premium.' },
+  'descarga-base': { title:'Descargar la base por puesto (Excel)', desc:'La base completa de Tunja — 26 puestos × 6 elecciones con ganador, partido, votos, censo y mesas, en un Excel con tablas formateadas — se descarga en el plan Premium.' },
 };
 const PLAN_PRICE = {
   pro:     { cop:'$39.900 COP', sub:'al mes · cancela cuando quieras' },
@@ -468,37 +472,142 @@ function updateLocks(){
   else chip.style.display='none';
 }
 
-// ---- descarga CSV (Premium) ----
-function downloadBaseCSV(){
-  const ALC=['alcaldia_2011','alcaldia_2015','alcaldia_2019','alcaldia_2023'];
-  const head=['pcode','puesto','censo','mesas'];
-  for(const e of ALC){ const y=e.slice(-4); head.push(`ganador_${y}`,`partido_${y}`,`votos_ganador_${y}`,`pct_${y}`,`validos_${y}`); }
-  head.push('cepeda_1v','abelardo_1v','votantes_1v','cepeda_2v','abelardo_2v','votantes_2v','potencial_2026');
-  const q=v=>{ v=(v==null?'':String(v)); return /[",;\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
-  const rows=[head.join(';')];
-  for(const pc in PUESTOS){
-    const p=PUESTOS[pc];
-    const row=[pc, p.nombre, (p.mujeres||0)+(p.hombres||0), p.mesas];
-    for(const e of ALC){
-      const b=DATA.alcaldias[e].by_puesto[pc];
-      if(b) row.push(b.winner, b.winner_par, b.winner_votos, b.winner_pct, b.validos);
-      else row.push('','','','','');
-    }
-    const pr=PRES[pc];
-    if(pr) row.push(pr.cep1, pr.abe1, pr.urna1, pr.cep2, pr.abe2, pr.urna2, pr.pot);
-    else row.push('','','','','','','');
-    rows.push(row.map(q).join(';'));
+// ---- descarga Excel (Premium) con ExcelJS (estilo + filas alternas) ----
+let _exceljsPromise=null;
+function loadExcelJS(){
+  if(window.ExcelJS) return Promise.resolve();
+  if(_exceljsPromise) return _exceljsPromise;
+  _exceljsPromise=new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
+    s.onload=res; s.onerror=()=>rej(new Error('No se pudo cargar ExcelJS'));
+    document.head.appendChild(s);
+  });
+  return _exceljsPromise;
+}
+async function downloadBaseXLSX(){
+  await loadExcelJS();
+  const ALC=[['2011','alcaldia_2011'],['2015','alcaldia_2015'],['2019','alcaldia_2019'],['2023','alcaldia_2023']];
+  const wb=new ExcelJS.Workbook();
+  wb.creator='Ricardo Ruiz \u00b7 ricardoruiz.co';
+  const INK='FF10131C', BLUE='FF0047FF', ZEBRA='FF11151F', LINE='FF2A3040', WHITE='FFF4F3EF', MUT='FFB9BEC9';
+  const border={top:{style:'thin',color:{argb:LINE}},bottom:{style:'thin',color:{argb:LINE}},left:{style:'thin',color:{argb:LINE}},right:{style:'thin',color:{argb:LINE}}};
+
+  function styleSheet(ws, cols, title){
+    ws.columns=cols;
+    // banda de titulo
+    ws.spliceRows(1,0,[title]); ws.spliceRows(2,0,[]);
+    ws.mergeCells(1,1,1,cols.length);
+    const t=ws.getCell(1,1);
+    t.value=title; t.font={name:'Calibri',size:14,bold:true,color:{argb:WHITE}};
+    t.fill={type:'pattern',pattern:'solid',fgColor:{argb:INK}};
+    t.alignment={vertical:'middle',horizontal:'left'}; ws.getRow(1).height=26;
+    // header (fila 3)
+    const hr=ws.getRow(3);
+    cols.forEach((c,i)=>{ const cell=hr.getCell(i+1); cell.value=c.header;
+      cell.font={name:'Calibri',size:10,bold:true,color:{argb:WHITE}};
+      cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:BLUE}};
+      cell.alignment={vertical:'middle',horizontal:c.num?'right':'left'};
+      cell.border=border;
+    });
+    hr.height=20;
+    ws.views=[{state:'frozen',ySplit:3}];
+    ws.autoFilter={from:{row:3,column:1},to:{row:3,column:cols.length}};
   }
-  const blob=new Blob(['\ufeff'+rows.join('\n')],{type:'text/csv;charset=utf-8'});
+  function fillRows(ws, cols, data){
+    data.forEach((r,ri)=>{
+      const row=ws.addRow(r);
+      const zebra=(ri%2===1);
+      row.eachCell({includeEmpty:true},(cell,ci)=>{
+        cell.font={name:'Calibri',size:10,color:{argb:WHITE}};
+        cell.fill={type:'pattern',pattern:'solid',fgColor:{argb: zebra?ZEBRA:INK}};
+        cell.alignment={vertical:'middle',horizontal:cols[ci-1] && cols[ci-1].num?'right':'left'};
+        cell.border=border;
+        if(cols[ci-1] && cols[ci-1].fmt) cell.numFmt=cols[ci-1].fmt;
+      });
+    });
+  }
+
+  // \u2500\u2500 Hoja 1: Alcald\u00edas (una fila por puesto, columnas por a\u00f1o) \u2500\u2500
+  const cA=[
+    {header:'Puesto',key:'nom',width:34},
+    {header:'Censo',key:'cen',width:9,num:true,fmt:'#,##0'},
+    {header:'Mesas',key:'mes',width:8,num:true},
+  ];
+  ALC.forEach(([y])=>{ cA.push(
+    {header:`Ganador ${y}`,key:'g'+y,width:26},
+    {header:`Partido ${y}`,key:'p'+y,width:34},
+    {header:`Votos ${y}`,key:'v'+y,width:10,num:true,fmt:'#,##0'},
+    {header:`% ${y}`,key:'pc'+y,width:8,num:true,fmt:'0.0'},
+  ); });
+  const wsA=wb.addWorksheet('Alcald\u00edas 2011-2023',{views:[{showGridLines:false}]});
+  const dataA=[];
+  for(const pc in PUESTOS){ const p=PUESTOS[pc];
+    const r=[p.nombre,(p.mujeres||0)+(p.hombres||0),p.mesas];
+    ALC.forEach(([y,e])=>{ const b=DATA.alcaldias[e].by_puesto[pc];
+      if(b) r.push(b.winner,b.winner_par,b.winner_votos,b.winner_pct);
+      else r.push('','','',''); });
+    dataA.push(r);
+  }
+  styleSheet(wsA,cA,'Tunja \u00b7 Alcald\u00edas por puesto de votaci\u00f3n (2011\u20132023)');
+  fillRows(wsA,cA,dataA);
+
+  // \u2500\u2500 Hoja 2: Presidencial 2026 por puesto \u2500\u2500
+  const cP=[
+    {header:'Puesto',key:'nom',width:34},
+    {header:'Potencial',key:'pot',width:11,num:true,fmt:'#,##0'},
+    {header:'Cepeda 1V',key:'c1',width:11,num:true,fmt:'#,##0'},
+    {header:'Abelardo 1V',key:'a1',width:12,num:true,fmt:'#,##0'},
+    {header:'Votantes 1V',key:'u1',width:12,num:true,fmt:'#,##0'},
+    {header:'Cepeda 2V',key:'c2',width:11,num:true,fmt:'#,##0'},
+    {header:'Abelardo 2V',key:'a2',width:12,num:true,fmt:'#,##0'},
+    {header:'Votantes 2V',key:'u2',width:12,num:true,fmt:'#,##0'},
+  ];
+  const wsP=wb.addWorksheet('Presidencial 2026',{views:[{showGridLines:false}]});
+  const dataP=[];
+  for(const pc in PUESTOS){ const p=PUESTOS[pc], pr=PRES[pc];
+    dataP.push([p.nombre, pr?pr.pot:'', pr?pr.cep1:'', pr?pr.abe1:'', pr?pr.urna1:'', pr?pr.cep2:'', pr?pr.abe2:'', pr?pr.urna2:'']);
+  }
+  styleSheet(wsP,cP,'Tunja \u00b7 Presidencial 2026 por puesto (1\u00aa y 2\u00aa vuelta)');
+  fillRows(wsP,cP,dataP);
+
+  const buf=await wb.xlsx.writeBuffer();
+  const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download='tunja-base-por-puesto-2011-2026.csv';
+  a.download='tunja-base-por-puesto-2011-2026.xlsx';
   document.body.appendChild(a); a.click();
   setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500);
 }
-document.getElementById('btn-dl').addEventListener('click',()=>{
+document.getElementById('btn-dl').addEventListener('click',async()=>{
   if(!hasFeature('descarga-base')){ openBlockedModal('descarga-base'); return; }
-  downloadBaseCSV();
+  const btn=document.getElementById('btn-dl'), txt=btn.textContent;
+  btn.textContent='Generando\u2026'; btn.disabled=true;
+  try{ await downloadBaseXLSX(); }
+  catch(e){ alert('No se pudo generar el Excel: '+e.message); }
+  finally{ btn.textContent=txt; btn.disabled=false; }
+});
+
+// ---- capa de puestos (Premium) ----
+let puestosLayer=null, showPuestos=false;
+function renderPuestos(){
+  if(puestosLayer){ puestosLayer.remove(); puestosLayer=null; }
+  if(!showPuestos) return;
+  puestosLayer=L.layerGroup();
+  for(const pc in PUESTOS){
+    const p=PUESTOS[pc]; if(!p.lat||!p.lon) continue;
+    const censo=(p.mujeres||0)+(p.hombres||0);
+    const r=Math.max(5,Math.min(15,4+Math.sqrt(censo)/16));
+    const mk=L.circleMarker([p.lat,p.lon],{radius:r,color:'#ffffff',weight:1.2,fillColor:'#0047FF',fillOpacity:.85});
+    mk.bindTooltip(`<b>${p.nombre}</b><br>Censo ${fmt(censo)} \u00b7 ${p.mesas} mesas`,{sticky:true});
+    mk.addTo(puestosLayer);
+  }
+  puestosLayer.addTo(map);
+}
+document.getElementById('btn-puestos').addEventListener('click',e=>{
+  const b=e.currentTarget;
+  if(!hasFeature('puestos')){ openBlockedModal('puestos'); return; }
+  showPuestos=!showPuestos; b.classList.toggle('on',showPuestos); renderPuestos();
 });
 
 // ---- controls ----
