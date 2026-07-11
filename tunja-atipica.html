@@ -513,7 +513,10 @@ async function downloadBaseXLSX(elec){
   await loadExcelJS();
   const wb=new ExcelJS.Workbook();
   wb.creator='Ricardo Ruiz \u00b7 ricardoruiz.co';
-  const INK='FF10131C', BLUE='FF0047FF', ZEBRA='FF11151F', LINE='FF2A3040', WHITE='FFF4F3EF';
+  // tema claro, legible: banda de titulo azul, header azul con texto blanco,
+  // filas alternas en dos pasteles suaves y texto oscuro.
+  const HEADBG='FF0047FF', TITLEBG='FF12224F', TXT='FF1A1510', HEADTXT='FFFFFFFF',
+        ROW_A='FFFFFFFF', ROW_B='FFEAF1FF', LINE='FFCFD8EA';
   const border={top:{style:'thin',color:{argb:LINE}},bottom:{style:'thin',color:{argb:LINE}},left:{style:'thin',color:{argb:LINE}},right:{style:'thin',color:{argb:LINE}}};
 
   function styleSheet(ws, cols, title){
@@ -521,13 +524,13 @@ async function downloadBaseXLSX(elec){
     ws.spliceRows(1,0,[title]); ws.spliceRows(2,0,[]);
     ws.mergeCells(1,1,1,cols.length);
     const t=ws.getCell(1,1);
-    t.value=title; t.font={name:'Calibri',size:14,bold:true,color:{argb:WHITE}};
-    t.fill={type:'pattern',pattern:'solid',fgColor:{argb:INK}};
-    t.alignment={vertical:'middle',horizontal:'left'}; ws.getRow(1).height=26;
+    t.value=title; t.font={name:'Calibri',size:14,bold:true,color:{argb:HEADTXT}};
+    t.fill={type:'pattern',pattern:'solid',fgColor:{argb:TITLEBG}};
+    t.alignment={vertical:'middle',horizontal:'left'}; ws.getRow(1).height=28;
     const hr=ws.getRow(3);
     cols.forEach((c,i)=>{ const cell=hr.getCell(i+1); cell.value=c.header;
-      cell.font={name:'Calibri',size:10,bold:true,color:{argb:WHITE}};
-      cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:BLUE}};
+      cell.font={name:'Calibri',size:10,bold:true,color:{argb:HEADTXT}};
+      cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:HEADBG}};
       cell.alignment={vertical:'middle',horizontal:c.num?'right':'left'};
       cell.border=border;
     });
@@ -538,10 +541,10 @@ async function downloadBaseXLSX(elec){
   function fillRows(ws, cols, data){
     data.forEach((r,ri)=>{
       const row=ws.addRow(r);
-      const zebra=(ri%2===1);
+      const bg=(ri%2===1)?ROW_B:ROW_A;
       row.eachCell({includeEmpty:true},(cell,ci)=>{
-        cell.font={name:'Calibri',size:10,color:{argb:WHITE}};
-        cell.fill={type:'pattern',pattern:'solid',fgColor:{argb: zebra?ZEBRA:INK}};
+        cell.font={name:'Calibri',size:10,color:{argb:TXT}};
+        cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:bg}};
         cell.alignment={vertical:'middle',horizontal:cols[ci-1] && cols[ci-1].num?'right':'left'};
         cell.border=border;
         if(cols[ci-1] && cols[ci-1].fmt) cell.numFmt=cols[ci-1].fmt;
@@ -549,11 +552,13 @@ async function downloadBaseXLSX(elec){
     });
   }
 
+  const barrioDe=p=>{ const b=(p.barrio_georef||p.barrio||'').trim(); return (b && !/^(no aplica|n\/a|na)$/i.test(b))?b:''; };
   let cols, data, sheetName, title, fname;
   if(elec.startsWith('alcaldia')){
     const y=elec.slice(-4);
     cols=[
       {header:'Puesto',width:34},
+      {header:'Barrio',width:22},
       {header:'Censo',width:9,num:true,fmt:'#,##0'},
       {header:'Mesas',width:8,num:true},
       {header:'Ganador',width:26},
@@ -564,7 +569,7 @@ async function downloadBaseXLSX(elec){
     ];
     data=[];
     for(const pc in PUESTOS){ const p=PUESTOS[pc]; const b=DATA.alcaldias[elec].by_puesto[pc];
-      data.push([p.nombre,(p.mujeres||0)+(p.hombres||0),p.mesas,
+      data.push([p.nombre, barrioDe(p), (p.mujeres||0)+(p.hombres||0), p.mesas,
         b?b.winner:'', b?b.winner_par:'', b?b.winner_votos:'', b?b.winner_pct:'', b?b.validos:'']);
     }
     sheetName='Alcald\u00eda '+y;
@@ -573,6 +578,7 @@ async function downloadBaseXLSX(elec){
   } else {
     cols=[
       {header:'Puesto',width:34},
+      {header:'Barrio',width:22},
       {header:'Potencial',width:11,num:true,fmt:'#,##0'},
       {header:'Cepeda 1V',width:11,num:true,fmt:'#,##0'},
       {header:'Abelardo 1V',width:12,num:true,fmt:'#,##0'},
@@ -583,7 +589,7 @@ async function downloadBaseXLSX(elec){
     ];
     data=[];
     for(const pc in PUESTOS){ const p=PUESTOS[pc], pr=PRES[pc];
-      data.push([p.nombre, pr?pr.pot:'', pr?pr.cep1:'', pr?pr.abe1:'', pr?pr.urna1:'', pr?pr.cep2:'', pr?pr.abe2:'', pr?pr.urna2:'']);
+      data.push([p.nombre, barrioDe(p), pr?pr.pot:'', pr?pr.cep1:'', pr?pr.abe1:'', pr?pr.urna1:'', pr?pr.cep2:'', pr?pr.abe2:'', pr?pr.urna2:'']);
     }
     sheetName='Presidencial 2026';
     title='Tunja \u00b7 Presidencial 2026 por puesto (1\u00aa y 2\u00aa vuelta)';
