@@ -4816,13 +4816,21 @@ documento correcto. Probado: Gaceta 857/2013 (boletín con proyectos 86/107/15/2
 Clemencia Vega Quiroz, 5 argumentos reales. Los PDFs locales van a `Bases de datos/
 leyes-senado/gacetas/` (gitignored; no guardamos PDFs en prod, solo el texto en S3).
 
+**Ficha del frontend wireada (LISTO):** en el modal de proyecto, los documentos de
+ponencia/plenaria/conciliación son clicables → llaman la acción `gaceta` de la
+Lambda → renderizan sentido (favorable/archivo, color verde/rojo), ponentes que
+firman y argumentos. Si la gaceta no tiene texto en S3 aún, muestra "no procesada
+(se baja bajo demanda)". Verificado en preview: Rosa Elvira Cely / Gaceta 857-2013
+→ favorable · Doris Clemencia Vega Quiroz · 6 argumentos (CEDAW, Belém do Pará,
+impunidad 10%…). Pusheado (commit 0f44542).
+
 **Pendiente (en orden):**
-1. Push a producción (`caudal.html` + `dashboard.html` + tools/) — incluye el fix
-   de colisión pdly/pal (id compartido → `_full` keyed por "tb:id"; `proyecto(id,tb)`).
-2. **Automatizar/facilitar la descarga de gacetas** (hoy semi-manual por Chrome):
-   o driver de navegador repetible, o descargar directo a carpeta accesible.
-   Wirear la ficha del frontend para mostrar el análisis de gaceta (acción `gaceta`).
-3. OCR para gacetas escaneadas (años 90-2005).
+1. **Automatizar/facilitar la descarga de gacetas** (hoy semi-manual por Chrome +
+   gotcha macOS TCC con `~/Downloads`): driver repetible, o Chrome directo a carpeta
+   accesible, o subir el texto por un flujo que no toque `~/Downloads`.
+2. OCR para gacetas escaneadas (años 90-2005) antes de subir su texto.
+3. (Opcional) pre-poblar `gacetas-texto/` de temas-cliente frecuentes (feminicidio,
+   paridad…) para que la ficha responda instantáneo sin la descarga en vivo.
 
 Refinamientos opcionales del join autor→partido: (a) más años de Congreso (pre-2014)
 para cubrir legisladores viejos; (b) ampliar `MANUAL`; (c) votación nominal por
