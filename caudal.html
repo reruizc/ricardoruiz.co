@@ -133,6 +133,18 @@
   .gac-list{display:flex; flex-wrap:wrap; gap:.5rem}
   .gac{font-size:.68rem; color:var(--ink2); border:1px solid var(--border); border-radius:5px; padding:.4rem .6rem}
   .gac b{color:var(--teal); display:block; font-size:.58rem; letter-spacing:.08em; text-transform:uppercase; margin-bottom:.2rem}
+  .gac-click{cursor:none; transition:.15s}
+  .gac-click:hover{border-color:var(--teal); color:var(--ink)}
+  .gac-hint{font-size:.52rem; color:var(--teal); margin-top:.3rem; letter-spacing:.06em}
+  #gac-analisis{margin-top:1.1rem}
+  .ga-card{background:linear-gradient(180deg,var(--teal-soft),transparent); border:1px solid var(--teal-dim); border-radius:9px; padding:1.1rem 1.2rem}
+  .ga-tag{font-size:.56rem; letter-spacing:.16em; text-transform:uppercase; color:var(--teal); margin-bottom:.7rem}
+  .ga-h{font-size:.56rem; letter-spacing:.14em; text-transform:uppercase; color:var(--ink3); margin:.8rem 0 .25rem}
+  .ga-t{font-size:.82rem; line-height:1.5; color:var(--ink)}
+  .ga-sent{display:inline-block; font-size:.6rem; text-transform:uppercase; letter-spacing:.06em; padding:.18rem .55rem; border-radius:3px; font-weight:700}
+  .ga-arg{font-size:.8rem; line-height:1.5; color:var(--ink); margin:.25rem 0 .25rem 1rem; position:relative}
+  .ga-arg::before{content:'—'; position:absolute; left:-1rem; color:var(--teal)}
+  .ga-none{font-size:.72rem; color:var(--ink2); line-height:1.5}
 
   .err{color:var(--red); font-size:.8rem; text-align:center; padding:2rem}
   .foot{text-align:center; color:var(--ink3); font-size:.62rem; margin-top:3rem; line-height:1.7}
@@ -329,7 +341,14 @@
     if(!f||f.error){ modalCard.innerHTML='<button class="modal-close">✕</button><div class="err">No se pudo cargar la ficha.</div>'; modalCard.querySelector('.modal-close').onclick=cerrar; return; }
     const meta=(k,v)=>v?`<div class="m"><div class="k">${k}</div><div class="v">${esc(v)}</div></div>`:'';
     const auts=(f.autores||[]).map(a=>`<div class="aut"><span>${esc(a.nombre)}</span>${a.partido?`<span class="p" style="border-color:${pcolor(a.partido)}55;color:${pcolor(a.partido)}">${esc(a.partido)}</span>`:''}</div>`).join('')||'<div class="cob-note">Sin autores registrados.</div>';
-    const gacs=(f.gacetas||[]).filter(g=>g.gaceta).map(g=>`<div class="gac"><b>${esc(g.tipo.replace(/_/g,' '))}</b>${esc(g.gaceta)}</div>`).join('')||'<div class="cob-note">Sin gacetas referenciadas.</div>';
+    // los documentos de ponencia/plenaria son analizables (DeepSeek lee la gaceta)
+    const analizable=t=>/ponencia|plenaria|conciliacion|objeciones/.test(t||'');
+    const gacs=(f.gacetas||[]).filter(g=>g.gaceta).map(g=>{
+      const key=String(g.gaceta).replace('/','-'); const ok=analizable(g.tipo);
+      return `<div class="gac ${ok?'gac-click':''}" ${ok?`data-key="${esc(key)}" data-tipo="${esc(g.tipo)}"`:''}>
+        <b>${esc(g.tipo.replace(/_/g,' '))}</b>${esc(g.gaceta)}${ok?'<div class="gac-hint">▸ analizar</div>':''}</div>`;
+    }).join('')||'<div class="cob-note">Sin gacetas referenciadas.</div>';
+    _gacContexto=`Proyecto de ley ${f.numero_senado||f.numero_camara||''} · ${f.titulo}`;
     modalCard.innerHTML=`
       <button class="modal-close">✕</button>
       <h2>${esc(f.titulo)}</h2>
@@ -341,9 +360,35 @@
       </div>
       <h3 style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin-bottom:.7rem">Autores</h3>
       <div class="aut-list">${auts}</div>
-      <h3 style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin-bottom:.7rem">Documentos · gacetas del Congreso</h3>
-      <div class="gac-list">${gacs}</div>`;
+      <h3 style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin-bottom:.7rem">Documentos · gacetas del Congreso · click para analizar la ponencia</h3>
+      <div class="gac-list">${gacs}</div>
+      <div id="gac-analisis"></div>`;
     modalCard.querySelector('.modal-close').onclick=cerrar;
+    modalCard.querySelectorAll('.gac-click').forEach(el=>el.onclick=()=>analizarGaceta(el.dataset.key,el.dataset.tipo));
+  }
+
+  // fase 3: analiza una gaceta (ponencia) vía la Lambda → ponente/sentido/argumentos
+  let _gacContexto='';
+  const SENT_COLOR={favorable:'var(--green)',archivo:'var(--red)',mixto:'var(--amber)',desconocido:'var(--gray)'};
+  async function analizarGaceta(key,tipo){
+    const box=document.getElementById('gac-analisis'); if(!box) return;
+    box.innerHTML=`<div class="ga-card"><div class="llm-load">Leyendo la gaceta ${esc(key.replace('-','/'))} y extrayendo la ponencia <span class="dots"><span></span><span></span><span></span></span></div></div>`;
+    let d; try{ d=await call({action:'gaceta',key,contexto:_gacContexto}); }catch(e){ d={error:'fallo de red'}; }
+    if(!d || d.error){
+      box.innerHTML=`<div class="ga-card"><div class="ga-none">Esta gaceta (${esc(key.replace('-','/'))}) aún no está procesada. En producción, Caudal la baja de la Imprenta bajo demanda y extrae su contenido. <br><span style="color:var(--ink3)">${esc((d&&d.error)||'')}</span></div></div>`;
+      return;
+    }
+    const sc=SENT_COLOR[d.sentido]||'var(--gray)';
+    const args=(d.argumentos||[]).map(a=>`<div class="ga-arg">${esc(a)}</div>`).join('');
+    box.innerHTML=`<div class="ga-card">
+      <div class="ga-tag">◈ Ponencia leída por IA · Gaceta ${esc(key.replace('-','/'))} · ${esc((tipo||'').replace(/_/g,' '))}</div>
+      <div class="ga-h">Sentido</div>
+      <span class="ga-sent" style="color:${sc};border:1px solid ${sc}44;background:${sc}14">${esc(d.sentido||'—')}</span>
+      ${d.sentido_detalle?`<div class="ga-t" style="margin-top:.5rem">${esc(d.sentido_detalle)}</div>`:''}
+      ${(d.ponentes&&d.ponentes.length)?`<div class="ga-h">Ponentes que firman</div><div class="ga-t">${d.ponentes.map(esc).join(' · ')}</div>`:''}
+      ${args?`<div class="ga-h">Argumentos</div>${args}`:''}
+      ${d.en_contra?`<div class="ga-h">Oposición / ponencia de archivo</div><div class="ga-t">${esc(d.en_contra)}</div>`:''}
+    </div>`;
   }
   addEventListener('keydown',e=>{ if(e.key==='Escape') cerrar(); });
 })();
