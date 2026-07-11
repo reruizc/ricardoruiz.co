@@ -4561,6 +4561,255 @@ Cuando se haga, **bumpear `CACHE_BUSTER` en `lab-indicadores.js`** (formato
   Más de 6 satura — meterlo como sub-módulo de uno existente (como
   Alternativas es sub-módulo de Problema Público).
 
+## Histórico legislativo — `tools/leyes-senado/` (harvester LISTO · foso de Cauce)
+
+Cosecha completa del histórico de **proyectos de ley, leyes sancionadas,
+proyectos de acto legislativo y actos legislativos** del Congreso desde
+**1990 hasta hoy**, scrapeado de `leyes.senado.gov.co`. Es la capa de datos
+base del frente **[[project_cauce_alianza]]** (inteligencia legislativa) — el
+"esqueleto" navegable de todo el trámite, con punteros a las gacetas donde
+vive el texto. Corrido completo el 2026-07-10.
+
+### La "API" no documentada del Senado
+`leyes.senado.gov.co` es un frontend estático (Bootstrap + `js/app.js`) que
+habla con endpoints PHP internos. **Sin auth, sin CSRF, sin captcha** — solo
+403 si el request no trae User-Agent de navegador (curl pelado falla; con UA
+Chrome pasa). Los 6 endpoints:
+```
+POST api/search_pdly.php   proyectos de ley (JSON)   → filtra ?legislatura= → SIN cap
+POST api/search_pal.php    proy. acto legislativo     → idem por legislatura
+POST api/search_lys.php    leyes sancionadas          → ⚠️ cap 100, NO filtra legislatura
+POST api/search_actos.php  actos legislativos         → ⚠️ idem cap 100
+GET  api/get_detalle_{pdly,lys,pal,actos}.php?id=N    ficha completa (HTML), IDs SECUENCIALES
+```
+El cap de 100 en lys/actos se rodea **enumerando IDs del detalle** (por eso el
+harvester baja por id, no por búsqueda). Campos del form: pdly=`legislatura,
+autor,comision,palabra_clave`; lys/actos=`palabra_clave,n_senado,n_camara`;
+pal=`legislatura,autor,palabra_clave`. Legislaturas van `1990-1991`..`2025-2026`.
+
+### `harvest.py` (stdlib pura, curl por subprocess, resumible)
+Mismo patrón que `scrape_cne.py` (curl subprocess esquiva el TLS de python
+3.14). **Decodifica bytes con tolerancia** (`errors='replace'`) porque algunas
+fichas traen encoding mixto utf-8/latin-1 que rompe `subprocess(text=True)` —
+ese era el falso "error de red" que abortaba corridas. 3 fases:
+```
+python3 tools/leyes-senado/harvest.py listas                    # pdly+pal por las 36 legislaturas → listas/*.json
+python3 tools/leyes-senado/harvest.py detalles --workers 4      # baja fichas 1..max por id (PARALELO)
+python3 tools/leyes-senado/harvest.py dataset                   # parsea HTML → JSONL + CSV por tabla
+python3 tools/leyes-senado/harvest.py test                      # slice de validación
+```
+- **Resumible**: cada ficha bajada queda en `raw/{tabla}/{id}.html` (vacío =
+  gap marcado); el resume reconstruye `pendientes` saltando lo que ya está.
+- **`--workers N`**: fase detalles con `ThreadPoolExecutor` (curl subprocess
+  libera el GIL). 4 obreros = ~45 min para las ~10k pdly vs horas secuencial.
+  El sitio lanza errores intermitentes → cada id reintenta 3× con backoff.
+  Secuencial (`--workers 1`) tiene backoff global que aborta a 40 errores
+  seguidos. **Correr una 2ª pasada** al terminar recupera los ids con error
+  (sin archivo → el resume los reintenta).
+- `MAX_ID_DEFAULT` (medido por bisección): pdly 10100 · lys 2800 · pal 820 ·
+  actos 90. Bumpear cuando el Congreso avance.
+
+### Cobertura final (2026-07-10) + columnas
+```
+Bases de datos/leyes-senado/{pdly,lys,pal,actos}.{jsonl,csv}   (gitignored)
+  pdly  9.919 proyectos de ley          (40 columnas)
+  lys   2.475 leyes sancionadas         (11 columnas)
+  pal     745 proy. acto legislativo    (34 columnas)
+  actos    33 actos legislativos        (12 columnas)
+```
+- **pdly** (el más rico): título · números Senado/Cámara · cuatrienio ·
+  legislatura · origen · tipo de ley · **autor(es) completos** · comisión ·
+  fecha presentación · **ponente + fecha de aprobación de los 4 debates**
+  (comisión+plenaria, Senado+Cámara) · conciliadores+fechas · **estado con
+  causa legal** · + 6 filas de documentos (exposición motivos, 1ª/2ª ponencia,
+  texto plenaria, conciliación, objeciones) → cada una con su **número de
+  Gaceta** (`exposicion_de_motivos: "Gaceta 258/08"` + `_url`).
+- **lys**: + `numero_ley` (solo en el buscador, NO en la ficha) · fecha de
+  sanción · presidente del Congreso · **cross-link `_ref_id` al pdly** que la
+  originó (trazabilidad proyecto→ley regalada).
+- **Gotchas del parser** (`parse_detalle`): (1) autor viejo usa toggle
+  `<span id='fullautor_N'>` "Ver más" → quedarse con el full; (2) `_cell_gaceta`
+  debe ignorar el anchor "Ver más" y solo disparar con texto tipo "Gaceta N/YY"
+  o href a imprenta.gov.co (si no, mete "Ver más" como si fuera documento);
+  (3) IDs secuenciales por año → **pdly id ↑ = más reciente** (id 9540=2025-26,
+  4177=2007-08), la descarga cronológica se ve en la distribución de legislaturas.
+
+### El texto completo vive en la Imprenta (otro corpus)
+Las fichas NO traen el articulado — traen el **número de Gaceta** donde está.
+El texto vive en `svrpubindc.imprenta.gov.co/senado/` (**31.110 gacetas**):
+- Es una app **JSF/PrimeFaces 5.2** (GlassFish, ViewState, sesión). Filtra
+  SOLO por número/entidad/fecha — **NO busca dentro del texto**. La descarga
+  del PDF es un *postback* con estado (`btnDescargarPdf`), no URL directa.
+- **Automatizar por navegador** (extensión Chrome), no por curl: filtrar
+  Número Gaceta → ir a la fila del año correcto (la col "Documento" clasifica:
+  "Ponencia para Primer Debate", "Acta de Comisión"…) → click descargar. El
+  PDF cae a `~/Downloads/gaceta_{N}.pdf`. Probado con Gaceta 601/2008.
+- **Una gaceta es un BOLETÍN con muchos documentos** de distintos proyectos —
+  no es "el PDF de un proyecto". El número de gaceta apunta a la sección.
+- Gacetas 2006+ son **PDF digital** (pypdf saca texto limpio, sin OCR). Años
+  90–2005 pueden venir **escaneadas** (requieren OCR: Tesseract o visión).
+
+### Arquitectura del producto (S3 privado + DeepSeek · pendiente de construir)
+```
+S3 privado (leyes-senado/):
+  metadata/{pdly,lys,pal,actos}.jsonl   ← el índice (chico, sube ENTERO; alimenta búsqueda/embudo/stats)
+  gacetas/{num}-{año}.pdf               ← cache de PDFs SOLO los consultados (NO bulk — 31k son gigas)
+  gacetas-texto/{num}-{año}.txt         ← texto extraído (pypdf digital / OCR escaneado)
+  analisis-cache/{hash24}.json          ← salida DeepSeek cacheada TTL
+Lambda leyes-analiza (patrón test-presidencial-explica):
+  {tema|proyecto_id} → busca metadata → gacetas relevantes → baja faltantes (Imprenta)
+  → extrae texto (pypdf|OCR) → DeepSeek V4 Flash → JSON {ponente,sentido,firmantes,argumentos} → cache
+```
+- **DeepSeek es texto, NO visión**: no "lee OCR", consume el texto que el OCR
+  produzca. El OCR es paso aparte río arriba. DeepSeek V4 limpia OCR ruidoso
+  (erratas, palabras cortadas) pero no recupera lo que el OCR no capturó.
+- **No entrenar/fine-tune**: es extracción/lectura, zero-shot con prompt
+  estructurado. ~fracciones de centavo/gaceta con V4 Flash. Una consulta tipo
+  "eutanasia" = ~6 intentos × ~2-3 gacetas ≈ 5 centavos USD.
+
+### Análisis que habilita (survival / embudo legislativo)
+Los metadatos solos (sin gaceta) permiten **análisis de supervivencia** del
+trámite — el foso que ni Dapper ni Sonar tienen. Hallazgos ya calculados
+(sobre pdly, no recalcular a menos que cambien los datos):
+- **74% de los proyectos mueren SIN llegar a primer debate** (96% presentados
+  → 26% debatidos). El cementerio es el **orden del día**, no la votación.
+- Solo **~28% terminan en ley**. Los que cruzan 1er debate: volado **50/50**.
+- **Mortalidad por brecha entre debates** (confirma "después de X se cae"): de
+  los que aprueban 1er debate en Senado, mueren el **34%** si el 2º debate
+  llega ≤90 días, **60%** a 181-365 días, **85%** si tarda >1 año o nunca
+  (=caso eutanasia: ponencia favorable, no se re-agenda, muere por Art. 190).
+- Reframe honesto: el riesgo real es **el calendario** (fin de legislatura +
+  Art. 190 Ley 5ª), no días sueltos. Modelo correcto = Kaplan-Meier con el
+  reloj legislativo. Fechas necesitan limpieza (typos con brechas de 200 años).
+
+### Temas de mujer (para MxD · [[reference_mxd_brand]] · 1990-2026)
+Búsqueda por título en pdly+pal, cruzada con lys sancionadas. Hallazgos:
+- **Feminicidio**: 11 intentos. La Ley 1761/2015 (Rosa Elvira Cely) **murió
+  por Art. 190 en 2012 y solo pasó cuando Gloria Inés Ramírez la re-radicó en
+  2013**. 7 intentos más de endurecer (2 leyes: 2356/2022, 2530/2023).
+- **Paridad política**: ~5 intentos (Claudia López 2×, CNE, reformas const.),
+  **CERO leyes** 2015-2025. La frontera sin conquistar — dato-bandera de MxD.
+- **Derechos sexuales/reproductivos**: 9 intentos en 26 años, **CERO leyes**.
+  De Piedad Córdoba (1996) a Angélica Lozano (2022) + licencia menstrual de
+  V. Sandino (2021). Todo lo que avanzó (IVE) vino de la **Corte**, no del
+  Congreso. Cuidado: A. Moreno Piraquive legisla el tema desde marco conservador.
+- **Patrón transversal**: mueren por "Art. 190" (tiempo), no por rechazo
+  (economía del cuidado 11 de 14 caídas por tiempo; maternidad 17 de 32). La
+  incidencia es por **agenda**, no por convencer opositores.
+
+### Módulo Caudal (el histórico como producto de Cauce · en construcción)
+
+**Caudal** = el módulo de Cauce que convierte el histórico legislativo en
+producto. El nombre juega la metáfora de la marca (el caudal que corre por el
+Cauce = el cuerpo de datos legislativos). Vive en `tools/caudal/`.
+
+- **`build_dataset.py`** — enriquece el crudo del harvester → `Bases de datos/
+  leyes-senado/dist/`: `proyectos.jsonl` (pdly, con autores separados + gacetas
+  estructuradas + resultado normalizado + etapa_max + días entre etapas),
+  `actos-legis.jsonl` (pal), `leyes.jsonl` (lys con ref al proyecto),
+  `indice.json` (índice compacto pdly+pal para búsqueda en memoria) y
+  `stats.json` (embudo + resultados por año/comisión, precalculado).
+  `resultado` ∈ {LEY, ARCHIVADO_TIEMPO, ARCHIVADO_OTRO, RETIRADO, EN_TRAMITE, OTRO}.
+- **`caudal_core.py`** — motor de consulta puro (sin AWS; lee local `dist/`, la
+  Lambda inyectará los mismos JSON desde S3). API: `buscar(query, filtros)`,
+  `resumen_tema(query)` (embudo + survival + top autores + línea de intentos),
+  `proyecto(id)` (ficha + punteros de gaceta para la fase DeepSeek). Trae un
+  **stemmer ligero** (`_stem`) que tolera erratas del propio Congreso — p.ej.
+  "feminicidio" matchea el título con errata "FEMINICIDO" vía la raíz "feminicid".
+- **`normalize_autores.py`** — normalización de autores (LISTO). El campo `autor`
+  del Senado es un desastre: variantes por tilde/mojibake ("Iván"/"Ivan"/"Ivã¡N"),
+  ruido ("Otros"/"Y Otros"), y radicaciones del Ejecutivo con listas de gabinete.
+  Resuelve por **clave canónica** (sin tildes + MAYÚSCULAS + solo alfanum) que
+  colapsa variantes exactas-módulo-acentos; **display** = variante más acentuada
+  entre las frecuentes; descarta ruido; clasifica institucionales (Gobierno,
+  Defensor, Fiscal…). Resultado: **9.156 → 6.354 personas canónicas + 9 entidades**;
+  1.321 proyectos marcados `autor_tipo=institucional` (Gobierno Nacional).
+  `build_dataset.py` lo integra: cada registro trae `autores` (display), `autores_keys`
+  (para el join a partido) y `autor_tipo`; emite `dist/autores.json` (registro
+  6.354 personas). **NO hace fuzzy-subset** ("Gloria Ramírez" vs "Gloria Ramírez Ríos"
+  quedan separados) — conservador a propósito; refinable después.
+- **`build_roster.py`** — join autor→partido/bancada (LISTO · 67% ponderado por
+  proyectos). Los autores de proyectos SON congresistas electos → aparecen en los
+  resultados de Congreso con su partido. Extrae cada candidato→partido de GCS
+  2014/2018/2022 + preconteo 2026 (`DES_CAN`→`DES_PAR`), canoniza con la MISMA
+  clave de `normalize_autores`, y une contra `autores.json`. **Matching:** exacto
+  primero, luego **subconjunto de tokens** (el padrón usa el nombre legal completo
+  "PALOMA SUSANA VALENCIA LASERNA" vs el autor "PALOMA VALENCIA LASERNA" — el
+  segundo nombre rompía el exacto; subset con ≥3 tokens lo arregla sin falsos
+  positivos). `MANUAL` = override curado para prolíficos pre-2014 fuera de los datos
+  (Gloria Inés Ramírez→Polo, Moreno Piraquive→MIRA, Vargas Lleras→Cambio Radical…).
+  Salidas: `dist/roster-autores.json` (8.883 congresistas) + `dist/autor-partido.json`
+  (clave autor→partido). `--reuse` evita re-escanear los 4GB de GCS. **Límite:** solo
+  hay Congreso desde 2014 → los misses son casi todos pre-2014. El motor
+  (`resumen_tema`) agrega `bancadas` (qué partidos impulsan el tema) + cobertura; la
+  ficha de `proyecto` trae partido por autor; la síntesis LLM lo usa ("transversal vs
+  un bloque"). `indice.json` ganó campo `ak` (autores_keys top 6) para el join.
+- **S3 privado**: bucket dedicado **`caudal-legislativo`** (decisión: bucket
+  aparte, NO prefijo en `elecciones-2026`, cuyo `bases de datos/*` es público).
+  `ricardo-mac-cli` está scoped a `elecciones-2026` → **no puede crear el bucket
+  ni el IAM**: eso lo corre el usuario con admin. Snippet listo en
+  `tools/caudal/setup-s3-privado.md` (create-bucket + block-public-access +
+  encryption + `iam-caudal-rw.json` para dar rw a la CLI). Estructura de llaves:
+  `metadata/{proyectos,leyes,indice,stats}` · `raw/*` · `gacetas/{num}-{año}.pdf`
+  · `gacetas-texto/*` · `analisis-cache/{hash}.json`. **Frontend NO lee el bucket
+  directo — habla con la Lambda.**
+
+**Estado (2026-07-11):** ✅ bucket privado `caudal-legislativo` creado + dataset
+enriquecido subido a `metadata/` (proyectos, actos-legis, leyes, indice, autores,
+stats) + respaldo crudo en `raw/`. Privado verificado (403 anónimo). ✅ Autores
+normalizados/deduplicados. ✅ **Lambda `caudal-analiza` desplegada** (data path vivo).
+
+**Lambda `caudal-analiza` (LISTO · data path)** — `tools/caudal/lambda/`:
+- `lambda_handler.py` envuelve `caudal_core` (inyecta índice/registros desde S3, no
+  usa `from_local`) + capa de síntesis LLM. Acciones POST JSON: `tema` (embudo +
+  supervivencia + autores + `lectura` LLM opcional), `buscar` (lista del índice),
+  `proyecto` (ficha + punteros de gaceta). `build_zip.py` empaqueta handler +
+  `caudal_core.py` CANÓNICO (sin drift). Guía completa en `setup-lambda.md`.
+- **Desplegada:** función `caudal-analiza` (python3.13, rol `lambda-caudal-analiza`
+  con AWSLambdaBasicExecutionRole + inline `caudal-s3`). **API pública:**
+  `POST https://l3kmprdjkl.execute-api.us-east-1.amazonaws.com` (HTTP API, CORS `*`).
+  Gotcha: `apigatewayv2 create-api --target` NO agrega el permiso de invocación →
+  hay que `lambda add-permission` a mano (si no, 500 con el Lambda corriendo limpio).
+- **Model-agnostic:** `STEP_MODELS` con provider/model por env var
+  (`CAUDAL_SINTESIS_PROVIDER/MODEL`, default `deepseek`/`deepseek-v4-flash`). El
+  switch a Claude para la síntesis es cambiar env vars a `anthropic`/`claude-sonnet-5`
+  + setear `ANTHROPIC_API_KEY` — cero código (el handler ya tiene `_call_anthropic`).
+  Razón (decisión 2026-07-11): extracción de gaceta = alto volumen, dato en el texto
+  → DeepSeek barato; síntesis del memo = bajo volumen, alto valor → candidata a Claude.
+- **✅ `DEEPSEEK_API_KEY` seteada (2026-07-11) → síntesis viva.** La lectura de un
+  tema (feminicidio) volvió en ~12s, tuteo neutro, anclada solo en los datos.
+- **Gotcha de max_tokens (mismo que test-presidencial):** DeepSeek V4 gasta tokens en
+  reasoning y con presupuesto bajo deja `content` vacío (`finish_reason=length`). La
+  síntesis usa `max_tokens=6000`; NO bajarlo. El handler además limpia fences ```json.
+- Cache de síntesis en `analisis-cache/{hash24}.json`, TTL vía `PROMPT_VERSION`
+  (va en `v2`). No cachea respuestas con error.
+
+**Frontend `caudal.html` (LISTO · gated)** — página privada en la raíz del repo,
+identidad Cauce (tema oscuro institucional, acento teal = agua/cauce, cursor custom,
+`noindex,nofollow`). Gate calcado de proyecto-dc: `rr-token`/`rr-user` + whitelist
+`['reruizc@gmail.com']` + verificación contra `rr-auth /auth/me` (401→login,
+email no permitido→dashboard). Consume la Lambda: buscar tema → embudo + KPIs +
+bancadas (color por partido) + línea de intentos + **lectura del analista** (LLM,
+pre-fetch en background: primero `lectura:false` instantáneo, luego `lectura:true`
+llena la tarjeta). Click en un intento → modal ficha (metadata + autores con partido
++ gacetas). Card en `dashboard.html` PRIVATE_TOOLS (grupo encargos, id `caudal`).
+Verificado end-to-end contra el endpoint real (feminicidio: 11 intentos, bancadas
+11/11, ficha Rosa Elvira Cely con Gloria Inés Ramírez→Polo). **Pendiente de push.**
+
+**Pendiente (en orden):**
+1. Push a producción (`caudal.html` + `dashboard.html` + tools/).
+2. **Fase 3 · texto de gaceta:** bajar de la Imprenta (navegador, JSF) → S3
+   `gacetas/` → extraer texto (pypdf/OCR) → DeepSeek paso `extraccion` →
+   `{ponente, sentido, firmantes, argumentos}` en `analisis-cache/`.
+
+Refinamientos opcionales del join autor→partido: (a) más años de Congreso (pre-2014)
+para cubrir legisladores viejos; (b) ampliar `MANUAL`; (c) votación nominal por
+bancada (necesita actas de gaceta, fase 3).
+
+**Gotcha de búsqueda:** el índice usa stemmer, no tesauro. Para temas con
+vocabulario disperso (varios nombres para lo mismo) conviene, más adelante, una
+capa de sinónimos curada o un stemmer Snowball español completo.
+
 ## Roadmap post-2V · Chats conversacionales (LLM + function calling)
 
 Dos productos planeados para julio 2026 (post-2V) que comparten
@@ -4816,6 +5065,13 @@ sus municipios de arrase (cordillera/Santander, separados del Catatumbo en guerr
   Tumaco, pcode 231399959: Cepeda 1816→3678, Abelardo 219→101, +1.681 votantes).
 - `rrss/linkedin/articulo-voto-fusil.md` — columna extendida (tuteo neutro), profundiza
   más allá de las imágenes. LISTA.
+- `rrss/instagram/carrusel-voto-fusil/01..10.png` — **carrusel IG (10 slides · 1080×1080)**.
+  Portada = imagen de referencia (comandante EMC "profesor", `tools/voto-fusil/assets/portada-ref.png`)
+  + título largo. Resto condensa el análisis (02 el 100% · 03 la tijera · 04 Llorente ·
+  05 inversión · 06 participación · 07 mapa 10 zonas · 08 coacción documentada · 09
+  Catatumbo coincidencia-no-prueba · 10 cierre). Caption en `rrss/instagram/voto-fusil-caption.md`.
+  Script **`tools/voto-fusil/build_carrusel_ig.py`** (Arima + DejaVu Sans, logo+crédito+contador
+  n/10, SIN watermark). Identidad igual que las imágenes twitter.
 - **`tools/voto-fusil/build_imgs.py`** — regenera las 4 imágenes corregidas (a inversión,
   b participación, c mapas Cauca/Nariño a nivel puesto, d tabla partida en 2 con el hecho
   visible). Reconstruido jun-2026 (el script original no quedó en el repo). Lee
@@ -4843,11 +5099,69 @@ sus municipios de arrase (cordillera/Santander, separados del Catatumbo en guerr
    partido Cauca/Nariño · (d) tabla partida en 2 con el hecho visible por zona.
 3. **Validación geográfica km puesto→hecho** (events DB Defensoría/prensa geocodificada a
    vereda) — pendiente (es el §5 del memo, "en construcción").
-4. **Carrusel IG + enlazar la página en `noticias.html`** — pendiente.
+4. ✅ **Carrusel IG** (10 slides) — `rrss/instagram/carrusel-voto-fusil/`. Falta solo
+   **enlazar la página en `noticias.html`** (card NOTICIA nueva).
 
 > Nota: las imágenes y el artículo NO se han subido a S3 ni pusheado (esperan luz verde
 > de Ricardo). El og:image de `voto-fusil-2026.html` se repuntó a `inversion-territorio.png`
 > (antes apuntaba al borrado `mapa-10-sitios.png`).
+
+## Sistema visual v2 (jul-2026) — oscuro azul + Helvetica
+
+Migración en curso al **sistema visual v2**: fondo `#060810` + gradientes
+radiales azules, **Helvetica Neue embebida** (`fonts/*.woff2`, familia completa
+200/300/400/500/700+italic), **Syne SOLO en el logo Ricardo.Ruiz**, tarjetas
+`rgba(10,10,16,.75)` borde `rgba(255,255,255,.07)`, azul `#0047FF` (CTAs) /
+`#3d6fff` (acento texto), naranja `#f97316` (Iniciar sesión / MI PERFIL),
+verde `#4ade80` (Volver / Planes & Precios). **Oscuro único: SIN modo día**
+(decisión 9-jul; reversible vía variables).
+
+**Convertidas:** `index.html` (portada de cuadros + pestañas Inicio/Proyectos/
+Servicios, hero "Datos que <verbo> <sustantivo>" rotando, cuadros con imagen en
+`imagenes-index/`, modal contacto correo/WhatsApp), `electoral.html`,
+`perfil.html`, `pricing.html`, `descargas.html`, `pago-confirmado.html` (nueva).
+**Pendientes:** noticias, dashboard, login/register, resto.
+
+Reglas al convertir una página:
+- Nav electoral: `.e-nav-left` (← Volver verde + auth) / `.e-nav-right` (país +
+  logo). Logueado → chip de plan + botón naranja **MI PERFIL** → dashboard +
+  Salir (sin nombre de usuario). Marcar `dataset.loggedIn` para que el cambio
+  de idioma no revierta el estado.
+- Móvil ≤900px: nav en columna — línea 1 = logo CENTRADO (país en absolute a la
+  izquierda), línea 2 = volver+auth centrados; ≤360px reduce país/logo.
+- i18n co/us/cn/**br** (Brasil está en todos los dropdowns nuevos).
+- Deploy: GitHub Pages desde `main` con **`.nojekyll`** (no quitarlo: un build
+  Jekyll roto congeló el sitio el 9-jul).
+
+### Centro de descargas — permisos y nombres en crudos
+- **`FILE_GRANTS`** en `descargas.html`: permisos puntuales por archivo
+  (`email → [{cat, anio}]`) sin acceso total y sin consumir cuota Premium.
+  Activo: `consultoria@legitimalab.com` (Juan José Guerrero) → Territoriales
+  2023. Además `ADMIN_EMAILS` / `FULL_ACCESS_EMAILS` (bypass total).
+- **Nombres en crudos GCS**: `tools/build-csv-names/build.py` (CSV) y
+  `tools/build-xlsx-zip-depto/build.py` (ZIP Excel por depto) insertan
+  `DES_DDE`/`DES_MME`/`DES_PP` junto a su código. Fuentes: divipola.json
+  (con `DEP_FIXES`: 25=Norte De Santander, 31=Valle Del Cauca — divipola los
+  trae mal) + PUESTOS_GEOREF 2026 + Divipol 2021 fallback (header en fila 5).
+- ⚠ **El dict `DEPTOS` viejo estaba descuadrado** con los códigos reales RNEC
+  (40=Arauca, 68=Vaupés, 72=Vichada, 19=Huila, 21=Magdalena, 23=Nariño,
+  25=N.Santander…). Los ZIP de Congreso del 31-may quedaron mal etiquetados y
+  se regeneraron el 10-jul. El mapeo de nombres de archivo ahora se deriva de
+  divipola+fixes — no reintroducir dicts hardcodeados.
+- **CSV mesa NO abre completo en Excel** (límite 1.048.576 filas → aviso "El
+  archivo no está totalmente cargado"). Nota visible en el tab crudos + modal.
+- Estado del catálogo: TER-2023 CSV mesa/puesto **con nombres** en S3; ZIPs
+  con nombres: TER-2023 + CON 2014/2018/2022 (regenerados 10-jul). Pendiente:
+  ZIPs TER 2011/2015/2019 (no existen; `xlsxZip:false` hasta generarlos) y
+  enriquecer los CSVs del resto del catálogo (~15 GB de re-uploads).
+
+### Pagos Wompi
+- `pago-confirmado.html` = redirección post-pago (lee `?id=`, consulta API
+  pública Wompi, polling a `/auth/me`, refresca `rr-user` en caché). Configurar
+  en cada link de Wompi: redirección `https://ricardoruiz.co/pago-confirmado.html`,
+  pago único NO, SKU `plan-{pro|premium}-{mensual|anual}`.
+- Pendiente: Ricardo crea los 4 links nuevos → actualizar `WOMPI_LINKS` en
+  `pricing.html`. Pricing quedó mensual por defecto, sin promo y sin Plan Datos.
 
 ## Convenciones de commit
 ```
