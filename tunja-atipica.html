@@ -86,8 +86,16 @@ h1{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-
 .map-wrap{position:relative;min-width:0}
 #map-detail{position:absolute;top:10px;left:10px;z-index:1200;max-width:300px;pointer-events:none;
   background:rgba(6,8,16,.93);border:1px solid rgba(0,71,255,.4);padding:.7rem .8rem;font-size:.8rem;line-height:1.45;color:var(--white)}
-#map-detail .dh{font-weight:700;margin-bottom:.3rem}
+#map-detail .dh{font-weight:700;margin-bottom:.2rem}
 #map-detail .hint{color:var(--muted)}
+#map-detail .md-sub{font-size:.72rem;color:var(--muted);line-height:1.35;margin-bottom:.5rem}
+#map-detail .md-row{margin:.32rem 0}
+#map-detail .md-top{display:flex;justify-content:space-between;font-size:.78rem;gap:.5rem;margin-bottom:.12rem}
+#map-detail .md-nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#map-detail .md-pct{font-weight:700;flex:none}
+#map-detail .md-track{height:7px;background:rgba(255,255,255,.1);overflow:hidden}
+#map-detail .md-track>span{display:block;height:100%}
+#map-detail .md-foot{font-size:.7rem;color:var(--muted);margin-top:.5rem;border-top:1px solid rgba(255,255,255,.1);padding-top:.4rem}
 .leaflet-tooltip{font-family:'HelveticaNeue',Helvetica,Arial,sans-serif !important;font-weight:400 !important;font-size:.8rem !important;background:rgba(6,8,16,0.97) !important;border:1px solid rgba(0,71,255,0.4) !important;color:var(--white) !important;border-radius:0 !important;padding:.4rem .6rem !important}
 .leaflet-tooltip:before{display:none !important}
 .leaflet-container{background:#0b0e18 !important}
@@ -316,9 +324,10 @@ function barrioName(i){
 }
 
 function styleFeature(i){
-  const bp = BP[String(i)]; if(!bp) return {fill:false,stroke:false};
+  const bp = BP[String(i)]; if(!bp) return {stroke:false,fill:false};
   const r = puestoResult(bp.pcode, curElec);
-  if(!r) return {fillColor:'#3a4152',fillOpacity:.25,color:'#4a5164',weight:.5};
+  // sin dato ese año (el puesto no existía todavía) → no se muestra
+  if(!r) return {stroke:false,fill:false};
   const cm = colorMap(curElec);
   let col = (cm[r.win]&&cm[r.win].color) || '#999'; col=css(col);
   // mismo color e intensidad para barrios con puesto y heredados
@@ -339,9 +348,10 @@ function render(){
       const i=GEO.features.indexOf(f);
       const bp=BP[String(i)]; if(!bp) return;
       const r=puestoResult(bp.pcode,curElec);
+      if(!r) return; // barrio sin dato ese año: sin tooltip ni click
       const nm = barrioName(i);
       const pnm = PUESTOS[bp.pcode]? PUESTOS[bp.pcode].nombre : bp.pcode;
-      lyr.bindTooltip(`<b>${nm}</b><br>${r?r.name:'—'} · ${r?r.pct+'%':''}<br><span style="opacity:.7">Puesto: ${pnm}${bp.is_direct?'':' (cercano)'}</span>`,{sticky:true});
+      lyr.bindTooltip(`<b>${nm}</b><br>${r.name} · ${r.pct}%<br><span style="opacity:.7">Puesto: ${pnm}${bp.is_direct?'':' (cercano)'}</span>`,{sticky:true});
       lyr.on('click',()=>showDetail(i));
     }
   }).addTo(map);
@@ -350,16 +360,49 @@ function render(){
   renderPanel();
 }
 
+// apellido(s): últimos 2 tokens si el nombre tiene 4+, si no el último.
+function apellido(nombre){
+  const t=(nombre||'').trim().split(/\s+/).filter(Boolean);
+  const take = t.length>=4 ? t.slice(-2) : t.slice(-1);
+  return take.map(w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' ');
+}
+// top-3 candidatos del puesto para la elección activa
+function top3For(pc){
+  if(curElec.startsWith('alcaldia')){
+    const b=DATA.alcaldias[curElec].by_puesto[pc]; if(!b||!b.cands) return null;
+    const cm=colorMap(curElec);
+    const arr=Object.entries(b.cands).map(([can,c])=>({sur:apellido(c.des),votos:c.votos,
+      pct: b.validos? 100*c.votos/b.validos : 0,
+      color: (cm[can]&&cm[can].color) || partyColor(c.par) || '#9aa7b8'}));
+    return {rows: arr.sort((a,b)=>b.votos-a.votos).slice(0,3), validos:b.validos};
+  }
+  const pr=PRES[pc]; if(!pr) return null;
+  const [c,a] = curElec==='pres_1v' ? [pr.cep1,pr.abe1] : [pr.cep2,pr.abe2];
+  const tot=c+a;
+  const rows=[{sur:'Cepeda',votos:c,pct:tot?100*c/tot:0,color:css('var(--cep)')},
+              {sur:'De la Espriella',votos:a,pct:tot?100*a/tot:0,color:css('var(--abe)')}]
+             .sort((x,y)=>y.votos-x.votos);
+  return {rows, validos:tot};
+}
+
 function showDetail(i){
   const bp=BP[String(i)]; const nm=barrioName(i);
-  const p=PUESTOS[bp.pcode]; const r=puestoResult(bp.pcode,curElec);
+  const p=PUESTOS[bp.pcode]; const t=top3For(bp.pcode);
   let h=`<div class="dh">${nm}</div>`;
-  h+=`Puesto que lo cubre: <b>${p?p.nombre:bp.pcode}</b> ${bp.is_direct?'<span style="color:var(--blue-light)">(dato directo)</span>':'<span style="color:var(--muted)">(puesto más cercano)</span>'}<br>`;
-  if(r){
-    if(curElec.startsWith('alcaldia')) h+=`Ganó <b>${r.name}</b> (${r.party}) con <b>${r.pct}%</b> · ${fmt(r.votos)} votos de ${fmt(r.validos)} válidos.`;
-    else h+=`<b>${r.name}</b> ${r.pct}% · Cepeda ${fmt(r.cep)} — Abelardo ${fmt(r.abe)}.`;
+  h+=`<div class="md-sub">Puesto: ${p?p.nombre:bp.pcode} ${bp.is_direct?'':'<span style="color:var(--muted)">(cercano)</span>'}</div>`;
+  if(t){
+    h+=`<div class="md-bars">`;
+    for(const c of t.rows){
+      h+=`<div class="md-row"><div class="md-top"><span class="md-nm">${c.sur}</span><span class="md-pct">${c.pct.toFixed(1)}%</span></div><div class="md-track"><span style="width:${Math.max(2,c.pct)}%;background:${c.color}"></span></div></div>`;
+    }
+    h+=`</div>`;
+    // censo del puesto solo cuando el censo actual (Divipole 2026) es contemporáneo:
+    // presidencial 2026 y alcaldía 2023. Para 2011/2015/2019 no tenemos censo de la época.
+    const censoOk = curElec==='alcaldia_2023' || curElec.startsWith('pres');
+    let foot=`${fmt(t.validos)} votos válidos`;
+    if(censoOk && p) foot+=` · censo ${fmt(p.mujeres+p.hombres)} · ${p.mesas} mesas`;
+    h+=`<div class="md-foot">${foot}</div>`;
   }
-  if(p) h+=`<br><span style="color:var(--muted)">Censo del puesto: ${fmt(p.mujeres+p.hombres)} · ${p.mesas} mesas</span>`;
   document.getElementById('map-detail').innerHTML=h;
 }
 
@@ -414,8 +457,7 @@ function setK(id,v,l){document.getElementById(id).textContent=v;document.getElem
 function legend(cm){
   let h='';
   for(const k in cm){ h+=`<div class="li"><span class="sw" style="background:${css(cm[k].color)}"></span>${cm[k].name} <span style="color:var(--muted)">· ${cm[k].party}</span></div>`; }
-  h+=`<div class="li" style="margin-top:.4rem"><span class="sw" style="background:#3a4152;opacity:.7"></span>Sin dato en ese año</div>`;
-  h+=`<div class="li" style="color:var(--muted);font-size:.72rem">Cada barrio toma el resultado del puesto que lo cubre</div>`;
+  h+=`<div class="li" style="color:var(--muted);font-size:.72rem;margin-top:.4rem">Cada barrio toma el resultado del puesto que lo cubre. Los barrios sin color no tenían puesto con votación ese año.</div>`;
   document.getElementById('legend').innerHTML=h;
 }
 
