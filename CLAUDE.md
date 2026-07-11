@@ -4796,11 +4796,33 @@ llena la tarjeta). Click en un intento → modal ficha (metadata + autores con p
 Verificado end-to-end contra el endpoint real (feminicidio: 11 intentos, bancadas
 11/11, ficha Rosa Elvira Cely con Gloria Inés Ramírez→Polo). **Pendiente de push.**
 
+**Fase 3 · texto de gaceta (PILOTO LISTO · verificado end-to-end):** loop
+completo probado con feminicidio. (1) **Descarga** semi-manual del portal JSF de
+la Imprenta **vía Chrome** (la extensión Claude in Chrome; el navegador in-app es
+Safari-sandbox y **aborta descargas a disco** — [[feedback_announce_browser_use]]).
+Filtrar Número Gaceta → fila del año correcto (columna "Documento" clasifica:
+"Informe de Ponencia Para Primer debate"…) → botón descargar (Chrome baja auto a
+`~/Downloads`). **Gotcha macOS:** Bash NO puede leer `~/Downloads` (TCC lo bloquea,
+"Operation not permitted" incluso con sandbox off) → mover el PDF a la carpeta del
+repo. (2) **`tools/caudal/extraer_gaceta.py <pdf> <key>`**: pypdf → texto → sube a
+`s3://caudal-legislativo/gacetas-texto/{num-año}.txt` (digital 2006+ limpio; viejos
+requieren OCR aparte). (3) **Lambda acción `gaceta`** (`{action:"gaceta",key,contexto}`):
+lee el texto de S3, DeepSeek paso `extraccion` (max_tokens 6000) → `{tipo_documento,
+ponentes, sentido, sentido_detalle, argumentos, en_contra}`, cache en
+`analisis-cache/gaceta-{hash}.json`. **Clave:** una gaceta es un BOLETÍN con varias
+ponencias; el `contexto` (número+título del proyecto) hace que DeepSeek aísle el
+documento correcto. Probado: Gaceta 857/2013 (boletín con proyectos 86/107/15/22)
+→ extrajo la ponencia del 107/2013 (feminicidio): sentido favorable, ponente Doris
+Clemencia Vega Quiroz, 5 argumentos reales. Los PDFs locales van a `Bases de datos/
+leyes-senado/gacetas/` (gitignored; no guardamos PDFs en prod, solo el texto en S3).
+
 **Pendiente (en orden):**
-1. Push a producción (`caudal.html` + `dashboard.html` + tools/).
-2. **Fase 3 · texto de gaceta:** bajar de la Imprenta (navegador, JSF) → S3
-   `gacetas/` → extraer texto (pypdf/OCR) → DeepSeek paso `extraccion` →
-   `{ponente, sentido, firmantes, argumentos}` en `analisis-cache/`.
+1. Push a producción (`caudal.html` + `dashboard.html` + tools/) — incluye el fix
+   de colisión pdly/pal (id compartido → `_full` keyed por "tb:id"; `proyecto(id,tb)`).
+2. **Automatizar/facilitar la descarga de gacetas** (hoy semi-manual por Chrome):
+   o driver de navegador repetible, o descargar directo a carpeta accesible.
+   Wirear la ficha del frontend para mostrar el análisis de gaceta (acción `gaceta`).
+3. OCR para gacetas escaneadas (años 90-2005).
 
 Refinamientos opcionales del join autor→partido: (a) más años de Congreso (pre-2014)
 para cubrir legisladores viejos; (b) ampliar `MANUAL`; (c) votación nominal por

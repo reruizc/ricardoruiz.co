@@ -273,7 +273,7 @@
       return `<div class="banc-row"><span class="banc-dot" style="background:${c}"></span><span class="banc-name" title="${esc(p)}">${esc(p)}</span><span class="banc-bar"><span style="width:${100*n/bmax}%;background:${c}"></span></span><span class="banc-n">${n}</span></div>`;
     }).join('');
     const tl=(r.intentos||[]).map(it=>`
-      <div class="tl-item" data-id="${it.id}">
+      <div class="tl-item" data-id="${it.id}" data-tb="${it.tb||'pdly'}">
         <span class="tl-year">${it.anio||'—'}</span>
         <div class="tl-body">
           <div class="tl-titulo">${esc((it.titulo||'').slice(0,120))}</div>
@@ -306,7 +306,7 @@
       <div class="panel"><h3>Línea de intentos · ${r.n_intentos} · click para la ficha</h3><div class="tl">${tl}</div></div>
     `;
     requestAnimationFrame(()=>{ results.querySelectorAll('.funnel-bar>span').forEach(s=>s.style.width=s.dataset.w); });
-    results.querySelectorAll('.tl-item').forEach(el=>el.onclick=()=>abrirProyecto(el.dataset.id));
+    results.querySelectorAll('.tl-item').forEach(el=>el.onclick=()=>abrirProyecto(el.dataset.id,el.dataset.tb));
   }
 
   function renderLectura(l){
@@ -322,10 +322,10 @@
   const modal=document.getElementById('modal'), modalCard=document.getElementById('modalCard');
   modal.onclick=e=>{ if(e.target===modal) cerrar(); };
   function cerrar(){ modal.classList.remove('on'); }
-  async function abrirProyecto(id){
+  async function abrirProyecto(id,tb){
     modalCard.innerHTML='<button class="modal-close">✕</button><div class="llm-load" style="padding:1.5rem">Cargando ficha <span class="dots"><span></span><span></span><span></span></span></div>';
     modal.classList.add('on'); modalCard.querySelector('.modal-close').onclick=cerrar;
-    let f; try{ f=await call({action:'proyecto',id:Number(id)}); }catch(e){ f=null; }
+    let f; try{ f=await call({action:'proyecto',id:Number(id),tb:tb||'pdly'}); }catch(e){ f=null; }
     if(!f||f.error){ modalCard.innerHTML='<button class="modal-close">✕</button><div class="err">No se pudo cargar la ficha.</div>'; modalCard.querySelector('.modal-close').onclick=cerrar; return; }
     const meta=(k,v)=>v?`<div class="m"><div class="k">${k}</div><div class="v">${esc(v)}</div></div>`:'';
     const auts=(f.autores||[]).map(a=>`<div class="aut"><span>${esc(a.nombre)}</span>${a.partido?`<span class="p" style="border-color:${pcolor(a.partido)}55;color:${pcolor(a.partido)}">${esc(a.partido)}</span>`:''}</div>`).join('')||'<div class="cob-note">Sin autores registrados.</div>';

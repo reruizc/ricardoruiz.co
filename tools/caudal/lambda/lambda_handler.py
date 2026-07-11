@@ -63,13 +63,14 @@ def _get_json(key):
     return json.loads(obj['Body'].read())
 
 
-def _get_jsonl(key):
+def _get_jsonl(key, tb):
+    """Devuelve {"tb:id": registro} — pdly y pal comparten espacio de ids."""
     obj = _s3.get_object(Bucket=BUCKET, Key=key)
     out = {}
     for line in obj['Body'].read().decode('utf-8').splitlines():
         if line.strip():
             r = json.loads(line)
-            out[r['id']] = r
+            out[f"{tb}:{r['id']}"] = r
     return out
 
 
@@ -87,11 +88,11 @@ def _caudal():
 
 
 def _full():
-    """Registros completos por id (lazy — solo cuando se pide un proyecto)."""
+    """Registros completos por 'tb:id' (lazy — solo cuando se pide un proyecto)."""
     global _FULL
     if _FULL is None:
-        _FULL = _get_jsonl('metadata/proyectos.jsonl')
-        _FULL.update(_get_jsonl('metadata/actos-legis.jsonl'))
+        _FULL = _get_jsonl('metadata/proyectos.jsonl', 'pdly')
+        _FULL.update(_get_jsonl('metadata/actos-legis.jsonl', 'pal'))
     return _FULL
 
 
@@ -218,6 +219,49 @@ def _sintesis_tema(resumen):
     return data
 
 
+# --- fase 3 · extracción del texto de una gaceta ----------------------------
+GACETA_SYSTEM = (
+    "Eres analista legislativo de Cauce. Te doy el TEXTO de una Gaceta del "
+    "Congreso de Colombia (un boletín que puede traer varios documentos). "
+    "Enfócate SOLO en el documento del proyecto indicado en el contexto. "
+    "REGLA DURA: extrae únicamente lo que está en el texto; NO inventes nombres, "
+    "fechas ni argumentos. Si algo no aparece, ponlo en null o lista vacía. "
+    "Devuelves SIEMPRE un JSON válido con estas claves: tipo_documento, "
+    "ponentes (lista de nombres que firman), sentido (uno de: 'favorable', "
+    "'archivo', 'mixto', 'desconocido' — ¿recomienda dar debate o archivar?), "
+    "sentido_detalle (frase que lo justifica), argumentos (lista de 3-6 bullets "
+    "con los argumentos centrales), en_contra (texto si hay ponencia de archivo "
+    "u oposición explícita, si no null)."
+)
+
+
+def _extraer_gaceta(key, contexto):
+    """Lee gacetas-texto/{key}.txt de S3 y saca la estructura vía LLM (cache)."""
+    try:
+        obj = _s3.get_object(Bucket=BUCKET, Key=f'gacetas-texto/{key}.txt')
+        texto = obj['Body'].read().decode('utf-8', errors='replace')
+    except Exception as e:
+        return {'error': f'no hay texto de la gaceta {key} en S3: {str(e)[:120]}'}
+    ck = _hash24(PROMPT_VERSION + '|gaceta|' + key + '|' + (contexto or ''))
+    cached = _cache_get('gaceta-' + ck)
+    if cached:
+        return cached
+    # el texto puede ser largo; recorta a ~60k chars (≈ una gaceta grande)
+    user = (f"Contexto (proyecto de interés): {contexto or 'el proyecto principal del documento'}\n\n"
+            f"TEXTO DE LA GACETA {key}:\n{texto[:60000]}")
+    try:
+        raw = _call_llm('extraccion', GACETA_SYSTEM, user, max_tokens=6000).strip()
+        if raw.startswith('```'):
+            raw = raw.split('```')[1].lstrip('json').strip()
+        data = json.loads(raw)
+    except Exception as e:
+        return {'error': f'extracción falló: {str(e)[:160]}'}
+    data['_model'] = STEP_MODELS['extraccion']['model']
+    data['gaceta'] = key
+    _cache_put('gaceta-' + ck, data)
+    return data
+
+
 # --- handler ----------------------------------------------------------------
 CORS = {'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type',
@@ -253,11 +297,17 @@ def handler(event, context):
 
     if action == 'proyecto':
         pid = body.get('id')
-        caudal._full = _full()          # inyecta registros completos
-        ficha = caudal.proyecto(pid)
+        caudal._full = _full()          # inyecta registros completos (keyed tb:id)
+        ficha = caudal.proyecto(pid, body.get('tb', 'pdly'))
         if not ficha:
             return _resp(404, {'error': f'proyecto {pid} no encontrado'})
         return _resp(200, ficha)
+
+    if action == 'gaceta':
+        key = body.get('key')          # ej '857-2013'
+        if not key:
+            return _resp(400, {'error': 'falta key de gaceta (num-año)'})
+        return _resp(200, _extraer_gaceta(key, body.get('contexto', '')))
 
     if action == 'tema':
         q = body.get('query', '')

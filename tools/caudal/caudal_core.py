@@ -69,11 +69,17 @@ class Caudal:
         return cls(indice=indice, autor_partido=ap)
 
     def _load_full(self):
+        # keyed por "tb:id" — pdly y pal comparten el espacio de ids (ambos
+        # arrancan en 1), así que un id pelado colisiona entre tablas.
         if self._full is None:
             self._full = {}
-            for line in open(DIST / 'proyectos.jsonl', encoding='utf-8'):
-                r = json.loads(line)
-                self._full[r['id']] = r
+            for fn, tb in [('proyectos.jsonl', 'pdly'), ('actos-legis.jsonl', 'pal')]:
+                p = DIST / fn
+                if not p.exists():
+                    continue
+                for line in open(p, encoding='utf-8'):
+                    r = json.loads(line)
+                    self._full[f"{tb}:{r['id']}"] = r
         return self._full
 
     # -------- búsqueda ------------------------------------------------
@@ -139,7 +145,7 @@ class Caudal:
             'bancadas': top_bancadas,
             'cobertura_partido': {'con': con_p, 'sin': sin_p},
             'intentos': [{
-                'id': h['id'], 'anio': h['a'], 'leg': h['leg'],
+                'id': h['id'], 'tb': h.get('tb', 'pdly'), 'anio': h['a'], 'leg': h['leg'],
                 'titulo': h['t'], 'resultado': h['res'],
                 'resultado_txt': RES_LABEL.get(h['res'], h['res']),
                 'autores': h.get('aut', []),
@@ -147,22 +153,24 @@ class Caudal:
         }
 
     # -------- ficha de un proyecto ------------------------------------
-    def proyecto(self, pid):
-        r = self._load_full().get(int(pid))
+    def proyecto(self, pid, tb='pdly'):
+        full = self._load_full()
+        r = full.get(f"{tb}:{int(pid)}") or full.get(f"pdly:{int(pid)}") or full.get(f"pal:{int(pid)}")
         if not r:
             return None
         autores = [{'nombre': n, 'partido': (self.ap.get(k) or {}).get('partido')}
                    for n, k in zip(r.get('autores', []), r.get('autores_keys', []))]
+        et = r.get('etapa_max')
         return {
-            'id': r['id'], 'titulo': r['titulo'],
-            'numero_senado': r['numero_senado'], 'numero_camara': r['numero_camara'],
-            'legislatura': r['legislatura'], 'comision': r['comision'],
+            'id': r['id'], 'tabla': r.get('tabla', tb), 'titulo': r.get('titulo', ''),
+            'numero_senado': r.get('numero_senado', ''), 'numero_camara': r.get('numero_camara', ''),
+            'legislatura': r.get('legislatura', ''), 'comision': r.get('comision', ''),
             'autores': autores,
-            'resultado': r['resultado'], 'resultado_txt': RES_LABEL.get(r['resultado']),
-            'etapa_max': ETAPA_LABEL[r['etapa_max']],
-            'fecha_presentacion': r['fecha_presentacion'],
-            'dias_a_primer_debate': r['dias_a_primer_debate'],
-            'gacetas': r['gacetas'],   # ← punteros para la fase DeepSeek
+            'resultado': r.get('resultado'), 'resultado_txt': RES_LABEL.get(r.get('resultado')),
+            'etapa_max': ETAPA_LABEL[et] if isinstance(et, int) and 0 <= et < len(ETAPA_LABEL) else None,
+            'fecha_presentacion': r.get('fecha_presentacion'),
+            'dias_a_primer_debate': r.get('dias_a_primer_debate'),
+            'gacetas': r.get('gacetas', []),   # ← punteros para la fase DeepSeek
         }
 
 
