@@ -169,7 +169,7 @@ h1{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-
       <button data-m="margen" data-feat="intensidad">Intensidad</button>
       <button id="btn-puestos" data-feat="puestos">Puestos</button>
     </div>
-    <button class="dl-btn" id="btn-dl" data-feat="descarga-base">↓ Base por puesto (Excel)</button>
+    <button class="dl-btn" id="btn-dl" data-feat="descarga-base">↓ Descargar Base (Excel) 2023</button>
   </div>
 
   <div class="layout">
@@ -209,7 +209,7 @@ h1{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-
 </div>
 
 <footer class="foot"><div class="wrap">
-  <p><b>Metodología.</b> La unidad estable entre elecciones es el <b>puesto de votación</b> (26 en Tunja). Cada barrio catastral se colorea con el resultado del puesto que lo contiene; los barrios sin puesto propio heredan el del puesto más cercano (se pintan más tenues). Los titulares y KPIs se calculan sobre votos reales de puesto, no sobre el relleno visual. Fuentes: Registraduría Nacional (GCS territoriales 2011/2015/2019/2023 y preconteo presidencial 2026 por mesa), cartografía catastral de barrios de Tunja, censo electoral Divipole marzo 2026.</p>
+  <p><b>Metodología.</b> La unidad estable entre elecciones es el <b>puesto de votación</b> (26 en Tunja). Cada barrio catastral se colorea con el resultado del puesto que lo contiene; los barrios sin puesto propio heredan el del puesto más cercano. Los barrios sin nombre en la cartografía catastral toman como referencia el barrio del puesto que los cubre. Los titulares y KPIs se calculan sobre votos reales de puesto, no sobre el relleno visual. Fuentes: Registraduría Nacional (GCS territoriales 2011/2015/2019/2023 y preconteo presidencial 2026 por mesa), cartografía catastral de barrios de Tunja, censo electoral Divipole marzo 2026.</p>
   <p style="margin-top:.6rem">Ricardo Ruiz · <a href="https://ricardoruiz.co">ricardoruiz.co</a></p>
 </div></footer>
 </div><!-- /.page -->
@@ -300,21 +300,35 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png'
   {attribution:'© OpenStreetMap © CARTO',subdomains:'abcd',maxZoom:19}).addTo(map);
 let layer=null;
 
+// nombre del barrio: usa el catastral; si viene vacío, cae al barrio
+// georreferenciado del puesto que lo cubre (mismo criterio de herencia).
+function barrioName(i){
+  const f=GEO.features[i];
+  const nm=f && f.properties && f.properties.n;
+  if(nm) return nm;
+  const bp=BP[String(i)];
+  if(bp){
+    const pu=PUESTOS[bp.pcode];
+    const bg=pu && (pu.barrio_georef||pu.barrio);
+    if(bg && !/^(no aplica|n\/a|na|sin nombre)$/i.test(String(bg).trim())) return bg;
+  }
+  return 'Sin nombre';
+}
+
 function styleFeature(i){
   const bp = BP[String(i)]; if(!bp) return {fill:false,stroke:false};
   const r = puestoResult(bp.pcode, curElec);
   if(!r) return {fillColor:'#3a4152',fillOpacity:.25,color:'#4a5164',weight:.5};
   const cm = colorMap(curElec);
   let col = (cm[r.win]&&cm[r.win].color) || '#999'; col=css(col);
+  // mismo color e intensidad para barrios con puesto y heredados
   let op;
   if(curMode==='margen'){
-    // intensidad por margen del ganador (proxy de fuerza)
-    op = bp.is_direct ? Math.min(.9,.25+ (r.pct-40)/60) : Math.min(.5,.12+(r.pct-40)/90);
-    op = Math.max(bp.is_direct?.3:.12, op);
+    op = Math.max(.35, Math.min(.9, .25 + (r.pct-40)/60)); // intensidad por margen del ganador
   } else {
-    op = bp.is_direct ? .82 : .34;
+    op = .82;
   }
-  return {fillColor:col,fillOpacity:op,color:bp.is_direct?'#0a0c14':'#2a3040',weight:bp.is_direct?1:.4};
+  return {fillColor:col,fillOpacity:op,color:'#0a0c14',weight:bp.is_direct?1:.4};
 }
 
 function render(){
@@ -325,7 +339,7 @@ function render(){
       const i=GEO.features.indexOf(f);
       const bp=BP[String(i)]; if(!bp) return;
       const r=puestoResult(bp.pcode,curElec);
-      const nm = f.properties.n || 'Sin nombre';
+      const nm = barrioName(i);
       const pnm = PUESTOS[bp.pcode]? PUESTOS[bp.pcode].nombre : bp.pcode;
       lyr.bindTooltip(`<b>${nm}</b><br>${r?r.name:'—'} · ${r?r.pct+'%':''}<br><span style="opacity:.7">Puesto: ${pnm}${bp.is_direct?'':' (cercano)'}</span>`,{sticky:true});
       lyr.on('click',()=>showDetail(i));
@@ -337,7 +351,7 @@ function render(){
 }
 
 function showDetail(i){
-  const bp=BP[String(i)]; const nm=GEO.features[i].properties.n||'Sin nombre';
+  const bp=BP[String(i)]; const nm=barrioName(i);
   const p=PUESTOS[bp.pcode]; const r=puestoResult(bp.pcode,curElec);
   let h=`<div class="dh">${nm}</div>`;
   h+=`Puesto que lo cubre: <b>${p?p.nombre:bp.pcode}</b> ${bp.is_direct?'<span style="color:var(--blue-light)">(dato directo)</span>':'<span style="color:var(--muted)">(puesto más cercano)</span>'}<br>`;
@@ -401,7 +415,7 @@ function legend(cm){
   let h='';
   for(const k in cm){ h+=`<div class="li"><span class="sw" style="background:${css(cm[k].color)}"></span>${cm[k].name} <span style="color:var(--muted)">· ${cm[k].party}</span></div>`; }
   h+=`<div class="li" style="margin-top:.4rem"><span class="sw" style="background:#3a4152;opacity:.7"></span>Sin dato en ese año</div>`;
-  h+=`<div class="li" style="color:var(--muted);font-size:.72rem">Sólido = barrio con puesto · tenue = puesto más cercano</div>`;
+  h+=`<div class="li" style="color:var(--muted);font-size:.72rem">Cada barrio toma el resultado del puesto que lo cubre</div>`;
   document.getElementById('legend').innerHTML=h;
 }
 
@@ -485,24 +499,31 @@ function loadExcelJS(){
   });
   return _exceljsPromise;
 }
-async function downloadBaseXLSX(){
+// etiqueta corta de la elecci\u00f3n activa (para bot\u00f3n + nombre de archivo)
+function elecLabel(e){
+  if(e.startsWith('alcaldia')) return e.slice(-4);            // 2011 \u00b7 2015 \u00b7 2019 \u00b7 2023
+  return 'Presidencial 2026';                                  // pres_1v / pres_2v
+}
+function updateDlLabel(){
+  const btn=document.getElementById('btn-dl');
+  if(btn && !btn.disabled) btn.textContent='\u2193 Descargar Base (Excel) '+elecLabel(curElec);
+}
+
+async function downloadBaseXLSX(elec){
   await loadExcelJS();
-  const ALC=[['2011','alcaldia_2011'],['2015','alcaldia_2015'],['2019','alcaldia_2019'],['2023','alcaldia_2023']];
   const wb=new ExcelJS.Workbook();
   wb.creator='Ricardo Ruiz \u00b7 ricardoruiz.co';
-  const INK='FF10131C', BLUE='FF0047FF', ZEBRA='FF11151F', LINE='FF2A3040', WHITE='FFF4F3EF', MUT='FFB9BEC9';
+  const INK='FF10131C', BLUE='FF0047FF', ZEBRA='FF11151F', LINE='FF2A3040', WHITE='FFF4F3EF';
   const border={top:{style:'thin',color:{argb:LINE}},bottom:{style:'thin',color:{argb:LINE}},left:{style:'thin',color:{argb:LINE}},right:{style:'thin',color:{argb:LINE}}};
 
   function styleSheet(ws, cols, title){
     ws.columns=cols;
-    // banda de titulo
     ws.spliceRows(1,0,[title]); ws.spliceRows(2,0,[]);
     ws.mergeCells(1,1,1,cols.length);
     const t=ws.getCell(1,1);
     t.value=title; t.font={name:'Calibri',size:14,bold:true,color:{argb:WHITE}};
     t.fill={type:'pattern',pattern:'solid',fgColor:{argb:INK}};
     t.alignment={vertical:'middle',horizontal:'left'}; ws.getRow(1).height=26;
-    // header (fila 3)
     const hr=ws.getRow(3);
     cols.forEach((c,i)=>{ const cell=hr.getCell(i+1); cell.value=c.header;
       cell.font={name:'Calibri',size:10,bold:true,color:{argb:WHITE}};
@@ -528,54 +549,56 @@ async function downloadBaseXLSX(){
     });
   }
 
-  // \u2500\u2500 Hoja 1: Alcald\u00edas (una fila por puesto, columnas por a\u00f1o) \u2500\u2500
-  const cA=[
-    {header:'Puesto',key:'nom',width:34},
-    {header:'Censo',key:'cen',width:9,num:true,fmt:'#,##0'},
-    {header:'Mesas',key:'mes',width:8,num:true},
-  ];
-  ALC.forEach(([y])=>{ cA.push(
-    {header:`Ganador ${y}`,key:'g'+y,width:26},
-    {header:`Partido ${y}`,key:'p'+y,width:34},
-    {header:`Votos ${y}`,key:'v'+y,width:10,num:true,fmt:'#,##0'},
-    {header:`% ${y}`,key:'pc'+y,width:8,num:true,fmt:'0.0'},
-  ); });
-  const wsA=wb.addWorksheet('Alcald\u00edas 2011-2023',{views:[{showGridLines:false}]});
-  const dataA=[];
-  for(const pc in PUESTOS){ const p=PUESTOS[pc];
-    const r=[p.nombre,(p.mujeres||0)+(p.hombres||0),p.mesas];
-    ALC.forEach(([y,e])=>{ const b=DATA.alcaldias[e].by_puesto[pc];
-      if(b) r.push(b.winner,b.winner_par,b.winner_votos,b.winner_pct);
-      else r.push('','','',''); });
-    dataA.push(r);
+  let cols, data, sheetName, title, fname;
+  if(elec.startsWith('alcaldia')){
+    const y=elec.slice(-4);
+    cols=[
+      {header:'Puesto',width:34},
+      {header:'Censo',width:9,num:true,fmt:'#,##0'},
+      {header:'Mesas',width:8,num:true},
+      {header:'Ganador',width:26},
+      {header:'Partido',width:36},
+      {header:'Votos ganador',width:14,num:true,fmt:'#,##0'},
+      {header:'% ganador',width:11,num:true,fmt:'0.0'},
+      {header:'V\u00e1lidos',width:10,num:true,fmt:'#,##0'},
+    ];
+    data=[];
+    for(const pc in PUESTOS){ const p=PUESTOS[pc]; const b=DATA.alcaldias[elec].by_puesto[pc];
+      data.push([p.nombre,(p.mujeres||0)+(p.hombres||0),p.mesas,
+        b?b.winner:'', b?b.winner_par:'', b?b.winner_votos:'', b?b.winner_pct:'', b?b.validos:'']);
+    }
+    sheetName='Alcald\u00eda '+y;
+    title='Tunja \u00b7 Alcald\u00eda '+y+' por puesto de votaci\u00f3n';
+    fname='tunja-alcaldia-'+y+'-por-puesto.xlsx';
+  } else {
+    cols=[
+      {header:'Puesto',width:34},
+      {header:'Potencial',width:11,num:true,fmt:'#,##0'},
+      {header:'Cepeda 1V',width:11,num:true,fmt:'#,##0'},
+      {header:'Abelardo 1V',width:12,num:true,fmt:'#,##0'},
+      {header:'Votantes 1V',width:12,num:true,fmt:'#,##0'},
+      {header:'Cepeda 2V',width:11,num:true,fmt:'#,##0'},
+      {header:'Abelardo 2V',width:12,num:true,fmt:'#,##0'},
+      {header:'Votantes 2V',width:12,num:true,fmt:'#,##0'},
+    ];
+    data=[];
+    for(const pc in PUESTOS){ const p=PUESTOS[pc], pr=PRES[pc];
+      data.push([p.nombre, pr?pr.pot:'', pr?pr.cep1:'', pr?pr.abe1:'', pr?pr.urna1:'', pr?pr.cep2:'', pr?pr.abe2:'', pr?pr.urna2:'']);
+    }
+    sheetName='Presidencial 2026';
+    title='Tunja \u00b7 Presidencial 2026 por puesto (1\u00aa y 2\u00aa vuelta)';
+    fname='tunja-presidencial-2026-por-puesto.xlsx';
   }
-  styleSheet(wsA,cA,'Tunja \u00b7 Alcald\u00edas por puesto de votaci\u00f3n (2011\u20132023)');
-  fillRows(wsA,cA,dataA);
 
-  // \u2500\u2500 Hoja 2: Presidencial 2026 por puesto \u2500\u2500
-  const cP=[
-    {header:'Puesto',key:'nom',width:34},
-    {header:'Potencial',key:'pot',width:11,num:true,fmt:'#,##0'},
-    {header:'Cepeda 1V',key:'c1',width:11,num:true,fmt:'#,##0'},
-    {header:'Abelardo 1V',key:'a1',width:12,num:true,fmt:'#,##0'},
-    {header:'Votantes 1V',key:'u1',width:12,num:true,fmt:'#,##0'},
-    {header:'Cepeda 2V',key:'c2',width:11,num:true,fmt:'#,##0'},
-    {header:'Abelardo 2V',key:'a2',width:12,num:true,fmt:'#,##0'},
-    {header:'Votantes 2V',key:'u2',width:12,num:true,fmt:'#,##0'},
-  ];
-  const wsP=wb.addWorksheet('Presidencial 2026',{views:[{showGridLines:false}]});
-  const dataP=[];
-  for(const pc in PUESTOS){ const p=PUESTOS[pc], pr=PRES[pc];
-    dataP.push([p.nombre, pr?pr.pot:'', pr?pr.cep1:'', pr?pr.abe1:'', pr?pr.urna1:'', pr?pr.cep2:'', pr?pr.abe2:'', pr?pr.urna2:'']);
-  }
-  styleSheet(wsP,cP,'Tunja \u00b7 Presidencial 2026 por puesto (1\u00aa y 2\u00aa vuelta)');
-  fillRows(wsP,cP,dataP);
+  const ws=wb.addWorksheet(sheetName,{views:[{showGridLines:false}]});
+  styleSheet(ws,cols,title);
+  fillRows(ws,cols,data);
 
   const buf=await wb.xlsx.writeBuffer();
   const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download='tunja-base-por-puesto-2011-2026.xlsx';
+  a.download=fname;
   document.body.appendChild(a); a.click();
   setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500);
 }
@@ -583,9 +606,9 @@ document.getElementById('btn-dl').addEventListener('click',async()=>{
   if(!hasFeature('descarga-base')){ openBlockedModal('descarga-base'); return; }
   const btn=document.getElementById('btn-dl'), txt=btn.textContent;
   btn.textContent='Generando\u2026'; btn.disabled=true;
-  try{ await downloadBaseXLSX(); }
+  try{ await downloadBaseXLSX(curElec); }
   catch(e){ alert('No se pudo generar el Excel: '+e.message); }
-  finally{ btn.textContent=txt; btn.disabled=false; }
+  finally{ btn.disabled=false; updateDlLabel(); }
 });
 
 // ---- capa de puestos (Premium) ----
@@ -615,7 +638,7 @@ document.getElementById('seg-elec').addEventListener('click',e=>{
   const b=e.target.closest('button[data-e]'); if(!b)return;
   if(b.dataset.feat && !hasFeature(b.dataset.feat)){ openBlockedModal(b.dataset.feat); return; }
   document.querySelectorAll('#seg-elec button').forEach(x=>x.classList.remove('on'));
-  b.classList.add('on'); curElec=b.dataset.e; render();
+  b.classList.add('on'); curElec=b.dataset.e; render(); updateDlLabel();
 });
 document.getElementById('seg-mode').addEventListener('click',e=>{
   const b=e.target.closest('button[data-m]'); if(!b)return;
@@ -629,7 +652,7 @@ document.getElementById('seg-mode').addEventListener('click',e=>{
 function boot(){
   loadUserFromStorage(); updateLocks();
   refreshUserFromAPI().then(updateLocks);
-  render();
+  render(); updateDlLabel();
   setTimeout(()=>{ try{ map.invalidateSize(); }catch(e){} },200);
 }
 if(document.readyState==='complete') boot(); else window.addEventListener('load',boot);
