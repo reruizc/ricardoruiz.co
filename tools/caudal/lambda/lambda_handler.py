@@ -410,6 +410,12 @@ def handler(event, context):
                              limit=body.get('limit', 50))
         return _resp(200, {'query': q, 'n': len(hits), 'resultados': hits})
 
+    if action == 'stats':          # agregados globales precalculados (para gráficas)
+        try:
+            return _resp(200, _get_json('metadata/stats.json'))
+        except Exception as e:
+            return _resp(500, {'error': f'no se pudo leer stats: {str(e)[:120]}'})
+
     if action == 'proyecto':
         pid = body.get('id')
         caudal._full = _full()          # inyecta registros completos (keyed tb:id)

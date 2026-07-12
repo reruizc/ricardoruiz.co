@@ -178,6 +178,7 @@ class Caudal:
                 'titulo': h['t'], 'resultado': h['res'],
                 'resultado_txt': RES_LABEL.get(h['res'], h['res']),
                 'autores': h.get('aut', []), 'autor_principal': h.get('ap'),
+                'comision': h.get('com', ''),
                 'tipologia': h.get('tip'), 'empuje': h.get('emp'),
                 'empuje_txt': EMPUJE_LABEL.get(h.get('emp'), h.get('emp')),
                 'vitrina_score': h.get('vs', 0), 'veces_presentado': h.get('vp', 1),
