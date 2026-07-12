@@ -220,6 +220,10 @@
   .broaden{font-size:.78rem; color:var(--ink2); background:var(--teal-soft); border:1px solid var(--teal-dim); border-radius:7px; padding:.6rem .85rem; margin-bottom:1rem}
   .broaden b{color:var(--ink)}
   .bd-link{color:var(--teal); cursor:none; text-decoration:underline; white-space:nowrap}
+  /* bloqueo en comisión (ficha) */
+  .bloq-card{background:linear-gradient(180deg,rgba(224,160,58,.09),transparent); border:1px solid rgba(224,160,58,.3); border-radius:9px; padding:1.1rem 1.2rem; margin:1rem 0}
+  .bloq-big{font-size:1rem; color:var(--ink); margin:.5rem 0}
+  .bloq-big b{font-size:1.35rem; font-weight:800; color:var(--amber)}
 
   /* modal proyecto */
   .modal{position:fixed; inset:0; z-index:800; background:rgba(4,7,11,.72); backdrop-filter:blur(4px); display:none; align-items:flex-start; justify-content:center; padding:4vh 1rem; overflow-y:auto}
@@ -351,6 +355,8 @@
   const TIP_COLOR={honores:'var(--amber)',fondos:'var(--red)',reforma:'var(--teal)',presupuestal:'var(--amber)',ordinaria:'var(--gray)'};
   const TIP_TXT={honores:'Honores',fondos:'Crea fondo',reforma:'Reforma',presupuestal:'Presupuestal',ordinaria:'Ordinaria'};
   const TIPO_DOC={pdly:'Proyecto de ley',pal:'Acto legislativo'};
+  const COM_NAME={primera:'Primera',segunda:'Segunda',tercera:'Tercera',cuarta:'Cuarta',quinta:'Quinta',sexta:'Sexta',septima:'Séptima',afro:'Legal Afro',ordenamiento:'Ordenamiento Territorial',ddhh:'Derechos Humanos',cuentas:'Legal de Cuentas',etica:'Ética',mujer:'Equidad de la Mujer',electoral:'Vigilancia Electoral'};
+  const mesAno=s=>{const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];const p=String(s||'').split('-');return p.length>=2?M[+p[1]-1]+' '+p[0]:s;};
   const TITLE_PREF=/^\s*por\s+(?:medio\s+de\s+)?(?:el\s+medio\s+de\s+)?(?:la|el|los|las)?\s*cual(?:es)?\s+se\s+/i;
   function shortTitle(t){ let s=String(t||'').replace(TITLE_PREF,'').replace(/\s+/g,' ').trim(); if(s.length<6) s=String(t||'').replace(/\s+/g,' ').trim(); return s.charAt(0).toUpperCase()+s.slice(1).toLowerCase(); }
 
@@ -362,6 +368,20 @@
       requestAnimationFrame(()=>b.querySelectorAll('.mort-bar').forEach(s=>s.style.height=s.dataset.h+'%')); }
     if(STATS) renderLanding(STATS);
     return STATS; }
+
+  // índice de bloqueo (sistema) — P(tratado|posición) para el landing
+  let BLOQ=null;
+  async function loadBloqueo(){ if(BLOQ) return BLOQ; try{ BLOQ=await call({action:'bloqueo'}); }catch(e){ BLOQ=null; }
+    const el=document.getElementById('bloq-box'); if(el&&BLOQ) el.innerHTML=posChart(BLOQ); return BLOQ; }
+  function posChart(s){
+    if(!s||!s.p_tratado_por_posicion) return '<div class="cob-note">Sin datos.</div>';
+    const P=s.p_tratado_por_posicion, labs=['1º','2º-3º','4º-6º','7º-10º','11º-15º'];
+    const max=Math.max(...labs.map(l=>(P[l]||{}).pct||0),1);
+    const bars=labs.map(l=>{const v=(P[l]||{}).pct||0;
+      return `<div class="cx-row"><span class="cx-lab">${l} del día</span><span class="cx-bar"><span style="width:${Math.round(100*v/max)}%;background:linear-gradient(90deg,var(--amber),#e8b96a)"></span></span><span class="cx-n">${v}%</span></div>`;}).join('');
+    const t=s.totales||{};
+    return `<div class="cob-note" style="margin-bottom:.7rem">Probabilidad de que un proyecto se trate según su <b>posición</b> en el orden del día · ${t.proyectos||0} proyectos, ${t.comisiones||0} comisiones de Cámara.</div>${bars}<div class="cob-note" style="margin-top:.7rem">Ser el 1º del día ≈ ${(P['1º']||{}).pct||0}%; del 4º en adelante cae a ~20%. <b>El orden de la agenda decide.</b></div>`;
+  }
 
   // --- chart builders (CSS puro, sin librerías) ---
   function yearBars(intentos){
@@ -412,8 +432,10 @@
         <div class="panel"><h3>Composición del histórico</h3>
           <div class="seg-sub">Tipo de proyecto</div>${segBar(s.tipologia,TIP_COLOR,TIP_TXT)}
           <div class="seg-sub">Empuje ${infoIcon(EMP_INFO)}</div>${segBar(s.empuje,EMP_COLOR,EMP_TXT)}</div>
+        <div class="panel wide"><h3>Bloqueo · dónde se cae en la cola ${infoIcon('<div class="row">De los órdenes del día de las comisiones: qué % de proyectos se <b>trata</b> según su posición en la agenda. Ser el primero del día importa mucho.</div>')}</h3><div id="bloq-box"><div class="llm-load">Cargando bloqueo <span class="dots"><span></span><span></span><span></span></span></div></div></div>
       </div>`;
     requestAnimationFrame(()=>el.querySelectorAll('.mort-bar').forEach(x=>x.style.height=x.dataset.h+'%'));
+    loadBloqueo();
   }
   function funnel(embudo){
     const ks=Object.keys(embudo||{}); if(!ks.length) return ''; const max=embudo[ks[0]]||1; let prev=null;
@@ -632,6 +654,13 @@
     if(f.jala_presupuesto_regional) chips.push(`<span class="emp-badge" style="color:var(--amber);background:rgba(224,160,64,.08);border:1px solid rgba(224,160,64,.35)">Jala presupuesto regional</span>`);
     // historial de re-radicación
     const hist=(f.historial_reradicacion||[]).filter(h=>h.anio);
+    const bl=f.bloqueo;
+    const bloqHTML=bl?`<div class="bloq-card">
+      <div class="ga-tag" style="color:var(--amber)">◈ Bloqueo en comisión · órdenes del día</div>
+      <div class="bloq-big"><b>${bl.n}×</b> agendado en Comisión ${(bl.com||[]).map(c=>COM_NAME[c]||c).join(', ')}</div>
+      <div class="ga-t">Posición promedio en la agenda del día: <b>${bl.pos_prom}</b> · entre ${mesAno(bl.primera)} y ${mesAno(bl.ultima)}</div>
+      <div class="cob-note">Veces que se puso en el orden del día de la comisión. Muchos agendamientos sin avanzar = lo dejaban esperando en la cola (bloqueo).</div>
+    </div>`:'';
     const reradic=hist.length>1?`
       <h3 style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin-bottom:.5rem">Re-radicaciones · misma iniciativa en ${f.veces_presentado} términos</h3>
       <div class="reradic">${hist.map(h=>`<div class="rr"><span class="y">${h.anio}</span><span style="color:${RES_COLOR[h.res]||'var(--gray)'}">${RES_TXT[h.res]||'—'}</span><span style="color:var(--ink3)">${esc(h.leg||'')}</span></div>`).join('')}</div>`:'';
@@ -659,6 +688,7 @@
       <h3 style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin-bottom:.7rem">Autores</h3>
       <div class="aut-list">${auts}</div>
       ${autNota?`<div class="cob-note" style="margin-top:.5rem">${autNota}</div>`:''}
+      ${bloqHTML}
       ${reradic}
       <h3 style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin:1.1rem 0 .7rem">Documentos · gacetas del Congreso · click para analizar la ponencia</h3>
       <div class="gac-list">${gacs}</div>

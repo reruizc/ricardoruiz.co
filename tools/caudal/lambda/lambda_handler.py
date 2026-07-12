@@ -102,6 +102,27 @@ def _full():
     return _FULL
 
 
+_BLOQUEO = None
+
+
+def _bloqueo():
+    """Índice de bloqueo (órdenes del día por comisión). Cache warm."""
+    global _BLOQUEO
+    if _BLOQUEO is None:
+        try:
+            _BLOQUEO = _get_json('metadata/bloqueo.json')
+        except Exception:
+            _BLOQUEO = {'sistema': {}, 'por_proyecto': {}}
+    return _BLOQUEO
+
+
+def _num_token(num):
+    """'397/2024' | '022/91' → '397/24' (llave del índice de bloqueo)."""
+    import re as _re
+    m = _re.search(r'(\d{1,4})\s*/\s*(?:20)?(\d{2})', num or '')
+    return f'{int(m.group(1))}/{m.group(2)}' if m else None
+
+
 # --- LLM (ruteo por paso) ---------------------------------------------------
 def _hash24(s):
     return hashlib.sha256(s.encode('utf-8')).hexdigest()[:24]
@@ -416,12 +437,21 @@ def handler(event, context):
         except Exception as e:
             return _resp(500, {'error': f'no se pudo leer stats: {str(e)[:120]}'})
 
+    if action == 'bloqueo':        # sistema de bloqueo (posición, hazard, comisiones)
+        return _resp(200, _bloqueo().get('sistema', {}))
+
     if action == 'proyecto':
         pid = body.get('id')
         caudal._full = _full()          # inyecta registros completos (keyed tb:id)
         ficha = caudal.proyecto(pid, body.get('tb', 'pdly'))
         if not ficha:
             return _resp(404, {'error': f'proyecto {pid} no encontrado'})
+        # bloqueo por número Cámara (órdenes del día de comisión)
+        tok = _num_token(ficha.get('numero_camara'))
+        if tok:
+            bl = _bloqueo().get('por_proyecto', {}).get(tok)
+            if bl:
+                ficha['bloqueo'] = bl
         return _resp(200, ficha)
 
     if action == 'gaceta':
