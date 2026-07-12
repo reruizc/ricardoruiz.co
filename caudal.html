@@ -357,11 +357,21 @@
     const en=Object.entries(dict||{}).sort((a,b)=>b[1]-a[1]); const tot=en.reduce((a,b)=>a+b[1],0)||1;
     return `<div class="segbar">${en.map(([k,v])=>`<div class="seg" style="width:${100*v/tot}%;background:${colorMap[k]||'var(--gray)'}" title="${esc(txtMap[k]||k)}: ${v}"></div>`).join('')}</div><div class="seg-leg">${en.map(([k,v])=>`<span class="sl"><i style="background:${colorMap[k]||'var(--gray)'}"></i>${esc(txtMap[k]||k)} ${v}</span>`).join('')}</div>`;
   }
+  const COM_NICE={PRIMERA:'Primera',SEGUNDA:'Segunda',TERCERA:'Tercera',CUARTA:'Cuarta',QUINTA:'Quinta',SEXTA:'Sexta',SEPTIMA:'Séptima'};
   function comisionChart(intentos){
-    const by={}; intentos.forEach(it=>{ const c=(it.comision||'').trim()||'Sin comisión'; (by[c]=by[c]||{t:0,l:0}).t++; if(it.resultado==='LEY') by[c].l++; });
-    const rows=Object.entries(by).sort((a,b)=>b[1].t-a[1].t).slice(0,6);
+    // la comisión viene con casing/acentos inconsistentes en el crudo
+    // (SEPTIMA vs Septima) → normalizo la llave para no duplicar filas.
+    const by={};
+    intentos.forEach(it=>{
+      const raw=String(it.comision||'').trim();
+      const key=raw?raw.toUpperCase().replace(/[ÁÀÄÂ]/g,'A').replace(/[ÉÈËÊ]/g,'E').replace(/[ÍÌÏÎ]/g,'I').replace(/[ÓÒÖÔ]/g,'O').replace(/[ÚÙÜÛ]/g,'U'):'SIN';
+      const label=COM_NICE[key]||(raw?raw.charAt(0).toUpperCase()+raw.slice(1).toLowerCase():'Sin comisión');
+      if(!by[key]) by[key]={t:0,l:0,label};
+      by[key].t++; if(it.resultado==='LEY') by[key].l++;
+    });
+    const rows=Object.values(by).sort((a,b)=>b.t-a.t).slice(0,6);
     if(!rows.length) return '<div class="cob-note">Sin datos de comisión.</div>';
-    return rows.map(([c,o])=>{ const pct=Math.round(100*o.l/o.t); return `<div class="cx-row"><span class="cx-lab" title="${esc(c)}">${esc(c)}</span><span class="cx-bar"><span data-w="${pct}"></span></span><span class="cx-n">${pct}% · ${o.l}/${o.t}</span></div>`; }).join('');
+    return rows.map(o=>{ const pct=Math.round(100*o.l/o.t); return `<div class="cx-row"><span class="cx-lab" title="${esc(o.label)}">${esc(o.label)}</span><span class="cx-bar"><span data-w="${pct}"></span></span><span class="cx-n">${pct}% · ${o.l}/${o.t}</span></div>`; }).join('');
   }
   function mortandadChart(mort){
     if(!mort) return '<div class="llm-load">Cargando patrón general <span class="dots"><span></span><span></span><span></span></span></div>';
