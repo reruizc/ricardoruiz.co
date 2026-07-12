@@ -21,6 +21,7 @@ MODELO POR PASO (el switch a Claude es cambiar env vars, sin tocar código):
 Secretos:
   DEEPSEEK_API_KEY   (mismo secreto que las otras Lambdas)
   ANTHROPIC_API_KEY  (solo si el paso usa provider=anthropic)
+  SERPER_API_KEY     (rastreo de medios · https://serper.dev, resultados Google)
 Bucket:
   CAUDAL_BUCKET      default 'caudal-legislativo'
 """
@@ -34,7 +35,7 @@ import boto3
 import caudal_core
 
 BUCKET = os.environ.get('CAUDAL_BUCKET', 'caudal-legislativo')
-PROMPT_VERSION = 'v3'            # bumpear para invalidar cache de síntesis
+PROMPT_VERSION = 'v4'            # bumpear para invalidar cache de síntesis
 CACHE_PREFIX = 'analisis-cache/'
 HTTP_TIMEOUT = 55
 
@@ -50,6 +51,11 @@ STEP_MODELS = {
     'extraccion': {
         'provider': os.environ.get('CAUDAL_EXTRACCION_PROVIDER', 'deepseek'),
         'model': os.environ.get('CAUDAL_EXTRACCION_MODEL', 'deepseek-v4-flash'),
+    },
+    # rastreo de medios: interpreta titulares → controversia/impopularidad
+    'contexto': {
+        'provider': os.environ.get('CAUDAL_CONTEXTO_PROVIDER', 'deepseek'),
+        'model': os.environ.get('CAUDAL_CONTEXTO_MODEL', 'deepseek-v4-flash'),
     },
 }
 
@@ -173,16 +179,18 @@ SINT_SYSTEM = (
 
 def _sintesis_tema(resumen):
     key = _hash24(PROMPT_VERSION + '|tema|' + resumen['query'] + '|' +
-                  str(resumen['n_intentos']) + '|' + str(resumen['n_leyes']))
+                  str(resumen['n_intentos']) + '|' + str(resumen['n_leyes']) +
+                  '|' + str(resumen.get('n_vitrina', 0)))
     cached = _cache_get(key)
     if cached:
         return cached
     intentos_txt = '\n'.join(
-        f"- [{it['anio']}] {it['resultado_txt']}: {it['titulo'][:90]}"
+        f"- [{it['anio']}] {it['resultado_txt']} · {it.get('empuje_txt','')}: {it['titulo'][:85]}"
         for it in resumen['intentos'][:20])
     autores_txt = ', '.join(f"{a} ({n})" for a, n in resumen['top_autores'][:6])
     bancadas_txt = ', '.join(f"{p} ({n} proyectos)" for p, n in resumen.get('bancadas', [])[:6]) or 'sin dato'
     cob = resumen.get('cobertura_partido', {})
+    emp = resumen.get('empuje', {})
     user = (
         f"Tema consultado: «{resumen['query']}»\n"
         f"Intentos totales: {resumen['n_intentos']} · convertidos en ley: "
@@ -191,12 +199,19 @@ def _sintesis_tema(resumen):
         f"murieron por vencimiento de términos, Art. 190 Ley 5ª).\n"
         f"Periodo: {resumen.get('periodo')}\n"
         f"Embudo del trámite: {json.dumps(resumen['embudo'], ensure_ascii=False)}\n"
+        f"LECTURA DE INTENCIÓN (metadata): {resumen.get('n_vitrina',0)} intentos "
+        f"({resumen.get('pct_vitrina',0)}%) son de VITRINA (re-radicados sin superar "
+        f"el 1er debate — se radican para figurar, no para empujar). "
+        f"{resumen.get('n_honores',0)} son de honores/conmemoración. "
+        f"Desglose de empuje: {json.dumps(emp, ensure_ascii=False)}.\n"
         f"Quiénes más lo intentan: {autores_txt}\n"
         f"Bancadas que lo impulsan (por partido de los autores, "
         f"cobertura {cob.get('con')}/{cob.get('con',0)+cob.get('sin',0)} intentos): {bancadas_txt}\n"
         f"Línea de intentos:\n{intentos_txt}\n\n"
         "Escribe el análisis en JSON. `titular`: una frase potente y precisa. "
-        "`hallazgo`: 2-3 frases con el patrón central. `por_que_caen`: la causa "
+        "`hallazgo`: 2-3 frases con el patrón central; si hay proporción alta de "
+        "vitrina o de honores, dilo sin rodeos (distingue quién de verdad empujó el "
+        "tema de quién solo lo radicó para figurar). `por_que_caen`: la causa "
         "de muerte dominante (si mueren por tiempo, dilo claro: se hunden en el "
         "orden del día, no por votación). `quien_propone`: usa las BANCADAS para "
         "decir qué partidos empujan el tema (¿transversal o de un solo bloque?); "
@@ -262,6 +277,104 @@ def _extraer_gaceta(key, contexto):
     return data
 
 
+# --- rastreo de medios (Serper/Google → controversia/impopularidad) ---------
+import re
+
+_TITULO_PREF = re.compile(
+    r'^\s*por\s+(?:medio\s+de\s+|el\s+medio\s+de\s+)?(?:la|el|los|las)?\s*cual(?:es)?\s+se\s+',
+    re.I)
+
+
+def _query_medios(titulo, autor, anio, numero):
+    """Arma una query de prensa desde la ficha (limpia el formulismo legal)."""
+    t = _TITULO_PREF.sub('', titulo or '').strip()
+    t = re.sub(r'\s+', ' ', t)[:90]
+    partes = ['proyecto de ley', t]
+    if numero:
+        partes.append(str(numero))
+    if anio:
+        partes.append(str(anio))
+    if autor:
+        partes.append(autor.split()[0] if ' ' in autor else autor)
+    partes.append('Colombia')
+    return ' '.join(p for p in partes if p)
+
+
+def _serper(q, num=10):
+    key = os.environ.get('SERPER_API_KEY')
+    if not key:
+        raise RuntimeError('SERPER_API_KEY no configurada')
+    body = json.dumps({'q': q, 'gl': 'co', 'hl': 'es', 'num': num}).encode('utf-8')
+    req = urllib.request.Request('https://google.serper.dev/search', data=body,
+                                 headers={'X-API-KEY': key, 'Content-Type': 'application/json'})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        d = json.loads(r.read())
+    out = []
+    for o in d.get('organic', [])[:num]:
+        out.append({'titulo': o.get('title', ''), 'url': o.get('link', ''),
+                    'fuente': (o.get('link', '').split('/')[2] if '://' in o.get('link', '') else ''),
+                    'fecha': o.get('date', ''), 'snippet': o.get('snippet', '')})
+    return out
+
+
+CTX_SYSTEM = (
+    "Eres analista legislativo de Cauce. Te doy TITULARES DE PRENSA sobre un "
+    "proyecto de ley/acto legislativo del Congreso de Colombia. Tu tarea: decir "
+    "si el proyecto tuvo controversia, oposición pública o impopularidad que "
+    "ayude a explicar su trámite (muchos se dejan caer por tiempo cuando se "
+    "vuelven impopulares o un gremio los frena). Escribes en tuteo neutro de "
+    "Bogotá. REGLA DURA: usa SOLO lo que dicen los titulares; si no hay señal "
+    "clara, dilo (no inventes controversia). Devuelves SIEMPRE un JSON válido con "
+    "las claves: tuvo_controversia ('si'|'no'|'sin_senal'), nivel "
+    "('alta'|'media'|'baja'|'sin_senal'), resumen (2-4 frases), quien_se_opuso "
+    "(lista de gremios/sectores/actores que aparezcan, o vacía), "
+    "murio_por_impopularidad ('probable'|'poco_probable'|'sin_senal'), "
+    "veredicto (1-2 frases). NO inventes URLs ni fechas: esas van aparte.")
+
+
+def _contexto_medios(payload):
+    titulo = payload.get('titulo', '')
+    q = _query_medios(titulo, payload.get('autor'), payload.get('anio'),
+                      payload.get('numero'))
+    ck = _hash24(PROMPT_VERSION + '|contexto|' + str(payload.get('id')) + '|' +
+                 str(payload.get('tb')) + '|' + titulo[:60])
+    cached = _cache_get('contexto-' + ck)
+    if cached:
+        return cached
+    try:
+        fuentes = _serper(q)
+    except Exception as e:
+        return {'error': f'búsqueda no disponible: {str(e)[:140]}', 'query': q}
+    if not fuentes:
+        return {'query': q, 'tuvo_controversia': 'sin_senal', 'nivel': 'sin_senal',
+                'resumen': 'No se encontró cobertura de prensa localizable para este '
+                           'proyecto (frecuente en iniciativas anteriores a ~2010).',
+                'quien_se_opuso': [], 'murio_por_impopularidad': 'sin_senal',
+                'veredicto': '', 'fuentes': []}
+    titulares_txt = '\n'.join(
+        f"- [{f.get('fecha') or 's/f'}] {f.get('fuente')}: {f.get('titulo')} — {f.get('snippet','')[:160]}"
+        for f in fuentes)
+    user = (f"Proyecto: «{titulo}»\n"
+            f"Resultado del trámite: {payload.get('resultado') or 's/d'}\n\n"
+            f"TITULARES ENCONTRADOS:\n{titulares_txt}\n\n"
+            "Analiza SOLO con base en estos titulares. Devuelve el JSON pedido.")
+    try:
+        raw = _call_llm('contexto', CTX_SYSTEM, user, max_tokens=3000).strip()
+        if raw.startswith('```'):
+            raw = raw.split('```')[1].lstrip('json').strip()
+        data = json.loads(raw)
+    except Exception as e:
+        data = {'tuvo_controversia': 'sin_senal', 'nivel': 'sin_senal', 'resumen': '',
+                'quien_se_opuso': [], 'murio_por_impopularidad': 'sin_senal',
+                'veredicto': '', 'error': str(e)[:160]}
+    data['query'] = q
+    data['fuentes'] = fuentes           # URLs/fechas REALES (no del LLM)
+    data['_model'] = STEP_MODELS['contexto']['model']
+    if 'error' not in data:
+        _cache_put('contexto-' + ck, data)
+    return data
+
+
 # --- handler ----------------------------------------------------------------
 CORS = {'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type',
@@ -292,6 +405,8 @@ def handler(event, context):
                              anio_max=body.get('anio_max'),
                              comision=body.get('comision'),
                              resultado=body.get('resultado'),
+                             tipologia=body.get('tipologia'),
+                             empuje=body.get('empuje'),
                              limit=body.get('limit', 50))
         return _resp(200, {'query': q, 'n': len(hits), 'resultados': hits})
 
@@ -308,6 +423,11 @@ def handler(event, context):
         if not key:
             return _resp(400, {'error': 'falta key de gaceta (num-año)'})
         return _resp(200, _extraer_gaceta(key, body.get('contexto', '')))
+
+    if action == 'contexto':           # rastreo de medios de un proyecto
+        if not body.get('titulo'):
+            return _resp(400, {'error': 'falta titulo del proyecto'})
+        return _resp(200, _contexto_medios(body))
 
     if action == 'tema':
         q = body.get('query', '')

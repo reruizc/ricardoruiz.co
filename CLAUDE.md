@@ -4764,10 +4764,32 @@ Cauce = el cuerpo de datos legislativos). Vive en `tools/caudal/`.
 - ✅ **Bucket privado `caudal-legislativo`** (403 anónimo) con `metadata/*` + `gacetas-texto/*`.
 - ✅ **Lambda `caudal-analiza`** desplegada (`POST https://l3kmprdjkl.execute-api.us-east-1.amazonaws.com`),
   model-agnostic (DeepSeek V4 default, switch a Claude por env var), `DEEPSEEK_API_KEY` seteada.
-  Acciones: `tema` (embudo+bancadas+lectura LLM) · `buscar` · `proyecto` (ficha) · `gaceta` (fase 3).
+  Acciones: `tema` (embudo+bancadas+intención+lectura LLM) · `buscar` (filtros tipologia/empuje) ·
+  `proyecto` (ficha) · `gaceta` (fase 3) · `contexto` (rastreo de medios · Serper+DeepSeek).
 - ✅ **Frontend `caudal.html`** (sistema visual v2: Helvetica, azul #060810) con búsqueda,
   embudo, bancadas, lectura del analista y ficha con análisis de ponencia por IA.
 - ✅ **Fase 3 piloto** verificado (Gaceta 857/2013 feminicidio → ponente/sentido/argumentos).
+- ✅ **Fase 1 · lectura de intención** (2026-07-11 · todo desde metadata, sin fuente nueva).
+  `tools/caudal/clasificar.py` deriva por proyecto: **tipología** (honores/fondos/reforma/
+  presupuestal/ordinaria + banderas `crea_fondo`, `jala_presupuesto_regional`), **empuje/
+  vitrina** (clusters de re-radicación por firma de título — tokens significativos + números
+  para no colapsar reformas de artículos distintos; `vitrina` = re-radicado ≥2 términos sin
+  superar 1er debate, umbral tuneable `VITRINA_MIN_VECES`), **autoría real** (1º firmante =
+  autor, resto firmones; EXCEPCIÓN actos legislativos ≥8 firmas = coautoría colectiva real),
+  **reloj por tipo** (AL 1 año/8 debates vs ordinaria 2 legisl/4). `build_dataset.py` lo cablea
+  y emite los campos a `proyectos.jsonl`/`actos-legis.jsonl`/`indice.json` (`tip/emp/vs/vp/ap`)
+  + stats (`tipologia`, `empuje`, `mortandad_por_anio_cuatrienio` → año 4 muere 34.7% vs ~26%).
+  `caudal_core.py` los expone en `resumen_tema` (desglose + n_vitrina) y `proyecto` (autoría,
+  historial de re-radicación). Frontend: chips de intención **clickeables que filtran** la
+  línea de intentos + ficha con autor principal ★, reloj e historial.
+- ✅ **Rastreo de medios contextual** (acción `contexto` del Lambda). Botón en la ficha →
+  **Serper.dev** (Google, `gl=co`, secreto `SERPER_API_KEY`, 2.5k gratis) busca prensa del
+  proyecto → DeepSeek interpreta titulares → `{tuvo_controversia, nivel, quien_se_opuso,
+  murio_por_impopularidad, veredicto}` + fuentes REALES (URLs de Serper, no del LLM). Cache
+  S3 `analisis-cache/contexto-{hash}`. Sirve para explicar muertes "por tiempo" que en
+  realidad fueron impopularidad/bloqueo de gremio. Cobertura buena ~2015+, pobre pre-2010
+  (dice "sin señal" honesto). `PROMPT_VERSION='v4'`. Verificado en vivo (caso Uber →
+  controversia alta, impopularidad probable, 8 fuentes).
 - 🔜 **Pendiente:** automatizar descarga de gacetas (hoy semi-manual por Chrome + gotcha
   macOS TCC ~/Downloads) · OCR gacetas escaneadas 90-2005 · pre-poblar `gacetas-texto/`
   de temas frecuentes. NADA bloquea el pitch — el producto ya se demuestra completo.

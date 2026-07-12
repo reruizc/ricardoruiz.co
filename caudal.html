@@ -75,7 +75,28 @@
   .kpi{background:var(--card); border:1px solid var(--border); border-radius:8px; padding:1rem}
   .kpi .n{font-family:'HelveticaNeue',Helvetica,Arial,sans-serif; font-weight:800; font-size:1.7rem; line-height:1}
   .kpi .l{font-size:.62rem; letter-spacing:.12em; text-transform:uppercase; color:var(--ink3); margin-top:.4rem}
-  .kpi.ley .n{color:var(--green)} .kpi.time .n{color:var(--amber)}
+  .kpi.ley .n{color:var(--green)} .kpi.time .n{color:var(--amber)} .kpi.vit .n{color:var(--red)}
+  /* F1 · intención */
+  .intencion{display:flex; flex-wrap:wrap; gap:.5rem; margin:0 0 1.3rem}
+  .ichip{font-size:.7rem; padding:.36rem .65rem; border-radius:999px; border:1px solid var(--border); background:var(--card); color:var(--ink2); display:flex; gap:.4rem; align-items:center}
+  .ichip b{font-weight:800; color:var(--ink)}
+  .ichip-f{cursor:pointer; transition:border-color .15s,box-shadow .15s}
+  .ichip-f.on{border-color:var(--teal); box-shadow:0 0 0 1px var(--teal-dim)}
+  .emp-badge{font-size:.56rem; letter-spacing:.05em; text-transform:uppercase; padding:.13rem .4rem; border-radius:4px; white-space:nowrap; font-weight:700}
+  .tip-chip{font-size:.58rem; letter-spacing:.06em; text-transform:uppercase; padding:.16rem .48rem; border-radius:5px; border:1px solid; display:inline-block; font-weight:700}
+  .reradic{margin-top:.5rem; border-left:2px solid var(--teal-dim); padding-left:.8rem}
+  .reradic .rr{display:flex; gap:.6rem; font-size:.74rem; padding:.15rem 0; color:var(--ink2)}
+  .reradic .rr .y{color:var(--ink3); min-width:2.6rem}
+  /* rastreo de medios */
+  .btn-medios{margin:.2rem 0 1rem; width:100%; padding:.7rem; border:1px solid var(--teal-dim); background:var(--teal-soft); color:var(--teal); border-radius:8px; font-size:.8rem; font-weight:600; cursor:pointer}
+  .btn-medios:hover{border-color:var(--teal)} .btn-medios:disabled{opacity:.5; cursor:default}
+  .med-srcs{display:flex; flex-direction:column; gap:.4rem; margin-top:.3rem}
+  .med-src{display:flex; flex-direction:column; padding:.4rem .55rem; border:1px solid var(--border); border-radius:6px; text-decoration:none; background:var(--card)}
+  .med-src:hover{border-color:var(--teal-dim)}
+  .med-src .ms-t{font-size:.76rem; color:var(--ink); line-height:1.35}
+  .med-src .ms-m{font-size:.62rem; color:var(--ink3); margin-top:.15rem}
+  .op-list{display:flex; flex-wrap:wrap; gap:.35rem; margin-top:.25rem}
+  .op-chip{font-size:.68rem; padding:.2rem .5rem; border-radius:999px; border:1px solid rgba(224,71,71,.35); color:var(--red); background:rgba(224,71,71,.06)}
 
   .grid2{display:grid; grid-template-columns:1fr 1fr; gap:1.2rem; margin-bottom:1.2rem}
   .panel{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:1.3rem}
@@ -227,6 +248,11 @@
   /* ---------- helpers ---------- */
   const RES_COLOR={LEY:'var(--green)',ARCHIVADO_TIEMPO:'var(--amber)',ARCHIVADO_OTRO:'var(--red)',RETIRADO:'var(--gray)',EN_TRAMITE:'var(--blue)',OTRO:'var(--gray)',SIN_DATO:'var(--gray)'};
   const RES_TXT={LEY:'Ley',ARCHIVADO_TIEMPO:'Archivado · tiempo',ARCHIVADO_OTRO:'Archivado',RETIRADO:'Retirado',EN_TRAMITE:'En trámite',OTRO:'—',SIN_DATO:'—'};
+  // F1 · lectura de intención
+  const EMP_COLOR={exitoso:'var(--green)',empujado:'var(--teal)',vitrina:'var(--red)',un_debate:'var(--amber)',sin_traccion:'var(--gray)'};
+  const EMP_TXT={exitoso:'Ley',empujado:'Empujado',vitrina:'Vitrina',un_debate:'1 debate',sin_traccion:'Sin tracción'};
+  const TIP_COLOR={honores:'var(--amber)',fondos:'var(--red)',reforma:'var(--teal)',presupuestal:'var(--amber)',ordinaria:'var(--gray)'};
+  const TIP_TXT={honores:'Honores',fondos:'Crea fondo',reforma:'Reforma',presupuestal:'Presupuestal',ordinaria:'Ordinaria'};
   const PARTY_COLOR=[
     [/pacto|polo|union patriotica|comunes|farc|colombia humana/i,'#d1584e'],
     [/centro democr/i,'#2f6fd0'],
@@ -285,13 +311,20 @@
       return `<div class="banc-row"><span class="banc-dot" style="background:${c}"></span><span class="banc-name" title="${esc(p)}">${esc(p)}</span><span class="banc-bar"><span style="width:${100*n/bmax}%;background:${c}"></span></span><span class="banc-n">${n}</span></div>`;
     }).join('');
     const tl=(r.intentos||[]).map(it=>`
-      <div class="tl-item" data-id="${it.id}" data-tb="${it.tb||'pdly'}">
+      <div class="tl-item" data-id="${it.id}" data-tb="${it.tb||'pdly'}" data-emp="${it.empuje||''}" data-tip="${it.tipologia||''}">
         <span class="tl-year">${it.anio||'—'}</span>
         <div class="tl-body">
           <div class="tl-titulo">${esc((it.titulo||'').slice(0,120))}</div>
           <span class="tl-res" style="color:${RES_COLOR[it.resultado]||'var(--gray)'};border:1px solid ${RES_COLOR[it.resultado]||'var(--gray)'}33;background:${RES_COLOR[it.resultado]||'var(--gray)'}14">${RES_TXT[it.resultado]||'—'}</span>
+          ${it.empuje?`<span class="emp-badge" style="color:${EMP_COLOR[it.empuje]};background:${EMP_COLOR[it.empuje]}14;border:1px solid ${EMP_COLOR[it.empuje]}44;margin-left:.4rem" title="${it.empuje==='vitrina'?'Re-radicado sin superar el 1er debate':''}">${EMP_TXT[it.empuje]||''}${it.veces_presentado>1?' '+it.veces_presentado+'×':''}</span>`:''}
+          ${it.tipologia&&it.tipologia!=='ordinaria'?`<span class="emp-badge" style="color:${TIP_COLOR[it.tipologia]};background:${TIP_COLOR[it.tipologia]}14;border:1px solid ${TIP_COLOR[it.tipologia]}44;margin-left:.35rem">${TIP_TXT[it.tipologia]||''}</span>`:''}
         </div>
       </div>`).join('');
+
+    // desglose de empuje para la tira de intención (orden fijo)
+    const empD=r.empuje||{};
+    const empChips=['exitoso','empujado','vitrina','un_debate','sin_traccion']
+      .filter(k=>empD[k]).map(k=>`<span class="ichip ichip-f" data-f="emp:${k}"><span class="emp-badge" style="color:${EMP_COLOR[k]};background:${EMP_COLOR[k]}14;border:1px solid ${EMP_COLOR[k]}44">${EMP_TXT[k]}</span><b>${empD[k]}</b></span>`).join('');
 
     results.innerHTML=`
       <div class="r-sub">Tema: <b>${esc(query)}</b> · ${r.n_intentos} intentos · ${r.periodo?r.periodo[0]+'–'+r.periodo[1]:''}</div>
@@ -302,6 +335,13 @@
         <div class="kpi ley"><div class="n">${r.n_leyes}</div><div class="l">Convertidos en ley</div></div>
         <div class="kpi"><div class="n">${r.n_caidos}</div><div class="l">Caídos</div></div>
         <div class="kpi time"><div class="n">${r.n_muerte_por_tiempo}</div><div class="l">Muertos por tiempo</div></div>
+      </div>
+
+      <div class="intencion">
+        <span class="ichip ichip-f on" data-f="all">Todos <b>${r.n_intentos}</b></span>
+        ${empChips}
+        ${r.n_honores?`<span class="ichip ichip-f" data-f="tip:honores">Honores <b>${r.n_honores}</b></span>`:''}
+        ${r.pct_vitrina?`<span class="ichip" style="border:none;color:var(--ink3)">· ${r.pct_vitrina}% de vitrina</span>`:''}
       </div>
 
       <div class="lectura">
@@ -315,10 +355,24 @@
           <div class="cob-note">Partido identificado en ${cob.con}/${cobTot} intentos (roster Congreso 2014–2026).</div></div>
       </div>
 
-      <div class="panel"><h3>Línea de intentos · ${r.n_intentos} · click para la ficha</h3><div class="tl">${tl}</div></div>
+      <div class="panel"><h3 id="tl-head">Línea de intentos · ${r.n_intentos} · click para la ficha</h3><div class="tl">${tl}</div></div>
     `;
     requestAnimationFrame(()=>{ results.querySelectorAll('.funnel-bar>span').forEach(s=>s.style.width=s.dataset.w); });
-    results.querySelectorAll('.tl-item').forEach(el=>el.onclick=()=>abrirProyecto(el.dataset.id,el.dataset.tb));
+    const tlItems=[...results.querySelectorAll('.tl-item')];
+    tlItems.forEach(el=>el.onclick=()=>abrirProyecto(el.dataset.id,el.dataset.tb));
+    // filtro clickeable: clasifica la línea de intentos por empuje/tipología
+    const tlHead=document.getElementById('tl-head');
+    results.querySelectorAll('.ichip-f').forEach(ch=>ch.onclick=()=>{
+      results.querySelectorAll('.ichip-f').forEach(x=>x.classList.remove('on'));
+      ch.classList.add('on');
+      const f=ch.dataset.f; let shown=0;
+      tlItems.forEach(it=>{
+        let ok=(f==='all');
+        if(!ok){ const p=f.split(':'); ok=(p[0]==='emp'?it.dataset.emp===p[1]:it.dataset.tip===p[1]); }
+        it.style.display=ok?'':'none'; if(ok) shown++;
+      });
+      if(tlHead) tlHead.textContent=`Línea de intentos · ${shown}${f==='all'?'':' filtrados'} · click para la ficha`;
+    });
   }
 
   function renderLectura(l){
@@ -340,7 +394,31 @@
     let f; try{ f=await call({action:'proyecto',id:Number(id),tb:tb||'pdly'}); }catch(e){ f=null; }
     if(!f||f.error){ modalCard.innerHTML='<button class="modal-close">✕</button><div class="err">No se pudo cargar la ficha.</div>'; modalCard.querySelector('.modal-close').onclick=cerrar; return; }
     const meta=(k,v)=>v?`<div class="m"><div class="k">${k}</div><div class="v">${esc(v)}</div></div>`:'';
-    const auts=(f.autores||[]).map(a=>`<div class="aut"><span>${esc(a.nombre)}</span>${a.partido?`<span class="p" style="border-color:${pcolor(a.partido)}55;color:${pcolor(a.partido)}">${esc(a.partido)}</span>`:''}</div>`).join('')||'<div class="cob-note">Sin autores registrados.</div>';
+    // autoría real: en ley ordinaria el 1º es el AUTOR y el resto firman en apoyo;
+    // en acto legislativo (≥10 firmas) todos son coautores reales (regla Ley 5ª).
+    const colectiva=f.autoria_colectiva;
+    const auts=(f.autores||[]).map(a=>{
+      const esPral=a.principal&&!colectiva;
+      const rol=colectiva?'coautor':(esPral?'autor':'firma de apoyo');
+      const rc=esPral?'var(--teal)':'var(--ink3)';
+      return `<div class="aut"><span style="${esPral?'color:var(--teal);font-weight:700':''}">${esPral?'★ ':''}${esc(a.nombre)}</span>
+        <span style="font-size:.56rem;letter-spacing:.06em;text-transform:uppercase;color:${rc}">${rol}</span>
+        ${a.partido?`<span class="p" style="border-color:${pcolor(a.partido)}55;color:${pcolor(a.partido)}">${esc(a.partido)}</span>`:''}</div>`;
+    }).join('')||'<div class="cob-note">Sin autores registrados.</div>';
+    const autNota=colectiva?'Acto legislativo · autoría colectiva: los firmantes son coautores reales.'
+      :((f.autores||[]).length>1?'★ autor principal (de quien es el proyecto) · el resto firma en apoyo para ayudar a empujarlo.':'');
+    // chips de intención de la ficha
+    const chips=[];
+    if(f.tipologia) chips.push(`<span class="tip-chip" style="color:${TIP_COLOR[f.tipologia]};border-color:${TIP_COLOR[f.tipologia]}66">${TIP_TXT[f.tipologia]||f.tipologia}</span>`);
+    if(f.empuje) chips.push(`<span class="emp-badge" style="color:${EMP_COLOR[f.empuje]};background:${EMP_COLOR[f.empuje]}14;border:1px solid ${EMP_COLOR[f.empuje]}44" title="${esc(f.empuje_txt||'')}">${EMP_TXT[f.empuje]||f.empuje}</span>`);
+    if(f.veces_presentado>1) chips.push(`<span class="ichip" style="padding:.13rem .5rem;font-size:.62rem">Re-radicado <b>${f.veces_presentado}×</b></span>`);
+    if(f.crea_fondo) chips.push(`<span class="emp-badge" style="color:var(--red);background:rgba(224,71,71,.08);border:1px solid rgba(224,71,71,.35)">Crea fondo</span>`);
+    if(f.jala_presupuesto_regional) chips.push(`<span class="emp-badge" style="color:var(--amber);background:rgba(224,160,64,.08);border:1px solid rgba(224,160,64,.35)">Jala presupuesto regional</span>`);
+    // historial de re-radicación
+    const hist=(f.historial_reradicacion||[]).filter(h=>h.anio);
+    const reradic=hist.length>1?`
+      <h3 style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin-bottom:.5rem">Re-radicaciones · misma iniciativa en ${f.veces_presentado} términos</h3>
+      <div class="reradic">${hist.map(h=>`<div class="rr"><span class="y">${h.anio}</span><span style="color:${RES_COLOR[h.res]||'var(--gray)'}">${RES_TXT[h.res]||'—'}</span><span style="color:var(--ink3)">${esc(h.leg||'')}</span></div>`).join('')}</div>`:'';
     // los documentos de ponencia/plenaria son analizables (DeepSeek lee la gaceta)
     const analizable=t=>/ponencia|plenaria|conciliacion|objeciones/.test(t||'');
     const gacs=(f.gacetas||[]).filter(g=>g.gaceta).map(g=>{
@@ -352,19 +430,54 @@
     modalCard.innerHTML=`
       <button class="modal-close">✕</button>
       <h2>${esc(f.titulo)}</h2>
+      ${chips.length?`<div class="intencion" style="margin:.3rem 0 1rem">${chips.join('')}</div>`:''}
       <div class="meta-grid">
         ${meta('N.º Senado',f.numero_senado)}${meta('N.º Cámara',f.numero_camara)}
         ${meta('Legislatura',f.legislatura)}${meta('Comisión',f.comision)}
         ${meta('Resultado',f.resultado_txt)}${meta('Llegó hasta',f.etapa_max)}
         ${meta('Presentado',f.fecha_presentacion)}${f.dias_a_primer_debate!=null?meta('Días a 1er debate',f.dias_a_primer_debate):''}
+        ${f.reloj?meta('Reloj de trámite',f.reloj.tipo==='acto_legislativo'?'Acto legislativo · 1 año, 8 debates (2 vueltas)':'Ley ordinaria · 2 legislaturas, 4 debates'):''}
       </div>
+      <button id="btn-medios" class="btn-medios">◈ Rastreo en medios · ¿tuvo controversia o impopularidad?</button>
+      <div id="medios-analisis"></div>
       <h3 style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin-bottom:.7rem">Autores</h3>
       <div class="aut-list">${auts}</div>
-      <h3 style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin-bottom:.7rem">Documentos · gacetas del Congreso · click para analizar la ponencia</h3>
+      ${autNota?`<div class="cob-note" style="margin-top:.5rem">${autNota}</div>`:''}
+      ${reradic}
+      <h3 style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin:1.1rem 0 .7rem">Documentos · gacetas del Congreso · click para analizar la ponencia</h3>
       <div class="gac-list">${gacs}</div>
       <div id="gac-analisis"></div>`;
     modalCard.querySelector('.modal-close').onclick=cerrar;
+    const bm=modalCard.querySelector('#btn-medios'); if(bm) bm.onclick=()=>rastrearMedios(f,bm);
     modalCard.querySelectorAll('.gac-click').forEach(el=>el.onclick=()=>analizarGaceta(el.dataset.key,el.dataset.tipo));
+  }
+
+  // rastreo de medios: busca prensa del proyecto → controversia/impopularidad
+  const CTRL_COLOR={si:'var(--red)',no:'var(--green)',sin_senal:'var(--gray)'};
+  const CTRL_TXT={si:'Con controversia en medios',no:'Sin controversia visible',sin_senal:'Sin señal en medios'};
+  const IMP_TXT={probable:'Probable que la impopularidad influyera en su caída',poco_probable:'Poco probable que la impopularidad lo tumbara',sin_senal:''};
+  async function rastrearMedios(f,btn){
+    const box=document.getElementById('medios-analisis'); if(!box) return;
+    if(btn) btn.disabled=true;
+    box.innerHTML=`<div class="ga-card"><div class="llm-load">Rastreando prensa sobre este proyecto <span class="dots"><span></span><span></span><span></span></span></div></div>`;
+    const anio=String(f.fecha_presentacion||f.legislatura||'').slice(0,4);
+    let d; try{ d=await call({action:'contexto',id:f.id,tb:f.tabla,titulo:f.titulo,autor:f.autor_principal,anio,numero:f.numero_senado||f.numero_camara,resultado:f.resultado_txt}); }catch(e){ d={error:'fallo de red'}; }
+    if(btn) btn.disabled=false;
+    if(!d||d.error){ box.innerHTML=`<div class="ga-card"><div class="ga-none">No se pudo rastrear medios. <span style="color:var(--ink3)">${esc((d&&d.error)||'')}</span></div></div>`; return; }
+    const cc=CTRL_COLOR[d.tuvo_controversia]||'var(--gray)';
+    const op=(d.quien_se_opuso||[]).map(x=>`<span class="op-chip">${esc(x)}</span>`).join('');
+    const fu=(d.fuentes||[]).slice(0,6).map(s=>`<a class="med-src" href="${esc(s.url)}" target="_blank" rel="noopener"><span class="ms-t">${esc(s.titulo||s.url)}</span><span class="ms-m">${esc(s.fuente||'')}${s.fecha?' · '+esc(s.fecha):''}</span></a>`).join('')||'<div class="cob-note">Sin fuentes.</div>';
+    const imp=IMP_TXT[d.murio_por_impopularidad]||'';
+    box.innerHTML=`<div class="ga-card">
+      <div class="ga-tag">◈ Rastreo en medios · IA sobre resultados de búsqueda</div>
+      <span class="ga-sent" style="color:${cc};border:1px solid ${cc}44;background:${cc}14">${CTRL_TXT[d.tuvo_controversia]||'—'}${d.nivel&&d.nivel!=='sin_senal'?' · '+esc(d.nivel):''}</span>
+      ${d.resumen?`<div class="ga-t" style="margin-top:.6rem">${esc(d.resumen)}</div>`:''}
+      ${op?`<div class="ga-h">Quién se opuso</div><div class="op-list">${op}</div>`:''}
+      ${imp?`<div class="ga-h">Muerte por tiempo · lectura</div><div class="ga-t">${esc(imp)}</div>`:''}
+      ${d.veredicto?`<div class="ga-t" style="margin-top:.5rem;color:var(--ink2)">${esc(d.veredicto)}</div>`:''}
+      ${(d.fuentes&&d.fuentes.length)?`<div class="ga-h">Titulares</div><div class="med-srcs">${fu}</div>`:''}
+      ${d.query?`<div class="cob-note" style="margin-top:.5rem">Búsqueda: ${esc(d.query)}</div>`:''}
+    </div>`;
   }
 
   // fase 3: analiza una gaceta (ponencia) vía la Lambda → ponente/sentido/argumentos

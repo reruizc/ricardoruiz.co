@@ -35,6 +35,7 @@ DIST = SRC / 'dist'
 
 sys.path.insert(0, str(REPO / 'tools' / 'caudal'))
 import normalize_autores as na  # noqa: E402
+import clasificar as cl  # noqa: E402
 
 # registro global de autores (clave→display); se llena en main() antes de enrich
 AUTOR_REG = {}
@@ -152,9 +153,12 @@ def enrich_pdly(rec):
         etapa_max = 5
     leg = rec.get('legislatura', '')
     anio = int(leg[:4]) if leg[:4].isdigit() else (fpres.year if fpres else None)
+    canon = _autores_canon(rec.get('autor', ''))
+    titulo = rec.get('titulo', '')
     return {
         'id': rec['id'],
-        'titulo': rec.get('titulo', ''),
+        'tabla': 'pdly',
+        'titulo': titulo,
         'numero_senado': rec.get('numero_senado', ''),
         'numero_camara': rec.get('numero_camara', ''),
         'legislatura': leg,
@@ -164,7 +168,10 @@ def enrich_pdly(rec):
         'tipo_de_ley': rec.get('tipo_de_ley', ''),
         'comision': rec.get('comision', ''),
         'autor_raw': rec.get('autor', ''),
-        **_autores_canon(rec.get('autor', '')),
+        **canon,
+        **cl.autoria('pdly', canon['autores'], canon['autor_tipo']),
+        **cl.clasificar_titulo(titulo),
+        'reloj': cl.reloj_de('pdly'),
         'estado': rec.get('estado', ''),
         'resultado': res,
         'es_ley': res == 'LEY',
@@ -187,18 +194,33 @@ def enrich_pal(rec):
     res = norm_resultado(rec.get('estado', ''))
     leg = rec.get('legislatura', '')
     anio = int(leg[:4]) if leg[:4].isdigit() else None
+    # etapa_max de un acto legislativo = nº de debates aprobados (hasta 8, doble
+    # vuelta). Es la señal que pide el experto para el AL "radicado cada semestre
+    # con 1 o 0 debates" (vitrina). Cuenta cualquier fecha_de_aprobacion_* válida.
+    n_debates = sum(1 for k, v in rec.items()
+                    if k.startswith('fecha_de_aprobacion') and pdate(v))
+    etapa_max = 5 if res == 'LEY' else min(n_debates, 5)
+    canon = _autores_canon(rec.get('autor', ''))
+    titulo = rec.get('titulo', '')
     return {
         'id': rec['id'], 'tabla': 'pal',
-        'titulo': rec.get('titulo', ''),
+        'titulo': titulo,
         'numero_senado': rec.get('numero_senado', ''),
         'numero_camara': rec.get('numero_camara', ''),
-        'legislatura': leg, 'anio': anio,
+        'legislatura': leg, 'cuatrienio': rec.get('cuatrenio', ''), 'anio': anio,
         'origen': rec.get('origen', ''),
+        'comision': rec.get('comision', ''),
         'autor_raw': rec.get('autor', ''),
-        **_autores_canon(rec.get('autor', '')),
+        **canon,
+        **cl.autoria('pal', canon['autores'], canon['autor_tipo']),
+        **cl.clasificar_titulo(titulo),
+        'reloj': cl.reloj_de('pal'),
         'estado': rec.get('estado', ''),
         'resultado': res, 'es_ley': res == 'LEY',
         'murio_por_tiempo': res == 'ARCHIVADO_TIEMPO',
+        'etapa_max': etapa_max, 'n_debates_aprobados': n_debates,
+        'fecha_presentacion': (pdate(rec.get('fecha_de_presentacion', '')) or '')
+                              and pdate(rec.get('fecha_de_presentacion', '')).isoformat(),
         'gacetas': extract_gacetas(rec),
     }
 
@@ -235,6 +257,18 @@ def main():
     pal = [enrich_pal(r) for r in raw_pal]
     lys = [enrich_lys(r) for r in load('lys')]
 
+    # 2) clusters de re-radicación (misma iniciativa en varios términos) →
+    #    veces_presentado + empuje/vitrina. Corre sobre pdly + pal juntos, pero
+    #    clasificar.py agrupa dentro de cada tabla.
+    clusters = cl.construir_clusters(pdly + pal)
+    for r in pdly + pal:
+        c = clusters.get((r['tabla'], r['id']), {})
+        r['veces_presentado'] = c.get('veces_presentado', 1)
+        r['empuje'] = c.get('empuje', 'sin_traccion')
+        r['vitrina_score'] = c.get('vitrina_score', 0)
+        r['cluster_id'] = c.get('cluster_id')
+        r['historial_reradicacion'] = c.get('historial', [])
+
     # registro de autores como salida propia (para el join autor→partido)
     autores_out = sorted(
         ({'key': k, 'display': v['display'], 'tipo': v['tipo'],
@@ -256,18 +290,20 @@ def main():
             f.write(json.dumps(r, ensure_ascii=False) + '\n')
 
     # índice compacto (búsqueda en memoria · frontend/Lambda) — pdly + pal
-    indice = [{
-        'id': r['id'], 'tb': 'pdly', 't': r['titulo'], 'a': r['anio'], 'leg': r['legislatura'],
-        'com': r['comision'], 'res': r['resultado'], 'ley': r['es_ley'],
-        'et': r['etapa_max'], 'aut': r['autores'][:6], 'ak': r['autores_keys'][:6],
-        'ng': len(r['gacetas']),
-    } for r in pdly] + [{
-        'id': r['id'], 'tb': 'pal', 't': r['titulo'], 'a': r['anio'], 'leg': r['legislatura'],
-        'com': '', 'res': r['resultado'], 'ley': r['es_ley'],
-        'et': 5 if r['es_ley'] else 0, 'aut': r['autores'][:6], 'ak': r['autores_keys'][:6],
-        'ng': len(r['gacetas']),
-    } for r in pal]
-    json.dump({'v': '2026-07-10', 'n': len(indice), 'proyectos': indice},
+    def _ix(r, tb):
+        return {
+            'id': r['id'], 'tb': tb, 't': r['titulo'], 'a': r['anio'],
+            'leg': r['legislatura'], 'com': r.get('comision', ''),
+            'res': r['resultado'], 'ley': r['es_ley'], 'et': r['etapa_max'],
+            'aut': r['autores'][:6], 'ak': r['autores_keys'][:6],
+            'ng': len(r['gacetas']),
+            # --- F1 (intención) ---
+            'tip': r['tipologia'], 'cf': r['crea_fondo'], 'jp': r['jala_presupuesto_regional'],
+            'emp': r['empuje'], 'vs': r['vitrina_score'], 'vp': r['veces_presentado'],
+            'ap': r.get('autor_principal'),
+        }
+    indice = [_ix(r, 'pdly') for r in pdly] + [_ix(r, 'pal') for r in pal]
+    json.dump({'v': '2026-07-11', 'n': len(indice), 'proyectos': indice},
               open(DIST / 'indice.json', 'w', encoding='utf-8'), ensure_ascii=False)
 
     # stats precalculadas
@@ -287,6 +323,32 @@ def main():
     embudo['ley'] = sum(1 for r in pdly if r['es_ley'])
     # días a primer debate
     dias = sorted(r['dias_a_primer_debate'] for r in pdly if r['dias_a_primer_debate'] is not None)
+
+    # --- F1: tipología, empuje, mortandad por año dentro del cuatrienio ---
+    tip_count = Counter(r['tipologia'] for r in pdly)
+    emp_count = Counter(r['empuje'] for r in pdly)
+    n_fondos = sum(1 for r in pdly if r['crea_fondo'])
+    n_jala = sum(1 for r in pdly if r['jala_presupuesto_regional'])
+
+    def anio_en_cuatrienio(r):
+        cu, lg = r.get('cuatrienio', ''), r.get('legislatura', '')
+        if cu[:4].isdigit() and lg[:4].isdigit():
+            k = int(lg[:4]) - int(cu[:4]) + 1
+            return k if 1 <= k <= 4 else None
+        return None
+
+    mort = defaultdict(lambda: {'total': 0, 'archivado_tiempo': 0, 'ley': 0})
+    for r in pdly:
+        k = anio_en_cuatrienio(r)
+        if k:
+            mort[k]['total'] += 1
+            mort[k]['archivado_tiempo'] += r['murio_por_tiempo']
+            mort[k]['ley'] += r['es_ley']
+    mortandad = {str(k): {**v,
+                          'pct_muerte_tiempo': round(100 * v['archivado_tiempo'] / v['total'], 1) if v['total'] else 0,
+                          'pct_ley': round(100 * v['ley'] / v['total'], 1) if v['total'] else 0}
+                 for k, v in sorted(mort.items())}
+
     stats = {
         'v': '2026-07-10', 'n_proyectos': len(pdly), 'n_leyes': len(lys),
         'resultados': dict(res_count),
@@ -300,6 +362,12 @@ def main():
         'por_comision': {k: v for k, v in sorted(
             por_comision.items(), key=lambda x: -x[1]['total'])},
         'por_anio': {str(a): dict(c) for a, c in sorted(por_anio.items())},
+        # --- F1 (intención) ---
+        'tipologia': dict(tip_count),
+        'empuje': dict(emp_count),
+        'n_crea_fondo': n_fondos,
+        'n_jala_presupuesto_regional': n_jala,
+        'mortandad_por_anio_cuatrienio': mortandad,
     }
     json.dump(stats, open(DIST / 'stats.json', 'w', encoding='utf-8'),
               ensure_ascii=False, indent=1)

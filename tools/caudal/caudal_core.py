@@ -27,6 +27,17 @@ RES_LABEL = {
     'ARCHIVADO_OTRO': 'archivado', 'RETIRADO': 'retirado por el autor',
     'EN_TRAMITE': 'en trámite', 'OTRO': 'otro', 'SIN_DATO': 'sin dato',
 }
+# F1 · lectura de intención
+EMPUJE_LABEL = {
+    'exitoso': 'llegó a ley', 'empujado': 'lo empujaron (llegó a 2º debate)',
+    'vitrina': 'proyecto de vitrina (re-radicado sin empujar)',
+    'un_debate': 'un solo debate', 'sin_traccion': 'sin tracción (1 intento, sin debate)',
+}
+TIPOLOGIA_LABEL = {
+    'honores': 'honores / conmemoración', 'fondos': 'crea un fondo',
+    'reforma': 'reforma / código', 'presupuestal': 'presupuestal regional',
+    'ordinaria': 'ordinaria',
+}
 
 
 def _norm(s):
@@ -84,8 +95,9 @@ class Caudal:
 
     # -------- búsqueda ------------------------------------------------
     def buscar(self, query, anio_min=None, anio_max=None, comision=None,
-               resultado=None, limit=None):
-        """Match por keyword(s) en el título. Devuelve ítems del índice."""
+               resultado=None, tipologia=None, empuje=None, limit=None):
+        """Match por keyword(s) en el título. Devuelve ítems del índice.
+        Filtros F1: tipologia (honores/fondos/…) y empuje (vitrina/empujado/…)."""
         terms = [_norm(t) for t in query.split() if len(t) > 2] if query else []
         out = []
         for it in self.indice:
@@ -99,6 +111,10 @@ class Caudal:
             if comision and _norm(comision) not in _norm(it['com']):
                 continue
             if resultado and it['res'] != resultado:
+                continue
+            if tipologia and it.get('tip') != tipologia:
+                continue
+            if empuje and it.get('emp') != empuje:
                 continue
             out.append(it)
         out.sort(key=lambda x: (x['a'] or 0))
@@ -134,6 +150,14 @@ class Caudal:
             else:
                 sin_p += 1
         top_bancadas = sorted(bancadas.items(), key=lambda x: -x[1])[:8]
+        # F1 · lectura de intención del tema
+        tipologia = {}
+        empuje = {}
+        for h in hits:
+            tipologia[h.get('tip', 'ordinaria')] = tipologia.get(h.get('tip', 'ordinaria'), 0) + 1
+            empuje[h.get('emp', 'sin_traccion')] = empuje.get(h.get('emp', 'sin_traccion'), 0) + 1
+        n_vitrina = empuje.get('vitrina', 0)
+        n_honores = tipologia.get('honores', 0)
         return {
             'query': query, 'n_intentos': n,
             'n_leyes': len(leyes), 'n_caidos': len(caidos),
@@ -144,11 +168,20 @@ class Caudal:
             'top_autores': top_autores,
             'bancadas': top_bancadas,
             'cobertura_partido': {'con': con_p, 'sin': sin_p},
+            # --- intención ---
+            'tipologia': dict(sorted(tipologia.items(), key=lambda x: -x[1])),
+            'empuje': dict(sorted(empuje.items(), key=lambda x: -x[1])),
+            'n_vitrina': n_vitrina, 'n_honores': n_honores,
+            'pct_vitrina': round(100 * n_vitrina / n, 1) if n else 0,
             'intentos': [{
                 'id': h['id'], 'tb': h.get('tb', 'pdly'), 'anio': h['a'], 'leg': h['leg'],
                 'titulo': h['t'], 'resultado': h['res'],
                 'resultado_txt': RES_LABEL.get(h['res'], h['res']),
-                'autores': h.get('aut', []),
+                'autores': h.get('aut', []), 'autor_principal': h.get('ap'),
+                'tipologia': h.get('tip'), 'empuje': h.get('emp'),
+                'empuje_txt': EMPUJE_LABEL.get(h.get('emp'), h.get('emp')),
+                'vitrina_score': h.get('vs', 0), 'veces_presentado': h.get('vp', 1),
+                'crea_fondo': h.get('cf', False), 'jala_presupuesto': h.get('jp', False),
             } for h in hits],
         }
 
@@ -158,14 +191,34 @@ class Caudal:
         r = full.get(f"{tb}:{int(pid)}") or full.get(f"pdly:{int(pid)}") or full.get(f"pal:{int(pid)}")
         if not r:
             return None
-        autores = [{'nombre': n, 'partido': (self.ap.get(k) or {}).get('partido')}
-                   for n, k in zip(r.get('autores', []), r.get('autores_keys', []))]
+        keys = r.get('autores_keys', [])
+        principal = r.get('autor_principal')
+        autores = [{'nombre': n, 'partido': (self.ap.get(k) or {}).get('partido'),
+                    'principal': (n == principal)}
+                   for n, k in zip(r.get('autores', []), keys)]
         et = r.get('etapa_max')
+        emp = r.get('empuje')
         return {
             'id': r['id'], 'tabla': r.get('tabla', tb), 'titulo': r.get('titulo', ''),
             'numero_senado': r.get('numero_senado', ''), 'numero_camara': r.get('numero_camara', ''),
             'legislatura': r.get('legislatura', ''), 'comision': r.get('comision', ''),
             'autores': autores,
+            # --- F1: autoría real ---
+            'autor_principal': principal,
+            'coautores': r.get('coautores', []),
+            'n_firmantes': r.get('n_firmantes', len(autores)),
+            'autoria_colectiva': r.get('autoria_colectiva', False),
+            'autor_tipo': r.get('autor_tipo'), 'entidad': r.get('entidad'),
+            # --- F1: tipología + intención ---
+            'tipologia': r.get('tipologia'),
+            'tipologia_txt': TIPOLOGIA_LABEL.get(r.get('tipologia')),
+            'crea_fondo': r.get('crea_fondo', False),
+            'jala_presupuesto_regional': r.get('jala_presupuesto_regional', False),
+            'empuje': emp, 'empuje_txt': EMPUJE_LABEL.get(emp, emp),
+            'vitrina_score': r.get('vitrina_score', 0),
+            'veces_presentado': r.get('veces_presentado', 1),
+            'historial_reradicacion': r.get('historial_reradicacion', []),
+            'reloj': r.get('reloj'),
             'resultado': r.get('resultado'), 'resultado_txt': RES_LABEL.get(r.get('resultado')),
             'etapa_max': ETAPA_LABEL[et] if isinstance(et, int) and 0 <= et < len(ETAPA_LABEL) else None,
             'fecha_presentacion': r.get('fecha_presentacion'),
@@ -189,6 +242,10 @@ def _cli():
               f"{r['n_leyes']} leyes ({r['pct_exito']}%)  ·  "
               f"{r['n_caidos']} caídos ({r['n_muerte_por_tiempo']} por tiempo)  ·  "
               f"periodo {r['periodo']}")
+        print(f"\nIntención:  {r['n_vitrina']} de vitrina ({r['pct_vitrina']}%)  ·  "
+              f"{r['n_honores']} de honores")
+        print('  empuje:  ' + '  '.join(f"{v}×{EMPUJE_LABEL.get(k,k).split('(')[0].strip()}" for k, v in r['empuje'].items()))
+        print('  tipo:    ' + '  '.join(f"{v}×{k}" for k, v in r['tipologia'].items()))
         print('\nEmbudo:')
         for et, n in r['embudo'].items():
             print(f"  {n:4}  {et}")
