@@ -123,6 +123,20 @@ def _num_token(num):
     return f'{int(m.group(1))}/{m.group(2)}' if m else None
 
 
+_VOTAC = None
+
+
+def _votaciones():
+    """Capa de outcome (Congreso Visible): debates/aplazamientos/votos. Cache warm."""
+    global _VOTAC
+    if _VOTAC is None:
+        try:
+            _VOTAC = _get_json('metadata/votaciones.json')
+        except Exception:
+            _VOTAC = {'por_proyecto': {}}
+    return _VOTAC
+
+
 # --- LLM (ruteo por paso) ---------------------------------------------------
 def _hash24(s):
     return hashlib.sha256(s.encode('utf-8')).hexdigest()[:24]
@@ -447,11 +461,17 @@ def handler(event, context):
         if not ficha:
             return _resp(404, {'error': f'proyecto {pid} no encontrado'})
         # bloqueo por número Cámara (órdenes del día de comisión)
-        tok = _num_token(ficha.get('numero_camara'))
-        if tok:
-            bl = _bloqueo().get('por_proyecto', {}).get(tok)
+        tok_c = _num_token(ficha.get('numero_camara'))
+        if tok_c:
+            bl = _bloqueo().get('por_proyecto', {}).get(tok_c)
             if bl:
                 ficha['bloqueo'] = bl
+        # outcome (Congreso Visible): match por número Senado o Cámara
+        vp = _votaciones().get('por_proyecto', {})
+        for tk in (_num_token(ficha.get('numero_senado')), tok_c):
+            if tk and tk in vp:
+                ficha['votaciones'] = vp[tk]
+                break
         return _resp(200, ficha)
 
     if action == 'gaceta':

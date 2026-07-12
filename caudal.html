@@ -226,6 +226,10 @@
   .bloq-card{background:linear-gradient(180deg,rgba(224,160,58,.09),transparent); border:1px solid rgba(224,160,58,.3); border-radius:9px; padding:1.1rem 1.2rem; margin:1rem 0}
   .bloq-big{font-size:1rem; color:var(--ink); margin:.5rem 0}
   .bloq-big b{font-size:1.35rem; font-weight:800; color:var(--amber)}
+  .vt-list{display:flex; flex-direction:column; gap:.32rem; margin:.6rem 0; max-height:260px; overflow-y:auto}
+  .vt-row{display:flex; gap:.5rem; align-items:center; font-size:.72rem}
+  .vt-y{color:var(--ink3); min-width:3.6rem; flex-shrink:0}
+  .vt-m{color:var(--ink2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 
   /* modal proyecto */
   .modal{position:fixed; inset:0; z-index:800; background:rgba(4,7,11,.72); backdrop-filter:blur(4px); display:none; align-items:flex-start; justify-content:center; padding:4vh 1rem; overflow-y:auto}
@@ -668,6 +672,14 @@
       <div class="ga-t">Posición promedio en la agenda del día: <b>${bl.pos_prom}</b> · entre ${mesAno(bl.primera)} y ${mesAno(bl.ultima)}</div>
       <div class="cob-note">Veces que se puso en el orden del día de la comisión. Muchos agendamientos sin avanzar = lo dejaban esperando en la cola (bloqueo).</div>
     </div>`:'';
+    const vt=f.votaciones;
+    const VTC={aplazamiento:'var(--amber)',archivo:'var(--red)',aprobado:'var(--green)',negado:'var(--red)',otro:'var(--gray)'};
+    const votacHTML=vt?`<div class="bloq-card" style="border-color:rgba(61,111,255,.28);background:linear-gradient(180deg,rgba(61,111,255,.07),transparent)">
+      <div class="ga-tag" style="color:var(--teal)">◈ Trámite · debates y votaciones · Congreso Visible</div>
+      <div class="bloq-big" style="font-size:.92rem"><b style="color:var(--teal);font-size:1.35rem">${vt.n_votaciones}</b> votaciones · ${vt.aplazamientos} aplazamiento(s) · ${vt.archivos} archivo(s) · ${vt.aprobados} aprobación(es)</div>
+      <div class="vt-list">${(vt.votaciones||[]).slice(0,12).map(x=>`<div class="vt-row"><span class="vt-y">${(x.fecha||'').slice(0,7)}</span><span class="emp-badge" style="color:${VTC[x.tipo]||'var(--gray)'};background:${(VTC[x.tipo]||'var(--gray)')}14;border:1px solid ${(VTC[x.tipo]||'var(--gray)')}44">${x.tipo}</span><span class="vt-m">${esc(x.donde||'')} · ${esc((x.motivo||'').slice(0,52))}${x.favor!=null?` · <b style="color:var(--ink)">${x.favor}–${x.contra}</b>`:''}</span></div>`).join('')}</div>
+      <div class="cob-note">Congreso Visible · 2006–2022. El voto nominal por congresista y el cuatrienio actual (parse de gacetas) quedan pendientes.</div>
+    </div>`:'';
     const reradic=hist.length>1?`
       <h3 style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin-bottom:.5rem">Re-radicaciones · misma iniciativa en ${f.veces_presentado} términos</h3>
       <div class="reradic">${hist.map(h=>`<div class="rr"><span class="y">${h.anio}</span><span style="color:${RES_COLOR[h.res]||'var(--gray)'}">${RES_TXT[h.res]||'—'}</span><span style="color:var(--ink3)">${esc(h.leg||'')}</span></div>`).join('')}</div>`:'';
@@ -696,6 +708,7 @@
       <div class="aut-list">${auts}</div>
       ${autNota?`<div class="cob-note" style="margin-top:.5rem">${autNota}</div>`:''}
       ${bloqHTML}
+      ${votacHTML}
       ${reradic}
       <h3 style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin:1.1rem 0 .7rem">Documentos · gacetas del Congreso · click para analizar la ponencia</h3>
       <div class="gac-list">${gacs}</div>
