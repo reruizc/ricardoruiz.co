@@ -4754,10 +4754,27 @@ Cauce = el cuerpo de datos legislativos). Vive en `tools/caudal/`.
   · `gacetas-texto/*` · `analisis-cache/{hash}.json`. **Frontend NO lee el bucket
   directo — habla con la Lambda.**
 
-**Estado (2026-07-11):** ✅ bucket privado `caudal-legislativo` creado + dataset
-enriquecido subido a `metadata/` (proyectos, actos-legis, leyes, indice, autores,
-stats) + respaldo crudo en `raw/`. Privado verificado (403 anónimo). ✅ Autores
-normalizados/deduplicados. ✅ **Lambda `caudal-analiza` desplegada** (data path vivo).
+**Estado (2026-07-11) · LISTO y en producción — handoff:**
+- 🔗 **En vivo:** `https://ricardoruiz.co/caudal.html` (gated, whitelist `reruizc@gmail.com`;
+  card en `dashboard.html` grupo encargos). GitHub Pages desde main.
+- ✅ Histórico cosechado (13.172 registros, 1990-2026) → `Bases de datos/leyes-senado/`.
+- ✅ Dataset enriquecido (`build_dataset.py` → `dist/`) + **autores normalizados**
+  (`normalize_autores.py`, 6.354 personas) + **join autor→partido** (`build_roster.py`,
+  67% ponderado) → `autor-partido.json` → bancadas por tema.
+- ✅ **Bucket privado `caudal-legislativo`** (403 anónimo) con `metadata/*` + `gacetas-texto/*`.
+- ✅ **Lambda `caudal-analiza`** desplegada (`POST https://l3kmprdjkl.execute-api.us-east-1.amazonaws.com`),
+  model-agnostic (DeepSeek V4 default, switch a Claude por env var), `DEEPSEEK_API_KEY` seteada.
+  Acciones: `tema` (embudo+bancadas+lectura LLM) · `buscar` · `proyecto` (ficha) · `gaceta` (fase 3).
+- ✅ **Frontend `caudal.html`** (sistema visual v2: Helvetica, azul #060810) con búsqueda,
+  embudo, bancadas, lectura del analista y ficha con análisis de ponencia por IA.
+- ✅ **Fase 3 piloto** verificado (Gaceta 857/2013 feminicidio → ponente/sentido/argumentos).
+- 🔜 **Pendiente:** automatizar descarga de gacetas (hoy semi-manual por Chrome + gotcha
+  macOS TCC ~/Downloads) · OCR gacetas escaneadas 90-2005 · pre-poblar `gacetas-texto/`
+  de temas frecuentes. NADA bloquea el pitch — el producto ya se demuestra completo.
+- **Reglas:** deploy = `git push origin HEAD:main`. Redeploy Lambda:
+  `python3 tools/caudal/lambda/build_zip.py && aws lambda update-function-code --function-name caudal-analiza --zip-file fileb://tools/caudal/lambda/caudal-analiza.zip`.
+  Regenerar dataset: `harvest.py dataset` → `build_dataset.py` → `build_roster.py --reuse`
+  → subir `dist/*` a `s3://caudal-legislativo/metadata/`.
 
 **Lambda `caudal-analiza` (LISTO · data path)** — `tools/caudal/lambda/`:
 - `lambda_handler.py` envuelve `caudal_core` (inyecta índice/registros desde S3, no
