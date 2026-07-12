@@ -29,11 +29,10 @@ COMISIONES = {'primera': 183, 'segunda': 184, 'tercera': 248, 'cuarta': 249,
               'quinta': 250, 'sexta': 251, 'septima': 252, 'mujer': 266}
 PROJ_RE = re.compile(r'\b(\d{1,4})\s*/\s*(?:20)?(\d{2})\b')
 PDF_RE = re.compile(r'(?:href|src)="([^"]+\.pdf)"', re.I)
-# bloque completo del proyecto en el orden del día: número + año + título
-PROJ_TITLE_RE = re.compile(
-    r'Proyecto de (?:Ley|Acto Legislativo)\s*(?:Org[áa]nica\s*)?(?:No\.?|N[°º]\.?)?\s*'
-    r'(\d{1,4})\s*de\s*(20\d{2})\s*C[áa]mara\s*[“"«]?\s*(.+?)\s*[”"»]?\s*'
-    r'(?:Autor|Ponente|Comisi|Proyecto de)', re.I | re.S)
+# bloque del proyecto en el orden del día: número + año + título (entre comillas)
+PROJ_BLOCK_RE = re.compile(
+    r'Proyecto de (?:Ley|Acto Legislativo)(?:\s+Org[aá]nica)?[^0-9"“]{0,25}'
+    r'(\d{1,4})\s*de\s*(20\d{2})[^"“]{0,18}["“](.+?)["”]', re.I | re.S)
 
 
 def curl(url, out=None):
@@ -110,9 +109,9 @@ def main():
         eventos = eventos[:limit]
     print(f'  {len(eventos)} sesiones')
 
-    agend = defaultdict(list)          # token proyecto → [fechas de sesión]
+    agend = defaultdict(list)          # token → [{fecha, pos, n_dia}]
     titulos = {}                       # token → título (del propio orden del día)
-    n_pdf = 0
+    n_pdf, n_ok = 0, 0
     for i, ev in enumerate(eventos):
         url = pdf_url(ev)
         if not url:
@@ -131,53 +130,51 @@ def main():
             txt = extract_text(str(fn))
             tf.write_text(txt, encoding='utf-8')
             n_pdf += 1
-        # un mismo proyecto puede repetirse en la misma sesión → set por sesión
-        seen = set()
-        for m in PROJ_RE.finditer(txt):
-            tok = norm(m.group(1), m.group(2))
-            if tok not in seen:
-                agend[tok].append(fecha); seen.add(tok)
-        for m in PROJ_TITLE_RE.finditer(txt):
+        # el orden del día trae 2 listas: la AGENDA de debate (arriba) y el
+        # "Anuncio de proyectos" (abajo, para la próxima sesión). Para la posición
+        # real en la cola de debate, cortamos en el anuncio.
+        body = re.split(r'anuncio\s+de\s+proyecto', txt, maxsplit=1, flags=re.I)[0]
+        # lista ordenada de proyectos únicos (por 1ª aparición) → posición
+        orden, seen = [], set()
+        for m in PROJ_BLOCK_RE.finditer(body):
             tok = norm(m.group(1), m.group(2)[-2:])
             t = re.sub(r'\s+', ' ', m.group(3)).strip(' "“”«»')
-            if tok not in titulos and 12 <= len(t) <= 160:
+            if 12 <= len(t) <= 180 and tok not in titulos:
                 titulos[tok] = t
+            if tok not in seen:
+                seen.add(tok); orden.append(tok)
+        if orden:
+            n_ok += 1
+        n_dia = len(orden)
+        for pos, tok in enumerate(orden, 1):
+            agend[tok].append({'fecha': fecha, 'pos': pos, 'n_dia': n_dia})
         if (i + 1) % 50 == 0:
             print(f'  …{i + 1}/{len(eventos)}')
 
-    # índice de agendamientos
-    index = {tok: {'n': len(set(f)), 'fechas': sorted(set(f))}
-             for tok, f in agend.items()}
-    # cruce con debates efectivos del dataset
-    camara = load_numero_camara_map()
-    ETAPA = ['presentado', '1er debate Senado', '2º debate Senado',
-             '1er debate Cámara', '2º debate Cámara', 'ley']
-    rows = []
-    for tok, info in index.items():
-        r = camara.get(tok)
-        titulo = (r.get('titulo') if r else None) or titulos.get(tok) or '(sin título)'
-        rows.append({
-            'num_camara': tok, 'agendado': info['n'],
-            'primera': info['fechas'][0], 'ultima': info['fechas'][-1],
-            'titulo': titulo[:75],
-            'etapa_max': (r or {}).get('etapa_max'),
-            'etapa_txt': ETAPA[r['etapa_max']] if r and isinstance(r.get('etapa_max'), int) else '—',
-            'resultado': (r or {}).get('resultado') if r else None,
-            'en_dataset': bool(r),
-        })
-    rows.sort(key=lambda x: -x['agendado'])
+    # índice de agendamientos por proyecto
+    index = {}
+    for tok, evs in agend.items():
+        evs.sort(key=lambda e: e['fecha'])
+        index[tok] = {
+            'titulo': titulos.get(tok, ''), 'n': len(evs),
+            'primera': evs[0]['fecha'], 'ultima': evs[-1]['fecha'],
+            'fechas': [e['fecha'] for e in evs],
+            'posiciones': [e['pos'] for e in evs],
+        }
+    rows = sorted(index.items(), key=lambda kv: -kv[1]['n'])
 
     out = {'comision': com, 'com_id': com_id, 'n_sesiones': len(eventos),
-           'n_proyectos_agendados': len(index), 'agendamientos': index,
-           'cruce': rows}
+           'n_sesiones_con_proyectos': n_ok,
+           'n_proyectos_agendados': len(index), 'agendamientos': index}
     outf = CACHE / f'agendamientos-{com}.json'
     json.dump(out, open(outf, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 
-    print(f'\n  {n_pdf} PDFs nuevos · {len(index)} proyectos distintos agendados · {len(titulos)} con título')
+    print(f'\n  {n_pdf} PDFs nuevos · {n_ok} sesiones con proyectos · '
+          f'{len(index)} proyectos distintos · {len(titulos)} con título')
     print(f'  → {outf.relative_to(REPO)}')
-    print('\n  BLOQUEO · proyectos más AGENDADOS en Comisión Primera:')
-    for r in rows[:15]:
-        print(f'  {r["agendado"]:>3}×  {r["num_camara"]:>9}  {r["titulo"][:66]}')
+    print('\n  Proyectos más AGENDADOS (nº veces en orden del día):')
+    for tok, info in rows[:15]:
+        print(f'  {info["n"]:>3}×  [{info["primera"]}→{info["ultima"]}]  {tok:>8}  {info["titulo"][:52]}')
 
 
 if __name__ == '__main__':
