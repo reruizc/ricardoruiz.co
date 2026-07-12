@@ -206,6 +206,18 @@
   .tl-scroll{max-height:440px; overflow-y:auto; padding-right:.3rem}
   .tl-tags{display:flex; flex-wrap:wrap; gap:.35rem; margin-top:.45rem; align-items:center}
 
+  /* info tooltip (ⓘ) */
+  .info-i{display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; border:1px solid var(--ink3); border-radius:50%; font-size:.62rem; font-style:italic; font-weight:800; color:var(--ink3); cursor:none; position:relative; flex-shrink:0; vertical-align:middle}
+  .info-i:hover{border-color:var(--teal); color:var(--teal)}
+  .info-pop{position:absolute; top:135%; left:0; z-index:60; width:min(300px,78vw); background:var(--bg2); border:1px solid var(--border2); border-radius:9px; padding:.85rem .95rem; font-size:.7rem; line-height:1.5; color:var(--ink2); box-shadow:0 10px 28px rgba(0,0,0,.45); display:none; text-align:left; letter-spacing:normal; text-transform:none; font-style:normal; font-weight:400}
+  .info-i.open .info-pop{display:block}
+  .info-pop .row{margin-bottom:.42rem} .info-pop .row:last-child{margin-bottom:0}
+  .info-pop b{color:var(--ink); font-weight:700}
+
+  /* landing (pre-búsqueda) */
+  #landing{margin-top:2rem}
+  .land-h{font-size:.66rem; letter-spacing:.16em; text-transform:uppercase; color:var(--ink3); text-align:center; margin-bottom:1rem}
+
   /* modal proyecto */
   .modal{position:fixed; inset:0; z-index:800; background:rgba(4,7,11,.72); backdrop-filter:blur(4px); display:none; align-items:flex-start; justify-content:center; padding:4vh 1rem; overflow-y:auto}
   .modal.on{display:flex}
@@ -276,6 +288,7 @@
       <div class="chips" id="chips"></div>
     </div>
 
+    <div id="landing"></div>
     <div id="results"></div>
 
     <div class="foot">
@@ -295,7 +308,13 @@
   /* ---------- cursor ---------- */
   const cur=document.getElementById('cur'), ring=document.getElementById('curRing');
   addEventListener('mousemove',e=>{cur.style.left=ring.style.left=e.clientX+'px'; cur.style.top=ring.style.top=e.clientY+'px';});
-  addEventListener('mouseover',e=>{const h=e.target.closest('button,a,.chip,.tl-item,input,.modal-close'); ring.style.opacity=h?'1':'.5'; ring.style.transform=`translate(-50%,-50%) scale(${h?1.4:1})`;});
+  addEventListener('mouseover',e=>{const h=e.target.closest('button,a,.chip,.tl-item,input,.modal-close,.info-i'); ring.style.opacity=h?'1':'.5'; ring.style.transform=`translate(-50%,-50%) scale(${h?1.4:1})`;});
+  // tooltips ⓘ: toggle al click; cierra al clickear afuera
+  addEventListener('click',e=>{
+    const i=e.target.closest('.info-i');
+    document.querySelectorAll('.info-i.open').forEach(x=>{ if(x!==i) x.classList.remove('open'); });
+    if(i){ i.classList.toggle('open'); e.stopPropagation(); }
+  });
 
   /* ---------- gate ---------- */
   const token=localStorage.getItem('rr-token'); const uRaw=localStorage.getItem('rr-user');
@@ -338,6 +357,7 @@
     const b=document.getElementById('mort-box');
     if(b&&STATS){ b.innerHTML=mortandadChart(STATS.mortandad_por_anio_cuatrienio);
       requestAnimationFrame(()=>b.querySelectorAll('.mort-bar').forEach(s=>s.style.height=s.dataset.h+'%')); }
+    if(STATS) renderLanding(STATS);
     return STATS; }
 
   // --- chart builders (CSS puro, sin librerías) ---
@@ -345,8 +365,52 @@
     const cnt={}; intentos.forEach(it=>{ if(it.anio) cnt[it.anio]=(cnt[it.anio]||0)+1; });
     const ys=Object.keys(cnt).map(Number).sort((a,b)=>a-b);
     if(!ys.length) return '<div class="cob-note">Sin años registrados.</div>';
-    const max=Math.max(...ys.map(y=>cnt[y]));
-    return `<div class="ybars">${ys.map(y=>`<div class="yb" title="${y}: ${cnt[y]} intento(s)"><div class="yb-wrap"><div class="yb-bar" data-h="${Math.round(100*cnt[y]/max)}"><span>${cnt[y]}</span></div></div><div class="yb-lab">'${String(y).slice(2)}</div></div>`).join('')}</div>`;
+    let bars;
+    if(ys[ys.length-1]-ys[0] > 15){
+      // >15 años: aglutina por lustros los años ≤2022; deja sueltos 2023–2026
+      const bk={};
+      ys.forEach(y=>{
+        if(y>=2023){ bk['y'+y]={from:y,to:y,n:cnt[y],single:true}; }
+        else{ const base=Math.floor(y/5)*5; const k='b'+base;
+          if(!bk[k]) bk[k]={from:base,to:Math.min(base+4,2022),n:0,single:false};
+          bk[k].n+=cnt[y]; }
+      });
+      bars=Object.values(bk).sort((a,b)=>a.from-b.from).map(b=>({
+        n:b.n,
+        lab:b.single?("'"+String(b.from).slice(2)):("'"+String(b.from).slice(2)+"–"+String(b.to).slice(2)),
+        title:b.single?(b.from+': '+b.n+' intento(s)'):(b.from+'–'+b.to+': '+b.n+' intento(s)'),
+      }));
+    } else {
+      bars=ys.map(y=>({n:cnt[y], lab:"'"+String(y).slice(2), title:y+': '+cnt[y]+' intento(s)'}));
+    }
+    const max=Math.max(...bars.map(b=>b.n));
+    return `<div class="ybars">${bars.map(b=>`<div class="yb" title="${b.title}"><div class="yb-wrap"><div class="yb-bar" data-h="${Math.round(100*b.n/max)}"><span>${b.n}</span></div></div><div class="yb-lab">${b.lab}</div></div>`).join('')}</div>`;
+  }
+  // tooltips de categorías (ⓘ)
+  const EMP_INFO=`<div class="row"><b>Ley</b> — llegó a convertirse en ley.</div><div class="row"><b>Empujado</b> — no es ley, pero superó el 2º debate: alguien lo movió de verdad.</div><div class="row"><b>Vitrina</b> — re-radicado en varios términos sin pasar del 1er debate: se radica para figurar, no para empujarlo.</div><div class="row"><b>1 debate</b> — alcanzó un solo debate y ahí quedó.</div><div class="row"><b>Sin tracción</b> — un solo intento, sin ningún debate.</div>`;
+  const EMBUDO_INFO=`<div class="row">Cada fila es una <b>fase del trámite</b>, en orden: presentado → 1º y 2º debate en Senado → 1º y 2º debate en Cámara → ley.</div><div class="row">El <b>↓ %</b> dice cuántos <b>sobreviven</b> de una fase a la siguiente — ahí se ve dónde se cae el tema.</div>`;
+  function infoIcon(html){ return `<span class="info-i">i<span class="info-pop">${html}</span></span>`; }
+  const fmt=n=>String(n==null?'—':n).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+
+  // landing pre-búsqueda: totales del histórico + mortandad + composición
+  function renderLanding(s){
+    const el=document.getElementById('landing'); if(!el||!s) return;
+    const vit=(s.empuje&&s.empuje.vitrina)||0;
+    el.innerHTML=`
+      <div class="land-h">El histórico del Congreso en números · 1990–2026</div>
+      <div class="kpis">
+        <div class="kpi"><div class="n">${fmt(s.n_proyectos)}</div><div class="l">Proyectos de ley</div></div>
+        <div class="kpi"><div class="n">${fmt(s.n_actos)}</div><div class="l">Actos legislativos</div></div>
+        <div class="kpi ley"><div class="n">${fmt(s.n_leyes)}</div><div class="l">Leyes sancionadas</div></div>
+        <div class="kpi vit"><div class="n">${fmt(vit)}</div><div class="l">Proyectos de vitrina</div></div>
+      </div>
+      <div class="charts">
+        <div class="panel"><h3>Mortandad por año de cuatrienio ${infoIcon('<div class="row">De los proyectos presentados en cada año del periodo de 4 años, qué % murió por vencimiento de términos (Art. 190).</div>')}</h3><div id="mort-land">${mortandadChart(s.mortandad_por_anio_cuatrienio)}</div></div>
+        <div class="panel"><h3>Composición del histórico</h3>
+          <div class="seg-sub">Tipo de proyecto</div>${segBar(s.tipologia,TIP_COLOR,TIP_TXT)}
+          <div class="seg-sub">Empuje ${infoIcon(EMP_INFO)}</div>${segBar(s.empuje,EMP_COLOR,EMP_TXT)}</div>
+      </div>`;
+    requestAnimationFrame(()=>el.querySelectorAll('.mort-bar').forEach(x=>x.style.height=x.dataset.h+'%'));
   }
   function funnel(embudo){
     const ks=Object.keys(embudo||{}); if(!ks.length) return ''; const max=embudo[ks[0]]||1; let prev=null;
@@ -410,6 +474,7 @@
   async function buscar(){
     const query=q.value.trim(); if(!query) return;
     const mine=++_seq;
+    const landing=document.getElementById('landing'); if(landing) landing.style.display='none';
     results.style.display='block';
     results.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Consultando el histórico <span class="dots"><span></span><span></span><span></span></span></div>';
     results.scrollIntoView({behavior:'smooth',block:'start'});
@@ -469,6 +534,7 @@
 
       <div class="intencion">
         <span class="ichip ichip-f on" data-f="all">Todos <b>${r.n_intentos}</b></span>
+        ${infoIcon(EMP_INFO)}
         ${empChips}
         ${r.n_honores?`<span class="ichip ichip-f" data-f="tip:honores">Honores <b>${r.n_honores}</b></span>`:''}
         ${r.pct_vitrina?`<span class="ichip" style="border:none;color:var(--ink3)">· ${r.pct_vitrina}% de vitrina</span>`:''}
@@ -479,7 +545,7 @@
         <div id="lectura-body"><div class="llm-load">Generando lectura <span class="dots"><span></span><span></span><span></span></span></div></div>
       </div>
 
-      <div class="panel wide" style="margin-bottom:1.2rem"><h3>Embudo del trámite · cómo cae en cada fase</h3>${funnel(emb)}</div>
+      <div class="panel wide" style="margin-bottom:1.2rem"><h3>Embudo del trámite · cómo cae en cada fase ${infoIcon(EMBUDO_INFO)}</h3>${funnel(emb)}</div>
 
       <div class="charts">
         <div class="panel"><h3>Intentos presentados por año</h3>${yearBars(intentos)}</div>

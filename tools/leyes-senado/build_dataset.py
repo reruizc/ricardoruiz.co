@@ -350,7 +350,8 @@ def main():
                  for k, v in sorted(mort.items())}
 
     stats = {
-        'v': '2026-07-10', 'n_proyectos': len(pdly), 'n_leyes': len(lys),
+        'v': '2026-07-10', 'n_proyectos': len(pdly), 'n_actos': len(pal),
+        'n_leyes': len(lys),
         'resultados': dict(res_count),
         'embudo': embudo,
         'dias_a_primer_debate': {
