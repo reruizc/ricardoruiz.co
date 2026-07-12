@@ -421,10 +421,18 @@ function renderPanel(){
     setK('k3',fmt(total),'Votos válidos');
     setK('k4','—','—');
     const cm=colorMap(curElec);
+    // cada candidato lleva color: ganador de puesto → su color del mapa;
+    // resto → color de su partido; sin partido reconocido → paleta neutral
+    // (nunca gris plano). Los neutrales no chocan con los ya usados.
+    const NEU=['#f0a04b','#b07fd8','#3fb5c9','#e8c34a','#cd7f52','#7ec95c'];
+    const used=new Set(Object.values(cm).map(v=>css(v.color)));
+    let ni=0;
     let bars=''; const shown=nac.slice(0,6);
     for(const c of shown){
       const pct=100*c.votos/total;
-      const col = cm[c.can]? css(cm[c.can].color) : '#b7b0a2';
+      let col = cm[c.can] ? css(cm[c.can].color) : partyColor(c.par);
+      if(!col){ while(used.has(NEU[ni%NEU.length])) ni++; col=NEU[ni%NEU.length]; used.add(col); ni++; }
+      else used.add(col);
       bars+=`<div class="bar-row"><div class="top"><span class="nm">${c.des}</span><span class="pct">${pct.toFixed(1)}%</span></div><div class="par">${c.par}</div><div class="track"><span style="width:${pct}%;background:${col}"></span></div></div>`;
     }
     document.getElementById('bars').innerHTML=bars;
