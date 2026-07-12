@@ -116,8 +116,10 @@ h1{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-
 .gate-tag{font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--blue-light);margin-bottom:.5rem;font-weight:500}
 .gate-title{font-weight:700;font-size:1.25rem;letter-spacing:-.02em;margin-bottom:.5rem}
 .gate-desc{font-size:.88rem;line-height:1.55;color:rgba(244,243,239,.7);margin-bottom:.9rem}
-.gate-price{font-weight:700;font-size:1.3rem;letter-spacing:-.02em}
-.gate-price-sub{font-size:.72rem;color:var(--muted);margin-bottom:1rem}
+.gate-benefits{list-style:none;margin:0 0 1rem;padding:0}
+.gate-benefits li{position:relative;padding:.32rem 0 .32rem 1.5rem;font-size:.86rem;line-height:1.4;color:var(--white);border-top:1px solid rgba(255,255,255,.07)}
+.gate-benefits li:first-child{border-top:none}
+.gate-benefits li::before{content:'✓';position:absolute;left:0;top:.32rem;color:#4ade80;font-weight:700}
 .gate-ctas{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin-top:.9rem}
 .gate-cta-primary{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-decoration:none;background:var(--blue);border:1.5px solid var(--blue);padding:.5rem 1rem;white-space:nowrap;transition:background .2s}
 .gate-cta-primary:hover{background:#0035cc}
@@ -207,10 +209,9 @@ h1{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-
     <div class="gate-tag" id="gate-tag"></div>
     <div class="gate-title" id="gate-title"></div>
     <div class="gate-desc" id="gate-desc"></div>
-    <div class="gate-price" id="gate-price" style="display:none"></div>
-    <div class="gate-price-sub" id="gate-price-sub" style="display:none"></div>
+    <ul class="gate-benefits" id="gate-benefits"></ul>
     <div class="gate-ctas">
-      <a class="gate-cta-primary" id="gate-cta-primary" href="pricing.html">Ver planes</a>
+      <a class="gate-cta-primary" id="gate-cta-primary" href="pricing.html">Quiero suscribirme</a>
       <a class="gate-cta-login" id="gate-cta-login" href="login.html" style="display:none">Ya tengo cuenta</a>
     </div>
   </div>
@@ -486,9 +487,16 @@ const FEATURE_COPY = {
   'puestos':       { title:'Capa de puestos de votación', desc:'Superponer los 26 puestos de votación sobre el mapa —ubicación y tamaño del censo de cada uno— está disponible en el plan Premium.' },
   'descarga-base': { title:'Descargar la base por puesto (Excel)', desc:'La base completa de Tunja — 26 puestos × 6 elecciones con ganador, partido, votos, censo y mesas, en un Excel con tablas formateadas — se descarga en el plan Premium.' },
 };
-const PLAN_PRICE = {
-  pro:     { cop:'$39.900 COP', sub:'al mes · cancela cuando quieras' },
-  premium: { cop:'$99.900 COP', sub:'al mes · incluye descargas de bases' },
+// beneficios por plan (sin precios: invitamos a suscribirse mostrando qué desbloquea)
+const PLAN_BENEFITS = {
+  pro: [
+    'Todo el histórico de alcaldías 2011–2019, puesto por puesto',
+    'Modo Intensidad para comparar la fuerza del ganador en cada barrio',
+  ],
+  premium: [
+    'Capa de puestos de votación sobre el mapa',
+    'Descarga de las bases en Excel + todo lo del plan Pro',
+  ],
 };
 function loadUserFromStorage(){
   try{
@@ -515,13 +523,14 @@ function openBlockedModal(feat){
   document.getElementById('gate-tag').textContent = isAnon ? 'Crea tu cuenta' : `Disponible en ${PLAN_LABEL[needed]}`;
   document.getElementById('gate-title').textContent = copy.title;
   document.getElementById('gate-desc').textContent = copy.desc;
-  const pe=document.getElementById('gate-price'), ps=document.getElementById('gate-price-sub');
-  const p = PLAN_PRICE[needed];
-  if(p){ pe.textContent=p.cop; ps.textContent=p.sub; pe.style.display=ps.style.display=''; }
-  else { pe.style.display=ps.style.display='none'; }
+  // beneficios del plan (sin precios)
+  const benWrap=document.getElementById('gate-benefits');
+  const bens=PLAN_BENEFITS[needed]||[];
+  benWrap.innerHTML = bens.map(b=>`<li>${b}</li>`).join('');
+  benWrap.style.display = bens.length ? '' : 'none';
   const cta=document.getElementById('gate-cta-primary'), login=document.getElementById('gate-cta-login');
   if(isAnon){ cta.href='register.html'; cta.textContent='Crear cuenta gratis'; login.style.display=''; }
-  else { cta.href='pricing.html'; cta.textContent=`Pasar a ${PLAN_LABEL[needed]}`; login.style.display='none'; }
+  else { cta.href='pricing.html'; cta.textContent='Quiero suscribirme'; login.style.display='none'; }
   document.getElementById('gate-overlay').classList.add('open');
 }
 function closeGateModal(){ document.getElementById('gate-overlay').classList.remove('open'); }
