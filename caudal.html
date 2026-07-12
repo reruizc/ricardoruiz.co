@@ -97,6 +97,10 @@
   .med-src .ms-m{font-size:.62rem; color:var(--ink3); margin-top:.15rem}
   .op-list{display:flex; flex-wrap:wrap; gap:.35rem; margin-top:.25rem}
   .op-chip{font-size:.68rem; padding:.2rem .5rem; border-radius:999px; border:1px solid rgba(224,71,71,.35); color:var(--red); background:rgba(224,71,71,.06)}
+  .med-confirm{display:flex; gap:.5rem; margin-top:.7rem}
+  .med-confirm button{padding:.4rem .85rem; border-radius:6px; font-size:.75rem; cursor:pointer; border:1px solid var(--border); background:var(--card); color:var(--ink)}
+  .med-confirm .mc-yes{border-color:var(--teal-dim); color:var(--teal)}
+  .med-confirm .mc-yes:hover{border-color:var(--teal)}
 
   .grid2{display:grid; grid-template-columns:1fr 1fr; gap:1.2rem; margin-bottom:1.2rem}
   .panel{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:1.3rem}
@@ -456,7 +460,19 @@
   const CTRL_COLOR={si:'var(--red)',no:'var(--green)',sin_senal:'var(--gray)'};
   const CTRL_TXT={si:'Con controversia en medios',no:'Sin controversia visible',sin_senal:'Sin señal en medios'};
   const IMP_TXT={probable:'Probable que la impopularidad influyera en su caída',poco_probable:'Poco probable que la impopularidad lo tumbara',sin_senal:''};
-  async function rastrearMedios(f,btn){
+  // guarda: en proyectos viejos (<2010) la web trae poco → avisa antes de gastar 1 búsqueda
+  function rastrearMedios(f,btn){
+    const box=document.getElementById('medios-analisis'); if(!box) return;
+    const anio=parseInt(String(f.fecha_presentacion||f.legislatura||'').slice(0,4))||0;
+    if(anio && anio<2010){
+      box.innerHTML=`<div class="ga-card"><div class="ga-t">Este proyecto es de <b>${anio}</b>. La prensa en la web tiene poca cobertura antes de ~2010, así que el rastreo puede volver <b>«sin señal»</b> y de todos modos gasta 1 búsqueda. ¿Rastrear igual?</div><div class="med-confirm"><button class="mc-yes">Rastrear igual</button><button class="mc-no">Cancelar</button></div></div>`;
+      box.querySelector('.mc-yes').onclick=()=>doRastrearMedios(f,btn);
+      box.querySelector('.mc-no').onclick=()=>{ box.innerHTML=''; };
+      return;
+    }
+    doRastrearMedios(f,btn);
+  }
+  async function doRastrearMedios(f,btn){
     const box=document.getElementById('medios-analisis'); if(!box) return;
     if(btn) btn.disabled=true;
     box.innerHTML=`<div class="ga-card"><div class="llm-load">Rastreando prensa sobre este proyecto <span class="dots"><span></span><span></span><span></span></span></div></div>`;
