@@ -21,7 +21,7 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 ROOT = Path(__file__).resolve().parents[2]
-SRC = ROOT / "Bases de datos" / "output_observatorio_mujer" / "dane-empleo" / "anex-GEIHMLS-ene-mar2026.xlsx"
+SRC = ROOT / "Bases de datos" / "output_observatorio_mujer" / "dane-empleo" / "anex-GEIHMLS-mar-may2026.xlsx"
 OUT = ROOT / "Bases de datos" / "output_observatorio_mujer" / "dane-ciiu-mensual.json"
 
 MES_NUM = {'Ene':1,'Feb':2,'Mar':3,'Abr':4,'May':5,'Jun':6,'Jul':7,'Ago':8,'Sep':9,'Oct':10,'Nov':11,'Dic':12}
