@@ -217,6 +217,9 @@
   /* landing (pre-búsqueda) */
   #landing{margin-top:2rem}
   .land-h{font-size:.66rem; letter-spacing:.16em; text-transform:uppercase; color:var(--ink3); text-align:center; margin-bottom:1rem}
+  .broaden{font-size:.78rem; color:var(--ink2); background:var(--teal-soft); border:1px solid var(--teal-dim); border-radius:7px; padding:.6rem .85rem; margin-bottom:1rem}
+  .broaden b{color:var(--ink)}
+  .bd-link{color:var(--teal); cursor:none; text-decoration:underline; white-space:nowrap}
 
   /* modal proyecto */
   .modal{position:fixed; inset:0; z-index:800; background:rgba(4,7,11,.72); backdrop-filter:blur(4px); display:none; align-items:flex-start; justify-content:center; padding:4vh 1rem; overflow-y:auto}
@@ -524,6 +527,7 @@
     results.innerHTML=`
       <div class="r-sub">Tema: <b>${esc(query)}</b> · ${r.n_intentos} intentos · ${r.periodo?r.periodo[0]+'–'+r.periodo[1]:''}</div>
       <div class="r-titular" id="r-titular">${r.n_intentos} intentos · ${r.n_leyes} ${r.n_leyes===1?'ley':'leyes'} · ${r.pct_exito}% de éxito</div>
+      ${r.broaden?`<div class="broaden" id="broaden-hint">Búsqueda estricta (todas las palabras). También hay <b>${r.broaden.count}</b> con «<b>${esc(r.broaden.term)}</b>» — <span class="bd-link" data-term="${esc(r.broaden.term)}">ver todos →</span></div>`:''}
 
       <div class="kpis">
         <div class="kpi"><div class="n">${r.n_intentos}</div><div class="l">Intentos</div></div>
@@ -568,6 +572,8 @@
       results.querySelectorAll('.mort-bar').forEach(s=>s.style.height=s.dataset.h+'%');
     });
     loadStats();   // por si aún no cargó (llena #mort-box cuando resuelva)
+    const bd=results.querySelector('#broaden-hint .bd-link');
+    if(bd) bd.onclick=()=>{ q.value=bd.dataset.term; buscar(); };
     const tlItems=[...results.querySelectorAll('.tl-item')];
     tlItems.forEach(el=>el.onclick=()=>abrirProyecto(el.dataset.id,el.dataset.tb));
     // filtro clickeable: clasifica los intentos por empuje/tipología

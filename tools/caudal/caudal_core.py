@@ -158,6 +158,16 @@ class Caudal:
             empuje[h.get('emp', 'sin_traccion')] = empuje.get(h.get('emp', 'sin_traccion'), 0) + 1
         n_vitrina = empuje.get('vitrina', 0)
         n_honores = tipologia.get('honores', 0)
+        # sugerencia de ampliar: si el query tiene ≥2 palabras y la intersección
+        # (AND) es chica, ofrece el término más distintivo (el más raro, que suele
+        # ser el "tema" real) porque recupera más. Ej: «reforma pensional» → «pensional».
+        broaden = None
+        terms = [t for t in query.split() if len(t) > 2] if query else []
+        if len(terms) >= 2:
+            counts = [(t, len(self.buscar(t))) for t in terms]
+            t_rare, c_rare = min(counts, key=lambda x: x[1])
+            if c_rare > n:
+                broaden = {'term': t_rare, 'count': c_rare}
         return {
             'query': query, 'n_intentos': n,
             'n_leyes': len(leyes), 'n_caidos': len(caidos),
@@ -173,6 +183,7 @@ class Caudal:
             'empuje': dict(sorted(empuje.items(), key=lambda x: -x[1])),
             'n_vitrina': n_vitrina, 'n_honores': n_honores,
             'pct_vitrina': round(100 * n_vitrina / n, 1) if n else 0,
+            'broaden': broaden,
             'intentos': [{
                 'id': h['id'], 'tb': h.get('tb', 'pdly'), 'anio': h['a'], 'leg': h['leg'],
                 'titulo': h['t'], 'resultado': h['res'],
