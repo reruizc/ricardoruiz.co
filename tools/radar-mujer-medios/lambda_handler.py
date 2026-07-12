@@ -28,6 +28,10 @@ from datetime import datetime, timezone
 
 import collect
 import report
+try:
+    import collect_social
+except Exception:
+    collect_social = None
 
 S3_BUCKET = os.environ.get("RADAR_S3_BUCKET", "elecciones-2026")
 RAW_PREFIX = os.environ.get("RADAR_S3_PREFIX", "ricardoruiz.co/radar-mujer/medios")
@@ -77,6 +81,37 @@ def build_tablero(agg, n_total, digest, ventana_dias, now):
     }
 
 
+def _add_redes(tablero, now):
+    ventana = int(os.environ.get("RADAR_VENTANA_DIAS", "7"))
+    events = collect_social.collect_social_events(now.isoformat())
+    if not events:
+        print("[redes] 0 eventos"); return
+    if os.environ.get("RADAR_PERSIST_RAW", "1") == "1":
+        try:
+            _persist_raw(events, now, now.strftime("%Y%m%dT%H%M%SZ"))
+        except Exception as e:
+            print(f"[redes raw] {e}")
+    agg = report.aggregate_social(events)
+    prompt = report.build_digest_prompt_social(agg, len(events), ventana)
+    digest = report.call_deepseek(prompt)
+    RL = report.RED_LABEL
+    tablero["redes"] = {
+        "n_posts": len(events),
+        "digest": digest,
+        "por_red": [{"red": r, "label": RL.get(r, r), "n": n} for r, n in agg["por_red"].most_common()],
+        "palabras": [{"w": w, "n": n} for w, n in agg["palabras"].most_common(50)],
+        "por_cuenta": [{"cuenta": c, "n": n} for c, n in agg["por_cuenta"].most_common(15)],
+        "top_posts": [
+            {"red": e.get("red"), "label": RL.get(e.get("red"), e.get("red")),
+             "autor": e.get("autor"), "texto": (e.get("titulo") or "")[:220],
+             "url": e.get("url"), "metrica": report._metrica_num(e.get("metrica")),
+             "fecha": (e.get("fecha_pub") or "")[:10]}
+            for e in agg["top_posts"][:12]
+        ],
+    }
+    print(f"[redes] posts={len(events)} por_red={dict(agg['por_red'])} digest={'ok' if digest else 'no'}")
+
+
 def handler(event, context):
     now = datetime.now(timezone.utc)
     run_id = now.strftime("%Y%m%dT%H%M%SZ")
@@ -99,6 +134,14 @@ def handler(event, context):
         print("[digest] sin DeepSeek (¿falta DEEPSEEK_API_KEY?) → tablero sin lectura")
 
     tablero = build_tablero(agg, n_total, digest, ventana, now)
+
+    # ── Capa REDES (Apify) · opcional: solo si hay token y el módulo cargó ──
+    if collect_social is not None and os.environ.get("APIFY_TOKEN"):
+        try:
+            _add_redes(tablero, now)
+        except Exception as e:
+            print(f"[redes] falló (sigo solo con prensa): {e}")
+
     _s3c().put_object(
         Bucket=S3_BUCKET, Key=TABLERO_KEY,
         Body=json.dumps(tablero, ensure_ascii=False).encode("utf-8"),

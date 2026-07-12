@@ -158,6 +158,54 @@ def build_digest_prompt(agg, n_total, ventana_dias):
     return "\n".join(lines)
 
 
+RED_LABEL = {"x": "X (Twitter)", "instagram": "Instagram", "tiktok": "TikTok"}
+
+def _metrica_num(v):
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return 0
+
+def aggregate_social(events):
+    """Agrega los eventos de redes: por red, nube, top posts por engagement,
+    cuentas más activas."""
+    por_red = Counter()
+    palabras = Counter()
+    por_cuenta = Counter()
+    for ev in events:
+        por_red[ev.get("red")] += 1
+        cuenta = ev.get("autor")
+        if cuenta:
+            por_cuenta[f"@{cuenta}"] += 1
+        for tok in tokenize(ev.get("titulo")):
+            if good(tok):
+                palabras[tok] += 1
+    top_posts = sorted(events, key=lambda e: _metrica_num(e.get("metrica")), reverse=True)[:12]
+    return {"por_red": por_red, "palabras": palabras, "por_cuenta": por_cuenta, "top_posts": top_posts}
+
+def build_digest_prompt_social(agg, n_total, ventana_dias):
+    L = []
+    L.append(f"Eres analista de redes sociales de Mujeres por la Democracia (MxD). Redacta un "
+             f"informe breve (tuteo neutro, sobrio) sobre la CONVERSACIÓN EN REDES de los últimos "
+             f"{ventana_dias} días en torno a las mujeres y su rol político/social en Colombia y la "
+             f"región. Se monitorearon {n_total} publicaciones (X, Instagram, TikTok).\n")
+    L.append("VOLUMEN POR RED:")
+    for r, n in agg["por_red"].most_common():
+        L.append(f"  - {RED_LABEL.get(r, r)}: {n}")
+    L.append("\nCUENTAS MÁS ACTIVAS:")
+    for c, n in agg["por_cuenta"].most_common(12):
+        L.append(f"  - {c}: {n}")
+    L.append("\nPUBLICACIONES CON MÁS ENGAGEMENT:")
+    for e in agg["top_posts"][:10]:
+        L.append(f"  · ({RED_LABEL.get(e.get('red'), e.get('red'))} · @{e.get('autor')} · {_metrica_num(e.get('metrica'))} reacciones) {(e.get('titulo') or '')[:140]}")
+    L.append("\n\nEn máximo 300 palabras:")
+    L.append("1. UN PÁRRAFO: qué está moviendo la conversación en redes y qué tono tiene.")
+    L.append("2. LOS 2-3 TEMAS o casos que más resuenan.")
+    L.append("3. UNA ALERTA si algo se está viralizando y MxD debería mirar.")
+    L.append("4. UNA RECOMENDACIÓN de contenido/vocería para redes esta semana.")
+    L.append("No inventes datos que no estén arriba.")
+    return "\n".join(L)
+
 def call_deepseek(prompt, intentos=2):
     key = os.environ.get("DEEPSEEK_API_KEY")
     if not key:
@@ -165,7 +213,7 @@ def call_deepseek(prompt, intentos=2):
     body = json.dumps({
         "model": os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash"),
         "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 1600,
+        "max_tokens": 4000,  # V4 gasta tokens en reasoning → margen para no truncar el content
         "temperature": 0.4,
     }).encode("utf-8")
     # V4 Flash puede fallar en cold call → un reintento corto.
