@@ -35,7 +35,7 @@ import boto3
 import caudal_core
 
 BUCKET = os.environ.get('CAUDAL_BUCKET', 'caudal-legislativo')
-PROMPT_VERSION = 'v4'            # bumpear para invalidar cache de síntesis
+PROMPT_VERSION = 'v5'            # bumpear para invalidar cache de síntesis
 CACHE_PREFIX = 'analisis-cache/'
 HTTP_TIMEOUT = 55
 
@@ -276,12 +276,19 @@ GACETA_SYSTEM = (
     "Enfócate SOLO en el documento del proyecto indicado en el contexto. "
     "REGLA DURA: extrae únicamente lo que está en el texto; NO inventes nombres, "
     "fechas ni argumentos. Si algo no aparece, ponlo en null o lista vacía. "
-    "Devuelves SIEMPRE un JSON válido con estas claves: tipo_documento, "
+    "Devuelves SIEMPRE un JSON válido con estas claves: tipo_documento (p.ej. "
+    "'ponencia', 'acta de comisión', 'acta de plenaria'), "
     "ponentes (lista de nombres que firman), sentido (uno de: 'favorable', "
     "'archivo', 'mixto', 'desconocido' — ¿recomienda dar debate o archivar?), "
     "sentido_detalle (frase que lo justifica), argumentos (lista de 3-6 bullets "
     "con los argumentos centrales), en_contra (texto si hay ponencia de archivo "
-    "u oposición explícita, si no null)."
+    "u oposición explícita, si no null). SI EL DOCUMENTO ES UN ACTA de sesión, "
+    "agrega además: aplazamiento (objeto {hubo: true/false, propuesto_por: nombre "
+    "de quien propuso aplazar o null, detalle: frase}), y votacion (objeto "
+    "{hubo: true/false, motivo: qué se votó, favor: nº, contra: nº, abstencion: "
+    "nº, nominal: lista de {nombre, voto} SOLO si el acta trae el listado nominal "
+    "de cada congresista, si no lista vacía}). Si no es acta o no hay votación/"
+    "aplazamiento, esos objetos van con hubo:false."
 )
 
 
