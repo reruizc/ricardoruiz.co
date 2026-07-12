@@ -25,8 +25,14 @@ DIST = SRC / 'dist'
 API = 'https://www.camara.gov.co/wp-json/wp/v2'
 UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120 Safari/537.36'
 TIPO_ORDEN = 185
-COMISIONES = {'primera': 183, 'segunda': 184, 'tercera': 248, 'cuarta': 249,
-              'quinta': 250, 'sexta': 251, 'septima': 252, 'mujer': 266}
+# las 14 comisiones reales de Cámara (7 constitucionales + 7 legales/especiales).
+# term ids de la taxonomía comision_evento (excluye salones/Secretaría General).
+COMISIONES = {
+    'primera': 183, 'segunda': 184, 'tercera': 248, 'cuarta': 249,
+    'quinta': 250, 'sexta': 251, 'septima': 252,
+    'afro': 272, 'ordenamiento': 260, 'ddhh': 271, 'cuentas': 257,
+    'etica': 258, 'mujer': 266, 'electoral': 269,
+}
 PROJ_RE = re.compile(r'\b(\d{1,4})\s*/\s*(?:20)?(\d{2})\b')
 PDF_RE = re.compile(r'(?:href|src)="([^"]+\.pdf)"', re.I)
 # bloque del proyecto en el orden del día: número + año + título (entre comillas)
@@ -94,11 +100,7 @@ def load_numero_camara_map():
     return mp
 
 
-def main():
-    com = sys.argv[1] if len(sys.argv) > 1 else 'primera'
-    limit = None
-    if '--limit' in sys.argv:
-        limit = int(sys.argv[sys.argv.index('--limit') + 1])
+def run(com, limit=None):
     com_id = COMISIONES[com]
     outdir = CACHE / 'ordenes' / com
     outdir.mkdir(parents=True, exist_ok=True)
@@ -178,4 +180,8 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    limit = int(sys.argv[sys.argv.index('--limit') + 1]) if '--limit' in sys.argv else None
+    arg = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith('-') else 'primera'
+    coms = list(COMISIONES) if arg == 'todas' else [arg]
+    for c in coms:
+        run(c, limit)
