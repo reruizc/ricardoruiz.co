@@ -103,7 +103,30 @@ def temas_of(ev):
     return [x for x in t if x]
 
 
+MAX_POR_MEDIO = 8  # cap editorial: ningún medio domina el volumen/nube
+
+def filter_window(events, dias):
+    """Solo eventos con fecha_pub (o capturada) dentro de la ventana."""
+    from datetime import datetime, timezone, timedelta
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=dias)).isoformat()
+    return [e for e in events
+            if (e.get("fecha_pub") or e.get("fecha_capturada") or "") >= cutoff]
+
+def cap_por_medio(events, cap=MAX_POR_MEDIO):
+    """Máximo `cap` titulares por medio (los más recientes). Equilibrio
+    editorial: evita que un solo medio (p.ej. un feed directo completo)
+    domine el volumen, la nube y los titulares."""
+    by_medio = defaultdict(list)
+    for e in events:
+        by_medio[e.get("medio", "desconocido")].append(e)
+    out = []
+    for m, evs in by_medio.items():
+        evs.sort(key=lambda e: e.get("fecha_pub") or "", reverse=True)
+        out.extend(evs[:cap])
+    return out
+
 def aggregate(events):
+    events = cap_por_medio(events)
     por_tema = Counter()
     por_medio = Counter()
     palabras = Counter()
@@ -123,6 +146,7 @@ def aggregate(events):
     for t in tema_titulares:
         tema_titulares[t].sort(key=lambda e: e.get("fecha_pub") or "", reverse=True)
     return {
+        "n": len(events),  # post-cap: lo que realmente se cuenta
         "por_tema": por_tema,
         "por_medio": por_medio,
         "palabras": palabras,
@@ -159,6 +183,66 @@ def build_digest_prompt(agg, n_total, ventana_dias):
 
 
 RED_LABEL = {"x": "X (Twitter)", "instagram": "Instagram", "tiktok": "TikTok"}
+
+# ── Sentimiento ──────────────────────────────────────────────────────────
+# Una sola llamada DeepSeek: lista numerada de textos → una letra por ítem.
+# N = negativo (violencia, denuncia, agresión, retroceso)
+# P = positivo (avance, logro, reconocimiento, protección, movilización propositiva)
+# X = neutro / informativo
+SENT_MAX_ITEMS = 120  # muestra: los más recientes
+SENT_CHUNK = 60       # V4 razona ~40 tokens/ítem → lotes chicos para no truncar
+
+def _sent_chunk_labels(evs_chunk):
+    lines = [f"{i+1}. {(e.get('titulo') or '')[:150]}" for i, e in enumerate(evs_chunk)]
+    prompt = (
+        "Clasifica el TONO de cada texto sobre la situación de las mujeres en Colombia. "
+        "Una letra por ítem: N = negativo (violencia, feminicidio, denuncia, agresión, "
+        "retroceso de derechos), P = positivo (avance, logro, reconocimiento, protección, "
+        "nombramiento, movilización propositiva), X = neutro o puramente informativo.\n"
+        "Responde SOLO un array JSON de letras, en el mismo orden, sin nada más. "
+        f"Debe tener exactamente {len(lines)} elementos.\n\n" + "\n".join(lines))
+    raw = call_deepseek(prompt, max_tokens=8000)
+    if not raw:
+        return None
+    m = re.search(r"\[.*\]", raw, re.S)
+    if not m:
+        return None
+    try:
+        return [str(x).strip().upper()[:1] for x in json.loads(m.group(0))]
+    except Exception:
+        return None
+
+def classify_sentiment(events):
+    """Devuelve {'7d': {...}, '24h': {...}} con conteos P/X/N, o None si falla."""
+    from datetime import datetime, timezone, timedelta
+    evs = sorted(events, key=lambda e: e.get("fecha_pub") or "", reverse=True)[:SENT_MAX_ITEMS]
+    if not evs:
+        return None
+    labels = []
+    for i in range(0, len(evs), SENT_CHUNK):
+        chunk = evs[i:i + SENT_CHUNK]
+        got = _sent_chunk_labels(chunk)
+        if got is None:
+            break  # usar lo acumulado hasta aquí
+        labels.extend(got[:len(chunk)])
+    if not labels:
+        return None
+    # alinear defensivamente
+    n = min(len(labels), len(evs))
+    cut24 = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+    out = {"7d": Counter(), "24h": Counter()}
+    for i in range(n):
+        lab = labels[i] if labels[i] in ("P", "N", "X") else "X"
+        key = {"P": "positivo", "N": "negativo", "X": "neutro"}[lab]
+        out["7d"][key] += 1
+        ts = evs[i].get("fecha_pub") or evs[i].get("fecha_capturada") or ""
+        if ts >= cut24:
+            out["24h"][key] += 1
+    def pack(c):
+        tot = sum(c.values())
+        return {"n": tot, "positivo": c.get("positivo", 0),
+                "neutro": c.get("neutro", 0), "negativo": c.get("negativo", 0)}
+    return {"7d": pack(out["7d"]), "24h": pack(out["24h"])}
 
 def _metrica_num(v):
     try:
@@ -206,14 +290,14 @@ def build_digest_prompt_social(agg, n_total, ventana_dias):
     L.append("No inventes datos que no estén arriba.")
     return "\n".join(L)
 
-def call_deepseek(prompt, intentos=2):
+def call_deepseek(prompt, intentos=2, max_tokens=4000):
     key = os.environ.get("DEEPSEEK_API_KEY")
     if not key:
         return None
     body = json.dumps({
         "model": os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash"),
         "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 4000,  # V4 gasta tokens en reasoning → margen para no truncar el content
+        "max_tokens": max_tokens,  # V4 gasta tokens en reasoning → margen para no truncar
         "temperature": 0.4,
     }).encode("utf-8")
     # V4 Flash puede fallar en cold call → un reintento corto.
@@ -282,7 +366,7 @@ def run(ventana_dias=7):
         print("No hay eventos en la ventana. ¿Corriste collect.py --local?")
         return
     agg = aggregate(events)
-    n_total = len(events)
+    n_total = agg["n"]
 
     prompt = build_digest_prompt(agg, n_total, ventana_dias)
     os.makedirs(OUT_DIR, exist_ok=True)

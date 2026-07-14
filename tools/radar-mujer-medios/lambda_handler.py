@@ -91,13 +91,20 @@ def _add_redes(tablero, now):
             _persist_raw(events, now, now.strftime("%Y%m%dT%H%M%SZ"))
         except Exception as e:
             print(f"[redes raw] {e}")
+    events = report.filter_window(events, ventana)
     agg = report.aggregate_social(events)
     prompt = report.build_digest_prompt_social(agg, len(events), ventana)
     digest = report.call_deepseek(prompt)
+    sent_redes = None
+    try:
+        sent_redes = report.classify_sentiment(events)
+    except Exception as e:
+        print(f"[sentimiento redes] falló: {e}")
     RL = report.RED_LABEL
     tablero["redes"] = {
         "n_posts": len(events),
         "digest": digest,
+        "sentimiento": sent_redes,
         "por_red": [{"red": r, "label": RL.get(r, r), "n": n} for r, n in agg["por_red"].most_common()],
         "palabras": [{"w": w, "n": n} for w, n in agg["palabras"].most_common(50)],
         "por_cuenta": [{"cuenta": c, "n": n} for c, n in agg["por_cuenta"].most_common(15)],
@@ -125,8 +132,11 @@ def handler(event, context):
         except Exception as e:
             print(f"[raw] persist falló (sigo): {e}")
 
-    agg = report.aggregate(events)
-    n_total = len(events)
+    # Ventana por fecha: Google News ya viene acotado (when:Nd) pero los
+    # feeds directos entregan sus últimos posts sin importar antigüedad.
+    events = report.filter_window(events, ventana)
+    agg = report.aggregate(events)          # incluye cap por medio
+    n_total = agg["n"]
 
     prompt = report.build_digest_prompt(agg, n_total, ventana)
     digest = report.call_deepseek(prompt)  # usa DEEPSEEK_API_KEY del env
@@ -134,6 +144,15 @@ def handler(event, context):
         print("[digest] sin DeepSeek (¿falta DEEPSEEK_API_KEY?) → tablero sin lectura")
 
     tablero = build_tablero(agg, n_total, digest, ventana, now)
+
+    # ── Sentimiento prensa (24h + 7d) ──
+    try:
+        sent = report.classify_sentiment(events)
+        if sent:
+            tablero["sentimiento"] = sent
+            print(f"[sentimiento prensa] 7d={sent['7d']} 24h={sent['24h']}")
+    except Exception as e:
+        print(f"[sentimiento prensa] falló (sigo): {e}")
 
     # ── Capa REDES (Apify) · opcional: solo si hay token y el módulo cargó ──
     if collect_social is not None and os.environ.get("APIFY_TOKEN"):
