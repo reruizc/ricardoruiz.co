@@ -4859,17 +4859,29 @@ Cauce = el cuerpo de datos legislativos). Vive en `tools/caudal/`.
 - Cache de síntesis en `analisis-cache/{hash24}.json`, TTL vía `PROMPT_VERSION`
   (va en `v2`). No cachea respuestas con error.
 
-**Frontend `caudal.html` (LISTO · gated)** — página privada en la raíz del repo,
-identidad Cauce (tema oscuro institucional, acento teal = agua/cauce, cursor custom,
-`noindex,nofollow`). Gate calcado de proyecto-dc: `rr-token`/`rr-user` + whitelist
-`['reruizc@gmail.com']` + verificación contra `rr-auth /auth/me` (401→login,
-email no permitido→dashboard). Consume la Lambda: buscar tema → embudo + KPIs +
-bancadas (color por partido) + línea de intentos + **lectura del analista** (LLM,
-pre-fetch en background: primero `lectura:false` instantáneo, luego `lectura:true`
-llena la tarjeta). Click en un intento → modal ficha (metadata + autores con partido
-+ gacetas). Card en `dashboard.html` PRIVATE_TOOLS (grupo encargos, id `caudal`).
-Verificado end-to-end contra el endpoint real (feminicidio: 11 intentos, bancadas
-11/11, ficha Rosa Elvira Cely con Gloria Inés Ramírez→Polo). **Pendiente de push.**
+**Frontend `caudal.html` (LISTO · gated · en producción)** — página privada en la raíz,
+sistema visual v2 (Helvetica embebida, fondo `#060810`, acento teal, azul `#0047FF`,
+cursor custom, `noindex,nofollow`). Gate calcado de proyecto-dc: `rr-token`/`rr-user`
++ whitelist **`['reruizc@gmail.com','nuevagemela@gmail.com']`** (Nury Gómez agregada
+jul-2026) + verificación contra `rr-auth /auth/me`. Card en `dashboard.html`
+PRIVATE_TOOLS (grupo encargos). **Nav v2 estándar del sitio**: izq Volver+Privado+Salir,
+centro "Caudal", der logo Ricardo.Ruiz (Syne + barras, cargado por Google Fonts, igual a
+index.html). **Rediseño UX jul-2026:**
+- **Landing pre-búsqueda** (acción `stats`+`bloqueo`): totales del histórico (proyectos de
+  ley/actos/leyes/vitrina) + mortandad por año de cuatrienio + gráfica **P(tratado|posición)**.
+- **Vista de tema**: KPIs · tira de intención (chips **filtrables** por empuje/tipología + ⓘ
+  tooltip que explica cada categoría) · lectura del analista (LLM, pre-fetch) · **embudo
+  escalonado** con % de supervivencia + ⓘ · 4 gráficas (**intentos por año** [agrupa por
+  lustros cuando >15 años, sueltos '23-'26] · composición tipología+empuje · **éxito por
+  comisión** [fusiona duplicados por casing SEPTIMA/Septima] · mortandad) · bancadas · **línea
+  de intentos** con títulos LEGIBLES (sin "POR MEDIO DE LA CUAL SE") + tipo PL/AL + badges.
+- **Búsqueda estricta + aviso de ampliar**: si trae pocos, "También hay N con «pensional» —
+  ver todos" (backend calcula el término más distintivo).
+- **Ficha (modal)**: autor real vs firmones (★, actos legislativos=coautoría colectiva) · tipología ·
+  reloj por tipo · re-radicaciones · **panel Bloqueo en comisión** (agendado N×, posición) ·
+  **panel Trámite/votaciones** (aplazamientos+tally de Congreso Visible) · **botón Rastreo en medios**
+  (Serper, con aviso <2010) · botón analizar ponencia/acta (DeepSeek).
+- JS validado con `new Function` antes de cada push (regla del proyecto). Todo desplegado.
 
 **Fase 3 · texto de gaceta (PILOTO LISTO · verificado end-to-end):** loop
 completo probado con feminicidio. (1) **Descarga** semi-manual del portal JSF de
@@ -4899,13 +4911,14 @@ firman y argumentos. Si la gaceta no tiene texto en S3 aún, muestra "no procesa
 → favorable · Doris Clemencia Vega Quiroz · 6 argumentos (CEDAW, Belém do Pará,
 impunidad 10%…). Pusheado (commit 0f44542).
 
-**Pendiente (en orden):**
-1. **Automatizar/facilitar la descarga de gacetas** (hoy semi-manual por Chrome +
-   gotcha macOS TCC con `~/Downloads`): driver repetible, o Chrome directo a carpeta
-   accesible, o subir el texto por un flujo que no toque `~/Downloads`.
+**Pendiente (gacetas · ver bloque "Fase 3" arriba y `procesar_gacetas.py`):**
+1. ✅ Descarga: carpeta de Chrome de Ricardo ya apunta a `Bases de datos/leyes-senado/gacetas/`
+   (sin diálogo). El folder es la cola; `procesar_gacetas.py` clasifica/enruta/sube texto.
+   Bulk NO automatizable (portal JSF hostil). Actas del cuatrienio actual = **on-demand** (opción B,
+   decisión Ricardo jul-2026). Targeting de actas (qué nº de gaceta es acta) = sin resolver → opción A.
 2. OCR para gacetas escaneadas (años 90-2005) antes de subir su texto.
-3. (Opcional) pre-poblar `gacetas-texto/` de temas-cliente frecuentes (feminicidio,
-   paridad…) para que la ficha responda instantáneo sin la descarga en vivo.
+3. Voto nominal por congresista: detalle `/votaciones/{id}/` de Congreso Visible (pre-2022) +
+   extracción de actas (cuatrienio actual, on-demand).
 
 Refinamientos opcionales del join autor→partido: (a) más años de Congreso (pre-2014)
 para cubrir legisladores viejos; (b) ampliar `MANUAL`; (c) votación nominal por
