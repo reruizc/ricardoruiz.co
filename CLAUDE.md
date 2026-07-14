@@ -4765,7 +4765,8 @@ Cauce = el cuerpo de datos legislativos). Vive en `tools/caudal/`.
 - ✅ **Lambda `caudal-analiza`** desplegada (`POST https://l3kmprdjkl.execute-api.us-east-1.amazonaws.com`),
   model-agnostic (DeepSeek V4 default, switch a Claude por env var), `DEEPSEEK_API_KEY` seteada.
   Acciones: `tema` (embudo+bancadas+intención+lectura LLM) · `buscar` (filtros tipologia/empuje) ·
-  `proyecto` (ficha) · `gaceta` (fase 3) · `contexto` (rastreo de medios · Serper+DeepSeek).
+  `proyecto` (ficha + bloqueo + votaciones) · `stats` · `bloqueo` (sistema P(tratado|posición)) ·
+  `gaceta` (acta/ponencia · aplazamiento+voto nominal) · `contexto` (rastreo de medios · Serper+DeepSeek).
 - ✅ **Frontend `caudal.html`** (sistema visual v2: Helvetica, azul #060810) con búsqueda,
   embudo, bancadas, lectura del analista y ficha con análisis de ponencia por IA.
 - ✅ **Fase 3 piloto** verificado (Gaceta 857/2013 feminicidio → ponente/sentido/argumentos).
@@ -4790,9 +4791,44 @@ Cauce = el cuerpo de datos legislativos). Vive en `tools/caudal/`.
   realidad fueron impopularidad/bloqueo de gremio. Cobertura buena ~2015+, pobre pre-2010
   (dice "sin señal" honesto). `PROMPT_VERSION='v4'`. Verificado en vivo (caso Uber →
   controversia alta, impopularidad probable, 8 fuentes).
-- 🔜 **Pendiente:** automatizar descarga de gacetas (hoy semi-manual por Chrome + gotcha
-  macOS TCC ~/Downloads) · OCR gacetas escaneadas 90-2005 · pre-poblar `gacetas-texto/`
-  de temas frecuentes. NADA bloquea el pitch — el producto ya se demuestra completo.
+- ✅ **Fase 3 · Índice de bloqueo** (2026-07-12/13). Herramientas en `tools/caudal/actas/`.
+  Responde el foso que ni Dapper ni Sonar tienen: **agendado N× vs debatido/aplazado/votado**.
+  - **Agendamientos** (`harvest_ordenes.py`): Cámara **wp-json** `/wp/v2/evento?comision_evento=<id>&evento_tipo=185`
+    (órdenes del día, PDF de descarga directa, sin JSF). Barrió las **14 comisiones** (term ids en
+    `COMISIONES`, Primera=183; `harvest_ordenes.py todas`). PDFs digitales → texto → nº de proyecto
+    agendado por sesión (regex bloque "Proyecto de Ley No. N de AAAA Cámara «título»"). Corta en
+    "Anuncio de proyectos" para que la POSICIÓN sea la de la cola de debate. Cache en
+    `Bases de datos/leyes-senado/actas/ordenes/{com}/` (gitignored, ~1.1GB solo texto+pdf).
+  - **Análisis** (`analiza_bloqueo.py` por comisión · `analiza_nacional.py` agrega): proxy "tratado"=
+    no reaparece la sesión siguiente (gap≤45d). Hallazgos: **P(tratado|posición) 1º≈53% → 4º-6º≈21%**
+    (el orden de la agenda decide); mediana 5 agendamientos; **hazard de parar más alto al inicio**
+    (1º-2º) → los que sobreviven entran en "purgatorio" (re-agendar rinde ~21%). Solo cuenta proyectos
+    con ≥2 agendamientos (los one-off contaminan). El 16º+ tiene composición mixta (agendas largas).
+  - **Outcome histórico** (`harvest_votaciones.py`): **Congreso Visible** (Uniandes) — su web Next.js
+    trae las votaciones server-rendered en `__NEXT_DATA__`. `…/votaciones/?rows=10300` devuelve las
+    **10.205** de una (87MB, ~40s, 2006→**nov-2022**). Cada una linkea a proyecto (numero_camara Y
+    senado), con `motivo` (aplazamientos/archivos), votos, `acta`, `urlGaceta`, `observaciones`
+    (relato con quién propuso archivo + tally). → `votaciones.json` (1.627 proyectos, 260 aplazamientos).
+    El voto nominal por congresista está en el detalle `/votaciones/{id}/` (pendiente, bajo demanda).
+  - **Datos a S3** (`build_bloqueo_s3.py` → `metadata/bloqueo.json` sistema+lookup · `votaciones.json`).
+    Lambda: acciones `bloqueo` (sistema para el landing) + enriquece `proyecto` con `bloqueo` (match
+    nº Cámara) y `votaciones` (match Senado/Cámara). Frontend: panel ámbar "Bloqueo en comisión"
+    (agendado N×, posición) + panel azul "Trámite · debates y votaciones" (aplazamientos + tally) +
+    gráfica P(tratado|posición) en el landing.
+  - **Gacetas** (`procesar_gacetas.py`): el portal JSF de la Imprenta es hostil (POST con ViewState,
+    sin Content-Length → `.crdownload` cuelga aunque el PDF esté completo [verificar `%%EOF` y renombrar];
+    503 intermitentes; el índice NO clasifica acta/ponencia). Descarga = navegador clic a clic (Chrome
+    real, carpeta apuntada a `gacetas/`), NO bulk automatizable. `procesar_gacetas.py` toma el folder
+    como cola → clasifica acta/ponencia → sube texto a `gacetas-texto/{n-año}.txt`. **Ponencias** →
+    botón "analizar ponencia" instantáneo; **actas** → listas para la acción `gaceta` (extrae
+    aplazamiento + voto nominal, `PROMPT_VERSION='v5'`). Pipeline probado end-to-end (ponencia 1632/24
+    → sentido/argumentos/ponentes). **Gotcha de targeting SIN resolver:** no hay fuente limpia que diga
+    qué nº de gaceta es un acta del cuatrienio actual → las actas 2023-2026 quedan **on-demand** (opción B).
+- 🔜 **Pendiente (Fase 3):** (A) fuente de targeting de actas (secretarías Senado/Cámara con nº gaceta) ·
+  (B) voto nominal cuatrienio actual quedó **on-demand** (decisión de Ricardo, jul-2026) · voto nominal
+  por congresista del detalle de Congreso Visible · OCR gacetas escaneadas 90-2005 · refinar títulos de
+  agendamientos (71%→100%). NADA bloquea el pitch — el módulo se demuestra completo.
+  Ver `[[reference_actas_bloqueo_fuentes]]` en memoria.
 - **Reglas:** deploy = `git push origin HEAD:main`. Redeploy Lambda:
   `python3 tools/caudal/lambda/build_zip.py && aws lambda update-function-code --function-name caudal-analiza --zip-file fileb://tools/caudal/lambda/caudal-analiza.zip`.
   Regenerar dataset: `harvest.py dataset` → `build_dataset.py` → `build_roster.py --reuse`
