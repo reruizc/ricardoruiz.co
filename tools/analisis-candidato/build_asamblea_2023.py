@@ -48,9 +48,8 @@ DEP_NAMES = {
 SPECIAL_CAN = {'0', '996', '997', '998', '999'}  # partido/blanco/nulos/no-marcados
 
 # Correcciones de nombre mal digitado en la fuente RNEC (slug → nombre correcto).
-NAME_FIXES = {
-    'ASAM2023-27-5533-51': 'ERLING DIANA JIMENEZ BECERRA',  # RNEC trae "ERLIG"
-}
+# Vacío por ahora: los nombres se dejan tal cual los trae la Registraduría.
+NAME_FIXES = {}
 
 
 def strip(s):
