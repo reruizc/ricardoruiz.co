@@ -47,6 +47,11 @@ DEP_NAMES = {
 }
 SPECIAL_CAN = {'0', '996', '997', '998', '999'}  # partido/blanco/nulos/no-marcados
 
+# Correcciones de nombre mal digitado en la fuente RNEC (slug → nombre correcto).
+NAME_FIXES = {
+    'ASAM2023-27-5533-51': 'ERLING DIANA JIMENEZ BECERRA',  # RNEC trae "ERLIG"
+}
+
 
 def strip(s):
     return unicodedata.normalize('NFD', s or '').encode('ascii', 'ignore').decode().upper().strip()
@@ -130,9 +135,10 @@ def main():
     for (dde, par, can), c in cands.items():
         dd = c['dd']
         slug = f'ASAM2023-{dde}-{par}-{can}'
+        nombre = NAME_FIXES.get(slug, c['nombre'])
         depNom = DEP_NAMES.get(dd, f'DEP {dd}')
         data = {
-            'nombre': c['nombre'], 'corp': f'ASAMBLEA · {depNom}',
+            'nombre': nombre, 'corp': f'ASAMBLEA · {depNom}',
             'circunscripcion': depNom, 'partido': c['partido'],
             'votos': c['votos'], 'mesas': c['mesas'],
         }
@@ -141,7 +147,7 @@ def main():
             json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
         total_bytes += os.path.getsize(path)
         index.append({
-            'slug': slug, 'nombre': c['nombre'],
+            'slug': slug, 'nombre': nombre,
             'corp': f'ASAMBLEA · {depNom} · 2023', 'circunscripcion': depNom,
             'partido': c['partido'], 'votos': c['votos'],
         })

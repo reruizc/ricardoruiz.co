@@ -29,7 +29,9 @@ S3_BUCKET_PREFIX = 's3://elecciones-2026/ricardoruiz.co/congreso-2026/output/fot
 ENDOSO_INDEX = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/endoso/index.json'
 PRES_INDEX_LOCAL = os.path.join(ROOT, 'Bases de datos', 'output_presidencial_endoso', 'index-presidencial.json')
 PRES_INDEX_S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/presidencial/index-presidencial.json'
-MAX_PX = 1200
+ASAM_INDEX_LOCAL = os.path.join(ROOT, 'Bases de datos', 'output_asamblea_2023', 'index-asamblea-2023.json')
+ASAM_INDEX_S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/asamblea-2023/index-asamblea-2023.json'
+TARGET_W, TARGET_H = 1248, 864     # tamaño editorial fijo 3:2 (crop-to-fill centrado)
 EXTS = ('.png', '.jpg', '.jpeg', '.webp', '.tiff', '.heic')
 
 
@@ -61,6 +63,23 @@ def load_candidates():
                 'nombre': p['nombre'], 'corp': 'PRESIDENCIA 2026',
                 'partido': p.get('partido', ''),
                 'votos': max(e['votos'] for e in p['elecciones']),
+            })
+    # Asamblea Departamental 2023
+    asam = None
+    if os.path.exists(ASAM_INDEX_LOCAL):
+        asam = json.load(open(ASAM_INDEX_LOCAL, encoding='utf-8'))
+    else:
+        try:
+            with urllib.request.urlopen(ASAM_INDEX_S3, timeout=60) as r:
+                asam = json.load(r)
+        except Exception:
+            pass
+    if asam:
+        for c in asam.get('candidatos', []):
+            cands.append({
+                'slug': c['slug'], 'nombre': c['nombre'],
+                'corp': c.get('corp', 'ASAMBLEA 2023'),
+                'partido': c.get('partido', ''), 'votos': c.get('votos', 0),
             })
     return cands
 
@@ -98,13 +117,34 @@ def cmd_status():
         print(f"  {c['votos']:>10,}  {c['slug']:55s} {c['nombre']}".replace(',', '.'))
 
 
+def _img_size(path):
+    r = subprocess.run(['sips', '-g', 'pixelWidth', '-g', 'pixelHeight', path],
+                       capture_output=True, text=True)
+    w = h = 0
+    for line in r.stdout.splitlines():
+        s = line.strip()
+        if s.startswith('pixelWidth:'):  w = int(s.split()[-1])
+        if s.startswith('pixelHeight:'): h = int(s.split()[-1])
+    return w, h
+
+
 def normalize(src, dst_jpg):
-    """Convierte a JPG y limita el lado mayor a MAX_PX (sips, macOS)."""
-    r = subprocess.run(['sips', '-s', 'format', 'jpeg', '-s', 'formatOptions', '85',
-                        '-Z', str(MAX_PX), src, '--out', dst_jpg],
+    """Convierte a JPG y recorta al tamaño editorial EXACTO 1248×864 (crop-to-fill
+    centrado, sin deformar): escala para cubrir el lado que falta y recorta el sobrante."""
+    w, h = _img_size(src)
+    # Escala para CUBRIR: fija el lado que se quedaría corto, el otro sobra y se recorta.
+    # w*TH >= h*TW  ⇔  el ancho sobra al fijar la altura → resample por altura.
+    resample = (['--resampleHeight', str(TARGET_H)] if w * TARGET_H >= h * TARGET_W
+                else ['--resampleWidth', str(TARGET_W)])
+    r = subprocess.run(['sips', '-s', 'format', 'jpeg', '-s', 'formatOptions', '88',
+                        *resample, src, '--out', dst_jpg], capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(f'sips resample falló: {r.stderr.strip()[:200]}')
+    # Recorte centrado al tamaño exacto (sips -c es alto ancho).
+    r = subprocess.run(['sips', '-c', str(TARGET_H), str(TARGET_W), dst_jpg],
                        capture_output=True, text=True)
     if r.returncode != 0:
-        raise RuntimeError(f'sips falló: {r.stderr.strip()[:200]}')
+        raise RuntimeError(f'sips crop falló: {r.stderr.strip()[:200]}')
 
 
 def cmd_subir(dry=False, force=False):
