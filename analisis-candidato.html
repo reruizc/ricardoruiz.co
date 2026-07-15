@@ -1080,6 +1080,13 @@
     let currentPresMeta = null;       // meta activo si es presidencial
     let SCORE_LOG_MAX = Math.log10(12950643);  // votos del presidente (2V) — se refresca con presIndex.vmax
 
+    // ─── ASAMBLEA DEPARTAMENTAL 2023 ──────────────────────────
+    // JSONs generados por tools/analisis-candidato/build_asamblea_2023.py.
+    // ?asamlocal=1 → lee los archivos locales del repo (verificación pre-subida).
+    const ASAM_BASE = new URLSearchParams(location.search).has('asamlocal')
+      ? 'Bases de datos/output_asamblea_2023'
+      : `${S3}/asamblea-2023`;
+
     // ─── I18N ─────────────────────────────────────────────────
     const candI18n = {
       co: {
@@ -2561,12 +2568,27 @@
     // ─── LOAD INDEX ───────────────────────────────────────────
     async function loadIndex() {
       try {
-        const [r, rp] = await Promise.all([
+        const [r, rp, ra] = await Promise.all([
           fetch(`${S3}/endoso/index.json`),
           fetch(`${PRES_BASE}/index-presidencial.json`).catch(() => null),
+          fetch(`${ASAM_BASE}/index-asamblea-2023.json`).catch(() => null),
         ]);
         if (!r.ok) throw new Error(`index.json devolvió ${r.status}`);
         candIndex = (await r.json()).filter(c => !isPartyEntry(c));
+
+        // Merge Asamblea Departamental 2023 (candidatos normales con dataUrl propio)
+        if (ra && ra.ok) {
+          try {
+            const asam = await ra.json();
+            const asamEntries = (asam.candidatos || []).map(c => ({
+              nombre: c.nombre, slug: c.slug, corp: c.corp,
+              circunscripcion: c.circunscripcion, partido: c.partido,
+              votos: c.votos, tipo: 'candidato',
+              dataUrl: `${ASAM_BASE}/${c.slug}.json`,
+            }));
+            candIndex = candIndex.concat(asamEntries);
+          } catch (e) { console.warn('[Asam] índice de asamblea no disponible:', e.message); }
+        }
 
         // Merge presidenciales (una entrada por persona; el histórico vive en meta.pres)
         if (rp && rp.ok) {

@@ -60,6 +60,17 @@ sin breadcrumb), **Helvetica Neue embebida** (Syne solo en el logo), y suma los
   (`--gold`, badge `.presidente`); el resto en azul con
   `round(100·log10(v+1)/log10(vmax+1))` cap 99 (Cepeda 2V=99 · consulta
   Paloma=92 · top senado≈74). `vmax` viene de `index-presidencial.json`.
+- **Asamblea Departamental 2023** (para cliente potencial): 3.307 candidatos
+  desde `FINAL SUBIDA GCS/GCS_2023TER.csv` (COD_COR='2'). Pipeline
+  `tools/analisis-candidato/build_asamblea_2023.py` → un JSON mesa-a-mesa por
+  candidato (formato endoso) `ASAM2023-{dde}-{par}-{can}.json` + índice, en
+  `Bases de datos/output_asamblea_2023/` (~664 MB, gitignoreado). Asamblea es
+  circunscripción **departamental** (32 deptos, sin Bogotá): cada candidato
+  colorea un solo depto y drilla a sus municipios. `COD_DDE` es Registraduría
+  (Antioquia=1) → casa con el mapa vía `normalizeDepCode`. El buscador lo suma
+  como candidato normal (corp "ASAMBLEA · {DEPTO} · 2023", `dataUrl` propio);
+  score en la misma escala azul global. `?asamlocal=1` lee los JSONs locales.
+  S3: `congreso-2026/output/asamblea-2023/` (subir con `aws s3 cp --recursive`).
 - **Fotos**: los 6 grandes usan `Fotos-presidenciales/{slug}.jpg` (campo `foto`
   del índice); consultas vinculadas caen a esa foto si el endoso jpg no existe.
   **Flujo sistematizado de fotos**: carpeta staging `fotos-candidatos/`
