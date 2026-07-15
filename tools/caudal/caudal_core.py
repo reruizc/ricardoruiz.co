@@ -64,6 +64,58 @@ def _term_match(term, texto_norm):
     return term in texto_norm or _stem(term) in texto_norm
 
 
+# --- capa de sinónimos (tesauro curado) -------------------------------------
+# El índice usa stemmer, no tesauro: 'aborto' NO recupera títulos que dicen
+# 'interrupción voluntaria del embarazo'. Cuando la consulta cae en un tópico
+# curado, la búsqueda pasa de AND-de-palabras a OR sobre TODO el vocabulario del
+# tópico (sube el recall). Cada término es una palabra (≥4 chars, match por
+# substring/raíz) o una frase (todas sus palabras >3 deben aparecer). Curado
+# conservador para no meter ruido; extensible. Todo normalizado (sin tildes,
+# minúsculas). Para agregar un tópico: una entrada {k, terms}.
+SINONIMOS = [
+    {'k': 'aborto / derechos reproductivos', 'terms': [
+        'aborto', 'interrupcion voluntaria del embarazo', 'reproductiva',
+        'reproductivos', 'salud reproductiva']},
+    {'k': 'eutanasia', 'terms': ['eutanasia', 'muerte digna', 'muerte asistida']},
+    {'k': 'paridad de genero', 'terms': ['paridad', 'cuota de genero',
+                                         'participacion politica de las mujeres']},
+    {'k': 'feminicidio', 'terms': ['feminicidio', 'femicidio']},
+    {'k': 'violencia de genero', 'terms': ['violencia contra la mujer',
+                                           'violencia de genero', 'violencia basada en genero']},
+    {'k': 'acoso', 'terms': ['acoso sexual', 'acoso laboral']},
+    {'k': 'trata de personas', 'terms': ['trata de personas', 'explotacion sexual']},
+    {'k': 'cannabis', 'terms': ['cannabis', 'marihuana', 'cannabis medicinal']},
+    {'k': 'dosis minima', 'terms': ['dosis minima', 'dosis personal', 'porte de estupefacientes']},
+    {'k': 'licencia de maternidad', 'terms': ['licencia de maternidad',
+                                              'licencia de paternidad', 'licencia parental']},
+    {'k': 'economia del cuidado', 'terms': ['economia del cuidado',
+                                            'trabajo de cuidado', 'sistema nacional de cuidado']},
+    {'k': 'teletrabajo', 'terms': ['teletrabajo', 'trabajo en casa', 'trabajo remoto']},
+    {'k': 'cambio climatico', 'terms': ['cambio climatico', 'crisis climatica',
+                                        'transicion energetica']},
+    {'k': 'proteccion animal', 'terms': ['proteccion animal', 'maltrato animal',
+                                         'bienestar animal']},
+    {'k': 'victimas del conflicto', 'terms': ['victimas del conflicto',
+                                              'reparacion de victimas']},
+]
+
+
+def _phrase_match(term, texto_norm):
+    """term = palabra o frase; frase casa si todas sus palabras (>3) aparecen."""
+    words = [w for w in term.split() if len(w) > 3]
+    if not words:                       # término corto: substring directo
+        return term in texto_norm
+    return all(_term_match(w, texto_norm) for w in words)
+
+
+def _topicos(query):
+    """Tópicos del tesauro que activa la consulta (por sus propios términos)."""
+    qn = _norm(query or '')
+    if not qn:
+        return []
+    return [t for t in SINONIMOS if any(_phrase_match(term, qn) for term in t['terms'])]
+
+
 class Caudal:
     def __init__(self, indice=None, proyectos=None, autor_partido=None):
         self.indice = indice or []
@@ -95,14 +147,24 @@ class Caudal:
 
     # -------- búsqueda ------------------------------------------------
     def buscar(self, query, anio_min=None, anio_max=None, comision=None,
-               resultado=None, tipologia=None, empuje=None, limit=None):
+               resultado=None, tipologia=None, empuje=None, limit=None, expandir=True):
         """Match por keyword(s) en el título. Devuelve ítems del índice.
-        Filtros F1: tipologia (honores/fondos/…) y empuje (vitrina/empujado/…)."""
-        terms = [_norm(t) for t in query.split() if len(t) > 2] if query else []
+        Filtros F1: tipologia (honores/fondos/…) y empuje (vitrina/empujado/…).
+        `expandir`: si la consulta cae en un tópico del tesauro, matchea por OR
+        sobre su vocabulario (capa de sinónimos); si no, AND de palabras (literal)."""
+        topicos = _topicos(query) if (query and expandir) else []
+        if topicos:
+            or_terms = [term for t in topicos for term in t['terms']]
+            def _match(titulo):
+                return any(_phrase_match(term, titulo) for term in or_terms)
+        else:
+            base = [_norm(w) for w in query.split() if len(w) > 2] if query else []
+            def _match(titulo):
+                return all(_term_match(w, titulo) for w in base)
         out = []
         for it in self.indice:
             t = _norm(it['t'])
-            if terms and not all(_term_match(term, t) for term in terms):
+            if query and not _match(t):
                 continue
             if anio_min and (it['a'] or 0) < anio_min:
                 continue
@@ -161,13 +223,24 @@ class Caudal:
         # sugerencia de ampliar: si el query tiene ≥2 palabras y la intersección
         # (AND) es chica, ofrece el término más distintivo (el más raro, que suele
         # ser el "tema" real) porque recupera más. Ej: «reforma pensional» → «pensional».
+        # capa de sinónimos: si la consulta cayó en tópico(s) curados, la búsqueda
+        # ya se expandió (OR sobre su vocabulario) — no se ofrece broaden.
+        topicos = _topicos(query)
         broaden = None
         terms = [t for t in query.split() if len(t) > 2] if query else []
-        if len(terms) >= 2:
-            counts = [(t, len(self.buscar(t))) for t in terms]
+        if not topicos and len(terms) >= 2:
+            counts = [(t, len(self.buscar(t, expandir=False))) for t in terms]
             t_rare, c_rare = min(counts, key=lambda x: x[1])
             if c_rare > n:
                 broaden = {'term': t_rare, 'count': c_rare}
+        sinonimos = None
+        if topicos:
+            incluye = []
+            for t in topicos:
+                for term in t['terms']:
+                    if term not in incluye:
+                        incluye.append(term)
+            sinonimos = {'topicos': [t['k'] for t in topicos], 'incluye': incluye}
         return {
             'query': query, 'n_intentos': n,
             'n_leyes': len(leyes), 'n_caidos': len(caidos),
@@ -184,6 +257,7 @@ class Caudal:
             'n_vitrina': n_vitrina, 'n_honores': n_honores,
             'pct_vitrina': round(100 * n_vitrina / n, 1) if n else 0,
             'broaden': broaden,
+            'sinonimos': sinonimos,
             'intentos': [{
                 'id': h['id'], 'tb': h.get('tb', 'pdly'), 'anio': h['a'], 'leg': h['leg'],
                 'titulo': h['t'], 'resultado': h['res'],

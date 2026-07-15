@@ -4965,9 +4965,23 @@ Refinamientos opcionales del join autor→partido: (a) más años de Congreso (p
 para cubrir legisladores viejos; (b) ampliar `MANUAL`; (c) votación nominal por
 bancada (necesita actas de gaceta, fase 3).
 
-**Gotcha de búsqueda:** el índice usa stemmer, no tesauro. Para temas con
-vocabulario disperso (varios nombres para lo mismo) conviene, más adelante, una
-capa de sinónimos curada o un stemmer Snowball español completo.
+**Búsqueda + capa de sinónimos (LISTO · jul-2026):** el índice usa un stemmer
+ligero (`_stem`) que tolera erratas del Congreso, y ahora una **capa de sinónimos
+curada** (`SINONIMOS` en `caudal_core.py`) para temas de vocabulario disperso.
+Cuando la consulta cae en un tópico curado, la búsqueda pasa de AND-de-palabras a
+**OR sobre todo el vocabulario del tópico** (más recall); fuera de tópico se
+comporta idéntico a antes (cero regresión). Cada tópico `{k, terms}`; los `terms`
+cumplen doble rol: **disparan** el tópico desde la consulta Y **expanden** el
+match (palabra ≥4 chars por substring/raíz · frase = todas sus palabras >3).
+15 tópicos hoy (aborto/derechos reproductivos, eutanasia↔muerte digna, paridad↔
+cuota de género, cannabis, protección animal, trata de personas, etc.). Hallazgo
+clave: el Congreso **no titula "aborto"** (0 hits) — el debate vive como "derechos
+sexuales y reproductivos"/"salud reproductiva" (→ ahora 12). `resumen_tema`
+devuelve `sinonimos:{topicos,incluye}`; el frontend lo muestra ("Búsqueda por
+tema · se incluyen: …") y suprime el hint de `broaden` en ese caso. **Agregar un
+tópico:** una entrada en `SINONIMOS` + validar contra el vocabulario REAL de los
+títulos (no el conceptual) + `build_zip.py` + `update-function-code`. Para casos
+no cubiertos, sigue disponible el stemmer Snowball español completo como upgrade.
 
 ### Arquitectura Caudal · paraguas vs pilares (aclaración conceptual jul-2026)
 
