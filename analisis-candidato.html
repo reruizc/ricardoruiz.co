@@ -1079,6 +1079,7 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="cand-index.js?v=20260715"></script>
   <script>
     // ─── CONFIG ───────────────────────────────────────────────
     const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
@@ -2627,28 +2628,13 @@
     // ─── LOAD INDEX ───────────────────────────────────────────
     async function loadIndex() {
       try {
-        const [r, rp, ra] = await Promise.all([
-          fetch(`${S3}/endoso/index.json`),
-          fetch(`${PRES_BASE}/index-presidencial.json`).catch(() => null),
-          fetch(`${ASAM_BASE}/index-asamblea-2023.json`).catch(() => null),
-        ]);
-        if (!r.ok) throw new Error(`index.json devolvió ${r.status}`);
-        candIndex = (await r.json()).filter(c => !isPartyEntry(c));
+        // Base compartida (cand-index.js): endoso (Congreso + Consultas) + Asamblea 2023
+        // + futuras candidaturas. `?asamlocal=1` apunta la base de asamblea al repo local.
+        const _bases = ASAM_BASE.startsWith('http') ? undefined : { asamblea: ASAM_BASE };
+        candIndex = await CandRegistry.load({ includeParties: false, bases: _bases });
+        if (!candIndex.length) throw new Error('índice de candidatos vacío');
 
-        // Merge Asamblea Departamental 2023 (candidatos normales con dataUrl propio)
-        if (ra && ra.ok) {
-          try {
-            const asam = await ra.json();
-            const asamEntries = (asam.candidatos || []).map(c => ({
-              nombre: c.nombre, slug: c.slug, corp: c.corp,
-              circunscripcion: c.circunscripcion, partido: c.partido,
-              votos: c.votos, tipo: 'candidato',
-              dataUrl: `${ASAM_BASE}/${c.slug}.json`,
-            }));
-            candIndex = candIndex.concat(asamEntries);
-          } catch (e) { console.warn('[Asam] índice de asamblea no disponible:', e.message); }
-        }
-
+        const rp = await fetch(`${PRES_BASE}/index-presidencial.json`).catch(() => null);
         // Merge presidenciales (una entrada por persona; el histórico vive en meta.pres)
         if (rp && rp.ok) {
           try {

@@ -71,6 +71,17 @@ sin breadcrumb), **Helvetica Neue embebida** (Syne solo en el logo), y suma los
   como candidato normal (corp "ASAMBLEA · {DEPTO} · 2023", `dataUrl` propio);
   score en la misma escala azul global. `?asamlocal=1` lee los JSONs locales.
   S3: `congreso-2026/output/asamblea-2023/` (subir con `aws s3 cp --recursive`).
+- **Base compartida `cand-index.js`** (jul-2026): registro único de candidatos
+  con datos mesa-a-mesa, consumido por **analisis-candidato.html**,
+  **endoso-2026.html** y **comparar-candidatos.html** (`<script src="cand-index.js">`).
+  `window.CandRegistry.load({includeParties,bases})` fusiona los índices de todas
+  las fuentes (`SOURCES` = endoso + asamblea-2023, extensible) en una lista con
+  `dataUrl` por candidato; `CandRegistry.dataUrlFor(slug)` resuelve slug → JSON.
+  **Para ampliar a más candidaturas (concejos, JAL, …): agregar una entrada a
+  `SOURCES` y las tres páginas la reciben** — no hay que tocar cada HTML.
+  Presidenciales NO están en el registro (modelo por-persona con histórico);
+  analisis-candidato los agrega encima leyendo `index-presidencial.json`.
+  endoso mantiene partidos en el buscador; comparar y analisis-candidato los filtran.
 - **Fotos**: los 6 grandes usan `Fotos-presidenciales/{slug}.jpg` (campo `foto`
   del índice); consultas vinculadas caen a esa foto si el endoso jpg no existe.
   **Flujo sistematizado de fotos**: carpeta staging `fotos-candidatos/`
@@ -78,8 +89,9 @@ sin breadcrumb), **Helvetica Neue embebida** (Syne solo en el logo), y suma los
   `tools/fotos-candidatos/sync.py`: `status` cruza índice vs S3 y escribe
   `pendientes.csv` con los slugs exactos ordenados por votos (Ricardo genera la
   imagen en NanoBanana y la guarda como `pendientes/{SLUG}.png`); `subir`
-  normaliza (JPG, máx 1200 px vía sips) → S3 `fotos-candidatos/{SLUG}.jpg` →
-  mueve a subidas/. Valida slugs contra el índice (`--force` para saltar).
+  normaliza (JPG, crop-to-fill centrado al tamaño editorial fijo **1248×864** vía
+  sips) → S3 `fotos-candidatos/{SLUG}.jpg` → mueve a subidas/. Valida slugs contra
+  el índice —endoso + presidenciales + Asamblea— (`--force` para saltar).
 
 ## Módulo Veleta — `veleta.html` (LISTO · B2B)
 

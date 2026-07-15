@@ -782,6 +782,7 @@
     <span class="footer-brand"><a href="https://registraduria.gov.co" target="_blank">Fuente: Registraduría Nacional</a></span>
   </div>
 
+  <script src="cand-index.js?v=20260715"></script>
   <script>
     // ─── CONFIG ───────────────────────────────────────────────
     const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
@@ -812,9 +813,9 @@
     async function loadIndex() {
       document.getElementById('load-progress').textContent = 'Conectando con S3…';
       try {
-        const r = await fetch(`${S3}/endoso/index.json`);
-        if (!r.ok) throw new Error(`index.json devolvió ${r.status}`);
-        candIndex = await r.json();
+        // Base compartida (cand-index.js): endoso + Asamblea 2023 + futuras candidaturas.
+        candIndex = await CandRegistry.load();   // incluye partidos (esta página los compara)
+        if (!candIndex.length) throw new Error('índice vacío');
         document.getElementById('meta-cands').textContent = candIndex.length.toLocaleString('es-CO');
         document.getElementById('load-state').classList.add('hidden');
         document.getElementById('main-content').classList.remove('hidden');
@@ -998,7 +999,7 @@
 
     // ─── FETCH CANDIDATE JSON ─────────────────────────────────
     async function fetchCand(slug) {
-      const r = await fetch(`${S3}/endoso/${slug}.json`);
+      const r = await fetch(CandRegistry.dataUrlFor(slug));   // endoso, asamblea, … según la fuente
       if (!r.ok) throw new Error(`No se encontró ${slug}.json (${r.status})`);
       return await r.json();
     }

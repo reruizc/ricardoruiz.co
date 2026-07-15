@@ -424,6 +424,7 @@
   </div><!-- /shell -->
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="cand-index.js?v=20260715"></script>
   <script>
     // ─── CONFIG ──────────────────────────────────────────────────
     const S3        = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
@@ -491,9 +492,9 @@
     // ─── INDEX LOADER ────────────────────────────────────────────
     async function loadIndex() {
       try {
-        const r = await fetch(`${S3}/endoso/index.json`);
-        if (!r.ok) throw new Error();
-        candIndex = (await r.json()).filter(c => !isPartyEntry(c));
+        // Base compartida (cand-index.js): endoso + Asamblea 2023 + futuras candidaturas.
+        candIndex = await CandRegistry.load({ includeParties: false });
+        if (!candIndex.length) throw new Error();
         const hint = document.getElementById('search-hint');
         if (hint) hint.textContent = `${candIndex.length.toLocaleString('es-CO')} candidatos cargados`;
       } catch {
@@ -592,7 +593,7 @@
 
     async function fetchData(slug) {
       try {
-        const r = await fetch(`${S3}/endoso/${slug}.json`);
+        const r = await fetch(CandRegistry.dataUrlFor(slug));   // endoso, asamblea, … según la fuente
         if (!r.ok) throw new Error();
         return await r.json();
       } catch {
