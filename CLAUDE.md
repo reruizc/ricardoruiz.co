@@ -5489,7 +5489,12 @@ verde `#4ade80` (Volver / Planes & Precios). **Oscuro único: SIN modo día**
 **Convertidas:** `index.html` (portada de cuadros + pestañas Inicio/Proyectos/
 Servicios, hero "Datos que <verbo> <sustantivo>" rotando, cuadros con imagen en
 `imagenes-index/`, modal contacto correo/WhatsApp), `electoral.html`,
-`perfil.html`, `pricing.html`, `descargas.html`, `pago-confirmado.html` (nueva).
+`perfil.html`, `pricing.html`, `descargas.html`, `pago-confirmado.html` (nueva),
+`analisis-candidato.html`, `endoso-2026.html`, `comparar-candidatos.html`
+(estas 3 comparten el nav v2 + `cand-index.js`; endoso/comparar perdieron el
+modo día/noche). **En Asamblea la comparación geográfica es departamental** (no
+nacional): comparar baja el radar a "Presencia por municipios" y endoso arranca
+el drill en el departamento del candidato (helper `isDeptRace`/`initialDrill`).
 **Pendientes:** noticias, dashboard, login/register, resto.
 
 Reglas al convertir una página:
