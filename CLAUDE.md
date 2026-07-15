@@ -32,6 +32,44 @@
   campo `contribuciones`). Cada punto del eje X es una semana ISO; cada línea
   un candidato. Debería respetar el toggle día/noche y la paleta del proyecto.
 
+## Análisis de Candidato — `analisis-candidato.html` (reestructurado jul-2026 · sistema visual v2)
+
+Perfil electoral por candidato (buscador + foto + mapa Leaflet + radar + score).
+Reestructura de jul-2026: **nav idéntica a index.html** (sin modo día/noche,
+sin breadcrumb), **Helvetica Neue embebida** (Syne solo en el logo), y suma los
+**candidatos presidenciales 1V + 2V** al buscador de congreso/consultas.
+
+- **Datos presidenciales**: `tools/analisis-candidato/build_presidenciales.py`
+  genera 16 JSONs mesa-a-mesa (13 de 1V + Cepeda/Abelardo 2V + índice) en el
+  MISMO formato `endoso/{slug}.json`, desde `PRECONTEO_1V_2026_MESA_con_Claudia.csv`
+  + `output_2v/PRECONTEO_2V_2026_MESA.csv` + PUESTOS_GEOREF (nombres). Output
+  local gitignoreado: `Bases de datos/output_presidencial_endoso/` (~170 MB).
+  Valida contra los 7 totales oficiales del 0247. S3 (frontend lo consume):
+  ```
+  aws s3 cp "Bases de datos/output_presidencial_endoso/" \
+    "s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/presidencial/" \
+    --recursive --content-type "application/json" --cache-control "public, max-age=300"
+  ```
+  El frontend tolera 404 del índice (los presidenciales simplemente no aparecen).
+  `?preslocal=1` lee los JSONs locales del repo (verificación pre-subida).
+- **Histórico electoral**: una entrada por persona en el buscador
+  (`PRES-{persona}`); barra bajo la foto con consulta · 1V · 2V (clickeable,
+  cambia la elección cargada). Las consultas se vinculan por slug del índice
+  endoso (Paloma/Claudia/Roy).
+- **Score renormalizado**: Abelardo 2V (presidente) = **100 en dorado**
+  (`--gold`, badge `.presidente`); el resto en azul con
+  `round(100·log10(v+1)/log10(vmax+1))` cap 99 (Cepeda 2V=99 · consulta
+  Paloma=92 · top senado≈74). `vmax` viene de `index-presidencial.json`.
+- **Fotos**: los 6 grandes usan `Fotos-presidenciales/{slug}.jpg` (campo `foto`
+  del índice); consultas vinculadas caen a esa foto si el endoso jpg no existe.
+  **Flujo sistematizado de fotos**: carpeta staging `fotos-candidatos/`
+  (pendientes/ + subidas/ + LEEME.md, gitignoreada) +
+  `tools/fotos-candidatos/sync.py`: `status` cruza índice vs S3 y escribe
+  `pendientes.csv` con los slugs exactos ordenados por votos (Ricardo genera la
+  imagen en NanoBanana y la guarda como `pendientes/{SLUG}.png`); `subir`
+  normaliza (JPG, máx 1200 px vía sips) → S3 `fotos-candidatos/{SLUG}.jpg` →
+  mueve a subidas/. Valida slugs contra el índice (`--force` para saltar).
+
 ## Módulo Veleta — `veleta.html` (LISTO · B2B)
 
 Producto B2B para equipos de campaña: mapa de **municipios sensibles al cambio

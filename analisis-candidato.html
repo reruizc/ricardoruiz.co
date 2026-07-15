@@ -3,13 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mapa Candidato · Congreso 2026 · Ricardo Ruiz</title>
+  <title>Análisis de Candidato · Elecciones 2026 · Ricardo Ruiz</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <style>
+    /* Helvetica Neue embebida (sistema visual v2). El logo va aparte en Syne. */
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-thin.woff2') format('woff2'); font-weight:200; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-light.woff2') format('woff2'); font-weight:300; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-medium.woff2') format('woff2'); font-weight:500; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-bold.woff2') format('woff2'); font-weight:600 900; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-italic.woff2') format('woff2'); font-weight:400; font-style:italic; font-display:swap; }
+
     /* ─── RESET & TOKENS ─── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -19,10 +27,12 @@
       --card-border: rgba(255,255,255,.10);
       --white: #f4f3ef;
       --blue: #0047FF;
+      --blue-light: #3d6fff;
       --green: #4ade80;
       --purple: #a78bfa;
-      --orange: #fb923c;
+      --orange: #f97316;
       --red: #f87171;
+      --gold: #e8b93b;
       --izq: #e53e3e;
       --der: #2563eb;
     }
@@ -30,115 +40,88 @@
     body {
       background: var(--bg);
       color: var(--white);
-      font-family: 'Syne', sans-serif;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       cursor: none;
       min-height: 100vh;
       overflow-x: hidden;
     }
-
-    /* ─── DAY MODE ─── */
-    body.day-mode { background: #e6ded3; color: #0d1120; }
-    body.day-mode .electoral-nav { background: rgba(230,222,211,.93); border-bottom: 1px solid rgba(0,0,0,.1); }
-    body.day-mode .logo-text { color: #0d1120; }
-    body.day-mode .pes-panel { background: #1a1d2e; color: var(--white); }
-    body.day-mode .search-panel { background: rgba(213,205,193,.55); border-color: rgba(0,0,0,.1); }
-    body.day-mode .search-label { color: rgba(0,0,0,.45); }
-    body.day-mode .search-hint { color: rgba(0,0,0,.28); }
-    body.day-mode .loader-label { color: rgba(0,0,0,.4); }
-    body.day-mode .placeholder-state { color: rgba(0,0,0,.18); }
-    body.day-mode .ac-input { background: rgba(255,255,255,.7); border: 1px solid rgba(0,0,0,.2); color: #0d1120; }
-    body.day-mode .ac-input::placeholder { color: rgba(0,0,0,.3); }
-    body.day-mode .ac-dropdown { background: #f5f0ea; border-color: rgba(0,71,255,.3); box-shadow: 0 4px 20px rgba(0,0,0,.12); }
-    body.day-mode .ac-item { color: rgba(0,0,0,.75); border-bottom-color: rgba(0,0,0,.06); }
-    body.day-mode .ac-item:hover, body.day-mode .ac-item.highlighted { background: rgba(0,71,255,.07); }
-    body.day-mode .ac-item .ac-corp { color: rgba(0,0,0,.4); }
-    body.day-mode .theme-btn { background: rgba(0,71,255,.08); border-color: rgba(0,71,255,.25); color: var(--blue); }
-    body.day-mode .full-footer { border-top-color: rgba(0,0,0,.1); }
-    body.day-mode .footer-brand { color: rgba(0,0,0,.35); }
-    body.day-mode .footer-brand a { color: rgba(0,0,0,.3); }
-    body.day-mode .breadcrumb { color: rgba(0,0,0,.4); border-bottom-color: rgba(0,0,0,.1); }
-    body.day-mode .e-btn-login { color: rgba(0,0,0,.6); border-color:transparent; }
-    body.day-mode .e-btn-register { color: var(--white); }
-    body.day-mode .e-user-name { color:#0d1120; border-color:rgba(0,0,0,.22); }
-    body.day-mode .e-user-plan { color:var(--blue); background:rgba(0,71,255,.1); }
-    body.day-mode .e-btn-logout { color:rgba(0,0,0,.55); border-color:rgba(0,0,0,.22); }
-    body.day-mode .e-btn-logout:hover { color:#0d1120; border-color:rgba(0,0,0,.5); }
-    body.day-mode .country-btn { color:rgba(0,0,0,.45); border-color:rgba(0,0,0,.18); }
-    body.day-mode .country-btn:hover, body.day-mode .country-btn.open { color:#0d1120; border-color:rgba(0,0,0,.4); }
-    body.day-mode .country-dropdown { background:#fff; border-color:rgba(0,0,0,.12); }
-    body.day-mode .country-option { color:rgba(0,0,0,.6); border-bottom-color:rgba(0,0,0,.07); }
-    body.day-mode .country-option:hover { background:rgba(0,71,255,.04); }
+    .bg-layer { position: fixed; inset: 0; z-index: 0;
+      background:
+        radial-gradient(1100px 600px at 78% -8%, rgba(0,71,255,0.18), transparent 60%),
+        radial-gradient(900px 500px at 12% 108%, rgba(0,71,255,0.10), transparent 60%),
+        #060810;
+      pointer-events: none; }
 
     /* ─── CURSOR ─── */
     .cursor { position:fixed; width:10px; height:10px; background:var(--blue); border-radius:50%; pointer-events:none; z-index:9999; transform:translate(-50%,-50%); transition:transform .15s, background .2s; }
     .cursor-ring { position:fixed; width:32px; height:32px; border:1.5px solid var(--blue); border-radius:50%; pointer-events:none; z-index:9998; transform:translate(-50%,-50%); opacity:.4; }
 
-    /* ─── NAV ─── */
-    .electoral-nav { position:relative; z-index:10; display:flex; align-items:center; justify-content:space-between; padding:.9rem 2.5rem; border-bottom:1px solid rgba(255,255,255,.06); background:rgba(4,6,16,.6); backdrop-filter:blur(8px); flex-shrink:0; }
-    .logo-link { display:flex; align-items:center; gap:.55rem; text-decoration:none; opacity:.8; transition:opacity .2s; }
-    .logo-link:hover { opacity:1; }
-    .logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
-    .logo-bar { width:5px; background:var(--blue); border-radius:1px 1px 0 0; }
-    .logo-text { font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(1.1rem,2vw,1.8rem); letter-spacing:-.03em; color:var(--white); }
-    .logo-text span { color:var(--blue); }
-    .electoral-nav-auth { display:flex; align-items:center; gap:.75rem; }
-    .e-btn-login { font-family:'Syne',sans-serif; font-size:.782rem; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,.45); text-decoration:none; border:1.5px solid transparent; padding:.35rem .8rem; transition:color .2s,border-color .2s; cursor:none; background:none; }
-    .e-btn-login:hover { color:var(--white); border-color:rgba(255,255,255,.2); }
-    .e-btn-register { font-family:'Syne',sans-serif; font-size:.782rem; letter-spacing:.08em; text-transform:uppercase; color:var(--white); text-decoration:none; background:var(--blue); border:1.5px solid var(--blue); padding:.35rem .8rem; }
-    .e-user-name { font-family:'Syne',sans-serif; font-size:.782rem; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,.7); text-decoration:none; border:1.5px solid transparent; padding:.3rem .8rem; }
-    .e-user-plan { font-family:'Syne',sans-serif; font-size:.69rem; letter-spacing:.08em; text-transform:uppercase; color:var(--blue); background:rgba(0,71,255,.12); padding:.2rem .6rem; }
-    .e-btn-logout { font-family:'Syne',sans-serif; font-size:.782rem; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,.25); background:none; border:1.5px solid transparent; padding:.3rem .8rem; cursor:none; transition:color .2s,border-color .2s; }
-    .e-btn-back { font-family:'Syne',sans-serif; font-size:.782rem; letter-spacing:.08em; text-transform:uppercase; color:var(--green); text-decoration:none; border:1.5px solid rgba(74,222,128,.4); padding:.3rem .8rem; transition:color .2s,border-color .2s,background .2s; flex-shrink:0; }
-    .e-btn-back:hover { color:#060810; background:var(--green); border-color:var(--green); }
-    .theme-btn { display:flex; align-items:center; gap:.4rem; font-family:'Syne',sans-serif; font-size:.7475rem; letter-spacing:.08em; text-transform:uppercase; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:rgba(255,255,255,.6); padding:.3rem .75rem; cursor:pointer; transition:all .2s; flex-shrink:0; }
-    .theme-btn:hover { background:rgba(255,255,255,.15); color:var(--white); }
-    .country-selector-wrap { position:relative; }
-    .country-btn { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,.4); background:none; border:1px solid rgba(255,255,255,.15); padding:.3rem .65rem; cursor:none; display:flex; align-items:center; transition:border-color .2s,color .2s; }
-    .country-btn:hover,.country-btn.open { border-color:rgba(255,255,255,.35); color:rgba(255,255,255,.7); }
-    .country-dropdown { position:absolute; top:calc(100% + 8px); right:0; background:#0e1220; border:1px solid rgba(255,255,255,.12); min-width:190px; display:none; flex-direction:column; z-index:200; box-shadow:0 8px 24px rgba(0,0,0,.2); }
-    .country-dropdown.open { display:flex; }
-    .country-option { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.05em; padding:.65rem 1rem; cursor:pointer; display:flex; align-items:center; gap:.5rem; color:rgba(255,255,255,.5); border-bottom:1px solid rgba(255,255,255,.07); transition:background .15s; user-select:none; }
-    .country-option:last-child { border-bottom:none; }
-    .country-option:hover { background:rgba(255,255,255,.05); color:rgba(255,255,255,.8); }
-    .country-option.selected { color:var(--blue); }
-    .country-check { font-size:.6rem; width:12px; opacity:0; color:var(--blue); }
-    .country-option.selected .country-check { opacity:1; }
+    /* ─── NAV (misma barra de index.html · sistema visual v2) ─── */
+    .electoral-nav{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(4,6,16,.6);backdrop-filter:blur(8px);flex-shrink:0}
+    .e-nav-left{display:flex;align-items:center;gap:1rem;min-width:0}
+    .e-nav-right{display:flex;align-items:center;gap:1.2rem;flex-shrink:0}
+    .electoral-nav-auth{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
+    .e-btn-login{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-decoration:none;background:var(--orange);border:1.5px solid var(--orange);padding:.35rem .8rem;transition:background .2s,border-color .2s;cursor:none;white-space:nowrap}
+    .e-btn-login:hover{background:#ea6d0d;border-color:#ea6d0d}
+    .e-btn-profile{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-decoration:none;background:var(--orange);border:1.5px solid var(--orange);padding:.35rem .8rem;transition:background .2s,border-color .2s;cursor:none;white-space:nowrap}
+    .e-btn-profile:hover{background:#ea6d0d;border-color:#ea6d0d}
+    .e-btn-register{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-decoration:none;background:var(--blue);border:1.5px solid var(--blue);padding:.35rem .8rem;white-space:nowrap;cursor:none}
+    .e-btn-register:hover{background:#0035cc;border-color:#0035cc}
+    .e-user-plan{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.69rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue-light);background:rgba(0,71,255,.12);padding:.2rem .6rem;text-decoration:none;white-space:nowrap}
+    .e-btn-logout{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.25);background:none;border:none;cursor:none;padding:0;white-space:nowrap}
+    .e-btn-logout:hover{color:rgba(255,255,255,.6)}
+    .e-btn-back{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:var(--green);text-decoration:none;border:1.5px solid rgba(74,222,128,.55);padding:.35rem .8rem;transition:color .2s,border-color .2s,background .2s;flex-shrink:0;white-space:nowrap;cursor:none}
+    .e-btn-back:hover{color:#060810;background:var(--green);border-color:var(--green)}
+    .country-selector-wrap{position:relative}
+    .country-btn{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-weight:500;font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.45);background:none;border:1px solid rgba(255,255,255,.15);padding:.3rem .65rem;cursor:none;display:flex;align-items:center;transition:border-color .2s,color .2s;white-space:nowrap}
+    .country-btn:hover,.country-btn.open{border-color:rgba(255,255,255,.35);color:rgba(255,255,255,.7)}
+    .country-btn.open #countryChevron{transform:rotate(180deg)}
+    .country-dropdown{position:absolute;top:calc(100% + 8px);right:0;background:#0e1220;border:1px solid rgba(255,255,255,.12);min-width:200px;display:none;flex-direction:column;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+    .country-dropdown.open{display:flex}
+    .country-option{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-weight:500;font-size:.68rem;letter-spacing:.04em;padding:.65rem 1rem;cursor:none;display:flex;align-items:center;gap:.5rem;color:rgba(255,255,255,.5);border-bottom:1px solid rgba(255,255,255,.07);transition:background .15s;user-select:none}
+    .country-option:last-child{border-bottom:none}
+    .country-option:hover{background:rgba(255,255,255,.05);color:rgba(255,255,255,.8)}
+    .country-option.selected{color:var(--blue)}
+    .country-check{font-size:.6rem;width:12px;opacity:0;color:var(--blue)}
+    .country-option.selected .country-check{opacity:1}
+    .logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.85;transition:opacity .2s;flex-shrink:0;cursor:none}
+    .logo-link:hover{opacity:1}
+    .logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px}
+    .logo-bar{width:5px;background:var(--blue);border-radius:1px 1px 0 0;opacity:.85}
+    .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.1rem,2vw,1.8rem);letter-spacing:-.03em;color:var(--white);line-height:1}
+    .logo-text span{color:var(--blue)}
     /* LOGIN MODAL */
     .login-overlay{position:fixed;inset:0;z-index:50000;display:flex;align-items:center;justify-content:center;background:rgba(4,6,16,.78);backdrop-filter:blur(4px)}
     .login-overlay.hidden{display:none!important}
     .login-modal{background:#0e1220;border:1px solid rgba(255,255,255,.12);padding:2.2rem 2rem;max-width:360px;width:90%;text-align:center}
-    .login-modal-title{font-family:'Syne',sans-serif;font-weight:800;font-size:1.15rem;letter-spacing:-.02em;color:var(--white);margin-bottom:.4rem}
-    .login-modal-sub{font-family:'Syne',sans-serif;font-size:.78rem;letter-spacing:.05em;color:rgba(255,255,255,.4);margin-bottom:1.4rem}
-    .login-modal input{width:100%;box-sizing:border-box;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:var(--white);font-family:'DM Mono',monospace;font-size:.8rem;padding:.55rem .8rem;margin-bottom:.65rem;outline:none}
+    .login-modal-title{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-weight:800;font-size:1.15rem;letter-spacing:-.02em;color:var(--white);margin-bottom:.4rem}
+    .login-modal-sub{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.78rem;letter-spacing:.05em;color:rgba(255,255,255,.4);margin-bottom:1.4rem}
+    .login-modal input{width:100%;box-sizing:border-box;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:var(--white);font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.8rem;padding:.55rem .8rem;margin-bottom:.65rem;outline:none}
     .login-modal input:focus{border-color:var(--blue)}
     .login-modal input::placeholder{color:rgba(255,255,255,.25)}
-    .login-modal-err{font-family:'Syne',sans-serif;font-size:.75rem;color:#ff5c5c;min-height:1rem;margin-bottom:.75rem;display:none}
+    .login-modal-err{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.75rem;color:#ff5c5c;min-height:1rem;margin-bottom:.75rem;display:none}
     .login-modal-err.visible{display:block}
     .login-modal-actions{display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap}
-    .login-modal-btn{font-family:'Syne',sans-serif;font-size:.782rem;letter-spacing:.1em;text-transform:uppercase;background:var(--blue);color:var(--white);border:none;padding:.55rem 1.6rem;cursor:pointer}
+    .login-modal-btn{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.782rem;letter-spacing:.1em;text-transform:uppercase;background:var(--blue);color:var(--white);border:none;padding:.55rem 1.6rem;cursor:pointer}
     .login-modal-btn:hover{background:#0035cc}
-    .login-modal-cancel{font-family:'Syne',sans-serif;font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.35);background:none;border:none;cursor:pointer;padding:.55rem .6rem}
+    .login-modal-cancel{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.35);background:none;border:none;cursor:pointer;padding:.55rem .6rem}
     .login-modal-cancel:hover{color:rgba(255,255,255,.65)}
-
-    /* ─── BREADCRUMB ─── */
-    .breadcrumb { padding:.6rem 2.5rem; font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.3); border-bottom:1px solid var(--border); }
-    .breadcrumb a { color:rgba(0,71,255,.7); text-decoration:none; }
 
     /* ─── SEARCH PANEL ─── */
     .search-panel { padding:1.4rem 2.5rem; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:1.2rem; flex-wrap:wrap; }
-    .search-label { font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.2em; text-transform:uppercase; color:rgba(255,255,255,.3); white-space:nowrap; }
+    .search-label { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-size:.62rem; letter-spacing:.2em; text-transform:uppercase; color:rgba(255,255,255,.3); white-space:nowrap; }
     .ac-wrap { position:relative; width:340px; max-width:100%; }
-    .ac-input { background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); color:var(--white); font-family:'DM Mono',monospace; font-size:.858rem; padding:.5rem .8rem; width:100%; outline:none; transition:border-color .2s,background .2s; }
+    .ac-input { background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); color:var(--white); font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-size:.858rem; padding:.5rem .8rem; width:100%; outline:none; transition:border-color .2s,background .2s; }
     .ac-input:focus { border-color:rgba(0,71,255,.5); background:rgba(0,71,255,.06); }
     .ac-input::placeholder { color:rgba(255,255,255,.25); }
     .ac-input.selected { border-color:rgba(0,71,255,.4); background:rgba(0,71,255,.08); }
     .ac-dropdown { position:absolute; top:100%; left:0; right:0; background:#0d0f1a; border:1px solid rgba(0,71,255,.3); border-top:none; z-index:1000; max-height:260px; overflow-y:auto; display:none; }
     .ac-dropdown.open { display:block; }
-    .ac-item { padding:.55rem .8rem; font-family:'DM Mono',monospace; font-size:.7rem; color:rgba(255,255,255,.7); cursor:pointer; border-bottom:1px solid rgba(255,255,255,.05); transition:background .1s; line-height:1.4; }
+    .ac-item { padding:.55rem .8rem; font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-size:.7rem; color:rgba(255,255,255,.7); cursor:pointer; border-bottom:1px solid rgba(255,255,255,.05); transition:background .1s; line-height:1.4; }
     .ac-item:hover, .ac-item.highlighted { background:rgba(0,71,255,.15); color:var(--white); }
     .ac-item .ac-corp { color:rgba(255,255,255,.3); font-size:.6rem; display:block; margin-top:2px; }
     .ac-item mark { background:transparent; color:var(--blue); font-weight:700; }
-    .search-hint { font-family:'DM Mono',monospace; font-size:1.2rem; color:rgba(255,255,255,.35); }
+    .search-hint { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-size:1.2rem; color:rgba(255,255,255,.35); }
 
     /* ─── MAIN LAYOUT ─── */
     .shell { position:relative; z-index:2; min-height:100vh; display:flex; flex-direction:column; }
@@ -148,10 +131,10 @@
     .loader-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1rem; min-height:300px; }
     .loader-ring { width:40px; height:40px; border:2px solid rgba(0,71,255,.2); border-top-color:var(--blue); border-radius:50%; animation:spin .8s linear infinite; }
     @keyframes spin { to { transform:rotate(360deg); } }
-    .loader-label { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.3); }
+    .loader-label { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-size:.65rem; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.3); }
 
     /* ─── PLACEHOLDER ─── */
-    .placeholder-state { text-align:center; padding:5rem 2rem; color:rgba(255,255,255,.25); font-family:'DM Mono',monospace; font-size:2rem; letter-spacing:.06em; text-transform:uppercase; line-height:2; }
+    .placeholder-state { text-align:center; padding:5rem 2rem; color:rgba(255,255,255,.25); font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-size:2rem; letter-spacing:.06em; text-transform:uppercase; line-height:2; }
     .placeholder-state .pes-hint { font-size:3rem; opacity:.15; margin-bottom:1rem; }
 
     /* ─── PES LAYOUT ─── */
@@ -180,7 +163,7 @@
       border-bottom: 1px solid rgba(0,71,255,.3);
     }
     .pes-panel-title {
-      font-family: 'DM Mono', monospace;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-size: .62rem;
       letter-spacing: .2em;
       text-transform: uppercase;
@@ -188,7 +171,7 @@
       font-weight: 700;
     }
     .pes-nav-hint {
-      font-family: 'DM Mono', monospace;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-size: .624rem;
       letter-spacing: .1em;
       color: rgba(255,255,255,.35);
@@ -212,7 +195,7 @@
       flex: 1;
     }
     .map-filter-label {
-      font-family: 'DM Mono', monospace;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-size: .572rem;
       letter-spacing: .15em;
       text-transform: uppercase;
@@ -222,7 +205,7 @@
       background: rgba(255,255,255,.08);
       border: 1px solid rgba(255,255,255,.18);
       color: var(--white);
-      font-family: 'DM Mono', monospace;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-size: .715rem;
       padding: .35rem .6rem;
       width: 100%;
@@ -248,7 +231,7 @@
       align-items: center;
       justify-content: center;
       background: rgba(6,8,16,.85);
-      font-family: 'DM Mono', monospace;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-size: .65rem;
       letter-spacing: .15em;
       text-transform: uppercase;
@@ -272,7 +255,7 @@
     .leaflet-control-attribution {
       background: rgba(6,8,16,.85) !important;
       color: rgba(255,255,255,.25) !important;
-      font-family: 'DM Mono', monospace !important;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif !important;
       font-size: .45rem !important;
     }
     .leaflet-control-attribution a { color: rgba(0,71,255,.6) !important; }
@@ -294,7 +277,7 @@
     #btn-volver-pais {
       display: none;
       margin-left: auto;
-      font-family: 'DM Mono', monospace;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-size: .62rem;
       letter-spacing: .1em;
       text-transform: uppercase;
@@ -316,7 +299,7 @@
       background: rgba(6,8,16,.88);
       border: 1px solid rgba(0,71,255,.4);
       color: rgba(255,255,255,.65);
-      font-family: 'DM Mono', monospace;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-size: .855rem;
       letter-spacing: .06em;
       padding: .3rem .7rem;
@@ -325,7 +308,7 @@
       line-height: 1.45;
     }
     .map-legend-title {
-      font-family: 'DM Mono', monospace;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-size: .65rem;
       letter-spacing: .15em;
       text-transform: uppercase;
@@ -348,7 +331,7 @@
       width: 240px;
     }
     .map-legend-end {
-      font-family: 'DM Mono', monospace;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-size: .924rem;
       color: rgba(255,255,255,.4);
     }
@@ -399,7 +382,7 @@
       margin-bottom: 2rem;
     }
     .candidate-photo-placeholder span {
-      font-family: 'DM Mono', monospace;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-size: .66rem;
       letter-spacing: .1em;
       text-transform: uppercase;
@@ -425,7 +408,7 @@
       background: linear-gradient(to top, rgba(8,10,24,.98) 0%, transparent 100%);
     }
     .candidate-name-overlay .cand-surname {
-      font-family: 'Syne', sans-serif;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-weight: 800;
       font-size: 1.1rem;
       letter-spacing: -.03em;
@@ -434,7 +417,7 @@
       line-height: 1;
     }
     .candidate-name-overlay .cand-name-first {
-      font-family: 'DM Mono', monospace;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-size: .6rem;
       letter-spacing: .2em;
       color: rgba(255,255,255,.4);
@@ -457,14 +440,14 @@
       backdrop-filter: blur(4px);
     }
     .overall-badge .rating-num {
-      font-family: 'Syne', sans-serif;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-weight: 800;
       font-size: 2.2rem;
       line-height: 1;
       color: var(--white);
     }
     .overall-badge .rating-label {
-      font-family: 'Syne', sans-serif;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-size: .418rem;
       letter-spacing: .05em;
       text-transform: uppercase;
@@ -478,7 +461,7 @@
       top: 1rem;
       right: 1rem;
       z-index: 3;
-      font-family: 'DM Mono', monospace;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-size: .96rem;
       letter-spacing: .2em;
       text-transform: uppercase;
@@ -490,6 +473,31 @@
       text-align: center;
       line-height: 1.5;
     }
+
+    /* Badge dorado — presidente electo (100/100) */
+    .overall-badge.presidente {
+      background: linear-gradient(140deg, rgba(140,102,10,.92), rgba(90,64,6,.92));
+      border: 2px solid var(--gold);
+      box-shadow: 0 0 22px rgba(232,185,59,.45);
+    }
+    .overall-badge.presidente .rating-num { color: var(--gold); }
+    .overall-badge.presidente .rating-label { color: rgba(232,185,59,.85); }
+
+    /* ─── HISTÓRICO ELECTORAL (columna izquierda, bajo la foto) ─── */
+    .historial-wrap { display:none; flex-shrink:0; border-top:1px solid rgba(255,255,255,.08); background:rgba(0,0,0,.25); padding:.75rem 1rem .9rem; }
+    .historial-wrap.active { display:block; }
+    .historial-title { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-weight:700; font-size:.62rem; letter-spacing:.2em; text-transform:uppercase; color:rgba(255,255,255,.45); margin-bottom:.6rem; }
+    .hist-item { display:block; width:100%; text-align:left; background:none; border:none; border-left:2px solid transparent; padding:.42rem .5rem .45rem; cursor:none; transition:background .15s,border-color .15s; }
+    .hist-item:hover { background:rgba(255,255,255,.05); }
+    .hist-item.active { background:rgba(0,71,255,.12); border-left-color:var(--blue); }
+    .hist-item.gold.active { background:rgba(232,185,59,.10); border-left-color:var(--gold); }
+    .hist-row { display:flex; align-items:baseline; justify-content:space-between; gap:.5rem; }
+    .hist-label { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-weight:500; font-size:.68rem; letter-spacing:.05em; text-transform:uppercase; color:rgba(255,255,255,.75); }
+    .hist-votes { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-weight:400; font-size:.66rem; color:rgba(255,255,255,.45); white-space:nowrap; }
+    .hist-bar-track { height:5px; background:rgba(255,255,255,.07); margin-top:.32rem; overflow:hidden; }
+    .hist-bar-fill { height:100%; width:0; background:var(--blue-light); transition:width .6s ease; }
+    .hist-item.gold .hist-bar-fill { background:var(--gold); }
+    .hist-tag-pres { display:inline-block; font-size:.54rem; font-weight:700; letter-spacing:.12em; color:#060810; background:var(--gold); padding:.1rem .38rem; margin-left:.45rem; vertical-align:middle; }
 
     /* Panel derecho: INFO */
     .pes-right {
@@ -504,7 +512,7 @@
       border-bottom: 1px solid rgba(0,71,255,.2);
     }
     .info-header .cand-full-name {
-      font-family: 'Syne', sans-serif;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-weight: 400;
       font-size: 1.2rem;
       letter-spacing: -.02em;
@@ -526,7 +534,7 @@
     }
     .info-row:hover { background: rgba(255,255,255,.02); }
     .info-key {
-      font-family: 'DM Mono', monospace;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-size: .6rem;
       letter-spacing: .1em;
       text-transform: uppercase;
@@ -535,7 +543,7 @@
       flex-shrink: 0;
     }
     .info-val {
-      font-family: 'DM Mono', monospace;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-size: .68rem;
       color: var(--white);
       text-align: right;
@@ -555,7 +563,7 @@
       border-bottom: 1px solid rgba(255,255,255,.05);
     }
     .ideology-label {
-      font-family: 'DM Mono', monospace;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-size: .52rem;
       letter-spacing: .15em;
       text-transform: uppercase;
@@ -590,7 +598,7 @@
     }
     .radar-title {
       display: none;
-      font-family: 'DM Mono', monospace;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-size: .624rem;
       letter-spacing: .15em;
       text-transform: uppercase;
@@ -621,7 +629,7 @@
     .cand-list-item:hover { background: rgba(0,71,255,.08); }
     .cand-list-item.active { background: rgba(0,71,255,.18); border-left: 2px solid var(--blue); }
     .cand-rank {
-      font-family: 'DM Mono', monospace;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-size: .6rem;
       color: rgba(255,255,255,.2);
       width: 18px;
@@ -630,7 +638,7 @@
     }
     .cand-list-name {
       flex: 1;
-      font-family: 'DM Mono', monospace;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-size: .68rem;
       color: rgba(255,255,255,.75);
       line-height: 1.3;
@@ -641,7 +649,7 @@
       color: rgba(255,255,255,.3);
     }
     .cand-list-votes {
-      font-family: 'DM Mono', monospace;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-size: .68rem;
       color: var(--blue);
       font-weight: 700;
@@ -650,7 +658,7 @@
 
     /* ─── FOOTER ─── */
     .full-footer { flex-shrink:0; width:100%; border-top:1px solid var(--border); padding:.5rem 2.5rem; display:flex; align-items:center; justify-content:space-between; }
-    .footer-brand { font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.09em; color:rgba(255,255,255,.2); }
+    .footer-brand { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-size:.62rem; letter-spacing:.09em; color:rgba(255,255,255,.2); }
     .footer-brand a { color:rgba(255,255,255,.25); text-decoration:none; }
 
     /* ─── CURTAIN ─── */
@@ -672,8 +680,8 @@
     /* ORIENT OVERLAY */
     .orient-overlay { display:none; position:fixed; inset:0; z-index:99990; background:rgba(6,8,16,.98); align-items:center; justify-content:center; flex-direction:column; gap:1rem; text-align:center; padding:2rem; }
     .orient-overlay.show { display:flex; }
-    .orient-overlay p { font-family:'DM Mono',monospace; font-size:.7rem; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.5); line-height:2; }
-    .orient-overlay button { font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.1em; text-transform:uppercase; padding:.4rem 1rem; background:var(--blue); color:var(--white); border:none; cursor:pointer; }
+    .orient-overlay p { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-size:.7rem; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.5); line-height:2; }
+    .orient-overlay button { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-size:.65rem; letter-spacing:.1em; text-transform:uppercase; padding:.4rem 1rem; background:var(--blue); color:var(--white); border:none; cursor:pointer; }
 
     @media (max-width:1100px) {
       .pes-panel { grid-template-columns: calc(240px + 7%) 1.33fr 1fr; }
@@ -682,11 +690,31 @@
       html, body { max-width: 100vw; overflow-x: hidden; }
       .pes-panel { grid-template-columns: 1fr; }
       .pes-left, .pes-center, .pes-right { border:none; border-bottom:1px solid rgba(255,255,255,.08); }
-      .electoral-nav { display:none; }
       #leaflet-map { min-height: 400px; }
       .search-panel { padding: .9rem 1rem; gap: .6rem; }
       .ac-wrap { width: 100%; max-width: 100%; }
       #dl-btns-wrap { display:none !important; }
+      /* Nav en móvil: logo centrado línea 1, volver+auth línea 2 (regla v2) */
+      .electoral-nav { flex-direction: column; align-items: stretch; padding: .6rem 1.1rem; gap: .5rem; }
+      .e-nav-right { order: 1; width: 100%; position: relative; justify-content: center; gap: .8rem; margin: 0; min-height: 26px; }
+      .e-nav-left { order: 2; width: 100%; justify-content: center; gap: .6rem; flex-wrap: wrap; row-gap: .45rem; }
+      .country-selector-wrap { position: absolute; left: 0; top: 50%; transform: translateY(-50%); }
+      .electoral-nav-auth { gap: .5rem; flex-wrap: wrap; justify-content: center; }
+      .e-btn-back, .e-btn-login, .e-btn-register, .e-btn-profile, .e-btn-logout { font-size: .68rem; letter-spacing: .06em; }
+      .e-btn-back, .e-btn-login, .e-btn-register, .e-btn-profile { padding: .3rem .55rem; }
+      .e-user-plan { font-size: .6rem; padding: .15rem .45rem; }
+      .country-btn { font-size: .54rem; padding: .24rem .46rem; letter-spacing: .05em; }
+      .country-dropdown { right: auto; left: 0; }
+      .logo-text { font-size: clamp(.7rem, 3.3vw, .9rem); }
+      .logo-bars { height: 11px; }
+      .logo-bar { width: 2.5px; }
+    }
+    @media (max-width: 360px) {
+      .electoral-nav { padding-left: .8rem; padding-right: .8rem; }
+      .country-btn { font-size: .52rem; padding: .22rem .42rem; letter-spacing: .06em; }
+      .logo-text { font-size: 9.5px; }
+      .logo-bars { height: 10px; }
+      .logo-bar { width: 2.5px; }
     }
 
     /* ─── MUNICIPIO LOCK OVERLAY ─── */
@@ -698,20 +726,20 @@
     .mun-modal { display: none; position: fixed; inset: 0; z-index: 99998; align-items: center; justify-content: center; background: rgba(6,8,16,.6); backdrop-filter: blur(4px); }
     .mun-modal.open { display: flex; }
     .mun-modal-box { background: #0d0f1c; border: 1px solid rgba(0,71,255,.4); padding: 1.89rem 2.43rem; max-width: 486px; text-align: center; position: relative; }
-    .mun-modal-box p { font-family: 'Syne', sans-serif; font-size: 1.107rem; color: rgba(255,255,255,.8); line-height: 1.7; }
+    .mun-modal-box p { font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-size: 1.107rem; color: rgba(255,255,255,.8); line-height: 1.7; }
     .mun-modal-box a { color: var(--blue); text-decoration: none; font-weight: 700; }
     .mun-modal-box a:hover { text-decoration: underline; }
     .mun-modal-close { position: absolute; top: .5rem; right: .7rem; background: none; border: none; color: rgba(255,255,255,.35); font-size: 1.1rem; cursor: pointer; padding: 0; line-height: 1; }
     .mun-modal-close:hover { color: var(--white); }
 
     /* ─── BOTÓN EXCEL ─── */
-    .btn-excel-dl { font-family:'DM Mono',monospace; font-size:.58rem; letter-spacing:.08em; text-transform:uppercase; color:var(--green); background:none; border:1.5px solid rgba(74,222,128,.4); padding:.2rem .55rem; cursor:pointer; transition:all .2s; flex-shrink:0; white-space:nowrap; }
+    .btn-excel-dl { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-size:.58rem; letter-spacing:.08em; text-transform:uppercase; color:var(--green); background:none; border:1.5px solid rgba(74,222,128,.4); padding:.2rem .55rem; cursor:pointer; transition:all .2s; flex-shrink:0; white-space:nowrap; }
     .btn-excel-dl:hover { background:var(--green); color:#060810; border-color:var(--green); }
     .btn-excel-dl.locked { color:rgba(255,255,255,.3); border-color:rgba(255,255,255,.15); cursor:pointer; }
     .btn-excel-dl.locked:hover { color:rgba(255,255,255,.55); border-color:rgba(255,255,255,.3); background:none; }
 
     /* ─── BOTONES DESCARGA POR NIVEL ─── */
-    .dl-tier-btn { font-family:'DM Mono',monospace; font-size:.696rem; letter-spacing:.07em; text-transform:uppercase; padding:.264rem .66rem; border:1.5px solid; cursor:pointer; transition:all .2s; white-space:nowrap; background:none; }
+    .dl-tier-btn { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-size:.696rem; letter-spacing:.07em; text-transform:uppercase; padding:.264rem .66rem; border:1.5px solid; cursor:pointer; transition:all .2s; white-space:nowrap; background:none; }
     .dl-tier-btn.locked { opacity:.38; cursor:pointer; }
     .dl-tier-btn.locked:hover { opacity:.6; }
     .dl-tier-btn.t-free { color:#4ade80; border-color:rgba(74,222,128,.4); }
@@ -720,18 +748,11 @@
     .dl-tier-btn.t-pro:not(.locked):hover { background:#fbbf24; color:#060810; border-color:#fbbf24; }
     .dl-tier-btn.t-premium { color:#a78bfa; border-color:rgba(167,139,250,.4); }
     .dl-tier-btn.t-premium:not(.locked):hover { background:#a78bfa; color:#060810; border-color:#a78bfa; }
-    body.day-mode .dl-tier-btn.t-free { color:#16a34a; border-color:rgba(22,163,74,.4); }
-    body.day-mode .dl-tier-btn.t-free:not(.locked):hover { background:#16a34a; color:#fff; border-color:#16a34a; }
-    body.day-mode .dl-tier-btn.t-pro { color:#b45309; border-color:rgba(180,83,9,.4); }
-    body.day-mode .dl-tier-btn.t-pro:not(.locked):hover { background:#b45309; color:#fff; border-color:#b45309; }
-    body.day-mode .dl-tier-btn.t-premium { color:#7c3aed; border-color:rgba(124,58,237,.4); }
-    body.day-mode .dl-tier-btn.t-premium:not(.locked):hover { background:#7c3aed; color:#fff; border-color:#7c3aed; }
     #dl-btns-wrap { display:none; align-items:center; gap:.45rem; flex-wrap:wrap; }
-    .dl-btns-label { font-family:'DM Mono',monospace; font-size:.696rem; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.28); white-space:nowrap; }
-    body.day-mode .dl-btns-label { color:rgba(0,0,0,.38); }
+    .dl-btns-label { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-size:.696rem; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.28); white-space:nowrap; }
     #dl-select-wrap { display:none; align-items:center; gap:.5rem; }
     #dl-select {
-      font-family:'DM Mono',monospace; font-size:.75rem; letter-spacing:.05em;
+      font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-size:.75rem; letter-spacing:.05em;
       background:rgba(255,255,255,.07); border:1.5px solid rgba(255,255,255,.18);
       color:var(--white); padding:.35rem .55rem; cursor:pointer; flex:1; max-width:220px;
       appearance:none; -webkit-appearance:none;
@@ -740,14 +761,12 @@
       padding-right:1.6rem;
     }
     #dl-select option { background:#0d0f1c; color:var(--white); }
-    body.day-mode #dl-select { background:rgba(0,0,0,.06); border-color:rgba(0,0,0,.2); color:#0d1120; }
-    body.day-mode #dl-select option { background:#f5f0ea; color:#0d1120; }
 
     /* ─── TIPOGRAFÍA SYNE EN LAS TRES COLUMNAS ─── */
     .pes-left, .pes-left *,
     .pes-center, .pes-center *,
     .pes-right, .pes-right * {
-      font-family: 'Syne', sans-serif !important;
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif !important;
     }
 
     /* ─── TAMAÑOS EN COLUMNA DERECHA ─── */
@@ -761,6 +780,7 @@
 <body>
   <div class="cursor" id="cursor"></div>
   <div class="cursor-ring" id="cursorRing"></div>
+  <div class="bg-layer"></div>
 
   <!-- CURTAIN -->
   <div class="curtain opening" id="curtain">
@@ -778,13 +798,13 @@
 
   <div class="shell">
 
-    <!-- NAV -->
+    <!-- NAV (misma barra de index.html) -->
     <nav class="electoral-nav">
-      <div style="display:flex;align-items:center;gap:1rem">
+      <div class="e-nav-left">
         <a href="javascript:history.back()" class="e-btn-back" id="btn-back">← Volver</a>
         <div id="e-nav-auth" class="electoral-nav-auth"></div>
       </div>
-      <div style="display:flex;align-items:center;gap:1.2rem">
+      <div class="e-nav-right">
         <div class="country-selector-wrap">
           <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
             <span id="countryBtnLabel">Colombia</span>
@@ -794,10 +814,10 @@
             <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
             <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
             <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
+            <div class="country-option" data-value="br" onclick="selectCountry(this)"><span class="country-check">✓</span> Brasil</div>
             <div class="country-option" data-value="cn" onclick="selectCountry(this)"><span class="country-check">✓</span> 中国 / China</div>
           </div>
         </div>
-        <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
         <a href="index.html" class="logo-link" onclick="navTo(event,'index.html')">
           <div class="logo-bars">
             <div class="logo-bar" style="height:20px"></div>
@@ -809,14 +829,6 @@
         </a>
       </div>
     </nav>
-
-    <!-- BREADCRUMB -->
-    <div class="breadcrumb">
-      <a href="index.html" onclick="navTo(event,'index.html')">Ricardo Ruiz</a>
-      &nbsp;/&nbsp;
-      <a href="senado-2026.html" id="breadcrumb-congress" onclick="navTo(event,'senado-2026.html')">Congreso 2026</a>
-      &nbsp;/&nbsp; <span id="breadcrumb-page">Mapa Candidato</span>
-    </div>
 
     <!-- SEARCH BAR -->
     <div class="search-panel">
@@ -883,6 +895,11 @@
               <div class="cand-surname" id="cand-surname">—</div>
               <div class="cand-name-first" id="cand-name-first">—</div>
             </div>
+          </div>
+          <!-- HISTÓRICO ELECTORAL (aparece cuando la persona tiene 2+ elecciones) -->
+          <div class="historial-wrap" id="historial-wrap">
+            <div class="historial-title" id="historial-title">Histórico electoral</div>
+            <div id="historial-items"></div>
           </div>
         </div>
 
@@ -1052,6 +1069,17 @@
     const MANIZALES_COMUNAS_URL   = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC/MANIZALESX.json';
     const fmt = n => Number(n).toLocaleString('es-CO');
 
+    // ─── PRESIDENCIALES 1V + 2V ───────────────────────────────
+    // JSONs generados por tools/analisis-candidato/build_presidenciales.py.
+    // ?preslocal=1 → lee los archivos locales del repo (para verificar antes de subir a S3).
+    const PRES_BASE = new URLSearchParams(location.search).has('preslocal')
+      ? 'Bases de datos/output_presidencial_endoso'
+      : `${S3}/presidencial`;
+    let presIndex = null;             // index-presidencial.json
+    let presPersonaBySlug = {};       // slug de consulta (endoso) → persona
+    let currentPresMeta = null;       // meta activo si es presidencial
+    let SCORE_LOG_MAX = Math.log10(12950643);  // votos del presidente (2V) — se refresca con presIndex.vmax
+
     // ─── I18N ─────────────────────────────────────────────────
     const candI18n = {
       co: {
@@ -1069,6 +1097,10 @@
         ideoLeft: '← Izquierda', ideoCenter: 'Espectro ideológico', ideoRight: 'Derecha →',
         radarTitle: 'Presencia territorial',
         ratingLabel: 'Puntos / 100',
+        ratingLabelPres: 'Presidente · 2026',
+        historialTitle: 'Histórico electoral',
+        histConsulta: 'Consulta · 2026', hist1v: '1ª vuelta · 2026', hist2v: '2ª vuelta · 2026',
+        histPresTag: 'PRESIDENTE', perfil: 'Mi perfil',
         photoPlaceholder: '<a href="https://drive.google.com/drive/folders/1ULVQC1Cyz_fjnhGdM7ydzg7tEgiDcPRS?usp=share_link" target="_blank">¿Quieres agregar la foto de tu candidato? ¡Haz click aquí y ayúdanos!</a>',
         keys: { origen:'Origen', partido:'Partido', corp:'Corporación', depTop:'Dpto. más votado', munTop:'Municipio top', zonaTop:'Comuna más votada', zonaVotos:'Votos comuna top', puestoTop:'Puesto más votado', puestoVotos:'Votos puesto top', votos:'Total de votos', dptos:'Dptos. con votos', mesas:'Mesas con votos' },
         plans: { free:'Free', basic:'Básico', pro:'Pro', premium:'Premium', analysis:'Análisis', full:'Completo' },
@@ -1099,6 +1131,10 @@
         ideoLeft: '← Left', ideoCenter: 'Ideological spectrum', ideoRight: 'Right →',
         radarTitle: 'Territorial presence',
         ratingLabel: 'Points / 100',
+        ratingLabelPres: 'President · 2026',
+        historialTitle: 'Electoral history',
+        histConsulta: 'Primary · 2026', hist1v: '1st round · 2026', hist2v: 'Runoff · 2026',
+        histPresTag: 'PRESIDENT', perfil: 'My profile',
         photoPlaceholder: '<a href="https://drive.google.com/drive/folders/1ULVQC1Cyz_fjnhGdM7ydzg7tEgiDcPRS?usp=share_link" target="_blank">Want to add this candidate\'s photo? Click here and help us!</a>',
         keys: { origen:'Origin', partido:'Party', corp:'Corporation', depTop:'Top dept.', munTop:'Top municipality', zonaTop:'Top commune', zonaVotos:'Commune top votes', puestoTop:'Top polling station', puestoVotos:'Station top votes', votos:'Total votes', dptos:'Depts. with votes', mesas:'Tables with votes' },
         plans: { free:'Free', basic:'Basic', pro:'Pro', premium:'Premium', analysis:'Analysis', full:'Full' },
@@ -1129,6 +1165,10 @@
         ideoLeft: '← 左翼', ideoCenter: '意识形态谱系', ideoRight: '右翼 →',
         radarTitle: '地域分布',
         ratingLabel: '得分 / 100',
+        ratingLabelPres: '总统 · 2026',
+        historialTitle: '选举历史',
+        histConsulta: '党内初选 · 2026', hist1v: '第一轮 · 2026', hist2v: '第二轮 · 2026',
+        histPresTag: '总统', perfil: '我的资料',
         photoPlaceholder: '<a href="https://drive.google.com/drive/folders/1ULVQC1Cyz_fjnhGdM7ydzg7tEgiDcPRS?usp=share_link" target="_blank">想添加候选人照片？点击这里帮助我们！</a>',
         keys: { origen:'来源', partido:'政党', corp:'机构', depTop:'最高票省份', munTop:'最高票城市', zonaTop:'最高票社区', zonaVotos:'社区最高票', puestoTop:'最高票站', puestoVotos:'投票站最高票', votos:'总票数', dptos:'得票省份数', mesas:'得票投票台数' },
         plans: { free:'免费', basic:'基础', pro:'专业', premium:'高级', analysis:'分析', full:'完整' },
@@ -1153,8 +1193,6 @@
       const si = (id, html) => { const el = s(id); if (el) el.innerHTML = html; };
 
       st('btn-back', t.back);
-      st('breadcrumb-congress', t.congress);
-      st('breadcrumb-page', t.page);
       st('search-label', t.searchLabel);
       const inp = s('ac-input'); if (inp) inp.placeholder = t.searchPlaceholder;
       const hint = s('search-hint');
@@ -1191,8 +1229,7 @@
       si('footer-source', t.footerSource);
       si('orient-text', t.orientText);
       st('orient-btn', t.orientBtn);
-      const themeBtn = s('theme-btn');
-      if (themeBtn) themeBtn.textContent = document.body.classList.contains('day-mode') ? t.themeNight : t.themeDay;
+      st('historial-title', t.historialTitle);
       st('lm-title', t.lmTitle); st('lm-sub', t.lmSub);
       const lmEmail = s('lm-email'); if (lmEmail) lmEmail.placeholder = t.lmEmail;
       const lmPwd = s('lm-password'); if (lmPwd) lmPwd.placeholder = t.lmPassword;
@@ -2073,7 +2110,7 @@
           weight: 0.8,
           fillOpacity: v > 0 ? 0.9 : 0.35,
         }).bindTooltip(
-          `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+          `<div style="font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
             <span style="color:#0047FF;font-size:.914rem">${p.nom}</span><br/>
             ${p.comNom && p.comNom !== 'NULL' ? `<span style="opacity:.55">${p.comNom}</span><br/>` : ''}
             ${v > 0 ? fmt(v)+' votos' : 'Sin datos'}
@@ -2184,7 +2221,7 @@
             const votes = data ? data.v : 0;
             layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
             layer.bindTooltip(
-              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+              `<div style="font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
                 <span style="color:#0047FF;font-size:.914rem">${name.toUpperCase()}</span><br/>
                 ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
               </div>`,
@@ -2214,7 +2251,7 @@
             const votes = data ? data.v : 0;
             layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
             layer.bindTooltip(
-              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+              `<div style="font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
                 <span style="color:#0047FF;font-size:.914rem">${name.toUpperCase()}</span><br/>
                 ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
               </div>`,
@@ -2238,7 +2275,7 @@
             const votes = data ? data.v : 0;
             layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
             layer.bindTooltip(
-              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+              `<div style="font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
                 <span style="color:#0047FF;font-size:.914rem">${name.toUpperCase()}</span><br/>
                 ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
               </div>`,
@@ -2262,7 +2299,7 @@
             const votes = data ? data.v : 0;
             layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
             layer.bindTooltip(
-              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+              `<div style="font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
                 <span style="color:#0047FF;font-size:.914rem">${name.toUpperCase()}</span><br/>
                 ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
               </div>`,
@@ -2286,7 +2323,7 @@
             const votes = data ? data.v : 0;
             layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
             layer.bindTooltip(
-              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+              `<div style="font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
                 <span style="color:#0047FF;font-size:.914rem">${name.toUpperCase()}</span><br/>
                 ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
               </div>`,
@@ -2310,7 +2347,7 @@
             const votes = data ? data.v : 0;
             layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
             layer.bindTooltip(
-              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+              `<div style="font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
                 <span style="color:#0047FF;font-size:.914rem">${name.toUpperCase()}</span><br/>
                 ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
               </div>`,
@@ -2333,7 +2370,7 @@
             const votes = data ? data.v : 0;
             layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
             layer.bindTooltip(
-              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+              `<div style="font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
                 <span style="color:#0047FF;font-size:.914rem">${name.toUpperCase()}</span><br/>
                 ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
               </div>`,
@@ -2357,7 +2394,7 @@
             const votes = data ? data.v : 0;
             layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
             layer.bindTooltip(
-              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+              `<div style="font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
                 <span style="color:#0047FF;font-size:.914rem">${name.toUpperCase()}</span><br/>
                 ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
               </div>`,
@@ -2381,7 +2418,7 @@
             const votes = data ? data.v : 0;
             layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
             layer.bindTooltip(
-              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+              `<div style="font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
                 <span style="color:#0047FF;font-size:.914rem">${name.toUpperCase()}</span><br/>
                 ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
               </div>`,
@@ -2466,7 +2503,7 @@
             const rankStr = rank ? `#${rank} ` : '';
             layer.setStyle({ weight: 2.5, color: '#ffffff', fillOpacity: 0.95 });
             layer.bindTooltip(
-              `<div style="font-family:'DM Mono',monospace;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
+              `<div style="font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.926rem;line-height:1.7;padding:.1rem .2rem">
                 <span style="color:#0047FF;font-size:.914rem">${rankStr}${name.toUpperCase()}</span><br/>
                 ${votes > 0 ? fmt(votes) + ' votos' : 'Sin datos'}
               </div>`,
@@ -2524,9 +2561,31 @@
     // ─── LOAD INDEX ───────────────────────────────────────────
     async function loadIndex() {
       try {
-        const r = await fetch(`${S3}/endoso/index.json`);
+        const [r, rp] = await Promise.all([
+          fetch(`${S3}/endoso/index.json`),
+          fetch(`${PRES_BASE}/index-presidencial.json`).catch(() => null),
+        ]);
         if (!r.ok) throw new Error(`index.json devolvió ${r.status}`);
         candIndex = (await r.json()).filter(c => !isPartyEntry(c));
+
+        // Merge presidenciales (una entrada por persona; el histórico vive en meta.pres)
+        if (rp && rp.ok) {
+          try {
+            presIndex = await rp.json();
+            if (presIndex.vmax) SCORE_LOG_MAX = Math.log10(presIndex.vmax + 1);
+            const presEntries = (presIndex.personas || []).map(p => {
+              if (p.consulta) presPersonaBySlug[p.consulta.slug] = p;
+              const last = p.elecciones[p.elecciones.length - 1] || {};
+              return {
+                nombre: p.nombre, slug: `PRES-${p.persona}`,
+                corp: 'PRESIDENCIA 2026', circunscripcion: 'NACIONAL',
+                partido: p.partido, votos: last.votos || 0,
+                tipo: 'presidencial', pres: p,
+              };
+            }).sort((a, b) => b.votos - a.votos);
+            candIndex = presEntries.concat(candIndex);
+          } catch (e) { console.warn('[Pres] índice presidencial no disponible:', e.message); }
+        }
         document.getElementById('load-state').style.display = 'none';
         document.getElementById('placeholder-state').style.display = 'block';
         const _lang = localStorage.getItem('rr-lang') || 'co';
@@ -2537,7 +2596,7 @@
         // y Leaflet mediría el contenedor como 0×0 → NaN en coordenadas.
         // El mapa se inicializa en loadCandData() cuando el panel ya es visible.
       } catch(e) {
-        document.getElementById('load-state').innerHTML = `<div style="font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,100,100,.8);text-align:center;line-height:1.8;padding:2rem">Error al cargar el índice.<br/><span style="font-size:.6rem;color:rgba(255,255,255,.3)">${e.message}</span></div>`;
+        document.getElementById('load-state').innerHTML = `<div style="font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.7rem;color:rgba(255,100,100,.8);text-align:center;line-height:1.8;padding:2rem">Error al cargar el índice.<br/><span style="font-size:.6rem;color:rgba(255,255,255,.3)">${e.message}</span></div>`;
       }
     }
 
@@ -2598,7 +2657,77 @@
       input.value = meta.nombre;
       input.classList.add('selected');
       document.getElementById('ac-dropdown').classList.remove('open');
+      if (meta.tipo === 'presidencial' && meta.pres) {
+        // arranca en su última elección (2V si llegó al balotaje, si no 1V)
+        await loadPresElection(meta.pres, meta.pres.elecciones.length - 1);
+      } else {
+        await loadCandData(meta);
+      }
+    }
+
+    // ─── PRESIDENCIALES: carga de una elección puntual ────────
+    async function loadPresElection(p, idx) {
+      const el = p.elecciones[idx];
+      if (!el) return;
+      const t = candI18n[localStorage.getItem('rr-lang')] || candI18n.co;
+      const meta = {
+        nombre: p.nombre,
+        slug: el.file.replace(/\.json$/, ''),
+        corp: `PRESIDENCIA ${el.ronda}`,
+        circunscripcion: 'NACIONAL',
+        partido: p.partido,
+        votos: el.votos,
+        tipo: 'presidencial',
+        pres: p, presElec: el, presIdx: idx,
+        dataUrl: `${PRES_BASE}/${el.file}`,
+        fotoUrl: p.foto || null,
+        ideol: p.ideol,
+        corpLabel: el.ronda === '2V' ? t.hist2v : t.hist1v,
+      };
       await loadCandData(meta);
+    }
+
+    function presHistClick(persona, idx) {
+      const p = presIndex && (presIndex.personas || []).find(x => x.persona === persona);
+      if (p) loadPresElection(p, idx);
+    }
+
+    // ─── HISTÓRICO ELECTORAL (columna izquierda) ──────────────
+    // Se muestra cuando la persona tiene 2+ elecciones (consulta · 1V · 2V).
+    function renderHistorial(meta) {
+      const wrap = document.getElementById('historial-wrap');
+      const box  = document.getElementById('historial-items');
+      if (!wrap || !box) return;
+      const p = meta.pres || presPersonaBySlug[meta.slug];
+      if (!p) { wrap.classList.remove('active'); box.innerHTML = ''; return; }
+      const t = candI18n[localStorage.getItem('rr-lang')] || candI18n.co;
+      const items = [];
+      if (p.consulta) items.push({
+        label: t.histConsulta, votos: p.consulta.votos || 0, gold: false,
+        active: meta.slug === p.consulta.slug,
+        onclick: `selectCand('${p.consulta.slug}')`,
+      });
+      (p.elecciones || []).forEach((el, i) => items.push({
+        label: el.ronda === '2V' ? t.hist2v : t.hist1v,
+        votos: el.votos || 0, gold: !!el.presidente,
+        active: !!(meta.presElec && meta.presElec.file === el.file),
+        onclick: `presHistClick('${p.persona}',${i})`,
+      }));
+      if (items.length < 2) { wrap.classList.remove('active'); box.innerHTML = ''; return; }
+      const maxV = Math.max(1, ...items.map(it => it.votos));
+      box.innerHTML = items.map(it => `
+        <button class="hist-item${it.gold ? ' gold' : ''}${it.active ? ' active' : ''}" onclick="${it.onclick}">
+          <div class="hist-row">
+            <span class="hist-label">${it.label}${it.gold ? `<span class="hist-tag-pres">${t.histPresTag}</span>` : ''}</span>
+            <span class="hist-votes">${fmt(it.votos)}</span>
+          </div>
+          <div class="hist-bar-track"><div class="hist-bar-fill" data-w="${Math.max(4, Math.round(100 * it.votos / maxV))}"></div></div>
+        </button>`).join('');
+      wrap.classList.add('active');
+      // anima las barras de 0 → ancho real
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        box.querySelectorAll('.hist-bar-fill').forEach(f => { f.style.width = f.dataset.w + '%'; });
+      }));
     }
 
     // ─── LOAD CANDIDATE DATA ──────────────────────────────────
@@ -2614,14 +2743,27 @@
       }, 80);
 
       updateDlBtns();
+      currentPresMeta = meta.tipo === 'presidencial' ? meta : null;
+      currentCand = meta;      // disponible desde ya (fallback de foto); currentData se anula
+      currentData = null;      // hasta que llegue el JSON — evita exportes con datos viejos
       setInfoVal('info-full-name', meta.nombre);
       setInfoVal('cand-surname', splitName(meta.nombre).apellidos);
       setInfoVal('cand-name-first', splitName(meta.nombre).nombres);
       setInfoVal('info-partido', meta.partido || '—');
-      setInfoVal('info-corp', meta.corp || '—');
+      setInfoVal('info-corp', meta.corpLabel || meta.corp || '—');
       setInfoVal('corp-badge', (meta.corp || '').toUpperCase());
       setInfoVal('corp-badge-header', (meta.corp || '—').toUpperCase());
       setInfoVal('overall-num', '…');
+
+      // Badge: dorado solo para el presidente electo (Abelardo · 2V)
+      const _isPres = !!(meta.presElec && meta.presElec.presidente);
+      const _badge = document.getElementById('overall-badge');
+      if (_badge) _badge.classList.toggle('presidente', _isPres);
+      const _t = candI18n[localStorage.getItem('rr-lang')] || candI18n.co;
+      setInfoVal('rating-label', _isPres ? _t.ratingLabelPres : _t.ratingLabel);
+
+      // Histórico electoral (consulta · 1V · 2V) bajo la foto
+      renderHistorial(meta);
       setInfoVal('info-origen', '…');
       // info-edad eliminado del HTML
       setInfoVal('info-dep-top', '…');
@@ -2635,12 +2777,13 @@
       const photoEl = document.getElementById('candidate-photo');
       const placeholderEl = document.getElementById('photo-placeholder');
       const photoKey = meta.slug;   // e.g. "FULANO-DE-TAL-123" → fotos-candidatos/FULANO-DE-TAL-123.jpg
-      photoEl.src = `${S3_PHOTOS}/${photoKey}.jpg`;
+      photoEl.src = meta.fotoUrl || `${S3_PHOTOS}/${photoKey}.jpg`;
       photoEl.style.display = 'block';
       placeholderEl.style.display = 'none';
 
-      // Ideology
-      document.getElementById('ideology-thumb').style.left = getIdeology(meta.partido || '') + '%';
+      // Ideology (los presidenciales traen valor explícito en el índice)
+      const _ideo = (meta.ideol != null) ? meta.ideol : getIdeology(meta.partido || '');
+      document.getElementById('ideology-thumb').style.left = _ideo + '%';
 
       // Reset map
       depVoteData = {};
@@ -2663,13 +2806,14 @@
       refreshMapColors();
 
       try {
-        const r = await fetch(`${S3}/endoso/${meta.slug}.json`);
+        const r = await fetch(meta.dataUrl || `${S3}/endoso/${meta.slug}.json`);
         if (!r.ok) throw new Error('No data');
         const data = await r.json();
         currentData = data;
         currentCand = meta;
         processData(data, meta);
       } catch(e) {
+        currentCand = meta;
         processDataBasic(meta);
       }
     }
@@ -2724,7 +2868,7 @@
       setInfoVal('info-mun-top', muns[0]?.[1]?.nom || '—');
       setInfoVal('info-dptos', `${deps.length} dptos.`);
       setInfoVal('info-mesas', `${fmt(mesas.length)} mesas`);
-      setInfoVal('overall-num', computeRating(totalVotos, deps.length));
+      setInfoVal('overall-num', computeRating(totalVotos, deps.length, meta));
 
       // Localidad/comuna y puesto: filas separadas
       renderTopComunaLocalidad(zonas);
@@ -2888,7 +3032,7 @@
     }
 
     function processDataBasic(meta) {
-      setInfoVal('overall-num', computeRating(meta.votos || 0, 5));
+      setInfoVal('overall-num', computeRating(meta.votos || 0, 5, meta));
       setInfoVal('info-origen', meta.partido || '—');
       // info-edad eliminado del HTML — no se intenta rellenar
       setInfoVal('info-dep-top', '—');
@@ -2906,11 +3050,13 @@
       setTimeout(() => document.getElementById('map-loading')?.classList.remove('active'), 400);
     }
 
-    function computeRating(votos, deps) {
+    // Puntaje renormalizado: el presidente electo (Abelardo · 2V) = 100 (dorado);
+    // el resto escala logarítmicamente contra sus votos (tope 99, en azul).
+    function computeRating(votos, deps, meta) {
+      if (meta && meta.presElec && meta.presElec.presidente) return 100;
       if (!votos) return 1;
-      const log = Math.log10(votos + 1);
-      const raw = Math.min(99, Math.round(log * 18));
-      return Math.max(1, raw);
+      const raw = Math.round(100 * Math.log10(votos + 1) / SCORE_LOG_MAX);
+      return Math.max(1, Math.min(99, raw));
     }
 
     function setInfoVal(id, val) {
@@ -3297,7 +3443,7 @@
               ticks: { display: false },
               grid: { color: 'rgba(255,255,255,.08)' },
               angleLines: { color: 'rgba(255,255,255,.06)' },
-              pointLabels: { font: { family: "'DM Mono',monospace", size: 9 }, color: 'rgba(255,255,255,.4)' }
+              pointLabels: { font: { family: "'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif", size: 9 }, color: 'rgba(255,255,255,.4)' }
             }
           },
           plugins: {
@@ -3316,8 +3462,13 @@
     }
 
     // ─── PHOTO ERROR ─────────────────────────────────────────
+    // Si la entrada es una consulta vinculada a un presidencial, intenta su foto
+    // de Fotos-presidenciales/ antes de caer al placeholder.
     function handlePhotoError() {
-      document.getElementById('candidate-photo').style.display = 'none';
+      const photoEl = document.getElementById('candidate-photo');
+      const p = currentCand && (currentCand.pres || presPersonaBySlug[currentCand.slug]);
+      if (p && p.foto && photoEl.src !== p.foto) { photoEl.src = p.foto; return; }
+      photoEl.style.display = 'none';
       document.getElementById('photo-placeholder').style.display = 'flex';
     }
 
@@ -3346,8 +3497,10 @@
       const _nt = candI18n[localStorage.getItem('rr-lang')] || candI18n.co;
       if (token && user) {
         const pl = _nt.plans;
-        area.innerHTML = `<span class="e-user-plan">${pl[user.plan]||user.plan}</span><a href="dashboard.html" class="e-user-name" onclick="navTo(event,'dashboard.html')">${user.name.split(' ')[0]}</a><button class="e-btn-logout" onclick="eLogOut()">${_nt.logout}</button>`;
+        area.dataset.loggedIn = '1';
+        area.innerHTML = `<a href="dashboard.html" class="e-user-plan" onclick="navTo(event,'dashboard.html')">${pl[user.plan]||user.plan}</a><a href="dashboard.html" class="e-btn-profile" onclick="navTo(event,'dashboard.html')">${_nt.perfil}</a><button class="e-btn-logout" onclick="eLogOut()">${_nt.logout}</button>`;
       } else {
+        delete area.dataset.loggedIn;
         area.innerHTML = `<button class="e-btn-login" onclick="showLoginModal()">${_nt.login}</button><a href="register.html" class="e-btn-register" onclick="navTo(event,'register.html')">${_nt.register}</a>`;
       }
     }
@@ -3411,8 +3564,6 @@
 
     window.__applyLang = function() { window.location.reload(); };
 
-    // ─── THEME ── lógica compartida en theme.js ─────────────
-
     // ─── ORIENT ──────────────────────────────────────────────
     function dismissOrient() { sessionStorage.setItem('orient-ok','1'); document.getElementById('orient-overlay').classList.remove('show'); }
     if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) && !sessionStorage.getItem('orient-ok')) { document.getElementById('orient-overlay').classList.add('show'); }
@@ -3440,7 +3591,6 @@
     loadDivipole();
     loadPuestosGeoref();
   </script>
-  <script src="theme.js"></script>
   <script src="lang.js"></script>
 
   <!-- MODAL LOGIN -->
