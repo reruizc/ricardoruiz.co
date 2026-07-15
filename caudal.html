@@ -122,6 +122,38 @@
   .sanc-tags{display:flex; flex-wrap:wrap; gap:.45rem; align-items:center; font-size:.66rem; color:var(--ink3)}
   .sanc-monto{color:var(--amber); font-weight:700}
 
+  /* ===== Radar del cliente (Vista Cliente · SKU A) ===== */
+  .radar-cta{margin:1.6rem 0 .4rem; padding:1.3rem 1.5rem; border-radius:14px; cursor:none;
+    background:linear-gradient(120deg, rgba(0,71,255,.15), rgba(61,111,255,.04)); border:1px solid var(--teal-dim);
+    display:flex; align-items:center; gap:1.1rem; transition:.15s}
+  .radar-cta:hover{border-color:var(--teal); transform:translateY(-2px)}
+  .radar-cta .rc-ic{font-size:1.5rem; color:var(--teal); line-height:1; flex-shrink:0}
+  .radar-cta .rc-t{font-weight:800; font-size:1.12rem; letter-spacing:-.01em}
+  .radar-cta .rc-d{color:var(--ink2); font-size:.8rem; margin-top:.22rem; line-height:1.5}
+  .radar-cta .rc-go{margin-left:auto; color:var(--teal); font-weight:700; font-size:.82rem; white-space:nowrap; align-self:center}
+  @media(max-width:640px){ .radar-cta{flex-wrap:wrap} .radar-cta .rc-go{margin-left:0; width:100%} }
+  #cli-body{margin-top:1.2rem}
+  .cli-note{font-size:.8rem; color:var(--ink2); background:var(--teal-soft); border:1px solid var(--teal-dim);
+    border-radius:8px; padding:.7rem .95rem; margin:.2rem 0 1.2rem}
+  .cli-note b{color:var(--ink)}
+  .cli-sub{font-size:.64rem; letter-spacing:.16em; text-transform:uppercase; color:var(--ink3); margin:1.5rem 0 .7rem; display:flex; align-items:center; gap:.5rem}
+  .cli-sub .cs-n{color:var(--teal)}
+  .sig-list{display:flex; flex-direction:column; gap:.55rem}
+  .sig{display:flex; gap:.85rem; padding:.8rem 1rem; border:1px solid var(--border); border-left-width:3px; border-radius:8px; background:var(--card)}
+  .sig.alto{border-left-color:var(--red)} .sig.medio{border-left-color:var(--amber)} .sig.bajo{border-left-color:var(--gray)}
+  .sig-lvl{font-size:.52rem; letter-spacing:.1em; text-transform:uppercase; font-weight:800; padding:.14rem .42rem; border-radius:3px; align-self:flex-start; white-space:nowrap; margin-top:.1rem}
+  .sig.alto .sig-lvl{color:var(--red); background:rgba(209,88,78,.13)}
+  .sig.medio .sig-lvl{color:var(--amber); background:rgba(224,160,58,.13)}
+  .sig.bajo .sig-lvl{color:var(--ink2); background:var(--card2)}
+  .sig-body{flex:1; min-width:0}
+  .sig-title{font-size:.82rem; color:var(--ink); line-height:1.38}
+  .sig-tags{display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.38rem; font-size:.62rem; color:var(--ink3); align-items:center}
+  .sig-action{font-size:.73rem; color:var(--teal); margin-top:.42rem; line-height:1.4}
+  .cli-empty{text-align:center; color:var(--ink2); font-size:.85rem; padding:3rem 1rem}
+  .cli-reg-none{font-size:.76rem; color:var(--ink3); border:1px dashed var(--border2); border-radius:8px; padding:.9rem 1rem}
+  .lectura .acc{font-size:.82rem; line-height:1.5; color:var(--ink); margin:.28rem 0 .28rem 1rem; position:relative}
+  .lectura .acc::before{content:'→'; position:absolute; left:-1rem; color:var(--teal)}
+
   /* resultados */
   #results{margin-top:2.4rem; display:none}
   .r-titular{font-family:'HelveticaNeue',Helvetica,Arial,sans-serif; font-weight:800; font-size:clamp(1.3rem,3.4vw,2rem); line-height:1.12; letter-spacing:-.02em; margin-bottom:.4rem}
@@ -352,6 +384,14 @@
         <div class="chips" id="hchips"></div>
         <div class="home-hint">La búsqueda entra hoy al pilar <b>Congreso</b>. Los demás pilares se encienden por etapas.</div>
       </div>
+      <div class="radar-cta" id="radar-cta">
+        <span class="rc-ic">◎</span>
+        <div>
+          <div class="rc-t">Radar del cliente</div>
+          <div class="rc-d">Elige un sector y Caudal cruza Congreso + Regulatorio, filtra el ruido y te deja las señales que mueven tu aguja, ya leídas y con una acción sugerida.</div>
+        </div>
+        <span class="rc-go">Abrir el radar →</span>
+      </div>
       <div class="pillars" id="pillars"></div>
     </div>
 
@@ -390,6 +430,20 @@
 
       <div id="reg-landing"></div>
       <div id="reg-results"></div>
+    </div>
+
+    <!-- ===== VISTA CLIENTE · Radar (SKU A) ===== -->
+    <div id="view-cliente" hidden>
+      <button class="pill-back" id="cliBack">← Volver a Caudal</button>
+      <div class="hero">
+        <h1>Radar del <em>cliente</em>.</h1>
+        <p>Elige el sector de un cliente: Caudal cruza el Congreso y las
+           superintendencias, descarta el ruido y te deja las señales que mueven su
+           aguja — cada una con su estado real y una acción sugerida. La lente de
+           precisión, con datos reales.</p>
+        <div class="chips" id="cli-sectors"></div>
+      </div>
+      <div id="cli-body"><div class="cli-empty">Elige un sector arriba para ver su radar.</div></div>
     </div>
 
     <div class="foot">
@@ -615,7 +669,7 @@
     });
   }
   function showView(v){
-    ['home','congreso','regulatorio'].forEach(n=>{ const el=document.getElementById('view-'+n); if(el) el.hidden=(v!==n); });
+    ['home','congreso','regulatorio','cliente'].forEach(n=>{ const el=document.getElementById('view-'+n); if(el) el.hidden=(v!==n); });
     window.scrollTo(0,0);
     if(v==='congreso') requestAnimationFrame(()=>document.querySelectorAll('#view-congreso .mort-bar').forEach(x=>x.style.height=x.dataset.h+'%'));
     if(v==='regulatorio') regLoadStats();
@@ -697,6 +751,8 @@
   function initHome(){
     renderPillars();
     regInit();
+    cliInit();
+    const rc=document.getElementById('radar-cta'); if(rc) rc.onclick=()=>showView('cliente');
     const hq=document.getElementById('hq'), hgo=document.getElementById('hgo');
     const goHome=()=>{ const v=(hq&&hq.value||'').trim(); if(!v) return; showView('congreso'); q.value=v; buscar(); };
     if(hgo) hgo.onclick=goHome;
@@ -704,6 +760,72 @@
     const hc=document.getElementById('hchips');
     if(hc) EJEMPLOS.forEach(t=>{ const ch=document.createElement('span'); ch.className='chip'; ch.textContent=t; ch.onclick=()=>{ showView('congreso'); q.value=t; buscar(); }; hc.appendChild(ch); });
     const cb=document.getElementById('congresoBack'); if(cb) cb.onclick=()=>showView('home');
+  }
+
+  /* ---------- Vista Cliente · Radar (SKU A) ---------- */
+  const CLI_SECS=[['salud','Salud'],['contratacion','Contratación e infraestructura'],['financiero','Financiero'],['energia','Energía y ambiente'],['educacion','Educación'],['trabajo','Trabajo y pensiones']];
+  let _cliInited=false, _cliSeq=0;
+  function cliInit(){
+    if(_cliInited) return; _cliInited=true;
+    const cont=document.getElementById('cli-sectors');
+    if(cont) CLI_SECS.forEach(([k,t])=>{ const c=document.createElement('span'); c.className='chip'; c.dataset.sec=k; c.textContent=t; c.onclick=()=>cliLoad(k); cont.appendChild(c); });
+    const b=document.getElementById('cliBack'); if(b) b.onclick=()=>showView('home');
+  }
+  function cliSigCard(x){
+    if(x.tipo==='congreso'){
+      const tags=[x.comision?esc(x.comision):'', x.anio||'', RES_TXT[x.resultado]||''].filter(Boolean).join(' · ');
+      return `<div class="sig ${x.nivel}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
+        <div class="sig-title">${esc(shortTitle(x.titulo).slice(0,120))}</div>
+        <div class="sig-tags">${tags}</div><div class="sig-action">${esc(x.accion)}</div></div></div>`;
+    }
+    const monto=x.monto?' · '+fmtCOP(x.monto):'';
+    return `<div class="sig ${x.nivel}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
+      <div class="sig-title">${esc(x.sancionado||'—')}</div>
+      <div class="sig-tags">${esc(x.fuente||'')}${x.tipo_sancion?' · '+esc(x.tipo_sancion):''}${x.fecha?' · '+esc(x.fecha):''}${monto}</div>
+      <div class="sig-action">${esc(x.accion)}</div></div></div>`;
+  }
+  function cliRender(d){
+    const body=document.getElementById('cli-body'); if(!body) return;
+    const k=d.kpis, cl=d.cliente, congreso=d.congreso||[], reg=d.regulatorio||[];
+    const regBlock=cl.sector_sanciones
+      ? (reg.length ? `<div class="sig-list">${reg.map(cliSigCard).join('')}</div>` : '<div class="cli-reg-none">Sin sanciones recientes en esta fuente.</div>')
+      : '<div class="cli-reg-none">Este sector aún no tiene fuente de sanciones conectada — Superfinanciera y otras superintendencias entran por etapas.</div>';
+    body.innerHTML=`
+      <div class="kpis">
+        <div class="kpi"><div class="n">${k.n_radar}</div><div class="l">Señales en el radar</div></div>
+        <div class="kpi vit"><div class="n">${k.alto}</div><div class="l">Alta prioridad</div></div>
+        <div class="kpi ley"><div class="n">${k.en_tramite}</div><div class="l">En trámite · ventana</div></div>
+        <div class="kpi"><div class="n">${k.n_sanciones_sector?fmt(k.n_sanciones_sector):'—'}</div><div class="l">Sanciones del sector</div></div>
+      </div>
+      <div class="cli-note">De <b>${fmt(k.n_proyectos_sector)}</b> proyectos que han tocado <b>${esc(cl.nombre)}</b> en 36 años, el radar prioriza <b>${congreso.length}</b> por accionabilidad (en trámite · caídos recientes · ya ley). Precisión sobre volumen.</div>
+      <div class="lectura">
+        <div class="tag">◈ Lectura del analista · para un cliente de ${esc(cl.nombre)}</div>
+        <div id="cli-lectura-body"><div class="llm-load">Generando lectura <span class="dots"><span></span><span></span><span></span></span></div></div>
+      </div>
+      <div class="cli-sub">Legislativo · Congreso <span class="cs-n">${congreso.length}</span></div>
+      <div class="sig-list">${congreso.map(cliSigCard).join('')||'<div class="cli-reg-none">Sin proyectos accionables ahora.</div>'}</div>
+      <div class="cli-sub">Regulatorio · Superintendencias ${cl.sector_sanciones?`<span class="cs-n">${reg.length}</span>`:''}</div>
+      ${regBlock}`;
+  }
+  function cliRenderLectura(l){
+    const body=document.getElementById('cli-lectura-body'); if(!body) return;
+    const blk=(h,t)=>t?`<div class="blk"><div class="h">${h}</div><div class="t">${esc(t)}</div></div>`:'';
+    const acc=(l.acciones&&l.acciones.length)?`<div class="blk"><div class="h">Acciones</div>${l.acciones.map(a=>`<div class="acc">${esc(a)}</div>`).join('')}</div>`:'';
+    body.innerHTML=(l.titular?`<div class="blk"><div class="t" style="font-weight:700;font-size:.95rem;color:var(--ink)">${esc(l.titular)}</div></div>`:'')
+      + blk('Lo que mueve la aguja', l.lo_que_importa) + acc + blk('Riesgo / oportunidad', l.riesgo_oportunidad)
+      || '<div class="cob-note">Sin lectura disponible.</div>';
+  }
+  async function cliLoad(sector){
+    const mine=++_cliSeq;
+    document.querySelectorAll('#cli-sectors .chip').forEach(c=>c.classList.toggle('on',c.dataset.sec===sector));
+    const body=document.getElementById('cli-body');
+    if(body) body.innerHTML='<div class="llm-load" style="padding:2.5rem;justify-content:center">Armando el radar del sector <span class="dots"><span></span><span></span><span></span></span></div>';
+    let d; try{ d=await call({action:'cliente',sector,lectura:false}); }
+    catch(e){ if(mine===_cliSeq&&body) body.innerHTML='<div class="err">No se pudo cargar el radar. Reintenta.</div>'; return; }
+    if(mine!==_cliSeq) return;
+    cliRender(d);
+    call({action:'cliente',sector,lectura:true}).then(d2=>{ if(mine===_cliSeq && d2.lectura) cliRenderLectura(d2.lectura); })
+      .catch(()=>{ const el=document.getElementById('cli-lectura-body'); if(el) el.innerHTML='<div class="cob-note">No se pudo generar la lectura.</div>'; });
   }
 
   /* ---------- búsqueda ---------- */

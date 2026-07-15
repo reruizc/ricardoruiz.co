@@ -116,6 +116,39 @@ def _topicos(query):
     return [t for t in SINONIMOS if any(_phrase_match(term, qn) for term in t['terms'])]
 
 
+# --- Radar del cliente (Vista Cliente · lente SIGA sobre los pilares) --------
+# Cada sector define los temas que se buscan en el Congreso + el sector de
+# sanciones del pilar Regulatorio + la comisión de referencia para las acciones.
+REF_YEAR = 2026    # horizonte del dataset (para calcular "reciente")
+
+# temas curados para PRECISIÓN: palabra sola solo si es distintiva (salud,
+# educacion, energia); si el término corto colisiona por substring
+# (seguros→seguridad, credito, pension→suspension, banca), se usa frase (AND).
+SECTORES_CLIENTE = [
+    {'k': 'salud', 'nombre': 'Salud', 'comision': 'Séptima', 'sector_sanciones': 'salud',
+     'temas': ['salud', 'medicamentos', 'aseguramiento en salud', 'habilitacion de ips']},
+    {'k': 'contratacion', 'nombre': 'Contratación e infraestructura', 'comision': 'Primera',
+     'sector_sanciones': 'contratacion',
+     'temas': ['contratacion', 'obras publicas', 'concesiones viales', 'licitacion']},
+    {'k': 'financiero', 'nombre': 'Financiero', 'comision': 'Tercera', 'sector_sanciones': 'financiero',
+     'temas': ['sistema financiero', 'entidades financieras', 'mercado de valores',
+               'establecimientos de credito']},
+    {'k': 'energia', 'nombre': 'Energía y ambiente', 'comision': 'Quinta', 'sector_sanciones': '',
+     'temas': ['energia', 'servicios publicos domiciliarios', 'transicion energetica', 'gas natural']},
+    {'k': 'educacion', 'nombre': 'Educación', 'comision': 'Sexta', 'sector_sanciones': '',
+     'temas': ['educacion', 'universidades', 'instituciones educativas']},
+    {'k': 'trabajo', 'nombre': 'Trabajo y pensiones', 'comision': 'Séptima', 'sector_sanciones': '',
+     'temas': ['reforma laboral', 'regimen pensional', 'seguridad social', 'salario minimo']},
+]
+
+
+def sector_cliente(k):
+    for s in SECTORES_CLIENTE:
+        if s['k'] == k:
+            return s
+    return None
+
+
 class Caudal:
     def __init__(self, indice=None, proyectos=None, autor_partido=None):
         self.indice = indice or []
@@ -270,6 +303,56 @@ class Caudal:
                 'crea_fondo': h.get('cf', False), 'jala_presupuesto': h.get('jp', False),
             } for h in hits],
         }
+
+    # -------- Radar del cliente · señales legislativas -----------------
+    def radar_congreso(self, sector_key=None, temas=None, comision_lbl='', cap=10):
+        """Proyectos que tocan los temas del cliente, priorizados por
+        accionabilidad (en trámite > caído reciente > ley > antecedente)."""
+        if temas is None:
+            s = sector_cliente(sector_key) or {}
+            temas = s.get('temas', [])
+            comision_lbl = comision_lbl or s.get('comision', '')
+        seen = {}
+        for t in temas:
+            for h in self.buscar(t):
+                seen.setdefault((h.get('tb', 'pdly'), h['id']), h)
+        hits = list(seen.values())
+
+        def _score(h):
+            res, a = h.get('res'), (h.get('a') or 0)
+            if res == 'EN_TRAMITE':
+                base = 3
+            elif res in ('ARCHIVADO_TIEMPO', 'ARCHIVADO_OTRO') and a >= REF_YEAR - 2:
+                base = 2
+            elif res == 'LEY' and a >= REF_YEAR - 3:
+                base = 2
+            elif res == 'LEY':
+                base = 1
+            else:
+                base = 0
+            return (base, a)
+
+        hits.sort(key=_score, reverse=True)
+        senales = [self._senal_congreso(h, comision_lbl) for h in hits[:cap]]
+        return {'n_tocados': len(hits), 'n_mostrados': len(senales), 'senales': senales}
+
+    def _senal_congreso(self, h, comision_lbl):
+        res, a = h.get('res'), (h.get('a') or 0)
+        com = (h.get('com', '') or comision_lbl).title()   # comisión REAL del proyecto
+        if res == 'EN_TRAMITE':
+            nivel = 'alto'
+            accion = f'Ventana de incidencia abierta — preparar concepto para la Comisión {com}'.strip()
+        elif res in ('ARCHIVADO_TIEMPO', 'ARCHIVADO_OTRO') and a >= REF_YEAR - 2:
+            nivel, accion = 'medio', 'Cayó reciente (probable re-radicación) — vigilar el orden del día'
+        elif res == 'LEY':
+            nivel = 'medio' if a >= REF_YEAR - 3 else 'bajo'
+            accion = 'Ya es ley — revisar reglamentación y cumplimiento'
+        else:
+            nivel, accion = 'bajo', 'Antecedente histórico — monitoreo pasivo'
+        return {'tipo': 'congreso', 'id': h['id'], 'tb': h.get('tb', 'pdly'),
+                'anio': a, 'titulo': h['t'], 'comision': h.get('com', ''),
+                'resultado': res, 'resultado_txt': RES_LABEL.get(res, res),
+                'empuje': h.get('emp'), 'nivel': nivel, 'accion': accion}
 
     # -------- ficha de un proyecto ------------------------------------
     def proyecto(self, pid, tb='pdly'):

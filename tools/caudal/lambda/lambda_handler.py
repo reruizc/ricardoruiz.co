@@ -299,6 +299,58 @@ def _sintesis_tema(resumen):
     return data
 
 
+# --- Radar del cliente · lectura interpretada (SKU A · Vista Cliente) --------
+CLIENTE_SYSTEM = (
+    "Eres analista de asuntos públicos de Cauce. Escribes en español, tuteo "
+    "neutro de Bogotá (sin voseo, sin regionalismos). Te doy el RADAR de un "
+    "cliente de un sector: las señales del Estado (proyectos de ley y sanciones) "
+    "que tocan su sector, ya filtradas y con su estado real y nivel de prioridad. "
+    "Tu trabajo: decir qué DE VERDAD mueve su aguja y qué hacer — precisión sobre "
+    "volumen. REGLA DURA: usa SOLO las señales que te doy; NO inventes proyectos, "
+    "cifras, entidades ni nombres. Si algo no está, no lo menciones. Devuelves "
+    "SIEMPRE un JSON válido con: titular (una frase potente y precisa), "
+    "lo_que_importa (2-3 frases: las 2-3 señales que priorizarías y por qué mueven "
+    "la aguja de este sector), acciones (lista de 2-4 acciones concretas), "
+    "riesgo_oportunidad (1-2 frases sobre el riesgo o la oportunidad dominante).")
+
+
+def _lectura_cliente(s, senales, kpis):
+    key = _hash24(PROMPT_VERSION + '|cliente|' + s['k'] + '|' + str(kpis['n_radar'])
+                  + '|' + str(kpis['alto']) + '|' + str(kpis['en_tramite']))
+    cached = _cache_get('cliente-' + key)
+    if cached:
+        return cached
+    lines = []
+    for x in senales[:14]:
+        if x['tipo'] == 'congreso':
+            lines.append(f"- [LEGISLATIVO · prioridad {x['nivel']}] ({x['anio']}, "
+                         f"{x.get('resultado_txt', x.get('resultado'))}) {x['titulo'][:95]}")
+        else:
+            lines.append(f"- [REGULATORIO · prioridad {x['nivel']}] {x.get('fecha', '')} "
+                         f"{x.get('fuente', '')}: {x.get('sancionado', '')} — {x.get('motivo', '')[:75]}")
+    user = (f"Cliente: sector {s['nombre']} (sus proyectos suelen ir a la Comisión "
+            f"{s['comision']}).\n"
+            f"Radar: {kpis['n_radar']} señales priorizadas · {kpis['alto']} de alta "
+            f"prioridad · {kpis['en_tramite']} proyectos EN TRÁMITE (ventana de "
+            f"incidencia abierta), de {kpis['n_proyectos_sector']} proyectos que han "
+            f"tocado el sector en 36 años"
+            + (f" · {kpis['n_sanciones_sector']} sanciones del sector"
+               if kpis.get('n_sanciones_sector') else '') + ".\n\n"
+            f"SEÑALES DEL RADAR:\n" + '\n'.join(lines) + "\n\nEscribe el análisis en JSON.")
+    try:
+        raw = _call_llm('sintesis', CLIENTE_SYSTEM, user, max_tokens=6000).strip()
+        if raw.startswith('```'):
+            raw = raw.split('```')[1].lstrip('json').strip()
+        data = json.loads(raw)
+    except Exception as e:
+        data = {'titular': '', 'lo_que_importa': '', 'acciones': [],
+                'riesgo_oportunidad': '', 'error': str(e)[:200]}
+    data['_model'] = STEP_MODELS['sintesis']['model']
+    if 'error' not in data:
+        _cache_put('cliente-' + key, data)
+    return data
+
+
 # --- fase 3 · extracción del texto de una gaceta ----------------------------
 GACETA_SYSTEM = (
     "Eres analista legislativo de Cauce. Te doy el TEXTO de una Gaceta del "
@@ -545,6 +597,44 @@ def handler(event, context):
             'con_monto': len(montos),
             'resultados': out,
         })
+
+    if action == 'cliente':        # Vista Cliente · radar SIGA sobre los pilares
+        sk = body.get('sector')
+        s = caudal_core.sector_cliente(sk)
+        sectores = [{'k': x['k'], 'nombre': x['nombre'],
+                     'regulatorio': bool(x.get('sector_sanciones'))}
+                    for x in caudal_core.SECTORES_CLIENTE]
+        if not s:
+            return _resp(400, {'error': f'sector desconocido: {sk}', 'sectores': sectores})
+        rc = caudal.radar_congreso(sector_key=sk)
+        reg, n_sanc = [], 0
+        if s.get('sector_sanciones'):
+            sanc = [r for r in _sanciones() if r.get('sector') == s['sector_sanciones']]
+            n_sanc = len(sanc)
+            sanc.sort(key=lambda r: r.get('fecha', ''), reverse=True)
+            for r in sanc[:6]:
+                yr = (r.get('fecha') or '')[:4]
+                reciente = yr.isdigit() and int(yr) >= caudal_core.REF_YEAR - 1
+                reg.append({'tipo': 'regulatorio', 'sancionado': r.get('sancionado'),
+                            'fuente': r.get('fuente_nombre'), 'tipo_sancion': r.get('tipo'),
+                            'motivo': (r.get('motivo') or '')[:170], 'fecha': r.get('fecha'),
+                            'monto': r.get('monto'), 'nivel': 'alto' if reciente else 'medio',
+                            'accion': ('Sanción reciente en tu sector — revisar exposición y activar '
+                                       'cumplimiento') if reciente else
+                                      'Antecedente sancionatorio — referencia de riesgo del sector'})
+        senales = rc['senales'] + reg
+        kpis = {'n_radar': len(senales),
+                'alto': sum(1 for x in senales if x['nivel'] == 'alto'),
+                'medio': sum(1 for x in senales if x['nivel'] == 'medio'),
+                'bajo': sum(1 for x in senales if x['nivel'] == 'bajo'),
+                'en_tramite': sum(1 for x in rc['senales'] if x['resultado'] == 'EN_TRAMITE'),
+                'n_proyectos_sector': rc['n_tocados'], 'n_sanciones_sector': n_sanc}
+        out = {'cliente': {'sector': sk, 'nombre': s['nombre'], 'comision': s['comision'],
+                           'sector_sanciones': s.get('sector_sanciones', ''), 'temas': s.get('temas', [])},
+               'congreso': rc['senales'], 'regulatorio': reg, 'kpis': kpis, 'sectores': sectores}
+        if body.get('lectura', False):
+            out['lectura'] = _lectura_cliente(s, senales, kpis)
+        return _resp(200, out)
 
     if action == 'tema':
         q = body.get('query', '')

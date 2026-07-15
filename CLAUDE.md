@@ -5024,6 +5024,9 @@ Caudal (paraguas)  ·  caudal.html = HOME multi-pilar (9 cards del mapa de fuent
 ├── Congreso      → view-congreso    + Lambda caudal-analiza (tema/proyecto/gaceta/…)   (LISTO · en prod)
 ├── Regulatorio   → view-regulatorio + Lambda action `sanciones` + tools/caudal/supers/  (LISTO · en prod)
 └── Cortes / Medios / Datos abiertos / Territoriales / …   (cards "Próximamente" en el home)
+
+⊕ Vista Cliente   → view-cliente + Lambda action `cliente` — lente SIGA que CRUZA los
+                    pilares por sector y triaja a acción (SKU A, NO es un pilar)  (LISTO · en prod)
 ```
 
 > **Decisión de naming RESUELTA (jul-2026 · modelo paraguas):** todo vive bajo
@@ -5036,6 +5039,40 @@ Caudal (paraguas)  ·  caudal.html = HOME multi-pilar (9 cards del mapa de fuent
 > Caudal; el router es `showView(v)`. Los pilares NO comparten código de datos
 > entre sí, pero SÍ el shell del frontend y la Lambda (acciones **aditivas** —
 > agregar un pilar no toca los otros).
+
+### Vista Cliente · Radar (SKU A · LISTO · en prod · jul-2026)
+
+La **lente SIGA** del pitch, materializada: eliges un **sector** y Caudal cruza
+Congreso + Regulatorio filtrado por ese sector, descarta el ruido y deja las
+señales que mueven la aguja, cada una con **nivel (alto/medio/bajo) + acción
+sugerida**, más una **lectura del analista** (LLM). Reproduce el "9 señales → 6
+descartadas → 2 importan" del roadmap con datos reales. Es el producto **SKU A**,
+NO un pilar (vive encima de los pilares).
+
+- **Entrada:** card `#radar-cta` en el home de `caudal.html` → `view-cliente`.
+- **Presets de sector** (`SECTORES_CLIENTE` en `caudal_core.py`): salud,
+  contratacion, financiero, energia, educacion, trabajo. Cada uno: `temas`
+  (búsqueda en el Congreso · **curados para precisión**: palabra sola solo si es
+  distintiva; si el término corto colisiona por substring —seguros→seguridad,
+  credito, pension→suspension— se usa frase AND), `sector_sanciones` (filtro del
+  pilar Regulatorio; salud+contratacion tienen sanciones reales, el resto muestra
+  "fuente por conectar") y `comision` de referencia.
+- **Triaje determinista** (`Caudal.radar_congreso` + `_senal_congreso`): score de
+  accionabilidad (EN_TRAMITE > caído reciente > ley reciente > antecedente) →
+  nivel + acción. **Cero invención de cifras** (todo sale del dato). La acción cita
+  la comisión REAL del proyecto. Regulatorio: sanción reciente del sector = alto.
+- **Lambda acción `cliente`** (`{action:'cliente', sector, lectura}`): ensambla
+  `radar_congreso` (Congreso) + `_sanciones()` filtrado por sector (Regulatorio) +
+  KPIs; con `lectura:true` agrega `_lectura_cliente` (DeepSeek, cache hash24 por
+  sector+conteos, mismo patrón que `_sintesis_tema`). Aditiva — no toca las otras rutas.
+- **Frontend** (`view-cliente`): pills de sector → `cliLoad()` pinta KPIs + nota
+  "de N proyectos que tocaron el sector, el radar prioriza M" + lectura (pre-fetch
+  como en tema) + 2 secciones de señales (Legislativo · Regulatorio) con dot de
+  nivel y acción. `CLI_SECS` hardcoded (espejo de `SECTORES_CLIENTE`).
+- **Pendiente / v2:** perfil de cliente guardado (temas propios + storage), triaje
+  LLM por-señal (hoy es determinista + 1 lectura global), y cuando entren
+  Superfinanciera/otras superintendencias, los sectores financiero/energía ganan
+  Regulatorio real.
 
 ### Pilar Regulatorio · sanciones de superintendencias (`tools/caudal/supers/` · piloto vía 1 LISTO)
 
