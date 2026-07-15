@@ -4882,14 +4882,28 @@ Cauce = el cuerpo de datos legislativos). Vive en `tools/caudal/`.
     nº Cámara) y `votaciones` (match Senado/Cámara). Frontend: panel ámbar "Bloqueo en comisión"
     (agendado N×, posición) + panel azul "Trámite · debates y votaciones" (aplazamientos + tally) +
     gráfica P(tratado|posición) en el landing.
-  - **Gacetas** (`procesar_gacetas.py`): el portal JSF de la Imprenta es hostil (POST con ViewState,
-    sin Content-Length → `.crdownload` cuelga aunque el PDF esté completo [verificar `%%EOF` y renombrar];
-    503 intermitentes; el índice NO clasifica acta/ponencia). Descarga = navegador clic a clic (Chrome
-    real, carpeta apuntada a `gacetas/`), NO bulk automatizable. `procesar_gacetas.py` toma el folder
-    como cola → clasifica acta/ponencia → sube texto a `gacetas-texto/{n-año}.txt`. **Ponencias** →
-    botón "analizar ponencia" instantáneo; **actas** → listas para la acción `gaceta` (extrae
-    aplazamiento + voto nominal, `PROMPT_VERSION='v5'`). Pipeline probado end-to-end (ponencia 1632/24
-    → sentido/argumentos/ponentes). **Gotcha de targeting SIN resolver:** no hay fuente limpia que diga
+  - **Descarga de gacetas por CURL — RESUELTO (jul-2026, `descargar_gaceta.py`).** La nota vieja
+    ("NO bulk automatizable, clic a clic") **quedó obsoleta**: el portal de la Imprenta SÍ se
+    automatiza. El deep-link `index2.xhtml?ent=Senado|Camara&fec=D-M-YYYY&num=NNN` (que sale del
+    botón "Ver Link PDF" del portal) renderiza una página que al cargar hace un postback PrimeFaces
+    (`pdfIr`) que devuelve el PDF. Reproducible en 2 pasos: **(1)** GET del deep-link con cookie jar
+    → captura `jsessionid` (cookie) + `javax.faces.ViewState` (en el HTML); **(2)** POST a
+    `index2.xhtml;jsessionid=…` con `dldFile=dldFile` + `pdfIr=pdfIr` + `javax.faces.ViewState=…`
+    → `Content-Type: application/pdf`. `tools/caudal/actas/descargar_gaceta.py <Senado|Camara>
+    <D-M-YYYY> <num>` lo encapsula (guarda `gaceta_{num}_{año}.pdf` en `gacetas/`). El único input
+    es `(ent, fec, num)`; el `fec` EXACTO sale del portal al filtrar por número (col Fecha Gaceta).
+    Verificado: reforma laboral 870/2025 (67 MB, 175 pág) y acta comisión 1942/2025 bajadas por curl.
+  - **Encontrar actas:** el filtro **Documento="acta de plenaria"** del portal devuelve ~2.549
+    (aunque la columna Documento se vea vacía en la lista, el filtro SÍ matchea el tipo interno). El
+    match es fuzzy (1942 salió como "actas de comisión" bajo ese filtro). `procesar_gacetas.py` toma
+    el folder `gacetas/` como cola → clasifica acta/ponencia → sube texto a `gacetas-texto/{n-año}.txt`
+    (`extraer_gaceta.py <pdf> <key>` sube una sola). **Ponencias** → sentido/ponentes/argumentos;
+    **actas** → la acción `gaceta` extrae aplazamiento + votación + **nominal** (`PROMPT_VERSION='v5'`,
+    trunca a 60k chars). Probado end-to-end con gacetas AUTO-DESCARGADAS: ponencia 870/2025 (reforma
+    laboral) → favorable · Aída Avella · 6 args. **Gotcha del nominal:** no toda acta trae roll-call
+    por nombre — muchas votan por unanimidad/agregado (la 1942/2025 salió sin nominal). La máquina
+    está lista; el variable es encontrar actas que SÍ traigan la lista nominal (y que caiga en los 60k).
+    **Gotcha de targeting (parcial):** no hay fuente limpia que diga
     qué nº de gaceta es un acta del cuatrienio actual → las actas 2023-2026 quedan **on-demand** (opción B).
 - 🔜 **Pendiente (Fase 3):** (A) fuente de targeting de actas (secretarías Senado/Cámara con nº gaceta) ·
   (B) voto nominal cuatrienio actual quedó **on-demand** (decisión de Ricardo, jul-2026) · voto nominal
