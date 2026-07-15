@@ -79,6 +79,29 @@
   .chip{font-size:.72rem; color:var(--ink2); border:1px solid var(--border); padding:.35rem .7rem; border-radius:20px; cursor:none; transition:.15s}
   .chip:hover{border-color:var(--teal); color:var(--ink)}
 
+  /* ===== home · paraguas + pilares ===== */
+  .home-hero{padding-top:2.6rem}
+  .home-hint{font-size:.68rem; color:var(--ink3); margin-top:1.1rem; letter-spacing:.02em}
+  .home-hint b{color:var(--ink2)}
+  .pillars{display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin-top:2.8rem}
+  @media(max-width:860px){ .pillars{grid-template-columns:repeat(2,1fr)} }
+  @media(max-width:560px){ .pillars{grid-template-columns:1fr} }
+  .pcard{background:var(--card); border:1px solid var(--border); border-radius:12px; padding:1.25rem 1.3rem; text-align:left; display:flex; flex-direction:column; gap:.7rem; min-height:150px; transition:.16s}
+  .pcard.live,.pcard.data{cursor:none}
+  .pcard.live:hover,.pcard.data:hover{border-color:var(--teal); transform:translateY(-2px); background:var(--card2)}
+  .pcard.soon{opacity:.48}
+  .pc-top{display:flex; align-items:flex-start; justify-content:space-between; gap:.6rem}
+  .pc-name{font-weight:700; font-size:.9rem; letter-spacing:-.01em; line-height:1.25}
+  .pc-status{font-size:.5rem; letter-spacing:.14em; text-transform:uppercase; padding:.22rem .45rem; border-radius:4px; white-space:nowrap; flex-shrink:0}
+  .pc-status.s-live{color:var(--green); border:1px solid rgba(74,222,128,.35); background:rgba(74,222,128,.08)}
+  .pc-status.s-data{color:var(--amber); border:1px solid rgba(224,160,58,.35); background:rgba(224,160,58,.08)}
+  .pc-status.s-soon{color:var(--ink3); border:1px solid var(--border2)}
+  .pc-n{font-family:'HelveticaNeue',Helvetica,Arial,sans-serif; font-weight:800; font-size:1.85rem; line-height:1}
+  .pc-n small{font-size:.58rem; font-weight:500; color:var(--ink3); letter-spacing:.1em; text-transform:uppercase; display:block; margin-top:.3rem}
+  .pc-desc{font-size:.71rem; color:var(--ink2); line-height:1.5; margin-top:auto}
+  .pill-back{background:none; border:1px solid var(--border2); color:var(--ink2); font-family:inherit; font-size:.74rem; padding:.42rem .85rem; border-radius:6px; cursor:none; margin-bottom:1.2rem}
+  .pill-back:hover{border-color:var(--teal); color:var(--ink)}
+
   /* resultados */
   #results{margin-top:2.4rem; display:none}
   .r-titular{font-family:'HelveticaNeue',Helvetica,Arial,sans-serif; font-weight:800; font-size:clamp(1.3rem,3.4vw,2rem); line-height:1.12; letter-spacing:-.02em; margin-bottom:.4rem}
@@ -295,19 +318,40 @@
   </nav>
 
   <div class="wrap" id="app" hidden>
-    <div class="hero">
-      <h1>El histórico del Congreso, <em>leído</em>.</h1>
-      <p>Busca un tema y Caudal te dice cuántas veces se ha intentado legislar,
-         por qué se cae, y qué bancadas lo empujan. 36 años de trámite, 1990–2026.</p>
-      <div class="search">
-        <input id="q" type="text" placeholder="feminicidio · paridad · eutanasia · reforma pensional…" autocomplete="off" />
-        <button id="go">Analizar</button>
+    <!-- ===== HOME · paraguas ===== -->
+    <div id="view-home">
+      <div class="hero home-hero">
+        <h1>El Estado, <em>leído</em>.</h1>
+        <p>Caudal reúne el histórico del Congreso, las sanciones de las
+           superintendencias y —por etapas— cortes, medios y datos abiertos.
+           Un solo motor; te entrega la señal ya leída, no el volumen.</p>
+        <div class="search">
+          <input id="hq" type="text" placeholder="busca un tema · una entidad · un gremio…" autocomplete="off" />
+          <button id="hgo">Buscar</button>
+        </div>
+        <div class="chips" id="hchips"></div>
+        <div class="home-hint">La búsqueda entra hoy al pilar <b>Congreso</b>. Los demás pilares se encienden por etapas.</div>
       </div>
-      <div class="chips" id="chips"></div>
+      <div class="pillars" id="pillars"></div>
     </div>
 
-    <div id="landing"></div>
-    <div id="results"></div>
+    <!-- ===== PILAR · Congreso ===== -->
+    <div id="view-congreso" hidden>
+      <button class="pill-back" id="congresoBack">← Volver a Caudal</button>
+      <div class="hero">
+        <h1>El histórico del Congreso, <em>leído</em>.</h1>
+        <p>Busca un tema y Caudal te dice cuántas veces se ha intentado legislar,
+           por qué se cae, y qué bancadas lo empujan. 36 años de trámite, 1990–2026.</p>
+        <div class="search">
+          <input id="q" type="text" placeholder="feminicidio · paridad · eutanasia · reforma pensional…" autocomplete="off" />
+          <button id="go">Analizar</button>
+        </div>
+        <div class="chips" id="chips"></div>
+      </div>
+
+      <div id="landing"></div>
+      <div id="results"></div>
+    </div>
 
     <div class="foot">
       Caudal · módulo de Cauce · inteligencia legislativa · datos de leyes.senado.gov.co (1990–2026)<br />
@@ -326,7 +370,7 @@
   /* ---------- cursor ---------- */
   const cur=document.getElementById('cur'), ring=document.getElementById('curRing');
   addEventListener('mousemove',e=>{cur.style.left=ring.style.left=e.clientX+'px'; cur.style.top=ring.style.top=e.clientY+'px';});
-  addEventListener('mouseover',e=>{const h=e.target.closest('button,a,.chip,.tl-item,input,.modal-close,.info-i'); ring.style.opacity=h?'1':'.5'; ring.style.transform=`translate(-50%,-50%) scale(${h?1.4:1})`;});
+  addEventListener('mouseover',e=>{const h=e.target.closest('button,a,.chip,.tl-item,input,.modal-close,.info-i,.pcard.live,.pcard.data,.pill-back'); ring.style.opacity=h?'1':'.5'; ring.style.transform=`translate(-50%,-50%) scale(${h?1.4:1})`;});
   // tooltips ⓘ: toggle al click; cierra al clickear afuera
   addEventListener('click',e=>{
     const i=e.target.closest('.info-i');
@@ -354,6 +398,7 @@
   })();
   function reveal(){ document.getElementById('gate').remove(); document.getElementById('topNav').hidden=false; document.getElementById('app').hidden=false;
     const lo=document.getElementById('navLogout'); if(lo) lo.onclick=()=>{ localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); location.replace('login.html'); };
+    initHome();
     loadStats();
   }
 
@@ -496,6 +541,71 @@
   async function call(payload){
     const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     return r.json();
+  }
+
+  /* ---------- home · paraguas + router de pilares ---------- */
+  // Mapa de fuentes de Cauce como pilares navegables. Congreso está vivo;
+  // Regulatorio tiene datos listos (6.084 sanciones); el resto se enciende por etapas.
+  const PILLARS=[
+    {id:'congreso',    name:'Congreso y órgano legislativo',    status:'live', n:'13.172', unit:'registros · 1990–2026', desc:'Proyectos de ley, actos legislativos y leyes. Cuántas veces se intentó, por qué se cae, quién lo empuja.'},
+    {id:'regulatorio', name:'Superintendencias y comisiones',   status:'data', n:'6.084',  unit:'sanciones',            desc:'Sanciones ejecutoriadas de INVIMA, SECOP, Contraloría y más. Datos listos; vista de consulta en construcción.'},
+    {id:'datos',       name:'Datos abiertos y contratación',    status:'soon', desc:'datos.gov.co, SECOP, presupuesto y metas de gobierno.'},
+    {id:'control',     name:'Órganos de control y altas cortes',status:'soon', desc:'Procuraduría, Consejo de Estado, Corte Constitucional.'},
+    {id:'ejecutivo',   name:'Ejecutivo nacional · min. y agencias',status:'soon', desc:'Decretos, resoluciones y agendas regulatorias del gobierno.'},
+    {id:'gacetas',     name:'Diarios y gacetas oficiales',      status:'soon', desc:'Diario Oficial y Gaceta del Congreso: el texto completo del trámite.'},
+    {id:'territorial', name:'Entidades territoriales',          status:'soon', desc:'Concejos, asambleas y gobiernos locales.'},
+    {id:'redes',       name:'Redes sociales oficiales y voceros',status:'soon', desc:'Cuentas oficiales de entidades y voceros clave.'},
+    {id:'medios',      name:'Medios nacionales y regionales',   status:'soon', desc:'Prensa nacional y regional, rastreada por tema.'},
+  ];
+  const PSTAT={live:['s-live','Activo'], data:['s-data','Datos listos'], soon:['s-soon','Próximamente']};
+  function renderPillars(){
+    const el=document.getElementById('pillars'); if(!el) return;
+    el.innerHTML=PILLARS.map(p=>{
+      const st=PSTAT[p.status]||PSTAT.soon;
+      const num=p.n?`<div class="pc-n">${esc(p.n)}<small>${esc(p.unit||'')}</small></div>`:'';
+      return `<div class="pcard ${p.status}" data-p="${p.id}">
+        <div class="pc-top"><div class="pc-name">${esc(p.name)}</div><span class="pc-status ${st[0]}">${st[1]}</span></div>
+        ${num}
+        <div class="pc-desc">${esc(p.desc)}</div>
+      </div>`;
+    }).join('');
+    el.querySelectorAll('.pcard.live,.pcard.data').forEach(c=>c.onclick=()=>{
+      const id=c.dataset.p;
+      if(id==='congreso') showView('congreso');
+      else openPillarInfo(id);
+    });
+  }
+  function showView(v){
+    const h=document.getElementById('view-home'), c=document.getElementById('view-congreso');
+    if(h) h.hidden=(v!=='home'); if(c) c.hidden=(v!=='congreso');
+    window.scrollTo(0,0);
+    if(v==='congreso') requestAnimationFrame(()=>document.querySelectorAll('#view-congreso .mort-bar').forEach(x=>x.style.height=x.dataset.h+'%'));
+  }
+  function openPillarInfo(id){
+    const p=PILLARS.find(x=>x.id===id); if(!p) return;
+    modalCard.innerHTML=`<button class="modal-close">✕</button>
+      <div class="ga-tag" style="color:var(--amber)">◈ Pilar regulatorio · Cauce</div>
+      <h2>${esc(p.name)}</h2>
+      <div class="kpis" style="grid-template-columns:1fr 1fr;margin:.4rem 0 1.2rem">
+        <div class="kpi"><div class="n" style="color:var(--amber)">${esc(p.n||'—')}</div><div class="l">Sanciones consolidadas</div></div>
+        <div class="kpi"><div class="n">5</div><div class="l">Fuentes vía Socrata</div></div>
+      </div>
+      <div class="ga-t">Ya están consolidadas <b>6.084 sanciones ejecutoriadas</b> a nivel entidad —INVIMA, SECOP I/II, Contraloría fiscal y Junta de Contadores— bajo un esquema común de sanción (sancionado · motivo · monto · resolución · fecha de firmeza · fuente citada).</div>
+      <div class="ga-h">Lo que viene</div>
+      <div class="ga-t">La vista de consulta por sector y entidad, más las superintendencias de mayor peso para gremios: Superfinanciera (804 actos, endpoint verificado), Supertransporte, SIC y Supersalud. Estas sanciones alimentarán las <b>alertas de precisión</b> por el sector de cada cliente.</div>
+      <div class="cob-note" style="margin-top:1rem">Fuente: datos.gov.co (Socrata) · esquema común en tools/caudal/supers. Cada alerta cita su acto sancionatorio.</div>`;
+    modal.classList.add('on');
+    modalCard.querySelector('.modal-close').onclick=cerrar;
+  }
+  function initHome(){
+    renderPillars();
+    const hq=document.getElementById('hq'), hgo=document.getElementById('hgo');
+    const goHome=()=>{ const v=(hq&&hq.value||'').trim(); if(!v) return; showView('congreso'); q.value=v; buscar(); };
+    if(hgo) hgo.onclick=goHome;
+    if(hq) hq.addEventListener('keydown',e=>{ if(e.key==='Enter') goHome(); });
+    const hc=document.getElementById('hchips');
+    if(hc) EJEMPLOS.forEach(t=>{ const ch=document.createElement('span'); ch.className='chip'; ch.textContent=t; ch.onclick=()=>{ showView('congreso'); q.value=t; buscar(); }; hc.appendChild(ch); });
+    const cb=document.getElementById('congresoBack'); if(cb) cb.onclick=()=>showView('home');
   }
 
   /* ---------- búsqueda ---------- */
