@@ -4898,11 +4898,23 @@ Cauce = el cuerpo de datos legislativos). Vive en `tools/caudal/`.
     match es fuzzy (1942 salió como "actas de comisión" bajo ese filtro). `procesar_gacetas.py` toma
     el folder `gacetas/` como cola → clasifica acta/ponencia → sube texto a `gacetas-texto/{n-año}.txt`
     (`extraer_gaceta.py <pdf> <key>` sube una sola). **Ponencias** → sentido/ponentes/argumentos;
-    **actas** → la acción `gaceta` extrae aplazamiento + votación + **nominal** (`PROMPT_VERSION='v5'`,
-    trunca a 60k chars). Probado end-to-end con gacetas AUTO-DESCARGADAS: ponencia 870/2025 (reforma
-    laboral) → favorable · Aída Avella · 6 args. **Gotcha del nominal:** no toda acta trae roll-call
-    por nombre — muchas votan por unanimidad/agregado (la 1942/2025 salió sin nominal). La máquina
-    está lista; el variable es encontrar actas que SÍ traigan la lista nominal (y que caiga en los 60k).
+    **actas** → la acción `gaceta` extrae aplazamiento + votación + **nominal** (`PROMPT_VERSION='v6'`).
+    **VOTO NOMINAL PROBADO (jul-2026):** acta de plenaria **1069/2019** (Senado, auto-descargada) →
+    la Lambda extrajo el roll-call de **84 senadores** (informe de conciliación, 83 Sí / 1 No, cada
+    uno con su voto: Roy Barreras, Nadya Blel, Aída Avella, David Barguil, Wilson Arias…). También
+    ponencia 870/2025 (reforma laboral) → favorable · Aída Avella · 6 args.
+  - **Ventana inteligente para actas largas (`_ventana`):** las actas de plenaria (300k-700k chars)
+    ponen el roll-call DESPUÉS del preámbulo (asistencia/quórum), lejos de los primeros 60k. `_ventana`
+    centra la ventana de 60k en la votación relevante: ancla en palabras distintivas del contexto
+    (≥8 chars, saltando ubicuas como proyecto/senado/plenaria) y, si no, en la primera "votación
+    nominal". **NO ancla en números sueltos** (un nº de proyecto aparece en cualquier parte del acta y
+    manda la ventana a un lugar sin voto — bug corregido). Para ver el nominal de un proyecto concreto,
+    el `contexto` (nº + título del proyecto votado en esa sesión) enfoca su votación.
+  - **Cómo cazar actas con nominal:** portal Documento="acta de plenaria" + Entidad=Senado → las que
+    traen "Acta de Plenaria" EXPLÍCITO en la columna (3 botones) son las confirmadas (p.ej. Senado
+    2019: 1147, 1069, 1068, 1067, 1066, 992, 970, 969). El roll-call va como "Por el Sí: N Por el No: M
+    … Honorables Senadores por el SÍ: [Apellidos Nombres] …". **Gotcha:** no toda acta trae roll-call —
+    muchas votan por unanimidad/agregado (la 1942/2025 comisión salió sin nominal).
     **Gotcha de targeting (parcial):** no hay fuente limpia que diga
     qué nº de gaceta es un acta del cuatrienio actual → las actas 2023-2026 quedan **on-demand** (opción B).
 - 🔜 **Pendiente (Fase 3):** (A) fuente de targeting de actas (secretarías Senado/Cámara con nº gaceta) ·

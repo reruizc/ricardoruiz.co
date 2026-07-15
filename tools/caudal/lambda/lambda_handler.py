@@ -36,7 +36,7 @@ import boto3
 import caudal_core
 
 BUCKET = os.environ.get('CAUDAL_BUCKET', 'caudal-legislativo')
-PROMPT_VERSION = 'v5'            # bumpear para invalidar cache de síntesis
+PROMPT_VERSION = 'v6'            # bumpear para invalidar cache de síntesis
 CACHE_PREFIX = 'analisis-cache/'
 HTTP_TIMEOUT = 55
 
@@ -374,6 +374,37 @@ GACETA_SYSTEM = (
 )
 
 
+def _ventana(texto, contexto, size=60000):
+    """Actas de plenaria largas: el roll-call nominal vive DESPUÉS del preámbulo
+    (asistencia/quórum), lejos de los primeros 60k. En vez de cortar por el
+    inicio, centra la ventana en la votación relevante — ancla en las palabras
+    distintivas del contexto y, si no, en la primera 'votación nominal'."""
+    if len(texto) <= size:
+        return texto
+    low = texto.lower()
+    anchor = -1
+    # ancla SOLO en palabras distintivas (≥7 chars) — NO en números sueltos: un
+    # número del contexto (nº de proyecto) aparece en cualquier parte del acta y
+    # manda la ventana a un lugar sin votación.
+    for tok in re.findall(r'[a-záéíóúñ]{8,}', (contexto or '').lower())[:8]:
+        if tok in ('proyecto', 'senado', 'camara', 'plenaria', 'congreso', 'republica'):
+            continue                     # palabras ubicuas en toda acta → no anclan
+        p = low.find(tok)
+        if p > size // 2:                # solo salta si el ancla está lejos del inicio
+            anchor = p
+            break
+    if anchor < 0:
+        for kw in ('votación nominal', 'votacion nominal', 'por el sí', 'por el si'):
+            p = low.find(kw)
+            if p >= 0:
+                anchor = p
+                break
+    if anchor < 0:
+        return texto[:size]
+    start = max(0, anchor - 2500)        # un poco de contexto antes del voto
+    return texto[start:start + size]
+
+
 def _extraer_gaceta(key, contexto):
     """Lee gacetas-texto/{key}.txt de S3 y saca la estructura vía LLM (cache)."""
     try:
@@ -387,7 +418,7 @@ def _extraer_gaceta(key, contexto):
         return cached
     # el texto puede ser largo; recorta a ~60k chars (≈ una gaceta grande)
     user = (f"Contexto (proyecto de interés): {contexto or 'el proyecto principal del documento'}\n\n"
-            f"TEXTO DE LA GACETA {key}:\n{texto[:60000]}")
+            f"TEXTO DE LA GACETA {key}:\n{_ventana(texto, contexto)}")
     try:
         raw = _call_llm('extraccion', GACETA_SYSTEM, user, max_tokens=6000).strip()
         if raw.startswith('```'):
