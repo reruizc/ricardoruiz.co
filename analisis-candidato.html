@@ -6,7 +6,7 @@
   <title>Análisis de Candidato · Elecciones 2026 · Ricardo Ruiz</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <style>
@@ -456,11 +456,17 @@
       text-align: center;
       line-height: 1.3;
     }
-    .corp-badge {
+    .corp-badge-stack {
       position: absolute;
       top: 1rem;
       right: 1rem;
       z-index: 3;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: .4rem;
+    }
+    .corp-badge {
       font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
       font-size: .96rem;
       letter-spacing: .2em;
@@ -469,9 +475,23 @@
       background: rgba(167,139,250,.15);
       border: 1px solid rgba(167,139,250,.3);
       color: var(--purple);
-      max-width: 132px;
+      max-width: 150px;
       text-align: center;
       line-height: 1.5;
+    }
+    /* Sub-badge: departamento (Asamblea) — separado y más chico */
+    .corp-badge-sub {
+      font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
+      font-size: .72rem;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      padding: .28rem .72rem;
+      background: rgba(0,71,255,.14);
+      border: 1px solid rgba(0,71,255,.32);
+      color: var(--blue-light);
+      max-width: 150px;
+      text-align: center;
+      line-height: 1.4;
     }
 
     /* Badge dorado — presidente electo (100/100) */
@@ -768,6 +788,11 @@
     .pes-right, .pes-right * {
       font-family: 'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif !important;
     }
+    /* El puntaje conserva Syne (override de la regla de arriba) */
+    .pes-left .overall-badge .rating-num,
+    .pes-left .overall-badge .rating-label {
+      font-family: 'Syne', sans-serif !important;
+    }
 
     /* ─── TAMAÑOS EN COLUMNA DERECHA ─── */
     .pes-right .info-key        { font-size: .894rem; }
@@ -886,7 +911,10 @@
               <span class="rating-num" id="overall-num">—</span>
               <span class="rating-label" id="rating-label">Puntos / 100</span>
             </div>
-            <div class="corp-badge" id="corp-badge">—</div>
+            <div class="corp-badge-stack">
+              <div class="corp-badge" id="corp-badge">—</div>
+              <div class="corp-badge-sub" id="corp-badge-sub" style="display:none"></div>
+            </div>
             <div class="candidate-photo-placeholder" id="photo-placeholder">
               <span id="photo-placeholder-text"><a href="https://drive.google.com/drive/folders/1ULVQC1Cyz_fjnhGdM7ydzg7tEgiDcPRS?usp=share_link" target="_blank">¿Quieres agregar la foto de tu candidato? ¡Haz click aquí y ayúdanos!</a></span>
             </div>
@@ -1546,6 +1574,25 @@
     let deptLayerBounds = null;       // bounds del depto activo (para volver desde municipio)
 
     // ─── INIT LEAFLET MAP ────────────────────────────────────
+    // Espera a que el mapa exista Y la capa nacional esté cargada, para que el
+    // auto-drill a municipios (Asamblea / Cámara territorial) no corra antes de
+    // que el mapa se inicialice (race cuando el fetch de datos es más rápido que
+    // la init diferida del mapa — típico con archivos locales o cacheados).
+    // Polling: no depende de que dispare un callback; resuelve cuando ambos
+    // están listos (o al tope de ~8s, con el mapa ya existente).
+    let _mapReady = false;
+    function markMapReady() { _mapReady = true; }
+    function ensureMapReady() {
+      return new Promise(resolve => {
+        let n = 0;
+        (function poll() {
+          if (leafletMap && _mapReady) return resolve();
+          if (++n > 160) return resolve();
+          setTimeout(poll, 50);
+        })();
+      });
+    }
+
     function initLeafletMap() {
       if (leafletMap) return;
       // Wait for next paint so the container has real pixel dimensions
@@ -1622,6 +1669,7 @@
     // NUNCA construir [lat, lng] para departamentos o municipios — solo para
     // marcadores de puestos/zonas (capa premium futura en loadPuestosLayer).
     function showBoundaryLayer(layer) {
+      if (!leafletMap || !layer) return;   // mapa aún no inicializado — evita crash
       if (activeBoundaryLayer && activeBoundaryLayer !== layer) {
         leafletMap.removeLayer(activeBoundaryLayer);
       }
@@ -1670,6 +1718,8 @@
         showBoundaryLayer(departamentosLayer);
       } catch(e) {
         console.error('[Mapa] Error cargando departamentos:', e.message);
+      } finally {
+        markMapReady();
       }
     }
 
@@ -2144,6 +2194,15 @@
       const c = (corp || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       return (c.includes('CAMARA') || c.includes('CÁMARA'))
         && !c.includes('INDIGENA') && !c.includes('AFRO') && !c.includes('PACIFICO');
+    }
+
+    // Asamblea es circunscripción departamental (un solo depto) → como cámara
+    // territorial: el mapa se desagrega por municipio de ese departamento.
+    function isAsamblea(corp) {
+      return (corp || '').toUpperCase().includes('ASAMBLEA');
+    }
+    function isDepartmentalRace(corp) {
+      return isCamaraTerritorial(corp) || isAsamblea(corp);
     }
 
     function featureStyle(feature) {
@@ -2773,7 +2832,17 @@
       setInfoVal('cand-name-first', splitName(meta.nombre).nombres);
       setInfoVal('info-partido', meta.partido || '—');
       setInfoVal('info-corp', meta.corpLabel || meta.corp || '—');
-      setInfoVal('corp-badge', (meta.corp || '').toUpperCase());
+      // Badge de corporación: Asamblea se parte en "ASAMBLEA" + depto aparte
+      // (el string completo "ASAMBLEA · SANTANDER · 2023" en un solo recuadro se ve enorme).
+      const _subBadge = document.getElementById('corp-badge-sub');
+      if (isAsamblea(meta.corp)) {
+        setInfoVal('corp-badge', 'ASAMBLEA 2023');
+        setInfoVal('corp-badge-sub', (meta.circunscripcion || '').toUpperCase());
+        if (_subBadge) _subBadge.style.display = meta.circunscripcion ? 'block' : 'none';
+      } else {
+        setInfoVal('corp-badge', (meta.corp || '').toUpperCase());
+        if (_subBadge) _subBadge.style.display = 'none';
+      }
       setInfoVal('corp-badge-header', (meta.corp || '—').toUpperCase());
       setInfoVal('overall-num', '…');
 
@@ -2824,6 +2893,8 @@
       if (_depSel) _depSel.value = '';
       const _munSel = document.getElementById('filter-mun');
       if (_munSel) { _munSel.innerHTML = '<option value="">— Todos los municipios —</option>'; _munSel.disabled = true; }
+      const _backBtn = document.getElementById('btn-volver-pais');
+      if (_backBtn) _backBtn.style.display = 'none';   // se re-muestra solo si hay drill
       if (departamentosLayer) showBoundaryLayer(departamentosLayer);
       refreshMapColors();
 
@@ -2912,8 +2983,9 @@
       maxDepVotes = deps[0]?.[1]?.v || 1;
       updateLegendMax(maxDepVotes);
 
-      if (isCamaraTerritorial(meta.corp) && deps.length > 0) {
-        // Cámara territorial: cargar directamente el depto con más votos
+      if (isDepartmentalRace(meta.corp) && deps.length > 0) {
+        // Cámara territorial / Asamblea: circunscripción departamental →
+        // cargar directamente el depto con más votos y desagregar por municipio
         const topDep = deps[0][0];
         const sel = document.getElementById('filter-dep');
         if (sel) sel.value = topDep;
@@ -2923,7 +2995,7 @@
           // Bogotá: mapa de localidades, no poblar selector de municipio
           if (munSel) munSel.disabled = true;
           buildZonVoteData(topDep);
-          loadBogotaLocalidadLayer();
+          ensureMapReady().then(() => loadBogotaLocalidadLayer());
         } else {
           // Otros deptos: poblar selector de municipios
           const munMap = {};
@@ -2941,7 +3013,9 @@
             munSel.disabled = !isLoggedIn();
           }
           buildMunVoteData(topDep);
-          loadDepMunicipiosLayer(topDep);
+          // Espera a que el mapa + capa nacional estén listos antes de drillear
+          // (si no, loadDepMunicipiosLayer corre con leafletMap null y revienta).
+          ensureMapReady().then(() => loadDepMunicipiosLayer(topDep));
         }
         // map-loading se quita dentro de loadDepMunicipiosLayer / loadBogotaLocalidadLayer
       } else {
