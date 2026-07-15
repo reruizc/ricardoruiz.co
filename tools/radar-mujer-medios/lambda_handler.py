@@ -155,11 +155,27 @@ def handler(event, context):
         print(f"[sentimiento prensa] falló (sigo): {e}")
 
     # ── Capa REDES (Apify) · opcional: solo si hay token y el módulo cargó ──
-    if collect_social is not None and os.environ.get("APIFY_TOKEN"):
+    # RADAR_SOCIAL_HOURS ("12" o "0,12", horas UTC): las redes CUESTAN por
+    # resultado, así que solo corren en los ciclos listados; en el resto se
+    # conserva la sección redes de la última corrida (desde el propio S3).
+    run_social = True
+    hrs = os.environ.get("RADAR_SOCIAL_HOURS", "").strip()
+    if hrs:
+        allowed = {int(h) for h in hrs.split(",") if h.strip().isdigit()}
+        run_social = now.hour in allowed
+    if collect_social is not None and os.environ.get("APIFY_TOKEN") and run_social:
         try:
             _add_redes(tablero, now)
         except Exception as e:
             print(f"[redes] falló (sigo solo con prensa): {e}")
+    else:
+        try:
+            prev = json.loads(_s3c().get_object(Bucket=S3_BUCKET, Key=TABLERO_KEY)["Body"].read())
+            if prev.get("redes"):
+                tablero["redes"] = prev["redes"]
+                print(f"[redes] ciclo sin scraping (hora {now.hour} UTC) → conservo redes de {prev.get('redes',{}).get('n_posts')} posts")
+        except Exception as e:
+            print(f"[redes] no pude conservar sección previa: {e}")
 
     _s3c().put_object(
         Bucket=S3_BUCKET, Key=TABLERO_KEY,
