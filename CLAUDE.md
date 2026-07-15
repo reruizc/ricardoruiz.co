@@ -4777,16 +4777,22 @@ Cauce = el cuerpo de datos legislativos). Vive en `tools/caudal/`.
   (para el join a partido) y `autor_tipo`; emite `dist/autores.json` (registro
   6.354 personas). **NO hace fuzzy-subset** ("Gloria Ramírez" vs "Gloria Ramírez Ríos"
   quedan separados) — conservador a propósito; refinable después.
-- **`build_roster.py`** — join autor→partido/bancada (LISTO · 67% ponderado por
-  proyectos). Los autores de proyectos SON congresistas electos → aparecen en los
-  resultados de Congreso con su partido. Extrae cada candidato→partido de GCS
+- **`build_roster.py`** — join autor→partido/bancada (LISTO · **70% ponderado por
+  proyectos**, jul-2026). Los autores de proyectos SON congresistas electos → aparecen
+  en los resultados de Congreso con su partido. Extrae cada candidato→partido de GCS
   2014/2018/2022 + preconteo 2026 (`DES_CAN`→`DES_PAR`), canoniza con la MISMA
   clave de `normalize_autores`, y une contra `autores.json`. **Matching:** exacto
   primero, luego **subconjunto de tokens** (el padrón usa el nombre legal completo
   "PALOMA SUSANA VALENCIA LASERNA" vs el autor "PALOMA VALENCIA LASERNA" — el
   segundo nombre rompía el exacto; subset con ≥3 tokens lo arregla sin falsos
-  positivos). `MANUAL` = override curado para prolíficos pre-2014 fuera de los datos
-  (Gloria Inés Ramírez→Polo, Moreno Piraquive→MIRA, Vargas Lleras→Cambio Radical…).
+  positivos). `MANUAL` = override curado (~33) para prolíficos fuera del join, por
+  pre-2014 O por fragmentación de nombre (2 tokens no subset-matchean: Paloma
+  Valencia, Nadia Blel, Efraín Cepeda…). Solo afiliación de alta confianza;
+  switchers/ambiguos deliberadamente fuera (Benedetti, Moreno de Caro, Vélez Uribe,
+  Clopatofsky, Araújo). Se supera cuando la RNEC entregue los GCS_*CON pre-2014.
+  Tras editar `MANUAL`: `build_roster.py --reuse` → subir `dist/autor-partido.json` a
+  `s3://caudal-legislativo/metadata/` → reciclar la Lambda (`update-function-code`,
+  el `_caudal()` recarga el autor-partido en contenedor frío).
   Salidas: `dist/roster-autores.json` (8.883 congresistas) + `dist/autor-partido.json`
   (clave autor→partido). `--reuse` evita re-escanear los 4GB de GCS. **Límite:** solo
   hay Congreso desde 2014 → los misses son casi todos pre-2014. El motor
