@@ -102,6 +102,26 @@
   .pill-back{background:none; border:1px solid var(--border2); color:var(--ink2); font-family:inherit; font-size:.74rem; padding:.42rem .85rem; border-radius:6px; cursor:none; margin-bottom:1.2rem}
   .pill-back:hover{border-color:var(--teal); color:var(--ink)}
 
+  /* ===== pilar Regulatorio · sanciones ===== */
+  .chip.on{border-color:var(--teal); color:var(--ink); background:var(--teal-soft)}
+  #reg-landing{margin-top:1.6rem}
+  #reg-results{margin-top:1.6rem; display:none}
+  .reg-sectors-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:.8rem; margin:1.4rem 0}
+  @media(max-width:640px){ .reg-sectors-grid{grid-template-columns:repeat(2,1fr)} }
+  .sec-card{background:var(--card); border:1px solid var(--border); border-radius:9px; padding:.9rem 1rem; cursor:none; transition:.15s}
+  .sec-card:hover{border-color:var(--teal); background:var(--card2); transform:translateY(-2px)}
+  .sec-card .n{font-family:'HelveticaNeue',Helvetica,Arial,sans-serif; font-weight:800; font-size:1.5rem; line-height:1}
+  .sec-card .l{font-size:.64rem; letter-spacing:.05em; color:var(--ink2); margin-top:.35rem}
+  .sanc-list{display:flex; flex-direction:column; gap:.6rem}
+  .sanc{border:1px solid var(--border); border-radius:9px; padding:.85rem 1rem; background:var(--card); transition:.15s}
+  .sanc:hover{border-color:var(--border2)}
+  .sanc-top{display:flex; align-items:baseline; justify-content:space-between; gap:.8rem}
+  .sanc-name{font-weight:700; font-size:.85rem; color:var(--ink); line-height:1.3}
+  .sanc-fecha{font-size:.66rem; color:var(--ink3); white-space:nowrap; flex-shrink:0}
+  .sanc-motivo{font-size:.74rem; color:var(--ink2); line-height:1.5; margin:.45rem 0 .55rem}
+  .sanc-tags{display:flex; flex-wrap:wrap; gap:.45rem; align-items:center; font-size:.66rem; color:var(--ink3)}
+  .sanc-monto{color:var(--amber); font-weight:700}
+
   /* resultados */
   #results{margin-top:2.4rem; display:none}
   .r-titular{font-family:'HelveticaNeue',Helvetica,Arial,sans-serif; font-weight:800; font-size:clamp(1.3rem,3.4vw,2rem); line-height:1.12; letter-spacing:-.02em; margin-bottom:.4rem}
@@ -353,6 +373,25 @@
       <div id="results"></div>
     </div>
 
+    <!-- ===== PILAR · Regulatorio (sanciones) ===== -->
+    <div id="view-regulatorio" hidden>
+      <button class="pill-back" id="regBack">← Volver a Caudal</button>
+      <div class="hero">
+        <h1>Las sanciones del Estado, <em>leídas</em>.</h1>
+        <p>Sanciones ejecutoriadas de las superintendencias y entidades de control,
+           bajo un esquema común. Filtra por sector o busca una entidad; cada sanción
+           cita su resolución. 6.084 sanciones · 5 fuentes.</p>
+        <div class="search">
+          <input id="rq" type="text" placeholder="busca una entidad, un producto, un motivo…" autocomplete="off" />
+          <button id="rgo">Buscar</button>
+        </div>
+        <div class="chips" id="rsectors"></div>
+      </div>
+
+      <div id="reg-landing"></div>
+      <div id="reg-results"></div>
+    </div>
+
     <div class="foot">
       Caudal · módulo de Cauce · inteligencia legislativa · datos de leyes.senado.gov.co (1990–2026)<br />
       Análisis asistido por IA sobre datos oficiales. Borrador; el criterio experto es del analista.
@@ -370,7 +409,7 @@
   /* ---------- cursor ---------- */
   const cur=document.getElementById('cur'), ring=document.getElementById('curRing');
   addEventListener('mousemove',e=>{cur.style.left=ring.style.left=e.clientX+'px'; cur.style.top=ring.style.top=e.clientY+'px';});
-  addEventListener('mouseover',e=>{const h=e.target.closest('button,a,.chip,.tl-item,input,.modal-close,.info-i,.pcard.live,.pcard.data,.pill-back'); ring.style.opacity=h?'1':'.5'; ring.style.transform=`translate(-50%,-50%) scale(${h?1.4:1})`;});
+  addEventListener('mouseover',e=>{const h=e.target.closest('button,a,.chip,.tl-item,input,.modal-close,.info-i,.pcard.live,.pcard.data,.pill-back,.sec-card'); ring.style.opacity=h?'1':'.5'; ring.style.transform=`translate(-50%,-50%) scale(${h?1.4:1})`;});
   // tooltips ⓘ: toggle al click; cierra al clickear afuera
   addEventListener('click',e=>{
     const i=e.target.closest('.info-i');
@@ -572,33 +611,92 @@
     el.querySelectorAll('.pcard.live,.pcard.data').forEach(c=>c.onclick=()=>{
       const id=c.dataset.p;
       if(id==='congreso') showView('congreso');
-      else openPillarInfo(id);
+      else if(id==='regulatorio') showView('regulatorio');
     });
   }
   function showView(v){
-    const h=document.getElementById('view-home'), c=document.getElementById('view-congreso');
-    if(h) h.hidden=(v!=='home'); if(c) c.hidden=(v!=='congreso');
+    ['home','congreso','regulatorio'].forEach(n=>{ const el=document.getElementById('view-'+n); if(el) el.hidden=(v!==n); });
     window.scrollTo(0,0);
     if(v==='congreso') requestAnimationFrame(()=>document.querySelectorAll('#view-congreso .mort-bar').forEach(x=>x.style.height=x.dataset.h+'%'));
+    if(v==='regulatorio') regLoadStats();
   }
-  function openPillarInfo(id){
-    const p=PILLARS.find(x=>x.id===id); if(!p) return;
-    modalCard.innerHTML=`<button class="modal-close">✕</button>
-      <div class="ga-tag" style="color:var(--amber)">◈ Pilar regulatorio · Cauce</div>
-      <h2>${esc(p.name)}</h2>
-      <div class="kpis" style="grid-template-columns:1fr 1fr;margin:.4rem 0 1.2rem">
-        <div class="kpi"><div class="n" style="color:var(--amber)">${esc(p.n||'—')}</div><div class="l">Sanciones consolidadas</div></div>
-        <div class="kpi"><div class="n">5</div><div class="l">Fuentes vía Socrata</div></div>
+  /* ---------- pilar Regulatorio · sanciones ---------- */
+  const REG={sector:'', q:''};
+  const REG_SECS=[['','Todos'],['salud','Salud'],['contratacion','Contratación'],['juridico','Jurídico'],['control','Control fiscal']];
+  let REG_STATS=null, _regInited=false, _regSeq=0;
+  function fmtCOP(n){ if(!n||n<=0) return ''; if(n>=1e12) return '$'+(n/1e12).toFixed(1).replace('.',',')+' B'; if(n>=1e6) return '$'+fmt(Math.round(n/1e6))+' M'; return '$'+fmt(Math.round(n)); }
+  function sancCard(r){
+    const mot=(r.motivo||'').replace(/\s+/g,' ').replace(/^[IVX]+\.\s*/,'').trim();
+    const monto=r.monto?`<span class="sanc-monto">${fmtCOP(r.monto)}</span> · `:'';
+    const tipo=r.tipo?`<span class="doc-badge">${esc(r.tipo)}</span>`:'';
+    return `<div class="sanc">
+      <div class="sanc-top"><span class="sanc-name">${esc(r.sancionado)}</span><span class="sanc-fecha">${esc(r.fecha||'')}</span></div>
+      ${mot?`<div class="sanc-motivo">${esc(mot)}</div>`:''}
+      <div class="sanc-tags"><span class="doc-badge pal">${esc(r.fuente_nombre||r.fuente)}</span>${tipo}${monto}${r.resolucion?'Res. '+esc(r.resolucion):''}</div>
+    </div>`;
+  }
+  function regRenderLanding(s){
+    const el=document.getElementById('reg-landing'); if(!el||!s) return;
+    const monto=(s.monto||{}).total_cop;
+    const rango=s.rango_fechas&&s.rango_fechas[0]?`${s.rango_fechas[0].slice(0,4)}–${s.rango_fechas[1].slice(0,4)}`:'—';
+    el.innerHTML=`
+      <div class="land-h">Las sanciones del Estado en números · esquema común</div>
+      <div class="kpis">
+        <div class="kpi"><div class="n">${fmt(s.total)}</div><div class="l">Sanciones</div></div>
+        <div class="kpi"><div class="n">${(s.por_fuente||[]).length}</div><div class="l">Fuentes</div></div>
+        <div class="kpi"><div class="n" style="color:var(--amber)">${fmtCOP(monto)||'—'}</div><div class="l">Monto reportado</div></div>
+        <div class="kpi"><div class="n">${rango}</div><div class="l">Periodo</div></div>
       </div>
-      <div class="ga-t">Ya están consolidadas <b>6.084 sanciones ejecutoriadas</b> a nivel entidad —INVIMA, SECOP I/II, Contraloría fiscal y Junta de Contadores— bajo un esquema común de sanción (sancionado · motivo · monto · resolución · fecha de firmeza · fuente citada).</div>
-      <div class="ga-h">Lo que viene</div>
-      <div class="ga-t">La vista de consulta por sector y entidad, más las superintendencias de mayor peso para gremios: Superfinanciera (804 actos, endpoint verificado), Supertransporte, SIC y Supersalud. Estas sanciones alimentarán las <b>alertas de precisión</b> por el sector de cada cliente.</div>
-      <div class="cob-note" style="margin-top:1rem">Fuente: datos.gov.co (Socrata) · esquema común en tools/caudal/supers. Cada alerta cita su acto sancionatorio.</div>`;
-    modal.classList.add('on');
-    modalCard.querySelector('.modal-close').onclick=cerrar;
+      <div class="reg-sectors-grid">
+        ${(s.por_sector||[]).map(x=>`<div class="sec-card" data-sec="${esc(x.sector)}"><div class="n">${fmt(x.n)}</div><div class="l">${esc(x.sector_txt||x.sector)}</div></div>`).join('')}
+      </div>
+      <div class="panel wide"><h3>Sanciones más recientes</h3><div class="sanc-list">${(s.recientes||[]).map(sancCard).join('')}</div></div>`;
+    el.querySelectorAll('.sec-card').forEach(c=>c.onclick=()=>{ REG.sector=c.dataset.sec; regSyncSectors(); regBuscar(); });
+  }
+  function regRenderResults(d){
+    const el=document.getElementById('reg-results'); if(!el) return;
+    el.style.display='block';
+    const scope=[d.sector?esc((REG_SECS.find(s=>s[0]===d.sector)||[])[1]||d.sector):'', d.query?`«${esc(d.query)}»`:''].filter(Boolean).join(' · ');
+    el.innerHTML=`
+      <div class="r-titular" style="font-size:1.4rem">${d.n} ${d.n===1?'sanción':'sanciones'}</div>
+      <div class="r-sub" style="margin-bottom:1rem">${scope||'todas las fuentes'}${d.con_monto?` · ${d.con_monto} con monto · <b>${fmtCOP(d.monto_total_cop)}</b> en total`:''}</div>
+      ${d.mostrados<d.n?`<div class="cob-note" style="margin-bottom:1rem">Mostrando las ${d.mostrados} más recientes de ${d.n}. Afina la búsqueda para ver menos.</div>`:''}
+      <div class="sanc-list">${(d.resultados||[]).map(sancCard).join('')||'<div class="err">Sin coincidencias. Prueba otra entidad o sector.</div>'}</div>`;
+    el.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+  async function regBuscar(){
+    const mine=++_regSeq;
+    const el=document.getElementById('reg-results'), landing=document.getElementById('reg-landing');
+    if(landing) landing.style.display='none';
+    if(el){ el.style.display='block'; el.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Buscando sanciones <span class="dots"><span></span><span></span><span></span></span></div>'; }
+    let d; try{ d=await call({action:'sanciones', query:REG.q, sector:REG.sector}); }
+    catch(e){ if(mine===_regSeq&&el) el.innerHTML='<div class="err">No se pudo consultar. Reintenta.</div>'; return; }
+    if(mine!==_regSeq) return;
+    regRenderResults(d);
+  }
+  async function regLoadStats(){
+    if(REG_STATS){ regRenderLanding(REG_STATS); return; }
+    const el=document.getElementById('reg-landing');
+    if(el) el.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Cargando el pilar regulatorio <span class="dots"><span></span><span></span><span></span></span></div>';
+    try{ REG_STATS=await call({action:'sanciones'}); }catch(e){ REG_STATS=null; }
+    if(REG_STATS) regRenderLanding(REG_STATS);
+    else if(el) el.innerHTML='<div class="err">No se pudieron cargar las sanciones. Reintenta.</div>';
+  }
+  function regShowLanding(){ const r=document.getElementById('reg-results'); if(r) r.style.display='none'; const l=document.getElementById('reg-landing'); if(l) l.style.display='block'; }
+  function regSyncSectors(){ document.querySelectorAll('#rsectors .chip').forEach(c=>c.classList.toggle('on',(c.dataset.sec||'')===REG.sector)); }
+  function regInit(){
+    if(_regInited) return; _regInited=true;
+    const rq=document.getElementById('rq'), rgo=document.getElementById('rgo');
+    const go=()=>{ REG.q=(rq&&rq.value||'').trim(); if(!REG.q&&!REG.sector) regShowLanding(); else regBuscar(); };
+    if(rgo) rgo.onclick=go;
+    if(rq) rq.addEventListener('keydown',e=>{ if(e.key==='Enter') go(); });
+    const cont=document.getElementById('rsectors');
+    if(cont) REG_SECS.forEach(([sec,t])=>{ const c=document.createElement('span'); c.className='chip'+(sec===''?' on':''); c.dataset.sec=sec; c.textContent=t; c.onclick=()=>{ REG.sector=sec; regSyncSectors(); if(!REG.q&&!REG.sector) regShowLanding(); else regBuscar(); }; cont.appendChild(c); });
+    const rb=document.getElementById('regBack'); if(rb) rb.onclick=()=>showView('home');
   }
   function initHome(){
     renderPillars();
+    regInit();
     const hq=document.getElementById('hq'), hgo=document.getElementById('hgo');
     const goHome=()=>{ const v=(hq&&hq.value||'').trim(); if(!v) return; showView('congreso'); q.value=v; buscar(); };
     if(hgo) hgo.onclick=goHome;

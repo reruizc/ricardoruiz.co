@@ -4859,7 +4859,10 @@ Cauce = el cuerpo de datos legislativos). Vive en `tools/caudal/`.
 - Cache de síntesis en `analisis-cache/{hash24}.json`, TTL vía `PROMPT_VERSION`
   (va en `v2`). No cachea respuestas con error.
 
-**Frontend `caudal.html` (LISTO · gated · en producción)** — página privada en la raíz,
+**Frontend `caudal.html` (LISTO · gated · en producción)** — es el **HOME paraguas**
+(ver "Arquitectura Caudal · paraguas vs pilares"): hero "El Estado, leído", búsqueda
+universal y grilla de 9 pilares. Lo que sigue en esta ficha describe la **vista
+Congreso** (`view-congreso`), uno de los pilares. Página privada en la raíz,
 sistema visual v2 (Helvetica embebida, fondo `#060810`, acento teal, azul `#0047FF`,
 cursor custom, `noindex,nofollow`). Gate calcado de proyecto-dc: `rr-token`/`rr-user`
 + whitelist **`['reruizc@gmail.com','nuevagemela@gmail.com']`** (Nury Gómez agregada
@@ -4927,6 +4930,113 @@ bancada (necesita actas de gaceta, fase 3).
 **Gotcha de búsqueda:** el índice usa stemmer, no tesauro. Para temas con
 vocabulario disperso (varios nombres para lo mismo) conviene, más adelante, una
 capa de sinónimos curada o un stemmer Snowball español completo.
+
+### Arquitectura Caudal · paraguas vs pilares (aclaración conceptual jul-2026)
+
+**Caudal = la plataforma-paraguas** (el "mini-Dapper interno" de Cauce que
+aglutina TODAS nuestras bases de datos). Lo que hoy llamamos Caudal
+(`caudal.html` + Lambda `caudal-analiza` + `harvest.py` de leyes.senado) es
+**solo el pilar Congreso**. A partir de jul-2026 Caudal se organiza en pilares:
+
+```
+Caudal (paraguas)  ·  caudal.html = HOME multi-pilar (9 cards del mapa de fuentes de Cauce)
+├── Congreso      → view-congreso    + Lambda caudal-analiza (tema/proyecto/gaceta/…)   (LISTO · en prod)
+├── Regulatorio   → view-regulatorio + Lambda action `sanciones` + tools/caudal/supers/  (LISTO · en prod)
+└── Cortes / Medios / Datos abiertos / Territoriales / …   (cards "Próximamente" en el home)
+```
+
+> **Decisión de naming RESUELTA (jul-2026 · modelo paraguas):** todo vive bajo
+> `tools/caudal/`; Regulatorio es un pilar de Caudal, NO un hermano — no se
+> bifurca a `tools/cauce/regulatorio/`. `caudal.html` es el HOME paraguas: hero
+> "El Estado, leído", búsqueda universal y grilla de **9 pilares** (Congreso
+> activo · Regulatorio activo · los 7 restantes "Próximamente", reproduciendo el
+> mapa de fuentes del pitch). Cada pilar es una **vista** (`view-home`,
+> `view-congreso`, `view-regulatorio`) con su hero, su búsqueda y un back a
+> Caudal; el router es `showView(v)`. Los pilares NO comparten código de datos
+> entre sí, pero SÍ el shell del frontend y la Lambda (acciones **aditivas** —
+> agregar un pilar no toca los otros).
+
+### Pilar Regulatorio · sanciones de superintendencias (`tools/caudal/supers/` · piloto vía 1 LISTO)
+
+Extractor de sanciones/actos de superintendencias y entidades reguladoras.
+Cumple una promesa que YA está en el documento de Cauce
+(`Propuestas/Cauce-Estado-de-Cosas-Inteligencia-Legislativa.pdf`): las
+superintendencias son 1 de las 9 categorías del "mapa inicial de fuentes" (18 en
+"Superintendencias y comisiones") y el ejemplo estrella del pitch (alerta de
+precisión para empresa de salud) usa una **circular de la Supersalud**.
+
+**Estado (jul-2026) · PILAR EN PRODUCCIÓN (vía 1):** ya tiene frontend +
+Lambda + S3, no solo datos.
+- **Frontend:** `view-regulatorio` en `caudal.html` (hero "Las sanciones del
+  Estado, leídas" + búsqueda + pills de sector Todos/Salud/Contratación/
+  Jurídico/Control + landing con KPIs y cards por sector + lista de sanciones).
+  Se entra por la card "Superintendencias" del home.
+- **Lambda:** acción **aditiva** `sanciones` en `caudal-analiza`
+  (`lambda_handler.py`). Sin query/sector → devuelve los agregados
+  precalculados (landing, rápido). Con `query`/`sector` → carga
+  `metadata/sanciones.jsonl` (cache warm), filtra por substring sobre un blob
+  `q` (sancionado+motivo+descripción) y/o sector, y devuelve hasta 120 (las
+  más recientes) + agregados del subconjunto. No toca ninguna ruta del Congreso.
+- **S3** (bucket privado `caudal-legislativo`): `metadata/sanciones.jsonl`
+  (slim, sin `_raw` ni cédulas · 3.5 MB) + `metadata/sanciones-stats.json`
+  (agregados chicos: total, por_sector, por_fuente, por_tipo, monto, recientes).
+- **Build:** `python3 tools/caudal/supers/build_s3.py` toma `dist/sanciones.jsonl`
+  (salida de `harvest_supers.py normalize`) → emite `dist/s3/{sanciones.jsonl,
+  sanciones-stats.json}`; subir con `aws s3 cp … s3://caudal-legislativo/metadata/`.
+  Re-correr cuando cambien los datos (o entre una fuente vía 2/3).
+
+**Esquema común de sanción** (`fuentes.json._schema_normalizado`): `fuente ·
+fuente_nombre · sector · sancionado · identificacion · tipo_sancion · motivo ·
+monto · resolucion · fecha_firmeza · estado · descripcion · _id · _raw`
+(`_raw` = fila original, trazabilidad — cada alerta cita su fuente).
+
+**Las 3 vías de extracción:**
+- **Vía 1 · Socrata** (datos.gov.co, JSON directo — IMPLEMENTADA): patrón de
+  `lab-indicadores`. Query `resource/{id}.json?$where=...`, cero scraping.
+- **Vía 2 · API interna del portal** (registrada, pendiente): patrón de la "API
+  oculta" de leyes.senado. **Superfinanciera** verificada — buscador SiriWeb
+  (Angular) habla con `.../api-siri-casillero/.../api/actoAdmin/listarSancionesMercadoValores`;
+  la **api-key está embebida en el bundle público `main.js` (const `Qt.apiKey`)** →
+  HTTP 200, **804 sanciones** con nombreDestino/montoSancion/tipoSancion/
+  temaClasificacion/estadoSancion/fechaFirmeza/observacion. También
+  Supertransporte (WP `?rest_route=/wp/v2/posts`, BOM utf-8-sig) y SIC (`rss.xml`).
+- **Vía 3 · normograma/PDF** (registrada, pendiente): reusa el **pipeline de
+  gacetas de Caudal fase 3** (pypdf + DeepSeek). Supersalud (SharePoint) y
+  Supersociedades (Liferay, 478 resoluciones + 198 circulares). PDFs viejos → OCR.
+
+**Comandos** (`harvest_supers.py`, stdlib + curl subprocess, resumible):
+```bash
+python3 tools/caudal/supers/harvest_supers.py list        # mapa de fuentes
+python3 tools/caudal/supers/harvest_supers.py test        # valida mapeos (1 fila/fuente)
+python3 tools/caudal/supers/harvest_supers.py fetch [slugs...] [--desde YYYY-MM-DD]
+python3 tools/caudal/supers/harvest_supers.py normalize    # raw -> dist (JSONL+CSV+stats)
+```
+Salidas (gitignored): `Bases de datos/leyes-senado/supers/{raw/{slug}.json,
+dist/{sanciones.jsonl,sanciones.csv,stats.json}}`.
+
+**Verificado end-to-end (2026-07):** **6.084 sanciones a nivel entidad**
+consolidadas de las 5 fuentes por-entidad vía 1: INVIMA (3.690), SECOP I
+(1.707), SECOP II (542), Junta de Contadores (85), Contraloría responsabilidad
+fiscal (60). El 6º dataset vía 1 (Min. Trabajo) es **agregado** (por territorial/
+sector, solo conteos) → `granularidad: agregado`, NO entra al consolidado por
+entidad (sirve de contexto).
+
+**Cómo agregar una fuente vía 1:** una entrada en `fuentes.json.fuentes` con
+`via:1`, `socrata_id`, `fecha_col` y el `map` (campo_normalizado → columna).
+Descubrir: `catalog/v1?domains=www.datos.gov.co&q=sanciones+<entidad>` →
+`resource/<id>.json?$limit=1` para ver columnas. `test` valida el mapeo.
+
+**Siguiente sprint (recomendado):** (1) `harvest_sfc.py` (Superfinanciera vía 2 —
+la fuente sectorial de más peso para gremios financieros, endpoint+key ya
+verificados; leer el bundle y extraer la key con regex, tolerar rotación 401).
+(2) ✅ HECHO — `sanciones.jsonl` ya está enganchado a la Lambda (acción
+`sanciones`, filtro por sector+texto) con frontend `view-regulatorio` en
+`caudal.html`. Pendiente fino: cruzar la alerta con el sector del cliente en la
+capa de "vista Cliente" (SIGA).
+(3) Vía 3 Supersalud con el pipeline de gacetas — cierra el ejemplo del pitch.
+
+**Estado:** commit `9f1c296` en `main` (solo `tools/caudal/supers/*` + `.gitignore`;
+NO tocó `caudal.html`). Datos NO subidos a S3 (esperan luz verde de Ricardo).
 
 ## Roadmap post-2V · Chats conversacionales (LLM + function calling)
 

@@ -30,6 +30,7 @@ import os
 import hashlib
 import urllib.request
 import urllib.error
+from collections import Counter
 
 import boto3
 import caudal_core
@@ -135,6 +136,35 @@ def _votaciones():
         except Exception:
             _VOTAC = {'por_proyecto': {}}
     return _VOTAC
+
+
+# --- pilar Regulatorio · sanciones de superintendencias ---------------------
+_SANC = None
+_SANC_STATS = None
+
+
+def _sanciones_stats():
+    """Agregados chicos precalculados para el landing del pilar. Cache warm."""
+    global _SANC_STATS
+    if _SANC_STATS is None:
+        try:
+            _SANC_STATS = _get_json('metadata/sanciones-stats.json')
+        except Exception:
+            _SANC_STATS = {'total': 0, 'por_sector': [], 'por_fuente': [],
+                           'por_tipo': [], 'recientes': [], 'monto': {}}
+    return _SANC_STATS
+
+
+def _sanciones():
+    """Lista slim de sanciones (lazy — solo cuando se busca). Cache warm."""
+    global _SANC
+    if _SANC is None:
+        try:
+            obj = _s3.get_object(Bucket=BUCKET, Key='metadata/sanciones.jsonl')
+            _SANC = [json.loads(l) for l in obj['Body'].read().decode('utf-8').splitlines() if l.strip()]
+        except Exception:
+            _SANC = []
+    return _SANC
 
 
 # --- LLM (ruteo por paso) ---------------------------------------------------
@@ -491,6 +521,30 @@ def handler(event, context):
         if not body.get('titulo'):
             return _resp(400, {'error': 'falta titulo del proyecto'})
         return _resp(200, _contexto_medios(body))
+
+    if action == 'sanciones':      # pilar Regulatorio · sanciones de superintendencias
+        q = (body.get('query') or '').strip().lower()
+        sector = body.get('sector') or ''
+        if not q and not sector:               # landing: agregados precalculados (rápido)
+            return _resp(200, dict(_sanciones_stats(), mode='stats'))
+        recs = _sanciones()
+        hits = [r for r in recs
+                if (not sector or r.get('sector') == sector)
+                and (not q or q in r.get('q', ''))]
+        secc = Counter(r.get('sector', '') for r in hits)
+        fuc = Counter(r.get('fuente_nombre', '') for r in hits)
+        montos = [r['monto'] for r in hits if r.get('monto')]
+        hits_sorted = sorted(hits, key=lambda r: r.get('fecha', ''), reverse=True)
+        out = [{k: v for k, v in r.items() if k != 'q'} for r in hits_sorted[:120]]
+        return _resp(200, {
+            'mode': 'search', 'query': body.get('query', ''), 'sector': sector,
+            'n': len(hits), 'mostrados': len(out),
+            'por_sector': [{'sector': s, 'n': n} for s, n in secc.most_common()],
+            'por_fuente': [{'fuente': f, 'n': n} for f, n in fuc.most_common()],
+            'monto_total_cop': round(sum(montos)) if montos else 0,
+            'con_monto': len(montos),
+            'resultados': out,
+        })
 
     if action == 'tema':
         q = body.get('query', '')
