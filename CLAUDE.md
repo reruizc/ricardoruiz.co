@@ -4975,11 +4975,21 @@ leyes-senado/gacetas/` (gitignored; no guardamos PDFs en prod, solo el texto en 
 
 **Ficha del frontend wireada (LISTO):** en el modal de proyecto, los documentos de
 ponencia/plenaria/conciliación son clicables → llaman la acción `gaceta` de la
-Lambda → renderizan sentido (favorable/archivo, color verde/rojo), ponentes que
-firman y argumentos. Si la gaceta no tiene texto en S3 aún, muestra "no procesada
-(se baja bajo demanda)". Verificado en preview: Rosa Elvira Cely / Gaceta 857-2013
-→ favorable · Doris Clemencia Vega Quiroz · 6 argumentos (CEDAW, Belém do Pará,
-impunidad 10%…). Pusheado (commit 0f44542).
+Lambda → `analizarGaceta` renderiza según el `tipo_documento`: **ponencia** (sentido
+favorable/archivo verde/rojo + ponentes + argumentos + oposición) y **acta**
+(header dinámico + **aplazamiento** [propuesto_por + detalle] + **votación**: tally
+favor/contra + **listado nominal por congresista** coloreado por voto Sí/No). Si la
+gaceta no tiene texto en S3, muestra "no procesada (se baja bajo demanda)".
+Verificado: Rosa Elvira Cely / Gaceta 857-2013 → favorable · Doris Clemencia Vega
+Quiroz · 6 argumentos. El render de acta espera el primer lote de actas procesadas.
+
+> **Voto nominal · hallazgo jul-2026 (feasibility):** el nominal por congresista
+> **NO existe en Congreso Visible** para 2006-2022 — solo el tally. Verificado:
+> `votacion_congresista=[]` en las 10.205 del dump + `CurulData` (112 curules) con
+> `tipo_respuesta_votacion_id`/`congresista_id` en null en 6 votaciones muestreadas
+> (2015-2022), y viene del SSR/backend de ellos (no es un XHR por capturar). El voto
+> nominal SOLO se obtiene de las **actas de gaceta** (la acción `gaceta` ya lo extrae
+> cuando el acta lo trae). → el nominal loopea a procesar actas.
 
 **Pendiente (gacetas · ver bloque "Fase 3" arriba y `procesar_gacetas.py`):**
 1. ✅ Descarga: carpeta de Chrome de Ricardo ya apunta a `Bases de datos/leyes-senado/gacetas/`

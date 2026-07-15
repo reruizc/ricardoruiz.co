@@ -1094,7 +1094,7 @@
   const SENT_COLOR={favorable:'var(--green)',archivo:'var(--red)',mixto:'var(--amber)',desconocido:'var(--gray)'};
   async function analizarGaceta(key,tipo){
     const box=document.getElementById('gac-analisis'); if(!box) return;
-    box.innerHTML=`<div class="ga-card"><div class="llm-load">Leyendo la gaceta ${esc(key.replace('-','/'))} y extrayendo la ponencia <span class="dots"><span></span><span></span><span></span></span></div></div>`;
+    box.innerHTML=`<div class="ga-card"><div class="llm-load">Leyendo la gaceta ${esc(key.replace('-','/'))} y extrayendo su contenido <span class="dots"><span></span><span></span><span></span></span></div></div>`;
     let d; try{ d=await call({action:'gaceta',key,contexto:_gacContexto}); }catch(e){ d={error:'fallo de red'}; }
     if(!d || d.error){
       box.innerHTML=`<div class="ga-card"><div class="ga-none">Esta gaceta (${esc(key.replace('-','/'))}) aún no está procesada. En producción, Caudal la baja de la Imprenta bajo demanda y extrae su contenido. <br><span style="color:var(--ink3)">${esc((d&&d.error)||'')}</span></div></div>`;
@@ -1102,14 +1102,24 @@
     }
     const sc=SENT_COLOR[d.sentido]||'var(--gray)';
     const args=(d.argumentos||[]).map(a=>`<div class="ga-arg">${esc(a)}</div>`).join('');
+    const doc=(d.tipo_documento||tipo||'documento').replace(/_/g,' ');
+    const ap=d.aplazamiento||{}, vo=d.votacion||{};
+    const votoColor=v=>/^\s*s[íi]|favor|aprob/i.test(v)?'var(--green)':/^\s*no|contra|nieg/i.test(v)?'var(--red)':'var(--gray)';
+    const nominalHTML=(vo.nominal&&vo.nominal.length)
+      ? `<div class="vt-list" style="margin-top:.5rem">${vo.nominal.map(n=>{const c=votoColor(n.voto||'');return `<div class="vt-row"><span class="emp-badge" style="color:${c};background:${c}14;border:1px solid ${c}44">${esc(n.voto||'—')}</span><span class="vt-m">${esc(n.nombre||'')}</span></div>`;}).join('')}</div>`
+      : '';
     box.innerHTML=`<div class="ga-card">
-      <div class="ga-tag">◈ Ponencia leída por IA · Gaceta ${esc(key.replace('-','/'))} · ${esc((tipo||'').replace(/_/g,' '))}</div>
-      <div class="ga-h">Sentido</div>
-      <span class="ga-sent" style="color:${sc};border:1px solid ${sc}44;background:${sc}14">${esc(d.sentido||'—')}</span>
-      ${d.sentido_detalle?`<div class="ga-t" style="margin-top:.5rem">${esc(d.sentido_detalle)}</div>`:''}
+      <div class="ga-tag">◈ ${esc(doc.charAt(0).toUpperCase()+doc.slice(1))} · leída por IA · Gaceta ${esc(key.replace('-','/'))}</div>
+      ${(d.sentido&&d.sentido!=='desconocido')?`<div class="ga-h">Sentido</div>
+      <span class="ga-sent" style="color:${sc};border:1px solid ${sc}44;background:${sc}14">${esc(d.sentido)}</span>
+      ${d.sentido_detalle?`<div class="ga-t" style="margin-top:.5rem">${esc(d.sentido_detalle)}</div>`:''}`:''}
       ${(d.ponentes&&d.ponentes.length)?`<div class="ga-h">Ponentes que firman</div><div class="ga-t">${d.ponentes.map(esc).join(' · ')}</div>`:''}
       ${args?`<div class="ga-h">Argumentos</div>${args}`:''}
       ${d.en_contra?`<div class="ga-h">Oposición / ponencia de archivo</div><div class="ga-t">${esc(d.en_contra)}</div>`:''}
+      ${ap.hubo?`<div class="ga-h">Aplazamiento</div><div class="ga-t">${ap.propuesto_por?`Propuesto por <b>${esc(ap.propuesto_por)}</b>. `:''}${esc(ap.detalle||'')}</div>`:''}
+      ${vo.hubo?`<div class="ga-h">Votación${vo.motivo?' · '+esc(vo.motivo):''}</div>
+        <div class="ga-t"><b style="color:var(--green)">${vo.favor==null?'—':vo.favor}</b> a favor · <b style="color:var(--red)">${vo.contra==null?'—':vo.contra}</b> en contra${vo.abstencion!=null?` · ${vo.abstencion} abstenciones`:''}</div>
+        ${nominalHTML||'<div class="cob-note">El acta no trae el listado nominal por congresista.</div>'}`:''}
     </div>`;
   }
   addEventListener('keydown',e=>{ if(e.key==='Escape') cerrar(); });
