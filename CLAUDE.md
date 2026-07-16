@@ -75,13 +75,36 @@ sin breadcrumb), **Helvetica Neue embebida** (Syne solo en el logo), y suma los
   con datos mesa-a-mesa, consumido por **analisis-candidato.html**,
   **endoso-2026.html** y **comparar-candidatos.html** (`<script src="cand-index.js">`).
   `window.CandRegistry.load({includeParties,bases})` fusiona los índices de todas
-  las fuentes (`SOURCES` = endoso + asamblea-2023, extensible) en una lista con
-  `dataUrl` por candidato; `CandRegistry.dataUrlFor(slug)` resuelve slug → JSON.
-  **Para ampliar a más candidaturas (concejos, JAL, …): agregar una entrada a
-  `SOURCES` y las tres páginas la reciben** — no hay que tocar cada HTML.
+  las fuentes (`SOURCES` = endoso + asamblea-2023 + congreso-2018, extensible) en
+  una lista con `dataUrl` por candidato; `CandRegistry.dataUrlFor(slug)` resuelve
+  slug → JSON. **Para ampliar a más candidaturas (concejos, JAL, …): agregar una
+  entrada a `SOURCES` y las tres páginas la reciben** — no hay que tocar cada HTML.
+  Si una fuente no responde, `load` la captura y devuelve `[]` con un warning (las
+  demás siguen) → se puede desplegar el código antes de subir sus datos.
   Presidenciales NO están en el registro (modelo por-persona con histórico);
   analisis-candidato los agrega encima leyendo `index-presidencial.json`.
   endoso mantiene partidos en el buscador; comparar y analisis-candidato los filtran.
+- **Congreso 2018-2022** (`tools/analisis-candidato/build_congreso_2018.py`, jul-2026):
+  2.379 candidatos mesa-a-mesa desde `GCS_2018CON.csv` (1,28 GB · 7,08M filas), en el
+  MISMO formato endoso. Mezcla dos ALCANCES: **Senado NACIONAL** (COD_COR=1, CIR=0) y
+  las especiales (indígena CIR=4, afro CIR=5) son nacionales → llave SIN depto, mapa
+  de los 33 deptos; **Cámara TERRITORIAL** (COR=2, CIR=1) compite en un depto → llave
+  CON depto, mapa de un solo depto (igual que asamblea). Slugs: `CON2018-{S|SI|CA|CI}-{par}-{can}`
+  (nacionales) y `CON2018-C-{dde}-{par}-{can}` (cámara). Salida local ~1,2 GB en
+  `Bases de datos/output_congreso_2018/` (gitignored). Validado: Uribe 891.964 ·
+  Mockus 549.734 · Robledo 229.276 en Senado 2018 (cuadran con el resultado oficial).
+  S3: `congreso-2026/output/congreso-2018/` (subir con `aws s3 cp --recursive`).
+- **Una entrada por PERSONA + toggle de elecciones** (`agruparPersonas` en
+  analisis-candidato.html): el registro trae una entrada por CANDIDATURA, así que la
+  misma persona sale varias veces (Senado 2018 · Asamblea 2023 · Congreso 2026). Se
+  colapsa por nombre normalizado a UNA entrada de buscador —la candidatura **más
+  reciente** (`SRC_YEAR` endoso 2026 > asamblea 2023 > con2018 2018), a igual año la
+  más votada— y el resto queda en `congHistBySlug` → la **misma barra de histórico**
+  que ya usaban los presidenciales (`renderHistorial` cae a este grupo cuando no hay
+  persona presidencial; el pintado se comparte en `pintarHistorial`). 205 personas se
+  agrupan 2018∩2026 (Robledo 229k→28,6k · Lidio García 121k→180k · Laureano Acuña
+  pasó de Senado a Cámara). Ojo: si la persona es presidencial, esa barra manda (el
+  histórico presidencial tiene precedencia sobre el de Congreso).
 - **Fotos**: los 6 grandes usan `Fotos-presidenciales/{slug}.jpg` (campo `foto`
   del índice); consultas vinculadas caen a esa foto si el endoso jpg no existe.
   **Flujo sistematizado de fotos**: carpeta staging `fotos-candidatos/`

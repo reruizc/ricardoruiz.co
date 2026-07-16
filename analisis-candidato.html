@@ -2625,6 +2625,41 @@
       }
     }
 
+    // ─── AGRUPACIÓN POR PERSONA (misma persona en varias elecciones) ───
+    // El registro compartido trae una entrada por CANDIDATURA. Una misma
+    // persona aparece varias veces (Senado 2018, Senado 2026, Asamblea 2023…).
+    // Se colapsa a UNA entrada de buscador (la candidatura más reciente) y el
+    // resto queda accesible en la barra de histórico.
+    const SRC_YEAR = { endoso: 2026, asamblea: 2023, con2018: 2018 };
+    const congHistBySlug = {};   // slug → [entradas de esa persona]
+
+    function normPersona(s) {
+      return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .toUpperCase().replace(/[^A-Z ]/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+
+    function agruparPersonas(list) {
+      const by = {};
+      list.forEach(c => {
+        if (c.tipo === 'presidencial') return;
+        const k = normPersona(c.nombre);
+        if (k) (by[k] = by[k] || []).push(c);
+      });
+      const out = [], seen = new Set();
+      list.forEach(c => {
+        if (c.tipo === 'presidencial') { out.push(c); return; }
+        const k = normPersona(c.nombre);
+        if (!k || seen.has(k)) return;
+        seen.add(k);
+        // más reciente primero; a igual año, la más votada
+        const g = by[k].slice().sort((a, b) =>
+          (SRC_YEAR[b.source] || 0) - (SRC_YEAR[a.source] || 0) || (b.votos || 0) - (a.votos || 0));
+        if (g.length > 1) g.forEach(x => { congHistBySlug[x.slug] = g; });
+        out.push(g[0]);
+      });
+      return out;
+    }
+
     // ─── LOAD INDEX ───────────────────────────────────────────
     async function loadIndex() {
       try {
@@ -2633,6 +2668,11 @@
         const _bases = ASAM_BASE.startsWith('http') ? undefined : { asamblea: ASAM_BASE };
         candIndex = await CandRegistry.load({ includeParties: false, bases: _bases });
         if (!candIndex.length) throw new Error('índice de candidatos vacío');
+        // Una entrada por PERSONA: el registro trae una por candidatura (2018,
+        // asamblea 2023, 2026). Si el nombre coincide es la misma persona → se
+        // colapsa a la candidatura más reciente y las otras quedan en la barra
+        // de histórico (misma UI que el toggle presidencial consulta·1V·2V).
+        candIndex = agruparPersonas(candIndex);
 
         const rp = await fetch(`${PRES_BASE}/index-presidencial.json`).catch(() => null);
         // Merge presidenciales (una entrada por persona; el histórico vive en meta.pres)
@@ -2766,7 +2806,23 @@
       const box  = document.getElementById('historial-items');
       if (!wrap || !box) return;
       const p = meta.pres || presPersonaBySlug[meta.slug];
-      if (!p) { wrap.classList.remove('active'); box.innerHTML = ''; return; }
+      if (!p) {
+        // No es presidencial: ¿la misma persona tiene varias candidaturas
+        // (Congreso 2018 / Asamblea 2023 / Congreso 2026)? → misma barra.
+        const g = congHistBySlug[meta.slug];
+        if (!g || g.length < 2) { wrap.classList.remove('active'); box.innerHTML = ''; return; }
+        // El corp de endoso no trae año ("SENADO"); en un toggle eso confunde
+        // frente a "SENADO · 2018" → se le añade el año de su fuente.
+        const etiqueta = e => {
+          const c = e.corp || e.circunscripcion || '—';
+          return /\b(19|20)\d{2}\b/.test(c) ? c : `${c} · ${SRC_YEAR[e.source] || ''}`.trim();
+        };
+        pintarHistorial(wrap, box, g.map(e => ({
+          label: etiqueta(e), votos: e.votos || 0, gold: false,
+          active: e.slug === meta.slug, onclick: `selectCand('${e.slug}')`,
+        })));
+        return;
+      }
       const t = candI18n[localStorage.getItem('rr-lang')] || candI18n.co;
       const items = [];
       if (p.consulta) items.push({
@@ -2781,6 +2837,12 @@
         onclick: `presHistClick('${p.persona}',${i})`,
       }));
       if (items.length < 2) { wrap.classList.remove('active'); box.innerHTML = ''; return; }
+      pintarHistorial(wrap, box, items, t);
+    }
+
+    // Pinta la barra de histórico (la usan presidenciales y Congreso/Asamblea).
+    function pintarHistorial(wrap, box, items, t) {
+      t = t || candI18n[localStorage.getItem('rr-lang')] || candI18n.co;
       const maxV = Math.max(1, ...items.map(it => it.votos));
       box.innerHTML = items.map(it => `
         <button class="hist-item${it.gold ? ' gold' : ''}${it.active ? ' active' : ''}" onclick="${it.onclick}">
