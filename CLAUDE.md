@@ -5379,12 +5379,36 @@ automáticamente (no hace falta manejarlo a mano).
   Prensa" tras Regulatorio. Verificado en vivo: sector salud (5 titulares,
   Supersalud/medicamentos entre ellos) y educación (sin sanciones conectadas,
   el bloque de medios igual funciona).
+- **Relevancia Colombia + filtro institucional — LISTO (jul-2026).** Dos bugs
+  encontrados probando el cruce con Vista Cliente: (1) `gl=CO` en la query de
+  Google News solo **sesga**, no restringe — sectores con temas genéricos
+  (`financiero`: "sistema financiero", "mercado de valores"; `trabajo`:
+  "salario minimo") traían prensa de México/España/Uruguay sin relación con
+  Colombia. Fix en `_medios_gn_url`: si la query no menciona ya "colombia"
+  (case-insensitive), se le agrega " Colombia" antes de mandarla — vuelve el
+  match un AND real. (2) Google News trae comunicados de entidades propias
+  (Sena.edu.co, Gobernación del Magdalena, Ministerio de Minas...) mezclados
+  con prensa editorial independiente. Nuevo `_medios_es_institucional(medio)`:
+  dominio `.gov.co`/`.edu.co` (chequeado sobre el string CRUDO, no el
+  compacto — `_medios_compact` se come los puntos) + palabras-raíz
+  (gobernacion, alcaldia, ministerio, universidad, camaradecomercio,
+  super{intendencia,salud,financiera,sociedades,transporte,servicios},
+  policianacional, registraduria...). Se filtra junto al de redes sociales en
+  `_medios_query_events` — un solo punto, aplica a landing/buscar/sector por
+  igual. De paso se sumó `t.co` (acortador de X) a `_MEDIOS_FUENTES_EXCLUIR`.
+  Verificado en vivo: sector salud pasó de traer Sena.edu.co/Gobernación a
+  traer "Newsroom RCN Radio · Supersalud pone límite a la espera..." — el
+  ejemplo real que reemplaza al hipotético del PDF de Cauce. **Gotcha
+  operativo:** el cache S3 (`analisis-cache/medios-*`) no invalida al
+  redeployar — la key es solo por tiempo (bucket de 3h), no por versión de
+  código. Cada vez que se cambie lógica del pilar Medios, borrar a mano las
+  keys `medios-*` en `s3://caudal-legislativo/analisis-cache/` después del
+  redeploy, o el bug corregido sigue sirviéndose desde caché hasta 3h.
 - **Pendiente / iteraciones futuras:** lectura LLM sobre los titulares de una
   búsqueda (mismo patrón que `_sintesis_tema`); ampliar
-  `_MEDIOS_REGIONALES` según se detecten outlets nuevos en producción; el
-  clasificador de medios no distingue fuentes institucionales (gobernaciones,
-  SENA) de prensa editorial — puede colarse un comunicado oficial junto a una
-  nota periodística real.
+  `_MEDIOS_REGIONALES`/`_MEDIOS_INSTITUCIONAL_RE` según se detecten casos
+  nuevos en producción; el filtro institucional es heurístico, no
+  exhaustivo (mismo criterio que el resto del pilar).
 
 ## Roadmap post-2V · Chats conversacionales (LLM + function calling)
 

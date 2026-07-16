@@ -599,6 +599,7 @@ _MEDIOS_FUENTES_EXCLUIR = {
     'instagramcom', 'instagram', 'tiktokcom', 'tiktok', 'youtubecom',
     'youtube', 'threadsnet', 'threads', 'linkedincom', 'linkedin',
     'redditcom', 'reddit', 'tme', 'telegram', 'whatsappcom', 'whatsapp',
+    'tco',
 }
 
 # TLDs comunes a recortar cuando Google News manda el dominio en vez de la
@@ -608,6 +609,30 @@ _DOMAIN_TLDS_SORTED = sorted(
     ('com.co', 'com.mx', 'com.ar', 'com.ve', 'com.pe', 'com.ec', 'com',
      'co', 'net', 'org', 'info', 'tv', 'la', 'news'),
     key=len, reverse=True)
+
+# fuentes institucionales (gobierno, entes de control, academia pública):
+# Google News las trae como si fueran prensa independiente, pero un comunicado
+# oficial no es "cobertura mediática" — mezclarlo con Infobae/El Tiempo infla
+# la sensación de que hay ruido de prensa cuando en realidad es la propia
+# entidad hablando de sí misma. Heurística no exhaustiva, mismo criterio que
+# _MEDIOS_REGIONALES: palabra-raíz institucional sobre el nombre COMPACTO
+# (sin puntos/espacios); el dominio .gov.co/.edu.co se chequea aparte, sobre
+# el string crudo, porque _medios_compact() se come los puntos.
+_MEDIOS_INSTITUCIONAL_RE = re.compile(
+    r'gobernacion|alcaldia|ministerio|universidad|camaradecomercio'
+    r'|personeria|contraloria|procuraduria|defensoria|^concejo|^asamblea'
+    r'|^sena$|^dian$|presidenciadelarepublica|^super(intendencia|salud'
+    r'|financiera|sociedades|transporte|servicios)|policianacional'
+    r'|ejercitonacional|unidadnacional|agencianacional|registraduria')
+
+
+def _medios_es_institucional(medio):
+    if not medio:
+        return False
+    low = _medios_strip_accents(medio.lower())
+    if low.endswith('.gov.co') or low.endswith('.edu.co'):
+        return True
+    return bool(_MEDIOS_INSTITUCIONAL_RE.search(_medios_compact(medio)))
 
 
 def _medios_strip_accents(s):
@@ -687,6 +712,13 @@ def _medios_parse_date(raw):
 
 
 def _medios_gn_url(q, dias):
+    # `gl=CO` solo SESGA el resultado a Colombia, no lo restringe — términos
+    # genéricos (p.ej. "sistema financiero", "salario minimo") matchean prensa
+    # de cualquier país hispanohablante. Forzar "Colombia" en la query (si el
+    # término no la trae ya) lo vuelve un AND real, sin tocar búsquedas ya
+    # específicas ("seguridad Catatumbo", "reforma pensional Colombia"...).
+    if 'colombia' not in q.lower():
+        q = f'{q} Colombia'
     qq = f'{q} when:{dias}d' if dias else q
     qs = urllib.parse.urlencode({'q': qq, 'hl': 'es-419', 'gl': 'CO', 'ceid': 'CO:es'})
     return f'https://news.google.com/rss/search?{qs}'
@@ -726,7 +758,7 @@ def _medios_query_events(query, dias):
     events = []
     for it in items:
         titulo, medio = _medios_split_title(it['title'], it['source'])
-        if not medio or _medios_es_fuente_social(medio):
+        if not medio or _medios_es_fuente_social(medio) or _medios_es_institucional(medio):
             continue
         events.append({'medio': medio, 'alcance': _medios_alcance(medio), 'titulo': titulo,
                        'url': it['link'], 'fecha': (it['fecha_pub'] or '')[:10],
