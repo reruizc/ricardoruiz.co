@@ -14,6 +14,9 @@ Acciones (POST JSON):
       → ficha del proyecto + punteros de gaceta (para la fase DeepSeek de texto).
   {"action":"buscar","query":"agua","limit":25,"anio_min":2010}
       → lista cruda de coincidencias del índice.
+  {"action":"medios","query":"reforma pensional","dias":30}
+      → pilar Medios: titulares de prensa nacional y regional vía Google News RSS
+        (gratis, sin key). Sin `query` → landing con el pulso político nacional.
 
 MODELO POR PASO (el switch a Claude es cambiar env vars, sin tocar código):
   CAUDAL_SINTESIS_PROVIDER  deepseek | anthropic     (default deepseek)
@@ -530,6 +533,192 @@ def _contexto_medios(payload):
     return data
 
 
+# --- pilar Medios · prensa nacional y regional (Google News RSS · gratis) ---
+# Mismo mecanismo que tools/radar-mujer-medios/collect.py (monitor de medios de
+# Radar Mujer/MxD): Google News RSS es gratis, sin API key, y cubre TODO el
+# ecosistema de prensa colombiano (nacional + regional) por query temática, sin
+# mantener un conector por medio. Aquí se reusa para el pilar Medios de Caudal.
+import unicodedata
+import urllib.parse
+import xml.etree.ElementTree as ET
+import time as _time
+from datetime import timezone
+from email.utils import parsedate_to_datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+MEDIOS_UA = ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
+             'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36')
+
+# consultas amplias para el landing (sin tema puntual): pulso político/legislativo
+# nacional. Se amplía fácil agregando más queries — cada una ya trae el ecosistema
+# completo de medios que cubrió ese ángulo, gratis.
+MEDIOS_LANDING_Q = [
+    'Congreso de la República Colombia',
+    'Gobierno Nacional Colombia',
+    'Corte Constitucional Colombia',
+    'reforma Colombia',
+]
+
+# medios regionales conocidos (forma "compacta": sin tildes/espacios/puntos) —
+# match por substring sobre el nombre del medio que trae Google News. Lo que NO
+# matchea cae a 'nacional' (la mayoría de la prensa digital colombiana es de
+# alcance nacional) — no pretende ser exhaustivo, solo dar un desglose útil.
+_MEDIOS_REGIONALES = [
+    'elcolombiano', 'elmundo', 'minuto30', 'minuto60', 'vivirenelpoblado',
+    'telemedellin', 'teleantioquia', 'elpais', 'qhubo', 'extra',
+    'elheraldo', 'elmeridianodecordoba', 'diariolalibertad', 'eluniversal',
+    'vanguardia', 'laopinion', 'lapatria', 'cronicadelquindio', 'elquindiano',
+    'elnuevodia', 'diariodelhuila', 'llano7dias', 'elpilon',
+    'hoydiariodelmagdalena', 'diariodelnorte', 'proclamadelcauca', 'latarde',
+    'diariodelotun', 'diariodelcauca', 'telecaribe', 'telepacifico', 'citytv',
+    'notipacifico', 'primiciadiario', 'hsbnoticias',
+]
+
+
+def _medios_strip_accents(s):
+    return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
+
+
+def _medios_norm(s):
+    return re.sub(r'\s+', ' ', _medios_strip_accents((s or '').lower())).strip()
+
+
+def _medios_compact(s):
+    return re.sub(r'[^a-z0-9]', '', _medios_strip_accents((s or '').lower()))
+
+
+def _medios_alcance(medio):
+    c = _medios_compact(medio)
+    return 'regional' if any(t in c for t in _MEDIOS_REGIONALES) else 'nacional'
+
+
+_GN_SUFFIX_RE = re.compile(r'\s+-\s+([^-]+)$')
+
+
+def _medios_split_title(title, source):
+    """Título de Google News = 'Titular real - Nombre del Medio'."""
+    if source:
+        m = _GN_SUFFIX_RE.search(title)
+        if m and _medios_norm(m.group(1)) == _medios_norm(source):
+            return title[:m.start()].strip(), source
+        return title, source
+    m = _GN_SUFFIX_RE.search(title)
+    if m:
+        return title[:m.start()].strip(), m.group(1).strip()
+    return title, None
+
+
+def _medios_parse_date(raw):
+    if not raw:
+        return None
+    try:
+        dt = parsedate_to_datetime(raw.strip())
+    except Exception:
+        return None
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat()
+
+
+def _medios_gn_url(q, dias):
+    qq = f'{q} when:{dias}d' if dias else q
+    qs = urllib.parse.urlencode({'q': qq, 'hl': 'es-419', 'gl': 'CO', 'ceid': 'CO:es'})
+    return f'https://news.google.com/rss/search?{qs}'
+
+
+def _medios_fetch_xml(url):
+    req = urllib.request.Request(url, headers={
+        'User-Agent': MEDIOS_UA,
+        'Accept': 'application/rss+xml, application/xml;q=0.9, */*;q=0.8',
+        'Accept-Language': 'es-CO,es;q=0.9'})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        return r.read()
+
+
+def _medios_parse_feed(xml_bytes):
+    root = ET.fromstring(xml_bytes)
+    ch = root.find('channel')
+    items = ch.findall('item') if ch is not None else root.findall('.//item')
+    out = []
+    for it in items:
+        link = (it.findtext('link') or '').strip()
+        if not link:
+            continue
+        src_el = it.find('source')
+        source = src_el.text.strip() if src_el is not None and src_el.text else None
+        out.append({'link': link, 'title': (it.findtext('title') or '').strip(),
+                    'fecha_pub': _medios_parse_date(it.findtext('pubDate')), 'source': source})
+    return out
+
+
+def _medios_query_events(query, dias):
+    try:
+        items = _medios_parse_feed(_medios_fetch_xml(_medios_gn_url(query, dias)))
+    except Exception as e:
+        print(f'[medios] FAIL "{query}": {type(e).__name__}: {e}')
+        return []
+    events = []
+    for it in items:
+        titulo, medio = _medios_split_title(it['title'], it['source'])
+        if not medio:
+            continue
+        events.append({'medio': medio, 'alcance': _medios_alcance(medio), 'titulo': titulo,
+                       'url': it['link'], 'fecha': (it['fecha_pub'] or '')[:10],
+                       '_fp': it['fecha_pub'] or ''})
+    return events
+
+
+def _medios_aggregate(events, cap):
+    seen, dedup = set(), []
+    for e in events:
+        k = (_medios_norm(e['titulo']), _medios_norm(e['medio']))
+        if k in seen:
+            continue
+        seen.add(k)
+        dedup.append(e)
+    dedup.sort(key=lambda e: e['_fp'], reverse=True)
+    por_medio = Counter(e['medio'] for e in dedup)
+    por_alcance = Counter(e['alcance'] for e in dedup)
+    return {
+        'n': len(dedup), 'n_medios': len(por_medio),
+        'por_medio': [{'medio': m, 'n': n} for m, n in por_medio.most_common(20)],
+        'por_alcance': [{'alcance': a, 'n': n} for a, n in por_alcance.most_common()],
+        'resultados': [{k: v for k, v in e.items() if k != '_fp'} for e in dedup[:cap]],
+    }
+
+
+def _medios_cache_bucket(hours=3):
+    return int(_time.time() // (hours * 3600))
+
+
+def _medios_landing():
+    ck = f'medios-landing-{_medios_cache_bucket()}'
+    cached = _cache_get(ck)
+    if cached:
+        return cached
+    events = []
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        for fut in as_completed([pool.submit(_medios_query_events, q, 3) for q in MEDIOS_LANDING_Q]):
+            events.extend(fut.result())
+    out = dict(_medios_aggregate(events, cap=24), mode='landing')
+    _cache_put(ck, out)
+    return out
+
+
+def _medios_buscar(query, dias):
+    dias = dias or 30
+    ck = f'medios-q-{_hash24(_medios_norm(query))}-{dias}-{_medios_cache_bucket()}'
+    cached = _cache_get(ck)
+    if cached:
+        return cached
+    out = dict(_medios_aggregate(_medios_query_events(query, dias), cap=60),
+               mode='search', query=query, dias=dias)
+    _cache_put(ck, out)
+    return out
+
+
 # --- handler ----------------------------------------------------------------
 CORS = {'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type',
@@ -628,6 +817,16 @@ def handler(event, context):
             'con_monto': len(montos),
             'resultados': out,
         })
+
+    if action == 'medios':      # pilar Medios · prensa nacional y regional (Google News RSS)
+        q = (body.get('query') or '').strip()
+        if not q:
+            return _resp(200, _medios_landing())
+        try:
+            dias = int(body.get('dias')) if body.get('dias') else None
+        except Exception:
+            dias = None
+        return _resp(200, _medios_buscar(q, dias))
 
     if action == 'cliente':        # Vista Cliente · radar SIGA sobre los pilares
         sk = body.get('sector')

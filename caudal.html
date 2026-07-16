@@ -432,6 +432,25 @@
       <div id="reg-results"></div>
     </div>
 
+    <!-- ===== PILAR · Medios (prensa nacional y regional) ===== -->
+    <div id="view-medios" hidden>
+      <button class="pill-back" id="medBack">← Volver a Caudal</button>
+      <div class="hero">
+        <h1>La prensa, <em>rastreada</em>.</h1>
+        <p>Titulares de medios nacionales y regionales sobre un tema, vía Google
+           News — sin mantener un conector por medio, cubre todo el ecosistema
+           de prensa colombiano en tiempo real.</p>
+        <div class="search">
+          <input id="mq" type="text" placeholder="busca un tema, una entidad, una reforma…" autocomplete="off" />
+          <button id="mgo">Buscar</button>
+        </div>
+        <div class="chips" id="mchips"></div>
+      </div>
+
+      <div id="med-landing"></div>
+      <div id="med-results"></div>
+    </div>
+
     <!-- ===== VISTA CLIENTE · Radar (SKU A) ===== -->
     <div id="view-cliente" hidden>
       <button class="pill-back" id="cliBack">← Volver a Caudal</button>
@@ -648,7 +667,7 @@
     {id:'gacetas',     name:'Diarios y gacetas oficiales',      status:'soon', desc:'Diario Oficial y Gaceta del Congreso: el texto completo del trámite.'},
     {id:'territorial', name:'Entidades territoriales',          status:'soon', desc:'Concejos, asambleas y gobiernos locales.'},
     {id:'redes',       name:'Redes sociales oficiales y voceros',status:'soon', desc:'Cuentas oficiales de entidades y voceros clave.'},
-    {id:'medios',      name:'Medios nacionales y regionales',   status:'soon', desc:'Prensa nacional y regional, rastreada por tema.'},
+    {id:'medios',      name:'Medios nacionales y regionales',   status:'live', desc:'Titulares en vivo de medios nacionales y regionales, vía Google News — sin conector por medio.'},
   ];
   const PSTAT={live:['s-live','Activo'], data:['s-data','Datos listos'], soon:['s-soon','Próximamente']};
   function renderPillars(){
@@ -666,13 +685,15 @@
       const id=c.dataset.p;
       if(id==='congreso') showView('congreso');
       else if(id==='regulatorio') showView('regulatorio');
+      else if(id==='medios') showView('medios');
     });
   }
   function showView(v){
-    ['home','congreso','regulatorio','cliente'].forEach(n=>{ const el=document.getElementById('view-'+n); if(el) el.hidden=(v!==n); });
+    ['home','congreso','regulatorio','cliente','medios'].forEach(n=>{ const el=document.getElementById('view-'+n); if(el) el.hidden=(v!==n); });
     window.scrollTo(0,0);
     if(v==='congreso') requestAnimationFrame(()=>document.querySelectorAll('#view-congreso .mort-bar').forEach(x=>x.style.height=x.dataset.h+'%'));
     if(v==='regulatorio') regLoadStats();
+    if(v==='medios') medLoadLanding();
   }
   /* ---------- pilar Regulatorio · sanciones ---------- */
   const REG={sector:'', q:''};
@@ -748,9 +769,74 @@
     if(cont) REG_SECS.forEach(([sec,t])=>{ const c=document.createElement('span'); c.className='chip'+(sec===''?' on':''); c.dataset.sec=sec; c.textContent=t; c.onclick=()=>{ REG.sector=sec; regSyncSectors(); if(!REG.q&&!REG.sector) regShowLanding(); else regBuscar(); }; cont.appendChild(c); });
     const rb=document.getElementById('regBack'); if(rb) rb.onclick=()=>showView('home');
   }
+  /* ---------- pilar Medios · prensa nacional y regional ---------- */
+  const MED={q:''};
+  const MED_EJEMPLOS=['reforma pensional','reforma laboral','reforma a la salud','seguridad Catatumbo','paro camionero','Petro Congreso'];
+  let MED_STATS=null, _medInited=false, _medSeq=0;
+  function medAlcanceBadge(a){ return a==='regional' ? '<span class="doc-badge pal">Regional</span>' : '<span class="doc-badge">Nacional</span>'; }
+  function medHeadCard(r){
+    return `<div class="sanc">
+      <div class="sanc-top"><a class="sanc-name" href="${esc(r.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(r.titulo)}</a><span class="sanc-fecha">${esc(r.fecha||'')}</span></div>
+      <div class="sanc-tags"><span class="doc-badge">${esc(r.medio)}</span>${medAlcanceBadge(r.alcance)}</div>
+    </div>`;
+  }
+  function medRenderLanding(s){
+    const el=document.getElementById('med-landing'); if(!el||!s) return;
+    const alc=Object.fromEntries((s.por_alcance||[]).map(x=>[x.alcance,x.n]));
+    el.innerHTML=`
+      <div class="land-h">Pulso de prensa política · últimos días</div>
+      <div class="kpis">
+        <div class="kpi"><div class="n">${fmt(s.n)}</div><div class="l">Titulares</div></div>
+        <div class="kpi"><div class="n">${fmt(s.n_medios)}</div><div class="l">Medios distintos</div></div>
+        <div class="kpi"><div class="n">${fmt(alc.nacional||0)}</div><div class="l">Nacional</div></div>
+        <div class="kpi"><div class="n">${fmt(alc.regional||0)}</div><div class="l">Regional</div></div>
+      </div>
+      <div class="panel wide"><h3>Titulares recientes</h3><div class="sanc-list">${(s.resultados||[]).map(medHeadCard).join('')||'<div class="cob-note">Sin titulares en la ventana.</div>'}</div></div>
+      <div class="cob-note" style="text-align:center;margin-top:1rem">Fuente: Google News (gl=CO) — cubre el ecosistema de prensa nacional y regional sin conectores por medio.</div>`;
+  }
+  function medRenderResults(d){
+    const el=document.getElementById('med-results'); if(!el) return;
+    el.style.display='block';
+    const alc=Object.fromEntries((d.por_alcance||[]).map(x=>[x.alcance,x.n]));
+    el.innerHTML=`
+      <div class="r-titular" style="font-size:1.4rem">${d.n} ${d.n===1?'titular':'titulares'}</div>
+      <div class="r-sub" style="margin-bottom:1rem">«${esc(d.query)}» · últimos ${d.dias} días · ${alc.nacional||0} nacional · ${alc.regional||0} regional</div>
+      <div class="sanc-list">${(d.resultados||[]).map(medHeadCard).join('')||'<div class="err">Sin cobertura de prensa reciente para este tema.</div>'}</div>`;
+    el.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+  async function medBuscar(){
+    const mine=++_medSeq;
+    const el=document.getElementById('med-results'), landing=document.getElementById('med-landing');
+    if(landing) landing.style.display='none';
+    if(el){ el.style.display='block'; el.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Rastreando prensa <span class="dots"><span></span><span></span><span></span></span></div>'; }
+    let d; try{ d=await call({action:'medios', query:MED.q}); }
+    catch(e){ if(mine===_medSeq&&el) el.innerHTML='<div class="err">No se pudo consultar. Reintenta.</div>'; return; }
+    if(mine!==_medSeq) return;
+    medRenderResults(d);
+  }
+  async function medLoadLanding(){
+    if(MED_STATS){ medRenderLanding(MED_STATS); return; }
+    const el=document.getElementById('med-landing');
+    if(el) el.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Cargando el pulso de prensa <span class="dots"><span></span><span></span><span></span></span></div>';
+    try{ MED_STATS=await call({action:'medios'}); }catch(e){ MED_STATS=null; }
+    if(MED_STATS) medRenderLanding(MED_STATS);
+    else if(el) el.innerHTML='<div class="err">No se pudo cargar la prensa. Reintenta.</div>';
+  }
+  function medShowLanding(){ const r=document.getElementById('med-results'); if(r) r.style.display='none'; const l=document.getElementById('med-landing'); if(l) l.style.display='block'; }
+  function medInit(){
+    if(_medInited) return; _medInited=true;
+    const mq=document.getElementById('mq'), mgo=document.getElementById('mgo');
+    const go=()=>{ MED.q=(mq&&mq.value||'').trim(); if(!MED.q) medShowLanding(); else medBuscar(); };
+    if(mgo) mgo.onclick=go;
+    if(mq) mq.addEventListener('keydown',e=>{ if(e.key==='Enter') go(); });
+    const mc=document.getElementById('mchips');
+    if(mc) MED_EJEMPLOS.forEach(t=>{ const ch=document.createElement('span'); ch.className='chip'; ch.textContent=t; ch.onclick=()=>{ mq.value=t; MED.q=t; medBuscar(); }; mc.appendChild(ch); });
+    const mb=document.getElementById('medBack'); if(mb) mb.onclick=()=>showView('home');
+  }
   function initHome(){
     renderPillars();
     regInit();
+    medInit();
     cliInit();
     const rc=document.getElementById('radar-cta'); if(rc) rc.onclick=()=>showView('cliente');
     const hq=document.getElementById('hq'), hgo=document.getElementById('hgo');

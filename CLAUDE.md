@@ -4915,13 +4915,110 @@ Cauce = el cuerpo de datos legislativos). Vive en `tools/caudal/`.
     2019: 1147, 1069, 1068, 1067, 1066, 992, 970, 969). El roll-call va como "Por el Sí: N Por el No: M
     … Honorables Senadores por el SÍ: [Apellidos Nombres] …". **Gotcha:** no toda acta trae roll-call —
     muchas votan por unanimidad/agregado (la 1942/2025 comisión salió sin nominal).
-    **Gotcha de targeting (parcial):** no hay fuente limpia que diga
-    qué nº de gaceta es un acta del cuatrienio actual → las actas 2023-2026 quedan **on-demand** (opción B).
-- 🔜 **Pendiente (Fase 3):** (A) fuente de targeting de actas (secretarías Senado/Cámara con nº gaceta) ·
-  (B) voto nominal cuatrienio actual quedó **on-demand** (decisión de Ricardo, jul-2026) · voto nominal
-  por congresista del detalle de Congreso Visible · OCR gacetas escaneadas 90-2005 · refinar títulos de
-  agendamientos (71%→100%). NADA bloquea el pitch — el módulo se demuestra completo.
-  Ver `[[reference_actas_bloqueo_fuentes]]` en memoria.
+    **Gotcha de targeting — RESUELTO para Cámara, sigue abierto para Senado** (ver bloque
+    "Fase 3 · voto nominal de Cámara" más abajo): Cámara tiene su propio índice público
+    sesión→acta→gaceta que hace innecesario adivinar. Senado sigue sin fuente limpia
+    equivalente → sus actas 2023-2026 quedan **on-demand** (opción B).
+- 🔜 **Pendiente (Fase 3):** targeting de actas de **Senado** (sin fuente limpia todavía,
+  a diferencia de Cámara) · voto MANUAL de Cámara ago-2021/sep-2022 (columna "X" sin texto,
+  necesita extracción por coordenadas tipo pdfplumber) · OCR de actas/gacetas escaneadas
+  pre-nov-2020 · voto nominal por congresista del detalle de Congreso Visible (Senado
+  pre-2022) · refinar títulos de agendamientos (71%→100%). NADA bloquea el pitch — el
+  módulo se demuestra completo. Ver `[[reference_actas_bloqueo_fuentes]]` en memoria.
+
+**Fase 3 · voto nominal de Cámara — RESUELTO (jul-2026 · `tools/caudal/actas/`).** Cierra
+el hueco de "voto nominal cuatrienio actual" que había quedado on-demand: se encontró que
+`camara.gov.co/secretaria-general/actas-votaciones-y-otros/` esconde un widget AJAX
+(`admin-ajax.php`, `action=get_actas_y_otros_page`, nonce público de 24h leído del HTML,
+`comision=Secretaría General`) que es **el índice sesión→acta→gaceta que el portal JSF de
+la Imprenta no da** — y de regalo, cada acta trae un `enlace` de descarga DIRECTA (sin JSF,
+sin postback) al ZIP/PDF de esa sesión.
+- **Cobertura verificada:** 1.400 actas de plenaria 2010-2026 en el índice (140 páginas ×10,
+  `per_page` configurable). El `enlace` cambia de formato con los años, pero **NO hay un
+  corte limpio por fecha** — el mismo tipo de documento aparece como texto nativo un año y
+  como imagen escaneada el siguiente (verificado: 2013 sí trae texto nativo, 2014-2017 no,
+  pese a ser el mismo formato de documento) → **detección por CONTENIDO en cada PDF**, tres
+  formatos:
+  - **consolidado** (~oct-2022 en adelante): 1 PDF "Registro de Asistencia y Votación
+    Electrónica" con TODAS las votaciones de la sesión, bloques `VOTACION N` + tabla nominal
+    con nombre completo (Apellidos Nombres) — alta confianza, sin OCR.
+  - **fragmentado_electronico** (~nov-2020 a ~sep-2022): 1 PDF por votación, votantes
+    identificados por **email** (`nombre.apellido@camara.gov.co`) con Sí/No/Abstención como
+    texto explícito → parseable.
+  - **manual_tabla** (intermitente ~2011-2020, y también la 2ª sección "REGISTRO MANUAL PARA
+    VOTACIONES" que trae el mismo PDF de `fragmentado_electronico`): tabla No./Nombre/
+    Circunscripción/Partido/SI/NO con una **"X" posicional** bajo la columna que corresponde
+    (no es texto — pypdf linealiza y pierde la columna). Resuelto con
+    **`pdfplumber.extract_table()`**, que reconstruye filas/columnas por coordenadas y
+    devuelve las celdas ya separadas — no hace falta calcular posiciones a mano. Confirmado
+    en muestreo (56 actas sin parsear 2010-2020): ~20% traían esta tabla con texto nativo,
+    rescatables sin gastar en OCR.
+- **Pipeline:** `harvest_actas_plenaria_camara.py index` (baja el índice completo,
+  paginado) → `harvest_actas_plenaria_camara.py download --workers N` (descarga resumible
+  de los 1.400 `enlace`, cache por id) → `parse_votaciones_camara.py` (extrae texto con
+  pypdf, autodetecta el formato por contenido — regex de bloques `VOTACION N` / filas con
+  email / `REGISTRO MANUAL PARA VOTACIONES` vía pdfplumber —, cruza cada votante contra
+  `dist/roster-autores.json` por **subconjunto de tokens** —mismo algoritmo de
+  `build_roster.py`, funciona pese al orden Apellido-Apellido-Nombre-Nombre de las actas vs
+  Nombre-Nombre-Apellido-Apellido del roster— y vincula el nombre de la votación
+  (`PL.NNN/YY`) contra `numero_camara` de `proyectos.jsonl` con el mismo `PROJ_RE` de
+  `harvest_ordenes.py`).
+- **Resultado final (2026-07-15):** **445 actas parseadas** (de 1.400 · el resto cae en
+  imagen sin texto — requiere OCR, no procesado —, o formatos `.rar`/`.docx`/`.doc` de
+  2011-2014 sin soportar), rango **2020-11-12 → 2026-06-17**, **3.956 votaciones · 317.455
+  votos individuales · 90,3% con partido asignado**. Outputs LOCALES (gitignored, NO
+  subidos a S3 todavía — pendiente luz verde):
+  `Bases de datos/leyes-senado/actas/plenaria-camara/{index,raw,parsed}/` +
+  `Bases de datos/leyes-senado/dist/{votaciones-camara-nominal.jsonl,votaciones-camara-stats.json}`.
+  Piloto de OCR (`tools/caudal/actas/ocr_pilot.py`, Tesseract+pymupdf, ambos instalados
+  vía `brew install tesseract-lang` + `pip install --break-system-packages pymupdf
+  pytesseract`) confirmó que el rango pre-2011 SÍ es OCR-eable (nombres reales salen
+  legibles) pero no se ha corrido en masa — queda como pendiente explícito, ya no
+  bloqueado por falta de piloto.
+- **Validado cruzado** contra [Congreso a la mano](https://congresoalamano.elespectador.com)
+  (El Espectador): Barguil "Sí" en reforma tributaria y "No" sostenido en reforma a la salud
+  coincide en ambas fuentes. Esa herramienta externa **no tiene registrada la reforma
+  laboral** para los congresistas probados — nuestro pipeline sí, con el detalle completo de
+  cada artículo + la conciliación final, una ventaja real sobre la competencia editorial.
+- **Pendiente para exponerlo:** nueva acción en la Lambda `caudal-analiza` (o enriquecer
+  `proyecto`) + sección "Cómo votó" en la ficha del frontend + subida a S3 —
+  **todo con luz verde de Ricardo antes de tocar producción**, nada de esto se sube solo.
+
+**Fase 3 · voto nominal de SENADO — investigación en curso, sin resolver (jul-2026).**
+Se buscó un equivalente al AJAX de Cámara. `senado.gov.co` es Joomla (no WordPress) — sin
+`admin-ajax.php`. Se encontró `secretariasenado.gov.co` (subsitio Joomla separado, también
+Secretaría General, con contenido spam SEO inyectado en el menú/footer — enlaces a sitios
+porno, vulnerabilidad Joomla clásica, **NO es cosa nuestra arreglarlo**, solo hay que
+ignorar esos links al scrapear) con una jerarquía real de carpetas DOCman:
+`/cuatrienio-2022-2026/legislatura-YYYY-YYYY/plenarias-N/mes/día-de-la-semana-DD-de-mes-de-AAAA/
+{impedimentos|constancias|proposiciones|proyectos-de-ley}` — y dentro de "proyectos de ley",
+una subcarpeta por proyecto (`pl-NNN-de-AAAA-senado-MMM-de-AAAA-camara`) con un archivo por
+documento (`P-NNN-ART-NNN-...pdf`, `CT-NNN-...pdf`).
+- **Gotcha de scraping:** curl simple con regex no encontró los archivos — el listado SÍ es
+  server-rendered (no hace falta JS/AJAX, confirmado con el navegador), el problema fue que
+  el texto de cada `<a>` va envuelto en spans anidados (`koowa_header__item` de Joomla/Koowa)
+  que mi regex simple no capturaba. Usar el navegador (o un parser HTML real, no regex) para
+  extraer los links.
+- **Lo que SÍ hay:** carpetas con contenido real, confirmado en 2 cuatrienios (2018-2022 y
+  2022-2026), URLs amigables terminadas en `/file` que curl descarga directo sin JSF ni
+  postback (mismo patrón fácil que Cámara).
+- **Lo que falta (el problema real):** los archivos que se revisaron (`P-045-ART 139...`,
+  `P-040-ART 132...`, `CT-009...`) son **documentos de TRÁMITE** (texto de la proposición +
+  justificación, o escaneo de la constancia) — **ninguno trae tabla de voto nominal**. A
+  diferencia de Cámara (que exporta un "Registro de Asistencia y Votación Electrónica"
+  consolidado por sesión), Senado parece guardar aquí solo el papeleo, no el resultado del
+  conteo. No se encontró todavía el equivalente al export Bosch/DCN-SW de Cámara — si existe,
+  puede vivir en otra sección del sitio, o Senado puede simplemente no tener un sistema de
+  voto electrónico exportable como el de Cámara (mociones nominales se piden caso a caso y
+  quedan solo en la Gaceta/acta narrativa).
+- **Conclusión del 2º intento (jul-2026):** la sección `área-legislativa/seccion-de-relatoria`
+  de senado.gov.co (donde viven las actas) **remite todo a la Gaceta del Congreso** — el
+  Senado **NO tiene un export electrónico de votación equivalente al Bosch/DCN-SW de Cámara**.
+  Sus votos nominales quedan en el ACTA NARRATIVA publicada en la Gaceta (formato "Por el Sí:
+  N … Honorables Senadores por el SÍ: [apellidos]", como el acta 1069/2019 con 84 senadores
+  que ya extrajimos). El árbol DOCman de secretariasenado.gov.co solo guarda trámite. → **para
+  Senado no hay atajo tipo Cámara; el único camino es la Gaceta (targeting manual, on-demand)**.
+  Revisado a fondo, se puede cerrar esta línea salvo que aparezca demanda concreta.
 - **Reglas:** deploy = `git push origin HEAD:main`. Redeploy Lambda:
   `python3 tools/caudal/lambda/build_zip.py && aws lambda update-function-code --function-name caudal-analiza --zip-file fileb://tools/caudal/lambda/caudal-analiza.zip`.
   Regenerar dataset: `harvest.py dataset` → `build_dataset.py` → `build_roster.py --reuse`
@@ -5017,14 +5114,17 @@ Quiroz · 6 argumentos. El render de acta espera el primer lote de actas procesa
 > nominal SOLO se obtiene de las **actas de gaceta** (la acción `gaceta` ya lo extrae
 > cuando el acta lo trae). → el nominal loopea a procesar actas.
 
-**Pendiente (gacetas · ver bloque "Fase 3" arriba y `procesar_gacetas.py`):**
+**Pendiente (gacetas de SENADO · ver bloque "Fase 3" arriba y `procesar_gacetas.py`) —
+Cámara ya no depende de esto, ver "Fase 3 · voto nominal de Cámara":**
 1. ✅ Descarga: carpeta de Chrome de Ricardo ya apunta a `Bases de datos/leyes-senado/gacetas/`
    (sin diálogo). El folder es la cola; `procesar_gacetas.py` clasifica/enruta/sube texto.
-   Bulk NO automatizable (portal JSF hostil). Actas del cuatrienio actual = **on-demand** (opción B,
-   decisión Ricardo jul-2026). Targeting de actas (qué nº de gaceta es acta) = sin resolver → opción A.
+   Bulk NO automatizable (portal JSF hostil). Actas de Senado del cuatrienio actual = **on-demand**
+   (opción B, decisión Ricardo jul-2026). Targeting de actas de Senado (qué nº de gaceta es
+   acta) = sin resolver → opción A. **Buscar si Senado tiene un endpoint propio equivalente al
+   de Cámara** (`secretaria-general/actas-votaciones-y-otros/`) antes de seguir por gacetas.
 2. OCR para gacetas escaneadas (años 90-2005) antes de subir su texto.
-3. Voto nominal por congresista: detalle `/votaciones/{id}/` de Congreso Visible (pre-2022) +
-   extracción de actas (cuatrienio actual, on-demand).
+3. Voto nominal de Senado por congresista: detalle `/votaciones/{id}/` de Congreso Visible
+   (pre-2022) + extracción de actas (cuatrienio actual, on-demand).
 
 Refinamientos opcionales del join autor→partido: (a) más años de Congreso (pre-2014)
 para cubrir legisladores viejos; (b) ampliar `MANUAL`; (c) votación nominal por
@@ -5059,7 +5159,8 @@ aglutina TODAS nuestras bases de datos). Lo que hoy llamamos Caudal
 Caudal (paraguas)  ·  caudal.html = HOME multi-pilar (9 cards del mapa de fuentes de Cauce)
 ├── Congreso      → view-congreso    + Lambda caudal-analiza (tema/proyecto/gaceta/…)   (LISTO · en prod)
 ├── Regulatorio   → view-regulatorio + Lambda action `sanciones` + tools/caudal/supers/  (LISTO · en prod)
-└── Cortes / Medios / Datos abiertos / Territoriales / …   (cards "Próximamente" en el home)
+├── Medios        → view-medios      + Lambda action `medios` (Google News RSS, gratis)  (LISTO · en prod)
+└── Cortes / Datos abiertos / Territoriales / …   (cards "Próximamente" en el home)
 
 ⊕ Vista Cliente   → view-cliente + Lambda action `cliente` — lente SIGA que CRUZA los
                     pilares por sector y triaja a acción (SKU A, NO es un pilar)  (LISTO · en prod)
@@ -5191,6 +5292,65 @@ capa de "vista Cliente" (SIGA).
 
 **Estado:** commit `9f1c296` en `main` (solo `tools/caudal/supers/*` + `.gitignore`;
 NO tocó `caudal.html`). Datos NO subidos a S3 (esperan luz verde de Ricardo).
+
+### Pilar Medios · prensa nacional y regional (`view-medios` en `caudal.html` · LISTO vía Google News RSS)
+
+Tercer pilar en vivo de Caudal (junto a Congreso y Regulatorio). Responde el
+mismo mapa de fuentes del pitch de Cauce ("medios" es 1 de las 9 categorías).
+**Mecanismo: Google News RSS** (`news.google.com/rss/search?q=…&hl=es-419&gl=CO&ceid=CO:es`),
+gratis y sin API key — el mismo motor que ya se usaba en
+`tools/radar-mujer-medios/collect.py` (monitor de prensa de Radar Mujer/MxD):
+una sola query trae ~50 titulares de **todo el ecosistema de prensa** (nacional
++ regional) con el nombre del medio limpio en el tag `<source>`, sin mantener
+un conector por outlet. `urllib.request.urlopen` sigue el 302 de Google
+automáticamente (no hace falta manejarlo a mano).
+
+- **Backend** (`tools/caudal/lambda/lambda_handler.py`, acción `medios`,
+  añadido self-contained — sin nuevas deps, sigue empaquetando solo
+  `lambda_handler.py` + `caudal_core.py` vía `build_zip.py`):
+  - `{"action":"medios"}` sin `query` → **landing**: fetch en paralelo
+    (`ThreadPoolExecutor`) de 4 queries amplias (`MEDIOS_LANDING_Q`: Congreso,
+    Gobierno Nacional, Corte Constitucional, "reforma Colombia"), ventana
+    `when:3d`, dedup + agregado.
+  - `{"action":"medios","query":"reforma pensional","dias":30}` → **búsqueda**:
+    una sola query con ventana `when:{dias}d` (default 30).
+  - Dedup por (título normalizado, medio) — mismo criterio que collect.py.
+    Título de Google News trae sufijo `" - Medio"` redundante con el tag
+    `<source>`; `_medios_split_title` lo recorta solo cuando coincide.
+  - **Clasificador nacional/regional** (`_medios_alcance`): lista curada
+    `_MEDIOS_REGIONALES` (~34 outlets, forma "compacta" sin tildes/espacios/
+    puntos — así matchea tanto "El Heraldo" como "ELHERALDO.CO"). No pretende
+    ser exhaustiva; lo que no matchea cae a `nacional` (fallback seguro, la
+    mayoría de la prensa digital colombiana es de alcance nacional).
+  - **Cache pobre-pero-efectivo** en `analisis-cache/` (mismo prefijo S3 que
+    el resto de Caudal): la key incluye un bucket de 3h
+    (`int(time.time()//10800)`), así que dentro de esa ventana la misma query
+    es instantánea y después de esa ventana se refresca sola — sin lógica de
+    TTL/expiración explícita, solo keys que cambian con el tiempo.
+  - Sin síntesis LLM en v1 (a diferencia de `tema`/`cliente`) — es agregación
+    pura, cero costo de DeepSeek. Iteración futura natural: una lectura corta
+    tipo `_contexto_medios` sobre los titulares de una búsqueda.
+- **Frontend** (`view-medios`, patrón calcado de `view-regulatorio`): hero +
+  buscador + chips de ejemplo (reforma pensional, reforma laboral, reforma a
+  la salud, seguridad Catatumbo, paro camionero, Petro Congreso) + landing
+  (KPIs: titulares, medios distintos, nacional, regional + lista de titulares
+  recientes) + resultados de búsqueda (mismo shape). Reusa las clases CSS
+  `.sanc`/`.sanc-list`/`.doc-badge` (ya existían para el pilar Regulatorio) —
+  cero CSS nuevo. Badge "Regional" reusa `.doc-badge.pal` (ámbar) tal cual.
+- **Validado con datos reales** (jul-2026, antes de deploy): landing trajo 265
+  titulares / 98 medios distintos (216 nacional / 49 regional); búsqueda
+  "reforma pensional" trajo 51 titulares con El Colombiano, Infobae, El
+  Espectador, La FM, Tropicana, ElUniversal.com.co, etc. — la mezcla
+  nacional+regional que promete el nombre del pilar, cero conectores que
+  mantener.
+- **Pilar marcado `status:'live'`** en el array `PILLARS` del home (antes
+  `soon`). `PILLARS`/`showView`/`renderPillars` actualizados para enrutar a
+  `view-medios`.
+- **Pendiente / iteraciones futuras:** lectura LLM sobre los titulares de una
+  búsqueda (mismo patrón que `_sintesis_tema`); cruzar con Vista Cliente
+  (SIGA) para que el radar de un sector traiga también su pulso de prensa,
+  igual que ya hace con Congreso + Regulatorio; ampliar
+  `_MEDIOS_REGIONALES` según se detecten outlets nuevos en producción.
 
 ## Roadmap post-2V · Chats conversacionales (LLM + function calling)
 
