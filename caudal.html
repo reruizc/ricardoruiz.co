@@ -75,6 +75,12 @@
   .search input:focus{border-color:var(--teal)}
   .search button{background:var(--blue); color:#fff; border:none; font-family:'HelveticaNeue',Helvetica,Arial,sans-serif; font-weight:700; font-size:.85rem; padding:0 1.5rem; border-radius:6px; cursor:none; letter-spacing:.02em}
   .search button:hover{filter:brightness(1.08)}
+  .cong-search{display:flex; gap:.5rem; align-items:center; max-width:600px; margin:.7rem auto 0; flex-wrap:wrap}
+  .cong-search span{font-size:.72rem; color:var(--ink3)}
+  .cong-search input{flex:1; min-width:140px; background:var(--card); border:1px solid var(--border2); color:var(--ink); padding:.5rem .7rem; font-family:inherit; font-size:.8rem; border-radius:5px; outline:none}
+  .cong-search input:focus{border-color:var(--green)}
+  .cong-search button{background:none; color:var(--green); border:1px solid var(--green)55; font-family:'HelveticaNeue',Helvetica,Arial,sans-serif; font-weight:700; font-size:.72rem; padding:.45rem .8rem; border-radius:5px; cursor:none; white-space:nowrap}
+  .cong-search button:hover{background:rgba(74,222,128,.1)}
   .chips{display:flex; flex-wrap:wrap; gap:.5rem; justify-content:center; margin-top:1rem}
   .chip{font-size:.72rem; color:var(--ink2); border:1px solid var(--border); padding:.35rem .7rem; border-radius:20px; cursor:none; transition:.15s}
   .chip:hover{border-color:var(--teal); color:var(--ink)}
@@ -325,6 +331,31 @@
   .vn-cn{text-transform:capitalize}
   .vn-n i{color:var(--ink3); font-style:normal; font-size:.58rem}
   .vn-dot{width:.42rem; height:.42rem; border-radius:50%; flex-shrink:0}
+  .vn-clk{cursor:pointer}
+  .vn-clk .vn-cn{text-decoration:underline; text-decoration-color:rgba(255,255,255,.18); text-underline-offset:2px}
+  .vn-clk:hover .vn-cn{color:var(--white); text-decoration-color:var(--teal)}
+
+  /* ficha del congresista */
+  .cf-sub{display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; margin:-.4rem 0 1rem}
+  .cf-meta{font-size:.66rem; color:var(--ink3)}
+  .cf-align{display:flex; align-items:center; gap:.9rem; background:linear-gradient(180deg,rgba(61,111,255,.08),transparent); border:1px solid rgba(61,111,255,.25); border-radius:10px; padding:.9rem 1.1rem; margin-bottom:1rem}
+  .cf-align-n{font-size:2rem; font-weight:700; color:var(--blue); line-height:1}
+  .cf-align-t{font-size:.74rem; color:var(--ink2); line-height:1.35}
+  .cf-align-t span{font-size:.62rem; color:var(--ink3)}
+  .cf-tot{font-size:.8rem; margin-bottom:.4rem}
+  .cf-list{display:flex; flex-direction:column; gap:.1rem; max-height:430px; overflow-y:auto}
+  .cf-p{padding:.5rem 0; border-top:1px solid rgba(255,255,255,.05)}
+  .cf-p-clk{cursor:pointer}
+  .cf-p-clk:hover .cf-p-t{color:var(--white)}
+  .cf-p-t{font-size:.72rem; color:var(--ink2); margin-bottom:.32rem; line-height:1.3}
+  .cf-p-num{color:var(--teal); font-weight:700; margin-right:.3rem}
+  .cf-p-r{display:flex; align-items:center; gap:.6rem}
+  .cf-bar{flex:1; height:.5rem; border-radius:3px; overflow:hidden; display:flex; background:rgba(255,255,255,.05); max-width:260px}
+  .cf-p-c{font-size:.68rem; white-space:nowrap}
+  .cf-pick{display:flex; flex-direction:column; gap:.4rem}
+  .cf-pk{cursor:pointer; padding:.6rem .8rem; border:1px solid var(--border2); border-radius:8px; display:flex; flex-direction:column; gap:.15rem}
+  .cf-pk:hover{border-color:var(--teal)}
+  .cf-pk b{font-size:.82rem} .cf-pk span{font-size:.66rem; color:var(--ink3)}
 
   /* modal proyecto */
   .modal{position:fixed; inset:0; z-index:800; background:rgba(4,7,11,.72); backdrop-filter:blur(4px); display:none; align-items:flex-start; justify-content:center; padding:4vh 1rem; overflow-y:auto}
@@ -425,6 +456,11 @@
         <div class="search">
           <input id="q" type="text" placeholder="feminicidio · paridad · eutanasia · reforma pensional…" autocomplete="off" />
           <button id="go">Analizar</button>
+        </div>
+        <div class="cong-search">
+          <span>¿Cómo votó un representante?</span>
+          <input id="cq" type="text" placeholder="Barguil, Cepeda, Racero…" autocomplete="off" />
+          <button id="cgo">Ver voto →</button>
         </div>
         <div class="chips" id="chips"></div>
       </div>
@@ -950,6 +986,10 @@
   const q=document.getElementById('q'), results=document.getElementById('results');
   document.getElementById('go').onclick=buscar;
   q.addEventListener('keydown',e=>{if(e.key==='Enter') buscar();});
+  const cq=document.getElementById('cq');
+  const cbuscar=()=>{ const v=(cq&&cq.value||'').trim(); if(v) abrirCongresista(v); };
+  const cgo=document.getElementById('cgo'); if(cgo) cgo.onclick=cbuscar;
+  if(cq) cq.addEventListener('keydown',e=>{if(e.key==='Enter') cbuscar();});
 
   let _seq=0;
   async function buscar(){
@@ -1096,7 +1136,7 @@
       const esPral=a.principal&&!colectiva;
       const rol=colectiva?'coautor':(esPral?'autor':'firma de apoyo');
       const rc=esPral?'var(--teal)':'var(--ink3)';
-      return `<div class="aut"><span style="${esPral?'color:var(--teal);font-weight:700':''}">${esPral?'★ ':''}${esc(a.nombre)}</span>
+      return `<div class="aut"><span class="aut-clk" data-nombre="${esc(a.nombre)}" style="${esPral?'color:var(--teal);font-weight:700':''}">${esPral?'★ ':''}${esc(a.nombre)}</span>
         <span style="font-size:.56rem;letter-spacing:.06em;text-transform:uppercase;color:${rc}">${rol}</span>
         ${a.partido?`<span class="p" style="border-color:${pcolor(a.partido)}55;color:${pcolor(a.partido)}">${esc(a.partido)}</span>`:''}</div>`;
     }).join('')||'<div class="cob-note">Sin autores registrados.</div>';
@@ -1187,6 +1227,7 @@
     const bm=modalCard.querySelector('#btn-medios'); if(bm) bm.onclick=()=>rastrearMedios(f,bm);
     modalCard.querySelectorAll('.gac-click').forEach(el=>el.onclick=()=>analizarGaceta(el.dataset.key,el.dataset.tipo));
     modalCard.querySelectorAll('.vn-head').forEach(el=>el.onclick=()=>toggleNominal(+el.dataset.vni,el));
+    modalCard.querySelectorAll('.aut-clk').forEach(el=>el.onclick=()=>abrirCongresista(el.dataset.nombre));
   }
 
   // expande una votación → lista nominal por congresista, agrupada por voto
@@ -1200,7 +1241,48 @@
     const g={}; (v.votos||[]).forEach(x=>{(g[x.r]=g[x.r]||[]).push(x);});
     box.innerHTML=['Si','No','Abstencion'].filter(r=>g[r]).map(r=>`
       <div class="vn-grp"><div class="vn-grp-h" style="color:${RC[r]}">${RT[r]} · ${g[r].length}</div>
-      <div class="vn-names">${g[r].sort((a,b)=>a.c.localeCompare(b.c)).map(x=>`<span class="vn-n"><span class="vn-dot" style="background:${RC[r]}"></span><span class="vn-cn">${esc((x.c||'').toLowerCase())}</span> <i>${esc(x.b||'')}</i></span>`).join('')}</div></div>`).join('');
+      <div class="vn-names">${g[r].sort((a,b)=>a.c.localeCompare(b.c)).map(x=>`<span class="vn-n${x.k?' vn-clk':''}"${x.k?` data-k="${esc(x.k)}"`:''}><span class="vn-dot" style="background:${RC[r]}"></span><span class="vn-cn">${esc((x.c||'').toLowerCase())}</span> <i>${esc(x.b||'')}</i></span>`).join('')}</div></div>`).join('');
+    box.querySelectorAll('.vn-clk').forEach(el=>el.onclick=()=>abrirCongresista(el.dataset.k));
+  }
+
+  // ficha del congresista: cómo votó (récord + alineación con gobierno + por proyecto)
+  const CFG={Si:'var(--green)',No:'var(--red)',Abstencion:'var(--amber)'};
+  async function abrirCongresista(q){
+    modalCard.innerHTML='<button class="modal-close">✕</button><div class="llm-load" style="padding:1.5rem">Cargando récord de voto <span class="dots"><span></span><span></span><span></span></span></div>';
+    modal.classList.add('on'); modalCard.querySelector('.modal-close').onclick=cerrar;
+    const d=await call({action:'congresista', q});
+    if(d && d.candidatos){
+      modalCard.innerHTML=`<button class="modal-close">✕</button><h2>Varios congresistas coinciden</h2>
+        <div class="cf-pick">${d.candidatos.map(c=>`<div class="cf-pk" data-k="${esc(c.key)}"><b>${esc(c.nombre)}</b><span>${esc(c.bancada||'')} · ${c.n_votos} votos</span></div>`).join('')}</div>`;
+      modalCard.querySelector('.modal-close').onclick=cerrar;
+      modalCard.querySelectorAll('.cf-pk').forEach(el=>el.onclick=()=>abrirCongresista(el.dataset.k));
+      return;
+    }
+    if(!d || !d.encontrado){
+      modalCard.innerHTML='<button class="modal-close">✕</button><div class="cob-note" style="padding:1rem">Sin récord de voto nominal para esta persona. El voto nominal cubre la plenaria de Cámara 2020–2026; senadores y quienes no votaron en ese periodo no aparecen.</div>';
+      modalCard.querySelector('.modal-close').onclick=cerrar; return;
+    }
+    const su=d.resumen||{}; const tot=d.n_votos||0;
+    const proys=(d.por_proyecto||[]).map(p=>{
+      const si=p.r.Si||0, no=p.r.No||0, ab=p.r.Abstencion||0, n=si+no+ab||1;
+      const bar=`<span class="cf-bar"><span style="width:${100*si/n}%;background:var(--green)"></span><span style="width:${100*no/n}%;background:var(--red)"></span><span style="width:${100*ab/n}%;background:var(--amber)"></span></span>`;
+      const cnt=`${si?`<b style="color:var(--green)">${si}</b>`:''}${no?` <b style="color:var(--red)">${no}</b>`:''}${ab?` <b style="color:var(--amber)">${ab}</b>`:''}`;
+      return `<div class="cf-p${p.id?' cf-p-clk':''}"${p.id?` data-id="${p.id}"`:''}>
+        <div class="cf-p-t"><span class="cf-p-num">${esc(p.numero_camara||p.tk)}</span> ${esc(p.titulo||'')}</div>
+        <div class="cf-p-r">${bar}<span class="cf-p-c">${cnt}</span></div></div>`;
+    }).join('');
+    const alin=d.alineacion_gob;
+    modalCard.innerHTML=`<button class="modal-close">✕</button>
+      <h2>${esc(d.nombre)}</h2>
+      <div class="cf-sub">${d.bancada?`<span class="p" style="border-color:${pcolor(d.bancada)}55;color:${pcolor(d.bancada)}">${esc(d.bancada)}</span>`:''}<span class="cf-meta">${tot} votos nominales · ${d.n_proyectos} proyectos · plenaria de Cámara 2020–2026</span></div>
+      ${alin!=null?`<div class="cf-align"><div class="cf-align-n">${alin}%</div><div class="cf-align-t">votó con la bancada de gobierno (Pacto)<br><span>en ${d.n_contestadas} votaciones contestadas · las unánimes se excluyen</span></div></div>`:''}
+      <div class="cf-tot"><b style="color:var(--green)">${su.Si||0} Sí</b> · <b style="color:var(--red)">${su.No||0} No</b>${su.Abstencion?` · <b style="color:var(--amber)">${su.Abstencion} abst</b>`:''} <span style="color:var(--ink3)">en total</span></div>
+      <h3 style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin:1.1rem 0 .6rem">Cómo votó por proyecto · click para abrir la ficha</h3>
+      <div class="cf-list">${proys}</div>
+      <div class="cob-note">Actas de plenaria de Cámara · voto nominal electrónico. Solo votos de fondo ligados a un proyecto.</div>`;
+    modalCard.querySelector('.modal-close').onclick=cerrar;
+    modalCard.querySelectorAll('.cf-p-clk').forEach(el=>el.onclick=()=>abrirProyecto(el.dataset.id,'pdly'));
+    modalCard.scrollTop=0;
   }
 
   // rastreo de medios: busca prensa del proyecto → controversia/impopularidad

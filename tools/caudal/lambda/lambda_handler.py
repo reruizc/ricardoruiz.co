@@ -157,6 +157,52 @@ def _votaciones_nominal():
     return _VOTAC_NOM
 
 
+_VOTAC_CONG = None
+_VOTAC_CONG_IDX = None
+
+
+def _congresistas():
+    """Récord de voto POR CONGRESISTA (keyed por roster_key). Cache warm."""
+    global _VOTAC_CONG, _VOTAC_CONG_IDX
+    if _VOTAC_CONG is None:
+        try:
+            _VOTAC_CONG = _get_json('metadata/votaciones-camara-congresista.json')
+        except Exception:
+            _VOTAC_CONG = {'por_congresista': {}}
+        # índice token → keys (para resolver un nombre tecleado/clickeado)
+        _VOTAC_CONG_IDX = {}
+        for k in _VOTAC_CONG.get('por_congresista', {}):
+            for t in k.split():
+                _VOTAC_CONG_IDX.setdefault(t, set()).add(k)
+    return _VOTAC_CONG
+
+
+def _canon_tokens(s):
+    import re as _re, unicodedata as _u
+    s = _u.normalize('NFD', s or '').encode('ascii', 'ignore').decode().upper()
+    return frozenset(t for t in _re.split(r'[^A-Z0-9]+', s) if len(t) > 1)
+
+
+def _resolver_congresista(q):
+    """Devuelve (key exacto|None, [candidatos]) resolviendo q por subconjunto de tokens."""
+    pc = _congresistas().get('por_congresista', {})
+    if q in pc:
+        return q, []
+    atoks = _canon_tokens(q)
+    if not atoks:
+        return None, []
+    cand = None
+    for t in atoks:
+        s = _VOTAC_CONG_IDX.get(t, set())
+        cand = s if cand is None else (cand & s)
+        if not cand:
+            break
+    keys = sorted(cand or [], key=lambda k: -pc[k].get('n_votos', 0))
+    if len(keys) == 1:
+        return keys[0], []
+    return None, keys[:12]
+
+
 # --- pilar Regulatorio · sanciones de superintendencias ---------------------
 _SANC = None
 _SANC_STATS = None
@@ -921,6 +967,22 @@ def handler(event, context):
             if vn:
                 ficha['voto_nominal'] = vn
         return _resp(200, ficha)
+
+    if action == 'congresista':
+        # récord de voto de una persona. {key} exacto (click-through) o {q}/{nombre}
+        # (nombre tecleado o clickeado, resuelto por subconjunto de tokens).
+        q = (body.get('key') or body.get('q') or body.get('nombre') or '').strip()
+        if not q:
+            return _resp(400, {'error': 'falta key/q/nombre del congresista'})
+        pc = _congresistas().get('por_congresista', {})
+        key, cands = _resolver_congresista(q)
+        if key:
+            return _resp(200, dict(pc[key], key=key, encontrado=True))
+        if cands:   # ambiguo: devolver candidatos para desambiguar
+            return _resp(200, {'encontrado': False, 'candidatos': [
+                {'key': k, 'nombre': pc[k]['nombre'], 'bancada': pc[k].get('bancada'),
+                 'n_votos': pc[k].get('n_votos')} for k in cands]})
+        return _resp(404, {'encontrado': False, 'error': f'sin récord de voto para «{q}»'})
 
     if action == 'gaceta':
         key = body.get('key')          # ej '857-2013'

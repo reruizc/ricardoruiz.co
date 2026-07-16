@@ -59,7 +59,7 @@ def main():
         v = votac[key]
         v['nombre'] = r.get('votacion_nombre') or ''
         v['fecha'] = r.get('fecha') or ''
-        v['votos'].append((cong, r['respuesta'], canon_bancada(r.get('partido'))))
+        v['votos'].append((cong, r['respuesta'], canon_bancada(r.get('partido')), r.get('roster_key') or ''))
 
     por_proyecto = {}
     n_votac, n_votos = 0, 0
@@ -69,14 +69,14 @@ def main():
             continue
         resumen = collections.Counter(x[1] for x in v['votos'])
         banc = collections.defaultdict(lambda: collections.Counter())
-        for c, resp, b in v['votos']:
+        for c, resp, b, k in v['votos']:
             banc[b][resp] += 1
         vot_obj = {
             'acta_id': aid, 'fecha': v['fecha'],
             'nombre': re.sub(r'\s+', ' ', v['nombre']).strip(),
             'resumen': dict(resumen),
             'por_bancada': {b: dict(c) for b, c in sorted(banc.items())},
-            'votos': [{'c': c, 'r': resp, 'b': b} for c, resp, b in sorted(v['votos'])],
+            'votos': [{'c': c, 'r': resp, 'b': b, 'k': k} for c, resp, b, k in sorted(v['votos'])],
         }
         por_proyecto.setdefault(tok, {'numero_camara': pnc, 'votaciones': []})
         por_proyecto[tok]['votaciones'].append(vot_obj)

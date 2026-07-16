@@ -4980,9 +4980,39 @@ sin postback) al ZIP/PDF de esa sesión.
   coincide en ambas fuentes. Esa herramienta externa **no tiene registrada la reforma
   laboral** para los congresistas probados — nuestro pipeline sí, con el detalle completo de
   cada artículo + la conciliación final, una ventaja real sobre la competencia editorial.
-- **Pendiente para exponerlo:** nueva acción en la Lambda `caudal-analiza` (o enriquecer
-  `proyecto`) + sección "Cómo votó" en la ficha del frontend + subida a S3 —
-  **todo con luz verde de Ricardo antes de tocar producción**, nada de esto se sube solo.
+- **EXPUESTO EN PRODUCCIÓN (jul-2026 · con luz verde de Ricardo):** el voto nominal
+  ya es producto vivo en Caudal, por dos ejes:
+  - **Por proyecto** — `tools/caudal/build_votaciones_camara_s3.py` →
+    `metadata/votaciones-camara-nominal.json` (por proyecto: tally + desglose por
+    bancada + lista nominal con `k`=roster_key). La acción `proyecto` de la Lambda
+    inyecta `voto_nominal` (aditivo). En la ficha: bloque "Voto nominal" con cada
+    votación expandible al nominal por congresista.
+  - **Por congresista** — `tools/caudal/build_congresista_s3.py` →
+    `metadata/votaciones-camara-congresista.json` (keyed por roster_key: bancada +
+    resumen + `alineacion_gob` [% con Pacto en votaciones CONTESTADAS, min lado ≥15%]
+    + `por_proyecto` con su Sí/No/Abst por proyecto e `id` para click-through).
+    Nueva acción Lambda `congresista` (resuelve `{key}` exacto o `{q}`/`{nombre}` por
+    subconjunto de tokens; si es ambiguo devuelve `candidatos` para desambiguar).
+    Frontend: buscador "¿cómo votó un representante?" en la vista Congreso + nombres
+    del nominal y autores clickeables → ficha del congresista (alineación + récord
+    por proyecto con barras Sí/No). Verificado con Barguil (66% alineación, 600 votos).
+  - **Fix de linking clave** (parse_votaciones_camara): `PROJ_RE` usaba `\b` final
+    que fallaba con el sufijo de cámara pegado (`166/23C`); + `PROJ_DASH_RE` para el
+    formato con guion y año de 4 dígitos (`118-2022`); + `_norm_proj` normaliza el año
+    a 2 dígitos. Cobertura de votos ligados a proyecto **17% → 43%** (135.293 votos,
+    328 proyectos). Re-linkear tras un cambio: leer el jsonl, re-aplicar `link_proyecto`
+    con `load_numero_camara_map`, reescribir (no hace falta re-parsear PDFs).
+  - **Regenerar/redeploy:** `build_votaciones_camara_s3.py` + `build_congresista_s3.py`
+    → `aws s3 cp … s3://caudal-legislativo/metadata/` → `build_zip.py` +
+    `update-function-code` (la Lambda recarga los JSON en contenedor frío; para forzar
+    el recycle, re-deploy). Los dos JSON viven local en `dist/s3/` (gitignored).
+  - **Hogar futuro de la ficha-persona:** `analisis-candidato.html` (foto/mapa/score/
+    histórico electoral) es la ficha rica; cuando Ricardo jale los perfiles de Congreso
+    2010-2026 ahí, la MISMA acción `congresista` alimenta un panel "cómo votó" (join por
+    nombre → roster_key que la Lambda ya resuelve). Caudal es el hogar actual.
+- **Pendiente de voto (backlog):** Senado (bloqueado por fuente, ver arriba) · OCR
+  Cámara pre-2020 (~928 actas imagen en disco, piloto Tesseract listo) · disciplina de
+  bancada como vista propia (la alineación ya se mide, falta exponerla agregada).
 
 **Fase 3 · voto nominal de SENADO — investigación en curso, sin resolver (jul-2026).**
 Se buscó un equivalente al AJAX de Cámara. `senado.gov.co` es Joomla (no WordPress) — sin
