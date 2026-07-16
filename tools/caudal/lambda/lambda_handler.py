@@ -141,6 +141,22 @@ def _votaciones():
     return _VOTAC
 
 
+_VOTAC_NOM = None
+
+
+def _votaciones_nominal():
+    """Voto NOMINAL de la plenaria de Cámara (por proyecto: tally + por bancada
+    + lista nominal). Distinto de _votaciones() (tally de Congreso Visible).
+    Cache warm."""
+    global _VOTAC_NOM
+    if _VOTAC_NOM is None:
+        try:
+            _VOTAC_NOM = _get_json('metadata/votaciones-camara-nominal.json')
+        except Exception:
+            _VOTAC_NOM = {'por_proyecto': {}}
+    return _VOTAC_NOM
+
+
 # --- pilar Regulatorio · sanciones de superintendencias ---------------------
 _SANC = None
 _SANC_STATS = None
@@ -574,6 +590,25 @@ _MEDIOS_REGIONALES = [
     'notipacifico', 'primiciadiario', 'hsbnoticias',
 ]
 
+# plataformas sociales que Google News a veces manda como <source> cuando el
+# resultado es un post/caption compartido, no una nota editorial (ej. un post
+# de Facebook con texto largo). Se descartan ANTES de agregar — es justo el
+# tipo de ruido que Caudal promete filtrar, no sumarlo junto a medios reales.
+_MEDIOS_FUENTES_EXCLUIR = {
+    'facebookcom', 'facebook', 'twittercom', 'twitter', 'xcom',
+    'instagramcom', 'instagram', 'tiktokcom', 'tiktok', 'youtubecom',
+    'youtube', 'threadsnet', 'threads', 'linkedincom', 'linkedin',
+    'redditcom', 'reddit', 'tme', 'telegram', 'whatsappcom', 'whatsapp',
+}
+
+# TLDs comunes a recortar cuando Google News manda el dominio en vez de la
+# marca como <source> (ver _medios_group_key). Ordenados de más largo a más
+# corto para que '.com.co' se pruebe antes que '.co'.
+_DOMAIN_TLDS_SORTED = sorted(
+    ('com.co', 'com.mx', 'com.ar', 'com.ve', 'com.pe', 'com.ec', 'com',
+     'co', 'net', 'org', 'info', 'tv', 'la', 'news'),
+    key=len, reverse=True)
+
 
 def _medios_strip_accents(s):
     return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
@@ -585,6 +620,35 @@ def _medios_norm(s):
 
 def _medios_compact(s):
     return re.sub(r'[^a-z0-9]', '', _medios_strip_accents((s or '').lower()))
+
+
+def _medios_es_fuente_social(medio):
+    return _medios_compact(medio) in _MEDIOS_FUENTES_EXCLUIR
+
+
+def _medios_looks_domain(medio):
+    return bool(medio) and '.' in medio and ' ' not in medio
+
+
+def _medios_domain_slug(medio):
+    """'elpais.com.co' -> 'elpais'; 'ElUniversal.com.co' -> 'eluniversal'."""
+    s = medio.lower()
+    s = re.sub(r'^https?://', '', s)
+    s = re.sub(r'^www\.', '', s)
+    for tld in _DOMAIN_TLDS_SORTED:
+        suf = '.' + tld
+        if s.endswith(suf):
+            return s[:-len(suf)]
+    return s
+
+
+def _medios_group_key(medio):
+    """Llave de agrupación agnóstica de la FORMA en que llega el medio: Google
+    News manda a veces el dominio ('elpais.com.co') y a veces la marca ('El
+    País') como <source> para el MISMO periódico — sin esto, 'por_medio' infla
+    el conteo de medios distintos con el mismo medio contado dos veces."""
+    base = _medios_domain_slug(medio) if _medios_looks_domain(medio) else medio
+    return _medios_compact(base)
 
 
 def _medios_alcance(medio):
@@ -662,7 +726,7 @@ def _medios_query_events(query, dias):
     events = []
     for it in items:
         titulo, medio = _medios_split_title(it['title'], it['source'])
-        if not medio:
+        if not medio or _medios_es_fuente_social(medio):
             continue
         events.append({'medio': medio, 'alcance': _medios_alcance(medio), 'titulo': titulo,
                        'url': it['link'], 'fecha': (it['fecha_pub'] or '')[:10],
@@ -671,21 +735,39 @@ def _medios_query_events(query, dias):
 
 
 def _medios_aggregate(events, cap):
+    # dedup por (titulo normalizado, LLAVE de medio) — no por el string crudo
+    # del medio, que puede venir en dos formas distintas para el mismo outlet.
     seen, dedup = set(), []
     for e in events:
-        k = (_medios_norm(e['titulo']), _medios_norm(e['medio']))
+        e['_gk'] = _medios_group_key(e['medio'])
+        k = (_medios_norm(e['titulo']), e['_gk'])
         if k in seen:
             continue
         seen.add(k)
         dedup.append(e)
     dedup.sort(key=lambda e: e['_fp'], reverse=True)
+
+    # nombre canónico por grupo: preferir la forma que NO parece dominio (la
+    # marca real, 'El País') sobre 'elpais.com.co'; si todas las variantes del
+    # grupo parecen dominio, usar la más frecuente tal cual.
+    variantes = {}
+    for e in dedup:
+        variantes.setdefault(e['_gk'], Counter())[e['medio']] += 1
+    canon = {}
+    for gk, vc in variantes.items():
+        marca = {m: n for m, n in vc.items() if not _medios_looks_domain(m)}
+        pool = marca or vc
+        canon[gk] = max(pool.items(), key=lambda kv: kv[1])[0]
+    for e in dedup:
+        e['medio'] = canon[e['_gk']]
+
     por_medio = Counter(e['medio'] for e in dedup)
     por_alcance = Counter(e['alcance'] for e in dedup)
     return {
         'n': len(dedup), 'n_medios': len(por_medio),
         'por_medio': [{'medio': m, 'n': n} for m, n in por_medio.most_common(20)],
         'por_alcance': [{'alcance': a, 'n': n} for a, n in por_alcance.most_common()],
-        'resultados': [{k: v for k, v in e.items() if k != '_fp'} for e in dedup[:cap]],
+        'resultados': [{k: v for k, v in e.items() if k not in ('_fp', '_gk')} for e in dedup[:cap]],
     }
 
 
@@ -715,6 +797,26 @@ def _medios_buscar(query, dias):
         return cached
     out = dict(_medios_aggregate(_medios_query_events(query, dias), cap=60),
                mode='search', query=query, dias=dias)
+    _cache_put(ck, out)
+    return out
+
+
+def _medios_para_sector(temas, dias=14, cap=6):
+    """Pulso de prensa para el Radar del cliente (Vista Cliente · SKU A): una
+    query de Google News por cada tema del sector, en paralelo, con el mismo
+    filtro de ruido y dedup del pilar Medios. Cache de 3h por combinación de
+    temas (mismo criterio que _medios_landing/_medios_buscar)."""
+    if not temas:
+        return {'n': 0, 'resultados': []}
+    ck = f'medios-sector-{_hash24("|".join(sorted(temas)))}-{dias}-{_medios_cache_bucket()}'
+    cached = _cache_get(ck)
+    if cached:
+        return cached
+    events = []
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        for fut in as_completed([pool.submit(_medios_query_events, t, dias) for t in temas]):
+            events.extend(fut.result())
+    out = _medios_aggregate(events, cap=cap)
     _cache_put(ck, out)
     return out
 
@@ -781,6 +883,11 @@ def handler(event, context):
             if tk and tk in vp:
                 ficha['votaciones'] = vp[tk]
                 break
+        # voto NOMINAL de plenaria Cámara (aditivo): match por número Cámara
+        if tok_c:
+            vn = _votaciones_nominal().get('por_proyecto', {}).get(tok_c)
+            if vn:
+                ficha['voto_nominal'] = vn
         return _resp(200, ficha)
 
     if action == 'gaceta':
@@ -852,16 +959,29 @@ def handler(event, context):
                             'accion': ('Sanción reciente en tu sector — revisar exposición y activar '
                                        'cumplimiento') if reciente else
                                       'Antecedente sancionatorio — referencia de riesgo del sector'})
-        senales = rc['senales'] + reg
+        med, n_med = [], 0
+        med_agg = _medios_para_sector(s.get('temas', []))
+        n_med = med_agg['n']
+        cutoff = _time.strftime('%Y-%m-%d', _time.gmtime(_time.time() - 5 * 86400))
+        for r in med_agg['resultados'][:5]:
+            reciente = (r.get('fecha') or '') >= cutoff
+            med.append({'tipo': 'medios', 'medio': r.get('medio'), 'titulo': r.get('titulo'),
+                        'url': r.get('url'), 'fecha': r.get('fecha'), 'alcance': r.get('alcance'),
+                        'nivel': 'alto' if reciente else 'medio',
+                        'accion': ('Cobertura reciente — revisar si necesita respuesta o vocería'
+                                   if reciente else
+                                   'Tema en el radar de prensa — monitoreo pasivo')})
+        senales = rc['senales'] + reg + med
         kpis = {'n_radar': len(senales),
                 'alto': sum(1 for x in senales if x['nivel'] == 'alto'),
                 'medio': sum(1 for x in senales if x['nivel'] == 'medio'),
                 'bajo': sum(1 for x in senales if x['nivel'] == 'bajo'),
                 'en_tramite': sum(1 for x in rc['senales'] if x['resultado'] == 'EN_TRAMITE'),
-                'n_proyectos_sector': rc['n_tocados'], 'n_sanciones_sector': n_sanc}
+                'n_proyectos_sector': rc['n_tocados'], 'n_sanciones_sector': n_sanc,
+                'n_medios_sector': n_med}
         out = {'cliente': {'sector': sk, 'nombre': s['nombre'], 'comision': s['comision'],
                            'sector_sanciones': s.get('sector_sanciones', ''), 'temas': s.get('temas', [])},
-               'congreso': rc['senales'], 'regulatorio': reg, 'kpis': kpis, 'sectores': sectores}
+               'congreso': rc['senales'], 'regulatorio': reg, 'medios': med, 'kpis': kpis, 'sectores': sectores}
         if body.get('lectura', False):
             out['lectura'] = _lectura_cliente(s, senales, kpis)
         return _resp(200, out)

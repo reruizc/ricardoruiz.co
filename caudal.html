@@ -306,6 +306,25 @@
   .vt-y{color:var(--ink3); min-width:3.6rem; flex-shrink:0}
   .vt-m{color:var(--ink2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 
+  /* voto nominal */
+  .vn-list{display:flex; flex-direction:column; gap:.15rem; margin:.6rem 0; max-height:420px; overflow-y:auto}
+  .vn-item{border-top:1px solid rgba(255,255,255,.05)}
+  .vn-head{display:flex; gap:.5rem; align-items:center; font-size:.72rem; cursor:pointer; padding:.4rem 0}
+  .vn-head:hover{color:var(--white)}
+  .vn-name{color:var(--ink2); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .vn-tally{flex-shrink:0; font-size:.68rem}
+  .vn-caret{color:var(--ink3); flex-shrink:0; width:1rem; text-align:center}
+  .vn-banks{display:flex; flex-wrap:wrap; gap:.5rem; font-size:.62rem; color:var(--ink3); padding:0 0 .45rem 4.1rem}
+  .vn-banc b{color:var(--ink2); font-weight:500}
+  .vn-detail{display:none}
+  .vn-detail.open{display:block; padding:.2rem 0 .7rem 4.1rem}
+  .vn-grp{margin-bottom:.6rem}
+  .vn-grp-h{font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; margin-bottom:.35rem; font-weight:600}
+  .vn-names{display:flex; flex-wrap:wrap; gap:.28rem .8rem}
+  .vn-n{font-size:.66rem; color:var(--ink2); display:inline-flex; align-items:center; gap:.3rem}
+  .vn-n i{color:var(--ink3); font-style:normal; font-size:.58rem}
+  .vn-dot{width:.42rem; height:.42rem; border-radius:50%; flex-shrink:0}
+
   /* modal proyecto */
   .modal{position:fixed; inset:0; z-index:800; background:rgba(4,7,11,.72); backdrop-filter:blur(4px); display:none; align-items:flex-start; justify-content:center; padding:4vh 1rem; overflow-y:auto}
   .modal.on{display:flex}
@@ -864,6 +883,12 @@
         <div class="sig-title">${esc(shortTitle(x.titulo).slice(0,120))}</div>
         <div class="sig-tags">${tags}</div><div class="sig-action">${esc(x.accion)}</div></div></div>`;
     }
+    if(x.tipo==='medios'){
+      const tags=[x.medio?esc(x.medio):'', x.alcance==='regional'?'Regional':'Nacional', x.fecha?esc(x.fecha):''].filter(Boolean).join(' · ');
+      return `<div class="sig ${x.nivel}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
+        <div class="sig-title"><a href="${esc(x.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(x.titulo)}</a></div>
+        <div class="sig-tags">${tags}</div><div class="sig-action">${esc(x.accion)}</div></div></div>`;
+    }
     const monto=x.monto?' · '+fmtCOP(x.monto):'';
     return `<div class="sig ${x.nivel}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
       <div class="sig-title">${esc(x.sancionado||'—')}</div>
@@ -872,10 +897,11 @@
   }
   function cliRender(d){
     const body=document.getElementById('cli-body'); if(!body) return;
-    const k=d.kpis, cl=d.cliente, congreso=d.congreso||[], reg=d.regulatorio||[];
+    const k=d.kpis, cl=d.cliente, congreso=d.congreso||[], reg=d.regulatorio||[], medios=d.medios||[];
     const regBlock=cl.sector_sanciones
       ? (reg.length ? `<div class="sig-list">${reg.map(cliSigCard).join('')}</div>` : '<div class="cli-reg-none">Sin sanciones recientes en esta fuente.</div>')
       : '<div class="cli-reg-none">Este sector aún no tiene fuente de sanciones conectada — Superfinanciera y otras superintendencias entran por etapas.</div>';
+    const medBlock=medios.length ? `<div class="sig-list">${medios.map(cliSigCard).join('')}</div>` : '<div class="cli-reg-none">Sin cobertura de prensa reciente para este sector.</div>';
     body.innerHTML=`
       <div class="kpis">
         <div class="kpi"><div class="n">${k.n_radar}</div><div class="l">Señales en el radar</div></div>
@@ -891,7 +917,9 @@
       <div class="cli-sub">Legislativo · Congreso <span class="cs-n">${congreso.length}</span></div>
       <div class="sig-list">${congreso.map(cliSigCard).join('')||'<div class="cli-reg-none">Sin proyectos accionables ahora.</div>'}</div>
       <div class="cli-sub">Regulatorio · Superintendencias ${cl.sector_sanciones?`<span class="cs-n">${reg.length}</span>`:''}</div>
-      ${regBlock}`;
+      ${regBlock}
+      <div class="cli-sub">Medios · Prensa <span class="cs-n">${medios.length}</span></div>
+      ${medBlock}`;
   }
   function cliRenderLectura(l){
     const body=document.getElementById('cli-lectura-body'); if(!body) return;
@@ -1095,7 +1123,30 @@
       <div class="ga-tag" style="color:var(--teal)">◈ Trámite · debates y votaciones · Congreso Visible</div>
       <div class="bloq-big" style="font-size:.92rem"><b style="color:var(--teal);font-size:1.35rem">${vt.n_votaciones}</b> votaciones · ${vt.aplazamientos} aplazamiento(s) · ${vt.archivos} archivo(s) · ${vt.aprobados} aprobación(es)</div>
       <div class="vt-list">${(vt.votaciones||[]).slice(0,12).map(x=>`<div class="vt-row"><span class="vt-y">${(x.fecha||'').slice(0,7)}</span><span class="emp-badge" style="color:${VTC[x.tipo]||'var(--gray)'};background:${(VTC[x.tipo]||'var(--gray)')}14;border:1px solid ${(VTC[x.tipo]||'var(--gray)')}44">${x.tipo}</span><span class="vt-m">${esc(x.donde||'')} · ${esc((x.motivo||'').slice(0,52))}${x.favor!=null?` · <b style="color:var(--ink)">${x.favor}–${x.contra}</b>`:''}</span></div>`).join('')}</div>
-      <div class="cob-note">Congreso Visible · 2006–2022. El voto nominal por congresista y el cuatrienio actual (parse de gacetas) quedan pendientes.</div>
+      <div class="cob-note">Congreso Visible · 2006–2022. Tally por proyecto. El voto nominal por congresista (abajo) sale de las actas de plenaria de Cámara.</div>
+    </div>`:'';
+    // voto NOMINAL de plenaria de Cámara (por congresista) — de las actas
+    const vn=f.voto_nominal;
+    const RCOL={Si:'var(--green)',No:'var(--red)',Abstencion:'var(--amber)'};
+    const RTXT={Si:'Sí',No:'No',Abstencion:'Abst'};
+    _vnData=(vn&&vn.votaciones)?vn.votaciones.slice().reverse():[];
+    const bancStrip=pb=>Object.entries(pb||{})
+      .sort((a,b)=>Object.values(b[1]).reduce((x,y)=>x+y,0)-Object.values(a[1]).reduce((x,y)=>x+y,0))
+      .filter(([b])=>b!=='Sin bancada'&&b!=='Otro')
+      .map(([banc,c])=>`<span class="vn-banc"><b>${esc(banc)}</b> ${Object.entries(c).map(([r,n])=>`<span style="color:${RCOL[r]||'var(--gray)'}">${n}${RTXT[r]||r}</span>`).join(' ')}</span>`).join('');
+    const nominalHTML=vn?`<div class="bloq-card" style="border-color:rgba(74,222,128,.3);background:linear-gradient(180deg,rgba(74,222,128,.06),transparent)">
+      <div class="ga-tag" style="color:var(--green)">◈ Voto nominal · plenaria de Cámara · por congresista</div>
+      <div class="bloq-big" style="font-size:.92rem"><b style="color:var(--green);font-size:1.35rem">${vn.n_votaciones}</b> votaciones nominales · click en una para ver quién votó qué</div>
+      <div class="vn-list">${_vnData.map((x,i)=>{
+        const su=x.resumen||{}; const tally=`<b style="color:var(--green)">${su.Si||0} Sí</b> · <b style="color:var(--red)">${su.No||0} No</b>${su.Abstencion?` · <b style="color:var(--amber)">${su.Abstencion} abst</b>`:''}`;
+        return `<div class="vn-item"><div class="vn-head" data-vni="${i}">
+          <span class="vt-y">${(x.fecha||'').slice(0,7)}</span>
+          <span class="vn-name">${esc((x.nombre||'').replace(/^PL\.?\s*\d+\/\d+[A-Z]?\s*[-–]?\s*/i,'').slice(0,60))}</span>
+          <span class="vn-tally">${tally}</span><span class="vn-caret">▸</span></div>
+          <div class="vn-banks">${bancStrip(x.por_bancada)}</div>
+          <div class="vn-detail" id="vnd-${i}"></div></div>`;
+      }).join('')}</div>
+      <div class="cob-note">Actas de plenaria de Cámara · voto nominal electrónico. ~90% cruzado con partido. Solo votos de fondo ligados a este proyecto.</div>
     </div>`:'';
     const reradic=hist.length>1?`
       <h3 style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin-bottom:.5rem">Re-radicaciones · misma iniciativa en ${f.veces_presentado} términos</h3>
@@ -1126,6 +1177,7 @@
       ${autNota?`<div class="cob-note" style="margin-top:.5rem">${autNota}</div>`:''}
       ${bloqHTML}
       ${votacHTML}
+      ${nominalHTML}
       ${reradic}
       <h3 style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin:1.1rem 0 .7rem">Documentos · gacetas del Congreso · click para analizar la ponencia</h3>
       <div class="gac-list">${gacs}</div>
@@ -1133,6 +1185,21 @@
     modalCard.querySelector('.modal-close').onclick=cerrar;
     const bm=modalCard.querySelector('#btn-medios'); if(bm) bm.onclick=()=>rastrearMedios(f,bm);
     modalCard.querySelectorAll('.gac-click').forEach(el=>el.onclick=()=>analizarGaceta(el.dataset.key,el.dataset.tipo));
+    modalCard.querySelectorAll('.vn-head').forEach(el=>el.onclick=()=>toggleNominal(+el.dataset.vni,el));
+  }
+
+  // expande una votación → lista nominal por congresista, agrupada por voto
+  let _vnData=[];
+  function toggleNominal(i,head){
+    const box=document.getElementById('vnd-'+i); if(!box) return;
+    const caret=head.querySelector('.vn-caret');
+    if(box.innerHTML){ box.innerHTML=''; box.classList.remove('open'); if(caret)caret.textContent='▸'; return; }
+    if(caret)caret.textContent='▾'; box.classList.add('open');
+    const v=_vnData[i]||{}; const RC={Si:'var(--green)',No:'var(--red)',Abstencion:'var(--amber)'}, RT={Si:'Sí',No:'No',Abstencion:'Abstención'};
+    const g={}; (v.votos||[]).forEach(x=>{(g[x.r]=g[x.r]||[]).push(x);});
+    box.innerHTML=['Si','No','Abstencion'].filter(r=>g[r]).map(r=>`
+      <div class="vn-grp"><div class="vn-grp-h" style="color:${RC[r]}">${RT[r]} · ${g[r].length}</div>
+      <div class="vn-names">${g[r].sort((a,b)=>a.c.localeCompare(b.c)).map(x=>`<span class="vn-n"><span class="vn-dot" style="background:${RC[r]}"></span>${esc((x.c||'').toLowerCase().replace(/\b\w/g,m=>m.toUpperCase()))} <i>${esc(x.b||'')}</i></span>`).join('')}</div></div>`).join('');
   }
 
   // rastreo de medios: busca prensa del proyecto → controversia/impopularidad

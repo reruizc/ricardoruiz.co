@@ -5016,9 +5016,27 @@ documento (`P-NNN-ART-NNN-...pdf`, `CT-NNN-...pdf`).
   Senado **NO tiene un export electrónico de votación equivalente al Bosch/DCN-SW de Cámara**.
   Sus votos nominales quedan en el ACTA NARRATIVA publicada en la Gaceta (formato "Por el Sí:
   N … Honorables Senadores por el SÍ: [apellidos]", como el acta 1069/2019 con 84 senadores
-  que ya extrajimos). El árbol DOCman de secretariasenado.gov.co solo guarda trámite. → **para
-  Senado no hay atajo tipo Cámara; el único camino es la Gaceta (targeting manual, on-demand)**.
-  Revisado a fondo, se puede cerrar esta línea salvo que aparezca demanda concreta.
+  que ya extrajimos). El árbol DOCman de secretariasenado.gov.co solo guarda trámite.
+- **3er intento — portal Imprenta scriptable pero filtro inservible (jul-2026 · `harvest_actas_plenaria_senado.py`):**
+  Se crackeó la MECÁNICA del buscador JSF de la Imprenta (dataTable PrimeFaces lazy, 31k
+  gacetas): el POST parcial de filtro (Entidad="Senado de la República" + `_filtering=true`)
+  y de paginación (`_pagination=true`+`_first`, fecha DESC) SÍ se scriptan por curl. **PERO
+  el filtro no sirve para aislar las actas de plenaria con voto nominal:** (a) la columna
+  "Documento" se renderiza VACÍA en el listado → solo hay (num, entidad, fecha), sin tipo;
+  (b) el filtro Documento es FUZZY — `plenaria` devuelve mayormente PONENCIAS/órdenes del día,
+  y `acta de plenaria` devuelve hasta gacetas de "ACTAS DE COMISIÓN" (verificado: gaceta
+  787/2026 sale de primera con ese filtro y es comisión, 0 roll-call). No existe un filtro
+  que dé limpio las actas de sesión. Clasificar acta-vs-ponencia-vs-comisión exige DESCARGAR
+  y leer el masthead de la página 1 ("ACTAS DE PLENARIA" vs "ACTAS DE COMISIÓN" vs "PONENCIAS").
+- **Conclusión definitiva para Senado:** no hay atajo tipo Cámara. La vía realista es
+  **TARGETED, no bulk**: para un voto concreto (reforma X, senador Y) → conocer la FECHA de
+  sesión → bajar las gacetas candidatas de esa ventana con `descargar_gaceta.py` → quedarse
+  con la de masthead "ACTAS DE PLENARIA" que traiga "Por el Sí"/"Honorables Senadores" →
+  parsear con la acción `gaceta` del Lambda → cruzar con `electos-2026-2030.json`. Un harvest
+  exhaustivo (bajar cientos de gacetas grandes y clasificarlas por masthead) es caro y ruidoso;
+  para preguntas puntuales, Congreso a la mano ya da el cross-check. **Se cierra esta línea de
+  investigación** — el mecanismo queda scriptado en `harvest_actas_plenaria_senado.py` (con
+  docstring que documenta el límite) por si se quiere el targeted más adelante.
 - **Reglas:** deploy = `git push origin HEAD:main`. Redeploy Lambda:
   `python3 tools/caudal/lambda/build_zip.py && aws lambda update-function-code --function-name caudal-analiza --zip-file fileb://tools/caudal/lambda/caudal-analiza.zip`.
   Regenerar dataset: `harvest.py dataset` → `build_dataset.py` → `build_roster.py --reuse`
@@ -5346,11 +5364,27 @@ automáticamente (no hace falta manejarlo a mano).
 - **Pilar marcado `status:'live'`** en el array `PILLARS` del home (antes
   `soon`). `PILLARS`/`showView`/`renderPillars` actualizados para enrutar a
   `view-medios`.
+- **Cruzado con Vista Cliente/Radar (SIGA) — LISTO (jul-2026).** El radar de
+  un sector ahora suma un tercer bloque "Medios · Prensa" junto a Congreso y
+  Regulatorio. Helper `_medios_para_sector(temas, dias=14, cap=6)`: corre una
+  query de Google News por cada tema del sector en paralelo
+  (`ThreadPoolExecutor`), reusa el mismo filtro de ruido/dedup/normalización
+  del pilar Medios, cachea 3h por combinación de temas. En la acción
+  `cliente`: nivel `alto` si el titular es de los últimos 5 días, si no
+  `medio`; entra al conteo combinado de `senales` (así `n_radar`/`alto` del
+  KPI reflejan los 3 pilares). Nuevo campo `kpis.n_medios_sector` (volumen
+  total de cobertura del sector, no solo los 5 que se muestran) + `medios[]`
+  en el payload. Frontend: `cliSigCard` gana rama `tipo==='medios'` (titular
+  linkeado + medio + alcance + fecha); `cliRender` agrega la sección "Medios ·
+  Prensa" tras Regulatorio. Verificado en vivo: sector salud (5 titulares,
+  Supersalud/medicamentos entre ellos) y educación (sin sanciones conectadas,
+  el bloque de medios igual funciona).
 - **Pendiente / iteraciones futuras:** lectura LLM sobre los titulares de una
-  búsqueda (mismo patrón que `_sintesis_tema`); cruzar con Vista Cliente
-  (SIGA) para que el radar de un sector traiga también su pulso de prensa,
-  igual que ya hace con Congreso + Regulatorio; ampliar
-  `_MEDIOS_REGIONALES` según se detecten outlets nuevos en producción.
+  búsqueda (mismo patrón que `_sintesis_tema`); ampliar
+  `_MEDIOS_REGIONALES` según se detecten outlets nuevos en producción; el
+  clasificador de medios no distingue fuentes institucionales (gobernaciones,
+  SENA) de prensa editorial — puede colarse un comunicado oficial junto a una
+  nota periodística real.
 
 ## Roadmap post-2V · Chats conversacionales (LLM + function calling)
 
