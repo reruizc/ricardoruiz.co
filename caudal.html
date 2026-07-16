@@ -547,15 +547,32 @@
     if(i){ i.classList.toggle('open'); e.stopPropagation(); }
   });
 
+  /* ---------- acceso temporal por link (sin registro, para socios) ---------- */
+  // El token NO vive aquí: se pasa por query string (?acceso=...) y se valida
+  // contra el worker (`/caudal/guest`), que lo busca en KV. Así el HTML público
+  // no expone ningún secreto y el acceso se revoca borrando la llave del KV
+  // (o dejando que expire su TTL) — sin tocar ni redesplegar esta página.
+  // Sembrar/revocar: ver CLAUDE.md · sección "acceso de invitado a Caudal".
+  async function checkShareAccess(){
+    const p=(new URLSearchParams(location.search).get('acceso')||'').trim();
+    if(!p) return false;
+    try{
+      const r=await fetch(`https://rr-auth.reruizc.workers.dev/caudal/guest?token=${encodeURIComponent(p)}`);
+      const d=await r.json();
+      return !!(d && d.ok && d.valid);
+    }catch(e){ return false; }
+  }
+
   /* ---------- gate ---------- */
   const token=localStorage.getItem('rr-token'); const uRaw=localStorage.getItem('rr-user');
   const user=uRaw?JSON.parse(uRaw):null;
   const ok=em=>em&&ALLOWED.includes(String(em).toLowerCase().trim());
   const toLogin=()=>{localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');location.replace('login.html');};
   const toDash=()=>location.replace('dashboard.html');
-  if(!token||!user) toLogin();
-  else if(!ok(user.email)) toDash();
-  else (async()=>{
+  (async()=>{
+    if(await checkShareAccess()) return reveal(true);
+    if(!token||!user) return toLogin();
+    if(!ok(user.email)) return toDash();
     try{
       const res=await fetch('https://rr-auth.reruizc.workers.dev/auth/me',{headers:{Authorization:`Bearer ${token}`}});
       if(res.status===401) return toLogin();
@@ -565,8 +582,12 @@
       reveal();
     }catch(e){ reveal(); }
   })();
-  function reveal(){ document.getElementById('gate').remove(); document.getElementById('topNav').hidden=false; document.getElementById('app').hidden=false;
-    const lo=document.getElementById('navLogout'); if(lo) lo.onclick=()=>{ localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); location.replace('login.html'); };
+  function reveal(guest){ document.getElementById('gate').remove(); document.getElementById('topNav').hidden=false; document.getElementById('app').hidden=false;
+    if(guest){
+      const nl=document.querySelector('.e-nav-left'); if(nl) nl.innerHTML='<span class="priv-badge">Vista de invitado</span>';
+    } else {
+      const lo=document.getElementById('navLogout'); if(lo) lo.onclick=()=>{ localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); location.replace('login.html'); };
+    }
     initHome();
     loadStats();
   }

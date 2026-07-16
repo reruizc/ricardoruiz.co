@@ -5128,6 +5128,26 @@ sistema visual v2 (Helvetica embebida, fondo `#060810`, acento teal, azul `#0047
 cursor custom, `noindex,nofollow`). Gate calcado de proyecto-dc: `rr-token`/`rr-user`
 + whitelist **`['reruizc@gmail.com','nuevagemela@gmail.com']`** (Nury Gómez agregada
 jul-2026) + verificación contra `rr-auth /auth/me`. Card en `dashboard.html`
+
+**Acceso de invitado a Caudal (link/QR sin registro · jul-2026).** Para mostrarle
+Caudal a socios (Cauce) sin crearles cuenta: `?acceso=<token>` en la URL. El token
+**NO vive en el HTML** (sería un secreto público e irrevocable en un repo abierto);
+vive en el KV del worker y `checkShareAccess()` lo valida contra
+**`GET /caudal/guest?token=`** de `rr-auth` (responde `{ok:true, valid:bool}`; no
+expone la lista de tokens). Falla cerrado: si el worker no responde o el token no
+está, cae al gate normal. En modo invitado la nav muestra "Vista de invitado" (sin
+Volver/Salir, que no aplican sin cuenta).
+```bash
+# sembrar un token (TTL en segundos · 2592000 = 30 días)
+TOKEN=$(python3 -c "import secrets; print(secrets.token_urlsafe(18))")
+cd /Users/ricardoruiz/rr-auth && npx wrangler kv key put "caudal-guest:$TOKEN" "cauce" \
+  --binding=RR_STORE --remote --ttl=2592000        # ⚠ el flag es --ttl, NO --expiration-ttl
+# revocar antes de tiempo
+npx wrangler kv key delete "caudal-guest:$TOKEN" --binding=RR_STORE --remote
+```
+El `get` puede dar 404 unos segundos tras el `put` (consistencia eventual del KV) —
+reintentar antes de asumir que falló. QR del link: `Bases de datos/caudal-acceso/`
+(gitignored, generado con segno — vive en python3.11, no en el python3 default).
 PRIVATE_TOOLS (grupo encargos). **Nav v2 estándar del sitio**: izq Volver+Privado+Salir,
 centro "Caudal", der logo Ricardo.Ruiz (Syne + barras, cargado por Google Fonts, igual a
 index.html). **Rediseño UX jul-2026:**
