@@ -913,6 +913,18 @@
     const cont=document.getElementById('cli-sectors');
     if(cont) CLI_SECS.forEach(([k,t])=>{ const c=document.createElement('span'); c.className='chip'; c.dataset.sec=k; c.textContent=t; c.onclick=()=>cliLoad(k); cont.appendChild(c); });
     const b=document.getElementById('cliBack'); if(b) b.onclick=()=>showView('home');
+    // toggle Legislativo/Regulatorio/Prensa — delegado porque #cli-toggle se
+    // recrea en cada cliRender(); click de nuevo en el mismo chip lo colapsa.
+    const vc=document.getElementById('view-cliente');
+    if(vc) vc.addEventListener('click', e=>{
+      const chip=e.target.closest('#cli-toggle .chip'); if(!chip) return;
+      const det=document.getElementById('cli-detalle'); if(!det) return;
+      const already=chip.classList.contains('on');
+      vc.querySelectorAll('#cli-toggle .chip').forEach(c=>c.classList.remove('on'));
+      if(already){ det.innerHTML=''; return; }
+      chip.classList.add('on');
+      det.innerHTML=_CLI_LAST?cliDetalleHTML(chip.dataset.p,_CLI_LAST):'';
+    });
   }
   function cliSigCard(x){
     if(x.tipo==='congreso'){
@@ -933,38 +945,48 @@
       <div class="sig-tags">${esc(x.fuente||'')}${x.tipo_sancion?' · '+esc(x.tipo_sancion):''}${x.fecha?' · '+esc(x.fecha):''}${monto}</div>
       <div class="sig-action">${esc(x.accion)}</div></div></div>`;
   }
+  let _CLI_LAST=null;
+  function cliDetalleHTML(pilar,d){
+    const cl=d.cliente, congreso=d.congreso||[], reg=d.regulatorio||[], medios=d.medios||[];
+    if(pilar==='congreso') return congreso.length?`<div class="sig-list">${congreso.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Sin proyectos accionables ahora.</div>';
+    if(pilar==='regulatorio') return cl.sector_sanciones
+      ? (reg.length?`<div class="sig-list">${reg.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Sin sanciones recientes en esta fuente.</div>')
+      : '<div class="cli-reg-none">Este sector aún no tiene fuente de sanciones conectada — Superfinanciera y otras superintendencias entran por etapas.</div>';
+    if(pilar==='medios') return medios.length?`<div class="sig-list">${medios.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Sin cobertura de prensa reciente para este sector.</div>';
+    return '';
+  }
   function cliRender(d){
     const body=document.getElementById('cli-body'); if(!body) return;
+    _CLI_LAST=d;
     const k=d.kpis, cl=d.cliente, congreso=d.congreso||[], reg=d.regulatorio||[], medios=d.medios||[];
-    const regBlock=cl.sector_sanciones
-      ? (reg.length ? `<div class="sig-list">${reg.map(cliSigCard).join('')}</div>` : '<div class="cli-reg-none">Sin sanciones recientes en esta fuente.</div>')
-      : '<div class="cli-reg-none">Este sector aún no tiene fuente de sanciones conectada — Superfinanciera y otras superintendencias entran por etapas.</div>';
-    const medBlock=medios.length ? `<div class="sig-list">${medios.map(cliSigCard).join('')}</div>` : '<div class="cli-reg-none">Sin cobertura de prensa reciente para este sector.</div>';
+    const sancTxt=cl.sector_sanciones ? `<b>${reg.length}</b> sanción(es) reciente(s)` : `sanciones sin fuente conectada`;
     body.innerHTML=`
       <div class="kpis">
         <div class="kpi"><div class="n">${k.n_radar}</div><div class="l">Señales en el radar</div></div>
         <div class="kpi vit"><div class="n">${k.alto}</div><div class="l">Alta prioridad</div></div>
         <div class="kpi ley"><div class="n">${k.en_tramite}</div><div class="l">En trámite · ventana</div></div>
-        <div class="kpi"><div class="n">${k.n_sanciones_sector?fmt(k.n_sanciones_sector):'—'}</div><div class="l">Sanciones del sector</div></div>
+        <div class="kpi"><div class="n">${k.n_medios_sector?fmt(k.n_medios_sector):'—'}</div><div class="l">Prensa reciente</div></div>
       </div>
-      <div class="cli-note">De <b>${fmt(k.n_proyectos_sector)}</b> proyectos que han tocado <b>${esc(cl.nombre)}</b> en 36 años, el radar prioriza <b>${congreso.length}</b> por accionabilidad (en trámite · caídos recientes · ya ley). Precisión sobre volumen.</div>
+      <div class="cli-note"><b>Activo ahora en ${esc(cl.nombre)}:</b> <b>${k.en_tramite}</b> proyecto(s) de ley en trámite · ${sancTxt} · <b>${fmt(k.n_medios_sector||0)}</b> titular(es) de prensa reciente.</div>
+      <div class="cob-note" style="margin:.5rem 0 1.3rem">De un histórico de <b>${fmt(k.n_proyectos_sector)}</b> proyectos${cl.sector_sanciones?` y <b>${fmt(k.n_sanciones_sector)}</b> sanciones`:''} en el sector, el radar prioriza por accionabilidad — precisión sobre volumen.</div>
       <div class="lectura">
-        <div class="tag">◈ Lectura del analista · para un cliente de ${esc(cl.nombre)}</div>
+        <div class="tag">◈ Lectura del analista · briefing de hoy para ${esc(cl.nombre)}</div>
         <div id="cli-lectura-body"><div class="llm-load">Generando lectura <span class="dots"><span></span><span></span><span></span></span></div></div>
       </div>
-      <div class="cli-sub">Legislativo · Congreso <span class="cs-n">${congreso.length}</span></div>
-      <div class="sig-list">${congreso.map(cliSigCard).join('')||'<div class="cli-reg-none">Sin proyectos accionables ahora.</div>'}</div>
-      <div class="cli-sub">Regulatorio · Superintendencias ${cl.sector_sanciones?`<span class="cs-n">${reg.length}</span>`:''}</div>
-      ${regBlock}
-      <div class="cli-sub">Medios · Prensa <span class="cs-n">${medios.length}</span></div>
-      ${medBlock}`;
+      <div class="cli-sub">Explorar el detalle</div>
+      <div class="chips" id="cli-toggle" style="justify-content:flex-start;margin-top:.3rem">
+        <span class="chip" data-p="congreso">Legislativo <b>${congreso.length}</b></span>
+        <span class="chip" data-p="regulatorio">Regulatorio <b>${reg.length}</b></span>
+        <span class="chip" data-p="medios">Prensa <b>${medios.length}</b></span>
+      </div>
+      <div id="cli-detalle" style="margin-top:1rem"></div>`;
   }
   function cliRenderLectura(l){
     const body=document.getElementById('cli-lectura-body'); if(!body) return;
     const blk=(h,t)=>t?`<div class="blk"><div class="h">${h}</div><div class="t">${esc(t)}</div></div>`:'';
     const acc=(l.acciones&&l.acciones.length)?`<div class="blk"><div class="h">Acciones</div>${l.acciones.map(a=>`<div class="acc">${esc(a)}</div>`).join('')}</div>`:'';
     body.innerHTML=(l.titular?`<div class="blk"><div class="t" style="font-weight:700;font-size:.95rem;color:var(--ink)">${esc(l.titular)}</div></div>`:'')
-      + blk('Lo que mueve la aguja', l.lo_que_importa) + acc + blk('Riesgo / oportunidad', l.riesgo_oportunidad)
+      + blk('Lo que mueve la aguja', l.lo_que_importa) + acc + blk('En el horizonte', l.horizonte)
       || '<div class="cob-note">Sin lectura disponible.</div>';
   }
   async function cliLoad(sector){

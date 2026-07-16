@@ -39,7 +39,7 @@ import boto3
 import caudal_core
 
 BUCKET = os.environ.get('CAUDAL_BUCKET', 'caudal-legislativo')
-PROMPT_VERSION = 'v6'            # bumpear para invalidar cache de síntesis
+PROMPT_VERSION = 'v8'            # bumpear para invalidar cache de síntesis
 CACHE_PREFIX = 'analisis-cache/'
 HTTP_TIMEOUT = 55
 
@@ -367,16 +367,23 @@ def _sintesis_tema(resumen):
 # --- Radar del cliente · lectura interpretada (SKU A · Vista Cliente) --------
 CLIENTE_SYSTEM = (
     "Eres analista de asuntos públicos de Cauce. Escribes en español, tuteo "
-    "neutro de Bogotá (sin voseo, sin regionalismos). Te doy el RADAR de un "
-    "cliente de un sector: las señales del Estado (proyectos de ley y sanciones) "
-    "que tocan su sector, ya filtradas y con su estado real y nivel de prioridad. "
-    "Tu trabajo: decir qué DE VERDAD mueve su aguja y qué hacer — precisión sobre "
-    "volumen. REGLA DURA: usa SOLO las señales que te doy; NO inventes proyectos, "
-    "cifras, entidades ni nombres. Si algo no está, no lo menciones. Devuelves "
-    "SIEMPRE un JSON válido con: titular (una frase potente y precisa), "
-    "lo_que_importa (2-3 frases: las 2-3 señales que priorizarías y por qué mueven "
-    "la aguja de este sector), acciones (lista de 2-4 acciones concretas), "
-    "riesgo_oportunidad (1-2 frases sobre el riesgo o la oportunidad dominante).")
+    "neutro de Bogotá (sin voseo, sin regionalismos). Te doy el RADAR DE HOY de "
+    "un cliente de un sector: los proyectos de ley activos en el Congreso, las "
+    "sanciones recientes de las superintendencias y la prensa reciente que "
+    "tocan su sector, ya filtradas y con su nivel de prioridad. Esto es un "
+    "BRIEFING de seguimiento, NO un archivo histórico — escribe como si le "
+    "contaras a tu cliente qué pasó y qué viene, no como quien resume un "
+    "expediente de 36 años. Precisión sobre volumen. REGLA DURA: usa SOLO las "
+    "señales que te doy; NO inventes proyectos, cifras, entidades, sanciones "
+    "ni titulares de prensa. Si algo no está, no lo menciones. Devuelves "
+    "SIEMPRE un JSON válido con: titular (una frase potente y precisa del "
+    "hallazgo principal de hoy), lo_que_importa (2-4 frases que sinteticen lo "
+    "legislativo + lo regulatorio + la prensa citando ítems concretos por "
+    "nombre, y por qué mueven la aguja de este sector — si un tipo de señal "
+    "no trajo nada relevante, no lo fuerces), acciones (lista de 2-4 acciones "
+    "concretas), horizonte (1-2 frases sobre qué ventana de incidencia, riesgo "
+    "u oportunidad se abre próximamente según el estado de trámite de las "
+    "señales que te di).")
 
 
 def _lectura_cliente(s, senales, kpis):
@@ -386,22 +393,31 @@ def _lectura_cliente(s, senales, kpis):
     if cached:
         return cached
     lines = []
-    for x in senales[:14]:
+    # senales ya viene acotado por pilar (congreso≤10 + regulatorio≤6 +
+    # medios≤5 = 21 máx) — el slice debe cubrir el total, si no, medios
+    # (el último en concatenarse) queda afuera aunque el bug de arriba esté
+    # arreglado. Ver hallazgo jul-2026: con [:14] nunca llegaba prensa al LLM.
+    for x in senales[:21]:
         if x['tipo'] == 'congreso':
             lines.append(f"- [LEGISLATIVO · prioridad {x['nivel']}] ({x['anio']}, "
                          f"{x.get('resultado_txt', x.get('resultado'))}) {x['titulo'][:95]}")
+        elif x['tipo'] == 'medios':
+            lines.append(f"- [PRENSA · prioridad {x['nivel']}] {x.get('fecha', '')} "
+                         f"{x.get('medio', '')}: {x['titulo'][:90]}")
         else:
             lines.append(f"- [REGULATORIO · prioridad {x['nivel']}] {x.get('fecha', '')} "
                          f"{x.get('fuente', '')}: {x.get('sancionado', '')} — {x.get('motivo', '')[:75]}")
     user = (f"Cliente: sector {s['nombre']} (sus proyectos suelen ir a la Comisión "
             f"{s['comision']}).\n"
-            f"Radar: {kpis['n_radar']} señales priorizadas · {kpis['alto']} de alta "
-            f"prioridad · {kpis['en_tramite']} proyectos EN TRÁMITE (ventana de "
-            f"incidencia abierta), de {kpis['n_proyectos_sector']} proyectos que han "
-            f"tocado el sector en 36 años"
-            + (f" · {kpis['n_sanciones_sector']} sanciones del sector"
-               if kpis.get('n_sanciones_sector') else '') + ".\n\n"
-            f"SEÑALES DEL RADAR:\n" + '\n'.join(lines) + "\n\nEscribe el análisis en JSON.")
+            f"Radar de hoy: {kpis['n_radar']} señales priorizadas ({kpis['alto']} alta · "
+            f"{kpis.get('medio', 0)} media prioridad) · {kpis['en_tramite']} proyectos de "
+            f"ley EN TRÁMITE ACTIVO"
+            + (f" · {kpis['n_sanciones_sector']} sanciones registradas del sector"
+               if kpis.get('n_sanciones_sector') else '')
+            + (f" · {kpis['n_medios_sector']} titulares de prensa recientes del sector"
+               if kpis.get('n_medios_sector') else '') + ".\n\n"
+            f"SEÑALES DEL RADAR (las priorizadas, no el histórico completo):\n"
+            + '\n'.join(lines) + "\n\nEscribe el briefing en JSON.")
     try:
         raw = _call_llm('sintesis', CLIENTE_SYSTEM, user, max_tokens=6000).strip()
         if raw.startswith('```'):
@@ -409,7 +425,7 @@ def _lectura_cliente(s, senales, kpis):
         data = json.loads(raw)
     except Exception as e:
         data = {'titular': '', 'lo_que_importa': '', 'acciones': [],
-                'riesgo_oportunidad': '', 'error': str(e)[:200]}
+                'horizonte': '', 'error': str(e)[:200]}
     data['_model'] = STEP_MODELS['sintesis']['model']
     if 'error' not in data:
         _cache_put('cliente-' + key, data)
