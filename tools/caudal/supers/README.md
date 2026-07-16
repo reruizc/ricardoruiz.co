@@ -57,20 +57,32 @@ cuatro datasets de Min. Trabajo son **agregados** (por territorial/sector, solo
 conteos) → `granularidad: agregado` en el registro, no entran al consolidado por
 entidad (sirven de contexto).
 
-### Vía 2 — API interna del portal (registrada, pendiente)
-Mismo enfoque que la "API oculta" de `leyes.senado.gov.co`. Casos verificados:
+### Vía 2 — API interna del portal
+Mismo enfoque que la "API oculta" de `leyes.senado.gov.co`.
 
-- **Superfinanciera** (la joya): el buscador SiriWeb es una app Angular que
-  habla con `.../api-siri-casillero/.../api/actoAdmin/listarSancionesMercadoValores`.
-  La **api-key está embebida en el bundle JS público** (`main.js`, const `Qt.apiKey`).
-  Verificado: HTTP 200, 804 sanciones con `nombreDestino`, `montoSancion`,
-  `tipoSancion`, `temaClasificacion`, `estadoSancion`, `fechaFirmeza`, `observacion`.
-  Hay endpoints hermanos (`listaSancionesGeneral`, `listaReporteSanciones`) que
-  esperan otro payload. Implementar en `harvest_sfc.py`: leer el bundle, extraer
-  la key con regex, tolerar rotación (re-leer si da 401).
-- **Supertransporte**: WordPress 6.9 → `?rest_route=/wp/v2/posts` (BOM utf-8-sig).
-  Multas como noticias; DeepSeek estructura sancionado/monto del cuerpo.
-- **SIC**: `sic.gov.co/rss.xml` (10 items recientes, título+pubDate). Ventana corta.
+- **Superfinanciera — IMPLEMENTADA (`harvest_sfc.py`, jul-2026).** El buscador
+  SiriWeb es una app Angular que habla con
+  `.../api-siri-casillero/.../api/actoAdmin/listarSancionesMercadoValores`. La
+  **api-key vive en texto plano en el bundle JS público** (`SiriWeb/main.js`,
+  `const Qt = {...apiKey:"..."}`) — se re-extrae en cada corrida con regex
+  (`harvest_sfc.py get_api_key()`), tolera rotación (falla claro si el bundle
+  cambia de forma o si la key ya no sirve). **Header correcto: `api-key` o
+  `Api-Key` — `apiKey`/`x-api-key` dan 401.** 805 sanciones, todas
+  `estadoSancion:"En firme"`. Fechas en epoch-millis → ISO (`_epoch_to_iso`,
+  descarta año fuera de [2000, hoy+1] en vez de adivinar — la fuente trae un
+  typo real, año 3022). `numeroActoAdmin` llega como int → se fuerza a string
+  antes de que `build_s3.py` le haga `.strip()`.
+  ```bash
+  python3 tools/caudal/supers/harvest_sfc.py test    # valida la key + 1 fila
+  python3 tools/caudal/supers/harvest_sfc.py fetch   # -> raw/sfc-mercado-valores.json
+  ```
+  Endpoints hermanos sin implementar: `listaSancionesGeneral`, `listaReporteSanciones`
+  (esperan otro payload).
+- **Supertransporte** (pendiente): WordPress 6.9 → `?rest_route=/wp/v2/posts`
+  (BOM utf-8-sig). Multas como noticias; DeepSeek estructura sancionado/monto
+  del cuerpo.
+- **SIC** (pendiente): `sic.gov.co/rss.xml` (10 items recientes, título+pubDate).
+  Ventana corta.
 
 ### Vía 3 — normograma/PDF (registrada, pendiente)
 Reusa **el pipeline de gacetas de Caudal fase 3** (`extraer_gaceta.py` +
@@ -95,10 +107,11 @@ consolida si la fuente tiene `map` en el registro.
 
 ## Siguiente sprint (recomendado)
 
-1. `harvest_sfc.py` (Superfinanciera vía 2) — la fuente sectorial de más peso
-   para gremios financieros, ya con endpoint y key verificados.
-2. Enganchar `dist/sanciones.jsonl` al `caudal_core.py` / Lambda: indexar por
-   sector + entidad para que una alerta de sanción salga por tema del cliente.
+1. ✅ HECHO — `harvest_sfc.py` (Superfinanciera vía 2).
+2. ✅ HECHO — `dist/sanciones.jsonl` enganchado a la Lambda (acción `sanciones`)
+   y al Radar del cliente (acción `cliente`, sector `financiero` ahora con
+   datos reales).
 3. Vía 3 (Supersalud) con el pipeline de gacetas — cierra el ejemplo del pitch.
+4. Supertransporte + SIC (vía 2, mismo patrón que Superfinanciera).
 
 Ver el mapa completo de las 18+ fuentes y su estado en `fuentes.json`.

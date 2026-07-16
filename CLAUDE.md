@@ -5296,16 +5296,43 @@ monto · resolucion · fecha_firmeza · estado · descripcion · _id · _raw`
 **Las 3 vías de extracción:**
 - **Vía 1 · Socrata** (datos.gov.co, JSON directo — IMPLEMENTADA): patrón de
   `lab-indicadores`. Query `resource/{id}.json?$where=...`, cero scraping.
-- **Vía 2 · API interna del portal** (registrada, pendiente): patrón de la "API
-  oculta" de leyes.senado. **Superfinanciera** verificada — buscador SiriWeb
-  (Angular) habla con `.../api-siri-casillero/.../api/actoAdmin/listarSancionesMercadoValores`;
-  la **api-key está embebida en el bundle público `main.js` (const `Qt.apiKey`)** →
-  HTTP 200, **804 sanciones** con nombreDestino/montoSancion/tipoSancion/
-  temaClasificacion/estadoSancion/fechaFirmeza/observacion. También
-  Supertransporte (WP `?rest_route=/wp/v2/posts`, BOM utf-8-sig) y SIC (`rss.xml`).
+- **Vía 2 · API interna del portal — Superfinanciera IMPLEMENTADA (jul-2026,
+  `harvest_sfc.py`)**: buscador SiriWeb (Angular) habla con
+  `.../api-siri-casillero/.../api/actoAdmin/listarSancionesMercadoValores`; la
+  **api-key vive en texto plano en el bundle público `SiriWeb/main.js`**
+  (`const Qt = {..., apiKey:"..."}`, regex `apiKey\s*:\s*"([^"]+)"`) — no es
+  una credencial protegida, es la misma que usa cualquier visitante del
+  buscador; el harvester la re-extrae en cada corrida por si rota. Header
+  correcto: **`api-key` (minúsculas) o `Api-Key`** — `apiKey`/`x-api-key` dan
+  401. **805 sanciones** verificadas (`nombreDestino/montoSancion/tipoSancion/
+  temaClasificacion/estadoSancion/fechaFirmeza/observacion`), todas
+  `estadoSancion:"En firme"`. Fechas llegan en epoch-millis → `harvest_sfc.py`
+  las convierte a ISO y descarta las fuera de rango sano (la fuente trae al
+  menos 1 typo real, año 3022) en vez de adivinar. `numeroActoAdmin` llega
+  como int → se convierte a string (si no, `build_s3.py` revienta con
+  `.strip()` sobre un int). Supertransporte (WP `?rest_route=/wp/v2/posts`,
+  BOM utf-8-sig) y SIC (`rss.xml`) siguen pendientes, mismo patrón.
 - **Vía 3 · normograma/PDF** (registrada, pendiente): reusa el **pipeline de
   gacetas de Caudal fase 3** (pypdf + DeepSeek). Supersalud (SharePoint) y
   Supersociedades (Liferay, 478 resoluciones + 198 circulares). PDFs viejos → OCR.
+
+**Gotcha de `build_s3.py` encontrado con los datos de Superfinanciera (jul-2026):**
+algunos textos largos (`observacion`) traen mojibake de control chars —
+comillas/elipsis de Windows-1252 mal transcodeadas (`\x93…\x85`) — mezclado
+con el texto real. Más allá de ensuciar la UI, **`U+0085` (NEL) es "salto de
+línea" para `str.splitlines()`** aunque NO sea el `\n` real que separa los
+registros del JSONL → partía un registro en dos fragmentos inválidos y
+`build_s3.py` reventaba con `JSONDecodeError: Unterminated string`. Fix: (1)
+`build_s3.py` lee con `.split('\n')`, nunca `.splitlines()` — regla general
+para cualquier JSONL que pueda traer texto con `U+0085`/`U+2028`/`U+2029`.
+(2) nuevo `_clean_text()` en `slim()` quita control chars (`\x00-\x1f`,
+`\x7f-\x9f`) de sancionado/motivo/descripcion antes de truncar — doble
+beneficio: no rompe el parseo Y no le muestra mojibake al cliente. **Ojo:**
+la Lambda (`_sanciones()` en `lambda_handler.py`) lee el mismo formato de
+archivo con el mismo patrón `.splitlines()` — quedó dormido esta vez porque
+el texto problemático cayó dentro de los primeros 120 chars que sí se
+truncan, pero es la misma clase de bug latente ahí; pendiente portar el
+mismo fix si vuelve a aparecer con otra fuente.
 
 **Comandos** (`harvest_supers.py`, stdlib + curl subprocess, resumible):
 ```bash
@@ -5317,29 +5344,31 @@ python3 tools/caudal/supers/harvest_supers.py normalize    # raw -> dist (JSONL+
 Salidas (gitignored): `Bases de datos/leyes-senado/supers/{raw/{slug}.json,
 dist/{sanciones.jsonl,sanciones.csv,stats.json}}`.
 
-**Verificado end-to-end (2026-07):** **6.084 sanciones a nivel entidad**
-consolidadas de las 5 fuentes por-entidad vía 1: INVIMA (3.690), SECOP I
-(1.707), SECOP II (542), Junta de Contadores (85), Contraloría responsabilidad
-fiscal (60). El 6º dataset vía 1 (Min. Trabajo) es **agregado** (por territorial/
-sector, solo conteos) → `granularidad: agregado`, NO entra al consolidado por
-entidad (sirve de contexto).
+**Verificado end-to-end (2026-07):** **6.889 sanciones a nivel entidad**
+consolidadas de las 6 fuentes por-entidad: INVIMA (3.690), SECOP I (1.707),
+SECOP II (542), Junta de Contadores (85), Contraloría responsabilidad fiscal
+(60), **Superfinanciera (805, vía 2)**. El dataset vía 1 de Min. Trabajo es
+**agregado** (por territorial/sector, solo conteos) → `granularidad: agregado`,
+NO entra al consolidado por entidad (sirve de contexto). Sector `financiero`
+del Radar del cliente (Vista Cliente/SIGA) pasó de "sin fuente conectada" a
+datos reales — verificado en vivo (`action:cliente,sector:financiero`).
 
 **Cómo agregar una fuente vía 1:** una entrada en `fuentes.json.fuentes` con
 `via:1`, `socrata_id`, `fecha_col` y el `map` (campo_normalizado → columna).
 Descubrir: `catalog/v1?domains=www.datos.gov.co&q=sanciones+<entidad>` →
 `resource/<id>.json?$limit=1` para ver columnas. `test` valida el mapeo.
 
-**Siguiente sprint (recomendado):** (1) `harvest_sfc.py` (Superfinanciera vía 2 —
-la fuente sectorial de más peso para gremios financieros, endpoint+key ya
-verificados; leer el bundle y extraer la key con regex, tolerar rotación 401).
-(2) ✅ HECHO — `sanciones.jsonl` ya está enganchado a la Lambda (acción
-`sanciones`, filtro por sector+texto) con frontend `view-regulatorio` en
-`caudal.html`. Pendiente fino: cruzar la alerta con el sector del cliente en la
-capa de "vista Cliente" (SIGA).
-(3) Vía 3 Supersalud con el pipeline de gacetas — cierra el ejemplo del pitch.
+**Siguiente sprint (recomendado):** (1) ✅ HECHO (jul-2026) — `harvest_sfc.py`
+(Superfinanciera vía 2). (2) ✅ HECHO — `sanciones.jsonl` ya está enganchado a
+la Lambda (acción `sanciones`, filtro por sector+texto) con frontend
+`view-regulatorio` en `caudal.html`, y ✅ cruzado con el Radar del cliente
+(SIGA) — ver sección "Vista Cliente · Radar". (3) Vía 3 Supersalud con el
+pipeline de gacetas — cierra el ejemplo del pitch, sigue pendiente. (4)
+Supertransporte + SIC (vía 2, mismo patrón que SFC, más simples).
 
 **Estado:** commit `9f1c296` en `main` (solo `tools/caudal/supers/*` + `.gitignore`;
-NO tocó `caudal.html`). Datos NO subidos a S3 (esperan luz verde de Ricardo).
+NO tocó `caudal.html`). **Datos ya subidos a S3 con luz verde de Ricardo
+(jul-2026)** — ver "Vía 2 · Superfinanciera IMPLEMENTADA" arriba.
 
 ### Pilar Medios · prensa nacional y regional (`view-medios` en `caudal.html` · LISTO vía Google News RSS)
 

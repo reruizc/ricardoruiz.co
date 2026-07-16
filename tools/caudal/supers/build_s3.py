@@ -33,6 +33,22 @@ SECTOR_TXT = {
 }
 
 
+
+# algunas fuentes (verificado con Superfinanciera) traen mojibake de control
+# chars (comillas/elipsis de Windows-1252 mal transcodeadas, p.ej. \x93\x85)
+# metidos en textos largos. Fuera de ensuciar la UI, U+0085/U+2028/U+2029 son
+# "salto de línea" para str.splitlines() aunque NO sean el '\n' real que
+# separa los registros del JSONL — por eso este archivo NUNCA debe leerse ni
+# escribirse con .splitlines(), solo con split('\n') (ver main()).
+_CTRL_RE = re.compile(r'[\x00-\x1f\x7f-\x9f]')
+
+
+def _clean_text(s):
+    if not s:
+        return s
+    return re.sub(r'\s+', ' ', _CTRL_RE.sub(' ', s)).strip()
+
+
 def parse_fecha(v):
     """'2026-03-27T00:00:00.000' | '2026-03-27' → '2026-03-27' (o '')."""
     if not v:
@@ -64,9 +80,9 @@ def parse_monto(v):
 def slim(rec):
     fecha = parse_fecha(rec.get('fecha_firmeza'))
     monto = parse_monto(rec.get('monto'))
-    sanc = (rec.get('sancionado') or '').strip()
-    mot = (rec.get('motivo') or '').strip()
-    desc = (rec.get('descripcion') or '').strip()
+    sanc = _clean_text(rec.get('sancionado') or '')
+    mot = _clean_text(rec.get('motivo') or '')
+    desc = _clean_text(rec.get('descripcion') or '')
     blob = ' '.join(x for x in (sanc, mot, desc, rec.get('fuente_nombre', '')) if x).lower()
     return {
         'sancionado': sanc or '—',
@@ -85,7 +101,9 @@ def slim(rec):
 
 def main():
     src = DIST / 'sanciones.jsonl'
-    recs = [slim(json.loads(l)) for l in src.read_text(encoding='utf-8').splitlines() if l.strip()]
+    # split('\n') literal — NO .splitlines(): un texto con U+0085/U+2028/U+2029
+    # partiría el JSONL en el lugar equivocado (ver _clean_text arriba).
+    recs = [slim(json.loads(l)) for l in src.read_text(encoding='utf-8').split('\n') if l.strip()]
     OUT.mkdir(parents=True, exist_ok=True)
 
     with (OUT / 'sanciones.jsonl').open('w', encoding='utf-8') as fh:
