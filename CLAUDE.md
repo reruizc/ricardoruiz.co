@@ -105,6 +105,42 @@ sin breadcrumb), **Helvetica Neue embebida** (Syne solo en el logo), y suma los
   agrupan 2018∩2026 (Robledo 229k→28,6k · Lidio García 121k→180k · Laureano Acuña
   pasó de Senado a Cámara). Ojo: si la persona es presidencial, esa barra manda (el
   histórico presidencial tiene precedencia sobre el de Congreso).
+
+> **📌 HANDOFF · qué falta de CONGRESO en analisis-candidato (jul-2026)**
+>
+> **Cobertura hoy:** Congreso **2018** ✓ (`con2018`, subido) · Congreso **2026** ✓
+> (`endoso`) · Asamblea **2023** ✓. Presidenciales aparte (modelo por-persona).
+>
+> **1. FALTA Congreso 2022 — el hueco que más importa.** `GCS_2022CON.csv` (1,2 GB)
+> sin procesar. Es el término **2022-2026**, o sea **el mismo cuyo voto nominal ya
+> construimos** (actas de plenaria de Cámara 2020-2026, ver sección Caudal). Sin él,
+> la ficha de un representante actual muestra 2026 y 2018 pero NO la elección del
+> período en que efectivamente votó → el join con el panel "cómo votó" queda cojo.
+> Receta: copiar `build_congreso_2018.py` → `build_congreso_2022.py` (mismo formato
+> GCS, revisar si 2022 trae sorpresas de encoding/columnas como las trajo 2018),
+> agregar `{name:'con2022', dir:'congreso-2022', …}` a `SOURCES` de cand-index.js y
+> `SRC_YEAR.con2022 = 2022` en analisis-candidato.html (el toggle lo recoge solo).
+>
+> **2. FALTA Congreso 2014** (`GCS_2014CON.csv`, 0,8 GB) — extiende la historia.
+> **NO existe `GCS_2010CON`**: los archivos de Congreso arrancan en 2014, así que el
+> span real es **2014-2026**, no 2010-2026 (corrige la expectativa inicial).
+>
+> **3. FALTA cablear el panel "cómo votó en el Congreso"** en la ficha. La acción
+> `congresista` de la Lambda `caudal-analiza` YA existe y resuelve por nombre
+> (subconjunto de tokens) o por `key`; devuelve bancada + alineación con gobierno +
+> récord por proyecto. Solo falta llamarla desde analisis-candidato y pintarla.
+> Cubre Cámara 2020-2026 (los senadores y quienes no votaron ahí no aparecen).
+>
+> **Deudas conocidas:** (a) el georef es de 2026 y los datos de 2018 son viejos →
+> **17% de mesas sin nombre de puesto** ("PUESTO 00-00"); depto/municipio resuelven
+> al 99%, así que el mapa está bien y solo el drill más profundo tiene el hueco.
+> (b) Paloma/Roy tienen su Senado 2018 tapado por la precedencia presidencial.
+> (c) **Sin verificar en navegador**: el sandbox del preview no baja archivos grandes
+> (falla el índice de endoso de 656 KB, Divipole y PUESTOS_GEOREF con "Failed to
+> fetch"). La lógica se verificó en Node con los índices reales (8.146 candidaturas
+> → 7.739 entradas, 398 personas con toggle), pero **el render de la barra no se ha
+> visto** — abrir `analisis-candidato.html` y buscar "Robledo" o "Manzur" para
+> confirmar.
 - **Fotos**: los 6 grandes usan `Fotos-presidenciales/{slug}.jpg` (campo `foto`
   del índice); consultas vinculadas caen a esa foto si el endoso jpg no existe.
   **Flujo sistematizado de fotos**: carpeta staging `fotos-candidatos/`
@@ -5030,12 +5066,20 @@ sin postback) al ZIP/PDF de esa sesión.
     `update-function-code` (la Lambda recarga los JSON en contenedor frío; para forzar
     el recycle, re-deploy). Los dos JSON viven local en `dist/s3/` (gitignored).
   - **Hogar futuro de la ficha-persona:** `analisis-candidato.html` (foto/mapa/score/
-    histórico electoral) es la ficha rica; cuando Ricardo jale los perfiles de Congreso
-    2010-2026 ahí, la MISMA acción `congresista` alimenta un panel "cómo votó" (join por
-    nombre → roster_key que la Lambda ya resuelve). Caudal es el hogar actual.
-- **Pendiente de voto (backlog):** Senado (bloqueado por fuente, ver arriba) · OCR
-  Cámara pre-2020 (~928 actas imagen en disco, piloto Tesseract listo) · disciplina de
-  bancada como vista propia (la alineación ya se mide, falta exponerla agregada).
+    histórico electoral) es la ficha rica; los perfiles de Congreso **2018 y 2026 ya
+    están ahí** (ver sección analisis-candidato) → falta solo CABLEAR el panel "cómo
+    votó" llamando a la MISMA acción `congresista` (join por nombre → roster_key, que
+    la Lambda ya resuelve). Caudal es el hogar actual.
+- **Pendiente de voto (backlog, en orden de valor):**
+  1. **Congreso 2022 en analisis-candidato** (`GCS_2022CON.csv`) — no es voto, pero es
+     el término 2022-2026 = el mismo que cubre nuestro nominal. Sin él el join queda
+     cojo. Ver el handoff de la sección analisis-candidato.
+  2. **Cablear el panel "cómo votó"** en la ficha (acción Lambda ya lista).
+  3. **Senado** — bloqueado por fuente (no hay export electrónico ni índice limpio;
+     solo targeted vía Gaceta, ver abajo).
+  4. **OCR Cámara pre-2020** (~928 actas imagen en disco, piloto Tesseract listo).
+  5. **Disciplina de bancada** como vista propia (la alineación ya se mide por persona
+     y por bancada; falta exponerla agregada). Coaliciones sigue PAUSADO por decisión.
 
 **Fase 3 · voto nominal de SENADO — investigación en curso, sin resolver (jul-2026).**
 Se buscó un equivalente al AJAX de Cámara. `senado.gov.co` es Joomla (no WordPress) — sin
