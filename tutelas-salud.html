@@ -1,0 +1,1660 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tutela de Salud — Herramienta gratuita | Ricardo Ruiz</title>
+  <meta name="description" content="Herramienta gratuita para redactar una acción de tutela por medicamentos, citas médicas o procedimientos negados o demorados por tu EPS. Funciona 100% en tu navegador: tus datos no salen de tu dispositivo." />
+  <meta property="og:title" content="Tutela de Salud — Herramienta gratuita" />
+  <meta property="og:description" content="Arma tu acción de tutela por medicamentos, citas o procedimientos demorados. Gratis, sin registro y sin que tus datos salgan de tu dispositivo." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* Helvetica Neue embebida (familia completa). El logo va aparte en Syne. */
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-thin.woff2') format('woff2'); font-weight:200; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-light.woff2') format('woff2'); font-weight:300; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-medium.woff2') format('woff2'); font-weight:500; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-bold.woff2') format('woff2'); font-weight:600 900; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-italic.woff2') format('woff2'); font-weight:400; font-style:italic; font-display:swap; }
+
+    :root{
+      --white:#f4f3ef; --blue:#0047FF; --blue-light:#3d6fff; --green:#22c55e; --green-light:#4ade80;
+      --orange:#f97316; --amber:#fbbf24; --red:#ef4444;
+      --card-bg:rgba(10,10,16,0.75); --card-border:rgba(255,255,255,0.07);
+      --muted:rgba(255,255,255,.5); --muted-2:rgba(255,255,255,.38);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body{min-height:100%;overflow-x:hidden}
+    body{
+      background:#060810;color:var(--white);
+      font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
+      cursor:none;display:flex;flex-direction:column;min-height:100vh;line-height:1.5;
+    }
+    .bg-layer{position:fixed;inset:0;z-index:0;
+      background:
+        radial-gradient(1100px 600px at 78% -8%, rgba(0,71,255,0.18), transparent 60%),
+        radial-gradient(900px 500px at 12% 108%, rgba(0,71,255,0.10), transparent 60%),
+        #060810;
+      pointer-events:none}
+    .shell{position:relative;z-index:1;display:flex;flex-direction:column;flex:1 0 auto}
+
+    /* ── CURSOR ── */
+    .cursor{position:fixed;width:10px;height:10px;background:var(--blue);border-radius:50%;
+      pointer-events:none;z-index:100000;transform:translate(-50%,-50%);transition:transform .15s,background .2s,border .2s,opacity .2s}
+    .cursor-ring{position:fixed;width:34px;height:34px;border:1px solid rgba(0,71,255,.5);border-radius:50%;
+      pointer-events:none;z-index:99999;transform:translate(-50%,-50%);opacity:.5;transition:opacity .2s}
+    /* En campos de texto devolvemos el caret nativo y escondemos el punto */
+    input,textarea,select{cursor:text}
+    select{cursor:none}
+    body.typing .cursor,body.typing .cursor-ring{opacity:0}
+
+    /* ── NAV ── */
+    .electoral-nav{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(4,6,16,.6);backdrop-filter:blur(8px);flex-shrink:0}
+    .e-nav-left{display:flex;align-items:center;gap:1rem;min-width:0}
+    .e-nav-right{display:flex;align-items:center;gap:1.2rem;flex-shrink:0}
+    .e-btn-back{font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:var(--green-light);text-decoration:none;border:1.5px solid rgba(74,222,128,.55);padding:.35rem .8rem;transition:color .2s,border-color .2s,background .2s;white-space:nowrap;cursor:none}
+    .e-btn-back:hover{color:#060810;background:var(--green-light);border-color:var(--green-light)}
+    .e-tag-free{font-size:.69rem;letter-spacing:.1em;text-transform:uppercase;color:var(--green-light);background:rgba(74,222,128,.12);padding:.25rem .6rem;white-space:nowrap}
+    .logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.85;transition:opacity .2s;flex-shrink:0;cursor:none}
+    .logo-link:hover{opacity:1}
+    .logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px}
+    .logo-bar{width:5px;background:var(--blue);border-radius:1px 1px 0 0;opacity:.85}
+    .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.1rem,2vw,1.8rem);letter-spacing:-.03em;color:var(--white);line-height:1}
+    .logo-text span{color:var(--blue)}
+
+    /* ── LAYOUT ── */
+    .wrap{width:100%;max-width:1080px;margin:0 auto;padding:2.2rem 2.5rem 3rem}
+    .eyebrow{font-weight:500;font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;color:var(--muted-2);margin-bottom:.6rem}
+    h1{font-weight:700;font-size:clamp(1.9rem,4.4vw,3.2rem);letter-spacing:-.02em;line-height:1.06}
+    h1 em{font-style:normal;color:var(--blue-light)}
+    .lede{font-weight:300;font-size:clamp(1rem,1.5vw,1.18rem);color:rgba(255,255,255,.62);max-width:64ch;margin-top:1rem;line-height:1.55}
+    h2{font-weight:700;font-size:1.32rem;letter-spacing:-.01em;margin-bottom:.35rem}
+    h3{font-weight:600;font-size:1rem;letter-spacing:.01em}
+    .section{margin-top:2.6rem}
+
+    /* ── STATS ── */
+    .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:1px;background:var(--card-border);border:1px solid var(--card-border);margin-top:2rem}
+    .stat{background:#080a14;padding:1.1rem 1.2rem}
+    .stat-num{font-weight:700;font-size:1.75rem;letter-spacing:-.02em;color:var(--blue-light);line-height:1}
+    .stat-lbl{font-size:.78rem;color:var(--muted);margin-top:.35rem;line-height:1.35}
+    .src{font-size:.72rem;color:var(--muted-2);margin-top:.7rem;line-height:1.5}
+
+    /* ── CARDS DE CASO ── */
+    .cases{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-top:1.4rem}
+    .case{position:relative;background:var(--card-bg);border:1px solid var(--card-border);padding:1.4rem 1.3rem 1.3rem;cursor:none;text-align:left;
+      transition:border-color .25s,transform .2s;backdrop-filter:blur(6px);display:flex;flex-direction:column;color:inherit;font-family:inherit}
+    .case:hover{border-color:rgba(0,71,255,.6);transform:translateY(-2px)}
+    .case.sel{border-color:var(--blue);background:rgba(0,71,255,.09)}
+    .case-rank{font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--blue-light);margin-bottom:.55rem}
+    .case-name{font-weight:700;font-size:1.16rem;line-height:1.2;margin-bottom:.4rem}
+    .case-desc{font-size:.85rem;color:var(--muted);line-height:1.45;flex:1}
+    .case-bar{height:4px;background:rgba(255,255,255,.08);margin-top:1rem;overflow:hidden}
+    .case-bar i{display:block;height:100%;background:var(--blue)}
+    .case-pct{font-size:.76rem;color:rgba(255,255,255,.55);margin-top:.45rem}
+    .case-pct b{color:var(--white);font-weight:600}
+
+    /* ── WIZARD ── */
+    .steps{display:flex;gap:1px;background:var(--card-border);border:1px solid var(--card-border);margin-bottom:1.8rem;overflow-x:auto}
+    .stepchip{background:#080a14;padding:.6rem .85rem;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2);white-space:nowrap;flex:1;text-align:center;min-width:96px}
+    .stepchip.on{background:rgba(0,71,255,.16);color:var(--white)}
+    .stepchip.done{color:var(--green-light)}
+
+    .panel{display:none}
+    .panel.active{display:block;animation:fade .3s ease}
+    @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+    .box{background:var(--card-bg);border:1px solid var(--card-border);padding:1.5rem 1.5rem 1.6rem;backdrop-filter:blur(6px)}
+    .box + .box{margin-top:1rem}
+    .box-title{font-weight:700;font-size:1.05rem;margin-bottom:.25rem}
+    .box-hint{font-size:.83rem;color:var(--muted);line-height:1.5;margin-bottom:1.15rem}
+
+    .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.95rem}
+    .grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.95rem}
+    .field{display:flex;flex-direction:column;gap:.32rem}
+    .field.full{grid-column:1/-1}
+    label{font-size:.78rem;letter-spacing:.04em;color:rgba(255,255,255,.72);font-weight:500}
+    label .req{color:var(--orange)}
+    .help{font-size:.73rem;color:var(--muted-2);line-height:1.45}
+    input[type=text],input[type=date],input[type=number],input[type=email],input[type=tel],textarea,select{
+      font-family:inherit;font-size:.92rem;color:var(--white);background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.13);padding:.6rem .7rem;width:100%;transition:border-color .2s,background .2s}
+    input:focus,textarea:focus,select:focus{outline:none;border-color:var(--blue);background:rgba(0,71,255,.07)}
+    input.err,textarea.err,select.err{border-color:var(--red)}
+    textarea{resize:vertical;min-height:88px;line-height:1.5}
+    select option{background:#0e1220;color:var(--white)}
+    ::placeholder{color:rgba(255,255,255,.25)}
+
+    .checks{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.2rem}
+    .chk{display:flex;align-items:center;gap:.45rem;font-size:.83rem;color:rgba(255,255,255,.72);
+      border:1px solid rgba(255,255,255,.13);padding:.42rem .7rem;cursor:none;transition:border-color .2s,background .2s;user-select:none}
+    .chk:hover{border-color:rgba(255,255,255,.3)}
+    .chk.on{border-color:var(--blue);background:rgba(0,71,255,.12);color:var(--white)}
+    .chk input{width:auto;cursor:none}
+
+    .radio-row{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.2rem}
+    .radio-opt{font-size:.85rem;border:1px solid rgba(255,255,255,.13);padding:.5rem .85rem;cursor:none;color:rgba(255,255,255,.7);transition:all .2s;user-select:none;background:none;font-family:inherit}
+    .radio-opt:hover{border-color:rgba(255,255,255,.32)}
+    .radio-opt.on{border-color:var(--blue);background:rgba(0,71,255,.14);color:var(--white)}
+
+    /* ── AVISOS ── */
+    .notice{border-left:3px solid var(--blue);background:rgba(0,71,255,.07);padding:1rem 1.15rem;font-size:.86rem;line-height:1.55;color:rgba(255,255,255,.75)}
+    .notice.warn{border-left-color:var(--amber);background:rgba(251,191,36,.07)}
+    .notice.green{border-left-color:var(--green-light);background:rgba(74,222,128,.07)}
+    .notice b{color:var(--white);font-weight:600}
+    .notice ul{margin:.55rem 0 0 1.05rem}
+    .notice li{margin-bottom:.3rem}
+
+    /* ── NAV BOTONES ── */
+    .navbtns{display:flex;justify-content:space-between;gap:1rem;margin-top:1.6rem;flex-wrap:wrap}
+    .btn{font-family:inherit;font-size:.8rem;letter-spacing:.09em;text-transform:uppercase;font-weight:500;
+      padding:.68rem 1.35rem;border:1.5px solid;cursor:none;transition:all .2s;white-space:nowrap;text-decoration:none;display:inline-block}
+    .btn-primary{background:var(--blue);border-color:var(--blue);color:var(--white)}
+    .btn-primary:hover{background:#0035cc;border-color:#0035cc}
+    .btn-primary:disabled{opacity:.35;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.14)}
+    .btn-ghost{background:none;border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.65)}
+    .btn-ghost:hover{border-color:rgba(255,255,255,.45);color:var(--white)}
+    .btn-green{background:var(--green);border-color:var(--green);color:#04140a;font-weight:700}
+    .btn-green:hover{background:#16a34a;border-color:#16a34a}
+    .btn-sm{font-size:.72rem;padding:.45rem .85rem}
+
+    .errmsg{color:var(--red);font-size:.83rem;margin-top:.9rem;display:none}
+    .errmsg.on{display:block}
+
+    /* ── PREVIEW DEL ESCRITO ── */
+    .doc{background:#f7f6f2;color:#14161c;padding:2.6rem 2.8rem;font-family:'Times New Roman',Georgia,serif;
+      font-size:.95rem;line-height:1.62;max-height:560px;overflow-y:auto;border:1px solid rgba(255,255,255,.1)}
+    .doc h4{font-size:.98rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:1.5rem 0 .5rem}
+    .doc p{margin-bottom:.72rem;text-align:justify}
+    .doc .center{text-align:center;font-weight:700}
+    .doc ol{margin:0 0 .8rem 1.4rem}
+    .doc ol li{margin-bottom:.55rem;text-align:justify}
+    .doc .sign{margin-top:2.2rem}
+    .doc .rule{border:none;border-top:1px solid #14161c;width:230px;margin:2rem 0 .3rem}
+    .doc .blank{background:#ffe9a8;padding:0 .2rem}
+
+    .dl-row{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:1.2rem}
+
+    /* ── CHECKLIST ANEXOS ── */
+    .anexos{list-style:none;margin-top:.7rem}
+    .anexos li{display:flex;gap:.6rem;align-items:flex-start;font-size:.87rem;color:rgba(255,255,255,.72);padding:.42rem 0;border-bottom:1px solid rgba(255,255,255,.05);line-height:1.45}
+    .anexos li:last-child{border-bottom:none}
+    .anexos li span:first-child{color:var(--blue-light);flex-shrink:0;font-weight:700}
+
+    /* ── PASOS RADICACIÓN ── */
+    .howto{counter-reset:h;margin-top:.6rem}
+    .howto li{list-style:none;position:relative;padding-left:2.4rem;margin-bottom:1.05rem;font-size:.89rem;color:rgba(255,255,255,.72);line-height:1.55}
+    .howto li::before{counter-increment:h;content:counter(h);position:absolute;left:0;top:0;width:1.65rem;height:1.65rem;
+      border:1px solid var(--blue);color:var(--blue-light);display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700}
+    .howto b{color:var(--white);font-weight:600}
+    .howto a{color:var(--blue-light);text-decoration:none;border-bottom:1px solid rgba(61,111,255,.4);word-break:break-all}
+    .howto a:hover{border-bottom-color:var(--blue-light)}
+
+    .faq{border-top:1px solid rgba(255,255,255,.08)}
+    .faq details{border-bottom:1px solid rgba(255,255,255,.08);padding:.95rem 0}
+    .faq summary{cursor:none;font-weight:600;font-size:.95rem;list-style:none;display:flex;justify-content:space-between;gap:1rem;align-items:center}
+    .faq summary::-webkit-details-marker{display:none}
+    .faq summary::after{content:'+';color:var(--blue-light);font-weight:400;font-size:1.25rem;line-height:1}
+    .faq details[open] summary::after{content:'–'}
+    .faq p{font-size:.87rem;color:var(--muted);line-height:1.6;margin-top:.7rem}
+
+    footer{border-top:1px solid rgba(255,255,255,.06);padding:1.6rem 2.5rem 2.4rem;font-size:.78rem;color:var(--muted-2);line-height:1.6;flex-shrink:0}
+    footer a{color:rgba(255,255,255,.55);text-decoration:none;border-bottom:1px solid rgba(255,255,255,.15)}
+    footer a:hover{color:var(--white)}
+
+    @media (max-width:900px){
+      body{cursor:auto}
+      .cursor,.cursor-ring{display:none}
+      *{cursor:auto !important}
+      .btn,.chk,.radio-opt,.case,.faq summary{cursor:pointer !important}
+      .electoral-nav{flex-direction:column;gap:.7rem;padding:.8rem 1rem;align-items:center}
+      .e-nav-left,.e-nav-right{width:100%;justify-content:center}
+      .wrap{padding:1.6rem 1rem 2.4rem}
+      .doc{padding:1.5rem 1.25rem;font-size:.9rem}
+      .box{padding:1.15rem 1rem 1.2rem}
+      .navbtns .btn{flex:1}
+    }
+    @media print{
+      body{background:#fff;color:#000;cursor:auto}
+      .bg-layer,.electoral-nav,.steps,.navbtns,.dl-row,footer,.cursor,.cursor-ring,.no-print{display:none !important}
+      .doc{max-height:none;overflow:visible;border:none;padding:0}
+      .wrap{max-width:none;padding:0}
+    }
+  </style>
+</head>
+<body>
+<div class="bg-layer"></div>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<div class="shell">
+
+  <nav class="electoral-nav no-print">
+    <div class="e-nav-left">
+      <a href="index.html" class="e-btn-back">← Volver</a>
+      <span class="e-tag-free">Gratis · sin registro</span>
+    </div>
+    <div class="e-nav-right">
+      <a href="index.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:9px"></div>
+          <div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:20px"></div>
+        </div>
+        <div class="logo-text">Ricardo<span>.Ruiz</span></div>
+      </a>
+    </div>
+  </nav>
+
+  <div class="wrap">
+
+    <!-- ══════════ INICIO ══════════ -->
+    <div class="panel active" id="panel-inicio">
+      <div class="eyebrow">Herramienta ciudadana gratuita</div>
+      <h1>Tu EPS no te entrega lo que ya te <em>autorizaron</em>.<br>Aquí armas la tutela.</h1>
+      <p class="lede">
+        En 2025 se radicaron <b>274.510 tutelas</b> por salud en Colombia. La mayoría no reclama tratamientos
+        exóticos: reclama cosas que <b>ya están cubiertas y ya están pagadas</b>, y que simplemente no llegan a tiempo.
+        Esta herramienta redacta el escrito por ti, con los hechos, el derecho invocado y la petición puntual.
+        Es gratis, no pide registro y <b>tus datos no salen de tu dispositivo</b>.
+      </p>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-num">274.510</div>
+          <div class="stat-lbl">tutelas en salud radicadas en 2025 (+15,7% frente a 2024)</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">64,85%</div>
+          <div class="stat-lbl">reclaman servicios <b>ya incluidos en el PBS</b>: el problema es la oportunidad, no la cobertura</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">89,5%</div>
+          <div class="stat-lbl">de las tutelas se conceden total o parcialmente en primera instancia</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">59,2%</div>
+          <div class="stat-lbl">de todas las peticiones son los 3 casos que cubre esta herramienta</div>
+        </div>
+      </div>
+      <p class="src">
+        Fuente: Ministerio de Salud y Protección Social, <i>Informe de Tutelas por Vulneración del Derecho a la Salud</i>
+        (abril de 2026), en cumplimiento de la orden trigésima de la Sentencia T-760 de 2008. Datos de la vigencia 2025.
+      </p>
+
+      <div class="section">
+        <h2>Elige tu caso</h2>
+        <p class="box-hint">Estas son las tres peticiones más frecuentes del país. Escoge la que describe tu situación.</p>
+        <div class="cases" id="cases"></div>
+      </div>
+
+      <div class="section">
+        <div class="notice warn">
+          <b>Léelo antes de empezar.</b> Esta herramienta genera un <b>borrador</b> de acción de tutela a partir de lo que
+          tú escribas. No es asesoría jurídica, no crea relación abogado-cliente y no radica nada por ti: el documento lo
+          presentas tú ante la Rama Judicial. Revísalo y ajústalo antes de firmarlo. Si tu caso es complejo
+          (una negación por escrito, una enfermedad huérfana, un tratamiento no incluido en el PBS o un desacato),
+          busca acompañamiento de la <b>Defensoría del Pueblo</b>, la <b>Personería</b> de tu municipio o un consultorio
+          jurídico universitario, que son gratuitos.
+        </div>
+      </div>
+
+      <div class="section faq">
+        <h2 style="margin-bottom:.9rem">Preguntas frecuentes</h2>
+        <details>
+          <summary>¿Necesito abogado para poner una tutela?</summary>
+          <p>No. El artículo 86 de la Constitución y el Decreto 2591 de 1991 permiten que cualquier persona presente
+          una tutela directamente, sin abogado y sin formalidades. Puede presentarse incluso verbalmente cuando la
+          persona no sabe escribir o es menor de edad.</p>
+        </details>
+        <details>
+          <summary>¿Cuánto se demora?</summary>
+          <p>El juez tiene <b>10 días hábiles</b> para fallar desde que recibe la tutela. Si pides medida provisional
+          por riesgo inminente, el juez puede ordenar de inmediato que te entreguen el servicio mientras decide el fondo.</p>
+        </details>
+        <details>
+          <summary>¿Cuánto cuesta?</summary>
+          <p>Nada. La tutela es gratuita y no tiene costos de radicación. Esta herramienta tampoco cobra ni pide registro.</p>
+        </details>
+        <details>
+          <summary>¿Qué pasa con mis datos personales aquí?</summary>
+          <p>Todo el procesamiento ocurre dentro de tu navegador. No hay servidor recibiendo el formulario, no se guarda
+          nada en ricardoruiz.co y nadie más ve lo que escribes. Si cierras la página sin descargar el documento, la
+          información se pierde. Solo se guarda un borrador en tu propio dispositivo si tú lo pides expresamente.</p>
+        </details>
+        <details>
+          <summary>¿Puedo poner tutela si ya puse un derecho de petición y no me han respondido?</summary>
+          <p>Sí, y de hecho conviene mencionarlo: fortalece el caso porque demuestra que agotaste la vía administrativa.
+          La herramienta tiene un campo para eso. La falta de respuesta a la petición también vulnera el derecho de
+          petición (artículo 23 de la Constitución y Ley 1755 de 2015).</p>
+        </details>
+      </div>
+    </div>
+
+    <!-- ══════════ WIZARD ══════════ -->
+    <div class="panel" id="panel-wizard">
+      <div class="eyebrow" id="wiz-eyebrow">Caso seleccionado</div>
+      <h1 style="font-size:clamp(1.5rem,3vw,2.2rem)" id="wiz-title">—</h1>
+
+      <div class="steps" id="steps" style="margin-top:1.6rem"></div>
+
+      <!-- PASO 1 · DATOS PERSONALES -->
+      <div class="wstep" data-step="1">
+        <div class="box">
+          <div class="box-title">Antes de empezar: tus datos personales</div>
+          <div class="box-hint">Vas a escribir información sensible sobre tu salud. Queremos ser explícitos sobre qué pasa con ella.</div>
+
+          <div class="notice green">
+            <b>Esta herramienta no recolecta tus datos.</b> Todo lo que escribas se procesa únicamente en tu navegador:
+            <ul>
+              <li>No se envía a ningún servidor ni se almacena en ricardoruiz.co.</li>
+              <li>No hay cuenta, registro ni cookies de seguimiento en esta página.</li>
+              <li>Al cerrar la pestaña sin descargar, la información desaparece.</li>
+              <li>Solo se guarda un borrador en <i>este</i> dispositivo si presionas el botón de guardar, y puedes borrarlo cuando quieras.</li>
+            </ul>
+          </div>
+
+          <div class="notice warn" style="margin-top:1rem">
+            <b>Lo que sí implica radicar la tutela.</b> Cuando presentes el documento, el juzgado y la EPS accionada
+            sí tratarán tus datos, incluidos <b>datos sensibles de salud</b> (artículos 5 y 6 de la Ley 1581 de 2012).
+            Ese tratamiento es necesario y está autorizado por la ley para que puedan tramitar y decidir tu caso.
+            Es la contrapartida inevitable de acudir a la justicia: sin esos datos, el juez no puede protegerte.
+          </div>
+
+          <div style="margin-top:1.2rem">
+            <div class="checks">
+              <label class="chk" data-chk="acepta">
+                <input type="checkbox" id="acepta">
+                <span>Entiendo cómo se manejan mis datos y quiero continuar</span>
+              </label>
+            </div>
+            <p class="help" style="margin-top:.7rem">
+              Ley 1581 de 2012 (protección de datos personales) y Ley 1266 de 2008 (habeas data).
+              Responsable del sitio: Ricardo Ruiz · <a href="mailto:contacto@ricardoruiz.co" style="color:var(--blue-light);text-decoration:none">contacto@ricardoruiz.co</a>
+            </p>
+          </div>
+          <div class="errmsg" id="err1">Debes marcar la casilla para continuar.</div>
+        </div>
+      </div>
+
+      <!-- PASO 2 · QUIÉN -->
+      <div class="wstep" data-step="2" style="display:none">
+        <div class="box">
+          <div class="box-title">¿Quién presenta la tutela?</div>
+          <div class="box-hint">Puedes presentarla por ti o por otra persona que no puede hacerlo sola.</div>
+          <div class="radio-row" id="rol-row">
+            <button type="button" class="radio-opt on" data-rol="propio">Por mí mismo(a)</button>
+            <button type="button" class="radio-opt" data-rol="agente">Por otra persona que no puede hacerlo</button>
+            <button type="button" class="radio-opt" data-rol="menor">Por un menor de edad a mi cargo</button>
+          </div>
+          <p class="help" style="margin-top:.6rem" id="rol-help">
+            Actúas en nombre propio: el afectado y quien firma son la misma persona.
+          </p>
+        </div>
+
+        <div class="box">
+          <div class="box-title" id="tit-accionante">Tus datos</div>
+          <div class="box-hint">Como aparecen en tu documento de identidad. Son los datos de quien firma la tutela.</div>
+          <div class="grid2">
+            <div class="field full">
+              <label>Nombre completo <span class="req">*</span></label>
+              <input type="text" id="a_nombre" placeholder="Ej.: María Fernanda Gómez Ríos">
+            </div>
+            <div class="field">
+              <label>Tipo de documento <span class="req">*</span></label>
+              <select id="a_tipodoc">
+                <option value="cédula de ciudadanía">Cédula de ciudadanía</option>
+                <option value="cédula de extranjería">Cédula de extranjería</option>
+                <option value="tarjeta de identidad">Tarjeta de identidad</option>
+                <option value="permiso por protección temporal">Permiso por Protección Temporal (PPT)</option>
+                <option value="pasaporte">Pasaporte</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Número de documento <span class="req">*</span></label>
+              <input type="text" id="a_doc" placeholder="Ej.: 1.020.345.678" inputmode="numeric">
+            </div>
+            <div class="field">
+              <label>Ciudad o municipio <span class="req">*</span></label>
+              <input type="text" id="a_ciudad" placeholder="Ej.: Bogotá D.C.">
+            </div>
+            <div class="field">
+              <label>Departamento <span class="req">*</span></label>
+              <input type="text" id="a_depto" placeholder="Ej.: Cundinamarca">
+            </div>
+            <div class="field full">
+              <label>Dirección de notificación <span class="req">*</span></label>
+              <input type="text" id="a_dir" placeholder="Ej.: Calle 45 # 12-30, apto 302, barrio Chapinero">
+            </div>
+            <div class="field">
+              <label>Teléfono o celular <span class="req">*</span></label>
+              <input type="tel" id="a_tel" placeholder="Ej.: 300 123 4567">
+            </div>
+            <div class="field">
+              <label>Correo electrónico <span class="req">*</span></label>
+              <input type="email" id="a_mail" placeholder="Ej.: nombre@correo.com">
+              <span class="help">Aquí te llegará la confirmación del juzgado.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="box" id="box-titular" style="display:none">
+          <div class="box-title" id="tit-titular">Datos de la persona afectada</div>
+          <div class="box-hint" id="hint-titular">Es la persona cuyo derecho a la salud se está vulnerando.</div>
+          <div class="grid2">
+            <div class="field full">
+              <label>Nombre completo <span class="req">*</span></label>
+              <input type="text" id="t_nombre" placeholder="Nombre de la persona afectada">
+            </div>
+            <div class="field">
+              <label>Tipo de documento</label>
+              <select id="t_tipodoc">
+                <option value="cédula de ciudadanía">Cédula de ciudadanía</option>
+                <option value="tarjeta de identidad">Tarjeta de identidad</option>
+                <option value="registro civil de nacimiento">Registro civil de nacimiento</option>
+                <option value="cédula de extranjería">Cédula de extranjería</option>
+                <option value="permiso por protección temporal">Permiso por Protección Temporal (PPT)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Número de documento <span class="req">*</span></label>
+              <input type="text" id="t_doc" placeholder="Número">
+            </div>
+            <div class="field">
+              <label>Parentesco o relación contigo <span class="req">*</span></label>
+              <input type="text" id="t_rel" placeholder="Ej.: mi madre, mi hijo, mi hermano">
+            </div>
+            <div class="field" id="wrap-edad">
+              <label>Edad</label>
+              <input type="number" id="t_edad" placeholder="Ej.: 8" min="0" max="120">
+            </div>
+            <div class="field full" id="wrap-motivo">
+              <label>¿Por qué esa persona no puede presentar la tutela por sí misma? <span class="req">*</span></label>
+              <textarea id="t_motivo" placeholder="Ej.: está hospitalizada y no puede movilizarse; es una persona de 84 años con movilidad reducida y deterioro cognitivo; se encuentra en estado de postración."></textarea>
+              <span class="help">La agencia oficiosa exige explicar esta imposibilidad (artículo 10 del Decreto 2591 de 1991).</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="box">
+          <div class="box-title">Condición de la persona afectada</div>
+          <div class="box-hint">Marca lo que aplique. Esto puede darle prioridad a tu caso: los sujetos de especial protección constitucional tienen un amparo reforzado.</div>
+          <div class="checks" id="sujetos"></div>
+        </div>
+        <div class="errmsg" id="err2">Completa los campos obligatorios marcados en rojo.</div>
+      </div>
+
+      <!-- PASO 3 · CONTRA QUIÉN -->
+      <div class="wstep" data-step="3" style="display:none">
+        <div class="box">
+          <div class="box-title">¿Contra quién va la tutela?</div>
+          <div class="box-hint">Normalmente es tu EPS. Si el problema está en la clínica u hospital donde te atienden, agrégala también.</div>
+          <div class="grid2">
+            <div class="field">
+              <label>EPS <span class="req">*</span></label>
+              <input type="text" id="e_eps" placeholder="Ej.: Nueva EPS, Sanitas, Salud Total..." list="eps-list">
+              <datalist id="eps-list"></datalist>
+            </div>
+            <div class="field">
+              <label>Régimen de afiliación <span class="req">*</span></label>
+              <select id="e_regimen">
+                <option value="contributivo">Contributivo</option>
+                <option value="subsidiado">Subsidiado</option>
+                <option value="especial o de excepción">Especial o de excepción</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Tu calidad en la afiliación</label>
+              <select id="e_calidad">
+                <option value="cotizante">Cotizante</option>
+                <option value="beneficiario(a)">Beneficiario(a)</option>
+                <option value="afiliado(a)">Afiliado(a)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>IPS, clínica u hospital <span style="color:var(--muted-2)">(opcional)</span></label>
+              <input type="text" id="e_ips" placeholder="Ej.: Clínica del Occidente">
+              <span class="help">Solo si la demora se origina ahí.</span>
+            </div>
+            <div class="field full">
+              <label>Ciudad donde ocurrieron los hechos <span class="req">*</span></label>
+              <input type="text" id="e_ciudad_hechos" placeholder="Ej.: Bogotá D.C.">
+              <span class="help">La plataforma de la Rama Judicial te pedirá este dato al radicar.</span>
+            </div>
+          </div>
+        </div>
+        <div class="errmsg" id="err3">Completa los campos obligatorios marcados en rojo.</div>
+      </div>
+
+      <!-- PASO 4 · QUÉ PASÓ -->
+      <div class="wstep" data-step="4" style="display:none">
+        <div class="box">
+          <div class="box-title">Los hechos</div>
+          <div class="box-hint">Escribe con tus palabras. La herramienta los convierte en hechos numerados en lenguaje jurídico. Entre más concreto seas (fechas, nombres, cuántas veces has ido), más fuerte queda la tutela.</div>
+          <div class="grid2">
+            <div class="field full">
+              <label>Diagnóstico o condición de salud <span class="req">*</span></label>
+              <input type="text" id="h_diag" placeholder="Ej.: diabetes mellitus tipo 2 e hipertensión arterial">
+              <span class="help">Como aparece en la historia clínica o en la fórmula. Si no lo sabes con exactitud, describe lo que tienes.</span>
+            </div>
+          </div>
+          <div class="grid2" id="campos-caso" style="margin-top:.95rem"></div>
+        </div>
+
+        <div class="box">
+          <div class="box-title">¿Ya reclamaste ante la EPS?</div>
+          <div class="box-hint">Este bloque es opcional, pero si ya reclamaste conviene dejarlo por escrito: demuestra que la tutela es el último recurso.</div>
+          <div class="radio-row" id="pqr-row">
+            <button type="button" class="radio-opt on" data-pqr="no">No he radicado nada por escrito</button>
+            <button type="button" class="radio-opt" data-pqr="si">Sí, radiqué petición o PQR</button>
+          </div>
+          <div class="grid2" id="pqr-fields" style="display:none;margin-top:1rem">
+            <div class="field">
+              <label>Fecha de radicación</label>
+              <input type="date" id="p_fecha">
+            </div>
+            <div class="field">
+              <label>Número de radicado <span style="color:var(--muted-2)">(si lo tienes)</span></label>
+              <input type="text" id="p_rad" placeholder="Ej.: 2026-458812">
+            </div>
+            <div class="field full">
+              <label>¿Qué respondieron?</label>
+              <select id="p_resp">
+                <option value="ninguna">No me han respondido nada</option>
+                <option value="tramite">Me dijeron que está en trámite, pero no lo resuelven</option>
+                <option value="negativa">Me respondieron negando el servicio</option>
+                <option value="incumplida">Me respondieron prometiendo una fecha que no cumplieron</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="box">
+          <div class="box-title">Afectación y urgencia</div>
+          <div class="box-hint">Esta es la parte que más pesa ante el juez: qué te está pasando en el cuerpo y en la vida por no recibir el servicio.</div>
+          <div class="grid2">
+            <div class="field full">
+              <label>¿Cómo te está afectando esta demora? <span class="req">*</span></label>
+              <textarea id="h_afecta" placeholder="Ej.: los dolores han aumentado y no puedo dormir; tuve que ir dos veces a urgencias; no he podido trabajar; mi presión se ha descompensado; he tenido que comprar el medicamento con mi propio dinero y ya no me alcanza."></textarea>
+            </div>
+            <div class="field full">
+              <label>¿Hay riesgo inminente para la vida, la salud o la integridad? <span class="req">*</span></label>
+              <div class="radio-row" id="urg-row">
+                <button type="button" class="radio-opt" data-urg="si">Sí, es urgente</button>
+                <button type="button" class="radio-opt on" data-urg="no">No es un riesgo inmediato</button>
+              </div>
+              <span class="help">Si marcas "sí", el escrito incluirá una solicitud de <b>medida provisional</b> para que el juez ordene la entrega inmediata mientras decide (artículo 7 del Decreto 2591 de 1991). Márcalo solo si es cierto.</span>
+            </div>
+            <div class="field full" id="wrap-urgdet" style="display:none">
+              <label>Explica el riesgo <span class="req">*</span></label>
+              <textarea id="h_urgdet" placeholder="Ej.: sin la insulina mi glicemia se descompensa y el médico advirtió riesgo de coma diabético; el aplazamiento de la cirugía puede causar pérdida irreversible de la visión."></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="errmsg" id="err4">Completa los campos obligatorios marcados en rojo.</div>
+      </div>
+
+      <!-- PASO 5 · RESULTADO -->
+      <div class="wstep" data-step="5" style="display:none">
+        <div class="box">
+          <div class="box-title">Tu tutela está lista</div>
+          <div class="box-hint">
+            Revísala completa antes de radicar. Lo resaltado en amarillo son campos que debes completar a mano o verificar.
+            Puedes descargarla en Word para editarla, o en PDF, que es el formato que pide la plataforma de la Rama Judicial.
+          </div>
+          <div class="dl-row no-print">
+            <button class="btn btn-green" id="btn-pdf">↓ Descargar PDF</button>
+            <button class="btn btn-primary" id="btn-word">↓ Descargar Word</button>
+            <button class="btn btn-ghost btn-sm" id="btn-copy">Copiar texto</button>
+            <button class="btn btn-ghost btn-sm" id="btn-print">Imprimir</button>
+            <button class="btn btn-ghost btn-sm" id="btn-save">Guardar borrador en este dispositivo</button>
+          </div>
+          <p class="help no-print" id="save-msg" style="margin-top:.6rem"></p>
+        </div>
+
+        <div class="box" style="padding:0;background:none;border:none">
+          <div class="doc" id="doc-preview"></div>
+        </div>
+
+        <div class="box no-print">
+          <div class="box-title">Anexos que debes adjuntar</div>
+          <div class="box-hint">Sin soportes la tutela se debilita. Toma foto o escanea cada documento y súbelo junto al escrito.</div>
+          <ul class="anexos" id="anexos-list"></ul>
+        </div>
+
+        <div class="box no-print">
+          <div class="box-title">Cómo radicarla</div>
+          <div class="box-hint">La tutela se presenta ante cualquier juez. No tienes que escoger juzgado: el sistema hace el reparto automáticamente.</div>
+          <ol class="howto">
+            <li>
+              <b>Firma el documento.</b> Imprime y firma a mano, o firma digitalmente. Escribe tu número de documento debajo de la firma.
+            </li>
+            <li>
+              <b>Reúne los anexos</b> de la lista de arriba en archivos PDF o fotos legibles.
+            </li>
+            <li>
+              <b>Entra a la plataforma oficial de la Rama Judicial:</b><br>
+              <a href="https://procesojudicial.ramajudicial.gov.co/TutelaEnLinea" target="_blank" rel="noopener">https://procesojudicial.ramajudicial.gov.co/TutelaEnLinea</a><br>
+              Está disponible 24 horas, todos los días, y no tiene ningún costo.
+            </li>
+            <li>
+              <b>Diligencia el formulario:</b> acepta los términos, selecciona el departamento y ciudad donde radicas, marca
+              "Tutela", indica dónde ocurrieron los hechos, y registra tus datos como accionante y los de la EPS como accionada.
+              <b>Adjunta el escrito en PDF</b> junto con los anexos.
+            </li>
+            <li>
+              <b>Guarda el código de recepción.</b> Al enviar, la plataforma genera un mensaje y un código de radicación,
+              y te llega una confirmación al correo. Guárdalo: es tu prueba de que radicaste.
+            </li>
+            <li>
+              <b>Espera la asignación.</b> El juzgado al que le corresponda tu caso te escribirá al correo con el número de
+              radicado. El juez tiene <b>10 días hábiles</b> para fallar.
+            </li>
+            <li>
+              <b>Si fallan a tu favor y la EPS no cumple</b>, puedes presentar un <b>incidente de desacato</b> ante el mismo
+              juez, que puede imponer multas y arresto a los directivos responsables (artículo 52 del Decreto 2591 de 1991).
+            </li>
+          </ol>
+          <div class="notice" style="margin-top:1.2rem">
+            <b>¿No tienes internet o prefieres presencial?</b> Puedes llevar el documento impreso a la oficina judicial de
+            reparto de tu ciudad, o pedir ayuda gratuita en la <b>Defensoría del Pueblo</b> (línea 143), la <b>Personería</b>
+            municipal o la <b>Superintendencia Nacional de Salud</b> (línea 018000513700), que también tramita quejas contra la EPS.
+          </div>
+        </div>
+      </div>
+
+      <div class="navbtns no-print">
+        <button class="btn btn-ghost" id="btn-prev">← Atrás</button>
+        <button class="btn btn-primary" id="btn-next">Continuar →</button>
+      </div>
+    </div>
+
+  </div>
+
+  <footer class="no-print">
+    <p style="margin-bottom:.5rem">
+      <b style="color:rgba(255,255,255,.7)">Aviso legal.</b> Esta herramienta produce un borrador orientativo de acción de
+      tutela. No constituye asesoría jurídica ni sustituye la valoración de un profesional del derecho, no crea relación
+      abogado-cliente y no garantiza ningún resultado judicial. La responsabilidad sobre el contenido final, su veracidad
+      y su radicación es exclusivamente de quien la presenta. Recuerda que afirmar hechos falsos ante un juez tiene
+      consecuencias legales.
+    </p>
+    <p>
+      Datos: MinSalud, <i>Informe de Tutelas por Vulneración del Derecho a la Salud</i>, abril de 2026 (orden 30, Sentencia T-760 de 2008).
+      · Hecha por <a href="index.html">Ricardo Ruiz</a> · <a href="mailto:contacto@ricardoruiz.co">contacto@ricardoruiz.co</a>
+    </p>
+  </footer>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ══════════════════ CURSOR ══════════════════ */
+  var cur = document.getElementById('cursor'), ring = document.getElementById('cursorRing');
+  if (window.matchMedia('(min-width:901px)').matches) {
+    document.addEventListener('mousemove', function(e){
+      cur.style.left = e.clientX + 'px'; cur.style.top = e.clientY + 'px';
+      ring.style.left = e.clientX + 'px'; ring.style.top = e.clientY + 'px';
+    });
+    document.addEventListener('mouseover', function(e){
+      var t = e.target, tag = t.tagName;
+      var isField = tag === 'INPUT' || tag === 'TEXTAREA';
+      document.body.classList.toggle('typing', isField);
+      var hot = t.closest && t.closest('.btn,.case,.chk,.radio-opt,a,summary,select');
+      if (hot && !isField) { cur.style.transform = 'translate(-50%,-50%) scale(1.9)'; cur.style.background = 'transparent';
+        cur.style.border = '1.5px solid ' + '#0047FF'; ring.style.opacity = '0'; }
+      else { cur.style.transform = 'translate(-50%,-50%) scale(1)'; cur.style.background = '#0047FF';
+        cur.style.border = 'none'; ring.style.opacity = '.5'; }
+    });
+  }
+
+  /* ══════════════════ DATOS DE LOS 3 CASOS ══════════════════
+     Priorización tomada del Informe de Tutelas por Vulneración del Derecho
+     a la Salud (MinSalud, abril 2026), vigencia 2025:
+       1. Medicamentos ............ 80.789 pretensiones · 23,38%
+       2. Citas médicas ........... 68.955 pretensiones · 19,95%
+       3. Procedimientos/tecnología 54.911 pretensiones · 15,89%
+     Los tres suman 59,22% y se enmarcan en el problema jurídico 9 (64,85%):
+     barreras de oportunidad frente a servicios YA incluidos y financiados.
+  ══════════════════════════════════════════════════════════ */
+  var CASOS = {
+    medicamentos: {
+      rank: 'La petición #1 del país',
+      nombre: 'Medicamentos que no me entregan',
+      desc: 'Te formularon un medicamento, la EPS no lo entrega o lo entrega incompleto, y te mandan a volver otro día.',
+      pct: 23.38, num: '80.789 peticiones en 2025',
+      objeto: 'la entrega efectiva del medicamento prescrito',
+      ref: 'Entrega de medicamentos prescritos por el médico tratante',
+      campos: [
+        {id:'c_item', label:'Medicamento o medicamentos que no te entregan', req:true, full:true,
+         ph:'Ej.: Insulina glargina 100 UI/ml, 3 lapiceros mensuales; Metformina 850 mg, 60 tabletas'},
+        {id:'c_medico', label:'Médico que lo formuló', req:false,
+         ph:'Ej.: Dr. Carlos Ramírez, medicina interna'},
+        {id:'c_fecha', label:'Fecha de la fórmula médica', req:true, tipo:'date'},
+        {id:'c_veces', label:'¿Cuántas veces has ido a reclamarlo?', req:true, tipo:'number', ph:'Ej.: 4'},
+        {id:'c_respuesta', label:'¿Qué te responden en la farmacia o la EPS?', req:true, full:true,
+         tipo:'select', opciones:[
+            'que no hay disponibilidad en el punto de entrega',
+            'que está en trámite o pendiente de autorización',
+            'que debo esperar a que llegue el pedido, sin fecha cierta',
+            'que solo hay entrega parcial de lo formulado',
+            'que el medicamento no está disponible en el país',
+            'no me dan ninguna explicación'
+         ]},
+        {id:'c_parcial', label:'¿Te han entregado una parte? Descríbelo', req:false, full:true, tipo:'textarea',
+         ph:'Ej.: solo me entregaron 15 de las 60 tabletas y quedé sin tratamiento las últimas dos semanas del mes. (Si no te han entregado nada, deja este campo vacío.)'}
+      ],
+      hechos: function(d){
+        var h = [];
+        h.push('El día ' + d.c_fecha_txt + ', ' + (d.c_medico ? 'el profesional de la salud ' + d.c_medico + ', adscrito a la red de la entidad accionada,' : 'el médico tratante adscrito a la red de la entidad accionada') +
+          ' prescribió a ' + d.quien + ' el siguiente tratamiento farmacológico: ' + d.c_item + '. Dicha prescripción obedece al diagnóstico antes descrito y fue emitida en ejercicio de la autonomía médica.');
+        h.push('Pese a que han transcurrido ' + d.dias_txt + ' desde la prescripción, la entidad accionada no ha hecho entrega efectiva y completa del medicamento formulado.');
+        h.push('He acudido en ' + d.c_veces + ' ' + (Number(d.c_veces) === 1 ? 'oportunidad' : 'oportunidades') + ' a solicitar la entrega, y la respuesta que he recibido de manera reiterada ha sido ' + d.c_respuesta + '. A la fecha no se me ha informado una fecha cierta de entrega.');
+        if (d.c_parcial) h.push('Sobre la entrega parcial del tratamiento debe precisarse lo siguiente: ' + pto(d.c_parcial) + ' La entrega fraccionada e irregular de un medicamento de uso continuo equivale, en la práctica, a la interrupción del tratamiento.');
+        h.push('El medicamento prescrito hace parte del Plan de Beneficios en Salud con cargo a la UPC, o en todo caso su suministro fue ordenado por el médico tratante, de modo que la entidad accionada no tiene fundamento jurídico alguno para dilatar su entrega.');
+        return h;
+      },
+      pretension: function(d){
+        return 'ORDENAR a ' + d.eps + ' que, en el término máximo de cuarenta y ocho (48) horas siguientes a la notificación del fallo, haga entrega efectiva y completa a ' + d.quien + ' del medicamento ' + d.c_item + ', en las cantidades, dosis y presentación prescritas por el médico tratante.';
+      },
+      pretensiones_extra: function(d){
+        return [
+          'ORDENAR a ' + d.eps + ' que garantice la entrega oportuna e ininterrumpida de este medicamento durante todo el tiempo que el médico tratante lo considere necesario, sin exigir a ' + d.quien + ' trámites, autorizaciones o desplazamientos adicionales cada vez que deba renovarse la fórmula, y sin que la entrega dependa de la disponibilidad de un punto de dispensación específico.',
+          'ORDENAR a ' + d.eps + ' que, en caso de agotamiento o desabastecimiento del medicamento, garantice de manera inmediata su suministro por cualquier medio idóneo, incluida la compra directa a un proveedor externo, la entrega domiciliaria o el suministro de una alternativa terapéutica de igual o superior eficacia previamente avalada por el médico tratante.'
+        ];
+      },
+      anexos: [
+        'Copia de la fórmula o prescripción médica (la más reciente y, si las tienes, las anteriores)',
+        'Copia del documento de identidad de quien firma la tutela',
+        'Constancias de las veces que has ido a reclamar: tirillas, pantallazos, correos, números de radicado',
+        'Historia clínica o epicrisis donde aparezca el diagnóstico (si la tienes)',
+        'Certificado de afiliación a la EPS o pantallazo de ADRES (opcional, ayuda)',
+        'Facturas si has tenido que comprar el medicamento con tu dinero'
+      ],
+      pruebas: [
+        'Copia de la prescripción médica en la que consta el medicamento ordenado por el médico tratante.',
+        'Copia del documento de identidad del accionante.',
+        'Soportes de las solicitudes de entrega presentadas ante la entidad accionada (comprobantes de reclamación, radicados o comunicaciones electrónicas).',
+        'Copia de la historia clínica o epicrisis en la que consta el diagnóstico.',
+        'Certificado de afiliación al Sistema General de Seguridad Social en Salud.',
+        'Facturas de compra del medicamento asumidas con recursos propios, en caso de haberlas.'
+      ]
+    },
+
+    citas: {
+      rank: 'La petición #2 del país',
+      nombre: 'Citas médicas que no me asignan',
+      desc: 'Necesitas una cita con especialista o medicina general y la EPS no te la asigna, o te la dan para dentro de varios meses.',
+      pct: 19.95, num: '68.955 peticiones en 2025',
+      objeto: 'la asignación efectiva de la cita médica requerida',
+      ref: 'Asignación de cita médica ordenada por el médico tratante',
+      campos: [
+        {id:'c_item', label:'¿Qué cita necesitas?', req:true, full:true,
+         ph:'Ej.: consulta con neurología; control con medicina interna; valoración por ortopedia'},
+        {id:'c_medico', label:'¿Quién la ordenó?', req:false,
+         ph:'Ej.: Dra. Ana Torres, medicina general'},
+        {id:'c_fecha', label:'Fecha de la orden médica', req:true, tipo:'date'},
+        {id:'c_veces', label:'¿Cuántas veces la has solicitado?', req:true, tipo:'number', ph:'Ej.: 5'},
+        {id:'c_respuesta', label:'¿Qué te responden cuando la pides?', req:true, full:true,
+         tipo:'select', opciones:[
+            'que no hay agenda disponible',
+            'que debo llamar nuevamente en unos días',
+            'que el especialista no tiene cupos y no hay fecha definida',
+            'que la orden debe ser autorizada primero y la autorización no avanza',
+            'que no hay especialista contratado en mi ciudad',
+            'no me dan ninguna explicación'
+         ]},
+        {id:'c_fechadada', label:'Si te dieron una fecha muy lejana, ¿cuál es?', req:false, tipo:'date',
+         help:'Déjalo vacío si no te han dado ninguna fecha.'}
+      ],
+      hechos: function(d){
+        var h = [];
+        h.push('El día ' + d.c_fecha_txt + ', ' + (d.c_medico ? 'el profesional de la salud ' + d.c_medico + ', adscrito a la red de la entidad accionada,' : 'el médico tratante adscrito a la red de la entidad accionada') +
+          ' ordenó a favor de ' + d.quien + ' lo siguiente: ' + d.c_item + '. Se trata de un servicio ordenado por criterio médico y necesario para el manejo del diagnóstico ya referido.');
+        h.push('A pesar de que han transcurrido ' + d.dias_txt + ' desde que se emitió la orden, la entidad accionada no ha asignado la cita.');
+        h.push('He solicitado la asignación en ' + d.c_veces + ' ' + (Number(d.c_veces) === 1 ? 'oportunidad' : 'oportunidades') + ', y la respuesta reiterada de la entidad accionada ha sido ' + d.c_respuesta + '. A la fecha no se me ha informado una fecha cierta de atención.');
+        if (d.c_fechadada_txt) h.push('La entidad accionada finalmente ofreció como fecha de atención el ' + d.c_fechadada_txt + '. Una asignación tan distante en el tiempo desnaturaliza el servicio: una cita que llega cuando la condición ya se deterioró no constituye atención en salud, sino una negación encubierta del servicio.');
+        h.push('La ausencia de agenda disponible o la falta de contratación suficiente de especialistas son problemas de organización interna de la entidad accionada, que no pueden trasladarse al usuario ni servir de excusa para postergar indefinidamente la atención.');
+        return h;
+      },
+      pretension: function(d){
+        return 'ORDENAR a ' + d.eps + ' que, en el término máximo de cuarenta y ocho (48) horas siguientes a la notificación del fallo, asigne y comunique a ' + d.quien + ' fecha, hora y lugar concretos para la atención de ' + d.c_item + ', y que dicha atención se produzca en un término que no exceda los cinco (5) días hábiles siguientes.';
+      },
+      pretensiones_extra: function(d){
+        return [
+          'ORDENAR a ' + d.eps + ' que, si no cuenta con la disponibilidad requerida dentro de su red contratada, garantice la atención a través de una institución externa o mediante contratación adicional, asumiendo integralmente el costo, sin que ello implique carga económica ni trámite alguno para ' + d.quien + '.',
+          'ORDENAR a ' + d.eps + ' que garantice de manera oportuna las citas de control, los exámenes, los procedimientos y los medicamentos que llegue a ordenar el especialista como resultado de esta valoración, sin necesidad de acudir a una nueva acción de tutela por cada servicio.'
+        ];
+      },
+      anexos: [
+        'Copia de la orden o remisión médica que ordena la cita',
+        'Copia del documento de identidad de quien firma la tutela',
+        'Constancias de las veces que has solicitado la cita: pantallazos de la app, correos, números de radicado, grabaciones de llamadas',
+        'Pantallazo o soporte de la fecha lejana que te asignaron (si aplica)',
+        'Historia clínica o epicrisis donde aparezca el diagnóstico (si la tienes)',
+        'Certificado de afiliación a la EPS (opcional, ayuda)'
+      ],
+      pruebas: [
+        'Copia de la orden o remisión médica que dispone la valoración requerida.',
+        'Copia del documento de identidad del accionante.',
+        'Soportes de las solicitudes de asignación presentadas ante la entidad accionada (radicados, comunicaciones electrónicas o constancias de atención telefónica).',
+        'Constancia de la fecha de atención asignada, en caso de haber sido comunicada.',
+        'Copia de la historia clínica o epicrisis en la que consta el diagnóstico.',
+        'Certificado de afiliación al Sistema General de Seguridad Social en Salud.'
+      ]
+    },
+
+    procedimientos: {
+      rank: 'La petición #3 del país',
+      nombre: 'Cirugías, exámenes y procedimientos represados',
+      desc: 'Te ordenaron una cirugía, un examen o un procedimiento. Está autorizado o pendiente de autorizar, y no lo programan.',
+      pct: 15.89, num: '54.911 peticiones en 2025',
+      objeto: 'la realización efectiva del procedimiento ordenado',
+      ref: 'Realización de procedimiento, examen o cirugía ordenado por el médico tratante',
+      campos: [
+        {id:'c_item', label:'¿Qué procedimiento, examen o cirugía necesitas?', req:true, full:true,
+         ph:'Ej.: colecistectomía laparoscópica; resonancia magnética de columna lumbar; cateterismo cardíaco'},
+        {id:'c_medico', label:'¿Quién lo ordenó?', req:false,
+         ph:'Ej.: Dr. Jorge Peña, cirugía general'},
+        {id:'c_fecha', label:'Fecha de la orden médica', req:true, tipo:'date'},
+        {id:'c_estado', label:'Estado actual del trámite', req:true, full:true, tipo:'select',
+         opciones:[
+            'la EPS ya lo autorizó pero no lo ha programado',
+            'la EPS no ha emitido la autorización y el trámite sigue pendiente',
+            'fue programado y luego cancelado o aplazado por la entidad',
+            'me remiten de un lado a otro sin que nadie asuma el trámite'
+         ]},
+        {id:'c_autoriz', label:'Número de autorización', req:false, ph:'Ej.: 8812934 (si lo tienes)'},
+        {id:'c_veces', label:'¿Cuántas veces has reclamado?', req:true, tipo:'number', ph:'Ej.: 3'}
+      ],
+      hechos: function(d){
+        var h = [];
+        h.push('El día ' + d.c_fecha_txt + ', ' + (d.c_medico ? 'el profesional de la salud ' + d.c_medico + ', adscrito a la red de la entidad accionada,' : 'el médico tratante adscrito a la red de la entidad accionada') +
+          ' ordenó a favor de ' + d.quien + ' la realización de: ' + d.c_item + ', como parte del manejo del diagnóstico ya referido.');
+        var e = 'A la fecha, ' + d.dias_txt + ' después de emitida la orden, el procedimiento no se ha realizado: ' + d.c_estado + '.';
+        if (d.c_autoriz) e += ' La autorización correspondiente figura con el número ' + d.c_autoriz + ', lo que demuestra que la propia entidad accionada reconoció la pertinencia y la cobertura del servicio y aun así no lo ha ejecutado.';
+        h.push(e);
+        h.push('He reclamado la programación en ' + d.c_veces + ' ' + (Number(d.c_veces) === 1 ? 'oportunidad' : 'oportunidades') + ', sin obtener una fecha cierta de realización.');
+        h.push('La demora en la realización de un procedimiento ordenado por el médico tratante no es un asunto meramente administrativo: cada día de espera prolonga innecesariamente el padecimiento y puede agravar de forma irreversible la condición de salud, además de encarecer el tratamiento que después deberá asumir el propio sistema.');
+        return h;
+      },
+      pretension: function(d){
+        return 'ORDENAR a ' + d.eps + ' que, en el término máximo de cuarenta y ocho (48) horas siguientes a la notificación del fallo, autorice si aún no lo ha hecho y programe en fecha cierta la realización de ' + d.c_item + ' a favor de ' + d.quien + ', y que el procedimiento se lleve a cabo en un plazo que no supere los diez (10) días hábiles siguientes, salvo que el médico tratante indique un término menor por razones clínicas.';
+      },
+      pretensiones_extra: function(d){
+        return [
+          'ORDENAR a ' + d.eps + ' que garantice todos los servicios conexos que el procedimiento requiera —valoración prequirúrgica, exámenes previos, insumos, materiales, banco de sangre, hospitalización, medicamentos, rehabilitación y controles posteriores— sin exigir a ' + d.quien + ' trámites adicionales ni nuevas autorizaciones para cada uno de ellos.',
+          'ORDENAR a ' + d.eps + ' que, si su red contratada no tiene capacidad para realizar el procedimiento en los términos ordenados, lo garantice a través de una institución externa asumiendo integralmente su costo.'
+        ];
+      },
+      anexos: [
+        'Copia de la orden médica del procedimiento, examen o cirugía',
+        'Copia de la autorización emitida por la EPS (si ya la tienes)',
+        'Copia del documento de identidad de quien firma la tutela',
+        'Constancias de las veces que has reclamado la programación: radicados, correos, pantallazos',
+        'Soporte de la cancelación o aplazamiento, si el procedimiento ya estaba programado',
+        'Historia clínica o epicrisis donde aparezca el diagnóstico',
+        'Certificado de afiliación a la EPS (opcional, ayuda)'
+      ],
+      pruebas: [
+        'Copia de la orden médica que dispone el procedimiento requerido.',
+        'Copia de la autorización expedida por la entidad accionada, en caso de haber sido emitida.',
+        'Copia del documento de identidad del accionante.',
+        'Soportes de las solicitudes de programación presentadas ante la entidad accionada.',
+        'Constancia de la cancelación o el aplazamiento del procedimiento, en caso de haberse producido.',
+        'Copia de la historia clínica o epicrisis en la que consta el diagnóstico.',
+        'Certificado de afiliación al Sistema General de Seguridad Social en Salud.'
+      ]
+    }
+  };
+
+  var SUJETOS = [
+    {id:'menor',      txt:'Menor de 18 años',               frase:'es un sujeto de especial protección constitucional por tratarse de un menor de edad, cuyos derechos prevalecen sobre los de los demás en los términos del artículo 44 de la Constitución Política'},
+    {id:'mayor',      txt:'Adulto mayor (60 o más)',        frase:'es una persona adulta mayor, sujeto de especial protección constitucional conforme al artículo 46 de la Constitución Política'},
+    {id:'discap',     txt:'Persona con discapacidad',       frase:'es una persona en situación de discapacidad, titular de una protección constitucional reforzada'},
+    {id:'gestante',   txt:'Mujer gestante o lactante',      frase:'es una mujer en estado de gestación o en periodo de lactancia, sujeto de especial protección constitucional conforme al artículo 43 de la Constitución Política'},
+    {id:'cronica',    txt:'Enfermedad crónica, catastrófica o huérfana', frase:'padece una enfermedad de carácter crónico, catastrófico o huérfano, lo que hace que cualquier interrupción del tratamiento tenga consecuencias particularmente graves'},
+    {id:'victima',    txt:'Víctima del conflicto armado',   frase:'ostenta la condición de víctima del conflicto armado, población respecto de la cual el Estado tiene deberes reforzados de atención'},
+    {id:'etnico',     txt:'Comunidad indígena, afro, raizal o ROM', frase:'pertenece a una comunidad étnica, respecto de la cual el Estado tiene obligaciones diferenciales de atención en salud'},
+    {id:'vulnerable', txt:'Situación económica precaria',   frase:'se encuentra en una situación económica que le impide costear por sus propios medios el servicio requerido'},
+    {id:'rural',      txt:'Zona rural o dispersa',          frase:'reside en una zona rural o de difícil acceso, lo que agrava materialmente las barreras de acceso a los servicios de salud'}
+  ];
+
+  var EPS_LIST = ['Nueva EPS','EPS Sanitas','Salud Total EPS','Sura EPS','Compensar EPS','Famisanar EPS',
+    'Coosalud EPS','Mutual Ser EPS','Asmet Salud EPS','Emssanar EPS','Savia Salud EPS','Capital Salud EPS',
+    'Comfenalco Valle EPS','Cajacopi EPS','Salud Mía EPS','Aliansalud EPS','SOS EPS','Comfaoriente EPS',
+    'Dusakawi EPSI','Anas Wayuu EPSI','Pijaos Salud EPSI','Fondo de Pasivo Social de Ferrocarriles'];
+
+  /* ══════════════════ ESTADO ══════════════════ */
+  var S = { caso:null, step:1, rol:'propio', pqr:'no', urg:'no', sujetos:{} };
+  var MAXSTEP = 5;
+  var STEP_NAMES = ['Tus datos','Quién','Contra quién','Qué pasó','Tu tutela'];
+
+  var $ = function(id){ return document.getElementById(id); };
+  var val = function(id){ var e = $(id); return e ? String(e.value || '').trim() : ''; };
+
+  /* ══════════════════ RENDER INICIAL ══════════════════ */
+  (function renderCases(){
+    var html = '';
+    Object.keys(CASOS).forEach(function(k){
+      var c = CASOS[k];
+      html += '<button type="button" class="case" data-caso="' + k + '">' +
+        '<div class="case-rank">' + c.rank + '</div>' +
+        '<div class="case-name">' + c.nombre + '</div>' +
+        '<div class="case-desc">' + c.desc + '</div>' +
+        '<div class="case-bar"><i style="width:' + (c.pct / 23.38 * 100) + '%"></i></div>' +
+        '<div class="case-pct"><b>' + String(c.pct).replace('.', ',') + '%</b> de las peticiones · ' + c.num + '</div>' +
+        '</button>';
+    });
+    $('cases').innerHTML = html;
+    $('cases').addEventListener('click', function(e){
+      var b = e.target.closest('.case'); if (!b) return;
+      startCaso(b.dataset.caso);
+    });
+  })();
+
+  (function renderSujetos(){
+    $('sujetos').innerHTML = SUJETOS.map(function(s){
+      return '<label class="chk" data-suj="' + s.id + '"><input type="checkbox" data-sid="' + s.id + '"><span>' + s.txt + '</span></label>';
+    }).join('');
+    $('sujetos').addEventListener('change', function(e){
+      var inp = e.target; if (!inp.dataset.sid) return;
+      S.sujetos[inp.dataset.sid] = inp.checked;
+      inp.closest('.chk').classList.toggle('on', inp.checked);
+    });
+  })();
+
+  $('eps-list').innerHTML = EPS_LIST.map(function(e){ return '<option value="' + e + '">'; }).join('');
+
+  $('acepta').addEventListener('change', function(){
+    this.closest('.chk').classList.toggle('on', this.checked);
+  });
+
+  /* ══════════════════ NAVEGACIÓN ══════════════════ */
+  function startCaso(k){
+    S.caso = k; S.step = 1;
+    var c = CASOS[k];
+    $('wiz-title').textContent = c.nombre;
+    $('wiz-eyebrow').textContent = c.rank + ' · ' + String(c.pct).replace('.', ',') + '% de las peticiones';
+    renderCamposCaso(c);
+    $('panel-inicio').classList.remove('active');
+    $('panel-wizard').classList.add('active');
+    paint();
+    window.scrollTo({ top:0, behavior:'smooth' });
+  }
+
+  function renderCamposCaso(c){
+    var html = '';
+    c.campos.forEach(function(f){
+      var cls = 'field' + (f.full ? ' full' : '');
+      html += '<div class="' + cls + '">';
+      html += '<label>' + f.label + (f.req ? ' <span class="req">*</span>' : '') + '</label>';
+      if (f.tipo === 'select') {
+        html += '<select id="' + f.id + '">' + f.opciones.map(function(o){
+          return '<option value="' + o + '">' + o.charAt(0).toUpperCase() + o.slice(1) + '</option>';
+        }).join('') + '</select>';
+      } else if (f.tipo === 'textarea') {
+        html += '<textarea id="' + f.id + '" placeholder="' + (f.ph || '') + '"></textarea>';
+      } else {
+        html += '<input type="' + (f.tipo || 'text') + '" id="' + f.id + '" placeholder="' + (f.ph || '') + '"' +
+                (f.tipo === 'number' ? ' min="1"' : '') + '>';
+      }
+      if (f.help) html += '<span class="help">' + f.help + '</span>';
+      html += '</div>';
+    });
+    $('campos-caso').innerHTML = html;
+  }
+
+  function paint(){
+    $('steps').innerHTML = STEP_NAMES.map(function(n, i){
+      var idx = i + 1;
+      var cls = 'stepchip' + (idx === S.step ? ' on' : (idx < S.step ? ' done' : ''));
+      return '<div class="' + cls + '">' + (idx < S.step ? '✓ ' : idx + '. ') + n + '</div>';
+    }).join('');
+    document.querySelectorAll('.wstep').forEach(function(el){
+      el.style.display = (Number(el.dataset.step) === S.step) ? '' : 'none';
+    });
+    $('btn-prev').textContent = S.step === 1 ? '← Cambiar de caso' : '← Atrás';
+    $('btn-next').style.display = S.step === MAXSTEP ? 'none' : '';
+    $('btn-next').textContent = S.step === MAXSTEP - 1 ? 'Generar mi tutela →' : 'Continuar →';
+  }
+
+  $('btn-prev').addEventListener('click', function(){
+    if (S.step === 1) {
+      $('panel-wizard').classList.remove('active');
+      $('panel-inicio').classList.add('active');
+      window.scrollTo({ top:0, behavior:'smooth' });
+      return;
+    }
+    S.step--; paint(); window.scrollTo({ top:0, behavior:'smooth' });
+  });
+
+  $('btn-next').addEventListener('click', function(){
+    if (!validate(S.step)) return;
+    if (S.step === MAXSTEP - 1) { buildDoc(); }
+    S.step++; paint(); window.scrollTo({ top:0, behavior:'smooth' });
+  });
+
+  /* ── toggles de rol / pqr / urgencia ── */
+  $('rol-row').addEventListener('click', function(e){
+    var b = e.target.closest('.radio-opt'); if (!b) return;
+    S.rol = b.dataset.rol;
+    this.querySelectorAll('.radio-opt').forEach(function(x){ x.classList.toggle('on', x === b); });
+    var otro = S.rol !== 'propio';
+    $('box-titular').style.display = otro ? '' : 'none';
+    $('wrap-motivo').style.display = S.rol === 'agente' ? '' : 'none';
+    $('wrap-edad').style.display = S.rol === 'menor' ? '' : 'none';
+    $('tit-accionante').textContent = otro ? 'Tus datos (quien firma la tutela)' : 'Tus datos';
+    $('rol-help').textContent = S.rol === 'propio'
+      ? 'Actúas en nombre propio: el afectado y quien firma son la misma persona.'
+      : (S.rol === 'menor'
+        ? 'Actúas como representante legal del menor. La Constitución da prevalencia a sus derechos (artículo 44).'
+        : 'Actúas como agente oficioso: deberás explicar por qué esa persona no puede presentar la tutela por sí misma (artículo 10 del Decreto 2591 de 1991).');
+    $('tit-titular').textContent = S.rol === 'menor' ? 'Datos del menor de edad' : 'Datos de la persona afectada';
+  });
+
+  $('pqr-row').addEventListener('click', function(e){
+    var b = e.target.closest('.radio-opt'); if (!b) return;
+    S.pqr = b.dataset.pqr;
+    this.querySelectorAll('.radio-opt').forEach(function(x){ x.classList.toggle('on', x === b); });
+    $('pqr-fields').style.display = S.pqr === 'si' ? '' : 'none';
+  });
+
+  $('urg-row').addEventListener('click', function(e){
+    var b = e.target.closest('.radio-opt'); if (!b) return;
+    S.urg = b.dataset.urg;
+    this.querySelectorAll('.radio-opt').forEach(function(x){ x.classList.toggle('on', x === b); });
+    $('wrap-urgdet').style.display = S.urg === 'si' ? '' : 'none';
+  });
+
+  /* ══════════════════ VALIDACIÓN ══════════════════ */
+  function mark(ids){
+    var bad = [];
+    ids.forEach(function(id){
+      var el = $(id); if (!el) return;
+      var empty = !String(el.value || '').trim();
+      el.classList.toggle('err', empty);
+      if (empty) bad.push(id);
+    });
+    return bad;
+  }
+
+  function validate(step){
+    document.querySelectorAll('.errmsg').forEach(function(e){ e.classList.remove('on'); });
+    var bad = [];
+    if (step === 1) {
+      if (!$('acepta').checked) { $('err1').classList.add('on'); return false; }
+      return true;
+    }
+    if (step === 2) {
+      bad = mark(['a_nombre','a_doc','a_ciudad','a_depto','a_dir','a_tel','a_mail']);
+      if (S.rol !== 'propio') bad = bad.concat(mark(['t_nombre','t_doc','t_rel']));
+      if (S.rol === 'agente') bad = bad.concat(mark(['t_motivo']));
+      if (bad.length) { $('err2').classList.add('on'); scrollToFirst(bad); return false; }
+      return true;
+    }
+    if (step === 3) {
+      bad = mark(['e_eps','e_ciudad_hechos']);
+      if (bad.length) { $('err3').classList.add('on'); scrollToFirst(bad); return false; }
+      return true;
+    }
+    if (step === 4) {
+      var req = ['h_diag','h_afecta'];
+      CASOS[S.caso].campos.forEach(function(f){ if (f.req) req.push(f.id); });
+      if (S.urg === 'si') req.push('h_urgdet');
+      bad = mark(req);
+      if (bad.length) { $('err4').classList.add('on'); scrollToFirst(bad); return false; }
+      return true;
+    }
+    return true;
+  }
+
+  function scrollToFirst(bad){
+    var el = $(bad[0]); if (el) el.scrollIntoView({ behavior:'smooth', block:'center' });
+  }
+
+  /* ══════════════════ UTILIDADES DE TEXTO ══════════════════ */
+  var MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+  function fechaLarga(iso){
+    if (!iso) return '';
+    var p = iso.split('-');
+    if (p.length !== 3) return iso;
+    return Number(p[2]) + ' de ' + MESES[Number(p[1]) - 1] + ' de ' + p[0];
+  }
+
+  function hoyLargo(){
+    var d = new Date();
+    return d.getDate() + ' de ' + MESES[d.getMonth()] + ' de ' + d.getFullYear();
+  }
+
+  function diasDesde(iso){
+    if (!iso) return null;
+    var d = new Date(iso + 'T00:00:00');
+    if (isNaN(d.getTime())) return null;
+    var hoy = new Date(); hoy.setHours(0,0,0,0);
+    return Math.max(0, Math.round((hoy - d) / 86400000));
+  }
+
+  function textoDias(n){
+    if (n === null) return 'un tiempo considerable';
+    if (n < 1) return 'menos de un día';
+    if (n < 31) return n + (n === 1 ? ' día' : ' días');
+    var m = Math.floor(n / 30);
+    return 'más de ' + m + (m === 1 ? ' mes' : ' meses') + ' (' + n + ' días)';
+  }
+
+  function esc(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  var BLANK = '__________';
+  function blankHTML(){ return '<span class="blank">' + BLANK + '</span>'; }
+
+  // Cierra una frase con punto sin duplicarlo (evita "Bogotá D.C..").
+  function pto(s){
+    s = String(s == null ? '' : s).trim();
+    return /[.!?]$/.test(s) ? s : s + '.';
+  }
+
+  /* ══════════════════ RECOLECCIÓN DE DATOS ══════════════════ */
+  function collect(){
+    var c = CASOS[S.caso];
+    var d = {};
+
+    d.caso = S.caso;
+    d.eps = val('e_eps') || BLANK;
+    d.ips = val('e_ips');
+    d.regimen = val('e_regimen');
+    d.calidad = val('e_calidad');
+    d.ciudad_hechos = val('e_ciudad_hechos') || BLANK;
+
+    d.a_nombre = val('a_nombre') || BLANK;
+    d.a_tipodoc = val('a_tipodoc');
+    d.a_doc = val('a_doc') || BLANK;
+    d.a_ciudad = val('a_ciudad') || BLANK;
+    d.a_depto = val('a_depto');
+    d.a_dir = val('a_dir') || BLANK;
+    d.a_tel = val('a_tel') || BLANK;
+    d.a_mail = val('a_mail') || BLANK;
+
+    d.rol = S.rol;
+    d.t_nombre = val('t_nombre');
+    d.t_tipodoc = val('t_tipodoc');
+    d.t_doc = val('t_doc');
+    d.t_rel = val('t_rel');
+    d.t_edad = val('t_edad');
+    d.t_motivo = val('t_motivo');
+
+    // "quien" = la persona afectada, en tercera o primera persona
+    d.propio = (S.rol === 'propio');
+    // "quien suscribe" funciona con todas las preposiciones de las plantillas
+    // ("prescribió a...", "a favor de...", "sin exigir a..."), a diferencia de
+    // "el suscrito", que exigiría contracciones.
+    d.quien = d.propio ? 'quien suscribe' : (d.t_nombre || BLANK);
+    d.posesivo = d.propio ? 'mi' : 'su';
+
+    d.diag = val('h_diag') || BLANK;
+    d.afecta = val('h_afecta') || BLANK;
+    d.urgente = (S.urg === 'si');
+    d.urgdet = val('h_urgdet');
+
+    d.pqr = (S.pqr === 'si');
+    d.p_fecha_txt = fechaLarga(val('p_fecha'));
+    d.p_rad = val('p_rad');
+    d.p_resp = val('p_resp');
+
+    // campos propios del caso
+    c.campos.forEach(function(f){ d[f.id] = val(f.id); });
+    d.c_fecha_txt = fechaLarga(d.c_fecha) || BLANK;
+    d.c_fechadada_txt = fechaLarga(d.c_fechadada);
+    d.dias = diasDesde(d.c_fecha);
+    d.dias_txt = textoDias(d.dias);
+    if (!d.c_veces) d.c_veces = 'varias';
+
+    d.sujetos = SUJETOS.filter(function(s){ return S.sujetos[s.id]; });
+
+    return d;
+  }
+
+  /* ══════════════════ CONSTRUCCIÓN DEL ESCRITO ══════════════════ */
+  function buildSecciones(d){
+    var c = CASOS[S.caso];
+    var sec = [];
+
+    /* ── ENCABEZADO ── */
+    var enc = [];
+    enc.push(d.a_ciudad + ', ' + hoyLargo());
+    enc.push('');
+    enc.push('Señor(a)');
+    enc.push('JUEZ CONSTITUCIONAL (REPARTO)');
+    enc.push(d.ciudad_hechos);
+    enc.push('E. S. D.');
+    enc.push('');
+    var refQuien = d.propio ? d.a_nombre : (d.t_nombre || BLANK) + ', agenciado(a) por ' + d.a_nombre;
+    enc.push('REFERENCIA: ACCIÓN DE TUTELA de ' + refQuien + ' contra ' + d.eps +
+      (d.ips ? ' y ' + d.ips : '') + '. Derecho fundamental a la salud. ' + c.ref + '.');
+    sec.push({ tipo:'enc', lineas:enc });
+
+    /* ── PRESENTACIÓN ── */
+    var pres = d.a_nombre + ', mayor de edad, identificado(a) con ' + d.a_tipodoc + ' número ' + d.a_doc +
+      ', domiciliado(a) en ' + d.a_ciudad + (d.a_depto ? ' (' + d.a_depto + ')' : '') + ', obrando ';
+
+    if (d.propio) {
+      pres += 'en nombre propio';
+    } else if (d.rol === 'menor') {
+      pres += 'en calidad de representante legal de ' + (d.t_nombre || BLANK) + ', menor de edad' +
+        (d.t_edad ? ' de ' + d.t_edad + ' años' : '') + ', identificado(a) con ' + d.t_tipodoc + ' número ' + (d.t_doc || BLANK) +
+        ', en mi condición de ' + (d.t_rel || BLANK);
+    } else {
+      pres += 'como AGENTE OFICIOSO de ' + (d.t_nombre || BLANK) + ', identificado(a) con ' + d.t_tipodoc +
+        ' número ' + (d.t_doc || BLANK) + ', quien es ' + (d.t_rel || BLANK);
+    }
+
+    pres += ', me permito promover ACCIÓN DE TUTELA contra ' + d.eps + (d.ips ? ' y contra ' + d.ips : '') +
+      ', con fundamento en el artículo 86 de la Constitución Política y el Decreto 2591 de 1991, para que se protejan los derechos fundamentales que a continuación invoco, vulnerados con ocasión de los siguientes:';
+    sec.push({ tipo:'p', texto:pres });
+
+    if (d.rol === 'agente') {
+      sec.push({ tipo:'p', texto:'Actúo en calidad de agente oficioso porque la persona agenciada no se encuentra en condiciones de promover su propia defensa, por las siguientes razones: ' +
+        pto(d.t_motivo || BLANK) + ' Esta circunstancia habilita la agencia oficiosa prevista en el artículo 10 del Decreto 2591 de 1991, según el cual se pueden agenciar derechos ajenos cuando el titular no esté en condiciones de promover su propia defensa.' });
+    }
+
+    /* ── HECHOS ── */
+    var hechos = [];
+    hechos.push((d.propio ? 'Me encuentro afiliado(a)' : (d.t_nombre || BLANK) + ' se encuentra afiliado(a)') +
+      ' al Sistema General de Seguridad Social en Salud, en el régimen ' + d.regimen + ', a través de ' + d.eps +
+      ', en calidad de ' + d.calidad + '. Dicha afiliación se encuentra activa.');
+    hechos.push((d.propio ? 'Padezco' : (d.t_nombre || BLANK) + ' padece') + ' el siguiente diagnóstico o condición de salud: ' + pto(d.diag));
+
+    c.hechos(d).forEach(function(h){ hechos.push(h); });
+
+    if (d.pqr) {
+      var pq = 'Con anterioridad a esta acción, ' +
+        (d.p_fecha_txt ? 'el ' + d.p_fecha_txt + ' ' : '') + 'radiqué ante la entidad accionada una petición formal' +
+        (d.p_rad ? ' identificada con el número de radicado ' + d.p_rad : '') + '. ';
+      if (d.p_resp === 'ninguna') pq += 'A la fecha no he recibido respuesta alguna, con lo cual se vulnera también el derecho fundamental de petición consagrado en el artículo 23 de la Constitución Política y desarrollado por la Ley 1755 de 2015.';
+      else if (d.p_resp === 'tramite') pq += 'La entidad se limitó a informar que la solicitud se encuentra "en trámite", sin resolver de fondo ni fijar fecha cierta de cumplimiento. Una respuesta que no resuelve materialmente la petición no satisface el derecho de petición.';
+      else if (d.p_resp === 'negativa') pq += 'La entidad respondió negando el servicio requerido, pese a haber sido ordenado por el médico tratante, con lo cual desconoce la autonomía médica y el carácter fundamental del derecho a la salud.';
+      else pq += 'La entidad respondió prometiendo una fecha de cumplimiento que posteriormente incumplió, lo que agrava la vulneración por generar una expectativa legítima defraudada.';
+      hechos.push(pq);
+    } else {
+      hechos.push('He agotado las gestiones ordinarias ante la entidad accionada por los canales de atención al usuario, sin obtener una solución efectiva. La acción de tutela se presenta como último recurso ante la ineficacia de esas gestiones.');
+    }
+
+    hechos.push('Como consecuencia directa de esta omisión, ' + (d.propio ? 'he sufrido las siguientes afectaciones' : 'se han producido las siguientes afectaciones') + ': ' + pto(d.afecta));
+
+    if (d.sujetos.length) {
+      var quienEs = d.propio ? 'El suscrito accionante ' : (d.t_nombre || BLANK) + ' ';
+      var fr = d.sujetos.map(function(s){ return s.frase; });
+      var frase = fr.length === 1 ? fr[0] : (fr.slice(0, -1).join('; ') + '; y además ' + fr[fr.length - 1]);
+      hechos.push(quienEs + frase +
+        '. Por esa razón el amparo constitucional debe ser reforzado y el análisis del juez de tutela más estricto frente a las barreras de acceso.');
+    }
+
+    hechos.push('No cuento con otro medio de defensa judicial idóneo y eficaz para obtener la protección inmediata que requiere ' +
+      (d.propio ? 'mi salud' : 'la salud de ' + (d.t_nombre || BLANK)) +
+      '. Los mecanismos administrativos ante la entidad accionada y ante la Superintendencia Nacional de Salud ya se han mostrado ineficaces o resultan insuficientes frente a la urgencia de la situación, y someter la protección a un trámite ordinario haría que el remedio llegara tarde.');
+    sec.push({ tipo:'ol', titulo:'I. HECHOS', items:hechos });
+
+    /* ── DERECHOS VULNERADOS ── */
+    var der = ['El derecho fundamental a la SALUD (artículo 49 de la Constitución Política y Ley Estatutaria 1751 de 2015), en sus facetas de accesibilidad, oportunidad, continuidad e integralidad.'];
+    der.push('El derecho fundamental a la VIDA en condiciones dignas y a la INTEGRIDAD PERSONAL (artículos 11 y 12 de la Constitución Política).');
+    der.push('El derecho fundamental a la DIGNIDAD HUMANA (artículo 1 de la Constitución Política).');
+    if (d.pqr && d.p_resp === 'ninguna') der.push('El derecho fundamental de PETICIÓN (artículo 23 de la Constitución Política y Ley 1755 de 2015).');
+    if (S.sujetos.menor) der.push('Los DERECHOS PREVALENTES DE LOS NIÑOS, NIÑAS Y ADOLESCENTES (artículo 44 de la Constitución Política).');
+    if (S.sujetos.mayor) der.push('La PROTECCIÓN ESPECIAL A LAS PERSONAS DE LA TERCERA EDAD (artículo 46 de la Constitución Política).');
+    if (S.sujetos.discap) der.push('La PROTECCIÓN ESPECIAL A LAS PERSONAS EN SITUACIÓN DE DISCAPACIDAD (artículo 47 de la Constitución Política).');
+    if (S.sujetos.gestante) der.push('La PROTECCIÓN ESPECIAL A LA MUJER GESTANTE Y LACTANTE (artículo 43 de la Constitución Política).');
+    der.push('El derecho a la SEGURIDAD SOCIAL como servicio público obligatorio bajo la dirección, coordinación y control del Estado (artículo 48 de la Constitución Política).');
+    sec.push({ tipo:'ol', titulo:'II. DERECHOS FUNDAMENTALES VULNERADOS', items:der });
+
+    /* ── FUNDAMENTOS DE DERECHO ── */
+    var fun = [];
+    fun.push('LA SALUD ES UN DERECHO FUNDAMENTAL AUTÓNOMO. La Ley Estatutaria 1751 de 2015 reconoció expresamente el carácter fundamental y autónomo del derecho a la salud, superando la doctrina de la conexidad. Su artículo 2 obliga al Estado a adoptar las medidas necesarias para garantizar su goce efectivo, y su artículo 6 fija como elementos esenciales la disponibilidad, la aceptabilidad, la accesibilidad y la calidad de los servicios, junto con los principios de continuidad y oportunidad. La Corte Constitucional avaló ese marco en la Sentencia C-313 de 2014.');
+    fun.push('LA OPORTUNIDAD HACE PARTE DEL NÚCLEO DEL DERECHO. Un servicio de salud que se presta tarde no protege el derecho: lo vacía de contenido. El artículo 10 de la Ley 1751 de 2015 reconoce a las personas el derecho a acceder a los servicios de salud de manera oportuna, eficaz y con calidad. Por eso una demora prolongada e injustificada como la descrita en los hechos constituye, en la práctica, una negación del servicio.');
+    fun.push('LAS BARRERAS ADMINISTRATIVAS SON INADMISIBLES. El artículo 14 de la Ley 1751 de 2015 prohíbe que las entidades impongan trámites o barreras administrativas que obstaculicen la prestación de los servicios. La falta de disponibilidad, la ausencia de agenda, el desabastecimiento, la demora en autorizaciones o los problemas de contratación de la red son asuntos internos de la entidad accionada; su ineficiencia organizativa no puede trasladarse al usuario ni convertirse en una carga que este deba soportar en su cuerpo.');
+    fun.push('PREVALENCIA DE LA AUTONOMÍA MÉDICA. Cuando el médico tratante, que es quien conoce el caso concreto, ordena un servicio, esa orden vincula a la entidad. El artículo 17 de la Ley 1751 de 2015 garantiza la autonomía de los profesionales de la salud, de modo que las consideraciones administrativas o financieras no pueden sobreponerse al criterio clínico.');
+    fun.push('PRINCIPIO DE INTEGRALIDAD Y CONTINUIDAD. El artículo 8 de la Ley 1751 de 2015 obliga a suministrar los servicios de manera completa, sin fragmentar la atención. La Corte Constitucional ha sostenido de forma reiterada que las entidades no pueden interrumpir un tratamiento ya iniciado ni obligar al paciente a interponer una acción judicial por cada servicio que requiera.');
+    fun.push('PRECEDENTE ESTRUCTURAL: SENTENCIA T-760 DE 2008. En esa providencia la Corte Constitucional constató fallas estructurales del sistema de salud y ordenó medidas para superarlas. El informe presentado por el Ministerio de Salud y Protección Social en cumplimiento de la orden trigésima de esa sentencia, correspondiente a la vigencia 2025, evidencia que el 64,85% de las tutelas en salud del país reclaman servicios que ya están incluidos en el Plan de Beneficios en Salud y ya están financiados con la UPC. Es decir, el litigio constitucional en salud no se explica por controversias de cobertura, sino por fallas de oportunidad como la que motiva esta acción.');
+    fun.push('PROCEDENCIA DE LA ACCIÓN. La tutela procede porque no existe otro mecanismo judicial idóneo y eficaz para conjurar de manera inmediata la afectación descrita, y porque, en todo caso, de existir, no tendría la eficacia necesaria para evitar un perjuicio irremediable, conforme al artículo 86 de la Constitución Política y al artículo 6 del Decreto 2591 de 1991.');
+    sec.push({ tipo:'ol', titulo:'III. FUNDAMENTOS DE DERECHO', items:fun });
+
+    /* ── PRETENSIONES ── */
+    var pre = [];
+    pre.push('TUTELAR los derechos fundamentales a la salud, a la vida en condiciones dignas, a la integridad personal y a la dignidad humana ' +
+      (d.propio ? 'del suscrito accionante' : 'de ' + (d.t_nombre || BLANK)) + '.');
+    pre.push(c.pretension(d));
+    c.pretensiones_extra(d).forEach(function(p){ pre.push(p); });
+    pre.push('ORDENAR a ' + d.eps + ' que garantice el TRATAMIENTO INTEGRAL de la patología diagnosticada (' + d.diag +
+      '), incluyendo todos los servicios, medicamentos, procedimientos, insumos, exámenes, valoraciones especializadas, terapias, controles y transporte que el médico tratante llegue a ordenar con ocasión de esa condición, sin que ' +
+      (d.propio ? 'el accionante' : (d.t_nombre || BLANK)) + ' deba interponer una nueva acción de tutela por cada servicio requerido.');
+    if (S.sujetos.vulnerable) {
+      pre.push('EXONERAR ' + (d.propio ? 'al suscrito accionante' : 'a ' + (d.t_nombre || BLANK)) +
+        ' del pago de copagos, cuotas moderadoras y cuotas de recuperación asociados a estos servicios, en atención a su situación económica, o subsidiariamente ordenar que la entidad accionada asuma dichos valores y los recobre por los canales que corresponda, sin que la falta de pago sea obstáculo para la prestación del servicio.');
+    }
+    pre.push('ADVERTIR a ' + d.eps + ' que el incumplimiento de la orden judicial dará lugar al trámite de incidente de desacato, con las sanciones de multa y arresto previstas en el artículo 52 del Decreto 2591 de 1991, y compulsar copias a la Superintendencia Nacional de Salud para lo de su competencia.');
+    sec.push({ tipo:'ol', titulo:'IV. PRETENSIONES', items:pre });
+
+    /* ── MEDIDA PROVISIONAL ── */
+    if (d.urgente) {
+      var mp = 'Con fundamento en el artículo 7 del Decreto 2591 de 1991, solicito respetuosamente al despacho DECRETAR MEDIDA PROVISIONAL y ordenar a ' + d.eps +
+        ' que, de manera inmediata y sin esperar el fallo, garantice ' + c.objeto + '. La urgencia se sustenta en lo siguiente: ' + pto(d.urgdet || BLANK) + ' ' +
+        '. La medida resulta necesaria y urgente para proteger el derecho y evitar que el daño se consume, pues de esperarse el término ordinario del fallo la protección podría tornarse ineficaz.';
+      sec.push({ tipo:'p', titulo:'V. SOLICITUD DE MEDIDA PROVISIONAL', texto:mp });
+    }
+
+    /* ── PRUEBAS ── */
+    var pruebas = [];
+    (c.pruebas || c.anexos).forEach(function(a){ pruebas.push(pto(a)); });
+    if (d.pqr) pruebas.push('Copia de la petición radicada ante la entidad accionada' + (d.p_rad ? ' con radicado ' + d.p_rad : '') + (d.p_resp !== 'ninguna' ? ' y de la respuesta recibida' : '') + '.');
+    if (S.rol === 'menor') pruebas.push('Copia del registro civil de nacimiento del menor de edad, que acredita el parentesco y la representación.');
+    pruebas.push('Solicito además al despacho REQUERIR a la entidad accionada para que allegue la historia clínica completa, las órdenes médicas vigentes y el reporte de todas las solicitudes y radicados presentados por el accionante en relación con los hechos de esta tutela.');
+    sec.push({ tipo:'ol', titulo:(d.urgente ? 'VI' : 'V') + '. PRUEBAS Y ANEXOS', items:pruebas });
+
+    /* ── JURAMENTO ── */
+    sec.push({ tipo:'p', titulo:(d.urgente ? 'VII' : 'VI') + '. JURAMENTO',
+      texto:'Bajo la gravedad del juramento manifiesto que no he presentado otra acción de tutela por los mismos hechos y derechos aquí invocados, ante ninguna otra autoridad judicial, de conformidad con el artículo 37 del Decreto 2591 de 1991.' });
+
+    /* ── NOTIFICACIONES ── */
+    var not = [];
+    not.push('ACCIONANTE: ' + pto(d.a_nombre) + ' Dirección: ' + pto(d.a_dir + ', ' + d.a_ciudad) +
+      ' Teléfono: ' + pto(d.a_tel) + ' Correo electrónico: ' + d.a_mail + '.');
+    if (!d.propio) not.push('PERSONA AGENCIADA O REPRESENTADA: ' + (d.t_nombre || BLANK) + '. Se recibirán notificaciones en la misma dirección y correo del accionante.');
+    not.push('ACCIONADA: ' + d.eps + '. Dirección y correo de notificación judicial: ' + BLANK + '.');
+    if (d.ips) not.push('ACCIONADA: ' + d.ips + '. Dirección y correo de notificación judicial: ' + BLANK + '.');
+    sec.push({ tipo:'ol', titulo:(d.urgente ? 'VIII' : 'VII') + '. NOTIFICACIONES', items:not });
+
+    /* ── FIRMA ── */
+    sec.push({ tipo:'firma', nombre:d.a_nombre, doc:d.a_tipodoc + ' No. ' + d.a_doc });
+
+    return sec;
+  }
+
+  /* ══════════════════ RENDER: HTML / TEXTO ══════════════════ */
+  function secToHTML(sec){
+    var out = '';
+    sec.forEach(function(s){
+      if (s.tipo === 'enc') {
+        out += '<p>' + s.lineas.map(function(l){
+          return l === '' ? '<br>' : (l.indexOf('REFERENCIA:') === 0 ? '<b>' + hl(l) + '</b>' : hl(l));
+        }).join('<br>') + '</p>';
+      } else if (s.tipo === 'p') {
+        if (s.titulo) out += '<h4>' + s.titulo + '</h4>';
+        out += '<p>' + hl(s.texto) + '</p>';
+      } else if (s.tipo === 'ol') {
+        out += '<h4>' + s.titulo + '</h4><ol>';
+        s.items.forEach(function(i){ out += '<li>' + hl(i) + '</li>'; });
+        out += '</ol>';
+      } else if (s.tipo === 'firma') {
+        out += '<div class="sign"><p>Atentamente,</p><hr class="rule">' +
+          '<p style="margin:0"><b>' + hl(s.nombre) + '</b><br>' + hl(s.doc) + '</p></div>';
+      }
+    });
+    return out;
+  }
+
+  function hl(t){
+    return esc(t).split(BLANK).join(blankHTML());
+  }
+
+  function secToText(sec){
+    var out = [];
+    sec.forEach(function(s){
+      if (s.tipo === 'enc') { out.push(s.lineas.join('\n')); out.push(''); }
+      else if (s.tipo === 'p') {
+        if (s.titulo) { out.push(''); out.push(s.titulo); out.push(''); }
+        out.push(s.texto); out.push('');
+      } else if (s.tipo === 'ol') {
+        out.push(''); out.push(s.titulo); out.push('');
+        s.items.forEach(function(i, n){ out.push((n + 1) + '. ' + i); out.push(''); });
+      } else if (s.tipo === 'firma') {
+        out.push(''); out.push('Atentamente,'); out.push(''); out.push('');
+        out.push('_______________________________');
+        out.push(s.nombre); out.push(s.doc);
+      }
+    });
+    return out.join('\n');
+  }
+
+  var LAST = { sec:null, d:null };
+
+  function buildDoc(){
+    var d = collect();
+    var sec = buildSecciones(d);
+    LAST.sec = sec; LAST.d = d;
+    $('doc-preview').innerHTML = secToHTML(sec);
+    $('anexos-list').innerHTML = CASOS[S.caso].anexos.map(function(a){
+      return '<li><span>▢</span><span>' + esc(a) + '</span></li>';
+    }).join('');
+  }
+
+  /* ══════════════════ DESCARGAS ══════════════════ */
+  function nombreArchivo(ext){
+    var n = (LAST.d && LAST.d.a_nombre ? LAST.d.a_nombre : 'accionante')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]+/g,'-').toLowerCase().slice(0,40);
+    return 'tutela-salud-' + n + '.' + ext;
+  }
+
+  function download(blob, name){
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 800);
+  }
+
+  $('btn-word').addEventListener('click', function(){
+    if (!LAST.sec) return;
+    var body = secToHTML(LAST.sec)
+      .split('<span class="blank">').join('<span style="background:#ffe9a8">');
+    var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">' +
+      '<head><meta charset="utf-8"><title>Accion de tutela</title>' +
+      '<style>@page{size:21cm 29.7cm;margin:2.5cm}' +
+      'body{font-family:"Times New Roman",serif;font-size:12pt;line-height:1.5;text-align:justify}' +
+      'h4{font-size:12pt;font-weight:bold;text-transform:uppercase;margin:18pt 0 6pt}' +
+      'p{margin:0 0 8pt}ol{margin:0 0 10pt 18pt}li{margin-bottom:7pt;text-align:justify}' +
+      '.rule{border:none;border-top:1px solid #000;width:230px;margin:28pt 0 4pt}</style></head><body>' +
+      body + '</body></html>';
+    download(new Blob(['﻿' + html], { type:'application/msword' }), nombreArchivo('doc'));
+  });
+
+  $('btn-copy').addEventListener('click', function(){
+    if (!LAST.sec) return;
+    var txt = secToText(LAST.sec);
+    var btn = this;
+    var ok = function(){ btn.textContent = 'Copiado ✓'; setTimeout(function(){ btn.textContent = 'Copiar texto'; }, 2000); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).then(ok).catch(function(){ fallbackCopy(txt, ok); });
+    } else { fallbackCopy(txt, ok); }
+  });
+
+  function fallbackCopy(txt, ok){
+    var ta = document.createElement('textarea');
+    ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); ok(); } catch(e){}
+    ta.remove();
+  }
+
+  $('btn-print').addEventListener('click', function(){ window.print(); });
+
+  /* ── PDF con jsPDF cargado bajo demanda ── */
+  function loadJsPDF(){
+    return new Promise(function(res, rej){
+      if (window.jspdf && window.jspdf.jsPDF) return res(window.jspdf.jsPDF);
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+      s.onload = function(){
+        if (window.jspdf && window.jspdf.jsPDF) res(window.jspdf.jsPDF);
+        else rej(new Error('jsPDF no disponible'));
+      };
+      s.onerror = function(){ rej(new Error('No se pudo cargar la librería de PDF')); };
+      document.head.appendChild(s);
+    });
+  }
+
+  $('btn-pdf').addEventListener('click', function(){
+    if (!LAST.sec) return;
+    var btn = this, original = btn.textContent;
+    btn.textContent = 'Generando…'; btn.disabled = true;
+    loadJsPDF().then(function(jsPDF){
+      makePDF(jsPDF);
+      btn.textContent = original; btn.disabled = false;
+    }).catch(function(){
+      btn.textContent = original; btn.disabled = false;
+      alert('No se pudo generar el PDF (posiblemente no hay conexión).\n\nUsa "Imprimir" y elige "Guardar como PDF" en el diálogo de tu navegador: el resultado es equivalente.');
+    });
+  });
+
+  function makePDF(jsPDF){
+    var doc = new jsPDF({ unit:'mm', format:'letter' });
+    var ML = 25, MR = 25, MT = 22, MB = 20;
+    var W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+    var TW = W - ML - MR;
+    var y = MT;
+    var LH = 5.0;
+
+    function nl(n){ y += (n || 1) * LH; }
+    function page(){ doc.addPage(); y = MT; }
+    function room(need){ if (y + (need || LH) > H - MB) page(); }
+
+    function write(txt, opt){
+      opt = opt || {};
+      doc.setFont('times', opt.bold ? 'bold' : 'normal');
+      doc.setFontSize(opt.size || 11.5);
+      var x = ML + (opt.indent || 0);
+      var lines = doc.splitTextToSize(String(txt), TW - (opt.indent || 0));
+      for (var i = 0; i < lines.length; i++) {
+        room();
+        var just = opt.justify && i < lines.length - 1 && lines.length > 1;
+        if (just) doc.text(lines[i], x, y, { maxWidth:TW - (opt.indent || 0), align:'justify' });
+        else doc.text(lines[i], x, y);
+        y += LH;
+      }
+    }
+
+    LAST.sec.forEach(function(s){
+      if (s.tipo === 'enc') {
+        s.lineas.forEach(function(l){
+          if (l === '') { nl(0.7); return; }
+          write(l, { bold: l.indexOf('REFERENCIA:') === 0 || l.indexOf('JUEZ') === 0, justify:true });
+        });
+        nl(1);
+      } else if (s.tipo === 'p') {
+        if (s.titulo) { nl(0.8); room(LH * 2); write(s.titulo, { bold:true }); nl(0.3); }
+        write(s.texto, { justify:true }); nl(0.7);
+      } else if (s.tipo === 'ol') {
+        nl(0.8); room(LH * 3); write(s.titulo, { bold:true }); nl(0.4);
+        s.items.forEach(function(it, n){
+          var num = (n + 1) + '. ';
+          room(LH * 2);
+          doc.setFont('times','normal'); doc.setFontSize(11.5);
+          doc.text(num, ML, y);
+          write(it, { indent:8, justify:true });
+          nl(0.35);
+        });
+      } else if (s.tipo === 'firma') {
+        nl(2); room(LH * 6);
+        write('Atentamente,'); nl(3);
+        doc.setLineWidth(0.3); doc.line(ML, y, ML + 65, y); nl(0.9);
+        write(s.nombre, { bold:true });
+        write(s.doc);
+      }
+    });
+
+    var total = doc.internal.getNumberOfPages();
+    for (var p = 1; p <= total; p++) {
+      doc.setPage(p);
+      doc.setFont('times','normal'); doc.setFontSize(8.5);
+      doc.setTextColor(120);
+      doc.text('Página ' + p + ' de ' + total, W / 2, H - 12, { align:'center' });
+      doc.setTextColor(0);
+    }
+    doc.save(nombreArchivo('pdf'));
+  }
+
+  /* ══════════════════ BORRADOR LOCAL (opt-in) ══════════════════ */
+  var KEY = 'tutela-salud-borrador-v1';
+
+  $('btn-save').addEventListener('click', function(){
+    var msg = $('save-msg');
+    try {
+      var payload = { caso:S.caso, rol:S.rol, pqr:S.pqr, urg:S.urg, sujetos:S.sujetos, campos:{} };
+      ['a_nombre','a_tipodoc','a_doc','a_ciudad','a_depto','a_dir','a_tel','a_mail',
+       't_nombre','t_tipodoc','t_doc','t_rel','t_edad','t_motivo',
+       'e_eps','e_regimen','e_calidad','e_ips','e_ciudad_hechos',
+       'h_diag','h_afecta','h_urgdet','p_fecha','p_rad','p_resp'].forEach(function(id){ payload.campos[id] = val(id); });
+      CASOS[S.caso].campos.forEach(function(f){ payload.campos[f.id] = val(f.id); });
+      localStorage.setItem(KEY, JSON.stringify(payload));
+      msg.innerHTML = 'Borrador guardado <b>solo en este dispositivo</b>, en el almacenamiento local de tu navegador. ' +
+        'Nadie más puede verlo. <button class="btn btn-ghost btn-sm" id="btn-del" style="margin-left:.5rem">Borrarlo ahora</button>';
+      $('btn-del').addEventListener('click', function(){
+        try { localStorage.removeItem(KEY); } catch(e){}
+        msg.textContent = 'Borrador eliminado de este dispositivo.';
+      });
+    } catch(e){
+      msg.textContent = 'No se pudo guardar (tu navegador tiene bloqueado el almacenamiento local). No pasa nada: descarga el documento.';
+    }
+  });
+
+  function tryRestore(){
+    var raw;
+    try { raw = localStorage.getItem(KEY); } catch(e){ return; }
+    if (!raw) return;
+    var p;
+    try { p = JSON.parse(raw); } catch(e){ return; }
+    if (!p || !p.caso || !CASOS[p.caso]) return;
+
+    var bar = document.createElement('div');
+    bar.className = 'notice green no-print';
+    bar.style.margin = '1.6rem 0 0';
+    bar.innerHTML = '<b>Tienes un borrador guardado en este dispositivo</b> del caso "' + esc(CASOS[p.caso].nombre) + '". ' +
+      '<button class="btn btn-primary btn-sm" id="rest-yes" style="margin:.55rem .5rem 0 0">Retomarlo</button>' +
+      '<button class="btn btn-ghost btn-sm" id="rest-no" style="margin-top:.55rem">Descartarlo</button>';
+    var host = $('panel-inicio');
+    host.insertBefore(bar, host.querySelector('.stats'));
+
+    document.getElementById('rest-yes').addEventListener('click', function(){
+      startCaso(p.caso);
+      S.rol = p.rol || 'propio'; S.pqr = p.pqr || 'no'; S.urg = p.urg || 'no'; S.sujetos = p.sujetos || {};
+      Object.keys(p.campos || {}).forEach(function(id){
+        var el = $(id); if (el && p.campos[id]) el.value = p.campos[id];
+      });
+      // refleja los toggles en la interfaz
+      var rolBtn = document.querySelector('#rol-row [data-rol="' + S.rol + '"]'); if (rolBtn) rolBtn.click();
+      var pqrBtn = document.querySelector('#pqr-row [data-pqr="' + S.pqr + '"]'); if (pqrBtn) pqrBtn.click();
+      var urgBtn = document.querySelector('#urg-row [data-urg="' + S.urg + '"]'); if (urgBtn) urgBtn.click();
+      Object.keys(S.sujetos).forEach(function(sid){
+        if (!S.sujetos[sid]) return;
+        var inp = document.querySelector('[data-sid="' + sid + '"]');
+        if (inp) { inp.checked = true; inp.closest('.chk').classList.add('on'); }
+      });
+      $('acepta').checked = true; $('acepta').closest('.chk').classList.add('on');
+      bar.remove();
+    });
+    document.getElementById('rest-no').addEventListener('click', function(){
+      try { localStorage.removeItem(KEY); } catch(e){}
+      bar.remove();
+    });
+  }
+  tryRestore();
+
+  /* Aviso al salir si hay datos sin descargar */
+  var dirty = false;
+  document.addEventListener('input', function(){ dirty = true; });
+  window.addEventListener('beforeunload', function(e){
+    if (!dirty) return;
+    e.preventDefault(); e.returnValue = '';
+  });
+  ['btn-pdf','btn-word','btn-save'].forEach(function(id){
+    var b = $(id); if (b) b.addEventListener('click', function(){ dirty = false; });
+  });
+
+})();
+</script>
+</body>
+</html>
