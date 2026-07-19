@@ -136,6 +136,17 @@
     .com-card{background:var(--card-bg);border:1px solid var(--card-border);padding:1.4rem 1.5rem;display:flex;flex-direction:column;gap:.8rem;cursor:none;transition:border-color .2s}
     .com-card:hover{border-color:var(--blue-light)}
     .com-cta{font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue-light);text-align:right;margin-top:-.15rem}
+
+    /* acuerdo de presidencia (borrador sin confirmar) */
+    .draft-badge{display:inline-block;font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:#060810;background:var(--amber);padding:.22rem .6rem;margin-left:.65rem;vertical-align:middle;font-weight:700}
+    .ap-chip-mini{display:inline-block;font-size:.72rem;font-weight:600;padding:.22rem .5rem;border:1px solid transparent;margin:.12rem 0}
+    .ap-or{display:block;font-size:.58rem;color:var(--gray);margin:.15rem 0}
+    .mesa-table{display:flex;flex-direction:column;gap:.5rem;margin-top:.8rem;overflow-x:auto}
+    .mesa-row{display:grid;grid-template-columns:180px repeat(4,1fr);gap:.6rem;align-items:center;min-width:640px}
+    .mesa-row.mesa-head{font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gray)}
+    .mesa-head span{text-align:center}
+    .mesa-cargo{font-size:.78rem;color:var(--white);font-weight:600}
+    .mesa-cell{text-align:center}
     .com-top{display:flex;align-items:baseline;justify-content:space-between;gap:1rem}
     .com-name{font-family:var(--hn);font-weight:700;font-size:1.05rem;letter-spacing:-.01em;color:var(--white)}
     .com-cupos{font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--gray);white-space:nowrap}
@@ -350,6 +361,13 @@
     <p class="sec-sub">Cada proyecto de ley vive o muere primero en una de las <strong>siete comisiones constitucionales permanentes</strong> (Ley 3ª de 1992). Tras la instalación del 20 de julio, las plenarias eligen a los integrantes de cada comisión — <strong>esta sección se actualiza apenas queden definidos</strong>. Mientras tanto, cada tarjeta muestra qué tramita la comisión y cómo le ha ido en el histórico 1990-2026.</p>
     <div class="com-grid" id="com-grid"></div>
     <div class="note" style="margin-top:1.1rem">Además de las siete constitucionales operan las <b>comisiones legales</b> (Ética, Acusaciones, Derechos Humanos, Cuentas y la Comisión Legal para la Equidad de la Mujer) y las <b>económicas conjuntas</b> (Tercera y Cuarta de ambas cámaras, que tramitan juntas el Presupuesto General y el Plan Nacional de Desarrollo). Los cupos por cámara son los de referencia de la Ley 3ª de 1992; se ajustan con las curules especiales.</div>
+
+    <div class="panel" style="margin-top:1.6rem">
+      <h3>Mesa directiva de la Plenaria de Cámara<span class="draft-badge">Borrador · sin confirmar</span></h3>
+      <p class="note" style="margin:0 0 1rem">Circula entre compromisarios un acuerdo político de repartición de la mesa directiva de la Plenaria de Cámara, un partido distinto por cada año del cuatrienio (2026–2030). No incluye nombres de personas — solo aplica a Cámara, click en cada comisión para ver su propio acuerdo de presidencia.</p>
+      <div class="mesa-table" id="mesa-table"></div>
+      <div class="note">Esto es un <b>borrador sin confirmar</b>, no una designación oficial de la Secretaría de Cámara. Fuente: documento de Axis Consultoría Pública, citado por Laura Villa (<a href="https://x.com/LauraV_Villa" target="_blank" rel="noopener" style="color:var(--blue-light)">@LauraV_Villa</a>) el 19 de julio de 2026.</div>
+    </div>
   </section>
 
   <!-- ══ CONGRESISTAS ═══════════════════════════════════════════ -->
@@ -463,6 +481,32 @@
     [/estatuto/i,'Estatuto de Oposición','#6b7b87'],
   ];
   function bancadaOf(p){ for(const [re,name,color] of BANCADAS) if(re.test(p)) return {name,color}; return {name:'Otros y coaliciones',color:'#8494a0'}; }
+  /* una celda puede traer 2 partidos separados por "/" (p.ej. "Cambio Radical / CITREP") */
+  function partyChips(text){
+    return String(text||'').split('/').map(p=>p.trim()).filter(Boolean).map((p,i,arr)=>{
+      const b=bancadaOf(p);
+      const chip=`<span class="ap-chip-mini" style="color:${b.color};background:${b.color}1a;border-color:${b.color}55">${esc(p)}</span>`;
+      return i<arr.length-1?chip+'<span class="ap-or">o</span>':chip;
+    }).join('');
+  }
+
+  /* ── mesa directiva de la Plenaria de Cámara (BORRADOR SIN CONFIRMAR) ──
+     Fuente: documento "Acuerdos para las presidencias" de Axis
+     Consultoría Pública, citado por Laura Villa (@LauraV_Villa) el
+     19 de julio de 2026 como "borrador que está circulando" entre
+     compromisarios. Solo cubre Cámara — no trae nombres de personas. */
+  const MESA_CAMARA=[
+    {cargo:'Presidencia', anios:['Partido Conservador','Partido Liberal','Centro Democrático','Centro Democrático']},
+    {cargo:'1ª vicepresidencia', anios:['CITREP','Centro Democrático (por resolver)','Partido Liberal (por resolver)','CITREP']},
+    {cargo:'2ª vicepresidencia', anios:['Partido Liberal','Partido Liberal','Partido Liberal','Partido Liberal']},
+    {cargo:'Subsecretaría', anios:['Centro Democrático','Centro Democrático','Centro Democrático','Centro Democrático']},
+    {cargo:'Dirección administrativa', anios:['Partido de la U','Partido de la U','Partido de la U','Partido de la U']},
+  ];
+  function renderMesaCamara(){
+    const box=document.getElementById('mesa-table'); if(!box) return;
+    box.innerHTML=`<div class="mesa-row mesa-head"><span></span><span>Año 1</span><span>Año 2</span><span>Año 3</span><span>Año 4</span></div>`+
+      MESA_CAMARA.map(r=>`<div class="mesa-row"><span class="mesa-cargo">${esc(r.cargo)}</span>${r.anios.map(a=>`<span class="mesa-cell">${partyChips(a)}</span>`).join('')}</div>`).join('');
+  }
 
   /* composición por bancada (barras segmentadas) */
   function renderComp(){
@@ -742,6 +786,7 @@
   updateNavAuth();
   renderComp();
   renderComisiones();
+  renderMesaCamara();
   loadComisionMiembros();
   rosterInit();
   proysInit();
