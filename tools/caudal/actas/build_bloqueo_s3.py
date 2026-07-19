@@ -81,7 +81,9 @@ def main():
         per_com.append({'com': com, 'proyectos': len(idx),
                         'sesiones': data.get('n_sesiones_con_proyectos', 0),
                         'mediana_agend': ns[len(ns) // 2] if ns else 0,
-                        'pct_1o_tratado': round(100 * b['1º'][0] / b['1º'][1], 1) if b['1º'][1] else 0})
+                        'pct_1o_tratado': round(100 * b['1º'][0] / b['1º'][1], 1) if b['1º'][1] else 0,
+                        'p_tratado_por_posicion': {lab: {'pct': round(100 * b[lab][0] / b[lab][1], 1) if b[lab][1] else 0,
+                                                         'n': b[lab][1]} for _, _, lab in BUCKETS}})
 
     sistema = {
         'p_tratado_por_posicion': {lab: {'pct': round(100 * nat[lab][0] / nat[lab][1], 1) if nat[lab][1] else 0,

@@ -96,6 +96,40 @@
     .note{font-size:.68rem;color:rgba(255,255,255,.35);line-height:1.6;margin-top:.8rem}
     .note b{color:var(--gray)}
 
+    /* ── histórico de la comisión (embudo · mortandad · bloqueo) ──── */
+    .panel{background:var(--card-bg);border:1px solid var(--card-border);padding:1.5rem 1.5rem}
+    .panel h3{font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;color:var(--gray);margin-bottom:1.1rem;font-weight:500}
+    .hist-charts{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-top:1.2rem}
+    .panel.wide{grid-column:1 / -1}
+    @media(max-width:900px){ .hist-charts{grid-template-columns:1fr} }
+
+    .funnel2{display:flex;flex-direction:column;gap:.45rem}
+    .f2-row{display:flex;align-items:center;gap:.7rem}
+    .f2-lab{width:130px;font-size:.68rem;color:var(--gray);text-align:right;flex-shrink:0}
+    .f2-track{flex:1;display:flex;justify-content:center}
+    .f2-bar{height:24px;background:linear-gradient(90deg,var(--blue),var(--blue-light));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:.7rem;min-width:32px;width:0;transition:width .8s cubic-bezier(.2,.8,.2,1)}
+    .f2-pct{width:48px;font-size:.62rem;color:rgba(255,255,255,.35);flex-shrink:0}
+
+    .mort{display:flex;gap:.7rem;align-items:flex-end;height:120px;margin-bottom:.5rem}
+    .mort-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:.4rem;height:100%}
+    .mort-wrap{flex:1;display:flex;align-items:flex-end;width:100%}
+    .mort-bar{width:100%;min-height:4px;background:linear-gradient(180deg,var(--red),#8a3730);position:relative;height:0;transition:height .8s cubic-bezier(.2,.8,.2,1)}
+    .mort-bar span{position:absolute;top:-15px;left:50%;transform:translateX(-50%);font-size:.6rem;color:var(--gray)}
+    .mort-lab{font-size:.58rem;color:rgba(255,255,255,.35)}
+
+    .cx-row{display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem}
+    .cx-lab{width:90px;font-size:.7rem;color:var(--white);flex-shrink:0;white-space:nowrap}
+    .cx-bar{flex:1;height:8px;background:var(--card-bg2);overflow:hidden}
+    .cx-bar>span{display:block;height:100%;background:linear-gradient(90deg,var(--amber),#e8b96a);width:0;transition:width .7s}
+    .cx-n{width:66px;text-align:right;font-size:.62rem;color:var(--gray);flex-shrink:0}
+
+    .find-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:1rem;margin-top:1.4rem}
+    .find{background:var(--card-bg);border:1px solid var(--card-border);border-top:2px solid var(--blue);padding:1.1rem}
+    .find .fn{font-family:var(--hn);font-weight:800;font-size:1.35rem;letter-spacing:-.02em;color:var(--white)}
+    .find .ft{font-size:.76rem;font-weight:600;color:var(--white);margin-top:.35rem}
+    .find .fd{font-size:.7rem;font-weight:300;color:var(--gray);line-height:1.55;margin-top:.35rem}
+    @media(max-width:900px){ .find-grid{grid-template-columns:repeat(2,1fr)} }
+
     /* ── acuerdo de presidencia (borrador sin confirmar) ─────────── */
     .draft-badge{display:inline-block;font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:#060810;background:var(--amber);padding:.22rem .6rem;margin-left:.65rem;vertical-align:middle;font-weight:700}
     .ap-years{display:grid;grid-template-columns:repeat(4,1fr);gap:.7rem;margin:1.2rem 0 .3rem}
@@ -267,6 +301,12 @@
     <div class="sec-tag">Histórico</div>
     <h2 class="sec-title">Cómo le ha ido a esta comisión</h2>
     <p class="sec-sub" id="hist-sub"></p>
+    <div class="hist-charts">
+      <div class="panel"><h3>El embudo del trámite en esta comisión</h3><div id="embudo-box"></div><div class="note">Cada fila es una fase del trámite; el ↓% dice cuántos sobreviven de una fase a la siguiente.</div></div>
+      <div class="panel"><h3>Mortandad por año del cuatrienio</h3><div id="mort-box"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
+      <div class="panel wide"><h3>Bloqueo en comisión · el orden del día decide</h3><div id="bloq-box"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
+    </div>
+    <div class="find-grid" id="find-grid"></div>
   </section>
 
   <footer>
@@ -400,6 +440,7 @@
     renderGroups();
     loadMiembros();
     loadProyectos();
+    loadHistoricoComision();
     document.getElementById('hist-sub').innerHTML=`Desde 1991, esta comisión ha tramitado <b style="color:var(--white)">${fmt((COM_HIST[COM.key]||{}).t)}</b> proyectos de ley, de los cuales <b style="color:var(--green)">${(COM_HIST[COM.key]||{}).l||0}</b> terminaron sancionados como ley (${(COM_HIST[COM.key]||{}).t?Math.round(100*(COM_HIST[COM.key]||{}).l/(COM_HIST[COM.key]||{}).t):0}%). Fuente: Secretaría del Senado · análisis propio 1990–2026.`;
   }
   function paintKpis(){
@@ -493,6 +534,7 @@
   const TITLE_PREF=/^\s*por\s+(?:medio\s+de\s+)?(?:el\s+medio\s+de\s+)?(?:la|el|los|las)?\s*cual(?:es)?\s+se\s+/i;
   function shortTitle(t){ let s=String(t||'').replace(TITLE_PREF,'').replace(/\s+/g,' ').trim(); if(s.length<6) s=String(t||'').replace(/\s+/g,' ').trim(); return s.charAt(0).toUpperCase()+s.slice(1).toLowerCase(); }
   const RES_TXT={EN_TRAMITE:['En trámite','res-tramite'],LEY:['Ley','res-ley'],ARCHIVADO_TIEMPO:['Archivado por tiempo','res-tiempo'],ARCHIVADO_OTRO:['Archivado','res-otro'],RETIRADO:['Retirado','res-otro'],SIN_DATO:['Sin dato','res-otro'],OTRO:['Otro','res-otro']};
+  let PROY_COMISION=null; // lista completa de la comisión (para embudo + hallazgos)
   async function loadProyectos(){
     const box=document.getElementById('com-proy-list');
     const shortName=COM.nombre.replace('Comisión ','');
@@ -501,7 +543,9 @@
       // pedir un límite mayor que el total de la comisión (máx ~2.4k) para no
       // quedarnos con los proyectos más VIEJOS en vez de los más recientes.
       const r=await call({action:'buscar', comision:shortName, limit:20000});
-      const items=(r.resultados||[]).sort((a,b)=>(b.a-a.a)||(b.id-a.id)).slice(0,5);
+      PROY_COMISION=r.resultados||[];
+      renderEmbudoYHallazgosProyectos();
+      const items=[...PROY_COMISION].sort((a,b)=>(b.a-a.a)||(b.id-a.id)).slice(0,5);
       if(!items.length){ box.innerHTML='<div class="note" style="margin-top:0">Sin proyectos registrados para esta comisión todavía.</div>'; return; }
       box.innerHTML=items.map(p=>{
         const res=RES_TXT[p.res]||[p.res||'—','res-otro'];
@@ -526,6 +570,85 @@
     }catch(e){
       box.innerHTML='<div class="note" style="margin-top:0">No se pudo cargar el radar de proyectos.</div>';
     }
+  }
+
+  /* ── histórico de la comisión: embudo + mortandad general + bloqueo real ── */
+  const ETAPA_LABEL=['Presentado','1er debate · Senado','2º debate · Senado','1er debate · Cámara','2º debate · Cámara','Ley'];
+  function funnel(embudo){
+    const ks=Object.keys(embudo); const max=embudo[ks[0]]||1; let prev=null;
+    return `<div class="funnel2">${ks.map(k=>{const v=embudo[k];const w=Math.max(8,Math.round(100*v/max));const pct=(prev!=null&&prev>0)?Math.round(100*v/prev):null;prev=v;
+      return `<div class="f2-row"><div class="f2-lab">${esc(k)}</div><div class="f2-track"><div class="f2-bar" data-w="${w}">${fmt(v)}</div></div><div class="f2-pct">${pct!=null?'↓ '+pct+'%':''}</div></div>`;}).join('')}</div>`;
+  }
+  let FIND_A=null; // {tLey, nTotal, nTiempo} — de los proyectos de la comisión
+  function renderEmbudoYHallazgosProyectos(){
+    const items=PROY_COMISION||[];
+    const box=document.getElementById('embudo-box');
+    if(!items.length){ box.innerHTML='<div class="note" style="margin-top:0">Sin proyectos registrados todavía.</div>'; FIND_A={nTotal:0,nLey:0,nTiempo:0}; maybeRenderFindGrid(); return; }
+    const embudo={}; ETAPA_LABEL.forEach((lab,i)=>{ embudo[lab]=items.filter(it=>it.et>=i).length; });
+    box.innerHTML=funnel(embudo);
+    requestAnimationFrame(()=>box.querySelectorAll('.f2-bar').forEach(b=>b.style.width=b.dataset.w+'%'));
+    FIND_A={nTotal:items.length, nLey:items.filter(it=>it.res==='LEY').length, nTiempo:items.filter(it=>it.res==='ARCHIVADO_TIEMPO').length};
+    maybeRenderFindGrid();
+  }
+  function mortandadChart(mort){
+    if(!mort) return '<div class="note" style="margin-top:0">Sin datos de mortandad por ahora.</div>';
+    const rows=Object.entries(mort); const max=Math.max(...rows.map(([,v])=>v.pct_muerte_tiempo||0),1);
+    const hot=rows.reduce((m,r)=>(r[1].pct_muerte_tiempo||0)>(m[1].pct_muerte_tiempo||0)?r:m,rows[0]);
+    return `<div class="mort">${rows.map(([k,v])=>`<div class="mort-col"><div class="mort-wrap"><div class="mort-bar" data-h="${Math.round(100*(v.pct_muerte_tiempo||0)/max)}" style="${k===hot[0]?'background:linear-gradient(180deg,#e8695e,var(--red))':''}"><span>${v.pct_muerte_tiempo}%</span></div></div><div class="mort-lab">Año ${k}</div></div>`).join('')}</div><div class="note">% de proyectos que muere por vencimiento de términos (Art. 190) según el año del cuatrienio en que se radicó. <b>Patrón general del Congreso</b>, no exclusivo de esta comisión — no hay desagregación por comisión para este cálculo.</div>`;
+  }
+  let FIND_C=null; // {pct1, pctLow, mediana} — del índice de bloqueo real de la comisión
+  function posChartCom(c){
+    if(!c){ FIND_C=false; maybeRenderFindGrid(); return '<div class="note" style="margin-top:0">Sin datos de bloqueo para esta comisión todavía (el índice cubre 7 comisiones de Cámara con órdenes del día digitalizados).</div>'; }
+    const P=c.p_tratado_por_posicion, labs=['1º','2º-3º','4º-6º','7º-10º','11º-15º','16º+'];
+    const max=Math.max(...labs.map(l=>(P[l]||{}).pct||0),1);
+    const bars=labs.map(l=>{const v=(P[l]||{}).pct||0;
+      return `<div class="cx-row"><span class="cx-lab">${l} del día</span><span class="cx-bar"><span data-w="${Math.round(100*v/max)}"></span></span><span class="cx-n">${v}%</span></div>`;}).join('');
+    const chico=c.sesiones<60?`<div class="note">Muestra pequeña (${c.sesiones} sesiones registradas) — estos porcentajes son menos estables que los de comisiones con más historial.</div>`:'';
+    // buckets con n<8 son ruido (a veces n=0, "0%" ahí no significa "nunca se trata",
+    // significa "sin datos") — se excluyen del hallazgo destacado, aunque igual
+    // aparecen en la barra con su valor real.
+    const MIN_N=8;
+    const otras=labs.filter(l=>l!=='1º'&&l!=='16º+'&&((P[l]||{}).n||0)>=MIN_N);
+    const pctLow=otras.length?Math.min(...otras.map(l=>(P[l]||{}).pct||0)):null;
+    const pct1=((P['1º']||{}).n||0)>=MIN_N?(P['1º']||{}).pct||0:null;
+    FIND_C={pct1, pctLow, mediana:c.mediana_agend};
+    maybeRenderFindGrid();
+    return `<div class="note" style="margin:0 0 .8rem">Probabilidad de que un proyecto de <b>esta comisión</b> se <b>debata</b> según su posición en el orden del día — medida sobre ${fmt(c.proyectos)} proyectos en ${fmt(c.sesiones)} sesiones.</div>${bars}${chico}<div class="note">Ser el 1º del día ≈ ${(P['1º']||{}).pct||0}% de probabilidad de ser tratado. <b>El orden de la agenda decide.</b></div>`;
+  }
+  function maybeRenderFindGrid(){
+    if(!FIND_A||FIND_C===null) return;
+    const h=COM_HIST[COM.key]||{t:0,l:0};
+    const cards=[];
+    cards.push({fn: h.l?`1 de ${Math.max(1,Math.round(h.t/h.l))}`:'—', ft:'termina en ley',
+      fd:`De ${fmt(h.t)} proyectos de esta comisión desde 1991, solo ${fmt(h.l)} (${h.t?Math.round(100*h.l/h.t):0}%) completaron el trámite.`});
+    cards.push({fn: fmt(FIND_A.nTiempo), ft:'muertos por el reloj',
+      fd:`De los ${fmt(FIND_A.nTotal)} proyectos radicados en esta comisión desde 1991, el archivo por vencimiento de términos (Art. 190) es la causa más común de caída.`});
+    if(FIND_C){
+      if(FIND_C.pct1!=null&&FIND_C.pctLow!=null){
+        cards.push({fn:`${FIND_C.pct1}% → ${FIND_C.pctLow}%`, ft:'el orden del día decide',
+          fd:`Ser el 1º de la agenda en esta comisión da ${FIND_C.pct1}% de probabilidad de tratarse; cae a ${FIND_C.pctLow}% cuando no está entre los primeros.`});
+      }
+      if(FIND_C.mediana){
+        cards.push({fn:`${FIND_C.mediana}×`, ft:'veces en el orden del día',
+          fd:`Un proyecto perseguido (agendado ≥2 veces) de esta comisión pasa una mediana de ${FIND_C.mediana} veces por el orden del día antes de resolverse.`});
+      }
+    }
+    document.getElementById('find-grid').innerHTML=cards.map(c=>`<div class="find"><div class="fn">${esc(c.fn)}</div><div class="ft">${esc(c.ft)}</div><div class="fd">${esc(c.fd)}</div></div>`).join('');
+  }
+  async function loadHistoricoComision(){
+    try{
+      const s=await call({action:'stats'});
+      const mb=document.getElementById('mort-box');
+      mb.innerHTML=s&&s.mortandad_por_anio_cuatrienio?mortandadChart(s.mortandad_por_anio_cuatrienio):'<div class="note" style="margin-top:0">Sin datos de mortandad por ahora.</div>';
+      requestAnimationFrame(()=>mb.querySelectorAll('.mort-bar').forEach(x=>x.style.height=x.dataset.h+'%'));
+    }catch(e){ document.getElementById('mort-box').innerHTML='<div class="note" style="margin-top:0">Sin datos de mortandad por ahora.</div>'; }
+    try{
+      const b=await call({action:'bloqueo'});
+      const c=(b.comisiones||[]).find(x=>x.com===COM.key.toLowerCase());
+      const el=document.getElementById('bloq-box');
+      el.innerHTML=posChartCom(c);
+      requestAnimationFrame(()=>el.querySelectorAll('.cx-bar > span').forEach(x=>x.style.width=x.dataset.w+'%'));
+    }catch(e){ document.getElementById('bloq-box').innerHTML='<div class="note" style="margin-top:0">Sin datos de bloqueo por ahora.</div>'; FIND_C=false; maybeRenderFindGrid(); }
   }
   async function toggleDetail(row){
     row.classList.toggle('open');
