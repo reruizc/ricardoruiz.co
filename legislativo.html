@@ -105,6 +105,14 @@
     .kpi .l{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gray);margin-top:.45rem;line-height:1.45}
     .kpi.hl .n{color:var(--green)}
     .kpi.hl2 .n{color:var(--blue-light)}
+    .kpi{position:relative}
+    .kpi.hasinfo{cursor:default}
+    .kpi-ihint{display:inline-flex;align-items:center;justify-content:center;width:12px;height:12px;border:1px solid var(--gray-light);border-radius:50%;font-size:.56rem;font-style:italic;font-weight:800;color:var(--gray-light);margin-left:.3rem;vertical-align:middle}
+    .kpi.hasinfo:hover .kpi-ihint{border-color:#e08fb8;color:#e08fb8}
+    .kpi-pop{position:absolute;left:0;top:calc(100% + 8px);z-index:60;width:min(300px,86vw);background:#0e1220;border:1px solid var(--card-border);padding:1.05rem 1.1rem;box-shadow:0 12px 30px rgba(0,0,0,.5);display:none;text-align:left}
+    .kpi.hasinfo:hover .kpi-pop,.kpi.hasinfo.open .kpi-pop{display:block}
+    .kp-title{font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--gray);margin-bottom:.85rem}
+    .kp-note{font-size:.64rem;color:rgba(255,255,255,.4);line-height:1.55;margin-top:.75rem}
 
     /* paneles / cards */
     .panel{background:var(--card-bg);border:1px solid var(--card-border);padding:1.5rem 1.5rem}
@@ -125,7 +133,9 @@
 
     /* comisiones */
     .com-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem}
-    .com-card{background:var(--card-bg);border:1px solid var(--card-border);padding:1.4rem 1.5rem;display:flex;flex-direction:column;gap:.8rem}
+    .com-card{background:var(--card-bg);border:1px solid var(--card-border);padding:1.4rem 1.5rem;display:flex;flex-direction:column;gap:.8rem;cursor:none;transition:border-color .2s}
+    .com-card:hover{border-color:var(--blue-light)}
+    .com-cta{font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue-light);text-align:right;margin-top:-.15rem}
     .com-top{display:flex;align-items:baseline;justify-content:space-between;gap:1rem}
     .com-name{font-family:var(--hn);font-weight:700;font-size:1.05rem;letter-spacing:-.01em;color:var(--white)}
     .com-cupos{font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--gray);white-space:nowrap}
@@ -314,7 +324,16 @@
       <div class="kpi"><div class="n">286</div><div class="l">Congresistas</div></div>
       <div class="kpi hl2"><div class="n">103</div><div class="l">Senadores</div></div>
       <div class="kpi hl"><div class="n">183</div><div class="l">Representantes</div></div>
-      <div class="kpi"><div class="n">29,7%</div><div class="l">Mujeres (85 curules)</div></div>
+      <div class="kpi hasinfo" id="kpi-mujeres">
+        <div class="n">29,7%</div><div class="l">Mujeres (85 curules) <span class="kpi-ihint">i</span></div>
+        <div class="kpi-pop">
+          <div class="kp-title">Mujeres electas al Congreso · serie histórica</div>
+          <div class="cx-row"><span class="cx-lab">2018</span><span class="cx-bar"><span style="width:66%;background:linear-gradient(90deg,#a24a78,#e08fb8)"></span></span><span class="cx-n">19,7%</span></div>
+          <div class="cx-row"><span class="cx-lab">2022</span><span class="cx-bar"><span style="width:98%;background:linear-gradient(90deg,#a24a78,#e08fb8)"></span></span><span class="cx-n">29%</span></div>
+          <div class="cx-row"><span class="cx-lab">2026</span><span class="cx-bar"><span style="width:100%;background:linear-gradient(90deg,#a24a78,#e08fb8)"></span></span><span class="cx-n">29,7%</span></div>
+          <div class="kp-note">En 1998 las mujeres no llegaban al 12% del Senado. Entre 2022 y 2026 la curva <b>se detuvo</b> pese a un récord de candidaturas: el 40,9% de quienes se lanzaron al Congreso 2026 fueron mujeres. Fuente: comunicado de prensa · Mujeres por la Democracia (MxD), 20 jul 2026.</div>
+        </div>
+      </div>
       <div class="kpi"><div class="n">16</div><div class="l">Curules de paz (CITREP)</div></div>
     </div>
     <div class="panel">
@@ -410,7 +429,7 @@
   document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.left=mx+'px';cur.style.top=my+'px';});
   (function loop(){rx+=(mx-rx)*.1;ry+=(my-ry)*.1;ri.style.left=rx+'px';ri.style.top=ry+'px';requestAnimationFrame(loop);})();
   document.addEventListener('mouseover',e=>{
-    if(e.target.closest('a,button,select,input')){cur.style.transform='translate(-50%,-50%) scale(2)';cur.style.background='transparent';cur.style.border='1.5px solid var(--blue)';ri.style.opacity='0';}
+    if(e.target.closest('a,button,select,input,.com-card,.kpi.hasinfo')){cur.style.transform='translate(-50%,-50%) scale(2)';cur.style.background='transparent';cur.style.border='1.5px solid var(--blue)';ri.style.opacity='0';}
     else{cur.style.transform='translate(-50%,-50%) scale(1)';cur.style.background='var(--blue)';cur.style.border='none';ri.style.opacity='.35';}
   });
 
@@ -489,11 +508,12 @@
       }else{
         intHtml=`<div class="ci-note">Integrantes en definición — las plenarias eligen las comisiones tras la instalación del 20 de julio. Esta tarjeta se actualiza apenas queden conformadas.</div>`;
       }
-      return `<div class="com-card">
+      return `<div class="com-card" onclick="location.href='comision.html?id=${c.key}'">
         <div class="com-top"><span class="com-name">${c.nombre}</span><span class="com-cupos">${c.sen} Senado · ${c.cam} Cámara</span></div>
         <div class="com-temas">${c.temas}</div>
         <div class="com-hist"><span class="ht">${fmt(h.t)} proyectos desde 1991</span><span class="hx"><span data-w="${pct}"></span></span><span class="ht"><b style="color:var(--green)">${pct}%</b> terminó en ley</span></div>
         <div class="com-int">${intHtml}</div>
+        <div class="com-cta">Ver comisión completa · integrantes y proyectos →</div>
       </div>`;
     }).join('');
     requestAnimationFrame(()=>grid.querySelectorAll('.hx > span').forEach(s=>s.style.width=s.dataset.w+'%'));
@@ -572,7 +592,10 @@
     if(!q){ proysInit(); return; }
     document.getElementById('p-list').innerHTML='<div class="loading">Buscando <span class="dots"><span></span><span></span><span></span></span></div>';
     try{
-      const r=await call({action:'buscar',query:q,limit:1200});
+      // el backend ordena ASCENDENTE por año y trunca al límite pedido — hay que
+      // pedir un límite alto para no quedarnos con los resultados más VIEJOS
+      // de un tema con muchos intentos, en vez de los más recientes.
+      const r=await call({action:'buscar',query:q,limit:20000});
       P_ALL=(r.resultados||[]).sort((a,b)=>(b.a-a.a)||(b.id-a.id));
       P_MODE='busqueda';
       P_SHOWN=15;
@@ -723,6 +746,13 @@
   rosterInit();
   proysInit();
   loadHistorico();
+
+  /* toggle táctil del popover de la KPI mujeres (el hover no sirve en móvil) */
+  (function(){
+    const k=document.getElementById('kpi-mujeres'); if(!k) return;
+    k.addEventListener('click',e=>{ e.stopPropagation(); k.classList.toggle('open'); });
+    document.addEventListener('click',()=>k.classList.remove('open'));
+  })();
   </script>
   <script src="lang.js"></script>
 </body>
