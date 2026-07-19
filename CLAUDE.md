@@ -5916,8 +5916,8 @@ Reglas al convertir una página:
 
 ## Convenciones de commit
 ```
-git commit -m "scope: descripción concisa\n\nDetalle si es necesario\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+git commit -m "scope: descripción concisa\n\nDetalle si es necesario\n\nCo-Authored-By: Ricardo y Claudio <noreply@anthropic.com>"
 git push origin HEAD:main
 ```
-> Usar el nombre del modelo activo (Opus 4.7 / Sonnet 4.6 / Haiku 4.5),
-> no un valor fijo. Si Claude está en otro modelo, ajustar.
+> Firma fija "Ricardo y Claudio" (decisión del usuario, jul-2026) — NO usar
+> el nombre del modelo (Opus/Sonnet/Haiku) en el Co-Authored-By.
