@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script defer src="/track.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>¿Qué plan quieres? · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* Helvetica Neue embebida (familia completa). El logo va aparte en Syne. */
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-light.woff2') format('woff2'); font-weight:300; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-medium.woff2') format('woff2'); font-weight:500; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-bold.woff2') format('woff2'); font-weight:600 900; font-style:normal; font-display:swap; }
+
+    :root {
+      --white: #f4f3ef;
+      --blue: #0047FF;
+      --blue-light: #3d6fff;
+      --orange: #f97316;
+      --green: #4ade80;
+      --card-bg: rgba(10,10,16,0.75);
+      --card-border: rgba(255,255,255,0.07);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: #060810; color: var(--white);
+      font-family: 'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;
+      min-height: 100vh; overflow-x: hidden; cursor: none;
+    }
+    body::before { content:''; position:fixed; inset:0; z-index:-1;
+      background:
+        radial-gradient(1100px 600px at 78% -8%, rgba(0,71,255,0.18), transparent 60%),
+        radial-gradient(900px 500px at 12% 108%, rgba(0,71,255,0.10), transparent 60%),
+        #060810; }
+
+    /* CURSOR */
+    .cursor { position: fixed; width: 10px; height: 10px; background: var(--blue); border-radius: 50%;
+      pointer-events: none; z-index: 100000; transform: translate(-50%,-50%); transition: transform .15s, background .2s, border .2s; }
+    .cursor-ring { position: fixed; width: 34px; height: 34px; border: 1px solid rgba(0,71,255,.5); border-radius: 50%;
+      pointer-events: none; z-index: 99999; transform: translate(-50%,-50%); opacity: .5; }
+
+    /* HEADER */
+    header { display:flex; align-items:center; justify-content:space-between; padding:1.4rem 2rem; }
+    .logo-link { display:flex; align-items:center; gap:.55rem; text-decoration:none; }
+    .logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
+    .logo-bar { width:5px; background:var(--blue); border-radius:1px 1px 0 0; opacity:.85; }
+    .logo-text { font-family:'Syne',sans-serif; font-weight:800; font-size:1.3rem; letter-spacing:-.03em; color:var(--white); line-height:1; }
+    .logo-text span { color:var(--blue); }
+    .back-link { font-size:.72rem; font-weight:500; letter-spacing:.08em; text-transform:uppercase; color:var(--green);
+      text-decoration:none; border:1.5px solid rgba(74,222,128,.4); padding:.4rem .9rem; transition:background .2s,color .2s,border-color .2s; }
+    .back-link:hover { background:var(--green); color:#060810; border-color:var(--green); }
+
+    /* HERO */
+    .hero { max-width:720px; margin:1.5rem auto 2.4rem; padding:0 2rem; text-align:center; }
+    .hero-tag { font-size:.68rem; font-weight:500; letter-spacing:.2em; text-transform:uppercase; color:var(--blue-light);
+      margin-bottom:1rem; display:flex; align-items:center; justify-content:center; gap:.6rem; }
+    .hero-tag::before, .hero-tag::after { content:''; width:24px; height:1px; background:var(--blue); }
+    .hero h1 { font-weight:800; font-size:clamp(1.8rem,4vw,2.6rem); letter-spacing:-.03em; line-height:1.05; margin-bottom:.9rem; }
+    .hero h1 em { font-style:normal; color:var(--blue-light); }
+    .hero p { font-weight:400; font-size:.95rem; line-height:1.65; color:rgba(255,255,255,.55); max-width:560px; margin:0 auto; }
+
+    /* PLAN CARDS (mismos estilos que pricing.html) */
+    .plans-grid { max-width:1020px; margin:0 auto; padding:0 2rem; display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+    .plan-card { position:relative; background:var(--card-bg); border:1px solid var(--card-border);
+      padding:1.8rem 1.5rem; display:flex; flex-direction:column; backdrop-filter:blur(6px); transition:border-color .25s; }
+    .plan-card:hover { border-color:rgba(0,71,255,.5); }
+    .plan-card.featured { background:linear-gradient(150deg, rgba(0,71,255,0.2), rgba(6,10,26,0.9) 60%); border-color:rgba(0,71,255,.45); }
+    .plan-card.featured:hover { border-color:rgba(0,71,255,.8); }
+    .plan-badge { display:flex; align-items:center; gap:.5rem; font-weight:500; font-size:.62rem;
+      letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.4); margin-bottom:.9rem; }
+    .plan-badge-dot { width:5px; height:5px; border-radius:50%; background:var(--blue); flex-shrink:0; }
+    .plan-featured-tag { font-weight:700; font-size:.58rem; letter-spacing:.1em; color:#060810;
+      background:var(--green); padding:.18rem .5rem; margin-left:auto; }
+    .plan-name { font-weight:800; font-size:1.4rem; letter-spacing:-.02em; color:var(--white); margin-bottom:.5rem; }
+    .plan-desc { font-weight:400; font-size:.8rem; line-height:1.55; color:rgba(255,255,255,.5); margin-bottom:1.3rem; min-height:3.4em; }
+    .plan-price-wrap { margin-bottom:1.4rem; }
+    .plan-price { font-weight:800; font-size:1.85rem; letter-spacing:-.02em; color:var(--white); display:flex; align-items:baseline; gap:.35rem; }
+    .plan-price-currency { font-weight:500; font-size:.66rem; letter-spacing:.1em; color:rgba(255,255,255,.4); }
+    .plan-price-period { font-weight:400; font-size:.7rem; color:rgba(255,255,255,.4); margin-top:.25rem; }
+    .plan-features { list-style:none; margin-bottom:1.7rem; flex:1; }
+    .plan-features li { font-weight:400; font-size:.78rem; line-height:1.5; color:rgba(255,255,255,.62);
+      padding:.36rem 0 .36rem 1.1rem; position:relative; border-bottom:1px solid rgba(255,255,255,.04); }
+    .plan-features li::before { content:'✓'; position:absolute; left:0; color:var(--green); font-size:.7rem; }
+    .plan-cta { display:block; text-align:center; font-weight:700; font-size:.78rem; letter-spacing:.08em; text-transform:uppercase;
+      padding:.75rem 1rem; text-decoration:none; cursor:none; border:none; width:100%;
+      transition:background .2s,color .2s,border-color .2s; font-family:inherit; }
+    .plan-cta-outline { background:none; color:var(--white); border:1.5px solid rgba(255,255,255,.28); }
+    .plan-cta-outline:hover { border-color:var(--white); }
+    .plan-cta-solid { background:var(--blue); color:var(--white); border:1.5px solid var(--blue); }
+    .plan-cta-solid:hover { background:#0035cc; border-color:#0035cc; }
+
+    /* LINKS SECUNDARIOS */
+    .more-links { max-width:1020px; margin:1.8rem auto 0; padding:0 2rem; text-align:center; }
+    .more-links p { font-weight:400; font-size:.82rem; color:rgba(255,255,255,.45); line-height:1.8; }
+    .more-links a { color:var(--blue-light); text-decoration:none; border-bottom:1px solid rgba(61,111,255,.4); }
+    .more-links a:hover { border-color:var(--blue-light); }
+
+    footer { text-align:center; margin:3rem auto 2.5rem; font-size:.8rem; color:rgba(255,255,255,.4); }
+    footer a { color:var(--white); text-decoration:none; border-bottom:1px solid rgba(255,255,255,.3); }
+    footer a:hover { border-color:var(--white); }
+
+    @media (max-width: 860px) {
+      .plans-grid { grid-template-columns:1fr; max-width:440px; }
+    }
+    @media (max-width: 520px) {
+      header { padding:1.2rem 1.3rem; }
+      .hero { padding:0 1.3rem; }
+      .plans-grid { padding:0 1.3rem; }
+      .more-links { padding:0 1.3rem; }
+      .logo-text { font-size:1.1rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <header>
+    <a href="index.html" class="logo-link">
+      <div class="logo-bars">
+        <div class="logo-bar" style="height:20px"></div>
+        <div class="logo-bar" style="height:15px"></div>
+        <div class="logo-bar" style="height:9px"></div>
+        <div class="logo-bar" style="height:4px"></div>
+      </div>
+      <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+    </a>
+    <a href="index.html" class="back-link">← Volver</a>
+  </header>
+
+  <main>
+    <div class="hero">
+      <div class="hero-tag">Antes de crear tu cuenta</div>
+      <h1>¿Qué tipo de <em>usuario</em> quieres ser?</h1>
+      <p>Elige el plan que mejor se ajuste a lo que necesitas hoy. Puedes cambiarlo cuando quieras desde tu perfil — esto solo define con qué arrancas.</p>
+    </div>
+
+    <div class="plans-grid">
+      <div class="plan-card">
+        <div class="plan-badge"><span class="plan-badge-dot"></span>Básico</div>
+        <div class="plan-name">Básico</div>
+        <div class="plan-desc">Explora gratis las herramientas abiertas: simuladores, mapas electorales y tests de afinidad.</div>
+        <div class="plan-price-wrap">
+          <div class="plan-price">Gratis</div>
+          <div class="plan-price-period">para siempre</div>
+        </div>
+        <ul class="plan-features">
+          <li>Simuladores y mapas electorales abiertos</li>
+          <li>Test de afinidad presidencial y pronósticos</li>
+          <li>Acceso a tu dashboard personal</li>
+        </ul>
+        <button class="plan-cta plan-cta-outline" onclick="choosePlan('free','Básico')">Continuar con Básico →</button>
+      </div>
+
+      <div class="plan-card featured">
+        <div class="plan-badge"><span class="plan-badge-dot"></span>Pro<span class="plan-featured-tag">Más popular</span></div>
+        <div class="plan-name">Pro</div>
+        <div class="plan-desc">Para periodistas, consultores y analistas que pasan de la consulta pública al análisis aplicado.</div>
+        <div class="plan-price-wrap">
+          <div class="plan-price">$79.900<span class="plan-price-currency">COP</span></div>
+          <div class="plan-price-period">/mes</div>
+        </div>
+        <ul class="plan-features">
+          <li>Drilldown a comunas y barrios en 8+ ciudades</li>
+          <li>Simulador de transferencia entre candidatos</li>
+          <li>3 descargas al mes</li>
+        </ul>
+        <button class="plan-cta plan-cta-solid" onclick="choosePlan('pro','Pro')">Continuar con Pro →</button>
+      </div>
+
+      <div class="plan-card">
+        <div class="plan-badge"><span class="plan-badge-dot"></span>Premium</div>
+        <div class="plan-name">Premium</div>
+        <div class="plan-desc">Para candidatos y equipos de campaña que necesitan leer el territorio puesto a puesto.</div>
+        <div class="plan-price-wrap">
+          <div class="plan-price">$219.000<span class="plan-price-currency">COP</span></div>
+          <div class="plan-price-period">/mes</div>
+        </div>
+        <ul class="plan-features">
+          <li>Capa de puestos de votación (13.500+)</li>
+          <li>Reporte territorial PDF mensual</li>
+          <li>10 descargas al mes</li>
+        </ul>
+        <button class="plan-cta plan-cta-outline" onclick="choosePlan('premium','Premium')">Continuar con Premium →</button>
+      </div>
+    </div>
+
+    <div class="more-links">
+      <p>
+        ¿Quieres ver la comparación completa, precios anuales y el plan Personalizado?
+        <a href="pricing.html">Ver todos los planes →</a>
+      </p>
+      <p>
+        ¿Buscas algo a la medida para campaña, gremio o medio?
+        <a href="https://wa.me/573243036767?text=Hola%20Ricardo%2C%20me%20gustar%C3%ADa%20hablar%20contigo%20sobre%20un%20proyecto." target="_blank" rel="noopener">Escríbenos →</a>
+      </p>
+    </div>
+  </main>
+
+  <footer>
+    <p>¿Ya tienes cuenta? <a href="login.html">Iniciar sesión →</a></p>
+  </footer>
+
+  <script>
+    // ─── Elegir plan y pasar el contexto a register.html (mismo mecanismo que pricing.html::startPayment) ──
+    function choosePlan(planId, planName) {
+      if (planId === 'free') {
+        window.location.href = 'register.html';
+        return;
+      }
+      const billing = 'mensual';
+      localStorage.setItem('rr-pending-plan', JSON.stringify({
+        planId: planId + '_' + billing, planName, billing, timestamp: Date.now()
+      }));
+      localStorage.setItem('rr-desired-plan', JSON.stringify({
+        planId, planName, billing, timestamp: Date.now()
+      }));
+      window.location.href = 'register.html?next=pay';
+    }
+
+    // ─── CURSOR ───────────────────────────────────────────────────────────────
+    const cursor = document.getElementById('cursor');
+    const ring = document.getElementById('cursorRing');
+    let mx=0, my=0, rx=0, ry=0;
+    document.addEventListener('mousemove', e => {
+      mx = e.clientX; my = e.clientY;
+      cursor.style.left = mx+'px'; cursor.style.top = my+'px';
+    });
+    (function ar(){ rx+=(mx-rx)*.12; ry+=(my-ry)*.12; ring.style.left=rx+'px'; ring.style.top=ry+'px'; requestAnimationFrame(ar); })();
+    document.querySelectorAll('a, button').forEach(el => {
+      el.addEventListener('mouseenter', () => { cursor.style.transform='translate(-50%,-50%) scale(2.5)'; cursor.style.background='transparent'; cursor.style.border='1.5px solid var(--blue)'; ring.style.opacity='0'; });
+      el.addEventListener('mouseleave', () => { cursor.style.transform='translate(-50%,-50%) scale(1)'; cursor.style.background='var(--blue)'; cursor.style.border='none'; ring.style.opacity='0.4'; });
+    });
+  </script>
+</body>
+</html>
