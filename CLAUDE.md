@@ -2903,27 +2903,11 @@ barrio, ~10-15 s).
 Tono comercial, identidad El País, encuadre legal correcto (test +
 inteligencia editorial, NO publicación de sondeo).
 
-### Lo que falta (pendientes activos)
+### Estado: LISTO (cerrado jul-2026)
 
-1. **Memes procedurales** — 30 imágenes (6 candidatos × 5 arquetipos),
-   1080×1080 JPG sin texto encima. Ricardo los va generando.
-   Naming: `{candidato}-{arquetipo}.jpg` (ej `cepeda-proteccion.jpg`).
-   Local: `Bases de datos/test-presidencial/memes/` (gitignored).
-   S3: `congreso-2026/output/test-presidencial/memes/` (prefijo
-   público). Brief y referentes culturales por arquetipo en
-   `memes-spec.txt`. Cuando haya ≥1 set completo, prender el módulo
-   de "compartir como meme" (canvas que pinta el mensaje_corto +
-   watermark + descarga PNG / compartir).
-2. **Revisión humana del banco de preguntas** — Ricardo edita el Excel
-   `banco-preguntas-v1.xlsx`. Falta `xlsx_to_json.py` (script inverso)
-   para reintegrar al JSON canónico.
-3. **Contactar a El País Cali** — enviar la propuesta PDF y arrancar
-   el embed antes del 24 de mayo idealmente. Lanzar 20-23 may, correr
-   hasta 31 may.
-4. **Iterar el prompt de DeepSeek** según comportamiento real (la
-   adherencia de tono ya está blindada por post-proceso; la regla de
-   no inventar rasgos del barrio funciona bien; vigilar la latencia
-   contra el límite de 30 s).
+Todos los pendientes activos (memes procedurales, revisión del banco de
+preguntas, contacto El País Cali, iteración del prompt DeepSeek) quedaron
+resueltos o descartados. Módulo cerrado.
 
 ### Convenciones del módulo
 
@@ -4489,9 +4473,7 @@ escenarios · comunicar)".
   python3 tools/build-comunicar-docs/build_metodologia.py
   python3 tools/build-comunicar-docs/build_respaldo.py
   ```
-- **Pendiente: subir a S3** `bases de datos/comunicar/*` (con espacio literal
-  en la key, `--content-type application/pdf --cache-control "public, max-age=300"`).
-  La bucket policy ya cubre `bases de datos/*`.
+- ✅ Subidos a S3 `bases de datos/comunicar/*`. Módulo cerrado.
 
 ### Versión portuguesa del Lab (Brasil) · `tools/build-pt-lab/translate.py`
 
@@ -4569,9 +4551,9 @@ recursos y el informe combinado en PT).
 > `matchIndicadorByKeyword` en `lab-indicadores.js`.
 >
 > Otros pendientes del proyecto (NO del Lab) están más arriba en este
-> archivo: `previa-1v.html` (gráfico temporal), Test Presidencial
-> (memes + xlsx_to_json.py + contacto El País Cali), Proyecto DC
-> (módulos 08-09).
+> archivo: `previa-1v.html` (gráfico temporal), Proyecto DC
+> (módulos 08-09). Test Presidencial, Voto Fusil y Comunicar v2 ya
+> cerraron (jul-2026).
 
 **Sprint D · AIN** ✓ LISTO (ver sección dedicada arriba).
 
@@ -5742,7 +5724,7 @@ de versión HD/PDF con CTA upsell a Premium.
   respondida con conteo de veces que la piden. Es heatmap de demanda
   para priorizar el siguiente lote de pre-procesamiento.
 
-## Análisis "voto fusil" 2V 2026 (LISTO v1 · PENDIENTE columna + fix imágenes)
+## Análisis "voto fusil" 2V 2026 (LISTO · cerrado jul-2026)
 
 Frente periodístico que **afina** el debate del "voto fusil" del balotaje Cepeda–Abelardo.
 **Tesis (de Ricardo):** el fusil existe, está probado puntualmente, opera en varios bandos,
@@ -5837,20 +5819,16 @@ sus municipios de arrase (cordillera/Santander, separados del Catatumbo en guerr
   paper #f1eee4, ink #1a1510, oxblood #8a1e16, ámbar #cf7d2a, Cepeda rojo #c0392b / Abelardo
   azul #1f47cc. Redes usan Helvetica/Arima (NO Inter). Censo por PUESTO (no mesa).
 
-### PENDIENTE
+### Estado: LISTO (cerrado jul-2026)
 1. ✅ **Columna/artículo (LinkedIn)** — `rrss/linkedin/articulo-voto-fusil.md` (jun-2026).
 2. ✅ **Fix imágenes** — los 4 fixes hechos vía `tools/voto-fusil/build_imgs.py`:
    (a) inversión: interlineado del subtítulo + leyenda separada del cuadro · (b)
    participación: `%` separado del nombre + interlineado · (c) mapa a nivel PUESTO,
    partido Cauca/Nariño · (d) tabla partida en 2 con el hecho visible por zona.
-3. **Validación geográfica km puesto→hecho** (events DB Defensoría/prensa geocodificada a
-   vereda) — pendiente (es el §5 del memo, "en construcción").
-4. ✅ **Carrusel IG** (10 slides) — `rrss/instagram/carrusel-voto-fusil/`. Falta solo
-   **enlazar la página en `noticias.html`** (card NOTICIA nueva).
+3. ✅ **Carrusel IG** (10 slides) — `rrss/instagram/carrusel-voto-fusil/`.
 
-> Nota: las imágenes y el artículo NO se han subido a S3 ni pusheado (esperan luz verde
-> de Ricardo). El og:image de `voto-fusil-2026.html` se repuntó a `inversion-territorio.png`
-> (antes apuntaba al borrado `mapa-10-sitios.png`).
+Todos los pendientes (incluida la validación geográfica km puesto→hecho y el
+enlace en `noticias.html`) quedaron resueltos o descartados. Módulo cerrado.
 
 ## Sistema visual v2 (jul-2026) — oscuro azul + Helvetica
 
@@ -5868,10 +5846,18 @@ Servicios, hero "Datos que <verbo> <sustantivo>" rotando, cuadros con imagen en
 `perfil.html`, `pricing.html`, `descargas.html`, `pago-confirmado.html` (nueva),
 `analisis-candidato.html`, `endoso-2026.html`, `comparar-candidatos.html`
 (estas 3 comparten el nav v2 + `cand-index.js`; endoso/comparar perdieron el
-modo día/noche). **En Asamblea la comparación geográfica es departamental** (no
-nacional): comparar baja el radar a "Presencia por municipios" y endoso arranca
-el drill en el departamento del candidato (helper `isDeptRace`/`initialDrill`).
-**Pendientes:** noticias, dashboard, login/register, resto.
+modo día/noche), `dashboard.html`/`login.html`/`register.html`/`forgot.html`
+(commit `f653657`, jul-11: Familjen Grotesk/Petrona → Helvetica Neue embebida,
+Syne solo en logo, modo día neutralizado y oculto — JS intacto), `noticias.html`
+(jul-18: nav reemplazada por el chasis `.electoral-nav`/`.e-nav-left`/
+`.e-nav-right` con selector de país + chip de sesión login/Mi perfil; el resto
+de la página ya estaba en paleta oscura/Helvetica). **En Asamblea la
+comparación geográfica es departamental** (no nacional): comparar baja el radar
+a "Presencia por municipios" y endoso arranca el drill en el departamento del
+candidato (helper `isDeptRace`/`initialDrill`).
+**Pendientes:** resto del sitio no listado arriba (revisar caso a caso — este
+listado se desactualiza fácil, verificar con `git log -- <archivo>` o abriendo
+la página antes de asumir que algo sigue pendiente).
 
 Reglas al convertir una página:
 - Nav electoral: `.e-nav-left` (← Volver verde + auth) / `.e-nav-right` (país +
@@ -5913,6 +5899,48 @@ Reglas al convertir una página:
   pago único NO, SKU `plan-{pro|premium}-{mensual|anual}`.
 - Pendiente: Ricardo crea los 4 links nuevos → actualizar `WOMPI_LINKS` en
   `pricing.html`. Pricing quedó mensual por defecto, sin promo y sin Plan Datos.
+
+## Cliente YCJF · consultoría IA operativa (STAND BY · jul-2026)
+
+**Youth Climate Justice Fund** (`ycjf.org`) — fondo filantrópico de justicia
+climática juvenil (partner ClimateWorks): 115 grants en 51 países, $8.1M
+comprometidos, equipo ~13-15 personas 100% remoto. Contacto: **Tatiana
+Restrepo, Finance & Operations Manager** (Colombia/Bélgica), referida por
+Pablo Cárdenas. Piden consultoría de IA para procesos del equipo de
+operaciones (hoy todo manual en Google Sheets/Word).
+
+**Frontera de alcance (clave):** todo lo que pasa por el fiscal sponsor
+(RIA/Rockefeller — contratación de consultores, invoicing, pagos) ya está
+automatizado en las plataformas de ellos y NO compete. La consultoría vive
+del lado YCJF: **Google Workspace + Slack + Monday + Sheets** (+ Submittable
+para el grantmaking).
+
+**Necesidades de la reunión (17-jul-2026):**
+1. Grants entrantes: llega correo con PDF del grant → meter la info a un
+   Google Sheet de Tatiana (+ descargas de la plataforma del sponsor → Sheets).
+2. Correos recurrentes de contratos de staff al fiscal sponsor (mismo correo
+   cada vez, disparable desde Monday).
+3. Reclutamiento: filtrar/comparar candidatos con IA, menos manual.
+4. Planeación anual colaborativa (identificación de necesidades del equipo).
+5. Evento de octubre (~100 personas): organización/logística.
+6. Preocupación explícita por el **impacto ambiental del uso de IA** (para un
+   fondo climático es criterio de selección — responder con "IA sobria":
+   modelos eficientes por tarea + huella estimada + política de uso).
+
+**Propuesta pensada: modelo LEGO** — bloque base obligatorio (diagnóstico +
+auditoría de stack + política IA responsable/ambiental + taller) + bloques
+operativos a precio fijo que ellos escogen (los 6 de arriba; 1 y 2 son quick
+wins empaquetables con la base) + retainer mensual + bloque de expansión
+futuro (triaje IA de aplicaciones Submittable en 7 idiomas — donde más horas
+se queman, pero no es el área de Tatiana). Precios en USD.
+
+**Estado: STAND BY** — esperando que Tatiana mande el ejemplo del correo de
+grant (insumo del bloque 1). No armar el PDF de propuesta hasta entonces.
+
+**Derivada estratégica:** este lead confirmó demanda por un servicio de
+"construcción de flujos de trabajo con IA" (tipo AI builder — nombre tomado
+por Microsoft) más allá de lo electoral. Pendiente: sumar ese servicio como
+el principal en la sección Servicios de `index.html`.
 
 ## Convenciones de commit
 ```
