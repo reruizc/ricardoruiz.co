@@ -142,13 +142,21 @@
     .card-hero { grid-column:1 / span 2; grid-row:1 / span 2; justify-content:center; padding:2.2rem 2.4rem;
       background:linear-gradient(140deg, rgba(0,71,255,0.28) 0%, rgba(6,10,26,0.9) 62%); border-color:rgba(0,71,255,0.32); cursor:default; }
     .card-hero:hover { transform:none; border-color:rgba(0,71,255,0.42); }
-    .hero-video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; }
-    /* El velo va SOBRE el video (z-index mayor): con el mismo z-index el video,
-       al ir después en el DOM, lo tapaba y el texto quedaba ilegible. */
+    /* El video se oscurece con filter, NO tapándolo con una capa opaca: Safari
+       pausa el autoplay de videos que quedan totalmente ocluidos. Así el texto
+       contrasta y el video nunca deja de ser "visible" para el navegador. */
+    .hero-video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0;
+      pointer-events:none; filter:brightness(.42) saturate(.85); }
+    /* Safari muestra su botón ▶ nativo si el autoplay se bloquea; lo ocultamos
+       porque el video es decorativo y el fallback es el poster. */
+    .hero-video::-webkit-media-controls-start-playback-button,
+    .hero-video::-webkit-media-controls { display:none !important; -webkit-appearance:none; }
+    /* Refuerzo sólo del lado del texto; se desvanece a transparente antes del
+       borde derecho para que buena parte del video quede sin tapar. */
     .card-hero::before { content:''; position:absolute; inset:0; z-index:1;
       background:
-        linear-gradient(102deg, rgba(4,6,16,0.88) 0%, rgba(4,6,16,0.8) 52%, rgba(4,6,16,0.62) 78%, rgba(4,6,16,0.45) 100%),
-        linear-gradient(140deg, rgba(0,45,160,0.42) 0%, rgba(0,20,70,0.18) 55%, transparent 100%); }
+        linear-gradient(102deg, rgba(4,6,16,0.72) 0%, rgba(4,6,16,0.5) 45%, rgba(4,6,16,0.16) 70%, transparent 88%),
+        linear-gradient(140deg, rgba(0,45,160,0.34) 0%, rgba(0,20,70,0.12) 55%, transparent 100%); }
     .card-hero .hero-statement, .card-hero .hero-sub, .card-hero .hero-cta-row { position:relative; z-index:2; }
     /* El video de fondo tiene zonas muy claras: sombra para asegurar la lectura */
     .card-hero .hero-statement { text-shadow:0 2px 18px rgba(0,0,0,.75); }
@@ -360,7 +368,9 @@
         <!-- ══ INICIO ══ -->
         <div class="panel pan-inicio active" id="pan-inicio">
           <div class="card card-hero">
-            <video class="hero-video" autoplay muted loop playsinline preload="auto" poster="imagenes-index/video-portada-poster.jpg">
+            <video class="hero-video" id="hero-video" autoplay muted loop playsinline webkit-playsinline
+                   preload="auto" disablepictureinpicture disableremoteplayback aria-hidden="true"
+                   poster="imagenes-index/video-portada-poster.jpg">
               <source src="imagenes-index/video-portada.mp4" type="video/mp4">
             </video>
             <h1 class="hero-statement">
@@ -797,6 +807,27 @@
     let wordVerbInterval, wordNounInterval;
 
     const _t = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+
+    // ─── VIDEO DEL HERO ─────────────────────────────────────────────────────
+    // Safari puede bloquear el autoplay (Low Power Mode, ajuste por sitio) y
+    // entonces pinta su botón ▶ sobre el póster. Forzamos play() y, si lo
+    // rechaza, reintentamos con el primer gesto del usuario. El video es
+    // decorativo: si nunca arranca, el póster queda como fondo y no se pierde nada.
+    (function initHeroVideo(){
+      const v = document.getElementById('hero-video');
+      if (!v) return;
+      v.muted = true;            // algunos navegadores exigen la propiedad, no solo el atributo
+      v.defaultMuted = true;
+      const tryPlay = () => {
+        const p = v.play();
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      };
+      tryPlay();
+      v.addEventListener('canplay', tryPlay, { once: true });
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) tryPlay(); });
+      ['pointerdown','touchstart','keydown','scroll'].forEach(evt =>
+        window.addEventListener(evt, tryPlay, { once: true, passive: true }));
+    })();
 
     // ─── PROYECTOS ──────────────────────────────────────────────────────────
     // Capturas de cada módulo, por posición (el orden de items es igual en los
