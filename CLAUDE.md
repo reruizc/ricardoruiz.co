@@ -5934,8 +5934,20 @@ wins empaquetables con la base) + retainer mensual + bloque de expansión
 futuro (triaje IA de aplicaciones Submittable en 7 idiomas — donde más horas
 se queman, pero no es el área de Tatiana). Precios en USD.
 
-**Estado: STAND BY** — esperando que Tatiana mande el ejemplo del correo de
-grant (insumo del bloque 1). No armar el PDF de propuesta hasta entonces.
+**Estado: BORRADOR v1 EN REVISIÓN INTERNA** (jul-2026). PDF armado en
+`Propuestas/Propuesta-YCJF-IA-Operativa.pdf` (4 págs, **sistema visual v2**:
+fondo #060810 + Helvetica woff2 del repo + Syne solo wordmark + logo 4 barras
+— esta es LA PLANTILLA para propuestas nuevas, decisión jul-2026) vía
+`tools/build-propuesta-ycjf/build.py` (WeasyPrint 68; los woff2 de `fonts/`
+cargan directo con @font-face file://; gotcha: en tablas auto-layout el
+padding no separa la celda más ancha de su vecina → usar &nbsp;).
+Ricardo lo repasa con su equipo antes de enviarlo a Tatiana. **Precios en USD
+son de REFERENCIA** (constantes al inicio del build: base $2.500 único con
+quick wins 01-02 incluidos · reclutamiento $1.200 · planeación $1.500 ·
+evento $1.800 · reuniones $900 · retainer $600/mes · Submittable a cotizar)
+— editarlas y poner `DRAFT = False` (quita la banda "BORRADOR INTERNO")
+antes de enviar. Sigue pendiente el ejemplo del correo de grant de Tatiana
+(insumo técnico del módulo 01, no bloquea la propuesta).
 
 **Derivada estratégica:** este lead confirmó demanda por un servicio de
 "construcción de flujos de trabajo con IA" (tipo AI builder — nombre tomado
