@@ -196,7 +196,10 @@ class Caudal:
                 return all(_term_match(w, titulo) for w in base)
         out = []
         for it in self.indice:
-            t = _norm(it['t'])
+            # 't' = título vigente; 'ta' = alias (p.ej. nombre con el que se
+            # sancionó como ley, si cambió en el trámite) — buscar contra ambos
+            # para que "clonación" encuentre el proyecto aunque hoy se llame distinto.
+            t = _norm(it['t'] + (' ' + it['ta'] if it.get('ta') else ''))
             if query and not _match(t):
                 continue
             if anio_min and (it['a'] or 0) < anio_min:
@@ -301,8 +304,21 @@ class Caudal:
                 'empuje_txt': EMPUJE_LABEL.get(h.get('emp'), h.get('emp')),
                 'vitrina_score': h.get('vs', 0), 'veces_presentado': h.get('vp', 1),
                 'crea_fondo': h.get('cf', False), 'jala_presupuesto': h.get('jp', False),
+                'etapa_max': h.get('et', 0),
             } for h in hits],
         }
+
+    # -------- candidatos para profundizar un tema con texto de gaceta --
+    def candidatos_gaceta(self, resumen, k=10):
+        """De los intentos de un tema, rankea cuáles vale más la pena leerles
+        la gaceta de verdad (no solo su metadata): prioriza los MÁS RECIENTES
+        (solo 2020+ tiene texto subido) y los que llegaron MÁS LEJOS en el
+        trámite (más etapas = ponencia/acta más informativa sobre por qué pasó
+        o se cayó). No garantiza que el texto exista en S3 — eso lo intenta el
+        llamador (Lambda) en orden, y salta al siguiente si falta."""
+        cand = [it for it in resumen.get('intentos', []) if (it.get('anio') or 0) >= 2019]
+        cand.sort(key=lambda it: (it.get('etapa_max', 0), it.get('anio') or 0), reverse=True)
+        return cand[:k]
 
     # -------- Radar del cliente · señales legislativas -----------------
     def radar_congreso(self, sector_key=None, temas=None, comision_lbl='', cap=10):
@@ -369,6 +385,7 @@ class Caudal:
         emp = r.get('empuje')
         return {
             'id': r['id'], 'tabla': r.get('tabla', tb), 'titulo': r.get('titulo', ''),
+            'titulos_alt': r.get('titulos_alt', []),
             'numero_senado': r.get('numero_senado', ''), 'numero_camara': r.get('numero_camara', ''),
             'legislatura': r.get('legislatura', ''), 'comision': r.get('comision', ''),
             'autores': autores,

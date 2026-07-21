@@ -35,10 +35,25 @@ COMISIONES = {
 }
 PROJ_RE = re.compile(r'\b(\d{1,4})\s*/\s*(?:20)?(\d{2})\b')
 PDF_RE = re.compile(r'(?:href|src)="([^"]+\.pdf)"', re.I)
-# bloque del proyecto en el orden del día: número + año + título (entre comillas)
+# bloque del proyecto en el orden del día: número + año + título (entre comillas).
+# Tolera 3 variantes reales del PDF (medidas jul-2026 sobre el caché local):
+#   (a) año partido por el wrap de columna del PDF ("202 1" en vez de "2021")
+#   (b) doble numeración bicameral ("No. 102 de 2025 Cámara, 083 de 2025 Senado")
+#   (c) cláusula "Acumulado con el Proyecto de Ley No. NNN de AAAA Cámara" antes de la cita
 PROJ_BLOCK_RE = re.compile(
-    r'Proyecto de (?:Ley|Acto Legislativo)(?:\s+Org[aá]nica)?[^0-9"“]{0,25}'
-    r'(\d{1,4})\s*de\s*(20\d{2})[^"“]{0,18}["“](.+?)["”]', re.I | re.S)
+    r'Proyecto de (?:Ley|Acto Legislativo)(?:\s+Org[aá]nica)?[^0-9"“]{0,30}'
+    r'(\d{1,4})\s*de\s*(2\s?0\s?\d\s?\d)\s*(?:C[aá]mara|Senado)?'
+    r'(?:\s*(?:,|[-–—]|:)?\s*(?:Acumulado con el Proyecto de (?:Ley|Acto Legislativo)[^0-9"“]{0,25})?'
+    r'\d{1,4}\s*de\s*(?:20)?\s?\d\s?\d\s*(?:C[aá]mara|Senado)?)?'
+    r'[^"“]{0,30}["“](.+?)["”]', re.I | re.S)
+# variante SIN número/título inline (algunas comisiones desde ~2024): el orden
+# del día solo cita la Gaceta de radicación — "Proyecto de Ley: Gaceta del
+# Congreso 2048 de 2025". Se resuelve por Gaceta contra nuestro propio dataset
+# (ya tenemos el número Cámara/Senado y el título reales, no hace falta parsear
+# el PDF para eso) vía load_gaceta_map().
+GACETA_REF_RE = re.compile(
+    r'Proyecto de (?:Ley|Acto Legislativo)\s*:\s*Gaceta\s*(?:del\s+Congreso|No\.?)?'
+    r'\s*(\d{1,4})\s*de\s*(20\d{2})', re.I)
 
 
 def curl(url, out=None):
@@ -100,6 +115,28 @@ def load_numero_camara_map():
     return mp
 
 
+def load_gaceta_map():
+    """gaceta 'NNNN/AAAA' → (tok 'NNN/YY' número Cámara, título) — resuelve los
+    agendamientos formato GACETA_REF_RE (sin número/título inline) contra
+    nuestro propio dataset en vez de parsear el PDF."""
+    p = DIST / 'proyectos.jsonl'
+    if not p.exists():
+        return {}
+    mp = {}
+    for line in open(p, encoding='utf-8'):
+        r = json.loads(line)
+        nc = (r.get('numero_camara') or '').strip()
+        m = PROJ_RE.search(nc)
+        if not m:
+            continue
+        tok = norm(m.group(1), m.group(2))
+        for g in r.get('gacetas', []):
+            gk = g.get('gaceta')
+            if gk and gk not in mp:
+                mp[gk] = (tok, r.get('titulo', ''))
+    return mp
+
+
 def run(com, limit=None):
     com_id = COMISIONES[com]
     outdir = CACHE / 'ordenes' / com
@@ -110,6 +147,7 @@ def run(com, limit=None):
     if limit:
         eventos = eventos[:limit]
     print(f'  {len(eventos)} sesiones')
+    gaceta_map = load_gaceta_map()
 
     agend = defaultdict(list)          # token → [{fecha, pos, n_dia}]
     titulos = {}                       # token → título (del propio orden del día)
@@ -139,10 +177,22 @@ def run(com, limit=None):
         # lista ordenada de proyectos únicos (por 1ª aparición) → posición
         orden, seen = [], set()
         for m in PROJ_BLOCK_RE.finditer(body):
-            tok = norm(m.group(1), m.group(2)[-2:])
+            anio = m.group(2).replace(' ', '')   # año puede venir partido por el wrap del PDF ("202 1")
+            tok = norm(m.group(1), anio[-2:])
             t = re.sub(r'\s+', ' ', m.group(3)).strip(' "“”«»')
             if 12 <= len(t) <= 180 and tok not in titulos:
                 titulos[tok] = t
+            if tok not in seen:
+                seen.add(tok); orden.append(tok)
+        # variante sin número/título inline — resuelve por Gaceta contra el dataset
+        for m in GACETA_REF_RE.finditer(body):
+            gk = f'{int(m.group(1))}/{m.group(2)}'
+            hit = gaceta_map.get(gk)
+            if not hit:
+                continue
+            tok, tit = hit
+            if tit and tok not in titulos:
+                titulos[tok] = tit
             if tok not in seen:
                 seen.add(tok); orden.append(tok)
         if orden:

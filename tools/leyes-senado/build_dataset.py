@@ -245,6 +245,38 @@ def load(name):
     return [json.loads(l) for l in open(p, encoding='utf-8')] if p.exists() else []
 
 
+def _titulo_cambio(a, b):
+    """¿b (título de sanción) es un nombre distinto de a (título de radicación)?
+    Reusa la firma de titulo_signature (tokens significativos, sin boilerplate
+    legal) y compara solapamiento Jaccard — no una comparación de string cruda,
+    porque 'por la cual' vs 'por medio de la cual' no debe contar como cambio."""
+    sa, sb = cl.titulo_signature(a), cl.titulo_signature(b)
+    if not sa or not sb:
+        return False
+    jac = len(sa & sb) / len(sa | sb)
+    return jac < 0.45
+
+
+def _link_titulos_alt(pdly, lys):
+    """Un proyecto puede sancionarse con un título distinto al de radicación
+    (frecuente tras ponencia/conciliación en 2º-3er debate). lys.proyecto_ref_id
+    ya cruza cada ley con el pdly que le dio origen — de ahí sale el alias, sin
+    scrapear nada nuevo. Guarda 'titulos_alt' en el pdly para que la búsqueda lo
+    encuentre por cualquiera de los dos nombres."""
+    by_id = {r['id']: r for r in pdly}
+    for l in lys:
+        ref = l.get('proyecto_ref_id')
+        p = by_id.get(ref)
+        if not p or not l.get('titulo'):
+            continue
+        if _titulo_cambio(p['titulo'], l['titulo']):
+            p.setdefault('titulos_alt', []).append({
+                'titulo': l['titulo'], 'motivo': 'nombre de sanción (Ley)',
+                'numero_ley': l.get('numero_ley', '')})
+    for r in pdly:
+        r.setdefault('titulos_alt', [])
+
+
 def main():
     DIST.mkdir(parents=True, exist_ok=True)
     raw_pdly, raw_pal = load('pdly'), load('pal')
@@ -256,6 +288,10 @@ def main():
     pdly = [enrich_pdly(r) for r in raw_pdly]
     pal = [enrich_pal(r) for r in raw_pal]
     lys = [enrich_lys(r) for r in load('lys')]
+
+    # 1b) título alternativo: el nombre con el que se sancionó, si cambió
+    #     respecto al de radicación (ver _link_titulos_alt / _titulo_cambio)
+    _link_titulos_alt(pdly, lys)
 
     # 2) clusters de re-radicación (misma iniciativa en varios términos) →
     #    veces_presentado + empuje/vitrina. Corre sobre pdly + pal juntos, pero
@@ -291,8 +327,10 @@ def main():
 
     # índice compacto (búsqueda en memoria · frontend/Lambda) — pdly + pal
     def _ix(r, tb):
+        alt = r.get('titulos_alt') or []
         return {
             'id': r['id'], 'tb': tb, 't': r['titulo'], 'a': r['anio'],
+            **({'ta': ' · '.join(a['titulo'] for a in alt)} if alt else {}),
             'leg': r['legislatura'], 'com': r.get('comision', ''),
             'res': r['resultado'], 'ley': r['es_ley'], 'et': r['etapa_max'],
             'aut': r['autores'][:6], 'ak': r['autores_keys'][:6],

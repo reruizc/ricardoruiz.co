@@ -1053,6 +1053,31 @@
     // lectura LLM en background (pre-fetch)
     call({action:'tema',query,lectura:true}).then(d2=>{ if(mine===_seq && d2.lectura) renderLectura(d2.lectura); })
       .catch(()=>{ const el=document.getElementById('lectura-body'); if(el) el.innerHTML='<div class="err" style="padding:.5rem;text-align:left">No se pudo generar la lectura.</div>'; });
+    const btnProf=document.getElementById('btn-profundizar');
+    if(btnProf) btnProf.onclick=()=>profundizar(query,mine);
+  }
+
+  async function profundizar(query,mine){
+    const btn=document.getElementById('btn-profundizar');
+    const casosEl=document.getElementById('lectura-casos');
+    if(btn){ btn.disabled=true; btn.textContent='Leyendo ponencias y actas… puede tardar 20-40s'; }
+    let d;
+    try{ d=await call({action:'tema',query,lectura:true,profundo:true}); }
+    catch(e){
+      if(btn){ btn.disabled=false; btn.textContent='◈ Profundizar con evidencia de gacetas (lee ponencias/actas reales · más lento)'; }
+      return;
+    }
+    if(mine!==_seq) return;
+    if(d.lectura) renderLectura(d.lectura);
+    const casos=(d.lectura&&d.lectura.casos_evidencia)||[];
+    if(casosEl){
+      casosEl.innerHTML = casos.length
+        ? `<div class="tag" style="margin-top:.8rem">◈ Casos con evidencia real de gaceta (${casos.length})</div>` +
+          casos.map(c=>`<div class="blk"><div class="h">[${c.anio}] ${esc((c.titulo||'').slice(0,80))} — Gaceta ${esc(c.gaceta)}${c.tipo_doc?' · '+esc(c.tipo_doc.replace(/_/g,' ')):''}</div>
+            <div class="t">${c.sentido?`Sentido: <b>${esc(c.sentido)}</b>. `:''}${esc(c.sentido_detalle||'')}${c.en_contra?` — Oposición/archivo: ${esc(c.en_contra)}`:''}</div></div>`).join('')
+        : `<div class="cob-note" style="margin-top:.6rem">Ninguno de los proyectos más relevantes de este tema tiene su gaceta digitalizada todavía — la cosecha de texto prioriza lo más reciente y sigue en curso. Reintenta en un rato.</div>`;
+    }
+    if(btn) btn.remove();
   }
 
   function renderResumen(query,r){
@@ -1110,6 +1135,8 @@
       <div class="lectura">
         <div class="tag">◈ Lectura del analista · IA sobre datos oficiales</div>
         <div id="lectura-body"><div class="llm-load">Generando lectura <span class="dots"><span></span><span></span><span></span></span></div></div>
+        <button id="btn-profundizar" class="btn-medios" style="margin-top:.6rem">◈ Profundizar con evidencia de gacetas (lee ponencias/actas reales · más lento)</button>
+        <div id="lectura-casos"></div>
       </div>
 
       <div class="panel wide" style="margin-bottom:1.2rem"><h3>Embudo del trámite · cómo cae en cada fase ${infoIcon(EMBUDO_INFO)}</h3>${funnel(emb)}</div>
@@ -1247,6 +1274,7 @@
     modalCard.innerHTML=`
       <button class="modal-close">✕</button>
       <h2>${esc(f.titulo)}</h2>
+      ${(f.titulos_alt||[]).length?`<div class="cob-note" style="margin-top:.35rem">Cambió de nombre en el trámite — también se conoce como: ${f.titulos_alt.map(a=>`«${esc(a.titulo)}»${a.motivo?` (${esc(a.motivo)})`:''}`).join('; ')}</div>`:''}
       ${chips.length?`<div class="intencion" style="margin:.3rem 0 1rem">${chips.join('')}</div>`:''}
       <div class="meta-grid">
         ${meta('N.º Senado',f.numero_senado)}${meta('N.º Cámara',f.numero_camara)}

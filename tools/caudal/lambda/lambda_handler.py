@@ -31,9 +31,11 @@ Bucket:
 import json
 import os
 import hashlib
+import time as _time
 import urllib.request
 import urllib.error
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeoutError
 
 import boto3
 import caudal_core
@@ -307,16 +309,34 @@ SINT_SYSTEM = (
 )
 
 
-def _sintesis_tema(resumen):
+def _sintesis_tema(resumen, casos=None):
+    casos_hash = _hash24('|'.join(sorted(c['gaceta'] for c in (casos or []))))
     key = _hash24(PROMPT_VERSION + '|tema|' + resumen['query'] + '|' +
                   str(resumen['n_intentos']) + '|' + str(resumen['n_leyes']) +
-                  '|' + str(resumen.get('n_vitrina', 0)))
+                  '|' + str(resumen.get('n_vitrina', 0)) + '|' + casos_hash)
     cached = _cache_get(key)
     if cached:
         return cached
     intentos_txt = '\n'.join(
         f"- [{it['anio']}] {it['resultado_txt']} · {it.get('empuje_txt','')}: {it['titulo'][:85]}"
         for it in resumen['intentos'][:20])
+    casos_txt = ''
+    if casos:
+        def _fmt_caso(c):
+            partes = [f"- [{c['anio']}] {c['titulo'][:80]} (Gaceta {c['gaceta']}, {c['tipo_doc'] or 'documento'}): "
+                     f"sentido {c['sentido'] or 'desconocido'}"]
+            if c.get('sentido_detalle'):
+                partes.append(f' — {c["sentido_detalle"]}')
+            if c.get('ponentes'):
+                partes.append(f". Ponente(s): {', '.join(c['ponentes'][:3])}.")
+            if c.get('argumentos'):
+                partes.append(f" Argumentos centrales: {'; '.join(c['argumentos'][:3])}.")
+            if c.get('en_contra'):
+                partes.append(f" Oposición/archivo: {c['en_contra']}")
+            return ''.join(partes)
+        casos_txt = ('\n\nEVIDENCIA REAL leída de la Gaceta del Congreso (no es metadata, es lo que '
+                    'DICE el documento — úsala, es más fuerte que la estadística sola) para algunos '
+                    'de estos intentos:\n' + '\n'.join(_fmt_caso(c) for c in casos))
     autores_txt = ', '.join(f"{a} ({n})" for a, n in resumen['top_autores'][:6])
     bancadas_txt = ', '.join(f"{p} ({n} proyectos)" for p, n in resumen.get('bancadas', [])[:6]) or 'sin dato'
     cob = resumen.get('cobertura_partido', {})
@@ -337,7 +357,8 @@ def _sintesis_tema(resumen):
         f"Quiénes más lo intentan: {autores_txt}\n"
         f"Bancadas que lo impulsan (por partido de los autores, "
         f"cobertura {cob.get('con')}/{cob.get('con',0)+cob.get('sin',0)} intentos): {bancadas_txt}\n"
-        f"Línea de intentos:\n{intentos_txt}\n\n"
+        f"Línea de intentos:\n{intentos_txt}"
+        f"{casos_txt}\n\n"
         "Escribe el análisis en JSON. `titular`: una frase potente y precisa. "
         "`hallazgo`: 2-3 frases con el patrón central; si hay proporción alta de "
         "vitrina o de honores, dilo sin rodeos (distingue quién de verdad empujó el "
@@ -346,7 +367,11 @@ def _sintesis_tema(resumen):
         "orden del día, no por votación). `quien_propone`: usa las BANCADAS para "
         "decir qué partidos empujan el tema (¿transversal o de un solo bloque?); "
         "si la cobertura de partido es parcial, acláralo. `veredicto`: cierre de "
-        "1-2 frases.")
+        "1-2 frases.\nSi te di EVIDENCIA REAL de gaceta arriba, úsala: nombra el "
+        "proyecto concreto, el ponente o el sentido en `hallazgo` y/o `por_que_caen` "
+        "— eso es lo que distingue este análisis de un conteo genérico. NO inventes "
+        "nada que no esté en esa evidencia. Si no te di evidencia, trabaja solo con "
+        "la metadata y no la menciones.")
     try:
         # max_tokens alto: DeepSeek V4 gasta tokens en reasoning y con presupuesto
         # bajo deja content vacío (finish_reason=length) — gotcha documentado.
@@ -359,9 +384,75 @@ def _sintesis_tema(resumen):
         data = {'titular': '', 'hallazgo': '', 'por_que_caen': '',
                 'quien_propone': '', 'veredicto': '', 'error': str(e)[:200]}
     data['_model'] = STEP_MODELS['sintesis']['model']
+    data['casos_evidencia'] = casos or []   # trazabilidad: qué gacetas sustentan la lectura
     if 'error' not in data:          # no cachear fallos
         _cache_put(key, data)
     return data
+
+
+def _gaceta_decisiva(full):
+    """Última gaceta con número real del trámite de un proyecto — la más
+    avanzada (ponencia/acta más cercana a la decisión final), y por tanto la
+    más informativa sobre por qué pasó o se cayó."""
+    gacetas = [g for g in (full.get('gacetas') or []) if g.get('gaceta')]
+    if not gacetas:
+        return None
+    g = gacetas[-1]
+    return g['gaceta'].replace('/', '-'), (g.get('tipo') or '')
+
+
+def _profundizar_tema(caudal, resumen, k_objetivo=2, k_candidatos=6, presupuesto_s=11):
+    """Trae evidencia REAL de gaceta (ponente/sentido/argumentos, no solo
+    metadata) para los proyectos más relevantes de un tema. Cobertura de texto
+    es solo 2020+ (harvest en curso) — prueba candidatos en paralelo y se queda
+    con los que sí tengan texto en S3, hasta juntar k_objetivo casos.
+    PARALELO a propósito: API Gateway (HTTP API) tiene un tope DURO de 30s de
+    integración que no se puede subir — encadenar 4+ llamadas a DeepSeek
+    secuenciales (una por candidato + la síntesis final) lo revienta seguro.
+    `presupuesto_s` corta la espera de candidatos lentos para dejarle tiempo a
+    la síntesis final, aunque junte menos de k_objetivo casos."""
+    caudal._full = _full()   # sin esto, caudal.proyecto() intenta leer un path
+                              # local que no existe en la Lambda y devuelve None
+                              # para TODO — mismo patrón que la acción 'proyecto'
+
+    def _intento(c):
+        full = caudal.proyecto(c['id'], c['tb'])
+        if not full:
+            return None
+        dec = _gaceta_decisiva(full)
+        if not dec:
+            return None
+        key, tipo = dec
+        numero = full.get('numero_camara') or full.get('numero_senado') or ''
+        contexto = f"Proyecto de ley {numero} · {full.get('titulo', '')}"
+        ext = _extraer_gaceta(key, contexto)
+        if 'error' in ext:
+            return None
+        return {
+            'id': c['id'], 'tb': c['tb'], 'titulo': full.get('titulo', ''),
+            'anio': c.get('anio'), 'resultado_txt': c.get('resultado_txt', ''),
+            'numero': numero, 'gaceta': key, 'tipo_doc': ext.get('tipo_documento', tipo),
+            'ponentes': ext.get('ponentes', []), 'sentido': ext.get('sentido'),
+            'sentido_detalle': ext.get('sentido_detalle'),
+            'argumentos': ext.get('argumentos', []), 'en_contra': ext.get('en_contra'),
+        }
+
+    candidatos = caudal.candidatos_gaceta(resumen, k=k_candidatos)
+    if not candidatos:
+        return []
+    casos, t0 = [], _time.time()
+    with ThreadPoolExecutor(max_workers=min(6, len(candidatos))) as ex:
+        futs = [ex.submit(_intento, c) for c in candidatos]
+        try:
+            for fut in as_completed(futs, timeout=presupuesto_s):
+                r = fut.result()
+                if r:
+                    casos.append(r)
+                if len(casos) >= k_objetivo or _time.time() - t0 > presupuesto_s:
+                    break
+        except FuturesTimeoutError:
+            pass
+    return casos[:k_objetivo]
 
 
 # --- Radar del cliente · lectura interpretada (SKU A · Vista Cliente) --------
@@ -1106,7 +1197,10 @@ def handler(event, context):
         out = {'query': q, 'resumen': resumen,
                'model_info': {'sintesis': STEP_MODELS['sintesis']}}
         if body.get('lectura', True) and resumen['n_intentos'] > 0:
-            out['lectura'] = _sintesis_tema(resumen)
+            casos = None
+            if body.get('profundo'):    # opt-in: más lento/costoso, lee gacetas de verdad
+                casos = _profundizar_tema(caudal, resumen)
+            out['lectura'] = _sintesis_tema(resumen, casos=casos)
         return _resp(200, out)
 
     return _resp(400, {'error': f'action desconocida: {action}'})
