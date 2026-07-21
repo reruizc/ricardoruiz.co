@@ -4663,6 +4663,46 @@ Cuando se haga, **bumpear `CACHE_BUSTER` en `lab-indicadores.js`** (formato
   Más de 6 satura — meterlo como sub-módulo de uno existente (como
   Alternativas es sub-módulo de Problema Público).
 
+## Páginas públicas del pilar Congreso — `legislativo.html` + `comision.html`
+
+Cara pública (no gated) del histórico legislativo de abajo, para el ciudadano
+general — distinta del privado `caudal.html`. `legislativo.html` es el hub
+nacional (embudo, mortandad, bloqueo, acuerdo de presidencias); `comision.html`
+(`?id=PRIMERA..SEPTIMA`) es la ficha por comisión constitucional, con el mismo
+bloque de análisis replicado 100% a nivel de esa comisión.
+
+**Composición de integrantes** (`comisiones-2026.json` en
+`s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/legislativo/`):
+consumida por `comision.html` (fetch directo, `COMISIONES_URL`) para pintar
+las bolitas de Senado/Cámara — sin dato, cada cupo queda como placeholder "?"
+("las plenarias eligen tras la instalación del 20 de julio de 2026"). Shape:
+```json
+{"v":"YYYY-MM-DD","comisiones":{"PRIMERA":{"senado":[{"nombre","partido"}],"camara":[...]}, ...}}
+```
+- **Fuente Cámara**: `Legislativo/Comisiones Cámara.xlsx` (Ricardo la baja a
+  mano; hojas `Comisión Primera`..`Séptima` con Nombres+Partido+Comisión ya
+  filtrado). El conteo real por comisión **no calza con los cupos teóricos**
+  de `COMISIONES` en comision.html (Ley 3ª de 1992 — ej. Sexta trae 20 reales
+  vs 28 de referencia); es esperado, no bug — `bubHtml` ya renderiza por
+  `list.length`, no por `cupos`, así que no hace falta reconciliar.
+  - Regenerar: leer las 7 hojas de comisión del xlsx, mapear
+    `{nombre: Nombres, partido: Partido}` → `camara[]`; `senado` queda `[]`
+    hasta que exista una fuente con esa asignación (la hoja `Senado` del xlsx
+    trae a todos los 103 senadores pero sin columna Comisión rellenada aún).
+  - Subir: `aws s3 cp "Bases de datos/legislativo/comisiones-2026.json"
+    "s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/legislativo/comisiones-2026.json"
+    --content-type application/json --cache-control "public, max-age=300"`.
+- **`ACUSACIONES`** (Comisión Legal de Investigación y Acusaciones, Cámara):
+  entrada extra en el mismo JSON con los 17 integrantes (transcritos de una
+  foto de la composición, jul-2026 — sin fuente oficial escaneable todavía).
+  **`comision.html` NO tiene esta key en su array `COMISIONES`** (solo
+  conoce PRIMERA..SEPTIMA) — el dato queda banked en el JSON para cuando se
+  decida construir una ficha de comisiones legales (Ética, Acusaciones,
+  Derechos Humanos, Cuentas, Equidad de la Mujer — mencionadas como nota en
+  `legislativo.html` pero sin página propia). Varios de sus integrantes
+  también se sientan en una constitucional (normal: es comisión legal, no
+  exclusiva) — confirmado cruzando contra las hojas del xlsx.
+
 ## Histórico legislativo — `tools/leyes-senado/` (harvester LISTO · foso de Cauce)
 
 Cosecha completa del histórico de **proyectos de ley, leyes sancionadas,

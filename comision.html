@@ -19,7 +19,7 @@
     :root {
       --black:#0a0a0a; --white:#f4f3ef;
       --blue:#0047FF; --blue-light:#3d6fff;
-      --green:#4ade80; --amber:#e0a03a; --red:#d1584e; --orange:#f97316;
+      --green:#4ade80; --amber:#e0a03a; --red:#d1584e; --orange:#f97316; --gold:#e8b93b;
       --gray:rgba(255,255,255,.5); --gray-light:rgba(255,255,255,.2);
       --border:rgba(255,255,255,0.08);
       --card-bg:rgba(10,10,16,0.75); --card-bg2:rgba(255,255,255,0.045);
@@ -150,11 +150,21 @@
     .bub:hover{transform:scale(1.08)}
     .bub.on{border-color:#fff;transform:scale(1.12)}
     .bub.ph{background:var(--card-bg2);color:rgba(255,255,255,.28);border:1.5px dashed var(--gray-light);font-size:1rem;font-weight:400}
+    .hemi-svg{width:100%;height:auto;display:block}
+    .hemi-dot{cursor:pointer;transition:r .1s,opacity .1s}
+    .hemi-legend{display:flex;flex-wrap:wrap;gap:.4rem 1.1rem;margin-top:.9rem}
+    .hemi-legend-item{display:flex;align-items:center;gap:.4rem;font-size:.66rem;color:var(--gray)}
+    .hemi-legend-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
     .panel-side{position:sticky;top:5.5rem;background:var(--card-bg);border:1px solid var(--card-border);padding:1.4rem 1.4rem;min-height:200px}
     .ps-empty{font-size:.82rem;color:var(--gray);line-height:1.65}
     .ps-name{font-family:var(--hn);font-weight:700;font-size:1.05rem;color:var(--white);margin-bottom:.5rem;line-height:1.3}
     .ps-chip{display:inline-block;font-size:.64rem;letter-spacing:.05em;padding:.2rem .55rem;margin-right:.35rem;margin-bottom:.7rem;border:1px solid transparent}
     .ps-meta{font-size:.78rem;color:var(--gray);line-height:1.65;margin-bottom:1rem}
+    .ps-score{border-top:1px solid var(--border);padding-top:.9rem;margin-bottom:.9rem}
+    .ps-score-row{display:flex;align-items:baseline;gap:.7rem}
+    .ps-score-num{font-family:var(--hn);font-weight:800;font-size:1.7rem;color:var(--gold);line-height:1}
+    .ps-score-lab{font-size:.66rem;color:var(--gray);line-height:1.5}
+    .ps-score-sub{display:block;font-size:.6rem;color:rgba(255,255,255,.35);margin-top:.15rem}
     .ps-vote{border-top:1px solid var(--border);padding-top:.9rem;margin-top:.2rem}
     .ps-align{display:flex;align-items:baseline;gap:.65rem;margin-bottom:.55rem}
     .ps-align .n{font-family:var(--hn);font-weight:800;font-size:1.5rem;color:var(--white);line-height:1}
@@ -314,6 +324,7 @@
     <a href="legislativo.html" class="e-btn-back" style="font-size:.62rem">← Legislativo</a>
   </footer>
 
+  <script src="cand-index.js"></script>
   <script>
   /* ── cursor ─────────────────────────────────────────────────── */
   const cur=document.getElementById('cursor'), ri=document.getElementById('cursorRing');
@@ -440,6 +451,7 @@
     renderGroups();
     loadMiembros();
     loadProyectos();
+    getVotosCongreso(); // precarga en paralelo — listo para cuando hagan click en alguien
     loadHistoricoComision();
     document.getElementById('hist-sub').innerHTML=`Desde 1991, esta comisión ha tramitado <b style="color:var(--white)">${fmt((COM_HIST[COM.key]||{}).t)}</b> proyectos de ley, de los cuales <b style="color:var(--green)">${(COM_HIST[COM.key]||{}).l||0}</b> terminaron sancionados como ley (${(COM_HIST[COM.key]||{}).t?Math.round(100*(COM_HIST[COM.key]||{}).l/(COM_HIST[COM.key]||{}).t):0}%). Fuente: Secretaría del Senado · análisis propio 1990–2026.`;
   }
@@ -453,28 +465,103 @@
       <div class="kpi hl"><div class="n">${pct}%</div><div class="l">Terminó en ley</div></div>`;
   }
 
-  /* ── bolitas de integrantes ──────────────────────────────────── */
-  function bubHtml(list,cupos,corp){
-    if(list&&list.length){
-      return list.map((m,i)=>{
-        const e=matchElectos(m.nombre);
-        const b=bancadaOf(m.partido||(e&&e.partido)||'');
-        return `<div class="bub" style="background:${b.color}" title="${esc(m.nombre)}" data-i="${i}" data-corp="${corp}">${esc(initials(m.nombre))}</div>`;
-      }).join('');
-    }
+  /* ── bolitas de cupos pendientes (aún sin integrantes confirmados) ── */
+  function bubPlaceholders(cupos,corp){
     return Array.from({length:cupos||0}).map((_,i)=>`<div class="bub ph" data-ph="1" data-i="${i}" data-corp="${corp}">?</div>`).join('');
   }
+
+  /* ── hemiciclo SVG de integrantes (todos, agrupados por bancada) ──
+     Mismo algoritmo de anillos concéntricos que el hemiciclo de 100
+     curules de senado-2026/camara-2026, generalizado a N asientos:
+     capacidad de cada anillo ∝ su longitud de arco, y los integrantes
+     se recorren en orden de bancada (mayor a menor) sobre un array
+     plano de posiciones — así cada bancada queda en un bloque
+     contiguo (formato "Composición del Congreso" tipo Datawrapper). */
+  function buildHemiRings(n){
+    const rings=[]; let remaining=n, r=70;
+    while(remaining>0){
+      const cap=Math.max(6,Math.round(Math.PI*r/20));
+      const take=Math.min(remaining,cap);
+      rings.push({r,n:take});
+      remaining-=take; r+=34;
+    }
+    return rings;
+  }
+  function renderHemi(list,corp,svgId,legendId){
+    const svg=document.getElementById(svgId); if(!svg||!list.length) return;
+    svg.innerHTML=''; svg.setAttribute('viewBox','0 0 600 300');
+    const cx=300, cy=282;
+    const rings=buildHemiRings(list.length);
+    const positions=[];
+    rings.forEach(ring=>{
+      for(let i=0;i<ring.n;i++){
+        const angle=Math.PI + (Math.PI/ring.n)*i + Math.PI/(2*ring.n);
+        positions.push({x:cx+ring.r*Math.cos(angle), y:cy+ring.r*Math.sin(angle)});
+      }
+    });
+    const groupsMap={};
+    list.forEach((m,i)=>{
+      const b=bancadaOf(m.partido||'');
+      if(!groupsMap[b.name]) groupsMap[b.name]={name:b.name,color:b.color,idx:[]};
+      groupsMap[b.name].idx.push(i);
+    });
+    const groups=Object.values(groupsMap).sort((a,b)=>b.idx.length-a.idx.length);
+    let pos=0;
+    groups.forEach(g=>{
+      g.idx.forEach(originalIndex=>{
+        if(pos>=positions.length) return;
+        const {x,y}=positions[pos++];
+        const m=list[originalIndex];
+        const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
+        dot.setAttribute('cx',x.toFixed(1)); dot.setAttribute('cy',y.toFixed(1));
+        dot.setAttribute('r','8'); dot.setAttribute('fill',g.color);
+        dot.setAttribute('opacity','0.88'); dot.setAttribute('stroke','rgba(255,255,255,0.25)'); dot.setAttribute('stroke-width','0.8');
+        dot.classList.add('hemi-dot');
+        dot.addEventListener('mouseenter',function(e){
+          if(!this.classList.contains('sel')){ this.setAttribute('r','11'); this.setAttribute('opacity','1'); }
+          let tip=document.getElementById('hemi-tooltip-com');
+          if(!tip){ tip=document.createElement('div'); tip.id='hemi-tooltip-com'; tip.style.cssText='position:fixed;background:rgba(6,8,16,0.97);border:1px solid rgba(0,71,255,0.4);color:#f4f3ef;padding:.5rem .85rem;font-size:.8rem;pointer-events:none;z-index:10000;font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-weight:400;white-space:nowrap'; document.body.appendChild(tip); }
+          tip.innerHTML=`<b>${esc(m.nombre)}</b><br><span style="color:${g.color}">${esc(m.partido||g.name)}</span>`;
+          tip.style.display='block';
+          const move=ev=>{ tip.style.left=(ev.clientX+14)+'px'; tip.style.top=(ev.clientY-10)+'px'; };
+          move(e); this._mv=move; window.addEventListener('mousemove',move);
+        });
+        dot.addEventListener('mouseleave',function(){
+          if(!this.classList.contains('sel')){ this.setAttribute('r','8'); this.setAttribute('opacity','0.88'); }
+          const tip=document.getElementById('hemi-tooltip-com'); if(tip) tip.style.display='none';
+          if(this._mv){ window.removeEventListener('mousemove',this._mv); delete this._mv; }
+        });
+        dot.addEventListener('click',()=>{
+          document.querySelectorAll('.hemi-dot.sel').forEach(x=>{x.classList.remove('sel'); x.setAttribute('r','8'); x.setAttribute('opacity','0.88'); x.setAttribute('stroke','rgba(255,255,255,0.25)'); x.setAttribute('stroke-width','0.8');});
+          dot.classList.add('sel'); dot.setAttribute('r','11'); dot.setAttribute('opacity','1'); dot.setAttribute('stroke','#fff'); dot.setAttribute('stroke-width','1.6');
+          renderPanelMember(m,corp);
+        });
+        svg.appendChild(dot);
+      });
+    });
+    const legend=document.getElementById(legendId);
+    if(legend) legend.innerHTML=groups.map(g=>`<span class="hemi-legend-item"><span class="hemi-legend-dot" style="background:${g.color}"></span>${esc(g.name)} · ${g.idx.length}</span>`).join('');
+  }
   function renderGroups(){
+    const senList=MIEMBROS.senado||[], camList=MIEMBROS.camara||[];
+    const senBody=senList.length
+      ? `<svg id="hemi-senado" class="hemi-svg"></svg><div class="hemi-legend" id="leg-senado"></div>`
+      : `<div class="bub-grid" id="bub-senado">${bubPlaceholders(COM.sen,'Senado')}</div>`;
+    const camBody=camList.length
+      ? `<svg id="hemi-camara" class="hemi-svg"></svg><div class="hemi-legend" id="leg-camara"></div>`
+      : `<div class="bub-grid" id="bub-camara">${bubPlaceholders(COM.cam,'Cámara')}</div>`;
     document.getElementById('mem-groups').innerHTML=`
       <div class="mem-group">
-        <div class="mem-group-title"><b>Senado</b> · ${COM.sen} cupos</div>
-        <div class="bub-grid" id="bub-senado">${bubHtml(MIEMBROS.senado,COM.sen,'Senado')}</div>
+        <div class="mem-group-title"><b>Senado</b> · ${COM.sen} cupos${senList.length?` · ${senList.length} confirmados`:''}</div>
+        ${senBody}
       </div>
       <div class="mem-group">
-        <div class="mem-group-title"><b>Cámara de Representantes</b> · ${COM.cam} cupos</div>
-        <div class="bub-grid" id="bub-camara">${bubHtml(MIEMBROS.camara,COM.cam,'Cámara')}</div>
+        <div class="mem-group-title"><b>Cámara de Representantes</b> · ${COM.cam} cupos${camList.length?` · ${camList.length} confirmados`:''}</div>
+        ${camBody}
       </div>`;
     document.getElementById('mem-groups').addEventListener('click',onBubClick);
+    if(senList.length) renderHemi(senList,'Senado','hemi-senado','leg-senado');
+    if(camList.length) renderHemi(camList,'Cámara','hemi-camara','leg-camara');
   }
   async function loadMiembros(){
     try{
@@ -490,14 +577,11 @@
     }catch(e){ /* aún no publicado — quedan las bolitas de cupos pendientes */ }
   }
   function onBubClick(e){
-    const b=e.target.closest('.bub'); if(!b) return;
+    const b=e.target.closest('.bub'); if(!b||!b.dataset.ph) return;
     document.querySelectorAll('.bub.on').forEach(x=>x.classList.remove('on'));
     b.classList.add('on');
     const i=+b.dataset.i, corp=b.dataset.corp;
-    if(b.dataset.ph){ renderPanelPlaceholder(corp,i,corp==='Senado'?COM.sen:COM.cam); return; }
-    const list=corp==='Senado'?MIEMBROS.senado:MIEMBROS.camara;
-    const m=list[i]; if(!m) return;
-    renderPanelMember(m,corp);
+    renderPanelPlaceholder(corp,i,corp==='Senado'?COM.sen:COM.cam);
   }
   function renderPanelPlaceholder(corp,i,cupos){
     document.getElementById('panel-side').innerHTML=`<div class="ps-empty">Integrante por definir · cupo ${i+1} de ${cupos} (${corp}). Las plenarias eligen los integrantes de cada comisión tras la instalación del Congreso el 20 de julio de 2026 — esta ficha se activa apenas se conforme.</div>`;
@@ -511,8 +595,49 @@
       <div class="ps-name">${esc(m.nombre)}</div>
       <span class="ps-chip" style="color:${b.color};background:${b.color}1a;border-color:${b.color}55">${esc(partido||b.name)}</span>
       <div class="ps-meta">${corp}${dep?' · '+esc(dep):''}</div>
+      <div class="ps-score" id="ps-score"><div class="ps-loading">Calculando puntaje electoral <span class="dots"><span></span><span></span><span></span></span></div></div>
       <div class="ps-vote" id="ps-vote"><div class="ps-loading">Buscando récord de voto <span class="dots"><span></span><span></span><span></span></span></div></div>`;
     loadCongresista(m.nombre);
+    loadScore(m.nombre);
+  }
+  /* ── puntaje electoral (mismo cálculo renormalizado de analisis-candidato.html) ── */
+  let _votosPromise=null;
+  function getVotosCongreso(){
+    if(!_votosPromise){
+      _votosPromise=(async()=>{
+        try{
+          const all=await CandRegistry.load({includeParties:false});
+          return all.filter(c=>c.source==='endoso'&&c.tipo==='candidato');
+        }catch(e){ return []; }
+      })();
+    }
+    return _votosPromise;
+  }
+  function votosFor(nombre,list){
+    const n=norm(nombre);
+    let hit=list.find(c=>norm(c.nombre)===n);
+    if(!hit){
+      const toks=n.split(/\s+/).filter(t=>t.length>2);
+      if(toks.length) hit=list.find(c=>{ const ct=norm(c.nombre).split(/\s+/); return toks.every(t=>ct.includes(t)); });
+    }
+    return hit?(hit.votos||0):0;
+  }
+  const SCORE_LOG_MAX=Math.log10(12950643); // votos del presidente (Abelardo · 2V) — mismo tope que analisis-candidato.html
+  function computeScore(votos){
+    if(!votos) return null;
+    return Math.max(1,Math.min(99,Math.round(100*Math.log10(votos+1)/SCORE_LOG_MAX)));
+  }
+  async function loadScore(nombre){
+    const box=document.getElementById('ps-score'); if(!box) return;
+    const list=await getVotosCongreso();
+    if(!box.isConnected) return;
+    const votos=votosFor(nombre,list);
+    const score=computeScore(votos);
+    if(score==null){
+      box.innerHTML=`<div class="note" style="margin:0 0 .9rem">Sin puntaje: va en lista cerrada (sin voto preferente individual) o no se encontró en el índice de candidatos 2026.</div>`;
+      return;
+    }
+    box.innerHTML=`<div class="ps-score-row"><span class="ps-score-num">${score}</span><span class="ps-score-lab">Puntaje electoral<br><span class="ps-score-sub">${fmt(votos)} votos personales 2026 · escala 1–99 de Análisis de Candidato</span></span></div>`;
   }
   async function loadCongresista(nombre){
     const box=document.getElementById('ps-vote'); if(!box) return;

@@ -160,6 +160,8 @@
     .com-int .ci-list{display:flex;flex-wrap:wrap;gap:.35rem}
     .ci-chip{font-size:.68rem;color:var(--white);background:var(--card-bg2);border:1px solid var(--card-border);padding:.22rem .55rem}
     .ci-chip small{color:var(--gray);font-size:.62rem}
+    .ci-more{font-size:.66rem;color:var(--blue-light);align-self:center;padding:.22rem .3rem}
+    .ci-hint{width:100%;font-size:.6rem;color:rgba(255,255,255,.32);margin-top:.35rem;font-style:italic}
 
     /* roster congresistas */
     .filters{display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:1.1rem;align-items:center}
@@ -440,6 +442,7 @@
     <a href="index.html" class="e-btn-back" style="font-size:.62rem">← Inicio</a>
   </footer>
 
+  <script src="cand-index.js"></script>
   <script>
   /* ── cursor ─────────────────────────────────────────────────── */
   const cur=document.getElementById('cursor'), ri=document.getElementById('cursorRing');
@@ -539,6 +542,26 @@
   const COMISIONES_URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo/comisiones-2026.json';
   let COM_MIEMBROS=null; // {PRIMERA:{senado:[{nombre,partido}...], camara:[...]}, ...}
 
+  /* ── votación personal 2026 (para el top-5 de cada tarjeta de comisión) ── */
+  let VOTOS_CONGRESO=null;
+  async function loadVotosCongreso(){
+    try{
+      const all=await CandRegistry.load({includeParties:false});
+      VOTOS_CONGRESO=all.filter(c=>c.source==='endoso'&&c.tipo==='candidato');
+    }catch(e){ VOTOS_CONGRESO=[]; }
+    renderComisiones();
+  }
+  function votosFor(nombre){
+    if(!VOTOS_CONGRESO) return 0;
+    const n=norm(nombre);
+    let hit=VOTOS_CONGRESO.find(c=>norm(c.nombre)===n);
+    if(!hit){
+      const toks=n.split(/\s+/).filter(t=>t.length>2);
+      if(toks.length) hit=VOTOS_CONGRESO.find(c=>{ const ct=norm(c.nombre).split(/\s+/); return toks.every(t=>ct.includes(t)); });
+    }
+    return hit?(hit.votos||0):0;
+  }
+
   function renderComisiones(){
     const grid=document.getElementById('com-grid');
     grid.innerHTML=COMISIONES.map(c=>{
@@ -548,7 +571,9 @@
       let intHtml;
       if(m&&((m.senado&&m.senado.length)||(m.camara&&m.camara.length))){
         const chips=[...(m.senado||[]).map(x=>({...x,tag:'S'})),...(m.camara||[]).map(x=>({...x,tag:'C'}))];
-        intHtml=`<div class="ci-list">${chips.map(x=>`<span class="ci-chip">${esc(x.nombre)} <small>· ${x.tag==='S'?'Senado':'Cámara'}</small></span>`).join('')}</div>`;
+        const ranked=chips.map(x=>({...x,votos:votosFor(x.nombre)})).sort((a,b)=>b.votos-a.votos);
+        const top=ranked.slice(0,5), restN=ranked.length-top.length;
+        intHtml=`<div class="ci-list">${top.map(x=>`<span class="ci-chip">${esc(x.nombre)} <small>· ${x.tag==='S'?'Senado':'Cámara'}</small></span>`).join('')}${restN>0?`<span class="ci-hint">+${restN} más · ${VOTOS_CONGRESO?'por votación personal 2026':'ver comisión completa'} →</span>`:''}</div>`;
       }else{
         intHtml=`<div class="ci-note">Integrantes en definición — las plenarias eligen las comisiones tras la instalación del 20 de julio. Esta tarjeta se actualiza apenas queden conformadas.</div>`;
       }
@@ -788,6 +813,7 @@
   renderComisiones();
   renderMesaCamara();
   loadComisionMiembros();
+  loadVotosCongreso();
   rosterInit();
   proysInit();
   loadHistorico();
