@@ -475,9 +475,9 @@
       <button class="pill-back" id="regBack">← Volver a Caudal</button>
       <div class="hero">
         <h1>Las sanciones del Estado, <em>leídas</em>.</h1>
-        <p>Sanciones ejecutoriadas de las superintendencias y entidades de control,
-           bajo un esquema común. Filtra por sector o busca una entidad; cada sanción
-           cita su resolución. 6.889 sanciones · 6 fuentes.</p>
+        <p>Sanciones ejecutoriadas y anunciadas de las superintendencias y entidades
+           de control, bajo un esquema común. Filtra por sector o busca una entidad;
+           cada sanción cita su resolución o comunicado. 7.015 sanciones · 9 fuentes.</p>
         <div class="search">
           <input id="rq" type="text" placeholder="busca una entidad, un producto, un motivo…" autocomplete="off" />
           <button id="rgo">Buscar</button>
@@ -738,7 +738,7 @@
   // (Congreso · Regulatorio · Medios); el resto se enciende por etapas.
   const PILLARS=[
     {id:'congreso',    name:'Congreso y órgano legislativo',    status:'live', n:'13.172', unit:'registros · 1990–2026', desc:'Proyectos de ley, actos legislativos y leyes. Cuántas veces se intentó, por qué se cae, quién lo empuja.'},
-    {id:'regulatorio', name:'Superintendencias y comisiones',   status:'live', n:'6.889',  unit:'sanciones · 6 fuentes', desc:'Sanciones ejecutoriadas de INVIMA, SECOP, Superfinanciera, Contraloría y más. Cada una cita su resolución.'},
+    {id:'regulatorio', name:'Superintendencias y comisiones',   status:'live', n:'7.015',  unit:'sanciones · 9 fuentes', desc:'Sanciones de INVIMA, SECOP, Superfinanciera, Supersalud, Supertransporte, SIC, Contraloría y más. Cada una cita su resolución o comunicado.'},
     {id:'medios',      name:'Medios nacionales y regionales',   status:'live', n:'en vivo', unit:'prensa por tema',      desc:'Titulares de prensa nacional y regional, rastreados por tema — sin mantener un conector por medio.'},
     {id:'datos',       name:'Datos abiertos y contratación',    status:'soon', desc:'datos.gov.co, SECOP, presupuesto y metas de gobierno.'},
     {id:'control',     name:'Órganos de control y altas cortes',status:'soon', desc:'Procuraduría, Consejo de Estado, Corte Constitucional.'},
@@ -775,17 +775,20 @@
   }
   /* ---------- pilar Regulatorio · sanciones ---------- */
   const REG={sector:'', q:''};
-  const REG_SECS=[['','Todos'],['salud','Salud'],['contratacion','Contratación'],['juridico','Jurídico'],['control','Control fiscal']];
+  const REG_SECS=[['','Todos'],['salud','Salud'],['contratacion','Contratación'],['financiero','Financiero'],['transporte','Transporte'],['consumo','Consumo'],['juridico','Jurídico'],['control','Control fiscal']];
   let REG_STATS=null, _regInited=false, _regSeq=0;
   function fmtCOP(n){ if(!n||n<=0) return ''; if(n>=1e12) return '$'+(n/1e12).toFixed(1).replace('.',',')+' B'; if(n>=1e6) return '$'+fmt(Math.round(n/1e6))+' M'; return '$'+fmt(Math.round(n)); }
   function sancCard(r){
     const mot=(r.motivo||'').replace(/\s+/g,' ').replace(/^[IVX]+\.\s*/,'').trim();
     const monto=r.monto?`<span class="sanc-monto">${fmtCOP(r.monto)}</span> · `:'';
     const tipo=r.tipo?`<span class="doc-badge">${esc(r.tipo)}</span>`:'';
+    const name=r.url
+      ?`<a class="sanc-name" href="${esc(r.url)}" target="_blank" rel="noopener" style="color:inherit">${esc(r.sancionado)}</a>`
+      :`<span class="sanc-name">${esc(r.sancionado)}</span>`;
     return `<div class="sanc">
-      <div class="sanc-top"><span class="sanc-name">${esc(r.sancionado)}</span><span class="sanc-fecha">${esc(r.fecha||'')}</span></div>
+      <div class="sanc-top">${name}<span class="sanc-fecha">${esc(r.fecha||'')}</span></div>
       ${mot?`<div class="sanc-motivo">${esc(mot)}</div>`:''}
-      <div class="sanc-tags"><span class="doc-badge pal">${esc(r.fuente_nombre||r.fuente)}</span>${tipo}${monto}${r.resolucion?'Res. '+esc(r.resolucion):''}</div>
+      <div class="sanc-tags"><span class="doc-badge pal">${esc(r.fuente_nombre||r.fuente)}</span>${tipo}${monto}${r.resolucion?'Res. '+esc(r.resolucion):''}${r.url?` · <a href="${esc(r.url)}" target="_blank" rel="noopener" style="color:var(--ink3)">comunicado ↗</a>`:''}</div>
     </div>`;
   }
   function regRenderLanding(s){
@@ -1097,6 +1100,7 @@
           <div class="tl-titulo" title="${esc(it.titulo)}">${esc(shortTitle(it.titulo).slice(0,110))}</div>
           <div class="tl-tags">
             <span class="doc-badge ${it.tb==='pal'?'pal':''}">${TIPO_DOC[it.tb||'pdly']}</span>
+            ${it.match_texto?`<span class="doc-badge pal" title="No coincide en el título — coincide en el texto de su ponencia/acta">◈ en el texto</span>`:''}
             <span class="tl-res" style="color:${rc};border:1px solid ${rc}33;background:${rc}14">${RES_TXT[it.resultado]||'—'}</span>
             ${it.empuje?`<span class="emp-badge" style="color:${EMP_COLOR[it.empuje]};background:${EMP_COLOR[it.empuje]}14;border:1px solid ${EMP_COLOR[it.empuje]}44" title="${it.empuje==='vitrina'?'Re-radicado sin superar el 1er debate':''}">${EMP_TXT[it.empuje]||''}${it.veces_presentado>1?' '+it.veces_presentado+'×':''}</span>`:''}
             ${it.tipologia&&it.tipologia!=='ordinaria'?`<span class="emp-badge" style="color:${TIP_COLOR[it.tipologia]};background:${TIP_COLOR[it.tipologia]}14;border:1px solid ${TIP_COLOR[it.tipologia]}44">${TIP_TXT[it.tipologia]||''}</span>`:''}

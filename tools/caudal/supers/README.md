@@ -37,10 +37,16 @@ Toda sanción, venga de donde venga, se mapea a estos campos (definidos en
 `fuentes.json._schema_normalizado`):
 
 `fuente · fuente_nombre · sector · sancionado · identificacion · tipo_sancion ·
-motivo · monto · resolucion · fecha_firmeza · estado · descripcion · _id · _raw`
+motivo · monto · resolucion · fecha_firmeza · estado · descripcion · url · _id · _raw`
 
 `_raw` conserva la fila original (trazabilidad — cada alerta cita su fuente,
-regla dura del pitch).
+regla dura del pitch). `url` (jul-2026) apunta a la fuente oficial del acto o
+comunicado cuando existe; el frontend lo pinta como link.
+
+**Ojo semántica de las fuentes de comunicados** (supertransporte · sic ·
+supersalud): el registro es el ANUNCIO oficial de la sanción, `fecha_firmeza`
+trae la fecha del comunicado (no la firmeza del acto) y `motivo` es el titular
+completo. Lo dice la nota de cada fuente en `fuentes.json`.
 
 ## Las tres vías de extracción
 
@@ -78,11 +84,31 @@ Mismo enfoque que la "API oculta" de `leyes.senado.gov.co`.
   ```
   Endpoints hermanos sin implementar: `listaSancionesGeneral`, `listaReporteSanciones`
   (esperan otro payload).
-- **Supertransporte** (pendiente): WordPress 6.9 → `?rest_route=/wp/v2/posts`
-  (BOM utf-8-sig). Multas como noticias; DeepSeek estructura sancionado/monto
-  del cuerpo.
-- **SIC** (pendiente): `sic.gov.co/rss.xml` (10 items recientes, título+pubDate).
-  Ventana corta.
+- **Supertransporte / SIC / Supersalud — IMPLEMENTADAS (`harvest_comunicados.py`,
+  jul-2026).** Las tres anuncian sanciones en comunicados oficiales con titulares
+  muy estructurados; el harvester extrae sancionado/monto/tipo/estado **por regex
+  del titular** (determinista, sin LLM; si el regex no saca el nombre, queda None
+  y el titular completo va en `motivo`).
+  - *Supertransporte*: WP REST paginado (BOM utf-8-sig). La página 9 con
+    per_page=100 da **500 persistente** (post corrupto del lado del servidor) →
+    esa ventana se rescata en sub-bloques de 10 vía `offset`.
+  - *SIC*: el `rss.xml` NO sirve (radicados de abogacía de la competencia) y el
+    filtro expuesto del view Drupal está roto → se paginan las ~180 páginas de
+    `/noticias?page=N` (título en `<div class="titulo"><a>`, items con rutas
+    `/noticias/` `/slider/` `/node/`) y la fecha se saca del detalle (dc:date)
+    solo para los hits.
+  - *Supersalud*: **la `_api` de SharePoint responde ANÓNIMA** (hallazgo
+    jul-2026, misma clase que la api-key de la SFC). Sanciones = comunicados PDF
+    en `docs.supersalud.gov.co/PortalWeb/Comunicaciones/Comunicados`, cazados
+    con `/es-co/_api/search/query` + filtro `path:` (la búsqueda matchea el
+    CUERPO del PDF; el corte fino es keyword sobre el título). El normograma
+    (Avance Jurídico, HTML) solo trae normativa general — NO sanciones
+    individuales; y la biblioteca "Procesos" del SharePoint son mapas Bizagi
+    internos, no expedientes.
+  ```bash
+  python3 tools/caudal/supers/harvest_comunicados.py test    # parseo de titulares
+  python3 tools/caudal/supers/harvest_comunicados.py fetch   # las 3 fuentes
+  ```
 
 ### Vía 3 — normograma/PDF (registrada, pendiente)
 Reusa **el pipeline de gacetas de Caudal fase 3** (`extraer_gaceta.py` +
@@ -111,7 +137,16 @@ consolida si la fuente tiene `map` en el registro.
 2. ✅ HECHO — `dist/sanciones.jsonl` enganchado a la Lambda (acción `sanciones`)
    y al Radar del cliente (acción `cliente`, sector `financiero` ahora con
    datos reales).
-3. Vía 3 (Supersalud) con el pipeline de gacetas — cierra el ejemplo del pitch.
-4. Supertransporte + SIC (vía 2, mismo patrón que Superfinanciera).
+3. ✅ HECHO (jul-2026) — `harvest_comunicados.py`: Supersalud (SharePoint search
+   anónima), Supertransporte (WP REST) y SIC (listado Drupal). El sector `salud`
+   del Radar ahora trae las multas de Supersalud a EPS — el ejemplo del pitch
+   con datos reales.
+4. Supersociedades (vía 3, Liferay): sigue pendiente — pipeline gaceta+DeepSeek.
+5. Supersalud vía profunda: leer el PDF del comunicado/acto con el pipeline
+   gaceta para sacar nº de resolución y motivo estructurado (hoy el registro
+   es el titular del comunicado).
+6. Stream normativo (circulares/resoluciones del normograma de Supersalud,
+   HTML limpio de Avance Jurídico) — es OTRO tipo de registro, no sanción;
+   pensarlo como capa "actos normativos" del pilar.
 
 Ver el mapa completo de las 18+ fuentes y su estado en `fuentes.json`.

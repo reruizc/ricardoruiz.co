@@ -14,6 +14,7 @@ artefactos que consume la Lambda caudal-analiza (acción `sanciones`):
 
 Todo stdlib. No sube nada: el `aws s3 cp` va aparte (ver README).
 """
+import datetime
 import json
 import re
 from collections import Counter
@@ -49,12 +50,21 @@ def _clean_text(s):
     return re.sub(r'\s+', ' ', _CTRL_RE.sub(' ', s)).strip()
 
 
+# varias fuentes traen typos de fecha (SFC año 3022 · SECOP II 2027/2028 ·
+# Junta de Contadores dic-2026): fuera de rango sano se descarta la FECHA
+# (no el registro), misma política que harvest_sfc.py — no fabricar dato.
+_FECHA_MAX = (datetime.date.today() + datetime.timedelta(days=45)).isoformat()
+
+
 def parse_fecha(v):
     """'2026-03-27T00:00:00.000' | '2026-03-27' → '2026-03-27' (o '')."""
     if not v:
         return ''
     m = re.match(r'(\d{4})-(\d{2})-(\d{2})', str(v))
-    return m.group(0) if m else ''
+    if not m:
+        return ''
+    f = m.group(0)
+    return f if '2000-01-01' <= f <= _FECHA_MAX else ''
 
 
 def parse_monto(v):
@@ -95,6 +105,7 @@ def slim(rec):
         'monto': monto,
         'resolucion': (rec.get('resolucion') or '').strip(),
         'fecha': fecha,
+        'url': (rec.get('url') or '').strip(),   # fuente oficial (comunicado/acto)
         'q': blob,           # blob de búsqueda (la Lambda hace substring sobre esto)
     }
 
@@ -132,7 +143,9 @@ def main():
         },
         'rango_fechas': [fechas[0], fechas[-1]] if fechas else ['', ''],
         'recientes': recientes,
-        'fuentes': ['INVIMA', 'SECOP I', 'SECOP II', 'Contraloría (resp. fiscal)', 'Junta Central de Contadores'],
+        'fuentes': ['INVIMA', 'SECOP I', 'SECOP II', 'Contraloría (resp. fiscal)',
+                    'Junta Central de Contadores', 'Superfinanciera',
+                    'Supertransporte', 'SIC', 'Supersalud'],
     }
     (OUT / 'sanciones-stats.json').write_text(
         json.dumps(stats, ensure_ascii=False, indent=1), encoding='utf-8')

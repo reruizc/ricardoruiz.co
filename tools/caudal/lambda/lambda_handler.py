@@ -87,7 +87,7 @@ def _get_jsonl(key, tb):
 
 
 def _caudal():
-    """Motor con índice + roster autor→partido (lazy, cache warm)."""
+    """Motor con índice + roster autor→partido + índice de texto (lazy, cache warm)."""
     global _CAUDAL
     if _CAUDAL is None:
         indice = _get_json('metadata/indice.json')['proyectos']
@@ -95,7 +95,11 @@ def _caudal():
             ap = _get_json('metadata/autor-partido.json')['autor_partido']
         except Exception:
             ap = {}
-        _CAUDAL = caudal_core.Caudal(indice=indice, autor_partido=ap)
+        try:
+            ti = _get_json('metadata/texto-index.json').get('index', {})
+        except Exception:
+            ti = {}
+        _CAUDAL = caudal_core.Caudal(indice=indice, autor_partido=ap, texto_index=ti)
     return _CAUDAL
 
 
@@ -228,7 +232,10 @@ def _sanciones():
     if _SANC is None:
         try:
             obj = _s3.get_object(Bucket=BUCKET, Key='metadata/sanciones.jsonl')
-            _SANC = [json.loads(l) for l in obj['Body'].read().decode('utf-8').splitlines() if l.strip()]
+            # split('\n') literal — NO .splitlines(): un texto con U+0085/U+2028/
+            # U+2029 partiría el JSONL en el lugar equivocado (mismo fix que
+            # build_s3.py; ver mojibake de Superfinanciera).
+            _SANC = [json.loads(l) for l in obj['Body'].read().decode('utf-8').split('\n') if l.strip()]
         except Exception:
             _SANC = []
     return _SANC

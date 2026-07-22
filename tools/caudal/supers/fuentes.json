@@ -13,6 +13,7 @@
     "fecha_firmeza",
     "estado",
     "descripcion",
+    "url",
     "_id",
     "_raw"
   ],
@@ -181,8 +182,17 @@
       "dificultad": "media",
       "endpoint": "https://www.supertransporte.gov.co/?rest_route=/wp/v2/posts",
       "metodo": "GET",
-      "nota": "WordPress 6.9. Publica multas como noticias/posts (ej. multa $211M a TRANS LOGYTOUR). Requiere filtrar posts por categoría 'multas/resoluciones' + DeepSeek para estructurar el sancionado/monto del titular+cuerpo.",
-      "map": {}
+      "nota": "IMPLEMENTADA jul-2026 via harvest_comunicados.py. WP REST paginado (BOM utf-8-sig); sanciones anunciadas en comunicados, sancionado/monto por regex del titular. La página 9 (per_page=100) da 500 persistente del lado del servidor → se rescata por sub-bloques offset. `fecha` = fecha del comunicado, no firmeza.",
+      "map": {
+        "sancionado": "sancionado",
+        "tipo_sancion": "tipo",
+        "motivo": "titulo",
+        "monto": "monto",
+        "fecha_firmeza": "fecha",
+        "estado": "estado",
+        "url": "url",
+        "_id": "id"
+      }
     },
     {
       "slug": "sic",
@@ -191,21 +201,40 @@
       "via": 2,
       "granularidad": "entidad",
       "dificultad": "media",
-      "endpoint": "https://www.sic.gov.co/rss.xml",
+      "endpoint": "https://www.sic.gov.co/noticias?page=N",
       "metodo": "GET",
-      "nota": "RSS con radicados/decisiones recientes (10 items, título+pubDate+link). Ventana corta; complementar con listados por año del portal.",
-      "map": {}
+      "nota": "IMPLEMENTADA jul-2026 via harvest_comunicados.py. El rss.xml NO sirve (trae radicados de abogacía de la competencia, no sanciones) y el filtro expuesto del view Drupal está roto → se pagina el listado completo (~180 páginas, título en <div class=titulo><a>, items mezclan rutas /noticias/ /slider/ /node/) y se filtra por keyword; la fecha se saca del detalle (dc:date) solo para los hits. `fecha` = fecha del comunicado.",
+      "map": {
+        "sancionado": "sancionado",
+        "tipo_sancion": "tipo",
+        "motivo": "titulo",
+        "monto": "monto",
+        "fecha_firmeza": "fecha",
+        "estado": "estado",
+        "url": "url",
+        "_id": "id"
+      }
     },
     {
       "slug": "supersalud",
       "nombre": "Superintendencia Nacional de Salud",
       "sector": "salud",
-      "via": 3,
+      "via": 2,
       "granularidad": "entidad",
-      "dificultad": "alta",
-      "endpoint": "https://normograma.supersalud.gov.co",
-      "nota": "SharePoint + normograma. Resoluciones/circulares/actos como PDF. Pipeline gaceta (pypdf) + DeepSeek para extraer sanciones a EPS/IPS. Es la fuente del ejemplo estrella del pitch de Cauce.",
-      "map": {}
+      "dificultad": "media",
+      "endpoint": "https://www.supersalud.gov.co/es-co/_api/search/query",
+      "metodo": "GET",
+      "nota": "IMPLEMENTADA jul-2026 via harvest_comunicados.py. HALLAZGO: la _api de SharePoint responde ANÓNIMA (lists + search). Sanciones = comunicados PDF en docs.supersalud.gov.co/PortalWeb/Comunicaciones/Comunicados, cazados con search/query + filtro path (la búsqueda matchea el CUERPO del PDF; el filtro fino es keyword sobre el título). El normograma (Avance Jurídico, HTML) trae solo normativa general —circulares/resoluciones—, NO sanciones individuales; queda como fuente futura de un stream normativo. `fecha` = Write (última modificación del PDF).",
+      "map": {
+        "sancionado": "sancionado",
+        "tipo_sancion": "tipo",
+        "motivo": "titulo",
+        "monto": "monto",
+        "fecha_firmeza": "fecha",
+        "estado": "estado",
+        "url": "url",
+        "_id": "id"
+      }
     },
     {
       "slug": "supersociedades",
