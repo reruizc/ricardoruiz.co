@@ -3728,10 +3728,32 @@
     `;
     document.head.appendChild(tooltipStyle);
 
+    // ─── DEEP-LINK (?cand=<slug> · ?q=<nombre>) — p.ej. desde comision.html ──
+    function applyDeepLink() {
+      try {
+        const sp = new URLSearchParams(location.search);
+        const slug = sp.get('cand'), q = sp.get('q');
+        if (slug) {
+          let meta = candIndex.find(c => c.slug === slug);
+          if (!meta) {
+            // slug de una candidatura vieja colapsada por agruparPersonas →
+            // abrir la entrada visible de esa misma persona
+            const g = congHistBySlug[slug];
+            if (g) meta = candIndex.find(c => g.some(x => x.slug === c.slug));
+          }
+          if (meta) { selectCand(meta.slug); return; }
+        }
+        if (q) {
+          const meta = candIndex.find(c => acMatch(q, c.nombre));
+          if (meta) selectCand(meta.slug);
+        }
+      } catch (e) { /* deep-link es best-effort */ }
+    }
+
     // ─── BOOT ────────────────────────────────────────────────
     if (!isLoggedIn()) document.getElementById('mun-lock-overlay').classList.add('active');
     applyLang(localStorage.getItem('rr-lang') || 'co');
-    loadIndex();
+    loadIndex().then(applyDeepLink);
     loadDivipole();
     loadPuestosGeoref();
   </script>
