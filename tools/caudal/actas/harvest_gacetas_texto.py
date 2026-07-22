@@ -108,15 +108,20 @@ def process_one(entry):
     y, m, d = fecha.split('-')
     fec = f'{int(d)}-{int(m)}-{y}'
 
+    # el campo "Entidad" del listado NO siempre coincide con la que pide el
+    # deep-link de descarga (confirmado jul-2026: 3/3 gacetas probadas a mano
+    # necesitaban la entidad CONTRARIA a la del listado) — probar la listada
+    # primero, y si falla, la otra, antes de darse por vencido.
+    otra_ent = 'Senado' if ent == 'Camara' else 'Camara'
     dest = None
-    for attempt in range(3):
+    for try_ent in (ent, ent, otra_ent, otra_ent):
         try:
-            dest = descargar_ts(ent, fec, str(num))
+            dest = descargar_ts(try_ent, fec, str(num))
         except Exception:
             dest = None
         if dest:
             break
-        time.sleep(1.2 * (attempt + 1))
+        time.sleep(1.0)
     if not dest:
         return ('fail_download', key, None)
 

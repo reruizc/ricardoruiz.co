@@ -95,11 +95,13 @@ def _caudal():
             ap = _get_json('metadata/autor-partido.json')['autor_partido']
         except Exception:
             ap = {}
+        ti, tids = {}, []
         try:
-            ti = _get_json('metadata/texto-index.json').get('index', {})
+            d = _get_json('metadata/texto-index.json')
+            ti, tids = d.get('index', {}), d.get('ids', [])
         except Exception:
-            ti = {}
-        _CAUDAL = caudal_core.Caudal(indice=indice, autor_partido=ap, texto_index=ti)
+            pass
+        _CAUDAL = caudal_core.Caudal(indice=indice, autor_partido=ap, texto_index=ti, texto_ids=tids)
     return _CAUDAL
 
 

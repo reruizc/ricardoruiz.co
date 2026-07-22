@@ -150,10 +150,16 @@ def sector_cliente(k):
 
 
 class Caudal:
-    def __init__(self, indice=None, proyectos=None, autor_partido=None):
+    def __init__(self, indice=None, proyectos=None, autor_partido=None,
+                 texto_index=None, texto_ids=None):
         self.indice = indice or []
         self._full = proyectos            # dict id→registro completo (lazy)
         self.ap = autor_partido or {}     # canon_key autor → {partido, via, ...}
+        # palabra(stem) → [posiciones enteras en texto_ids] — enteros en vez de
+        # 'pdly:1234' repetido miles de veces para que el JSON no sea gigante
+        # (build_texto_index.py). texto_ids[i] = 'tb:id'.
+        self.texto_index = texto_index or {}
+        self.texto_ids = texto_ids or []
 
     @classmethod
     def from_local(cls):
@@ -162,7 +168,12 @@ class Caudal:
         p = DIST / 'autor-partido.json'
         if p.exists():
             ap = json.load(open(p, encoding='utf-8'))['autor_partido']
-        return cls(indice=indice, autor_partido=ap)
+        ti, tids = {}, []
+        p = DIST / 'texto-index.json'
+        if p.exists():
+            d = json.load(open(p, encoding='utf-8'))
+            ti, tids = d.get('index', {}), d.get('ids', [])
+        return cls(indice=indice, autor_partido=ap, texto_index=ti, texto_ids=tids)
 
     def _load_full(self):
         # keyed por "tb:id" — pdly y pal comparten el espacio de ids (ambos
@@ -178,10 +189,30 @@ class Caudal:
                     self._full[f"{tb}:{r['id']}"] = r
         return self._full
 
+    def _match_texto(self, query):
+        """ids ('tb:id') cuyas gacetas mencionan TODAS las palabras
+        significativas de la consulta — capa sobre el título/alias que cubre
+        términos que solo aparecen DENTRO de la ponencia/acta, no en el título
+        formal (build_texto_index.py, cobertura 2020+ mientras avanza el
+        harvest). AND de palabras, mismo criterio que el match de título."""
+        if not self.texto_index or not self.texto_ids:
+            return set()
+        words = [_stem(_norm(w)) for w in (query or '').split() if len(w) > 3]
+        if not words:
+            return set()
+        sets = [set(self.texto_index.get(w, [])) for w in words]   # sets de POSICIONES (int)
+        if any(not s for s in sets):
+            return set()
+        result = sets[0]
+        for s in sets[1:]:
+            result = result & s
+        n = len(self.texto_ids)
+        return {self.texto_ids[i] for i in result if 0 <= i < n}
+
     # -------- búsqueda ------------------------------------------------
     def buscar(self, query, anio_min=None, anio_max=None, comision=None,
                resultado=None, tipologia=None, empuje=None, limit=None, expandir=True):
-        """Match por keyword(s) en el título. Devuelve ítems del índice.
+        """Match por keyword(s) en el título O en el texto de sus gacetas.
         Filtros F1: tipologia (honores/fondos/…) y empuje (vitrina/empujado/…).
         `expandir`: si la consulta cae en un tópico del tesauro, matchea por OR
         sobre su vocabulario (capa de sinónimos); si no, AND de palabras (literal)."""
@@ -194,13 +225,17 @@ class Caudal:
             base = [_norm(w) for w in query.split() if len(w) > 2] if query else []
             def _match(titulo):
                 return all(_term_match(w, titulo) for w in base)
+        texto_ids = self._match_texto(query) if query else set()
         out = []
         for it in self.indice:
             # 't' = título vigente; 'ta' = alias (p.ej. nombre con el que se
             # sancionó como ley, si cambió en el trámite) — buscar contra ambos
             # para que "clonación" encuentre el proyecto aunque hoy se llame distinto.
             t = _norm(it['t'] + (' ' + it['ta'] if it.get('ta') else ''))
-            if query and not _match(t):
+            tid = f"{it.get('tb', 'pdly')}:{it['id']}"
+            match_titulo = _match(t) if query else True
+            match_texto = tid in texto_ids
+            if query and not match_titulo and not match_texto:
                 continue
             if anio_min and (it['a'] or 0) < anio_min:
                 continue
@@ -214,7 +249,7 @@ class Caudal:
                 continue
             if empuje and it.get('emp') != empuje:
                 continue
-            out.append(it)
+            out.append({**it, 'mt': True} if (match_texto and not match_titulo) else it)
         out.sort(key=lambda x: (x['a'] or 0))
         return out[:limit] if limit else out
 
@@ -305,6 +340,7 @@ class Caudal:
                 'vitrina_score': h.get('vs', 0), 'veces_presentado': h.get('vp', 1),
                 'crea_fondo': h.get('cf', False), 'jala_presupuesto': h.get('jp', False),
                 'etapa_max': h.get('et', 0),
+                'match_texto': h.get('mt', False),   # matcheó por el texto de su gaceta, no por título
             } for h in hits],
         }
 
