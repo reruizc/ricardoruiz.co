@@ -21,8 +21,11 @@ cd "$REPO" || { echo "no pude cd a $REPO" >&2; exit 1; }
   echo "═════════ $(date '+%Y-%m-%d %H:%M:%S %z') · run_diario ═════════"
   python3 tools/leyes-senado/harvest_diario.py
   rc_h=$?
-  echo "--- harvest exit=$rc_h · build_diario_s3 --upload ---"
+  echo "--- harvest Senado exit=$rc_h · build_diario_s3 --upload ---"
   python3 tools/leyes-senado/build_diario_s3.py --upload
   rc_u=$?
-  echo "═════════ fin $(date '+%H:%M:%S') · harvest=$rc_h upload=$rc_u ═════════"
+  echo "--- harvest Cámara (camara.gov.co) ---"
+  python3 tools/leyes-senado/harvest_camara.py
+  rc_c=$?
+  echo "═════════ fin $(date '+%H:%M:%S') · senado=$rc_h upload=$rc_u camara=$rc_c ═════════"
 } >> "$LOG" 2>&1
