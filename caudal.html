@@ -152,6 +152,9 @@
   .rad-dl.alt:hover{background:rgba(0,71,255,.08)}
   .rad-src{font-size:.68rem; color:var(--ink3); text-decoration:none; margin-left:auto}
   .rad-src:hover{color:var(--ink2)}
+  .rad-sec{font-size:.72rem; font-weight:600; color:var(--ink2); letter-spacing:.02em; margin:1.6rem 0 .3rem; padding-top:.9rem; border-top:1px solid var(--border)}
+  .doc-badge.cam{color:var(--teal); border-color:var(--teal-dim); background:rgba(45,212,191,.08)}
+  .rad-pend{font-size:.7rem; color:var(--ink3); font-style:italic}
 
   /* ===== Radar del cliente (Vista Cliente · SKU A) ===== */
   .radar-cta{margin:1.6rem 0 .4rem; padding:1.3rem 1.5rem; border-radius:14px; cursor:none;
@@ -985,19 +988,41 @@
       <div class="rad-dls">${dl.join('')}</div>
     </div>`;
   }
+  function radCardCamara(r){
+    const com=r.comision?`<span class="doc-badge">${esc(r.comision.replace(/Comisión\s*/i,'Comisión '))}</span>`:'';
+    const autor=(r.autor||'').split(',')[0].trim();
+    const dl=[];
+    if(r.pdf_url){
+      dl.push(`<a class="rad-dl" href="${esc(r.pdf_url)}" target="_blank" rel="noopener">↓ Texto radicado (Gaceta ${esc(r.gaceta||'')})</a>`);
+      if(r.txt_url) dl.push(`<a class="rad-dl alt" href="${esc(r.txt_url)}" target="_blank" rel="noopener">texto plano (.txt)</a>`);
+    } else {
+      dl.push(`<span class="rad-pend">Texto en la Gaceta${r.gaceta?' '+esc(r.gaceta):''} · pendiente de publicación</span>`);
+    }
+    if(r.fuente_url) dl.push(`<a class="rad-src" href="${esc(r.fuente_url)}" target="_blank" rel="noopener">en la Cámara ↗</a>`);
+    return `<div class="sanc rad">
+      <div class="sanc-top"><span class="sanc-name">PL ${esc(r.numero_camara)}</span><span class="doc-badge cam">Cámara</span></div>
+      <div class="rad-tit">${esc(r.titulo)}</div>
+      <div class="sanc-tags">${com}${r.tipo_de_ley?`<span class="doc-badge pal">${esc(r.tipo_de_ley)}</span>`:''}${autor?'<span class="rad-aut">'+esc(autor)+'</span>':''}</div>
+      <div class="rad-dls">${dl.join('')}</div>
+    </div>`;
+  }
   function radRender(d){
     const el=document.getElementById('rad-body'); if(!el) return;
     const rs=(d&&d.radicados)||[];
-    if(!rs.length){ el.innerHTML='<div class="err">Aún no hay radicados cargados para esta legislatura.</div>'; return; }
+    const cam=(d&&d.radicados_camara)||[];
+    if(!rs.length && !cam.length){ el.innerHTML='<div class="err">Aún no hay radicados cargados para esta legislatura.</div>'; return; }
     const reradic=rs.filter(r=>r.intentos_previos>0).length;
-    const conpdf=rs.filter(r=>r.pdf_url).length;
-    el.innerHTML=`
+    const conpdf=rs.filter(r=>r.pdf_url).length + cam.filter(r=>r.pdf_url).length;
+    let html=`
       <div class="kpis">
-        <div class="kpi"><div class="n">${rs.length}</div><div class="l">Radicados · ${esc(d.legislatura||'')}</div></div>
-        <div class="kpi"><div class="n" style="color:var(--amber)">${reradic}</div><div class="l">Ya intentados antes</div></div>
+        <div class="kpi"><div class="n">${rs.length+cam.length}</div><div class="l">Radicados · ${esc(d.legislatura||'')}</div></div>
+        <div class="kpi"><div class="n">${rs.length}</div><div class="l">Senado</div></div>
+        <div class="kpi"><div class="n">${cam.length}</div><div class="l">Cámara</div></div>
         <div class="kpi"><div class="n">${conpdf}</div><div class="l">Con texto descargable</div></div>
-      </div>
-      <div class="rad-list">${rs.map(radCard).join('')}</div>`;
+      </div>`;
+    if(rs.length) html+=`<div class="rad-sec">Senado · ${rs.length} · texto radicado el mismo día</div><div class="rad-list">${rs.map(radCard).join('')}</div>`;
+    if(cam.length) html+=`<div class="rad-sec">Cámara · ${cam.length} · el texto radicado es la Gaceta (born-digital)</div><div class="rad-list">${cam.map(radCardCamara).join('')}</div>`;
+    el.innerHTML=html;
   }
   async function radLoad(){
     const el=document.getElementById('rad-body'); if(!el) return;

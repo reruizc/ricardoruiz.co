@@ -27,5 +27,8 @@ cd "$REPO" || { echo "no pude cd a $REPO" >&2; exit 1; }
   echo "--- harvest Cámara (camara.gov.co) ---"
   python3 tools/leyes-senado/harvest_camara.py
   rc_c=$?
-  echo "═════════ fin $(date '+%H:%M:%S') · senado=$rc_h upload=$rc_u camara=$rc_c ═════════"
+  echo "--- build_diario_camara_s3 --upload (resuelve+baja gacetas nuevas) ---"
+  python3 tools/leyes-senado/build_diario_camara_s3.py --upload
+  rc_cu=$?
+  echo "═════════ fin $(date '+%H:%M:%S') · senado=$rc_h upload=$rc_u camara=$rc_c camara_up=$rc_cu ═════════"
 } >> "$LOG" 2>&1

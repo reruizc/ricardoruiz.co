@@ -118,20 +118,30 @@ def _full():
 _RADICADOS = {}
 
 
-def _radicados(leg):
-    """Lista de proyectos radicados de una legislatura, desde el rastreo diario.
-    Manifiesto en metadata/pl-radicados-{leg}.jsonl (harvest_diario + build_diario_s3).
-    Cache por contenedor warm; [] si aún no existe (legislatura sin subir)."""
-    if leg not in _RADICADOS:
+def _radicados_manifest(key):
+    """Lee un manifiesto jsonl de radicados de S3 (cache warm). [] si no existe.
+    .split('\n') y NO .splitlines(): el OCR puede meter U+0085 (NEL), que
+    splitlines trata como salto de línea y parte un registro."""
+    if key not in _RADICADOS:
         try:
-            obj = _s3.get_object(Bucket=BUCKET, Key=f'metadata/pl-radicados-{leg}.jsonl')
-            # .split('\n') y NO .splitlines(): el OCR puede meter U+0085 (NEL),
-            # que splitlines trata como salto de línea y parte un registro.
+            obj = _s3.get_object(Bucket=BUCKET, Key=key)
             rows = [json.loads(x) for x in obj['Body'].read().decode('utf-8').split('\n') if x.strip()]
         except Exception:
             rows = []
-        _RADICADOS[leg] = rows
-    return _RADICADOS[leg]
+        _RADICADOS[key] = rows
+    return _RADICADOS[key]
+
+
+def _radicados(leg):
+    """Proyectos radicados del Senado (harvest_diario + build_diario_s3)."""
+    return _radicados_manifest(f'metadata/pl-radicados-{leg}.jsonl')
+
+
+def _radicados_camara(leg):
+    """Proyectos radicados de la Cámara (harvest_camara + build_diario_camara_s3).
+    El texto radicado es la Gaceta (born-digital); s3_pdf/s3_txt None mientras la
+    Imprenta no la publica (gaceta_pendiente=true)."""
+    return _radicados_manifest(f'metadata/pl-radicados-camara-{leg}.jsonl')
 
 
 def _presign(key, filename=None, expires=3600):
@@ -1165,7 +1175,35 @@ def handler(event, context):
             })
         # lo más nuevo primero (número de senado desc)
         out.sort(key=lambda x: int((x['numero_senado'] or '0/0').split('/')[0]), reverse=True)
-        return _resp(200, {'legislatura': leg, 'n': len(out), 'radicados': out})
+
+        # Cámara (Gaceta como texto radicado; s3_* None si aún no publicada)
+        cam = []
+        for r in _radicados_camara(leg):
+            num = r.get('numero_camara', '') or ''
+            autores = r.get('autores') or []
+            comis = r.get('comisiones') or []
+            gac = (r.get('gacetas') or [{}])[0]
+            fname = f"PLC {num.replace('/', '-')} - texto radicado.pdf" if num else 'texto-radicado.pdf'
+            cam.append({
+                'camara': True,
+                'numero_camara': num,
+                'numero_senado': r.get('numero_senado', '') or '',
+                'comision': (comis[0].get('nombre') if comis else '') or '',
+                'titulo': r.get('titulo', ''),
+                'autor': ', '.join(a.get('nombre', '') for a in autores) if autores else '',
+                'estado': r.get('estado', ''),
+                'tipo_de_ley': r.get('tipo', ''),
+                'origen': r.get('origen', ''),
+                'gaceta': r.get('gaceta_radicado') or gac.get('key', ''),
+                'gaceta_pendiente': r.get('gaceta_pendiente', False),
+                'pdf_url': _presign(r.get('s3_pdf'), fname),
+                'txt_url': _presign(r.get('s3_txt')),
+                'fuente_url': f"https://www.camara.gov.co/{r.get('link_web','')}" if r.get('link_web') else '',
+            })
+        cam.sort(key=lambda x: int((x['numero_camara'] or '0/0').split('/')[0]), reverse=True)
+
+        return _resp(200, {'legislatura': leg, 'n': len(out), 'radicados': out,
+                           'n_camara': len(cam), 'radicados_camara': cam})
 
     if action == 'gaceta':
         key = body.get('key')          # ej '857-2013'
