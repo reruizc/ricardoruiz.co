@@ -548,8 +548,9 @@
             </div>
             <div class="field">
               <label>IPS, clínica u hospital <span style="color:var(--muted-2)">(opcional)</span></label>
-              <input type="text" id="e_ips" placeholder="Ej.: Clínica del Occidente">
-              <span class="help">Solo si la demora se origina ahí.</span>
+              <input type="text" id="e_ips" placeholder="Ej.: Clínica del Occidente" list="ips-list" autocomplete="off">
+              <datalist id="ips-list"></datalist>
+              <span class="help" id="e_ips_help">Solo si la demora se origina ahí. Al elegir el departamento de los hechos te sugerimos las IPS de esa zona.</span>
             </div>
             <div class="field">
               <label>Departamento de los hechos <span class="req">*</span></label>
@@ -1170,6 +1171,36 @@
   }
   if ($('e_eps')){ $('e_eps').addEventListener('input', refreshEpsCorreo); $('e_eps').addEventListener('change', refreshEpsCorreo); }
   if ($('e_depto_hechos')) $('e_depto_hechos').addEventListener('change', refreshEpsCorreo);
+
+  /* ══════════════════ AUTOCOMPLETAR IPS POR DEPARTAMENTO ══════════════════ */
+  /* Las IPS (≈11 mil, REPS oficial) son muchas para embeber: se bajan de S3 solo
+     las del departamento de los hechos, bajo demanda. No envía datos del usuario;
+     si falla la red, el campo sigue siendo texto libre (degrada sin romper). */
+  var IPS_BASE = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/tutelas/ips/';
+  var _ipsCache = {};
+  function deptoCod(nombre){
+    for (var i = 0; i < DIVIPOLA.deptos.length; i++){
+      if (DIVIPOLA.deptos[i].nombre === nombre) return DIVIPOLA.deptos[i].cod;
+    }
+    return '';
+  }
+  function fillIpsList(arr){
+    var dl = $('ips-list'); if (!dl) return;
+    dl.innerHTML = (arr || []).map(function(x){
+      return '<option value="' + esc(x.n) + '">' + esc(x.m || '') + '</option>';
+    }).join('');
+  }
+  function loadIps(deptoNombre){
+    var dl = $('ips-list'); if (!dl) return;
+    var cod = deptoCod(deptoNombre);
+    if (!cod){ dl.innerHTML = ''; return; }
+    if (_ipsCache[cod]){ fillIpsList(_ipsCache[cod]); return; }
+    fetch(IPS_BASE + 'ips-' + cod + '.json')
+      .then(function(r){ return r.ok ? r.json() : []; })
+      .then(function(arr){ _ipsCache[cod] = arr; fillIpsList(arr); })
+      .catch(function(){ /* silencioso: el campo sigue siendo texto libre */ });
+  }
+  if ($('e_depto_hechos')) $('e_depto_hechos').addEventListener('change', function(){ loadIps(this.value); });
 
   /* Aviso de soporte documental por condición marcada */
   function renderSoporte(){
@@ -1896,6 +1927,7 @@
       // Los <select> de municipio se llenan según su departamento: repóblalos.
       fillMuniSel($('a_depto').value, 'a_ciudad', p.campos && p.campos.a_ciudad);
       fillMuniSel($('e_depto_hechos').value, 'e_ciudad_hechos', p.campos && p.campos.e_ciudad_hechos);
+      if ($('e_depto_hechos').value) loadIps($('e_depto_hechos').value);
       if (p.campos && p.campos.e_eps_correo) epsCorreoTouched = true;
       // refleja los toggles en la interfaz
       var rolBtn = document.querySelector('#rol-row [data-rol="' + S.rol + '"]'); if (rolBtn) rolBtn.click();
