@@ -26,6 +26,7 @@
   const SOURCES = [
     { name: 'endoso',   dir: 'endoso',        indexFile: 'index.json',                    list: d => Array.isArray(d) ? d : (d.candidatos || []) },
     { name: 'asamblea', dir: 'asamblea-2023', indexFile: 'index-asamblea-2023.json',       list: d => d.candidatos || [] },
+    { name: 'con2014',  dir: 'congreso-2014', indexFile: 'index-congreso-2014.json',       list: d => d.candidatos || [] },
     { name: 'con2018',  dir: 'congreso-2018', indexFile: 'index-congreso-2018.json',       list: d => d.candidatos || [] },
     { name: 'con2022',  dir: 'congreso-2022', indexFile: 'index-congreso-2022.json',       list: d => d.candidatos || [] },
   ];

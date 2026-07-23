@@ -94,6 +94,18 @@ sin breadcrumb), **Helvetica Neue embebida** (Syne solo en el logo), y suma los
   `Bases de datos/output_congreso_2018/` (gitignored). Validado: Uribe 891.964 ·
   Mockus 549.734 · Robledo 229.276 en Senado 2018 (cuadran con el resultado oficial).
   S3: `congreso-2026/output/congreso-2018/` (subir con `aws s3 cp --recursive`).
+- **Congreso 2014-2018** (`tools/analisis-candidato/build_congreso_2014.py`, jul-2026):
+  **1.940 candidatos** mesa-a-mesa desde `GCS_2014CON.csv` (0,84 GB · 6,78M filas). **2014
+  usa los MISMOS códigos que 2018** (verificado): Senado nac `(1,0)` · Senado indígena
+  `(1,4)` · Cámara territorial `(2,1)` · afro `(2,5)` · indígena `(2,4)`. **NO tiene CITREP
+  ni Internacional** (aparecen recién en 2022) → el script es un clon directo del de 2018
+  (mismo `SCOPES`, solo cambian año/archivo/rutas). Slugs `CON2014-{S|SI|CA|CI}-{par}-{can}`
+  (nac) · `CON2014-C-{dde}-{par}-{can}` (cámara). Salida ~816 MB en
+  `Bases de datos/output_congreso_2014/` (gitignored). **Validado:** Robledo 194.523 (senador
+  MÁS votado 2014, voto preferente, exacto) · Musa Besaile 156.288 · 'Ñoño' Elías 152.015 ·
+  Barguil 91.209 (Cámara Córdoba). Efecto lista cerrada: Uribe/Centro Democrático Senado = 0
+  nominal (voto al logo). S3: `congreso-2026/output/congreso-2014/`. Cableado: `con2014` en
+  `SOURCES` de cand-index.js + `SRC_YEAR.con2014 = 2014`. Con esto el span es **2014-2026**.
 - **Congreso 2022-2026** (`tools/analisis-candidato/build_congreso_2022.py`, jul-2026):
   **2.254 candidatos** mesa-a-mesa desde `GCS_2022CON.csv` (1,2 GB · 6,99M filas), mismo
   formato endoso. ⚠️ **2022 NO usa los códigos de circunscripción de 2018** (verificado):
@@ -126,18 +138,19 @@ sin breadcrumb), **Helvetica Neue embebida** (Syne solo en el logo), y suma los
 
 > **📌 HANDOFF · qué falta de CONGRESO en analisis-candidato (jul-2026)**
 >
-> **Cobertura hoy:** Congreso **2018** ✓ (`con2018`, subido) · Congreso **2022** ✓
-> (`con2022`, subido jul-2026) · Congreso **2026** ✓ (`endoso`) · Asamblea **2023** ✓.
-> Presidenciales aparte (modelo por-persona).
+> **Cobertura hoy:** Congreso **2014** ✓ (`con2014`) · **2018** ✓ (`con2018`) · **2022** ✓
+> (`con2022`) · **2026** ✓ (`endoso`) · Asamblea **2023** ✓. Span completo **2014-2026**,
+> los 4 subidos a S3. Presidenciales aparte (modelo por-persona).
 >
 > **1. ✓ HECHO — Congreso 2022** (`build_congreso_2022.py`, ver entrada arriba). Es el
 > término **2022-2026**, el mismo cuyo voto nominal ya construimos (actas de plenaria de
-> Cámara 2020-2026, sección Caudal) → ahora la ficha de un representante actual muestra la
+> Cámara 2020-2026, sección Caudal) → la ficha de un representante actual muestra la
 > elección del período en que votó, listo para el join con el panel "cómo votó".
 >
-> **2. FALTA Congreso 2014** (`GCS_2014CON.csv`, 0,8 GB) — extiende la historia.
-> **NO existe `GCS_2010CON`**: los archivos de Congreso arrancan en 2014, así que el
-> span real es **2014-2026**, no 2010-2026 (corrige la expectativa inicial).
+> **2. ✓ HECHO — Congreso 2014** (`build_congreso_2014.py`, ver entrada arriba). Clon del
+> de 2018 (mismos códigos de circunscripción). El span de Congreso queda **2014-2026** (4
+> elecciones). **NO existe `GCS_2010CON`**: los archivos arrancan en 2014, así que 2014 es
+> el piso — no hay más historia hacia atrás por conseguir de la RNEC.
 >
 > **3. ✓ HECHO — panel "Cómo votó en el Congreso"** en la ficha (jul-2026). Panel
 > `#voto-cong-wrap` en la columna izquierda (bajo el histórico): `renderVotoCongreso(meta)`
