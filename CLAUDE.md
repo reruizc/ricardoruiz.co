@@ -139,11 +139,16 @@ sin breadcrumb), **Helvetica Neue embebida** (Syne solo en el logo), y suma los
 > **NO existe `GCS_2010CON`**: los archivos de Congreso arrancan en 2014, así que el
 > span real es **2014-2026**, no 2010-2026 (corrige la expectativa inicial).
 >
-> **3. FALTA cablear el panel "cómo votó en el Congreso"** en la ficha. La acción
-> `congresista` de la Lambda `caudal-analiza` YA existe y resuelve por nombre
-> (subconjunto de tokens) o por `key`; devuelve bancada + alineación con gobierno +
-> récord por proyecto. Solo falta llamarla desde analisis-candidato y pintarla.
-> Cubre Cámara 2020-2026 (los senadores y quienes no votaron ahí no aparecen).
+> **3. ✓ HECHO — panel "Cómo votó en el Congreso"** en la ficha (jul-2026). Panel
+> `#voto-cong-wrap` en la columna izquierda (bajo el histórico): `renderVotoCongreso(meta)`
+> hace POST a la Lambda `caudal-analiza` (acción `congresista`, endpoint `CAUDAL_API`)
+> con el nombre de la persona; pinta bancada + alineación con gobierno (%) + tally
+> Sí/No/Abst + récord por proyecto (barras, lista scrollable). Best-effort (si falla la
+> red o no hay récord, el panel queda oculto — no rompe la ficha). Ante ambigüedad
+> `_pickCongresista` elige SOLO el match de tokens idéntico (no adivina). Trilingüe
+> (`t.voto`). Cubre Cámara 2020-2026 → senadores/congreso viejo/asamblea/presidenciales
+> simplemente no muestran el panel. Verificado en navegador (Juvinao 60%, 205 proyectos;
+> senador deja oculto).
 >
 > **Deudas conocidas:** (a) el georef es de 2026 y los datos de 2018 son viejos →
 > **17% de mesas sin nombre de puesto** ("PUESTO 00-00"); depto/municipio resuelven
