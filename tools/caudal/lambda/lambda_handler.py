@@ -114,6 +114,41 @@ def _full():
     return _FULL
 
 
+# --- radicados de la legislatura viva (rastreo diario) ----------------------
+_RADICADOS = {}
+
+
+def _radicados(leg):
+    """Lista de proyectos radicados de una legislatura, desde el rastreo diario.
+    Manifiesto en metadata/pl-radicados-{leg}.jsonl (harvest_diario + build_diario_s3).
+    Cache por contenedor warm; [] si aún no existe (legislatura sin subir)."""
+    if leg not in _RADICADOS:
+        try:
+            obj = _s3.get_object(Bucket=BUCKET, Key=f'metadata/pl-radicados-{leg}.jsonl')
+            # .split('\n') y NO .splitlines(): el OCR puede meter U+0085 (NEL),
+            # que splitlines trata como salto de línea y parte un registro.
+            rows = [json.loads(x) for x in obj['Body'].read().decode('utf-8').split('\n') if x.strip()]
+        except Exception:
+            rows = []
+        _RADICADOS[leg] = rows
+    return _RADICADOS[leg]
+
+
+def _presign(key, filename=None, expires=3600):
+    """URL firmada (SigV4) de vida corta para descargar UN objeto privado.
+    El bucket es privado; esto le da al navegador acceso temporal sin abrirlo.
+    filename fuerza el nombre de descarga (Content-Disposition)."""
+    if not key:
+        return None
+    params = {'Bucket': BUCKET, 'Key': key}
+    if filename:
+        params['ResponseContentDisposition'] = f'attachment; filename="{filename}"'
+    try:
+        return _s3.generate_presigned_url('get_object', Params=params, ExpiresIn=expires)
+    except Exception:
+        return None
+
+
 _BLOQUEO = None
 
 
@@ -1099,6 +1134,38 @@ def handler(event, context):
                 {'key': k, 'nombre': pc[k]['nombre'], 'bancada': pc[k].get('bancada'),
                  'n_votos': pc[k].get('n_votos')} for k in cands]})
         return _resp(404, {'encontrado': False, 'error': f'sin récord de voto para «{q}»'})
+
+    if action == 'radicados':
+        # proyectos recién radicados de la legislatura viva + descarga (PDF/texto).
+        # Fuente: rastreo diario de leyes.senado.gov.co (harvest_diario). Cada
+        # proyecto trae encabezado + tipología + intentos previos + URLs firmadas.
+        leg = body.get('legislatura', '2026-2027')
+        rows = _radicados(leg)
+        out = []
+        for r in rows:
+            num = r.get('numero_senado', '') or ''
+            fname = f"PL {num.replace('/', '-')} - texto radicado.pdf" if num else 'texto-radicado.pdf'
+            out.append({
+                'numero_senado': num,
+                'numero_camara': r.get('numero_camara', ''),
+                'comision': r.get('comision', ''),
+                'fecha': r.get('fecha_de_presentacion', ''),
+                'titulo': r.get('titulo', ''),
+                'autor': r.get('autor', ''),
+                'estado': r.get('estado', ''),
+                'tipo_de_ley': r.get('tipo_de_ley', ''),
+                'origen': r.get('origen', ''),
+                'tipologia': r.get('tipologia'),
+                'crea_fondo': r.get('crea_fondo', False),
+                'intentos_previos': r.get('intentos_previos', 0),
+                'intentos_previos_detalle': r.get('intentos_previos_detalle', []),
+                'pdf_url': _presign(r.get('s3_pdf'), fname),
+                'txt_url': _presign(r.get('s3_txt')),
+                'fuente_url': r.get('texto_radicado_url', ''),
+            })
+        # lo más nuevo primero (número de senado desc)
+        out.sort(key=lambda x: int((x['numero_senado'] or '0/0').split('/')[0]), reverse=True)
+        return _resp(200, {'legislatura': leg, 'n': len(out), 'radicados': out})
 
     if action == 'gaceta':
         key = body.get('key')          # ej '857-2013'

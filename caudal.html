@@ -128,6 +128,31 @@
   .sanc-tags{display:flex; flex-wrap:wrap; gap:.45rem; align-items:center; font-size:.66rem; color:var(--ink3)}
   .sanc-monto{color:var(--amber); font-weight:700}
 
+  /* ===== Radicados recientes (rastreo diario) ===== */
+  .rad-cta{display:flex; align-items:center; gap:.8rem; margin:1.4rem 0 .2rem; padding:.9rem 1.1rem;
+    border-radius:12px; cursor:none; text-decoration:none;
+    background:linear-gradient(120deg, rgba(0,71,255,.14), rgba(61,111,255,.03)); border:1px solid var(--teal-dim); transition:.15s}
+  .rad-cta:hover{border-color:var(--teal); transform:translateY(-1px)}
+  .rad-cta-tag{flex-shrink:0; font-size:.6rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--blue); background:rgba(0,71,255,.13); border:1px solid rgba(0,71,255,.3); border-radius:6px; padding:.25rem .5rem}
+  .rad-cta-txt{font-size:.82rem; color:var(--ink2); line-height:1.4}
+  .rad-cta-txt b{color:var(--ink)}
+  .rad-list{display:grid; grid-template-columns:1fr 1fr; gap:.7rem; margin-top:1rem}
+  @media(max-width:720px){ .rad-list{grid-template-columns:1fr} }
+  .sanc.rad{display:flex; flex-direction:column}
+  .rad-tit{font-size:.8rem; color:var(--ink); line-height:1.42; margin:.45rem 0 .55rem; font-weight:500}
+  .rad-aut{color:var(--ink2)}
+  .rad-prev{font-size:.68rem; color:var(--amber); background:rgba(224,160,58,.08);
+    border:1px solid rgba(224,160,58,.25); border-radius:6px; padding:.35rem .55rem; margin:.15rem 0 .55rem; line-height:1.4}
+  .rad-dls{display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; margin-top:auto; padding-top:.4rem}
+  .rad-dl{font-size:.72rem; font-weight:600; color:#fff; background:var(--blue); border-radius:7px;
+    padding:.38rem .7rem; text-decoration:none; cursor:none; transition:.15s}
+  .rad-dl:hover{background:#1a5bff}
+  .rad-dl.alt{color:var(--blue); background:transparent; border:1px solid rgba(0,71,255,.4)}
+  .rad-dl.alt:hover{background:rgba(0,71,255,.08)}
+  .rad-src{font-size:.68rem; color:var(--ink3); text-decoration:none; margin-left:auto}
+  .rad-src:hover{color:var(--ink2)}
+
   /* ===== Radar del cliente (Vista Cliente · SKU A) ===== */
   .radar-cta{margin:1.6rem 0 .4rem; padding:1.3rem 1.5rem; border-radius:14px; cursor:none;
     background:linear-gradient(120deg, rgba(0,71,255,.15), rgba(61,111,255,.04)); border:1px solid var(--teal-dim);
@@ -466,8 +491,25 @@
         <div class="chips" id="chips"></div>
       </div>
 
+      <a class="rad-cta" id="radCta">
+        <span class="rad-cta-tag">Nuevo</span>
+        <span class="rad-cta-txt"><b>Lo último radicado</b> · proyectos de ley de la legislatura viva, con su texto descargable el mismo día →</span>
+      </a>
+
       <div id="landing"></div>
       <div id="results"></div>
+    </div>
+
+    <!-- ===== Radicados recientes (rastreo diario del Senado) ===== -->
+    <div id="view-radicados" hidden>
+      <button class="pill-back" id="radBack">← Volver a Congreso</button>
+      <div class="hero">
+        <h1>Lo último <em>radicado</em>.</h1>
+        <p>Proyectos de ley de la legislatura viva, rastreados cada día desde
+           leyes.senado.gov.co. Cada uno con su texto radicado descargable y
+           cruzado contra 36 años de histórico: cuántas veces se intentó antes.</p>
+      </div>
+      <div id="rad-body"></div>
     </div>
 
     <!-- ===== PILAR · Regulatorio (sanciones) ===== -->
@@ -767,11 +809,12 @@
     });
   }
   function showView(v){
-    ['home','congreso','regulatorio','cliente','medios'].forEach(n=>{ const el=document.getElementById('view-'+n); if(el) el.hidden=(v!==n); });
+    ['home','congreso','regulatorio','cliente','medios','radicados'].forEach(n=>{ const el=document.getElementById('view-'+n); if(el) el.hidden=(v!==n); });
     window.scrollTo(0,0);
     if(v==='congreso') requestAnimationFrame(()=>document.querySelectorAll('#view-congreso .mort-bar').forEach(x=>x.style.height=x.dataset.h+'%'));
     if(v==='regulatorio') regLoadStats();
     if(v==='medios') medLoadLanding();
+    if(v==='radicados') radLoad();
   }
   /* ---------- pilar Regulatorio · sanciones ---------- */
   const REG={sector:'', q:''};
@@ -914,6 +957,56 @@
     if(mc) MED_EJEMPLOS.forEach(t=>{ const ch=document.createElement('span'); ch.className='chip'; ch.textContent=t; ch.onclick=()=>{ mq.value=t; MED.q=t; medBuscar(); }; mc.appendChild(ch); });
     const mb=document.getElementById('medBack'); if(mb) mb.onclick=()=>showView('home');
   }
+
+  /* ---------- Radicados recientes (rastreo diario del Senado) ---------- */
+  let RAD_DATA=null;
+  const RAD_TIP={honores:'Honores',fondos:'Crea fondo',reforma:'Reforma',presupuestal:'Presupuestal',ordinaria:''};
+  function radCard(r){
+    const com=r.comision?`<span class="doc-badge">Comisión ${esc(r.comision)}</span>`:'';
+    const tl=RAD_TIP[r.tipologia]; const tip=tl?`<span class="doc-badge pal">${esc(tl)}</span>`:'';
+    const autor=(r.autor||'').replace(/^H\.?\s*[SR]\.?\s*/i,'').split(',')[0].trim();
+    let prev='';
+    if(r.intentos_previos>0){
+      const legs=(r.intentos_previos_detalle||[]).map(x=>x.legislatura).filter(Boolean);
+      const tiempo=(r.intentos_previos_detalle||[]).filter(x=>/190/.test(x.estado||'')).length;
+      prev=`<div class="rad-prev">↺ ${r.intentos_previos} ${r.intentos_previos===1?'intento previo':'intentos previos'}`
+        +(legs.length?` (${esc(legs.join(', '))})`:'')
+        +(tiempo?` · ${tiempo} muerto${tiempo>1?'s':''} por vencimiento de términos`:'')+`</div>`;
+    }
+    const dl=[];
+    if(r.pdf_url) dl.push(`<a class="rad-dl" href="${esc(r.pdf_url)}" target="_blank" rel="noopener">↓ Texto radicado (PDF)</a>`);
+    if(r.txt_url) dl.push(`<a class="rad-dl alt" href="${esc(r.txt_url)}" target="_blank" rel="noopener">texto plano (.txt)</a>`);
+    if(r.fuente_url) dl.push(`<a class="rad-src" href="${esc(r.fuente_url)}" target="_blank" rel="noopener">en el Senado ↗</a>`);
+    return `<div class="sanc rad">
+      <div class="sanc-top"><span class="sanc-name">PL ${esc(r.numero_senado)}</span><span class="sanc-fecha">${esc(r.fecha||'')}</span></div>
+      <div class="rad-tit">${esc(r.titulo)}</div>
+      <div class="sanc-tags">${com}${tip}${autor?'<span class="rad-aut">'+esc(autor)+'</span>':''}</div>
+      ${prev}
+      <div class="rad-dls">${dl.join('')}</div>
+    </div>`;
+  }
+  function radRender(d){
+    const el=document.getElementById('rad-body'); if(!el) return;
+    const rs=(d&&d.radicados)||[];
+    if(!rs.length){ el.innerHTML='<div class="err">Aún no hay radicados cargados para esta legislatura.</div>'; return; }
+    const reradic=rs.filter(r=>r.intentos_previos>0).length;
+    const conpdf=rs.filter(r=>r.pdf_url).length;
+    el.innerHTML=`
+      <div class="kpis">
+        <div class="kpi"><div class="n">${rs.length}</div><div class="l">Radicados · ${esc(d.legislatura||'')}</div></div>
+        <div class="kpi"><div class="n" style="color:var(--amber)">${reradic}</div><div class="l">Ya intentados antes</div></div>
+        <div class="kpi"><div class="n">${conpdf}</div><div class="l">Con texto descargable</div></div>
+      </div>
+      <div class="rad-list">${rs.map(radCard).join('')}</div>`;
+  }
+  async function radLoad(){
+    const el=document.getElementById('rad-body'); if(!el) return;
+    if(RAD_DATA){ radRender(RAD_DATA); return; }
+    el.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Cargando radicados <span class="dots"><span></span><span></span><span></span></span></div>';
+    let d; try{ d=await call({action:'radicados'}); }catch(e){ el.innerHTML='<div class="err">No se pudo cargar. Reintenta.</div>'; return; }
+    RAD_DATA=d; radRender(d);
+  }
+
   function initHome(){
     renderPillars();
     regInit();
@@ -927,6 +1020,8 @@
     const hc=document.getElementById('hchips');
     if(hc) EJEMPLOS.forEach(t=>{ const ch=document.createElement('span'); ch.className='chip'; ch.textContent=t; ch.onclick=()=>{ showView('congreso'); q.value=t; buscar(); }; hc.appendChild(ch); });
     const cb=document.getElementById('congresoBack'); if(cb) cb.onclick=()=>showView('home');
+    const rcta=document.getElementById('radCta'); if(rcta) rcta.onclick=()=>showView('radicados');
+    const rbk=document.getElementById('radBack'); if(rbk) rbk.onclick=()=>showView('congreso');
   }
 
   /* ---------- Vista Cliente · Radar (SKU A) ---------- */
