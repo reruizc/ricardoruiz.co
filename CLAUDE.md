@@ -94,6 +94,24 @@ sin breadcrumb), **Helvetica Neue embebida** (Syne solo en el logo), y suma los
   `Bases de datos/output_congreso_2018/` (gitignored). Validado: Uribe 891.964 ·
   Mockus 549.734 · Robledo 229.276 en Senado 2018 (cuadran con el resultado oficial).
   S3: `congreso-2026/output/congreso-2018/` (subir con `aws s3 cp --recursive`).
+- **Congreso 2022-2026** (`tools/analisis-candidato/build_congreso_2022.py`, jul-2026):
+  **2.254 candidatos** mesa-a-mesa desde `GCS_2022CON.csv` (1,2 GB · 6,99M filas), mismo
+  formato endoso. ⚠️ **2022 NO usa los códigos de circunscripción de 2018** (verificado):
+  Senado nac `(1,1)` [era (1,0)] · Senado indígena `(1,6)` [era (1,4)] · Cámara territorial
+  `(2,2)` [era (2,1)] · afro `(2,5)` · indígena `(2,6)` [era (2,4)] · **+2 nuevas:**
+  Internacional `(2,0)` (exterior, 2 curules) y **CITREP `(2,7)`** (16 curules de paz).
+  **CITREP tiene estructura irregular:** el candidato = una ORGANIZACIÓN (`COD_PAR` único,
+  p.ej. Jorge Tovar=428 'Paz es Vida'), `COD_CAN` es marcador constante (501/502), y sus
+  votos se reparten en los VARIOS deptos que cubre su distrito → se keyea NACIONAL por
+  `(COD_PAR, COD_CAN)` para agregar el distrito en un solo JSON (Tovar 15.272 en
+  Cesar+Magdalena+Guajira; Salazar/ASOINTEC 9.672 en Cauca+Nariño+Valle). Slugs:
+  `CON2022-{S|SI|CA|CI|CE|CT}-{par}-{can}` (nacionales) · `CON2022-C-{dde}-{par}-{can}`
+  (cámara territorial). Salida local ~1,19 GB en `Bases de datos/output_congreso_2022/`
+  (gitignored). **Validado:** Miguel Uribe Turbay 226.922 (senador más votado 2022, exacto)
+  · Cabal 207.732 · 'Jota Pe' Hernández 194.758 · De la Calle 189.068. Efecto lista cerrada
+  esperado: Pacto Histórico Senado = 0 nominal (voto al logo, sin filas por candidato — igual
+  que 2018/2026). S3: `congreso-2026/output/congreso-2022/`. Cableado: `con2022` en `SOURCES`
+  de cand-index.js + `SRC_YEAR.con2022 = 2022` en analisis-candidato.html.
 - **Una entrada por PERSONA + toggle de elecciones** (`agruparPersonas` en
   analisis-candidato.html): el registro trae una entrada por CANDIDATURA, así que la
   misma persona sale varias veces (Senado 2018 · Asamblea 2023 · Congreso 2026). Se
@@ -108,18 +126,14 @@ sin breadcrumb), **Helvetica Neue embebida** (Syne solo en el logo), y suma los
 
 > **📌 HANDOFF · qué falta de CONGRESO en analisis-candidato (jul-2026)**
 >
-> **Cobertura hoy:** Congreso **2018** ✓ (`con2018`, subido) · Congreso **2026** ✓
-> (`endoso`) · Asamblea **2023** ✓. Presidenciales aparte (modelo por-persona).
+> **Cobertura hoy:** Congreso **2018** ✓ (`con2018`, subido) · Congreso **2022** ✓
+> (`con2022`, subido jul-2026) · Congreso **2026** ✓ (`endoso`) · Asamblea **2023** ✓.
+> Presidenciales aparte (modelo por-persona).
 >
-> **1. FALTA Congreso 2022 — el hueco que más importa.** `GCS_2022CON.csv` (1,2 GB)
-> sin procesar. Es el término **2022-2026**, o sea **el mismo cuyo voto nominal ya
-> construimos** (actas de plenaria de Cámara 2020-2026, ver sección Caudal). Sin él,
-> la ficha de un representante actual muestra 2026 y 2018 pero NO la elección del
-> período en que efectivamente votó → el join con el panel "cómo votó" queda cojo.
-> Receta: copiar `build_congreso_2018.py` → `build_congreso_2022.py` (mismo formato
-> GCS, revisar si 2022 trae sorpresas de encoding/columnas como las trajo 2018),
-> agregar `{name:'con2022', dir:'congreso-2022', …}` a `SOURCES` de cand-index.js y
-> `SRC_YEAR.con2022 = 2022` en analisis-candidato.html (el toggle lo recoge solo).
+> **1. ✓ HECHO — Congreso 2022** (`build_congreso_2022.py`, ver entrada arriba). Es el
+> término **2022-2026**, el mismo cuyo voto nominal ya construimos (actas de plenaria de
+> Cámara 2020-2026, sección Caudal) → ahora la ficha de un representante actual muestra la
+> elección del período en que votó, listo para el join con el panel "cómo votó".
 >
 > **2. FALTA Congreso 2014** (`GCS_2014CON.csv`, 0,8 GB) — extiende la historia.
 > **NO existe `GCS_2010CON`**: los archivos de Congreso arrancan en 2014, así que el

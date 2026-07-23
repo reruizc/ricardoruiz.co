@@ -1014,6 +1014,10 @@
               <span class="info-key" id="key-corp">Corporación</span>
               <span class="info-val" id="info-corp">—</span>
             </div>
+            <div class="info-row" id="info-edad-row" style="display:none">
+              <span class="info-key" id="key-edad">Edad</span>
+              <span class="info-val orange" id="info-edad">—</span>
+            </div>
             <div class="info-row">
               <span class="info-key" id="key-dep-top">Dpto. más votado</span>
               <span class="info-val green" id="info-dep-top">—</span>
@@ -1138,7 +1142,8 @@
         histConsulta: 'Consulta · 2026', hist1v: '1ª vuelta · 2026', hist2v: '2ª vuelta · 2026',
         histPresTag: 'PRESIDENTE', perfil: 'Mi panel',
         photoPlaceholder: '<a href="https://drive.google.com/drive/folders/1ULVQC1Cyz_fjnhGdM7ydzg7tEgiDcPRS?usp=share_link" target="_blank">¿Quieres agregar la foto de tu candidato? ¡Haz click aquí y ayúdanos!</a>',
-        keys: { origen:'Origen', partido:'Partido', corp:'Corporación', depTop:'Dpto. más votado', munTop:'Municipio top', zonaTop:'Comuna más votada', zonaVotos:'Votos comuna top', puestoTop:'Puesto más votado', puestoVotos:'Votos puesto top', votos:'Total de votos', dptos:'Dptos. con votos', mesas:'Mesas con votos' },
+        keys: { origen:'Origen', partido:'Partido', corp:'Corporación', edad:'Edad', depTop:'Dpto. más votado', munTop:'Municipio top', zonaTop:'Comuna más votada', zonaVotos:'Votos comuna top', puestoTop:'Puesto más votado', puestoVotos:'Votos puesto top', votos:'Total de votos', dptos:'Dptos. con votos', mesas:'Mesas con votos' },
+        ageUnit: 'años',
         plans: { free:'Free', basic:'Básico', pro:'Pro', premium:'Premium', analysis:'Análisis', full:'Completo' },
         logout: 'Salir', login: 'Iniciar sesión', register: 'Registrarse',
         munModal: 'Para ver municipios, apóyanos <a href="elige-plan.html">registrándote aquí</a>',
@@ -1172,7 +1177,8 @@
         histConsulta: 'Primary · 2026', hist1v: '1st round · 2026', hist2v: 'Runoff · 2026',
         histPresTag: 'PRESIDENT', perfil: 'My dashboard',
         photoPlaceholder: '<a href="https://drive.google.com/drive/folders/1ULVQC1Cyz_fjnhGdM7ydzg7tEgiDcPRS?usp=share_link" target="_blank">Want to add this candidate\'s photo? Click here and help us!</a>',
-        keys: { origen:'Origin', partido:'Party', corp:'Corporation', depTop:'Top dept.', munTop:'Top municipality', zonaTop:'Top commune', zonaVotos:'Commune top votes', puestoTop:'Top polling station', puestoVotos:'Station top votes', votos:'Total votes', dptos:'Depts. with votes', mesas:'Tables with votes' },
+        keys: { origen:'Origin', partido:'Party', corp:'Corporation', edad:'Age', depTop:'Top dept.', munTop:'Top municipality', zonaTop:'Top commune', zonaVotos:'Commune top votes', puestoTop:'Top polling station', puestoVotos:'Station top votes', votos:'Total votes', dptos:'Depts. with votes', mesas:'Tables with votes' },
+        ageUnit: 'yrs',
         plans: { free:'Free', basic:'Basic', pro:'Pro', premium:'Premium', analysis:'Analysis', full:'Full' },
         logout: 'Log out', login: 'Log in', register: 'Sign up',
         munModal: 'To view municipalities, support us by <a href="elige-plan.html">registering here</a>',
@@ -1206,7 +1212,8 @@
         histConsulta: '党内初选 · 2026', hist1v: '第一轮 · 2026', hist2v: '第二轮 · 2026',
         histPresTag: '总统', perfil: '我的面板',
         photoPlaceholder: '<a href="https://drive.google.com/drive/folders/1ULVQC1Cyz_fjnhGdM7ydzg7tEgiDcPRS?usp=share_link" target="_blank">想添加候选人照片？点击这里帮助我们！</a>',
-        keys: { origen:'来源', partido:'政党', corp:'机构', depTop:'最高票省份', munTop:'最高票城市', zonaTop:'最高票社区', zonaVotos:'社区最高票', puestoTop:'最高票站', puestoVotos:'投票站最高票', votos:'总票数', dptos:'得票省份数', mesas:'得票投票台数' },
+        keys: { origen:'来源', partido:'政党', corp:'机构', edad:'年龄', depTop:'最高票省份', munTop:'最高票城市', zonaTop:'最高票社区', zonaVotos:'社区最高票', puestoTop:'最高票站', puestoVotos:'投票站最高票', votos:'总票数', dptos:'得票省份数', mesas:'得票投票台数' },
+        ageUnit: '岁',
         plans: { free:'免费', basic:'基础', pro:'专业', premium:'高级', analysis:'分析', full:'完整' },
         logout: '退出', login: '登录', register: '注册',
         munModal: '要查看市级数据，请<a href="elige-plan.html">在此注册</a>支持我们',
@@ -1254,7 +1261,9 @@
       st('rating-label', t.ratingLabel);
       si('photo-placeholder-text', t.photoPlaceholder);
       const keys = t.keys;
-      st('key-origen', keys.origen); st('key-partido', keys.partido); st('key-corp', keys.corp);
+      st('key-origen', keys.origen); st('key-partido', keys.partido); st('key-corp', keys.corp); st('key-edad', keys.edad);
+      // re-pinta la edad del candidato activo en el nuevo idioma (cambia la unidad "años/yrs/岁")
+      if (typeof currentCand !== 'undefined' && currentCand) setEdad(currentCand);
       st('key-dep-top', keys.depTop); st('key-mun-top', keys.munTop);
       st('key-zona-top', keys.zonaTop); st('key-zona-votos', keys.zonaVotos);
       st('key-puesto-top', keys.puestoTop); st('key-puesto-votos', keys.puestoVotos);
@@ -2630,12 +2639,44 @@
     // persona aparece varias veces (Senado 2018, Senado 2026, Asamblea 2023…).
     // Se colapsa a UNA entrada de buscador (la candidatura más reciente) y el
     // resto queda accesible en la barra de histórico.
-    const SRC_YEAR = { endoso: 2026, asamblea: 2023, con2018: 2018 };
+    const SRC_YEAR = { endoso: 2026, asamblea: 2023, con2022: 2022, con2018: 2018 };
     const congHistBySlug = {};   // slug → [entradas de esa persona]
 
     function normPersona(s) {
       return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
         .toUpperCase().replace(/[^A-Z ]/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+
+    // ─── EDAD DE CONGRESISTAS ─────────────────────────────────
+    // Fecha de nacimiento por nombre (Congreso Visible · congreso-edades.json,
+    // hermano de este HTML). Llave = normPersona(nombre). La edad se calcula al
+    // vuelo contra el día de hoy (no caduca). Cobertura ~540 congresistas
+    // 2018/2022/2026; quien no matchea simplemente no muestra la fila.
+    let CONG_EDADES = {};
+    async function loadEdades() {
+      try {
+        const r = await fetch('congreso-edades.json');
+        if (r.ok) CONG_EDADES = (await r.json()).personas || {};
+      } catch (e) { /* best-effort: sin este archivo la ficha funciona igual */ }
+    }
+    function edadDesde(iso) {
+      const p = String(iso || '').split('-').map(Number);
+      if (p.length !== 3 || !p[0]) return null;
+      const [y, m, d] = p, now = new Date();
+      let a = now.getFullYear() - y;
+      const mm = now.getMonth() + 1, dd = now.getDate();
+      if (mm < m || (mm === m && dd < d)) a--;
+      return (a >= 0 && a < 120) ? a : null;
+    }
+    function setEdad(meta) {
+      const row = document.getElementById('info-edad-row');
+      if (!row) return;
+      const rec = CONG_EDADES[normPersona(meta && meta.nombre)];
+      const a = rec ? edadDesde(rec.f) : null;
+      if (a == null) { row.style.display = 'none'; return; }
+      const t = candI18n[localStorage.getItem('rr-lang')] || candI18n.co;
+      setInfoVal('info-edad', `${a} ${t.ageUnit} · ${String(rec.f).slice(0, 4)}`);
+      row.style.display = 'flex';
     }
 
     function agruparPersonas(list) {
@@ -2665,6 +2706,7 @@
       try {
         // Base compartida (cand-index.js): endoso (Congreso + Consultas) + Asamblea 2023
         // + futuras candidaturas. `?asamlocal=1` apunta la base de asamblea al repo local.
+        loadEdades();   // fecha de nacimiento (best-effort, no bloquea el índice)
         const _bases = ASAM_BASE.startsWith('http') ? undefined : { asamblea: ASAM_BASE };
         candIndex = await CandRegistry.load({ includeParties: false, bases: _bases });
         if (!candIndex.length) throw new Error('índice de candidatos vacío');
@@ -2904,7 +2946,7 @@
       // Histórico electoral (consulta · 1V · 2V) bajo la foto
       renderHistorial(meta);
       setInfoVal('info-origen', '…');
-      // info-edad eliminado del HTML
+      setEdad(meta);   // edad del congresista (si hay fecha de nacimiento)
       setInfoVal('info-dep-top', '…');
       setInfoVal('info-mun-top', '…');
       setInfoVal('info-zona-top', '…');
