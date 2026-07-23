@@ -363,8 +363,11 @@ def build(only=None, upload=False):
         s3.put_object(Bucket=S3_BUCKET, Key=f'{S3_PREFIX}/en-vivo.json',
                       Body=payload.encode('utf-8'), ContentType='application/json',
                       CacheControl='public, max-age=300')
-    STAGE.mkdir(parents=True, exist_ok=True)
-    (STAGE / 'en-vivo.json').write_text(payload, encoding='utf-8')
+    else:
+        # solo en corridas locales: staging para revisar/subir con aws s3 cp
+        # (en Lambda el filesystem del repo no existe y es read-only)
+        STAGE.mkdir(parents=True, exist_ok=True)
+        (STAGE / 'en-vivo.json').write_text(payload, encoding='utf-8')
     return result
 
 

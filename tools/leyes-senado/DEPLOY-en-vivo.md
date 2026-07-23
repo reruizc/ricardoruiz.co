@@ -56,6 +56,19 @@ aws lambda update-function-code --function-name leyes-en-vivo \
 ```
 
 ## 4 · EventBridge · 3×/día (08:00, 13:00, 18:00 hora Colombia = UTC-5)
+
+> ⚠ **REQUIERE IDENTIDAD ADMIN.** `ricardo-mac-cli` NO tiene `events:*` ni puede
+> auto-otorgárselo (`iam:PutUserPolicy` está bloqueado — guardarraíl anti-escalada).
+> Corre estos 3 comandos con una identidad admin, **o** primero concédele a
+> `ricardo-mac-cli` el permiso y luego corre los comandos con la CLI normal:
+> ```bash
+> aws iam put-user-policy --user-name ricardo-mac-cli --policy-name eventbridge-leyes-en-vivo \
+>   --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["events:PutRule","events:PutTargets","events:DeleteRule","events:RemoveTargets","events:DescribeRule","events:ListTargetsByRule","events:EnableRule","events:DisableRule"],"Resource":"arn:aws:events:us-east-1:167386641785:rule/leyes-en-vivo*"}]}'
+> ```
+> Estado actual: la Lambda `leyes-en-vivo` YA existe y corre (probada, siembra S3);
+> solo falta este trigger. Mientras tanto se puede refrescar a mano con
+> `aws lambda invoke --function-name leyes-en-vivo /tmp/o.json`.
+
 ```bash
 ACCOUNT=167386641785
 aws events put-rule --name leyes-en-vivo-3x \
