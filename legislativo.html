@@ -205,7 +205,17 @@
     .p-tipo{font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue-light);background:rgba(0,71,255,.12);padding:.16rem .5rem}
     .loading{display:flex;align-items:center;gap:.6rem;color:var(--gray);font-size:.8rem;padding:1.2rem 0}
     /* ── EN VIVO · proyectos de ley radicados (Senado + Cámara) ──── */
-    .ev-updated{font-size:.66rem;letter-spacing:.06em;color:rgba(255,255,255,.4);margin-bottom:1.1rem;display:flex;align-items:center;gap:.5rem}
+    .ev-bar{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.1rem;flex-wrap:wrap}
+    .ev-updated{font-size:.66rem;letter-spacing:.06em;color:rgba(255,255,255,.4);display:flex;align-items:center;gap:.5rem}
+    .ev-refresh{font-family:var(--hn);font-size:.63rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);background:rgba(255,255,255,.06);border:1px solid var(--card-border);padding:.4rem .8rem;display:flex;align-items:center;gap:.45rem;cursor:none;transition:background .15s,border-color .15s}
+    .ev-refresh:hover{background:rgba(255,255,255,.1);border-color:var(--gray-light)}
+    .ev-refresh:disabled{opacity:.55;cursor:default}
+    .ev-refresh-ic{display:inline-block;font-size:.85rem;line-height:1}
+    .ev-refresh.spin .ev-refresh-ic{animation:evspin .8s linear infinite}
+    @keyframes evspin{to{transform:rotate(360deg)}}
+    .ev-flash{font-size:.68rem;color:var(--green);margin:-.4rem 0 1rem;min-height:1.1em;opacity:0;transition:opacity .2s}
+    .ev-flash.show{opacity:1}
+    .ev-flash.none{color:var(--gray)}
     .ev-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(74,222,128,.6);animation:evpulse 2s infinite}
     @keyframes evpulse{0%{box-shadow:0 0 0 0 rgba(74,222,128,.5)}70%{box-shadow:0 0 0 7px rgba(74,222,128,0)}100%{box-shadow:0 0 0 0 rgba(74,222,128,0)}}
     .ev-wrap{display:grid;grid-template-columns:1fr 1fr;gap:1.4rem;align-items:start}
@@ -365,7 +375,13 @@
     <div class="sec-tag">En vivo · Legislatura 2026–2027</div>
     <h2 class="sec-title">Últimos proyectos de ley radicados</h2>
     <p class="sec-sub">Lo más reciente que llega al Congreso, extraído a diario de <strong>Senado</strong> (leyes.senado.gov.co) y <strong>Cámara</strong> (camara.gov.co). Haz clic en cada proyecto para ver su objeto y descargar el texto radicado.</p>
-    <div class="ev-updated" id="ev-updated"></div>
+    <div class="ev-bar">
+      <div class="ev-updated" id="ev-updated"></div>
+      <button class="ev-refresh" id="ev-refresh" type="button" title="Buscar radicaciones nuevas">
+        <span class="ev-refresh-ic">↻</span><span class="ev-refresh-tx">Actualizar</span>
+      </button>
+    </div>
+    <div class="ev-flash" id="ev-flash"></div>
     <div class="ev-wrap">
       <div class="ev-col">
         <div class="ev-col-head"><b>Senado</b> <span class="c" id="ev-sen-count"></span></div>
@@ -909,14 +925,33 @@
       r.classList.toggle('open');
     }));
   }
-  async function loadEnVivo(){
+  let EV_SEEN=null;   // Set de 'sen:NUM'/'cam:NUM' ya vistos (para detectar novedades)
+  function evFlash(txt,none){
+    const f=document.getElementById('ev-flash'); if(!f) return;
+    f.textContent=txt; f.className='ev-flash show'+(none?' none':'');
+    clearTimeout(evFlash._t); evFlash._t=setTimeout(()=>{ f.className='ev-flash'; },6000);
+  }
+  async function loadEnVivo(opts){
+    opts=opts||{};
     const sB=document.getElementById('ev-senado'), cB=document.getElementById('ev-camara');
+    const btn=document.getElementById('ev-refresh');
+    if(opts.refresh && btn){ btn.disabled=true; btn.classList.add('spin'); }
     try{
-      const r=await fetch(EN_VIVO_URL+'?v='+Math.floor(Date.now()/3600000));
+      // en refresh: cache-buster fino (por minuto) para traer el último feed publicado
+      const v=opts.refresh?Date.now():Math.floor(Date.now()/3600000);
+      const r=await fetch(EN_VIVO_URL+'?v='+v,{cache:opts.refresh?'no-store':'default'});
       if(!r.ok) throw new Error('HTTP '+r.status);
       const j=await r.json();
       const base=j.base_pdf||'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo/';
       const sen=(j.senado||[]).slice(0,5), cam=(j.camara||[]).slice(0,5);
+      // detectar radicaciones nuevas respecto a lo ya visto
+      const ahora=new Set([...sen.map(x=>'sen:'+x.numero),...cam.map(x=>'cam:'+x.numero)]);
+      if(EV_SEEN && opts.refresh){
+        const nuevos=[...ahora].filter(k=>!EV_SEEN.has(k)).length;
+        evFlash(nuevos?`✦ ${nuevos} radicación${nuevos>1?'es':''} nueva${nuevos>1?'s':''} desde tu última consulta`
+                      :'Sin radicaciones nuevas por ahora — el feed se refresca varias veces al día', !nuevos);
+      }
+      EV_SEEN=ahora;
       evPaint(sB,sen,'sen',base); evPaint(cB,cam,'cam',base);
       document.getElementById('ev-sen-count').textContent=sen.length?`· ${sen.length} recientes`:'';
       document.getElementById('ev-cam-count').textContent=cam.length?`· ${cam.length} recientes`:'';
@@ -926,14 +961,20 @@
         up.innerHTML=`<span class="ev-dot"></span>Actualizado ${isNaN(d)?esc(j.actualizado):d.toLocaleString('es-CO',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}`;
       }
     }catch(e){
-      const msg=`<div class="ev-empty">No se pudo cargar el feed en vivo por ahora. Consulta el <a href="#proyectos" style="color:var(--blue-light)">Radar legislativo</a> con el histórico completo.</div>`;
-      sB.innerHTML=msg; cB.innerHTML='';
+      if(opts.refresh) evFlash('No se pudo actualizar ahora. Reintenta en un momento.',true);
+      else{
+        const msg=`<div class="ev-empty">No se pudo cargar el feed en vivo por ahora. Consulta el <a href="#proyectos" style="color:var(--blue-light)">Radar legislativo</a> con el histórico completo.</div>`;
+        sB.innerHTML=msg; cB.innerHTML='';
+      }
+    }finally{
+      if(btn){ btn.disabled=false; btn.classList.remove('spin'); }
     }
   }
 
   /* ── init ───────────────────────────────────────────────────── */
   updateNavAuth();
   loadEnVivo();
+  (function(){ const b=document.getElementById('ev-refresh'); if(b) b.addEventListener('click',()=>loadEnVivo({refresh:true})); })();
   renderComp();
   renderComisiones();
   renderMesaCamara();
