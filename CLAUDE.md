@@ -4783,6 +4783,76 @@ python3 tools/leyes-senado/harvest.py test                      # slice de valid
 - `MAX_ID_DEFAULT` (medido por bisección): pdly 10100 · lys 2800 · pal 820 ·
   actos 90. Bumpear cuando el Congreso avance.
 
+### Rastreo DIARIO de radicados (legislatura viva) — automatizado vía launchd
+
+Complemento operativo de `harvest.py`: mientras aquel baja el histórico
+1990-hoy por enumeración de IDs, el rastreo diario mira SOLO la legislatura
+viva todos los días y responde "¿qué se radicó / qué se movió desde ayer?".
+Alimenta la vista **"Lo último radicado"** de `caudal.html` (acción `radicados`
+de la Lambda `caudal-analiza`, que lee el manifiesto de S3). **YA CORRE SOLO
+— no es Lambda y no es manual.**
+
+**Scripts** (`tools/leyes-senado/`):
+- `harvest_diario.py` — lista (`search_pdly.php`) → detalle (`get_detalle_pdly.php`,
+  reusa `parse_detalle` de harvest.py) → PDF (`data-link` del botón
+  `textoRadicadoBtn`) → texto (`pypdf`, los radicados 2026 traen OCR embebido del
+  escáner del Senado) → diff contra el snapshot de ayer → emite
+  `novedades-YYYY-MM-DD.{json,md}`. **Ritmo lento embebido** (DELAY_META=3s,
+  DELAY_PDF=6s, MAX_PDF_POR_CORRIDA=20) para esquivar el WAF (ban ~10 min por
+  fingerprint JA3 + volumen). Existe el gemelo `harvest_camara.py` (Cámara, vía
+  AJAX WP — ver `[[reference_camara_proyectos_ajax]]`).
+- `build_diario_s3.py --upload` — arma `metadata/pl-radicados-{leg}.jsonl`
+  (encabezado + tipología de `clasificar.py` + intentos_previos vs histórico +
+  llaves `s3_pdf`/`s3_txt`) y sube manifiesto + PDFs + texto al bucket privado
+  `caudal-legislativo` (`radicados-pdf/`, `radicados-texto/`). Sin `--upload` =
+  dry-run. Gemelo: `build_diario_camara_s3.py`.
+
+**Montaje launchd (el que lo corre solo):**
+```
+tools/leyes-senado/run_diario.sh                     # encadena las 4 etapas (senado + cámara), log en diario/cron.log
+tools/leyes-senado/co.ricardoruiz.leyes-diario.plist # → instalado en ~/Library/LaunchAgents/
+```
+`run_diario.sh` fija `PATH=/opt/homebrew/bin:…` (aws y python3 viven ahí) y corre,
+en orden: `harvest_diario` → `build_diario_s3 --upload` → `harvest_camara` →
+`build_diario_camara_s3 --upload`. El plist dispara **2×/día** (`StartCalendarInterval`
+08:00 y 19:30 — la lista del Senado se mueve mañana y tarde); si el Mac estaba
+dormido, launchd corre la agendada perdida al despertar. Logs:
+`Bases de datos/leyes-senado/diario/{cron.log,launchd.out.log,launchd.err.log}`.
+Operar:
+```bash
+launchctl list | grep leyes-diario                                   # ¿cargado? (last exit debe ser 0)
+launchctl kickstart -k gui/$(id -u)/co.ricardoruiz.leyes-diario      # forzar una corrida ya
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/co.ricardoruiz.leyes-diario.plist   # desinstalar
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/co.ricardoruiz.leyes-diario.plist # reinstalar (tras editar el plist)
+```
+
+**Por qué launchd local y NO Lambda** (decisión firme, no rehacer sin razón nueva):
+1. **Estado en el filesystem local.** El diff compara contra
+   `diario/{leg}/proyectos.json` y el "¿ya tengo este PDF?" es `pdf_path.exists()`
+   sobre archivos locales. El `/tmp` de Lambda es efímero y siempre frío a 12-24h →
+   creería que los 20 PDF son nuevos y los bajaría de golpe = **la ráfaga exacta que
+   el WAF castiga**. Portar exige reescribir el estado a S3 (restaurar snapshot +
+   cambiar el check por HeadObject/manifiesto).
+2. **Deps + runtime.** `pypdf` es externo (bundle en el ZIP, rompe el patrón
+   stdlib+boto3 de agenda-medios) y `/usr/bin/curl` no viene en el runtime Python de
+   Lambda AL2023 (habría que empacar curl estático o pasar a urllib).
+3. **El WAF no distingue.** Banea por fingerprint no-Chrome + volumen; curl/urllib en
+   Lambda tiene el mismo fingerprint que el del Mac → Lambda no da ventaja de evasión.
+   Lo que protege es el ritmo lento, que el script local ya hace.
+4. El Mac ya tiene todo probado (curl, pypdf, aws-cli con creds `ricardo-mac-cli`) →
+   cero refactor. **Único costo:** el Mac debe estar despierto cerca de 08:00/19:30
+   (launchd mitiga con corrida al despertar; solo los `novedades-YYYY-MM-DD` tendrían
+   huecos en días apagado — el manifiesto que lee el frontend siempre queda al día).
+
+**Si algún día se quiere Mac-independiente en la nube:** rol IAM dedicado con
+`s3:GetObject` (restaurar snapshot) + `s3:PutObject` sobre `metadata/pl-radicados-*`,
+`radicados-pdf/*`, `radicados-texto/*` (+ `-camara-*`); el rol de `caudal-analiza`
+solo tiene GetObject ahí (read-only para presignar) → no reusable tal cual.
+
+**Verificado en prod (2026-07-23):** launchd cargado (last exit 0), corrida de las
+19:30 subió el manifiesto (19:43-19:44), y la acción `radicados` devuelve
+**76 Senado + 14 Cámara** en vivo (53/76 con PDF presignado).
+
 ### Cobertura final (2026-07-10) + columnas
 ```
 Bases de datos/leyes-senado/{pdly,lys,pal,actos}.{jsonl,csv}   (gitignored)
@@ -5085,9 +5155,45 @@ sin postback) al ZIP/PDF de esa sesión.
   `Bases de datos/leyes-senado/dist/{votaciones-camara-nominal.jsonl,votaciones-camara-stats.json}`.
   Piloto de OCR (`tools/caudal/actas/ocr_pilot.py`, Tesseract+pymupdf, ambos instalados
   vía `brew install tesseract-lang` + `pip install --break-system-packages pymupdf
-  pytesseract`) confirmó que el rango pre-2011 SÍ es OCR-eable (nombres reales salen
-  legibles) pero no se ha corrido en masa — queda como pendiente explícito, ya no
-  bloqueado por falta de piloto.
+  pytesseract`) confirmó que el escaneado SÍ es OCR-eable (nombres reales legibles).
+- **OCR en masa RESUELTO para 2014-2017 (jul-24-2026 · `tools/caudal/actas/parse_dcnsw_camara.py`).**
+  Los escaneados sin texto nativo (329 actas "sin-texto-OCR", **86% en 2014-2017 —
+  años con CERO cobertura nativa**) son casi todos del formato **DCN-SW** ("Software de
+  Conferencias DCN-SW · Resultados de votación"): un PDF POR VOTO dentro del ZIP de la
+  sesión, nombrado `NN. P.L.175-2014 (…).pdf`. **El parser nativo NO lo reconoce** (no es
+  consolidado/fragmentado/manual_tabla) → parser aparte con OCR (pymupdf 300dpi + tesseract spa).
+  - **Nº de proyecto = del NOMBRE DE ARCHIVO** (`P.L.175-2014`→`175/14`, admite PAL/PLE/guion/slash),
+    más fiable que el OCR de la cabecera.
+  - **Lista nominal seccionada** "Resultados individuales" con encabezados al margen izquierdo
+    (Sí="Yes" en inglés · No · No votado · Abstención); nombres INDENTADos + partido a la derecha.
+    **Clave:** el OCR BARAJA el orden de columnas → se reconstruye por GEOMETRÍA (agrupa palabras
+    en líneas por coord-y, ordena por (página,y)). El encabezado "Yes"/Sí es GRIS CLARO y el OCR
+    lo PIERDE → default `cur_resp='Si'` al entrar a la lista (DCN-SW siempre lista Sí primero) y
+    solo cambia con los encabezados oscuros No/No votado/Abstención que el OCR sí capta.
+  - **`finalize_vote` reconcilia** geometría vs totales de cabecera pág 1 (Presente/Sí/No, cuando
+    el OCR los capta — a menudo el número de la derecha se pierde en el escaneo) + reasignación
+    POR POSICIÓN (orden fijo Sí·No·Abst·No votado) para recuperar encabezados que el OCR perdió.
+    Flag **`confianza`**: `alta` (cabecera reconcilia) · `media` (geometría, estructura confirmada
+    o plenaria llena) · `baja` (sin validar / implausible). Todo lleva `fuente:'ocr'`.
+  - **Resultado full run:** 329 actas → 219 con voto · **1.314 votaciones · 119.793 votos ·
+    85,8% partido asignado** (66 alta / 1.240 media / 8 baja). **Validación:** de las 90 votaciones
+    con totales de pág 1, **97% reconcilia** (70% EXACTO, 27% ±2); **99,3% coherencia de era**
+    (los nombres OCR matchean a congresistas realmente presentes en 2014/2018, no anacrónicos).
+  - **Integración:** `parse_dcnsw` escribe `dist/votaciones-camara-nominal-ocr.jsonl` (cada fila
+    con `fuente:'ocr'`+`confianza`+`archivo`) + `parsed-ocr/{aid}.json`. Los build scripts
+    (`build_votaciones_camara_s3` · `build_congresista_s3`) leen AMBOS jsonls vía `_iter_rows()`
+    (descartan OCR `baja`, keyean OCR por `archivo` porque no traen `votacion_numero`). Cada
+    votación OCR lleva `fuente`/`confianza` en el JSON S3 → el frontend PUEDE degradar confianza
+    (badge opcional, aún no puesto). Correr: `parse_dcnsw_camara.py --workers 6` (~1h · lee
+    `/tmp/diag_pending.json` con status `sin-texto-OCR`, o cae a todas las del índice).
+  - **En producción (jul-24):** subidos `metadata/votaciones-camara-{nominal,congresista}.json`
+    (nominal **474 proy / 2.312 votaciones**, 783 OCR; congresista **340** — ahora hay reps 2014-17
+    puros: Á. M. Robledo, Pedrito Pereira…). **Rango 2014-12 → 2026-06.** Lambda redeployada.
+  - **NO recuperable por OCR:** 2010-2013 son "RESUMEN SESIÓN PLENARIA" **narrativo** (dicen "con
+    votación nominal se aprobó" pero NO listan por-congresista → no hay nominal que extraer);
+    `.rar`(93)/`.docx`(49)/`.doc`(4) son formato, no OCR; 96 `sin-archivo` se re-bajan con el
+    harvester (texto nativo 2018-19, no OCR). ~110 sin-texto restantes son mayormente narrativas
+    2013 y scattered 2020-25.
 - **Validado cruzado** contra [Congreso a la mano](https://congresoalamano.elespectador.com)
   (El Espectador): Barguil "Sí" en reforma tributaria y "No" sostenido en reforma a la salud
   coincide en ambas fuentes. Esa herramienta externa **no tiene registrada la reforma
@@ -5131,7 +5237,9 @@ sin postback) al ZIP/PDF de esa sesión.
   2. **Cablear el panel "cómo votó"** en la ficha (acción Lambda ya lista).
   3. **Senado** — bloqueado por fuente (no hay export electrónico ni índice limpio;
      solo targeted vía Gaceta, ver abajo).
-  4. **OCR Cámara pre-2020** (~928 actas imagen en disco, piloto Tesseract listo).
+  4. **OCR Cámara** — ✅ HECHO para 2014-2017 (formato DCN-SW, ver arriba `parse_dcnsw_camara.py`).
+     Queda solo el OCR de 2010-2013, pero esas actas son RESUMEN narrativo SIN nominal → nada
+     que extraer; y re-bajar las 96 `sin-archivo` (2018-19 texto nativo, no OCR).
   5. **Disciplina de bancada** como vista propia (la alineación ya se mide por persona
      y por bancada; falta exponerla agregada). Coaliciones sigue PAUSADO por decisión.
 
