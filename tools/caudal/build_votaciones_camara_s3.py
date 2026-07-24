@@ -43,26 +43,48 @@ def num_token(num):
     return f'{int(m.group(1))}/{m.group(2)}' if m else None
 
 
+def _iter_rows():
+    """Filas de voto nominal: nativas (parse_votaciones_camara) + OCR DCN-SW
+    (parse_dcnsw_camara). Las OCR con confianza 'baja' se descartan; las
+    demás entran marcadas con su fuente/confianza."""
+    for line in open(DIST / 'votaciones-camara-nominal.jsonl', encoding='utf-8'):
+        yield json.loads(line)
+    ocr = DIST / 'votaciones-camara-nominal-ocr.jsonl'
+    if ocr.exists():
+        for line in open(ocr, encoding='utf-8'):
+            r = json.loads(line)
+            if r.get('confianza') == 'baja':
+                continue
+            yield r
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     # agrupar filas por (proyecto, votación)
-    votac = collections.defaultdict(lambda: {'nombre': '', 'fecha': '', 'votos': []})
-    for line in open(DIST / 'votaciones-camara-nominal.jsonl', encoding='utf-8'):
-        r = json.loads(line)
+    votac = collections.defaultdict(lambda: {'nombre': '', 'fecha': '', 'votos': [],
+                                             'fuente': 'nativa', 'confianza': None})
+    for r in _iter_rows():
         pnc = r.get('proyecto_numero_camara')
         if not pnc:
             continue
         cong = r.get('congresista') or r.get('email')
         if not cong or not r.get('respuesta'):
             continue
-        key = (pnc, r['acta_id'], r['votacion_numero'])
+        # OCR no trae votacion_numero → keyear por 'archivo' (único por voto)
+        vkey = r.get('votacion_numero')
+        if vkey is None:
+            vkey = r.get('archivo') or r.get('votacion_nombre')
+        key = (pnc, r['acta_id'], vkey)
         v = votac[key]
         v['nombre'] = r.get('votacion_nombre') or ''
         v['fecha'] = r.get('fecha') or ''
+        if r.get('fuente', '').startswith('ocr'):
+            v['fuente'] = 'ocr'
+            v['confianza'] = r.get('confianza')
         v['votos'].append((cong, r['respuesta'], canon_bancada(r.get('partido')), r.get('roster_key') or ''))
 
     por_proyecto = {}
-    n_votac, n_votos = 0, 0
+    n_votac, n_votos, n_votac_ocr = 0, 0, 0
     for (pnc, aid, vnum), v in votac.items():
         tok = num_token(pnc)
         if not tok:
@@ -78,6 +100,10 @@ def main():
             'por_bancada': {b: dict(c) for b, c in sorted(banc.items())},
             'votos': [{'c': c, 'r': resp, 'b': b, 'k': k} for c, resp, b, k in sorted(v['votos'])],
         }
+        if v['fuente'] == 'ocr':
+            vot_obj['fuente'] = 'ocr'          # voto recuperado por OCR (2014-2017)
+            vot_obj['confianza'] = v['confianza']
+            n_votac_ocr += 1
         por_proyecto.setdefault(tok, {'numero_camara': pnc, 'votaciones': []})
         por_proyecto[tok]['votaciones'].append(vot_obj)
         n_votac += 1
@@ -90,11 +116,13 @@ def main():
 
     out = {
         'meta': {
-            'v': '2026-07-15', 'fuente': 'actas de plenaria de Cámara (voto nominal electrónico)',
-            'rango': '2020-11 a 2026-06', 'n_proyectos': len(por_proyecto),
-            'n_votaciones': n_votac, 'n_votos': n_votos,
+            'v': '2026-07-24', 'fuente': 'actas de plenaria de Cámara (voto nominal electrónico + OCR DCN-SW 2014-2017)',
+            'rango': '2014-12 a 2026-06', 'n_proyectos': len(por_proyecto),
+            'n_votaciones': n_votac, 'n_votaciones_ocr': n_votac_ocr, 'n_votos': n_votos,
             'cobertura': 'solo votos de fondo ligados a un proyecto (numero_camara); '
-                         'el voto procedimental sin proyecto no se incluye',
+                         'el voto procedimental sin proyecto no se incluye. Las votaciones '
+                         'con "fuente":"ocr" se recuperaron por OCR de escaneos DCN-SW '
+                         '(2014-2017) y llevan un flag "confianza" (alta/media).',
         },
         'por_proyecto': por_proyecto,
     }

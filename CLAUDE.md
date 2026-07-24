@@ -5559,11 +5559,26 @@ monto · resolucion · fecha_firmeza · estado · descripcion · _id · _raw`
   las convierte a ISO y descarta las fuera de rango sano (la fuente trae al
   menos 1 typo real, año 3022) en vez de adivinar. `numeroActoAdmin` llega
   como int → se convierte a string (si no, `build_s3.py` revienta con
-  `.strip()` sobre un int). Supertransporte (WP `?rest_route=/wp/v2/posts`,
-  BOM utf-8-sig) y SIC (`rss.xml`) siguen pendientes, mismo patrón.
-- **Vía 3 · normograma/PDF** (registrada, pendiente): reusa el **pipeline de
-  gacetas de Caudal fase 3** (pypdf + DeepSeek). Supersalud (SharePoint) y
-  Supersociedades (Liferay, 478 resoluciones + 198 circulares). PDFs viejos → OCR.
+  `.strip()` sobre un int). **Supertransporte (36), SIC (76) y Supersalud (16)
+  YA IMPLEMENTADAS** vía `harvest_comunicados.py` (ver "Vía 2 · comunicados
+  oficiales" abajo).
+- **Vía 2 · comunicados oficiales** (`harvest_comunicados.py`, IMPLEMENTADA
+  jul-2026): tres entidades sin registro estructurado que anuncian sanciones en
+  comunicados con titulares muy estructurados. **Supertransporte** WP REST
+  (`?rest_route=/wp/v2/posts`, BOM utf-8-sig). **SIC** listado Drupal
+  `/noticias?page=N`. **Supersalud** SharePoint Search API ANÓNIMA
+  (`/es-co/_api/search/query`) filtrada al repo de Comunicados. `sancionado`/
+  `monto`/`tipo` se sacan del titular por regex (sin LLM); `fecha` = la del
+  comunicado, no la firmeza. Ver la nota extensa de Supersalud abajo.
+- **Vía 3 · normograma/PDF** (registrada, PENDIENTE): reusa el **pipeline de
+  gacetas de Caudal fase 3** (pypdf + DeepSeek). Candidata: **Supersociedades**
+  (Liferay). ⚠️ OJO (verificado jul-2026): la sección `/normativa` de
+  Supersociedades (478 resoluciones + 198 circulares externas) es **NORMATIVA
+  GENERAL, NO sanciones** — una "Circular Externa 100-000021" es una instrucción
+  a vigilados, igual que el normograma de Supersalud. Las sanciones REALES de
+  Supersociedades se notifican como "avisos" bajo landings Liferay DINÁMICOS
+  (`/web/supervision-societaria/avisos-y-otros`), que exigen crackear el scraping
+  JS primero. Ver "Investigación Supersalud + Supersociedades (jul-2026)" abajo.
 
 **Gotcha de `build_s3.py` encontrado con los datos de Superfinanciera (jul-2026):**
 algunos textos largos (`observacion`) traen mojibake de control chars —
@@ -5583,20 +5598,28 @@ el texto problemático cayó dentro de los primeros 120 chars que sí se
 truncan, pero es la misma clase de bug latente ahí; pendiente portar el
 mismo fix si vuelve a aparecer con otra fuente.
 
-**Comandos** (`harvest_supers.py`, stdlib + curl subprocess, resumible):
+**Comandos** (stdlib + curl subprocess, resumible). El `normalize` de
+`harvest_supers.py` consolida el raw de TODOS los harvesters hermanos:
 ```bash
 python3 tools/caudal/supers/harvest_supers.py list        # mapa de fuentes
 python3 tools/caudal/supers/harvest_supers.py test        # valida mapeos (1 fila/fuente)
-python3 tools/caudal/supers/harvest_supers.py fetch [slugs...] [--desde YYYY-MM-DD]
+python3 tools/caudal/supers/harvest_supers.py fetch [slugs...] [--desde YYYY-MM-DD]  # vía 1 Socrata
+python3 tools/caudal/supers/harvest_sfc.py               # vía 2 Superfinanciera
+python3 tools/caudal/supers/harvest_comunicados.py fetch [supertransporte|sic|supersalud]  # vía 2 comunicados
 python3 tools/caudal/supers/harvest_supers.py normalize    # raw -> dist (JSONL+CSV+stats)
+python3 tools/caudal/supers/build_s3.py                     # dist -> dist/s3 (para la Lambda)
 ```
-Salidas (gitignored): `Bases de datos/leyes-senado/supers/{raw/{slug}.json,
-dist/{sanciones.jsonl,sanciones.csv,stats.json}}`.
+Salidas (gitignored bajo `Bases de datos/leyes-senado/supers/`): `raw/{slug}.json`,
+`dist/{sanciones.jsonl,sanciones.csv,stats.json}`, `dist/s3/{sanciones.jsonl,
+sanciones-stats.json}`. **Deploy:** subir los 2 de `dist/s3/` a
+`s3://caudal-legislativo/metadata/` + `build_zip.py` + `aws lambda
+update-function-code` (recicla el cache warm; los 2 JSON se leen de S3).
 
-**Verificado end-to-end (2026-07):** **6.889 sanciones a nivel entidad**
-consolidadas de las 6 fuentes por-entidad: INVIMA (3.690), SECOP I (1.707),
-SECOP II (542), Junta de Contadores (85), Contraloría responsabilidad fiscal
-(60), **Superfinanciera (805, vía 2)**. El dataset vía 1 de Min. Trabajo es
+**Verificado end-to-end (2026-07):** **7.019 sanciones a nivel entidad**
+consolidadas de **10 fuentes** por-entidad: INVIMA (3.690), SECOP I (1.707),
+Superfinanciera (805, vía 2), SECOP II (544), Junta de Contadores (85), SIC
+(76, vía 2), Contraloría responsabilidad fiscal (60), Supertransporte (36,
+vía 2), **Supersalud (16, vía 2)**. El dataset vía 1 de Min. Trabajo es
 **agregado** (por territorial/sector, solo conteos) → `granularidad: agregado`,
 NO entra al consolidado por entidad (sirve de contexto). Sector `financiero`
 del Radar del cliente (Vista Cliente/SIGA) pasó de "sin fuente conectada" a
@@ -5607,17 +5630,85 @@ datos reales — verificado en vivo (`action:cliente,sector:financiero`).
 Descubrir: `catalog/v1?domains=www.datos.gov.co&q=sanciones+<entidad>` →
 `resource/<id>.json?$limit=1` para ver columnas. `test` valida el mapeo.
 
-**Siguiente sprint (recomendado):** (1) ✅ HECHO (jul-2026) — `harvest_sfc.py`
-(Superfinanciera vía 2). (2) ✅ HECHO — `sanciones.jsonl` ya está enganchado a
-la Lambda (acción `sanciones`, filtro por sector+texto) con frontend
-`view-regulatorio` en `caudal.html`, y ✅ cruzado con el Radar del cliente
-(SIGA) — ver sección "Vista Cliente · Radar". (3) Vía 3 Supersalud con el
-pipeline de gacetas — cierra el ejemplo del pitch, sigue pendiente. (4)
-Supertransporte + SIC (vía 2, mismo patrón que SFC, más simples).
+**Siguiente sprint:** (1) ✅ HECHO — `harvest_sfc.py` (Superfinanciera vía 2).
+(2) ✅ HECHO — `sanciones.jsonl` enganchado a la Lambda + frontend
+`view-regulatorio` + cruzado con el Radar del cliente (SIGA). (3) ✅ HECHO —
+Supertransporte + SIC + Supersalud (vía 2 comunicados). (4) 🟡 PENDIENTE —
+extraer TODO el acto regulatorio de las supers (ver dirección nueva abajo);
+Supersociedades vía 3 (avisos dinámicos).
 
-**Estado:** commit `9f1c296` en `main` (solo `tools/caudal/supers/*` + `.gitignore`;
-NO tocó `caudal.html`). **Datos ya subidos a S3 con luz verde de Ricardo
-(jul-2026)** — ver "Vía 2 · Superfinanciera IMPLEMENTADA" arriba.
+**Estado:** **10 fuentes · 7.019 sanciones en producción** (S3
+`caudal-legislativo/metadata/` + Lambda `caudal-analiza`). Última subida:
+jul-2026 (Supersalud 12→16 tras recalibrar el filtro, ver abajo).
+
+### Investigación Supersalud + Supersociedades (jul-2026) · el registro real vs la prensa
+
+Auditoría a fondo de las dos fuentes que "rendían poco" / estaban mal
+encuadradas. **Conclusión: la sala de prensa NO es el registro de sanciones, y
+el registro de notificaciones NO es un registro de sanciones limpio.**
+
+**Supersalud — el filtro estaba mal calibrado (12→16) Y la fuente es prensa:**
+- El path `Comunicaciones/Comunicados` es una **SALA DE PRENSA**: de ~102 PDFs
+  que mencionan multa/sanción, solo **16 son sanciones individuales impuestas**
+  (con monto y entidad: EPS SURA $5.800M, Medimás $6.960M, Sanitas, Coomeva,
+  Pijaos, Dusakawi, etc.); el resto son investigaciones, medidas cautelares,
+  liquidaciones y balances agregados.
+- El `es_sancion()` genérico (pensado para titulares de prensa de SIC/
+  Supertransporte) rendía **12**: tumbaba las de título=nombre de archivo
+  (`Comunicado056_Sancion Coomeva`, 2014) y por un `liquida` mal puesto habría
+  perdido "la **liquidada** EPS Medimás". `fetch_supersalud()` ahora usa un
+  clasificador PROPIO `SNS_POS`/`SNS_NEG` (título + filename) → **16**, cero
+  regresiones. Keyword de búsqueda ampliada a todas las variantes de multa/
+  sanción. **Desplegado y verificado en vivo** (búsqueda "sura" → EPS SURA
+  $5.800M).
+- **El REGISTRO REAL** (resoluciones sancionatorias) NO está en Comunicados:
+  vive en las bibliotecas SharePoint `Notificaciones/Por Aviso` (544 body-match
+  "sancionatorio"), `Notificaciones/NotificacionesPorAviso` (184) y
+  `Juridica/Resoluciones` (72) — enumerables con la misma Search API. **PERO
+  (verificado leyendo los PDFs): están DOMINADAS POR ACTOS PROCESALES, no
+  multas** — muestra de 12 recientes = **0 sanciones reales** (todas `archivo` /
+  `apertura de investigación` / resoluciones de **contribución especial** [el
+  tributo de los vigilados, no una multa]). Las frases que marcan una multa
+  impuesta (`"resuelve sancionar"`, `"se impone una multa"`) casi no se indexan
+  (0-2 en todo el dominio) porque los saltos de línea del PDF las parten. Un
+  harvest completo de ~771 candidatos rescataría solo **~30-80 multas reales**
+  obscuras en ~2h de DeepSeek. **Decisión (Ricardo, jul-2026): quedarse con las
+  16 de prensa; el registro queda PENDIENTE.**
+
+**Supersociedades — `/normativa` ≠ sanciones (premise del fuentes.json
+corregido):** las "478 resoluciones + 198 circulares externas" de
+`/web/nuestra-entidad/normativa` (secciones `?id=876701` Resoluciones,
+`?id=1256465` Circulares Externas) son **normativa general**, no multas — igual
+que el normograma. Supersociedades NO tiene dataset de sanciones en datos.gov.co
+(sus 7 datasets son estados financieros NIIF). Sus sanciones reales se notifican
+como "avisos" bajo landings Liferay **dinámicos** (`/notificaciones` →
+`/web/supervision-societaria/avisos-y-otros`, JS-heavy). **PENDIENTE:** crackear
+ese scraping antes de vía-3.
+
+**Pipeline vía-3 CONSTRUIDO (`harvest_supersalud_registro.py`, listo por si se
+retoma):** `enumerate` (Search API → manifest dedup por nº de resolución) ·
+`download` (curl con **URL-encode del path** — los Path de SharePoint traen
+espacios/acentos literales que curl rechaza; sin `quote(path, safe=':/%')` el
+PDF llega en 0 bytes) · `extract` (pypdf → DeepSeek `deepseek-v4-flash`, prompt
+`SNS_REG_SYSTEM` que clasifica `es_sancion` + saca sancionado/monto/motivo).
+Resumible, caché por doc. Necesita `DEEPSEEK_API_KEY` en env (leerla de la
+Lambda: `aws lambda get-function-configuration --function-name caudal-analiza
+--query 'Environment.Variables.DEEPSEEK_API_KEY' --output text`). Los PDFs
+2016-2026 son **digitales** (pypdf limpio, 0 escaneados en la muestra).
+
+**🟡 DIRECCIÓN NUEVA (Ricardo, jul-2026) — el pilar NO es solo "sanciones":**
+"necesitamos igual extraer todo lo de las super así no sean sanciones". Los
+actos procesales que hoy descartamos (contribuciones, aperturas, archivos,
+resoluciones, circulares) **SÍ son inteligencia regulatoria** — el cliente
+quiere ver TODA la actividad del Estado sobre su sector, no solo las multas.
+Reencuadra el pilar de "sanciones de superintendencias" a "**actos regulatorios
+de superintendencias**". Trabajo pendiente: (a) generalizar
+`harvest_supersalud_registro.py` para conservar TODOS los actos (quitar el
+filtro `es_sancion` de `_consolidar`, tipar por `tipo_acto`); (b) correr el
+harvest completo de Supersalud (~771 + las carpetas no-sancionatorias); (c)
+extender a las demás supers (Supersociedades avisos, etc.); (d) el frontend/
+Lambda deberá distinguir "sanción" vs "otro acto" para no diluir la vista de
+sanciones. Es un sprint aparte, no bloquea nada de lo desplegado.
 
 ### Pilar Medios · prensa nacional y regional (`view-medios` en `caudal.html` · LISTO vía Google News RSS)
 

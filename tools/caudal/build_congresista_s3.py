@@ -44,6 +44,19 @@ def num_token(num):
     return f'{int(m.group(1))}/{m.group(2)}' if m else None
 
 
+def _iter_rows():
+    """Filas nativas + OCR DCN-SW (descarta OCR confianza 'baja')."""
+    for line in open(DIST / 'votaciones-camara-nominal.jsonl', encoding='utf-8'):
+        yield json.loads(line)
+    ocr = DIST / 'votaciones-camara-nominal-ocr.jsonl'
+    if ocr.exists():
+        for line in open(ocr, encoding='utf-8'):
+            r = json.loads(line)
+            if r.get('confianza') == 'baja':
+                continue
+            yield r
+
+
 def _short_titulo(t):
     t = re.sub(r'\s+', ' ', t or '').strip()
     t = re.sub(r'^POR\s+(MEDIO\s+DE\s+LA\s+CUAL|LA\s+CUAL|EL\s+CUAL|MEDIO\s+DEL\s+CUAL)\s+SE\s+', '', t, flags=re.I)
@@ -57,8 +70,7 @@ def main():
     # 1) agrupar votos por votación (para calcular posición de gobierno + contestada)
     votac = collections.defaultdict(list)   # (acta,vnum) -> [(rk, resp, banc, pnc, nombre, fecha)]
     titulos = {}
-    for line in open(DIST / 'votaciones-camara-nominal.jsonl', encoding='utf-8'):
-        r = json.loads(line)
+    for r in _iter_rows():
         pnc = r.get('proyecto_numero_camara')
         rk = r.get('roster_key')
         if not pnc or not rk or not r.get('respuesta'):
@@ -66,7 +78,11 @@ def main():
         tok = num_token(pnc)
         if not tok:
             continue
-        votac[(r['acta_id'], r['votacion_numero'])].append(
+        # OCR no trae votacion_numero → keyear por 'archivo' (único por voto)
+        vkey = r.get('votacion_numero')
+        if vkey is None:
+            vkey = r.get('archivo') or r.get('votacion_nombre')
+        votac[(r['acta_id'], vkey)].append(
             (rk, r['respuesta'], canon_bancada(r.get('partido')), tok, r.get('proyecto_titulo') or ''))
         titulos.setdefault(tok, {'numero_camara': pnc, 'id': r.get('proyecto_id'),
                                  'titulo': _short_titulo(r.get('proyecto_titulo'))})
@@ -131,8 +147,8 @@ def main():
 
     out = {
         'meta': {
-            'v': '2026-07-16', 'fuente': 'actas de plenaria de Cámara (voto nominal electrónico)',
-            'rango': '2020-11 a 2026-06', 'n_congresistas': len(por_congresista),
+            'v': '2026-07-24', 'fuente': 'actas de plenaria de Cámara (voto nominal electrónico + OCR DCN-SW 2014-2017)',
+            'rango': '2014-12 a 2026-06', 'n_congresistas': len(por_congresista),
             'alineacion': 'alineación con la bancada de gobierno (Pacto) en votaciones '
                           'CONTESTADAS (min lado ≥15%); las unánimes se excluyen',
         },
