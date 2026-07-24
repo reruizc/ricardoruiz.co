@@ -30,5 +30,12 @@ cd "$REPO" || { echo "no pude cd a $REPO" >&2; exit 1; }
   echo "--- build_diario_camara_s3 --upload (resuelve+baja gacetas nuevas) ---"
   python3 tools/leyes-senado/build_diario_camara_s3.py --upload
   rc_cu=$?
-  echo "═════════ fin $(date '+%H:%M:%S') · senado=$rc_h upload=$rc_u camara=$rc_c camara_up=$rc_cu ═════════"
+  # Feed 'En vivo' de legislativo.html (en-vivo.json): top-5 por cámara. Va de
+  # ÚLTIMO a propósito → las etapas de Cámara/Imprenta dan un respiro entre los
+  # golpes al Senado (harvest_diario) y estos (esquiva el WAF). Sube solo aunque
+  # no haya boto3 (cae al AWS CLI).
+  echo "--- leyes_en_vivo --upload (feed 'En vivo' de legislativo.html) ---"
+  python3 tools/leyes-senado/leyes_en_vivo.py --upload
+  rc_ev=$?
+  echo "═════════ fin $(date '+%H:%M:%S') · senado=$rc_h upload=$rc_u camara=$rc_c camara_up=$rc_cu envivo=$rc_ev ═════════"
 } >> "$LOG" 2>&1

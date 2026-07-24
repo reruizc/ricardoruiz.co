@@ -283,6 +283,30 @@ def _boto3():
         return None
 
 
+def _aws_cli_upload():
+    """Fallback sin boto3: sube el staging a S3 con el AWS CLI (subprocess),
+    mismo patrón que build_diario_s3.py. Devuelve True si los 3 comandos
+    salieron ok. En Lambda boto3 siempre está → esto solo corre en CLI local
+    cuando el python3 del sistema no trae boto3."""
+    base = f's3://{S3_BUCKET}/{S3_PREFIX}'
+    cmds = [
+        ['aws', 's3', 'cp', str(STAGE / 'en-vivo.json'), f'{base}/en-vivo.json',
+         '--content-type', 'application/json', '--cache-control', 'public, max-age=300'],
+        ['aws', 's3', 'sync', f'{STAGE / "senado"}/', f'{base}/en-vivo/senado/',
+         '--content-type', 'application/pdf', '--exclude', '*', '--include', '*.pdf'],
+        ['aws', 's3', 'sync', f'{STAGE / "camara"}/', f'{base}/en-vivo/camara/',
+         '--content-type', 'application/pdf', '--exclude', '*', '--include', '*.pdf'],
+    ]
+    ok = True
+    for c in cmds:
+        try:
+            ok = (subprocess.run(c).returncode == 0) and ok
+        except FileNotFoundError:
+            print('  ! no encontré el AWS CLI (aws) en el PATH', file=sys.stderr)
+            return False
+    return ok
+
+
 def rehost_pdfs(items, camara, s3):
     """Descarga el PDF de origen y lo re-aloja en S3 (idempotente: si ya está, lo reusa).
     Devuelve la ruta relativa (respecto de PUBLIC_BASE) para el JSON, o None."""
@@ -359,15 +383,21 @@ def build(only=None, upload=False):
             print(f'  ! cámara falló, conservo lo previo: {e}', file=sys.stderr)
 
     payload = json.dumps(result, ensure_ascii=False, indent=1)
+    result['_destino'] = 'staging'          # solo para el print/return; NO va al JSON
     if s3:
         s3.put_object(Bucket=S3_BUCKET, Key=f'{S3_PREFIX}/en-vivo.json',
                       Body=payload.encode('utf-8'), ContentType='application/json',
                       CacheControl='public, max-age=300')
+        result['_destino'] = 'boto3'
     else:
-        # solo en corridas locales: staging para revisar/subir con aws s3 cp
-        # (en Lambda el filesystem del repo no existe y es read-only)
+        # sin boto3: staging local + (si --upload) empujar con el AWS CLI. En
+        # Lambda el filesystem del repo no existe pero ahí boto3 siempre está.
         STAGE.mkdir(parents=True, exist_ok=True)
         (STAGE / 'en-vivo.json').write_text(payload, encoding='utf-8')
+        for cam in ('senado', 'camara'):    # asegura las carpetas para el sync
+            (STAGE / cam).mkdir(parents=True, exist_ok=True)
+        if upload:
+            result['_destino'] = 'aws-cli' if _aws_cli_upload() else 'staging'
     return result
 
 
@@ -390,9 +420,17 @@ def main():
         for it in r[cam]:
             pdf = '✓pdf' if it.get('pdf') else '—'
             print(f'  [{cam[:3]}] {it["numero"]:>10}  {pdf}  {it["titulo"][:70]}')
-    print(f'· staging → {STAGE.relative_to(REPO)}')
-    if not args.upload:
-        print('  (usa --upload para subir a S3, o aws s3 cp del staging)')
+    dest = r.get('_destino', 'staging')
+    if dest == 'boto3':
+        print(f'· subido a S3 (boto3) → {PUBLIC_BASE}en-vivo.json')
+    elif dest == 'aws-cli':
+        print(f'· subido a S3 (aws cli) → {PUBLIC_BASE}en-vivo.json')
+    else:
+        print(f'· staging → {STAGE.relative_to(REPO)}')
+        if args.upload:
+            print('  ! no se pudo subir a S3 (sin boto3 y el AWS CLI falló o no está)')
+        else:
+            print('  (usa --upload para subir a S3, o aws s3 cp del staging)')
 
 
 if __name__ == '__main__':

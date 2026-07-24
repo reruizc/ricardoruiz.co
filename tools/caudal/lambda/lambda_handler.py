@@ -115,21 +115,33 @@ def _full():
 
 
 # --- radicados de la legislatura viva (rastreo diario) ----------------------
-_RADICADOS = {}
+# Cache warm CON TTL: el cron sube manifiestos nuevos varias veces al día, así
+# que un contenedor de larga vida que cacheara para siempre se quedaría sirviendo
+# radicados viejos (bug real: la vitrina mostraba 33 cuando S3 ya tenía 76).
+# Guardamos (epoch, filas) por llave y re-leemos si el cache supera _RADICADOS_TTL;
+# sigue evitando el hit a S3 en cada request.
+_RADICADOS = {}                 # key -> (loaded_epoch, rows)
+_RADICADOS_TTL = 300            # s
 
 
 def _radicados_manifest(key):
-    """Lee un manifiesto jsonl de radicados de S3 (cache warm). [] si no existe.
-    .split('\n') y NO .splitlines(): el OCR puede meter U+0085 (NEL), que
+    """Lee un manifiesto jsonl de radicados de S3 (cache warm con TTL). [] si no
+    existe. .split('\n') y NO .splitlines(): el OCR puede meter U+0085 (NEL), que
     splitlines trata como salto de línea y parte un registro."""
-    if key not in _RADICADOS:
-        try:
-            obj = _s3.get_object(Bucket=BUCKET, Key=key)
-            rows = [json.loads(x) for x in obj['Body'].read().decode('utf-8').split('\n') if x.strip()]
-        except Exception:
-            rows = []
-        _RADICADOS[key] = rows
-    return _RADICADOS[key]
+    cached = _RADICADOS.get(key)
+    if cached and (_time.time() - cached[0]) < _RADICADOS_TTL:
+        return cached[1]
+    try:
+        obj = _s3.get_object(Bucket=BUCKET, Key=key)
+        rows = [json.loads(x) for x in obj['Body'].read().decode('utf-8').split('\n') if x.strip()]
+    except Exception:
+        # si la re-lectura falla pero ya teníamos filas, conserva lo viejo antes
+        # que devolver [] (mejor rezagado que vacío).
+        if cached:
+            return cached[1]
+        rows = []
+    _RADICADOS[key] = (_time.time(), rows)
+    return rows
 
 
 def _radicados(leg):
