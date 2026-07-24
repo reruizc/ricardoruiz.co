@@ -319,6 +319,10 @@
   <section id="proyectos">
     <div class="sec-tag">Radar legislativo</div>
     <h2 class="sec-title">Últimos proyectos de ley de esta comisión</h2>
+    <div id="com-radicados-wrap" style="display:none;margin-bottom:1.6rem">
+      <p class="sec-sub" style="margin-bottom:.8rem">Recién radicados en esta legislatura (2026-2027) — rastreo diario, no forman parte todavía del histórico 1990-2026 de abajo.</p>
+      <div class="p-list" id="com-radicados-list"></div>
+    </div>
     <p class="sec-sub">Los cinco proyectos más recientes radicados en esta comisión, según el histórico del Congreso. Haz clic en uno para ver más detalle.</p>
     <div class="p-list" id="com-proy-list"><div class="loading">Cargando proyectos <span class="dots"><span></span><span></span><span></span></span></div></div>
   </section>
@@ -490,6 +494,7 @@
     renderGroups();
     loadMiembros();
     loadProyectos();
+    loadRadicados();
     getVotosCongreso(); // precarga en paralelo — listo para cuando hagan click en alguien
     loadHistoricoComision();
     document.getElementById('hist-sub').innerHTML=`Desde 1991, esta comisión ha tramitado <b style="color:var(--white)">${fmt((COM_HIST[COM.key]||{}).t)}</b> proyectos de ley, de los cuales <b style="color:var(--green)">${(COM_HIST[COM.key]||{}).l||0}</b> terminaron sancionados como ley (${(COM_HIST[COM.key]||{}).t?Math.round(100*(COM_HIST[COM.key]||{}).l/(COM_HIST[COM.key]||{}).t):0}%). Fuente: Secretaría del Senado · análisis propio 1990–2026.`;
@@ -803,6 +808,44 @@
   function shortTitle(t){ let s=String(t||'').replace(TITLE_PREF,'').replace(/\s+/g,' ').trim(); if(s.length<6) s=String(t||'').replace(/\s+/g,' ').trim(); return s.charAt(0).toUpperCase()+s.slice(1).toLowerCase(); }
   const RES_TXT={EN_TRAMITE:['En trámite','res-tramite'],LEY:['Ley','res-ley'],ARCHIVADO_TIEMPO:['Archivado por tiempo','res-tiempo'],ARCHIVADO_OTRO:['Archivado','res-otro'],RETIRADO:['Retirado','res-otro'],SIN_DATO:['Sin dato','res-otro'],OTRO:['Otro','res-otro']};
   let PROY_COMISION=null; // lista completa de la comisión (para embudo + hallazgos)
+  /* ── recién radicados (legislatura viva 2026-2027) ──────────────
+     El histórico de abajo (buscar/proyectos.jsonl) se corta el 2026-07-10,
+     antes de la instalación del Congreso el 20 de julio — por eso los
+     proyectos radicados desde entonces no aparecían. La acción `radicados`
+     lee el rastreo diario (Senado + Cámara) y sí los tiene al día. */
+  async function loadRadicados(){
+    const wrap=document.getElementById('com-radicados-wrap');
+    const box=document.getElementById('com-radicados-list');
+    if(!wrap||!box) return;
+    try{
+      const r=await call({action:'radicados'});
+      const shortUp=COM.nombre.replace('Comisión ','').toUpperCase();
+      const sen=(r.radicados||[]).filter(x=>(x.comision||'').toUpperCase()===shortUp).map(x=>({...x,_cam:false}));
+      const cam=(r.radicados_camara||[]).filter(x=>(x.comision||'').toUpperCase()===shortUp).map(x=>({...x,_cam:true}));
+      const all=[...sen,...cam];
+      if(!all.length){ wrap.style.display='none'; return; }
+      wrap.style.display='block';
+      box.innerHTML=all.map(x=>{
+        const num=(x._cam?x.numero_camara:x.numero_senado)||'—';
+        const corp=x._cam?'Cámara':'Senado';
+        const aut=(x.autor||'').split(',')[0].trim();
+        return `<div class="p-row">
+          <div class="p-row-top">
+            <span class="p-year">${esc(num)}</span>
+            <span class="p-body">
+              <span class="p-title">${esc(shortTitle(x.titulo).slice(0,170))}</span>
+              <span class="p-meta">
+                <span class="p-tipo">${corp}</span>
+                <span class="p-res res-tramite">Nuevo · ${esc(x.estado||'radicado')}</span>
+                ${aut?`<span class="p-aut">${esc(aut)}</span>`:''}
+                ${x.fuente_url?`<a class="p-hint" style="text-decoration:none" href="${esc(x.fuente_url)}" target="_blank" rel="noopener">Ver fuente ↗</a>`:''}
+              </span>
+            </span>
+          </div>
+        </div>`;
+      }).join('');
+    }catch(e){ /* silencioso — la sección histórica de abajo sigue funcionando igual */ }
+  }
   async function loadProyectos(){
     const box=document.getElementById('com-proy-list');
     const shortName=COM.nombre.replace('Comisión ','');

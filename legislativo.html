@@ -722,10 +722,39 @@
   function shortTitle(t){ let s=String(t||'').replace(TITLE_PREF,'').replace(/\s+/g,' ').trim(); if(s.length<6) s=String(t||'').replace(/\s+/g,' ').trim(); return s.charAt(0).toUpperCase()+s.slice(1).toLowerCase(); }
   const RES_TXT={EN_TRAMITE:['En trámite','res-tramite'],LEY:['Ley','res-ley'],ARCHIVADO_TIEMPO:['Archivado por tiempo','res-tiempo'],ARCHIVADO_OTRO:['Archivado','res-otro'],RETIRADO:['Retirado','res-otro'],SIN_DATO:['Sin dato','res-otro'],OTRO:['Otro','res-otro']};
   let P_ALL=[], P_FILTER='', P_SHOWN=15, P_MODE='recientes';
+  /* ── recién radicados (legislatura viva 2026-2027) ───────────────
+     El histórico de `buscar` (proyectos.jsonl) se corta el 2026-07-10,
+     antes de la instalación del Congreso el 20 de julio — los proyectos
+     radicados desde entonces no salían en el Radar. `action:'radicados'`
+     lee el rastreo diario (Senado + Cámara) y sí los tiene al día; se
+     convierten a la misma forma que usa proysRender() y se mezclan. */
+  let _radConvPromise=null;
+  function getRadicadosConverted(){
+    if(!_radConvPromise){
+      _radConvPromise=(async()=>{
+        try{
+          const r=await call({action:'radicados'});
+          const sen=(r.radicados||[]).map((x,i)=>({
+            a:2026, id:'RAD-S-'+i, t:x.titulo, res:'EN_TRAMITE', tb:'pdly',
+            ap:(x.autor||'').split(',')[0].trim(), ng:(x.autor||'').split(',').filter(Boolean).length,
+            com:x.comision?titleCase(x.comision):'', _nuevo:true, _corp:'Senado', _fuente:x.fuente_url||'',
+          }));
+          const cam=(r.radicados_camara||[]).map((x,i)=>({
+            a:2026, id:'RAD-C-'+i, t:x.titulo, res:'EN_TRAMITE', tb:'pdly',
+            ap:(x.autor||'').split(',')[0].trim(), ng:(x.autor||'').split(',').filter(Boolean).length,
+            com:x.comision?titleCase(x.comision):'', _nuevo:true, _corp:'Cámara', _fuente:x.fuente_url||'',
+          }));
+          return [...sen,...cam];
+        }catch(e){ return []; }
+      })();
+    }
+    return _radConvPromise;
+  }
+  const titleCase=s=>String(s||'').toLowerCase().replace(/(^|\s)(\p{L})/gu,(m,sp,ch)=>sp+ch.toUpperCase());
   async function proysInit(){
     try{
-      const r=await call({action:'buscar',query:'',anio_min:2024,limit:2000});
-      P_ALL=(r.resultados||[]).sort((a,b)=>(b.a-a.a)||(b.id-a.id));
+      const [r,rad]=await Promise.all([call({action:'buscar',query:'',anio_min:2024,limit:2000}),getRadicadosConverted()]);
+      P_ALL=[...rad,...(r.resultados||[])].sort((a,b)=>(b.a-a.a)||(b.id-a.id));
       P_MODE='recientes';
       proysRender();
     }catch(e){
@@ -740,8 +769,10 @@
       // el backend ordena ASCENDENTE por año y trunca al límite pedido — hay que
       // pedir un límite alto para no quedarnos con los resultados más VIEJOS
       // de un tema con muchos intentos, en vez de los más recientes.
-      const r=await call({action:'buscar',query:q,limit:20000});
-      P_ALL=(r.resultados||[]).sort((a,b)=>(b.a-a.a)||(b.id-a.id));
+      const nq=norm(q);
+      const [r,rad]=await Promise.all([call({action:'buscar',query:q,limit:20000}),getRadicadosConverted()]);
+      const radHit=rad.filter(x=>norm(x.t+' '+x.ap).includes(nq));
+      P_ALL=[...radHit,...(r.resultados||[])].sort((a,b)=>(b.a-a.a)||(b.id-a.id));
       P_MODE='busqueda';
       P_SHOWN=15;
       proysRender();
@@ -767,9 +798,10 @@
           <span class="p-title">${esc(shortTitle(p.t).slice(0,160))}</span>
           <span class="p-meta">
             <span class="p-tipo">${p.tb==='pal'?'Acto legislativo':'Proyecto de ley'}</span>
-            <span class="p-res ${res[1]}">${res[0]}</span>
+            ${p._nuevo?`<span class="p-res res-tramite">Nuevo · ${esc(p._corp||'')}</span>`:`<span class="p-res ${res[1]}">${res[0]}</span>`}
             ${aut?`<span class="p-aut">${esc(aut)}${p.ng>1?' +'+(p.ng-1):''}</span>`:''}
             ${p.com?`<span class="p-aut">Comisión ${esc(p.com)}</span>`:''}
+            ${p._nuevo&&p._fuente?`<a href="${esc(p._fuente)}" target="_blank" rel="noopener" style="font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.4);text-decoration:none;margin-left:auto">Ver fuente ↗</a>`:''}
           </span>
         </span>
       </div>`;
