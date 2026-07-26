@@ -6,15 +6,23 @@
   <title>CITREP 2026 · Escrutinio · Ricardo Ruiz</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <style>
+    /* HelveticaNeue embebida (familia completa). El logo va aparte en Syne. */
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-thin.woff2') format('woff2'); font-weight:200; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-light.woff2') format('woff2'); font-weight:300; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-medium.woff2') format('woff2'); font-weight:500; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-bold.woff2') format('woff2'); font-weight:600 900; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-italic.woff2') format('woff2'); font-weight:400; font-style:italic; font-display:swap; }
+    [onclick*="toggleTheme"] { display: none !important; }  /* sistema visual v2: sin toggle de modo dia */
     :root{--white:#f4f3ef;--blue:#0047FF;--green:#4ade80;--card-border:rgba(255,255,255,0.1);--border:rgba(255,255,255,0.08);--bar-bg:rgba(255,255,255,0.1);--td-hover:rgba(255,255,255,0.04)}
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     html{scroll-behavior:smooth}
-    body{background:#060810;color:var(--white);font-family:'Syne',sans-serif;cursor:none;min-height:100vh;overflow-x:hidden}
+    body{background:#060810;color:var(--white);font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;cursor:none;min-height:100vh;overflow-x:hidden}
     .cursor{position:fixed;width:10px;height:10px;background:var(--blue);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);transition:transform .15s,background .2s}
     .cursor-ring{position:fixed;width:32px;height:32px;border:1.5px solid var(--blue);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);opacity:.4}
     .bg-layer{position:fixed;inset:0;z-index:0;background:url('foto-fondo.webp') center right/cover no-repeat}
@@ -22,13 +30,13 @@
     .shell{position:relative;z-index:2;min-height:100vh;display:flex;flex-direction:column}
     .electoral-nav{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(4,6,16,.6);backdrop-filter:blur(8px);flex-shrink:0}
     .electoral-nav-auth{display:flex;align-items:center;gap:.75rem}
-    .e-btn-login{font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.55);text-decoration:none;border:1.5px solid transparent;padding:.4rem .9rem;transition:color .2s,border-color .2s}
+    .e-btn-login{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.55);text-decoration:none;border:1.5px solid transparent;padding:.4rem .9rem;transition:color .2s,border-color .2s}
     .e-btn-login:hover{color:var(--white);border-color:rgba(255,255,255,.2)}
-    .e-btn-register{font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-decoration:none;background:var(--blue);border:1.5px solid var(--blue);padding:.4rem .9rem}
-    .e-user-name{font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.75)}
-    .e-user-plan{font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue);background:rgba(0,71,255,.12);padding:.25rem .7rem}
-    .e-btn-logout{font-family:'DM Mono',monospace;font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);background:none;border:none;cursor:none;padding:0}
-    .e-btn-back{font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--green);text-decoration:none;border:1.5px solid rgba(74,222,128,.4);padding:.4rem .9rem;transition:color .2s,border-color .2s,background .2s;flex-shrink:0}
+    .e-btn-register{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-decoration:none;background:var(--blue);border:1.5px solid var(--blue);padding:.4rem .9rem}
+    .e-user-name{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.75)}
+    .e-user-plan{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue);background:rgba(0,71,255,.12);padding:.25rem .7rem}
+    .e-btn-logout{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);background:none;border:none;cursor:none;padding:0}
+    .e-btn-back{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--green);text-decoration:none;border:1.5px solid rgba(74,222,128,.4);padding:.4rem .9rem;transition:color .2s,border-color .2s,background .2s;flex-shrink:0}
     .e-btn-back:hover{color:#060810;background:var(--green);border-color:var(--green)}
     .logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.8;transition:opacity .2s}
     .logo-link:hover{opacity:1}
@@ -38,72 +46,72 @@
     .logo-text span{color:var(--blue)}
     @media(max-width:900px){.electoral-nav{display:none}}
     .country-selector-wrap{position:relative}
-    .country-btn{font-family:'DM Mono',monospace;font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5);background:none;border:1px solid rgba(255,255,255,.15);padding:.35rem .75rem;cursor:none;display:flex;align-items:center;transition:border-color .2s,color .2s}
+    .country-btn{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5);background:none;border:1px solid rgba(255,255,255,.15);padding:.35rem .75rem;cursor:none;display:flex;align-items:center;transition:border-color .2s,color .2s}
     .country-btn:hover,.country-btn.open{border-color:rgba(255,255,255,.35);color:rgba(255,255,255,.7)}
     .country-dropdown{position:absolute;top:calc(100% + 8px);right:0;background:#0e1220;border:1px solid rgba(255,255,255,.12);min-width:190px;display:none;flex-direction:column;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.2)}
     .country-dropdown.open{display:flex}
-    .country-option{font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.05em;padding:.7rem 1rem;cursor:pointer;display:flex;align-items:center;gap:.5rem;color:rgba(255,255,255,.6);border-bottom:1px solid rgba(255,255,255,.07);transition:background .15s;user-select:none}
+    .country-option{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.78rem;letter-spacing:.05em;padding:.7rem 1rem;cursor:pointer;display:flex;align-items:center;gap:.5rem;color:rgba(255,255,255,.6);border-bottom:1px solid rgba(255,255,255,.07);transition:background .15s;user-select:none}
     .country-option:last-child{border-bottom:none}
     .country-option:hover{background:rgba(255,255,255,.05);color:rgba(255,255,255,.8)}
     .country-option.selected{color:var(--blue)}
     .country-check{font-size:.6rem;width:12px;opacity:0;color:var(--blue)}
     .country-option.selected .country-check{opacity:1}
     .top-bar{display:flex;align-items:flex-start;justify-content:space-between;padding:1.1rem 2.5rem 0;flex-shrink:0}
-    .page-title{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.5rem,2.8vw,2.5rem);letter-spacing:-.04em;line-height:1.05;color:var(--white);text-shadow:0 2px 24px rgba(0,71,255,.4)}
+    .page-title{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-weight:800;font-size:clamp(1.5rem,2.8vw,2.5rem);letter-spacing:-.04em;line-height:1.05;color:var(--white);text-shadow:0 2px 24px rgba(0,71,255,.4)}
     .page-title span{color:var(--blue)}
-    .breadcrumb{padding:.7rem 2.5rem 0;font-family:'DM Mono',monospace;font-size:.74rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.45);border-bottom:1px solid var(--border);padding-bottom:.8rem;flex-shrink:0}
+    .breadcrumb{padding:.7rem 2.5rem 0;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.74rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.45);border-bottom:1px solid var(--border);padding-bottom:.8rem;flex-shrink:0}
     .breadcrumb a{color:rgba(0,71,255,.7);text-decoration:none}
     .breadcrumb a:hover{color:var(--blue)}
-    .meta-bar{display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap;padding:.6rem 2.5rem;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:.74rem;letter-spacing:.06em;color:rgba(255,255,255,.5);flex-shrink:0}
+    .meta-bar{display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap;padding:.6rem 2.5rem;border-bottom:1px solid var(--border);font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.74rem;letter-spacing:.06em;color:rgba(255,255,255,.5);flex-shrink:0}
     .meta-item b{color:rgba(74,222,128,.85);font-weight:700}
-    .source-badge{margin-left:auto;font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:.3rem .8rem}
+    .source-badge{margin-left:auto;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:.3rem .8rem}
     .source-badge b{color:var(--blue)}
     .content-area{flex:1;padding:1.8rem 2.5rem 1.5rem}
     .loader-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;min-height:300px}
     .loader-ring{width:40px;height:40px;border:2px solid rgba(0,71,255,.2);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
-    .loader-label{font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.45)}
+    .loader-label{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.45)}
     .sub-selector{display:flex;gap:.75rem;margin-bottom:1.5rem;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--border);padding-bottom:1rem}
-    .sub-label{font-family:'DM Mono',monospace;font-size:.74rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-right:.25rem}
-    .dep-select{font-family:'DM Mono',monospace;font-size:.8rem;letter-spacing:.04em;text-transform:uppercase;background:rgba(255,255,255,.05);border:1.5px solid var(--card-border);color:var(--white);padding:.55rem 2rem .55rem .85rem;cursor:pointer;outline:none;transition:border-color .2s;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23aaa' stroke-width='1.5' stroke-linecap='round' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .75rem center}
+    .sub-label{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.74rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-right:.25rem}
+    .dep-select{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.8rem;letter-spacing:.04em;text-transform:uppercase;background:rgba(255,255,255,.05);border:1.5px solid var(--card-border);color:var(--white);padding:.55rem 2rem .55rem .85rem;cursor:pointer;outline:none;transition:border-color .2s;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23aaa' stroke-width='1.5' stroke-linecap='round' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .75rem center}
     .dep-select:hover,.dep-select:focus{border-color:var(--blue)}
     .dep-select option{background:#0e1220;color:var(--white)}
-    .search-input{font-family:'DM Mono',monospace;font-size:.82rem;letter-spacing:.04em;background:rgba(255,255,255,.05);border:1.5px solid var(--card-border);color:var(--white);padding:.55rem .85rem;outline:none;width:220px;transition:border-color .2s}
+    .search-input{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.82rem;letter-spacing:.04em;background:rgba(255,255,255,.05);border:1.5px solid var(--card-border);color:var(--white);padding:.55rem .85rem;outline:none;width:220px;transition:border-color .2s}
     .search-input:focus{border-color:var(--blue)}
     .search-input::placeholder{color:rgba(255,255,255,.25)}
     .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
     .kpi-card{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1.15rem 1.35rem;backdrop-filter:blur(4px)}
-    .kpi-label{font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:.5rem}
-    .kpi-val{font-family:'Syne',sans-serif;font-weight:800;font-size:1.85rem;letter-spacing:-.04em;line-height:1;color:var(--blue)}
+    .kpi-label{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:.5rem}
+    .kpi-val{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-weight:800;font-size:1.85rem;letter-spacing:-.04em;line-height:1;color:var(--blue)}
     .kpi-val.wh{color:var(--white)}.kpi-val.gr{color:var(--green)}.kpi-val.sm{font-size:1.05rem;line-height:1.3}
-    .kpi-delta{font-family:'DM Mono',monospace;font-size:.74rem;color:rgba(255,255,255,.45);margin-top:.4rem}
+    .kpi-delta{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.74rem;color:rgba(255,255,255,.45);margin-top:.4rem}
     .results-grid{display:grid;grid-template-columns:1fr 300px;gap:1.2rem}
     .card{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1.3rem;overflow:hidden;backdrop-filter:blur(4px)}
-    .card-label{font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:1rem}
+    .card-label{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:1rem}
     .drill-nav{display:flex;align-items:center;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap}
-    .drill-crumb{font-family:'DM Mono',monospace;font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5);cursor:pointer;padding:.35rem .75rem;border:1px solid transparent;transition:color .15s}
+    .drill-crumb{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5);cursor:pointer;padding:.35rem .75rem;border:1px solid transparent;transition:color .15s}
     .drill-crumb.active{color:var(--white);border-color:var(--card-border);background:rgba(255,255,255,.04)}
     .drill-crumb.clickable{color:rgba(0,71,255,.8)}
     .drill-crumb.clickable:hover{color:var(--blue)}
     .drill-sep{color:rgba(255,255,255,.25);font-size:.72rem}
-    .level-badge{font-family:'DM Mono',monospace;font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;padding:.25rem .65rem;border:1px solid}
+    .level-badge{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;padding:.25rem .65rem;border:1px solid}
     .level-badge.dep{color:rgba(167,139,250,.7);border-color:rgba(167,139,250,.25);background:rgba(167,139,250,.06)}
     .level-badge.mun{color:rgba(0,71,255,.8);border-color:rgba(0,71,255,.3);background:rgba(0,71,255,.06)}
     .level-badge.pues{color:rgba(74,222,128,.7);border-color:rgba(74,222,128,.25);background:rgba(74,222,128,.06)}
     .results-table{width:100%;border-collapse:collapse}
-    .results-table th{font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.45);text-align:left;padding:.6rem .7rem;border-bottom:1px solid var(--border);white-space:nowrap}
+    .results-table th{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.45);text-align:left;padding:.6rem .7rem;border-bottom:1px solid var(--border);white-space:nowrap}
     .results-table th.r{text-align:right}
-    .results-table td{padding:.75rem .7rem;border-bottom:1px solid rgba(255,255,255,.05);font-family:'DM Mono',monospace;font-size:.88rem;color:rgba(255,255,255,.85);vertical-align:middle}
+    .results-table td{padding:.75rem .7rem;border-bottom:1px solid rgba(255,255,255,.05);font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.88rem;color:rgba(255,255,255,.85);vertical-align:middle}
     .results-table td.r{text-align:right}
     .results-table tr:hover td{background:var(--td-hover)}
     .bar-wrap{width:80px;height:5px;background:var(--bar-bg);border-radius:2px;overflow:hidden;display:inline-block;vertical-align:middle}
     .bar-fill{height:100%;background:var(--blue);border-radius:2px;transition:width 1s ease}
-    .pct-val{font-family:'Syne',sans-serif;font-weight:700;font-size:.95rem;color:var(--white);display:inline-block;width:52px;text-align:right;margin-left:6px}
-    .cbadge{display:inline-flex;align-items:center;justify-content:center;background:rgba(0,71,255,.15);color:var(--blue);font-family:'Syne',sans-serif;font-weight:800;font-size:.95rem;min-width:30px;height:26px;padding:0 7px;border:1px solid rgba(0,71,255,.3)}
+    .pct-val{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-weight:700;font-size:.95rem;color:var(--white);display:inline-block;width:52px;text-align:right;margin-left:6px}
+    .cbadge{display:inline-flex;align-items:center;justify-content:center;background:rgba(0,71,255,.15);color:var(--blue);font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-weight:800;font-size:.95rem;min-width:30px;height:26px;padding:0 7px;border:1px solid rgba(0,71,255,.3)}
     .cbadge.sub{background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border-color:rgba(255,255,255,.08)}
-    .drill-btn{background:none;border:none;color:var(--blue);font-family:'DM Mono',monospace;font-size:.88rem;cursor:pointer;text-align:left;padding:0;display:inline-flex;align-items:center;gap:.4rem;transition:color .15s}
+    .drill-btn{background:none;border:none;color:var(--blue);font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.88rem;cursor:pointer;text-align:left;padding:0;display:inline-flex;align-items:center;gap:.4rem;transition:color .15s}
     .drill-btn:hover{color:#7ab3ff}
-    .expand-btn{background:none;border:none;cursor:pointer;font-family:'DM Mono',monospace;font-size:.88rem;letter-spacing:.04em;color:rgba(0,71,255,.95);display:flex;align-items:center;gap:.4rem;padding:.3rem 0;transition:color .15s;font-weight:500}
+    .expand-btn{background:none;border:none;cursor:pointer;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.88rem;letter-spacing:.04em;color:rgba(0,71,255,.95);display:flex;align-items:center;gap:.4rem;padding:.3rem 0;transition:color .15s;font-weight:500}
     .expand-btn:hover{color:var(--blue);text-decoration:underline}
     .cands-inner{background:rgba(0,0,0,.2);border-top:1px solid var(--border);border-bottom:2px solid rgba(0,71,255,.2);padding:.6rem 1rem .85rem 2.5rem;display:none}
     .cands-inner.open{display:block}
@@ -115,17 +123,17 @@
     .donut-wrap{display:flex;flex-direction:column;align-items:center;gap:1rem}
     .donut-cw{position:relative;width:150px;height:150px}
     .donut-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
-    .donut-pct{font-family:'Syne',sans-serif;font-weight:800;font-size:1.5rem;letter-spacing:-.04em;color:var(--white);line-height:1}
-    .donut-sub{font-family:'DM Mono',monospace;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-top:3px}
+    .donut-pct{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-weight:800;font-size:1.5rem;letter-spacing:-.04em;color:var(--white);line-height:1}
+    .donut-sub{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-top:3px}
     .donut-legend{width:100%;display:flex;flex-direction:column;gap:.6rem}
-    .li{display:flex;align-items:center;gap:.6rem;font-family:'DM Mono',monospace;font-size:.88rem;color:rgba(255,255,255,.65)}
+    .li{display:flex;align-items:center;gap:.6rem;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.88rem;color:rgba(255,255,255,.65)}
     .ld{width:11px;height:11px;border-radius:50%;flex-shrink:0}
-    .lv{margin-left:auto;color:var(--white);font-weight:700;font-family:'Syne',sans-serif}
+    .lv{margin-left:auto;color:var(--white);font-weight:700;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif}
     .umbral-bar{margin-top:1.1rem;padding-top:.9rem;border-top:1px solid var(--border)}
-    .umbral-label{font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-bottom:.45rem}
-    .umbral-val{font-family:'DM Mono',monospace;font-size:.92rem;color:var(--blue)}
+    .umbral-label{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-bottom:.45rem}
+    .umbral-val{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.92rem;color:var(--blue)}
     .full-footer{flex-shrink:0;width:100%;border-top:1px solid var(--border);padding:.5rem 2.5rem;display:flex;align-items:center;justify-content:space-between}
-    .footer-brand{font-family:'DM Mono',monospace;font-size:.74rem;letter-spacing:.08em;color:rgba(255,255,255,.4)}
+    .footer-brand{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.74rem;letter-spacing:.08em;color:rgba(255,255,255,.4)}
     .footer-brand a{color:rgba(255,255,255,.25);text-decoration:none}
     .curtain{position:fixed;inset:0;z-index:99999;pointer-events:none}
     .curtain-layer{position:absolute;inset:0;background:#04060e}
@@ -134,9 +142,9 @@
     .curtain-layer:nth-child(3){clip-path:polygon(0 53%,100% 47%,100% 76%,0 82%);transform:translateX(-110%);transition:transform .58s cubic-bezier(.75,0,.25,1) .14s}
     .curtain-layer:nth-child(4){clip-path:polygon(0 80%,100% 74%,100% 100%,0 100%);transform:translateX(110%);transition:transform .58s cubic-bezier(.75,0,.25,1) .21s}
     .curtain-stage{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.8rem;pointer-events:none}
-    .curtain-tag{font-family:'DM Mono',monospace;font-size:1.08rem;letter-spacing:.35em;text-transform:uppercase;color:rgba(0,71,255,.7);opacity:0;transform:translateY(-12px);transition:opacity .4s ease,transform .4s ease}
-    .curtain-sub{font-family:'DM Mono',monospace;font-size:.975rem;letter-spacing:.22em;color:rgba(255,255,255,.35);text-transform:uppercase;opacity:0;transform:translateY(12px);transition:opacity .4s ease,transform .4s ease}
-    .curtain-headline{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(2.6rem,6.5vw,5.85rem);letter-spacing:-.03em;line-height:1.05;text-shadow:0 0 50px rgba(0,71,255,.5);text-align:center}
+    .curtain-tag{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:1.08rem;letter-spacing:.35em;text-transform:uppercase;color:rgba(0,71,255,.7);opacity:0;transform:translateY(-12px);transition:opacity .4s ease,transform .4s ease}
+    .curtain-sub{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.975rem;letter-spacing:.22em;color:rgba(255,255,255,.35);text-transform:uppercase;opacity:0;transform:translateY(12px);transition:opacity .4s ease,transform .4s ease}
+    .curtain-headline{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-weight:800;font-size:clamp(2.6rem,6.5vw,5.85rem);letter-spacing:-.03em;line-height:1.05;text-shadow:0 0 50px rgba(0,71,255,.5);text-align:center}
     .curtain-line{overflow:hidden;display:block}
     .curtain-word{display:inline-block;opacity:0;transition:transform .52s cubic-bezier(.25,.46,.45,.94),opacity .45s ease}
     .curtain-word.from-left{transform:translateX(-80px)}.curtain-word.from-right{transform:translateX(80px)}
@@ -157,13 +165,13 @@
     .curtain.closing .curtain-tag{opacity:1;transform:translateY(0);transition-delay:.68s}
     .curtain.closing .curtain-sub{opacity:1;transform:translateY(0);transition-delay:.72s}
     .circ-toggle{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap}
-    .circ-btn{font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;padding:.45rem 1.1rem;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.55);cursor:pointer;transition:all .15s}
+    .circ-btn{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;padding:.45rem 1.1rem;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.55);cursor:pointer;transition:all .15s}
     .circ-btn:hover{border-color:rgba(167,139,250,.4);color:rgba(167,139,250,.8)}
     .circ-btn.circ-btn-active{background:rgba(167,139,250,.12);border-color:rgba(167,139,250,.4);color:rgba(167,139,250,.9)}
     body.day-mode .circ-btn{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.15);color:rgba(0,0,0,.4)}
     body.day-mode .circ-btn.circ-btn-active{background:rgba(120,80,200,.1);border-color:rgba(120,80,200,.35);color:rgba(120,80,200,.9)}
     .map-mode-toggle{display:inline-flex;gap:.3rem;margin-left:auto}
-    .map-mode-btn{font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;padding:.35rem .8rem;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.55);cursor:pointer;transition:all .15s}
+    .map-mode-btn{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;padding:.35rem .8rem;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.55);cursor:pointer;transition:all .15s}
     .map-mode-btn:hover{border-color:rgba(0,71,255,.4);color:rgba(0,71,255,.8)}
     .map-mode-btn.active{background:rgba(0,71,255,.14);border-color:rgba(0,71,255,.45);color:rgba(0,71,255,.95)}
     body.day-mode .map-mode-btn{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.12);color:rgba(0,0,0,.45)}
@@ -178,7 +186,7 @@
     body.day-mode .leaflet-control-attribution{background:rgba(255,255,255,.85) !important;color:rgba(0,0,0,.4) !important}
     body.day-mode .leaflet-control-zoom a{background:#fff !important;color:#1a1a2e !important;border-color:rgba(0,0,0,.15) !important}
     #hemiciclo-map .leaflet-interactive{cursor:pointer !important}
-    .leaflet-tooltip{font-family:Avenir,sans-serif!important;font-weight:400!important;font-size:.85rem!important;background:rgba(6,8,16,0.97)!important;border:1px solid rgba(0,71,255,0.4)!important;color:#f4f3ef!important;box-shadow:none!important;padding:.45rem .65rem!important;border-radius:0!important;width:220px!important;white-space:normal!important;line-height:1.45!important;overflow-wrap:break-word!important;word-break:normal!important}
+    .leaflet-tooltip{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif!important;font-weight:400!important;font-size:.85rem!important;background:rgba(6,8,16,0.97)!important;border:1px solid rgba(0,71,255,0.4)!important;color:#f4f3ef!important;box-shadow:none!important;padding:.45rem .65rem!important;border-radius:0!important;width:220px!important;white-space:normal!important;line-height:1.45!important;overflow-wrap:break-word!important;word-break:normal!important}
     .leaflet-tooltip:before{display:none!important}
     body.day-mode .leaflet-tooltip{background:rgba(255,255,255,.98)!important;border-color:rgba(0,71,255,.45)!important;color:#0d1120!important}
     .hemi-seat{transition:opacity .2s,transform .2s;transform-origin:center;transform-box:fill-box}
@@ -285,9 +293,9 @@
       #hemiciclo-map{height:240px !important}
     }
     .hidden{display:none!important}
-    .copy-toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) translateY(24px);background:rgba(10,10,20,.97);border:1.5px solid rgba(255,100,100,.5);color:rgba(255,180,180,.9);font-family:'DM Mono',monospace;font-size:.88rem;letter-spacing:.08em;padding:1rem 2rem;z-index:99998;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;text-align:center}
+    .copy-toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) translateY(24px);background:rgba(10,10,20,.97);border:1.5px solid rgba(255,100,100,.5);color:rgba(255,180,180,.9);font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.88rem;letter-spacing:.08em;padding:1rem 2rem;z-index:99998;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;text-align:center}
     .copy-toast.show{opacity:1;transform:translate(-50%,-50%);pointer-events:auto}
-    .theme-btn{display:flex;align-items:center;gap:.4rem;font-family:'DM Mono',monospace;font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.7);padding:.4rem .85rem;cursor:pointer;transition:all .2s;flex-shrink:0}
+    .theme-btn{display:flex;align-items:center;gap:.4rem;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.7);padding:.4rem .85rem;cursor:pointer;transition:all .2s;flex-shrink:0}
     .theme-btn:hover{background:rgba(255,255,255,.15);color:var(--white)}
     body.day-mode .theme-btn{background:rgba(0,71,255,.08);border-color:rgba(0,71,255,.25);color:var(--blue)}
     body.day-mode{--white:#1a1a2e;--card-border:rgba(0,0,0,.12);--border:rgba(0,0,0,.08);--bar-bg:rgba(0,0,0,.1);--td-hover:rgba(0,71,255,.04);background:#e6ded3;color:#1a1a2e}
@@ -349,8 +357,8 @@
     .orient-overlay.show{display:flex}
     .orient-box{background:#0e1220;border:1px solid rgba(255,255,255,.12);padding:2rem 1.8rem;max-width:320px;text-align:center}
     .orient-icon{font-size:2.2rem;margin-bottom:1rem;display:block}
-    .orient-msg{font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.06em;line-height:1.9;color:rgba(255,255,255,.75);margin-bottom:1.5rem}
-    .orient-btn{font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;background:#4ade80;color:#060810;border:none;padding:.55rem 2rem;cursor:pointer;transition:background .2s}
+    .orient-msg{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.78rem;letter-spacing:.06em;line-height:1.9;color:rgba(255,255,255,.75);margin-bottom:1.5rem}
+    .orient-btn{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;background:#4ade80;color:#060810;border:none;padding:.55rem 2rem;cursor:pointer;transition:background .2s}
     .orient-btn:hover{background:#22c55e}
   </style>
 </head>
@@ -499,10 +507,10 @@
               </div>
               <div style="position:relative">
                 <div id="hemiciclo-map" style="width:100%;height:400px;background:#060810"></div>
-                <button id="hemiciclo-back" type="button" style="display:none;position:absolute;top:.55rem;right:.55rem;z-index:500;background:rgba(0,71,255,.92);color:#fff;border:none;padding:.5rem .85rem;font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;border-radius:2px">← Nacional</button>
+                <button id="hemiciclo-back" type="button" style="display:none;position:absolute;top:.55rem;right:.55rem;z-index:500;background:rgba(0,71,255,.92);color:#fff;border:none;padding:.5rem .85rem;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;border-radius:2px">← Nacional</button>
               </div>
               <div id="map-info-card" style="margin-top:.95rem;padding:1rem 1.1rem;background:rgba(255,255,255,.04);border:1px solid var(--card-border);min-height:140px">
-                <div id="map-info-placeholder" style="font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.08em;color:rgba(255,255,255,.45);text-transform:uppercase;text-align:center;padding:1.8rem 0;line-height:1.7">
+                <div id="map-info-placeholder" style="font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.78rem;letter-spacing:.08em;color:rgba(255,255,255,.45);text-transform:uppercase;text-align:center;padding:1.8rem 0;line-height:1.7">
                   Pasa el mouse sobre el mapa<br/>para ver el detalle
                 </div>
                 <div id="map-info-content" style="display:none"></div>
@@ -677,7 +685,7 @@
         renderTipoOrgBars();
         renderNacional();
       }catch(e){
-        document.getElementById('load-state').innerHTML=`<div style="font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,100,100,.8);text-align:center;line-height:1.8">Error al cargar datos.<br/><span style="color:rgba(255,255,255,.3);font-size:.6rem">${e.message}</span></div>`;
+        document.getElementById('load-state').innerHTML=`<div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:.7rem;color:rgba(255,100,100,.8);text-align:center;line-height:1.8">Error al cargar datos.<br/><span style="color:rgba(255,255,255,.3);font-size:.6rem">${e.message}</span></div>`;
       }
     }
 
@@ -815,10 +823,10 @@
           ? (circCurules[p.partido]>0 ? `<span class="cbadge">1</span>` : `<span class="cbadge sub">—</span>`)
           : `<span class="cbadge sub">${p.candidatos?.length||'—'}</span>`;
         tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td>
-          <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span></div>
+          <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span></div>
           ${esCirc&&cands.length>0?`<div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${cands.length} candidato${cands.length!==1?'s':''}</button></div>`:''}
           </td>
-          <td class="r" style="font-size:.9rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td>
+          <td class="r" style="font-size:.9rem;font-weight:700;font-family:HelveticaNeue, Helvetica, Arial, sans-serif}</td>
           <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>
           <td class="r">${curulesCell}</td>`;
         tbody.appendChild(tr);
@@ -829,7 +837,7 @@
             <tbody>${cands.map((c,j)=>{
               const nat=resumenData.candidatos.find(x=>x.nombre===c.nombre);
               const codStr=nat&&nat.codigo!=null?String(nat.codigo).padStart(3,'0'):'—';
-              return `<tr><td style="color:rgba(0,71,255,.85);font-family:'DM Mono',monospace;font-size:.85rem;font-weight:700;width:2.8rem;letter-spacing:.04em">${codStr}</td><td style="color:rgba(255,255,255,.4);width:2.3rem;font-size:.85rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif;font-size:1rem">${c.nombre}</td><td class="r" style="font-family:'Syne',sans-serif;font-size:1rem">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.55);font-size:.88rem">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;
+              return `<tr><td style="color:rgba(0,71,255,.85);font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:.85rem;font-weight:700;width:2.8rem;letter-spacing:.04em">${codStr}</td><td style="color:rgba(255,255,255,.4);width:2.3rem;font-size:.85rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:1rem">${c.nombre}</td><td class="r" style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:1rem">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.55);font-size:.88rem">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;
             }).join('')}</tbody>
             </table></div></td>`;
           tbody.appendChild(trC);
@@ -929,7 +937,7 @@
       geoPartidos.forEach((p,i)=>{
         const color=getColor(p.partido),pctV=pct(p.votos,totalVotos),bw=((p.votos/maxV)*100).toFixed(1);
         const tr=document.createElement('tr');
-        tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td><td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span></div></td><td class="r" style="font-size:.9rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td><td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>`;
+        tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td><td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span></div></td><td class="r" style="font-size:.9rem;font-weight:700;font-family:HelveticaNeue, Helvetica, Arial, sans-serif}</td><td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>`;
         tbody.appendChild(tr);
       });
       setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
@@ -977,7 +985,7 @@
       geoPartidos.forEach((p,i)=>{
         const color=getColor(p.partido),pctV=pct(p.votos,totalVotos),bw=((p.votos/maxV)*100).toFixed(1);
         const tr=document.createElement('tr');
-        tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td><td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span></div></td><td class="r" style="font-size:.9rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td><td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>`;
+        tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td><td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span></div></td><td class="r" style="font-size:.9rem;font-weight:700;font-family:HelveticaNeue, Helvetica, Arial, sans-serif}</td><td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>`;
         tbody.appendChild(tr);
       });
       setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
@@ -998,10 +1006,10 @@
         const tr=document.createElement('tr');
         const hasCands=p.candidatos&&p.candidatos.length>0;
         tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td>
-          <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span></div>
+          <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-weight:700;font-size:.9rem">${p.partido}</span></div>
           ${hasCands?`<div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${p.candidatos.length} candidatos</button></div>`:''}
           </td>
-          <td class="r" style="font-size:.9rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td>
+          <td class="r" style="font-size:.9rem;font-weight:700;font-family:HelveticaNeue, Helvetica, Arial, sans-serif}</td>
           <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>
           <td class="r">${curulesCell}</td>`;
         tbody.appendChild(tr);
@@ -1011,7 +1019,7 @@
             <table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% partido</th></tr></thead>
             <tbody>${p.candidatos.map((c,j)=>{
               const codStr=c.codigo!=null?String(c.codigo).padStart(3,'0'):'—';
-              return `<tr><td style="color:rgba(0,71,255,.85);font-family:'DM Mono',monospace;font-size:.85rem;font-weight:700;width:2.8rem;letter-spacing:.04em">${codStr}</td><td style="color:rgba(255,255,255,.4);width:2.3rem;font-size:.85rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif;font-size:1rem">${c.nombre}</td><td class="r" style="font-family:'Syne',sans-serif;font-size:1rem">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.55);font-size:.88rem">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;
+              return `<tr><td style="color:rgba(0,71,255,.85);font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:.85rem;font-weight:700;width:2.8rem;letter-spacing:.04em">${codStr}</td><td style="color:rgba(255,255,255,.4);width:2.3rem;font-size:.85rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:1rem">${c.nombre}</td><td class="r" style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:1rem">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.55);font-size:.88rem">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;
             }).join('')}</tbody>
             </table></div></td>`;
           tbody.appendChild(trC);
@@ -1030,10 +1038,10 @@
       const norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(), qn=norm(q), res=[];
       (resumenData?.partidos||[]).forEach(p=>p.candidatos.forEach((c,idx)=>{if(!norm(c.nombre).includes(qn))return;res.push({nombre:c.nombre,partido:p.partido,votos:c.votos,pos:idx+1});}));
       res.sort((a,b)=>b.votos-a.votos);
-      box.innerHTML=!res.length?`<div style="padding:2rem;font-family:'DM Mono',monospace;font-size:.88rem;color:rgba(255,255,255,.5);text-align:center">No se encontraron candidatos con "<b>${q}</b>"</div>`
-        :`<div style="font-family:'DM Mono',monospace;font-size:.74rem;letter-spacing:.08em;color:rgba(255,255,255,.45);text-transform:uppercase;padding:.85rem 0 .6rem">${res.length} resultado${res.length!==1?'s':''} para "${q}"</div>
+      box.innerHTML=!res.length?`<div style="padding:2rem;font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:.88rem;color:rgba(255,255,255,.5);text-align:center">No se encontraron candidatos con "<b>${q}</b>"</div>`
+        :`<div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:.74rem;letter-spacing:.08em;color:rgba(255,255,255,.45);text-transform:uppercase;padding:.85rem 0 .6rem">${res.length} resultado${res.length!==1?'s':''} para "${q}"</div>
         <table class="results-table"><thead><tr><th>#</th><th>Candidato/a</th><th>Partido</th><th class="r">Pos.</th><th class="r">Votos</th></tr></thead>
-        <tbody>${res.map((r,i)=>`<tr><td style="color:rgba(255,255,255,.4)">${String(i+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif;font-size:1rem">${r.nombre}</td><td style="color:rgba(255,255,255,.65);font-family:'Syne',sans-serif;font-size:.95rem">${r.partido}</td><td class="r" style="color:rgba(255,255,255,.5)">#${r.pos}</td><td class="r" style="font-family:'Syne',sans-serif;font-size:1rem">${fmt(r.votos)}</td></tr>`).join('')}</tbody></table>`;
+        <tbody>${res.map((r,i)=>`<tr><td style="color:rgba(255,255,255,.4)">${String(i+1).padStart(2,'0')}</td><td style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:1rem">${r.nombre}</td><td style="color:rgba(255,255,255,.65);font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:.95rem">${r.partido}</td><td class="r" style="color:rgba(255,255,255,.5)">#${r.pos}</td><td class="r" style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:1rem">${fmt(r.votos)}</td></tr>`).join('')}</tbody></table>`;
     }
 
     // ─── Composición por tipo de organización ───────────────
@@ -1065,15 +1073,15 @@
           const col = (CITREP_PALETTES[cat]||CITREP_PALETTES.OTR)[0];
           const wpct = ((n/16)*100).toFixed(0);
           const bw = ((n/maxN)*100).toFixed(1);
-          return `<div style="display:flex;align-items:center;gap:.6rem;font-family:'DM Mono',monospace;font-size:.8rem;color:rgba(255,255,255,.8)">
+          return `<div style="display:flex;align-items:center;gap:.6rem;font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:.8rem;color:rgba(255,255,255,.8)">
             <span style="width:11px;height:11px;background:${col};flex-shrink:0;border-radius:2px"></span>
             <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${CITREP_CAT_LABEL[cat]||cat}</span>
             <span style="width:64px;height:5px;background:var(--bar-bg);overflow:hidden"><span style="display:block;height:100%;width:${bw}%;background:${col}"></span></span>
-            <span style="font-family:'Syne',sans-serif;font-weight:800;color:var(--white);min-width:20px;text-align:right;font-size:.95rem">${n}</span>
+            <span style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-weight:800;color:var(--white);min-width:20px;text-align:right;font-size:.95rem">${n}</span>
           </div>`;
         }).join('');
       } catch(e){
-        box.innerHTML = '<div style="font-family:DM Mono,monospace;font-size:.62rem;color:rgba(255,100,100,.6)">No se pudo cargar</div>';
+        box.innerHTML = '<div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:.62rem;color:rgba(255,100,100,.6)">No se pudo cargar</div>';
       }
       if(orgsEl) orgsEl.textContent = fmt((resumenData.partidos||[]).length);
       if(candsEl) candsEl.textContent = fmt((resumenData.candidatos||[]).length);
@@ -1228,7 +1236,7 @@
         const circNum = String(parseInt(cc,10));
         const tip = `${w.nombre || ('Circ '+cc)} — ${w.electo || '—'} (${w.partido || 's/d'}) · ${fmt(w.electoVotos||0)} votos`;
         html += `<circle class="hemi-seat" cx="${pos.x.toFixed(1)}" cy="${pos.y.toFixed(1)}" r="${seatR}" fill="${color}" stroke="rgba(255,255,255,0.18)" stroke-width="1.5" data-cc="${cc}" data-tip="${tip.replace(/"/g,'&quot;')}"/>`;
-        html += `<text x="${pos.x.toFixed(1)}" y="${(pos.y+5).toFixed(1)}" text-anchor="middle" font-family="DM Mono,monospace" font-size="14" font-weight="700" fill="rgba(255,255,255,0.97)" pointer-events="none">${circNum}</text>`;
+        html += `<text x="${pos.x.toFixed(1)}" y="${(pos.y+5).toFixed(1)}" text-anchor="middle" font-family="HelveticaNeue, Helvetica, sans-serif" font-size="14" font-weight="700" fill="rgba(255,255,255,0.97)" pointer-events="none">${circNum}</text>`;
       });
       svg.innerHTML = html;
       // Tooltips hover
@@ -1238,7 +1246,7 @@
           if(!tip){
             tip = document.createElement('div');
             tip.id = 'hemi-tooltip';
-            tip.style.cssText = 'position:fixed;background:rgba(6,8,16,0.97);border:1px solid rgba(0,71,255,0.4);color:#f4f3ef;padding:.6rem 1rem;font-size:.9rem;pointer-events:none;z-index:10000;font-family:Avenir,sans-serif;font-weight:400;white-space:normal;line-height:1.5;max-width:320px';
+            tip.style.cssText = 'position:fixed;background:rgba(6,8,16,0.97);border:1px solid rgba(0,71,255,0.4);color:#f4f3ef;padding:.6rem 1rem;font-size:.9rem;pointer-events:none;z-index:10000;font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-weight:400;white-space:normal;line-height:1.5;max-width:320px';
             document.body.appendChild(tip);
           }
           tip.textContent = seat.getAttribute('data-tip');
@@ -1269,10 +1277,10 @@
       const leg = document.getElementById('hemiciclo-legend');
       leg.innerHTML = partiesByCount.map(([p, n])=>{
         const c = getColor(p);
-        return `<div style="display:flex;align-items:center;gap:.7rem;font-family:'DM Mono',monospace;font-size:.85rem;color:rgba(255,255,255,.8)">
+        return `<div style="display:flex;align-items:center;gap:.7rem;font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:.85rem;color:rgba(255,255,255,.8)">
           <span style="width:13px;height:13px;background:${c};border-radius:50%;flex-shrink:0"></span>
-          <span style="flex:1;font-family:'Syne',sans-serif;font-weight:500;font-size:.95rem">${p}</span>
-          <span style="font-family:'Syne',sans-serif;font-weight:800;color:var(--white);font-size:1rem">${n}</span>
+          <span style="flex:1;font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-weight:500;font-size:.95rem">${p}</span>
+          <span style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-weight:800;color:var(--white);font-size:1rem">${n}</span>
         </div>`;
       }).join('');
     }
@@ -1323,16 +1331,16 @@
         <div style="display:flex;align-items:flex-start;gap:.8rem;margin-bottom:.7rem">
           <span style="width:16px;height:16px;background:${partidoCol};border-radius:3px;flex-shrink:0;margin-top:.25rem"></span>
           <div style="flex:1;min-width:0">
-            <div style="font-family:'DM Mono',monospace;font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(0,71,255,.95);margin-bottom:.25rem">Circunscripción ${parseInt(cc,10)}</div>
-            <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.2rem;letter-spacing:-.02em;line-height:1.2">${feat.properties.com_nom||'—'}</div>
+            <div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(0,71,255,.95);margin-bottom:.25rem">Circunscripción ${parseInt(cc,10)}</div>
+            <div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-weight:800;font-size:1.2rem;letter-spacing:-.02em;line-height:1.2">${feat.properties.com_nom||'—'}</div>
           </div>
         </div>
         ${w && w.electo ? `
-        <div style="font-family:'DM Mono',monospace;font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:.3rem;padding-top:.7rem;border-top:1px solid var(--border)">Electo/a</div>
-        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.05rem;margin-bottom:.3rem;line-height:1.25">${w.electo}</div>
-        <div style="font-family:'DM Mono',monospace;font-size:.85rem;color:rgba(255,255,255,.7);line-height:1.5">${w.partido} · <span style="color:#fff;font-weight:700">${fmt(w.electoVotos||0)}</span> votos</div>
+        <div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:.3rem;padding-top:.7rem;border-top:1px solid var(--border)">Electo/a</div>
+        <div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-weight:700;font-size:1.05rem;margin-bottom:.3rem;line-height:1.25">${w.electo}</div>
+        <div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:.85rem;color:rgba(255,255,255,.7);line-height:1.5">${w.partido} · <span style="color:#fff;font-weight:700">${fmt(w.electoVotos||0)}</span> votos</div>
         ` : ''}
-        <div style="display:flex;gap:1.4rem;margin-top:.8rem;padding-top:.65rem;border-top:1px solid var(--border);font-family:'DM Mono',monospace;font-size:.76rem;color:rgba(255,255,255,.55)">
+        <div style="display:flex;gap:1.4rem;margin-top:.8rem;padding-top:.65rem;border-top:1px solid var(--border);font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:.76rem;color:rgba(255,255,255,.55)">
           <span>${feat.properties.mun_count} municipios</span>
           <span>${partidoCat}</span>
         </div>
@@ -1349,17 +1357,17 @@
         <div style="display:flex;align-items:flex-start;gap:.8rem;margin-bottom:.7rem">
           <span style="width:16px;height:16px;background:${partidoCol};border-radius:3px;flex-shrink:0;margin-top:.25rem"></span>
           <div style="flex:1;min-width:0">
-            <div style="font-family:'DM Mono',monospace;font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(0,71,255,.95);margin-bottom:.25rem">${p.dep_nom||''}</div>
-            <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.2rem;letter-spacing:-.02em;line-height:1.2">${p.nombre}</div>
-            <div style="font-family:'DM Mono',monospace;font-size:.74rem;letter-spacing:.04em;color:rgba(255,255,255,.55);margin-top:.3rem">Circunscripción ${parseInt(p.com_cod,10)}</div>
+            <div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(0,71,255,.95);margin-bottom:.25rem">${p.dep_nom||''}</div>
+            <div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-weight:800;font-size:1.2rem;letter-spacing:-.02em;line-height:1.2">${p.nombre}</div>
+            <div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:.74rem;letter-spacing:.04em;color:rgba(255,255,255,.55);margin-top:.3rem">Circunscripción ${parseInt(p.com_cod,10)}</div>
           </div>
         </div>
         ${w && w.partido ? `
-        <div style="font-family:'DM Mono',monospace;font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:.3rem;padding-top:.7rem;border-top:1px solid var(--border)">Puntero</div>
-        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.05rem;margin-bottom:.3rem;line-height:1.25">${w.partido}</div>
-        <div style="font-family:'DM Mono',monospace;font-size:.85rem;color:rgba(255,255,255,.7);line-height:1.5"><span style="color:#fff;font-weight:700">${fmt(w.votos)}</span> de ${fmt(w.total)} votos${pctShare!==null?` · <span style="color:#fff;font-weight:700">${pctShare}%</span>`:''}</div>
-        <div style="font-family:'DM Mono',monospace;font-size:.76rem;color:rgba(255,255,255,.55);margin-top:.65rem;padding-top:.55rem;border-top:1px solid var(--border)">${partidoCat}</div>
-        ` : '<div style="font-family:DM Mono,monospace;font-size:.78rem;color:rgba(255,255,255,.45);padding-top:.65rem;border-top:1px solid var(--border)">Sin datos de ganador</div>'}
+        <div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:.3rem;padding-top:.7rem;border-top:1px solid var(--border)">Puntero</div>
+        <div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-weight:700;font-size:1.05rem;margin-bottom:.3rem;line-height:1.25">${w.partido}</div>
+        <div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:.85rem;color:rgba(255,255,255,.7);line-height:1.5"><span style="color:#fff;font-weight:700">${fmt(w.votos)}</span> de ${fmt(w.total)} votos${pctShare!==null?` · <span style="color:#fff;font-weight:700">${pctShare}%</span>`:''}</div>
+        <div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:.76rem;color:rgba(255,255,255,.55);margin-top:.65rem;padding-top:.55rem;border-top:1px solid var(--border)">${partidoCat}</div>
+        ` : '<div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:.78rem;color:rgba(255,255,255,.45);padding-top:.65rem;border-top:1px solid var(--border)">Sin datos de ganador</div>'}
       `);
     }
 
@@ -1404,7 +1412,7 @@
           style: styleCirc,
           onEachFeature: (feat, layer)=>{
             const cc = feat.properties.com_cod;
-            const tip = `<div style="font-family:'Syne',sans-serif;font-weight:700;font-size:.88rem">Circunscripción ${parseInt(cc,10)}</div>`;
+            const tip = `<div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-weight:700;font-size:.88rem">Circunscripción ${parseInt(cc,10)}</div>`;
             layer.bindTooltip(tip, {sticky:true, direction:'top'});
             layer.on('mouseover', ()=>{ layer.setStyle({weight:2.2, color:'#fff', fillOpacity:0.92}); showCircInfo(feat); });
             layer.on('mouseout', ()=>_circLayer.resetStyle(layer));
@@ -1431,8 +1439,8 @@
           style: styleMun,
           onEachFeature: (feat, layer)=>{
             const p = feat.properties;
-            const tip = `<div style="font-family:'Syne',sans-serif;font-weight:700;font-size:.92rem;line-height:1.2">${p.nombre}</div>
-              <div style="font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.06em;color:rgba(255,255,255,.55);text-transform:uppercase;margin-top:.15rem">${p.dep_nom||''}</div>`;
+            const tip = `<div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-weight:700;font-size:.92rem;line-height:1.2">${p.nombre}</div>
+              <div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:.58rem;letter-spacing:.06em;color:rgba(255,255,255,.55);text-transform:uppercase;margin-top:.15rem">${p.dep_nom||''}</div>`;
             layer.bindTooltip(tip, {sticky:true, direction:'top'});
             layer.on('mouseover', ()=>{ layer.setStyle({weight:1.8, color:'#fff', fillOpacity:0.92}); showMunInfo(feat); });
             layer.on('mouseout', ()=>_munLayer.resetStyle(layer));
@@ -1506,7 +1514,7 @@
       },
     };
 
-    function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;const lang=localStorage.getItem('rr-lang')||'co';const t=CIT_LANG[lang]||CIT_LANG.co;if(token&&user){const pl=lang==='us'?{free:'Free',basic:'Basic',analysis:'Analysis',pro:'Pro',premium:'Premium',full:'Full'}:lang==='cn'?{free:'免费',basic:'基础版',analysis:'分析版',pro:'Pro',premium:'Premium',full:'完整版'}:{free:'Free',basic:'Básico',analysis:'Análisis',pro:'Pro',premium:'Premium',full:'Completo'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">${t.logout}</button>`;}else{area.innerHTML=`<a href="pricing.html" style="font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">${t.planes}</a><a href="login.html" class="e-btn-login">${t.login}</a><a href="elige-plan.html" class="e-btn-register">${t.register}</a>`;}}
+    function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;const lang=localStorage.getItem('rr-lang')||'co';const t=CIT_LANG[lang]||CIT_LANG.co;if(token&&user){const pl=lang==='us'?{free:'Free',basic:'Basic',analysis:'Analysis',pro:'Pro',premium:'Premium',full:'Full'}:lang==='cn'?{free:'免费',basic:'基础版',analysis:'分析版',pro:'Pro',premium:'Premium',full:'完整版'}:{free:'Free',basic:'Básico',analysis:'Análisis',pro:'Pro',premium:'Premium',full:'Completo'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">${t.logout}</button>`;}else{area.innerHTML=`<a href="pricing.html" style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">${t.planes}</a><a href="login.html" class="e-btn-login">${t.login}</a><a href="elige-plan.html" class="e-btn-register">${t.register}</a>`;}}
     async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();}
     updateElectoralNav();
 
@@ -1546,5 +1554,7 @@
   </script>
   <script src="theme.js"></script>
   <script src="lang.js"></script>
+<script>/* sistema visual v2: modo dia retirado -- siempre oscuro */
+(function(){var b=document.body;var strip=function(){if(b&&b.classList.contains('day-mode'))b.classList.remove('day-mode');};strip();try{new MutationObserver(strip).observe(b,{attributes:true,attributeFilter:['class']});}catch(e){}})();</script>
 </body>
 </html>
