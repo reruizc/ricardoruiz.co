@@ -300,6 +300,34 @@ def _sanciones():
     return _SANC
 
 
+_EJEC = None
+_EJEC_STATS = None
+
+
+def _ejecutivo_stats():
+    """Agregados del pilar Ejecutivo (decretos/normativa Presidencia). Cache warm."""
+    global _EJEC_STATS
+    if _EJEC_STATS is None:
+        try:
+            _EJEC_STATS = _get_json('metadata/normativa-stats.json')
+        except Exception:
+            _EJEC_STATS = {'total': 0, 'por_tipo': [], 'por_anio': {},
+                           'recientes': [], 'rango_fechas': ['', ''], 'fuente': {}}
+    return _EJEC_STATS
+
+
+def _ejecutivo():
+    """Lista slim de normativa del Ejecutivo (lazy — solo al buscar). Cache warm."""
+    global _EJEC
+    if _EJEC is None:
+        try:
+            obj = _s3.get_object(Bucket=BUCKET, Key='metadata/normativa.jsonl')
+            _EJEC = [json.loads(l) for l in obj['Body'].read().decode('utf-8').split('\n') if l.strip()]
+        except Exception:
+            _EJEC = []
+    return _EJEC
+
+
 # --- LLM (ruteo por paso) ---------------------------------------------------
 def _hash24(s):
     return hashlib.sha256(s.encode('utf-8')).hexdigest()[:24]
@@ -1249,6 +1277,25 @@ def handler(event, context):
             'por_fuente': [{'fuente': f, 'n': n} for f, n in fuc.most_common()],
             'monto_total_cop': round(sum(montos)) if montos else 0,
             'con_monto': len(montos),
+            'resultados': out,
+        })
+
+    if action == 'ejecutivo':      # pilar Ejecutivo Nacional · decretos y normativa de Presidencia
+        q = (body.get('query') or '').strip().lower()
+        tipo = (body.get('tipo') or '').strip().upper()
+        if not q and not tipo:                 # landing: agregados precalculados (rápido)
+            return _resp(200, dict(_ejecutivo_stats(), mode='stats'))
+        recs = _ejecutivo()
+        hits = [r for r in recs
+                if (not tipo or (r.get('tipo') or '').upper() == tipo)
+                and (not q or q in r.get('q', ''))]
+        tic = Counter((r.get('tipo') or '—') for r in hits)
+        hits_sorted = sorted(hits, key=lambda r: r.get('fecha', ''), reverse=True)
+        out = [{k: v for k, v in r.items() if k != 'q'} for r in hits_sorted[:120]]
+        return _resp(200, {
+            'mode': 'search', 'query': body.get('query', ''), 'tipo': tipo,
+            'n': len(hits), 'mostrados': len(out),
+            'por_tipo': [{'tipo': t, 'n': n} for t, n in tic.most_common()],
             'resultados': out,
         })
 

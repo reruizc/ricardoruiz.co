@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Caudal × Cauce — Monitoreo en tiempo real · asuntos públicos, regulatorios y reputacionales</title>
+  <meta name="description" content="Caudal reúne legislación, regulación, sanciones, medios y redes en un solo motor. Recolecta todo el fenómeno, lo procesa y te deja en el radar solo lo que puede afectar a tu empresa —regulatoria, normativa o reputacionalmente. Monitoreo en tiempo real — Colombia." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* Helvetica Neue embebida (sistema visual v2). Syne solo en el logo del sitio. */
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-thin.woff2') format('woff2'); font-weight:200; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-light.woff2') format('woff2'); font-weight:300; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-medium.woff2') format('woff2'); font-weight:500; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-bold.woff2') format('woff2'); font-weight:600 900; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-italic.woff2') format('woff2'); font-weight:400; font-style:italic; font-display:swap; }
+
+    :root {
+      --white:#f4f3ef; --ink2:#9aa7bd; --ink3:#5f6b82;
+      --blue:#0047FF; --blue-light:#3d6fff; --teal:#3d6fff;
+      --green:#4ade80; --orange:#f97316; --amber:#e0a03a; --red:#d1584e;
+      --card-bg:rgba(10,10,16,0.75); --card-border:rgba(255,255,255,0.07);
+      --border2:rgba(255,255,255,0.14);
+    }
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+    html, body { min-height:100%; overflow-x:hidden; }
+    body {
+      background:#060810; color:var(--white);
+      font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;
+      cursor:none; -webkit-font-smoothing:antialiased;
+    }
+    a { color:inherit; }
+    ::selection { background:rgba(61,111,255,.24); }
+
+    /* ── FONDO ── */
+    .bg-layer { position:fixed; inset:0; z-index:0; pointer-events:none;
+      background:
+        radial-gradient(1100px 620px at 80% -10%, rgba(0,71,255,0.18), transparent 60%),
+        radial-gradient(900px 520px at 10% 108%, rgba(61,111,255,0.10), transparent 60%),
+        #060810; }
+    .shell { position:relative; z-index:1; }
+
+    /* ── CURSOR ── */
+    .cursor { position:fixed; width:10px; height:10px; background:var(--blue); border-radius:50%;
+      pointer-events:none; z-index:100000; transform:translate(-50%,-50%); transition:transform .15s, background .2s, border .2s; }
+    .cursor-ring { position:fixed; width:34px; height:34px; border:1px solid rgba(0,71,255,.5); border-radius:50%;
+      pointer-events:none; z-index:99999; transform:translate(-50%,-50%); opacity:.5; }
+
+    /* ── NAV (misma barra de index.html) ── */
+    .electoral-nav{position:sticky;top:0;z-index:400;display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(4,6,16,.72);backdrop-filter:blur(10px)}
+    .e-nav-left{display:flex;align-items:center;gap:1rem;min-width:0}
+    .e-nav-right{display:flex;align-items:center;gap:1.2rem;flex-shrink:0}
+    .electoral-nav-auth{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
+    .e-btn-login,.e-btn-profile{font-family:inherit;font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-decoration:none;background:var(--orange);border:1.5px solid var(--orange);padding:.35rem .8rem;transition:background .2s,border-color .2s;cursor:none;white-space:nowrap}
+    .e-btn-login:hover,.e-btn-profile:hover{background:#ea6d0d;border-color:#ea6d0d}
+    .e-btn-register{font-family:inherit;font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-decoration:none;background:var(--blue);border:1.5px solid var(--blue);padding:.35rem .8rem;white-space:nowrap;cursor:none}
+    .e-btn-register:hover{background:#0035cc;border-color:#0035cc}
+    .e-user-plan{font-family:inherit;font-size:.69rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue);background:rgba(0,71,255,.12);padding:.2rem .6rem;text-decoration:none;white-space:nowrap;cursor:none}
+    .e-btn-logout{font-family:inherit;font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.25);background:none;border:none;cursor:none;padding:0;white-space:nowrap}
+    .e-btn-logout:hover{color:rgba(255,255,255,.6)}
+    .e-btn-planes{font-family:inherit;font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:#4ade80;text-decoration:none;border:1.5px solid rgba(74,222,128,.55);padding:.35rem .8rem;transition:color .2s,border-color .2s,background .2s;flex-shrink:0;white-space:nowrap;cursor:none}
+    .e-btn-planes:hover{color:#060810;background:#4ade80;border-color:#4ade80}
+
+    /* CTA nuevo: Demo? NO, explóralo en vivo! */
+    .e-btn-live{font-family:inherit;font-size:.782rem;letter-spacing:.05em;text-transform:uppercase;color:#fff;text-decoration:none;
+      background:linear-gradient(120deg,var(--blue) 0%,var(--blue-light) 100%);border:1.5px solid var(--blue-light);
+      padding:.4rem .9rem;display:inline-flex;align-items:center;gap:.5rem;cursor:none;white-space:nowrap;
+      box-shadow:0 0 0 0 rgba(61,111,255,.5);transition:box-shadow .25s,transform .15s,filter .2s}
+    .e-btn-live:hover{filter:brightness(1.1);transform:translateY(-1px)}
+    .e-btn-live .live-dot{width:7px;height:7px;border-radius:50%;background:#7ee2a6;box-shadow:0 0 0 0 rgba(126,226,166,.7);animation:pulse 1.8s infinite}
+    @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(126,226,166,.55)}70%{box-shadow:0 0 0 7px rgba(126,226,166,0)}100%{box-shadow:0 0 0 0 rgba(126,226,166,0)}}
+
+    .country-selector-wrap{position:relative}
+    .country-btn{font-family:inherit;font-weight:500;font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.45);background:none;border:1px solid rgba(255,255,255,.15);padding:.3rem .65rem;cursor:none;display:flex;align-items:center;transition:border-color .2s,color .2s;white-space:nowrap}
+    .country-btn:hover,.country-btn.open{border-color:rgba(255,255,255,.35);color:rgba(255,255,255,.7)}
+    .country-btn.open #countryChevron{transform:rotate(180deg)}
+    .country-dropdown{position:absolute;top:calc(100% + 8px);right:0;background:#0e1220;border:1px solid rgba(255,255,255,.12);min-width:200px;display:none;flex-direction:column;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+    .country-dropdown.open{display:flex}
+    .country-option{font-family:inherit;font-weight:500;font-size:.68rem;letter-spacing:.04em;padding:.65rem 1rem;cursor:none;display:flex;align-items:center;gap:.5rem;color:rgba(255,255,255,.5);border-bottom:1px solid rgba(255,255,255,.07);transition:background .15s;user-select:none}
+    .country-option:last-child{border-bottom:none}
+    .country-option:hover{background:rgba(255,255,255,.05);color:rgba(255,255,255,.8)}
+    .country-option.selected{color:var(--blue)}
+    .country-check{font-size:.6rem;width:12px;opacity:0;color:var(--blue)}
+    .country-option.selected .country-check{opacity:1}
+    .logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.85;transition:opacity .2s;flex-shrink:0;cursor:none}
+    .logo-link:hover{opacity:1}
+    .logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px}
+    .logo-bar{width:5px;background:var(--blue);border-radius:1px 1px 0 0;opacity:.85}
+    .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.1rem,2vw,1.6rem);letter-spacing:-.03em;color:var(--white);line-height:1}
+    .logo-text span{color:var(--blue)}
+
+    /* ── LAYOUT ── */
+    .container{max-width:1120px;margin:0 auto;padding:0 2.5rem}
+    section{position:relative}
+    .eyebrow{font-weight:500;font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:var(--ink2)}
+    em.ac{font-style:italic;color:var(--teal)}
+
+    /* ── HERO ── */
+    .hero{padding:4.6rem 0 3rem;text-align:center}
+    .live-badge{display:inline-flex;align-items:center;gap:.55rem;font-size:.7rem;letter-spacing:.18em;text-transform:uppercase;color:var(--ink2);
+      border:1px solid var(--card-border);background:rgba(10,12,20,.6);padding:.4rem .9rem;border-radius:999px}
+    .live-badge .dot{width:8px;height:8px;border-radius:50%;background:#7ee2a6;animation:pulse 1.8s infinite}
+    .hero h1{font-family:'HelveticaNeue',Helvetica,Arial,sans-serif;font-weight:800;font-size:clamp(2.4rem,6.4vw,4.6rem);letter-spacing:-.035em;line-height:1.02;margin:1.4rem 0 .1rem}
+    .hero .brand-mark{font-family:'Syne',sans-serif;font-weight:800;font-size:.9rem;letter-spacing:-.02em;color:var(--ink2)}
+    .hero .brand-mark b{color:var(--white)}
+    .hero p.lead{color:var(--ink2);font-size:clamp(1rem,1.6vw,1.18rem);line-height:1.6;max-width:640px;margin:1.3rem auto 0}
+    .cta-row{display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap;margin-top:2rem}
+    .cta{font-family:inherit;font-weight:700;font-size:.86rem;letter-spacing:.05em;text-transform:uppercase;padding:.85rem 1.5rem;text-decoration:none;cursor:none;display:inline-flex;align-items:center;gap:.55rem;transition:filter .2s,transform .15s,background .2s,color .2s,border-color .2s;white-space:nowrap}
+    .cta.primary{background:linear-gradient(120deg,var(--blue) 0%,var(--blue-light) 100%);color:#fff;border:1.5px solid var(--blue-light)}
+    .cta.primary:hover{filter:brightness(1.1);transform:translateY(-1px)}
+    .cta.ghost{background:none;color:var(--white);border:1.5px solid var(--border2)}
+    .cta.ghost:hover{border-color:var(--teal);color:var(--teal)}
+
+    /* Ticker en vivo bajo el hero */
+    .ticker{margin:2.4rem auto 0;max-width:720px;border:1px solid var(--card-border);background:rgba(10,12,20,.55);backdrop-filter:blur(6px);
+      display:flex;align-items:center;gap:.9rem;padding:.7rem 1rem;overflow:hidden}
+    .ticker .tk-tag{flex-shrink:0;font-size:.6rem;letter-spacing:.16em;text-transform:uppercase;color:#7ee2a6;display:flex;align-items:center;gap:.45rem}
+    .ticker .tk-tag .dot{width:6px;height:6px;border-radius:50%;background:#7ee2a6;animation:pulse 1.8s infinite}
+    .ticker .tk-feed{position:relative;height:1.25rem;flex:1;min-width:0}
+    .ticker .tk-line{position:absolute;inset:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.82rem;color:var(--ink2);
+      opacity:0;transform:translateY(6px);transition:opacity .5s,transform .5s}
+    .ticker .tk-line.on{opacity:1;transform:translateY(0)}
+    .ticker .tk-line b{color:var(--white);font-weight:500}
+
+    /* ── STAT STRIP ── */
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--card-border);border:1px solid var(--card-border);margin-top:3rem}
+    .stat{background:#080b14;padding:1.5rem 1.2rem;text-align:center}
+    .stat .n{font-weight:800;font-size:clamp(1.4rem,2.6vw,2rem);letter-spacing:-.02em;color:var(--white)}
+    .stat .n small{color:var(--teal);font-weight:700}
+    .stat .l{font-size:.72rem;letter-spacing:.06em;color:var(--ink3);margin-top:.35rem;text-transform:uppercase}
+
+    /* ── SECTION HEADINGS ── */
+    .sec{padding:4.4rem 0}
+    .sec-head{max-width:720px}
+    .sec-head.center{margin:0 auto;text-align:center}
+    .sec h2{font-weight:800;font-size:clamp(1.7rem,3.4vw,2.5rem);letter-spacing:-.03em;line-height:1.08;margin:.7rem 0 0}
+    .sec p.sub{color:var(--ink2);font-size:1rem;line-height:1.6;margin-top:1rem}
+
+    /* Banda "costoso" */
+    .cost-band{border:1px solid var(--card-border);background:linear-gradient(135deg,rgba(209,88,78,.08),transparent 60%);padding:2.2rem 2rem;margin-top:2rem}
+    .cost-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.4rem;margin-top:1.6rem}
+    .cost-item{border-left:2px solid rgba(209,88,78,.55);padding-left:1rem}
+    .cost-item .amt{font-weight:800;font-size:1.35rem;color:#ffb0a8;letter-spacing:-.01em}
+    .cost-item .who{font-weight:500;margin-top:.25rem}
+    .cost-item .d{color:var(--ink2);font-size:.85rem;line-height:1.5;margin-top:.35rem}
+
+    /* Cómo funciona (4 capacidades) */
+    .feat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;margin-top:2.2rem}
+    .step-grid{grid-template-columns:repeat(3,1fr)}
+    .feat{position:relative;border:1px solid var(--card-border);background:var(--card-bg);backdrop-filter:blur(6px);padding:1.6rem 1.5rem;overflow:hidden;transition:border-color .25s,transform .2s}
+    .feat:hover{border-color:rgba(61,111,255,.6);transform:translateY(-2px)}
+    .feat .fx-num{font-family:'Syne',sans-serif;font-weight:800;font-size:.8rem;letter-spacing:.1em;color:var(--teal)}
+    .feat h3{font-weight:700;font-size:1.12rem;margin:.6rem 0 .5rem;letter-spacing:-.01em}
+    .feat p{color:var(--ink2);font-size:.9rem;line-height:1.55}
+    .feat .glow{position:absolute;inset:0;background:linear-gradient(135deg,rgba(61,111,255,.14) 0%,transparent 60%);opacity:0;transition:opacity .3s;pointer-events:none}
+    .feat:hover .glow{opacity:1}
+
+    /* Pilares */
+    .pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--card-border);border:1px solid var(--card-border);margin-top:2.2rem}
+    .pcard{background:#080b14;padding:1.3rem 1.25rem;display:flex;flex-direction:column;gap:.55rem;min-height:150px;transition:background .2s}
+    .pcard.live{cursor:none}
+    .pcard.live:hover{background:#0c1220}
+    .pc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:.6rem}
+    .pc-name{font-weight:700;font-size:.98rem;line-height:1.2;letter-spacing:-.01em}
+    .pc-status{flex-shrink:0;font-size:.56rem;letter-spacing:.12em;text-transform:uppercase;padding:.2rem .48rem;border-radius:3px;white-space:nowrap}
+    .s-live{color:#7ee2a6;background:rgba(74,222,128,.12);border:1px solid rgba(74,222,128,.3)}
+    .s-soon{color:var(--ink3);background:rgba(255,255,255,.04);border:1px solid var(--card-border)}
+    .pc-n{font-weight:800;font-size:1.5rem;letter-spacing:-.02em;color:var(--white);line-height:1}
+    .pc-n small{display:block;font-size:.66rem;font-weight:400;letter-spacing:.02em;color:var(--ink3);margin-top:.3rem;text-transform:none}
+    .pc-desc{color:var(--ink2);font-size:.82rem;line-height:1.5;margin-top:auto}
+
+    /* Diferencial */
+    .diff-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:2.2rem}
+    .diff{border:1px solid var(--card-border);background:var(--card-bg);padding:1.6rem 1.5rem}
+    .diff .k{font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;color:var(--teal)}
+    .diff h3{font-weight:700;font-size:1.15rem;margin:.5rem 0 .55rem}
+    .diff p{color:var(--ink2);font-size:.9rem;line-height:1.55}
+
+    /* CTA final */
+    .final{margin:3rem 0 4rem;border:1px solid var(--card-border);background:linear-gradient(140deg,rgba(0,71,255,0.2) 0%,rgba(6,10,26,.9) 62%);
+      padding:3.4rem 2.4rem;text-align:center}
+    .final h2{font-weight:800;font-size:clamp(1.9rem,4vw,2.8rem);letter-spacing:-.03em;line-height:1.05}
+    .final p{color:var(--ink2);font-size:1.02rem;line-height:1.6;max-width:560px;margin:1.1rem auto 0}
+    .final .cta-row{margin-top:2.1rem}
+
+    /* Footer */
+    footer{border-top:1px solid var(--card-border);padding:2.4rem 0;color:var(--ink3);font-size:.8rem;line-height:1.7}
+    footer .container{display:flex;flex-wrap:wrap;justify-content:space-between;gap:1rem;align-items:center}
+    footer a{color:var(--ink2);text-decoration:none;cursor:none}
+    footer a:hover{color:var(--white)}
+
+    /* ── RESPONSIVE ── */
+    @media(max-width:900px){
+      .electoral-nav{flex-direction:column;align-items:stretch;padding:.6rem 1.1rem;gap:.5rem}
+      .e-nav-right{order:1;width:100%;justify-content:center;gap:.8rem}
+      .e-nav-left{order:2;width:100%;justify-content:center;gap:.6rem;flex-wrap:wrap;row-gap:.45rem}
+      .container{padding:0 1.3rem}
+      .feat-grid,.step-grid{grid-template-columns:1fr}
+      .pillars{grid-template-columns:1fr 1fr}
+      .diff-grid{grid-template-columns:1fr}
+      .cost-grid{grid-template-columns:1fr}
+      .stats{grid-template-columns:1fr 1fr}
+    }
+    @media(max-width:560px){
+      .pillars{grid-template-columns:1fr}
+      .stats{grid-template-columns:1fr 1fr}
+      .hero{padding:3.2rem 0 2rem}
+    }
+    @media(hover:none){
+      body{cursor:auto}
+      .cursor,.cursor-ring{display:none}
+      a,button,.cta,.e-btn-live,.pcard.live{cursor:pointer}
+    }
+  </style>
+</head>
+<body>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+  <div class="bg-layer"></div>
+
+  <div class="shell">
+
+    <!-- NAV (barra de index.html + botón "explóralo en vivo") -->
+    <nav class="electoral-nav">
+      <div class="e-nav-left">
+        <a href="caudal.html" class="e-btn-live" data-live>
+          <span class="live-dot"></span>Demo? NO, explóralo en vivo!
+        </a>
+        <a href="pricing.html" class="e-btn-planes" id="nav-planes">Planes &amp; Precios</a>
+        <div class="electoral-nav-auth" id="nav-auth-area"></div>
+      </div>
+      <div class="e-nav-right">
+        <div class="country-selector-wrap">
+          <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
+            <span id="countryBtnLabel">Colombia</span>
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style="margin-left:6px;transition:transform 0.2s" id="countryChevron"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+          <div class="country-dropdown" id="countryDropdown">
+            <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
+            <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
+            <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
+            <div class="country-option" data-value="br" onclick="selectCountry(this)"><span class="country-check">✓</span> Brasil</div>
+            <div class="country-option" data-value="cn" onclick="selectCountry(this)"><span class="country-check">✓</span> 中国 / China</div>
+          </div>
+        </div>
+        <a href="index.html" class="logo-link">
+          <div class="logo-bars">
+            <div class="logo-bar" style="height:20px"></div>
+            <div class="logo-bar" style="height:15px"></div>
+            <div class="logo-bar" style="height:9px"></div>
+            <div class="logo-bar" style="height:4px"></div>
+          </div>
+          <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+        </a>
+      </div>
+    </nav>
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="container">
+        <span class="live-badge"><span class="dot"></span>Monitoreo en tiempo real — CO</span>
+        <div class="brand-mark" style="margin-top:1.4rem"><b>Caudal</b> × Cauce · inteligencia de asuntos públicos, regulatorios y reputacionales</div>
+        <h1>Todo el entorno que afecta a tu organización, <em class="ac">leído</em>.</h1>
+        <p class="lead">Legislación, regulación, sanciones, medios y redes: cada día se produce más de
+          lo que tu equipo alcanza a seguir. Caudal recolecta todo tu entorno, lo procesa y te deja
+          en el radar solo lo que puede afectar a tu organización —regulatoria, normativa o
+          reputacionalmente.</p>
+        <div class="cta-row">
+          <a href="caudal.html" class="cta primary" data-live><span class="live-dot" style="width:8px;height:8px;border-radius:50%;background:#7ee2a6;display:inline-block"></span>Explóralo en vivo</a>
+          <a href="#pilares" class="cta ghost">Ver los pilares</a>
+        </div>
+
+        <div class="ticker" aria-hidden="true">
+          <span class="tk-tag"><span class="dot"></span>En vivo</span>
+          <div class="tk-feed" id="tkFeed"></div>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><div class="n">13.172</div><div class="l">registros del Congreso · 1990–2026</div></div>
+          <div class="stat"><div class="n">7.015</div><div class="l">sanciones · 9 fuentes de control</div></div>
+          <div class="stat"><div class="n">en vivo</div><div class="l">prensa nacional y regional</div></div>
+          <div class="stat"><div class="n">4<small>/9</small></div><div class="l">pilares activos · el resto por etapas</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VOLUMEN / URGENCIA -->
+    <section class="sec">
+      <div class="container">
+        <div class="sec-head">
+          <span class="eyebrow">El problema</span>
+          <h2>Nadie alcanza a <em class="ac">leerlo todo</em>.</h2>
+          <p class="sub">El riesgo llega por muchos frentes —regulatorio, normativo y reputacional— y
+            casi nunca con aviso. Una sanción cambia las reglas de tu sector en un comunicado, un
+            proyecto de ley te toca sin que lo veas venir, y una mención en redes escala antes de que
+            tu equipo lea la primera alerta.</p>
+        </div>
+
+        <div class="cost-band">
+          <span class="eyebrow" style="color:#ffb0a8">Casos reales en la base de Caudal</span>
+          <div class="cost-grid">
+            <div class="cost-item">
+              <div class="amt">$6.960M</div>
+              <div class="who">Medimás · Supersalud</div>
+              <div class="d">Multa a una EPS. Las sanciones de control se anuncian en comunicados que casi nadie rastrea a tiempo.</div>
+            </div>
+            <div class="cost-item">
+              <div class="amt">Suspensión</div>
+              <div class="who">Uber · Colombia</div>
+              <div class="d">Una decisión regulatoria bastó para frenar la operación. El riesgo estaba en el trámite mucho antes.</div>
+            </div>
+            <div class="cost-item">
+              <div class="amt">Datos y competencia</div>
+              <div class="who">SIC · empresas sancionadas</div>
+              <div class="d">Protección de datos, competencia y consumidor: multas que golpean la reputación tanto como el bolsillo, cada una con su resolución.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CÓMO FUNCIONA -->
+    <section class="sec">
+      <div class="container">
+        <div class="sec-head">
+          <span class="eyebrow">Así funciona</span>
+          <h2>Recolectamos, procesamos y te <em class="ac">acompañamos</em>.</h2>
+        </div>
+
+        <div class="feat-grid step-grid">
+          <div class="feat">
+            <div class="glow"></div>
+            <div class="fx-num">01</div>
+            <h3>Recolectamos</h3>
+            <p>Todas las fuentes que pueden afectarte: legislación, regulación, sanciones, medios y redes.</p>
+          </div>
+          <div class="feat">
+            <div class="glow"></div>
+            <div class="fx-num">02</div>
+            <h3>Lo dejamos en tu radar</h3>
+            <p>La IA procesa el volumen y en tu radar —tu tablero— queda solo la señal que te mueve la aguja.</p>
+          </div>
+          <div class="feat">
+            <div class="glow"></div>
+            <div class="fx-num">03</div>
+            <h3>Acompañamiento humano</h3>
+            <p>Un analista revisa, prioriza y te acompaña. La IA lee; el criterio es humano.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PILARES -->
+    <section class="sec" id="pilares">
+      <div class="container">
+        <div class="sec-head">
+          <span class="eyebrow">Infraestructura de datos</span>
+          <h2>Nueve fuentes, <em class="ac">un solo radar</em>.</h2>
+          <p class="sub">Legislación, regulación, medios, redes y más —estatal y no estatal—. Tres
+            fuentes ya están vivas; el resto se enciende por etapas. Todo lo que puede afectar tu
+            reputación o tu operación, reunido en el mismo lugar.</p>
+        </div>
+        <div class="pillars" id="pillars"></div>
+      </div>
+    </section>
+
+    <!-- DIFERENCIAL -->
+    <section class="sec">
+      <div class="container">
+        <div class="sec-head center">
+          <span class="eyebrow">Por qué Caudal</span>
+          <h2>Otras herramientas monitorean. Caudal <em class="ac">lee</em>.</h2>
+        </div>
+        <div class="diff-grid">
+          <div class="diff">
+            <div class="k">Precisión</div>
+            <h3>La señal, no el volumen</h3>
+            <p>No te entregamos un feed infinito para que lo filtres tú. Caudal descarta el ruido y te
+              deja lo que importa para tu sector, ya priorizado.</p>
+          </div>
+          <div class="diff">
+            <div class="k">Análisis</div>
+            <h3>El porqué, no solo el qué</h3>
+            <p>36 años de supervivencia legislativa: por qué se cae un proyecto, en qué punto del trámite
+              y quién lo mueve. El foso que el monitoreo genérico no tiene.</p>
+          </div>
+          <div class="diff">
+            <div class="k">Criterio humano</div>
+            <h3>La IA lee; el analista decide</h3>
+            <p>Borrador asistido por IA sobre datos oficiales, con la fuente citada y el criterio experto
+              encima. No es una caja negra que adivina.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA FINAL -->
+    <section class="sec" style="padding-top:0">
+      <div class="container">
+        <div class="final">
+          <span class="live-badge"><span class="dot"></span>Sin formularios · sin esperas</span>
+          <h2 style="margin-top:1.2rem">No es un demo. Es la plataforma <em class="ac">en vivo</em>.</h2>
+          <p>Entra a Caudal y busca un tema, una entidad o un gremio. Lo que ves es lo que hay:
+            datos reales, leídos, con su fuente.</p>
+          <div class="cta-row">
+            <a href="caudal.html" class="cta primary" data-live><span class="live-dot" style="width:8px;height:8px;border-radius:50%;background:#7ee2a6;display:inline-block"></span>Explóralo en vivo</a>
+            <a href="pricing.html" class="cta ghost">Ver planes</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="container">
+        <div>Caudal · módulo de Cauce · asuntos públicos, regulatorios y reputacionales · datos oficiales y abiertos 1990–2026</div>
+        <div><a href="index.html">Ricardo.Ruiz</a> · <a href="pricing.html">Planes</a> · <a href="caudal.html" data-live>Entrar</a></div>
+      </div>
+    </footer>
+
+  </div>
+
+  <script>
+    // ─── CURSOR ───────────────────────────────────────────────────────────────
+    const cursor = document.getElementById('cursor');
+    const ring = document.getElementById('cursorRing');
+    let mx=0,my=0,rx=0,ry=0;
+    document.addEventListener('mousemove', e=>{ mx=e.clientX; my=e.clientY; cursor.style.left=mx+'px'; cursor.style.top=my+'px'; });
+    (function animRing(){ rx+=(mx-rx)*0.14; ry+=(my-ry)*0.14; ring.style.left=rx+'px'; ring.style.top=ry+'px'; requestAnimationFrame(animRing); })();
+    function attachHover(els){
+      els.forEach(el=>{
+        el.addEventListener('mouseenter',()=>{ cursor.style.transform='translate(-50%,-50%) scale(2.4)'; cursor.style.background='transparent'; cursor.style.border='1.5px solid var(--blue)'; ring.style.opacity='0'; });
+        el.addEventListener('mouseleave',()=>{ cursor.style.transform='translate(-50%,-50%) scale(1)'; cursor.style.background='var(--blue)'; cursor.style.border='none'; ring.style.opacity='0.5'; });
+      });
+    }
+    attachHover(document.querySelectorAll('a, button, .feat, .pcard.live, .diff'));
+
+    // ─── REENVÍO DE TOKEN DE INVITADO (?acceso=) A LA PLATAFORMA ───────────────
+    // Si esta portada se comparte con ?acceso=TOKEN (demo a socios), el botón
+    // "explóralo en vivo" lo reenvía a caudal.html para saltar el gate.
+    (function(){
+      const acc = new URLSearchParams(location.search).get('acceso');
+      if(!acc) return;
+      document.querySelectorAll('[data-live]').forEach(a=>{ a.href = 'caudal.html?acceso=' + encodeURIComponent(acc); });
+    })();
+
+    // ─── PILARES (espejo de caudal.html) ──────────────────────────────────────
+    const PILLARS=[
+      {name:'Congreso y órgano legislativo', status:'live', n:'13.172', unit:'registros · 1990–2026', desc:'Proyectos de ley, actos legislativos y leyes. Cuántas veces se intentó, por qué se cae, quién lo empuja.', view:'congreso'},
+      {name:'Superintendencias y comisiones', status:'live', n:'7.015', unit:'sanciones · 9 fuentes', desc:'INVIMA, SECOP, Superfinanciera, Supersalud, SIC, Contraloría y más. Cada sanción cita su resolución.', view:'regulatorio'},
+      {name:'Medios nacionales y regionales', status:'live', n:'en vivo', unit:'prensa por tema', desc:'Titulares de prensa nacional y regional, rastreados por tema — sin un conector por medio.', view:'medios'},
+      {name:'Datos abiertos y contratación', status:'soon', desc:'datos.gov.co, SECOP, presupuesto y metas de gobierno.'},
+      {name:'Órganos de control y altas cortes', status:'soon', desc:'Procuraduría, Consejo de Estado, Corte Constitucional.'},
+      {name:'Ejecutivo nacional · Presidencia', status:'live', n:'10.193', unit:'decretos · desde 2015', desc:'Decretos, resoluciones, directivas, circulares y agenda regulatoria de la Presidencia. Cada norma enlaza su texto oficial.', view:'ejecutivo'},
+      {name:'Diarios y gacetas oficiales', status:'soon', desc:'Diario Oficial y Gaceta del Congreso: el texto completo del trámite.'},
+      {name:'Entidades territoriales', status:'soon', desc:'Concejos, asambleas y gobiernos locales.'},
+      {name:'Redes sociales y escucha social', status:'soon', desc:'Conversación en X, Instagram, Facebook y TikTok: menciones de marca, voceros y crisis reputacionales.'}
+    ];
+    const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    (function renderPillars(){
+      const el=document.getElementById('pillars'); if(!el) return;
+      const accParam = new URLSearchParams(location.search).get('acceso');
+      const q = accParam ? ('?acceso='+encodeURIComponent(accParam)) : '';
+      el.innerHTML=PILLARS.map(p=>{
+        const live=p.status==='live';
+        const tag=live?'<span class="pc-status s-live">Activo</span>':'<span class="pc-status s-soon">Próximamente</span>';
+        const num=p.n?`<div class="pc-n">${esc(p.n)}<small>${esc(p.unit||'')}</small></div>`:'';
+        return `<div class="pcard ${p.status}"${live?` data-view="${p.view}"`:''}>
+          <div class="pc-top"><div class="pc-name">${esc(p.name)}</div>${tag}</div>
+          ${num}
+          <div class="pc-desc">${esc(p.desc)}</div>
+        </div>`;
+      }).join('');
+      el.querySelectorAll('.pcard.live').forEach(c=>{ c.onclick=()=>{ location.href='caudal.html'+q; }; });
+      attachHover(el.querySelectorAll('.pcard.live'));
+    })();
+
+    // ─── TICKER "EN VIVO" (muestras del tipo de señal que entrega Caudal) ──────
+    (function(){
+      const feed=document.getElementById('tkFeed'); if(!feed) return;
+      const items=[
+        '<b>Redes ·</b> una mención de tu marca escala en horas — alerta temprana antes de la crisis',
+        '<b>Congreso ·</b> reforma pensional — 5 intentos previos, 3 archivados por tiempo',
+        '<b>Supersalud ·</b> nueva sanción a una EPS por incumplimiento — comunicado citado',
+        '<b>Prensa ·</b> 41 titulares nacionales y regionales sobre reforma laboral (24h)',
+        '<b>Radar ·</b> sector salud — 2 señales altas: 1 legislativa, 1 regulatoria',
+        '<b>Voto nominal ·</b> Cámara — cómo votó cada representante, proyecto por proyecto'
+      ];
+      let i=0;
+      const line=document.createElement('div'); line.className='tk-line'; feed.appendChild(line);
+      const show=()=>{ line.classList.remove('on'); setTimeout(()=>{ line.innerHTML=items[i]; line.classList.add('on'); i=(i+1)%items.length; },350); };
+      show(); setInterval(show, 3200);
+    })();
+
+    // ─── SESIÓN / AUTH (misma lógica de index.html) ───────────────────────────
+    let currentLang = localStorage.getItem('rr-lang') || 'co';
+    function updateNavAuth(){
+      const token=localStorage.getItem('rr-token');
+      const user=JSON.parse(localStorage.getItem('rr-user')||'null');
+      const area=document.getElementById('nav-auth-area');
+      if(!area) return;
+      if(token && user){
+        const planLabels = currentLang==='us' ? {free:'Free',basic:'Basic',analysis:'Analysis',full:'Full',pro:'Pro',premium:'Premium'}
+          : currentLang==='cn' ? {free:'免费',basic:'基础版',analysis:'分析版',full:'完整版',pro:'Pro',premium:'Premium'}
+          : currentLang==='br' ? {free:'Free',basic:'Básico',analysis:'Análise',full:'Completo',pro:'Pro',premium:'Premium'}
+          : {free:'Free',basic:'Básico',analysis:'Análisis',full:'Completo',pro:'Pro',premium:'Premium'};
+        const perfilLabel = currentLang==='us'?'My dashboard':currentLang==='cn'?'我的面板':currentLang==='br'?'Meu painel':'Mi panel';
+        const logoutLabel = currentLang==='us'?'Log out':currentLang==='cn'?'退出':currentLang==='br'?'Sair':'Salir';
+        area.dataset.loggedIn='1';
+        area.innerHTML=`
+          <a href="dashboard.html" class="e-user-plan">${planLabels[user.plan]||user.plan||''}</a>
+          <a href="dashboard.html" class="e-btn-profile">${perfilLabel}</a>
+          <button class="e-btn-logout" onclick="logOut()">${logoutLabel}</button>`;
+      } else {
+        delete area.dataset.loggedIn;
+        const loginLabel = currentLang==='us'?'Log in':currentLang==='cn'?'登录':currentLang==='br'?'Entrar':'Iniciar sesión';
+        const registerLabel = currentLang==='us'?'Sign up':currentLang==='cn'?'注册':currentLang==='br'?'Cadastrar':'Registrarme';
+        area.innerHTML=`
+          <a href="login.html" class="e-btn-login">${loginLabel}</a>
+          <a href="elige-plan.html" class="e-btn-register">${registerLabel}</a>`;
+      }
+      attachHover(area.querySelectorAll('a, button'));
+    }
+    async function logOut(){
+      const token=localStorage.getItem('rr-token');
+      if(token){ try{ await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}}); }catch(e){} }
+      localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); updateNavAuth();
+    }
+    window.logOut = logOut;
+    // lang.js llama a window.__applyLang tras cambiar de país
+    window.__applyLang = function(lang){ currentLang=lang; localStorage.setItem('rr-lang',lang); updateNavAuth(); };
+    updateNavAuth();
+  </script>
+  <script src="lang.js?v=20260527"></script>
+</body>
+</html>

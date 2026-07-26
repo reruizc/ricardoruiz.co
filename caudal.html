@@ -112,6 +112,8 @@
   .chip.on{border-color:var(--teal); color:var(--ink); background:var(--teal-soft)}
   #reg-landing{margin-top:1.6rem}
   #reg-results{margin-top:1.6rem; display:none}
+  #eje-landing{margin-top:1.6rem}
+  #eje-results{margin-top:1.6rem; display:none}
   .reg-sectors-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:.8rem; margin:1.4rem 0}
   @media(max-width:640px){ .reg-sectors-grid{grid-template-columns:repeat(2,1fr)} }
   .sec-card{background:var(--card); border:1px solid var(--border); border-radius:9px; padding:.9rem 1rem; cursor:none; transition:.15s}
@@ -554,6 +556,25 @@
       <div id="med-results"></div>
     </div>
 
+    <!-- ===== PILAR · Ejecutivo Nacional (decretos y normativa) ===== -->
+    <div id="view-ejecutivo" hidden>
+      <button class="pill-back" id="ejeBack">← Volver a Caudal</button>
+      <div class="hero">
+        <h1>La normativa del Ejecutivo, <em>leída</em>.</h1>
+        <p>Decretos, resoluciones, directivas, circulares y la agenda regulatoria
+           de la Presidencia, bajo un esquema común. Busca un decreto, un tema o una
+           entidad; cada norma enlaza su texto oficial. 10.193 decretos · desde 2015.</p>
+        <div class="search">
+          <input id="eq" type="text" placeholder="busca un decreto, un tema, una entidad…" autocomplete="off" />
+          <button id="ego">Buscar</button>
+        </div>
+        <div class="chips" id="etipos"></div>
+      </div>
+
+      <div id="eje-landing"></div>
+      <div id="eje-results"></div>
+    </div>
+
     <!-- ===== VISTA CLIENTE · Radar (SKU A) ===== -->
     <div id="view-cliente" hidden>
       <button class="pill-back" id="cliBack">← Volver a Caudal</button>
@@ -788,7 +809,7 @@
     {id:'medios',      name:'Medios nacionales y regionales',   status:'live', n:'en vivo', unit:'prensa por tema',      desc:'Titulares de prensa nacional y regional, rastreados por tema — sin mantener un conector por medio.'},
     {id:'datos',       name:'Datos abiertos y contratación',    status:'soon', desc:'datos.gov.co, SECOP, presupuesto y metas de gobierno.'},
     {id:'control',     name:'Órganos de control y altas cortes',status:'soon', desc:'Procuraduría, Consejo de Estado, Corte Constitucional.'},
-    {id:'ejecutivo',   name:'Ejecutivo nacional · min. y agencias',status:'soon', desc:'Decretos, resoluciones y agendas regulatorias del gobierno.'},
+    {id:'ejecutivo',   name:'Ejecutivo nacional · Presidencia',   status:'live', n:'10.193', unit:'decretos · desde 2015', desc:'Decretos, resoluciones, directivas, circulares y agenda regulatoria de la Presidencia. Cada norma enlaza su texto oficial.'},
     {id:'gacetas',     name:'Diarios y gacetas oficiales',      status:'soon', desc:'Diario Oficial y Gaceta del Congreso: el texto completo del trámite.'},
     {id:'territorial', name:'Entidades territoriales',          status:'soon', desc:'Concejos, asambleas y gobiernos locales.'},
     {id:'redes',       name:'Redes sociales oficiales y voceros',status:'soon', desc:'Cuentas oficiales de entidades y voceros clave.'},
@@ -810,13 +831,15 @@
       if(id==='congreso') showView('congreso');
       else if(id==='regulatorio') showView('regulatorio');
       else if(id==='medios') showView('medios');
+      else if(id==='ejecutivo') showView('ejecutivo');
     });
   }
   function showView(v){
-    ['home','congreso','regulatorio','cliente','medios','radicados'].forEach(n=>{ const el=document.getElementById('view-'+n); if(el) el.hidden=(v!==n); });
+    ['home','congreso','regulatorio','ejecutivo','cliente','medios','radicados'].forEach(n=>{ const el=document.getElementById('view-'+n); if(el) el.hidden=(v!==n); });
     window.scrollTo(0,0);
     if(v==='congreso') requestAnimationFrame(()=>document.querySelectorAll('#view-congreso .mort-bar').forEach(x=>x.style.height=x.dataset.h+'%'));
     if(v==='regulatorio') regLoadStats();
+    if(v==='ejecutivo') ejeLoadStats();
     if(v==='medios') medLoadLanding();
     if(v==='radicados') radLoad();
   }
@@ -896,6 +919,86 @@
     const cont=document.getElementById('rsectors');
     if(cont) REG_SECS.forEach(([sec,t])=>{ const c=document.createElement('span'); c.className='chip'+(sec===''?' on':''); c.dataset.sec=sec; c.textContent=t; c.onclick=()=>{ REG.sector=sec; regSyncSectors(); if(!REG.q&&!REG.sector) regShowLanding(); else regBuscar(); }; cont.appendChild(c); });
     const rb=document.getElementById('regBack'); if(rb) rb.onclick=()=>showView('home');
+  }
+  /* ---------- pilar Ejecutivo Nacional · decretos y normativa ---------- */
+  const EJE={tipo:'', q:''};
+  const EJE_TIPOS=[['','Todas'],['DECRETOS','Decretos'],['RESOLUCIONES','Resoluciones'],['DIRECTIVAS','Directivas'],['CIRCULARES','Circulares'],['ACTOS LEGISLATIVOS','Actos legislativos'],['AGENDA REGULATORIA','Agenda regulatoria'],['LEYES','Leyes']];
+  const EJE_TSING={'DECRETOS':'Decreto','LEYES':'Ley','RESOLUCIONES':'Resolución','DIRECTIVAS':'Directiva','CIRCULARES':'Circular','ACTOS LEGISLATIVOS':'Acto legislativo','AGENDA REGULATORIA':'Agenda regulatoria','RESOLUCIONES DE NOMBRAMIENTOS':'Nombramiento','CONPES':'CONPES','CONSTITUCIÓN POLÍTICA':'Constitución','DECRETO ÚNICO REGLAMENTARIO':'Decreto Único'};
+  let EJE_STATS=null, _ejeInited=false, _ejeSeq=0;
+  function ejeSing(t){ return EJE_TSING[t]||(t?t.charAt(0)+t.slice(1).toLowerCase():'—'); }
+  function ejeTitle(t){ return t?t.charAt(0)+t.slice(1).toLowerCase():'—'; }
+  function ejeCard(r){
+    const nombre=ejeSing(r.tipo)+(r.numero?(' '+r.numero):'')+(r.anio?(' de '+r.anio):'');
+    const desc=(r.descripcion||'').replace(/\s+/g,' ').replace(/^["“]|["”]$/g,'').trim();
+    const href=r.url?encodeURI(r.url):'';
+    const name=href
+      ?`<a class="sanc-name" href="${esc(href)}" target="_blank" rel="noopener" style="color:inherit">${esc(nombre)}</a>`
+      :`<span class="sanc-name">${esc(nombre)}</span>`;
+    return `<div class="sanc">
+      <div class="sanc-top">${name}<span class="sanc-fecha">${esc(r.fecha||'')}</span></div>
+      ${desc?`<div class="sanc-motivo">${esc(desc)}</div>`:''}
+      <div class="sanc-tags"><span class="doc-badge pal">${esc(ejeSing(r.tipo))}</span>${href?` · <a href="${esc(href)}" target="_blank" rel="noopener" style="color:var(--ink3)">texto oficial ↗</a>`:''}</div>
+    </div>`;
+  }
+  function ejeRenderLanding(s){
+    const el=document.getElementById('eje-landing'); if(!el||!s) return;
+    const dec=((s.por_tipo||[]).find(x=>x.tipo==='DECRETOS')||{}).n||0;
+    const rango=s.rango_fechas&&s.rango_fechas[0]?`${s.rango_fechas[0].slice(0,4)}–${s.rango_fechas[1].slice(0,4)}`:'—';
+    const frec=(s.fuente||{}).frecuencia||'—';
+    el.innerHTML=`
+      <div class="land-h">La normativa del Ejecutivo en números · Presidencia de la República</div>
+      <div class="kpis">
+        <div class="kpi"><div class="n">${fmt(dec)}</div><div class="l">Decretos</div></div>
+        <div class="kpi"><div class="n">${fmt(s.total)}</div><div class="l">Normas en total</div></div>
+        <div class="kpi"><div class="n">${rango}</div><div class="l">Periodo</div></div>
+        <div class="kpi"><div class="n" style="color:var(--teal)">${esc(frec)}</div><div class="l">Actualización</div></div>
+      </div>
+      <div class="reg-sectors-grid">
+        ${(s.por_tipo||[]).filter(x=>x.n>=5).map(x=>`<div class="sec-card" data-tipo="${esc(x.tipo)}"><div class="n">${fmt(x.n)}</div><div class="l">${esc(ejeTitle(x.tipo))}</div></div>`).join('')}
+      </div>
+      <div class="panel wide"><h3>Lo último publicado</h3><div class="sanc-list">${(s.recientes||[]).map(ejeCard).join('')}</div></div>`;
+    el.querySelectorAll('.sec-card').forEach(c=>c.onclick=()=>{ EJE.tipo=c.dataset.tipo; ejeSyncTipos(); ejeBuscar(); });
+  }
+  function ejeRenderResults(d){
+    const el=document.getElementById('eje-results'); if(!el) return;
+    el.style.display='block';
+    const scope=[d.tipo?esc(ejeTitle(d.tipo)):'', d.query?`«${esc(d.query)}»`:''].filter(Boolean).join(' · ');
+    el.innerHTML=`
+      <div class="r-titular" style="font-size:1.4rem">${fmt(d.n)} ${d.n===1?'norma':'normas'}</div>
+      <div class="r-sub" style="margin-bottom:1rem">${scope||'toda la normativa'}</div>
+      ${d.mostrados<d.n?`<div class="cob-note" style="margin-bottom:1rem">Mostrando las ${d.mostrados} más recientes de ${fmt(d.n)}. Afina la búsqueda para ver menos.</div>`:''}
+      <div class="sanc-list">${(d.resultados||[]).map(ejeCard).join('')||'<div class="err">Sin coincidencias. Prueba otro término o tipo.</div>'}</div>`;
+    el.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+  async function ejeBuscar(){
+    const mine=++_ejeSeq;
+    const el=document.getElementById('eje-results'), landing=document.getElementById('eje-landing');
+    if(landing) landing.style.display='none';
+    if(el){ el.style.display='block'; el.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Buscando normativa <span class="dots"><span></span><span></span><span></span></span></div>'; }
+    let d; try{ d=await call({action:'ejecutivo', query:EJE.q, tipo:EJE.tipo}); }
+    catch(e){ if(mine===_ejeSeq&&el) el.innerHTML='<div class="err">No se pudo consultar. Reintenta.</div>'; return; }
+    if(mine!==_ejeSeq) return;
+    ejeRenderResults(d);
+  }
+  async function ejeLoadStats(){
+    if(EJE_STATS){ ejeRenderLanding(EJE_STATS); return; }
+    const el=document.getElementById('eje-landing');
+    if(el) el.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Cargando el pilar ejecutivo <span class="dots"><span></span><span></span><span></span></span></div>';
+    try{ EJE_STATS=await call({action:'ejecutivo'}); }catch(e){ EJE_STATS=null; }
+    if(EJE_STATS) ejeRenderLanding(EJE_STATS);
+    else if(el) el.innerHTML='<div class="err">No se pudo cargar la normativa. Reintenta.</div>';
+  }
+  function ejeShowLanding(){ const r=document.getElementById('eje-results'); if(r) r.style.display='none'; const l=document.getElementById('eje-landing'); if(l) l.style.display='block'; }
+  function ejeSyncTipos(){ document.querySelectorAll('#etipos .chip').forEach(c=>c.classList.toggle('on',(c.dataset.tipo||'')===EJE.tipo)); }
+  function ejeInit(){
+    if(_ejeInited) return; _ejeInited=true;
+    const eq=document.getElementById('eq'), ego=document.getElementById('ego');
+    const go=()=>{ EJE.q=(eq&&eq.value||'').trim(); if(!EJE.q&&!EJE.tipo) ejeShowLanding(); else ejeBuscar(); };
+    if(ego) ego.onclick=go;
+    if(eq) eq.addEventListener('keydown',e=>{ if(e.key==='Enter') go(); });
+    const cont=document.getElementById('etipos');
+    if(cont) EJE_TIPOS.forEach(([tp,t])=>{ const c=document.createElement('span'); c.className='chip'+(tp===''?' on':''); c.dataset.tipo=tp; c.textContent=t; c.onclick=()=>{ EJE.tipo=tp; ejeSyncTipos(); if(!EJE.q&&!EJE.tipo) ejeShowLanding(); else ejeBuscar(); }; cont.appendChild(c); });
+    const eb=document.getElementById('ejeBack'); if(eb) eb.onclick=()=>showView('home');
   }
   /* ---------- pilar Medios · prensa nacional y regional ---------- */
   const MED={q:''};
@@ -1036,6 +1139,7 @@
   function initHome(){
     renderPillars();
     regInit();
+    ejeInit();
     medInit();
     cliInit();
     const rc=document.getElementById('radar-cta'); if(rc) rc.onclick=()=>showView('cliente');

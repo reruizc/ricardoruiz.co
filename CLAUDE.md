@@ -5457,6 +5457,7 @@ Caudal (paraguas)  ·  caudal.html = HOME multi-pilar (9 cards del mapa de fuent
 ├── Congreso      → view-congreso    + Lambda caudal-analiza (tema/proyecto/gaceta/…)   (LISTO · en prod)
 ├── Regulatorio   → view-regulatorio + Lambda action `sanciones` + tools/caudal/supers/  (LISTO · en prod)
 ├── Medios        → view-medios      + Lambda action `medios` (Google News RSS, gratis)  (LISTO · en prod)
+├── Ejecutivo     → view-ejecutivo   + Lambda action `ejecutivo` + tools/caudal/ejecutivo/ (LISTO · en prod)
 └── Cortes / Datos abiertos / Territoriales / …   (cards "Próximamente" en el home)
 
 ⊕ Vista Cliente   → view-cliente + Lambda action `cliente` — lente SIGA que CRUZA los
@@ -5808,6 +5809,42 @@ automáticamente (no hace falta manejarlo a mano).
   `_MEDIOS_REGIONALES`/`_MEDIOS_INSTITUCIONAL_RE` según se detecten casos
   nuevos en producción; el filtro institucional es heurístico, no
   exhaustivo (mismo criterio que el resto del pilar).
+
+### Pilar Ejecutivo Nacional · decretos y normativa de Presidencia (`view-ejecutivo` en `caudal.html` · LISTO · en prod · jul-2026)
+
+Cuarto pilar en vivo (junto a Congreso, Regulatorio y Medios). Cubre la **normativa del
+Ejecutivo**: decretos, resoluciones, directivas, circulares y **agenda regulatoria**.
+
+- **Fuente única, vía 1 (Socrata)** — dataset **`88h2-dykw`** "Normativa Nacional ·
+  Presidencia de la República" en datos.gov.co. Verificado jul-2026: **10.193 decretos** +
+  811 leyes · 309 resoluciones · 97 directivas · 89 res. de nombramientos · 59 circulares ·
+  27 actos legislativos · **22 agenda regulatoria** — desde 2015. Campos: `tipo`, `fecha`,
+  `titulo` (trae el número → regex), `descripcion` (el "por medio del cual se…") y **`url` =
+  PDF DIRECTO** en `dapre.presidencia.gov.co/normativa/…` (digital, pypdf limpio). Cero scraping.
+  ⚠️ **Frecuencia del dataset: MENSUAL** (no en vivo) — se muestra honestamente en el KPI
+  "Actualización" del landing. Contraste útil: SECOP II es diario, decretos mensual (ver
+  [[reference_datos_legislativo_estado]]).
+- **Harvester** `tools/caudal/ejecutivo/harvest_decretos.py` (stdlib, curl por subprocess,
+  mismo patrón que `harvest_supers.py`): `fetch` (baja toda la normativa paginando por offset) ·
+  `build` (raw → `dist/normativa.jsonl` slim con blob `q` + `dist/stats.json`) · `test`. Salida
+  local (gitignored) en `Bases de datos/leyes-senado/ejecutivo/`. Extracción validada: **0
+  decretos sin número, 0 sin descripción; 100% con PDF**. Subir a S3:
+  `aws s3 cp "…/ejecutivo/dist/normativa.jsonl" "s3://caudal-legislativo/metadata/normativa.jsonl"`
+  + `dist/stats.json` → `metadata/normativa-stats.json`.
+- **Lambda** — acción **aditiva `ejecutivo`** en `caudal-analiza` (`_ejecutivo()` +
+  `_ejecutivo_stats()`, cache warm; leen `metadata/normativa.jsonl` + `metadata/normativa-stats.json`).
+  Sin query/tipo → landing (stats precalculados). Con `query`/`tipo` → filtra por substring sobre
+  `q` y/o tipo exacto, hasta 120 por fecha desc. No toca ninguna otra ruta.
+- **Frontend** `view-ejecutivo`: hero "La normativa del Ejecutivo, *leída*." + búsqueda + 8 chips
+  de tipo + landing (KPIs decretos/total/periodo/actualización · tipo-cards clicables · "lo último
+  publicado") + resultados. Espejo del pilar Regulatorio (reusa `.sanc`/`.kpis`/`.reg-sectors-grid`/
+  `.doc-badge`, sin CSS nuevo). Cada norma **enlaza su PDF** con el href **`encodeURI`-ado** (los
+  PDF de Presidencia traen espacios en el nombre → sin encodear no abrirían). Pilar `live` en
+  `PILLARS`; `showView` dispara `ejeLoadStats`.
+- **Pendiente / v2:** el **articulado completo** de cada decreto queda on-demand (reusar el
+  pipeline de gacetas fase 3: pypdf + DeepSeek sobre el `url`) — hoy el pilar es el índice
+  navegable con descripción + PDF. Cobertura 2015→hoy; pre-2015 tocaría SUIN-Juriscol (TLS roto
+  para fetch auto) o el Diario Oficial.
 
 ## Roadmap post-2V · Chats conversacionales (LLM + function calling)
 
