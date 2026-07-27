@@ -202,6 +202,16 @@
     .barrio-picker.barrio-locked { cursor:none; opacity:.75; }
     .barrio-picker .lock-hint { font-size:.78rem; color:var(--dim); display:inline-flex; align-items:center; gap:.45rem; }
     .det-nav button.locked { opacity:.72; }
+    /* contenido bloqueado: se ve borroso y encima el CTA */
+    .pg-paywall { position:relative; }
+    .pg-blurred { filter:blur(5px); pointer-events:none; user-select:none; opacity:.7; max-height:340px; overflow:hidden; }
+    /* el CTA se ancla arriba y queda fijo mientras el usuario mira el contenido borroso */
+    .pg-paywall-cta { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.55rem; text-align:center; padding:1rem;
+      background:linear-gradient(180deg,rgba(6,8,16,.28) 0%,rgba(6,8,16,.55) 45%,rgba(6,8,16,.9) 100%); }
+    .pg-paywall-cta .pgc-t { font-size:.9rem; color:var(--white); }
+    .pg-paywall-cta .pgc-btn { font-family:inherit; font-size:.78rem; letter-spacing:.08em; text-transform:uppercase; font-weight:600;
+      background:var(--blue); color:#fff; border:none; padding:.6rem 1.15rem; cursor:none; }
+    .pg-paywall-cta .pgc-btn:hover { background:#0035cc; }
     /* listas de unidades (barrio/puesto/mesa) */
     .unit-list { display:flex; flex-direction:column; }
     .unit-row { border-bottom:1px solid rgba(255,255,255,.05); }
@@ -794,7 +804,6 @@
     }
     function setDetView(v){
       if(v!=='resumen' && !curDetail) return;
-      if((v==='puestos'||v==='mesas') && !PlanGate.require(v)) return;
       detView=v;
       document.querySelectorAll('#det-nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
       renderDetView();
@@ -885,6 +894,21 @@
       if(open && body && !body.dataset.filled && curUnits[id]){ body.innerHTML=curUnits[id](); body.dataset.filled='1'; }
     }
 
+    // Lo bloqueado se muestra BORROSO en vez de esconderse: se ve que el dato existe
+    // y cuánto hay. (El gate es de producto, no de seguridad: el JSON del scope ya
+    // viaja completo al navegador — igual que en el resto del sitio.)
+    function paywallWrap(html, feat){
+      if(PlanGate.has(feat)) return html;
+      const need=PlanGate.planFor(feat)==='premium'?'Premium':'Pro';
+      const que=feat==='mesas'?'el detalle mesa a mesa':'el desglose por puesto de votación';
+      return `<div class="pg-paywall"><div class="pg-blurred" aria-hidden="true">${html}</div>
+        <div class="pg-paywall-cta">
+          <span class="pg-lock">${need}</span>
+          <div class="pgc-t">Aquí está ${que}</div>
+          <button class="pgc-btn" onclick="PlanGate.open('${feat}')">Desbloquear con ${need}</button>
+        </div></div>`;
+    }
+
     // ---- Puestos (→ candidatos + mesas) ----
     function renderPuestos(){
       const puestos=(curDetail.puestos||[]).map((p,i)=>({...p,_i:i})).sort((a,b)=>b.validos-a.validos);
@@ -892,14 +916,13 @@
       const rows=puestos.map(p=>{ const id='p'+p._i;
         curUnits[id]=()=>unitCandTable(p.v,p.validos)+((p.mesas&&p.mesas.length)?`<div class="subhdr">Desagregar por mesa <button class="mesa-btn" onclick="showMesas('${id}',${p._i})">ver ${p.mesas.length} mesas${PlanGate.has('mesas')?'':' <span class="pg-lock">Premium</span>'}</button></div><div id="mesas-${id}"></div>`:'');
         return unitRow(id, p.nombre, p.barrio, unitWinner(p.v), p.validos); }).join('');
-      document.getElementById('det-content').innerHTML=`<div class="unit-list">${rows}</div>`;
+      document.getElementById('det-content').innerHTML=paywallWrap(`<div class="unit-list">${rows}</div>`,'puestos');
     }
     function showMesas(rowId, pi){
-      if(!PlanGate.require('mesas')) return;
       const cont=document.getElementById('mesas-'+rowId); if(!cont || cont.dataset.filled) return;
       const p=curDetail.puestos[pi];
       const rows=(p.mesas||[]).map((m,i)=>{ const id=rowId+'m'+i; curUnits[id]=()=>unitCandTable(m[2],m[1]); return unitRow(id,'Mesa '+m[0], null, unitWinner(m[2]), m[1]); }).join('');
-      cont.innerHTML=`<div class="unit-list">${rows}</div>`; cont.dataset.filled='1';
+      cont.innerHTML=paywallWrap(`<div class="unit-list">${rows}</div>`,'mesas'); cont.dataset.filled='1';
     }
 
     // ---- Mesas (elige un puesto → sus mesas) ----
@@ -912,7 +935,7 @@
       const w=document.getElementById('mesa-list-wrap'); if(pi===''){ w.innerHTML=''; return; }
       const p=curDetail.puestos[pi]; curUnits={};
       const rows=(p.mesas||[]).map((m,i)=>{ const id='mm'+i; curUnits[id]=()=>unitCandTable(m[2],m[1]); return unitRow(id,'Mesa '+m[0], p.nombre, unitWinner(m[2]), m[1]); }).join('');
-      w.innerHTML=`<div class="unit-list">${rows||'<div style="padding:.8rem 1.3rem;color:var(--dim2)">Sin mesas</div>'}</div>`;
+      w.innerHTML=paywallWrap(`<div class="unit-list">${rows||'<div style="padding:.8rem 1.3rem;color:var(--dim2)">Sin mesas</div>'}</div>`,'mesas');
     }
 
     // Rota el GeoJSON de Bogotá 90° a la izquierda alrededor de su centroide.
