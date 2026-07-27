@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resultados JAL 2023 · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <style>
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-thin.woff2') format('woff2'); font-weight:200; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-light.woff2') format('woff2'); font-weight:300; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-medium.woff2') format('woff2'); font-weight:500; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-bold.woff2') format('woff2'); font-weight:600 900; font-style:normal; font-display:swap; }
+
+    :root { --white:#f4f3ef; --blue:#0047FF; --blue-light:#3d6fff; --dim:rgba(255,255,255,.55); --dim2:rgba(255,255,255,.32); --card:rgba(10,10,16,.75); --line:rgba(255,255,255,.08); }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html,body { background:#060810; color:var(--white); font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; }
+    body { cursor:none; min-height:100vh; background-image:radial-gradient(1100px 600px at 15% -10%, rgba(0,71,255,.10), transparent 60%), radial-gradient(900px 500px at 110% 10%, rgba(61,111,255,.08), transparent 55%); }
+    a { color:inherit; text-decoration:none; }
+
+    .cursor { position:fixed; width:10px; height:10px; background:var(--blue); border-radius:50%; pointer-events:none; z-index:9999; transform:translate(-50%,-50%); transition:transform .15s,background .2s; }
+    .cursor-ring { position:fixed; width:32px; height:32px; border:1.5px solid var(--blue); border-radius:50%; pointer-events:none; z-index:9998; transform:translate(-50%,-50%); opacity:.4; transition:opacity .2s; }
+    @media (hover:none){ body{cursor:auto;} .cursor,.cursor-ring{display:none;} }
+
+    /* NAV */
+    .nav { position:relative; z-index:10; display:flex; align-items:center; justify-content:space-between; padding:.9rem 2.2rem; border-bottom:1px solid var(--line); background:rgba(4,6,16,.6); backdrop-filter:blur(8px); }
+    .nav-left { display:flex; align-items:center; gap:1rem; }
+    .btn-back { font-size:.78rem; letter-spacing:.02em; color:#4ade80; border:1px solid rgba(74,222,128,.35); padding:.4rem .8rem; border-radius:2px; transition:background .2s; }
+    .btn-back:hover { background:rgba(74,222,128,.12); }
+    .logo-link { display:flex; align-items:flex-end; gap:.5rem; }
+    .logo-bars { display:flex; align-items:flex-end; gap:2px; height:20px; }
+    .logo-bars span { width:4px; background:var(--blue); border-radius:1px 1px 0 0; opacity:.85; }
+    .logo-text { font-family:'Syne',sans-serif; font-weight:800; font-size:1rem; letter-spacing:.01em; }
+    .logo-text b { color:var(--blue); font-weight:800; }
+
+    /* HERO */
+    .hero { padding:2rem 2.2rem 1rem; max-width:1500px; margin:0 auto; }
+    .eyebrow { font-size:.7rem; letter-spacing:.28em; text-transform:uppercase; color:var(--blue-light); font-weight:600; }
+    .hero h1 { font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(1.7rem,4.4vw,2.9rem); line-height:1.02; margin-top:.5rem; }
+    .hero h1 span { color:var(--blue); }
+    .hero p { color:var(--dim); font-size:.92rem; max-width:720px; margin-top:.7rem; line-height:1.55; }
+
+    /* CONTROLS */
+    .controls { display:flex; flex-wrap:wrap; gap:.9rem 1.4rem; align-items:flex-end; padding:1.2rem 2.2rem 0; max-width:1500px; margin:0 auto; }
+    .ctl-group { display:flex; flex-direction:column; gap:.35rem; }
+    .ctl-label { font-size:.64rem; letter-spacing:.18em; text-transform:uppercase; color:var(--dim2); }
+    select.city-sel { background:var(--card); color:var(--white); border:1px solid var(--line); border-radius:3px; padding:.6rem .9rem; font-family:inherit; font-size:.95rem; min-width:230px; cursor:none; }
+    select.city-sel:focus { outline:none; border-color:rgba(0,71,255,.6); }
+    .toggle { display:flex; border:1px solid var(--line); border-radius:3px; overflow:hidden; }
+    .toggle button { background:transparent; color:var(--dim); border:none; padding:.6rem 1rem; font-family:inherit; font-size:.82rem; cursor:none; transition:background .2s,color .2s; }
+    .toggle button.on { background:var(--blue); color:#fff; }
+
+    /* LAYOUT */
+    .wrap { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(280px,.9fr); gap:1.2rem; padding:1.2rem 2.2rem; max-width:1500px; margin:0 auto; }
+    @media (max-width:900px){ .wrap { grid-template-columns:1fr; } }
+    .map-card { background:var(--card); border:1px solid var(--line); border-radius:6px; overflow:hidden; position:relative; }
+    #map { height:min(62vh,560px); min-height:340px; background:#060810; }
+    .leaflet-container { background:#060810 !important; font-family:'HelveticaNeue',Helvetica,Arial,sans-serif !important; }
+    .leaflet-tile-pane { display:none; }
+    .leaflet-control-attribution { background:rgba(6,8,16,.7) !important; color:var(--dim2) !important; }
+    .leaflet-control-attribution a { color:rgba(0,71,255,.6) !important; }
+    .leaflet-control-zoom a { background:rgba(6,8,16,.85) !important; color:var(--white) !important; border-color:var(--line) !important; }
+    .leaflet-control-zoom a:hover { background:rgba(0,71,255,.3) !important; }
+    .leaflet-tooltip.jal-tt { background:rgba(6,8,16,.97) !important; border:1px solid rgba(0,71,255,.5) !important; border-radius:3px !important; color:var(--white) !important; box-shadow:0 4px 20px rgba(0,0,0,.6) !important; padding:.5rem .7rem !important; font-size:.8rem !important; }
+    .leaflet-tooltip.jal-tt::before { border-top-color:rgba(0,71,255,.5) !important; }
+    .tt-t { font-weight:600; font-size:.86rem; margin-bottom:.25rem; }
+    .tt-row { color:var(--dim); font-size:.75rem; }
+    .tt-row b { color:var(--white); font-weight:500; }
+
+    /* SIDE PANEL */
+    .side { display:flex; flex-direction:column; gap:1rem; }
+    .panel-card { background:var(--card); border:1px solid var(--line); border-radius:6px; padding:1.1rem 1.2rem; }
+    .panel-card h3 { font-family:'Syne',sans-serif; font-weight:700; font-size:1.05rem; }
+    .kpis { display:grid; grid-template-columns:1fr 1fr; gap:.7rem; margin-top:.9rem; }
+    .kpi { background:rgba(255,255,255,.03); border:1px solid var(--line); border-radius:4px; padding:.6rem .7rem; }
+    .kpi .n { font-size:1.2rem; font-weight:500; }
+    .kpi .l { font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; color:var(--dim2); margin-top:.2rem; }
+    .legend { margin-top:.4rem; }
+    .legend-row { display:flex; align-items:center; gap:.5rem; padding:.28rem 0; font-size:.8rem; }
+    .legend-row .sw { width:13px; height:13px; border-radius:2px; flex-shrink:0; }
+    .legend-row .nm { color:var(--dim); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .legend-row .ct { color:var(--dim2); font-size:.72rem; }
+    .grad { height:12px; border-radius:3px; background:linear-gradient(90deg,#0b1730,#123a8a,#2f6fff,#6fa0ff); margin:.5rem 0 .3rem; }
+    .grad-lab { display:flex; justify-content:space-between; font-size:.66rem; color:var(--dim2); }
+
+    /* TABLE */
+    .table-wrap { padding:0 2.2rem 2rem; max-width:1500px; margin:0 auto; }
+    .table-card { background:var(--card); border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+    .table-head { padding:.9rem 1.2rem; border-bottom:1px solid var(--line); font-family:'Syne',sans-serif; font-weight:700; font-size:1rem; }
+    .table-scroll { overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    thead th { text-align:left; padding:.6rem .9rem; color:var(--dim2); font-weight:500; font-size:.66rem; letter-spacing:.12em; text-transform:uppercase; border-bottom:1px solid var(--line); white-space:nowrap; }
+    thead th.num, tbody td.num { text-align:right; }
+    tbody td { padding:.55rem .9rem; border-bottom:1px solid rgba(255,255,255,.045); white-space:nowrap; }
+    tbody tr { transition:background .15s; }
+    tbody tr:hover, tbody tr.hl { background:rgba(0,71,255,.10); cursor:none; }
+    .com-nm { font-weight:500; }
+    .pdot { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:.45rem; vertical-align:middle; }
+    .p-name { color:var(--dim); }
+    .edil { color:var(--white); }
+    .edil small { color:var(--dim2); display:block; font-size:.7rem; }
+    .bar-cell { min-width:90px; }
+    .bar { height:6px; background:rgba(255,255,255,.08); border-radius:3px; overflow:hidden; }
+    .bar > i { display:block; height:100%; background:var(--blue); }
+
+    .foot { padding:1.5rem 2.2rem 3rem; max-width:1500px; margin:0 auto; color:var(--dim2); font-size:.72rem; line-height:1.7; border-top:1px solid var(--line); }
+    .foot a { color:var(--blue-light); }
+    .load { padding:3rem; text-align:center; color:var(--dim); font-size:.85rem; }
+    @media (max-width:640px){ .nav{padding:.7rem 1rem;} .hero,.controls,.wrap,.table-wrap,.foot{padding-left:1rem;padding-right:1rem;} .kpis{grid-template-columns:1fr 1fr;} }
+  </style>
+</head>
+<body>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <div class="nav">
+    <div class="nav-left">
+      <a href="electoral.html" class="btn-back">← Volver</a>
+    </div>
+    <a href="index.html" class="logo-link">
+      <span class="logo-bars"><span style="height:8px"></span><span style="height:14px"></span><span style="height:20px"></span></span>
+      <span class="logo-text">Ricardo<b>.Ruiz</b></span>
+    </a>
+  </div>
+
+  <div class="hero">
+    <div class="eyebrow">Elecciones Territoriales · 29 oct 2023</div>
+    <h1>Resultados <span>JAL</span> · Juntas Administradoras Locales</h1>
+    <p>Quién ganó la elección de ediles en cada comuna y localidad de las principales ciudades del país. Escoge una ciudad para ver el mapa por comuna con el partido ganador, el edil más votado y la participación estimada.</p>
+  </div>
+
+  <div class="controls">
+    <div class="ctl-group">
+      <span class="ctl-label">Ciudad</span>
+      <select class="city-sel" id="city-sel" onchange="onCity()"></select>
+    </div>
+    <div class="ctl-group">
+      <span class="ctl-label">Colorear por</span>
+      <div class="toggle" id="mode-toggle">
+        <button class="on" data-mode="ganador" onclick="setMode('ganador')">Partido ganador</button>
+        <button data-mode="participacion" onclick="setMode('participacion')">Participación</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="content">
+    <div class="load" id="loadmsg">Cargando resultados…</div>
+  </div>
+
+  <div class="foot">
+    Fuente: Registraduría Nacional (GCS 2023). El <b>partido ganador</b> de cada comuna/localidad es el que más votos de JAL sumó allí; el <b>edil</b> es el candidato más votado. La <b>participación</b> es aproximada: usa como denominador el censo electoral actual del puesto (Divipole/georef), no el censo exacto de 2023. Comunas rurales/corregimientos sin polígono aparecen en la tabla pero no en el mapa. · <a href="analisis-candidato.html">Análisis por candidato</a> · <a href="electoral.html">Resultados 2023</a>
+  </div>
+
+  <script>
+    // ─── CURSOR ───────────────────────────────────────────────
+    const cur=document.getElementById('cursor'), rng=document.getElementById('cursorRing');
+    let mx=0,my=0,rx=0,ry=0;
+    document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.left=mx+'px';cur.style.top=my+'px';});
+    (function loop(){rx+=(mx-rx)*.14;ry+=(my-ry)*.14;rng.style.left=rx+'px';rng.style.top=ry+'px';requestAnimationFrame(loop);})();
+    document.addEventListener('mouseover',e=>{
+      if(e.target.closest('a,button,select,tr')){cur.style.transform='translate(-50%,-50%) scale(2.1)';cur.style.background='transparent';cur.style.border='1.5px solid #0047FF';rng.style.opacity='0';}
+      else{cur.style.transform='translate(-50%,-50%) scale(1)';cur.style.background='#0047FF';cur.style.border='none';rng.style.opacity='.4';}
+    });
+
+    // ─── CONST ────────────────────────────────────────────────
+    const S3='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
+    // ?local=1 → lee el JSON del repo (verificación antes de subir a S3).
+    const DATA_URL=new URLSearchParams(location.search).has('local')
+      ? 'Bases de datos/output_jal_2023/resultados-jal-2023.json'
+      : `${S3}/jal-2023/resultados-jal-2023.json`;
+    const GEO_BASE=`${S3}/mapas-2026/Ciudades-COM-LOC`;
+
+    // Config por ciudad: GeoJSON + extractor de nº de comuna/localidad + rotación.
+    const CITY_GEO={
+      '16-001':{geo:'BOG-LOCALIDADX.json', code:p=>parseInt(p.LocCodigo,10), rotate:true},
+      '01-001':{geo:'MEDELLINX.json',      code:p=>parseInt(p.CODIGO,10)},
+      '31-001':{geo:'CALIX.json',          code:p=>parseInt(p.comuna,10)},
+      '27-001':{geo:'BUCARAMANGAX.json',   code:p=>parseInt(p.COD_COMUNA,10)},
+      '25-001':{geo:'CUCUTAX.json',        code:p=>parseInt(p.Comuna,10)},
+      '29-001':{geo:'IBAGUEX.json',        code:p=>parseInt(String(p.COMUNAS).replace(/\D/g,''),10)},
+      '09-001':{geo:'MANIZALESX.json',     code:p=>parseInt(p.ID_COMUNA,10)},
+      '13-001':{geo:'MONTERIAX.json',      code:p=>parseInt(p.CC_COMUNA,10)},
+      '19-001':{geo:'NEIVAX.json',         code:p=>parseInt(String(p.comuna).replace(/\D/g,''),10)},
+      '11-001':{geo:'POPAYANX.json',       code:p=>parseInt(p.ACAD_TEXT!=null?p.ACAD_TEXT:String(p.COMUNAS).replace(/\D/g,''),10)},
+      '52-001':{geo:'VILLAVICENCIOX.json', code:p=>parseInt(String(p.Comuna).replace(/\D/g,''),10)},
+    };
+
+    // Colores por partido (distintivos). El resto se colorea por hash del nombre.
+    const PARTY_COLORS={
+      'PARTIDO LIBERAL COLOMBIANO':'#E23B3B',
+      'PARTIDO CONSERVADOR COLOMBIANO':'#2E7CE0',
+      'PARTIDO CENTRO DEMOCRÁTICO':'#0f2a57',
+      'PARTIDO DE LA UNIÓN POR LA GENTE - PARTIDO DE LA U':'#E8811A',
+      'PARTIDO ALIANZA VERDE':'#38A85A',
+      'PARTIDO CAMBIO RADICAL':'#D5194E',
+      'PARTIDO POLÍTICO CREEMOS':'#7C3AED',
+      'PARTIDO POLÍTICO MIRA':'#1F9E8F',
+      'PARTIDO POLÍTICO GENTE EN MOVIMIENTO':'#B8862B',
+      'PACTO HISTORICO':'#E0457B',
+      'PACTO HISTORICO COLOMBIA PUEDE':'#E0457B',
+      'PARTIDO POLO DEMOCRÁTICO ALTERNATIVO':'#C43A9A',
+      'PARTIDO NUEVO LIBERALISMO':'#3AB0C9',
+      'NUEVO LIBERALISMO- AGRUPACION POLITICA EN MARCHA':'#3AB0C9',
+      'AGRUPACIÓN POLÍTICA EN MARCHA':'#4AA3A3',
+    };
+    function hashHue(s){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return h%360;}
+    function partyColor(p){ if(!p) return '#5a6070'; if(PARTY_COLORS[p]) return PARTY_COLORS[p]; return `hsl(${hashHue(p)},42%,52%)`; }
+    const fmt=n=>(n||0).toLocaleString('es-CO');
+
+    let DATA=null, curKey=null, mode='ganador', map=null, layer=null, curCity=null, featById={};
+
+    async function boot(){
+      try{
+        const r=await fetch(DATA_URL);
+        DATA=await r.json();
+      }catch(e){ document.getElementById('loadmsg').textContent='No se pudo cargar el resultado.'; return; }
+      const sel=document.getElementById('city-sel');
+      sel.innerHTML=DATA.cities.map(c=>`<option value="${c.key}">${c.name} (${c.nivel==='localidad'?'localidades':'comunas'})</option>`).join('');
+      // estructura fija del contenido
+      document.getElementById('content').innerHTML=`
+        <div class="wrap">
+          <div class="map-card"><div id="map"></div></div>
+          <div class="side">
+            <div class="panel-card" id="city-panel"></div>
+            <div class="panel-card" id="legend-panel"></div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <div class="table-card">
+            <div class="table-head" id="tbl-head">Comunas</div>
+            <div class="table-scroll"><table>
+              <thead><tr>
+                <th id="th-com">Comuna</th><th>Partido ganador</th><th>Edil más votado</th>
+                <th class="num">Válidos</th><th class="num">Particip.</th><th class="num">Mesas</th>
+              </tr></thead>
+              <tbody id="tbl-body"></tbody>
+            </table></div>
+          </div>
+        </div>`;
+      onCity();
+    }
+
+    function setMode(m){
+      mode=m;
+      document.querySelectorAll('#mode-toggle button').forEach(b=>b.classList.toggle('on',b.dataset.mode===m));
+      if(curKey) renderCity(false);
+    }
+
+    function onCity(){
+      curKey=document.getElementById('city-sel').value;
+      renderCity(true);
+    }
+
+    function comunaList(cd){
+      return Object.entries(cd.comunas).map(([code,c])=>({code, num:parseInt(code,10), ...c}))
+        .sort((a,b)=>b.validos-a.validos);
+    }
+
+    async function renderCity(refetchGeo){
+      const key=curKey;
+      const cd=DATA.data[key];
+      const cityMeta=DATA.cities.find(c=>c.key===key);
+      const cfg=CITY_GEO[key];
+      const rows=comunaList(cd);
+      const byNum={}; rows.forEach(r=>{ byNum[r.num]=r; });
+
+      renderPanels(cityMeta, cd, rows);
+      renderTable(cityMeta, rows);
+
+      // MAPA
+      if(!map){
+        map=L.map('map',{zoomControl:true,attributionControl:true,scrollWheelZoom:false}).setView([4.6,-74.1],10);
+      }
+      if(refetchGeo || curCity!==key){
+        curCity=key;
+        if(layer){ map.removeLayer(layer); layer=null; }
+        if(!cfg){ return; }
+        let geo;
+        try{
+          const r=await fetch(`${GEO_BASE}/${cfg.geo}`);
+          geo=await r.json();
+        }catch(e){ return; }
+        if(cfg.rotate) geo=rotate90Left(geo);
+        layer=L.geoJSON(geo,{
+          style:f=>styleFeat(f,cfg,byNum),
+          onEachFeature:(f,lyr)=>{
+            const num=cfg.code(f.properties);
+            const c=byNum[num];
+            lyr.on('mouseover',()=>lyr.setStyle({weight:2.4,color:'#fff'}));
+            lyr.on('mouseout',()=>lyr.setStyle({weight:1,color:'rgba(255,255,255,.25)'}));
+            lyr.bindTooltip(tooltipHtml(num,c),{className:'jal-tt',sticky:true});
+            lyr.on('click',()=>{ const tr=document.getElementById('row-'+num); if(tr){ tr.scrollIntoView({block:'center',behavior:'smooth'}); tr.classList.add('hl'); setTimeout(()=>tr.classList.remove('hl'),1600); } });
+          }
+        }).addTo(map);
+        try{ const b=layer.getBounds(); if(b.isValid()) map.fitBounds(b,{padding:[16,16]}); }catch(e){}
+      } else if(layer){
+        layer.setStyle(f=>styleFeat(f,cfg,byNum));
+        layer.eachLayer(l=>{ const num=cfg.code(l.feature.properties); l.unbindTooltip(); l.bindTooltip(tooltipHtml(num,byNum[num]),{className:'jal-tt',sticky:true}); });
+      }
+    }
+
+    function partRatio(c){ return (c && c.potencial>0)? c.votantes/c.potencial : 0; }
+    function styleFeat(f,cfg,byNum){
+      const num=cfg.code(f.properties);
+      const c=byNum[num];
+      let fill='#20242e', op=.35;
+      if(c){
+        if(mode==='ganador'){ fill=partyColor(c.winner&&c.winner.partido); op=.82; }
+        else { const r=Math.min(.6,partRatio(c))/0.6; fill=blueScale(r); op=.85; }
+      }
+      return {fillColor:fill, fillOpacity:op, color:'rgba(255,255,255,.25)', weight:1};
+    }
+    function blueScale(t){ // 0..1 → azul oscuro a claro
+      const a=[11,23,48], b=[111,160,255];
+      const c=a.map((v,i)=>Math.round(v+(b[i]-v)*t));
+      return `rgb(${c[0]},${c[1]},${c[2]})`;
+    }
+    function tooltipHtml(num,c){
+      if(!c) return `<div class="tt-t">Comuna ${num}</div><div class="tt-row">Sin datos de JAL</div>`;
+      const pr=partRatio(c);
+      const w=c.winner?`<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${partyColor(c.winner.partido)};margin-right:5px"></span>${c.winner.partido}`:'—';
+      return `<div class="tt-t">${c.name}</div>`
+        +`<div class="tt-row">Gana: <b>${w}</b></div>`
+        +(c.top_cand?`<div class="tt-row">Edil: <b>${c.top_cand.nombre}</b> · ${fmt(c.top_cand.votos)}</div>`:'')
+        +`<div class="tt-row"><b>${fmt(c.validos)}</b> válidos · particip. <b>${pr?(pr*100).toFixed(1)+'%':'—'}</b></div>`;
+    }
+
+    function renderPanels(meta, cd, rows){
+      const t=cd.totals;
+      const votantes=rows.reduce((s,r)=>s+r.votantes,0);
+      const part=t.potencial>0?(votantes/t.potencial*100).toFixed(1):'—';
+      document.getElementById('city-panel').innerHTML=`
+        <h3>${meta.name}</h3>
+        <div style="color:var(--dim);font-size:.78rem;margin-top:.2rem">${meta.dep} · ${meta.n_comunas} ${meta.nivel==='localidad'?'localidades':'comunas'}</div>
+        <div class="kpis">
+          <div class="kpi"><div class="n">${fmt(t.validos)}</div><div class="l">Votos válidos</div></div>
+          <div class="kpi"><div class="n">${fmt(t.blanco)}</div><div class="l">Voto en blanco</div></div>
+          <div class="kpi"><div class="n">${fmt(t.potencial)}</div><div class="l">Censo (aprox.)</div></div>
+          <div class="kpi"><div class="n">${part}${part!=='—'?'%':''}</div><div class="l">Participación</div></div>
+        </div>`;
+      // legend
+      const lp=document.getElementById('legend-panel');
+      if(mode==='ganador'){
+        const cnt={};
+        rows.forEach(r=>{ if(r.winner){ const p=r.winner.partido; cnt[p]=(cnt[p]||0)+1; } });
+        const ord=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
+        lp.innerHTML=`<h3 style="font-size:.95rem">Partido ganador por ${meta.nivel==='localidad'?'localidad':'comuna'}</h3>`
+          +`<div class="legend">`+ord.map(([p,n])=>`
+            <div class="legend-row"><span class="sw" style="background:${partyColor(p)}"></span><span class="nm">${p}</span><span class="ct">${n}</span></div>`).join('')+`</div>`;
+      } else {
+        lp.innerHTML=`<h3 style="font-size:.95rem">Participación estimada</h3>
+          <div class="grad"></div>
+          <div class="grad-lab"><span>menor</span><span>0% – 60%+</span><span>mayor</span></div>
+          <div style="color:var(--dim2);font-size:.72rem;margin-top:.5rem">Votantes JAL sobre censo actual del puesto. Aproximado.</div>`;
+      }
+    }
+
+    function renderTable(meta, rows){
+      document.getElementById('tbl-head').textContent=`${meta.name} · ${rows.length} ${meta.nivel==='localidad'?'localidades':'comunas'}`;
+      document.getElementById('th-com').textContent=meta.nivel==='localidad'?'Localidad':'Comuna';
+      const maxV=rows[0]?rows[0].validos:1;
+      document.getElementById('tbl-body').innerHTML=rows.map(r=>{
+        const pr=partRatio(r);
+        const wp=r.winner?r.winner.partido:'';
+        return `<tr id="row-${r.num}">
+          <td class="com-nm">${r.name}</td>
+          <td>${wp?`<span class="pdot" style="background:${partyColor(wp)}"></span><span class="p-name">${wp}</span>`:'—'}</td>
+          <td>${r.top_cand?`<span class="edil">${r.top_cand.nombre}<small>${r.top_cand.partido||''} · ${fmt(r.top_cand.votos)} votos</small></span>`:'—'}</td>
+          <td class="num">${fmt(r.validos)}<div class="bar-cell"><div class="bar"><i style="width:${Math.round(r.validos/maxV*100)}%"></i></div></div></td>
+          <td class="num">${pr?(pr*100).toFixed(1)+'%':'—'}</td>
+          <td class="num">${fmt(r.mesas)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // Rota el GeoJSON de Bogotá 90° a la izquierda alrededor de su centroide.
+    function rotate90Left(geoData){
+      const cx=-74.08, cy=4.65;
+      const rc=([lon,lat])=>[cx-(lat-cy), cy+(lon-cx)];
+      const rg=g=>{
+        if(g.type==='Polygon') return {...g,coordinates:g.coordinates.map(r=>r.map(rc))};
+        if(g.type==='MultiPolygon') return {...g,coordinates:g.coordinates.map(p=>p.map(r=>r.map(rc)))};
+        return g;
+      };
+      return {...geoData,features:geoData.features.map(f=>({...f,geometry:rg(f.geometry)}))};
+    }
+
+    boot();
+  </script>
+</body>
+</html>

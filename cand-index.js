@@ -31,6 +31,16 @@
     { name: 'con2022',  dir: 'congreso-2022', indexFile: 'index-congreso-2022.json',       list: d => d.candidatos || [] },
   ];
 
+  // Fuentes LOCALES (Concejo · JAL 2023): índices GRANDES (~94k + ~14k candidatos).
+  // NO se cargan en load() para no frenar el arranque de las páginas; se piden
+  // aparte con loadLocal(), típicamente al primer foco/tecla del buscador.
+  // A diferencia del resto, estas NO se agrupan por persona (nombres comunes se
+  // repiten entre municipios → colapsarlas por nombre fusionaría personas distintas).
+  const LOCAL_SOURCES = [
+    { name: 'concejo', dir: 'concejo-2023', indexFile: 'index-concejo-2023.json', list: d => d.candidatos || [] },
+    { name: 'jal',     dir: 'jal-2023',     indexFile: 'index-jal-2023.json',     list: d => d.candidatos || [] },
+  ];
+
   const _bySlug = {};   // slug → entrada (para dataUrlFor)
 
   function isPartyEntry(c) {
@@ -86,11 +96,51 @@
     return all;
   }
 
+  // Carga LAZY de las fuentes locales (Concejo · JAL 2023). Se cachea la promesa
+  // para no re-pedir. Devuelve la lista fusionada (cada candidatura es su propia
+  // entrada, SIN agrupar por persona). Tolerante a 404 igual que load().
+  //   opts.bases → { concejo:'<base>', jal:'<base>' } override (rutas locales).
+  //   opts.includeParties=false → filtra entradas de partido.
+  let _localPromise = null;
+  function loadLocal(opts) {
+    opts = opts || {};
+    if (_localPromise) return _localPromise;
+    const bases = opts.bases || {};
+    _localPromise = Promise.all(LOCAL_SOURCES.map(async src => {
+      const base = bases[src.name] || `${S3}/${src.dir}`;
+      try {
+        const r = await fetch(`${base}/${src.indexFile}`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const raw = await r.json();
+        return src.list(raw).map(c => ({
+          nombre: c.nombre,
+          slug: c.slug,
+          corp: c.corp || '',
+          circunscripcion: c.circunscripcion || '',
+          partido: c.partido || '',
+          votos: c.votos || 0,
+          tipo: c.tipo || 'candidato',
+          source: src.name,
+          dataUrl: `${base}/${c.slug}.json`,
+        }));
+      } catch (e) {
+        console.warn(`[CandRegistry] fuente local "${src.name}" no disponible:`, e.message);
+        return [];
+      }
+    })).then(per => {
+      let all = per.flat();
+      all.forEach(c => { _bySlug[c.slug] = c; });
+      if (opts.includeParties === false) all = all.filter(c => !isPartyEntry(c));
+      return all;
+    });
+    return _localPromise;
+  }
+
   // slug → URL del JSON mesa-a-mesa. Cae a la ruta endoso si el slug no se
   // cargó por el registro (compatibilidad hacia atrás).
   function dataUrlFor(slug) {
     return (_bySlug[slug] && _bySlug[slug].dataUrl) || `${S3}/endoso/${slug}.json`;
   }
 
-  global.CandRegistry = { S3, SOURCES, isPartyEntry, acMatch, load, dataUrlFor };
+  global.CandRegistry = { S3, SOURCES, LOCAL_SOURCES, isPartyEntry, acMatch, load, loadLocal, dataUrlFor };
 })(typeof window !== 'undefined' ? window : this);

@@ -2244,8 +2244,15 @@
     function isAsamblea(corp) {
       return (corp || '').toUpperCase().includes('ASAMBLEA');
     }
+    // Concejo (municipal) y JAL (comuna/localidad): la candidatura vive en UN
+    // municipio → se auto-drillea al depto y se colorean sus municipios (para
+    // Bogotá, sus localidades). Reusa la misma maquinaria que Cámara/Asamblea.
+    function isConcejoOJAL(corp) {
+      const c = (corp || '').toUpperCase();
+      return c.startsWith('CONCEJO') || c.startsWith('JAL');
+    }
     function isDepartmentalRace(corp) {
-      return isCamaraTerritorial(corp) || isAsamblea(corp);
+      return isCamaraTerritorial(corp) || isAsamblea(corp) || isConcejoOJAL(corp);
     }
 
     function featureStyle(feature) {
@@ -2870,6 +2877,38 @@
       }
     }
 
+    // ─── FUENTES LOCALES (Concejo · JAL 2023) · carga diferida ──
+    // ~108k candidatos: no entran al índice del arranque. Se piden al primer
+    // foco/tecla del buscador y se APILAN al índice sin agrupar por persona.
+    // ?conclocal=1 / ?jallocal=1 → leen los JSON locales del repo (pre-subida).
+    let _localReq = null, _localDone = false;
+    function ensureLocal() {
+      if (_localDone) return _localReq;
+      if (_localReq) return _localReq;
+      const sp = new URLSearchParams(location.search);
+      const bases = {};
+      if (sp.has('conclocal')) bases.concejo = 'Bases de datos/output_concejo_2023';
+      if (sp.has('jallocal'))  bases.jal     = 'Bases de datos/output_jal_2023';
+      _localReq = CandRegistry.loadLocal({
+        includeParties: false,
+        bases: Object.keys(bases).length ? bases : undefined,
+      }).then(list => {
+        _localDone = true;
+        const have = new Set(candIndex.map(c => c.slug));
+        candIndex = candIndex.concat(list.filter(c => !have.has(c.slug)));
+        const _hint = document.getElementById('search-hint');
+        if (_hint) {
+          const _t = candI18n[localStorage.getItem('rr-lang')] || candI18n.co;
+          _hint.dataset.count = candIndex.length;
+          _hint.textContent = _t.candidatesLoaded(candIndex.length);
+        }
+        const inp = document.getElementById('ac-input');
+        if (inp && inp.value.trim().length >= 2) acSearch();
+        return list;
+      }).catch(e => { console.warn('[local] no disponible:', e && e.message); _localDone = true; });
+      return _localReq;
+    }
+
     // ─── FILTRO: excluir partidos y movimientos ───────────────
     // Regla: nombre === partido  →  es entrada de partido (no candidato)
     // Más: nombres que empiezan con PARTIDO/MOVIMIENTO/COALICIÓN/ALIANZA/PACTO/LISTA
@@ -2889,6 +2928,7 @@
     }
 
     function acSearch() {
+      ensureLocal();   // apila Concejo/JAL 2023 al índice la primera vez (lazy)
       const input = document.getElementById('ac-input');
       const drop = document.getElementById('ac-dropdown');
       const q = input.value.trim();
@@ -3235,7 +3275,7 @@
         setTimeout(() => document.getElementById('map-loading')?.classList.remove('active'), 400);
       }
 
-      buildTerritorialRadar({ meta, deps, muns, zonas, totalVotos });
+      buildTerritorialRadar({ meta, deps, muns, zonas, puestos, totalVotos });
     }
 
     // ─── COMMUNE / LOCALIDAD MÁS VOTADA ─────────────────────
@@ -3687,7 +3727,7 @@
     //   No existe campo "circunscripcion" en meta ni en data — si se agrega, usar ese.
     const RADAR_MAX = 60;   // techo visual del radar — cambiar aquí si se ajusta
 
-    function buildTerritorialRadar({ meta, deps, muns, zonas, totalVotos }) {
+    function buildTerritorialRadar({ meta, deps, muns, zonas, puestos, totalVotos }) {
       if (!totalVotos) return;
 
       const corp = (meta.corp || '').toUpperCase().trim();
@@ -3698,7 +3738,16 @@
       let items = [];
       let radarTitle = 'Presencia territorial';
 
-      if (corp.includes('CAMARA') || corp.includes('CÁMARA')) {
+      if (corp.startsWith('JAL')) {
+        // JAL: una comuna/localidad → el detalle útil es por PUESTO
+        items = (puestos || []).slice(0, 5).map(([, d]) => ({ nom: d.nom, v: d.v }));
+        radarTitle = 'Presencia territorial · puestos';
+      } else if (corp.startsWith('CONCEJO')) {
+        // Concejo: un municipio → radar por comunas/localidades
+        items = (zonas || []).slice(0, 5).map(([, d]) => ({ nom: d.nom, v: d.v }));
+        radarTitle = esBogota ? 'Presencia territorial · localidades'
+                              : 'Presencia territorial · comunas';
+      } else if (corp.includes('CAMARA') || corp.includes('CÁMARA')) {
         if (esBogota) {
           // Cámara Bogotá (electoral_id '16'): radar por zonas (localidades)
           items = zonas.slice(0, 5).map(([,d]) => ({ nom: d.nom, v: d.v }));

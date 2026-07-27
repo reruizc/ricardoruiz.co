@@ -557,6 +557,23 @@
       return /^(PARTIDO|MOVIMIENTO|COALICION|ALIANZA|LISTA|PACTO)\b/.test(n);
     }
 
+    // \u2500\u2500\u2500 FUENTES LOCALES (Concejo \u00b7 JAL 2023) \u00b7 carga diferida \u2500\u2500\u2500\u2500
+    // ~108k candidatos: se piden al primer foco/tecla del buscador y se apilan.
+    let _localReq = null, _localDone = false;
+    function ensureLocal() {
+      if (_localDone) return _localReq;
+      if (_localReq) return _localReq;
+      _localReq = CandRegistry.loadLocal({ includeParties: false }).then(list => {
+        _localDone = true;
+        const have = new Set(candIndex.map(c => c.slug));
+        candIndex = candIndex.concat(list.filter(c => !have.has(c.slug)));
+        const hint = document.getElementById('search-hint');
+        if (hint) hint.textContent = `${candIndex.length.toLocaleString('es-CO')} candidatos cargados`;
+        return list;
+      }).catch(e => { console.warn('[local] no disponible:', e && e.message); _localDone = true; });
+      return _localReq;
+    }
+
     // ─── AUTOCOMPLETE ─────────────────────────────────────────────
     function normStr(s) { return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim(); }
 
@@ -581,6 +598,7 @@
     }
 
     function acSearchA() {
+      ensureLocal();
       acHlA = -1;
       const q = document.getElementById('ac-a').value.trim();
       const drop = document.getElementById('drop-a');
@@ -589,6 +607,7 @@
     }
 
     function acSearchB() {
+      ensureLocal();
       acHlB = -1;
       const q = document.getElementById('ac-b').value.trim();
       const drop = document.getElementById('drop-b');
@@ -682,8 +701,14 @@
     function isAsamblea(corp) {
       return (corp||'').toUpperCase().includes('ASAMBLEA');
     }
-    // Carrera de circunscripci\u00f3n departamental (C\u00e1mara territorial o Asamblea).
-    function isDeptRace(corp) { return isCamTerr(corp) || isAsamblea(corp); }
+    // Concejo (municipal) y JAL (comuna/localidad): la comparaci\u00f3n geogr\u00e1fica
+    // tambi\u00e9n es sub-nacional (municipio del depto) \u2192 se tratan como dept-race.
+    function isConcejoOJAL(corp) {
+      const c = (corp||'').toUpperCase();
+      return c.startsWith('CONCEJO') || c.startsWith('JAL');
+    }
+    // Carrera de circunscripci\u00f3n sub-nacional (C\u00e1mara territorial, Asamblea, Concejo, JAL).
+    function isDeptRace(corp) { return isCamTerr(corp) || isAsamblea(corp) || isConcejoOJAL(corp); }
 
     // Departamentos ordenados desc por votos: [[code, {nom, v}], ...]
     function computeDeps(mesas) {
