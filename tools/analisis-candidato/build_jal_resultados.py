@@ -150,19 +150,22 @@ def main():
         for comC, c in cd.items():
             if comC == 'ND':
                 continue   # corregimientos/sin-comuna fuera del mapa de comunas
+            # partidos ordenados desc + índice para comprimir la lista de candidatos
             parties = sorted(c['parties'].items(), key=lambda kv: -kv[1])
-            top_cand = max(c['cands'].items(), key=lambda kv: kv[1]) if c['cands'] else None
+            pidx = {p: i for i, (p, _) in enumerate(parties)}
+            # TODOS los candidatos de la comuna, ordenados por votos desc.
+            # cada uno = [nombre, índice-de-partido, votos]  (partyIdx apunta a partidos[])
+            cands = sorted(c['cands'].items(), key=lambda kv: -kv[1])
+            cand_list = [[nom, pidx.get(c['partyOf'].get(par), 0), v]
+                         for (par, can, nom), v in cands]
             potc = pot.get((dde, mme, comC), 0)
             votantes = c['validos'] + c['blanco'] + c['nulos']
             comunas[comC] = {
                 'name': comN.get((dde, mme, comC), f'COMUNA {int(comC)}' if comC.isdigit() else comC),
                 'validos': c['validos'], 'blanco': c['blanco'], 'nulos': c['nulos'],
                 'votantes': votantes, 'potencial': potc, 'mesas': len(c['mesas']),
-                'winner': ({'partido': parties[0][0], 'votos': parties[0][1]} if parties else None),
-                'top_partidos': [[p, vv] for p, vv in parties[:6]],
-                'top_cand': ({'nombre': top_cand[0][2],
-                              'partido': c['partyOf'].get(top_cand[0][0]),
-                              'votos': top_cand[1]} if top_cand else None),
+                'partidos': [[p, vv] for p, vv in parties],   # ganador = partidos[0]
+                'cands': cand_list,                            # top edil = cands[0]
             }
             tot_val += c['validos']; tot_bl += c['blanco']; tot_pot += potc
             for p, vv in c['parties'].items():
