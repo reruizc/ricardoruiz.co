@@ -184,6 +184,17 @@
     .bmap-wrap { position:relative; border-bottom:1px solid var(--line); }
     #bmap { height:min(46vh,380px); min-height:260px; background:#060810; }
     .bmap-hint { position:absolute; top:.6rem; left:.7rem; z-index:500; background:rgba(6,8,16,.8); border:1px solid var(--line); border-radius:3px; padding:.3rem .55rem; font-size:.68rem; color:var(--dim); pointer-events:none; }
+    /* botón "volver a la ciudad" + etiqueta sobre el mapa único */
+    .map-back { position:absolute; top:.7rem; right:.7rem; z-index:600; background:rgba(6,8,16,.86); color:var(--blue-light); border:1px solid rgba(0,71,255,.45); border-radius:3px; padding:.4rem .75rem; font-family:inherit; font-size:.74rem; cursor:none; transition:background .2s; }
+    .map-back:hover { background:rgba(0,71,255,.24); }
+    .map-badge { position:absolute; top:.7rem; left:.7rem; z-index:600; background:rgba(6,8,16,.86); border:1px solid var(--line); border-radius:3px; padding:.35rem .6rem; font-size:.72rem; color:var(--white); pointer-events:none; max-width:60%; }
+    .map-badge small { color:var(--dim2); }
+    /* selector "seleccione barrio" en el resumen */
+    .barrio-picker { display:flex; align-items:center; gap:.7rem; flex-wrap:wrap; padding:.9rem 1.3rem .2rem; }
+    .barrio-picker label { font-size:.64rem; letter-spacing:.14em; text-transform:uppercase; color:var(--dim2); }
+    .barrio-picker select { background:var(--card); color:var(--white); border:1px solid var(--line); border-radius:3px; padding:.5rem .7rem; font-family:inherit; font-size:.86rem; min-width:240px; cursor:none; }
+    .barrio-picker select:focus { outline:none; border-color:rgba(0,71,255,.6); }
+    .scope-tag { font-size:.78rem; color:var(--blue-light); }
     /* listas de unidades (barrio/puesto/mesa) */
     .unit-list { display:flex; flex-direction:column; }
     .unit-row { border-bottom:1px solid rgba(255,255,255,.05); }
@@ -363,6 +374,8 @@
 
     let DATA=null, curKey=null, mode='ganador', map=null, layer=null, curCity=null;
     let selComuna=null, curRows=[], curByNum={}, curMeta=null;
+    let mapMode='city', selBarrio=null, curVot=null, votFilter=null;   // mapa único + drill de barrio
+    let cityLayerGeo=null, cityLayerCity=null;                         // GeoJSON de comunas cacheado
 
     async function boot(){
       try{
@@ -374,7 +387,7 @@
       // estructura fija del contenido
       document.getElementById('content').innerHTML=`
         <div class="wrap">
-          <div class="map-card"><div id="map"></div></div>
+          <div class="map-card"><div id="map"></div><button class="map-back" id="map-back" style="display:none" onclick="backToCity()">← Volver a la ciudad</button><div class="map-badge" id="map-badge" style="display:none"></div></div>
           <div class="side">
             <div class="panel-card" id="city-panel"></div>
             <div class="panel-card" id="legend-panel"></div>
@@ -394,12 +407,15 @@
     function setMode(m){
       mode=m;
       document.querySelectorAll('#mode-toggle button').forEach(b=>b.classList.toggle('on',b.dataset.mode===m));
-      if(curKey) renderCity(false);
+      if(!curKey || !DATA.data[curKey]) return;
+      renderPanels(curMeta, DATA.data[curKey], curRows);   // la leyenda cambia con el modo
+      // el mapa de barrios va siempre por ganador; solo re-colorea el mapa de ciudad
+      if(mapMode==='city' && layer){ layer.setStyle(f=>styleFeat(f,CITY_GEO[curKey],curByNum)); }
     }
 
     function onCity(){
       curKey=document.getElementById('city-sel').value;
-      selComuna=null;
+      selComuna=null; selBarrio=null;
       renderCity(true);
     }
 
@@ -417,46 +433,79 @@
       const key=curKey;
       const cd=DATA.data[key];
       curMeta=DATA.cities.find(c=>c.key===key);
-      const cfg=CITY_GEO[key];
       curRows=comunaList(cd);
       curByNum={}; curRows.forEach(r=>{ curByNum[r.num]=r; });
 
       renderPanels(curMeta, cd, curRows);
       renderGrid(curMeta, curRows);
-      // conservar el detalle abierto al cambiar de modo; reset al cambiar de ciudad
+      await paintCityLayer();
+      // conservar el detalle abierto al cambiar de ciudad: reset
       if(selComuna!=null && curByNum[selComuna]) openComuna(selComuna, false);
       else showGrid(false);
-
-      // MAPA
-      if(!map){
-        map=L.map('map',{zoomControl:true,attributionControl:true,scrollWheelZoom:false}).setView([4.6,-74.1],10);
-      }
-      if(refetchGeo || curCity!==key){
-        curCity=key;
-        if(layer){ map.removeLayer(layer); layer=null; }
-        if(!cfg){ return; }
-        let geo;
-        try{
-          const r=await fetch(`${GEO_BASE}/${cfg.geo}`);
-          geo=await r.json();
-        }catch(e){ return; }
-        if(cfg.rotate) geo=rotate90Left(geo);
-        layer=L.geoJSON(geo,{
-          style:f=>styleFeat(f,cfg,curByNum),
-          onEachFeature:(f,lyr)=>{
-            const num=cfg.code(f.properties);
-            lyr.on('mouseover',()=>lyr.setStyle({weight:2.4,color:'#fff'}));
-            lyr.on('mouseout',()=>lyr.setStyle({weight:1,color:'rgba(255,255,255,.25)'}));
-            lyr.bindTooltip(tooltipHtml(num,curByNum[num]),{className:'jal-tt',sticky:true});
-            lyr.on('click',()=>{ if(curByNum[num]) openComuna(num, true); });
-          }
-        }).addTo(map);
-        try{ const b=layer.getBounds(); if(b.isValid()) map.fitBounds(b,{padding:[16,16]}); }catch(e){}
-      } else if(layer){
-        layer.setStyle(f=>styleFeat(f,cfg,curByNum));
-        layer.eachLayer(l=>{ const num=cfg.code(l.feature.properties); l.unbindTooltip(); l.bindTooltip(tooltipHtml(num,curByNum[num]),{className:'jal-tt',sticky:true}); });
-      }
     }
+
+    // Pinta el mapa ÚNICO en modo CIUDAD (comunas/localidades). Click → abre comuna.
+    // Reconstruye siempre (el GeoJSON de comunas queda cacheado por ciudad).
+    async function paintCityLayer(){
+      const key=curKey, cfg=CITY_GEO[key];
+      if(!map){ map=L.map('map',{zoomControl:true,attributionControl:true,scrollWheelZoom:false}).setView([4.6,-74.1],10); }
+      mapMode='city'; curCity=key;
+      document.getElementById('map-back').style.display='none';
+      document.getElementById('map-badge').style.display='none';
+      if(layer){ map.removeLayer(layer); layer=null; }
+      if(!cfg) return;
+      if(!cityLayerGeo || cityLayerCity!==key){
+        try{ let g=await (await fetch(`${GEO_BASE}/${cfg.geo}`)).json(); cityLayerGeo=cfg.rotate?rotate90Left(g):g; cityLayerCity=key; }catch(e){ return; }
+      }
+      layer=L.geoJSON(cityLayerGeo,{
+        style:f=>styleFeat(f,cfg,curByNum),
+        onEachFeature:(f,lyr)=>{
+          const num=cfg.code(f.properties);
+          lyr.on('mouseover',()=>lyr.setStyle({weight:2.4,color:'#fff'}));
+          lyr.on('mouseout',()=>lyr.setStyle({weight:1,color:'rgba(255,255,255,.25)'}));
+          lyr.bindTooltip(tooltipHtml(num,curByNum[num]),{className:'jal-tt',sticky:true});
+          lyr.on('click',()=>{ if(curByNum[num]) openComuna(num, true); });
+        }
+      }).addTo(map);
+      const fit=()=>{ if(!map)return; map.invalidateSize(); try{const b=layer.getBounds(); if(b.isValid()) map.fitBounds(b,{padding:[16,16]});}catch(e){} };
+      setTimeout(fit,60);
+    }
+
+    // Pinta el mapa ÚNICO en modo COMUNA (sus barrios). Click barrio → selectBarrio.
+    async function paintComunaLayer(){
+      const cfg=BARRIO_GEO[curKey];
+      if(!cfg || !curDetail || !curDetail.has_barrio_map || !map) return false;
+      let geo=barrioGeoCache[curKey];
+      if(!geo){ try{ geo=await (await fetch(cfg.url)).json(); barrioGeoCache[curKey]=geo; }catch(e){ return false; } }
+      const byFeat={}; curDetail.barrios.forEach((b,i)=>{ if(b.feat!=null) byFeat[b.feat]={b,i}; });
+      const sub={type:'FeatureCollection',features:geo.features.map((f,i)=>({...f,_fi:i})).filter(f=>byFeat[f._fi]!=null)};
+      const drawn=cfg.rotate?rotate90Left(sub):sub;
+      if(layer){ map.removeLayer(layer); layer=null; }
+      layer=L.geoJSON(drawn,{
+        style:f=>barrioStyle(f._fi, byFeat),
+        onEachFeature:(f,lyr)=>{ const e=byFeat[f._fi]; const w=unitWinner(e.b.v), tc=e.b.v[0];
+          lyr.on('mouseover',()=>lyr.setStyle({weight:2.4,color:'#fff'}));
+          lyr.on('mouseout',()=>{ if(selBarrio!==e.i) layer.resetStyle(lyr); });
+          lyr.bindTooltip(`<div class="tt-t">${e.b.name}</div><div class="tt-row">Gana: <b>${w?w.party:'—'}</b></div>${tc?`<div class="tt-row">Edil: <b>${dName(tc[0])}</b> · ${fmt(tc[1])}</div>`:''}<div class="tt-row"><b>${fmt(e.b.validos)}</b> válidos</div><div class="tt-row" style="color:var(--blue-light)">Toca para ver su votación</div>`,{className:'jal-tt',sticky:true});
+          lyr.on('click',()=>selectBarrio(e.i));
+        }
+      }).addTo(map);
+      layer._byFeat=byFeat;
+      mapMode='comuna';
+      const bk=document.getElementById('map-back'); if(bk) bk.style.display='';
+      const bd=document.getElementById('map-badge'); if(bd){ bd.style.display=''; bd.innerHTML=`${detState.r.name}<br><small>barrios · color = ganador</small>`; }
+      const fit=()=>{ if(!map)return; map.invalidateSize(); try{const b=layer.getBounds(); if(b.isValid()) map.fitBounds(b,{padding:[14,14]});}catch(e){} };
+      setTimeout(fit,60);
+      return true;
+    }
+    function barrioStyle(fi, byFeat){
+      byFeat=byFeat||(layer&&layer._byFeat)||{};
+      const e=byFeat[fi];
+      if(!e) return {fillColor:'#20242e',fillOpacity:.3,color:'rgba(255,255,255,.2)',weight:1};
+      const w=unitWinner(e.b.v), sel=(selBarrio===e.i);
+      return {fillColor:w?partyColor(w.party):'#20242e', fillOpacity:sel?.95:.8, color:sel?'#fff':'rgba(255,255,255,.28)', weight:sel?3:1};
+    }
+    function backToCity(){ selComuna=null; selBarrio=null; showGrid(true); }
 
     function partRatio(c){ return (c && c.potencial>0)? c.votantes/c.potencial : 0; }
     function styleFeat(f,cfg,byNum){
@@ -537,14 +586,15 @@
     }
 
     function showGrid(scroll){
-      selComuna=null;
+      selComuna=null; selBarrio=null;
       document.getElementById('comuna-grid').style.display='';
       document.getElementById('comuna-detail').style.display='none';
       document.getElementById('back-btn').style.display='none';
       const nl=curMeta.nivel==='localidad'?'localidades':'comunas';
       document.getElementById('sec-title').textContent=curMeta.name;
       document.getElementById('sec-sub').textContent=`${curRows.length} ${nl} · toca una para ver todos los candidatos`;
-      if(layer) layer.setStyle(f=>styleFeat(f,CITY_GEO[curKey],curByNum));
+      if(mapMode==='comuna') paintCityLayer();                     // el mapa vuelve a la ciudad
+      else if(layer) layer.setStyle(f=>styleFeat(f,CITY_GEO[curKey],curByNum));
       if(scroll) document.querySelector('.detail-wrap').scrollIntoView({block:'start',behavior:'smooth'});
     }
 
@@ -553,7 +603,6 @@
     let curDetail=null;      // detalle por-comuna (lazy)
     let detView='resumen';
     let curUnits={};         // id → fn() que devuelve el HTML del body (relleno lazy)
-    let bmap=null, bLayer=null;
     const detailCache={}, barrioGeoCache={};
     const DETAIL_BASE = new URLSearchParams(location.search).has('local')
       ? 'Bases de datos/output_jal_2023/comuna'
@@ -571,15 +620,16 @@
 
     function openComuna(num, scroll){
       const r=curByNum[num]; if(!r) return;
-      selComuna=num; detView='resumen'; curDetail=null; curUnits={};
-      detState={r, num, partidos:r.partidos||[], cands:r.cands||[], filter:null};
+      selComuna=num; selBarrio=null; detView='resumen'; curDetail=null; curUnits={}; votFilter=null;
+      detState={r, num, partidos:r.partidos||[], cands:r.cands||[]};
       renderDetailShell();
       document.getElementById('comuna-grid').style.display='none';
       document.getElementById('comuna-detail').style.display='';
       document.getElementById('back-btn').style.display='';
       document.getElementById('sec-title').textContent=r.name;
-      document.getElementById('sec-sub').textContent=`${curMeta.name} · resumen · barrios · puestos · mesas`;
-      if(layer) layer.setStyle(f=>styleFeat(f,CITY_GEO[curKey],curByNum));
+      document.getElementById('sec-sub').textContent=`${curMeta.name} · resumen, barrio, puesto y mesa`;
+      // el mapa de ciudad resalta la comuna elegida mientras carga su desagregado
+      if(mapMode==='city' && layer) layer.setStyle(f=>styleFeat(f,CITY_GEO[curKey],curByNum));
       if(scroll) document.querySelector('.detail-wrap').scrollIntoView({block:'start',behavior:'smooth'});
       loadDetail(r.code);
     }
@@ -600,7 +650,6 @@
         </div>
         <div class="det-nav" id="det-nav">
           <button data-v="resumen" class="on" onclick="setDetView('resumen')">Resumen</button>
-          <button data-v="barrios" onclick="setDetView('barrios')" disabled>Barrios</button>
           <button data-v="puestos" onclick="setDetView('puestos')" disabled>Puestos</button>
           <button data-v="mesas" onclick="setDetView('mesas')" disabled>Mesas</button>
           <span class="dn-load" id="dn-load">cargando desagregado…</span>
@@ -624,7 +673,10 @@
       const nav=document.getElementById('det-nav'); if(!nav) return;
       nav.querySelectorAll('button[disabled]').forEach(b=>b.disabled=false);
       const l=document.getElementById('dn-load'); if(l) l.remove();
-      if(detView!=='resumen') renderDetView();
+      // el mapa único se convierte en la comuna (sus barrios) donde hay polígonos
+      if(curDetail && curDetail.has_barrio_map) paintComunaLayer();
+      if(detView==='resumen') renderResumen();   // ahora con el selector de barrio poblado
+      else renderDetView();
     }
     function setDetView(v){
       if(v!=='resumen' && !curDetail) return;
@@ -633,34 +685,59 @@
       renderDetView();
     }
     function renderDetView(){
-      if(detView!=='barrios' && bmap){ bmap.remove(); bmap=null; bLayer=null; }
       if(detView==='resumen') renderResumen();
-      else if(detView==='barrios') renderBarrios();
       else if(detView==='puestos') renderPuestos();
       else if(detView==='mesas') renderMesas();
     }
 
-    // ---- Resumen: partidos clickeables + candidatos ----
+    // ---- Resumen: selector de barrio + votación (partidos clickeables + candidatos) ----
+    // Votación normalizada de un barrio: {partidos:[[p,v]], cands:[[nom,pidx,v]], validos}.
+    function barrioVotacion(b){
+      const by={}; b.v.forEach(([ci,vt])=>{const p=dParty(ci); by[p]=(by[p]||0)+vt;});
+      const partidos=Object.entries(by).sort((a,b)=>b[1]-a[1]);
+      const pidx={}; partidos.forEach(([p],i)=>pidx[p]=i);
+      const cands=b.v.slice().sort((a,b)=>b[1]-a[1]).map(([ci,vt])=>[dName(ci), pidx[dParty(ci)], vt]);
+      return {partidos, cands, validos:b.validos};
+    }
     function renderResumen(){
-      const {partidos}=detState;
-      const maxP=partidos[0]?partidos[0][1]:1;
+      // scope: toda la comuna (JSON principal) o un barrio (detalle)
+      curVot = (selBarrio!=null && curDetail && curDetail.barrios[selBarrio])
+        ? barrioVotacion(curDetail.barrios[selBarrio])
+        : {partidos:detState.partidos, cands:detState.cands, validos:detState.r.validos};
+      votFilter=null;
+      const nl=curMeta.nivel==='localidad'?'localidad':'comuna';
+      const barrios=(curDetail&&curDetail.barrios)?curDetail.barrios:[];
+      let sel='';
+      if(barrios.length){
+        const opts=`<option value="">Toda la ${nl}</option>`+barrios.map((b,i)=>`<option value="${i}"${selBarrio==i?' selected':''}>${b.name} (${fmt(b.validos)} válidos)</option>`).join('');
+        sel=`<div class="barrio-picker"><label>Seleccione barrio</label><select onchange="selectBarrio(this.value)">${opts}</select>`
+          +(selBarrio!=null?`<button class="clear-filter" onclick="selectBarrio('')">✕ toda la ${nl}</button>`:'')+`</div>`;
+      }
+      const partidos=curVot.partidos, maxP=partidos[0]?partidos[0][1]:1;
+      const scopeH=selBarrio!=null?`Barrio: ${curDetail.barrios[selBarrio].name}`:`Toda la ${nl}`;
       const pbars=partidos.slice(0,16).map((pp,i)=>`<div class="pbar" data-pi="${i}" onclick="filterCands(${i})" title="Ver los candidatos de ${pp[0]}"><div class="top"><span class="nm">${pp[0]}</span><span class="vv">${fmt(pp[1])}</span></div><div class="track"><i style="width:${Math.max(2,Math.round(pp[1]/maxP*100))}%;background:${partyColor(pp[0])}"></i></div></div>`).join('');
-      document.getElementById('det-content').innerHTML=`<div class="det-body">
-        <div class="det-parties"><h4>Votos por partido <span class="h4-hint">· toca uno para filtrar</span></h4>${pbars||'<div style="color:var(--dim2);font-size:.8rem">Sin datos</div>'}</div>
+      document.getElementById('det-content').innerHTML=`${sel}<div class="det-body">
+        <div class="det-parties"><h4>Votos por partido <span class="h4-hint">· ${scopeH}</span></h4>${pbars||'<div style="color:var(--dim2);font-size:.8rem">Sin datos</div>'}</div>
         <div class="det-cands" id="det-cands"></div></div>`;
       renderCandTable();
     }
+    function selectBarrio(v){
+      selBarrio=(v===''||v==null)?null:parseInt(v,10);
+      if(detView!=='resumen'){ detView='resumen'; document.querySelectorAll('#det-nav button').forEach(b=>b.classList.toggle('on',b.dataset.v==='resumen')); }
+      renderResumen();
+      if(mapMode==='comuna' && layer && layer._byFeat) layer.setStyle(f=>barrioStyle(f._fi));
+    }
     function filterCands(idx){
-      if(!detState) return;
-      detState.filter=(detState.filter===idx?null:idx);
+      if(!curVot) return;
+      votFilter=(votFilter===idx?null:idx);
       renderCandTable();
-      document.querySelectorAll('#comuna-detail .pbar').forEach(el=>el.classList.toggle('active', detState.filter!=null && +el.dataset.pi===detState.filter));
+      document.querySelectorAll('#comuna-detail .pbar').forEach(el=>el.classList.toggle('active', votFilter!=null && +el.dataset.pi===votFilter));
     }
     function renderCandTable(){
-      const {r,partidos,cands,filter}=detState;
+      const {partidos,cands,validos}=curVot, filter=votFilter;
       const list=filter==null?cands:cands.filter(c=>c[1]===filter);
       const head=filter==null?`Todos los candidatos · ${cands.length}`:`Candidatos de ${partidos[filter][0]} · ${list.length} <button class="clear-filter" onclick="filterCands(${filter})">ver todos ✕</button>`;
-      const crows=list.map((c,i)=>{const party=(partidos[c[1]]||[])[0]||'';const pct=r.validos?(c[2]/r.validos*100):0;return `<tr class="${filter==null&&i===0?'win':''}"><td class="c-rank">${i+1}</td><td><div class="c-nm">${c[0]}</div></td><td><div class="c-party"><span class="sw" style="background:${partyColor(party)}"></span>${party}</div></td><td class="num">${fmt(c[2])}</td><td class="num c-pct">${pct.toFixed(1)}%</td></tr>`;}).join('');
+      const crows=list.map((c,i)=>{const party=(partidos[c[1]]||[])[0]||'';const pct=validos?(c[2]/validos*100):0;return `<tr class="${filter==null&&i===0?'win':''}"><td class="c-rank">${i+1}</td><td><div class="c-nm">${c[0]}</div></td><td><div class="c-party"><span class="sw" style="background:${partyColor(party)}"></span>${party}</div></td><td class="num">${fmt(c[2])}</td><td class="num c-pct">${pct.toFixed(1)}%</td></tr>`;}).join('');
       document.getElementById('det-cands').innerHTML=`<h4>${head}</h4><div class="cand-scroll"><table class="ctab"><thead><tr><th class="c-rank">#</th><th>Candidato (edil)</th><th>Partido</th><th class="num">Votos</th><th class="num">% válid.</th></tr></thead><tbody>${crows}</tbody></table></div>`;
     }
 
@@ -685,45 +762,6 @@
       const open=row.classList.toggle('open');
       const body=document.getElementById('body-'+id);
       if(open && body && !body.dataset.filled && curUnits[id]){ body.innerHTML=curUnits[id](); body.dataset.filled='1'; }
-    }
-
-    // ---- Barrios (tabla + mapa donde exista) ----
-    function renderBarrios(){
-      const d=curDetail;
-      const barrios=(d.barrios||[]).map((b,i)=>({...b,_i:i})).sort((a,b)=>b.validos-a.validos);
-      curUnits={};
-      const rows=barrios.map(b=>{ const id='b'+b._i; curUnits[id]=()=>unitCandTable(b.v,b.validos); return unitRow(id, b.name, null, unitWinner(b.v), b.validos); }).join('');
-      document.getElementById('det-content').innerHTML=
-        (d.has_barrio_map?`<div class="bmap-wrap"><div class="bmap-hint">Barrios de ${detState.r.name} · color = partido ganador · toca uno</div><div id="bmap"></div></div>`
-                        :`<div style="padding:.85rem 1.3rem;color:var(--dim2);font-size:.76rem">Esta ciudad no tiene polígonos de barrio; se muestra la tabla por barrio (censo).</div>`)
-        +`<div class="unit-list">${rows}</div>`;
-      if(d.has_barrio_map) buildBarrioMap(barrios);
-    }
-    async function buildBarrioMap(barrios){
-      const cfg=BARRIO_GEO[curKey]; if(!cfg) return;
-      let geo=barrioGeoCache[curKey];
-      if(!geo){ try{ geo=await (await fetch(cfg.url)).json(); barrioGeoCache[curKey]=geo; }catch(e){ return; } }
-      const byFeat={}; barrios.forEach(b=>{ if(b.feat!=null) byFeat[b.feat]=b; });
-      const sub={type:'FeatureCollection',features:geo.features.map((f,i)=>({...f,_fi:i})).filter(f=>byFeat[f._fi]!=null)};
-      const drawn = cfg.rotate ? rotate90Left(sub) : sub;
-      if(!document.getElementById('bmap')) return;
-      if(bmap){ bmap.remove(); bmap=null; }
-      // setView inicial: garantiza que el mapa tenga una vista válida (si se crea
-      // antes del layout, el contenedor mide 0×0 y fitBounds daría zoom NaN →
-      // polígonos degenerados). El fitBounds real corre en un doble rAF con el
-      // contenedor ya medido (invalidateSize).
-      bmap=L.map('bmap',{zoomControl:true,attributionControl:false,scrollWheelZoom:false}).setView([4.6,-74.1],11);
-      bLayer=L.geoJSON(drawn,{
-        style:f=>{ const b=byFeat[f._fi]; const w=unitWinner(b.v); return {fillColor:w?partyColor(w.party):'#20242e',fillOpacity:.82,color:'rgba(255,255,255,.28)',weight:1}; },
-        onEachFeature:(f,lyr)=>{ const b=byFeat[f._fi]; const w=unitWinner(b.v); const tc=b.v[0];
-          lyr.on('mouseover',()=>lyr.setStyle({weight:2.4,color:'#fff'}));
-          lyr.on('mouseout',()=>lyr.setStyle({weight:1,color:'rgba(255,255,255,.28)'}));
-          lyr.bindTooltip(`<div class="tt-t">${b.name}</div><div class="tt-row">Gana: <b>${w?w.party:'—'}</b></div>${tc?`<div class="tt-row">Edil: <b>${dName(tc[0])}</b> · ${fmt(tc[1])}</div>`:''}<div class="tt-row"><b>${fmt(b.validos)}</b> válidos</div>`,{className:'jal-tt',sticky:true});
-          lyr.on('click',()=>{ const id='b'+b._i, row=document.getElementById('row-'+id); if(row){ if(!row.classList.contains('open')) toggleUnit(id); row.scrollIntoView({block:'center',behavior:'smooth'}); row.classList.add('hl'); setTimeout(()=>row.classList.remove('hl'),1500); } });
-        }
-      }).addTo(bmap);
-      const fit=()=>{ if(!bmap) return; bmap.invalidateSize(); try{ const bb=bLayer.getBounds(); if(bb.isValid()) bmap.fitBounds(bb,{padding:[12,12]}); }catch(e){} };
-      requestAnimationFrame(()=>requestAnimationFrame(fit));
     }
 
     // ---- Puestos (→ candidatos + mesas) ----
