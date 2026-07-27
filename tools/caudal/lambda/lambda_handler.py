@@ -1191,16 +1191,24 @@ def handler(event, context):
         # expansión IA opt-in aquí (la vista de lista se usa también para
         # filtros internos, donde el literal es lo que se espera).
         extra = _expandir_query(q) if body.get('expandir_ia') else []
-        hits = caudal.buscar(q, anio_min=body.get('anio_min'),
-                             anio_max=body.get('anio_max'),
-                             comision=body.get('comision'),
-                             resultado=body.get('resultado'),
-                             tipologia=body.get('tipologia'),
-                             empuje=body.get('empuje'),
-                             limit=body.get('limit', 50),
-                             extra_terms=extra)
+        # relajar=True (③): consultas de varias palabras no colapsan por AND; anclan
+        # al término más específico y rankean por nº de coincidencias.
+        hits, meta = caudal.buscar(q, anio_min=body.get('anio_min'),
+                                   anio_max=body.get('anio_max'),
+                                   comision=body.get('comision'),
+                                   resultado=body.get('resultado'),
+                                   tipologia=body.get('tipologia'),
+                                   empuje=body.get('empuje'),
+                                   limit=body.get('limit', 50),
+                                   extra_terms=extra, relajar=True, with_meta=True)
+        rel = (meta or {}).get('relajado')
+        flex = None
+        if rel and rel.get('n_total', 0) > rel.get('n_estricto', 0):
+            flex = {'anchor': rel['anchor'], 'n_estricto': rel['n_estricto'],
+                    'n_total': rel['n_total']}
         return _resp(200, {'query': q, 'n': len(hits), 'resultados': hits,
-                           'expansion': {'terminos': extra} if extra else None})
+                           'expansion': {'terminos': extra} if extra else None,
+                           'flexible': flex})
 
     if action == 'stats':          # agregados globales precalculados (para gráficas)
         try:

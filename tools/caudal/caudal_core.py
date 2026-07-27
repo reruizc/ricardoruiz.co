@@ -97,6 +97,46 @@ SINONIMOS = [
                                          'bienestar animal']},
     {'k': 'victimas del conflicto', 'terms': ['victimas del conflicto',
                                               'reparacion de victimas']},
+    # --- vocabulario empresarial / sectorial (② · respaldo determinista de la
+    # expansión IA de la Lambda). El cliente busca con la palabra del gremio, pero
+    # el título formal usa otra: 'etiquetado' → 'entornos alimentarios saludables'
+    # (Ley 2120/2021). Validado contra el vocabulario REAL de los títulos; se evitan
+    # palabras que colisionan por substring/stem ('seguros'→'segur'≈seguridad,
+    # 'gas'≤3 chars queda solo 'natural', 'chatarra'≈chatarrización). Las frases
+    # (todas sus palabras >3 deben aparecer) son disparadores seguros: solo activan
+    # el tópico si TODAS están en la consulta.
+    {'k': 'alimentos / etiquetado', 'terms': [
+        'etiquetado', 'rotulado nutricional', 'rotulado', 'sellos de advertencia',
+        'entornos alimentarios saludables', 'alimentacion saludable']},
+    {'k': 'transporte por plataformas', 'terms': [
+        'plataformas digitales', 'plataformas tecnologicas', 'transporte por aplicaciones',
+        'aplicaciones de transporte', 'economia colaborativa', 'trabajo en plataformas']},
+    {'k': 'asbesto', 'terms': ['asbesto', 'amianto']},
+    {'k': 'farmaceutico / medicamentos', 'terms': [
+        'medicamentos', 'farmaceutico', 'industria farmaceutica', 'dispositivos medicos',
+        'precios de medicamentos']},
+    {'k': 'sector financiero', 'terms': [
+        'sistema financiero', 'entidades financieras', 'establecimientos de credito',
+        'mercado de valores', 'tasa de usura', 'inclusion financiera', 'habeas financiero']},
+    {'k': 'energia y servicios publicos', 'terms': [
+        'transicion energetica', 'energias renovables', 'servicios publicos domiciliarios',
+        'eficiencia energetica', 'energia electrica']},
+    {'k': 'telecomunicaciones', 'terms': [
+        'telecomunicaciones', 'espectro radioelectrico', 'servicios de comunicaciones',
+        'conectividad', 'banda ancha', 'internet']},
+    {'k': 'ambiental / medio ambiente', 'terms': [
+        'proteccion del medio ambiente', 'licencia ambiental', 'delitos ambientales',
+        'deforestacion', 'recursos naturales', 'contaminacion']},
+    {'k': 'datos personales / habeas data', 'terms': [
+        'datos personales', 'habeas data', 'proteccion de datos', 'tratamiento de datos']},
+    {'k': 'mineria e hidrocarburos', 'terms': [
+        'mineria', 'hidrocarburos', 'explotacion minera', 'actividad minera', 'regalias']},
+    {'k': 'sector agropecuario', 'terms': [
+        'agropecuario', 'reforma agraria', 'desarrollo rural', 'produccion agropecuaria']},
+    {'k': 'licores y tabaco', 'terms': [
+        'bebidas alcoholicas', 'licores', 'tabaco', 'cigarrillo', 'productos de tabaco']},
+    {'k': 'propiedad intelectual', 'terms': [
+        'propiedad intelectual', 'derechos de autor', 'patentes', 'marcas registradas']},
 ]
 
 
@@ -160,6 +200,7 @@ class Caudal:
         # (build_texto_index.py). texto_ids[i] = 'tb:id'.
         self.texto_index = texto_index or {}
         self.texto_ids = texto_ids or []
+        self._tn_cache = None             # [(it, título_norm, 'tb:id')] — lazy
 
     @classmethod
     def from_local(cls):
@@ -189,6 +230,18 @@ class Caudal:
                     self._full[f"{tb}:{r['id']}"] = r
         return self._full
 
+    def _titulos_norm(self):
+        """[(it, título_normalizado, 'tb:id')] cacheado — el índice es estático, así
+        se normaliza una sola vez por contenedor (antes cada buscar re-normalizaba
+        los ~10k títulos; el Radar del cliente llama a buscar ~24 veces por request).
+        También sirve para calcular la frecuencia por palabra en la búsqueda relajada."""
+        if self._tn_cache is None:
+            self._tn_cache = [
+                (it, _norm(it['t'] + (' ' + it['ta'] if it.get('ta') else '')),
+                 f"{it.get('tb', 'pdly')}:{it['id']}")
+                for it in self.indice]
+        return self._tn_cache
+
     def _match_texto(self, query):
         """ids ('tb:id') cuyas gacetas mencionan TODAS las palabras
         significativas de la consulta — capa sobre el título/alias que cubre
@@ -212,7 +265,7 @@ class Caudal:
     # -------- búsqueda ------------------------------------------------
     def buscar(self, query, anio_min=None, anio_max=None, comision=None,
                resultado=None, tipologia=None, empuje=None, limit=None, expandir=True,
-               extra_terms=None):
+               extra_terms=None, relajar=False, with_meta=False):
         """Match por keyword(s) en el título O en el texto de sus gacetas.
         Filtros F1: tipologia (honores/fondos/…) y empuje (vitrina/empujado/…).
         `expandir`: si la consulta cae en un tópico del tesauro, matchea por OR
@@ -222,7 +275,18 @@ class Caudal:
         el tesauro curado, así que cubre el desajuste de vocabulario cuando el
         título formal no usa la palabra del usuario ('etiquetado' vs 'entornos
         alimentarios saludables'). La consulta original entra siempre como una
-        opción más del OR, para no perder el match literal."""
+        opción más del OR, para no perder el match literal.
+        `relajar` (③ · SOLO la búsqueda del usuario, NO el Radar): cuando la consulta
+        es de varias palabras y NO cayó en tópico ni trae expansión IA, en vez de
+        exigir TODAS las palabras (AND, que colapsa 'prohibición de asbesto' a 1),
+        ancla al término más ESPECÍFICO (el de menor frecuencia = el 'tema'; las
+        otras suelen ser calificadores como 'prohibición de', 'regulación de') y
+        rankea por cuántas palabras coincide cada título. Reproduce
+        'prohibición de asbesto'→37 (=='asbesto') sin inundar con el ruido del
+        calificador común. El Radar del cliente deja relajar=False para conservar
+        la precisión del AND en sus frases curadas.
+        `with_meta`: si True devuelve (lista, {'relajado': ...}) para que la UI
+        muestre el aviso de búsqueda flexible."""
         topicos = _topicos(query) if (query and expandir) else []
         or_terms = [term for t in topicos for term in t['terms']]
         if query and extra_terms:
@@ -232,25 +296,61 @@ class Caudal:
                 if len(tn) >= 4 and tn not in seen:
                     seen.add(tn)
                     or_terms.append(tn)
+        titn = self._titulos_norm()
+        base = [_norm(w) for w in query.split() if len(w) > 2] if query else []
+        nbase = len(base)
+        relajado = None
+        anchor = None
+        # ancla = término(s) más específico(s) de la consulta (menor frecuencia en
+        # títulos = el "tema"; las demás palabras suelen ser calificadores como
+        # 'prohibición de', 'regulación de'). Solo se calcula cuando se necesita
+        # (búsqueda del usuario: tópico/IA o relajación) — el Radar la salta.
+        need_anchor = bool(base) and (bool(or_terms) or (relajar and nbase >= 2))
+        if need_anchor:
+            dfw = {w: sum(1 for (_i, t, _x) in titn if _term_match(w, t)) for w in base}
+            min_df = min(dfw.values())
+            anchor = [w for w in base if dfw[w] == min_df]
         if or_terms:
             def _match(titulo):
-                return any(_phrase_match(term, titulo) for term in or_terms)
-        else:
-            base = [_norm(w) for w in query.split() if len(w) > 2] if query else []
+                return 1 if any(_phrase_match(term, titulo) for term in or_terms) else 0
+        elif relajar and nbase >= 2:
+            # rankea por nº de palabras que coincide; incluye si toca el ancla.
             def _match(titulo):
-                return all(_term_match(w, titulo) for w in base)
-        texto_ids = self._match_texto(query) if query else set()
+                if not any(_term_match(w, titulo) for w in anchor):
+                    return 0
+                return sum(1 for w in base if _term_match(w, titulo))   # ≥1
+            relajado = {'base': base, 'anchor': anchor}
+        elif base:
+            def _match(titulo):
+                return 1 if all(_term_match(w, titulo) for w in base) else 0
+        else:
+            _match = None
+        # texto de gaceta anclado al término específico (tópico/IA y relajado): un
+        # calificador común no debe restringir el texto —'prohibición de asbesto'
+        # perdía las 32 menciones de 'asbesto' en ponencias/actas y daba 5 en vez de
+        # 37 (agregar palabras encogía). El Radar (base literal, expandir=False)
+        # mantiene AND de la frase curada por precisión.
+        if not query:
+            texto_ids = set()
+        elif anchor:
+            texto_ids = set()
+            for w in anchor:
+                texto_ids |= self._match_texto(w)
+        else:
+            texto_ids = self._match_texto(query)
         out = []
-        for it in self.indice:
-            # 't' = título vigente; 'ta' = alias (p.ej. nombre con el que se
-            # sancionó como ley, si cambió en el trámite) — buscar contra ambos
-            # para que "clonación" encuentre el proyecto aunque hoy se llame distinto.
-            t = _norm(it['t'] + (' ' + it['ta'] if it.get('ta') else ''))
-            tid = f"{it.get('tb', 'pdly')}:{it['id']}"
-            match_titulo = _match(t) if query else True
-            match_texto = tid in texto_ids
-            if query and not match_titulo and not match_texto:
-                continue
+        n_estricto = 0
+        for it, t, tid in titn:
+            # 't' ya trae título vigente + alias 'ta' normalizados (_titulos_norm),
+            # así "clonación" encuentra el proyecto aunque hoy se llame distinto.
+            if _match is not None:
+                mc = _match(t)
+                match_titulo = mc > 0
+                match_texto = tid in texto_ids
+                if not match_titulo and not match_texto:
+                    continue
+            else:
+                mc, match_titulo, match_texto = 0, True, False
             if anio_min and (it['a'] or 0) < anio_min:
                 continue
             if anio_max and (it['a'] or 9999) > anio_max:
@@ -263,14 +363,32 @@ class Caudal:
                 continue
             if empuje and it.get('emp') != empuje:
                 continue
-            out.append({**it, 'mt': True} if (match_texto and not match_titulo) else it)
-        out.sort(key=lambda x: (x['a'] or 0))
-        return out[:limit] if limit else out
+            if relajado and match_titulo and mc == nbase:
+                n_estricto += 1
+            if match_texto and not match_titulo:
+                rec = {**it, 'mt': True}
+            elif relajado:
+                rec = {**it, '_mc': mc, '_nw': nbase}
+            else:
+                rec = it
+            out.append(rec)
+        if relajado:
+            relajado['n_estricto'] = n_estricto
+            relajado['n_total'] = len(out)
+            # ranking por nº de coincidencias desc (luego año) — para la LISTA de la
+            # acción 'buscar'. El timeline del tema re-ordena por año en resumen_tema.
+            out.sort(key=lambda x: (-(x.get('_mc') or 0), -(x['a'] or 0)))
+        else:
+            out.sort(key=lambda x: (x['a'] or 0))
+        result = out[:limit] if limit else out
+        return (result, {'relajado': relajado}) if with_meta else result
 
     # -------- análisis de un tema (survival / embudo) -----------------
     def resumen_tema(self, query, **filtros):
         extra_terms = filtros.get('extra_terms') or []
-        hits = self.buscar(query, **filtros)
+        # relajar=True: la búsqueda del usuario nunca colapsa por AND (③). El
+        # Radar del cliente llama a buscar aparte con relajar=False (precisión).
+        hits, meta = self.buscar(query, relajar=True, with_meta=True, **filtros)
         n = len(hits)
         leyes = [h for h in hits if h['ley']]
         tiempo = [h for h in hits if h['res'] == 'ARCHIVADO_TIEMPO']
@@ -306,21 +424,16 @@ class Caudal:
             empuje[h.get('emp', 'sin_traccion')] = empuje.get(h.get('emp', 'sin_traccion'), 0) + 1
         n_vitrina = empuje.get('vitrina', 0)
         n_honores = tipologia.get('honores', 0)
-        # sugerencia de ampliar: si el query tiene ≥2 palabras y la intersección
-        # (AND) es chica, ofrece el término más distintivo (el más raro, que suele
-        # ser el "tema" real) porque recupera más. Ej: «reforma pensional» → «pensional».
-        # capa de sinónimos: si la consulta cayó en tópico(s) curados, la búsqueda
-        # ya se expandió (OR sobre su vocabulario) — no se ofrece broaden.
         topicos = _topicos(query)
-        broaden = None
-        terms = [t for t in query.split() if len(t) > 2] if query else []
-        # con expansión (tesauro o IA) la búsqueda ya fue OR: ofrecer "ampliar"
-        # sería ruido, porque el recall ya se subió.
-        if not topicos and not extra_terms and len(terms) >= 2:
-            counts = [(t, len(self.buscar(t, expandir=False))) for t in terms]
-            t_rare, c_rare = min(counts, key=lambda x: x[1])
-            if c_rare > n:
-                broaden = {'term': t_rare, 'count': c_rare}
+        # ③ búsqueda flexible: si la consulta multi-palabra se relajó (ancló al
+        # término más específico en vez de exigir todas), el aviso explica por qué
+        # salieron más resultados que las coincidencias exactas. Reemplaza el viejo
+        # 'broaden', que pedía un segundo clic para ampliar a un solo término.
+        flexible = None
+        rel = (meta or {}).get('relajado')
+        if rel and rel.get('n_total', 0) > rel.get('n_estricto', 0):
+            flexible = {'anchor': rel['anchor'], 'base': rel['base'],
+                        'n_estricto': rel['n_estricto'], 'n_total': rel['n_total']}
         sinonimos = None
         if topicos:
             incluye = []
@@ -348,9 +461,12 @@ class Caudal:
             'empuje': dict(sorted(empuje.items(), key=lambda x: -x[1])),
             'n_vitrina': n_vitrina, 'n_honores': n_honores,
             'pct_vitrina': round(100 * n_vitrina / n, 1) if n else 0,
-            'broaden': broaden,
+            'flexible': flexible,
             'sinonimos': sinonimos,
             'expansion': expansion,
+            # timeline en orden cronológico (buscar puede devolver por ranking cuando
+            # relaja); 'mc'/'nw' = palabras coincididas / total, para el toggle
+            # cliente-side "solo exactas".
             'intentos': [{
                 'id': h['id'], 'tb': h.get('tb', 'pdly'), 'anio': h['a'], 'leg': h['leg'],
                 'titulo': h['t'], 'resultado': h['res'],
@@ -362,8 +478,9 @@ class Caudal:
                 'vitrina_score': h.get('vs', 0), 'veces_presentado': h.get('vp', 1),
                 'crea_fondo': h.get('cf', False), 'jala_presupuesto': h.get('jp', False),
                 'etapa_max': h.get('et', 0),
+                'mc': h.get('_mc'), 'nw': h.get('_nw'),
                 'match_texto': h.get('mt', False),   # matcheó por el texto de su gaceta, no por título
-            } for h in hits],
+            } for h in sorted(hits, key=lambda h: (h.get('a') or 0))],
         }
 
     # -------- candidatos para profundizar un tema con texto de gaceta --
@@ -388,7 +505,10 @@ class Caudal:
             comision_lbl = comision_lbl or s.get('comision', '')
         seen = {}
         for t in temas:
-            for h in self.buscar(t):
+            # expandir=False + relajar=False: los temas del Radar son frases curadas
+            # para PRECISIÓN (AND literal); el tesauro/relajación es solo de la
+            # búsqueda libre del usuario, no del Radar.
+            for h in self.buscar(t, expandir=False):
                 seen.setdefault((h.get('tb', 'pdly'), h['id']), h)
         hits = list(seen.values())
 

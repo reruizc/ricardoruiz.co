@@ -1337,7 +1337,7 @@
     const intentos=r.intentos||[];
     const tl=intentos.map(it=>{
       const rc=RES_COLOR[it.resultado]||'var(--gray)';
-      return `<div class="tl-item" data-id="${it.id}" data-tb="${it.tb||'pdly'}" data-emp="${it.empuje||''}" data-tip="${it.tipologia||''}">
+      return `<div class="tl-item" data-id="${it.id}" data-tb="${it.tb||'pdly'}" data-emp="${it.empuje||''}" data-tip="${it.tipologia||''}" data-mc="${it.mc!=null?it.mc:''}" data-nw="${it.nw!=null?it.nw:''}">
         <span class="tl-year">${it.anio||'—'}</span>
         <div class="tl-body">
           <div class="tl-titulo" title="${esc(it.titulo)}">${esc(shortTitle(it.titulo).slice(0,110))}</div>
@@ -1361,7 +1361,7 @@
     results.innerHTML=`
       <div class="r-sub">Tema: <b>${esc(query)}</b> · ${r.n_intentos} intentos · ${r.periodo?r.periodo[0]+'–'+r.periodo[1]:''}</div>
       <div class="r-titular" id="r-titular">${r.n_intentos} intentos · ${r.n_leyes} ${r.n_leyes===1?'ley':'leyes'} · ${r.pct_exito}% de éxito</div>
-      ${r.broaden?`<div class="broaden" id="broaden-hint">Búsqueda estricta (todas las palabras). También hay <b>${r.broaden.count}</b> con «<b>${esc(r.broaden.term)}</b>» — <span class="bd-link" data-term="${esc(r.broaden.term)}">ver todos →</span></div>`:''}
+      ${r.flexible?`<div class="broaden" id="flex-hint"><b>Búsqueda flexible</b> · pocas coincidencias con todas tus palabras (<b>${r.flexible.n_estricto}</b>). Mostrando los <b>${r.flexible.n_total}</b> del término más específico: «<b>${esc((r.flexible.anchor||[]).join(', '))}</b>». <span class="bd-link" id="flex-toggle" data-mode="all">ver solo las exactas →</span></div>`:''}
       ${r.sinonimos?`<div class="broaden" id="syn-hint"><b>Búsqueda por tema</b> · el Congreso titula esto de varias formas, así que se incluyen: ${r.sinonimos.incluye.map(esc).join(' · ')}.</div>`:''}
       ${(r.expansion&&r.expansion.terminos&&r.expansion.terminos.length)?`<div class="broaden" id="exp-hint"><b>Búsqueda ampliada</b> · los títulos del Congreso rara vez usan tus palabras, así que también se buscó por: ${r.expansion.terminos.map(esc).join(' · ')}.</div>`:''}
 
@@ -1410,8 +1410,6 @@
       results.querySelectorAll('.mort-bar').forEach(s=>s.style.height=s.dataset.h+'%');
     });
     loadStats();   // por si aún no cargó (llena #mort-box cuando resuelva)
-    const bd=results.querySelector('#broaden-hint .bd-link');
-    if(bd) bd.onclick=()=>{ q.value=bd.dataset.term; buscar(); };
     const tlItems=[...results.querySelectorAll('.tl-item')];
     tlItems.forEach(el=>el.onclick=()=>abrirProyecto(el.dataset.id,el.dataset.tb));
     // filtro clickeable: clasifica los intentos por empuje/tipología
@@ -1427,6 +1425,23 @@
       });
       if(tlHead) tlHead.textContent=`${shown} intento(s)${f==='all'?'':' filtrados'} · click para la ficha`;
     });
+    // ③ toggle búsqueda flexible: alterna entre TODAS (relajado) y solo las que
+    // coinciden con todas las palabras (mc===nw), filtrando el timeline in situ.
+    const flexTgl=document.getElementById('flex-toggle');
+    if(flexTgl) flexTgl.onclick=()=>{
+      const showAll=flexTgl.dataset.mode==='exact';   // si estaba en 'exact' → volver a todas
+      let shown=0;
+      tlItems.forEach(el=>{
+        const mc=el.dataset.mc, nw=el.dataset.nw;
+        const exact=(mc!=='' && nw!=='' && mc===nw);
+        const ok=showAll||exact;
+        el.style.display=ok?'':'none'; if(ok) shown++;
+      });
+      flexTgl.dataset.mode=showAll?'all':'exact';
+      flexTgl.textContent=showAll?'ver solo las exactas →':'ver todas →';
+      if(tlHead) tlHead.textContent=`${shown} intento(s)${showAll?'':' · solo exactas'} · click para la ficha`;
+      results.querySelectorAll('.ichip-f').forEach(x=>x.classList.toggle('on', x.dataset.f==='all'));
+    };
   }
 
   function renderLectura(l){
