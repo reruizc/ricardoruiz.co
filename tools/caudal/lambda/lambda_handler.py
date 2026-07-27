@@ -403,6 +403,68 @@ SINT_SYSTEM = (
 )
 
 
+QEXP_SYSTEM = """Eres experto en técnica legislativa colombiana. El usuario busca un tema con
+SUS palabras (lenguaje común o empresarial), pero los títulos de los proyectos de ley usan
+lenguaje formal y a menudo NO contienen esa palabra. Ejemplo real: la ley de sellos de
+advertencia se titula "por medio de la cual se adoptan medidas para fomentar ENTORNOS
+ALIMENTARIOS SALUDABLES" — la palabra "etiquetado" no aparece nunca.
+
+Devuelve el vocabulario que REALMENTE aparece en los títulos de proyectos de ley del Congreso
+de Colombia sobre ese tema, para poder recuperarlos.
+
+Reglas:
+1. Entre 6 y 12 términos. Cada uno es una palabra o una frase corta (2-4 palabras).
+2. OBLIGATORIO: si sobre el tema ya se aprobó una ley en Colombia, incluye la frase con la que
+   se TITULÓ esa ley, aunque no contenga la palabra del usuario. Piensa "¿cómo se llamó la ley
+   que quedó?" — es el término más valioso, porque es el que el título sí contiene.
+3. Incluye además sinónimos formales, el nombre técnico y como el Congreso nombra el asunto.
+4. NO incluyas palabras genéricas que traerían ruido: ley, norma, nacional, sistema, servicio,
+   medidas, disposiciones, política, general, colombiano, territorio, fomento.
+5. Cada término debe ser DISTINTIVO del tema: si al leerlo suelto no se sabe de qué trata, va fuera.
+6. Prefiere precisión sobre cantidad. Ante la duda, omite el término.
+7. Sin tildes, en minúsculas.
+
+Ejemplo (tema "etiquetado alimentos") → debe incluir "entornos alimentarios saludables" (así se
+tituló la Ley 2120 de 2021), además de "sellos de advertencia", "rotulado nutricional", etc.
+
+Responde SOLO JSON: {"terminos": ["...", "..."]}"""
+
+QEXP_VERSION = 'v2'   # versión propia: cambiarla invalida SOLO el cache de expansión
+
+
+def _expandir_query(query):
+    """Vocabulario legislativo equivalente a la consulta del usuario (expansión
+    de consulta con IA). Resuelve el desajuste de vocabulario: el usuario busca
+    'etiquetado' y el título dice 'entornos alimentarios saludables'. Cacheado
+    por consulta normalizada; best-effort (si falla, [] y la búsqueda sigue
+    como antes — nunca rompe la ruta)."""
+    q = (query or '').strip()
+    if len(q) < 3:
+        return []
+    ck = 'qexp-' + _hash24(QEXP_VERSION + '|qexp|' + q.lower())
+    cached = _cache_get(ck)
+    if cached is not None:
+        return cached.get('terminos', [])
+    try:
+        raw = _call_llm('sintesis', QEXP_SYSTEM,
+                        f'Tema buscado por el usuario: "{q}"\n\nJSON:',
+                        max_tokens=2500).strip()
+        if raw.startswith('```'):
+            raw = raw.split('```')[1].lstrip('json').strip()
+        data = json.loads(raw)
+        terms, seen = [], set()
+        for t in (data.get('terminos') or [])[:10]:
+            t = str(t or '').strip().lower()
+            # descarta lo muy corto/genérico y los duplicados
+            if 4 <= len(t) <= 48 and t not in seen:
+                seen.add(t)
+                terms.append(t)
+    except Exception:
+        terms = []
+    _cache_put(ck, {'terminos': terms})
+    return terms
+
+
 def _sintesis_tema(resumen, casos=None):
     casos_hash = _hash24('|'.join(sorted(c['gaceta'] for c in (casos or []))))
     key = _hash24(PROMPT_VERSION + '|tema|' + resumen['query'] + '|' +
@@ -1126,14 +1188,19 @@ def handler(event, context):
 
     if action == 'buscar':
         q = body.get('query', '')
+        # expansión IA opt-in aquí (la vista de lista se usa también para
+        # filtros internos, donde el literal es lo que se espera).
+        extra = _expandir_query(q) if body.get('expandir_ia') else []
         hits = caudal.buscar(q, anio_min=body.get('anio_min'),
                              anio_max=body.get('anio_max'),
                              comision=body.get('comision'),
                              resultado=body.get('resultado'),
                              tipologia=body.get('tipologia'),
                              empuje=body.get('empuje'),
-                             limit=body.get('limit', 50))
-        return _resp(200, {'query': q, 'n': len(hits), 'resultados': hits})
+                             limit=body.get('limit', 50),
+                             extra_terms=extra)
+        return _resp(200, {'query': q, 'n': len(hits), 'resultados': hits,
+                           'expansion': {'terminos': extra} if extra else None})
 
     if action == 'stats':          # agregados globales precalculados (para gráficas)
         try:
@@ -1364,9 +1431,12 @@ def handler(event, context):
         q = body.get('query', '')
         if not q.strip():
             return _resp(400, {'error': 'falta query'})
+        # expansión de consulta con IA (ON por defecto): cubre el desajuste de
+        # vocabulario usuario↔título formal. `expandir_ia:false` la apaga.
+        extra = _expandir_query(q) if body.get('expandir_ia', True) else []
         resumen = caudal.resumen_tema(
             q, anio_min=body.get('anio_min'), anio_max=body.get('anio_max'),
-            comision=body.get('comision'))
+            comision=body.get('comision'), extra_terms=extra)
         out = {'query': q, 'resumen': resumen,
                'model_info': {'sintesis': STEP_MODELS['sintesis']}}
         if body.get('lectura', True) and resumen['n_intentos'] > 0:

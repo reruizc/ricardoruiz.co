@@ -211,14 +211,28 @@ class Caudal:
 
     # -------- búsqueda ------------------------------------------------
     def buscar(self, query, anio_min=None, anio_max=None, comision=None,
-               resultado=None, tipologia=None, empuje=None, limit=None, expandir=True):
+               resultado=None, tipologia=None, empuje=None, limit=None, expandir=True,
+               extra_terms=None):
         """Match por keyword(s) en el título O en el texto de sus gacetas.
         Filtros F1: tipologia (honores/fondos/…) y empuje (vitrina/empujado/…).
         `expandir`: si la consulta cae en un tópico del tesauro, matchea por OR
-        sobre su vocabulario (capa de sinónimos); si no, AND de palabras (literal)."""
+        sobre su vocabulario (capa de sinónimos); si no, AND de palabras (literal).
+        `extra_terms`: vocabulario adicional inyectado desde fuera (expansión IA
+        de la consulta, ver _expandir_query en la Lambda). Entra al MISMO OR que
+        el tesauro curado, así que cubre el desajuste de vocabulario cuando el
+        título formal no usa la palabra del usuario ('etiquetado' vs 'entornos
+        alimentarios saludables'). La consulta original entra siempre como una
+        opción más del OR, para no perder el match literal."""
         topicos = _topicos(query) if (query and expandir) else []
-        if topicos:
-            or_terms = [term for t in topicos for term in t['terms']]
+        or_terms = [term for t in topicos for term in t['terms']]
+        if query and extra_terms:
+            seen = set(or_terms)
+            for t in [query] + list(extra_terms):
+                tn = _norm(t or '').strip()
+                if len(tn) >= 4 and tn not in seen:
+                    seen.add(tn)
+                    or_terms.append(tn)
+        if or_terms:
             def _match(titulo):
                 return any(_phrase_match(term, titulo) for term in or_terms)
         else:
@@ -255,6 +269,7 @@ class Caudal:
 
     # -------- análisis de un tema (survival / embudo) -----------------
     def resumen_tema(self, query, **filtros):
+        extra_terms = filtros.get('extra_terms') or []
         hits = self.buscar(query, **filtros)
         n = len(hits)
         leyes = [h for h in hits if h['ley']]
@@ -299,7 +314,9 @@ class Caudal:
         topicos = _topicos(query)
         broaden = None
         terms = [t for t in query.split() if len(t) > 2] if query else []
-        if not topicos and len(terms) >= 2:
+        # con expansión (tesauro o IA) la búsqueda ya fue OR: ofrecer "ampliar"
+        # sería ruido, porque el recall ya se subió.
+        if not topicos and not extra_terms and len(terms) >= 2:
             counts = [(t, len(self.buscar(t, expandir=False))) for t in terms]
             t_rare, c_rare = min(counts, key=lambda x: x[1])
             if c_rare > n:
@@ -312,6 +329,10 @@ class Caudal:
                     if term not in incluye:
                         incluye.append(term)
             sinonimos = {'topicos': [t['k'] for t in topicos], 'incluye': incluye}
+        # expansión IA: se reporta aparte para que la UI pueda decir con qué
+        # vocabulario se buscó (el usuario debe ver por qué salió un título que
+        # no contiene su palabra).
+        expansion = {'terminos': list(extra_terms)} if extra_terms else None
         return {
             'query': query, 'n_intentos': n,
             'n_leyes': len(leyes), 'n_caidos': len(caidos),
@@ -329,6 +350,7 @@ class Caudal:
             'pct_vitrina': round(100 * n_vitrina / n, 1) if n else 0,
             'broaden': broaden,
             'sinonimos': sinonimos,
+            'expansion': expansion,
             'intentos': [{
                 'id': h['id'], 'tb': h.get('tb', 'pdly'), 'anio': h['a'], 'leg': h['leg'],
                 'titulo': h['t'], 'resultado': h['res'],
