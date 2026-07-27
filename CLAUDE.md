@@ -5548,15 +5548,38 @@ Cuando la consulta cae en un tópico curado, la búsqueda pasa de AND-de-palabra
 comporta idéntico a antes (cero regresión). Cada tópico `{k, terms}`; los `terms`
 cumplen doble rol: **disparan** el tópico desde la consulta Y **expanden** el
 match (palabra ≥4 chars por substring/raíz · frase = todas sus palabras >3).
-15 tópicos hoy (aborto/derechos reproductivos, eutanasia↔muerte digna, paridad↔
-cuota de género, cannabis, protección animal, trata de personas, etc.). Hallazgo
-clave: el Congreso **no titula "aborto"** (0 hits) — el debate vive como "derechos
-sexuales y reproductivos"/"salud reproductiva" (→ ahora 12). `resumen_tema`
-devuelve `sinonimos:{topicos,incluye}`; el frontend lo muestra ("Búsqueda por
-tema · se incluyen: …") y suprime el hint de `broaden` en ese caso. **Agregar un
-tópico:** una entrada en `SINONIMOS` + validar contra el vocabulario REAL de los
-títulos (no el conceptual) + `build_zip.py` + `update-function-code`. Para casos
-no cubiertos, sigue disponible el stemmer Snowball español completo como upgrade.
+**28 tópicos hoy** (15 sociales: aborto/derechos reproductivos, eutanasia↔muerte
+digna, paridad↔cuota de género, cannabis, protección animal, trata, etc. + **13
+empresariales/sectoriales** ②: alimentos/etiquetado, transporte-plataformas,
+asbesto, farmacéutico, financiero, energía, telecom, ambiental, datos personales/
+habeas data, minería/hidrocarburos, agro, licores-tabaco, propiedad intelectual).
+Hallazgo clave: el Congreso **no titula "aborto"** (0 hits) — el debate vive como
+"derechos sexuales y reproductivos"; y **no titula "etiquetado"** — la ley de
+sellos es "entornos alimentarios saludables" (Ley 2120), que ② ya recupera por
+título. `resumen_tema` devuelve `sinonimos:{topicos,incluye}`; el frontend lo
+muestra ("Búsqueda por tema · se incluyen: …"). **Agregar un tópico:** una entrada
+en `SINONIMOS` + validar contra el vocabulario REAL de los títulos (no el
+conceptual) + `build_zip.py` + `update-function-code`. ⚠ Al curar términos: evitar
+palabras que colisionan por substring/stem (`seguros`→`segur`≈seguridad, `gas`≤3
+chars queda solo `natural`, `chatarra`≈chatarrización) y frases cuyo único término
+distintivo sea ≤3 chars (se descarta y la frase se vuelve ruido).
+
+**③ Búsqueda relajada — el AND multi-palabra ya no colapsa** (`buscar(relajar,
+with_meta)`, jul-2026): cuando la consulta es de varias palabras y NO cae en tópico
+ni trae expansión IA, en vez de exigir TODAS las palabras (AND, que daba
+'prohibición de asbesto'→1) ancla al **término más ESPECÍFICO** (el de menor
+frecuencia en títulos = el "tema"; las otras suelen ser calificadores) y rankea por
+nº de coincidencias. Reproduce 'prohibición de asbesto'→37 (=='asbesto'), 'reforma
+pensional'→42 (=='pensional'). El **texto de gaceta también se ancla al término
+específico** (no al calificador común) — sin esto 'asbesto' daba 37 pero
+'prohibición de asbesto' daba 5 (agregar palabras encogía). `resumen_tema` expone
+`flexible:{anchor,n_estricto,n_total}`; el frontend pinta el aviso "Búsqueda
+flexible · mostrando N por el término más específico" + toggle client-side "ver
+solo las exactas" (`data-mc`/`data-nw` en los `tl-item`). El **Radar del cliente
+queda `expandir=False`** (AND literal de sus frases curadas) para no perder
+precisión. `_titulos_norm()` cachea los títulos normalizados (el Radar llama a
+`buscar` ~24×/request). Para casos no cubiertos, sigue disponible el stemmer
+Snowball español completo como upgrade.
 
 ### Arquitectura Caudal · paraguas vs pilares (aclaración conceptual jul-2026)
 
