@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """
-build_jal_comuna_detalle.py — detalle POR COMUNA/LOCALIDAD de JAL 2023 para el
-drill de resultados-jal-2023.html (barrio · puesto · mesa). Un JSON por comuna,
-cargado LAZY al abrir la comuna (no entra al JSON principal, que es liviano).
+build_territorial_comuna_detalle.py — detalle POR COMUNA/LOCALIDAD de una
+corporación local de 2023 para el drill de resultados-{jal,concejo}-2023.html
+(barrio · puesto · mesa). Un JSON por comuna, cargado LAZY al abrir la comuna
+(no entra al JSON principal, que es liviano).
+
+    python3 build_territorial_comuna_detalle.py jal        # JAL / ediles (default)
+    python3 build_territorial_comuna_detalle.py concejo    # Concejo distrital / municipal
 
 Cada comuna trae:
   - partidos[]  (master, ordenado desc)   · cands[] = [nombre, partyIdx]  (master)
@@ -29,20 +33,32 @@ un array propio para que NO puedan entrar a totales, al selector de barrio ni a 
 votación por candidato: solo pintan el polígono en tono translúcido. Un barrio con
 dato en otra comuna nunca se rellena (se pintaría dos veces con distinto sentido).
 
-Fuentes: GCS_2023JAL.csv (COD_COR=5) · PUESTOS_GEOREF.csv · GeoJSON de barrios (S3).
-Salida (gitignored): Bases de datos/output_jal_2023/comuna/{dde}-{mme}-{com}.json
-S3: congreso-2026/output/jal-2023/comuna/
+Fuentes: GCS_2023{JAL,TER}.csv · PUESTOS_GEOREF.csv · GeoJSON de barrios (S3).
+Salida (gitignored): Bases de datos/output_{corp}_2023/comuna/{dde}-{mme}-{com}.json
+S3: congreso-2026/output/{corp}-2023/comuna/
 """
-import csv, json, os, re, sys, unicodedata, urllib.request
+import csv, json, os, re, subprocess, sys, unicodedata, urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BD   = os.path.join(ROOT, 'Bases de datos')
-SRC  = os.path.join(BD, 'FINAL SUBIDA GCS', 'GCS_2023JAL.csv')
 GEOREF = os.path.join(BD, 'PUESTOS_GEOREF.csv')
-OUT_DIR = os.path.join(BD, 'output_jal_2023', 'comuna')
 SCRATCH = os.environ.get('SCRATCH_DIR',
     '/private/tmp/claude-501/-Users-ricardoruiz-ricardoruiz-co/9416b8e0-fd95-4229-aeaa-f8a817241616/scratchpad')
-SORTED = os.path.join(SCRATCH, 'jal_2023_sorted.csv')
+
+# corporación → CSV crudo · COD_COR · carpeta de salida · temporal ordenado
+CORPS = {
+    'jal':     {'csv': 'GCS_2023JAL.csv', 'cor': '5', 'dir': 'output_jal_2023',
+                'sorted': 'jal_2023_sorted.csv'},
+    'concejo': {'csv': 'GCS_2023TER.csv', 'cor': '4', 'dir': 'output_concejo_2023',
+                'sorted': 'concejo_2023_sorted.csv'},
+}
+CORP = sys.argv[1] if len(sys.argv) > 1 else 'jal'
+if CORP not in CORPS:
+    sys.exit(f'corporación desconocida: {CORP} (usa {" | ".join(CORPS)})')
+CFG = CORPS[CORP]
+SRC = os.path.join(BD, 'FINAL SUBIDA GCS', CFG['csv'])
+OUT_DIR = os.path.join(BD, CFG['dir'], 'comuna')
+SORTED = os.path.join(SCRATCH, CFG['sorted'])
 GEO_S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Ciudades-COM-LOC'
 MDE_GEO = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/MEDELLIN_BARRIOS_OFICIAL.json'
 
@@ -76,8 +92,36 @@ COMUNA_GEO = {
 }
 NAME_FIELDS = ['nombre', 'NOMBRE', 'barrio', 'BARRIO', 'BARRIOS', 'Barrio', 'NOMBRE_BAR', 'name', 'NOM_BARRIO']
 SPECIAL = {'996', '997', '998', '999'}
+C_COR = 2
 C_CAN, C_VOT, C_DDE, C_MME, C_ZZ, C_PP = 13, 15, 6, 7, 8, 9
 C_MS, C_PAR, C_DESPAR, C_DESCAN = 10, 11, 12, 14
+
+
+def ensure_sorted():
+    """Temporal ordenado por (dde,mme) — el loop agrupa ciudad por ciudad.
+
+    Sale SIN encabezado (`awk NR>1`), igual que el de build_jal_2023.py: el loop
+    de abajo NO debe saltarse la primera línea. Para las corporaciones que viven
+    en GCS_2023TER (4 corporaciones intercaladas, 1,96 GB) se filtra por COD_COR
+    y por las 11 ciudades del tablero, así el temporal baja de GB a decenas de MB.
+    """
+    if os.path.exists(SORTED) and os.path.getsize(SORTED) > 0:
+        print(f'· usando temporal ya ordenado: {SORTED}')
+        return
+    os.makedirs(SCRATCH, exist_ok=True)
+    ciudades = ' || '.join(f'($7+0=={int(d)} && $8+0=={int(m)})' for (d, m) in CITIES)
+    prog = f'NR>1 && $3=="{CFG["cor"]}" && ({ciudades})'
+    print(f'· filtrando y ordenando {CFG["csv"]} (COD_COR={CFG["cor"]}, 11 ciudades)…')
+    with open(SORTED, 'wb') as out:
+        p1 = subprocess.Popen(['awk', '-F;', prog, SRC], stdout=subprocess.PIPE)
+        p2 = subprocess.Popen(['sort', '-t;', '-k7,7', '-k8,8', '-S', '1G'],
+                              stdin=p1.stdout, stdout=out,
+                              env={**os.environ, 'LC_ALL': 'C', 'TMPDIR': SCRATCH})
+        p1.stdout.close()
+        p2.communicate()
+        if p2.returncode != 0:
+            sys.exit('sort falló')
+    print(f'· temporal listo: {os.path.getsize(SORTED)/1e6:.0f} MB')
 
 
 def strip(s):
@@ -337,8 +381,7 @@ def flush_city(cands, key_city, pip, index_rows, fill_ctx=None):
 
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
-    if not (os.path.exists(SORTED) and os.path.getsize(SORTED) > 0):
-        sys.exit('Falta el temporal ordenado; corre build_jal_2023.py primero.')
+    ensure_sorted()
     georef = load_georef()
     print(f'GEOREF (11 ciudades): {len(georef)} puestos')
 
@@ -392,6 +435,8 @@ def main():
         rd = csv.reader(f, delimiter=';')
         for row in rd:
             if len(row) < 16:
+                continue
+            if row[C_COR].strip() != CFG['cor']:   # GCS_2023TER mezcla las 4 corporaciones
                 continue
             dde, mme = row[C_DDE].strip().zfill(2), row[C_MME].strip().zfill(3)
             keyc = (dde, mme)

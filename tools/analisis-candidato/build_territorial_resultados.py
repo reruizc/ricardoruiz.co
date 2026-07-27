@@ -1,36 +1,60 @@
 #!/usr/bin/env python3
 """
-build_jal_resultados.py — agrega los resultados de JAL 2023 por CIUDAD → COMUNA/
-LOCALIDAD para el tablero resultados-jal-2023.html (que luego se embebe en
-electoral.html · sección 2023). NO es por-candidato (eso lo hace build_jal_2023);
-esto es el resumen agregado que colorea el mapa de comunas y llena la tabla.
+build_territorial_resultados.py — agrega una corporación LOCAL de 2023 por
+CIUDAD → COMUNA/LOCALIDAD para los tableros resultados-{jal,concejo}-2023.html.
+NO es por-candidato (eso lo hacen build_jal_2023 / build_concejo_2023); esto es el
+resumen agregado que colorea el mapa de comunas y llena la tabla.
+
+    python3 build_territorial_resultados.py jal        # JAL / ediles   (default)
+    python3 build_territorial_resultados.py concejo    # Concejo distrital / municipal
 
 Ciudades soportadas: las 11 con GeoJSON de comuna/localidad de código numérico
 limpio en S3 (mapas-2026/Ciudades-COM-LOC/{CITY}X.json), que casa con el
 `CÓDIGO COMUNA` del georef. Bogotá va por LOCALIDAD (LocCodigo 01-20).
 
 Por comuna: votos válidos, blanco, nulos/no-marcados, potencial (censo actual del
-georef, aprox.), mesas, partido ganador (más votos JAL), top partidos, top edil.
+georef, aprox.), mesas, partido ganador (más votos), top partidos, top candidato.
+
+⚠️ El CSV de JAL es mono-corporación, pero **GCS_2023TER trae las 4 corporaciones
+INTERCALADAS** (1=gobernador · 2=asamblea · 3=alcalde · 4=concejo) → el filtro por
+`COD_COR` es obligatorio, no decorativo.
 
 Fuentes:
-  Bases de datos/FINAL SUBIDA GCS/GCS_2023JAL.csv   (COD_COR='5')
+  Bases de datos/FINAL SUBIDA GCS/GCS_2023{JAL,TER}.csv
   Bases de datos/PUESTOS_GEOREF.csv                 (comuna + censo MUJERES/HOMBRES)
 
 Salida (gitignored):
-  Bases de datos/output_jal_2023/resultados-jal-2023.json  (se sube a S3)
+  Bases de datos/output_{jal,concejo}_2023/resultados-{corp}-2023.json  (se sube a S3)
 
 Subida a S3:
   aws s3 cp "Bases de datos/output_jal_2023/resultados-jal-2023.json" \
     "s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/jal-2023/resultados-jal-2023.json" \
     --content-type "application/json" --cache-control "public, max-age=300"
 """
-import csv, json, os, re, unicodedata
+import csv, json, os, re, sys, unicodedata
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BD   = os.path.join(ROOT, 'Bases de datos')
-SRC  = os.path.join(BD, 'FINAL SUBIDA GCS', 'GCS_2023JAL.csv')
 GEOREF = os.path.join(BD, 'PUESTOS_GEOREF.csv')
-OUT  = os.path.join(BD, 'output_jal_2023', 'resultados-jal-2023.json')
+
+# corporación → CSV crudo · COD_COR · carpeta de salida · rótulos
+CORPS = {
+    'jal': {
+        'csv': 'GCS_2023JAL.csv', 'cor': '5', 'dir': 'output_jal_2023',
+        'file': 'resultados-jal-2023.json', 'eleccion': 'JAL (Ediles) 2023',
+    },
+    'concejo': {
+        'csv': 'GCS_2023TER.csv', 'cor': '4', 'dir': 'output_concejo_2023',
+        'file': 'resultados-concejo-2023.json',
+        'eleccion': 'Concejo Distrital / Municipal 2023',
+    },
+}
+CORP = sys.argv[1] if len(sys.argv) > 1 else 'jal'
+if CORP not in CORPS:
+    sys.exit(f'corporación desconocida: {CORP} (usa {" | ".join(CORPS)})')
+CFG = CORPS[CORP]
+SRC = os.path.join(BD, 'FINAL SUBIDA GCS', CFG['csv'])
+OUT = os.path.join(BD, CFG['dir'], CFG['file'])
 
 # (dde, mme) → (nombre, depto, nivel)  ·  nivel = 'localidad' (Bogotá) o 'comuna'
 CITIES = {
@@ -47,6 +71,7 @@ CITIES = {
     ('52', '001'): ('VILLAVICENCIO', 'META',               'comuna'),
 }
 SPECIAL = {'996', '997', '998', '999'}   # blanco, nulos, no-marcados, no-marcados
+C_COR = 2
 C_CAN, C_VOT, C_DDE, C_MME, C_ZZ, C_PP = 13, 15, 6, 7, 8, 9
 C_MS, C_PAR, C_DESPAR, C_DESCAN = 10, 11, 12, 14
 
@@ -101,6 +126,8 @@ def main():
         next(rd, None)  # header
         for row in rd:
             if len(row) < 16:
+                continue
+            if row[C_COR].strip() != CFG['cor']:   # GCS_2023TER mezcla las 4 corporaciones
                 continue
             dde = row[C_DDE].strip(); mme = row[C_MME].strip().zfill(3)
             keyc = (dde.zfill(2), mme)   # CITIES usa dde con cero a la izquierda
@@ -187,7 +214,7 @@ def main():
     out_cities.sort(key=lambda x: -x['validos'])
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, 'w', encoding='utf-8') as f:
-        json.dump({'v': '2026-07-26', 'eleccion': 'JAL (Ediles) 2023',
+        json.dump({'v': '2026-07-26', 'eleccion': CFG['eleccion'],
                    'cities': out_cities, 'data': out_data},
                   f, ensure_ascii=False, separators=(',', ':'))
     print(f'{n:,} filas · {len(out_cities)} ciudades → {OUT}')
