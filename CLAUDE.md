@@ -238,9 +238,11 @@ copia HTML. Paleta v2 (azul `#0047FF`), sin modo día.
 - Uso: `window.GATE_FEATURES={plan:{feat:'pro'},copy:{feat:{title,desc}}}` → `PlanGate.init()`
   → `PlanGate.require('barrios')` / `PlanGate.requireOrSample('drill', key, 1)` (la muestra
   gratis del anónimo, patrón de veleta, cuenta en `localStorage['gate-sample-{key}']`).
-- **Lo bloqueado se ve, no se oculta**: candado con el plan que hace falta y el conteo de
-  barrios, para que el valor esté a la vista. Las pestañas bloqueadas quedan clickeables a
-  propósito (el click abre el modal).
+- **Lo bloqueado se ve, no se oculta**: el selector de barrio muestra el candado + el conteo
+  de barrios; las pestañas Puestos/Mesas **entran y renderizan el contenido real detrás de un
+  `blur(5px)` recortado a 340px** (`paywallWrap`/`.pg-paywall`), con un CTA "Desbloquear con
+  Pro/Premium" encima. El gate es de producto, no de seguridad: el JSON del scope ya viaja
+  completo al navegador, igual que en el resto del sitio.
 - `PlanGate.onChange(fn)` repinta al cambiar el plan; el login del modal del sitio llama
   `PlanGate.refresh()` y el logout `PlanGate.reset()`. `plan` ∈ {anonymous (sintético del
   cliente) · free · pro · premium · full}; `full` y `premium` empatan en rango.
