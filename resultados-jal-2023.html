@@ -303,7 +303,7 @@
 
   <div class="controls">
     <div class="ctl-group">
-      <span class="ctl-label">Ciudad</span>
+      <span class="ctl-label" id="ctl-scope-label">Ciudad</span>
       <select class="city-sel" id="city-sel" onchange="onCity()"></select>
     </div>
     <div class="ctl-group">
@@ -342,6 +342,10 @@
       key:'jal', s3dir:'jal-2023', localDir:'output_jal_2023',
       dataFile:'resultados-jal-2023.json',
       cargo:'edil', cargoCap:'Edil', cargoPl:'ediles', sampleKey:'jal-comuna',
+      // JAL/Concejo: el índice ya trae los datos de las 11 ciudades y el mapa sale
+      // de CITY_GEO. Asamblea es departamental → carga el depto aparte (scopeDir)
+      // y su mapa es el de municipios del depto (geoDir).
+      scopeDir:null, geoDir:null, detailDir:'comuna', unidadSel:'Ciudad',
     };
     const S3='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
     // ?local=1 → lee el JSON del repo (verificación antes de subir a S3).
@@ -390,6 +394,27 @@
       '52-001':{geo:'VILLAVICENCIOX.json', code:p=>parseInt(String(p.Comuna).replace(/\D/g,''),10)},
     };
 
+    // Config de mapa del scope activo. Asamblea no tiene una entrada por ciudad:
+    // su mapa es el de municipios del departamento (clave = mun_elec, el código
+    // ELECTORAL del municipio — mpio_ccdgo es el DANE y NO coincide).
+    function cityCfg(key){
+      if(CORP.geoDir) return {geo:`${key}.json`, base:`${S3}/mapas-2026/${CORP.geoDir}`,
+                              code:p=>parseInt(p.mun_elec,10)};
+      return CITY_GEO[key];
+    }
+    // Carga perezosa del scope (solo asamblea: un JSON por departamento).
+    async function loadScope(key){
+      if(!CORP.scopeDir) return null;
+      const base=new URLSearchParams(location.search).has('local')
+        ? `Bases de datos/${CORP.localDir}/${CORP.scopeDir}`
+        : `${S3}/${CORP.s3dir}/${CORP.scopeDir}`;
+      try{
+        const d=await (await fetch(`${base}/${key}.json`)).json();
+        DATA.data=DATA.data||{}; DATA.data[key]=d;
+        return d;
+      }catch(e){ return null; }
+    }
+
     // Colores por partido (distintivos). El resto se colorea por hash del nombre.
     const PARTY_COLORS={
       'PARTIDO LIBERAL COLOMBIANO':'#E23B3B',
@@ -412,6 +437,13 @@
     function partyColor(p){ if(!p) return '#5a6070'; if(PARTY_COLORS[p]) return PARTY_COLORS[p]; return `hsl(${hashHue(p)},42%,52%)`; }
     const fmt=n=>(n||0).toLocaleString('es-CO');
 
+    // Rótulo del nivel territorial: comuna (default) · localidad (Bogotá) · municipio (asamblea).
+    const NIVEL_LBL={localidad:['localidad','localidades','Localidad'],
+                     comuna:['comuna','comunas','Comuna'],
+                     municipio:['municipio','municipios','Municipio']};
+    function nvl(kind,meta){ const n=((meta||curMeta||{}).nivel)||'comuna';
+      return (NIVEL_LBL[n]||NIVEL_LBL.comuna)[kind==='pl'?1:kind==='cap'?2:0]; }
+
     let DATA=null, curKey=null, mode='ganador', map=null, layer=null, curCity=null;
     let selComuna=null, curRows=[], curByNum={}, curMeta=null;
     let mapMode='city', selBarrio=null, curVot=null, votFilter=null;   // mapa único + drill de barrio
@@ -422,8 +454,9 @@
         const r=await fetch(DATA_URL);
         DATA=await r.json();
       }catch(e){ document.getElementById('loadmsg').textContent='No se pudo cargar el resultado.'; return; }
+      const lbl=document.getElementById('ctl-scope-label'); if(lbl) lbl.textContent=CORP.unidadSel;
       const sel=document.getElementById('city-sel');
-      sel.innerHTML=DATA.cities.map(c=>`<option value="${c.key}">${c.name} (${c.nivel==='localidad'?'localidades':'comunas'})</option>`).join('');
+      sel.innerHTML=DATA.cities.map(c=>`<option value="${c.key}">${c.name} (${nvl('pl',c)})</option>`).join('');
       // estructura fija del contenido
       document.getElementById('content').innerHTML=`
         <div class="wrap">
@@ -450,7 +483,7 @@
       if(!curKey || !DATA.data[curKey]) return;
       renderPanels(curMeta, DATA.data[curKey], curRows);   // la leyenda cambia con el modo
       // el mapa de barrios va siempre por ganador; solo re-colorea el mapa de ciudad
-      if(mapMode==='city' && layer){ layer.setStyle(f=>styleFeat(f,CITY_GEO[curKey],curByNum)); }
+      if(mapMode==='city' && layer){ layer.setStyle(f=>styleFeat(f,cityCfg(curKey),curByNum)); }
     }
 
     function onCity(){
@@ -471,7 +504,13 @@
 
     async function renderCity(refetchGeo){
       const key=curKey;
-      const cd=DATA.data[key];
+      let cd=(DATA.data||{})[key];
+      if(!cd){
+        document.getElementById('content').style.opacity='.5';
+        cd=await loadScope(key);
+        document.getElementById('content').style.opacity='';
+        if(!cd || key!==curKey) return;      // el usuario ya cambió de scope
+      }
       curMeta=DATA.cities.find(c=>c.key===key);
       curRows=comunaList(cd);
       curByNum={}; curRows.forEach(r=>{ curByNum[r.num]=r; });
@@ -487,7 +526,7 @@
     // Pinta el mapa ÚNICO en modo CIUDAD (comunas/localidades). Click → abre comuna.
     // Reconstruye siempre (el GeoJSON de comunas queda cacheado por ciudad).
     async function paintCityLayer(){
-      const key=curKey, cfg=CITY_GEO[key];
+      const key=curKey, cfg=cityCfg(key);
       if(!map){ map=L.map('map',{zoomControl:true,attributionControl:true,scrollWheelZoom:false}).setView([4.6,-74.1],10); }
       mapMode='city'; curCity=key;
       document.getElementById('map-back').style.display='none';
@@ -495,7 +534,7 @@
       if(layer){ map.removeLayer(layer); layer=null; }
       if(!cfg) return;
       if(!cityLayerGeo || cityLayerCity!==key){
-        try{ let g=await (await fetch(`${GEO_BASE}/${cfg.geo}`)).json(); cityLayerGeo=cfg.rotate?rotate90Left(g):g; cityLayerCity=key; }catch(e){ return; }
+        try{ let g=await (await fetch(`${cfg.base||GEO_BASE}/${cfg.geo}`)).json(); cityLayerGeo=cfg.rotate?rotate90Left(g):g; cityLayerCity=key; }catch(e){ return; }
       }
       layer=L.geoJSON(cityLayerGeo,{
         style:f=>styleFeat(f,cfg,curByNum),
@@ -599,7 +638,7 @@
       const part=t.potencial>0?(votantes/t.potencial*100).toFixed(1):'—';
       document.getElementById('city-panel').innerHTML=`
         <h3>${meta.name}</h3>
-        <div style="color:var(--dim);font-size:.78rem;margin-top:.2rem">${meta.dep} · ${meta.n_comunas} ${meta.nivel==='localidad'?'localidades':'comunas'}</div>
+        <div style="color:var(--dim);font-size:.78rem;margin-top:.2rem">${meta.dep} · ${meta.n_comunas} ${nvl('pl',meta)}</div>
         <div class="kpis">
           <div class="kpi"><div class="n">${fmt(t.validos)}</div><div class="l">Votos válidos</div></div>
           <div class="kpi"><div class="n">${fmt(t.blanco)}</div><div class="l">Voto en blanco</div></div>
@@ -611,7 +650,7 @@
         const cnt={};
         rows.forEach(r=>{ if(r.winner){ const p=r.winner.partido; cnt[p]=(cnt[p]||0)+1; } });
         const ord=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
-        lp.innerHTML=`<h3 style="font-size:.95rem">Partido ganador por ${meta.nivel==='localidad'?'localidad':'comuna'}</h3>`
+        lp.innerHTML=`<h3 style="font-size:.95rem">Partido ganador por ${nvl('sg',meta)}</h3>`
           +`<div class="legend">`+ord.map(([p,n])=>`
             <div class="legend-row"><span class="sw" style="background:${partyColor(p)}"></span><span class="nm">${p}</span><span class="ct">${n}</span></div>`).join('')+`</div>`;
       } else {
@@ -648,11 +687,11 @@
       document.getElementById('comuna-grid').style.display='';
       document.getElementById('comuna-detail').style.display='none';
       document.getElementById('back-btn').style.display='none';
-      const nl=curMeta.nivel==='localidad'?'localidades':'comunas';
+      const nl=nvl('pl');
       document.getElementById('sec-title').textContent=curMeta.name;
       document.getElementById('sec-sub').textContent=`${curRows.length} ${nl} · toca una para ver todos los candidatos`;
       if(mapMode==='comuna') paintCityLayer();                     // el mapa vuelve a la ciudad
-      else if(layer) layer.setStyle(f=>styleFeat(f,CITY_GEO[curKey],curByNum));
+      else if(layer) layer.setStyle(f=>styleFeat(f,cityCfg(curKey),curByNum));
       if(scroll) document.querySelector('.detail-wrap').scrollIntoView({block:'start',behavior:'smooth'});
     }
 
@@ -663,8 +702,8 @@
     let curUnits={};         // id → fn() que devuelve el HTML del body (relleno lazy)
     const detailCache={}, barrioGeoCache={};
     const DETAIL_BASE = new URLSearchParams(location.search).has('local')
-      ? `Bases de datos/${CORP.localDir}/comuna`
-      : `${S3}/${CORP.s3dir}/comuna`;
+      ? `Bases de datos/${CORP.localDir}/${CORP.detailDir}`
+      : `${S3}/${CORP.s3dir}/${CORP.detailDir}`;
     const MDE_BARRIO='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/MEDELLIN_BARRIOS_OFICIAL.json';
     const BARRIO_GEO={
       '16-001':{url:`${GEO_BASE}/BOG-BARRIOS-CATASTRALES.json`, rotate:true},
@@ -689,13 +728,13 @@
       document.getElementById('sec-title').textContent=r.name;
       document.getElementById('sec-sub').textContent=`${curMeta.name} · resumen, barrio, puesto y mesa`;
       // el mapa de ciudad resalta la comuna elegida mientras carga su desagregado
-      if(mapMode==='city' && layer) layer.setStyle(f=>styleFeat(f,CITY_GEO[curKey],curByNum));
+      if(mapMode==='city' && layer) layer.setStyle(f=>styleFeat(f,cityCfg(curKey),curByNum));
       if(scroll) document.querySelector('.detail-wrap').scrollIntoView({block:'start',behavior:'smooth'});
       loadDetail(r.code);
     }
 
     function renderDetailShell(){
-      const r=detState.r, nivel=curMeta.nivel==='localidad'?'Localidad':'Comuna', pr=partRatio(r);
+      const r=detState.r, nivel=nvl('cap'), pr=partRatio(r);
       document.getElementById('comuna-detail').innerHTML=`
         <div class="det-head">
           <h3>${r.name}</h3>
@@ -780,7 +819,7 @@
         ? barrioVotacion(curDetail.barrios[selBarrio])
         : {partidos:detState.partidos, cands:detState.cands, validos:detState.r.validos};
       votFilter=null;
-      const nl=curMeta.nivel==='localidad'?'localidad':'comuna';
+      const nl=nvl('sg');
       const barrios=(curDetail&&curDetail.barrios)?curDetail.barrios:[];
       let sel='';
       if(barrios.length && !PlanGate.has('barrios')){

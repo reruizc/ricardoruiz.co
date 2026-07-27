@@ -159,18 +159,50 @@ sin breadcrumb), **Helvetica Neue embebida** (Syne solo en el logo), y suma los
   - **Mapa/radar**: `isDepartmentalRace` (y `isDeptRace` en comparar) ahora incluye Concejo/JAL
     (`isConcejoOJAL`) → auto-drill al depto y colorea municipios (Bogotá: localidades). Radar:
     Concejo → comunas/localidades, JAL → puestos.
-- **Resultados de JAL agregados** (`tools/analisis-candidato/build_jal_resultados.py` →
-  `resultados-jal-2023.html`, jul-2026): tablero **Ciudad → comuna/localidad** (mapa Leaflet +
-  tabla) para embeber en `electoral.html` (card "Junta Administradora Local", sección 2023, aún
-  sin cablear). 11 ciudades con GeoJSON de comuna/localidad de código numérico limpio (Bogotá
-  localidades · Medellín · Cali · Bucaramanga · Cúcuta · Ibagué · Manizales · Montería · Neiva ·
-  Popayán · Villavicencio); casa el `CÓDIGO COMUNA` del georef con el nº de comuna del GeoJSON.
-  Por comuna: partido ganador (más votos JAL), edil más votado, válidos/blanco, participación
-  aprox. (censo actual del georef). Toggle Ganador/Participación. Salida
-  `Bases de datos/output_jal_2023/resultados-jal-2023.json` (124 KB) → S3
-  `congreso-2026/output/jal-2023/resultados-jal-2023.json`. `?local=1` lee el JSON del repo.
-  - **Detalle por comuna** (`build_jal_comuna_detalle.py` → 250 JSON en
-    `output_jal_2023/comuna/{dde}-{mme}-{com}.json`, S3 `…/jal-2023/comuna/`, lazy al abrir la
+### Tableros territoriales 2023 — JAL · Concejo · Asamblea (LISTO · jul-2026)
+
+**Tres tableros con la MISMA estructura y el mismo chasis de página**, enlazados desde
+`electoral.html` (sección 2023):
+
+| Tablero | Página | Drill | Card en electoral.html |
+|---|---|---|---|
+| JAL / ediles | `resultados-jal-2023.html` | ciudad → **comuna/localidad** → barrio · puesto · mesa | "Junta Administradora Local" (directa) |
+| Concejo distrital/municipal | `resultados-concejo-2023.html` | ídem | drill "Concejos · 2023" → *Análisis Territorial* |
+| Asamblea departamental | `resultados-asamblea-2023.html` | **depto → municipio** → puesto · mesa | "Asambleas Departamentales" (directa) |
+
+**Las 3 páginas son EL MISMO archivo** salvo el bloque `CORP` del inicio del script y el
+hero/footer. Si tocas la lógica, tócala en las tres (o regenera con el snippet de
+sustitución del commit `c1526cc`). `CORP` define: `s3dir`/`localDir`/`dataFile`,
+rótulos del cargo (`edil`/`concejal`/`diputado`), `detailDir` (`comuna`|`mun`),
+`scopeDir` (asamblea carga el depto aparte), `geoDir` (asamblea usa
+`Departamentos-mps/{dde}.json`) y `unidadSel` (Ciudad|Departamento).
+Helper `nvl('sg'|'pl'|'cap')` da el rótulo del nivel (comuna · localidad · municipio).
+
+- **Motor de datos parametrizado** — `tools/analisis-candidato/build_territorial_{resultados,
+  comuna_detalle}.py` (antes `build_jal_*`; renombrados jul-2026). `python3 … jal|concejo`
+  elige CSV, `COD_COR`, carpeta y rótulos. Verificado que JAL sale **byte-idéntico** tras el
+  refactor. ⚠️ **`GCS_2023TER` trae las 4 corporaciones INTERCALADAS** (1 gobernador · 2
+  asamblea · 3 alcalde · 4 concejo) → el filtro `COD_COR` es obligatorio; el CSV de JAL es
+  mono-corporación y no lo necesitaba. El detalle por comuna **genera su propio temporal
+  ordenado**, acotado a la corporación y a las 11 ciudades (1,96 GB → 353 MB).
+- **11 ciudades** con GeoJSON de comuna/localidad de código numérico limpio (Bogotá
+  localidades · Medellín · Cali · Bucaramanga · Cúcuta · Ibagué · Manizales · Montería ·
+  Neiva · Popayán · Villavicencio); casa el `CÓDIGO COMUNA` del georef con el nº del GeoJSON.
+  Por unidad: partido ganador, candidato más votado, válidos/blanco, participación aprox.
+  (censo ACTUAL del georef, no el de 2023). Toggle Ganador/Participación. `?local=1` lee del repo.
+- **Volúmenes** · JAL: 250 comunas · 9,7 MB. Concejo: 264 comunas · 23,5 MB. Asamblea:
+  32 deptos (`dep/`, 4,8 MB) + **1.118 municipios** (`mun/`, 38,6 MB) + índice de 4 KB.
+  S3: `congreso-2026/output/{jal,concejo,asamblea}-2023/`.
+- **Asamblea** (`build_asamblea_resultados.py`, script propio — la llave es (depto,municipio),
+  no (ciudad,comuna)): índice liviano de 32 deptos + `dep/{dde}.json` (municipios con partidos
+  y TODOS los diputados) + `mun/{dde}-{mme}.json` (puestos + mesas). Sin barrios
+  (`has_barrio_map:false`). **Bogotá queda fuera: es Distrito Capital y no tiene asamblea.**
+  El mapa usa `mun_elec` del GeoJSON (código ELECTORAL) — `mpio_ccdgo` es el DANE y **NO
+  coincide** (Achí: mun_elec 004 vs DANE 006). Los agregados del CSV que el georef no cubre
+  (p.ej. `zona 99 · puesto 00`, el más votado de Medellín con 18.042) se muestran marcados
+  "sin georreferenciar", sin inventar a qué corresponden.
+  - **Detalle por comuna** (`build_territorial_comuna_detalle.py` → 250/264 JSON en
+    `output_{jal,concejo}_2023/comuna/{dde}-{mme}-{com}.json`, lazy al abrir la
     comuna): barrios (PIP puesto→polígono) · puestos · mesas. 7 ciudades con mapa de barrio
     (`has_barrio_map`): Bogotá · Medellín · Cali · Bucaramanga · Cúcuta · Manizales · Popayán.
   - **Relleno de vecino** (jul-2026 · **1.609 barrios**): los barrios de la comuna SIN puesto
@@ -185,9 +217,35 @@ sin breadcrumb), **Helvetica Neue embebida** (Syne solo en el logo), y suma los
     ni a la votación por candidato: el frontend los pinta translúcidos (`fillOpacity .42` +
     borde punteado, vs `.8` sólido del dato) con tooltip de aviso y el conteo en `.map-badge`
     ("N con dato · + M sin puesto propio, color inferido, no suma a totales").
-  - ⚠️ Al regenerar: el temporal `jal_2023_sorted.csv` **NO trae encabezado** (lo quita el
-    `awk NR>1` de `build_jal_2023.py`). `build_jal_comuna_detalle.py` hacía `next(rd)` y se
-    comía la primera fila de datos (10 votos en blanco de Medellín, puesto 10-01) — corregido.
+  - ⚠️ Al regenerar: los temporales ordenados **NO traen encabezado** (`awk NR>1`).
+    `build_jal_comuna_detalle.py` hacía `next(rd)` y se comía la primera fila de datos
+    (10 votos en blanco de Medellín, puesto 10-01) — corregido.
+
+**Gate por plan (`plan-gate.js`) — jul-2026.** Los 3 tableros limitan por plan. El helper
+extrae el bloque que `veleta.html` y `oportunidad.html` tenían **duplicado inline**: todo va
+en un IIFE que solo expone `window.PlanGate` (así no choca con las constantes que las páginas
+ya declaran, p.ej. `PLAN_LABEL`) e **inyecta su propio modal (DOM + CSS)**, así la página no
+copia HTML. Paleta v2 (azul `#0047FF`), sin modo día.
+
+| | Anónimo | Básico (free) | Pro | Premium |
+|---|---|---|---|---|
+| Mapa + grid + quién ganó (dato público) | ✓ | ✓ | ✓ | ✓ |
+| Abrir la unidad (resumen + todos los candidatos) | **1 de muestra** | ✓ | ✓ | ✓ |
+| Mapa de barrios + selector de barrio | ✗ | ✗ | ✓ | ✓ |
+| Puestos de votación | ✗ | ✗ | ✓ | ✓ |
+| Mesa a mesa | ✗ | ✗ | ✗ | ✓ |
+
+- Uso: `window.GATE_FEATURES={plan:{feat:'pro'},copy:{feat:{title,desc}}}` → `PlanGate.init()`
+  → `PlanGate.require('barrios')` / `PlanGate.requireOrSample('drill', key, 1)` (la muestra
+  gratis del anónimo, patrón de veleta, cuenta en `localStorage['gate-sample-{key}']`).
+- **Lo bloqueado se ve, no se oculta**: candado con el plan que hace falta y el conteo de
+  barrios, para que el valor esté a la vista. Las pestañas bloqueadas quedan clickeables a
+  propósito (el click abre el modal).
+- `PlanGate.onChange(fn)` repinta al cambiar el plan; el login del modal del sitio llama
+  `PlanGate.refresh()` y el logout `PlanGate.reset()`. `plan` ∈ {anonymous (sintético del
+  cliente) · free · pro · premium · full}; `full` y `premium` empatan en rango.
+- **Pendiente**: portarlo a `veleta.html`/`oportunidad.html` (siguen con su copia inline) y
+  a las otras ~12 páginas que solo tienen login/logout.
 
 > **📌 HANDOFF · qué falta de CONGRESO en analisis-candidato (jul-2026)**
 >
