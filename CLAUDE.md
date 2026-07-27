@@ -135,6 +135,59 @@ sin breadcrumb), **Helvetica Neue embebida** (Syne solo en el logo), y suma los
   agrupan 2018∩2026 (Robledo 229k→28,6k · Lidio García 121k→180k · Laureano Acuña
   pasó de Senado a Cámara). Ojo: si la persona es presidencial, esa barra manda (el
   histórico presidencial tiene precedencia sobre el de Congreso).
+- **Concejo 2023 + JAL/Edil 2023** (`tools/analisis-candidato/build_concejo_2023.py` y
+  `build_jal_2023.py`, jul-2026): mesa-a-mesa formato endoso, **~108k candidatos**
+  (Concejo **94.467** + JAL **13.590**). Concejo es circunscripción MUNICIPAL → llave
+  `(dde,mme,par,can)` (verificado: 0 conflictos de nombre); slug `CONC2023-{dde}-{mme}-{par}-{can}`,
+  corp `CONCEJO · {mun}`. JAL es LOCAL (comuna/localidad) y ⚠️ **el COD_CAN SE REINICIA por
+  comuna** (CAN=81 del par 1 es otra persona en cada comuna) → llave `(dde,mme,par,can,nombre)`,
+  slug `JAL2023-{dde}-{mme}-{par}-{can}-{md5(nombre)[:6]}`, comuna derivada del georef (moda por
+  votos), corp `JAL · {comuna} · {mun}`. **Bogotá** es municipio único (mme=001) para Concejo/JAL
+  y el georef guarda la LOCALIDAD en `MUNICIPIO` → se fuerza `munNom='BOGOTÁ D.C.'` (la localidad
+  viaja en `comNom`). Memoria: 8 GB → los scripts EXTRAEN+ORDENAN por (dde,mme) a un temporal en
+  scratchpad y procesan municipio-por-municipio (streaming, cota = 1 municipio). Salidas
+  gitignored `Bases de datos/output_{concejo,jal}_2023/` (~1,4 GB + 332 MB). Validado: top
+  concejal Edison Julián Forero (Bogotá 70.032) · top edil Juan Camilo Ramírez (Suba 12.165).
+  S3: `congreso-2026/output/{concejo,jal}-2023/`.
+  - **Carga LAZY en cand-index.js** (`LOCAL_SOURCES` + `CandRegistry.loadLocal()`): los índices
+    son grandes (concejo 18,9 MB · JAL 3,1 MB) → NO entran a `load()` (el arranque de las
+    páginas); se piden al primer foco/tecla del buscador (`ensureLocal()` en analisis-candidato
+    y comparar-candidatos, llamado desde `acSearch`/`acSearchA/B`) y se APILAN a `candIndex` SIN
+    `agruparPersonas` (nombres comunes se repiten entre municipios → agruparlos fusionaría
+    personas distintas). Endoso NO los carga (no aplica). `?conclocal=1`/`?jallocal=1` leen los
+    JSON locales del repo (verificación pre-subida).
+  - **Mapa/radar**: `isDepartmentalRace` (y `isDeptRace` en comparar) ahora incluye Concejo/JAL
+    (`isConcejoOJAL`) → auto-drill al depto y colorea municipios (Bogotá: localidades). Radar:
+    Concejo → comunas/localidades, JAL → puestos.
+- **Resultados de JAL agregados** (`tools/analisis-candidato/build_jal_resultados.py` →
+  `resultados-jal-2023.html`, jul-2026): tablero **Ciudad → comuna/localidad** (mapa Leaflet +
+  tabla) para embeber en `electoral.html` (card "Junta Administradora Local", sección 2023, aún
+  sin cablear). 11 ciudades con GeoJSON de comuna/localidad de código numérico limpio (Bogotá
+  localidades · Medellín · Cali · Bucaramanga · Cúcuta · Ibagué · Manizales · Montería · Neiva ·
+  Popayán · Villavicencio); casa el `CÓDIGO COMUNA` del georef con el nº de comuna del GeoJSON.
+  Por comuna: partido ganador (más votos JAL), edil más votado, válidos/blanco, participación
+  aprox. (censo actual del georef). Toggle Ganador/Participación. Salida
+  `Bases de datos/output_jal_2023/resultados-jal-2023.json` (124 KB) → S3
+  `congreso-2026/output/jal-2023/resultados-jal-2023.json`. `?local=1` lee el JSON del repo.
+  - **Detalle por comuna** (`build_jal_comuna_detalle.py` → 250 JSON en
+    `output_jal_2023/comuna/{dde}-{mme}-{com}.json`, S3 `…/jal-2023/comuna/`, lazy al abrir la
+    comuna): barrios (PIP puesto→polígono) · puestos · mesas. 7 ciudades con mapa de barrio
+    (`has_barrio_map`): Bogotá · Medellín · Cali · Bucaramanga · Cúcuta · Manizales · Popayán.
+  - **Relleno de vecino** (jul-2026 · **1.609 barrios**): los barrios de la comuna SIN puesto
+    propio dejaban huecos en el mapa. Ahora se emiten en un array **`fills[]` aparte** —nunca
+    dentro de `barrios`— con `{name, feat, winner_heredado, from, fill:true}` y SIN votos:
+    heredan el ganador del barrio con dato más cercano por centroide (mismo criterio que
+    `_fill_neighbors` de `pacto-1v-2026/build_maps.py` y el `FILL` de `bogota-1v-barrios.html`).
+    La membresía barrio→comuna sale del PIP del centroide del barrio contra el polígono de
+    comuna del mapa superior (`Ciudades-COM-LOC/{CITY}X.json`, dict `COMUNA_GEO`). Un barrio con
+    dato en OTRA comuna nunca se rellena (se pintaría dos veces con distinto sentido). Van en
+    array propio justamente para que no puedan entrar a totales, al selector "Seleccione barrio"
+    ni a la votación por candidato: el frontend los pinta translúcidos (`fillOpacity .42` +
+    borde punteado, vs `.8` sólido del dato) con tooltip de aviso y el conteo en `.map-badge`
+    ("N con dato · + M sin puesto propio, color inferido, no suma a totales").
+  - ⚠️ Al regenerar: el temporal `jal_2023_sorted.csv` **NO trae encabezado** (lo quita el
+    `awk NR>1` de `build_jal_2023.py`). `build_jal_comuna_detalle.py` hacía `next(rd)` y se
+    comía la primera fila de datos (10 votos en blanco de Medellín, puesto 10-01) — corregido.
 
 > **📌 HANDOFF · qué falta de CONGRESO en analisis-candidato (jul-2026)**
 >

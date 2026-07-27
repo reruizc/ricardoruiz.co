@@ -187,8 +187,11 @@
     /* botón "volver a la ciudad" + etiqueta sobre el mapa único */
     .map-back { position:absolute; top:.7rem; right:.7rem; z-index:600; background:rgba(6,8,16,.86); color:var(--blue-light); border:1px solid rgba(0,71,255,.45); border-radius:3px; padding:.4rem .75rem; font-family:inherit; font-size:.74rem; cursor:none; transition:background .2s; }
     .map-back:hover { background:rgba(0,71,255,.24); }
-    .map-badge { position:absolute; top:.7rem; left:.7rem; z-index:600; background:rgba(6,8,16,.86); border:1px solid var(--line); border-radius:3px; padding:.35rem .6rem; font-size:.72rem; color:var(--white); pointer-events:none; max-width:60%; }
+    /* abajo-izquierda: arriba estorba el control de zoom de Leaflet */
+    .map-badge { position:absolute; bottom:.7rem; left:.7rem; z-index:600; background:rgba(6,8,16,.86); border:1px solid var(--line); border-radius:3px; padding:.35rem .6rem; font-size:.72rem; color:var(--white); pointer-events:none; max-width:min(62%,320px); }
     .map-badge small { color:var(--dim2); }
+    /* aviso del relleno: los barrios sin puesto propio se pintan con el color del vecino */
+    .map-badge .badge-fill { display:block; margin-top:.28rem; padding-top:.28rem; border-top:1px dashed rgba(255,255,255,.14); line-height:1.35; opacity:.9; }
     /* selector "seleccione barrio" en el resumen */
     .barrio-picker { display:flex; align-items:center; gap:.7rem; flex-wrap:wrap; padding:.9rem 1.3rem .2rem; }
     .barrio-picker label { font-size:.64rem; letter-spacing:.14em; text-transform:uppercase; color:var(--dim2); }
@@ -478,30 +481,48 @@
       let geo=barrioGeoCache[curKey];
       if(!geo){ try{ geo=await (await fetch(cfg.url)).json(); barrioGeoCache[curKey]=geo; }catch(e){ return false; } }
       const byFeat={}; curDetail.barrios.forEach((b,i)=>{ if(b.feat!=null) byFeat[b.feat]={b,i}; });
-      const sub={type:'FeatureCollection',features:geo.features.map((f,i)=>({...f,_fi:i})).filter(f=>byFeat[f._fi]!=null)};
+      // Relleno: barrios de la comuna SIN puesto propio. Solo pintan el polígono con
+      // el ganador heredado del vecino más cercano — no tienen datos y no suman a nada.
+      const byFill={}; (curDetail.fills||[]).forEach(fl=>{ if(fl.feat!=null && byFeat[fl.feat]==null) byFill[fl.feat]=fl; });
+      const sub={type:'FeatureCollection',features:geo.features.map((f,i)=>({...f,_fi:i})).filter(f=>byFeat[f._fi]!=null||byFill[f._fi]!=null)};
       const drawn=cfg.rotate?rotate90Left(sub):sub;
       if(layer){ map.removeLayer(layer); layer=null; }
       layer=L.geoJSON(drawn,{
-        style:f=>barrioStyle(f._fi, byFeat),
-        onEachFeature:(f,lyr)=>{ const e=byFeat[f._fi]; const w=unitWinner(e.b.v), tc=e.b.v[0];
+        style:f=>barrioStyle(f._fi, byFeat, byFill),
+        onEachFeature:(f,lyr)=>{ const e=byFeat[f._fi];
+          if(!e){ const fl=byFill[f._fi]; if(!fl) return;
+            lyr.on('mouseover',()=>lyr.setStyle({weight:1.8,color:'rgba(255,255,255,.6)'}));
+            lyr.on('mouseout',()=>layer.resetStyle(lyr));
+            lyr.bindTooltip(`<div class="tt-t">${fl.name}</div><div class="tt-row" style="color:var(--dim)">Barrio sin puesto propio · tendencia heredada del vecino (aproximado)</div><div class="tt-row"><span class="sw" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${partyColor(fl.winner_heredado)};margin-right:5px"></span>${fl.winner_heredado}</div><div class="tt-row" style="color:var(--dim2)">Vecino más cercano: ${fl.from||'—'} · no suma a ningún total</div>`,{className:'jal-tt',sticky:true});
+            return; }
+          const w=unitWinner(e.b.v), tc=e.b.v[0];
           lyr.on('mouseover',()=>lyr.setStyle({weight:2.4,color:'#fff'}));
           lyr.on('mouseout',()=>{ if(selBarrio!==e.i) layer.resetStyle(lyr); });
           lyr.bindTooltip(`<div class="tt-t">${e.b.name}</div><div class="tt-row">Gana: <b>${w?w.party:'—'}</b></div>${tc?`<div class="tt-row">Edil: <b>${dName(tc[0])}</b> · ${fmt(tc[1])}</div>`:''}<div class="tt-row"><b>${fmt(e.b.validos)}</b> válidos</div><div class="tt-row" style="color:var(--blue-light)">Toca para ver su votación</div>`,{className:'jal-tt',sticky:true});
           lyr.on('click',()=>selectBarrio(e.i));
         }
       }).addTo(map);
-      layer._byFeat=byFeat;
+      layer._byFeat=byFeat; layer._byFill=byFill;
       mapMode='comuna';
       const bk=document.getElementById('map-back'); if(bk) bk.style.display='';
-      const bd=document.getElementById('map-badge'); if(bd){ bd.style.display=''; bd.innerHTML=`${detState.r.name}<br><small>barrios · color = ganador</small>`; }
+      const bd=document.getElementById('map-badge');
+      if(bd){ const nf=Object.keys(byFill).length;
+        bd.style.display='';
+        bd.innerHTML=`${detState.r.name}<br><small>${curDetail.barrios.length} barrios con dato · color = ganador</small>`
+          +(nf?`<br><small class="badge-fill">+ ${nf} sin puesto propio (translúcido): color inferido del barrio vecino más cercano, no es su votación y no suma a totales</small>`:''); }
       const fit=()=>{ if(!map)return; map.invalidateSize(); try{const b=layer.getBounds(); if(b.isValid()) map.fitBounds(b,{padding:[14,14]});}catch(e){} };
       setTimeout(fit,60);
       return true;
     }
-    function barrioStyle(fi, byFeat){
+    function barrioStyle(fi, byFeat, byFill){
       byFeat=byFeat||(layer&&layer._byFeat)||{};
+      byFill=byFill||(layer&&layer._byFill)||{};
       const e=byFeat[fi];
-      if(!e) return {fillColor:'#20242e',fillOpacity:.3,color:'rgba(255,255,255,.2)',weight:1};
+      if(!e){
+        const fl=byFill[fi];   // relleno heredado: translúcido y con borde punteado
+        if(fl) return {fillColor:partyColor(fl.winner_heredado), fillOpacity:.42, color:'rgba(255,255,255,.18)', weight:.7, dashArray:'2,3'};
+        return {fillColor:'#20242e',fillOpacity:.3,color:'rgba(255,255,255,.2)',weight:1};
+      }
       const w=unitWinner(e.b.v), sel=(selBarrio===e.i);
       return {fillColor:w?partyColor(w.party):'#20242e', fillOpacity:sel?.95:.8, color:sel?'#fff':'rgba(255,255,255,.28)', weight:sel?3:1};
     }
