@@ -173,8 +173,40 @@
     .det-kpis { display:flex; flex-wrap:wrap; gap:1.4rem; margin-top:.9rem; }
     .det-kpis .k .n { font-size:1.15rem; font-weight:500; }
     .det-kpis .k .l { font-size:.6rem; letter-spacing:.1em; text-transform:uppercase; color:var(--dim2); }
+    /* sub-nav del detalle (resumen / barrios / puestos / mesas) */
+    .det-nav { display:flex; gap:.4rem; padding:.7rem 1.3rem 0; flex-wrap:wrap; border-bottom:1px solid var(--line); }
+    .det-nav button { background:transparent; color:var(--dim); border:1px solid var(--line); border-bottom:none; border-radius:4px 4px 0 0; padding:.5rem .9rem; font-family:inherit; font-size:.78rem; cursor:none; transition:background .2s,color .2s; }
+    .det-nav button.on { background:rgba(0,71,255,.14); color:var(--white); border-color:rgba(0,71,255,.4); }
+    .det-nav button:disabled { opacity:.4; }
+    .det-nav .dn-load { font-size:.66rem; color:var(--dim2); align-self:center; margin-left:.3rem; }
+    #det-content { padding:0; }
+    /* mapa de barrios dentro del detalle */
+    .bmap-wrap { position:relative; border-bottom:1px solid var(--line); }
+    #bmap { height:min(46vh,380px); min-height:260px; background:#060810; }
+    .bmap-hint { position:absolute; top:.6rem; left:.7rem; z-index:500; background:rgba(6,8,16,.8); border:1px solid var(--line); border-radius:3px; padding:.3rem .55rem; font-size:.68rem; color:var(--dim); pointer-events:none; }
+    /* listas de unidades (barrio/puesto/mesa) */
+    .unit-list { display:flex; flex-direction:column; }
+    .unit-row { border-bottom:1px solid rgba(255,255,255,.05); }
+    .unit-head { display:grid; grid-template-columns:1.6fr 1fr auto; gap:.6rem; align-items:center; padding:.6rem 1.3rem; cursor:none; transition:background .15s; }
+    .unit-head:hover, .unit-row.open .unit-head { background:rgba(0,71,255,.08); }
+    .unit-row.hl .unit-head { background:rgba(0,71,255,.16); }
+    .unit-nm { font-weight:500; font-size:.86rem; }
+    .unit-nm small { display:block; color:var(--dim2); font-size:.68rem; font-weight:400; }
+    .unit-win { display:flex; align-items:center; gap:.4rem; color:var(--dim); font-size:.74rem; min-width:0; }
+    .unit-win .sw { width:9px; height:9px; border-radius:2px; flex-shrink:0; }
+    .unit-win span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .unit-val { text-align:right; font-size:.8rem; }
+    .unit-val small { display:block; color:var(--dim2); font-size:.66rem; }
+    .unit-body { padding:.2rem 1.3rem .9rem; display:none; }
+    .unit-row.open .unit-body { display:block; }
+    .unit-body .subhdr { font-size:.64rem; letter-spacing:.12em; text-transform:uppercase; color:var(--dim2); margin:.6rem 0 .4rem; display:flex; align-items:center; gap:.6rem; }
+    .mesa-btn { font-family:inherit; font-size:.62rem; letter-spacing:.05em; text-transform:uppercase; color:var(--blue-light); background:rgba(0,71,255,.1); border:1px solid rgba(0,71,255,.3); border-radius:3px; padding:.15rem .5rem; cursor:none; }
+    .mesa-btn:hover { background:rgba(0,71,255,.22); }
+    .puesto-picker { padding:.9rem 1.3rem .3rem; display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; }
+    .puesto-picker select { background:var(--card); color:var(--white); border:1px solid var(--line); border-radius:3px; padding:.5rem .7rem; font-family:inherit; font-size:.86rem; min-width:240px; cursor:none; }
+    .puesto-picker label { font-size:.66rem; letter-spacing:.14em; text-transform:uppercase; color:var(--dim2); }
     .det-body { display:grid; grid-template-columns:minmax(220px,.75fr) minmax(0,1.6fr); gap:0; }
-    @media (max-width:820px){ .det-body { grid-template-columns:1fr; } }
+    @media (max-width:820px){ .det-body { grid-template-columns:1fr; } .unit-head{grid-template-columns:1.4fr auto;} .unit-win{display:none;} }
     .det-parties { padding:1rem 1.3rem; border-right:1px solid var(--line); }
     @media (max-width:820px){ .det-parties { border-right:none; border-bottom:1px solid var(--line); } }
     .det-parties h4, .det-cands h4 { font-size:.66rem; letter-spacing:.14em; text-transform:uppercase; color:var(--dim2); margin-bottom:.8rem; }
@@ -516,26 +548,48 @@
       if(scroll) document.querySelector('.detail-wrap').scrollIntoView({block:'start',behavior:'smooth'});
     }
 
-    // Detalle de una comuna: partidos (clickeables) + candidatos filtrables.
-    let detState=null;   // {r, partidos, cands, filter}
+    // ═══ DETALLE DE COMUNA · drill Resumen / Barrio / Puesto / Mesa ═══
+    let detState=null;       // {r, num, partidos, cands, filter}  · resumen (JSON principal)
+    let curDetail=null;      // detalle por-comuna (lazy)
+    let detView='resumen';
+    let curUnits={};         // id → fn() que devuelve el HTML del body (relleno lazy)
+    let bmap=null, bLayer=null;
+    const detailCache={}, barrioGeoCache={};
+    const DETAIL_BASE = new URLSearchParams(location.search).has('local')
+      ? 'Bases de datos/output_jal_2023/comuna'
+      : `${S3}/jal-2023/comuna`;
+    const MDE_BARRIO='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/MEDELLIN_BARRIOS_OFICIAL.json';
+    const BARRIO_GEO={
+      '16-001':{url:`${GEO_BASE}/BOG-BARRIOS-CATASTRALES.json`, rotate:true},
+      '01-001':{url:MDE_BARRIO},
+      '31-001':{url:`${GEO_BASE}/CALI-BARRIOS.json`},
+      '27-001':{url:`${GEO_BASE}/BUCARAMANGA-BARRIOS.json`},
+      '25-001':{url:`${GEO_BASE}/CUCUTA-BARRIOS.json`},
+      '09-001':{url:`${GEO_BASE}/MANIZALES-BARRIOS.json`},
+      '11-001':{url:`${GEO_BASE}/POPAYAN-BARRIOS.json`},
+    };
+
     function openComuna(num, scroll){
       const r=curByNum[num]; if(!r) return;
-      selComuna=num;
-      const nivel=curMeta.nivel==='localidad'?'Localidad':'Comuna';
-      const pr=partRatio(r);
-      const partidos=r.partidos||[], cands=r.cands||[];
-      detState={r, partidos, cands, filter:null};
-      const maxP=partidos[0]?partidos[0][1]:1;
-      const pbars=partidos.slice(0,16).map((pp,i)=>{
-        const [p,v]=pp;
-        return `<div class="pbar" data-pi="${i}" onclick="filterCands(${i})" title="Ver los candidatos de ${p}">
-          <div class="top"><span class="nm">${p}</span><span class="vv">${fmt(v)}</span></div>
-          <div class="track"><i style="width:${Math.max(2,Math.round(v/maxP*100))}%;background:${partyColor(p)}"></i></div></div>`;
-      }).join('');
+      selComuna=num; detView='resumen'; curDetail=null; curUnits={};
+      detState={r, num, partidos:r.partidos||[], cands:r.cands||[], filter:null};
+      renderDetailShell();
+      document.getElementById('comuna-grid').style.display='none';
+      document.getElementById('comuna-detail').style.display='';
+      document.getElementById('back-btn').style.display='';
+      document.getElementById('sec-title').textContent=r.name;
+      document.getElementById('sec-sub').textContent=`${curMeta.name} · resumen · barrios · puestos · mesas`;
+      if(layer) layer.setStyle(f=>styleFeat(f,CITY_GEO[curKey],curByNum));
+      if(scroll) document.querySelector('.detail-wrap').scrollIntoView({block:'start',behavior:'smooth'});
+      loadDetail(r.code);
+    }
+
+    function renderDetailShell(){
+      const r=detState.r, nivel=curMeta.nivel==='localidad'?'Localidad':'Comuna', pr=partRatio(r);
       document.getElementById('comuna-detail').innerHTML=`
         <div class="det-head">
           <h3>${r.name}</h3>
-          <div class="det-city">${curMeta.name} · ${nivel} · ${cands.length} candidatos · ${fmt(r.mesas)} mesas</div>
+          <div class="det-city">${curMeta.name} · ${nivel} · ${detState.cands.length} candidatos · ${fmt(r.mesas)} mesas</div>
           <div class="det-kpis">
             <div class="k"><div class="n">${fmt(r.validos)}</div><div class="l">Válidos</div></div>
             <div class="k"><div class="n">${fmt(r.blanco)}</div><div class="l">Blanco</div></div>
@@ -544,52 +598,161 @@
             <div class="k"><div class="n">${fmt(r.potencial)}</div><div class="l">Censo (aprox.)</div></div>
           </div>
         </div>
-        <div class="det-body">
-          <div class="det-parties"><h4>Votos por partido <span class="h4-hint">· toca uno para filtrar</span></h4>${pbars||'<div style="color:var(--dim2);font-size:.8rem">Sin datos</div>'}</div>
-          <div class="det-cands" id="det-cands"></div>
-        </div>`;
-      renderCandTable();
-      document.getElementById('comuna-grid').style.display='none';
-      document.getElementById('comuna-detail').style.display='';
-      document.getElementById('back-btn').style.display='';
-      document.getElementById('sec-title').textContent=r.name;
-      document.getElementById('sec-sub').textContent=`${curMeta.name} · ${nivel} · votación candidato por candidato`;
-      if(layer) layer.setStyle(f=>styleFeat(f,CITY_GEO[curKey],curByNum));
-      if(scroll) document.querySelector('.detail-wrap').scrollIntoView({block:'start',behavior:'smooth'});
+        <div class="det-nav" id="det-nav">
+          <button data-v="resumen" class="on" onclick="setDetView('resumen')">Resumen</button>
+          <button data-v="barrios" onclick="setDetView('barrios')" disabled>Barrios</button>
+          <button data-v="puestos" onclick="setDetView('puestos')" disabled>Puestos</button>
+          <button data-v="mesas" onclick="setDetView('mesas')" disabled>Mesas</button>
+          <span class="dn-load" id="dn-load">cargando desagregado…</span>
+        </div>
+        <div id="det-content"></div>`;
+      renderDetView();
     }
 
-    // Filtra la tabla de candidatos por partido (índice en partidos[]). Re-toque = quitar filtro.
+    async function loadDetail(comCode){
+      const key=`${curKey}-${comCode}`;
+      if(detailCache[key]){ curDetail=detailCache[key]; onDetailReady(comCode); return; }
+      try{
+        const res=await fetch(`${DETAIL_BASE}/${key}.json`);
+        if(!res.ok) throw new Error('HTTP '+res.status);
+        const d=await res.json();
+        detailCache[key]=d;
+        if(selComuna!=null && curByNum[selComuna] && curByNum[selComuna].code===comCode){ curDetail=d; onDetailReady(comCode); }
+      }catch(e){ const l=document.getElementById('dn-load'); if(l) l.textContent='desagregado no disponible'; }
+    }
+    function onDetailReady(){
+      const nav=document.getElementById('det-nav'); if(!nav) return;
+      nav.querySelectorAll('button[disabled]').forEach(b=>b.disabled=false);
+      const l=document.getElementById('dn-load'); if(l) l.remove();
+      if(detView!=='resumen') renderDetView();
+    }
+    function setDetView(v){
+      if(v!=='resumen' && !curDetail) return;
+      detView=v;
+      document.querySelectorAll('#det-nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+      renderDetView();
+    }
+    function renderDetView(){
+      if(detView!=='barrios' && bmap){ bmap.remove(); bmap=null; bLayer=null; }
+      if(detView==='resumen') renderResumen();
+      else if(detView==='barrios') renderBarrios();
+      else if(detView==='puestos') renderPuestos();
+      else if(detView==='mesas') renderMesas();
+    }
+
+    // ---- Resumen: partidos clickeables + candidatos ----
+    function renderResumen(){
+      const {partidos}=detState;
+      const maxP=partidos[0]?partidos[0][1]:1;
+      const pbars=partidos.slice(0,16).map((pp,i)=>`<div class="pbar" data-pi="${i}" onclick="filterCands(${i})" title="Ver los candidatos de ${pp[0]}"><div class="top"><span class="nm">${pp[0]}</span><span class="vv">${fmt(pp[1])}</span></div><div class="track"><i style="width:${Math.max(2,Math.round(pp[1]/maxP*100))}%;background:${partyColor(pp[0])}"></i></div></div>`).join('');
+      document.getElementById('det-content').innerHTML=`<div class="det-body">
+        <div class="det-parties"><h4>Votos por partido <span class="h4-hint">· toca uno para filtrar</span></h4>${pbars||'<div style="color:var(--dim2);font-size:.8rem">Sin datos</div>'}</div>
+        <div class="det-cands" id="det-cands"></div></div>`;
+      renderCandTable();
+    }
     function filterCands(idx){
       if(!detState) return;
-      detState.filter = (detState.filter===idx ? null : idx);
+      detState.filter=(detState.filter===idx?null:idx);
       renderCandTable();
-      document.querySelectorAll('#comuna-detail .pbar').forEach(el=>{
-        el.classList.toggle('active', detState.filter!=null && +el.dataset.pi===detState.filter);
-      });
+      document.querySelectorAll('#comuna-detail .pbar').forEach(el=>el.classList.toggle('active', detState.filter!=null && +el.dataset.pi===detState.filter));
+    }
+    function renderCandTable(){
+      const {r,partidos,cands,filter}=detState;
+      const list=filter==null?cands:cands.filter(c=>c[1]===filter);
+      const head=filter==null?`Todos los candidatos · ${cands.length}`:`Candidatos de ${partidos[filter][0]} · ${list.length} <button class="clear-filter" onclick="filterCands(${filter})">ver todos ✕</button>`;
+      const crows=list.map((c,i)=>{const party=(partidos[c[1]]||[])[0]||'';const pct=r.validos?(c[2]/r.validos*100):0;return `<tr class="${filter==null&&i===0?'win':''}"><td class="c-rank">${i+1}</td><td><div class="c-nm">${c[0]}</div></td><td><div class="c-party"><span class="sw" style="background:${partyColor(party)}"></span>${party}</div></td><td class="num">${fmt(c[2])}</td><td class="num c-pct">${pct.toFixed(1)}%</td></tr>`;}).join('');
+      document.getElementById('det-cands').innerHTML=`<h4>${head}</h4><div class="cand-scroll"><table class="ctab"><thead><tr><th class="c-rank">#</th><th>Candidato (edil)</th><th>Partido</th><th class="num">Votos</th><th class="num">% válid.</th></tr></thead><tbody>${crows}</tbody></table></div>`;
     }
 
-    function renderCandTable(){
-      const {r, partidos, cands, filter}=detState;
-      const list = filter==null ? cands : cands.filter(c=>c[1]===filter);
-      const head = filter==null
-        ? `Todos los candidatos · ${cands.length}`
-        : `Candidatos de ${partidos[filter][0]} · ${list.length} <button class="clear-filter" onclick="filterCands(${filter})">ver todos ✕</button>`;
-      const crows=list.map((c,i)=>{
-        const party=(partidos[c[1]]||[])[0]||'';
-        const pct=r.validos?(c[2]/r.validos*100):0;
-        return `<tr class="${filter==null&&i===0?'win':''}">
-          <td class="c-rank">${i+1}</td>
-          <td><div class="c-nm">${c[0]}</div></td>
-          <td><div class="c-party"><span class="sw" style="background:${partyColor(party)}"></span>${party}</div></td>
-          <td class="num">${fmt(c[2])}</td>
-          <td class="num c-pct">${pct.toFixed(1)}%</td>
-        </tr>`;
-      }).join('');
-      document.getElementById('det-cands').innerHTML=`<h4>${head}</h4>
-        <div class="cand-scroll"><table class="ctab">
-          <thead><tr><th class="c-rank">#</th><th>Candidato (edil)</th><th>Partido</th><th class="num">Votos</th><th class="num">% válid.</th></tr></thead>
-          <tbody>${crows}</tbody>
-        </table></div>`;
+    // ---- helpers de detalle (índices comprimidos) ----
+    function dName(ci){ return (curDetail.cands[ci]||['?'])[0]; }
+    function dParty(ci){ const c=curDetail.cands[ci]; return c?(curDetail.partidos[c[1]]||[''])[0]:''; }
+    function unitWinner(v){ const by={}; v.forEach(([ci,vt])=>{const p=dParty(ci); by[p]=(by[p]||0)+vt;}); let bp=null,bv=-1; for(const p in by){ if(by[p]>bv){bv=by[p];bp=p;} } return bp?{party:bp,votos:bv}:null; }
+    function unitCandTable(v,validos){
+      const rows=v.map(([ci,vt],i)=>{const party=dParty(ci);const pct=validos?(vt/validos*100):0;return `<tr class="${i===0?'win':''}"><td class="c-rank">${i+1}</td><td><div class="c-nm">${dName(ci)}</div></td><td><div class="c-party"><span class="sw" style="background:${partyColor(party)}"></span>${party}</div></td><td class="num">${fmt(vt)}</td><td class="num c-pct">${pct.toFixed(1)}%</td></tr>`;}).join('');
+      return `<div class="cand-scroll"><table class="ctab"><thead><tr><th class="c-rank">#</th><th>Candidato (edil)</th><th>Partido</th><th class="num">Votos</th><th class="num">%</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+    function unitRow(id, name, sub, winner, validos){
+      const w=winner?partyColor(winner.party):'#3a3f4c';
+      return `<div class="unit-row" id="row-${id}"><div class="unit-head" onclick="toggleUnit('${id}')">
+        <div class="unit-nm">${name}${sub?`<small>${sub}</small>`:''}</div>
+        <div class="unit-win"><span class="sw" style="background:${w}"></span><span>${winner?winner.party:'—'}</span></div>
+        <div class="unit-val">${fmt(validos)}<small>válidos</small></div></div>
+        <div class="unit-body" id="body-${id}"></div></div>`;
+    }
+    function toggleUnit(id){
+      const row=document.getElementById('row-'+id); if(!row) return;
+      const open=row.classList.toggle('open');
+      const body=document.getElementById('body-'+id);
+      if(open && body && !body.dataset.filled && curUnits[id]){ body.innerHTML=curUnits[id](); body.dataset.filled='1'; }
+    }
+
+    // ---- Barrios (tabla + mapa donde exista) ----
+    function renderBarrios(){
+      const d=curDetail;
+      const barrios=(d.barrios||[]).map((b,i)=>({...b,_i:i})).sort((a,b)=>b.validos-a.validos);
+      curUnits={};
+      const rows=barrios.map(b=>{ const id='b'+b._i; curUnits[id]=()=>unitCandTable(b.v,b.validos); return unitRow(id, b.name, null, unitWinner(b.v), b.validos); }).join('');
+      document.getElementById('det-content').innerHTML=
+        (d.has_barrio_map?`<div class="bmap-wrap"><div class="bmap-hint">Barrios de ${detState.r.name} · color = partido ganador · toca uno</div><div id="bmap"></div></div>`
+                        :`<div style="padding:.85rem 1.3rem;color:var(--dim2);font-size:.76rem">Esta ciudad no tiene polígonos de barrio; se muestra la tabla por barrio (censo).</div>`)
+        +`<div class="unit-list">${rows}</div>`;
+      if(d.has_barrio_map) buildBarrioMap(barrios);
+    }
+    async function buildBarrioMap(barrios){
+      const cfg=BARRIO_GEO[curKey]; if(!cfg) return;
+      let geo=barrioGeoCache[curKey];
+      if(!geo){ try{ geo=await (await fetch(cfg.url)).json(); barrioGeoCache[curKey]=geo; }catch(e){ return; } }
+      const byFeat={}; barrios.forEach(b=>{ if(b.feat!=null) byFeat[b.feat]=b; });
+      const sub={type:'FeatureCollection',features:geo.features.map((f,i)=>({...f,_fi:i})).filter(f=>byFeat[f._fi]!=null)};
+      const drawn = cfg.rotate ? rotate90Left(sub) : sub;
+      if(!document.getElementById('bmap')) return;
+      if(bmap){ bmap.remove(); bmap=null; }
+      // setView inicial: garantiza que el mapa tenga una vista válida (si se crea
+      // antes del layout, el contenedor mide 0×0 y fitBounds daría zoom NaN →
+      // polígonos degenerados). El fitBounds real corre en un doble rAF con el
+      // contenedor ya medido (invalidateSize).
+      bmap=L.map('bmap',{zoomControl:true,attributionControl:false,scrollWheelZoom:false}).setView([4.6,-74.1],11);
+      bLayer=L.geoJSON(drawn,{
+        style:f=>{ const b=byFeat[f._fi]; const w=unitWinner(b.v); return {fillColor:w?partyColor(w.party):'#20242e',fillOpacity:.82,color:'rgba(255,255,255,.28)',weight:1}; },
+        onEachFeature:(f,lyr)=>{ const b=byFeat[f._fi]; const w=unitWinner(b.v); const tc=b.v[0];
+          lyr.on('mouseover',()=>lyr.setStyle({weight:2.4,color:'#fff'}));
+          lyr.on('mouseout',()=>lyr.setStyle({weight:1,color:'rgba(255,255,255,.28)'}));
+          lyr.bindTooltip(`<div class="tt-t">${b.name}</div><div class="tt-row">Gana: <b>${w?w.party:'—'}</b></div>${tc?`<div class="tt-row">Edil: <b>${dName(tc[0])}</b> · ${fmt(tc[1])}</div>`:''}<div class="tt-row"><b>${fmt(b.validos)}</b> válidos</div>`,{className:'jal-tt',sticky:true});
+          lyr.on('click',()=>{ const id='b'+b._i, row=document.getElementById('row-'+id); if(row){ if(!row.classList.contains('open')) toggleUnit(id); row.scrollIntoView({block:'center',behavior:'smooth'}); row.classList.add('hl'); setTimeout(()=>row.classList.remove('hl'),1500); } });
+        }
+      }).addTo(bmap);
+      const fit=()=>{ if(!bmap) return; bmap.invalidateSize(); try{ const bb=bLayer.getBounds(); if(bb.isValid()) bmap.fitBounds(bb,{padding:[12,12]}); }catch(e){} };
+      requestAnimationFrame(()=>requestAnimationFrame(fit));
+    }
+
+    // ---- Puestos (→ candidatos + mesas) ----
+    function renderPuestos(){
+      const puestos=(curDetail.puestos||[]).map((p,i)=>({...p,_i:i})).sort((a,b)=>b.validos-a.validos);
+      curUnits={};
+      const rows=puestos.map(p=>{ const id='p'+p._i;
+        curUnits[id]=()=>unitCandTable(p.v,p.validos)+((p.mesas&&p.mesas.length)?`<div class="subhdr">Desagregar por mesa <button class="mesa-btn" onclick="showMesas('${id}',${p._i})">ver ${p.mesas.length} mesas</button></div><div id="mesas-${id}"></div>`:'');
+        return unitRow(id, p.nombre, p.barrio, unitWinner(p.v), p.validos); }).join('');
+      document.getElementById('det-content').innerHTML=`<div class="unit-list">${rows}</div>`;
+    }
+    function showMesas(rowId, pi){
+      const cont=document.getElementById('mesas-'+rowId); if(!cont || cont.dataset.filled) return;
+      const p=curDetail.puestos[pi];
+      const rows=(p.mesas||[]).map((m,i)=>{ const id=rowId+'m'+i; curUnits[id]=()=>unitCandTable(m[2],m[1]); return unitRow(id,'Mesa '+m[0], null, unitWinner(m[2]), m[1]); }).join('');
+      cont.innerHTML=`<div class="unit-list">${rows}</div>`; cont.dataset.filled='1';
+    }
+
+    // ---- Mesas (elige un puesto → sus mesas) ----
+    function renderMesas(){
+      const opts=(curDetail.puestos||[]).slice().sort((a,b)=>b.validos-a.validos).map((p,i)=>({p,gi:curDetail.puestos.indexOf(p)}))
+        .map(o=>`<option value="${o.gi}">${o.p.nombre} — ${o.p.barrio} (${fmt(o.p.validos)})</option>`).join('');
+      document.getElementById('det-content').innerHTML=`<div class="puesto-picker"><label>Puesto de votación</label><select id="mesa-puesto" onchange="renderMesasFor(this.value)"><option value="">— elige un puesto —</option>${opts}</select></div><div id="mesa-list-wrap" style="padding:.3rem 0 .7rem"></div>`;
+    }
+    function renderMesasFor(pi){
+      const w=document.getElementById('mesa-list-wrap'); if(pi===''){ w.innerHTML=''; return; }
+      const p=curDetail.puestos[pi]; curUnits={};
+      const rows=(p.mesas||[]).map((m,i)=>{ const id='mm'+i; curUnits[id]=()=>unitCandTable(m[2],m[1]); return unitRow(id,'Mesa '+m[0], p.nombre, unitWinner(m[2]), m[1]); }).join('');
+      w.innerHTML=`<div class="unit-list">${rows||'<div style="padding:.8rem 1.3rem;color:var(--dim2)">Sin mesas</div>'}</div>`;
     }
 
     // Rota el GeoJSON de Bogotá 90° a la izquierda alrededor de su centroide.
