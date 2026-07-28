@@ -41,6 +41,18 @@ with open(os.path.join(_HERE, "social.json"), encoding="utf-8") as _f:
 APIFY_BASE = "https://api.apify.com/v2"
 APIFY_TIMEOUT = 150
 
+# Cuentas que se descartan siempre (extranjeras que entran por hashtag).
+_EXCLUIR_CUENTAS = [collect.norm(c).lstrip("@")
+                    for c in SOCIAL.get("excluir_cuentas", []) if collect.norm(c)]
+
+
+def cuenta_excluida(autor):
+    """True si el autor está en la lista negra de excluir_cuentas."""
+    if not _EXCLUIR_CUENTAS:
+        return False
+    a = collect.norm(autor or "").lstrip("@")
+    return any(x in a for x in _EXCLUIR_CUENTAS)
+
 
 def _token():
     tok = os.environ.get("APIFY_TOKEN")
@@ -144,6 +156,8 @@ def fetch_red(red, cfg, run_iso):
             continue  # centinela de "sin resultados" que algunos actores emiten
         texto = _dig(it, m["texto"]) or ""
         if not texto.strip():
+            continue
+        if cuenta_excluida(_dig(it, m["autor"])):
             continue
         matched = collect.match_keywords(texto, "")
         # X busca laxo → si el config lo pide, exigir al menos un término del léxico.
