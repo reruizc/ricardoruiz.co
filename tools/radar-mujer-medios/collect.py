@@ -153,11 +153,24 @@ _EXCLUIR = [norm(t) for t in CFG.get("excluir", {}).get("terminos", [])]
 _EXCLUIR_MEDIOS = [norm(m) for m in CFG.get("excluir", {}).get("medios", []) if norm(m)]
 
 def medio_excluido(medio: str) -> bool:
-    """True si el medio está en la lista negra de excluir.medios."""
+    """True si el medio está en la lista negra de excluir.medios.
+
+    Dos formas de entrada:
+      · empieza con '.'  → sufijo de dominio, match por FINAL ('.mx' apaga
+        sinaloahoy.com.mx pero nunca algo llamado 'noticias.mxtra');
+      · cualquier otra   → substring sobre el nombre normalizado.
+    """
     if not _EXCLUIR_MEDIOS:
         return False
     m = norm(medio or "")
-    return any(x in m for x in _EXCLUIR_MEDIOS)
+    dom = m.rstrip(".")          # Google News a veces manda 'tvyumuri.cu.'
+    for x in _EXCLUIR_MEDIOS:
+        if x.startswith("."):
+            if dom.endswith(x):
+                return True
+        elif x in m:
+            return True
+    return False
 
 def match_keywords(title: str, summary: str):
     """Devuelve lista de términos del léxico que aparecen en title+summary."""
