@@ -5506,6 +5506,36 @@ documento correcto. Probado: Gaceta 857/2013 (boletín con proyectos 86/107/15/2
 Clemencia Vega Quiroz, 5 argumentos reales. Los PDFs locales van a `Bases de datos/
 leyes-senado/gacetas/` (gitignored; no guardamos PDFs en prod, solo el texto en S3).
 
+**Fase 3 · índice de texto MASIVO (④ · el "curado de fondo" · jul-2026) — distinto
+del piloto de arriba.** El piloto de la acción `gaceta` es análisis LLM profundo de UNA
+gaceta; esto es el **índice invertido palabra→proyecto** que hace que `buscar()` matchee
+por el ARTICULADO, no solo el título (badge ◈ "en el texto"). Pipeline **automatizado por
+curl, ya NO manual** (la nota vieja "descarga semi-manual vía Chrome" aplica solo al piloto
+LLM): `enumerar_gacetas.py --desde AAAA` (pagina el buscador JSF, saca num+fecha de TODAS
+las gacetas 2005-2026, 27.399 filas) → `harvest_gacetas_texto.py --indexables --desde AAAA
+--workers 3` (descarga 2 pasos + pypdf + sube a `gacetas-texto/{num}-{año}.txt`, resumible,
+borra el PDF) → `build_texto_index.py` (cruza cada proyecto con sus gacetas ≤4-proyectos y
+sin expo-motivos, tokeniza, filtra palabras >5% docfreq → `dist/texto-index.json`).
+- **`--indexables`** (agregado ④): filtra a las gacetas que el índice SÍ usa (mismo criterio
+  que build_texto_index) → salta los **boletines gigantes** (verificados hasta 109 MB, que
+  build descarta igual y que causaban timeout). Bajó el trabajo a la mitad. Los ~2.5k
+  "fallos" del barrido inicial eran **transitorios** (8 workers + PDFs enormes + timeout 180s
+  saturaban), no persistentes → con **workers 3 + timeout 300s** se recuperan casi todos.
+- **Cobertura (jul-2026):** cosechado el tramo digital **2006-2019** (2.457 gacetas, **0
+  escaneadas** — 2006+ es todo digital, pypdf limpio, 42 min a ~59/min) → índice pasó de
+  **~1.996 → ~4.572 proyectos con texto** (~19% → **~43%** de los 10.664). `texto-index.json`
+  23 MB · 255.901 palabras.
+- **Deploy del índice:** `aws s3 cp dist/texto-index.json s3://caudal-legislativo/metadata/
+  texto-index.json` → la Lambda lo recarga en cold start (`_get_json('metadata/texto-index.json')`).
+  ⚠ **Memoria Lambda subida a 1024 MB** (era 512): parsear el JSON de 23 MB a dict de 255k
+  palabras se comía los 512. El `update-function-configuration --memory-size` además recicla
+  los contenedores warm (sirve de "redeploy" para que tomen el índice nuevo).
+- **PENDIENTE — pre-2006 (~1.393 gacetas indexables, ESCANEADAS):** `harvest_gacetas_texto`
+  las marca `fail_empty` (pypdf no saca texto). Requieren **OCR** (Tesseract, ya usado en
+  `parse_dcnsw_camara.py`/`ocr_pilot.py`). Es la Fase 2 para llegar a ~100% de cobertura;
+  más lenta y de menor relevancia para clientes de hoy. Residuo aparte: ~34 `fail_download`
+  de número muy bajo (num 1-9 de enero, primeras del año legislativo, casos borde genuinos).
+
 **Ficha del frontend wireada (LISTO):** en el modal de proyecto, los documentos de
 ponencia/plenaria/conciliación son clicables → llaman la acción `gaceta` de la
 Lambda → `analizarGaceta` renderiza según el `tipo_documento`: **ponencia** (sentido
