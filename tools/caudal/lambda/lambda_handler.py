@@ -1210,6 +1210,39 @@ def handler(event, context):
                            'expansion': {'terminos': extra} if extra else None,
                            'flexible': flex})
 
+    if action == 'snippets':
+        # fragmento del cuerpo de gaceta donde aparece la palabra, para los match
+        # ◈ "en el texto" — le deja al usuario chequear si el proyecto le sirve sin
+        # abrir la ficha. Lazy: el frontend lo pide solo para los que muestra.
+        q = body.get('query', '')
+        items = (body.get('ids') or [])[:body.get('max', 50)]
+        terms = caudal.snippet_terms(q)
+        full = _full()
+
+        def _one(item):
+            tb, pid = item.get('tb', 'pdly'), item.get('id')
+            base = {'id': pid, 'tb': tb}
+            rec = full.get(f"{tb}:{pid}")
+            if not rec or not terms:
+                return {**base, 'snippet': None}
+            for g in rec.get('gacetas', []):
+                gk = g.get('gaceta')
+                if not gk or g.get('tipo') == 'exposicion_motivos':
+                    continue
+                try:
+                    obj = _s3.get_object(Bucket=BUCKET, Key=f"gacetas-texto/{gk.replace('/', '-')}.txt")
+                    txt = obj['Body'].read().decode('utf-8', 'replace')
+                except Exception:
+                    continue
+                sn = caudal.make_snippet(txt, terms)
+                if sn:
+                    return {**base, 'gaceta': gk, 'tipo': g.get('tipo'), **sn}
+            return {**base, 'snippet': None}
+
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            out = list(ex.map(_one, items))
+        return _resp(200, {'snippets': out})
+
     if action == 'stats':          # agregados globales precalculados (para gráficas)
         try:
             return _resp(200, _get_json('metadata/stats.json'))

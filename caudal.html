@@ -343,6 +343,9 @@
   .land-h{font-size:.66rem; letter-spacing:.16em; text-transform:uppercase; color:var(--ink3); text-align:center; margin-bottom:1rem}
   .broaden{font-size:.78rem; color:var(--ink2); background:var(--teal-soft); border:1px solid var(--teal-dim); border-radius:7px; padding:.6rem .85rem; margin-bottom:1rem}
   .broaden b{color:var(--ink)}
+  .snip{font-size:.8rem; color:var(--ink2); line-height:1.55; margin:.3rem 0 .15rem; font-style:italic}
+  .snip-hi{color:var(--ink); background:var(--teal-soft); font-style:normal; padding:0 3px; border-radius:3px; font-weight:600}
+  .snip-load,.snip-none{color:var(--ink3); font-style:normal; font-size:.76rem}
   .bd-link{color:var(--teal); cursor:none; text-decoration:underline; white-space:nowrap}
   /* bloqueo en comisión (ficha) */
   .bloq-card{background:linear-gradient(180deg,rgba(224,160,58,.09),transparent); border:1px solid rgba(224,160,58,.3); border-radius:9px; padding:1.1rem 1.2rem; margin:1rem 0}
@@ -1326,6 +1329,26 @@
     if(btn) btn.remove();
   }
 
+  // ④ trae los fragmentos del cuerpo de gaceta para los match ◈ "en el texto"
+  async function loadSnippets(query, txtInt){
+    const rows=(txtInt||[]).slice(0,50);   // cap: 50 fragmentos por búsqueda
+    if(!rows.length) return;
+    const ids=rows.map(it=>({id:it.id, tb:it.tb||'pdly'}));
+    let d; try{ d=await call({action:'snippets', query, ids, max:50}); }catch(e){ return; }
+    const by={}; (d.snippets||[]).forEach(s=>by[(s.tb||'pdly')+':'+s.id]=s);
+    rows.forEach(it=>{
+      const key=(it.tb||'pdly')+':'+it.id;
+      const el=results.querySelector(`#texto-list .snip[data-key="${key}"]`);
+      if(!el) return;
+      const s=by[key];
+      if(s&&s.snippet){
+        let h=esc(s.snippet);
+        if(s.match){ const m=esc(s.match); if(m) h=h.split(m).join('<b class="snip-hi">'+m+'</b>'); }
+        el.innerHTML=h;
+      } else { el.innerHTML='<span class="snip-none">fragmento no disponible (gaceta aún no cosechada)</span>'; }
+    });
+  }
+
   function renderResumen(query,r){
     const cob=r.cobertura_partido||{con:0,sin:0}; const cobTot=cob.con+cob.sin;
     const emb=r.embudo||{};
@@ -1335,22 +1358,29 @@
       return `<div class="banc-row"><span class="banc-dot" style="background:${c}"></span><span class="banc-name" title="${esc(p)}">${esc(p)}</span><span class="banc-bar"><span style="width:${100*n/bmax}%;background:${c}"></span></span><span class="banc-n">${n}</span></div>`;
     }).join('');
     const intentos=r.intentos||[];
-    const tl=intentos.map(it=>{
+    // ④ split: la palabra en el TÍTULO (radicado o alias) vs solo en el CUERPO de
+    // la gaceta (◈). Los de texto van en su propia sección, cada uno con el fragmento.
+    const titInt=intentos.filter(it=>!it.match_texto);
+    const txtInt=intentos.filter(it=>it.match_texto);
+    const tlRow=(it,inTexto)=>{
       const rc=RES_COLOR[it.resultado]||'var(--gray)';
+      const key=(it.tb||'pdly')+':'+it.id;
       return `<div class="tl-item" data-id="${it.id}" data-tb="${it.tb||'pdly'}" data-emp="${it.empuje||''}" data-tip="${it.tipologia||''}" data-mc="${it.mc!=null?it.mc:''}" data-nw="${it.nw!=null?it.nw:''}">
         <span class="tl-year">${it.anio||'—'}</span>
         <div class="tl-body">
           <div class="tl-titulo" title="${esc(it.titulo)}">${esc(shortTitle(it.titulo).slice(0,110))}</div>
+          ${inTexto?`<div class="snip" data-key="${key}"><span class="snip-load">buscando el fragmento…</span></div>`:''}
           <div class="tl-tags">
             <span class="doc-badge ${it.tb==='pal'?'pal':''}">${TIPO_DOC[it.tb||'pdly']}</span>
-            ${it.match_texto?`<span class="doc-badge pal" title="No coincide en el título — coincide en el texto de su ponencia/acta">◈ en el texto</span>`:''}
             <span class="tl-res" style="color:${rc};border:1px solid ${rc}33;background:${rc}14">${RES_TXT[it.resultado]||'—'}</span>
             ${it.empuje?`<span class="emp-badge" style="color:${EMP_COLOR[it.empuje]};background:${EMP_COLOR[it.empuje]}14;border:1px solid ${EMP_COLOR[it.empuje]}44" title="${it.empuje==='vitrina'?'Re-radicado sin superar el 1er debate':''}">${EMP_TXT[it.empuje]||''}${it.veces_presentado>1?' '+it.veces_presentado+'×':''}</span>`:''}
             ${it.tipologia&&it.tipologia!=='ordinaria'?`<span class="emp-badge" style="color:${TIP_COLOR[it.tipologia]};background:${TIP_COLOR[it.tipologia]}14;border:1px solid ${TIP_COLOR[it.tipologia]}44">${TIP_TXT[it.tipologia]||''}</span>`:''}
           </div>
         </div>
       </div>`;
-    }).join('');
+    };
+    const tl=titInt.map(it=>tlRow(it,false)).join('');
+    const txtList=txtInt.map(it=>tlRow(it,true)).join('');
 
     // desglose de empuje para la tira de intención (orden fijo)
     const empD=r.empuje||{};
@@ -1401,7 +1431,11 @@
       <div class="panel wide" style="margin-bottom:1.2rem"><h3>Bancadas que lo impulsan</h3>${banc||'<div class="cob-note">Sin datos de partido.</div>'}
         <div class="cob-note">Partido identificado en ${cob.con}/${cobTot} intentos (roster Congreso 2014–2026).</div></div>
 
-      <div class="panel"><h3 id="tl-head">Los ${r.n_intentos} intentos · click para la ficha</h3><div class="tl tl-scroll">${tl}</div></div>
+      ${titInt.length?`<div class="panel"><h3 id="tl-head">${titInt.length} con «${esc(query)}» en el título · click para la ficha</h3><div class="tl tl-scroll" id="tl-timeline">${tl}</div></div>`:''}
+
+      ${txtInt.length?`<div class="panel" style="margin-top:1.2rem"><h3>Además, ${txtInt.length} lo mencionan «${esc(query)}» dentro del texto de su ponencia o acta</h3>
+        <div class="cob-note">No lo llevan en el título — el fragmento te deja ver si el proyecto te sirve. Ojo: una gaceta es un boletín con varias ponencias, así que a veces el proyecto trata de otra cosa y solo comparte el documento.</div>
+        <div class="tl tl-scroll" id="texto-list" style="max-height:460px">${txtList}</div></div>`:''}
     `;
     requestAnimationFrame(()=>{
       results.querySelectorAll('.f2-bar').forEach(s=>s.style.width=s.dataset.w+'%');
@@ -1410,8 +1444,11 @@
       results.querySelectorAll('.mort-bar').forEach(s=>s.style.height=s.dataset.h+'%');
     });
     loadStats();   // por si aún no cargó (llena #mort-box cuando resuelva)
-    const tlItems=[...results.querySelectorAll('.tl-item')];
+    // ojo: los filtros/toggle operan SOLO sobre el timeline de título (no la sección de texto)
+    const tlItems=[...results.querySelectorAll('#tl-timeline .tl-item')];
     tlItems.forEach(el=>el.onclick=()=>abrirProyecto(el.dataset.id,el.dataset.tb));
+    results.querySelectorAll('#texto-list .tl-item').forEach(el=>el.onclick=()=>abrirProyecto(el.dataset.id,el.dataset.tb));
+    loadSnippets(query, txtInt);   // ④ trae los fragmentos del cuerpo de gaceta (lazy)
     // filtro clickeable: clasifica los intentos por empuje/tipología
     const tlHead=document.getElementById('tl-head');
     results.querySelectorAll('.ichip-f').forEach(ch=>ch.onclick=()=>{

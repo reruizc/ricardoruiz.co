@@ -45,6 +45,19 @@ def _norm(s):
     return s.lower()
 
 
+# fold 1:1 (preserva offsets, a diferencia de _norm que puede cambiar longitud con
+# NFD): minúsculas sin tildes por traducción char→char. Se usa para buscar un
+# término dentro del texto crudo de una gaceta sin descuadrar las posiciones del
+# recorte del snippet.
+_FOLD_MAP = str.maketrans(
+    'áàäâãéèëêíìïîóòöôõúùüûñçÁÀÄÂÃÉÈËÊÍÌÏÎÓÒÖÔÕÚÙÜÛÑÇ',
+    'aaaaaeeeeiiiiooooouuuuncAAAAAEEEEIIIIOOOOOUUUUNC')
+
+
+def _fold(s):
+    return (s or '').translate(_FOLD_MAP).lower()
+
+
 # sufijos que trima el stemmer ligero (más largos primero) para tolerar
 # erratas/flexiones del propio sistema del Congreso ("feminicido" sin la 2ª i)
 _SUFIJOS = ('idades', 'ciones', 'idad', 'cion', 'mente', 'ico', 'ica', 'ios',
@@ -494,6 +507,55 @@ class Caudal:
         cand = [it for it in resumen.get('intentos', []) if (it.get('anio') or 0) >= 2019]
         cand.sort(key=lambda it: (it.get('etapa_max', 0), it.get('anio') or 0), reverse=True)
         return cand[:k]
+
+    # -------- snippet del cuerpo de gaceta (para los match ◈ "en el texto") --
+    def snippet_terms(self, query):
+        """Términos a buscar/resaltar en el fragmento: el vocabulario del tópico si
+        la consulta cayó en uno (así 'eutanasia' también encuentra 'muerte digna'
+        en el texto), si no las palabras de la consulta (>3 chars)."""
+        topicos = _topicos(query)
+        if topicos:
+            terms, seen = [], set()
+            for t in topicos:
+                for term in t['terms']:
+                    if term not in seen:
+                        seen.add(term)
+                        terms.append(term)
+            return terms
+        return [_norm(w) for w in (query or '').split() if len(w) > 3]
+
+    def make_snippet(self, text, terms, ctx=110):
+        """Primer fragmento del texto (crudo) donde aparece alguno de los términos,
+        con ±ctx chars de contexto y espacios colapsados. Devuelve
+        {'snippet','match'} (match = el fragmento tal como aparece, para resaltar)
+        o None. Búsqueda sin tildes/mayúsculas preservando offsets (fold 1:1)."""
+        if not text:
+            return None
+        folded = _fold(text)
+        best = None                       # (pos, largo del término)
+        for term in terms:
+            ft = _fold(term)
+            if len(ft) < 3:
+                continue
+            # \b al inicio: 'pension' NO debe pegar dentro de 'suspensión'; sí en
+            # 'pensional'/'pensiones' (arranca palabra). Frases ('muerte digna')
+            # matchean textual con espacio en medio.
+            m = re.search(r'\b' + re.escape(ft), folded)
+            if m and (best is None or m.start() < best[0]):
+                best = (m.start(), len(ft))
+        if best is None:
+            return None
+        i, ln = best
+        # extiende hasta el fin de la palabra para resaltar la palabra completa
+        # (pension → pensional), no solo el prefijo del término
+        j = i + ln
+        while j < len(folded) and folded[j].isalpha():
+            j += 1
+        match = text[i:j]
+        a, b = max(0, i - ctx), min(len(text), j + ctx)
+        frag = re.sub(r'\s+', ' ', text[a:b]).strip()
+        return {'snippet': ('…' if a > 0 else '') + frag + ('…' if b < len(text) else ''),
+                'match': match}
 
     # -------- Radar del cliente · señales legislativas -----------------
     def radar_congreso(self, sector_key=None, temas=None, comision_lbl='', cap=10):
