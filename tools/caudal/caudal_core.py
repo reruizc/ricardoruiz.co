@@ -396,52 +396,67 @@ class Caudal:
         result = out[:limit] if limit else out
         return (result, {'relajado': relajado}) if with_meta else result
 
-    # -------- análisis de un tema (survival / embudo) -----------------
-    def resumen_tema(self, query, **filtros):
-        extra_terms = filtros.get('extra_terms') or []
-        # relajar=True: la búsqueda del usuario nunca colapsa por AND (③). El
-        # Radar del cliente llama a buscar aparte con relajar=False (precisión).
-        hits, meta = self.buscar(query, relajar=True, with_meta=True, **filtros)
+    # -------- bloque de estadísticas sobre una lista de hits ----------
+    def _theme_stats(self, hits):
+        """Embudo/éxito/bancadas/intención sobre una lista de hits. Se calcula por
+        separado para los match de TÍTULO y para todos (título+texto) → el switch
+        del frontend (④) muestra las estadísticas de los proyectos REALES (título)
+        sin que los 'también mencionan' (ruido de citas/boletines) las inflen."""
         n = len(hits)
         leyes = [h for h in hits if h['ley']]
         tiempo = [h for h in hits if h['res'] == 'ARCHIVADO_TIEMPO']
         caidos = [h for h in hits if h['res'] in ('ARCHIVADO_TIEMPO', 'ARCHIVADO_OTRO', 'RETIRADO')]
         embudo = {ETAPA_LABEL[i]: sum(1 for h in hits if h['et'] >= i) for i in range(6)}
         anios = [h['a'] for h in hits if h['a']]
-        # autores que más radican en el tema
         autores = {}
         for h in hits:
             for a in h.get('aut', []):
                 autores[a] = autores.get(a, 0) + 1
-        top_autores = sorted(autores.items(), key=lambda x: -x[1])[:8]
-        # bancadas que impulsan el tema (por partido de los autores) + cobertura
         bancadas, con_p, sin_p = {}, 0, 0
         for h in hits:
-            partidos_h = set()
+            ps = set()
             for k in h.get('ak', []):
                 e = self.ap.get(k)
                 if e:
-                    partidos_h.add(e['partido'])
-            if partidos_h:
+                    ps.add(e['partido'])
+            if ps:
                 con_p += 1
-                for p in partidos_h:
+                for p in ps:
                     bancadas[p] = bancadas.get(p, 0) + 1
             else:
                 sin_p += 1
-        top_bancadas = sorted(bancadas.items(), key=lambda x: -x[1])[:8]
-        # F1 · lectura de intención del tema
-        tipologia = {}
-        empuje = {}
+        tipologia, empuje = {}, {}
         for h in hits:
             tipologia[h.get('tip', 'ordinaria')] = tipologia.get(h.get('tip', 'ordinaria'), 0) + 1
             empuje[h.get('emp', 'sin_traccion')] = empuje.get(h.get('emp', 'sin_traccion'), 0) + 1
-        n_vitrina = empuje.get('vitrina', 0)
-        n_honores = tipologia.get('honores', 0)
+        return {
+            'n_intentos': n, 'n_leyes': len(leyes), 'n_caidos': len(caidos),
+            'n_muerte_por_tiempo': len(tiempo),
+            'pct_exito': round(100 * len(leyes) / n, 1) if n else 0,
+            'periodo': [min(anios), max(anios)] if anios else None,
+            'embudo': embudo,
+            'top_autores': sorted(autores.items(), key=lambda x: -x[1])[:8],
+            'bancadas': sorted(bancadas.items(), key=lambda x: -x[1])[:8],
+            'cobertura_partido': {'con': con_p, 'sin': sin_p},
+            'tipologia': dict(sorted(tipologia.items(), key=lambda x: -x[1])),
+            'empuje': dict(sorted(empuje.items(), key=lambda x: -x[1])),
+            'n_vitrina': empuje.get('vitrina', 0), 'n_honores': tipologia.get('honores', 0),
+            'pct_vitrina': round(100 * empuje.get('vitrina', 0) / n, 1) if n else 0,
+        }
+
+    # -------- análisis de un tema (survival / embudo) -----------------
+    def resumen_tema(self, query, **filtros):
+        extra_terms = filtros.get('extra_terms') or []
+        # relajar=True: la búsqueda del usuario nunca colapsa por AND (③). El
+        # Radar del cliente llama a buscar aparte con relajar=False (precisión).
+        hits, meta = self.buscar(query, relajar=True, with_meta=True, **filtros)
+        tit = [h for h in hits if not h.get('mt')]   # ④ palabra en el TÍTULO/alias
+        st = self._theme_stats(tit)                  # default: solo título (los reales)
+        st_todos = self._theme_stats(hits)           # título + contenido (para el switch)
         topicos = _topicos(query)
         # ③ búsqueda flexible: si la consulta multi-palabra se relajó (ancló al
         # término más específico en vez de exigir todas), el aviso explica por qué
-        # salieron más resultados que las coincidencias exactas. Reemplaza el viejo
-        # 'broaden', que pedía un segundo clic para ampliar a un solo término.
+        # salieron más resultados que las coincidencias exactas.
         flexible = None
         rel = (meta or {}).get('relajado')
         if rel and rel.get('n_total', 0) > rel.get('n_estricto', 0):
@@ -460,20 +475,10 @@ class Caudal:
         # no contiene su palabra).
         expansion = {'terminos': list(extra_terms)} if extra_terms else None
         return {
-            'query': query, 'n_intentos': n,
-            'n_leyes': len(leyes), 'n_caidos': len(caidos),
-            'n_muerte_por_tiempo': len(tiempo),
-            'pct_exito': round(100 * len(leyes) / n, 1) if n else 0,
-            'periodo': [min(anios), max(anios)] if anios else None,
-            'embudo': embudo,
-            'top_autores': top_autores,
-            'bancadas': top_bancadas,
-            'cobertura_partido': {'con': con_p, 'sin': sin_p},
-            # --- intención ---
-            'tipologia': dict(sorted(tipologia.items(), key=lambda x: -x[1])),
-            'empuje': dict(sorted(empuje.items(), key=lambda x: -x[1])),
-            'n_vitrina': n_vitrina, 'n_honores': n_honores,
-            'pct_vitrina': round(100 * n_vitrina / n, 1) if n else 0,
+            'query': query,
+            'n_titulo': len(tit), 'n_texto': len(hits) - len(tit),
+            **st,                     # ④ estadísticas por defecto = solo título
+            'stats_todos': st_todos,  # ④ switch: título + contenido
             'flexible': flexible,
             'sinonimos': sinonimos,
             'expansion': expansion,

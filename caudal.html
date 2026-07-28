@@ -346,6 +346,14 @@
   .snip{font-size:.8rem; color:var(--ink2); line-height:1.55; margin:.3rem 0 .15rem; font-style:italic}
   .snip-hi{color:var(--ink); background:var(--teal-soft); font-style:normal; padding:0 3px; border-radius:3px; font-weight:600}
   .snip-load,.snip-none{color:var(--ink3); font-style:normal; font-size:.76rem}
+  .stat-switch{font-size:.8rem; color:var(--ink2); margin:.2rem 0 1rem; display:flex; align-items:center; gap:.4rem; flex-wrap:wrap}
+  .ss-btn{background:none; border:1px solid var(--border); color:var(--ink2); border-radius:7px; padding:.3rem .7rem; cursor:pointer; font:inherit; font-size:.8rem}
+  .ss-btn.on{background:var(--teal-soft); border-color:var(--teal-dim); color:var(--ink); font-weight:600}
+  .uni-tabs{display:flex; gap:.3rem; flex-wrap:wrap; margin:1rem 0 1.4rem; border-bottom:1px solid var(--border)}
+  .uni-tab{background:none; border:none; border-bottom:2px solid transparent; color:var(--ink2); padding:.55rem .9rem; cursor:pointer; font:inherit; font-size:.92rem; margin-bottom:-1px}
+  .uni-tab b{color:var(--ink3); font-weight:600}
+  .uni-tab.on{color:var(--ink); border-bottom-color:var(--teal)}
+  .uni-tab.on b{color:var(--teal)}
   .bd-link{color:var(--teal); cursor:none; text-decoration:underline; white-space:nowrap}
   /* bloqueo en comisión (ficha) */
   .bloq-card{background:linear-gradient(180deg,rgba(224,160,58,.09),transparent); border:1px solid rgba(224,160,58,.3); border-radius:9px; padding:1.1rem 1.2rem; margin:1rem 0}
@@ -449,7 +457,7 @@
 
   <nav id="topNav" hidden>
     <div class="e-nav-left">
-      <a href="dashboard.html" class="e-btn-back">← Volver</a>
+      <a href="dashboard.html" class="e-btn-back" id="navBack">← Volver</a>
       <span class="priv-badge">Privado</span>
       <button class="e-btn-logout" id="navLogout" type="button">Salir</button>
     </div>
@@ -486,7 +494,7 @@
           <button id="hgo">Buscar</button>
         </div>
         <div class="chips" id="hchips"></div>
-        <div class="home-hint">Esta búsqueda entra al pilar <b>Congreso</b>; <b>Regulatorio</b>, <b>Ejecutivo</b> y <b>Medios</b> tienen la suya. Los demás se encienden por etapas.</div>
+        <div class="home-hint">Esta búsqueda cruza los 4 pilares activos —<b>Congreso</b>, <b>Regulatorio</b>, <b>Ejecutivo</b> y <b>Medios</b>— y te los muestra por pestañas. Los demás se encienden por etapas.</div>
       </div>
       <div class="radar-cta" id="radar-cta">
         <span class="rc-ic">◎</span>
@@ -497,6 +505,15 @@
         <span class="rc-go">Abrir el radar →</span>
       </div>
       <div class="pillars" id="pillars"></div>
+    </div>
+
+    <!-- ===== Búsqueda universal (4 pilares) ===== -->
+    <div id="view-buscar" hidden>
+      <button class="pill-back" id="uniBack">← Portada de Caudal</button>
+      <div class="hero" style="padding-bottom:.4rem">
+        <div class="search"><input id="uq" type="text" placeholder="busca un tema en los 4 pilares…" autocomplete="off" /><button id="ugo">Buscar</button></div>
+      </div>
+      <div id="uni-results"></div>
     </div>
 
     <!-- ===== PILAR · Congreso ===== -->
@@ -855,9 +872,15 @@
       else if(id==='ejecutivo') showView('ejecutivo');
     });
   }
+  let _view='home';
   function showView(v){
-    ['home','congreso','regulatorio','ejecutivo','cliente','medios','radicados'].forEach(n=>{ const el=document.getElementById('view-'+n); if(el) el.hidden=(v!==n); });
+    _view=v;
+    ['home','buscar','congreso','regulatorio','ejecutivo','cliente','medios','radicados'].forEach(n=>{ const el=document.getElementById('view-'+n); if(el) el.hidden=(v!==n); });
     window.scrollTo(0,0);
+    // ← Volver de arriba: desde un pilar vuelve a la portada de Caudal; solo desde
+    // la portada sale al dashboard (el puente pilar↔portada↔sitio).
+    const nb=document.getElementById('navBack');
+    if(nb) nb.textContent=(v==='home')?'← Volver':'← Portada de Caudal';
     if(v==='congreso') requestAnimationFrame(()=>document.querySelectorAll('#view-congreso .mort-bar').forEach(x=>x.style.height=x.dataset.h+'%'));
     if(v==='regulatorio') regLoadStats();
     if(v==='ejecutivo') ejeLoadStats();
@@ -1157,6 +1180,78 @@
     RAD_DATA=d; radRender(d);
   }
 
+  /* ---------- Búsqueda universal · 4 pilares (Punto 2) ---------- */
+  const UNI_TABS=[['congreso','Congreso'],['regulatorio','Regulatorio'],['ejecutivo','Ejecutivo'],['medios','Medios']];
+  let _uniSeq=0, _uniData={};
+  async function uniSearch(query){
+    query=(query||'').trim(); if(!query) return;
+    const mine=++_uniSeq;
+    showView('buscar');
+    const uq=document.getElementById('uq'); if(uq) uq.value=query;
+    const box=document.getElementById('uni-results');
+    box.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Buscando en los 4 pilares <span class="dots"><span></span><span></span><span></span></span></div>';
+    const [cong,reg,eje,med]=await Promise.allSettled([
+      call({action:'tema', query, lectura:false}),
+      call({action:'sanciones', query}),
+      call({action:'ejecutivo', query}),
+      call({action:'medios', query}),
+    ]);
+    if(mine!==_uniSeq) return;
+    const V=x=>x&&x.status==='fulfilled'?x.value:null;
+    const cD=V(cong), rD=V(reg), eD=V(eje), mD=V(med);
+    const cR=cD&&cD.resumen;
+    const counts={
+      congreso: cR?((cR.intentos||[]).filter(i=>!i.match_texto).length):0,
+      regulatorio: rD?(rD.n||0):0, ejecutivo: eD?(eD.n||0):0, medios: mD?(mD.n||0):0,
+    };
+    _uniData={congreso:cD, regulatorio:rD, ejecutivo:eD, medios:mD, query, counts};
+    const first=(UNI_TABS.find(([k])=>counts[k]>0)||UNI_TABS[0])[0];
+    box.innerHTML=`
+      <div class="r-sub">Resultados para <b>${esc(query)}</b> en los pilares activos</div>
+      <div class="uni-tabs">${UNI_TABS.map(([k,n])=>`<button class="uni-tab" data-k="${k}">${n} <b>${fmt(counts[k])}</b></button>`).join('')}</div>
+      <div id="uni-tab-body"></div>`;
+    const tabs=[...box.querySelectorAll('.uni-tab')];
+    const show=k=>{ tabs.forEach(t=>t.classList.toggle('on',t.dataset.k===k)); document.getElementById('uni-tab-body').innerHTML=uniTabBody(k); wireUniTab(k); };
+    tabs.forEach(t=>t.onclick=()=>show(t.dataset.k));
+    show(first);
+  }
+  function uniMiniRow(it){
+    const rc=RES_COLOR[it.resultado]||'var(--gray)';
+    return `<div class="tl-item" data-id="${it.id}" data-tb="${it.tb||'pdly'}">
+      <span class="tl-year">${it.anio||'—'}</span>
+      <div class="tl-body"><div class="tl-titulo" title="${esc(it.titulo)}">${esc(shortTitle(it.titulo).slice(0,110))}</div>
+      <div class="tl-tags"><span class="doc-badge ${it.tb==='pal'?'pal':''}">${TIPO_DOC[it.tb||'pdly']}</span><span class="tl-res" style="color:${rc};border:1px solid ${rc}33;background:${rc}14">${RES_TXT[it.resultado]||'—'}</span></div></div></div>`;
+  }
+  function uniTabBody(k){
+    const d=_uniData[k], query=_uniData.query;
+    if(k==='congreso'){
+      const r=d&&d.resumen; if(!r||!(r.intentos||[]).length) return '<div class="err">Sin proyectos de ley para este tema.</div>';
+      const tit=(r.intentos||[]).filter(i=>!i.match_texto), txt=(r.intentos||[]).filter(i=>i.match_texto);
+      const rows=tit.slice(0,25).map(uniMiniRow).join('')||'<div class="cob-note">Ninguno lo lleva en el título.</div>';
+      return `<div class="cob-note" style="margin-bottom:.8rem"><b>${tit.length}</b> con «${esc(query)}» en el título · <b>${txt.length}</b> lo mencionan en el texto. <a class="bd-link" id="uni-cong-full">Ver el análisis completo (embudo, éxito, bancadas) →</a></div><div class="tl tl-scroll">${rows}</div>`;
+    }
+    const card={regulatorio:sancCard, ejecutivo:ejeCard, medios:medHeadCard}[k];
+    const l=(d&&d.resultados)||[];
+    const noun={regulatorio:['sanción','sanciones'], ejecutivo:['norma','normas'], medios:['titular','titulares']}[k];
+    const empty={regulatorio:'Sin sanciones para este término.', ejecutivo:'Sin normas del Ejecutivo para este término.', medios:'Sin cobertura de prensa reciente para este tema.'}[k];
+    if(!l.length) return `<div class="err">${empty}</div>`;
+    return `<div class="cob-note" style="margin-bottom:.8rem">${fmt(d.n)} ${d.n===1?noun[0]:noun[1]} · <a class="bd-link" id="uni-${k}-full">abrir en el pilar →</a></div><div class="sanc-list">${l.slice(0,40).map(card).join('')}</div>`;
+  }
+  function wireUniTab(k){
+    const query=_uniData.query;
+    if(k==='congreso'){
+      document.querySelectorAll('#uni-tab-body .tl-item').forEach(el=>el.onclick=()=>abrirProyecto(el.dataset.id,el.dataset.tb));
+      const f=document.getElementById('uni-cong-full'); if(f) f.onclick=()=>{ showView('congreso'); q.value=query; buscar(); };
+      return;
+    }
+    const f=document.getElementById(`uni-${k}-full`); if(!f) return;
+    f.onclick=()=>{
+      if(k==='regulatorio'){ showView('regulatorio'); const e=document.getElementById('rq'); if(e)e.value=query; REG.q=query; regBuscar(); }
+      if(k==='ejecutivo'){ showView('ejecutivo'); const e=document.getElementById('eq'); if(e)e.value=query; EJE.q=query; ejeBuscar(); }
+      if(k==='medios'){ showView('medios'); const e=document.getElementById('mq'); if(e)e.value=query; MED.q=query; medBuscar(); }
+    };
+  }
+
   function initHome(){
     renderPillars();
     regInit();
@@ -1164,12 +1259,20 @@
     medInit();
     cliInit();
     const rc=document.getElementById('radar-cta'); if(rc) rc.onclick=()=>showView('cliente');
+    // Punto 1: ← Volver de arriba es contextual (pilar → portada de Caudal)
+    const nb=document.getElementById('navBack'); if(nb) nb.onclick=(e)=>{ if(_view!=='home'){ e.preventDefault(); showView('home'); } };
+    // Punto 2: el buscador del home entra a la búsqueda UNIVERSAL (4 pilares)
     const hq=document.getElementById('hq'), hgo=document.getElementById('hgo');
-    const goHome=()=>{ const v=(hq&&hq.value||'').trim(); if(!v) return; showView('congreso'); q.value=v; buscar(); };
+    const goHome=()=>{ const v=(hq&&hq.value||'').trim(); if(!v) return; uniSearch(v); };
     if(hgo) hgo.onclick=goHome;
     if(hq) hq.addEventListener('keydown',e=>{ if(e.key==='Enter') goHome(); });
     const hc=document.getElementById('hchips');
-    if(hc) EJEMPLOS.forEach(t=>{ const ch=document.createElement('span'); ch.className='chip'; ch.textContent=t; ch.onclick=()=>{ showView('congreso'); q.value=t; buscar(); }; hc.appendChild(ch); });
+    if(hc) EJEMPLOS.forEach(t=>{ const ch=document.createElement('span'); ch.className='chip'; ch.textContent=t; ch.onclick=()=>uniSearch(t); hc.appendChild(ch); });
+    const uq=document.getElementById('uq'), ugo=document.getElementById('ugo');
+    const goUni=()=>{ const v=(uq&&uq.value||'').trim(); if(v) uniSearch(v); };
+    if(ugo) ugo.onclick=goUni;
+    if(uq) uq.addEventListener('keydown',e=>{ if(e.key==='Enter') goUni(); });
+    const ub=document.getElementById('uniBack'); if(ub) ub.onclick=()=>showView('home');
     const cb=document.getElementById('congresoBack'); if(cb) cb.onclick=()=>showView('home');
     const rcta=document.getElementById('radCta'); if(rcta) rcta.onclick=()=>showView('radicados');
     const rbk=document.getElementById('radBack'); if(rbk) rbk.onclick=()=>showView('congreso');
@@ -1285,9 +1388,12 @@
   if(cq) cq.addEventListener('keydown',e=>{if(e.key==='Enter') cbuscar();});
 
   let _seq=0;
+  // ④ estado del tema actual (para el switch de estadísticas sin re-consultar)
+  let _statMode='titulo', _temaR=null, _temaQ=''; let _lecturaData=null; const _snipCache={};
   async function buscar(){
     const query=q.value.trim(); if(!query) return;
     const mine=++_seq;
+    _statMode='titulo'; _temaR=null; _lecturaData=null; Object.keys(_snipCache).forEach(k=>delete _snipCache[k]);
     const landing=document.getElementById('landing'); if(landing) landing.style.display='none';
     results.style.display='block';
     results.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Consultando el histórico <span class="dots"><span></span><span></span><span></span></span></div>';
@@ -1297,13 +1403,12 @@
     catch(e){ if(mine===_seq) results.innerHTML='<div class="err">No se pudo consultar. Reintenta.</div>'; return; }
     if(mine!==_seq) return;
     const r=data.resumen;
-    if(!r||r.n_intentos===0){ results.innerHTML=`<div class="err">Sin resultados para «${esc(query)}». Prueba otra palabra (feminicidio, paridad, pensional…).</div>`; return; }
+    if(!r||!(r.intentos||[]).length){ results.innerHTML=`<div class="err">Sin resultados para «${esc(query)}». Prueba otra palabra (feminicidio, paridad, pensional…).</div>`; return; }
+    _temaR=r; _temaQ=query;
     renderResumen(query,r);
-    // lectura LLM en background (pre-fetch)
-    call({action:'tema',query,lectura:true}).then(d2=>{ if(mine===_seq && d2.lectura) renderLectura(d2.lectura); })
+    // lectura LLM en background (pre-fetch); se cachea para que el switch no la re-pida
+    call({action:'tema',query,lectura:true}).then(d2=>{ if(mine===_seq && d2.lectura){ _lecturaData=d2.lectura; renderLectura(d2.lectura); } })
       .catch(()=>{ const el=document.getElementById('lectura-body'); if(el) el.innerHTML='<div class="err" style="padding:.5rem;text-align:left">No se pudo generar la lectura.</div>'; });
-    const btnProf=document.getElementById('btn-profundizar');
-    if(btnProf) btnProf.onclick=()=>profundizar(query,mine);
   }
 
   async function profundizar(query,mine){
@@ -1317,7 +1422,7 @@
       return;
     }
     if(mine!==_seq) return;
-    if(d.lectura) renderLectura(d.lectura);
+    if(d.lectura){ _lecturaData=d.lectura; renderLectura(d.lectura); }
     const casos=(d.lectura&&d.lectura.casos_evidencia)||[];
     if(casosEl){
       casosEl.innerHTML = casos.length
@@ -1329,39 +1434,47 @@
     if(btn) btn.remove();
   }
 
-  // ④ trae los fragmentos del cuerpo de gaceta para los match ◈ "en el texto"
+  function fillSnip(key,s){
+    const el=results.querySelector(`#texto-list .snip[data-key="${key}"]`); if(!el) return;
+    if(s&&s.snippet){
+      let h=esc(s.snippet);
+      if(s.match){ const m=esc(s.match); if(m) h=h.split(m).join('<b class="snip-hi">'+m+'</b>'); }
+      el.innerHTML=h;
+    } else { el.innerHTML='<span class="snip-none">fragmento no disponible (gaceta aún no cosechada)</span>'; }
+  }
+  // ④ trae los fragmentos del cuerpo de gaceta para los match ◈ "en el texto".
+  // Cachea en _snipCache → el switch de estadísticas re-renderiza sin re-pedir.
   async function loadSnippets(query, txtInt){
     const rows=(txtInt||[]).slice(0,50);   // cap: 50 fragmentos por búsqueda
     if(!rows.length) return;
-    const ids=rows.map(it=>({id:it.id, tb:it.tb||'pdly'}));
+    const missing=[];
+    rows.forEach(it=>{ const key=(it.tb||'pdly')+':'+it.id; if(_snipCache[key]!==undefined) fillSnip(key,_snipCache[key]); else missing.push(it); });
+    if(!missing.length) return;
+    const ids=missing.map(it=>({id:it.id, tb:it.tb||'pdly'}));
     let d; try{ d=await call({action:'snippets', query, ids, max:50}); }catch(e){ return; }
-    const by={}; (d.snippets||[]).forEach(s=>by[(s.tb||'pdly')+':'+s.id]=s);
-    rows.forEach(it=>{
-      const key=(it.tb||'pdly')+':'+it.id;
-      const el=results.querySelector(`#texto-list .snip[data-key="${key}"]`);
-      if(!el) return;
-      const s=by[key];
-      if(s&&s.snippet){
-        let h=esc(s.snippet);
-        if(s.match){ const m=esc(s.match); if(m) h=h.split(m).join('<b class="snip-hi">'+m+'</b>'); }
-        el.innerHTML=h;
-      } else { el.innerHTML='<span class="snip-none">fragmento no disponible (gaceta aún no cosechada)</span>'; }
-    });
+    (d.snippets||[]).forEach(s=>{ const key=(s.tb||'pdly')+':'+s.id; _snipCache[key]=s; fillSnip(key,s); });
+    missing.forEach(it=>{ const key=(it.tb||'pdly')+':'+it.id; if(_snipCache[key]===undefined){ _snipCache[key]=null; fillSnip(key,null); } });
   }
 
   function renderResumen(query,r){
-    const cob=r.cobertura_partido||{con:0,sin:0}; const cobTot=cob.con+cob.sin;
-    const emb=r.embudo||{};
-    const bmax=(r.bancadas&&r.bancadas[0]&&r.bancadas[0][1])||1;
-    const banc=(r.bancadas||[]).map(([p,n])=>{
-      const c=pcolor(p);
-      return `<div class="banc-row"><span class="banc-dot" style="background:${c}"></span><span class="banc-name" title="${esc(p)}">${esc(p)}</span><span class="banc-bar"><span style="width:${100*n/bmax}%;background:${c}"></span></span><span class="banc-n">${n}</span></div>`;
-    }).join('');
     const intentos=r.intentos||[];
     // ④ split: la palabra en el TÍTULO (radicado o alias) vs solo en el CUERPO de
     // la gaceta (◈). Los de texto van en su propia sección, cada uno con el fragmento.
     const titInt=intentos.filter(it=>!it.match_texto);
     const txtInt=intentos.filter(it=>it.match_texto);
+    // ④ switch de estadísticas: por DEFECTO solo título (los proyectos reales del
+    // tema); 'todos' incluye los que solo lo mencionan en el texto (con su ruido de
+    // citas/boletines). Si no hay ninguno con la palabra en el título, cae a 'todos'.
+    const mode=(_statMode==='titulo' && titInt.length===0)?'todos':_statMode;
+    const S=(mode==='todos')?(r.stats_todos||r):r;
+    const chartInt=(mode==='todos')?intentos:titInt;
+    const cob=S.cobertura_partido||{con:0,sin:0}; const cobTot=cob.con+cob.sin;
+    const emb=S.embudo||{};
+    const bmax=(S.bancadas&&S.bancadas[0]&&S.bancadas[0][1])||1;
+    const banc=(S.bancadas||[]).map(([p,n])=>{
+      const c=pcolor(p);
+      return `<div class="banc-row"><span class="banc-dot" style="background:${c}"></span><span class="banc-name" title="${esc(p)}">${esc(p)}</span><span class="banc-bar"><span style="width:${100*n/bmax}%;background:${c}"></span></span><span class="banc-n">${n}</span></div>`;
+    }).join('');
     const tlRow=(it,inTexto)=>{
       const rc=RES_COLOR[it.resultado]||'var(--gray)';
       const key=(it.tb||'pdly')+':'+it.id;
@@ -1383,31 +1496,35 @@
     const txtList=txtInt.map(it=>tlRow(it,true)).join('');
 
     // desglose de empuje para la tira de intención (orden fijo)
-    const empD=r.empuje||{};
+    const empD=S.empuje||{};
     const empChips=['exitoso','empujado','vitrina','un_debate','sin_traccion']
       .filter(k=>empD[k]).map(k=>`<span class="ichip ichip-f" data-f="emp:${k}"><span class="emp-badge" style="color:${EMP_COLOR[k]};background:${EMP_COLOR[k]}14;border:1px solid ${EMP_COLOR[k]}44">${EMP_TXT[k]}</span><b>${empD[k]}</b></span>`).join('');
     const mortHTML=mortandadChart(STATS&&STATS.mortandad_por_anio_cuatrienio);
+    const nAll=(r.n_titulo||0)+(r.n_texto||0);
+    // ④ el switch solo tiene sentido si hay match de texto (si no, título==todos)
+    const swSwitch=txtInt.length?`<div class="stat-switch">Estadísticas de: <button class="ss-btn${mode==='titulo'?' on':''}" data-m="titulo">solo el título · ${r.n_titulo}</button><button class="ss-btn${mode==='todos'?' on':''}" data-m="todos">título + contenido · ${nAll}</button></div>`:'';
 
     results.innerHTML=`
-      <div class="r-sub">Tema: <b>${esc(query)}</b> · ${r.n_intentos} intentos · ${r.periodo?r.periodo[0]+'–'+r.periodo[1]:''}</div>
-      <div class="r-titular" id="r-titular">${r.n_intentos} intentos · ${r.n_leyes} ${r.n_leyes===1?'ley':'leyes'} · ${r.pct_exito}% de éxito</div>
+      <div class="r-sub">Tema: <b>${esc(query)}</b> · ${S.n_intentos} ${S.n_intentos===1?'proyecto':'proyectos'}${mode==='titulo'?' con la palabra en el título':' (título + contenido)'} · ${S.periodo?S.periodo[0]+'–'+S.periodo[1]:''}</div>
+      <div class="r-titular" id="r-titular">${S.n_intentos} ${S.n_intentos===1?'proyecto':'proyectos'} · ${S.n_leyes} ${S.n_leyes===1?'ley':'leyes'} · ${S.pct_exito}% de éxito</div>
+      ${swSwitch}
       ${r.flexible?`<div class="broaden" id="flex-hint"><b>Búsqueda flexible</b> · pocas coincidencias con todas tus palabras (<b>${r.flexible.n_estricto}</b>). Mostrando los <b>${r.flexible.n_total}</b> del término más específico: «<b>${esc((r.flexible.anchor||[]).join(', '))}</b>». <span class="bd-link" id="flex-toggle" data-mode="all">ver solo las exactas →</span></div>`:''}
       ${r.sinonimos?`<div class="broaden" id="syn-hint"><b>Búsqueda por tema</b> · el Congreso titula esto de varias formas, así que se incluyen: ${r.sinonimos.incluye.map(esc).join(' · ')}.</div>`:''}
       ${(r.expansion&&r.expansion.terminos&&r.expansion.terminos.length)?`<div class="broaden" id="exp-hint"><b>Búsqueda ampliada</b> · los títulos del Congreso rara vez usan tus palabras, así que también se buscó por: ${r.expansion.terminos.map(esc).join(' · ')}.</div>`:''}
 
       <div class="kpis">
-        <div class="kpi"><div class="n">${r.n_intentos}</div><div class="l">Intentos</div></div>
-        <div class="kpi ley"><div class="n">${r.n_leyes}</div><div class="l">Convertidos en ley</div></div>
-        <div class="kpi"><div class="n">${r.n_caidos}</div><div class="l">Caídos</div></div>
-        <div class="kpi time"><div class="n">${r.n_muerte_por_tiempo}</div><div class="l">Muertos por tiempo</div></div>
+        <div class="kpi"><div class="n">${S.n_intentos}</div><div class="l">${mode==='titulo'?'Proyectos':'Proyectos + menciones'}</div></div>
+        <div class="kpi ley"><div class="n">${S.n_leyes}</div><div class="l">Convertidos en ley</div></div>
+        <div class="kpi"><div class="n">${S.n_caidos}</div><div class="l">Caídos</div></div>
+        <div class="kpi time"><div class="n">${S.n_muerte_por_tiempo}</div><div class="l">Muertos por tiempo</div></div>
       </div>
 
       <div class="intencion">
-        <span class="ichip ichip-f on" data-f="all">Todos <b>${r.n_intentos}</b></span>
+        <span class="ichip ichip-f on" data-f="all">Todos <b>${S.n_intentos}</b></span>
         ${infoIcon(EMP_INFO)}
         ${empChips}
-        ${r.n_honores?`<span class="ichip ichip-f" data-f="tip:honores">Honores <b>${r.n_honores}</b></span>`:''}
-        ${r.pct_vitrina?`<span class="ichip" style="border:none;color:var(--ink3)">· ${r.pct_vitrina}% de vitrina</span>`:''}
+        ${S.n_honores?`<span class="ichip ichip-f" data-f="tip:honores">Honores <b>${S.n_honores}</b></span>`:''}
+        ${S.pct_vitrina?`<span class="ichip" style="border:none;color:var(--ink3)">· ${S.pct_vitrina}% de vitrina</span>`:''}
       </div>
 
       <div class="lectura">
@@ -1420,11 +1537,11 @@
       <div class="panel wide" style="margin-bottom:1.2rem"><h3>Embudo del trámite · cómo cae en cada fase ${infoIcon(EMBUDO_INFO)}</h3>${funnel(emb)}</div>
 
       <div class="charts">
-        <div class="panel"><h3>Intentos presentados por año</h3>${yearBars(intentos)}</div>
+        <div class="panel"><h3>Intentos presentados por año</h3>${yearBars(chartInt)}</div>
         <div class="panel"><h3>Composición del tema</h3>
-          <div class="seg-sub">Tipo de proyecto</div>${segBar(r.tipologia,TIP_COLOR,TIP_TXT)}
-          <div class="seg-sub">Empuje</div>${segBar(r.empuje,EMP_COLOR,EMP_TXT)}</div>
-        <div class="panel"><h3>Éxito por comisión</h3>${comisionChart(intentos)}</div>
+          <div class="seg-sub">Tipo de proyecto</div>${segBar(S.tipologia,TIP_COLOR,TIP_TXT)}
+          <div class="seg-sub">Empuje</div>${segBar(S.empuje,EMP_COLOR,EMP_TXT)}</div>
+        <div class="panel"><h3>Éxito por comisión</h3>${comisionChart(chartInt)}</div>
         <div class="panel"><h3>Mortandad por año de cuatrienio</h3><div id="mort-box">${mortHTML}</div></div>
       </div>
 
@@ -1449,6 +1566,13 @@
     tlItems.forEach(el=>el.onclick=()=>abrirProyecto(el.dataset.id,el.dataset.tb));
     results.querySelectorAll('#texto-list .tl-item').forEach(el=>el.onclick=()=>abrirProyecto(el.dataset.id,el.dataset.tb));
     loadSnippets(query, txtInt);   // ④ trae los fragmentos del cuerpo de gaceta (lazy)
+    // ④ switch de estadísticas (solo título ↔ título+contenido): re-renderiza con
+    // el otro set SIN re-consultar (lectura y snippets salen de caché).
+    results.querySelectorAll('.ss-btn').forEach(b=>b.onclick=()=>{ if(b.dataset.m===_statMode) return; _statMode=b.dataset.m; renderResumen(_temaQ, _temaR); });
+    // btn profundizar cableado aquí (no en buscar) para que el switch lo re-cablee
+    const bp=document.getElementById('btn-profundizar'); if(bp) bp.onclick=()=>profundizar(query,_seq);
+    // lectura ya cargada (pre-fetch previo o re-render por el switch) → píntala directo
+    if(_lecturaData) renderLectura(_lecturaData);
     // filtro clickeable: clasifica los intentos por empuje/tipología
     const tlHead=document.getElementById('tl-head');
     results.querySelectorAll('.ichip-f').forEach(ch=>ch.onclick=()=>{
